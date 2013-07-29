@@ -4172,7 +4172,11 @@ bool LLAgent::teleportCore(bool is_local)
         LL_INFOS("Teleport") << "Non-local, setting teleport state to TELEPORT_START" << LL_ENDL;
         gAgent.setTeleportState( LLAgent::TELEPORT_START );
     }
-    make_ui_sound("UISndTeleportOut");
+
+    if (gSavedSettings.getBOOL("AlchemyPlayTeleportSound"))
+    {
+        make_ui_sound("UISndTeleportOut");
+    }
 
     return true;
 }
