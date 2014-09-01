@@ -1315,6 +1315,10 @@ Note: OTHER_TYPING_TIMEOUT must be > ME_TYPING_TIMEOUT for proper operation of t
         // Save im_info so that removeTypingIndicator can be properly called because a timeout has occurred
         mImFromId = from_id;
 
+        LLFloaterIMContainer* im_container = LLFloaterIMContainer::getInstance();
+        if (im_container)
+            im_container->updateTypingState(mSessionID, true);
+
         // Update speaker
         LLIMSpeakerMgr* speaker_mgr = LLIMModel::getInstance()->getSpeakerManager(mSessionID);
         if ( speaker_mgr )
@@ -1329,6 +1333,10 @@ void LLFloaterIMSession::removeTypingIndicator(const LLUUID& from_id)
     if (mOtherTyping)
     {
         mOtherTyping = false;
+
+        LLFloaterIMContainer* im_container = LLFloaterIMContainer::getInstance();
+        if (im_container)
+            im_container->updateTypingState(mSessionID, false);
 
         if (from_id.notNull())
         {

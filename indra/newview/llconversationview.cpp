@@ -86,6 +86,7 @@ LLConversationViewSession::LLConversationViewSession(const LLConversationViewSes
     mContainer(p.container),
     mItemPanel(NULL),
     mCallIconLayoutPanel(NULL),
+    mTypingIconLayoutPanel(nullptr),
     mSessionTitle(NULL),
     mSpeakingIndicator(NULL),
     mVoiceClientObserver(NULL),
@@ -226,6 +227,7 @@ bool LLConversationViewSession::postBuild()
     addChild(mItemPanel);
 
     mCallIconLayoutPanel = mItemPanel->getChild<LLPanel>("call_icon_panel");
+    mTypingIconLayoutPanel = mItemPanel->getChild<LLPanel>("typing_icon_panel");
     mSessionTitle = mItemPanel->getChild<LLTextBox>("conversation_title");
 
     mActiveVoiceChannelConnection = LLVoiceChannel::setCurrentVoiceChannelChangedCallback(boost::bind(&LLConversationViewSession::onCurrentVoiceSessionChanged, this, _1));
@@ -500,6 +502,12 @@ void LLConversationViewSession::showVoiceIndicator(bool visible)
     requestArrange();
 }
 
+void LLConversationViewSession::showTypingIndicator(bool visible)
+{
+    mTypingIconLayoutPanel->setVisible(visible);
+    requestArrange();
+}
+
 void LLConversationViewSession::refresh()
 {
     // Refresh the session view from its model data
@@ -671,13 +679,13 @@ bool LLConversationViewParticipant::postBuild()
 
 void LLConversationViewParticipant::draw()
 {
-    static LLUIColor sFgColor = LLUIColorTable::instance().getColor("MenuItemEnabledColor", DEFAULT_WHITE);
-    static LLUIColor sFgDisabledColor = LLUIColorTable::instance().getColor("MenuItemDisabledColor", DEFAULT_WHITE);
-    static LLUIColor sHighlightFgColor = LLUIColorTable::instance().getColor("MenuItemHighlightFgColor", DEFAULT_WHITE);
-    static LLUIColor sHighlightBgColor = LLUIColorTable::instance().getColor("MenuItemHighlightBgColor", DEFAULT_WHITE);
-    static LLUIColor sFlashBgColor = LLUIColorTable::instance().getColor("MenuItemFlashBgColor", DEFAULT_WHITE);
-    static LLUIColor sFocusOutlineColor = LLUIColorTable::instance().getColor("InventoryFocusOutlineColor", DEFAULT_WHITE);
-    static LLUIColor sMouseOverColor = LLUIColorTable::instance().getColor("InventoryMouseOverColor", DEFAULT_WHITE);
+    static LLUIColor sFgColor = LLUIColorTable::instance().getColor("MenuItemEnabledColor", LLColor4::white);
+    static LLUIColor sFgDisabledColor = LLUIColorTable::instance().getColor("MenuItemDisabledColor", LLColor4::white);
+    static LLUIColor sHighlightFgColor = LLUIColorTable::instance().getColor("MenuItemHighlightFgColor", LLColor4::white);
+    static LLUIColor sHighlightBgColor = LLUIColorTable::instance().getColor("MenuItemHighlightBgColor", LLColor4::white);
+    static LLUIColor sFlashBgColor = LLUIColorTable::instance().getColor("MenuItemFlashBgColor", LLColor4::white);
+    static LLUIColor sFocusOutlineColor = LLUIColorTable::instance().getColor("InventoryFocusOutlineColor", LLColor4::white);
+    static LLUIColor sMouseOverColor = LLUIColorTable::instance().getColor("InventoryMouseOverColor", LLColor4::white);
     static LLUIColor sFriendColor = LLUIColorTable::instance().getColor("ConversationFriendColor");
 
     const bool show_context = (getRoot() ? getRoot()->getShowSelectionContext() : false);

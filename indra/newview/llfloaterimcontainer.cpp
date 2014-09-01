@@ -2336,6 +2336,17 @@ void LLFloaterIMContainer::updateSpeakBtnState()
     mSpeakBtn->setEnabled(LLAgent::isActionAllowed("speak"));
 }
 
+void LLFloaterIMContainer::updateTypingState(const LLUUID& session_id, bool typing)
+{
+    //Finds the conversation line item to flash using the session_id
+    LLConversationViewSession * widget = dynamic_cast<LLConversationViewSession *>(get_ptr_in_map(mConversationsWidgets, session_id));
+
+    if (widget)
+    {
+        widget->showTypingIndicator(typing);
+    }
+}
+
 bool LLFloaterIMContainer::isConversationLoggingAllowed()
 {
     return gSavedPerAccountSettings.getS32("KeepConversationLogTranscripts") > 0;

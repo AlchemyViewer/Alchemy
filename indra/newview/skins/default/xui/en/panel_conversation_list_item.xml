@@ -60,8 +60,26 @@
              layout="topleft"
              left="0"
              name="selected_icon"
-             top="3"
+             top="4"
              width="18" />
+        </layout_panel>
+        <layout_panel
+         auto_resize="false"
+         user_resize="false"        
+         height="24"
+         mouse_opaque="false"
+         name="typing_icon_panel"
+         visible="false"
+         width="18">
+            <icon
+             height="16"
+             follows="top|right|left"
+             image_name="Conv_typing"
+             layout="topleft"
+             left="2"
+             name="typing_icon"
+             top="4"
+             width="16" />
         </layout_panel>
         <layout_panel
          auto_resize="true"
