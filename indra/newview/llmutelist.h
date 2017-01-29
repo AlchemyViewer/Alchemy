@@ -132,6 +132,11 @@ public:
     // call this method on logout to save everything.
     void cache(const LLUUID& agent_id);
 
+    // group functions
+    BOOL addGroup(const LLUUID& group_id);
+    BOOL removeGroup(const LLUUID& group_id);
+    BOOL isGroupMuted(const LLUUID& group_id);
+
 private:
     bool loadFromFile(const std::string& filename);
     bool saveToFile(const std::string& filename);
