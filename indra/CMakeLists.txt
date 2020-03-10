@@ -6,8 +6,8 @@
 ## 3.8 added VS_DEBUGGER_WORKING_DIRECTORY support
 cmake_minimum_required(VERSION 3.8.0 FATAL_ERROR)
 
-set(ROOT_PROJECT_NAME "SecondLife" CACHE STRING
-    "The root project/makefile/solution name. Defaults to SecondLife.")
+set(ROOT_PROJECT_NAME "Alchemy" CACHE STRING
+    "The root project/makefile/solution name. Defaults to Alchemy.")
 project(${ROOT_PROJECT_NAME})
 
 set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")

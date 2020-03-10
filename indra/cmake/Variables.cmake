@@ -209,7 +209,7 @@ endif (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
 # Default deploy grid
 set(GRID agni CACHE STRING "Target Grid")
 
-set(VIEWER_CHANNEL "Second Life Test" CACHE STRING "Viewer Channel Name")
+set(VIEWER_CHANNEL "Alchemy Test" CACHE STRING "Viewer Channel Name")
 
 set(ENABLE_SIGNING OFF CACHE BOOL "Enable signing the viewer")
 set(SIGNING_IDENTITY "" CACHE STRING "Specifies the signing identity to use, if necessary.")

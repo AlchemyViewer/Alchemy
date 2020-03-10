@@ -91,7 +91,7 @@ def get_default_platform(dummy):
             }[sys.platform]
 
 DEFAULT_SRCTREE = os.path.dirname(sys.argv[0])
-CHANNEL_VENDOR_BASE = 'Second Life'
+CHANNEL_VENDOR_BASE = 'Alchemy'
 RELEASE_CHANNEL = CHANNEL_VENDOR_BASE + ' Release'
 
 BASE_ARGUMENTS=[
@@ -117,7 +117,7 @@ BASE_ARGUMENTS=[
     dict(name='buildtype', description='Build type (i.e. Debug, Release, RelWithDebInfo).', default=None),
     dict(name='bundleid',
          description="""The Mac OS X Bundle identifier.""",
-         default="com.secondlife.indra.viewer"),
+         default="org.alchemyviewer.viewer"),
     dict(name='channel',
          description="""The channel to use for updates, packaging, settings name, etc.""",
          default='CHANNEL UNSET'),
