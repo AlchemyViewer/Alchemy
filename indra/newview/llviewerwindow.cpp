@@ -2480,48 +2480,16 @@ void LLViewerWindow::setNormalControlsVisible( BOOL visible )
 
 void LLViewerWindow::setMenuBackgroundColor(bool god_mode, bool dev_grid)
 {
-    LLSD args;
     LLColor4 new_bg_color;
 
 	// god more important than project, proj more important than grid
     if ( god_mode ) 
     {
-		if ( LLGridManager::getInstance()->isInProductionGrid() )
-		{
-			new_bg_color = LLUIColorTable::instance().getColor( "MenuBarGodBgColor" );
-		}
-		else
-		{
-			new_bg_color = LLUIColorTable::instance().getColor( "MenuNonProductionGodBgColor" );
-		}
+		new_bg_color = LLUIColorTable::instance().getColor("MenuBarGodBgColor");
     }
     else
     {
-        switch (LLVersionInfo::getViewerMaturity())
-        {
-        case LLVersionInfo::TEST_VIEWER:
-            new_bg_color = LLUIColorTable::instance().getColor( "MenuBarTestBgColor" );
-            break;
-
-        case LLVersionInfo::PROJECT_VIEWER:
-            new_bg_color = LLUIColorTable::instance().getColor( "MenuBarProjectBgColor" );
-            break;
-            
-        case LLVersionInfo::BETA_VIEWER:
-            new_bg_color = LLUIColorTable::instance().getColor( "MenuBarBetaBgColor" );
-            break;
-            
-        case LLVersionInfo::RELEASE_VIEWER:
-            if(!LLGridManager::getInstance()->isInProductionGrid())
-            {
-                new_bg_color = LLUIColorTable::instance().getColor( "MenuNonProductionBgColor" );
-            }
-            else 
-            {
-                new_bg_color = LLUIColorTable::instance().getColor( "MenuBarBgColor" );
-            }
-            break;
-        }
+        new_bg_color = LLUIColorTable::instance().getColor("MenuBarBgColor");
     }
     
     if(gMenuBarView)
