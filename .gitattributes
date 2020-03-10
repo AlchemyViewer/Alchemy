@@ -24,15 +24,29 @@
 *.ico      binary
 *.svg      text
 *.eps      binary
-*.j2k binary
-*.j2c binary
-*.icns binary
-*.bmp binary
-*.BMP binary
+*.tga      binary
+*.j2k      binary
+*.j2c      binary
+*.icns     binary
+*.bmp      binary
+*.BMP      binary
 
 # Scripts
 *.sh       text eol=lf
 *.bat      text eol=crlf
+
+# Viewer Files
+*.db2      binary
+*.llm      binary
+
+# Fonts
+*.ttf      binary
+*.otf      binary
+
+# Mac
+*.nib      binary
+
+*.exe      binary
 
 # Exclude files from exporting
 .gitattributes export-ignore
