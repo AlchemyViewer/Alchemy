@@ -17,16 +17,14 @@
 #include "llviewerprecompiledheaders.h"
 #include "llagent.h"
 #include "llagentcamera.h"
-#include "lldaycyclemanager.h"
 #include "llvoavatarself.h"
-#include "llwlparammanager.h"
 
 #include "rlvextensions.h"
 #include "rlvhandler.h"
 #include "rlvhelper.h"
 
 // ============================================================================
-
+/*
 class RlvWindLightControl
 {
 public:
@@ -370,7 +368,7 @@ bool RlvWindLight::setValue(const std::string& strRlvName, const std::string& st
 	}
 	return false;
 }
-
+*/
 // ============================================================================
 
 std::map<std::string, S16> RlvExtGetSet::m_DbgAllowed;
@@ -441,21 +439,21 @@ bool RlvExtGetSet::processCommand(const RlvCommand& rlvCmd, ERlvCmdRet& eRet)
 		}
 		else if ("env" == strBehaviour)
 		{
-			bool fError = false;
-			if ( ("get" == strGetSet) && (RLV_TYPE_REPLY == rlvCmd.getParamType()) )
-			{
-				RlvUtil::sendChatReply(rlvCmd.getParam(), RlvWindLight::instance().getValue(strSetting, fError));
-				eRet = (!fError) ? RLV_RET_SUCCESS : RLV_RET_FAILED_UNKNOWN;
-				return true;
-			}
-			else if ( ("set" == strGetSet) && (RLV_TYPE_FORCE == rlvCmd.getParamType()) )
-			{
-				if (!gRlvHandler.hasBehaviourExcept(RLV_BHVR_SETENV, rlvCmd.getObjectID()))
-					eRet = (RlvWindLight::instance().setValue(strSetting, rlvCmd.getOption())) ? RLV_RET_SUCCESS : RLV_RET_FAILED_UNKNOWN;
-				else
-					eRet = RLV_RET_FAILED_LOCK;
-				return true;
-			}
+			//bool fError = false;
+			//if ( ("get" == strGetSet) && (RLV_TYPE_REPLY == rlvCmd.getParamType()) )
+			//{
+			//	RlvUtil::sendChatReply(rlvCmd.getParam(), RlvWindLight::instance().getValue(strSetting, fError));
+			//	eRet = (!fError) ? RLV_RET_SUCCESS : RLV_RET_FAILED_UNKNOWN;
+			//	return true;
+			//}
+			//else if ( ("set" == strGetSet) && (RLV_TYPE_FORCE == rlvCmd.getParamType()) )
+			//{
+			//	if (!gRlvHandler.hasBehaviourExcept(RLV_BHVR_SETENV, rlvCmd.getObjectID()))
+			//		eRet = (RlvWindLight::instance().setValue(strSetting, rlvCmd.getOption())) ? RLV_RET_SUCCESS : RLV_RET_FAILED_UNKNOWN;
+			//	else
+			//		eRet = RLV_RET_FAILED_LOCK;
+			//	return true;
+			//}
 		}
 	}
 	else if ("setrot" == rlvCmd.getBehaviour())
