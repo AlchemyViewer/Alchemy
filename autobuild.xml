@@ -3427,17 +3427,17 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
     <key>package_description</key>
     <map>
       <key>canonical_repo</key>
-      <string>https://bitbucket.org/lindenlab/viewer</string>
+      <string>https://git.alchemyviewer.org/alchemy</string>
       <key>copyright</key>
-      <string>Copyright (c) 2014, Linden Research, Inc.</string>
+      <string>Copyright (c) 2020, Alchemy Development Group</string>
       <key>description</key>
-      <string>Second Life Viewer</string>
+      <string>Alchemy Viewer</string>
       <key>license</key>
       <string>LGPL</string>
       <key>license_file</key>
       <string>docs/LICENSE-source.txt</string>
       <key>name</key>
-      <string>Second Life Viewer</string>
+      <string>Alchemy Viewer</string>
       <key>platforms</key>
       <map>
         <key>common</key>
@@ -3457,7 +3457,7 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
                 <array>
                   <string>-DCMAKE_BUILD_TYPE:STRING=RelWithDebInfo</string>
                   <string>-DADDRESS_SIZE:STRING=$AUTOBUILD_ADDRSIZE</string>
-                  <string>-DROOT_PROJECT_NAME:STRING=SecondLife</string>
+                  <string>-DROOT_PROJECT_NAME:STRING=Alchemy</string>
                   <string>-DINSTALL_PROPRIETARY=TRUE</string>
                 </array>
               </map>
@@ -3478,7 +3478,7 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
                 <array>
                   <string>-DCMAKE_BUILD_TYPE:STRING=RelWithDebInfo</string>
                   <string>-DADDRESS_SIZE:STRING=$AUTOBUILD_ADDRSIZE</string>
-                  <string>-DROOT_PROJECT_NAME:STRING=SecondLife</string>
+                  <string>-DROOT_PROJECT_NAME:STRING=Alchemy</string>
                   <string>-DINSTALL_PROPRIETARY=FALSE</string>
                 </array>
               </map>
@@ -3498,7 +3498,7 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
                 <array>
                   <string>-DCMAKE_BUILD_TYPE:STRING=Release</string>
                   <string>-DADDRESS_SIZE:STRING=$AUTOBUILD_ADDRSIZE</string>
-                  <string>-DROOT_PROJECT_NAME:STRING=SecondLife</string>
+                  <string>-DROOT_PROJECT_NAME:STRING=Alchemy</string>
                   <string>-DINSTALL_PROPRIETARY=TRUE</string>
                 </array>
               </map>
@@ -3519,7 +3519,7 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
                 <array>
                   <string>-DCMAKE_BUILD_TYPE:STRING=Release</string>
                   <string>-DADDRESS_SIZE:STRING=$AUTOBUILD_ADDRSIZE</string>
-                  <string>-DROOT_PROJECT_NAME:STRING=SecondLife</string>
+                  <string>-DROOT_PROJECT_NAME:STRING=Alchemy</string>
                   <string>-DINSTALL_PROPRIETARY=FALSE</string>
                 </array>
               </map>
@@ -3547,7 +3547,7 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
                   <string>-configuration</string>
                   <string>RelWithDebInfo</string>
                   <string>-project</string>
-                  <string>SecondLife.xcodeproj</string>
+                  <string>Alchemy.xcodeproj</string>
                 </array>
               </map>
               <key>configure</key>
@@ -3578,7 +3578,7 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
                   <string>-configuration</string>
                   <string>RelWithDebInfo</string>
                   <string>-project</string>
-                  <string>SecondLife.xcodeproj</string>
+                  <string>Alchemy.xcodeproj</string>
                 </array>
               </map>
               <key>configure</key>
@@ -3603,7 +3603,7 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
                   <string>-configuration</string>
                   <string>Release</string>
                   <string>-project</string>
-                  <string>SecondLife.xcodeproj</string>
+                  <string>Alchemy.xcodeproj</string>
                 </array>
               </map>
               <key>configure</key>
@@ -3632,7 +3632,7 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
                   <string>-configuration</string>
                   <string>Release</string>
                   <string>-project</string>
-                  <string>SecondLife.xcodeproj</string>
+                  <string>Alchemy.xcodeproj</string>
                 </array>
               </map>
               <key>configure</key>
@@ -3782,7 +3782,7 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
               <map>
                 <key>arguments</key>
                 <array>
-                  <string>SecondLife.sln</string>
+                  <string>Alchemy.sln</string>
                 </array>
                 <key>command</key>
                 <string>devenv</string>
@@ -3815,7 +3815,7 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
               <map>
                 <key>arguments</key>
                 <array>
-                  <string>SecondLife.sln</string>
+                  <string>Alchemy.sln</string>
                 </array>
                 <key>command</key>
                 <string>msbuild.exe</string>
@@ -3854,7 +3854,7 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
               <map>
                 <key>arguments</key>
                 <array>
-                  <string>SecondLife.sln</string>
+                  <string>Alchemy.sln</string>
                 </array>
                 <key>command</key>
                 <string>devenv</string>
@@ -3885,7 +3885,7 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
               <map>
                 <key>arguments</key>
                 <array>
-                  <string>SecondLife.sln</string>
+                  <string>Alchemy.sln</string>
                 </array>
                 <key>command</key>
                 <string>msbuild.exe</string>
