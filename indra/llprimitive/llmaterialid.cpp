@@ -35,11 +35,6 @@
 
 const LLMaterialID LLMaterialID::null;
 
-LLMaterialID::LLMaterialID()
-{
-	clear();
-}
-
 LLMaterialID::LLMaterialID(const LLSD& pMaterialID)
 {
 	llassert(pMaterialID.isBinary());
@@ -56,59 +51,9 @@ LLMaterialID::LLMaterialID(const void* pMemory)
 	set(pMemory);
 }
 
-LLMaterialID::LLMaterialID(const LLMaterialID& pOtherMaterialID)
-{
-	copyFromOtherMaterialID(pOtherMaterialID);
-}
-
 LLMaterialID::LLMaterialID(const LLUUID& lluid)
 {
 	set(lluid.mData);
-}
-
-LLMaterialID::~LLMaterialID()
-{
-}
-
-bool LLMaterialID::operator == (const LLMaterialID& pOtherMaterialID) const
-{
-	return (compareToOtherMaterialID(pOtherMaterialID) == 0);
-}
-
-bool LLMaterialID::operator != (const LLMaterialID& pOtherMaterialID) const
-{
-	return (compareToOtherMaterialID(pOtherMaterialID) != 0);
-}
-
-bool LLMaterialID::operator < (const LLMaterialID& pOtherMaterialID) const
-{
-	return (compareToOtherMaterialID(pOtherMaterialID) < 0);
-}
-
-bool LLMaterialID::operator <= (const LLMaterialID& pOtherMaterialID) const
-{
-	return (compareToOtherMaterialID(pOtherMaterialID) <= 0);
-}
-
-bool LLMaterialID::operator > (const LLMaterialID& pOtherMaterialID) const
-{
-	return (compareToOtherMaterialID(pOtherMaterialID) > 0);
-}
-
-bool LLMaterialID::operator >= (const LLMaterialID& pOtherMaterialID) const
-{
-	return (compareToOtherMaterialID(pOtherMaterialID) >= 0);
-}
-
-LLMaterialID& LLMaterialID::operator = (const LLMaterialID& pOtherMaterialID)
-{
-	copyFromOtherMaterialID(pOtherMaterialID);
-	return (*this);
-}
-
-bool LLMaterialID::isNull() const
-{
-	return (compareToOtherMaterialID(LLMaterialID::null) == 0);
 }
 
 const U8* LLMaterialID::get() const
@@ -161,28 +106,8 @@ std::ostream& operator<<(std::ostream& s, const LLMaterialID &material_id)
 	return s;
 }
 
-
 void LLMaterialID::parseFromBinary (const LLSD::Binary& pMaterialID)
 {
 	llassert(pMaterialID.size() == (MATERIAL_ID_SIZE * sizeof(U8)));
 	memcpy(mID, &pMaterialID[0], MATERIAL_ID_SIZE * sizeof(U8));
-}
-
-void LLMaterialID::copyFromOtherMaterialID(const LLMaterialID& pOtherMaterialID)
-{
-	memcpy(mID, pOtherMaterialID.get(), MATERIAL_ID_SIZE * sizeof(U8));
-}
-
-int LLMaterialID::compareToOtherMaterialID(const LLMaterialID& pOtherMaterialID) const
-{
-	int retVal = 0;
-
-	for (unsigned int i = 0U; (retVal == 0) && (i < static_cast<unsigned int>(MATERIAL_ID_SIZE / sizeof(U32))); ++i)
-	{
-		const U32 *thisValue = reinterpret_cast<const U32*>(&get()[i * sizeof(U32)]);
-		const U32 *otherValue = reinterpret_cast<const U32*>(&pOtherMaterialID.get()[i * sizeof(U32)]);
-		retVal = ((*thisValue < *otherValue) ? -1 : ((*thisValue > *otherValue) ? 1 : 0));
-	}
-
-	return retVal;
 }
