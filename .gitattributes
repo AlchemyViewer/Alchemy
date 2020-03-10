@@ -1,9 +1,14 @@
-*          text=auto
+*          text eol=lf
 
 # Sources
 *.cpp      text diff=cpp
 *.h        text diff=cpp
 *.py       text diff=python
+
+# Visual Studio
+*.sln text eol=crlf
+*.vcproj text eol=crlf
+*.vcxproj text eol=crlf
 
 # Documents
 *.txt      text
@@ -19,6 +24,11 @@
 *.ico      binary
 *.svg      text
 *.eps      binary
+*.j2k binary
+*.j2c binary
+*.icns binary
+*.bmp binary
+*.BMP binary
 
 # Scripts
 *.sh       text eol=lf
