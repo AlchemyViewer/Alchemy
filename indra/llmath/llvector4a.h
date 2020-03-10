@@ -92,10 +92,14 @@ public:
 	// CONSTRUCTORS 
 	////////////////////////////////////
 	
+#if SHOW_ASSERT
 	LLVector4a()
 	{ //DO NOT INITIALIZE -- The overhead is completely unnecessary
 		ll_assert_aligned(this,16);
 	}
+#else
+	LLVector4a() = default;
+#endif
 	
 	LLVector4a(F32 x, F32 y, F32 z, F32 w = 0.f)
 	{
@@ -240,7 +244,7 @@ public:
 	// Normalize this vector with respect to the x, y, and z components only. Accurate only to 10-12 bits of precision. W component is destroyed
 	// Same as above except substitutes default vector contents if the vector is non-finite or degenerate due to zero length.
 	//
-	inline void normalize3fast_checked(LLVector4a* d = 0);
+	inline void normalize3fast_checked(LLVector4a* d = nullptr);
 
 	// Return true if this vector is normalized with respect to x,y,z up to tolerance
 	inline LLBool32 isNormalized3( F32 tolerance = 1e-3 ) const;
@@ -315,8 +319,6 @@ public:
 	////////////////////////////////////	
 	
 	// Do NOT add aditional operators without consulting someone with SSE experience
-	inline const LLVector4a& operator= ( const LLVector4a& rhs );
-	
 	inline const LLVector4a& operator= ( const LLQuad& rhs );
 
 	inline operator LLQuad() const;	
@@ -324,6 +326,9 @@ public:
 private:
 	LLQuad mQ;
 } LL_ALIGN_POSTFIX(16);
+
+static_assert(std::is_trivial<LLVector4a>::value, "LLVector4a must be a trivial type");
+static_assert(std::is_standard_layout<LLVector4a>::value, "LLVector4a must be a standard layout type");
 
 inline void update_min_max(LLVector4a& min, LLVector4a& max, const LLVector4a& p)
 {

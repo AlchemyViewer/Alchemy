@@ -34,23 +34,10 @@
 typedef __m128	LLQuad;
 
 
-#if LL_WINDOWS
-#pragma warning(push)
-#pragma warning( disable : 4800 3 ) // Disable warning about casting int to bool for this class.
-#if defined(_MSC_VER) && (_MSC_VER < 1500)
-// VC++ 2005 is missing these intrinsics
-// __forceinline is MSVC specific and attempts to override compiler inlining judgment. This is so
-// even in debug builds this call is a NOP.
-__forceinline const __m128 _mm_castsi128_ps( const __m128i a ) { return reinterpret_cast<const __m128&>(a); }
-__forceinline const __m128i _mm_castps_si128( const __m128 a ) { return reinterpret_cast<const __m128i&>(a); }
-#endif // _MSC_VER
-
-#endif // LL_WINDOWS
-
 class LLBool32
 {
 public:
-	inline LLBool32() {}
+	inline LLBool32() = default;
 	inline LLBool32(int rhs) : m_bool(rhs) {}
 	inline LLBool32(unsigned int rhs) : m_bool(rhs) {}
 	inline LLBool32(bool rhs) { m_bool = static_cast<const int>(rhs); }
@@ -63,14 +50,10 @@ private:
 	int m_bool;
 };
 
-#if LL_WINDOWS
-#pragma warning(pop)
-#endif
-
 class LLSimdScalar
 {
 public:
-	inline LLSimdScalar() {}
+	inline LLSimdScalar() = default;
 	inline LLSimdScalar(LLQuad q) 
 	{ 
 		mQ = q; 
@@ -120,5 +103,9 @@ public:
 private:
 	LLQuad mQ;
 };
+static_assert(std::is_trivial<LLBool32>::value, "LLBool32 must be a trivial type");
+static_assert(std::is_standard_layout<LLBool32>::value, "LLBool32 must be a standard layout type");
+static_assert(std::is_trivial<LLSimdScalar>::value, "LLSimdScalar must be a trivial type");
+static_assert(std::is_standard_layout<LLSimdScalar>::value, "LLSimdScalar must be a standard layout type");
 
 #endif //LL_SIMD_TYPES_H
