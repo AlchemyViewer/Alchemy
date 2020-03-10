@@ -59,6 +59,10 @@
 #include "llui.h"
 #include "llviewermenu.h"
 #include "lluictrlfactory.h"
+// [RLVa:KB] - Checked: 2010-02-27 (RLVa-1.2.0b)
+#include "rlvactions.h"
+#include "rlvcommon.h"
+// [/RLVa:KB]
 
 //
 // Globals
@@ -78,7 +82,10 @@ private:
 };
 
 
-extern void send_chat_from_viewer(const std::string& utf8_out_text, EChatType type, S32 channel);
+//extern void send_chat_from_viewer(const std::string& utf8_out_text, EChatType type, S32 channel);
+// [RLVa:KB] - Checked: 2010-02-27 (RLVa-0.2.2)
+extern void send_chat_from_viewer(std::string utf8_out_text, EChatType type, S32 channel);
+// [/RLVa:KB]
 
 //
 // Functions
@@ -472,7 +479,11 @@ void LLChatBar::onInputEditorKeystroke( LLLineEditor* caller, void* userdata )
 
 	S32 length = raw_text.length();
 
-	if( (length > 0) && (raw_text[0] != '/') )  // forward slash is used for escape (eg. emote) sequences
+//	if( (length > 0) && (raw_text[0] != '/') )  // forward slash is used for escape (eg. emote) sequences
+// [RLVa:KB] - Checked: 2010-03-26 (RLVa-1.2.0b) | Modified: RLVa-1.0.0d
+	// RELEASE-RLVa: [SL-2.0.0] This entire class appears to be dead/non-functional?
+	if ( (length > 0) && (raw_text[0] != '/') && (!RlvActions::hasBehaviour(RLV_BHVR_REDIRCHAT)) )
+// [/RLVa:KB]
 	{
 		gAgent.startTyping();
 	}
@@ -583,6 +594,16 @@ void LLChatBar::sendChatFromViewer(const LLWString &wtext, EChatType type, BOOL 
 	{
 		utf8_text = utf8str_truncate(utf8_text, MAX_STRING - 1);
 	}
+
+// [RLVa:KB] - Checked: 2010-03-27 (RLVa-1.2.0b) | Modified: RLVa-1.2.0b
+	// RELEASE-RLVa: [SL-2.0.0] This entire class appears to be dead/non-functional?
+	if ( (0 == channel) && (RlvActions::isRlvEnabled()) )
+	{
+		// Adjust the (public) chat "volume" on chat and gestures (also takes care of playing the proper animation)
+		type = RlvActions::checkChatVolume(type);
+		animate &= !RlvActions::hasBehaviour( (!RlvUtil::isEmote(utf8_text)) ? RLV_BHVR_REDIRCHAT : RLV_BHVR_REDIREMOTE );
+	}
+// [/RLVa:KB]
 
 	// Don't animate for chats people can't hear (chat to scripts)
 	if (animate && (channel == 0))

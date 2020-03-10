@@ -39,6 +39,9 @@
 #include "llviewerobject.h"
 #include "llviewerwindow.h"
 #include "llfloatertools.h"
+// [RLVa:KB] - Checked: RLVa-2.1.0
+#include "rlvactions.h"
+// [/RLVa:KB]
 
 //
 // Member functions
@@ -89,6 +92,13 @@ void LLToolFace::pickCallback(const LLPickInfo& pick_info)
 			// ...clicked on an avatar, so don't do anything
 			return;
 		}
+
+// [RLVa:KB] - Checked: RLVa-1.3.0
+		if ( (RlvActions::isRlvEnabled()) && ((!RlvActions::canEdit(hit_obj)) || (!RlvActions::canInteract(hit_obj, pick_info.mObjectOffset))) )
+		{
+			return;
+		}
+// [/RLVa:KB]
 
 		// ...clicked on a world object, try to pick the appropriate face
 

@@ -213,6 +213,10 @@
 #include "llpaneltopinfobar.h"
 #include "llcleanup.h"
 
+// [RLVa:KB] - Checked: 2010-03-31 (RLVa-1.2.0c)
+#include "rlvhandler.h"
+// [/RLVa:KB]
+
 #if LL_WINDOWS
 #include <tchar.h> // For Unicode conversion methods
 #endif
@@ -4187,6 +4191,13 @@ LLViewerObject* LLViewerWindow::cursorIntersect(S32 mouse_x, S32 mouse_y, F32 de
 		found = gPipeline.lineSegmentIntersectInHUD(mh_start, mh_end, pick_transparent,
 													face_hit, intersection, uv, normal, tangent);
 
+// [RLVa:KB] - Checked: 2010-03-31 (RLVa-1.2.0c) | Modified: RLVa-1.2.0c
+		if ( (rlv_handler_t::isEnabled()) && (found) &&
+			 (LLToolCamera::getInstance()->hasMouseCapture()) && (gKeyboard->currentMask(TRUE) & MASK_ALT) )
+		{
+			found = NULL;
+		}
+// [/RLVa:KB]
 		if (!found) // if not found in HUD, look in world:
 		{
 			found = gPipeline.lineSegmentIntersectInWorld(mw_start, mw_end, pick_transparent, pick_rigged,
@@ -4196,6 +4207,23 @@ LLViewerObject* LLViewerWindow::cursorIntersect(S32 mouse_x, S32 mouse_y, F32 de
 				gDebugRaycastIntersection = *intersection;
 			}
 		}
+
+// [RLVa:KB] - Checked: RLVa-1.2.0
+		if ( (found) && ((gTeleportDisplay) || ((rlv_handler_t::isEnabled()) && (gRlvHandler.hasBehaviour(RLV_BHVR_INTERACT)))) )
+		{
+			// Allow picking if:
+			//   - the drag-and-drop tool is active (allows inventory offers)
+			//   - the camera tool is active
+			//   - the pie tool is active *and* we picked our own avie (allows "mouse steering" and the self pie menu)
+			LLTool* pCurTool = LLToolMgr::getInstance()->getCurrentTool();
+			if ( (LLToolDragAndDrop::getInstance() != pCurTool) && 
+			     (!LLToolCamera::getInstance()->hasMouseCapture()) &&
+			     ((LLToolPie::getInstance() != pCurTool) || (gAgent.getID() != found->getID())) )
+			{
+				found = NULL;
+			}
+		}
+// [/RLVa:KB]
 	}
 
 	return found;
@@ -5633,6 +5661,16 @@ void LLPickInfo::fetchResults()
 									&intersection, &uv, &normal, &tangent, &start, &end);
 	
 	mPickPt = mMousePt;
+
+// [RLVa:KB] - Checked: RLVa-2.2 (@setoverlay)
+	if ( (gRlvHandler.isEnabled()) && (hit_object) && (!hit_object->isHUDAttachment()) )
+	{
+		if (gRlvHandler.hitTestOverlay(mMousePt))
+		{
+			hit_object = nullptr;
+		}
+	}
+// [/RLVa:KB]
 
 	U32 te_offset = face_hit > -1 ? face_hit : 0;
 

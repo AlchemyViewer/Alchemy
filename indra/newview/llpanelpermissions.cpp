@@ -70,6 +70,11 @@
 #include "llavatarnamecache.h"
 #include "llcachename.h"
 
+// [RLVa:KB] - Checked: 2010-08-25 (RLVa-1.2.2a)
+#include "llslurl.h"
+#include "rlvactions.h"
+#include "rlvcommon.h"
+// [/RLVa:KB]
 
 U8 string_value_to_click_action(std::string p_value);
 std::string click_action_to_string_value( U8 action);
@@ -388,62 +393,78 @@ void LLPanelPermissions::refresh()
 	// Update creator text field
 	getChildView("Creator:")->setEnabled(TRUE);
 	std::string creator_app_link;
-	LLSelectMgr::getInstance()->selectGetCreator(mCreatorID, creator_app_link);
+// [RLVa:KB] - Checked: 2010-11-02 (RLVa-1.2.2a) | Modified: RLVa-1.2.2a
+	const bool creators_identical = LLSelectMgr::getInstance()->selectGetCreator(mCreatorID, creator_app_link);
+	std::string owner_app_link;
+	const bool owners_identical = LLSelectMgr::getInstance()->selectGetOwner(mOwnerID, owner_app_link);
+// [/RLVa:KB]
+//	LLSelectMgr::getInstance()->selectGetCreator(mCreatorID, creator_app_link);
 
 	// Style for creator and owner links (both group and agent)
-	LLStyle::Params style_params;
-	LLColor4 link_color = LLUIColorTable::instance().getColor("HTMLLinkColor");
-	style_params.color = link_color;
-	style_params.readonly_color = link_color;
-	style_params.is_link = true; // link will be added later
-	const LLFontGL* fontp = mLabelCreatorName->getFont();
-	style_params.font.name = LLFontGL::nameFromFont(fontp);
-	style_params.font.size = LLFontGL::sizeFromFont(fontp);
-	style_params.font.style = "UNDERLINE";
+	//LLStyle::Params style_params;
+	//LLColor4 link_color = LLUIColorTable::instance().getColor("HTMLLinkColor");
+	//style_params.color = link_color;
+	//style_params.readonly_color = link_color;
+	//style_params.is_link = true; // link will be added later
+	//const LLFontGL* fontp = mLabelCreatorName->getFont();
+	//style_params.font.name = LLFontGL::nameFromFont(fontp);
+	//style_params.font.size = LLFontGL::sizeFromFont(fontp);
+	//style_params.font.style = "UNDERLINE";
 
 	LLAvatarName av_name;
-	style_params.link_href = creator_app_link;
-	if (LLAvatarNameCache::get(mCreatorID, &av_name))
+	//style_params.link_href = creator_app_link;
+// [RLVa:KB] - Checked: RLVa-2.0.1
+	// Only anonymize the creator if all of the selection was created by the same avie who's also the owner or they're a nearby avie
+	if ( (RlvActions::isRlvEnabled()) && (creators_identical) && (!RlvActions::canShowName(RlvActions::SNC_DEFAULT, mCreatorID)) && ( (mCreatorID == mOwnerID) || (RlvUtil::isNearbyAgent(mCreatorID))) )
 	{
-		updateCreatorName(mCreatorID, av_name, style_params);
+		creator_app_link = LLSLURL("agent", mCreatorID, "rlvanonym").getSLURLString();
 	}
-	else
-	{
-		if (mCreatorCacheConnection.connected())
-		{
-			mCreatorCacheConnection.disconnect();
-		}
-		mLabelCreatorName->setText(LLTrans::getString("None"));
-		mCreatorCacheConnection = LLAvatarNameCache::get(mCreatorID, boost::bind(&LLPanelPermissions::updateCreatorName, this, _1, _2, style_params));
-	}
-	getChild<LLAvatarIconCtrl>("Creator Icon")->setValue(mCreatorID);
-	getChild<LLAvatarIconCtrl>("Creator Icon")->setVisible(TRUE);
+	mLabelCreatorName->setText(creator_app_link);
+// [/RLVa:KB]
+//	if (LLAvatarNameCache::get(mCreatorID, &av_name))
+//	{
+//		updateCreatorName(mCreatorID, av_name, style_params);
+//	}
+//	else
+//	{
+//		if (mCreatorCacheConnection.connected())
+//		{
+//			mCreatorCacheConnection.disconnect();
+//		}
+//		mLabelCreatorName->setText(LLTrans::getString("None"));
+//		mCreatorCacheConnection = LLAvatarNameCache::get(mCreatorID, boost::bind(&LLPanelPermissions::updateCreatorName, this, _1, _2, style_params));
+//	}
+//	getChild<LLAvatarIconCtrl>("Creator Icon")->setValue(mCreatorID);
+//	getChild<LLAvatarIconCtrl>("Creator Icon")->setVisible(TRUE);
 	mLabelCreatorName->setEnabled(TRUE);
 
 	// Update owner text field
 	getChildView("Owner:")->setEnabled(TRUE);
 
-	std::string owner_app_link;
-	const BOOL owners_identical = LLSelectMgr::getInstance()->selectGetOwner(mOwnerID, owner_app_link);
+//	std::string owner_app_link;
+//	const BOOL owners_identical = LLSelectMgr::getInstance()->selectGetOwner(mOwnerID, owner_app_link);
 
 
 	if (LLSelectMgr::getInstance()->selectIsGroupOwned())
 	{
 		// Group owned already displayed by selectGetOwner
-		LLGroupMgrGroupData* group_data = LLGroupMgr::getInstance()->getGroupData(mOwnerID);
-		if (group_data && group_data->isGroupPropertiesDataComplete())
-		{
-			style_params.link_href = owner_app_link;
-			mLabelOwnerName->setText(group_data->mName, style_params);
-			getChild<LLGroupIconCtrl>("Owner Group Icon")->setIconId(group_data->mInsigniaID);
-			getChild<LLGroupIconCtrl>("Owner Group Icon")->setVisible(TRUE);
-			getChild<LLUICtrl>("Owner Icon")->setVisible(FALSE);
-		}
-		else
-		{
-			// Triggers refresh
-			LLGroupMgr::getInstance()->sendGroupPropertiesRequest(mOwnerID);
-		}
+// [RLVa:KB] - Checked: RLVa-2.0.1
+		childSetValue("Owner Name", owner_app_link);
+// [/RLVa:KB]
+//		LLGroupMgrGroupData* group_data = LLGroupMgr::getInstance()->getGroupData(mOwnerID);
+//		if (group_data && group_data->isGroupPropertiesDataComplete())
+//		{
+//			style_params.link_href = owner_app_link;
+//			mLabelOwnerName->setText(group_data->mName, style_params);
+//			getChild<LLGroupIconCtrl>("Owner Group Icon")->setIconId(group_data->mInsigniaID);
+//			getChild<LLGroupIconCtrl>("Owner Group Icon")->setVisible(TRUE);
+//			getChild<LLUICtrl>("Owner Icon")->setVisible(FALSE);
+//		}
+//		else
+//		{
+//			// Triggers refresh
+//			LLGroupMgr::getInstance()->sendGroupPropertiesRequest(mOwnerID);
+//		}
 	}
 	else
 	{
@@ -464,24 +485,31 @@ void LLPanelPermissions::refresh()
 			owner_id = mLastOwnerID;
 		}
 
-		style_params.link_href = owner_app_link;
-		if (LLAvatarNameCache::get(owner_id, &av_name))
+//		style_params.link_href = owner_app_link;
+// [RLVa:KB] - Checked: RLVa-2.0.1
+		if ( (RlvActions::isRlvEnabled()) && (owners_identical) && (!RlvActions::canShowName(RlvActions::SNC_DEFAULT, mOwnerID)) )
 		{
-			updateOwnerName(owner_id, av_name, style_params);
+			owner_app_link = LLSLURL("agent", mOwnerID, "rlvanonym").getSLURLString();
 		}
-		else
-		{
-			if (mOwnerCacheConnection.connected())
-			{
-				mOwnerCacheConnection.disconnect();
-			}
-			mLabelOwnerName->setText(LLTrans::getString("None"));
-			mOwnerCacheConnection = LLAvatarNameCache::get(owner_id, boost::bind(&LLPanelPermissions::updateOwnerName, this, _1, _2, style_params));
-		}
-
-		getChild<LLAvatarIconCtrl>("Owner Icon")->setValue(owner_id);
-		getChild<LLAvatarIconCtrl>("Owner Icon")->setVisible(TRUE);
-		getChild<LLUICtrl>("Owner Group Icon")->setVisible(FALSE);
+		mLabelOwnerName->setText(owner_app_link);
+// [/RLVa:KB]
+//		if (LLAvatarNameCache::get(owner_id, &av_name))
+//		{
+//			updateOwnerName(owner_id, av_name, style_params);
+//		}
+//		else
+//		{
+//			if (mOwnerCacheConnection.connected())
+//			{
+//				mOwnerCacheConnection.disconnect();
+//			}
+//			mLabelOwnerName->setText(LLTrans::getString("None"));
+//			mOwnerCacheConnection = LLAvatarNameCache::get(owner_id, boost::bind(&LLPanelPermissions::updateOwnerName, this, _1, _2, style_params));
+//		}
+//
+//		getChild<LLAvatarIconCtrl>("Owner Icon")->setValue(owner_id);
+//		getChild<LLAvatarIconCtrl>("Owner Icon")->setVisible(TRUE);
+//		getChild<LLUICtrl>("Owner Group Icon")->setVisible(FALSE);
 	}
 	mLabelOwnerName->setEnabled(TRUE);
 

@@ -95,6 +95,14 @@
 #include "llprogressview.h"
 #include "llvocache.h"
 #include "llvopartgroup.h"
+// [SL:KB] - Patch: Appearance-Misc | Checked: 2013-02-12 (Catznip-3.4)
+#include "llappearancemgr.h"
+// [/SL:KB]
+// [RLVa:KB] - Checked: 2010-05-03 (RLVa-1.2.0g)
+#include "rlvactions.h"
+#include "rlvhandler.h"
+// [/RLVa:KB]
+
 #include "llweb.h"
 #include "llfloatertexturefetchdebugger.h"
 #include "llspellcheck.h"
@@ -487,7 +495,11 @@ void idle_afk_check()
 {
 	// check idle timers
 	F32 current_idle = gAwayTriggerTimer.getElapsedTimeF32();
-	F32 afk_timeout  = gSavedSettings.getS32("AFKTimeout");
+// [RLVa:KB] - Checked: 2010-05-03 (RLVa-1.2.0g) | Modified: RLVa-1.2.0g
+	// Enforce an idle time of 30 minutes if @allowidle=n restricted
+	F32 afk_timeout = (!gRlvHandler.hasBehaviour(RLV_BHVR_ALLOWIDLE)) ? gSavedSettings.getS32("AFKTimeout") : 60 * 30;
+// [/RLVa:KB]
+//	F32 afk_timeout  = gSavedSettings.getS32("AFKTimeout");
 	if (afk_timeout && (current_idle > afk_timeout) && ! gAgent.getAFK())
 	{
 		LL_INFOS("IdleAway") << "Idle more than " << afk_timeout << " seconds: automatically changing to Away status" << LL_ENDL;
@@ -2206,7 +2218,14 @@ void errorCallback(const std::string &error_string)
 	// static info file.
 	LLAppViewer::instance()->writeDebugInfo();
 
+// [SL:KB] - Patch: Viewer-Build | Checked: Catznip-2.4
+#if !LL_RELEASE_FOR_DOWNLOAD && LL_WINDOWS
+	DebugBreak();
+#else
 	LLError::crashAndLoop(error_string);
+#endif // LL_RELEASE_WITH_DEBUG_INFO && LL_WINDOWS
+// [/SL:KB]
+//	LLError::crashAndLoop(error_string);
 }
 
 void LLAppViewer::initLoggingAndGetLastDuration()
@@ -2866,6 +2885,21 @@ bool LLAppViewer::initConfiguration()
 		LLEventPumps::instance().obtain("LLControlGroup").post(LLSDMap("init", *ki));
 	}
 
+// [RLVa:KB] - Patch: RLVa-2.1.0
+	if (LLControlVariable* pControl = gSavedSettings.getControl(RLV_SETTING_MAIN))
+	{
+		if ( (pControl->getValue().asBoolean()) && (pControl->hasUnsavedValue()) )
+		{
+			pControl->resetToDefault();
+			pControl->setValue(false);
+
+			std::ostringstream msg;
+			msg << LLTrans::getString("RLVaToggleMessageLogin", LLSD().with("[STATE]", LLTrans::getString("RLVaToggleDisabled")));
+			OSMessageBox(msg.str(), LLStringUtil::null, OSMB_OK);
+		}
+	}
+// [/RLVa:KB]
+
 	return true; // Config was successful.
 }
 
@@ -3111,16 +3145,28 @@ LLSD LLAppViewer::getViewerInfo() const
 	LLViewerRegion* region = gAgent.getRegion();
 	if (region)
 	{
-		LLVector3d pos = gAgent.getPositionGlobal();
-		info["POSITION"] = ll_sd_from_vector3d(pos);
-		info["POSITION_LOCAL"] = ll_sd_from_vector3(gAgent.getPosAgentFromGlobal(pos));
-		info["REGION"] = gAgent.getRegion()->getName();
-		info["HOSTNAME"] = gAgent.getRegion()->getHost().getHostName();
-		info["HOSTIP"] = gAgent.getRegion()->getHost().getString();
+// [RLVa:KB] - Checked: 2014-02-24 (RLVa-1.4.10)
+		if (RlvActions::canShowLocation())
+		{
+// [/RLVa:KB]
+			LLVector3d pos = gAgent.getPositionGlobal();
+			info["POSITION"] = ll_sd_from_vector3d(pos);
+			info["POSITION_LOCAL"] = ll_sd_from_vector3(gAgent.getPosAgentFromGlobal(pos));
+			info["REGION"] = gAgent.getRegion()->getName();
+			info["HOSTNAME"] = gAgent.getRegion()->getHost().getHostName();
+			info["HOSTIP"] = gAgent.getRegion()->getHost().getString();
+//			info["SERVER_VERSION"] = gLastVersionChannel;
+			LLSLURL slurl;
+			LLAgentUI::buildSLURL(slurl);
+			info["SLURL"] = slurl.getSLURLString();
+// [RLVa:KB] - Checked: 2014-02-24 (RLVa-1.4.10)
+		}
+		else
+		{
+			info["REGION"] = RlvStrings::getString(RLV_STRING_HIDDEN_REGION);
+		}
 		info["SERVER_VERSION"] = gLastVersionChannel;
-		LLSLURL slurl;
-		LLAgentUI::buildSLURL(slurl);
-		info["SLURL"] = slurl.getSLURLString();
+// [/RLVa:KB]
 	}
 
 	// CPU
@@ -3148,6 +3194,9 @@ LLSD LLAppViewer::getViewerInfo() const
 	}
 #endif
 
+// [RLVa:KB] - Checked: 2010-04-18 (RLVa-1.2.0)
+	info["RLV_VERSION"] = (rlv_handler_t::isEnabled()) ? RlvStrings::getVersionAbout() : "(disabled)";
+// [/RLVa:KB]
 	info["OPENGL_VERSION"] = (const char*)(glGetString(GL_VERSION));
 
     // Settings
@@ -3304,7 +3353,10 @@ std::string LLAppViewer::getViewerInfoString(bool default_string) const
 	}
 	if (info.has("REGION"))
 	{
-		support << "\n\n" << LLTrans::getString("AboutPosition", args, default_string);
+// [RLVa:KB] - Checked: 2014-02-24 (RLVa-1.4.10)
+		support << "\n\n" << LLTrans::getString( (RlvActions::canShowLocation()) ? "AboutPosition" : "AboutPositionRLVShowLoc", args, default_string);
+// [/RLVa:KB]
+//		support << "\n\n" << LLTrans::getString("AboutPosition", args);
 	}
 	support << "\n\n" << LLTrans::getString("AboutSystem", args, default_string);
 	support << "\n";
@@ -5388,6 +5440,11 @@ void LLAppViewer::disconnectViewer()
 
 	// close inventory interface, close all windows
 	LLSidepanelInventory::cleanup();
+
+// [SL:KB] - Patch: Appearance-Misc | Checked: 2013-02-12 (Catznip-3.4)
+	// Destroying all objects below will trigger attachment detaching code and attempt to remove the COF links for them
+	LLAppearanceMgr::instance().setAttachmentInvLinkEnable(false);
+// [/SL:KB]
 
 	gAgentWearables.cleanup();
 	gAgentCamera.cleanup();

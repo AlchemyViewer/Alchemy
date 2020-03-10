@@ -57,6 +57,10 @@ public:
 	bool 			buildEnabledOrActive();
     bool            canAccessMarketplace();
 	void			toggleBuildMode(const LLSD& sdname);
+// [RLVa:KB] - Checked: RLVa-2.1.0
+	void			enterBuildMode(bool verify_canedit = false);
+	void			leaveBuildMode();
+// [/RLVa:KB]
 	void			toggleMarketplace(const LLSD& sdname);
 	
 	/* Determines if we are in Build mode or not. */

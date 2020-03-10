@@ -84,6 +84,12 @@ public:
 	void setUseUsernames(bool use);
 
 	void insert(const LLUUID& agent_id, const LLAvatarName& av_name);
+
+// [RLVa:KB] - Checked: 2010-12-08 (RLVa-1.4.0a) | Added: RLVa-1.2.2c
+	bool getForceDisplayNames();
+	void setForceDisplayNames(bool force);
+// [/RLVa:KB]
+
 	void erase(const LLUUID& agent_id);
 
 	// A way to find agent id by UUID, very slow, also unreliable
@@ -149,6 +155,11 @@ private:
     // Use the People API (modern) for fetching name if true. Use the old legacy protocol if false.
     // For testing, there's a UsePeopleAPI setting that can be flipped (must restart viewer).
     bool mUsePeopleAPI;
+
+// [RLVa:KB] - Checked: 2010-12-08 (RLVa-1.4.0a) | Added: RLVa-1.2.2c
+    // RLVa override for display names
+    bool mRlvForceDisplayNames = false;
+// [/RLVa:KB]
 
     // Base lookup URL for name service.
     // On simulator, loaded from indra.xml

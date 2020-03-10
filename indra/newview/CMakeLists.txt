@@ -722,6 +722,16 @@ set(viewer_SOURCE_FILES
     llxmlrpctransaction.cpp
     noise.cpp
     pipeline.cpp
+    rlvactions.cpp
+    rlvhandler.cpp
+    rlvhelper.cpp
+    rlvcommon.cpp
+    rlvlocks.cpp
+    rlvinventory.cpp
+    rlvextensions.cpp
+    rlvfloaters.cpp
+    rlvmodifiers.cpp
+    rlvui.cpp
     )
 
 set(VIEWER_BINARY_NAME "secondlife-bin" CACHE STRING
@@ -1340,6 +1350,17 @@ set(viewer_HEADER_FILES
     macmain.h
     noise.h
     pipeline.h
+    rlvactions.h
+    rlvdefines.h
+    rlvhandler.h
+    rlvhelper.h
+    rlvcommon.h
+    rlvlocks.h
+    rlvinventory.h
+    rlvextensions.h
+    rlvfloaters.h
+    rlvmodifiers.h
+    rlvui.h
     roles_constants.h
     VertexCache.h
     VorbisFramework.h
@@ -1744,7 +1765,7 @@ if (WINDOWS)
         # *TODO -reenable this once we get server usage sorted out
         LINK_FLAGS "/debug /NODEFAULTLIB:LIBCMT /SUBSYSTEM:WINDOWS /LARGEADDRESSAWARE"
         LINK_FLAGS_DEBUG "/NODEFAULTLIB:\"LIBCMT;LIBCMTD;MSVCRT\" /INCREMENTAL:NO /LARGEADDRESSAWARE"
-        LINK_FLAGS_RELEASE "/FORCE:MULTIPLE /MAP\"secondlife-bin.MAP\" /OPT:REF /LARGEADDRESSAWARE"
+        LINK_FLAGS_RELEASE "/MAP\"secondlife-bin.MAP\" /OPT:REF /LARGEADDRESSAWARE"
         )
 
     if(USE_PRECOMPILED_HEADERS)
@@ -1866,6 +1887,21 @@ if (WINDOWS)
       SLPlugin
       windows-crash-logger
     )
+
+    # sets the 'working directory' for debugging from visual studio.
+    if (NOT UNATTENDED)
+        add_custom_command(
+            TARGET ${VIEWER_BINARY_NAME} POST_BUILD
+            COMMAND ${CMAKE_SOURCE_DIR}/tools/vstool/vstool.exe
+            ARGS
+              --solution
+              ${CMAKE_BINARY_DIR}/${CMAKE_PROJECT_NAME}.sln
+              --workingdir
+              ${VIEWER_BINARY_NAME}
+              "${CMAKE_CURRENT_SOURCE_DIR}"
+            COMMENT "Setting the ${VIEWER_BINARY_NAME} working directory for debugging."
+            )
+    endif (NOT UNATTENDED)
 
     # sets the 'working directory' for debugging from visual studio.
     # Condition for version can be moved to requirements once build agents will be updated (see TOOL-3865)

@@ -57,7 +57,10 @@
 #include "llviewerjoystick.h"
 #include "llviewermenu.h"
 #include "llviewerparcelmgr.h"
-
+// [RLVa:KB] - Checked: RLVa-2.1.0
+#include "llfloatertools.h"
+#include "rlvactions.h"
+// [/RLVa:KB]
 
 // Used when app not active to avoid processing hover.
 LLTool*			gToolNull	= NULL;
@@ -262,7 +265,10 @@ bool LLToolMgr::inEdit()
 
 bool LLToolMgr::canEdit()
 {
-	return LLViewerParcelMgr::getInstance()->allowAgentBuild();
+// [RLVa:KB] - Patch: RLVa-2.1.0
+	return LLViewerParcelMgr::getInstance()->allowAgentBuild() && RlvActions::canBuild();
+// [/RLVa:KB]
+//	return LLViewerParcelMgr::getInstance()->allowAgentBuild();
 }
 
 bool LLToolMgr::buildEnabledOrActive()
@@ -272,17 +278,43 @@ bool LLToolMgr::buildEnabledOrActive()
 
 void LLToolMgr::toggleBuildMode(const LLSD& sdname)
 {
-	const std::string& param = sdname.asString();
+//	const std::string& param = sdname.asString();
+//
+//	LLFloaterReg::toggleInstanceOrBringToFront("build");
+//	if (param == "build" && !canEdit())
+//	{
+//		return;
+//	}
+//
+//	bool build_visible = LLFloaterReg::instanceVisible("build");
+//	if (build_visible)
+//	{
+// [RLVa:KB] - Checked: RLVa-2.1.0
+	if (gFloaterTools)
+	{
+		if (gFloaterTools->isShown())
+			leaveBuildMode();
+		else
+			enterBuildMode("build" == sdname.asString());
+	}
+}
 
-	LLFloaterReg::toggleInstanceOrBringToFront("build");
-	if (param == "build" && !canEdit())
+void LLToolMgr::enterBuildMode(bool verify_canedit /*=false*/)
+{
+	if (!gFloaterTools)
+		return;
+	if (!gFloaterTools->isShown())
+		gFloaterTools->openFloater();
+	if (!gFloaterTools->isFrontmost())
+		gFloaterTools->setVisibleAndFrontmost(true);
+
+	if (verify_canedit && !canEdit())
 	{
 		return;
 	}
 
-	bool build_visible = LLFloaterReg::instanceVisible("build");
-	if (build_visible)
 	{
+// [/RLVa:KB]
 		ECameraMode camMode = gAgentCamera.getCameraMode();
 		if (CAMERA_MODE_MOUSELOOK == camMode ||	CAMERA_MODE_CUSTOMIZE_AVATAR == camMode)
 		{
@@ -321,7 +353,20 @@ void LLToolMgr::toggleBuildMode(const LLSD& sdname)
 		LLViewerJoystick::getInstance()->setNeedsReset();
 
 	}
-	else
+// [RLVa:KB] - Checked: RLVa-2.1.0
+}
+// [/RLVa:KB]
+//	else
+// [RLVa:KB] - Checked: RLVa-2.1.0
+void LLToolMgr::leaveBuildMode()
+{
+	if ( (!gFloaterTools) || (!gFloaterTools->getVisible()) )
+	{
+		return;
+	}
+
+	gFloaterTools->closeFloater();
+// [/RLVa:KB]
 	{
 		if (gSavedSettings.getBOOL("EditCameraMovement"))
 		{

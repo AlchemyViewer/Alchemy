@@ -49,7 +49,6 @@
 #include <map>
 #include <set>
 
-
 // Time-to-live for a temp cache entry.
 const F64 TEMP_CACHE_ENTRY_LIFETIME = 60.0;
 // Maximum time an unrefreshed cache entry is allowed.
@@ -680,10 +679,30 @@ LLAvatarNameCache::callback_connection_t LLAvatarNameCache::getNameCallback(cons
 	return connection;
 }
 
+// [RLVa:KB] - Checked: 2010-12-08 (RLVa-1.4.0a) | Added: RLVa-1.2.2c
+bool LLAvatarNameCache::getForceDisplayNames()
+{
+	return mRlvForceDisplayNames;
+}
+
+void LLAvatarNameCache::setForceDisplayNames(bool force)
+{
+	mRlvForceDisplayNames = force;
+	if ( (!LLAvatarName::useDisplayNames()) && (force) )
+	{
+		LLAvatarName::setUseDisplayNames(true);
+	}
+}
+// [/RLVa:KB]
 
 void LLAvatarNameCache::setUseDisplayNames(bool use)
 {
+// [RLVa:KB] - Checked: 2010-12-08 (RLVa-1.4.0a) | Added: RLVa-1.2.2c
+	// We need to force the use of the "display names" cache when @shownames=n restricted (and disallow toggling it)
+	use |= getForceDisplayNames();
+// [/RLVa:KB]
 	if (use != LLAvatarName::useDisplayNames())
+
 	{
 		LLAvatarName::setUseDisplayNames(use);
 		mUseDisplayNamesSignal();
