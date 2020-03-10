@@ -40,6 +40,9 @@ static const char * const TEST_FILENAME("llslurl_test.xml");
 
 }
 
+class LLViewerFetchedTexture : public LLRefCount
+{};
+
 //
 // Stub implementation for LLTrans
 //
@@ -69,7 +72,7 @@ bool RlvUtil::isNearbyRegion(const std::string& strRegion)
 	return false;
 }
 
-RlvHandler::RlvHandler() : m_pGCTimer(NULL), m_pWLSnapshot(NULL)
+RlvHandler::RlvHandler() : m_pGCTimer(NULL)
 {
 	// Array auto-initialization to 0 is non-standard? (Compiler warning in VC-8.0)
 	memset(m_Behaviours, 0, sizeof(S16) * RLV_BHVR_COUNT);
@@ -77,6 +80,14 @@ RlvHandler::RlvHandler() : m_pGCTimer(NULL), m_pWLSnapshot(NULL)
 
 RlvHandler::~RlvHandler()
 {
+}
+
+void RlvHandler::changed(const LLUUID& idGroup, LLGroupChange change)
+{}
+
+bool RlvHandler::handleEvent(LLPointer<LLOldEvents::LLEvent> event, const LLSD& sdUserdata)
+{
+	return true;
 }
 
 RlvHandler gRlvHandler;

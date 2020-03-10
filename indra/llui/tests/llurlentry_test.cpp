@@ -86,6 +86,12 @@ S32 LLUIImage::getHeight() const
 }
 |*==========================================================================*/
 
+const std::string dogFace("DogFace");
+const std::string& rlvGetAnonym(const LLAvatarName& avName)
+{
+	return dogFace;
+}
+
 namespace tut
 {
 	struct LLUrlEntryData
