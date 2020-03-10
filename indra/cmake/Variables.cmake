@@ -9,13 +9,6 @@
 #   LINUX   - Linux
 #   WINDOWS - Windows
 
-# Switches set here and in 00-Common.cmake must agree with
-# https://bitbucket.org/lindenlab/viewer-build-variables/src/tip/variables
-# Reading $LL_BUILD is an attempt to directly use those switches.
-if ("$ENV{LL_BUILD}" STREQUAL "")
-  message(FATAL_ERROR "Environment variable LL_BUILD must be set")
-endif ()
-
 # Relative and absolute paths to subtrees.
 
 if(NOT DEFINED ${CMAKE_CURRENT_LIST_FILE}_INCLUDED)
@@ -77,34 +70,32 @@ elseif (ADDRESS_SIZE EQUAL 64)
   #message(STATUS "ADDRESS_SIZE is 64")
   set(ARCH x86_64)
 else (ADDRESS_SIZE EQUAL 32)
-  #message(STATUS "ADDRESS_SIZE is UNRECOGNIZED: '${ADDRESS_SIZE}'")
-  # Use Python's platform.machine() since uname -m isn't available everywhere.
-  # Even if you can assume cygwin uname -m, the answer depends on whether
-  # you're running 32-bit cygwin or 64-bit cygwin! But even 32-bit Python will
-  # report a 64-bit processor.
-  execute_process(COMMAND
-                  "${PYTHON_EXECUTABLE}" "-c"
-                  "import platform; print platform.machine()"
-                  OUTPUT_VARIABLE ARCH OUTPUT_STRIP_TRAILING_WHITESPACE)
-  # We expect values of the form i386, i686, x86_64, AMD64.
-  # In CMake, expressing ARCH.endswith('64') is awkward:
-  string(LENGTH "${ARCH}" ARCH_LENGTH)
-  math(EXPR ARCH_LEN_2 "${ARCH_LENGTH} - 2")
-  string(SUBSTRING "${ARCH}" ${ARCH_LEN_2} 2 ARCH_LAST_2)
-  if (ARCH_LAST_2 STREQUAL 64)
-    #message(STATUS "ARCH is detected as 64; ARCH is ${ARCH}")
-    set(ADDRESS_SIZE 64)
-  else ()
-    #message(STATUS "ARCH is detected as 32; ARCH is ${ARCH}")
-    set(ADDRESS_SIZE 32)
-  endif ()
+    #message(STATUS "ADDRESS_SIZE is UNDEFINED")
+    if (CMAKE_SIZEOF_VOID_P EQUAL 8)
+      message(STATUS "Size of void pointer is detected as 8; ARCH is 64-bit")
+      set(ARCH x86_64)
+      set(ADDRESS_SIZE 64)
+    elseif (CMAKE_SIZEOF_VOID_P EQUAL 4)
+      message(STATUS "Size of void pointer is detected as 4; ARCH is 32-bit")
+      set(ADDRESS_SIZE 32)
+      set(ARCH i686)
+    else()
+      message(FATAL_ERROR "Unkown Architecture!")
+    endif()
 endif (ADDRESS_SIZE EQUAL 32)
 
-if (${CMAKE_SYSTEM_NAME} MATCHES "Windows")
+if (${CMAKE_SYSTEM_NAME} STREQUAL "Windows")
   set(WINDOWS ON BOOL FORCE)
-  set(LL_ARCH ${ARCH}_win32)
-  set(LL_ARCH_DIR ${ARCH}-win32)
-endif (${CMAKE_SYSTEM_NAME} MATCHES "Windows")
+  if (ADDRESS_SIZE EQUAL 64)
+    set(LL_ARCH ${ARCH}_win64)
+    set(LL_ARCH_DIR ${ARCH}-win64)
+  elseif (ADDRESS_SIZE EQUAL 32)
+    set(LL_ARCH ${ARCH}_win32)
+    set(LL_ARCH_DIR ${ARCH}-win32)
+  else()
+    message(FATAL_ERROR "Unkown Architecture!")
+  endif ()
+endif (${CMAKE_SYSTEM_NAME} STREQUAL "Windows")
 
 if (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
   set(LINUX ON BOOl FORCE)
