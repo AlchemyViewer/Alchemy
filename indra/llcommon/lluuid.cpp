@@ -912,7 +912,15 @@ BOOL LLUUID::parseUUID(const std::string& buf, LLUUID* value)
 }
 
 //static
-LLUUID LLUUID::generateNewID(std::string hash_string)
+LLUUID LLUUID::generateNewID()
+{
+	LLUUID new_id;
+	new_id.generate();
+	return new_id;
+}
+
+//static
+LLUUID LLUUID::generateNewID(const std::string& hash_string)
 {
 	LLUUID new_id;
 	if (hash_string.empty())
@@ -940,21 +948,10 @@ LLAssetID LLTransactionID::makeAssetID(const LLUUID& session) const
 	return result;
 }
 
-// Construct
-LLUUID::LLUUID()
-{
-	setNull();
-}
-
-
 // Faster than copying from memory
  void LLUUID::setNull()
 {
-	U32 *word = (U32 *)mData;
-	word[0] = 0;
-	word[1] = 0;
-	word[2] = 0;
-	word[3] = 0;
+	 memset(mData, 0, sizeof(mData));
 }
 
 
@@ -1008,36 +1005,6 @@ LLUUID::LLUUID()
 	// If all bits are zero, return !0 == TRUE
 	return !(word[0] | word[1] | word[2] | word[3]);
 }
-
-// Copy constructor
- LLUUID::LLUUID(const LLUUID& rhs)
-{
-	U32 *tmp = (U32 *)mData;
-	U32 *rhstmp = (U32 *)rhs.mData;
-	tmp[0] = rhstmp[0];
-	tmp[1] = rhstmp[1];
-	tmp[2] = rhstmp[2];
-	tmp[3] = rhstmp[3];
-}
-
- LLUUID::~LLUUID()
-{
-}
-
-// Assignment
- LLUUID& LLUUID::operator=(const LLUUID& rhs)
-{
-	// No need to check the case where this==&rhs.  The branch is slower than the write.
-	U32 *tmp = (U32 *)mData;
-	U32 *rhstmp = (U32 *)rhs.mData;
-	tmp[0] = rhstmp[0];
-	tmp[1] = rhstmp[1];
-	tmp[2] = rhstmp[2];
-	tmp[3] = rhstmp[3];
-	
-	return *this;
-}
-
 
  LLUUID::LLUUID(const char *in_string)
 {
@@ -1107,6 +1074,10 @@ LLUUID::LLUUID()
 
  U32 LLUUID::getCRC32() const
 {
-	U32 *tmp = (U32*)mData;
-	return tmp[0] + tmp[1] + tmp[2] + tmp[3];
+	U32 ret = 0;
+	for(U32 i = 0;i < 4;++i)
+	{
+		ret += (mData[i*4]) | (mData[i*4+1]) << 8 | (mData[i*4+2]) << 16 | (mData[i*4+3]) << 24;
+	}
+	return ret;
 }

@@ -52,13 +52,9 @@ public:
 	//
 	// CREATORS
 	//
-	LLUUID();
+	LLUUID() = default;
 	explicit LLUUID(const char *in_string); // Convert from string.
 	explicit LLUUID(const std::string& in_string); // Convert from string.
-	LLUUID(const LLUUID &in);
-	LLUUID &operator=(const LLUUID &rhs);
-
-	~LLUUID();
 
 	//
 	// MANIPULATORS
@@ -66,7 +62,9 @@ public:
 	void	generate();					// Generate a new UUID
 	void	generate(const std::string& stream); //Generate a new UUID based on hash of input stream
 
-	static LLUUID generateNewID(std::string stream = "");	//static version of above for use in initializer expressions such as constructor params, etc. 
+	//static versions of above for use in initializer expressions such as constructor params, etc. 
+	static LLUUID generateNewID();	
+	static LLUUID generateNewID(const std::string& stream);	//static version of above for use in initializer expressions such as constructor params, etc. 
 
 	BOOL	set(const char *in_string, BOOL emit = TRUE);	// Convert from string, if emit is FALSE, do not emit warnings
 	BOOL	set(const std::string& in_string, BOOL emit = TRUE);	// Convert from string, if emit is FALSE, do not emit warnings
@@ -129,8 +127,11 @@ public:
 
 	static BOOL parseUUID(const std::string& buf, LLUUID* value);
 
-	U8 mData[UUID_BYTES];
+	U8 mData[UUID_BYTES] = {};
 };
+static_assert(std::is_trivially_copyable<LLUUID>::value, "LLUUID must be trivial copy");
+static_assert(std::is_trivially_move_assignable<LLUUID>::value, "LLUUID must be trivial move");
+static_assert(std::is_standard_layout<LLUUID>::value, "LLUUID must be a standard layout type");
 
 typedef std::vector<LLUUID> uuid_vec_t;
 typedef std::set<LLUUID> uuid_set_t;
