@@ -3739,7 +3739,7 @@ void LLVOAvatar::updateAnimationDebugText()
             {
                 if (isControlAvatar())
                 {
-                    LLControlAvatar *control_av = dynamic_cast<LLControlAvatar*>(this);
+                    LLControlAvatar *control_av = static_cast<LLControlAvatar*>(this);
                     // Try to get name from inventory of associated object
                     LLVOVolume *volp = control_av->mRootVolp;
                     LLViewerInventoryItem *item = recursiveGetObjectInventoryItem(volp,motionp->getID());
@@ -4269,11 +4269,10 @@ void LLVOAvatar::updateRootPositionAndRotation(LLAgent& agent, F32 speed, bool w
 			root_pos += LLVector3d(getHoverOffset());
 		}
 
-        LLControlAvatar *cav = dynamic_cast<LLControlAvatar*>(this);
-        if (cav)
+        if (isControlAvatar())
         {
             // SL-1350: Moved to LLDrawable::updateXform()
-            cav->matchVolumeTransform();
+            static_cast<LLControlAvatar*>(this)->matchVolumeTransform();
         }
         else
         {
@@ -4344,8 +4343,8 @@ BOOL LLVOAvatar::updateCharacter(LLAgent &agent)
 	bool is_attachment = false;
 	if (is_control_avatar)
 	{
-        LLControlAvatar *cav = dynamic_cast<LLControlAvatar*>(this);
-		is_attachment = cav && cav->mRootVolp && cav->mRootVolp->isAttachment(); // For attached animated objects
+        LLControlAvatar *cav = static_cast<LLControlAvatar*>(this);
+        is_attachment = cav->mRootVolp && cav->mRootVolp->isAttachment(); // For attached animated objects
 	}
 
     LLScopedContextString str("updateCharacter " + getFullname() + " is_control_avatar "
@@ -6055,10 +6054,9 @@ void LLVOAvatar::rebuildAttachmentOverrides()
     clearAttachmentOverrides();
 
     // Handle the case that we're resetting the skeleton of an animated object.
-    LLControlAvatar *control_av = dynamic_cast<LLControlAvatar*>(this);
-    if (control_av)
+    if (isControlAvatar())
 	{
-        LLVOVolume *volp = control_av->mRootVolp;
+        LLVOVolume *volp = static_cast<LLControlAvatar*>(this)->mRootVolp;
         if (volp)
         {
             LL_DEBUGS("Avatar") << volp->getID() << " adding attachment overrides for root vol, prim count " 
@@ -6106,10 +6104,10 @@ void LLVOAvatar::updateAttachmentOverrides()
     std::set<LLUUID> meshes_seen;
     
     // Handle the case that we're updating the skeleton of an animated object.
-    LLControlAvatar *control_av = dynamic_cast<LLControlAvatar*>(this);
-    if (control_av)
+    if (isControlAvatar())
     {
-        LLVOVolume *volp = control_av->mRootVolp;
+		LLControlAvatar* control_av = static_cast<LLControlAvatar*>(this);
+		LLVOVolume *volp = control_av->mRootVolp;
         if (volp)
         {
             LL_DEBUGS("Avatar") << volp->getID() << " adding attachment overrides for root vol, prim count " 
@@ -10010,10 +10008,10 @@ void LLVOAvatar::getAssociatedVolumes(std::vector<LLVOVolume*>& volumes)
         }
     }
 
-    LLControlAvatar *control_av = dynamic_cast<LLControlAvatar*>(this);
-    if (control_av)
+    if (isControlAvatar())
     {
-        LLVOVolume *volp = control_av->mRootVolp;
+		LLControlAvatar* control_av = static_cast<LLControlAvatar*>(this);
+		LLVOVolume *volp = control_av->mRootVolp;
         if (volp)
         {
             volumes.push_back(volp);
@@ -10208,8 +10206,8 @@ void LLVOAvatar::idleUpdateRenderComplexity()
 {
     if (isControlAvatar())
     {
-        LLControlAvatar *cav = dynamic_cast<LLControlAvatar*>(this);
-        bool is_attachment = cav && cav->mRootVolp && cav->mRootVolp->isAttachment(); // For attached animated objects
+        LLControlAvatar *cav = static_cast<LLControlAvatar*>(this);
+        bool is_attachment = cav->mRootVolp && cav->mRootVolp->isAttachment(); // For attached animated objects
         if (is_attachment)
         {
             // ARC for animated object attachments is accounted with the avatar they're attached to.
@@ -10480,10 +10478,10 @@ void LLVOAvatar::calculateUpdateRenderComplexity()
         // A standalone animated object needs to be accounted for
         // using its associated volume. Attached animated objects
         // will be covered by the subsequent loop over attachments.
-        LLControlAvatar *control_av = dynamic_cast<LLControlAvatar*>(this);
-        if (control_av)
+        if (isControlAvatar())
         {
-            LLVOVolume *volp = control_av->mRootVolp;
+			LLControlAvatar* control_av = static_cast<LLControlAvatar*>(this);
+			LLVOVolume *volp = control_av->mRootVolp;
             if (volp && !volp->isAttachment())
             {
                 accountRenderComplexityForObject(volp, max_attachment_complexity,

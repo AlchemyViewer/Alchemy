@@ -666,8 +666,11 @@ void LLControlAvatar::onRegionChanged()
 	std::vector<LLCharacter*>::iterator it = LLCharacter::sInstances.begin();
 	for ( ; it != LLCharacter::sInstances.end(); ++it)
 	{
-		LLControlAvatar* cav = dynamic_cast<LLControlAvatar*>(*it);
-		if (!cav) continue;
-		cav->mRegionChanged = true;
+		auto avatar = static_cast<LLVOAvatar*>(*it);
+		if (!avatar->isDead() && avatar->isControlAvatar())
+		{
+			LLControlAvatar* cav = static_cast<LLControlAvatar*>(avatar);
+			cav->mRegionChanged = true;
+		}
 	}
 }
