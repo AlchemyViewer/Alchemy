@@ -102,8 +102,8 @@ void LLViewerTextureList::init()
 {			
 	mInitialized = TRUE ;
 	sNumImages = 0;
-	mMaxResidentTexMemInMegaBytes = (U32Bytes)0;
-	mMaxTotalTextureMemInMegaBytes = (U32Bytes)0;
+	mMaxResidentTexMemInMegaBytes = S32Megabytes(0);
+	mMaxTotalTextureMemInMegaBytes = S32Megabytes(0);
 	
 	// Update how much texture RAM we're allowed to use.
 	updateMaxResidentTexMem(S32Megabytes(0)); // 0 = use current
@@ -1375,15 +1375,15 @@ S32Megabytes LLViewerTextureList::getMaxVideoRamSetting(bool get_recommended, fl
 	{
 		if (!get_recommended)
 		{
-			max_texmem = (S32Megabytes)512;
+			max_texmem = S32Megabytes(512);
 		}
 		else if (gSavedSettings.getBOOL("NoHardwareProbe")) //did not do hardware detection at startup
 		{
-			max_texmem = (S32Megabytes)512;
+			max_texmem = S32Megabytes(512);
 		}
 		else
 		{
-			max_texmem = (S32Megabytes)128;
+			max_texmem = S32Megabytes(128);
 		}
 
 		LL_WARNS() << "VRAM amount not detected, defaulting to " << max_texmem << " MB" << LL_ENDL;
@@ -1412,11 +1412,11 @@ void LLViewerTextureList::updateMaxResidentTexMem(S32Megabytes mem)
 	S32Megabytes cur_mem(gSavedSettings.getS32("TextureMemory"));
 	F32 mem_multiplier = gSavedSettings.getF32("RenderTextureMemoryMultiple");
 	S32Megabytes default_mem = getMaxVideoRamSetting(true, mem_multiplier); // recommended default
-	if (mem == (S32Bytes)0)
+	if (mem == (S32Megabytes)0)
 	{
-		mem = cur_mem > (S32Bytes)0 ? cur_mem : default_mem;
+		mem = cur_mem > (S32Megabytes)0 ? cur_mem : default_mem;
 	}
-	else if (mem < (S32Bytes)0)
+	else if (mem < (S32Megabytes)0)
 	{
 		mem = default_mem;
 	}
@@ -1435,11 +1435,22 @@ void LLViewerTextureList::updateMaxResidentTexMem(S32Megabytes mem)
 	S32Megabytes fb_mem = llmax(VIDEO_CARD_FRAMEBUFFER_MEM, vb_mem/4);
 	mMaxResidentTexMemInMegaBytes = (vb_mem - fb_mem) ; //in MB
 	
+#if defined(_WIN64) || defined(__amd64__) || defined(__x86_64__)
+	if (mMaxResidentTexMemInMegaBytes > gMaxVideoRam / 2)
+	{
+		mMaxTotalTextureMemInMegaBytes = gMaxVideoRam + (S32Megabytes) (mMaxResidentTexMemInMegaBytes * 0.25f);
+	}
+	else
+	{
+		mMaxTotalTextureMemInMegaBytes = mMaxResidentTexMemInMegaBytes * 2;
+	}
+#else
 	mMaxTotalTextureMemInMegaBytes = mMaxResidentTexMemInMegaBytes * 2;
 	if (mMaxResidentTexMemInMegaBytes > (S32Megabytes)640)
 	{
 		mMaxTotalTextureMemInMegaBytes -= (mMaxResidentTexMemInMegaBytes / 4);
 	}
+#endif
 
 	//system mem
 	S32Megabytes system_ram = gSysMemory.getPhysicalMemoryKB();
@@ -1456,6 +1467,8 @@ void LLViewerTextureList::updateMaxResidentTexMem(S32Megabytes mem)
 	
 	LL_INFOS() << "Total Video Memory set to: " << vb_mem << " MB" << LL_ENDL;
 	LL_INFOS() << "Available Texture Memory set to: " << (vb_mem - fb_mem) << " MB" << LL_ENDL;
+	LL_INFOS() << "Total Texture Memory set to: " << mMaxTotalTextureMemInMegaBytes << " MB" << LL_ENDL;
+	LL_INFOS() << "Maxiumum Resident Texture Memory set to: " << mMaxResidentTexMemInMegaBytes << " MB" << LL_ENDL;
 }
 
 ///////////////////////////////////////////////////////////////////////////////

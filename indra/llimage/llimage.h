@@ -272,7 +272,7 @@ protected:
 	void setDataAndSize(U8 *data, S32 width, S32 height, S8 components) ;
 
 public:
-	static S32 sGlobalRawMemory;
+	static S64 sGlobalRawMemory;
 	static S32 sRawImageCount;
 
 private:
@@ -351,7 +351,7 @@ protected:
 	S8 mLevels;			// Number of resolution levels in that image. Min is 1. 0 means unknown.
 	
 public:
-	static S32 sGlobalFormattedMemory;
+	static S64 sGlobalFormattedMemory;
 };
 
 #endif

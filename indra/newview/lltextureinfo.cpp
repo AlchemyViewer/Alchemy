@@ -104,7 +104,7 @@ void LLTextureInfo::setRequestSize(const LLUUID& id, U32 size)
 	{
 		addRequest(id);
 	}
-	mTextures[id]->mSize = (U32Bytes)size;
+	mTextures[id]->mSize = U32Bytes(size);
 }
 
 void LLTextureInfo::setRequestOffset(const LLUUID& id, U32 offset)
