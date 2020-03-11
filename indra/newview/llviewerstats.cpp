@@ -302,14 +302,14 @@ F32		gAveLandCompression = 0.f,
 		gWorstLandCompression = 0.f, 
 		gWorstWaterCompression = 0.f;
 
-U32Bytes				gTotalWorldData, 
+U64Bytes				gTotalWorldData, 
 								gTotalObjectData, 
 								gTotalTextureData;
 U32								gSimPingCount = 0;
 U32Bits				gObjectData;
 F32Milliseconds		gAvgSimPing(0.f);
 // rely on default initialization
-U32Bytes			gTotalTextureBytesPerBoostLevel[LLViewerTexture::MAX_GL_IMAGE_CATEGORY];
+U64Bytes			gTotalTextureBytesPerBoostLevel[LLViewerTexture::MAX_GL_IMAGE_CATEGORY];
 
 extern U32  gVisCompared;
 extern U32  gVisTested;

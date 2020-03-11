@@ -490,6 +490,10 @@ static LLTrace::BlockTimerStatHandle FTM_TEXTURE_MEMORY_CHECK("Memory Check");
 //static 
 bool LLViewerTexture::isMemoryForTextureLow()
 {
+	static LLCachedControl<bool> disable_vidmem_check(gSavedSettings, "RenderDisableLowVidMem", true);
+	if (disable_vidmem_check)
+		return false;
+
     // Note: we need to figure out a better source for 'min' values,
     // what is free for low end at minimal settings is 'nothing left'
     // for higher end gpus at high settings.
