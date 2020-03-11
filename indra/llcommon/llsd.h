@@ -317,6 +317,9 @@ public:
 		typedef std::map<String, LLSD>::iterator		map_iterator;
 		typedef std::map<String, LLSD>::const_iterator	map_const_iterator;
 		
+		std::map<String, LLSD>& map();
+		const std::map<String, LLSD>& map() const;
+
 		map_iterator		beginMap();
 		map_iterator		endMap();
 		map_const_iterator	beginMap() const;
@@ -326,6 +329,9 @@ public:
 		typedef std::vector<LLSD>::const_iterator	array_const_iterator;
 		typedef std::vector<LLSD>::reverse_iterator reverse_array_iterator;
 		
+		std::vector<LLSD>& array();
+		const std::vector<LLSD>& array() const;
+
 		array_iterator			beginArray();
 		array_iterator			endArray();
 		array_const_iterator	beginArray() const;

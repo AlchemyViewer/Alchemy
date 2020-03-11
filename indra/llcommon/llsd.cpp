@@ -141,10 +141,15 @@ public:
 	virtual void erase(Integer)					{ }
 	virtual const LLSD& ref(Integer) const		{ return undef(); }
 
-	virtual LLSD::map_const_iterator beginMap() const { return endMap(); }
-	virtual LLSD::map_const_iterator endMap() const { static const std::map<String, LLSD> empty; return empty.end(); }
-	virtual LLSD::array_const_iterator beginArray() const { return endArray(); }
-	virtual LLSD::array_const_iterator endArray() const { static const std::vector<LLSD> empty; return empty.end(); }
+	virtual const std::map<String, LLSD>& map() const { static const std::map<String, LLSD> empty; return empty; }
+	virtual std::map<String, LLSD>& map() { static std::map<String, LLSD> empty; return empty; }
+	LLSD::map_const_iterator beginMap() const { return endMap(); }
+	LLSD::map_const_iterator endMap() const { return map().end(); }
+	virtual const std::vector<LLSD>& array() const { static const std::vector<LLSD> empty; return empty; }
+	virtual std::vector<LLSD>& array() { static std::vector<LLSD> empty; return empty; }
+	LLSD::array_const_iterator beginArray() const { return endArray(); }
+	LLSD::array_const_iterator endArray() const { return array().end(); }
+
 
 	virtual void dumpStats() const;
 	virtual void calcStats(S32 type_counts[], S32 share_counts[]) const;
@@ -389,10 +394,8 @@ namespace
 
 		virtual int size() const { return mData.size(); }
 
-		LLSD::map_iterator beginMap() { return mData.begin(); }
-		LLSD::map_iterator endMap() { return mData.end(); }
-		virtual LLSD::map_const_iterator beginMap() const { return mData.begin(); }
-		virtual LLSD::map_const_iterator endMap() const { return mData.end(); }
+		DataMap& map() final override { return mData; }
+		const DataMap& map() const final override { return mData; }
 
 		virtual void dumpStats() const;
 		virtual void calcStats(S32 type_counts[], S32 share_counts[]) const;
@@ -521,12 +524,8 @@ namespace
 		              LLSD& ref(LLSD::Integer);
 		virtual const LLSD& ref(LLSD::Integer) const; 
 
-		LLSD::array_iterator beginArray() { return mData.begin(); }
-		LLSD::array_iterator endArray() { return mData.end(); }
-		LLSD::reverse_array_iterator rbeginArray() { return mData.rbegin(); }
-		LLSD::reverse_array_iterator rendArray() { return mData.rend(); }
-		virtual LLSD::array_const_iterator beginArray() const { return mData.begin(); }
-		virtual LLSD::array_const_iterator endArray() const { return mData.end(); }
+		DataVector& array() final override { return mData; }
+		const DataVector& array() const final override { return mData; }
 
 		virtual void calcStats(S32 type_counts[], S32 share_counts[]) const;
 	};
@@ -957,18 +956,24 @@ const char *LLSD::dump(const LLSD &llsd)
 	return llsd_dump(llsd, false);
 }
 
-LLSD::map_iterator			LLSD::beginMap()		{ return makeMap(impl).beginMap(); }
-LLSD::map_iterator			LLSD::endMap()			{ return makeMap(impl).endMap(); }
-LLSD::map_const_iterator	LLSD::beginMap() const	{ return safe(impl).beginMap(); }
-LLSD::map_const_iterator	LLSD::endMap() const	{ return safe(impl).endMap(); }
+std::map<LLSD::String, LLSD>& LLSD::map() { return makeMap(impl).map(); }
+const std::map<LLSD::String, LLSD>& LLSD::map() const { return safe(impl).map(); }
 
-LLSD::array_iterator		LLSD::beginArray()		{ return makeArray(impl).beginArray(); }
-LLSD::array_iterator		LLSD::endArray()		{ return makeArray(impl).endArray(); }
-LLSD::array_const_iterator	LLSD::beginArray() const{ return safe(impl).beginArray(); }
-LLSD::array_const_iterator	LLSD::endArray() const	{ return safe(impl).endArray(); }
+LLSD::map_iterator			LLSD::beginMap()		{ return map().begin(); }
+LLSD::map_iterator			LLSD::endMap()			{ return map().end(); }
+LLSD::map_const_iterator	LLSD::beginMap() const	{ return map().cbegin(); }
+LLSD::map_const_iterator	LLSD::endMap() const	{ return map().cend(); }
 
-LLSD::reverse_array_iterator	LLSD::rbeginArray()		{ return makeArray(impl).rbeginArray(); }
-LLSD::reverse_array_iterator	LLSD::rendArray()		{ return makeArray(impl).rendArray(); }
+std::vector<LLSD>& LLSD::array() { return makeArray(impl).array(); }
+const std::vector<LLSD>& LLSD::array() const { return safe(impl).array(); }
+
+LLSD::array_iterator		LLSD::beginArray()		{ return array().begin(); }
+LLSD::array_iterator		LLSD::endArray()		{ return array().end(); }
+LLSD::array_const_iterator	LLSD::beginArray() const{ return array().cbegin(); }
+LLSD::array_const_iterator	LLSD::endArray() const	{ return array().cend(); }
+
+LLSD::reverse_array_iterator	LLSD::rbeginArray()		{ return array().rbegin(); }
+LLSD::reverse_array_iterator	LLSD::rendArray()		{ return array().rend(); }
 
 namespace llsd
 {
