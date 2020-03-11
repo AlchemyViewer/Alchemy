@@ -1517,7 +1517,8 @@ BOOL LLVOVolume::updateLOD()
 
 	if (lod_changed)
 	{
-        if (debugLoggingEnabled("AnimatedObjectsLinkset"))
+		static const bool enable_log = debugLoggingEnabled("AnimatedObjectsLinkset");
+        if (enable_log)
         {
             if (isAnimatedObject() && isRiggedMesh())
             {
@@ -4452,7 +4453,8 @@ const LLMatrix4& LLVOVolume::getWorldMatrix(LLXformMatrix* xform) const
 
 void LLVOVolume::markForUpdate(BOOL priority)
 { 
-    if (debugLoggingEnabled("AnimatedObjectsLinkset"))
+	static const bool enable_log = debugLoggingEnabled("AnimatedObjectsLinkset");
+    if (enable_log)
     {
         if (isAnimatedObject() && isRiggedMesh())
         {
@@ -6063,7 +6065,8 @@ void LLVolumeGeometryManager::rebuildMesh(LLSpatialGroup* group)
 			if (drawablep && !drawablep->isDead() && drawablep->isState(LLDrawable::REBUILD_ALL) && !drawablep->isState(LLDrawable::RIGGED) )
 			{
 				LLVOVolume* vobj = drawablep->getVOVolume();
-                if (debugLoggingEnabled("AnimatedObjectsLinkset"))
+				static const bool enable_log = debugLoggingEnabled("AnimatedObjectsLinkset");
+                if (enable_log)
                 {
                     if (vobj->isAnimatedObject() && vobj->isRiggedMesh())
                     {

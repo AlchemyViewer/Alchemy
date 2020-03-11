@@ -3355,7 +3355,8 @@ void LLPipeline::markRebuild(LLDrawable *drawablep, LLDrawable::EDrawableFlags f
 {
 	if (drawablep && !drawablep->isDead() && assertInitialized())
 	{
-        if (debugLoggingEnabled("AnimatedObjectsLinkset"))
+		static const bool enable_log = debugLoggingEnabled("AnimatedObjectsLinkset");
+        if (enable_log)
         {
             LLVOVolume *vol_obj = drawablep->getVOVolume();
             if (vol_obj && vol_obj->isAnimatedObject() && vol_obj->isRiggedMesh())
