@@ -1232,7 +1232,7 @@ void LLMeshRepoThread::constructUrl(LLUUID mesh_id, std::string * url)
 		if (!res_url.empty())
 		{
 			res_url += "/?mesh_id=";
-			res_url += mesh_id.asString().c_str();
+			res_url += mesh_id.asString();
 		}
 		else
 		{
@@ -1247,7 +1247,7 @@ void LLMeshRepoThread::constructUrl(LLUUID mesh_id, std::string * url)
 		LL_DEBUGS_ONCE(LOG_MESH) << "Cannot load mesh " << mesh_id << " due to missing capability." << LL_ENDL;
 	}
 
-	*url = res_url;
+	*url = std::move(res_url);
 }
 
 // Issue an HTTP GET request with byte range using the right
@@ -1712,20 +1712,25 @@ bool LLMeshRepoThread::fetchMeshLOD(const LLVolumeParams& mesh_params, S32 lod, 
 		return false;
 	}
 
-	mHeaderMutex->lock();
+	const LLUUID& mesh_id = mesh_params.getSculptID();
 
+	mHeaderMutex->lock();
+	auto header_it = mMeshHeader.find(mesh_id);
+	if (header_it == mMeshHeader.end())
+	{ //we have no header info for this mesh, do nothing
+		mHeaderMutex->unlock();
+		return false;
+	}
 	++LLMeshRepository::sMeshRequestCount;
 	bool retval = true;
-
-	LLUUID mesh_id = mesh_params.getSculptID();
 	
 	U32 header_size = mMeshHeaderSize[mesh_id];
-
 	if (header_size > 0)
 	{
-		S32 version = mMeshHeader[mesh_id]["version"].asInteger();
-		S32 offset = header_size + mMeshHeader[mesh_id][header_lod[lod]]["offset"].asInteger();
-		S32 size = mMeshHeader[mesh_id][header_lod[lod]]["size"].asInteger();
+		const auto& header = header_it->second;
+		S32 version = header["version"].asInteger();
+		S32 offset = header_size + header[header_lod[lod]]["offset"].asInteger();
+		S32 size = header[header_lod[lod]]["size"].asInteger();
 		mHeaderMutex->unlock();
 				
 		if (version <= MAX_MESH_VERSION && offset >= 0 && size > 0)
