@@ -3364,9 +3364,8 @@ void LLMeshSkinInfoHandler::processFailure(LLCore::HttpStatus status)
 					   << ", Reason:  " << status.toString()
 					   << " (" << status.toTerseString() << ").  Not retrying."
 					   << LL_ENDL;
-
-	// *TODO:  Mark mesh unavailable on error.  For now, simply leave
-	// request unfulfilled rather than retry forever.
+		LLMutexLock lock(gMeshRepo.mThread->mMutex);
+		gMeshRepo.mThread->mSkinUnavailableQ.emplace(mMeshID);
 }
 
 void LLMeshSkinInfoHandler::processData(LLCore::BufferArray * /* body */, S32 /* body_offset */,
@@ -3395,7 +3394,8 @@ void LLMeshSkinInfoHandler::processData(LLCore::BufferArray * /* body */, S32 /*
 		LL_WARNS(LOG_MESH) << "Error during mesh skin info processing.  ID:  " << mMeshID
 						   << ", Unknown reason.  Not retrying."
 						   << LL_ENDL;
-		// *TODO:  Mark mesh unavailable on error
+		LLMutexLock lock(gMeshRepo.mThread->mMutex);
+		gMeshRepo.mThread->mSkinUnavailableQ.emplace(mMeshID);
 	}
 }
 
