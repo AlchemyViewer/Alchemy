@@ -6253,7 +6253,7 @@ void LLVOAvatar::addAttachmentOverridesForObject(LLViewerObject *vo, std::set<LL
 	}
 	const LLMeshSkinInfo*  pSkinData = nullptr;
 
-	if ( vobj && vobj->isMesh() && (pSkinData = vobj->getSkinInfo()) )
+	if ( vobj && vobj->isMesh() && (pSkinData = vobj->getSkinInfo()) && vobj->getVolume() && vobj->getVolume()->isMeshAssetLoaded() && gMeshRepo.meshRezEnabled())
 	{
 		const int bindCnt = pSkinData->mAlternateBindMatrix.size();								
         const int jointCnt = pSkinData->mJointNames.size();
@@ -10053,10 +10053,9 @@ void LLVOAvatar::updateRiggingInfo()
 	{
 		LL_RECORD_BLOCK_TIME(FTM_AVATAR_RIGGING_KEY_UPDATE);
 		// Get current rigging info key
-		for (std::vector<LLVOVolume*>::iterator it = volumes.begin(); it != volumes.end(); ++it)
+		for (LLVOVolume* vol : volumes)
 		{
-			LLVOVolume *vol = *it;
-			if (vol->isMesh() && vol->getVolume())
+			if (vol->isRiggedMesh() && vol->getVolume() && vol->getVolume()->isMeshAssetLoaded())
 			{
 				const LLUUID& mesh_id = vol->getVolume()->getParams().getSculptID();
 				S32 max_lod = llmax(vol->getLOD(), vol->mLastRiggingInfoLOD);
