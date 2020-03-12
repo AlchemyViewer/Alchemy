@@ -108,15 +108,12 @@ void LLDrawPoolAlpha::beginPostDeferredPass(S32 pass)
 { 
     LL_RECORD_BLOCK_TIME(FTM_RENDER_ALPHA_DEFERRED);
 
-    F32 gamma = gSavedSettings.getF32("RenderDeferredDisplayGamma");
-
     emissive_shader = (LLPipeline::sRenderDeferred)   ? &gDeferredEmissiveProgram    :
                       (LLPipeline::sUnderWaterRender) ? &gObjectEmissiveWaterProgram : &gObjectEmissiveProgram;
 
     emissive_shader->bind();
     emissive_shader->uniform1i(LLShaderMgr::NO_ATMO, (LLPipeline::sRenderingHUDs) ? 1 : 0);
     emissive_shader->uniform1f(LLShaderMgr::TEXTURE_GAMMA, 2.2f); 
-	emissive_shader->uniform1f(LLShaderMgr::DISPLAY_GAMMA, (gamma > 0.1f) ? 1.0f / gamma : (1.0f/2.2f));
 
 	if (pass == 0)
 	{
@@ -125,7 +122,6 @@ void LLDrawPoolAlpha::beginPostDeferredPass(S32 pass)
 
 		fullbright_shader->bind();
 		fullbright_shader->uniform1f(LLShaderMgr::TEXTURE_GAMMA, 2.2f); 
-		fullbright_shader->uniform1f(LLShaderMgr::DISPLAY_GAMMA, (gamma > 0.1f) ? 1.0f / gamma : (1.0f/2.2f));
         fullbright_shader->uniform1i(LLShaderMgr::NO_ATMO, LLPipeline::sRenderingHUDs ? 1 : 0);
 		fullbright_shader->unbind();
 
@@ -135,7 +131,6 @@ void LLDrawPoolAlpha::beginPostDeferredPass(S32 pass)
 		//prime simple shader (loads shadow relevant uniforms)
 		gPipeline.bindDeferredShader(*simple_shader);
 
-		simple_shader->uniform1f(LLShaderMgr::DISPLAY_GAMMA, (gamma > 0.1f) ? 1.0f / gamma : (1.0f/2.2f));
         simple_shader->uniform1i(LLShaderMgr::NO_ATMO, LLPipeline::sRenderingHUDs ? 1 : 0);
 	}
 	else if (!LLPipeline::sImpostorRender)

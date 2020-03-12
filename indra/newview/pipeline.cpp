@@ -9046,10 +9046,6 @@ void LLPipeline::renderDeferredLighting(LLRenderTarget* screen_target)
 		
         gDeferredPostGammaCorrectProgram.uniform2f(LLShaderMgr::DEFERRED_SCREEN_RES, screen_target->getWidth(), screen_target->getHeight());
 		
-		F32 gamma = gSavedSettings.getF32("RenderDeferredDisplayGamma");
-
-		gDeferredPostGammaCorrectProgram.uniform1f(LLShaderMgr::DISPLAY_GAMMA, (gamma > 0.1f) ? 1.0f / gamma : (1.0f/2.2f));
-		
 		gGL.begin(LLRender::TRIANGLE_STRIP);
 		gGL.texCoord2f(tc1.mV[0], tc1.mV[1]);
 		gGL.vertex2f(-1,-1);

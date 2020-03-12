@@ -217,7 +217,6 @@ public:
 		TERRAIN_ALPHARAMP,
 		
 		SHINY_ORIGIN,
-        DISPLAY_GAMMA,
 
         INSCATTER_RT,
         SUN_SIZE,
