@@ -3725,7 +3725,8 @@ void LLMeshRepository::notifyLoadedMeshes()
               ? (2 * LLAppCoreHttp::PIPELINING_DEPTH)
               : 5);
 
-    LLMeshRepoThread::sMaxConcurrentRequests = gSavedSettings.getU32("Mesh2MaxConcurrentRequests");
+	static const LLCachedControl<U32> mesh2_max_con_req(gSavedSettings, "Mesh2MaxConcurrentRequests");
+	LLMeshRepoThread::sMaxConcurrentRequests = mesh2_max_con_req;
     LLMeshRepoThread::sRequestHighWater = llclamp(scale * S32(LLMeshRepoThread::sMaxConcurrentRequests),
                                                   REQUEST2_HIGH_WATER_MIN,
                                                   REQUEST2_HIGH_WATER_MAX);
@@ -5208,7 +5209,8 @@ void LLMeshRepository::buildPhysicsMesh(LLModel::Decomposition& decomp)
 bool LLMeshRepository::meshUploadEnabled()
 {
 	LLViewerRegion *region = gAgent.getRegion();
-	if(gSavedSettings.getBOOL("MeshEnabled") &&
+	static const LLCachedControl<bool> mesh_enabled(gSavedSettings, "MeshEnabled", true);
+	if(mesh_enabled &&
 	   region)
 	{
 		return region->meshUploadEnabled();
@@ -5219,7 +5221,8 @@ bool LLMeshRepository::meshUploadEnabled()
 bool LLMeshRepository::meshRezEnabled()
 {
 	LLViewerRegion *region = gAgent.getRegion();
-	if(gSavedSettings.getBOOL("MeshEnabled") && 
+	static const LLCachedControl<bool> mesh_enabled(gSavedSettings, "MeshEnabled", true);
+	if(mesh_enabled &&
 	   region)
 	{
 		return region->meshRezEnabled();

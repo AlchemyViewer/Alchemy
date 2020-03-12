@@ -199,7 +199,7 @@ void LLDrawPoolBump::prerender()
 // static
 S32 LLDrawPoolBump::numBumpPasses()
 {
-	if (gSavedSettings.getBOOL("RenderObjectBump"))
+	if (LLPipeline::sRenderBump)
 	{
 		if (mShaderLevel > 1)
 		{
@@ -824,7 +824,7 @@ void LLDrawPoolBump::endBump(U32 pass)
 
 S32 LLDrawPoolBump::getNumDeferredPasses()
 { 
-	if (gSavedSettings.getBOOL("RenderObjectBump"))
+	if (LLPipeline::sRenderBump)
 	{
 		return 1;
 	}

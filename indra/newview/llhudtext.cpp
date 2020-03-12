@@ -142,13 +142,6 @@ void LLHUDText::renderText()
 
 	mOffsetY = lltrunc(mHeight * ((mVertAlignment == ALIGN_VERT_CENTER) ? 0.5f : 1.f));
 
-	// *TODO: cache this image
-	LLUIImagePtr imagep = LLUI::getUIImage("Rounded_Square");
-
-	// *TODO: make this a per-text setting
-	LLColor4 bg_color = LLUIColorTable::instance().getColor("ObjectBubbleColor");
-	bg_color.setAlpha(gSavedSettings.getF32("ChatBubbleOpacity") * alpha_factor);
-
 	const S32 border_height = 16;
 	const S32 border_width = 16;
 

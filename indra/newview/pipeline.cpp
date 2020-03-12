@@ -9745,10 +9745,8 @@ void LLPipeline::renderShadow(glh::matrix4f& view, glh::matrix4f& proj, LLCamera
 
 		gGL.diffuseColor4f(1,1,1,1);
 
-        S32 shadow_detail = gSavedSettings.getS32("RenderShadowDetail");
-
         // if not using VSM, disable color writes
-        if (shadow_detail <= 2)
+        if (LLPipeline::RenderShadowDetail <= 2)
         {
 		gGL.setColorMask(false, false);
         }

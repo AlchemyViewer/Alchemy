@@ -108,7 +108,8 @@ class LLMeshEnabled : public view_listener_t
 {
 	bool handleEvent(const LLSD& userdata)
 	{
-		return gSavedSettings.getBOOL("MeshEnabled");
+		static const LLCachedControl<bool> mesh_enabled(gSavedSettings, "MeshEnabled", true);
+		return mesh_enabled;
 	}
 };
 
