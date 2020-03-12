@@ -202,7 +202,7 @@ void LLAvatarRenderInfoAccountant::avatarRenderInfoReportCoro(std::string url, U
     std::vector<LLCharacter*>::iterator iter = LLCharacter::sInstances.begin();
     while( iter != LLCharacter::sInstances.end() )
     {
-        LLVOAvatar* avatar = dynamic_cast<LLVOAvatar*>(*iter);
+        LLVOAvatar* avatar = static_cast<LLVOAvatar*>(*iter);
         if (avatar &&
             avatar->getRezzedStatus() >= 2 &&					// Mostly rezzed (maybe without baked textures downloaded)
             !avatar->isDead() &&								// Not dead yet

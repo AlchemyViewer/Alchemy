@@ -3422,21 +3422,24 @@ public:
 				renderTexelDensity(drawable);
 			}
 
-			LLVOAvatar* avatar = dynamic_cast<LLVOAvatar*>(drawable->getVObj().get());
-			
-			if (avatar && gPipeline.hasRenderDebugMask(LLPipeline::RENDER_DEBUG_AVATAR_VOLUME))
+			LLViewerObject* vobjp = drawable->getVObj();
+			LLVOAvatar* avatar = vobjp ? vobjp->asAvatar() : nullptr;
+			if (avatar)
 			{
-				renderAvatarCollisionVolumes(avatar);
-			}
+				if (gPipeline.hasRenderDebugMask(LLPipeline::RENDER_DEBUG_AVATAR_VOLUME))
+				{
+					renderAvatarCollisionVolumes(avatar);
+				}
 
-			if (avatar && gPipeline.hasRenderDebugMask(LLPipeline::RENDER_DEBUG_AVATAR_JOINTS))
-			{
-				renderAvatarBones(avatar);
-			}
+				if (gPipeline.hasRenderDebugMask(LLPipeline::RENDER_DEBUG_AVATAR_JOINTS))
+				{
+					renderAvatarBones(avatar);
+				}
 
-			if (avatar && gPipeline.hasRenderDebugMask(LLPipeline::RENDER_DEBUG_AGENT_TARGET))
-			{
-				renderAgentTarget(avatar);
+				if (gPipeline.hasRenderDebugMask(LLPipeline::RENDER_DEBUG_AGENT_TARGET))
+				{
+					renderAgentTarget(avatar);
+				}
 			}
 			
 			if (gDebugGL)

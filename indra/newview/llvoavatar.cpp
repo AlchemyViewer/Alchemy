@@ -3420,7 +3420,7 @@ void LLVOAvatar::invalidateNameTag(const LLUUID& agent_id)
 	LLViewerObject* obj = gObjectList.findObject(agent_id);
 	if (!obj) return;
 
-	LLVOAvatar* avatar = dynamic_cast<LLVOAvatar*>(obj);
+	LLVOAvatar* avatar = obj->asAvatar();
 	if (!avatar) return;
 
 	avatar->clearNameTag();
@@ -3432,7 +3432,7 @@ void LLVOAvatar::invalidateNameTags()
 	std::vector<LLCharacter*>::iterator it = LLCharacter::sInstances.begin();
 	for ( ; it != LLCharacter::sInstances.end(); ++it)
 	{
-		LLVOAvatar* avatar = dynamic_cast<LLVOAvatar*>(*it);
+		LLVOAvatar* avatar = static_cast<LLVOAvatar*>(*it);
 		if (!avatar) continue;
 		if (avatar->isDead()) continue;
 

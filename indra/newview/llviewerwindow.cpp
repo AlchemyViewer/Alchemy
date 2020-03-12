@@ -683,7 +683,7 @@ public:
 			std::vector<LLCharacter*>::iterator sort_iter = LLCharacter::sInstances.begin();
 			while (sort_iter != LLCharacter::sInstances.end())
 			{
-				LLVOAvatar* avatar = dynamic_cast<LLVOAvatar*>(*sort_iter);
+				LLVOAvatar* avatar = static_cast<LLVOAvatar*>(*sort_iter);
 				if (avatar &&
 					!avatar->isDead())						// Not dead yet
 				{
