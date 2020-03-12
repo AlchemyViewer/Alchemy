@@ -1318,7 +1318,7 @@ void LLVOAvatar::calculateSpatialExtents(LLVector4a& newMin, LLVector4a& newMax)
 {
     LL_RECORD_BLOCK_TIME(FTM_AVATAR_EXTENT_UPDATE);
 
-    S32 box_detail = gSavedSettings.getS32("AvatarBoundingBoxComplexity");
+    static const LLCachedControl<S32> box_detail(gSavedSettings, "AvatarBoundingBoxComplexity");
 
     // FIXME the update_min_max function used below assumes there is a
     // known starting point, but in general there isn't. Ideally the
@@ -1377,12 +1377,9 @@ void LLVOAvatar::calculateSpatialExtents(LLVector4a& newMin, LLVector4a& newMax)
 
 		if (attachment->getValid())
 		{
-			for (LLViewerJointAttachment::attachedobjs_vec_t::iterator attachment_iter = attachment->mAttachedObjects.begin();
-				 attachment_iter != attachment->mAttachedObjects.end();
-				 ++attachment_iter)
+			for (LLViewerObject* attached_object : attachment->mAttachedObjects)
 			{
-                    // Don't we need to look at children of attached_object as well?
-                LLViewerObject* attached_object = attachment_iter->get();
+                // Don't we need to look at children of attached_object as well?
 				if (attached_object && !attached_object->isHUDAttachment())
 				{
                         const LLVOVolume *vol = attached_object->asVolume();
@@ -3027,8 +3024,8 @@ void LLVOAvatar::idleUpdateNameTag(const LLVector3& root_pos_last)
 	}
 	
 	const F32 time_visible = mTimeVisible.getElapsedTimeF32();
-	const F32 NAME_SHOW_TIME = gSavedSettings.getF32("RenderNameShowTime");	// seconds
-	const F32 FADE_DURATION = gSavedSettings.getF32("RenderNameFadeDuration"); // seconds
+	static const LLCachedControl<F32> NAME_SHOW_TIME(gSavedSettings, "RenderNameShowTime");	// seconds
+	static const LLCachedControl<F32> FADE_DURATION(gSavedSettings, "RenderNameFadeDuration"); // seconds
 // [RLVa:KB] - Checked: RLVa-2.0.1
 	bool fRlvShowAvTag = true, fRlvShowAvName = true;
 	if (RlvActions::isRlvEnabled())
@@ -3038,7 +3035,8 @@ void LLVOAvatar::idleUpdateNameTag(const LLVector3& root_pos_last)
 	}
 // [/RLVa:KB]
 	BOOL visible_avatar = isVisible() || mNeedsAnimUpdate;
-	BOOL visible_chat = gSavedSettings.getBOOL("UseChatBubbles") && (mChats.size() || mTyping);
+	static const LLCachedControl<bool> use_chat_bubble(gSavedSettings, "UseChatBubbles"); // seconds
+	BOOL visible_chat = use_chat_bubble && (mChats.size() || mTyping);
 	BOOL render_name =	visible_chat ||
 		                (visible_avatar &&
 // [RLVa:KB] - Checked: RLVa-2.0.1
@@ -3823,12 +3821,14 @@ void LLVOAvatar::updateDebugText()
 {
     // Leave mDebugText uncleared here, in case a derived class has added some state first
 
-	if (gSavedSettings.getBOOL("DebugAvatarAppearanceMessage"))
+	static const LLCachedControl<bool> debug_av_appr_msg(gSavedSettings, "DebugAvatarAppearanceMessage");
+	if (debug_av_appr_msg)
 	{
         updateAppearanceMessageDebugText();
 	}
 
-	if (gSavedSettings.getBOOL("DebugAvatarCompositeBaked"))
+	static const LLCachedControl<bool> debug_av_comp_bk(gSavedSettings, "DebugAvatarCompositeBaked");
+	if (debug_av_comp_bk)
 	{
 		if (!mBakedTextureDebugText.empty())
 			addDebugText(mBakedTextureDebugText);
@@ -8024,7 +8024,8 @@ LLMotion* LLVOAvatar::findMotion(const LLUUID& id) const
 // colorized if using deferred rendering.
 void LLVOAvatar::debugColorizeSubMeshes(U32 i, const LLColor4& color)
 {
-	if (gSavedSettings.getBOOL("DebugAvatarCompositeBaked"))
+	static const LLCachedControl<bool> debug_av_comp_bk(gSavedSettings, "DebugAvatarCompositeBaked");
+	if (debug_av_comp_bk)
 	{
 		avatar_joint_mesh_list_t::iterator iter = mBakedTextureDatas[i].mJointMeshes.begin();
 		avatar_joint_mesh_list_t::iterator end  = mBakedTextureDatas[i].mJointMeshes.end();

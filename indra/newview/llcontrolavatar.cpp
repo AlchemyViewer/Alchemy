@@ -80,19 +80,12 @@ void LLControlAvatar::initInstance()
 
 void LLControlAvatar::getNewConstraintFixups(LLVector3& new_pos_fixup, F32& new_scale_fixup) const
 {
-
-    F32 max_legal_offset = MAX_LEGAL_OFFSET;
-    if (gSavedSettings.getControl("AnimatedObjectsMaxLegalOffset"))
-    {
-        max_legal_offset = gSavedSettings.getF32("AnimatedObjectsMaxLegalOffset");
-    }
+    static const LLCachedControl<F32> max_legal_offset_cc(gSavedSettings, "AnimatedObjectsMaxLegalOffset", MAX_LEGAL_OFFSET);
+    F32 max_legal_offset = max_legal_offset_cc;
 	max_legal_offset = llmax(max_legal_offset,0.f);
 
-    F32 max_legal_size = MAX_LEGAL_SIZE;
-    if (gSavedSettings.getControl("AnimatedObjectsMaxLegalSize"))
-    {
-        max_legal_size = gSavedSettings.getF32("AnimatedObjectsMaxLegalSize");
-    }
+    static const LLCachedControl<F32> max_legal_size_cc(gSavedSettings, "AnimatedObjectsMaxLegalSize", MAX_LEGAL_SIZE);
+    F32 max_legal_size = max_legal_size_cc;
 	max_legal_size = llmax(max_legal_size, 1.f);
     
     new_pos_fixup = LLVector3();
@@ -163,6 +156,8 @@ void LLControlAvatar::matchVolumeTransform()
 		mPositionConstraintFixup = new_pos_fixup;
 		mScaleConstraintFixup = new_scale_fixup;
 
+        static const LLCachedControl<F32> global_scale(gSavedSettings, "AnimatedObjectsGlobalScale");
+
         if (mRootVolp->isAttachment())
         {
             LLVOAvatar *attached_av = mRootVolp->getAvatarAncestor();
@@ -183,7 +178,6 @@ void LLControlAvatar::matchVolumeTransform()
                 mRoot->setWorldRotation(obj_rot * joint_rot);
                 setRotation(mRoot->getRotation());
 
-				F32 global_scale = gSavedSettings.getF32("AnimatedObjectsGlobalScale");
 				setGlobalScale(global_scale * mScaleConstraintFixup);
             }
             else
@@ -234,8 +228,7 @@ void LLControlAvatar::matchVolumeTransform()
             }
 			mRoot->setPosition(vol_pos + mPositionConstraintFixup);
 
-            F32 global_scale = gSavedSettings.getF32("AnimatedObjectsGlobalScale");
-            setGlobalScale(global_scale * mScaleConstraintFixup);
+             setGlobalScale(global_scale * mScaleConstraintFixup);
         }
     }
 }
@@ -368,7 +361,8 @@ BOOL LLControlAvatar::updateCharacter(LLAgent &agent)
 //virtual
 void LLControlAvatar::updateDebugText()
 {
-	if (gSavedSettings.getBOOL("DebugAnimatedObjects"))
+    static const LLCachedControl<bool> debug_anim_obj(gSavedSettings, "DebugAnimatedObjects");
+	if (debug_anim_obj)
     {
         S32 total_linkset_count = 0;
         if (mRootVolp)
