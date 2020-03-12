@@ -39,6 +39,9 @@
 #include "lleventcoro.h"
 #include "llcoros.h"
 
+// system includes
+#include <unordered_map>
+
 class LLCamera;
 class LLNetMap;
 class LLDebugBeacon;
@@ -210,7 +213,7 @@ protected:
 
     uuid_set_t   mDeadObjects;
 
-	std::map<LLUUID, LLPointer<LLViewerObject> > mUUIDObjectMap;
+	std::unordered_map<LLUUID, LLPointer<LLViewerObject> > mUUIDObjectMap;
 
 	//set of objects that need to update their cost
     uuid_set_t   mStaleObjectCost;
@@ -225,9 +228,9 @@ protected:
 	S32 mCurLazyUpdateIndex;
 
 	static U32 sSimulatorMachineIndex;
-	static std::map<U64, U32> sIPAndPortToIndex;
+	static std::unordered_map<U64, U32> sIPAndPortToIndex;
 
-	static std::map<U64, LLUUID> sIndexAndLocalIDToUUID;
+	static std::unordered_map<U64, LLUUID> sIndexAndLocalIDToUUID;
 
 	std::set<LLViewerObject *> mSelectPickList;
 
@@ -268,7 +271,7 @@ extern LLViewerObjectList gObjectList;
  */
 inline LLViewerObject *LLViewerObjectList::findObject(const LLUUID &id)
 {
-	std::map<LLUUID, LLPointer<LLViewerObject> >::iterator iter = mUUIDObjectMap.find(id);
+	auto iter = mUUIDObjectMap.find(id);
 	if(iter != mUUIDObjectMap.end())
 	{
 		return iter->second;

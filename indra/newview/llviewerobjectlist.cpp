@@ -98,8 +98,8 @@ extern LLPipeline	gPipeline;
 
 // Statics for object lookup tables.
 U32						LLViewerObjectList::sSimulatorMachineIndex = 1; // Not zero deliberately, to speed up index check.
-std::map<U64, U32>		LLViewerObjectList::sIPAndPortToIndex;
-std::map<U64, LLUUID>	LLViewerObjectList::sIndexAndLocalIDToUUID;
+std::unordered_map<U64, U32>		LLViewerObjectList::sIPAndPortToIndex;
+std::unordered_map<U64, LLUUID>	LLViewerObjectList::sIndexAndLocalIDToUUID;
 
 LLViewerObjectList::LLViewerObjectList()
 {
@@ -180,7 +180,7 @@ BOOL LLViewerObjectList::removeFromLocalIDTable(const LLViewerObject* objectp)
 		
 		U64	indexid = (((U64)index) << 32) | (U64)local_id;
 		
-		std::map<U64, LLUUID>::iterator iter = sIndexAndLocalIDToUUID.find(indexid);
+		auto iter = sIndexAndLocalIDToUUID.find(indexid);
 		if (iter == sIndexAndLocalIDToUUID.end())
 		{
 			return FALSE;

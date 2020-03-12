@@ -214,33 +214,9 @@ void delete_and_clear_array(T*& ptr)
 	ptr = NULL;
 }
 
-// Simple function to help with finding pointers in maps.
-// For example:
-// 	typedef  map_t;
-//  std::map<int, const char*> foo;
-//	foo[18] = "there";
-//	foo[2] = "hello";
-// 	const char* bar = get_ptr_in_map(foo, 2); // bar -> "hello"
-//  const char* baz = get_ptr_in_map(foo, 3); // baz == NULL
-template <typename K, typename T>
-inline T* get_ptr_in_map(const std::map<K,T*>& inmap, const K& key)
-{
-	// Typedef here avoids warnings because of new c++ naming rules.
-	typedef typename std::map<K,T*>::const_iterator map_iter;
-	map_iter iter = inmap.find(key);
-	if(iter == inmap.end())
-	{
-		return NULL;
-	}
-	else
-	{
-		return iter->second;
-	}
-};
-
 // helper function which returns true if key is in inmap.
-template <typename K, typename T>
-inline bool is_in_map(const std::map<K,T>& inmap, const K& key)
+template <typename T>
+inline bool is_in_map(const T& inmap, typename T::key_type const& key)
 {
 	if(inmap.find(key) == inmap.end())
 	{
@@ -256,11 +232,11 @@ inline bool is_in_map(const std::map<K,T>& inmap, const K& key)
 // To replace LLSkipMap getIfThere, use:
 //   get_if_there(map, key, 0)
 // WARNING: Make sure default_value (generally 0) is not a valid map entry!
-template <typename K, typename T>
-inline T get_if_there(const std::map<K,T>& inmap, const K& key, T default_value)
+template <typename T>
+inline typename T::mapped_type get_if_there(const T& inmap, typename T::key_type const& key, typename T::mapped_type default_value)
 {
 	// Typedef here avoids warnings because of new c++ naming rules.
-	typedef typename std::map<K,T>::const_iterator map_iter;
+	typedef typename T::const_iterator map_iter;
 	map_iter iter = inmap.find(key);
 	if(iter == inmap.end())
 	{
@@ -270,6 +246,21 @@ inline T get_if_there(const std::map<K,T>& inmap, const K& key, T default_value)
 	{
 		return iter->second;
 	}
+};
+
+// Simple function to help with finding pointers in maps.
+// For example:
+// 	typedef  map_t;
+//  std::map<int, const char*> foo;
+//	foo[18] = "there";
+//	foo[2] = "hello";
+// 	const char* bar = get_ptr_in_map(foo, 2); // bar -> "hello"
+//  const char* baz = get_ptr_in_map(foo, 3); // baz == NULL
+// <alchemy/> - This has been generalized to support a broader range of map-esque containers
+template <typename T>
+inline typename T::mapped_type get_ptr_in_map(const T& inmap, typename T::key_type const& key)
+{
+	return get_if_there(inmap,key,NULL);
 };
 
 // Useful for replacing the removeObj() functionality of LLDynamicArray
