@@ -249,7 +249,8 @@
 //     sMaxConcurrentRequests   mMutex        wo.main.none, ro.repo.none, ro.main.mMutex
 //     mMeshHeader              mHeaderMutex  rw.repo.mHeaderMutex, ro.main.mHeaderMutex, ro.main.none [0]
 //     mMeshHeaderSize          mHeaderMutex  rw.repo.mHeaderMutex
-//     mSkinRequests            mMutex        rw.repo.mMutex, ro.repo.none [5]
+//     mSkinReqQ			    mMutex        rw.repo.mMutex, ro.repo.none [5]
+//     mSkinUnavailableQ        mMutex        rw.repo.mMutex, ro.repo.none [5]
 //     mSkinInfoQ               mMutex        rw.repo.mMutex, rw.main.mMutex [5] (was:  [0])
 //     mDecompositionRequests   mMutex        rw.repo.mMutex, ro.repo.none [5]
 //     mPhysicsShapeRequests    mMutex        rw.repo.mMutex, ro.repo.none [5]
@@ -948,6 +949,7 @@ void LLMeshRepoThread::run()
                     else
                     {
                         // too many fails
+						LLMutexLock lock(mMutex);
                         mUnavailableQ.push(req);
                         LL_WARNS() << "Failed to load " << req.mMeshParams << " , skip" << LL_ENDL;
                     }
@@ -1046,7 +1048,7 @@ void LLMeshRepoThread::run()
 				LLMutexLock locker(mMutex);
 				for (const auto& req : incomplete)
 				{
-					mSkinReqQ.emplace(req);
+					mSkinReqQ.push(req);
 				}
 			}
 		}
@@ -1796,16 +1798,19 @@ bool LLMeshRepoThread::fetchMeshLOD(const LLVolumeParams& mesh_params, S32 lod, 
 				}
 				else
 				{
+					LLMutexLock lock(mMutex);
 					mUnavailableQ.push(LODRequest(mesh_params, lod));
 				}
 			}
 			else
 			{
+				LLMutexLock lock(mMutex);
 				mUnavailableQ.push(LODRequest(mesh_params, lod));
 			}
 		}
 		else
 		{
+			LLMutexLock lock(mMutex);
 			mUnavailableQ.push(LODRequest(mesh_params, lod));
 		}
 	}
@@ -3244,7 +3249,6 @@ void LLMeshHeaderHandler::processData(LLCore::BufferArray * /* body */, S32 /* b
 			lod_bytes = llmax(lod_bytes, header["skin"]["offset"].asInteger() + header["skin"]["size"].asInteger());
 			lod_bytes = llmax(lod_bytes, header["physics_convex"]["offset"].asInteger() + header["physics_convex"]["size"].asInteger());
 
-			S32 header_bytes = (S32) gMeshRepo.mThread->mMeshHeaderSize[mesh_id];
 			S32 bytes = lod_bytes + header_bytes; 
 
 		
