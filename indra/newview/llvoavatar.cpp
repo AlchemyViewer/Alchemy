@@ -10072,7 +10072,7 @@ void LLVOAvatar::updateRiggingInfo()
 	}
 
 	// Something changed. Update.
-	mLastRiggingInfoKey = curr_rigging_info_key;
+	mLastRiggingInfoKey = std::move(curr_rigging_info_key);
     mJointRiggingInfoTab.clear();
     for (std::vector<LLVOVolume*>::iterator it = volumes.begin(); it != volumes.end(); ++it)
     {

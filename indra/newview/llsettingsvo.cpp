@@ -704,9 +704,7 @@ void LLSettingsVOSky::applySpecial(void *ptarget, bool force)
     shader->uniform1f(LLShaderMgr::DENSITY_MULTIPLIER, getDensityMultiplier());
     shader->uniform1f(LLShaderMgr::DISTANCE_MULTIPLIER, getDistanceMultiplier());
     
-    F32 g             = getGamma();    
-
-    shader->uniform1f(LLShaderMgr::GAMMA, g);
+    shader->uniform1f(LLShaderMgr::GAMMA, getGamma());
 }
 
 LLSettingsSky::parammapping_t LLSettingsVOSky::getParameterMap() const
