@@ -336,7 +336,7 @@ public:
     void updateVisualComplexity();
     
 	void notifyMeshLoaded();
-	void notifySkinInfoLoaded(LLMeshSkinInfo* skin);
+	void notifySkinInfoLoaded(const LLMeshSkinInfo* skin);
 	void notifySkinInfoUnavailable();
 	
 	// Returns 'true' iff the media data for this object is in flight
@@ -416,12 +416,10 @@ private:
 
 	LLPointer<LLRiggedVolume> mRiggedVolume;
 
-	bool isSkinInfoLoaded() { return mSkinInfoReceived; }
-	bool hasSkinInfoFailed() { return mSkinInfoFailed; }
+	bool hasSkinInfoFailed() const { return mSkinInfoFailed; }
 
-	bool mSkinInfoReceived;
 	bool mSkinInfoFailed;
-	LLMeshSkinInfo *mSkinInfo;
+	const LLMeshSkinInfo *mSkinInfo;
 	
 	// statics
 public:

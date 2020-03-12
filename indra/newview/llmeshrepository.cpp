@@ -4068,7 +4068,7 @@ S32 LLMeshRepository::getActualMeshLOD(const LLVolumeParams& mesh_params, S32 lo
 	return mThread->getActualMeshLOD(mesh_params, lod);
 }
 
-LLMeshSkinInfo* LLMeshRepository::getSkinInfo(const LLUUID& mesh_id, LLVOVolume* requesting_obj)
+const LLMeshSkinInfo* LLMeshRepository::getSkinInfo(const LLUUID& mesh_id, LLVOVolume* requesting_obj)
 {
 	LL_RECORD_BLOCK_TIME(FTM_MESH_FETCH);
 

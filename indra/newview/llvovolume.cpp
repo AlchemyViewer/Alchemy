@@ -235,7 +235,6 @@ LLVOVolume::LLVOVolume(const LLUUID &id, const LLPCode pcode, LLViewerRegion *re
 	mSculptChanged = FALSE;
 	mSpotLightPriority = 0.f;
 
-	mSkinInfoReceived = false;
 	mSkinInfoFailed = false;
 	mSkinInfo = NULL;
 
@@ -1053,7 +1052,6 @@ BOOL LLVOVolume::setVolume(const LLVolumeParams &params_in, const S32 detail, bo
 				if (mSkinInfo && mSkinInfo->mMeshID != volume_params.getSculptID())
 				{
 					mSkinInfo = NULL;
-					mSkinInfoReceived = false;
 					mSkinInfoFailed = false;
 				}
 
@@ -1067,7 +1065,7 @@ BOOL LLVOVolume::setVolume(const LLVolumeParams &params_in, const S32 detail, bo
 					}
 				}
 				
-				if (!mSkinInfo && !isSkinInfoLoaded() && !hasSkinInfoFailed())
+				if (!mSkinInfo && !hasSkinInfoFailed())
 				{
 					mSkinInfo = gMeshRepo.getSkinInfo(volume_params.getSculptID(), this);
 					if (mSkinInfo)
@@ -1128,6 +1126,7 @@ void LLVOVolume::updateSculptTexture()
 			mSculptTexture = LLViewerTextureManager::getFetchedTexture(id, FTT_DEFAULT, TRUE, LLGLTexture::BOOST_NONE, LLViewerTexture::LOD_TEXTURE);
 		}
 
+		mSkinInfoFailed = false;
 		mSkinInfo = NULL;
 	}
 	else
@@ -1179,10 +1178,9 @@ void LLVOVolume::notifyMeshLoaded()
     updateVisualComplexity();
 }
 
-void LLVOVolume::notifySkinInfoLoaded(LLMeshSkinInfo* skin)
+void LLVOVolume::notifySkinInfoLoaded(const LLMeshSkinInfo* skin)
 {
 	mSkinInfoFailed = false;
-	mSkinInfoReceived = true;
 	mSkinInfo = skin;
 
 	notifyMeshLoaded();
@@ -1191,7 +1189,6 @@ void LLVOVolume::notifySkinInfoLoaded(LLMeshSkinInfo* skin)
 void LLVOVolume::notifySkinInfoUnavailable()
 {
 	mSkinInfoFailed = true;
-	mSkinInfoReceived = false;
 	mSkinInfo = nullptr;
 }
 
