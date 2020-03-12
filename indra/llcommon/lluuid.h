@@ -138,8 +138,8 @@ public:
 
 	bool operator<(const LLUUID& rhs) const
 	{
-		__m128i mm_left = _mm_lddqu_si128(reinterpret_cast<const __m128i*>(mData));
-		__m128i mm_right = _mm_lddqu_si128(reinterpret_cast<const __m128i*>(rhs.mData));
+		__m128i mm_left = load_unaligned_si128(mData);
+		__m128i mm_right = load_unaligned_si128(rhs.mData);
 
 		// To emulate lexicographical_compare behavior we have to perform two comparisons - the forward and reverse one.
 		// Then we know which bytes are equivalent and which ones are different, and for those different the comparison results
