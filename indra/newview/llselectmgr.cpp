@@ -2088,7 +2088,7 @@ void LLSelectMgr::selectionSetMedia(U8 media_type, const LLSD &media_data)
 					else {
 						// Add/update media
 						object->setTEMediaFlags(te, mMediaFlags);
-						LLVOVolume *vo = dynamic_cast<LLVOVolume*>(object);
+						LLVOVolume *vo = object->asVolume();
 						llassert(NULL != vo);
 						if (NULL != vo) 
 						{
@@ -2114,7 +2114,7 @@ void LLSelectMgr::selectionSetMedia(U8 media_type, const LLSD &media_data)
 			if (object->permModify())
 			{
 				object->sendTEUpdate();
-				LLVOVolume *vo = dynamic_cast<LLVOVolume*>(object);
+				LLVOVolume *vo = object->asVolume();
 				llassert(NULL != vo);
 				// It's okay to skip this object if hasMedia() is false...
 				// the sendTEUpdate() above would remove all media data if it were
@@ -7537,7 +7537,7 @@ S32 LLObjectSelection::getSelectedObjectRenderCost()
 						 ++child_iter)
 				   {
 					   LLViewerObject* child_obj = *child_iter;
-					   LLVOVolume *child = dynamic_cast<LLVOVolume*>( child_obj );
+					   LLVOVolume *child = child_obj ? child_obj->asVolume() : nullptr;
 					   if (child)
 					   {
 						   cost += child->getRenderCost(textures);

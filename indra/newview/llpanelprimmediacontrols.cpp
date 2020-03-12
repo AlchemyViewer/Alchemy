@@ -319,11 +319,12 @@ void LLPanelPrimMediaControls::updateShape()
 		bool hasPermsControl = true;
 		bool mini_controls = false;
 		LLMediaEntry *media_data = objectp->getTE(mTargetObjectFace)->getMediaData();
-		if (media_data && NULL != dynamic_cast<LLVOVolume*>(objectp))
+        LLVOVolume *vol = objectp ? objectp->asVolume() : nullptr;
+		if (media_data && vol)
 		{
 			// Don't show the media controls if we do not have permissions
-			enabled = dynamic_cast<LLVOVolume*>(objectp)->hasMediaPermission(media_data, LLVOVolume::MEDIA_PERM_CONTROL);
-			hasPermsControl = dynamic_cast<LLVOVolume*>(objectp)->hasMediaPermission(media_data, LLVOVolume::MEDIA_PERM_CONTROL);
+			enabled = vol->hasMediaPermission(media_data, LLVOVolume::MEDIA_PERM_CONTROL);
+			hasPermsControl = vol->hasMediaPermission(media_data, LLVOVolume::MEDIA_PERM_CONTROL);
 			mini_controls = (LLMediaEntry::MINI == media_data->getControls());
 		}
 		const bool is_hud = objectp->isHUDAttachment();
@@ -805,12 +806,16 @@ void LLPanelPrimMediaControls::draw()
 	// draw control background UI image
 	
 	LLViewerObject* objectp = getTargetObject();
-	LLMediaEntry *media_data(0);
+	LLMediaEntry *media_data = nullptr;
+	LLVOVolume* volumep = nullptr;
 
 	if( objectp )
+	{
 		media_data = objectp->getTE(mTargetObjectFace)->getMediaData();
+		volumep = objectp->asVolume();
+	}
 
-	if( !dynamic_cast<LLVOVolume*>(objectp) || !media_data || dynamic_cast<LLVOVolume*>(objectp)->hasMediaPermission(media_data, LLVOVolume::MEDIA_PERM_CONTROL) )
+	if( !volumep || !media_data || volumep->hasMediaPermission(media_data, LLVOVolume::MEDIA_PERM_CONTROL) )
 		mBackgroundImage->draw( controls_bg_area, UI_VERTEX_COLOR % alpha);
 
 	// draw volume slider background UI image

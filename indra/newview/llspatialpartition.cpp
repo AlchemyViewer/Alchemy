@@ -2033,7 +2033,7 @@ void renderComplexityDisplay(LLDrawable* drawablep)
 		return;
 	}
 
-	LLVOVolume *voVol = dynamic_cast<LLVOVolume*>(vobj);
+	LLVOVolume *voVol = vobj->asVolume();;
 
 	if (!voVol)
 	{
@@ -2052,8 +2052,8 @@ void renderComplexityDisplay(LLDrawable* drawablep)
 	LLViewerObject::const_child_list_t children = voVol->getChildren();
 	for (LLViewerObject::const_child_list_t::const_iterator iter = children.begin(); iter != children.end(); ++iter)
 	{
-		const LLViewerObject *child = *iter;
-		const LLVOVolume *child_volume = dynamic_cast<const LLVOVolume*>(child);
+		LLViewerObject *child = *iter;
+		LLVOVolume* child_volume = child ? child->asVolume() : nullptr;
 		if (child_volume)
 		{
 			cost += child_volume->getRenderCost(textures);

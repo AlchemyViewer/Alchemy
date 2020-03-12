@@ -267,6 +267,11 @@ LLVOVolume::~LLVOVolume()
 	}
 }
 
+LLVOVolume* LLVOVolume::asVolume()
+{
+	return this;
+}
+
 void LLVOVolume::markDead()
 {
 	if (!mDead)
@@ -1324,7 +1329,7 @@ std::string get_debug_object_lod_text(LLVOVolume *rootp)
          iter != child_list.end(); ++iter)
     {
         LLViewerObject *childp = *iter;
-        LLVOVolume *volp = dynamic_cast<LLVOVolume*>(childp);
+        LLVOVolume *volp = childp ? childp->asVolume() : nullptr;
         if (volp)
         {
             lod_string += llformat("%d",volp->getLOD());
@@ -3674,8 +3679,6 @@ bool LLVOVolume::isAnimatedObject() const
 // virtual
 void LLVOVolume::onReparent(LLViewerObject *old_parent, LLViewerObject *new_parent)
 {
-    LLVOVolume *old_volp = dynamic_cast<LLVOVolume*>(old_parent);
-
     if (new_parent && !new_parent->isAvatar())
     {
         if (mControlAvatar.notNull())
@@ -3687,7 +3690,9 @@ void LLVOVolume::onReparent(LLViewerObject *old_parent, LLViewerObject *new_pare
             av->markForDeath();
         }
     }
-    if (old_volp && old_volp->isAnimatedObject())
+
+	LLVOVolume *old_volp = old_parent ? old_parent->asVolume() : nullptr;
+	if (old_volp && old_volp->isAnimatedObject())
     {
         if (old_volp->getControlAvatar())
         {
@@ -5442,7 +5447,7 @@ void LLVolumeGeometryManager::rebuildGeom(LLSpatialGroup* group)
 	if (bridge)
 	{
         vobj = bridge->mDrawable->getVObj();
-        vol_obj = dynamic_cast<LLVOVolume*>(vobj);
+        vol_obj = vobj ? vobj->asVolume() : nullptr;
 	}
     if (vol_obj)
     {

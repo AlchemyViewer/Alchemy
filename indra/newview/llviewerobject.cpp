@@ -3151,7 +3151,7 @@ void LLViewerObject::linkControlAvatar()
 {
     if (!getControlAvatar() && isRootEdit())
     {
-        LLVOVolume *volp = dynamic_cast<LLVOVolume*>(this);
+        LLVOVolume *volp = asVolume();
         if (!volp)
         {
             LL_WARNS() << "called with null or non-volume object" << LL_ENDL;
@@ -3972,7 +3972,9 @@ F32 LLViewerObject::recursiveGetScaledSurfaceArea() const
                  ++child_iter)
             {
                 LLViewerObject* child_obj = *child_iter;
-                LLVOVolume *child = dynamic_cast<LLVOVolume*>( child_obj );
+				if(!child_obj) continue;
+
+                LLVOVolume *child = child_obj->asVolume();
                 if (child && child->getVolume())
                 {
                     const LLVector3& scale = child->getScale();
@@ -5692,9 +5694,16 @@ bool LLViewerObject::isOwnerInMuteList(LLUUID id)
 	return muted;
 }
 
+// virtual 
 LLVOAvatar* LLViewerObject::asAvatar()
 {
 	return NULL;
+}
+
+// virtual 
+LLVOVolume* LLViewerObject::asVolume()
+{
+	return nullptr;
 }
 
 // If this object is directly or indirectly parented by an avatar,

@@ -501,7 +501,7 @@ void LLControlAvatar::getAnimatedVolumes(std::vector<LLVOVolume*>& volumes)
 		 iter != child_list.end(); ++iter)
 	{
 		LLViewerObject* childp = *iter;
-        LLVOVolume *child_volp = dynamic_cast<LLVOVolume*>(childp);
+        LLVOVolume *child_volp = childp ? childp->asVolume() : nullptr;
         if (child_volp && child_volp->isAnimatedObject())
         {
             volumes.push_back(child_volp);

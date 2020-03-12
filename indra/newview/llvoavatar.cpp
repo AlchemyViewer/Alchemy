@@ -1382,15 +1382,15 @@ void LLVOAvatar::calculateSpatialExtents(LLVector4a& newMin, LLVector4a& newMax)
 				 ++attachment_iter)
 			{
                     // Don't we need to look at children of attached_object as well?
-                const LLViewerObject* attached_object = attachment_iter->get();
+                LLViewerObject* attached_object = attachment_iter->get();
 				if (attached_object && !attached_object->isHUDAttachment())
 				{
-                        const LLVOVolume *vol = dynamic_cast<const LLVOVolume*>(attached_object);
+                        const LLVOVolume *vol = attached_object->asVolume();
                         if (vol && vol->isAnimatedObject())
                         {
                             // Animated objects already have a bounding box in their control av, use that. 
                             // Could lag by a frame if there's no guarantee on order of processing for avatars.
-                            LLControlAvatar *cav = vol->getControlAvatar();
+                            const LLControlAvatar *cav = vol->getControlAvatar();
                             if (cav)
                             {
                                 LLVector4a cav_min;
@@ -1409,7 +1409,7 @@ void LLVOAvatar::calculateSpatialExtents(LLVector4a& newMin, LLVector4a& newMax)
 					LLDrawable* drawable = attached_object->mDrawable;
 					if (drawable && !drawable->isState(LLDrawable::RIGGED))
 					{
-						LLSpatialBridge* bridge = drawable->getSpatialBridge();
+						const LLSpatialBridge* bridge = drawable->getSpatialBridge();
 						if (bridge)
 						{
 							const LLVector4a* ext = bridge->getSpatialExtents();
@@ -6235,7 +6235,7 @@ void LLVOAvatar::addAttachmentOverridesForObject(LLViewerObject *vo, std::set<LL
         }
 	}
 
-	LLVOVolume *vobj = dynamic_cast<LLVOVolume*>(vo);
+	LLVOVolume *vobj = vo->asVolume();
 	bool pelvisGotSet = false;
 
 	if (!vobj)
@@ -7632,12 +7632,12 @@ void LLVOAvatar::rebuildAttachments()
 	{
 		for (LLViewerObject* pAttachObj : kvpAttachPt.second->mAttachedObjects)
 		{
-			if (LLVOVolume* pAttachVol = (pAttachObj->isMesh()) ? dynamic_cast<LLVOVolume*>(pAttachObj) : nullptr)
+			if (LLVOVolume* pAttachVol = (pAttachObj->isMesh()) ? pAttachObj->asVolume() : nullptr)
 			{
 				pAttachVol->forceLOD(3);
 				for (LLViewerObject* pChildObj : pAttachObj->getChildren())
 				{
-					if (LLVOVolume* pChildVol = (pChildObj->isMesh()) ? dynamic_cast<LLVOVolume*>(pChildObj) : nullptr)
+					if (LLVOVolume* pChildVol = (pChildObj->isMesh()) ? pChildObj->asVolume() : nullptr)
 						pAttachVol->forceLOD(3);
 				}
 			}
@@ -9978,11 +9978,12 @@ void LLVOAvatar::getAssociatedVolumes(std::vector<LLVOVolume*>& volumes)
 		LLViewerJointAttachment* attachment = iter->second;
 		LLViewerJointAttachment::attachedobjs_vec_t::iterator attach_end = attachment->mAttachedObjects.end();
 		
-		for (LLViewerJointAttachment::attachedobjs_vec_t::iterator attach_iter = attachment->mAttachedObjects.begin();
-			 attach_iter != attach_end; ++attach_iter)
+		for (LLViewerObject* attached_object : attachment->mAttachedObjects)
 		{
-			LLViewerObject* attached_object =  attach_iter->get();
-            LLVOVolume *volume = dynamic_cast<LLVOVolume*>(attached_object);
+			if (!attached_object)
+				continue;
+
+            LLVOVolume *volume = attached_object->asVolume();
             if (volume)
             {
                 volumes.push_back(volume);
@@ -9995,11 +9996,12 @@ void LLVOAvatar::getAssociatedVolumes(std::vector<LLVOVolume*>& volumes)
                 }
             }
             LLViewerObject::const_child_list_t& children = attached_object->getChildren();
-            for (LLViewerObject::const_child_list_t::const_iterator it = children.begin();
-                 it != children.end(); ++it)
+            for (LLViewerObject* childp : children)
             {
-                LLViewerObject *childp = *it;
-                LLVOVolume *volume = dynamic_cast<LLVOVolume*>(childp);
+				if (!childp) 
+					continue;
+
+                LLVOVolume *volume = childp->asVolume();
                 if (volume)
                 {
                     volumes.push_back(volume);
@@ -10016,11 +10018,9 @@ void LLVOAvatar::getAssociatedVolumes(std::vector<LLVOVolume*>& volumes)
         {
             volumes.push_back(volp);
             LLViewerObject::const_child_list_t& children = volp->getChildren();
-            for (LLViewerObject::const_child_list_t::const_iterator it = children.begin();
-                 it != children.end(); ++it)
+            for (LLViewerObject* childp : children)
             {
-                LLViewerObject *childp = *it;
-                LLVOVolume *volume = dynamic_cast<LLVOVolume*>(childp);
+                LLVOVolume *volume = childp ? childp->asVolume() : nullptr;
                 if (volume)
                 {
                     volumes.push_back(volume);
@@ -10345,7 +10345,7 @@ void LLVOAvatar::accountRenderComplexityForObject(
 								  ++child_iter)
 							{
 								LLViewerObject* child_obj = *child_iter;
-								LLVOVolume *child = dynamic_cast<LLVOVolume*>( child_obj );
+								LLVOVolume *child = child_obj ? child_obj->asVolume() : nullptr;
 								if (child)
 								{
 									attachment_children_cost += child->getRenderCost(textures);
@@ -10396,11 +10396,9 @@ void LLVOAvatar::accountRenderComplexityForObject(
                         hud_object_complexity.objectsCount++;
 
                         LLViewerObject::const_child_list_t& child_list = attached_object->getChildren();
-                        for (LLViewerObject::child_list_t::const_iterator iter = child_list.begin();
-                            iter != child_list.end(); ++iter)
+                        for (LLViewerObject* childp : child_list)
                         {
-                            LLViewerObject* childp = *iter;
-                            const LLVOVolume* chld_volume = dynamic_cast<LLVOVolume*>(childp);
+                            const LLVOVolume* chld_volume = childp ? childp->asVolume() : nullptr;
                             if (chld_volume)
                             {
                                 // get cost and individual textures

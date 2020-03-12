@@ -1192,7 +1192,8 @@ LLWindowCallbacks::DragNDropResult LLViewerWindow::handleDragNDrop( LLWindow *wi
 
 					LL_DEBUGS() << "Object: picked at " << pos.mX << ", " << pos.mY << " - face = " << object_face << " - URL = " << url << LL_ENDL;
 
-					LLVOVolume *obj = dynamic_cast<LLVOVolume*>(static_cast<LLViewerObject*>(pick_info.getObject()));
+					LLViewerObject* vobjp = static_cast<LLViewerObject*>(pick_info.getObject());
+					LLVOVolume *obj = vobjp ? vobjp->asVolume() : nullptr;
 				
 					if (obj && !obj->getRegion()->getCapability("ObjectMedia").empty())
 					{

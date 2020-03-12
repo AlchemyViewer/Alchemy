@@ -4428,7 +4428,7 @@ void process_object_animation(LLMessageSystem *mesgsys, void **user_data)
         return;
     }
     
-	LLVOVolume *volp = dynamic_cast<LLVOVolume*>(objp);
+	LLVOVolume *volp = objp->asVolume();
     if (!volp)
     {
 		LL_DEBUGS("AnimatedObjectsNotify") << "Received animation state for non-volume object " << uuid << LL_ENDL;
