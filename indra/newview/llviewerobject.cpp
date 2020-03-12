@@ -4328,7 +4328,7 @@ const LLVector3 LLViewerObject::getRenderPosition() const
             }
         }
 		LLVOAvatar* avatar = getAvatar();
-		if ((avatar) && !getControlAvatar())
+		if ((avatar) && !cav)
 		{
 			return avatar->getPositionAgent();
 		}
