@@ -871,15 +871,22 @@ static LLTrace::BlockTimerStatHandle FTM_IDLE_COPY("Idle Copy");
 
 void LLViewerObjectList::update(LLAgent &agent)
 {
+	static LLCachedControl<bool> cc_velocity_interpolate(gSavedSettings, "VelocityInterpolate");
+	static LLCachedControl<bool> cc_ping_interpolate(gSavedSettings, "PingInterpolate");
+	static LLCachedControl<F32> cc_interpolation_time(gSavedSettings, "InterpolationTime");
+	static LLCachedControl<F32> cc_ping_region_cross_interp(gSavedSettings, "RegionCrossingInterpolationTime");
+	static LLCachedControl<F32> cc_interpolation_phase_out(gSavedSettings, "InterpolationPhaseOut");
+	static LLCachedControl<bool> cc_animate_textures(gSavedSettings, "AnimateTextures");
+
 	// Update globals
-	LLViewerObject::setVelocityInterpolate( gSavedSettings.getBOOL("VelocityInterpolate") );
-	LLViewerObject::setPingInterpolate( gSavedSettings.getBOOL("PingInterpolate") );
+	LLViewerObject::setVelocityInterpolate( cc_velocity_interpolate );
+	LLViewerObject::setPingInterpolate( cc_ping_interpolate );
 	
-	F32 interp_time = gSavedSettings.getF32("InterpolationTime");
-	F32 phase_out_time = gSavedSettings.getF32("InterpolationPhaseOut");
-	F32 region_interp_time = llclamp(gSavedSettings.getF32("RegionCrossingInterpolationTime"), 0.5f, 5.f);
-	if (interp_time < 0.0 || 
-		phase_out_time < 0.0 ||
+	F32 interp_time = cc_interpolation_time;
+	F32 phase_out_time = cc_interpolation_phase_out;
+	F32 region_interp_time = llclamp(cc_ping_region_cross_interp(), 0.5f, 5.f);
+	if (interp_time < 0.0f || 
+		phase_out_time < 0.0f ||
 		phase_out_time > interp_time)
 	{
 		LL_WARNS() << "Invalid values for InterpolationTime or InterpolationPhaseOut, resetting to defaults" << LL_ENDL;
@@ -890,7 +897,7 @@ void LLViewerObjectList::update(LLAgent &agent)
 	LLViewerObject::setMaxUpdateInterpolationTime( phase_out_time );
 	LLViewerObject::setMaxRegionCrossingInterpolationTime(region_interp_time);
 
-	gAnimateTextures = gSavedSettings.getBOOL("AnimateTextures");
+	gAnimateTextures = cc_animate_textures;
 
 	// update global timer
 	F32 last_time = gFrameTimeSeconds;
@@ -950,7 +957,8 @@ void LLViewerObjectList::update(LLAgent &agent)
 
 	std::vector<LLViewerObject*>::iterator idle_end = idle_list.begin()+idle_count;
 
-	if (gSavedSettings.getBOOL("FreezeTime"))
+	static const LLCachedControl<bool> freezeTime(gSavedSettings, "FreezeTime");
+	if (freezeTime)
 	{
 		
 		for (std::vector<LLViewerObject*>::iterator iter = idle_list.begin();

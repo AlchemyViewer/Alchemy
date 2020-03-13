@@ -380,7 +380,8 @@ public:
 
 		clearText();
 		
-		if (gSavedSettings.getBOOL("DebugShowTime"))
+		static LLCachedControl<bool> debugShowTime(gSavedSettings, "DebugShowTime");
+		if (debugShowTime)
 		{
 			{
 			const U32 y_inc2 = 15;
@@ -401,7 +402,8 @@ public:
 		}
 		}
 		
-		if (gSavedSettings.getBOOL("DebugShowMemory"))
+		static LLCachedControl<bool> debugShowMemory(gSavedSettings, "DebugShowMemory");
+		if (debugShowMemory)
 		{
 			addText(xpos, ypos,
 					STRINGIZE("Memory: " << (LLMemory::getCurrentRSS() / 1024) << " (KB)"));
@@ -494,7 +496,8 @@ public:
 			ypos += y_inc;
 		}*/
 		
-		if (gSavedSettings.getBOOL("DebugShowRenderInfo"))
+		static LLCachedControl<bool> debugShowRenderInfo(gSavedSettings, "DebugShowRenderInfo");
+		if (debugShowRenderInfo)
 		{
 			LLTrace::Recording& last_frame_recording = LLTrace::get_frame_recording().getLastRecording();
 
@@ -676,7 +679,8 @@ public:
 				LLVertexBuffer::sSetCount = LLImageGL::sUniqueCount = 
 				gPipeline.mNumVisibleNodes = LLPipeline::sVisibleLightCount = 0;
 		}
-		if (gSavedSettings.getBOOL("DebugShowAvatarRenderInfo"))
+		static LLCachedControl<bool> debugShowAvatarRenderInfo(gSavedSettings, "DebugShowAvatarRenderInfo");
+		if (debugShowAvatarRenderInfo)
 		{
 			std::map<std::string, LLVOAvatar*> sorted_avs;
 			
@@ -711,7 +715,8 @@ public:
 				av_iter++;
 			}
 		}
-		if (gSavedSettings.getBOOL("DebugShowRenderMatrices"))
+		static LLCachedControl<bool> debugShowRenderMatrices(gSavedSettings, "DebugShowRenderMatrices");
+		if (debugShowRenderMatrices)
 		{
 			addText(xpos, ypos, llformat("%.4f    .%4f    %.4f    %.4f", gGLProjection[12], gGLProjection[13], gGLProjection[14], gGLProjection[15]));
 			ypos += y_inc;
@@ -744,8 +749,8 @@ public:
 			addText(xpos, ypos, "View Matrix");
 			ypos += y_inc;
 		}
-		// disable use of glReadPixels which messes up nVidia nSight graphics debugging
-		if (gSavedSettings.getBOOL("DebugShowColor") && !LLRender::sNsightDebugSupport)
+		static LLCachedControl<bool> debugShowColor(gSavedSettings, "DebugShowColor");
+		if (debugShowColor && !LLRender::sNsightDebugSupport)
 		{
 			U8 color[4];
 			LLCoordGL coord = gViewerWindow->getCurrentMouse();
@@ -832,7 +837,8 @@ public:
 			}
 		}				
 
-		if (gSavedSettings.getBOOL("DebugShowTextureInfo"))
+		static LLCachedControl<bool> debugShowTextureInfo(gSavedSettings, "DebugShowTextureInfo");
+		if (debugShowTextureInfo)
 		{
 			LLViewerObject* objectp = NULL ;
 			
@@ -2546,13 +2552,14 @@ void LLViewerWindow::draw()
 
 	//S32 screen_x, screen_y;
 
-	if (!gSavedSettings.getBOOL("RenderUIBuffer"))
+	if (!LLPipeline::RenderUIBuffer)
 	{
 		LLUI::getInstance()->mDirtyRect = getWindowRectScaled();
 	}
 
 	// HACK for timecode debugging
-	if (gSavedSettings.getBOOL("DisplayTimecode"))
+	static const LLCachedControl<bool> display_timecode(gSavedSettings, "DisplayTimecode");
+	if (display_timecode)
 	{
 		// draw timecode block
 		std::string text;
@@ -3127,11 +3134,13 @@ void LLViewerWindow::updateUI()
 
 	if (gLoggedInTime.getStarted())
 	{
-		if (gLoggedInTime.getElapsedTimeF32() > gSavedSettings.getF32("DestinationGuideHintTimeout"))
+		static const LLCachedControl<F32> dest_hint_timeout(gSavedSettings, "DestinationGuideHintTimeout");
+		if (gLoggedInTime.getElapsedTimeF32() > dest_hint_timeout)
 		{
 			LLFirstUse::notUsingDestinationGuide();
 		}
-		if (gLoggedInTime.getElapsedTimeF32() > gSavedSettings.getF32("SidePanelHintTimeout"))
+		static const LLCachedControl<F32> sidepanel_hint_timeout(gSavedSettings, "SidePanelHintTimeout");
+		if (gLoggedInTime.getElapsedTimeF32() > sidepanel_hint_timeout)
 		{
 			LLFirstUse::notUsingSidePanel();
 		}
@@ -3520,7 +3529,7 @@ void LLViewerWindow::updateLayout()
 		&& tool != gToolNull  
 		&& tool != LLToolCompInspect::getInstance() 
 		&& tool != LLToolDragAndDrop::getInstance() 
-		&& !gSavedSettings.getBOOL("FreezeTime"))
+		&& !LLPipeline::FreezeTime)
 	{ 
 		// Suppress the toolbox view if our source tool was the pie tool,
 		// and we've overridden to something else.
@@ -3587,7 +3596,8 @@ void LLViewerWindow::updateMouseDelta()
 
 	LLVector2 mouse_vel; 
 
-	if (gSavedSettings.getBOOL("MouseSmooth"))
+	static const LLCachedControl<bool> mouseSmooth(gSavedSettings, "MouseSmooth");
+	if (mouseSmooth)
 	{
 		static F32 fdx = 0.f;
 		static F32 fdy = 0.f;

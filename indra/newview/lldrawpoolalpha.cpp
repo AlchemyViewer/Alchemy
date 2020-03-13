@@ -94,7 +94,7 @@ S32 LLDrawPoolAlpha::getNumPostDeferredPasses()
 	{ //skip depth buffer filling pass when rendering impostors
 		return 1;
 	}
-	else if (gSavedSettings.getBOOL("RenderDepthOfField"))
+	else if (LLPipeline::RenderDepthOfField)
 	{
 		return 2; 
 	}
@@ -606,8 +606,8 @@ void LLDrawPoolAlpha::renderEmissives(U32 mask, std::vector<LLDrawInfo*>& emissi
 
 void LLDrawPoolAlpha::renderAlpha(U32 mask, S32 pass)
 {
-    BOOL batch_fullbrights = gSavedSettings.getBOOL("RenderAlphaBatchFullbrights");
-    BOOL batch_emissives   = gSavedSettings.getBOOL("RenderAlphaBatchEmissives");
+    static const LLCachedControl<bool> batch_fullbrights(gSavedSettings, "RenderAlphaBatchFullbrights");
+	static const LLCachedControl<bool> batch_emissives(gSavedSettings, "RenderAlphaBatchEmissives");
 	BOOL initialized_lighting = FALSE;
 	BOOL light_enabled = TRUE;
 	

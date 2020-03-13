@@ -650,7 +650,8 @@ void LLSettingsVOSky::updateSettings()
     // After some A/B comparison of relesae vs EEP, tweak to allow strength to fall below 2 
     // at night, for better match. (mSceneLightStrength is a divisor, so lower value means brighter
     // local lights)
-	F32 sun_dynamic_range = llmax(gSavedSettings.getF32("RenderSunDynamicRange"), 0.0001f);
+    static LLCachedControl<F32> render_sun_dyn_range(gSavedSettings, "RenderSunDynamicRange");
+	F32 sun_dynamic_range = llmax(render_sun_dyn_range(), 0.0001f);
     mSceneLightStrength = 2.0f * (0.75f + sun_dynamic_range * dp);
 
     gSky.setSunAndMoonDirectionsCFR(sun_direction, moon_direction);

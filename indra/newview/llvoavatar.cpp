@@ -2562,7 +2562,8 @@ void LLVOAvatar::idleUpdateVoiceVisualizer(bool voice_enabled)
 	// Don't render the user's own voice visualizer when in mouselook, or when opening the mic is disabled.
 	if(isSelf())
 	{
-		if(gAgentCamera.cameraMouselook() || gSavedSettings.getBOOL("VoiceDisableMic"))
+		static const LLCachedControl<bool> voice_disable_mic(gSavedSettings, "VoiceDisableMic");
+		if(gAgentCamera.cameraMouselook() || voice_disable_mic)
 		{
 			render_visualizer = false;
 		}
@@ -3048,10 +3049,10 @@ void LLVOAvatar::idleUpdateNameTag(const LLVector3& root_pos_last)
 	// draw if we're specifically hiding our own name.
 	if (isSelf())
 	{
+		static const LLCachedControl<bool> render_name_show_self(gSavedSettings, "RenderNameShowSelf");
 		render_name = render_name
 			&& !gAgentCamera.cameraMouselook()
-			&& (visible_chat || (gSavedSettings.getBOOL("RenderNameShowSelf") 
-								 && gSavedSettings.getS32("AvatarNameTagMode") ));
+			&& (visible_chat || (render_name_show_self && sRenderName));
 	}
 
 	if ( !render_name )
@@ -5781,7 +5782,7 @@ void LLVOAvatar::resetAnimations()
 // animations.
 LLUUID LLVOAvatar::remapMotionID(const LLUUID& id)
 {
-	BOOL use_new_walk_run = gSavedSettings.getBOOL("UseNewWalkRun");
+	static const LLCachedControl<bool> use_new_walk_run(gSavedSettings, "UseNewWalkRun");
 	LLUUID result = id;
 
 	// start special case female walk for female avatars
@@ -7988,8 +7989,9 @@ BOOL LLVOAvatar::isFullyLoaded() const
 
 bool LLVOAvatar::isTooComplex() const
 {
+	static const LLCachedControl<bool> always_render_friends(gSavedSettings, "AlwaysRenderFriends", false);
 	bool too_complex;
-	bool render_friend =  (LLAvatarTracker::instance().isBuddy(getID()) && gSavedSettings.getBOOL("AlwaysRenderFriends"));
+	bool render_friend =  (always_render_friends && LLAvatarTracker::instance().isBuddy(getID()));
 
 	if (isSelf() || render_friend || mVisuallyMuteSetting == AV_ALWAYS_RENDER)
 	{

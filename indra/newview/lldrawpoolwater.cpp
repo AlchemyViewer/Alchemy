@@ -767,9 +767,11 @@ void LLDrawPoolWater::shade()
         edge_shader = &gWaterEdgeProgram;
 	}
 
+	static const LLCachedControl<bool> render_water_mip_normal(gSavedSettings, "RenderWaterMipNormal");
+
     if (mWaterNormp[0])
     {
-	    if (gSavedSettings.getBOOL("RenderWaterMipNormal"))
+	    if (render_water_mip_normal)
 	    {
 		    mWaterNormp[0]->setFilteringOption(LLTexUnit::TFO_ANISOTROPIC);
 	    }
@@ -781,7 +783,7 @@ void LLDrawPoolWater::shade()
 
     if (mWaterNormp[1])
     {
-	    if (gSavedSettings.getBOOL("RenderWaterMipNormal"))
+	    if (render_water_mip_normal)
 	    {
             mWaterNormp[1]->setFilteringOption(LLTexUnit::TFO_ANISOTROPIC);
 	    }

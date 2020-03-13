@@ -1532,7 +1532,7 @@ BOOL LLVOAvatarSelf::isLocalTextureDataAvailable(const LLViewerTexLayerSet* laye
 //-----------------------------------------------------------------------------
 BOOL LLVOAvatarSelf::isLocalTextureDataFinal(const LLViewerTexLayerSet* layerset) const
 {
-	const U32 desired_tex_discard_level = gSavedSettings.getU32("TextureDiscardLevel"); 
+	static const LLCachedControl<U32> desired_tex_discard_level(gSavedSettings, "TextureDiscardLevel");
 	// const U32 desired_tex_discard_level = 0; // hack to not bake textures on lower discard levels.
 
 	for (U32 i = 0; i < mBakedTextureDatas.size(); i++)
@@ -1567,7 +1567,7 @@ BOOL LLVOAvatarSelf::isLocalTextureDataFinal(const LLViewerTexLayerSet* layerset
 
 BOOL LLVOAvatarSelf::isAllLocalTextureDataFinal() const
 {
-	const U32 desired_tex_discard_level = gSavedSettings.getU32("TextureDiscardLevel"); 
+	static const LLCachedControl<U32> desired_tex_discard_level(gSavedSettings, "TextureDiscardLevel");
 	// const U32 desired_tex_discard_level = 0; // hack to not bake textures on lower discard levels
 
 	for (U32 i = 0; i < mBakedTextureDatas.size(); i++)
@@ -2257,7 +2257,7 @@ const std::string LLVOAvatarSelf::debugDumpLocalTextureDataInfo(const LLViewerTe
 const std::string LLVOAvatarSelf::debugDumpAllLocalTextureDataInfo() const
 {
 	std::string text;
-	const U32 override_tex_discard_level = gSavedSettings.getU32("TextureDiscardLevel");
+	static const LLCachedControl<U32> override_tex_discard_level(gSavedSettings, "TextureDiscardLevel");
 
 	for (U32 i = 0; i < mBakedTextureDatas.size(); i++)
 	{

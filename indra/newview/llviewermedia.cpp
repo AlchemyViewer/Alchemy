@@ -653,7 +653,8 @@ void LLViewerMedia::updateMedia(void *dummy_arg)
 	LL_RECORD_BLOCK_TIME(FTM_MEDIA_UPDATE);
 
 	// Enable/disable the plugin read thread
-	LLPluginProcessParent::setUseReadThread(gSavedSettings.getBOOL("PluginUseReadThread"));
+	static LLCachedControl<bool> pluginUseReadThread(gSavedSettings, "PluginUseReadThread");
+	LLPluginProcessParent::setUseReadThread(pluginUseReadThread);
 
 	// HACK: we always try to keep a spare running webkit plugin around to improve launch times.
 	// 2017-04-19 Removed CP - this doesn't appear to buy us much and consumes a lot of resources so
@@ -702,10 +703,10 @@ void LLViewerMedia::updateMedia(void *dummy_arg)
 
 	static LLCachedControl<bool> inworld_media_enabled(gSavedSettings, "AudioStreamingMedia", true);
 	static LLCachedControl<bool> inworld_audio_enabled(gSavedSettings, "AudioStreamingMusic", true);
-	U32 max_instances = gSavedSettings.getU32("PluginInstancesTotal");
-	U32 max_normal = gSavedSettings.getU32("PluginInstancesNormal");
-	U32 max_low = gSavedSettings.getU32("PluginInstancesLow");
-	F32 max_cpu = gSavedSettings.getF32("PluginInstancesCPULimit");
+	static LLCachedControl<U32> max_instances(gSavedSettings, "PluginInstancesTotal");
+	static LLCachedControl<U32> max_normal(gSavedSettings, "PluginInstancesNormal");
+	static LLCachedControl<U32> max_low(gSavedSettings, "PluginInstancesLow");
+	static LLCachedControl<F32> max_cpu(gSavedSettings, "PluginInstancesCPULimit");
 	// Setting max_cpu to 0.0 disables CPU usage checking.
 	bool check_cpu_usage = (max_cpu != 0.0f);
 
@@ -894,7 +895,8 @@ void LLViewerMedia::updateMedia(void *dummy_arg)
 		}
 	}
 
-	if(gSavedSettings.getBOOL("MediaPerformanceManagerDebug"))
+	static LLCachedControl<bool> mediaPerformanceManager(gSavedSettings, "MediaPerformanceManagerDebug");
+	if(mediaPerformanceManager)
 	{
 		// Give impls the same ordering as the priority list
 		// they're already in the right order for this.
@@ -2080,16 +2082,19 @@ void LLViewerMediaImpl::updateVolume()
 
 		if (mProximityCamera > 0)
 		{
-			if (mProximityCamera > gSavedSettings.getF32("MediaRollOffMax"))
+			static LLCachedControl<F32> sMediaRollOffMax(gSavedSettings, "MediaRollOffMax", 30.f);
+			static LLCachedControl<F32> sMediaRollOffMin(gSavedSettings, "MediaRollOffMin", 5.f);
+			static LLCachedControl<F32> sMediaRollOffRate(gSavedSettings, "MediaRollOffRate", 0.125f);
+			if (mProximityCamera > sMediaRollOffMax)
 			{
 				volume = 0;
 			}
-			else if (mProximityCamera > gSavedSettings.getF32("MediaRollOffMin"))
+			else if (mProximityCamera > sMediaRollOffMin)
 			{
 				// attenuated_volume = 1 / (roll_off_rate * (d - min))^2
 				// the +1 is there so that for distance 0 the volume stays the same
-				F64 adjusted_distance = mProximityCamera - gSavedSettings.getF32("MediaRollOffMin");
-				F64 attenuation = 1.0 + (gSavedSettings.getF32("MediaRollOffRate") * adjusted_distance);
+				F64 adjusted_distance = mProximityCamera - sMediaRollOffMin;
+				F64 attenuation = 1.0 + (sMediaRollOffRate * adjusted_distance);
 				attenuation = 1.0 / (attenuation * attenuation);
 				// the attenuation multiplier should never be more than one since that would increase volume
 				volume = volume * llmin(1.0, attenuation);
@@ -2337,7 +2342,7 @@ void LLViewerMediaImpl::updateJavascriptObject()
 	if ( mMediaSource )
 	{
 		// flag to expose this information to internal browser or not.
-		bool enable = gSavedSettings.getBOOL("BrowserEnableJSObject");
+		static LLCachedControl<bool> enable(gSavedSettings, "BrowserEnableJSObject", false);
 
 		if(!enable)
 		{
