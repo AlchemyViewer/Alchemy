@@ -1432,7 +1432,8 @@ bool LLMeshRepoThread::fetchMeshDecomposition(const LLUUID& mesh_id)
 
 	mHeaderMutex->lock();
 
-	if (mMeshHeader.find(mesh_id) == mMeshHeader.end())
+	auto header_it = mMeshHeader.find(mesh_id);
+	if (header_it == mMeshHeader.end())
 	{ //we have no header info for this mesh, do nothing
 		mHeaderMutex->unlock();
 		return false;
@@ -1444,9 +1445,10 @@ bool LLMeshRepoThread::fetchMeshDecomposition(const LLUUID& mesh_id)
 	
 	if (header_size > 0)
 	{
-		S32 version = mMeshHeader[mesh_id]["version"].asInteger();
-		S32 offset = header_size + mMeshHeader[mesh_id]["physics_convex"]["offset"].asInteger();
-		S32 size = mMeshHeader[mesh_id]["physics_convex"]["size"].asInteger();
+		const auto& header = header_it->second;
+		S32 version = header["version"].asInteger();
+		S32 offset = header_size + header["physics_convex"]["offset"].asInteger();
+		S32 size = header["physics_convex"]["size"].asInteger();
 
 		mHeaderMutex->unlock();
 
@@ -1529,7 +1531,8 @@ bool LLMeshRepoThread::fetchMeshPhysicsShape(const LLUUID& mesh_id)
 
 	mHeaderMutex->lock();
 
-	if (mMeshHeader.find(mesh_id) == mMeshHeader.end())
+	auto header_it = mMeshHeader.find(mesh_id);
+	if (header_it == mMeshHeader.end())
 	{ //we have no header info for this mesh, do nothing
 		mHeaderMutex->unlock();
 		return false;
@@ -1541,9 +1544,10 @@ bool LLMeshRepoThread::fetchMeshPhysicsShape(const LLUUID& mesh_id)
 
 	if (header_size > 0)
 	{
-		S32 version = mMeshHeader[mesh_id]["version"].asInteger();
-		S32 offset = header_size + mMeshHeader[mesh_id]["physics_mesh"]["offset"].asInteger();
-		S32 size = mMeshHeader[mesh_id]["physics_mesh"]["size"].asInteger();
+		const auto& header = header_it->second;
+		S32 version = header["version"].asInteger();
+		S32 offset = header_size + header["physics_mesh"]["offset"].asInteger();
+		S32 size = header["physics_mesh"]["size"].asInteger();
 
 		mHeaderMutex->unlock();
 
@@ -1965,7 +1969,7 @@ bool LLMeshRepoThread::skinInfoReceived(const LLUUID& mesh_id, U8* data, S32 dat
 		// LL_DEBUGS(LOG_MESH) << "info pelvis offset" << info.mPelvisOffset << LL_ENDL;
 		{
 			LLMutexLock lock(mMutex);
-			mSkinInfoQ.push(info);
+			mSkinInfoQ.emplace(std::move(info));
 		}
 	}
 
@@ -3265,8 +3269,7 @@ void LLMeshHeaderHandler::processData(LLCore::BufferArray * /* body */, S32 /* b
 				file.write(data, data_size);
 			
 				// zero out the rest of the file 
-				U8 block[MESH_HEADER_SIZE];
-				memset(block, 0, sizeof(block));
+				U8 block[MESH_HEADER_SIZE] = {0};
 
 				while (bytes-file.tell() > sizeof(block))
 				{
