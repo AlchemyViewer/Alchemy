@@ -322,7 +322,9 @@ void LLStatusBar::refresh()
 
 	// Disable media toggle if there's no media, parcel media, and no parcel audio
 	// (or if media is disabled)
-	bool button_enabled = (gSavedSettings.getBOOL("AudioStreamingMusic")||gSavedSettings.getBOOL("AudioStreamingMedia")) && 
+	static const LLCachedControl<bool> audio_streaming_enabled(gSavedSettings, "AudioStreamingMusic");
+	static const LLCachedControl<bool> media_streaming_enabled(gSavedSettings, "AudioStreamingMedia");
+	bool button_enabled = (audio_streaming_enabled || media_streaming_enabled) &&
 						  (media_inst->hasInWorldMedia() || media_inst->hasParcelMedia() || media_inst->hasParcelAudio());
 	mMediaToggle->setEnabled(button_enabled);
 	// Note the "sense" of the toggle is opposite whether media is playing or not

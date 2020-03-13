@@ -342,10 +342,12 @@ void update_statistics()
 
 	record(LLStatViewer::TRIANGLES_DRAWN_PER_FRAME, last_frame_recording.getSum(LLStatViewer::TRIANGLES_DRAWN));
 
-	sample(LLStatViewer::ENABLE_VBO,      (F64)gSavedSettings.getBOOL("RenderVBOEnable"));
+	sample(LLStatViewer::ENABLE_VBO,      (F64)LLVertexBuffer::sEnableVBOs);
 	sample(LLStatViewer::LIGHTING_DETAIL, (F64)gPipeline.getLightingDetail());
-	sample(LLStatViewer::DRAW_DISTANCE,   (F64)gSavedSettings.getF32("RenderFarClip"));
-	sample(LLStatViewer::CHAT_BUBBLES,    gSavedSettings.getBOOL("UseChatBubbles"));
+	sample(LLStatViewer::DRAW_DISTANCE,   (F64)LLPipeline::RenderFarClip);
+
+	static const LLCachedControl<bool> use_chat_bubbles(gSavedSettings, "UseChatBubbles");
+	sample(LLStatViewer::CHAT_BUBBLES, use_chat_bubbles);
 
 	typedef LLTrace::StatType<LLTrace::TimeBlockAccumulator>::instance_tracker_t stat_type_t;
 

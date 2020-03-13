@@ -417,7 +417,8 @@ void LLHUDText::updateVisibility()
 
 	LLVector3 pos_agent_center = gAgent.getPosAgentFromGlobal(mPositionGlobal) - dir_from_camera;
 	F32 last_distance_center = (pos_agent_center - LLViewerCamera::getInstance()->getOrigin()).magVec();
-	F32 max_draw_distance = gSavedSettings.getF32("PrimTextMaxDrawDistance");
+	static const LLCachedControl<F32> prim_text_max_draw(gSavedSettings, "PrimTextMaxDrawDistance");
+	F32 max_draw_distance = prim_text_max_draw;
 
 	if(max_draw_distance < 0)
 	{

@@ -494,9 +494,10 @@ void idle_afk_check()
 {
 	// check idle timers
 	F32 current_idle = gAwayTriggerTimer.getElapsedTimeF32();
+	static const LLCachedControl<S32> afk_timeout_cc(gSavedSettings, "AFKTimeout");
 // [RLVa:KB] - Checked: 2010-05-03 (RLVa-1.2.0g) | Modified: RLVa-1.2.0g
 	// Enforce an idle time of 30 minutes if @allowidle=n restricted
-	F32 afk_timeout = (!gRlvHandler.hasBehaviour(RLV_BHVR_ALLOWIDLE)) ? gSavedSettings.getS32("AFKTimeout") : 60 * 30;
+	F32 afk_timeout = (!gRlvHandler.hasBehaviour(RLV_BHVR_ALLOWIDLE)) ? afk_timeout_cc : 60 * 30;
 // [/RLVa:KB]
 //	F32 afk_timeout  = gSavedSettings.getS32("AFKTimeout");
 	if (afk_timeout && (current_idle > afk_timeout) && ! gAgent.getAFK())
@@ -4717,7 +4718,7 @@ void LLAppViewer::idle()
 	// Smoothly weight toward current frame
 	gFPSClamped = (frame_rate_clamped + (4.f * gFPSClamped)) / 5.f;
 
-	F32 qas = gSavedSettings.getF32("QuitAfterSeconds");
+	static const LLCachedControl<F32> qas(gSavedSettings, "QuitAfterSeconds");
 	if (qas > 0.f)
 	{
 		if (gRenderStartTime.getElapsedTimeF32() > qas)
@@ -4762,7 +4763,8 @@ void LLAppViewer::idle()
 	    // Update simulator agent state
 	    //
 
-		if (gSavedSettings.getBOOL("RotateRight"))
+		static const LLCachedControl<bool> rotateRight(gSavedSettings, "RotateRight");
+		if (rotateRight)
 		{
 			gAgent.moveYaw(-1.f);
 		}
@@ -5299,7 +5301,8 @@ void LLAppViewer::idleNetwork()
 	gObjectList.mNumNewObjects = 0;
 	S32 total_decoded = 0;
 
-	if (!gSavedSettings.getBOOL("SpeedTest"))
+	static const LLCachedControl<bool> speedTest(gSavedSettings, "SpeedTest");
+	if (!speedTest)
 	{
 		LL_RECORD_BLOCK_TIME(FTM_IDLE_NETWORK); // decode
 
@@ -5338,7 +5341,8 @@ void LLAppViewer::idleNetwork()
 		}
 
 		// Handle per-frame message system processing.
-		gMessageSystem->processAcks(gSavedSettings.getF32("AckCollectTime"));
+        static LLCachedControl<F32> sAckCollectTime(gSavedSettings, "AckCollectTime", 0.1f);
+		gMessageSystem->processAcks(sAckCollectTime);
 
 #ifdef TIME_THROTTLE_MESSAGES
 		if (total_time >= CheckMessagesMaxTime)
@@ -5652,7 +5656,8 @@ void LLAppViewer::setMasterSystemAudioMute(bool mute)
 //virtual
 bool LLAppViewer::getMasterSystemAudioMute()
 {
-	return gSavedSettings.getBOOL("MuteAudio");
+	static const LLCachedControl<bool> mute_audio(gSavedSettings, "MuteAudio");
+	return mute_audio;
 }
 
 //----------------------------------------------------------------------------
