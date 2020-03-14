@@ -223,10 +223,11 @@ void main()
     // fully opaque and for fully transparent objects. This code assumes the 0 alpha
     // is always from the opaque end of the scale. TODO: Remove the conditional once
     // the root cause of the slider ambiguity is fixed.
-    if (vertex_color.a > 0.0)
-    {
-        diffuse_srgb.a *= vertex_color.a;
-    }
+    // <Alchemy:Rye>: This broke alpha masked material content. REVERT UNTIL THEY FIX IT.
+    // if (vertex_color.a > 0.0)
+    // {
+    //     diffuse_srgb.a *= vertex_color.a;
+    // }
     vec4 diffuse_linear = vec4(srgb_to_linear(diffuse_srgb.rgb), diffuse_srgb.a);
 
 #if (DIFFUSE_ALPHA_MODE == DIFFUSE_ALPHA_MODE_MASK)
