@@ -51,10 +51,6 @@ static const F64 LL_APR_USEC_PER_SEC = 1000000.0;
 LLDate::LLDate() : mSecondsSinceEpoch(DATE_EPOCH)
 {}
 
-LLDate::LLDate(const LLDate& date) :
-	mSecondsSinceEpoch(date.mSecondsSinceEpoch)
-{}
-
 LLDate::LLDate(F64SecondsImplicit seconds_since_epoch) :
 	mSecondsSinceEpoch(seconds_since_epoch.value())
 {}
