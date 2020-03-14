@@ -62,14 +62,10 @@ if(WINDOWS)
       endif(ADDRESS_SIZE EQUAL 32)
     endif (BUGSPLAT_DB)
 
-    if (FMODEX)
-
-        if(ADDRESS_SIZE EQUAL 32)
-            set(release_files ${release_files} fmodex.dll)
-        else(ADDRESS_SIZE EQUAL 32)
-            set(release_files ${release_files} fmodex64.dll)
-        endif(ADDRESS_SIZE EQUAL 32)
-    endif (FMODEX)
+    if (USE_FMODSTUDIO)
+      list(APPEND debug_files fmodL.dll)
+      list(APPEND release_files fmod.dll)
+    endif (USE_FMODSTUDIO)
 
     #*******************************
     # Copy MS C runtime dlls, required for packaging.
@@ -192,10 +188,10 @@ elseif(DARWIN)
         libnghttp2.14.14.0.dylib
        )
 
-    if (FMODEX)
-      set(debug_files ${debug_files} libfmodexL.dylib)
-      set(release_files ${release_files} libfmodex.dylib)
-    endif (FMODEX)
+    if (USE_FMODSTUDIO)
+      list(APPEND debug_files libfmodL.dylib)
+      list(APPEND release_files libfmod.dylib)
+    endif (USE_FMODSTUDIO)
 
 elseif(LINUX)
     # linux is weird, multiple side by side configurations aren't supported
@@ -242,10 +238,10 @@ elseif(LINUX)
         libfontconfig.so.1
        )
 
-    if (FMODEX)
-      set(debug_files ${debug_files} "libfmodexL.so")
-      set(release_files ${release_files} "libfmodex.so")
-    endif (FMODEX)
+    if (USE_FMODSTUDIO)
+      list(APPEND debug_files "libfmodL.so")
+      list(APPEND release_files "libfmod.so")
+    endif (USE_FMODSTUDIO)
 
 else(WINDOWS)
     message(STATUS "WARNING: unrecognized platform for staging 3rd party libs, skipping...")

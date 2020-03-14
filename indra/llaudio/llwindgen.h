@@ -74,7 +74,7 @@ public:
 		bool interp_freq = false; 
 		
 		//if the frequency isn't changing much, we don't need to interpolate in the inner loop
-		if (llabs(mTargetFreq - mCurrentFreq) < (mCurrentFreq * 0.112))
+		if (llabs(mTargetFreq - mCurrentFreq) < (mCurrentFreq * 0.112f))
 		{
 			// calculate resonant filter coefficients
 			mCurrentFreq = mTargetFreq;

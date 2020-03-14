@@ -39,8 +39,8 @@
 #include "llviewermedia_streamingaudio.h"
 #include "llaudioengine.h"
 
-#ifdef LL_FMODEX
-# include "llaudioengine_fmodex.h"
+#if USE_FMODSTUDIO
+# include "llaudioengine_fmodstudio.h"
 #endif
 
 #ifdef LL_OPENAL
@@ -625,12 +625,14 @@ bool idle_startup()
 			delete gAudiop;
 			gAudiop = NULL;
 
-#ifdef LL_FMODEX		
+#if USE_FMODSTUDIO
+			if (!gAudiop
 #if !LL_WINDOWS
-			if (NULL == getenv("LL_BAD_FMODEX_DRIVER"))
+				&& NULL == getenv("LL_BAD_FMODSTUDIO_DRIVER")
 #endif // !LL_WINDOWS
+				)
 			{
-				gAudiop = (LLAudioEngine *) new LLAudioEngine_FMODEX(gSavedSettings.getBOOL("FMODExProfilerEnable"));
+				gAudiop = (LLAudioEngine *) new LLAudioEngine_FMODSTUDIO(LLAppViewer::instance()->getSecondLifeTitle(), gSavedSettings.getBOOL("FMODProfilerEnable"), gSavedSettings.getU32("FMODResampleMethod"));
 			}
 #endif
 

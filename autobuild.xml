@@ -729,16 +729,18 @@
         <key>version</key>
         <string>2.1.1.500375</string>
       </map>
-      <key>fmodex</key>
+      <key>fmodstudio</key>
       <map>
         <key>copyright</key>
-        <string>COPYRIGHT 2014 FIRELIGHT TECHNOLOGIES PTY LTD. ALL RIGHTS RESERVED</string>
+        <string>FMOD Studio, Copyright (c) Firelight Technologies Pty Ltd.</string>
+        <key>description</key>
+        <string>FMOD Studio audio system library</string>
         <key>license</key>
-        <string>fmodex</string>
+        <string>fmodstudio</string>
         <key>license_file</key>
-        <string>LICENSES/fmodex.txt</string>
+        <string>LICENSES/fmodstudio.txt</string>
         <key>name</key>
-        <string>fmodex</string>
+        <string>fmodstudio</string>
         <key>platforms</key>
         <map>
           <key>darwin</key>
@@ -746,45 +748,25 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>ed0d8767652aecd65a7fef3e28645bad</string>
+              <string>21610bcca4e2ff76b6483c1faae8b152</string>
+              <key>hash_algorithm</key>
+              <string>md5</string>
               <key>url</key>
-              <string>http://s3-proxy.lindenlab.com/private-builds-secondlife-com/hg/repo/fmodex_3p-update-fmodex/rev/297261/arch/Darwin/installer/fmodex-4.44.31.297261-darwin-297261.tar.bz2</string>
+              <string>https://pkg.alchemyviewer.org/repository/autobuild-internal/fmodstudio/darwin/fmodstudio-2.00.07.4-darwin-4.tar.bz2</string>
             </map>
             <key>name</key>
             <string>darwin</string>
-          </map>
-          <key>darwin64</key>
-          <map>
-            <key>archive</key>
-            <map>
-              <key>hash</key>
-              <string>cba1feed7f6bb671d791a517fddf205a</string>
-              <key>url</key>
-              <string>https://downloads.catznip.com/packages/fmodex-44461-darwin-201601300040-r23.tar.bz2</string>
-            </map>
-            <key>name</key>
-            <string>darwin64</string>
-          </map>
-          <key>linux</key>
-          <map>
-            <key>archive</key>
-            <map>
-              <key>hash</key>
-              <string>b847ec838da1ad1dd646df9d74e9b395</string>
-              <key>url</key>
-              <string>http://s3-proxy.lindenlab.com/private-builds-secondlife-com/hg/repo/p64_3p-fmodex/rev/314207/arch/Linux/installer/fmodex-4.44.61.314207-linux-314207.tar.bz2</string>
-            </map>
-            <key>name</key>
-            <string>linux</string>
           </map>
           <key>linux64</key>
           <map>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>89a75d8719f7b2cbe1e54cd8407bb992</string>
+              <string>54dbd41322a08a1fc333ca6d96af5502</string>
+              <key>hash_algorithm</key>
+              <string>md5</string>
               <key>url</key>
-              <string>http://s3-proxy.lindenlab.com/private-builds-secondlife-com/ct2/1544/3476/fmodex-4.44.64.501533-linux64-501533.tar.bz2</string>
+              <string>https://depot.alchemyviewer.org/pub/linux64/lib/fmodstudio-1.10.00-linux64-201709282320.tar.bz2</string>
             </map>
             <key>name</key>
             <string>linux64</string>
@@ -794,9 +776,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>2038da4ab71da8dc086738007c0acdd3</string>
+              <string>d32efb193ffcd73bcba4875ddfd17bf0</string>
+              <key>hash_algorithm</key>
+              <string>md5</string>
               <key>url</key>
-              <string>http://viewer.catznip.com/downloads/packages/fmodex-4.44.61-windows-171261212.tar.bz2</string>
+              <string>https://pkg.alchemyviewer.org/repository/autobuild-internal/fmodstudio/windows/fmodstudio-2.00.07.4-windows-4.tar.bz2</string>
             </map>
             <key>name</key>
             <string>windows</string>
@@ -806,16 +790,18 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>b4b73cd64bfd72e7ae84aad429d69cf6</string>
+              <string>0604fd6b53ceaf14ce04d0de1bea51b8</string>
+              <key>hash_algorithm</key>
+              <string>md5</string>
               <key>url</key>
-              <string>http://viewer.catznip.com/downloads/packages/fmodex-4.44.61-windows64-171261211.tar.bz2</string>
+              <string>file:///c:/bld/fmodstudio-2.00.07.4-windows64-4.tar.bz2</string>
             </map>
             <key>name</key>
             <string>windows64</string>
           </map>
         </map>
         <key>version</key>
-        <string>4.44.64.501533</string>
+        <string>2.00.07.4</string>
       </map>
       <key>fontconfig</key>
       <map>
@@ -1748,9 +1734,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>da3b1ea90797b189d80ab5d50fdf05d4</string>
+              <string>6bb48e878e7f4e7b6630a6f3a5fd2f89</string>
+              <key>hash_algorithm</key>
+              <string>md5</string>
               <key>url</key>
-              <string>http://s3-proxy.lindenlab.com/private-builds-secondlife-com/ct2/15260/98469/kdu-7.10.4.513518-windows64-513518.tar.bz2</string>
+              <string>file:///c:/bld/kdu-7.10.4.200681608-windows64-200681608.tar.bz2</string>
             </map>
             <key>name</key>
             <string>windows64</string>
@@ -2706,9 +2694,9 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>545954e46a316e469f6b68ecbcb76573</string>
+              <string>8a7f0be5647e07235d205ac00805fb78</string>
               <key>url</key>
-              <string>http://viewer.catznip.com/downloads/packages/openjpeg-1.5.2.171271050-windows-171271050.tar.bz2</string>
+              <string>http://automated-builds-secondlife-com.s3.amazonaws.com/ct2/1116/2586/openjpeg-1.5.1.501102-windows-501102.tar.bz2</string>
             </map>
             <key>name</key>
             <string>windows</string>
@@ -2718,9 +2706,9 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>a68103651741c8b66356153ee5668d6b</string>
+              <string>398544058036bc27097fcff208934d11</string>
               <key>url</key>
-              <string>http://viewer.catznip.com/downloads/packages/openjpeg-1.5.2.171271046-windows64-171271046.tar.bz2</string>
+              <string>http://automated-builds-secondlife-com.s3.amazonaws.com/ct2/1115/2581/openjpeg-1.5.1.501102-windows64-501102.tar.bz2</string>
             </map>
             <key>name</key>
             <string>windows64</string>

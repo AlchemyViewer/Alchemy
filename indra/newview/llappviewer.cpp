@@ -1789,18 +1789,11 @@ bool LLAppViewer::cleanup()
 
 	if (gAudiop)
 	{
-        // be sure to stop the internet stream cleanly BEFORE destroying the interface to stop it.
-        gAudiop->stopInternetStream();
-        // shut down the streaming audio sub-subsystem first, in case it relies on not outliving the general audio subsystem.
-        LLStreamingAudioInterface *sai = gAudiop->getStreamingAudioImpl();
-		delete sai;
-		gAudiop->setStreamingAudioImpl(NULL);
-
-        // shut down the audio subsystem
+		// shut down the audio subsystem
         gAudiop->shutdown();
 
 		delete gAudiop;
-		gAudiop = NULL;
+		gAudiop = nullptr;
 	}
 
 	// Note: this is where LLFeatureManager::getInstance()-> used to be deleted.

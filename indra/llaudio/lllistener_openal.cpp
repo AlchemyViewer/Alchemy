@@ -31,32 +31,29 @@
 #include "lllistener_openal.h"
 
 LLListener_OpenAL::LLListener_OpenAL()
-{
-	init();
-}
-
-LLListener_OpenAL::~LLListener_OpenAL()
+	: LLListener(),
+	  mRolloffFactor(1.f)
 {
 }
 
-void LLListener_OpenAL::translate(LLVector3 offset)
+void LLListener_OpenAL::translate(const LLVector3& offset)
 {
 	//LL_INFOS() << "LLListener_OpenAL::translate() : " << offset << LL_ENDL;
 	LLListener::translate(offset);
 }
 
-void LLListener_OpenAL::setPosition(LLVector3 pos)
+void LLListener_OpenAL::setPosition(const LLVector3& pos)
 {
 	//LL_INFOS() << "LLListener_OpenAL::setPosition() : " << pos << LL_ENDL;
 	LLListener::setPosition(pos);
 }
 
-void LLListener_OpenAL::setVelocity(LLVector3 vel)
+void LLListener_OpenAL::setVelocity(const LLVector3& vel)
 {
 	LLListener::setVelocity(vel);
 }
 
-void LLListener_OpenAL::orient(LLVector3 up, LLVector3 at)
+void LLListener_OpenAL::orient(const LLVector3& up, const LLVector3& at)
 {
 	//LL_INFOS() << "LLListener_OpenAL::orient() up: " << up << " at: " << at << LL_ENDL;
 	LLListener::orient(up, at);
@@ -64,18 +61,20 @@ void LLListener_OpenAL::orient(LLVector3 up, LLVector3 at)
 
 void LLListener_OpenAL::commitDeferredChanges()
 {
-	ALfloat orientation[6];
-	orientation[0] = mListenAt.mV[0];
-	orientation[1] = mListenAt.mV[1];
-	orientation[2] = mListenAt.mV[2];
-	orientation[3] = mListenUp.mV[0];
-	orientation[4] = mListenUp.mV[1];
-	orientation[5] = mListenUp.mV[2];
+	ALfloat orientation[] = {
+		mListenAt.mV[0],
+		mListenAt.mV[1],
+		mListenAt.mV[2],
+		mListenUp.mV[0],
+		mListenUp.mV[1],
+		mListenUp.mV[2],
+	};
 
-	ALfloat velocity[3];
-	velocity[0] = mVelocity.mV[0];
-	velocity[1] = mVelocity.mV[1];
-	velocity[2] = mVelocity.mV[2];
+	ALfloat velocity[3] = {
+		mVelocity.mV[0],
+		mVelocity.mV[1],
+		mVelocity.mV[2],
+	};
 
 	alListenerfv(AL_ORIENTATION, orientation);
 	alListenerfv(AL_POSITION, mPosition.mV);

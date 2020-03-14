@@ -16665,18 +16665,18 @@
     <key>Value</key>
     <real>1.0</real>
   </map>
-  <key>FMODExProfilerEnable</key>
+  <key>FMODProfilerEnable</key>
   <map>
     <key>Comment</key>
-    <string>Enable profiler tool if using FMOD Ex</string>
+    <string>Enable profiler tool if using FMOD Studio</string>
     <key>Persist</key>
     <integer>1</integer>
     <key>Type</key>
     <string>Boolean</string>
     <key>Value</key>
     <integer>0</integer>
-    </map>
-  <key>FMODExDecodeBufferSize</key>
+  </map>
+  <key>FMODDecodeBufferSize</key>
   <map>
     <key>Comment</key>
     <string>Sets the streaming decode buffer size (in milliseconds)</string>
@@ -16686,8 +16686,19 @@
     <string>U32</string>
     <key>Value</key>
     <integer>1000</integer>
-    </map>
-  <key>FMODExStreamBufferSize</key>
+  </map>
+  <key>FMODResampleMethod</key>
+  <map>
+    <key>Comment</key>
+    <string>Sets the method used for internal resampler 0(Linear), 1(Cubic), 2(Spline)</string>
+    <key>Persist</key>
+    <integer>1</integer>
+    <key>Type</key>
+    <string>U32</string>
+    <key>Value</key>
+    <integer>0</integer>
+  </map>
+  <key>FMODStreamBufferSize</key>
   <map>
     <key>Comment</key>
     <string>Sets the streaming buffer size (in milliseconds)</string>

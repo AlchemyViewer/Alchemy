@@ -513,14 +513,11 @@ class WindowsManifest(ViewerManifest):
                 print err.message
                 print "Skipping GLOD library (assumming linked statically)"
 
-            # Get fmodex dll, continue if missing
-            try:
-                if(self.address_size == 64):
-                    self.path("fmodex64.dll")
-                else:
-                    self.path("fmodex.dll")
-            except:
-                print "Skipping fmodex audio library(assuming other audio engine)"
+            # Get fmodstudio dll, continue if missing
+            if self.args['configuration'].lower() == 'debug':
+                self.path("fmodL.dll")
+            else:
+                self.path("fmod.dll")
 
             # For textures
             self.path("openjpeg.dll")
@@ -1049,12 +1046,12 @@ class DarwinManifest(ViewerManifest):
                 # dylibs that vary based on configuration
                 if self.args['configuration'].lower() == 'debug':
                     for libfile in (
-                                "libfmodexL.dylib",
+                                "libfmodL.dylib",
                                 ):
                         dylibs += path_optional(os.path.join(debpkgdir, libfile), libfile)
                 else:
                     for libfile in (
-                                "libfmodex.dylib",
+                                "libfmod.dylib",
                                 ):
                         dylibs += path_optional(os.path.join(relpkgdir, libfile), libfile)
 
@@ -1520,13 +1517,11 @@ class Linux_i686_Manifest(LinuxManifest):
                 pass
 
             try:
-                self.path("libfmodex-*.so")
-                self.path("libfmodex.so")
+                self.path_optional("libfmod.so*")
                 pass
             except:
-                print "Skipping libfmodex.so - not found"
+                print "Skipping libfmod.so - not found"
                 pass
-
 
         # Vivox runtimes
         with self.prefix(src=relpkgdir, dst="bin"):

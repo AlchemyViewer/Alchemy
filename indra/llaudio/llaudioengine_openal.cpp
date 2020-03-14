@@ -47,11 +47,6 @@ LLAudioEngine_OpenAL::LLAudioEngine_OpenAL()
 }
 
 // virtual
-LLAudioEngine_OpenAL::~LLAudioEngine_OpenAL()
-{
-}
-
-// virtual
 bool LLAudioEngine_OpenAL::init(const S32 num_channels, void* userdata)
 {
 	mWindGen = NULL;

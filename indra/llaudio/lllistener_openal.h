@@ -33,22 +33,22 @@
 #include "AL/al.h"
 #include "AL/alut.h"
 
-class LLListener_OpenAL  : public LLListener
+class LLListener_OpenAL final : public LLListener
 {
  public:  
 	LLListener_OpenAL();
-	virtual ~LLListener_OpenAL();
+	virtual ~LLListener_OpenAL() = default;
 
-	virtual void translate(LLVector3 offset);
-	virtual void setPosition(LLVector3 pos);
-	virtual void setVelocity(LLVector3 vel);
-	virtual void orient(LLVector3 up, LLVector3 at);
-	virtual void commitDeferredChanges();
+	virtual void translate(const LLVector3& offset) override;
+	virtual void setPosition(const LLVector3& pos) override;
+	virtual void setVelocity(const LLVector3& vel) override;
+	virtual void orient(const LLVector3& up, const LLVector3& at) override;
+	virtual void commitDeferredChanges() override;
 
-	virtual void setDopplerFactor(F32 factor);
-	virtual F32 getDopplerFactor();
-	virtual void setRolloffFactor(F32 factor);
-	virtual F32 getRolloffFactor();
+	virtual void setDopplerFactor(F32 factor) override;
+	virtual F32 getDopplerFactor() override;
+	virtual void setRolloffFactor(F32 factor) override;
+	virtual F32 getRolloffFactor() override;
 
  protected:
 	F32 mRolloffFactor;

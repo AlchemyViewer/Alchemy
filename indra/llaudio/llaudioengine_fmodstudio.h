@@ -1,7 +1,7 @@
 /** 
- * @file audioengine_fmodex.h
+ * @file audioengine_fmodstudio.h
  * @brief Definition of LLAudioEngine class abstracting the audio 
- * support as a FMODEX implementation
+ * support as a FMOD Studio implementation
  *
  * $LicenseInfo:firstyear=2002&license=viewerlgpl$
  * Second Life Viewer Source Code
@@ -25,14 +25,14 @@
  * $/LicenseInfo$
  */
 
-#ifndef LL_AUDIOENGINE_FMODEX_H
-#define LL_AUDIOENGINE_FMODEX_H
+#ifndef LL_AUDIOENGINE_FMODSTUDIO_H
+#define LL_AUDIOENGINE_FMODSTUDIO_H
 
 #include "llaudioengine.h"
 #include "llwindgen.h"
 
 //Stubs
-class LLAudioStreamManagerFMODEX;
+class LLAudioStreamManagerFMODSTUDIO;
 namespace FMOD
 {
 	class System;
@@ -44,32 +44,38 @@ namespace FMOD
 typedef struct FMOD_DSP_DESCRIPTION FMOD_DSP_DESCRIPTION;
 
 //Interfaces
-class LLAudioEngine_FMODEX : public LLAudioEngine 
+class LLAudioEngine_FMODSTUDIO final : public LLAudioEngine 
 {
 public:
-	LLAudioEngine_FMODEX(bool enable_profiler);
-	virtual ~LLAudioEngine_FMODEX();
+	enum
+	{
+		RESAMPLE_LINEAR=0,
+		RESAMPLE_CUBIC,
+		RESAMPLE_SPLINE
+	};
+	LLAudioEngine_FMODSTUDIO(std::string app_name, bool enable_profiler, U32 resample_method);
+	virtual ~LLAudioEngine_FMODSTUDIO();
 
 	// initialization/startup/shutdown
-	virtual bool init(const S32 num_channels, void *user_data);
-	virtual std::string getDriverName(bool verbose);
-	virtual void allocateListener();
+	bool init(const S32 num_channels, void *user_data) final override;
+	std::string getDriverName(bool verbose) final override;
+	void allocateListener() final override;
 
-	virtual void shutdown();
+	void shutdown() final override;
 
-	/*virtual*/ bool initWind();
-	/*virtual*/ void cleanupWind();
+	/*virtual*/ bool initWind() final override;
+	/*virtual*/ void cleanupWind() final override;
 
-	/*virtual*/void updateWind(LLVector3 direction, F32 camera_height_above_water);
+	/*virtual*/void updateWind(LLVector3 direction, F32 camera_height_above_water) final override;
 
 	typedef F32 MIXBUFFERFORMAT;
 
 	FMOD::System *getSystem()				const {return mSystem;}
 protected:
-	/*virtual*/ LLAudioBuffer *createBuffer(); // Get a free buffer, or flush an existing one if you have to.
-	/*virtual*/ LLAudioChannel *createChannel(); // Create a new audio channel.
+	/*virtual*/ LLAudioBuffer *createBuffer() final override; // Get a free buffer, or flush an existing one if you have to.
+	/*virtual*/ LLAudioChannel *createChannel() final override; // Create a new audio channel.
 
-	/*virtual*/ void setInternalGain(F32 gain);
+	/*virtual*/ void setInternalGain(F32 gain) final override;
 
 	bool mInited;
 
@@ -79,27 +85,29 @@ protected:
 	FMOD::DSP *mWindDSP;
 	FMOD::System *mSystem;
 	bool mEnableProfiler;
+	U32 mResampleMethod;
+	std::string mAppName;
 
 public:
 	static FMOD::ChannelGroup *mChannelGroups[LLAudioEngine::AUDIO_TYPE_COUNT];
 };
 
 
-class LLAudioChannelFMODEX : public LLAudioChannel
+class LLAudioChannelFMODSTUDIO final : public LLAudioChannel
 {
 public:
-	LLAudioChannelFMODEX(FMOD::System *audioengine);
-	virtual ~LLAudioChannelFMODEX();
+	LLAudioChannelFMODSTUDIO(FMOD::System *audioengine);
+	virtual ~LLAudioChannelFMODSTUDIO();
 
 protected:
-	/*virtual*/ void play();
-	/*virtual*/ void playSynced(LLAudioChannel *channelp);
-	/*virtual*/ void cleanup();
-	/*virtual*/ bool isPlaying();
+	/*virtual*/ void play() final override;
+	/*virtual*/ void playSynced(LLAudioChannel *channelp) final override;
+	/*virtual*/ void cleanup() final override;
+	/*virtual*/ bool isPlaying() final override;
 
-	/*virtual*/ bool updateBuffer();
-	/*virtual*/ void update3DPosition();
-	/*virtual*/ void updateLoop();
+	/*virtual*/ bool updateBuffer() final override;
+	/*virtual*/ void update3DPosition() final override;
+	/*virtual*/ void updateLoop() final override;
 
 	void set3DMode(bool use3d);
 protected:
@@ -110,15 +118,15 @@ protected:
 };
 
 
-class LLAudioBufferFMODEX : public LLAudioBuffer
+class LLAudioBufferFMODSTUDIO final : public LLAudioBuffer
 {
 public:
-	LLAudioBufferFMODEX(FMOD::System *audioengine);
-	virtual ~LLAudioBufferFMODEX();
+	LLAudioBufferFMODSTUDIO(FMOD::System *audioengine);
+	virtual ~LLAudioBufferFMODSTUDIO();
 
-	/*virtual*/ bool loadWAV(const std::string& filename);
-	/*virtual*/ U32 getLength();
-	friend class LLAudioChannelFMODEX;
+	/*virtual*/ bool loadWAV(const std::string& filename) final override;
+	/*virtual*/ U32 getLength() final override;
+	friend class LLAudioChannelFMODSTUDIO;
 protected:
 	FMOD::System *getSystem()	const {return mSystemp;}
 	FMOD::System *mSystemp;
@@ -127,4 +135,4 @@ protected:
 };
 
 
-#endif // LL_AUDIOENGINE_FMODEX_H
+#endif // LL_AUDIOENGINE_FMODSTUDIO_H
