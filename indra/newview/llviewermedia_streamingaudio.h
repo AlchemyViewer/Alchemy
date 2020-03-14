@@ -50,6 +50,15 @@ class LLStreamingAudio_MediaPlugins : public LLStreamingAudioInterface
 	/*virtual*/ F32 getGain();
 	/*virtual*/ std::string getURL();
 
+	virtual bool supportsAdjustableBufferSizes(){return false;}
+	virtual void setBufferSizes(U32 streambuffertime, U32 decodebuffertime){};
+
+	virtual bool supportsMetaData() { return false; }
+	virtual const LLSD *getMetaData() { return nullptr; }
+	virtual bool hasNewMetaData() { return false; }
+	virtual bool supportsWaveData() { return false; }
+	virtual bool getWaveData(float* arr, S32 count, S32 stride = 1){ return false; }
+
 private:
 	LLPluginClassMedia* initializeMedia(const std::string& media_type);
 
