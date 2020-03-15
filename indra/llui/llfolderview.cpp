@@ -163,6 +163,7 @@ LLFolderView::LLFolderView(const Params& p)
 :	LLFolderViewFolder(p),
 	mScrollContainer( NULL ),
 	mPopupMenuHandle(),
+	mMenuFileName(p.options_menu),
 	mAllowMultiSelect(p.allow_multiselect),
 	mAllowDrag(p.allow_drag),
 	mShowEmptyMessage(p.show_empty_message),
@@ -244,17 +245,6 @@ LLFolderView::LLFolderView(const Params& p)
 	mStatusTextBox->setFollowsLeft();
 	mStatusTextBox->setFollowsTop();
 	addChild(mStatusTextBox);
-
-
-	// make the popup menu available
-	llassert(LLMenuGL::sMenuContainer != NULL);
-	LLMenuGL* menu = LLUICtrlFactory::getInstance()->createFromFile<LLMenuGL>(p.options_menu, LLMenuGL::sMenuContainer, LLMenuHolderGL::child_registry_t::instance());
-	if (!menu)
-	{
-		menu = LLUICtrlFactory::getDefaultWidget<LLMenuGL>("inventory_menu");
-	}
-	menu->setBackgroundColor(LLUIColorTable::instance().getColor("MenuPopupBgColor"));
-	mPopupMenuHandle = menu->getHandle();
 
 	mViewModelItem->openItem();
 }
@@ -1442,22 +1432,57 @@ BOOL LLFolderView::handleRightMouseDown( S32 x, S32 y, MASK mask )
 	BOOL handled = childrenHandleRightMouseDown(x, y, mask) != NULL;
 	S32 count = mSelectedItems.size();
 
-	LLMenuGL* menu = (LLMenuGL*)mPopupMenuHandle.get();
+	// make the popup menu available
+	LLMenuGL* menu = static_cast<LLMenuGL*>(mPopupMenuHandle.get());
+	if (!menu)
+	{
+		if (mCallbackRegistrar)
+		{
+			mCallbackRegistrar->pushScope();
+		}
+		if (mEnableRegistrar)
+		{
+			mEnableRegistrar->pushScope();
+		}
+		llassert(LLMenuGL::sMenuContainer != NULL);
+		menu = LLUICtrlFactory::getInstance()->createFromFile<LLMenuGL>(mMenuFileName, LLMenuGL::sMenuContainer, LLMenuHolderGL::child_registry_t::instance());
+		if (!menu)
+		{
+			menu = LLUICtrlFactory::getDefaultWidget<LLMenuGL>("inventory_menu");
+		}
+	menu->setBackgroundColor(LLUIColorTable::instance().getColor("MenuPopupBgColor"));
+		mPopupMenuHandle = menu->getHandle();
+		if (mEnableRegistrar)
+		{
+			mEnableRegistrar->popScope();
+		}
+		if (mCallbackRegistrar)
+		{
+			mCallbackRegistrar->popScope();
+		}
+	}
 	bool hide_folder_menu = mSuppressFolderMenu && isFolderSelected();
-	if ((handled
-		&& ( count > 0 && (hasVisibleChildren()) ) // show menu only if selected items are visible
-		&& menu ) &&
+	if ((menu && handled
+		&& ( count > 0 && (hasVisibleChildren()) )) && // show menu only if selected items are visible
 		!hide_folder_menu)
 	{
 		if (mCallbackRegistrar)
         {
 			mCallbackRegistrar->pushScope();
         }
+		if (mEnableRegistrar)
+		{
+			mEnableRegistrar->pushScope();
+		}
 
 		updateMenuOptions(menu);
 	   
 		menu->updateParent(LLMenuGL::sMenuContainer);
 		LLMenuGL::showPopup(this, menu, x, y);
+		if (mEnableRegistrar)
+		{
+			mEnableRegistrar->popScope();
+		}
 		if (mCallbackRegistrar)
         {
 			mCallbackRegistrar->popScope();
