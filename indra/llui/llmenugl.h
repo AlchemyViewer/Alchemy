@@ -735,8 +735,7 @@ public:
 
 	LLContextMenuBranch(const Params&);
 
-	virtual ~LLContextMenuBranch()
-	{}
+	virtual ~LLContextMenuBranch();
 
 	// called to rebuild the draw label
 	virtual void	buildDrawLabel( void );
@@ -744,13 +743,13 @@ public:
 	// onCommit() - do the primary funcationality of the menu item.
 	virtual void	onCommit( void );
 
-	LLContextMenu*	getBranch() { return mBranch.get(); }
+	LLContextMenu*	getBranch() { return mBranchHandle.get(); }
 	void			setHighlight( BOOL highlight );
 
 protected:
 	void	showSubMenu();
 
-	LLHandle<LLContextMenu> mBranch;
+	LLHandle<LLContextMenu> mBranchHandle;
 };
 
 
