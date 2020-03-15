@@ -2667,7 +2667,6 @@ BOOL LLMenuGL::appendContextSubMenu(LLMenuGL *menu)
 		LL_ERRS() << "Can't attach a context menu to itself" << LL_ENDL;
 	}
 
-	LLContextMenuBranch *item;
 	LLContextMenuBranch::Params p;
 	p.name = menu->getName();
 	p.label = menu->getLabel();
@@ -2677,7 +2676,7 @@ BOOL LLMenuGL::appendContextSubMenu(LLMenuGL *menu)
 	p.highlight_bg_color=LLUIColorTable::instance().getColor("MenuItemHighlightBgColor");
 	p.highlight_fg_color=LLUIColorTable::instance().getColor("MenuItemHighlightFgColor");
 
-	item = LLUICtrlFactory::create<LLContextMenuBranch>(p);
+	LLContextMenuBranch *item = LLUICtrlFactory::create<LLContextMenuBranch>(p);
 	LLMenuGL::sMenuContainer->addChild(item->getBranch());
 
 	return append( item );
