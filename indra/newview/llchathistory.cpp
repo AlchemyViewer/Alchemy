@@ -148,6 +148,18 @@ public:
 		{
 			mAvatarNameCacheConnection.disconnect();
 		}
+		auto menu = mPopupMenuHandleAvatar.get();
+		if (menu)
+		{
+			menu->die();
+			mPopupMenuHandleAvatar.markDead();
+		}
+		menu = mPopupMenuHandleObject.get();
+		if (menu)
+		{
+			menu->die();
+			mPopupMenuHandleObject.markDead();
+		}
 	}
 
 	BOOL handleMouseUp(S32 x, S32 y, MASK mask)
