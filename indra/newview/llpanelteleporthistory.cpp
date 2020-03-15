@@ -366,31 +366,40 @@ void LLTeleportHistoryFlatItemStorage::purge()
 ////////////////////////////////////////////////////////////////////////////////
 
 LLTeleportHistoryPanel::ContextMenu::ContextMenu() :
-	mMenu(NULL), mIndex(0)
+	mMenuHandle(), mIndex(0)
 {
+}
+
+LLTeleportHistoryPanel::ContextMenu::~ContextMenu()
+{
+	if (auto menu = mMenuHandle.get())
+	{
+		menu->die();
+		mMenuHandle.markDead();
+	}
 }
 
 void LLTeleportHistoryPanel::ContextMenu::show(LLView* spawning_view, S32 index, S32 x, S32 y)
 {
-	if (mMenu)
+	auto menu = mMenuHandle.get();
+	if (menu)
 	{
-		//preventing parent (menu holder) from deleting already "dead" context menus on exit
-		LLView* parent = mMenu->getParent();
-		if (parent)
-		{
-			parent->removeChild(mMenu);
-		}
-		delete mMenu;
+		menu->die();
+		mMenuHandle.markDead();
 	}
 
 	mIndex = index;
-	mMenu = createMenu();
+	mMenuHandle = createMenu();
 
-	mMenu->show(x, y);
-	LLMenuGL::showPopup(spawning_view, mMenu, x, y);
+	menu = mMenuHandle.get();
+	if (menu)
+	{
+		menu->show(x, y);
+		LLMenuGL::showPopup(spawning_view, menu, x, y);
+	}
 }
 
-LLContextMenu* LLTeleportHistoryPanel::ContextMenu::createMenu()
+LLHandle<LLContextMenu> LLTeleportHistoryPanel::ContextMenu::createMenu()
 {
 	// set up the callbacks for all of the avatar menu items
 	// (N.B. callbacks don't take const refs as mID is local scope)
@@ -403,7 +412,7 @@ LLContextMenu* LLTeleportHistoryPanel::ContextMenu::createMenu()
 	// create the context menu from the XUI
 	llassert(LLMenuGL::sMenuContainer != NULL);
 	return LLUICtrlFactory::getInstance()->createFromFile<LLContextMenu>(
-		"menu_teleport_history_item.xml", LLMenuGL::sMenuContainer, LLViewerMenuHolderGL::child_registry_t::instance());
+		"menu_teleport_history_item.xml", LLMenuGL::sMenuContainer, LLViewerMenuHolderGL::child_registry_t::instance())->getHandle();
 }
 
 void LLTeleportHistoryPanel::ContextMenu::onTeleport()
@@ -443,7 +452,6 @@ LLTeleportHistoryPanel::LLTeleportHistoryPanel()
 		mCurrentItem(0),
 		mTeleportHistory(NULL),
 		mHistoryAccordion(NULL),
-		mAccordionTabMenu(NULL),
 		mLastSelectedFlatlList(NULL),
 		mLastSelectedItemIndex(-1),
 		mMenuGearButton(NULL)
@@ -454,8 +462,13 @@ LLTeleportHistoryPanel::LLTeleportHistoryPanel()
 LLTeleportHistoryPanel::~LLTeleportHistoryPanel()
 {
 	LLTeleportHistoryFlatItemStorage::instance().purge();
-	if (mGearMenuHandle.get()) mGearMenuHandle.get()->die();
 	mTeleportHistoryChangedConnection.disconnect();
+	auto menu = mAccordionTabMenuHandle.get();
+	if (menu)
+	{
+		menu->die();
+		mAccordionTabMenuHandle.markDead();
+	}
 }
 
 BOOL LLTeleportHistoryPanel::postBuild()
@@ -519,13 +532,7 @@ BOOL LLTeleportHistoryPanel::postBuild()
 	mEnableCallbackRegistrar.add("TeleportHistory.GearMenu.Enable", boost::bind(&LLTeleportHistoryPanel::isActionEnabled, this, _2));
 
 	mMenuGearButton = getChild<LLMenuButton>("gear_btn");
-
-	LLToggleableMenu* gear_menu  = LLUICtrlFactory::getInstance()->createFromFile<LLToggleableMenu>("menu_teleport_history_gear.xml",  gMenuHolder, LLViewerMenuHolderGL::child_registry_t::instance());;
-	if(gear_menu)
-	{
-		mGearMenuHandle  = gear_menu->getHandle();
-		mMenuGearButton->setMenu(gear_menu);
-	}
+	mMenuGearButton->setMenu("menu_teleport_history_gear.xml");
 
 	return TRUE;
 }
@@ -977,15 +984,14 @@ void LLTeleportHistoryPanel::onAccordionTabRightClick(LLView *view, S32 x, S32 y
 	if (y < tab->getRect().getHeight() - tab->getHeaderHeight() - tab->getPaddingBottom())
 		return;
 
-	if (mAccordionTabMenu)
+	if (!mAccordionTabMenuHandle.isDead())
 	{
-		//preventing parent (menu holder) from deleting already "dead" context menus on exit
-		LLView* parent = mAccordionTabMenu->getParent();
-		if (parent)
+		auto menu = mAccordionTabMenuHandle.get();
+		if (menu)
 		{
-			parent->removeChild(mAccordionTabMenu);
+			menu->die();
+			mAccordionTabMenuHandle.markDead();
 		}
-		delete mAccordionTabMenu;
 	}
 
 	// set up the callbacks for all of the avatar menu items
@@ -997,14 +1003,17 @@ void LLTeleportHistoryPanel::onAccordionTabRightClick(LLView *view, S32 x, S32 y
 
 	// create the context menu from the XUI
 	llassert(LLMenuGL::sMenuContainer != NULL);
-	mAccordionTabMenu = LLUICtrlFactory::getInstance()->createFromFile<LLContextMenu>(
+	auto menu = LLUICtrlFactory::getInstance()->createFromFile<LLContextMenu>(
 		"menu_teleport_history_tab.xml", LLMenuGL::sMenuContainer, LLViewerMenuHolderGL::child_registry_t::instance());
+	if (menu)
+	{
+		mAccordionTabMenuHandle = menu->getHandle();
+		menu->setItemVisible("TabOpen", !tab->isExpanded() ? true : false);
+		menu->setItemVisible("TabClose", tab->isExpanded() ? true : false);
 
-	mAccordionTabMenu->setItemVisible("TabOpen", !tab->isExpanded() ? true : false);
-	mAccordionTabMenu->setItemVisible("TabClose", tab->isExpanded() ? true : false);
-
-	mAccordionTabMenu->show(x, y);
-	LLMenuGL::showPopup(tab, mAccordionTabMenu, x, y);
+		menu->show(x, y);
+		LLMenuGL::showPopup(tab, menu, x, y);
+	}
 }
 
 void LLTeleportHistoryPanel::onAccordionTabOpen(LLAccordionCtrlTab *tab)

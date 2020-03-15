@@ -48,17 +48,18 @@ public:
 	{
 	public:
 		ContextMenu();
+		~ContextMenu();
 		void show(LLView* spawning_view, S32 index, S32 x, S32 y);
 
 	private:
-		LLContextMenu* createMenu();
+		LLHandle<LLContextMenu> createMenu();
 		void onTeleport();
 		void onInfo();
 		void onCopyToClipboard();
 
 		static void gotSLURLCallback(const std::string& slurl);
 
-		LLContextMenu* mMenu;
+		LLHandle<LLContextMenu> mMenuHandle;
 		S32 mIndex;
 	};
 
@@ -116,8 +117,7 @@ private:
 	item_containers_t mItemContainers;
 
 	ContextMenu mContextMenu;
-	LLContextMenu*			mAccordionTabMenu;
-	LLHandle<LLView>		mGearMenuHandle;
+	LLHandle<LLContextMenu>	mAccordionTabMenuHandle;
 	LLMenuButton*			mMenuGearButton;
 
 	boost::signals2::connection mTeleportHistoryChangedConnection;
