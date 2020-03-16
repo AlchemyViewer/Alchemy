@@ -646,7 +646,12 @@ void LLFloater::openFloater(const LLSD& key)
 {
     LL_INFOS() << "Opening floater " << getName() << " full path: " << getPathname() << LL_ENDL;
 
-	LLViewerEventRecorder::instance().logVisibilityChange( getPathname(), getName(), true,"floater"); // Last param is event subtype or empty string
+#if AL_VIEWER_EVENT_RECORDER
+	if(LLViewerEventRecorder::getLoggingStatus())
+	{
+		LLViewerEventRecorder::instance().logVisibilityChange( getPathname(), getName(), true,"floater"); // Last param is event subtype or empty string
+	}
+#endif
 
 	mKey = key; // in case we need to open ourselves again
 	
@@ -695,7 +700,14 @@ void LLFloater::openFloater(const LLSD& key)
 void LLFloater::closeFloater(bool app_quitting)
 {
 	LL_INFOS() << "Closing floater " << getName() << LL_ENDL;
-	LLViewerEventRecorder::instance().logVisibilityChange( getPathname(), getName(), false,"floater"); // Last param is event subtype or empty string
+
+#if AL_VIEWER_EVENT_RECORDER
+	if(LLViewerEventRecorder::getLoggingStatus())
+	{
+		LLViewerEventRecorder::instance().logVisibilityChange( getPathname(), getName(), false,"floater"); // Last param is event subtype or empty string
+	}
+#endif
+
 	if (app_quitting)
 	{
 		LLFloater::sQuitting = true;
@@ -1552,9 +1564,13 @@ BOOL LLFloater::handleMouseUp(S32 x, S32 y, MASK mask)
 {
 	LL_DEBUGS() << "LLFloater::handleMouseUp calling LLPanel (really LLView)'s handleMouseUp (first initialized xui to: " << getPathname() << " )" << LL_ENDL;
 	BOOL handled = LLPanel::handleMouseUp(x,y,mask); // Not implemented in LLPanel so this actually calls LLView
-	if (handled) {
+
+#if AL_VIEWER_EVENT_RECORDER
+	if (handled && LLViewerEventRecorder::getLoggingStatus()) {
 		LLViewerEventRecorder::instance().updateMouseEventInfo(x,y,-55,-55,getPathname());
 	}
+#endif
+
 	return handled;
 }
 
@@ -1579,10 +1595,13 @@ BOOL LLFloater::handleMouseDown(S32 x, S32 y, MASK mask)
 	else
 	{
 		bringToFront( x, y );
-		BOOL handled = LLPanel::handleMouseDown( x, y, mask ); 
-		if (handled) {
+		BOOL handled = LLPanel::handleMouseDown( x, y, mask );
+
+#if AL_VIEWER_EVENT_RECORDER
+		if (handled && LLViewerEventRecorder::getLoggingStatus()) {
 			LLViewerEventRecorder::instance().updateMouseEventInfo(x,y,-55,-55,getPathname()); 
 		}
+#endif
 		return handled;
 	}
 }

@@ -2086,6 +2086,7 @@ class LLAdvancedViewerEventRecorder : public view_listener_t
 {
 	bool handleEvent(const LLSD& userdata)
 	{
+#if AL_VIEWER_EVENT_RECORDER
 		std::string command = userdata.asString();
 		if ("start playback" == command)
 		{
@@ -2107,6 +2108,7 @@ class LLAdvancedViewerEventRecorder : public view_listener_t
 			LLViewerEventRecorder::instance().setEventLoggingOff();
 			LL_INFOS() << "Event recording stopped" << LL_ENDL;
 		} 
+#endif
 
 		return true;
 	}		
@@ -9253,6 +9255,14 @@ void show_topinfobar_context_menu(LLView* ctrl, S32 x, S32 y)
 	LLMenuGL::showPopup(ctrl, show_topbarinfo_context_menu, x, y);
 }
 
+namespace
+{
+	bool always_disable_menu()
+	{
+		return false;
+	}
+}
+
 void initialize_edit_menu()
 {
 	view_listener_t::addMenu(new LLEditUndo(), "Edit.Undo");
@@ -9315,7 +9325,11 @@ void initialize_menus()
 	// Don't prepend MenuName.Foo because these can be used in any menu.
 	enable.add("IsGodCustomerService", boost::bind(&is_god_customer_service));
 
+#if AL_VIEWER_EVENT_RECORDER
 	enable.add("displayViewerEventRecorderMenuItems",boost::bind(&LLViewerEventRecorder::displayViewerEventRecorderMenuItems,&LLViewerEventRecorder::instance()));
+#else
+	enable.add("displayViewerEventRecorderMenuItems", boost::bind(&always_disable_menu));
+#endif
 
 	view_listener_t::addEnable(new LLUploadCostCalculator(), "Upload.CalculateCosts");
 

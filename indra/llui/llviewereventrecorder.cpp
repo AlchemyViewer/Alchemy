@@ -28,10 +28,11 @@
 #include "llui.h"
 #include "llleap.h"
 
+bool LLViewerEventRecorder::sLogEvents = false;
+
 LLViewerEventRecorder::LLViewerEventRecorder() {
 
   clear(UNDEFINED);
-  logEvents = false;
   // Remove any previous event log file
   std::string old_log_ui_events_to_llsd_file = gDirUtilp->getExpandedFilename(LL_PATH_LOGS, "SecondLife_Events_log.old");
   LLFile::remove(old_log_ui_events_to_llsd_file, ENOENT);
@@ -52,12 +53,12 @@ void LLViewerEventRecorder::setEventLoggingOn() {
   if (! mLog.is_open()) {
       mLog.open(mLogFilename.c_str(), std::ios_base::out);
   }
-  logEvents=true; 
+  sLogEvents=true;
   LL_DEBUGS() << "LLViewerEventRecorder::setEventLoggingOn event logging turned on" << LL_ENDL;
 }
 
 void LLViewerEventRecorder::setEventLoggingOff() {
-  logEvents=false;
+  sLogEvents=false;
   mLog.flush();
   mLog.close();
   LL_DEBUGS() << "LLViewerEventRecorder::setEventLoggingOff event logging turned off" << LL_ENDL;
@@ -98,7 +99,7 @@ void LLViewerEventRecorder::setMouseGlobalCoords(S32 x, S32 y) {
 }
 
 void LLViewerEventRecorder::updateMouseEventInfo(S32 local_x, S32 local_y, S32 global_x, S32 global_y, std::string mName) {
-
+  if (!sLogEvents) return;
   LLView * target_view = LLUI::getInstance()->resolvePath(LLUI::getInstance()->getRootView(), xui);
   if (! target_view) {
     LL_DEBUGS() << "LLViewerEventRecorder::updateMouseEventInfo - xui path on file at moment is NOT valid - so DO NOT record these local coords" << LL_ENDL;
@@ -125,7 +126,7 @@ void LLViewerEventRecorder::updateMouseEventInfo(S32 local_x, S32 local_y, S32 g
 }
 
 void LLViewerEventRecorder::logVisibilityChange(std::string xui, std::string name, BOOL visibility, std::string event_subtype) {
-
+    if (!sLogEvents) return;
   LLSD  event=LLSD::emptyMap();
 
   event.insert("event",LLSD(std::string("visibility")));
@@ -167,6 +168,7 @@ void LLViewerEventRecorder::update_xui(std::string xui) {
 
 void LLViewerEventRecorder::logKeyEvent(KEY key, MASK mask) {
 
+  if (!sLogEvents) return;
   // NOTE: Event recording only logs keydown events - the viewer itself hides keyup events at a fairly low level in the code and does not appear to care about them anywhere
 
   LLSD event = LLSD::emptyMap();
@@ -230,7 +232,7 @@ void LLViewerEventRecorder::recordEvent(LLSD event) {
   
 }
 void LLViewerEventRecorder::logKeyUnicodeEvent(llwchar uni_char) {
-  if (! logEvents) return;
+  if (!sLogEvents) return;
 
   // Note: keyUp is not captured since the viewer seems to not care about keyUp events
 
@@ -267,7 +269,7 @@ void LLViewerEventRecorder::logKeyUnicodeEvent(llwchar uni_char) {
 
 void LLViewerEventRecorder::logMouseEvent(std::string button_state,std::string button_name)
 {
-  if (! logEvents) return; 
+  if (!sLogEvents) return;
 
   LLSD  event=LLSD::emptyMap();
 

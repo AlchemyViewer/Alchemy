@@ -2649,9 +2649,11 @@ bool LLAppViewer::initConfiguration()
         }
     }
 
+#if AL_VIEWER_EVENT_RECORDER
     if  (clp.hasOption("logevents")) {
 		LLViewerEventRecorder::instance().setEventLoggingOn();
     }
+#endif
 
 	std::string CmdLineChannel(gSavedSettings.getString("CmdLineChannel"));
 	if(! CmdLineChannel.empty())

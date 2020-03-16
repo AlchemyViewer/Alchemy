@@ -605,7 +605,9 @@ void LLView::setVisible(BOOL visible)
 void LLView::onVisibilityChange ( BOOL new_visibility )
 {
 	BOOL old_visibility;
-	BOOL log_visibility_change = LLViewerEventRecorder::instance().getLoggingStatus();
+#if AL_VIEWER_EVENT_RECORDER
+	BOOL log_visibility_change = LLViewerEventRecorder::getLoggingStatus();
+#endif
 	BOOST_FOREACH(LLView* viewp, mChildList)
 	{
 		if (!viewp)
@@ -616,19 +618,22 @@ void LLView::onVisibilityChange ( BOOL new_visibility )
 		// only views that are themselves visible will have their overall visibility affected by their ancestors
 		old_visibility=viewp->getVisible();
 
-		if(log_visibility_change)
+#if AL_VIEWER_EVENT_RECORDER
+		if (log_visibility_change)
 		{
-		if (old_visibility!=new_visibility)
-		{
-			LLViewerEventRecorder::instance().logVisibilityChange( viewp->getPathname(), viewp->getName(), new_visibility,"widget");
+			if (old_visibility != new_visibility)
+			{
+				LLViewerEventRecorder::instance().logVisibilityChange(viewp->getPathname(), viewp->getName(), new_visibility, "widget");
+			}
 		}
-		}
+#endif
 
 		if (old_visibility)
 		{
 			viewp->onVisibilityChange ( new_visibility );
 		}
 
+#if AL_VIEWER_EVENT_RECORDER
 		if(log_visibility_change)
 		{
 			// Consider changing returns to confirm success and know which widget grabbed it
@@ -637,6 +642,7 @@ void LLView::onVisibilityChange ( BOOL new_visibility )
 			LL_DEBUGS() << "LLView::handleVisibilityChange	 - now: " << getVisible()  << " xui: " << viewp->getPathname() << " name: " << viewp->getName() << LL_ENDL;
 		
 		}
+#endif
 	}
 }
 
@@ -735,7 +741,12 @@ LLView* LLView::childrenHandleMouseEvent(const METHOD& method, S32 x, S32 y, XDA
 			LL_DEBUGS() << "LLView::childrenHandleMouseEvent calling updatemouseeventinfo - local_x|global x  "<< local_x << " " << x	<< "local/global y " << local_y << " " << y << LL_ENDL;
 			LL_DEBUGS() << "LLView::childrenHandleMouseEvent  getPathname for viewp result: " << viewp->getPathname() << "for this view: " << getPathname() << LL_ENDL;
 
-			LLViewerEventRecorder::instance().updateMouseEventInfo(x,y,-55,-55,getPathname()); 
+#if AL_VIEWER_EVENT_RECORDER
+			if(LLViewerEventRecorder::getLoggingStatus())
+			{
+				LLViewerEventRecorder::instance().updateMouseEventInfo(x,y,-55,-55,getPathname()); 
+			}
+#endif
 
 			// This is NOT event recording related
 			viewp->logMouseEvent();
@@ -1004,10 +1015,12 @@ BOOL LLView::handleUnicodeChar(llwchar uni_char, BOOL called_from_parent)
 		handled = mParentView->handleUnicodeChar(uni_char, FALSE);
 	}
 
-	if (handled)
+#if AL_VIEWER_EVENT_RECORDER
+	if (handled && LLViewerEventRecorder::getLoggingStatus())
 	{
 		LLViewerEventRecorder::instance().logKeyUnicodeEvent(uni_char);
 	}
+#endif
 	
 	return handled;
 }

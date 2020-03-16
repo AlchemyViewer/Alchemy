@@ -444,7 +444,12 @@ BOOL LLButton::handleMouseDown(S32 x, S32 y, MASK mask)
 		 */
 		LLUICtrl::handleMouseDown(x, y, mask);
 
-		LLViewerEventRecorder::instance().updateMouseEventInfo(x,y,-55,-55,getPathname());
+#if AL_VIEWER_EVENT_RECORDER
+		if(LLViewerEventRecorder::getLoggingStatus())
+		{
+			LLViewerEventRecorder::instance().updateMouseEventInfo(x,y,-55,-55,getPathname());
+		}
+#endif
 
 		if(mMouseDownSignal) (*mMouseDownSignal)(this, LLSD());
 
@@ -476,7 +481,13 @@ BOOL LLButton::handleMouseUp(S32 x, S32 y, MASK mask)
 		 * by calling LLUICtrl::mMouseUpSignal(x, y, mask);
 		 */
 		LLUICtrl::handleMouseUp(x, y, mask);
-		LLViewerEventRecorder::instance().updateMouseEventInfo(x,y,-55,-55,getPathname()); 
+
+#if AL_VIEWER_EVENT_RECORDER
+		if (LLViewerEventRecorder::getLoggingStatus())
+		{
+			LLViewerEventRecorder::instance().updateMouseEventInfo(x,y,-55,-55,getPathname()); 
+		}
+#endif
 
 		// Regardless of where mouseup occurs, handle callback
 		if(mMouseUpSignal) (*mMouseUpSignal)(this, LLSD());

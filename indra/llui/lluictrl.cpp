@@ -354,9 +354,11 @@ BOOL LLUICtrl::handleMouseDown(S32 x, S32 y, MASK mask)
 	}
 	LL_DEBUGS() << "LLUICtrl::handleMousedown - handled is returning as: " << handled << "	  " << LL_ENDL;
 	
-	if (handled) {
+#if AL_VIEWER_EVENT_RECORDER
+	if (handled && LLViewerEventRecorder::getLoggingStatus()) {
 		LLViewerEventRecorder::instance().updateMouseEventInfo(x,y,-56,-56,getPathname());
 	}
+#endif
 	return handled;
 }
 
@@ -367,9 +369,12 @@ BOOL LLUICtrl::handleMouseUp(S32 x, S32 y, MASK mask)
 	LL_DEBUGS() << "LLUICtrl::handleMouseUp calling LLView)'s handleMouseUp (first initialized xui to: " << getPathname() << " )" << LL_ENDL;
 
 	BOOL handled  = LLView::handleMouseUp(x,y,mask);
-	if (handled) {
+
+#if AL_VIEWER_EVENT_RECORDER
+	if (handled && LLViewerEventRecorder::getLoggingStatus()) {
 		LLViewerEventRecorder::instance().updateMouseEventInfo(x,y,-56,-56,getPathname()); 
 	}
+#endif
 	if (mMouseUpSignal)
 	{
 		(*mMouseUpSignal)(this,x,y,mask);
