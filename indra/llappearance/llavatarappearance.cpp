@@ -453,7 +453,7 @@ void LLAvatarAppearance::initClass(const std::string& avatar_file_name_arg, cons
 void LLAvatarAppearance::cleanupClass()
 {
 	delete_and_clear(sAvatarXmlInfo);
-	// *TODO: What about sAvatarSkeletonInfo ???
+	delete_and_clear(sAvatarSkeletonInfo);
 	sSkeletonXMLTree.cleanup();
 	sXMLTree.cleanup();
 }
@@ -1962,6 +1962,7 @@ BOOL LLAvatarAppearance::LLAvatarXmlInfo::parseXmlMeshNodes(LLXmlTreeNode* root)
 				{
 					LL_WARNS() << "Unknown param type." << LL_ENDL;
 				}
+				delete info;
                 return FALSE;
 			}
 
