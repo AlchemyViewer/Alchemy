@@ -1193,12 +1193,20 @@ bool LLImageTGA::loadFile( const std::string& path )
 		fseek(file, 0, SEEK_SET);
 	}
 
+	if (file_size < 0)
+	{
+		LL_WARNS() << "Couldn't determine file size " << path << LL_ENDL;
+		fclose(file);
+		return false;
+	}
+
 	U8* buffer = allocateData(file_size);
 	S32 bytes_read = fread(buffer, 1, file_size, file);
 	if( bytes_read != file_size )
 	{
 		deleteData();
 		LL_WARNS() << "Couldn't read file " << path << LL_ENDL;
+		fclose(file);
 		return false;
 	}
 

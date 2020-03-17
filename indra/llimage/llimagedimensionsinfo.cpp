@@ -178,11 +178,13 @@ bool LLImageDimensionsInfo::getImageDimensionsJpeg()
 	if (fread(signature, sizeof(signature), 1, fp) != 1)
 	{
 		LL_WARNS() << "Premature end of file" << LL_ENDL;
+		fclose(fp);
 		return false;
 	}
 	if (memcmp(signature, jpeg_magic, JPEG_MAGIC_SIZE) != 0)
 	{
 		LL_WARNS() << "Not a JPEG" << LL_ENDL;
+		fclose(fp);
 		return false;
 	}
 	fseek(fp, 0, SEEK_SET); // go back to start of the file
