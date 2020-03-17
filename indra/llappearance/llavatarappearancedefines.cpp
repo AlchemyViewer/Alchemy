@@ -256,6 +256,7 @@ LLAvatarAppearanceDictionary::BakedEntry::BakedEntry(ETextureIndex tex_index,
 		LLWearableType::EType t = (LLWearableType::EType)va_arg(argp,int);
 		mWearables.push_back(t);
 	}
+	va_end(argp);
 }
 
 // static
