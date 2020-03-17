@@ -937,7 +937,7 @@ static const char *llsd_dump(const LLSD &llsd, bool useXMLFormat)
 			out << LLSDNotationStreamer(llsd);
 		out_string = out.str();
 	}
-	int len = out_string.length();
+	size_t len = out_string.length();
 	sStorage = new char[len + 1];
 	memcpy(sStorage, out_string.c_str(), len);
 	sStorage[len] = '\0';

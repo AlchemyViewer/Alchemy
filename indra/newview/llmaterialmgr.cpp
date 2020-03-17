@@ -330,8 +330,8 @@ void LLMaterialMgr::put(const LLUUID& object_id, const U8 te, const LLMaterial& 
 	if (mPutQueue.end() == itQueue)
 	{
 		LL_DEBUGS("Materials") << "mPutQueue insert object " << object_id << LL_ENDL;
-		mPutQueue.insert(std::pair<LLUUID, facematerial_map_t>(object_id, facematerial_map_t()));
-		itQueue = mPutQueue.find(object_id);
+		auto ret = mPutQueue.insert(std::pair<LLUUID, facematerial_map_t>(object_id, facematerial_map_t()));
+		itQueue = ret.first;
 	}
 
 	facematerial_map_t::iterator itFace = itQueue->second.find(te);
