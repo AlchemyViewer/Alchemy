@@ -7887,7 +7887,7 @@ void LLVOAvatar::logMetricsTimerRecord(const std::string& phase_name, F32 elapse
 	record["elapsed"] = elapsed;
 	record["completed"] = completed;
 	U32 grid_x(0), grid_y(0);
-	if (getRegion() && LLWorld::instance().isRegionListed(getRegion()))
+	if (!isDead() && getRegion() && LLWorld::instance().isRegionListed(getRegion()))
 	{
 		record["central_bake_version"] = LLSD::Integer(getRegion()->getCentralBakeVersion());
 		grid_from_region_handle(getRegion()->getHandle(), &grid_x, &grid_y);
