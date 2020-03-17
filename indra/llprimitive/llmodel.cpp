@@ -1115,19 +1115,16 @@ bool LLModel::loadModel(std::istream& is)
 	}
 
 	mSubmodelID = header.has("submodel_id") ? header["submodel_id"].asInteger() : false;
+    
+    static const std::array<std::string, 5> lod_name = {{
+        "lowest_lod",
+        "low_lod",
+        "medium_lod",
+        "high_lod",
+        "physics_mesh",
+    }};
 
-	static const std::string lod_name[] = 
-	{
-		"lowest_lod",
-		"low_lod",
-		"medium_lod",
-		"high_lod",
-		"physics_mesh",
-	};
-
-	const S32 MODEL_LODS = 5;
-
-	S32 lod = llclamp((S32) mDetail, 0, MODEL_LODS);
+	S32 lod = llclamp(static_cast<S32>(mDetail), 0, static_cast<S32>(lod_name.size()) - 1);
 
 	if (header[lod_name[lod]]["offset"].asInteger() == -1 || 
 		header[lod_name[lod]]["size"].asInteger() == 0 )
