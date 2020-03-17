@@ -97,6 +97,7 @@ LLConversationViewSession::~LLConversationViewSession()
 	if(LLVoiceClient::instanceExists() && mVoiceClientObserver)
 	{
 		LLVoiceClient::getInstance()->removeObserver(mVoiceClientObserver);
+		delete mVoiceClientObserver;
 	}
 
 	mFlashTimer->unset();
@@ -203,7 +204,7 @@ BOOL LLConversationViewSession::postBuild()
 			mIsInActiveVoiceChannel = true;
 			if(LLVoiceClient::instanceExists())
 			{
-				LLNearbyVoiceClientStatusObserver* mVoiceClientObserver = new LLNearbyVoiceClientStatusObserver(this);
+				mVoiceClientObserver = new LLNearbyVoiceClientStatusObserver(this);
 				LLVoiceClient::getInstance()->addObserver(mVoiceClientObserver);
 			}
 			break;
