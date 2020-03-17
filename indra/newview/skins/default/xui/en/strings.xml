@@ -4293,4 +4293,6 @@ and report the problem.
 [https://community.secondlife.com/knowledgebase/english/error-messages-r520/#Section__3 Knowledge Base]
   </string>
 
+  <string name="outfit_photo_load_codec_error">Invalid image format. Please use another image</string>
+
 </strings>
