@@ -376,6 +376,15 @@ LLGroupNotificationListItem::~LLGroupNotificationListItem()
 	LLGroupMgr::getInstance()->removeObserver(this);
 }
 
+LLGroupNoticeNotificationListItem::~LLGroupNoticeNotificationListItem()
+{
+	if (mInventoryOffer != nullptr)
+	{
+		mInventoryOffer->forceResponse(IOR_ACCEPT);
+		mInventoryOffer = nullptr;
+	}
+}
+
 BOOL LLGroupNoticeNotificationListItem::postBuild()
 {
     BOOL rv = LLGroupNotificationListItem::postBuild();
@@ -533,9 +542,7 @@ void LLGroupNoticeNotificationListItem::close()
 
 void LLGroupNoticeNotificationListItem::onClickAttachment()
 {
-    if (mInventoryOffer != NULL) {
-        mInventoryOffer->forceResponse(IOR_ACCEPT);
-
+    if (mInventoryOffer != nullptr) {
         static const LLUIColor textColor = LLUIColorTable::instance().getColor(
             "GroupNotifyDimmedTextColor");
         mAttachmentTextBox->setColor(textColor);
@@ -546,7 +553,8 @@ void LLGroupNoticeNotificationListItem::onClickAttachment()
             LLNotifications::instance().add("AttachmentSaved", LLSD(), LLSD());
         }
 
-        mInventoryOffer = NULL;
+        mInventoryOffer->forceResponse(IOR_ACCEPT);
+        mInventoryOffer = nullptr;
     }
 }
 
