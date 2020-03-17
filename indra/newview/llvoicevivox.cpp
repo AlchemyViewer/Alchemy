@@ -5769,7 +5769,7 @@ LLVivoxVoiceClient::sessionStatePtr_t LLVivoxVoiceClient::addSession(const std::
 	return result;
 }
 
-void LLVivoxVoiceClient::clearSessionHandle(const sessionStatePtr_t &session)
+void LLVivoxVoiceClient::clearSessionHandle(const sessionStatePtr_t session)
 {
     if (session)
     {
@@ -5793,7 +5793,7 @@ void LLVivoxVoiceClient::clearSessionHandle(const sessionStatePtr_t &session)
 
 }
 
-void LLVivoxVoiceClient::setSessionHandle(const sessionStatePtr_t &session, const std::string &handle)
+void LLVivoxVoiceClient::setSessionHandle(const sessionStatePtr_t session, const std::string &handle)
 {
 	// Have to remove the session from the handle-indexed map before changing the handle, or things will break badly.
 	
@@ -5834,7 +5834,7 @@ void LLVivoxVoiceClient::setSessionURI(const sessionStatePtr_t &session, const s
 	verifySessionState();
 }
 
-void LLVivoxVoiceClient::deleteSession(const sessionStatePtr_t &session)
+void LLVivoxVoiceClient::deleteSession(const sessionStatePtr_t session)
 {
 	// Remove the session from the handle map
 	if(!session->mHandle.empty())

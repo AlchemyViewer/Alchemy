@@ -524,10 +524,10 @@ protected:
     sessionStatePtr_t findSession(const LLUUID &participant_id);
 	
     sessionStatePtr_t addSession(const std::string &uri, const std::string &handle = std::string());
-    void clearSessionHandle(const sessionStatePtr_t &session);
-    void setSessionHandle(const sessionStatePtr_t &session, const std::string &handle);
+    void clearSessionHandle(const sessionStatePtr_t session);
+    void setSessionHandle(const sessionStatePtr_t session, const std::string &handle);
     void setSessionURI(const sessionStatePtr_t &session, const std::string &uri);
-    void deleteSession(const sessionStatePtr_t &session);
+    void deleteSession(const sessionStatePtr_t session);
 	void deleteAllSessions(void);
 
 	void verifySessionState(void);
