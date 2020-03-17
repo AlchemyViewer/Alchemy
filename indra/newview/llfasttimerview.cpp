@@ -253,6 +253,12 @@ BOOL LLFastTimerView::handleHover(S32 x, S32 y, MASK mask)
 			bar_index < end_index; 
 			++bar_index)
 		{
+			if (!row.mBars)
+			{
+				LL_WARNS() << "mTimerBarRows.mBars is null at index: " << bar_index << " bailing out" << LL_ENDL;
+				break;
+			}
+
 			TimerBar& bar = row.mBars[bar_index];
 			if (bar.mSelfStart > mouse_time_offset)
 			{
@@ -426,21 +432,16 @@ void LLFastTimerView::draw()
 
 void LLFastTimerView::onOpen(const LLSD& key)
 {
+	mTimerBarRows.resize(NUM_FRAMES_HISTORY);
 	setPauseState(false);
 	mRecording.reset();
 	mRecording.appendPeriodicRecording(LLTrace::get_frame_recording());
-	for(std::deque<TimerBarRow>::iterator it = mTimerBarRows.begin(), end_it = mTimerBarRows.end();
-		it != end_it; 
-		++it)
-	{
-		delete []it->mBars;
-		it->mBars = NULL;
-	}
 }
 										
 void LLFastTimerView::onClose(bool app_quitting)
 {
 	setVisible(FALSE);
+	mTimerBarRows.clear();
 }
 
 void saveChart(const std::string& label, const char* suffix, LLImageRaw* scratch)
@@ -782,7 +783,7 @@ LLSD LLFastTimerView::analyzePerformanceLogDefault(std::istream& is)
 	stats_map_t time_stats;
 	stats_map_t sample_stats;
 
-	while (!is.eof() && LLSDParser::PARSE_FAILURE != LLSDSerialize::fromXML(cur, is))
+	while (!is.eof() && !is.fail() && LLSDParser::PARSE_FAILURE != LLSDSerialize::fromXML(cur, is))
 	{
 		for (LLSD::map_iterator iter = cur.beginMap(); iter != cur.endMap(); ++iter)
 		{
@@ -1514,13 +1515,16 @@ void LLFastTimerView::drawBars()
 		{
 			llassert(bar_index < mTimerBarRows.size());
 			TimerBarRow& row = mTimerBarRows[bar_index];
-			row.mTop = frame_bar_rect.mTop;
-			row.mBottom = frame_bar_rect.mBottom;
-			frame_bar_rect.mRight = frame_bar_rect.mLeft 
-									+ ll_round((row.mBars[0].mTotalTime / mTotalTimeDisplay) * mBarRect.getWidth());
- 			drawBar(frame_bar_rect, row, image_width, image_height);
+			if (row.mBars)
+			{
+				row.mTop = frame_bar_rect.mTop;
+				row.mBottom = frame_bar_rect.mBottom;
+				frame_bar_rect.mRight = frame_bar_rect.mLeft
+					+ ll_round((row.mBars[0].mTotalTime / mTotalTimeDisplay) * mBarRect.getWidth());
+				drawBar(frame_bar_rect, row, image_width, image_height);
 
-			frame_bar_rect.translate(0, -(bar_height + vpad));
+				frame_bar_rect.translate(0, -(bar_height + vpad));
+			}
 		}
 
 	}	
@@ -1679,4 +1683,13 @@ S32 LLFastTimerView::drawBar(LLRect bar_rect, TimerBarRow& row, S32 image_width,
 	}
 
 	return bar_index;
+}
+
+LLFastTimerView::TimerBarRow::~TimerBarRow()
+{
+	if (mBars != nullptr) 
+	{
+		delete[] mBars;
+		mBars = nullptr;
+	}
 }
