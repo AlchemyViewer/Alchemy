@@ -865,7 +865,7 @@ void LLMotionController::updateMotions(bool force_update)
 		}
 		else
 		{
-			mAnimTime = update_time;
+			mAnimTime = llmax(mAnimTime, update_time);
 		}
 	}
 
