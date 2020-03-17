@@ -664,7 +664,7 @@ void LLMaterialMgr::processGetQueue()
 		material_queue_t& materials = itRegionQueue->second;
 		U32 max_entries = regionp->getMaxMaterialsPerTransaction();
 		material_queue_t::iterator loopMaterial = materials.begin();
-		while ( (materials.end() != loopMaterial) && (materialsData.size() < max_entries) )
+		while ( (materials.end() != loopMaterial) && ((U32)materialsData.size() < max_entries) )
 		{
 			material_queue_t::iterator itMaterial = loopMaterial++;
 			materialsData.append((*itMaterial).asLLSD());
@@ -933,7 +933,7 @@ void LLMaterialMgr::processPutQueue()
 		        facematerial_map_t& face_map = itQueue->second;
 				        U32 max_entries = regionp->getMaxMaterialsPerTransaction();
 		        facematerial_map_t::iterator itFace = face_map.begin();
-				        while ( (face_map.end() != itFace) && (facesData.size() < max_entries) )
+				        while ( (face_map.end() != itFace) && ((U32)facesData.size() < max_entries) )
 		        {
 			        LLSD faceData = LLSD::emptyMap();
 			        faceData[MATERIALS_CAP_FACE_FIELD] = static_cast<LLSD::Integer>(itFace->first);

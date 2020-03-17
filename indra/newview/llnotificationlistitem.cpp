@@ -42,12 +42,17 @@
 
 LLNotificationListItem::LLNotificationListItem(const Params& p) : LLPanel(p),
     mParams(p),
-    mTitleBox(NULL),
-    mExpandBtn(NULL),
-    mCondenseBtn(NULL),
-    mCloseBtn(NULL),
-    mCondensedViewPanel(NULL),
-    mExpandedViewPanel(NULL),
+    mTitleBox(nullptr),
+    mTitleBoxExp(nullptr),
+    mNoticeTextExp(nullptr),
+    mTimeBox(nullptr),
+    mTimeBoxExp(nullptr),
+    mExpandBtn(nullptr),
+    mCondenseBtn(nullptr),
+    mCloseBtn(nullptr),
+    mCloseBtnExp(nullptr),
+    mCondensedViewPanel(nullptr),
+    mExpandedViewPanel(nullptr),
     mCondensedHeight(0),
     mExpandedHeight(0),
     mExpandedHeightResize(0),
@@ -267,13 +272,21 @@ std::set<std::string> LLTransactionNotificationListItem::getTypes()
 }
 
 LLGroupNotificationListItem::LLGroupNotificationListItem(const Params& p)
-    : LLNotificationListItem(p),
-    mSenderOrFeeBox(NULL)
+    : LLNotificationListItem(p)
+    , mGroupIcon(nullptr)
+    , mGroupIconExp(nullptr)
+    , mSenderOrFeeBox(nullptr) 
+    , mSenderOrFeeBoxExp(nullptr)
+    , mGroupNameBoxExp(nullptr)
 {
 }
 
 LLGroupInviteNotificationListItem::LLGroupInviteNotificationListItem(const Params& p)
     : LLGroupNotificationListItem(p)
+    , mInviteButtonPanel(nullptr)
+    , mJoinBtn(nullptr)
+    , mDeclineBtn(nullptr)
+    , mInfoBtn(nullptr)
 {
     buildFromFile("panel_notification_list_item.xml");
 }
@@ -598,14 +611,6 @@ LLSystemNotificationListItem::LLSystemNotificationListItem(const Params& p)
 {
     buildFromFile("panel_notification_list_item.xml");
     mIsCaution = p.notification_priority >= NOTIFICATION_PRIORITY_HIGH;
-    if (mIsCaution)
-    {
-        mTitleBox->setColor(LLUIColorTable::instance().getColor("NotifyCautionBoxColor"));
-        mTitleBoxExp->setColor(LLUIColorTable::instance().getColor("NotifyCautionBoxColor"));
-        mNoticeTextExp->setReadOnlyColor(LLUIColorTable::instance().getColor("NotifyCautionBoxColor"));
-        mTimeBox->setColor(LLUIColorTable::instance().getColor("NotifyCautionBoxColor"));
-        mTimeBoxExp->setColor(LLUIColorTable::instance().getColor("NotifyCautionBoxColor"));
-    }
 }
 
 BOOL LLSystemNotificationListItem::postBuild()
@@ -617,5 +622,14 @@ BOOL LLSystemNotificationListItem::postBuild()
         mSystemNotificationIcon->setVisible(TRUE);
     if (mSystemNotificationIconExp)
         mSystemNotificationIconExp->setVisible(TRUE);
+
+    if (mIsCaution)
+    {
+        mTitleBox->setColor(LLUIColorTable::instance().getColor("NotifyCautionBoxColor"));
+        mTitleBoxExp->setColor(LLUIColorTable::instance().getColor("NotifyCautionBoxColor"));
+        mNoticeTextExp->setReadOnlyColor(LLUIColorTable::instance().getColor("NotifyCautionBoxColor"));
+        mTimeBox->setColor(LLUIColorTable::instance().getColor("NotifyCautionBoxColor"));
+        mTimeBoxExp->setColor(LLUIColorTable::instance().getColor("NotifyCautionBoxColor"));
+    }
     return rv;
 }
