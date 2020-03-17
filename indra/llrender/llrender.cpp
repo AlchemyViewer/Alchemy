@@ -1206,8 +1206,8 @@ void LLRender::syncLightState()
 		LLVector4 position[8];
 		LLVector3 direction[8];
 		LLVector4 attenuation[8];
-		LLVector3 diffuse[8];
-        LLVector3 diffuse_b[8];
+		LLVector4 diffuse[8];
+        LLVector4 diffuse_b[8];
         bool      sun_primary[8];
 
 		for (U32 i = 0; i < 8; i++)
