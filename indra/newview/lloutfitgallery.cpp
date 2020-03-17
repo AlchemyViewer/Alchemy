@@ -241,7 +241,7 @@ void LLOutfitGallery::removeLastRow()
     mGalleryPanel->removeChild(mLastRowPanel);
     mUnusedRowPanels.push_back(mLastRowPanel);
     mRowPanels.pop_back();
-    mLastRowPanel = mRowPanels.back();
+    mLastRowPanel = mRowPanels.empty() ? nullptr : mRowPanels.back();
 }
 
 LLPanel* LLOutfitGallery::addToRow(LLPanel* row_stack, LLOutfitGalleryItem* item, int pos, int hgap)
