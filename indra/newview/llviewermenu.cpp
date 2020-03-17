@@ -340,7 +340,10 @@ class LLMenuParcelObserver : public LLParcelObserver
 public:
 	LLMenuParcelObserver();
 	~LLMenuParcelObserver();
-	virtual void changed();
+    void changed() override;
+private:
+	LLHandle<LLUICtrl> mLandBuyHandle;
+	LLHandle<LLUICtrl> mLandBuyPassHandle;
 };
 
 static LLMenuParcelObserver* gMenuParcelObserver = NULL;
@@ -349,6 +352,8 @@ static LLUIListener sUIListener;
 
 LLMenuParcelObserver::LLMenuParcelObserver()
 {
+	mLandBuyHandle = gMenuLand->getChild<LLMenuItemCallGL>("Land Buy")->getHandle();
+	mLandBuyPassHandle = gMenuLand->getChild<LLMenuItemCallGL>("Land Buy Pass")->getHandle();
 	LLViewerParcelMgr::getInstance()->addObserver(this);
 }
 
@@ -359,12 +364,17 @@ LLMenuParcelObserver::~LLMenuParcelObserver()
 
 void LLMenuParcelObserver::changed()
 {
-	LLParcel *parcel = LLViewerParcelMgr::getInstance()->getParcelSelection()->getParcel();
-	gMenuHolder->childSetEnabled("Land Buy Pass", LLPanelLandGeneral::enableBuyPass(NULL) && !(parcel->getOwnerID()== gAgent.getID()));
+	if (!mLandBuyPassHandle.isDead())
+	{
+		LLParcel *parcel = LLViewerParcelMgr::getInstance()->getParcelSelection()->getParcel();
+		static_cast<LLMenuItemCallGL*>(mLandBuyPassHandle.get())->setEnabled(LLPanelLandGeneral::enableBuyPass(NULL) && !(parcel->getOwnerID() == gAgent.getID()));
+	}
 	
-	BOOL buyable = enable_buy_land(NULL);
-	gMenuHolder->childSetEnabled("Land Buy", buyable);
-	gMenuHolder->childSetEnabled("Buy Land...", buyable);
+	if (!mLandBuyHandle.isDead())
+	{
+		BOOL buyable = enable_buy_land(NULL);
+		static_cast<LLMenuItemCallGL*>(mLandBuyHandle.get())->setEnabled(buyable);
+	}
 }
 
 
