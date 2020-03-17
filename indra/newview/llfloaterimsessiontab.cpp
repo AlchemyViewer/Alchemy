@@ -230,6 +230,7 @@ BOOL LLFloaterIMSessionTab::postBuild()
 {
 	BOOL result;
 
+	mContentsView = getChild<LLView>("contents_view");
 	mBodyStack = getChild<LLLayoutStack>("main_stack");
     mParticipantListAndHistoryStack = getChild<LLLayoutStack>("im_panels");
 
@@ -678,7 +679,6 @@ void LLFloaterIMSessionTab::hideOrShowTitle()
 {
 	const LLFloater::Params& default_params = LLFloater::getDefaultParams();
 	S32 floater_header_size = default_params.header_height;
-	LLView* floater_contents = getChild<LLView>("contents_view");
 
 	LLRect floater_rect = getLocalRect();
 	S32 top_border_of_contents = floater_rect.mTop - (isTornOff()? floater_header_size : 0);
@@ -686,7 +686,7 @@ void LLFloaterIMSessionTab::hideOrShowTitle()
 	LLRect contents_rect (0, top_border_of_contents, floater_rect.mRight, floater_rect.mBottom);
 	mDragHandle->setShape(handle_rect);
 	mDragHandle->setVisible(isTornOff());
-	floater_contents->setShape(contents_rect);
+	mContentsView->setShape(contents_rect);
 }
 
 void LLFloaterIMSessionTab::updateSessionName(const std::string& name)
