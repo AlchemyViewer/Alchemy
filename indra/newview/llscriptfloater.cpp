@@ -460,10 +460,11 @@ void LLScriptFloaterManager::onAddNotification(const LLUUID& notification_id)
 
 		if(it != mNotifications.end())
 		{
+			LLUUID old_id = it->first; // copy LLUUID to prevent use after free when it is erased below
 			LLChicletPanel * chiclet_panelp = LLChicletBar::getInstance()->getChicletPanel();
 			if (NULL != chiclet_panelp)
 			{
-				LLIMChiclet * chicletp = chiclet_panelp->findChiclet<LLIMChiclet>(it->first);
+				LLIMChiclet * chicletp = chiclet_panelp->findChiclet<LLIMChiclet>(old_id);
 				if (NULL != chicletp)
 				{
 					// Pass the new_message icon state further.
@@ -472,14 +473,14 @@ void LLScriptFloaterManager::onAddNotification(const LLUUID& notification_id)
 				}
 			}
 
-			LLScriptFloater* floater = LLFloaterReg::findTypedInstance<LLScriptFloater>("script_floater", it->first);
+			LLScriptFloater* floater = LLFloaterReg::findTypedInstance<LLScriptFloater>("script_floater", old_id);
 			if (floater)
 			{
 				// Generate chiclet with a "new message" indicator if a docked window was opened but not in focus. See EXT-3142.
 				set_new_message |= !floater->hasFocus();
 			}
 
-			removeNotification(it->first);
+			removeNotification(old_id);
 		}
 	}
 
@@ -690,7 +691,7 @@ void LLScriptFloaterManager::saveFloaterPosition(const LLUUID& object_id, const 
 {
 	if(object_id.notNull())
 	{
-		LLScriptFloaterManager::getInstance()->mFloaterPositions[object_id] = fpi;
+		mFloaterPositions[object_id] = fpi;
 	}
 	else
 	{
@@ -701,7 +702,7 @@ void LLScriptFloaterManager::saveFloaterPosition(const LLUUID& object_id, const 
 bool LLScriptFloaterManager::getFloaterPosition(const LLUUID& object_id, FloaterPositionInfo& fpi)
 {
 	floater_position_map_t::const_iterator it = mFloaterPositions.find(object_id);
-	if(LLScriptFloaterManager::getInstance()->mFloaterPositions.end() != it)
+	if(mFloaterPositions.end() != it)
 	{
 		fpi = it->second;
 		return true;
