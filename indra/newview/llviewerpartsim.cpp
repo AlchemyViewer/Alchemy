@@ -399,8 +399,7 @@ void LLViewerPartGroup::updateParticles(const F32 lastdt)
 		// Kill dead particles (either flagged dead, or too old)
 		if ((part->mLastUpdateTime > part->mMaxAge) || (LLViewerPart::LL_PART_DEAD_MASK == part->mFlags))
 		{
-			mParticles[i] = mParticles.back() ;
-			mParticles.pop_back() ;
+			vector_replace_with_last(mParticles, mParticles.begin() + i);
 			delete part ;
 		}
 		else 
@@ -410,8 +409,7 @@ void LLViewerPartGroup::updateParticles(const F32 lastdt)
 			{
 				// Transfer particles between groups
 				LLViewerPartSim::getInstance()->put(part) ;
-				mParticles[i] = mParticles.back() ;
-				mParticles.pop_back() ;
+				vector_replace_with_last(mParticles, mParticles.begin() + i);
 			}
 			else
 			{
@@ -680,11 +678,9 @@ void LLViewerPartSim::updateSimulation()
 	S32 count = (S32) mViewerPartSources.size();
 	S32 start = (S32)ll_frand((F32)count);
 	S32 dir = 1;
-	S32 deldir = 0;
 	if (ll_frand() > 0.5f)
 	{
 		dir = -1;
-		deldir = -1;
 	}
 
 	S32 num_updates = 0;
@@ -703,31 +699,33 @@ void LLViewerPartSim::updateSimulation()
 		{
 			BOOL upd = TRUE;
 			LLViewerObject* vobj = mViewerPartSources[i]->mSourceObjectp;
-
-			if (vobj && vobj->isAvatar() && ((LLVOAvatar*)vobj)->isInMuteList())
+			if (vobj)
 			{
-				upd = FALSE;
-			}
-
-			if(vobj && vobj->isOwnerInMuteList(mViewerPartSources[i]->getOwnerUUID()))
-			{
-				upd = FALSE;
-			}
-
-			if (upd && vobj && (vobj->getPCode() == LL_PCODE_VOLUME))
-			{
-				if(vobj->getAvatar() && vobj->getAvatar()->isTooComplex())
+				if (vobj->isAvatar() && ((LLVOAvatar*) vobj)->isInMuteList())
 				{
 					upd = FALSE;
 				}
 
-				LLVOVolume* vvo = (LLVOVolume *)vobj;
-				if (!LLPipeline::sRenderAttachedParticles && vvo && vvo->isAttachment())
+				if (vobj->isOwnerInMuteList(mViewerPartSources[i]->getOwnerUUID()))
 				{
 					upd = FALSE;
 				}
-			}
 
+				if (upd && (vobj->getPCode() == LL_PCODE_VOLUME))
+				{
+					LLVOAvatar* avatarp = vobj->getAvatar();
+					if (avatarp && avatarp->isTooComplex())
+					{
+						upd = FALSE;
+					}
+
+					LLVOVolume* vvo = (LLVOVolume *) vobj;
+					if (!LLPipeline::sRenderAttachedParticles && vvo && vvo->isAttachment())
+					{
+						upd = FALSE;
+					}
+				}
+			}
 			if (upd) 
 			{
 				mViewerPartSources[i]->update(dt);
@@ -736,9 +734,8 @@ void LLViewerPartSim::updateSimulation()
 
 		if (mViewerPartSources[i]->isDead())
 		{
-			mViewerPartSources.erase(mViewerPartSources.begin() + i);
+			vector_replace_with_last(mViewerPartSources, mViewerPartSources.begin() + i);
 			count--;
-			i+=deldir;
 		}
 		else
         {
@@ -764,7 +761,7 @@ void LLViewerPartSim::updateSimulation()
 
 		if ((LLDrawable::getCurrentFrame()+mViewerPartGroups[i]->mID)%visirate == 0)
 		{
-			if (vobj && !vobj->isDead())
+			if (vobj && !vobj->isDead() && vobj->mDrawable)
 			{
 				gPipeline.markRebuild(vobj->mDrawable, LLDrawable::REBUILD_ALL, TRUE);
 			}
@@ -773,7 +770,7 @@ void LLViewerPartSim::updateSimulation()
 			if (!mViewerPartGroups[i]->getCount())
 			{
 				delete mViewerPartGroups[i];
-				mViewerPartGroups.erase(mViewerPartGroups.begin() + i);
+				vector_replace_with_last(mViewerPartGroups, mViewerPartGroups.begin() + i);
 				i--;
 				count--;
 			}
@@ -855,15 +852,15 @@ void LLViewerPartSim::removeLastCreatedSource()
 
 void LLViewerPartSim::cleanupRegion(LLViewerRegion *regionp)
 {
-	for (group_list_t::iterator i = mViewerPartGroups.begin(); i != mViewerPartGroups.end(); )
+	group_list_t& vec = mViewerPartGroups;
+	for (group_list_t::iterator it = vec.begin();it!=vec.end();)
 	{
-		group_list_t::iterator iter = i++;
-
-		if ((*iter)->getRegion() == regionp)
+		if ((*it)->getRegion() == regionp)
 		{
-			delete *iter;
-			i = mViewerPartGroups.erase(iter);			
+			delete *it;
+			it = vector_replace_with_last(vec,it);
 		}
+		else ++it;
 	}
 }
 
