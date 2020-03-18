@@ -3226,19 +3226,13 @@ void LLIMMgr::addPendingAgentListUpdates(
 		update_types.append("agent_updates");
 		update_types.append("updates");
 
-		for (
-			array_iter = update_types.beginArray();
-			array_iter != update_types.endArray();
-			++array_iter)
+		for (const auto& update_type : update_types.array())
 		{
 			//we only want to include the last update for a given agent
-			for (
-				iter = updates[array_iter->asString()].beginMap();
-				iter != updates[array_iter->asString()].endMap();
-				++iter)
+			for (const auto& update_pair : updates[update_type.asStringRef()].map())
 			{
-				mPendingAgentListUpdates[session_id.asString()][array_iter->asString()][iter->first] =
-					iter->second;
+				mPendingAgentListUpdates[session_id.asString()][array_iter->asString()][update_pair.first] =
+					update_pair.second;
 			}
 		}
 	}
@@ -3250,13 +3244,10 @@ void LLIMMgr::addPendingAgentListUpdates(
 		//of agent_id -> "LEAVE"/"ENTER"
 
 		//only want to keep last update for each agent
-		for (
-			iter = updates["updates"].beginMap();
-			iter != updates["updates"].endMap();
-			++iter)
+		for (const auto& update_pair : updates["updates"].map())
 		{
-			mPendingAgentListUpdates[session_id.asString()]["updates"][iter->first] =
-				iter->second;
+			mPendingAgentListUpdates[session_id.asString()]["updates"][update_pair.first] =
+				update_pair.second;
 		}
 	}
 }

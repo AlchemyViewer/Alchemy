@@ -1085,12 +1085,10 @@ void LLFloaterIMSession::processAgentListUpdates(const LLSD& body)
 	if (body.isMap() && body.has("agent_updates") && body["agent_updates"].isMap())
 	{
 		LLSD::map_const_iterator update_it;
-		for(update_it = body["agent_updates"].beginMap();
-			update_it != body["agent_updates"].endMap();
-			++update_it)
+		for(const auto& agent_update : body["agent_updates"].map())
 		{
-			LLUUID agent_id(update_it->first);
-			LLSD agent_data = update_it->second;
+			LLUUID agent_id(agent_update.first);
+			LLSD agent_data = agent_update.second;
 
 			if (agent_data.isMap())
 			{
