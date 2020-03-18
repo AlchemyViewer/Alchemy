@@ -426,7 +426,8 @@ public:
 public:
 	U32 		renderImpostor(LLColor4U color = LLColor4U(255,255,255,255), S32 diffuse_channel = 0);
 	bool		isVisuallyMuted();
-	bool 		isInMuteList();
+	bool 		isInMuteList() const;
+	bool		isInBuddyList() const;
 // [RLVa:KB] - Checked: RLVa-2.2 (@setcam_avdist)
 	bool        isRlvSilhouette();
 // [/RLVa:KB]
@@ -473,8 +474,10 @@ public:
 	mutable bool mVisualComplexityStale;
 	U32          mReportedVisualComplexity; // from other viewers through the simulator
 
-	bool		mCachedInMuteList;
-	F64			mCachedMuteListUpdateTime;
+	mutable bool		mCachedInMuteList;
+	mutable F64			mCachedMuteListUpdateTime;
+	mutable bool		mCachedInBuddyList;
+	mutable F64			mCachedBuddyListUpdateTime;
 // [RLVa:KB] - Checked: RLVa-2.2 (@setcam_avdist)
 	mutable bool mCachedIsRlvSilhouette = false;
 	mutable F64  mCachedRlvSilhouetteUpdateTime = 0.f;

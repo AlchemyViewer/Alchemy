@@ -1,4 +1,4 @@
-﻿/** 
+/** 
  * @File llvoavatar.cpp
  * @brief Implementation of LLVOAvatar class which is a derivation of LLViewerObject
  *
@@ -676,6 +676,8 @@ LLVOAvatar::LLVOAvatar(const LLUUID& id,
 	mLastUpdateReceivedCOFVersion(-1),
 	mCachedMuteListUpdateTime(0),
 	mCachedInMuteList(false),
+	mCachedBuddyListUpdateTime(0),
+	mCachedInBuddyList(false),
     mIsControlAvatar(false),
     mIsUIAvatar(false),
     mEnableDefaultMotions(true)
@@ -3169,7 +3171,7 @@ void LLVOAvatar::idleUpdateNameTagText(BOOL new_name)
 	}
 //	bool is_friend = LLAvatarTracker::instance().isBuddy(getID());
 // [RLVa:KB] - Checked: RLVa-1.2.2
-	bool is_friend = (fRlvShowAvName) && (LLAvatarTracker::instance().isBuddy(getID()));
+	bool is_friend = (fRlvShowAvName) && isInBuddyList();
 // [/RLVa:KB]
 	bool is_cloud = getIsCloud();
 
@@ -3581,7 +3583,7 @@ bool LLVOAvatar::isVisuallyMuted()
 	return muted;
 }
 
-bool LLVOAvatar::isInMuteList()
+bool LLVOAvatar::isInMuteList() const
 {
 	bool muted = false;
 	F64 now = LLFrameTimer::getTotalSeconds();
@@ -3598,6 +3600,25 @@ bool LLVOAvatar::isInMuteList()
 		mCachedInMuteList = muted;
 	}
 	return muted;
+}
+
+bool LLVOAvatar::isInBuddyList() const
+{
+	bool is_friend = false;
+	F64 now = LLFrameTimer::getTotalSeconds();
+	if (now < mCachedBuddyListUpdateTime)
+	{
+		is_friend = mCachedInBuddyList;
+	}
+	else
+	{
+		is_friend = LLAvatarTracker::instance().isBuddy(getID());
+
+		const F64 SECONDS_BETWEEN_MUTE_UPDATES = 1;
+		mCachedBuddyListUpdateTime = now + SECONDS_BETWEEN_MUTE_UPDATES;
+		mCachedInBuddyList = is_friend;
+	}
+	return is_friend;
 }
 
 // [RLVa:KB] - Checked: RLVa-2.2 (@setcam_avdist)
@@ -7991,7 +8012,7 @@ bool LLVOAvatar::isTooComplex() const
 {
 	static const LLCachedControl<bool> always_render_friends(gSavedSettings, "AlwaysRenderFriends", false);
 	bool too_complex;
-	bool render_friend =  (always_render_friends && LLAvatarTracker::instance().isBuddy(getID()));
+	bool render_friend =  (always_render_friends && isInBuddyList());
 
 	if (isSelf() || render_friend || mVisuallyMuteSetting == AV_ALWAYS_RENDER)
 	{
@@ -10606,7 +10627,7 @@ void LLVOAvatar::calcMutedAVColor()
 		 }
 // [/RLVa:KB]
     }
-    else if (LLMuteList::getInstance()->isMuted(av_id)) // the user blocked them
+    else if (isInMuteList()) // the user blocked them
     {
         // blocked avatars are dark grey
         new_color = LLColor4::grey4;
