@@ -45,6 +45,7 @@
 // newview includes
 #include "llagent.h"
 #include "llfloatersidepanelcontainer.h"
+#include "llfloaterreg.h"
 #include "llinventoryobserver.h"
 #include "lllandmarkactions.h"
 #include "lllandmarklist.h"
@@ -640,7 +641,7 @@ void LLLocationInputCtrl::onInfoButtonClicked()
 		return;
 // [/RLVa:KB]
 
-	LLFloaterSidePanelContainer::showPanel("places", LLSD().with("type", "agent"));
+	LLFloaterReg::showInstance("about_land");
 }
 
 void LLLocationInputCtrl::onForSaleButtonClicked()
