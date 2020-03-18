@@ -301,6 +301,9 @@ void LLViewerPartSourceScript::update(const F32 dt)
 				continue;
 			}
 
+			if (mPartSysData.mPartData.mFlags & LLPartData::LL_PART_RIBBON_MASK && mLastPart && (mLastPart->mPosAgent-mPosAgent).magVec() <= .005f)
+				continue; //Skip if parent isn't far enough away.
+
 			LLViewerPart* part = new LLViewerPart();
 
 			part->init(this, mImagep, NULL);
@@ -375,7 +378,7 @@ void LLViewerPartSourceScript::update(const F32 dt)
 				part->mPosAgent = mPosAgent;
 				
 				// original implemenetation for part_dir_vector was just:					
-				LLVector3 part_dir_vector(0.0, 0.0, 1.0);
+				LLVector3 part_dir_vector(0.0f, 0.0f, 1.0f);
 				// params from the script...
 				// outer = outer cone angle
 				// inner = inner cone angle
@@ -386,24 +389,24 @@ void LLViewerPartSourceScript::update(const F32 dt)
 				// generate a random angle within the given space...
 				F32 angle = innerAngle + ll_frand(outerAngle - innerAngle);
 				// split which side it will go on randomly...
-				if (ll_frand() < 0.5) 
+				if (ll_frand() < 0.5f) 
 				{
 					angle = -angle;
 				}
 				// Both patterns rotate around the x-axis first:
-				part_dir_vector.rotVec(angle, 1.0, 0.0, 0.0);
+				part_dir_vector.rotVec(angle, 1.0f, 0.0f, 0.0f);
 
 				// If this is a cone pattern, rotate again to create the cone.
 				if (mPartSysData.mPattern & LLPartSysData::LL_PART_SRC_PATTERN_ANGLE_CONE)
 				{
-					part_dir_vector.rotVec(ll_frand(4*F_PI), 0.0, 0.0, 1.0);
+					part_dir_vector.rotVec(ll_frand(4.f*F_PI), 0.0f, 0.0f, 1.0f);
 				}
 								
 				// Only apply this rotation if using the deprecated angles. 
 				if (! (mPartSysData.mFlags & LLPartSysData::LL_PART_USE_NEW_ANGLE))
 				{
 					// Deprecated...
-					part_dir_vector.rotVec(outerAngle, 1.0, 0.0, 0.0);
+					part_dir_vector.rotVec(outerAngle, 1.0f, 0.0f, 0.0f);
 				}
 				
 				if (mSourceObjectp)
@@ -430,7 +433,7 @@ void LLViewerPartSourceScript::update(const F32 dt)
 			if (part->mFlags & LLPartData::LL_PART_FOLLOW_SRC_MASK ||	// SVC-193, VWR-717
 				part->mFlags & LLPartData::LL_PART_TARGET_LINEAR_MASK) 
 			{
-				mPartSysData.mBurstRadius = 0; 
+				mPartSysData.mBurstRadius = 0.f; 
 			}
 
 			LLViewerPartSim::getInstance()->addPart(part);

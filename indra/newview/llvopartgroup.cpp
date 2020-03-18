@@ -713,7 +713,8 @@ void LLVOPartGroup::getGeometry(S32 idx,
 	*colorsp++ = color;
 	*colorsp++ = color;
 
-	//if (pglow.mV[3] || part.mGlow.mV[3])
+	//Only add emissive attributes if glowing (doing it for all particles is INCREDIBLY inefficient as it leads to a second, slower, render pass.)
+	if (gPipeline.canUseVertexShaders() && (pglow.mV[3] > 0 || part.mGlow.mV[3] > 0))
 	{ //only write glow if it is not zero
 		*emissivep++ = pglow;
 		*emissivep++ = pglow;
