@@ -2153,13 +2153,16 @@ LLUZipHelper::EZipRresult LLUZipHelper::unzip_llsd(LLSD& data, std::istream& is,
 	z_stream strm;
 		
 	const U32 CHUNK = 65536;
-
-	U8 *in = new(std::nothrow) U8[size];
-	if (!in)
+	std::unique_ptr<U8[]> in;
+	try
+	{
+		in = std::make_unique<U8[]>(size);
+	}
+	catch(const std::bad_alloc&)
 	{
 		return ZR_MEM_ERROR;
 	}
-	is.read((char*) in, size); 
+	is.read((char*) in.get(), size); 
 
 	U8 out[CHUNK];
 		
@@ -2167,7 +2170,7 @@ LLUZipHelper::EZipRresult LLUZipHelper::unzip_llsd(LLSD& data, std::istream& is,
 	strm.zfree = Z_NULL;
 	strm.opaque = Z_NULL;
 	strm.avail_in = size;
-	strm.next_in = in;
+	strm.next_in = in.get();
 
 	S32 ret = inflateInit(&strm);
 	
@@ -2180,7 +2183,6 @@ LLUZipHelper::EZipRresult LLUZipHelper::unzip_llsd(LLSD& data, std::istream& is,
 		{
 			inflateEnd(&strm);
 			free(result);
-			delete [] in;
 			return ZR_DATA_ERROR;
 		}
 		
@@ -2192,9 +2194,7 @@ LLUZipHelper::EZipRresult LLUZipHelper::unzip_llsd(LLSD& data, std::istream& is,
 		case Z_MEM_ERROR:
 			inflateEnd(&strm);
 			free(result);
-			delete [] in;
 			return ZR_MEM_ERROR;
-			break;
 		}
 
 		U32 have = CHUNK-strm.avail_out;
@@ -2207,7 +2207,6 @@ LLUZipHelper::EZipRresult LLUZipHelper::unzip_llsd(LLSD& data, std::istream& is,
 			{
 				free(result);
 			}
-			delete[] in;
 			return ZR_MEM_ERROR;
 		}
 		result = new_result;
@@ -2217,7 +2216,7 @@ LLUZipHelper::EZipRresult LLUZipHelper::unzip_llsd(LLSD& data, std::istream& is,
 	} while (ret == Z_OK);
 
 	inflateEnd(&strm);
-	delete [] in;
+	in.reset();
 
 	if (ret != Z_STREAM_END)
 	{
@@ -2284,13 +2283,18 @@ U8* unzip_llsdNavMesh( bool& valid, unsigned int& outsize, std::istream& is, S32
 		
 	const U32 CHUNK = 0x4000;
 
-	U8 *in = new(std::nothrow) U8[size];
-	if (in == NULL)
+	std::unique_ptr<U8[]> in;
+	try
+	{
+		in = std::make_unique<U8[]>(size);
+	}
+	catch (const std::bad_alloc&)
 	{
 		LL_WARNS() << "Memory allocation failure." << LL_ENDL;
-		return NULL;
+		return nullptr;
 	}
-	is.read((char*) in, size); 
+
+	is.read((char*) in.get(), size); 
 
 	U8 out[CHUNK];
 		
@@ -2298,7 +2302,7 @@ U8* unzip_llsdNavMesh( bool& valid, unsigned int& outsize, std::istream& is, S32
 	strm.zfree = Z_NULL;
 	strm.opaque = Z_NULL;
 	strm.avail_in = size;
-	strm.next_in = in;
+	strm.next_in = in.get();
 
 	
 	S32 ret = inflateInit2(&strm,  windowBits | ENABLE_ZLIB_GZIP );
@@ -2311,8 +2315,7 @@ U8* unzip_llsdNavMesh( bool& valid, unsigned int& outsize, std::istream& is, S32
 		{
 			inflateEnd(&strm);
 			free(result);
-			delete [] in;
-			valid = false;
+			return NULL;
 		}
 		
 		switch (ret)
@@ -2323,9 +2326,8 @@ U8* unzip_llsdNavMesh( bool& valid, unsigned int& outsize, std::istream& is, S32
 		case Z_MEM_ERROR:
 			inflateEnd(&strm);
 			free(result);
-			delete [] in;
 			valid = false;
-			break;
+			return NULL;
 		}
 
 		U32 have = CHUNK-strm.avail_out;
@@ -2342,7 +2344,6 @@ U8* unzip_llsdNavMesh( bool& valid, unsigned int& outsize, std::istream& is, S32
 			{
 				free(result);
 			}
-			delete[] in;
 			valid = false;
 			return NULL;
 		}
@@ -2353,7 +2354,7 @@ U8* unzip_llsdNavMesh( bool& valid, unsigned int& outsize, std::istream& is, S32
 	} while (ret == Z_OK);
 
 	inflateEnd(&strm);
-	delete [] in;
+	in.reset();
 
 	if (ret != Z_STREAM_END)
 	{
