@@ -308,7 +308,6 @@ LLURI::LLURI(const std::string& escaped_str)
 {
 	std::string::size_type delim_pos;
 	delim_pos = escaped_str.find(':');
-	std::string temp;
 	if (delim_pos == std::string::npos)
 	{
 		mScheme = "";
