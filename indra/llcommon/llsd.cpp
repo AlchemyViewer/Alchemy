@@ -441,7 +441,7 @@ namespace
 
 	void ImplMap::insert(const LLSD::String& k, const LLSD& v)
 	{
-		mData.insert(DataMap::value_type(k, v));
+		mData.emplace(DataMap::value_type(k, v));
 	}
 	
 	void ImplMap::erase(const LLSD::String& k)

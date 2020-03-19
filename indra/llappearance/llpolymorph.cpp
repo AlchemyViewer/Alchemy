@@ -303,7 +303,7 @@ BOOL LLPolyMorphTargetInfo::parseXml(LLXmlTreeNode* node)
 				static LLStdStringHandle pos_string = LLXmlTree::addAttributeString("pos");
 				child_node->getFastAttributeVector3(pos_string, pos);
 
-				mVolumeInfoList.push_back(LLPolyVolumeMorphInfo(volume_name,scale,pos));
+				mVolumeInfoList.emplace_back(LLPolyVolumeMorphInfo(volume_name,scale,pos));
 			}
 		}
 	}
@@ -369,7 +369,7 @@ BOOL LLPolyMorphTarget::setInfo(LLPolyMorphTargetInfo* info)
 		{
 			if (avatarp->mCollisionVolumes[i].getName() == volume_info->mName)
 			{
-				mVolumeMorphs.push_back(
+				mVolumeMorphs.emplace_back(
 					LLPolyVolumeMorph(&avatarp->mCollisionVolumes[i],
 														  volume_info->mScale,
 														  volume_info->mPos));

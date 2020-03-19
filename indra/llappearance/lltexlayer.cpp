@@ -763,7 +763,7 @@ BOOL LLTexLayerInfo::parseXml(LLXmlTreeNode* node)
 			BOOL invert = FALSE;
 			static LLStdStringHandle invert_string = LLXmlTree::addAttributeString("invert");
 			maskNode->getFastAttributeBOOL(invert_string, invert);			
-			mMorphNameList.push_back(std::pair<std::string,BOOL>(morph_name,invert));
+			mMorphNameList.emplace_back(std::pair<std::string,BOOL>(morph_name,invert));
 		}
 	}
 

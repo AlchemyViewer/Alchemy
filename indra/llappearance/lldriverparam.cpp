@@ -85,7 +85,7 @@ BOOL LLDriverParamInfo::parseXml(LLXmlTreeNode* node)
 
 			// Push these on the front of the deque, so that we can construct
 			// them in order later (faster)
-			mDrivenInfoList.push_front( LLDrivenEntryInfo( driven_id, min1, max1, max2, min2 ) );
+			mDrivenInfoList.emplace_front( LLDrivenEntryInfo( driven_id, min1, max1, max2, min2 ) );
 		}
 		else
 		{
@@ -500,7 +500,7 @@ BOOL LLDriverParam::linkDrivenParams(visual_param_mapper mapper, BOOL only_cross
 			bool push = param && (!only_cross_params || param->getCrossWearable());
 			if (push)
 			{
-				mDriven.push_back(LLDrivenEntry( param, driven_info ));
+				mDriven.emplace_back(LLDrivenEntry( param, driven_info ));
 			}
 			else
 			{

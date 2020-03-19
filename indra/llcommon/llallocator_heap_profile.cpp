@@ -112,7 +112,7 @@ void LLAllocatorHeapProfile::parse(std::string const & prof_text)
 	{
 		++j; // skip the '@'
 
-		mLines.push_back(line(live_count, live_size, tot_count, tot_size));
+		mLines.emplace_back(line(live_count, live_size, tot_count, tot_size));
 		line & current_line = mLines.back();
 		
 		for(; j != line_elems.end(); ++j)
