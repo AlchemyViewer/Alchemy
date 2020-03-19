@@ -2121,13 +2121,16 @@ BOOL LLVolume::generate()
 	// stretched due to twisting or scaling on the path.  
 	S32 split = (S32) ((mDetail)*0.66f);
 	
-	if (mParams.getPathParams().getCurveType() == LL_PCODE_PATH_LINE &&
-		(mParams.getPathParams().getScale().mV[0] != 1.0f ||
-		 mParams.getPathParams().getScale().mV[1] != 1.0f) &&
-		(mParams.getProfileParams().getCurveType() == LL_PCODE_PROFILE_SQUARE ||
-		 mParams.getProfileParams().getCurveType() == LL_PCODE_PROFILE_ISOTRI ||
-		 mParams.getProfileParams().getCurveType() == LL_PCODE_PROFILE_EQUALTRI ||
-		 mParams.getProfileParams().getCurveType() == LL_PCODE_PROFILE_RIGHTTRI))
+	const auto& path_params = mParams.getPathParams();
+	const auto& profile_params = mParams.getProfileParams();
+
+	if (path_params.getCurveType() == LL_PCODE_PATH_LINE &&
+		(path_params.getScale().mV[0] != 1.0f ||
+		 path_params.getScale().mV[1] != 1.0f) &&
+		(profile_params.getCurveType() == LL_PCODE_PROFILE_SQUARE ||
+		 profile_params.getCurveType() == LL_PCODE_PROFILE_ISOTRI ||
+		 profile_params.getCurveType() == LL_PCODE_PROFILE_EQUALTRI ||
+		 profile_params.getCurveType() == LL_PCODE_PROFILE_RIGHTTRI))
 	{
 		split = 0;
 	}
@@ -2139,8 +2142,8 @@ BOOL LLVolume::generate()
 
 	if ((mParams.getSculptType() & LL_SCULPT_TYPE_MASK) != LL_SCULPT_TYPE_MESH)
 	{
-		U8 path_type = mParams.getPathParams().getCurveType();
-		U8 profile_type = mParams.getProfileParams().getCurveType();
+		U8 path_type = path_params.getCurveType();
+		U8 profile_type = profile_params.getCurveType();
 		if (path_type == LL_PCODE_PATH_LINE && profile_type == LL_PCODE_PROFILE_CIRCLE)
 		{
 			//cylinders don't care about Z-Axis
@@ -2152,8 +2155,8 @@ BOOL LLVolume::generate()
 		}
 	}
 
-	BOOL regenPath = mPathp->generate(mParams.getPathParams(), path_detail, split);
-	BOOL regenProf = mProfilep->generate(mParams.getProfileParams(), mPathp->isOpen(),profile_detail, split);
+	BOOL regenPath = mPathp->generate(path_params, path_detail, split);
+	BOOL regenProf = mProfilep->generate(profile_params, mPathp->isOpen(),profile_detail, split);
 
 	if (regenPath || regenProf ) 
 	{
@@ -3557,7 +3560,7 @@ bool LLVolumeParams::setSkew(const F32 skew_value)
 
 bool LLVolumeParams::setSculptID(const LLUUID sculpt_id, U8 sculpt_type)
 {
-	mSculptID = sculpt_id;
+	mSculptID = std::move(sculpt_id);
 	mSculptType = sculpt_type;
 	return true;
 }
