@@ -39,7 +39,7 @@ LLUriParser::LLUriParser(const std::string& u) : mTmpScheme(false), mNormalizedT
 		mTmpScheme = true;
 	}
 
-	mNormalizedUri += u.c_str();
+	mNormalizedUri.append(u);
 
 	mRes = parse();
 }

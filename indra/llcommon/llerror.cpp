@@ -120,7 +120,7 @@ namespace {
 	public:
 		RecordToFile(const std::string& filename)
 		{
-			mFile.open(filename.c_str(), std::ios_base::out | std::ios_base::app);
+			mFile.open(filename, std::ios_base::out | std::ios_base::app);
 			if (!mFile)
 			{
 				LL_INFOS() << "Error setting log file to " << filename << LL_ENDL;

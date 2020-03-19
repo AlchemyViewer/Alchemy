@@ -1357,7 +1357,7 @@ BOOL LLStringUtilBase<T>::precedesDict( const string_type& a, const string_type&
 {
 	if( a.size() && b.size() )
 	{
-		return (LLStringUtilBase<T>::compareDict(a.c_str(), b.c_str()) < 0);
+		return (LLStringUtilBase<T>::compareDict(a, b) < 0);
 	}
 	else
 	{
