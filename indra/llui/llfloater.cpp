@@ -1914,9 +1914,9 @@ void LLFloater::draw()
 	{
 		if (hasFocus() && getDefaultButton()->getEnabled())
 		{
-			LLFocusableElement* focus_ctrl = gFocusMgr.getKeyboardFocus();
+			LLButton* focus_ctrl = dynamic_cast<LLButton*>(gFocusMgr.getKeyboardFocus());
 			// is this button a direct descendent and not a nested widget (e.g. checkbox)?
-			BOOL focus_is_child_button = dynamic_cast<LLButton*>(focus_ctrl) != NULL && dynamic_cast<LLButton*>(focus_ctrl)->getParent() == this;
+			BOOL focus_is_child_button = focus_ctrl != NULL && focus_ctrl->getParent() == this;
 			// only enable default button when current focus is not a button
 			getDefaultButton()->setBorderEnabled(!focus_is_child_button);
 		}
