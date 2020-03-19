@@ -959,11 +959,8 @@ void LLComboBox::onTextEntry(LLLineEditor* line_editor)
 
 void LLComboBox::updateSelection()
 {
-	LLWString left_wstring = mTextEntry->getWText().substr(0, mTextEntry->getCursor());
-	// user-entered portion of string, based on assumption that any selected
-    // text was a result of auto-completion
-	LLWString user_wstring = mHasAutocompletedText ? left_wstring : mTextEntry->getWText();
-	std::string full_string = mTextEntry->getText();
+	const LLWString left_wstring = mTextEntry->getWText().substr(0, mTextEntry->getCursor());
+	const std::string& full_string = mTextEntry->getText();
 
 	// go ahead and arrange drop down list on first typed character, even
 	// though we aren't showing it... some code relies on prearrange
@@ -991,6 +988,10 @@ void LLComboBox::updateSelection()
 	}
 	else // no matching items found
 	{
+		// user-entered portion of string, based on assumption that any selected
+		// text was a result of auto-completion
+		const LLWString user_wstring = mHasAutocompletedText ? left_wstring : mTextEntry->getWText();
+
 		mList->deselectAllItems();
 		mTextEntry->setText(wstring_to_utf8str(user_wstring)); // removes text added by autocompletion
 		mTextEntry->setTentative(mTextEntryTentative);
@@ -1138,6 +1139,19 @@ BOOL LLComboBox::selectItemRange( S32 first, S32 last )
 	return mList->selectItemRange(first, last);
 }
 
+// virtual
+BOOL LLComboBox::handleScrollWheel(S32 x, S32 y, S32 clicks)
+{
+	if (mList->getVisible()) return mList->handleScrollWheel(x, y, clicks);
+	if (mAllowTextEntry) // We might be editable
+		if (!mList->getFirstSelected()) // We aren't in the list, don't kill their text
+			return false;
+	
+	setCurrentByIndex(llclamp(getCurrentIndex() + clicks, 0, getItemCount() - 1));
+	prearrangeList();
+	onCommit();
+	return true;
+}
 
 static LLDefaultChildRegistry::Register<LLIconsComboBox> register_icons_combo_box("icons_combo_box");
 
