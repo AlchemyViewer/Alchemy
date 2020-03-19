@@ -175,7 +175,17 @@ void LLSpinCtrl::onUpBtn( const LLSD& data )
 			F32 cur_val = (F32) atof(text.c_str());
 		
 			// use getValue()/setValue() to force reload from/to control
-			F32 val = cur_val + mIncrement;
+			F32 val = cur_val;
+			if (gKeyboard->getKeyDown(KEY_SHIFT)) {
+				val = cur_val + (mIncrement * 0.01f);
+			} else if (gKeyboard->getKeyDown(KEY_CONTROL)) {
+				val = cur_val + (mIncrement * 0.1f);
+			} else if (gKeyboard->getKeyDown(KEY_ALT)) {
+				val = cur_val + (mIncrement * 10.f);
+			} else {
+				val = cur_val + mIncrement;
+			}
+
 			val = clamp_precision(val, mPrecision);
 			val = llmin( val, mMaxValue );
 			if (val < mMinValue) val = mMinValue;
@@ -208,7 +218,17 @@ void LLSpinCtrl::onDownBtn( const LLSD& data )
 			LLLocale locale(LLLocale::USER_LOCALE);
 			F32 cur_val = (F32) atof(text.c_str());
 		
-			F32 val = cur_val - mIncrement;
+			F32 val = cur_val;
+			if (gKeyboard->getKeyDown(KEY_SHIFT)) {
+				val = cur_val - (mIncrement * 0.01f);
+			} else if (gKeyboard->getKeyDown(KEY_CONTROL)) {
+				val = cur_val - (mIncrement * 0.1f);
+			} else if (gKeyboard->getKeyDown(KEY_ALT)) {
+				val = cur_val - (mIncrement * 10.f);
+			} else {
+				val = cur_val - mIncrement;
+			}
+
 			val = clamp_precision(val, mPrecision);
 			val = llmax( val, mMinValue );
 
