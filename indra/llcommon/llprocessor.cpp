@@ -32,6 +32,7 @@
 
 #include <iomanip>
 //#include <memory>
+#include <tuple>
 
 #if LL_WINDOWS
 #	include "llwin32headerslean.h"
@@ -458,111 +459,139 @@ public:
 	}
 
 private:
+	typedef std::tuple<int, int, int, int> familyModelTuple;
+	familyModelTuple computeFamilyAndModel(
+		const std::string& vendor,
+		int signature) {
+		int family = (signature >> 8) & 0xf;
+		int model = (signature >> 4) & 0xf;
+		int ext_family = 0;
+		int ext_model = 0;
+		// The "Intel 64 and IA-32 Architectures Developer's Manual: Vol. 2A"
+		// specifies the Extended Model is defined only when the Base Family is
+		// 06h or 0Fh.
+		// The "AMD CPUID Specification" specifies that the Extended Model is
+		// defined only when Base Family is 0Fh.
+		// Both manuals define the display model as
+		// {ExtendedModel[3:0],BaseModel[3:0]} in that case.
+		if (family == 0xf || (family == 0x6 && vendor == "GenuineIntel")) {
+			ext_model = (signature >> 16) & 0xf;
+			model += ext_model << 4;
+		}
+		// Both the "Intel 64 and IA-32 Architectures Developer's Manual: Vol. 2A"
+		// and the "AMD CPUID Specification" specify that the Extended Family is
+		// defined only when the Base Family is 0Fh.
+		// Both manuals define the display family as {0000b,BaseFamily[3:0]} +
+		// ExtendedFamily[7:0] in that case.
+		if (family == 0xf) {
+			ext_family = (signature >> 20) & 0xff;
+			family += ext_family;
+		}
+		return familyModelTuple(family, model, ext_family, ext_model);
+	}
+
 	void getCPUIDInfo()
 	{
-		// http://msdn.microsoft.com/en-us/library/hskdteyh(VS.80).aspx
+		//// http://msdn.microsoft.com/en-us/library/hskdteyh(VS.80).aspx
 
-		// __cpuid with an InfoType argument of 0 returns the number of
-		// valid Ids in cpu_info[0] and the CPU identification string in
-		// the other three array elements. The CPU identification string is
-		// not in linear order. The code below arranges the information 
-		// in a human readable form.
-		int cpu_info[4] = {-1};
+		//// __cpuid with an InfoType argument of 0 returns the number of
+		//// valid Ids in cpu_info[0] and the CPU identification string in
+		//// the other three array elements. The CPU identification string is
+		//// not in linear order. The code below arranges the information 
+		//// in a human readable form.
+
+		int cpu_info[4] = { -1 };
 		__cpuid(cpu_info, 0);
-		unsigned int ids = (unsigned int)cpu_info[0];
-		setConfig(eMaxID, (S32)ids);
 
-		char cpu_vendor[0x20];
-		memset(cpu_vendor, 0, sizeof(cpu_vendor));
-		*((int*)cpu_vendor) = cpu_info[1];
-		*((int*)(cpu_vendor+4)) = cpu_info[3];
-		*((int*)(cpu_vendor+8)) = cpu_info[2];
+		const int ids = cpu_info[0];
+		setConfig(eMaxID, LLSD::Integer(ids));
+
+		std::swap(cpu_info[2], cpu_info[3]);
+		char cpu_string[sizeof(cpu_info) * 3 + 1];
+		static const size_t kVendorNameSize = 3 * sizeof(cpu_info[1]);
+		static_assert(kVendorNameSize < sizeof(cpu_string),	"cpu_string too small");
+		memcpy(cpu_string, &cpu_info[1], kVendorNameSize);
+		cpu_string[kVendorNameSize] = '\0';
+		std::string cpu_vendor(cpu_string);
 		setInfo(eVendor, cpu_vendor);
 
-		// Get the information associated with each valid Id
-		for(unsigned int i=0; i<=ids; ++i)
+		if (ids > 0)
 		{
-			__cpuid(cpu_info, i);
+			__cpuid(cpu_info, 1);
+			const int signature = cpu_info[0];
 
-			// Interpret CPU feature information.
-			if  (i == 1)
+			setInfo(eStepping, cpu_info[0] & 0xf);
+			setInfo(eType, (cpu_info[0] >> 12) & 0x3);
+			setInfo(eBrandID, cpu_info[1] & 0xff);
+
+			int family, model, ext_family, ext_model;
+			std::tie(family, model, ext_family, ext_model) = computeFamilyAndModel(cpu_vendor, signature);
+			setInfo(eFamily, family);
+			setInfo(eModel, model);
+			setInfo(eExtendedFamily, ext_family);
+			setInfo(eExtendedModel, ext_model);
+				
+			setInfo(eFamilyName, compute_CPUFamilyName(cpu_string, family, ext_family));
+
+			setConfig(eCLFLUSHCacheLineSize, ((cpu_info[1] >> 8) & 0xff) * 8);
+			setConfig(eAPICPhysicalID, (cpu_info[1] >> 24) & 0xff);
+
+			if (cpu_info[2] & 0x1)
 			{
-				setInfo(eStepping, cpu_info[0] & 0xf);
-				setInfo(eModel, (cpu_info[0] >> 4) & 0xf);
-				int family = (cpu_info[0] >> 8) & 0xf;
-				setInfo(eFamily, family);
-				setInfo(eType, (cpu_info[0] >> 12) & 0x3);
-				setInfo(eExtendedModel, (cpu_info[0] >> 16) & 0xf);
-				int ext_family = (cpu_info[0] >> 20) & 0xff;
-				setInfo(eExtendedFamily, ext_family);
-				setInfo(eBrandID, cpu_info[1] & 0xff);
+				setExtension(cpu_feature_names[eSSE3_Features]);
+			}
 
-				setInfo(eFamilyName, compute_CPUFamilyName(cpu_vendor, family, ext_family));
+			if (cpu_info[2] & 0x8)
+			{
+				setExtension(cpu_feature_names[eMONTIOR_MWAIT]);
+			}
 
-				setConfig(eCLFLUSHCacheLineSize, ((cpu_info[1] >> 8) & 0xff) * 8);
-				setConfig(eAPICPhysicalID, (cpu_info[1] >> 24) & 0xff);
-				
-				if(cpu_info[2] & 0x1)
-				{
-					setExtension(cpu_feature_names[eSSE3_Features]);
-				}
+			if (cpu_info[2] & 0x10)
+			{
+				setExtension(cpu_feature_names[eCPLDebugStore]);
+			}
 
-				if(cpu_info[2] & 0x8)
+			if (cpu_info[2] & 0x100)
+			{
+				setExtension(cpu_feature_names[eThermalMonitor2]);
+			}
+
+			int feature_info = cpu_info[3];
+			for (int index = 0, bit = 1; index < eSSE3_Features; ++index, bit <<= 1)
+			{
+				if (feature_info & bit)
 				{
-					setExtension(cpu_feature_names[eMONTIOR_MWAIT]);
-				}
-				
-				if(cpu_info[2] & 0x10)
-				{
-					setExtension(cpu_feature_names[eCPLDebugStore]);
-				}
-				
-				if(cpu_info[2] & 0x100)
-				{
-					setExtension(cpu_feature_names[eThermalMonitor2]);
-				}
-						
-				unsigned int feature_info = (unsigned int) cpu_info[3];
-				for(unsigned int index = 0, bit = 1; index < eSSE3_Features; ++index, bit <<= 1)
-				{
-					if(feature_info & bit)
-					{
-						setExtension(cpu_feature_names[index]);
-					}
+					setExtension(cpu_feature_names[index]);
 				}
 			}
 		}
 
-		// Calling __cpuid with 0x80000000 as the InfoType argument
-		// gets the number of valid extended IDs.
+		// Get the brand string of the cpu.
 		__cpuid(cpu_info, 0x80000000);
-		unsigned int ext_ids = cpu_info[0];
-		setConfig(eMaxExtID, 0);
+		const int max_parameter = cpu_info[0];
 
-		char cpu_brand_string[0x40];
-		memset(cpu_brand_string, 0, sizeof(cpu_brand_string));
+		static const int paramStart = 0x80000002;
+		static const int paramEnd = 0x80000004;
+		static const int kParameterSize = paramEnd - paramStart + 1;
+		static_assert(kParameterSize * sizeof(cpu_info) + 1 == sizeof(cpu_string), "cpu_string has wrong size");
+		if (max_parameter >= paramEnd) {
+			size_t i = 0;
+			for (int parameter = paramStart; parameter <= paramEnd;
+				++parameter) {
+				__cpuid(cpu_info, parameter);
+				memcpy(&cpu_string[i], cpu_info, sizeof(cpu_info));
+				i += sizeof(cpu_info);
+			}
+			cpu_string[i] = '\0';
+			setInfo(eBrandName, std::string(cpu_string));
+		}
 
-		// Get the information associated with each extended ID.
-		for(unsigned int i=0x80000000; i<=ext_ids; ++i)
+		if (max_parameter >= 0x80000006)
 		{
-			__cpuid(cpu_info, i);
-
-			// Interpret CPU brand string and cache information.
-			if  (i == 0x80000002)
-				memcpy(cpu_brand_string, cpu_info, sizeof(cpu_info));
-			else if  (i == 0x80000003)
-				memcpy(cpu_brand_string + 16, cpu_info, sizeof(cpu_info));
-			else if  (i == 0x80000004)
-			{
-				memcpy(cpu_brand_string + 32, cpu_info, sizeof(cpu_info));
-				setInfo(eBrandName, cpu_brand_string);
-			}
-			else if  (i == 0x80000006)
-			{
-				setConfig(eCacheLineSize, cpu_info[2] & 0xff);
-				setConfig(eL2Associativity, (cpu_info[2] >> 12) & 0xf);
-				setConfig(eCacheSizeK, (cpu_info[2] >> 16) & 0xffff);
-			}
+			__cpuid(cpu_info, 0x80000006);
+			setConfig(eCacheLineSize, cpu_info[2] & 0xff);
+			setConfig(eL2Associativity, (cpu_info[2] >> 12) & 0xf);
+			setConfig(eCacheSizeK, (cpu_info[2] >> 16) & 0xffff);
 		}
 	}
 };
