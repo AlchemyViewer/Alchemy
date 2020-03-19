@@ -38,6 +38,7 @@
 #include "raytrace.h"
 
 #include "llagent.h" //  Get state values from here
+#include "llagentbenefits.h"
 #include "llagentcamera.h"
 #include "llagentwearables.h"
 #include "llanimationstates.h"
@@ -7166,20 +7167,7 @@ U32 LLVOAvatar::getNumAttachments() const
 //-----------------------------------------------------------------------------
 S32 LLVOAvatar::getMaxAttachments() const
 {
-	const S32 MAX_AGENT_ATTACHMENTS = 38;
-
-	S32 max_attach = MAX_AGENT_ATTACHMENTS;
-	
-	if (gAgent.getRegion())
-	{
-		LLSD features;
-		gAgent.getRegion()->getSimulatorFeatures(features);
-		if (features.has("MaxAgentAttachments"))
-		{
-			max_attach = features["MaxAgentAttachments"].asInteger();
-		}
-	}
-	return max_attach;
+	return LLAgentBenefitsMgr::current().getAttachmentLimit();
 }
 
 //-----------------------------------------------------------------------------
@@ -7213,24 +7201,7 @@ U32 LLVOAvatar::getNumAnimatedObjectAttachments() const
 //-----------------------------------------------------------------------------
 S32 LLVOAvatar::getMaxAnimatedObjectAttachments() const
 {
-    S32 max_attach = 0;
-    if (gSavedSettings.getBOOL("AnimatedObjectsIgnoreLimits"))
-    {
-        max_attach = getMaxAttachments(); 
-    }
-    else
-    {
-        if (gAgent.getRegion())
-        {
-            LLSD features;
-            gAgent.getRegion()->getSimulatorFeatures(features);
-            if (features.has("AnimatedObjects"))
-            {
-                max_attach = features["AnimatedObjects"]["MaxAgentAnimatedObjectAttachments"].asInteger();
-            }
-        }
-    }
-    return max_attach;
+	return LLAgentBenefitsMgr::current().getAnimatedObjectLimit();
 }
 
 //-----------------------------------------------------------------------------
