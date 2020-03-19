@@ -60,7 +60,7 @@ protected:
 
 public:
 	LLTimer();
-	~LLTimer();
+	~LLTimer() = default;
 
 	static void initClass();
 	static void cleanupClass();
