@@ -200,12 +200,10 @@ LLPanel::ctrl_list_t LLPanel::getCtrlList() const
 
 void LLPanel::draw()
 {
-	F32 alpha = getDrawContext().mAlpha;
-
 	// draw background
 	if( mBgVisible )
 	{
-		alpha = getCurrentTransparency();
+		F32 alpha = getCurrentTransparency();
 
 		LLRect local_rect = getLocalRect();
 		if (mBgOpaque )
