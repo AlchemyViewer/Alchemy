@@ -704,43 +704,14 @@ bool LLAppViewerWin32::initHardwareTest()
 	// Do driver verification and initialization based on DirectX
 	// hardware polling and driver versions
 	//
-	if (TRUE == gSavedSettings.getBOOL("ProbeHardwareOnStartup") && FALSE == gSavedSettings.getBOOL("NoHardwareProbe"))
+	if (FALSE == gSavedSettings.getBOOL("NoHardwareProbe"))
 	{
-		// per DEV-11631 - disable hardware probing for everything
-		// but vram.
-		BOOL vram_only = TRUE;
-
 		LLSplashScreen::update(LLTrans::getString("StartupDetectingHardware"));
 
 		LL_DEBUGS("AppInit") << "Attempting to poll DirectX for hardware info" << LL_ENDL;
 		gDXHardware.setWriteDebugFunc(write_debug_dx);
-		BOOL probe_ok = gDXHardware.getInfo(vram_only);
-
-		if (!probe_ok
-			&& gWarningSettings.getBOOL("AboutDirectX9"))
-		{
-			LL_WARNS("AppInit") << "DirectX probe failed, alerting user." << LL_ENDL;
-
-			// Warn them that runnin without DirectX 9 will
-			// not allow us to tell them about driver issues
-			std::ostringstream msg;
-			msg << LLTrans::getString ("MBNoDirectX");
-			S32 button = OSMessageBox(
-				msg.str(),
-				LLTrans::getString("MBWarning"),
-				OSMB_YESNO);
-			if (OSBTN_NO== button)
-			{
-				LL_INFOS("AppInit") << "User quitting after failed DirectX 9 detection" << LL_ENDL;
-				LLWeb::loadURLExternal("http://secondlife.com/support/", false);
-				return false;
-			}
-			gWarningSettings.setBOOL("AboutDirectX9", FALSE);
-		}
-		LL_DEBUGS("AppInit") << "Done polling DirectX for hardware info" << LL_ENDL;
-
-		// Only probe once after installation
-		gSavedSettings.setBOOL("ProbeHardwareOnStartup", FALSE);
+		gDXHardware.updateVRAM();
+		LL_DEBUGS("AppInit") << "Done polling DXGI for vram info" << LL_ENDL;
 
 		// Disable so debugger can work
 		std::string splash_msg;

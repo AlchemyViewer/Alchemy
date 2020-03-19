@@ -145,6 +145,7 @@ if (WINDOWS)
   list(APPEND llwindow_LINK_LIBRARIES
        comdlg32     # Common Dialogs for ChooseColor
        ole32
+       DXGI
        )
 endif (WINDOWS)
 

@@ -683,28 +683,38 @@ bool LLGLManager::initGL()
 	initExtensions();
 	stop_glerror();
 
-	S32 old_vram = mVRAM;
-
-	if (mHasATIMemInfo)
-	{ //ask the gl how much vram is free at startup and attempt to use no more than half of that
-		S32 meminfo[4];
-		glGetIntegerv(GL_TEXTURE_FREE_MEMORY_ATI, meminfo);
-
-		mVRAM = meminfo[0]/1024;
-	}
-	else if (mHasNVXMemInfo)
+	if (mVRAM == 0)
 	{
-		S32 dedicated_memory;
-		glGetIntegerv(GL_GPU_MEMORY_INFO_DEDICATED_VIDMEM_NVX, &dedicated_memory);
-		mVRAM = dedicated_memory/1024;
-	}
+		S32 old_vram = mVRAM;
 
-	if (mVRAM < 256)
-	{ //something likely went wrong using the above extensions, fall back to old method
-		mVRAM = old_vram;
-	}
+		if (mHasATIMemInfo)
+		{ //ask the gl how much vram is free at startup and attempt to use no more than half of that
+			S32 meminfo[4];
+			glGetIntegerv(GL_TEXTURE_FREE_MEMORY_ATI, meminfo);
 
-	stop_glerror();
+			mVRAM = meminfo[0] / 1024;
+		}
+		else if (mHasNVXMemInfo)
+		{
+			S32 dedicated_memory;
+			glGetIntegerv(GL_GPU_MEMORY_INFO_DEDICATED_VIDMEM_NVX, &dedicated_memory);
+			mVRAM = dedicated_memory / 1024;
+		}
+
+		if (mVRAM < 256)
+		{ //something likely went wrong using the above extensions, fall back to old method
+			mVRAM = old_vram;
+			LL_INFOS("RenderInit") << "Failed to detect VRAM from GL falling back to value: " << mVRAM << LL_ENDL;
+		}
+		else
+		{
+			LL_INFOS("RenderInit") << "Detected VRAM from GL: " << mVRAM << LL_ENDL;
+		}
+	}
+	else
+	{
+		LL_INFOS("RenderInit") << "Using VRAM value from OS: " << mVRAM << LL_ENDL;
+	}
 
 	stop_glerror();
 

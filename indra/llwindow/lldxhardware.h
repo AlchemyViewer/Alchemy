@@ -86,7 +86,7 @@ public:
 
 	// Returns TRUE on success.
 	// vram_only TRUE does a "light" probe.
-	BOOL getInfo(BOOL vram_only);
+	BOOL updateVRAM();
 
 	std::string getDriverVersionWMI();
 
