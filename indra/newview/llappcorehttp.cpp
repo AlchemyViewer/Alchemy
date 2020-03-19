@@ -539,7 +539,7 @@ LLCore::HttpStatus LLAppCoreHttp::sslVerify(const std::string &url,
 		// don't validate hostname.  Let libcurl do it instead.  That way, it'll handle redirects
 		store->validate(VALIDATION_POLICY_SSL & (~VALIDATION_POLICY_HOSTNAME), chain, validation_params);
 	}
-	catch (LLCertValidationTrustException &cert_exception)
+	catch (const LLCertValidationTrustException &cert_exception)
 	{
 		// this exception is is handled differently than the general cert
 		// exceptions, as we allow the user to actually add the certificate
@@ -555,7 +555,7 @@ LLCore::HttpStatus LLAppCoreHttp::sslVerify(const std::string &url,
 		// We should probably have a more generic way of passing information
 		// back to the error handlers.
 	}
-	catch (LLCertException &cert_exception)
+	catch (const LLCertException &cert_exception)
 	{
 		result = LLCore::HttpStatus(LLCore::HttpStatus::EXT_CURL_EASY, CURLE_SSL_PEER_CERTIFICATE);
 		result.setMessage(cert_exception.what());

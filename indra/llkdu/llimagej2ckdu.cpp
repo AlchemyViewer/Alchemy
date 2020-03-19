@@ -483,7 +483,7 @@ bool LLImageJ2CKDU::initDecode(LLImageJ2C &base, LLImageRaw &raw_image, F32 deco
 		base.setLastError(msg.what());
 		return false;
 	}
-	catch (kdu_exception kdu_value)
+	catch (const kdu_exception& kdu_value)
 	{
 		// KDU internally throws kdu_exception. It's possible that such an
 		// exception might leak out into our code. Catch kdu_exception
@@ -592,7 +592,7 @@ bool LLImageJ2CKDU::decodeImpl(LLImageJ2C &base, LLImageRaw &raw_image, F32 deco
 				cleanupCodeStream();
 				return true; // done
 			}
-			catch (kdu_exception kdu_value)
+			catch (const kdu_exception& kdu_value)
 			{
 				// KDU internally throws kdu_exception. It's possible that such an
 				// exception might leak out into our code. Catch kdu_exception
@@ -795,7 +795,7 @@ bool LLImageJ2CKDU::encodeImpl(LLImageJ2C &base, const LLImageRaw &raw_image, co
 		base.setLastError(msg.what());
 		return false;
 	}
-	catch (kdu_exception kdu_value)
+	catch (const kdu_exception& kdu_value)
 	{
 		// KDU internally throws kdu_exception. It's possible that such an
 		// exception might leak out into our code. Catch kdu_exception
@@ -829,7 +829,7 @@ bool LLImageJ2CKDU::getMetadata(LLImageJ2C &base)
 		base.setLastError(msg.what());
 		return false;
 	}
-	catch (kdu_exception kdu_value)
+	catch (const kdu_exception& kdu_value)
 	{
 		// KDU internally throws kdu_exception. It's possible that such an
 		// exception might leak out into our code. Catch kdu_exception

@@ -38,7 +38,7 @@ public:
 	LLInvalidGridName(std::string grid) : mGrid(grid)
 	{
 	}
-	std::string name() { return mGrid; }
+	std::string name() const { return mGrid; }
 protected:
 	std::string mGrid;
 };

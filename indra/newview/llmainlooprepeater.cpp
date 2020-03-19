@@ -80,7 +80,7 @@ bool LLMainLoopRepeater::onMessage(LLSD const & event)
 {
 	try {
 		mQueue->pushFront(event);
-	} catch(LLThreadSafeQueueError & e) {
+	} catch(const LLThreadSafeQueueError & e) {
 		LL_WARNS() << "could not repeat message (" << e.what() << ")" << 
 			event.asString() << LL_ENDL;
 	}

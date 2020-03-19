@@ -802,7 +802,7 @@ void LLFloaterScriptQueue::objectScriptProcessingQueueCoro(std::string action, L
         floater->addStringMessage("Done");
         floater->getChildView("close")->setEnabled(TRUE);
     }
-    catch (LLCheckedHandleBase::Stale &)
+    catch (const LLCheckedHandleBase::Stale &)
     {
         // This is expected.  It means that floater has been closed before 
         // processing was completed.

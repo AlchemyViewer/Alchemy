@@ -5288,7 +5288,7 @@ bool LLVolumeFace::cacheOptimize()
 		triangle_data.resize(mNumIndices / 3);
 		vertex_data.resize(mNumVertices);
 	}
-	catch (std::bad_alloc)
+	catch (const std::bad_alloc&)
 	{
 		LL_WARNS("LLVOLUME") << "Resize failed" << LL_ENDL;
 		return false;
@@ -5442,7 +5442,7 @@ bool LLVolumeFace::cacheOptimize()
 	{
 		new_idx.resize(mNumVertices, -1);
 	}
-	catch (std::bad_alloc)
+	catch (const std::bad_alloc&)
 	{
 		ll_aligned_free<64>(pos);
 		ll_aligned_free_16(wght);

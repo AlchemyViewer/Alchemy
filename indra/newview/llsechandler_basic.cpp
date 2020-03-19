@@ -605,7 +605,7 @@ void LLBasicCertificateStore::load_from_file(const std::string& filename)
                                 << LL_ENDL;
                         loaded++;
                     }
-                    catch (LLCertException& cert_exception)
+                    catch (const LLCertException& cert_exception)
                     {
                         LLSD cert_info(cert_exception.getCertData());
                         LL_DEBUGS("SECAPI_BADCERT","SECAPI") << "invalid certificate (" << cert_exception.what() << "): " << cert_info << LL_ENDL;

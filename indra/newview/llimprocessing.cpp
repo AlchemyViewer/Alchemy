@@ -396,7 +396,7 @@ static bool parse_lure_bucket(const std::string& bucket,
         ly = boost::lexical_cast<S32>((*(++iter)).c_str());
         lz = boost::lexical_cast<S32>((*(++iter)).c_str());
     }
-    catch (boost::bad_lexical_cast&)
+    catch (const boost::bad_lexical_cast&)
     {
         LL_WARNS("parse_lure_bucket")
             << "Couldn't parse lure bucket."

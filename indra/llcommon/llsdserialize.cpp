@@ -2244,13 +2244,13 @@ LLUZipHelper::EZipRresult LLUZipHelper::unzip_llsd(LLSD& data, std::istream& is,
 			istr.str(res_str);
 		}
 #ifdef LL_WINDOWS
-		catch (std::length_error)
+		catch (const std::length_error&)
 		{
 			free(result);
 			return ZR_SIZE_ERROR;
 		}
 #endif
-		catch (std::bad_alloc)
+		catch (const std::bad_alloc&)
 		{
 			free(result);
 			return ZR_MEM_ERROR;

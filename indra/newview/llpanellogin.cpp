@@ -999,7 +999,7 @@ void LLPanelLogin::onClickConnect(void *)
 		{
 			LLGridManager::getInstance()->setGridChoice(combo_val.asString());
 		}
-		catch (LLInvalidGridName ex)
+		catch (const LLInvalidGridName& ex)
 		{
 			LLSD args;
 			args["GRID"] = ex.name();
@@ -1206,7 +1206,7 @@ void LLPanelLogin::updateServer()
 			// grid changed so show new splash screen (possibly)
 			loadLoginPage();
 		}
-		catch (LLInvalidGridName ex)
+		catch (const LLInvalidGridName& ex)
 		{
 			LL_WARNS("AppInit")<<"server '"<<ex.name()<<"' selection failed"<<LL_ENDL;
 			LLSD args;

@@ -118,7 +118,7 @@ static bool matchRegex(const char *text, boost::regex regex, U32 &start, U32 &en
 	{
 		found = boost::regex_search(text, result, regex);
 	}
-	catch (std::runtime_error &)
+	catch (const std::runtime_error &)
 	{
 		return false;
 	}
