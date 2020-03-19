@@ -219,7 +219,7 @@ void LLMD5::finalize (){
   encode (digest, state, 16);
 
   // Zeroize sensitive information
-  memset (buffer, 0, sizeof(*buffer));
+  memset (buffer, 0, sizeof(buffer));
 
   finalized=1;
 
