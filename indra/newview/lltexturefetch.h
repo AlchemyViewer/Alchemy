@@ -135,7 +135,7 @@ public:
 	U32 getTotalNumHTTPRequests();
 	
     // Threads:  T*
-    S32 getPending();
+    S32 getPending() const override { return mCommandsSize + mRequestQueueSize; }
 
     // Threads:  T*
 	void lockQueue() { mQueueMutex.lock(); }
@@ -332,12 +332,12 @@ private:
 	typedef std::map<LLHost,std::set<LLUUID> > cancel_queue_t;
 	cancel_queue_t mCancelQueue;										// Mfnq
 	F32 mTextureBandwidth;												// <none>
-	F32 mMaxBandwidth;													// Mfnq
+	std::atomic<F32> mMaxBandwidth;
 	LLTextureInfo mTextureInfo;
 	LLTextureInfo mTextureInfoMainThread;
 
 	// XXX possible delete
-	U32Bits mHTTPTextureBits;												// Mfnq
+	std::atomic<U32Bits> mHTTPTextureBits;
 
 	// XXX possible delete
 	//debug use
@@ -349,6 +349,7 @@ private:
 	// same locks.
 	typedef std::deque<TFRequest *> command_queue_t;
 	command_queue_t mCommands;											// Mfq
+	std::atomic<S32> mCommandsSize;
 
 	// If true, modifies some behaviors that help with QA tasks.
 	const bool mQAMode;

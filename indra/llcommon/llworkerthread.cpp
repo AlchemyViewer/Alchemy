@@ -35,7 +35,8 @@
 // Run on MAIN thread
 
 LLWorkerThread::LLWorkerThread(const std::string& name, bool threaded, bool should_pause) :
-	LLQueuedThread(name, threaded, should_pause)
+	LLQueuedThread(name, threaded, should_pause),
+	mDeleteListSize(0)
 {
 	mDeleteMutex = new LLMutex();
 
@@ -76,6 +77,7 @@ void LLWorkerThread::clearDeleteList()
 			delete *iter ;
 		}
 		mDeleteList.clear() ;
+		mDeleteListSize = mDeleteList.size();
 		mDeleteMutex->unlock() ;
 	}
 }
@@ -87,26 +89,30 @@ S32 LLWorkerThread::update(F32 max_time_ms)
 	// Delete scheduled workers
 	std::vector<LLWorkerClass*> delete_list;
 	std::vector<LLWorkerClass*> abort_list;
-	mDeleteMutex->lock();
-	for (delete_list_t::iterator iter = mDeleteList.begin();
-		 iter != mDeleteList.end(); )
+	if (mDeleteListSize)
 	{
-		delete_list_t::iterator curiter = iter++;
-		LLWorkerClass* worker = *curiter;
-		if (worker->deleteOK())
+		mDeleteMutex->lock();
+		for (delete_list_t::iterator iter = mDeleteList.begin();
+			 iter != mDeleteList.end(); )
 		{
-			if (worker->getFlags(LLWorkerClass::WCF_WORK_FINISHED))
+			delete_list_t::iterator curiter = iter++;
+			LLWorkerClass* worker = *curiter;
+			if (worker->deleteOK())
 			{
-				delete_list.push_back(worker);
-				mDeleteList.erase(curiter);
-			}
-			else if (!worker->getFlags(LLWorkerClass::WCF_ABORT_REQUESTED))
-			{
-				abort_list.push_back(worker);
+				if (worker->getFlags(LLWorkerClass::WCF_WORK_FINISHED))
+				{
+					delete_list.push_back(worker);
+					mDeleteList.erase(curiter);
+				}
+				else if (!worker->getFlags(LLWorkerClass::WCF_ABORT_REQUESTED))
+				{
+					abort_list.push_back(worker);
+				}
 			}
 		}
+		mDeleteListSize = mDeleteList.size();
+		mDeleteMutex->unlock();
 	}
-	mDeleteMutex->unlock();	
 	// abort and delete after releasing mutex
 	for (std::vector<LLWorkerClass*>::iterator iter = abort_list.begin();
 		 iter != abort_list.end(); ++iter)
@@ -154,6 +160,7 @@ void LLWorkerThread::deleteWorker(LLWorkerClass* workerclass)
 {
 	mDeleteMutex->lock();
 	mDeleteList.push_back(workerclass);
+	mDeleteListSize = mDeleteList.size();
 	mDeleteMutex->unlock();
 }
 

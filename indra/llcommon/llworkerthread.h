@@ -81,6 +81,7 @@ protected:
 private:
 	typedef std::list<LLWorkerClass*> delete_list_t;
 	delete_list_t mDeleteList;
+	std::atomic<S32> mDeleteListSize;
 	LLMutex* mDeleteMutex;
 	
 public:
@@ -91,7 +92,7 @@ public:
 	
 	handle_t addWorkRequest(LLWorkerClass* workerclass, S32 param, U32 priority = PRIORITY_NORMAL);
 	
-	S32 getNumDeletes() { return (S32)mDeleteList.size(); } // debug
+	S32 getNumDeletes() const { return mDeleteListSize; } // debug
 
 private:
 	void deleteWorker(LLWorkerClass* workerclass); // schedule for deletion

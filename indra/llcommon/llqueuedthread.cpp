@@ -36,9 +36,10 @@
 LLQueuedThread::LLQueuedThread(const std::string& name, bool threaded, bool should_pause) :
 	LLThread(name),
 	mThreaded(threaded),
-	mIdleThread(TRUE),
-	mNextHandle(0),
-	mStarted(FALSE)
+    mStarted(false),
+	mIdleThread(true),
+	mRequestQueueSize(0),
+    mNextHandle(0)
 {
 	if (mThreaded)
 	{
@@ -117,7 +118,7 @@ S32 LLQueuedThread::update(F32 max_time_ms)
 		if (!mThreaded)
 		{
 			startThread();
-			mStarted = TRUE;
+			mStarted = true;
 		}
 	}
 	return updateQueue(max_time_ms);
@@ -160,17 +161,6 @@ void LLQueuedThread::incQueue()
 			wake(); // Wake the thread up if necessary.
 		}
 	}
-}
-
-//virtual
-// May be called from any thread
-S32 LLQueuedThread::getPending()
-{
-	S32 res;
-	lockData();
-	res = mRequestQueue.size();
-	unlockData();
-	return res;
 }
 
 // MAIN thread
@@ -236,6 +226,7 @@ bool LLQueuedThread::addRequest(QueuedRequest* req)
 #if _DEBUG
 // 	LL_INFOS() << llformat("LLQueuedThread::Added req [%08d]",handle) << LL_ENDL;
 #endif
+	mRequestQueueSize = mRequestQueue.size();
 	unlockData();
 
 	incQueue();
@@ -289,7 +280,7 @@ LLQueuedThread::QueuedRequest* LLQueuedThread::getRequest(handle_t handle)
 {
 	if (handle == nullHandle())
 	{
-		return 0;
+		return nullptr;
 	}
 	lockData();
 	QueuedRequest* res = (QueuedRequest*)mRequestHash.find(handle);
@@ -429,6 +420,10 @@ S32 LLQueuedThread::processNextRequest()
 		llassert_always(req->getStatus() == STATUS_QUEUED);
 		break;
 	}
+
+	// Update queue size after processing
+	mRequestQueueSize = mRequestQueue.size();
+
 	U32 start_priority = 0 ;
 	if (req)
 	{
@@ -463,6 +458,7 @@ S32 LLQueuedThread::processNextRequest()
 			lockData();
 			req->setStatus(STATUS_QUEUED);
 			mRequestQueue.insert(req);
+			mRequestQueueSize = mRequestQueue.size();
 			unlockData();
 			if (mThreaded && start_priority < PRIORITY_NORMAL)
 			{
@@ -481,10 +477,7 @@ S32 LLQueuedThread::processNextRequest()
 bool LLQueuedThread::runCondition()
 {
 	// mRunCondition must be locked here
-	if (mRequestQueue.empty() && mIdleThread)
-		return false;
-	else
-		return true;
+	return !((mRequestQueueSize <= 0) && mIdleThread);
 }
 
 // virtual
@@ -493,7 +486,7 @@ void LLQueuedThread::run()
 	// call checPause() immediately so we don't try to do anything before the class is fully constructed
 	checkPause();
 	startThread();
-	mStarted = TRUE;
+	mStarted = true;
 	
 	while (1)
 	{
@@ -507,7 +500,7 @@ void LLQueuedThread::run()
 			break;
 		}
 
-		mIdleThread = FALSE;
+		mIdleThread = false;
 
 		threadedUpdate();
 		
@@ -515,7 +508,7 @@ void LLQueuedThread::run()
 
 		if (pending_work == 0)
 		{
-			mIdleThread = TRUE;
+			mIdleThread = true;
 			ms_sleep(1);
 		}
 		//LLThread::yield(); // thread should yield after each request		

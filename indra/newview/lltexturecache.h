@@ -210,9 +210,11 @@ private:
 
 	typedef std::vector<handle_t> handle_list_t;
 	handle_list_t mPrioritizeWriteList;
+	std::atomic<bool> mPrioritizeWriteListEmpty;
 
 	typedef std::vector<std::pair<LLPointer<Responder>, bool> > responder_list_t;
 	responder_list_t mCompletedList;
+	std::atomic<bool> mCompletedListEmpty;
 	
 	BOOL mReadOnly;
 	

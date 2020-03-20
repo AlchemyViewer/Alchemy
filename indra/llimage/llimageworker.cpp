@@ -34,6 +34,7 @@
 // MAIN THREAD
 LLImageDecodeThread::LLImageDecodeThread(bool threaded)
 	: LLQueuedThread("imagedecode", threaded)
+	, mCreationListSize(0)
 {
 	mCreationMutex = new LLMutex();
 }
@@ -48,22 +49,26 @@ LLImageDecodeThread::~LLImageDecodeThread()
 // virtual
 S32 LLImageDecodeThread::update(F32 max_time_ms)
 {
-	LLMutexLock lock(mCreationMutex);
-	for (creation_list_t::iterator iter = mCreationList.begin();
-		 iter != mCreationList.end(); ++iter)
+	if (mCreationListSize > 0)
 	{
-		creation_info& info = *iter;
-		ImageRequest* req = new ImageRequest(info.handle, info.image,
-						     info.priority, info.discard, info.needs_aux,
-						     info.responder);
-
-		bool res = addRequest(req);
-		if (!res)
+		LLMutexLock lock(mCreationMutex);
+		for (creation_list_t::iterator iter = mCreationList.begin();
+			 iter != mCreationList.end(); ++iter)
 		{
-			LL_ERRS() << "request added after LLLFSThread::cleanupClass()" << LL_ENDL;
+			creation_info& info = *iter;
+			ImageRequest* req = new ImageRequest(info.handle, info.image,
+				info.priority, info.discard, info.needs_aux,
+				info.responder);
+
+			bool res = addRequest(req);
+			if (!res)
+			{
+				LL_ERRS() << "request added after LLLFSThread::cleanupClass()" << LL_ENDL;
+			}
 		}
+		mCreationList.clear();
+		mCreationListSize = 0;
 	}
-	mCreationList.clear();
 	S32 res = LLQueuedThread::update(max_time_ms);
 	return res;
 }
@@ -74,6 +79,7 @@ LLImageDecodeThread::handle_t LLImageDecodeThread::decodeImage(LLImageFormatted*
 	LLMutexLock lock(mCreationMutex);
 	handle_t handle = generateHandle();
 	mCreationList.push_back(creation_info(handle, image, priority, discard, needs_aux, responder));
+	mCreationListSize = mCreationList.size();
 	return handle;
 }
 

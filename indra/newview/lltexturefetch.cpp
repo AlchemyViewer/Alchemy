@@ -2569,8 +2569,9 @@ LLTextureFetch::LLTextureFetch(LLTextureCache* cache, LLImageDecodeThread* image
 	  mTextureCache(cache),
 	  mImageDecodeThread(imagedecodethread),
 	  mTextureBandwidth(0),
-	  mHTTPTextureBits(0),
+	  mHTTPTextureBits((U32Bits)0),
 	  mTotalHTTPRequests(0),
+  	  mCommandsSize(0),
 	  mQAMode(qa_mode),
 	  mHttpRequest(NULL),
 	  mHttpOptions(),
@@ -2632,6 +2633,7 @@ LLTextureFetch::~LLTextureFetch()
 		mCommands.erase(mCommands.begin());
 		delete req;
 	}
+	mCommandsSize = 0;
 
 	mHttpWaitResource.clear();
 	
@@ -2814,7 +2816,7 @@ void LLTextureFetch::removeFromHTTPQueue(const LLUUID& id, S32Bytes received_siz
 {
 	LLMutexLock lock(&mNetworkQueueMutex);								// +Mfnq
 	mHTTPTextureQueue.erase(id);
-	mHTTPTextureBits += received_size; // Approximate - does not include header bits	
+	mHTTPTextureBits = U32Bits(mHTTPTextureBits) + received_size;
 }																		// -Mfnq
 
 // NB:  If you change deleteRequest() you should probably make
@@ -3013,54 +3015,12 @@ bool LLTextureFetch::updateRequestPriority(const LLUUID& id, F32 priority)
 	return res;
 }
 
-// Replicates and expands upon the base class's
-// getPending() implementation.  getPending() and
-// runCondition() replicate one another's logic to
-// an extent and are sometimes used for the same
-// function (deciding whether or not to sleep/pause
-// a thread).  So the implementations need to stay
-// in step, at least until this can be refactored and
-// the redundancy eliminated.
-//
-// Threads:  T*
-
-//virtual
-S32 LLTextureFetch::getPending()
-{
-	S32 res;
-	lockData();															// +Ct
-    {
-        LLMutexLock lock(&mQueueMutex);									// +Mfq
-        
-        res = mRequestQueue.size();
-        res += mCommands.size();
-    }																	// -Mfq
-	unlockData();														// -Ct
-	return res;
-}
-
 // Locks:  Ct
 // virtual
 bool LLTextureFetch::runCondition()
 {
-	// Caller is holding the lock on LLThread's condition variable.
-	
-	// LLQueuedThread, unlike its base class LLThread, makes this a
-	// private method which is unfortunate.  I want to use it directly
-	// but I'm going to have to re-implement the logic here (or change
-	// declarations, which I don't want to do right now).
-	//
-	// Changes here may need to be reflected in getPending().
-	
-	bool have_no_commands(false);
-	{
-		LLMutexLock lock(&mQueueMutex);									// +Mfq
-		
-		have_no_commands = mCommands.empty();
-	}																	// -Mfq
-	
-	return ! (have_no_commands
-			  && (mRequestQueue.empty() && mIdleThread));		// From base class
+	return ! ( !mCommandsSize && (!mRequestQueueSize && mIdleThread) );		// From base class
+
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -3104,16 +3064,12 @@ void LLTextureFetch::commonUpdate()
 //virtual
 S32 LLTextureFetch::update(F32 max_time_ms)
 {
-	static LLCachedControl<F32> band_width(gSavedSettings,"ThrottleBandwidthKBPS", 3000.0);
+	static LLCachedControl<F32> band_width(gSavedSettings,"ThrottleBandwidthKBPS", 3000.0f);
 
 	{
-		mNetworkQueueMutex.lock();										// +Mfnq
 		mMaxBandwidth = band_width();
 
-		add(LLStatViewer::TEXTURE_NETWORK_DATA_RECEIVED, mHTTPTextureBits);
-		mHTTPTextureBits = (U32Bits)0;
-
-		mNetworkQueueMutex.unlock();									// -Mfnq
+		add(LLStatViewer::TEXTURE_NETWORK_DATA_RECEIVED, mHTTPTextureBits.exchange((U32Bits)0));
 	}
 
 	S32 res = LLWorkerThread::update(max_time_ms);
@@ -3288,10 +3244,9 @@ void LLTextureFetch::sendRequestListToSimulators()
 		}
 	}																	// -Mfnq
 
-	for (work_request_map_t::iterator iter1 = requests.begin();
-		 iter1 != requests.end(); ++iter1)
-	{
-		LLHost host = iter1->first;
+	for (auto& request : requests)
+    {
+		LLHost host = request.first;
 		// invalid host = use agent host
 		if (host.isInvalid())
 		{
@@ -3300,10 +3255,8 @@ void LLTextureFetch::sendRequestListToSimulators()
 
 		S32 sim_request_count = 0;
 		
-		for (request_list_t::iterator iter2 = iter1->second.begin();
-			 iter2 != iter1->second.end(); ++iter2)
-		{
-			LLTextureFetchWorker* req = *iter2;
+		for (LLTextureFetchWorker* req : request.second)
+        {
 			if (gMessageSystem)
 			{
 				if (req->mSentRequest != LLTextureFetchWorker::SENT_SIM)
@@ -3932,6 +3885,7 @@ void LLTextureFetch::cmdEnqueue(TFRequest * req)
 {
 	lockQueue();														// +Mfq
 	mCommands.push_back(req);
+	mCommandsSize = mCommands.size();
 	unlockQueue();														// -Mfq
 
 	unpause();
@@ -3948,6 +3902,7 @@ LLTextureFetch::TFRequest * LLTextureFetch::cmdDequeue()
 		ret = mCommands.front();
 		mCommands.pop_front();
 	}
+	mCommandsSize = mCommands.size();
 	unlockQueue();														// -Mfq
 
 	return ret;

@@ -153,11 +153,10 @@ public:
 	virtual ~LLQueuedThread();	
 	virtual void shutdown();
 	
-private:
-	// No copy constructor or copy assignment
-	LLQueuedThread(const LLQueuedThread&);
-	LLQueuedThread& operator=(const LLQueuedThread&);
+    LLQueuedThread(const LLQueuedThread&) = delete;
+    LLQueuedThread& operator=(const LLQueuedThread&) = delete;
 
+private:
 	virtual bool runCondition(void);
 	virtual void run(void);
 	virtual void startThread(void);
@@ -179,8 +178,8 @@ public:
 	void waitOnPending();
 	void printQueueStats();
 
-	virtual S32 getPending();
-	bool getThreaded() { return mThreaded ? true : false; }
+	virtual S32 getPending() const { return mRequestQueueSize; } // May be called from any thread
+	bool getThreaded() const { return mThreaded; }
 
 	// Request accessors
 	status_t getRequestStatus(handle_t handle);
@@ -196,12 +195,13 @@ public:
 	bool check();
 	
 protected:
-	BOOL mThreaded;  // if false, run on main thread and do updates during update()
-	BOOL mStarted;  // required when mThreaded is false to call startThread() from update()
+	bool mThreaded;  // if false, run on main thread and do updates during update()
+	bool mStarted;  // required when mThreaded is false to call startThread() from update()
 	LLAtomicBool mIdleThread; // request queue is empty (or we are quitting) and the thread is idle
 	
 	typedef std::set<QueuedRequest*, queued_request_less> request_queue_t;
 	request_queue_t mRequestQueue;
+	std::atomic<S32> mRequestQueueSize;
 
 	enum { REQUEST_HASH_SIZE = 512 }; // must be power of 2
 	typedef LLSimpleHash<handle_t, REQUEST_HASH_SIZE> request_hash_t;

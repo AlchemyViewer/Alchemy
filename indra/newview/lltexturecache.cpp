@@ -831,6 +831,8 @@ LLTextureCache::LLTextureCache(bool threaded)
 	  mListMutex(),
 	  mFastCacheMutex(),
 	  mHeaderAPRFile(NULL),
+	  mPrioritizeWriteListEmpty(true),
+	  mCompletedListEmpty(true),
 	  mReadOnly(TRUE), //do not allow to change the texture cache until setReadOnly() is called.
 	  mTexturesSizeTotal(0),
 	  mDoPurge(FALSE),
@@ -862,35 +864,41 @@ S32 LLTextureCache::update(F32 max_time_ms)
 	S32 res;
 	res = LLWorkerThread::update(max_time_ms);
 
-	mListMutex.lock();
-	handle_list_t priorty_list = mPrioritizeWriteList; // copy list
-	mPrioritizeWriteList.clear();
-	responder_list_t completed_list = mCompletedList; // copy list
-	mCompletedList.clear();
-	mListMutex.unlock();
-	
-	lockWorkers();
-	
-	for (handle_list_t::iterator iter1 = priorty_list.begin();
-		 iter1 != priorty_list.end(); ++iter1)
+	handle_list_t priorty_list;
+	responder_list_t completed_list;
+	if ((!mPrioritizeWriteListEmpty) || (!mCompletedListEmpty))
 	{
-		handle_t handle = *iter1;
-		handle_map_t::iterator iter2 = mWriters.find(handle);
-		if(iter2 != mWriters.end())
-		{
-			LLTextureCacheWorker* worker = iter2->second;
-			worker->setPriority(LLWorkerThread::PRIORITY_HIGH | worker->mPriority);
-		}
+		LLMutexLock lock(&mListMutex);
+		priorty_list.swap(mPrioritizeWriteList); // copy list
+		mPrioritizeWriteList.clear();
+		mPrioritizeWriteListEmpty = mPrioritizeWriteList.empty();
+		completed_list.swap(mCompletedList); // copy list
+		mCompletedList.clear();
+		mCompletedListEmpty = mCompletedList.empty();
 	}
+	
+	if (!priorty_list.empty())
+	{
+		lockWorkers();
 
-	unlockWorkers(); 
+		for (handle_t handle : priorty_list)
+		{
+			handle_map_t::iterator iter2 = mWriters.find(handle);
+			if (iter2 != mWriters.end())
+			{
+				LLTextureCacheWorker* worker = iter2->second;
+				worker->setPriority(LLWorkerThread::PRIORITY_HIGH | worker->mPriority);
+			}
+		}
+
+		unlockWorkers();
+	}
 	
 	// call 'completed' with workers list unlocked (may call readComplete() or writeComplete()
-	for (responder_list_t::iterator iter1 = completed_list.begin();
-		 iter1 != completed_list.end(); ++iter1)
-	{
-		Responder *responder = iter1->first;
-		bool success = iter1->second;
+	for (auto& iter1 : completed_list)
+    {
+		Responder *responder = iter1.first;
+		bool success = iter1.second;
 		responder->completed(success);
 	}
 	
@@ -917,7 +925,7 @@ std::string LLTextureCache::getLocalFileName(const LLUUID& id)
 std::string LLTextureCache::getTextureFileName(const LLUUID& id)
 {
 	std::string idstr = id.asString();
-	std::string delem = gDirUtilp->getDirDelimiter();
+	const std::string& delem = gDirUtilp->getDirDelimiter();
 	std::string filename = mTexturesDirName + delem + idstr[0] + delem + idstr + ".texture";
 	return filename;
 }
@@ -993,8 +1001,6 @@ const char* fast_cache_filename = "FastCache.cache";
 
 void LLTextureCache::setDirNames(ELLPath location)
 {
-	std::string delem = gDirUtilp->getDirDelimiter();
-
 	mHeaderEntriesFileName = gDirUtilp->getExpandedFilename(location, textures_dirname, entries_filename);
 	mHeaderDataFileName = gDirUtilp->getExpandedFilename(location, textures_dirname, cache_filename);
 	mTexturesDirName = gDirUtilp->getExpandedFilename(location, textures_dirname);
@@ -2300,12 +2306,14 @@ void LLTextureCache::prioritizeWrite(handle_t handle)
 	//   which could create a deadlock
 	LLMutexLock lock(&mListMutex);	
 	mPrioritizeWriteList.push_back(handle);
+	mPrioritizeWriteListEmpty = mPrioritizeWriteList.empty();
 }
 
 void LLTextureCache::addCompleted(Responder* responder, bool success)
 {
 	LLMutexLock lock(&mListMutex);
 	mCompletedList.push_back(std::make_pair(responder,success));
+	mCompletedListEmpty = mCompletedList.empty();
 }
 
 //////////////////////////////////////////////////////////////////////////////
