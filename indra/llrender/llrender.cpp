@@ -863,7 +863,7 @@ void LLTexUnit::setTextureColorSpace(eTextureColorSpace space) {
         }
 
         if (gDebugGL) {
-            assert_glerror();
+			stop_glerror();
         }
     }
 #endif

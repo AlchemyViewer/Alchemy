@@ -325,13 +325,18 @@ const LLVector3& LLJoint::getPosition()
 	return mXform.getPosition();
 }
 
+
 bool do_debug_joint(const std::string& name)
 {
+#ifdef ENABLE_DEBUG
     if (std::find(LLJoint::s_debugJointNames.begin(), LLJoint::s_debugJointNames.end(),name) != LLJoint::s_debugJointNames.end())
     {
         return true;
     }
     return false;
+#else
+	return false;
+#endif
 }
 
 //--------------------------------------------------------------------
@@ -345,14 +350,17 @@ void LLJoint::setPosition( const LLVector3& requested_pos, bool apply_attachment
     LLUUID mesh_id;
     if (apply_attachment_overrides && m_attachmentPosOverrides.findActiveOverride(mesh_id,active_override))
     {  
+#ifdef ENABLE_DEBUG
         if (pos != active_override && do_debug_joint(getName()))
         {
             LLScopedContextString str("setPosition");
             LL_DEBUGS("Avatar") << " joint " << getName() << " requested_pos " << requested_pos
                                 << " overriden by attachment " << active_override << LL_ENDL;
         }
+#endif
         pos = active_override;
     }
+#ifdef ENABLE_DEBUG
 	if ((pos != getPosition()) && do_debug_joint(getName()))
 	{
         LLScopedContextString str("setPosition");
@@ -362,6 +370,7 @@ void LLJoint::setPosition( const LLVector3& requested_pos, bool apply_attachment
         LL_DEBUGS("Avatar") << "CONTEXT:\n" << "====================\n" << con_status << "====================" << LL_ENDL;
         LL_DEBUGS("Avatar") << "STACK:\n" << "====================\n" << cs << "====================" << LL_ENDL;
 	}
+#endif
     if (pos != getPosition())
     {
         mXform.setPosition(pos);
@@ -888,14 +897,17 @@ void LLJoint::setScale( const LLVector3& requested_scale, bool apply_attachment_
     LLVector3 active_override;
     if (apply_attachment_overrides && m_attachmentScaleOverrides.findActiveOverride(mesh_id,active_override))
     {  
+#ifdef ENABLE_DEBUG
         if (scale != active_override && do_debug_joint(getName()))
         {
             LLScopedContextString str("setScale");
             LL_DEBUGS("Avatar") << " joint " << getName() << " requested_scale " << requested_scale
                                 << " overriden by attachment " << active_override << LL_ENDL;
         }
+#endif
         scale = active_override;
     }
+#ifdef ENABLE_DEBUG
 	if ((mXform.getScale() != scale) && do_debug_joint(getName()))
 	{	
         LLScopedContextString str("setScale");
@@ -905,6 +917,7 @@ void LLJoint::setScale( const LLVector3& requested_scale, bool apply_attachment_
         LL_DEBUGS("Avatar") << "CONTEXT:\n" << "====================\n" << con_status << LL_ENDL;
         LL_DEBUGS("Avatar") << "STACK:\n" << "====================\n" << cs << "====================" << LL_ENDL;
 	}
+#endif
     mXform.setScale(scale);
     touch();
 

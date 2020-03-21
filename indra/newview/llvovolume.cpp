@@ -5502,9 +5502,8 @@ void LLVolumeGeometryManager::rebuildGeom(LLSpatialGroup* group)
 				continue;
 			}
 
-            std::string vobj_name = llformat("Vol%p", vobj);
-
-			if (vobj->isMesh() &&
+			bool is_mesh = vobj->isMesh();
+			if (is_mesh &&
 				((vobj->getVolume() && !vobj->getVolume()->isMeshAssetLoaded()) || !gMeshRepo.meshRezEnabled()))
 			{
 				continue;
@@ -5517,12 +5516,13 @@ void LLVolumeGeometryManager::rebuildGeom(LLSpatialGroup* group)
 				group->mSurfaceArea += volume->getSurfaceArea() * llmax(llmax(scale.mV[0], scale.mV[1]), scale.mV[2]);
 			}
 
-            bool is_mesh = vobj->isMesh();
-            F32 est_tris = vobj->getEstTrianglesMax();
-
             vobj->updateControlAvatar();
             
-            LL_DEBUGS("AnimatedObjectsLinkset") << vobj_name << " rebuilding, isAttachment: " << (U32) vobj->isAttachment()
+#if ENABLE_DEBUG
+			std::string vobj_name = llformat("Vol%p", vobj);
+
+			F32 est_tris = vobj->getEstTrianglesMax();
+			LL_DEBUGS("AnimatedObjectsLinkset") << vobj_name << " rebuilding, isAttachment: " << (U32) vobj->isAttachment()
                                                 << " is_mesh " << is_mesh
                                                 << " est_tris " << est_tris
                                                 << " is_animated " << vobj->isAnimatedObject()
@@ -5536,6 +5536,8 @@ void LLVolumeGeometryManager::rebuildGeom(LLSpatialGroup* group)
                                                 << LL_ENDL;
 
 			llassert_always(vobj);
+#endif
+
 			vobj->updateTextureVirtualSize(true);
 			vobj->preRebuild();
 
