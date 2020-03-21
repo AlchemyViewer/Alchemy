@@ -115,7 +115,7 @@ inline void LLVector4a::set(F32 x, F32 y, F32 z, F32 w)
 // Set to all zeros
 inline void LLVector4a::clear()
 {
-	mQ = LLVector4a::getZero().mQ;
+	mQ = _mm_setzero_ps();
 }
 
 inline void LLVector4a::splat(const F32 x)
