@@ -4152,7 +4152,7 @@ BOOL LLModelPreview::render()
 							LLMatrix4a mat[LL_MAX_JOINTS_PER_MESH_OBJECT];
                             const LLMeshSkinInfo *skin = &model->mSkinInfo;
 							U32 count = LLSkinningUtil::getMeshJointCount(skin);
-                            LLSkinningUtil::initSkinningMatrixPalette((LLMatrix4*)mat, count,
+                            LLSkinningUtil::initSkinningMatrixPalette(mat, count,
                                                                         skin, getPreviewAvatar());
                             LLMatrix4a bind_shape_matrix;
                             bind_shape_matrix.loadu(skin->mBindShapeMatrix);

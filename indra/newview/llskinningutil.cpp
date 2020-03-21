@@ -123,7 +123,7 @@ void LLSkinningUtil::scrubInvalidJoints(LLVOAvatar *avatar, LLMeshSkinInfo* skin
 #define MAT_USE_SSE 1
 
 void LLSkinningUtil::initSkinningMatrixPalette(
-    LLMatrix4* mat,
+    LLMatrix4a* mat,
     S32 count, 
     const LLMeshSkinInfo* skin,
     LLVOAvatar *avatar)
@@ -136,11 +136,10 @@ void LLSkinningUtil::initSkinningMatrixPalette(
         if (joint)
         {
 #ifdef MAT_USE_SSE
-            LLMatrix4a bind, world, res;
+            LLMatrix4a bind, world;
             bind.loadu(skin->mInvBindMatrix[j]);
             world.loadu(joint->getWorldMatrix());
-            matMul(bind,world,res);
-            memcpy(mat[j].mMatrix,res.mMatrix,16*sizeof(float));
+            matMul(bind,world, mat[j]);
 #else
             mat[j] = skin->mInvBindMatrix[j];
             mat[j] *= joint->getWorldMatrix();
@@ -148,7 +147,7 @@ void LLSkinningUtil::initSkinningMatrixPalette(
         }
         else
         {
-            mat[j] = skin->mInvBindMatrix[j];
+            mat[j].loadu(skin->mInvBindMatrix[j]);
 #if DEBUG_SKINNING
             // This  shouldn't  happen   -  in  mesh  upload,  skinned
             // rendering  should  be disabled  unless  all joints  are

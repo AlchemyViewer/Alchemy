@@ -1955,7 +1955,7 @@ void LLDrawPoolAvatar::updateRiggedFaceVertexBuffer(
 		//build matrix palette
 		LLMatrix4a mat[LL_MAX_JOINTS_PER_MESH_OBJECT];
         U32 count = LLSkinningUtil::getMeshJointCount(skin);
-        LLSkinningUtil::initSkinningMatrixPalette((LLMatrix4*)mat, count, skin, avatar);
+        LLSkinningUtil::initSkinningMatrixPalette(mat, count, skin, avatar);
         LLSkinningUtil::checkSkinWeights(weights, buffer->getNumVerts(), skin);
 
 		LLMatrix4a bind_shape_matrix;
@@ -2170,7 +2170,7 @@ void LLDrawPoolAvatar::renderRigged(LLVOAvatar* avatar, U32 type, bool glow)
                 // upload matrix palette to shader
 				LLMatrix4a mat[LL_MAX_JOINTS_PER_MESH_OBJECT];
 				U32 count = LLSkinningUtil::getMeshJointCount(skin);
-                LLSkinningUtil::initSkinningMatrixPalette((LLMatrix4*)mat, count, skin, avatar);
+                LLSkinningUtil::initSkinningMatrixPalette(mat, count, skin, avatar);
 
 				stop_glerror();
 

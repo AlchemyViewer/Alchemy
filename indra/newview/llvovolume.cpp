@@ -4827,7 +4827,7 @@ void LLRiggedVolume::update(const LLMeshSkinInfo* skin, LLVOAvatar* avatar, cons
 
 	LLMatrix4a mat[kMaxJoints];
 	U32 maxJoints = LLSkinningUtil::getMeshJointCount(skin);
-    LLSkinningUtil::initSkinningMatrixPalette((LLMatrix4*)mat, maxJoints, skin, avatar);
+    LLSkinningUtil::initSkinningMatrixPalette(mat, maxJoints, skin, avatar);
 
     S32 rigged_vert_count = 0;
     S32 rigged_face_count = 0;
