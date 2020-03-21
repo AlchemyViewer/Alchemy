@@ -114,7 +114,7 @@ LLViewerPartSourceScript::LLViewerPartSourceScript(LLViewerObject *source_objp) 
 	llassert(source_objp);
 	mSourceObjectp = source_objp;
 	mPosAgent = mSourceObjectp->getPositionAgent();
-	mImagep = LLViewerTextureManager::getFetchedTextureFromFile("pixiesmall.j2c");
+	mImagep = LLViewerFetchedTexture::sPixieSmallImagep;
 	
 	mImagep->setAddressMode(LLTexUnit::TAM_CLAMP);
 }
@@ -622,7 +622,7 @@ void LLViewerPartSourceSpiral::update(const F32 dt)
 {
 	if (!mImagep)
 	{
-		mImagep = LLViewerTextureManager::getFetchedTextureFromFile("pixiesmall.j2c");
+		mImagep = LLViewerFetchedTexture::sPixieSmallImagep;
 	}
 
 	const F32 RATE = 0.025f;
@@ -791,7 +791,7 @@ void LLViewerPartSourceBeam::update(const F32 dt)
 
 		if (!mImagep)
 		{
-			mImagep = LLViewerTextureManager::getFetchedTextureFromFile("pixiesmall.j2c");
+			mImagep = LLViewerFetchedTexture::sPixieSmallImagep;
 		}
 
 		LLViewerPart* part = new LLViewerPart();
@@ -878,7 +878,7 @@ void LLViewerPartSourceChat::update(const F32 dt)
 {
 	if (!mImagep)
 	{
-		mImagep = LLViewerTextureManager::getFetchedTextureFromFile("pixiesmall.j2c");
+		mImagep = LLViewerFetchedTexture::sPixieSmallImagep;
 	}
 
 

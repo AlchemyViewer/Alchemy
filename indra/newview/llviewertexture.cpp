@@ -79,6 +79,7 @@ LLPointer<LLViewerFetchedTexture> LLViewerFetchedTexture::sWhiteImagep = NULL;
 LLPointer<LLViewerFetchedTexture> LLViewerFetchedTexture::sDefaultImagep = NULL;
 LLPointer<LLViewerFetchedTexture> LLViewerFetchedTexture::sSmokeImagep = NULL;
 LLPointer<LLViewerFetchedTexture> LLViewerFetchedTexture::sFlatNormalImagep = NULL;
+LLPointer<LLViewerFetchedTexture> LLViewerFetchedTexture::sPixieSmallImagep = NULL;
 // [SL:KB] - Patch: Render-TextureToggle (Catznip-4.0)
 LLPointer<LLViewerFetchedTexture> LLViewerFetchedTexture::sDefaultDiffuseImagep = NULL;
 // [/SL:KB]
@@ -456,8 +457,10 @@ void LLViewerTextureManager::cleanup()
 	LLViewerFetchedTexture::sMissingAssetImagep = NULL;
 	LLTexUnit::sWhiteTexture = 0;
 	LLViewerFetchedTexture::sWhiteImagep = NULL;
-	
+
 	LLViewerFetchedTexture::sFlatNormalImagep = NULL;
+
+	LLViewerFetchedTexture::sPixieSmallImagep = NULL;
 
 	LLViewerMediaTexture::cleanUpClass();	
 }
