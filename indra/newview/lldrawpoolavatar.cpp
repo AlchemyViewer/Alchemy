@@ -2229,12 +2229,15 @@ void LLDrawPoolAvatar::renderRigged(LLVOAvatar* avatar, U32 type, bool glow)
                 {
                     specular = face->getTexture(LLRender::SPECULAR_MAP);
                 }
-                if (specular)
+                if (specular && specular_channel > -1)
                 {
                     gGL.getTexUnit(specular_channel)->bind(specular);
                 }
                 
-				gGL.getTexUnit(normal_channel)->bind(face->getTexture(LLRender::NORMAL_MAP));
+				if (normal_channel > -1)
+				{
+					gGL.getTexUnit(normal_channel)->bind(face->getTexture(LLRender::NORMAL_MAP));
+				}
 				gGL.getTexUnit(sDiffuseChannel)->bind(face->getTexture(LLRender::DIFFUSE_MAP), false, true);
 
 

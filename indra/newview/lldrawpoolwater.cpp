@@ -633,7 +633,10 @@ void LLDrawPoolWater::shade2(bool edge, LLGLSLShader* shader, const LLColor3& li
                 if (face)
                 {
                     LLVOWater* water = (LLVOWater*) face->getViewerObject();
-			        gGL.getTexUnit(diffTex)->bind(face->getTexture());
+					if (diffTex > -1)
+					{
+						gGL.getTexUnit(diffTex)->bind(face->getTexture());
+					}
 
                     if (water)
                     {
@@ -655,7 +658,10 @@ void LLDrawPoolWater::shade2(bool edge, LLGLSLShader* shader, const LLColor3& li
                 if (face)
                 {
                     LLVOWater* water = (LLVOWater*) face->getViewerObject();
-			        gGL.getTexUnit(diffTex)->bind(face->getTexture());
+					if (diffTex > -1)
+					{
+						gGL.getTexUnit(diffTex)->bind(face->getTexture());
+					}
 
                     if (water)
                     {
