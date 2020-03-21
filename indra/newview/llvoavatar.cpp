@@ -10434,16 +10434,23 @@ void LLVOAvatar::calculateUpdateRenderComplexity()
      * everyone. If you have suggested improvements, submit them to
      * the official viewer for consideration.
      *****************************************************************/
-	static const U32 COMPLEXITY_BODY_PART_COST = 200;
-	static LLCachedControl<F32> max_complexity_setting(gSavedSettings,"MaxAttachmentComplexity");
-	F32 max_attachment_complexity = max_complexity_setting;
-	max_attachment_complexity = llmax(max_attachment_complexity, DEFAULT_MAX_ATTACHMENT_COMPLEXITY);
-
-	// Diagnostic list of all textures on our avatar
-	static std::set<LLUUID> all_textures;
-
     if (mVisualComplexityStale)
 	{
+		const F64 now = LLFrameTimer::getTotalSeconds();
+		if (now < mVisualComplexityUpdateTime)
+		{
+			return;
+		}
+
+		static const U32 COMPLEXITY_BODY_PART_COST = 200;
+		static LLCachedControl<F32> max_complexity_setting(gSavedSettings, "MaxAttachmentComplexity");
+		F32 max_attachment_complexity = max_complexity_setting;
+		max_attachment_complexity = llmax(max_attachment_complexity, DEFAULT_MAX_ATTACHMENT_COMPLEXITY);
+
+		// Diagnostic list of all textures on our avatar
+		static std::set<LLUUID> all_textures;
+
+
 		U32 cost = VISUAL_COMPLEXITY_UNKNOWN;
 		LLVOVolume::texture_cost_t textures;
 		hud_complexity_list_t hud_complexity_list;
@@ -10552,6 +10559,8 @@ void LLVOAvatar::calculateUpdateRenderComplexity()
         }
 		mVisualComplexity = cost;
 		mVisualComplexityStale = false;
+		static const F64 SECONDS_BETWEEN_COMPLEXITY_RECALC = 1.f;
+		mVisualComplexityUpdateTime = now + SECONDS_BETWEEN_COMPLEXITY_RECALC;
 
         static LLCachedControl<U32> show_my_complexity_changes(gSavedSettings, "ShowMyComplexityChanges", 20);
 

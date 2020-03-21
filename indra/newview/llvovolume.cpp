@@ -5437,20 +5437,6 @@ void LLVolumeGeometryManager::rebuildGeom(LLSpatialGroup* group)
 
 	group->mBuilt = 1.f;
 	
-	LLSpatialBridge* bridge = group->getSpatialPartition()->asBridge();
-    LLViewerObject *vobj = NULL;
-    LLVOVolume *vol_obj = NULL;
-
-	if (bridge)
-	{
-        vobj = bridge->mDrawable->getVObj();
-        vol_obj = vobj ? vobj->asVolume() : nullptr;
-	}
-    if (vol_obj)
-    {
-        vol_obj->updateVisualComplexity();
-    }
-
 	group->mGeometryBytes = 0;
 	group->mSurfaceArea = 0;
 	

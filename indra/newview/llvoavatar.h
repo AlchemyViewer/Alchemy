@@ -472,6 +472,7 @@ public:
 	// the isTooComplex method uses these mutable values to avoid recalculating too frequently
 	mutable U32  mVisualComplexity;
 	mutable bool mVisualComplexityStale;
+	mutable F64  mVisualComplexityUpdateTime = 0.f;
 	U32          mReportedVisualComplexity; // from other viewers through the simulator
 
 	mutable bool		mCachedInMuteList;
