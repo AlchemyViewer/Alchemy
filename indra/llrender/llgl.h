@@ -192,13 +192,13 @@ void assert_glerror();
 
 void clear_glerror();
 
-//#if LL_DEBUG
+#if ENABLE_DEBUG
 # define stop_glerror() assert_glerror()
 # define llglassertok() assert_glerror()
-//#else
-//# define stop_glerror()
-//# define llglassertok()
-//#endif
+#else
+# define stop_glerror()
+# define llglassertok()
+#endif
 
 #define llglassertok_always() assert_glerror()
 
