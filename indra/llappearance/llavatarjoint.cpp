@@ -167,7 +167,7 @@ void LLAvatarJoint::updateJointGeometry()
 	for (joints_t::iterator iter = mChildren.begin();
 		 iter != mChildren.end(); ++iter)
 	{
-		LLAvatarJoint* joint = dynamic_cast<LLAvatarJoint*>(*iter);
+		LLAvatarJoint* joint = static_cast<LLAvatarJoint*>(*iter);
 		joint->updateJointGeometry();
 	}
 }
