@@ -155,6 +155,14 @@ void LLPanelProfileClassifieds::onOpen(const LLSD& key)
         mDeleteButton->setVisible(TRUE);
         mDeleteButton->setEnabled(FALSE);
     }
+    else
+    {
+        mNewButton->setVisible(FALSE);
+        mNewButton->setEnabled(FALSE);
+
+        mDeleteButton->setVisible(FALSE);
+        mDeleteButton->setEnabled(FALSE);
+    }
 }
 
 void LLPanelProfileClassifieds::selectClassified(const LLUUID& classified_id, bool edit)
