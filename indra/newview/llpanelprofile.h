@@ -208,6 +208,7 @@ private:
 	bool				mVoiceStatus;
 
 	boost::signals2::connection	mAvatarNameCacheConnection;
+	boost::signals2::connection mRlvBehaviorConn;
 };
 
 

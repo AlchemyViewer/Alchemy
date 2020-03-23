@@ -65,6 +65,7 @@
 #include "llviewercontrol.h"
 #include "llvoiceclient.h"
 #include "llweb.h"
+#include "rlvhandler.h"
 
 
 static LLPanelInjector<LLPanelProfileSecondLife> t_panel_profile_secondlife("panel_profile_secondlife");
@@ -249,6 +250,11 @@ LLPanelProfileSecondLife::~LLPanelProfileSecondLife()
     {
         mAvatarNameCacheConnection.disconnect();
     }
+
+    if (mRlvBehaviorConn.connected())
+    {
+        mRlvBehaviorConn.disconnect();
+    }
 }
 
 BOOL LLPanelProfileSecondLife::postBuild()
@@ -298,6 +304,8 @@ BOOL LLPanelProfileSecondLife::postBuild()
 
     LLVoiceClient::getInstance()->addObserver((LLVoiceClientStatusObserver*)this);
     mCopyMenuButton->setMenu("menu_name_field.xml", LLMenuButton::MP_BOTTOM_RIGHT);
+
+    mRlvBehaviorConn = gRlvHandler.setBehaviourToggleCallback([this](ERlvBehaviour eBhvr, ERlvParamType eParam) { if (eBhvr == RLV_BHVR_SHOWWORLDMAP) updateButtons(); });
 
     return TRUE;
 }
@@ -737,7 +745,7 @@ void LLPanelProfileSecondLife::updateButtons()
             mAddFriendButton->setEnabled(true);
         }
 
-        bool enable_map_btn = (is_buddy_online && is_agent_mappable(av_id)) || gAgent.isGodlike();
+        bool enable_map_btn = ((is_buddy_online && is_agent_mappable(av_id)) || gAgent.isGodlike()) && !gRlvHandler.hasBehaviour(RLV_BHVR_SHOWWORLDMAP);
         mShowOnMapButton->setEnabled(enable_map_btn);
 
         bool enable_block_btn = LLAvatarActions::canBlock(av_id) && !LLAvatarActions::isBlocked(av_id);

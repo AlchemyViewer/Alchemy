@@ -56,6 +56,8 @@
 #include "llviewerregion.h"
 #include "llviewertexture.h"
 #include "llviewertexture.h"
+#include "rlvactions.h"
+#include "rlvhandler.h"
 
 
 //*TODO: verify this limit
@@ -139,6 +141,10 @@ LLPanelProfileClassifieds::LLPanelProfileClassifieds()
 
 LLPanelProfileClassifieds::~LLPanelProfileClassifieds()
 {
+    if (mRlvBehaviorConn.connected())
+    {
+        mRlvBehaviorConn.disconnect();
+    }
 }
 
 void LLPanelProfileClassifieds::onOpen(const LLSD& key)
@@ -202,6 +208,8 @@ BOOL LLPanelProfileClassifieds::postBuild()
 
     mNewButton->setCommitCallback(boost::bind(&LLPanelProfileClassifieds::onClickNewBtn, this));
     mDeleteButton->setCommitCallback(boost::bind(&LLPanelProfileClassifieds::onClickDelete, this));
+
+    mRlvBehaviorConn = gRlvHandler.setBehaviourToggleCallback([this](ERlvBehaviour eBhvr, ERlvParamType eParam) { if (eBhvr == RLV_BHVR_SHOWLOC) updateButtons(); });
 
     return TRUE;
 }
@@ -356,7 +364,7 @@ void LLPanelProfileClassifieds::updateData()
 
 bool LLPanelProfileClassifieds::canAddNewClassified()
 {
-    return (mTabContainer->getTabCount() < MAX_AVATAR_CLASSIFIEDS);
+    return (mTabContainer->getTabCount() < MAX_AVATAR_CLASSIFIEDS) && RlvActions::canShowLocation();
 }
 
 bool LLPanelProfileClassifieds::canDeleteClassified()

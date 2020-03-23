@@ -105,6 +105,8 @@ private:
 
     LLUUID          mClassifiedToSelectOnLoad;
     bool            mClassifiedEditOnLoad;
+
+    boost::signals2::connection mRlvBehaviorConn;
 };
 
 

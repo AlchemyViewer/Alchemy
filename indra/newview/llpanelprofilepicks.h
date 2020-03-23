@@ -86,6 +86,8 @@ private:
     LLButton*       mDeleteButton;
 
     LLUUID          mPickToSelectOnLoad;
+
+    boost::signals2::connection mRlvBehaviorConn;
 };
 
 
