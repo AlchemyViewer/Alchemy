@@ -806,6 +806,10 @@ void LLPanelProfileSecondLife::onCommitMenu(const LLSD& userdata)
     {
         wstr = utf8str_to_wstring(getAvatarId().asString());
     }
+    else if (item_name == "slurl")
+    {
+        wstr = utf8str_to_wstring(LLSLURL("agent", getAvatarId(), "about").getSLURLString());
+    }
     LLClipboard::instance().copyToClipboard(wstr, 0, wstr.size());
 }
 
