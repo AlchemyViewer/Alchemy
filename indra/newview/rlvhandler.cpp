@@ -302,7 +302,7 @@ void RlvHandler::removeBlockedObject(const LLUUID& idObj)
 		}), m_BlockedObjects.end());
 }
 
-void RlvHandler::getAttachmentResourcesCoro(const std::string& strUrl)
+void RlvHandler::getAttachmentResourcesCoro(const std::string strUrl)
 {
 	LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
 	LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t httpAdapter(new LLCoreHttpUtil::HttpCoroutineAdapter("RlvHandler::getAttachmentResourcesCoro", httpPolicy));
