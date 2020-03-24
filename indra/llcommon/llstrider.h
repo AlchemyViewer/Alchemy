@@ -26,7 +26,19 @@
 #ifndef LL_LLSTRIDER_H
 #define LL_LLSTRIDER_H
 
-#include "stdtypes.h"
+#include "llmath.h"
+#include "llvector4a.h"
+
+template<typename T>
+inline void copyArray(T* dst, const T* src, const U32 bytes)
+{
+	memcpy(dst, src, bytes);
+}
+template<>
+inline void copyArray<>(LLVector4a* dst, const LLVector4a* src, const U32 bytes)
+{
+	LLVector4a::memcpyNonAliased16(dst->getF32ptr(), src->getF32ptr(), bytes);
+}
 
 template <class Object> class LLStrider
 {
@@ -39,7 +51,7 @@ template <class Object> class LLStrider
 public:
 
 	LLStrider()  { mObjectp = NULL; mSkip = sizeof(Object); } 
-	~LLStrider() { } 
+	~LLStrider() = default;
 
 	const LLStrider<Object>& operator =  (Object *first)    { mObjectp = first; return *this;}
 	void setStride (S32 skipBytes)	{ mSkip = (skipBytes ? skipBytes : sizeof(Object));}
@@ -62,6 +74,21 @@ public:
 	Object* operator +=(int i)     { mBytep += mSkip*i; return mObjectp; }
 
 	Object& operator[](U32 index)  { return *(Object*)(mBytep + (mSkip * index)); }
+
+	void copyArray(const U32 offset, const Object* src, const U32 length)
+	{
+		if (mSkip == sizeof(Object))
+		{
+			::copyArray(mObjectp + offset, src, length * sizeof(Object));
+		}
+		else
+		{
+			for (U32 i = 0; i < length; i++)
+			{
+				(*this)[offset + i] = src[i];
+			}
+		}
+	}
 };
 
 #endif // LL_LLSTRIDER_H

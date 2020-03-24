@@ -2097,34 +2097,21 @@ void LLVertexBuffer::unmapBuffer()
 
 //----------------------------------------------------------------------------
 
-template <class T,S32 type> struct VertexBufferStrider
+template <class T, S32 type>
+struct VertexBufferStrider
 {
 	typedef LLStrider<T> strider_t;
-	static bool get(LLVertexBuffer& vbo, 
-					strider_t& strider, 
-					S32 index, S32 count, bool map_range)
+	static bool get(LLVertexBuffer& vbo,
+		strider_t& strider,
+		S32 index, S32 count, bool map_range)
 	{
-		if (type == LLVertexBuffer::TYPE_INDEX)
-		{
-			volatile U8* ptr = vbo.mapIndexBuffer(index, count, map_range);
-
-			if (ptr == NULL)
-			{
-				LL_WARNS() << "mapIndexBuffer failed!" << LL_ENDL;
-				return false;
-			}
-
-			strider = (T*)ptr;
-			strider.setStride(0);
-			return true;
-		}
-		else if (vbo.hasDataType(type))
+		if (vbo.hasDataType(type))
 		{
 			S32 stride = LLVertexBuffer::sTypeSize[type];
 
 			volatile U8* ptr = vbo.mapVertexBuffer(type, index, count, map_range);
 
-			if (ptr == NULL)
+			if (ptr == nullptr)
 			{
 				LL_WARNS() << "mapVertexBuffer failed!" << LL_ENDL;
 				return false;
@@ -2139,6 +2126,28 @@ template <class T,S32 type> struct VertexBufferStrider
 			LL_ERRS() << "VertexBufferStrider could not find valid vertex data." << LL_ENDL;
 		}
 		return false;
+	}
+};
+
+template<class T>
+struct VertexBufferStrider<T, LLVertexBuffer::TYPE_INDEX>
+{
+	typedef LLStrider<T> strider_t;
+	static bool get(LLVertexBuffer& vbo,
+		strider_t& strider,
+		S32 index, S32 count, bool map_range)
+	{
+		volatile U8* ptr = vbo.mapIndexBuffer(index, count, map_range);
+
+		if (ptr == nullptr)
+		{
+			LL_WARNS() << "mapIndexBuffer failed!" << LL_ENDL;
+			return false;
+		}
+
+		strider = (T*) ptr;
+		strider.setStride(0);
+		return true;
 	}
 };
 
@@ -2326,9 +2335,7 @@ void LLVertexBuffer::setBuffer(U32 data_mask)
 			{
 				
 				U32 unsatisfied_mask = (required_mask & ~data_mask);
-				U32 i = 0;
-
-				while (i < TYPE_MAX)
+				for (U32 i = 0; i < TYPE_MAX; i++) // <alchemy/>
 				{
                     U32 unsatisfied_flag = unsatisfied_mask & (1 << i);
 					switch (unsatisfied_flag)
@@ -2355,7 +2362,7 @@ void LLVertexBuffer::setBuffer(U32 data_mask)
                LL_INFOS() << "Missing indices" << LL_ENDL;
             }
 
-				LL_ERRS() << "Shader consumption mismatches data provision." << LL_ENDL;
+				LL_WARNS() << "Shader consumption mismatches data provision." << LL_ENDL;
 			}
 		}
 	}
