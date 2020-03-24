@@ -67,6 +67,7 @@
 #include "llviewerchat.h"
 #include "lltranslate.h"
 #include "llautoreplace.h"
+#include "alchatcommand.h"
 // [RLVa:KB] - Checked: 2010-02-27 (RLVa-1.2.0b)
 #include "rlvactions.h"
 #include "rlvcommon.h"
@@ -619,7 +620,7 @@ void LLFloaterIMNearbyChat::sendChat( EChatType type )
 
 			type = processChatTypeTriggers(type, utf8_revised_text);
 
-			if (!utf8_revised_text.empty())
+			if (!utf8_revised_text.empty() && !ALChatCommand::parseCommand(utf8_revised_text))
 			{
 				// Chat with animation
 				sendChatFromViewer(utf8_revised_text, type, gSavedSettings.getBOOL("PlayChatAnim"));

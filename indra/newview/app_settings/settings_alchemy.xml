@@ -200,5 +200,16 @@
       <key>Value</key>
       <string>/tp2cam</string>
     </map>
+    <key>AlchemyRezUnderLandGroup</key>
+    <map>
+      <key>Comment</key>
+      <string>Allows the agent to rez objects under the target locations land group. Must be a member of the land group.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <integer>1</integer>
+    </map>
   </map>
 </llsd>

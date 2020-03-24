@@ -36,6 +36,7 @@
 #include "message.h"
 #include "llfocusmgr.h"
 
+#include "alchatcommand.h"
 #include "llagent.h"
 #include "llbutton.h"
 #include "llcombobox.h"
@@ -385,7 +386,7 @@ void LLChatBar::sendChat( EChatType type )
 
 			utf8_revised_text = utf8str_trim(utf8_revised_text);
 
-			if (!utf8_revised_text.empty())
+			if (!utf8_revised_text.empty() && !ALChatCommand::parseCommand(utf8_revised_text))
 			{
 				// Chat with animation
 				sendChatFromViewer(utf8_revised_text, type, gSavedSettings.getBOOL("PlayChatAnim"));
@@ -659,7 +660,7 @@ void LLChatBar::onCommitGesture(LLUICtrl* ctrl)
 		LLGestureMgr::instance().triggerAndReviseString(text, &revised_text);
 
 		revised_text = utf8str_trim(revised_text);
-		if (!revised_text.empty())
+		if (!revised_text.empty() && !ALChatCommand::parseCommand(revised_text))
 		{
 			// Don't play nodding animation
 			sendChatFromViewer(revised_text, CHAT_TYPE_NORMAL, FALSE);

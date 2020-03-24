@@ -110,6 +110,7 @@ include_directories(SYSTEM
     )
 
 set(viewer_SOURCE_FILES
+    alchatcommand.cpp
     alunzip.cpp
     groupchatlistener.cpp
     llaccountingcostmanager.cpp
@@ -746,6 +747,7 @@ set(viewer_HEADER_FILES
     CMakeLists.txt
     ViewerInstall.cmake
     alunzip.h
+    alchatcommand.h
     groupchatlistener.h
     llaccountingcost.h
     llaccountingcostmanager.h
