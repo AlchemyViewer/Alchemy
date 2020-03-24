@@ -196,6 +196,8 @@ protected:
 	ctrl_name_table_t mNameTable;
 	static const std::string mTypeString[TYPE_COUNT];
 
+	std::set<std::string> mIncludedFiles;
+
 public:
 	static eControlType typeStringToEnum(const std::string& typestr);
 	static std::string typeEnumToString(eControlType typeenum);	
