@@ -362,10 +362,10 @@ void LLTextEditor::selectNext(const std::string& search_text_in, BOOL case_insen
 		}
 	}
 	
-	S32 loc = text.find(search_text,mCursorPos);
+	size_t loc = text.find(search_text,mCursorPos);
 	
 	// If Maybe we wrapped, search again
-	if (wrap && (-1 == loc))
+	if (wrap && (std::string::npos == loc))
 	{	
 		loc = text.find(search_text);
 	}

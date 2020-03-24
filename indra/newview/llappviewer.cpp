@@ -4333,8 +4333,8 @@ bool LLAppViewer::initCache()
 		{
 			old_vfs_data_file = gDirUtilp->add(dir, found_file);
 
-			S32 start_pos = found_file.find_last_of('.');
-			if (start_pos > 0)
+			size_t start_pos = found_file.find_last_of('.');
+			if (start_pos != std::string::npos && start_pos > 0)
 			{
 				sscanf(found_file.substr(start_pos+1).c_str(), "%d", &old_salt);
 			}

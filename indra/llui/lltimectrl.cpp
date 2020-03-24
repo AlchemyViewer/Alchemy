@@ -322,19 +322,21 @@ LLTimeCtrl::EEditingPart LLTimeCtrl::getEditingPart()
 	S32 cur_pos = mEditor->getCursor();
 	std::string time_str = mEditor->getText();
 
-	S32 colon_index = time_str.find_first_of(':');
-
-	if (cur_pos <= colon_index)
+	size_t colon_index = time_str.find_first_of(':');
+	if (colon_index != std::string::npos)
 	{
-		return HOURS;
-	}
-	else if (cur_pos > colon_index && cur_pos <= (S32)(time_str.length() - AMPM_LEN))
-	{
-		return MINUTES;
-	}
-	else if (cur_pos > (S32)(time_str.length() - AMPM_LEN))
-	{
-		return DAYPART;
+		if (cur_pos <= colon_index)
+		{
+			return HOURS;
+		}
+		else if (cur_pos > colon_index&& cur_pos <= (S32)(time_str.length() - AMPM_LEN))
+		{
+			return MINUTES;
+		}
+		else if (cur_pos > (S32)(time_str.length() - AMPM_LEN))
+		{
+			return DAYPART;
+		}
 	}
 
 	return NONE;
