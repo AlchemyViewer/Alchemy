@@ -40,7 +40,7 @@ LLUrlRegistry::LLUrlRegistry()
 {
 //	mUrlEntry.reserve(20);
 // [RLVa:KB] - Checked: 2010-11-01 (RLVa-1.2.2a) | Added: RLVa-1.2.2a
-	mUrlEntry.reserve(21);
+	mUrlEntry.reserve(26);
 // [/RLVa:KB]
 
 	// Urls are matched in the order that they were registered
@@ -77,7 +77,6 @@ LLUrlRegistry::LLUrlRegistry()
 	registerUrl(new LLUrlEntryObjectIM());
 	registerUrl(new LLUrlEntryPlace());
 	registerUrl(new LLUrlEntryInventory());
-	registerUrl(new LLUrlEntryObjectIM());
     registerUrl(new LLUrlEntryExperienceProfile());
 	//LLUrlEntrySL and LLUrlEntrySLLabel have more common pattern, 
 	//so it should be registered in the end of list
