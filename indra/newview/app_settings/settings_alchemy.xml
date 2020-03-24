@@ -200,6 +200,17 @@
       <key>Value</key>
       <string>/tp2cam</string>
     </map>
+    <key>AlchemyRainbowEffects</key>
+    <map>
+      <key>Comment</key>
+      <string>Makes agent effects rainbows!</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <integer>1</integer>
+    </map>
     <key>AlchemyRezUnderLandGroup</key>
     <map>
       <key>Comment</key>
