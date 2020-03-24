@@ -1051,6 +1051,7 @@ void LLDir::dumpCurrentDirectories(LLError::ELevel level)
 	LL_VLOGS(level, "AppInit", "Directories") << "  CAFile:                " << getCAFile() << LL_ENDL;
 	LL_VLOGS(level, "AppInit", "Directories") << "  SkinBaseDir:           " << getSkinBaseDir() << LL_ENDL;
 	LL_VLOGS(level, "AppInit", "Directories") << "  SkinDir:               " << getSkinDir() << LL_ENDL;
+	LL_VLOGS(level, "AppInit", "Directories") << "  UserSkinDir:           " << getUserSkinDir() << LL_ENDL;
 }
 
 void LLDir::append(std::string& destpath, const std::string& name) const

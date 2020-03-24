@@ -64,6 +64,7 @@ LLFilePicker LLFilePicker::sInstance;
 #define MODEL_FILTER L"Model files (*.dae)\0*.dae\0"
 #define SCRIPT_FILTER L"Script files (*.lsl)\0*.lsl\0"
 #define DICTIONARY_FILTER L"Dictionary files (*.dic; *.xcu)\0*.dic;*.xcu\0"
+#define ZIP_FILTER L"ZIP files (*.zip)\0*.zip\0"
 #endif
 
 #ifdef LL_DARWIN
@@ -225,6 +226,10 @@ BOOL LLFilePicker::setupFilter(ELoadFilter filter)
 		break;
 	case FFLOAD_DICTIONARY:
 		mOFN.lpstrFilter = DICTIONARY_FILTER \
+			L"\0";
+		break;
+	case FFLOAD_ZIP:
+		mOFN.lpstrFilter = ZIP_FILTER \
 			L"\0";
 		break;
 	default:
@@ -641,6 +646,9 @@ std::vector<std::string>* LLFilePicker::navOpenFilterProc(ELoadFilter filter) //
         case FFLOAD_DICTIONARY:
             allowedv->push_back("dic");
             allowedv->push_back("xcu");
+            break;
+        case FFLOAD_ZIP:
+            allowedv.push_back("zip");
             break;
         case FFLOAD_DIRECTORY:
             break;
@@ -1188,6 +1196,12 @@ static std::string add_dictionary_filter_to_gtkchooser(GtkWindow *picker)
 							LLTrans::getString("dictionary_files") + " (*.dic; *.xcu)");
 }
 
+static std::string add_zip_filter_to_gtkchooser(GtkWindow *picker)
+{
+	return add_simple_mime_filter_to_gtkchooser(picker, HTTP_CONTENT_TEXT_PLAIN,
+												LLTrans::getString("zip_files") + " (*.zip)");
+}
+
 static std::string add_save_texture_filter_to_gtkchooser(GtkWindow *picker)
 {
 	GtkFileFilter *gfilter_tga = gtk_file_filter_new();
@@ -1365,6 +1379,9 @@ BOOL LLFilePicker::getOpenFile( ELoadFilter filter, bool blocking )
 			break;
 		case FFLOAD_DICTIONARY:
 			filtername = add_dictionary_filter_to_gtkchooser(picker);
+			break;
+		case FFLOAD_ZIP:
+			filtername = add_zip_filter_to_gtkchooser(picker);
 			break;
 		default:;
 			break;

@@ -68,6 +68,7 @@ endif(USE_FMODSTUDIO)
 
 include_directories(
     ${DBUSGLIB_INCLUDE_DIRS}
+    ${ZLIB_INCLUDE_DIRS}
     ${JSONCPP_INCLUDE_DIR}
     ${GLOD_INCLUDE_DIR}
     ${LLAUDIO_INCLUDE_DIRS}
@@ -109,6 +110,7 @@ include_directories(SYSTEM
     )
 
 set(viewer_SOURCE_FILES
+    alunzip.cpp
     groupchatlistener.cpp
     llaccountingcostmanager.cpp
     llaisapi.cpp
@@ -743,6 +745,7 @@ set(VIEWER_BINARY_NAME "secondlife-bin" CACHE STRING
 set(viewer_HEADER_FILES
     CMakeLists.txt
     ViewerInstall.cmake
+    alunzip.h
     groupchatlistener.h
     llaccountingcost.h
     llaccountingcostmanager.h

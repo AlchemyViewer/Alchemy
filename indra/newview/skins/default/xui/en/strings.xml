@@ -573,6 +573,7 @@ http://secondlife.com/support for help fixing this problem.
 	<string name="choose_the_directory">Choose Directory</string>
 	<string name="script_files">Scripts</string>
 	<string name="dictionary_files">Dictionaries</string>
+	<string name="zip_files">Zip files</string>
 
   <!-- LSL Usage Hover Tips -->
   <!-- NOTE: For now these are set as translate="false", until DEV-40761 is implemented (to internationalize the rest of tooltips in the same window).

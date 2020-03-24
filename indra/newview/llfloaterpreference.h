@@ -47,6 +47,7 @@ class LLScrollListCtrl;
 class LLSliderCtrl;
 class LLSD;
 class LLTextBox;
+struct skin_t;
 
 namespace ll
 {
@@ -144,8 +145,6 @@ public:
 	void onClickSetCache();
 	void changeCachePath(const std::vector<std::string>& filenames, std::string proposed_name);
 	void onClickResetCache();
-	void onClickSkin(LLUICtrl* ctrl,const LLSD& userdata);
-	void onSelectSkin();
 	void onClickSetKey();
 	void setKey(KEY key);
 	void setMouse(LLMouseHandler::EClickType click);
@@ -201,6 +200,17 @@ private:
 	void updateMaxComplexity();
 	static bool loadFromFilename(const std::string& filename, std::map<std::string, std::string> &label_map);
 
+	
+	void loadUserSkins();
+	void reloadSkinList();
+	void onAddSkin();
+	void onRemoveSkin();
+	void callbackRemoveSkin(const LLSD& notification, const LLSD& response);
+	void onApplySkin();
+	void callbackApplySkin(const LLSD& notification, const LLSD& response);
+	void onSelectSkin(const LLSD& data);
+	void refreshSkinInfo(const skin_t& skin);
+
 	static std::string sSkin;
 	notifications_map mNotificationOptions;
 	bool mClickActionDirty; ///< Set to true when the click/double-click options get changed by user.
@@ -215,6 +225,10 @@ private:
 	
 	LLAvatarData mAvatarProperties;
 	std::string mSavedGraphicsPreset;
+
+	typedef std::map<std::string, skin_t> skinmap_t;
+	skinmap_t mUserSkins;
+	
 	LOG_CLASS(LLFloaterPreference);
 
 	LLSearchEditor *mFilterEdit;

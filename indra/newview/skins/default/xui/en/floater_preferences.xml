@@ -169,6 +169,11 @@ https://accounts.secondlife.com/change_email/
          layout="topleft"
          help_topic="preferences_uploads_tab"
          name="uploads" />
+        <panel
+         filename="panel_preferences_skins.xml"
+         label="Skinning"
+         layout="topleft"
+         name="skins" />
     </tab_container>
 
 </floater>

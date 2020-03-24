@@ -11684,4 +11684,60 @@ Unable to load the track from [TRACK1] into [TRACK2].
   <tag>fail</tag>
   </notification>
   
+  <!-- ALCHEMY BELOW THIS LINE -->
+  <notification
+   icon="alertmodal.tga"
+   name="ConfirmRemoveSkin"
+   type="alertmodal">
+    <tag>confirm</tag>
+    Are you sure you want to remove [SKIN]? This will erase it permenantly from your hard disk.
+    <usetemplate
+     ignoretext="Confirm removing skins"
+     name="okcancelignore"
+     notext="Cancel"
+     yestext="OK"/>
+  </notification>
+  <notification
+   icon="alertmodal.tga"
+   name="RemoveSkinSuccess"
+   type="alertmodal">
+    <tag>fail</tag>
+    Removed [SKIN] successfully.
+  </notification>
+  <notification
+   icon="alertmodal.tga"
+   name="RemoveSkinFailure"
+   type="alertmodal">
+    <tag>fail</tag>
+    Failed to remove [SKIN].
+  </notification>
+  <notification
+   icon="alertmodal.tga"
+   name="AddSkinNoManifest"
+   type="alertmodal">
+    <tag>fail</tag>
+    [PACKAGE] doesn't contain a manifest or is unreadable.
+  </notification>
+  <notification
+   icon="alertmodal.tga"
+   name="AddSkinCantParseManifest"
+   type="alertmodal">
+    <tag>fail</tag>
+    [PACKAGE] has an invalid manifest.
+  </notification>
+  <notification
+   icon="alertmodal.tga"
+   name="AddSkinUnpackFailed"
+   type="alertmodal">
+    <tag>fail</tag>
+    Failed to unpack the skin package. See the log for more details.
+  </notification>
+  <notification
+   icon="alertmodal.tga"
+   name="AddSkinSuccess"
+   type="alertmodal">
+    <tag>fail</tag>
+    [PACKAGE] was added successfully.
+  </notification>
+  
 </notifications>
