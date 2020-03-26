@@ -6369,8 +6369,7 @@ void LLPipeline::setupHWLights(LLDrawPool* pool)
 				mLightMovingMask |= (1<<cur_light);
 			}
 			
-            //NOTE: for legacy reasons, send sRGB color to light shader for both deferred and non-deferred path
-			LLColor4  light_color = light->getLightColor();
+			LLColor4  light_color = sRenderDeferred ? light->getLightSRGBColor() : light->getLightColor();
 			light_color.mV[3] = 0.0f;
 
 			F32 fade = iter->fade;
@@ -8814,8 +8813,7 @@ void LLPipeline::renderDeferredLighting(LLRenderTarget* screen_target)
 					const F32* c = center.getF32ptr();
 					F32 s = volume->getLightRadius()*1.5f;
 
-                    //NOTE: for legacy reasons, send sRGB color to light shader
-                    LLColor3 col = volume->getLightColor();
+                    LLColor3 col = volume->getLightSRGBColor();
 					
 					if (col.magVecSquared() < 0.001f)
 					{
@@ -8907,8 +8905,7 @@ void LLPipeline::renderDeferredLighting(LLRenderTarget* screen_target)
 
 					setupSpotLight(gDeferredSpotLightProgram, drawablep);
 					
-                    //NOTE: for legacy reasons, send sRGB color to light shader
-                    LLColor3 col = volume->getLightColor();
+                    LLColor3 col = volume->getLightSRGBColor();
 					
 					gDeferredSpotLightProgram.uniform3fv(LLShaderMgr::LIGHT_CENTER, 1, c);
 					gDeferredSpotLightProgram.uniform1f(LLShaderMgr::LIGHT_SIZE, s);
@@ -8997,8 +8994,8 @@ void LLPipeline::renderDeferredLighting(LLRenderTarget* screen_target)
 					
 					setupSpotLight(gDeferredMultiSpotLightProgram, drawablep);
 
-                    //NOTE: for legacy reasons, send sRGB color to light shader
-                    LLColor3 col = volume->getLightColor();
+                    LLColor3 col = volume->getLightSRGBColor();
+					
 					
 					gDeferredMultiSpotLightProgram.uniform3fv(LLShaderMgr::LIGHT_CENTER, 1, tc.v);
                     gDeferredMultiSpotLightProgram.uniform1f(LLShaderMgr::LIGHT_SIZE, light_size_final);
