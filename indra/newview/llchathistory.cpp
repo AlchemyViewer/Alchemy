@@ -33,6 +33,7 @@
 #include "llavatarnamecache.h"
 #include "llinstantmessage.h"
 
+#include "alavataractions.h"
 #include "llimview.h"
 #include "llcommandhandler.h"
 #include "llpanel.h"
@@ -866,6 +867,7 @@ protected:
 			LLUICtrl::CommitCallbackRegistry::ScopedRegistrar registrar;
 			LLUICtrl::EnableCallbackRegistry::ScopedRegistrar registrar_enable;
 			registrar.add("AvatarIcon.Action", boost::bind(&LLChatHistoryHeader::onAvatarIconContextMenuItemClicked, this, _2));
+			registrar.add("AvatarIcon.CopyData", [&](LLUICtrl* ctrl, const LLSD& param) { ALAvatarActions::copyData(mAvatarID, param); });
 			registrar_enable.add("AvatarIcon.Check", boost::bind(&LLChatHistoryHeader::onAvatarIconContextMenuItemChecked, this, _2));
 			registrar_enable.add("AvatarIcon.Enable", boost::bind(&LLChatHistoryHeader::onAvatarIconContextMenuItemEnabled, this, _2));
 			registrar_enable.add("AvatarIcon.Visible", boost::bind(&LLChatHistoryHeader::onAvatarIconContextMenuItemVisible, this, _2));

@@ -185,6 +185,15 @@ void LLConversationItem::buildParticipantMenuOptions(menuentry_vec_t& items, U32
 			items.push_back(std::string("Group Ban Separator"));
 			items.push_back(std::string("BanMember"));
 		}
+
+
+		items.push_back(std::string("separator_utils"));
+		items.push_back(std::string("utils_menu"));
+		items.push_back(std::string("copy_username"));
+		items.push_back(std::string("copy_display_name"));
+		items.push_back(std::string("copy_account_name"));
+		items.push_back(std::string("copy_slurl"));
+		items.push_back(std::string("copy_uuid"));
 	}
 }
 

@@ -37,6 +37,8 @@ class LLView;
 class LLParcelSelection;
 class LLObjectSelection;
 class LLSelectNode;
+class LLViewerObject;
+class LLVOAvatar;
 
 // [RLVa:KB] - Checked: RLVa-2.0.0
 void set_use_wireframe(bool useWireframe);
@@ -140,6 +142,10 @@ void handle_give_money_dialog();
 bool enable_pay_object();
 bool enable_buy_object();
 bool handle_go_to();
+
+// find avatar from object methods
+LLVOAvatar* find_avatar_from_object(LLViewerObject* object);
+LLVOAvatar* find_avatar_from_object(const LLUUID& object_id);
 
 // Export to XML or Collada
 void handle_export_selected( void * );

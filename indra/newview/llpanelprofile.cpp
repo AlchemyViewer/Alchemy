@@ -47,6 +47,7 @@
 #include "llgrouplist.h"
 
 // Newview
+#include "alavataractions.h"
 #include "llagent.h" //gAgent
 #include "llagentpicksinfo.h"
 #include "llavataractions.h"
@@ -293,7 +294,7 @@ BOOL LLPanelProfileSecondLife::postBuild()
     mSecondLifePic->setCommitCallback(boost::bind(&LLPanelProfileSecondLife::onCommitTexture, this));
 
     LLUICtrl::CommitCallbackRegistry::ScopedRegistrar commit;
-    commit.add("Profile.CopyName", [this](LLUICtrl*, const LLSD& userdata) { onCommitMenu(userdata); });
+    commit.add("Profile.CopyName", [this](LLUICtrl*, const LLSD& userdata) { ALAvatarActions::copyData(getAvatarId(), userdata); });
 
     LLUICtrl::EnableCallbackRegistry::ScopedRegistrar enable;
     enable.add("Profile.EnableCall",                [this](LLUICtrl*, const LLSD&) { return mVoiceStatus; });
@@ -780,37 +781,6 @@ void LLPanelProfileSecondLife::onCommitTexture()
             NULL,
             FALSE);
     }
-}
-
-void LLPanelProfileSecondLife::onCommitMenu(const LLSD& userdata)
-{
-    LLAvatarName av_name;
-    if (!LLAvatarNameCache::get(getAvatarId(), &av_name))
-    {
-        // shouldn't happen, button(menu) is supposed to be invisible while name is fetching
-        LL_WARNS() << "Failed to get agent data" << LL_ENDL;
-        return;
-    }
-
-    const std::string item_name = userdata.asString();
-    LLWString wstr;
-    if (item_name == "display")
-    {
-        wstr = utf8str_to_wstring(av_name.getDisplayName(true));
-    }
-    else if (item_name == "name")
-    {
-        wstr = utf8str_to_wstring(av_name.getAccountName());
-    }
-    else if (item_name == "id")
-    {
-        wstr = utf8str_to_wstring(getAvatarId().asString());
-    }
-    else if (item_name == "slurl")
-    {
-        wstr = utf8str_to_wstring(LLSLURL("agent", getAvatarId(), "about").getSLURLString());
-    }
-    LLClipboard::instance().copyToClipboard(wstr, 0, wstr.size());
 }
 
 void LLPanelProfileSecondLife::onAvatarNameCacheSetName(const LLUUID& agent_id, const LLAvatarName& av_name)

@@ -34,6 +34,7 @@
 #include "lllayoutstack.h"
 #include "llfloaterimnearbychat.h"
 
+#include "alavataractions.h"
 #include "llagent.h"
 #include "llavataractions.h"
 #include "llavatariconctrl.h"
@@ -717,7 +718,7 @@ void LLFloaterIMContainer::getDetachedConversationFloaters(floater_list_t& float
 	typedef conversations_widgets_map::value_type conv_pair;
 	LLFloaterIMNearbyChat *nearby_chat = LLFloaterReg::findTypedInstance<LLFloaterIMNearbyChat>("nearby_chat");
 
-	BOOST_FOREACH(conv_pair item, mConversationsWidgets)
+	for(const conv_pair& item : mConversationsWidgets)
 	{
 		LLConversationViewSession* widget = dynamic_cast<LLConversationViewSession*>(item.second);
 		if (widget)
@@ -1191,6 +1192,26 @@ void LLFloaterIMContainer::doToParticipants(const std::string& command, uuid_vec
 		{
 			banSelectedMember(userID);
 		}
+		else if ("copy_username" == command)
+		{
+			ALAvatarActions::copyData(userID, ALAvatarActions::E_DATA_USER_NAME);
+		}
+		else if ("copy_display_name" == command)
+		{
+			ALAvatarActions::copyData(userID, ALAvatarActions::E_DATA_DISPLAY_NAME);
+		}
+		else if ("copy_account_name" == command)
+		{
+			ALAvatarActions::copyData(userID, ALAvatarActions::E_DATA_ACCOUNT_NAME);
+		}
+		else if ("copy_slurl" == command)
+		{
+			ALAvatarActions::copyData(userID, ALAvatarActions::E_DATA_SLURL);
+		}
+		else if ("copy_uuid" == command)
+		{
+			ALAvatarActions::copyData(userID, ALAvatarActions::E_DATA_UUID);
+		}
 	}
 	else if (selectedIDS.size() > 1)
 	{
@@ -1209,6 +1230,26 @@ void LLFloaterIMContainer::doToParticipants(const std::string& command, uuid_vec
 		else if ("remove_friend" == command)
 		{
 			LLAvatarActions::removeFriendsDialog(selectedIDS);
+		}
+		else if ("copy_username" == command)
+		{
+			ALAvatarActions::copyData(selectedIDS, ALAvatarActions::E_DATA_USER_NAME);
+		}
+		else if ("copy_display_name" == command)
+		{
+			ALAvatarActions::copyData(selectedIDS, ALAvatarActions::E_DATA_DISPLAY_NAME);
+		}
+		else if ("copy_account_name" == command)
+		{
+			ALAvatarActions::copyData(selectedIDS, ALAvatarActions::E_DATA_ACCOUNT_NAME);
+		}
+		else if ("copy_slurl" == command)
+		{
+			ALAvatarActions::copyData(selectedIDS, ALAvatarActions::E_DATA_SLURL);
+		}
+		else if ("copy_uuid" == command)
+		{
+			ALAvatarActions::copyData(selectedIDS, ALAvatarActions::E_DATA_UUID);
 		}
 	}
 }

@@ -43,6 +43,7 @@
 #include "llviewereventrecorder.h"
 
 // newview includes
+#include "alviewermenu.h"
 #include "llagent.h"
 #include "llagentaccess.h"
 #include "llagentbenefits.h"
@@ -9877,4 +9878,6 @@ void initialize_menus()
 		enable.add("RLV.EnableIfNot", boost::bind(&rlvMenuEnableIfNot, _2));
 	}
 // [/RLVa:KB]
+
+	ALViewerMenu::initialize_menus();
 }

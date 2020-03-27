@@ -148,4 +148,52 @@
       <on_click function="AvatarIcon.Action" parameter="ban_member" />
       <on_enable function="AvatarIcon.Enable" parameter="can_ban_member" />
     </menu_item_call>
+  <menu_item_separator />
+  <context_menu
+   label="Utilities"
+   name="Utilities">
+    <menu_item_call
+     label="Copy Username"
+     name="Copy Username">
+      <menu_item_call.on_click
+       function="AvatarIcon.CopyData"
+       parameter="user_name"/>
+      <menu_item_call.on_enable
+       function="RLV.CanShowName" />
+    </menu_item_call>
+    <menu_item_call
+     label="Copy Display Name"
+     name="Copy Display Name">
+      <menu_item_call.on_click
+       function="AvatarIcon.CopyData"
+       parameter="display_name"/>
+      <menu_item_call.on_enable
+       function="RLV.CanShowName" />
+    </menu_item_call>
+    <menu_item_call
+     label="Copy Account Name"
+     name="Copy Account Name">
+      <menu_item_call.on_click
+       function="AvatarIcon.CopyData"
+       parameter="account_name"/>
+      <menu_item_call.on_enable
+       function="RLV.CanShowName" />
+    </menu_item_call>
+    <menu_item_call
+     label="Copy SLurl"
+     name="Copy SLurl">
+      <menu_item_call.on_click
+       function="AvatarIcon.CopyData"
+       parameter="slurl"/>
+      <menu_item_call.on_enable
+       function="RLV.CanShowName" />
+    </menu_item_call>
+    <menu_item_call
+     label="Copy ID"
+     name="Copy ID">
+      <menu_item_call.on_click
+       function="AvatarIcon.CopyData"
+       parameter="id"/>
+    </menu_item_call>
+  </context_menu>
 </toggleable_menu>

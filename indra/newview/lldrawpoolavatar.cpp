@@ -1738,6 +1738,9 @@ void LLDrawPoolAvatar::getRiggedGeometry(
 	face->setIndicesIndex(0);
 		
 	//rigged faces do not batch textures
+	if (face->getTextureIndex() != 255)
+		face->setDrawInfo(nullptr);
+
 	face->setTextureIndex(255);
 
 	if (buffer.isNull() || buffer->getTypeMask() != data_mask || !buffer->isWriteable())

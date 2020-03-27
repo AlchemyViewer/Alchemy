@@ -110,8 +110,10 @@ include_directories(SYSTEM
     )
 
 set(viewer_SOURCE_FILES
+    alavataractions.cpp
     alchatcommand.cpp
     alunzip.cpp
+    alviewermenu.cpp
     groupchatlistener.cpp
     llaccountingcostmanager.cpp
     llaisapi.cpp
@@ -746,8 +748,10 @@ set(VIEWER_BINARY_NAME "secondlife-bin" CACHE STRING
 set(viewer_HEADER_FILES
     CMakeLists.txt
     ViewerInstall.cmake
-    alunzip.h
+    alavataractions.h
     alchatcommand.h
+    alunzip.h
+    alviewermenu.h
     groupchatlistener.h
     llaccountingcost.h
     llaccountingcostmanager.h
