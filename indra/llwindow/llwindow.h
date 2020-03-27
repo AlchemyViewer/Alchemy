@@ -111,6 +111,7 @@ public:
 	virtual BOOL pasteTextFromPrimary(LLWString &dst);
 	virtual BOOL copyTextToPrimary(const LLWString &src);
  
+	virtual void setWindowTitle(const std::string& title) {}
 	virtual void flashIcon(F32 seconds) = 0;
 	virtual F32 getGamma() = 0;
 	virtual BOOL setGamma(const F32 gamma) = 0; // Set the gamma

@@ -175,6 +175,7 @@ public:
 	void			initWorldUI();
 	void			setUIVisibility(bool);
 	bool			getUIVisibility();
+	void			setWindowTitle(const std::string& title);
 
 	BOOL handleAnyMouseClick(LLWindow *window,  LLCoordGL pos, MASK mask, LLMouseHandler::EClickType clicktype, BOOL down);
 

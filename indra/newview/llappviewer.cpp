@@ -2837,7 +2837,14 @@ bool LLAppViewer::initConfiguration()
 	//
 	// Set the name of the window
 	//
-	gWindowTitle = LLTrans::getString("APP_NAME");
+	if (LLVersionInfo::getViewerMaturity() != LLVersionInfo::RELEASE_VIEWER)
+	{
+		gWindowTitle = LLVersionInfo::getChannelAndVersion();
+	}
+	else
+	{
+		gWindowTitle = LLTrans::getString("APP_NAME");
+	}
 #if LL_DEBUG
 	gWindowTitle += std::string(" [DEBUG]");
 #endif
@@ -5632,6 +5639,9 @@ void LLAppViewer::handleLoginComplete()
 	{
 		gDebugInfo["MainloopTimeoutState"] = LLAppViewer::instance()->mMainloopTimeout->getState();
 	}
+	
+	gWindowTitle.append(" - ").append(gAgentAvatarp->getFullname());
+	gViewerWindow->setWindowTitle(gWindowTitle);
 
 	mOnLoginCompleted();
 
