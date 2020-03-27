@@ -183,6 +183,7 @@ LLFolderView::LLFolderView(const Params& p)
 	mMinWidth(0),
 	mDragAndDropThisFrame(FALSE),
 	mCallbackRegistrar(NULL),
+	mEnableRegistrar(NULL),
 	mUseEllipses(p.use_ellipses),
 	mDraggingOverItem(NULL),
 	mStatusTextBox(NULL),
