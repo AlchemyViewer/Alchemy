@@ -11739,5 +11739,14 @@ Unable to load the track from [TRACK1] into [TRACK2].
     <tag>fail</tag>
     [PACKAGE] was added successfully.
   </notification>
+
+  <notification
+   icon="notify.tga"
+   name="AutoAcceptedInventory"
+   persist="true"
+   type="notify">
+    Auto-accepted [ITEM] from [NAME] and placed in inventory.
+  </notification>
+
   
 </notifications>

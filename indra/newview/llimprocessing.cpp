@@ -58,6 +58,7 @@
 #include "rlvactions.h"
 #include "rlvhelper.h"
 #include "rlvhandler.h"
+#include "rlvinventory.h"
 #include "rlvui.h"
 // [/RLVa:KB]
 
@@ -194,30 +195,52 @@ void inventory_offer_handler(LLOfferInfo* info)
         return;
     }
 
-    bool bAutoAccept(false);
-    // Avoid the Accept/Discard dialog if the user so desires. JC
-    if (gSavedSettings.getBOOL("AutoAcceptNewInventory")
-        && (info->mType == LLAssetType::AT_NOTECARD
-        || info->mType == LLAssetType::AT_LANDMARK
-        || info->mType == LLAssetType::AT_TEXTURE))
-    {
-        // For certain types, just accept the items into the inventory,
-        // and possibly open them on receipt depending upon "ShowNewInventory".
-        bAutoAccept = true;
-    }
-
     // Strip any SLURL from the message display. (DEV-2754)
     std::string msg = info->mDesc;
-    int indx = msg.find(" ( http://slurl.com/secondlife/");
+	size_t indx = msg.find(" ( http://slurl.com/secondlife/");
     if (indx == std::string::npos)
     {
         // try to find new slurl host
         indx = msg.find(" ( http://maps.secondlife.com/secondlife/");
     }
-    if (indx >= 0)
+    if (indx != std::string::npos && indx >= 0)
     {
         LLStringUtil::truncate(msg, indx);
     }
+    bool bAutoAccept(false);
+
+    bool al_accept_new_inv = gSavedSettings.getBOOL("AlchemyAutoAcceptAllInventory");
+    bool is_nc_lm_txtr = info->mType == LLAssetType::AT_NOTECARD
+        || info->mType == LLAssetType::AT_LANDMARK
+        || info->mType == LLAssetType::AT_TEXTURE;
+
+    // Avoid the Accept/Discard dialog if the user so desires. JC
+    // For certain types, just accept the items into the inventory,
+    // and possibly open them on receipt depending upon "ShowNewInventory".
+    // Also accept all inventory types if secondary override is in effect
+    // But do not accept RLV folder gives automagically
+    if ((al_accept_new_inv || (gSavedSettings.getBOOL("AutoAcceptNewInventory")
+        && is_nc_lm_txtr))
+        && ((!rlv_handler_t::isEnabled()) || (!RlvInventory::instance().isGiveToRLVOffer(*info))))
+    {
+        bAutoAccept = true;
+        if (al_accept_new_inv && !is_nc_lm_txtr)
+        {
+            LLSD args;
+            args["NAME"] = LLSLURL(info->mFromGroup ? "group" : "agent", info->mFromID, "about").getSLURLString();
+            if (info->mFromObject)
+                args["ITEM"] = msg;
+            else
+            {
+                const std::string& verb = "select?name=" + LLURI::escape(msg);
+                args["ITEM"] = LLSLURL("inventory", info->mObjectID, verb.c_str()).getSLURLString();
+            }
+            LLNotificationsUtil::add("AutoAcceptedInventory", args);
+        }
+    }
+
+    // Strip any SLURL from the message display. (DEV-2754)
+        // try to find new slurl host
 
     LLSD args;
     args["[OBJECTNAME]"] = msg;
@@ -744,7 +767,7 @@ void LLIMProcessing::processNewMessage(LLUUID from_id,
             }
             else
             {
-                S32 index = original_name.find(" Resident");
+                std::string::size_type index = original_name.find(" Resident");
                 if (index != std::string::npos)
                 {
                     original_name = original_name.substr(0, index);
@@ -1541,7 +1564,7 @@ void LLIMProcessing::processNewMessage(LLUUID from_id,
         {
             LLSD payload;
             payload["from_id"] = from_id;
-            payload["session_id"] = session_id;;
+            payload["session_id"] = session_id;
             payload["online"] = (offline == IM_ONLINE);
             payload["sender"] = sender.getIPandPort();
 
