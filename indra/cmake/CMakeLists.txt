@@ -90,6 +90,7 @@ set(cmake_SOURCE_FILES
     UI.cmake
     UnixInstall.cmake
     URIPARSER.cmake
+    WebP.cmake
     Variables.cmake
     ViewerMiscLibs.cmake
     VisualLeakDetector.cmake

@@ -2035,6 +2035,54 @@
         <key>version</key>
         <string>1.6.2</string>
       </map>
+      <key>libwebp</key>
+      <map>
+        <key>canonical_repo</key>
+        <string>https://git.alchemyviewer.org/alchemy/thirdparty/3p-libwebp</string>
+        <key>copyright</key>
+        <string>Copyright (c) 2010, Google Inc. All rights reserved.</string>
+        <key>description</key>
+        <string>WebP is a modern image format that provides superior lossless and lossy compression for images on the web.</string>
+        <key>license</key>
+        <string>BSD</string>
+        <key>license_file</key>
+        <string>LICENSES/libwebp.txt</string>
+        <key>name</key>
+        <string>libwebp</string>
+        <key>platforms</key>
+        <map>
+          <key>windows</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>hash</key>
+              <string>3de8bf840cde51ec061ae1c12e39b620</string>
+              <key>hash_algorithm</key>
+              <string>md5</string>
+              <key>url</key>
+              <string>https://pkg.alchemyviewer.org/repository/autobuild-external/tmpanext/libwebp-1.1.0.200900053-windows-200900053.tar.bz2</string>
+            </map>
+            <key>name</key>
+            <string>windows</string>
+          </map>
+          <key>windows64</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>hash</key>
+              <string>0063c0a3053b222014b6bec37a1311d4</string>
+              <key>hash_algorithm</key>
+              <string>md5</string>
+              <key>url</key>
+              <string>https://pkg.alchemyviewer.org/repository/autobuild-external/tmpanext/libwebp-1.1.0.200900052-windows64-200900052.tar.bz2</string>
+            </map>
+            <key>name</key>
+            <string>windows64</string>
+          </map>
+        </map>
+        <key>version</key>
+        <string>1.1.0.200900052</string>
+      </map>
       <key>libxml2</key>
       <map>
         <key>copyright</key>

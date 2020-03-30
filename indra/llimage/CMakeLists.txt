@@ -9,6 +9,7 @@ include(LLMath)
 include(LLVFS)
 include(LLKDU)
 include(LLImageJ2COJ)
+include(WebP)
 include(ZLIB)
 include(LLAddBuildTest)
 include(Tut)
@@ -18,6 +19,7 @@ include_directories(
     ${LLCOMMON_SYSTEM_INCLUDE_DIRS}
     ${LLMATH_INCLUDE_DIRS}
     ${LLVFS_INCLUDE_DIRS}
+    ${WEBP_INCLUDE_DIRS}
     ${PNG_INCLUDE_DIRS}
     ${ZLIB_INCLUDE_DIRS}
     )
@@ -32,6 +34,7 @@ set(llimage_SOURCE_FILES
     llimagejpeg.cpp
     llimagepng.cpp
     llimagetga.cpp
+    llimagewebp.cpp
     llimageworker.cpp
     llpngwrapper.cpp
     )
@@ -48,6 +51,7 @@ set(llimage_HEADER_FILES
     llimagejpeg.h
     llimagepng.h
     llimagetga.h
+    llimagewebp.h
     llimageworker.h
     llmapimagetype.h
     llpngwrapper.h
@@ -71,6 +75,7 @@ target_link_libraries(llimage
     ${LLVFS_LIBRARIES}
     ${LLMATH_LIBRARIES}
     ${LLCOMMON_LIBRARIES}
+    ${WEBP_LIBRARIES}
     ${JPEG_LIBRARIES}
     ${PNG_LIBRARIES}
     ${ZLIB_LIBRARIES}
