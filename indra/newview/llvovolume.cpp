@@ -3273,7 +3273,7 @@ BOOL LLVOVolume::getIsLight() const
 
 LLColor3 LLVOVolume::getLightSRGBBaseColor() const
 {
-    return srgbColor3(getLightLinearColor());
+    return srgbColor3(getLightLinearBaseColor());
 }
 
 LLColor3 LLVOVolume::getLightLinearBaseColor() const
@@ -3426,7 +3426,7 @@ F32 LLVOVolume::getLightFalloff() const
 	const LLLightParams *param_block = (const LLLightParams *)getParameterEntry(LLNetworkData::PARAMS_LIGHT);
 	if (param_block)
 	{
-		return param_block->getFalloff() * 0.5f;
+		return param_block->getFalloff();
 	}
 	else
 	{

@@ -2347,11 +2347,14 @@ even though the user gets a free copy.
           <spinner
              follows="left|top"
              height="19"
+             increment="0.1"
              initial_value="0.5"
              label="Intensity"
              label_width="70"
              layout="topleft"
              left="10"
+             max_val="1"
+             min_val="0"
              name="Light Intensity"
              top_pad="3"
              width="128" />
