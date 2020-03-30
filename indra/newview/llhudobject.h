@@ -76,6 +76,10 @@ public:
 
 	static void cleanupHUDObjects();
 
+	// Used to clean up the dirty viewer effect spam that can occur.
+	// This includes: LOOKAT, POINTAT, SPIRAL, POINT, EDIT, BEAM, SPHERE
+	static void markViewerEffectsDead();
+
 	enum
 	{
 		LL_HUD_TEXT,

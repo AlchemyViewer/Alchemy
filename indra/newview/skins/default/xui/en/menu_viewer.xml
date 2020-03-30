@@ -147,12 +147,6 @@
           <menu_item_check.on_click
            function="World.AlwaysRun" />
         </menu_item_check>
-        <menu_item_call
-         label="Stop Animating Me"
-         name="Stop Animating My Avatar">
-          <menu_item_call.on_click
-           function="Tools.StopAllAnimations" />
-        </menu_item_call>
         <menu_item_check
          label="Walk / run / fly..."
          name="WalkRunFly">
@@ -163,6 +157,32 @@
            function="Floater.ToggleOrBringToFront"
            parameter="moveview" />
         </menu_item_check>
+      </menu>
+
+      <menu
+       create_jump_keys="true"
+       label="Health"
+       name="Health"
+       tear_off="true">
+        <menu_item_call
+         label="Stop Animating Me"
+         name="Stop Animating My Avatar"
+         shortcut="alt|shift|A">
+          <menu_item_call.on_click
+           function="Tools.StopAllAnimations" />
+        </menu_item_call>
+        <menu_item_call
+         label="Undeform Me"
+         name="Undeform Me">
+          <menu_item_call.on_click
+           function="Tools.UndeformSelf" />
+        </menu_item_call>
+        <menu_item_call
+         label="Clear Viewer Effects"
+         name="Clear Viewer Effects">
+          <menu_item_call.on_click
+           function="World.ClearEffects" />
+        </menu_item_call>
       </menu>
 
       <menu
@@ -417,6 +437,14 @@
      label="World"
      name="World"
      tear_off="true">
+        <menu_item_call
+         label="Resync Animations"
+         name="Resync Animations"
+         shortcut="control|S">
+          <menu_item_call.on_click
+           function="World.SyncAnimations" />
+        </menu_item_call>
+        <menu_item_separator/>
         <menu_item_call
          label="Landmark This Place"
          name="Create Landmark Here">
