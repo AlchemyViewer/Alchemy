@@ -373,7 +373,7 @@ void validate_framebuffer_object();
 bool addDeferredAttachments(LLRenderTarget& target)
 {
 	return target.addColorAttachment(GL_SRGB8_ALPHA8) && //specular
-			target.addColorAttachment(GL_RGB10_A2); //normal+z
+			target.addColorAttachment(GL_RGBA12); //normal+z
 }
 
 LLPipeline::LLPipeline() :
