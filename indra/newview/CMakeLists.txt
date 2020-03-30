@@ -112,6 +112,7 @@ include_directories(SYSTEM
 set(viewer_SOURCE_FILES
     alavataractions.cpp
     alchatcommand.cpp
+    alfloaterparticleeditor.cpp
     alunzip.cpp
     alviewermenu.cpp
     groupchatlistener.cpp
@@ -750,6 +751,7 @@ set(viewer_HEADER_FILES
     ViewerInstall.cmake
     alavataractions.h
     alchatcommand.h
+    alfloaterparticleeditor.h
     alunzip.h
     alviewermenu.h
     groupchatlistener.h

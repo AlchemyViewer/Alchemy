@@ -11748,5 +11748,64 @@ Unable to load the track from [TRACK1] into [TRACK2].
     Auto-accepted [ITEM] from [NAME] and placed in inventory.
   </notification>
 
+  <notification
+   icon="alertmodal.tga"
+   name="ParticleSaveChanges"
+   type="alertmodal">
+Inject with particle script before closing?
+   <tag>confirm</tag>
+   <usetemplate
+    canceltext="Cancel"
+    name="yesnocancelbuttons"
+    notext="Don&apos;t Inject"
+    yestext="Inject"/>
+  </notification>
+    
+  <notification
+   icon="alertmodal.tga"
+   name="ParticleScriptFindFolderFailed"
+   type="alertmodal">
+Could not find a folder for the new script in inventory.
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="ParticleScriptCreationFailed"
+   type="alertmodal">
+Could not create new script for this particle system.
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="ParticleScriptNotFound"
+   type="alertmodal">
+Could not find the newly created script for this particle system.
+  </notification>
+
+  <notification
+   icon="notify.tga"
+   name="ParticleScriptInjected"
+   type="notify">
+Particle script was injected successfully.
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="ParticleScriptFailed"
+   type="alertmodal">
+Failed to inject script into object.
+  </notification>
+
+  <notification
+   icon="notify.tga"
+   name="ParticleScriptCopiedToClipboard"
+   type="notify">
+The LSL script to create this particle system has been copied to your clipboard. You can now paste it into a new script to use it.
+   <form name="form">
+      <ignore name="ignore"
+       text="A particle script was copied to my clipboard"/>
+    </form>
+  </notification>
+
   
 </notifications>
