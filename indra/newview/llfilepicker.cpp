@@ -52,7 +52,7 @@ LLFilePicker LLFilePicker::sInstance;
 
 #if LL_WINDOWS
 #define SOUND_FILTER L"Sounds (*.wav)\0*.wav\0"
-#define IMAGE_FILTER L"Images (*.tga; *.bmp; *.jpg; *.jpeg; *.png)\0*.tga;*.bmp;*.jpg;*.jpeg;*.png\0"
+#define IMAGE_FILTER L"Images (*.tga; *.bmp; *.jpg; *.jpeg; *.png; *.webp)\0*.tga;*.bmp;*.jpg;*.jpeg;*.png;*.webp\0"
 #define ANIM_FILTER L"Animations (*.bvh; *.anim)\0*.bvh;*.anim\0"
 #define COLLADA_FILTER L"Scene (*.dae)\0*.dae\0"
 #ifdef _CORY_TESTING
@@ -442,7 +442,17 @@ BOOL LLFilePicker::getSaveFile(ESaveFilter filter, const std::string& filename, 
 			L"PNG Images (*.png)\0*.png\0" \
 			L"\0";
 		break;
-	case FFSAVE_TGAPNG:
+	case FFSAVE_WEBP:
+		if (filename.empty())
+		{
+			wcsncpy(mFilesW, L"untitled.webp", FILENAME_BUFFER_SIZE);	/*Flawfinder: ignore*/
+		}
+		mOFN.lpstrDefExt = L"webp";
+		mOFN.lpstrFilter =
+			L"WebP Images (*.webp)\0*.webp\0" \
+			L"\0";
+		break;
+	case FFSAVE_TGAPNGWEBP:
 		if (filename.empty())
 		{
 			wcsncpy( mFilesW,L"untitled.png", FILENAME_BUFFER_SIZE);	/*Flawfinder: ignore*/
@@ -452,9 +462,10 @@ BOOL LLFilePicker::getSaveFile(ESaveFilter filter, const std::string& filename, 
 		mOFN.lpstrFilter =
 			L"PNG Images (*.png)\0*.png\0" \
 			L"Targa Images (*.tga)\0*.tga\0" \
+			L"WebP Images (*.webp)\0*.webp\0" \
 			L"\0";
 		break;
-		
+
 	case FFSAVE_JPEG:
 		if (filename.empty())
 		{
@@ -614,6 +625,7 @@ std::vector<std::string>* LLFilePicker::navOpenFilterProc(ELoadFilter filter) //
             allowedv->push_back("bmpf");
             allowedv->push_back("tpic");
             allowedv->push_back("png");
+			allowedv->push_back("webp");
             break;
         case FFLOAD_EXE:
             allowedv->push_back("app");
@@ -704,10 +716,10 @@ bool	LLFilePicker::doNavSaveDialog(ESaveFilter filter, const std::string& filena
 			creator = "prvw";
 			extension = "tga";
 			break;
-		case FFSAVE_TGAPNG:
+		case FFSAVE_TGAPNGWEBP:
 			type = "PNG";
 			creator = "prvw";
-			extension = "png,tga";
+			extension = "png,tga,webp";
 			break;
 		case FFSAVE_BMP:
 			type = "BMPf";
@@ -723,6 +735,11 @@ bool	LLFilePicker::doNavSaveDialog(ESaveFilter filter, const std::string& filena
 			type = "PNG ";
 			creator = "prvw";
 			extension = "png";
+			break;
+		case FFSAVE_WEBP:
+			type = "WebP";
+			creator = "prvw";
+			extension = "webp";
 			break;
 		case FFSAVE_AVI:
 			type = "\?\?\?\?";
@@ -1017,6 +1034,10 @@ void LLFilePicker::chooser_responder(GtkWidget *widget, gint response, gpointer 
 		{
 			picker->mCurrentExtension = ".tga";
 		}
+		else if (filter == LLTrans::getString("webp_image_files"))
+		{
+			picker->mCurrentExtension = ".webp";
+		}
 	}
 
 	// set the default path for this usage context.
@@ -1206,17 +1227,22 @@ static std::string add_save_texture_filter_to_gtkchooser(GtkWindow *picker)
 {
 	GtkFileFilter *gfilter_tga = gtk_file_filter_new();
 	GtkFileFilter *gfilter_png = gtk_file_filter_new();
+	GtkFileFilter *gfilter_webp = gtk_file_filter_new();
 
 	gtk_file_filter_add_pattern(gfilter_tga, "*.tga");
 	gtk_file_filter_add_mime_type(gfilter_png, "image/png");
-	std::string caption = LLTrans::getString("save_texture_image_files") + " (*.tga; *.png)";
+	gtk_file_filter_add_pattern(gfilter_webp, "*.webp");
+	std::string caption = LLTrans::getString("save_texture_image_files") + " (*.tga; *.png; *.webp)";
 	gtk_file_filter_set_name(gfilter_tga, LLTrans::getString("targa_image_files").c_str());
 	gtk_file_filter_set_name(gfilter_png, LLTrans::getString("png_image_files").c_str());
+	gtk_file_filter_set_name(gfilter_webp, LLTrans::getString("webp_image_files").c_str());
 
 	gtk_file_chooser_add_filter(GTK_FILE_CHOOSER(picker),
 					gfilter_png);
 	gtk_file_chooser_add_filter(GTK_FILE_CHOOSER(picker),
 					gfilter_tga);
+	gtk_file_chooser_add_filter(GTK_FILE_CHOOSER(picker),
+					gfilter_webp);
 	return caption;
 }
 
@@ -1262,7 +1288,12 @@ BOOL LLFilePicker::getSaveFile( ESaveFilter filter, const std::string& filename 
 				(picker, "image/png", LLTrans::getString("png_image_files") + " (*.png)");
 			suggest_ext = ".png";
 			break;
-		case FFSAVE_TGAPNG:
+		case FFSAVE_WEBP:
+			caption += add_simple_pattern_filter_to_gtkchooser
+			(picker, "*.webp", LLTrans::getString("webp_image_files") + " (*.webp)");
+			suggest_ext = ".webp";
+			break;
+		case FFSAVE_TGAPNGWEBP:
 			caption += add_save_texture_filter_to_gtkchooser(picker);
 			suggest_ext = ".png";
 			break;
@@ -1324,7 +1355,7 @@ BOOL LLFilePicker::getSaveFile( ESaveFilter filter, const std::string& filename 
 
 		rtn = (getFileCount() == 1);
 
-		if(rtn && filter == FFSAVE_TGAPNG)
+		if(rtn && filter == FFSAVE_TGAPNGWEBP)
 		{
 			std::string selected_file = mFiles.back();
 			mFiles.pop_back();

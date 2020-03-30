@@ -258,7 +258,7 @@ void LLFilePickerReplyThread::notify(const std::vector<std::string>& filenames)
 
 #if LL_WINDOWS
 static std::string SOUND_EXTENSIONS = "wav";
-static std::string IMAGE_EXTENSIONS = "tga bmp jpg jpeg png";
+static std::string IMAGE_EXTENSIONS = "tga bmp jpg jpeg png webp";
 static std::string ANIM_EXTENSIONS =  "bvh anim";
 #ifdef _CORY_TESTING
 static std::string GEOMETRY_EXTENSIONS = "slg";

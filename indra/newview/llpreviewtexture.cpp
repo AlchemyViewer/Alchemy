@@ -37,6 +37,7 @@
 #include "llfloaterreg.h"
 #include "llimagetga.h"
 #include "llimagepng.h"
+#include "llimagewebp.h"
 #include "llinventory.h"
 #include "llinventorymodel.h"
 #include "llnotificationsutil.h"
@@ -295,7 +296,7 @@ void LLPreviewTexture::saveAs()
 		return;
 
 	std::string filename = getItem() ? LLDir::getScrubbedFileName(getItem()->getName()) : LLStringUtil::null;
-	(new LLFilePickerReplyThread(boost::bind(&LLPreviewTexture::saveTextureToFile, this, _1), LLFilePicker::FFSAVE_TGAPNG, filename))->getFile();
+	(new LLFilePickerReplyThread(boost::bind(&LLPreviewTexture::saveTextureToFile, this, _1), LLFilePicker::FFSAVE_TGAPNGWEBP, filename))->getFile();
 }
 
 void LLPreviewTexture::saveTextureToFile(const std::vector<std::string>& filenames)
@@ -412,8 +413,12 @@ void LLPreviewTexture::onFileLoadedForSave(BOOL success,
 
 	if( self && final && success )
 	{
-		const U32 ext_length = 3;
-		std::string extension = self->mSaveFileName.substr( self->mSaveFileName.length() - ext_length);
+		std::string extension;
+		size_t extpos = self->mSaveFileName.rfind(".");
+		if (extpos != std::string::npos)
+		{
+			extension = self->mSaveFileName.substr(extpos + 1);
+		}
 
 		// We only support saving in PNG or TGA format
 		LLPointer<LLImageFormatted> image;
@@ -424,6 +429,10 @@ void LLPreviewTexture::onFileLoadedForSave(BOOL success,
 		else if(extension == "tga")
 		{
 			image = new LLImageTGA;
+		}
+		else if (extension == "webp")
+		{
+			image = new LLImageWebP;
 		}
 
 		if( image && !image->encode( src, 0 ) )
