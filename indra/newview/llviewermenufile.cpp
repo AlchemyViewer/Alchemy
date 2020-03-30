@@ -45,6 +45,7 @@
 #include "llimagej2c.h"
 #include "llimagejpeg.h"
 #include "llimagetga.h"
+#include "llimagewebp.h"
 #include "llinventorymodel.h"	// gInventory
 #include "llresourcedata.h"
 #include "lltoast.h"
@@ -712,6 +713,9 @@ class LLFileTakeSnapshotToDisk : public view_listener_t
 				break;
 			case LLSnapshotModel::SNAPSHOT_FORMAT_BMP:
 				formatted = new LLImageBMP;
+				break;
+			case LLSnapshotModel::SNAPSHOT_FORMAT_WEBP:
+				formatted = new LLImageWebP;
 				break;
 			}
 			formatted->enableOverSize() ;
