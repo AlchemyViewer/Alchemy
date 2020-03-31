@@ -21,6 +21,7 @@
 #include "alviewermenu.h"
 
 // library
+#include "llclipboard.h"
 #include "llfloaterreg.h"
 #include "llview.h"
 
@@ -130,6 +131,17 @@ namespace
 		msg->addBinaryDataFast(_PREHASH_TypeData, nullptr, 0);
 		msg->sendReliable(gAgent.getRegion()->getHost());
 	}
+
+	void object_copy_key()
+	{
+		LLViewerObject* objectp = LLSelectMgr::getInstance()->getSelection()->getPrimaryObject();
+		if (!objectp)
+			return;
+
+		const LLUUID& object_id = objectp->getID();
+		LLWString idwstr = utf8string_to_wstring(object_id.asString());
+		LLClipboard::instance().copyToClipboard(idwstr,0, idwstr.size());
+	}
 }
 
 ////////////////////////////////////////////////////////
@@ -142,6 +154,7 @@ void ALViewerMenu::initialize_menus()
 	LLUICtrl::CommitCallbackRegistry::Registrar& commit = LLUICtrl::CommitCallbackRegistry::currentRegistrar();
 	commit.add("Avatar.CopyData",		[](LLUICtrl* ctrl, const LLSD& param) { avatar_copy_data(param); });
 
+	commit.add("Object.CopyID", [](LLUICtrl* ctrl, const LLSD& param) { object_copy_key(); });
 	commit.add("Object.EditParticles",	[](LLUICtrl* ctrl, const LLSD& param) { edit_particle_source(); });
 
 	commit.add("Tools.UndeformSelf", [](LLUICtrl* ctrl, const LLSD& param) { avatar_undeform_self(); });
