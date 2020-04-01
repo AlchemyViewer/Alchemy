@@ -288,10 +288,10 @@ public:
 	LLVLComposition *getComposition() const;
 	F32 getCompositionXY(const S32 x, const S32 y) const;
 
-	BOOL isOwnedSelf(const LLVector3& pos);
+	BOOL isOwnedSelf(const LLVector3& pos) const;
 
 	// Owned by a group you belong to?  (officer OR member)
-	BOOL isOwnedGroup(const LLVector3& pos);
+	BOOL isOwnedGroup(const LLVector3& pos) const;
 
 	// deal with map object updates in the world.
 	void updateCoarseLocations(LLMessageSystem* msg);

@@ -162,9 +162,22 @@ public:
 	// All arguments are optional. Given containers will be emptied and then filled.
 	// Not supplying origin or radius input returns data on all avatars in the known regions.
 	void getAvatars(
-		uuid_vec_t* avatar_ids = NULL,
-		std::vector<LLVector3d>* positions = NULL, 
+		uuid_vec_t* avatar_ids = nullptr,
+		std::vector<LLVector3d>* positions = nullptr, 
 		const LLVector3d& relative_to = LLVector3d(), F32 radius = FLT_MAX) const;
+	
+	typedef std::map<LLUUID, LLVector3d> pos_map_t;
+	void getAvatars(pos_map_t* map = nullptr,
+					const LLVector3d& relative_to = LLVector3d(),
+					F32 radius = FLT_MAX) const;
+
+	// Returns list of avatar ids with region pointer and global position
+	typedef std::pair<LLViewerRegion*, LLVector3d > regionp_gpos_pair_t;
+	typedef std::map<LLUUID, regionp_gpos_pair_t > region_gpos_map_t;
+	void getAvatars(region_gpos_map_t* map = nullptr,
+		const LLVector3d& relative_to = LLVector3d(),
+		F32 radius = FLT_MAX) const;
+
 // [RLVa:KB] - Checked: RLVa-2.0.1
 	bool getAvatar(const LLUUID& idAvatar, LLVector3d& posAvatar) const;
 // [/RLVa:KB]
