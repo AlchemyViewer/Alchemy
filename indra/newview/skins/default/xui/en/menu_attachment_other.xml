@@ -209,6 +209,33 @@
       <menu_item_call.on_visible
        function="Avatar.EnableFreezeEject"/>
     </menu_item_call>
+    <menu_item_call
+     label="Teleport Home"
+     name="Teleport Home...">
+      <menu_item_call.on_click
+       function="Avatar.ManageEstate" 
+       parameter="0" />
+      <menu_item_call.on_visible
+       function="Avatar.EnableManageEstate"/>
+    </menu_item_call>
+    <menu_item_call
+     label="Estate Kick"
+     name="Estate Kick...">
+      <menu_item_call.on_click
+       function="Avatar.ManageEstate"
+       parameter="1" />
+      <menu_item_call.on_visible
+       function="Avatar.EnableManageEstate"/>
+    </menu_item_call>
+    <menu_item_call
+     label="Estate Ban"
+     name="Estate Ban...">
+      <menu_item_call.on_click
+       function="Avatar.ManageEstate"
+       parameter="2" />
+      <menu_item_call.on_visible
+       function="Avatar.EnableManageEstate"/>
+    </menu_item_call>
   </context_menu>
   <menu_item_separator />
   <menu_item_call
@@ -217,6 +244,14 @@
     <menu_item_call.on_click
        function="Tools.LookAtSelection"
        parameter="zoom" />
+  </menu_item_call>
+  <menu_item_call
+   label="Teleport To"
+   name="Teleport To">
+    <menu_item_call.on_click
+     function="Avatar.TeleportTo" />
+    <menu_item_call.on_enable
+     function="Avatar.EnableTeleportTo" />
   </menu_item_call>
   <menu_item_call
     enabled="false"

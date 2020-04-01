@@ -142,6 +142,56 @@ namespace
 		LLWString idwstr = utf8string_to_wstring(object_id.asString());
 		LLClipboard::instance().copyToClipboard(idwstr,0, idwstr.size());
 	}
+
+	bool can_teleport_to()
+	{
+		LLVOAvatar* avatarp = find_avatar_from_object(LLSelectMgr::getInstance()->getSelection()->getPrimaryObject());
+		if (avatarp)
+		{
+			return ALAvatarActions::canTeleportTo(avatarp->getID());
+		}
+		return false;
+	}
+
+	void teleport_to()
+	{
+		LLVOAvatar* avatarp = find_avatar_from_object(LLSelectMgr::getInstance()->getSelection()->getPrimaryObject());
+		if (avatarp)
+		{
+			ALAvatarActions::teleportTo(avatarp->getID());
+		}
+	}
+
+	bool can_manage_avatar_estate()
+	{
+		LLVOAvatar* avatarp = find_avatar_from_object(LLSelectMgr::getInstance()->getSelection()->getPrimaryObject());
+		if (avatarp)
+		{
+			return ALAvatarActions::canManageAvatarsEstate(avatarp->getID());
+		}
+		return false;
+	}
+
+	void manage_estate(const LLSD& param)
+	{
+		LLVOAvatar* avatarp = find_avatar_from_object(LLSelectMgr::getInstance()->getSelection()->getPrimaryObject());
+		if (avatarp)
+		{
+			S32 action = param.asInteger();
+			switch (action)
+			{
+			case 0:
+				ALAvatarActions::estateTeleportHome(avatarp->getID());
+				break;
+			case 1:
+				ALAvatarActions::estateKick(avatarp->getID());
+				break;
+			case 2:
+				ALAvatarActions::estateBan(avatarp->getID());
+				break;
+			}
+		}
+	}
 }
 
 ////////////////////////////////////////////////////////
@@ -149,10 +199,14 @@ namespace
 void ALViewerMenu::initialize_menus()
 {
 	LLUICtrl::EnableCallbackRegistry::Registrar& enable = LLUICtrl::EnableCallbackRegistry::currentRegistrar();
+	enable.add("Avatar.EnableManageEstate", [](LLUICtrl* ctrl, const LLSD& param) { return can_manage_avatar_estate(); });
+	enable.add("Avatar.EnableTeleportTo", [](LLUICtrl* ctrl, const LLSD& param) { return can_teleport_to(); });
 	enable.add("Object.EnableEditParticles", [](LLUICtrl* ctrl, const LLSD& param) { return enable_edit_particle_source(); });
 
 	LLUICtrl::CommitCallbackRegistry::Registrar& commit = LLUICtrl::CommitCallbackRegistry::currentRegistrar();
 	commit.add("Avatar.CopyData",		[](LLUICtrl* ctrl, const LLSD& param) { avatar_copy_data(param); });
+	commit.add("Avatar.ManageEstate", [](LLUICtrl* ctrl, const LLSD& param) { manage_estate(param); });
+	commit.add("Avatar.TeleportTo", [](LLUICtrl* ctrl, const LLSD& param) { teleport_to(); });
 
 	commit.add("Object.CopyID", [](LLUICtrl* ctrl, const LLSD& param) { object_copy_key(); });
 	commit.add("Object.EditParticles",	[](LLUICtrl* ctrl, const LLSD& param) { edit_particle_source(); });

@@ -59,6 +59,48 @@ public:
 	static void copyData(const uuid_vec_t& ids, ECopyDataType type);
 	static void copyData(const LLUUID& id, const LLSD& userdata);
 	static void copyData(const uuid_vec_t& id, const LLSD& userdata);
+
+	static bool canTeleportTo(const LLUUID& avatar_id);
+	static void teleportTo(const LLUUID& avatar_id);
+
+	static bool canFreezeEject(const LLUUID& avatar_id);
+	static bool canFreezeEject(const uuid_vec_t& ids);
+	static void parcelFreeze(const LLUUID& avatar_id);
+	static void parcelFreeze(const uuid_vec_t& ids);
+	static void parcelEject(const LLUUID& avatar_id);
+	static void parcelEject(const uuid_vec_t& ids);
+
+	static bool canManageAvatarsEstate(const LLUUID& avatar_id);
+	static bool canManageAvatarsEstate(const uuid_vec_t& ids);
+	static void estateTeleportHome(const LLUUID& avatar_id);
+	static void estateTeleportHome(const uuid_vec_t& ids);
+	static void estateKick(const LLUUID& avatar_id);
+	static void estateKick(const uuid_vec_t& ids);
+	static void estateBan(const LLUUID& avatar_id);
+	static void estateBan(const uuid_vec_t& ids);
+
+	/**
+	 * Kick avatar off grid
+	 */	
+	static void godKick(const LLUUID& id);
+
+	/**
+	 * God Freeze avatar
+	 */	
+	static void godFreeze(const LLUUID& id);
+
+	/**
+	 * God Unfreeze avatar
+	 */	
+	static void godUnfreeze(const LLUUID& id);
+
+private:
+	static bool handleParcelFreeze(const LLSD& notification, const LLSD& response);
+	static bool handleParcelEject(const LLSD& notification, const LLSD& response);
+	static bool handleEstateTeleportHome(const LLSD& notification, const LLSD& response);
+	static bool handleEstateKick(const LLSD& notification, const LLSD& response);
+	static bool handleEstateBan(const LLSD& notification, const LLSD& response);
+	static bool handleGodKick(const LLSD& notification, const LLSD& response);
 };
 
 #endif // AL_ALAVATARACTIONS_H

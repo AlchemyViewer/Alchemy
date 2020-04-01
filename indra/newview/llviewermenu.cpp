@@ -43,6 +43,7 @@
 #include "llviewereventrecorder.h"
 
 // newview includes
+#include "alavataractions.h"
 #include "alviewermenu.h"
 #include "llagent.h"
 #include "llagentaccess.h"
@@ -3373,44 +3374,22 @@ bool callback_freeze(const LLSD& notification, const LLSD& response)
 
 void handle_avatar_freeze(const LLSD& avatar_id)
 {
-		// Use avatar_id if available, otherwise default to right-click avatar
-		LLVOAvatar* avatar = NULL;
-		if (avatar_id.asUUID().notNull())
-		{
-			avatar = find_avatar_from_object(avatar_id.asUUID());
-		}
-		else
-		{
-			avatar = find_avatar_from_object(
-				LLSelectMgr::getInstance()->getSelection()->getPrimaryObject());
-		}
+	// Use avatar_id if available, otherwise default to right-click avatar
+	LLVOAvatar* avatar = NULL;
+	if (avatar_id.asUUID().notNull())
+	{
+		avatar = find_avatar_from_object(avatar_id.asUUID());
+	}
+	else
+	{
+		avatar = find_avatar_from_object(
+			LLSelectMgr::getInstance()->getSelection()->getPrimaryObject());
+	}
 
-		if( avatar )
-		{
-			std::string fullname = avatar->getFullname();
-			LLSD payload;
-			payload["avatar_id"] = avatar->getID();
-
-			if (!fullname.empty())
-			{
-				LLSD args;
-//				args["AVATAR_NAME"] = fullname;
-// [RLVa:KB] - Checked: RLVa-1.0.0
-				args["AVATAR_NAME"] = (RlvActions::canShowName(RlvActions::SNC_DEFAULT, avatar->getID())) ? fullname : RlvStrings::getAnonym(fullname);
-// [/RLVa:KB]
-				LLNotificationsUtil::add("FreezeAvatarFullname",
-							args,
-							payload,
-							callback_freeze);
-			}
-			else
-			{
-				LLNotificationsUtil::add("FreezeAvatar",
-							LLSD(),
-							payload,
-							callback_freeze);
-			}
-		}
+	if (avatar)
+	{
+		ALAvatarActions::parcelFreeze(avatar->getID());
+	}
 }
 
 class LLAvatarVisibleDebug : public view_listener_t
@@ -3499,74 +3478,22 @@ bool callback_eject(const LLSD& notification, const LLSD& response)
 
 void handle_avatar_eject(const LLSD& avatar_id)
 {
-		// Use avatar_id if available, otherwise default to right-click avatar
-		LLVOAvatar* avatar = NULL;
-		if (avatar_id.asUUID().notNull())
-		{
-			avatar = find_avatar_from_object(avatar_id.asUUID());
-		}
-		else
-		{
-			avatar = find_avatar_from_object(
-				LLSelectMgr::getInstance()->getSelection()->getPrimaryObject());
-		}
+	// Use avatar_id if available, otherwise default to right-click avatar
+	LLVOAvatar* avatar = NULL;
+	if (avatar_id.asUUID().notNull())
+	{
+		avatar = find_avatar_from_object(avatar_id.asUUID());
+	}
+	else
+	{
+		avatar = find_avatar_from_object(
+			LLSelectMgr::getInstance()->getSelection()->getPrimaryObject());
+	}
 
-		if( avatar )
-		{
-			LLSD payload;
-			payload["avatar_id"] = avatar->getID();
-			std::string fullname = avatar->getFullname();
-
-			const LLVector3d& pos = avatar->getPositionGlobal();
-			LLParcel* parcel = LLViewerParcelMgr::getInstance()->selectParcelAt(pos)->getParcel();
-			
-			if (LLViewerParcelMgr::getInstance()->isParcelOwnedByAgent(parcel,GP_LAND_MANAGE_BANNED))
-			{
-                payload["ban_enabled"] = true;
-				if (!fullname.empty())
-				{
-    				LLSD args;
-//					args["AVATAR_NAME"] = fullname;
-// [RLVa:KB] - Checked: RLVa-1.0.0
-					args["AVATAR_NAME"] = (RlvActions::canShowName(RlvActions::SNC_DEFAULT, avatar->getID())) ? fullname : RlvStrings::getAnonym(fullname);
-// [/RLVa:KB]
-    				LLNotificationsUtil::add("EjectAvatarFullname",
-    							args,
-    							payload,
-    							callback_eject);
-				}
-				else
-				{
-    				LLNotificationsUtil::add("EjectAvatarFullname",
-    							LLSD(),
-    							payload,
-    							callback_eject);
-				}
-			}
-			else
-			{
-                payload["ban_enabled"] = false;
-				if (!fullname.empty())
-				{
-    				LLSD args;
-//					args["AVATAR_NAME"] = fullname;
-// [RLVa:KB] - Checked: RLVa-1.0.0
-					args["AVATAR_NAME"] = (RlvActions::canShowName(RlvActions::SNC_DEFAULT, avatar->getID())) ? fullname : RlvStrings::getAnonym(fullname);
-// [/RLVa:KB]
-    				LLNotificationsUtil::add("EjectAvatarFullnameNoBan",
-    							args,
-    							payload,
-    							callback_eject);
-				}
-				else
-				{
-    				LLNotificationsUtil::add("EjectAvatarNoBan",
-    							LLSD(),
-    							payload,
-    							callback_eject);
-				}
-			}
-		}
+	if (avatar)
+	{
+		ALAvatarActions::parcelEject(avatar->getID());
+	}
 }
 
 bool my_profile_visible()
@@ -3598,20 +3525,7 @@ bool enable_freeze_eject(const LLSD& avatar_id)
 	// Gods can always freeze
 	if (gAgent.isGodlike()) return true;
 
-	// Estate owners / managers can freeze
-	// Parcel owners can also freeze
-	const LLVector3& pos = avatar->getPositionRegion();
-	const LLVector3d& pos_global = avatar->getPositionGlobal();
-	LLParcel* parcel = LLViewerParcelMgr::getInstance()->selectParcelAt(pos_global)->getParcel();
-	LLViewerRegion* region = avatar->getRegion();
-	if (!region) return false;
-				
-	bool new_value = region->isOwnedSelf(pos);
-	if (!new_value || region->isOwnedGroup(pos))
-	{
-		new_value = LLViewerParcelMgr::getInstance()->isParcelOwnedByAgent(parcel,GP_LAND_ADMIN);
-	}
-	return new_value;
+	return ALAvatarActions::canFreezeEject(avatar->getID());
 }
 
 bool callback_leave_group(const LLSD& notification, const LLSD& response)
