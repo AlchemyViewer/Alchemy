@@ -9,7 +9,7 @@
      name="add_friends">
         <on_click
          function="Avatar.AddFriends" />
-        <on_enable
+        <on_visible
          function="Avatar.EnableItem"
          parameter="can_add" />
     </menu_item_call>
@@ -19,7 +19,7 @@
      name="remove_friends">
         <menu_item_call.on_click
          function="Avatar.RemoveFriend" />
-        <menu_item_call.on_enable
+        <menu_item_call.on_visible
          function="Avatar.EnableItem"
          parameter="can_delete" />
     </menu_item_call>
@@ -66,7 +66,59 @@
       function="Avatar.EnableItem"
       parameter="can_offer_teleport"/>
     </menu_item_call>
-    <menu_item_separator name="separator_utils" />
+  <menu_item_separator name="separator_utils" />
+    <context_menu
+   label="Manage"
+   name="manage_menu">
+    <menu_item_call
+         label="Freeze"
+         name="freeze">
+        <menu_item_call.on_click
+         function="Avatar.Freeze" />
+        <menu_item_call.on_visible
+         function="Avatar.EnableItem"
+         parameter="can_freeze_eject" />
+    </menu_item_call>
+    <menu_item_call
+         label="Eject"
+         name="eject">
+        <menu_item_call.on_click
+         function="Avatar.Eject" />
+        <menu_item_call.on_visible
+         function="Avatar.EnableItem"
+         parameter="can_freeze_eject" />
+    </menu_item_call>
+    <menu_item_call
+     label="Teleport Home"
+     name="teleporthome">
+      <menu_item_call.on_click
+       function="Avatar.ManageEstate" 
+       parameter="0" />
+      <menu_item_call.on_visible
+       function="Avatar.EnableItem"
+       parameter="can_manage_estate" />
+    </menu_item_call>
+    <menu_item_call
+     label="Estate Kick"
+     name="estatekick">
+      <menu_item_call.on_click
+       function="Avatar.ManageEstate"
+       parameter="1" />
+      <menu_item_call.on_visible
+       function="Avatar.EnableItem"
+       parameter="can_manage_estate" />
+    </menu_item_call>
+    <menu_item_call
+     label="Estate Ban"
+     name="estateban">
+      <menu_item_call.on_click
+       function="Avatar.ManageEstate"
+       parameter="2" />
+      <menu_item_call.on_visible
+       function="Avatar.EnableItem"
+       parameter="can_manage_estate" />
+    </menu_item_call>
+  </context_menu>
   <context_menu
    label="Utilities"
    name="utils_menu">

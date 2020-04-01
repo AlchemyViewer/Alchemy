@@ -81,10 +81,12 @@
 #include "rlvcommon.h"
 // [/RLVa:KB]
 
+#if 0
 // Flags for kick message
 const U32 KICK_FLAGS_DEFAULT	= 0x0;
 const U32 KICK_FLAGS_FREEZE		= 1 << 0;
 const U32 KICK_FLAGS_UNFREEZE	= 1 << 1;
+#endif
 
 
 std::string getProfileURL(const std::string& agent_name, bool feed_only)
@@ -591,6 +593,7 @@ void LLAvatarActions::teleportRequest(const LLUUID& id)
 	LLNotificationsUtil::add("TeleportRequestPrompt", notification, payload, teleport_request_callback);
 }
 
+#if 0
 // static
 void LLAvatarActions::kick(const LLUUID& id)
 {
@@ -663,6 +666,7 @@ void LLAvatarActions::unfreeze(const LLUUID& id)
 	payload["avatar_id"] = id;
 	LLNotifications::instance().add("UnFreezeUser", LLSD(), payload, handleUnfreeze);
 }
+#endif
 
 //static 
 void LLAvatarActions::csr(const LLUUID& id, std::string name)
@@ -1304,6 +1308,7 @@ bool LLAvatarActions::callbackAddFriendWithMessage(const LLSD& notification, con
 	return false;
 }
 
+#if 0
 // static
 bool LLAvatarActions::handleKick(const LLSD& notification, const LLSD& response)
 {
@@ -1433,6 +1438,7 @@ bool LLAvatarActions::handleUnfreeze(const LLSD& notification, const LLSD& respo
 	}
 	return false;
 }
+#endif
 
 // static
 void LLAvatarActions::requestFriendship(const LLUUID& target_id, const std::string& target_name, const std::string& message)
