@@ -478,7 +478,7 @@ void LLFace::setTextureIndex(U8 index)
 		}
 		else
 		{
-			if (mDrawInfo && mDrawInfo->mTextureList.size() <= 1)
+			if (mDrawInfo && !mDrawInfo->mTextureList.empty())
 			{
 				LL_ERRS() << "Face with no texture index references indexed texture draw info." << LL_ENDL;
 			}
@@ -656,14 +656,16 @@ void LLFace::renderOneWireframe(const LLColor4 &color, F32 fogCfx, bool wirefram
         }
         else
         {
-            LLGLEnable fog(GL_FOG);
-            glFogi(GL_FOG_MODE, GL_LINEAR);
-            float d = (LLViewerCamera::getInstance()->getPointOfInterest() - LLViewerCamera::getInstance()->getOrigin()).magVec();
-            LLColor4 fogCol = color * fogCfx;
-            glFogf(GL_FOG_START, d);
-            glFogf(GL_FOG_END, d*(1 + (LLViewerCamera::getInstance()->getView() / LLViewerCamera::getInstance()->getDefaultFOV())));
-            glFogfv(GL_FOG_COLOR, fogCol.mV);
-
+			if (!LLGLSLShader::sNoFixedFunction)
+			{
+				LLGLEnable fog(GL_FOG);
+				glFogi(GL_FOG_MODE, GL_LINEAR);
+				float d = (LLViewerCamera::getInstance()->getPointOfInterest() - LLViewerCamera::getInstance()->getOrigin()).magVec();
+				LLColor4 fogCol = color * fogCfx;
+				glFogf(GL_FOG_START, d);
+				glFogf(GL_FOG_END, d * (1 + (LLViewerCamera::getInstance()->getView() / LLViewerCamera::getInstance()->getDefaultFOV())));
+				glFogfv(GL_FOG_COLOR, fogCol.mV);
+			}
             gGL.setAlphaRejectSettings(LLRender::CF_DEFAULT);
             {
                 gGL.diffuseColor4f(color.mV[VRED], color.mV[VGREEN], color.mV[VBLUE], 0.4f);
@@ -1039,12 +1041,19 @@ void LLFace::getPlanarProjectedParams(LLQuaternion* face_rot, LLVector3* face_po
 {
 	const LLMatrix4& vol_mat = getWorldMatrix();
 	const LLVolumeFace& vf = getViewerObject()->getVolume()->getVolumeFace(mTEOffset);
+    if (!vf.mNormals)
+    {
+        LL_WARNS( ) << "Volume face without normals (object id: " << getViewerObject()->getID().asString() << ")" << LL_ENDL;
+        return;
+    }
+    
+    if (!vf.mTangents)
+    {
+        LL_WARNS( ) << "Volume face without tangents (object id: " << getViewerObject()->getID().asString() << ")" << LL_ENDL;
+        return;
+    }
 	const LLVector4a& normal4a = vf.mNormals[0];
 	const LLVector4a& tangent = vf.mTangents[0];
-	if (!&tangent)
-	{
-		return;
-	}
 
 	LLVector4a binormal4a;
 	binormal4a.setCross3(normal4a, tangent);
