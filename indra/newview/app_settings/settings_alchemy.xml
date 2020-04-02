@@ -211,6 +211,61 @@
       <key>Value</key>
       <string>/tp2cam</string>
     </map>
+    <key>AlchemyLookAtShow</key>
+    <map>
+      <key>Comment</key>
+      <string>If true, avatar look at beacons will be displayed</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <integer>0</integer>
+    </map>
+    <key>AlchemyLookAtLines</key>
+    <map>
+      <key>Comment</key>
+      <string>Render a line from Look At beacon to the originating avatar</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <integer>0</integer>
+    </map>
+    <key>AlchemyLookAtNames</key>
+    <map>
+      <key>Comment</key>
+      <string>Render name of originating avatar under Look At beacon</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>U32</string>
+      <key>Value</key>
+      <integer>0</integer>
+    </map>
+    <key>AlchemyLookAtHideSelf</key>
+    <map>
+      <key>Comment</key>
+      <string>Hide own Look At beacon when Look At render is enabled</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <integer>0</integer>
+    </map>
+    <key>AlchemyLookAtPrivate</key>
+    <map>
+      <key>Comment</key>
+      <string>Disable broadcast of own look at to other users.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <integer>0</integer>
+    </map>
     <key>AlchemyRainbowEffects</key>
     <map>
       <key>Comment</key>

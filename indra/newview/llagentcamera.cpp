@@ -2677,9 +2677,9 @@ void LLAgentCamera::setCameraPosAndFocusGlobal(const LLVector3d& camera_pos, con
 
 	if (mCameraAnimating)
 	{
-		const F64 ANIM_METERS_PER_SECOND = 10.0;
+		const F64 ANIM_METERS_PER_SECOND = 50.0;
 		const F64 MIN_ANIM_SECONDS = 0.5;
-		const F64 MAX_ANIM_SECONDS = 10.0;
+		const F64 MAX_ANIM_SECONDS = 1.0;
 		F64 anim_duration = llmax( MIN_ANIM_SECONDS, sqrt(focus_delta_squared) / ANIM_METERS_PER_SECOND );
 		anim_duration = llmin( anim_duration, MAX_ANIM_SECONDS );
 		setAnimationDuration( (F32)anim_duration );
@@ -2774,6 +2774,15 @@ void LLAgentCamera::setFocusOnAvatar(BOOL focus_on_avatar, BOOL animate)
 
 BOOL LLAgentCamera::setLookAt(ELookAtType target_type, LLViewerObject *object, LLVector3 position)
 {
+	static LLCachedControl<bool> isPrivate(gSavedSettings, "AlchemyLookAtPrivate", false);
+	if (isPrivate)
+	{
+		if(!mLookAt || mLookAt->isDead())
+			return FALSE;
+
+		position.clearVec();
+		return mLookAt->setLookAt(LOOKAT_TARGET_NONE, gAgentAvatarp, position);
+	}
 	if(object && object->isAttachment())
 	{
 		LLViewerObject* parent = object;

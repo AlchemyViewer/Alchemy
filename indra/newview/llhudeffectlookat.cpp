@@ -27,6 +27,7 @@
 #include "llviewerprecompiledheaders.h"
 
 #include "llhudeffectlookat.h"
+#include <utility>
 
 #include "llrender.h"
 
@@ -41,8 +42,9 @@
 #include "llglheaders.h"
 #include "llxmltree.h"
 
-
-BOOL LLHUDEffectLookAt::sDebugLookAt = FALSE;
+#include "llavatarnamecache.h"
+#include "llhudrender.h"
+#include "llviewercontrol.h"
 
 // packet layout
 const S32 SOURCE_AVATAR = 0;
@@ -71,8 +73,8 @@ public:
 		: mTimeout(0.f),
 		  mPriority(0.f)
 	{}
-	LLAttention(F32 timeout, F32 priority, const std::string& name, LLColor3 color) :
-	  mTimeout(timeout), mPriority(priority), mName(name), mColor(color)
+	LLAttention(F32 timeout, F32 priority, std::string name, LLColor3 color) :
+	  mTimeout(timeout), mPriority(priority), mName(std::move(name)), mColor(color)
 	{
 	}
 	F32 mTimeout, mPriority;
@@ -239,7 +241,8 @@ static BOOL loadAttentions()
 LLHUDEffectLookAt::LLHUDEffectLookAt(const U8 type) : 
 	LLHUDEffect(type), 
 	mKillTime(0.f),
-	mLastSendTime(0.f)
+	mLastSendTime(0.f),
+	mDebugLookAt(gSavedSettings, "AlchemyLookAtShow", false)
 {
 	clearLookAtTarget();
 	// parse the default sets
@@ -264,8 +267,7 @@ void LLHUDEffectLookAt::packData(LLMessageSystem *mesgsys)
 	LLHUDEffect::packData(mesgsys);
 
 	// Pack the type-specific data.  Uses a fun packed binary format.  Whee!
-	U8 packed_data[PKT_SIZE];
-	memset(packed_data, 0, PKT_SIZE);
+	U8 packed_data[PKT_SIZE] = {0};
 
 	if (mSourceObject)
 	{
@@ -359,8 +361,15 @@ void LLHUDEffectLookAt::unpackData(LLMessageSystem *mesgsys, S32 blocknum)
 
 	U8 lookAtTypeUnpacked = 0;
 	htolememcpy(&lookAtTypeUnpacked, &(packed_data[LOOKAT_TYPE]), MVT_U8, 1);
-	mTargetType = (ELookAtType)lookAtTypeUnpacked;
-
+	if ((U8)LOOKAT_NUM_TARGETS > lookAtTypeUnpacked)
+	{
+		mTargetType = (ELookAtType)lookAtTypeUnpacked;
+	}
+	else
+	{ 
+		mTargetType = LOOKAT_TARGET_NONE;
+		LL_DEBUGS("HUDEffect") << "Invalid target type: " << lookAtTypeUnpacked << LL_ENDL;
+	}
 	if (mTargetType == LOOKAT_TARGET_NONE)
 	{
 		clearLookAtTarget();
@@ -491,8 +500,14 @@ void LLHUDEffectLookAt::setSourceObject(LLViewerObject* objectp)
 //-----------------------------------------------------------------------------
 void LLHUDEffectLookAt::render()
 {
-	if (sDebugLookAt && mSourceObject.notNull())
+	if (mDebugLookAt && mSourceObject.notNull())
 	{
+		static LLCachedControl<bool> isOwnHidden(gSavedSettings, "AlchemyLookAtHideSelf", true);
+		static LLCachedControl<bool> isPrivate(gSavedSettings, "AlchemyLookAtPrivate", false);
+
+		if ((isOwnHidden || isPrivate) && static_cast<LLVOAvatar*>(mSourceObject.get())->isSelf())
+			return;
+
 		gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
 
 		LLGLDisable gls_stencil(GL_STENCIL_TEST);
@@ -501,7 +516,7 @@ void LLHUDEffectLookAt::render()
 		gGL.matrixMode(LLRender::MM_MODELVIEW);
 		gGL.pushMatrix();
 		gGL.translatef(target.mV[VX], target.mV[VY], target.mV[VZ]);
-		gGL.scalef(0.3f, 0.3f, 0.3f);
+		gGL.scalef(0.1f, 0.1f, 0.1f);
 		gGL.begin(LLRender::LINES);
 		{
 			LLColor3 color = (*mAttentions)[mTargetType].mColor;
@@ -514,8 +529,59 @@ void LLHUDEffectLookAt::render()
 
 			gGL.vertex3f(0.f, 0.f, -1.f);
 			gGL.vertex3f(0.f, 0.f, 1.f);
-		} gGL.end();
+
+			static LLCachedControl<bool> lookAtLines(gSavedSettings, "AlchemyLookAtLines", false);
+			if(lookAtLines)
+			{
+				const std::string targname = (*mAttentions)[mTargetType].mName;
+				if(targname != "None" && targname != "Idle" && targname != "AutoListen")
+				{
+					LLVector3 dist = (mSourceObject->getWorldPosition() - mTargetPos) * 10;
+					gGL.vertex3f(0.f, 0.f, 0.f);
+					gGL.vertex3f(dist.mV[VX], dist.mV[VY], dist.mV[VZ] + 0.5f);
+				}
+			}
+		}
+		gGL.end();
 		gGL.popMatrix();
+
+		static LLCachedControl<U32> lookAtNames(gSavedSettings, "AlchemyLookAtNames", 0);
+		if(lookAtNames > 0)
+		{
+			std::string text;
+			LLAvatarName av_name;
+			LLAvatarNameCache::get(static_cast<LLVOAvatar*>(mSourceObject.get())->getID(), &av_name);
+			switch (lookAtNames)
+			{
+				case 1: // Display Name (user.name)
+					text = av_name.getCompleteName();
+					break;
+				case 2: // Display Name
+					text = av_name.getDisplayName();
+					break;
+				case 3: // First Last
+					text = av_name.getUserName();
+					break;
+				default: //user.name
+					text = av_name.getAccountName();
+					break;
+			}
+
+			const LLFontGL* fontp = LLFontGL::getFontSansSerif();
+			gGL.pushMatrix();
+			hud_render_utf8text(
+				text, 
+				target + LLVector3(0.f, 0.f, 0.15f),
+				*fontp,
+				LLFontGL::NORMAL, 
+				LLFontGL::NO_SHADOW,
+				-0.5f * fontp->getWidthF32(text), 
+				0.0f,
+				(*mAttentions)[mTargetType].mColor, 
+				FALSE
+			);
+			gGL.popMatrix();
+		}
 	}
 }
 
@@ -567,11 +633,6 @@ void LLHUDEffectLookAt::update()
 				((LLVOAvatar*)(LLViewerObject*)mSourceObject)->startMotion(ANIM_AGENT_HEAD_ROT);
 			}
 		}
-	}
-
-	if (sDebugLookAt)
-	{
-		((LLVOAvatar*)(LLViewerObject*)mSourceObject)->addDebugText((*mAttentions)[mTargetType].mName);
 	}
 }
 
