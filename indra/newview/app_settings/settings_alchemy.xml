@@ -266,6 +266,28 @@
       <key>Value</key>
       <integer>0</integer>
     </map>
+    <key>AlchemyMouselookIFF</key>
+    <map>
+      <key>Comment</key>
+      <string>Display user that is currently focused upon by crosshair in mouselook</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <integer>1</integer>
+    </map>
+    <key>AlchemyMouselookIFFRange</key>
+    <map>
+      <key>Comment</key>
+      <string>Range of IFF display</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>F32</string>
+      <key>Value</key>
+      <real>380.0</real>
+    </map>
     <key>AlchemyRainbowEffects</key>
     <map>
       <key>Comment</key>

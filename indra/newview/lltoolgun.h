@@ -48,6 +48,7 @@ public:
 	virtual BOOL	clipMouseWhenDown()		{ return FALSE; }
 private:
 	BOOL mIsSelected;
+	LLUIImagePtr	mCrosshairp;
 };
 
 #endif
