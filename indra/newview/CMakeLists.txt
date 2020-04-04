@@ -113,6 +113,7 @@ set(viewer_SOURCE_FILES
     alavataractions.cpp
     alchatcommand.cpp
     alfloaterparticleeditor.cpp
+    alfloaterregiontracker.cpp
     alunzip.cpp
     alviewermenu.cpp
     groupchatlistener.cpp
@@ -752,6 +753,7 @@ set(viewer_HEADER_FILES
     alavataractions.h
     alchatcommand.h
     alfloaterparticleeditor.h
+    alfloaterregiontracker.h
     alunzip.h
     alviewermenu.h
     groupchatlistener.h

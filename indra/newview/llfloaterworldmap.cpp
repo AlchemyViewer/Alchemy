@@ -34,6 +34,7 @@
 
 #include "llfloaterworldmap.h"
 
+#include "alfloaterregiontracker.h"
 #include "llagent.h"
 #include "llagentcamera.h"
 #include "llbutton.h"
@@ -254,7 +255,8 @@ LLFloaterWorldMap::LLFloaterWorldMap(const LLSD& key)
 	mTrackedStatus(LLTracker::TRACKING_NOTHING),
 	mListFriendCombo(NULL),
 	mListLandmarkCombo(NULL),
-	mListSearchResults(NULL)
+	mListSearchResults(NULL),
+	mTrackRegionButton(nullptr)
 {
 	gFloaterWorldMap = this;
 	
@@ -271,6 +273,7 @@ LLFloaterWorldMap::LLFloaterWorldMap(const LLSD& key)
 	mCommitCallbackRegistrar.add("WMap.ShowAgent",		boost::bind(&LLFloaterWorldMap::onShowAgentBtn, this));		
 	mCommitCallbackRegistrar.add("WMap.Clear",			boost::bind(&LLFloaterWorldMap::onClearBtn, this));		
 	mCommitCallbackRegistrar.add("WMap.CopySLURL",		boost::bind(&LLFloaterWorldMap::onCopySLURL, this));
+	mCommitCallbackRegistrar.add("WMap.TrackRegion",	boost::bind(&LLFloaterWorldMap::onTrackRegion, this));
 	
 	gSavedSettings.getControl("PreferredMaturity")->getSignal()->connect(boost::bind(&LLFloaterWorldMap::onChangeMaturity, this));
 }
@@ -284,6 +287,7 @@ void* LLFloaterWorldMap::createWorldMapView(void* data)
 BOOL LLFloaterWorldMap::postBuild()
 {
 	mPanel = getChild<LLPanel>("objects_mapview");
+	mTrackRegionButton = getChild<LLButton>("track_region");
 	
 	LLComboBox *avatar_combo = getChild<LLComboBox>("friend combo");
 	avatar_combo->selectFirstItem();
@@ -497,6 +501,7 @@ void LLFloaterWorldMap::draw()
 	//	getChildView("Clear")->setEnabled((BOOL)tracking_status);
 	getChildView("Show Destination")->setEnabled((BOOL)tracking_status || LLWorldMap::getInstance()->isTracking());
 	getChildView("copy_slurl")->setEnabled((mSLURL.isValid()) );
+	mTrackRegionButton->setEnabled((BOOL) tracking_status || LLWorldMap::getInstance()->isTracking());
 // [RLVa:KB] - Checked: 2010-08-22 (RLVa-1.2.1a) | Added: RLVa-1.2.1a
 	childSetEnabled("Go Home", 
 		(!rlv_handler_t::isEnabled()) || !(gRlvHandler.hasBehaviour(RLV_BHVR_TPLM) && gRlvHandler.hasBehaviour(RLV_BHVR_TPLOC)));
@@ -1355,6 +1360,27 @@ void LLFloaterWorldMap::onCopySLURL()
 	LLNotificationsUtil::add("CopySLURL", args);
 }
 
+void LLFloaterWorldMap::onTrackRegion()
+{
+	ALFloaterRegionTracker* floaterp = LLFloaterReg::getTypedInstance<ALFloaterRegionTracker>("region_tracker");
+	if (floaterp)
+	{
+		if (LLTracker::getTrackingStatus() != LLTracker::TRACKING_NOTHING)
+		{
+			std::string sim_name;
+			if (LLWorldMap::getInstance()->simNameFromPosGlobal(LLTracker::getTrackedPositionGlobal(), sim_name))
+			{
+				const std::string& temp_label = floaterp->getRegionLabelIfExists(sim_name);
+				LLSD args, payload;
+				args["REGION"] = sim_name;
+				args["LABEL"] = !temp_label.empty() ? temp_label : sim_name;
+				payload["name"] = sim_name;
+				LLNotificationsUtil::add("RegionTrackerAdd", args, payload, boost::bind(&ALFloaterRegionTracker::onRegionAddedCallback, floaterp, _1, _2));
+			}
+		}
+	}
+}
+
 // protected
 void LLFloaterWorldMap::centerOnTarget(BOOL animate)
 {
@@ -1558,8 +1584,6 @@ void LLFloaterWorldMap::updateSims(bool found_null_sim)
 	LLScrollListCtrl *list = getChild<LLScrollListCtrl>("search_results");
 	list->operateOnAll(LLCtrlListInterface::OP_DELETE);
 	
-	S32 name_length = mCompletingRegionName.length();
-	
 	LLSD match;
 
 	S32 num_results = 0;
@@ -1573,7 +1597,7 @@ void LLFloaterWorldMap::updateSims(bool found_null_sim)
 		std::string sim_name_lower = info->getName();
 		LLStringUtil::toLower(sim_name_lower);
 		
-		if (sim_name_lower.substr(0, name_length) == mCompletingRegionName)
+		if (sim_name_lower.find(mCompletingRegionName) != std::string::npos)
 		{
 			if (sim_name_lower == mCompletingRegionName)
 			{
@@ -1591,7 +1615,7 @@ void LLFloaterWorldMap::updateSims(bool found_null_sim)
 	
 	if (found_null_sim)
 	{
-		mCompletingRegionName = "";
+		mCompletingRegionName.clear();
 	}
 	
 	if (num_results > 0)

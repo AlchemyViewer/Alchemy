@@ -130,6 +130,7 @@ protected:
 	void			onShowTargetBtn();
 	void			onShowAgentBtn();
 	void			onCopySLURL();
+	void			onTrackRegion();
 
 	void			centerOnTarget(BOOL animate);
 	void			updateLocation();
@@ -196,6 +197,8 @@ private:
 	LLCtrlListInterface *	mListFriendCombo;
 	LLCtrlListInterface *	mListLandmarkCombo;
 	LLCtrlListInterface *	mListSearchResults;
+
+	LLButton*				mTrackRegionButton;
 };
 
 extern LLFloaterWorldMap* gFloaterWorldMap;

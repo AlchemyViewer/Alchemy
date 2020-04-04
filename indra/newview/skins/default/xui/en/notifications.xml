@@ -11741,6 +11741,27 @@ Unable to load the track from [TRACK1] into [TRACK2].
   </notification>
 
   <notification
+   icon="alert.tga"
+   name="RegionTrackerAdd"
+   type="alert">
+What label would you like to use for
+the region &quot;[REGION]&quot;?
+    <tag>confirm</tag>
+    <form name="form">
+      <input name="label" type="text">[LABEL]</input>
+      <button
+       default="true"
+       index="0"
+       name="OK"
+       text="OK"/>
+      <button
+       index="1"
+       name="Cancel"
+       text="Cancel"/>
+    </form>
+  </notification>
+
+  <notification
    icon="notify.tga"
    name="AutoAcceptedInventory"
    persist="true"
