@@ -2777,13 +2777,11 @@ BOOL LLAgentCamera::setLookAt(ELookAtType target_type, LLViewerObject *object, L
 	static LLCachedControl<bool> isPrivate(gSavedSettings, "AlchemyLookAtPrivate", false);
 	if (isPrivate)
 	{
-		if(!mLookAt || mLookAt->isDead())
-			return FALSE;
-
+		target_type = LOOKAT_TARGET_CLEAR;
+		object = nullptr;
 		position.clearVec();
-		return mLookAt->setLookAt(LOOKAT_TARGET_NONE, gAgentAvatarp, position);
 	}
-	if(object && object->isAttachment())
+	else if(object && object->isAttachment())
 	{
 		LLViewerObject* parent = object;
 		while(parent)
@@ -2899,6 +2897,14 @@ BOOL LLAgentCamera::setPointAt(EPointAtType target_type, LLViewerObject *object,
 	if (object && (object->isAttachment() || object->isAvatar()))
 	{
 		return FALSE;
+	}
+
+	static LLCachedControl<bool> disablePointAt(gSavedSettings, "AlchemyPointAtPrivate", false);
+	if (disablePointAt)
+	{
+		target_type = POINTAT_TARGET_CLEAR;
+		object = nullptr;
+		position.clear();
 	}
 	if (!mPointAt || mPointAt->isDead())
 	{

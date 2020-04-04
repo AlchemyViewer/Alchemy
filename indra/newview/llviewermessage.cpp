@@ -3187,10 +3187,13 @@ void process_teleport_finish(LLMessageSystem* msg, void**)
 
 	// Do teleport effect for where you're leaving
 	// VEFFECT: TeleportStart
-	LLHUDEffectSpiral *effectp = (LLHUDEffectSpiral *)LLHUDManager::getInstance()->createViewerEffect(LLHUDObject::LL_HUD_EFFECT_POINT, TRUE);
-	effectp->setPositionGlobal(gAgent.getPositionGlobal());
-	effectp->setColor(LLColor4U(gAgent.getEffectColor()));
-	LLHUDManager::getInstance()->sendEffects();
+	if (!gSavedSettings.getBOOL("AlchemyDisableEffectSpiral"))
+	{
+		LLHUDEffectSpiral* effectp = (LLHUDEffectSpiral*)LLHUDManager::getInstance()->createViewerEffect(LLHUDObject::LL_HUD_EFFECT_POINT, TRUE);
+		effectp->setPositionGlobal(gAgent.getPositionGlobal());
+		effectp->setColor(LLColor4U(gAgent.getEffectColor()));
+		LLHUDManager::getInstance()->sendEffects();
+	}
 
 	U32 location_id;
 	U32 sim_ip;
@@ -3274,11 +3277,14 @@ void process_teleport_finish(LLMessageSystem* msg, void**)
 
 	// Now do teleport effect for where you're going.
 	// VEFFECT: TeleportEnd
-	effectp = (LLHUDEffectSpiral *)LLHUDManager::getInstance()->createViewerEffect(LLHUDObject::LL_HUD_EFFECT_POINT, TRUE);
-	effectp->setPositionGlobal(gAgent.getPositionGlobal());
+	if (!gSavedSettings.getBOOL("AlchemyDisableEffectSpiral"))
+	{
+		auto effectp = (LLHUDEffectSpiral*)LLHUDManager::getInstance()->createViewerEffect(LLHUDObject::LL_HUD_EFFECT_POINT, TRUE);
+		effectp->setPositionGlobal(gAgent.getPositionGlobal());
 
-	effectp->setColor(LLColor4U(gAgent.getEffectColor()));
-	LLHUDManager::getInstance()->sendEffects();
+		effectp->setColor(LLColor4U(gAgent.getEffectColor()));
+		LLHUDManager::getInstance()->sendEffects();
+	}
 
 //	gTeleportDisplay = TRUE;
 //	gTeleportDisplayTimer.reset();

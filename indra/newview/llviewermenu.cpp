@@ -4633,10 +4633,13 @@ static void derez_objects(
 				LLViewerObject* object = objectsp->at(object_index++);
 				msg->nextBlockFast(_PREHASH_ObjectData);
 				msg->addU32Fast(_PREHASH_ObjectLocalID, object->getLocalID());
-				// VEFFECT: DerezObject
-				LLHUDEffectSpiral* effectp = (LLHUDEffectSpiral*)LLHUDManager::getInstance()->createViewerEffect(LLHUDObject::LL_HUD_EFFECT_POINT, TRUE);
-				effectp->setPositionGlobal(object->getPositionGlobal());
-				effectp->setColor(LLColor4U(gAgent.getEffectColor()));
+				if (!gSavedSettings.getBOOL("AlchemyDisableEffectSpiral"))
+				{
+					// VEFFECT: DerezObject
+					LLHUDEffectSpiral* effectp = (LLHUDEffectSpiral*)LLHUDManager::getInstance()->createViewerEffect(LLHUDObject::LL_HUD_EFFECT_POINT, TRUE);
+					effectp->setPositionGlobal(object->getPositionGlobal());
+					effectp->setColor(LLColor4U(gAgent.getEffectColor()));
+				}
 			}
 			msg->sendReliable(first_region->getHost());
 		}

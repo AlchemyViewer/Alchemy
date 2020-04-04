@@ -4014,11 +4014,14 @@ void LLAppViewer::requestQuit()
 		gAgentAvatarp->updateAvatarRezMetrics(true); // force a last packet to be sent.
 	}
 
-	LLHUDEffectSpiral *effectp = (LLHUDEffectSpiral*)LLHUDManager::getInstance()->createViewerEffect(LLHUDObject::LL_HUD_EFFECT_POINT, TRUE);
-	effectp->setPositionGlobal(gAgent.getPositionGlobal());
-	effectp->setColor(LLColor4U(gAgent.getEffectColor()));
-	LLHUDManager::getInstance()->sendEffects();
-	effectp->markDead() ;//remove it.
+	if (!gSavedSettings.getBOOL("AlchemyDisableEffectSpiral"))
+	{
+		LLHUDEffectSpiral* effectp = (LLHUDEffectSpiral*)LLHUDManager::getInstance()->createViewerEffect(LLHUDObject::LL_HUD_EFFECT_POINT, TRUE);
+		effectp->setPositionGlobal(gAgent.getPositionGlobal());
+		effectp->setColor(LLColor4U(gAgent.getEffectColor()));
+		LLHUDManager::getInstance()->sendEffects();
+		effectp->markDead();//remove it.
+	}
 
 	// Attempt to close all floaters that might be
 	// editing things.

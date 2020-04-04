@@ -1999,6 +1999,11 @@ BOOL LLToolPie::handleRightClickPick()
 
 void LLToolPie::showVisualContextMenuEffect()
 {
+	if (gSavedSettings.getBOOL("AlchemyDisableEffectSpiral"))
+	{
+		return;
+	}
+
 	// VEFFECT: ShowPie
 	LLHUDEffectSpiral *effectp = (LLHUDEffectSpiral *)LLHUDManager::getInstance()->createViewerEffect(LLHUDObject::LL_HUD_EFFECT_SPHERE, TRUE);
 	effectp->setPositionGlobal(mPick.mPosGlobal);

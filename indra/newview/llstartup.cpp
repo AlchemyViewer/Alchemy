@@ -1596,7 +1596,7 @@ bool idle_startup()
 
 		// Create login effect
 		// But not on first login, because you can't see your avatar then
-		if (!gAgent.isFirstLogin())
+		if (!gAgent.isFirstLogin()&& !gSavedSettings.getBOOL("AlchemyDisableEffectSpiral"))
 		{
 			LLHUDEffectSpiral *effectp = (LLHUDEffectSpiral *)LLHUDManager::getInstance()->createViewerEffect(LLHUDObject::LL_HUD_EFFECT_POINT, TRUE);
 			effectp->setPositionGlobal(gAgent.getPositionGlobal());
