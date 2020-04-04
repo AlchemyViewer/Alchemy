@@ -1362,7 +1362,7 @@ void LLFloaterWorldMap::onCopySLURL()
 
 void LLFloaterWorldMap::onTrackRegion()
 {
-	ALFloaterRegionTracker* floaterp = LLFloaterReg::getTypedInstance<ALFloaterRegionTracker>("region_tracker");
+	ALFloaterRegionTracker* floaterp = LLFloaterReg::showTypedInstance<ALFloaterRegionTracker>("region_tracker");
 	if (floaterp)
 	{
 		if (LLTracker::getTrackingStatus() != LLTracker::TRACKING_NOTHING)
