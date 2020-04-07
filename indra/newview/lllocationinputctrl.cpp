@@ -809,9 +809,10 @@ void LLLocationInputCtrl::refreshLocation()
 	}
 
 	// Update location field.
+	static LLUICachedControl<bool> show_coords("NavBarShowCoordinates", false);
 	std::string location_name;
 	LLAgentUI::ELocationFormat format =
-		(gSavedSettings.getBOOL("NavBarShowCoordinates")
+		(show_coords
 			? LLAgentUI::LOCATION_FORMAT_FULL
 			: LLAgentUI::LOCATION_FORMAT_NO_COORDS);
 

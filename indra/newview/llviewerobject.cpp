@@ -3880,7 +3880,8 @@ F32 LLViewerObject::recursiveGetEstTrianglesMax() const
 S32 LLViewerObject::getAnimatedObjectMaxTris() const
 {
     S32 max_tris = 0;
-    if (gSavedSettings.getBOOL("AnimatedObjectsIgnoreLimits")) 
+	static LLCachedControl<bool> anim_obj_ignore_limits(gSavedSettings, "AnimatedObjectsIgnoreLimits");
+    if (anim_obj_ignore_limits)
     {
         max_tris = S32_MAX;
     }

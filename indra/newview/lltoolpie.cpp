@@ -1196,8 +1196,7 @@ BOOL LLToolPie::handleTooltipObject( LLViewerObject* hover_object, std::string l
 		//
 		//  Default prefs will suppress display unless the object is interactive
 		//
-		bool show_all_object_tips =
-		(bool)gSavedSettings.getBOOL("ShowAllObjectHoverTip");			
+		static const LLCachedControl<bool> show_all_object_tips(gSavedSettings, "ShowAllObjectHoverTip");			
 		LLSelectNode *nodep = LLSelectMgr::getInstance()->getHoverNode();
 		
 		// only show tooltip if same inspector not already open
@@ -1303,7 +1302,8 @@ BOOL LLToolPie::handleTooltipObject( LLViewerObject* hover_object, std::string l
 					p.click_homepage_callback(boost::bind(VisitHomePage, mHoverPick));
 					p.visible_time_near(6.f);
 					p.visible_time_far(3.f);
-					p.delay_time(gSavedSettings.getF32("ObjectInspectorTooltipDelay"));
+					static const LLCachedControl<F32> object_inspect_tooltip_delay(gSavedSettings, "ObjectInspectorTooltipDelay");
+					p.delay_time(object_inspect_tooltip_delay);
 					p.wrap(false);
 					
 					LLToolTipMgr::instance().show(p);
