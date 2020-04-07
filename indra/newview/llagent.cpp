@@ -4377,7 +4377,7 @@ void LLAgent::setTeleportState(ETeleportState state)
     }
     LL_DEBUGS("Teleport") << "Setting teleport state to " << state << " Previous state: " << mTeleportState << LL_ENDL;
 	mTeleportState = state;
-	if (mTeleportState > TELEPORT_NONE && gSavedSettings.getBOOL("FreezeTime"))
+	if (mTeleportState > TELEPORT_NONE && LLPipeline::FreezeTime)
 	{
 		LLFloaterReg::hideInstance("snapshot");
 	}

@@ -672,7 +672,7 @@ BOOL LLSnapshotLivePreview::onIdle( void* snapshot_preview )
 	LLQuaternion new_camera_rot = LLViewerCamera::getInstance()->getQuaternion();
 	if (previewp->mForceUpdateSnapshot ||
 		(((gSavedSettings.getBOOL("AutoSnapshot") && LLView::isAvailable(previewp->mViewContainer)) ||
-		(gSavedSettings.getBOOL("FreezeTime") && previewp->mAllowFullScreenPreview)) &&
+		(LLPipeline::FreezeTime && previewp->mAllowFullScreenPreview)) &&
 		(new_camera_pos != previewp->mCameraPos || dot(new_camera_rot, previewp->mCameraRot) < 0.995f)))
 	{
 		previewp->mCameraPos = new_camera_pos;
