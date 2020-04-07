@@ -409,7 +409,11 @@ private:
 /**                    Keys
  **                                                                            **
  *******************************************************************************/
-
+	// Settings
+	bool			mDisableCameraConstraints = false;
+	F32				mCameraOffsetScale = 1.f;
+	F32				mYawFromMousePosition = 90.f;
+	F32				mPitchFromMousePosition = 90.f;
 };
 
 extern LLAgentCamera gAgentCamera;
