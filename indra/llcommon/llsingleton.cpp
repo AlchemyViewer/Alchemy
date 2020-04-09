@@ -31,7 +31,6 @@
 #include "llerrorcontrol.h"         // LLError::is_available()
 #include "lldependencies.h"
 #include "llcoro_get_id.h"
-#include <boost/foreach.hpp>
 #include <boost/unordered_map.hpp>
 #include <algorithm>
 #include <iostream>                 // std::cerr in dire emergency
@@ -314,7 +313,7 @@ LLSingletonBase::vec_t LLSingletonBase::dep_sort()
     typedef LLDependencies<LLSingletonBase*> SingletonDeps;
     SingletonDeps sdeps;
     list_t& master(get_master());
-    BOOST_FOREACH(LLSingletonBase* sp, master)
+    for (LLSingletonBase* sp : master)
     {
         // Build the SingletonDeps structure by adding, for each
         // LLSingletonBase* sp in the master list, sp itself. It has no
@@ -331,7 +330,7 @@ LLSingletonBase::vec_t LLSingletonBase::dep_sort()
     // extracts just the first (key) element from each sorted_iterator, then
     // uses vec_t's range constructor... but frankly this is more
     // straightforward, as long as we remember the above reserve() call!
-    BOOST_FOREACH(SingletonDeps::sorted_iterator::value_type pair, sdeps.sort())
+    for (SingletonDeps::sorted_iterator::value_type pair : sdeps.sort())
     {
         ret.push_back(pair.first);
     }
@@ -346,7 +345,7 @@ LLSingletonBase::vec_t LLSingletonBase::dep_sort()
 void LLSingletonBase::cleanupAll()
 {
     // It's essential to traverse these in dependency order.
-    BOOST_FOREACH(LLSingletonBase* sp, dep_sort())
+    for (LLSingletonBase* sp : dep_sort())
     {
         // Call cleanupSingleton() only if we haven't already done so for this
         // instance.
@@ -378,7 +377,7 @@ void LLSingletonBase::cleanupAll()
 void LLSingletonBase::deleteAll()
 {
     // It's essential to traverse these in dependency order.
-    BOOST_FOREACH(LLSingletonBase* sp, dep_sort())
+    for (LLSingletonBase* sp : dep_sort())
     {
         // Capture the class name first: in case of exception, don't count on
         // being able to extract it later.

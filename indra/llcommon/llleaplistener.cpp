@@ -16,7 +16,6 @@
 // STL headers
 // std headers
 // external library headers
-#include <boost/foreach.hpp>
 // other Linden headers
 #include "lluuid.h"
 #include "llsdutil.h"
@@ -113,7 +112,7 @@ LLLeapListener::~LLLeapListener()
     // value_type, and Bad Things would happen if you copied an
     // LLTempBoundListener. (Destruction of the original would disconnect the
     // listener, invalidating every stored connection.)
-    BOOST_FOREACH(ListenersMap::value_type& pair, mListeners)
+    for(ListenersMap::value_type& pair : mListeners)
     {
         pair.second.disconnect();
     }

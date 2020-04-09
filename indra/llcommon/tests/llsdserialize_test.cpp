@@ -45,7 +45,6 @@ typedef U32 uint32_t;
 #endif
 
 #include "boost/range.hpp"
-#include "boost/foreach.hpp"
 #include "boost/function.hpp"
 #include "boost/bind.hpp"
 #include "boost/phoenix/bind/bind_function.hpp"
@@ -1792,7 +1791,7 @@ namespace tut
     // helper for test<3>
     static void writeLLSDArray(std::ostream& out, const LLSD& array)
     {
-        BOOST_FOREACH(LLSD item, llsd::inArray(array))
+        for (LLSD item : llsd::inArray(array))
         {
             LLSDSerialize::toNotation(item, out);
             // It's important to separate with newlines because Python's llsd
