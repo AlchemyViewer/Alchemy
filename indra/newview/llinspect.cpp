@@ -113,7 +113,8 @@ BOOL LLInspect::handleToolTip(S32 x, S32 y, MASK mask)
 		params.fillFrom(LLUICtrlFactory::instance().getDefaultParams<LLInspector>());
 		params.message = child_handler->getToolTip();
 		//set up delay if there is no visible tooltip at this moment
-		params.delay_time =  LLToolTipMgr::instance().toolTipVisible() ? 0.f : LLUI::getInstance()->mSettingGroups["config"]->getF32( "ToolTipDelay" );
+		static LLUICachedControl<F32> tool_tip_delay("ToolTipDelay", 0.69999f);
+		params.delay_time =  LLToolTipMgr::instance().toolTipVisible() ? 0.f : tool_tip_delay;
 		LLToolTipMgr::instance().show(params);
 		handled = TRUE;
 	}

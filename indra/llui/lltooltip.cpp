@@ -145,10 +145,6 @@ LLToolTip::Params::Params()
 	wrap("wrap", true),
 	pos("pos"),
 	message("message"),
-	delay_time("delay_time", LLUI::getInstance()->mSettingGroups["config"]->getF32( "ToolTipDelay" )),
-	visible_time_over("visible_time_over", LLUI::getInstance()->mSettingGroups["config"]->getF32( "ToolTipVisibleTimeOver" )),
-	visible_time_near("visible_time_near", LLUI::getInstance()->mSettingGroups["config"]->getF32( "ToolTipVisibleTimeNear" )),
-	visible_time_far("visible_time_far", LLUI::getInstance()->mSettingGroups["config"]->getF32( "ToolTipVisibleTimeFar" )),
 	sticky_rect("sticky_rect"),
 	image("image"),
 	text_color("text_color"),
@@ -156,6 +152,15 @@ LLToolTip::Params::Params()
 	web_based_media("web_based_media", false),
 	media_playing("media_playing", false)
 {
+	static LLUICachedControl<F32> tool_tip_delay("ToolTipDelay", 0.69999f);
+	static LLUICachedControl<F32> visible_time_over_setting("ToolTipVisibleTimeOver", 1000.f);
+	static LLUICachedControl<F32> visible_time_near_setting("ToolTipVisibleTimeNear", 10.f);
+	static LLUICachedControl<F32> visible_time_far_setting("ToolTipVisibleTimeFar", 1.0f);
+	changeDefault(delay_time, tool_tip_delay);
+	changeDefault(visible_time_over, visible_time_over_setting);
+	changeDefault(visible_time_near, visible_time_near_setting);
+	changeDefault(visible_time_far, visible_time_far_setting);
+
 	changeDefault(chrome, true);
 }
 
