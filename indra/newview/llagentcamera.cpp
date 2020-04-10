@@ -351,7 +351,9 @@ void LLAgentCamera::resetView(BOOL reset_camera, BOOL change_camera)
 		//Camera Tool is needed for Free Camera Control Mode
 		if (!LLFloaterCamera::inFreeCameraMode())
 		{
-			LLFloaterReg::hideInstance("build");
+			
+			if (LLFloaterReg::instanceVisible("build"))
+				LLFloaterReg::hideInstance("build");
 
 			// Switch back to basic toolset
 			LLToolMgr::getInstance()->setCurrentToolset(gBasicToolset);

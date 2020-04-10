@@ -3703,7 +3703,10 @@ void LLViewerWindow::updateLayout()
 		}
 		else
 		{
-			gFloaterTools->setVisible(FALSE);
+			if (gFloaterTools->getVisible())
+			{
+				gFloaterTools->setVisible(FALSE);
+			}
 		}
 		//gMenuBarView->setItemVisible("BuildTools", gFloaterTools->getVisible());
 	}
