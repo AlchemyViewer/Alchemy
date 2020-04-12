@@ -327,7 +327,7 @@ bool idle_startup()
 		return false; // No world yet
 	}
 
-	const F32 PRECACHING_DELAY = gSavedSettings.getF32("PrecachingDelay");
+	static const F32 PRECACHING_DELAY = gSavedSettings.getF32("PrecachingDelay");
 	static LLTimer timeout;
 
 	static LLTimer login_time;
