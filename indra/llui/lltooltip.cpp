@@ -363,7 +363,7 @@ void LLToolTip::draw()
 
 	if (mFadeTimer.getStarted())
 	{
-		F32 tool_tip_fade_time = LLUI::getInstance()->mSettingGroups["config"]->getF32("ToolTipFadeTime");
+		static LLUICachedControl<F32> tool_tip_fade_time("ToolTipFadeTime", 1.f);
 		alpha = clamp_rescale(mFadeTimer.getElapsedTimeF32(), 0.f, tool_tip_fade_time, 1.f, 0.f);
 		if (alpha == 0.f)
 		{
