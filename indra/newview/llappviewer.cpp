@@ -814,6 +814,8 @@ bool LLAppViewer::init()
 	if (!initConfiguration())
 		return false;
 
+	ALControlCache::initControls();
+
 	LL_INFOS("InitInfo") << "Configuration initialized." << LL_ENDL ;
 
 	//set the max heap size.
