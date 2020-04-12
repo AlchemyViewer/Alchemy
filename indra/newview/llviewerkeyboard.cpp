@@ -112,13 +112,14 @@ static void agent_check_temporary_run(LLAgent::EDoubleTapRunMode mode)
 
 static void agent_handle_doubletap_run(EKeystate s, LLAgent::EDoubleTapRunMode mode)
 {
+	static LLCachedControl<bool> allow_tap_hold_run(gSavedSettings, "AllowTapTapHoldRun", true);
 	if (KEYSTATE_UP == s)
 	{
 		// Note: in case shift is already released, slide left/right run
 		// will be released in agent_turn_left()/agent_turn_right()
 		agent_check_temporary_run(mode);
 	}
-	else if (gSavedSettings.getBOOL("AllowTapTapHoldRun") &&
+	else if (allow_tap_hold_run &&
 		 KEYSTATE_DOWN == s &&
 		 !gAgent.getRunning())
 	{

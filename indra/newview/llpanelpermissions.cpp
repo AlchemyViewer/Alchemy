@@ -293,7 +293,8 @@ void LLPanelPermissions::refresh()
 	if(BtnDeedToGroup)
 	{	
 		std::string deedText;
-		if (gWarningSettings.getBOOL("DeedObject"))
+		static const LLCachedControl<bool> deed_object(gWarningSettings, "DeedObject");
+		if (deed_object)
 		{
 			deedText = getString("text deed continued");
 		}

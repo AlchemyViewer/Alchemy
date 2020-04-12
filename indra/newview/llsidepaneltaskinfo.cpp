@@ -261,7 +261,8 @@ void LLSidepanelTaskInfo::refresh()
 	if (btn_deed_to_group)
 	{	
 		std::string deedText;
-		if (gWarningSettings.getBOOL("DeedObject"))
+		static const LLCachedControl<bool> deed_object(gWarningSettings, "DeedObject");
+		if (deed_object)
 		{
 			deedText = getString("text deed continued");
 		}
