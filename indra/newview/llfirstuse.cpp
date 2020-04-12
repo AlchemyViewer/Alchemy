@@ -94,12 +94,12 @@ void LLFirstUse::notUsingSidePanel(bool enable)
 void LLFirstUse::notMoving(bool enable)
 {
 	// fire off 2 notifications and rely on filtering to select the relevant one
-	firstUseNotification("FirstNotMoving", enable, "HintMove", LLSD(), LLSD().with("target", "move_btn").with("direction", "top"));
-	firstUseNotification("FirstNotMoving", enable, "HintMoveClick", LLSD(), LLSD()
-		.with("target", "nav_bar")
-		.with("direction", "bottom")
-		.with("hint_image", "click_to_move.png")
-		.with("up_arrow", ""));
+	//firstUseNotification("FirstNotMoving", enable, "HintMove", LLSD(), LLSD().with("target", "move_btn").with("direction", "top"));
+	//firstUseNotification("FirstNotMoving", enable, "HintMoveClick", LLSD(), LLSD()
+	//	.with("target", "nav_bar")
+	//	.with("direction", "bottom")
+	//	.with("hint_image", "click_to_move.png")
+	//	.with("up_arrow", ""));
 }
 
 // static
