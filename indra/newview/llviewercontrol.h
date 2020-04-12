@@ -29,6 +29,7 @@
 
 #include <map>
 #include "llcontrol.h"
+#include "alcontrolcache.h"
 
 // Enabled this definition to compile a 'hacked' viewer that
 // allows a hacked godmode to be toggled on and off.

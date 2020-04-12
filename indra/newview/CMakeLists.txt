@@ -112,6 +112,7 @@ include_directories(SYSTEM
 set(viewer_SOURCE_FILES
     alavataractions.cpp
     alchatcommand.cpp
+    alcontrolcache.cpp
     alfloaterparticleeditor.cpp
     alfloaterregiontracker.cpp
     alunzip.cpp
@@ -752,6 +753,7 @@ set(viewer_HEADER_FILES
     ViewerInstall.cmake
     alavataractions.h
     alchatcommand.h
+    alcontrolcache.h
     alfloaterparticleeditor.h
     alfloaterregiontracker.h
     alunzip.h
