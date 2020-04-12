@@ -42,6 +42,7 @@
 #include "lltoolfocus.h"
 #include "lltoolmgr.h"
 #include "llwebprofile.h"
+#include "pipeline.h"
 
 ///----------------------------------------------------------------------------
 /// Local function declarations, constants, enums, and typedefs
@@ -1395,7 +1396,7 @@ LLSnapshotFloaterView::~LLSnapshotFloaterView()
 BOOL LLSnapshotFloaterView::handleKey(KEY key, MASK mask, BOOL called_from_parent)
 {
 	// use default handler when not in freeze-frame mode
-	if(!gSavedSettings.getBOOL("FreezeTime"))
+	if(!LLPipeline::FreezeTime)
 	{
 		return LLFloaterView::handleKey(key, mask, called_from_parent);
 	}
@@ -1417,7 +1418,7 @@ BOOL LLSnapshotFloaterView::handleKey(KEY key, MASK mask, BOOL called_from_paren
 BOOL LLSnapshotFloaterView::handleMouseDown(S32 x, S32 y, MASK mask)
 {
 	// use default handler when not in freeze-frame mode
-	if(!gSavedSettings.getBOOL("FreezeTime"))
+	if(!LLPipeline::FreezeTime)
 	{
 		return LLFloaterView::handleMouseDown(x, y, mask);
 	}
@@ -1433,7 +1434,7 @@ BOOL LLSnapshotFloaterView::handleMouseDown(S32 x, S32 y, MASK mask)
 BOOL LLSnapshotFloaterView::handleMouseUp(S32 x, S32 y, MASK mask)
 {
 	// use default handler when not in freeze-frame mode
-	if(!gSavedSettings.getBOOL("FreezeTime"))
+	if(!LLPipeline::FreezeTime)
 	{
 		return LLFloaterView::handleMouseUp(x, y, mask);
 	}
@@ -1449,7 +1450,7 @@ BOOL LLSnapshotFloaterView::handleMouseUp(S32 x, S32 y, MASK mask)
 BOOL LLSnapshotFloaterView::handleHover(S32 x, S32 y, MASK mask)
 {
 	// use default handler when not in freeze-frame mode
-	if(!gSavedSettings.getBOOL("FreezeTime"))
+	if(!LLPipeline::FreezeTime)
 	{
 		return LLFloaterView::handleHover(x, y, mask);
 	}	
