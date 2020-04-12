@@ -167,7 +167,7 @@ void LLInboxFolderViewFolder::selectItem()
 
 void LLInboxFolderViewFolder::computeFreshness()
 {
-	const U32 last_expansion_utc = gSavedPerAccountSettings.getU32("LastInventoryInboxActivity");
+	static const LLCachedControl<U32> last_expansion_utc(gSavedPerAccountSettings, "LastInventoryInboxActivity");
 
 	if (last_expansion_utc > 0)
 	{
@@ -245,7 +245,7 @@ void LLInboxFolderViewItem::selectItem()
 
 void LLInboxFolderViewItem::computeFreshness()
 {
-	const U32 last_expansion_utc = gSavedPerAccountSettings.getU32("LastInventoryInboxActivity");
+	static const LLCachedControl<U32> last_expansion_utc(gSavedPerAccountSettings, "LastInventoryInboxActivity");
 
 	if (last_expansion_utc > 0)
 	{

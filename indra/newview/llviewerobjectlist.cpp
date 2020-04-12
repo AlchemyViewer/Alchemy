@@ -1785,23 +1785,21 @@ void LLViewerObjectList::clearAllMapObjectsInRegion(LLViewerRegion* regionp)
 
 void LLViewerObjectList::renderObjectsForMap(LLNetMap &netmap)
 {
-	LLColor4 above_water_color = LLUIColorTable::instance().getColor( "NetMapOtherOwnAboveWater" );
-	LLColor4 below_water_color = LLUIColorTable::instance().getColor( "NetMapOtherOwnBelowWater" );
-	LLColor4 you_own_above_water_color = 
+	static const LLUIColor above_water_color = LLUIColorTable::instance().getColor( "NetMapOtherOwnAboveWater" );
+	static const LLUIColor below_water_color = LLUIColorTable::instance().getColor( "NetMapOtherOwnBelowWater" );
+	static const LLUIColor you_own_above_water_color =
 						LLUIColorTable::instance().getColor( "NetMapYouOwnAboveWater" );
-	LLColor4 you_own_below_water_color = 
+	static const LLUIColor you_own_below_water_color =
 						LLUIColorTable::instance().getColor( "NetMapYouOwnBelowWater" );
-	LLColor4 group_own_above_water_color = 
+	static const LLUIColor group_own_above_water_color =
 						LLUIColorTable::instance().getColor( "NetMapGroupOwnAboveWater" );
-	LLColor4 group_own_below_water_color = 
+	static const LLUIColor group_own_below_water_color =
 						LLUIColorTable::instance().getColor( "NetMapGroupOwnBelowWater" );
 
-	F32 max_radius = gSavedSettings.getF32("MiniMapPrimMaxRadius");
+	static const LLCachedControl<F32> max_radius(gSavedSettings, "MiniMapPrimMaxRadius");
 
-	for (vobj_list_t::iterator iter = mMapObjects.begin(); iter != mMapObjects.end(); ++iter)
+	for (LLViewerObject* objectp : mMapObjects)
 	{
-		LLViewerObject* objectp = *iter;
-
 		if(objectp->isDead())//some dead objects somehow not cleaned.
 		{
 			continue ;
@@ -1821,9 +1819,9 @@ void LLViewerObjectList::renderObjectsForMap(LLNetMap &netmap)
 		// Limit the size of megaprims so they don't blot out everything on the minimap.
 		// Attempting to draw very large megaprims also causes client lag.
 		// See DEV-17370 and DEV-29869/SNOW-79 for details.
-		approx_radius = llmin(approx_radius, max_radius);
+		approx_radius = llmin<F32>(approx_radius, max_radius);
 
-		LLColor4U color = above_water_color;
+		LLColor4 color = above_water_color;
 		if( objectp->permYouOwner() )
 		{
 			const F32 MIN_RADIUS_FOR_OWNED_OBJECTS = 2.f;
@@ -1840,8 +1838,8 @@ void LLViewerObjectList::renderObjectsForMap(LLNetMap &netmap)
 				}
 				else
 				{
-				color = you_own_above_water_color;
-			}
+					color = you_own_above_water_color;
+				}
 			}
 			else
 			{
@@ -1855,8 +1853,7 @@ void LLViewerObjectList::renderObjectsForMap(LLNetMap &netmap)
 			}
 		}
 		}
-		else
-		if( pos.mdV[VZ] < water_height )
+		else if( pos.mdV[VZ] < water_height )
 		{
 			color = below_water_color;
 		}
