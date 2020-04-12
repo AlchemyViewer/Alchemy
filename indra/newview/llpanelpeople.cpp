@@ -834,7 +834,7 @@ void LLPanelPeople::updateNearbyList()
 	if (RlvActions::canShowNearbyAgents())
 	{
 // [/RLVa:KB]
-		LLWorld::getInstance()->getAvatars(&mNearbyList->getIDs(), &positions, gAgent.getPositionGlobal(), gSavedSettings.getF32("NearMeRange"));
+		LLWorld::getInstance()->getAvatars(&mNearbyList->getIDs(), &positions, gAgent.getPositionGlobal(), ALControlCache::NearMeRange);
 // [RLVa:KB] - Checked: RLVa-2.0.3
 	}
 	else
@@ -1620,8 +1620,7 @@ bool LLPanelPeople::updateNearbyArrivalTime()
 {
 	std::vector<LLVector3d> positions;
 	std::vector<LLUUID> uuids;
-	static LLCachedControl<F32> range(gSavedSettings, "NearMeRange");
-	LLWorld::getInstance()->getAvatars(&uuids, &positions, gAgent.getPositionGlobal(), range);
+	LLWorld::getInstance()->getAvatars(&uuids, &positions, gAgent.getPositionGlobal(), ALControlCache::NearMeRange);
 	LLRecentPeople::instance().updateAvatarsArrivalTime(uuids);
 	return LLApp::isExiting();
 }

@@ -5,6 +5,9 @@ struct ALControlCache
 {
 	static void initControls();
 
+	static bool		AutoSnapshot;
+	static bool		AutomaticFly;
+	static bool		DebugAvatarRezTime;
 	static bool		EditLinkedParts;
 	static F32		GridDrawSize;
 	static F32		GridOpacity;
@@ -16,7 +19,10 @@ struct ALControlCache
 	static bool		MapShowPeople;
 	static bool		MapShowTelehubs;
 	static bool		NavBarShowParcelProperties;
+	static F32		NearMeRange;
 	static U32		PreferredMaturity;
+	static bool		ShowAdultEvents;
+	static bool		ShowMatureEvents;
 	static bool		SnapEnabled;
 	static S32		ToastGap;
 };

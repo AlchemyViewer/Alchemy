@@ -671,14 +671,14 @@ BOOL LLSnapshotLivePreview::onIdle( void* snapshot_preview )
 	LLVector3 new_camera_pos = LLViewerCamera::getInstance()->getOrigin();
 	LLQuaternion new_camera_rot = LLViewerCamera::getInstance()->getQuaternion();
 	if (previewp->mForceUpdateSnapshot ||
-		(((gSavedSettings.getBOOL("AutoSnapshot") && LLView::isAvailable(previewp->mViewContainer)) ||
+		(((ALControlCache::AutoSnapshot && LLView::isAvailable(previewp->mViewContainer)) ||
 		(LLPipeline::FreezeTime && previewp->mAllowFullScreenPreview)) &&
 		(new_camera_pos != previewp->mCameraPos || dot(new_camera_rot, previewp->mCameraRot) < 0.995f)))
 	{
 		previewp->mCameraPos = new_camera_pos;
 		previewp->mCameraRot = new_camera_rot;
 		// request a new snapshot whenever the camera moves, with a time delay
-		BOOL new_snapshot = gSavedSettings.getBOOL("AutoSnapshot") || previewp->mForceUpdateSnapshot;
+		BOOL new_snapshot = ALControlCache::AutoSnapshot || previewp->mForceUpdateSnapshot;
 		LL_DEBUGS() << "camera moved, updating thumbnail" << LL_ENDL;
 		previewp->updateSnapshot(
 			new_snapshot, // whether a new snapshot is needed or merely invalidate the existing one

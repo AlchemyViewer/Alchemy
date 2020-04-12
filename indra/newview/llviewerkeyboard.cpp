@@ -76,7 +76,7 @@ void agent_jump( EKeystate s )
 	if( time < FLY_TIME 
 		|| frame_count <= FLY_FRAMES 
 		|| gAgent.upGrabbed()
-		|| !gSavedSettings.getBOOL("AutomaticFly"))
+		|| !ALControlCache::AutomaticFly)
 	{
 		gAgent.moveUp(1);
 	}

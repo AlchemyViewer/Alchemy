@@ -1710,7 +1710,7 @@ void LLFloaterIMContainer::setNearbyDistances()
 		// Get the positions of the nearby avatars and their ids
 		std::vector<LLVector3d> positions;
 		uuid_vec_t avatar_ids;
-		LLWorld::getInstance()->getAvatars(&avatar_ids, &positions, gAgent.getPositionGlobal(), gSavedSettings.getF32("NearMeRange"));
+		LLWorld::getInstance()->getAvatars(&avatar_ids, &positions, gAgent.getPositionGlobal(), ALControlCache::NearMeRange);
 		// Get the position of the agent
 		const LLVector3d& me_pos = gAgent.getPositionGlobal();
 		// For each nearby avatar, compute and update the distance

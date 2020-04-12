@@ -415,7 +415,7 @@ void LLFloaterSnapshotBase::ImplBase::setNeedRefresh(bool need)
 	if (!mFloater) return;
 
 	// Don't display the "Refresh to save" message if we're in auto-refresh mode.
-	if (gSavedSettings.getBOOL("AutoSnapshot"))
+	if (ALControlCache::AutoSnapshot)
 	{
 		need = false;
 	}
@@ -429,7 +429,7 @@ void LLFloaterSnapshotBase::ImplBase::checkAutoSnapshot(LLSnapshotLivePreview* p
 {
 	if (previewp)
 	{
-		BOOL autosnap = gSavedSettings.getBOOL("AutoSnapshot");
+		BOOL autosnap = ALControlCache::AutoSnapshot;
 		LL_DEBUGS() << "updating " << (autosnap ? "snapshot" : "thumbnail") << LL_ENDL;
 		previewp->updateSnapshot(autosnap, update_thumbnail, autosnap ? AUTO_SNAPSHOT_TIME_DELAY : 0.f);
 	}

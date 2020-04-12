@@ -3,6 +3,9 @@
 #include "alcontrolcache.h"
 #include "llviewercontrol.h"
 
+bool ALControlCache::AutoSnapshot = false;
+bool ALControlCache::AutomaticFly = true;
+bool ALControlCache::DebugAvatarRezTime = false;
 bool ALControlCache::EditLinkedParts = false;
 F32  ALControlCache::GridDrawSize;
 F32  ALControlCache::GridOpacity;
@@ -14,7 +17,10 @@ bool ALControlCache::MapShowLandForSale;
 bool ALControlCache::MapShowPeople;
 bool ALControlCache::MapShowTelehubs;
 bool ALControlCache::NavBarShowParcelProperties = true;
+F32	 ALControlCache::NearMeRange = 4096.f;
 U32  ALControlCache::PreferredMaturity;
+bool ALControlCache::ShowAdultEvents;
+bool ALControlCache::ShowMatureEvents;
 bool ALControlCache::SnapEnabled;
 S32  ALControlCache::ToastGap;
 
@@ -46,6 +52,9 @@ S32  ALControlCache::ToastGap;
 void ALControlCache::initControls()
 {
 	// Keep this list alphabatized.
+	DECLARE_CTRL_BOOL(AutoSnapshot);
+	DECLARE_CTRL_BOOL(AutomaticFly);
+	DECLARE_CTRL_BOOL(DebugAvatarRezTime);
 	DECLARE_CTRL_BOOL(EditLinkedParts);
 	DECLARE_CTRL_F32(GridDrawSize);
 	DECLARE_CTRL_F32(GridOpacity);
@@ -57,7 +66,10 @@ void ALControlCache::initControls()
 	DECLARE_CTRL_BOOL(MapShowPeople);
 	DECLARE_CTRL_BOOL(MapShowTelehubs);
 	DECLARE_CTRL_BOOL(NavBarShowParcelProperties);
+	DECLARE_CTRL_F32(NearMeRange);
 	DECLARE_CTRL_U32(PreferredMaturity);
+	DECLARE_CTRL_BOOL(ShowAdultEvents);
+	DECLARE_CTRL_BOOL(ShowMatureEvents);
 	DECLARE_CTRL_BOOL(SnapEnabled);
 	DECLARE_CTRL_S32(ToastGap);
 }

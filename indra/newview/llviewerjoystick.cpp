@@ -395,7 +395,7 @@ void LLViewerJoystick::agentFly(F32 inc)
 		if (! (gAgent.getFlying() ||
 		       !gAgent.canFly() ||
 		       gAgent.upGrabbed() ||
-		       !gSavedSettings.getBOOL("AutomaticFly")) )
+		       !ALControlCache::AutomaticFly) )
 		{
 			gAgent.setFlying(true);
 		}
@@ -625,7 +625,7 @@ void LLViewerJoystick::moveAvatar(bool reset)
 		// jump (as the up/down axis already controls flying) if on the
 		// ground, or cease flight if already flying.
 		// If AutomaticFly is disabled, then button1 toggles flying.
-		if (gSavedSettings.getBOOL("AutomaticFly"))
+		if (ALControlCache::AutomaticFly)
 		{
 			if (!gAgent.getFlying())
 			{

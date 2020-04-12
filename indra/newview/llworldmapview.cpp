@@ -416,7 +416,7 @@ void LLWorldMapView::draw()
 			gGL.end();
 		}
 		 **********************/
-		else if (gSavedSettings.getBOOL("MapShowLandForSale") && (level <= DRAW_LANDFORSALE_THRESHOLD))
+		else if (ALControlCache::MapShowLandForSale && (level <= DRAW_LANDFORSALE_THRESHOLD))
 		{
 			// Draw the overlay image "Land for Sale / Land for Auction"
 			LLViewerFetchedTexture* overlayimage = info->getLandForSaleImage();
@@ -512,12 +512,12 @@ void LLWorldMapView::draw()
 	gGL.setSceneBlendType(LLRender::BT_ALPHA);
 
 	// Draw item infos if we're not zoomed out too much and there's something to draw
-	if ((level <= DRAW_SIMINFO_THRESHOLD) && (gSavedSettings.getBOOL("MapShowInfohubs") || 
-											  gSavedSettings.getBOOL("MapShowTelehubs") ||
-											  gSavedSettings.getBOOL("MapShowLandForSale") || 
-											  gSavedSettings.getBOOL("MapShowEvents") || 
-											  gSavedSettings.getBOOL("ShowMatureEvents") ||
-											  gSavedSettings.getBOOL("ShowAdultEvents")))
+	if ((level <= DRAW_SIMINFO_THRESHOLD) && (ALControlCache::MapShowInfohubs || 
+											  ALControlCache::MapShowTelehubs ||
+											  ALControlCache::MapShowLandForSale || 
+											  ALControlCache::MapShowEvents || 
+											  ALControlCache::ShowMatureEvents ||
+											  ALControlCache::ShowAdultEvents))
 	{
 		drawItems();
 	}
@@ -549,7 +549,7 @@ void LLWorldMapView::draw()
 
 	// Draw icons for the avatars in each region.
 	// Drawn this after the current agent avatar so one can see nearby people
-	if (gSavedSettings.getBOOL("MapShowPeople") && (level <= DRAW_SIMINFO_THRESHOLD))
+	if (ALControlCache::MapShowPeople && (level <= DRAW_SIMINFO_THRESHOLD))
 	{
 		drawAgents();
 	}
@@ -820,8 +820,8 @@ void LLWorldMapView::drawItems()
 	bool mature_enabled = gAgent.canAccessMature();
 	bool adult_enabled = gAgent.canAccessAdult();
 
-    BOOL show_mature = mature_enabled && gSavedSettings.getBOOL("ShowMatureEvents");
-	BOOL show_adult = adult_enabled && gSavedSettings.getBOOL("ShowAdultEvents");
+    BOOL show_mature = mature_enabled && ALControlCache::ShowMatureEvents;
+	BOOL show_adult = adult_enabled && ALControlCache::ShowAdultEvents;
 
 	for (handle_list_t::iterator iter = mVisibleRegions.begin(); iter != mVisibleRegions.end(); ++iter)
 	{
@@ -832,17 +832,17 @@ void LLWorldMapView::drawItems()
 			continue;
 		}
 		// Infohubs
-		if (gSavedSettings.getBOOL("MapShowInfohubs"))
+		if (ALControlCache::MapShowInfohubs)
 		{
 			drawGenericItems(info->getInfoHub(), sInfohubImage);
 		}
 		// Telehubs
-		if (gSavedSettings.getBOOL("MapShowTelehubs"))
+		if (ALControlCache::MapShowTelehubs)
 		{
 			drawGenericItems(info->getTeleHub(), sTelehubImage);
 		}
 		// Land for sale
-		if (gSavedSettings.getBOOL("MapShowLandForSale"))
+		if (ALControlCache::MapShowLandForSale)
 		{
 			drawGenericItems(info->getLandForSale(), sForSaleImage);
 			// for 1.23, we're showing normal land and adult land in the same UI; you don't
@@ -854,7 +854,7 @@ void LLWorldMapView::drawItems()
 			}
 		}
 		// PG Events
-		if (gSavedSettings.getBOOL("MapShowEvents"))
+		if (ALControlCache::MapShowEvents)
 		{
 			drawGenericItems(info->getPGEvent(), sEventImage);
 		}
@@ -1518,11 +1518,11 @@ void LLWorldMapView::handleClick(S32 x, S32 y, MASK mask,
 	// If the zoom level is not too far out already, test hits
 	if (level <= DRAW_SIMINFO_THRESHOLD)
 	{
-		bool show_mature = gAgent.canAccessMature() && gSavedSettings.getBOOL("ShowMatureEvents");
-		bool show_adult = gAgent.canAccessAdult() && gSavedSettings.getBOOL("ShowAdultEvents");
+		bool show_mature = gAgent.canAccessMature() && ALControlCache::ShowMatureEvents;
+		bool show_adult = gAgent.canAccessAdult() && ALControlCache::ShowAdultEvents;
 
 		// Test hits if trackable data are displayed, otherwise, we don't even bother
-		if (gSavedSettings.getBOOL("MapShowEvents") || show_mature || show_adult || gSavedSettings.getBOOL("MapShowLandForSale"))
+		if (ALControlCache::MapShowEvents || show_mature || show_adult || ALControlCache::MapShowLandForSale)
 		{
 			// Iterate through the visible regions
 			for (handle_list_t::iterator iter = mVisibleRegions.begin(); iter != mVisibleRegions.end(); ++iter)
@@ -1534,7 +1534,7 @@ void LLWorldMapView::handleClick(S32 x, S32 y, MASK mask,
 					continue;
 				}
 				// If on screen check hits with the visible item lists
-				if (gSavedSettings.getBOOL("MapShowEvents"))
+				if (ALControlCache::MapShowEvents)
 				{
 					LLSimInfo::item_info_list_t::const_iterator it = siminfo->getPGEvent().begin();
 					while (it != siminfo->getPGEvent().end())
@@ -1582,7 +1582,7 @@ void LLWorldMapView::handleClick(S32 x, S32 y, MASK mask,
 						++it;
 					}
 				}
-				if (gSavedSettings.getBOOL("MapShowLandForSale"))
+				if (ALControlCache::MapShowLandForSale)
 				{
 					LLSimInfo::item_info_list_t::const_iterator it = siminfo->getLandForSale().begin();
 					while (it != siminfo->getLandForSale().end())

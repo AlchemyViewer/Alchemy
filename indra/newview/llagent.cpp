@@ -1934,7 +1934,7 @@ void LLAgent::propagate(const F32 dt)
 		if (!in_air 
 			&& gAgentCamera.getUpKey() < 0 
 			&& land_vel.magVecSquared() < MAX_VELOCITY_AUTO_LAND_SQUARED
-			&& gSavedSettings.getBOOL("AutomaticFly"))
+			&& ALControlCache::AutomaticFly)
 		{
 			// land automatically
 			setFlying(FALSE);

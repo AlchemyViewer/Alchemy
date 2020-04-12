@@ -409,7 +409,7 @@ private:
 
 void LLAvatarTexBar::draw()
 {	
-	if (!gSavedSettings.getBOOL("DebugAvatarRezTime")) return;
+	if (!ALControlCache::DebugAvatarRezTime) return;
 
 	LLVOAvatarSelf* avatarp = gAgentAvatarp;
 	if (!avatarp) return;
@@ -465,7 +465,7 @@ LLRect LLAvatarTexBar::getRequiredRect()
 {
 	LLRect rect;
 	rect.mTop = 100;
-	if (!gSavedSettings.getBOOL("DebugAvatarRezTime")) rect.mTop = 0;
+	if (!ALControlCache::DebugAvatarRezTime) rect.mTop = 0;
 	return rect;
 }
 
