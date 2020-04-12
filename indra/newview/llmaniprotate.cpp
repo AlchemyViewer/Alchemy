@@ -747,8 +747,7 @@ void LLManipRotate::renderActiveRing( F32 radius, F32 width, const LLColor4& fro
 
 void LLManipRotate::renderSnapGuides()
 {
-	static LLCachedControl<bool> snap_enabled(gSavedSettings, "SnapEnabled", true);
-	if (!snap_enabled)
+	if (!ALControlCache::SnapEnabled)
 	{
 		return;
 	}
@@ -1126,7 +1125,7 @@ void LLManipRotate::renderSnapGuides()
 
 			LLVector3 offset_dir = LLViewerCamera::getInstance()->getUpAxis();
 
-			F32 line_alpha = gSavedSettings.getF32("GridOpacity");
+			F32 line_alpha = ALControlCache::GridOpacity;
 
 			LLVector3 help_text_pos = selection_center_start + (mRadiusMeters * 3.f * offset_dir);
 			const LLFontGL* big_fontp = LLFontGL::getFontSansSerif();
@@ -1196,7 +1195,7 @@ BOOL LLManipRotate::updateVisiblity()
 			F32 z_dist = -1.f * (mCenterToCam * cameraAtAxis);
 
 			// Don't drag manip if object too far away
-			if (gSavedSettings.getBOOL("LimitSelectDistance"))
+			if (ALControlCache::LimitSelectDistance)
 			{
 				F32 max_select_distance = gSavedSettings.getF32("MaxSelectDistance");
 				if (dist_vec_squared(gAgent.getPositionAgent(), center) > (max_select_distance * max_select_distance))
@@ -1410,7 +1409,7 @@ LLQuaternion LLManipRotate::dragConstrained( S32 x, S32 y )
 		BOOL hit = getMousePointOnPlaneAgent(projected_mouse, x, y, snap_plane_center, constraint_axis);
 		projected_mouse -= snap_plane_center;
 
-		if (gSavedSettings.getBOOL("SnapEnabled")) {
+		if (ALControlCache::SnapEnabled) {
 			S32 snap_plane = 0;
 	
 			F32 dot = cam_to_snap_plane * constraint_axis;
@@ -1601,7 +1600,7 @@ LLQuaternion LLManipRotate::dragConstrained( S32 x, S32 y )
 			return LLQuaternion::DEFAULT;
 		}
 
-		if (gSavedSettings.getBOOL("SnapEnabled") && projected_mouse.magVec() > SNAP_GUIDE_INNER_RADIUS * mRadiusMeters)
+		if (ALControlCache::SnapEnabled && projected_mouse.magVec() > SNAP_GUIDE_INNER_RADIUS * mRadiusMeters)
 		{
 			if (!mInSnapRegime)
 			{
@@ -1928,7 +1927,7 @@ BOOL LLManipRotate::canAffectSelection()
 				LLViewerObject *root_object = (objectp == NULL) ? NULL : objectp->getRootEdit();
 				return objectp->permMove() && !objectp->isPermanentEnforced() &&
 					((root_object == NULL) || !root_object->isPermanentEnforced()) &&
-					(objectp->permModify() || !gSavedSettings.getBOOL("EditLinkedParts"));
+					(objectp->permModify() || !ALControlCache::EditLinkedParts);
 			}
 		} func;
 		can_rotate = mObjectSelection->applyToObjects(&func);

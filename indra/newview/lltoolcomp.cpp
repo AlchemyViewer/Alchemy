@@ -111,7 +111,7 @@ BOOL LLToolComposite::isSelecting()
 
 void LLToolComposite::handleSelect()
 {
-	if (!gSavedSettings.getBOOL("EditLinkedParts"))
+	if (!ALControlCache::EditLinkedParts)
 	{
 		LLSelectMgr::getInstance()->promoteSelectionToRoot();
 	}
@@ -179,7 +179,7 @@ void LLToolCompInspect::pickCallback(const LLPickInfo& pick_info)
 	if (!tool_inspectp->mMouseDown)
 	{
 		// fast click on object, but mouse is already up...just do select
-		tool_inspectp->mSelectRect->handleObjectSelection(pick_info, gSavedSettings.getBOOL("EditLinkedParts"), FALSE);
+		tool_inspectp->mSelectRect->handleObjectSelection(pick_info, ALControlCache::EditLinkedParts, FALSE);
 		return;
 	}
 
@@ -279,7 +279,7 @@ void LLToolCompTranslate::pickCallback(const LLPickInfo& pick_info)
 	if (!LLToolCompTranslate::getInstance()->mMouseDown)
 	{
 		// fast click on object, but mouse is already up...just do select
-		LLToolCompTranslate::getInstance()->mSelectRect->handleObjectSelection(pick_info, gSavedSettings.getBOOL("EditLinkedParts"), FALSE);
+		LLToolCompTranslate::getInstance()->mSelectRect->handleObjectSelection(pick_info, ALControlCache::EditLinkedParts, FALSE);
 		return;
 	}
 
@@ -403,7 +403,7 @@ void LLToolCompScale::pickCallback(const LLPickInfo& pick_info)
 	if (!LLToolCompScale::getInstance()->mMouseDown)
 	{
 		// fast click on object, but mouse is already up...just do select
-		LLToolCompScale::getInstance()->mSelectRect->handleObjectSelection(pick_info, gSavedSettings.getBOOL("EditLinkedParts"), FALSE);
+		LLToolCompScale::getInstance()->mSelectRect->handleObjectSelection(pick_info, ALControlCache::EditLinkedParts, FALSE);
 
 		return;
 	}
@@ -603,7 +603,7 @@ void LLToolCompRotate::pickCallback(const LLPickInfo& pick_info)
 	if (!LLToolCompRotate::getInstance()->mMouseDown)
 	{
 		// fast click on object, but mouse is already up...just do select
-		LLToolCompRotate::getInstance()->mSelectRect->handleObjectSelection(pick_info, gSavedSettings.getBOOL("EditLinkedParts"), FALSE);
+		LLToolCompRotate::getInstance()->mSelectRect->handleObjectSelection(pick_info, ALControlCache::EditLinkedParts, FALSE);
 		return;
 	}
 	

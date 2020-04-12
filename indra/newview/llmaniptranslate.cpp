@@ -546,7 +546,7 @@ BOOL LLManipTranslate::handleHover(S32 x, S32 y, MASK mask)
 	getMousePointOnPlaneGlobal(cursor_point_snap_line, x, y, current_pos_global, mSnapOffsetAxis % axis_f);
 	off_axis_magnitude = axis_exists ? llabs((cursor_point_snap_line - current_pos_global) * LLVector3d(mSnapOffsetAxis)) : 0.f;
 
-	if (gSavedSettings.getBOOL("SnapEnabled"))
+	if (ALControlCache::SnapEnabled)
 	{
 		if (off_axis_magnitude > mSnapOffsetMeters)
 		{
@@ -1074,13 +1074,13 @@ void LLManipTranslate::render()
 
 void LLManipTranslate::renderSnapGuides()
 {
-	if (!gSavedSettings.getBOOL("SnapEnabled"))
+	if (!ALControlCache::SnapEnabled)
 	{
 		return;
 	}
 
 	F32 max_subdivisions = sGridMaxSubdivisionLevel;//(F32)gSavedSettings.getS32("GridSubdivision");
-	F32 line_alpha = gSavedSettings.getF32("GridOpacity");
+	F32 line_alpha = ALControlCache::GridOpacity;
 
 	gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
 	LLGLDepthTest gls_depth(GL_TRUE);
@@ -1840,7 +1840,7 @@ void LLManipTranslate::renderTranslationHandles()
 		F32 range_from_agent = dist_vec(gAgent.getPositionAgent(), selection_center);
 		
 		// Don't draw handles if you're too far away
-		if (gSavedSettings.getBOOL("LimitSelectDistance"))
+		if (ALControlCache::LimitSelectDistance)
 		{
 			if (range_from_agent > gSavedSettings.getF32("MaxSelectDistance"))
 			{
@@ -1866,7 +1866,7 @@ void LLManipTranslate::renderTranslationHandles()
 	mArrowLengthMeters *= ui_scale_factor;
 
 	mPlaneManipOffsetMeters = mArrowLengthMeters * 1.8f;
-	mGridSizeMeters = gSavedSettings.getF32("GridDrawSize");
+	mGridSizeMeters = ALControlCache::GridDrawSize;
 	mConeSize = mArrowLengthMeters / 4.f;
 
 	gGL.matrixMode(LLRender::MM_MODELVIEW);
@@ -2300,7 +2300,7 @@ BOOL LLManipTranslate::canAffectSelection()
 				LLViewerObject *root_object = (objectp == NULL) ? NULL : objectp->getRootEdit();
 				return objectp->permMove() && !objectp->isPermanentEnforced() &&
 					((root_object == NULL) || !root_object->isPermanentEnforced()) &&
-					(objectp->permModify() || !gSavedSettings.getBOOL("EditLinkedParts"));
+					(objectp->permModify() || !ALControlCache::EditLinkedParts);
 			}
 		} func;
 		can_move = mObjectSelection->applyToObjects(&func);

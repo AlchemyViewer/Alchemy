@@ -607,8 +607,7 @@ void LLLocationInputCtrl::draw()
 		refreshLocation();
 	}
 	
-	static LLUICachedControl<bool> show_icons("NavBarShowParcelProperties", false);
-	if (show_icons)
+	if (ALControlCache::NavBarShowParcelProperties)
 	{
 		refreshHealth();
 	}
@@ -858,7 +857,7 @@ void LLLocationInputCtrl::refreshParcelIcons()
 
 	x = layout_widget(mForSaleBtn, x);
 
-	if (gSavedSettings.getBOOL("NavBarShowParcelProperties"))
+	if (ALControlCache::NavBarShowParcelProperties)
 	{
 		LLParcel* current_parcel;
 		LLViewerRegion* selection_region = vpm->getSelectionRegion();

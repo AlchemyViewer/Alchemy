@@ -249,7 +249,7 @@ void LLManipScale::render()
 				F32 range_from_agent_squared = dist_vec_squared(gAgent.getPositionAgent(), manipulator_pos);
 
 				// Don't draw manip if object too far away
-				if (gSavedSettings.getBOOL("LimitSelectDistance"))
+				if (ALControlCache::LimitSelectDistance)
 				{
 					F32 max_select_distance = gSavedSettings.getF32("MaxSelectDistance");
 					if (range_from_agent_squared > max_select_distance * max_select_distance)
@@ -877,7 +877,7 @@ void LLManipScale::dragCorner( S32 x, S32 y )
 	LLVector3 projected_drag_pos1 = inverse_projected_vec(mScaleDir, orthogonal_component(mouse_on_plane1, mSnapGuideDir1));
 	LLVector3 projected_drag_pos2 = inverse_projected_vec(mScaleDir, orthogonal_component(mouse_on_plane2, mSnapGuideDir2));
 
-	BOOL snap_enabled = gSavedSettings.getBOOL("SnapEnabled");
+	BOOL snap_enabled = ALControlCache::SnapEnabled;
 	if (snap_enabled && (mouse_on_plane1 - projected_drag_pos1) * mSnapGuideDir1 > mSnapRegimeOffset)
 	{
 		F32 drag_dist = mScaleDir * projected_drag_pos1; // Projecting the drag position allows for negative results, vs using the length which will result in a "reverse scaling" bug.
@@ -1088,7 +1088,7 @@ void LLManipScale::dragFace( S32 x, S32 y )
 	F32 dist_from_scale_line = dist_vec(scale_center_to_mouse, (mouse_on_scale_line - mScaleCenter));
 	F32 dist_along_scale_line = scale_center_to_mouse * mScaleDir;
 
-	BOOL snap_enabled = gSavedSettings.getBOOL("SnapEnabled");
+	BOOL snap_enabled = ALControlCache::SnapEnabled;
 
 	if (snap_enabled && dist_from_scale_line > mSnapRegimeOffset)
 	{
@@ -1186,7 +1186,7 @@ void LLManipScale::sendUpdates( BOOL send_position_update, BOOL send_scale_updat
 		mLastUpdateFlags = update_flags;
 
 		// enforce minimum update delay and don't stream updates on sub-object selections
-		if( elapsed_time > UPDATE_DELAY && !gSavedSettings.getBOOL("EditLinkedParts") )
+		if( elapsed_time > UPDATE_DELAY && !ALControlCache::EditLinkedParts )
 		{
 			LLSelectMgr::getInstance()->sendMultipleUpdate( update_flags );
 			update_timer.reset();
@@ -1552,12 +1552,12 @@ void LLManipScale::updateSnapGuides(const LLBBox& bbox)
 
 void LLManipScale::renderSnapGuides(const LLBBox& bbox)
 {
-	if (!gSavedSettings.getBOOL("SnapEnabled"))
+	if (!ALControlCache::SnapEnabled)
 	{
 		return;
 	}
 
-	F32 grid_alpha = gSavedSettings.getF32("GridOpacity");
+	F32 grid_alpha = ALControlCache::GridOpacity;
 
 	F32 max_point_on_scale_line = partToMaxScale(mManipPart, bbox);
 	LLVector3 drag_point = gAgent.getPosAgentFromGlobal(mDragPointGlobal);
@@ -1746,7 +1746,7 @@ void LLManipScale::renderSnapGuides(const LLBBox& bbox)
 		start_tick = -(llmin(ticks_from_scale_center_1, num_ticks_per_side1));
 		stop_tick = llmin(max_ticks1, num_ticks_per_side1);
 
-		F32 grid_resolution = mObjectSelection->getSelectType() == SELECT_TYPE_HUD ? 0.25f : llmax(gSavedSettings.getF32("GridResolution"), 0.001f);
+		F32 grid_resolution = mObjectSelection->getSelectType() == SELECT_TYPE_HUD ? 0.25f : llmax<F32>(ALControlCache::GridResolution, 0.001f);
 		S32 label_sub_div_offset_1 = ll_round(fmod(dist_grid_axis - grid_offset1, mScaleSnapUnit1  * 32.f) / smallest_subdivision1);
 		S32 label_sub_div_offset_2 = ll_round(fmod(dist_grid_axis - grid_offset2, mScaleSnapUnit2  * 32.f) / smallest_subdivision2);
 

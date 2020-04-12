@@ -628,7 +628,7 @@ void LLScreenChannel::showToastsBottom()
 			}
 
 			bottom = toast->getRect().mTop - toast->getTopPad();
-			toast_margin = gSavedSettings.getS32("ToastGap");
+			toast_margin = ALControlCache::ToastGap;
 		}
 
 		LLToast* toast = it->getToast();
@@ -671,7 +671,7 @@ void LLScreenChannel::showToastsBottom()
 		{
 			if( it != vToastList.rend()-1)
 			{
-				S32 toast_top = toast->getRect().mTop + gSavedSettings.getS32("ToastGap");
+				S32 toast_top = toast->getRect().mTop + ALControlCache::ToastGap;
 				stop_showing_toasts = toast_top > getRect().mTop;
 			}
 		} 
@@ -740,7 +740,7 @@ void LLScreenChannel::showToastsCentre()
 		}
 
 		toast_rect = toast->getRect();
-		toast_rect.setLeftTopAndSize(getRect().mLeft - toast_rect.getWidth() / 2, bottom + toast_rect.getHeight() / 2 + gSavedSettings.getS32("ToastGap"), toast_rect.getWidth() ,toast_rect.getHeight());
+		toast_rect.setLeftTopAndSize(getRect().mLeft - toast_rect.getWidth() / 2, bottom + toast_rect.getHeight() / 2 + ALControlCache::ToastGap, toast_rect.getWidth() ,toast_rect.getHeight());
 		toast->setRect(toast_rect);
 
 		toast->setVisible(TRUE);
@@ -776,7 +776,6 @@ void LLScreenChannel::showToastsTop()
 			}
 
 			top = toast->getRect().mBottom - toast->getTopPad();
-			gSavedSettings.getS32("ToastGap");
 		}
 
 		LLToast* toast = it->getToast();
@@ -819,7 +818,7 @@ void LLScreenChannel::showToastsTop()
 		{
 			if( it != vToastList.rend()-1)
 			{
-				S32 toast_bottom = toast->getRect().mBottom - gSavedSettings.getS32("ToastGap");
+				S32 toast_bottom = toast->getRect().mBottom - ALControlCache::ToastGap;
 				stop_showing_toasts = toast_bottom < channel_rect.mBottom;
 			}
 		} 
@@ -902,7 +901,7 @@ void LLScreenChannel::createStartUpToast(S32 notif_num, F32 timer)
 	text_box->reshapeToFitText();
 	text_box->setOrigin(text_box->getRect().mLeft, (wrapper_panel->getRect().getHeight() - text_box->getRect().getHeight())/2);
 
-	toast_rect.setLeftTopAndSize(0, getRect().getHeight() - gSavedSettings.getS32("ToastGap"), getRect().getWidth(), toast_rect.getHeight());
+	toast_rect.setLeftTopAndSize(0, getRect().getHeight() - ALControlCache::ToastGap, getRect().getWidth(), toast_rect.getHeight());
 	mStartUpToastPanel->setRect(toast_rect);
 
 	addChild(mStartUpToastPanel);

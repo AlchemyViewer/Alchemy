@@ -464,7 +464,7 @@ LLObjectSelectionHandle LLSelectMgr::selectObjectAndFamily(LLViewerObject* obj, 
 	root->resetRot();
 
 	// leave component mode
-	if (gSavedSettings.getBOOL("EditLinkedParts"))
+	if (ALControlCache::EditLinkedParts)
 	{
 		gSavedSettings.setBOOL("EditLinkedParts", FALSE);
 		promoteSelectionToRoot();
@@ -534,7 +534,7 @@ LLObjectSelectionHandle LLSelectMgr::selectObjectAndFamily(const std::vector<LLV
 	}
 
 	// leave component mode
-	if (gSavedSettings.getBOOL("EditLinkedParts"))
+	if (ALControlCache::EditLinkedParts)
 	{		
 		gSavedSettings.setBOOL("EditLinkedParts", FALSE);
 		promoteSelectionToRoot();
@@ -709,7 +709,7 @@ bool LLSelectMgr::enableLinkObjects()
 	// user can modify at least one of the selected objects.
 
 	// in component mode, can't link
-	if (!gSavedSettings.getBOOL("EditLinkedParts"))
+	if (!ALControlCache::EditLinkedParts)
 	{
 		if(LLSelectMgr::getInstance()->selectGetAllRootsValid() && LLSelectMgr::getInstance()->getSelection()->getRootObjectCount() >= 2)
 		{
@@ -1231,7 +1231,7 @@ LLObjectSelectionHandle LLSelectMgr::selectHighlightedObjects()
 
 void LLSelectMgr::deselectHighlightedObjects()
 {
-	BOOL select_linked_set = !gSavedSettings.getBOOL("EditLinkedParts");
+	BOOL select_linked_set = !ALControlCache::EditLinkedParts;
 	for (std::set<LLPointer<LLViewerObject> >::iterator iter = mRectSelectedObjects.begin();
 		 iter != mRectSelectedObjects.end(); iter++)
 	{
@@ -1367,7 +1367,7 @@ void LLSelectMgr::getGrid(LLVector3& origin, LLQuaternion &rotation, LLVector3 &
 				LLXform* attachment_point_xform = first_object->getRootEdit()->mDrawable->mXform.getParent();
 				mGridOrigin = attachment_point_xform->getWorldPosition();
 				mGridRotation = attachment_point_xform->getWorldRotation();
-				mGridScale = LLVector3(1.f, 1.f, 1.f) * gSavedSettings.getF32("GridResolution");
+				mGridScale = LLVector3(1.f, 1.f, 1.f) * ALControlCache::GridResolution;
 			}
 			break;
 		case SELECT_TYPE_HUD:
@@ -1375,7 +1375,7 @@ void LLSelectMgr::getGrid(LLVector3& origin, LLQuaternion &rotation, LLVector3 &
 			mGridScale = LLVector3(0.25f, 0.25f, 0.25f);
 			break;
 		case SELECT_TYPE_WORLD:
-			mGridScale = LLVector3(1.f, 1.f, 1.f) * gSavedSettings.getF32("GridResolution");
+			mGridScale = LLVector3(1.f, 1.f, 1.f) * ALControlCache::GridResolution;
 			break;
 		}
 	}
@@ -3309,7 +3309,7 @@ private:
 
 void LLSelectMgr::getFirst(LLSelectGetFirstTest* test)
 {
-	if (gSavedSettings.getBOOL("EditLinkedParts"))
+	if (ALControlCache::EditLinkedParts)
 	{
 		for (LLObjectSelection::valid_iterator iter = getSelection()->valid_begin();
 			iter != getSelection()->valid_end(); ++iter )
@@ -3779,7 +3779,7 @@ BOOL LLSelectMgr::selectGetEditMoveLinksetPermissions(bool &move, bool &modify)
 {
     move = true;
     modify = true;
-    bool selecting_linked_set = !gSavedSettings.getBOOL("EditLinkedParts");
+    bool selecting_linked_set = !ALControlCache::EditLinkedParts;
 
     for (LLObjectSelection::iterator iter = getSelection()->begin();
         iter != getSelection()->end(); iter++)
@@ -4178,7 +4178,7 @@ void LLSelectMgr::sendMultipleUpdate(U32 type)
 {
 	if (type == UPD_NONE) return;
 	// send individual updates when selecting textures or individual objects
-	ESendType send_type = (!gSavedSettings.getBOOL("EditLinkedParts") && !getTEMode()) ? SEND_ONLY_ROOTS : SEND_ROOTS_FIRST;
+	ESendType send_type = (!ALControlCache::EditLinkedParts && !getTEMode()) ? SEND_ONLY_ROOTS : SEND_ROOTS_FIRST;
 	if (send_type == SEND_ONLY_ROOTS)
 	{
 		// tell simulator to apply to whole linked sets
@@ -4494,7 +4494,7 @@ void LLSelectMgr::deselectAllIfTooFar()
 	static RlvCachedBehaviourModifier<float> s_nFartouchDist(RLV_MODIFIER_FARTOUCHDIST);
 
 	BOOL fRlvFartouch = gRlvHandler.hasBehaviour(RLV_BHVR_FARTOUCH) && LLToolMgr::instance().inEdit();
-	if ( (gSavedSettings.getBOOL("LimitSelectDistance") || (fRlvFartouch) )
+	if ( (ALControlCache::LimitSelectDistance || (fRlvFartouch) )
 // [/RLVa:KB]
 		&& (!mSelectedObjects->getPrimaryObject() || !mSelectedObjects->getPrimaryObject()->isAvatar())
 		&& (mSelectedObjects->getPrimaryObject() != LLViewerMediaFocus::getInstance()->getFocusedObject())
@@ -5746,7 +5746,7 @@ void LLSelectMgr::updateSilhouettes()
 		// persists from frame to frame to avoid regenerating object silhouettes
 		// mHighlightedObjects includes all siblings of rect selected objects
 
-		BOOL select_linked_set = !gSavedSettings.getBOOL("EditLinkedParts");
+		BOOL select_linked_set = !ALControlCache::EditLinkedParts;
 
 		// generate list of roots from current object selection
 		for (std::set<LLPointer<LLViewerObject> >::iterator iter = mRectSelectedObjects.begin();
@@ -7043,7 +7043,7 @@ BOOL LLSelectMgr::canUndo() const
 //-----------------------------------------------------------------------------
 void LLSelectMgr::undo()
 {
-	BOOL select_linked_set = !gSavedSettings.getBOOL("EditLinkedParts");
+	BOOL select_linked_set = !ALControlCache::EditLinkedParts;
 	LLUUID group_id(gAgent.getGroupID());
 	sendListToRegions("Undo", packAgentAndSessionAndGroupID, packObjectID, logNoOp, &group_id, select_linked_set ? SEND_ONLY_ROOTS : SEND_CHILDREN_FIRST);
 }
@@ -7061,7 +7061,7 @@ BOOL LLSelectMgr::canRedo() const
 //-----------------------------------------------------------------------------
 void LLSelectMgr::redo()
 {
-	BOOL select_linked_set = !gSavedSettings.getBOOL("EditLinkedParts");
+	BOOL select_linked_set = !ALControlCache::EditLinkedParts;
 	LLUUID group_id(gAgent.getGroupID());
 	sendListToRegions("Redo", packAgentAndSessionAndGroupID, packObjectID, logNoOp, &group_id, select_linked_set ? SEND_ONLY_ROOTS : SEND_CHILDREN_FIRST);
 }
@@ -8035,7 +8035,7 @@ bool LLSelectMgr::selectionMove(const LLVector3& displ,
 	bool update_success = true;
 	bool update_position = update_type & UPD_POSITION;
 	bool update_rotation = update_type & UPD_ROTATION;
-	const bool noedit_linked_parts = !gSavedSettings.getBOOL("EditLinkedParts");
+	const bool noedit_linked_parts = !ALControlCache::EditLinkedParts;
 	
 	if (update_position)
 	{
@@ -8168,7 +8168,7 @@ void LLSelectMgr::sendSelectionMove()
 	S32 objects_in_this_packet = 0;
 
 	// apply to linked objects if unable to select their individual parts 
-	if (!gSavedSettings.getBOOL("EditLinkedParts") && !getTEMode())
+	if (!ALControlCache::EditLinkedParts && !getTEMode())
 	{
 		// tell simulator to apply to whole linked sets
 		update_type |= UPD_LINKED_SETS;

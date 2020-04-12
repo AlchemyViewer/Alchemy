@@ -293,7 +293,7 @@ LLObjectSelectionHandle LLToolSelect::handleObjectSelection(const LLPickInfo& pi
 
 BOOL LLToolSelect::handleMouseUp(S32 x, S32 y, MASK mask)
 {
-	mIgnoreGroup = gSavedSettings.getBOOL("EditLinkedParts");
+	mIgnoreGroup = ALControlCache::EditLinkedParts;
 
 	handleObjectSelection(mPick, mIgnoreGroup, FALSE);
 

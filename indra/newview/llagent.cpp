@@ -2668,7 +2668,7 @@ void LLAgent::handlePreferredMaturityResult(U8 pServerMaturity)
 		{
 			mMaturityPreferenceNumRetries = 0;
 			reportPreferredMaturitySuccess();
-			llassert(static_cast<U8>(gSavedSettings.getU32("PreferredMaturity")) == mLastKnownResponseMaturity);
+			llassert(static_cast<U8>(ALControlCache::PreferredMaturity) == mLastKnownResponseMaturity);
 		}
 		// Else, the viewer is out of sync with the server, so let's try to re-sync with the
 		// server by re-sending our last known request.  Cap the re-tries at 3 just to be safe.
@@ -2752,7 +2752,7 @@ void LLAgent::reportPreferredMaturityError()
 
 	// Check the saved settings to ensure that we are consistent.  If we are not consistent, update
 	// the viewer, but do not send anything to server
-	U8 localMaturity = static_cast<U8>(gSavedSettings.getU32("PreferredMaturity"));
+	U8 localMaturity = static_cast<U8>(ALControlCache::PreferredMaturity);
 	if (localMaturity != mLastKnownResponseMaturity)
 	{
 		bool tmpIsDoSendMaturityPreferenceToServer = mIsDoSendMaturityPreferenceToServer;

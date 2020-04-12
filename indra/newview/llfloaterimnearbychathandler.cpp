@@ -297,7 +297,7 @@ void LLFloaterIMNearbyChatScreenChannel::addChat(LLSD& chat)
 	}
 	LLRect channel_rect;
 	mFloaterSnapRegion->localRectToOtherView(mFloaterSnapRegion->getLocalRect(), &channel_rect, gFloaterView);
-	chat["available_height"] = channel_rect.getHeight() - channel_rect.mBottom - gSavedSettings.getS32("ToastGap") - 110;;
+	chat["available_height"] = channel_rect.getHeight() - channel_rect.mBottom - ALControlCache::ToastGap - 110;;
 
 	/*
     find last toast and check ID
@@ -405,7 +405,7 @@ void LLFloaterIMNearbyChatScreenChannel::arrangeToasts()
 	S32 channel_bottom = channel_rect.mBottom;
 
 	S32		bottom = channel_bottom + 80;
-	S32		margin = gSavedSettings.getS32("ToastGap");
+	S32		margin = ALControlCache::ToastGap;
 
 	//sort active toasts
 	std::sort(m_active_toasts.begin(),m_active_toasts.end(),sort_toasts_predicate);

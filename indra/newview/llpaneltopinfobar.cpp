@@ -287,7 +287,7 @@ void LLPanelTopInfoBar::updateParcelIcons()
 	if (!agent_region || !agent_parcel)
 		return;
 
-	if (gSavedSettings.getBOOL("NavBarShowParcelProperties"))
+	if (ALControlCache::NavBarShowParcelProperties)
 	{
 		LLParcel* current_parcel;
 		LLViewerRegion* selection_region = vpm->getSelectionRegion();
@@ -340,10 +340,8 @@ void LLPanelTopInfoBar::updateParcelIcons()
 
 void LLPanelTopInfoBar::updateHealth()
 {
-	static LLUICachedControl<bool> show_icons("NavBarShowParcelProperties", false);
-
 	// *FIXME: Status bar owns health information, should be in agent
-	if (show_icons && gStatusBar)
+	if (ALControlCache::NavBarShowParcelProperties && gStatusBar)
 	{
 		static S32 last_health = -1;
 		S32 health = gStatusBar->getHealth();

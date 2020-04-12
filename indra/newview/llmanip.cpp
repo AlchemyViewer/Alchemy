@@ -593,7 +593,7 @@ LLColor4 LLManip::setupSnapGuideRenderPass(S32 pass)
 	static LLColor4 grid_color_shadow = LLUIColorTable::instance().getColor("GridlineShadowColor");
 
 	LLColor4 line_color;
-	F32 line_alpha = gSavedSettings.getF32("GridOpacity");
+	F32 line_alpha = ALControlCache::GridOpacity;
 
 	switch(pass)
 	{

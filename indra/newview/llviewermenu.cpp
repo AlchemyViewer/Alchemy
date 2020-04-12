@@ -5258,7 +5258,7 @@ class LLToolsSnapObjectXY : public view_listener_t
 {
 	bool handleEvent(const LLSD& userdata)
 	{
-		F64 snap_size = (F64)gSavedSettings.getF32("GridResolution");
+		F64 snap_size = (F64)ALControlCache::GridResolution;
 
 		for (LLObjectSelection::root_iterator iter = LLSelectMgr::getInstance()->getSelection()->root_begin();
 			 iter != LLSelectMgr::getInstance()->getSelection()->root_end(); iter++)
@@ -5306,7 +5306,7 @@ class LLToolsEnableSelectNextPart : public view_listener_t
 	bool handleEvent(const LLSD& userdata)
 	{
         bool new_value = (!LLSelectMgr::getInstance()->getSelection()->isEmpty()
-                          && (gSavedSettings.getBOOL("EditLinkedParts")
+                          && (ALControlCache::EditLinkedParts
                               || LLToolFace::getInstance() == LLToolMgr::getInstance()->getCurrentTool()));
 		return new_value;
 	}
@@ -5320,7 +5320,7 @@ class LLToolsSelectNextPartFace : public view_listener_t
     bool handleEvent(const LLSD& userdata)
     {
         bool cycle_faces = LLToolFace::getInstance() == LLToolMgr::getInstance()->getCurrentTool();
-        bool cycle_linked = gSavedSettings.getBOOL("EditLinkedParts");
+        bool cycle_linked = ALControlCache::EditLinkedParts;
 
         if (!cycle_faces && !cycle_linked)
         {

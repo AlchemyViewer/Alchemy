@@ -639,7 +639,7 @@ void LLToolGrabBase::handleHoverActive(S32 x, S32 y, MASK mask)
 			BOOL snap_on = gSavedSettings.getBOOL("SnapEnabled");
 			if (snap_on && !gGrabTransientTool)
 			{
-				F64	snap_size = gSavedSettings.getF32("GridResolution");
+				F64	snap_size = ALControlCache::GridResolution;
 				U8 snap_dimensions = (mVerticalDragging ? 3 : 2);
 
 				for (U8 i = 0; i < snap_dimensions; i++)
