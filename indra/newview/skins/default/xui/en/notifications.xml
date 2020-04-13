@@ -192,7 +192,7 @@ No tutorial is currently available.
    icon="alertmodal.tga"
    name="BadInstallation"
    type="alertmodal">
- An error occurred while updating [APP_NAME].  Please [http://get.secondlife.com download the latest version] of the Viewer.
+ An error occurred while updating [APP_NAME].  Please [https://www.alchemyviewer.org/pages/downloads.html download the latest version] of the Viewer.
     <tag>fail</tag>
     <usetemplate
      name="okbutton"
@@ -4021,7 +4021,7 @@ Finished download of raw terrain file to:
    name="RequiredUpdate"
    type="alertmodal">
 Version [VERSION] is required for login.
-Please download from https://secondlife.com/support/downloads/
+Please download from https://www.alchemyviewer.org/pages/downloads.html
     <tag>confirm</tag>
     <usetemplate
      name="okbutton"

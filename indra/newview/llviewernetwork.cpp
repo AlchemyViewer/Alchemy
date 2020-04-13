@@ -67,7 +67,7 @@ const std::string DEFAULT_LOGIN_PAGE = "https://viewer-splash.secondlife.com/";
 
 const std::string MAIN_GRID_LOGIN_URI = "https://login.agni.lindenlab.com/cgi-bin/login.cgi";
 
-const std::string SL_UPDATE_QUERY_URL = "https://update.secondlife.com/update";
+const std::string SL_UPDATE_QUERY_URL = "https://app.alchemyviewer.org/update";
 
 const std::string MAIN_GRID_SLURL_BASE = "http://maps.secondlife.com/secondlife/";
 const std::string SYSTEM_GRID_APP_SLURL_BASE = "secondlife:///app";
