@@ -385,7 +385,7 @@ std::string LLDir::buildSLOSCacheDir() const
 	}
 	else
 	{
-		res = add(getOSCacheDir(), "SecondLife");
+		res = add(getOSCacheDir(), "AlchemyNext");
 	}
 	return res;
 }
