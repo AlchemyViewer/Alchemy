@@ -492,7 +492,7 @@ class WindowsManifest(ViewerManifest):
 
             with self.prefix(dst="vmp_icons"):
                 with self.prefix(src=self.icon_path()):
-                    self.path("secondlife.ico")
+                    self.path("alchemy.ico")
                 #VMP  Tkinter icons
                 with self.prefix(src="vmp_icons"):
                     self.path("*.png")
@@ -941,13 +941,13 @@ class DarwinManifest(ViewerManifest):
 
                 # need .icns file referenced by Info.plist
                 with self.prefix(src=self.icon_path(), dst="") :
-                    self.path("secondlife.icns")
+                    self.path("alchemy.icns")
 
                 # Copy in the updater script and helper modules
                 self.path(src=os.path.join(pkgdir, 'VMP'), dst="updater")
 
                 with self.prefix(src="", dst=os.path.join("updater", "icons")):
-                    self.path2basename(self.icon_path(), "secondlife.ico")
+                    self.path2basename(self.icon_path(), "alchemy.ico")
                     with self.prefix(src="vmp_icons", dst=""):
                         self.path("*.png")
                         self.path("*.gif")
@@ -1386,9 +1386,9 @@ class LinuxManifest(ViewerManifest):
         icon_path = self.icon_path()
         print "DEBUG: icon_path '%s'" % icon_path
         with self.prefix(src=icon_path) :
-            self.path("secondlife_256.png","secondlife_icon.png")
+            self.path("alchemy_256.png","alchemy_icon.png")
             with self.prefix(dst="res-sdl") :
-                self.path("secondlife_256.BMP","ll_icon.BMP")
+                self.path("alchemy_256.BMP","ll_icon.BMP")
 
         # plugins
         with self.prefix(src="../media_plugins", dst="bin/llplugin"):
