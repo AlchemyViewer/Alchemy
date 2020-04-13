@@ -18,6 +18,7 @@ struct ALControlCache
 	static bool		MapShowLandForSale;
 	static bool		MapShowPeople;
 	static bool		MapShowTelehubs;
+	static F32		MaxSelectDistance;
 	static bool		NavBarShowParcelProperties;
 	static F32		NearMeRange;
 	static U32		PreferredMaturity;

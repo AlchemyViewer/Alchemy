@@ -332,7 +332,7 @@ void LLViewerCamera::setPerspective(BOOL for_selection,
 		if (limit_select_distance)
 		{
 			// ...select distance from control
-			z_far = gSavedSettings.getF32("MaxSelectDistance");
+			z_far = ALControlCache::MaxSelectDistance;
 		}
 		else
 		{

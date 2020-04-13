@@ -4501,9 +4501,9 @@ void LLSelectMgr::deselectAllIfTooFar()
 		&& !mSelectedObjects->isAttachment()
 		&& !selectionCenter.isExactlyZero())
 	{
-//		F32 deselect_dist = gSavedSettings.getF32("MaxSelectDistance");
+//		F32 deselect_dist = ALControlCache::MaxSelectDistance;
 // [RLVa:KB] - Checked: 2010-04-11 (RLVa-1.2.0e) | Modified: RLVa-0.2.0f
-		F32 deselect_dist = (!fRlvFartouch) ? gSavedSettings.getF32("MaxSelectDistance") : s_nFartouchDist;
+		F32 deselect_dist = (!fRlvFartouch) ? ALControlCache::MaxSelectDistance : s_nFartouchDist;
 // [/RLVa:KB]
 		F32 deselect_dist_sq = deselect_dist * deselect_dist;
 

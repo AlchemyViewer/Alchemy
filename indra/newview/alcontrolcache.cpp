@@ -16,6 +16,7 @@ bool ALControlCache::MapShowEvents;
 bool ALControlCache::MapShowLandForSale;
 bool ALControlCache::MapShowPeople;
 bool ALControlCache::MapShowTelehubs;
+F32  ALControlCache::MaxSelectDistance = 512.f;
 bool ALControlCache::NavBarShowParcelProperties = true;
 F32	 ALControlCache::NearMeRange = 4096.f;
 U32  ALControlCache::PreferredMaturity;
@@ -65,6 +66,7 @@ void ALControlCache::initControls()
 	DECLARE_CTRL_BOOL(MapShowLandForSale);
 	DECLARE_CTRL_BOOL(MapShowPeople);
 	DECLARE_CTRL_BOOL(MapShowTelehubs);
+	DECLARE_CTRL_F32(MaxSelectDistance);
 	DECLARE_CTRL_BOOL(NavBarShowParcelProperties);
 	DECLARE_CTRL_F32(NearMeRange);
 	DECLARE_CTRL_U32(PreferredMaturity);

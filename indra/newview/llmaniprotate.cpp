@@ -1197,7 +1197,7 @@ BOOL LLManipRotate::updateVisiblity()
 			// Don't drag manip if object too far away
 			if (ALControlCache::LimitSelectDistance)
 			{
-				F32 max_select_distance = gSavedSettings.getF32("MaxSelectDistance");
+				F32 max_select_distance = ALControlCache::MaxSelectDistance;
 				if (dist_vec_squared(gAgent.getPositionAgent(), center) > (max_select_distance * max_select_distance))
 				{
 					visible = FALSE;
