@@ -40,6 +40,7 @@ class LLQuaternion;
 class LLUUID;
 class LLVector3;
 class LLVector3d;
+class LLVector4;
 class LLXmlTreeNode;
 class LLXmlTreeParser;
 
@@ -119,6 +120,7 @@ public:
 	BOOL			getFastAttributeColor4U(	LLStdStringHandle cannonical_name, LLColor4U& value );
 	BOOL			getFastAttributeVector3(	LLStdStringHandle cannonical_name, LLVector3& value );
 	BOOL			getFastAttributeVector3d(	LLStdStringHandle cannonical_name, LLVector3d& value );
+	BOOL			getFastAttributeVector4(	LLStdStringHandle cannonical_name, LLVector4& value );
 	BOOL			getFastAttributeQuat(		LLStdStringHandle cannonical_name, LLQuaternion& value );
 	BOOL			getFastAttributeUUID(		LLStdStringHandle cannonical_name, LLUUID& value );
 	BOOL			getFastAttributeString(		LLStdStringHandle cannonical_name, std::string& value );
@@ -138,6 +140,7 @@ public:
 	virtual BOOL		getAttributeColor4U(	const std::string& name, LLColor4U& value );
 	virtual BOOL		getAttributeVector3(	const std::string& name, LLVector3& value );
 	virtual BOOL		getAttributeVector3d(	const std::string& name, LLVector3d& value );
+	virtual BOOL		getAttributeVector4(	const std::string& name, LLVector4& value );
 	virtual BOOL		getAttributeQuat(		const std::string& name, LLQuaternion& value );
 	virtual BOOL		getAttributeUUID(		const std::string& name, LLUUID& value );
 	virtual BOOL		getAttributeString(		const std::string& name, std::string& value );

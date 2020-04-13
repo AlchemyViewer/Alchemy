@@ -283,6 +283,12 @@ BOOL LLXmlTreeNode::getFastAttributeVector3d(LLStdStringHandle canonical_name, L
 	return s ? LLVector3d::parseVector3d(*s,  &value ) : FALSE;
 }
 
+BOOL LLXmlTreeNode::getFastAttributeVector4(LLStdStringHandle canonical_name, LLVector4& value)
+{
+	const std::string* s = getAttribute(canonical_name);
+	return s ? LLVector4::parseVector4(*s, &value) : FALSE;
+}
+
 BOOL LLXmlTreeNode::getFastAttributeQuat(LLStdStringHandle canonical_name, LLQuaternion& value)
 {
 	const std::string *s = getAttribute( canonical_name );
@@ -392,6 +398,12 @@ BOOL LLXmlTreeNode::getAttributeVector3d(const std::string& name, LLVector3d& va
 {
 	LLStdStringHandle canonical_name = LLXmlTree::sAttributeKeys.addString( name );
 	return getFastAttributeVector3d(canonical_name, value);
+}
+
+BOOL LLXmlTreeNode::getAttributeVector4(const std::string& name, LLVector4& value)
+{
+	LLStdStringHandle canonical_name = LLXmlTree::sAttributeKeys.addString(name);
+	return getFastAttributeVector4(canonical_name, value);
 }
 
 BOOL LLXmlTreeNode::getAttributeQuat(const std::string& name, LLQuaternion& value)

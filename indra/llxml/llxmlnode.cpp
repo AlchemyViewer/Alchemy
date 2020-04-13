@@ -1386,6 +1386,12 @@ BOOL LLXMLNode::getAttributeVector3d(const char* name, LLVector3d& value )
 	return (getAttribute(name, node) && node->getDoubleValue(3, value.mdV));
 }
 
+BOOL LLXMLNode::getAttributeVector4(const char* name, LLVector4& value)
+{
+	LLXMLNodePtr node;
+	return (getAttribute(name, node) && node->getFloatValue(4, value.mV));
+}
+
 BOOL LLXMLNode::getAttributeQuat(const char* name, LLQuaternion& value )
 {
 	LLXMLNodePtr node;

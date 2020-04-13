@@ -201,6 +201,7 @@ public:
 	BOOL getAttributeColor4U(const char* name, LLColor4U& value );
 	BOOL getAttributeVector3(const char* name, LLVector3& value );
 	BOOL getAttributeVector3d(const char* name, LLVector3d& value );
+	BOOL getAttributeVector4(const char* name, LLVector4& value);
 	BOOL getAttributeQuat(const char* name, LLQuaternion& value );
 	BOOL getAttributeUUID(const char* name, LLUUID& value );
 	BOOL getAttributeString(const char* name, std::string& value );

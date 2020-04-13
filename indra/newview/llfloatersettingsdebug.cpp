@@ -114,11 +114,13 @@ void LLFloaterSettingsDebug::onCommitSettings()
 
 	LLVector3 vector;
 	LLVector3d vectord;
+	LLVector4 vector4;
 	LLRect rect;
 	LLColor4 col4;
 	LLColor3 col3;
 	LLColor4U col4U;
 	LLColor4 color_with_alpha;
+	LLUUID uuid;
 
 	switch(controlp->type())
 	{		
@@ -149,6 +151,13 @@ void LLFloaterSettingsDebug::onCommitSettings()
 		vectord.mdV[VZ] = getChild<LLUICtrl>("val_spinner_3")->getValue().asReal();
 		controlp->set(vectord.getValue());
 		break;
+	  case TYPE_VEC4:
+		vector4.mV[VX] = getChild<LLUICtrl>("val_spinner_1")->getValue().asReal();
+		vector4.mV[VY] = getChild<LLUICtrl>("val_spinner_2")->getValue().asReal();
+		vector4.mV[VZ] = getChild<LLUICtrl>("val_spinner_3")->getValue().asReal();
+		vector4.mV[VW] = getChild<LLUICtrl>("val_spinner_3")->getValue().asReal();
+		controlp->set(vector4.getValue());
+		break;
 	  case TYPE_RECT:
 		rect.mLeft = getChild<LLUICtrl>("val_spinner_1")->getValue().asInteger();
 		rect.mRight = getChild<LLUICtrl>("val_spinner_2")->getValue().asInteger();
@@ -167,6 +176,10 @@ void LLFloaterSettingsDebug::onCommitSettings()
 		//col3.mV[VGREEN] = (F32)floaterp->getChild<LLUICtrl>("val_spinner_2")->getValue().asReal();
 		//col3.mV[VBLUE] = (F32)floaterp->getChild<LLUICtrl>("val_spinner_3")->getValue().asReal();
 		//controlp->set(col3.getValue());
+		break;
+	  case TYPE_UUID:
+		LLUUID::parseUUID(getChild<LLUICtrl>("val_text")->getValue().asString(), &uuid);
+		controlp->set(LLSD(uuid));
 		break;
 	  default:
 		break;
@@ -368,6 +381,40 @@ void LLFloaterSettingsDebug::updateControl(LLControlVariable* controlp)
 			}
 			break;
 		  }
+		  case TYPE_VEC4:
+		  {
+			LLVector4 v;
+			v.setValue(sd);
+			spinner1->setVisible(TRUE);
+			spinner1->setLabel(std::string("X"));
+			spinner2->setVisible(TRUE);
+			spinner2->setLabel(std::string("Y"));
+			spinner3->setVisible(TRUE);
+			spinner3->setLabel(std::string("Z"));
+			spinner4->setVisible(TRUE);
+			spinner4->setLabel(std::string("W"));
+			if (!spinner1->hasFocus())
+			{
+				spinner1->setPrecision(3);
+				spinner1->setValue(v[VX]);
+			}
+			if (!spinner2->hasFocus())
+			{
+				spinner2->setPrecision(3);
+				spinner2->setValue(v[VY]);
+			}
+			if (!spinner3->hasFocus())
+			{
+				spinner3->setPrecision(3);
+				spinner3->setValue(v[VZ]);
+			}
+			if (!spinner4->hasFocus())
+			{
+				spinner4->setPrecision(3);
+				spinner4->setValue(v[VW]);
+			}
+			break;
+		  }
 		  case TYPE_RECT:
 		  {
 			LLRect r;
@@ -447,6 +494,13 @@ void LLFloaterSettingsDebug::updateControl(LLControlVariable* controlp)
 			color_swatch->setValue(sd);
 			break;
 		  }
+		  case TYPE_UUID:
+			getChildView("val_text")->setVisible( TRUE);
+			if (!getChild<LLUICtrl>("val_text")->hasFocus())
+			{
+				getChild<LLUICtrl>("val_text")->setValue(sd);
+			}
+			break;
 // [RLVa:KB] - Patch: RLVa-2.1.0
 		  case TYPE_LLSD:
 			  {

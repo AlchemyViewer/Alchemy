@@ -32,6 +32,7 @@
 
 #include "v3math.h"
 #include "v3dmath.h"
+#include "v4math.h"
 #include "v3color.h"
 #include "v4color.h"
 #include "llrect.h"
@@ -47,11 +48,13 @@ public:
 	virtual std::string	getText(const std::string& name) { return ""; }
 	virtual LLVector3	getVector3(const std::string& name) { return LLVector3(); }
 	virtual LLVector3d	getVector3d(const std::string& name) { return LLVector3d(); }
+	virtual LLVector4	getVector4(const std::string& name) { return LLVector4(); }
 	virtual LLRect		getRect(const std::string& name) { return LLRect(); }
 	virtual BOOL		getBOOL(const std::string& name) { return FALSE; }
 	virtual S32			getS32(const std::string& name) { return 0; }
 	virtual F32			getF32(const std::string& name) {return 0.0f; }
 	virtual U32			getU32(const std::string& name) {return 0; }
+	virtual LLUUID		getUUID(const std::string& name) { return LLUUID(); }
 	virtual LLSD        getLLSD(const std::string& name) { return LLSD(); }
 
 	virtual LLColor4	getColor(const std::string& name) { return LLColor4(); }
@@ -65,8 +68,10 @@ public:
 	virtual void		setString(const std::string&  name, const std::string& val) {}
 	virtual void		setVector3(const std::string& name, const LLVector3 &val) {}
 	virtual void		setVector3d(const std::string& name, const LLVector3d &val) {}
+	virtual void		setVector4(const std::string& name, const LLVector4& val) {}
 	virtual void		setRect(const std::string& name, const LLRect &val) {}
 	virtual void		setColor4(const std::string& name, const LLColor4 &val) {}
+	virtual void		setUUID(const std::string& name, const LLUUID& val) {}
 	virtual void    	setLLSD(const std::string& name, const LLSD& val) {}
 };
 
