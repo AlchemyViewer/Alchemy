@@ -106,7 +106,7 @@ char const * const llallocator_heap_profile_data::sample_win_profile =
 "277152: 82862770 [621961: 168503640] @        2        3        3        7       21       32       87\n"
 "\n"
 "MAPPED_LIBRARIES:\n"
-"00400000-02681000 r-xp 00000000 00:00 0           c:\\proj\\tcmalloc-eval-9\\indra\\build-vc80\\newview\\RelWithDebInfo\\secondlife-bin.exe\n"
+"00400000-02681000 r-xp 00000000 00:00 0           c:\\proj\\tcmalloc-eval-9\\indra\\build-vc80\\newview\\RelWithDebInfo\\alchemy-bin.exe\n"
 "77280000-773a7000 r-xp 00000000 00:00 0           C:\\Windows\\system32\\ntdll.dll\n"
 "76df0000-76ecb000 r-xp 00000000 00:00 0           C:\\Windows\\system32\\kernel32.dll\n"
 "76000000-76073000 r-xp 00000000 00:00 0           C:\\Windows\\system32\\comdlg32.dll\n"

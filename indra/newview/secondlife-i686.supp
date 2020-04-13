@@ -34,7 +34,7 @@
 #   (if you have one), so that the viewer will use the system's
 #   libstdc++.
 # - After you build the viewer, replace the stripped
-#   do-not-directly-run-secondlife-bin binary with an unstripped copy.
+#   do-not-directly-run-alchemy-bin binary with an unstripped copy.
 
 # Mozilla noise.
 

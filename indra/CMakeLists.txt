@@ -79,14 +79,14 @@ elseif (WINDOWS)
 endif (LINUX)
 
 add_subdirectory(${VIEWER_PREFIX}newview)
-add_dependencies(viewer secondlife-bin)
+add_dependencies(viewer alchemy-bin)
 
 add_subdirectory(${VIEWER_PREFIX}doxygen EXCLUDE_FROM_ALL)
 
 # sets the 'startup project' for debugging from visual studio.
 set_property(
     DIRECTORY ${VIEWER_PREFIX}
-    PROPERTY VS_STARTUP_PROJECT secondlife-bin
+    PROPERTY VS_STARTUP_PROJECT alchemy-bin
     )
 
 if (LL_TESTS)
