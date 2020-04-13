@@ -35,6 +35,12 @@
 
 // LLVector4
 
+// WARNING: Don't use these for global const definitions!
+// For example: 
+//		const LLQuaternion(0.5f * F_PI, LLVector3d::zero);
+// at the top of a *.cpp file might not give you what you think.
+const LLVector4 LLVector4::zero(0.f, 0.f, 0.f, 0.f);
+
 // Axis-Angle rotations
 
 /*
@@ -101,6 +107,24 @@ std::ostream& operator<<(std::ostream& s, const LLVector4 &a)
 	return s;
 }
 
+
+BOOL LLVector4::parseVector4(const std::string& buf, LLVector4* value)
+{
+	if (buf.empty() || value == NULL)
+	{
+		return FALSE;
+	}
+
+	LLVector4 v;
+	S32 count = sscanf(buf.c_str(), "%lf %lf %lf %lf", v.mV + 0, v.mV + 1, v.mV + 2, v.mV + 3);
+	if (4 == count)
+	{
+		value->setVec(v);
+		return TRUE;
+	}
+
+	return FALSE;
+}
 
 // Non-member functions
 
