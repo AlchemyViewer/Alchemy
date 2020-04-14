@@ -492,7 +492,7 @@ class WindowsManifest(ViewerManifest):
 
             with self.prefix(dst="vmp_icons"):
                 with self.prefix(src=self.icon_path()):
-                    self.path("alchemy.ico")
+                    self.path(src="alchemy.ico", dst="secondlife.ico")
                 #VMP  Tkinter icons
                 with self.prefix(src="vmp_icons"):
                     self.path("*.png")
