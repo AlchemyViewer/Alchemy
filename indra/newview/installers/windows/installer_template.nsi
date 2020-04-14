@@ -341,14 +341,10 @@ StrCpy $INSTSHORTCUT "${SHORTCUT}"
 
 Call CheckIfAdministrator		# Make sure the user can install/uninstall
 Call CloseSecondLife			# Make sure Second Life not currently running
-Call CheckWillUninstallV2		# Check if Second Life is already installed
 
 StrCmp $DO_UNINSTALL_V2 "" PRESERVE_DONE
 PRESERVE_DONE:
 
-# Viewer had "SLLauncher" for some time and we was seting "IsHostApp" for viewer, make sure to clean it up
-DeleteRegValue HKEY_CLASSES_ROOT "Applications\$VIEWER_EXE" "IsHostApp"
-DeleteRegValue HKEY_CLASSES_ROOT "Applications\$VIEWER_EXE" "NoStartPage"
 ClearErrors
 
 Call RemoveProgFilesOnInst		# Remove existing files to prevent certain errors when running the new version of the viewer
@@ -392,10 +388,10 @@ WriteRegStr SHELL_CONTEXT "${INSTNAME_KEY}" "" "$INSTDIR"
 WriteRegStr SHELL_CONTEXT "${INSTNAME_KEY}" "Version" "${VERSION_LONG}"
 WriteRegStr SHELL_CONTEXT "${INSTNAME_KEY}" "Shortcut" "$INSTSHORTCUT"
 WriteRegStr SHELL_CONTEXT "${INSTNAME_KEY}" "Exe" "$VIEWER_EXE"
-WriteRegStr SHELL_CONTEXT "${MSUNINSTALL_KEY}" "Publisher" "Linden Research, Inc."
-WriteRegStr SHELL_CONTEXT "${MSUNINSTALL_KEY}" "URLInfoAbout" "http://secondlife.com/whatis/"
-WriteRegStr SHELL_CONTEXT "${MSUNINSTALL_KEY}" "URLUpdateInfo" "http://secondlife.com/support/downloads/"
-WriteRegStr SHELL_CONTEXT "${MSUNINSTALL_KEY}" "HelpLink" "https://support.secondlife.com/contact-support/"
+WriteRegStr SHELL_CONTEXT "${MSUNINSTALL_KEY}" "Publisher" "Alchemy Development Group"
+WriteRegStr SHELL_CONTEXT "${MSUNINSTALL_KEY}" "URLInfoAbout" "https://alchemyviewer.org/pages/about.html"
+WriteRegStr SHELL_CONTEXT "${MSUNINSTALL_KEY}" "URLUpdateInfo" "https://alchemyviewer.org/pages/downloads.html"
+WriteRegStr SHELL_CONTEXT "${MSUNINSTALL_KEY}" "HelpLink" "https://alchemyviewer.org/"
 WriteRegStr SHELL_CONTEXT "${MSUNINSTALL_KEY}" "DisplayName" "$INSTNAME"
 WriteRegStr SHELL_CONTEXT "${MSUNINSTALL_KEY}" "UninstallString" '"$INSTDIR\uninst.exe"'
 WriteRegStr SHELL_CONTEXT "${MSUNINSTALL_KEY}" "DisplayVersion" "${VERSION_LONG}"
@@ -403,9 +399,6 @@ WriteRegDWORD SHELL_CONTEXT "${MSUNINSTALL_KEY}" "EstimatedSize" "0x0001D500"		#
 
 # from FS:Ansariel
 WriteRegStr SHELL_CONTEXT "${MSUNINSTALL_KEY}" "DisplayIcon" '"$INSTDIR\$VIEWER_EXE"'
-
-# BUG-2707 Disable SEHOP for installed viewer.
-WriteRegDWORD SHELL_CONTEXT "${MSNTCURRVER_KEY}\Image File Execution Options\$VIEWER_EXE" "DisableExceptionChainValidation" 1
 
 # Write URL registry info
 WriteRegStr HKEY_CLASSES_ROOT "${URLNAME}" "(default)" "URL:Second Life"
@@ -427,14 +420,6 @@ WriteRegStr HKEY_CLASSES_ROOT "Applications\$INSTEXE" "IsHostApp" ""
 
 # Write out uninstaller
 WriteUninstaller "$INSTDIR\uninst.exe"
-
-# Uninstall existing "Second Life Viewer 2" install if needed.
-StrCmp $DO_UNINSTALL_V2 "" REMOVE_SLV2_DONE
-  ExecWait '"$PROGRAMFILES\SecondLifeViewer2\uninst.exe" /S _?=$PROGRAMFILES\SecondLifeViewer2'
-  Delete "$PROGRAMFILES\SecondLifeViewer2\uninst.exe"	# With _? option above, uninst.exe will be left behind.
-  RMDir "$PROGRAMFILES\SecondLifeViewer2"	# Will remove only if empty.
-
-REMOVE_SLV2_DONE:
 
 SectionEnd
 
@@ -515,28 +500,6 @@ Function un.CheckIfAdministrator
         Quit
 lbl_is_admin:
     Return
-
-FunctionEnd
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Function CheckWillUninstallV2               
-;;
-;; If called through auto-update, need to uninstall any existing V2 installation.
-;; Don't want to end up with SecondLifeViewer2 and SecondLifeViewer installations
-;;  existing side by side with no indication on which to use.
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-Function CheckWillUninstallV2
-
-  StrCpy $DO_UNINSTALL_V2 ""
-
-  StrCmp $SKIP_DIALOGS "true" 0 CHECKV2_DONE
-  StrCmp $INSTDIR "$PROGRAMFILES\SecondLifeViewer2" CHECKV2_DONE	# Don't uninstall our own install dir.
-  IfFileExists "$PROGRAMFILES\SecondLifeViewer2\uninst.exe" CHECKV2_FOUND CHECKV2_DONE
-
-CHECKV2_FOUND:
-  StrCpy $DO_UNINSTALL_V2 "true"
-
-CHECKV2_DONE:
 
 FunctionEnd
 
@@ -636,7 +599,7 @@ Push $0
 Push $1
 Push $2
 
-  DetailPrint "Deleting Second Life data files"
+  DetailPrint "Deleting Alchemy data files"
 
   StrCpy $0 0	# Index number used to iterate via EnumRegKey
 
@@ -650,18 +613,18 @@ Push $2
 # Required since ProfileImagePath is of type REG_EXPAND_SZ
     ExpandEnvStrings $2 $2
 
-# Delete files in \Users\<User>\AppData\Roaming\SecondLife
+# Delete files in \Users\<User>\AppData\Roaming\AlchemyNext
 # Remove all settings files but leave any other .txt files to preserve the chat logs
-;    RMDir /r "$2\AppData\Roaming\SecondLife\logs"
-    RMDir /r "$2\AppData\Roaming\SecondLife\browser_profile"
-    RMDir /r "$2\AppData\Roaming\SecondLife\user_settings"
-    Delete  "$2\AppData\Roaming\SecondLife\*.xml"
-    Delete  "$2\AppData\Roaming\SecondLife\*.bmp"
-    Delete  "$2\AppData\Roaming\SecondLife\search_history.txt"
-    Delete  "$2\AppData\Roaming\SecondLife\plugin_cookies.txt"
-    Delete  "$2\AppData\Roaming\SecondLife\typed_locations.txt"
-# Delete files in \Users\<User>\AppData\Local\SecondLife
-    RmDir /r  "$2\AppData\Local\SecondLife"							#Delete the cache folder
+;    RMDir /r "$2\AppData\Roaming\AlchemyNext\logs"
+    RMDir /r "$2\AppData\Roaming\AlchemyNext\browser_profile"
+    RMDir /r "$2\AppData\Roaming\AlchemyNext\user_settings"
+    Delete  "$2\AppData\Roaming\AlchemyNext\*.xml"
+    Delete  "$2\AppData\Roaming\AlchemyNext\*.bmp"
+    Delete  "$2\AppData\Roaming\AlchemyNext\search_history.txt"
+    Delete  "$2\AppData\Roaming\AlchemyNext\plugin_cookies.txt"
+    Delete  "$2\AppData\Roaming\AlchemyNext\typed_locations.txt"
+# Delete files in \Users\<User>\AppData\Local\AlchemyNext
+    RmDir /r  "$2\AppData\Local\AlchemyNext"							#Delete the cache folder
 
   CONTINUE:
     IntOp $0 $0 + 1
@@ -676,7 +639,7 @@ Pop $0
 Push $0
   ReadRegStr $0 SHELL_CONTEXT "${MSCURRVER_KEY}\Explorer\Shell Folders" "Common AppData"
   StrCmp $0 "" +2
-  RMDir /r "$0\SecondLife"
+  RMDir /r "$0\Alchemy"
 Pop $0
 
 Keep:
@@ -704,14 +667,14 @@ Delete "$INSTDIR\dronesettings.ini"
 Delete "$INSTDIR\message_template.msg"
 Delete "$INSTDIR\newview.pdb"
 Delete "$INSTDIR\newview.map"
-Delete "$INSTDIR\SecondLife.pdb"
-Delete "$INSTDIR\SecondLife.map"
+Delete "$INSTDIR\Alchemy.pdb"
+Delete "$INSTDIR\Alchemy.map"
 Delete "$INSTDIR\comm.dat"
 Delete "$INSTDIR\*.glsl"
 Delete "$INSTDIR\motions\*.lla"
 Delete "$INSTDIR\trial\*.html"
 Delete "$INSTDIR\newview.exe"
-Delete "$INSTDIR\SecondLife.exe"
+Delete "$INSTDIR\Alchemy.exe"
 
 # MAINT-3099 workaround - prevent these log files, if present, from causing a user alert
 Delete "$INSTDIR\VivoxVoiceService-*.log"
