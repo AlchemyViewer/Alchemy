@@ -475,7 +475,6 @@
             left="10"
             name="edit_experience_title"
             max_length_bytes="63"
-            text_color="black"
             right="-10"/>
           <text
             follows="left|top|right"
@@ -495,7 +494,6 @@
             name="edit_experience_description"
             spellcheck="true"
             max_length="2048"
-            text_color="black"
             right="-11"
             word_wrap="true"/>
           <button

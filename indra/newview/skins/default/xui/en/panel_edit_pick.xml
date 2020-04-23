@@ -107,7 +107,6 @@
          top_pad="2"
          max_length_bytes="63"
          name="pick_name"
-         text_color="black"
          width="273" />
         <text
          type="string"
@@ -135,7 +134,6 @@
          max_length="1023"
          name="pick_desc"
          spellcheck="true"
-         text_color="black"
          word_wrap="true" />
         <text
          type="string"

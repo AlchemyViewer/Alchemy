@@ -466,7 +466,6 @@
                  max_length_bytes="30"
                  prevalidate_callback="ascii"
                  commit_on_focus_lost="false"
-                 text_color="black"
                 />
                 <text
                  name="description_label"
@@ -493,7 +492,6 @@
                  follows="left|top|right"
                  layout="topleft"
                  max_length="256"
-                 text_color="black"
                  word_wrap="true"
                 />
                 <text
