@@ -170,7 +170,7 @@ struct LabelTable : public LLInitParam::Block<LabelTable>
     {}
 };
 
-const std::string DEFAULT_SKIN = "default";
+const std::string DEFAULT_SKIN = "alchemy";
 
 class LLVoiceSetKeyDialog : public LLModalDialog
 {
