@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<!--
+Supports all of these:
+		text_color,
+        text_readonly_color,
+        text_tentative_color,
+        bg_readonly_color,
+        bg_writeable_color,
+        bg_focus_color,
+        text_selected_color,
+        bg_selected_color
+        default_color; -->
+<chat_editor
+  name="chat_editor"
+  show_context_menu="true"
+  bg_writeable_color="TextField_Off"
+  bg_focus_color="TextField_Active" />
