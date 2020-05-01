@@ -4692,7 +4692,8 @@ LLVolumeFace::LLVolumeFace(const LLVolumeFace& src)
     mJointIndices(NULL),
 #endif
     mWeightsScrubbed(FALSE),
-	mOctree(NULL)
+	mOctree(NULL),
+	mOptimized(FALSE)
 { 
 	mExtents = (LLVector4a*) ll_aligned_malloc_16(sizeof(LLVector4a)*3);
 	mCenter = mExtents+2;
@@ -4734,7 +4735,7 @@ LLVolumeFace& LLVolumeFace::operator=(const LLVolumeFace& src)
 
 		if (src.mNormals)
 		{
-		LLVector4a::memcpyNonAliased16((F32*) mNormals, (F32*) src.mNormals, vert_size);
+			LLVector4a::memcpyNonAliased16((F32*) mNormals, (F32*) src.mNormals, vert_size);
 		}
 
 		if(src.mTexCoords)
@@ -4742,59 +4743,31 @@ LLVolumeFace& LLVolumeFace::operator=(const LLVolumeFace& src)
 			LLVector4a::memcpyNonAliased16((F32*) mTexCoords, (F32*) src.mTexCoords, tc_size);
 		}
 
+		allocateTangents(src.mTangents ? src.mNumVertices : 0);
 		if (src.mTangents)
 		{
-			allocateTangents(src.mNumVertices);
-			LLVector4a::memcpyNonAliased16((F32*) mTangents, (F32*) src.mTangents, vert_size);
-		}
-		else
-		{
-			ll_aligned_free_16(mTangents);
-			mTangents = NULL;
+			LLVector4a::memcpyNonAliased16((F32*)mTangents, (F32*)src.mTangents, vert_size);
 		}
 
+		allocateWeights(src.mWeights ? src.mNumVertices : 0);
 		if (src.mWeights)
 		{
-            llassert(!mWeights); // don't orphan an old alloc here accidentally
-			allocateWeights(src.mNumVertices);
-			LLVector4a::memcpyNonAliased16((F32*) mWeights, (F32*) src.mWeights, vert_size);            
-            mWeightsScrubbed = src.mWeightsScrubbed;
+			LLVector4a::memcpyNonAliased16((F32*) mWeights, (F32*) src.mWeights, vert_size);
+			mWeightsScrubbed = src.mWeightsScrubbed;
 		}
 		else
 		{
-			ll_aligned_free_16(mWeights);            
-			mWeights = NULL;            
-            mWeightsScrubbed = FALSE;
-		}   
-
-    #if USE_SEPARATE_JOINT_INDICES_AND_WEIGHTS
-        if (src.mJointIndices)
-        {
-            llassert(!mJointIndices); // don't orphan an old alloc here accidentally
-            allocateJointIndices(src.mNumVertices);
-            LLVector4a::memcpyNonAliased16((F32*) mJointIndices, (F32*) src.mJointIndices, src.mNumVertices * sizeof(U8) * 4);
-        }
-        else*/
-        {
-            ll_aligned_free_16(mJointIndices);
-            mJointIndices = NULL;
-        }     
-    #endif
-
+        	mWeightsScrubbed = FALSE;
+		}
 	}
-    
+
 	if (mNumIndices)
 	{
-		S32 idx_size = (mNumIndices*sizeof(U16)+0xF) & ~0xF;
+		size_t idx_size = (mNumIndices*sizeof(U16)+0xF) & ~0xF;
 		
 		LLVector4a::memcpyNonAliased16((F32*) mIndices, (F32*) src.mIndices, idx_size);
 	}
-	else
-    {
-        ll_aligned_free_16(mIndices);
-        mIndices = NULL;
-    }
-
+	
 	mOptimized = src.mOptimized;
 
 	//delete 
@@ -4812,26 +4785,10 @@ LLVolumeFace::~LLVolumeFace()
 
 void LLVolumeFace::freeData()
 {
-	ll_aligned_free<64>(mPositions);
-	mPositions = NULL;
-
-	//normals and texture coordinates are part of the same buffer as mPositions, do not free them separately
-	mNormals = NULL;
-	mTexCoords = NULL;
-
-	ll_aligned_free_16(mIndices);
-	mIndices = NULL;
-	ll_aligned_free_16(mTangents);
-	mTangents = NULL;
-	ll_aligned_free_16(mWeights);
-	mWeights = NULL;
-
-#if USE_SEPARATE_JOINT_INDICES_AND_WEIGHTS
-    ll_aligned_free_16(mJointIndices);
-	mJointIndices = NULL;
-    ll_aligned_free_16(mJustWeights);
-	mJustWeights = NULL;
-#endif
+	allocateVertices(0);
+	allocateTangents(0);
+	allocateWeights(0);
+	allocateIndices(0);
 
 	delete mOctree;
 	mOctree = NULL;
@@ -6309,37 +6266,19 @@ void LLVolumeFace::createTangents()
 	}
 }
 
-void LLVolumeFace::resizeVertices(S32 num_verts)
+bool LLVolumeFace::resizeVertices(S32 num_verts)
 {
-	ll_aligned_free<64>(mPositions);
-	//DO NOT free mNormals and mTexCoords as they are part of mPositions buffer
-	ll_aligned_free_16(mTangents);
-
-	mTangents = NULL;
-
-	if (num_verts)
+	allocateTangents(0);
+	if (!allocateVertices(num_verts))
 	{
-		//pad texture coordinate block end to allow for QWORD reads
-		S32 size = ((num_verts*sizeof(LLVector2)) + 0xF) & ~0xF;
-
-		mPositions = (LLVector4a*) ll_aligned_malloc<64>(sizeof(LLVector4a)*2*num_verts+size);
-		mNormals = mPositions+num_verts;
-		mTexCoords = (LLVector2*) (mNormals+num_verts);
-
-		ll_assert_aligned(mPositions, 64);
-	}
-	else
-	{
-		mPositions = NULL;
-		mNormals = NULL;
-		mTexCoords = NULL;
+		return false;
 	}
 
 	mNumVertices = num_verts;
-	mNumAllocatedVertices = num_verts;
 
     // Force update
     mJointRiggingInfoTab.clear();
+	return true;
 }
 
 void LLVolumeFace::pushVertex(const LLVolumeFace::VertexData& cv)
@@ -6353,41 +6292,11 @@ void LLVolumeFace::pushVertex(const LLVector4a& pos, const LLVector4a& norm, con
 
 	if (new_verts > mNumAllocatedVertices)
 	{ 
-		// double buffer size on expansion
-		new_verts *= 2;
+		//double buffer size on expansion
+		allocateVertices(new_verts * 2, true);
 
-		S32 new_tc_size = ((new_verts*8)+0xF) & ~0xF;
-		S32 old_tc_size = ((mNumVertices*8)+0xF) & ~0xF;
-
-		S32 old_vsize = mNumVertices*16;
-		
-		S32 new_size = new_verts*16*2+new_tc_size;
-
-		LLVector4a* old_buf = mPositions;
-
-		mPositions = (LLVector4a*) ll_aligned_malloc<64>(new_size);
-		mNormals = mPositions+new_verts;
-		mTexCoords = (LLVector2*) (mNormals+new_verts);
-
-		if (old_buf != NULL)
-		{
-			// copy old positions into new buffer
-			LLVector4a::memcpyNonAliased16((F32*)mPositions, (F32*)old_buf, old_vsize);
-
-			// normals
-			LLVector4a::memcpyNonAliased16((F32*)mNormals, (F32*)(old_buf + mNumVertices), old_vsize);
-
-			// tex coords
-			LLVector4a::memcpyNonAliased16((F32*)mTexCoords, (F32*)(old_buf + mNumVertices * 2), old_tc_size);
-		}
-
-		// just clear tangents
-		ll_aligned_free_16(mTangents);
-		mTangents = NULL;
-		ll_aligned_free<64>(old_buf);
-
-		mNumAllocatedVertices = new_verts;
-
+		//just clear tangents
+		allocateTangents(0);
 	}
 
 	mPositions[mNumVertices] = pos;
@@ -6397,62 +6306,135 @@ void LLVolumeFace::pushVertex(const LLVector4a& pos, const LLVector4a& norm, con
 	mNumVertices++;	
 }
 
-void LLVolumeFace::allocateTangents(S32 num_verts)
+bool LLVolumeFace::allocateTangents(S32 num_verts)
 {
 	ll_aligned_free_16(mTangents);
-	mTangents = (LLVector4a*) ll_aligned_malloc_16(sizeof(LLVector4a)*num_verts);
+	mTangents = nullptr;
+	if (num_verts)
+	{
+		mTangents = (LLVector4a*)ll_aligned_malloc_16(sizeof(LLVector4a)*num_verts);
+		if (!mTangents)
+		{
+			LL_WARNS("LLVOLUME") << "Allocation of binormals[" << sizeof(LLVector4a)*num_verts << "] failed" << LL_ENDL;
+			return false;
+		}
+	}
+	return true;
 }
 
-void LLVolumeFace::allocateWeights(S32 num_verts)
+bool LLVolumeFace::allocateWeights(S32 num_verts)
 {
 	ll_aligned_free_16(mWeights);
-	mWeights = (LLVector4a*)ll_aligned_malloc_16(sizeof(LLVector4a)*num_verts);
-    
+	mWeights = nullptr;
+	if (num_verts)
+	{
+		mWeights = (LLVector4a*)ll_aligned_malloc_16(sizeof(LLVector4a)*num_verts);
+		if (!mWeights)
+		{
+			LL_WARNS("LLVOLUME") << "Allocation of weights[" << sizeof(LLVector4a) * num_verts << "] failed" << LL_ENDL;
+			return false;
+		}
+	}
+	return true;
 }
 
-void LLVolumeFace::allocateJointIndices(S32 num_verts)
+bool LLVolumeFace::allocateVertices(S32 num_verts, bool copy)
 {
-#if USE_SEPARATE_JOINT_INDICES_AND_WEIGHTS
-    ll_aligned_free_16(mJointIndices);
-    ll_aligned_free_16(mJustWeights);
+	if (!copy || !num_verts)
+	{
+		ll_aligned_free<64>(mPositions);
+		mPositions = nullptr;
+		mNormals = nullptr;
+		mTexCoords = nullptr;
+	}
 
-    mJointIndices = (U8*)ll_aligned_malloc_16(sizeof(U8) * 4 * num_verts);    
-    mJustWeights = (LLVector4a*)ll_aligned_malloc_16(sizeof(LLVector4a) * num_verts);    
-#endif
+	if (num_verts)
+	{
+		const U32 new_vsize = num_verts * sizeof(LLVector4a);
+		const U32 new_nsize = new_vsize;
+		const U32 new_tcsize = (num_verts * sizeof(LLVector2) + 0xF) & ~0xF;
+		const U32 new_size = new_vsize + new_nsize + new_tcsize;
+
+		//allocate new buffer space
+		LLVector4a* old_buf = mPositions;
+		mPositions = (LLVector4a*)ll_aligned_malloc<64>(new_size);
+		if (!mPositions)
+		{
+			LL_WARNS("LLVOLUME") << "Allocation of positions vector[" << new_size << "] failed. " << LL_ENDL;
+			return false;
+		}
+		mNormals = mPositions + num_verts;
+		mTexCoords = (LLVector2*)(mNormals + num_verts);
+
+		if (copy && old_buf)
+		{
+			U32 verts_to_copy = std::min(mNumVertices, num_verts);
+			if (verts_to_copy)
+			{
+				const U32 old_vsize = verts_to_copy * sizeof(LLVector4a);
+				const U32 old_nsize = old_vsize;
+				const U32 old_tcsize = (verts_to_copy * sizeof(LLVector2) + 0xF) & ~0xF;
+
+				LLVector4a::memcpyNonAliased16((F32*)mPositions, (F32*)old_buf, old_vsize);
+				LLVector4a::memcpyNonAliased16((F32*)mNormals, (F32*)(old_buf + mNumVertices), old_nsize);
+				LLVector4a::memcpyNonAliased16((F32*)mTexCoords, (F32*)(old_buf + mNumVertices * 2), old_tcsize);
+			}
+			ll_aligned_free<64>(old_buf);
+		}
+	}
+
+	mNumAllocatedVertices = num_verts;
+	return true;
 }
 
-void LLVolumeFace::resizeIndices(S32 num_indices)
+bool LLVolumeFace::allocateIndices(S32 num_indices, bool copy)
 {
+	if (num_indices == mNumIndices)
+	{
+		return true;
+	}
+
+	S32 new_size = ((num_indices * sizeof(U16)) + 0xF) & ~0xF;
+	if (copy && num_indices && mIndices && mNumIndices)
+	{
+		S32 old_size = ((mNumIndices * sizeof(U16)) + 0xF) & ~0xF;
+
+		U16* temp_indices = (U16*)ll_aligned_realloc_16(mIndices, new_size, old_size);
+		if (!temp_indices)
+		{
+			LL_WARNS("LLVOLUME") << "Reallocation of indices buffer[" << new_size << "] failed. " << LL_ENDL;
+			return false;
+		}
+		mIndices = temp_indices;
+		mNumIndices = num_indices;
+		return true;
+	}
 	ll_aligned_free_16(mIndices);
-	
+	mIndices = nullptr;
 	if (num_indices)
 	{
-		//pad index block end to allow for QWORD reads
-		S32 size = ((num_indices*sizeof(U16)) + 0xF) & ~0xF;
-		
-		mIndices = (U16*) ll_aligned_malloc_16(size);
-	}
-	else
-	{
-		mIndices = NULL;
+		mIndices = (U16*)ll_aligned_malloc_16(new_size);
+		if (!mIndices)
+		{
+			LL_WARNS("LLVOLUME") << "Allocation of indices buffer[" << new_size << "] failed. " << LL_ENDL;
+			return false;
+		}
 	}
 
 	mNumIndices = num_indices;
+	return true;
+}
+
+bool LLVolumeFace::resizeIndices(S32 num_indices)
+{
+	return allocateIndices(num_indices);
 }
 
 void LLVolumeFace::pushIndex(const U16& idx)
 {
-	S32 new_count = mNumIndices + 1;
-	S32 new_size = ((new_count*2)+0xF) & ~0xF;
+	allocateIndices(mNumIndices + 1, true);
 
-	S32 old_size = ((mNumIndices*2)+0xF) & ~0xF;
-	if (new_size != old_size)
-	{
-		mIndices = (U16*) ll_aligned_realloc_16(mIndices, new_size, old_size);
-		ll_assert_aligned(mIndices,16);
-	}
-	
-	mIndices[mNumIndices++] = idx;
+	mIndices[mNumIndices-1] = idx;
 }
 
 void LLVolumeFace::fillFromLegacyData(std::vector<LLVolumeFace::VertexData>& v, std::vector<U16>& idx)

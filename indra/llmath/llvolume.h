@@ -872,11 +872,12 @@ public:
 	BOOL create(LLVolume* volume, BOOL partial_build = FALSE);
 	void createTangents();
 	
-	void resizeVertices(S32 num_verts);
-	void allocateTangents(S32 num_verts);
-	void allocateWeights(S32 num_verts);
-    void allocateJointIndices(S32 num_verts);
-	void resizeIndices(S32 num_indices);
+	bool resizeVertices(S32 num_verts);
+	bool allocateTangents(S32 num_verts);
+	bool allocateWeights(S32 num_verts);
+	bool allocateVertices(S32 num_verts, bool copy = false);
+    bool allocateIndices(S32 num_indices, bool copy = false);
+	bool resizeIndices(S32 num_indices);
 	void fillFromLegacyData(std::vector<LLVolumeFace::VertexData>& v, std::vector<U16>& idx);
 
 	void pushVertex(const VertexData& cv);
