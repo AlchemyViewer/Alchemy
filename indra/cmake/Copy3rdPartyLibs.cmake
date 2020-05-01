@@ -18,7 +18,7 @@ if(WINDOWS)
     #*******************************
     # VIVOX - *NOTE: no debug version
     set(vivox_lib_dir "${ARCH_PREBUILT_DIRS_RELEASE}")
-    set(slvoice_src_dir "${ARCH_PREBUILT_BIN_RELEASE}")    
+    set(slvoice_src_dir "${ARCH_PREBUILT_BIN_DIRS_RELEASE}")    
     set(slvoice_files SLVoice.exe )
     if (ADDRESS_SIZE EQUAL 64)
         list(APPEND vivox_libs
