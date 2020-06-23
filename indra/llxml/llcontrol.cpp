@@ -41,6 +41,7 @@
 #include "v4coloru.h"
 #include "v4color.h"
 #include "v3color.h"
+#include "llquaternion.h"
 #include "llrect.h"
 #include "llxmltree.h"
 #include "llsdserialize.h"
@@ -133,6 +134,9 @@ bool LLControlVariable::llsd_compare(const LLSD& a, const LLSD & b)
 		break;
 	case TYPE_VEC4:
 		result = LLVector4(a) == LLVector4(b);
+		break;
+	case TYPE_QUAT:
+		result = LLQuaternion(a) == LLQuaternion(b);
 		break;
 	case TYPE_RECT:
 		result = LLRect(a) == LLRect(b);
@@ -374,6 +378,7 @@ const std::string LLControlGroup::mTypeString[TYPE_COUNT] = { "U32"
                                                              ,"Vector3"
                                                              ,"Vector3D"
                                                              ,"Vector4"
+                                                             ,"Quaternion"
                                                              ,"Rect"
                                                              ,"Color4"
                                                              ,"Color3"
@@ -542,6 +547,11 @@ LLControlVariable* LLControlGroup::declareVec4(const std::string& name, const LL
 	return declareControl(name, TYPE_VEC4, initial_val.getValue(), comment, persist);
 }
 
+LLControlVariable* LLControlGroup::declareQuat(const std::string& name, const LLQuaternion &initial_val, const std::string& comment, LLControlVariable::ePersist persist)
+{
+	return declareControl(name, TYPE_QUAT, initial_val.getValue(), comment, persist);
+}
+
 LLControlVariable* LLControlGroup::declareRect(const std::string& name, const LLRect &initial_val, const std::string& comment, LLControlVariable::ePersist persist)
 {
 	return declareControl(name, TYPE_RECT, initial_val.getValue(), comment, persist);
@@ -629,6 +639,11 @@ LLVector4 LLControlGroup::getVector4(const std::string& name)
 	return get<LLVector4>(name);
 }
 
+LLQuaternion LLControlGroup::getQuaternion(const std::string& name)
+{
+	return get<LLQuaternion>(name);
+}
+
 LLRect LLControlGroup::getRect(const std::string& name)
 {
 	return get<LLRect>(name);
@@ -708,6 +723,11 @@ void LLControlGroup::setVector3(const std::string& name, const LLVector3 &val)
 }
 
 void LLControlGroup::setVector3d(const std::string& name, const LLVector3d &val)
+{
+	set(name, val);
+}
+
+void LLControlGroup::setQuaternion(const std::string& name, const LLQuaternion &val)
 {
 	set(name, val);
 }
@@ -911,6 +931,16 @@ U32 LLControlGroup::loadFromFileLegacy(const std::string& filename, BOOL require
 				child_nodep->getAttributeVector4("value", vector);
 
 				control->set(vector.getValue());
+				validitems++;
+			}
+			break;
+		case TYPE_QUAT:
+			{
+				LLQuaternion quat;
+
+				child_nodep->getAttributeQuat("value", quat);
+
+				control->set(quat.getValue());
 				validitems++;
 			}
 			break;
@@ -1295,6 +1325,11 @@ template <> eControlType get_control_type<LLVector4>()
 	return TYPE_VEC4;
 }
 
+template <> eControlType get_control_type<LLQuaternion>()
+{
+	return TYPE_QUAT;
+}
+
 template <> eControlType get_control_type<LLRect>() 
 { 
 	return TYPE_RECT; 
@@ -1337,6 +1372,11 @@ template <> LLSD convert_to_llsd<LLVector3d>(const LLVector3d& in)
 }
 
 template <> LLSD convert_to_llsd<LLVector4>(const LLVector4& in)
+{
+	return in.getValue();
+}
+
+template <> LLSD convert_to_llsd<LLQuaternion>(const LLQuaternion& in)
 {
 	return in.getValue();
 }
@@ -1461,6 +1501,18 @@ LLVector4 convert_from_llsd<LLVector4>(const LLSD& sd, eControlType type, const 
 	{
 		CONTROL_ERRS << "Invalid LLVector3d value for " << control_name << ": " << LLControlGroup::typeEnumToString(type) << " " << sd << LL_ENDL;
 		return LLVector4::zero;
+	}
+}
+
+template<>
+LLQuaternion convert_from_llsd<LLQuaternion>(const LLSD& sd, eControlType type, const std::string& control_name)
+{
+	if (type == TYPE_QUAT)
+		return (LLQuaternion)sd;
+	else
+	{
+		CONTROL_ERRS << "Invalid LLQuaternion value for " << control_name << ": " << LLControlGroup::typeEnumToString(type) << " " << sd << LL_ENDL;
+		return LLQuaternion();
 	}
 }
 
