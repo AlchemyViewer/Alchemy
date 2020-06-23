@@ -401,6 +401,18 @@ void LLDXHardware::cleanup()
 
 BOOL LLDXHardware::updateVRAM()
 {
+	SIZE_T vram = getMBVideoMemoryViaDXGI();
+
+	if (vram > 0)
+	{
+		mVRAM = vram / (1024 * 1024);
+		return TRUE;
+	}
+	return FALSE;
+}
+
+S32 LLDXHardware::getMBVideoMemoryViaDXGI()
+{
 	HRESULT hr;
 	BOOL bGotMemory = FALSE;
 	HRESULT hrCoInitialize = S_OK;
@@ -441,12 +453,7 @@ BOOL LLDXHardware::updateVRAM()
 		}
 		CoUninitialize();
 	}
-
-	if (bGotMemory != FALSE)
-	{
-		mVRAM = vram / (1024 * 1024);
-	}
-	return bGotMemory;
+	return vram / (1024 * 1024);
 }
 
 LLSD LLDXHardware::getDisplayInfo()

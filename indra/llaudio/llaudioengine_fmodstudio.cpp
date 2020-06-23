@@ -50,7 +50,7 @@ FMOD_RESULT F_CALLBACK windDSPCallback(FMOD_DSP_STATE *dsp_state, float *inbuffe
 
 FMOD::ChannelGroup *LLAudioEngine_FMODSTUDIO::mChannelGroups[LLAudioEngine::AUDIO_TYPE_COUNT] = {nullptr};
 
-LLAudioEngine_FMODSTUDIO::LLAudioEngine_FMODSTUDIO(std::string app_name, bool enable_profiler, U32 resample_method)
+LLAudioEngine_FMODSTUDIO::LLAudioEngine_FMODSTUDIO(bool enable_profiler, U32 resample_method)
 	: mInited(false)
 	, mWindGen(nullptr)
 	, mWindDSPDesc(nullptr)
@@ -58,7 +58,6 @@ LLAudioEngine_FMODSTUDIO::LLAudioEngine_FMODSTUDIO(std::string app_name, bool en
 	, mSystem(nullptr)
 	, mEnableProfiler(enable_profiler)
 	, mResampleMethod(resample_method)
-	, mAppName(std::move(app_name))
 {
 }
 
@@ -74,7 +73,7 @@ inline bool Check_FMOD_Error(FMOD_RESULT result, const char *string)
 	return true;
 }
 
-bool LLAudioEngine_FMODSTUDIO::init(const S32 num_channels, void* userdata)
+bool LLAudioEngine_FMODSTUDIO::init(const S32 num_channels, void* userdata, const std::string& app_title)
 {
 	U32 version;
 	FMOD_RESULT result;
@@ -86,7 +85,7 @@ bool LLAudioEngine_FMODSTUDIO::init(const S32 num_channels, void* userdata)
 		return false;
 
 	//will call LLAudioEngine_FMODSTUDIO::allocateListener, which needs a valid mSystem pointer.
-	LLAudioEngine::init(num_channels, userdata);	
+	LLAudioEngine::init(num_channels, userdata, app_title);
 	
 	result = mSystem->getVersion(&version);
 	Check_FMOD_Error(result, "FMOD::System::getVersion");
@@ -135,7 +134,7 @@ bool LLAudioEngine_FMODSTUDIO::init(const S32 num_channels, void* userdata)
 		{
 			LL_DEBUGS("AppInit") << "Trying PulseAudio audio output..." << LL_ENDL;
 			if((result = mSystem->setOutput(FMOD_OUTPUTTYPE_PULSEAUDIO)) == FMOD_OK &&
-				(result = mSystem->init(num_channels + EXTRA_SOUND_CHANNELS, fmod_flags, const_cast<char*>(mAppName.c_str()))) == FMOD_OK)
+				(result = mSystem->init(num_channels + EXTRA_SOUND_CHANNELS, fmod_flags, const_cast<char*>(app_title.c_str()))) == FMOD_OK)
 			{
 				LL_DEBUGS("AppInit") << "PulseAudio output initialized OKAY"	<< LL_ENDL;
 				audio_ok = true;

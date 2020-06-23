@@ -398,13 +398,13 @@ void LLProgressView::initLogos()
     std::string temp_str = gDirUtilp->getExpandedFilename(LL_PATH_DEFAULT_SKIN, "textures", "3p_icons");
 
     temp_str += gDirUtilp->getDirDelimiter();
-
-#ifdef LL_FMODSTUDIO
+	S32 pad_y = 0;
+#ifdef USE_FMODSTUDIO
     // original image size is 264x96, it is on longer side but
     // with no internal paddings so it gets additional padding
     icon_width = 77;
     icon_height = 21;
-    S32 pad_y = 4;
+	pad_y = 4;
     texture_start_x++;
     loadLogo(temp_str + "fmod_logo.png",
         image_codec,

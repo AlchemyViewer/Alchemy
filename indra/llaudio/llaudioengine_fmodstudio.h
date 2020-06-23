@@ -53,11 +53,11 @@ public:
 		RESAMPLE_CUBIC,
 		RESAMPLE_SPLINE
 	};
-	LLAudioEngine_FMODSTUDIO(std::string app_name, bool enable_profiler, U32 resample_method);
+	LLAudioEngine_FMODSTUDIO(bool enable_profiler, U32 resample_method);
 	virtual ~LLAudioEngine_FMODSTUDIO();
 
 	// initialization/startup/shutdown
-	bool init(const S32 num_channels, void *user_data) final override;
+	bool init(const S32 num_channels, void *user_data, const std::string& app_title) final override;
 	std::string getDriverName(bool verbose) final override;
 	void allocateListener() final override;
 
