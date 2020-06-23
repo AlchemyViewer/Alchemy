@@ -1554,6 +1554,7 @@ if __name__ == "__main__":
     extra_arguments = [
         dict(name='bugsplat', description="""BugSplat database to which to post crashes,
              if BugSplat crash reporting is desired""", default=''),
+        dict(name='fmodstudio', description="""Indication if fmod studio libraries are needed""", default='OFF'),
         ]
     try:
         main(extra=extra_arguments)
