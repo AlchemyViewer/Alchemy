@@ -2032,6 +2032,11 @@ void LLViewerWindow::initBase()
 	LLPanel* panel_holder = main_view->getChild<LLPanel>("toolbar_view_holder");
 	// Load the toolbar view from file 
 	gToolBarView = LLUICtrlFactory::getInstance()->createFromFile<LLToolBarView>("panel_toolbar_view.xml", panel_holder, LLDefaultChildRegistry::instance());
+	if (!gToolBarView)
+	{
+		LL_ERRS() << "Failed to initialize viewer: Viewer couldn't process file panel_toolbar_view.xml, "
+				<< "if this problem happens again, please validate your installation." << LL_ENDL;
+	}
 	gToolBarView->setShape(panel_holder->getLocalRect());
 	// Hide the toolbars for the moment: we'll make them visible after logging in world (see LLViewerWindow::initWorldUI())
 	gToolBarView->setVisible(FALSE);
@@ -2909,7 +2914,8 @@ BOOL LLViewerWindow::handleKey(KEY key, MASK mask)
 	// no view has keyboard focus, this is a printable character key (and no modifier key is 
 	// pressed except shift), then give focus to nearby chat (STORM-560)
 	static const LLCachedControl<S32> letter_keys_Focus_chat_bar(gSavedSettings, "LetterKeysFocusChatBar");
-	if (letter_keys_Focus_chat_bar && !gAgentCamera.cameraMouselook() &&
+	if ( LLStartUp::getStartupState() >= STATE_STARTED && 
+		letter_keys_Focus_chat_bar && !gAgentCamera.cameraMouselook() &&
 		!keyboard_focus && key < 0x80 && (mask == MASK_NONE || mask == MASK_SHIFT) )
 	{
 		// Initialize nearby chat if it's missing

@@ -62,7 +62,9 @@
 #include "llallocator.h"
 #include "llcalc.h"
 #include "llconversationlog.h"
+#if LL_WINDOWS
 #include "lldxhardware.h"
+#endif
 #include "lltexturestats.h"
 #include "lltrace.h"
 #include "lltracethreadrecorder.h"
@@ -1732,6 +1734,11 @@ bool LLAppViewer::cleanup()
 	disconnectViewer();
 
 	LL_INFOS() << "Viewer disconnected" << LL_ENDL;
+	
+	if (gKeyboard)
+	{
+		gKeyboard->resetKeys();
+	}
 
 	display_cleanup();
 
@@ -4053,7 +4060,10 @@ static LLNotificationFunctorRegistration finish_quit_reg("ConfirmQuit", finish_q
 
 void LLAppViewer::userQuit()
 {
-	if (gDisconnected || gViewerWindow->getProgressView()->getVisible())
+	if (gDisconnected
+		|| !gViewerWindow
+		|| !gViewerWindow->getProgressView()
+		|| gViewerWindow->getProgressView()->getVisible())
 	{
 		requestQuit();
 	}
