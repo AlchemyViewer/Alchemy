@@ -2241,7 +2241,9 @@ void errorCallback(const std::string &error_string)
 	LLError::crashAndLoop(error_string);
 #endif // LL_RELEASE_WITH_DEBUG_INFO && LL_WINDOWS
 // [/SL:KB]
+//#ifndef SHADER_CRASH_NONFATAL
 //	LLError::crashAndLoop(error_string);
+//#endif
 }
 
 void LLAppViewer::initLoggingAndGetLastDuration()
@@ -5478,6 +5480,10 @@ void LLAppViewer::disconnectViewer()
 	// Destroying all objects below will trigger attachment detaching code and attempt to remove the COF links for them
 	LLAppearanceMgr::instance().setAttachmentInvLinkEnable(false);
 // [/SL:KB]
+
+// [RLVa:KB] - Checked: RLVa-2.3 (Housekeeping)
+	SUBSYSTEM_CLEANUP(RlvHandler);
+// [/RLVa:KB]
 
 	gAgentWearables.cleanup();
 	gAgentCamera.cleanup();

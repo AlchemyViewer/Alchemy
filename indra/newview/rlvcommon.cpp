@@ -439,6 +439,11 @@ std::string RlvStrings::getVersionNum(const LLUUID& idRlvObject)
 		(!fCompatMode) ? RLV_VERSION_PATCH : RLV_VERSION_PATCH_COMPAT, (!fCompatMode) ? RLV_VERSION_BUILD : RLV_VERSION_BUILD_COMPAT);
 }
 
+std::string RlvStrings::getVersionImplNum()
+{
+	return llformat("%d%02d%02d%02d", RLVa_VERSION_MAJOR, RLVa_VERSION_MAJOR, RLVa_VERSION_PATCH, RLVa_IMPL_ID);
+}
+
 // Checked: 2011-11-08 (RLVa-1.5.0)
 bool RlvStrings::hasString(const std::string& strStringName, bool fCheckCustom)
 {
@@ -728,8 +733,13 @@ void rlvMenuToggleVisible()
 
 bool rlvMenuCanShowName()
 {
-  const LLVOAvatar* pAvatar = find_avatar_from_object(LLSelectMgr::getInstance()->getSelection()->getPrimaryObject());
-  return (pAvatar) && (RlvActions::canShowName(RlvActions::SNC_DEFAULT, pAvatar->getID()));
+	bool fEnable = true;
+	if (rlv_handler_t::isEnabled())
+	{
+		const LLVOAvatar* pAvatar = find_avatar_from_object(LLSelectMgr::getInstance()->getSelection()->getPrimaryObject());
+		fEnable = (pAvatar) && (RlvActions::canShowName(RlvActions::SNC_DEFAULT, pAvatar->getID()));
+	}
+	return fEnable;
 }
 
 // Checked: 2010-04-23 (RLVa-1.2.0g) | Modified: RLVa-1.2.0g

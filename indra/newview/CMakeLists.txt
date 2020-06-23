@@ -739,6 +739,7 @@ set(viewer_SOURCE_FILES
     noise.cpp
     pipeline.cpp
     rlvactions.cpp
+    rlvenvironment.cpp
     rlvhandler.cpp
     rlvhelper.cpp
     rlvcommon.cpp
@@ -1382,6 +1383,7 @@ set(viewer_HEADER_FILES
     noise.h
     pipeline.h
     rlvactions.h
+    rlvenvironment.h
     rlvdefines.h
     rlvhandler.h
     rlvhelper.h

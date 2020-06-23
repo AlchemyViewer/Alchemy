@@ -60,9 +60,11 @@ enum ECameraPreset
 
 	/** Current view when a preset is saved */
 	CAMERA_PRESET_CUSTOM,
-	
-	/** Current view when a preset is saved */
-	CAMERA_PRESET_CUSTOM
+
+// [RLVa:KB] - @setcam_eyeoffset and @setcam_focusoffset
+	/* Used by RLVa */
+	CAMERA_RLV_SETCAM_VIEW,
+// [/RLVa:KB]
 };
 
 //------------------------------------------------------------------------
@@ -114,9 +116,17 @@ private:
 	// Preset
 	//--------------------------------------------------------------------
 public:
+// [RLVa:KB] - @setcam family
+	/** Determines default camera offset scale depending on the current camera preset */
+	ECameraPreset getCameraPreset() const { return mCameraPreset; }
+// [/RLVa:KB]
 	void switchCameraPreset(ECameraPreset preset);
 	/** Determines default camera offset depending on the current camera preset */
 	LLVector3 getCameraOffsetInitial();
+// [RLVa:KB] - @setcam_eyeoffsetscale
+	/** Determines default camera offset scale depending on the current camera preset */
+	F32 getCameraOffsetScale() const;
+// [/RLVa:KB]
 	/** Determines default focus offset depending on the current camera preset */
 	LLVector3d getFocusOffsetInitial();
 
@@ -135,10 +145,24 @@ private:
 	ECameraPreset mCameraPreset; 
 
 	/** Initial camera offset */
-	LLPointer<LLControlVariable> mCameraOffsetInitial;
+//	LLPointer<LLControlVariable> mCameraOffsetInitial;
+// [RLVa:KB] - @setcam_eyeoffset
+	// Renamed to catch their uses
+	LLPointer<LLControlVariable> mCameraOffsetInitialControl;
+	LLPointer<LLControlVariable> mRlvCameraOffsetInitialControl;
+// [/RLVa:KB]
+
+// [RLVa:KB] - @setcam_eyeoffsetscale
+	LLPointer<LLControlVariable> mRlvCameraOffsetScaleControl;
+// [/RLVa:KB]
 
 	/** Initial focus offset */
-	LLPointer<LLControlVariable> mFocusOffsetInitial;
+//	LLPointer<LLControlVariable> mFocusOffsetInitial;
+// [RLVa:KB] - @setcam_focusoffset
+	// Renamed to catch their uses
+	LLPointer<LLControlVariable> mFocusOffsetInitialControl;
+	LLPointer<LLControlVariable> mRlvFocusOffsetInitialControl;
+// [/RLVa:KB]
 
 	LLQuaternion mInitSitRot;
 
