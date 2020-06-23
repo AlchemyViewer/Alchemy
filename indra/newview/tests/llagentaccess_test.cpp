@@ -65,7 +65,7 @@ U32 LLControlGroup::getU32(const std::string& name)
 	return test_preferred_maturity;
 }
 //----------------------------------------------------------------------------
-	
+
 namespace tut
 {
     struct agentaccess

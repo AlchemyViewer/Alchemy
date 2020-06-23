@@ -101,19 +101,31 @@ bool LLAgentAccess::canAccessAdult() const
 
 bool LLAgentAccess::prefersPG() const
 {
+#ifdef LL_TEST
+	U32 access = mSavedSettings.getU32("PreferredMaturity");
+#else
 	U32 access = ALControlCache::PreferredMaturity;
+#endif
 	return access < SIM_ACCESS_MATURE;
 }
 
 bool LLAgentAccess::prefersMature() const
 {
+#ifdef LL_TEST
+	U32 access = mSavedSettings.getU32("PreferredMaturity");
+#else
 	U32 access = ALControlCache::PreferredMaturity;
+#endif
 	return access >= SIM_ACCESS_MATURE;
 }
 
 bool LLAgentAccess::prefersAdult() const
 {
+#ifdef LL_TEST
+	U32 access = mSavedSettings.getU32("PreferredMaturity");
+#else
 	U32 access = ALControlCache::PreferredMaturity;
+#endif
 	return access >= SIM_ACCESS_ADULT;
 }
 

@@ -159,7 +159,7 @@ const char *gSampleGridFile =
 	"      <array>"
 	"        <string>myloginuri</string>"
 	"      </array>"
-	"      <key>update_query_url_base</key><string>https://update.secondlife.com/update</string>"
+	"      <key>update_query_url_base</key><string>https://app.alchemyviewer.org/update</string>"
 	"      <key>keyname</key><string>util.foobar.lindenlab.com</string>"
 	"    </map>"
 	"  </map>"
@@ -219,7 +219,7 @@ namespace tut
 					  std::string("Agni"),
 					  LLGridManager::getInstance()->getGridId("util.agni.lindenlab.com"));
 		ensure_equals("update url base for Agni", // relies on agni being the default
-					  std::string("https://update.secondlife.com/update"),
+					  std::string("https://app.alchemyviewer.org/update"),
 					  LLGridManager::getInstance()->getUpdateServiceURL());
 		ensure_equals("label for agni",
 					  LLGridManager::getInstance()->getGridLabel("util.agni.lindenlab.com"),
@@ -293,7 +293,7 @@ namespace tut
 					  LLGridManager::getInstance()->getGridId("util.agni.lindenlab.com"),
 					  std::string("Agni"));
 		ensure_equals("update url base for Agni", // relies on agni being the default
-					  std::string("https://update.secondlife.com/update"),
+					  std::string("https://app.alchemyviewer.org/update"),
 					  LLGridManager::getInstance()->getUpdateServiceURL());
 		ensure_equals("label for agni",
 					  LLGridManager::getInstance()->getGridLabel("util.agni.lindenlab.com"),
@@ -424,7 +424,7 @@ namespace tut
 					  LLGridManager::getInstance()->getLoginPage(),
 					  std::string("https://viewer-splash.secondlife.com/"));
 		ensure_equals("update url base for Agni", // relies on agni being the default
-					  std::string("https://update.secondlife.com/update"),
+					  std::string("https://app.alchemyviewer.org/update"),
 					  LLGridManager::getInstance()->getUpdateServiceURL());
 		ensure("Is Agni a production grid", LLGridManager::getInstance()->isInProductionGrid());
 		std::vector<std::string> uris;
