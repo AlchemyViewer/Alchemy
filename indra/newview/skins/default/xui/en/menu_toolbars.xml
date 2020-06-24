@@ -32,4 +32,80 @@
     <on_check function="Toolbars.CheckSetting"
               parameter="icons_only" />
   </menu_item_check>
+  <menu_item_check label="Small Icons only"
+                   layout="topleft"
+                   name="icons_only_small">
+    <on_click function="Toolbars.EnableSetting"
+              parameter="icons_only_small" />
+    <on_check function="Toolbars.CheckSetting"
+              parameter="icons_only_small" />
+  </menu_item_check>
+  <menu_item_check label="Text only"
+                   layout="topleft"
+                   name="text_only">
+    <on_click function="Toolbars.EnableSetting"
+              parameter="text_only" />
+    <on_check function="Toolbars.CheckSetting"
+              parameter="text_only" />
+  </menu_item_check>
+  <menu_item_separator
+   name="layout_separator" />
+  <menu_item_check label="Buttons auto-layout"
+                   layout="topleft"
+                   name="autolayout">
+    <on_click function="Toolbars.ChangeLayout"
+              parameter="none" />
+    <on_check function="Toolbars.CheckLayout"
+              parameter="none" />
+  </menu_item_check>
+  <menu_item_check label="Buttons fill width"
+                   layout="topleft"
+                   name="filllayout">
+    <on_click function="Toolbars.ChangeLayout"
+              parameter="fill" />
+    <on_check function="Toolbars.CheckLayout"
+              parameter="fill" />
+	<on_visible function="Toolbars.CheckOrientation"
+			  parameter="horizontal" />
+  </menu_item_check>
+  <menu_item_check label="Buttons left align"
+                   layout="topleft"
+                   name="left_align">
+    <on_click function="Toolbars.ChangeLayout"
+              parameter="left" />
+    <on_check function="Toolbars.CheckLayout"
+              parameter="left" />
+    <on_visible function="Toolbars.CheckOrientation"
+          parameter="horizontal" />
+  </menu_item_check>
+  <menu_item_check label="Buttons right align"
+                 layout="topleft"
+                 name="right_align">
+    <on_click function="Toolbars.ChangeLayout"
+              parameter="right" />
+    <on_check function="Toolbars.CheckLayout"
+              parameter="right" />
+    <on_visible function="Toolbars.CheckOrientation"
+          parameter="horizontal" />
+  </menu_item_check>
+  <menu_item_check label="Buttons top aligned"
+                 layout="topleft"
+                 name="top_align">
+    <on_click function="Toolbars.ChangeLayout"
+              parameter="left" />
+    <on_check function="Toolbars.CheckLayout"
+              parameter="left" />
+    <on_visible function="Toolbars.CheckOrientation"
+          parameter="vertical" />
+  </menu_item_check>
+  <menu_item_check label="Buttons bottom aligned"
+                 layout="topleft"
+                 name="bottom_align">
+    <on_click function="Toolbars.ChangeLayout"
+              parameter="right" />
+    <on_check function="Toolbars.CheckLayout"
+              parameter="right" />
+    <on_visible function="Toolbars.CheckOrientation"
+          parameter="vertical" />
+  </menu_item_check>
 </context_menu>
