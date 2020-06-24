@@ -115,6 +115,8 @@ set(viewer_SOURCE_FILES
     alcontrolcache.cpp
     alfloaterparticleeditor.cpp
     alfloaterregiontracker.cpp
+    alpanelquicksettings.cpp
+    alpanelquicksettingspulldown.cpp
     alunzip.cpp
     alviewermenu.cpp
     groupchatlistener.cpp
@@ -762,6 +764,8 @@ set(viewer_HEADER_FILES
     alcontrolcache.h
     alfloaterparticleeditor.h
     alfloaterregiontracker.h
+    alpanelquicksettings.h
+    alpanelquicksettingspulldown.h
     alunzip.h
     alviewermenu.h
     groupchatlistener.h

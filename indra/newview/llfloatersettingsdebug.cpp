@@ -40,7 +40,7 @@
 
 
 LLFloaterSettingsDebug::LLFloaterSettingsDebug(const LLSD& key) 
-:	LLFloater(key)
+:	LLFloater(key.asString().empty() ? LLSD("all") : key)
 {
 	mCommitCallbackRegistrar.add("SettingSelect",	boost::bind(&LLFloaterSettingsDebug::onSettingSelect, this,_1));
 	mCommitCallbackRegistrar.add("CommitSettings",	boost::bind(&LLFloaterSettingsDebug::onCommitSettings, this));

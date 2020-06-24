@@ -29,6 +29,7 @@
 #include "llstatusbar.h"
 
 // viewer includes
+#include "alpanelquicksettingspulldown.h"
 #include "llagent.h"
 #include "llagentcamera.h"
 #include "llbutton.h"
@@ -110,6 +111,8 @@ LLStatusBar::LLStatusBar(const LLRect& rect)
 	mTextTime(NULL),
 	mSGBandwidth(NULL),
 	mSGPacketLoss(NULL),
+	mPanelPopupHolder(nullptr),
+	mBtnQuickSettings(nullptr),
 	mBtnVolume(NULL),
 	mBoxBalance(NULL),
 	mBalance(0),
@@ -162,6 +165,8 @@ BOOL LLStatusBar::postBuild()
 {
 	gMenuBarView->setRightMouseDownCallback(boost::bind(&show_navbar_context_menu, _1, _2, _3));
 
+	mPanelPopupHolder = gViewerWindow->getRootView()->getChildView("popup_holder");
+
 	mTextTime = getChild<LLTextBox>("TimeText" );
 	
 	getChild<LLUICtrl>("buyL")->setCommitCallback(
@@ -177,6 +182,9 @@ BOOL LLStatusBar::postBuild()
 
 	mIconPresetsGraphic = getChild<LLIconCtrl>( "presets_icon_graphic" );
 	mIconPresetsGraphic->setMouseEnterCallback(boost::bind(&LLStatusBar::onMouseEnterPresets, this));
+
+	mBtnQuickSettings = getChild<LLButton>("quick_settings_btn");
+	mBtnQuickSettings->setMouseEnterCallback(boost::bind(&LLStatusBar::onMouseEnterQuickSettings, this));
 
 	mBtnVolume = getChild<LLButton>( "volume_btn" );
 	mBtnVolume->setClickedCallback( onClickVolume, this );
@@ -245,6 +253,11 @@ BOOL LLStatusBar::postBuild()
 	addChild(mPanelVolumePulldown);
 	mPanelVolumePulldown->setFollows(FOLLOWS_TOP|FOLLOWS_RIGHT);
 	mPanelVolumePulldown->setVisible(FALSE);
+
+	mPanelQuickSettingsPulldown = new ALPanelQuickSettingsPulldown();
+	addChild(mPanelQuickSettingsPulldown);
+	mPanelQuickSettingsPulldown->setFollows(FOLLOWS_TOP | FOLLOWS_RIGHT);
+	mPanelQuickSettingsPulldown->setVisible(FALSE);
 
 	mPanelNearByMedia = new LLPanelNearByMedia();
 	addChild(mPanelNearByMedia);
@@ -348,6 +361,7 @@ void LLStatusBar::setVisibleForMouselook(bool visible)
 	mTextTime->setVisible(visible);
 	getChild<LLUICtrl>("balance_bg")->setVisible(visible);
 	mBoxBalance->setVisible(visible);
+	mBtnQuickSettings->setVisible(visible);
 	mBtnVolume->setVisible(visible);
 	mMediaToggle->setVisible(visible);
 	mSGBandwidth->setVisible(visible);
@@ -498,7 +512,6 @@ void LLStatusBar::onClickBuyCurrency()
 
 void LLStatusBar::onMouseEnterPresetsCamera()
 {
-	LLView* popup_holder = gViewerWindow->getRootView()->getChildView("popup_holder");
 	LLIconCtrl* icon =  getChild<LLIconCtrl>( "presets_icon_camera" );
 	LLRect icon_rect = icon->getRect();
 	LLRect pulldown_rect = mPanelPresetsCameraPulldown->getRect();
@@ -508,7 +521,7 @@ void LLStatusBar::onMouseEnterPresetsCamera()
 			       pulldown_rect.getWidth(),
 			       pulldown_rect.getHeight());
 
-	pulldown_rect.translate(popup_holder->getRect().getWidth() - pulldown_rect.mRight, 0);
+	pulldown_rect.translate(mPanelPopupHolder->getRect().getWidth() - pulldown_rect.mRight, 0);
 	mPanelPresetsCameraPulldown->setShape(pulldown_rect);
 
 	// show the master presets pull-down
@@ -522,7 +535,6 @@ void LLStatusBar::onMouseEnterPresetsCamera()
 
 void LLStatusBar::onMouseEnterPresets()
 {
-	LLView* popup_holder = gViewerWindow->getRootView()->getChildView("popup_holder");
 	LLIconCtrl* icon =  getChild<LLIconCtrl>( "presets_icon_graphic" );
 	LLRect icon_rect = icon->getRect();
 	LLRect pulldown_rect = mPanelPresetsPulldown->getRect();
@@ -532,7 +544,7 @@ void LLStatusBar::onMouseEnterPresets()
 			       pulldown_rect.getWidth(),
 			       pulldown_rect.getHeight());
 
-	pulldown_rect.translate(popup_holder->getRect().getWidth() - pulldown_rect.mRight, 0);
+	pulldown_rect.translate(mPanelPopupHolder->getRect().getWidth() - pulldown_rect.mRight, 0);
 	mPanelPresetsPulldown->setShape(pulldown_rect);
 
 	// show the master presets pull-down
@@ -543,9 +555,32 @@ void LLStatusBar::onMouseEnterPresets()
 	mPanelPresetsPulldown->setVisible(TRUE);
 }
 
+void LLStatusBar::onMouseEnterQuickSettings()
+{
+	LLRect qs_rect = mPanelQuickSettingsPulldown->getRect();
+	LLRect qs_btn_rect = mBtnQuickSettings->getRect();
+	qs_rect.setLeftTopAndSize(qs_btn_rect.mLeft -
+		(qs_rect.getWidth() - qs_btn_rect.getWidth()) / 2,
+		qs_btn_rect.mBottom,
+		qs_rect.getWidth(),
+		qs_rect.getHeight());
+	// force onscreen
+	qs_rect.translate(mPanelPopupHolder->getRect().getWidth() - qs_rect.mRight, 0);
+
+	// show the master volume pull-down
+	mPanelQuickSettingsPulldown->setShape(qs_rect);
+	LLUI::getInstance()->clearPopups();
+	LLUI::getInstance()->addPopup(mPanelQuickSettingsPulldown);
+
+	mPanelNearByMedia->setVisible(FALSE);
+	mPanelVolumePulldown->setVisible(FALSE);
+	//mPanelAOPulldown->setVisible(FALSE);
+	//mPanelAvatarComplexityPulldown->setVisible(FALSE);
+	mPanelQuickSettingsPulldown->setVisible(TRUE);
+}
+
 void LLStatusBar::onMouseEnterVolume()
 {
-	LLView* popup_holder = gViewerWindow->getRootView()->getChildView("popup_holder");
 	LLButton* volbtn =  getChild<LLButton>( "volume_btn" );
 	LLRect vol_btn_rect = volbtn->getRect();
 	LLRect volume_pulldown_rect = mPanelVolumePulldown->getRect();
@@ -555,7 +590,7 @@ void LLStatusBar::onMouseEnterVolume()
 			       volume_pulldown_rect.getWidth(),
 			       volume_pulldown_rect.getHeight());
 
-	volume_pulldown_rect.translate(popup_holder->getRect().getWidth() - volume_pulldown_rect.mRight, 0);
+	volume_pulldown_rect.translate(mPanelPopupHolder->getRect().getWidth() - volume_pulldown_rect.mRight, 0);
 	mPanelVolumePulldown->setShape(volume_pulldown_rect);
 
 
@@ -565,12 +600,12 @@ void LLStatusBar::onMouseEnterVolume()
 	mPanelPresetsCameraPulldown->setVisible(FALSE);
 	mPanelPresetsPulldown->setVisible(FALSE);
 	mPanelNearByMedia->setVisible(FALSE);
+	mPanelQuickSettingsPulldown->setVisible(FALSE);
 	mPanelVolumePulldown->setVisible(TRUE);
 }
 
 void LLStatusBar::onMouseEnterNearbyMedia()
 {
-	LLView* popup_holder = gViewerWindow->getRootView()->getChildView("popup_holder");
 	LLRect nearby_media_rect = mPanelNearByMedia->getRect();
 	LLButton* nearby_media_btn =  getChild<LLButton>( "media_toggle_btn" );
 	LLRect nearby_media_btn_rect = nearby_media_btn->getRect();
@@ -580,7 +615,7 @@ void LLStatusBar::onMouseEnterNearbyMedia()
 										nearby_media_rect.getWidth(),
 										nearby_media_rect.getHeight());
 	// force onscreen
-	nearby_media_rect.translate(popup_holder->getRect().getWidth() - nearby_media_rect.mRight, 0);
+	nearby_media_rect.translate(mPanelPopupHolder->getRect().getWidth() - nearby_media_rect.mRight, 0);
 	
 	// show the master volume pull-down
 	mPanelNearByMedia->setShape(nearby_media_rect);
@@ -589,12 +624,13 @@ void LLStatusBar::onMouseEnterNearbyMedia()
 
 	mPanelPresetsCameraPulldown->setVisible(FALSE);
 	mPanelPresetsPulldown->setVisible(FALSE);
+	mPanelQuickSettingsPulldown->setVisible(FALSE);
 	mPanelVolumePulldown->setVisible(FALSE);
 	mPanelNearByMedia->setVisible(TRUE);
 }
 
 
-static void onClickVolume(void* data)
+void LLStatusBar::onClickVolume(void* data)
 {
 	// toggle the master mute setting
 	bool mute_audio = LLAppViewer::instance()->getMasterSystemAudioMute();

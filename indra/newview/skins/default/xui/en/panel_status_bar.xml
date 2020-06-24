@@ -142,7 +142,7 @@
      left_pad="0"
      name="TimeText"
      tool_tip="Current time (Pacific)"
-     width="145">
+     width="135">
         24:00 AM PST
     </text>
     <icon
@@ -186,4 +186,18 @@
      top="2"
      name="volume_btn"
      width="16" />
+    <button
+     follows="right|top"
+     height="16"
+     image_selected="Icon_Gear_Background"
+     image_pressed="Icon_Gear_Background"
+     image_unselected="Icon_Gear_Foreground"
+     left_pad="5"
+     top="2"
+     name="quick_settings_btn"
+     width="16">
+     <click_callback
+      function="Floater.ToggleOrBringToFront"
+      parameter="quick_settings" />
+    </button>
 </panel>

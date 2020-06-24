@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<panel
+ bg_opaque_image="Volume_Background"
+ bg_alpha_image="Volume_Background"
+ background_opaque="true"
+ background_visible="true"
+ layout="topleft"
+ width="300"
+ height="140"
+ name="quick_settings_pulldown">
+  <panel
+   name="quick_settings"
+   class="quick_settings"
+   filename="panel_quick_settings.xml"
+   layout="topleft"/>
+</panel>

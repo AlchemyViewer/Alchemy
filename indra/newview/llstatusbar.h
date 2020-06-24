@@ -41,6 +41,7 @@ class LLUICtrl;
 class LLUUID;
 class LLFrameTimer;
 class LLStatGraph;
+class ALPanelQuickSettingsPulldown;
 class LLPanelPresetsCameraPulldown;
 class LLPanelPresetsPulldown;
 class LLPanelVolumePulldown;
@@ -55,17 +56,17 @@ namespace ll
 		struct SearchData;
 	}
 }
-class LLStatusBar
+class LLStatusBar final
 :	public LLPanel
 {
 public:
 	LLStatusBar(const LLRect& rect );
 	/*virtual*/ ~LLStatusBar();
 	
-	/*virtual*/ void draw();
+	/*virtual*/ void draw() override;
 
-	/*virtual*/ BOOL handleRightMouseDown(S32 x, S32 y, MASK mask);
-	/*virtual*/ BOOL postBuild();
+	/*virtual*/ BOOL handleRightMouseDown(S32 x, S32 y, MASK mask) override;
+	/*virtual*/ BOOL postBuild() override;
 
 	// MANIPULATORS
 	void		setBalance(S32 balance);
@@ -80,7 +81,7 @@ public:
 	void setLandCredit(S32 credit);
 	void setLandCommitted(S32 committed);
 
-	void		refresh();
+	void		refresh() override;
 	void setVisibleForMouselook(bool visible);
 		// some elements should hide in mouselook
 
@@ -93,7 +94,7 @@ public:
 	S32 getSquareMetersCommitted() const;
 	S32 getSquareMetersLeft() const;
 
-	LLPanelNearByMedia* getNearbyMediaPanel() { return mPanelNearByMedia; }
+	LLPanelNearByMedia* getNearbyMediaPanel() const { return mPanelNearByMedia; }
 
 private:
 	
@@ -102,10 +103,12 @@ private:
 
 	void onMouseEnterPresetsCamera();
 	void onMouseEnterPresets();
+	void onMouseEnterQuickSettings();
 	void onMouseEnterVolume();
 	void onMouseEnterNearbyMedia();
 	void onClickScreen(S32 x, S32 y);
 
+	static void onClickVolume(void* data);
 	static void onClickMediaToggle(void* data);
 	static void onClickBalance(void* data);
 
@@ -119,14 +122,16 @@ private:
 	void updateMenuSearchPosition(); // depends onto balance position
 	void updateBalancePanelPosition();
 
-private:
+
 	LLTextBox	*mTextTime;
 
 	LLStatGraph *mSGBandwidth;
 	LLStatGraph *mSGPacketLoss;
 
+	LLView		*mPanelPopupHolder;
 	LLIconCtrl	*mIconPresetsCamera;
 	LLIconCtrl	*mIconPresetsGraphic;
+	LLButton	*mBtnQuickSettings;
 	LLButton	*mBtnVolume;
 	LLTextBox	*mBoxBalance;
 	LLButton	*mMediaToggle;
@@ -140,6 +145,7 @@ private:
 	LLFrameTimer*	mHealthTimer;
 	LLPanelPresetsCameraPulldown* mPanelPresetsCameraPulldown;
 	LLPanelPresetsPulldown* mPanelPresetsPulldown;
+	ALPanelQuickSettingsPulldown* mPanelQuickSettingsPulldown;
 	LLPanelVolumePulldown* mPanelVolumePulldown;
 	LLPanelNearByMedia*	mPanelNearByMedia;
 };
