@@ -131,11 +131,12 @@ namespace LLToolBarEnums
 		TOOLBAR_LEFT,
 		TOOLBAR_RIGHT,
 		TOOLBAR_BOTTOM,
+		TOOLBAR_TOP,
 
 		TOOLBAR_COUNT,
 
 		TOOLBAR_FIRST = TOOLBAR_LEFT,
-		TOOLBAR_LAST = TOOLBAR_BOTTOM,
+		TOOLBAR_LAST = TOOLBAR_TOP,
 	};
 
 	LLView::EOrientation getOrientation(SideType sideType);

@@ -60,7 +60,8 @@ public:
 	{
 		Optional<Toolbar>	left_toolbar,
 							right_toolbar,
-							bottom_toolbar;
+							bottom_toolbar,
+							top_toolbar;
 
 		ToolbarSet();
 	};

@@ -18,6 +18,35 @@
                 height="500"
                 follows="all"
                 mouse_opaque="false">
+  <layout_panel name="top_toolbar_panel"
+                auto_resize="false"
+                height="30"
+                width="1024"
+                mouse_opaque="false">
+    <toolbar layout="topleft"
+             button_panel.bg_opaque_image="Rounded_Rect_Top"
+             name="toolbar_top"
+             height="30"
+             left="40"
+             right="-40"
+             top="1"
+             side="top"
+             follows="left|right|top"
+             button_display_mode="icons_with_text"
+             visible="true">
+             <icon layout="topleft"
+                    height="28"
+                    width="15"
+                    follows="left|top"
+                    top="20"
+                    left="10"
+                    tab_stop="false" 
+                    visible="false"
+                    use_draw_context_alpha="false"
+                    image_name="Caret_Top_Icon"
+                    name="caret" />
+    </toolbar>
+  </layout_panel>
   <layout_panel name="vertical_toolbar_panel"
                 auto_resize="true"
                 width="1024"
