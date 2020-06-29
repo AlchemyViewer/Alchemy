@@ -41,7 +41,7 @@ class LLViewerTexture;
 class LLFloaterMap;
 class LLMenuGL;
 
-class LLNetMap : public LLUICtrl
+class LLNetMap final : public LLUICtrl
 {
 public:
 	struct Params 
@@ -134,7 +134,7 @@ private:
 	void handleZoom(const LLSD& userdata);
 	void handleStopTracking (const LLSD& userdata);
 
-	LLMenuGL*		mPopupMenu;
+	LLHandle<LLView>		mPopupMenuHandle;
 	uuid_vec_t		gmSelected;
 };
 

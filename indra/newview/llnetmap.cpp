@@ -67,9 +67,9 @@
 
 static LLDefaultChildRegistry::Register<LLNetMap> r1("net_map");
 
-const F32 LLNetMap::MAP_SCALE_MIN = 32;
-const F32 LLNetMap::MAP_SCALE_MID = 1024;
-const F32 LLNetMap::MAP_SCALE_MAX = 4096;
+const F32 LLNetMap::MAP_SCALE_MIN = 32.f;
+const F32 LLNetMap::MAP_SCALE_MID = 1024.f;
+const F32 LLNetMap::MAP_SCALE_MAX = 4096.f;
 
 const F32 MAP_SCALE_ZOOM_FACTOR = 1.04f; // Zoom in factor per click of scroll wheel (4%)
 const F32 MIN_DOT_RADIUS = 3.5f;
@@ -81,24 +81,24 @@ const F64 COARSEUPDATE_MAX_Z = 1020.0f;
 
 LLNetMap::LLNetMap (const Params & p)
 :	LLUICtrl (p),
+	mUpdateNow(false),
 	mBackgroundColor (p.bg_color()),
 	mScale( MAP_SCALE_MID ),
 	mPixelsPerMeter( MAP_SCALE_MID / REGION_WIDTH_METERS ),
 	mObjectMapTPM(0.f),
 	mObjectMapPixels(0.f),
+	mPanning(false),
 	mTargetPan(0.f, 0.f),
 	mCurPan(0.f, 0.f),
 	mStartPan(0.f, 0.f),
 	mMouseDown(0, 0),
-	mPanning(false),
-	mUpdateNow(false),
 	mObjectImageCenterGlobal( gAgentCamera.getCameraPositionGlobal() ),
 	mObjectRawImagep(),
 	mObjectImagep(),
 	mClosestAgentToCursor(),
 	mClosestAgentAtLastRightClick(),
 	mToolTipMsg(),
-	mPopupMenu(NULL)
+	mPopupMenuHandle()
 {
 	mScale = gSavedSettings.getF32("MiniMapScale");
 	mPixelsPerMeter = mScale / REGION_WIDTH_METERS;
@@ -107,6 +107,12 @@ LLNetMap::LLNetMap (const Params & p)
 
 LLNetMap::~LLNetMap()
 {
+	auto menu = static_cast<LLMenuGL*>(mPopupMenuHandle.get());
+	if (menu)
+	{
+		menu->die();
+		mPopupMenuHandle.markDead();
+	}
 }
 
 BOOL LLNetMap::postBuild()
@@ -116,7 +122,9 @@ BOOL LLNetMap::postBuild()
 	registrar.add("Minimap.Zoom", boost::bind(&LLNetMap::handleZoom, this, _2));
 	registrar.add("Minimap.Tracker", boost::bind(&LLNetMap::handleStopTracking, this, _2));
 
-	mPopupMenu = LLUICtrlFactory::getInstance()->createFromFile<LLMenuGL>("menu_mini_map.xml", gMenuHolder, LLViewerMenuHolderGL::child_registry_t::instance());
+	LLMenuGL* menu = LLUICtrlFactory::getInstance()->createFromFile<LLMenuGL>("menu_mini_map.xml", gMenuHolder, LLViewerMenuHolderGL::child_registry_t::instance());
+	mPopupMenuHandle = menu->getHandle();
+
 	return TRUE;
 }
 
@@ -873,12 +881,13 @@ BOOL LLNetMap::handleMouseUp( S32 x, S32 y, MASK mask )
 
 BOOL LLNetMap::handleRightMouseDown(S32 x, S32 y, MASK mask)
 {
-	if (mPopupMenu)
+	auto menu = static_cast<LLMenuGL*>(mPopupMenuHandle.get());
+	if (menu)
 	{
-		mPopupMenu->buildDrawLabels();
-		mPopupMenu->updateParent(LLMenuGL::sMenuContainer);
-		mPopupMenu->setItemEnabled("Stop Tracking", LLTracker::isTracking(0));
-		LLMenuGL::showPopup(this, mPopupMenu, x, y);
+		menu->buildDrawLabels();
+		menu->updateParent(LLMenuGL::sMenuContainer);
+		menu->setItemEnabled("Stop Tracking", LLTracker::isTracking(0));
+		LLMenuGL::showPopup(this, menu, x, y);
 	}
 	return TRUE;
 }
@@ -1004,9 +1013,10 @@ void LLNetMap::handleZoom(const LLSD& userdata)
 
 void LLNetMap::handleStopTracking (const LLSD& userdata)
 {
-	if (mPopupMenu)
+	auto menu = static_cast<LLMenuGL*>(mPopupMenuHandle.get());
+	if (menu)
 	{
-		mPopupMenu->setItemEnabled ("Stop Tracking", false);
+		menu->setItemEnabled ("Stop Tracking", false);
 		LLTracker::stopTracking (LLTracker::isTracking(NULL));
 	}
 }
