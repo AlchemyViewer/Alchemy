@@ -32,7 +32,6 @@
 #include "llnotificationtemplate.h"
 #include "llsd.h"
 #include "llui.h"
-#include <boost/foreach.hpp>
 
 LLNotificationsListener::LLNotificationsListener(LLNotifications & notifications) :
     LLEventAPI("LLNotifications",
@@ -132,7 +131,7 @@ void LLNotificationsListener::listChannels(const LLSD& params) const
          cmi != cmend; ++cmi)
     {
         LLSD channelInfo, parents;
-        BOOST_FOREACH(const std::string& parent, cmi->getParents())
+        for (const std::string& parent : cmi->getParents())
         {
             parents.append(parent);
         }

@@ -32,7 +32,6 @@
 
 #include <sstream>
 #include <boost/tokenizer.hpp>
-#include <boost/foreach.hpp>
 #include <boost/bind.hpp>
 
 #include "llrender.h"
@@ -577,7 +576,7 @@ void LLView::deleteAllChildren()
 
 void LLView::setAllChildrenEnabled(BOOL b)
 {
-	BOOST_FOREACH(LLView* viewp, mChildList)
+	for (LLView* viewp : mChildList)
 	{
 		viewp->setEnabled(b);
 	}
@@ -608,7 +607,7 @@ void LLView::onVisibilityChange ( BOOL new_visibility )
 #if AL_VIEWER_EVENT_RECORDER
 	BOOL log_visibility_change = LLViewerEventRecorder::getLoggingStatus();
 #endif
-	BOOST_FOREACH(LLView* viewp, mChildList)
+	for (LLView* viewp : mChildList)
 	{
 		if (!viewp)
 		{
@@ -706,7 +705,7 @@ LLView* LLView::childrenHandleCharEvent(const std::string& desc, const METHOD& m
 {
 	if ( getVisible() && getEnabled() )
 	{
-		BOOST_FOREACH(LLView* viewp, mChildList)
+		for (LLView* viewp : mChildList)
 		{
 			if ((viewp->*method)(c, mask, TRUE))
 			{
@@ -725,7 +724,7 @@ LLView* LLView::childrenHandleCharEvent(const std::string& desc, const METHOD& m
 template <typename METHOD, typename XDATA>
 LLView* LLView::childrenHandleMouseEvent(const METHOD& method, S32 x, S32 y, XDATA extra, bool allow_mouse_block)
 {
-	BOOST_FOREACH(LLView* viewp, mChildList)
+	for (LLView* viewp : mChildList)
 	{
 		S32 local_x = x - viewp->getRect().mLeft;
 		S32 local_y = y - viewp->getRect().mBottom;
@@ -759,7 +758,7 @@ LLView* LLView::childrenHandleMouseEvent(const METHOD& method, S32 x, S32 y, XDA
 
 LLView* LLView::childrenHandleToolTip(S32 x, S32 y, MASK mask)
 {
-	BOOST_FOREACH(LLView* viewp, mChildList)
+	for (LLView* viewp : mChildList)
 	{
 		S32 local_x = x - viewp->getRect().mLeft;
 		S32 local_y = y - viewp->getRect().mBottom;
@@ -791,7 +790,7 @@ LLView* LLView::childrenHandleDragAndDrop(S32 x, S32 y, MASK mask,
 	// default to not accepting drag and drop, will be overridden by handler
 	*accept = ACCEPT_NO;
 
-	BOOST_FOREACH(LLView* viewp, mChildList)
+	for (LLView* viewp : mChildList)
 	{
 		S32 local_x = x - viewp->getRect().mLeft;
 		S32 local_y = y - viewp->getRect().mBottom;
@@ -817,7 +816,7 @@ LLView* LLView::childrenHandleDragAndDrop(S32 x, S32 y, MASK mask,
 
 LLView* LLView::childrenHandleHover(S32 x, S32 y, MASK mask)
 {
-	BOOST_FOREACH(LLView* viewp, mChildList)
+	for (LLView* viewp : mChildList)
 	{
 		S32 local_x = x - viewp->getRect().mLeft;
 		S32 local_y = y - viewp->getRect().mBottom;
@@ -845,7 +844,7 @@ LLView*	LLView::childFromPoint(S32 x, S32 y, bool recur)
 	if (!getVisible())
 		return NULL;
 
-	BOOST_FOREACH(LLView* viewp, mChildList)
+	for (LLView* viewp : mChildList)
 	{
 		S32 local_x = x - viewp->getRect().mLeft;
 		S32 local_y = y - viewp->getRect().mBottom;
@@ -1355,7 +1354,7 @@ void LLView::reshape(S32 width, S32 height, BOOL called_from_parent)
 		mRect.mTop = getRect().mBottom + height;
 
 		// move child views according to reshape flags
-		BOOST_FOREACH(LLView* viewp, mChildList)
+		for (LLView* viewp : mChildList)
 		{
 			if (viewp != NULL)
 			{
@@ -1425,7 +1424,7 @@ LLRect LLView::calcBoundingRect()
 {
 	LLRect local_bounding_rect = LLRect::null;
 
-	BOOST_FOREACH(LLView* childp, mChildList)
+	for (LLView* childp : mChildList)
 	{
 		// ignore invisible and "top" children when calculating bounding rect
 		// such as combobox popups
@@ -1592,7 +1591,7 @@ LLView* LLView::findChildView(const std::string& name, BOOL recurse) const
 	//if(name.empty())
 	//	return NULL;
 	// Look for direct children *first*
-	BOOST_FOREACH(LLView* childp, mChildList)
+	for (LLView* childp : mChildList)
 	{
 		llassert(childp);
 		if (childp->getName() == name)
@@ -1603,7 +1602,7 @@ LLView* LLView::findChildView(const std::string& name, BOOL recurse) const
 	if (recurse)
 	{
 		// Look inside each child as well.
-		BOOST_FOREACH(LLView* childp, mChildList)
+		for (LLView* childp : mChildList)
 		{
 			llassert(childp);
 			LLView* viewp = childp->findChildView(name, recurse);
@@ -2778,7 +2777,7 @@ S32	LLView::notifyParent(const LLSD& info)
 bool	LLView::notifyChildren(const LLSD& info)
 {
 	bool ret = false;
-	BOOST_FOREACH(LLView* childp, mChildList)
+	for (LLView* childp : mChildList)
 	{
 		ret = ret || childp->notifyChildren(info);
 	}

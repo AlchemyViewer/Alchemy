@@ -35,7 +35,6 @@
 #include "llnotifications.h"
 
 #include <boost/bind.hpp>
-#include <boost/foreach.hpp>
 
 using namespace LLNotificationsUI;
 

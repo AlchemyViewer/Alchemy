@@ -93,7 +93,7 @@ LLExternalEditor::EErrorCode LLExternalEditor::run(const std::string& file_path)
 	params.executable = mProcessParams.executable;
 
 	// Substitute the filename marker in the command with the actual passed file name.
-	BOOST_FOREACH(const std::string& arg, mProcessParams.args)
+	for (const std::string& arg : mProcessParams.args)
 	{
 		std::string fixed(arg);
 		LLStringUtil::replaceString(fixed, sFilenameMarker, file_path);

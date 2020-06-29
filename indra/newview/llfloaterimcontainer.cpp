@@ -56,7 +56,6 @@
 #include "llworld.h"
 #include "llsdserialize.h"
 #include "llviewerobjectlist.h"
-#include "boost/foreach.hpp"
 
 //
 // LLFloaterIMContainer
