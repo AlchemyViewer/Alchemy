@@ -158,10 +158,7 @@ public:
 	void setComment(const std::string& comment);
 
 private:
-	void firePropertyChanged(const LLSD &pPreviousValue)
-	{
-		mCommitSignal(this, mValues.back(), pPreviousValue);
-	}
+	void firePropertyChanged(const LLSD &pPreviousValue);
 	LLSD getComparableValue(const LLSD& value);
 	bool llsd_compare(const LLSD& a, const LLSD & b);
 };
@@ -240,6 +237,7 @@ public:
 	std::string getString(const std::string& name);
 	std::string getText(const std::string& name);
 	BOOL		getBOOL(const std::string& name);
+	bool		getBool(const std::string& name);
 	S32			getS32(const std::string& name);
 	F32			getF32(const std::string& name);
 	U32			getU32(const std::string& name);

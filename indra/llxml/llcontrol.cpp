@@ -355,6 +355,18 @@ LLSD LLControlVariable::getSaveValue() const
 	return mValues[0];
 }
 
+void LLControlVariable::firePropertyChanged(const LLSD &pPreviousValue)
+{
+	try
+	{
+		mCommitSignal(this, mValues.back(), pPreviousValue);
+	}
+	catch (const boost::exception &ex)
+	{
+		LL_WARNS("LLControlVariable") << getName() << " commit signal threw exception. " << boost::diagnostic_information(ex) << LL_ENDL;
+	}
+}
+
 LLPointer<LLControlVariable> LLControlGroup::getControl(const std::string& name)
 {
 	if (mSettingsProfile)
@@ -589,6 +601,11 @@ void LLControlGroup::incrCount(const std::string& name)
 BOOL LLControlGroup::getBOOL(const std::string& name)
 {
 	return (BOOL)get<bool>(name);
+}
+
+bool LLControlGroup::getBool(const std::string& name)
+{
+	return get<bool>(name);
 }
 
 S32 LLControlGroup::getS32(const std::string& name)
