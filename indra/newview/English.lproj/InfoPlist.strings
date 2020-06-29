@@ -1,7 +1,7 @@
 /* Localized versions of Info.plist keys */
 
-CFBundleName = "Second Life";
+CFBundleName = "Alchemy";
 
-CFBundleShortVersionString = "Second Life version %%VERSION%%";
-CFBundleGetInfoString = "Second Life version %%VERSION%%, Copyright 2004 Linden Research, Inc.";
+CFBundleShortVersionString = "Alchemy version %%VERSION%%";
+CFBundleGetInfoString = "Alchemy version %%VERSION%%, Copyright © 2013-2020 Alchemy Development Group";
 
