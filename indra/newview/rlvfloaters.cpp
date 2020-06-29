@@ -691,7 +691,7 @@ void RlvFloaterStrings::onStringRevertDefault()
 void RlvFloaterStrings::checkDirty(bool fRefresh)
 {
 	LLTextEditor* pStringValue = findChild<LLTextEditor>("string_value");
-	if (!pStringValue->isPristine())
+    if (pStringValue && !pStringValue->isPristine())
 	{
 		RlvStrings::setCustomString(m_strStringCurrent, pStringValue->getText());
 		m_fDirty = true;
