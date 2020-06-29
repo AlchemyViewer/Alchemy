@@ -673,7 +673,7 @@ std::string LLDir::findSkinnedFilename(const std::string &subdir,
 	std::vector<std::string> found(findSkinnedFilenames(subdir, filename, constraint));
 	if (found.empty())
 	{
-		return "";
+		return std::string();
 	}
 	return found.back();
 }
