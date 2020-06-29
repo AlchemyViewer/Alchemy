@@ -34,6 +34,7 @@
 
 #include "llstl.h"
 
+#include "llexception.h"
 #include "llstring.h"
 #include "v3math.h"
 #include "v3dmath.h"
@@ -361,9 +362,9 @@ void LLControlVariable::firePropertyChanged(const LLSD &pPreviousValue)
 	{
 		mCommitSignal(this, mValues.back(), pPreviousValue);
 	}
-	catch (const boost::exception &ex)
+	catch (const boost::exception&)
 	{
-		LL_WARNS("LLControlVariable") << getName() << " commit signal threw exception. " << boost::diagnostic_information(ex) << LL_ENDL;
+        LOG_UNHANDLED_EXCEPTION(getName() + " commit signal threw exception.");
 	}
 }
 
