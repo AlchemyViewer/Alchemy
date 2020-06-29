@@ -2425,6 +2425,7 @@ If you continue to receive this message, please contact Second Life support for 
 	<string name="Since Logoff"  value=" - Since Logoff" />
 
 	<!-- inventory folder -->
+	<string name="InvFolder Basic Root">Basic Root</string>
 	<string name="InvFolder My Inventory">My Inventory</string>
 	<string name="InvFolder Library">Library</string>
 	<string name="InvFolder Textures">Textures</string>
@@ -2459,6 +2460,8 @@ If you continue to receive this message, please contact Second Life support for 
 	<string name="InvFolder Meshes">Meshes</string>
 	<string name="InvFolder Received Items">Received Items</string>
 	<string name="InvFolder Merchant Outbox">Merchant Outbox</string>
+	<string name="InvFolder Animation Overrides">Animation Overrides</string>
+	<string name="InvFolder #Firestorm">#Firestorm</string>
 
   <!-- are used for Friends and Friends/All folders in Inventory "Calling cards" folder. See EXT-694-->
 	<string name="InvFolder Friends">Friends</string>	

@@ -144,8 +144,11 @@ LLViewerFolderDictionary::LLViewerFolderDictionary()
 	addEntry(LLFolderType::FT_MARKETPLACE_LISTINGS, new ViewerFolderEntry("Marketplace Listings",   "Inv_SysOpen",			"Inv_SysClosed",		FALSE,     boxes_invisible));
 	addEntry(LLFolderType::FT_MARKETPLACE_STOCK,    new ViewerFolderEntry("New Stock",              "Inv_StockFolderOpen",	"Inv_StockFolderClosed",		FALSE,     false, "default"));
 	addEntry(LLFolderType::FT_MARKETPLACE_VERSION,  new ViewerFolderEntry("New Version",            "Inv_VersionFolderOpen","Inv_VersionFolderClosed",		FALSE,     false, "default"));
+	addEntry(LLFolderType::FT_SUITCASE,				new ViewerFolderEntry("My Suitcase",			"Inv_SysOpen", "Inv_SysClosed",							FALSE,		false));
+	addEntry(LLFolderType::FT_ANIM_OVERRIDES,		new ViewerFolderEntry("Animation Overrides",	"Inv_SysOpen",			"Inv_SysClosed",		FALSE,	false));
 
 	addEntry(LLFolderType::FT_NONE, 				new ViewerFolderEntry("New Folder",				"Inv_FolderOpen",		"Inv_FolderClosed",		FALSE,     false, "default"));
+	addEntry(LLFolderType::FT_TOXIC, 			new ViewerFolderEntry("Firstorm",				"Inv_FolderOpenToxic",		"Inv_FolderClosedToxic",		FALSE,     false));
 
 	for (U32 type = (U32)LLFolderType::FT_ENSEMBLE_START; type <= (U32)LLFolderType::FT_ENSEMBLE_END; ++type)
 	{

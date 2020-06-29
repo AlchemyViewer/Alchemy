@@ -102,6 +102,9 @@ LLFolderDictionary::LLFolderDictionary()
 		 
     addEntry(LLFolderType::FT_SETTINGS,             new FolderEntry("settings", TRUE));
 
+	addEntry(LLFolderType::FT_SUITCASE, new FolderEntry("suitcase", TRUE));
+    addEntry(LLFolderType::FT_ANIM_OVERRIDES, new FolderEntry("animover", TRUE));
+
 	addEntry(LLFolderType::FT_NONE, 				new FolderEntry("-1",		FALSE));
 };
 

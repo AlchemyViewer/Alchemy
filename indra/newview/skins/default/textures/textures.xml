@@ -294,7 +294,9 @@ with the same filename but different name
   <texture name="Inv_Clothing" file_name="icons/Inv_Clothing.png" preload="false" />
   <texture name="Inv_Eye" file_name="icons/Inv_Eye.png" preload="false" />
   <texture name="Inv_FolderClosed" file_name="icons/Inv_FolderClosed.png" preload="false" />
+  <texture name="Inv_FolderClosedToxic" file_name="icons/Inv_FolderClosedToxic.png" preload="false" />
   <texture name="Inv_FolderOpen" file_name="icons/Inv_FolderOpen.png" preload="false" />
+  <texture name="Inv_FolderOpenToxic" file_name="icons/Inv_FolderOpenToxic.png" preload="false" />
   <texture name="Inv_Gesture" file_name="icons/Inv_Gesture.png" preload="false" />
   <texture name="Inv_Gloves" file_name="icons/Inv_Gloves.png" preload="false" />
   <texture name="Inv_Hair" file_name="icons/Inv_Hair.png" preload="false" />
