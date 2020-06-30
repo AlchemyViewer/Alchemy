@@ -41,6 +41,7 @@ class LLUICtrl;
 class LLUUID;
 class LLFrameTimer;
 class LLStatGraph;
+class ALPanelAOPulldown;
 class ALPanelQuickSettingsPulldown;
 class LLPanelPresetsCameraPulldown;
 class LLPanelPresetsPulldown;
@@ -104,10 +105,12 @@ private:
 	void onMouseEnterPresetsCamera();
 	void onMouseEnterPresets();
 	void onMouseEnterQuickSettings();
+	void onMouseEnterAO();
 	void onMouseEnterVolume();
 	void onMouseEnterNearbyMedia();
 	void onClickScreen(S32 x, S32 y);
 
+	static void onClickAOBtn(void* data);
 	static void onClickVolume(void* data);
 	static void onClickMediaToggle(void* data);
 	static void onClickBalance(void* data);
@@ -122,6 +125,7 @@ private:
 	void updateMenuSearchPosition(); // depends onto balance position
 	void updateBalancePanelPosition();
 
+	void onAOStateChanged();
 
 	LLTextBox	*mTextTime;
 
@@ -132,6 +136,7 @@ private:
 	LLIconCtrl	*mIconPresetsCamera;
 	LLIconCtrl	*mIconPresetsGraphic;
 	LLButton	*mBtnQuickSettings;
+	LLButton	*mBtnAO;
 	LLButton	*mBtnVolume;
 	LLTextBox	*mBoxBalance;
 	LLButton	*mMediaToggle;
@@ -145,6 +150,7 @@ private:
 	LLFrameTimer*	mHealthTimer;
 	LLPanelPresetsCameraPulldown* mPanelPresetsCameraPulldown;
 	LLPanelPresetsPulldown* mPanelPresetsPulldown;
+	ALPanelAOPulldown* mPanelAOPulldown;	
 	ALPanelQuickSettingsPulldown* mPanelQuickSettingsPulldown;
 	LLPanelVolumePulldown* mPanelVolumePulldown;
 	LLPanelNearByMedia*	mPanelNearByMedia;

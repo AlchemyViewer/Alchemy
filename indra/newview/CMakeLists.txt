@@ -110,11 +110,16 @@ include_directories(SYSTEM
     )
 
 set(viewer_SOURCE_FILES
+    alaoengine.cpp
+    alaoset.cpp
     alavataractions.cpp
     alchatcommand.cpp
     alcontrolcache.cpp
+    alfloaterao.cpp
     alfloaterparticleeditor.cpp
     alfloaterregiontracker.cpp
+    alpanelaomini.cpp
+    alpanelaopulldown.cpp
     alpanelquicksettings.cpp
     alpanelquicksettingspulldown.cpp
     alunzip.cpp
@@ -759,11 +764,16 @@ set(VIEWER_BINARY_NAME "alchemy-bin" CACHE STRING
 set(viewer_HEADER_FILES
     CMakeLists.txt
     ViewerInstall.cmake
+    alaoengine.h
+    alaoset.h
     alavataractions.h
     alchatcommand.h
     alcontrolcache.h
+    alfloaterao.h
     alfloaterparticleeditor.h
     alfloaterregiontracker.h
+    alpanelaomini.h
+    alpanelaopulldown.h
     alpanelquicksettings.h
     alpanelquicksettingspulldown.h
     alunzip.h

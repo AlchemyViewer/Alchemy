@@ -512,6 +512,39 @@ const LLUUID LLInventoryModel::findCategoryUUIDForTypeInRoot(
 	return rv;
 }
 
+const LLUUID LLInventoryModel::findCategoryUUIDForNameInRoot(std::string const& folder_name, bool create_folder, LLUUID const& root_id)
+{
+	LLUUID rv = LLUUID::null;
+	if (root_id.notNull())
+	{
+		cat_array_t* cats = nullptr;
+		cats = get_ptr_in_map(mParentChildCategoryTree, root_id);
+		if (cats)
+		{
+			U32 count = cats->size();
+			for (U32 i = 0; i < count; ++i)
+			{
+				if (cats->at(i)->getName() == folder_name)
+				{
+					LLUUID const& folder_id = cats->at(i)->getUUID();
+					if (rv.isNull() || folder_id < rv)
+					{
+						rv = folder_id;
+					}
+				}
+			}
+		}
+	}
+	if (rv.isNull() && isInventoryUsable() && create_folder)
+	{
+		if (root_id.notNull())
+		{
+			return createNewCategory(root_id, LLFolderType::FT_NONE, folder_name);
+		}
+	}
+	return rv;
+}
+
 // findCategoryUUIDForType() returns the uuid of the category that
 // specifies 'type' as what it defaults to containing. The category is
 // not necessarily only for that type. *NOTE: This will create a new
@@ -560,6 +593,25 @@ const LLUUID LLInventoryModel::findUserDefinedCategoryUUIDForType(LLFolderType::
 const LLUUID LLInventoryModel::findLibraryCategoryUUIDForType(LLFolderType::EType preferred_type, bool create_folder)
 {
 	return findCategoryUUIDForTypeInRoot(preferred_type, create_folder, gInventory.getLibraryRootFolderID());
+}
+
+const LLUUID LLInventoryModel::findDescendentCategoryIDByName(const LLUUID& parent_id, const std::string& name) const
+{
+	LLInventoryModel::cat_array_t cat_array;
+	LLInventoryModel::item_array_t item_array;
+	LLNameCategoryCollector has_name(name);
+	gInventory.collectDescendentsIf(parent_id,
+									cat_array,
+									item_array,
+									LLInventoryModel::EXCLUDE_TRASH,
+									has_name);
+	if (cat_array.empty())
+		return LLUUID::null;
+	LLViewerInventoryCategory *cat = cat_array.at(0);
+	if (cat)
+		return cat->getUUID();
+	LL_WARNS() << "null cat" << LL_ENDL;
+	return LLUUID::null;
 }
 
 // Convenience function to create a new category. You could call

@@ -282,6 +282,10 @@ public:
 		bool create_folder,
 		const LLUUID& root_id);
 
+	const LLUUID findCategoryUUIDForNameInRoot(std::string const& folder_name,
+											   bool create_folder,
+											   LLUUID const& root_id);
+
 	// Returns the uuid of the category that specifies 'type' as what it 
 	// defaults to containing. The category is not necessarily only for that type. 
 	//    NOTE: If create_folder is true, this will create a new inventory category 
@@ -295,6 +299,10 @@ public:
 	// Returns user specified category for uploads, returns default id if there are no
 	// user specified one or it does not exist, creates default category if it is missing.
 	const LLUUID findUserDefinedCategoryUUIDForType(LLFolderType::EType preferred_type);
+
+	// Returns the uuid of the category if found, LLUUID::null is not
+	const LLUUID findDescendentCategoryIDByName(const LLUUID& parent_id,
+												const std::string& name) const;
 	
 	// Get whatever special folder this object is a child of, if any.
 	const LLViewerInventoryCategory *getFirstNondefaultParent(const LLUUID& obj_id) const;

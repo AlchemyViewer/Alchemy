@@ -29,6 +29,7 @@
 
 #include "pipeline.h"
 
+#include "alaoengine.h"
 #include "llagent.h"
 #include "llanimationstates.h"
 #include "llfloatercamera.h"
@@ -2320,6 +2321,7 @@ void LLAgentCamera::changeCameraToMouselook(BOOL animate)
 		mCameraMode = CAMERA_MODE_MOUSELOOK;
 		const U32 old_flags = gAgent.getControlFlags();
 		gAgent.setControlFlags(AGENT_CONTROL_MOUSELOOK);
+        ALAOEngine::getInstance()->inMouselook(true);
 		if (old_flags != gAgent.getControlFlags())
 		{
 			gAgent.setFlagsDirty();
@@ -2384,6 +2386,7 @@ void LLAgentCamera::changeCameraToFollow(BOOL animate)
 
 		updateLastCamera();
 		mCameraMode = CAMERA_MODE_FOLLOW;
+		ALAOEngine::getInstance()->inMouselook(false);
 
 		// bang-in the current focus, position, and up vector of the follow cam
 		mFollowCam.reset(mCameraPositionAgent, LLViewerCamera::getInstance()->getPointOfInterest(), LLVector3::z_axis);
@@ -2464,6 +2467,7 @@ void LLAgentCamera::changeCameraToThirdPerson(BOOL animate)
 		}
 		updateLastCamera();
 		mCameraMode = CAMERA_MODE_THIRD_PERSON;
+        ALAOEngine::getInstance()->inMouselook(false);
 		gAgent.clearControlFlags(AGENT_CONTROL_MOUSELOOK);
 	}
 

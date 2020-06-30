@@ -30,6 +30,7 @@
 #include "llfloaterreg.h"
 #include "llviewerfloaterreg.h"
 
+#include "alfloaterao.h"
 #include "alfloaterparticleeditor.h"
 #include "alfloaterregiontracker.h"
 #include "llcommandhandler.h"
@@ -390,6 +391,7 @@ void LLViewerFloaterReg::registerFloaters()
 
 	// *NOTE: Please keep these alphabetized for easier merges
 
+	LLFloaterReg::add("ao", "floater_ao.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<ALFloaterAO>);
 	LLFloaterReg::add("particle_editor", "floater_particle_editor.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<ALFloaterParticleEditor>);
 	LLFloaterReg::add("quick_settings", "floater_quick_settings.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloater>);
 	LLFloaterReg::add("region_tracker", "floater_region_tracker.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<ALFloaterRegionTracker>);

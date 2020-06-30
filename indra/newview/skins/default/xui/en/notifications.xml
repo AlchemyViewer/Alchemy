@@ -11783,6 +11783,166 @@ the region &quot;[REGION]&quot;?
 
   <notification
    icon="alertmodal.tga"
+   name="NewAOSet"
+   type="alertmodal">
+Specify a name for the new AO set:
+(The name may contain any ASCII character, except for ":" or "|")
+    <form name="form">
+      <input name="message" type="text" default="true">
+New AO Set
+      </input>
+      <button
+       default="true"
+       index="0"
+       name="OK"
+       text="OK"/>
+      <button
+       index="1"
+       name="Cancel"
+       text="Cancel"/>
+    </form>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="NewAOCantContainNonASCII"
+   type="alertmodal">
+Could not create new AO set "[AO_SET_NAME]".
+The name may only contain ASCII characters, excluding ":" and "|".
+    <usetemplate
+     name="okbutton"
+     yestext="OK"/>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="RenameAOMustBeASCII"
+   type="alertmodal">
+Could not rename AO set "[AO_SET_NAME]".
+The name may only contain ASCII characters, excluding ":" and "|".
+    <usetemplate
+     name="okbutton"
+     yestext="OK"/>
+  </notification>
+
+<notification
+   icon="alertmodal.tga"
+   name="RemoveAOSet"
+   type="alertmodal">
+Remove AO set "[AO_SET_NAME]" from the list?
+    <usetemplate
+     name="okcancelbuttons"
+     notext="Cancel"
+     yestext="Remove"/>
+  </notification>
+
+  <notification
+   icon="notifytip.tga"
+   name="AOForeignItemsFound"
+   type="alertmodal">
+The animation overrider found at least one item that did not belong in the configuration. Please check your &quot;Lost and Found&quot; folder for items that were moved out of the animation overrider configuration.
+  </notification>
+
+  <notification
+   icon="notifytip.tga"
+   name="AOImportSetAlreadyExists"
+   type="notifytip">
+An animation set with this name already exists.
+  </notification>
+
+  <notification
+   icon="notifytip.tga"
+   name="AOImportPermissionDenied"
+   type="notifytip">
+Insufficient permissions to read notecard.
+  </notification>
+
+  <notification
+   icon="notifytip.tga"
+   name="AOImportCreateSetFailed"
+   type="notifytip">
+Error while creating import set.
+  </notification>
+
+  <notification
+   icon="notifytip.tga"
+   name="AOImportDownloadFailed"
+   type="notifytip">
+Could not download notecard.
+  </notification>
+
+  <notification
+   icon="notifytip.tga"
+   name="AOImportNoText"
+   type="notifytip">
+Notecard is empty or unreadable.
+  </notification>
+
+  <notification
+   icon="notifytip.tga"
+   name="AOImportNoFolder"
+   type="notifytip">
+Couldn't find folder to read the animations.
+  </notification>
+
+  <notification
+   icon="notifytip.tga"
+   name="AOImportNoStatePrefix"
+   type="notifytip">
+Notecard line [LINE] has no valid [ state prefix.
+  </notification>
+
+  <notification
+   icon="notifytip.tga"
+   name="AOImportNoValidDelimiter"
+   type="notifytip">
+Notecard line [LINE] has no valid ] delimiter.
+  </notification>
+
+  <notification
+   icon="notifytip.tga"
+   name="AOImportStateNameNotFound"
+   type="notifytip">
+State name [NAME] not found.
+  </notification>
+
+  <notification
+   icon="notifytip.tga"
+   name="AOImportAnimationNotFound"
+   type="notifytip">
+Couldn't find animation [NAME]. Please make sure it's present in the same folder as the import notecard.
+  </notification>
+
+  <notification
+   icon="notifytip.tga"
+   name="AOImportInvalid"
+   type="notifytip">
+Notecard didn't contain any usable data. Aborting import.
+  </notification>
+
+  <notification
+   icon="notifytip.tga"
+   name="AOImportRetryCreateSet"
+   type="notifytip">
+Could not create import folder for animation set [NAME]. Retrying ...
+  </notification>
+
+  <notification
+   icon="notifytip.tga"
+   name="AOImportAbortCreateSet"
+   type="notifytip">
+Could not create import folder for animation set [NAME]. Giving up.
+  </notification>
+
+  <notification
+   icon="notifytip.tga"
+   name="AOImportLinkFailed"
+   type="notifytip">
+Creating animation link for animation "[NAME]" failed!
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
    name="ParticleSaveChanges"
    type="alertmodal">
 Inject with particle script before closing?

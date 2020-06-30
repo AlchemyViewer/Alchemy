@@ -1,5 +1,9 @@
 <llsd>
     <map>
+    <key>Include</key>
+    <array>
+      <string>settings_per_account_alchemy.xml</string>
+    </array>
     <key>RLVaLoginLastLocation</key>
         <map>
         <key>Comment</key>

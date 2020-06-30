@@ -29,10 +29,10 @@
 #include "object_flags.h"
 
 // viewer includes
+#include "alaoengine.h"
 #include "llagent.h"
 #include "llagentcamera.h"
 #include "llagentui.h"
-//#include "llaoengine.h"
 #include "llcommandhandler.h"
 #include "llfloaterimnearbychat.h"
 #include "llfloaterreg.h"
@@ -297,44 +297,44 @@ bool ALChatCommand::parseCommand(std::string data)
 			}
 			return true;
 		}
-		//else if (cmd == utf8str_tolower(sAOCommand))
-		//{
-		//	std::string subcmd;
-		//	if (input >> subcmd)
-		//	{
-		//		if (subcmd == "on")
-		//		{
-		//			gSavedPerAccountSettings.setBOOL("UseAO", TRUE);
-		//			return true;
-		//		}
-		//		else if (subcmd == "off")
-		//		{
-		//			gSavedPerAccountSettings.setBOOL("UseAO", FALSE);
-		//			return true;
-		//		}
-		//		else if (subcmd == "sit")
-		//		{
-		//			auto ao_set = LLAOEngine::instance().getSetByName(LLAOEngine::instance().getCurrentSetName());
-		//			if (input >> subcmd)
-		//			{
-		//				if (subcmd == "on")
-		//				{
-		//					LLAOEngine::instance().setOverrideSits(ao_set, true);
+		else if (cmd == utf8str_tolower(sAOCommand))
+		{
+			std::string subcmd;
+			if (input >> subcmd)
+			{
+				if (subcmd == "on")
+				{
+					gSavedPerAccountSettings.setBOOL("AlchemyAOEnable", TRUE);
+					return true;
+				}
+				else if (subcmd == "off")
+				{
+					gSavedPerAccountSettings.setBOOL("AlchemyAOEnable", FALSE);
+					return true;
+				}
+				else if (subcmd == "sit")
+				{
+					auto ao_set = ALAOEngine::instance().getSetByName(ALAOEngine::instance().getCurrentSetName());
+					if (input >> subcmd)
+					{
+						if (subcmd == "on")
+						{
+							ALAOEngine::instance().setOverrideSits(ao_set, true);
 
-		//				}
-		//				else if (subcmd == "off")
-		//				{
-		//					LLAOEngine::instance().setOverrideSits(ao_set, false);
-		//				}
-		//			}
-		//			else
-		//			{
-		//				LLAOEngine::instance().setOverrideSits(ao_set, !ao_set->getSitOverride());
-		//			}
-		//			return true;
-		//		}
-		//	}
-		//}
+						}
+						else if (subcmd == "off")
+						{
+							ALAOEngine::instance().setOverrideSits(ao_set, false);
+						}
+					}
+					else
+					{
+						ALAOEngine::instance().setOverrideSits(ao_set, !ao_set->getSitOverride());
+					}
+					return true;
+				}
+			}
+		}
 	}
 	return false;
 }

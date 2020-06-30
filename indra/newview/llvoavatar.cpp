@@ -37,6 +37,7 @@
 #include "sound_ids.h"
 #include "raytrace.h"
 
+#include "alaoengine.h"
 #include "llagent.h" //  Get state values from here
 #include "llagentbenefits.h"
 #include "llagentcamera.h"
@@ -2916,6 +2917,8 @@ void LLVOAvatar::idleUpdateLoadingEffect()
 				{
 					LL_INFOS("Avatar") << avString() << "self isFullyLoaded, mFirstFullyVisible" << LL_ENDL;
 					LLAppearanceMgr::instance().onFirstFullyVisible();
+
+					ALAOEngine::instance().onLoginComplete();
 				}
 				else
 				{
@@ -3532,11 +3535,12 @@ LLColor4 LLVOAvatar::getNameTagColor(bool is_friend)
 void LLVOAvatar::idleUpdateBelowWater()
 {
 	F32 avatar_height = (F32)(getPositionGlobal().mdV[VZ]);
+	F32 water_height = getRegion()->getWaterHeight();
 
-	F32 water_height;
-	water_height = getRegion()->getWaterHeight();
-
-	mBelowWater =  avatar_height < water_height;
+	BOOL was_below_water = mBelowWater;
+	mBelowWater = avatar_height < water_height;
+	if (isSelf() && mBelowWater != was_below_water)
+        ALAOEngine::instance().checkBelowWater(mBelowWater);
 }
 
 void LLVOAvatar::slamPosition()
@@ -5903,9 +5907,21 @@ LLUUID LLVOAvatar::remapMotionID(const LLUUID& id)
 BOOL LLVOAvatar::startMotion(const LLUUID& id, F32 time_offset)
 {
 	LL_DEBUGS("Motion") << "motion requested " << id.asString() << " " << gAnimLibrary.animationName(id) << LL_ENDL;
-
-	LLUUID remap_id = remapMotionID(id);
-
+	
+	LLUUID remap_id;
+	if(isSelf())
+	{
+        remap_id = ALAOEngine::getInstance()->override(id, true);
+		if(remap_id.isNull())
+			remap_id = remapMotionID(id);
+		else
+			gAgent.sendAnimationRequest(remap_id, ANIM_REQUEST_START);
+	}
+	else
+	{
+		remap_id = remapMotionID(id);
+	}
+	
 	if (remap_id != id)
 	{
 		LL_DEBUGS("Motion") << "motion resultant " << remap_id.asString() << " " << gAnimLibrary.animationName(remap_id) << LL_ENDL;
@@ -5926,7 +5942,19 @@ BOOL LLVOAvatar::stopMotion(const LLUUID& id, BOOL stop_immediate)
 {
 	LL_DEBUGS("Motion") << "Motion requested " << id.asString() << " " << gAnimLibrary.animationName(id) << LL_ENDL;
 
-	LLUUID remap_id = remapMotionID(id);
+	LLUUID remap_id;
+	if(isSelf())
+	{
+        remap_id = ALAOEngine::getInstance()->override(id, false);
+		if(remap_id.isNull())
+			remap_id = remapMotionID(id);
+		else
+			gAgent.sendAnimationRequest(remap_id, ANIM_REQUEST_STOP);
+	}
+	else
+	{
+		remap_id = remapMotionID(id);
+	}
 	
 	if (remap_id != id)
 	{
