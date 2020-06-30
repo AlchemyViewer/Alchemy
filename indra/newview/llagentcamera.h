@@ -139,7 +139,7 @@ public:
 
 private:
 	/** Determines maximum camera distance from target for mouselook, opposite to LAND_MIN_ZOOM */
-	F32 getCameraMaxZoomDistance();
+	F32 getCameraMaxZoomDistance(bool allow_disabled_constraints = false);
 
 	/** Camera preset in Third Person Mode */
 	ECameraPreset mCameraPreset; 
@@ -458,11 +458,6 @@ private:
 /**                    Keys
  **                                                                            **
  *******************************************************************************/
-	// Settings
-	bool			mDisableCameraConstraints = false;
-	F32				mCameraOffsetScale = 1.f;
-	F32				mYawFromMousePosition = 90.f;
-	F32				mPitchFromMousePosition = 90.f;
 };
 
 extern LLAgentCamera gAgentCamera;

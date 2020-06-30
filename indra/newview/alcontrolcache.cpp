@@ -6,6 +6,7 @@
 bool ALControlCache::AutoSnapshot = false;
 bool ALControlCache::AutomaticFly = true;
 bool ALControlCache::DebugAvatarRezTime = false;
+bool ALControlCache::DisableCameraConstraints = false;
 bool ALControlCache::EditLinkedParts = false;
 F32  ALControlCache::GridDrawSize;
 F32  ALControlCache::GridOpacity;
@@ -24,6 +25,8 @@ bool ALControlCache::ShowAdultEvents;
 bool ALControlCache::ShowMatureEvents;
 bool ALControlCache::SnapEnabled;
 S32  ALControlCache::ToastGap;
+F32  ALControlCache::YawFromMousePosition = 90.f;
+F32  ALControlCache::PitchFromMousePosition = 90.f;
 
 
 #define DECLARE_CTRL(ctrl, type, ctrl_type) \
@@ -56,6 +59,7 @@ void ALControlCache::initControls()
 	DECLARE_CTRL_BOOL(AutoSnapshot);
 	DECLARE_CTRL_BOOL(AutomaticFly);
 	DECLARE_CTRL_BOOL(DebugAvatarRezTime);
+    DECLARE_CTRL_BOOL(DisableCameraConstraints);
 	DECLARE_CTRL_BOOL(EditLinkedParts);
 	DECLARE_CTRL_F32(GridDrawSize);
 	DECLARE_CTRL_F32(GridOpacity);
@@ -74,4 +78,6 @@ void ALControlCache::initControls()
 	DECLARE_CTRL_BOOL(ShowMatureEvents);
 	DECLARE_CTRL_BOOL(SnapEnabled);
 	DECLARE_CTRL_S32(ToastGap);
+    DECLARE_CTRL_F32(YawFromMousePosition);
+    DECLARE_CTRL_F32(PitchFromMousePosition);
 }

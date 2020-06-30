@@ -8,6 +8,7 @@ struct ALControlCache
 	static bool		AutoSnapshot;
 	static bool		AutomaticFly;
 	static bool		DebugAvatarRezTime;
+    static bool     DisableCameraConstraints;
 	static bool		EditLinkedParts;
 	static F32		GridDrawSize;
 	static F32		GridOpacity;
@@ -26,6 +27,8 @@ struct ALControlCache
 	static bool		ShowMatureEvents;
 	static bool		SnapEnabled;
 	static S32		ToastGap;
+    static F32		YawFromMousePosition;
+    static F32      PitchFromMousePosition;
 };
 
 #endif

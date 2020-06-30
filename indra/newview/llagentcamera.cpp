@@ -581,7 +581,7 @@ BOOL LLAgentCamera::calcCameraMinDistance(F32 &obj_min_distance)
 	BOOL soft_limit = FALSE; // is the bounding box to be treated literally (volumes) or as an approximation (avatars)
 	if (!mFocusObject || mFocusObject->isDead() || 
 		mFocusObject->isMesh() ||
-		mDisableCameraConstraints)
+		ALControlCache::DisableCameraConstraints)
 	{
 		obj_min_distance = 0.f;
 		return TRUE;
@@ -963,7 +963,7 @@ void LLAgentCamera::cameraZoomIn(const F32 fraction)
 
 	new_distance = llmax(new_distance, min_zoom); 
 
-	F32 max_distance = getCameraMaxZoomDistance();
+	F32 max_distance = getCameraMaxZoomDistance(true);
 
     max_distance = llmin(max_distance, current_distance * 4.f); //Scaled max relative to current distance.  MAINT-3154
 
@@ -1037,12 +1037,12 @@ void LLAgentCamera::cameraOrbitIn(const F32 meters)
 
 		new_distance = llmax(new_distance, min_zoom);
 
-		F32 max_distance = getCameraMaxZoomDistance();
+		F32 max_distance = getCameraMaxZoomDistance(true);
 
 		if (new_distance > max_distance)
 		{
 			// Unless camera is unlocked
-			if (!mDisableCameraConstraints)
+            if (!ALControlCache::DisableCameraConstraints)
 			{
 				return;
 			}
@@ -1203,8 +1203,8 @@ void LLAgentCamera::updateLookAt(const S32 mouse_x, const S32 mouse_y)
 			F32 y_from_center = 
 				((F32) mouse_y / (F32) gViewerWindow->getWorldViewHeightScaled() ) - 0.5f;
 
-			frameCamera.yaw( - x_from_center * mYawFromMousePosition * DEG_TO_RAD);
-			frameCamera.pitch( - y_from_center * mPitchFromMousePosition * DEG_TO_RAD);
+			frameCamera.yaw( - x_from_center * ALControlCache::YawFromMousePosition * DEG_TO_RAD);
+			frameCamera.pitch( - y_from_center * ALControlCache::PitchFromMousePosition * DEG_TO_RAD);
 			lookAtType = LOOKAT_TARGET_FREELOOK;
 		}
 
@@ -1991,7 +1991,7 @@ LLVector3d LLAgentCamera::calcCameraPositionTargetGlobal(BOOL *hit_limit)
 		camera_position_global = focusPosGlobal + mCameraFocusOffset;
 	}
 
-	if (!mDisableCameraConstraints && !gAgent.isGodlike())
+	if (!ALControlCache::DisableCameraConstraints && !gAgent.isGodlike())
 	{
 		LLViewerRegion* regionp = LLWorld::getInstance()->getRegionFromPosGlobal(camera_position_global);
 		bool constrain = true;
@@ -2119,7 +2119,7 @@ bool LLAgentCamera::clampCameraPosition(LLVector3d& posCamGlobal, const LLVector
 		m_fRlvMinDist = true;
 	}
 
-	if (!isnan(nDistMult))
+	if (!llisnan(nDistMult))
 	{
 		posCamGlobal = posCamRefGlobal + nDistMult * offsetCamera;
 		m_posRlvRefGlobal = posCamRefGlobal;
@@ -2176,12 +2176,13 @@ F32 LLAgentCamera::getCameraOffsetScale() const
 }
 // [/RLVa:KB]
 
-F32 LLAgentCamera::getCameraMaxZoomDistance()
+F32 LLAgentCamera::getCameraMaxZoomDistance(bool allow_disabled_constraints/* = false */)
 {
-    // Ignore "DisableCameraConstraints", we don't want to be out of draw range when we focus onto objects or avatars
-    return llmin(MAX_CAMERA_DISTANCE_FROM_OBJECT,
-                 mDrawDistance - 1, // convenience, don't hit draw limit when focusing on something
-                 LLWorld::getInstance()->getRegionWidthInMeters() - CAMERA_FUDGE_FROM_OBJECT);
+    return (allow_disabled_constraints && ALControlCache::DisableCameraConstraints)
+               ? INT_MAX
+               : llmin(MAX_CAMERA_DISTANCE_FROM_OBJECT,
+                       mDrawDistance - 1,  // convenience, don't hit draw limit when focusing on something
+                       LLWorld::getInstance()->getRegionWidthInMeters() - CAMERA_FUDGE_FROM_OBJECT);
 }
 
 LLVector3 LLAgentCamera::getAvatarRootPosition()
@@ -2255,7 +2256,7 @@ F32 LLAgentCamera::getCameraMinOffGround()
 	{
 		return 0.f;
 	}
-	return mDisableCameraConstraints ? -1000.f : 0.5f;
+    return ALControlCache::DisableCameraConstraints ? -1000.f : 0.5f;
 }
 
 
