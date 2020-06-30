@@ -544,6 +544,9 @@ void LLStatusBar::onMouseEnterPresetsCamera()
 	mPanelNearByMedia->setVisible(FALSE);
 	mPanelVolumePulldown->setVisible(FALSE);
 	mPanelPresetsPulldown->setVisible(FALSE);
+    mPanelAOPulldown->setVisible(FALSE);
+    // mPanelAvatarComplexityPulldown->setVisible(FALSE);
+    mPanelQuickSettingsPulldown->setVisible(FALSE);
 	mPanelPresetsCameraPulldown->setVisible(TRUE);
 }
 
@@ -564,8 +567,13 @@ void LLStatusBar::onMouseEnterPresets()
 	// show the master presets pull-down
 	LLUI::getInstance()->clearPopups();
 	LLUI::getInstance()->addPopup(mPanelPresetsPulldown);
+
+	mPanelPresetsCameraPulldown->setVisible(FALSE);
 	mPanelNearByMedia->setVisible(FALSE);
 	mPanelVolumePulldown->setVisible(FALSE);
+    mPanelAOPulldown->setVisible(FALSE);
+    // mPanelAvatarComplexityPulldown->setVisible(FALSE);
+    mPanelQuickSettingsPulldown->setVisible(FALSE);
 	mPanelPresetsPulldown->setVisible(TRUE);
 }
 
@@ -586,9 +594,11 @@ void LLStatusBar::onMouseEnterQuickSettings()
 	LLUI::getInstance()->clearPopups();
 	LLUI::getInstance()->addPopup(mPanelQuickSettingsPulldown);
 
+	mPanelPresetsCameraPulldown->setVisible(FALSE);
+    mPanelPresetsPulldown->setVisible(FALSE);
 	mPanelNearByMedia->setVisible(FALSE);
 	mPanelVolumePulldown->setVisible(FALSE);
-	//mPanelAOPulldown->setVisible(FALSE);
+	mPanelAOPulldown->setVisible(FALSE);
 	//mPanelAvatarComplexityPulldown->setVisible(FALSE);
 	mPanelQuickSettingsPulldown->setVisible(TRUE);
 }
@@ -609,6 +619,8 @@ void LLStatusBar::onMouseEnterAO()
 	LLUI::getInstance()->clearPopups();
 	LLUI::getInstance()->addPopup(mPanelAOPulldown);
 	
+	mPanelPresetsCameraPulldown->setVisible(FALSE);
+    mPanelPresetsPulldown->setVisible(FALSE);
 	mPanelNearByMedia->setVisible(FALSE);
 	mPanelVolumePulldown->setVisible(FALSE);
 	mPanelQuickSettingsPulldown->setVisible(FALSE);
