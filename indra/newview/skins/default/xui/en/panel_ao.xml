@@ -4,7 +4,7 @@
  left="0"
  top="0"
  width="200"
- height="314"
+ height="334"
  follows="all"
  visible="true"
  layout="topleft">
@@ -18,11 +18,22 @@
    follows="all"
    visible="true"
    layout="topleft">
+    <check_box
+     name="ao_enable"
+     label="Enable AO"
+     tool_tip="Enable or disable the Animation Overrider"
+     control_name="AlchemyAOEnable"
+     left="0"
+     top="4"
+     width="20"
+     height="20"
+     follows="left|top"
+     layout="topleft" />
     <combo_box
      name="ao_set_selection_combo"
      tool_tip="Select animation set to edit."
      left="0"
-     top="4"
+     top_pad="2"
      right="-24"
      height="20"
      allow_text_entry="true"
