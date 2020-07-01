@@ -122,6 +122,7 @@ set(viewer_SOURCE_FILES
     alpanelaopulldown.cpp
     alpanelquicksettings.cpp
     alpanelquicksettingspulldown.cpp
+    altoolalign.cpp
     alunzip.cpp
     alviewermenu.cpp
     groupchatlistener.cpp
@@ -776,6 +777,7 @@ set(viewer_HEADER_FILES
     alpanelaopulldown.h
     alpanelquicksettings.h
     alpanelquicksettingspulldown.h
+    altoolalign.h
     alunzip.h
     alviewermenu.h
     groupchatlistener.h

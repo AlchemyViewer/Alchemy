@@ -32,6 +32,7 @@
 #include "llcoord.h"
 //#include "llgl.h"
 
+#include "altoolalign.h"
 #include "llagent.h"
 #include "llagentcamera.h"
 #include "llbutton.h"
@@ -656,6 +657,7 @@ void LLFloaterTools::updatePopup(LLCoordGL center, MASK mask)
 						tool == LLToolCompScale::getInstance() ||
 						tool == LLToolFace::getInstance() ||
 						tool == LLToolIndividual::getInstance() ||
+						tool == ALToolAlign::getInstance() ||
 						tool == LLToolPipette::getInstance();
 
 	mBtnEdit	->setToggleState( edit_visible );
@@ -691,8 +693,11 @@ void LLFloaterTools::updatePopup(LLCoordGL center, MASK mask)
 	{
 		mRadioGroupEdit->setValue("radio select face");
 	}
+	else if ( tool == ALToolAlign::getInstance() )
+	{
+		mRadioGroupEdit->setValue("radio align");
+	}
 
-	if (mComboGridMode) 
 	{
 		mComboGridMode->setVisible( edit_visible );
 		S32 index = mComboGridMode->getCurrentIndex();
@@ -1008,6 +1013,10 @@ void commit_radio_group_edit(LLUICtrl *ctrl)
 	else if (selected == "radio select face")
 	{
 		LLFloaterTools::setEditTool( LLToolFace::getInstance() );
+	}
+	else if (selected == "radio align")
+	{
+		LLFloaterTools::setEditTool( ALToolAlign::getInstance() );
 	}
 	gSavedSettings.setBOOL("ShowParcelOwners", show_owners);
 }

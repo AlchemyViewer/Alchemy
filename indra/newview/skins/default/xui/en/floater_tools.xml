@@ -229,7 +229,7 @@
 	<radio_group
      follows="left|top"
 	 left="5"
-	 top="55"
+	 top="53"
 	 height="70"
      layout="topleft"
 	 name="edit_radio_group">
@@ -238,20 +238,25 @@
 		 layout="topleft"
 		 name="radio position" />
         <radio_item
-		 top_pad="6"
+		 top_pad="5"
          label="Rotate (Ctrl)"
          layout="topleft"
          name="radio rotate" />
         <radio_item
-		 top_pad="6"
+		 top_pad="5"
          label="Stretch (Ctrl+Shift)"
          layout="topleft"
          name="radio stretch" />
         <radio_item
-		 top_pad="6"
+		 top_pad="5"
          label="Select Face"
          layout="topleft"
          name="radio select face" />
+        <radio_item
+         top_pad="5"
+         label="Align"
+         layout="topleft"
+         name="radio align" />
 			<radio_group.commit_callback
 			function="BuildTool.commitRadioEdit"/>
     </radio_group>
@@ -263,7 +268,7 @@
      label="Edit linked"
      layout="topleft"
      name="checkbox edit linked parts"
-     top_pad="-18">
+     top_pad="-8">
 		  <check_box.commit_callback
 			function="BuildTool.selectComponent"/>
 	</check_box>
@@ -272,7 +277,7 @@
      follows="left|top"
      height="20"
      label="Link"
-     top="108"
+     top="103"
      layout="topleft"
      left="143"
      name="link_btn"
@@ -750,7 +755,7 @@
 	  layout="topleft"
 	  left="10"
 	  name="selection_empty"
-	  top_pad="0"
+	  top_pad="11"
 	  width="100">
 		Nothing selected.
 	</text>
@@ -778,7 +783,7 @@
 	  layout="topleft"
 	  left="10"
 	  name="remaining_capacity"
-	  top_pad="0"
+	  top_pad="-2"
 	  visible="false"
 	  width="280">
 	  [CAPACITY_STRING] [secondlife:///app/openfloater/object_weights More info]
@@ -816,7 +821,7 @@
     layout="topleft"
     left="6"
     name="cost_text_border"
-    top="135"
+    top="145"
     width="282"/>
     <tab_container
      follows="left|top"
@@ -827,9 +832,8 @@
      tab_max_width="100"
      tab_min_width="40"
      tab_position="top"
-     tab_height="25"
      open_tabs_on_drag_and_drop="true"
-     top="173"
+     top="180"
      width="295">
 	
 <panel
