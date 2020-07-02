@@ -661,7 +661,10 @@ LLViewerRegion::~LLViewerRegion()
 	saveObjectCache();
 
 	delete mImpl;
-	mImpl = NULL;
+	mImpl = nullptr;
+
+	for (LLPointer<LLViewerTexture> tile : mWorldMapTiles)
+		tile->setBoostLevel(LLViewerTexture::BOOST_NONE);
 }
 
 /*virtual*/ 
@@ -3322,3 +3325,44 @@ U32 LLViewerRegion::getMaxMaterialsPerTransaction() const
 
 
 
+std::string LLViewerRegion::getMapServerURL() const
+{
+	std::string url;
+	if (mSimulatorFeatures.has("OpenSimExtras")
+		&& mSimulatorFeatures["OpenSimExtras"].has("map-server-url"))
+	{
+		url = mSimulatorFeatures["OpenSimExtras"]["map-server-url"].asString();
+	}
+	else
+	{
+		url = gSavedSettings.getString("CurrentMapServerURL");
+	}
+	return url;
+}
+
+
+const LLViewerRegion::tex_matrix_t& LLViewerRegion::getWorldMapTiles() const
+{
+	if (mWorldMapTiles.empty())
+	{
+		U32 gridX, gridY;
+		grid_from_region_handle(mHandle, &gridX, &gridY);
+		U32 totalX(getWidth() / REGION_WIDTH_U32);
+		if (!totalX) ++totalX; // If this region is too small, still get an image.
+		// *TODO: Non-square regions?
+		//U32 totalY(getLength()/REGION_WIDTH_U32);
+		//if (!totalY) ++totalY; // If this region is too small, still get an image.
+		const U32 totalY(totalX);
+		mWorldMapTiles.reserve(totalX * totalY);
+		for (U32 x = 0; x != totalX; ++x)
+			for (U32 y = 0; y != totalY; ++y)
+			{
+				const std::string map_url = getMapServerURL().append(llformat("map-1-%d-%d-objects.jpg", gridX + x, gridY + y));
+				LLPointer<LLViewerTexture> tex(LLViewerTextureManager::getFetchedTextureFromUrl(map_url, FTT_MAP_TILE, TRUE,
+											   LLViewerTexture::BOOST_NONE, LLViewerTexture::LOD_TEXTURE));
+				mWorldMapTiles.push_back(tex);
+				tex->setBoostLevel(LLViewerTexture::BOOST_MAP);
+			}
+	}
+	return mWorldMapTiles;
+}

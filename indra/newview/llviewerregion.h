@@ -53,6 +53,7 @@ const U32 REGION_HANDSHAKE_SUPPORTS_SELF_APPEARANCE = 1U << 2;
 class LLEventPoll;
 class LLVLComposition;
 class LLViewerObject;
+class LLViewerTexture;
 class LLMessageSystem;
 class LLNetMap;
 class LLViewerParcelOverlay;
@@ -71,7 +72,7 @@ class LLViewerRegionImpl;
 class LLViewerOctreeGroup;
 class LLVOCachePartition;
 
-class LLViewerRegion: public LLCapabilityProvider // implements this interface
+class LLViewerRegion final : public LLCapabilityProvider // implements this interface
 {
 public:
 	//MUST MATCH THE ORDER OF DECLARATION IN CONSTRUCTOR
@@ -390,6 +391,12 @@ public:
 
 	static BOOL isNewObjectCreationThrottleDisabled() {return sNewObjectCreationThrottle < 0;}
 
+	/// Hypergrid map server url
+	std::string getMapServerURL() const;
+
+	typedef std::vector<LLPointer<LLViewerTexture> > tex_matrix_t;
+	const tex_matrix_t& getWorldMapTiles() const;
+
 private:
 	void addToVOCacheTree(LLVOCacheEntry* entry);
 	LLViewerObject* addNewObject(LLVOCacheEntry* entry);
@@ -552,6 +559,8 @@ private:
 	LLFrameTimer mMaterialsCapThrottleTimer;
 	LLFrameTimer mRenderInfoRequestTimer;
 	LLFrameTimer mRenderInfoReportTimer;
+
+	mutable tex_matrix_t mWorldMapTiles;
 };
 
 inline BOOL LLViewerRegion::getRegionProtocol(U64 protocol) const

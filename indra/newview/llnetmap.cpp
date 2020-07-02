@@ -48,6 +48,7 @@
 #include "llappviewer.h" // for gDisconnected
 #include "llcallingcard.h" // LLAvatarTracker
 #include "llfloaterworldmap.h"
+#include "llparcel.h"
 #include "lltracker.h"
 #include "llsurface.h"
 #include "llviewercamera.h"
@@ -56,6 +57,8 @@
 #include "llviewertexturelist.h"
 #include "llviewermenu.h"
 #include "llviewerobjectlist.h"
+#include "llviewerparcelmgr.h"
+#include "llviewerparceloverlay.h"
 #include "llviewerregion.h"
 #include "llviewerwindow.h"
 #include "llworld.h"
@@ -77,7 +80,7 @@ const F32 DOT_SCALE = 0.75f;
 const F32 MIN_PICK_SCALE = 2.f;
 const S32 MOUSE_DRAG_SLOP = 2;		// How far the mouse needs to move before we think it's a drag
 
-const F64 COARSEUPDATE_MAX_Z = 1020.0f;
+const F64 COARSEUPDATE_MAX_Z = 1020.0;
 
 LLNetMap::LLNetMap (const Params & p)
 :	LLUICtrl (p),
@@ -167,6 +170,7 @@ void LLNetMap::draw()
 	static LLUIColor map_frustum_color = LLUIColorTable::instance().getColor("MapFrustumColor", LLColor4::white);
 	static LLUIColor map_frustum_rotating_color = LLUIColorTable::instance().getColor("MapFrustumRotatingColor", LLColor4::white);
 	
+	static const LLCachedControl<bool> use_world_map_image(gSavedSettings, "AlchemyMinimapTile", true);
 	if (mObjectImagep.isNull())
 	{
 		createObjectImage();
@@ -234,6 +238,7 @@ void LLNetMap::draw()
 			LLVector3 rel_region_pos = origin_agent - gAgentCamera.getCameraPositionAgent();
 			F32 relative_x = (rel_region_pos.mV[0] / region_width) * mScale;
 			F32 relative_y = (rel_region_pos.mV[1] / region_width) * mScale;
+			const F32 real_width(regionp->getWidth());
 
 			// background region rectangle
 			F32 bottom =	relative_y;
@@ -254,40 +259,76 @@ void LLNetMap::draw()
 			{
 				gGL.color4f(1.f, 0.5f, 0.5f, 1.f);
 			}
-
-
-			// Draw using texture.
-			gGL.getTexUnit(0)->bind(regionp->getLand().getSTexture());
-			gGL.begin(LLRender::QUADS);
-				gGL.texCoord2f(0.f, 1.f);
-				gGL.vertex2f(left, top);
-				gGL.texCoord2f(0.f, 0.f);
-				gGL.vertex2f(left, bottom);
-				gGL.texCoord2f(1.f, 0.f);
-				gGL.vertex2f(right, bottom);
-				gGL.texCoord2f(1.f, 1.f);
-				gGL.vertex2f(right, top);
-			gGL.end();
-
-			// Draw water
-			gGL.setAlphaRejectSettings(LLRender::CF_GREATER, ABOVE_WATERLINE_ALPHA / 255.f);
+			
+			// <alchemy>
+			bool render_land_textures = true;
+			if (use_world_map_image)
 			{
-				if (regionp->getLand().getWaterTexture())
+				const LLViewerRegion::tex_matrix_t& tiles(regionp->getWorldMapTiles());
+				for (S32 i(0), scaled_width(real_width / region_width), square_width(scaled_width * scaled_width);
+					 i < square_width; ++i)
 				{
-					gGL.getTexUnit(0)->bind(regionp->getLand().getWaterTexture());
-					gGL.begin(LLRender::QUADS);
-						gGL.texCoord2f(0.f, 1.f);
-						gGL.vertex2f(left, top);
-						gGL.texCoord2f(0.f, 0.f);
-						gGL.vertex2f(left, bottom);
-						gGL.texCoord2f(1.f, 0.f);
-						gGL.vertex2f(right, bottom);
-						gGL.texCoord2f(1.f, 1.f);
-						gGL.vertex2f(right, top);
-					gGL.end();
+					const F32 y(i / scaled_width);
+					const F32 x(i - y * scaled_width);
+					const F32 local_left(left + x * mScale);
+					const F32 local_right(local_left + mScale);
+					const F32 local_bottom(bottom + y * mScale);
+					const F32 local_top(local_bottom + mScale);
+					LLViewerTexture* img = tiles[x * scaled_width + y];
+					if (img && img->hasGLTexture())
+					{
+						gGL.getTexUnit(0)->bind(img);
+						gGL.begin(LLRender::QUADS);
+							gGL.texCoord2f(0.f, 1.f);
+							gGL.vertex2f(local_left, local_top);
+							gGL.texCoord2f(0.f, 0.f);
+							gGL.vertex2f(local_left, local_bottom);
+							gGL.texCoord2f(1.f, 0.f);
+							gGL.vertex2f(local_right, local_bottom);
+							gGL.texCoord2f(1.f, 1.f);
+							gGL.vertex2f(local_right, local_top);
+						gGL.end();
+						img->setBoostLevel(LLViewerTexture::BOOST_MAP_VISIBLE);
+						render_land_textures = false;
+					}
 				}
 			}
-			gGL.setAlphaRejectSettings(LLRender::CF_DEFAULT);
+			
+			if (render_land_textures)
+			{
+				// Draw using texture.
+				gGL.getTexUnit(0)->bind(regionp->getLand().getSTexture());
+				gGL.begin(LLRender::QUADS);
+					gGL.texCoord2f(0.f, 1.f);
+					gGL.vertex2f(left, top);
+					gGL.texCoord2f(0.f, 0.f);
+					gGL.vertex2f(left, bottom);
+					gGL.texCoord2f(1.f, 0.f);
+					gGL.vertex2f(right, bottom);
+					gGL.texCoord2f(1.f, 1.f);
+					gGL.vertex2f(right, top);
+				gGL.end();
+
+				// Draw water
+				gGL.setAlphaRejectSettings(LLRender::CF_GREATER, ABOVE_WATERLINE_ALPHA / 255.f);
+				{
+					if (regionp->getLand().getWaterTexture())
+					{
+						gGL.getTexUnit(0)->bind(regionp->getLand().getWaterTexture());
+						gGL.begin(LLRender::QUADS);
+							gGL.texCoord2f(0.f, 1.f);
+							gGL.vertex2f(left, top);
+							gGL.texCoord2f(0.f, 0.f);
+							gGL.vertex2f(left, bottom);
+							gGL.texCoord2f(1.f, 0.f);
+							gGL.vertex2f(right, bottom);
+							gGL.texCoord2f(1.f, 1.f);
+							gGL.vertex2f(right, top);
+						gGL.end();
+					}
+				}
+				gGL.setAlphaRejectSettings(LLRender::CF_DEFAULT);
+			}
 		}
 
 		// Redraw object layer periodically
