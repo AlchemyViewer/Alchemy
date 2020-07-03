@@ -505,6 +505,12 @@
      name="MapAvatarSelfColor"
      value="0.53125 0 0.498047 1" />
     <color
+     name="MapChatRingColor"
+     reference="White_10" />
+    <color
+     name="MapShoutRingColor"
+     reference="White_10" />
+    <color
      name="MapFrustumColor"
      reference="White_10" />
     <color

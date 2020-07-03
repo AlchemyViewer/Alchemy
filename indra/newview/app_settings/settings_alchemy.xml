@@ -299,10 +299,43 @@
       <key>Value</key>
       <integer>1</integer>
     </map>
+    <key>AlchemyMinimapChatRings</key>
+    <map>
+      <key>Comment</key>
+      <string>Draw rings to denote chat range</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <integer>0</integer>
+    </map>
+    <key>AlchemyMinimapObjectUpdateInterval</key>
+    <map>
+      <key>Comment</key>
+      <string>Render a red line in the center of the camera view frustrum</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>F32</string>
+      <key>Value</key>
+      <real>0.1</real>
+    </map>
+    <key>AlchemyMinimapRenderObjects</key>
+    <map>
+      <key>Comment</key>
+      <string>>Render objects on minimap</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <integer>1</integer>
+    </map>
     <key>AlchemyMinimapTile</key>
     <map>
       <key>Comment</key>
-      <string>Use world map tile as minimap image</string>
+      <string>Use the world map tile as the minimap background</string>
       <key>Persist</key>
       <integer>1</integer>
       <key>Type</key>

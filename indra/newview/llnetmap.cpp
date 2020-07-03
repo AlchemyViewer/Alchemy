@@ -162,15 +162,23 @@ void LLNetMap::setScale( F32 scale )
 
 void LLNetMap::draw()
 {
+	LLViewerRegion* curregionp = gAgent.getRegion();
+	if (!curregionp)
+		return;
+
  	static LLFrameTimer map_timer;
 	static LLUIColor map_avatar_color = LLUIColorTable::instance().getColor("MapAvatarColor", LLColor4::white);
 	static LLUIColor map_avatar_friend_color = LLUIColorTable::instance().getColor("MapAvatarFriendColor", LLColor4::white);
 	static LLUIColor map_track_color = LLUIColorTable::instance().getColor("MapTrackColor", LLColor4::white);
+    static LLUIColor map_chat_ring_color = LLUIColorTable::instance().getColor("MapChatRingColor", LLColor4::white);
+    static LLUIColor map_shout_ring_color = LLUIColorTable::instance().getColor("MapShoutRingColor", LLColor4::white);
 	//static LLUIColor map_track_disabled_color = LLUIColorTable::instance().getColor("MapTrackDisabledColor", LLColor4::white);
 	static LLUIColor map_frustum_color = LLUIColorTable::instance().getColor("MapFrustumColor", LLColor4::white);
 	static LLUIColor map_frustum_rotating_color = LLUIColorTable::instance().getColor("MapFrustumRotatingColor", LLColor4::white);
 	
 	static const LLCachedControl<bool> use_world_map_image(gSavedSettings, "AlchemyMinimapTile", true);
+	static LLCachedControl<bool> enable_object_render(gSavedSettings, "AlchemyMinimapRenderObjects", true);
+    static LLCachedControl<bool> map_chat_ring(gSavedSettings, "AlchemyMinimapChatRings", false);
 	if (mObjectImagep.isNull())
 	{
 		createObjectImage();
@@ -331,50 +339,59 @@ void LLNetMap::draw()
 			}
 		}
 
+
+		const LLVector3& camera_position = gAgentCamera.getCameraPositionAgent();
+
 		// Redraw object layer periodically
-		if (mUpdateNow || (map_timer.getElapsedTimeF32() > 0.5f))
+		if (enable_object_render)
 		{
-			mUpdateNow = false;
+			static LLCachedControl<F32>  object_layer_update_time_setting(gSavedSettings, "AlchemyMinimapObjectUpdateInterval", 0.1f);
+			F32 object_layer_update_time = llclamp(object_layer_update_time_setting(), 0.01f, 60.f);
+			if (mUpdateNow || (map_timer.getElapsedTimeF32() > object_layer_update_time))
+			{
+				mUpdateNow = false;
 
-			// Locate the centre of the object layer, accounting for panning
-			LLVector3 new_center = globalPosToView(gAgentCamera.getCameraPositionGlobal());
-			new_center.mV[VX] -= mCurPan.mV[VX];
-			new_center.mV[VY] -= mCurPan.mV[VY];
-			new_center.mV[VZ] = 0.f;
-			mObjectImageCenterGlobal = viewPosToGlobal(llfloor(new_center.mV[VX]), llfloor(new_center.mV[VY]));
+				// Locate the centre of the object layer, accounting for panning
+				LLVector3 new_center = globalPosToView(gAgentCamera.getCameraPositionGlobal());
+				new_center.mV[VX] -= mCurPan.mV[VX];
+				new_center.mV[VY] -= mCurPan.mV[VY];
+				new_center.mV[VZ] = 0.f;
+				mObjectImageCenterGlobal = viewPosToGlobal(llfloor(new_center.mV[VX]), llfloor(new_center.mV[VY]));
 
-			// Create the base texture.
-			U8 *default_texture = mObjectRawImagep->getData();
-			memset( default_texture, 0, mObjectImagep->getWidth() * mObjectImagep->getHeight() * mObjectImagep->getComponents() );
+				// Create the base texture.
+				U8 *default_texture = mObjectRawImagep->getData();
+				memset( default_texture, 0, mObjectImagep->getWidth() * mObjectImagep->getHeight() * mObjectImagep->getComponents() );
 
-			// Draw objects
-			gObjectList.renderObjectsForMap(*this);
+				// Draw objects
+				gObjectList.renderObjectsForMap(*this);
 
-			mObjectImagep->setSubImage(mObjectRawImagep, 0, 0, mObjectImagep->getWidth(), mObjectImagep->getHeight());
-			
-			map_timer.reset();
+				mObjectImagep->setSubImage(mObjectRawImagep, 0, 0, mObjectImagep->getWidth(), mObjectImagep->getHeight());
+
+				map_timer.reset();
+			}
+
+			LLVector3 map_center_agent = gAgent.getPosAgentFromGlobal(mObjectImageCenterGlobal);
+			map_center_agent -= camera_position;
+			map_center_agent.mV[VX] *= mScale/region_width;
+			map_center_agent.mV[VY] *= mScale/region_width;
+
+			gGL.getTexUnit(0)->bind(mObjectImagep);
+			F32 image_half_width = 0.5f*mObjectMapPixels;
+			F32 image_half_height = 0.5f*mObjectMapPixels;
+
+			gGL.begin(LLRender::QUADS);
+			{
+				gGL.texCoord2f(0.f, 1.f);
+				gGL.vertex2f(map_center_agent.mV[VX] - image_half_width, image_half_height + map_center_agent.mV[VY]);
+				gGL.texCoord2f(0.f, 0.f);
+				gGL.vertex2f(map_center_agent.mV[VX] - image_half_width, map_center_agent.mV[VY] - image_half_height);
+				gGL.texCoord2f(1.f, 0.f);
+				gGL.vertex2f(image_half_width + map_center_agent.mV[VX], map_center_agent.mV[VY] - image_half_height);
+				gGL.texCoord2f(1.f, 1.f);
+				gGL.vertex2f(image_half_width + map_center_agent.mV[VX], image_half_height + map_center_agent.mV[VY]);
+			}
+			gGL.end();
 		}
-
-		LLVector3 map_center_agent = gAgent.getPosAgentFromGlobal(mObjectImageCenterGlobal);
-		LLVector3 camera_position = gAgentCamera.getCameraPositionAgent();
-		map_center_agent -= camera_position;
-		map_center_agent.mV[VX] *= mScale/region_width;
-		map_center_agent.mV[VY] *= mScale/region_width;
-
-		gGL.getTexUnit(0)->bind(mObjectImagep);
-		F32 image_half_width = 0.5f*mObjectMapPixels;
-		F32 image_half_height = 0.5f*mObjectMapPixels;
-
-		gGL.begin(LLRender::QUADS);
-			gGL.texCoord2f(0.f, 1.f);
-			gGL.vertex2f(map_center_agent.mV[VX] - image_half_width, image_half_height + map_center_agent.mV[VY]);
-			gGL.texCoord2f(0.f, 0.f);
-			gGL.vertex2f(map_center_agent.mV[VX] - image_half_width, map_center_agent.mV[VY] - image_half_height);
-			gGL.texCoord2f(1.f, 0.f);
-			gGL.vertex2f(image_half_width + map_center_agent.mV[VX], map_center_agent.mV[VY] - image_half_height);
-			gGL.texCoord2f(1.f, 1.f);
-			gGL.vertex2f(image_half_width + map_center_agent.mV[VX], image_half_height + map_center_agent.mV[VY]);
-		gGL.end();
 
 		gGL.popMatrix();
 
@@ -388,29 +405,29 @@ void LLNetMap::draw()
 		F32 min_pick_dist_squared = (mDotRadius * MIN_PICK_SCALE) * (mDotRadius * MIN_PICK_SCALE);
 
 		LLVector3 pos_map;
-		uuid_vec_t avatar_ids;
-		std::vector<LLVector3d> positions;
 		bool unknown_relative_z;
 
-		LLWorld::getInstance()->getAvatars(&avatar_ids, &positions, gAgentCamera.getCameraPositionGlobal());
+		LLWorld::pos_map_t avatar_id_pos_map;
+		LLWorld::getInstance()->getAvatars(&avatar_id_pos_map, gAgentCamera.getCameraPositionGlobal());
 
 		// Draw avatars
-		for (U32 i = 0; i < avatar_ids.size(); i++)
+		for (const auto& av_pos_pair : avatar_id_pos_map)
 		{
-			LLUUID uuid = avatar_ids[i];
+			const LLUUID& uuid = av_pos_pair.first;
+			const LLVector3d& av_pos = av_pos_pair.second;
 			// Skip self, we'll draw it later
 			if (uuid == gAgent.getID()) continue;
 
-			pos_map = globalPosToView(positions[i]);
+			pos_map = globalPosToView(av_pos);
 
 // [RLVa:KB] - Checked: RLVa-1.2.0
 			bool show_as_friend = (LLAvatarTracker::instance().getBuddyInfo(uuid) != NULL) && (RlvActions::canShowName(RlvActions::SNC_DEFAULT, uuid));
 // [/RLVa:KB]
 //			bool show_as_friend = (LLAvatarTracker::instance().getBuddyInfo(uuid) != NULL);
 
-			LLColor4 color = show_as_friend ? map_avatar_friend_color : map_avatar_color;
+			const LLColor4& color = show_as_friend ? map_avatar_friend_color : map_avatar_color;
 
-			unknown_relative_z = positions[i].mdV[VZ] >= COARSEUPDATE_MAX_Z &&
+			unknown_relative_z = av_pos.mdV[VZ] >= COARSEUPDATE_MAX_Z &&
 					camera_position.mV[VZ] >= COARSEUPDATE_MAX_Z;
 
 			LLWorldMapView::drawAvatar(
@@ -422,10 +439,9 @@ void LLNetMap::draw()
 			if(uuid.notNull())
 			{
 				bool selected = false;
-				uuid_vec_t::iterator sel_iter = gmSelected.begin();
-				for (; sel_iter != gmSelected.end(); sel_iter++)
+				for (const LLUUID& sel_uuid : gmSelected)
 				{
-					if(*sel_iter == uuid)
+					if(sel_uuid == uuid)
 					{
 						selected = true;
 						break;
@@ -441,7 +457,8 @@ void LLNetMap::draw()
 						S32 x = ll_round( pos_map.mV[VX] );
 						S32 y = ll_round( pos_map.mV[VY] );
 						LLWorldMapView::drawTrackingCircle( getRect(), x, y, color, 1, 10);
-					} else
+					}
+					else
 					{
 						LLWorldMapView::drawTrackingDot(pos_map.mV[VX],pos_map.mV[VY],color,0.f);
 					}
@@ -511,7 +528,18 @@ void LLNetMap::draw()
 
 
 		gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+		
+        if (map_chat_ring)
+        {
+            const F32 chat_radius = curregionp->getChatRange() * mPixelsPerMeter;
+            const F32 shout_radius = curregionp->getShoutRange() * mPixelsPerMeter;
 
+            gGL.pushUIMatrix();
+                gGL.translateUI(pos_map.mV[VX], pos_map.mV[VY], 0.f);
+                gl_ring(chat_radius, 1.5f, map_chat_ring_color, map_chat_ring_color, 128, FALSE);
+                gl_ring(shout_radius, 1.5f, map_shout_ring_color, map_shout_ring_color, 128, FALSE);
+            gGL.popUIMatrix();
+        }
 		if( rotate_map )
 		{
 			gGL.color4fv((map_frustum_color()).mV);
