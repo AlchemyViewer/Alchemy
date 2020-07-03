@@ -40,6 +40,7 @@ class LLImageRaw;
 class LLViewerTexture;
 class LLFloaterMap;
 class LLMenuGL;
+class LLViewerRegion;
 
 class LLNetMap final : public LLUICtrl
 {
@@ -66,25 +67,27 @@ public:
 	static const F32 MAP_SCALE_MID;
 	static const F32 MAP_SCALE_MAX;
 
-	/*virtual*/ void	draw();
-	/*virtual*/ BOOL	handleScrollWheel(S32 x, S32 y, S32 clicks);
-	/*virtual*/ BOOL	handleMouseDown(S32 x, S32 y, MASK mask);
-	/*virtual*/ BOOL	handleMouseUp(S32 x, S32 y, MASK mask);
-	/*virtual*/ BOOL	handleHover( S32 x, S32 y, MASK mask );
-	/*virtual*/ BOOL	handleToolTip( S32 x, S32 y, MASK mask);
-	/*virtual*/ void	reshape(S32 width, S32 height, BOOL called_from_parent = TRUE);
+	/*virtual*/ void	draw() override;
+	/*virtual*/ BOOL	handleScrollWheel(S32 x, S32 y, S32 clicks) override;
+	/*virtual*/ BOOL	handleMouseDown(S32 x, S32 y, MASK mask) override;
+	/*virtual*/ BOOL	handleMouseUp(S32 x, S32 y, MASK mask) override;
+	/*virtual*/ BOOL	handleHover( S32 x, S32 y, MASK mask ) override;
+	/*virtual*/ BOOL	handleToolTip( S32 x, S32 y, MASK mask) override;
+	/*virtual*/ void	reshape(S32 width, S32 height, BOOL called_from_parent = TRUE) override;
 
-	/*virtual*/ BOOL 	postBuild();
-	/*virtual*/ BOOL	handleRightMouseDown( S32 x, S32 y, MASK mask );
+	/*virtual*/ BOOL 	postBuild() override;
+	/*virtual*/ BOOL	handleRightMouseDown( S32 x, S32 y, MASK mask ) override;
 	/*virtual*/ BOOL	handleClick(S32 x, S32 y, MASK mask);
-	/*virtual*/ BOOL	handleDoubleClick( S32 x, S32 y, MASK mask );
+	/*virtual*/ BOOL	handleDoubleClick( S32 x, S32 y, MASK mask ) override;
+
+	void			refreshParcelOverlay() { mUpdateParcelImage = true; }
 
 	void			setScale( F32 scale );
 	void			setToolTipMsg(const std::string& msg) { mToolTipMsg = msg; }
 	void			renderScaledPointGlobal( const LLVector3d& pos, const LLColor4U &color, F32 radius );
 
 private:
-	const LLVector3d& getObjectImageCenterGlobal()	{ return mObjectImageCenterGlobal; }
+	const LLVector3d& getObjectImageCenterGlobal() const { return mObjectImageCenterGlobal; }
 	void 			renderPoint(const LLVector3 &pos, const LLColor4U &color, 
 								S32 diameter, S32 relative_height = 0);
 
@@ -99,11 +102,14 @@ private:
 
 	bool			createImage(LLPointer<LLImageRaw>& rawimagep) const;
 	void			createObjectImage();
+	void			createParcelImage();
+	void			renderPropertyLinesForRegion(const LLViewerRegion* pRegion, const LLColor4U& clrOverlay);
 
 	static bool		outsideSlop(S32 x, S32 y, S32 start_x, S32 start_y, S32 slop);
 
 private:
 	bool			mUpdateObjectImage;
+	bool			mUpdateParcelImage;
 
 	LLUIColor		mBackgroundColor;
 
@@ -122,6 +128,13 @@ private:
 	LLVector3d		mObjectImageCenterGlobal;
 	LLPointer<LLImageRaw> mObjectRawImagep;
 	LLPointer<LLViewerTexture>	mObjectImagep;
+
+	LLVector3d		mParcelImageCenterGlobal;
+	LLPointer<LLImageRaw> mParcelRawImagep;
+	LLPointer<LLViewerTexture>	mParcelImagep;
+
+	boost::signals2::connection mParcelMgrConn;
+	boost::signals2::connection mParcelOverlayConn;
 
 	LLUUID			mClosestAgentToCursor;
 	LLUUID			mClosestAgentAtLastRightClick;
