@@ -56,6 +56,74 @@
              parameter="MiniMapAutoCenter" />
     </menu_item_check>
     <menu_item_separator />
+  <menu_item_check
+   label="Use Map Tile"
+   name="Use Map Tile">
+    <menu_item_check.on_check
+       control="AlchemyMinimapTile" />
+    <menu_item_check.on_click
+       function="ToggleControl"
+       parameter="AlchemyMinimapTile" />
+  </menu_item_check>
+  <menu_item_check
+   label="Render Objects"
+   name="Render Objects">
+    <menu_item_check.on_check
+       control="AlchemyMinimapRenderObjects" />
+    <menu_item_check.on_click
+       function="ToggleControl"
+       parameter="AlchemyMinimapRenderObjects" />
+  </menu_item_check>
+  <menu_item_check
+   label="Show Guide Line"
+   name="Show Guide Line">
+    <menu_item_check.on_check
+       control="AlchemyMinimapGuideLine" />
+    <menu_item_check.on_click
+       function="ToggleControl"
+       parameter="AlchemyMinimapGuideLine" />
+  </menu_item_check>
+  <menu_item_check
+    label="Show Chat Rings"
+    name="Show Chat Rings">
+    <menu_item_check.on_check
+      control="AlchemyMinimapChatRings" />
+    <menu_item_check.on_click
+      function="ToggleControl"
+      parameter="AlchemyMinimapChatRings" />
+  </menu_item_check>
+      <menu_item_separator />
+    <menu_item_check
+    label="Parcel Boundries"
+    name="Parcel Boundries">
+    <menu_item_check.on_check
+      control="AlchemyMinimapParcelBoundries" />
+    <menu_item_check.on_click
+      function="ToggleControl"
+      parameter="AlchemyMinimapParcelBoundries" />
+  </menu_item_check>
+    <menu_item_check
+    enabled_control="AlchemyMinimapParcelBoundries"
+    label="Parcels For Sale"
+    name="Parcels For Sale">
+    <menu_item_check.on_check
+      control="AlchemyMiniMapForSaleParcels" />
+    <menu_item_check.on_click
+      function="ToggleControl"
+      parameter="AlchemyMiniMapForSaleParcels" />
+  </menu_item_check>
+    <menu_item_check
+    enabled_control="AlchemyMinimapParcelBoundries"
+    label="Parcel Access"
+    name="Parcel Access">
+    <menu_item_check.on_check
+      control="AlchemyMiniMapCollisionParcels" />
+    <menu_item_check.on_click
+      function="ToggleControl"
+      parameter="AlchemyMiniMapCollisionParcels" />
+  </menu_item_check>
+  
+    <menu_item_separator />
     <menu_item_call
      label="Stop Tracking"
      name="Stop Tracking">
