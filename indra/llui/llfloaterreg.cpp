@@ -352,9 +352,8 @@ void LLFloaterReg::restoreVisibleInstances()
 	for (instance_map_t::iterator iter = sInstanceMap.begin(); iter != sInstanceMap.end(); ++iter)
 	{
 		instance_list_t& list = iter->second;
-		for (instance_list_t::iterator iter = list.begin(); iter != list.end(); ++iter)
+		for (LLFloater* floater : list)
 		{
-			LLFloater* floater = *iter;
 			floater->popVisible();
 		}
 	}

@@ -171,9 +171,9 @@ void LLContextStrings::output(std::ostream& os)
 {
     const std::map<std::string,S32>& strings =
         LLThreadLocalSingletonPointer<LLContextStrings>::getInstance()->m_contextStrings;
-    for (std::map<std::string,S32>::const_iterator it = strings.begin(); it!=strings.end(); ++it)
+    for (const auto& string_pair : strings)
     {
-        os << it->first << "[" << it->second << "]" << "\n";
+        os << string_pair.first << "[" << string_pair.second << "]" << "\n";
     }
 }
 
