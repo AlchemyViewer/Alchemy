@@ -158,10 +158,7 @@ void main()
 	
 	//mix with reflection
 	// Note we actually want to use just df1, but multiplying by 0.999999 gets around an nvidia compiler bug
-	color.rgb = mix(fb.rgb, refcol.rgb, df1 * 0.99999f);
-	
-	vec4 pos = vary_position;
-	
+	color.rgb = mix(fb.rgb, refcol.rgb, df1);
 	color.rgb += spec * specular;
 
 	color.rgb = atmosTransport(color.rgb);
@@ -171,14 +168,8 @@ void main()
     
 	vec3 screenspacewavef = normalize((norm_mat*vec4(wavef, 1.0)).xyz);
 
-	//frag_data[0] = color;
+	frag_data[0] = color;
 
-    // TODO: The non-obvious assignment below is copied from the pre-EEP WL shader code
-    //       Unfortunately, fixing it causes a mismatch for EEP, and so it remains...  for now
-    //       SL-12975 (unfix pre-EEP broken alpha)
-    frag_data[0] = vec4(color.rgb, color);  // Effectively, color.rgbr
-
-
-    frag_data[1] = vec4(0);		// speccolor, spec
+	frag_data[1] = vec4(specular * 0.5, 0.35);		// speccolor, spec
 	frag_data[2] = vec4(encode_normal(screenspacewavef.xyz), 0.05, 0);// normalxy, 0, 0
 }
