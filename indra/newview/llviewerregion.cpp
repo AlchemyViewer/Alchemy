@@ -81,6 +81,7 @@
 #include "llcorehttputil.h"
 #include "llcallstack.h"
 #include "llsettingsdaycycle.h"
+#include "llviewerparcelmgr.h"
 
 #ifdef LL_WINDOWS
 	#pragma warning(disable:4355)
@@ -590,7 +591,8 @@ LLViewerRegion::LLViewerRegion(const U64 &handle,
 					mImpl->mOriginGlobal,
 					mWidth);
 
-	mParcelOverlay = new LLViewerParcelOverlay(this, region_width_meters);
+	mParcelOverlay = new LLViewerParcelOverlay(this, mWidth);
+	LLViewerParcelMgr::getInstance()->init(mWidth);
 
 	setOriginGlobal(from_region_handle(handle));
 	calculateCenterGlobal();

@@ -52,15 +52,18 @@
 
 const U8  OVERLAY_IMG_COMPONENTS = 4;
 
+LLViewerParcelOverlay::update_signal_t* LLViewerParcelOverlay::mUpdateSignal = NULL;
+
 LLViewerParcelOverlay::LLViewerParcelOverlay(LLViewerRegion* region, F32 region_width_meters)
 :	mRegion( region ),
 	mParcelGridsPerEdge( S32( region_width_meters / PARCEL_GRID_STEP_METERS ) ),
+	mRegionSize(S32(region_width_meters)),
 	mDirty( FALSE ),
 	mTimeSinceLastUpdate(),
 	mOverlayTextureIdx(-1),
 	mVertexCount(0),
-	mVertexArray(NULL),
-	mColorArray(NULL)
+	mVertexArray(nullptr),
+	mColorArray(nullptr)
 //	mTexCoordArray(NULL),
 {
 	// Create a texture to hold color information.
@@ -81,7 +84,7 @@ LLViewerParcelOverlay::LLViewerParcelOverlay(LLViewerRegion* region, F32 region_
 	{
 		raw[i] = 0;
 	}
-	//mTexture->setSubImage(mImageRaw, 0, 0, mParcelGridsPerEdge, mParcelGridsPerEdge);
+	mTexture->setSubImage(mImageRaw, 0, 0, mParcelGridsPerEdge, mParcelGridsPerEdge);
 
 	// Create storage for ownership information from simulator
 	// and initialize it.
@@ -97,6 +100,13 @@ LLViewerParcelOverlay::LLViewerParcelOverlay(LLViewerRegion* region, F32 region_
 
 LLViewerParcelOverlay::~LLViewerParcelOverlay()
 {
+	if (mUpdateSignal)
+	{
+		mUpdateSignal->disconnect_all_slots();
+		delete mUpdateSignal;
+		mUpdateSignal = nullptr;
+	}
+
 	delete[] mOwnership;
 	mOwnership = NULL;
 
@@ -426,7 +436,8 @@ void LLViewerParcelOverlay::uncompressLandOverlay(S32 chunk, U8 *packed_overlay)
 {
 	// Unpack the message data into the ownership array
 	S32	size	= mParcelGridsPerEdge * mParcelGridsPerEdge;
-	S32 chunk_size = size / PARCEL_OVERLAY_CHUNKS;
+	S32 mParcelOverLayChunks = mRegionSize * mRegionSize / (128 * 128);
+	S32 chunk_size = size / mParcelOverLayChunks;
 
 	memcpy(mOwnership + chunk*chunk_size, packed_overlay, chunk_size);		/*Flawfinder: ignore*/
 
@@ -870,6 +881,8 @@ void LLViewerParcelOverlay::idleUpdate(bool force_update)
 		{
 			updateOverlayTexture();
 			updatePropertyLines();
+			if (mUpdateSignal)
+				(*mUpdateSignal)(mRegion);
 			mTimeSinceLastUpdate.reset();
 		}
 	}
@@ -1018,4 +1031,11 @@ S32 LLViewerParcelOverlay::renderPropertyLines	()
 	gGL.popMatrix();
 
 	return drawn;
+}
+
+boost::signals2::connection LLViewerParcelOverlay::setUpdateCallback(const update_signal_t::slot_type& cb)
+{
+	if (!mUpdateSignal)
+		mUpdateSignal = new update_signal_t();
+	return mUpdateSignal->connect(cb); 
 }

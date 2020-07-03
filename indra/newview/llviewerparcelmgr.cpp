@@ -122,6 +122,8 @@ LLViewerParcelMgr::LLViewerParcelMgr()
 	mHoverWestSouth(),
 	mHoverEastNorth(),
 	mTeleportInProgressPosition(),
+	mCollisionRegionHandle(0),
+	mCollisionUpdateSignal(nullptr),
 	mRenderCollision(FALSE),
 	mRenderSelection(TRUE),
 	mCollisionBanned(0),
@@ -137,9 +139,12 @@ LLViewerParcelMgr::LLViewerParcelMgr()
 	mHoverParcel = new LLParcel();
 	mCollisionParcel = new LLParcel();
 
-	mParcelsPerEdge = S32(	REGION_WIDTH_METERS / PARCEL_GRID_STEP_METERS );
+	mParcelsPerEdge = S32(8192.f / PARCEL_GRID_STEP_METERS); // 8192 is the maximum region size on Aurora
 	mHighlightSegments = new U8[(mParcelsPerEdge+1)*(mParcelsPerEdge+1)];
 	resetSegments(mHighlightSegments);
+
+	mCollisionBitmap = new U8[getCollisionBitmapSize()];
+	memset(mCollisionBitmap, 0, getCollisionBitmapSize());
 
 	mCollisionSegments = new U8[(mParcelsPerEdge+1)*(mParcelsPerEdge+1)];
 	resetSegments(mCollisionSegments);
@@ -160,12 +165,24 @@ LLViewerParcelMgr::LLViewerParcelMgr()
 		mAgentParcelOverlay[i] = 0;
 	}
 
+	mParcelsPerEdge = S32(REGION_WIDTH_METERS / PARCEL_GRID_STEP_METERS);
 	mTeleportInProgress = TRUE; // the initial parcel update is treated like teleport
 }
 
+void LLViewerParcelMgr::init(F32 region_size)
+{
+	mParcelsPerEdge = S32(region_size / PARCEL_GRID_STEP_METERS);
+}
 
 LLViewerParcelMgr::~LLViewerParcelMgr()
 {
+	if (mCollisionUpdateSignal)
+	{
+		mCollisionUpdateSignal->disconnect_all_slots();
+		delete mCollisionUpdateSignal;
+		mCollisionUpdateSignal = nullptr;
+	}
+
 	mCurrentParcelSelection->setParcel(NULL);
 	mCurrentParcelSelection = NULL;
 
@@ -186,6 +203,9 @@ LLViewerParcelMgr::~LLViewerParcelMgr()
 
 	delete[] mHighlightSegments;
 	mHighlightSegments = NULL;
+
+	delete[] mCollisionBitmap;
+	mCollisionBitmap = NULL;
 
 	delete[] mCollisionSegments;
 	mCollisionSegments = NULL;
@@ -899,7 +919,8 @@ void LLViewerParcelMgr::renderParcelCollision()
 		mRenderCollision = FALSE;
 	}
 
-	if (mRenderCollision && gSavedSettings.getBOOL("ShowBanLines"))
+	static LLCachedControl<bool> render_ban_line(gSavedSettings, "ShowBanLines");
+	if (mRenderCollision && render_ban_line)
 	{
 		LLViewerRegion* regionp = gAgent.getRegion();
 		if (regionp)
@@ -1490,8 +1511,7 @@ void LLViewerParcelMgr::processParcelOverlay(LLMessageSystem *msg, void **user)
 		return;
 	}
 
-	S32 parcels_per_edge = LLViewerParcelMgr::getInstance()->mParcelsPerEdge;
-	S32 expected_size = parcels_per_edge * parcels_per_edge / PARCEL_OVERLAY_CHUNKS;
+	S32 expected_size = 1024;
 	if (packed_overlay_size != expected_size)
 	{
 		LL_WARNS() << "Got parcel overlay size " << packed_overlay_size
@@ -1558,6 +1578,11 @@ void LLViewerParcelMgr::processParcelProperties(LLMessageSystem *msg, void **use
     S32		other_clean_time = 0;
 
     LLViewerParcelMgr& parcel_mgr = LLViewerParcelMgr::instance();
+    LLViewerRegion* msg_region = LLWorld::getInstance()->getRegion(msg->getSender());
+    if(msg_region)
+        parcel_mgr.mParcelsPerEdge = S32(msg_region->getWidth() / PARCEL_GRID_STEP_METERS);
+    else
+        parcel_mgr.mParcelsPerEdge = S32(gAgent.getRegion()->getWidth() / PARCEL_GRID_STEP_METERS);
 
     msg->getS32Fast(_PREHASH_ParcelData, _PREHASH_RequestResult, request_result);
     msg->getS32Fast(_PREHASH_ParcelData, _PREHASH_SequenceID, sequence_id);
@@ -1853,18 +1878,16 @@ void LLViewerParcelMgr::processParcelProperties(LLMessageSystem *msg, void **use
 
 		}
 
-		S32 bitmap_size =	parcel_mgr.mParcelsPerEdge
-							* parcel_mgr.mParcelsPerEdge
-							/ 8;
-		U8* bitmap = new U8[ bitmap_size ];
-		msg->getBinaryDataFast(_PREHASH_ParcelData, _PREHASH_Bitmap, bitmap, bitmap_size);
+		msg->getBinaryDataFast(_PREHASH_ParcelData, _PREHASH_Bitmap, parcel_mgr.mCollisionBitmap, parcel_mgr.getCollisionBitmapSize());
 
 		parcel_mgr.resetSegments(parcel_mgr.mCollisionSegments);
-		parcel_mgr.writeSegmentsFromBitmap( bitmap, parcel_mgr.mCollisionSegments );
+		parcel_mgr.writeSegmentsFromBitmap(parcel_mgr.mCollisionBitmap, parcel_mgr.mCollisionSegments);
 
-		delete[] bitmap;
-		bitmap = NULL;
+		LLViewerRegion* pRegion = LLWorld::getInstance()->getRegion(msg->getSender());
+		parcel_mgr.mCollisionRegionHandle = (pRegion) ? pRegion->getHandle() : 0;
 
+		if (parcel_mgr.mCollisionUpdateSignal)
+			(*parcel_mgr.mCollisionUpdateSignal)(pRegion);
 	}
 	else if (sequence_id == HOVERED_PARCEL_SEQ_ID)
 	{
@@ -2689,6 +2712,13 @@ bool  LLViewerParcelMgr::getTeleportInProgress()
 {
     return mTeleportInProgress // case where parcel data arrives after teleport
         || gAgent.getTeleportState() > LLAgent::TELEPORT_NONE; // For LOCAL, no mTeleportInProgress
+}
+
+boost::signals2::connection LLViewerParcelMgr::setCollisionUpdateCallback(const collision_update_signal_t::slot_type& cb)
+{
+	if (!mCollisionUpdateSignal)
+		mCollisionUpdateSignal = new collision_update_signal_t();
+	return mCollisionUpdateSignal->connect(cb); 
 }
 
 // [SL:KB] - Patch: Appearance-TeleportAttachKill | Checked: Catznip-4.0

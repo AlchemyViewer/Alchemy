@@ -41,7 +41,7 @@ class LLVector3;
 class LLColor4U;
 class LLVector2;
 
-class LLViewerParcelOverlay : public LLGLUpdate
+class LLViewerParcelOverlay final : public LLGLUpdate
 {
 public:
 	LLViewerParcelOverlay(LLViewerRegion* region, F32 region_width_meters);
@@ -66,6 +66,7 @@ public:
 
 	BOOL			isBuildCameraAllowed(const LLVector3& pos) const;
 	F32				getOwnedRatio() const;
+	const U8*		getOwnership() const { return mOwnership; }
 
 	// Returns the number of vertices drawn
 	S32				renderPropertyLines();
@@ -81,7 +82,10 @@ public:
 	void	setDirty();
 
 	void	idleUpdate(bool update_now = false);
-	void	updateGL();
+	void	updateGL() override;
+
+	typedef boost::signals2::signal<void (const LLViewerRegion*)> update_signal_t;
+	static boost::signals2::connection setUpdateCallback(const update_signal_t::slot_type & cb);
 
 private:
 	// This is in parcel rows and columns, not grid rows and columns
@@ -104,6 +108,7 @@ private:
 	LLViewerRegion*	mRegion;
 
 	S32				mParcelGridsPerEdge;
+	S32				mRegionSize;
 
 	LLPointer<LLViewerTexture> mTexture;
 	LLPointer<LLImageRaw> mImageRaw;
@@ -121,6 +126,8 @@ private:
 	S32				mVertexCount;
 	F32*			mVertexArray;
 	U8*				mColorArray;
+
+	static update_signal_t* mUpdateSignal;
 };
 
 #endif
