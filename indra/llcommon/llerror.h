@@ -42,10 +42,13 @@ const int LL_ERR_NOERR = 0;
 // #define RELEASE_SHOW_DEBUG // Define this if you want your release builds to show lldebug output.
 #define RELEASE_SHOW_INFO // Define this if you want your release builds to show llinfo output
 #define RELEASE_SHOW_WARN // Define this if you want your release builds to show llwarn output.
-#define ENABLE_DEBUG 1
+#if LL_TEST
+#define ENABLE_DEBUG_MACRO 1
+#else
+#define ENABLE_DEBUG_MACRO 0
+#endif
 
 #ifdef _DEBUG
-#define ENABLE_DEBUG 1
 #define SHOW_DEBUG
 #define SHOW_WARN
 #define SHOW_INFO
@@ -53,12 +56,10 @@ const int LL_ERR_NOERR = 0;
 #else // _DEBUG
 
 #ifdef LL_RELEASE_WITH_DEBUG_INFO
-#define ENABLE_DEBUG 1
 #define SHOW_ASSERT
 #endif // LL_RELEASE_WITH_DEBUG_INFO
 
 #ifdef RELEASE_SHOW_DEBUG
-#define ENABLE_DEBUG 1
 #define SHOW_DEBUG
 #endif
 
@@ -293,7 +294,7 @@ namespace LLError
 }
 
 //this is cheaper than llcallstacks if no need to output other variables to call stacks. 
-#if ENABLE_DEBUG
+#if ENABLE_DEBUG_MACRO
 #define LL_PUSH_CALLSTACKS() LLError::LLCallStacks::push(__FUNCTION__, __LINE__)
 
 #define llcallstacks                                                                      \
@@ -365,7 +366,7 @@ typedef LLError::NoClassInfo _LL_CLASS_TO_LOG;
 			std::ostringstream* _out = LLError::Log::out(); \
 			(*_out)
 
-#ifdef ENABLE_DEBUG
+#if ENABLE_DEBUG_MACRO
 
 #define lllog_debug(level, once, ...)                                         \
 	do {                                                                \

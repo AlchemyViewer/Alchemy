@@ -5524,7 +5524,7 @@ void LLVolumeGeometryManager::rebuildGeom(LLSpatialGroup* group)
 
             vobj->updateControlAvatar();
             
-#if ENABLE_DEBUG
+#ifdef SHOW_DEBUG
 			std::string vobj_name = llformat("Vol%p", vobj);
 
 			F32 est_tris = vobj->getEstTrianglesMax();

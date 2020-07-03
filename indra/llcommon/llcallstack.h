@@ -79,7 +79,7 @@ struct LLContextStatus
 
 LL_COMMON_API std::ostream& operator<<(std::ostream& s, const LLContextStatus& context_status);
 
-#ifdef ENABLE_DEBUG
+#if ENABLE_DEBUG_MACRO
 #define dumpStack(tag) \
     static const bool enable_log = debugLoggingEnabled(tag); \
     if (enable_log) \

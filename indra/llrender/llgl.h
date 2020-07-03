@@ -193,7 +193,7 @@ void assert_glerror();
 
 void clear_glerror();
 
-#if ENABLE_DEBUG
+#ifdef SHOW_DEBUG
 # define stop_glerror() assert_glerror()
 # define llglassertok() assert_glerror()
 #else

@@ -328,7 +328,7 @@ const LLVector3& LLJoint::getPosition()
 
 bool do_debug_joint(const std::string& name)
 {
-#ifdef ENABLE_DEBUG
+#ifdef SHOW_DEBUG
     if (std::find(LLJoint::s_debugJointNames.begin(), LLJoint::s_debugJointNames.end(),name) != LLJoint::s_debugJointNames.end())
     {
         return true;
@@ -350,7 +350,7 @@ void LLJoint::setPosition( const LLVector3& requested_pos, bool apply_attachment
     LLUUID mesh_id;
     if (apply_attachment_overrides && m_attachmentPosOverrides.findActiveOverride(mesh_id,active_override))
     {  
-#ifdef ENABLE_DEBUG
+#ifdef SHOW_DEBUG
         if (pos != active_override && do_debug_joint(getName()))
         {
             LLScopedContextString str("setPosition");
@@ -360,7 +360,7 @@ void LLJoint::setPosition( const LLVector3& requested_pos, bool apply_attachment
 #endif
         pos = active_override;
     }
-#ifdef ENABLE_DEBUG
+#ifdef SHOW_DEBUG
 	if ((pos != getPosition()) && do_debug_joint(getName()))
 	{
         LLScopedContextString str("setPosition");
@@ -897,7 +897,7 @@ void LLJoint::setScale( const LLVector3& requested_scale, bool apply_attachment_
     LLVector3 active_override;
     if (apply_attachment_overrides && m_attachmentScaleOverrides.findActiveOverride(mesh_id,active_override))
     {  
-#ifdef ENABLE_DEBUG
+#ifdef SHOW_DEBUG
         if (scale != active_override && do_debug_joint(getName()))
         {
             LLScopedContextString str("setScale");
@@ -907,7 +907,7 @@ void LLJoint::setScale( const LLVector3& requested_scale, bool apply_attachment_
 #endif
         scale = active_override;
     }
-#ifdef ENABLE_DEBUG
+#ifdef SHOW_DEBUG
 	if ((mXform.getScale() != scale) && do_debug_joint(getName()))
 	{	
         LLScopedContextString str("setScale");

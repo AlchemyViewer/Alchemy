@@ -2479,7 +2479,7 @@ void LLVOAvatar::idleUpdate(LLAgent &agent, const F64 &time)
 		mNeedsExtentUpdate = ((LLDrawable::getCurrentFrame()+mID.mData[0])%upd_freq==0);
 	}
     
-#ifdef ENABLE_DEBUG
+#ifdef SHOW_DEBUG
     LLScopedContextString str("avatar_idle_update " + getFullname());
 #endif
     
@@ -4375,7 +4375,7 @@ BOOL LLVOAvatar::updateCharacter(LLAgent &agent)
 	}
 
 	BOOL visible = isVisible();
-#ifdef ENABLE_DEBUG
+#ifdef SHOW_DEBUG
     bool is_control_avatar = isControlAvatar(); // capture state to simplify tracing
 	bool is_attachment = false;
 	if (is_control_avatar)
@@ -6109,7 +6109,7 @@ bool LLVOAvatar::jointIsRiggedTo(const LLJoint *joint) const
 
 void LLVOAvatar::clearAttachmentOverrides()
 {
-#ifdef ENABLE_DEBUG
+#ifdef SHOW_DEBUG
     LLScopedContextString str("clearAttachmentOverrides " + getFullname());
 #endif
 
@@ -6143,7 +6143,7 @@ void LLVOAvatar::clearAttachmentOverrides()
 //-----------------------------------------------------------------------------
 void LLVOAvatar::rebuildAttachmentOverrides()
 {
-#ifdef ENABLE_DEBUG
+#ifdef SHOW_DEBUG
     LLScopedContextString str("rebuildAttachmentOverrides " + getFullname());
 
     LL_DEBUGS("AnimatedObjects") << "rebuilding" << LL_ENDL;
@@ -6195,7 +6195,7 @@ void LLVOAvatar::rebuildAttachmentOverrides()
 // -----------------------------------------------------------------------------
 void LLVOAvatar::updateAttachmentOverrides()
 {
-#ifdef ENABLE_DEBUG
+#ifdef SHOW_DEBUG
     LLScopedContextString str("updateAttachmentOverrides " + getFullname());
 
     LL_DEBUGS("AnimatedObjects") << "updating" << LL_ENDL;
@@ -6319,7 +6319,7 @@ void LLVOAvatar::addAttachmentOverridesForObject(LLViewerObject *vo, std::set<LL
         return;
 	}
 
-#ifdef ENABLE_DEBUG
+#ifdef SHOW_DEBUG
     LLScopedContextString str("addAttachmentOverridesForObject " + getFullname());
     
     LL_DEBUGS("AnimatedObjects") << "adding" << LL_ENDL;
@@ -10185,7 +10185,7 @@ void LLVOAvatar::updateRiggingInfo()
     }
 
     //LL_INFOS() << "done update rig count is " << countRigInfoTab(mJointRiggingInfoTab) << LL_ENDL;
-#if ENABLE_DEBUG
+#ifdef SHOW_DEBUG
     LL_DEBUGS("RigSpammish") << getFullname() << " after update rig tab:" << LL_ENDL;
 
     S32 joint_count, box_count;
