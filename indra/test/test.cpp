@@ -123,7 +123,7 @@ public:
 	void replay(std::ostream& out)
 	{
 		mFile.close();
-		std::ifstream inf(mTempFile.getName().c_str());
+		llifstream inf(mTempFile.getName().c_str());
 		std::string line;
 		while (std::getline(inf, line))
 		{

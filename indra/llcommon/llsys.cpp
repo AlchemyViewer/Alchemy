@@ -1081,7 +1081,7 @@ LLSD LLMemoryInfo::loadStatsMap()
 	stats.add("Total Physical KB", phys);
 
 #elif LL_LINUX
-	std::ifstream meminfo(MEMINFO_FILE);
+	llifstream meminfo(MEMINFO_FILE);
 	if (meminfo.is_open())
 	{
 		// MemTotal:		4108424 kB

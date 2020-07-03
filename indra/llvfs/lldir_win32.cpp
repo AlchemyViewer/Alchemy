@@ -50,7 +50,7 @@ namespace
     enum class prst { INIT, OPEN, SKIP } state = prst::INIT;
     // This is called so early that we can't count on static objects being
     // properly constructed yet, so declare a pointer instead of an instance.
-    std::ofstream* prelogf = nullptr;
+    llofstream* prelogf = nullptr;
 
     void prelog(const std::string& message)
     {
