@@ -246,6 +246,7 @@ LLFloater::LLFloater(const LLSD& key, const LLFloater::Params& p)
 	mShortTitle(p.short_title),
 	mSingleInstance(p.single_instance),
 	mReuseInstance(p.reuse_instance.isProvided() ? p.reuse_instance : p.single_instance), // reuse single-instance floaters by default
+	mIsReuseInitialized(p.reuse_instance.isProvided()),
 	mKey(key),
 	mCanTearOff(p.can_tear_off),
 	mCanMinimize(p.can_minimize),
@@ -3129,6 +3130,9 @@ void LLFloaterView::setToolbarRect(LLToolBarEnums::EToolBarLocation tb, const LL
 	case LLToolBarEnums::TOOLBAR_RIGHT:
 		mToolbarRightRect = toolbar_rect;
 		break;
+	case LLToolBarEnums::TOOLBAR_TOP:
+		mToolbarTopRect = toolbar_rect;
+		break;
 	default:
 		LL_WARNS() << "setToolbarRect() passed odd toolbar number " << (S32) tb << LL_ENDL;
 		break;
@@ -3224,6 +3228,7 @@ void LLFloater::initFromParams(const LLFloater::Params& p)
 	mLegacyHeaderHeight = p.legacy_header_height;
 	mSingleInstance = p.single_instance;
 	mReuseInstance = p.reuse_instance.isProvided() ? p.reuse_instance : p.single_instance;
+	mIsReuseInitialized = p.reuse_instance.isProvided();
 
 	mPositioning = p.positioning;
 
