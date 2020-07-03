@@ -52,6 +52,10 @@
 // The minor cardinal direction labels are hidden if their height is more
 // than this proportion of the map.
 const F32 MAP_MINOR_DIR_THRESHOLD = 0.07f;
+const S32 MAP_PADDING_LEFT = 0;
+const S32 MAP_PADDING_TOP = 2;
+const S32 MAP_PADDING_RIGHT = 2;
+const S32 MAP_PADDING_BOTTOM = 0;
 
 //
 // Member functions
@@ -59,15 +63,15 @@ const F32 MAP_MINOR_DIR_THRESHOLD = 0.07f;
 
 LLFloaterMap::LLFloaterMap(const LLSD& key) 
 	: LLFloater(key),
-	  mTextBoxEast(NULL),
-	  mTextBoxNorth(NULL),
-	  mTextBoxWest(NULL),
-	  mTextBoxSouth(NULL),
-	  mTextBoxSouthEast(NULL),
-	  mTextBoxNorthEast(NULL),
-	  mTextBoxNorthWest(NULL),
-	  mTextBoxSouthWest(NULL),
-	  mMap(NULL)
+	  mTextBoxEast(nullptr),
+	  mTextBoxNorth(nullptr),
+	  mTextBoxWest(nullptr),
+	  mTextBoxSouth(nullptr),
+	  mTextBoxSouthEast(nullptr),
+	  mTextBoxNorthEast(nullptr),
+	  mTextBoxNorthWest(nullptr),
+	  mTextBoxSouthWest(nullptr),
+	  mMap(nullptr)
 {
 }
 
@@ -96,6 +100,9 @@ BOOL LLFloaterMap::postBuild()
 	mTextBoxNorthEast = getChild<LLTextBox> ("floater_map_northeast");
 	mTextBoxSouthWest = getChild<LLTextBox> ("floater_map_southwest");
 	mTextBoxNorthWest = getChild<LLTextBox> ("floater_map_northwest");
+
+	stretchMiniMap(getRect().getWidth() - MAP_PADDING_LEFT - MAP_PADDING_RIGHT
+		,getRect().getHeight() - MAP_PADDING_TOP - MAP_PADDING_BOTTOM);
 
 	updateMinorDirections();
 
@@ -211,10 +218,26 @@ void LLFloaterMap::draw()
 	LLFloater::draw();
 }
 
+void LLFloaterMap::stretchMiniMap(S32 width,S32 height)
+{
+	//fix for ext-7112
+	//by default ctrl can't overlap caption area
+	if(mMap)
+	{
+		LLRect map_rect;
+		map_rect.setLeftTopAndSize( MAP_PADDING_LEFT, getRect().getHeight() - MAP_PADDING_TOP, width, height);
+		mMap->reshape( width, height, 1);
+		mMap->setRect(map_rect);
+	}
+}
+
 void LLFloaterMap::reshape(S32 width, S32 height, BOOL called_from_parent)
 {
 	LLFloater::reshape(width, height, called_from_parent);
 	
+	stretchMiniMap(width - MAP_PADDING_LEFT - MAP_PADDING_RIGHT
+		,height - MAP_PADDING_TOP - MAP_PADDING_BOTTOM);
+
 	updateMinorDirections();
 }
 
@@ -242,6 +265,13 @@ void LLFloaterMap::handleZoom(const LLSD& userdata)
 	{
 		mMap->setScale(scale);
 	}
+}
+
+void LLFloaterMap::setMinimized(BOOL b)
+{
+	LLFloater::setMinimized(b);
+	setTitle(b ? getString("mini_map_caption") : "");
+
 }
 
 LLFloaterMap* LLFloaterMap::getInstance()

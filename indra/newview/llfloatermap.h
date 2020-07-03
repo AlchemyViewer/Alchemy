@@ -35,22 +35,25 @@ class LLTextBox;
 //
 // Classes
 //
-class LLFloaterMap : public LLFloater
+class LLFloaterMap final : public LLFloater
 {
 public:
 	LLFloaterMap(const LLSD& key);
 	static LLFloaterMap* getInstance();
 	virtual ~LLFloaterMap();
 	
-	/*virtual*/ BOOL 	postBuild();
-	/*virtual*/ BOOL	handleDoubleClick( S32 x, S32 y, MASK mask );
-	/*virtual*/ void	reshape(S32 width, S32 height, BOOL called_from_parent = TRUE);
-	/*virtual*/ void	draw();
+	/*virtual*/ BOOL 	postBuild() override;
+	/*virtual*/ BOOL	handleDoubleClick( S32 x, S32 y, MASK mask ) override;
+	/*virtual*/ void	reshape(S32 width, S32 height, BOOL called_from_parent = TRUE) override;
+	/*virtual*/ void	draw() override;
+	/*virtual*/ void	setMinimized(BOOL b) override;
 
 private:
 	void handleZoom(const LLSD& userdata);
 	void setDirectionPos( LLTextBox* text_box, F32 rotation );
 	void updateMinorDirections();
+
+	void stretchMiniMap(S32 width,S32 height);
 
 	LLTextBox*		mTextBoxEast;
 	LLTextBox*		mTextBoxNorth;

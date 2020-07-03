@@ -1,15 +1,17 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes" ?>
 <floater
  positioning="cascading"
+ bg_alpha_image_overlay="DkGray_33"
  can_minimize="true" 
  can_resize="true"
+ header_height="0"
  chrome="true"
  height="200"
  layout="topleft"
  min_height="128"
  min_width="128"
  name="Map"
- title="MINI-MAP"
+ title=""
  help_topic="map"
  save_rect="true"
  save_visibility="true"
@@ -27,6 +29,7 @@
 	Mini-map
     </floater.string>
     <net_map
+     bg_color="NetMapBackgroundColor"
      follows="top|left|bottom|right"
      layout="topleft"
      left="0"
@@ -45,6 +48,7 @@
      name="floater_map_north"
      right="10"
      text_color="1 1 1 0.7"
+     font_shadow="hard"
      top="189">
         N
     </text>
@@ -58,6 +62,7 @@
      name="floater_map_east"
      right="10"
      text_color="1 1 1 0.7"
+     font_shadow="hard"
      top="189">
         E
     </text>
@@ -71,6 +76,7 @@
      name="floater_map_west"
      right="11"
      text_color="1 1 1 0.7"
+     font_shadow="hard"
      top="175">
         W
     </text>
@@ -84,6 +90,7 @@
      name="floater_map_south"
      right="10"
      text_color="1 1 1 0.7"
+     font_shadow="hard"
      top="189">
         S
     </text>
@@ -97,6 +104,7 @@
      name="floater_map_southeast"
      right="20"
      text_color="1 1 1 0.7"
+     font_shadow="hard"
      top="189">
         SE
     </text>
@@ -110,6 +118,7 @@
      name="floater_map_northeast"
      right="20"
      text_color="1 1 1 0.7"
+     font_shadow="hard"
      top="189">
         NE
     </text>
@@ -123,6 +132,7 @@
      name="floater_map_southwest"
      right="20"
      text_color="1 1 1 0.7"
+     font_shadow="hard"
      top="189">
         SW
     </text>
@@ -136,6 +146,7 @@
      name="floater_map_northwest"
      right="20"
      text_color="1 1 1 0.7"
+     font_shadow="hard"
      top="189">
         NW
     </text>
