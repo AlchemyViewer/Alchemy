@@ -170,6 +170,8 @@ LLFloater::Params::Params()
 	single_instance("single_instance", false),
 	reuse_instance("reuse_instance", false),
 	can_resize("can_resize", false),
+	can_resize_height("can_resize_height", true),
+	can_resize_width("can_resize_width", true),
 	can_minimize("can_minimize", true),
 	can_close("can_close", true),
 	can_drag_on_left("can_drag_on_left", false),
@@ -179,6 +181,7 @@ LLFloater::Params::Params()
 	save_visibility("save_visibility", false),
 	can_dock("can_dock", false),
 	show_title("show_title", true),
+	show_help("show_help", false),
 	positioning("positioning", LLFloaterEnums::POSITIONING_RELATIVE),
 	header_height("header_height", 0),
 	legacy_header_height("legacy_header_height", 0),
@@ -249,6 +252,9 @@ LLFloater::LLFloater(const LLSD& key, const LLFloater::Params& p)
 	mCanClose(p.can_close),
 	mDragOnLeft(p.can_drag_on_left),
 	mResizable(p.can_resize),
+	mResizableHeight(p.can_resize_height),
+	mResizableWidth(p.can_resize_width),
+	mShowHelp(p.show_help),
 	mPositioning(p.positioning),
 	mMinWidth(p.min_width),
 	mMinHeight(p.min_height),
@@ -303,7 +309,7 @@ void LLFloater::initFloater(const Params& p)
 	}
 
 	// Help button: '?'
-	if ( !mHelpTopic.empty() )
+	if ( !mHelpTopic.empty() && mShowHelp)
 	{
 		mButtonsEnabled[BUTTON_HELP] = TRUE;
 	}
@@ -603,16 +609,14 @@ void LLFloater::setVisible( BOOL visible )
 		}
 	}
 
-	for(handle_set_iter_t dependent_it = mDependents.begin();
-		dependent_it != mDependents.end(); )
+	for (const auto& dependent_handle : mDependents)
 	{
-		LLFloater* floaterp = dependent_it->get();
+		LLFloater* floaterp = dependent_handle.get();
 
 		if (floaterp)
 		{
 			floaterp->setVisible(visible);
 		}
-		++dependent_it;
 	}
 
 	storeVisibilityControl();
@@ -2032,7 +2036,7 @@ void	LLFloater::setCanTearOff(BOOL can_tear_off)
 void LLFloater::setCanResize(BOOL can_resize)
 {
 	mResizable = can_resize;
-	enableResizeCtrls(can_resize);
+	enableResizeCtrls(can_resize, mResizableWidth, mResizableHeight);
 }
 
 void LLFloater::setCanDrag(BOOL can_drag)
@@ -3210,6 +3214,8 @@ void LLFloater::initFromParams(const LLFloater::Params& p)
 	setCanMinimize(p.can_minimize);
 	setCanClose(p.can_close);
 	setCanDock(p.can_dock);
+	mResizableWidth = p.can_resize_width;
+	mResizableHeight = p.can_resize_height;
 	setCanResize(p.can_resize);
 	setResizeLimits(p.min_width, p.min_height);
 	

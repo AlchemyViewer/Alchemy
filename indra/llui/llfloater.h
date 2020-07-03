@@ -157,6 +157,8 @@ public:
 		Optional<bool>			single_instance,
 								reuse_instance,
 								can_resize,
+								can_resize_height,
+								can_resize_width,
 								can_minimize,
 								can_close,
 								can_drag_on_left,
@@ -165,7 +167,8 @@ public:
 								save_visibility,
 								save_dock_state,
 								can_dock,
-								show_title;
+								show_title,
+								show_help;
 		
 		Optional<LLFloaterEnums::EOpenPositioning>	positioning;
 		
@@ -478,6 +481,9 @@ private:
 	BOOL			mCanClose;
 	BOOL			mDragOnLeft;
 	BOOL			mResizable;
+	BOOL			mResizableHeight;
+	BOOL			mResizableWidth;
+	BOOL			mShowHelp;
 
 	LLFloaterEnums::EOpenPositioning	mPositioning;
 	LLCoordFloater	mPosition;
