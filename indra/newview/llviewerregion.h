@@ -393,6 +393,12 @@ public:
 
 	/// Hypergrid map server url
 	std::string getMapServerURL() const;
+    /// Chat Range (0.8.1)
+    U32 getChatRange() const;
+    /// Shout Range (0.8.1)
+    U32 getShoutRange() const;
+    /// Whisper Range (0.8.1)
+    U32 getWhisperRange() const;
 
 	typedef std::vector<LLPointer<LLViewerTexture> > tex_matrix_t;
 	const tex_matrix_t& getWorldMapTiles() const;
