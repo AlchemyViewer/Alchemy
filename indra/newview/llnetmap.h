@@ -97,12 +97,13 @@ private:
 	BOOL			handleToolTipAgent(const LLUUID& avatar_id);
 	static void		showAvatarInspector(const LLUUID& avatar_id);
 
+	bool			createImage(LLPointer<LLImageRaw>& rawimagep) const;
 	void			createObjectImage();
 
 	static bool		outsideSlop(S32 x, S32 y, S32 start_x, S32 start_y, S32 slop);
 
 private:
-	bool			mUpdateNow;
+	bool			mUpdateObjectImage;
 
 	LLUIColor		mBackgroundColor;
 

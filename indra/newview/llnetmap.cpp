@@ -84,7 +84,7 @@ const F64 COARSEUPDATE_MAX_Z = 1020.0;
 
 LLNetMap::LLNetMap (const Params & p)
 :	LLUICtrl (p),
-	mUpdateNow(false),
+	mUpdateObjectImage(false),
 	mBackgroundColor (p.bg_color()),
 	mScale( MAP_SCALE_MID ),
 	mPixelsPerMeter( MAP_SCALE_MID / REGION_WIDTH_METERS ),
@@ -153,8 +153,7 @@ void LLNetMap::setScale( F32 scale )
 	mDotRadius = llmax(DOT_SCALE * mPixelsPerMeter, MIN_DOT_RADIUS);
 
 	gSavedSettings.setF32("MiniMapScale", mScale);
-
-	mUpdateNow = true;
+	mUpdateObjectImage = true;
 }
 
 
@@ -237,10 +236,8 @@ void LLNetMap::draw()
 		// figure out where agent is
 		S32 region_width = ll_round(LLWorld::getInstance()->getRegionWidthInMeters());
 
-		for (LLWorld::region_list_t::const_iterator iter = LLWorld::getInstance()->getRegionList().begin();
-			 iter != LLWorld::getInstance()->getRegionList().end(); ++iter)
+		for (LLViewerRegion* regionp : LLWorld::getInstance()->getRegionList())
 		{
-			LLViewerRegion* regionp = *iter;
 			// Find x and y position relative to camera's center.
 			LLVector3 origin_agent = regionp->getOriginAgent();
 			LLVector3 rel_region_pos = origin_agent - gAgentCamera.getCameraPositionAgent();
@@ -347,9 +344,9 @@ void LLNetMap::draw()
 		{
 			static LLCachedControl<F32>  object_layer_update_time_setting(gSavedSettings, "AlchemyMinimapObjectUpdateInterval", 0.1f);
 			F32 object_layer_update_time = llclamp(object_layer_update_time_setting(), 0.01f, 60.f);
-			if (mUpdateNow || (map_timer.getElapsedTimeF32() > object_layer_update_time))
+			if (mUpdateObjectImage || (map_timer.getElapsedTimeF32() > object_layer_update_time))
 			{
-				mUpdateNow = false;
+				mUpdateObjectImage = false;
 
 				// Locate the centre of the object layer, accounting for panning
 				LLVector3 new_center = globalPosToView(gAgentCamera.getCameraPositionGlobal());
@@ -872,7 +869,7 @@ void LLNetMap::renderPoint(const LLVector3 &pos_local, const LLColor4U &color,
 	}
 }
 
-void LLNetMap::createObjectImage()
+bool LLNetMap::createImage(LLPointer<LLImageRaw>& rawimagep) const
 {
 	// Find the size of the side of a square that surrounds the circle that surrounds getRect().
 	// ... which is, the diagonal of the rect.
@@ -882,24 +879,31 @@ void LLNetMap::createObjectImage()
 
 	// Find the least power of two >= the minimum size.
 	const S32 MIN_SIZE = 64;
-	const S32 MAX_SIZE = 256;
+	const S32 MAX_SIZE = 512;
 	S32 img_size = MIN_SIZE;
 	while( (img_size*2 < square_size ) && (img_size < MAX_SIZE) )
 	{
 		img_size <<= 1;
 	}
 
-	if( mObjectImagep.isNull() ||
-		(mObjectImagep->getWidth() != img_size) ||
-		(mObjectImagep->getHeight() != img_size) )
+	if( rawimagep.isNull() ||
+		(rawimagep->getWidth() != img_size) ||
+		(rawimagep->getHeight() != img_size) )
 	{
-		mObjectRawImagep = new LLImageRaw(img_size, img_size, 4);
-		U8* data = mObjectRawImagep->getData();
-		memset( data, 0, img_size * img_size * 4 );
-		mObjectImagep = LLViewerTextureManager::getLocalTexture( mObjectRawImagep.get(), FALSE);
+		rawimagep = new LLImageRaw(img_size, img_size, 4);
+		U8* data = rawimagep->getData();
+		memset(data, 0, img_size * img_size * 4);
+		return true;
 	}
-	setScale(mScale);
-	mUpdateNow = true;
+	return false;
+}
+
+void LLNetMap::createObjectImage()
+{
+	if (createImage(mObjectRawImagep))
+		mObjectImagep = LLViewerTextureManager::getLocalTexture( mObjectRawImagep.get(), FALSE);
+    setScale(mScale);
+	mUpdateObjectImage = true;
 }
 
 BOOL LLNetMap::handleMouseDown( S32 x, S32 y, MASK mask )
