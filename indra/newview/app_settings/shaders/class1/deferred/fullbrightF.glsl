@@ -73,6 +73,9 @@ void main()
 
 	color.rgb *= vertex_color.rgb;
 
+	color.rgb = fullbrightAtmosTransport(color.rgb);
+	color.rgb = fullbrightScaleSoftClip(color.rgb);
+
 #ifdef WATER_FOG
 	vec3 pos = vary_position;
 	vec4 fogged = applyWaterFogView(pos, vec4(color.rgb, final_alpha));

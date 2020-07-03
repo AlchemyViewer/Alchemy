@@ -76,7 +76,7 @@ void main()
 
 	//color.rgb = srgb_to_linear(color.rgb);
 	
-	color.rgb = fullbrightAtmosTransportFrag(color.rgb, additive, atten);
+	color.rgb = fullbrightShinyAtmosTransport(color.rgb);
 	color.rgb = fullbrightScaleSoftClip(color.rgb);
 
 	color.a = 1.0;
