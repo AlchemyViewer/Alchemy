@@ -515,7 +515,10 @@
      reference="White_10" />
     <color
      name="MapFrustumRotatingColor"
-     value="1 1 1 0.2" />
+     reference="White_10" />
+    <color
+     name="MapParcelBoundryLine"
+     reference="White_10" />
     <color
      name="MapTrackColor"
      reference="Red" />
@@ -604,7 +607,7 @@
      reference="White" />
     <color
      name="NetMapBackgroundColor"
-     value="0 0 0 1" />
+     reference="Black_10" />
     <color
      name="NetMapGroupOwnAboveWater"
      reference="Purple" />
