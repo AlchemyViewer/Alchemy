@@ -357,7 +357,7 @@ void main()
             float scol = fres*texture2D(lightFunc, vec2(nh, spec.a)).r*gt / (nh*da);
             vec3 sp = sun_contrib*scol / 6.0f;
             sp = clamp(sp, vec3(0), vec3(1));
-            bloom = dot(sp, sp) / 4.0;
+            bloom += dot(sp, sp) / 4.0;
             color += sp * spec.rgb;
         }
 #else // PRODUCTION
