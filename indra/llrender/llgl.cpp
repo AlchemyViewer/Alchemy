@@ -796,6 +796,8 @@ bool LLGLManager::initGL()
 		mNumTextureImageUnits = llmin(num_tex_image_units, 32);
 	}
 
+	LL_INFOS() << "NUM TEX IMAGE UNITS: " << mNumTextureImageUnits << LL_ENDL;
+
 	if (LLRender::sGLCoreProfile)
 	{
 		mNumTextureUnits = llmin(mNumTextureImageUnits, MAX_GL_TEXTURE_UNITS);

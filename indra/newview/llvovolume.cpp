@@ -6278,7 +6278,7 @@ U32 LLVolumeGeometryManager::genDrawInfo(LLSpatialGroup* group, U32 mask, LLFace
 		texture_index_channels = gDeferredAlphaProgram.mFeatures.mIndexedTextureChannels;
 	}
 
-	static LLCachedControl<U32> max_texture_index(gSavedSettings, "RenderMaxTextureIndex", 16);
+	static LLCachedControl<U32> max_texture_index(gSavedSettings, "RenderMaxTextureIndex", 32);
 	texture_index_channels = llmin(texture_index_channels, (S32) max_texture_index);
 	
 	//NEVER use more than 16 texture index channels (workaround for prevalent driver bug)
