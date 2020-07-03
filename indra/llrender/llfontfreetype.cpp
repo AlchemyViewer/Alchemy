@@ -120,6 +120,8 @@ LLFontFreetype::LLFontFreetype()
 	mStyle(0),
 	mPointSize(0)
 {
+	mCharGlyphInfoMap.reserve(500);
+	mKerningCache.reserve(500);
 }
 
 
@@ -396,26 +398,38 @@ F32 LLFontFreetype::getXKerning(llwchar char_left, llwchar char_right) const
 	LLFontGlyphInfo* right_glyph_info = getGlyphInfo(char_right);
 	U32 right_glyph = right_glyph_info ? right_glyph_info->mGlyphIndex : 0;
 
+	F32 kerning = 0.0f;
+	if (getKerningCache(left_glyph,  right_glyph, kerning))
+		return kerning;
+
 	FT_Vector  delta;
 
-	llverify(!FT_Get_Kerning(mFTFace, left_glyph, right_glyph, ft_kerning_unfitted, &delta));
+	llverify(!FT_Get_Kerning(mFTFace, left_glyph, right_glyph, FT_KERNING_DEFAULT, &delta));
 
-	return delta.x*(1.f/64.f);
+	kerning = delta.x*(1.f/64.f);
+	setKerningCache(left_glyph, right_glyph, kerning);
+	return kerning;
 }
 
 F32 LLFontFreetype::getXKerning(const LLFontGlyphInfo* left_glyph_info, const LLFontGlyphInfo* right_glyph_info) const
 {
-	if (mFTFace == NULL)
+	if (mFTFace == nullptr)
 		return 0.0;
 
 	U32 left_glyph = left_glyph_info ? left_glyph_info->mGlyphIndex : 0;
 	U32 right_glyph = right_glyph_info ? right_glyph_info->mGlyphIndex : 0;
 
+	F32 kerning = 0.0f;
+	if (getKerningCache(left_glyph,  right_glyph, kerning))
+		return kerning;
+
 	FT_Vector  delta;
 
-	llverify(!FT_Get_Kerning(mFTFace, left_glyph, right_glyph, ft_kerning_unfitted, &delta));
+	llverify(!FT_Get_Kerning(mFTFace, left_glyph, right_glyph, FT_KERNING_DEFAULT, &delta));
 
-	return delta.x*(1.f/64.f);
+	kerning = delta.x*(1.f/64.f);
+	setKerningCache(left_glyph, right_glyph, kerning);
+	return kerning;
 }
 
 BOOL LLFontFreetype::hasGlyph(llwchar wch) const
@@ -439,13 +453,12 @@ LLFontGlyphInfo* LLFontFreetype::addGlyph(llwchar wch) const
 	if (glyph_index == 0)
 	{
 		//LL_INFOS() << "Trying to add glyph from fallback font!" << LL_ENDL;
-		font_vector_t::const_iterator iter;
-		for(iter = mFallbackFonts.begin(); iter != mFallbackFonts.end(); iter++)
-		{
-			glyph_index = FT_Get_Char_Index((*iter)->mFTFace, wch);
+		for (const auto fallback_fontp : mFallbackFonts)
+        {
+			glyph_index = FT_Get_Char_Index(fallback_fontp->mFTFace, wch);
 			if (glyph_index)
 			{
-				return addGlyphFromFont(*iter, wch, glyph_index);
+				return addGlyphFromFont(fallback_fontp, wch, glyph_index);
 			}
 		}
 	}
@@ -615,11 +628,9 @@ void LLFontFreetype::reset(F32 vert_dpi, F32 horz_dpi)
 		}
 		else
 		{
-			for(font_vector_t::iterator it = mFallbackFonts.begin();
-				it != mFallbackFonts.end();
-				++it)
-			{
-				(*it)->reset(vert_dpi, horz_dpi);
+			for (auto& font : mFallbackFonts)
+            {
+                font->reset(vert_dpi, horz_dpi);
 			}
 		}
 	}
@@ -627,12 +638,10 @@ void LLFontFreetype::reset(F32 vert_dpi, F32 horz_dpi)
 
 void LLFontFreetype::resetBitmapCache()
 {
-	for (char_glyph_info_map_t::iterator it = mCharGlyphInfoMap.begin(), end_it = mCharGlyphInfoMap.end();
-		it != end_it;
-		++it)
-	{
-		disclaimMem(it->second);
-		delete it->second;
+	for (auto& glyph_pair : mCharGlyphInfoMap)
+    {
+		disclaimMem(glyph_pair.second);
+		delete glyph_pair.second;
 	}
 	mCharGlyphInfoMap.clear();
 	disclaimMem(mFontBitmapCachep);
@@ -707,3 +716,21 @@ void LLFontFreetype::setSubImageLuminanceAlpha(U32 x, U32 y, U32 bitmap_num, U32
 	}
 }
 
+static inline U64 kerning_cache_key(const U32 left_glyph, const U32 right_glyph)
+{
+	return (((U64)left_glyph) << 32) | right_glyph;
+}
+
+bool LLFontFreetype::getKerningCache(U32 left_glyph, U32 right_glyph, F32& kerning) const
+{
+	auto const& iter = mKerningCache.find(kerning_cache_key(left_glyph, right_glyph));
+	if (iter == mKerningCache.cend())
+		return false;
+	kerning = iter->second;
+	return true;
+}
+
+void LLFontFreetype::setKerningCache(U32 left_glyph, U32 right_glyph, F32 kerning) const
+{
+	mKerningCache.emplace(kerning_cache_key(left_glyph, right_glyph), kerning);
+}
