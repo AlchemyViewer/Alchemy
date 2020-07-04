@@ -7577,6 +7577,12 @@ class LLToolsSelectedScriptAction : public view_listener_t
 			msg = "SetRunningNot";
 			title = LLTrans::getString("NotRunQueueTitle");
 		}
+		else if (action == "delete")
+		{
+			name = "delete_queue";
+			msg = "Delete";
+			title = LLTrans::getString("DeleteQueueTitle");
+		}
 		LLUUID id; id.generate();
 		
 		LLFloaterScriptQueue* queue =LLFloaterReg::getTypedInstance<LLFloaterScriptQueue>(name, LLSD(id));

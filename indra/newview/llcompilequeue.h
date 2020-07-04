@@ -33,11 +33,12 @@
 #include "lluuid.h"
 
 #include "llfloater.h"
-#include "llscrolllistctrl.h"
 
 #include "llviewerinventory.h"
 
 #include "llevents.h"
+
+class LLScrollListCtrl;
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // Class LLFloaterScriptQueue
@@ -56,7 +57,7 @@ public:
 	LLFloaterScriptQueue(const LLSD& key);
 	virtual ~LLFloaterScriptQueue();
 
-	/*virtual*/ BOOL postBuild();
+	/*virtual*/ BOOL postBuild() override;
 	
 	void setMono(bool mono) { mMono = mono; }
 	
@@ -120,7 +121,7 @@ struct LLCompileQueueData
 		mQueueID(q_id), mItemId(item_id) {}
 };
 
-class LLFloaterCompileQueue : public LLFloaterScriptQueue
+class LLFloaterCompileQueue final : public LLFloaterScriptQueue
 {
 	friend class LLFloaterReg;
 public:
@@ -131,8 +132,8 @@ public:
 protected:
 	LLFloaterCompileQueue(const LLSD& key);
 	virtual ~LLFloaterCompileQueue();
-	
-	virtual bool startQueue();
+
+	bool startQueue() override;
 
     static bool processScript(LLHandle<LLFloaterCompileQueue> hfloater, const LLPointer<LLViewerObject> &object, LLInventoryObject* inventory, LLEventPump &pump);
 
@@ -152,7 +153,7 @@ private:
 // This script queue will reset each script.
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-class LLFloaterResetQueue : public LLFloaterScriptQueue
+class LLFloaterResetQueue final : public LLFloaterScriptQueue
 {
 	friend class LLFloaterReg;
 protected:
@@ -161,7 +162,7 @@ protected:
 	
     static bool resetObjectScripts(LLHandle<LLFloaterScriptQueue> hfloater, const LLPointer<LLViewerObject> &object, LLInventoryObject* inventory, LLEventPump &pump);
 
-    virtual bool startQueue();
+	bool startQueue() override;
 };
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -170,7 +171,7 @@ protected:
 // This script queue will set each script as running.
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-class LLFloaterRunQueue : public LLFloaterScriptQueue
+class LLFloaterRunQueue final : public LLFloaterScriptQueue
 {
 	friend class LLFloaterReg;
 protected:
@@ -179,7 +180,7 @@ protected:
 
     static bool runObjectScripts(LLHandle<LLFloaterScriptQueue> hfloater, const LLPointer<LLViewerObject> &object, LLInventoryObject* inventory, LLEventPump &pump);
 
-    virtual bool startQueue();
+	bool startQueue() override;
 };
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -188,7 +189,7 @@ protected:
 // This script queue will set each script as not running.
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-class LLFloaterNotRunQueue : public LLFloaterScriptQueue
+class LLFloaterNotRunQueue final : public LLFloaterScriptQueue
 {
 	friend class LLFloaterReg;
 protected:
@@ -197,7 +198,24 @@ protected:
 	
     static bool stopObjectScripts(LLHandle<LLFloaterScriptQueue> hfloater, const LLPointer<LLViewerObject> &object, LLInventoryObject* inventory, LLEventPump &pump);
 
-    virtual bool startQueue();
+	bool startQueue() override;
 };
 
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+// Class LLFloaterDeleteQueue
+//
+// This script queue will remove each script.
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class LLFloaterDeleteQueue final : public LLFloaterScriptQueue
+{
+	friend class LLFloaterReg;
+protected:
+	LLFloaterDeleteQueue(const LLSD& key);
+	virtual ~LLFloaterDeleteQueue();
+
+	static bool deleteObjectScripts(LLHandle<LLFloaterScriptQueue> hfloater, const LLPointer<LLViewerObject> &object, LLInventoryObject* inventory, LLEventPump &pump);
+
+	bool startQueue() override;
+};
 #endif // LL_LLCOMPILEQUEUE_H

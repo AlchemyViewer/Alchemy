@@ -1163,6 +1163,15 @@ function="World.EnvPreset"
             <menu_item_call.on_enable
                function="EditableSelected" />
           </menu_item_call>
+          <menu_item_call
+             label="Delete Scripts"
+             name="Delete Scripts">
+            <menu_item_call.on_click
+               function="Tools.SelectedScriptAction"
+               parameter="delete" />
+            <menu_item_call.on_enable
+               function="EditableSelected" />
+          </menu_item_call>
         </menu>
 
       <menu

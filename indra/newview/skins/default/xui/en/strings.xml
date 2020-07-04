@@ -2625,6 +2625,8 @@ If you continue to receive this message, please contact Second Life support for 
 	<string name="RunQueueStart">set running</string>
 	<string name="NotRunQueueTitle">Set Not Running Progress</string>
 	<string name="NotRunQueueStart">set not running</string>
+	<string name="DeleteQueueTitle">Deletion Progress</string>
+	<string name="DeleteQueueStart">deletion</string>
 
 	<!-- compile comment text-->
 	<string name="CompileSuccessful">Compile successful!</string>
