@@ -1185,7 +1185,7 @@ BOOL LLToolPie::handleTooltipObject( LLViewerObject* hover_object, std::string l
 			     ( (RlvActions::canInteract(hover_object, mHoverPick.mObjectOffset)) && (RlvActions::canShowName(RlvActions::SNC_DEFAULT, hover_object->getID())) ) )
 			{
 // [/RLVa:KB]
-				static const LLCachedControl<bool> av_inspector_tooltip_delay(gSavedSettings, "AvatarInspectorTooltipDelay");
+				static const LLCachedControl<F32> av_inspector_tooltip_delay(gSavedSettings, "AvatarInspectorTooltipDelay");
 				LLInspector::Params p;
 				p.fillFrom(LLUICtrlFactory::instance().getDefaultParams<LLInspector>());
 				p.message(final_name);
