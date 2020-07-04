@@ -1058,7 +1058,7 @@ U32 LLControlGroup::saveToFile(const std::string& filename, BOOL nondefault_only
 
 U32 LLControlGroup::loadFromFile(const std::string& filename, bool set_default_values, bool save_values)
 {
-	if (!mIncludedFiles.insert(filename).second)
+	if (!mIncludedFiles.insert(filename).second && set_default_values)
 	{
 		return 0; //Already included this file.
 	}
