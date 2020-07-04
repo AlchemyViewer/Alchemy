@@ -4738,7 +4738,7 @@
       <key>Persist</key>
       <integer>1</integer>
       <key>Type</key>
-      <string>LLSD</string>
+      <string>Quaternion</string>
       <key>Value</key>
       <array>
         <real>0</real>

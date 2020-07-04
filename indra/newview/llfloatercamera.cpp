@@ -579,7 +579,7 @@ void LLFloaterCamera::switchToPreset(const std::string& name)
 
 	if (isAgentAvatarValid() && gAgentAvatarp->getParent())
 	{
-		LLQuaternion sit_rot(gSavedSettings.getLLSD("AvatarSitRotation"));
+		LLQuaternion sit_rot(gSavedSettings.getQuaternion("AvatarSitRotation"));
 		if (sit_rot != LLQuaternion())
 		{
 			gAgent.rotate(~gAgent.getFrameAgent().getQuaternion());
