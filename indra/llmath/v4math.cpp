@@ -116,7 +116,7 @@ BOOL LLVector4::parseVector4(const std::string& buf, LLVector4* value)
 	}
 
 	LLVector4 v;
-	S32 count = sscanf(buf.c_str(), "%lf %lf %lf %lf", v.mV + 0, v.mV + 1, v.mV + 2, v.mV + 3);
+	S32 count = sscanf(buf.c_str(), "%f %f %f %f", v.mV + 0, v.mV + 1, v.mV + 2, v.mV + 3);
 	if (4 == count)
 	{
 		value->setVec(v);
