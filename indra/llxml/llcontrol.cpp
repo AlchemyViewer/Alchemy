@@ -68,6 +68,7 @@ template <> eControlType get_control_type<std::string>();
 template <> eControlType get_control_type<LLVector3>();
 template <> eControlType get_control_type<LLVector3d>();
 template <> eControlType get_control_type<LLVector4>();
+template <> eControlType get_control_type<LLQuaternion>();
 template <> eControlType get_control_type<LLRect>();
 template <> eControlType get_control_type<LLColor4>();
 template <> eControlType get_control_type<LLColor3>();
@@ -79,6 +80,7 @@ template <> LLSD convert_to_llsd<U32>(const U32& in);
 template <> LLSD convert_to_llsd<LLVector3>(const LLVector3& in);
 template <> LLSD convert_to_llsd<LLVector3d>(const LLVector3d& in);
 template <> LLSD convert_to_llsd<LLVector4>(const LLVector4& in);
+template <> LLSD convert_to_llsd<LLQuaternion>(const LLQuaternion& in);
 template <> LLSD convert_to_llsd<LLRect>(const LLRect& in);
 template <> LLSD convert_to_llsd<LLColor4>(const LLColor4& in);
 template <> LLSD convert_to_llsd<LLColor3>(const LLColor3& in);
@@ -93,6 +95,7 @@ template <> LLWString convert_from_llsd<LLWString>(const LLSD& sd, eControlType 
 template <> LLVector3 convert_from_llsd<LLVector3>(const LLSD& sd, eControlType type, const std::string& control_name);
 template <> LLVector3d convert_from_llsd<LLVector3d>(const LLSD& sd, eControlType type, const std::string& control_name);
 template <> LLVector4 convert_from_llsd<LLVector4>(const LLSD& sd, eControlType type, const std::string& control_name);
+template <> LLQuaternion convert_from_llsd<LLQuaternion>(const LLSD& sd, eControlType type, const std::string& control_name);
 template <> LLRect convert_from_llsd<LLRect>(const LLSD& sd, eControlType type, const std::string& control_name);
 template <> LLColor4 convert_from_llsd<LLColor4>(const LLSD& sd, eControlType type, const std::string& control_name);
 template <> LLColor4U convert_from_llsd<LLColor4U>(const LLSD& sd, eControlType type, const std::string& control_name);
@@ -1000,10 +1003,10 @@ U32 LLControlGroup::loadFromFileLegacy(const std::string& filename, BOOL require
 			break;
 		case TYPE_UUID:
 			{
-				LLUUID color;
+				LLUUID uuid;
 				
-				child_nodep->getAttributeUUID("value", color);
-				control->set(color);
+				child_nodep->getAttributeUUID("value", uuid);
+				control->set(uuid);
 				validitems++;
 			}
 			break;
@@ -1517,7 +1520,7 @@ LLVector4 convert_from_llsd<LLVector4>(const LLSD& sd, eControlType type, const 
 		return (LLVector4)sd;
 	else
 	{
-		CONTROL_ERRS << "Invalid LLVector3d value for " << control_name << ": " << LLControlGroup::typeEnumToString(type) << " " << sd << LL_ENDL;
+		CONTROL_ERRS << "Invalid LLVector4 value for " << control_name << ": " << LLControlGroup::typeEnumToString(type) << " " << sd << LL_ENDL;
 		return LLVector4::zero;
 	}
 }

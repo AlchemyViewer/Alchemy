@@ -2625,7 +2625,7 @@ void cleanup_menus()
 	gMenuAttachmentSelf = NULL;
 
 	delete gMenuAttachmentOther;
-	gMenuAttachmentSelf = NULL;
+	gMenuAttachmentOther = NULL;
 
 	delete gMenuLand;
 	gMenuLand = NULL;
