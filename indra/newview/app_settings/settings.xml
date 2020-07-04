@@ -15600,6 +15600,7 @@
 	      <string>postcard</string>
 	      <string>mini_map</string>
 	      <string>beacons</string>
+	      <string>stats</string>
       </array>
     </map>
     <key>LandmarksSortedByDate</key>
