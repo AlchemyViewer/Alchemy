@@ -1085,11 +1085,11 @@ U32 LLControlGroup::loadFromFile(const std::string& filename, bool set_default_v
 	U32	validitems = 0;
 	bool hidefromsettingseditor = false;
 	
-	for(LLSD::map_const_iterator itr = settings.beginMap(); itr != settings.endMap(); ++itr)
+	for(const auto& e : settings.map())
 	{
 		LLControlVariable::ePersist persist = LLControlVariable::PERSIST_NONDFT;
-		std::string const & name = itr->first;
-		LLSD const & control_map = itr->second;
+		std::string const & name = e.first;
+		LLSD const & control_map = e.second;
 		
 		if(name == "Include")
 		{
