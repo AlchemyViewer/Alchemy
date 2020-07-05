@@ -1917,7 +1917,11 @@ BOOL LLFace::getGeometryVolume(const LLVolume& volume,
 				LL_RECORD_BLOCK_TIME(FTM_FACE_TEX_DEFAULT);
 
 				std::vector<LLVector2> bump_tc;
-		
+				if (!mat && do_bump)
+				{
+					bump_tc.reserve(num_vertices);
+				}
+
 				if (mat && !mat->getNormalID().isNull())
 				{ //writing out normal and specular texture coordinates, not bump offsets
 					do_bump = false;
@@ -2006,8 +2010,8 @@ BOOL LLFace::getGeometryVolume(const LLVolume& volume,
 						xform(tc, cos_ang, sin_ang, os, ot, ms, mt);
 					}
 
-						*dst++ = tc;
-					if (do_bump)
+					*dst++ = tc;
+					if (!mat && do_bump)
 					{
 						bump_tc.push_back(tc);
 					}
