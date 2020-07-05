@@ -231,10 +231,8 @@ BOOL LLViewerDynamicTexture::updateAllInstances()
 	BOOL ret = FALSE ;
 	for( S32 order = 0; order < ORDER_COUNT; order++ )
 	{
-		for (instance_list_t::iterator iter = LLViewerDynamicTexture::sInstances[order].begin();
-			 iter != LLViewerDynamicTexture::sInstances[order].end(); ++iter)
+		for (LLViewerDynamicTexture* dynamicTexture : LLViewerDynamicTexture::sInstances[order])
 		{
-			LLViewerDynamicTexture *dynamicTexture = *iter;
 			if (dynamicTexture->needsRender())
 			{				
 				glClear(GL_DEPTH_BUFFER_BIT);
@@ -276,10 +274,8 @@ void LLViewerDynamicTexture::destroyGL()
 {
 	for( S32 order = 0; order < ORDER_COUNT; order++ )
 	{
-		for (instance_list_t::iterator iter = LLViewerDynamicTexture::sInstances[order].begin();
-			 iter != LLViewerDynamicTexture::sInstances[order].end(); ++iter)
+		for (LLViewerDynamicTexture* dynamicTexture : LLViewerDynamicTexture::sInstances[order])
 		{
-			LLViewerDynamicTexture *dynamicTexture = *iter;
 			dynamicTexture->destroyGLTexture() ;
 		}
 	}
@@ -298,10 +294,8 @@ void LLViewerDynamicTexture::restoreGL()
 	
 	for( S32 order = 0; order < ORDER_COUNT; order++ )
 	{
-		for (instance_list_t::iterator iter = LLViewerDynamicTexture::sInstances[order].begin();
-			 iter != LLViewerDynamicTexture::sInstances[order].end(); ++iter)
+		for (LLViewerDynamicTexture* dynamicTexture : LLViewerDynamicTexture::sInstances[order])
 		{
-			LLViewerDynamicTexture *dynamicTexture = *iter;
 			dynamicTexture->restoreGLTexture() ;
 		}
 	}

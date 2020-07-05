@@ -1566,9 +1566,8 @@ void LLPipeline::dirtyPoolObjectTextures(const std::set<LLViewerFetchedTexture*>
 	// *TODO: This is inefficient and causes frame spikes; need a better way to do this
 	//        Most of the time is spent in dirty.traverse.
 
-	for (pool_set_t::iterator iter = mPools.begin(); iter != mPools.end(); ++iter)
+	for (LLDrawPool* poolp : mPools)
 	{
-		LLDrawPool *poolp = *iter;
 		if (poolp->isFacePool())
 		{
 			((LLFacePool*) poolp)->dirtyTextures(textures);
@@ -2068,10 +2067,8 @@ void LLPipeline::updateMove()
 	{
 		LL_RECORD_BLOCK_TIME(FTM_RETEXTURE);
 
-		for (LLDrawable::drawable_set_t::iterator iter = mRetexturedList.begin();
-			 iter != mRetexturedList.end(); ++iter)
+		for (LLDrawable* drawablep : mRetexturedList)
 		{
-			LLDrawable* drawablep = *iter;
 			if (drawablep && !drawablep->isDead())
 			{
 				drawablep->updateTexture();
@@ -2742,7 +2739,7 @@ void LLPipeline::doOcclusion(LLCamera& camera)
 		}
 		mCubeVB->setBuffer(LLVertexBuffer::MAP_VERTEX);
 
-		for (LLCullResult::sg_iterator iter = sCull->beginOcclusionGroups(); iter != sCull->endOcclusionGroups(); ++iter)
+		for (LLCullResult::sg_iterator iter = sCull->beginOcclusionGroups(), iter_end = sCull->endOcclusionGroups(); iter != iter_end; ++iter)
 		{
 			LLSpatialGroup* group = *iter;
 			group->doOcclusion(&camera);
@@ -2816,11 +2813,8 @@ void LLPipeline::clearRebuildGroups()
 
 	mGroupQ1Locked = true;
 	// Iterate through all drawables on the priority build queue,
-	for (LLSpatialGroup::sg_vector_t::iterator iter = mGroupQ1.begin();
-		 iter != mGroupQ1.end(); ++iter)
+	for (LLSpatialGroup* group : mGroupQ1)
 	{
-		LLSpatialGroup* group = *iter;
-
 		// If the group contains HUD objects, save the group
 		if (group->isHUDGroup())
 		{
@@ -2844,11 +2838,8 @@ void LLPipeline::clearRebuildGroups()
 	hudGroups.clear();
 
 	mGroupQ2Locked = true;
-	for (LLSpatialGroup::sg_vector_t::iterator iter = mGroupQ2.begin();
-		 iter != mGroupQ2.end(); ++iter)
+	for (LLSpatialGroup* group : mGroupQ2)
 	{
-		LLSpatialGroup* group = *iter;
-
 		// If the group contains HUD objects, save the group
 		if (group->isHUDGroup())
 		{
@@ -2871,10 +2862,8 @@ void LLPipeline::clearRebuildGroups()
 void LLPipeline::clearRebuildDrawables()
 {
 	// Clear all drawables on the priority build queue,
-	for (LLDrawable::drawable_list_t::iterator iter = mBuildQ1.begin();
-		 iter != mBuildQ1.end(); ++iter)
+	for (LLDrawable* drawablep : mBuildQ1)
 	{
-		LLDrawable* drawablep = *iter;
 		if (drawablep && !drawablep->isDead())
 		{
 			drawablep->clearState(LLDrawable::IN_REBUILD_Q2);
@@ -2884,10 +2873,8 @@ void LLPipeline::clearRebuildDrawables()
 	mBuildQ1.clear();
 
 	// clear drawables on the non-priority build queue
-	for (LLDrawable::drawable_list_t::iterator iter = mBuildQ2.begin();
-		 iter != mBuildQ2.end(); ++iter)
+	for (LLDrawable* drawablep : mBuildQ2)
 	{
-		LLDrawable* drawablep = *iter;
 		if (!drawablep->isDead())
 		{
 			drawablep->clearState(LLDrawable::IN_REBUILD_Q2);
@@ -2896,19 +2883,15 @@ void LLPipeline::clearRebuildDrawables()
 	mBuildQ2.clear();
 	
 	//clear all moving bridges
-	for (LLDrawable::drawable_vector_t::iterator iter = mMovedBridge.begin();
-		 iter != mMovedBridge.end(); ++iter)
+	for (LLDrawable* drawablep : mMovedBridge)
 	{
-		LLDrawable *drawablep = *iter;
 		drawablep->clearState(LLDrawable::EARLY_MOVE | LLDrawable::MOVE_UNDAMPED | LLDrawable::ON_MOVE_LIST | LLDrawable::ANIMATED_CHILD);
 	}
 	mMovedBridge.clear();
 
 	//clear all moving drawables
-	for (LLDrawable::drawable_vector_t::iterator iter = mMovedList.begin();
-		 iter != mMovedList.end(); ++iter)
+	for (LLDrawable* drawablep : mMovedList)
 	{
-		LLDrawable *drawablep = *iter;
 		drawablep->clearState(LLDrawable::EARLY_MOVE | LLDrawable::MOVE_UNDAMPED | LLDrawable::ON_MOVE_LIST | LLDrawable::ANIMATED_CHILD);
 	}
 	mMovedList.clear();
@@ -2924,10 +2907,8 @@ void LLPipeline::rebuildPriorityGroups()
 
 	mGroupQ1Locked = true;
 	// Iterate through all drawables on the priority build queue,
-	for (LLSpatialGroup::sg_vector_t::iterator iter = mGroupQ1.begin();
-		 iter != mGroupQ1.end(); ++iter)
+	for (LLSpatialGroup* group : mGroupQ1)
 	{
-		LLSpatialGroup* group = *iter;
 		group->rebuildGeom();
 		group->clearState(LLSpatialGroup::IN_BUILD_Q1);
 	}
@@ -3209,10 +3190,8 @@ void LLPipeline::shiftObjects(const LLVector3 &offset)
 	{
 		LL_RECORD_BLOCK_TIME(FTM_SHIFT_DRAWABLE);
 
-		for (LLDrawable::drawable_vector_t::iterator iter = mShiftList.begin();
-			 iter != mShiftList.end(); iter++)
+		for (LLDrawable* drawablep : mShiftList)
 		{
-			LLDrawable *drawablep = *iter;
 			if (drawablep->isDead())
 			{
 				continue;
@@ -3278,9 +3257,8 @@ static LLTrace::BlockTimerStatHandle FTM_PROCESS_PARTITIONQ("PartitionQ");
 void LLPipeline::processPartitionQ()
 {
 	LL_RECORD_BLOCK_TIME(FTM_PROCESS_PARTITIONQ);
-	for (LLDrawable::drawable_list_t::iterator iter = mPartitionQ.begin(); iter != mPartitionQ.end(); ++iter)
+	for (LLDrawable* drawable : mPartitionQ)
 	{
-		LLDrawable* drawable = *iter;
 		if (!drawable->isDead())
 		{
 			drawable->updateBinRadius();
@@ -3401,7 +3379,7 @@ void LLPipeline::stateSort(LLCamera& camera, LLCullResult &result)
 	//LLVertexBuffer::unbind();
 
 	grabReferences(result);
-	for (LLCullResult::sg_iterator iter = sCull->beginDrawableGroups(); iter != sCull->endDrawableGroups(); ++iter)
+	for (LLCullResult::sg_iterator iter = sCull->beginDrawableGroups(), iter_end = sCull->endDrawableGroups(); iter != iter_end; ++iter)
 	{
 		LLSpatialGroup* group = *iter;
 		group->checkOcclusion();
@@ -3412,7 +3390,7 @@ void LLPipeline::stateSort(LLCamera& camera, LLCullResult &result)
 		else
 		{
 			group->setVisible();
-			for (LLSpatialGroup::element_iter i = group->getDataBegin(); i != group->getDataEnd(); ++i)
+			for (LLSpatialGroup::element_iter i = group->getDataBegin(), i_end = group->getDataEnd(); i != i_end; ++i)
 			{
                 LLDrawable* drawablep = (LLDrawable*)(*i)->getDrawable();
 				markVisible(drawablep, camera);
@@ -3429,7 +3407,7 @@ void LLPipeline::stateSort(LLCamera& camera, LLCullResult &result)
 	{
 		LLSpatialGroup* last_group = NULL;
 		BOOL fov_changed = LLViewerCamera::getInstance()->isDefaultFOVChanged();
-		for (LLCullResult::bridge_iterator i = sCull->beginVisibleBridge(); i != sCull->endVisibleBridge(); ++i)
+		for (LLCullResult::bridge_iterator i = sCull->beginVisibleBridge(), i_end = sCull->endVisibleBridge(); i != i_end; ++i)
 		{
 			LLCullResult::bridge_iterator cur_iter = i;
 			LLSpatialBridge* bridge = *cur_iter;
@@ -3461,7 +3439,7 @@ void LLPipeline::stateSort(LLCamera& camera, LLCullResult &result)
 		}
 	}
 
-	for (LLCullResult::sg_iterator iter = sCull->beginVisibleGroups(); iter != sCull->endVisibleGroups(); ++iter)
+	for (LLCullResult::sg_iterator iter = sCull->beginVisibleGroups(), iter_end = sCull->endVisibleGroups(); iter != iter_end; ++iter)
 	{
 		LLSpatialGroup* group = *iter;
 		group->checkOcclusion();
@@ -3483,8 +3461,8 @@ void LLPipeline::stateSort(LLCamera& camera, LLCullResult &result)
 	
 	{
 		LL_RECORD_BLOCK_TIME(FTM_STATESORT_DRAWABLE);
-		for (LLCullResult::drawable_iterator iter = sCull->beginVisibleList();
-			 iter != sCull->endVisibleList(); ++iter)
+		for (LLCullResult::drawable_iterator iter = sCull->beginVisibleList(), iter_end = sCull->endVisibleList();
+			 iter != iter_end; ++iter)
 		{
 			LLDrawable *drawablep = *iter;
 			if (!drawablep->isDead())
@@ -3501,7 +3479,7 @@ void LLPipeline::stateSort(LLSpatialGroup* group, LLCamera& camera)
 {
 	if (group->changeLOD())
 	{
-		for (LLSpatialGroup::element_iter i = group->getDataBegin(); i != group->getDataEnd(); ++i)
+		for (LLSpatialGroup::element_iter i = group->getDataBegin(), i_end = group->getDataEnd(); i != i_end; ++i)
 		{
             LLDrawable* drawablep = (LLDrawable*)(*i)->getDrawable();            
 			stateSort(drawablep, camera);
@@ -3601,11 +3579,8 @@ void LLPipeline::stateSort(LLDrawable* drawablep, LLCamera& camera)
 
 	if (!drawablep->getVOVolume())
 	{
-		for (LLDrawable::face_list_t::iterator iter = drawablep->mFaces.begin();
-				iter != drawablep->mFaces.end(); iter++)
+		for (LLFace* facep : drawablep->mFaces)
 		{
-			LLFace* facep = *iter;
-
 			if (facep->hasGeometry())
 			{
 				if (facep->getPool())
@@ -3834,7 +3809,7 @@ void LLPipeline::postSort(LLCamera& camera)
 
 	LL_PUSH_CALLSTACKS();
 	//rebuild drawable geometry
-	for (LLCullResult::sg_iterator i = sCull->beginDrawableGroups(); i != sCull->endDrawableGroups(); ++i)
+	for (LLCullResult::sg_iterator i = sCull->beginDrawableGroups(), i_end = sCull->endDrawableGroups(); i != i_end; ++i)
 	{
 		LLSpatialGroup* group = *i;
 		if (!sUseOcclusion || 
@@ -3852,7 +3827,7 @@ void LLPipeline::postSort(LLCamera& camera)
 
 	
 	//build render map
-	for (LLCullResult::sg_iterator i = sCull->beginVisibleGroups(); i != sCull->endVisibleGroups(); ++i)
+	for (LLCullResult::sg_iterator i = sCull->beginVisibleGroups(), i_end = sCull->endVisibleGroups(); i != i_end; ++i)
 	{
 		LLSpatialGroup* group = *i;
 		if ((sUseOcclusion && 
@@ -3868,7 +3843,7 @@ void LLPipeline::postSort(LLCamera& camera)
 			group->rebuildGeom();
 		}
 
-		for (LLSpatialGroup::draw_map_t::iterator j = group->mDrawMap.begin(); j != group->mDrawMap.end(); ++j)
+		for (LLSpatialGroup::draw_map_t::iterator j = group->mDrawMap.begin(), j_end = group->mDrawMap.end(); j != j_end; ++j)
 		{
 			LLSpatialGroup::drawmap_elem_t& src_vec = j->second;	
 			if (!hasRenderType(j->first))
@@ -3876,7 +3851,7 @@ void LLPipeline::postSort(LLCamera& camera)
 				continue;
 			}
 			
-			for (LLSpatialGroup::drawmap_elem_t::iterator k = src_vec.begin(); k != src_vec.end(); ++k)
+			for (LLSpatialGroup::drawmap_elem_t::iterator k = src_vec.begin(), k_end = src_vec.end(); k != k_end; ++k)
 			{
 				if (sMinRenderSize > 0.f)
 				{
@@ -3949,9 +3924,9 @@ void LLPipeline::postSort(LLCamera& camera)
 	}*/
 
 	//pack vertex buffers for groups that chose to delay their updates
-	for (LLSpatialGroup::sg_vector_t::iterator iter = mMeshDirtyGroup.begin(); iter != mMeshDirtyGroup.end(); ++iter)
+	for (LLSpatialGroup* group : mMeshDirtyGroup)
 	{
-		(*iter)->rebuildMesh();
+		group->rebuildMesh();
 	}
 
 	/*if (use_transform_feedback)
@@ -4423,9 +4398,8 @@ void LLPipeline::renderGeom(LLCamera& camera, bool forceVBOUpdate)
 	
 	LLAppViewer::instance()->pingMainloopTimeout("Pipeline:RenderDrawPools");
 
-	for (pool_set_t::iterator iter = mPools.begin(); iter != mPools.end(); ++iter)
+	for (LLDrawPool* poolp : mPools)
 	{
-		LLDrawPool *poolp = *iter;
 		if (hasRenderType(poolp->getType()))
 		{
 			poolp->prerender();
@@ -4448,7 +4422,8 @@ void LLPipeline::renderGeom(LLCamera& camera, bool forceVBOUpdate)
 		U32 cur_type = 0;
 
 		pool_set_t::iterator iter1 = mPools.begin();
-		while ( iter1 != mPools.end() )
+		pool_set_t::iterator pools_end = mPools.end();
+		while ( iter1 != pools_end )
 		{
 			LLDrawPool *poolp = *iter1;
 			
@@ -4478,7 +4453,7 @@ void LLPipeline::renderGeom(LLCamera& camera, bool forceVBOUpdate)
 				{
 					LLVertexBuffer::unbind();
 					poolp->beginRenderPass(i);
-					for (iter2 = iter1; iter2 != mPools.end(); iter2++)
+					for (iter2 = iter1; iter2 != pools_end; ++iter2)
 					{
 						LLDrawPool *p = *iter2;
 						if (p->getType() != cur_type)
@@ -4502,7 +4477,7 @@ void LLPipeline::renderGeom(LLCamera& camera, bool forceVBOUpdate)
 			else
 			{
 				// Skip all pools of this type
-				for (iter2 = iter1; iter2 != mPools.end(); iter2++)
+				for (iter2 = iter1; iter2 != pools_end; ++iter2)
 				{
 					LLDrawPool *p = *iter2;
 					if (p->getType() != cur_type)
@@ -4605,9 +4580,8 @@ void LLPipeline::renderGeomDeferred(LLCamera& camera)
 
 	LLGLEnable cull(GL_CULL_FACE);
 
-	for (pool_set_t::iterator iter = mPools.begin(); iter != mPools.end(); ++iter)
+	for (LLDrawPool* poolp : mPools)
 	{
-		LLDrawPool *poolp = *iter;
 		if (hasRenderType(poolp->getType()))
 		{
 			poolp->prerender();
@@ -4627,8 +4601,9 @@ void LLPipeline::renderGeomDeferred(LLCamera& camera)
 	gGL.setColorMask(true, true);
 	
 	pool_set_t::iterator iter1 = mPools.begin();
+	pool_set_t::iterator pools_end = mPools.end();
 
-	while ( iter1 != mPools.end() )
+	while ( iter1 != pools_end )
 	{
 		LLDrawPool *poolp = *iter1;
 		
@@ -4646,7 +4621,7 @@ void LLPipeline::renderGeomDeferred(LLCamera& camera)
 			{
 				LLVertexBuffer::unbind();
 				poolp->beginDeferredPass(i);
-				for (iter2 = iter1; iter2 != mPools.end(); iter2++)
+				for (iter2 = iter1; iter2 != pools_end; ++iter2)
 				{
 					LLDrawPool *p = *iter2;
 					if (p->getType() != cur_type)
@@ -4668,7 +4643,7 @@ void LLPipeline::renderGeomDeferred(LLCamera& camera)
 		else
 		{
 			// Skip all pools of this type
-			for (iter2 = iter1; iter2 != mPools.end(); iter2++)
+			for (iter2 = iter1; iter2 != pools_end; ++iter2)
 			{
 				LLDrawPool *p = *iter2;
 				if (p->getType() != cur_type)
@@ -4703,9 +4678,10 @@ void LLPipeline::renderGeomPostDeferred(LLCamera& camera, bool do_occlusion)
 	gGL.setColorMask(true, false);
 
 	pool_set_t::iterator iter1 = mPools.begin();
+	pool_set_t::iterator pools_end = mPools.end();
 	bool occlude = LLPipeline::sUseOcclusion > 1 && do_occlusion;
 
-	while ( iter1 != mPools.end() )
+	while ( iter1 != pools_end)
 	{
 		LLDrawPool *poolp = *iter1;
 		
@@ -4733,7 +4709,7 @@ void LLPipeline::renderGeomPostDeferred(LLCamera& camera, bool do_occlusion)
 			{
 				LLVertexBuffer::unbind();
 				poolp->beginPostDeferredPass(i);
-				for (iter2 = iter1; iter2 != mPools.end(); iter2++)
+				for (iter2 = iter1; iter2 != pools_end; ++iter2)
 				{
 					LLDrawPool *p = *iter2;
 					if (p->getType() != cur_type)
@@ -4741,7 +4717,7 @@ void LLPipeline::renderGeomPostDeferred(LLCamera& camera, bool do_occlusion)
 						break;
 					}
 										
-					p->renderPostDeferred(i);
+					if (!p->getSkipRenderFlag()) { p->renderPostDeferred(i); }
 				}
 				poolp->endPostDeferredPass(i);
 				LLVertexBuffer::unbind();
@@ -4755,7 +4731,7 @@ void LLPipeline::renderGeomPostDeferred(LLCamera& camera, bool do_occlusion)
 		else
 		{
 			// Skip all pools of this type
-			for (iter2 = iter1; iter2 != mPools.end(); iter2++)
+			for (iter2 = iter1; iter2 != pools_end; ++iter2)
 			{
 				LLDrawPool *p = *iter2;
 				if (p->getType() != cur_type)
@@ -4792,8 +4768,9 @@ void LLPipeline::renderGeomShadow(LLCamera& camera)
 	LLVertexBuffer::unbind();
 
 	pool_set_t::iterator iter1 = mPools.begin();
-	
-	while ( iter1 != mPools.end() )
+	pool_set_t::iterator pools_end = mPools.end();
+
+	while ( iter1 != pools_end )
 	{
 		LLDrawPool *poolp = *iter1;
 		
@@ -4811,7 +4788,7 @@ void LLPipeline::renderGeomShadow(LLCamera& camera)
 			{
 				LLVertexBuffer::unbind();
 				poolp->beginShadowPass(i);
-				for (iter2 = iter1; iter2 != mPools.end(); iter2++)
+				for (iter2 = iter1; iter2 != pools_end; ++iter2)
 				{
 					LLDrawPool *p = *iter2;
 					if (p->getType() != cur_type)
@@ -4819,7 +4796,7 @@ void LLPipeline::renderGeomShadow(LLCamera& camera)
 						break;
 					}
 										
-					p->renderShadow(i);
+					if ( !p->getSkipRenderFlag() ) { p->renderShadow(i); }
 				}
 				poolp->endShadowPass(i);
 				LLVertexBuffer::unbind();
@@ -4830,7 +4807,7 @@ void LLPipeline::renderGeomShadow(LLCamera& camera)
 		else
 		{
 			// Skip all pools of this type
-			for (iter2 = iter1; iter2 != mPools.end(); iter2++)
+			for (iter2 = iter1; iter2 != pools_end; ++iter2)
 			{
 				LLDrawPool *p = *iter2;
 				if (p->getType() != cur_type)
@@ -4894,10 +4871,8 @@ void LLPipeline::renderPhysicsDisplay()
 		gDebugProgram.bind();
 	}
 
-	for (LLWorld::region_list_t::const_iterator iter = LLWorld::getInstance()->getRegionList().begin(); 
-			iter != LLWorld::getInstance()->getRegionList().end(); ++iter)
+	for (LLViewerRegion* region : LLWorld::getInstance()->getRegionList())
 	{
-		LLViewerRegion* region = *iter;
 		for (U32 i = 0; i < LLViewerRegion::NUM_PARTITIONS; i++)
 		{
 			LLSpatialPartition* part = region->getSpatialPartition(i);
@@ -5302,10 +5277,8 @@ void LLPipeline::renderDebug()
 
 
 	// Debug stuff.
-	for (LLWorld::region_list_t::const_iterator iter = LLWorld::getInstance()->getRegionList().begin(); 
-			iter != LLWorld::getInstance()->getRegionList().end(); ++iter)
+	for (LLViewerRegion* region : LLWorld::getInstance()->getRegionList())
 	{
-		LLViewerRegion* region = *iter;
 		for (U32 i = 0; i < LLViewerRegion::NUM_PARTITIONS; i++)
 		{
 			LLSpatialPartition* part = region->getSpatialPartition(i);
@@ -5320,7 +5293,7 @@ void LLPipeline::renderDebug()
 		}
 	}
 
-	for (LLCullResult::bridge_iterator i = sCull->beginVisibleBridge(); i != sCull->endVisibleBridge(); ++i)
+	for (LLCullResult::bridge_iterator i = sCull->beginVisibleBridge(), i_end = sCull->endVisibleBridge(); i != i_end; ++i)
 	{
 		LLSpatialBridge* bridge = *i;
 		if (!bridge->isDead() && hasRenderType(bridge->mDrawableType))
@@ -5978,9 +5951,9 @@ void LLPipeline::resetDrawOrders()
 {
 	assertInitialized();
 	// Iterate through all of the draw pools and rebuild them.
-	for (pool_set_t::iterator iter = mPools.begin(); iter != mPools.end(); ++iter)
+	for (LLDrawPool* poolp : mPools)
 	{
-		LLDrawPool *poolp = *iter;
+
 		poolp->resetDrawOrders();
 	}
 }
@@ -6133,12 +6106,10 @@ void LLPipeline::calcNearbyLights(LLCamera& camera)
 		
 		// UPDATE THE EXISTING NEARBY LIGHTS
 		light_set_t cur_nearby_lights;
-		for (light_set_t::iterator iter = mNearbyLights.begin();
-			iter != mNearbyLights.end(); iter++)
+		for (const Light& light : mNearbyLights)
 		{
-			const Light* light = &(*iter);
-			LLDrawable* drawable = light->drawable;
-            const LLViewerObject *vobj = light->drawable->getVObj();
+			LLDrawable* drawable = light.drawable;
+            const LLViewerObject *vobj = light.drawable->getVObj();
             if(vobj && vobj->getAvatar() 
                && (vobj->getAvatar()->isTooComplex() || vobj->getAvatar()->isInMuteList())
                )
@@ -6153,7 +6124,7 @@ void LLPipeline::calcNearbyLights(LLCamera& camera)
 				drawable->clearState(LLDrawable::NEARBY_LIGHT);
 				continue;
 			}
-			if (light->fade <= -LIGHT_FADE_TIME)
+			if (light.fade <= -LIGHT_FADE_TIME)
 			{
 				drawable->clearState(LLDrawable::NEARBY_LIGHT);
 				continue;
@@ -6165,16 +6136,14 @@ void LLPipeline::calcNearbyLights(LLCamera& camera)
 			}
 
 			F32 dist = calc_light_dist(volight, cam_pos, max_dist);
-			cur_nearby_lights.insert(Light(drawable, dist, light->fade));
+			cur_nearby_lights.insert(Light(drawable, dist, light.fade));
 		}
 		mNearbyLights = cur_nearby_lights;
 				
 		// FIND NEW LIGHTS THAT ARE IN RANGE
 		light_set_t new_nearby_lights;
-		for (LLDrawable::drawable_set_t::iterator iter = mLights.begin();
-			 iter != mLights.end(); ++iter)
+		for (LLDrawable* drawable : mLights)
 		{
-			LLDrawable* drawable = *iter;
 			LLVOVolume* light = drawable->getVOVolume();
 			if (!light || drawable->isState(LLDrawable::NEARBY_LIGHT))
 			{
@@ -6203,14 +6172,12 @@ void LLPipeline::calcNearbyLights(LLCamera& camera)
 		}
 
 		// INSERT ANY NEW LIGHTS
-		for (light_set_t::iterator iter = new_nearby_lights.begin();
-			 iter != new_nearby_lights.end(); iter++)
+		for (const Light& light : new_nearby_lights)
 		{
-			const Light* light = &(*iter);
 			if (mNearbyLights.size() < (U32)MAX_LOCAL_LIGHTS)
 			{
-				mNearbyLights.insert(*light);
-				((LLDrawable*) light->drawable)->setState(LLDrawable::NEARBY_LIGHT);
+				mNearbyLights.insert(light);
+				((LLDrawable*) light.drawable)->setState(LLDrawable::NEARBY_LIGHT);
 			}
 			else
 			{
@@ -6218,7 +6185,7 @@ void LLPipeline::calcNearbyLights(LLCamera& camera)
 				// even though gcc enforces sets as const
 				// (fade value doesn't affect sort so this is safe)
 				Light* farthest_light = (const_cast<Light*>(&(*(mNearbyLights.rbegin()))));
-				if (light->dist < farthest_light->dist)
+				if (light.dist < farthest_light->dist)
 				{
 					if (farthest_light->fade >= 0.f)
 					{
@@ -6233,11 +6200,9 @@ void LLPipeline::calcNearbyLights(LLCamera& camera)
 		}
 		
 		//mark nearby lights not-removable.
-		for (light_set_t::iterator iter = mNearbyLights.begin();
-			 iter != mNearbyLights.end(); iter++)
+		for (const Light& light : mNearbyLights)
 		{
-			const Light* light = &(*iter);
-			((LLViewerOctreeEntryData*) light->drawable)->setVisible();
+			((LLViewerOctreeEntryData*) light.drawable)->setVisible();
 		}
 	}
 }
@@ -6728,9 +6693,8 @@ bool LLPipeline::verify()
 	bool ok = assertInitialized();
 	if (ok) 
 	{
-		for (pool_set_t::iterator iter = mPools.begin(); iter != mPools.end(); ++iter)
+		for (LLDrawPool* poolp : mPools)
 		{
-			LLDrawPool *poolp = *iter;
 			if (!poolp->verify())
 			{
 				ok = false;
@@ -8738,10 +8702,8 @@ void LLPipeline::renderDeferredLighting(LLRenderTarget* screen_target)
 				mCubeVB->setBuffer(LLVertexBuffer::MAP_VERTEX);
 				
 				LLGLDepthTest depth(GL_TRUE, GL_FALSE);
-				for (LLDrawable::drawable_set_t::iterator iter = mLights.begin(); iter != mLights.end(); ++iter)
+				for (LLDrawable* drawablep : mLights)
 				{
-					LLDrawable* drawablep = *iter;
-					
 					LLVOVolume* volume = drawablep->getVOVolume();
 					if (!volume)
 					{
@@ -8854,10 +8816,9 @@ void LLPipeline::renderDeferredLighting(LLRenderTarget* screen_target)
 
 				gDeferredSpotLightProgram.enableTexture(LLShaderMgr::DEFERRED_PROJECTION);
 
-				for (LLDrawable::drawable_list_t::iterator iter = spot_lights.begin(); iter != spot_lights.end(); ++iter)
+				for (LLDrawable* drawablep : spot_lights)
 				{
 					LL_RECORD_BLOCK_TIME(FTM_PROJECTORS);
-					LLDrawable* drawablep = *iter;
 
 					LLVOVolume* volume = drawablep->getVOVolume();
 
@@ -8941,11 +8902,10 @@ void LLPipeline::renderDeferredLighting(LLRenderTarget* screen_target)
 
 				mDeferredVB->setBuffer(LLVertexBuffer::MAP_VERTEX);
 
-				for (LLDrawable::drawable_list_t::iterator iter = fullscreen_spot_lights.begin(); iter != fullscreen_spot_lights.end(); ++iter)
+				for (LLDrawable* drawablep : fullscreen_spot_lights)
 				{
 					LL_RECORD_BLOCK_TIME(FTM_PROJECTORS);
-					LLDrawable* drawablep = *iter;
-					
+
 					LLVOVolume* volume = drawablep->getVOVolume();
 
 					LLVector3 center = drawablep->getPositionAgent();
@@ -10000,9 +9960,9 @@ void LLPipeline::renderHighlight(const LLViewerObject* obj, F32 fade)
 {
 	if (obj && obj->getVolume())
 	{
-		for (LLViewerObject::child_list_t::const_iterator iter = obj->getChildren().begin(); iter != obj->getChildren().end(); ++iter)
+		for (const LLViewerObject* object : obj->getChildren())
 		{
-			renderHighlight(*iter, fade);
+			renderHighlight(object, fade);
 		}
 
 		LLDrawable* drawable = obj->mDrawable;
@@ -10868,7 +10828,7 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
 
 void LLPipeline::renderGroups(LLRenderPass* pass, U32 type, U32 mask, bool texture)
 {
-	for (LLCullResult::sg_iterator i = sCull->beginVisibleGroups(); i != sCull->endVisibleGroups(); ++i)
+	for (LLCullResult::sg_iterator i = sCull->beginVisibleGroups(), i_end = sCull->endVisibleGroups(); i != i_end; ++i)
 	{
 		LLSpatialGroup* group = *i;
 		if (!group->isDead() &&
@@ -11452,7 +11412,8 @@ void LLPipeline::restorePermanentObjects( const std::vector<U32>& restoreList )
 void LLPipeline::skipRenderingOfTerrain( bool flag )
 {
 	pool_set_t::iterator iter = mPools.begin();
-	while ( iter != mPools.end() )
+	pool_set_t::iterator iter_end = mPools.end();
+	while ( iter != iter_end)
 	{
 		LLDrawPool* pPool = *iter;		
 		U32 poolType = pPool->getType();					
@@ -11485,10 +11446,8 @@ void LLPipeline::hideDrawable( LLDrawable *pDrawable )
 	markRebuild( pDrawable, LLDrawable::REBUILD_ALL, TRUE );
 	//hide the children
 	LLViewerObject::const_child_list_t& child_list = pDrawable->getVObj()->getChildren();
-	for ( LLViewerObject::child_list_t::const_iterator iter = child_list.begin();
-		  iter != child_list.end(); iter++ )
+	for (LLViewerObject* child : child_list)
 	{
-		LLViewerObject* child = *iter;
 		LLDrawable* drawable = child->mDrawable;					
 		if ( drawable )
 		{
@@ -11503,10 +11462,8 @@ void LLPipeline::unhideDrawable( LLDrawable *pDrawable )
 	markRebuild( pDrawable, LLDrawable::REBUILD_ALL, TRUE );
 	//restore children
 	LLViewerObject::const_child_list_t& child_list = pDrawable->getVObj()->getChildren();
-	for ( LLViewerObject::child_list_t::const_iterator iter = child_list.begin();
-		  iter != child_list.end(); iter++)
+	for (LLViewerObject* child : child_list)
 	{
-		LLViewerObject* child = *iter;
 		LLDrawable* drawable = child->mDrawable;					
 		if ( drawable )
 		{

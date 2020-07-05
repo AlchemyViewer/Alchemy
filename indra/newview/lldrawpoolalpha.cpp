@@ -327,7 +327,7 @@ void LLDrawPoolAlpha::render(S32 pass)
 
 void LLDrawPoolAlpha::renderAlphaHighlight(U32 mask)
 {
-	for (LLCullResult::sg_iterator i = gPipeline.beginAlphaGroups(); i != gPipeline.endAlphaGroups(); ++i)
+	for (LLCullResult::sg_iterator i = gPipeline.beginAlphaGroups(), i_end = gPipeline.endAlphaGroups(); i != i_end; ++i)
 	{
 		LLSpatialGroup* group = *i;
 		if (group->getSpatialPartition()->mRenderByGroup &&
@@ -613,7 +613,7 @@ void LLDrawPoolAlpha::renderAlpha(U32 mask, S32 pass)
 	
 	BOOL use_shaders = gPipeline.canUseVertexShaders();
 		
-	for (LLCullResult::sg_iterator i = gPipeline.beginAlphaGroups(); i != gPipeline.endAlphaGroups(); ++i)
+	for (LLCullResult::sg_iterator i = gPipeline.beginAlphaGroups(), i_end = gPipeline.endAlphaGroups(); i != i_end; ++i)
 	{
 		LLSpatialGroup* group = *i;
 		llassert(group);
@@ -638,9 +638,9 @@ void LLDrawPoolAlpha::renderAlpha(U32 mask, S32 pass)
 
 			LLSpatialGroup::drawmap_elem_t& draw_info = group->mDrawMap[LLRenderPass::PASS_ALPHA];
 
-			for (LLSpatialGroup::drawmap_elem_t::iterator k = draw_info.begin(); k != draw_info.end(); ++k)	
+			for (LLDrawInfo* k : draw_info)
 			{
-				LLDrawInfo& params = **k;
+				LLDrawInfo& params = *k;
                 U32 have_mask = params.mVertexBuffer->getTypeMask() & mask;
 				if (have_mask != mask)
 				{ //FIXME!

@@ -104,10 +104,8 @@ void LLDrawPoolTree::render(S32 pass)
 // [/SL:KB]
 //	gGL.getTexUnit(sDiffTex)->bind(mTexturep);
 				
-	for (std::vector<LLFace*>::iterator iter = mDrawFace.begin();
-		 iter != mDrawFace.end(); iter++)
+	for (LLFace* face : mDrawFace)
 	{
-		LLFace *face = *iter;
 		LLVertexBuffer* buff = face->getVertexBuffer();
 
 		if(buff)

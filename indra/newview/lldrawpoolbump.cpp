@@ -639,9 +639,9 @@ void LLDrawPoolBump::renderGroup(LLSpatialGroup* group, U32 type, U32 mask, BOOL
 {					
 	LLSpatialGroup::drawmap_elem_t& draw_info = group->mDrawMap[type];	
 	
-	for (LLSpatialGroup::drawmap_elem_t::iterator k = draw_info.begin(); k != draw_info.end(); ++k) 
+	for (LLDrawInfo* k : draw_info)
 	{
-		LLDrawInfo& params = **k;
+		LLDrawInfo& params = *k;
 		
 		applyModelMatrix(params);
 
