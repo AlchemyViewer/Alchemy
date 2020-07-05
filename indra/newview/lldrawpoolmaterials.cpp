@@ -177,13 +177,15 @@ void LLDrawPoolMaterials::pushBatch(LLDrawInfo& params, U32 mask, BOOL texture, 
 	
 	bool tex_setup = false;
 	
-	if (batch_textures && params.mTextureList.size() > 1)
+	const U32 tex_list_size = params.mTextureList.size();
+	if (batch_textures && tex_list_size > 1)
 	{
-		for (U32 i = 0; i < params.mTextureList.size(); ++i)
+		for (U32 i = 0; i < tex_list_size; ++i)
 		{
-			if (params.mTextureList[i].notNull())
+			LLViewerTexture* texturep = params.mTextureList[i];
+			if (texturep)
 			{
-				gGL.getTexUnit(i)->bind(params.mTextureList[i], TRUE);
+				gGL.getTexUnit(i)->bind(texturep, TRUE);
 			}
 		}
 	}
