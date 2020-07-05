@@ -33,7 +33,7 @@
 #include "llviewertexture.h"
 #include "llviewerobject.h"
 
-class LLVOGround : public LLStaticViewerObject
+class LLVOGround final : public LLStaticViewerObject
 {
 protected:
 	~LLVOGround();

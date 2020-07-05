@@ -47,7 +47,7 @@ typedef void (*LLVPCallback)(LLViewerPart &part, const F32 dt);
 //
 
 
-class LLViewerPart : public LLPartData
+class LLViewerPart final : public LLPartData
 {
 public:
 	~LLViewerPart();
@@ -133,7 +133,7 @@ protected:
 	LLViewerRegion *mRegionp;
 };
 
-class LLViewerPartSim : public LLSingleton<LLViewerPartSim>
+class LLViewerPartSim final : public LLSingleton<LLViewerPartSim>
 {
 	LLSINGLETON(LLViewerPartSim);
 public:

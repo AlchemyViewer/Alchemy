@@ -36,7 +36,7 @@
 #include "llextendedstatus.h"
 #include "llsingleton.h"
 
-class ALAOTimerCollection : public LLEventTimer
+class ALAOTimerCollection final : public LLEventTimer
 {
 public:
 	ALAOTimerCollection();
@@ -60,7 +60,7 @@ protected:
 
 // ----------------------------------------------------
 
-class ALAOSitCancelTimer : public LLEventTimer
+class ALAOSitCancelTimer final : public LLEventTimer
 {
 public:
 	ALAOSitCancelTimer();

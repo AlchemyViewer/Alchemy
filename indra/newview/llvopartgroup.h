@@ -115,7 +115,7 @@ protected:
 };
 
 
-class LLVOHUDPartGroup : public LLVOPartGroup
+class LLVOHUDPartGroup final : public LLVOPartGroup
 {
 public:
 	LLVOHUDPartGroup(const LLUUID &id, const LLPCode pcode, LLViewerRegion *regionp) : 

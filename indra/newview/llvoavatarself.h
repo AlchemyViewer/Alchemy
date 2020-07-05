@@ -42,7 +42,7 @@ class LLInventoryCallback;
 // LLVOAvatarSelf
 //
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-class LLVOAvatarSelf :
+class LLVOAvatarSelf final :
 	public LLVOAvatar
 {
 	LOG_CLASS(LLVOAvatarSelf);

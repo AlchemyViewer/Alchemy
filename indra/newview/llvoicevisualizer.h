@@ -65,7 +65,7 @@ const static int NUM_VOICE_SYMBOL_WAVES = 7;
 //----------------------------------------------------
 // LLVoiceVisualizer class 
 //----------------------------------------------------
-class LLVoiceVisualizer : public LLHUDEffect
+class LLVoiceVisualizer final : public LLHUDEffect
 {
 	//---------------------------------------------------
 	// public methods 

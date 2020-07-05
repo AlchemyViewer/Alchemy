@@ -34,7 +34,7 @@ class LLFace;
 class LLDrawPool;
 class LLViewerFetchedTexture;
 
-class LLVOTree : public LLViewerObject
+class LLVOTree final : public LLViewerObject
 {
 protected:
 	~LLVOTree();

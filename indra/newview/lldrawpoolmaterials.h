@@ -38,7 +38,7 @@ class LLViewerTexture;
 class LLDrawInfo;
 class LLGLSLShader;
 
-class LLDrawPoolMaterials : public LLRenderPass
+class LLDrawPoolMaterials final : public LLRenderPass
 {
 	LLGLSLShader *mShader;
 public:

@@ -34,7 +34,7 @@ class LLSurfacePatch;
 class LLViewerTexture;
 
 
-class LLVOGrass : public LLAlphaObject
+class LLVOGrass final : public LLAlphaObject
 {
 public:
 	LLVOGrass(const LLUUID &id, const LLPCode pcode, LLViewerRegion *regionp);

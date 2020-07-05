@@ -134,7 +134,7 @@ private:
 	
     static void finishUpload(LLUUID itemId, LLUUID taskId, LLUUID newAssetId, LLSD response, bool isRunning, LLUUID objectId);
     
-	class LLParticleScriptCreationCallback : public LLInventoryCallback
+	class LLParticleScriptCreationCallback final : public LLInventoryCallback
 	{
 	public:
 		LLParticleScriptCreationCallback(ALFloaterParticleEditor* editor);

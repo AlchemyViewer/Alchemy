@@ -46,7 +46,7 @@ class LLGLSLShader;
 class LLParcel;
 
 //-------------------------------------------------------------------------
-class LLEnvironment : public LLSingleton<LLEnvironment>
+class LLEnvironment final : public LLSingleton<LLEnvironment>
 {
     LLSINGLETON_C11(LLEnvironment);
     LOG_CLASS(LLEnvironment);

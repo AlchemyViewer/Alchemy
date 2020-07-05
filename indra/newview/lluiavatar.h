@@ -30,7 +30,7 @@
 #include "llvoavatar.h"
 #include "llvovolume.h"
 
-class LLUIAvatar:
+class LLUIAvatar final :
     public LLVOAvatar
 {
     LOG_CLASS(LLUIAvatar);

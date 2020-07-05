@@ -32,7 +32,7 @@
 class LLSkyTex;
 class LLGLSLShader;
 
-class LLDrawPoolSky : public LLFacePool
+class LLDrawPoolSky final : public LLFacePool
 {
 private:
 	LLSkyTex			*mSkyTex;

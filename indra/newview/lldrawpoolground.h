@@ -30,7 +30,7 @@
 #include "lldrawpool.h"
 
 
-class LLDrawPoolGround : public LLFacePool
+class LLDrawPoolGround final : public LLFacePool
 {
 public:
 	enum

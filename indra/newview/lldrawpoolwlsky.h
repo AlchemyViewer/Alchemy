@@ -31,7 +31,7 @@
 
 class LLGLSLShader;
 
-class LLDrawPoolWLSky : public LLDrawPool {
+class LLDrawPoolWLSky final : public LLDrawPool {
 public:
 
 	static const U32 SKY_VERTEX_DATA_MASK =	LLVertexBuffer::MAP_VERTEX |

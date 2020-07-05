@@ -57,7 +57,7 @@ enum LLVolumeInterfaceType
 const F32 MAX_LOD_FACTOR = 4.0f;
 
 
-class LLRiggedVolume : public LLVolume
+class LLRiggedVolume final : public LLVolume
 {
 public:
 	LLRiggedVolume(const LLVolumeParams& params)
@@ -93,7 +93,7 @@ public:
 };
 
 // Class which embodies all Volume objects (with pcode LL_PCODE_VOLUME)
-class LLVOVolume : public LLViewerObject
+class LLVOVolume final : public LLViewerObject
 {
 	LOG_CLASS(LLVOVolume);
 protected:

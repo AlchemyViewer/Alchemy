@@ -36,7 +36,7 @@ class LLVector2;
 class LLFacePool;
 class LLFace;
 
-class LLVOSurfacePatch : public LLStaticViewerObject
+class LLVOSurfacePatch final : public LLStaticViewerObject
 {
 public:
 	static F32 sLODFactor;

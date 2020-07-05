@@ -37,7 +37,7 @@ class LLViewerObject;
 
 const S32 NUM_POINTS = 5;
 
-class LLHUDEffectBeam : public LLHUDEffect
+class LLHUDEffectBeam final : public LLHUDEffect
 {
 public:
 	/*virtual*/ void setSourceObject(LLViewerObject *objp);

@@ -29,7 +29,7 @@
 
 #include "llviewerobject.h"
 
-class LLVOWLSky : public LLStaticViewerObject {
+class LLVOWLSky final : public LLStaticViewerObject {
 private:
 	inline static U32 getNumStacks(void);
 	inline static U32 getNumSlices(void);

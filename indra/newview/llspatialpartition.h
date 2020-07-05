@@ -664,7 +664,7 @@ private:
 };
 
 //spatial partition that uses volume geometry manager (implemented in LLVOVolume.cpp)
-class LLVolumePartition : public LLSpatialPartition, public LLVolumeGeometryManager
+class LLVolumePartition final : public LLSpatialPartition, public LLVolumeGeometryManager
 {
 public:
 	LLVolumePartition(LLViewerRegion* regionp);
@@ -685,7 +685,7 @@ public:
 	virtual void addGeometryCount(LLSpatialGroup* group, U32 &vertex_count, U32& index_count) { LLVolumeGeometryManager::addGeometryCount(group, vertex_count, index_count); }
 };
 
-class LLHUDBridge : public LLVolumeBridge
+class LLHUDBridge final : public LLVolumeBridge
 {
 public:
 	LLHUDBridge(LLDrawable* drawablep, LLViewerRegion* regionp);

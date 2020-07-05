@@ -29,7 +29,7 @@
 
 #include "lldrawpool.h"
 
-class LLDrawPoolSimple : public LLRenderPass
+class LLDrawPoolSimple final : public LLRenderPass
 {
 public:
 	enum
@@ -57,7 +57,7 @@ public:
 
 };
 
-class LLDrawPoolGrass : public LLRenderPass
+class LLDrawPoolGrass final : public LLRenderPass
 {
 public:
 	enum
@@ -84,7 +84,7 @@ public:
 	/*virtual*/ void prerender();
 };
 
-class LLDrawPoolAlphaMask : public LLRenderPass
+class LLDrawPoolAlphaMask final : public LLRenderPass
 {
 public:
 	enum
@@ -111,7 +111,7 @@ public:
 
 };
 
-class LLDrawPoolFullbrightAlphaMask : public LLRenderPass
+class LLDrawPoolFullbrightAlphaMask final : public LLRenderPass
 {
 public:
 	enum
@@ -137,7 +137,7 @@ public:
 };
 
 
-class LLDrawPoolFullbright : public LLRenderPass
+class LLDrawPoolFullbright final : public LLRenderPass
 {
 public:
 	enum
@@ -163,7 +163,7 @@ public:
 
 };
 
-class LLDrawPoolGlow : public LLRenderPass
+class LLDrawPoolGlow final : public LLRenderPass
 {
 public:
 	LLDrawPoolGlow(): LLRenderPass(LLDrawPool::POOL_GLOW) { }

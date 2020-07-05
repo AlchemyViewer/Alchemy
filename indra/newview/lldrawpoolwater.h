@@ -35,7 +35,7 @@ class LLHeavenBody;
 class LLWaterSurface;
 class LLGLSLShader;
 
-class LLDrawPoolWater: public LLFacePool
+class LLDrawPoolWater final : public LLFacePool
 {
 protected:
 	LLPointer<LLViewerTexture> mWaterImagep[2];	

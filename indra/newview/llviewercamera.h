@@ -44,7 +44,7 @@ extern template class LLViewerCamera* LLSingleton<class LLViewerCamera>::getInst
 #endif
 
 LL_ALIGN_PREFIX(16)
-class LLViewerCamera : public LLCamera, public LLSingleton<LLViewerCamera>
+class LLViewerCamera final : public LLCamera, public LLSingleton<LLViewerCamera>
 {
 	LLSINGLETON(LLViewerCamera);
 public:

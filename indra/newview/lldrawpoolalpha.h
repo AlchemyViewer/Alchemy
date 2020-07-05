@@ -35,7 +35,7 @@ class LLFace;
 class LLColor4;
 class LLGLSLShader;
 
-class LLDrawPoolAlpha: public LLRenderPass
+class LLDrawPoolAlpha final : public LLRenderPass
 {
 public:
 	enum
@@ -91,13 +91,6 @@ private:
 	LLRender::eBlendFactor mColorDFactor;	
 	LLRender::eBlendFactor mAlphaSFactor;
 	LLRender::eBlendFactor mAlphaDFactor;
-};
-
-class LLDrawPoolAlphaPostWater : public LLDrawPoolAlpha
-{
-public:
-	LLDrawPoolAlphaPostWater();
-	virtual void render(S32 pass = 0);
 };
 
 #endif // LL_LLDRAWPOOLALPHA_H

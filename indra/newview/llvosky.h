@@ -191,7 +191,7 @@ public:
 
 class LLCubeMap;
 
-class LLVOSky : public LLStaticViewerObject
+class LLVOSky final : public LLStaticViewerObject
 {
 public:	
 	enum

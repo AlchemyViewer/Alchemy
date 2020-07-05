@@ -37,7 +37,7 @@
 // Cache entries
 class LLCamera;
 
-class LLVOCacheEntry 
+class LLVOCacheEntry final
 :	public LLViewerOctreeEntryData,
 	public LLTrace::MemTrackable<LLVOCacheEntry, 16>
 {
@@ -173,7 +173,7 @@ public:
 	static F32					sRearPixelThreshold;
 };
 
-class LLVOCacheGroup : public LLOcclusionCullingGroup
+class LLVOCacheGroup final : public LLOcclusionCullingGroup
 {
 public:
 	LLVOCacheGroup(OctreeNode* node, LLViewerOctreePartition* part) : LLOcclusionCullingGroup(node, part){}	
@@ -185,7 +185,7 @@ protected:
 	virtual ~LLVOCacheGroup();
 };
 
-class LLVOCachePartition : public LLViewerOctreePartition, public LLTrace::MemTrackable<LLVOCachePartition>
+class LLVOCachePartition final : public LLViewerOctreePartition, public LLTrace::MemTrackable<LLVOCachePartition>
 {
 public:
 	LLVOCachePartition(LLViewerRegion* regionp);
@@ -221,7 +221,7 @@ private:
 //
 //Note: LLVOCache is not thread-safe
 //
-class LLVOCache : public LLParamSingleton<LLVOCache>
+class LLVOCache final : public LLParamSingleton<LLVOCache>
 {
 	LLSINGLETON(LLVOCache, bool read_only);
 	~LLVOCache() ;

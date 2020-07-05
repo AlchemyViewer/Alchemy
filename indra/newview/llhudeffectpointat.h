@@ -42,7 +42,7 @@ typedef enum e_pointat_type
 	POINTAT_NUM_TARGETS
 } EPointAtType;
 
-class LLHUDEffectPointAt : public LLHUDEffect
+class LLHUDEffectPointAt final : public LLHUDEffect
 {
 public:
 	friend class LLHUDObject;

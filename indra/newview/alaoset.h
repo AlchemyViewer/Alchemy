@@ -30,7 +30,7 @@
 #include <utility>
 #include "lleventtimer.h"
 
-class ALAOSet : public LLEventTimer
+class ALAOSet final : public LLEventTimer
 {
 public:
 	ALAOSet(const LLUUID& inventoryID);

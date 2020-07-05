@@ -29,7 +29,7 @@
 
 #include "lldrawpool.h"
 
-class LLDrawPoolTree : public LLFacePool
+class LLDrawPoolTree final : public LLFacePool
 {
 	LLPointer<LLViewerTexture> mTexturep;
 public:

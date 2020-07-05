@@ -68,7 +68,7 @@ struct LLFlexibleObjectSection
 //---------------------------------------------------------
 // The LLVolumeImplFlexible class 
 //---------------------------------------------------------
-class LLVolumeImplFlexible : public LLVolumeInterface
+class LLVolumeImplFlexible final : public LLVolumeInterface
 {
 private:
 	static std::vector<LLVolumeImplFlexible*> sInstanceList;

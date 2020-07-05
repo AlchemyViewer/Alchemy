@@ -59,7 +59,7 @@ class LLVOAvatar;
 // as simulators are connected to, viewer_regions are popped off the stack and connected as required
 // as simulators are removed, they are pushed back onto the stack
 
-class LLWorld : public LLSingleton<LLWorld>
+class LLWorld final : public LLSingleton<LLWorld>
 {
 	LLSINGLETON(LLWorld);
 public:

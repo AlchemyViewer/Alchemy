@@ -168,7 +168,7 @@ private:
 
 extern LLBumpImageList gBumpImageList;
 
-class LLDrawPoolInvisible : public LLDrawPoolBump
+class LLDrawPoolInvisible final : public LLDrawPoolBump
 {
 public:
 	LLDrawPoolInvisible() : LLDrawPoolBump(LLDrawPool::POOL_INVISIBLE) { }
