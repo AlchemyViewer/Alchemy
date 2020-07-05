@@ -575,10 +575,8 @@ void LLDrawPoolWater::shade2(bool edge, LLGLSLShader* shader, const LLColor3& li
 	shader->uniform1f(LLShaderMgr::WATER_SPECULAR_EXP, light_exp);
     if (LLEnvironment::instance().isCloudScrollPaused())
     {
-        static const std::array<F32, 2> zerowave{ {0.0f, 0.0f} };
-        
-        shader->uniform2fv(LLShaderMgr::WATER_WAVE_DIR1, 1, zerowave.data());
-        shader->uniform2fv(LLShaderMgr::WATER_WAVE_DIR2, 1, zerowave.data());
+        shader->uniform2fv(LLShaderMgr::WATER_WAVE_DIR1, 1, LLVector2::zero.mV);
+        shader->uniform2fv(LLShaderMgr::WATER_WAVE_DIR2, 1, LLVector2::zero.mV);
     }
     else
     {
@@ -599,7 +597,6 @@ void LLDrawPoolWater::shade2(bool edge, LLGLSLShader* shader, const LLColor3& li
 	shader->uniform1f(LLShaderMgr::WATER_SUN_ANGLE, sunAngle);
 	shader->uniform1f(LLShaderMgr::WATER_SCALED_ANGLE, scaledAngle);
 	shader->uniform1f(LLShaderMgr::WATER_SUN_ANGLE2, 0.1f + 0.2f*sunAngle);
-    shader->uniform1i(LLShaderMgr::WATER_EDGE_FACTOR, edge ? 1 : 0);
 
     LLVector4 rotated_light_direction = LLEnvironment::instance().getRotatedLightNorm();
     shader->uniform4fv(LLViewerShaderMgr::LIGHTNORM, 1, rotated_light_direction.mV);
@@ -614,61 +611,39 @@ void LLDrawPoolWater::shade2(bool edge, LLGLSLShader* shader, const LLColor3& li
 		shader->uniform1f(LLShaderMgr::WATER_REFSCALE, pwater->getScaleAbove());
 	}
 
-	{		
+	{
+		LLGLEnable depth_clamp(gGLManager.mHasDepthClamp ? GL_DEPTH_CLAMP : 0);
 		LLGLDisable cullface(GL_CULL_FACE);
+		for (LLFace* face : mDrawFace)
+		{
+			if (gSky.mVOSkyp->isReflFace(face))
+			{
+				continue;
+			}
 
-        if (edge)
-        {
-            for (std::vector<LLFace*>::iterator iter = mDrawFace.begin(); iter != mDrawFace.end(); iter++)
-		    {
-			    LLFace *face = *iter;
-                if (face)
-                {
-                    LLVOWater* water = (LLVOWater*) face->getViewerObject();
-					if (diffTex > -1)
-					{
-						gGL.getTexUnit(diffTex)->bind(face->getTexture());
-					}
+			LLVOWater* water = (LLVOWater*)face->getViewerObject();
+			if (diffTex > -1)
+			{
+				gGL.getTexUnit(diffTex)->bind(face->getTexture());
+			}
 
-                    if (water)
-                    {
-                        bool edge_patch = water->getIsEdgePatch();
-                        if (edge_patch)
-                        {
-                            //sNeedsReflectionUpdate = TRUE;
-                            face->renderIndexed();
-                        }
-                    }
-                }
-		    }
-        }
-        else
-        {
-            for (std::vector<LLFace*>::iterator iter = mDrawFace.begin(); iter != mDrawFace.end(); iter++)
-		    {
-			    LLFace *face = *iter;
-                if (face)
-                {
-                    LLVOWater* water = (LLVOWater*) face->getViewerObject();
-					if (diffTex > -1)
-					{
-						gGL.getTexUnit(diffTex)->bind(face->getTexture());
-					}
+			if (!water->getIsEdgePatch())
+			{
+				sNeedsReflectionUpdate = TRUE;
+				sNeedsDistortionUpdate = TRUE;
+			}
 
-                    if (water)
-                    {
-                        bool edge_patch = water->getIsEdgePatch();
-                        if (!edge_patch)
-                        {
-                            sNeedsReflectionUpdate = TRUE;
-                            sNeedsDistortionUpdate = TRUE;
-                            face->renderIndexed();
-                        }
-                    }
-                }
-		    }
-        }
-    }
+			if (water->getUseTexture() || !water->getIsEdgePatch() || gGLManager.mHasDepthClamp || deferred_render)
+			{
+				face->renderIndexed();
+			}
+			else
+			{
+				LLGLSquashToFarClip far_clip(get_current_projection());
+				face->renderIndexed();
+			}
+		}
+	}
 
     gGL.getTexUnit(bumpTex)->unbind(LLTexUnit::TT_TEXTURE);
     gGL.getTexUnit(bumpTex2)->unbind(LLTexUnit::TT_TEXTURE);
@@ -762,7 +737,7 @@ void LLDrawPoolWater::shade()
 	else
 	{
 		shader = &gWaterProgram;
-        edge_shader = &gWaterEdgeProgram;
+        edge_shader = nullptr;
 	}
 
 	static const LLCachedControl<bool> render_water_mip_normal(gSavedSettings, "RenderWaterMipNormal");
@@ -792,7 +767,7 @@ void LLDrawPoolWater::shade()
 	}
 
     shade2(false, shader, light_diffuse, light_dir, light_exp);
-    shade2(true, edge_shader ? edge_shader : shader, light_diffuse, light_dir, light_exp);
+    //shade2(true, edge_shader ? edge_shader : shader, light_diffuse, light_dir, light_exp);
 
 	gGL.getTexUnit(0)->activate();
 	gGL.getTexUnit(0)->enable(LLTexUnit::TT_TEXTURE);

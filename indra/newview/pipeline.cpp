@@ -9398,7 +9398,7 @@ void LLPipeline::generateWaterReflection(LLCamera& camera_in)
             set_current_modelview(current);         
 		}
 
-        //LLPipeline::sUseOcclusion = occlusion;
+        LLPipeline::sUseOcclusion = occlusion;
 
 		camera.setOrigin(camera_in.getOrigin());
 		//render distortion map
@@ -9441,10 +9441,6 @@ void LLPipeline::generateWaterReflection(LLCamera& camera_in)
 			
                 mWaterDis.bindTarget();
 			mWaterDis.getViewport(gGLViewport);
-			
-                gGL.setColorMask(true, true);
-                mWaterDis.clear();
-                gGL.setColorMask(true, false);
 
                 F32 water_dist = water_height * LLPipeline::sDistortionWaterClipPlaneMargin;
 
