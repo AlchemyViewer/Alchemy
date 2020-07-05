@@ -138,7 +138,7 @@ public:
 	LLVector3			mHeadOffset; // current head position
 	LLAvatarJoint		*mRoot;
 
-	typedef std::map<std::string, LLJoint*> joint_map_t;
+	typedef boost::unordered_map<std::string, LLJoint*> joint_map_t;
 	joint_map_t			mJointMap;
 
     typedef std::map<std::string, LLVector3> joint_state_map_t;

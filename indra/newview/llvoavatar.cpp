@@ -1652,12 +1652,12 @@ void LLVOAvatar::renderJoints()
 	std::ostringstream ostr;
 	std::ostringstream nullstr;
 
-	for (joint_map_t::iterator iter = mJointMap.begin(); iter != mJointMap.end(); ++iter)
+	for (const auto& joint_pair : mJointMap)
 	{
-		LLJoint* jointp = iter->second;
+		LLJoint* jointp = joint_pair.second;
 		if (!jointp)
 		{
-			nullstr << iter->first << " is NULL" << std::endl;
+			nullstr << joint_pair.first << " is NULL" << std::endl;
 			continue;
 		}
 
