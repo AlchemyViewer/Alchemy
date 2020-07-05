@@ -344,11 +344,10 @@ void LLWorldMapView::draw()
 	gGL.setColorMask(true, true);
 
 	// Draw per sim overlayed information (names, mature, offline...)
-	for (LLWorldMap::sim_info_map_t::const_iterator it = LLWorldMap::getInstance()->getRegionMap().begin();
-		 it != LLWorldMap::getInstance()->getRegionMap().end(); ++it)
+	for (const auto& sim_info_pair : LLWorldMap::getInstance()->getRegionMap())
 	{
-		U64 handle = it->first;
-		LLSimInfo* info = it->second;
+		U64 handle = sim_info_pair.first;
+		LLSimInfo* info = sim_info_pair.second;
 
 		LLVector3d origin_global = from_region_handle(handle);
 

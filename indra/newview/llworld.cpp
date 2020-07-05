@@ -1258,10 +1258,8 @@ void send_agent_pause()
 	gAgentPauseSerialNum++;
 	gMessageSystem->addU32Fast(_PREHASH_SerialNum, gAgentPauseSerialNum);
 
-	for (LLWorld::region_list_t::const_iterator iter = LLWorld::getInstance()->getRegionList().begin();
-		 iter != LLWorld::getInstance()->getRegionList().end(); ++iter)
+	for (LLViewerRegion* regionp : LLWorld::getInstance()->getRegionList())
 	{
-		LLViewerRegion* regionp = *iter;
 		gMessageSystem->sendReliable(regionp->getHost());
 	}
 
@@ -1289,10 +1287,8 @@ void send_agent_resume()
 	gMessageSystem->addU32Fast(_PREHASH_SerialNum, gAgentPauseSerialNum);
 	
 
-	for (LLWorld::region_list_t::const_iterator iter = LLWorld::getInstance()->getRegionList().begin();
-		 iter != LLWorld::getInstance()->getRegionList().end(); ++iter)
+	for (LLViewerRegion* regionp : LLWorld::getInstance()->getRegionList())
 	{
-		LLViewerRegion* regionp = *iter;
 		gMessageSystem->sendReliable(regionp->getHost());
 	}
 

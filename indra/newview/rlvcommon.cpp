@@ -474,10 +474,11 @@ bool RlvUtil::m_fForceTp = false;
 void RlvUtil::filterLocation(std::string& strUTF8Text)
 {
 	// Filter any mention of the surrounding region names
-	LLWorld::region_list_t regions = LLWorld::getInstance()->getRegionList();
 	const std::string& strHiddenRegion = RlvStrings::getString(RLV_STRING_HIDDEN_REGION);
-	for (LLWorld::region_list_t::const_iterator itRegion = regions.begin(); itRegion != regions.end(); ++itRegion)
-		boost::ireplace_all(strUTF8Text, (*itRegion)->getName(), strHiddenRegion);
+	for (LLViewerRegion* pRegion : LLWorld::getInstance()->getRegionList())
+	{
+		boost::ireplace_all(strUTF8Text, pRegion->getName(), strHiddenRegion);
+	}
 
 	// Filter any mention of the parcel name
 	LLViewerParcelMgr* pParcelMgr = LLViewerParcelMgr::getInstance();
@@ -571,9 +572,8 @@ bool RlvUtil::isNearbyAgent(const LLUUID& idAgent)
 // Checked: 2010-04-05 (RLVa-1.2.0d) | Modified: RLVa-1.2.0d
 bool RlvUtil::isNearbyRegion(const std::string& strRegion)
 {
-	LLWorld::region_list_t regions = LLWorld::getInstance()->getRegionList();
-	for (LLWorld::region_list_t::const_iterator itRegion = regions.begin(); itRegion != regions.end(); ++itRegion)
-		if ((*itRegion)->getName() == strRegion)
+	for (LLViewerRegion* pRegion : LLWorld::getInstance()->getRegionList())
+		if (pRegion->getName() == strRegion)
 			return true;
 	return false;
 }

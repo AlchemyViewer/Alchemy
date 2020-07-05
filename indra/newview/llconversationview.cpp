@@ -237,17 +237,13 @@ void LLConversationViewSession::draw()
 
 	// Todo/fix this: arrange hides children 'out of bonds', session 'slowly' adjusts container size, unhides children
 	// this process repeats until children fit
-	for (folders_t::iterator iter = mFolders.begin();
-		iter != mFolders.end();)
+	for (LLFolderViewFolder* folderp : mFolders)
 	{
-		folders_t::iterator fit = iter++;
-		(*fit)->setVisible(draw_children);
+		folderp->setVisible(draw_children);
 	}
-	for (items_t::iterator iter = mItems.begin();
-		iter != mItems.end();)
+	for (LLFolderViewItem* itemp : mItems)
 	{
-		items_t::iterator iit = iter++;
-		(*iit)->setVisible(draw_children);
+		itemp->setVisible(draw_children);
 	}
 
 	// we don't draw the open folder arrow in minimized mode

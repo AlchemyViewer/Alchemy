@@ -1883,10 +1883,8 @@ void LLViewerObjectList::generatePickList(LLCamera &camera)
 
 		std::vector<LLDrawable*> pick_drawables;
 
-		for (LLWorld::region_list_t::const_iterator iter = LLWorld::getInstance()->getRegionList().begin(); 
-			iter != LLWorld::getInstance()->getRegionList().end(); ++iter)
+		for (LLViewerRegion* region : LLWorld::getInstance()->getRegionList())
 		{
-			LLViewerRegion* region = *iter;
 			for (U32 i = 0; i < LLViewerRegion::NUM_PARTITIONS; i++)
 			{
 				LLSpatialPartition* part = region->getSpatialPartition(i);

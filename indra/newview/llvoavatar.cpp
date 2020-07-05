@@ -1033,11 +1033,9 @@ void LLVOAvatar::dumpBakedStatus()
 		{
 			LL_CONT << " Unbaked (";
 			
-			for (LLAvatarAppearanceDictionary::BakedTextures::const_iterator iter = LLAvatarAppearanceDictionary::getInstance()->getBakedTextures().begin();
-				 iter != LLAvatarAppearanceDictionary::getInstance()->getBakedTextures().end();
-				 ++iter)
+			for (const auto& baked_pair : LLAvatarAppearanceDictionary::getInstance()->getBakedTextures())
 			{
-				const LLAvatarAppearanceDictionary::BakedEntry *baked_dict = iter->second;
+				const LLAvatarAppearanceDictionary::BakedEntry *baked_dict = baked_pair.second;
 				const ETextureIndex index = baked_dict->mTextureIndex;
 				if (!inst->isTextureDefined(index))
 				{
@@ -7654,11 +7652,9 @@ BOOL LLVOAvatar::isWearingWearableType(LLWearableType::EType type) const
 			break; // Do nothing
 	}
 
-	for (LLAvatarAppearanceDictionary::Textures::const_iterator tex_iter = LLAvatarAppearanceDictionary::getInstance()->getTextures().begin();
-		 tex_iter != LLAvatarAppearanceDictionary::getInstance()->getTextures().end();
-		 ++tex_iter)
+	for (const auto& tex_pair : LLAvatarAppearanceDictionary::getInstance()->getTextures())
 	{
-		const LLAvatarAppearanceDictionary::TextureEntry *texture_dict = tex_iter->second;
+		const LLAvatarAppearanceDictionary::TextureEntry *texture_dict = tex_pair.second;
 		if (texture_dict->mWearableType == type)
 		{
 			// Thus, you must check to see if the corresponding baked texture is defined.
@@ -8440,13 +8436,10 @@ void LLVOAvatar::updateMeshTextures()
 	} 
 	
 	
-	for (LLAvatarAppearanceDictionary::BakedTextures::const_iterator baked_iter =
-			 LLAvatarAppearanceDictionary::getInstance()->getBakedTextures().begin();
-		 baked_iter != LLAvatarAppearanceDictionary::getInstance()->getBakedTextures().end();
-		 ++baked_iter)
+	for (const auto& baked_pair : LLAvatarAppearanceDictionary::getInstance()->getBakedTextures())
 	{
-		const EBakedTextureIndex baked_index = baked_iter->first;
-		const LLAvatarAppearanceDictionary::BakedEntry *baked_dict = baked_iter->second;
+		const EBakedTextureIndex baked_index = baked_pair.first;
+		const LLAvatarAppearanceDictionary::BakedEntry *baked_dict = baked_pair.second;
 		
 		for (texture_vec_t::const_iterator local_tex_iter = baked_dict->mLocalTextures.begin();
 			 local_tex_iter != baked_dict->mLocalTextures.end();
@@ -8639,13 +8632,11 @@ void LLVOAvatar::releaseComponentTextures()
 void LLVOAvatar::dumpAvatarTEs( const std::string& context ) const
 {	
 	LL_DEBUGS("Avatar") << avString() << (isSelf() ? "Self: " : "Other: ") << context << LL_ENDL;
-	for (LLAvatarAppearanceDictionary::Textures::const_iterator iter = LLAvatarAppearanceDictionary::getInstance()->getTextures().begin();
-		 iter != LLAvatarAppearanceDictionary::getInstance()->getTextures().end();
-		 ++iter)
+	for (const auto& tex_pair : LLAvatarAppearanceDictionary::getInstance()->getTextures())
 	{
-		const LLAvatarAppearanceDictionary::TextureEntry *texture_dict = iter->second;
+		const LLAvatarAppearanceDictionary::TextureEntry *texture_dict = tex_pair.second;
 		// TODO: MULTI-WEARABLE: handle multiple textures for self
-		const LLViewerTexture* te_image = getImage(iter->first,0);
+		const LLViewerTexture* te_image = getImage(tex_pair.first,0);
 		if( !te_image )
 		{
 			LL_DEBUGS("Avatar") << avString() << "       " << texture_dict->mName << ": null ptr" << LL_ENDL;
@@ -9389,15 +9380,12 @@ void LLVOAvatar::onBakedTextureMasksLoaded( BOOL success, LLViewerFetchedTexture
 					 self->mBakedTextureDatas[BAKED_HEAD].mTexLayerSet->applyMorphMask(aux_src->getData(), aux_src->getWidth(), aux_src->getHeight(), 1);
 					 maskData->mLastDiscardLevel = discard_level; */
 			BOOL found_texture_id = false;
-			for (LLAvatarAppearanceDictionary::Textures::const_iterator iter = LLAvatarAppearanceDictionary::getInstance()->getTextures().begin();
-				 iter != LLAvatarAppearanceDictionary::getInstance()->getTextures().end();
-				 ++iter)
+			for (const auto& tex_pair : LLAvatarAppearanceDictionary::getInstance()->getTextures())
 			{
-
-				const LLAvatarAppearanceDictionary::TextureEntry *texture_dict = iter->second;
+				const LLAvatarAppearanceDictionary::TextureEntry *texture_dict = tex_pair.second;
 				if (texture_dict->mIsUsedByBakedTexture)
 				{
-					const ETextureIndex texture_index = iter->first;
+					const ETextureIndex texture_index = tex_pair.first;
 					const LLViewerTexture *baked_img = self->getImage(texture_index, 0);
 					if (baked_img && id == baked_img->getID())
 					{
@@ -10636,13 +10624,11 @@ void LLVOAvatar::calculateUpdateRenderComplexity()
 			}
 
 			// print any avatar textures we didn't already know about
-		    for (LLAvatarAppearanceDictionary::Textures::const_iterator iter = LLAvatarAppearanceDictionary::getInstance()->getTextures().begin();
-			 iter != LLAvatarAppearanceDictionary::getInstance()->getTextures().end();
-				 ++iter)
+			for (const auto& tex_pair : LLAvatarAppearanceDictionary::getInstance()->getTextures())
 			{
-			    const LLAvatarAppearanceDictionary::TextureEntry *texture_dict = iter->second;
+			    const LLAvatarAppearanceDictionary::TextureEntry *texture_dict = tex_pair.second;
 				// TODO: MULTI-WEARABLE: handle multiple textures for self
-				const LLViewerTexture* te_image = getImage(iter->first,0);
+				const LLViewerTexture* te_image = getImage(tex_pair.first,0);
 				if (!te_image)
 					continue;
 				LLUUID image_id = te_image->getID();
@@ -10784,12 +10770,10 @@ const std::string LLVOAvatar::getBakedStatusForPrintout() const
 {
 	std::string line;
 
-	for (LLAvatarAppearanceDictionary::Textures::const_iterator iter = LLAvatarAppearanceDictionary::getInstance()->getTextures().begin();
-		 iter != LLAvatarAppearanceDictionary::getInstance()->getTextures().end();
-		 ++iter)
+	for (const auto& tex_pair : LLAvatarAppearanceDictionary::getInstance()->getTextures())
 	{
-		const ETextureIndex index = iter->first;
-		const LLAvatarAppearanceDictionary::TextureEntry *texture_dict = iter->second;
+		const ETextureIndex index = tex_pair.first;
+		const LLAvatarAppearanceDictionary::TextureEntry *texture_dict = tex_pair.second;
 		if (texture_dict->mIsBakedTexture)
 		{
 			line += texture_dict->mName;

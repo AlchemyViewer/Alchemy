@@ -728,14 +728,12 @@ BOOL LLTexLayerInfo::parseXml(LLXmlTreeNode* node)
 			/* if ("upper_shirt" == local_texture_name)
 				mLocalTexture = TEX_UPPER_SHIRT; */
 			mLocalTexture = TEX_NUM_INDICES;
-			for (LLAvatarAppearanceDictionary::Textures::const_iterator iter = LLAvatarAppearanceDictionary::getInstance()->getTextures().begin();
-				 iter != LLAvatarAppearanceDictionary::getInstance()->getTextures().end();
-				 iter++)
+			for (const auto& tex_pair : LLAvatarAppearanceDictionary::getInstance()->getTextures())
 			{
-				const LLAvatarAppearanceDictionary::TextureEntry *texture_dict = iter->second;
+				const LLAvatarAppearanceDictionary::TextureEntry *texture_dict = tex_pair.second;
 				if (local_texture_name == texture_dict->mName)
 			{
-					mLocalTexture = iter->first;
+					mLocalTexture = tex_pair.first;
 					break;
 			}
 			}

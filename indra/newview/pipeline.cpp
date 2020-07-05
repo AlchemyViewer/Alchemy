@@ -1424,10 +1424,8 @@ void LLPipeline::restoreGL()
 		LLViewerShaderMgr::instance()->setShaders();
 	}
 
-	for (LLWorld::region_list_t::const_iterator iter = LLWorld::getInstance()->getRegionList().begin(); 
-			iter != LLWorld::getInstance()->getRegionList().end(); ++iter)
+	for (LLViewerRegion* region : LLWorld::getInstance()->getRegionList())
 	{
-		LLViewerRegion* region = *iter;
 		for (U32 i = 0; i < LLViewerRegion::NUM_PARTITIONS; i++)
 		{
 			LLSpatialPartition* part = region->getSpatialPartition(i);
@@ -1578,10 +1576,8 @@ void LLPipeline::dirtyPoolObjectTextures(const std::set<LLViewerFetchedTexture*>
 	}
 	
 	LLOctreeDirtyTexture dirty(textures);
-	for (LLWorld::region_list_t::const_iterator iter = LLWorld::getInstance()->getRegionList().begin(); 
-			iter != LLWorld::getInstance()->getRegionList().end(); ++iter)
+	for (LLViewerRegion* region : LLWorld::getInstance()->getRegionList())
 	{
-		LLViewerRegion* region = *iter;
 		for (U32 i = 0; i < LLViewerRegion::NUM_PARTITIONS; i++)
 		{
 			LLSpatialPartition* part = region->getSpatialPartition(i);
@@ -2093,10 +2089,8 @@ void LLPipeline::updateMove()
 	{
  		LL_RECORD_BLOCK_TIME(FTM_OCTREE_BALANCE);
 
-		for (LLWorld::region_list_t::const_iterator iter = LLWorld::getInstance()->getRegionList().begin(); 
-			iter != LLWorld::getInstance()->getRegionList().end(); ++iter)
+		for (LLViewerRegion* region : LLWorld::getInstance()->getRegionList())
 		{
-			LLViewerRegion* region = *iter;
 			for (U32 i = 0; i < LLViewerRegion::NUM_PARTITIONS; i++)
 			{
 				LLSpatialPartition* part = region->getSpatialPartition(i);
@@ -2356,11 +2350,8 @@ void LLPipeline::checkReferences(LLSpatialGroup* group)
 
 bool LLPipeline::visibleObjectsInFrustum(LLCamera& camera)
 {
-	for (LLWorld::region_list_t::const_iterator iter = LLWorld::getInstance()->getRegionList().begin(); 
-			iter != LLWorld::getInstance()->getRegionList().end(); ++iter)
+	for (LLViewerRegion* region : LLWorld::getInstance()->getRegionList())
 	{
-		LLViewerRegion* region = *iter;
-
 		for (U32 i = 0; i < LLViewerRegion::NUM_PARTITIONS; i++)
 		{
 			LLSpatialPartition* part = region->getSpatialPartition(i);
@@ -2392,11 +2383,8 @@ bool LLPipeline::getVisibleExtents(LLCamera& camera, LLVector3& min, LLVector3& 
 
 	bool res = true;
 
-	for (LLWorld::region_list_t::const_iterator iter = LLWorld::getInstance()->getRegionList().begin(); 
-			iter != LLWorld::getInstance()->getRegionList().end(); ++iter)
+	for (LLViewerRegion* region : LLWorld::getInstance()->getRegionList())
 	{
-		LLViewerRegion* region = *iter;
-
 		for (U32 i = 0; i < LLViewerRegion::NUM_PARTITIONS; i++)
 		{
 			LLSpatialPartition* part = region->getSpatialPartition(i);
@@ -2488,11 +2476,8 @@ void LLPipeline::updateCull(LLCamera& camera, LLCullResult& result, S32 water_cl
         camera.disableUserClipPlane();
     }
 
-	for (LLWorld::region_list_t::const_iterator iter = LLWorld::getInstance()->getRegionList().begin(); 
-			iter != LLWorld::getInstance()->getRegionList().end(); ++iter)
+	for (LLViewerRegion* region : LLWorld::getInstance()->getRegionList())
 	{
-		LLViewerRegion* region = *iter;
-
 		for (U32 i = 0; i < LLViewerRegion::NUM_PARTITIONS; i++)
 		{
 			LLSpatialPartition* part = region->getSpatialPartition(i);
@@ -2765,10 +2750,9 @@ void LLPipeline::doOcclusion(LLCamera& camera)
 		}
 	
 		//apply occlusion culling to object cache tree
-		for (LLWorld::region_list_t::const_iterator iter = LLWorld::getInstance()->getRegionList().begin(); 
-			iter != LLWorld::getInstance()->getRegionList().end(); ++iter)
+		for (LLViewerRegion* region : LLWorld::getInstance()->getRegionList())
 		{
-			LLVOCachePartition* vo_part = (*iter)->getVOCachePartition();
+			LLVOCachePartition* vo_part = region->getVOCachePartition();
 			if(vo_part)
 			{
 				vo_part->processOccluders(&camera);
@@ -3242,10 +3226,8 @@ void LLPipeline::shiftObjects(const LLVector3 &offset)
 	
 	{
 		LL_RECORD_BLOCK_TIME(FTM_SHIFT_OCTREE);
-		for (LLWorld::region_list_t::const_iterator iter = LLWorld::getInstance()->getRegionList().begin(); 
-				iter != LLWorld::getInstance()->getRegionList().end(); ++iter)
+		for (LLViewerRegion* region : LLWorld::getInstance()->getRegionList())
 		{
-			LLViewerRegion* region = *iter;
 			for (U32 i = 0; i < LLViewerRegion::NUM_PARTITIONS; i++)
 			{
 				LLSpatialPartition* part = region->getSpatialPartition(i);
@@ -7139,11 +7121,8 @@ LLVOPartGroup* LLPipeline::lineSegmentIntersectParticle(const LLVector4a& start,
 
 	LLDrawable* drawable = NULL;
 
-	for (LLWorld::region_list_t::const_iterator iter = LLWorld::getInstance()->getRegionList().begin(); 
-			iter != LLWorld::getInstance()->getRegionList().end(); ++iter)
+	for (LLViewerRegion* region : LLWorld::getInstance()->getRegionList())
 	{
-		LLViewerRegion* region = *iter;
-
 		LLSpatialPartition* part = region->getSpatialPartition(LLViewerRegion::PARTITION_PARTICLE);
 		if (part && hasRenderType(part->mDrawableType))
 		{
@@ -7191,11 +7170,8 @@ LLViewerObject* LLPipeline::lineSegmentIntersectInWorld(const LLVector4a& start,
 
 	sPickAvatar = false; //! LLToolMgr::getInstance()->inBuildMode();
 	
-	for (LLWorld::region_list_t::const_iterator iter = LLWorld::getInstance()->getRegionList().begin(); 
-			iter != LLWorld::getInstance()->getRegionList().end(); ++iter)
+	for (LLViewerRegion* region : LLWorld::getInstance()->getRegionList())
 	{
-		LLViewerRegion* region = *iter;
-
 		for (U32 j = 0; j < LLViewerRegion::NUM_PARTITIONS; j++)
 		{
 			if ((j == LLViewerRegion::PARTITION_VOLUME) || 
@@ -7256,11 +7232,8 @@ LLViewerObject* LLPipeline::lineSegmentIntersectInWorld(const LLVector4a& start,
 
 		//check against avatars
 		sPickAvatar = true;
-		for (LLWorld::region_list_t::const_iterator iter = LLWorld::getInstance()->getRegionList().begin(); 
-				iter != LLWorld::getInstance()->getRegionList().end(); ++iter)
+		for (LLViewerRegion* region : LLWorld::getInstance()->getRegionList())
 		{
-			LLViewerRegion* region = *iter;
-
 			LLSpatialPartition* part = region->getSpatialPartition(LLViewerRegion::PARTITION_BRIDGE);
 			if (part && hasRenderType(part->mDrawableType))
 			{
@@ -7337,11 +7310,8 @@ LLViewerObject* LLPipeline::lineSegmentIntersectInHUD(const LLVector4a& start, c
 {
 	LLDrawable* drawable = NULL;
 
-	for (LLWorld::region_list_t::const_iterator iter = LLWorld::getInstance()->getRegionList().begin(); 
-			iter != LLWorld::getInstance()->getRegionList().end(); ++iter)
+	for (LLViewerRegion* region : LLWorld::getInstance()->getRegionList())
 	{
-		LLViewerRegion* region = *iter;
-
 		bool toggle = false;
 		if (!hasRenderType(LLPipeline::RENDER_TYPE_HUD))
 		{
@@ -7430,10 +7400,8 @@ void LLPipeline::doResetVertexBuffers(bool forced)
 
 	mCubeVB = NULL;
 
-	for (LLWorld::region_list_t::const_iterator iter = LLWorld::getInstance()->getRegionList().begin(); 
-			iter != LLWorld::getInstance()->getRegionList().end(); ++iter)
+	for (LLViewerRegion* region : LLWorld::getInstance()->getRegionList())
 	{
-		LLViewerRegion* region = *iter;
 		for (U32 i = 0; i < LLViewerRegion::NUM_PARTITIONS; i++)
 		{
 			LLSpatialPartition* part = region->getSpatialPartition(i);

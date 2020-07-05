@@ -2813,12 +2813,10 @@ void LLIMMgr::addSystemMessage(const LLUUID& session_id, const std::string& mess
 
 S32 LLIMMgr::getNumberOfUnreadIM()
 {
-	std::map<LLUUID, LLIMModel::LLIMSession*>::iterator it;
-	
 	S32 num = 0;
-	for(it = LLIMModel::getInstance()->mId2SessionMap.begin(); it != LLIMModel::getInstance()->mId2SessionMap.end(); ++it)
+	for (const auto& session_pair : LLIMModel::getInstance()->mId2SessionMap)
 	{
-		num += (*it).second->mNumUnread;
+		num += session_pair.second->mNumUnread;
 	}
 
 	return num;
@@ -2826,12 +2824,10 @@ S32 LLIMMgr::getNumberOfUnreadIM()
 
 S32 LLIMMgr::getNumberOfUnreadParticipantMessages()
 {
-	std::map<LLUUID, LLIMModel::LLIMSession*>::iterator it;
-
 	S32 num = 0;
-	for(it = LLIMModel::getInstance()->mId2SessionMap.begin(); it != LLIMModel::getInstance()->mId2SessionMap.end(); ++it)
+	for(const auto& session_pair : LLIMModel::getInstance()->mId2SessionMap)
 	{
-		num += (*it).second->mParticipantUnreadMessageCount;
+		num += session_pair.second->mParticipantUnreadMessageCount;
 	}
 
 	return num;
