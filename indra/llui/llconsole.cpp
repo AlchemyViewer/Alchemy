@@ -188,7 +188,8 @@ void LLConsole::draw()
 
 	F32 line_height = mFont->getLineHeight();
 
-	for(paragraph_it = mParagraphs.rbegin(); paragraph_it != mParagraphs.rend(); paragraph_it++)
+	auto paragraph_rend = mParagraphs.rend();
+	for(paragraph_it = mParagraphs.rbegin(); paragraph_it != paragraph_rend; ++paragraph_it)
 	{
 		S32 target_height = llfloor( (*paragraph_it).mLines.size() * line_height + padding_vertical);
 		S32 target_width =  llfloor( (*paragraph_it).mMaxWidth + padding_horizontal);

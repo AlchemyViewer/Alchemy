@@ -38,6 +38,8 @@
 #include "lltrans.h"
 #include "llwindow.h"
 
+#include <boost/range/adaptor/reversed.hpp>
+
 ///----------------------------------------------------------------------------
 /// Class LLFolderViewItem
 ///----------------------------------------------------------------------------
@@ -1025,9 +1027,8 @@ S32 LLFolderViewFolder::arrange( S32* width, S32* height )
 		// We have to verify that there's at least one child that's not filtered out
 		bool found = false;
 		// Try the items first
-		for (items_t::iterator iit = mItems.begin(); iit != mItems.end(); ++iit)
+		for (LLFolderViewItem* itemp : mItems)
 		{
-			LLFolderViewItem* itemp = (*iit);
 			found = itemp->isPotentiallyVisible();
 			if (found)
 				break;
@@ -1035,9 +1036,8 @@ S32 LLFolderViewFolder::arrange( S32* width, S32* height )
 		if (!found)
 		{
 			// If no item found, try the folders
-			for (folders_t::iterator fit = mFolders.begin(); fit != mFolders.end(); ++fit)
+			for (LLFolderViewFolder* folderp : mFolders)
 			{
-				LLFolderViewFolder* folderp = (*fit);
 				found = folderp->isPotentiallyVisible();
 				if (found)
 					break;
@@ -1074,9 +1074,8 @@ S32 LLFolderViewFolder::arrange( S32* width, S32* height )
 			// Add sizes of children
 			S32 parent_item_height = getRect().getHeight();
 
-			for(folders_t::iterator fit = mFolders.begin(); fit != mFolders.end(); ++fit)
+			for (LLFolderViewFolder* folderp : mFolders)
 			{
-				LLFolderViewFolder* folderp = (*fit);
 				folderp->setVisible(folderp->isPotentiallyVisible());
 
 				if (folderp->getVisible())
@@ -1092,10 +1091,8 @@ S32 LLFolderViewFolder::arrange( S32* width, S32* height )
 					folderp->setOrigin( 0, child_top - folderp->getRect().getHeight() );
 				}
 			}
-			for(items_t::iterator iit = mItems.begin();
-				iit != mItems.end(); ++iit)
+			for(LLFolderViewItem* itemp : mItems)
 			{
-				LLFolderViewItem* itemp = (*iit);
 				itemp->setVisible(itemp->isPotentiallyVisible());
 
 				if (itemp->getVisible())
@@ -1133,28 +1130,24 @@ S32 LLFolderViewFolder::arrange( S32* width, S32* height )
 		requestArrange();
 
 		// hide child elements that fall out of current animated height
-		for (folders_t::iterator iter = mFolders.begin();
-			iter != mFolders.end();)
+		for (LLFolderViewFolder* folderp : mFolders)
 		{
-			folders_t::iterator fit = iter++;
 			// number of pixels that bottom of folder label is from top of parent folder
-			if (getRect().getHeight() - (*fit)->getRect().mTop + (*fit)->getItemHeight() 
+			if (getRect().getHeight() - folderp->getRect().mTop + folderp->getItemHeight()
 				> ll_round(mCurHeight) + mMaxFolderItemOverlap)
 			{
 				// hide if beyond current folder height
-				(*fit)->setVisible(FALSE);
+				folderp->setVisible(FALSE);
 			}
 		}
 
-		for (items_t::iterator iter = mItems.begin();
-			iter != mItems.end();)
+		for (LLFolderViewItem* itemp : mItems)
 		{
-			items_t::iterator iit = iter++;
 			// number of pixels that bottom of item label is from top of parent folder
-			if (getRect().getHeight() - (*iit)->getRect().mBottom
+			if (getRect().getHeight() - itemp->getRect().mBottom
 				> ll_round(mCurHeight) + mMaxFolderItemOverlap)
 			{
-				(*iit)->setVisible(FALSE);
+				itemp->setVisible(FALSE);
 			}
 		}
 	}
@@ -1206,21 +1199,17 @@ BOOL LLFolderViewFolder::setSelection(LLFolderViewItem* selection, BOOL openitem
 	}
 	BOOL child_selected = FALSE;
 
-	for (folders_t::iterator iter = mFolders.begin();
-		iter != mFolders.end();)
+	for (LLFolderViewFolder* folderp : mFolders)
 	{
-		folders_t::iterator fit = iter++;
-		if((*fit)->setSelection(selection, openitem, take_keyboard_focus))
+		if(folderp->setSelection(selection, openitem, take_keyboard_focus))
 		{
 			rv = TRUE;
 			child_selected = TRUE;
 		}
 	}
-	for (items_t::iterator iter = mItems.begin();
-		iter != mItems.end();)
+	for (LLFolderViewItem* itemp : mItems)
 	{
-		items_t::iterator iit = iter++;
-		if((*iit)->setSelection(selection, openitem, take_keyboard_focus))
+		if(itemp->setSelection(selection, openitem, take_keyboard_focus))
 		{
 			rv = TRUE;
 			child_selected = TRUE;
@@ -1256,20 +1245,16 @@ BOOL LLFolderViewFolder::changeSelection(LLFolderViewItem* selection, BOOL selec
 		}
 	}
 
-	for (folders_t::iterator iter = mFolders.begin();
-		iter != mFolders.end();)
+	for (LLFolderViewFolder* folderp : mFolders)
 	{
-		folders_t::iterator fit = iter++;
-		if((*fit)->changeSelection(selection, selected))
+		if(folderp->changeSelection(selection, selected))
 		{
 			rv = TRUE;
 		}
 	}
-	for (items_t::iterator iter = mItems.begin();
-		iter != mItems.end();)
+	for (LLFolderViewItem* itemp : mItems)
 	{
-		items_t::iterator iit = iter++;
-		if((*iit)->changeSelection(selection, selected))
+		if(itemp->changeSelection(selection, selected))
 		{
 			rv = TRUE;
 		}
@@ -1372,39 +1357,35 @@ void LLFolderViewFolder::gatherChildRangeExclusive(LLFolderViewItem* start, LLFo
 	bool selecting = start == NULL;
 	if (reverse)
 	{
-		for (items_t::reverse_iterator it = mItems.rbegin(), end_it = mItems.rend();
-			it != end_it;
-			++it)
+		for (LLFolderViewItem* itemp : boost::adaptors::reverse(mItems))
 		{
-			if (*it == end)
+			if (itemp == end)
 			{
 				return;
 			}
-			if (selecting && (*it)->getVisible())
+			if (selecting && itemp->getVisible())
 			{
-				items.push_back(*it);
+				items.push_back(itemp);
 			}
 
-			if (*it == start)
+			if (itemp == start)
 			{
 				selecting = true;
 			}
 		}
-		for (folders_t::reverse_iterator it = mFolders.rbegin(), end_it = mFolders.rend();
-			it != end_it;
-			++it)
+		for (LLFolderViewFolder* folderp : boost::adaptors::reverse(mFolders))
 		{
-			if (*it == end)
+			if (folderp == end)
 			{
 				return;
 			}
 
-			if (selecting && (*it)->getVisible())
+			if (selecting && (folderp)->getVisible())
 			{
-				items.push_back(*it);
+				items.push_back(folderp);
 			}
 
-			if (*it == start)
+			if (folderp == start)
 			{
 				selecting = true;
 			}
@@ -1412,40 +1393,36 @@ void LLFolderViewFolder::gatherChildRangeExclusive(LLFolderViewItem* start, LLFo
 	}
 	else
 	{
-		for (folders_t::iterator it = mFolders.begin(), end_it = mFolders.end();
-			it != end_it;
-			++it)
+		for (LLFolderViewFolder* folderp : mFolders)
 		{
-			if (*it == end)
+			if (folderp == end)
 			{
 				return;
 			}
 
-			if (selecting && (*it)->getVisible())
+			if (selecting && (folderp)->getVisible())
 			{
-				items.push_back(*it);
+				items.push_back(folderp);
 			}
 
-			if (*it == start)
+			if (folderp == start)
 			{
 				selecting = true;
 			}
 		}
-		for (items_t::iterator it = mItems.begin(), end_it = mItems.end();
-			it != end_it;
-			++it)
+		for (LLFolderViewItem* itemp : mItems)
 		{
-			if (*it == end)
+			if (itemp == end)
 			{
 				return;
 			}
 
-			if (selecting && (*it)->getVisible())
+			if (selecting && itemp->getVisible())
 			{
-				items.push_back(*it);
+				items.push_back(itemp);
 			}
 
-			if (*it == start)
+			if (itemp == start)
 			{
 				selecting = true;
 			}
@@ -1605,11 +1582,9 @@ BOOL LLFolderViewFolder::isMovable()
 			}
 		}
 
-		for (folders_t::iterator iter = mFolders.begin();
-			iter != mFolders.end();)
+		for (LLFolderViewFolder* folderp : mFolders)
 		{
-			folders_t::iterator fit = iter++;
-			if(!(*fit)->isMovable())
+			if(!folderp->isMovable())
 			{
 				return FALSE;
 			}
@@ -1625,21 +1600,17 @@ BOOL LLFolderViewFolder::isRemovable()
 			return FALSE;
 		}
 
-		for (items_t::iterator iter = mItems.begin();
-			iter != mItems.end();)
-		{
-			items_t::iterator iit = iter++;
-			if(!(*iit)->isRemovable())
+	for (LLFolderViewItem* itemp : mItems)
+	{
+			if(!itemp->isRemovable())
 			{
 				return FALSE;
 			}
 		}
 
-		for (folders_t::iterator iter = mFolders.begin();
-			iter != mFolders.end();)
+		for (LLFolderViewFolder* folderp : mFolders)
 		{
-			folders_t::iterator fit = iter++;
-			if(!(*fit)->isRemovable())
+			if(!folderp->isRemovable())
 			{
 				return FALSE;
 			}
@@ -1786,17 +1757,13 @@ void LLFolderViewFolder::openItem( void )
 
 void LLFolderViewFolder::applyFunctorToChildren(LLFolderViewFunctor& functor)
 {
-	for (folders_t::iterator iter = mFolders.begin();
-		iter != mFolders.end();)
+	for (LLFolderViewFolder* folderp : mFolders)
 	{
-		folders_t::iterator fit = iter++;
-		functor.doItem((*fit));
+		functor.doItem(folderp);
 	}
-	for (items_t::iterator iter = mItems.begin();
-		iter != mItems.end();)
+	for (LLFolderViewItem* itemp : mItems)
 	{
-		items_t::iterator iit = iter++;
-		functor.doItem((*iit));
+		functor.doItem(itemp);
 	}
 }
 
@@ -1804,17 +1771,13 @@ void LLFolderViewFolder::applyFunctorRecursively(LLFolderViewFunctor& functor)
 {
 	functor.doFolder(this);
 
-	for (folders_t::iterator iter = mFolders.begin();
-		iter != mFolders.end();)
+	for (LLFolderViewFolder* folderp : mFolders)
 	{
-		folders_t::iterator fit = iter++;
-		(*fit)->applyFunctorRecursively(functor);
+		folderp->applyFunctorRecursively(functor);
 	}
-	for (items_t::iterator iter = mItems.begin();
-		iter != mItems.end();)
+	for (LLFolderViewItem* itemp : mItems)
 	{
-		items_t::iterator iit = iter++;
-		functor.doItem((*iit));
+		functor.doItem(itemp);
 	}
 }
 

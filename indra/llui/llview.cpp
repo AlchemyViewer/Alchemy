@@ -1175,7 +1175,7 @@ void LLView::drawChildren()
 		LLView* rootp = LLUI::getInstance()->getRootView();		
 		++sDepth;
 
-		for (child_list_reverse_iter_t child_iter = mChildList.rbegin(); child_iter != mChildList.rend();)  // ++child_iter)
+		for (child_list_reverse_iter_t child_iter = mChildList.rbegin(), child_end = mChildList.rend(); child_iter != child_end;)  // ++child_iter)
 		{
 			child_list_reverse_iter_t child = child_iter++;
 			LLView *viewp = *child;
@@ -2134,11 +2134,8 @@ LLView*	LLView::findSnapEdge(S32& new_edge_val, const LLCoordGL& mouse_dir, ESna
 
 	if (snap_type == SNAP_SIBLINGS || snap_type == SNAP_PARENT_AND_SIBLINGS)
 	{
-		for ( child_list_const_iter_t child_it = mParentView->getChildList()->begin();
-			  child_it != mParentView->getChildList()->end(); ++child_it)
+		for (LLView* siblingp : *mParentView->getChildList())
 		{
-			LLView* siblingp = *child_it;
-
 			if (!canSnapTo(siblingp)) continue;
 
 			LLRect sibling_rect = siblingp->getSnapRect();
@@ -2363,11 +2360,8 @@ static bool get_last_child_rect(LLView* parent, LLRect *rect)
 {
 	if (!parent) return false;
 
-	LLView::child_list_t::const_iterator itor = 
-		parent->getChildList()->begin();
-	for (;itor != parent->getChildList()->end(); ++itor)
+	for (LLView* last_view : *parent->getChildList())
 	{
-		LLView *last_view = (*itor);
 		if (last_view->getFromXUI())
 		{
 			*rect = last_view->getRect();

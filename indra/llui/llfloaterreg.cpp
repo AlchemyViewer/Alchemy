@@ -96,10 +96,8 @@ LLFloater* LLFloaterReg::getLastFloaterCascading()
 
 		instance_list_t& instances = sInstanceMap[group_name];
 
-		for (instance_list_t::const_iterator iter = instances.begin(); iter != instances.end(); ++iter)
+		for (LLFloater* inst : instances)
 		{
-			LLFloater* inst = *iter;
-
 			if (inst->getVisible() 
 				&& (inst->isPositioning(LLFloaterEnums::POSITIONING_CASCADING)
 					|| inst->isPositioning(LLFloaterEnums::POSITIONING_CASCADE_GROUP)))
@@ -124,9 +122,8 @@ LLFloater* LLFloaterReg::findInstance(const std::string& name, const LLSD& key)
 	if (!groupname.empty())
 	{
 		instance_list_t& list = sInstanceMap[groupname];
-		for (instance_list_t::iterator iter = list.begin(); iter != list.end(); ++iter)
+		for (LLFloater* inst : list)
 		{
-			LLFloater* inst = *iter;
 			if (inst->matchesKey(key))
 			{
 				res = inst;
@@ -197,7 +194,7 @@ LLFloater* LLFloaterReg::removeInstance(const std::string& name, const LLSD& key
 	if (!groupname.empty())
 	{
 		instance_list_t& list = sInstanceMap[groupname];
-		for (instance_list_t::iterator iter = list.begin(); iter != list.end(); ++iter)
+		for (instance_list_t::iterator iter = list.begin(), end = list.end(); iter != end; ++iter)
 		{
 			LLFloater* inst = *iter;
 			if (inst->matchesKey(key))

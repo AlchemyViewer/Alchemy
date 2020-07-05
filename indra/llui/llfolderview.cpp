@@ -48,6 +48,7 @@
 
 // Third-party library includes
 #include <algorithm>
+#include <boost/range/adaptor/reversed.hpp>
 
 ///----------------------------------------------------------------------------
 /// Local function declarations, constants, enums, and typedefs
@@ -1916,10 +1917,8 @@ bool LLFolderView::isFolderSelected()
 
 bool LLFolderView::selectFirstItem()
 {
-	for (folders_t::iterator iter = mFolders.begin();
-		 iter != mFolders.end();++iter)
+	for (LLFolderViewFolder* folder : mFolders)
 	{
-		LLFolderViewFolder* folder = (*iter );
 		if (folder->getVisible())
 		{
 			LLFolderViewItem* itemp = folder->getNextFromChild(0,true);
@@ -1929,10 +1928,8 @@ bool LLFolderView::selectFirstItem()
 		}
 		
 	}
-	for(items_t::iterator iit = mItems.begin();
-		iit != mItems.end(); ++iit)
+	for(LLFolderViewItem* itemp : mItems)
 	{
-		LLFolderViewItem* itemp = (*iit);
 		if (itemp->getVisible())
 		{
 			setSelection(itemp,FALSE,TRUE);
@@ -1943,20 +1940,16 @@ bool LLFolderView::selectFirstItem()
 }
 bool LLFolderView::selectLastItem()
 {
-	for(items_t::reverse_iterator iit = mItems.rbegin();
-		iit != mItems.rend(); ++iit)
+	for(LLFolderViewItem* itemp : boost::adaptors::reverse(mItems))
 	{
-		LLFolderViewItem* itemp = (*iit);
 		if (itemp->getVisible())
 		{
 			setSelection(itemp,FALSE,TRUE);
 			return true;	
 		}
 	}
-	for (folders_t::reverse_iterator iter = mFolders.rbegin();
-		 iter != mFolders.rend();++iter)
+	for (LLFolderViewFolder* folder : boost::adaptors::reverse(mFolders))
 	{
-		LLFolderViewFolder* folder = (*iter);
 		if (folder->getVisible())
 		{
 			LLFolderViewItem* itemp = folder->getPreviousFromChild(0,true);
