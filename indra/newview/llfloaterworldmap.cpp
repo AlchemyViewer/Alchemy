@@ -1654,11 +1654,10 @@ void LLFloaterWorldMap::onCommitSearchResult()
 		return;
 	}
 	LLStringUtil::toLower(sim_name);
-	
-	std::map<U64, LLSimInfo*>::const_iterator it;
-	for (it = LLWorldMap::getInstance()->getRegionMap().begin(); it != LLWorldMap::getInstance()->getRegionMap().end(); ++it)
+
+	for (const auto& sim_info_pair : LLWorldMap::getInstance()->getRegionMap())
 	{
-		LLSimInfo* info = it->second;
+		LLSimInfo* info = sim_info_pair.second;
 		
 		if (info->isName(sim_name))
 		{
