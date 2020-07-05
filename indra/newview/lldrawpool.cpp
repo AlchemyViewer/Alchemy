@@ -397,9 +397,8 @@ void LLRenderPass::renderGroup(LLSpatialGroup* group, U32 type, U32 mask, BOOL t
 {					
 	LLSpatialGroup::drawmap_elem_t& draw_info = group->mDrawMap[type];
 	
-	for (LLSpatialGroup::drawmap_elem_t::iterator k = draw_info.begin(); k != draw_info.end(); ++k)	
+	for (LLDrawInfo* pparams : draw_info)
 	{
-		LLDrawInfo *pparams = *k;
 		if (pparams) {
 			pushBatch(*pparams, mask, texture);
 		}
@@ -413,7 +412,7 @@ void LLRenderPass::renderTexture(U32 type, U32 mask, BOOL batch_textures)
 
 void LLRenderPass::pushBatches(U32 type, U32 mask, BOOL texture, BOOL batch_textures)
 {
-	for (LLCullResult::drawinfo_iterator i = gPipeline.beginRenderMap(type); i != gPipeline.endRenderMap(type); ++i)	
+	for (LLCullResult::drawinfo_iterator i = gPipeline.beginRenderMap(type), end = gPipeline.endRenderMap(type); i != end; ++i)
 	{
 		LLDrawInfo* pparams = *i;
 		if (pparams) 
@@ -425,7 +424,7 @@ void LLRenderPass::pushBatches(U32 type, U32 mask, BOOL texture, BOOL batch_text
 
 void LLRenderPass::pushMaskBatches(U32 type, U32 mask, BOOL texture, BOOL batch_textures)
 {
-	for (LLCullResult::drawinfo_iterator i = gPipeline.beginRenderMap(type); i != gPipeline.endRenderMap(type); ++i)	
+	for (LLCullResult::drawinfo_iterator i = gPipeline.beginRenderMap(type), end = gPipeline.endRenderMap(type); i != end; ++i)
 	{
 		LLDrawInfo* pparams = *i;
 		if (pparams) 

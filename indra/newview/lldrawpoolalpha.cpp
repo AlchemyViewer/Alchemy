@@ -335,9 +335,9 @@ void LLDrawPoolAlpha::renderAlphaHighlight(U32 mask)
 		{
 			LLSpatialGroup::drawmap_elem_t& draw_info = group->mDrawMap[LLRenderPass::PASS_ALPHA];	
 
-			for (LLSpatialGroup::drawmap_elem_t::iterator k = draw_info.begin(); k != draw_info.end(); ++k)	
+			for (LLDrawInfo* paramsp : draw_info)
 			{
-				LLDrawInfo& params = **k;
+				LLDrawInfo& params = *paramsp;
 				
 				if (params.mParticle)
 				{
