@@ -150,19 +150,19 @@ public:
 	template <class T>
 	static T* findTypedInstance(const std::string& name, const LLSD& key = LLSD())
 	{
-		return dynamic_cast<T*>(findInstance(name, key));
+		return static_cast<T*>(findInstance(name, key));
 	}
 
 	template <class T>
 	static T* getTypedInstance(const std::string& name, const LLSD& key = LLSD())
 	{
-		return dynamic_cast<T*>(getInstance(name, key));
+		return static_cast<T*>(getInstance(name, key));
 	}
 
 	template <class T>
 	static T* showTypedInstance(const std::string& name, const LLSD& key = LLSD(), BOOL focus = FALSE)
 	{
-		return dynamic_cast<T*>(showInstance(name, key, focus));
+		return static_cast<T*>(showInstance(name, key, focus));
 	}
 
 	static void blockShowFloaters(bool value) { sBlockShowFloaters = value;}
