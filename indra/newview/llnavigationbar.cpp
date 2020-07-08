@@ -47,6 +47,7 @@
 #include "llresizebar.h"
 #include "llsearchcombobox.h"
 #include "llslurl.h"
+#include "llurlaction.h"
 #include "llurlregistry.h"
 #include "llurldispatcher.h"
 #include "llviewerinventory.h"
@@ -485,6 +486,11 @@ void LLNavigationBar::onLocationSelection()
 	  region_name = slurl.getRegion();
 	  local_coords = slurl.getPosition();
 	}
+	else if (slurl.getType() == LLSLURL::APP)
+	{
+		LLUrlAction::executeSLURL(typed_location);
+		return;
+	}
 	else if(!slurl.isValid())
 	{
 	  // we have to do this check after previous, because LLUrlRegistry contains handlers for slurl too  
@@ -504,7 +510,7 @@ void LLNavigationBar::onLocationSelection()
 	}
 	else
 	{
-	  // was an app slurl, home, whatever.  Bail
+	  // Unknown slurl type, bail.
 	  return;
 	}
 	
