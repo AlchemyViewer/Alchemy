@@ -79,6 +79,8 @@ vec4 getPositionWithDepth(vec2 pos_screen, float depth);
 vec4 getPosition(vec2 pos_screen);
 vec3 getNorm(vec2 pos_screen);
 
+vec3 decode_normal(vec2 enc);
+
 #ifdef WATER_FOG
 vec4 applyWaterFogView(vec3 pos, vec4 color);
 #endif
@@ -90,7 +92,7 @@ void main()
     vec3 pos = getPositionWithDepth(tc, depth).xyz;
     vec4 norm = texture2DRect(normalMap, tc);
     float envIntensity = norm.z;
-    norm.xyz = getNorm(tc);
+    norm.xyz = decode_normal(norm.xy);
 
     float da = max(dot(norm.xyz, sun_dir.xyz), 0.0);
 

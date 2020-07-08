@@ -256,8 +256,6 @@ void main()
 
     norm.xyz = normalize(tnorm.xyz);
 
-    vec2 abnormal = encode_normal(norm.xyz);
-
     vec4 final_color = diffcol;
 
 #if (DIFFUSE_ALPHA_MODE != DIFFUSE_ALPHA_MODE_EMISSIVE)

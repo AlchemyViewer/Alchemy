@@ -70,7 +70,7 @@ uniform vec2 screen_res;
 
 uniform mat4 inv_proj;
 
-vec3 getNorm(vec2 pos_screen);
+vec3 getNormWithEnvIntensity(vec2 screenpos, out float envIntensity);
 vec3 srgb_to_linear(vec3 c);
 
 vec4 texture2DLodSpecular(sampler2D projectionMap, vec2 tc, float lod)
@@ -148,10 +148,8 @@ void main()
 		discard;
 	}
 		
-	vec3 norm = texture2DRect(normalMap, frag.xy).xyz;
-	float envIntensity = norm.z;
-	norm = getNorm(frag.xy);
-	norm = normalize(norm);
+	float envIntensity;
+	vec3 norm = getNormWithEnvIntensity(frag.xy, envIntensity);
 	float l_dist = -dot(lv, proj_n);
 	
 	vec4 proj_tc = (proj_mat * vec4(pos.xyz, 1.0));

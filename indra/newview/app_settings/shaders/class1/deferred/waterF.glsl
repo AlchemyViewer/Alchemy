@@ -64,7 +64,6 @@ VARYING vec4 view;
 VARYING vec4 vary_position;
 
 vec2 encode_normal(vec3 n);
-vec3 scaleSoftClip(vec3 l);
 vec3 srgb_to_linear(vec3 c);
 vec3 linear_to_srgb(vec3 c);
 
