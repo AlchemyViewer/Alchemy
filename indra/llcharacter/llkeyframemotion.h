@@ -325,7 +325,7 @@ public:
 
 		InterpolationType	mInterpolationType;
 		S32					mNumKeys;
-		typedef std::map<F32, ScaleKey> key_map_t;
+		typedef std::vector<std::pair<F32, ScaleKey> > key_map_t;
 		key_map_t 			mKeys;
 		ScaleKey			mLoopInKey;
 		ScaleKey			mLoopOutKey;
@@ -344,7 +344,7 @@ public:
 
 		InterpolationType	mInterpolationType;
 		S32					mNumKeys;
-		typedef std::map<F32, RotationKey> key_map_t;
+		typedef std::vector<std::pair<F32, RotationKey> > key_map_t;
 		key_map_t		mKeys;
 		RotationKey		mLoopInKey;
 		RotationKey		mLoopOutKey;
@@ -363,7 +363,7 @@ public:
 
 		InterpolationType	mInterpolationType;
 		S32					mNumKeys;
-		typedef std::map<F32, PositionKey> key_map_t;
+		typedef std::vector< std::pair<F32, PositionKey> > key_map_t;
 		key_map_t		mKeys;
 		PositionKey		mLoopInKey;
 		PositionKey		mLoopOutKey;

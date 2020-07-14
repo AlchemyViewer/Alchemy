@@ -160,7 +160,7 @@ LLVector3 LLKeyframeMotion::ScaleCurve::getValue(F32 time, F32 duration)
 		return value;
 	}
 	
-	key_map_t::iterator right = mKeys.lower_bound(time);
+	key_map_t::iterator right = std::lower_bound(mKeys.begin(), mKeys.end(), time, [](const key_map_t::value_type& a, const F32 b) { return a.first < b; });
 	if (right == mKeys.end())
 	{
 		// Past last key
@@ -240,7 +240,7 @@ LLQuaternion LLKeyframeMotion::RotationCurve::getValue(F32 time, F32 duration)
 		return value;
 	}
 	
-	key_map_t::iterator right = mKeys.lower_bound(time);
+	key_map_t::iterator right = std::lower_bound(mKeys.begin(), mKeys.end(), time, [](const key_map_t::value_type& a, const F32 b) { return a.first < b; });
 	if (right == mKeys.end())
 	{
 		// Past last key
@@ -321,7 +321,7 @@ LLVector3 LLKeyframeMotion::PositionCurve::getValue(F32 time, F32 duration)
 		return value;
 	}
 	
-	key_map_t::iterator right = mKeys.lower_bound(time);
+	key_map_t::iterator right = std::lower_bound(mKeys.begin(), mKeys.end(), time, [](const key_map_t::value_type& a, const F32 b) { return a.first < b; });
 	if (right == mKeys.end())
 	{
 		// Past last key
@@ -1596,8 +1596,10 @@ BOOL LLKeyframeMotion::deserialize(LLDataPacker& dp, const LLUUID& asset_id)
 				return FALSE;
 			}
 
-			rCurve->mKeys[time] = rot_key;
+			rCurve->mKeys.emplace_back(time, rot_key);
 		}
+
+		std::sort(rCurve->mKeys.begin(), rCurve->mKeys.end(), [](const RotationCurve::key_map_t::value_type& a, const RotationCurve::key_map_t::value_type& b) { return a.first < b.first; });
 
 		//---------------------------------------------------------------------
 		// scan position curve header
@@ -1686,13 +1688,15 @@ BOOL LLKeyframeMotion::deserialize(LLDataPacker& dp, const LLUUID& asset_id)
 				return FALSE;
 			}
 			
-			pCurve->mKeys[pos_key.mTime] = pos_key;
+			pCurve->mKeys.emplace_back(pos_key.mTime, pos_key);
 
 			if (is_pelvis)
 			{
 				mJointMotionList->mPelvisBBox.addPoint(pos_key.mPosition);
 			}
 		}
+
+		std::sort(pCurve->mKeys.begin(), pCurve->mKeys.end(), [](const PositionCurve::key_map_t::value_type& a, const PositionCurve::key_map_t::value_type& b) { return a.first < b.first; });
 
 		joint_motion->mUsage = joint_state->getUsage();
 	}
