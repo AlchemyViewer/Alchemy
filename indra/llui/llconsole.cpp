@@ -372,9 +372,9 @@ LLConsole::Paragraph::Paragraph (LLWString str, const LLColor4 &color, F32 add_t
 // static
 void LLConsole::updateClass()
 {	
-	for (instance_iter it = beginInstances(), it_end = endInstances(); it != it_end; ++it)
+	for (auto& con : instance_snapshot())
 	{
-		it->update();
+		con.update();
 	} 
 }
 

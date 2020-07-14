@@ -2473,9 +2473,8 @@ void LLGLNamePool::release(GLuint name)
 //static
 void LLGLNamePool::upkeepPools()
 {
-	for (tracker_t::instance_iter iter = beginInstances(), end = endInstances(); iter != end; ++iter)
+	for (auto& pool : instance_snapshot())
 	{
-		LLGLNamePool & pool = *iter;
 		pool.upkeep();
 	}
 }
@@ -2483,9 +2482,8 @@ void LLGLNamePool::upkeepPools()
 //static
 void LLGLNamePool::cleanupPools()
 {
-	for (tracker_t::instance_iter iter = beginInstances(), end = endInstances(); iter != end; ++iter)
+	for (auto& pool : instance_snapshot())
 	{
-		LLGLNamePool & pool = *iter;
 		pool.cleanup();
 	}
 }

@@ -23,6 +23,7 @@
 #include "stringize.h"
 #include "tests/wrapllerrs.h"
 #include "../test/catch_and_store_what_in.h"
+#include "../test/debug.h"
 
 #include <map>
 #include <string>
@@ -42,15 +43,6 @@ using boost::lambda::constant_ref;
 using boost::lambda::var;
 
 using namespace llsd;
-
-/*****************************************************************************
-*   Output control
-*****************************************************************************/
-#ifdef DEBUG_ON
-using std::cout;
-#else
-static std::ostringstream cout;
-#endif
 
 /*****************************************************************************
 *   Example data, functions, classes
@@ -153,13 +145,13 @@ struct Vars
     /*------------- no-args (non-const, const, static) methods -------------*/
     void method0()
     {
-        cout << "method0()\n";
+        debug()("method0()");
         i = 17;
     }
 
     void cmethod0() const
     {
-        cout << 'c';
+        debug()('c', NONL);
         const_cast<Vars*>(this)->method0();
     }
 
@@ -168,13 +160,13 @@ struct Vars
     /*------------ Callable (non-const, const, static) methods -------------*/
     void method1(const LLSD& obj)
     {
-        cout << "method1(" << obj << ")\n";
+        debug()("method1(", obj, ")");
         llsd = obj;
     }
 
     void cmethod1(const LLSD& obj) const
     {
-        cout << 'c';
+        debug()('c', NONL);
         const_cast<Vars*>(this)->method1(obj);
     }
 
@@ -194,12 +186,12 @@ struct Vars
         else
             vcp = std::string("'") + cp + "'";
 
-        cout << "methodna(" << b
-             << ", " << i
-             << ", " << f
-             << ", " << d
-             << ", " << vcp
-             << ")\n";
+        debug()("methodna(", b,
+              ", ", i,
+              ", ", f,
+              ", ", d,
+              ", ", vcp,
+              ")");
 
         this->b = b;
         this->i = i;
@@ -216,12 +208,12 @@ struct Vars
             vbin << std::hex << std::setfill('0') << std::setw(2) << unsigned(byte);
         }
 
-        cout << "methodnb(" << "'" << s << "'"
-             << ", " << uuid
-             << ", " << date
-             << ", '" << uri << "'"
-             << ", " << vbin.str()
-             << ")\n";
+        debug()("methodnb(", "'", s, "'",
+              ", ", uuid,
+              ", ", date,
+              ", '", uri, "'",
+              ", ", vbin.str(),
+              ")");
 
         this->s = s;
         this->uuid = uuid;
@@ -232,18 +224,30 @@ struct Vars
 
     void cmethodna(NPARAMSa) const
     {
-        cout << 'c';
+        debug()('c', NONL);
         const_cast<Vars*>(this)->methodna(NARGSa);
     }
 
     void cmethodnb(NPARAMSb) const
     {
-        cout << 'c';
+        debug()('c', NONL);
         const_cast<Vars*>(this)->methodnb(NARGSb);
     }
 
     static void smethodna(NPARAMSa);
     static void smethodnb(NPARAMSb);
+
+    static Debug& debug()
+    {
+        // Lazily initialize this Debug instance so it can notice if main()
+        // has forcibly set LOGTEST. If it were simply a static member, it
+        // would already have examined the environment variable by the time
+        // main() gets around to checking command-line switches. Since we have
+        // a global static Vars instance, the same would be true of a plain
+        // non-static member.
+        static Debug sDebug("Vars");
+        return sDebug;
+    }
 };
 /*------- Global Vars instance for free functions and static methods -------*/
 static Vars g;
@@ -251,25 +255,25 @@ static Vars g;
 /*------------ Static Vars method implementations reference 'g' ------------*/
 void Vars::smethod0()
 {
-    cout << "smethod0() -> ";
+    debug()("smethod0() -> ", NONL);
     g.method0();
 }
 
 void Vars::smethod1(const LLSD& obj)
 {
-    cout << "smethod1(" << obj << ") -> ";
+    debug()("smethod1(", obj, ") -> ", NONL);
     g.method1(obj);
 }
 
 void Vars::smethodna(NPARAMSa)
 {
-    cout << "smethodna(...) -> ";
+    debug()("smethodna(...) -> ", NONL);
     g.methodna(NARGSa);
 }
 
 void Vars::smethodnb(NPARAMSb)
 {
-    cout << "smethodnb(...) -> ";
+    debug()("smethodnb(...) -> ", NONL);
     g.methodnb(NARGSb);
 }
 
@@ -282,25 +286,25 @@ void clear()
 /*------------------- Free functions also reference 'g' --------------------*/
 void free0()
 {
-    cout << "free0() -> ";
+    g.debug()("free0() -> ", NONL);
     g.method0();
 }
 
 void free1(const LLSD& obj)
 {
-    cout << "free1(" << obj << ") -> ";
+    g.debug()("free1(", obj, ") -> ", NONL);
     g.method1(obj);
 }
 
 void freena(NPARAMSa)
 {
-    cout << "freena(...) -> ";
+    g.debug()("freena(...) -> ", NONL);
     g.methodna(NARGSa);
 }
 
 void freenb(NPARAMSb)
 {
-    cout << "freenb(...) -> ";
+    g.debug()("freenb(...) -> ", NONL);
     g.methodnb(NARGSb);
 }
 
@@ -311,6 +315,7 @@ namespace tut
 {
     struct lleventdispatcher_data
     {
+        Debug debug{"test"};
         WrapLLErrs redirect;
         Dispatcher work;
         Vars v;
@@ -429,12 +434,17 @@ namespace tut
             // Same for freenb() et al.
             params = LLSDMap("a", LLSDArray("b")("i")("f")("d")("cp"))
                             ("b", LLSDArray("s")("uuid")("date")("uri")("bin"));
-            cout << "params:\n" << params << "\nparams[\"a\"]:\n" << params["a"] << "\nparams[\"b\"]:\n" << params["b"] << std::endl;
+            debug("params:\n",
+                  params, "\n"
+                  "params[\"a\"]:\n",
+                  params["a"], "\n"
+                  "params[\"b\"]:\n",
+                  params["b"]);
             // default LLSD::Binary value   
             std::vector<U8> binary;
             for (size_t ix = 0, h = 0xaa; ix < 6; ++ix, h += 0x11)
             {
-                binary.push_back(h);
+                binary.push_back((U8)h);
             }
             // Full defaults arrays. We actually don't care what the LLUUID or
             // LLDate values are, as long as they're different from the
@@ -446,7 +456,8 @@ namespace tut
                                                    (LLDate::now())
                                                    (LLURI("http://www.ietf.org/rfc/rfc3986.txt"))
                                                    (binary));
-            cout << "dft_array_full:\n" << dft_array_full << std::endl;
+            debug("dft_array_full:\n",
+                  dft_array_full);
             // Partial defaults arrays.
             for (LLSD::String a : ab)
             {
@@ -455,7 +466,8 @@ namespace tut
                     llsd_copy_array(dft_array_full[a].beginArray() + partition,
                                     dft_array_full[a].endArray());
             }
-            cout << "dft_array_partial:\n" << dft_array_partial << std::endl;
+            debug("dft_array_partial:\n",
+                  dft_array_partial);
 
             for (LLSD::String a : ab)
             {
@@ -471,7 +483,10 @@ namespace tut
                     dft_map_partial[a][params[a][ix].asString()] = dft_array_full[a][ix];
                 }
             }
-            cout << "dft_map_full:\n" << dft_map_full << "\ndft_map_partial:\n" << dft_map_partial << '\n';
+            debug("dft_map_full:\n",
+                  dft_map_full, "\n"
+                  "dft_map_partial:\n",
+                  dft_map_partial);
 
             // (Free function | static method) with (no | arbitrary) params,
             // map style, no (empty array) defaults
@@ -916,7 +931,12 @@ namespace tut
                                                  params[a].endArray()),
                                  dft_array_partial[a]);
         }
-        cout << "allreq:\n" << allreq << "\nleftreq:\n" << leftreq << "\nrightdft:\n" << rightdft << std::endl;
+        debug("allreq:\n",
+              allreq, "\n"
+              "leftreq:\n",
+              leftreq, "\n"
+              "rightdft:\n",
+              rightdft);
 
         // Generate maps containing parameter names not provided by the
         // dft_map_partial maps.
@@ -928,7 +948,8 @@ namespace tut
                 skipreq[a].erase(me.first);
             }
         }
-        cout << "skipreq:\n" << skipreq << std::endl;
+        debug("skipreq:\n",
+              skipreq);
 
         LLSD groups(LLSDArray       // array of groups
 
@@ -973,7 +994,11 @@ namespace tut
             LLSD names(grp[0]);
             LLSD required(grp[1][0]);
             LLSD optional(grp[1][1]);
-            cout << "For " << names << ",\n" << "required:\n" << required << "\noptional:\n" << optional << std::endl;
+            debug("For ", names, ",\n",
+                  "required:\n",
+                  required, "\n"
+                  "optional:\n",
+                  optional);
 
             // Loop through 'names'
             for (LLSD nm : inArray(names))
@@ -1143,7 +1168,7 @@ namespace tut
         std::vector<U8> binary;
         for (size_t h(0x01), i(0); i < 5; h+= 0x22, ++i)
         {
-            binary.push_back(h);
+            binary.push_back((U8)h);
         }
         LLSD args(LLSDMap("a", LLSDArray(true)(17)(3.14)(123.456)("char*"))
                          ("b", LLSDArray("string")
@@ -1161,7 +1186,7 @@ namespace tut
         }
         // Adjust expect["a"]["cp"] for special Vars::cp treatment.
         expect["a"]["cp"] = std::string("'") + expect["a"]["cp"].asString() + "'";
-        cout << "expect: " << expect << '\n';
+        debug("expect: ", expect);
 
         // Use substantially the same logic for args and argsplus
         LLSD argsarrays(LLSDArray(args)(argsplus));
@@ -1216,7 +1241,8 @@ namespace tut
         {
             array_overfull[a].append("bogus");
         }
-        cout << "array_full: " << array_full << "\narray_overfull: " << array_overfull << std::endl;
+        debug("array_full: ", array_full, "\n"
+              "array_overfull: ", array_overfull);
         // We rather hope that LLDate::now() will generate a timestamp
         // distinct from the one it generated in the constructor, moments ago.
         ensure_not_equals("Timestamps too close",
@@ -1231,7 +1257,8 @@ namespace tut
             map_overfull[a] = map_full[a];
             map_overfull[a]["extra"] = "ignore";
         }
-        cout << "map_full: " << map_full << "\nmap_overfull: " << map_overfull << std::endl;
+        debug("map_full: ", map_full, "\n"
+              "map_overfull: ", map_overfull);
         LLSD expect(map_full);
         // Twiddle the const char* param.
         expect["a"]["cp"] = std::string("'") + expect["a"]["cp"].asString() + "'";
@@ -1246,7 +1273,7 @@ namespace tut
         // so won't bother returning it. Predict that behavior to match the
         // LLSD values.
         expect["a"].erase("b");
-        cout << "expect: " << expect << std::endl;
+        debug("expect: ", expect);
         // For this test, calling functions registered with different sets of
         // parameter defaults should make NO DIFFERENCE WHATSOEVER. Every call
         // should pass all params.
