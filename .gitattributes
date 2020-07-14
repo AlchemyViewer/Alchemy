@@ -1,0 +1,55 @@
+*          text eol=lf
+
+# Sources
+*.cpp      text diff=cpp
+*.h        text diff=cpp
+*.py       text diff=python
+
+# Visual Studio
+*.sln text eol=crlf
+*.vcproj text eol=crlf
+*.vcxproj text eol=crlf
+
+# Documents
+*.txt      text
+*.xml      text
+indra/tools/vstool/README.txt -text
+indra/newview/installers/windows/FILES_ARE_UNICODE_UTF-16LE.txt -text
+
+# Graphics
+*.png      binary diff=exif
+*.jpg      binary diff=exif
+*.jpeg     binary diff=exif
+*.gif      binary diff=exif
+*.tif      binary
+*.tiff     binary
+*.ico      binary
+*.svg      text
+*.eps      binary
+*.tga      binary
+*.j2k      binary
+*.j2c      binary
+*.icns     binary
+*.bmp      binary
+*.BMP      binary
+
+# Scripts
+*.sh       text eol=lf
+*.bat      text eol=crlf
+
+# Viewer Files
+*.db2      binary
+*.llm      binary
+
+# Fonts
+*.ttf      binary
+*.otf      binary
+
+# Mac
+*.nib      binary
+
+*.exe      binary
+
+# Exclude files from exporting
+.gitattributes export-ignore
+.gitignore     export-ignore
