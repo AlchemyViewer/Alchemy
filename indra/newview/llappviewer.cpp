@@ -2835,9 +2835,9 @@ bool LLAppViewer::initConfiguration()
 	//
 	// Set the name of the window
 	//
-	if (LLVersionInfo::getViewerMaturity() != LLVersionInfo::RELEASE_VIEWER)
+	if (LLVersionInfo::instance().getViewerMaturity() != LLVersionInfo::RELEASE_VIEWER)
 	{
-		gWindowTitle = LLVersionInfo::getChannelAndVersion();
+		gWindowTitle = LLVersionInfo::instance().getChannelAndVersion();
 	}
 	else
 	{

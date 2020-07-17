@@ -660,7 +660,7 @@ skin_t manifestFromJson(const std::string& filename, const ESkinType type)
 			// If it's a system skin, the compatability version is always the current build
 			if (type == SYSTEM_SKIN)
 			{
-				skin.mCompatVer = LLVersionInfo::getShortVersion();
+				skin.mCompatVer = LLVersionInfo::instance().getShortVersion();
 			}
         } 
 		else
