@@ -317,9 +317,9 @@ LLUUID LLViewerWearable::getDefaultTextureImageID(ETextureIndex index) const
 //virtual
 void LLViewerWearable::writeToAvatar(LLAvatarAppearance *avatarp)
 {
-	LLVOAvatarSelf* viewer_avatar = dynamic_cast<LLVOAvatarSelf*>(avatarp);
+	if (!avatarp || !avatarp->isSelf()) return;
 
-	if (!avatarp || !viewer_avatar) return;
+	LLVOAvatarSelf* viewer_avatar = static_cast<LLVOAvatarSelf*>(avatarp);
 
 	if (!viewer_avatar->isValid()) return;
 
