@@ -81,58 +81,6 @@ if(WINDOWS)
       list(APPEND debug_files fmodL.dll)
       list(APPEND release_files fmod.dll)
     endif (USE_FMODSTUDIO)
-
-    #*******************************
-    # Copy MS C runtime dlls, required for packaging.
-    if (MSVC80)
-        set(MSVC_VER 80)
-    elseif (MSVC_VERSION EQUAL 1600) # VisualStudio 2010
-        MESSAGE(STATUS "MSVC_VERSION ${MSVC_VERSION}")
-    elseif (MSVC_VERSION EQUAL 1800) # VisualStudio 2013, which is (sigh) VS 12
-        set(MSVC_VER 120)
-    elseif (MSVC_VERSION GREATER_EQUAL 1910 AND MSVC_VERSION LESS 1920) # Visual Studio 2017
-        set(MSVC_VER 140)
-    else (MSVC80)
-        MESSAGE(WARNING "New MSVC_VERSION ${MSVC_VERSION} of MSVC: adapt Copy3rdPartyLibs.cmake")
-    endif (MSVC80)
-
-    if(ADDRESS_SIZE EQUAL 32)
-        # this folder contains the 32bit DLLs.. (yes really!)
-        set(registry_find_path "[HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\Windows;Directory]/SysWOW64")
-    else(ADDRESS_SIZE EQUAL 32)
-        # this folder contains the 64bit DLLs.. (yes really!)
-        set(registry_find_path "[HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\Windows;Directory]/System32")
-    endif(ADDRESS_SIZE EQUAL 32)
-
-    # Having a string containing the system registry path is a start, but to
-    # get CMake to actually read the registry, we must engage some other
-    # operation.
-    get_filename_component(registry_path "${registry_find_path}" ABSOLUTE)
-
-    # These are candidate DLL names. Empirically, VS versions before 2015 have
-    # msvcp*.dll and msvcr*.dll. VS 2017 has msvcp*.dll and vcruntime*.dll.
-    # Check each of them.
-    foreach(release_msvc_file
-            msvcp${MSVC_VER}.dll
-            msvcr${MSVC_VER}.dll
-            vcruntime${MSVC_VER}.dll
-            )
-        if(EXISTS "${registry_path}/${release_msvc_file}")
-            to_staging_dirs(
-                ${registry_path}
-                third_party_targets
-                ${release_msvc_file})
-        else()
-            # This isn't a WARNING because, as noted above, every VS version
-            # we've observed has only a subset of the specified DLL names.
-            MESSAGE(STATUS "Redist lib ${release_msvc_file} not found")
-        endif()
-    endforeach()
-    MESSAGE(STATUS "Will copy redist files for MSVC ${MSVC_VER}:")
-    foreach(target ${third_party_targets})
-        MESSAGE(STATUS "${target}")
-    endforeach()
-
 elseif(DARWIN)
     set(SHARED_LIB_STAGING_DIR_DEBUG            "${SHARED_LIB_STAGING_DIR}/Debug/Resources")
     set(SHARED_LIB_STAGING_DIR_RELWITHDEBINFO   "${SHARED_LIB_STAGING_DIR}/RelWithDebInfo/Resources")
