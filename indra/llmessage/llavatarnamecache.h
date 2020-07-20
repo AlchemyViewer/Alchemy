@@ -28,13 +28,14 @@
 #ifndef LLAVATARNAMECACHE_H
 #define LLAVATARNAMECACHE_H
 
+#include "lluuid.h"
 #include "llavatarname.h"	// for convenience
 #include "llsingleton.h"
 #include <boost/signals2.hpp>
+#include <boost/unordered_map.hpp>
 #include <set>
 
 class LLSD;
-class LLUUID;
 
 class LLAvatarNameCache : public LLSingleton<LLAvatarNameCache>
 {
@@ -173,18 +174,18 @@ private:
 
     // Agent IDs that have been requested, but with no reply.
     // Maps agent ID to frame time request was made.
-    typedef std::map<LLUUID, F64> pending_queue_t;
+    typedef boost::unordered_map<LLUUID, F64> pending_queue_t;
     pending_queue_t mPendingQueue;
 
     // Callbacks to fire when we received a name.
     // May have multiple callbacks for a single ID, which are
     // represented as multiple slots bound to the signal.
     // Avoid copying signals via pointers.
-    typedef std::map<LLUUID, callback_signal_t*> signal_map_t;
+    typedef boost::unordered_map<LLUUID, callback_signal_t*> signal_map_t;
     signal_map_t mSignalMap;
 
     // The cache at last, i.e. avatar names we know about.
-    typedef std::map<LLUUID, LLAvatarName> cache_t;
+    typedef boost::unordered_map<LLUUID, LLAvatarName> cache_t;
     cache_t mCache;
 
     // Time when unrefreshed cached names were checked last.

@@ -504,9 +504,6 @@ namespace tut
 	template<> template<>
 	void v3dmath_object::test<24>()
 	{
-#if LL_WINDOWS && _MSC_VER < 1400
-		skip("This fails on VS2003!");
-#else
 		F64 x = 10., y = 20., z = -15.;
 		F64 angle1, angle2;
 		LLVector3d vec3Da(x,y,z), vec3Db(x,y,z);
@@ -520,12 +517,6 @@ namespace tut
 		vec3Da.normVec();
 		F64 angle = vec3Db*vec3Da;
 		angle = acos(angle);
-#if LL_WINDOWS && _MSC_VER > 1900
-		skip("This fails on VS2017!");
-#else
 		ensure("2:angle_between: Fail ", (angle == angle2));
-#endif
-		
-#endif
 	}
 }

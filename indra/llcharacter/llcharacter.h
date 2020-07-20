@@ -39,6 +39,8 @@
 #include "llpointer.h"
 #include "llrefcount.h"
 
+#include <boost/unordered_map.hpp>
+
 class LLPolyMesh;
 
 class LLPauseRequestHandle : public LLThreadSafeRefCount
@@ -181,11 +183,11 @@ public:
 
 	virtual S32 getCollisionVolumeID(std::string &name) { return -1; }
 
-	void setAnimationData(std::string name, void *data);
+	void setAnimationData(const std::string& name, void *data);
 	
-	void *getAnimationData(std::string name);
+	void *getAnimationData(const std::string& name);
 
-	void removeAnimationData(std::string name);
+	void removeAnimationData(const std::string& name);
 	
 	void addVisualParam(LLVisualParam *param);
 	void addSharedVisualParam(LLVisualParam *param);
@@ -237,11 +239,10 @@ public:
 	}
 	S32 getVisualParamID(LLVisualParam *id)
 	{
-		visual_param_index_map_t::iterator iter;
-		for (iter = mVisualParamIndexMap.begin(); iter != mVisualParamIndexMap.end(); iter++)
+		for (const auto& param_pair : mVisualParamIndexMap)
 		{
-			if (iter->second == id)
-				return iter->first;
+			if (param_pair.second == id)
+				return param_pair.first;
 		}
 		return 0;
 	}
@@ -267,7 +268,7 @@ public:
 protected:
 	LLMotionController	mMotionController;
 
-	typedef std::map<std::string, void *> animation_data_map_t;
+	typedef boost::unordered_map<std::string, void *> animation_data_map_t;
 	animation_data_map_t mAnimationData;
 
 	F32					mPreferredPelvisHeight;

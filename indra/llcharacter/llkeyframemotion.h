@@ -442,7 +442,7 @@ public:
 	LLKeyframeDataCache(){};
 	~LLKeyframeDataCache();
 
-	typedef std::map<LLUUID, class LLKeyframeMotion::JointMotionList*> keyframe_data_map_t; 
+	typedef boost::unordered_map<LLUUID, class LLKeyframeMotion::JointMotionList*> keyframe_data_map_t; 
 	static keyframe_data_map_t sKeyframeDataMap;
 
 	static void addKeyframeData(const LLUUID& id, LLKeyframeMotion::JointMotionList*);

@@ -569,7 +569,7 @@ void LLVertexBuffer::setupClientArrays(U32 data_mask)
 static LLTrace::BlockTimerStatHandle FTM_VB_DRAW_ARRAYS("drawArrays");
 void LLVertexBuffer::drawArrays(U32 mode, const std::vector<LLVector3>& pos, const std::vector<LLVector3>& norm)
 {
-	LL_RECORD_BLOCK_TIME(FTM_VB_DRAW_ARRAYS);
+	//LL_RECORD_BLOCK_TIME(FTM_VB_DRAW_ARRAYS);
 	llassert(!LLGLSLShader::sNoFixedFunction || LLGLSLShader::sCurBoundShaderPtr != NULL);
 	gGL.syncMatrices();
 
@@ -857,7 +857,7 @@ void LLVertexBuffer::drawArrays(U32 mode, U32 first, U32 count) const
 	}
 
 	{
-		LL_RECORD_BLOCK_TIME(FTM_GL_DRAW_ARRAYS);
+		//LL_RECORD_BLOCK_TIME(FTM_GL_DRAW_ARRAYS);
 		stop_glerror();
 		LLGLSLShader::startProfile();
 		stop_glerror();
@@ -2225,7 +2225,7 @@ bool LLVertexBuffer::bindGLArray()
 	if (mGLArray && sGLRenderArray != mGLArray)
 	{
 		{
-			LL_RECORD_BLOCK_TIME(FTM_BIND_GL_ARRAY);
+			//LL_RECORD_BLOCK_TIME(FTM_BIND_GL_ARRAY);
 #if GL_ARB_vertex_array_object
 			glBindVertexArray(mGLArray);
 #endif
@@ -2276,7 +2276,7 @@ bool LLVertexBuffer::bindGLIndices(bool force_bind)
 	bool ret = false;
 	if (useVBOs() && (force_bind || (mGLIndices && (mGLIndices != sGLRenderIndices || !sIBOActive))))
 	{
-		LL_RECORD_BLOCK_TIME(FTM_BIND_GL_INDICES);
+		//LL_RECORD_BLOCK_TIME(FTM_BIND_GL_INDICES);
 		/*if (sMapped)
 		{
 			LL_ERRS() << "VBO bound while another VBO mapped!" << LL_ENDL;

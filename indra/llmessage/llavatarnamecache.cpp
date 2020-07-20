@@ -251,7 +251,7 @@ void LLAvatarNameCache::handleAvNameCacheSuccess(const LLSD &data, const LLSD &h
 // Provide some fallback for agents that return errors
 void LLAvatarNameCache::handleAgentError(const LLUUID& agent_id)
 {
-	std::map<LLUUID,LLAvatarName>::iterator existing = mCache.find(agent_id);
+	auto existing = mCache.find(agent_id);
 	if (existing == mCache.end())
     {
         // there is no existing cache entry, so make a temporary name from legacy
@@ -376,9 +376,12 @@ void LLAvatarNameCache::legacyNameCallback(const LLUUID& agent_id,
 	// Retrieve the name and set it to never (or almost never...) expire: when we are using the legacy
 	// protocol, we do not get an expiration date for each name and there's no reason to ask the 
 	// data again and again so we set the expiration time to the largest value admissible.
-	std::map<LLUUID,LLAvatarName>::iterator av_record = LLAvatarNameCache::getInstance()->mCache.find(agent_id);
-	LLAvatarName& av_name = av_record->second;
-	av_name.setExpires(MAX_UNREFRESHED_TIME);
+	auto av_record = LLAvatarNameCache::getInstance()->mCache.find(agent_id);
+	if (av_record != LLAvatarNameCache::getInstance()->mCache.end())
+	{
+		LLAvatarName& av_name = av_record->second;
+		av_name.setExpires(MAX_UNREFRESHED_TIME);
+	}
 }
 
 void LLAvatarNameCache::legacyNameFetch(const LLUUID& agent_id,
@@ -589,7 +592,7 @@ bool LLAvatarNameCache::getName(const LLUUID& agent_id, LLAvatarName *av_name)
 	if (mRunning)
 	{
 		// ...only do immediate lookups when cache is running
-		std::map<LLUUID,LLAvatarName>::iterator it = mCache.find(agent_id);
+		auto it = mCache.find(agent_id);
 		if (it != mCache.end())
 		{
 			*av_name = it->second;
@@ -640,7 +643,7 @@ LLAvatarNameCache::callback_connection_t LLAvatarNameCache::getNameCallback(cons
 	if (mRunning)
 	{
 		// ...only do immediate lookups when cache is running
-		std::map<LLUUID,LLAvatarName>::iterator it = mCache.find(agent_id);
+		auto it = mCache.find(agent_id);
 		if (it != mCache.end())
 		{
 			const LLAvatarName& av_name = it->second;
@@ -731,9 +734,7 @@ void LLAvatarNameCache::insert(const LLUUID& agent_id, const LLAvatarName& av_na
 
 LLUUID LLAvatarNameCache::findIdByName(const std::string& name)
 {
-    std::map<LLUUID, LLAvatarName>::iterator it;
-    std::map<LLUUID, LLAvatarName>::iterator end = mCache.end();
-    for (it = mCache.begin(); it != end; ++it)
+    for (auto it = mCache.begin(), end = mCache.end(); it != end; ++it)
     {
         if (it->second.getUserName() == name)
         {

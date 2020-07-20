@@ -221,8 +221,8 @@ void BlockTimer::bootstrapTimerTree()
 // this preserves partial order derived from current frame's observations
 void BlockTimer::incrementalUpdateTimerTree()
 {
-	for(block_timer_tree_df_post_iterator_t it = begin_block_timer_tree_df_post(BlockTimer::getRootTimeBlock());
-		it != end_block_timer_tree_df_post();
+	for(block_timer_tree_df_post_iterator_t it = begin_block_timer_tree_df_post(BlockTimer::getRootTimeBlock()), end = end_block_timer_tree_df_post();
+		it != end;
 		++it)
 	{
 		BlockTimerStatHandle* timerp = *it;
@@ -391,8 +391,8 @@ void BlockTimer::dumpCurTimes()
 	LLTrace::Recording& last_frame_recording = frame_recording.getLastRecording();
 
 	// walk over timers in depth order and output timings
-	for(block_timer_tree_df_iterator_t it = begin_timer_tree(BlockTimer::getRootTimeBlock());
-		it != end_timer_tree();
+	for(block_timer_tree_df_iterator_t it = begin_timer_tree(BlockTimer::getRootTimeBlock()), end = end_timer_tree();
+		it != end;
 		++it)
 	{
 		BlockTimerStatHandle* timerp = (*it);

@@ -672,9 +672,10 @@ void LLWearable::addVisualParam(LLVisualParam *param)
 
 void LLWearable::setVisualParamWeight(S32 param_index, F32 value)
 {
-	if( is_in_map(mVisualParamIndexMap, param_index ) )
+	auto iter = mVisualParamIndexMap.find(param_index);
+	if(iter != mVisualParamIndexMap.end())
 	{
-		LLVisualParam *wearable_param = mVisualParamIndexMap[param_index];
+		LLVisualParam *wearable_param = iter->second;
 		wearable_param->setWeight(value);
 	}
 	else
@@ -685,16 +686,17 @@ void LLWearable::setVisualParamWeight(S32 param_index, F32 value)
 
 F32 LLWearable::getVisualParamWeight(S32 param_index) const
 {
-	if( is_in_map(mVisualParamIndexMap, param_index ) )
+	auto iter = mVisualParamIndexMap.find(param_index);
+	if(iter != mVisualParamIndexMap.end())
 	{
-		const LLVisualParam *wearable_param = mVisualParamIndexMap.find(param_index)->second;
+		const LLVisualParam *wearable_param = iter->second;
 		return wearable_param->getWeight();
 	}
 	else
 	{
 		LL_WARNS() << "LLWerable::getVisualParam passed invalid parameter index: "  << param_index << " for wearable type: " << this->getName() << LL_ENDL;
 	}
-	return (F32)-1.0;
+	return (F32)-1.0f;
 }
 
 LLVisualParam* LLWearable::getVisualParam(S32 index) const
@@ -718,11 +720,9 @@ void LLWearable::getVisualParams(visual_param_vec_t &list)
 
 void LLWearable::animateParams(F32 delta)
 {
-	for(visual_param_index_map_t::iterator iter = mVisualParamIndexMap.begin();
-		 iter != mVisualParamIndexMap.end();
-		 ++iter)
+	for(const auto& param_pair : mVisualParamIndexMap)
 	{
-		LLVisualParam *param = (LLVisualParam*) iter->second;
+		LLVisualParam *param = (LLVisualParam*)param_pair.second;
 		param->animate(delta);
 	}
 }
@@ -762,7 +762,8 @@ void LLWearable::writeToAvatar(LLAvatarAppearance* avatarp)
 	{
 		// cross-wearable parameters are not authoritative, as they are driven by a different wearable. So don't copy the values to the
 		// avatar object if cross wearable. Cross wearable params get their values from the avatar, they shouldn't write the other way.
-		if( (((LLViewerVisualParam*)param)->getWearableType() == mType) && (!((LLViewerVisualParam*)param)->getCrossWearable()) )
+		LLViewerVisualParam* viewer_param = (LLViewerVisualParam*)param;
+		if((viewer_param->getWearableType() == mType) && (!viewer_param->getCrossWearable()) )
 		{
 			S32 param_id = param->getID();
 			F32 weight = getVisualParamWeight(param_id);

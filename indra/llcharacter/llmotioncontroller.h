@@ -40,6 +40,8 @@
 #include "llstatemachine.h"
 #include "llstring.h"
 
+#include <boost/unordered_map.hpp>
+
 //-----------------------------------------------------------------------------
 // Class predeclaration
 // This is necessary because llcharacter.h includes this file.
@@ -73,7 +75,7 @@ public:
 
 
 protected:
-	typedef std::map<LLUUID, LLMotionConstructor> motion_map_t;
+	typedef boost::unordered_map<LLUUID, LLMotionConstructor> motion_map_t;
 	motion_map_t mMotionTable;
 };
 
@@ -208,7 +210,7 @@ protected:
 //	Once an animations is loaded, it will be initialized and put on the mLoadedMotions list.
 //	Any animation that is currently playing also sits in the mActiveMotions list.
 
-	typedef std::map<LLUUID, LLMotion*> motion_map_t;
+	typedef boost::unordered_map<LLUUID, LLMotion*> motion_map_t;
 	motion_map_t	mAllMotions;
 
 	motion_set_t		mLoadingMotions;

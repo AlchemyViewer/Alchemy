@@ -40,6 +40,7 @@
 #include <errno.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <shlwapi.h>
 
 // Utility stuff to get versions of the sh
 #define PACKVERSION(major,minor) MAKELONG(minor,major)
@@ -371,20 +372,9 @@ std::string LLDir_Win32::getCurPath()
 }
 
 
-bool LLDir_Win32::fileExists(const std::string &filename) const
+bool LLDir_Win32::fileExists(const std::string& filename) const
 {
-	llstat stat_data;
-	// Check the age of the file
-	// Now, we see if the files we've gathered are recent...
-	int res = LLFile::stat(filename, &stat_data);
-	if (!res)
-	{
-		return TRUE;
-	}
-	else
-	{
-		return FALSE;
-	}
+	return PathFileExists(ll_convert_string_to_wide(filename).c_str());
 }
 
 

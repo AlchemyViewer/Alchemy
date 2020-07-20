@@ -461,12 +461,9 @@ BOOL LLPhysicsMotionController::onUpdate(F32 time, U8* joint_mask)
         }
         
         BOOL update_visuals = FALSE;
-        for (motion_vec_t::iterator iter = mMotions.begin();
-             iter != mMotions.end();
-             ++iter)
+        for (LLPhysicsMotion* motion : mMotions)
         {
-                LLPhysicsMotion *motion = (*iter);
-                update_visuals |= motion->onUpdate(time);
+            update_visuals |= motion->onUpdate(time);
         }
                 
         if (update_visuals)
