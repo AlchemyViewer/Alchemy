@@ -263,7 +263,7 @@ void LLCharacter::dumpCharacter( LLJoint* joint )
 //-----------------------------------------------------------------------------
 // setAnimationData()
 //-----------------------------------------------------------------------------
-void LLCharacter::setAnimationData(std::string name, void *data)
+void LLCharacter::setAnimationData(const std::string& name, void *data)
 {
 	mAnimationData[name] = data;
 }
@@ -271,7 +271,7 @@ void LLCharacter::setAnimationData(std::string name, void *data)
 //-----------------------------------------------------------------------------
 // getAnimationData()
 //-----------------------------------------------------------------------------
-void* LLCharacter::getAnimationData(std::string name)
+void* LLCharacter::getAnimationData(const std::string& name)
 {
 	return get_if_there(mAnimationData, name, (void*)NULL);
 }
@@ -279,7 +279,7 @@ void* LLCharacter::getAnimationData(std::string name)
 //-----------------------------------------------------------------------------
 // removeAnimationData()
 //-----------------------------------------------------------------------------
-void LLCharacter::removeAnimationData(std::string name)
+void LLCharacter::removeAnimationData(const std::string& name)
 {
 	mAnimationData.erase(name);
 }
