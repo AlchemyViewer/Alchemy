@@ -75,6 +75,10 @@ target_link_libraries(llvfs
     ${vfs_BOOST_LIBRARIES}
     )
 
+if (WINDOWS)
+  target_link_libraries(llvfs Shlwapi)
+endif (WINDOWS)
+
 if (DARWIN)
   include(CMakeFindFrameworks)
   find_library(COCOA_LIBRARY Cocoa)
