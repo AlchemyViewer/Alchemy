@@ -125,6 +125,9 @@ LLApp::LLApp() : mThreadErrorp(NULL)
 
 void LLApp::commonCtor()
 {
+	assert_main_thread();		// Make sure we record the main thread
+	on_main_thread();			// Make sure we record the main thread
+
 	// Set our status to running
 	setStatus(APP_STATUS_RUNNING);
 
