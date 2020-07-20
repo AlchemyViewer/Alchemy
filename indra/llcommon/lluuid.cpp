@@ -27,7 +27,7 @@
 
 // We can't use WIN32_LEAN_AND_MEAN here, needs lots of includes.
 #if LL_WINDOWS
-#include "llwin32headers.h"
+#include "llwin32headerslean.h"
 // ugh, this is ugly.  We need to straighten out our linking for this library
 #pragma comment(lib, "IPHLPAPI.lib")
 #include <iphlpapi.h>
@@ -456,51 +456,88 @@ static void get_random_bytes(void *buf, int nbytes)
 
 #if	LL_WINDOWS
 
-typedef struct _ASTAT_
-{
-	ADAPTER_STATUS adapt;
-	NAME_BUFFER    NameBuff [30];
-}ASTAT, * PASTAT;
-
 // static
 S32	LLUUID::getNodeID(unsigned char	*node_id)
 {
-	ASTAT Adapter;
-	NCB Ncb;
-	UCHAR uRetCode;
-	LANA_ENUM   lenum;
-	int      i;
-	int retval = 0;
-
-	memset( &Ncb, 0, sizeof(Ncb) );
-	Ncb.ncb_command = NCBENUM;
-	Ncb.ncb_buffer = (UCHAR *)&lenum;
-	Ncb.ncb_length = sizeof(lenum);
-	uRetCode = Netbios( &Ncb );
-
-	for(i=0; i < lenum.length ;i++)
+	static bool got_node_id = false;
+	static unsigned char local_node_id[6];
+	if (got_node_id)
 	{
-		memset( &Ncb, 0, sizeof(Ncb) );
-		Ncb.ncb_command = NCBRESET;
-		Ncb.ncb_lana_num = lenum.lana[i];
-
-		uRetCode = Netbios( &Ncb );
-
-		memset( &Ncb, 0, sizeof (Ncb) );
-		Ncb.ncb_command = NCBASTAT;
-		Ncb.ncb_lana_num = lenum.lana[i];
-
-		strcpy( (char *)Ncb.ncb_callname,  "*              " );		/* Flawfinder: ignore */
-		Ncb.ncb_buffer = (unsigned char *)&Adapter;
-		Ncb.ncb_length = sizeof(Adapter);
-
-		uRetCode = Netbios( &Ncb );
-		if ( uRetCode == 0 )
-		{
-			memcpy(node_id,Adapter.adapt.adapter_address,6);		/* Flawfinder: ignore */
-			retval = 1;
-		}
+		memcpy(node_id, local_node_id, sizeof(local_node_id));
+		return 1;
 	}
+
+	S32 retval = 0;
+	PIP_ADAPTER_ADDRESSES pAddresses = nullptr;
+	ULONG outBufLen = 0U;
+	DWORD dwRetVal = 0U;
+
+	ULONG family = AF_INET;
+	ULONG flags = GAA_FLAG_INCLUDE_PREFIX | GAA_FLAG_INCLUDE_GATEWAYS;
+
+	GetAdaptersAddresses(
+		AF_INET,
+		flags,
+		nullptr,
+		nullptr,
+		&outBufLen);
+
+	constexpr U32 MAX_TRIES = 3U;
+	U32 iteration = 0U;
+	do {
+
+		pAddresses = reinterpret_cast<PIP_ADAPTER_ADDRESSES>(malloc(outBufLen));
+		if (pAddresses == nullptr) {
+			return 0;
+		}
+
+		dwRetVal =
+			GetAdaptersAddresses(family, flags, nullptr, pAddresses, &outBufLen);
+
+		if (dwRetVal == ERROR_BUFFER_OVERFLOW) {
+			free(pAddresses);
+			pAddresses = nullptr;
+		}
+		else {
+			break;
+		}
+
+		++iteration;
+
+	} while ((dwRetVal == ERROR_BUFFER_OVERFLOW) && (iteration < MAX_TRIES));
+
+	if (dwRetVal == NO_ERROR)
+	{
+		PIP_ADAPTER_ADDRESSES pCurrAddresses = pAddresses;
+		PIP_ADAPTER_GATEWAY_ADDRESS pFirstGateway = nullptr;
+		do {
+			pFirstGateway = pCurrAddresses->FirstGatewayAddress;
+			if (pFirstGateway)
+			{
+				if ((pCurrAddresses->IfType == IF_TYPE_ETHERNET_CSMACD || pCurrAddresses->IfType == IF_TYPE_IEEE80211) && pCurrAddresses->ConnectionType == NET_IF_CONNECTION_DEDICATED
+					&& pCurrAddresses->OperStatus == IfOperStatusUp)
+				{
+					if (pCurrAddresses->PhysicalAddressLength == 6) 
+					{
+						for (size_t i = 0; i < 5; ++i)
+						{
+							node_id[i] = pCurrAddresses->PhysicalAddress[i];
+							local_node_id[i] = pCurrAddresses->PhysicalAddress[i];
+						}
+						retval = 1;
+						got_node_id = true;
+						break;
+					}
+				}
+			}
+			pCurrAddresses = pCurrAddresses->Next;
+		} while (pCurrAddresses);                    // Terminate if last adapter
+	}
+	
+	if(pAddresses)
+		free(pAddresses);
+	pAddresses = nullptr;
+
 	return retval;
 }
 
@@ -892,7 +929,9 @@ U32 LLUUID::getRandomSeed()
    md5_seed.finalize();
    md5_seed.raw_digest(seed);
    
-   return(*(U32 *)seed);
+   U32 out;
+   memcpy(&out, seed, sizeof(out));
+   return out;
 }
 
 BOOL LLUUID::parseUUID(const std::string& buf, LLUUID* value)
