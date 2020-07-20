@@ -478,7 +478,8 @@ BOOL LLPoseBlender::addMotion(LLMotion* motion)
 	{
 		LLJoint *jointp = jsp->getJoint();
 		LLJointStateBlender* joint_blender;
-		if (mJointStateBlenderPool.find(jointp) == mJointStateBlenderPool.end())
+		auto joint_iter = mJointStateBlenderPool.find(jointp);
+		if (joint_iter == mJointStateBlenderPool.end())
 		{
 			// this is the first time we are animating this joint
 			// so create new jointblender and add it to our pool
@@ -487,7 +488,7 @@ BOOL LLPoseBlender::addMotion(LLMotion* motion)
 		}
 		else
 		{
-			joint_blender = mJointStateBlenderPool[jointp];
+			joint_blender = joint_iter->second;
 		}
 
 		if (jsp->getPriority() == LLJoint::USE_MOTION_PRIORITY)
@@ -513,10 +514,8 @@ BOOL LLPoseBlender::addMotion(LLMotion* motion)
 //-----------------------------------------------------------------------------
 void LLPoseBlender::blendAndApply()
 {
-	for (blender_list_t::iterator iter = mActiveBlenders.begin();
-		 iter != mActiveBlenders.end(); )
+	for (LLJointStateBlender* jsbp : mActiveBlenders)
 	{
-		LLJointStateBlender* jsbp = *iter++;
 		jsbp->blendJointStates();
 	}
 

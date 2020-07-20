@@ -232,19 +232,19 @@ void LLDriverParam::setWeight(F32 weight)
 	//-------|----|-------|----|-------> driver
 	//  | min1   max1    max2  min2
 
-	for( entry_list_t::iterator iter = mDriven.begin(); iter != mDriven.end(); iter++ )
+	for(LLDrivenEntry& driven : mDriven )
 	{
-		LLDrivenEntry* driven = &(*iter);
-		LLDrivenEntryInfo* info = driven->mInfo;
+		LLDrivenEntryInfo* info = driven.mInfo;
+		LLViewerVisualParam* driven_param = driven.mParam;
 		
 		F32 driven_weight = 0.f;
-		F32 driven_min = driven->mParam->getMinWeight();
-		F32 driven_max = driven->mParam->getMaxWeight();
+		F32 driven_min = driven_param->getMinWeight();
+		F32 driven_max = driven_param->getMaxWeight();
 
 		if (mIsAnimating)
 		{
 			// driven param doesn't interpolate (textures, for example)
-			if (!driven->mParam->getAnimating())
+			if (!driven_param->getAnimating())
 			{
 				continue;
 			}
@@ -268,7 +268,7 @@ void LLDriverParam::setWeight(F32 weight)
 					driven_weight = driven_min;
 				}
 				
-				setDrivenWeight(driven,driven_weight);
+				setDrivenWeight(&driven,driven_weight);
 				continue;
 			}
 			else 
@@ -292,13 +292,13 @@ void LLDriverParam::setWeight(F32 weight)
 					driven_weight = driven_min;
 				}
 
-				setDrivenWeight(driven,driven_weight);
+				setDrivenWeight(&driven,driven_weight);
 				continue;
 			}
 		}
 
-		driven_weight = getDrivenWeight(driven, mCurWeight);
-		setDrivenWeight(driven,driven_weight);
+		driven_weight = getDrivenWeight(&driven, mCurWeight);
+		setDrivenWeight(&driven,driven_weight);
 	}
 }
 
