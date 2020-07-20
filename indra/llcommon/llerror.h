@@ -451,10 +451,6 @@ typedef LLError::NoClassInfo _LL_CLASS_TO_LOG;
 #define LL_INFOS_ONCE(...)	lllog(LLError::LEVEL_INFO, true, ##__VA_ARGS__)
 #define LL_WARNS_ONCE(...)	lllog(LLError::LEVEL_WARN, true, ##__VA_ARGS__)
 
-// Use this if you need to pass LLError::ELevel as a variable.
-#define LL_VLOGS(level, ...)      llvlog(level, false, ##__VA_ARGS__)
-#define LL_VLOGS_ONCE(level, ...) llvlog(level, true,  ##__VA_ARGS__)
-
 // The problem with using lllog() with a variable level is that the first time
 // through, it initializes a static CallSite instance with whatever level you
 // pass. That first level is bound into the CallSite; the level parameter is
@@ -492,6 +488,10 @@ typedef LLError::NoClassInfo _LL_CLASS_TO_LOG;
 		/* selected CallSite *must* be named _site for LL_ENDL */       \
 		LLError::CallSite& _site(_sites[which]);                        \
 		lllog_test_()
+
+// Use this if you need to pass LLError::ELevel as a variable.
+#define LL_VLOGS(level, ...)      llvlog(level, false, ##__VA_ARGS__)
+#define LL_VLOGS_ONCE(level, ...) llvlog(level, true,  ##__VA_ARGS__)
 
 // Check at run-time whether logging is enabled, without generating output
 bool debugLoggingEnabled(const std::string& tag);
