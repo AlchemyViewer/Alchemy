@@ -206,32 +206,27 @@ void LLMotionController::purgeExcessMotions()
 		}
 	}
 
-	std::set<LLUUID> motions_to_kill;
+	std::vector<LLUUID> motions_to_kill;
+	motions_to_kill.reserve(100);
 	if (mLoadedMotions.size() > MAX_MOTION_INSTANCES)
 	{
 		// too many motions active this frame, kill all blenders
 		mPoseBlender.clearBlenders();
-		for (motion_set_t::iterator loaded_motion_it = mLoadedMotions.begin(); 
-			 loaded_motion_it != mLoadedMotions.end(); 
-			 ++loaded_motion_it)
+		for (LLMotion* cur_motionp : mLoadedMotions)
 		{
-			LLMotion* cur_motionp = *loaded_motion_it;
 			// motion isn't playing, delete it
 			if (!isMotionActive(cur_motionp))
 			{
-				motions_to_kill.insert(cur_motionp->getID());
+				motions_to_kill.push_back(cur_motionp->getID());
 			}
 		}
 	}
 	
 	// clean up all inactive, loaded motions
-	for (std::set<LLUUID>::iterator motion_it = motions_to_kill.begin();
-		motion_it != motions_to_kill.end();
-		++motion_it)
+	for (const LLUUID& motion_id : motions_to_kill)
 	{
 		// look up the motion again by ID to get canonical instance
 		// and kill it only if that one is inactive
-		LLUUID motion_id = *motion_it;
 		LLMotion* motionp = findMotion(motion_id);
 		if (motionp && !isMotionActive(motionp))
 		{
@@ -563,11 +558,8 @@ void LLMotionController::updateMotionsByType(LLMotion::LLMotionBlendType anim_ty
 	memset(&last_joint_signature, 0, sizeof(U8) * LL_CHARACTER_MAX_ANIMATED_JOINTS);
 
 	// iterate through active motions in chronological order
-	for (motion_list_t::iterator iter = mActiveMotions.begin();
-		 iter != mActiveMotions.end(); )
+	for (LLMotion* motionp : mActiveMotions)
 	{
-		motion_list_t::iterator curiter = iter++;
-		LLMotion* motionp = *curiter;
 		if (motionp->getBlendType() != anim_type)
 		{
 			continue;
@@ -1114,10 +1106,9 @@ void LLMotionController::flushAllMotions()
 	mCharacter->removeAnimationData("Hand Pose");
 
 	// restart motions
-	for (std::vector<std::pair<LLUUID,F32> >::iterator iter = active_motions.begin();
-		 iter != active_motions.end(); ++iter)
+	for (const auto& motion_pair : active_motions)
 	{
-		startMotion(iter->first, iter->second);
+		startMotion(motion_pair.first, motion_pair.second);
 	}
 }
 

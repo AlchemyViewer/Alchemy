@@ -40,7 +40,7 @@
 #include "llcoros.h"
 
 // system includes
-#include <unordered_map>
+#include <boost/unordered_map.hpp>
 
 class LLCamera;
 class LLNetMap;
@@ -213,7 +213,7 @@ protected:
 
     uuid_set_t   mDeadObjects;
 
-	std::unordered_map<LLUUID, LLPointer<LLViewerObject> > mUUIDObjectMap;
+	boost::unordered_map<LLUUID, LLPointer<LLViewerObject> > mUUIDObjectMap;
 
 	//set of objects that need to update their cost
     uuid_set_t   mStaleObjectCost;
@@ -228,9 +228,9 @@ protected:
 	S32 mCurLazyUpdateIndex;
 
 	static U32 sSimulatorMachineIndex;
-	static std::unordered_map<U64, U32> sIPAndPortToIndex;
+	static boost::unordered_map<U64, U32> sIPAndPortToIndex;
 
-	static std::unordered_map<U64, LLUUID> sIndexAndLocalIDToUUID;
+	static boost::unordered_map<U64, LLUUID> sIndexAndLocalIDToUUID;
 
 	std::set<LLViewerObject *> mSelectPickList;
 

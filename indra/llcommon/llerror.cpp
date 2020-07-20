@@ -41,7 +41,7 @@
 # include <unistd.h>
 #endif // !LL_WINDOWS
 #include <vector>
-#include <unordered_map>
+#include <boost/unordered_map.hpp>
 #include "string.h"
 
 #include "llapp.h"
@@ -487,7 +487,7 @@ namespace LLError
 		LevelMap                            mClassLevelMap;
 		LevelMap                            mFileLevelMap;
 		LevelMap                            mTagLevelMap;
-		std::unordered_map<std::string, unsigned int> mUniqueLogMessages;
+		boost::unordered_map<std::string, unsigned int> mUniqueLogMessages;
 		
 		LLError::FatalFunction              mCrashFunction;
 		LLError::TimeFunction               mTimeFunction;
