@@ -28,6 +28,7 @@
 #include "llsdserialize.h"
 #include "lljoint.h"
 #include "llcallbacklist.h"
+#include "lltimer.h"
 
 #include "glh/glh_linear.h"
 #include "llmatrix4a.h"
@@ -365,7 +366,7 @@ void LLModelLoader::loadModelCallback()
 
 	while (!isStopped())
 	{ //wait until this thread is stopped before deleting self
-		apr_sleep(100);
+		micro_sleep(100);
 	}
 
 	//double check if "this" is valid before deleting it, in case it is aborted during running.

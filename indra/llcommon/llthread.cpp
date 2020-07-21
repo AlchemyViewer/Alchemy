@@ -286,13 +286,13 @@ void LLThread::start()
     {
         mThreadp = new std::thread(std::bind(&LLThread::threadRun, this));
         mNativeHandle = mThreadp->native_handle();
-    }
-    catch (std::system_error& ex)
-    {
-        mStatus = STOPPED;
-        LL_WARNS() << "failed to start thread " << mName << " " << ex.what() << LL_ENDL;
-    }
-
+		mThreadp->detach();
+	}
+	catch (const std::system_error& err)
+	{
+		mStatus = CRASHED;
+		LL_WARNS() << "Failed to start thread: \"" << mName << "\" due to error: " << err.what() << LL_ENDL;
+	}
 }
 
 //============================================================================
