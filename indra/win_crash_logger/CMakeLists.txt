@@ -101,5 +101,3 @@ if (WINDOWS)
         LINK_FLAGS_DEBUG "/NODEFAULTLIB:\"LIBCMT;LIBCMTD;MSVCRT\""
         )
 endif (WINDOWS)
-
-ll_deploy_sharedlibs_command(windows-crash-logger)
