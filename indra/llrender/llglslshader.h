@@ -31,6 +31,8 @@
 #include "llrender.h"
 #include "llstaticstringtable.h"
 
+#include <boost/unordered_map.hpp>
+
 class LLShaderFeatures
 {
 public:

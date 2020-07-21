@@ -44,7 +44,7 @@
 # include <io.h>
 #endif // !LL_WINDOWS
 #include <vector>
-#include <boost/unordered_map.hpp>
+#include <robin_hood.h>
 #include "string.h"
 
 #include "llapp.h"
@@ -498,7 +498,7 @@ namespace LLError
 		LevelMap                            mClassLevelMap;
 		LevelMap                            mFileLevelMap;
 		LevelMap                            mTagLevelMap;
-		boost::unordered_map<std::string, unsigned int> mUniqueLogMessages;
+		robin_hood::unordered_map<std::string, unsigned int> mUniqueLogMessages;
 		
 		LLError::FatalFunction              mCrashFunction;
 		LLError::TimeFunction               mTimeFunction;

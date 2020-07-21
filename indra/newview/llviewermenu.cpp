@@ -148,7 +148,7 @@ using namespace LLAvatarAppearanceDefines;
 
 typedef LLPointer<LLViewerObject> LLViewerObjectPtr;
 
-static boost::unordered_map<std::string, LLStringExplicit> sDefaultItemLabels;
+static robin_hood::unordered_map<std::string, LLStringExplicit> sDefaultItemLabels;
 
 BOOL enable_land_build(void*);
 BOOL enable_object_build(void*);
@@ -2706,7 +2706,7 @@ static void init_default_item_label(LLUICtrl* ctrl, const std::string& item_name
 		LLStringExplicit default_label = ctrl->getValue().asString();
 		if (!default_label.empty())
 		{
-			sDefaultItemLabels.insert(std::pair<std::string, LLStringExplicit>(item_name, default_label));
+			sDefaultItemLabels.emplace(item_name, default_label);
 		}
 	}
 }

@@ -34,6 +34,8 @@
 #include "httpheaders.h"
 #include "httpoptions.h"
 
+#include <boost/unordered_map.hpp>
+
 class LLViewerRegion;
 
 class LLMaterialMgr : public LLSingleton<LLMaterialMgr>

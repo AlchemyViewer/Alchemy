@@ -30,7 +30,7 @@
 // This file contains various stuff for handling gl extensions and other gl related stuff.
 
 #include <string>
-#include <boost/unordered_map.hpp>
+#include <robin_hood.h>
 #include <list>
 
 #include "llerror.h"
@@ -274,7 +274,7 @@ public:
 	static void checkClientArrays(const std::string& msg = "", U32 data_mask = 0);
 	
 protected:
-	static boost::unordered_map<LLGLenum, LLGLboolean> sStateMap;
+	static robin_hood::unordered_map<LLGLenum, LLGLboolean> sStateMap;
 	
 public:
 	enum { CURRENT_STATE = -2 };

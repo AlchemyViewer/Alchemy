@@ -34,7 +34,7 @@
 #include <boost/shared_ptr.hpp>
 #include <boost/type_traits/is_convertible.hpp>
 #include <boost/type_traits/is_enum.hpp>
-#include <boost/unordered_map.hpp>
+#include <robin_hood.h>
 
 #include "llerror.h"
 #include "llstl.h"
@@ -649,7 +649,7 @@ namespace LLInitParam
 		void aggregateBlockData(BlockDescriptor& src_block_data);
 		void addParam(ParamDescriptorPtr param, const char* name);
 
-		typedef boost::unordered_map<const std::string, ParamDescriptorPtr>						param_map_t; 
+		typedef robin_hood::unordered_node_map<std::string, ParamDescriptorPtr>						param_map_t; 
 		typedef std::vector<ParamDescriptorPtr>													param_list_t; 
 		typedef std::list<ParamDescriptorPtr>													all_params_list_t;
 		typedef std::vector<std::pair<param_handle_t, ParamDescriptor::validation_func_t> >		param_validation_list_t;

@@ -98,8 +98,8 @@ extern LLPipeline	gPipeline;
 
 // Statics for object lookup tables.
 U32						LLViewerObjectList::sSimulatorMachineIndex = 1; // Not zero deliberately, to speed up index check.
-boost::unordered_map<U64, U32>		LLViewerObjectList::sIPAndPortToIndex;
-boost::unordered_map<U64, LLUUID>	LLViewerObjectList::sIndexAndLocalIDToUUID;
+robin_hood::unordered_map<U64, U32>		LLViewerObjectList::sIPAndPortToIndex;
+robin_hood::unordered_node_map<U64, LLUUID>	LLViewerObjectList::sIndexAndLocalIDToUUID;
 
 LLViewerObjectList::LLViewerObjectList()
 {

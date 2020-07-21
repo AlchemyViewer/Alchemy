@@ -213,7 +213,7 @@ protected:
 
     uuid_set_t   mDeadObjects;
 
-	boost::unordered_map<LLUUID, LLPointer<LLViewerObject> > mUUIDObjectMap;
+	robin_hood::unordered_map<LLUUID, LLPointer<LLViewerObject> > mUUIDObjectMap;
 
 	//set of objects that need to update their cost
     uuid_set_t   mStaleObjectCost;
@@ -228,9 +228,9 @@ protected:
 	S32 mCurLazyUpdateIndex;
 
 	static U32 sSimulatorMachineIndex;
-	static boost::unordered_map<U64, U32> sIPAndPortToIndex;
+	static robin_hood::unordered_map<U64, U32> sIPAndPortToIndex;
 
-	static boost::unordered_map<U64, LLUUID> sIndexAndLocalIDToUUID;
+	static robin_hood::unordered_node_map<U64, LLUUID> sIndexAndLocalIDToUUID;
 
 	std::set<LLViewerObject *> mSelectPickList;
 
