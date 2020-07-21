@@ -558,8 +558,11 @@ void LLMotionController::updateMotionsByType(LLMotion::LLMotionBlendType anim_ty
 	memset(&last_joint_signature, 0, sizeof(U8) * LL_CHARACTER_MAX_ANIMATED_JOINTS);
 
 	// iterate through active motions in chronological order
-	for (LLMotion* motionp : mActiveMotions)
+	for (motion_list_t::iterator iter = mActiveMotions.begin();
+		iter != mActiveMotions.end(); )
 	{
+		motion_list_t::iterator curiter = iter++;
+		LLMotion* motionp = *curiter;
 		if (motionp->getBlendType() != anim_type)
 		{
 			continue;
