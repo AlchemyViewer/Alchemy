@@ -39,7 +39,7 @@
 #include "llpointer.h"
 #include "llrefcount.h"
 
-#include <robin_hood.h>
+#include <absl/container/flat_hash_map.h>
 
 class LLPolyMesh;
 
@@ -268,7 +268,7 @@ public:
 protected:
 	LLMotionController	mMotionController;
 
-	typedef robin_hood::unordered_map<std::string, void *> animation_data_map_t;
+	typedef absl::flat_hash_map<std::string, void *> animation_data_map_t;
 	animation_data_map_t mAnimationData;
 
 	F32					mPreferredPelvisHeight;

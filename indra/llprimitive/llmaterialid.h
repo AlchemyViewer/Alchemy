@@ -33,7 +33,7 @@
 #include <immintrin.h>
 #include "llsd.h"
 
-#include <robin_hood.h>
+#include "absl/hash/hash.h"
 
 class LLMaterialID
 {
@@ -141,17 +141,14 @@ public:
 
 	inline size_t hash() const
 	{
-		size_t seed = 0;
-		for (U8 i = 0; i < 4; ++i)
-		{
-			seed ^= static_cast<size_t>(mID[i * 4]) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-			seed ^= static_cast<size_t>(mID[i * 4 + 1]) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-			seed ^= static_cast<size_t>(mID[i * 4 + 2]) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-			seed ^= static_cast<size_t>(mID[i * 4 + 3]) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-		}
-		return robin_hood::hash_bytes(mID, MATERIAL_ID_SIZE);
+		return absl::Hash<LLMaterialID>{}(*this);
 	}
 // END BOOST
+
+	template <typename H>
+	friend H AbslHashValue(H h, const LLMaterialID& id) {
+		return H::combine_contiguous(std::move(h), id.mID, MATERIAL_ID_SIZE);
+	}
 
 	const U8*     get() const;
 	void          set(const void* pMemory);
@@ -181,16 +178,6 @@ namespace std {
 }
 
 namespace boost {
-	template<> struct hash<LLMaterialID>
-	{
-		size_t operator()(const LLMaterialID& id) const
-		{
-			return id.hash();
-		}
-	};
-}
-
-namespace robin_hood {
 	template<> struct hash<LLMaterialID>
 	{
 		size_t operator()(const LLMaterialID& id) const

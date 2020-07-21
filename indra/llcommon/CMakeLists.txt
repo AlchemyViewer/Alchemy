@@ -300,7 +300,8 @@ target_link_libraries(
     ${BOOST_SYSTEM_LIBRARY}
     ${GOOGLE_PERFTOOLS_LIBRARIES}
     ${URIPARSER_LIBRARIES}
-    robin_hood
+    absl::flat_hash_map
+    absl::node_hash_map
     )
 
 if (DARWIN)

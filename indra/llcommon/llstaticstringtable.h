@@ -29,7 +29,8 @@
 #define LL_STATIC_STRING_TABLE_H
 
 #include "lldefs.h"
-#include <robin_hood.h>
+#include "absl/hash/hash.h"
+#include "absl/container/flat_hash_map.h"
 #include "llstl.h"
 
 class LLStaticHashedString
@@ -51,7 +52,7 @@ protected:
 
 	size_t makehash(const std::string& s)
 	{
-		return robin_hood::hash<std::string>{}(s);
+		return absl::Hash<std::string>{}(s);
 	}
 
 	std::string string;
@@ -65,10 +66,7 @@ struct LLStaticStringHasher
 };
 
 template< typename MappedObject >
-class LL_COMMON_API LLStaticStringTable
-	: public robin_hood::unordered_map< LLStaticHashedString, MappedObject, LLStaticStringHasher >
-{
-};
+using LLStaticStringTable = absl::flat_hash_map<LLStaticHashedString, MappedObject, LLStaticStringHasher>;
 
 #endif
 

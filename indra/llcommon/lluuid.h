@@ -35,7 +35,7 @@
 #include "llpreprocessor.h"
 #include <immintrin.h>
 
-#include <robin_hood.h>
+#include "absl/hash/hash.h"
 
 class LLMutex;
 
@@ -179,9 +179,14 @@ public:
 
 	inline size_t hash() const
 	{
-		return robin_hood::hash_bytes(mData, UUID_BYTES);
+		return absl::Hash<LLUUID>{}(*this);
 	}
 	// END BOOST
+	
+	template <typename H>
+	friend H AbslHashValue(H h, const LLUUID& id) {
+		return H::combine_contiguous(std::move(h), id.mData, UUID_BYTES);
+	}
 
 	// xor functions. Useful since any two random uuids xored together
 	// will yield a determinate third random unique id that can be
@@ -256,16 +261,6 @@ namespace std {
 }
 
 namespace boost {
-	template<> struct hash<LLUUID>
-	{
-		size_t operator()(const LLUUID& id) const
-		{
-			return id.hash();
-		}
-	};
-}
-
-namespace robin_hood {
 	template<> struct hash<LLUUID>
 	{
 		size_t operator()(const LLUUID& id) const

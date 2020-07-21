@@ -6,18 +6,16 @@ include(FetchContent)
 set(CMAKE_FOLDER "Third Party")
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
- FetchContent_Declare(
-   meshoptimizer
-   GIT_REPOSITORY https://github.com/zeux/meshoptimizer.git
-   GIT_TAG        v0.14
-   )
-
+FetchContent_Declare(
+  meshoptimizer
+  GIT_REPOSITORY https://github.com/zeux/meshoptimizer.git
+  GIT_TAG        v0.14
+  )
 FetchContent_Declare(
   robin-hood-hashing
   GIT_REPOSITORY https://git.alchemyviewer.org/alchemy/thirdparty/robin-hood-hashing.git
   GIT_TAG        alchemy
   )
-
 # FetchContent_Declare(
 #   Catch2
 #   GIT_REPOSITORY https://github.com/catchorg/Catch2.git
@@ -33,25 +31,25 @@ FetchContent_Declare(
 #   GIT_REPOSITORY https://github.com/nlohmann/json.git
 #   GIT_TAG        v3.7.3
 #   )
-# FetchContent_Declare(
-#   absl
-#   GIT_REPOSITORY https://github.com/abseil/abseil-cpp.git
-#   GIT_TAG        cde2e2410e58c884b3bf5f67c6511e6266036249
-# )
+FetchContent_Declare(
+  absl
+  GIT_REPOSITORY https://github.com/abseil/abseil-cpp.git
+  GIT_TAG        3c2bed2e77a8b77ce3092e3f75140dd21879bdba
+  )
 
-# # This is a hack because absl has dumb cmake
-# set(OLD_BUILD_TEST ${BUILD_TESTING})
-# set(BUILD_TESTING OFF)
-# FetchContent_MakeAvailable(absl)
-# set(BUILD_TESTING ${OLD_BUILD_TEST})
+# This is a hack because absl has dumb cmake
+set(OLD_BUILD_TEST ${BUILD_TESTING})
+set(BUILD_TESTING OFF)
+FetchContent_MakeAvailable(absl)
+set(BUILD_TESTING ${OLD_BUILD_TEST})
 
-# # Supress warnings inside abseil under MSVC
-# if(WINDOWS)
-#   target_compile_options(absl_strings PRIVATE /wd4018)
-#   target_compile_options(absl_str_format_internal PRIVATE /wd4018)
-#   target_compile_options(absl_flags_usage_internal PRIVATE /wd4018)
-# endif()
-
+# Supress warnings inside abseil under MSVC
+if(WINDOWS)
+  target_compile_options(absl_strings PRIVATE /wd4018)
+  target_compile_options(absl_str_format_internal PRIVATE /wd4018)
+  target_compile_options(absl_flags_usage_internal PRIVATE /wd4018)
+  target_compile_options(absl_random_internal_distribution_test_util PRIVATE /wd4723)
+endif()
 
 # if (BUILD_TESTING)
 #   FetchContent_MakeAvailable(Catch2)
@@ -60,7 +58,6 @@ FetchContent_Declare(
 # #Download the rest of the libraries
 # FetchContent_MakeAvailable(fmt)
 FetchContent_MakeAvailable(meshoptimizer)
-FetchContent_MakeAvailable(robin-hood-hashing)
 
 # # Typically you don't care so much for a third party library's tests to be
 # # run from your own project's code.

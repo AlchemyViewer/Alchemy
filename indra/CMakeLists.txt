@@ -11,6 +11,12 @@ project(${ROOT_PROJECT_NAME})
 
 set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
 
+set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_VISIBILITY_PRESET hidden)
+
+set_property(GLOBAL PROPERTY USE_FOLDERS ON)
+
 include(Variables)
 include(BuildVersion)
 

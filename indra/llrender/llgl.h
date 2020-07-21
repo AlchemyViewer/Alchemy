@@ -30,7 +30,7 @@
 // This file contains various stuff for handling gl extensions and other gl related stuff.
 
 #include <string>
-#include <robin_hood.h>
+#include <absl/container/flat_hash_map.h>
 #include <list>
 
 #include "llerror.h"
@@ -274,7 +274,7 @@ public:
 	static void checkClientArrays(const std::string& msg = "", U32 data_mask = 0);
 	
 protected:
-	static robin_hood::unordered_map<LLGLenum, LLGLboolean> sStateMap;
+	static absl::flat_hash_map<LLGLenum, LLGLboolean> sStateMap;
 	
 public:
 	enum { CURRENT_STATE = -2 };

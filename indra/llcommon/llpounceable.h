@@ -41,7 +41,7 @@
 #include <boost/type_traits/remove_pointer.hpp>
 #include <boost/utility/value_init.hpp>
 #include <boost/signals2/signal.hpp>
-#include <robin_hood.h>
+#include <absl/container/node_hash_map.h>
 
 // Forward declare the user template, since we want to be able to point to it
 // in some of its implementation classes.
@@ -86,7 +86,7 @@ class LLPounceableQueueSingleton:
     // instance will call on the SAME LLPounceableQueueSingleton instance --
     // given how class statics work. We must keep a separate queue for each
     // LLPounceable instance. Use a hash map for that.
-    typedef robin_hood::unordered_node_map<owner_ptr, signal_t> map_t;
+    typedef absl::node_hash_map<owner_ptr, signal_t> map_t;
 
 public:
     // Disambiguate queues belonging to different LLPounceables.

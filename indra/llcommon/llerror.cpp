@@ -44,8 +44,8 @@
 # include <io.h>
 #endif // !LL_WINDOWS
 #include <vector>
-#include <robin_hood.h>
 #include "string.h"
+#include <absl/container/flat_hash_map.h>
 
 #include "llapp.h"
 #include "llapr.h"
@@ -498,7 +498,7 @@ namespace LLError
 		LevelMap                            mClassLevelMap;
 		LevelMap                            mFileLevelMap;
 		LevelMap                            mTagLevelMap;
-		robin_hood::unordered_map<std::string, unsigned int> mUniqueLogMessages;
+		absl::flat_hash_map<std::string, unsigned int> mUniqueLogMessages;
 		
 		LLError::FatalFunction              mCrashFunction;
 		LLError::TimeFunction               mTimeFunction;

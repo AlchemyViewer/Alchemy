@@ -1644,7 +1644,7 @@ void clear_glerror()
 //
 
 // Static members
-robin_hood::unordered_map<LLGLenum, LLGLboolean> LLGLState::sStateMap;
+absl::flat_hash_map<LLGLenum, LLGLboolean> LLGLState::sStateMap;
 
 GLboolean LLGLDepthTest::sDepthEnabled = GL_FALSE; // OpenGL default
 GLenum LLGLDepthTest::sDepthFunc = GL_LESS; // OpenGL default
