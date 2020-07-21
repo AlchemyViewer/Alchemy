@@ -70,6 +70,10 @@ list(APPEND llinventory_SOURCE_FILES ${llinventory_HEADER_FILES})
 
 add_library (llinventory ${llinventory_SOURCE_FILES})
 
+target_link_libraries(
+    llinventory
+    llcommon
+    )
 
 
 #add unit tests

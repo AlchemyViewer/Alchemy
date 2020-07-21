@@ -197,5 +197,5 @@ if (SDL_FOUND)
     )
 endif (SDL_FOUND)
 
-  target_link_libraries (llwindow ${llwindow_LINK_LIBRARIES})
+  target_link_libraries (llwindow llcommon ${llwindow_LINK_LIBRARIES})
 

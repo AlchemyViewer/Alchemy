@@ -60,6 +60,7 @@ include(URIPARSER)
 if (NOT HAVOK_TPV)
    # When using HAVOK_TPV, the library is precompiled, so no need for this
    add_subdirectory(${LLPHYSICSEXTENSIONS_SRC_DIR} llphysicsextensions)
+   target_link_libraries(${LLPHYSICSEXTENSIONS_LIBRARIES} llcommon)
 endif (NOT HAVOK_TPV)
 
 if(USE_FMODSTUDIO)
