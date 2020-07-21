@@ -237,41 +237,20 @@ inline void LLVector4a::mul(const F32 x)
 // Set this to (a x b) (geometric cross-product)
 inline void LLVector4a::setCross3(const LLVector4a& a, const LLVector4a& b)
 {
-	// Vectors are stored in memory in w, z, y, x order from high to low
-	// Set vector1 = { a[W], a[X], a[Z], a[Y] }
-	const LLQuad vector1 = _mm_shuffle_ps( a.mQ, a.mQ, _MM_SHUFFLE( 3, 0, 2, 1 ));
-	// Set vector2 = { b[W], b[Y], b[X], b[Z] }
-	const LLQuad vector2 = _mm_shuffle_ps( b.mQ, b.mQ, _MM_SHUFFLE( 3, 1, 0, 2 ));
-	// mQ = { a[W]*b[W], a[X]*b[Y], a[Z]*b[X], a[Y]*b[Z] }
-	mQ = _mm_mul_ps( vector1, vector2 );
-	// vector3 = { a[W], a[Y], a[X], a[Z] }
-	const LLQuad vector3 = _mm_shuffle_ps( a.mQ, a.mQ, _MM_SHUFFLE( 3, 1, 0, 2 ));
-	// vector4 = { b[W], b[X], b[Z], b[Y] }
-	const LLQuad vector4 = _mm_shuffle_ps( b.mQ, b.mQ, _MM_SHUFFLE( 3, 0, 2, 1 ));
-	// mQ = { 0, a[X]*b[Y] - a[Y]*b[X], a[Z]*b[X] - a[X]*b[Z], a[Y]*b[Z] - a[Z]*b[Y] }
-	mQ = _mm_sub_ps( mQ, _mm_mul_ps( vector3, vector4 ));
+	LLQuad tmp0 = _mm_shuffle_ps(b.mQ, b.mQ, _MM_SHUFFLE(3, 0, 2, 1));
+	LLQuad tmp1 = _mm_shuffle_ps(a.mQ, a.mQ, _MM_SHUFFLE(3, 0, 2, 1));
+	tmp0 = _mm_mul_ps(tmp0, a.mQ);
+	tmp1 = _mm_mul_ps(tmp1, b.mQ);
+	LLQuad tmp2 = _mm_sub_ps(tmp0, tmp1);
+	mQ = _mm_shuffle_ps(tmp2, tmp2, _MM_SHUFFLE(3, 0, 2, 1));
 }
-
-/* This function works, but may be slightly slower than the one below on older machines
- inline void LLVector4a::setAllDot3(const LLVector4a& a, const LLVector4a& b)
- {
- // ab = { a[W]*b[W], a[Z]*b[Z], a[Y]*b[Y], a[X]*b[X] }
- const LLQuad ab = _mm_mul_ps( a.mQ, b.mQ );
- // yzxw = { a[W]*b[W], a[Z]*b[Z], a[X]*b[X], a[Y]*b[Y] }
- const LLQuad wzxy = _mm_shuffle_ps( ab, ab, _MM_SHUFFLE(3, 2, 0, 1 ));
- // xPlusY = { 2*a[W]*b[W], 2 * a[Z] * b[Z], a[Y]*b[Y] + a[X] * b[X], a[X] * b[X] + a[Y] * b[Y] }
- const LLQuad xPlusY = _mm_add_ps(ab, wzxy);
- // xPlusYSplat = { a[Y]*b[Y] + a[X] * b[X], a[X] * b[X] + a[Y] * b[Y], a[Y]*b[Y] + a[X] * b[X], a[X] * b[X] + a[Y] * b[Y] } 
- const LLQuad xPlusYSplat = _mm_movelh_ps(xPlusY, xPlusY);
- // zSplat = { a[Z]*b[Z], a[Z]*b[Z], a[Z]*b[Z], a[Z]*b[Z] }
- const LLQuad zSplat = _mm_shuffle_ps( ab, ab, _MM_SHUFFLE( 2, 2, 2, 2 ));
- // mQ = { a[Z] * b[Z] + a[Y] * b[Y] + a[X] * b[X], same, same, same }
- mQ = _mm_add_ps(zSplat, xPlusYSplat);
- }*/
 
 // Set all elements to the dot product of the x, y, and z elements in a and b
 inline void LLVector4a::setAllDot3(const LLVector4a& a, const LLVector4a& b)
 {
+#if AL_AVX
+	mQ = _mm_dp_ps(a.mQ, b.mQ, 0x7f);
+#else
 	// ab = { a[W]*b[W], a[Z]*b[Z], a[Y]*b[Y], a[X]*b[X] }
 	const LLQuad ab = _mm_mul_ps( a.mQ, b.mQ );
 	// yzxw = { a[W]*b[W], a[Z]*b[Z], a[X]*b[X], a[Y]*b[Y] }
@@ -284,11 +263,15 @@ inline void LLVector4a::setAllDot3(const LLVector4a& a, const LLVector4a& b)
 	const __m128i zSplat = _mm_shuffle_epi32(_mm_castps_si128(ab), _MM_SHUFFLE( 2, 2, 2, 2 ));
 	// mQ = { a[Z] * b[Z] + a[Y] * b[Y] + a[X] * b[X], same, same, same }
 	mQ = _mm_add_ps(_mm_castsi128_ps(zSplat), xPlusYSplat);
+#endif
 }
 
 // Set all elements to the dot product of the x, y, z, and w elements in a and b
 inline void LLVector4a::setAllDot4(const LLVector4a& a, const LLVector4a& b)
 {
+#if AL_AVX
+	mQ = _mm_dp_ps(a.mQ, b.mQ, 0xff);
+#else
 	// ab = { a[W]*b[W], a[Z]*b[Z], a[Y]*b[Y], a[X]*b[X] }
 	const LLQuad ab = _mm_mul_ps( a.mQ, b.mQ );
 	// yzxw = { a[W]*b[W], a[Z]*b[Z], a[X]*b[X], a[Y]*b[Y] }
@@ -301,21 +284,29 @@ inline void LLVector4a::setAllDot4(const LLVector4a& a, const LLVector4a& b)
 
 	// mQ = { a[W]*b[W] + a[Z] * b[Z] + a[Y] * b[Y] + a[X] * b[X], same, same, same }
 	mQ = _mm_add_ps(xPlusYSplat, zPlusWSplat);
+#endif
 }
 
 // Return the 3D dot product of this vector and b
 inline LLSimdScalar LLVector4a::dot3(const LLVector4a& b) const
 {
+#if AL_AVX
+	return _mm_dp_ps(mQ, b.mQ, 0x7f);
+#else
 	const LLQuad ab = _mm_mul_ps( mQ, b.mQ );
 	const LLQuad splatY = _mm_castsi128_ps( _mm_shuffle_epi32( _mm_castps_si128(ab), _MM_SHUFFLE(1, 1, 1, 1) ) );
 	const LLQuad splatZ = _mm_castsi128_ps( _mm_shuffle_epi32( _mm_castps_si128(ab), _MM_SHUFFLE(2, 2, 2, 2) ) );
 	const LLQuad xPlusY = _mm_add_ps( ab, splatY );
-	return _mm_add_ps( xPlusY, splatZ );	
+	return _mm_add_ps( xPlusY, splatZ );
+#endif
 }
 
 // Return the 4D dot product of this vector and b
 inline LLSimdScalar LLVector4a::dot4(const LLVector4a& b) const
 {
+#if AL_AVX
+	return _mm_dp_ps(mQ, b.mQ, 0xff);
+#else
 	// ab = { w, z, y, x }
  	const LLQuad ab = _mm_mul_ps( mQ, b.mQ );
  	// upperProdsInLowerElems = { y, x, y, x }
@@ -325,6 +316,7 @@ inline LLSimdScalar LLVector4a::dot4(const LLVector4a& b) const
 	// shuffled = { z+x, z+x, z+x, z+x }
 	const LLQuad shuffled = _mm_castsi128_ps( _mm_shuffle_epi32( _mm_castps_si128( sumOfPairs ), _MM_SHUFFLE(1, 1, 1, 1) ) );
 	return _mm_add_ss( sumOfPairs, shuffled );
+#endif
 }
 
 // Normalize this vector with respect to the x, y, and z components only. Accurate to 22 bites of precision. W component is destroyed
@@ -432,11 +424,10 @@ inline void LLVector4a::normalize3fast_checked(LLVector4a* d)
 // Return true if this vector is normalized with respect to x,y,z up to tolerance
 inline LLBool32 LLVector4a::isNormalized3( F32 tolerance ) const
 {
-	static LL_ALIGN_16(const U32 ones[4]) = { 0x3f800000, 0x3f800000, 0x3f800000, 0x3f800000 };
 	LLSimdScalar tol = _mm_load_ss( &tolerance );
 	tol = _mm_mul_ss( tol, tol );
 	LLVector4a lenSquared; lenSquared.setAllDot3( *this, *this );
-	lenSquared.sub( *reinterpret_cast<const LLVector4a*>(ones) );
+	lenSquared.sub( _mm_set1_ps(1.f) );
 	lenSquared.setAbs(lenSquared);
 	return _mm_comile_ss( lenSquared, tol );		
 }
@@ -444,11 +435,10 @@ inline LLBool32 LLVector4a::isNormalized3( F32 tolerance ) const
 // Return true if this vector is normalized with respect to all components up to tolerance
 inline LLBool32 LLVector4a::isNormalized4( F32 tolerance ) const
 {
-	static LL_ALIGN_16(const U32 ones[4]) = { 0x3f800000, 0x3f800000, 0x3f800000, 0x3f800000 };
 	LLSimdScalar tol = _mm_load_ss( &tolerance );
 	tol = _mm_mul_ss( tol, tol );
 	LLVector4a lenSquared; lenSquared.setAllDot4( *this, *this );
-	lenSquared.sub( *reinterpret_cast<const LLVector4a*>(ones) );
+	lenSquared.sub(_mm_set1_ps(1.f));
 	lenSquared.setAbs(lenSquared);
 	return _mm_comile_ss( lenSquared, tol );		
 }
