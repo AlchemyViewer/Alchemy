@@ -3,8 +3,7 @@
 # cmake_minimum_required should appear before any
 # other commands to guarantee full compatibility
 # with the version specified
-## 3.8 added VS_DEBUGGER_WORKING_DIRECTORY support
-cmake_minimum_required(VERSION 3.8.0 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.13.0 FATAL_ERROR)
 
 set(ROOT_PROJECT_NAME "Alchemy" CACHE STRING
     "The root project/makefile/solution name. Defaults to Alchemy.")
