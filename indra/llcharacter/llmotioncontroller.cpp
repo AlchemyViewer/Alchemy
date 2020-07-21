@@ -172,7 +172,7 @@ void LLMotionController::deleteAllMotions()
 	mLoadedMotions.clear();
 	mActiveMotions.clear();
 
-	for_each(mAllMotions.begin(), mAllMotions.end(), DeletePairedPointer());
+	std::for_each(mAllMotions.begin(), mAllMotions.end(), DeletePairedPointer());
 	mAllMotions.clear();
 
 	// stinson 05/12/20014 : Ownership of the LLMotion pointers is transferred from

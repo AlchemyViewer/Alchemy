@@ -39,7 +39,7 @@
 #include "llpointer.h"
 #include "llrefcount.h"
 
-#include <boost/unordered_map.hpp>
+#include <robin_hood.h>
 
 class LLPolyMesh;
 
@@ -268,7 +268,7 @@ public:
 protected:
 	LLMotionController	mMotionController;
 
-	typedef boost::unordered_map<std::string, void *> animation_data_map_t;
+	typedef robin_hood::unordered_map<std::string, void *> animation_data_map_t;
 	animation_data_map_t mAnimationData;
 
 	F32					mPreferredPelvisHeight;

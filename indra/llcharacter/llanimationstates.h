@@ -28,7 +28,7 @@
 #define LL_LLANIMATIONSTATES_H
 
 #include <map>
-#include <boost/unordered_map.hpp>
+#include <robin_hood.h>
 
 #include "llstringtable.h"
 #include "lluuid.h"
@@ -204,7 +204,7 @@ class LLAnimationLibrary
 private:
 	LLStringTable mAnimStringTable;
 
-	typedef boost::unordered_map<LLUUID, char *> anim_map_t;
+	typedef robin_hood::unordered_map<LLUUID, char *> anim_map_t;
 	anim_map_t mAnimMap;
 
 public:

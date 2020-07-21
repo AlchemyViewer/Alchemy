@@ -35,6 +35,8 @@
 #include "llviewervisualparam.h"
 #include "llxmltree.h"
 
+#include <robin_hood.h>
+
 class LLTexLayerSet;
 class LLTexGlobalColor;
 class LLTexGlobalColorInfo;
@@ -138,7 +140,7 @@ public:
 	LLVector3			mHeadOffset; // current head position
 	LLAvatarJoint		*mRoot;
 
-	typedef boost::unordered_map<std::string, LLJoint*> joint_map_t;
+	typedef robin_hood::unordered_map<std::string, LLJoint*> joint_map_t;
 	joint_map_t			mJointMap;
 
     typedef std::map<std::string, LLVector3> joint_state_map_t;

@@ -2452,7 +2452,7 @@ LLKeyframeDataCache::~LLKeyframeDataCache()
 //-----------------------------------------------------------------------------
 void LLKeyframeDataCache::clear()
 {
-	for_each(sKeyframeDataMap.begin(), sKeyframeDataMap.end(), DeletePairedPointer());
+	std::for_each(sKeyframeDataMap.begin(), sKeyframeDataMap.end(), DeletePairedPointer());
 	sKeyframeDataMap.clear();
 }
 

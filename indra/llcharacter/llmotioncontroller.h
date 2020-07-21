@@ -40,7 +40,7 @@
 #include "llstatemachine.h"
 #include "llstring.h"
 
-#include <boost/unordered_map.hpp>
+#include <robin_hood.h>
 
 //-----------------------------------------------------------------------------
 // Class predeclaration
@@ -75,7 +75,7 @@ public:
 
 
 protected:
-	typedef boost::unordered_map<LLUUID, LLMotionConstructor> motion_map_t;
+	typedef robin_hood::unordered_map<LLUUID, LLMotionConstructor> motion_map_t;
 	motion_map_t mMotionTable;
 };
 
@@ -210,7 +210,7 @@ protected:
 //	Once an animations is loaded, it will be initialized and put on the mLoadedMotions list.
 //	Any animation that is currently playing also sits in the mActiveMotions list.
 
-	typedef boost::unordered_map<LLUUID, LLMotion*> motion_map_t;
+	typedef robin_hood::unordered_map<LLUUID, LLMotion*> motion_map_t;
 	motion_map_t	mAllMotions;
 
 	motion_set_t		mLoadingMotions;
