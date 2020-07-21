@@ -12,6 +12,12 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
    GIT_TAG        v0.14
    )
 
+FetchContent_Declare(
+  robin-hood-hashing
+  GIT_REPOSITORY https://git.alchemyviewer.org/alchemy/thirdparty/robin-hood-hashing.git
+  GIT_TAG        alchemy
+  )
+
 # FetchContent_Declare(
 #   Catch2
 #   GIT_REPOSITORY https://github.com/catchorg/Catch2.git
@@ -54,6 +60,7 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 # #Download the rest of the libraries
 # FetchContent_MakeAvailable(fmt)
 FetchContent_MakeAvailable(meshoptimizer)
+FetchContent_MakeAvailable(robin-hood-hashing)
 
 # # Typically you don't care so much for a third party library's tests to be
 # # run from your own project's code.

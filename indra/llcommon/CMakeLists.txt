@@ -285,6 +285,7 @@ endif(LLCOMMON_LINK_SHARED)
 
 target_link_libraries(
     llcommon
+    PUBLIC
     ${BREAKPAD_EXCEPTION_HANDLER_LIBRARIES}
     ${APRUTIL_LIBRARIES}
     ${APR_LIBRARIES}
@@ -299,6 +300,7 @@ target_link_libraries(
     ${BOOST_SYSTEM_LIBRARY}
     ${GOOGLE_PERFTOOLS_LIBRARIES}
     ${URIPARSER_LIBRARIES}
+    robin_hood
     )
 
 if (DARWIN)
