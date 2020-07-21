@@ -288,6 +288,17 @@
       <key>Value</key>
       <integer>0</integer>
     </map>
+    <key>AlchemyMainLoopSleep</key>
+    <map>
+      <key>Comment</key>
+      <string>Sleep main loop after 90-ish fps threshold to reduce needless gpu strain</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <integer>1</integer>
+    </map>
     <key>AlchemyMapShowAgentCount</key>
     <map>
       <key>Comment</key>
