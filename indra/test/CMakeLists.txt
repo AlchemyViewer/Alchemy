@@ -84,7 +84,6 @@ list(APPEND test_SOURCE_FILES ${test_HEADER_FILES})
 add_executable(lltest ${test_SOURCE_FILES})
 
 target_link_libraries(lltest
-    ${LEGACY_STDIO_LIBS}
     ${LLDATABASE_LIBRARIES}
     ${LLINVENTORY_LIBRARIES}
     ${LLMESSAGE_LIBRARIES}
