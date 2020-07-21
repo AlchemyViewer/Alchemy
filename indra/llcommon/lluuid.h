@@ -35,6 +35,8 @@
 #include "llpreprocessor.h"
 #include <immintrin.h>
 
+#include <robin_hood.h>
+
 class LLMutex;
 
 const S32 UUID_BYTES = 16;
@@ -177,15 +179,7 @@ public:
 
 	inline size_t hash() const
 	{
-		size_t seed = 0;
-		for (U8 i = 0; i < 4; ++i)
-		{
-			seed ^= static_cast<size_t>(mData[i * 4]) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-			seed ^= static_cast<size_t>(mData[i * 4 + 1]) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-			seed ^= static_cast<size_t>(mData[i * 4 + 2]) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-			seed ^= static_cast<size_t>(mData[i * 4 + 3]) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-		}
-		return seed;
+		return robin_hood::hash_bytes(mData, UUID_BYTES);
 	}
 	// END BOOST
 
@@ -262,6 +256,16 @@ namespace std {
 }
 
 namespace boost {
+	template<> struct hash<LLUUID>
+	{
+		size_t operator()(const LLUUID& id) const
+		{
+			return id.hash();
+		}
+	};
+}
+
+namespace robin_hood {
 	template<> struct hash<LLUUID>
 	{
 		size_t operator()(const LLUUID& id) const

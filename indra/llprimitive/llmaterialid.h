@@ -33,6 +33,8 @@
 #include <immintrin.h>
 #include "llsd.h"
 
+#include <robin_hood.h>
+
 class LLMaterialID
 {
 public:
@@ -147,7 +149,7 @@ public:
 			seed ^= static_cast<size_t>(mID[i * 4 + 2]) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
 			seed ^= static_cast<size_t>(mID[i * 4 + 3]) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
 		}
-		return seed;
+		return robin_hood::hash_bytes(mID, MATERIAL_ID_SIZE);
 	}
 // END BOOST
 
@@ -167,6 +169,36 @@ private:
 
 	U8 mID[MATERIAL_ID_SIZE] = {};
 } ;
+
+namespace std {
+	template <> struct hash<LLMaterialID>
+	{
+		size_t operator()(const LLMaterialID& id) const
+		{
+			return id.hash();
+		}
+	};
+}
+
+namespace boost {
+	template<> struct hash<LLMaterialID>
+	{
+		size_t operator()(const LLMaterialID& id) const
+		{
+			return id.hash();
+		}
+	};
+}
+
+namespace robin_hood {
+	template<> struct hash<LLMaterialID>
+	{
+		size_t operator()(const LLMaterialID& id) const
+		{
+			return id.hash();
+		}
+	};
+}
 
 #endif // LL_LLMATERIALID_H
 
