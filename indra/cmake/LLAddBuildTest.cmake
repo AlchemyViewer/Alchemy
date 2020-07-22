@@ -200,6 +200,7 @@ FUNCTION(LL_ADD_INTEGRATION_TEST
     )
 
   SET(libraries
+    ${LEGACY_STDIO_LIBS}
     ${library_dependencies}
     ${BOOST_FIBER_LIBRARY}
     ${BOOST_CONTEXT_LIBRARY}
