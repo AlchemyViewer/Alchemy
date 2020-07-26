@@ -207,10 +207,10 @@ bool LLSettingsDay::initialize(bool validate_frames)
 
     std::map<std::string, LLSettingsBase::ptr_t> used;
 
-    for (LLSD::map_const_iterator itFrame = frames.beginMap(); itFrame != frames.endMap(); ++itFrame)
+    for (const auto& llsd_pair : frames.map())
     {
-        std::string name = (*itFrame).first;
-        LLSD data = (*itFrame).second;
+        const std::string& name = llsd_pair.first;
+        const LLSD& data = llsd_pair.second;
         LLSettingsBase::ptr_t keyframe;
 
         if (data[SETTING_TYPE].asString() == "sky")
@@ -241,16 +241,16 @@ bool LLSettingsDay::initialize(bool validate_frames)
     {
         mDayTracks[i].clear();
         LLSD curtrack = tracks[i];
-        for (LLSD::array_const_iterator it = curtrack.beginArray(); it != curtrack.endArray(); ++it)
+        for (const auto& llsd_val : curtrack.array())
         {
-            LLSettingsBase::TrackPosition keyframe = LLSettingsBase::TrackPosition((*it)[SETTING_KEYKFRAME].asReal());
+            LLSettingsBase::TrackPosition keyframe = LLSettingsBase::TrackPosition(llsd_val[SETTING_KEYKFRAME].asReal());
             keyframe = llclamp(keyframe, 0.0f, 1.0f);
             LLSettingsBase::ptr_t setting;
 
             
-            if ((*it).has(SETTING_KEYNAME))
+            if (llsd_val.has(SETTING_KEYNAME))
             {
-                std::string key_name = (*it)[SETTING_KEYNAME];
+                std::string key_name = llsd_val[SETTING_KEYNAME];
                 if (i == TRACK_WATER)
                 {
                     setting = used[key_name];
@@ -470,36 +470,36 @@ namespace
 
         S32 framecount(0);
 
-        for (LLSD::array_iterator track = value.beginArray(); track != value.endArray(); ++track)
+        for (auto& llsd_val : value.array())
         {
             S32 index = 0;
-            while (index < (*track).size())
+            while (index < llsd_val.size())
             {
-                LLSD& elem = (*track)[index];
+                LLSD& elem = llsd_val[index];
 
                 ++framecount;
                 if (index >= LLSettingsDay::FRAME_MAX)
                 {
-                    (*track).erase(index);
+                    llsd_val.erase(index);
                     continue;
                 }
 
                 if (!elem.has(LLSettingsDay::SETTING_KEYKFRAME))
                 {
-                    (*track).erase(index);
+                    llsd_val.erase(index);
                     continue;
                 }
 
                 if (!elem[LLSettingsDay::SETTING_KEYKFRAME].isReal())
                 {
-                    (*track).erase(index);
+                    llsd_val.erase(index);
                     continue;
                 }
 
                 if (!elem.has(LLSettingsDay::SETTING_KEYNAME) &&
                     !elem.has(LLSettingsDay::SETTING_KEYID))
                 {
-                    (*track).erase(index);
+                    llsd_val.erase(index);
                     continue;
                 }
 
@@ -536,9 +536,9 @@ namespace
         bool hasSky(false);
         bool hasWater(false);
 
-        for (LLSD::map_iterator itf = value.beginMap(); itf != value.endMap(); ++itf)
+        for (const auto& llsd_pair : value.map())
         {
-            LLSD frame = (*itf).second;
+            LLSD frame = llsd_pair.second;
 
             std::string ftype = frame[LLSettingsBase::SETTING_TYPE];
             if (ftype == "sky")
@@ -548,7 +548,7 @@ namespace
                 
                 if (res_sky["success"].asInteger() == 0)
                 {
-                    LL_WARNS("SETTINGS") << "Sky setting named '" << (*itf).first << "' validation failed!: " << res_sky << LL_ENDL;
+                    LL_WARNS("SETTINGS") << "Sky setting named '" << llsd_pair.first << "' validation failed!: " << res_sky << LL_ENDL;
                     LL_WARNS("SETTINGS") << "Sky: " << frame << LL_ENDL;
                     continue;
                 }
@@ -560,7 +560,7 @@ namespace
                 LLSD res_h2o = LLSettingsBase::settingValidation(frame, valid_h2o);
                 if (res_h2o["success"].asInteger() == 0)
                 {
-                    LL_WARNS("SETTINGS") << "Water setting named '" << (*itf).first << "' validation failed!: " << res_h2o << LL_ENDL;
+                    LL_WARNS("SETTINGS") << "Water setting named '" << llsd_pair.first << "' validation failed!: " << res_h2o << LL_ENDL;
                     LL_WARNS("SETTINGS") << "Water: " << frame << LL_ENDL;
                     continue;
                 }
@@ -568,7 +568,7 @@ namespace
             }
             else
             {
-                LL_WARNS("SETTINGS") << "Unknown settings block of type '" << ftype << "' named '" << (*itf).first << "'" << LL_ENDL;
+                LL_WARNS("SETTINGS") << "Unknown settings block of type '" << ftype << "' named '" << llsd_pair.first << "'" << LL_ENDL;
                 return false;
             }
         }

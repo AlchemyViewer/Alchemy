@@ -135,16 +135,13 @@ std::string LLKeywords::getArguments(LLSD& arguments)
 	if (arguments.isArray())
 	{
 		U32 argsCount = arguments.size();
-		LLSD::array_iterator arrayIt = arguments.beginArray();
-		for ( ; arrayIt != arguments.endArray(); ++arrayIt)
+		for (const LLSD& args : arguments.array())
 		{
-			LLSD& args = (*arrayIt);
 			if (args.isMap())
 			{
-				LLSD::map_iterator argsIt = args.beginMap();
-				for ( ; argsIt != args.endMap(); ++argsIt)
+				for (const auto& llsd_pair : args.map())
 				{
-					argString += argsIt->second.get("type").asString() + " " + argsIt->first;
+					argString += llsd_pair.second.get("type").asString() + " " + llsd_pair.first;
 					if (argsCount-- > 1)
 					{
 						argString += ", ";
@@ -239,22 +236,21 @@ void LLKeywords::processTokens()
 	addToken(LLKeywordToken::TT_TWO_SIDED_DELIMITER, "/*", LLUIColorTable::instance().getColor("SyntaxLslComment"), "Comment (multi-line)\nNon-functional commentary or disabled code", "*/" );
 	addToken(LLKeywordToken::TT_DOUBLE_QUOTATION_MARKS, "\"", LLUIColorTable::instance().getColor("SyntaxLslStringLiteral"), "String literal", "\"" );
 
-	LLSD::map_iterator itr = mSyntax.beginMap();
-	for ( ; itr != mSyntax.endMap(); ++itr)
+	for (const auto& llsd_pair : mSyntax.map())
 	{
-		if (itr->first == "llsd-lsl-syntax-version")
+		if (llsd_pair.first == "llsd-lsl-syntax-version")
 		{
 			// Skip over version key.
 		}
 		else
 		{
-			if (itr->second.isMap())
+			if (llsd_pair.second.isMap())
 			{
-				processTokensGroup(itr->second, itr->first);
+				processTokensGroup(llsd_pair.second, llsd_pair.first);
 			}
 			else
 			{
-				LL_WARNS("LSL-Tokens-Processing") << "Map for " + itr->first + " entries is missing! Ignoring." << LL_ENDL;
+				LL_WARNS("LSL-Tokens-Processing") << "Map for " + llsd_pair.first + " entries is missing! Ignoring." << LL_ENDL;
 			}
 		}
 	}
@@ -300,30 +296,28 @@ void LLKeywords::processTokensGroup(const LLSD& tokens, const std::string& group
 
 	if (tokens.isMap())
 	{
-		LLSD::map_const_iterator outer_itr = tokens.beginMap();
-		for ( ; outer_itr != tokens.endMap(); ++outer_itr )
+		for (const auto& token_pair : tokens.map())
 		{
-			if (outer_itr->second.isMap())
+			if (token_pair.second.isMap())
 			{
 				mAttributes.clear();
 				LLSD arguments = LLSD();
-				LLSD::map_const_iterator inner_itr = outer_itr->second.beginMap();
-				for ( ; inner_itr != outer_itr->second.endMap(); ++inner_itr )
+				for (const auto& token_inner_pair : token_pair.second.map())
 				{
-					if (inner_itr->first == "arguments")
+					if (token_inner_pair.first == "arguments")
 					{ 
-						if (inner_itr->second.isArray())
+						if (token_inner_pair.second.isArray())
 						{
-							arguments = inner_itr->second;
+							arguments = token_inner_pair.second;
 						}
 					}
-					else if (!inner_itr->second.isMap() && !inner_itr->second.isArray())
+					else if (!token_inner_pair.second.isMap() && !token_inner_pair.second.isArray())
 					{
-						mAttributes[inner_itr->first] = inner_itr->second.asString();
+						mAttributes[token_inner_pair.first] = token_inner_pair.second.asString();
 					}
 					else
 					{
-						LL_WARNS("SyntaxLSL") << "Not a valid attribute: " << inner_itr->first << LL_ENDL;
+						LL_WARNS("SyntaxLSL") << "Not a valid attribute: " << token_inner_pair.first << LL_ENDL;
 					}
 				}
 
@@ -342,10 +336,10 @@ void LLKeywords::processTokensGroup(const LLSD& tokens, const std::string& group
 						tooltip = "Type: " + getAttribute("type") + ", Value: " + getAttribute("value");
 						break;
 					case LLKeywordToken::TT_EVENT:
-						tooltip = outer_itr->first + "(" + getArguments(arguments) + ")";
+						tooltip = token_pair.first + "(" + getArguments(arguments) + ")";
 						break;
 					case LLKeywordToken::TT_FUNCTION:
-						tooltip = getAttribute("return") + " " + outer_itr->first + "(" + getArguments(arguments) + ");";
+						tooltip = getAttribute("return") + " " + token_pair.first + "(" + getArguments(arguments) + ");";
 						tooltip.append("\nEnergy: ");
 						tooltip.append(getAttribute("energy").empty() ? "0.0" : getAttribute("energy"));
 						if (!getAttribute("sleep").empty())
@@ -372,7 +366,7 @@ void LLKeywords::processTokensGroup(const LLSD& tokens, const std::string& group
 					color = color_god_mode;
 				}
 
-				addToken(token_type, outer_itr->first, color, tooltip);
+				addToken(token_type, token_pair.first, color, tooltip);
 			}
 		}
 	}

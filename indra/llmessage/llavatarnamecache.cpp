@@ -204,10 +204,8 @@ void LLAvatarNameCache::handleAvNameCacheSuccess(const LLSD &data, const LLSD &h
     F64 now = LLFrameTimer::getTotalSeconds();
 
     const LLSD& agents = data["agents"];
-    LLSD::array_const_iterator it = agents.beginArray();
-    for (; it != agents.endArray(); ++it)
+    for (const LLSD& row : agents.array())
     {
-        const LLSD& row = *it;
         LLUUID agent_id = row["id"].asUUID();
 
         LLAvatarName av_name;
@@ -231,10 +229,9 @@ void LLAvatarNameCache::handleAvNameCacheSuccess(const LLSD &data, const LLSD &h
         LL_WARNS("AvNameCache") << "LLAvatarNameResponder::result " << num_unresolved << " unresolved ids; "
             << "expires in " << expires - now << " seconds"
             << LL_ENDL;
-        it = unresolved_agents.beginArray();
-        for (; it != unresolved_agents.endArray(); ++it)
+        for (const LLSD& llsd_val : unresolved_agents.array())
         {
-            const LLUUID& agent_id = *it;
+            const LLUUID& agent_id = llsd_val.asUUID();
 
             LL_WARNS("AvNameCache") << "LLAvatarNameResponder::result "
                 << "failed id " << agent_id
@@ -439,11 +436,10 @@ bool LLAvatarNameCache::importFile(std::istream& istr)
 
 	LLUUID agent_id;
 	LLAvatarName av_name;
-	LLSD::map_const_iterator it = agents.beginMap();
-	for ( ; it != agents.endMap(); ++it)
+	for (const auto& llsd_pair : agents.map())
 	{
-		agent_id.set(it->first);
-		av_name.fromLLSD( it->second );
+		agent_id.set(llsd_pair.first);
+		av_name.fromLLSD(llsd_pair.second );
 		mCache[agent_id] = av_name;
 	}
     LL_INFOS("AvNameCache") << "LLAvatarNameCache loaded " << mCache.size() << LL_ENDL;

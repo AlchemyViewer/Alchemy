@@ -453,12 +453,11 @@ LLURI LLURI::buildHTTP(const std::string& prefix,
 	if (path.isArray())
 	{
 		// break out and escape each path component
-		for (LLSD::array_const_iterator it = path.beginArray();
-			 it != path.endArray();
-			 ++it)
+		for (const auto& llsd_val : path.array())
 		{
-			LL_DEBUGS() << "PATH: inserting " << it->asString() << LL_ENDL;
-			result.mEscapedPath += "/" + escapePathComponent(it->asString());
+			const std::string& str = llsd_val.asStringRef();
+			LL_DEBUGS() << "PATH: inserting " << str << LL_ENDL;
+			result.mEscapedPath += "/" + escapePathComponent(str);
 		}
 	}
 	else if (path.isString())

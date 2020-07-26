@@ -308,11 +308,9 @@ bool LLGridManager::addGrid(LLSD& grid_data)
 										 <<"  helper page: "<<grid_data[GRID_HELPER_URI_VALUE].asString()<<"\n"
 										 <<"  web profile: "<<grid_data[GRID_WEB_PROFILE_VALUE].asString()<<"\n";
 				/* still in LL_DEBUGS */ 
-				for (LLSD::array_const_iterator login_uris = grid_data[GRID_LOGIN_URI_VALUE].beginArray();
-					 login_uris != grid_data[GRID_LOGIN_URI_VALUE].endArray();
-					 login_uris++)
+				for (const LLSD& login_uris : grid_data[GRID_LOGIN_URI_VALUE].array())
 				{
-					LL_CONT << "  login uri:   "<<login_uris->asString()<<"\n";
+					LL_CONT << "  login uri:   "<<login_uris.asString()<<"\n";
 				}
 				LL_CONT << LL_ENDL;
 				mGridList[grid] = grid_data;
@@ -486,11 +484,9 @@ void LLGridManager::getLoginURIs(const std::string& grid, std::vector<std::strin
 	{
         if (mGridList[grid_name][GRID_LOGIN_URI_VALUE].isArray())
         {
-		    for (LLSD::array_iterator llsd_uri = mGridList[grid_name][GRID_LOGIN_URI_VALUE].beginArray();
-			     llsd_uri != mGridList[grid_name][GRID_LOGIN_URI_VALUE].endArray();
-			     llsd_uri++)
+		    for (const LLSD& llsd_uri : mGridList[grid_name][GRID_LOGIN_URI_VALUE].array())
 		    {
-			    uris.push_back(llsd_uri->asString());
+			    uris.push_back(llsd_uri.asString());
 		    }
         }
         else

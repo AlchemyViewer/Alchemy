@@ -279,20 +279,16 @@ BOOL compare_llsd_with_template(
 		//any excess is taken from the template
 		//excess is ignored in the test
 		LLSD value;
-		LLSD::map_const_iterator template_iter;
 
 		resultant_llsd = LLSD::emptyMap();
-		for (
-			template_iter = template_llsd.beginMap();
-			template_iter != template_llsd.endMap();
-			++template_iter)
+		for (const auto& template_pair : template_llsd.map())
 		{
-			if ( llsd_to_test.has(template_iter->first) )
+			if ( llsd_to_test.has(template_pair.first) )
 			{
 				//the test LLSD has the same key
 				if ( !compare_llsd_with_template(
-						 llsd_to_test[template_iter->first],
-						 template_iter->second,
+						 llsd_to_test[template_pair.first],
+						 template_pair.second,
 						 value) )
 				{
 					resultant_llsd = LLSD();
@@ -300,15 +296,15 @@ BOOL compare_llsd_with_template(
 				}
 				else
 				{
-					resultant_llsd[template_iter->first] = value;
+					resultant_llsd[template_pair.first] = value;
 				}
 			}
 			else
 			{
 				//test llsd doesn't have it...take the
 				//template as default value
-				resultant_llsd[template_iter->first] =
-					template_iter->second;
+				resultant_llsd[template_pair.first] =
+					template_pair.second;
 			}
 		}
 	}
@@ -669,11 +665,11 @@ std::string llsd_matches(const LLSD& prototype, const LLSD& data, const std::str
         out << colon(pfx);
         const char* init = "Map missing keys: ";
         const char* sep = init;
-        for (LLSD::map_const_iterator mi = prototype.beginMap(); mi != prototype.endMap(); ++mi)
+        for (const auto& prototype_pair : prototype.map())
         {
-            if (! data.has(mi->first))
+            if (! data.has(prototype_pair.first))
             {
-                out << sep << mi->first;
+                out << sep << prototype_pair.first;
                 sep = ", ";
             }
         }
@@ -684,10 +680,10 @@ std::string llsd_matches(const LLSD& prototype, const LLSD& data, const std::str
         }
         // Good, the data block contains all the keys required by the
         // prototype. Now match the prototype entries.
-        for (LLSD::map_const_iterator mi2 = prototype.beginMap(); mi2 != prototype.endMap(); ++mi2)
+        for (const auto& prototype_pair : prototype.map())
         {
-            std::string match(llsd_matches(mi2->second, data[mi2->first],
-                                           STRINGIZE("['" << mi2->first << "']")));
+            std::string match(llsd_matches(prototype_pair.second, data[prototype_pair.first],
+                                           STRINGIZE("['" << prototype_pair.first << "']")));
             if (! match.empty())
             {
                 return match;
@@ -936,13 +932,13 @@ LLSD llsd_clone(LLSD value, LLSD filter)
     {
     case LLSD::TypeMap:
         clone = LLSD::emptyMap();
-        for (LLSD::map_const_iterator itm = value.beginMap(); itm != value.endMap(); ++itm)
+        for (const auto& value_pair : value.map())
         {
             if (has_filter)
             {
-                if (filter.has((*itm).first))
+                if (filter.has(value_pair.first))
                 {
-                    if (!filter[(*itm).first].asBoolean())
+                    if (!filter[value_pair.first].asBoolean())
                         continue;
                 }
                 else if (filter.has("*"))
@@ -955,14 +951,14 @@ LLSD llsd_clone(LLSD value, LLSD filter)
                     continue;
                 }
             }
-            clone[(*itm).first] = llsd_clone((*itm).second, filter);
+            clone[value_pair.first] = llsd_clone(value_pair.second, filter);
         }
         break;
     case LLSD::TypeArray:
         clone = LLSD::emptyArray();
-        for (LLSD::array_const_iterator ita = value.beginArray(); ita != value.endArray(); ++ita)
+        for (const auto& llsd_val : value.array())
         {
-            clone.append(llsd_clone(*ita, filter));
+            clone.append(llsd_clone(llsd_val, filter));
         }
         break;
 
@@ -987,13 +983,13 @@ LLSD llsd_shallow(LLSD value, LLSD filter)
     if (value.isMap())
     {
         shallow = LLSD::emptyMap();
-        for (LLSD::map_const_iterator itm = value.beginMap(); itm != value.endMap(); ++itm)
+        for (const auto& value_pair : value.map())
         {
             if (has_filter)
             {
-                if (filter.has((*itm).first))
+                if (filter.has(value_pair.first))
                 {
-                    if (!filter[(*itm).first].asBoolean())
+                    if (!filter[value_pair.first].asBoolean())
                         continue;
                 }
                 else if (filter.has("*"))
@@ -1006,15 +1002,15 @@ LLSD llsd_shallow(LLSD value, LLSD filter)
                     continue;
                 }
             }
-            shallow[(*itm).first] = (*itm).second;
+            shallow[value_pair.first] = value_pair.second;
         }
     }
     else if (value.isArray())
     {
         shallow = LLSD::emptyArray();
-        for (LLSD::array_const_iterator ita = value.beginArray(); ita != value.endArray(); ++ita)
+        for (const auto& llsd_val : value.array())
         {
-            shallow.append(*ita);
+            shallow.append(llsd_val);
         }
     }
     else
