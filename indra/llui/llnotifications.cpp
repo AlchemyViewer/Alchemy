@@ -266,11 +266,9 @@ LLSD LLNotificationForm::asLLSD() const
 
 LLSD LLNotificationForm::getElement(const std::string& element_name)
 {
-	for (LLSD::array_const_iterator it = mFormData.beginArray();
-		it != mFormData.endArray();
-		++it)
+	for (const LLSD& llsd_val : mFormData.array())
 	{
-		if ((*it)["name"].asString() == element_name) return (*it);
+		if (llsd_val["name"].asString() == element_name) return llsd_val;
 	}
 	return LLSD();
 }
@@ -278,11 +276,9 @@ LLSD LLNotificationForm::getElement(const std::string& element_name)
 
 bool LLNotificationForm::hasElement(const std::string& element_name) const
 {
-	for (LLSD::array_const_iterator it = mFormData.beginArray();
-		it != mFormData.endArray();
-		++it)
+	for (const LLSD& llsd_val : mFormData.array())
 	{
-		if ((*it)["name"].asString() == element_name) return true;
+		if (llsd_val["name"].asString() == element_name) return true;
 	}
 	return false;
 }
@@ -291,9 +287,10 @@ void LLNotificationForm::getElements(LLSD& elements, S32 offset)
 {
     //Finds elements that the template did not add
     LLSD::array_const_iterator it = mFormData.beginArray() + offset;
+	LLSD::array_const_iterator end = mFormData.endArray();
 
     //Keeps track of only the dynamic elements
-    for(; it != mFormData.endArray(); ++it)
+    for(; it != end; ++it)
     {
         elements.append(*it);
     }
@@ -301,13 +298,11 @@ void LLNotificationForm::getElements(LLSD& elements, S32 offset)
 
 bool LLNotificationForm::getElementEnabled(const std::string& element_name) const
 {
-	for (LLSD::array_const_iterator it = mFormData.beginArray();
-		it != mFormData.endArray();
-		++it)
+	for (const LLSD& llsd_val : mFormData.array())
 	{
-		if ((*it)["name"].asString() == element_name)
+		if (llsd_val["name"].asString() == element_name)
 		{
-			return (*it)["enabled"].asBoolean();
+			return llsd_val["enabled"].asBoolean();
 		}
 	}
 
@@ -316,13 +311,11 @@ bool LLNotificationForm::getElementEnabled(const std::string& element_name) cons
 
 void LLNotificationForm::setElementEnabled(const std::string& element_name, bool enabled)
 {
-	for (LLSD::array_iterator it = mFormData.beginArray();
-		it != mFormData.endArray();
-		++it)
+	for (LLSD& llsd_val : mFormData.array())
 	{
-		if ((*it)["name"].asString() == element_name)
+		if (llsd_val["name"].asString() == element_name)
 		{
-			(*it)["enabled"] = enabled;
+			llsd_val["enabled"] = enabled;
 		}
 	}
 }
@@ -344,44 +337,38 @@ void LLNotificationForm::append(const LLSD& sub_form)
 {
 	if (sub_form.isArray())
 	{
-		for (LLSD::array_const_iterator it = sub_form.beginArray();
-			it != sub_form.endArray();
-			++it)
+		for (const auto& llsd_val : sub_form.array())
 		{
-			mFormData.append(*it);
+			mFormData.append(llsd_val);
 		}
 	}
 }
 
 void LLNotificationForm::formatElements(const LLSD& substitutions)
 {
-	for (LLSD::array_iterator it = mFormData.beginArray();
-		it != mFormData.endArray();
-		++it)
+	for (LLSD& llsd_val : mFormData.array())
 	{
 		// format "text" component of each form element
-		if ((*it).has("text"))
+		if (llsd_val.has("text"))
 		{
-			std::string text = (*it)["text"].asString();
+			std::string text = llsd_val["text"].asString();
 			LLStringUtil::format(text, substitutions);
-			(*it)["text"] = text;
+			llsd_val["text"] = text;
 		}
-		if ((*it)["type"].asString() == "text" && (*it).has("value"))
+		if (llsd_val["type"].asString() == "text" && llsd_val.has("value"))
 		{
-			std::string value = (*it)["value"].asString();
+			std::string value = llsd_val["value"].asString();
 			LLStringUtil::format(value, substitutions);
-			(*it)["value"] = value;
+			llsd_val["value"] = value;
 		}
 	}
 }
 
 std::string LLNotificationForm::getDefaultOption()
 {
-	for (LLSD::array_const_iterator it = mFormData.beginArray();
-		it != mFormData.endArray();
-		++it)
+	for (const LLSD& llsd_val : mFormData.array())
 	{
-		if ((*it)["default"]) return (*it)["name"].asString();
+		if (llsd_val["default"]) return llsd_val["name"].asString();
 	}
 	return "";
 }
@@ -656,13 +643,11 @@ S32 LLNotification::getSelectedOption(const LLSD& notification, const LLSD& resp
 //static
 std::string LLNotification::getSelectedOptionName(const LLSD& response)
 {
-	for (LLSD::map_const_iterator response_it = response.beginMap();
-		response_it != response.endMap();
-		++response_it)
+	for (const auto& llsd_pair : response.map())
 	{
-		if (response_it->second.isBoolean() && response_it->second.asBoolean())
+		if (llsd_pair.second.isBoolean() && llsd_pair.second.asBoolean())
 		{
-			return response_it->first;
+			return llsd_pair.first;
 		}
 	}
 	return "";

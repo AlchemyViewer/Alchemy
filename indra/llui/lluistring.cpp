@@ -59,11 +59,9 @@ void LLUIString::setArgs(const LLSD& sd)
 	LL_RECORD_BLOCK_TIME(FTM_UI_STRING);
 	
 	if (!sd.isMap()) return;
-	for(LLSD::map_const_iterator sd_it = sd.beginMap();
-		sd_it != sd.endMap();
-		++sd_it)
+	for(const auto& llsd_pair : sd.map())
 	{
-		setArg(sd_it->first, sd_it->second.asString());
+		setArg(llsd_pair.first, llsd_pair.second.asString());
 	}
 	dirty();
 }

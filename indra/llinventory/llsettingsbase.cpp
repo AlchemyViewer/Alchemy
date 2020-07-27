@@ -90,10 +90,10 @@ LLSD LLSettingsBase::combineSDMaps(const LLSD &settings, const LLSD &other) cons
 {
     LLSD newSettings;
 
-    for (LLSD::map_const_iterator it = settings.beginMap(); it != settings.endMap(); ++it)
+    for (const auto& llsd_pair : settings.map())
     {
-        std::string key_name = (*it).first;
-        LLSD value = (*it).second;
+        const std::string& key_name = llsd_pair.first;
+        const LLSD& value = llsd_pair.second;
 
         LLSD::Type setting_type = value.type();
         switch (setting_type)
@@ -103,9 +103,9 @@ LLSD LLSettingsBase::combineSDMaps(const LLSD &settings, const LLSD &other) cons
             break;
         case LLSD::TypeArray:
             newSettings[key_name] = LLSD::emptyArray();
-            for (LLSD::array_const_iterator ita = value.beginArray(); ita != value.endArray(); ++ita)
+            for (const auto& llsd_val : value.array())
             {
-                newSettings[key_name].append(*ita);
+                newSettings[key_name].append(llsd_val);
             }
             break;
         //case LLSD::TypeInteger:
@@ -124,10 +124,10 @@ LLSD LLSettingsBase::combineSDMaps(const LLSD &settings, const LLSD &other) cons
 
     if (!other.isUndefined())
     {
-        for (LLSD::map_const_iterator it = other.beginMap(); it != other.endMap(); ++it)
+        for (const auto& llsd_pair : other.map())
         {
-            std::string key_name = (*it).first;
-            LLSD value = (*it).second;
+            const std::string& key_name = llsd_pair.first;
+            const LLSD& value = llsd_pair.second;
 
             LLSD::Type setting_type = value.type();
             switch (setting_type)
@@ -137,9 +137,9 @@ LLSD LLSettingsBase::combineSDMaps(const LLSD &settings, const LLSD &other) cons
                 break;
             case LLSD::TypeArray:
                 newSettings[key_name] = LLSD::emptyArray();
-                for (LLSD::array_const_iterator ita = value.beginArray(); ita != value.endArray(); ++ita)
+                for (const auto& llsd_val : value.array())
                 {
-                    newSettings[key_name].append(*ita);
+                    newSettings[key_name].append(llsd_val);
                 }
                 break;
             //case LLSD::TypeInteger:
@@ -169,10 +169,10 @@ LLSD LLSettingsBase::interpolateSDMap(const LLSD &settings, const LLSD &other, c
 
     llassert(mix >= 0.0f && mix <= 1.0f);
 
-    for (LLSD::map_const_iterator it = settings.beginMap(); it != settings.endMap(); ++it)
+    for (const auto& llsd_pair : settings.map())
     {
-        std::string key_name = (*it).first;
-        LLSD value = (*it).second;
+        const std::string& key_name = llsd_pair.first;
+        const LLSD& value = llsd_pair.second;
 
         if (skip.find(key_name) != skip.end())
             continue;
@@ -218,9 +218,9 @@ LLSD LLSettingsBase::interpolateSDMap(const LLSD &settings, const LLSD &other, c
     }
 
     // Now add anything that is in other but not in the settings
-    for (LLSD::map_const_iterator it = other.beginMap(); it != other.endMap(); ++it)
+    for (const auto& llsd_pair : other.map())
     {
-        std::string key_name = (*it).first;
+        const std::string& key_name = llsd_pair.first;
 
         if (skip.find(key_name) != skip.end())
             continue;
@@ -232,28 +232,28 @@ LLSD LLSettingsBase::interpolateSDMap(const LLSD &settings, const LLSD &other, c
         if (def_iter != defaults.end())
         {
             // Blend against default value
-            newSettings[key_name] = interpolateSDValue(key_name, def_iter->second.getDefaultValue(), (*it).second, defaults, mix, slerps);
+            newSettings[key_name] = interpolateSDValue(key_name, def_iter->second.getDefaultValue(), llsd_pair.second, defaults, mix, slerps);
         }
-        else if ((*it).second.type() == LLSD::TypeMap)
+        else if (llsd_pair.second.type() == LLSD::TypeMap)
         {
             // interpolate in case there are defaults inside (part of legacy)
-            newSettings[key_name] = interpolateSDValue(key_name, LLSDMap(), (*it).second, defaults, mix, slerps);
+            newSettings[key_name] = interpolateSDValue(key_name, LLSDMap(), llsd_pair.second, defaults, mix, slerps);
         }
         // else do nothing when no known defaults
         // TODO: Should I blend this out instead?
     }
 
     // Note: writes variables from skip list, bug?
-    for (LLSD::map_const_iterator it = other.beginMap(); it != other.endMap(); ++it)
+    for (const auto& llsd_pair : other.map())
     {
         // TODO: Should I blend this in instead?
-        if (skip.find((*it).first) == skip.end())
+        if (skip.find(llsd_pair.first) == skip.end())
             continue;
 
-        if (!settings.has((*it).first))
+        if (!settings.has(llsd_pair.first))
             continue;
     
-        newSettings[(*it).first] = (*it).second;
+        newSettings[llsd_pair.first] = llsd_pair.second;
     }
 
     return newSettings;
@@ -455,53 +455,53 @@ LLSD LLSettingsBase::settingValidation(LLSD &settings, validation_list_t &valida
     validated.insert(validateFlags.getName());
 
     // Fields for specific settings.
-    for (validation_list_t::iterator itv = validations.begin(); itv != validations.end(); ++itv)
+    for (auto& validator : validations)
     {
 #ifdef VALIDATION_DEBUG
         LLSD oldvalue;
-        if (settings.has((*itv).getName()))
+        if (settings.has(validator.getName()))
         {
-            oldvalue = llsd_clone(mSettings[(*itv).getName()]);
+            oldvalue = llsd_clone(mSettings[validator.getName()]);
         }
 #endif
 
-        if (!(*itv).verify(settings, flags))
+        if (!validator.verify(settings, flags))
         {
             std::stringstream errtext;
 
-            errtext << "Settings LLSD fails validation and could not be corrected for '" << (*itv).getName() << "'!\n";
+            errtext << "Settings LLSD fails validation and could not be corrected for '" << validator.getName() << "'!\n";
             errors.append( errtext.str() );
             isValid = false;
         }
-        validated.insert((*itv).getName());
+        validated.insert(validator.getName());
 
 #ifdef VALIDATION_DEBUG
         if (!oldvalue.isUndefined())
         {
-            if (!compare_llsd(settings[(*itv).getName()], oldvalue))
+            if (!compare_llsd(settings[validator.getName()], oldvalue))
             {
-                LL_WARNS("SETTINGS") << "Setting '" << (*itv).getName() << "' was changed: " << oldvalue << " -> " << settings[(*itv).getName()] << LL_ENDL;
+                LL_WARNS("SETTINGS") << "Setting '" << validator.getName() << "' was changed: " << oldvalue << " -> " << settings[validator.getName()] << LL_ENDL;
             }
         }
 #endif
     }
 
     // strip extra entries
-    for (LLSD::map_const_iterator itm = settings.beginMap(); itm != settings.endMap(); ++itm)
+    for (const auto& setting_pair : settings.map())
     {
-        if (validated.find((*itm).first) == validated.end())
+        if (validated.find(setting_pair.first) == validated.end())
         {
             std::stringstream warntext;
 
-            warntext << "Stripping setting '" << (*itm).first << "'";
+            warntext << "Stripping setting '" << setting_pair.first << "'";
             warnings.append( warntext.str() );
-            strip.insert((*itm).first);
+            strip.insert(setting_pair.first);
         }
     }
 
-    for (stringset_t::iterator its = strip.begin(); its != strip.end(); ++its)
+    for (const auto& string : strip)
     {
-        settings.erase(*its);
+        settings.erase(string);
     }
 
     return LLSDMap("success", LLSD::Boolean(isValid))

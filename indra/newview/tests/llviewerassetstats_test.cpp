@@ -217,16 +217,14 @@ get_region(const LLSD & sd, U64 region_handle1)
 	U32 grid_x(0), grid_y(0);
 	grid_from_region_handle(region_handle1, &grid_x, &grid_y);
 
-	for (LLSD::array_const_iterator it(sd["regions"].beginArray());
-		 sd["regions"].endArray() != it;
-		 ++it)
+	for (const LLSD& llsd_val : sd["regions"].array())
 	{
-		if ((*it).has("grid_x") &&
-			(*it).has("grid_y") &&
-			(*it)["grid_x"].isInteger() &&
-			(*it)["grid_y"].isInteger() &&
-			(*it)["grid_x"].asInteger() == grid_x &&
-			(*it)["grid_y"].asInteger() == grid_y)
+		if (llsd_val.has("grid_x") &&
+			llsd_val.has("grid_y") &&
+			llsd_val["grid_x"].isInteger() &&
+			llsd_val["grid_y"].isInteger() &&
+			llsd_val["grid_x"].asInteger() == grid_x &&
+			llsd_val["grid_y"].asInteger() == grid_y)
 		{
 			return *it;
 		}

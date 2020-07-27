@@ -258,23 +258,19 @@ void LLParamSDParserUtilities::readSDValues(read_sd_cb_t cb, const LLSD& sd, LLI
 {
 	if (sd.isMap())
 	{
-		for (LLSD::map_const_iterator it = sd.beginMap();
-			it != sd.endMap();
-			++it)
+		for (const auto& llsd_pair : sd.map())
 		{
-			stack.push_back(make_pair(it->first, true));
-			readSDValues(cb, it->second, stack);
+			stack.push_back(make_pair(llsd_pair.first, true));
+			readSDValues(cb, llsd_pair.second, stack);
 			stack.pop_back();
 		}
 	}
 	else if (sd.isArray())
 	{
-		for (LLSD::array_const_iterator it = sd.beginArray();
-			it != sd.endArray();
-			++it)
+		for (const auto& llsd_val : sd.array())
 		{
 			stack.push_back(make_pair(std::string(), true));
-			readSDValues(cb, *it, stack);
+			readSDValues(cb, llsd_val, stack);
 			stack.pop_back();
 		}
 	}

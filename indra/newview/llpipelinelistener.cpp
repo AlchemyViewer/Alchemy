@@ -41,11 +41,9 @@ namespace {
 	// Render Types
 	void toggle_render_types_wrapper(LLSD const& request)
 	{
-		for (LLSD::array_const_iterator iter = request["types"].beginArray();
-			iter != request["types"].endArray();
-			++iter)
+		for (const LLSD& llsd_val : request["types"].array())
 		{
-			U32 render_type = render_type_from_string( iter->asString() );
+			U32 render_type = render_type_from_string( llsd_val.asString() );
 			if ( render_type != 0 )
 			{
 				LLPipeline::toggleRenderTypeControl( render_type );
@@ -80,11 +78,9 @@ namespace {
 	// Render Features
 	void toggle_render_features_wrapper(LLSD const& request)
 	{
-		for (LLSD::array_const_iterator iter = request["features"].beginArray();
-			iter != request["features"].endArray();
-			++iter)
+		for (const LLSD& llsd_val : request["features"].array())
 		{
-			U32 render_feature = feature_from_string( iter->asString() );
+			U32 render_feature = feature_from_string( llsd_val.asString() );
 			if ( render_feature != 0 )
 			{
 				LLPipeline::toggleRenderDebugFeatureControl( render_feature );
@@ -119,11 +115,9 @@ namespace {
 	// Render Info Displays
 	void toggle_info_displays_wrapper(LLSD const& request)
 	{
-		for (LLSD::array_const_iterator iter = request["displays"].beginArray();
-			iter != request["displays"].endArray();
-			++iter)
+		for (const LLSD& llsd_val : request["displays"].array())
 		{
-			U64 info_display = info_display_from_string( iter->asString() );
+			U64 info_display = info_display_from_string( llsd_val.asString() );
 			if ( info_display != 0 )
 			{
 				LLPipeline::toggleRenderDebug( info_display );

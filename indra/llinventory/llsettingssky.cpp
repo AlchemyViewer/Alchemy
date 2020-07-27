@@ -275,9 +275,8 @@ bool validateRayleighLayers(LLSD &value)
     if (value.isArray())
     {
         bool allGood = true;
-        for (LLSD::array_iterator itf = value.beginArray(); itf != value.endArray(); ++itf)
+        for (LLSD& layerConfig : value.array())
         {
-            LLSD& layerConfig = (*itf);
             if (layerConfig.type() == LLSD::TypeMap)
             {
                 if (!validateRayleighLayers(layerConfig))
@@ -317,9 +316,8 @@ bool validateAbsorptionLayers(LLSD &value)
     if (value.isArray())
     {
         bool allGood = true;   
-        for (LLSD::array_iterator itf = value.beginArray(); itf != value.endArray(); ++itf)
+        for (LLSD& layerConfig : value.array())
         {
-            LLSD& layerConfig = (*itf);
             if (layerConfig.type() == LLSD::TypeMap)
             {
                 if (!validateAbsorptionLayers(layerConfig))
@@ -359,9 +357,8 @@ bool validateMieLayers(LLSD &value)
     if (value.isArray())
     {
         bool allGood = true;
-        for (LLSD::array_iterator itf = value.beginArray(); itf != value.endArray(); ++itf)
+        for (LLSD& layerConfig : value.array())
         {
-            LLSD& layerConfig = (*itf);
             if (layerConfig.type() == LLSD::TypeMap)
             {
                 if (!validateMieLayers(layerConfig))

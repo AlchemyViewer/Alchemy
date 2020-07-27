@@ -508,12 +508,10 @@ ELoadStatus LLBVHLoader::loadAliases(const char * filename)
     {
         if ( LLSDSerialize::fromXML(aliases_sd, input_stream) )
         {
-            for(LLSD::map_iterator alias_iter = aliases_sd.beginMap();
-                alias_iter != aliases_sd.endMap();
-                ++alias_iter)
+            for(const auto& alias_pair : aliases_sd.map())
             {
-                LLSD::String alias_name = alias_iter->first;
-                LLSD::String joint_name = alias_iter->second;
+                LLSD::String alias_name = alias_pair.first;
+                LLSD::String joint_name = alias_pair.second;
                 makeTranslation(alias_name, joint_name);
                 
             }

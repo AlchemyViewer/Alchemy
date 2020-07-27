@@ -3532,9 +3532,9 @@ void LLPanelEstateAccess::requestEstateGetAccessCoro(std::string url)
 
 		allowed_agent_name_list->clearSortOrder();
 		allowed_agent_name_list->deleteAllItems();
-		for (LLSD::array_const_iterator it = result["AllowedAgents"].beginArray(); it != result["AllowedAgents"].endArray(); ++it)
+		for (const auto& llsd_val : result["AllowedAgents"].array())
 		{ 
-			LLUUID id = (*it)["id"].asUUID(); 
+			LLUUID id = llsd_val["id"].asUUID();
 			allowed_agent_name_list->addNameItem(id);
 		}
 		allowed_agent_name_list->sortByName(TRUE);
@@ -3551,23 +3551,23 @@ void LLPanelEstateAccess::requestEstateGetAccessCoro(std::string url)
 
 		banned_agent_name_list->clearSortOrder();
 		banned_agent_name_list->deleteAllItems();
-		for (LLSD::array_const_iterator it = result["BannedAgents"].beginArray(); it != result["BannedAgents"].endArray(); ++it)
+		for (const auto& llsd_val : result["BannedAgents"].array())
 		{
 			LLSD item;
-			item["id"] = (*it)["id"].asUUID();
+			item["id"] = llsd_val["id"].asUUID();
 			LLSD& columns = item["columns"];
 
 			columns[0]["column"] = "name"; // to be populated later
 
 			columns[1]["column"] = "last_login_date";
-			columns[1]["value"] = (*it)["last_login_date"].asString().substr(0, 16); // cut the seconds
+			columns[1]["value"] = llsd_val["last_login_date"].asString().substr(0, 16); // cut the seconds
 
-			std::string ban_date = (*it)["ban_date"].asString();
+			std::string ban_date = llsd_val["ban_date"].asString();
 			columns[2]["column"] = "ban_date";
 			columns[2]["value"] = ban_date[0] != '0' ? ban_date.substr(0, 16) : LLTrans::getString("na"); // server returns the "0000-00-00 00:00:00" date in case it doesn't know it
 
 			columns[3]["column"] = "bannedby";
-			LLUUID banning_id = (*it)["banning_id"].asUUID();
+			LLUUID banning_id = llsd_val["banning_id"].asUUID();
 			LLAvatarName av_name;
 			if (banning_id.isNull())
 			{
@@ -3594,9 +3594,9 @@ void LLPanelEstateAccess::requestEstateGetAccessCoro(std::string url)
 
 		allowed_group_name_list->clearSortOrder();
 		allowed_group_name_list->deleteAllItems();
-		for (LLSD::array_const_iterator it = result["AllowedGroups"].beginArray(); it != result["AllowedGroups"].endArray(); ++it)
+		for (const auto& llsd_val : result["AllowedGroups"].array())
 		{
-			LLUUID id = (*it)["id"].asUUID();
+			LLUUID id = llsd_val["id"].asUUID();
 			allowed_group_name_list->addGroupNameItem(id);
 		}
 		allowed_group_name_list->sortByName(TRUE);
@@ -3613,9 +3613,9 @@ void LLPanelEstateAccess::requestEstateGetAccessCoro(std::string url)
 
 		estate_manager_name_list->clearSortOrder();
 		estate_manager_name_list->deleteAllItems();
-		for (LLSD::array_const_iterator it = result["Managers"].beginArray(); it != result["Managers"].endArray(); ++it)
+		for (const auto& llsd_val : result["Managers"].array())
 		{
-			LLUUID id = (*it)["agent_id"].asUUID();
+			LLUUID id = llsd_val["agent_id"].asUUID();
 			estate_manager_name_list->addNameItem(id);
 		}
 		estate_manager_name_list->sortByName(TRUE);

@@ -104,16 +104,16 @@ Json::Value LlsdToJson(const LLSD &val)
         break;
     case LLSD::TypeMap:
         result = Json::Value(Json::objectValue);
-        for (LLSD::map_const_iterator it = val.beginMap(); it != val.endMap(); ++it)
+        for (const auto& llsd_pair : val.map())
         {
-            result[it->first] = LlsdToJson(it->second);
+            result[llsd_pair.first] = LlsdToJson(llsd_pair.second);
         }
         break;
     case LLSD::TypeArray:
         result = Json::Value(Json::arrayValue);
-        for (LLSD::array_const_iterator it = val.beginArray(); it != val.endArray(); ++it)
+        for (const auto& llsd_val : val.array())
         {
-            result.append(LlsdToJson(*it));
+            result.append(LlsdToJson(llsd_val));
         }
         break;
     case LLSD::TypeBinary:
