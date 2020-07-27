@@ -149,8 +149,6 @@
 
 #pragma warning( disable : 4503 )	// 'decorated name length exceeded, name was truncated'. Does not seem to affect compilation.
 #pragma warning( disable : 4800 )	// 'BOOL' : forcing value to bool 'true' or 'false' (performance warning)
-#pragma warning( disable : 4996 )	// warning: deprecated
-
 // Linker optimization with "extern template" generates these warnings
 #pragma warning( disable : 4231 )	// nonstandard extension used : 'extern' before template explicit instantiation
 #pragma warning( disable : 4506 )   // no definition for inline function
