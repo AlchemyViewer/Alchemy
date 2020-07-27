@@ -639,7 +639,8 @@ void LLDrawPoolWater::shade2(bool edge, LLGLSLShader* shader, const LLColor3& li
 			}
 			else
 			{
-				LLGLSquashToFarClip far_clip(get_current_projection());
+				auto proj = get_current_projection();
+				LLGLSquashToFarClip far_clip(proj);
 				face->renderIndexed();
 			}
 		}
