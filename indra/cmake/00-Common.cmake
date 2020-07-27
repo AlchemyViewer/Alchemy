@@ -131,7 +131,7 @@ if (WINDOWS)
   endif()
 
   set(GLOBAL_CXX_FLAGS 
-      "/GS /W3 /c /Zc:forScope /Zc:rvalueCast /Zc:wchar_t- /nologo"
+      "/GS /W3 /c /Zc:__cplusplus  /Zc:forScope /Zc:rvalueCast /Zc:strictStrings /Zc:ternary /Zc:wchar_t- /nologo"
       )
 
   if (USE_AVX2)
@@ -177,7 +177,6 @@ if (WINDOWS)
       /D_WINSOCK_DEPRECATED_NO_WARNINGS
       /D_SILENCE_CXX17_OLD_ALLOCATOR_MEMBERS_DEPRECATION_WARNING
       /DBOOST_CONFIG_SUPPRESS_OUTDATED_MESSAGE
-      /wd4351
       )
 
   if("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
