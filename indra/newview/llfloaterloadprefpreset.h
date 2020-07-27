@@ -32,7 +32,7 @@
 
 class LLComboBox;
 
-class LLFloaterLoadPrefPreset : public LLFloater
+class LLFloaterLoadPrefPreset final : public LLFloater
 {
 
 public:

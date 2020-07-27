@@ -34,7 +34,7 @@
 
 class LLScriptEdCore;
 
-class LLFloaterGotoLine : public LLFloater
+class LLFloaterGotoLine final : public LLFloater
 {
 public:
         LLFloaterGotoLine(LLScriptEdCore* editor_core);

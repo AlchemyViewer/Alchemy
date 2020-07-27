@@ -42,7 +42,7 @@ class LLFilterEditor;
 class LLInventoryPanel;
 
 //=========================================================================
-class LLFloaterSettingsPicker : public LLFloater
+class LLFloaterSettingsPicker final : public LLFloater
 {
 public:
     enum ETrackMode

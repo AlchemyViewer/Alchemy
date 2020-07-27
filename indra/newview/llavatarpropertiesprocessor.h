@@ -196,7 +196,7 @@ public:
 	virtual void processProperties(void* data, EAvatarProcessorType type) = 0;
 };
 
-class LLAvatarPropertiesProcessor
+class LLAvatarPropertiesProcessor final
 	: public LLSingleton<LLAvatarPropertiesProcessor>
 {
 	LLSINGLETON(LLAvatarPropertiesProcessor);

@@ -48,7 +48,7 @@ struct FolderEntry : public LLDictionaryEntry
 	const bool mIsProtected;
 };
 
-class LLFolderDictionary : public LLSingleton<LLFolderDictionary>,
+class LLFolderDictionary final : public LLSingleton<LLFolderDictionary>,
 						   public LLDictionary<LLFolderType::EType, FolderEntry>
 {
 	LLSINGLETON(LLFolderDictionary);

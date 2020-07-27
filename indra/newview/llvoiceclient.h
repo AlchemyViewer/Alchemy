@@ -310,7 +310,7 @@ public:
 };
 
 
-class LLVoiceClient: public LLParamSingleton<LLVoiceClient>
+class LLVoiceClient final : public LLParamSingleton<LLVoiceClient>
 {
 	LLSINGLETON(LLVoiceClient, LLPumpIO *pump);
 	LOG_CLASS(LLVoiceClient);
@@ -497,7 +497,7 @@ protected:
 /**
  * Speaker volume storage helper class
  **/
-class LLSpeakerVolumeStorage : public LLSingleton<LLSpeakerVolumeStorage>
+class LLSpeakerVolumeStorage final : public LLSingleton<LLSpeakerVolumeStorage>
 {
 	LLSINGLETON(LLSpeakerVolumeStorage);
 	~LLSpeakerVolumeStorage();

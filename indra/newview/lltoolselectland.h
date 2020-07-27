@@ -32,7 +32,7 @@
 
 class LLParcelSelection;
 
-class LLToolSelectLand
+class LLToolSelectLand final
 :	public LLTool, public LLSingleton<LLToolSelectLand>
 {
 	LLSINGLETON(LLToolSelectLand);

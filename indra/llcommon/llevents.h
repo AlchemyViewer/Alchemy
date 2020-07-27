@@ -234,7 +234,7 @@ class LLEventPump;
 // capable of this.) In that case, instead of calling LLEventPumps::instance()
 // again -- resurrecting the deleted LLSingleton -- store an
 // LLHandle<LLEventPumps> and test it before use.
-class LL_COMMON_API LLEventPumps: public LLSingleton<LLEventPumps>,
+class LL_COMMON_API LLEventPumps final : public LLSingleton<LLEventPumps>,
                                   public LLHandleProvider<LLEventPumps>
 {
     LLSINGLETON(LLEventPumps);

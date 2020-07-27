@@ -35,7 +35,7 @@ class LLComboBox;
 class LLLineEditor;
 class LLRadioGroup;
 
-class LLFloaterTranslationSettings : public LLFloater
+class LLFloaterTranslationSettings final : public LLFloater
 {
 public:
 	LLFloaterTranslationSettings(const LLSD& key);

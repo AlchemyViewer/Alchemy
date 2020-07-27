@@ -30,7 +30,7 @@
 #include "llfloater.h"
 class LLTextureFetchDebugger;
 
-class LLFloaterTextureFetchDebugger : public LLFloater
+class LLFloaterTextureFetchDebugger final : public LLFloater
 {
 	friend class LLFloaterReg;
 public:

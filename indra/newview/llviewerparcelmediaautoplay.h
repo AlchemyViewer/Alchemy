@@ -31,7 +31,7 @@
 #include "lluuid.h"
 
 // timer to automatically play media
-class LLViewerParcelMediaAutoPlay : LLEventTimer, public LLSingleton<LLViewerParcelMediaAutoPlay>
+class LLViewerParcelMediaAutoPlay final : LLEventTimer, public LLSingleton<LLViewerParcelMediaAutoPlay>
 {
 	LLSINGLETON(LLViewerParcelMediaAutoPlay);
 public:

@@ -870,7 +870,7 @@ public:
 						LLNotificationFunctorRegistry::ResponseFunctor functor) = 0;
 };
 
-class LLNotifications : 
+class LLNotifications final :
 	public LLNotificationsInterface,
 	public LLSingleton<LLNotifications>, 
 	public LLNotificationChannelBase

@@ -832,10 +832,10 @@ private:                                                                \
  */
 #define LLSINGLETON_EMPTY_CTOR(DERIVED_CLASS)                           \
     /* LLSINGLETON() is carefully implemented to permit exactly this */ \
-    LLSINGLETON(DERIVED_CLASS) {}
+    LLSINGLETON(DERIVED_CLASS) = default;
 
 #define LLSINGLETON_EMPTY_CTOR_C11(DERIVED_CLASS)                       \
     /* LLSINGLETON() is carefully implemented to permit exactly this */ \
-    LLSINGLETON_C11(DERIVED_CLASS) {}
+    LLSINGLETON_C11(DERIVED_CLASS) = default;
 
 #endif

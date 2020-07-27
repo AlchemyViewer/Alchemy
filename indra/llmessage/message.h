@@ -69,7 +69,7 @@ const U32 MESSAGE_NUMBER_OF_HASH_BUCKETS = 8192;
 
 const S32 MESSAGE_MAX_PER_FRAME = 400;
 
-class LLMessageStringTable : public LLSingleton<LLMessageStringTable>
+class LLMessageStringTable final : public LLSingleton<LLMessageStringTable>
 {
 	LLSINGLETON(LLMessageStringTable);
 	~LLMessageStringTable();

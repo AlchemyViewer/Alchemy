@@ -34,7 +34,7 @@ struct LLAvatarPicks;
 /**
  * Class that provides information about Agent Picks
  */
-class LLAgentPicksInfo : public LLSingleton<LLAgentPicksInfo>
+class LLAgentPicksInfo final : public LLSingleton<LLAgentPicksInfo>
 {
 	LLSINGLETON(LLAgentPicksInfo);
 	virtual ~LLAgentPicksInfo();

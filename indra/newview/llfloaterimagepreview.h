@@ -107,7 +107,7 @@ protected:
 	U32			mTextureName;
 };
 
-class LLFloaterImagePreview : public LLFloaterNameDesc
+class LLFloaterImagePreview final : public LLFloaterNameDesc
 {
 public:
 	LLFloaterImagePreview(const std::string& filename);

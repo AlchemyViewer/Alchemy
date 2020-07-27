@@ -193,7 +193,7 @@ const S32 MAP_MAX_SIZE = 2048;
 const S32 MAP_BLOCK_SIZE = 4;
 const S32 MAP_BLOCK_RES = (MAP_MAX_SIZE / MAP_BLOCK_SIZE);
 
-class LLWorldMap : public LLSingleton<LLWorldMap>
+class LLWorldMap final : public LLSingleton<LLWorldMap>
 {
 	LLSINGLETON(LLWorldMap);
 	~LLWorldMap();

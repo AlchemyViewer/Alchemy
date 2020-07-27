@@ -49,7 +49,7 @@ public:
 	virtual void changed() = 0;
 };
 
-class LLGestureMgr : public LLSingleton<LLGestureMgr>, public LLInventoryFetchItemsObserver
+class LLGestureMgr final : public LLSingleton<LLGestureMgr>, public LLInventoryFetchItemsObserver
 {
 	LLSINGLETON(LLGestureMgr);
 	~LLGestureMgr();

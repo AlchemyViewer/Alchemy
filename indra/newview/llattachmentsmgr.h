@@ -60,7 +60,7 @@ class LLViewerInventoryItem;
 // To handle attachments that never arrive, we forget about requests
 // that exceed a timeout value.
 //--------------------------------------------------------------------------------
-class LLAttachmentsMgr: public LLSingleton<LLAttachmentsMgr>
+class LLAttachmentsMgr final : public LLSingleton<LLAttachmentsMgr>
 {
     LLSINGLETON(LLAttachmentsMgr);
 	virtual ~LLAttachmentsMgr();

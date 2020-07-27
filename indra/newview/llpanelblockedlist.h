@@ -86,7 +86,7 @@ private:
 // LLFloaterGetBlockedObjectName()
 //-----------------------------------------------------------------------------
 // Class for handling mute object by name floater.
-class LLFloaterGetBlockedObjectName : public LLFloater
+class LLFloaterGetBlockedObjectName final : public LLFloater
 {
 	friend class LLFloaterReg;
 public:

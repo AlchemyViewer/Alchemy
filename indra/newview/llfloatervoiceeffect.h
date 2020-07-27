@@ -34,7 +34,7 @@
 class LLButton;
 class LLScrollListCtrl;
 
-class LLFloaterVoiceEffect
+class LLFloaterVoiceEffect final
 	: public LLFloater
 	, public LLVoiceEffectObserver
 {

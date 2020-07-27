@@ -41,7 +41,7 @@ class LLButton;
 class LLRadioGroup;
 class LLVFS;
 
-class LLPreviewGesture : public LLPreview
+class LLPreviewGesture final : public LLPreview
 {
 public:
 	// Pass an object_id if this gesture is inside an object in the world,

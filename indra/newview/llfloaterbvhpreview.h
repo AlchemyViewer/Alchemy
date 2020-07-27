@@ -68,7 +68,7 @@ protected:
 	LLPointer<LLVOAvatar>			mDummyAvatar;
 };
 
-class LLFloaterBvhPreview : public LLFloaterNameDesc
+class LLFloaterBvhPreview final : public LLFloaterNameDesc
 {
 public:
 	LLFloaterBvhPreview(const std::string& filename);

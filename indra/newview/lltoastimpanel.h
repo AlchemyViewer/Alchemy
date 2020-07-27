@@ -35,7 +35,7 @@
 
 class LLGroupIconCtrl;
 
-class LLToastIMPanel: public LLToastPanel 
+class LLToastIMPanel final : public LLToastPanel
 {
 public:
 	struct Params

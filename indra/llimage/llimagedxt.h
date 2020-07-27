@@ -31,7 +31,7 @@
 
 // This class decodes and encodes LL DXT files (which may unclude uncompressed RGB or RGBA mipped data)
 
-class LLImageDXT : public LLImageFormatted
+class LLImageDXT final : public LLImageFormatted
 {
 public:
 	enum EFileFormat

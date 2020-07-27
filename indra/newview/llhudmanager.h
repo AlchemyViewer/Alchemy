@@ -34,7 +34,7 @@
 class LLHUDEffect;
 class LLMessageSystem;
 
-class LLHUDManager : public LLSingleton<LLHUDManager>
+class LLHUDManager final : public LLSingleton<LLHUDManager>
 {
 	LLSINGLETON(LLHUDManager);
 	~LLHUDManager();

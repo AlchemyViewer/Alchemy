@@ -33,7 +33,7 @@
 /**
  * Toast panel for scripted llTextbox notifications.
  */
-class LLToastScriptTextbox
+class LLToastScriptTextbox final
 :	public LLToastPanel
 {
 public:

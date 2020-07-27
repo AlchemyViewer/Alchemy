@@ -44,7 +44,7 @@ class LLVector3;
 class LLTextBox;
 
 
-class LLWorldMapView : public LLPanel
+class LLWorldMapView final : public LLPanel
 {
 public:
 	static void initClass();

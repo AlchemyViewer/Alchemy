@@ -36,7 +36,7 @@
 #include "llfloater.h"
 #include "llscrolllistctrl.h"
 
-class LLFloaterBulkPermission : public LLFloater, public LLVOInventoryListener
+class LLFloaterBulkPermission final : public LLFloater, public LLVOInventoryListener
 {
 	friend class LLFloaterReg;
 public:

@@ -45,7 +45,7 @@ struct ViewerAssetEntry : public LLDictionaryEntry
 	EDragAndDropType mDadType;
 };
 
-class LLViewerAssetDictionary : public LLSingleton<LLViewerAssetDictionary>,
+class LLViewerAssetDictionary final : public LLSingleton<LLViewerAssetDictionary>,
 						  public LLDictionary<LLViewerAssetType::EType, ViewerAssetEntry>
 {
 	LLSINGLETON(LLViewerAssetDictionary);

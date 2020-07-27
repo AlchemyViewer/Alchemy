@@ -48,7 +48,7 @@ class LLFloaterIMContainer;
 class LLSpeaker;
 class LLSpeakerMgr;
 
-class LLFloaterIMContainer
+class LLFloaterIMContainer final
 	: public LLMultiFloater
 	, public LLIMSessionObserver
 {

@@ -100,7 +100,7 @@ struct ViewerFolderEntry : public LLDictionaryEntry
 	bool mHideIfEmpty;
 };
 
-class LLViewerFolderDictionary : public LLSingleton<LLViewerFolderDictionary>,
+class LLViewerFolderDictionary final : public LLSingleton<LLViewerFolderDictionary>,
 								 public LLDictionary<LLFolderType::EType, ViewerFolderEntry>
 {
 	LLSINGLETON(LLViewerFolderDictionary);

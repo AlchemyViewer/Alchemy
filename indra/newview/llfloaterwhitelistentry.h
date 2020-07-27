@@ -31,7 +31,7 @@
 
 class LLLineEditor;
 
-class LLFloaterWhiteListEntry : 
+class LLFloaterWhiteListEntry final :
 	public LLFloater
 {
 	public:

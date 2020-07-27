@@ -31,7 +31,7 @@
 #include "llfloater.h"
 #include "lluuid.h"
 
-class LLFloaterGroupInvite
+class LLFloaterGroupInvite final
 : public LLFloater
 {
 public:

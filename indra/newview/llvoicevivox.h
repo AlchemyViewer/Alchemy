@@ -52,7 +52,7 @@ class LLAvatarName;
 class LLVivoxVoiceClientMuteListObserver;
 
 
-class LLVivoxVoiceClient :	public LLSingleton<LLVivoxVoiceClient>,
+class LLVivoxVoiceClient final : public LLSingleton<LLVivoxVoiceClient>,
 							virtual public LLVoiceModuleInterface,
 							virtual public LLVoiceEffectInterface
 {
@@ -1026,7 +1026,7 @@ protected:
 
 };
 
-class LLVivoxSecurity :	public LLSingleton<LLVivoxSecurity>
+class LLVivoxSecurity final : public LLSingleton<LLVivoxSecurity>
 {
     LLSINGLETON(LLVivoxSecurity);
     virtual ~LLVivoxSecurity();
@@ -1040,7 +1040,7 @@ class LLVivoxSecurity :	public LLSingleton<LLVivoxSecurity>
     std::string     mAccountHandle;
 };
 
-class LLVoiceVivoxStats : public LLSingleton<LLVoiceVivoxStats>
+class LLVoiceVivoxStats final : public LLSingleton<LLVoiceVivoxStats>
 {
     LLSINGLETON(LLVoiceVivoxStats);
     LOG_CLASS(LLVoiceVivoxStats);

@@ -113,7 +113,7 @@ typedef std::vector<ESubpart> subpart_vec_t;
 
 // Locally defined classes
 
-class LLEditWearableDictionary : public LLSingleton<LLEditWearableDictionary>
+class LLEditWearableDictionary final : public LLSingleton<LLEditWearableDictionary>
 {
         //--------------------------------------------------------------------
         // Constructors and Destructors

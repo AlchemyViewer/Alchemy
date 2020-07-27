@@ -44,7 +44,7 @@ class LLToast;
 /**
  * Responsible for registering notification handlers.
  */
-class LLNotificationManager : public LLSingleton<LLNotificationManager>
+class LLNotificationManager final : public LLSingleton<LLNotificationManager>
 {
 	LLSINGLETON(LLNotificationManager);
 	virtual ~LLNotificationManager();

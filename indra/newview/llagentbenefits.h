@@ -63,7 +63,7 @@ private:
 	bool m_initalized;
 };
 
-class LLAgentBenefitsMgr: public LLSingleton<LLAgentBenefitsMgr> 
+class LLAgentBenefitsMgr final : public LLSingleton<LLAgentBenefitsMgr>
 {
 	LLSINGLETON(LLAgentBenefitsMgr);
 	~LLAgentBenefitsMgr();

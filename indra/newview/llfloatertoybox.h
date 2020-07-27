@@ -34,7 +34,7 @@ class LLButton;
 class LLToolBar;
 
 
-class LLFloaterToybox : public LLFloater
+class LLFloaterToybox final : public LLFloater
 {
 public:
 	LLFloaterToybox(const LLSD& key);

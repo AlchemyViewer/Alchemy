@@ -29,7 +29,7 @@
 
 #include "llfloater.h"
 
-class LLFloaterHoverHeight: public LLFloater
+class LLFloaterHoverHeight final : public LLFloater
 {
 public:
 	LLFloaterHoverHeight(const LLSD& key);

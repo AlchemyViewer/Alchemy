@@ -31,7 +31,7 @@
 ///----------------------------------------------------------------------------
 /// Class LLFloaterWindowSize
 ///----------------------------------------------------------------------------
-class LLFloaterWindowSize
+class LLFloaterWindowSize final
 	:	public LLFloater
 {
 	friend class LLFloaterReg;

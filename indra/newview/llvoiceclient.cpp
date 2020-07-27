@@ -46,7 +46,7 @@ const F32 LLVoiceClient::VOLUME_MAX = 1.0f;
 
 
 // Support for secondlife:///app/voice SLapps
-class LLVoiceHandler : public LLCommandHandler
+class LLVoiceHandler final : public LLCommandHandler
 {
 public:
 	// requests will be throttled from a non-trusted browser
@@ -892,7 +892,7 @@ LLVoiceEffectInterface* LLVoiceClient::getVoiceEffectInterface() const
 ///////////////////
 // version checking
 
-class LLViewerRequiredVoiceVersion : public LLHTTPNode
+class LLViewerRequiredVoiceVersion final : public LLHTTPNode
 {
 	static BOOL sAlertedUser;
 	virtual void post(
@@ -923,7 +923,7 @@ class LLViewerRequiredVoiceVersion : public LLHTTPNode
 	}
 };
 
-class LLViewerParcelVoiceInfo : public LLHTTPNode
+class LLViewerParcelVoiceInfo final : public LLHTTPNode
 {
 	virtual void post(
 					  LLHTTPNode::ResponsePtr response,

@@ -32,7 +32,7 @@
 
 class LLPanelExperiences;
 
-class LLFloaterExperiences :
+class LLFloaterExperiences final :
 	public LLFloater
 {
 public:

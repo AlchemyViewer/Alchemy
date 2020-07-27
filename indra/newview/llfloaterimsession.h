@@ -50,7 +50,7 @@ typedef boost::signals2::signal<void(const LLUUID& session_id)> floater_showed_s
  * Individual IM window that appears at the bottom of the screen,
  * optionally "docked" to the bottom tray.
  */
-class LLFloaterIMSession
+class LLFloaterIMSession final
     : public LLVoiceClientStatusObserver
     , public LLFloaterIMSessionTab
 {

@@ -45,7 +45,7 @@ enum ECameraControlMode
 	CAMERA_CTRL_MODE_PRESETS
 };
 
-class LLFloaterCamera : public LLFloater
+class LLFloaterCamera final : public LLFloater
 {
 	friend class LLFloaterReg;
 	

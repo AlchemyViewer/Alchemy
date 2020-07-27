@@ -33,7 +33,7 @@
 #include "llsingleton.h"
 #include "llinvtranslationbrdg.h"
 
-class LLWearableType : public LLParamSingleton<LLWearableType>
+class LLWearableType final : public LLParamSingleton<LLWearableType>
 {
 	LLSINGLETON(LLWearableType, LLTranslationBridge* trans);
 	~LLWearableType();

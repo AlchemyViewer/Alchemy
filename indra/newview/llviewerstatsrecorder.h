@@ -42,7 +42,7 @@
 class LLMutex;
 class LLViewerObject;
 
-class LLViewerStatsRecorder : public LLSingleton<LLViewerStatsRecorder>
+class LLViewerStatsRecorder final : public LLSingleton<LLViewerStatsRecorder>
 {
 	LLSINGLETON(LLViewerStatsRecorder);
 	LOG_CLASS(LLViewerStatsRecorder);

@@ -35,7 +35,7 @@
 class LLViewerObject;
 class LLObjectSelection;
 
-class LLToolPie : public LLTool, public LLSingleton<LLToolPie>
+class LLToolPie final : public LLTool, public LLSingleton<LLToolPie>
 {
 	LLSINGLETON(LLToolPie);
 	LOG_CLASS(LLToolPie);

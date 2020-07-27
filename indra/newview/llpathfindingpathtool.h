@@ -34,7 +34,7 @@
 #include "llsingleton.h"
 #include "lltool.h"
 
-class LLPathfindingPathTool : public LLTool, public LLSingleton<LLPathfindingPathTool>
+class LLPathfindingPathTool final : public LLTool, public LLSingleton<LLPathfindingPathTool>
 {
 	LLSINGLETON(LLPathfindingPathTool);
 	virtual ~LLPathfindingPathTool();

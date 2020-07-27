@@ -90,7 +90,7 @@ struct RlvBehaviourModifierTween
 	RlvBehaviourModifierValue endValue;
 };
 
-class RlvBehaviourModifierAnimator : public LLSingleton<RlvBehaviourModifierAnimator>
+class RlvBehaviourModifierAnimator final : public LLSingleton<RlvBehaviourModifierAnimator>
 {
 	LLSINGLETON_EMPTY_CTOR(RlvBehaviourModifierAnimator);
 public:

@@ -95,7 +95,7 @@ protected:
 };
 
 
-class LLFeatureManager : public LLFeatureList, public LLSingleton<LLFeatureManager>
+class LLFeatureManager final : public LLFeatureList, public LLSingleton<LLFeatureManager>
 {
 	LLSINGLETON(LLFeatureManager);
 	~LLFeatureManager() {cleanupFeatureTables();}

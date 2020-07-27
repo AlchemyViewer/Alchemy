@@ -32,7 +32,7 @@
 
 class LLPanelProfile;
 
-class LLFloaterProfile : public LLFloater
+class LLFloaterProfile final : public LLFloater
 {
     LOG_CLASS(LLFloaterProfile);
 public:

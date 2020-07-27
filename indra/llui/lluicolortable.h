@@ -36,7 +36,7 @@
 
 class LLUIColor;
 
-class LLUIColorTable : public LLSingleton<LLUIColorTable>
+class LLUIColorTable final : public LLSingleton<LLUIColorTable>
 {
 	LLSINGLETON_EMPTY_CTOR(LLUIColorTable);
 	LOG_CLASS(LLUIColorTable);

@@ -108,7 +108,7 @@ class LLImageProviderInterface;
 
 typedef	void (*LLUIAudioCallback)(const LLUUID& uuid);
 
-class LLUI : public LLParamSingleton<LLUI>
+class LLUI final : public LLParamSingleton<LLUI>
 {
 public:
 	typedef std::map<std::string, LLControlGroup*> settings_map_t;

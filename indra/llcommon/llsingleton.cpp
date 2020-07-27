@@ -52,7 +52,7 @@ bool oktolog();
 // list is to help track inter-LLSingleton dependencies, and since we have
 // this implicit dependency from every LLSingleton to the master list, make it
 // an LLSingleton.
-class LLSingletonBase::MasterList:
+class LLSingletonBase::MasterList final :
     public LLSingleton<LLSingletonBase::MasterList>
 {
 private:

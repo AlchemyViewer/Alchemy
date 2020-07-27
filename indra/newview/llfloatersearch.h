@@ -42,7 +42,7 @@ class LLMediaCtrl;
 /// web page. The browser control is explicitly marked as "trusted"
 /// so that the user can click on teleport links in search results.
 ///
-class LLFloaterSearch : 
+class LLFloaterSearch final :
 	public LLFloaterWebContent
 {
 public:

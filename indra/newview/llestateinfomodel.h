@@ -36,7 +36,7 @@ class LLMessageSystem;
 /**
  * Contains estate info, notifies interested parties of its changes.
  */
-class LLEstateInfoModel : public LLSingleton<LLEstateInfoModel>
+class LLEstateInfoModel final : public LLSingleton<LLEstateInfoModel>
 {
 	LLSINGLETON(LLEstateInfoModel);
 	LOG_CLASS(LLEstateInfoModel);

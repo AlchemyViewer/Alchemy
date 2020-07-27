@@ -33,7 +33,7 @@
 
 class LLPickInfo;
 
-class LLToolObjPicker : public LLTool, public LLSingleton<LLToolObjPicker>
+class LLToolObjPicker final : public LLTool, public LLSingleton<LLToolObjPicker>
 {
 	LLSINGLETON(LLToolObjPicker);
 public:

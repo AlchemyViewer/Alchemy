@@ -34,7 +34,7 @@ class LLIMChiclet;
 class LLLayoutPanel;
 class LLLayoutStack;
 
-class LLChicletBar
+class LLChicletBar final
 	: public LLSingleton<LLChicletBar>
 	, public LLPanel
 {

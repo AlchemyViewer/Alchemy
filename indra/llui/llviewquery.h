@@ -52,37 +52,37 @@ public:
 	virtual void sort(LLView * parent, viewList_t &children) const;
 };
 
-class LLLeavesFilter : public LLQueryFilter, public LLSingleton<LLLeavesFilter>
+class LLLeavesFilter final : public LLQueryFilter, public LLSingleton<LLLeavesFilter>
 {
 	LLSINGLETON_EMPTY_CTOR(LLLeavesFilter);
 	/*virtual*/ filterResult_t operator() (const LLView* const view, const viewList_t & children) const;
 };
 
-class LLRootsFilter : public LLQueryFilter, public LLSingleton<LLRootsFilter>
+class LLRootsFilter final : public LLQueryFilter, public LLSingleton<LLRootsFilter>
 {
 	LLSINGLETON_EMPTY_CTOR(LLRootsFilter);
 	/*virtual*/ filterResult_t operator() (const LLView* const view, const viewList_t & children) const;
 };
 
-class LLVisibleFilter : public LLQueryFilter, public LLSingleton<LLVisibleFilter>
+class LLVisibleFilter final : public LLQueryFilter, public LLSingleton<LLVisibleFilter>
 {
 	LLSINGLETON_EMPTY_CTOR(LLVisibleFilter);
 	/*virtual*/ filterResult_t operator() (const LLView* const view, const viewList_t & children) const;
 };
 
-class LLEnabledFilter : public LLQueryFilter, public LLSingleton<LLEnabledFilter>
+class LLEnabledFilter final : public LLQueryFilter, public LLSingleton<LLEnabledFilter>
 {
 	LLSINGLETON_EMPTY_CTOR(LLEnabledFilter);
 	/*virtual*/ filterResult_t operator() (const LLView* const view, const viewList_t & children) const;
 };
 
-class LLTabStopFilter : public LLQueryFilter, public LLSingleton<LLTabStopFilter>
+class LLTabStopFilter final : public LLQueryFilter, public LLSingleton<LLTabStopFilter>
 {
 	LLSINGLETON_EMPTY_CTOR(LLTabStopFilter);
 	/*virtual*/ filterResult_t operator() (const LLView* const view, const viewList_t & children) const;
 };
 
-class LLCtrlFilter : public LLQueryFilter, public LLSingleton<LLCtrlFilter>
+class LLCtrlFilter final : public LLQueryFilter, public LLSingleton<LLCtrlFilter>
 {
 	LLSINGLETON_EMPTY_CTOR(LLCtrlFilter);
 	/*virtual*/ filterResult_t operator() (const LLView* const view, const viewList_t & children) const;

@@ -35,7 +35,7 @@
 #include <dbghelp.h>
 #pragma warning (pop)
 
-class LLWinDebug:
+class LLWinDebug final :
 	public LLSingleton<LLWinDebug>
 {
 	LLSINGLETON_EMPTY_CTOR(LLWinDebug);

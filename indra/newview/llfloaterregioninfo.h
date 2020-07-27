@@ -70,7 +70,7 @@ class LLPanelRegionEnvironment;
 
 class LLEventTimer;
 
-class LLFloaterRegionInfo : public LLFloater
+class LLFloaterRegionInfo final : public LLFloater
 {
 	friend class LLFloaterReg;
 public:

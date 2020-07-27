@@ -35,7 +35,7 @@
 
 class LLInventoryPanel;
 
-class LLFloaterMyEnvironment
+class LLFloaterMyEnvironment final
 :	public LLFloater, LLInventoryFetchDescendentsObserver
 {
     LOG_CLASS(LLFloaterMyEnvironment);

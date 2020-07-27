@@ -36,7 +36,7 @@ static const std::string empty_string;
 ///----------------------------------------------------------------------------
 /// Class LLInventoryType
 ///----------------------------------------------------------------------------
-struct InventoryEntry : public LLDictionaryEntry
+struct InventoryEntry final : public LLDictionaryEntry
 {
 	InventoryEntry(const std::string &name, // unlike asset type names, not limited to 8 characters; need not match asset type names
 				   const std::string &human_name, // for decoding to human readable form; put any and as many printable characters you want in each one.
@@ -61,7 +61,7 @@ struct InventoryEntry : public LLDictionaryEntry
 	asset_vec_t mAssetTypes;
 };
 
-class LLInventoryDictionary : public LLSingleton<LLInventoryDictionary>,
+class LLInventoryDictionary final : public LLSingleton<LLInventoryDictionary>,
 							  public LLDictionary<LLInventoryType::EType, InventoryEntry>
 {
 	LLSINGLETON(LLInventoryDictionary);

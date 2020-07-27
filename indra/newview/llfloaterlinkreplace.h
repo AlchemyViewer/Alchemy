@@ -78,7 +78,7 @@ private:
 };
 
 
-class LLFloaterLinkReplace : public LLFloater, LLEventTimer
+class LLFloaterLinkReplace final : public LLFloater, LLEventTimer
 {
 	LOG_CLASS(LLFloaterLinkReplace);
 

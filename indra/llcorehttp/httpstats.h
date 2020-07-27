@@ -35,7 +35,7 @@
 
 namespace LLCore
 {
-    class HTTPStats : public LLSingleton<HTTPStats>
+    class HTTPStats final : public LLSingleton<HTTPStats>
     {
         LLSINGLETON(HTTPStats);
         virtual ~HTTPStats();

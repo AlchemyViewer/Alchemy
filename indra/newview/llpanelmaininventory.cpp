@@ -76,7 +76,7 @@ void on_file_loaded_for_save(BOOL success,
 /// LLFloaterInventoryFinder
 ///----------------------------------------------------------------------------
 
-class LLFloaterInventoryFinder : public LLFloater
+class LLFloaterInventoryFinder final : public LLFloater
 {
 public:
 	LLFloaterInventoryFinder( LLPanelMainInventory* inventory_view);

@@ -50,7 +50,7 @@ class LLScrollListCtrl;
 class LLButton;
 class LLFloaterGroupPicker;
 
-class LLFloaterGroupPicker : public LLFloater
+class LLFloaterGroupPicker final : public LLFloater
 {
 public:
 	LLFloaterGroupPicker(const LLSD& seed);

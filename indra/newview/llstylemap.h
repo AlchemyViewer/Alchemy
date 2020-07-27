@@ -37,7 +37,7 @@
 
 typedef std::map<LLUUID, LLStyle::Params> style_map_t;
 
-class LLStyleMap : public LLSingleton<LLStyleMap>
+class LLStyleMap final : public LLSingleton<LLStyleMap>
 {
 	LLSINGLETON_EMPTY_CTOR(LLStyleMap);
 public:

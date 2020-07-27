@@ -50,7 +50,7 @@ public:
 	virtual void stop();
 };
 
-class LLWatchdogTimeout : public LLWatchdogEntry
+class LLWatchdogTimeout final : public LLWatchdogEntry
 {
 public:
 	LLWatchdogTimeout();
@@ -73,7 +73,7 @@ private:
 };
 
 class LLWatchdogTimerThread; // Defined in the cpp
-class LLWatchdog : public LLSingleton<LLWatchdog>
+class LLWatchdog final : public LLSingleton<LLWatchdog>
 {
 	LLSINGLETON(LLWatchdog);
 	~LLWatchdog();

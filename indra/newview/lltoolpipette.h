@@ -40,7 +40,7 @@
 class LLViewerObject;
 class LLPickInfo;
 
-class LLToolPipette
+class LLToolPipette final
 :	public LLTool, public LLSingleton<LLToolPipette>
 {
 	LLSINGLETON(LLToolPipette);

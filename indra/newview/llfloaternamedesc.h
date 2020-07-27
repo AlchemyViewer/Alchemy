@@ -60,21 +60,21 @@ protected:
 	std::string		mFilename;
 };
 
-class LLFloaterSoundPreview : public LLFloaterNameDesc
+class LLFloaterSoundPreview final : public LLFloaterNameDesc
 {
 public:
 	LLFloaterSoundPreview(const LLSD& filename );
 	virtual BOOL postBuild();
 };
 
-class LLFloaterAnimPreview : public LLFloaterNameDesc
+class LLFloaterAnimPreview final : public LLFloaterNameDesc
 {
 public:
 	LLFloaterAnimPreview(const LLSD& filename );
 	virtual BOOL postBuild();
 };
 
-class LLFloaterScriptPreview : public LLFloaterNameDesc
+class LLFloaterScriptPreview final : public LLFloaterNameDesc
 {
 public:
 	LLFloaterScriptPreview(const LLSD& filename );

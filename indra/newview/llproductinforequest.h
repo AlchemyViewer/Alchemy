@@ -39,7 +39,7 @@
  * We use description in the UI, but the sku is provided in the various
  * messages; this tool provides translation between the systems.
  */
-class LLProductInfoRequestManager : public LLSingleton<LLProductInfoRequestManager>
+class LLProductInfoRequestManager final : public LLSingleton<LLProductInfoRequestManager>
 {
 	LLSINGLETON(LLProductInfoRequestManager);
 public:

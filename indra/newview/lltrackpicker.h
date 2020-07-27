@@ -33,7 +33,7 @@
 
 //=========================================================================
 
-class LLFloaterTrackPicker : public LLFloater
+class LLFloaterTrackPicker final : public LLFloater
 {
 public:
     LLFloaterTrackPicker(LLView * owner, const LLSD &params = LLSD());

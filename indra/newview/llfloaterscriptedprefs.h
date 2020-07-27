@@ -33,7 +33,7 @@
 class LLScriptEditor;
 class LLUICtrl;
 
-class LLFloaterScriptEdPrefs : public LLFloater
+class LLFloaterScriptEdPrefs final : public LLFloater
 {
 public:
 	LLFloaterScriptEdPrefs(const LLSD& key);

@@ -296,7 +296,7 @@ public:
 	}
 };
 
-class RecordToChatConsole : public LLSingleton<RecordToChatConsole>
+class RecordToChatConsole final : public LLSingleton<RecordToChatConsole>
 {
 	LLSINGLETON(RecordToChatConsole);
 public:
@@ -1981,7 +1981,7 @@ void LLViewerWindow::initGLDefaults()
 	gBox.prerender();
 }
 
-struct MainPanel : public LLPanel
+struct MainPanel final : public LLPanel
 {
 };
 

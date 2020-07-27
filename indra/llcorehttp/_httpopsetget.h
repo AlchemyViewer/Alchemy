@@ -50,7 +50,7 @@ namespace LLCore
 /// *TODO:  Can't return values to caller yet.  Need to do
 /// something better with HttpResponse and visitNotifier().
 ///
-class HttpOpSetGet : public HttpOperation
+class HttpOpSetGet final : public HttpOperation
 {
 public:
     typedef boost::shared_ptr<HttpOpSetGet> ptr_t;

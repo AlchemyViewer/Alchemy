@@ -31,7 +31,7 @@
 
 class LLMediaCtrl;
 
-class LLFloaterHUD : public LLFloater
+class LLFloaterHUD final : public LLFloater
 {
 	friend class LLFloaterReg;
 public:

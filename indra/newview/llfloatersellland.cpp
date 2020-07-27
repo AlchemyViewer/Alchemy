@@ -51,7 +51,7 @@ void send_parcel_select_objects(S32 parcel_local_id, U32 return_type,
 
 enum Badge { BADGE_OK, BADGE_NOTE, BADGE_WARN, BADGE_ERROR };
 
-class LLFloaterSellLandUI
+class LLFloaterSellLandUI final
 :	public LLFloater
 {
 public:

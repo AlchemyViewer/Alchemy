@@ -29,7 +29,7 @@
 
 #include "llpreview.h"
 
-class LLPreviewSound : public LLPreview
+class LLPreviewSound final : public LLPreview
 {
 public:
 	LLPreviewSound(const LLSD& key);

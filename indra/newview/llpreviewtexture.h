@@ -35,7 +35,7 @@
 class LLComboBox;
 class LLImageRaw;
 
-class LLPreviewTexture : public LLPreview
+class LLPreviewTexture final : public LLPreview
 {
 public:
 	LLPreviewTexture(const LLSD& key);

@@ -1940,7 +1940,7 @@ private:
 	const S32 mDefaultTabGroup;
 };
 
-class SortByTabOrder : public LLQuerySorter, public LLSingleton<SortByTabOrder>
+class SortByTabOrder final : public LLQuerySorter, public LLSingleton<SortByTabOrder>
 {
 	LLSINGLETON_EMPTY_CTOR(SortByTabOrder);
 	/*virtual*/ void sort(LLView * parent, LLView::child_list_t &children) const 
@@ -1964,7 +1964,7 @@ const LLViewQuery & LLView::getTabOrderQuery()
 }
 
 // This class is only used internally by getFocusRootsQuery below. 
-class LLFocusRootsFilter : public LLQueryFilter, public LLSingleton<LLFocusRootsFilter>
+class LLFocusRootsFilter final : public LLQueryFilter, public LLSingleton<LLFocusRootsFilter>
 {
 	LLSINGLETON_EMPTY_CTOR(LLFocusRootsFilter);
 	/*virtual*/ filterResult_t operator() (const LLView* const view, const viewList_t & children) const 

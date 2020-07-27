@@ -48,7 +48,7 @@ class LLDate;
  * 
  *TODO: purge least recently added items? 
  */
-class LLRecentPeople: public LLSingleton<LLRecentPeople>, public LLOldEvents::LLSimpleListener
+class LLRecentPeople final : public LLSingleton<LLRecentPeople>, public LLOldEvents::LLSimpleListener
 {
 	LLSINGLETON_EMPTY_CTOR(LLRecentPeople);
 	LOG_CLASS(LLRecentPeople);

@@ -39,7 +39,7 @@ namespace {
 }
 
 //=========================================================================
-struct SettingsEntry : public LLDictionaryEntry
+struct SettingsEntry final : public LLDictionaryEntry
 {
     SettingsEntry(const std::string &name,
         const std::string& default_new_name,
@@ -61,7 +61,7 @@ struct SettingsEntry : public LLDictionaryEntry
     LLInventoryType::EIconName mIconName;
 };
 
-class LLSettingsDictionary : public LLSingleton<LLSettingsDictionary>,
+class LLSettingsDictionary final : public LLSingleton<LLSettingsDictionary>,
     public LLDictionary<LLSettingsType::type_e, SettingsEntry>
 {
     LLSINGLETON(LLSettingsDictionary);

@@ -47,7 +47,7 @@ F32 LLVOSurfacePatch::sLODFactor = 1.f;
 
 //============================================================================
 
-class LLVertexBufferTerrain : public LLVertexBuffer
+class LLVertexBufferTerrain final : public LLVertexBuffer
 {
 public:
 	LLVertexBufferTerrain() :

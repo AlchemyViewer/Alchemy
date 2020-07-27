@@ -34,7 +34,7 @@
 
 class LLTextureCtrl;
 
-class LLFloaterAvatarTextures : public LLFloater
+class LLFloaterAvatarTextures final : public LLFloater
 {
 public:
 	LLFloaterAvatarTextures(const LLSD& id);

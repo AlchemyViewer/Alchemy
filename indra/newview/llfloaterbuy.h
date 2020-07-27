@@ -42,7 +42,7 @@ class LLViewerObject;
 class LLSaleInfo;
 class LLObjectSelection;
 
-class LLFloaterBuy
+class LLFloaterBuy final
 : public LLFloater, public LLVOInventoryListener
 {
 public:

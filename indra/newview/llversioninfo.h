@@ -44,7 +44,7 @@ class LLStoreListener;
 /// viewer code that wants to query the current version should 
 /// use this API.
 ///
-class LLVersionInfo: public LLSingleton<LLVersionInfo>
+class LLVersionInfo final : public LLSingleton<LLVersionInfo>
 {
 	LLSINGLETON(LLVersionInfo);
 	void initSingleton();

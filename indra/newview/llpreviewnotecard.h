@@ -41,7 +41,7 @@
 class LLViewerTextEditor;
 class LLButton;
 
-class LLPreviewNotecard : public LLPreview
+class LLPreviewNotecard final : public LLPreview
 {
 public:
 	LLPreviewNotecard(const LLSD& key);

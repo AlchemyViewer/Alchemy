@@ -82,7 +82,7 @@ namespace LLCore
 /// sometime.
 ///
 
-class BufferArrayStreamBuf : public std::streambuf
+class BufferArrayStreamBuf final : public std::streambuf
 {
 public:
 	/// Constructor increments the reference count on the
@@ -131,7 +131,7 @@ protected:
 /// can be applied to a BufferArray.  Very convenient for LLSD
 /// serialization and parsing as well.
 
-class BufferArrayStream : public std::iostream
+class BufferArrayStream final : public std::iostream
 {
 public:
 	/// Constructor increments the reference count on the

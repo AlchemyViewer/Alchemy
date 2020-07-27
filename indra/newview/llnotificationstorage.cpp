@@ -43,7 +43,7 @@
 
 typedef boost::function<LLNotificationResponderInterface * (const LLSD& pParams)> responder_constructor_t;
 
-class LLResponderRegistry : public LLRegistrySingleton<std::string, responder_constructor_t, LLResponderRegistry>
+class LLResponderRegistry final : public LLRegistrySingleton<std::string, responder_constructor_t, LLResponderRegistry>
 {
     LLSINGLETON_EMPTY_CTOR(LLResponderRegistry);
 public:

@@ -41,7 +41,7 @@ class LLTextBox;
  * A functor that checks whether a bounding box for all
  * selected objects crosses a region or parcel bounds.
  */
-struct LLCrossParcelFunctor : public LLSelectedObjectFunctor
+struct LLCrossParcelFunctor final : public LLSelectedObjectFunctor
 {
 	/*virtual*/ bool apply(LLViewerObject* obj);
 
@@ -50,7 +50,7 @@ private:
 };
 
 
-class LLFloaterObjectWeights : public LLFloater, LLAccountingCostObserver
+class LLFloaterObjectWeights final : public LLFloater, LLAccountingCostObserver
 {
 public:
 	LOG_CLASS(LLFloaterObjectWeights);

@@ -131,7 +131,7 @@ private:
     bool                    mIsDirty;
 };
 
-class LLFloaterFixedEnvironmentWater : public LLFloaterFixedEnvironment
+class LLFloaterFixedEnvironmentWater final : public LLFloaterFixedEnvironment
 {
     LOG_CLASS(LLFloaterFixedEnvironmentWater);
 
@@ -151,7 +151,7 @@ protected:
 private:
 };
 
-class LLFloaterFixedEnvironmentSky : public LLFloaterFixedEnvironment
+class LLFloaterFixedEnvironmentSky final : public LLFloaterFixedEnvironment
 {
     LOG_CLASS(LLFloaterFixedEnvironmentSky);
 

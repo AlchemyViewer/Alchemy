@@ -33,7 +33,7 @@
 
 class LLViewerInventoryItem;
 
-class LLFriendCardsManager
+class LLFriendCardsManager final
 	: public LLSingleton<LLFriendCardsManager>
 	, public LLFriendObserver
 {

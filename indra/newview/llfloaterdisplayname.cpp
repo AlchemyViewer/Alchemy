@@ -40,7 +40,7 @@
 #include "llagent.h"
 
 
-class LLFloaterDisplayName : public LLFloater
+class LLFloaterDisplayName final : public LLFloater
 {
 public:
 	LLFloaterDisplayName(const LLSD& key);

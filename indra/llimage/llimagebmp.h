@@ -31,7 +31,7 @@
 
 // This class compresses and decompressed BMP files
 
-class LLImageBMP : public LLImageFormatted
+class LLImageBMP final : public LLImageFormatted
 {
 protected:
 	virtual ~LLImageBMP();

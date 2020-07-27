@@ -34,7 +34,7 @@ extern const std::string LL_FCP_ACCOUNT_NAME;		//"user_name"
 
 class LLSpinCtrl;
 
-class LLFloaterConversationPreview : public LLFloater
+class LLFloaterConversationPreview final : public LLFloater
 {
 public:
 

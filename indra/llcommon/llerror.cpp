@@ -439,7 +439,7 @@ namespace
 	typedef std::vector<LLError::RecorderPtr> Recorders;
 	typedef std::vector<LLError::CallSite*> CallSiteVector;
 
-	class Globals : public LLSingleton<Globals>
+	class Globals final : public LLSingleton<Globals>
 	{
 		LLSINGLETON(Globals);
 	public:
@@ -513,7 +513,7 @@ namespace LLError
 
 	typedef LLPointer<SettingsConfig> SettingsConfigPtr;
 
-	class Settings : public LLSingleton<Settings>
+	class Settings final : public LLSingleton<Settings>
 	{
 		LLSINGLETON(Settings);
 	public:

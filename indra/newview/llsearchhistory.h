@@ -35,7 +35,7 @@
  * Search history container able to save and load history from file.
  * History is stored in chronological order, most recent at the beginning.
  */
-class LLSearchHistory : public LLSingleton<LLSearchHistory>, private LLDestroyClass<LLSearchHistory>
+class LLSearchHistory final : public LLSingleton<LLSearchHistory>, private LLDestroyClass<LLSearchHistory>
 {
 	LLSINGLETON(LLSearchHistory);
 	friend class LLDestroyClass<LLSearchHistory>;

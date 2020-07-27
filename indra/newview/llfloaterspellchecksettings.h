@@ -29,7 +29,7 @@
 
 #include "llfloater.h"
 
-class LLFloaterSpellCheckerSettings : public LLFloater
+class LLFloaterSpellCheckerSettings final : public LLFloater
 {
 public:
 	LLFloaterSpellCheckerSettings(const LLSD& key);
@@ -47,7 +47,7 @@ protected:
 	void refreshDictionaries(bool from_settings);
 };
 
-class LLFloaterSpellCheckerImport : public LLFloater
+class LLFloaterSpellCheckerImport final : public LLFloater
 {
 public:
 	LLFloaterSpellCheckerImport(const LLSD& key);

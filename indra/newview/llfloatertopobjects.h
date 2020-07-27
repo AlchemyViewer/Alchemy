@@ -47,7 +47,7 @@ enum LAND_STAT_REPORT_TYPE
 	STAT_REPORT_TOP_COLLIDERS
 };
 
-class LLFloaterTopObjects : public LLFloater
+class LLFloaterTopObjects final : public LLFloater
 {
 	friend class LLFloaterReg;
 public:

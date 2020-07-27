@@ -217,7 +217,7 @@ protected:
 /// request *does* generate a reply on the response
 /// queue, if requested.
 
-class HttpOpStop : public HttpOperation
+class HttpOpStop final : public HttpOperation
 {
 public:
 	HttpOpStop();
@@ -239,7 +239,7 @@ public:
 /// the servicing thread which bounces a reply back to the
 /// caller without any further delay.
 
-class HttpOpNull : public HttpOperation
+class HttpOpNull final : public HttpOperation
 {
 public:
 	HttpOpNull();
@@ -259,7 +259,7 @@ public:
 /// HttpOpSpin is a test-only request that puts the worker
 /// thread into a cpu spin.  Used for unit tests and cleanup
 /// evaluation.  You do not want to use this in production.
-class HttpOpSpin : public HttpOperation
+class HttpOpSpin final : public HttpOperation
 {
 public:
 	// 0 does a hard spin in the operation

@@ -39,7 +39,7 @@
 namespace LLCoreInt
 {
 
-class HttpThread : public RefCounted
+class HttpThread final : public RefCounted
 {
 private:
 	HttpThread();							// Not defined

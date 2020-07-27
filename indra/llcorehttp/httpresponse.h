@@ -57,7 +57,7 @@ class HttpHeaders;
 /// Allocation:  Refcounted, heap only.  Caller of the constructor
 /// is given a refcount.
 ///
-class HttpResponse : public LLCoreInt::RefCounted
+class HttpResponse final : public LLCoreInt::RefCounted
 {
 public:
 	HttpResponse();

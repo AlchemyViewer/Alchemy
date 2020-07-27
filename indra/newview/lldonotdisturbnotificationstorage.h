@@ -35,7 +35,7 @@
 
 class LLSD;
 
-class LLDoNotDisturbNotificationStorageTimer : public LLEventTimer
+class LLDoNotDisturbNotificationStorageTimer final : public LLEventTimer
 {
 public:
     LLDoNotDisturbNotificationStorageTimer();
@@ -45,7 +45,7 @@ public:
     BOOL tick();
 };
 
-class LLDoNotDisturbNotificationStorage : public LLParamSingleton<LLDoNotDisturbNotificationStorage>, public LLNotificationStorage
+class LLDoNotDisturbNotificationStorage final : public LLParamSingleton<LLDoNotDisturbNotificationStorage>, public LLNotificationStorage
 {
 	LLSINGLETON(LLDoNotDisturbNotificationStorage);
 	~LLDoNotDisturbNotificationStorage();

@@ -57,13 +57,13 @@ protected:
 	LLChildRegistry() {}
 };
 
-class LLDefaultChildRegistry : public LLChildRegistry<LLDefaultChildRegistry>
+class LLDefaultChildRegistry final : public LLChildRegistry<LLDefaultChildRegistry>
 {
 	LLSINGLETON_EMPTY_CTOR(LLDefaultChildRegistry);
 };
 
 // lookup widget name by type
-class LLWidgetNameRegistry 
+class LLWidgetNameRegistry final
 :	public LLRegistrySingleton<const std::type_info*, std::string, LLWidgetNameRegistry>
 {
 	LLSINGLETON_EMPTY_CTOR(LLWidgetNameRegistry);
@@ -87,7 +87,7 @@ extern LLTrace::BlockTimerStatHandle FTM_INIT_FROM_PARAMS;
 extern template class LLUICtrlFactory* LLSingleton<class LLUICtrlFactory>::getInstance();
 #endif
 
-class LLUICtrlFactory : public LLSingleton<LLUICtrlFactory>
+class LLUICtrlFactory final : public LLSingleton<LLUICtrlFactory>
 {
 	LLSINGLETON(LLUICtrlFactory);
 	~LLUICtrlFactory();

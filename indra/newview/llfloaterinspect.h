@@ -40,7 +40,7 @@ class LLUICtrl;
 class LLSelectNode;
 // [/RLVa:KB]
 
-class LLFloaterInspect : public LLFloater
+class LLFloaterInspect final : public LLFloater
 {
 	friend class LLFloaterReg;
 public:

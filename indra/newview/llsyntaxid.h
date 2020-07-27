@@ -36,7 +36,7 @@
 
 class fetchKeywordsFileResponder;
 
-class LLSyntaxIdLSL : public LLSingleton<LLSyntaxIdLSL>
+class LLSyntaxIdLSL final : public LLSingleton<LLSyntaxIdLSL>
 {
 	LLSINGLETON(LLSyntaxIdLSL);
 	friend class fetchKeywordsFileResponder;

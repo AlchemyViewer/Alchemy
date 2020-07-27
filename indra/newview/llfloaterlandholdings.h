@@ -34,7 +34,7 @@ class LLTextBox;
 class LLScrollListCtrl;
 class LLButton;
 
-class LLFloaterLandHoldings
+class LLFloaterLandHoldings final
 :	public LLFloater
 {
 public:

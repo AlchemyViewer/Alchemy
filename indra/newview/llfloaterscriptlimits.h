@@ -42,7 +42,7 @@ class LLAvatarName;
 
 class LLPanelScriptLimitsRegionMemory;
 
-class LLFloaterScriptLimits : public LLFloater
+class LLFloaterScriptLimits final : public LLFloater
 {
 	friend class LLFloaterReg;
 public:

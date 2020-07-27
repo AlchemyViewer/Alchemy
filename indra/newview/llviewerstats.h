@@ -244,7 +244,7 @@ extern LLTrace::EventStatHandle<LLUnit<F32, LLUnits::Percent> > OBJECT_CACHE_HIT
 
 }
 
-class LLViewerStats : public LLSingleton<LLViewerStats>
+class LLViewerStats final : public LLSingleton<LLViewerStats>
 {
 	LLSINGLETON(LLViewerStats);
 	~LLViewerStats();

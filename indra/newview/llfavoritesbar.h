@@ -171,7 +171,7 @@ private:
  * It replaced previously implemented solution to store sort index in landmark's name as a "<N>@" prefix.
  * Data are stored in user home directory.
  */
-class LLFavoritesOrderStorage : public LLSingleton<LLFavoritesOrderStorage>
+class LLFavoritesOrderStorage final : public LLSingleton<LLFavoritesOrderStorage>
 	, public LLDestroyClass<LLFavoritesOrderStorage>
 {
 	LLSINGLETON(LLFavoritesOrderStorage);

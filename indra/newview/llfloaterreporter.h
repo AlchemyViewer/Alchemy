@@ -74,7 +74,7 @@ enum EReportType
 	CS_REQUEST_REPORT = 4
 };
 
-class LLFloaterReporter
+class LLFloaterReporter final
 :	public LLFloater
 {
 public:

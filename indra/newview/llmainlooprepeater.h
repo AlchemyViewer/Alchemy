@@ -40,7 +40,7 @@
 // pump value is a string naming the pump to which the message should be
 // re-posted.  The payload value is what will be posted to the designated pump.
 //
-class LLMainLoopRepeater:
+class LLMainLoopRepeater final :
 	public LLSingleton<LLMainLoopRepeater>
 {
 	LLSINGLETON(LLMainLoopRepeater);

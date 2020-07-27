@@ -193,7 +193,7 @@ protected:
 };// end of FollowCam class
 
 
-class LLFollowCamMgr : public LLSingleton<LLFollowCamMgr>
+class LLFollowCamMgr final : public LLSingleton<LLFollowCamMgr>
 {
     LLSINGLETON(LLFollowCamMgr);
     ~LLFollowCamMgr();

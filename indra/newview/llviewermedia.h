@@ -70,7 +70,7 @@ private:
 
 class LLViewerMediaImpl;
 
-class LLViewerMedia: public LLSingleton<LLViewerMedia>
+class LLViewerMedia final : public LLSingleton<LLViewerMedia>
 {
 	LLSINGLETON(LLViewerMedia);
 	~LLViewerMedia();

@@ -39,7 +39,7 @@ class LLNotificationsInterface;
 
 // This class hosts the login module and is used to 
 // negotiate user authentication attempts.
-class LLLoginInstance : public LLSingleton<LLLoginInstance>
+class LLLoginInstance final : public LLSingleton<LLLoginInstance>
 {
 	LLSINGLETON(LLLoginInstance);
 	~LLLoginInstance();

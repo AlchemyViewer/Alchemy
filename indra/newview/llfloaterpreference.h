@@ -69,7 +69,7 @@ typedef enum
 	} EGraphicsSettings;
 
 // Floater to control preferences (display, audio, bandwidth, general.
-class LLFloaterPreference : public LLFloater, public LLAvatarPropertiesObserver, public LLConversationLogObserver
+class LLFloaterPreference final : public LLFloater, public LLAvatarPropertiesObserver, public LLConversationLogObserver
 {
 public: 
 	LLFloaterPreference(const LLSD& key);
@@ -287,7 +287,7 @@ private:
 	LOG_CLASS(LLPanelPreference);
 };
 
-class LLPanelPreferenceGraphics : public LLPanelPreference
+class LLPanelPreferenceGraphics final : public LLPanelPreference
 {
 public:
 	BOOL postBuild();
@@ -308,7 +308,7 @@ private:
 	LOG_CLASS(LLPanelPreferenceGraphics);
 };
 
-class LLFloaterPreferenceGraphicsAdvanced : public LLFloater
+class LLFloaterPreferenceGraphicsAdvanced final : public LLFloater
 {
   public: 
 	LLFloaterPreferenceGraphicsAdvanced(const LLSD& key);
@@ -345,7 +345,7 @@ class LLAvatarComplexityControls
 	LOG_CLASS(LLAvatarComplexityControls);
 };
 
-class LLFloaterPreferenceProxy : public LLFloater
+class LLFloaterPreferenceProxy final : public LLFloater
 {
 public: 
 	LLFloaterPreferenceProxy(const LLSD& key);

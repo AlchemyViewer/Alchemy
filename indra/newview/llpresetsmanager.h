@@ -52,7 +52,7 @@ enum EDefaultOptions
 	DEFAULT_HIDE				// Do not display "Default" in a list
 };
 
-class LLPresetsManager : public LLSingleton<LLPresetsManager>
+class LLPresetsManager final : public LLSingleton<LLPresetsManager>
 {
 	LLSINGLETON(LLPresetsManager);
 	~LLPresetsManager();

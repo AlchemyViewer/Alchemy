@@ -31,7 +31,7 @@
 
 class LLPickInfo;
 
-class LLToolCamera
+class LLToolCamera final
 :	public LLTool, public LLSingleton<LLToolCamera>
 {
 	LLSINGLETON(LLToolCamera);

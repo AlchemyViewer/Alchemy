@@ -41,7 +41,7 @@
 #include <iosfwd>
 #include <string>
 
-class LL_COMMON_API LLOSInfo : public LLSingleton<LLOSInfo>
+class LL_COMMON_API LLOSInfo final : public LLSingleton<LLOSInfo>
 {
 	LLSINGLETON(LLOSInfo);
 public:

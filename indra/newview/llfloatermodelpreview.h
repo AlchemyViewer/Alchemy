@@ -59,7 +59,7 @@ class domMesh;
 class LLMenuButton;
 class LLToggleableMenu;
 
-class LLFloaterModelPreview : public LLFloaterModelUploadBase
+class LLFloaterModelPreview final : public LLFloaterModelUploadBase
 {
 public:
 	

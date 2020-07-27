@@ -37,7 +37,7 @@
 class LLViewerMediaImpl;
 class LLPanelPrimMediaControls;
 
-class LLViewerMediaFocus : 
+class LLViewerMediaFocus final :
 	public LLFocusableElement, 
 	public LLSingleton<LLViewerMediaFocus>
 {

@@ -31,7 +31,7 @@
 
 #include "llsingleton.h"
 
-class LLExperienceLog : public LLSingleton<LLExperienceLog>
+class LLExperienceLog final : public LLSingleton<LLExperienceLog>
 {
 	LLSINGLETON(LLExperienceLog);
 public:

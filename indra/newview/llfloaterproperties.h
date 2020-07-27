@@ -44,7 +44,7 @@ class LLTextBox;
 
 class LLPropertiesObserver;
 
-class LLFloaterProperties : public LLFloater
+class LLFloaterProperties final : public LLFloater
 {
 public:
 	LLFloaterProperties(const LLUUID& item_id);
@@ -89,7 +89,7 @@ protected:
 	LLPropertiesObserver* mPropertiesObserver;
 };
 
-class LLMultiProperties : public LLMultiFloater
+class LLMultiProperties final : public LLMultiFloater
 {
 public:
 	LLMultiProperties();

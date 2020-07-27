@@ -814,7 +814,7 @@ namespace action_give_inventory
 		}
 	}
 
-	struct LLShareInfo : public LLSingleton<LLShareInfo>
+	struct LLShareInfo final : public LLSingleton<LLShareInfo>
 	{
 		LLSINGLETON_EMPTY_CTOR(LLShareInfo);
 	public:

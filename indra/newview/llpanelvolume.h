@@ -41,7 +41,7 @@ class LLViewerObject;
 class LLComboBox;
 class LLColorSwatchCtrl;
 
-class LLPanelVolume : public LLPanel
+class LLPanelVolume final : public LLPanel
 {
 public:
 	LLPanelVolume();

@@ -31,7 +31,7 @@
 
 class LLTextBox;
 
-class LLFloaterLagMeter : public LLFloater
+class LLFloaterLagMeter final : public LLFloater
 {
 	friend class LLFloaterReg;
 	

@@ -130,7 +130,7 @@ public:
 };
 
 
-class LLFloaterUIPreview : public LLFloater
+class LLFloaterUIPreview final : public LLFloater
 {
 public:
 	// Setup
@@ -263,7 +263,7 @@ private:
 
 // Implementation of previewed floater
 // Used to override draw and mouse handler
-class LLPreviewedFloater : public LLFloater
+class LLPreviewedFloater final : public LLFloater
 {
 public:
 	LLPreviewedFloater(LLFloaterUIPreview* floater, const Params& params)

@@ -104,7 +104,7 @@ private:
 ////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
 
-class LLTeleportHistoryFlatItemStorage: public LLSingleton<LLTeleportHistoryFlatItemStorage>
+class LLTeleportHistoryFlatItemStorage final : public LLSingleton<LLTeleportHistoryFlatItemStorage>
 {
 	LLSINGLETON_EMPTY_CTOR(LLTeleportHistoryFlatItemStorage);
 protected:

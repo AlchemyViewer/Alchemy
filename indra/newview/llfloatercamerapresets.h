@@ -30,7 +30,7 @@
 
 class LLFloaterReg;
 
-class LLFloaterCameraPresets : public LLFloater
+class LLFloaterCameraPresets final : public LLFloater
 {
     friend class LLFloaterReg;
 

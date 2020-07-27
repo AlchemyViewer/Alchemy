@@ -29,7 +29,7 @@
 
 #include "llfloater.h"
 
-class LLFloaterMemLeak : public LLFloater
+class LLFloaterMemLeak final : public LLFloater
 {
 	friend class LLFloaterReg;
 public:

@@ -30,7 +30,7 @@
 
 #include "llfloater.h"
 
-class LLFloaterFontTest:
+class LLFloaterFontTest final :
 	public LLFloater
 {
 	friend class LLFloaterReg;

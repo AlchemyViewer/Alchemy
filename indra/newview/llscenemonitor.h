@@ -37,7 +37,7 @@ class LLCharacter;
 class LLRenderTarget;
 class LLViewerTexture;
 
-class LLSceneMonitor : public LLSingleton<LLSceneMonitor>
+class LLSceneMonitor final : public LLSingleton<LLSceneMonitor>
 {
 	LLSINGLETON(LLSceneMonitor);
 	~LLSceneMonitor();
@@ -107,7 +107,7 @@ private:
 	LLTrace::Recording						mMonitorRecording;
 };
 
-class LLSceneMonitorView : public LLFloater
+class LLSceneMonitorView final : public LLFloater
 {
 public:
 	LLSceneMonitorView(const LLRect& rect);

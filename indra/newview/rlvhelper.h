@@ -89,7 +89,7 @@ protected:
 // RlvBehaviourDictionary and related classes
 //
 
-class RlvBehaviourDictionary : public LLSingleton<RlvBehaviourDictionary>
+class RlvBehaviourDictionary final : public LLSingleton<RlvBehaviourDictionary>
 {
 	friend class RlvFloaterBehaviours;
 	LLSINGLETON(RlvBehaviourDictionary);
@@ -470,7 +470,7 @@ protected:
 // RlvForceWear
 //
 
-class RlvForceWear : public LLSingleton<RlvForceWear>
+class RlvForceWear final : public LLSingleton<RlvForceWear>
 {
 	LLSINGLETON(RlvForceWear);
 public:
@@ -572,7 +572,7 @@ private:
 // RlvBehaviourNotifyObserver
 //
 
-class RlvBehaviourNotifyHandler : public LLSingleton<RlvBehaviourNotifyHandler>
+class RlvBehaviourNotifyHandler final : public LLSingleton<RlvBehaviourNotifyHandler>
 {
 	LLSINGLETON(RlvBehaviourNotifyHandler);
 protected:

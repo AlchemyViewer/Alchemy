@@ -146,7 +146,7 @@ private:
 };
 
 /// This is the LLSingleton instance of LLToolGrab.
-class LLToolGrab : public LLToolGrabBase, public LLSingleton<LLToolGrab>
+class LLToolGrab final : public LLToolGrabBase, public LLSingleton<LLToolGrab>
 {
 	LLSINGLETON_EMPTY_CTOR(LLToolGrab);
 };

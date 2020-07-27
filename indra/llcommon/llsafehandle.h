@@ -178,7 +178,7 @@ protected:
 	// Of course, as with any LLSingleton, the "null instance" is only
 	// instantiated on demand -- in this case, if you actually try to
 	// dereference an LLSafeHandle containing null.
-	class NullInstanceHolder: public LLSingleton<NullInstanceHolder>
+	class NullInstanceHolder final : public LLSingleton<NullInstanceHolder>
 	{
 		LLSINGLETON_EMPTY_CTOR(NullInstanceHolder);
 		~NullInstanceHolder() {}

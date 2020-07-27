@@ -40,7 +40,7 @@ class LLWearableHoldingPattern;
 class LLInventoryCallback;
 class LLOutfitUnLockTimer;
 
-class LLAppearanceMgr: public LLSingleton<LLAppearanceMgr>
+class LLAppearanceMgr final : public LLSingleton<LLAppearanceMgr>
 {
 	LLSINGLETON(LLAppearanceMgr);
 	~LLAppearanceMgr();

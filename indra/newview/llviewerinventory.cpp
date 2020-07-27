@@ -97,7 +97,7 @@ void doInventoryCb(LLPointer<LLInventoryCallback> cb, LLUUID id)
 ///----------------------------------------------------------------------------
 /// Helper class to store special inventory item names and their localized values.
 ///----------------------------------------------------------------------------
-class LLLocalizedInventoryItemsDictionary : public LLSingleton<LLLocalizedInventoryItemsDictionary>
+class LLLocalizedInventoryItemsDictionary final : public LLSingleton<LLLocalizedInventoryItemsDictionary>
 {
 	LLSINGLETON(LLLocalizedInventoryItemsDictionary);
 public:

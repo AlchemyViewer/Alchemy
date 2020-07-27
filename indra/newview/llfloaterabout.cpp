@@ -74,7 +74,7 @@ extern U32 gPacketsIn;
 ///----------------------------------------------------------------------------
 /// Class LLFloaterAbout
 ///----------------------------------------------------------------------------
-class LLFloaterAbout 
+class LLFloaterAbout final
 	: public LLFloater
 {
 	friend class LLFloaterReg;

@@ -72,7 +72,7 @@ protected:
 	LLRootHandle<LLRemoteParcelInfoObserver> mObserverHandle;
 };
 
-class LLRemoteParcelInfoProcessor : public LLSingleton<LLRemoteParcelInfoProcessor>
+class LLRemoteParcelInfoProcessor final : public LLSingleton<LLRemoteParcelInfoProcessor>
 {
 	LLSINGLETON_EMPTY_CTOR(LLRemoteParcelInfoProcessor);
 	virtual ~LLRemoteParcelInfoProcessor() {}

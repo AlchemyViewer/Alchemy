@@ -30,7 +30,7 @@
 
 #include "llfloater.h"
 
-class LLFloaterPreviewTrash
+class LLFloaterPreviewTrash final
 : public LLFloater
 {
 public:

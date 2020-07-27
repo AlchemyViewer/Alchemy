@@ -32,7 +32,7 @@
 class LLViewerObject;
 class LLPickInfo;
 
-class LLToolFace
+class LLToolFace final
 :	public LLTool, public LLSingleton<LLToolFace>
 {
 	LLSINGLETON(LLToolFace);

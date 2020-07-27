@@ -138,7 +138,7 @@ extern RlvAttachmentLocks gRlvAttachmentLocks;
 //
 
 // TODO-RLVa: [RLVa-1.2.1] This class really looks rather cluttered so look into cleaning it up/simplifying it a bit
-class RlvAttachmentLockWatchdog : public LLSingleton<RlvAttachmentLockWatchdog>
+class RlvAttachmentLockWatchdog final : public LLSingleton<RlvAttachmentLockWatchdog>
 {
 	LLSINGLETON(RlvAttachmentLockWatchdog);
 protected:
@@ -279,7 +279,7 @@ extern RlvWearableLocks gRlvWearableLocks;
 // RlvFolderLocks class declaration
 //
 
-class RlvFolderLocks : public LLSingleton<RlvFolderLocks>
+class RlvFolderLocks final : public LLSingleton<RlvFolderLocks>
 {
 	friend class RlvLockedDescendentsCollector;
 	LLSINGLETON(RlvFolderLocks);

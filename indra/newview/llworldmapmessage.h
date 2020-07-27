@@ -32,7 +32,7 @@
 // Handling of messages (send and process) as well as SLURL callback if necessary
 class LLMessageSystem;
 
-class LLWorldMapMessage : public LLSingleton<LLWorldMapMessage>
+class LLWorldMapMessage final : public LLSingleton<LLWorldMapMessage>
 {
 	LLSINGLETON(LLWorldMapMessage);
 	~LLWorldMapMessage();

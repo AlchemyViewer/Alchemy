@@ -37,7 +37,7 @@ class LLTextEditor;
 typedef boost::signals2::signal<
 	void (const std::string& output)> console_reply_signal_t;
 
-class LLFloaterRegionDebugConsole : public LLFloater
+class LLFloaterRegionDebugConsole final : public LLFloater
 {
 public:
 	LLFloaterRegionDebugConsole(LLSD const & key);

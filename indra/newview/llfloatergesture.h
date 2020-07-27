@@ -48,7 +48,7 @@ class LLFloaterGestureInventoryObserver;
 class LLMultiGesture;
 class LLMenuGL;
 
-class LLFloaterGesture
+class LLFloaterGesture final
 :	public LLFloater, LLInventoryFetchDescendentsObserver
 {
 	LOG_CLASS(LLFloaterGesture);

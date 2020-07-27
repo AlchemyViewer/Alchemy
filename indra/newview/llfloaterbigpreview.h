@@ -29,7 +29,7 @@
 
 #include "llfloater.h"
 
-class LLFloaterBigPreview : public LLFloater
+class LLFloaterBigPreview final : public LLFloater
 {
 public:
 	LLFloaterBigPreview(const LLSD& key);

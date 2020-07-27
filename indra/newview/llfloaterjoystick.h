@@ -32,7 +32,7 @@
 
 class LLCheckBoxCtrl;
 
-class LLFloaterJoystick : public LLFloater
+class LLFloaterJoystick final : public LLFloater
 {
 	friend class LLFloaterReg;
 

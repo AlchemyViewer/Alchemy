@@ -46,7 +46,7 @@ namespace LLCore
 /// *NOTE:  This will very likely be removed in the near future
 /// when priority is removed from the library.
 
-class HttpOpSetPriority : public HttpOperation
+class HttpOpSetPriority final : public HttpOperation
 {
 public:
 	HttpOpSetPriority(HttpHandle handle, HttpRequest::priority_t priority);

@@ -46,7 +46,7 @@
  *
  * Several indicators can be registered for the same avatar.
  */
-class SpeakingIndicatorManager : public LLSingleton<SpeakingIndicatorManager>, LLVoiceClientParticipantObserver
+class SpeakingIndicatorManager final : public LLSingleton<SpeakingIndicatorManager>, LLVoiceClientParticipantObserver
 {
 	LLSINGLETON(SpeakingIndicatorManager);
 	~SpeakingIndicatorManager();

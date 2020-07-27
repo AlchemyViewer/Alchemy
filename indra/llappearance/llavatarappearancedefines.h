@@ -143,7 +143,7 @@ typedef std::vector<LLWearableType::EType> wearables_vec_t;
 // 
 // This holds const data - it is initialized once and the contents never change after that.
 //------------------------------------------------------------------------
-class LLAvatarAppearanceDictionary : public LLSingleton<LLAvatarAppearanceDictionary>
+class LLAvatarAppearanceDictionary final : public LLSingleton<LLAvatarAppearanceDictionary>
 {
 	//--------------------------------------------------------------------
 	// Constructors and Destructors

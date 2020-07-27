@@ -121,7 +121,7 @@ inline void gl_rect_2d_offset_local( const LLRect& rect, S32 pixel_offset, BOOL 
 
 class LLImageProviderInterface;
 
-class LLRender2D : public LLParamSingleton<LLRender2D>
+class LLRender2D final : public LLParamSingleton<LLRender2D>
 {
 	LLSINGLETON(LLRender2D, LLImageProviderInterface* image_provider);
 	LOG_CLASS(LLRender2D);

@@ -35,7 +35,7 @@
 #include <boost/bind.hpp>
 #include "llautoreplace.h"
 
-class LLFloaterAutoReplaceSettings : public LLFloater
+class LLFloaterAutoReplaceSettings final : public LLFloater
 {
 public:
 	LLFloaterAutoReplaceSettings(const LLSD& key);

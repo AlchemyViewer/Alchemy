@@ -34,7 +34,7 @@ class LLLineEditor;
 class LLPanelExperiencePicker;
 
 
-class LLFloaterExperiencePicker : public LLFloater
+class LLFloaterExperiencePicker final : public LLFloater
 {
 public:
 

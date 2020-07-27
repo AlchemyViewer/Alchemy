@@ -37,7 +37,7 @@ class LLJoystickAgentSlide;
 //
 // Classes
 //
-class LLFloaterMove
+class LLFloaterMove final
 :	public LLFloater
 {
 	LOG_CLASS(LLFloaterMove);

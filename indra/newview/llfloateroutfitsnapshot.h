@@ -36,7 +36,7 @@
 /// Class LLFloaterOutfitSnapshot
 ///----------------------------------------------------------------------------
 
-class LLFloaterOutfitSnapshot : public LLFloaterSnapshotBase
+class LLFloaterOutfitSnapshot final : public LLFloaterSnapshotBase
 {
     LOG_CLASS(LLFloaterOutfitSnapshot);
 
@@ -74,7 +74,7 @@ private:
 /// Class LLFloaterOutfitSnapshot::Impl
 ///----------------------------------------------------------------------------
 
-class LLFloaterOutfitSnapshot::Impl : public LLFloaterSnapshotBase::ImplBase
+class LLFloaterOutfitSnapshot::Impl final : public LLFloaterSnapshotBase::ImplBase
 {
     LOG_CLASS(LLFloaterOutfitSnapshot::Impl);
 public:
@@ -102,7 +102,7 @@ private:
 /// Class LLOutfitSnapshotFloaterView
 ///----------------------------------------------------------------------------
 
-class LLOutfitSnapshotFloaterView : public LLFloaterView
+class LLOutfitSnapshotFloaterView final : public LLFloaterView
 {
 public:
     struct Params

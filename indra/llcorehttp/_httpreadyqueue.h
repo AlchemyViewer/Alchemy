@@ -66,7 +66,7 @@ typedef std::priority_queue<HttpOpRequest::ptr_t,
 
 #endif // LLCORE_HTTP_READY_QUEUE_IGNORES_PRIORITY
 
-class HttpReadyQueue : public HttpReadyQueueBase
+class HttpReadyQueue final : public HttpReadyQueueBase
 {
 public:
 	HttpReadyQueue()

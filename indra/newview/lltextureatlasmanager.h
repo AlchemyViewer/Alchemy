@@ -83,7 +83,7 @@ private:
 	U32             mUpdatedTime ;	
 } ;
 
-class LLTextureAtlasManager : public LLSingleton<LLTextureAtlasManager>
+class LLTextureAtlasManager final : public LLSingleton<LLTextureAtlasManager>
 {
 	LLSINGLETON(LLTextureAtlasManager);
 	~LLTextureAtlasManager();

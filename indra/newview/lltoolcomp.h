@@ -101,7 +101,7 @@ public:
 //-----------------------------------------------------------------------
 // LLToolCompTranslate
 
-class LLToolCompInspect : public LLToolComposite, public LLSingleton<LLToolCompInspect>
+class LLToolCompInspect final : public LLToolComposite, public LLSingleton<LLToolCompInspect>
 {
 	LLSINGLETON(LLToolCompInspect);
 	virtual ~LLToolCompInspect();
@@ -126,7 +126,7 @@ private:
 //-----------------------------------------------------------------------
 // LLToolCompTranslate
 
-class LLToolCompTranslate : public LLToolComposite, public LLSingleton<LLToolCompTranslate>
+class LLToolCompTranslate final : public LLToolComposite, public LLSingleton<LLToolCompTranslate>
 {
 	LLSINGLETON(LLToolCompTranslate);
 	virtual ~LLToolCompTranslate();
@@ -147,7 +147,7 @@ public:
 //-----------------------------------------------------------------------
 // LLToolCompScale
 
-class LLToolCompScale : public LLToolComposite, public LLSingleton<LLToolCompScale>
+class LLToolCompScale final : public LLToolComposite, public LLSingleton<LLToolCompScale>
 {
 	LLSINGLETON(LLToolCompScale);
 	virtual ~LLToolCompScale();
@@ -169,7 +169,7 @@ public:
 //-----------------------------------------------------------------------
 // LLToolCompRotate
 
-class LLToolCompRotate : public LLToolComposite, public LLSingleton<LLToolCompRotate>
+class LLToolCompRotate final : public LLToolComposite, public LLSingleton<LLToolCompRotate>
 {
 	LLSINGLETON(LLToolCompRotate);
 	virtual ~LLToolCompRotate();
@@ -192,7 +192,7 @@ protected:
 //-----------------------------------------------------------------------
 // LLToolCompCreate
 
-class LLToolCompCreate : public LLToolComposite, public LLSingleton<LLToolCompCreate>
+class LLToolCompCreate final : public LLToolComposite, public LLSingleton<LLToolCompCreate>
 {
 	LLSINGLETON(LLToolCompCreate);
 	virtual ~LLToolCompCreate();
@@ -217,7 +217,7 @@ class LLToolGun;
 class LLToolGrabBase;
 class LLToolSelect;
 
-class LLToolCompGun : public LLToolComposite, public LLSingleton<LLToolCompGun>
+class LLToolCompGun final : public LLToolComposite, public LLSingleton<LLToolCompGun>
 {
 	LLSINGLETON(LLToolCompGun);
 	virtual ~LLToolCompGun();

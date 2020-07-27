@@ -34,7 +34,7 @@ class LLPanelMediaSettingsGeneral;
 class LLPanelMediaSettingsSecurity;
 class LLPanelMediaSettingsPermissions;
 
-class LLFloaterMediaSettings : 
+class LLFloaterMediaSettings final :
 	public LLFloater
 {
 public: 

@@ -26,7 +26,7 @@
 // RlvUIEnabler - self-contained class that handles disabling or reenabling certain aspects of the viewer's UI
 //
 
-class RlvUIEnabler : public LLSingleton<RlvUIEnabler>
+class RlvUIEnabler final : public LLSingleton<RlvUIEnabler>
 {
 	friend class RlvHandler;
 	LLSINGLETON(RlvUIEnabler);

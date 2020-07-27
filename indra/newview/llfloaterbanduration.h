@@ -29,7 +29,7 @@
 
 #include "llfloater.h"
 
-class LLFloaterBanDuration : public LLFloater
+class LLFloaterBanDuration final : public LLFloater
 {
     typedef boost::function<void(const uuid_vec_t&, const S32 duration)> select_callback_t;
 

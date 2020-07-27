@@ -49,7 +49,7 @@ namespace LLCore
 /// its final status unchanged and *this* request will complete
 /// with an HE_HANDLE_NOT_FOUND error status.
 
-class HttpOpCancel : public HttpOperation
+class HttpOpCancel final : public HttpOperation
 {
 public:
 	/// @param	handle	Handle of previously-issued request to

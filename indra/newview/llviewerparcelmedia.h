@@ -37,7 +37,7 @@ class LLViewerParcelMediaNavigationObserver;
 // This class understands land parcels, network traffic, LSL media
 // transport commands, and talks to the LLViewerMedia class to actually
 // do playback.  It allows us to remove code from LLViewerParcelMgr.
-class LLViewerParcelMedia : public LLViewerMediaObserver, public LLSingleton<LLViewerParcelMedia>
+class LLViewerParcelMedia final : public LLViewerMediaObserver, public LLSingleton<LLViewerParcelMedia>
 {
 	LLSINGLETON(LLViewerParcelMedia);
 	~LLViewerParcelMedia();

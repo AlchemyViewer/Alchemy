@@ -36,7 +36,7 @@
 #include "llwearabletype.h"
 #include "llinventorysettings.h"
 
-struct IconEntry : public LLDictionaryEntry
+struct IconEntry final : public LLDictionaryEntry
 {
 	IconEntry(const std::string &item_name)
 		:
@@ -44,7 +44,7 @@ struct IconEntry : public LLDictionaryEntry
 	{}
 };
 
-class LLIconDictionary : public LLSingleton<LLIconDictionary>,
+class LLIconDictionary final : public LLSingleton<LLIconDictionary>,
 						 public LLDictionary<LLInventoryType::EIconName, IconEntry>
 {
 	LLSINGLETON(LLIconDictionary);

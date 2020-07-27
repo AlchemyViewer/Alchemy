@@ -63,7 +63,7 @@ class BufferArray;
 /// the information needed to make a working request which can
 /// then be enqueued to a request queue.
 ///
-class HttpOpRequest : public HttpOperation
+class HttpOpRequest final : public HttpOperation
 {
 public:
     typedef boost::shared_ptr<HttpOpRequest> ptr_t;

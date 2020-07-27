@@ -41,7 +41,7 @@ class LLViewerRegion;
 class LLVOAvatar;
 class LLPickInfo;
 
-class LLToolDragAndDrop : public LLTool, public LLSingleton<LLToolDragAndDrop>
+class LLToolDragAndDrop final : public LLTool, public LLSingleton<LLToolDragAndDrop>
 {
 	LLSINGLETON(LLToolDragAndDrop);
 public:
@@ -279,7 +279,7 @@ private:
 						 dragOrDrop3dImpl f_land);
 		dragOrDrop3dImpl mFunctions[DT_COUNT];
 	};	
-	class LLDragAndDropDictionary : public LLSingleton<LLDragAndDropDictionary>,
+	class LLDragAndDropDictionary final : public LLSingleton<LLDragAndDropDictionary>,
 									public LLDictionary<EDragAndDropType, DragAndDropEntry>
 	{
 		LLSINGLETON(LLDragAndDropDictionary);

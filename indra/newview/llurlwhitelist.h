@@ -30,7 +30,7 @@
 
 #include <list>
 
-class LLUrlWhiteList : public LLSingleton<LLUrlWhiteList>
+class LLUrlWhiteList final : public LLSingleton<LLUrlWhiteList>
 {
 	LLSINGLETON(LLUrlWhiteList);
 	~LLUrlWhiteList();

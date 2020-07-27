@@ -111,7 +111,7 @@ class LLLocalBitmapTimer : public LLEventTimer
 
 };
 
-class LLLocalBitmapMgr : public LLSingleton<LLLocalBitmapMgr>
+class LLLocalBitmapMgr final : public LLSingleton<LLLocalBitmapMgr>
 {
 	LLSINGLETON(LLLocalBitmapMgr);
 	~LLLocalBitmapMgr();

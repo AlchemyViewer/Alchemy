@@ -32,7 +32,7 @@
 
 #include "llpanelpulldown.h"
 
-class LLPanelVolumePulldown : public LLPanelPulldown
+class LLPanelVolumePulldown final : public LLPanelPulldown
 {
  public:
 	LLPanelVolumePulldown();

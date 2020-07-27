@@ -35,7 +35,7 @@
 class LLLineEditor;
 class LLComboBox;
 
-class LLFloaterURLEntry : public LLFloater
+class LLFloaterURLEntry final : public LLFloater
 {
 public:
 	// Can only be shown by LLPanelLandMedia, and pushes data back into

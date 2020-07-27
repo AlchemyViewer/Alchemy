@@ -51,7 +51,7 @@ class LLTabContainer;
 class LLTextBox;
 class LLMessageSystem;
 
-class LLFloaterGodTools
+class LLFloaterGodTools final
 	: public LLFloater
 {
 	friend class LLFloaterReg;

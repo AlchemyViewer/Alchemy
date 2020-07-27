@@ -60,7 +60,7 @@ struct AssetEntry : public LLDictionaryEntry
 	bool mCanKnow;
 };
 
-class LLAssetDictionary : public LLSingleton<LLAssetDictionary>,
+class LLAssetDictionary final : public LLSingleton<LLAssetDictionary>,
 						  public LLDictionary<LLAssetType::EType, AssetEntry>
 {
 	LLSINGLETON(LLAssetDictionary);

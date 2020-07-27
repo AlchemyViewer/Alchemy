@@ -40,7 +40,7 @@ class LLLineEditor;
 class LLRadioGroup;
 class LLPreview;
 
-class LLMultiPreview : public LLMultiFloater
+class LLMultiPreview final : public LLMultiFloater
 {
 public:
 	LLMultiPreview();

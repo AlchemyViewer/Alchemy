@@ -39,7 +39,7 @@ class LLQuaternion;
 class LLSD;
 class LLVector3;
 
-class LLFloaterPathfindingCharacters : public LLFloaterPathfindingObjects
+class LLFloaterPathfindingCharacters final : public LLFloaterPathfindingObjects
 {
 public:
 	virtual void                                    onClose(bool pIsAppQuitting);

@@ -42,7 +42,7 @@ class LLParcelSelection;
 class LLParcel;
 class LLViewerRegion;
 
-class LLFloaterAuction : public LLFloater
+class LLFloaterAuction final : public LLFloater
 {
 	friend class LLFloaterReg;
 public:

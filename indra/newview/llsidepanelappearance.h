@@ -39,7 +39,7 @@ class LLPanelEditWearable;
 class LLViewerWearable;
 class LLPanelOutfitsInventory;
 
-class LLSidepanelAppearance : public LLPanel
+class LLSidepanelAppearance final : public LLPanel
 {
 	LOG_CLASS(LLSidepanelAppearance);
 public:

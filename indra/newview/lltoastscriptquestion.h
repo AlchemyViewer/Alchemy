@@ -30,7 +30,7 @@
 #ifndef LLTOASTSCRIPTQUESTION_H_
 #define LLTOASTSCRIPTQUESTION_H_
 
-class LLToastScriptQuestion : public LLToastPanel
+class LLToastScriptQuestion final : public LLToastPanel
 {
 	LOG_CLASS(LLToastScriptQuestion);
 

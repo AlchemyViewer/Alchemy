@@ -30,7 +30,7 @@
 #include "llcontrol.h"
 #include "llfloater.h"
 
-class LLFloaterPreferenceViewAdvanced
+class LLFloaterPreferenceViewAdvanced final
 :	public LLFloater
 {
 	friend class LLFloaterReg;

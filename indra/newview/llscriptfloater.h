@@ -36,7 +36,7 @@ class LLToastPanel;
  * Handles script notifications ("ScriptDialog" and "ScriptDialogGroup")
  * and manages Script Floaters.
  */
-class LLScriptFloaterManager : public LLSingleton<LLScriptFloaterManager>
+class LLScriptFloaterManager final : public LLSingleton<LLScriptFloaterManager>
 {
 	// *TODO
 	// LLScriptFloaterManager and LLScriptFloater will need some refactoring after we 

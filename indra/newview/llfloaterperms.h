@@ -32,7 +32,7 @@
 #include "lleventcoro.h"
 #include "llcoros.h"
 
-class LLFloaterPerms : public LLFloater
+class LLFloaterPerms final : public LLFloater
 {
 	friend class LLFloaterReg;
 	
@@ -50,7 +50,7 @@ private:
 
 };
 
-class LLFloaterPermsDefault : public LLFloater
+class LLFloaterPermsDefault final : public LLFloater
 {
 	friend class LLFloaterReg;
 

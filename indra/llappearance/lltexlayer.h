@@ -291,7 +291,7 @@ protected:
 // LLTexLayerStaticImageList
 //
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-class LLTexLayerStaticImageList : public LLSingleton<LLTexLayerStaticImageList>
+class LLTexLayerStaticImageList final : public LLSingleton<LLTexLayerStaticImageList>
 {
 	LLSINGLETON(LLTexLayerStaticImageList);
 	~LLTexLayerStaticImageList();

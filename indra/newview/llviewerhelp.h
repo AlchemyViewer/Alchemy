@@ -37,7 +37,7 @@
 
 class LLUICtrl;
 
-class LLViewerHelp : public LLHelp, public LLSingleton<LLViewerHelp>
+class LLViewerHelp final : public LLHelp, public LLSingleton<LLViewerHelp>
 {
 	LLSINGLETON_EMPTY_CTOR(LLViewerHelp);
 

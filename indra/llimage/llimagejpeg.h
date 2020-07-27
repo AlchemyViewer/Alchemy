@@ -42,7 +42,7 @@ extern "C" {
 #endif
 }
 
-class LLImageJPEG : public LLImageFormatted
+class LLImageJPEG final : public LLImageFormatted
 {
 protected:
 	virtual ~LLImageJPEG();

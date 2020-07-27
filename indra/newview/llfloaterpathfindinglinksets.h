@@ -43,7 +43,7 @@ class LLTextBase;
 class LLUICtrl;
 class LLVector3;
 
-class LLFloaterPathfindingLinksets : public LLFloaterPathfindingObjects
+class LLFloaterPathfindingLinksets final : public LLFloaterPathfindingObjects
 {
 public:
 	static void  openLinksetsWithSelectedObjects();

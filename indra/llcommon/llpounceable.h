@@ -73,7 +73,7 @@ class LLPounceableQueueImpl;
 // because we can't count on a data member queue being initialized at the time
 // we start getting callWhenReady() calls. This is that LLSingleton.
 template <typename T>
-class LLPounceableQueueSingleton:
+class LLPounceableQueueSingleton final :
     public LLSingleton<LLPounceableQueueSingleton<T> >
 {
     LLSINGLETON_EMPTY_CTOR(LLPounceableQueueSingleton);

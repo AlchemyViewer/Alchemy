@@ -35,7 +35,7 @@
 class LLComboBox;
 class LLImageRaw;
 
-class LLFloaterOutfitPhotoPreview : public LLPreview
+class LLFloaterOutfitPhotoPreview final : public LLPreview
 {
 public:
 	LLFloaterOutfitPhotoPreview(const LLSD& key);

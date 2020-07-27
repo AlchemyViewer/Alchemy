@@ -351,7 +351,7 @@ struct LLRoleActionSet
 	std::vector<LLRoleAction*> mActions;
 };
 
-class LLGroupMgr : public LLSingleton<LLGroupMgr>
+class LLGroupMgr final : public LLSingleton<LLGroupMgr>
 {
 	LLSINGLETON(LLGroupMgr);
 	~LLGroupMgr();

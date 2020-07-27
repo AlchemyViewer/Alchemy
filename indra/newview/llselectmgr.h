@@ -407,7 +407,7 @@ private:
     LLObjectSelectionHandle					mSelectedObjects;
 };
 
-class LLSelectMgr : public LLEditMenuHandler, public LLSingleton<LLSelectMgr>
+class LLSelectMgr final : public LLEditMenuHandler, public LLSingleton<LLSelectMgr>
 {
 	LLSINGLETON(LLSelectMgr);
 	~LLSelectMgr();

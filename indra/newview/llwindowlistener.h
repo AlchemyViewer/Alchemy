@@ -33,7 +33,7 @@
 class LLKeyboard;
 class LLViewerWindow;
 
-class LLWindowListener : public LLEventAPI
+class LLWindowListener final : public LLEventAPI
 {
 public:
 	typedef boost::function<LLKeyboard*()> KeyboardGetter;

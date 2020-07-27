@@ -40,7 +40,7 @@ enum LLLOCALE_ID
 	LLLOCALE_COUNT	// Number of values in this enum.  Keep at end.
 };
 
-class LLResMgr : public LLSingleton<LLResMgr>
+class LLResMgr final : public LLSingleton<LLResMgr>
 {
 	LLSINGLETON(LLResMgr);
 

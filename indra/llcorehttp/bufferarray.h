@@ -64,7 +64,7 @@ class BufferArrayStreamBuf;
 /// Allocation:  Refcounted, heap only.  Caller of the constructor
 /// is given a single refcount.
 ///
-class BufferArray : public LLCoreInt::RefCounted
+class BufferArray final : public LLCoreInt::RefCounted
 {
 public:
 	// BufferArrayStreamBuf has intimate knowledge of this

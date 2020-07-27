@@ -34,7 +34,7 @@ class LLMessageSystem;
 /**
  * Contains region info, notifies interested parties of its changes.
  */
-class LLRegionInfoModel : public LLSingleton<LLRegionInfoModel>
+class LLRegionInfoModel final : public LLSingleton<LLRegionInfoModel>
 {
 	LLSINGLETON(LLRegionInfoModel);
 	LOG_CLASS(LLRegionInfoModel);

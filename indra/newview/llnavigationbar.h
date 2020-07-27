@@ -82,7 +82,7 @@ protected:
 /**
  * Web browser-like navigation bar.
  */ 
-class LLNavigationBar
+class LLNavigationBar final
 	:	public LLPanel, public LLSingleton<LLNavigationBar>, private LLDestroyClass<LLNavigationBar>
 {
 	LLSINGLETON(LLNavigationBar);

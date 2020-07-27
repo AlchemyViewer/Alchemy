@@ -189,7 +189,7 @@ class LLAutoReplaceSettings
  * See the autoreplaceCallback method for how to add autoreplace functionality
  * to a text entry tool.
  */
-class LLAutoReplace : public LLSingleton<LLAutoReplace>
+class LLAutoReplace final : public LLSingleton<LLAutoReplace>
 {
     LLSINGLETON(LLAutoReplace);
 public:

@@ -137,7 +137,7 @@ public:
 	EStatus mStatus;
 };
 
-class LLFloaterSnapshot : public LLFloaterSnapshotBase
+class LLFloaterSnapshot final : public LLFloaterSnapshotBase
 {
 	LOG_CLASS(LLFloaterSnapshot);
 
@@ -171,7 +171,7 @@ public:
 /// Class LLFloaterSnapshot::Impl
 ///----------------------------------------------------------------------------
 
-class LLFloaterSnapshot::Impl : public LLFloaterSnapshotBase::ImplBase
+class LLFloaterSnapshot::Impl final : public LLFloaterSnapshotBase::ImplBase
 {
 	LOG_CLASS(LLFloaterSnapshot::Impl);
 public:
@@ -211,7 +211,7 @@ private:
 	void setFinished(bool finished, bool ok = true, const std::string& msg = LLStringUtil::null);
 };
 
-class LLSnapshotFloaterView : public LLFloaterView
+class LLSnapshotFloaterView final : public LLFloaterView
 {
 public:
 	struct Params 

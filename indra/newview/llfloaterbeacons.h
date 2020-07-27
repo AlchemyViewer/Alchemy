@@ -30,7 +30,7 @@
 
 #include "llfloater.h"
 
-class LLFloaterBeacons : public LLFloater
+class LLFloaterBeacons final : public LLFloater
 {
 	friend class LLFloaterReg;
 	

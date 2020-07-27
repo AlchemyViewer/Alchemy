@@ -51,7 +51,7 @@
  */
 
 template <typename FUNCTOR_TYPE>
-class LLFunctorRegistry : public LLSingleton<LLFunctorRegistry<FUNCTOR_TYPE> >
+class LLFunctorRegistry final : public LLSingleton<LLFunctorRegistry<FUNCTOR_TYPE> >
 {
 	LLSINGLETON(LLFunctorRegistry);
 	LOG_CLASS(LLFunctorRegistry);

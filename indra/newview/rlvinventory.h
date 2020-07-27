@@ -34,7 +34,7 @@ class LLOfferInfo;
 // RlvInventory class declaration
 //
 
-class RlvInventory : public LLSingleton<RlvInventory>, public LLInventoryObserver
+class RlvInventory final : public LLSingleton<RlvInventory>, public LLInventoryObserver
 {
 	LLSINGLETON(RlvInventory);
 public:

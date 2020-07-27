@@ -85,7 +85,7 @@ namespace boost {
  * can provide diagnostic info: we can look up the name of the
  * currently-running coroutine.
  */
-class LL_COMMON_API LLCoros: public LLSingleton<LLCoros>
+class LL_COMMON_API LLCoros final : public LLSingleton<LLCoros>
 {
     LLSINGLETON(LLCoros);
     ~LLCoros();

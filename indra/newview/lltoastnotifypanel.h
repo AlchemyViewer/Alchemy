@@ -137,7 +137,7 @@ protected:
 	static const LLFontGL* sFontSmall;
 };
 
-class LLIMToastNotifyPanel : public LLToastNotifyPanel
+class LLIMToastNotifyPanel final : public LLToastNotifyPanel
 {
 public:
 

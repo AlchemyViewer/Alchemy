@@ -40,7 +40,7 @@
 
 class LLResizeBar;
 
-class LLFloaterIMNearbyChat
+class LLFloaterIMNearbyChat final
 	:	public LLFloaterIMSessionTab
 {
 public:

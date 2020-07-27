@@ -409,7 +409,7 @@ public:
 	 * (e.g. for items selected across multiple wearable lists),
 	 * so making it a singleton.
 	 */
-	class ContextMenu : public LLListContextMenu, public LLSingleton<ContextMenu>
+	class ContextMenu final : public LLListContextMenu, public LLSingleton<ContextMenu>
 	{
 		LLSINGLETON(ContextMenu);
 	public:

@@ -65,7 +65,7 @@ typedef std::list<LLHUDComplexity> hud_complexity_list_t;
 
 // Class to notify user about drastic changes in agent's render weights or if other agents
 // reported that user's agent is too 'heavy' for their settings
-class LLAvatarRenderNotifier : public LLSingleton<LLAvatarRenderNotifier>
+class LLAvatarRenderNotifier final : public LLSingleton<LLAvatarRenderNotifier>
 {
 	LLSINGLETON(LLAvatarRenderNotifier);
 
@@ -112,7 +112,7 @@ private:
 };
 
 // Class to notify user about heavy set of HUD
-class LLHUDRenderNotifier : public LLSingleton<LLHUDRenderNotifier>
+class LLHUDRenderNotifier final : public LLSingleton<LLHUDRenderNotifier>
 {
     LLSINGLETON(LLHUDRenderNotifier);
     ~LLHUDRenderNotifier();

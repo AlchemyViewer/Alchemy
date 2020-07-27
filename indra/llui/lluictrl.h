@@ -258,7 +258,7 @@ public:
 
 	LLUICtrl* findRootMostFocusRoot();
 
-	class LLTextInputFilter : public LLQueryFilter, public LLSingleton<LLTextInputFilter>
+	class LLTextInputFilter final : public LLQueryFilter, public LLSingleton<LLTextInputFilter>
 	{
 		LLSINGLETON_EMPTY_CTOR(LLTextInputFilter);
 		/*virtual*/ filterResult_t operator() (const LLView* const view, const viewList_t & children) const 
@@ -270,12 +270,12 @@ public:
 	template <typename F, typename DERIVED> class CallbackRegistry : public LLRegistrySingleton<std::string, F, DERIVED >
 	{};	
 
-	class CommitCallbackRegistry : public CallbackRegistry<commit_callback_t, CommitCallbackRegistry>
+	class CommitCallbackRegistry final : public CallbackRegistry<commit_callback_t, CommitCallbackRegistry>
 	{
 		LLSINGLETON_EMPTY_CTOR(CommitCallbackRegistry);
 	};
 	// the enable callback registry is also used for visiblity callbacks
-	class EnableCallbackRegistry : public CallbackRegistry<enable_callback_t, EnableCallbackRegistry>
+	class EnableCallbackRegistry final : public CallbackRegistry<enable_callback_t, EnableCallbackRegistry>
 	{
 		LLSINGLETON_EMPTY_CTOR(EnableCallbackRegistry);
 	};

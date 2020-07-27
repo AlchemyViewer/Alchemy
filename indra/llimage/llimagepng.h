@@ -29,7 +29,7 @@
 #include "stdtypes.h"
 #include "llimage.h"
 
-class LLImagePNG : public LLImageFormatted
+class LLImagePNG final : public LLImageFormatted
 {
 protected:
 	~LLImagePNG();

@@ -127,7 +127,7 @@ public:
 	{};
 };
 
-class LLToolTipMgr : public LLSingleton<LLToolTipMgr>
+class LLToolTipMgr final : public LLSingleton<LLToolTipMgr>
 {
 	LLSINGLETON(LLToolTipMgr);
 	LOG_CLASS(LLToolTipMgr);

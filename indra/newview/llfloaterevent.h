@@ -34,7 +34,7 @@
 class LLMediaCtrl;
 class LLButton;
 
-class LLFloaterEvent : public LLFloater,
+class LLFloaterEvent final : public LLFloater,
                        public LLViewerMediaObserver
 
 {

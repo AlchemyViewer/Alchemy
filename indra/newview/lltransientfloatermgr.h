@@ -36,7 +36,7 @@ class LLTransientFloater;
 /**
  * Provides functionality to hide transient floaters.
  */
-class LLTransientFloaterMgr: public LLSingleton<LLTransientFloaterMgr>
+class LLTransientFloaterMgr final : public LLSingleton<LLTransientFloaterMgr>
 {
 	LLSINGLETON(LLTransientFloaterMgr);
 

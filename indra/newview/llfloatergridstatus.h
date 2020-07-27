@@ -35,7 +35,7 @@
 class LLMediaCtrl;
 
 
-class LLFloaterGridStatus :
+class LLFloaterGridStatus final :
     public LLFloaterWebContent
 {
 public:

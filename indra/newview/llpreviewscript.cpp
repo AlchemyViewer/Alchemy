@@ -150,7 +150,7 @@ bool LLLiveLSLFile::loadFile()
 /// ---------------------------------------------------------------------------
 /// LLFloaterScriptSearch
 /// ---------------------------------------------------------------------------
-class LLFloaterScriptSearch : public LLFloater
+class LLFloaterScriptSearch final : public LLFloater
 {
 public:
 	LLFloaterScriptSearch(LLScriptEdCore* editor_core);

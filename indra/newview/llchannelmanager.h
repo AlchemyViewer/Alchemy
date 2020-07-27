@@ -41,7 +41,7 @@ namespace LLNotificationsUI
  * Manager for screen channels.
  * Responsible for instantiating and retrieving screen channels.
  */
-class LLChannelManager : public LLSingleton<LLChannelManager>
+class LLChannelManager final : public LLSingleton<LLChannelManager>
 {
 	LLSINGLETON(LLChannelManager);
 	virtual ~LLChannelManager();

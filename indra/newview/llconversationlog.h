@@ -107,7 +107,7 @@ private:
  * To distinguish two conversations with the same sessionID it's also needed to compare their creation date.
  */
 
-class LLConversationLog : public LLSingleton<LLConversationLog>, LLIMSessionObserver
+class LLConversationLog final : public LLSingleton<LLConversationLog>, LLIMSessionObserver
 {
 	LLSINGLETON(LLConversationLog);
 public:

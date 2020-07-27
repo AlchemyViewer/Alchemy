@@ -40,7 +40,7 @@ const MASK MASK_ORBIT			= MASK_CONTROL;
 const MASK MASK_PAN				= MASK_CONTROL | MASK_SHIFT;
 const MASK MASK_COPY			= MASK_SHIFT;
 
-class LLToolMgr : public LLSingleton<LLToolMgr>
+class LLToolMgr final : public LLSingleton<LLToolMgr>
 {
 	LLSINGLETON(LLToolMgr);
 	~LLToolMgr();

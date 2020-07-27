@@ -46,7 +46,7 @@ class LLItemInfo;
 class LLLineEditor;
 class LLTabContainer;
 
-class LLFloaterWorldMap : public LLFloater
+class LLFloaterWorldMap final : public LLFloater
 {
 public:
 	LLFloaterWorldMap(const LLSD& key);

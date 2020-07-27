@@ -132,7 +132,7 @@ void append_to_last_message(std::list<LLSD>& messages, const std::string& line)
 	messages.back()[LL_IM_TEXT] = im_text;
 }
 
-class LLLogChatTimeScanner: public LLSingleton<LLLogChatTimeScanner>
+class LLLogChatTimeScanner final : public LLSingleton<LLLogChatTimeScanner>
 {
 	LLSINGLETON(LLLogChatTimeScanner);
 

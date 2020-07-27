@@ -33,7 +33,7 @@
 
 class LLMediaCtrl;
 
-class LLFloaterHelpBrowser : 
+class LLFloaterHelpBrowser final :
 	public LLFloater, 
 	public LLViewerMediaObserver
 {

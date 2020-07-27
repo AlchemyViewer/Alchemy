@@ -30,7 +30,7 @@
 
 class LLConversationLogList;
 
-class LLFloaterConversationLog : public LLFloater
+class LLFloaterConversationLog final : public LLFloater
 {
 public:
 

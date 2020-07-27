@@ -165,7 +165,7 @@ private:
 	BOOL mIsRetrying;
 };
 
-class LLVoiceChannelProximal : public LLVoiceChannel, public LLSingleton<LLVoiceChannelProximal>
+class LLVoiceChannelProximal final : public LLVoiceChannel, public LLSingleton<LLVoiceChannelProximal>
 {
 	LLSINGLETON(LLVoiceChannelProximal);
 public:
@@ -179,7 +179,7 @@ public:
 
 };
 
-class LLVoiceChannelP2P : public LLVoiceChannelGroup
+class LLVoiceChannelP2P final : public LLVoiceChannelGroup
 {
 public:
 	LLVoiceChannelP2P(const LLUUID& session_id, const std::string& session_name, const LLUUID& other_user_id);

@@ -44,7 +44,7 @@
 
 #include "llsingleton.h" // includes llerror which we need here so we can skip the include here
 
-class LLViewerEventRecorder : public LLSingleton<LLViewerEventRecorder>
+class LLViewerEventRecorder final : public LLSingleton<LLViewerEventRecorder>
 {
   LLSINGLETON(LLViewerEventRecorder);
   ~LLViewerEventRecorder();

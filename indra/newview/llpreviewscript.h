@@ -54,7 +54,7 @@ class LLScriptEdContainer;
 class LLFloaterGotoLine;
 class LLFloaterExperienceProfile;
 
-class LLLiveLSLFile : public LLLiveFile
+class LLLiveLSLFile final : public LLLiveFile
 {
 public:
     typedef boost::function<bool(const std::string& filename)> change_callback_t;
@@ -72,7 +72,7 @@ protected:
 };
 
 // Inner, implementation class.  LLPreviewScript and LLLiveLSLEditor each own one of these.
-class LLScriptEdCore : public LLPanel
+class LLScriptEdCore final : public LLPanel
 {
 	friend class LLPreviewScript;
 	friend class LLPreviewLSL;
@@ -214,7 +214,7 @@ protected:
 };
 
 // Used to view and edit an LSL script from your inventory.
-class LLPreviewLSL : public LLScriptEdContainer
+class LLPreviewLSL final : public LLScriptEdContainer
 {
 public:
 	LLPreviewLSL(const LLSD& key );
@@ -252,7 +252,7 @@ protected:
 
 
 // Used to view and edit an LSL script that is attached to an object.
-class LLLiveLSLEditor : public LLScriptEdContainer
+class LLLiveLSLEditor final : public LLScriptEdContainer
 {
 	friend class LLLiveLSLFile;
 public: 

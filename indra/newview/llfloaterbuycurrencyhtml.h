@@ -30,7 +30,7 @@
 #include "llfloater.h"
 #include "llmediactrl.h"
 
-class LLFloaterBuyCurrencyHTML : 
+class LLFloaterBuyCurrencyHTML final :
 	public LLFloater, 
 	public LLViewerMediaObserver
 {

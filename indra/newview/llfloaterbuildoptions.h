@@ -39,7 +39,7 @@ class LLObjectSelection;
 
 typedef LLSafeHandle<LLObjectSelection> LLObjectSelectionHandle;
 
-class LLFloaterBuildOptions
+class LLFloaterBuildOptions final
 	:	public LLFloater
 {
 public:

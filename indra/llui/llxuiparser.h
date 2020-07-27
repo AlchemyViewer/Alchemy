@@ -39,7 +39,7 @@
 class LLView;
 
 // lookup widget type by name
-class LLWidgetTypeRegistry
+class LLWidgetTypeRegistry final
 :	public LLRegistrySingleton<std::string, const std::type_info*, LLWidgetTypeRegistry>
 {
 	LLSINGLETON_EMPTY_CTOR(LLWidgetTypeRegistry);

@@ -52,7 +52,7 @@ class LLLandImpactsObserver;
 
 typedef LLSafeHandle<LLObjectSelection> LLObjectSelectionHandle;
 
-class LLFloaterTools
+class LLFloaterTools final
 : public LLFloater
 {
 public:

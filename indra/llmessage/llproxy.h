@@ -217,7 +217,7 @@ enum LLSocks5AuthType
  * *TODO$: This should be moved into the LLCore::Http space.
  * 
  */
-class LLProxy: public LLSingleton<LLProxy>
+class LLProxy final : public LLSingleton<LLProxy>
 {
 	/*###########################################################################################
 	METHODS THAT DO NOT LOCK mProxyMutex!

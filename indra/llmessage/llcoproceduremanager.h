@@ -36,7 +36,7 @@
 
 class LLCoprocedurePool;
 
-class LLCoprocedureManager : public LLSingleton < LLCoprocedureManager >
+class LLCoprocedureManager final : public LLSingleton < LLCoprocedureManager >
 {
     LLSINGLETON(LLCoprocedureManager);
     virtual ~LLCoprocedureManager();

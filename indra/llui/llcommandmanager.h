@@ -170,7 +170,7 @@ private:
 };
 
 
-class LLCommandManager
+class LLCommandManager final
 :	public LLSingleton<LLCommandManager>
 {
 	LLSINGLETON(LLCommandManager);

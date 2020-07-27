@@ -39,7 +39,7 @@
    inventory items pointing to the same asset (i.e. more than one ItemID
    per assetID).  EXT-6252
 */
-class LLWearableList : public LLSingleton<LLWearableList>
+class LLWearableList final : public LLSingleton<LLWearableList>
 {
 	LLSINGLETON_EMPTY_CTOR(LLWearableList);
 	~LLWearableList();

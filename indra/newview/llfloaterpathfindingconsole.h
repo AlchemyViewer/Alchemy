@@ -49,7 +49,7 @@ class LLTabContainer;
 class LLTextBase;
 class LLToolset;
 
-class LLFloaterPathfindingConsole
+class LLFloaterPathfindingConsole final
 :	public LLFloater
 {
 	friend class LLFloaterReg;

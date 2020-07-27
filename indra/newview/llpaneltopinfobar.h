@@ -35,7 +35,7 @@ class LLTextBox;
 class LLIconCtrl;
 class LLParcelChangeObserver;
 
-class LLPanelTopInfoBar : public LLPanel, public LLSingleton<LLPanelTopInfoBar>, private LLDestroyClass<LLPanelTopInfoBar>
+class LLPanelTopInfoBar final : public LLPanel, public LLSingleton<LLPanelTopInfoBar>, private LLDestroyClass<LLPanelTopInfoBar>
 {
 	LLSINGLETON(LLPanelTopInfoBar);
 	~LLPanelTopInfoBar();

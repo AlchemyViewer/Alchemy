@@ -36,7 +36,7 @@
 class LLAvatarName;
 class LLScrollListCtrl;
 
-class LLFloaterAvatarPicker :public LLFloater
+class LLFloaterAvatarPicker final :public LLFloater
 {
 public:
 	typedef boost::signals2::signal<bool(const uuid_vec_t&), boost_boolean_combiner> validate_signal_t;

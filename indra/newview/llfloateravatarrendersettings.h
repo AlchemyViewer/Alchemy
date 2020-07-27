@@ -33,7 +33,7 @@
 
 class LLNameListCtrl;
 
-class LLFloaterAvatarRenderSettings : public LLFloater
+class LLFloaterAvatarRenderSettings final : public LLFloater
 {
 public:
 

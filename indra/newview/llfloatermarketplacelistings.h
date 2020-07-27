@@ -89,7 +89,7 @@ private:
 // Class LLFloaterMarketplaceListings
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-class LLFloaterMarketplaceListings : public LLFloater
+class LLFloaterMarketplaceListings final : public LLFloater
 {
 public:
 	LLFloaterMarketplaceListings(const LLSD& key);
@@ -146,7 +146,7 @@ private:
 //-----------------------------------------------------------------------------
 // LLFloaterAssociateListing
 //-----------------------------------------------------------------------------
-class LLFloaterAssociateListing : public LLFloater
+class LLFloaterAssociateListing final : public LLFloater
 {
 	friend class LLFloaterReg;
 public:
@@ -176,7 +176,7 @@ private:
 // get the validation triggered on the server and display the html report.
 // *TODO : morph into an html/text window using the pattern in llfloatertos
 
-class LLFloaterMarketplaceValidation : public LLFloater
+class LLFloaterMarketplaceValidation final : public LLFloater
 {
 public:
 	LLFloaterMarketplaceValidation(const LLSD& key);
@@ -211,7 +211,7 @@ private:
 // LLFloaterItemProperties
 //-----------------------------------------------------------------------------
 
-class LLFloaterItemProperties : public LLFloater
+class LLFloaterItemProperties final : public LLFloater
 {
 public:
 	LLFloaterItemProperties(const LLSD& key);

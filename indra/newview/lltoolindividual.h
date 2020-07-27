@@ -37,7 +37,7 @@ class LLPickInfo;
 // A tool to select individual objects rather than linked sets.
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-class LLToolIndividual : public LLTool, public LLSingleton<LLToolIndividual>
+class LLToolIndividual final : public LLTool, public LLSingleton<LLToolIndividual>
 {
 	LLSINGLETON(LLToolIndividual);
 	virtual ~LLToolIndividual();

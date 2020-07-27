@@ -60,7 +60,7 @@ void LLUrlRegistryNullCallback(const std::string &url,
 /// As such, you can provide a callback method that will get invoked
 /// when a new label is available for one of your matched Urls.
 ///
-class LLUrlRegistry : public LLSingleton<LLUrlRegistry>
+class LLUrlRegistry final : public LLSingleton<LLUrlRegistry>
 {
 	LLSINGLETON(LLUrlRegistry);
 	~LLUrlRegistry();

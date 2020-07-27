@@ -33,7 +33,7 @@
 /**
  * Represents online tip toast panel.
  */
-class LLPanelOnlineStatus : public LLPanelTipToast
+class LLPanelOnlineStatus final : public LLPanelTipToast
 {
 	// disallow instantiation of this class
 private:

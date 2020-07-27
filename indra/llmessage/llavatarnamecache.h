@@ -39,7 +39,7 @@
 
 class LLSD;
 
-class LLAvatarNameCache : public LLSingleton<LLAvatarNameCache>
+class LLAvatarNameCache final : public LLSingleton<LLAvatarNameCache>
 {
 	LLSINGLETON(LLAvatarNameCache);
 	~LLAvatarNameCache();

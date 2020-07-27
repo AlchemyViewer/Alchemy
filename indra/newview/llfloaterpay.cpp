@@ -78,7 +78,7 @@ typedef boost::shared_ptr<LLGiveMoneyInfo> give_money_ptr;
 /// Class LLFloaterPay
 ///----------------------------------------------------------------------------
 
-class LLFloaterPay : public LLFloater
+class LLFloaterPay final : public LLFloater
 {
 public:
 	LLFloaterPay(const LLSD& key);

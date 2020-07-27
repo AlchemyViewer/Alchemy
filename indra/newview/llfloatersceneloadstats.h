@@ -29,7 +29,7 @@
 
 #include "llfloater.h"
 
-class LLFloaterSceneLoadStats : public LLFloater
+class LLFloaterSceneLoadStats final : public LLFloater
 {
 	friend class LLFloaterReg;
 private:

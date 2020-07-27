@@ -30,7 +30,7 @@
 #include "llnotificationptr.h"
 #include "lluuid.h"
 
-class LLViewerParcelAskPlay : public LLSingleton<LLViewerParcelAskPlay>
+class LLViewerParcelAskPlay final : public LLSingleton<LLViewerParcelAskPlay>
 {
     LLSINGLETON(LLViewerParcelAskPlay);
     ~LLViewerParcelAskPlay();

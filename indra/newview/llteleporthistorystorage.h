@@ -66,7 +66,7 @@ public:
  * Persistent teleport history.
  *
  */
-class LLTeleportHistoryStorage: public LLSingleton<LLTeleportHistoryStorage>
+class LLTeleportHistoryStorage final : public LLSingleton<LLTeleportHistoryStorage>
 {
 	LLSINGLETON(LLTeleportHistoryStorage);
 	~LLTeleportHistoryStorage();

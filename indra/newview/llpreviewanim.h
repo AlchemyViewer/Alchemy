@@ -30,7 +30,7 @@
 #include "llpreview.h"
 #include "llcharacter.h"
 
-class LLPreviewAnim : public LLPreview
+class LLPreviewAnim final : public LLPreview
 {
 public:
 

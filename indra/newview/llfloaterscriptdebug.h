@@ -32,7 +32,7 @@
 class LLTextEditor;
 class LLUUID;
 
-class LLFloaterScriptDebug : public LLMultiFloater
+class LLFloaterScriptDebug final : public LLMultiFloater
 {
 public:
 	LLFloaterScriptDebug(const LLSD& key);
@@ -51,7 +51,7 @@ protected:
 	static LLFloaterScriptDebug*	sInstance;
 };
 
-class LLFloaterScriptDebugOutput : public LLFloater
+class LLFloaterScriptDebugOutput final : public LLFloater
 {
 public:
 	LLFloaterScriptDebugOutput(const LLSD& object_id);

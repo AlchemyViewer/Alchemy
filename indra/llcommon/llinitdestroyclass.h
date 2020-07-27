@@ -74,7 +74,7 @@ private:
  * (before main()), requiring LLInitClassList to be fully constructed on
  * demand regardless of module initialization order.
  */
-class LLInitClassList : 
+class LLInitClassList final :
 	public LLCallbackRegistry, 
 	public LLSingleton<LLInitClassList>
 {
@@ -88,7 +88,7 @@ class LLInitClassList :
  * time (before main()), requiring LLDestroyClassList to be fully constructed
  * on demand regardless of module initialization order.
  */
-class LLDestroyClassList : 
+class LLDestroyClassList final :
 	public LLCallbackRegistry, 
 	public LLSingleton<LLDestroyClassList>
 {

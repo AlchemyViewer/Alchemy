@@ -30,7 +30,7 @@
 #include "llfloater.h"
 
 
-class LLSceneView : public LLFloater
+class LLSceneView final : public LLFloater
 {
 public:
 	LLSceneView(const LLRect& rect);

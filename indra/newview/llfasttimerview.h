@@ -35,7 +35,7 @@
 
 class LLScrollbar;
 
-class LLFastTimerView : public LLFloater
+class LLFastTimerView final : public LLFloater
 {
 public:
 	LLFastTimerView(const LLSD&);

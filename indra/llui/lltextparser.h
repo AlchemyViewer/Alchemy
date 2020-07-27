@@ -35,7 +35,7 @@ class LLUUID;
 class LLVector3d;
 class LLColor4;
 
-class LLTextParser : public LLSingleton<LLTextParser>
+class LLTextParser final : public LLSingleton<LLTextParser>
 {
 	LLSINGLETON(LLTextParser);
 

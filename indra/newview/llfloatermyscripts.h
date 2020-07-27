@@ -30,7 +30,7 @@
 #include "llfloater.h"
 #include "llpanel.h"
 
-class LLFloaterMyScripts : public LLFloater
+class LLFloaterMyScripts final : public LLFloater
 {
 public:
 	LLFloaterMyScripts(const LLSD& seed);

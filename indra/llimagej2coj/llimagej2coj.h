@@ -29,7 +29,7 @@
 
 #include "llimagej2c.h"
 
-class LLImageJ2COJ : public LLImageJ2CImpl
+class LLImageJ2COJ final : public LLImageJ2CImpl
 {	
 public:
 	LLImageJ2COJ();
