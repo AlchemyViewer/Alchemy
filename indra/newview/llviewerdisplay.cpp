@@ -568,8 +568,9 @@ void display(BOOL rebuild, F32 zoom_factor, int subfield, BOOL for_snapshot)
 	//
 
 	LLAppViewer::instance()->pingMainloopTimeout("Display:Camera");
-	LLViewerCamera::getInstance()->setZoomParameters(zoom_factor, subfield);
-	LLViewerCamera::getInstance()->setNear(MIN_NEAR_PLANE);
+	auto& vwrCamera = LLViewerCamera::instance();
+	vwrCamera.setZoomParameters(zoom_factor, subfield);
+	vwrCamera.setNear(MIN_NEAR_PLANE);
 
 	//////////////////////////
 	//
@@ -647,7 +648,7 @@ void display(BOOL rebuild, F32 zoom_factor, int subfield, BOOL for_snapshot)
 		{
 			LL_RECORD_BLOCK_TIME(FTM_EEP_UPDATE);
             // update all the sky/atmospheric/water settings
-            LLEnvironment::instance().update(LLViewerCamera::getInstance());
+            LLEnvironment::instance().update(&vwrCamera);
 		}
 
 		// *TODO: merge these two methods
@@ -676,7 +677,7 @@ void display(BOOL rebuild, F32 zoom_factor, int subfield, BOOL for_snapshot)
 			 (gPipeline.hasRenderType(LLPipeline::RENDER_TYPE_WATER) || 
 			  gPipeline.hasRenderType(LLPipeline::RENDER_TYPE_VOIDWATER)))
 		{
-			if (LLViewerCamera::getInstance()->cameraUnderWater())
+			if (vwrCamera.cameraUnderWater())
 			{
 				water_clip = -1;
 			}
@@ -707,8 +708,8 @@ void display(BOOL rebuild, F32 zoom_factor, int subfield, BOOL for_snapshot)
 
 		static LLCullResult result;
 		LLViewerCamera::sCurCameraID = LLViewerCamera::CAMERA_WORLD;
-		LLPipeline::sUnderWaterRender = LLViewerCamera::getInstance()->cameraUnderWater();
-		gPipeline.updateCull(*LLViewerCamera::getInstance(), result, water_clip);
+		LLPipeline::sUnderWaterRender = vwrCamera.cameraUnderWater();
+		gPipeline.updateCull(vwrCamera, result, water_clip);
 		stop_glerror();
 
 		LLGLState::checkStates();
@@ -739,7 +740,7 @@ void display(BOOL rebuild, F32 zoom_factor, int subfield, BOOL for_snapshot)
 				if (gFrameCount > 1)
 				{ //for some reason, ATI 4800 series will error out if you 
 				  //try to generate a shadow before the first frame is through
-					gPipeline.generateSunShadow(*LLViewerCamera::getInstance());
+					gPipeline.generateSunShadow(vwrCamera);
 				}
 
 				LLVertexBuffer::unbind();
@@ -780,8 +781,8 @@ void display(BOOL rebuild, F32 zoom_factor, int subfield, BOOL for_snapshot)
 		//if (!for_snapshot)
 		{
 			LLAppViewer::instance()->pingMainloopTimeout("Display:Imagery");
-			gPipeline.generateWaterReflection(*LLViewerCamera::getInstance());
-			gPipeline.generateHighlight(*LLViewerCamera::getInstance());
+			gPipeline.generateWaterReflection(vwrCamera);
+			gPipeline.generateHighlight(vwrCamera);
 			gPipeline.renderPhysicsDisplay();
 		}
 
@@ -843,7 +844,7 @@ void display(BOOL rebuild, F32 zoom_factor, int subfield, BOOL for_snapshot)
 		LLAppViewer::instance()->pingMainloopTimeout("Display:StateSort");
 		{
 			LLViewerCamera::sCurCameraID = LLViewerCamera::CAMERA_WORLD;
-			gPipeline.stateSort(*LLViewerCamera::getInstance(), result);
+			gPipeline.stateSort(vwrCamera, result);
 			stop_glerror();
 				
 			if (rebuild)
@@ -901,8 +902,8 @@ void display(BOOL rebuild, F32 zoom_factor, int subfield, BOOL for_snapshot)
 		//								(F32)floater_rect.mRight / (F32)gViewerWindow->getWindowWidthScaled(),
 		//								(F32)floater_rect.mBottom / (F32)gViewerWindow->getWindowHeightScaled());
 		//		floater_3d_rect.translate(-0.5f, -0.5f);
-		//		gGL.translatef(0.f, 0.f, -LLViewerCamera::getInstance()->getNear());
-		//		gGL.scalef(LLViewerCamera::getInstance()->getNear() * LLViewerCamera::getInstance()->getAspect() / sinf(LLViewerCamera::getInstance()->getView()), LLViewerCamera::getInstance()->getNear() / sinf(LLViewerCamera::getInstance()->getView()), 1.f);
+		//		gGL.translatef(0.f, 0.f, -vwrCamera.getNear());
+		//		gGL.scalef(vwrCamera.getNear() * vwrCamera.getAspect() / sinf(vwrCamera.getView()), vwrCamera.getNear() / sinf(vwrCamera.getView()), 1.f);
 		//		gGL.color4fv(LLColor4::white.mV);
 		//		gGL.begin(LLVertexBuffer::QUADS);
 		//		{
@@ -917,7 +918,7 @@ void display(BOOL rebuild, F32 zoom_factor, int subfield, BOOL for_snapshot)
 		//	gGL.popMatrix();
 		//}
 
-		LLPipeline::sUnderWaterRender = LLViewerCamera::getInstance()->cameraUnderWater() ? TRUE : FALSE;
+		LLPipeline::sUnderWaterRender = vwrCamera.cameraUnderWater() ? TRUE : FALSE;
 
 		LLGLState::checkStates();
 		LLGLState::checkClientArrays();
@@ -980,11 +981,11 @@ void display(BOOL rebuild, F32 zoom_factor, int subfield, BOOL for_snapshot)
 			gGL.setColorMask(true, false);
 			if (LLPipeline::sRenderDeferred)
 			{
-				gPipeline.renderGeomDeferred(*LLViewerCamera::getInstance());
+				gPipeline.renderGeomDeferred(vwrCamera);
 			}
 			else
 			{
-				gPipeline.renderGeom(*LLViewerCamera::getInstance(), TRUE);
+				gPipeline.renderGeom(vwrCamera, TRUE);
 			}
 			
 			gGL.setColorMask(true, true);
@@ -1204,8 +1205,9 @@ LLRect get_whole_screen_region()
 	LLRect whole_screen = gViewerWindow->getWorldViewRectScaled();
 	
 	// apply camera zoom transform (for high res screenshots)
-	F32 zoom_factor = LLViewerCamera::getInstance()->getZoomFactor();
-	S16 sub_region = LLViewerCamera::getInstance()->getZoomSubRegion();
+	auto& vwrCamera = LLViewerCamera::instance();
+	F32 zoom_factor = vwrCamera.getZoomFactor();
+	S16 sub_region = vwrCamera.getZoomSubRegion();
 	if (zoom_factor > 1.f)
 	{
 		S32 num_horizontal_tiles = llceil(zoom_factor);
@@ -1223,14 +1225,15 @@ bool get_hud_matrices(const LLRect& screen_region, glh::matrix4f &proj, glh::mat
 {
 	if (isAgentAvatarValid() && gAgentAvatarp->hasHUDAttachment())
 	{
+		auto& vwrCamera = LLViewerCamera::instance();
 		F32 zoom_level = gAgentCamera.mHUDCurZoom;
 		LLBBox hud_bbox = gAgentAvatarp->getHUDBBox();
 		
 		F32 hud_depth = llmax(1.f, hud_bbox.getExtentLocal().mV[VX] * 1.1f);
-		proj = gl_ortho(-0.5f * LLViewerCamera::getInstance()->getAspect(), 0.5f * LLViewerCamera::getInstance()->getAspect(), -0.5f, 0.5f, 0.f, hud_depth);
+		proj = gl_ortho(-0.5f * vwrCamera.getAspect(), 0.5f * vwrCamera.getAspect(), -0.5f, 0.5f, 0.f, hud_depth);
 		proj.element(2,2) = -0.01f;
 		
-		F32 aspect_ratio = LLViewerCamera::getInstance()->getAspect();
+		F32 aspect_ratio = vwrCamera.getAspect();
 		
 		glh::matrix4f mat;
 		F32 scale_x = (F32)gViewerWindow->getWorldViewWidthScaled() / (F32)screen_region.getWidth();
@@ -1507,8 +1510,9 @@ void render_ui_2d()
 	//  Menu overlays, HUD, etc
 	gViewerWindow->setup2DRender();
 
-	F32 zoom_factor = LLViewerCamera::getInstance()->getZoomFactor();
-	S16 sub_region = LLViewerCamera::getInstance()->getZoomSubRegion();
+	auto& vwrCamera = LLViewerCamera::instance();
+	F32 zoom_factor = vwrCamera.getZoomFactor();
+	S16 sub_region = vwrCamera.getZoomSubRegion();
 
 	if (zoom_factor > 1.f)
 	{

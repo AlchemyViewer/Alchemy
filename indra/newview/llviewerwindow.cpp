@@ -4382,8 +4382,10 @@ LLViewerObject* LLViewerWindow::cursorIntersect(S32 mouse_x, S32 mouse_y, F32 de
 // indicating direction of point on screen x,y
 LLVector3 LLViewerWindow::mouseDirectionGlobal(const S32 x, const S32 y) const
 {
+	auto& viewerCamera = LLViewerCamera::instance();
+
 	// find vertical field of view
-	F32			fov = LLViewerCamera::getInstance()->getView();
+	F32			fov = viewerCamera.getView();
 
 	// find world view center in scaled ui coordinates
 	F32			center_x = getWorldViewRectScaled().getCenterX();
@@ -4397,9 +4399,9 @@ LLVector3 LLViewerWindow::mouseDirectionGlobal(const S32 x, const S32 y) const
 	F32			click_y = y - center_y;
 
 	// compute mouse vector
-	LLVector3	mouse_vector =	distance * LLViewerCamera::getInstance()->getAtAxis()
-								- click_x * LLViewerCamera::getInstance()->getLeftAxis()
-								+ click_y * LLViewerCamera::getInstance()->getUpAxis();
+	LLVector3	mouse_vector =	distance * viewerCamera.getAtAxis()
+								- click_x * viewerCamera.getLeftAxis()
+								+ click_y * viewerCamera.getUpAxis();
 
 	mouse_vector.normVec();
 
@@ -4426,9 +4428,11 @@ LLVector3 LLViewerWindow::mousePointHUD(const S32 x, const S32 y) const
 // indicating direction of point on screen x,y
 LLVector3 LLViewerWindow::mouseDirectionCamera(const S32 x, const S32 y) const
 {
+	auto& viewerCamera = LLViewerCamera::instance();
+
 	// find vertical field of view
-	F32			fov_height = LLViewerCamera::getInstance()->getView();
-	F32			fov_width = fov_height * LLViewerCamera::getInstance()->getAspect();
+	F32			fov_height = viewerCamera.getView();
+	F32			fov_width = fov_height * viewerCamera.getAspect();
 
 	// find screen resolution
 	S32			height = getWorldViewHeightScaled();
@@ -4893,6 +4897,8 @@ BOOL LLViewerWindow::rawSnapshot(LLImageRaw *raw, S32 image_width, S32 image_hei
 
 	LLRenderTarget scratch_space;
 
+	auto& viewerCamera = LLViewerCamera::instance();
+
 	F32 scale_factor = 1.0f ;
 	if (!keep_window_aspect || (image_width > window_width) || (image_height > window_height))
 	{	
@@ -4913,8 +4919,8 @@ BOOL LLViewerWindow::rawSnapshot(LLImageRaw *raw, S32 image_width, S32 image_hei
 					snapshot_height = image_height;
 					reset_deferred = true;
 					mWorldViewRectRaw.set(0, image_height, image_width, 0);
-					LLViewerCamera::getInstance()->setViewHeightInPixels( mWorldViewRectRaw.getHeight() );
-					LLViewerCamera::getInstance()->setAspect( getWorldViewAspectRatio() );
+					viewerCamera.setViewHeightInPixels( mWorldViewRectRaw.getHeight() );
+					viewerCamera.setAspect( getWorldViewAspectRatio() );
 					scratch_space.bindTarget();
 				}
 				else
@@ -4979,8 +4985,8 @@ BOOL LLViewerWindow::rawSnapshot(LLImageRaw *raw, S32 image_width, S32 image_hei
 
 	S32 output_buffer_offset_y = 0;
 
-	F32 depth_conversion_factor_1 = (LLViewerCamera::getInstance()->getFar() + LLViewerCamera::getInstance()->getNear()) / (2.f * LLViewerCamera::getInstance()->getFar() * LLViewerCamera::getInstance()->getNear());
-	F32 depth_conversion_factor_2 = (LLViewerCamera::getInstance()->getFar() - LLViewerCamera::getInstance()->getNear()) / (2.f * LLViewerCamera::getInstance()->getFar() * LLViewerCamera::getInstance()->getNear());
+	F32 depth_conversion_factor_1 = (viewerCamera.getFar() + viewerCamera.getNear()) / (2.f * viewerCamera.getFar() * viewerCamera.getNear());
+	F32 depth_conversion_factor_2 = (viewerCamera.getFar() - viewerCamera.getNear()) / (2.f * viewerCamera.getFar() * viewerCamera.getNear());
 
 	gObjectList.generatePickList(*LLViewerCamera::getInstance());
 
@@ -5060,7 +5066,7 @@ BOOL LLViewerWindow::rawSnapshot(LLImageRaw *raw, S32 image_width, S32 image_hei
 								F32 depth_float = *(F32*)(depth_line_buffer->getData() + (i * sizeof(F32)));
 					
 								F32 linear_depth_float = 1.f / (depth_conversion_factor_1 - (depth_float * depth_conversion_factor_2));
-								U8 depth_byte = F32_to_U8(linear_depth_float, LLViewerCamera::getInstance()->getNear(), LLViewerCamera::getInstance()->getFar());
+								U8 depth_byte = F32_to_U8(linear_depth_float, viewerCamera.getNear(), viewerCamera.getFar());
 								// write converted scanline out to result image
 								for (S32 j = 0; j < raw->getComponents(); j++)
 								{
@@ -5128,8 +5134,8 @@ BOOL LLViewerWindow::rawSnapshot(LLImageRaw *raw, S32 image_width, S32 image_hei
 	if (reset_deferred)
 	{
 		mWorldViewRectRaw = window_rect;
-		LLViewerCamera::getInstance()->setViewHeightInPixels( mWorldViewRectRaw.getHeight() );
-		LLViewerCamera::getInstance()->setAspect( getWorldViewAspectRatio() );
+		viewerCamera.setViewHeightInPixels( mWorldViewRectRaw.getHeight() );
+		viewerCamera.setAspect( getWorldViewAspectRatio() );
 		scratch_space.flush();
 		scratch_space.release();
 		gPipeline.allocateScreenBuffer(original_width, original_height);

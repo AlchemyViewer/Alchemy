@@ -2691,6 +2691,7 @@ void LLVOAvatar::idleUpdateMisc(bool detailed_update)
 	if (detailed_update || !sUseImpostors)
 	{
 		LL_RECORD_BLOCK_TIME(FTM_ATTACHMENT_UPDATE);
+		auto& selectMgr = LLSelectMgr::instance();
 		for (attachment_map_t::iterator iter = mAttachmentPoints.begin(); 
 			 iter != mAttachmentPoints.end();
 			 ++iter)
@@ -2709,7 +2710,7 @@ void LLVOAvatar::idleUpdateMisc(bool detailed_update)
 				if (visibleAttachment && attached_object && !attached_object->isDead() && attachment->getValid())
 				{
 					// if selecting any attachments, update all of them as non-damped
-					if (LLSelectMgr::getInstance()->getSelection()->getObjectCount() && LLSelectMgr::getInstance()->getSelection()->isAttachment())
+					if (selectMgr.getSelection()->getObjectCount() && selectMgr.getSelection()->isAttachment())
 					{
 						gPipeline.updateMoveNormalAsync(attached_object->mDrawable);
 					}
@@ -2872,7 +2873,8 @@ F32 LLVOAvatar::calcMorphAmount()
 void LLVOAvatar::idleUpdateLipSync(bool voice_enabled)
 {
 	// Use the Lipsync_Ooh and Lipsync_Aah morphs for lip sync
-	if ( voice_enabled && (LLVoiceClient::getInstance()->lipSyncEnabled()) && LLVoiceClient::getInstance()->getIsSpeaking( mID ) )
+	auto& voiceClient = LLVoiceClient::instance();
+	if ( voice_enabled && (voiceClient.lipSyncEnabled()) && voiceClient.getIsSpeaking( mID ) )
 	{
 		F32 ooh_morph_amount = 0.0f;
 		F32 aah_morph_amount = 0.0f;
@@ -3455,15 +3457,16 @@ void LLVOAvatar::invalidateNameTags()
 // Compute name tag position during idle update
 void LLVOAvatar::idleUpdateNameTagPosition(const LLVector3& root_pos_last)
 {
+	auto& viewerCamera = LLViewerCamera::instance();
 	LLQuaternion root_rot = mRoot->getWorldRotation();
 	LLQuaternion inv_root_rot = ~root_rot;
 	LLVector3 pixel_right_vec;
 	LLVector3 pixel_up_vec;
-	LLViewerCamera::getInstance()->getPixelVectors(root_pos_last, pixel_up_vec, pixel_right_vec);
-	LLVector3 camera_to_av = root_pos_last - LLViewerCamera::getInstance()->getOrigin();
+	viewerCamera.getPixelVectors(root_pos_last, pixel_up_vec, pixel_right_vec);
+	LLVector3 camera_to_av = root_pos_last - viewerCamera.getOrigin();
 	camera_to_av.normalize();
 	LLVector3 local_camera_at = camera_to_av * inv_root_rot;
-	LLVector3 local_camera_up = camera_to_av % LLViewerCamera::getInstance()->getLeftAxis();
+	LLVector3 local_camera_up = camera_to_av % viewerCamera.getLeftAxis();
 	local_camera_up.normalize();
 	local_camera_up = local_camera_up * inv_root_rot;
 
@@ -5379,6 +5382,9 @@ void LLVOAvatar::updateTextures()
 	mMaxPixelArea = 0.f;
 	mMinPixelArea = 99999999.f;
 	mHasGrey = FALSE; // debug
+
+	auto& avApprDict = LLAvatarAppearanceDictionary::instance();
+
 	for (U32 texture_index = 0; texture_index < getNumTEs(); texture_index++)
 	{
 		LLWearableType::EType wearable_type = LLAvatarAppearanceDictionary::getTEWearableType((ETextureIndex)texture_index);
@@ -5404,7 +5410,7 @@ void LLVOAvatar::updateTextures()
 			imagep = LLViewerTextureManager::staticCastToFetchedTexture(getImage(texture_index, wearable_index), TRUE);
 			if (imagep)
 			{
-				const LLAvatarAppearanceDictionary::TextureEntry *texture_dict = LLAvatarAppearanceDictionary::getInstance()->getTexture((ETextureIndex)texture_index);
+				const LLAvatarAppearanceDictionary::TextureEntry *texture_dict = avApprDict.getTexture((ETextureIndex)texture_index);
 				const EBakedTextureIndex baked_index = texture_dict ? texture_dict->mBakedTextureIndex : EBakedTextureIndex::BAKED_NUM_INDICES;
 				if (texture_dict && texture_dict->mIsLocalTexture)
 				{
@@ -7652,7 +7658,8 @@ BOOL LLVOAvatar::isWearingWearableType(LLWearableType::EType type) const
 			break; // Do nothing
 	}
 
-	for (const auto& tex_pair : LLAvatarAppearanceDictionary::getInstance()->getTextures())
+	auto& avApprDict = LLAvatarAppearanceDictionary::instance();
+	for (const auto& tex_pair : avApprDict.getTextures())
 	{
 		const LLAvatarAppearanceDictionary::TextureEntry *texture_dict = tex_pair.second;
 		if (texture_dict->mWearableType == type)
@@ -7664,7 +7671,7 @@ BOOL LLVOAvatar::isWearingWearableType(LLWearableType::EType type) const
 			if (texture_dict->mIsUsedByBakedTexture)
 			{
 				const EBakedTextureIndex baked_index = texture_dict->mBakedTextureIndex;
-				return isTextureDefined(LLAvatarAppearanceDictionary::getInstance()->getBakedTexture(baked_index)->mTextureIndex);
+				return isTextureDefined(avApprDict.getBakedTexture(baked_index)->mTextureIndex);
 			}
 			return FALSE;
 		}
@@ -8611,9 +8618,10 @@ void LLVOAvatar::releaseComponentTextures()
 		}
 	}
 
+	auto& avApprDict = LLAvatarAppearanceDictionary::instance();
 	for (U8 baked_index = 0; baked_index < BAKED_NUM_INDICES; baked_index++)
 	{
-		const LLAvatarAppearanceDictionary::BakedEntry * bakedDicEntry = LLAvatarAppearanceDictionary::getInstance()->getBakedTexture((EBakedTextureIndex)baked_index);
+		const LLAvatarAppearanceDictionary::BakedEntry * bakedDicEntry = avApprDict.getBakedTexture((EBakedTextureIndex)baked_index);
 		// skip if this is a skirt and av is not wearing one, or if we don't have a baked texture UUID
 		if (!isTextureDefined(bakedDicEntry->mTextureIndex)
 			&& ( (baked_index != BAKED_SKIRT) || isWearingWearableType(LLWearableType::WT_SKIRT) ))
@@ -9478,6 +9486,7 @@ void LLVOAvatar::onBakedTextureLoaded(BOOL success,
 // Called when baked texture is loaded and also when we start up with a baked texture
 void LLVOAvatar::useBakedTexture( const LLUUID& id )
 {
+	auto& avApprDict = LLAvatarAppearanceDictionary::instance();
 	for (U32 i = 0; i < mBakedTextureDatas.size(); i++)
 	{
 		LLViewerTexture* image_baked = getImage( mBakedTextureDatas[i].mTextureIndex, 0 );
@@ -9509,7 +9518,7 @@ void LLVOAvatar::useBakedTexture( const LLUUID& id )
 			}
 			
 			const LLAvatarAppearanceDictionary::BakedEntry *baked_dict =
-				LLAvatarAppearanceDictionary::getInstance()->getBakedTexture((EBakedTextureIndex)i);
+				avApprDict.getBakedTexture((EBakedTextureIndex)i);
 			for (texture_vec_t::const_iterator local_tex_iter = baked_dict->mLocalTextures.begin();
 				 local_tex_iter != baked_dict->mLocalTextures.end();
 				 ++local_tex_iter)
@@ -10556,10 +10565,11 @@ void LLVOAvatar::calculateUpdateRenderComplexity()
 		LLVOVolume::texture_cost_t textures;
 		hud_complexity_list_t hud_complexity_list;
 
+		auto& avApprDict = LLAvatarAppearanceDictionary::instance();
 		for (U8 baked_index = 0; baked_index < BAKED_NUM_INDICES; baked_index++)
 		{
 		    const LLAvatarAppearanceDictionary::BakedEntry *baked_dict
-				= LLAvatarAppearanceDictionary::getInstance()->getBakedTexture((EBakedTextureIndex)baked_index);
+				= avApprDict.getBakedTexture((EBakedTextureIndex)baked_index);
 			ETextureIndex tex_index = baked_dict->mTextureIndex;
 			if ((tex_index != TEX_SKIRT_BAKED) || (isWearingWearableType(LLWearableType::WT_SKIRT)))
 			{
@@ -10624,7 +10634,7 @@ void LLVOAvatar::calculateUpdateRenderComplexity()
 			}
 
 			// print any avatar textures we didn't already know about
-			for (const auto& tex_pair : LLAvatarAppearanceDictionary::getInstance()->getTextures())
+			for (const auto& tex_pair : avApprDict.getTextures())
 			{
 			    const LLAvatarAppearanceDictionary::TextureEntry *texture_dict = tex_pair.second;
 				// TODO: MULTI-WEARABLE: handle multiple textures for self

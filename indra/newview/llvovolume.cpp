@@ -2362,9 +2362,10 @@ bool LLVOVolume::notifyAboutCreatingTexture(LLViewerTexture *texture)
 	} //for
 
 	//setup new materials
+	auto& matMgr = LLMaterialMgr::instance();
 	for(map_te_material::const_iterator it = new_material.begin(), end = new_material.end(); it != end; ++it)
 	{
-		LLMaterialMgr::getInstance()->put(getID(), it->first, *it->second);
+		matMgr.put(getID(), it->first, *it->second);
 		LLViewerObject::setTEMaterialParams(it->first, it->second);
 	}
 
@@ -2441,9 +2442,10 @@ bool LLVOVolume::notifyAboutMissingAsset(LLViewerTexture *texture)
 	} //for
 
 	//setup new materials
+	auto& matMgr = LLMaterialMgr::instance();
 	for(map_te_material::const_iterator it = new_material.begin(), end = new_material.end(); it != end; ++it)
 	{
-		LLMaterialMgr::getInstance()->setLocalMaterial(getRegion()->getRegionID(), it->second);
+		matMgr.setLocalMaterial(getRegion()->getRegionID(), it->second);
 		LLViewerObject::setTEMaterialParams(it->first, it->second);
 	}
 
@@ -3345,6 +3347,8 @@ F32 LLVOVolume::getSpotLightPriority() const
 
 void LLVOVolume::updateSpotLightPriority()
 {
+	auto& viewerCamera = LLViewerCamera::instance();
+
     F32 r = getLightRadius();
 	LLVector3 pos = mDrawable->getPositionAgent();
 
@@ -3352,10 +3356,10 @@ void LLVOVolume::updateSpotLightPriority()
 	at *= getRenderRotation();
 	pos += at * r;
 
-	at = LLViewerCamera::getInstance()->getAtAxis();
+	at = viewerCamera.getAtAxis();
 	pos -= at * r;
 
-	mSpotLightPriority = gPipeline.calcPixelArea(pos, LLVector3(r,r,r), *LLViewerCamera::getInstance());
+	mSpotLightPriority = gPipeline.calcPixelArea(pos, LLVector3(r,r,r), viewerCamera);
 
 	if (mLightTexture.notNull())
 	{

@@ -897,11 +897,13 @@ void LLWorldMapView::drawAgents()
 
 void LLWorldMapView::drawFrustum()
 {
+	auto& viewerCamera = LLViewerCamera::instance();
+
 	// Draw frustum
 	F32 meters_to_pixels = sMapScale/ REGION_WIDTH_METERS;
 
-	F32 horiz_fov = LLViewerCamera::getInstance()->getView() * LLViewerCamera::getInstance()->getAspect();
-	F32 far_clip_meters = LLViewerCamera::getInstance()->getFar();
+	F32 horiz_fov = viewerCamera.getView() * viewerCamera.getAspect();
+	F32 far_clip_meters = viewerCamera.getFar();
 	F32 far_clip_pixels = far_clip_meters * meters_to_pixels;
 
 	F32 half_width_meters = far_clip_meters * tan( horiz_fov / 2 );

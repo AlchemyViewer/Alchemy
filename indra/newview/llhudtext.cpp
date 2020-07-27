@@ -388,26 +388,27 @@ void LLHUDText::updateVisibility()
 	}
 
 	// push text towards camera by radius of object, but not past camera
-	LLVector3 vec_from_camera = mPositionAgent - LLViewerCamera::getInstance()->getOrigin();
+	auto& viewerCamera = LLViewerCamera::instance();
+	LLVector3 vec_from_camera = mPositionAgent - viewerCamera.getOrigin();
 	LLVector3 dir_from_camera = vec_from_camera;
 	dir_from_camera.normVec();
 
-	if (dir_from_camera * LLViewerCamera::getInstance()->getAtAxis() <= 0.f)
+	if (dir_from_camera * viewerCamera.getAtAxis() <= 0.f)
 	{ //text is behind camera, don't render
 		mVisible = FALSE;
 		return;
 	}
 
-	if (vec_from_camera * LLViewerCamera::getInstance()->getAtAxis() <= LLViewerCamera::getInstance()->getNear() + 0.1f + mSourceObject->getVObjRadius())
+	if (vec_from_camera * viewerCamera.getAtAxis() <= viewerCamera.getNear() + 0.1f + mSourceObject->getVObjRadius())
 	{
-		mPositionAgent = LLViewerCamera::getInstance()->getOrigin() + vec_from_camera * ((LLViewerCamera::getInstance()->getNear() + 0.1f) / (vec_from_camera * LLViewerCamera::getInstance()->getAtAxis()));
+		mPositionAgent = viewerCamera.getOrigin() + vec_from_camera * ((viewerCamera.getNear() + 0.1f) / (vec_from_camera * viewerCamera.getAtAxis()));
 	}
 	else
 	{
 		mPositionAgent -= dir_from_camera * mSourceObject->getVObjRadius();
 	}
 
-	mLastDistance = (mPositionAgent - LLViewerCamera::getInstance()->getOrigin()).magVec();
+	mLastDistance = (mPositionAgent - viewerCamera.getOrigin()).magVec();
 
 	if (!mTextSegments.size() || (mDoFade && (mLastDistance > mFadeDistance + mFadeRange)))
 	{
@@ -416,7 +417,7 @@ void LLHUDText::updateVisibility()
 	}
 
 	LLVector3 pos_agent_center = gAgent.getPosAgentFromGlobal(mPositionGlobal) - dir_from_camera;
-	F32 last_distance_center = (pos_agent_center - LLViewerCamera::getInstance()->getOrigin()).magVec();
+	F32 last_distance_center = (pos_agent_center - viewerCamera.getOrigin()).magVec();
 	static const LLCachedControl<F32> prim_text_max_draw(gSavedSettings, "PrimTextMaxDrawDistance");
 	F32 max_draw_distance = prim_text_max_draw;
 
@@ -441,14 +442,14 @@ void LLHUDText::updateVisibility()
 	LLVector3 x_pixel_vec;
 	LLVector3 y_pixel_vec;
 
-	LLViewerCamera::getInstance()->getPixelVectors(mPositionAgent, y_pixel_vec, x_pixel_vec);
+	viewerCamera.getPixelVectors(mPositionAgent, y_pixel_vec, x_pixel_vec);
 
 	LLVector3 render_position = mPositionAgent + 			
 			(x_pixel_vec * mPositionOffset.mV[VX]) +
 			(y_pixel_vec * mPositionOffset.mV[VY]);
 
 	mOffscreen = FALSE;
-	if (!LLViewerCamera::getInstance()->sphereInFrustum(render_position, mRadius))
+	if (!viewerCamera.sphereInFrustum(render_position, mRadius))
 	{
 //		if (!mVisibleOffScreen)
 //		{

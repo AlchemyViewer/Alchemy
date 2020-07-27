@@ -1532,11 +1532,12 @@ BOOL LLVOAvatarSelf::isLocalTextureDataFinal(const LLViewerTexLayerSet* layerset
 	static const LLCachedControl<U32> desired_tex_discard_level(gSavedSettings, "TextureDiscardLevel");
 	// const U32 desired_tex_discard_level = 0; // hack to not bake textures on lower discard levels.
 
+	auto& avApprDict = LLAvatarAppearanceDictionary::instance();
 	for (U32 i = 0; i < mBakedTextureDatas.size(); i++)
 	{
 		if (layerset == mBakedTextureDatas[i].mTexLayerSet)
 		{
-			const LLAvatarAppearanceDictionary::BakedEntry *baked_dict = LLAvatarAppearanceDictionary::getInstance()->getBakedTexture((EBakedTextureIndex)i);
+			const LLAvatarAppearanceDictionary::BakedEntry *baked_dict = avApprDict.getBakedTexture((EBakedTextureIndex)i);
 			for (texture_vec_t::const_iterator local_tex_iter = baked_dict->mLocalTextures.begin();
 				 local_tex_iter != baked_dict->mLocalTextures.end();
 				 ++local_tex_iter)
@@ -1567,9 +1568,10 @@ BOOL LLVOAvatarSelf::isAllLocalTextureDataFinal() const
 	static const LLCachedControl<U32> desired_tex_discard_level(gSavedSettings, "TextureDiscardLevel");
 	// const U32 desired_tex_discard_level = 0; // hack to not bake textures on lower discard levels
 
+	auto& avApprDict = LLAvatarAppearanceDictionary::instance();
 	for (U32 i = 0; i < mBakedTextureDatas.size(); i++)
 	{
-		const LLAvatarAppearanceDictionary::BakedEntry *baked_dict = LLAvatarAppearanceDictionary::getInstance()->getBakedTexture((EBakedTextureIndex)i);
+		const LLAvatarAppearanceDictionary::BakedEntry *baked_dict = avApprDict.getBakedTexture((EBakedTextureIndex)i);
 		for (texture_vec_t::const_iterator local_tex_iter = baked_dict->mLocalTextures.begin();
 			 local_tex_iter != baked_dict->mLocalTextures.end();
 			 ++local_tex_iter)
@@ -1891,14 +1893,16 @@ void LLVOAvatarSelf::dumpLocalTextures() const
 	/* ETextureIndex baked_equiv[] = {
 	   TEX_UPPER_BAKED,
 	   if (isTextureDefined(baked_equiv[i])) */
-	for (const auto& tex_pair : LLAvatarAppearanceDictionary::getInstance()->getTextures())
+
+	auto& avApprDict = LLAvatarAppearanceDictionary::instance();
+	for (const auto& tex_pair : avApprDict.getTextures())
 	{
 		const LLAvatarAppearanceDictionary::TextureEntry *texture_dict = tex_pair.second;
 		if (!texture_dict->mIsLocalTexture || !texture_dict->mIsUsedByBakedTexture)
 			continue;
 
 		const EBakedTextureIndex baked_index = texture_dict->mBakedTextureIndex;
-		const ETextureIndex baked_equiv = LLAvatarAppearanceDictionary::getInstance()->getBakedTexture(baked_index)->mTextureIndex;
+		const ETextureIndex baked_equiv = avApprDict.getBakedTexture(baked_index)->mTextureIndex;
 
 		const std::string &name = texture_dict->mName;
 		const LLLocalTextureObject *local_tex_obj = getLocalTextureObject(tex_pair.first, 0);

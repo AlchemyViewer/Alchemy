@@ -617,7 +617,9 @@ LLVector3 LLWorld::resolveLandNormalGlobal(const LLVector3d &pos_global)
 
 void LLWorld::updateVisibilities()
 {
-	F32 cur_far_clip = LLViewerCamera::getInstance()->getFar();
+	auto& viewerCamera = LLViewerCamera::instance();
+
+	F32 cur_far_clip = viewerCamera.getFar();
 
 	// Go through the culled list and check for visible regions (region is visible if land is visible)
 	for (region_list_t::iterator iter = mCulledRegionList.begin();
@@ -631,7 +633,7 @@ void LLWorld::updateVisibilities()
 		{
 			LLSpatialGroup* group = (LLSpatialGroup*) part->mOctree->getListener(0);
 			const LLVector4a* bounds = group->getBounds();
-			if (LLViewerCamera::getInstance()->AABBInFrustum(bounds[0], bounds[1]))
+			if (viewerCamera.AABBInFrustum(bounds[0], bounds[1]))
 			{
 				mCulledRegionList.erase(curiter);
 				mVisibleRegionList.push_back(regionp);
@@ -655,7 +657,7 @@ void LLWorld::updateVisibilities()
 		{
 			LLSpatialGroup* group = (LLSpatialGroup*) part->mOctree->getListener(0);
 			const LLVector4a* bounds = group->getBounds();
-			if (LLViewerCamera::getInstance()->AABBInFrustum(bounds[0], bounds[1]))
+			if (viewerCamera.AABBInFrustum(bounds[0], bounds[1]))
 			{
 				regionp->calculateCameraDistance();
 				regionp->getLand().updatePatchVisibilities(gAgent);
@@ -671,7 +673,7 @@ void LLWorld::updateVisibilities()
 	// Sort visible regions
 	mVisibleRegionList.sort(LLViewerRegion::CompareDistance());
 	
-	LLViewerCamera::getInstance()->setFar(cur_far_clip);
+	viewerCamera.setFar(cur_far_clip);
 }
 
 static LLTrace::SampleStatHandle<> sNumActiveCachedObjects("numactivecachedobjects", "Number of objects loaded from cache");
@@ -734,7 +736,7 @@ void LLWorld::updateRegions(F32 max_update_time)
 	}
 
 	sample(sNumActiveCachedObjects, mNumOfActiveCachedObjects);
-		}
+}
 
 void LLWorld::clearAllVisibleObjects()
 {
