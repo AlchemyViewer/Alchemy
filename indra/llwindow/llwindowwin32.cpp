@@ -537,7 +537,6 @@ LLWindowWin32::LLWindowWin32(LLWindowCallbacks* callbacks,
 	if (pGetDpiForSystem && pGetSystemMetricsForDpi)
 	{
 		UINT sysdpi = pGetDpiForSystem();
-		LL_INFOS() << "AAAAAAAAAAAAAAAAAAAAAAAAAA: " << sysdpi << LL_ENDL;
 		window_border_y = pGetSystemMetricsForDpi(SM_CYBORDER, sysdpi);
 		virtual_screen_x = pGetSystemMetricsForDpi(SM_XVIRTUALSCREEN, sysdpi);
 		virtual_screen_y = pGetSystemMetricsForDpi(SM_YVIRTUALSCREEN, sysdpi);
