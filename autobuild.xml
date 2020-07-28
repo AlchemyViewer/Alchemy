@@ -776,11 +776,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>d32efb193ffcd73bcba4875ddfd17bf0</string>
+              <string>233a908cd1bed0f7319de99cbb079c89</string>
               <key>hash_algorithm</key>
               <string>md5</string>
               <key>url</key>
-              <string>https://pkg.alchemyviewer.org/repository/autobuild-internal/fmodstudio/windows/fmodstudio-2.00.07.4-windows-4.tar.bz2</string>
+              <string>https://pkg.alchemyviewer.org/repository/autobuild-internal/fmodstudio/windows/fmodstudio-2.00.10.7-windows-7.tar.bz2</string>
             </map>
             <key>name</key>
             <string>windows</string>
@@ -790,18 +790,18 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>0604fd6b53ceaf14ce04d0de1bea51b8</string>
+              <string>4f6a6896330f926e59c139f5b14d7fee</string>
               <key>hash_algorithm</key>
               <string>md5</string>
               <key>url</key>
-              <string>file:///c:/bld/fmodstudio-2.00.07.4-windows64-4.tar.bz2</string>
+              <string>https://pkg.alchemyviewer.org/repository/autobuild-internal/fmodstudio/windows64/fmodstudio-2.00.10.7-windows64-7.tar.bz2</string>
             </map>
             <key>name</key>
             <string>windows64</string>
           </map>
         </map>
         <key>version</key>
-        <string>2.00.07.4</string>
+        <string>2.00.10.7</string>
       </map>
       <key>fontconfig</key>
       <map>
