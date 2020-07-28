@@ -52,7 +52,7 @@ public:
 	U32 getPageSize() const { return mPageSize; }
 	void setPageSize(U32 val) { mPageSize = val; }
 
-	const LLSD& getEvents()const;
+	const auto& getEvents() const { return mEvents; };
 	void clear();
 
 	virtual ~LLExperienceLog();
@@ -60,8 +60,7 @@ public:
 	static void notify(LLSD& message);
 	static std::string getFilename();
 	static std::string getPermissionString(const LLSD& message, const std::string& base);
-	void setEventsToSave(LLSD new_events){mEventsToSave = new_events; }
-	bool isNotExpired(std::string& date);
+	bool isExpired(const std::string& date);
 	void handleExperienceMessage(LLSD& message);
 
 protected:
@@ -69,10 +68,7 @@ protected:
 	void saveEvents();
 	void eraseExpired();
 
-
-
-	LLSD mEvents;
-	LLSD mEventsToSave;
+	std::map<std::string, LLSD> mEvents;
 	callback_signal_t mSignals;
 	callback_connection_t mNotifyConnection;
 	U32 mMaxDays;

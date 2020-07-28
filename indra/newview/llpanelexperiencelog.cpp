@@ -47,7 +47,7 @@ static LLPanelInjector<LLPanelExperienceLog> register_experiences_panel("experie
 
 
 LLPanelExperienceLog::LLPanelExperienceLog(  )
-	: mEventList(NULL)
+	: mEventList(nullptr)
 	, mPageSize(25)
 	, mCurrentPage(0)
 {
@@ -94,9 +94,9 @@ void LLPanelExperienceLog::refresh()
 {
 	S32 selected = mEventList->getFirstSelectedIndex();
 	mEventList->deleteAllItems();
-	const LLSD events = LLExperienceLog::instance().getEvents();
+	const auto& events = LLExperienceLog::instance().getEvents();
 
-	if(events.size() == 0)
+	if(events.empty())
 	{
 		mEventList->setCommentText(getString("no_events"));
 		return;
@@ -109,23 +109,17 @@ void LLPanelExperienceLog::refresh()
 	LLUUID waiting_id;
 
 	int itemsToSkip = mPageSize*mCurrentPage;
-	int items = 0;
+	U32 items = 0;
 	bool moreItems = false;
-	LLSD events_to_save = events;
-	if (events.size() != 0)
-	{
-		LLSD::map_const_iterator day = events.endMap();
-		do
-		{
-			--day;
-			const LLSD& dayArray = day->second;
 
-			std::string date = day->first;
-			if(!LLExperienceLog::instance().isNotExpired(date))
-			{
-				events_to_save.erase(day->first);
+	for (auto day = events.crbegin(), end_day = events.crend(); day != end_day; ++day)
+	{
+		const std::string date = day->first;
+		if (LLExperienceLog::instance().isExpired(date))
+		{
 				continue;
-			}
+		}
+		const LLSD& dayArray = day->second;
 			int size = dayArray.size();
 			if(itemsToSkip > size)
 			{
@@ -168,9 +162,8 @@ void LLPanelExperienceLog::refresh()
 				}
 				++items;
 			}
-		} while (day != events.beginMap());
 	}
-	LLExperienceLog::getInstance()->setEventsToSave(events_to_save);
+
 	if(waiting)
 	{
 		mEventList->deleteAllItems();

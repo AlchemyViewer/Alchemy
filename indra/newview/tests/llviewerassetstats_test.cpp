@@ -226,7 +226,7 @@ get_region(const LLSD & sd, U64 region_handle1)
 			llsd_val["grid_x"].asInteger() == grid_x &&
 			llsd_val["grid_y"].asInteger() == grid_y)
 		{
-			return *it;
+			return llsd_val;
 		}
 	}
 	return LLSD();
