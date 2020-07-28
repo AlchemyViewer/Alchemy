@@ -34,9 +34,49 @@
 #include "llwindowcallbacks.h"
 #include "lldragdropwin32.h"
 
-// Hack for async host by name
-#define LL_WM_HOST_RESOLVED      (WM_APP + 1)
-typedef void (*LLW32MsgCallback)(const MSG &msg);
+#ifndef DPI_ENUMS_DECLARED
+
+typedef enum PROCESS_DPI_AWARENESS {
+	PROCESS_DPI_UNAWARE = 0,
+	PROCESS_SYSTEM_DPI_AWARE = 1,
+	PROCESS_PER_MONITOR_DPI_AWARE = 2
+} PROCESS_DPI_AWARENESS;
+
+typedef enum MONITOR_DPI_TYPE {
+	MDT_EFFECTIVE_DPI = 0,
+	MDT_ANGULAR_DPI = 1,
+	MDT_RAW_DPI = 2,
+	MDT_DEFAULT = MDT_EFFECTIVE_DPI
+} MONITOR_DPI_TYPE;
+
+#endif
+
+typedef HRESULT(WINAPI* SetProcessDpiAwareness_t)(_In_ PROCESS_DPI_AWARENESS value);
+
+typedef HRESULT(WINAPI* GetProcessDpiAwareness_t)(
+	_In_ HANDLE hprocess,
+	_Out_ PROCESS_DPI_AWARENESS *value);
+
+typedef HRESULT(WINAPI* GetDpiForMonitor_t)(
+	_In_ HMONITOR hmonitor,
+	_In_ MONITOR_DPI_TYPE dpiType,
+	_Out_ UINT *dpiX,
+	_Out_ UINT *dpiY);
+
+typedef UINT(WINAPI* GetDpiForWindow_t)(_In_ HWND hwnd);
+
+typedef UINT(WINAPI* GetDpiForSystem_t)(VOID);
+
+typedef BOOL(WINAPI* AdjustWindowRectExForDpi_t)(
+	_Inout_ LPRECT lpRect,
+	_In_ DWORD dwStyle,
+	_In_ BOOL bMenu,
+	_In_ DWORD dwExStyle,
+	_In_ UINT dpi);
+
+typedef int(WINAPI* GetSystemMetricsForDpi_t)(
+	_In_ int nIndex,
+	_In_ UINT dpi);
 
 class LLWindowWin32 : public LLWindow
 {
@@ -116,7 +156,6 @@ public:
 	LLWindowCallbacks::DragNDropResult completeDragNDropRequest( const LLCoordGL gl_coord, const MASK mask, LLWindowCallbacks::DragNDropAction action, const std::string url );
 
 	static std::vector<std::string> getDynamicFallbackFontList();
-	static void setDPIAwareness();
 protected:
 	LLWindowWin32(LLWindowCallbacks* callbacks,
 		const std::string& title, const std::string& name, int x, int y, int width, int height, U32 flags, 
@@ -217,6 +256,18 @@ protected:
 	U32				mRawLParam;
 
 	BOOL			mMouseVanish;
+private:
+	HMODULE mOpenGL32DLL;
+	HMODULE mUser32DLL;
+	HMODULE mShellcoDLL;
+
+	SetProcessDpiAwareness_t pSetProcessDpiAwareness;
+	GetProcessDpiAwareness_t pGetProcessDpiAwareness;
+	GetDpiForMonitor_t pGetDpiForMonitor;
+	GetDpiForWindow_t pGetDpiForWindow;
+	GetDpiForSystem_t pGetDpiForSystem;
+	AdjustWindowRectExForDpi_t pAdjustWindowRectExForDpi;
+	GetSystemMetricsForDpi_t pGetSystemMetricsForDpi;
 
 	friend class LLWindowManager;
 };
@@ -241,11 +292,6 @@ private:
 	HWND mWindow;
 #endif
 };
-
-extern LLW32MsgCallback gAsyncMsgCallback;
-extern LPWSTR gIconResource;
-
-static void	handleMessage( const MSG& msg );
 
 S32 OSMessageBoxWin32(const std::string& text, const std::string& caption, U32 type);
 

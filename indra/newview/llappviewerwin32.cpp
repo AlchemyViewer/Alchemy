@@ -324,8 +324,6 @@ int APIENTRY WINMAIN(HINSTANCE hInstance,
 	DWORD heap_enable_lfh_error[MAX_HEAPS];
 	S32 num_heaps = 0;
 	
-	LLWindowWin32::setDPIAwareness();
-
 #if WINDOWS_CRT_MEM_CHECKS && !INCLUDE_VLD
 	_CrtSetDbgFlag ( _CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF ); // dump memory leaks on exit
 #elif 0
@@ -353,9 +351,6 @@ int APIENTRY WINMAIN(HINSTANCE hInstance,
 #endif
 #endif
 	
-	// *FIX: global
-	gIconResource = MAKEINTRESOURCE(IDI_LL_ICON);
-
 	LLAppViewerWin32* viewer_app_ptr = new LLAppViewerWin32(ll_convert_wide_to_string(pCmdLine).c_str());
 
 	gOldTerminateHandler = std::set_terminate(exceptionTerminateHandler);
