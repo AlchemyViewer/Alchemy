@@ -39,11 +39,11 @@
 class LLExperienceLogDispatchHandler : public LLDispatchHandler
 {
 public:
-	virtual bool operator()(
+	bool operator()(
 		const LLDispatcher* dispatcher,
 		const std::string& key,
 		const LLUUID& invoice,
-		const sparam_t& strings)
+		const sparam_t& strings) override
 	{
 		LLSD message;
 
@@ -90,7 +90,8 @@ void LLExperienceLog::handleExperienceMessage(LLSD& message)
 
 	std::string day = daybuf;
 
-	if(!mEvents.has(day))
+	auto iter = mEvents.find(day);
+	if(iter == mEvents.end())
 	{
 		mEvents[day] = LLSD::emptyArray();
 	}
@@ -112,7 +113,6 @@ void LLExperienceLog::handleExperienceMessage(LLSD& message)
 	}
 	message["Time"] = time_of_day;
 	mEvents[day].append(message);
-	mEventsToSave[day].append(message);
 	mSignals(message);
 }
 
@@ -177,8 +177,14 @@ void LLExperienceLog::notify( LLSD& message )
 
 void LLExperienceLog::saveEvents()
 {
+	eraseExpired();
 	std::string filename = getFilename();
-	LLSD settings = LLSD::emptyMap().with("Events", mEventsToSave);
+	LLSD temp_events;
+	for (const auto& event_pair : mEvents)
+	{
+		temp_events[event_pair.first] = event_pair.second;
+	}
+	LLSD settings = LLSD::emptyMap().with("Events", temp_events);
 
 	settings["MaxDays"] = (int)mMaxDays;
 	settings["Notify"] = mNotifyNewEvent;
@@ -212,9 +218,11 @@ void LLExperienceLog::loadEvents()
 	mEvents.clear();
 	if(mMaxDays > 0 && settings.has("Events"))
 	{
-		mEvents = settings["Events"];
-		mEventsToSave = mEvents;
+		const auto& events = settings["Events"];
+		mEvents.insert(events.beginMap(), events.endMap());
 	}
+
+	eraseExpired();
 }
 
 LLExperienceLog::~LLExperienceLog()
@@ -224,35 +232,28 @@ LLExperienceLog::~LLExperienceLog()
 
 void LLExperienceLog::eraseExpired()
 {
-	while(mEvents.size() > mMaxDays && mMaxDays > 0)
+	for (auto it = mEvents.begin(), end = mEvents.end(); it != end;)
 	{
-		mEvents.erase(mEvents.beginMap()->first);
+		auto event_it = it++;
+		if (isExpired(event_it->first))
+		{
+			mEvents.erase(event_it);
+		}
 	}
 }
 
-bool LLExperienceLog::isNotExpired(std::string& date)
+bool LLExperienceLog::isExpired(const std::string& date)
 {
-	LLDate event_date;
-	S32 month, day, year;
+	if (date.empty())
+		return true;
+
+	S32 month, day, year = 0;
 	S32 matched = sscanf(date.c_str(), "%d-%d-%d", &year, &month, &day);
 	if (matched != 3) return false;
+	LLDate event_date;
 	event_date.fromYMDHMS(year, month, day);
-	const U32 seconds_in_day = 24 * 60 * 60;
-	S32 curr_year = 0, curr_month = 0, curr_day = 0;
 
-
-	LLDate curr_date = LLDate::now();
-	curr_date.split(&curr_year, &curr_month, &curr_day);
-	curr_date.fromYMDHMS(curr_year, curr_month, curr_day); // Set hour, min, and sec to 0
-
-	LLDate boundary_date =  LLDate(curr_date.secondsSinceEpoch() - seconds_in_day*getMaxDays());
-	return event_date >= boundary_date;
-
-}
-
-const LLSD& LLExperienceLog::getEvents() const
-{
-	return mEvents;
+	return event_date.secondsSinceEpoch() <= (LLDate::now().secondsSinceEpoch() - F64(getMaxDays() * 86400U));
 }
 
 void LLExperienceLog::clear()
@@ -279,6 +280,6 @@ void LLExperienceLog::setNotifyNewEvent( bool val )
 	}
 	else if( val && !mNotifyConnection.connected())
 	{
-		mNotifyConnection = addUpdateSignal(boost::function<void(LLSD&)>(LLExperienceLog::notify));
+		mNotifyConnection = addUpdateSignal(std::function<void(LLSD&)>(LLExperienceLog::notify));
 	}
 }
