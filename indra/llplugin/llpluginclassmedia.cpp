@@ -372,11 +372,11 @@ void LLPluginClassMedia::setSizeInternal(void)
     if (!gHiDPISupport)
 #endif
     {
-        if (mRequestedMediaWidth > 2048)
-            mRequestedMediaWidth = 2048;
+        if (mRequestedMediaWidth > 8192)
+            mRequestedMediaWidth = 8192;
 
-        if (mRequestedMediaHeight > 2048)
-            mRequestedMediaHeight = 2048;
+        if (mRequestedMediaHeight > 8192)
+            mRequestedMediaHeight = 8192;
     }
 }
 
