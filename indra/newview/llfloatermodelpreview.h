@@ -365,10 +365,6 @@ private:
 
 	//GLOD object parameters (must rebuild object if these change)
 	bool mLODFrozen;
-	F32 mBuildShareTolerance;
-	U32 mBuildQueueMode;
-	U32 mBuildOperator;
-	U32 mBuildBorderMode;
 	U32 mRequestedLoDMode[LLModel::NUM_LODS];
 	S32 mRequestedTriangleCount[LLModel::NUM_LODS];
 	F32 mRequestedErrorThreshold[LLModel::NUM_LODS];

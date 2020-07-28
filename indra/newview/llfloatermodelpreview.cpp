@@ -1250,10 +1250,6 @@ LLModelPreview::LLModelPreview(S32 width, S32 height, LLFloater* fmp)
 	mLoadState = LLModelLoader::STARTING;
 	mGroup = 0;
 	mLODFrozen = false;
-	mBuildShareTolerance = 0.f;
-	mBuildQueueMode = GLOD_QUEUE_GREEDY;
-	mBuildBorderMode = GLOD_BORDER_UNLOCK;
-	mBuildOperator = GLOD_OPERATOR_EDGE_COLLAPSE;
 
 	for (U32 i = 0; i < LLModel::NUM_LODS; ++i)
 	{
