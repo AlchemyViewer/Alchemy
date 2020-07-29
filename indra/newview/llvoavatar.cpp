@@ -1986,7 +1986,7 @@ void LLVOAvatar::resetVisualParams()
 			 ++iter)
 		{
 			LLPolySkeletalDistortionInfo *info = (LLPolySkeletalDistortionInfo*)*iter;
-			LLPolySkeletalDistortion *param = dynamic_cast<LLPolySkeletalDistortion*>(getVisualParam(info->getID()));
+			LLPolySkeletalDistortion *param = static_cast<LLPolySkeletalDistortion*>(getVisualParam(info->getID()));
             *param = LLPolySkeletalDistortion(this);
             llassert(param);
 			if (!param->setInfo(info))
@@ -2002,7 +2002,7 @@ void LLVOAvatar::resetVisualParams()
 		 ++iter)
 	{
 		LLDriverParamInfo *info = *iter;
-        LLDriverParam *param = dynamic_cast<LLDriverParam*>(getVisualParam(info->getID()));
+        LLDriverParam *param = static_cast<LLDriverParam*>(getVisualParam(info->getID()));
         LLDriverParam::entry_list_t driven_list = param->getDrivenList();
         *param = LLDriverParam(this);
         llassert(param);

@@ -553,7 +553,7 @@ void LLWearable::revertValues()
 		S32 id = iter->first;
 		F32 value = iter->second;
 		LLVisualParam *param = getVisualParam(id);
-		if(param &&  !dynamic_cast<LLDriverParam*>(param) )
+		if(param &&  !param->isDriverParam() )
 		{
 			setVisualParamWeight(id, value);
 		}
@@ -565,7 +565,7 @@ void LLWearable::revertValues()
 		S32 id = iter->first;
 		F32 value = iter->second;
 		LLVisualParam *param = getVisualParam(id);
-		if(param &&  dynamic_cast<LLDriverParam*>(param) )
+		if(param && param->isDriverParam())
 		{
 			setVisualParamWeight(id, value);
 		}

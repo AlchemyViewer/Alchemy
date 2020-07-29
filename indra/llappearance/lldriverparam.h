@@ -58,7 +58,7 @@ struct LLDrivenEntry
 
 //-----------------------------------------------------------------------------
 
-class LLDriverParamInfo : public LLViewerVisualParamInfo
+class LLDriverParamInfo final : public LLViewerVisualParamInfo
 {
 	friend class LLDriverParam;
 public:
@@ -78,7 +78,7 @@ protected:
 //-----------------------------------------------------------------------------
 
 LL_ALIGN_PREFIX(16)
-class LLDriverParam : public LLViewerVisualParam
+class LLDriverParam final : public LLViewerVisualParam
 {
 private:
 	// Hide the default constructor.  Force construction with LLAvatarAppearance.
@@ -116,7 +116,8 @@ public:
 	/*virtual*/ void				stopAnimating();
 	/*virtual*/ BOOL				linkDrivenParams(visual_param_mapper mapper, BOOL only_cross_params);
 	/*virtual*/ void				resetDrivenParams();
-	
+	/*virtual*/ bool				isDriverParam() { return true; }
+
 	// LLViewerVisualParam Virtual functions
 	/*virtual*/ F32					getTotalDistortion();
 	/*virtual*/ const LLVector4a&	getAvgDistortion();

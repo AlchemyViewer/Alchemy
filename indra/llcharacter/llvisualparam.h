@@ -128,6 +128,8 @@ public:
 	virtual BOOL			linkDrivenParams(visual_param_mapper mapper, BOOL only_cross_params);
 	virtual void			resetDrivenParams();
 
+	virtual bool			isDriverParam() { return false; }
+
 	// Interface methods
 	S32						getID() const		{ return mID; }
 	void					setID(S32 id) 		{ llassert(!mInfo); mID = id; }

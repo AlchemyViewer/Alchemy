@@ -660,8 +660,8 @@ BOOL LLPhysicsMotion::onUpdate(F32 time)
 							       0.0f,
 							       1.0f);
 
-		LLDriverParam *driver_param = dynamic_cast<LLDriverParam *>(mParamDriver);
-		llassert_always(driver_param);
+		LLDriverParam *driver_param = static_cast<LLDriverParam *>(mParamDriver);
+		llassert_always(mParamDriver->isDriverParam());
 		if (driver_param)
 		{
 			// If this is one of our "hidden" driver params, then make sure it's
@@ -697,7 +697,7 @@ BOOL LLPhysicsMotion::onUpdate(F32 time)
 		const F32 area_for_this_setting = area_for_max_settings + (area_for_min_settings-area_for_max_settings)*(1.0-lod_factor);
 	        const F32 pixel_area = sqrtf(mCharacter->getPixelArea());
         
-		const BOOL is_self = (dynamic_cast<LLVOAvatarSelf *>(mCharacter) != NULL);
+		const BOOL is_self = static_cast<LLVOAvatar*>(mCharacter)->isSelf();
 		if ((pixel_area > area_for_this_setting) || is_self)
 		{
 			const F32 position_diff_local = llabs(mPositionLastUpdate_local-position_new_local_clamped);
