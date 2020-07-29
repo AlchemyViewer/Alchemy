@@ -806,7 +806,7 @@ void LLParticlePartition::addGeometryCount(LLSpatialGroup* group, U32& vertex_co
 	mFaceList.clear();
 
 	LLViewerCamera* camera = LLViewerCamera::getInstance();
-	for (LLSpatialGroup::element_iter i = group->getDataBegin(); i != group->getDataEnd(); ++i)
+	for (LLSpatialGroup::element_iter i = group->getDataBegin(), i_end = group->getDataEnd(); i != i_end; ++i)
 	{
 		LLDrawable* drawablep = (LLDrawable*)(*i)->getDrawable();
 		

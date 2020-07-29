@@ -2170,7 +2170,7 @@ void LLPipeline::clearReferences()
 
 void check_references(LLSpatialGroup* group, LLDrawable* drawable)
 {
-	for (LLSpatialGroup::element_iter i = group->getDataBegin(); i != group->getDataEnd(); ++i)
+	for (LLSpatialGroup::element_iter i = group->getDataBegin(), i_end = group->getDataEnd(); i != i_end; ++i)
 	{
         LLDrawable* drawablep = (LLDrawable*)(*i)->getDrawable();
 		if (drawable == drawablep)
@@ -2193,7 +2193,7 @@ void check_references(LLDrawable* drawable, LLFace* face)
 
 void check_references(LLSpatialGroup* group, LLFace* face)
 {
-	for (LLSpatialGroup::element_iter i = group->getDataBegin(); i != group->getDataEnd(); ++i)
+	for (LLSpatialGroup::element_iter i = group->getDataBegin(), i_end = group->getDataEnd(); i != i_end; ++i)
 	{
 		LLDrawable* drawable = (LLDrawable*)(*i)->getDrawable();
 		if(drawable)
@@ -3605,7 +3605,7 @@ void forAllDrawables(LLCullResult::sg_iterator begin,
 {
 	for (LLCullResult::sg_iterator i = begin; i != end; ++i)
 	{
-		for (LLSpatialGroup::element_iter j = (*i)->getDataBegin(); j != (*i)->getDataEnd(); ++j)
+		for (LLSpatialGroup::element_iter j = (*i)->getDataBegin(), j_end = (*i)->getDataEnd(); j != j_end; ++j)
 		{
 			if((*j)->hasDrawable())
 			{

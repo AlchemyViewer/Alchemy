@@ -399,7 +399,7 @@ public:
 			max = *(tri->mV[0]);
 			
 			for (LLOctreeNode<LLVolumeTriangle>::const_element_iter iter = 
-				branch->getDataBegin(); iter != branch->getDataEnd(); ++iter)
+				branch->getDataBegin(), iter_end = branch->getDataEnd(); iter != iter_end; ++iter)
 			{ //for each triangle in node
 
 				//stretch by triangles in node

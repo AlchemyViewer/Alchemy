@@ -125,7 +125,7 @@ void LLOctreeTriangleRayIntersect::traverse(const LLOctreeNode<LLVolumeTriangle>
 void LLOctreeTriangleRayIntersect::visit(const LLOctreeNode<LLVolumeTriangle>* node)
 {
 	for (LLOctreeNode<LLVolumeTriangle>::const_element_iter iter = 
-			node->getDataBegin(); iter != node->getDataEnd(); ++iter)
+			node->getDataBegin(), iter_end = node->getDataEnd(); iter != iter_end; ++iter)
 	{
 		const LLVolumeTriangle* tri = *iter;
 
@@ -256,8 +256,8 @@ void LLVolumeOctreeValidate::visit(const LLOctreeNode<LLVolumeTriangle>* branch)
 	}
 
 	//children fit, check data
-	for (LLOctreeNode<LLVolumeTriangle>::const_element_iter iter = branch->getDataBegin(); 
-			iter != branch->getDataEnd(); ++iter)
+	for (LLOctreeNode<LLVolumeTriangle>::const_element_iter iter = branch->getDataBegin(), iter_end = branch->getDataEnd();
+			iter != iter_end; ++iter)
 	{
 		const LLVolumeTriangle* tri = *iter;
 

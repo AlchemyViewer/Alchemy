@@ -5490,8 +5490,7 @@ void LLVolumeGeometryManager::rebuildGeom(LLSpatialGroup* group)
 		LL_RECORD_BLOCK_TIME(FTM_REBUILD_VOLUME_FACE_LIST);
 
 		//get all the faces into a list
-		for (LLSpatialGroup::element_iter drawable_iter = group->getDataBegin(); 
-             drawable_iter != group->getDataEnd(); ++drawable_iter)
+		for (LLSpatialGroup::element_iter drawable_iter = group->getDataBegin(), drawable_end = group->getDataEnd(); drawable_iter != drawable_end; ++drawable_iter)
 		{
 			LLDrawable* drawablep = (LLDrawable*)(*drawable_iter)->getDrawable();
 		
@@ -6017,7 +6016,7 @@ void LLVolumeGeometryManager::rebuildGeom(LLSpatialGroup* group)
 	if (!LLPipeline::sDelayVBUpdate)
 	{
 		//drawables have been rebuilt, clear rebuild status
-		for (LLSpatialGroup::element_iter drawable_iter = group->getDataBegin(); drawable_iter != group->getDataEnd(); ++drawable_iter)
+		for (LLSpatialGroup::element_iter drawable_iter = group->getDataBegin(), drawable_end = group->getDataEnd(); drawable_iter != drawable_end; ++drawable_iter)
 		{
 			LLDrawable* drawablep = (LLDrawable*)(*drawable_iter)->getDrawable();
 			if(drawablep)
@@ -6058,7 +6057,7 @@ void LLVolumeGeometryManager::rebuildMesh(LLSpatialGroup* group)
 		
 		U32 buffer_count = 0;
 
-		for (LLSpatialGroup::element_iter drawable_iter = group->getDataBegin(); drawable_iter != group->getDataEnd(); ++drawable_iter)
+		for (LLSpatialGroup::element_iter drawable_iter = group->getDataBegin(), drawable_end = group->getDataEnd(); drawable_iter != drawable_end; ++drawable_iter)
 		{
 			LLDrawable* drawablep = (LLDrawable*)(*drawable_iter)->getDrawable();
 
@@ -6141,7 +6140,7 @@ void LLVolumeGeometryManager::rebuildMesh(LLSpatialGroup* group)
 		if(num_mapped_vertex_buffer != LLVertexBuffer::sMappedCount) 
 		{
 			LL_WARNS() << "Not all mapped vertex buffers are unmapped!" << LL_ENDL ; 
-			for (LLSpatialGroup::element_iter drawable_iter = group->getDataBegin(); drawable_iter != group->getDataEnd(); ++drawable_iter)
+			for (LLSpatialGroup::element_iter drawable_iter = group->getDataBegin(), drawable_end = group->getDataEnd(); drawable_iter != drawable_end; ++drawable_iter)
 			{
 				LLDrawable* drawablep = (LLDrawable*)(*drawable_iter)->getDrawable();
 				if(!drawablep)
@@ -6848,7 +6847,7 @@ void LLGeometryManager::addGeometryCount(LLSpatialGroup* group, U32 &vertex_coun
 
 	//for each drawable
 
-	for (LLSpatialGroup::element_iter drawable_iter = group->getDataBegin(); drawable_iter != group->getDataEnd(); ++drawable_iter)
+	for (LLSpatialGroup::element_iter drawable_iter = group->getDataBegin(), drawable_end = group->getDataEnd(); drawable_iter != drawable_end; ++drawable_iter)
 	{
 		LLDrawable* drawablep = (LLDrawable*)(*drawable_iter)->getDrawable();
 		

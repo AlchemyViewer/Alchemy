@@ -883,7 +883,7 @@ void LLSpatialGroup::handleDestruction(const TreeNode* node)
 	}
 	setState(DEAD);	
 
-	for (element_iter i = getDataBegin(); i != getDataEnd(); ++i)
+	for (element_iter i = getDataBegin(), i_end = getDataEnd(); i != i_end; ++i)
 	{
 		LLViewerOctreeEntry* entry = *i;
 
@@ -940,7 +940,7 @@ void LLSpatialGroup::destroyGL(bool keep_occlusion)
 	}
 
 
-	for (LLSpatialGroup::element_iter i = getDataBegin(); i != getDataEnd(); ++i)
+	for (LLSpatialGroup::element_iter i = getDataBegin(), i_end = getDataEnd(); i != i_end; ++i)
 	{
 		LLDrawable* drawable = (LLDrawable*)(*i)->getDrawable();
 		if(!drawable)
@@ -1298,7 +1298,7 @@ public:
 		LLSpatialGroup* group = (LLSpatialGroup*)base_group;
 		OctreeNode* branch = group->getOctreeNode();
 
-		for (OctreeNode::const_element_iter i = branch->getDataBegin(); i != branch->getDataEnd(); ++i)
+		for (OctreeNode::const_element_iter i = branch->getDataBegin(), i_end = branch->getDataEnd(); i != i_end; ++i)
 		{
 			LLDrawable* drawable = (LLDrawable*)(*i)->getDrawable();
 			if(!drawable)
@@ -1439,7 +1439,7 @@ public:
 		LLSpatialGroup* group = (LLSpatialGroup*) state->getListener(0);
 		group->destroyGL();
 
-		for (LLSpatialGroup::element_iter i = group->getDataBegin(); i != group->getDataEnd(); ++i)
+		for (LLSpatialGroup::element_iter i = group->getDataBegin(), i_end = group->getDataEnd(); i != i_end; ++i)
 		{
 			LLDrawable* drawable = (LLDrawable*)(*i)->getDrawable();
 			if(!drawable)
@@ -1726,7 +1726,7 @@ void renderOctree(LLSpatialGroup* group)
 			gGL.flush();
 			glLineWidth(1.f);
 			gGL.flush();
-			for (LLSpatialGroup::element_iter i = group->getDataBegin(); i != group->getDataEnd(); ++i)
+			for (LLSpatialGroup::element_iter i = group->getDataBegin(), i_end = group->getDataEnd(); i != i_end; ++i)
 			{
 				LLDrawable* drawable = (LLDrawable*)(*i)->getDrawable();
 				if(!drawable)
@@ -1869,7 +1869,7 @@ void renderVisibility(LLSpatialGroup* group, LLCamera* camera)
 
 		bool selected = false;
 		
-		for (LLSpatialGroup::element_iter iter = group->getDataBegin(); iter != group->getDataEnd(); ++iter)
+		for (LLSpatialGroup::element_iter iter = group->getDataBegin(), iter_end = group->getDataEnd(); iter != iter_end; ++iter)
 		{
 			LLDrawable* drawable = *iter;
 			if (drawable->getVObj().notNull() && drawable->getVObj()->isSelected())
@@ -1913,7 +1913,7 @@ void renderVisibility(LLSpatialGroup* group, LLCamera* camera)
 		
 			bool selected = false;
 		
-			for (LLSpatialGroup::element_iter iter = group->getDataBegin(); iter != group->getDataEnd(); ++iter)
+			for (LLSpatialGroup::element_iter iter = group->getDataBegin(), iter_end = group->getDataEnd(); iter != iter_end; ++iter)
 			{
 				LLDrawable* drawable = *iter;
 				if (drawable->getVObj().notNull() && drawable->getVObj()->isSelected())
@@ -1942,7 +1942,7 @@ void renderXRay(LLSpatialGroup* group, LLCamera* camera)
 
 		bool selected = false;
 
-		for (LLSpatialGroup::element_iter iter = group->getDataBegin(); iter != group->getDataEnd(); ++iter)
+		for (LLSpatialGroup::element_iter iter = group->getDataBegin(), iter_end = group->getDataEnd(); iter != iter_end; ++iter)
 		{
 			LLDrawable* drawable = (LLDrawable*)(*iter)->getDrawable();
 			if (drawable->getVObj().notNull() && drawable->getVObj()->isSelected())
@@ -2688,7 +2688,7 @@ void renderPhysicsShape(LLDrawable* drawable, LLVOVolume* volume)
 
 void renderPhysicsShapes(LLSpatialGroup* group)
 {
-	for (OctreeNode::const_element_iter i = group->getDataBegin(); i != group->getDataEnd(); ++i)
+	for (OctreeNode::const_element_iter i = group->getDataBegin(), i_end = group->getDataEnd(); i != i_end; ++i)
 	{
 		LLDrawable* drawable = (LLDrawable*)(*i)->getDrawable();
 		if(!drawable)
@@ -3096,8 +3096,8 @@ public:
 			}
 
 			gGL.begin(LLRender::TRIANGLES);
-			for (LLOctreeNode<LLVolumeTriangle>::const_element_iter iter = branch->getDataBegin();
-					iter != branch->getDataEnd();
+			for (LLOctreeNode<LLVolumeTriangle>::const_element_iter iter = branch->getDataBegin(), end = branch->getDataEnd();
+					iter != end;
 					++iter)
 			{
 				const LLVolumeTriangle* tri = *iter;
@@ -3356,7 +3356,7 @@ public:
 			}
 		}
 
-		for (OctreeNode::const_element_iter i = branch->getDataBegin(); i != branch->getDataEnd(); ++i)
+		for (OctreeNode::const_element_iter i = branch->getDataBegin(), i_end = branch->getDataEnd(); i != i_end; ++i)
 		{
 			LLDrawable* drawable = (LLDrawable*)(*i)->getDrawable();
 			if(!drawable)
@@ -3603,7 +3603,7 @@ public:
 			return;
 		}
 
-		for (OctreeNode::const_element_iter i = branch->getDataBegin(); i != branch->getDataEnd(); ++i)
+		for (OctreeNode::const_element_iter i = branch->getDataBegin(), i_end = branch->getDataEnd(); i != i_end; ++i)
 		{
 			LLDrawable* drawable = (LLDrawable*)(*i)->getDrawable();
 			if(!drawable)
@@ -3853,7 +3853,7 @@ public:
 	
 	virtual void visit(const OctreeNode* branch) 
 	{	
-		for (OctreeNode::const_element_iter i = branch->getDataBegin(); i != branch->getDataEnd(); ++i)
+		for (OctreeNode::const_element_iter i = branch->getDataBegin(), i_end = branch->getDataEnd(); i != i_end; ++i)
 		{
 			check(*i);
 		}
