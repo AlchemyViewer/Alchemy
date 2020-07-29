@@ -321,12 +321,12 @@ void LLViewerTexLayerSet::setUpdatesEnabled( BOOL b )
 
 LLVOAvatarSelf* LLViewerTexLayerSet::getAvatar()
 {
-	return dynamic_cast<LLVOAvatarSelf*> (mAvatarAppearance);
+	return mAvatarAppearance->isSelf() ? static_cast<LLVOAvatarSelf*>(mAvatarAppearance) : nullptr;
 }
 
 const LLVOAvatarSelf* LLViewerTexLayerSet::getAvatar() const
 {
-	return dynamic_cast<const LLVOAvatarSelf*> (mAvatarAppearance);
+	return mAvatarAppearance->isSelf() ? static_cast<const LLVOAvatarSelf*>(mAvatarAppearance) : nullptr;
 }
 
 LLViewerTexLayerSetBuffer* LLViewerTexLayerSet::getViewerComposite()
