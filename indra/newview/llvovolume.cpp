@@ -1386,7 +1386,9 @@ BOOL LLVOVolume::calcLOD()
             const LLVector3* box = avatar->getLastAnimExtents();
             LLVector3 diag = box[1] - box[0];
             radius = diag.magVec() * 0.5f;
+#ifdef SHOW_DEBUG
             LL_DEBUGS("DynamicBox") << avatar->getFullname() << " diag " << diag << " radius " << radius << LL_ENDL;
+#endif
         }
         else
         {
@@ -1397,11 +1399,15 @@ BOOL LLVOVolume::calcLOD()
             const LLVector3* box = avatar->getLastAnimExtents();
             LLVector3 diag = box[1] - box[0];
             radius = diag.magVec(); // preserve old BinRadius behavior - 2x off
+#ifdef SHOW_DEBUG
             LL_DEBUGS("DynamicBox") << avatar->getFullname() << " diag " << diag << " radius " << radius << LL_ENDL;
+#endif
         }
         if (distance <= 0.f || radius <= 0.f)
         {
+#ifdef SHOW_DEBUG
             LL_DEBUGS("DynamicBox","CalcLOD") << "avatar distance/radius uninitialized, skipping" << LL_ENDL;
+#endif
             return FALSE;
         }
 	}
@@ -1411,7 +1417,9 @@ BOOL LLVOVolume::calcLOD()
 		radius = getVolume() ? getVolume()->mLODScaleBias.scaledVec(getScale()).length() : getScale().length();
         if (distance <= 0.f || radius <= 0.f)
         {
+#ifdef SHOW_DEBUG
             LL_DEBUGS("DynamicBox","CalcLOD") << "non-avatar distance/radius uninitialized, skipping" << LL_ENDL;
+#endif
             return FALSE;
         }
 	}
@@ -1483,12 +1491,14 @@ BOOL LLVOVolume::calcLOD()
 
 	if (cur_detail != mLOD)
 	{
+#ifdef SHOW_DEBUG
         LL_DEBUGS("DynamicBox","CalcLOD") << "new LOD " << cur_detail << " change from " << mLOD 
                              << " distance " << distance << " radius " << radius << " rampDist " << rampDist
                              << " drawable rigged? " << (mDrawable ? (S32) mDrawable->isState(LLDrawable::RIGGED) : (S32) -1)
 							 << " mRiggedVolume " << (void*)getRiggedVolume()
                              << " distanceWRTCamera " << (mDrawable ? mDrawable->mDistanceWRTCamera : -1.f)
                              << LL_ENDL;
+#endif
         
 		mAppAngle = ll_round((F32) atan2( mDrawable->getRadius(), mDrawable->mDistanceWRTCamera) * RAD_TO_DEG, 0.01f);
 		mLOD = cur_detail;		
