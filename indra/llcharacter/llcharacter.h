@@ -234,12 +234,12 @@ public:
 
 	LLVisualParam*	getVisualParam(S32 id) const
 	{
-		visual_param_index_map_t::const_iterator iter = mVisualParamIndexMap.find(id);
-		return (iter == mVisualParamIndexMap.end()) ? 0 : iter->second;
+		visual_param_index_hashmap_t::const_iterator iter = mVisualParamIndexHashmap.find(id);
+		return (iter == mVisualParamIndexHashmap.end()) ? 0 : iter->second;
 	}
 	S32 getVisualParamID(LLVisualParam *id)
 	{
-		for (const auto& param_pair : mVisualParamIndexMap)
+		for (const auto& param_pair : mVisualParamIndexHashmap)
 		{
 			if (param_pair.second == id)
 				return param_pair.first;
@@ -280,10 +280,12 @@ protected:
 private:
 	// visual parameter stuff
 	typedef std::map<S32, LLVisualParam *> 		visual_param_index_map_t;
-	typedef std::map<char *, LLVisualParam *> 	visual_param_name_map_t;
+	typedef absl::flat_hash_map<S32, LLVisualParam*> 		visual_param_index_hashmap_t;
+	typedef absl::flat_hash_map<char *, LLVisualParam *> 	visual_param_name_map_t;
 
 	visual_param_index_map_t::iterator 			mCurIterator;
 	visual_param_index_map_t 					mVisualParamIndexMap;
+	visual_param_index_hashmap_t				mVisualParamIndexHashmap;
 	visual_param_name_map_t  					mVisualParamNameMap;
 
 	static LLStringTable sVisualParamNames;	
