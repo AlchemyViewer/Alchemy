@@ -787,16 +787,12 @@ void LLViewerOctreeGroup::checkStates()
 //occulsion culling functions and classes
 //-------------------------------------------------------------------------------------------
 std::set<U32> LLOcclusionCullingGroup::sPendingQueries;
-class LLOcclusionQueryPool : public LLGLNamePool
+class LLOcclusionQueryPool
 {
 public:
-	LLOcclusionQueryPool()
-	{
-	}
+	LLOcclusionQueryPool() = default;
 
-protected:
-
-	virtual GLuint allocateName()
+	GLuint allocateName()
 	{
 		GLuint ret = 0;
 
@@ -805,7 +801,7 @@ protected:
 		return ret;
 	}
 
-	virtual void releaseName(GLuint name)
+	void releaseName(GLuint name)
 	{
 #if LL_TRACK_PENDING_OCCLUSION_QUERIES
 		LLOcclusionCullingGroup::sPendingQueries.erase(name);
@@ -817,12 +813,12 @@ protected:
 static LLOcclusionQueryPool sQueryPool;
 U32 LLOcclusionCullingGroup::getNewOcclusionQueryObjectName()
 {
-	return sQueryPool.allocate();
+	return sQueryPool.allocateName();
 }
 
 void LLOcclusionCullingGroup::releaseOcclusionQueryObjectName(GLuint name)
 {
-	sQueryPool.release(name);
+	sQueryPool.releaseName(name);
 }
 
 //=====================================
