@@ -306,7 +306,7 @@ namespace LLError
 }
 
 //this is cheaper than llcallstacks if no need to output other variables to call stacks. 
-#if ENABLE_DEBUG_MACRO
+#if defined(SHOW_DEBUG) || defined(LL_RELEASE_WITH_DEBUG_INFO) || defined(_DEBUG)
 #define LL_PUSH_CALLSTACKS() LLError::LLCallStacks::push(__FUNCTION__, __LINE__)
 
 #define llcallstacks                                                                      \

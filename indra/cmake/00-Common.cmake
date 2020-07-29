@@ -306,4 +306,12 @@ else (USESYSTEMLIBS)
       )
 endif (USESYSTEMLIBS)
 
+option(RELEASE_SHOW_ASSERTS "Enable asserts in release builds" OFF)
+
+if(RELEASE_SHOW_ASSERTS)
+  add_definitions(-DRELEASE_SHOW_ASSERT=1)
+else()
+  add_definitions(-URELEASE_SHOW_ASSERT)
+endif()
+
 endif(NOT DEFINED ${CMAKE_CURRENT_LIST_FILE}_INCLUDED)

@@ -2203,31 +2203,40 @@ bool LLAppViewer::initThreads()
 	return true;
 }
 
-void errorCallback(const std::string &error_string)
+void errorCallback(const std::string& error_string)
 {
-#ifndef LL_RELEASE_FOR_DOWNLOAD
-	OSMessageBox(error_string, LLTrans::getString("MBFatalError"), OSMB_OK);
+	static std::string last_message;
+	if (last_message != error_string)
+	{
+#ifdef SHOW_ASSERT
+		U32 response = OSMessageBox(error_string, LLTrans::getString("MBFatalError"), OSMB_YESNO);
+		if (response == OSBTN_NO)
+		{
+			last_message = error_string;
+			return;
+		}
 #endif
 
-	//Set the ErrorActivated global so we know to create a marker file
-	gLLErrorActivated = true;
+		//Set the ErrorActivated global so we know to create a marker file
+		gLLErrorActivated = true;
 
-	gDebugInfo["FatalMessage"] = error_string;
-	// We're not already crashing -- we simply *intend* to crash. Since we
-	// haven't actually trashed anything yet, we can afford to write the whole
-	// static info file.
-	LLAppViewer::instance()->writeDebugInfo();
+		gDebugInfo["FatalMessage"] = error_string;
+		// We're not already crashing -- we simply *intend* to crash. Since we
+		// haven't actually trashed anything yet, we can afford to write the whole
+		// static info file.
+		LLAppViewer::instance()->writeDebugInfo();
 
-// [SL:KB] - Patch: Viewer-Build | Checked: Catznip-2.4
+		// [SL:KB] - Patch: Viewer-Build | Checked: Catznip-2.4
 #if !LL_RELEASE_FOR_DOWNLOAD && LL_WINDOWS
-	DebugBreak();
+		DebugBreak();
 #else
-	LLError::crashAndLoop(error_string);
+		LLError::crashAndLoop(error_string);
 #endif // LL_RELEASE_WITH_DEBUG_INFO && LL_WINDOWS
-// [/SL:KB]
-//#ifndef SHADER_CRASH_NONFATAL
-//	LLError::crashAndLoop(error_string);
-//#endif
+		// [/SL:KB]
+		//#ifndef SHADER_CRASH_NONFATAL
+		//	LLError::crashAndLoop(error_string);
+		//#endif
+	}
 }
 
 void LLAppViewer::initLoggingAndGetLastDuration()

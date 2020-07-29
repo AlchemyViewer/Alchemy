@@ -95,7 +95,7 @@ public:
 	// CONSTRUCTORS 
 	////////////////////////////////////
 	
-#if SHOW_ASSERT
+#ifdef SHOW_ASSERT
 	LLVector4a()
 	{ //DO NOT INITIALIZE -- The overhead is completely unnecessary
 		ll_assert_aligned(this,16);
@@ -330,8 +330,10 @@ private:
 	LLQuad mQ;
 } LL_ALIGN_POSTFIX(16);
 
+#ifndef SHOW_ASSERT
 static_assert(std::is_trivial<LLVector4a>::value, "LLVector4a must be a trivial type");
 static_assert(std::is_standard_layout<LLVector4a>::value, "LLVector4a must be a standard layout type");
+#endif
 
 inline void update_min_max(LLVector4a& min, LLVector4a& max, const LLVector4a& p)
 {

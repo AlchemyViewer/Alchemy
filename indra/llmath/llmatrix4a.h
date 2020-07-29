@@ -152,9 +152,10 @@ public:
         affineTransformSSE(v,res);
     }
 };
-
+#ifndef SHOW_ASSERT
 static_assert(std::is_trivial<LLMatrix4a>::value, "LLMatrix4a must be a trivial type");
 static_assert(std::is_standard_layout<LLMatrix4a>::value, "LLMatrix4a must be a standard layout type");
+#endif
 
 inline LLVector4a rowMul(const LLVector4a &row, const LLMatrix4a &mat)
 {
