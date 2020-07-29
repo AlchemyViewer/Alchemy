@@ -258,10 +258,8 @@ void LLWorld::removeRegion(const LLHost &host)
 	
 	if (regionp == gAgent.getRegion())
 	{
-		for (region_list_t::iterator iter = mRegionList.begin();
-			 iter != mRegionList.end(); ++iter)
+		for (LLViewerRegion* reg : mRegionList)
 		{
-			LLViewerRegion* reg = *iter;
 			LL_WARNS() << "RegionDump: " << reg->getName()
 				<< " " << reg->getHost()
 				<< " " << reg->getOriginGlobal()
@@ -305,10 +303,8 @@ void LLWorld::removeRegion(const LLHost &host)
 
 LLViewerRegion* LLWorld::getRegion(const LLHost &host)
 {
-	for (region_list_t::iterator iter = mRegionList.begin();
-		 iter != mRegionList.end(); ++iter)
+	for (LLViewerRegion* regionp : mRegionList)
 	{
-		LLViewerRegion* regionp = *iter;
 		if (regionp->getHost() == host)
 		{
 			return regionp;
@@ -324,10 +320,8 @@ LLViewerRegion* LLWorld::getRegionFromPosAgent(const LLVector3 &pos)
 
 LLViewerRegion* LLWorld::getRegionFromPosGlobal(const LLVector3d &pos)
 {
-	for (region_list_t::iterator iter = mRegionList.begin();
-		 iter != mRegionList.end(); ++iter)
+	for (LLViewerRegion* regionp : mRegionList)
 	{
-		LLViewerRegion* regionp = *iter;
 		if (regionp->pointInRegionGlobal(pos))
 		{
 			return regionp;
@@ -402,16 +396,14 @@ LLVector3d	LLWorld::clipToVisibleRegions(const LLVector3d &start_pos, const LLVe
 	final_region_pos.mdV[VY] = llclamp(final_region_pos.mdV[VY], 0.0,
 									   (F64)(region_width - F_ALMOST_ZERO));
 	final_region_pos.mdV[VZ] = llclamp(final_region_pos.mdV[VZ], 0.0,
-									   (F64)(LLWorld::getInstance()->getRegionMaxHeight() - F_ALMOST_ZERO));
+									   (F64)(getRegionMaxHeight() - F_ALMOST_ZERO));
 	return regionp->getPosGlobalFromRegion(LLVector3(final_region_pos));
 }
 
 LLViewerRegion* LLWorld::getRegionFromHandle(const U64 &handle)
 {
-	for (region_list_t::iterator iter = mRegionList.begin();
-		 iter != mRegionList.end(); ++iter)
+	for (LLViewerRegion* regionp : mRegionList)
 	{
-		LLViewerRegion* regionp = *iter;
 		if (regionp->getHandle() == handle)
 		{
 			return regionp;
@@ -422,10 +414,8 @@ LLViewerRegion* LLWorld::getRegionFromHandle(const U64 &handle)
 
 LLViewerRegion* LLWorld::getRegionFromID(const LLUUID& region_id)
 {
-	for (region_list_t::iterator iter = mRegionList.begin();
-		 iter != mRegionList.end(); ++iter)
+	for (LLViewerRegion* regionp : mRegionList)
 	{
-		LLViewerRegion* regionp = *iter;
 		if (regionp->getRegionID() == region_id)
 		{
 			return regionp;
@@ -437,10 +427,8 @@ LLViewerRegion* LLWorld::getRegionFromID(const LLUUID& region_id)
 void LLWorld::updateAgentOffset(const LLVector3d &offset_global)
 {
 #if 0
-	for (region_list_t::iterator iter = mRegionList.begin();
-		 iter != mRegionList.end(); ++iter)
+	for (LLViewerRegion* regionp : mRegionList)
 	{
-		LLViewerRegion* regionp = *iter;
 		regionp->setAgentOffset(offset_global);
 	}
 #endif
@@ -449,10 +437,8 @@ void LLWorld::updateAgentOffset(const LLVector3d &offset_global)
 
 BOOL LLWorld::positionRegionValidGlobal(const LLVector3d &pos_global)
 {
-	for (region_list_t::iterator iter = mRegionList.begin();
-		 iter != mRegionList.end(); ++iter)
+	for (LLViewerRegion* regionp : mRegionList)
 	{
-		LLViewerRegion* regionp = *iter;
 		if (regionp->pointInRegionGlobal(pos_global))
 		{
 			return TRUE;
@@ -704,10 +690,8 @@ void LLWorld::updateRegions(F32 max_update_time)
 	//sort regions by its mLastUpdate
 	//smaller mLastUpdate first to make sure every region has chance to get updated.
 	LLViewerRegion::region_priority_list_t region_list;
-	for (region_list_t::iterator iter = mRegionList.begin();
-		 iter != mRegionList.end(); ++iter)
+	for (LLViewerRegion* regionp : mRegionList)
 	{
-		LLViewerRegion* regionp = *iter;
 		if(regionp != self_regionp)
 		{
 			region_list.insert(regionp);
@@ -716,8 +700,7 @@ void LLWorld::updateRegions(F32 max_update_time)
 	}
 
 	// Perform idle time updates for the regions (and associated surfaces)
-	for (LLViewerRegion::region_priority_list_t::iterator iter = region_list.begin();
-		 iter != region_list.end(); ++iter)
+	for (LLViewerRegion* regionp : region_list)
 	{
 		if(max_time > 0.f)
 		{
@@ -726,12 +709,12 @@ void LLWorld::updateRegions(F32 max_update_time)
 
 		if(max_time > 0.f)
 		{
-			(*iter)->idleUpdate(max_time);
+			regionp->idleUpdate(max_time);
 		}
 		else
 		{
 			//perform some necessary but very light updates.
-			(*iter)->lightIdleUpdate();
+			regionp->lightIdleUpdate();
 		}		
 	}
 
@@ -773,10 +756,8 @@ void LLWorld::updateNetStats()
 	F64Bits bits;
 	U32 packets = 0;
 
-	for (region_list_t::iterator iter = mActiveRegionList.begin();
-		 iter != mActiveRegionList.end(); ++iter)
+	for (LLViewerRegion* regionp : mActiveRegionList)
 	{
-		LLViewerRegion* regionp = *iter;
 		regionp->updateNetStats();
 		bits += regionp->mBitsReceived;
 		packets += llfloor( regionp->mPacketsReceived );
@@ -817,10 +798,8 @@ void LLWorld::printPacketsLost()
 	LL_INFOS() << "----------" << LL_ENDL;
 
 	LLCircuitData *cdp = NULL;
-	for (region_list_t::iterator iter = mActiveRegionList.begin();
-		 iter != mActiveRegionList.end(); ++iter)
+	for (LLViewerRegion* regionp : mActiveRegionList)
 	{
-		LLViewerRegion* regionp = *iter;
 		cdp = gMessageSystem->mCircuitInfo.findCircuit(regionp->getHost());
 		if (cdp)
 		{
@@ -865,11 +844,11 @@ void LLWorld::setLandFarClip(const F32 far_clip)
 // a (possibly) new water height. Update it in our local copy.
 void LLWorld::waterHeightRegionInfo(std::string const& sim_name, F32 water_height)
 {
-	for (region_list_t::iterator iter = mRegionList.begin(); iter != mRegionList.end(); ++iter)
+	for (LLViewerRegion* regionp : mRegionList)
 	{
-		if ((*iter)->getName() == sim_name)
+		if (regionp->getName() == sim_name)
 		{
-			(*iter)->setWaterHeight(water_height);
+			regionp->setWaterHeight(water_height);
 			break;
 		}
 	}
@@ -888,10 +867,8 @@ void LLWorld::precullWaterObjects(LLCamera& camera, LLCullResult* cull, bool inc
 		return;
 	}
 
-	for (region_list_t::iterator iter = mRegionList.begin();
-		 iter != mRegionList.end(); ++iter)
+	for (LLViewerRegion* regionp : mRegionList)
 	{
-		LLViewerRegion* regionp = *iter;
 		LLVOWater* waterp = regionp->getLand().getWaterObj();
 		if (waterp && waterp->mDrawable)
 		{
@@ -958,10 +935,8 @@ void LLWorld::updateWaterObjects()
 	max_x = (S32)region_x + range;
 	max_y = (S32)region_y + range;
 
-	for (region_list_t::iterator iter = mRegionList.begin();
-		 iter != mRegionList.end(); ++iter)
+	for (LLViewerRegion* regionp : mRegionList)
 	{
-		LLViewerRegion* regionp = *iter;
 		LLVOWater* waterp = regionp->getLand().getWaterObj();
 		if (waterp)
 		{
@@ -1070,9 +1045,8 @@ void LLWorld::updateWaterObjects()
 
 void LLWorld::shiftRegions(const LLVector3& offset)
 {
-	for (region_list_t::const_iterator i = getRegionList().begin(); i != getRegionList().end(); ++i)
+	for (LLViewerRegion* region : getRegionList())
 	{
-		LLViewerRegion* region = *i;
 		region->updateRenderMatrix();
 	}
 
@@ -1096,10 +1070,8 @@ U64MicrosecondsImplicit LLWorld::getSpaceTimeUSec() const
 
 void LLWorld::requestCacheMisses()
 {
-	for (region_list_t::iterator iter = mRegionList.begin();
-		 iter != mRegionList.end(); ++iter)
+	for (LLViewerRegion* regionp : mRegionList)
 	{
-		LLViewerRegion* regionp = *iter;
 		regionp->requestCacheMisses();
 	}
 }
@@ -1107,10 +1079,8 @@ void LLWorld::requestCacheMisses()
 void LLWorld::getInfo(LLSD& info)
 {
 	LLSD region_info;
-	for (region_list_t::iterator iter = mRegionList.begin();
-		 iter != mRegionList.end(); ++iter)
-	{	
-		LLViewerRegion* regionp = *iter;
+	for (LLViewerRegion* regionp : mRegionList)
+	{
 		regionp->getInfo(region_info);
 		info["World"].append(region_info);
 	}
@@ -1119,10 +1089,8 @@ void LLWorld::getInfo(LLSD& info)
 void LLWorld::disconnectRegions()
 {
 	LLMessageSystem* msg = gMessageSystem;
-	for (region_list_t::iterator iter = mRegionList.begin();
-		 iter != mRegionList.end(); ++iter)
+	for (LLViewerRegion* regionp : mRegionList)
 	{
-		LLViewerRegion* regionp = *iter;
 		if (regionp == gAgent.getRegion())
 		{
 			// Skip the main agent
@@ -1352,7 +1320,7 @@ void LLWorld::getAvatars(uuid_vec_t* avatar_ids, std::vector<LLVector3d>* positi
 		}
 	}
 	// region avatars added for situations where radius is greater than RenderFarClip
-	for (LLViewerRegion* regionp : LLWorld::getInstance()->getRegionList())
+	for (LLViewerRegion* regionp : getRegionList())
 	{
 		const LLVector3d& origin_global = regionp->getOriginGlobal();
 		S32 count = regionp->mMapAvatars.size();
@@ -1404,7 +1372,7 @@ void LLWorld::getAvatars(pos_map_t* umap, const LLVector3d& relative_to, F32 rad
 		}
 	}
 	// region avatars added for situations where radius is greater than RenderFarClip
-	for (LLViewerRegion* regionp : LLWorld::getInstance()->getRegionList())
+	for (LLViewerRegion* regionp : getRegionList())
 	{
 		const LLVector3d& origin_global = regionp->getOriginGlobal();
 		S32 count = regionp->mMapAvatars.size();
@@ -1451,7 +1419,7 @@ void LLWorld::getAvatars(region_gpos_map_t* umap, const LLVector3d& relative_to,
 		}
 	}
 	// region avatars added for situations where radius is greater than RenderFarClip
-	for (LLViewerRegion* regionp : LLWorld::getInstance()->getRegionList())
+	for (LLViewerRegion* regionp : getRegionList())
 	{
 		const LLVector3d& origin_global = regionp->getOriginGlobal();
 		size_t count = regionp->mMapAvatars.size();
@@ -1482,7 +1450,7 @@ bool LLWorld::getAvatar(const LLUUID& idAvatar, LLVector3d& posAvatar) const
 		}
 	}
 
-	for (const LLViewerRegion* pRegion : LLWorld::getInstance()->getRegionList())
+	for (const LLViewerRegion* pRegion : getRegionList())
 	{
 		for (S32 idxAgent = 0, cntAgent = pRegion->mMapAvatarIDs.size(); idxAgent < cntAgent; ++idxAgent)
 		{
