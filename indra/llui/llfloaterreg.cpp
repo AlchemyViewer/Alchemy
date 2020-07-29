@@ -41,7 +41,7 @@ LLFloaterReg::instance_map_t LLFloaterReg::sInstanceMap;
 LLFloaterReg::build_map_t LLFloaterReg::sBuildMap;
 LLFloaterReg::group_map_t LLFloaterReg::sGroupMap;
 bool LLFloaterReg::sBlockShowFloaters = false;
-std::set<std::string> LLFloaterReg::sAlwaysShowableList;
+absl::flat_hash_set<std::string> LLFloaterReg::sAlwaysShowableList;
 
 static LLFloaterRegListener sFloaterRegListener;
 
