@@ -382,13 +382,13 @@ inline void Draw(LLDrawInfo* draw, U32 mask)
 
 bool LLDrawPoolAlpha::TexSetup(LLDrawInfo* draw, bool use_shaders, bool use_material, LLGLSLShader* current_shader)
 {
-    LL_RECORD_BLOCK_TIME(FTM_RENDER_ALPHA_TEX_BINDS);    
+    //LL_RECORD_BLOCK_TIME(FTM_RENDER_ALPHA_TEX_BINDS);    
 
     bool tex_setup = false;
 
     if (deferred_render && use_material && current_shader)
     {
-        LL_RECORD_BLOCK_TIME(FTM_RENDER_ALPHA_DEFERRED_TEX_BINDS);
+        //LL_RECORD_BLOCK_TIME(FTM_RENDER_ALPHA_DEFERRED_TEX_BINDS);
         if (draw->mNormalMap)
 		{            
 			draw->mNormalMap->addTextureStats(draw->mVSize);
@@ -518,7 +518,7 @@ void LLDrawPoolAlpha::renderMaterials(U32 mask, std::vector<LLDrawInfo*>& materi
 
 		if (current_shader != target_shader)
 		{
-            LL_RECORD_BLOCK_TIME(FTM_RENDER_ALPHA_DEFERRED_SHADER_BINDS);
+            //LL_RECORD_BLOCK_TIME(FTM_RENDER_ALPHA_DEFERRED_SHADER_BINDS);
             if (current_shader)
             {
                 gPipeline.unbindDeferredShader(*current_shader);
@@ -534,7 +534,7 @@ void LLDrawPoolAlpha::renderMaterials(U32 mask, std::vector<LLDrawInfo*>& materi
 		current_shader->uniform1f(LLShaderMgr::EMISSIVE_BRIGHTNESS, draw->mFullbright ? 1.f : 0.f);
 
         {
-            LL_RECORD_BLOCK_TIME(FTM_RENDER_ALPHA_DEFERRED_TEX_BINDS);
+            //LL_RECORD_BLOCK_TIME(FTM_RENDER_ALPHA_DEFERRED_TEX_BINDS);
 			if (draw->mNormalMap)
 			{
 				draw->mNormalMap->addTextureStats(draw->mVSize);
@@ -613,6 +613,8 @@ void LLDrawPoolAlpha::renderAlpha(U32 mask, S32 pass)
 	
 	BOOL use_shaders = gPipeline.canUseVertexShaders();
 		
+	LL_RECORD_BLOCK_TIME(FTM_RENDER_ALPHA_GROUP_LOOP);
+
 	for (LLCullResult::sg_iterator i = gPipeline.beginAlphaGroups(), i_end = gPipeline.endAlphaGroups(); i != i_end; ++i)
 	{
 		LLSpatialGroup* group = *i;
@@ -631,7 +633,7 @@ void LLDrawPoolAlpha::renderAlpha(U32 mask, S32 pass)
 			bool draw_glow_for_this_partition = mShaderLevel > 0; // no shaders = no glow.
 
 			
-			LL_RECORD_BLOCK_TIME(FTM_RENDER_ALPHA_GROUP_LOOP);
+
 
 			bool disable_cull = is_particle_or_hud_particle;
 			LLGLDisable cull(disable_cull ? GL_CULL_FACE : 0);
@@ -687,7 +689,7 @@ void LLDrawPoolAlpha::renderAlpha(U32 mask, S32 pass)
 					// Turn off lighting if it hasn't already been so.
 					if (light_enabled || !initialized_lighting)
 					{
-                        LL_RECORD_BLOCK_TIME(FTM_RENDER_ALPHA_LIGHT_SETUP);
+                        //LL_RECORD_BLOCK_TIME(FTM_RENDER_ALPHA_LIGHT_SETUP);
 
 						initialized_lighting = TRUE;
 						if (use_shaders) 
@@ -704,7 +706,7 @@ void LLDrawPoolAlpha::renderAlpha(U32 mask, S32 pass)
 				// Turn on lighting if it isn't already.
 				else if (!light_enabled || !initialized_lighting)
 				{
-                    LL_RECORD_BLOCK_TIME(FTM_RENDER_ALPHA_LIGHT_SETUP);
+                    //LL_RECORD_BLOCK_TIME(FTM_RENDER_ALPHA_LIGHT_SETUP);
 
 					initialized_lighting = TRUE;
 					if (use_shaders) 
@@ -732,7 +734,7 @@ void LLDrawPoolAlpha::renderAlpha(U32 mask, S32 pass)
 
 					if (current_shader != target_shader)
 					{
-                        LL_RECORD_BLOCK_TIME(FTM_RENDER_ALPHA_DEFERRED_SHADER_BINDS);
+                        //LL_RECORD_BLOCK_TIME(FTM_RENDER_ALPHA_DEFERRED_SHADER_BINDS);
 						gPipeline.bindDeferredShader(*target_shader);
                         current_shader = target_shader;
 					}
@@ -749,7 +751,7 @@ void LLDrawPoolAlpha::renderAlpha(U32 mask, S32 pass)
 				if(use_shaders && (current_shader != target_shader))
 				{// If we need shaders, and we're not ALREADY using the proper shader, then bind it
 				// (this way we won't rebind shaders unnecessarily).
-                    LL_RECORD_BLOCK_TIME(FTM_RENDER_ALPHA_SHADER_BINDS);
+                    //LL_RECORD_BLOCK_TIME(FTM_RENDER_ALPHA_SHADER_BINDS);
 					current_shader = target_shader;
 					current_shader->bind();
 				}
@@ -786,7 +788,7 @@ void LLDrawPoolAlpha::renderAlpha(U32 mask, S32 pass)
                 bool tex_setup = TexSetup(&params, use_shaders, use_shaders && (mat != nullptr), current_shader);
 
 				{
-					LL_RECORD_BLOCK_TIME(FTM_RENDER_ALPHA_PUSH);
+					//LL_RECORD_BLOCK_TIME(FTM_RENDER_ALPHA_PUSH);
 
 					LLGLEnableFunc stencil_test(GL_STENCIL_TEST, params.mSelected, &LLGLCommonFunc::selected_stencil_test);
 
@@ -794,7 +796,7 @@ void LLDrawPoolAlpha::renderAlpha(U32 mask, S32 pass)
 					params.mVertexBuffer->setBuffer(mask & ~(params.mFullbright ? (LLVertexBuffer::MAP_TANGENT | LLVertexBuffer::MAP_TEXCOORD1 | LLVertexBuffer::MAP_TEXCOORD2) : 0));
 
                     {
-                        LL_RECORD_BLOCK_TIME(FTM_RENDER_ALPHA_DRAW);
+                        //LL_RECORD_BLOCK_TIME(FTM_RENDER_ALPHA_DRAW);
 					    params.mVertexBuffer->drawRange(params.mDrawMode, params.mStart, params.mEnd, params.mCount, params.mOffset);
 					    gPipeline.addTrianglesDrawn(params.mCount, params.mDrawMode);
                     }
@@ -806,7 +808,7 @@ void LLDrawPoolAlpha::renderAlpha(U32 mask, S32 pass)
 					(!is_particle_or_hud_particle || params.mHasGlow) &&
 					params.mVertexBuffer->hasDataType(LLVertexBuffer::TYPE_EMISSIVE))
 				{
-                    LL_RECORD_BLOCK_TIME(FTM_RENDER_ALPHA_EMISSIVE);
+                    //LL_RECORD_BLOCK_TIME(FTM_RENDER_ALPHA_EMISSIVE);
 
                     if (batch_emissives)
                     {
