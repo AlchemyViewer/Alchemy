@@ -145,23 +145,23 @@ const S32 KEY_COUNT = 256;
 const F32 DEFAULT_WATER_HEIGHT 	= 20.0f;
 
 // Maturity ratings for simulators
-const U8 SIM_ACCESS_MIN 	= 0;		// Treated as 'unknown', usually ends up being SIM_ACCESS_PG
-const U8 SIM_ACCESS_PG		= 13;
-const U8 SIM_ACCESS_MATURE	= 21;
-const U8 SIM_ACCESS_ADULT	= 42;		// Seriously Adult Only
-const U8 SIM_ACCESS_DOWN	= 254;
-const U8 SIM_ACCESS_MAX 	= SIM_ACCESS_ADULT;
+constexpr U8 SIM_ACCESS_MIN 	= 0;		// Treated as 'unknown', usually ends up being SIM_ACCESS_PG
+constexpr U8 SIM_ACCESS_PG		= 13;
+constexpr U8 SIM_ACCESS_MATURE	= 21;
+constexpr U8 SIM_ACCESS_ADULT	= 42;		// Seriously Adult Only
+constexpr U8 SIM_ACCESS_DOWN	= 254;
+constexpr U8 SIM_ACCESS_MAX 	= SIM_ACCESS_ADULT;
 
 // attachment constants
-const U8  ATTACHMENT_ADD = 0x80;
+constexpr U8  ATTACHMENT_ADD = 0x80;
 
 // god levels
-const U8 GOD_MAINTENANCE = 250;
-const U8 GOD_FULL = 200;
-const U8 GOD_LIAISON = 150;
-const U8 GOD_CUSTOMER_SERVICE = 100;
-const U8 GOD_LIKE = 1;
-const U8 GOD_NOT = 0;
+constexpr U8 GOD_MAINTENANCE = 250;
+constexpr U8 GOD_FULL = 200;
+constexpr U8 GOD_LIAISON = 150;
+constexpr U8 GOD_CUSTOMER_SERVICE = 100;
+constexpr U8 GOD_LIKE = 1;
+constexpr U8 GOD_NOT = 0;
 
 // "agent id" for things that should be done to ALL agents
 LL_COMMON_API extern const LLUUID LL_UUID_ALL_AGENTS;
