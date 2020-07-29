@@ -7693,8 +7693,8 @@ void LLPipeline::renderBloom(bool for_snapshot, F32 zoom_factor, int subfield)
 
 	if (LLPipeline::sRenderDeferred)
 	{
-
-		bool dof_enabled = !LLViewerCamera::getInstance()->cameraUnderWater() &&
+		auto& viewerCamera = LLViewerCamera::instance();
+		bool dof_enabled = !viewerCamera.cameraUnderWater() &&
 			(RenderDepthOfFieldInEditMode || !LLToolMgr::getInstance()->inBuildMode()) &&
 							RenderDepthOfField;
 
@@ -7757,11 +7757,11 @@ void LLPipeline::renderBloom(bool for_snapshot, F32 zoom_factor, int subfield)
 				}
 			}
 
-			LLVector3 eye = LLViewerCamera::getInstance()->getOrigin();
+			const LLVector3& eye = viewerCamera.getOrigin();
 			F32 target_distance = 16.f;
 			if (!focus_point.isExactlyZero())
 			{
-				target_distance = LLViewerCamera::getInstance()->getAtAxis() * (focus_point-eye);
+				target_distance = viewerCamera.getAtAxis() * (focus_point-eye);
 			}
 
 			if (transition_time >= 1.f &&
@@ -7788,7 +7788,7 @@ void LLPipeline::renderBloom(bool for_snapshot, F32 zoom_factor, int subfield)
 			F32 fnumber = CameraFNumber;
 			F32 default_focal_length = CameraFocalLength;
 
-			F32 fov = LLViewerCamera::getInstance()->getView();
+			F32 fov = viewerCamera.getView();
 		
 			const F32 default_fov = CameraFieldOfView * F_PI/180.f;
 		
@@ -8373,12 +8373,13 @@ void LLPipeline::bindDeferredShader(LLGLSLShader& shader, LLRenderTarget* light_
 								matrix_nondiag, matrix_nondiag, matrix_diag};
 	shader.uniformMatrix3fv(LLShaderMgr::DEFERRED_SSAO_EFFECT_MAT, 1, GL_FALSE, ssao_effect_mat);
 
+	auto& viewerCamera = LLViewerCamera::instance();
 	//F32 shadow_offset_error = 1.f + RenderShadowOffsetError * fabsf(LLViewerCamera::getInstance()->getOrigin().mV[2]);
-	F32 shadow_bias_error = RenderShadowBiasError * fabsf(LLViewerCamera::getInstance()->getOrigin().mV[2])/3000.f;
+	F32 shadow_bias_error = RenderShadowBiasError * fabsf(viewerCamera.getOrigin().mV[2])/3000.f;
     F32 shadow_bias       = RenderShadowBias + shadow_bias_error;
 
     shader.uniform2f(LLShaderMgr::DEFERRED_SCREEN_RES, deferred_target->getWidth(), deferred_target->getHeight());
-	shader.uniform1f(LLShaderMgr::DEFERRED_NEAR_CLIP, LLViewerCamera::getInstance()->getNear()*2.f);
+	shader.uniform1f(LLShaderMgr::DEFERRED_NEAR_CLIP, viewerCamera.getNear()*2.f);
 	shader.uniform1f (LLShaderMgr::DEFERRED_SHADOW_OFFSET, RenderShadowOffset); //*shadow_offset_error);
     shader.uniform1f(LLShaderMgr::DEFERRED_SHADOW_BIAS, shadow_bias);
 	shader.uniform1f(LLShaderMgr::DEFERRED_SPOT_SHADOW_OFFSET, RenderSpotShadowOffset);
@@ -8445,9 +8446,10 @@ void LLPipeline::renderDeferredLighting(LLRenderTarget* screen_target)
     LLRenderTarget* deferred_depth_target = &mDeferredDepth;
     LLRenderTarget* deferred_light_target = &mDeferredLight;
 
+	LLViewerCamera& camera = LLViewerCamera::instance();
+
 	{
 		LL_RECORD_BLOCK_TIME(FTM_RENDER_DEFERRED);
-		LLViewerCamera* camera = LLViewerCamera::getInstance();
 		{
 			LLGLDepthTest depth(GL_TRUE);
             deferred_depth_target->copyContents(*deferred_target, 0, 0, deferred_target->getWidth(), deferred_target->getHeight(),
@@ -8669,7 +8671,7 @@ void LLPipeline::renderDeferredLighting(LLRenderTarget* screen_target)
 										LLPipeline::END_RENDER_TYPES);
 								
 			
-			renderGeomPostDeferred(*LLViewerCamera::getInstance(), false);
+			renderGeomPostDeferred(camera, false);
 			gPipeline.popRenderTypeMask();
 		}
 
@@ -8729,7 +8731,7 @@ void LLPipeline::renderDeferredLighting(LLRenderTarget* screen_target)
                     }
 
                     const LLVector3 position = drawablep->getPositionAgent();
-                    if (dist_vec(position, LLViewerCamera::getInstance()->getOrigin()) > RenderFarClip + volume->getLightRadius())
+                    if (dist_vec(position, camera.getOrigin()) > RenderFarClip + volume->getLightRadius())
                     {
                         continue;
                     }
@@ -8754,19 +8756,20 @@ void LLPipeline::renderDeferredLighting(LLRenderTarget* screen_target)
 
 					LLVector4a sa;
 					sa.splat(s);
-					if (camera->AABBInFrustumNoFarClip(center, sa) == 0)
+					if (camera.AABBInFrustumNoFarClip(center, sa) == 0)
 					{
 						continue;
 					}
 
 					sVisibleLightCount++;
-										
-					if (camera->getOrigin().mV[0] > c[0] + s + 0.2f ||
-						camera->getOrigin().mV[0] < c[0] - s - 0.2f ||
-						camera->getOrigin().mV[1] > c[1] + s + 0.2f ||
-						camera->getOrigin().mV[1] < c[1] - s - 0.2f ||
-						camera->getOrigin().mV[2] > c[2] + s + 0.2f ||
-						camera->getOrigin().mV[2] < c[2] - s - 0.2f)
+								
+					const auto& cam_origin = camera.getOrigin();
+					if (cam_origin.mV[0] > c[0] + s + 0.2f ||
+						cam_origin.mV[0] < c[0] - s - 0.2f ||
+						cam_origin.mV[1] > c[1] + s + 0.2f ||
+						cam_origin.mV[1] < c[1] - s - 0.2f ||
+						cam_origin.mV[2] > c[2] + s + 0.2f ||
+						cam_origin.mV[2] < c[2] - s - 0.2f)
 					{ //draw box if camera is outside box
 						if (render_local)
 						{
@@ -8784,7 +8787,7 @@ void LLPipeline::renderDeferredLighting(LLRenderTarget* screen_target)
                             gDeferredLightProgram.uniform1f(LLShaderMgr::LIGHT_FALLOFF, volume->getLightFalloff(DEFERRED_LIGHT_FALLOFF));
 							gGL.syncMatrices();
 							
-							mCubeVB->drawRange(LLRender::TRIANGLE_FAN, 0, 7, 8, get_box_fan_indices(camera, center));
+							mCubeVB->drawRange(LLRender::TRIANGLE_FAN, 0, 7, 8, get_box_fan_indices(&camera, center));
 							stop_glerror();
 						}
 					}
@@ -8840,7 +8843,7 @@ void LLPipeline::renderDeferredLighting(LLRenderTarget* screen_target)
                     gDeferredSpotLightProgram.uniform1f(LLShaderMgr::LIGHT_FALLOFF, volume->getLightFalloff(DEFERRED_LIGHT_FALLOFF));
 					gGL.syncMatrices();
 										
-					mCubeVB->drawRange(LLRender::TRIANGLE_FAN, 0, 7, 8, get_box_fan_indices(camera, center));
+					mCubeVB->drawRange(LLRender::TRIANGLE_FAN, 0, 7, 8, get_box_fan_indices(&camera, center));
 				}
 				gDeferredSpotLightProgram.disableTexture(LLShaderMgr::DEFERRED_PROJECTION);
 				unbindDeferredShader(gDeferredSpotLightProgram);
@@ -9024,7 +9027,7 @@ void LLPipeline::renderDeferredLighting(LLRenderTarget* screen_target)
 						 LLPipeline::RENDER_TYPE_FULLBRIGHT_ALPHA_MASK,
 						 END_RENDER_TYPES);
 		
-		renderGeomPostDeferred(*LLViewerCamera::getInstance());
+		renderGeomPostDeferred(camera);
 		popRenderTypeMask();
 	}
 
@@ -10913,11 +10916,11 @@ void LLPipeline::generateImpostor(LLVOAvatar* avatar)
 	sShadowRender = true;
 	sImpostorRender = true;
 
-	LLViewerCamera* viewer_camera = LLViewerCamera::getInstance();
+	LLViewerCamera& viewer_camera = LLViewerCamera::instance();
 
 	{
 		LL_RECORD_BLOCK_TIME(FTM_IMPOSTOR_MARK_VISIBLE);
-		markVisible(avatar->mDrawable, *viewer_camera);
+		markVisible(avatar->mDrawable, viewer_camera);
 		LLVOAvatar::sUseImpostors = false; // @TODO ???
 
 		LLVOAvatar::attachment_map_t::iterator iter;
@@ -10932,15 +10935,15 @@ void LLPipeline::generateImpostor(LLVOAvatar* avatar)
 			{
 				if (LLViewerObject* attached_object = attachment_iter->get())
 				{
-					markVisible(attached_object->mDrawable->getSpatialBridge(), *viewer_camera);
+					markVisible(attached_object->mDrawable->getSpatialBridge(), viewer_camera);
 				}
 			}
 		}
 	}
 
-	stateSort(*LLViewerCamera::getInstance(), result);
+	stateSort(viewer_camera, result);
 	
-	LLCamera camera = *viewer_camera;
+	LLCamera camera = viewer_camera;
 	LLVector2 tdim;
 	U32 resY = 0;
 	U32 resX = 0;
@@ -10950,7 +10953,7 @@ void LLPipeline::generateImpostor(LLVOAvatar* avatar)
 		const LLVector4a* ext = avatar->mDrawable->getSpatialExtents();
 		LLVector3 pos(avatar->getRenderPosition()+avatar->getImpostorOffset());
 
-		camera.lookAt(viewer_camera->getOrigin(), pos, viewer_camera->getUpAxis());
+		camera.lookAt(viewer_camera.getOrigin(), pos, viewer_camera.getUpAxis());
 	
 		LLVector4a half_height;
 		half_height.setSub(ext[1], ext[0]);
@@ -10995,7 +10998,7 @@ void LLPipeline::generateImpostor(LLVOAvatar* avatar)
 		gGL.setColorMask(true, true);
 	
 		// get the number of pixels per angle
-		F32 pa = gViewerWindow->getWindowHeightRaw() / (RAD_TO_DEG * viewer_camera->getView());
+		F32 pa = gViewerWindow->getWindowHeightRaw() / (RAD_TO_DEG * viewer_camera.getView());
 
 		//get resolution based on angle width and height of impostor (double desired resolution to prevent aliasing)
 		resY = llmin(nhpo2((U32) (fov*pa)), (U32) 512);
