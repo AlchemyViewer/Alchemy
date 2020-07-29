@@ -1096,8 +1096,9 @@ BOOL LLVOSky::updateGeometry(LLDrawable *drawable)
     bool draw_sun  = updateHeavenlyBodyGeometry(drawable, mSunScale, FACE_SUN, mSun, up, right);
     bool draw_moon = updateHeavenlyBodyGeometry(drawable, mMoonScale, FACE_MOON, mMoon, up, right);
 
-    draw_sun  &= LLEnvironment::getInstance()->getIsSunUp();
-    draw_moon &= LLEnvironment::getInstance()->getIsMoonUp();
+	LLEnvironment& environment = LLEnvironment::instance();
+    draw_sun  &= environment.getIsSunUp();
+    draw_moon &= environment.getIsMoonUp();
 
 	mSun.setDraw(draw_sun);
 	mMoon.setDraw(draw_moon);

@@ -129,7 +129,7 @@ public:
 	// callback from LLAppViewer
 	static void onLoginComplete();
 
-	const std::vector<ALAOSet*> getSetList() const;
+	const std::vector<ALAOSet*>& getSetList() const;
 	const std::string& getCurrentSetName() const;
 	const ALAOSet* getDefaultSet() const;
 	bool renameSet(ALAOSet* set, const std::string& name);

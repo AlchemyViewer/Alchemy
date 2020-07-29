@@ -258,10 +258,12 @@ void LLNetMap::draw()
 			gGL.rotatef( rotation * RAD_TO_DEG, 0.f, 0.f, 1.f);
 		}
 
-		// figure out where agent is
-		S32 region_width = ll_round(LLWorld::getInstance()->getRegionWidthInMeters());
+		auto& worldInst = LLWorld::instance();
 
-		for (LLViewerRegion* regionp : LLWorld::getInstance()->getRegionList())
+		// figure out where agent is
+		S32 region_width = ll_round(worldInst.getRegionWidthInMeters());
+
+		for (LLViewerRegion* regionp : worldInst.getRegionList())
 		{
 			// Find x and y position relative to camera's center.
 			LLVector3 origin_agent = regionp->getOriginAgent();
@@ -431,7 +433,7 @@ void LLNetMap::draw()
 					memset(texture_data, 0, mParcelImagep->getWidth() * mParcelImagep->getHeight() * mParcelImagep->getComponents());
 
 					// Process each region
-					for (LLViewerRegion* region : LLWorld::getInstance()->getRegionList())
+					for (LLViewerRegion* region : worldInst.getRegionList())
 					{
 						LLColor4 overlay_color = region->isAlive()
 							? map_parcel_line_color.get()
@@ -483,7 +485,7 @@ void LLNetMap::draw()
 		LLWorld::pos_map_t positions;
 		bool unknown_relative_z;
 
-		LLWorld::getInstance()->getAvatars(&positions);
+		worldInst.getAvatars(&positions);
 
 		// Draw avatars
 		for (const auto& av_pos_pair : positions)
@@ -588,7 +590,7 @@ void LLNetMap::draw()
 		}
 
 		// Draw frustum
-		F32 meters_to_pixels = mScale/ LLWorld::getInstance()->getRegionWidthInMeters();
+		F32 meters_to_pixels = mScale/ worldInst.getRegionWidthInMeters();
 
 		F32 horiz_fov = LLViewerCamera::getInstance()->getView() * LLViewerCamera::getInstance()->getAspect();
 		F32 far_clip_meters = LLViewerCamera::getInstance()->getFar();

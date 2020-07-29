@@ -620,6 +620,7 @@ void LLMaterialMgr::CapsRecvForRegion(const LLUUID& regionId, LLUUID regionTest,
 
 void LLMaterialMgr::processGetQueue()
 {
+	auto& worldInst = LLWorld::instance();
     get_queue_t::iterator loopRegionQueue = mGetQueue.begin();
     while (mGetQueue.end() != loopRegionQueue)
     {
@@ -635,7 +636,7 @@ void LLMaterialMgr::processGetQueue()
             continue;
         }
 
-        LLViewerRegion* regionp = LLWorld::instance().getRegionFromID(region_id);
+        LLViewerRegion* regionp = worldInst.getRegionFromID(region_id);
         if (!regionp)
         {
             LL_WARNS("Materials") << "Unknown region with id " << region_id.asString() << LL_ENDL;
@@ -834,7 +835,8 @@ void LLMaterialMgr::processGetAllQueue()
 
 void LLMaterialMgr::processGetAllQueueCoro(LLUUID regionId)
 {
-    LLViewerRegion* regionp = LLWorld::instance().getRegionFromID(regionId);
+	auto& worldInst = LLWorld::instance();
+    LLViewerRegion* regionp = worldInst.getRegionFromID(regionId);
     if (regionp == NULL)
     {
         LL_WARNS("Materials") << "Unknown region with id " << regionId.asString() << LL_ENDL;
@@ -852,7 +854,7 @@ void LLMaterialMgr::processGetAllQueueCoro(LLUUID regionId)
         llcoro::suspendUntilEventOn(capsRecv);
 
         // reget the region from the region ID since it may have gone away while waiting.
-        regionp = LLWorld::instance().getRegionFromID(regionId);
+        regionp = worldInst.getRegionFromID(regionId);
         if (!regionp)
         {
             LL_WARNS("Materials") << "Region with ID " << regionId << " is no longer valid." << LL_ENDL;
@@ -895,7 +897,7 @@ void LLMaterialMgr::processGetAllQueueCoro(LLUUID regionId)
     }
 
     // reget the region from the region ID since it may have gone away while waiting.
-    regionp = LLWorld::instance().getRegionFromID(regionId);
+    regionp = worldInst.getRegionFromID(regionId);
     if (!regionp)
     {
         LL_WARNS("Materials") << "Region with ID " << regionId << " is no longer valid." << LL_ENDL;

@@ -75,7 +75,7 @@ BOOL ALPanelAOMini::postBuild()
 
 void ALPanelAOMini::updateSetList()
 {
-	std::vector<ALAOSet*> list = ALAOEngine::getInstance()->getSetList();
+	const std::vector<ALAOSet*>& list = ALAOEngine::getInstance()->getSetList();
 	if (list.empty())
 	{
 		return;

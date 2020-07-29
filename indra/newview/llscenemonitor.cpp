@@ -483,10 +483,6 @@ void LLSceneMonitor::fetchQueryResult()
 {
 	LL_RECORD_BLOCK_TIME(FTM_SCENE_LOAD_IMAGE_DIFF);
 
-	// also throttle timing here, to avoid going below sample time due to phasing with frame capture
-	static LLCachedControl<F32>  scene_load_sample_time_control(gSavedSettings, "SceneLoadingMonitorSampleTime");
-	F32Seconds scene_load_sample_time = (F32Seconds)scene_load_sample_time_control();
-
 	if(mDiffState == WAIT_ON_RESULT 
 		&& !LLAppViewer::instance()->quitRequested())
 	{
@@ -506,6 +502,10 @@ void LLSceneMonitor::fetchQueryResult()
 
 			static LLCachedControl<F32> diff_threshold(gSavedSettings,"SceneLoadingMonitorPixelDiffThreshold");
 			F32Seconds elapsed_time = mRecordingTimer.getElapsedTimeF32();
+
+			// also throttle timing here, to avoid going below sample time due to phasing with frame capture
+			static LLCachedControl<F32>  scene_load_sample_time_control(gSavedSettings, "SceneLoadingMonitorSampleTime");
+			F32Seconds scene_load_sample_time = (F32Seconds)scene_load_sample_time_control();
 
 			if (elapsed_time > scene_load_sample_time)
 			{

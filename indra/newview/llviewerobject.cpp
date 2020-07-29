@@ -1142,8 +1142,10 @@ U32 LLViewerObject::processUpdateMessage(LLMessageSystem *mesgsys,
 
 	U32 retval = 0x0;
 	
+	auto& worldInst = LLWorld::instance();
+
 	// If region is removed from the list it is also deleted.
-	if (!LLWorld::instance().isRegionListed(mRegionp))
+	if (!worldInst.isRegionListed(mRegionp))
 	{
 		LL_WARNS() << "Updating object in an invalid region" << LL_ENDL;
 		return retval;
@@ -1155,7 +1157,7 @@ U32 LLViewerObject::processUpdateMessage(LLMessageSystem *mesgsys,
 	if(mesgsys != NULL)
 	{
 		mesgsys->getU64Fast(_PREHASH_RegionData, _PREHASH_RegionHandle, region_handle);
-		LLViewerRegion* regionp = LLWorld::getInstance()->getRegionFromHandle(region_handle);
+		LLViewerRegion* regionp = worldInst.getRegionFromHandle(region_handle);
 		if(regionp != mRegionp && regionp && mRegionp)//region cross
 		{
 			//this is the redundant position and region update, but it is necessary in case the viewer misses the following 
@@ -1211,9 +1213,9 @@ U32 LLViewerObject::processUpdateMessage(LLMessageSystem *mesgsys,
 	U16 valswizzle[4];
 #endif
 	U16	*val;
-	const F32 size = LLWorld::getInstance()->getRegionWidthInMeters();	
-	const F32 MAX_HEIGHT = LLWorld::getInstance()->getRegionMaxHeight();
-	const F32 MIN_HEIGHT = LLWorld::getInstance()->getRegionMinHeight();
+	const F32 size = worldInst.getRegionWidthInMeters();	
+	const F32 MAX_HEIGHT = worldInst.getRegionMaxHeight();
+	const F32 MIN_HEIGHT = worldInst.getRegionMinHeight();
 	S32 length;
 	S32	count;
 	S32 this_update_precision = 32;		// in bits
@@ -2671,21 +2673,22 @@ void LLViewerObject::interpolateLinearMotion(const F64SecondsImplicit& frame_tim
 		new_pos = new_pos + getPositionRegion();
 		new_v = new_v + vel;
 
+		auto& worldInst = LLWorld::instance();
 
 		// Clamp interpolated position to minimum underground and maximum region height
 		LLVector3d new_pos_global = mRegionp->getPosGlobalFromRegion(new_pos);
 		F32 min_height;
 		if (isAvatar())
 		{	// Make a better guess about AVs not going underground
-			min_height = LLWorld::getInstance()->resolveLandHeightGlobal(new_pos_global);
+			min_height = worldInst.resolveLandHeightGlobal(new_pos_global);
 			min_height += (0.5f * getScale().mV[VZ]);
 		}
 		else
 		{	// This will put the object underground, but we can't tell if it will stop 
 			// at ground level or not
-			min_height = LLWorld::getInstance()->getMinAllowedZ(this, new_pos_global);
+			min_height = worldInst.getMinAllowedZ(this, new_pos_global);
 			// Cap maximum height
-			new_pos.mV[VZ] = llmin(LLWorld::getInstance()->getRegionMaxHeight(), new_pos.mV[VZ]);
+			new_pos.mV[VZ] = llmin(worldInst.getRegionMaxHeight(), new_pos.mV[VZ]);
 		}
 
 		new_pos.mV[VZ] = llmax(min_height, new_pos.mV[VZ]);
@@ -2698,7 +2701,7 @@ void LLViewerObject::interpolateLinearMotion(const F64SecondsImplicit& frame_tim
 			new_pos_global = mRegionp->getPosGlobalFromRegion(new_pos);		// Re-fetch in case it got clipped above
 
 			// Clip the positions to known regions
-			LLVector3d clip_pos_global = LLWorld::getInstance()->clipToVisibleRegions(old_pos_global, new_pos_global);
+			LLVector3d clip_pos_global = worldInst.clipToVisibleRegions(old_pos_global, new_pos_global);
 			if (clip_pos_global != new_pos_global)
 			{
 				// Was clipped, so this means we hit a edge where there is no region to enter

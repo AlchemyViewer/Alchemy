@@ -871,25 +871,34 @@ std::string LLViewerRegion::regionFlagsToString(U64 flags)
 }
 
 // static
-std::string LLViewerRegion::accessToString(U8 sim_access)
+const std::string& LLViewerRegion::accessToString(U8 sim_access)
 {
+	static std::vector<std::string> access_strings(5);
+	if (access_strings.empty())
+	{
+		access_strings.push_back(LLTrans::getString("SIM_ACCESS_PG"));
+		access_strings.push_back(LLTrans::getString("SIM_ACCESS_MATURE"));
+		access_strings.push_back(LLTrans::getString("SIM_ACCESS_ADULT"));
+		access_strings.push_back(LLTrans::getString("SIM_ACCESS_DOWN"));
+		access_strings.push_back(LLTrans::getString("SIM_ACCESS_MIN"));
+	}
 	switch(sim_access)
 	{
 	case SIM_ACCESS_PG:
-		return LLTrans::getString("SIM_ACCESS_PG");
+		return access_strings[0];
 
 	case SIM_ACCESS_MATURE:
-		return LLTrans::getString("SIM_ACCESS_MATURE");
+		return access_strings[1];
 
 	case SIM_ACCESS_ADULT:
-		return LLTrans::getString("SIM_ACCESS_ADULT");
+		return access_strings[2];
 
 	case SIM_ACCESS_DOWN:
-		return LLTrans::getString("SIM_ACCESS_DOWN");
+		return access_strings[3];
 
 	case SIM_ACCESS_MIN:
 	default:
-		return LLTrans::getString("SIM_ACCESS_MIN");
+		return access_strings[4];
 	}
 }
 
@@ -1285,8 +1294,8 @@ void LLViewerRegion::updateVisibleEntries(F32 max_time)
 	F32 projection_threshold = LLVOCacheEntry::getSquaredPixelThreshold(mImpl->mVOCachePartition->isFrontCull());
 	F32 dist_threshold = mImpl->mVOCachePartition->isFrontCull() ? gAgentCamera.mDrawDistance : LLVOCacheEntry::sRearFarRadius;
 	
-	std::set< LLPointer<LLViewerOctreeGroup> >::iterator group_iter = mImpl->mVisibleGroups.begin();
-	for(; group_iter != mImpl->mVisibleGroups.end(); ++group_iter)
+	std::set< LLPointer<LLViewerOctreeGroup> >::iterator group_iter = mImpl->mVisibleGroups.begin(), group_end = mImpl->mVisibleGroups.end();
+	for(; group_iter != group_end; ++group_iter)
 	{
 		LLPointer<LLViewerOctreeGroup> group = *group_iter;
 		if(group->getNumRefs() < 3 || //group to be deleted
@@ -1295,7 +1304,7 @@ void LLViewerRegion::updateVisibleEntries(F32 max_time)
 			continue;
 		}
 
-		for (LLViewerOctreeGroup::element_iter i = group->getDataBegin(); i != group->getDataEnd(); ++i)
+		for (LLViewerOctreeGroup::element_iter i = group->getDataBegin(), i_end = group->getDataEnd(); i != i_end; ++i)
 		{
 			if((*i)->hasVOCacheEntry())
 			{

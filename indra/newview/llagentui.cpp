@@ -72,7 +72,8 @@ BOOL LLAgentUI::checkAgentDistance(const LLVector3& pole, F32 radius)
 BOOL LLAgentUI::buildLocationString(std::string& str, ELocationFormat fmt,const LLVector3& agent_pos_region)
 {
 	LLViewerRegion* region = gAgent.getRegion();
-	LLParcel* parcel = LLViewerParcelMgr::getInstance()->getAgentParcel();
+	LLViewerParcelMgr& parcelMGr = LLViewerParcelMgr::instance();
+	LLParcel* parcel = parcelMGr.getAgentParcel();
 
 	if (!region || !parcel) return FALSE;
 
@@ -100,21 +101,20 @@ BOOL LLAgentUI::buildLocationString(std::string& str, ELocationFormat fmt,const 
 	}
 
 	// create a default name and description for the landmark
-	std::string parcel_name = LLViewerParcelMgr::getInstance()->getAgentParcelName();
-	std::string region_name = region->getName();
+	bool rlva_has_showloc = gRlvHandler.hasBehaviour(RLV_BHVR_SHOWLOC);
+	const std::string& parcel_name = rlva_has_showloc  ? RlvStrings::getString(RLV_STRING_HIDDEN_PARCEL) : parcelMGr.getAgentParcelName();
+	const std::string& region_name = rlva_has_showloc ? RlvStrings::getString(RLV_STRING_HIDDEN_REGION) : region->getName();
 // [RLVa:KB] - Checked: 2010-04-04 (RLVa-1.2.0d) | Modified: RLVa-1.2.0d
 	// RELEASE-RLVa: [SL-2.0.0] Check ELocationFormat to make sure our switch still makes sense
 	if (gRlvHandler.hasBehaviour(RLV_BHVR_SHOWLOC))
 	{
-		parcel_name = RlvStrings::getString(RLV_STRING_HIDDEN_PARCEL);
-		region_name = RlvStrings::getString(RLV_STRING_HIDDEN_REGION);
 		if (LOCATION_FORMAT_NO_MATURITY == fmt)
 			fmt = LOCATION_FORMAT_LANDMARK;
 		else if (LOCATION_FORMAT_FULL == fmt)
 			fmt = LOCATION_FORMAT_NO_COORDS;
 	}
 // [/RLVa:KB]
-	std::string sim_access_string = region->getSimAccessString();
+	const std::string& sim_access_string = region->getSimAccessString();
 	std::string buffer;
 	if( parcel_name.empty() )
 	{
@@ -191,7 +191,7 @@ BOOL LLAgentUI::buildLocationString(std::string& str, ELocationFormat fmt,const 
 			break;
 		}
 	}
-	str = buffer;
+	str = std::move(buffer);
 	return TRUE;
 }
 BOOL LLAgentUI::buildLocationString(std::string& str, ELocationFormat fmt)

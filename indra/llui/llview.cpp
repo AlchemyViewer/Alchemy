@@ -33,6 +33,7 @@
 #include <sstream>
 #include <boost/tokenizer.hpp>
 #include <boost/bind.hpp>
+#include <boost/range/adaptor/reversed.hpp>
 
 #include "llrender.h"
 #include "llevent.h"
@@ -1172,14 +1173,12 @@ void LLView::drawChildren()
 {
 	if (!mChildList.empty())
 	{
-		LLView* rootp = LLUI::getInstance()->getRootView();		
+		auto& uiInst = LLUI::instance();
+		LLView* rootp = uiInst.getRootView();
 		++sDepth;
 
-		for (child_list_reverse_iter_t child_iter = mChildList.rbegin(), child_end = mChildList.rend(); child_iter != child_end;)  // ++child_iter)
+		for (LLView* viewp : boost::adaptors::reverse(mChildList))
 		{
-			child_list_reverse_iter_t child = child_iter++;
-			LLView *viewp = *child;
-			
 			if (viewp == NULL)
 			{
 				continue;
@@ -1188,7 +1187,7 @@ void LLView::drawChildren()
 			if (viewp->getVisible() && viewp->getRect().isValid())
 			{
 				LLRect screen_rect = viewp->calcScreenRect();
-				if ( rootp->getLocalRect().overlaps(screen_rect)  && LLUI::getInstance()->mDirtyRect.overlaps(screen_rect))
+				if ( rootp->getLocalRect().overlaps(screen_rect)  && uiInst.mDirtyRect.overlaps(screen_rect))
 				{
 					LLUI::pushMatrix();
 					{

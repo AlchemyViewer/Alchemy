@@ -961,10 +961,10 @@ void LLToolBar::draw()
 	// Update enable/disable state and highlight state for editable toolbars
 	if (!mReadOnly)
 	{
-		for (toolbar_button_list::iterator btn_it = mButtons.begin(); btn_it != mButtons.end(); ++btn_it)
+		auto& commandManager = LLCommandManager::instance();
+		for (LLToolBarButton* btn : mButtons)
 		{
-			LLToolBarButton* btn = *btn_it;
-			LLCommand* command = LLCommandManager::instance().getCommand(btn->mId);
+			LLCommand* command = commandManager.getCommand(btn->mId);
 
 			if (command && btn->mIsEnabledSignal)
 			{

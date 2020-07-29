@@ -1991,9 +1991,11 @@ LLVector3d LLAgentCamera::calcCameraPositionTargetGlobal(BOOL *hit_limit)
 		camera_position_global = focusPosGlobal + mCameraFocusOffset;
 	}
 
+	auto& worldInst = LLWorld::instance();
+
 	if (!ALControlCache::DisableCameraConstraints && !gAgent.isGodlike())
 	{
-		LLViewerRegion* regionp = LLWorld::getInstance()->getRegionFromPosGlobal(camera_position_global);
+		LLViewerRegion* regionp = worldInst.getRegionFromPosGlobal(camera_position_global);
 		bool constrain = true;
 		if(regionp && regionp->canManageEstate())
 		{
@@ -2014,7 +2016,7 @@ LLVector3d LLAgentCamera::calcCameraPositionTargetGlobal(BOOL *hit_limit)
 		}
 
 // JC - Could constrain camera based on parcel stuff here.
-//			LLViewerRegion *regionp = LLWorld::getInstance()->getRegionFromPosGlobal(camera_position_global);
+//			LLViewerRegion *regionp = worldInst.getRegionFromPosGlobal(camera_position_global);
 //			
 //			if (regionp && !regionp->mParcelOverlay->isBuildCameraAllowed(regionp->getPosRegionFromGlobal(camera_position_global)))
 //			{
@@ -2068,7 +2070,7 @@ LLVector3d LLAgentCamera::calcCameraPositionTargetGlobal(BOOL *hit_limit)
 	// Don't let camera go underground
 	F32 camera_min_off_ground = getCameraMinOffGround();
 
-	camera_land_height = LLWorld::getInstance()->resolveLandHeightGlobal(camera_position_global);
+	camera_land_height = worldInst.resolveLandHeightGlobal(camera_position_global);
 
 	if (camera_position_global.mdV[VZ] < camera_land_height + camera_min_off_ground)
 	{

@@ -218,10 +218,8 @@ void LLToolSelectRect::handleRectangleSelection(S32 x, S32 y, MASK mask)
 	{
 		std::vector<LLDrawable*> potentials;
 				
-		for (LLWorld::region_list_t::const_iterator iter = LLWorld::getInstance()->getRegionList().begin(); 
-			iter != LLWorld::getInstance()->getRegionList().end(); ++iter)
+		for (LLViewerRegion* region : LLWorld::getInstance()->getRegionList())
 		{
-			LLViewerRegion* region = *iter;
 			for (U32 i = 0; i < LLViewerRegion::NUM_PARTITIONS; i++)
 			{
 				LLSpatialPartition* part = region->getSpatialPartition(i);
@@ -354,10 +352,12 @@ void LLViewerParcelMgr::renderRect(const LLVector3d &west_south_bottom_global,
 	// resolves correctly so we can get a height value.
 	const F32 FUDGE = 0.01f;
 
-	F32 sw_bottom = LLWorld::getInstance()->resolveLandHeightAgent( LLVector3( west, south, 0.f ) );
-	F32 se_bottom = LLWorld::getInstance()->resolveLandHeightAgent( LLVector3( east-FUDGE, south, 0.f ) );
-	F32 ne_bottom = LLWorld::getInstance()->resolveLandHeightAgent( LLVector3( east-FUDGE, north-FUDGE, 0.f ) );
-	F32 nw_bottom = LLWorld::getInstance()->resolveLandHeightAgent( LLVector3( west, north-FUDGE, 0.f ) );
+	auto& worldInst = LLWorld::instance();
+
+	F32 sw_bottom = worldInst.resolveLandHeightAgent( LLVector3( west, south, 0.f ) );
+	F32 se_bottom = worldInst.resolveLandHeightAgent( LLVector3( east-FUDGE, south, 0.f ) );
+	F32 ne_bottom = worldInst.resolveLandHeightAgent( LLVector3( east-FUDGE, north-FUDGE, 0.f ) );
+	F32 nw_bottom = worldInst.resolveLandHeightAgent( LLVector3( west, north-FUDGE, 0.f ) );
 
 	F32 sw_top = sw_bottom + PARCEL_POST_HEIGHT;
 	F32 se_top = se_bottom + PARCEL_POST_HEIGHT;

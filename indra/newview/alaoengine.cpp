@@ -1316,7 +1316,7 @@ ALAOSet* ALAOEngine::selectSetByName(const std::string& name)
 	return nullptr;
 }
 
-const std::vector<ALAOSet*> ALAOEngine::getSetList() const
+const std::vector<ALAOSet*>& ALAOEngine::getSetList() const
 {
 	return mSets;
 }

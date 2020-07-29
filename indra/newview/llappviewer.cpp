@@ -4765,6 +4765,7 @@ void LLAppViewer::idle()
 		gGLActive = FALSE;
 	}
 
+	auto& worldInst = LLWorld::instance();
 
     F32 yaw = 0.f;				// radians
 
@@ -4772,7 +4773,7 @@ void LLAppViewer::idle()
 	{
 		LL_RECORD_BLOCK_TIME(FTM_NETWORK);
 		// Update spaceserver timeinfo
-	    LLWorld::getInstance()->setSpaceTimeUSec(LLWorld::getInstance()->getSpaceTimeUSec() + LLUnits::Seconds::fromValue(dt_raw));
+	    worldInst.setSpaceTimeUSec(worldInst.getSpaceTimeUSec() + LLUnits::Seconds::fromValue(dt_raw));
 
 
 	    //////////////////////////////////////
@@ -4999,11 +5000,11 @@ void LLAppViewer::idle()
 	// Update surfaces, and surface textures as well.
 	//
 
-	LLWorld::getInstance()->updateVisibilities();
+	worldInst.updateVisibilities();
 	{
 		const F32 max_region_update_time = .001f; // 1ms
 		LL_RECORD_BLOCK_TIME(FTM_REGION_UPDATE);
-		LLWorld::getInstance()->updateRegions(max_region_update_time);
+		worldInst.updateRegions(max_region_update_time);
 	}
 
 	/////////////////////////
@@ -5016,7 +5017,7 @@ void LLAppViewer::idle()
 	static LLVector3 average_wind;
 
 	LLViewerRegion *regionp;
-	regionp = LLWorld::getInstance()->resolveRegionGlobal(wind_position_region, gAgent.getPositionGlobal());	// puts agent's local coords into wind_position
+	regionp = worldInst.resolveRegionGlobal(wind_position_region, gAgent.getPositionGlobal());	// puts agent's local coords into wind_position
 	if (regionp)
 	{
 		gWindVec = regionp->mWind.getVelocity(wind_position_region);
@@ -5041,7 +5042,7 @@ void LLAppViewer::idle()
 	LL_RECORD_BLOCK_TIME(FTM_WORLD_UPDATE);
 	gPipeline.updateMove();
 
-	LLWorld::getInstance()->updateParticles();
+	worldInst.updateParticles();
 
 	if (gAgentPilot.isPlaying() && gAgentPilot.getOverrideCamera())
 	{
