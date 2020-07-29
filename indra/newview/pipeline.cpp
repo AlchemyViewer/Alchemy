@@ -2913,7 +2913,7 @@ void LLPipeline::rebuildPriorityGroups()
 		group->clearState(LLSpatialGroup::IN_BUILD_Q1);
 	}
 
-	mGroupSaveQ1 = mGroupQ1;
+	mGroupSaveQ1.swap(mGroupQ1);
 	mGroupQ1.clear();
 	mGroupQ1Locked = false;
 
@@ -6138,7 +6138,7 @@ void LLPipeline::calcNearbyLights(LLCamera& camera)
 			F32 dist = calc_light_dist(volight, cam_pos, max_dist);
 			cur_nearby_lights.insert(Light(drawable, dist, light.fade));
 		}
-		mNearbyLights = cur_nearby_lights;
+		mNearbyLights = std::move(cur_nearby_lights);
 				
 		// FIND NEW LIGHTS THAT ARE IN RANGE
 		light_set_t new_nearby_lights;

@@ -250,6 +250,31 @@ static LLTrace::BlockTimerStatHandle FTM_TEXTURE_UNBIND("Texture Unbind");
 static LLTrace::BlockTimerStatHandle FTM_TELEPORT_DISPLAY("Teleport Display");
 static LLTrace::BlockTimerStatHandle FTM_EEP_UPDATE("Env Update");
 
+static std::string STR_DISPLAY_PICK("Display:Pick");
+static std::string STR_DISPLAY_CHECK_STATES("Display:CheckStates");
+static std::string STR_DISPLAY_STARTUP("Display:Startup");
+static std::string STR_DISPLAY_TEXTURE_STATS("Display:TextureStats");
+static std::string STR_DISPLAY_TELEPORT("Display:Teleport");
+static std::string STR_DISPLAY_LOGOUT("Display:Logout");
+static std::string STR_DISPLAY_RESTOREGL("Display:RestoreGL");
+static std::string STR_DISPLAY_CAMERA("Display:Camera");
+static std::string STR_DISPLAY_DISCONNECTED("Display:Disconnected");
+static std::string STR_DISPLAY_RENDER_SETUP("Display:RenderSetup");
+static std::string STR_DISPLAY_DYN_TEX("Display:DynamicTextures");
+static std::string STR_DISPLAY_UPDATE("Display:Update");
+static std::string STR_DISPLAY_CULL("Display:Cull");
+static std::string STR_DISPLAY_SWAP("Display:Swap");
+static std::string STR_DISPLAY_IMAGERY("Display:Imagery");
+static std::string STR_DISPLAY_UPDATE_IMAGES("Display:UpdateImages");
+static std::string STR_DISPLAY_STATE_SORT("Display:StateSort");
+static std::string STR_DISPLAY_SKY("Display:Sky");
+static std::string STR_DISPLAY_RENDER_START("Display:RenderStart");
+static std::string STR_DISPLAY_RENDER_GEOM("Display:RenderGeom");
+static std::string STR_DISPLAY_RENDER_FLUSH("Display:RenderFlush");
+static std::string STR_DISPLAY_RENDERUI("Display:RenderUI");
+static std::string STR_DISPLAY_FRAME_STATS("Display:FrameStats");
+static std::string STR_DISPLAY_DONE("Display:Done");
+
 // Paint the display!
 void display(BOOL rebuild, F32 zoom_factor, int subfield, BOOL for_snapshot)
 {
@@ -328,11 +353,11 @@ void display(BOOL rebuild, F32 zoom_factor, int subfield, BOOL for_snapshot)
 	
 	{
 		LL_RECORD_BLOCK_TIME(FTM_PICK);
-		LLAppViewer::instance()->pingMainloopTimeout("Display:Pick");
+		LLAppViewer::instance()->pingMainloopTimeout(STR_DISPLAY_PICK);
 		gViewerWindow->performPick();
 	}
 	
-	LLAppViewer::instance()->pingMainloopTimeout("Display:CheckStates");
+	LLAppViewer::instance()->pingMainloopTimeout(STR_DISPLAY_CHECK_STATES);
 	LLGLState::checkStates();
 	LLGLState::checkTextureChannels();
 	
@@ -365,7 +390,7 @@ void display(BOOL rebuild, F32 zoom_factor, int subfield, BOOL for_snapshot)
 	//
 	if (LLStartUp::getStartupState() < STATE_PRECACHE)
 	{
-		LLAppViewer::instance()->pingMainloopTimeout("Display:Startup");
+		LLAppViewer::instance()->pingMainloopTimeout(STR_DISPLAY_STARTUP);
 		display_startup();
 		return;
 	}
@@ -383,7 +408,7 @@ void display(BOOL rebuild, F32 zoom_factor, int subfield, BOOL for_snapshot)
 	// Update GL Texture statistics (used for discard logic?)
 	//
 
-	LLAppViewer::instance()->pingMainloopTimeout("Display:TextureStats");
+	LLAppViewer::instance()->pingMainloopTimeout(STR_DISPLAY_TEXTURE_STATS);
 	stop_glerror();
 
 	LLImageGL::updateStats(gFrameTimeSeconds);
@@ -410,7 +435,7 @@ void display(BOOL rebuild, F32 zoom_factor, int subfield, BOOL for_snapshot)
 	if (gTeleportDisplay)
 	{
 		LL_RECORD_BLOCK_TIME(FTM_TELEPORT_DISPLAY);
-		LLAppViewer::instance()->pingMainloopTimeout("Display:Teleport");
+		LLAppViewer::instance()->pingMainloopTimeout(STR_DISPLAY_TELEPORT);
 		static LLCachedControl<F32> teleport_arrival_delay(gSavedSettings, "TeleportArrivalDelay");
 		static LLCachedControl<F32> teleport_local_delay(gSavedSettings, "TeleportLocalDelay");
 
@@ -426,7 +451,7 @@ void display(BOOL rebuild, F32 zoom_factor, int subfield, BOOL for_snapshot)
 		{
 			// Give up.  Don't keep the UI locked forever.
 			gAgent.setTeleportState( LLAgent::TELEPORT_NONE );
-			gAgent.setTeleportMessage(std::string());
+			gAgent.setTeleportMessage(LLStringUtil::null);
 		}
 
 		const std::string& message = gAgent.getTeleportMessage();
@@ -518,7 +543,7 @@ void display(BOOL rebuild, F32 zoom_factor, int subfield, BOOL for_snapshot)
 	}
     else if(LLAppViewer::instance()->logoutRequestSent())
 	{
-		LLAppViewer::instance()->pingMainloopTimeout("Display:Logout");
+		LLAppViewer::instance()->pingMainloopTimeout(STR_DISPLAY_LOGOUT);
 		F32 percent_done = gLogoutTimer.getElapsedTimeF32() * 100.f / gLogoutMaxTime;
 		if (percent_done > 100.f)
 		{
@@ -531,12 +556,12 @@ void display(BOOL rebuild, F32 zoom_factor, int subfield, BOOL for_snapshot)
 		}
 		
 		gViewerWindow->setProgressPercent( percent_done );
-		gViewerWindow->setProgressMessage(std::string());
+		gViewerWindow->setProgressMessage(LLStringUtil::null);
 	}
 	else
 	if (gRestoreGL)
 	{
-		LLAppViewer::instance()->pingMainloopTimeout("Display:RestoreGL");
+		LLAppViewer::instance()->pingMainloopTimeout(STR_DISPLAY_RESTOREGL);
 		F32 percent_done = gRestoreGLTimer.getElapsedTimeF32() * 100.f / RESTORE_GL_TIME;
 		if( percent_done > 100.f )
 		{
@@ -553,7 +578,7 @@ void display(BOOL rebuild, F32 zoom_factor, int subfield, BOOL for_snapshot)
 			
 			gViewerWindow->setProgressPercent( percent_done );
 		}
-		gViewerWindow->setProgressMessage(std::string());
+		gViewerWindow->setProgressMessage(LLStringUtil::null);
 	}
 
 	//////////////////////////
@@ -567,7 +592,7 @@ void display(BOOL rebuild, F32 zoom_factor, int subfield, BOOL for_snapshot)
 	//
 	//
 
-	LLAppViewer::instance()->pingMainloopTimeout("Display:Camera");
+	LLAppViewer::instance()->pingMainloopTimeout(STR_DISPLAY_CAMERA);
 	auto& vwrCamera = LLViewerCamera::instance();
 	vwrCamera.setZoomParameters(zoom_factor, subfield);
 	vwrCamera.setNear(MIN_NEAR_PLANE);
@@ -580,7 +605,7 @@ void display(BOOL rebuild, F32 zoom_factor, int subfield, BOOL for_snapshot)
 
 	if (gDisconnected)
 	{
-		LLAppViewer::instance()->pingMainloopTimeout("Display:Disconnected");
+		LLAppViewer::instance()->pingMainloopTimeout(STR_DISPLAY_DISCONNECTED);
 		render_ui();
 		swap();
 	}
@@ -590,7 +615,7 @@ void display(BOOL rebuild, F32 zoom_factor, int subfield, BOOL for_snapshot)
 	// Set rendering options
 	//
 	//
-	LLAppViewer::instance()->pingMainloopTimeout("Display:RenderSetup");
+	LLAppViewer::instance()->pingMainloopTimeout(STR_DISPLAY_RENDER_SETUP);
 	stop_glerror();
 
 	///////////////////////////////////////
@@ -612,7 +637,7 @@ void display(BOOL rebuild, F32 zoom_factor, int subfield, BOOL for_snapshot)
 	// do render-to-texture stuff here
 	if (gPipeline.hasRenderDebugFeatureMask(LLPipeline::RENDER_DEBUG_FEATURE_DYNAMIC_TEXTURES))
 	{
-		LLAppViewer::instance()->pingMainloopTimeout("Display:DynamicTextures");
+		LLAppViewer::instance()->pingMainloopTimeout(STR_DISPLAY_DYN_TEX);
 		LL_RECORD_BLOCK_TIME(FTM_UPDATE_DYNAMIC_TEXTURES);
 		if (LLViewerDynamicTexture::updateAllInstances())
 		{
@@ -627,7 +652,7 @@ void display(BOOL rebuild, F32 zoom_factor, int subfield, BOOL for_snapshot)
 	
 	if (!gDisconnected)
 	{
-		LLAppViewer::instance()->pingMainloopTimeout("Display:Update");
+		LLAppViewer::instance()->pingMainloopTimeout(STR_DISPLAY_UPDATE);
 		if (gPipeline.hasRenderType(LLPipeline::RENDER_TYPE_HUD))
 		{ //don't draw hud objects in this frame
 			gPipeline.toggleRenderType(LLPipeline::RENDER_TYPE_HUD);
@@ -687,7 +712,7 @@ void display(BOOL rebuild, F32 zoom_factor, int subfield, BOOL for_snapshot)
 			}
 		}
 		
-		LLAppViewer::instance()->pingMainloopTimeout("Display:Cull");
+		LLAppViewer::instance()->pingMainloopTimeout(STR_DISPLAY_CULL);
 		
 		//Increment drawable frame counter
 		LLDrawable::incrementVisible();
@@ -719,7 +744,7 @@ void display(BOOL rebuild, F32 zoom_factor, int subfield, BOOL for_snapshot)
 		BOOL to_texture = gPipeline.canUseVertexShaders() &&
 						LLPipeline::sRenderGlow;
 
-		LLAppViewer::instance()->pingMainloopTimeout("Display:Swap");
+		LLAppViewer::instance()->pingMainloopTimeout(STR_DISPLAY_SWAP);
 		
 		{ 
 			if (gResizeScreenTexture)
@@ -780,7 +805,7 @@ void display(BOOL rebuild, F32 zoom_factor, int subfield, BOOL for_snapshot)
 
 		//if (!for_snapshot)
 		{
-			LLAppViewer::instance()->pingMainloopTimeout("Display:Imagery");
+			LLAppViewer::instance()->pingMainloopTimeout(STR_DISPLAY_IMAGERY);
 			gPipeline.generateWaterReflection(vwrCamera);
 			gPipeline.generateHighlight(vwrCamera);
 			gPipeline.renderPhysicsDisplay();
@@ -796,7 +821,7 @@ void display(BOOL rebuild, F32 zoom_factor, int subfield, BOOL for_snapshot)
 		// Can put objects onto the retextured list.
 		//
 		// Doing this here gives hardware occlusion queries extra time to complete
-		LLAppViewer::instance()->pingMainloopTimeout("Display:UpdateImages");
+		LLAppViewer::instance()->pingMainloopTimeout(STR_DISPLAY_UPDATE_IMAGES);
 		
 		{
 			LL_RECORD_BLOCK_TIME(FTM_IMAGE_UPDATE);
@@ -841,7 +866,7 @@ void display(BOOL rebuild, F32 zoom_factor, int subfield, BOOL for_snapshot)
 		// In the case of alpha objects, z-sorts them first.
 		// Also creates special lists for outlines and selected face rendering.
 		//
-		LLAppViewer::instance()->pingMainloopTimeout("Display:StateSort");
+		LLAppViewer::instance()->pingMainloopTimeout(STR_DISPLAY_STATE_SORT);
 		{
 			LLViewerCamera::sCurCameraID = LLViewerCamera::CAMERA_WORLD;
 			gPipeline.stateSort(vwrCamera, result);
@@ -867,7 +892,7 @@ void display(BOOL rebuild, F32 zoom_factor, int subfield, BOOL for_snapshot)
 		LLPipeline::sUseOcclusion = occlusion;
 
 		{
-			LLAppViewer::instance()->pingMainloopTimeout("Display:Sky");
+			LLAppViewer::instance()->pingMainloopTimeout(STR_DISPLAY_SKY);
 			LL_RECORD_BLOCK_TIME(FTM_UPDATE_SKY);	
 			gSky.updateSky();
 		}
@@ -879,7 +904,7 @@ void display(BOOL rebuild, F32 zoom_factor, int subfield, BOOL for_snapshot)
 			glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 		}
 
-		LLAppViewer::instance()->pingMainloopTimeout("Display:RenderStart");
+		LLAppViewer::instance()->pingMainloopTimeout(STR_DISPLAY_RENDER_START);
 		
 		//// render frontmost floater opaque for occlusion culling purposes
 		//LLFloater* frontmost_floaterp = gFloaterView->getFrontmost();
@@ -949,7 +974,7 @@ void display(BOOL rebuild, F32 zoom_factor, int subfield, BOOL for_snapshot)
 			gGL.setColorMask(true, false);
 		}
 		
-		LLAppViewer::instance()->pingMainloopTimeout("Display:RenderGeom");
+		LLAppViewer::instance()->pingMainloopTimeout(STR_DISPLAY_RENDER_GEOM);
 		
 		if (!(LLAppViewer::instance()->logoutRequestSent() && LLAppViewer::instance()->hasSavedFinalSnapshot())
 				&& !gRestoreGL)
@@ -1012,7 +1037,7 @@ void display(BOOL rebuild, F32 zoom_factor, int subfield, BOOL for_snapshot)
 			}
 		}
 
-		LLAppViewer::instance()->pingMainloopTimeout("Display:RenderFlush");		
+		LLAppViewer::instance()->pingMainloopTimeout(STR_DISPLAY_RENDER_FLUSH);
 		
 		if (to_texture)
 		{
@@ -1054,7 +1079,7 @@ void display(BOOL rebuild, F32 zoom_factor, int subfield, BOOL for_snapshot)
 			LLSceneMonitor::getInstance()->capture();
 		}
 
-		LLAppViewer::instance()->pingMainloopTimeout("Display:RenderUI");
+		LLAppViewer::instance()->pingMainloopTimeout(STR_DISPLAY_RENDERUI);
 		if (!for_snapshot)
 		{
 			render_ui();
@@ -1068,7 +1093,7 @@ void display(BOOL rebuild, F32 zoom_factor, int subfield, BOOL for_snapshot)
 		gPipeline.rebuildGroups();
 	}
 
-	LLAppViewer::instance()->pingMainloopTimeout("Display:FrameStats");
+	LLAppViewer::instance()->pingMainloopTimeout(STR_DISPLAY_FRAME_STATS);
 	
 	stop_glerror();
 
@@ -1080,7 +1105,7 @@ void display(BOOL rebuild, F32 zoom_factor, int subfield, BOOL for_snapshot)
 
 	display_stats();
 				
-	LLAppViewer::instance()->pingMainloopTimeout("Display:Done");
+	LLAppViewer::instance()->pingMainloopTimeout(STR_DISPLAY_DONE);
 
 	gShiftFrame = false;
 

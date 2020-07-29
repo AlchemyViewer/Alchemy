@@ -131,6 +131,11 @@ void LLConsole::setFontSize(S32 size_index)
 
 void LLConsole::draw()
 {
+	if (mParagraphs.empty()) 	//No text to draw.
+	{
+		return;
+	}
+
 	// Units in pixels
 	static const F32 padding_horizontal = 10;
 	static const F32 padding_vertical = 3;
@@ -141,11 +146,6 @@ void LLConsole::draw()
 	
 	F32 skip_time = cur_time - mLinePersistTime;
 	F32 fade_time = cur_time - mFadeTime;
-
-	if (mParagraphs.empty()) 	//No text to draw.
-	{
-		return;
-	}
 
 	U32 num_lines=0;
 

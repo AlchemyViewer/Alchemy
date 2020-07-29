@@ -39,7 +39,7 @@
 LLFloaterReg::instance_list_t LLFloaterReg::sNullInstanceList;
 LLFloaterReg::instance_map_t LLFloaterReg::sInstanceMap;
 LLFloaterReg::build_map_t LLFloaterReg::sBuildMap;
-std::map<std::string,std::string> LLFloaterReg::sGroupMap;
+LLFloaterReg::group_map_t LLFloaterReg::sGroupMap;
 bool LLFloaterReg::sBlockShowFloaters = false;
 std::set<std::string> LLFloaterReg::sAlwaysShowableList;
 
@@ -89,7 +89,7 @@ LLFloater* LLFloaterReg::getLastFloaterCascading()
 	candidate_rect.mTop = 100000;
 	LLFloater* candidate_floater = NULL;
 
-	std::map<std::string,std::string>::const_iterator it = sGroupMap.begin(), it_end = sGroupMap.end();
+	auto it = sGroupMap.begin(), it_end = sGroupMap.end();
 	for( ; it != it_end; ++it)
 	{
 		const std::string& group_name = it->second;
@@ -457,11 +457,9 @@ void LLFloaterReg::registerControlVariables()
 	}
 
 	const LLSD& exclude_list = LLUI::getInstance()->mSettingGroups["config"]->getLLSD("always_showable_floaters");
-	for (LLSD::array_const_iterator iter = exclude_list.beginArray();
-		iter != exclude_list.endArray();
-		iter++)
+	for (const auto& llsd_var : exclude_list.array())
 	{
-		sAlwaysShowableList.insert(iter->asString());
+		sAlwaysShowableList.insert(llsd_var.asString());
 	}
 }
 
@@ -540,7 +538,7 @@ U32 LLFloaterReg::getVisibleFloaterInstanceCount()
 {
 	U32 count = 0;
 
-	std::map<std::string,std::string>::const_iterator it = sGroupMap.begin(), it_end = sGroupMap.end();
+	auto it = sGroupMap.begin(), it_end = sGroupMap.end();
 	for( ; it != it_end; ++it)
 	{
 		const std::string& group_name = it->second;

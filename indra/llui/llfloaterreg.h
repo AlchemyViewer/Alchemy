@@ -69,7 +69,7 @@ private:
 	static instance_list_t sNullInstanceList;
 	static instance_map_t sInstanceMap;
 	static build_map_t sBuildMap;
-	static std::map<std::string,std::string> sGroupMap;
+	static group_map_t sGroupMap;
 	static bool sBlockShowFloaters;
 	/**
 	 * Defines list of floater names that can be shown despite state of sBlockShowFloaters.
