@@ -27,7 +27,7 @@
 #ifndef LL_LLSD_NEW_H
 #define LL_LLSD_NEW_H
 
-#include <map>
+#include <absl/container/node_hash_map.h>
 #include <string>
 #include <vector>
 
@@ -314,11 +314,11 @@ public:
 	//@{
 		int size() const;
 
-		typedef std::map<String, LLSD>::iterator		map_iterator;
-		typedef std::map<String, LLSD>::const_iterator	map_const_iterator;
+		typedef absl::node_hash_map<String, LLSD>::iterator		map_iterator;
+		typedef absl::node_hash_map<String, LLSD>::const_iterator	map_const_iterator;
 		
-		std::map<String, LLSD>& map();
-		const std::map<String, LLSD>& map() const;
+		absl::node_hash_map<String, LLSD>& map();
+		const absl::node_hash_map<String, LLSD>& map() const;
 
 		map_iterator		beginMap();
 		map_iterator		endMap();

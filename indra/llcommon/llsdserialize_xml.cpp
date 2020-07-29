@@ -101,12 +101,11 @@ S32 LLSDXMLFormatter::format_impl(const LLSD& data, std::ostream& ostr,
 		else
 		{
 			ostr << pre << "<map>" << post;
-			LLSD::map_const_iterator iter = data.beginMap();
-			LLSD::map_const_iterator end = data.endMap();
-			for(; iter != end; ++iter)
+			std::map<std::string, LLSD> sorted_map(data.beginMap(), data.endMap());
+			for(const auto& out_pair : sorted_map)
 			{
-				ostr << pre << "<key>" << escapeString((*iter).first) << "</key>" << post;
-				format_count += format_impl((*iter).second, ostr, options, level + 1);
+				ostr << pre << "<key>" << escapeString(out_pair.first) << "</key>" << post;
+				format_count += format_impl(out_pair.second, ostr, options, level + 1);
 			}
 			ostr << pre <<  "</map>" << post;
 		}

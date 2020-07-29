@@ -141,8 +141,8 @@ public:
 	virtual void erase(Integer)					{ }
 	virtual const LLSD& ref(Integer) const		{ return undef(); }
 
-	virtual const std::map<String, LLSD>& map() const { static const std::map<String, LLSD> empty; return empty; }
-	virtual std::map<String, LLSD>& map() { static std::map<String, LLSD> empty; return empty; }
+	virtual const absl::node_hash_map<String, LLSD>& map() const { static const absl::node_hash_map<String, LLSD> empty; return empty; }
+	virtual absl::node_hash_map<String, LLSD>& map() { static absl::node_hash_map<String, LLSD> empty; return empty; }
 	LLSD::map_const_iterator beginMap() const { return endMap(); }
 	LLSD::map_const_iterator endMap() const { return map().end(); }
 	virtual const std::vector<LLSD>& array() const { static const std::vector<LLSD> empty; return empty; }
@@ -364,7 +364,7 @@ namespace
 	class ImplMap : public LLSD::Impl
 	{
 	private:
-		typedef std::map<LLSD::String, LLSD>	DataMap;
+		typedef absl::node_hash_map<LLSD::String, LLSD>	DataMap;
 		
 		DataMap mData;
 		
@@ -456,8 +456,8 @@ namespace
 	
 	const LLSD& ImplMap::ref(const LLSD::String& k) const
 	{
-		DataMap::const_iterator i = mData.lower_bound(k);
-		if (i == mData.end()  ||  mData.key_comp()(k, i->first))
+		DataMap::const_iterator i = mData.find(k);
+		if (i == mData.end())
 		{
 			return undef();
 		}
@@ -956,8 +956,8 @@ const char *LLSD::dump(const LLSD &llsd)
 	return llsd_dump(llsd, false);
 }
 
-std::map<LLSD::String, LLSD>& LLSD::map() { return makeMap(impl).map(); }
-const std::map<LLSD::String, LLSD>& LLSD::map() const { return safe(impl).map(); }
+absl::node_hash_map<LLSD::String, LLSD>& LLSD::map() { return makeMap(impl).map(); }
+const absl::node_hash_map<LLSD::String, LLSD>& LLSD::map() const { return safe(impl).map(); }
 
 LLSD::map_iterator			LLSD::beginMap()		{ return map().begin(); }
 LLSD::map_iterator			LLSD::endMap()			{ return map().end(); }
