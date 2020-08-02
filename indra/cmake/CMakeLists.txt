@@ -34,7 +34,6 @@ set(cmake_SOURCE_FILES
     FindOpenJPEG.cmake
     FindURIPARSER.cmake
     FindXmlRpcEpi.cmake
-    FindZLIB.cmake
     FMODSTUDIO.cmake
     FreeType.cmake
     GLEXT.cmake
