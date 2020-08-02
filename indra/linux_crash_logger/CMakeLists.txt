@@ -72,7 +72,6 @@ target_link_libraries(linux-crash-logger
     ${BOOST_FIBER_LIBRARY}
     ${BOOST_CONTEXT_LIBRARY}
     ${UI_LIBRARIES}
-    ${DB_LIBRARIES}
     ${FREETYPE_LIBRARIES}
     ${LIBRT_LIBRARY}
     )
