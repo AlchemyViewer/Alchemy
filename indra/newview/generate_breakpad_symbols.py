@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 """\
 @file generate_breakpad_symbols.py
 @author Brad Kittenbrink <brad@lindenlab.com>

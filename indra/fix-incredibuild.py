@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 ## 
 ## $LicenseInfo:firstyear=2011&license=viewerlgpl$
 ## Second Life Viewer Source Code

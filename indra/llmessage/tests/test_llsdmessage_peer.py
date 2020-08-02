@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 """\
 @file   test_llsdmessage_peer.py
 @author Nat Goodspeed
