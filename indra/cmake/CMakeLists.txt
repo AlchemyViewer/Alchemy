@@ -32,7 +32,6 @@ set(cmake_SOURCE_FILES
     FindJsonCpp.cmake
     FindNDOF.cmake
     FindOpenJPEG.cmake
-    FindSCP.cmake
     FindURIPARSER.cmake
     FindXmlRpcEpi.cmake
     FindZLIB.cmake
