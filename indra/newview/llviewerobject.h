@@ -307,7 +307,7 @@ public:
 	const LLQuaternion getRotationRegion() const;
 	const LLQuaternion getRotationEdit() const;
 	const LLQuaternion getRenderRotation() const;
-	virtual	const LLMatrix4 getRenderMatrix() const;
+	virtual	const LLMatrix4& getRenderMatrix() const;
 
 	void setPosition(const LLVector3 &pos, BOOL damped = FALSE);
 	void setPositionGlobal(const LLVector3d &position, BOOL damped = FALSE);

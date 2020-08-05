@@ -408,9 +408,9 @@ void LLAgentCamera::slamLookAt(const LLVector3 &look_at)
 //-----------------------------------------------------------------------------
 LLVector3 LLAgentCamera::calcFocusOffset(LLViewerObject *object, LLVector3 original_focus_point, S32 x, S32 y)
 {
-	LLMatrix4 obj_matrix = object->getRenderMatrix();
-	LLQuaternion obj_rot = object->getRenderRotation();
-	LLVector3 obj_pos = object->getRenderPosition();
+	const LLMatrix4& obj_matrix = object->getRenderMatrix();
+	const LLQuaternion obj_rot = object->getRenderRotation();
+	const LLVector3 obj_pos = object->getRenderPosition();
 
 	BOOL is_avatar = object->isAvatar();
 	// if is avatar - don't do any funk heuristics to position the focal point

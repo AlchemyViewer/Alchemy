@@ -4380,7 +4380,7 @@ const LLQuaternion LLViewerObject::getRenderRotation() const
 	return ret;
 }
 
-const LLMatrix4 LLViewerObject::getRenderMatrix() const
+const LLMatrix4& LLViewerObject::getRenderMatrix() const
 {
 	return mDrawable->getWorldMatrix();
 }

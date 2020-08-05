@@ -138,7 +138,7 @@ public:
 	const LLVector3		getPivotPositionAgent() const;
 	const LLMatrix4&	getRelativeXform() const				{ return mRelativeXform; }
 	const LLMatrix3&	getRelativeXformInvTrans() const		{ return mRelativeXformInvTrans; }
-	/*virtual*/	const LLMatrix4	getRenderMatrix() const;
+	/*virtual*/	const LLMatrix4&	getRenderMatrix() const;
 				typedef std::map<LLUUID, S32> texture_cost_t;
 				U32 	getRenderCost(texture_cost_t &textures) const;
     /*virtual*/	F32		getEstTrianglesMax() const;
