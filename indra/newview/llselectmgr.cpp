@@ -604,13 +604,13 @@ BOOL LLSelectMgr::removeObjectFromSelections(const LLUUID &id)
 
 bool LLSelectMgr::linkObjects()
 {
-	if (!LLSelectMgr::getInstance()->selectGetAllRootsValid())
+	if (!selectGetAllRootsValid())
 	{
 		LLNotificationsUtil::add("UnableToLinkWhileDownloading");
 		return true;
 	}
 
-	S32 object_count = LLSelectMgr::getInstance()->getSelection()->getObjectCount();
+	S32 object_count = getSelection()->getObjectCount();
 	if (object_count > MAX_CHILDREN_PER_TASK + 1)
 	{
 		LLSD args;
@@ -621,19 +621,19 @@ bool LLSelectMgr::linkObjects()
 		return true;
 	}
 
-	if (LLSelectMgr::getInstance()->getSelection()->getRootObjectCount() < 2)
+	if (getSelection()->getRootObjectCount() < 2)
 	{
 		LLNotificationsUtil::add("CannotLinkIncompleteSet");
 		return true;
 	}
 
-	if (!LLSelectMgr::getInstance()->selectGetRootsModify())
+	if (!selectGetRootsModify())
 	{
 		LLNotificationsUtil::add("CannotLinkModify");
 		return true;
 	}
 
-	if (!LLSelectMgr::getInstance()->selectGetRootsNonPermanentEnforced())
+	if (!selectGetRootsNonPermanentEnforced())
 	{
 		LLNotificationsUtil::add("CannotLinkPermanent");
 		return true;
@@ -641,7 +641,7 @@ bool LLSelectMgr::linkObjects()
 
 	LLUUID owner_id;
 	std::string owner_name;
-	if (!LLSelectMgr::getInstance()->selectGetOwner(owner_id, owner_name))
+	if (!selectGetOwner(owner_id, owner_name))
 	{
 		// we don't actually care if you're the owner, but novices are
 		// the most likely to be stumped by this one, so offer the
@@ -650,13 +650,13 @@ bool LLSelectMgr::linkObjects()
 		return true;
 	}
 
-	if (!LLSelectMgr::getInstance()->selectGetSameRegion())
+	if (!selectGetSameRegion())
 	{
 		LLNotificationsUtil::add("CannotLinkAcrossRegions");
 		return true;
 	}
 
-	LLSelectMgr::getInstance()->sendLink();
+	sendLink();
 
 	return true;
 }
@@ -673,7 +673,7 @@ bool LLSelectMgr::unlinkObjects()
 		return true;
 	}
 
-	LLSelectMgr::getInstance()->sendDelink();
+	sendDelink();
 	return true;
 }
 
@@ -686,7 +686,7 @@ void LLSelectMgr::confirmUnlinkObjects(const LLSD& notification, const LLSD& res
 		return;
 	}
 
-	LLSelectMgr::getInstance()->sendDelink();
+	sendDelink();
 	return;
 }
 
@@ -711,7 +711,7 @@ bool LLSelectMgr::enableLinkObjects()
 	// in component mode, can't link
 	if (!ALControlCache::EditLinkedParts)
 	{
-		if(LLSelectMgr::getInstance()->selectGetAllRootsValid() && LLSelectMgr::getInstance()->getSelection()->getRootObjectCount() >= 2)
+		if(selectGetAllRootsValid() && getSelection()->getRootObjectCount() >= 2)
 		{
 			struct f : public LLSelectedObjectFunctor
 			{
@@ -723,10 +723,10 @@ bool LLSelectMgr::enableLinkObjects()
 				}
 			} func;
 			const bool firstonly = true;
-			new_value = LLSelectMgr::getInstance()->getSelection()->applyToRootObjects(&func, firstonly);
+			new_value = getSelection()->applyToRootObjects(&func, firstonly);
 		}
 	}
-    if (!LLSelectMgr::getInstance()->getSelection()->checkAnimatedObjectLinkable())
+    if (!getSelection()->checkAnimatedObjectLinkable())
     {
         new_value = false;
     }
@@ -734,7 +734,7 @@ bool LLSelectMgr::enableLinkObjects()
 	if ( (new_value) && ((rlv_handler_t::isEnabled()) && (!RlvActions::canStand())) )
 	{
 		// Allow only if the avie isn't sitting on any of the selected objects
-		LLObjectSelectionHandle hSel = LLSelectMgr::getInstance()->getSelection();
+		LLObjectSelectionHandle hSel = getSelection();
 		RlvSelectIsSittingOn f(gAgentAvatarp);
 		if (hSel->getFirstRootNode(&f, TRUE) != NULL)
 			new_value = false;
@@ -745,10 +745,10 @@ bool LLSelectMgr::enableLinkObjects()
 
 bool LLSelectMgr::enableUnlinkObjects()
 {
-	LLViewerObject* first_editable_object = LLSelectMgr::getInstance()->getSelection()->getFirstEditableObject();
+	LLViewerObject* first_editable_object = getSelection()->getFirstEditableObject();
 	LLViewerObject *root_object = (first_editable_object == NULL) ? NULL : first_editable_object->getRootEdit();
 
-	bool new_value = LLSelectMgr::getInstance()->selectGetAllRootsValid() &&
+	bool new_value = selectGetAllRootsValid() &&
 		first_editable_object &&
 		!first_editable_object->isAttachment() && !first_editable_object->isPermanentEnforced() &&
 		((root_object == NULL) || !root_object->isPermanentEnforced());
@@ -756,7 +756,7 @@ bool LLSelectMgr::enableUnlinkObjects()
 	if ( (new_value) && ((rlv_handler_t::isEnabled()) && (!RlvActions::canStand())) )
 	{
 		// Allow only if the avie isn't sitting on any of the selected objects
-		LLObjectSelectionHandle hSel = LLSelectMgr::getInstance()->getSelection();
+		LLObjectSelectionHandle hSel = getSelection();
 		RlvSelectIsSittingOn f(gAgentAvatarp);
 		if (hSel->getFirstRootNode(&f, TRUE) != NULL)
 			new_value = false;
@@ -891,7 +891,7 @@ void LLSelectMgr::addAsFamily(std::vector<LLViewerObject*>& objects, BOOL add_to
 		
 		// Can't select yourself
 		if (objectp->mID == gAgentID
-			&& !LLSelectMgr::getInstance()->mAllowSelectAvatar)
+			&& !mAllowSelectAvatar)
 		{
 			continue;
 		}
@@ -5856,6 +5856,7 @@ void LLSelectMgr::updateSilhouettes()
 		num_sils_genned	= 0;
 
 		// render silhouettes for highlighted objects
+		const auto& viewer_cam_origin = LLViewerCamera::instance().getOrigin();
 		//BOOL subtracting_from_selection = (gKeyboard->currentMask(TRUE) == MASK_CONTROL);
 		for (S32 pass = 0; pass < 2; pass++)
 		{
@@ -5881,7 +5882,7 @@ void LLSelectMgr::updateSilhouettes()
 				{
 					if (num_sils_genned++ < MAX_SILS_PER_FRAME)
 					{
-						generateSilhouette(node, LLViewerCamera::getInstance()->getOrigin());
+						generateSilhouette(node, viewer_cam_origin);
 						changed_objects.push_back(objectp);			
 					}
 					else if (objectp->isAttachment() && objectp->getRootEdit()->mDrawable.notNull())
@@ -5934,7 +5935,7 @@ void LLSelectMgr::updateSelectionSilhouette(LLObjectSelectionHandle object_handl
 
 		//mSilhouetteImagep->bindTexture();
 		//glAlphaFunc(GL_GREATER, sHighlightAlphaTest);
-
+		const auto& viewer_cam_origin = LLViewerCamera::instance().getOrigin();
 		for (S32 pass = 0; pass < 2; pass++)
 		{
 			for (LLObjectSelection::iterator iter = object_handle->begin();
@@ -5958,7 +5959,7 @@ void LLSelectMgr::updateSelectionSilhouette(LLObjectSelectionHandle object_handl
 				{
 					if (num_sils_genned++ < MAX_SILS_PER_FRAME)// && objectp->mDrawable->isVisible())
 					{
-						generateSilhouette(node, LLViewerCamera::getInstance()->getOrigin());
+						generateSilhouette(node, viewer_cam_origin);
 						changed_objects.push_back(objectp);
 					}
 					else if (objectp->isAttachment())
@@ -5999,7 +6000,8 @@ void LLSelectMgr::renderSilhouettes(BOOL for_hud)
 		gGL.pushMatrix();
 		gGL.loadIdentity();
 		F32 depth = llmax(1.f, hud_bbox.getExtentLocal().mV[VX] * 1.1f);
-		gGL.ortho(-0.5f * LLViewerCamera::getInstance()->getAspect(), 0.5f * LLViewerCamera::getInstance()->getAspect(), -0.5f, 0.5f, 0.f, depth);
+		auto& viewerCamera = LLViewerCamera::instance();
+		gGL.ortho(-0.5f * viewerCamera.getAspect(), 0.5f * viewerCamera.getAspect(), -0.5f, 0.5f, 0.f, depth);
 
 		gGL.matrixMode(LLRender::MM_MODELVIEW);
 		gGL.pushMatrix();
@@ -6012,7 +6014,7 @@ void LLSelectMgr::renderSilhouettes(BOOL for_hud)
 	}
 
 	bool wireframe_selection = (gFloaterTools && gFloaterTools->getVisible()) || LLSelectMgr::sRenderHiddenSelections;
-	F32 fogCfx = (F32)llclamp((LLSelectMgr::getInstance()->getSelectionCenterGlobal() - gAgentCamera.getCameraPositionGlobal()).magVec() / (LLSelectMgr::getInstance()->getBBoxOfSelection().getExtentLocal().magVec() * 4), 0.0, 1.0);
+	F32 fogCfx = (F32)llclamp((getSelectionCenterGlobal() - gAgentCamera.getCameraPositionGlobal()).magVec() / (getBBoxOfSelection().getExtentLocal().magVec() * 4), 0.0, 1.0);
 
 	static LLColor4 sParentColor = LLColor4(sSilhouetteParentColor[VRED], sSilhouetteParentColor[VGREEN], sSilhouetteParentColor[VBLUE], LLSelectMgr::sHighlightAlpha);
 	static LLColor4 sChildColor = LLColor4(sSilhouetteChildColor[VRED], sSilhouetteChildColor[VGREEN], sSilhouetteChildColor[VBLUE], LLSelectMgr::sHighlightAlpha);
@@ -6619,6 +6621,8 @@ void LLSelectNode::renderOneSilhouette(const LLColor4 &color)
 	LLVolume *volume = objectp->getVolume();
 	if (volume)
 	{
+		auto& viewerCamera = LLViewerCamera::instance();
+
 		F32 silhouette_thickness;
 		if (isAgentAvatarValid() && is_hud_object)
 		{
@@ -6626,8 +6630,8 @@ void LLSelectNode::renderOneSilhouette(const LLColor4 &color)
 		}
 		else
 		{
-			LLVector3 view_vector = LLViewerCamera::getInstance()->getOrigin() - objectp->getRenderPosition();
-			silhouette_thickness = view_vector.magVec() * LLSelectMgr::sHighlightThickness * (LLViewerCamera::getInstance()->getView() / LLViewerCamera::getInstance()->getDefaultFOV());
+			LLVector3 view_vector = viewerCamera.getOrigin() - objectp->getRenderPosition();
+			silhouette_thickness = view_vector.magVec() * LLSelectMgr::sHighlightThickness * (viewerCamera.getView() / viewerCamera.getDefaultFOV());
 		}		
 		F32 animationTime = (F32)LLFrameTimer::getElapsedSeconds();
 
@@ -6641,10 +6645,10 @@ void LLSelectNode::renderOneSilhouette(const LLColor4 &color)
 			gGL.blendFunc(LLRender::BF_SOURCE_COLOR, LLRender::BF_ONE);
 			LLGLEnable fog(GL_FOG);
 			glFogi(GL_FOG_MODE, GL_LINEAR);
-			float d = (LLViewerCamera::getInstance()->getPointOfInterest()-LLViewerCamera::getInstance()->getOrigin()).magVec();
+			float d = (viewerCamera.getPointOfInterest()-viewerCamera.getOrigin()).magVec();
 			LLColor4 fogCol = color * (F32)llclamp((LLSelectMgr::getInstance()->getSelectionCenterGlobal()-gAgentCamera.getCameraPositionGlobal()).magVec()/(LLSelectMgr::getInstance()->getBBoxOfSelection().getExtentLocal().magVec()*4), 0.0, 1.0);
 			glFogf(GL_FOG_START, d);
-			glFogf(GL_FOG_END, d*(1 + (LLViewerCamera::getInstance()->getView() / LLViewerCamera::getInstance()->getDefaultFOV())));
+			glFogf(GL_FOG_END, d*(1 + (viewerCamera.getView() / viewerCamera.getDefaultFOV())));
 			glFogfv(GL_FOG_COLOR, fogCol.mV);
 
 			LLGLDepthTest gls_depth(GL_TRUE, GL_FALSE, GL_GEQUAL);
