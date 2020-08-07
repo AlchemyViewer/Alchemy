@@ -323,7 +323,6 @@ if (LL_TESTS)
   set(test_libs llcommon 
       ${LLCOMMON_LIBRARIES} 
       ${WINDOWS_LIBRARIES} 
-      ${GOOGLEMOCK_LIBRARIES} 
       ${BOOST_FIBER_LIBRARY} 
       ${BOOST_CONTEXT_LIBRARY} 
       ${BOOST_THREAD_LIBRARY} 

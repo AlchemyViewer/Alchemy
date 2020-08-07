@@ -41,7 +41,6 @@ set(cmake_SOURCE_FILES
     GLOD.cmake
 ##  GStreamer010Plugin.cmake
     GoogleBreakpad.cmake
-    GoogleMock.cmake
     Havok.cmake
     Hunspell.cmake
     JPEG.cmake

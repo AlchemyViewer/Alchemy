@@ -3,7 +3,6 @@
 project(llmessage)
 
 include(00-Common)
-include(GoogleMock)
 include(LLAddBuildTest)
 include(LLCommon)
 include(LLCoreHttp)
@@ -268,7 +267,6 @@ if (LINUX)
     ${BOOST_FIBER_LIBRARY}
     ${BOOST_CONTEXT_LIBRARY}
     rt
-    ${GOOGLEMOCK_LIBRARIES}
     )
 else (LINUX)
   set(test_libs
@@ -283,7 +281,6 @@ else (LINUX)
     ${JSONCPP_LIBRARIES}
     ${BOOST_FIBER_LIBRARY}
     ${BOOST_CONTEXT_LIBRARY}
-    ${GOOGLEMOCK_LIBRARIES}
     )
 endif(LINUX)
 
