@@ -408,9 +408,9 @@ void LLAgentCamera::slamLookAt(const LLVector3 &look_at)
 //-----------------------------------------------------------------------------
 LLVector3 LLAgentCamera::calcFocusOffset(LLViewerObject *object, LLVector3 original_focus_point, S32 x, S32 y)
 {
-	LLMatrix4 obj_matrix = object->getRenderMatrix();
-	LLQuaternion obj_rot = object->getRenderRotation();
-	LLVector3 obj_pos = object->getRenderPosition();
+	const LLMatrix4& obj_matrix = object->getRenderMatrix();
+	const LLQuaternion obj_rot = object->getRenderRotation();
+	const LLVector3 obj_pos = object->getRenderPosition();
 
 	BOOL is_avatar = object->isAvatar();
 	// if is avatar - don't do any funk heuristics to position the focal point
@@ -426,8 +426,11 @@ LLVector3 LLAgentCamera::calcFocusOffset(LLViewerObject *object, LLVector3 origi
 	// make sure they object extents are non-zero
 	object_extents.clamp(0.001f, F32_MAX);
 
+	auto& viewerCamera = LLViewerCamera::instance();
+	const auto& viewer_camera_origin = viewerCamera.getOrigin();
+
 	// obj_to_cam_ray is unit vector pointing from object center to camera, in the coordinate frame of the object
-	LLVector3 obj_to_cam_ray = obj_pos - LLViewerCamera::getInstance()->getOrigin();
+	LLVector3 obj_to_cam_ray = obj_pos - viewer_camera_origin;
 	obj_to_cam_ray.rotVec(inv_obj_rot);
 	obj_to_cam_ray.normalize();
 
@@ -474,7 +477,7 @@ LLVector3 LLAgentCamera::calcFocusOffset(LLViewerObject *object, LLVector3 origi
 	LLVector3 focus_pt = gAgent.getPosAgentFromGlobal(focus_pt_global);
 
 	// find vector from camera to focus point in object space
-	LLVector3 camera_to_focus_vec = focus_pt - LLViewerCamera::getInstance()->getOrigin();
+	LLVector3 camera_to_focus_vec = focus_pt - viewer_camera_origin;
 	camera_to_focus_vec.rotVec(inv_obj_rot);
 
 	// find vector from object origin to focus point in object coordinates
@@ -542,13 +545,13 @@ LLVector3 LLAgentCamera::calcFocusOffset(LLViewerObject *object, LLVector3 origi
 	// is almost always "tumble about middle" and not "spin around surface point"
 	if (!is_avatar) 
 	{
-		LLVector3 obj_rel = original_focus_point - object->getRenderPosition();
+		LLVector3 obj_rel = original_focus_point - obj_pos;
 		
 		//now that we have the object relative position, we should bias toward the center of the object 
 		//based on the distance of the camera to the focus point vs. the distance of the camera to the focus
 
-		F32 relDist = llabs(obj_rel * LLViewerCamera::getInstance()->getAtAxis());
-		F32 viewDist = dist_vec(obj_pos + obj_rel, LLViewerCamera::getInstance()->getOrigin());
+		F32 relDist = llabs(obj_rel * viewerCamera.getAtAxis());
+		F32 viewDist = dist_vec(obj_pos + obj_rel, viewer_camera_origin);
 
 
 		LLBBox obj_bbox = object->getBoundingBoxAgent();

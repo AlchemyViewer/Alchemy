@@ -141,10 +141,12 @@ void LLViewerPartSourceScript::update(const F32 dt)
 		return;
 	}
 			
+	LLViewerPartSim& vwrPartSim = LLViewerPartSim::instance();
+
 	F32 old_update_time = mLastUpdateTime;
 	mLastUpdateTime += dt;
 
-	F32 ref_rate_travelspeed = llmin(LLViewerPartSim::getInstance()->getRefRate(), 1.f);
+	F32 ref_rate_travelspeed = llmin(vwrPartSim.getRefRate(), 1.f);
 	
 	F32 dt_update = mLastUpdateTime - mLastPartTime;
 
@@ -213,6 +215,8 @@ void LLViewerPartSourceScript::update(const F32 dt)
 		first_run = TRUE;
 	}
 
+	LLViewerCamera& vwrCamera = LLViewerCamera::instance();
+
 	F32 max_time = llmax(1.f, 10.f*mPartSysData.mBurstRate);
 	dt_update = llmin(max_time, dt_update);
 	while ((dt_update > mPartSysData.mBurstRate) || first_run)
@@ -234,7 +238,7 @@ void LLViewerPartSourceScript::update(const F32 dt)
 			mRotation.setQuat(0, 0, 0);
 		}
 		
-		if (LLViewerPartSim::getInstance()->aboveParticleLimit())
+		if (vwrPartSim.aboveParticleLimit())
 		{
 			// Don't bother doing any more updates if we're above the particle limit,
 			// just give up.
@@ -256,7 +260,7 @@ void LLViewerPartSourceScript::update(const F32 dt)
 				    (mPartSysData.mPartData.mStartScale[1]
 				     + mPartSysData.mPartData.mEndScale[1])/2));
 		
-		F32 pixel_meter_ratio = LLViewerCamera::getInstance()->getPixelMeterRatio();
+		F32 pixel_meter_ratio = vwrCamera.getPixelMeterRatio();
 
 		// Maximum distance at which spawned particles will be viewable
 		F32 max_dist = max_short_side * pixel_meter_ratio; 
@@ -271,7 +275,7 @@ void LLViewerPartSourceScript::update(const F32 dt)
 		}
 
 		// Distance from camera
-		F32 dist = (mPosAgent - LLViewerCamera::getInstance()->getOrigin()).magVec();
+		F32 dist = (mPosAgent - vwrCamera.getOrigin()).magVec();
 
 		// Particle size vs distance vs maxage throttling
 
@@ -295,7 +299,7 @@ void LLViewerPartSourceScript::update(const F32 dt)
 		S32 i;
 		for (i = 0; i < mPartSysData.mBurstPartCount; i++)
 		{
-			if (ll_frand() < llmax(1.0f - LLViewerPartSim::getInstance()->getBurstRate(), limited_rate))
+			if (ll_frand() < llmax(1.0f - vwrPartSim.getBurstRate(), limited_rate))
 			{
 				// Limit particle generation
 				continue;
@@ -436,7 +440,7 @@ void LLViewerPartSourceScript::update(const F32 dt)
 				mPartSysData.mBurstRadius = 0.f; 
 			}
 
-			LLViewerPartSim::getInstance()->addPart(part);
+			vwrPartSim.addPart(part);
 		}
 
 		mLastPartTime = mLastUpdateTime;
@@ -636,7 +640,9 @@ void LLViewerPartSourceSpiral::update(const F32 dt)
 	if (dt_update > RATE)
 	{
 		mLastPartTime = mLastUpdateTime;
-		if (!LLViewerPartSim::getInstance()->shouldAddPart())
+
+		LLViewerPartSim& vwrPartSim = LLViewerPartSim::instance();
+		if (!vwrPartSim.shouldAddPart())
 		{
 			// Particle simulation says we have too many particles, skip all this
 			return;
@@ -664,7 +670,7 @@ void LLViewerPartSourceSpiral::update(const F32 dt)
 		part->mEndGlow = 0.f;
 		part->mGlow = LLColor4U(0, 0, 0, 0);
 
-		LLViewerPartSim::getInstance()->addPart(part);
+		vwrPartSim.addPart(part);
 	}
 }
 
@@ -783,7 +789,9 @@ void LLViewerPartSourceBeam::update(const F32 dt)
 	if (dt_update > RATE)
 	{
 		mLastPartTime = mLastUpdateTime;
-		if (!LLViewerPartSim::getInstance()->shouldAddPart())
+
+		LLViewerPartSim& vwrPartSim = LLViewerPartSim::instance();
+		if (!vwrPartSim.shouldAddPart())
 		{
 			// Particle simulation says we have too many particles, skip all this
 			return;
@@ -820,7 +828,7 @@ void LLViewerPartSourceBeam::update(const F32 dt)
 		part->mEndGlow = 0.f;
 		part->mGlow = LLColor4U(0, 0, 0, 0);
 
-		LLViewerPartSim::getInstance()->addPart(part);
+		vwrPartSim.addPart(part);
 	}
 }
 
@@ -902,7 +910,9 @@ void LLViewerPartSourceChat::update(const F32 dt)
 	if (dt_update > RATE)
 	{
 		mLastPartTime = mLastUpdateTime;
-		if (!LLViewerPartSim::getInstance()->shouldAddPart())
+
+		LLViewerPartSim& vwrPartSim = LLViewerPartSim::instance();
+		if (!vwrPartSim.shouldAddPart())
 		{
 			// Particle simulation says we have too many particles, skip all this
 			return;
@@ -931,7 +941,7 @@ void LLViewerPartSourceChat::update(const F32 dt)
 		part->mGlow = LLColor4U(0, 0, 0, 0);
 
 
-		LLViewerPartSim::getInstance()->addPart(part);
+		vwrPartSim.addPart(part);
 	}
 }
 

@@ -403,11 +403,13 @@ void LLVOTree::render(LLAgent &agent)
 
 void LLVOTree::setPixelAreaAndAngle(LLAgent &agent)
 {
+	auto& viewerCamera = LLViewerCamera::instance();
+
 	LLVector3 center = getPositionAgent();//center of tree.
 	LLVector3 viewer_pos_agent = gAgentCamera.getCameraPositionAgent();
 	LLVector3 lookAt = center - viewer_pos_agent;
 	F32 dist = lookAt.normVec() ;	
-	F32 cos_angle_to_view_dir = lookAt * LLViewerCamera::getInstance()->getXAxis() ;	
+	F32 cos_angle_to_view_dir = lookAt * viewerCamera.getXAxis() ;
 	
 	F32 range = dist - getMinScale()/2;
 	if (range < F_ALMOST_ZERO || isHUDAttachment())		// range == zero
@@ -422,12 +424,12 @@ void LLVOTree::setPixelAreaAndAngle(LLAgent &agent)
 	F32 max_scale = mBillboardScale * getMaxScale();
 	F32 area = max_scale * (max_scale*mBillboardRatio);
 	// Compute pixels per meter at the given range
-	F32 pixels_per_meter = LLViewerCamera::getInstance()->getViewHeightInPixels() / (tan(LLViewerCamera::getInstance()->getView()) * dist);
+	F32 pixels_per_meter = viewerCamera.getViewHeightInPixels() / (tan(viewerCamera.getView()) * dist);
 	mPixelArea = pixels_per_meter * pixels_per_meter * area ;	
 
 	F32 importance = LLFace::calcImportanceToCamera(cos_angle_to_view_dir, dist) ;
 	mPixelArea = LLFace::adjustPixelArea(importance, mPixelArea) ;
-	if (mPixelArea > LLViewerCamera::getInstance()->getScreenPixelArea())
+	if (mPixelArea > viewerCamera.getScreenPixelArea())
 	{
 		mAppAngle = 180.f;
 	}

@@ -2513,12 +2513,13 @@ F32 LLFace::calcImportanceToCamera(F32 cos_angle_to_view_dir, F32 dist)
 {
 	F32 importance = 0.f ;
 	
-	if(cos_angle_to_view_dir > LLViewerCamera::getInstance()->getCosHalfFov() && 
+	LLViewerCamera& camera = LLViewerCamera::instance();
+
+	if(cos_angle_to_view_dir > camera.getCosHalfFov() &&
 		dist < FACE_IMPORTANCE_TO_CAMERA_OVER_DISTANCE[FACE_IMPORTANCE_LEVEL - 1][0]) 
 	{
-		LLViewerCamera* camera = LLViewerCamera::getInstance();
-		F32 camera_moving_speed = camera->getAverageSpeed() ;
-		F32 camera_angular_speed = camera->getAverageAngularSpeed();
+		F32 camera_moving_speed = camera.getAverageSpeed() ;
+		F32 camera_angular_speed = camera.getAverageAngularSpeed();
 
 		if(camera_moving_speed > 10.0f || camera_angular_speed > 1.0f)
 		{

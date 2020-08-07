@@ -29,6 +29,8 @@
 
 #include "lldrawpool.h"
 
+#include "llsettingssky.h"
+
 class LLGLSLShader;
 
 class LLDrawPoolWLSky final : public LLDrawPool {
@@ -75,14 +77,14 @@ private:
 	void renderDome(const LLVector3& camPosLocal, F32 camHeightLocal, LLGLSLShader * shader) const;
 
     void renderSkyHaze(const LLVector3& camPosLocal, F32 camHeightLocal) const;
-    void renderSkyClouds(const LLVector3& camPosLocal, F32 camHeightLocal, LLGLSLShader* cloudshader) const;
+    void renderSkyClouds(const LLSettingsSky::ptr_t& psky, const LLVector3& camPosLocal, F32 camHeightLocal, LLGLSLShader* cloudshader) const;
 
-	void renderSkyHazeDeferred(const LLVector3& camPosLocal, F32 camHeightLocal) const;
-    void renderSkyCloudsDeferred(const LLVector3& camPosLocal, F32 camHeightLocal, LLGLSLShader* cloudshader) const;
+	void renderSkyHazeDeferred(const LLSettingsSky::ptr_t& psky, const LLVector3& camPosLocal, F32 camHeightLocal) const;
+    void renderSkyCloudsDeferred(const LLSettingsSky::ptr_t& psky, const LLVector3& camPosLocal, F32 camHeightLocal, LLGLSLShader* cloudshader) const;
 
-    void renderStarsDeferred(void) const;
-	void renderStars(void) const;
-	void renderHeavenlyBodies();    
+    void renderStarsDeferred(const LLSettingsSky::ptr_t& psky) const;
+	void renderStars(const LLSettingsSky::ptr_t& psky) const;
+	void renderHeavenlyBodies(const LLSettingsSky::ptr_t& psky, const LLVector3& camPosLocal);
 };
 
 #endif // LL_DRAWPOOLWLSKY_H

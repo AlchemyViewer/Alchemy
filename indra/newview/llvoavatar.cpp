@@ -10268,11 +10268,13 @@ void LLVOAvatar::getImpostorValues(LLVector4a* extents, LLVector3& angle, F32& d
 	extents[0] = ext[0];
 	extents[1] = ext[1];
 
-	LLVector3 at = LLViewerCamera::getInstance()->getOrigin()-(getRenderPosition()+mImpostorOffset);
+	auto& vwrCamera = LLViewerCamera::instance();
+
+	LLVector3 at = vwrCamera.getOrigin()-(getRenderPosition()+mImpostorOffset);
 	distance = at.normalize();
-	F32 da = 1.f - (at*LLViewerCamera::getInstance()->getAtAxis());
-	angle.mV[0] = LLViewerCamera::getInstance()->getYaw()*da;
-	angle.mV[1] = LLViewerCamera::getInstance()->getPitch()*da;
+	F32 da = 1.f - (at* vwrCamera.getAtAxis());
+	angle.mV[0] = vwrCamera.getYaw()*da;
+	angle.mV[1] = vwrCamera.getPitch()*da;
 	angle.mV[2] = da;
 }
 
