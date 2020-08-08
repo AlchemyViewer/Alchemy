@@ -7715,7 +7715,7 @@ void LLVOAvatar::rebuildAttachments()
 				for (LLViewerObject* pChildObj : pAttachObj->getChildren())
 				{
 					if (LLVOVolume* pChildVol = (pChildObj->isMesh()) ? pChildObj->asVolume() : nullptr)
-						pAttachVol->forceLOD(3);
+						pChildVol->forceLOD(3);
 				}
 			}
 		}
