@@ -638,8 +638,9 @@ bool idle_startup()
 #endif
 
 #ifdef LL_OPENAL
+			if (!gAudiop
 #if !LL_WINDOWS
-			if (NULL == getenv("LL_BAD_OPENAL_DRIVER"))
+				&& NULL == getenv("LL_BAD_OPENAL_DRIVER"))
 #endif // !LL_WINDOWS
 			{
 				gAudiop = (LLAudioEngine *) new LLAudioEngine_OpenAL();
