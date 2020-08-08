@@ -34,10 +34,16 @@
 #include "../llcoproceduremanager.h"
 
 #include <functional>
-
+#if LL_GNUC
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wpessimizing-move"
+#endif
 #include <boost/fiber/fiber.hpp>
 #include <boost/fiber/buffered_channel.hpp>
 #include <boost/fiber/unbuffered_channel.hpp>
+#if LL_GNUC
+#pragma GCC diagnostic pop
+#endif
 
 #include "../test/lltut.h"
 #include "../test/sync.h"
