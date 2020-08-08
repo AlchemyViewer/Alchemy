@@ -2579,9 +2579,23 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>name</key>
             <string>linux</string>
           </map>
+          <key>linux64</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>hash</key>
+              <string>f20fdc409f5bfc2646fda8064ef16f0e</string>
+              <key>hash_algorithm</key>
+              <string>md5</string>
+              <key>url</key>
+              <string>https://pkg.alchemyviewer.org/repository/autobuild-external/open-libndofdev/linux64/debian10/open_libndofdev-0.12.202210807-linux64-202210807.tar.bz2</string>
+            </map>
+            <key>name</key>
+            <string>linux64</string>
+          </map>
         </map>
         <key>version</key>
-        <string>0.3</string>
+        <string>0.12.202210807</string>
       </map>
       <key>openal</key>
       <map>
@@ -2708,9 +2722,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>ac66f3197010b1549a5e4467aebbc27d</string>
+              <string>2855cc01de820f3f9c1c43845aa8f308</string>
+              <key>hash_algorithm</key>
+              <string>md5</string>
               <key>url</key>
-              <string>http://automated-builds-secondlife-com.s3.amazonaws.com/ct2/1113/2571/openjpeg-1.5.1.501102-linux64-501102.tar.bz2</string>
+              <string>https://depot.alchemyviewer.org/pub/linux64/lib-xenial/openjpeg-1.5.1-linux64-201609240352.tar.bz2</string>
             </map>
             <key>name</key>
             <string>linux64</string>
@@ -2743,7 +2759,7 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
           </map>
         </map>
         <key>version</key>
-        <string>1.5.1.200900057</string>
+        <string>1.5.1</string>
       </map>
       <key>openssl</key>
       <map>
