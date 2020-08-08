@@ -4,6 +4,8 @@
 # other commands to guarantee full compatibility
 # with the version specified
 cmake_minimum_required(VERSION 3.13.0 FATAL_ERROR)
+cmake_policy(SET CMP0063 NEW)
+cmake_policy(SET CMP0072 OLD)
 
 set(ROOT_PROJECT_NAME "Alchemy" CACHE STRING
     "The root project/makefile/solution name. Defaults to Alchemy.")
