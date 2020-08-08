@@ -20,7 +20,6 @@ include(EXPAT)
 include(FMODSTUDIO)
 include(GLOD)
 include(Hunspell)
-include(JsonCpp)
 include(LLAppearance)
 include(LLAudio)
 include(LLCA)
@@ -70,7 +69,6 @@ endif(USE_FMODSTUDIO)
 include_directories(
     ${DBUSGLIB_INCLUDE_DIRS}
     ${ZLIB_INCLUDE_DIRS}
-    ${JSONCPP_INCLUDE_DIR}
     ${GLOD_INCLUDE_DIR}
     ${LLAUDIO_INCLUDE_DIRS}
     ${LLCHARACTER_INCLUDE_DIRS}
@@ -2089,7 +2087,6 @@ target_link_libraries(${VIEWER_BINARY_NAME}
     ${FMODWRAPPER_LIBRARY} # must come after LLAudio
     ${GLOD_LIBRARIES}
     ${OPENGL_LIBRARIES}
-    ${JSONCPP_LIBRARIES}
     ${SDL_LIBRARY}
     ${SMARTHEAP_LIBRARY}
     ${UI_LIBRARIES}
@@ -2471,7 +2468,6 @@ if (LL_TESTS)
 
   set(test_libs
     ${LLCOMMON_LIBRARIES}
-    ${JSONCPP_LIBRARIES}
     ${CURL_LIBRARIES}
     ${NGHTTP2_LIBRARIES}
     )

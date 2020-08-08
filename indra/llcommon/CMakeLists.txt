@@ -4,10 +4,10 @@ project(llcommon)
 
 include(00-Common)
 include(LLCommon)
+include(LLMath)
 include(Linking)
 include(Boost)
 include(LLSharedLibs)
-include(JsonCpp)
 include(GoogleBreakpad)
 include(Copy3rdPartyLibs)
 include(ZLIB)
@@ -16,7 +16,7 @@ include(URIPARSER)
 include_directories(
     ${EXPAT_INCLUDE_DIRS}
     ${LLCOMMON_INCLUDE_DIRS}
-    ${JSONCPP_INCLUDE_DIR}
+    ${LLMATH_INCLUDE_DIRS}
     ${ZLIB_INCLUDE_DIRS}
     ${BREAKPAD_INCLUDE_DIRECTORIES}
     ${URIPARSER_INCLUDE_DIRS}
@@ -290,7 +290,6 @@ target_link_libraries(
     ${APRUTIL_LIBRARIES}
     ${APR_LIBRARIES}
     ${EXPAT_LIBRARIES}
-    ${JSONCPP_LIBRARIES}
     ${ZLIB_LIBRARIES}
     ${WINDOWS_LIBRARIES}
     ${BOOST_FIBER_LIBRARY}
