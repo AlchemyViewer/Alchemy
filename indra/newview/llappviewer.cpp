@@ -1158,6 +1158,7 @@ bool LLAppViewer::init()
 	gGLActive = FALSE;
 
 #if LL_RELEASE_FOR_DOWNLOAD 
+#ifndef LL_LINUX
     if (!gSavedSettings.getBOOL("CmdLineSkipUpdater"))
     {
 	LLProcess::Params updater;
@@ -1192,6 +1193,7 @@ bool LLAppViewer::init()
 	{
 		LL_WARNS("InitInfo") << "Skipping updater check." << LL_ENDL;
 	}
+#endif
 
 	// Iterate over --leap command-line options. But this is a bit tricky: if
 	// there's only one, it won't be an array at all.
