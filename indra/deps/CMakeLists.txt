@@ -26,11 +26,11 @@ FetchContent_Declare(
 #   GIT_REPOSITORY https://github.com/fmtlib/fmt.git
 #   GIT_TAG        6.1.2
 #   )
-# FetchContent_Declare(
-#   nlohmann_json
-#   GIT_REPOSITORY https://github.com/nlohmann/json.git
-#   GIT_TAG        v3.7.3
-#   )
+FetchContent_Declare(
+  nlohmann_json
+  GIT_REPOSITORY https://github.com/nlohmann/json.git
+  GIT_TAG        v3.7.3
+  )
 FetchContent_Declare(
   absl
   GIT_REPOSITORY https://github.com/abseil/abseil-cpp.git
@@ -63,10 +63,10 @@ FetchContent_MakeAvailable(meshoptimizer)
 # # run from your own project's code.
 # set(JSON_BuildTests OFF CACHE INTERNAL "")
 
-# # If you only include this third party in PRIVATE source files, you do not
-# # need to install it when your main project gets installed.
-# set(JSON_Install OFF CACHE INTERNAL "")
-# FetchContent_MakeAvailable(nlohmann_json)
+# If you only include this third party in PRIVATE source files, you do not
+# need to install it when your main project gets installed.
+set(JSON_Install OFF CACHE INTERNAL "")
+FetchContent_MakeAvailable(nlohmann_json)
 
 unset(CMAKE_FOLDER)
 unset(CMAKE_POSITION_INDEPENDENT_CODE)
