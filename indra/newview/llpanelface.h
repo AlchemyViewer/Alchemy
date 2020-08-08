@@ -372,7 +372,7 @@ private:
 		ReturnType (LLTextureEntry::* const TEGetFunc)() const >
 	static void getTEValue(DataType& data_to_return, bool& identical, DataType default_value, bool has_tolerance = false, DataType tolerance = DataType())
 	{
-		DataType data_value;
+		DataType data_value = DataType();
 		struct GetTEVal : public LLSelectedTEGetFunctor<DataType>
 		{
 			GetTEVal(DataType default_value) : _default(default_value) {}
