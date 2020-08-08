@@ -66,6 +66,7 @@ FetchContent_MakeAvailable(meshoptimizer)
 # If you only include this third party in PRIVATE source files, you do not
 # need to install it when your main project gets installed.
 set(JSON_Install OFF CACHE INTERNAL "")
+set(JSON_BuildTests OFF CACHE INTERNAL "")
 FetchContent_MakeAvailable(nlohmann_json)
 
 unset(CMAKE_FOLDER)
