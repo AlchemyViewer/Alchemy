@@ -1381,7 +1381,7 @@ class LinuxManifest(ViewerManifest):
 
         self.path("featuretable_linux.txt")
 
-        with self.prefix(src=pkgdir):
+        with self.prefix(src=pkgdir, dst="app_settings"):
             self.path("ca-bundle.crt")
 
     def package_finish(self):
