@@ -119,7 +119,6 @@ if (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
     set(CMAKE_SYSTEM_LIBRARY_PATH /usr/lib/${DPKG_ARCH} /usr/local/lib/${DPKG_ARCH} ${CMAKE_SYSTEM_LIBRARY_PATH})
   endif (DPKG_RESULT EQUAL 0)
 
-  include(ConfigurePkgConfig)
 
   set(LL_ARCH ${ARCH}_linux)
   set(LL_ARCH_DIR ${ARCH}-linux)
