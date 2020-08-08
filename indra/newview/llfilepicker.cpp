@@ -1246,7 +1246,7 @@ static std::string add_save_texture_filter_to_gtkchooser(GtkWindow *picker)
 	return caption;
 }
 
-BOOL LLFilePicker::getSaveFile( ESaveFilter filter, const std::string& filename )
+BOOL LLFilePicker::getSaveFile( ESaveFilter filter, const std::string& filename /*= LLStringUtil::null*/, bool blocking /*= true*/ )
 {
 	BOOL rtn = FALSE;
 
