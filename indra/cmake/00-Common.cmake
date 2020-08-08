@@ -192,18 +192,13 @@ endif (WINDOWS)
 if (LINUX)
   set(CMAKE_SKIP_RPATH TRUE)
 
-  add_definitions(-D_FORTIFY_SOURCE=2)
-
-  set(CMAKE_CXX_FLAGS "-Wno-deprecated -Wno-unused-but-set-variable -Wno-unused-variable ${CMAKE_CXX_FLAGS}")
-
-  # gcc 4.3 and above don't like the LL boost and also
-  # cause warnings due to our use of deprecated headers
-  add_definitions(-Wno-parentheses)
-
   add_definitions(
+      -DLL_LINUX=1
       -D_REENTRANT
+      -DAPPID=secondlife
       )
   add_compile_options(
+      -fvisibility=hidden
       -fexceptions
       -fno-math-errno
       -fno-strict-aliasing
@@ -216,24 +211,14 @@ if (LINUX)
   # force this platform to accept TOS via external browser
   add_definitions(-DEXTERNAL_TOS)
 
-  add_definitions(-DAPPID=secondlife)
-  add_compile_options(-fvisibility=hidden)
   # don't catch SIGCHLD in our base application class for the viewer - some of
   # our 3rd party libs may need their *own* SIGCHLD handler to work. Sigh! The
   # viewer doesn't need to catch SIGCHLD anyway.
   add_definitions(-DLL_IGNORE_SIGCHLD)
-  if (ADDRESS_SIZE EQUAL 32)
-    add_compile_options(-march=pentium4)
-  endif (ADDRESS_SIZE EQUAL 32)
-  #add_compile_options(-ftree-vectorize) # THIS CRASHES GCC 3.1-3.2
-  if (NOT USESYSTEMLIBS)
-    # this stops us requiring a really recent glibc at runtime
-    add_compile_options(-fno-stack-protector)
-    # linking can be very memory-hungry, especially the final viewer link
-    set(CMAKE_CXX_LINK_FLAGS "-Wl,--no-keep-memory")
-  endif (NOT USESYSTEMLIBS)
 
   set(CMAKE_CXX_FLAGS_DEBUG "-fno-inline ${CMAKE_CXX_FLAGS_DEBUG}")
+  set(CMAKE_CXX_FLAGS_RELEASE "-O3 -ffast-math -fstack-protector-strong -D_FORTIFY_SOURCE=2 ${CMAKE_CXX_FLAGS_RELEASE}")
+  set(CMAKE_CXX_LINK_FLAGS "-Wl,--as-needed ${CMAKE_CXX_LINK_FLAGS}")
 endif (LINUX)
 
 
@@ -269,7 +254,7 @@ if (LINUX OR DARWIN)
   endif (CMAKE_CXX_COMPILER MATCHES ".*clang")
 
   if (CMAKE_COMPILER_IS_GNUCXX)
-    set(GCC_WARNINGS "-Wall -Wno-sign-compare -Wno-trigraphs")
+    set(GCC_WARNINGS "-Wall -Wno-sign-compare -Wno-trigraphs -Wno-unused-function -Wno-misleading-indentation")
   elseif (CMAKE_COMPILER_IS_CLANGXX)
     set(GCC_WARNINGS "-Wall -Wno-sign-compare -Wno-trigraphs")
   endif()
@@ -287,6 +272,7 @@ if (LINUX OR DARWIN)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -m${ADDRESS_SIZE}")
 endif (LINUX OR DARWIN)
 
+add_definitions(-DBOOST_BIND_GLOBAL_PLACEHOLDERS)
 
 if (USESYSTEMLIBS)
   add_definitions(-DLL_USESYSTEMLIBS=1)
