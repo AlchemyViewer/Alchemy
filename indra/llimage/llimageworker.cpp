@@ -136,7 +136,7 @@ bool LLImageDecodeThread::ImageRequest::processRequest()
 			{
 				return true; // done (failed)
 			}
-			if (!(mFormattedImage->getWidth() * mFormattedImage->getHeight() * mFormattedImage->getComponents()))
+			if ((mFormattedImage->getWidth() * mFormattedImage->getHeight() * mFormattedImage->getComponents()) <= 0)
 			{
 				return true; // done (failed)
 			}
