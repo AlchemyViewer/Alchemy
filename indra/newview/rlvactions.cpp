@@ -216,6 +216,7 @@ bool RlvActions::canShowName(EShowNamesContext eContext, const LLUUID& idAgent)
 				return (gRlvHandler.isException(RLV_BHVR_SHOWNAMETAGS, idAgent)) || (gAgentID == idAgent);
 			// Show/hide avatar name
 			case SNC_DEFAULT:
+			case SNC_COUNT:
 			case SNC_TELEPORTOFFER:
 			case SNC_TELEPORTREQUEST:
 				return gRlvHandler.isException(RLV_BHVR_SHOWNAMES, idAgent) || (gAgentID == idAgent);

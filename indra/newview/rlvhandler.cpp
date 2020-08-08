@@ -830,7 +830,8 @@ void RlvHandler::setActiveGroupRole(const LLUUID& idGroup, const std::string& st
 	// We have everything - activate the requested role (if we can find it)
 	if (pGroupData)
 	{
-		enum class EMatch { None, Partial, Exact } eMatch = EMatch::None; LLUUID idRole;
+		enum class EMatch { ENone, EPartial, EExact };
+		EMatch eMatch = EMatch::ENone; LLUUID idRole;
 		for (const auto& roleData : pGroupData->mRoles)
 		{
 			// NOTE: exact matches take precedence over partial matches; in case of partial matches the last match wins
@@ -838,13 +839,13 @@ void RlvHandler::setActiveGroupRole(const LLUUID& idGroup, const std::string& st
 			if (boost::istarts_with(strRoleName, strRole))
 			{
 				idRole = roleData.first;
-				eMatch = (strRoleName.length() == strRole.length()) ? EMatch::Exact : EMatch::Partial;
-				if (eMatch == EMatch::Exact)
+				eMatch = (strRoleName.length() == strRole.length()) ? EMatch::EExact : EMatch::EPartial;
+				if (eMatch == EMatch::EExact)
 					break;
 			}
 		}
 
-		if (eMatch != EMatch::None)
+		if (eMatch != EMatch::ENone)
 		{
 			RLV_INFOS << "Activating role '" << strRole << "' for group '" << pGroupData->mName << "'" << RLV_ENDL;
 			LLGroupMgr::getInstance()->sendGroupTitleUpdate(idGroup, idRole);

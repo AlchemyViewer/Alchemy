@@ -18,6 +18,7 @@
 #define RLV_HANDLER_H
 
 #include "llgroupmgr.h"
+#include "llviewertexture.h"
 #include <stack>
 
 #include "rlvcommon.h"
