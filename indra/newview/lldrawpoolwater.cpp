@@ -717,7 +717,6 @@ void LLDrawPoolWater::shade()
     light_diffuse *= 6.f;
 
 	LLGLSLShader* shader = nullptr;
-    LLGLSLShader* edge_shader = nullptr;
 
 	F32 eyedepth = LLViewerCamera::getInstance()->getOrigin().mV[2] - environment.getWaterHeight();
 	
@@ -735,13 +734,11 @@ void LLDrawPoolWater::shade()
 	else if (deferred_render)
 	{
 		shader = &gDeferredWaterProgram;
-        edge_shader = nullptr;
 	}
 	else
 	{
 		shader = &gWaterProgram;
-        edge_shader = nullptr;
-	}
+  	}
 
 	static const LLCachedControl<bool> render_water_mip_normal(gSavedSettings, "RenderWaterMipNormal");
 

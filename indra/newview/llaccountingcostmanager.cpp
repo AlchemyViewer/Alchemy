@@ -97,10 +97,7 @@ void LLAccountingCostManager::accountingCostCoro(std::string url,
         dataToPost[keystr.c_str()] = objectList;
 
         LLAccountingCostObserver* observer = observerHandle.get();
-        LLUUID transactionId = observer->getTransactionID();
         observer = NULL;
-
-
 
         LLSD results = httpAdapter->postAndSuspend(httpRequest, url, dataToPost);
 

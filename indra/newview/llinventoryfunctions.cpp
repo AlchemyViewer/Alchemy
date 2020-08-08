@@ -1385,9 +1385,6 @@ bool move_item_to_marketplacelistings(LLInventoryItem* inv_item, LLUUID dest_fol
                 return false;
             }
             
-            // Get the parent folder of the moved item : we may have to update it
-            LLUUID src_folder = viewer_inv_item->getParentUUID();
-
             if (copy)
             {
                 // Copy the item

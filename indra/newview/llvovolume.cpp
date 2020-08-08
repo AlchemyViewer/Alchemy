@@ -809,9 +809,6 @@ void LLVOVolume::updateTextureVirtualSize(bool forced)
 	
 	if (isSculpted())
 	{
-		LLSculptParams *sculpt_params = (LLSculptParams *)getParameterEntry(LLNetworkData::PARAMS_SCULPT);
-		LLUUID id =  sculpt_params->getSculptTexture();
-		
 		updateSculptTexture();
 
 		if (mSculptTexture.notNull())

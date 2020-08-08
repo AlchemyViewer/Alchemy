@@ -38,8 +38,16 @@
 
 #include "llvorbisencode.h"
 
+#if LL_GNUC
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-variable"
+#endif
 #include "vorbis/codec.h"
 #include "vorbis/vorbisfile.h"
+#if LL_GNUC
+#pragma GCC diagnostic pop
+#endif
+
 #include <iterator>
 #include <deque>
 

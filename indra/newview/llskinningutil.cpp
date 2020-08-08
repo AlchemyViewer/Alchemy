@@ -211,7 +211,9 @@ void LLSkinningUtil::getPerVertexSkinMatrix(
     LLMatrix4a& final_mat,
     U32 max_joints)
 {
+#ifdef SHOW_ASSERT
     bool valid_weights = true;
+#endif
     final_mat.clear();
 
     S32 idx[4];
@@ -237,7 +239,9 @@ void LLSkinningUtil::getPerVertexSkinMatrix(
     if (handle_bad_scale && scale <= 0.f)
     {
         wght = LLVector4(1.0f, 0.0f, 0.0f, 0.0f);
+#ifdef SHOW_ASSERT
         valid_weights = false;
+#endif
     }
     else
     {
@@ -255,9 +259,11 @@ void LLSkinningUtil::getPerVertexSkinMatrix(
 
         final_mat.add(src);
     }
+#ifdef SHOW_ASSERT
     // SL-366 - with weight validation/cleanup code, it should no longer be
     // possible to hit the bad scale case.
     llassert(valid_weights);
+#endif
 }
 
 void LLSkinningUtil::initJointNums(LLMeshSkinInfo* skin, LLVOAvatar *avatar)
