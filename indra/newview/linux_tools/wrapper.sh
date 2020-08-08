@@ -56,29 +56,32 @@ fi
 #export LL_WRAPPER='valgrind --smc-check=all --error-limit=no --log-file=secondlife.vg --leak-check=full --suppressions=/usr/lib/valgrind/glibc-2.5.supp --suppressions=secondlife-i686.supp'
 
 ## - Avoids an often-buggy X feature that doesn't really benefit us anyway.
-export SDL_VIDEO_X11_DGAMOUSE=0
+# export SDL_VIDEO_X11_DGAMOUSE=0
 
-## - Works around a problem with misconfigured 64-bit systems not finding GL
-I386_MULTIARCH="$(dpkg-architecture -ai386 -qDEB_HOST_MULTIARCH 2>/dev/null)"
-MULTIARCH_ERR=$?
-if [ $MULTIARCH_ERR -eq 0 ]; then
-    echo 'Multi-arch support detected.'
-    MULTIARCH_GL_DRIVERS="/usr/lib/${I386_MULTIARCH}/dri"
-    export LIBGL_DRIVERS_PATH="${LIBGL_DRIVERS_PATH}:${MULTIARCH_GL_DRIVERS}:/usr/lib64/dri:/usr/lib32/dri:/usr/lib/dri"
-else
-    export LIBGL_DRIVERS_PATH="${LIBGL_DRIVERS_PATH}:/usr/lib64/dri:/usr/lib32/dri:/usr/lib/dri"
-fi
+# ## - Works around a problem with misconfigured 64-bit systems not finding GL
+# I386_MULTIARCH="$(dpkg-architecture -ai386 -qDEB_HOST_MULTIARCH 2>/dev/null)"
+# MULTIARCH_ERR=$?
+# if [ $MULTIARCH_ERR -eq 0 ]; then
+#     echo 'Multi-arch support detected.'
+#     MULTIARCH_GL_DRIVERS="/usr/lib/${I386_MULTIARCH}/dri"
+#     export LIBGL_DRIVERS_PATH="${LIBGL_DRIVERS_PATH}:${MULTIARCH_GL_DRIVERS}:/usr/lib64/dri:/usr/lib32/dri:/usr/lib/dri"
+# else
+#     export LIBGL_DRIVERS_PATH="${LIBGL_DRIVERS_PATH}:/usr/lib64/dri:/usr/lib32/dri:/usr/lib/dri"
+# fi
 
 ## - The 'scim' GTK IM module widely crashes the viewer.  Avoid it.
-if [ "$GTK_IM_MODULE" = "scim" ]; then
-    export GTK_IM_MODULE=xim
-fi
+# if [ "$GTK_IM_MODULE" = "scim" ]; then
+#     export GTK_IM_MODULE=xim
+# fi
 
 ## - Automatically work around the ATI mouse cursor crash bug:
 ## (this workaround is disabled as most fglrx users do not see the bug)
 #if lsmod | grep fglrx &>/dev/null ; then
 #	export LL_ATI_MOUSE_CURSOR_BUG=x
 #fi
+
+## - Enable threaded mesa GL impl
+export mesa_glthread=true
 
 
 ## Nothing worth editing below this line.
