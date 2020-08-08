@@ -40,12 +40,25 @@
 #include "lldir.h"
 #include "llfindlocale.h"
 
+#if LL_GNUC
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#endif
+
 #if LL_GTK
 extern "C" {
-# include "gtk/gtk.h"
+#include <gtk/gtk.h>
+#include <gdk/gdk.h>
+#if GTK_CHECK_VERSION(2, 24, 0)
+#include <gdk/gdkx.h>
+#endif
 }
 #include <locale.h>
 #endif // LL_GTK
+
+#if LL_GNUC
+#pragma GCC diagnostic pop
+#endif
 
 extern "C" {
 # include "fontconfig/fontconfig.h"
@@ -119,7 +132,6 @@ bool LLWindowSDL::ll_try_gtk_init(void)
 	if (!tried_gtk_init)
 	{
 		tried_gtk_init = TRUE;
-		if (!g_thread_supported ()) g_thread_init (NULL);
 		maybe_lock_display();
 		gtk_is_good = gtk_init_check(NULL, NULL);
 		maybe_unlock_display();
@@ -1404,36 +1416,36 @@ LLWindow::LLWindowResolution* LLWindowSDL::getSupportedResolutions(S32 &num_reso
 		mSupportedResolutions = new LLWindowResolution[MAX_NUM_RESOLUTIONS];
 		mNumSupportedResolutions = 0;
 
-        SDL_Rect **modes = SDL_ListModes(NULL, SDL_OPENGL | SDL_FULLSCREEN);
-        if ( (modes != NULL) && (modes != ((SDL_Rect **) -1)) )
-        {
-            int count = 0;
-            while (*modes && count<MAX_NUM_RESOLUTIONS)  // they're sorted biggest to smallest, so find end...
-            {
-                modes++;
-                count++;
-            }
+		SDL_Rect **modes = SDL_ListModes(NULL, SDL_OPENGL | SDL_FULLSCREEN);
+		if ( (modes != NULL) && (modes != ((SDL_Rect **) -1)) )
+		{
+			int count = 0;
+			while (*modes && count<MAX_NUM_RESOLUTIONS)  // they're sorted biggest to smallest, so find end...
+			{
+				modes++;
+				count++;
+			}
 
-            while (count--)
-            {
-                modes--;
-                SDL_Rect *r = *modes;
-                int w = r->w;
-                int h = r->h;
-                if ((w >= 800) && (h >= 600))
-                {
-                    // make sure we don't add the same resolution multiple times!
-                    if ( (mNumSupportedResolutions == 0) ||
-                         ((mSupportedResolutions[mNumSupportedResolutions-1].mWidth != w) &&
-                          (mSupportedResolutions[mNumSupportedResolutions-1].mHeight != h)) )
-                    {
-                        mSupportedResolutions[mNumSupportedResolutions].mWidth = w;
-                        mSupportedResolutions[mNumSupportedResolutions].mHeight = h;
-                        mNumSupportedResolutions++;
-                    }
-                }
-            }
-        }
+			while (count--)
+			{
+				modes--;
+				SDL_Rect *r = *modes;
+				int w = r->w;
+				int h = r->h;
+				if ((w >= 800) && (h >= 600))
+				{
+					// make sure we don't add the same resolution multiple times!
+					if ( (mNumSupportedResolutions == 0) ||
+						 ((mSupportedResolutions[mNumSupportedResolutions-1].mWidth != w) &&
+						  (mSupportedResolutions[mNumSupportedResolutions-1].mHeight != h)) )
+					{
+						mSupportedResolutions[mNumSupportedResolutions].mWidth = w;
+						mSupportedResolutions[mNumSupportedResolutions].mHeight = h;
+						mNumSupportedResolutions++;
+					}
+				}
+			}
+		}
 	}
 
 	num_resolutions = mNumSupportedResolutions;
@@ -1442,8 +1454,8 @@ LLWindow::LLWindowResolution* LLWindowSDL::getSupportedResolutions(S32 &num_reso
 
 BOOL LLWindowSDL::convertCoords(LLCoordGL from, LLCoordWindow *to)
 {
-    if (!to)
-        return FALSE;
+	if (!to)
+		return FALSE;
 
 	to->mX = from.mX;
 	to->mY = mWindow->h - from.mY - 1;
@@ -1453,8 +1465,8 @@ BOOL LLWindowSDL::convertCoords(LLCoordGL from, LLCoordWindow *to)
 
 BOOL LLWindowSDL::convertCoords(LLCoordWindow from, LLCoordGL* to)
 {
-    if (!to)
-        return FALSE;
+	if (!to)
+		return FALSE;
 
 	to->mX = from.mX;
 	to->mY = mWindow->h - from.mY - 1;
@@ -1464,13 +1476,13 @@ BOOL LLWindowSDL::convertCoords(LLCoordWindow from, LLCoordGL* to)
 
 BOOL LLWindowSDL::convertCoords(LLCoordScreen from, LLCoordWindow* to)
 {
-    if (!to)
+	if (!to)
 		return FALSE;
 
 	// In the fullscreen case, window and screen coordinates are the same.
 	to->mX = from.mX;
 	to->mY = from.mY;
-    return (TRUE);
+	return (TRUE);
 }
 
 BOOL LLWindowSDL::convertCoords(LLCoordWindow from, LLCoordScreen *to)

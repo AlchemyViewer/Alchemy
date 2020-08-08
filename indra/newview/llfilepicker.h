@@ -54,12 +54,19 @@
 #include <commdlg.h>
 #endif
 
+#if LL_GTK
+#if LL_GNUC
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#endif
 extern "C" {
 // mostly for Linux, possible on others
-#if LL_GTK
 # include "gtk/gtk.h"
-#endif // LL_GTK
 }
+#if LL_GNUC
+#pragma GCC diagnostic pop
+#endif // LL_GNUC
+#endif // LL_GTK
 
 class LLFilePicker
 {

@@ -38,9 +38,24 @@
 #include "lldir.h"
 #include "llsdserialize.h"
 
+#if LL_GNUC
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#endif
+
 #if LL_GTK
-# include "gtk/gtk.h"
+extern "C" {
+#include <gtk/gtk.h>
+#include <gdk/gdk.h>
+#if GTK_CHECK_VERSION(2, 24, 0)
+#include <gdk/gdkx.h>
+#endif
+}
 #endif // LL_GTK
+
+#if LL_GNUC
+#pragma GCC diagnostic pop
+#endif
 
 #define MAX_LOADSTRING 100
 
