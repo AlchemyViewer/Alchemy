@@ -57,14 +57,6 @@ target_link_libraries(media_plugin_example
   ${PLUGIN_API_WINDOWS_LIBRARIES}
 )
 
-add_dependencies(media_plugin_example
-  ${LLPLUGIN_LIBRARIES}
-  ${MEDIA_PLUGIN_BASE_LIBRARIES}
-  # Using ${LLCOMMON_LIBRARIES} here drags in a whole bunch of Boost stuff
-  # that only produces CMake warnings about nonexistent dependencies.
-  llcommon
-)
-
 if (WINDOWS)
   set_target_properties(
     media_plugin_example
