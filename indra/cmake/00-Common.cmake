@@ -290,20 +290,6 @@ endif (LINUX OR DARWIN)
 
 if (USESYSTEMLIBS)
   add_definitions(-DLL_USESYSTEMLIBS=1)
-
-  if (LINUX AND ADDRESS_SIZE EQUAL 32)
-    add_definitions(-march=pentiumpro)
-  endif (LINUX AND ADDRESS_SIZE EQUAL 32)
-
-else (USESYSTEMLIBS)
-  set(${ARCH}_linux_INCLUDES
-      ELFIO
-      atk-1.0
-      glib-2.0
-      gstreamer-0.10
-      gtk-2.0
-      pango-1.0
-      )
 endif (USESYSTEMLIBS)
 
 option(RELEASE_SHOW_ASSERTS "Enable asserts in release builds" OFF)

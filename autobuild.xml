@@ -34,9 +34,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>7ea2df03bfc35c06acf23dd9e734adac</string>
+              <string>55892534ec68d04afef4a3b0a0abd760</string>
+              <key>hash_algorithm</key>
+              <string>md5</string>
               <key>url</key>
-              <string>http://automated-builds-secondlife-com.s3.amazonaws.com/ct2/1103/2554/SDL-1.2.15-linux64-501092.tar.bz2</string>
+              <string>https://pkg.alchemyviewer.org/repository/autobuild-external/sdl/linux64/debian10/SDL-1.2.15-linux64-202202237.tar.bz2</string>
             </map>
             <key>name</key>
             <string>linux64</string>
@@ -190,9 +192,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>038853b97307a9b65de20c4c50098023</string>
+              <string>9d8367d1eb5c021a63557fcf7a60b12d</string>
+              <key>hash_algorithm</key>
+              <string>md5</string>
               <key>url</key>
-              <string>http://automated-builds-secondlife-com.s3.amazonaws.com/ct2/9675/45694/boost-1.65.1-linux64-509640.tar.bz2</string>
+              <string>https://pkg.alchemyviewer.org/repository/autobuild-external/boost/linux64/debian10/boost-1.73-linux64-202201735.tar.bz2</string>
             </map>
             <key>name</key>
             <string>linux64</string>
@@ -223,7 +227,7 @@
           </map>
         </map>
         <key>version</key>
-        <string>1.72</string>
+        <string>1.73</string>
       </map>
       <key>bugsplat</key>
       <map>
@@ -332,9 +336,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>c90613240ba3e3a171d3379275ae4ee3</string>
+              <string>55bac36687633e27220248b671f69d38</string>
+              <key>hash_algorithm</key>
+              <string>md5</string>
               <key>url</key>
-              <string>http://automated-builds-secondlife-com.s3.amazonaws.com/ct2/9695/45732/colladadom-2.3.509683-linux64-509683.tar.bz2</string>
+              <string>https://pkg.alchemyviewer.org/repository/autobuild-external/colladadom/linux64/debian10/colladadom-2.3.202210519-linux64-202210519.tar.bz2</string>
             </map>
             <key>name</key>
             <string>linux64</string>
@@ -365,12 +371,12 @@
           </map>
         </map>
         <key>version</key>
-        <string>2.3.539922</string>
+        <string>2.3.202210519</string>
       </map>
       <key>curl</key>
       <map>
         <key>copyright</key>
-        <string>Copyright (c) 1996 - 2014, Daniel Stenberg, (daniel@haxx.se).</string>
+        <string>Copyright (c) 1996 - 2017, Daniel Stenberg, (daniel@haxx.se), and many contributors</string>
         <key>description</key>
         <string>Library for transferring data specified with URL syntax</string>
         <key>license</key>
@@ -422,9 +428,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>630a2ddf43bba6e5b6e171dc68921dcb</string>
+              <string>04fd0581f6937f4cc8d895628e1aeeaa</string>
+              <key>hash_algorithm</key>
+              <string>md5</string>
               <key>url</key>
-              <string>http://automated-builds-secondlife-com.s3.amazonaws.com/ct2/8663/36142/curl-7.54.1.508652-linux64-508652.tar.bz2</string>
+              <string>https://pkg.alchemyviewer.org/repository/autobuild-external/curl/linux64/debian10/curl-7.54.1.202200953-linux64-202200953.tar.bz2</string>
             </map>
             <key>name</key>
             <string>linux64</string>
@@ -457,7 +465,7 @@
           </map>
         </map>
         <key>version</key>
-        <string>7.54.1.539883</string>
+        <string>7.54.1.202200953</string>
       </map>
       <key>db</key>
       <map>
@@ -883,26 +891,16 @@
             <key>name</key>
             <string>darwin64</string>
           </map>
-          <key>linux</key>
-          <map>
-            <key>archive</key>
-            <map>
-              <key>hash</key>
-              <string>1b401394106cedc86926bd488f5aa45e</string>
-              <key>url</key>
-              <string>http://automated-builds-secondlife-com.s3.amazonaws.com/hg/repo/p64_3p-freetype/rev/314215/arch/Linux/installer/freetype-2.4.4.314215-linux-314215.tar.bz2</string>
-            </map>
-            <key>name</key>
-            <string>linux</string>
-          </map>
           <key>linux64</key>
           <map>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>94cf61dfdbc86aae5bbaf0b5cb8a366c</string>
+              <string>e5929f8386713c31b08862d126676e57</string>
+              <key>hash_algorithm</key>
+              <string>md5</string>
               <key>url</key>
-              <string>http://automated-builds-secondlife-com.s3.amazonaws.com/ct2/874/1914/freetype-2.4.4.500865-linux64-500865.tar.bz2</string>
+              <string>https://pkg.alchemyviewer.org/repository/autobuild-external/freetype/linux64/debian10/freetype-2.10.2.202202106-linux64-202202106.tar.bz2</string>
             </map>
             <key>name</key>
             <string>linux64</string>
@@ -933,7 +931,7 @@
           </map>
         </map>
         <key>version</key>
-        <string>2.4.4.539865</string>
+        <string>2.10.2.202202106</string>
       </map>
       <key>glext</key>
       <map>
@@ -960,18 +958,6 @@
             </map>
             <key>name</key>
             <string>darwin64</string>
-          </map>
-          <key>linux</key>
-          <map>
-            <key>archive</key>
-            <map>
-              <key>hash</key>
-              <string>baf1fd13e1fe6aef586200fc87a70f53</string>
-              <key>url</key>
-              <string>http://automated-builds-secondlife-com.s3.amazonaws.com/hg/repo/p64_3p-glext/rev/314200/arch/Linux/installer/glext-68-linux-314200.tar.bz2</string>
-            </map>
-            <key>name</key>
-            <string>linux</string>
           </map>
           <key>linux64</key>
           <map>
@@ -1174,18 +1160,6 @@
             </map>
             <key>name</key>
             <string>darwin64</string>
-          </map>
-          <key>linux</key>
-          <map>
-            <key>archive</key>
-            <map>
-              <key>hash</key>
-              <string>352e673897e8f36f8470150b8ace6ce9</string>
-              <key>url</key>
-              <string>http://automated-builds-secondlife-com.s3.amazonaws.com/hg/repo/p64_3p-google-breakpad/rev/314225/arch/Linux/installer/google_breakpad-1413.314225-linux-314225.tar.bz2</string>
-            </map>
-            <key>name</key>
-            <string>linux</string>
           </map>
           <key>linux64</key>
           <map>
@@ -1826,7 +1800,7 @@
       <key>libpng</key>
       <map>
         <key>copyright</key>
-        <string>Copyright (c) 2004, 2006-2013 Glenn Randers-Pehrson</string>
+        <string>Copyright (c) 1995-2019 The PNG Reference Library Authors</string>
         <key>description</key>
         <string>PNG Reference library</string>
         <key>license</key>
@@ -1878,9 +1852,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>13de93ea11544051b69f238eeb644fd3</string>
+              <string>95f4fee252feb17168597f45f0f0b68d</string>
+              <key>hash_algorithm</key>
+              <string>md5</string>
               <key>url</key>
-              <string>http://automated-builds-secondlife-com.s3.amazonaws.com/ct2/882/1946/libpng-1.6.8.500873-linux64-500873.tar.bz2</string>
+              <string>https://pkg.alchemyviewer.org/repository/autobuild-external/libpng/linux64/debian10/libpng-1.6.37.202201824-linux64-202201824.tar.bz2</string>
             </map>
             <key>name</key>
             <string>linux64</string>
@@ -1911,7 +1887,7 @@
           </map>
         </map>
         <key>version</key>
-        <string>1.6.8.539868</string>
+        <string>1.6.37.202201824</string>
       </map>
       <key>libuuid</key>
       <map>
@@ -1971,6 +1947,20 @@
         <string>libwebp</string>
         <key>platforms</key>
         <map>
+          <key>linux64</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>hash</key>
+              <string>7167636936d5efc09683670718243b99</string>
+              <key>hash_algorithm</key>
+              <string>md5</string>
+              <key>url</key>
+              <string>https://pkg.alchemyviewer.org/repository/autobuild-external/libwebp/linux64/debian10/libwebp-1.1.0.202202257-linux64-202202257.tar.bz2</string>
+            </map>
+            <key>name</key>
+            <string>linux64</string>
+          </map>
           <key>windows</key>
           <map>
             <key>archive</key>
@@ -2001,7 +1991,7 @@
           </map>
         </map>
         <key>version</key>
-        <string>1.1.0.200900052</string>
+        <string>1.1.0.202202257</string>
       </map>
       <key>libxml2</key>
       <map>
@@ -2058,9 +2048,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>740fc93f195c77b3a0c0800b31878ecb</string>
+              <string>99410545a3be0d58b5ac3db37c6da30e</string>
+              <key>hash_algorithm</key>
+              <string>md5</string>
               <key>url</key>
-              <string>http://automated-builds-secondlife-com.s3.amazonaws.com/ct2/890/1968/libxml2-2.9.4.500877-linux64-500877.tar.bz2</string>
+              <string>https://pkg.alchemyviewer.org/repository/autobuild-external/libxml2/linux64/debian10/libxml2-2.9.10.202210350-linux64-202210350.tar.bz2</string>
             </map>
             <key>name</key>
             <string>linux64</string>
@@ -2091,7 +2083,7 @@
           </map>
         </map>
         <key>version</key>
-        <string>2.9.4.539866</string>
+        <string>2.9.10.202210350</string>
       </map>
       <key>llappearance_utility</key>
       <map>
@@ -2390,9 +2382,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>c3c5ff7d2f7ac1143ef8d888192d4a53</string>
+              <string>aa902fcc428a59c9e61acd7021ee1482</string>
+              <key>hash_algorithm</key>
+              <string>md5</string>
               <key>url</key>
-              <string>http://automated-builds-secondlife-com.s3.amazonaws.com/ct2/9257/41579/nghttp2-1.25.0.509246-linux64-509246.tar.bz2</string>
+              <string>https://pkg.alchemyviewer.org/repository/autobuild-external/nghttp2/linux64/debian10/nghttp2-1.41.0.202200516-linux64-202200516.tar.bz2</string>
             </map>
             <key>name</key>
             <string>linux64</string>
@@ -2425,7 +2419,7 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
         <key>source_type</key>
         <string>hg</string>
         <key>version</key>
-        <string>1.25.0.538985</string>
+        <string>1.41.0.202200516</string>
       </map>
       <key>nvapi</key>
       <map>
@@ -2754,7 +2748,7 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
       <key>openssl</key>
       <map>
         <key>copyright</key>
-        <string>Copyright (c) 1998-2011 The OpenSSL Project.  All rights reserved; Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)</string>
+        <string>Copyright (c) 1998-2018 The OpenSSL Project.  All rights reserved; Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)</string>
         <key>description</key>
         <string>Secure Sockets Layer (SSL v2/v3) and Transport Layer Security (TLS v1) Library</string>
         <key>license</key>
@@ -2806,9 +2800,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>d50ccfbf0c1d249392919e2c46ad8d5c</string>
+              <string>a1048f56c334c5599efb60eab63815d0</string>
+              <key>hash_algorithm</key>
+              <string>md5</string>
               <key>url</key>
-              <string>http://automated-builds-secondlife-com.s3.amazonaws.com/ct2/8339/33495/openssl-1.0.2l.508328-linux64-508328.tar.bz2</string>
+              <string>https://pkg.alchemyviewer.org/repository/autobuild-external/openssl/linux64/debian10/openssl-1.0.2u.202200624-linux64-202200624.tar.bz2</string>
             </map>
             <key>name</key>
             <string>linux64</string>
@@ -2839,7 +2835,7 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
           </map>
         </map>
         <key>version</key>
-        <string>1.0.2l.539874</string>
+        <string>1.0.2u.202200624</string>
       </map>
       <key>pcre</key>
       <map>
@@ -2878,30 +2874,6 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
-          </map>
-          <key>linux</key>
-          <map>
-            <key>archive</key>
-            <map>
-              <key>hash</key>
-              <string>24a119b18e63017ad932ad54df8161bc</string>
-              <key>url</key>
-              <string>http://automated-builds-secondlife-com.s3.amazonaws.com/hg/repo/p64_3p-pcre/rev/314136/arch/Linux/installer/pcre-8.35.314136-linux-314136.tar.bz2</string>
-            </map>
-            <key>name</key>
-            <string>linux</string>
-          </map>
-          <key>linux64</key>
-          <map>
-            <key>archive</key>
-            <map>
-              <key>hash</key>
-              <string>0f058ca2176e7d02d51e54c66a96f336</string>
-              <key>url</key>
-              <string>http://automated-builds-secondlife-com.s3.amazonaws.com/ct2/908/2010/pcre-8.35.500898-linux64-500898.tar.bz2</string>
-            </map>
-            <key>name</key>
-            <string>linux64</string>
           </map>
           <key>windows</key>
           <map>
@@ -3106,9 +3078,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>087375378f104cdac0cb0fe0ca43dd4d</string>
+              <string>66328f420630b1c67c7d68ca734bd557</string>
+              <key>hash_algorithm</key>
+              <string>md5</string>
               <key>url</key>
-              <string>http://automated-builds-secondlife-com.s3.amazonaws.com/ct2/346/880/uriparser-0.8.0.1-linux64-500342.tar.bz2</string>
+              <string>https://pkg.alchemyviewer.org/repository/autobuild-external/uriparser/linux64/debian10/uriparser-0.9.4-linux64-202210514.tar.bz2</string>
             </map>
             <key>name</key>
             <string>linux64</string>
@@ -3139,7 +3113,7 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
           </map>
         </map>
         <key>version</key>
-        <string>0.8.0.1</string>
+        <string>0.9.4</string>
       </map>
       <key>viewer-manager</key>
       <map>
@@ -3356,7 +3330,7 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
       <key>zlib</key>
       <map>
         <key>copyright</key>
-        <string>Copyright (C) 1995-2013 Jean-loup Gailly and Mark Adler</string>
+        <string>Copyright (C) 1995-2017 Jean-loup Gailly and Mark Adler</string>
         <key>description</key>
         <string>Zlib Data Compression Library</string>
         <key>license</key>
@@ -3410,9 +3384,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>dab6be8b0596c1e3354f2b6d41335131</string>
+              <string>5d7866be22eaca6d38cfd0bb4e411fb0</string>
+              <key>hash_algorithm</key>
+              <string>md5</string>
               <key>url</key>
-              <string>http://automated-builds-secondlife-com.s3.amazonaws.com/ct2/866/1898/zlib-1.2.8.500857-linux64-500857.tar.bz2</string>
+              <string>https://pkg.alchemyviewer.org/repository/autobuild-external/zlib/linux64/debian10/zlib-1.2.11.202200500-linux64-202200500.tar.bz2</string>
             </map>
             <key>name</key>
             <string>linux64</string>
@@ -3443,7 +3419,7 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
           </map>
         </map>
         <key>version</key>
-        <string>1.2.8.538988</string>
+        <string>1.2.11.202200500</string>
       </map>
     </map>
     <key>package_description</key>
@@ -3675,7 +3651,7 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
         <key>linux</key>
         <map>
           <key>build_directory</key>
-          <string>build-linux-i686</string>
+          <string>build-linux-$AUTOBUILD_ADDRSIZE</string>
           <key>configurations</key>
           <map>
             <key>RelWithDebInfo</key>

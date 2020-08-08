@@ -3,15 +3,16 @@
 # these should be moved to their own cmake file
 include(Prebuilt)
 include(Boost)
+include(URIPARSER)
 
 use_prebuilt_binary(colladadom)
-use_prebuilt_binary(pcre)
 use_prebuilt_binary(libxml2)
 
 set(LLPRIMITIVE_INCLUDE_DIRS
     ${LIBS_OPEN_DIR}/llprimitive
     )
 if (WINDOWS)
+    use_prebuilt_binary(pcre)
     set(LLPRIMITIVE_LIBRARIES 
         debug llprimitive
         optimized llprimitive
@@ -25,6 +26,7 @@ if (WINDOWS)
         ${BOOST_SYSTEM_LIBRARIES}
         )
 elseif (DARWIN)
+    use_prebuilt_binary(pcre)
     set(LLPRIMITIVE_LIBRARIES 
         llprimitive
         debug collada14dom-d
@@ -42,8 +44,7 @@ elseif (LINUX)
         optimized collada14dom
         minizip
         xml2
-        pcrecpp
-        pcre
+        ${URIPARSER_LIBRARIES}
         )
 endif (WINDOWS)
 
