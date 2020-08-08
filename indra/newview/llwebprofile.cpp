@@ -41,8 +41,7 @@
 
 #include "llcorehttputil.h"
 
-// third-party
-#include "reader.h" // JSON
+#include "bufferstream.h"
 
 /*
  * Workflow:

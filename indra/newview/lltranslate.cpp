@@ -36,10 +36,10 @@
 #include "llversioninfo.h"
 #include "llviewercontrol.h"
 #include "llcoros.h"
-#include "reader.h"
 #include "llcorehttputil.h"
 #include "llurlregistry.h"
 
+#include <nlohmann/json.hpp>
 
 static const std::string BING_NOTRANSLATE_OPENING_TAG("<div class=\"notranslate\">");
 static const std::string BING_NOTRANSLATE_CLOSING_TAG("</div>");
@@ -260,13 +260,13 @@ public:
 
 private:
     static void parseErrorResponse(
-        const Json::Value& root,
-        int& status,
-        std::string& err_msg);
+        const nlohmann::json &root,
+        int &status,
+        std::string &err_msg);
     static bool parseTranslation(
-        const Json::Value& root,
-        std::string& translation,
-        std::string& detected_lang);
+        const nlohmann::json &root,
+        std::string &translation,
+        std::string &detected_lang);
     static std::string getAPIKey();
 
 };
@@ -304,16 +304,19 @@ bool LLGoogleTranslationHandler::parseResponse(
 	std::string& detected_lang,
 	std::string& err_msg) const
 {
-	Json::Value root;
-	Json::Reader reader;
-
-	if (!reader.parse(body, root))
+	std::stringstream stream(body);
+	nlohmann::json root;
+    try
+    {
+		stream >> root;
+    }
+    catch(nlohmann::json::exception &e)
 	{
-		err_msg = reader.getFormatedErrorMessages();
+		err_msg = e.what();
 		return false;
 	}
 
-	if (!root.isObject()) // empty response? should not happen
+	if (!root.is_object()) // empty response? should not happen
 	{
 		return false;
 	}
@@ -337,48 +340,48 @@ bool LLGoogleTranslationHandler::isConfigured() const
 
 // static
 void LLGoogleTranslationHandler::parseErrorResponse(
-	const Json::Value& root,
-	int& status,
-	std::string& err_msg)
+	const nlohmann::json &root,
+	int &status,
+	std::string &err_msg)
 {
-	const Json::Value& error = root.get("error", 0);
-	if (!error.isObject() || !error.isMember("message") || !error.isMember("code"))
+    const nlohmann::json &error = root.value("error", nlohmann::json::value_t::null);
+	if (!error.is_object() || error.find("message") == error.end() || error.find("code") == error.end())
 	{
 		return;
 	}
 
-	err_msg = error["message"].asString();
-	status = error["code"].asInt();
+	err_msg = error["message"].get<std::string>();
+	status = error.at("code");
 }
 
 // static
 bool LLGoogleTranslationHandler::parseTranslation(
-	const Json::Value& root,
-	std::string& translation,
-	std::string& detected_lang)
+	const nlohmann::json &root,
+	std::string &translation,
+	std::string &detected_lang)
 {
-	// JsonCpp is prone to aborting the program on failed assertions,
+	// Json is prone to aborting the program on failed assertions,
 	// so be super-careful and verify the response format.
-	const Json::Value& data = root.get("data", 0);
-	if (!data.isObject() || !data.isMember("translations"))
+	const nlohmann::json &data = root.value("data", nlohmann::json::value_t::null);
+	if (!data.is_object() || data.find("translations") == data.end())
 	{
 		return false;
 	}
 
-	const Json::Value& translations = data["translations"];
-	if (!translations.isArray() || translations.size() == 0)
+	const nlohmann::json &translations = data["translations"];
+	if (!translations.is_array() || translations.empty())
 	{
 		return false;
 	}
 
-	const Json::Value& first = translations[0U];
-	if (!first.isObject() || !first.isMember("translatedText"))
+	const nlohmann::json &first = translations[0];
+	if (!first.is_object() || first.find("translatedText") == first.end())
 	{
 		return false;
 	}
 
-	translation = first["translatedText"].asString();
-	detected_lang = first.get("detectedSourceLanguage", "").asString();
+	translation = first["translatedText"].get<std::string>();
+    detected_lang = first.value("detectedSourceLanguage", "");
 	return true;
 }
 
@@ -492,7 +495,7 @@ bool LLBingTranslationHandler::parseResponse(
 
 	size_t end = body.find("</string>", begin);
 
-	detected_lang = ""; // unsupported by this API
+	detected_lang.clear(); // unsupported by this API
 	translation = body.substr(begin, end-begin);
 	LLStringUtil::replaceString(translation, "&#xD;", ""); // strip CR
 	return true;

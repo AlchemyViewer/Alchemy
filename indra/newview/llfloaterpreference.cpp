@@ -124,7 +124,7 @@
 #include "llfeaturemanager.h"
 #include "llviewertexturelist.h"
 
-#include <json/json.h>
+#include <nlohmann/json.hpp>
 #include <utility>
 
 #include "llsearchableui.h"
@@ -642,30 +642,29 @@ void LLFloaterPreference::onDoNotDisturbResponseChanged()
 skin_t manifestFromJson(const std::string& filename, const ESkinType type)
 {
 	skin_t skin;
-	Json::Reader reader;
-	Json::Value root;
-
+	nlohmann::json root;
 	llifstream in;
 	in.open(filename);
 	if (in.is_open())
 	{
-		if (reader.parse(in, root, false))
+        try
         {
-			skin.mName = root.get("name", "Unknown").asString();
-			skin.mAuthor = root.get("author", "Unknown").asString();
-			skin.mUrl = root.get("url", "Unknown").asString();
-			skin.mCompatVer = root.get("compatibility", "Unknown").asString();
-			skin.mDate = LLDate(root.get("date", "1983-04-20T00:00:00+00:00").asString());
-			skin.mNotes = root.get("notes", "").asString();
+            in >> root;
+            skin.mName = root.value("name", "Unknown");
+            skin.mAuthor = root.value("author", "Unknown");
+            skin.mUrl = root.value("url", "Unknown");
+			skin.mCompatVer = root.value("compatibility", "Unknown");
+			skin.mDate = LLDate(root.value("date", "1983-04-20T00:00:00Z"));
+			skin.mNotes = root.value("notes", "");
 			// If it's a system skin, the compatability version is always the current build
 			if (type == SYSTEM_SKIN)
 			{
 				skin.mCompatVer = LLVersionInfo::instance().getShortVersion();
 			}
         } 
-		else
+		catch(const nlohmann::json::exception& e)
 		{
-			LL_WARNS() << "Failed to parse " << filename << ": " << reader.getFormatedErrorMessages() << LL_ENDL;
+			LL_WARNS() << "Failed to parse " << filename << ": " << e.what() << LL_ENDL;
 		}
 		in.close();
 	}
@@ -757,12 +756,11 @@ void LLFloaterPreference::onAddSkin()
 				ss << std::string(const_cast<const char*>(buf.get()), buf_size);
 				buf.reset();
 				
-				Json::Reader reader;
-				Json::Value root;
-				std::string errors;
-				if (reader.parse(ss, root, false))
+				nlohmann::json root;
+				try
 				{
-					const std::string& name = root.get("name", "Unknown").asString();
+                    ss >> root;
+					const std::string& name = root.value("name", "Unknown");
 					std::string pathname = gDirUtilp->add(gDirUtilp->getOSUserAppDir(), "skins");
 					if (!gDirUtilp->fileExists(pathname))
 					{
@@ -783,7 +781,7 @@ void LLFloaterPreference::onAddSkin()
 						LLNotificationsUtil::add("AddSkinSuccess", LLSD().with("PACKAGE", name));
 					}
 				}
-				else
+                catch(const nlohmann::json::exception&)
 				{
 					LLNotificationsUtil::add("AddSkinCantParseManifest", LLSD().with("PACKAGE", package));
 				}
