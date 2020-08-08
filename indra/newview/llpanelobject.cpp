@@ -360,7 +360,9 @@ void LLPanelObject::getState( )
 	if ( (rlv_handler_t::isEnabled()) && ((gRlvHandler.hasBehaviour(RLV_BHVR_UNSIT)) || (gRlvHandler.hasBehaviour(RLV_BHVR_SITTP))) )
 	{
 		if ( (isAgentAvatarValid()) && (gAgentAvatarp->isSitting()) && (gAgentAvatarp->getRoot() == objectp->getRootEdit()) )
-			enable_move = enable_scale = enable_rotate = FALSE;
+			enable_move = FALSE;
+			enable_scale = FALSE;
+			enable_rotate = FALSE;
 	}
 // [/RLVa:KB]
 
