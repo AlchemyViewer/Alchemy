@@ -1,3 +1,4 @@
 include (Prebuilt)
-use_prebuilt_binary(viewer-manager)
-
+if(NOT LINUX)
+    use_prebuilt_binary(viewer-manager)
+endif()

@@ -73,11 +73,10 @@ if (LINUX)
       ${LLMATH_LIBRARIES}
       ${LLRENDER_LIBRARIES}
       ${LLVFS_LIBRARIES}
-      ${LLWINDOW_LIBRARIES}
       ${LLXML_LIBRARIES}
       ${UI_LIBRARIES}     # for GTK
       ${SDL_LIBRARY}
-      fontconfig          # For FCInit and other FC* functions.
+      ${FONTCONFIG_LIBRARIES}          # For FCInit and other FC* functions.
       )
 
   list(APPEND viewer_SOURCE_FILES 
