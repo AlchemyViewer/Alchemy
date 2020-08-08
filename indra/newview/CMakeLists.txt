@@ -2119,10 +2119,7 @@ if (LINUX)
   # These are the generated targets that are copied to package/
   set(COPY_INPUT_DEPENDENCIES
     ${VIEWER_BINARY_NAME}
-    linux-crash-logger
     SLPlugin
-    media_plugin_gstreamer010
-    media_plugin_libvlc
     llcommon
     )
 

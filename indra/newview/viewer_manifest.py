@@ -1352,8 +1352,8 @@ class LinuxManifest(ViewerManifest):
             self.path("../linux_crash_logger/linux-crash-logger","linux-crash-logger.bin")
             self.path2basename("../llplugin/slplugin", "SLPlugin") 
             #this copies over the python wrapper script, associated utilities and required libraries, see SL-321, SL-322 and SL-323
-            with self.prefix(src="../viewer_components/manager", dst=""):
-                self.path("*.py")
+            #with self.prefix(src="../viewer_components/manager", dst=""):
+            #    self.path("*.py")
 
         # recurses, packaged again
         self.path("res-sdl")
@@ -1367,21 +1367,17 @@ class LinuxManifest(ViewerManifest):
                 self.path("alchemy_256.BMP","ll_icon.BMP")
 
         # plugins
-        with self.prefix(src="../media_plugins", dst="bin/llplugin"):
-            self.path("gstreamer010/libmedia_plugin_gstreamer010.so",
-                      "libmedia_plugin_gstreamer.so")
-            self.path2basename("libvlc", "libmedia_plugin_libvlc.so")
+        #with self.prefix(src="../media_plugins", dst="bin/llplugin"):
+        #    self.path("gstreamer010/libmedia_plugin_gstreamer010.so",
+        #              "libmedia_plugin_gstreamer.so")
+        #    self.path2basename("libvlc", "libmedia_plugin_libvlc.so")
 
-        with self.prefix(src=os.path.join(pkgdir, 'lib', 'vlc', 'plugins'), dst="bin/llplugin/vlc/plugins"):
-            self.path( "plugins.dat" )
-            self.path( "*/*.so" )
+        # with self.prefix(src=os.path.join(pkgdir, 'lib', 'vlc', 'plugins'), dst="bin/llplugin/vlc/plugins"):
+        #     self.path( "plugins.dat" )
+        #     self.path( "*/*.so" )
 
-        with self.prefix(src=os.path.join(pkgdir, 'lib' ), dst="lib"):
-            self.path( "libvlc*.so*" )
-
-        # llcommon
-        if not self.path("../llcommon/libllcommon.so", "lib/libllcommon.so"):
-            print "Skipping llcommon.so (assuming llcommon was linked statically)"
+        # with self.prefix(src=os.path.join(pkgdir, 'lib' ), dst="lib"):
+        #     self.path( "libvlc*.so*" )
 
         self.path("featuretable_linux.txt")
 
@@ -1494,7 +1490,7 @@ class Linux_i686_Manifest(LinuxManifest):
                 pass
 
             try:
-                self.path_optional("libfmod.so*")
+                self.path("libfmod.so*")
                 pass
             except:
                 print "Skipping libfmod.so - not found"
@@ -1518,8 +1514,44 @@ class Linux_x86_64_Manifest(LinuxManifest):
     def construct(self):
         super(Linux_x86_64_Manifest, self).construct()
 
-        # support file for valgrind debug tool
-        self.path("secondlife-i686.supp")
+        pkgdir = os.path.join(self.args['build'], os.pardir, 'packages')
+        relpkgdir = os.path.join(pkgdir, "lib", "release")
+        debpkgdir = os.path.join(pkgdir, "lib", "debug")
+
+        with self.prefix(src=relpkgdir, dst="lib"):
+            self.path("libapr-1.so")
+            self.path("libapr-1.so.0")
+            self.path("libapr-1.so.0.4.5")
+            self.path("libaprutil-1.so")
+            self.path("libaprutil-1.so.0")
+            self.path("libaprutil-1.so.0.4.1")
+            self.path("libexpat.so.*")
+            self.path("libGLOD.so")
+            self.path("libuuid.so*")
+            self.path("libSDL-1.2.so.*")
+            self.path("libopenjpeg.so*")
+            self.path("libhunspell-1.3.so*")
+            self.path("libalut.so*")
+            self.path("libopenal.so*")
+            self.path("libopenal.so", "libvivoxoal.so.1") # vivox's sdk expects this soname
+
+            try:
+                self.path("libfmod.so*")
+                pass
+            except:
+                print "Skipping libfmod.so - not found"
+                pass
+
+        # Vivox runtimes
+        with self.prefix(src=relpkgdir, dst="bin"):
+            self.path("SLVoice")
+        with self.prefix(src=relpkgdir, dst="lib"):
+            self.path("libortp.so")
+            self.path("libsndfile.so.1")
+            #self.path("libvivoxoal.so.1") # no - we'll re-use the viewer's own OpenAL lib
+            self.path("libvivoxsdk.so")
+
+        self.strip_binaries()
 
 ################################################################
 
