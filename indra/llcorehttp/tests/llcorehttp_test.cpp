@@ -53,7 +53,7 @@
 #include "llproxy.h"
 #include "llcleanup.h"
 
-void ssl_thread_id_callback(CRYPTO_THREADID*);
+unsigned long ssl_thread_id(void);
 void ssl_locking_callback(int mode, int type, const char * file, int line);
 
 #if 0	// lltut provides main and runner
@@ -98,7 +98,7 @@ void init_curl()
 		}
 
 		CRYPTO_set_locking_callback(ssl_locking_callback);
-		CRYPTO_THREADID_set_callback(ssl_thread_id_callback);
+		CRYPTO_set_id_callback(&ssl_thread_id);
 	}
 
 	LLProxy::getInstance();
@@ -118,13 +118,11 @@ void term_curl()
 }
 
 
-void ssl_thread_id_callback(CRYPTO_THREADID* pthreadid)
+//static
+unsigned long ssl_thread_id(void)
 {
-#if defined(WIN32)
-	CRYPTO_THREADID_set_pointer(pthreadid, GetCurrentThread());
-#else
-	CRYPTO_THREADID_set_pointer(pthreadid, pthread_self());
-#endif
+    // std::thread::id is very deliberately opaque, but we can hash it
+    return std::hash<LLThread::id_t>()(LLThread::currentID());
 }
 
 

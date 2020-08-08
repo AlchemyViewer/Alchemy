@@ -32,6 +32,7 @@
 #if !defined(WIN32)
 #include <pthread.h>
 #endif
+#include <thread>
 
 #include "linden_common.h"
 
@@ -52,7 +53,7 @@
 
 void init_curl();
 void term_curl();
-void ssl_thread_id_callback(CRYPTO_THREADID*);
+unsigned long ssl_thread_id(void);
 void ssl_locking_callback(int mode, int type, const char * file, int line);
 void usage(std::ostream & out);
 
@@ -624,7 +625,7 @@ void init_curl()
 		}
 
 		CRYPTO_set_locking_callback(ssl_locking_callback);
-		CRYPTO_THREADID_set_callback(ssl_thread_id_callback);
+    	CRYPTO_set_id_callback(&ssl_thread_id);
 	}
 }
 
@@ -640,13 +641,11 @@ void term_curl()
 }
 
 
-void ssl_thread_id_callback(CRYPTO_THREADID* pthreadid)
+//static
+unsigned long ssl_thread_id(void)
 {
-#if defined(WIN32)
-	CRYPTO_THREADID_set_pointer(pthreadid, GetCurrentThread());
-#else
-	CRYPTO_THREADID_set_pointer(pthreadid, pthread_self());
-#endif
+    // std::thread::id is very deliberately opaque, but we can hash it
+    return std::hash<std::thread::id>()(std::this_thread::get_id());
 }
 
 
