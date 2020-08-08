@@ -47,6 +47,10 @@
 #include <set>
 #include <boost/range.hpp>
 
+#if LL_GNUC
+#pragma GCC diagnostic ignored "-Wstringop-truncation"
+#endif
+
 // U32
 LLSD ll_sd_from_U32(const U32 val)
 {

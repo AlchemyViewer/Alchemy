@@ -435,9 +435,7 @@ namespace tut
       
       for (counter=0, foundUnused=false; !foundUnused; counter++ )
       {
-         char counterStr[3];
-         sprintf(counterStr, "%02d", counter);
-         uniqueDir = dirbase + counterStr;
+         uniqueDir = dirbase + std::to_string(counter);
          foundUnused = ! ( LLFile::isdir(uniqueDir) || LLFile::isfile(uniqueDir) );
       }
       ensure("test directory '" + uniqueDir + "' creation failed", !LLFile::mkdir(uniqueDir));

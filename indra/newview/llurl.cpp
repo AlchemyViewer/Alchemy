@@ -28,6 +28,10 @@
 #include "llurl.h"
 #include "llerror.h"
 
+#if LL_GNUC
+#pragma GCC diagnostic ignored "-Wstringop-truncation"
+#endif
+
 LLURL::LLURL()
 {
 	init("");
