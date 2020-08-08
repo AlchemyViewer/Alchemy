@@ -33,14 +33,6 @@ include_directories(SYSTEM
 
 ### media_plugin_libvlc
 
-if(NOT ADDRESS_SIZE EQUAL 32)
-  if(WINDOWS)
-    ##add_definitions(/FIXED:NO)
-  else(WINDOWS) # not windows therefore gcc LINUX and DARWIN
-    add_definitions(-fPIC)
-  endif(WINDOWS)
-endif(NOT ADDRESS_SIZE EQUAL 32)
-
 set(media_plugin_libvlc_SOURCE_FILES
     media_plugin_libvlc.cpp
     )
@@ -57,6 +49,8 @@ target_link_libraries(media_plugin_libvlc
   ${VLC_PLUGIN_LIBRARIES}
   ${PLUGIN_API_WINDOWS_LIBRARIES}
 )
+
+set_target_properties(media_plugin_libvlc PROPERTIES POSITION_INDEPENDENT_CODE TRUE)
 
 if (WINDOWS)
   set_target_properties(
