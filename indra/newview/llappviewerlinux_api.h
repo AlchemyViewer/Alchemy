@@ -94,9 +94,9 @@ dbus_glib_marshal_viewerapp_BOOLEAN__STRING_POINTER_POINTER (GClosure     *closu
                                                                     gpointer     arg_2,
                                                                     gpointer     arg_3,
                                                                     gpointer     data2);
-  register GMarshalFunc_BOOLEAN__STRING_POINTER_POINTER callback;
-  register GCClosure *cc = (GCClosure*) closure;
-  register gpointer data1, data2;
+  GMarshalFunc_BOOLEAN__STRING_POINTER_POINTER callback;
+  GCClosure *cc = (GCClosure*) closure;
+  gpointer data1, data2;
   gboolean v_return;
 
   g_return_if_fail (return_value != NULL);
