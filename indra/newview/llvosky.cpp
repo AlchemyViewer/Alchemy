@@ -688,7 +688,7 @@ void LLVOSky::forceSkyUpdate()
 {
     mForceUpdate = TRUE;
 
-    memset(&m_lastAtmosphericsVars, 0x00, sizeof(AtmosphericsVars));
+    m_lastAtmosphericsVars = AtmosphericsVars();
 
     mCubeMapUpdateStage = -1;
 }
