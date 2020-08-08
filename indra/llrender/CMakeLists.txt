@@ -114,6 +114,8 @@ endif (BUILD_HEADLESS)
 
 add_library (llrender ${llrender_SOURCE_FILES})
 
+set_target_properties(llrender PROPERTIES POSITION_INDEPENDENT_CODE TRUE)
+
 if (SDL_FOUND)
   set_property(TARGET llrender
     PROPERTY COMPILE_DEFINITIONS LL_SDL=1

@@ -3,6 +3,9 @@
 project(llmessage)
 
 include(00-Common)
+include(CURL)
+include(OpenSSL)
+include(NGHTTP2)
 include(LLAddBuildTest)
 include(LLCommon)
 include(LLCoreHttp)

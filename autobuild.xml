@@ -770,11 +770,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>54dbd41322a08a1fc333ca6d96af5502</string>
+              <string>815b630a413c88f40030e6edb0e1503b</string>
               <key>hash_algorithm</key>
               <string>md5</string>
               <key>url</key>
-              <string>https://depot.alchemyviewer.org/pub/linux64/lib/fmodstudio-1.10.00-linux64-201709282320.tar.bz2</string>
+              <string>https://pkg.alchemyviewer.org/repository/autobuild-internal/fmodstudio/linux64/fmodstudio-2.00.10.202212145-linux64-202212145.tar.bz2</string>
             </map>
             <key>name</key>
             <string>linux64</string>
@@ -809,7 +809,7 @@
           </map>
         </map>
         <key>version</key>
-        <string>2.00.10.7</string>
+        <string>2.00.10.202212145</string>
       </map>
       <key>fontconfig</key>
       <map>

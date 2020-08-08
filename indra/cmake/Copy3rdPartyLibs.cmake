@@ -144,26 +144,17 @@ elseif(LINUX)
     set(release_files
         libapr-1.so.0
         libaprutil-1.so.0
-        libatk-1.0.so
-        libdb-5.1.so
         ${EXPAT_COPY}
-        libfreetype.so.6.6.2
-        libfreetype.so.6
         libGLOD.so
-        libgmodule-2.0.so
-        libgobject-2.0.so
         libhunspell-1.3.so.0.0.0
         libopenal.so
-        libopenjpeg.so
         libuuid.so.16
         libuuid.so.16.0.22
-        libfontconfig.so.1.8.0
-        libfontconfig.so.1
        )
 
     if (USE_FMODSTUDIO)
-      list(APPEND debug_files "libfmodL.so")
-      list(APPEND release_files "libfmod.so")
+      list(APPEND debug_files libfmodL.so)
+      list(APPEND release_files libfmod.so libfmod.so.11 libfmod.so.11.10)
     endif (USE_FMODSTUDIO)
 
 else(WINDOWS)

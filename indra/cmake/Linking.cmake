@@ -51,9 +51,11 @@ link_directories(${AUTOBUILD_LIBS_INSTALL_DIRS})
 
 if (LINUX)
   set(DL_LIBRARY dl)
+  set(RT_LIBRARY rt)
   set(PTHREAD_LIBRARY pthread)
 else (LINUX)
   set(DL_LIBRARY "")
+  set(RT_LIBRARY "")
   set(PTHREAD_LIBRARY "")
 endif (LINUX)
 
@@ -75,6 +77,6 @@ else (WINDOWS)
   set(WINDOWS_LIBRARIES "")
 endif (WINDOWS)
     
-mark_as_advanced(DL_LIBRARY PTHREAD_LIBRARY WINDOWS_LIBRARIES)
+mark_as_advanced(DL_LIBRARY RT_LIBRARY PTHREAD_LIBRARY WINDOWS_LIBRARIES)
 
 endif(NOT DEFINED ${CMAKE_CURRENT_LIST_FILE}_INCLUDED)
