@@ -34,7 +34,7 @@ class LLCalc
 {
 public:
 	LLCalc();
-	~LLCalc();
+	~LLCalc() = default;
 
 	// Variable name constants
 	static const char* X_POS;
@@ -86,13 +86,8 @@ public:
 private:
 	std::string::size_type	mLastErrorPos;
 	
-	calc_map_t	mConstants;
 	calc_map_t	mVariables;
-	
-	// *TODO: Add support for storing user defined variables, and stored functions.
-	//	Will need UI work, and a means to save them between sessions.
-//	calc_map_t mUserVariables;
-	
+
 	// "There shall be only one"
 	static LLCalc*	sInstance;
 };
