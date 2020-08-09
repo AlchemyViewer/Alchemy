@@ -811,48 +811,6 @@
         <key>version</key>
         <string>2.00.10.202212145</string>
       </map>
-      <key>fontconfig</key>
-      <map>
-        <key>copyright</key>
-        <string>Copyright (C) 2000,2001,2002,2003,2004,2006,2007 Keith Packard, 2005 Patrick Lam, 2009 Roozbeh Pournader, 2008,2009 Red Hat, Inc., 2008 Danilo Šegan, 2012 Google, Inc.</string>
-        <key>description</key>
-        <string>Fontconfig is a library for configuring and customizing font access.</string>
-        <key>license</key>
-        <string>bsd</string>
-        <key>license_file</key>
-        <string>LICENSES/fontconfig.txt</string>
-        <key>name</key>
-        <string>fontconfig</string>
-        <key>platforms</key>
-        <map>
-          <key>linux</key>
-          <map>
-            <key>archive</key>
-            <map>
-              <key>hash</key>
-              <string>a20a3d0ab7fc3401bc2ca81e9309f630</string>
-              <key>url</key>
-              <string>http://automated-builds-secondlife-com.s3.amazonaws.com/hg/repo/p64_3p-fontconfig/rev/314281/arch/Linux/installer/fontconfig-2.11.0-linux-314281.tar.bz2</string>
-            </map>
-            <key>name</key>
-            <string>linux</string>
-          </map>
-          <key>linux64</key>
-          <map>
-            <key>archive</key>
-            <map>
-              <key>hash</key>
-              <string>e2419d56960c160670051fbb055fb729</string>
-              <key>url</key>
-              <string>http://automated-builds-secondlife-com.s3.amazonaws.com/hg/repo/p64_3p-fontconfig/rev/314281/arch/Linux/installer/fontconfig-2.11.0-linux64-314281.tar.bz2</string>
-            </map>
-            <key>name</key>
-            <string>linux64</string>
-          </map>
-        </map>
-        <key>version</key>
-        <string>2.11.0</string>
-      </map>
       <key>freetype</key>
       <map>
         <key>copyright</key>
@@ -890,20 +848,6 @@
             </map>
             <key>name</key>
             <string>darwin64</string>
-          </map>
-          <key>linux64</key>
-          <map>
-            <key>archive</key>
-            <map>
-              <key>hash</key>
-              <string>e5929f8386713c31b08862d126676e57</string>
-              <key>hash_algorithm</key>
-              <string>md5</string>
-              <key>url</key>
-              <string>https://pkg.alchemyviewer.org/repository/autobuild-external/freetype/linux64/debian10/freetype-2.10.2.202202106-linux64-202202106.tar.bz2</string>
-            </map>
-            <key>name</key>
-            <string>linux64</string>
           </map>
           <key>windows</key>
           <map>
@@ -1240,46 +1184,6 @@
         </map>
         <key>version</key>
         <string>0.10.6.314267</string>
-      </map>
-      <key>gtk-atk-pango-glib</key>
-      <map>
-        <key>copyright</key>
-        <string>Copyright (various, see sources)</string>
-        <key>license</key>
-        <string>lgpl</string>
-        <key>license_file</key>
-        <string>LICENSES/gtk-atk-pango-glib.txt</string>
-        <key>name</key>
-        <string>gtk-atk-pango-glib</string>
-        <key>platforms</key>
-        <map>
-          <key>linux</key>
-          <map>
-            <key>archive</key>
-            <map>
-              <key>hash</key>
-              <string>a6431df705526501684d9050e04bfa5b</string>
-              <key>url</key>
-              <string>http://automated-builds-secondlife-com.s3.amazonaws.com/hg/repo/p64_3p-gtk-atk-pango-glib/rev/314220/arch/Linux/installer/gtk_atk_pango_glib-0.1-linux-314220.tar.bz2</string>
-            </map>
-            <key>name</key>
-            <string>linux</string>
-          </map>
-          <key>linux64</key>
-          <map>
-            <key>archive</key>
-            <map>
-              <key>hash</key>
-              <string>de7bba8fd2275a11b077b124413065d0</string>
-              <key>url</key>
-              <string>http://automated-builds-secondlife-com.s3.amazonaws.com/hg/repo/p64_3p-gtk-atk-pango-glib/rev/314220/arch/Linux/installer/gtk_atk_pango_glib-0.1-linux64-314220.tar.bz2</string>
-            </map>
-            <key>name</key>
-            <string>linux64</string>
-          </map>
-        </map>
-        <key>version</key>
-        <string>0.1</string>
       </map>
       <key>havok-source</key>
       <map>
