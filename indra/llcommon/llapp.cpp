@@ -61,12 +61,6 @@
 
 LONG WINAPI default_windows_exception_handler(struct _EXCEPTION_POINTERS *exception_infop);
 BOOL ConsoleCtrlHandler(DWORD fdwCtrlType);
-bool windows_post_minidump_callback(const wchar_t* dump_path,
-									const wchar_t* minidump_id,
-									void* context,
-									EXCEPTION_POINTERS* exinfo,
-									MDRawAssertionInfo* assertion,
-									bool succeeded);
 #else
 # include <signal.h>
 # include <unistd.h> // for fork()
@@ -136,11 +130,6 @@ void LLApp::commonCtor()
 
 	// Set the application to this instance.
 	sApplication = this;
-
-	// initialize the buffer to write the minidump filename to
-	// (this is used to avoid allocating memory in the crash handler)
-	memset(mMinidumpPath, 0, MAX_MINDUMP_PATH_LENGTH);
-	mCrashReportPipeStr = L"\\\\.\\pipe\\LLCrashReporterPipe";
 }
 
 LLApp::LLApp(LLErrorThread *error_thread) :
@@ -531,27 +520,10 @@ void LLApp::setError()
 	setStatus(APP_STATUS_ERROR);
 }
 
-void LLApp::setMiniDumpDir(const std::string &path)
-{
-	if (path.empty())
-	{
-		mDumpPath = "/tmp";
-	}
-	else
-	{
-		mDumpPath = path;
-	}
-}
-
 void LLApp::setDebugFileNames(const std::string &path)
 {
   	mStaticDebugFileName = path + "static_debug_info.log";
   	mDynamicDebugFileName = path + "dynamic_debug_info.log";
-}
-
-void LLApp::writeMiniDump()
-{
-
 }
 
 // static
@@ -909,109 +881,4 @@ void default_unix_signal_handler(int signum, siginfo_t *info, void *)
 		}
 	}
 }
-
-bool unix_post_minidump_callback(const char *dump_dir,
-					  const char *minidump_id,
-					  void *context, bool succeeded)
-{
-	// Copy minidump file path into fixed buffer in the app instance to avoid
-	// heap allocations in a crash handler.
-	
-	// path format: <dump_dir>/<minidump_id>.dmp
-	int dirPathLength = strlen(dump_dir);
-	int idLength = strlen(minidump_id);
-	
-	// The path must not be truncated.
-	llassert((dirPathLength + idLength + 5) <= LLApp::MAX_MINDUMP_PATH_LENGTH);
-	
-	char * path = LLApp::instance()->getMiniDumpFilename();
-	S32 remaining = LLApp::MAX_MINDUMP_PATH_LENGTH;
-	strncpy(path, dump_dir, remaining);
-	remaining -= dirPathLength;
-	path += dirPathLength;
-	if (remaining > 0 && dirPathLength > 0 && path[-1] != '/')
-	{
-		*path++ = '/';
-		--remaining;
-	}
-	if (remaining > 0)
-	{
-		strncpy(path, minidump_id, remaining);
-		remaining -= idLength;
-		path += idLength;
-		strncpy(path, ".dmp", remaining);
-	}
-	
-	LL_INFOS("CRASHREPORT") << "generated minidump: " << LLApp::instance()->getMiniDumpFilename() << LL_ENDL;
-	LLApp::runErrorHandler();
-	
-#ifndef LL_RELEASE_FOR_DOWNLOAD
-	clear_signals();
-	return false;
-#else
-	return true;
-#endif
-}
 #endif // !WINDOWS
-
-#ifdef LL_WINDOWS
-bool windows_post_minidump_callback(const wchar_t* dump_path,
-									const wchar_t* minidump_id,
-									void* context,
-									EXCEPTION_POINTERS* exinfo,
-									MDRawAssertionInfo* assertion,
-									bool succeeded)
-{
-	char * path = LLApp::instance()->getMiniDumpFilename();
-	S32 remaining = LLApp::MAX_MINDUMP_PATH_LENGTH;
-	size_t bytesUsed;
-
-	LL_INFOS("MINIDUMPCALLBACK") << "Dump file was generated." << LL_ENDL;
-	bytesUsed = wcstombs(path, dump_path, static_cast<size_t>(remaining));
-	remaining -= bytesUsed;
-	path += bytesUsed;
-	if(remaining > 0 && bytesUsed > 0 && path[-1] != '\\')
-	{
-		*path++ = '\\';
-		--remaining;
-	}
-	if(remaining > 0)
-	{
-		bytesUsed = wcstombs(path, minidump_id, static_cast<size_t>(remaining));
-		remaining -= bytesUsed;
-		path += bytesUsed;
-	}
-	if(remaining > 0)
-	{
-		strncpy(path, ".dmp", remaining);
-	}
-
-	LL_INFOS("CRASHREPORT") << "generated minidump: " << LLApp::instance()->getMiniDumpFilename() << LL_ENDL;
-   // *NOTE:Mani - this code is stolen from LLApp, where its never actually used.
-	//OSMessageBox("Attach Debugger Now", "Error", OSMB_OK);
-   // *TODO: Translate the signals/exceptions into cross-platform stuff
-	// Windows implementation
-	LL_INFOS() << "Entering Windows Exception Handler..." << LL_ENDL;
-
-	if (LLApp::isError())
-	{
-		LL_WARNS() << "Got another fatal signal while in the error handler, die now!" << LL_ENDL;
-	}
-
-	// Flag status to error, so thread_error starts its work
-	LLApp::setError();
-
-	// Block in the exception handler until the app has stopped
-	// This is pretty sketchy, but appears to work just fine
-	while (!LLApp::isStopped())
-	{
-		ms_sleep(10);
-	}
-
-#ifndef LL_RELEASE_FOR_DOWNLOAD
-	return false;
-#else
-	return true;
-#endif
-}
-#endif

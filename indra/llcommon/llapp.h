@@ -232,17 +232,11 @@ public:
 	static const U32 MAX_MINDUMP_PATH_LENGTH = 256;
 
 	// change the directory where Breakpad minidump files are written to
-	void setMiniDumpDir(const std::string &path);
     void setDebugFileNames(const std::string &path);
 
 	// Return the Google Breakpad minidump filename after a crash.
-	char *getMiniDumpFilename() { return mMinidumpPath; }
     std::string* getStaticDebugFile() { return &mStaticDebugFileName; }
     std::string* getDynamicDebugFile() { return &mDynamicDebugFileName; }
-
-	// Write out a Google Breakpad minidump file.
-	void writeMiniDump();
-
 
 	/**
 	  * @brief Get a reference to the application runner
@@ -265,9 +259,6 @@ protected:
 	static EAppStatus sStatus; // Reflects current application status
 	static BOOL sErrorThreadRunning; // Set while the error thread is running
 	static BOOL sDisableCrashlogger; // Let the OS handle crashes for us.
-	std::wstring mCrashReportPipeStr;  //Name of pipe to use for crash reporting.
-
-    std::string mDumpPath;  //output path for google breakpad.  Dependency workaround.
 
 	/**
 	  * @brief This method is called once a frame to do once a frame tasks.
@@ -277,9 +268,6 @@ protected:
 private:
 	void startErrorThread();
 	
-	// Contains the filename of the minidump file after a crash.
-	char mMinidumpPath[MAX_MINDUMP_PATH_LENGTH];
-    
     std::string mStaticDebugFileName;
     std::string mDynamicDebugFileName;
 

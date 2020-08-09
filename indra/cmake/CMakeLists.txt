@@ -26,7 +26,6 @@ set(cmake_SOURCE_FILES
     FindAutobuild.cmake
     FindFMODSTUDIO.cmake
     FindGLH.cmake
-    FindGoogleBreakpad.cmake
     FindHUNSPELL.cmake
     FindNDOF.cmake
     FindOpenJPEG.cmake
@@ -38,7 +37,6 @@ set(cmake_SOURCE_FILES
     GLH.cmake
     GLOD.cmake
 ##  GStreamer010Plugin.cmake
-    GoogleBreakpad.cmake
     Havok.cmake
     Hunspell.cmake
     JPEG.cmake
@@ -47,7 +45,6 @@ set(cmake_SOURCE_FILES
     LLAudio.cmake
     LLCharacter.cmake
     LLCommon.cmake
-    LLCrashLogger.cmake
     LLImage.cmake
     LLImageJ2COJ.cmake
     LLInventory.cmake

@@ -708,8 +708,6 @@ LLAppViewer::LLAppViewer()
 		LL_ERRS() << "Oh no! An instance of LLAppViewer already exists! LLAppViewer is sort of like a singleton." << LL_ENDL;
 	}
 
-    mDumpPath ="";
-
 	// Need to do this initialization before we do anything else, since anything
 	// that touches files should really go through the lldir API
 	gDirUtilp->initAppDirs("AlchemyNext");
@@ -743,8 +741,6 @@ LLAppViewer::LLAppViewer()
 	// write Google Breakpad minidump files to a per-run dump directory to avoid multiple viewer issues.
 	std::string logdir = gDirUtilp->getExpandedFilename(LL_PATH_DUMP, "");
 #endif // ! LL_BUGSPLAT
-	mDumpPath = logdir;
-	setMiniDumpDir(logdir);
 	setDebugFileNames(logdir);
 }
 
@@ -3685,20 +3681,6 @@ void LLAppViewer::handleViewerCrash()
 	Sleep(200);
 #endif
 
-	char *minidump_file = pApp->getMiniDumpFilename();
-    LL_DEBUGS("CRASHREPORT") << "minidump file name " << minidump_file << LL_ENDL;
-	if(minidump_file && minidump_file[0] != 0)
-	{
-		gDebugInfo["Dynamic"]["MinidumpPath"] = minidump_file;
-	}
-	else
-	{
-#ifdef LL_WINDOWS
-		getFileList();
-#else
-        LL_WARNS("CRASHREPORT") << "no minidump file?" << LL_ENDL;
-#endif
-	}
     gDebugInfo["Dynamic"]["CrashType"]="crash";
 
 	if (gMessageSystem && gDirUtilp)
@@ -4559,8 +4541,6 @@ void LLAppViewer::badNetworkHandler()
 		"If the problem continues, see the Tech Support FAQ at: \n"
 		"www.secondlife.com/support";
 	forceDisconnect(message.str());
-
-	LLApp::instance()->writeMiniDump();
 }
 
 // This routine may get called more than once during the shutdown process.

@@ -8,7 +8,6 @@ include(LLMath)
 include(Linking)
 include(Boost)
 include(LLSharedLibs)
-include(GoogleBreakpad)
 include(Copy3rdPartyLibs)
 include(ZLIB)
 include(URIPARSER)
@@ -18,7 +17,6 @@ include_directories(
     ${LLCOMMON_INCLUDE_DIRS}
     ${LLMATH_INCLUDE_DIRS}
     ${ZLIB_INCLUDE_DIRS}
-    ${BREAKPAD_INCLUDE_DIRECTORIES}
     ${URIPARSER_INCLUDE_DIRS}
     )
 
@@ -272,7 +270,6 @@ set_target_properties(llcommon PROPERTIES POSITION_INDEPENDENT_CODE TRUE)
 target_link_libraries(
     llcommon
     PUBLIC
-    ${BREAKPAD_EXCEPTION_HANDLER_LIBRARIES}
     ${APRUTIL_LIBRARIES}
     ${APR_LIBRARIES}
     ${EXPAT_LIBRARIES}

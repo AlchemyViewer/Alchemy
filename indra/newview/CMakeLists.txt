@@ -1876,7 +1876,6 @@ if (WINDOWS)
       media_plugin_libvlc
       media_plugin_example
       winmm_shim
-      windows-crash-logger
       )
 
     if (ADDRESS_SIZE EQUAL 64)
@@ -1935,7 +1934,6 @@ if (WINDOWS)
 
     add_dependencies(${VIEWER_BINARY_NAME}
       SLPlugin
-      windows-crash-logger
     )
 
     # sets the 'working directory' for debugging from visual studio.
@@ -2250,8 +2248,7 @@ if (DARWIN)
       ${CMAKE_CURRENT_SOURCE_DIR}/viewer_manifest.py
     )
 
-  add_dependencies(${VIEWER_BINARY_NAME} SLPlugin media_plugin_libvlc media_plugin_cef mac-crash-logger)
-  add_dependencies(${VIEWER_BINARY_NAME} mac-crash-logger)
+  add_dependencies(${VIEWER_BINARY_NAME} SLPlugin media_plugin_libvlc media_plugin_cef)
 
   if (ENABLE_SIGNING)
       set(SIGNING_SETTING "--signature=${SIGNING_IDENTITY}")
@@ -2308,10 +2305,8 @@ if (PACKAGE AND (RELEASE_CRASH_REPORTING OR NON_RELEASE_CRASH_REPORTING) AND VIE
       list(APPEND SYMBOL_SEARCH_DIRS "${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}")
       # *TODO: Generate these search dirs in the cmake files related to each binary.
       list(APPEND SYMBOL_SEARCH_DIRS "${CMAKE_BINARY_DIR}/llplugin/slplugin/${CMAKE_CFG_INTDIR}")
-      list(APPEND SYMBOL_SEARCH_DIRS "${CMAKE_BINARY_DIR}/mac_crash_logger/${CMAKE_CFG_INTDIR}")
       list(APPEND SYMBOL_SEARCH_DIRS "${CMAKE_BINARY_DIR}/media_plugins/gstreamer010/${CMAKE_CFG_INTDIR}")
-      set(VIEWER_EXE_GLOBS "'${product}' SLPlugin mac-crash-logger")
-      set(VIEWER_EXE_GLOBS "'${product}' mac-crash-logger")
+      set(VIEWER_EXE_GLOBS "'${product}' SLPlugin")
       set(VIEWER_LIB_GLOB "*.dylib")
     endif (DARWIN)
     if (LINUX)

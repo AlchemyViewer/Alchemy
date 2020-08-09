@@ -338,62 +338,6 @@ bool LLAppViewerLinux::sendURLToOtherInstance(const std::string& url)
 
 void LLAppViewerLinux::initCrashReporting(bool reportFreeze)
 {
-	std::string cmd =gDirUtilp->getExecutableDir();
-	cmd += gDirUtilp->getDirDelimiter();
-#if LL_LINUX
-	cmd += "linux-crash-logger.bin";
-#elif LL_SOLARIS
-	cmd += "solaris-crash-logger";
-#else
-# error Unknown platform
-#endif
-
-    std::stringstream pid_str;
-    pid_str <<  LLApp::getPid();
-    std::string logdir = gDirUtilp->getExpandedFilename(LL_PATH_DUMP, "");
-    std::string appname = gDirUtilp->getExecutableFilename();
-	// launch the actual crash logger
-	const char * cmdargv[] =
-		{cmd.c_str(),
-		 "-user",
-		 (char*)LLGridManager::getInstance()->getGridId().c_str(),
-		 "-name",
-		 LLAppViewer::instance()->getSecondLifeTitle().c_str(),
-		 "-pid", 
-		 pid_str.str().c_str(),
-		 "-dumpdir",
-		 logdir.c_str(),
-		 "-procname",
-		 appname.c_str(),
-		 NULL};
-	fflush(NULL);
-
-	pid_t pid = fork();
-	if (pid == 0)
-	{ // child
-		execv(cmd.c_str(), (char* const*) cmdargv);		/* Flawfinder: ignore */
-		LL_WARNS() << "execv failure when trying to start " << cmd << LL_ENDL;
-		_exit(1); // avoid atexit()
-	} 
-	else
-	{
-		if (pid > 0)
-		{
-			// DO NOT wait for child proc to die; we want
-			// the logger to outlive us while we quit to
-			// free up the screen/keyboard/etc.
-			////int childExitStatus;
-			////waitpid(pid, &childExitStatus, 0);
-		} 
-		else
-		{
-			LL_WARNS() << "fork failure." << LL_ENDL;
-		}
-	}
-	// Sometimes signals don't seem to quit the viewer.  Also, we may
-	// have been called explicitly instead of from a signal handler.
-	// Make sure we exit so as to not totally confuse the user.
-	//_exit(1); // avoid atexit(), else we may re-crash in dtors.
 }
 
 bool LLAppViewerLinux::beingDebugged()
