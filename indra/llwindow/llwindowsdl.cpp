@@ -2335,9 +2335,8 @@ S32 OSMessageBoxSDL(const std::string& text, const std::string& caption, U32 typ
 		    gWindowImplementation->mSDL_XWindowID != None)
 		{
 			gtk_widget_realize(GTK_WIDGET(win)); // so we can get its gdkwin
-			GdkWindow *gdkwin = gdk_window_foreign_new(gWindowImplementation->mSDL_XWindowID);
-			gdk_window_set_transient_for(GTK_WIDGET(win)->window,
-						     gdkwin);
+            GdkWindow* gdkwin = gdk_x11_window_foreign_new_for_display(gdk_display_get_default(), static_cast<Window>(gWindowImplementation->mSDL_XWindowID));
+			gdk_window_set_transient_for(gtk_widget_get_window(GTK_WIDGET(win)), gdkwin);
 		}
 # endif //LL_X11
 
@@ -2450,13 +2449,12 @@ BOOL LLWindowSDL::dialogColorPicker( F32 *r, F32 *g, F32 *b)
 		if (mSDL_XWindowID != None)
 		{
 			gtk_widget_realize(GTK_WIDGET(win)); // so we can get its gdkwin
-			GdkWindow *gdkwin = gdk_window_foreign_new(mSDL_XWindowID);
-			gdk_window_set_transient_for(GTK_WIDGET(win)->window,
-						     gdkwin);
+            GdkWindow* gdkwin = gdk_x11_window_foreign_new_for_display(gdk_display_get_default(), static_cast<Window>(mSDL_XWindowID));
+			gdk_window_set_transient_for(gtk_widget_get_window(GTK_WIDGET(win)), gdkwin);
 		}
 # endif //LL_X11
 
-		GtkColorSelection *colorsel = GTK_COLOR_SELECTION (GTK_COLOR_SELECTION_DIALOG(win)->colorsel);
+		GtkColorSelection *colorsel = GTK_COLOR_SELECTION (gtk_color_selection_dialog_get_color_selection (GTK_COLOR_SELECTION_DIALOG(win)));
 
 		GdkColor color, orig_color;
 		orig_color.pixel = 0;
@@ -2482,8 +2480,6 @@ BOOL LLWindowSDL::dialogColorPicker( F32 *r, F32 *g, F32 *b)
 
 		gtk_window_set_modal(GTK_WINDOW(win), TRUE);
 		gtk_widget_show_all(win);
-		// hide the help button - we don't service it.
-		gtk_widget_hide(GTK_COLOR_SELECTION_DIALOG(win)->help_button);
 		gtk_main();
 
 		if (response == GTK_RESPONSE_OK &&
