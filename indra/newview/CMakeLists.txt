@@ -2569,16 +2569,18 @@ if (LL_TESTS)
     "${test_libs}"
     )
 
-  set(llslurl_test_sources
-      llslurl.cpp
-      llviewernetwork.cpp
-  )
-
-
-  LL_ADD_INTEGRATION_TEST(llslurl
-     "${llslurl_test_sources}"
-    "${test_libs}"
+  if (NOT LINUX)
+    set(llslurl_test_sources
+        llslurl.cpp
+        llviewernetwork.cpp
     )
+
+
+    LL_ADD_INTEGRATION_TEST(llslurl
+        "${llslurl_test_sources}"
+        "${test_libs}"
+      )
+  endif()
 
   LL_ADD_INTEGRATION_TEST(llviewernetwork
      llviewernetwork.cpp

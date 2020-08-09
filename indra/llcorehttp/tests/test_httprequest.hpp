@@ -513,6 +513,10 @@ void HttpRequestTestObjectType::test<5>()
 template <> template <>
 void HttpRequestTestObjectType::test<6>()
 {
+	// TODO: FIX THIS!!!
+#if LL_LINUX
+	skip("Skip due to issues with pthread_cancel");
+#endif
 	ScopedCurlInit ready;
 	
 	set_test_name("HttpRequest Spin + NoOp + hard termination");

@@ -82,7 +82,3 @@ if (DARWIN)
       ${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/SLPlugin.app/Contents/Resources
   )
 endif (DARWIN)
-
-if (LL_TESTS)
-  ll_deploy_sharedlibs_command(SLPlugin)
-endif (LL_TESTS)

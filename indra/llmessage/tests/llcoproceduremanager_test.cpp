@@ -97,7 +97,7 @@ namespace tut
     {
         Sync sync;
         int foo = 0;
-        LLUUID queueId = LLCoprocedureManager::instance().enqueueCoprocedure("PoolName", "ProcName",
+        LLCoprocedureManager::instance().enqueueCoprocedure("PoolName", "ProcName",
             [&foo, &sync] (LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t & ptr, const LLUUID & id) {
                 sync.bump();
                 foo = 1;
