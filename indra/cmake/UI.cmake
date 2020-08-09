@@ -37,18 +37,7 @@ else (USESYSTEMLIBS)
   include(FindPkgConfig)
     
     set(PKGCONFIG_PACKAGES
-        atk
-        cairo
-        gdk-2.0
-        gdk-pixbuf-2.0
-        glib-2.0
-        gmodule-2.0
-        gtk+-2.0
-        gthread-2.0
-        pango
-        pangoft2
-        pangox
-        pangoxft
+        gtk+-3.0
         x11
         xinerama
         )

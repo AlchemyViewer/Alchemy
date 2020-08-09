@@ -1069,13 +1069,13 @@ GtkWindow* LLFilePicker::buildFilePicker(bool is_save, bool is_folder, std::stri
 
 		win = gtk_file_chooser_dialog_new(NULL, NULL,
 						  pickertype,
-						  GTK_STOCK_CANCEL,
+						  "_Cancel",
 						   GTK_RESPONSE_CANCEL,
 						  is_folder ?
-						  GTK_STOCK_APPLY :
+						  "_Apply" :
 						  (is_save ? 
-						   GTK_STOCK_SAVE :
-						   GTK_STOCK_OPEN),
+						   "_Save" :
+						   "_Open"),
 						   GTK_RESPONSE_ACCEPT,
 						  (gchar *)NULL);
 		mCurContextName = context;

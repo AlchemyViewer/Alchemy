@@ -61,7 +61,9 @@
 #endif
 extern "C" {
 // mostly for Linux, possible on others
-# include "gtk/gtk.h"
+#include <gtk/gtk.h>
+#include <gdk/gdk.h>
+#include <gdk/gdkx.h>
 }
 #if LL_GNUC
 #pragma GCC diagnostic pop
