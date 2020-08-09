@@ -16,6 +16,7 @@
 if(NOT DEFINED ${CMAKE_CURRENT_LIST_FILE}_INCLUDED)
 set(${CMAKE_CURRENT_LIST_FILE}_INCLUDED "YES")
 
+include(CheckCXXCompilerFlag)
 include(Variables)
 
 # Portable compilation flags.
@@ -193,32 +194,77 @@ if (LINUX)
   set(CMAKE_SKIP_RPATH TRUE)
 
   add_definitions(
-      -DLL_LINUX=1
-      -D_REENTRANT
-      -DAPPID=secondlife
-      )
+    -DLL_LINUX=1
+    -DAPPID=secondlife
+    -DLL_IGNORE_SIGCHLD
+    -D_REENTRANT
+    -DGDK_DISABLE_DEPRECATED 
+    -DGTK_DISABLE_DEPRECATED
+    -DGSEAL_ENABLE
+    -DGTK_DISABLE_SINGLE_INCLUDES
+    )
   add_compile_options(
-      -fvisibility=hidden
-      -fexceptions
-      -fno-math-errno
-      -fno-strict-aliasing
-      -fsigned-char
-      -msse2
-      -mfpmath=sse
-      -pthread
-      )
+    -fvisibility=hidden
+    -fexceptions
+    -fno-math-errno
+    -fno-strict-aliasing
+    -fsigned-char
+    -g
+    -pthread
+    -msse4.2
+    -mfpmath=sse
+    )
 
   # force this platform to accept TOS via external browser
   add_definitions(-DEXTERNAL_TOS)
 
-  # don't catch SIGCHLD in our base application class for the viewer - some of
-  # our 3rd party libs may need their *own* SIGCHLD handler to work. Sigh! The
-  # viewer doesn't need to catch SIGCHLD anyway.
-  add_definitions(-DLL_IGNORE_SIGCHLD)
+  if (USE_LTO)
+    add_compile_options(-flto=8)
+  endif (USE_LTO)
 
-  set(CMAKE_CXX_FLAGS_DEBUG "-fno-inline ${CMAKE_CXX_FLAGS_DEBUG}")
-  set(CMAKE_CXX_FLAGS_RELEASE "-O3 -ffast-math -fstack-protector-strong -D_FORTIFY_SOURCE=2 ${CMAKE_CXX_FLAGS_RELEASE}")
-  set(CMAKE_CXX_LINK_FLAGS "-Wl,--as-needed ${CMAKE_CXX_LINK_FLAGS}")
+  if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU" OR "${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
+    if (USE_ASAN)
+      add_compile_options(-fsanitize=address)
+      link_libraries(-lasan)
+    endif (USE_ASAN)
+
+    if (USE_LEAKSAN)
+      add_compile_options(-fsanitize=leak)
+      link_libraries(-llsan)
+    endif (USE_LEAKSAN)
+
+    if (USE_UBSAN)
+      add_compile_options(-fsanitize=undefined -fno-sanitize=vptr)
+      link_libraries(-lubsan)
+    endif (USE_UBSAN)
+
+    if (USE_THDSAN)
+      add_compile_options(-fsanitize=thread)
+    endif (USE_THDSAN)
+  endif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU" OR "${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
+
+  CHECK_CXX_COMPILER_FLAG(-Og HAS_DEBUG_OPTIMIZATION)
+  CHECK_CXX_COMPILER_FLAG(-fstack-protector-strong HAS_STRONG_STACK_PROTECTOR)
+  CHECK_CXX_COMPILER_FLAG(-fstack-protector HAS_STACK_PROTECTOR)
+  if (${CMAKE_BUILD_TYPE} STREQUAL "Release")
+    if(HAS_STRONG_STACK_PROTECTOR)
+      add_compile_options(-fstack-protector-strong)
+    elseif(HAS_STACK_PROTECTOR)
+      add_compile_options(-fstack-protector)
+    endif(HAS_STRONG_STACK_PROTECTOR)
+    set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=2")
+  endif (${CMAKE_BUILD_TYPE} STREQUAL "Release")
+
+    if (HAS_DEBUG_OPTIMIZATION)
+      set(CMAKE_CXX_FLAGS_DEBUG "-Og ${CMAKE_CXX_FLAGS_DEBUG}")
+    else (HAS_DEBUG_OPTIMIZATION)
+      set(CMAKE_CXX_FLAGS_DEBUG "-O0 -fno-inline ${CMAKE_CXX_FLAGS_DEBUG}")
+    endif (HAS_DEBUG_OPTIMIZATION)
+
+  set(CMAKE_CXX_FLAGS_RELEASE "-O3 -ffast-math ${CMAKE_CXX_FLAGS_RELEASE}")
+  # Enable these flags so we have a read only GOT and some linking opts
+  set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,-z,relro -Wl,-z,now -Wl,--as-needed")
+  set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,-z,relro -Wl,-z,now -Wl,--as-needed")
 endif (LINUX)
 
 
