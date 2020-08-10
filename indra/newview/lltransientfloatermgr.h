@@ -78,6 +78,8 @@ protected:
 	 */
 	void init(LLFloater* thiz);
 public:
+	virtual ~LLTransientFloater() = default;
+
 	virtual LLTransientFloaterMgr::ETransientGroup getGroup() = 0;
 	bool isTransientDocked() { return mFloater->isDocked(); };
 	void setTransientVisible(BOOL visible) {mFloater->setVisible(visible); }

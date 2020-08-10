@@ -30,6 +30,8 @@
 class LLSpellCheckMenuHandler
 {
 public:
+	virtual ~LLSpellCheckMenuHandler() = default;
+
 	virtual bool	getSpellCheck() const			{ return false; }
 
 	virtual const std::string& getSuggestion(U32 index) const	{ return LLStringUtil::null; }
