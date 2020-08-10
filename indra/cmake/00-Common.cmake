@@ -300,16 +300,16 @@ if (LINUX OR DARWIN)
   endif (CMAKE_CXX_COMPILER MATCHES ".*clang")
 
   if (CMAKE_COMPILER_IS_GNUCXX)
-    set(GCC_WARNINGS "-Wall -Wno-sign-compare -Wno-trigraphs -Wno-unused-function -Wno-misleading-indentation")
+    set(GCC_WARNINGS "-Wall -Wno-sign-compare -Wno-unused-parameter -Wno-unused-but-set-parameter -Wno-deprecated-copy -Wno-ignored-qualifiers -Wnon-virtual-dtor")
   elseif (CMAKE_COMPILER_IS_CLANGXX)
     set(GCC_WARNINGS "-Wall -Wno-sign-compare -Wno-trigraphs")
   endif()
 
   if (NOT GCC_DISABLE_FATAL_WARNINGS)
-    set(GCC_WARNINGS "${GCC_WARNINGS} -Werror")
+  #  set(GCC_WARNINGS "${GCC_WARNINGS} -Werror")
   endif (NOT GCC_DISABLE_FATAL_WARNINGS)
 
-  set(GCC_CXX_WARNINGS "${GCC_WARNINGS} -Wno-reorder -Wno-non-virtual-dtor")
+  set(GCC_CXX_WARNINGS "${GCC_WARNINGS} -Wno-reorder")
 
   set(CMAKE_C_FLAGS "${GCC_WARNINGS} ${CMAKE_C_FLAGS}")
   set(CMAKE_CXX_FLAGS "${GCC_CXX_WARNINGS} ${CMAKE_CXX_FLAGS}")
