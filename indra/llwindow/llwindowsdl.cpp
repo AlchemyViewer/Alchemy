@@ -220,6 +220,8 @@ LLWindowSDL::LLWindowSDL(LLWindowCallbacks* callbacks,
 	mHaveInputFocus = -1;
 	mIsMinimized = -1;
 	mFSAASamples = fsaa_samples;
+	mPreeditor = nullptr;
+	mLanguageTextInputAllowed = false;
 
 #if LL_X11
 	mSDL_XWindowID = None;
@@ -249,6 +251,9 @@ LLWindowSDL::LLWindowSDL(LLWindowCallbacks* callbacks,
 		//start with arrow cursor
 		initCursors();
 		setCursor( UI_CURSOR_ARROW );
+
+
+		allowLanguageTextInput(NULL, FALSE);
 	}
 
 	stop_glerror();
@@ -796,8 +801,6 @@ BOOL LLWindowSDL::createContext(int x, int y, int width, int height, int bits, B
 	LL_INFOS() << "  Depth Bits " << d << LL_ENDL;
 	LL_INFOS() << "  Stencil Bits " << s << LL_ENDL;
 	
-	SDL_StartTextInput();
-
 	//make sure multisampling is disabled by default
 	glDisable(GL_MULTISAMPLE_ARB);
 
@@ -2690,6 +2693,47 @@ void LLWindowSDL::bringToFront()
 		maybe_unlock_display();
 	}
 #endif // LL_X11
+}
+
+void LLWindowSDL::allowLanguageTextInput(LLPreeditor *preeditor, BOOL b)
+{
+	if (preeditor != mPreeditor && !b)
+	{
+		// This condition may occur by a call to
+		// setEnabled(BOOL) against LLTextEditor or LLLineEditor
+		// when the control is not focused.
+		// We need to silently ignore the case so that
+		// the language input status of the focused control
+		// is not disturbed.
+		return;
+	}
+    
+	// Take care of old and new preeditors.
+	if (preeditor != mPreeditor || !b)
+	{
+		// We need to interrupt before updating mPreeditor,
+		// so that the fix string from input method goes to
+		// the old preeditor.
+		if (mLanguageTextInputAllowed)
+		{
+			interruptLanguageTextInput();
+		}
+		mPreeditor = (b ? preeditor : NULL);
+	}
+	
+	if (b == mLanguageTextInputAllowed)
+	{
+		return;
+	}
+	mLanguageTextInputAllowed = b;
+    if(mLanguageTextInputAllowed)
+	{
+		SDL_StartTextInput();
+	}
+	else
+	{
+		SDL_StopTextInput();
+	}
 }
 
 //static

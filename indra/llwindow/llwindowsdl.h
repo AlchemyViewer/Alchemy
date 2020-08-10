@@ -126,6 +126,8 @@ public:
 	/*virtual*/ void *getPlatformWindow();
 	/*virtual*/ void bringToFront();
 
+	void allowLanguageTextInput(LLPreeditor *preeditor, BOOL b) override;
+
 	/*virtual*/ void spawnWebBrowser(const std::string& escaped_url, bool async);
 	
 	static std::vector<std::string> getDynamicFallbackFontList();
@@ -218,6 +220,9 @@ private:
 	U32 mKeyScanCode;
 	U32 mKeyVirtualKey;
 	SDL_Keymod mKeyModifiers;
+
+	bool			mLanguageTextInputAllowed;
+	LLPreeditor*	mPreeditor;
 };
 
 
