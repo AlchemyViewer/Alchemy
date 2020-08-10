@@ -59,7 +59,14 @@
 #include "llsdserialize.h"
 #include "lljoint.h"
 
+#if LL_GNUC
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wmisleading-indentation"
+#endif
 #include "glh/glh_linear.h"
+#if LL_GNUC
+#pragma GCC diagnostic pop
+#endif
 #include "llmatrix4a.h"
 
 #include <boost/regex.hpp>

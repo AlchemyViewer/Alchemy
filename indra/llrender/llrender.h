@@ -42,7 +42,14 @@
 #include "llpointer.h"
 #include "llglheaders.h"
 #include "llmatrix4a.h"
+#if LL_GNUC
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wmisleading-indentation"
+#endif
 #include "glh/glh_linear.h"
+#if LL_GNUC
+#pragma GCC diagnostic pop
+#endif
 
 class LLVertexBuffer;
 class LLCubeMap;
