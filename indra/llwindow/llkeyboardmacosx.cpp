@@ -133,7 +133,7 @@ LLKeyboardMacOSX::LLKeyboardMacOSX()
 	mTranslateKeyMap[0x7e] = KEY_UP;
 
 	// Build inverse map
-	std::map<U16, KEY>::iterator iter;
+	std::map<U32, KEY>::iterator iter;
 	for (iter = mTranslateKeyMap.begin(); iter != mTranslateKeyMap.end(); iter++)
 	{
 		mInvTranslateKeyMap[iter->second] = iter->first;
@@ -187,10 +187,10 @@ void LLKeyboardMacOSX::resetMaskKeys()
 }
 
 /*
-static BOOL translateKeyMac(const U16 key, const U32 mask, KEY &outKey, U32 &outMask)
+static BOOL translateKeyMac(const U32 key, const U32 mask, KEY &outKey, U32 &outMask)
 {
 	// Translate the virtual keycode into the keycodes the keyboard system expects.
-	U16 virtualKey = (mask >> 24) & 0x0000007F;
+	U32 virtualKey = (mask >> 24) & 0x0000007F;
 	outKey = macKeyTransArray[virtualKey];
 
 
@@ -226,7 +226,7 @@ MASK LLKeyboardMacOSX::updateModifiers(const U32 mask)
 	return out_mask;
 }
 
-BOOL LLKeyboardMacOSX::handleKeyDown(const U16 key, const U32 mask)
+BOOL LLKeyboardMacOSX::handleKeyDown(const U32 key, U32 mask)
 {
 	KEY		translated_key = 0;
 	U32		translated_mask = 0;
@@ -243,7 +243,7 @@ BOOL LLKeyboardMacOSX::handleKeyDown(const U16 key, const U32 mask)
 }
 
 
-BOOL LLKeyboardMacOSX::handleKeyUp(const U16 key, const U32 mask)
+BOOL LLKeyboardMacOSX::handleKeyUp(const U32 key, U32 mask)
 {
 	KEY		translated_key = 0;
 	U32		translated_mask = 0;
@@ -304,12 +304,12 @@ void LLKeyboardMacOSX::scanKeyboard()
 	}
 }
 
-BOOL LLKeyboardMacOSX::translateNumpadKey( const U16 os_key, KEY *translated_key )
+BOOL LLKeyboardMacOSX::translateNumpadKey( const U32 os_key, KEY *translated_key )
 {
 	return translateKey(os_key, translated_key);
 }
 
-U16	LLKeyboardMacOSX::inverseTranslateNumpadKey(const KEY translated_key)
+U32	LLKeyboardMacOSX::inverseTranslateNumpadKey(const KEY translated_key)
 {
 	return inverseTranslateKey(translated_key);
 }

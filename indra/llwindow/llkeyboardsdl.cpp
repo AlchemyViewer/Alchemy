@@ -40,7 +40,7 @@ LLKeyboardSDL::LLKeyboardSDL()
 	// Virtual key mappings from SDL_keysym.h ...
 
 	// SDL maps the letter keys to the ASCII you'd expect, but it's lowercase...
-	U16 cur_char;
+	U32 cur_char;
 	for (cur_char = 'A'; cur_char <= 'Z'; cur_char++)
 	{
 		mTranslateKeyMap[cur_char] = cur_char;
@@ -124,7 +124,7 @@ LLKeyboardSDL::LLKeyboardSDL()
 	mTranslateKeyMap[SDLK_QUOTE] = '\'';
 
 	// Build inverse map
-	std::map<U16, KEY>::iterator iter;
+	std::map<U32, KEY>::iterator iter;
 	for (iter = mTranslateKeyMap.begin(); iter != mTranslateKeyMap.end(); iter++)
 	{
 		mInvTranslateKeyMap[iter->second] = iter->first;
@@ -201,11 +201,11 @@ MASK LLKeyboardSDL::updateModifiers(const U32 mask)
 }
 
 
-static U16 adjustNativekeyFromUnhandledMask(const U16 key, const U32 mask)
+static U32 adjustNativekeyFromUnhandledMask(const U32 key, const U32 mask)
 {
 	// SDL doesn't automatically adjust the keysym according to
 	// whether NUMLOCK is engaged, so we massage the keysym manually.
-	U16 rtn = key;
+	U32 rtn = key;
 	if (!(mask & KMOD_NUM))
 	{
 		switch (key)
@@ -226,11 +226,11 @@ static U16 adjustNativekeyFromUnhandledMask(const U16 key, const U32 mask)
 }
 
 
-BOOL LLKeyboardSDL::handleKeyDown(const U16 key, const U32 mask)
+BOOL LLKeyboardSDL::handleKeyDown(const U32 key, MASK mask)
 {
-	U16     adjusted_nativekey;
+	U32     adjusted_nativekey;
 	KEY	translated_key = 0;
-	U32	translated_mask = MASK_NONE;
+	MASK translated_mask = MASK_NONE;
 	BOOL	handled = FALSE;
 
 	adjusted_nativekey = adjustNativekeyFromUnhandledMask(key, mask);
@@ -246,11 +246,11 @@ BOOL LLKeyboardSDL::handleKeyDown(const U16 key, const U32 mask)
 }
 
 
-BOOL LLKeyboardSDL::handleKeyUp(const U16 key, const U32 mask)
+BOOL LLKeyboardSDL::handleKeyUp(const U32 key, MASK mask)
 {
-	U16     adjusted_nativekey;
+	U32     adjusted_nativekey;
 	KEY	translated_key = 0;
-	U32	translated_mask = MASK_NONE;
+	MASK translated_mask = MASK_NONE;
 	BOOL	handled = FALSE;
 
 	adjusted_nativekey = adjustNativekeyFromUnhandledMask(key, mask);
@@ -310,12 +310,12 @@ void LLKeyboardSDL::scanKeyboard()
 }
 
  
-BOOL LLKeyboardSDL::translateNumpadKey( const U16 os_key, KEY *translated_key)
+BOOL LLKeyboardSDL::translateNumpadKey( const U32 os_key, KEY *translated_key)
 {
 	return translateKey(os_key, translated_key);	
 }
 
-U16 LLKeyboardSDL::inverseTranslateNumpadKey(const KEY translated_key)
+U32 LLKeyboardSDL::inverseTranslateNumpadKey(const KEY translated_key)
 {
 	return inverseTranslateKey(translated_key);
 }

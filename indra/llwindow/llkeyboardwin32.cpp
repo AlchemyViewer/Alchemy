@@ -114,7 +114,7 @@ LLKeyboardWin32::LLKeyboardWin32()
 	mTranslateKeyMap[VK_CLEAR] = KEY_PAD_CENTER;
 
 	// Build inverse map
-	std::map<U16, KEY>::iterator iter;
+	std::map<U32, KEY>::iterator iter;
 	for (iter = mTranslateKeyMap.begin(); iter != mTranslateKeyMap.end(); iter++)
 	{
 		mInvTranslateKeyMap[iter->second] = iter->first;
@@ -197,7 +197,7 @@ MASK LLKeyboardWin32::updateModifiers()
 
 
 // mask is ignored, except for extended flag -- we poll the modifier keys for the other flags
-BOOL LLKeyboardWin32::handleKeyDown(const U16 key, MASK mask)
+BOOL LLKeyboardWin32::handleKeyDown(const U32 key, MASK mask)
 {
 	KEY		translated_key;
 	U32		translated_mask;
@@ -214,7 +214,7 @@ BOOL LLKeyboardWin32::handleKeyDown(const U16 key, MASK mask)
 }
 
 // mask is ignored, except for extended flag -- we poll the modifier keys for the other flags
-BOOL LLKeyboardWin32::handleKeyUp(const U16 key, MASK mask)
+BOOL LLKeyboardWin32::handleKeyUp(const U32 key, MASK mask)
 {
 	KEY		translated_key;
 	U32		translated_mask;
@@ -247,7 +247,7 @@ void LLKeyboardWin32::scanKeyboard()
 {
 	S32 key;
 	MSG	msg;
-	BOOL pending_key_events = PeekMessage(&msg, NULL, WM_KEYFIRST, WM_KEYLAST, PM_NOREMOVE | PM_NOYIELD);
+	BOOL pending_key_events = PeekMessage(&msg, nullptr, WM_KEYFIRST, WM_KEYLAST, PM_NOREMOVE | PM_NOYIELD);
 	for (key = 0; key < KEY_COUNT; key++)
 	{
 		// On Windows, verify key down state. JC
@@ -262,7 +262,7 @@ void LLKeyboardWin32::scanKeyboard()
 			{
 				// ...under windows make sure the key actually still is down.
 				// ...translate back to windows key
-				U16 virtual_key = inverseTranslateExtendedKey(key);
+				U32 virtual_key = inverseTranslateExtendedKey(key);
 				// keydown in highest bit
 				if (!pending_key_events && !(GetAsyncKeyState(virtual_key) & 0x8000))
 				{
@@ -294,17 +294,17 @@ void LLKeyboardWin32::scanKeyboard()
 	}
 }
 
-BOOL LLKeyboardWin32::translateExtendedKey(const U16 os_key, const MASK mask, KEY *translated_key)
+BOOL LLKeyboardWin32::translateExtendedKey(const U32 os_key, const MASK mask, KEY *translated_key)
 {
 	return translateKey(os_key, translated_key);
 }
 
-U16  LLKeyboardWin32::inverseTranslateExtendedKey(const KEY translated_key)
+U32  LLKeyboardWin32::inverseTranslateExtendedKey(const KEY translated_key)
 {
 	// if numlock is on, then we need to translate KEY_PAD_FOO to the corresponding number pad number
 	if(GetKeyState(VK_NUMLOCK) & 1)
 	{
-		std::map<KEY, U16>::iterator iter = mInvTranslateNumpadMap.find(translated_key);
+		std::map<KEY, U32>::iterator iter = mInvTranslateNumpadMap.find(translated_key);
 		if (iter != mInvTranslateNumpadMap.end())
 		{
 			return iter->second;
