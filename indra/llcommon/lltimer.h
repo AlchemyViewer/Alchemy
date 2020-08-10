@@ -132,7 +132,7 @@ LL_COMMON_API U64 get_clock_count();
 
 // Sleep for milliseconds
 LL_COMMON_API void ms_sleep(U32 ms);
-LL_COMMON_API U32 micro_sleep(U64 us, U32 max_yields = 0xFFFFFFFF);
+LL_COMMON_API void micro_sleep(U64 us);
 
 // Returns the correct UTC time in seconds, like time(NULL).
 // Useful on the viewer, which may have its local clock set wrong.

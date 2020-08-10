@@ -1503,7 +1503,7 @@ bool LLAppViewer::doFrame()
 							LL_RECORD_BLOCK_TIME(FTM_SLEEP);
 							// llclamp for when time function gets funky
 							U64 sleep_time = llclamp(mMinMicroSecPerFrame - elapsed_time, (U64)1, (U64)1e6);
-							micro_sleep(sleep_time, 0);
+							micro_sleep(sleep_time);
 						}
 					}
 					last_call = LLTimer::getTotalTime();

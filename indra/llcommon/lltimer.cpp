@@ -71,12 +71,9 @@ void ms_sleep(U32 ms)
 	std::this_thread::sleep_for(std::chrono::milliseconds(ms));
 }
 
-U32 micro_sleep(U64 us, U32 max_yields)
+void micro_sleep(U64 us)
 {
-    // max_yields is unused; just fiddle with it to avoid warnings.
-    max_yields = 0;
 	std::this_thread::sleep_for(std::chrono::microseconds(us));
-    return 0;
 }
 
 //
