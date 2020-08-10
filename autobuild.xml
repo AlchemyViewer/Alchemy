@@ -2878,9 +2878,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>92b0ae08832bd0e99c34ef8f3e6346ad</string>
+              <string>df43d3df49296bfe93996ec537b9eddf</string>
+              <key>hash_algorithm</key>
+              <string>md5</string>
               <key>url</key>
-              <string>http://automated-builds-secondlife-com.s3.amazonaws.com/ct2/613/1289/slvoice-3.2.0002.10426.500605-linux64-500605.tar.bz2</string>
+              <string>https://depot.alchemyviewer.org/pub/linux64/lib/slvoice-4.6.0009.20030-linux64-201501031918.tar.bz2</string>
             </map>
             <key>name</key>
             <string>linux64</string>

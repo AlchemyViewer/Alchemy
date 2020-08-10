@@ -520,7 +520,9 @@ void LLVivoxVoiceClient::connectorCreate()
 		<< "<ClientName>V2 SDK</ClientName>"
 		<< "<AccountManagementServer>" << mVoiceAccountServerURI << "</AccountManagementServer>"
 		<< "<Mode>Normal</Mode>"
+#ifndef LL_LINUX
         << "<ConnectorHandle>" << LLVivoxSecurity::getInstance()->connectorHandle() << "</ConnectorHandle>"
+#endif
 		<< "<Logging>"
 		<< "<Folder>" << logdir << "</Folder>"
 		<< "<FileNamePrefix>Connector</FileNamePrefix>"
@@ -861,6 +863,7 @@ bool LLVivoxVoiceClient::startAndLaunchDaemon()
             }
             params.cwd = gDirUtilp->getAppRODataDir();
 
+#ifndef LL_LINUX
 #           ifdef VIVOX_HANDLE_ARGS
             params.args.add("-ah");
             params.args.add(LLVivoxSecurity::getInstance()->accountHandle());
@@ -868,6 +871,7 @@ bool LLVivoxVoiceClient::startAndLaunchDaemon()
             params.args.add("-ch");
             params.args.add(LLVivoxSecurity::getInstance()->connectorHandle());
 #           endif // VIVOX_HANDLE_ARGS
+#endif
 
             params.postend = sGatewayPump.getName();
             sGatewayPump.listen("VivoxDaemonPump", boost::bind(&LLVivoxVoiceClient::callbackEndDaemon, this, _1));
@@ -2177,7 +2181,9 @@ void LLVivoxVoiceClient::loginSendMessage()
 		<< "<ConnectorHandle>" << LLVivoxSecurity::getInstance()->connectorHandle() << "</ConnectorHandle>"
 		<< "<AccountName>" << mAccountName << "</AccountName>"
         << "<AccountPassword>" << mAccountPassword << "</AccountPassword>"
+#ifndef LL_LINUX
         << "<AccountHandle>" << LLVivoxSecurity::getInstance()->accountHandle() << "</AccountHandle>"
+#endif
 		<< "<AudioSessionAnswerMode>VerifyAnswer</AudioSessionAnswerMode>"
 		<< "<EnableBuddiesAndPresence>false</EnableBuddiesAndPresence>"
 		<< "<EnablePresencePersistence>0</EnablePresencePersistence>"
@@ -3175,6 +3181,7 @@ void LLVivoxVoiceClient::connectorCreateResponse(int statusCode, std::string &st
 
 	if(statusCode == 0)
 	{
+#ifndef LL_LINUX
 		// Connector created, move forward.
         if (connectorHandle == LLVivoxSecurity::getInstance()->connectorHandle())
         {
@@ -3198,6 +3205,15 @@ void LLVivoxVoiceClient::connectorCreateResponse(int statusCode, std::string &st
             // Give up.
             mTerminateDaemon = true;
         }
+#else
+        LL_INFOS("Voice") << "Connector.Create succeeded, Vivox SDK version is " << versionID << LL_ENDL;
+        mVoiceVersion.serverVersion = versionID;
+        LLVivoxSecurity::getInstance()->setConnectorHandle(connectorHandle);
+        mConnectorEstablished = true;
+        mTerminateDaemon = false;
+ 
+        result["connector"] = LLSD::Boolean(true);
+#endif
 	}
     else if (statusCode == 10028) // web request timeout prior to login
     {
@@ -3247,6 +3263,9 @@ void LLVivoxVoiceClient::loginResponse(int statusCode, std::string &statusString
 	else
 	{
 		// Login succeeded, move forward.
+#ifdef LL_LINUX
+        LLVivoxSecurity::getInstance()->setAccountHandle(accountHandle);
+#endif
 		mAccountLoggedIn = true;
 		mNumberOfAliases = numberOfAliases;
         result["login"] = LLSD::String("response_ok");

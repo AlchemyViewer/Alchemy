@@ -1035,6 +1035,11 @@ class LLVivoxSecurity final : public LLSingleton<LLVivoxSecurity>
     std::string     connectorHandle() { return mConnectorHandle; };
     std::string     accountHandle()    { return mAccountHandle;    };
 
+#ifdef LL_LINUX
+    void setConnectorHandle(const std::string& handle) { mConnectorHandle = handle; }
+    void setAccountHandle(const std::string& handle) { mAccountHandle = handle; }
+#endif
+    
   private:
     std::string     mConnectorHandle;
     std::string     mAccountHandle;
