@@ -210,6 +210,7 @@ std::string glob_to_regex(const std::string& glob)
 			case '|':
 			case '$':
 				regex += '\\'; 
+				[[fallthrough]];
 			default:
 				regex += c;
 				break;

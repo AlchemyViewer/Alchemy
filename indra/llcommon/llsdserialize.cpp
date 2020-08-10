@@ -2212,6 +2212,7 @@ LLUZipHelper::EZipRresult LLUZipHelper::unzip_llsd(LLSD& data, std::istream& is,
 		{
 		case Z_NEED_DICT:
 			ret = Z_DATA_ERROR;
+			[[fallthrough]];
 		case Z_DATA_ERROR:
 		case Z_MEM_ERROR:
 			inflateEnd(&strm);
@@ -2344,6 +2345,7 @@ U8* unzip_llsdNavMesh( bool& valid, unsigned int& outsize, std::istream& is, S32
 		{
 		case Z_NEED_DICT:
 			ret = Z_DATA_ERROR;
+			[[fallthrough]];
 		case Z_DATA_ERROR:
 		case Z_MEM_ERROR:
 			inflateEnd(&strm);

@@ -620,6 +620,7 @@ HttpStatus HttpOpRequest::prepareRequest(HttpService * service)
     case HOR_PATCH:
         check_curl_easy_setopt(mCurlHandle, CURLOPT_CUSTOMREQUEST, "PATCH");
         // fall through.  The rest is the same as PUT
+		[[fallthrough]];
     case HOR_PUT:
 		{
 			check_curl_easy_setopt(mCurlHandle, CURLOPT_UPLOAD, 1);
