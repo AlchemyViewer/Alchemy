@@ -1320,7 +1320,7 @@ void LLFloaterTools::getMediaState()
                 if ( object->getTE(face) )
                     if ( object->getTE(face)->getMediaData() )
                         return *(object->getTE(face)->getMediaData());
-			return mMediaEntry;
+            return mMediaEntry;
         };
 		
 		const LLMediaEntry& mMediaEntry;

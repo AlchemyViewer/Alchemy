@@ -5552,7 +5552,7 @@ LLVivoxVoiceClient::sessionState::~sessionState()
     if (mMyIterator != mSession.end())
         mSession.erase(mMyIterator);
 
-	removeAllParticipants();
+    removeAllParticipants();
 }
 
 bool LLVivoxVoiceClient::sessionState::isCallBackPossible()
