@@ -529,7 +529,7 @@ static int recvfrom_destip( int socket, void *buf, int len, struct sockaddr *fro
 	struct iovec iov[1];
 	char cmsg[CMSG_SPACE(sizeof(struct in_pktinfo))];
 	struct cmsghdr *cmsgptr;
-	struct msghdr msg = {0};
+	struct msghdr msg = {};
 
 	iov[0].iov_base = buf;
 	iov[0].iov_len = len;
