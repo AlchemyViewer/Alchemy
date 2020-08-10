@@ -86,7 +86,7 @@ public:
 	/*virtual*/ BOOL isPrimaryTextAvailable();
 	/*virtual*/ BOOL pasteTextFromPrimary(LLWString &dst);
 	/*virtual*/ BOOL copyTextToPrimary(const LLWString & src);
- 
+	/*virtual*/ void setWindowTitle(const std::string& title);
 	/*virtual*/ void flashIcon(F32 seconds);
 	/*virtual*/ F32 getGamma();
 	/*virtual*/ BOOL setGamma(const F32 gamma); // Set the gamma

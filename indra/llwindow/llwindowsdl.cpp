@@ -40,10 +40,6 @@
 #include "lldir.h"
 #include "llfindlocale.h"
 
-#if LL_GNUC
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-#endif
 
 #if LL_GTK
 extern "C" {
@@ -56,28 +52,21 @@ extern "C" {
 #include <locale.h>
 #endif // LL_GTK
 
-#if LL_GNUC
-#pragma GCC diagnostic pop
-#endif
-
 extern "C" {
 # include "fontconfig/fontconfig.h"
 }
 
-#if LL_LINUX || LL_SOLARIS
+#if LL_LINUX
 // not necessarily available on random SDL platforms, so #if LL_LINUX
 // for execv(), waitpid(), fork()
 # include <unistd.h>
 # include <sys/types.h>
 # include <sys/wait.h>
-#endif // LL_LINUX || LL_SOLARIS
+#endif // LL_LINUX
 
 extern BOOL gDebugWindowProc;
 
 const S32 MAX_NUM_RESOLUTIONS = 200;
-
-// static variable for ATI mouse cursor crash work-around:
-static bool ATIbug = false; 
 
 //
 // LLWindowSDL
@@ -85,6 +74,7 @@ static bool ATIbug = false;
 
 #if LL_X11
 # include <X11/Xutil.h>
+# include <boost/regex.hpp>
 #endif //LL_X11
 
 // TOFU HACK -- (*exactly* the same hack as LLWindowMacOSX for a similar
@@ -284,117 +274,69 @@ static SDL_Surface *Load_BMP_Resource(const char *basename)
 // on this machine.  It works by searching /var/log/var/log/Xorg.?.log or
 // /var/log/XFree86.?.log for a ': (VideoRAM ?|Memory): (%d+) kB' regex, where
 // '?' is the X11 display number derived from $DISPLAY
-static int x11_detect_VRAM_kb_fp(FILE *fp, const char *prefix_str)
-{
-	const int line_buf_size = 1000;
-	char line_buf[line_buf_size];
-	while (fgets(line_buf, line_buf_size, fp))
-	{
-		//LL_DEBUGS() << "XLOG: " << line_buf << LL_ENDL;
+#define X11_VRAM_REGEX "(VRAM|Memory|Video\\s?RAM)\\D*(\\d+)\\s?([kK]B?)"
 
-		// Why the ad-hoc parser instead of using a regex?  Our
-		// favourite regex implementation - libboost_regex - is
-		// quite a heavy and troublesome dependency for the client, so
-		// it seems a shame to introduce it for such a simple task.
-		// *FIXME: libboost_regex is a dependency now anyway, so we may
-		// as well use it instead of this hand-rolled nonsense.
-		const char *part1_template = prefix_str;
-		const char part2_template[] = " kB";
-		char *part1 = strstr(line_buf, part1_template);
-		if (part1) // found start of matching line
-		{
-			part1 = &part1[strlen(part1_template)]; // -> after
-			char *part2 = strstr(part1, part2_template);
-			if (part2) // found end of matching line
-			{
-				// now everything between part1 and part2 is
-				// supposed to be numeric, describing the
-				// number of kB of Video RAM supported
-				int rtn = 0;
-				for (; part1 < part2; ++part1)
-				{
-					if (*part1 < '0' || *part1 > '9')
-					{
-						// unexpected char, abort parse
-						rtn = 0;
-						break;
-					}
-					rtn *= 10;
-					rtn += (*part1) - '0';
-				}
-				if (rtn > 0)
-				{
-					// got the kB number.  return it now.
-					return rtn;
-				}
+static int x11_detect_VRAM_kb_fp(FILE *fp) 
+{
+	boost::regex pattern(X11_VRAM_REGEX);
+	if(fp)
+	{
+		char * line = NULL;
+		size_t len = 0;
+		ssize_t read;
+		while((read = getline(&line, &len, fp)) != -1) {
+			std::string sline(line, len);
+			boost::cmatch match;
+			if(boost::regex_search(line, match, pattern)) {
+				long int vram = strtol(std::string(match[2].str()).c_str(), NULL, 10);
+				LL_INFOS() << "Found VRAM " << vram << LL_ENDL;
+                if (line)
+                    free(line);
+				return (int)vram;
 			}
 		}
+		if (line)
+            free(line);
 	}
-	return 0; // 'could not detect'
+	return 0; // not detected
 }
 
 static int x11_detect_VRAM_kb()
 {
-#if LL_SOLARIS && defined(__sparc)
-      //  NOTE: there's no Xorg server on SPARC so just return 0
-      //        and allow SDL to attempt to get the amount of VRAM
-      return(0);
-#else
-
-	std::string x_log_location("/var/log/");
-	std::string fname;
+	const std::string x_log_location("/var/log/");
 	int rtn = 0; // 'could not detect'
-	int display_num = 0;
 	FILE *fp;
-	char *display_env = getenv("DISPLAY"); // e.g. :0 or :0.0 or :1.0 etc
-	// parse DISPLAY number so we can go grab the right log file
-	if (display_env[0] == ':' &&
-	    display_env[1] >= '0' && display_env[1] <= '9')
-	{
-		display_num = display_env[1] - '0';
-	}
 
 	// *TODO: we could be smarter and see which of Xorg/XFree86 has the
 	// freshest time-stamp.
 
-	// Try Xorg log first
-	fname = x_log_location;
-	fname += "Xorg.";
-	fname += ('0' + display_num);
-	fname += ".log";
-	fp = fopen(fname.c_str(), "r");
+	// try journald first
+	fp = popen("journalctl -e _COMM=Xorg{,.bin}", "r");
 	if (fp)
 	{
-		LL_INFOS() << "Looking in " << fname
-			<< " for VRAM info..." << LL_ENDL;
-		rtn = x11_detect_VRAM_kb_fp(fp, ": VideoRAM: ");
-		fclose(fp);
-		if (0 == rtn)
-		{
-			fp = fopen(fname.c_str(), "r");
-			if (fp)
-			{
-				rtn = x11_detect_VRAM_kb_fp(fp, ": Video RAM: ");
-				fclose(fp);
-				if (0 == rtn)
-				{
-					fp = fopen(fname.c_str(), "r");
-					if (fp)
-					{
-						rtn = x11_detect_VRAM_kb_fp(fp, ": Memory: ");
-						fclose(fp);
-					}
-				}
-			}
-		}
+		LL_INFOS() << "Looking in journald for VRAM info..." << LL_ENDL;
+		rtn = x11_detect_VRAM_kb_fp(fp);
+		pclose(fp);
+	} else {
+		LL_INFOS() << "Failed to popen journalctl (expected on non-systemd)" << LL_ENDL;
 	}
-	else
+
+	if (rtn == 0)
 	{
-		LL_INFOS() << "Could not open " << fname
-			<< " - skipped." << LL_ENDL;	
-		// Try old XFree86 log otherwise
-		fname = x_log_location;
-		fname += "XFree86.";
+		// Try Xorg log last
+		// XXX: this will not work on system that output Xorg logs to syslog
+		std::string fname;
+		int display_num = 0;
+		char *display_env = getenv("DISPLAY"); // e.g. :0 or :0.0 or :1.0 etc
+		// parse DISPLAY number so we can go grab the right log file
+		if (display_env[0] == ':' &&
+			display_env[1] >= '0' && display_env[1] <= '9')
+		{
+			display_num = display_env[1] - '0';
+		}
+
+		fname = getenv("HOME");
+		fname += "/.local/share/xorg/Xorg.";
 		fname += ('0' + display_num);
 		fname += ".log";
 		fp = fopen(fname.c_str(), "r");
@@ -402,26 +344,49 @@ static int x11_detect_VRAM_kb()
 		{
 			LL_INFOS() << "Looking in " << fname
 				<< " for VRAM info..." << LL_ENDL;
-			rtn = x11_detect_VRAM_kb_fp(fp, ": VideoRAM: ");
+			rtn = x11_detect_VRAM_kb_fp(fp);
 			fclose(fp);
-			if (0 == rtn)
-			{
-				fp = fopen(fname.c_str(), "r");
-				if (fp)
-				{
-					rtn = x11_detect_VRAM_kb_fp(fp, ": Memory: ");
-					fclose(fp);
-				}
-			}
 		}
 		else
 		{
-			LL_INFOS() << "Could not open " << fname
-				<< " - skipped." << LL_ENDL;
+			fname = x_log_location;
+			fname += "Xorg.";
+			fname += ('0' + display_num);
+			fname += ".log";
+			fp = fopen(fname.c_str(), "r");
+			if (fp)
+			{
+				LL_INFOS() << "Looking in " << fname
+					<< " for VRAM info..." << LL_ENDL;
+				rtn = x11_detect_VRAM_kb_fp(fp);
+				fclose(fp);
+			}
+			else
+			{
+				LL_INFOS() << "Could not open " << fname
+					<< " - skipped." << LL_ENDL;
+				// Try old XFree86 log otherwise
+				fname = x_log_location;
+				fname += "XFree86.";
+				fname += ('0' + display_num);
+				fname += ".log";
+				fp = fopen(fname.c_str(), "r");
+				if (fp)
+				{
+					LL_INFOS() << "Looking in " << fname
+						<< " for VRAM info..." << LL_ENDL;
+					rtn = x11_detect_VRAM_kb_fp(fp);
+					fclose(fp);
+				}
+				else
+				{
+					LL_INFOS() << "Could not open " << fname
+						<< " - skipped." << LL_ENDL;
+				}
+			}
 		}
 	}
 	return rtn;
-#endif // LL_SOLARIS
 }
 #endif // LL_X11
 
@@ -435,7 +400,7 @@ BOOL LLWindowSDL::createContext(int x, int y, int width, int height, int bits, B
 	// captures don't survive contexts
 	mGrabbyKeyFlags = 0;
 	mReallyCapturedCount = 0;
-	
+
 	if (SDL_Init(SDL_INIT_VIDEO) < 0)
 	{
 		LL_INFOS() << "sdl_init() failed! " << SDL_GetError() << LL_ENDL;
@@ -496,27 +461,11 @@ BOOL LLWindowSDL::createContext(int x, int y, int width, int height, int bits, B
 	SDL_GL_SetAttribute(SDL_GL_RED_SIZE,  8);
 	SDL_GL_SetAttribute(SDL_GL_GREEN_SIZE,8);
 	SDL_GL_SetAttribute(SDL_GL_BLUE_SIZE, 8);
-#if !LL_SOLARIS
-        SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, (bits <= 16) ? 16 : 24);
+
+    SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, (bits <= 16) ? 16 : 24);
 	// We need stencil support for a few (minor) things.
 	if (!getenv("LL_GL_NO_STENCIL"))
 		SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
-#else
-	// NOTE- use smaller Z-buffer to enable more graphics cards
-        //     - This should not affect better GPUs and has been proven
-        //	 to provide 24-bit z-buffers when available.
-	//
-        // As the API states: 
-	//
-        // GLX_DEPTH_SIZE    Must be followed by a nonnegative
-        //                   minimum size specification.  If this
-        //                   value is zero, visuals with no depth
-        //                   buffer are preferred.  Otherwise, the
-        //                   largest available depth buffer of at
-        //                   least the minimum size is preferred.
-
-        SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 16);
-#endif
         SDL_GL_SetAttribute(SDL_GL_ALPHA_SIZE, (bits <= 16) ? 1 : 8);
 
         // *FIX: try to toggle vsync here?
@@ -694,25 +643,13 @@ BOOL LLWindowSDL::createContext(int x, int y, int width, int height, int bits, B
 	// fixme: actually, it's REALLY important for picking that we get at
 	// least 8 bits each of red,green,blue.  Alpha we can be a bit more
 	// relaxed about if we have to.
-#if LL_SOLARIS && defined(__sparc)
-//  again the __sparc required because Xsun support, 32bit are very pricey on SPARC
-	if(colorBits < 24)		//HACK:  on SPARC allow 24-bit color
-#else
 	if (colorBits < 32)
-#endif
 	{
 		close();
 		setupFailure(
-#if LL_SOLARIS && defined(__sparc)
-			"Second Life requires at least 24-bit color on SPARC to run in a window.\n"
-			"Please use fbconfig to set your default color depth to 24 bits.\n"
-			"You may also need to adjust the X11 setting in SMF.  To do so use\n"
-			"  'svccfg -s svc:/application/x11/x11-server setprop options/default_depth=24'\n"
-#else
 			"Second Life requires True Color (32-bit) to run in a window.\n"
 			"Please go to Control Panels -> Display -> Settings and\n"
 			"set the screen to 32-bit color.\n"
-#endif
 			"Alternately, if you choose to run fullscreen, Second Life\n"
 			"will automatically adjust the screen each time it runs.",
 			"Error",
@@ -720,7 +657,6 @@ BOOL LLWindowSDL::createContext(int x, int y, int width, int height, int bits, B
 		return FALSE;
 	}
 
-#if 0  // *FIX: we're going to brave it for now...
 	if (alphaBits < 8)
 	{
 		close();
@@ -735,7 +671,6 @@ BOOL LLWindowSDL::createContext(int x, int y, int width, int height, int bits, B
 			OSMB_OK);
 		return FALSE;
 	}
-#endif
 
 #if LL_X11
 	/* Grab the window manager specific information */
@@ -807,6 +742,11 @@ BOOL LLWindowSDL::switchContext(BOOL fullscreen, const LLCoordScreen &size, BOOL
 
 void LLWindowSDL::destroyContext()
 {
+	if (mWindow == nullptr)
+	{
+		LL_INFOS() << "Context already destroy" << LL_ENDL;
+		return;
+	}
 	LL_INFOS() << "destroyContext begins" << LL_ENDL;
 
 #if LL_X11
@@ -876,6 +816,7 @@ void LLWindowSDL::close()
 	setMouseClipping(FALSE);
 	showCursor();
 
+	quitCursors();
 	destroyContext();
 }
 
@@ -964,7 +905,7 @@ BOOL LLWindowSDL::getSize(LLCoordWindow *size)
     return (FALSE);
 }
 
-BOOL LLWindowSDL::setPosition(const LLCoordScreen position)
+BOOL LLWindowSDL::setPosition(LLCoordScreen position)
 {
 	if(mWindow)
 	{
@@ -975,7 +916,7 @@ BOOL LLWindowSDL::setPosition(const LLCoordScreen position)
 	return TRUE;
 }
 
-BOOL LLWindowSDL::setSizeImpl(const LLCoordScreen size)
+BOOL LLWindowSDL::setSizeImpl(LLCoordScreen size)
 {
 	if(mWindow)
 	{
@@ -993,7 +934,7 @@ BOOL LLWindowSDL::setSizeImpl(const LLCoordScreen size)
 	return FALSE;
 }
 
-BOOL LLWindowSDL::setSizeImpl(const LLCoordWindow size)
+BOOL LLWindowSDL::setSizeImpl(LLCoordWindow size)
 {
 	if(mWindow)
 	{
@@ -1056,8 +997,6 @@ BOOL LLWindowSDL::isCursorHidden()
 	return mCursorHidden;
 }
 
-
-
 // Constrains the mouse to the window.
 void LLWindowSDL::setMouseClipping( BOOL b )
 {
@@ -1083,7 +1022,7 @@ void LLWindowSDL::setMinSize(U32 min_width, U32 min_height, bool enforce_immedia
 #endif
 }
 
-BOOL LLWindowSDL::setCursorPosition(const LLCoordWindow position)
+BOOL LLWindowSDL::setCursorPosition(LLCoordWindow position)
 {
 	BOOL result = TRUE;
 	LLCoordScreen screen_pos;
@@ -1953,7 +1892,7 @@ void LLWindowSDL::gatherInput()
 			// which confuses the focus code [SL-24071].
 			if (event.active.gain != mHaveInputFocus)
 			{
-				mHaveInputFocus = !!event.active.gain;
+				mHaveInputFocus = event.active.gain != 0;
 
 				if (mHaveInputFocus)
 					mCallbacks->handleFocus(this);
@@ -2081,12 +2020,6 @@ static SDL_Cursor *makeSDLCursorFromBMP(const char *filename, int hotx, int hoty
 
 void LLWindowSDL::updateCursor()
 {
-	if (ATIbug) {
-		// cursor-updating is very flaky when this bug is
-		// present; do nothing.
-		return;
-	}
-
 	if (mCurrentCursor != mNextCursor)
 	{
 		if (mNextCursor < UI_CURSOR_COUNT)
@@ -2159,11 +2092,6 @@ void LLWindowSDL::initCursors()
 	mSDLCursors[UI_CURSOR_TOOLPATHFINDING_PATH_END] = makeSDLCursorFromBMP("lltoolpathfindingpathend.BMP", 16, 16);
 	mSDLCursors[UI_CURSOR_TOOLPATHFINDING_PATH_END_ADD] = makeSDLCursorFromBMP("lltoolpathfindingpathendadd.BMP", 16, 16);
 	mSDLCursors[UI_CURSOR_TOOLNO] = makeSDLCursorFromBMP("llno.BMP",8,8);
-
-	if (getenv("LL_ATI_MOUSE_CURSOR_BUG") != NULL) {
-		LL_INFOS() << "Disabling cursor updating due to LL_ATI_MOUSE_CURSOR_BUG" << LL_ENDL;
-		ATIbug = true;
-	}
 }
 
 void LLWindowSDL::quitCursors()
@@ -2193,7 +2121,7 @@ void LLWindowSDL::captureMouse()
 	// SDL already enforces the semantics that captureMouse is
 	// used for, i.e. that we continue to get mouse events as long
 	// as a button is down regardless of whether we left the
-	// window, and in a less obnoxious way than SDL_WM_GrabInput	
+	// window, and in a less obnoxious way than SDL_WM_GrabInput
 	// which would confine the cursor to the window too.
 
 	LL_DEBUGS() << "LLWindowSDL::captureMouse" << LL_ENDL;
@@ -2509,7 +2437,7 @@ BOOL LLWindowSDL::dialogColorPicker( F32 *r, F32 *g, F32 *b)
 }
 #endif // LL_GTK
 
-#if LL_LINUX || LL_SOLARIS
+#if LL_LINUX
 // extracted from spawnWebBrowser for clarity and to eliminate
 //  compiler confusion regarding close(int fd) vs. LLWindow::close()
 void exec_cmd(const std::string& cmd, const std::string& arg)
@@ -2565,7 +2493,7 @@ void LLWindowSDL::spawnWebBrowser(const std::string& escaped_url, bool async)
 
 	LL_INFOS() << "spawn_web_browser: " << escaped_url << LL_ENDL;
 	
-#if LL_LINUX || LL_SOLARIS
+#if LL_LINUX
 # if LL_X11
 	if (mSDL_Display)
 	{
@@ -2584,7 +2512,7 @@ void LLWindowSDL::spawnWebBrowser(const std::string& escaped_url, bool async)
 	cmd += "launch_url.sh";
 	arg = escaped_url;
 	exec_cmd(cmd, arg);
-#endif // LL_LINUX || LL_SOLARIS
+#endif // LL_LINUX
 
 	LL_INFOS() << "spawn_web_browser returning." << LL_ENDL;
 }
@@ -2734,4 +2662,8 @@ std::vector<std::string> LLWindowSDL::getDynamicFallbackFontList()
 	return rtns;
 }
 
+void LLWindowSDL::setWindowTitle(const std::string& title)
+{
+	SDL_WM_SetCaption(title.c_str(), title.c_str());
+}
 #endif // LL_SDL
