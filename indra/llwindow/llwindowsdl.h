@@ -32,12 +32,16 @@
 #include "llwindow.h"
 #include "lltimer.h"
 
-#include "SDL/SDL.h"
-#include "SDL/SDL_endian.h"
+#ifndef SDL_MAIN_HANDLED
+#define SDL_MAIN_HANDLED 1
+#endif
+#include <SDL.h>
+#include <SDL_endian.h>
+#include <SDL_video.h>
 
 #if LL_X11
 // get X11-specific headers for use in low-level stuff like copy-and-paste support
-#include "SDL/SDL_syswm.h"
+#include <SDL_syswm.h>
 #endif
 
 // AssertMacros.h does bad things.
@@ -177,26 +181,28 @@ protected:
 	void destroyContext();
 	void setupFailure(const std::string& text, const std::string& caption, U32 type);
 	void fixWindowSize(void);
-	U32 SDLCheckGrabbyKeys(SDLKey keysym, BOOL gain);
+	U32 SDLCheckGrabbyKeys(SDL_Keycode keysym, BOOL gain);
 	BOOL SDLReallyCaptureInput(BOOL capture);
 
 	//
 	// Platform specific variables
 	//
 	U32             mGrabbyKeyFlags;
-	int			mReallyCapturedCount;
-	SDL_Surface *	mWindow;
-	std::string mWindowTitle;
-	double		mOriginalAspectRatio;
-	BOOL		mNeedsResize;		// Constructor figured out the window is too big, it needs a resize.
+	int				mReallyCapturedCount;
+	SDL_Window*		mWindow;
+	SDL_GLContext   mGLContext;
+	std::string		mWindowName;
+	std::string 	mWindowTitle;
+	double			mOriginalAspectRatio;
+	BOOL			mNeedsResize;		// Constructor figured out the window is too big, it needs a resize.
 	LLCoordScreen   mNeedsResizeSize;
-	F32			mOverrideAspectRatio;
-	F32		mGamma;
-	U32		mFSAASamples;
+	F32				mOverrideAspectRatio;
+	F32				mGamma;
+	U32				mFSAASamples;
 
-	int		mSDLFlags;
+	int				mSDLFlags;
 
-	SDL_Cursor*	mSDLCursors[UI_CURSOR_COUNT];
+	SDL_Cursor*		mSDLCursors[UI_CURSOR_COUNT];
 	int             mHaveInputFocus; /* 0=no, 1=yes, else unknown */
 	int             mIsMinimized; /* 0=no, 1=yes, else unknown */
 
@@ -210,8 +216,8 @@ private:
 #endif //LL_X11
 	
 	U32 mKeyScanCode;
-        U32 mKeyVirtualKey;
-	SDLMod mKeyModifiers;
+	U32 mKeyVirtualKey;
+	SDL_Keymod mKeyModifiers;
 };
 
 

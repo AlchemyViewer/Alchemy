@@ -2085,7 +2085,7 @@ target_link_libraries(${VIEWER_BINARY_NAME}
     ${FMODWRAPPER_LIBRARY} # must come after LLAudio
     ${GLOD_LIBRARIES}
     ${OPENGL_LIBRARIES}
-    ${SDL_LIBRARY}
+    ${SDL_LIBRARIES}
     ${SMARTHEAP_LIBRARY}
     ${UI_LIBRARIES}
     ${WINDOWS_LIBRARIES}

@@ -75,7 +75,7 @@ if (LINUX)
       ${LLVFS_LIBRARIES}
       ${LLXML_LIBRARIES}
       ${UI_LIBRARIES}     # for GTK
-      ${SDL_LIBRARY}
+      ${SDL_LIBRARIES}
       ${FONTCONFIG_LIBRARIES}          # For FCInit and other FC* functions.
       )
 

@@ -36,6 +36,7 @@
 
 #include "llerror.h"
 #include "llgl.h"
+#include "llglslshader.h"
 #include "llstring.h"
 #include "lldir.h"
 #include "llfindlocale.h"
@@ -194,13 +195,24 @@ LLWindowSDL::LLWindowSDL(LLWindowCallbacks* callbacks,
 	  Lock_Display(NULL),
 	  Unlock_Display(NULL), mGamma(1.0f)
 {
+	SDL_SetMainReady();
+
+	if (SDL_Init(0) != 0)
+	{
+		LL_WARNS() << "Failed to initialize SDL due to error: " << SDL_GetError() << LL_ENDL;
+		return;
+	}
+	
+	SDL_InitSubSystem(SDL_INIT_EVENTS);
+
 	// Initialize the keyboard
 	gKeyboard = new LLKeyboardSDL();
 	gKeyboard->setCallbacks(callbacks);
 	// Note that we can't set up key-repeat until after SDL has init'd video
 
 	// Ignore use_gl for now, only used for drones on PC
-	mWindow = NULL;
+	mWindow = nullptr;
+	mGLContext = nullptr;
 	mNeedsResize = FALSE;
 	mOverrideAspectRatio = 0.f;
 	mGrabbyKeyFlags = 0;
@@ -401,7 +413,7 @@ BOOL LLWindowSDL::createContext(int x, int y, int width, int height, int bits, B
 	mGrabbyKeyFlags = 0;
 	mReallyCapturedCount = 0;
 
-	if (SDL_Init(SDL_INIT_VIDEO) < 0)
+	if (SDL_InitSubSystem(SDL_INIT_VIDEO) < 0)
 	{
 		LL_INFOS() << "sdl_init() failed! " << SDL_GetError() << LL_ENDL;
 		setupFailure("sdl_init() failure,  window creation error", "error", OSMB_OK);
@@ -414,65 +426,178 @@ BOOL LLWindowSDL::createContext(int x, int y, int width, int height, int bits, B
 		<< int(c_sdl_version.major) << "."
 		<< int(c_sdl_version.minor) << "."
 		<< int(c_sdl_version.patch) << LL_ENDL;
-	const SDL_version *r_sdl_version;
-	r_sdl_version = SDL_Linked_Version();
+	SDL_version r_sdl_version;
+	SDL_GetVersion(&r_sdl_version);
 	LL_INFOS() << " Running against SDL "
-		<< int(r_sdl_version->major) << "."
-		<< int(r_sdl_version->minor) << "."
-		<< int(r_sdl_version->patch) << LL_ENDL;
+		<< int(r_sdl_version.major) << "."
+		<< int(r_sdl_version.minor) << "."
+		<< int(r_sdl_version.patch) << LL_ENDL;
 
-	const SDL_VideoInfo *video_info = SDL_GetVideoInfo( );
-	if (!video_info)
+	SDL_DisplayMode current_mode;
+	if (SDL_GetCurrentDisplayMode(0, &current_mode) != 0)
 	{
-		LL_INFOS() << "SDL_GetVideoInfo() failed! " << SDL_GetError() << LL_ENDL;
-		setupFailure("SDL_GetVideoInfo() failed, Window creation error", "Error", OSMB_OK);
+		LL_INFOS() << "SDL_GetCurrentDisplayMode failed! " << SDL_GetError() << LL_ENDL;
+		setupFailure("SDL_GetCurrentDisplayMode failed!", "Error", OSMB_OK);
 		return FALSE;
 	}
 
-	if (video_info->current_h > 0)
+	if (current_mode.h > 0)
 	{
-		mOriginalAspectRatio = (float)video_info->current_w / (float)video_info->current_h;
-		LL_INFOS() << "Original aspect ratio was " << video_info->current_w << ":" << video_info->current_h << "=" << mOriginalAspectRatio << LL_ENDL;
+		mOriginalAspectRatio = (double) current_mode.w / (double) current_mode.h;
+		LL_INFOS() << "Original aspect ratio was " << current_mode.w << ":" << current_mode.h << "=" << mOriginalAspectRatio << LL_ENDL;
+
 	}
 
-	SDL_EnableUNICODE(1);
-	SDL_WM_SetCaption(mWindowTitle.c_str(), mWindowTitle.c_str());
+	// Setup default window flags
+   	mSDLFlags = SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE;
 
-	// Set the application icon.
-	SDL_Surface *bmpsurface;
-	bmpsurface = Load_BMP_Resource("ll_icon.BMP");
-	if (bmpsurface)
+	if (mWindow == nullptr)
 	{
-		// This attempts to give a black-keyed mask to the icon.
-		SDL_SetColorKey(bmpsurface,
-				SDL_SRCCOLORKEY,
-				SDL_MapRGB(bmpsurface->format, 0,0,0) );
-		SDL_WM_SetIcon(bmpsurface, NULL);
-		// The SDL examples cheerfully avoid freeing the icon
-		// surface, but I'm betting that's leaky.
-		SDL_FreeSurface(bmpsurface);
-		bmpsurface = NULL;
-	}
+		if (width == 0)
+			width = 1024;
+		if (height == 0)
+			height = 768;
 
-	// note: these SetAttributes make Tom's 9600-on-AMD64 fail to
-	// get a visual, but it's broken anyway when it does, and without
-	// these SetAttributes we might easily get an avoidable substandard
-	// visual to work with on most other machines.
-	SDL_GL_SetAttribute(SDL_GL_RED_SIZE,  8);
-	SDL_GL_SetAttribute(SDL_GL_GREEN_SIZE,8);
-	SDL_GL_SetAttribute(SDL_GL_BLUE_SIZE, 8);
+		if (x == 0)
+			x = SDL_WINDOWPOS_UNDEFINED;
+		if (y == 0)
+			y = SDL_WINDOWPOS_UNDEFINED;
 
-    SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, (bits <= 16) ? 16 : 24);
-	// We need stencil support for a few (minor) things.
-	if (!getenv("LL_GL_NO_STENCIL"))
-		SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
-        SDL_GL_SetAttribute(SDL_GL_ALPHA_SIZE, (bits <= 16) ? 1 : 8);
+		LL_INFOS() << "Creating window " << width << "x" << height << "x" << bits << LL_ENDL;
+		mWindow = SDL_CreateWindow(mWindowTitle.c_str(), x, y, width, height, SDL_WINDOW_RESIZABLE | SDL_WINDOW_OPENGL);
+		if (mWindow == nullptr)
+		{
+			LL_WARNS() << "Window creation failure. SDL: " << SDL_GetError() << LL_ENDL;
+			setupFailure("Window creation error", "Error", OSMB_OK);
+            return FALSE;
+        }
+        // Set the application icon.
+        SDL_Surface* bmpsurface = Load_BMP_Resource("ll_icon.BMP");
+        if (bmpsurface)
+        {
+            // This attempts to give a black-keyed mask to the icon.
+            SDL_SetColorKey(bmpsurface, SDL_TRUE, SDL_MapRGB(bmpsurface->format, 0, 0, 0));
+            SDL_SetWindowIcon(mWindow, bmpsurface);
+            // The SDL examples cheerfully avoid freeing the icon
+            // surface, but I'm betting that's leaky.
+            SDL_FreeSurface(bmpsurface);
+            bmpsurface = NULL;
+        }
+    }
 
-        // *FIX: try to toggle vsync here?
+    mFullscreen = fullscreen;
+    if (mFullscreen)
+    {
+        int ret = SDL_SetWindowFullscreen(mWindow, SDL_WINDOW_FULLSCREEN);
+        if (ret == 0)
+        {
+            LL_INFOS() << "createContext: setting up fullscreen " << width << "x" << height << LL_ENDL;
 
-	mFullscreen = fullscreen;
+            // If the requested width or height is 0, find the best default for the monitor.
+            if ((width == 0) || (height == 0))
+            {
+                // Scan through the list of modes, looking for one which has:
+                //		height between 700 and 800
+                //		aspect ratio closest to the user's original mode
+                S32 resolutionCount = 0;
+                LLWindowResolution *resolutionList = getSupportedResolutions(resolutionCount);
 
-	int sdlflags = SDL_OPENGL | SDL_RESIZABLE | SDL_ANYFORMAT;
+                if (resolutionList != nullptr)
+                {
+                    F32 closestAspect = 0;
+                    U32 closestHeight = 0;
+                    U32 closestWidth = 0;
+                    int i;
+
+                    LL_INFOS() << "createContext: searching for a display mode, original aspect is "
+                               << mOriginalAspectRatio << LL_ENDL;
+
+                    for (i = 0; i < resolutionCount; i++)
+                    {
+                        F32 aspect = (F32) resolutionList[i].mWidth / (F32) resolutionList[i].mHeight;
+
+                        LL_INFOS() << "createContext: width " << resolutionList[i].mWidth << " height "
+                                   << resolutionList[i].mHeight << " aspect " << aspect << LL_ENDL;
+
+                        if ((resolutionList[i].mHeight >= 700) && (resolutionList[i].mHeight <= 800) &&
+                            (fabs(aspect - mOriginalAspectRatio) < fabs(closestAspect - mOriginalAspectRatio)))
+                        {
+                            LL_INFOS() << " (new closest mode) " << LL_ENDL;
+
+                            // This is the closest mode we've seen yet.
+                            closestWidth = resolutionList[i].mWidth;
+                            closestHeight = resolutionList[i].mHeight;
+                            closestAspect = aspect;
+                        }
+                    }
+
+                    width = closestWidth;
+                    height = closestHeight;
+                }
+            }
+
+            if ((width == 0) || (height == 0))
+            {
+                // Mode search failed for some reason.  Use the old-school default.
+                width = 1024;
+                height = 768;
+            }
+            SDL_DisplayMode target_mode;
+            SDL_zero(target_mode);
+            target_mode.w = width;
+            target_mode.h = height;
+
+            SDL_DisplayMode closest_mode;
+            SDL_zero(closest_mode);
+            SDL_GetClosestDisplayMode(SDL_GetWindowDisplayIndex(mWindow), &target_mode, &closest_mode);
+            if (SDL_SetWindowDisplayMode(mWindow, &closest_mode) == 0)
+            {
+                SDL_DisplayMode mode;
+                SDL_GetWindowDisplayMode(mWindow, &mode);
+                mFullscreen = TRUE;
+                mFullscreenWidth = mode.w;
+                mFullscreenHeight = mode.h;
+                mFullscreenBits = SDL_BITSPERPIXEL(mode.format);
+                mFullscreenRefresh = mode.refresh_rate;
+
+                mOverrideAspectRatio = (float) mode.w / (float) mode.h;
+
+                LL_INFOS() << "Running at " << mFullscreenWidth << "x" << mFullscreenHeight << "x" << mFullscreenBits
+                           << " @ " << mFullscreenRefresh << LL_ENDL;
+            }
+            else
+            {
+                LL_WARNS() << "createContext: fullscreen creation failure. SDL: " << SDL_GetError() << LL_ENDL;
+                // No fullscreen support
+                mFullscreen = FALSE;
+                mFullscreenWidth = -1;
+                mFullscreenHeight = -1;
+                mFullscreenBits = -1;
+                mFullscreenRefresh = -1;
+
+                std::string error = llformat("Unable to run fullscreen at %d x %d.\nRunning in window.", width, height);
+                OSMessageBox(error, "Error", OSMB_OK);
+                SDL_SetWindowFullscreen(mWindow, 0);
+                SDL_SetWindowResizable(mWindow, SDL_TRUE);
+            }
+        }
+        else
+        {
+            LL_WARNS() << "Failed to set fullscreen. SDL: " << SDL_GetError() << LL_ENDL;
+        }
+    }
+
+    GLint redBits{8}, greenBits{8}, blueBits{8}, alphaBits{(bits <= 16) ? 1 : 8};
+	
+	GLint depthBits{(bits <= 16) ? 16 : 24}, stencilBits{8};
+
+    SDL_GL_SetAttribute(SDL_GL_RED_SIZE, redBits);
+	SDL_GL_SetAttribute(SDL_GL_GREEN_SIZE, greenBits);
+	SDL_GL_SetAttribute(SDL_GL_BLUE_SIZE, blueBits);
+	SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, depthBits);
+	SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, stencilBits);
+
+	SDL_GL_SetAttribute(SDL_GL_ALPHA_SIZE, alphaBits);
 
 	SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
 
@@ -481,121 +606,96 @@ BOOL LLWindowSDL::createContext(int x, int y, int width, int height, int bits, B
 		SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, 1);
 		SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, mFSAASamples);
 	}
-	
-    	mSDLFlags = sdlflags;
 
-	if (mFullscreen)
+	if (LLRender::sGLCoreProfile)
 	{
-		LL_INFOS() << "createContext: setting up fullscreen " << width << "x" << height << LL_ENDL;
+		SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
+	}
+#if !LL_DARWIN
+	else
+	{
+		SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_COMPATIBILITY);
+	}
+#endif
 
-		// If the requested width or height is 0, find the best default for the monitor.
-		if((width == 0) || (height == 0))
+	U32 context_flags = 0;
+	if (gDebugGL)
+	{
+		context_flags |= SDL_GL_CONTEXT_DEBUG_FLAG;
+	}
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, context_flags);
+
+	U32 major_gl_version = 4;
+	U32 minor_gl_version = 5;
+
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, major_gl_version);
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, minor_gl_version);
+
+	bool done = false;
+	while (!done)
+	{
+		mGLContext = SDL_GL_CreateContext(mWindow);
+
+		if (!mGLContext)
 		{
-			// Scan through the list of modes, looking for one which has:
-			//		height between 700 and 800
-			//		aspect ratio closest to the user's original mode
-			S32 resolutionCount = 0;
-			LLWindowResolution *resolutionList = getSupportedResolutions(resolutionCount);
-
-			if(resolutionList != NULL)
-			{
-				F32 closestAspect = 0;
-				U32 closestHeight = 0;
-				U32 closestWidth = 0;
-				int i;
-
-				LL_INFOS() << "createContext: searching for a display mode, original aspect is " << mOriginalAspectRatio << LL_ENDL;
-
-				for(i=0; i < resolutionCount; i++)
-				{
-					F32 aspect = (F32)resolutionList[i].mWidth / (F32)resolutionList[i].mHeight;
-
-					LL_INFOS() << "createContext: width " << resolutionList[i].mWidth << " height " << resolutionList[i].mHeight << " aspect " << aspect << LL_ENDL;
-
-					if( (resolutionList[i].mHeight >= 700) && (resolutionList[i].mHeight <= 800) &&
-						(fabs(aspect - mOriginalAspectRatio) < fabs(closestAspect - mOriginalAspectRatio)))
-					{
-						LL_INFOS() << " (new closest mode) " << LL_ENDL;
-
-						// This is the closest mode we've seen yet.
-						closestWidth = resolutionList[i].mWidth;
-						closestHeight = resolutionList[i].mHeight;
-						closestAspect = aspect;
-					}
-				}
-
-				width = closestWidth;
-				height = closestHeight;
+			if (minor_gl_version > 0)
+			{ //decrement minor version
+				minor_gl_version--;
+				SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, minor_gl_version);
 			}
-		}
-
-		if((width == 0) || (height == 0))
-		{
-			// Mode search failed for some reason.  Use the old-school default.
-			width = 1024;
-			height = 768;
-		}
-
-		mWindow = SDL_SetVideoMode(width, height, bits, sdlflags | SDL_FULLSCREEN);
-		if (!mWindow && bits > 16)
-		{
-			SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 16);
-			mWindow = SDL_SetVideoMode(width, height, bits, sdlflags | SDL_FULLSCREEN);
-		}
-
-		if (mWindow)
-		{
-			mFullscreen = TRUE;
-			mFullscreenWidth   = mWindow->w;
-			mFullscreenHeight  = mWindow->h;
-			mFullscreenBits    = mWindow->format->BitsPerPixel;
-			mFullscreenRefresh = -1;
-
-			LL_INFOS() << "Running at " << mFullscreenWidth
-				<< "x"   << mFullscreenHeight
-				<< "x"   << mFullscreenBits
-				<< " @ " << mFullscreenRefresh
-				<< LL_ENDL;
+			else if (major_gl_version > 3)
+			{ //decrement major version and start minor version over at 3
+				major_gl_version--;
+				minor_gl_version = 3;
+				SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, major_gl_version);
+				SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, minor_gl_version);
+			}
+			else
+			{ //we reached 3.0 and still failed, bail out
+				done = true;
+			}
 		}
 		else
 		{
-			LL_WARNS() << "createContext: fullscreen creation failure. SDL: " << SDL_GetError() << LL_ENDL;
-			// No fullscreen support
-			mFullscreen = FALSE;
-			mFullscreenWidth   = -1;
-			mFullscreenHeight  = -1;
-			mFullscreenBits    = -1;
-			mFullscreenRefresh = -1;
+			LL_INFOS() << "Created OpenGL " << llformat("%d.%d", major_gl_version, minor_gl_version) <<
+				(LLRender::sGLCoreProfile ? " core" : " compatibility") << " context." << LL_ENDL;
+			done = true;
 
-			std::string error = llformat("Unable to run fullscreen at %d x %d.\nRunning in window.", width, height);	
-			OSMessageBox(error, "Error", OSMB_OK);
+			if (LLRender::sGLCoreProfile)
+			{
+				LLGLSLShader::sNoFixedFunction = true;
+			}
 		}
 	}
 
-	if(!mFullscreen && (mWindow == NULL))
+	if (!mGLContext)
 	{
-		if (width == 0)
-		    width = 1024;
-		if (height == 0)
-		    width = 768;
-
-		LL_INFOS() << "createContext: creating window " << width << "x" << height << "x" << bits << LL_ENDL;
-		mWindow = SDL_SetVideoMode(width, height, bits, sdlflags);
-		if (!mWindow && bits > 16)
-		{
-			SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 16);
-			mWindow = SDL_SetVideoMode(width, height, bits, sdlflags);
-		}
-
-		if (!mWindow)
-		{
-			LL_WARNS() << "createContext: window creation failure. SDL: " << SDL_GetError() << LL_ENDL;
-			setupFailure("Window creation error", "Error", OSMB_OK);
-			return FALSE;
-		}
-	} else if (!mFullscreen && (mWindow != NULL))
+		LL_WARNS() << "OpenGL context creation failure. SDL: " << SDL_GetError() << LL_ENDL;
+		setupFailure("Context creation error", "Error", OSMB_OK);
+		SDL_DestroyWindow(mWindow);
+		mWindow = nullptr;
+		SDL_QuitSubSystem(SDL_INIT_VIDEO);
+		return FALSE;
+	}
+	if (SDL_GL_MakeCurrent(mWindow, mGLContext) != 0)
 	{
-		LL_INFOS() << "createContext: SKIPPING - !fullscreen, but +mWindow " << width << "x" << height << "x" << bits << LL_ENDL;
+		LL_WARNS() << "Failed to make context current. SDL: " << SDL_GetError() << LL_ENDL;
+		setupFailure("Context current failure", "Error", OSMB_OK);
+		SDL_GL_DeleteContext(mGLContext);
+		mGLContext = nullptr;
+		SDL_DestroyWindow(mWindow);
+		mWindow = nullptr;
+		SDL_QuitSubSystem(SDL_INIT_VIDEO);
+		return FALSE;
+	}
+	
+	int vsync_enable = 1;
+	if(disable_vsync)
+		vsync_enable = 0;
+		
+	if(SDL_GL_SetSwapInterval(vsync_enable) == -1)
+	{
+		LL_INFOS() << "Swap interval not supported with sdl err: " << SDL_GetError() << LL_ENDL;
 	}
 	
 	// Detect video memory size.
@@ -604,32 +704,15 @@ BOOL LLWindowSDL::createContext(int x, int y, int width, int height, int bits, B
 	if (gGLManager.mVRAM != 0)
 	{
 		LL_INFOS() << "X11 log-parser detected " << gGLManager.mVRAM << "MB VRAM." << LL_ENDL;
-	} else
-# endif // LL_X11
-	{
-		// fallback to letting SDL detect VRAM.
-		// note: I've not seen SDL's detection ever actually find
-		// VRAM != 0, but if SDL *does* detect it then that's a bonus.
-		gGLManager.mVRAM = video_info->video_mem / 1024;
-		if (gGLManager.mVRAM != 0)
-		{
-			LL_INFOS() << "SDL detected " << gGLManager.mVRAM << "MB VRAM." << LL_ENDL;
-		}
 	}
-	// If VRAM is not detected, that is handled later
+# endif // LL_X11
 
-	// *TODO: Now would be an appropriate time to check for some
-	// explicitly unsupported cards.
-	//const char* RENDERER = (const char*) glGetString(GL_RENDERER);
-
-	GLint depthBits, stencilBits, redBits, greenBits, blueBits, alphaBits;
-
-	glGetIntegerv(GL_RED_BITS, &redBits);
-	glGetIntegerv(GL_GREEN_BITS, &greenBits);
-	glGetIntegerv(GL_BLUE_BITS, &blueBits);
-	glGetIntegerv(GL_ALPHA_BITS, &alphaBits);
-	glGetIntegerv(GL_DEPTH_BITS, &depthBits);
-	glGetIntegerv(GL_STENCIL_BITS, &stencilBits);
+	SDL_GL_GetAttribute(SDL_GL_RED_SIZE, &redBits);
+	SDL_GL_GetAttribute(SDL_GL_GREEN_SIZE, &greenBits);
+	SDL_GL_GetAttribute(SDL_GL_BLUE_SIZE, &blueBits);
+	SDL_GL_GetAttribute(SDL_GL_ALPHA_SIZE, &alphaBits);
+	SDL_GL_GetAttribute(SDL_GL_DEPTH_SIZE, &depthBits);
+	SDL_GL_GetAttribute(SDL_GL_STENCIL_SIZE, &stencilBits);
 	
 	LL_INFOS() << "GL buffer:" << LL_ENDL;
         LL_INFOS() << "  Red Bits " << S32(redBits) << LL_ENDL;
@@ -676,15 +759,13 @@ BOOL LLWindowSDL::createContext(int x, int y, int width, int height, int bits, B
 	/* Grab the window manager specific information */
 	SDL_SysWMinfo info;
 	SDL_VERSION(&info.version);
-	if ( SDL_GetWMInfo(&info) )
+	if ( SDL_GetWindowWMInfo(mWindow, &info) )
 	{
 		/* Save the information for later use */
 		if ( info.subsystem == SDL_SYSWM_X11 )
 		{
 			mSDL_Display = info.info.x11.display;
-			mSDL_XWindowID = info.info.x11.wmwindow;
-			Lock_Display = info.info.x11.lock_func;
-			Unlock_Display = info.info.x11.unlock_func;
+			mSDL_XWindowID = info.info.x11.window;
 		}
 		else
 		{
@@ -699,14 +780,26 @@ BOOL LLWindowSDL::createContext(int x, int y, int width, int height, int bits, B
 	}
 #endif // LL_X11
 
+	int r, g, b, a, d, s;
+	SDL_GL_GetAttribute(SDL_GL_RED_SIZE, &r);
+	SDL_GL_GetAttribute(SDL_GL_GREEN_SIZE, &g);
+	SDL_GL_GetAttribute(SDL_GL_BLUE_SIZE, &b);
+	SDL_GL_GetAttribute(SDL_GL_ALPHA_SIZE, &a);
+	SDL_GL_GetAttribute(SDL_GL_DEPTH_SIZE, &d);
+	SDL_GL_GetAttribute(SDL_GL_STENCIL_SIZE, &s);
+
+	LL_INFOS() << "GL buffer:" << LL_ENDL;
+	LL_INFOS() << "  Red Bits " << r << LL_ENDL;
+	LL_INFOS() << "  Green Bits " << g << LL_ENDL;
+	LL_INFOS() << "  Blue Bits " << b << LL_ENDL;
+	LL_INFOS() << "  Alpha Bits " << a << LL_ENDL;
+	LL_INFOS() << "  Depth Bits " << d << LL_ENDL;
+	LL_INFOS() << "  Stencil Bits " << s << LL_ENDL;
+	
+	SDL_StartTextInput();
 
 	//make sure multisampling is disabled by default
 	glDisable(GL_MULTISAMPLE_ARB);
-	
-	// We need to do this here, once video is init'd
-	if (-1 == SDL_EnableKeyRepeat(SDL_DEFAULT_REPEAT_DELAY,
-				      SDL_DEFAULT_REPEAT_INTERVAL))
-	    LL_WARNS() << "Couldn't enable key-repeat: " << SDL_GetError() <<LL_ENDL;
 
 	// Don't need to get the current gamma, since there's a call that restores it to the system defaults.
 	return TRUE;
@@ -724,7 +817,7 @@ BOOL LLWindowSDL::switchContext(BOOL fullscreen, const LLCoordScreen &size, BOOL
 	if(needsRebuild)
 	{
 		destroyContext();
-		result = createContext(0, 0, size.mX, size.mY, 0, fullscreen, disable_vsync);
+		result = createContext(0, 0, size.mX, size.mY, 32, fullscreen, disable_vsync);
 		if (result)
 		{
 			gGLManager.initGL();
@@ -749,6 +842,7 @@ void LLWindowSDL::destroyContext()
 	}
 	LL_INFOS() << "destroyContext begins" << LL_ENDL;
 
+	SDL_StopTextInput();
 #if LL_X11
 	mSDL_Display = NULL;
 	mSDL_XWindowID = None;
@@ -786,21 +880,29 @@ void LLWindowSDL::show()
 
 void LLWindowSDL::hide()
 {
-    // *FIX: What to do with SDL?
+	if (mWindow)
+	{
+		SDL_HideWindow(mWindow);
+	}
 }
 
 //virtual
 void LLWindowSDL::minimize()
 {
-    // *FIX: What to do with SDL?
+	if (mWindow)
+	{
+		SDL_MinimizeWindow(mWindow);
+	}
 }
 
 //virtual
 void LLWindowSDL::restore()
 {
-    // *FIX: What to do with SDL?
+	if (mWindow)
+	{
+		SDL_RestoreWindow(mWindow);
+	}
 }
-
 
 // close() destroys all OS-specific code associated with a window.
 // Usually called from LLWindowManager::destroyWindow()
@@ -842,29 +944,38 @@ BOOL LLWindowSDL::getVisible()
 BOOL LLWindowSDL::getMinimized()
 {
 	BOOL result = FALSE;
-
-	if (mWindow && (1 == mIsMinimized))
+	if (mWindow)
 	{
-		result = TRUE;
+		Uint32 flags = SDL_GetWindowFlags(mWindow);
+		if (flags & SDL_WINDOW_MINIMIZED)
+		{
+			result = TRUE;
+		}
 	}
-	return(result);
+	return result;
 }
 
 BOOL LLWindowSDL::getMaximized()
 {
-	BOOL result = FALSE;
-
 	if (mWindow)
 	{
-		// TODO
+		Uint32 flags = SDL_GetWindowFlags(mWindow);
+		if (flags & SDL_WINDOW_MAXIMIZED)
+		{
+			return TRUE;
+		}
 	}
 
-	return(result);
+	return FALSE;
 }
 
 BOOL LLWindowSDL::maximize()
 {
-	// TODO
+	if (mWindow)
+	{
+		SDL_MaximizeWindow(mWindow);
+		return TRUE;
+	}
 	return FALSE;
 }
 
@@ -875,59 +986,85 @@ BOOL LLWindowSDL::getFullscreen()
 
 BOOL LLWindowSDL::getPosition(LLCoordScreen *position)
 {
-    // *FIX: can anything be done with this?
-	position->mX = 0;
-	position->mY = 0;
-    return TRUE;
+	if (mWindow)
+	{
+		SDL_GetWindowPosition(mWindow, &position->mX, &position->mY);
+		return TRUE;
+	}
+	return FALSE;
 }
 
 BOOL LLWindowSDL::getSize(LLCoordScreen *size)
 {
-    if (mWindow)
-    {
-        size->mX = mWindow->w;
-        size->mY = mWindow->h;
-	return (TRUE);
-    }
+	if (mWindow)
+	{
+		SDL_GetWindowSize(mWindow, &size->mX, &size->mY);
+		return TRUE;
+	}
 
-    return (FALSE);
+	return FALSE;
 }
 
 BOOL LLWindowSDL::getSize(LLCoordWindow *size)
 {
-    if (mWindow)
-    {
-        size->mX = mWindow->w;
-        size->mY = mWindow->h;
-	return (TRUE);
-    }
+	if (mWindow)
+	{
+		SDL_GetWindowSize(mWindow, &size->mX, &size->mY);
+		return (TRUE);
+	}
 
-    return (FALSE);
+	return (FALSE);
 }
 
 BOOL LLWindowSDL::setPosition(LLCoordScreen position)
 {
-	if(mWindow)
+	if (mWindow)
 	{
-        // *FIX: (?)
-		//MacMoveWindow(mWindow, position.mX, position.mY, false);
+		SDL_SetWindowPosition(mWindow, position.mX, position.mY);
+		return TRUE;
 	}
 
-	return TRUE;
+	return FALSE;
 }
 
 BOOL LLWindowSDL::setSizeImpl(LLCoordScreen size)
 {
-	if(mWindow)
+	if (mWindow)
 	{
-		// Push a resize event onto SDL's queue - we'll handle it
-		// when it comes out again.
-		SDL_Event event;
-		event.type = SDL_VIDEORESIZE;
-		event.resize.w = size.mX;
-		event.resize.h = size.mY;
-		SDL_PushEvent(&event); // copied into queue
+		S32 width = llmax(size.mX, (S32) mMinWindowWidth);
+		S32 height = llmax(size.mY, (S32) mMinWindowHeight);
 
+		if (mFullscreen)
+		{
+			SDL_DisplayMode target_mode;
+			SDL_zero(target_mode);
+			target_mode.w = width;
+			target_mode.h = height;
+
+			SDL_DisplayMode closest_mode;
+			SDL_zero(closest_mode);
+			SDL_GetClosestDisplayMode(SDL_GetWindowDisplayIndex(mWindow), &target_mode, &closest_mode);
+			if (SDL_SetWindowDisplayMode(mWindow, &closest_mode) == 0)
+			{
+				SDL_DisplayMode mode;
+				SDL_GetWindowDisplayMode(mWindow, &mode);
+				mFullscreenWidth = mode.w;
+				mFullscreenHeight = mode.h;
+				mFullscreenBits = SDL_BITSPERPIXEL(mode.format);
+				mFullscreenRefresh = mode.refresh_rate;
+				mOverrideAspectRatio = (float) mode.w / (float) mode.h;
+
+				LL_INFOS() << "Running at " << mFullscreenWidth
+					<< "x" << mFullscreenHeight
+					<< "x" << mFullscreenBits
+					<< " @ " << mFullscreenRefresh
+					<< LL_ENDL;
+			}
+		}
+		else
+		{
+			SDL_SetWindowSize(mWindow, width, height);
+		}
 		return TRUE;
 	}
 		
@@ -938,14 +1075,40 @@ BOOL LLWindowSDL::setSizeImpl(LLCoordWindow size)
 {
 	if(mWindow)
 	{
-		// Push a resize event onto SDL's queue - we'll handle it
-		// when it comes out again.
-		SDL_Event event;
-		event.type = SDL_VIDEORESIZE;
-		event.resize.w = size.mX;
-		event.resize.h = size.mY;
-		SDL_PushEvent(&event); // copied into queue
+		S32 width = llmax(size.mX, (S32) mMinWindowWidth);
+		S32 height = llmax(size.mY, (S32) mMinWindowHeight);
 
+		if (mFullscreen)
+		{
+			SDL_DisplayMode target_mode;
+			SDL_zero(target_mode);
+			target_mode.w = width;
+			target_mode.h = height;
+
+			SDL_DisplayMode closest_mode;
+			SDL_zero(closest_mode);
+			SDL_GetClosestDisplayMode(SDL_GetWindowDisplayIndex(mWindow), &target_mode, &closest_mode);
+			if (SDL_SetWindowDisplayMode(mWindow, &closest_mode) == 0)
+			{
+				SDL_DisplayMode mode;
+				SDL_GetWindowDisplayMode(mWindow, &mode);
+				mFullscreenWidth = mode.w;
+				mFullscreenHeight = mode.h;
+				mFullscreenBits = SDL_BITSPERPIXEL(mode.format);
+				mFullscreenRefresh = mode.refresh_rate;
+				mOverrideAspectRatio = (float) mode.w / (float) mode.h;
+
+				LL_INFOS() << "Running at " << mFullscreenWidth
+					<< "x" << mFullscreenHeight
+					<< "x" << mFullscreenBits
+					<< " @ " << mFullscreenRefresh
+					<< LL_ENDL;
+			}
+		}
+		else
+		{
+			SDL_SetWindowSize(mWindow, width, height);
+		}
 		return TRUE;
 	}
 
@@ -956,8 +1119,8 @@ BOOL LLWindowSDL::setSizeImpl(LLCoordWindow size)
 void LLWindowSDL::swapBuffers()
 {
 	if (mWindow)
-	{	
-		SDL_GL_SwapBuffers();
+	{
+		SDL_GL_SwapWindow(mWindow);
 	}
 }
 
@@ -973,22 +1136,33 @@ void LLWindowSDL::setFSAASamples(const U32 samples)
 
 F32 LLWindowSDL::getGamma()
 {
-	return 1/mGamma;
+	return 1.f / mGamma;
 }
 
 BOOL LLWindowSDL::restoreGamma()
 {
-	//CGDisplayRestoreColorSyncSettings();
-    SDL_SetGamma(1.0f, 1.0f, 1.0f);
+	if (mWindow)
+	{
+		Uint16 ramp[256];
+		SDL_CalculateGammaRamp(1.f, ramp);
+		SDL_SetWindowGammaRamp(mWindow, ramp, ramp, ramp);
+	}
 	return true;
 }
 
 BOOL LLWindowSDL::setGamma(const F32 gamma)
 {
-	mGamma = gamma;
-	if (mGamma == 0) mGamma = 0.1f;
-	mGamma = 1/mGamma;
-	SDL_SetGamma(mGamma, mGamma, mGamma);
+	if (mWindow)
+	{
+		Uint16 ramp[256];
+
+		mGamma = gamma;
+		if (mGamma == 0) mGamma = 0.1f;
+		mGamma = 1.f / mGamma;
+
+		SDL_CalculateGammaRamp(mGamma, ramp);
+		SDL_SetWindowGammaRamp(mWindow, ramp, ramp, ramp);
+	}
 	return true;
 }
 
@@ -1008,18 +1182,10 @@ void LLWindowSDL::setMinSize(U32 min_width, U32 min_height, bool enforce_immedia
 {
 	LLWindow::setMinSize(min_width, min_height, enforce_immediately);
 
-#if LL_X11
-	// Set the minimum size limits for X11 window
-	// so the window manager doesn't allow resizing below those limits.
-	XSizeHints* hints = XAllocSizeHints();
-	hints->flags |= PMinSize;
-	hints->min_width = mMinWindowWidth;
-	hints->min_height = mMinWindowHeight;
-
-	XSetWMNormalHints(mSDL_Display, mSDL_XWindowID, hints);
-
-	XFree(hints);
-#endif
+	if (mWindow)
+	{
+		SDL_SetWindowMinimumSize(mWindow, mMinWindowWidth, mMinWindowHeight);
+	}
 }
 
 BOOL LLWindowSDL::setCursorPosition(LLCoordWindow position)
@@ -1035,8 +1201,8 @@ BOOL LLWindowSDL::setCursorPosition(LLCoordWindow position)
 	//LL_INFOS() << "setCursorPosition(" << screen_pos.mX << ", " << screen_pos.mY << ")" << LL_ENDL;
 
 	// do the actual forced cursor move.
-	SDL_WarpMouse(screen_pos.mX, screen_pos.mY);
-	
+	SDL_WarpMouseInWindow(mWindow, screen_pos.mX, screen_pos.mY);
+
 	//LL_INFOS() << llformat("llcw %d,%d -> scr %d,%d", position.mX, position.mY, screen_pos.mX, screen_pos.mY) << LL_ENDL;
 
 	return result;
@@ -1047,13 +1213,7 @@ BOOL LLWindowSDL::getCursorPosition(LLCoordWindow *position)
 	//Point cursor_point;
 	LLCoordScreen screen_pos;
 
-	//GetMouse(&cursor_point);
-    int x, y;
-    SDL_GetMouseState(&x, &y);
-
-	screen_pos.mX = x;
-	screen_pos.mY = y;
-
+	SDL_GetMouseState(&screen_pos.mX, &screen_pos.mY);
 	return convertCoords(screen_pos, position);
 }
 
@@ -1131,9 +1291,9 @@ void LLWindowSDL::beforeDialog()
 			// need to temporarily go non-fullscreen; bless SDL
 			// for providing a SDL_WM_ToggleFullScreen() - though
 			// it only works in X11
-			if (running_x11 && mWindow)
+			if (mWindow)
 			{
-				SDL_WM_ToggleFullScreen(mWindow);
+				SDL_SetWindowFullscreen( mWindow, 0 );
 			}
 		}
 	}
@@ -1173,11 +1333,13 @@ void LLWindowSDL::afterDialog()
 	{
 		// need to restore fullscreen mode after dialog - only works
 		// in X11
-		if (running_x11 && mWindow)
+		if (mWindow)
 		{
-			SDL_WM_ToggleFullScreen(mWindow);
+			SDL_SetWindowFullscreen( mWindow, SDL_WINDOW_FULLSCREEN);
 		}
 	}
+
+	SDL_GL_MakeCurrent(mWindow, mGLContext);	
 }
 
 
@@ -1353,35 +1515,29 @@ LLWindow::LLWindowResolution* LLWindowSDL::getSupportedResolutions(S32 &num_reso
 	if (!mSupportedResolutions)
 	{
 		mSupportedResolutions = new LLWindowResolution[MAX_NUM_RESOLUTIONS];
+	}
 		mNumSupportedResolutions = 0;
-
-		SDL_Rect **modes = SDL_ListModes(NULL, SDL_OPENGL | SDL_FULLSCREEN);
-		if ( (modes != NULL) && (modes != ((SDL_Rect **) -1)) )
-		{
-			int count = 0;
-			while (*modes && count<MAX_NUM_RESOLUTIONS)  // they're sorted biggest to smallest, so find end...
+	int mode_count = SDL_GetNumDisplayModes(0);
+		mode_count = llclamp( mode_count, 0, MAX_NUM_RESOLUTIONS );
+	for (int i = mode_count - 1; i >= 0; i--)
 			{
-				modes++;
-				count++;
-			}
+		SDL_DisplayMode mode = { SDL_PIXELFORMAT_UNKNOWN, 0, 0, 0, 0 };
+		if (SDL_GetDisplayMode(0, i, &mode) == 0)
 
-			while (count--)
 			{
-				modes--;
-				SDL_Rect *r = *modes;
-				int w = r->w;
-				int h = r->h;
+			int w = mode.w;
+			int h = mode.h;
 				if ((w >= 800) && (h >= 600))
 				{
 					// make sure we don't add the same resolution multiple times!
 					if ( (mNumSupportedResolutions == 0) ||
 						 ((mSupportedResolutions[mNumSupportedResolutions-1].mWidth != w) &&
-						  (mSupportedResolutions[mNumSupportedResolutions-1].mHeight != h)) )
+					(mSupportedResolutions[mNumSupportedResolutions - 1].mHeight != h))
+					)
 					{
 						mSupportedResolutions[mNumSupportedResolutions].mWidth = w;
 						mSupportedResolutions[mNumSupportedResolutions].mHeight = h;
 						mNumSupportedResolutions++;
-					}
 				}
 			}
 		}
@@ -1396,8 +1552,13 @@ BOOL LLWindowSDL::convertCoords(LLCoordGL from, LLCoordWindow *to)
 	if (!to)
 		return FALSE;
 
+	if (!mWindow)
+		return FALSE;
+	S32 height;
+	SDL_GetWindowSize(mWindow, nullptr, &height);
+
 	to->mX = from.mX;
-	to->mY = mWindow->h - from.mY - 1;
+	to->mY = height - from.mY - 1;
 
 	return TRUE;
 }
@@ -1407,8 +1568,13 @@ BOOL LLWindowSDL::convertCoords(LLCoordWindow from, LLCoordGL* to)
 	if (!to)
 		return FALSE;
 
+	if (!mWindow)
+		return FALSE;
+	S32 height;
+	SDL_GetWindowSize(mWindow, nullptr, &height);
+
 	to->mX = from.mX;
-	to->mY = mWindow->h - from.mY - 1;
+	to->mY = height - from.mY - 1;
 
 	return TRUE;
 }
@@ -1469,13 +1635,13 @@ BOOL LLWindowSDL::SDLReallyCaptureInput(BOOL capture)
 	else
 		mReallyCapturedCount = 0;
 	
-	SDL_GrabMode wantmode, newmode;
+	bool wantGrab;
 	if (mReallyCapturedCount <= 0) // uncapture
 	{
-		wantmode = SDL_GRAB_OFF;
+		wantGrab = false;
 	} else // capture
 	{
-		wantmode = SDL_GRAB_ON;
+		wantGrab = true;
 	}
 	
 	if (mReallyCapturedCount < 0) // yuck, imbalance.
@@ -1484,9 +1650,10 @@ BOOL LLWindowSDL::SDLReallyCaptureInput(BOOL capture)
 		LL_WARNS() << "ReallyCapture count was < 0" << LL_ENDL;
 	}
 
+	bool newGrab = wantGrab;
+#if LL_X11
 	if (!mFullscreen) /* only bother if we're windowed anyway */
 	{
-#if LL_X11
 		if (mSDL_Display)
 		{
 			/* we dirtily mix raw X11 with SDL so that our pointer
@@ -1499,7 +1666,7 @@ BOOL LLWindowSDL::SDLReallyCaptureInput(BOOL capture)
 			   *keyboard* input from the window manager, which was
 			   frustrating users. */
 			int result;
-			if (wantmode == SDL_GRAB_ON)
+			if (wantGrab == true)
 			{
 				//LL_INFOS() << "X11 POINTER GRABBY" << LL_ENDL;
 				//newmode = SDL_WM_GrabInput(wantmode);
@@ -1510,13 +1677,13 @@ BOOL LLWindowSDL::SDLReallyCaptureInput(BOOL capture)
 						      None, None, CurrentTime);
 				maybe_unlock_display();
 				if (GrabSuccess == result)
-					newmode = SDL_GRAB_ON;
+					newGrab = true;
 				else
-					newmode = SDL_GRAB_OFF;
-			} else if (wantmode == SDL_GRAB_OFF)
+					newGrab = false;
+			}
+			else
 			{
-				//LL_INFOS() << "X11 POINTER UNGRABBY" << LL_ENDL;
-				newmode = SDL_GRAB_OFF;
+				newGrab = false;
 				//newmode = SDL_WM_GrabInput(SDL_GRAB_OFF);
 				
 				maybe_lock_display();
@@ -1524,24 +1691,17 @@ BOOL LLWindowSDL::SDLReallyCaptureInput(BOOL capture)
 				// Make sure the ungrab happens RIGHT NOW.
 				XSync(mSDL_Display, False);
 				maybe_unlock_display();
-			} else
-			{
-				newmode = SDL_GRAB_QUERY; // neutral
 			}
-		} else // not actually running on X11, for some reason
-			newmode = wantmode;
+		}
+			}
 #endif // LL_X11
-	} else {
 		// pretend we got what we wanted, when really we don't care.
-		newmode = wantmode;
-	}
 	
 	// return boolean success for whether we ended up in the desired state
-	return (capture && SDL_GRAB_ON==newmode) ||
-		(!capture && SDL_GRAB_OFF==newmode);
+	return capture == newGrab;
 }
 
-U32 LLWindowSDL::SDLCheckGrabbyKeys(SDLKey keysym, BOOL gain)
+U32 LLWindowSDL::SDLCheckGrabbyKeys(SDL_Keycode keysym, BOOL gain)
 {
 	/* part of the fix for SL-13243: Some popular window managers like
 	   to totally eat alt-drag for the purposes of moving windows.  We
@@ -1718,11 +1878,7 @@ void LLWindowSDL::processMiscNativeEvents()
 
 void LLWindowSDL::gatherInput()
 {
-    const Uint32 CLICK_THRESHOLD = 300;  // milliseconds
-    static int leftClick = 0;
-    static int rightClick = 0;
-    static Uint32 lastLeftDown = 0;
-    static Uint32 lastRightDown = 0;
+    // Handle all outstanding SDL events
     SDL_Event event;
 
     // Handle all outstanding SDL events
@@ -1730,216 +1886,210 @@ void LLWindowSDL::gatherInput()
     {
         switch (event.type)
         {
-            case SDL_MOUSEMOTION:
+        case SDL_MOUSEMOTION:
+        {
+            LLCoordWindow winCoord(event.motion.x, event.motion.y);
+            LLCoordGL openGlCoord;
+            convertCoords(winCoord, &openGlCoord);
+            MASK mask = gKeyboard->currentMask(TRUE);
+            mCallbacks->handleMouseMove(this, openGlCoord, mask);
+            break;
+        }
+        case SDL_MOUSEWHEEL:
+        {
+            if (event.wheel.y != 0)
             {
-                LLCoordWindow winCoord(event.button.x, event.button.y);
-                LLCoordGL openGlCoord;
-                convertCoords(winCoord, &openGlCoord);
-				MASK mask = gKeyboard->currentMask(TRUE);
-				mCallbacks->handleMouseMove(this, openGlCoord, mask);
-                break;
+                mCallbacks->handleScrollWheel(this, -event.wheel.y);
+            }
+            if (event.wheel.x != 0)
+            {
+                mCallbacks->handleScrollHWheel(this, -event.wheel.x);
+            }
+            break;
+        }
+        case SDL_TEXTINPUT:
+        {
+            auto string = utf8str_to_utf16str(event.text.text);
+            for (auto key : string)
+            {
+                mKeyVirtualKey = key;
+                handleUnicodeUTF16(key, gKeyboard->currentMask(FALSE));
+            }
+            break;
+        }
+        case SDL_KEYDOWN:
+        {
+            mKeyScanCode = event.key.keysym.scancode;
+            mKeyVirtualKey = event.key.keysym.sym;
+            mKeyModifiers = (SDL_Keymod) event.key.keysym.mod;
+
+            gKeyboard->handleKeyDown(mKeyVirtualKey, mKeyModifiers);
+            if (mKeyVirtualKey == SDLK_RETURN)
+                handleUnicodeUTF16(mKeyVirtualKey, gKeyboard->currentMask(FALSE));
+            // part of the fix for SL-13243
+            if (SDLCheckGrabbyKeys(event.key.keysym.sym, TRUE) != 0)
+                SDLReallyCaptureInput(TRUE);
+
+            break;
+        }
+        case SDL_KEYUP:
+            mKeyScanCode = event.key.keysym.scancode;
+            mKeyVirtualKey = event.key.keysym.sym;
+            mKeyModifiers = (SDL_Keymod) event.key.keysym.mod;
+
+            if (SDLCheckGrabbyKeys(mKeyVirtualKey, FALSE) == 0)
+                SDLReallyCaptureInput(FALSE); // part of the fix for SL-13243
+
+            gKeyboard->handleKeyUp(mKeyVirtualKey, mKeyModifiers);
+            break;
+
+        case SDL_MOUSEBUTTONDOWN:
+        {
+            LLCoordWindow winCoord(event.button.x, event.button.y);
+            LLCoordGL openGlCoord;
+            convertCoords(winCoord, &openGlCoord);
+            MASK mask = gKeyboard->currentMask(TRUE);
+
+            if (event.button.button == SDL_BUTTON_LEFT) // SDL doesn't manage double clicking...
+            {
+                if (event.button.clicks >= 2)
+                    mCallbacks->handleDoubleClick(this, openGlCoord, mask);
+                else
+                    mCallbacks->handleMouseDown(this, openGlCoord, mask);
             }
 
-            case SDL_KEYDOWN:
-		    mKeyScanCode = event.key.keysym.scancode;
-		    mKeyVirtualKey = event.key.keysym.unicode;
-		    mKeyModifiers = event.key.keysym.mod;
-
-		    gKeyboard->handleKeyDown(event.key.keysym.sym, event.key.keysym.mod);
-		    // part of the fix for SL-13243
-		    if (SDLCheckGrabbyKeys(event.key.keysym.sym, TRUE) != 0)
-			    SDLReallyCaptureInput(TRUE);
-
-		    if (event.key.keysym.unicode)
-		    {
-			    handleUnicodeUTF16(event.key.keysym.unicode,
-					       gKeyboard->currentMask(FALSE));
-		    }
-                break;
-
-            case SDL_KEYUP:
-		    mKeyScanCode = event.key.keysym.scancode;
-		    mKeyVirtualKey = event.key.keysym.unicode;
-		    mKeyModifiers = event.key.keysym.mod;
-
-		    if (SDLCheckGrabbyKeys(event.key.keysym.sym, FALSE) == 0)
-			    SDLReallyCaptureInput(FALSE); // part of the fix for SL-13243
-
-		    gKeyboard->handleKeyUp(event.key.keysym.sym, event.key.keysym.mod);
-		    break;
-
-            case SDL_MOUSEBUTTONDOWN:
+            else if (event.button.button == SDL_BUTTON_RIGHT) // right
             {
-                bool isDoubleClick = false;
-                LLCoordWindow winCoord(event.button.x, event.button.y);
-                LLCoordGL openGlCoord;
-                convertCoords(winCoord, &openGlCoord);
-		MASK mask = gKeyboard->currentMask(TRUE);
-
-                if (event.button.button == SDL_BUTTON_LEFT)   // SDL doesn't manage double clicking...
-                {
-                    Uint32 now = SDL_GetTicks();
-                    if ((now - lastLeftDown) > CLICK_THRESHOLD)
-                        leftClick = 1;
-                    else
-                    {
-                        if (++leftClick >= 2)
-                        {
-                            leftClick = 0;
-			    isDoubleClick = true;
-                        }
-                    }
-                    lastLeftDown = now;
-                }
-                else if (event.button.button == SDL_BUTTON_RIGHT)
-                {
-                    Uint32 now = SDL_GetTicks();
-                    if ((now - lastRightDown) > CLICK_THRESHOLD)
-                        rightClick = 1;
-                    else
-                    {
-                        if (++rightClick >= 2)
-                        {
-                            rightClick = 0;
-    					    isDoubleClick = true;
-                        }
-                    }
-                    lastRightDown = now;
-                }
-
-                if (event.button.button == SDL_BUTTON_LEFT)  // left
-                {
-                    if (isDoubleClick)
-				        mCallbacks->handleDoubleClick(this, openGlCoord, mask);
-                    else
-    				    mCallbacks->handleMouseDown(this, openGlCoord, mask);
-                }
-
-                else if (event.button.button == SDL_BUTTON_RIGHT)  // right
-                {
-			mCallbacks->handleRightMouseDown(this, openGlCoord, mask);
-                }
-
-                else if (event.button.button == SDL_BUTTON_MIDDLE)  // middle
-				{
-				    mCallbacks->handleMiddleMouseDown(this, openGlCoord, mask);
-				}
-                else if (event.button.button == 4)  // mousewheel up...thanks to X11 for making SDL consider these "buttons".
-					mCallbacks->handleScrollWheel(this, -1);
-                else if (event.button.button == 5)  // mousewheel down...thanks to X11 for making SDL consider these "buttons".
-					mCallbacks->handleScrollWheel(this, 1);
-
-                break;
+                mCallbacks->handleRightMouseDown(this, openGlCoord, mask);
             }
 
-            case SDL_MOUSEBUTTONUP:
+            else if (event.button.button == SDL_BUTTON_MIDDLE) // middle
             {
-                LLCoordWindow winCoord(event.button.x, event.button.y);
-                LLCoordGL openGlCoord;
-                convertCoords(winCoord, &openGlCoord);
-		MASK mask = gKeyboard->currentMask(TRUE);
-
-                if (event.button.button == SDL_BUTTON_LEFT)  // left
-			mCallbacks->handleMouseUp(this, openGlCoord, mask);
-                else if (event.button.button == SDL_BUTTON_RIGHT)  // right
-			mCallbacks->handleRightMouseUp(this, openGlCoord, mask);
-                else if (event.button.button == SDL_BUTTON_MIDDLE)  // middle
-			mCallbacks->handleMiddleMouseUp(this, openGlCoord, mask);
-                // don't handle mousewheel here...
-
-                break;
+                mCallbacks->handleMiddleMouseDown(this, openGlCoord, mask);
             }
 
-            case SDL_VIDEOEXPOSE:  // VIDEOEXPOSE doesn't specify the damage, but hey, it's OpenGL...repaint the whole thing!
-			    mCallbacks->handlePaint(this, 0, 0, mWindow->w, mWindow->h);
-                break;
+            break;
+        }
 
-            case SDL_VIDEORESIZE:  // *FIX: handle this?
+        case SDL_MOUSEBUTTONUP:
+        {
+            LLCoordWindow winCoord(event.button.x, event.button.y);
+            LLCoordGL openGlCoord;
+            convertCoords(winCoord, &openGlCoord);
+            MASK mask = gKeyboard->currentMask(TRUE);
+
+            if (event.button.button == SDL_BUTTON_LEFT) // left
+                mCallbacks->handleMouseUp(this, openGlCoord, mask);
+            else if (event.button.button == SDL_BUTTON_RIGHT) // right
+                mCallbacks->handleRightMouseUp(this, openGlCoord, mask);
+            else if (event.button.button == SDL_BUTTON_MIDDLE) // middle
+                mCallbacks->handleMiddleMouseUp(this, openGlCoord, mask);
+            // don't handle mousewheel here...
+
+            break;
+        }
+
+        case SDL_WINDOWEVENT:
+        {
+            switch (event.window.event)
             {
-		LL_INFOS() << "Handling a resize event: " << event.resize.w <<
-			"x" << event.resize.h << LL_ENDL;
-
-		S32 width = llmax(event.resize.w, (S32)mMinWindowWidth);
-		S32 height = llmax(event.resize.h, (S32)mMinWindowHeight);
-
-		// *FIX: I'm not sure this is necessary!
-		mWindow = SDL_SetVideoMode(width, height, 32, mSDLFlags);
-		if (!mWindow)
-		{
-			// *FIX: More informative dialog?
-			LL_INFOS() << "Could not recreate context after resize! Quitting..." << LL_ENDL;
-			if(mCallbacks->handleCloseRequest(this))
-    			{
-    				// Get the app to initiate cleanup.
-    				mCallbacks->handleQuit(this);
-    				// The app is responsible for calling destroyWindow when done with GL
-    			}
+            case SDL_WINDOWEVENT_SHOWN:
                 break;
-		}
+            case SDL_WINDOWEVENT_HIDDEN:
+                break;
+            case SDL_WINDOWEVENT_EXPOSED:
+            {
+                int width, height = 0;
+                SDL_GetWindowSize(mWindow, &width, &height);
 
-		mCallbacks->handleResize(this, width, height);
+                mCallbacks->handlePaint(this, 0, 0, width, height);
                 break;
             }
-            case SDL_ACTIVEEVENT:
-                if (event.active.state & SDL_APPINPUTFOCUS)
-                {
-			// Note that for SDL (particularly on X11), keyboard
-			// and mouse focus are independent things.  Here we are
-			// tracking keyboard focus state changes.
+            case SDL_WINDOWEVENT_MOVED:
+                break;
+            //case SDL_WINDOWEVENT_SIZE_CHANGED:
+            case SDL_WINDOWEVENT_RESIZED:
+            {
+                S32 width = llmax(event.window.data1, (S32) mMinWindowWidth);
+                S32 height = llmax(event.window.data2, (S32) mMinWindowHeight);
 
-			// We have to do our own state massaging because SDL
-			// can send us two unfocus events in a row for example,
-			// which confuses the focus code [SL-24071].
-			if (event.active.gain != mHaveInputFocus)
-			{
-				mHaveInputFocus = event.active.gain != 0;
+                // // *FIX: I'm not sure this is necessary!
+                // mWindow = SDL_SetVideoMode(width, height, 32, mSDLFlags);
+                // if (!mWindow)
+                // {
+                //     // *FIX: More informative dialog?
+                //     LL_INFOS() << "Could not recreate context after resize! Quitting..." << LL_ENDL;
+                //     if (mCallbacks->handleCloseRequest(this))
+                //     {
+                //         // Get the app to initiate cleanup.
+                //         mCallbacks->handleQuit(this);
+                //         // The app is responsible for calling destroyWindow when done with GL
+                //     }
+                //     break;
+                // }
 
-				if (mHaveInputFocus)
-					mCallbacks->handleFocus(this);
-				else
-					mCallbacks->handleFocusLost(this);
-			}
-                }
-                if (event.active.state & SDL_APPACTIVE)
-                {
-			// Change in iconification/minimization state.
-			if ((!event.active.gain) != mIsMinimized)
-			{
-				mIsMinimized = (!event.active.gain);
+                mCallbacks->handleResize(this, width, height);
+                break;
+            }
+            case SDL_WINDOWEVENT_MINIMIZED:
+                [[fallthrough]];
+            case SDL_WINDOWEVENT_MAXIMIZED:
+                [[fallthrough]];
+            case SDL_WINDOWEVENT_RESTORED:
+                mIsMinimized = (event.window.event == SDL_WINDOWEVENT_MINIMIZED);
 
-				mCallbacks->handleActivate(this, !mIsMinimized);
-				LL_INFOS() << "SDL deiconification state switched to " << BOOL(event.active.gain) << LL_ENDL;
-			}
-			else
-			{
-				LL_INFOS() << "Ignored bogus redundant SDL deiconification state switch to " << BOOL(event.active.gain) << LL_ENDL;
-			}
-                }
+                mCallbacks->handleActivate(this, !mIsMinimized);
+                LL_INFOS() << "SDL deiconification state switched to " << mIsMinimized << LL_ENDL;
                 break;
 
-            case SDL_QUIT:
-			    if(mCallbacks->handleCloseRequest(this))
-    			{
-    				// Get the app to initiate cleanup.
-    				mCallbacks->handleQuit(this);
-    				// The app is responsible for calling destroyWindow when done with GL
-    			}
+            case SDL_WINDOWEVENT_ENTER:
                 break;
-	default:
-		//LL_INFOS() << "Unhandled SDL event type " << event.type << LL_ENDL;
-		break;
+            case SDL_WINDOWEVENT_LEAVE:
+                break;
+            case SDL_WINDOWEVENT_FOCUS_GAINED:
+                mHaveInputFocus = true;
+                mCallbacks->handleFocus(this);
+                break;
+            case SDL_WINDOWEVENT_FOCUS_LOST:
+                mHaveInputFocus = false;
+                mCallbacks->handleFocusLost(this);
+                break;
+            case SDL_WINDOWEVENT_CLOSE:
+                break;
+#if SDL_VERSION_ATLEAST(2, 0, 5)
+            case SDL_WINDOWEVENT_TAKE_FOCUS:
+                break;
+            case SDL_WINDOWEVENT_HIT_TEST:
+                break;
+#endif
+            default:
+                break;
+            }
+            break;
+        }
+        case SDL_QUIT:
+            if (mCallbacks->handleCloseRequest(this))
+            {
+                // Get the app to initiate cleanup.
+                mCallbacks->handleQuit(this);
+                // The app is responsible for calling destroyWindow when done with GL
+            }
+            break;
+        default:
+            // LL_INFOS() << "Unhandled SDL event type " << event.type << LL_ENDL;
+            break;
         }
     }
-	
-	updateCursor();
+
+    updateCursor();
 
 #if LL_X11
     // This is a good time to stop flashing the icon if our mFlashTimer has
     // expired.
     if (mFlashing && mFlashTimer.hasExpired())
     {
-	    x11_set_urgent(FALSE);
-	    mFlashing = FALSE;
+        x11_set_urgent(FALSE);
+        mFlashing = FALSE;
     }
 #endif // LL_X11
 }
@@ -2050,48 +2200,48 @@ void LLWindowSDL::initCursors()
 	// We hardcode the hotspots - to avoid that we'd have to write
 	// a .cur file loader.
 	// NOTE: SDL doesn't load RLE-compressed BMP files.
-	mSDLCursors[UI_CURSOR_ARROW] = makeSDLCursorFromBMP("llarrow.BMP",0,0);
-	mSDLCursors[UI_CURSOR_WAIT] = makeSDLCursorFromBMP("wait.BMP",12,15);
-	mSDLCursors[UI_CURSOR_HAND] = makeSDLCursorFromBMP("hand.BMP",7,10);
-	mSDLCursors[UI_CURSOR_IBEAM] = makeSDLCursorFromBMP("ibeam.BMP",15,16);
-	mSDLCursors[UI_CURSOR_CROSS] = makeSDLCursorFromBMP("cross.BMP",16,14);
-	mSDLCursors[UI_CURSOR_SIZENWSE] = makeSDLCursorFromBMP("sizenwse.BMP",14,17);
-	mSDLCursors[UI_CURSOR_SIZENESW] = makeSDLCursorFromBMP("sizenesw.BMP",17,17);
-	mSDLCursors[UI_CURSOR_SIZEWE] = makeSDLCursorFromBMP("sizewe.BMP",16,14);
-	mSDLCursors[UI_CURSOR_SIZENS] = makeSDLCursorFromBMP("sizens.BMP",17,16);
-	mSDLCursors[UI_CURSOR_NO] = makeSDLCursorFromBMP("llno.BMP",8,8);
-	mSDLCursors[UI_CURSOR_WORKING] = makeSDLCursorFromBMP("working.BMP",12,15);
-	mSDLCursors[UI_CURSOR_TOOLGRAB] = makeSDLCursorFromBMP("lltoolgrab.BMP",2,13);
-	mSDLCursors[UI_CURSOR_TOOLLAND] = makeSDLCursorFromBMP("lltoolland.BMP",1,6);
-	mSDLCursors[UI_CURSOR_TOOLFOCUS] = makeSDLCursorFromBMP("lltoolfocus.BMP",8,5);
-	mSDLCursors[UI_CURSOR_TOOLCREATE] = makeSDLCursorFromBMP("lltoolcreate.BMP",7,7);
-	mSDLCursors[UI_CURSOR_ARROWDRAG] = makeSDLCursorFromBMP("arrowdrag.BMP",0,0);
-	mSDLCursors[UI_CURSOR_ARROWCOPY] = makeSDLCursorFromBMP("arrowcop.BMP",0,0);
-	mSDLCursors[UI_CURSOR_ARROWDRAGMULTI] = makeSDLCursorFromBMP("llarrowdragmulti.BMP",0,0);
-	mSDLCursors[UI_CURSOR_ARROWCOPYMULTI] = makeSDLCursorFromBMP("arrowcopmulti.BMP",0,0);
-	mSDLCursors[UI_CURSOR_NOLOCKED] = makeSDLCursorFromBMP("llnolocked.BMP",8,8);
-	mSDLCursors[UI_CURSOR_ARROWLOCKED] = makeSDLCursorFromBMP("llarrowlocked.BMP",0,0);
-	mSDLCursors[UI_CURSOR_GRABLOCKED] = makeSDLCursorFromBMP("llgrablocked.BMP",2,13);
-	mSDLCursors[UI_CURSOR_TOOLTRANSLATE] = makeSDLCursorFromBMP("lltooltranslate.BMP",0,0);
-	mSDLCursors[UI_CURSOR_TOOLROTATE] = makeSDLCursorFromBMP("lltoolrotate.BMP",0,0);
-	mSDLCursors[UI_CURSOR_TOOLSCALE] = makeSDLCursorFromBMP("lltoolscale.BMP",0,0);
-	mSDLCursors[UI_CURSOR_TOOLCAMERA] = makeSDLCursorFromBMP("lltoolcamera.BMP",7,5);
-	mSDLCursors[UI_CURSOR_TOOLPAN] = makeSDLCursorFromBMP("lltoolpan.BMP",7,5);
-	mSDLCursors[UI_CURSOR_TOOLZOOMIN] = makeSDLCursorFromBMP("lltoolzoomin.BMP",7,5);
-	mSDLCursors[UI_CURSOR_TOOLPICKOBJECT3] = makeSDLCursorFromBMP("toolpickobject3.BMP",0,0);
-	mSDLCursors[UI_CURSOR_TOOLPLAY] = makeSDLCursorFromBMP("toolplay.BMP",0,0);
-	mSDLCursors[UI_CURSOR_TOOLPAUSE] = makeSDLCursorFromBMP("toolpause.BMP",0,0);
-	mSDLCursors[UI_CURSOR_TOOLMEDIAOPEN] = makeSDLCursorFromBMP("toolmediaopen.BMP",0,0);
-	mSDLCursors[UI_CURSOR_PIPETTE] = makeSDLCursorFromBMP("lltoolpipette.BMP",2,28);
-	mSDLCursors[UI_CURSOR_TOOLSIT] = makeSDLCursorFromBMP("toolsit.BMP",20,15);
-	mSDLCursors[UI_CURSOR_TOOLBUY] = makeSDLCursorFromBMP("toolbuy.BMP",20,15);
-	mSDLCursors[UI_CURSOR_TOOLOPEN] = makeSDLCursorFromBMP("toolopen.BMP",20,15);
+	mSDLCursors[UI_CURSOR_ARROW] = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_ARROW);
+	mSDLCursors[UI_CURSOR_WAIT] = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_WAIT);
+	mSDLCursors[UI_CURSOR_HAND] = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_HAND);
+	mSDLCursors[UI_CURSOR_IBEAM] = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_IBEAM);
+	mSDLCursors[UI_CURSOR_CROSS] = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_CROSSHAIR);
+	mSDLCursors[UI_CURSOR_SIZENWSE] = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_SIZENWSE);
+	mSDLCursors[UI_CURSOR_SIZENESW] = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_SIZENESW);
+	mSDLCursors[UI_CURSOR_SIZEWE] = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_SIZEWE);
+	mSDLCursors[UI_CURSOR_SIZENS] = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_SIZENS);
+	mSDLCursors[UI_CURSOR_NO] = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_NO);
+	mSDLCursors[UI_CURSOR_WORKING] = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_WAITARROW);
+	mSDLCursors[UI_CURSOR_TOOLGRAB] = makeSDLCursorFromBMP("lltoolgrab.BMP", 2, 13);
+	mSDLCursors[UI_CURSOR_TOOLLAND] = makeSDLCursorFromBMP("lltoolland.BMP", 1, 6);
+	mSDLCursors[UI_CURSOR_TOOLFOCUS] = makeSDLCursorFromBMP("lltoolfocus.BMP", 8, 5);
+	mSDLCursors[UI_CURSOR_TOOLCREATE] = makeSDLCursorFromBMP("lltoolcreate.BMP", 7, 7);
+	mSDLCursors[UI_CURSOR_ARROWDRAG] = makeSDLCursorFromBMP("arrowdrag.BMP", 0, 0);
+	mSDLCursors[UI_CURSOR_ARROWCOPY] = makeSDLCursorFromBMP("arrowcop.BMP", 0, 0);
+	mSDLCursors[UI_CURSOR_ARROWDRAGMULTI] = makeSDLCursorFromBMP("llarrowdragmulti.BMP", 0, 0);
+	mSDLCursors[UI_CURSOR_ARROWCOPYMULTI] = makeSDLCursorFromBMP("arrowcopmulti.BMP", 0, 0);
+	mSDLCursors[UI_CURSOR_NOLOCKED] = makeSDLCursorFromBMP("llnolocked.BMP", 8, 8);
+	mSDLCursors[UI_CURSOR_ARROWLOCKED] = makeSDLCursorFromBMP("llarrowlocked.BMP", 0, 0);
+	mSDLCursors[UI_CURSOR_GRABLOCKED] = makeSDLCursorFromBMP("llgrablocked.BMP", 2, 13);
+	mSDLCursors[UI_CURSOR_TOOLTRANSLATE] = makeSDLCursorFromBMP("lltooltranslate.BMP", 0, 0);
+	mSDLCursors[UI_CURSOR_TOOLROTATE] = makeSDLCursorFromBMP("lltoolrotate.BMP", 0, 0);
+	mSDLCursors[UI_CURSOR_TOOLSCALE] = makeSDLCursorFromBMP("lltoolscale.BMP", 0, 0);
+	mSDLCursors[UI_CURSOR_TOOLCAMERA] = makeSDLCursorFromBMP("lltoolcamera.BMP", 7, 5);
+	mSDLCursors[UI_CURSOR_TOOLPAN] = makeSDLCursorFromBMP("lltoolpan.BMP", 7, 5);
+	mSDLCursors[UI_CURSOR_TOOLZOOMIN] = makeSDLCursorFromBMP("lltoolzoomin.BMP", 7, 5);
+	mSDLCursors[UI_CURSOR_TOOLPICKOBJECT3] = makeSDLCursorFromBMP("toolpickobject3.BMP", 0, 0);
+	mSDLCursors[UI_CURSOR_TOOLPLAY] = makeSDLCursorFromBMP("toolplay.BMP", 0, 0);
+	mSDLCursors[UI_CURSOR_TOOLPAUSE] = makeSDLCursorFromBMP("toolpause.BMP", 0, 0);
+	mSDLCursors[UI_CURSOR_TOOLMEDIAOPEN] = makeSDLCursorFromBMP("toolmediaopen.BMP", 0, 0);
+	mSDLCursors[UI_CURSOR_PIPETTE] = makeSDLCursorFromBMP("lltoolpipette.BMP", 2, 28);
+	mSDLCursors[UI_CURSOR_TOOLSIT] = makeSDLCursorFromBMP("toolsit.BMP", 20, 15);
+	mSDLCursors[UI_CURSOR_TOOLBUY] = makeSDLCursorFromBMP("toolbuy.BMP", 20, 15);
+	mSDLCursors[UI_CURSOR_TOOLOPEN] = makeSDLCursorFromBMP("toolopen.BMP", 20, 15);
 	mSDLCursors[UI_CURSOR_TOOLPATHFINDING] = makeSDLCursorFromBMP("lltoolpathfinding.BMP", 16, 16);
 	mSDLCursors[UI_CURSOR_TOOLPATHFINDING_PATH_START] = makeSDLCursorFromBMP("lltoolpathfindingpathstart.BMP", 16, 16);
 	mSDLCursors[UI_CURSOR_TOOLPATHFINDING_PATH_START_ADD] = makeSDLCursorFromBMP("lltoolpathfindingpathstartadd.BMP", 16, 16);
 	mSDLCursors[UI_CURSOR_TOOLPATHFINDING_PATH_END] = makeSDLCursorFromBMP("lltoolpathfindingpathend.BMP", 16, 16);
 	mSDLCursors[UI_CURSOR_TOOLPATHFINDING_PATH_END_ADD] = makeSDLCursorFromBMP("lltoolpathfindingpathendadd.BMP", 16, 16);
-	mSDLCursors[UI_CURSOR_TOOLNO] = makeSDLCursorFromBMP("llno.BMP",8,8);
+	mSDLCursors[UI_CURSOR_TOOLNO] = makeSDLCursorFromBMP("llno.BMP", 8, 8);
 }
 
 void LLWindowSDL::quitCursors()
@@ -2664,6 +2814,6 @@ std::vector<std::string> LLWindowSDL::getDynamicFallbackFontList()
 
 void LLWindowSDL::setWindowTitle(const std::string& title)
 {
-	SDL_WM_SetCaption(title.c_str(), title.c_str());
+	SDL_SetWindowTitle(mWindow, title.c_str());
 }
 #endif // LL_SDL
