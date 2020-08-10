@@ -464,7 +464,7 @@ BOOL LLWindowSDL::createContext(int x, int y, int width, int height, int bits, B
 			y = SDL_WINDOWPOS_UNDEFINED;
 
 		LL_INFOS() << "Creating window " << width << "x" << height << "x" << bits << LL_ENDL;
-		mWindow = SDL_CreateWindow(mWindowTitle.c_str(), x, y, width, height, SDL_WINDOW_RESIZABLE | SDL_WINDOW_OPENGL);
+		mWindow = SDL_CreateWindow(mWindowTitle.c_str(), x, y, width, height, mSDLFlags);
 		if (mWindow == nullptr)
 		{
 			LL_WARNS() << "Window creation failure. SDL: " << SDL_GetError() << LL_ENDL;
@@ -1615,9 +1615,6 @@ BOOL LLWindowSDL::convertCoords(LLCoordGL from, LLCoordScreen *to)
 	return(convertCoords(from, &window_coord) && convertCoords(window_coord, to));
 }
 
-
-
-
 void LLWindowSDL::setupFailure(const std::string& text, const std::string& caption, U32 type)
 {
 	destroyContext();
@@ -2012,22 +2009,6 @@ void LLWindowSDL::gatherInput()
             {
                 S32 width = llmax(event.window.data1, (S32) mMinWindowWidth);
                 S32 height = llmax(event.window.data2, (S32) mMinWindowHeight);
-
-                // // *FIX: I'm not sure this is necessary!
-                // mWindow = SDL_SetVideoMode(width, height, 32, mSDLFlags);
-                // if (!mWindow)
-                // {
-                //     // *FIX: More informative dialog?
-                //     LL_INFOS() << "Could not recreate context after resize! Quitting..." << LL_ENDL;
-                //     if (mCallbacks->handleCloseRequest(this))
-                //     {
-                //         // Get the app to initiate cleanup.
-                //         mCallbacks->handleQuit(this);
-                //         // The app is responsible for calling destroyWindow when done with GL
-                //     }
-                //     break;
-                // }
-
                 mCallbacks->handleResize(this, width, height);
                 break;
             }
