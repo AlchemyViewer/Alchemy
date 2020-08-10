@@ -36,7 +36,7 @@ set(cmake_SOURCE_FILES
     GLEXT.cmake
     GLH.cmake
     GLOD.cmake
-##  GStreamer010Plugin.cmake
+    GStreamer010Plugin.cmake
     Havok.cmake
     Hunspell.cmake
     JPEG.cmake
