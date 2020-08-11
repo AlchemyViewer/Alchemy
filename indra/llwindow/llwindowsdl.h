@@ -138,8 +138,6 @@ public:
 	Window mSDL_XWindowID;
 	Display *mSDL_Display;
 #endif
-	void (*Lock_Display)(void);
-	void (*Unlock_Display)(void);
 
 #if LL_GTK
 	// Lazily initialize and check the runtime GTK version for goodness.
@@ -163,7 +161,6 @@ protected:
 
 	void	initCursors();
 	void	quitCursors();
-	void	moveWindow(const LLCoordScreen& position,const LLCoordScreen& size);
 
 	// Changes display resolution. Returns true if successful
 	BOOL	setDisplayResolution(S32 width, S32 height, S32 bits, S32 refresh);
@@ -182,7 +179,6 @@ protected:
 	BOOL createContext(int x, int y, int width, int height, int bits, BOOL fullscreen, BOOL disable_vsync);
 	void destroyContext();
 	void setupFailure(const std::string& text, const std::string& caption, U32 type);
-	void fixWindowSize(void);
 	U32 SDLCheckGrabbyKeys(SDL_Keycode keysym, BOOL gain);
 	BOOL SDLReallyCaptureInput(BOOL capture);
 

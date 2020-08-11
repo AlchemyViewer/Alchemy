@@ -84,23 +84,6 @@ const S32 MAX_NUM_RESOLUTIONS = 200;
 // be only one object of this class at any time.  Currently this is true.
 static LLWindowSDL *gWindowImplementation = NULL;
 
-
-void maybe_lock_display(void)
-{
-	if (gWindowImplementation && gWindowImplementation->Lock_Display) {
-		gWindowImplementation->Lock_Display();
-	}
-}
-
-
-void maybe_unlock_display(void)
-{
-	if (gWindowImplementation && gWindowImplementation->Unlock_Display) {
-		gWindowImplementation->Unlock_Display();
-	}
-}
-
-
 #if LL_GTK
 // Lazily initialize and check the runtime GTK version for goodness.
 // static
@@ -114,18 +97,14 @@ bool LLWindowSDL::ll_try_gtk_init(void)
 	if (!done_setlocale)
 	{
 		LL_INFOS() << "Starting GTK Initialization." << LL_ENDL;
-		maybe_lock_display();
 		gtk_disable_setlocale();
-		maybe_unlock_display();
 		done_setlocale = TRUE;
 	}
 	
 	if (!tried_gtk_init)
 	{
 		tried_gtk_init = TRUE;
-		maybe_lock_display();
 		gtk_is_good = gtk_init_check(NULL, NULL);
-		maybe_unlock_display();
 		if (!gtk_is_good)
 			LL_WARNS() << "GTK Initialization failed." << LL_ENDL;
 	}
@@ -141,12 +120,11 @@ bool LLWindowSDL::ll_try_gtk_init(void)
 			<< gtk_major_version << "."
 			<< gtk_minor_version << "."
 			<< gtk_micro_version << LL_ENDL;
-		maybe_lock_display();
+
 		const gchar* gtk_warning = gtk_check_version(
 			GTK_MAJOR_VERSION,
 			GTK_MINOR_VERSION,
 			GTK_MICRO_VERSION);
-		maybe_unlock_display();
 		if (gtk_warning)
 		{
 			LL_WARNS() << "- GTK COMPATIBILITY WARNING: " <<
@@ -192,8 +170,7 @@ LLWindowSDL::LLWindowSDL(LLWindowCallbacks* callbacks,
 			 BOOL disable_vsync, BOOL use_gl,
 			 BOOL ignore_pixel_depth, U32 fsaa_samples)
 	: LLWindow(callbacks, fullscreen, flags),
-	  Lock_Display(NULL),
-	  Unlock_Display(NULL), mGamma(1.0f)
+	  mGamma(1.0f)
 {
 	SDL_SetMainReady();
 
@@ -668,18 +645,12 @@ BOOL LLWindowSDL::createContext(int x, int y, int width, int height, int bits, B
 	{
 		LL_WARNS() << "OpenGL context creation failure. SDL: " << SDL_GetError() << LL_ENDL;
 		setupFailure("Context creation error", "Error", OSMB_OK);
-		SDL_DestroyWindow(mWindow);
-		mWindow = nullptr;
 		return FALSE;
 	}
 	if (SDL_GL_MakeCurrent(mWindow, mGLContext) != 0)
 	{
 		LL_WARNS() << "Failed to make context current. SDL: " << SDL_GetError() << LL_ENDL;
 		setupFailure("Context current failure", "Error", OSMB_OK);
-		SDL_GL_DeleteContext(mGLContext);
-		mGLContext = nullptr;
-		SDL_DestroyWindow(mWindow);
-		mWindow = nullptr;
 		return FALSE;
 	}
 	
@@ -701,102 +672,95 @@ BOOL LLWindowSDL::createContext(int x, int y, int width, int height, int bits, B
 	}
 # endif // LL_X11
 
-	SDL_GL_GetAttribute(SDL_GL_RED_SIZE, &redBits);
-	SDL_GL_GetAttribute(SDL_GL_GREEN_SIZE, &greenBits);
-	SDL_GL_GetAttribute(SDL_GL_BLUE_SIZE, &blueBits);
-	SDL_GL_GetAttribute(SDL_GL_ALPHA_SIZE, &alphaBits);
-	SDL_GL_GetAttribute(SDL_GL_DEPTH_SIZE, &depthBits);
-	SDL_GL_GetAttribute(SDL_GL_STENCIL_SIZE, &stencilBits);
-	
-	LL_INFOS() << "GL buffer:" << LL_ENDL;
-        LL_INFOS() << "  Red Bits " << S32(redBits) << LL_ENDL;
-        LL_INFOS() << "  Green Bits " << S32(greenBits) << LL_ENDL;
-        LL_INFOS() << "  Blue Bits " << S32(blueBits) << LL_ENDL;
-	LL_INFOS()	<< "  Alpha Bits " << S32(alphaBits) << LL_ENDL;
-	LL_INFOS()	<< "  Depth Bits " << S32(depthBits) << LL_ENDL;
-	LL_INFOS()	<< "  Stencil Bits " << S32(stencilBits) << LL_ENDL;
+    SDL_GL_GetAttribute(SDL_GL_RED_SIZE, &redBits);
+    SDL_GL_GetAttribute(SDL_GL_GREEN_SIZE, &greenBits);
+    SDL_GL_GetAttribute(SDL_GL_BLUE_SIZE, &blueBits);
+    SDL_GL_GetAttribute(SDL_GL_ALPHA_SIZE, &alphaBits);
+    SDL_GL_GetAttribute(SDL_GL_DEPTH_SIZE, &depthBits);
+    SDL_GL_GetAttribute(SDL_GL_STENCIL_SIZE, &stencilBits);
 
-	GLint colorBits = redBits + greenBits + blueBits + alphaBits;
-	// fixme: actually, it's REALLY important for picking that we get at
-	// least 8 bits each of red,green,blue.  Alpha we can be a bit more
-	// relaxed about if we have to.
-	if (colorBits < 32)
-	{
-		close();
-		setupFailure(
-			"Second Life requires True Color (32-bit) to run in a window.\n"
-			"Please go to Control Panels -> Display -> Settings and\n"
-			"set the screen to 32-bit color.\n"
-			"Alternately, if you choose to run fullscreen, Second Life\n"
-			"will automatically adjust the screen each time it runs.",
-			"Error",
-			OSMB_OK);
-		return FALSE;
-	}
+    LL_INFOS() << "GL buffer:" << LL_ENDL;
+    LL_INFOS() << "  Red Bits " << S32(redBits) << LL_ENDL;
+    LL_INFOS() << "  Green Bits " << S32(greenBits) << LL_ENDL;
+    LL_INFOS() << "  Blue Bits " << S32(blueBits) << LL_ENDL;
+    LL_INFOS() << "  Alpha Bits " << S32(alphaBits) << LL_ENDL;
+    LL_INFOS() << "  Depth Bits " << S32(depthBits) << LL_ENDL;
+    LL_INFOS() << "  Stencil Bits " << S32(stencilBits) << LL_ENDL;
 
-	if (alphaBits < 8)
-	{
-		close();
-		setupFailure(
-			"Second Life is unable to run because it can't get an 8 bit alpha\n"
-			"channel.  Usually this is due to video card driver issues.\n"
-			"Please make sure you have the latest video card drivers installed.\n"
-			"Also be sure your monitor is set to True Color (32-bit) in\n"
-			"Control Panels -> Display -> Settings.\n"
-			"If you continue to receive this message, contact customer service.",
-			"Error",
-			OSMB_OK);
-		return FALSE;
-	}
+    GLint colorBits = redBits + greenBits + blueBits + alphaBits;
+    // fixme: actually, it's REALLY important for picking that we get at
+    // least 8 bits each of red,green,blue.  Alpha we can be a bit more
+    // relaxed about if we have to.
+    if (colorBits < 32)
+    {
+        close();
+        setupFailure("Second Life requires True Color (32-bit) to run in a window.\n"
+                     "Please go to Control Panels -> Display -> Settings and\n"
+                     "set the screen to 32-bit color.\n"
+                     "Alternately, if you choose to run fullscreen, Second Life\n"
+                     "will automatically adjust the screen each time it runs.",
+                     "Error", OSMB_OK);
+        return FALSE;
+    }
+
+    if (alphaBits < 8)
+    {
+        close();
+        setupFailure("Second Life is unable to run because it can't get an 8 bit alpha\n"
+                     "channel.  Usually this is due to video card driver issues.\n"
+                     "Please make sure you have the latest video card drivers installed.\n"
+                     "Also be sure your monitor is set to True Color (32-bit) in\n"
+                     "Control Panels -> Display -> Settings.\n"
+                     "If you continue to receive this message, contact customer service.",
+                     "Error", OSMB_OK);
+        return FALSE;
+    }
 
 #if LL_X11
-	/* Grab the window manager specific information */
-	SDL_SysWMinfo info;
-	SDL_VERSION(&info.version);
-	if ( SDL_GetWindowWMInfo(mWindow, &info) == SDL_TRUE)
-	{
-		/* Save the information for later use */
-		if ( info.subsystem == SDL_SYSWM_X11 )
-		{
-			mSDL_Display = info.info.x11.display;
-			mSDL_XWindowID = info.info.x11.window;
-		}
-		else
-		{
-			LL_WARNS() << "We're not running under X11?  Wild."
-				<< LL_ENDL;
-		}
-	}
-	else
-	{
-		LL_WARNS() << "We're not running under any known WM. SDL Err: " << SDL_GetError()
-			<< LL_ENDL;
-	}
+    /* Grab the window manager specific information */
+    SDL_SysWMinfo info;
+    SDL_VERSION(&info.version);
+    if (SDL_GetWindowWMInfo(mWindow, &info) == SDL_TRUE)
+    {
+        /* Save the information for later use */
+        if (info.subsystem == SDL_SYSWM_X11)
+        {
+            mSDL_Display = info.info.x11.display;
+            mSDL_XWindowID = info.info.x11.window;
+        }
+        else
+        {
+            LL_WARNS() << "We're not running under X11?  Wild." << LL_ENDL;
+        }
+    }
+    else
+    {
+        LL_WARNS() << "We're not running under any known WM. SDL Err: " << SDL_GetError() << LL_ENDL;
+    }
 #endif // LL_X11
 
-	int r, g, b, a, d, s;
-	SDL_GL_GetAttribute(SDL_GL_RED_SIZE, &r);
-	SDL_GL_GetAttribute(SDL_GL_GREEN_SIZE, &g);
-	SDL_GL_GetAttribute(SDL_GL_BLUE_SIZE, &b);
-	SDL_GL_GetAttribute(SDL_GL_ALPHA_SIZE, &a);
-	SDL_GL_GetAttribute(SDL_GL_DEPTH_SIZE, &d);
-	SDL_GL_GetAttribute(SDL_GL_STENCIL_SIZE, &s);
+    int r, g, b, a, d, s;
+    SDL_GL_GetAttribute(SDL_GL_RED_SIZE, &r);
+    SDL_GL_GetAttribute(SDL_GL_GREEN_SIZE, &g);
+    SDL_GL_GetAttribute(SDL_GL_BLUE_SIZE, &b);
+    SDL_GL_GetAttribute(SDL_GL_ALPHA_SIZE, &a);
+    SDL_GL_GetAttribute(SDL_GL_DEPTH_SIZE, &d);
+    SDL_GL_GetAttribute(SDL_GL_STENCIL_SIZE, &s);
 
-	LL_INFOS() << "GL buffer:" << LL_ENDL;
-	LL_INFOS() << "  Red Bits " << r << LL_ENDL;
-	LL_INFOS() << "  Green Bits " << g << LL_ENDL;
-	LL_INFOS() << "  Blue Bits " << b << LL_ENDL;
-	LL_INFOS() << "  Alpha Bits " << a << LL_ENDL;
-	LL_INFOS() << "  Depth Bits " << d << LL_ENDL;
-	LL_INFOS() << "  Stencil Bits " << s << LL_ENDL;
-	
-	//make sure multisampling is disabled by default
-	glDisable(GL_MULTISAMPLE_ARB);
+    LL_INFOS() << "GL buffer:" << LL_ENDL;
+    LL_INFOS() << "  Red Bits " << r << LL_ENDL;
+    LL_INFOS() << "  Green Bits " << g << LL_ENDL;
+    LL_INFOS() << "  Blue Bits " << b << LL_ENDL;
+    LL_INFOS() << "  Alpha Bits " << a << LL_ENDL;
+    LL_INFOS() << "  Depth Bits " << d << LL_ENDL;
+    LL_INFOS() << "  Stencil Bits " << s << LL_ENDL;
 
-	// Don't need to get the current gamma, since there's a call that restores it to the system defaults.
-	return TRUE;
+    // make sure multisampling is disabled by default
+    glDisable(GL_MULTISAMPLE_ARB);
+
+    // Don't need to get the current gamma, since there's a call that restores it to the system defaults.
+    return TRUE;
 }
-
 
 // changing fullscreen resolution, or switching between windowed and fullscreen mode.
 BOOL LLWindowSDL::switchContext(BOOL fullscreen, const LLCoordScreen &size, BOOL disable_vsync, const LLCoordScreen * const posp)
@@ -827,35 +791,45 @@ BOOL LLWindowSDL::switchContext(BOOL fullscreen, const LLCoordScreen &size, BOOL
 
 void LLWindowSDL::destroyContext()
 {
-	if (mWindow == nullptr)
-	{
-		LL_INFOS() << "Context already destroy" << LL_ENDL;
-		return;
-	}
 	LL_INFOS() << "destroyContext begins" << LL_ENDL;
 
+	// Stop unicode input
 	SDL_StopTextInput();
-#if LL_X11
-	mSDL_Display = NULL;
-	mSDL_XWindowID = None;
-	Lock_Display = NULL;
-	Unlock_Display = NULL;
-#endif // LL_X11
 
 	// Clean up remaining GL state before blowing away window
 	LL_INFOS() << "shutdownGL begins" << LL_ENDL;
 	gGLManager.shutdownGL();
 
+#if LL_X11
+	mSDL_Display = NULL;
+	mSDL_XWindowID = None;
+#endif // LL_X11
+
 	LL_INFOS() << "Destroying SDL cursors" << LL_ENDL;
 	quitCursors();
 
-	LL_INFOS() << "Destroying GL Context" << LL_ENDL;
-	SDL_GL_DeleteContext(mGLContext);
-	mGLContext = nullptr;
+    if (mGLContext)
+    {
+        LL_INFOS() << "Destroying SDL GL Context" << LL_ENDL;
+        SDL_GL_DeleteContext(mGLContext);
+        mGLContext = nullptr;
+    }
+    else
+    {
+        LL_INFOS() << "SDL GL Context already destroyed" << LL_ENDL;
+    }
 
-	LL_INFOS() << "Destroying SDL Window" << LL_ENDL;
-	SDL_DestroyWindow(mWindow);
-	mWindow = nullptr;
+    if (mWindow)
+    {
+        LL_INFOS() << "Destroying SDL Window" << LL_ENDL;
+        SDL_DestroyWindow(mWindow);
+        mWindow = nullptr;
+    }
+    else
+    {
+        LL_INFOS() << "SDL Window already destroyed" << LL_ENDL;
+    }
+	LL_INFOS() << "destroyContext end" << LL_ENDL;
 }
 
 LLWindowSDL::~LLWindowSDL()
@@ -1303,9 +1277,7 @@ void LLWindowSDL::beforeDialog()
 	{
 		// Everything that we/SDL asked for should happen before we
 		// potentially hand control over to GTK.
-		maybe_lock_display();
 		XSync(mSDL_Display, False);
-		maybe_unlock_display();
 	}
 #endif // LL_X11
 
@@ -1314,8 +1286,6 @@ void LLWindowSDL::beforeDialog()
 	// diagnostics, if not already done.
 	ll_try_gtk_init();
 #endif // LL_GTK
-
-	maybe_lock_display();
 }
 
 void LLWindowSDL::afterDialog()
@@ -1326,8 +1296,6 @@ void LLWindowSDL::afterDialog()
 #endif //LL_X11
 
 	LL_INFOS() << "LLWindowSDL::afterDialog()" << LL_ENDL;
-
-	maybe_unlock_display();
 
 	if (mFullscreen)
 	{
@@ -1353,7 +1321,6 @@ void LLWindowSDL::x11_set_urgent(BOOL urgent)
 		
 		LL_INFOS() << "X11 hint for urgency, " << urgent << LL_ENDL;
 
-		maybe_lock_display();
 		wm_hints = XGetWMHints(mSDL_Display, mSDL_XWindowID);
 		if (!wm_hints)
 			wm_hints = XAllocWMHints();
@@ -1366,7 +1333,6 @@ void LLWindowSDL::x11_set_urgent(BOOL urgent)
 		XSetWMHints(mSDL_Display, mSDL_XWindowID, wm_hints);
 		XFree(wm_hints);
 		XSync(mSDL_Display, False);
-		maybe_unlock_display();
 	}
 }
 #endif // LL_X11
@@ -1667,12 +1633,10 @@ BOOL LLWindowSDL::SDLReallyCaptureInput(BOOL capture)
 			{
 				//LL_INFOS() << "X11 POINTER GRABBY" << LL_ENDL;
 				//newmode = SDL_WM_GrabInput(wantmode);
-				maybe_lock_display();
 				result = XGrabPointer(mSDL_Display, mSDL_XWindowID,
 						      True, 0, GrabModeAsync,
 						      GrabModeAsync,
 						      None, None, CurrentTime);
-				maybe_unlock_display();
 				if (GrabSuccess == result)
 					newGrab = true;
 				else
@@ -1683,11 +1647,9 @@ BOOL LLWindowSDL::SDLReallyCaptureInput(BOOL capture)
 				newGrab = false;
 				//newmode = SDL_WM_GrabInput(SDL_GRAB_OFF);
 				
-				maybe_lock_display();
 				XUngrabPointer(mSDL_Display, CurrentTime);
 				// Make sure the ungrab happens RIGHT NOW.
 				XSync(mSDL_Display, False);
-				maybe_unlock_display();
 			}
 		}
 			}
@@ -2628,10 +2590,8 @@ void LLWindowSDL::spawnWebBrowser(const std::string& escaped_url, bool async)
 # if LL_X11
 	if (mSDL_Display)
 	{
-		maybe_lock_display();
 		// Just in case - before forking.
 		XSync(mSDL_Display, False);
-		maybe_unlock_display();
 	}
 # endif // LL_X11
 
@@ -2654,8 +2614,6 @@ void *LLWindowSDL::getPlatformWindow()
 #if LL_GTK && LL_LLMOZLIB_ENABLED
 	if (LLWindowSDL::ll_try_gtk_init())
 	{
-		maybe_lock_display();
-
 		GtkWidget *owin = gtk_window_new(GTK_WINDOW_POPUP);
 		// Why a layout widget?  A MozContainer would be ideal, but
 		// it involves exposing Mozilla headers to mozlib-using apps.
@@ -2666,8 +2624,6 @@ void *LLWindowSDL::getPlatformWindow()
 		gtk_container_add(GTK_CONTAINER(owin), rtnw);
 		gtk_widget_realize(rtnw);
 		GTK_WIDGET_UNSET_FLAGS(GTK_WIDGET(rtnw), GTK_NO_WINDOW);
-		
-		maybe_unlock_display();
 		
 		return rtnw;
 	}
