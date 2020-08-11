@@ -424,6 +424,19 @@ BOOL LLWindowSDL::createContext(int x, int y, int width, int height, int bits, B
 	// Setup default window flags
    	mSDLFlags = SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE;
 
+	// Setup default backing colors
+    GLint redBits{8}, greenBits{8}, blueBits{8}, alphaBits{8};
+	
+	GLint depthBits{24}, stencilBits{8};
+
+    SDL_GL_SetAttribute(SDL_GL_RED_SIZE, redBits);
+	SDL_GL_SetAttribute(SDL_GL_GREEN_SIZE, greenBits);
+	SDL_GL_SetAttribute(SDL_GL_BLUE_SIZE, blueBits);
+	SDL_GL_SetAttribute(SDL_GL_ALPHA_SIZE, alphaBits);
+	SDL_GL_SetAttribute(SDL_GL_BUFFER_SIZE, 32);
+	SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, depthBits);
+	SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, stencilBits);
+
 	if (mWindow == nullptr)
 	{
 		if (width == 0)
@@ -559,18 +572,6 @@ BOOL LLWindowSDL::createContext(int x, int y, int width, int height, int bits, B
             LL_WARNS() << "Failed to set fullscreen. SDL: " << SDL_GetError() << LL_ENDL;
         }
     }
-
-    GLint redBits{8}, greenBits{8}, blueBits{8}, alphaBits{(bits <= 16) ? 1 : 8};
-	
-	GLint depthBits{(bits <= 16) ? 16 : 24}, stencilBits{8};
-
-    SDL_GL_SetAttribute(SDL_GL_RED_SIZE, redBits);
-	SDL_GL_SetAttribute(SDL_GL_GREEN_SIZE, greenBits);
-	SDL_GL_SetAttribute(SDL_GL_BLUE_SIZE, blueBits);
-	SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, depthBits);
-	SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, stencilBits);
-
-	SDL_GL_SetAttribute(SDL_GL_ALPHA_SIZE, alphaBits);
 
 	SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
 
