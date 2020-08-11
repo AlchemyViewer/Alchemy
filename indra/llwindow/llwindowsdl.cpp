@@ -873,7 +873,10 @@ LLWindowSDL::~LLWindowSDL()
 
 void LLWindowSDL::show()
 {
-    // *FIX: What to do with SDL?
+	if (mWindow)
+	{
+		SDL_ShowWindow(mWindow);
+	}
 }
 
 void LLWindowSDL::hide()
@@ -927,15 +930,15 @@ BOOL LLWindowSDL::isValid()
 BOOL LLWindowSDL::getVisible()
 {
 	BOOL result = FALSE;
-
-    // *FIX: This isn't really right...
-	// Then what is?
 	if (mWindow)
 	{
-		result = TRUE;
+		Uint32 flags = SDL_GetWindowFlags(mWindow);
+		if (flags & SDL_WINDOW_SHOWN)
+		{
+			result = TRUE;
+		}
 	}
-
-	return(result);
+	return result;
 }
 
 BOOL LLWindowSDL::getMinimized()
@@ -2269,7 +2272,7 @@ void LLWindowSDL::hideCursor()
 		// LL_INFOS() << "hideCursor: hiding" << LL_ENDL;
 		mCursorHidden = TRUE;
 		mHideCursorPermanent = TRUE;
-		SDL_ShowCursor(0);
+		SDL_ShowCursor(SDL_DISABLE);
 	}
 	else
 	{
@@ -2284,7 +2287,7 @@ void LLWindowSDL::showCursor()
 		// LL_INFOS() << "showCursor: showing" << LL_ENDL;
 		mCursorHidden = FALSE;
 		mHideCursorPermanent = FALSE;
-		SDL_ShowCursor(1);
+		SDL_ShowCursor(SDL_ENABLE);
 	}
 	else
 	{
@@ -2679,12 +2682,9 @@ void LLWindowSDL::bringToFront()
 	// map position externally.
 	LL_INFOS() << "bringToFront" << LL_ENDL;
 #if LL_X11
-	if (mSDL_Display && !mFullscreen)
+	if (mWindow && !mFullscreen)
 	{
-		maybe_lock_display();
-		XRaiseWindow(mSDL_Display, mSDL_XWindowID);
-		XSync(mSDL_Display, False);
-		maybe_unlock_display();
+		SDL_RaiseWindow(mWindow);
 	}
 #endif // LL_X11
 }
@@ -2833,6 +2833,9 @@ std::vector<std::string> LLWindowSDL::getDynamicFallbackFontList()
 
 void LLWindowSDL::setWindowTitle(const std::string& title)
 {
-	SDL_SetWindowTitle(mWindow, title.c_str());
+	if(mWindow)
+	{
+		SDL_SetWindowTitle(mWindow, title.c_str());
+	}
 }
 #endif // LL_SDL
