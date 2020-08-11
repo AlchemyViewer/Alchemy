@@ -599,7 +599,7 @@ BOOL LLWindowSDL::createContext(int x, int y, int width, int height, int bits, B
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, context_flags);
 
 	U32 major_gl_version = 4;
-	U32 minor_gl_version = 5;
+	U32 minor_gl_version = 6;
 
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, major_gl_version);
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, minor_gl_version);
