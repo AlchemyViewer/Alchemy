@@ -669,6 +669,7 @@ BOOL LLWindowSDL::createContext(int x, int y, int width, int height, int bits, B
 		LL_WARNS() << "OpenGL context creation failure. SDL: " << SDL_GetError() << LL_ENDL;
 		setupFailure("Context creation error", "Error", OSMB_OK);
 		SDL_DestroyWindow(mWindow);
+		mWindow = nullptr;
 		return FALSE;
 	}
 	if (SDL_GL_MakeCurrent(mWindow, mGLContext) != 0)
@@ -845,12 +846,20 @@ void LLWindowSDL::destroyContext()
 	LL_INFOS() << "shutdownGL begins" << LL_ENDL;
 	gGLManager.shutdownGL();
 
-	mWindow = NULL;
+	LL_INFOS() << "Destroying SDL cursors" << LL_ENDL;
+	quitCursors();
+
+	LL_INFOS() << "Destroying GL Context" << LL_ENDL;
+	SDL_GL_DeleteContext(mGLContext);
+	mGLContext = nullptr;
+
+	LL_INFOS() << "Destroying SDL Window" << LL_ENDL;
+	SDL_DestroyWindow(mWindow);
+	mWindow = nullptr;
 }
 
 LLWindowSDL::~LLWindowSDL()
 {
-	quitCursors();
 	destroyContext();
 
 	if(mSupportedResolutions != NULL)
@@ -907,7 +916,6 @@ void LLWindowSDL::close()
 	setMouseClipping(FALSE);
 	showCursor();
 
-	quitCursors();
 	destroyContext();
 }
 
