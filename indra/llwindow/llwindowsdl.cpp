@@ -197,14 +197,12 @@ LLWindowSDL::LLWindowSDL(LLWindowCallbacks* callbacks,
 {
 	SDL_SetMainReady();
 
-	if (SDL_Init(0) != 0)
+	if (SDL_InitSubSystem(SDL_INIT_EVENTS|SDL_INIT_VIDEO|SDL_INIT_GAMECONTROLLER|SDL_INIT_JOYSTICK) != 0)
 	{
 		LL_WARNS() << "Failed to initialize SDL due to error: " << SDL_GetError() << LL_ENDL;
 		return;
 	}
 	
-	SDL_InitSubSystem(SDL_INIT_EVENTS);
-
 	// Initialize the keyboard
 	gKeyboard = new LLKeyboardSDL();
 	gKeyboard->setCallbacks(callbacks);
@@ -417,13 +415,6 @@ BOOL LLWindowSDL::createContext(int x, int y, int width, int height, int bits, B
 	// captures don't survive contexts
 	mGrabbyKeyFlags = 0;
 	mReallyCapturedCount = 0;
-
-	if (SDL_InitSubSystem(SDL_INIT_VIDEO) < 0)
-	{
-		LL_INFOS() << "sdl_init() failed! " << SDL_GetError() << LL_ENDL;
-		setupFailure("sdl_init() failure,  window creation error", "error", OSMB_OK);
-		return false;
-	}
 
 	SDL_version c_sdl_version;
 	SDL_VERSION(&c_sdl_version);
@@ -678,8 +669,6 @@ BOOL LLWindowSDL::createContext(int x, int y, int width, int height, int bits, B
 		LL_WARNS() << "OpenGL context creation failure. SDL: " << SDL_GetError() << LL_ENDL;
 		setupFailure("Context creation error", "Error", OSMB_OK);
 		SDL_DestroyWindow(mWindow);
-		mWindow = nullptr;
-		SDL_QuitSubSystem(SDL_INIT_VIDEO);
 		return FALSE;
 	}
 	if (SDL_GL_MakeCurrent(mWindow, mGLContext) != 0)
@@ -690,7 +679,6 @@ BOOL LLWindowSDL::createContext(int x, int y, int width, int height, int bits, B
 		mGLContext = nullptr;
 		SDL_DestroyWindow(mWindow);
 		mWindow = nullptr;
-		SDL_QuitSubSystem(SDL_INIT_VIDEO);
 		return FALSE;
 	}
 	
@@ -764,7 +752,7 @@ BOOL LLWindowSDL::createContext(int x, int y, int width, int height, int bits, B
 	/* Grab the window manager specific information */
 	SDL_SysWMinfo info;
 	SDL_VERSION(&info.version);
-	if ( SDL_GetWindowWMInfo(mWindow, &info) )
+	if ( SDL_GetWindowWMInfo(mWindow, &info) == SDL_TRUE)
 	{
 		/* Save the information for later use */
 		if ( info.subsystem == SDL_SYSWM_X11 )
@@ -780,7 +768,7 @@ BOOL LLWindowSDL::createContext(int x, int y, int width, int height, int bits, B
 	}
 	else
 	{
-		LL_WARNS() << "We're not running under any known WM.  Wild."
+		LL_WARNS() << "We're not running under any known WM. SDL Err: " << SDL_GetError()
 			<< LL_ENDL;
 	}
 #endif // LL_X11
@@ -856,8 +844,6 @@ void LLWindowSDL::destroyContext()
 	// Clean up remaining GL state before blowing away window
 	LL_INFOS() << "shutdownGL begins" << LL_ENDL;
 	gGLManager.shutdownGL();
-	LL_INFOS() << "SDL_QuitSS/VID begins" << LL_ENDL;
-	SDL_QuitSubSystem(SDL_INIT_VIDEO);  // *FIX: this might be risky...
 
 	mWindow = NULL;
 }
