@@ -1140,7 +1140,7 @@ void LLWindowSDL::setMinSize(U32 min_width, U32 min_height, bool enforce_immedia
 {
 	LLWindow::setMinSize(min_width, min_height, enforce_immediately);
 
-	if (mWindow)
+	if (mWindow && min_width > 0 && min_height > 0)
 	{
 		SDL_SetWindowMinimumSize(mWindow, mMinWindowWidth, mMinWindowHeight);
 	}
