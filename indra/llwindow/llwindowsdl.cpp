@@ -739,22 +739,6 @@ BOOL LLWindowSDL::createContext(int x, int y, int width, int height, int bits, B
     }
 #endif // LL_X11
 
-    int r, g, b, a, d, s;
-    SDL_GL_GetAttribute(SDL_GL_RED_SIZE, &r);
-    SDL_GL_GetAttribute(SDL_GL_GREEN_SIZE, &g);
-    SDL_GL_GetAttribute(SDL_GL_BLUE_SIZE, &b);
-    SDL_GL_GetAttribute(SDL_GL_ALPHA_SIZE, &a);
-    SDL_GL_GetAttribute(SDL_GL_DEPTH_SIZE, &d);
-    SDL_GL_GetAttribute(SDL_GL_STENCIL_SIZE, &s);
-
-    LL_INFOS() << "GL buffer:" << LL_ENDL;
-    LL_INFOS() << "  Red Bits " << r << LL_ENDL;
-    LL_INFOS() << "  Green Bits " << g << LL_ENDL;
-    LL_INFOS() << "  Blue Bits " << b << LL_ENDL;
-    LL_INFOS() << "  Alpha Bits " << a << LL_ENDL;
-    LL_INFOS() << "  Depth Bits " << d << LL_ENDL;
-    LL_INFOS() << "  Stencil Bits " << s << LL_ENDL;
-
     // make sure multisampling is disabled by default
     glDisable(GL_MULTISAMPLE_ARB);
 
@@ -1251,11 +1235,6 @@ F32 LLWindowSDL::getPixelAspectRatio()
 // dialogs are still usable in fullscreen.
 void LLWindowSDL::beforeDialog()
 {
-	bool running_x11 = false;
-#if LL_X11
-	running_x11 = (mSDL_XWindowID != None);
-#endif //LL_X11
-
 	LL_INFOS() << "LLWindowSDL::beforeDialog()" << LL_ENDL;
 
 	if (SDLReallyCaptureInput(FALSE)) // must ungrab input so popup works!
@@ -1290,11 +1269,6 @@ void LLWindowSDL::beforeDialog()
 
 void LLWindowSDL::afterDialog()
 {
-	bool running_x11 = false;
-#if LL_X11
-	running_x11 = (mSDL_XWindowID != None);
-#endif //LL_X11
-
 	LL_INFOS() << "LLWindowSDL::afterDialog()" << LL_ENDL;
 
 	if (mFullscreen)
