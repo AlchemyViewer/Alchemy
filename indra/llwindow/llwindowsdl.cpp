@@ -162,6 +162,72 @@ Display* LLWindowSDL::get_SDL_Display(void)
 }
 #endif // LL_X11
 
+void sdlLogOutputFunc(void *userdata, int category, SDL_LogPriority priority, const char *message)
+{
+    LLError::ELevel level = LLError::LEVEL_INFO;
+    std::string level_str;
+    switch (priority)
+    {
+    case SDL_LOG_PRIORITY_VERBOSE:
+        level = LLError::LEVEL_DEBUG;
+        level_str = "verbose";
+        break;
+    case SDL_LOG_PRIORITY_DEBUG:
+        level = LLError::LEVEL_DEBUG;
+        level_str = "debug";
+        break;
+    case SDL_LOG_PRIORITY_INFO:
+        level = LLError::LEVEL_INFO;
+        level_str = "info";
+        break;
+    case SDL_LOG_PRIORITY_WARN:
+        level = LLError::LEVEL_WARN;
+        level_str = "warn";
+        break;
+    case SDL_LOG_PRIORITY_ERROR:
+        level = LLError::LEVEL_WARN;
+        level_str = "error";
+        break;
+    case SDL_LOG_PRIORITY_CRITICAL:
+        level = LLError::LEVEL_WARN;
+        level_str = "critical";
+        break;
+    }
+
+    std::string category_str;
+    switch (priority)
+    {
+    case SDL_LOG_CATEGORY_APPLICATION:
+        category_str = "application";
+        break;
+    case SDL_LOG_CATEGORY_ERROR:
+        category_str = "error";
+        break;
+    case SDL_LOG_CATEGORY_ASSERT:
+        category_str = "assert";
+        break;
+    case SDL_LOG_CATEGORY_SYSTEM:
+        category_str = "system";
+        break;
+    case SDL_LOG_CATEGORY_AUDIO:
+        category_str = "audio";
+        break;
+    case SDL_LOG_CATEGORY_VIDEO:
+        category_str = "video";
+        break;
+    case SDL_LOG_CATEGORY_RENDER:
+        category_str = "render";
+        break;
+    case SDL_LOG_CATEGORY_INPUT:
+        category_str = "input";
+        break;
+    case SDL_LOG_CATEGORY_TEST:
+        category_str = "test";
+        break;
+    }
+
+    LL_VLOGS(level, "LLWindowSDL") << "SDL " << level_str << " " << category_str << " :" << message << LL_ENDL;
+}
 
 LLWindowSDL::LLWindowSDL(LLWindowCallbacks* callbacks,
 			 const std::string& title, S32 x, S32 y, S32 width,
@@ -173,6 +239,8 @@ LLWindowSDL::LLWindowSDL(LLWindowCallbacks* callbacks,
 	  mGamma(1.0f)
 {
 	SDL_SetMainReady();
+
+	SDL_LogSetOutputFunction(&sdlLogOutputFunc, nullptr);
 
 	if (SDL_InitSubSystem(SDL_INIT_EVENTS|SDL_INIT_VIDEO|SDL_INIT_GAMECONTROLLER|SDL_INIT_JOYSTICK) != 0)
 	{
