@@ -2031,6 +2031,7 @@ void LLWindowSDL::gatherInput()
             case SDL_WINDOWEVENT_ENTER:
                 break;
             case SDL_WINDOWEVENT_LEAVE:
+				mCallbacks->handleMouseLeave(this);
                 break;
             case SDL_WINDOWEVENT_FOCUS_GAINED:
                 mHaveInputFocus = true;
