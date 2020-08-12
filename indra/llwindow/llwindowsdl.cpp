@@ -170,27 +170,27 @@ void sdlLogOutputFunc(void *userdata, int category, SDL_LogPriority priority, co
     {
     case SDL_LOG_PRIORITY_VERBOSE:
         level = LLError::LEVEL_DEBUG;
-        level_str = "verbose";
+        level_str = "VERBOSE";
         break;
     case SDL_LOG_PRIORITY_DEBUG:
         level = LLError::LEVEL_DEBUG;
-        level_str = "debug";
+        level_str = "DEBUG";
         break;
     case SDL_LOG_PRIORITY_INFO:
         level = LLError::LEVEL_INFO;
-        level_str = "info";
+        level_str = "INFO";
         break;
     case SDL_LOG_PRIORITY_WARN:
         level = LLError::LEVEL_WARN;
-        level_str = "warn";
+        level_str = "WARN";
         break;
     case SDL_LOG_PRIORITY_ERROR:
         level = LLError::LEVEL_WARN;
-        level_str = "error";
+        level_str = "ERROR";
         break;
     case SDL_LOG_PRIORITY_CRITICAL:
         level = LLError::LEVEL_WARN;
-        level_str = "critical";
+        level_str = "CRITICAL";
         break;
     }
 
@@ -198,35 +198,35 @@ void sdlLogOutputFunc(void *userdata, int category, SDL_LogPriority priority, co
     switch (priority)
     {
     case SDL_LOG_CATEGORY_APPLICATION:
-        category_str = "application";
+        category_str = "Application";
         break;
     case SDL_LOG_CATEGORY_ERROR:
-        category_str = "error";
+        category_str = "Error";
         break;
     case SDL_LOG_CATEGORY_ASSERT:
-        category_str = "assert";
+        category_str = "Assert";
         break;
     case SDL_LOG_CATEGORY_SYSTEM:
-        category_str = "system";
+        category_str = "System";
         break;
     case SDL_LOG_CATEGORY_AUDIO:
-        category_str = "audio";
+        category_str = "Audio";
         break;
     case SDL_LOG_CATEGORY_VIDEO:
-        category_str = "video";
+        category_str = "Video";
         break;
     case SDL_LOG_CATEGORY_RENDER:
-        category_str = "render";
+        category_str = "Render";
         break;
     case SDL_LOG_CATEGORY_INPUT:
-        category_str = "input";
+        category_str = "Input";
         break;
     case SDL_LOG_CATEGORY_TEST:
-        category_str = "test";
+        category_str = "Test";
         break;
     }
 
-    LL_VLOGS(level, "LLWindowSDL") << "SDL " << level_str << " " << category_str << " :" << message << LL_ENDL;
+    LL_VLOGS(level, "LLWindowSDL") << "SDL [" << level_str << "] <" << category_str << "> : " << message << LL_ENDL;
 }
 
 LLWindowSDL::LLWindowSDL(LLWindowCallbacks* callbacks,
