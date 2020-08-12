@@ -1911,11 +1911,11 @@ void LLWindowSDL::gatherInput()
         }
         case SDL_TEXTINPUT:
         {
-            auto string = utf8str_to_utf16str(event.text.text);
+            auto string = utf8str_to_wstring(event.text.text);
             for (auto key : string)
             {
-                mKeyVirtualKey = key;
-                handleUnicodeUTF16(key, gKeyboard->currentMask(FALSE));
+                //mKeyVirtualKey = key;
+                mCallbacks->handleUnicodeChar(key, gKeyboard->currentMask(FALSE));
             }
             break;
         }
