@@ -2233,12 +2233,7 @@ void LLLineEditor::setFocus( BOOL new_state )
 
 	if (new_state)
 	{
-		// Allow Language Text Input only when this LineEditor has
-		// no prevalidate function attached.  This criterion works
-		// fine on 1.15.0.2, since all prevalidate func reject any
-		// non-ASCII characters.  I'm not sure on future versions,
-		// however.
-		getWindow()->allowLanguageTextInput(this, mPrevalidateFunc == NULL);
+		getWindow()->allowLanguageTextInput(this, TRUE);
 	}
 }
 
@@ -2406,19 +2401,13 @@ BOOL LLLineEditor::setLabelArg( const std::string& key, const LLStringExplicit& 
 
 void LLLineEditor::updateAllowingLanguageInput()
 {
-	// Allow Language Text Input only when this LineEditor has
-	// no prevalidate function attached (as long as other criteria
-	// common to LLTextEditor).  This criterion works
-	// fine on 1.15.0.2, since all prevalidate func reject any
-	// non-ASCII characters.  I'm not sure on future versions,
-	// however...
 	LLWindow* window = getWindow();
 	if (!window)
 	{
 		// test app, no window available
 		return;	
 	}
-	if (hasFocus() && !mReadOnly && !mDrawAsterixes && mPrevalidateFunc == NULL)
+	if (hasFocus() && !mReadOnly && !mDrawAsterixes)
 	{
 		window->allowLanguageTextInput(this, TRUE);
 	}
