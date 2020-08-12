@@ -239,8 +239,11 @@ LLWindowSDL::LLWindowSDL(LLWindowCallbacks* callbacks,
 	  mGamma(1.0f)
 {
 	SDL_SetMainReady();
-
 	SDL_LogSetOutputFunction(&sdlLogOutputFunc, nullptr);
+
+#if LL_X11
+	XInitThreads();
+#endif
 
 	if (SDL_InitSubSystem(SDL_INIT_EVENTS|SDL_INIT_VIDEO|SDL_INIT_GAMECONTROLLER|SDL_INIT_JOYSTICK) != 0)
 	{
