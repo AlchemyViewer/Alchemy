@@ -1361,10 +1361,11 @@ class LinuxManifest(ViewerManifest):
                 self.path("alchemy_256.BMP","ll_icon.BMP")
 
         # plugins
-        #with self.prefix(src="../media_plugins", dst="bin/llplugin"):
+        with self.prefix(src=os.path.join(self.args['build'], os.pardir, "media_plugins"), dst="bin/llplugin"):
         #    self.path("gstreamer010/libmedia_plugin_gstreamer010.so",
         #              "libmedia_plugin_gstreamer.so")
-        #    self.path2basename("libvlc", "libmedia_plugin_libvlc.so")
+            self.path2basename("example", "libmedia_plugin_example.so")
+            self.path2basename("libvlc", "libmedia_plugin_libvlc.so")
 
         # with self.prefix(src=os.path.join(pkgdir, 'lib', 'vlc', 'plugins'), dst="bin/llplugin/vlc/plugins"):
         #     self.path( "plugins.dat" )
@@ -1453,7 +1454,6 @@ class Linux_i686_Manifest(LinuxManifest):
             self.path("libhunspell-1.3.so*")
             self.path("libalut.so*")
             self.path("libopenal.so*")
-            self.path("libopenal.so", "libvivoxoal.so.1") # vivox's sdk expects this soname
             # KLUDGE: As of 2012-04-11, the 'fontconfig' package installs
             # libfontconfig.so.1.4.4, along with symlinks libfontconfig.so.1
             # and libfontconfig.so. Before we added support for library-file
@@ -1496,7 +1496,8 @@ class Linux_i686_Manifest(LinuxManifest):
         with self.prefix(src=relpkgdir, dst="lib"):
             self.path("libortp.so")
             self.path("libsndfile.so.1")
-            #self.path("libvivoxoal.so.1") # no - we'll re-use the viewer's own OpenAL lib
+            self.path("libvivoxoal.so.1")
+            self.path("libvivoxplatform.so")
             self.path("libvivoxsdk.so")
 
         self.strip_binaries()
@@ -1527,7 +1528,6 @@ class Linux_x86_64_Manifest(LinuxManifest):
             self.path("libhunspell-1.3.so*")
             self.path("libalut.so*")
             self.path("libopenal.so*")
-            self.path("libopenal.so", "libvivoxoal.so.1") # vivox's sdk expects this soname
 
             try:
                 self.path("libfmod.so*")
@@ -1542,7 +1542,7 @@ class Linux_x86_64_Manifest(LinuxManifest):
         with self.prefix(src=relpkgdir, dst="lib"):
             self.path("libortp.so")
             self.path("libsndfile.so.1")
-            #self.path("libvivoxoal.so.1") # no - we'll re-use the viewer's own OpenAL lib
+            self.path("libvivoxoal.so.1")
             self.path("libvivoxsdk.so")
 
         self.strip_binaries()

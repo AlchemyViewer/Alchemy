@@ -2118,7 +2118,8 @@ if (LINUX)
   set(COPY_INPUT_DEPENDENCIES
     ${VIEWER_BINARY_NAME}
     SLPlugin
-    llcommon
+    media_plugin_example
+    media_plugin_libvlc
     )
 
   add_custom_command(

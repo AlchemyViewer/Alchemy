@@ -133,6 +133,28 @@
 			media_plugin_libvlc
 		</impl>
 	</scheme>
+	<scheme name="example">
+		<label name="example_label">
+			Example Plugin scheme trigger
+		</label>
+		<widgettype>
+			movie
+		</widgettype>
+		<impl>
+			media_plugin_example
+		</impl>
+	</scheme>
+	<scheme name="libvlc">
+		<label name="libvlc_label">
+			LibVLC supported media
+		</label>
+		<widgettype>
+			movie
+		</widgettype>
+		<impl>
+			media_plugin_libvlc
+		</impl>
+	</scheme>
 	<mimetype name="blank">
 		<label name="blank_label">
 			- None -
@@ -141,7 +163,7 @@
 			none
 		</widgettype>
 		<impl>
-			media_plugin_libvlc
+			media_plugin_cef
 		</impl>
 	</mimetype>
 	<mimetype name="none/none">
@@ -184,7 +206,7 @@
 		<widgettype>
 			image
 		</widgettype>
-        <impl>
+		<impl>
 			media_plugin_cef
 		</impl>
 	</mimetype>
@@ -452,7 +474,18 @@
 			media_plugin_libvlc
 		</impl>
 	</mimetype>
-	<mimetype menu="1" name="video/quicktime">
+  <mimetype name="application/octet-stream">
+    <label name="video/octet-stream">
+      Movie
+    </label>
+    <widgettype>
+      movie
+    </widgettype>
+    <impl>
+      media_plugin_libvlc
+    </impl>
+  </mimetype>
+  <mimetype menu="1" name="video/quicktime">
 		<label name="video/quicktime_label">
 			Movie (QuickTime)
 		</label>

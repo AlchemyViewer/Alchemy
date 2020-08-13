@@ -240,7 +240,7 @@
 			audio
 		</widgettype>
 		<impl>
-			media_plugin_cef
+			media_plugin_libvlc
 		</impl>
 	</mimetype>
 	<mimetype name="application/pdf">
@@ -317,7 +317,7 @@
 			audio
 		</widgettype>
 		<impl>
-			media_plugin_cef
+			media_plugin_libvlc
 		</impl>
 	</mimetype>
 	<mimetype name="audio/mpeg">
@@ -515,7 +515,7 @@
 			movie
 		</widgettype>
 		<impl>
-			media_plugin_cef
+			media_plugin_libvlc
 		</impl>
 	</mimetype>
 	<mimetype menu="1" name="video/x-msvideo">
