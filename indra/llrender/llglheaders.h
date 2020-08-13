@@ -289,22 +289,22 @@ extern PFNGLGENERATEMIPMAPEXTPROC glGenerateMipmapEXT;
 
 
 #if LL_LINUX && !LL_MESA_HEADLESS
-// The __APPLE__ kludge is to make glh_extensions.h not symbol-clash horribly
+#if LL_SDL
+# include "SDL_video.h"
+// Use glXGetProcAddressARB instead of glXGetProcAddress - the ARB symbol
+// is considered 'legacy' but works on more machines.
+# define GLH_EXT_GET_PROC_ADDRESS(p) SDL_GL_GetProcAddress((const char*)(p))
+#else
 # define __APPLE__
 # include "GL/glh_extensions.h"
 # undef __APPLE__
-
-/* Although SDL very likely ends up calling glXGetProcAddress() itself,
-   if we use SDL_GL_GetProcAddress() then we get bogus addresses back on
-   some systems.  Weird. */
-/*# include "SDL/SDL.h"
-  # define GLH_EXT_GET_PROC_ADDRESS(p) SDL_GL_GetProcAddress(p) */
 #define GLX_GLXEXT_PROTOTYPES 1
 # include "GL/glx.h"
 # include "GL/glxext.h"
 // Use glXGetProcAddressARB instead of glXGetProcAddress - the ARB symbol
 // is considered 'legacy' but works on more machines.
 # define GLH_EXT_GET_PROC_ADDRESS(p) glXGetProcAddressARB((const GLubyte*)(p))
+#endif
 #endif // LL_LINUX && !LL_MESA_HEADLESS
 
 #if LL_LINUX && defined(WINGDIAPI)
@@ -322,6 +322,9 @@ extern PFNGLACTIVETEXTUREARBPROC	glActiveTextureARB;
 extern PFNGLCLIENTACTIVETEXTUREARBPROC	glClientActiveTextureARB;
 extern PFNGLDRAWRANGEELEMENTSPROC 	glDrawRangeElements;
 #endif // LL_LINUX_NV_GL_HEADERS
+
+// Core GL 3
+extern PFNGLGETSTRINGIPROC glGetStringi;
 
 // GL_ARB_vertex_array_object
 extern PFNGLBINDVERTEXARRAYPROC glBindVertexArray;
