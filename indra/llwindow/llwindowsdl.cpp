@@ -195,7 +195,7 @@ void sdlLogOutputFunc(void *userdata, int category, SDL_LogPriority priority, co
     }
 
     std::string category_str;
-    switch (priority)
+    switch (category)
     {
     case SDL_LOG_CATEGORY_APPLICATION:
         category_str = "Application";
