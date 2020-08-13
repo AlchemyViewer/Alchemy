@@ -3,49 +3,37 @@
 <map>
     <key>installables</key>
     <map>
-      <key>SDL</key>
+      <key>SDL2</key>
       <map>
         <key>copyright</key>
-        <string>Copyright (C) 1997-2012 Sam Lantinga</string>
+        <string>Copyright (C) 1997-2020 Sam Lantinga (slouken@libsdl.org)</string>
         <key>description</key>
         <string>Simple DirectMedia Layer is a cross-platform multimedia library designed to provide low level access to audio, keyboard, mouse, joystick, 3D hardware via OpenGL, and 2D video framebuffer.</string>
         <key>license</key>
         <string>lgpl</string>
         <key>license_file</key>
-        <string>LICENSES/SDL.txt</string>
+        <string>LICENSES/SDL2.txt</string>
         <key>name</key>
-        <string>SDL</string>
+        <string>SDL2</string>
         <key>platforms</key>
         <map>
-          <key>linux</key>
-          <map>
-            <key>archive</key>
-            <map>
-              <key>hash</key>
-              <string>459cdc8d7c19a8025f98f61db95622ff</string>
-              <key>url</key>
-              <string>http://automated-builds-secondlife-com.s3.amazonaws.com/hg/repo/sdl_3p-update-sdl/rev/297546/arch/Linux/installer/SDL-1.2.15-linux-297546.tar.bz2</string>
-            </map>
-            <key>name</key>
-            <string>linux</string>
-          </map>
           <key>linux64</key>
           <map>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>55892534ec68d04afef4a3b0a0abd760</string>
+              <string>90abf8d9d3035abcee39d9168942cad8</string>
               <key>hash_algorithm</key>
               <string>md5</string>
               <key>url</key>
-              <string>https://pkg.alchemyviewer.org/repository/autobuild-external/sdl/linux64/debian10/SDL-1.2.15-linux64-202202237.tar.bz2</string>
+              <string>https://pkg.alchemyviewer.org/repository/autobuild-external/sdl2/linux64/debian10/SDL2-2.0.12-linux64-202261342.tar.bz2</string>
             </map>
             <key>name</key>
             <string>linux64</string>
           </map>
         </map>
         <key>version</key>
-        <string>1.2.15</string>
+        <string>2.0.12</string>
       </map>
       <key>apr_suite</key>
       <map>
@@ -2488,18 +2476,18 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>f20fdc409f5bfc2646fda8064ef16f0e</string>
+              <string>67bcb05ccc9dee211da84fefc61a2bce</string>
               <key>hash_algorithm</key>
               <string>md5</string>
               <key>url</key>
-              <string>https://pkg.alchemyviewer.org/repository/autobuild-external/open-libndofdev/linux64/debian10/open_libndofdev-0.12.202210807-linux64-202210807.tar.bz2</string>
+              <string>https://pkg.alchemyviewer.org/repository/autobuild-external/open-libndofdev/linux64/debian10/open_libndofdev-0.12.202261514-linux64-202261514.tar.bz2</string>
             </map>
             <key>name</key>
             <string>linux64</string>
           </map>
         </map>
         <key>version</key>
-        <string>0.12.202210807</string>
+        <string>0.12.202261514</string>
       </map>
       <key>openal</key>
       <map>
