@@ -37,6 +37,7 @@ else (USESYSTEMLIBS)
   include(FindPkgConfig)
     
     set(PKGCONFIG_PACKAGES
+        gdk-3.0
         gtk+-3.0
         x11
         xinerama
