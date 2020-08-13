@@ -273,7 +273,7 @@ void MediaPluginLibVLC::eventCallbacks(const libvlc_event_t* event, void* ptr)
 //
 void MediaPluginLibVLC::playMedia()
 {
-	if (mURL.length() == 0)
+    if (mURL.length() == 0 || mWidth == 0 || mHeight == 0)
 	{
 		return;
 	}
