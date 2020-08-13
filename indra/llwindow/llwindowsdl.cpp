@@ -1662,44 +1662,36 @@ BOOL LLWindowSDL::SDLReallyCaptureInput(BOOL capture)
 
 	bool newGrab = wantGrab;
 #if LL_X11
-	if (!mFullscreen) /* only bother if we're windowed anyway */
-	{
-		if (mSDL_Display)
-		{
-			/* we dirtily mix raw X11 with SDL so that our pointer
-			   isn't (as often) constrained to the limits of the
-			   window while grabbed, which feels nicer and
-			   hopefully eliminates some reported 'sticky pointer'
-			   problems.  We use raw X11 instead of
-			   SDL_WM_GrabInput() because the latter constrains
-			   the pointer to the window and also steals all
-			   *keyboard* input from the window manager, which was
-			   frustrating users. */
-			int result;
-			if (wantGrab == true)
-			{
-				//LL_INFOS() << "X11 POINTER GRABBY" << LL_ENDL;
-				//newmode = SDL_WM_GrabInput(wantmode);
-				result = XGrabPointer(mSDL_Display, mSDL_XWindowID,
-						      True, 0, GrabModeAsync,
-						      GrabModeAsync,
-						      None, None, CurrentTime);
-				if (GrabSuccess == result)
-					newGrab = true;
-				else
-					newGrab = false;
-			}
-			else
-			{
-				newGrab = false;
-				//newmode = SDL_WM_GrabInput(SDL_GRAB_OFF);
-				
-				XUngrabPointer(mSDL_Display, CurrentTime);
-				// Make sure the ungrab happens RIGHT NOW.
-				XSync(mSDL_Display, False);
-			}
-		}
-			}
+    if (!mFullscreen) /* only bother if we're windowed anyway */
+    {
+        if (mSDL_Display)
+        {
+            /* we dirtily mix raw X11 with SDL so that our pointer
+               isn't (as often) constrained to the limits of the
+               window while grabbed, which feels nicer and
+               hopefully eliminates some reported 'sticky pointer'
+               problems.  We use raw X11 instead of
+               SDL_WM_GrabInput() because the latter constrains
+               the pointer to the window and also steals all
+               *keyboard* input from the window manager, which was
+               frustrating users. */
+            int result;
+            if (wantGrab == true)
+            {
+                // LL_INFOS() << "X11 POINTER GRABBY" << LL_ENDL;
+                result = SDL_CaptureMouse(SDL_TRUE);
+                if (0 == result)
+                    newGrab = true;
+                else
+                    newGrab = false;
+            }
+            else
+            {
+                newGrab = false;
+                result = SDL_CaptureMouse(SDL_FALSE);
+            }
+        }
+    }
 #endif // LL_X11
 		// pretend we got what we wanted, when really we don't care.
 	
