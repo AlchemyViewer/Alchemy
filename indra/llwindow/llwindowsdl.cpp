@@ -166,32 +166,33 @@ void sdlLogOutputFunc(void *userdata, int category, SDL_LogPriority priority, co
 {
     LLError::ELevel level = LLError::LEVEL_INFO;
     std::string level_str;
-    switch (priority)
-    {
-    case SDL_LOG_PRIORITY_VERBOSE:
-        level = LLError::LEVEL_DEBUG;
-        level_str = "VERBOSE";
-        break;
-    case SDL_LOG_PRIORITY_DEBUG:
-        level = LLError::LEVEL_DEBUG;
-        level_str = "DEBUG";
-        break;
-    case SDL_LOG_PRIORITY_INFO:
-        level = LLError::LEVEL_INFO;
-        level_str = "INFO";
-        break;
-    case SDL_LOG_PRIORITY_WARN:
-        level = LLError::LEVEL_WARN;
-        level_str = "WARN";
-        break;
-    case SDL_LOG_PRIORITY_ERROR:
-        level = LLError::LEVEL_WARN;
-        level_str = "ERROR";
-        break;
-    case SDL_LOG_PRIORITY_CRITICAL:
-        level = LLError::LEVEL_WARN;
-        level_str = "CRITICAL";
-        break;
+    switch (priority) {
+        case SDL_LOG_PRIORITY_VERBOSE:
+            level = LLError::LEVEL_DEBUG;
+            level_str = "VERBOSE";
+            break;
+        case SDL_LOG_PRIORITY_DEBUG:
+            level = LLError::LEVEL_DEBUG;
+            level_str = "DEBUG";
+            break;
+        case SDL_LOG_PRIORITY_INFO:
+            level = LLError::LEVEL_INFO;
+            level_str = "INFO";
+            break;
+        case SDL_LOG_PRIORITY_WARN:
+            level = LLError::LEVEL_WARN;
+            level_str = "WARN";
+            break;
+        case SDL_LOG_PRIORITY_ERROR:
+            level = LLError::LEVEL_WARN;
+            level_str = "ERROR";
+            break;
+        case SDL_LOG_PRIORITY_CRITICAL:
+            level = LLError::LEVEL_WARN;
+            level_str = "CRITICAL";
+            break;
+        case SDL_NUM_LOG_PRIORITIES:
+            break;
     }
 
     std::string category_str;
