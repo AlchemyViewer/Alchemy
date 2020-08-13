@@ -1001,14 +1001,14 @@ void LLGLManager::printGLInfoString()
             if (!exten.empty() && i != n)
                 gl_extension_strstrm << exten << "\n";
         }
-        LL_DEBUGS("RenderInit") << "GL_EXTENSIONS:\n" << gl_extension_strstrm.str() << LL_ENDL;
+        LL_INFOS("RenderInit") << "GL_EXTENSIONS:\n" << gl_extension_strstrm.str() << LL_ENDL;
     }
     else
 #endif
     {
         std::string all_exts = ll_safe_string((const char *) glGetString(GL_EXTENSIONS));
         LLStringUtil::replaceChar(all_exts, ' ', '\n');
-        LL_DEBUGS("RenderInit") << "GL_EXTENSIONS:\n" << all_exts << LL_ENDL;
+        LL_INFOS("RenderInit") << "GL_EXTENSIONS:\n" << all_exts << LL_ENDL;
     }
 #endif
 }
