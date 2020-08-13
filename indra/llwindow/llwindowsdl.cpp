@@ -50,7 +50,7 @@ extern "C" {
 #include <gdk/gdkx.h>
 #endif
 }
-#include <locale.h>
+#include <clocale>
 #endif // LL_GTK
 
 extern "C" {
@@ -1676,7 +1676,7 @@ BOOL LLWindowSDL::SDLReallyCaptureInput(BOOL capture)
                *keyboard* input from the window manager, which was
                frustrating users. */
             int result;
-            if (wantGrab == true)
+            if (wantGrab)
             {
                 // LL_INFOS() << "X11 POINTER GRABBY" << LL_ENDL;
                 result = SDL_CaptureMouse(SDL_TRUE);
@@ -2715,15 +2715,15 @@ void LLWindowSDL::allowLanguageTextInput(LLPreeditor *preeditor, BOOL b)
 	{
 		return;
 	}
-	mLanguageTextInputAllowed = b;
-    if(mLanguageTextInputAllowed)
-	{
-		SDL_StartTextInput();
-	}
-	else
-	{
-		SDL_StopTextInput();
-	}
+    mLanguageTextInputAllowed = b;
+    if (mLanguageTextInputAllowed)
+    {
+        SDL_StartTextInput();
+    }
+    else
+    {
+        SDL_StopTextInput();
+    }
 }
 
 //static
@@ -2806,7 +2806,7 @@ std::vector<std::string> LLWindowSDL::getDynamicFallbackFontList()
 								&filename)
 			    && filename)
 			{
-				rtns.push_back(std::string((const char*)filename));
+				rtns.emplace_back((const char*)filename);
 				if (rtns.size() >= max_font_count_cutoff)
 					break; // hit limit
 			}
