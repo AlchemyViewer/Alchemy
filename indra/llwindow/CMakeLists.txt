@@ -20,6 +20,7 @@ include(LLVFS)
 include(LLWindow)
 include(LLXML)
 include(UI)
+include(SDL2)
 
 include_directories(
     ${LLCOMMON_INCLUDE_DIRS}
