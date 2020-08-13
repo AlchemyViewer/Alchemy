@@ -4,7 +4,7 @@ if (USESYSTEMLIBS OR LINUX)
     include(FindPkgConfig)
 
     pkg_check_modules(VLC REQUIRED libvlc)
-else (USESYSTEMLIBS)
+else ()
     include(Prebuilt)
 
     use_prebuilt_binary(vlc-bin)
@@ -27,4 +27,4 @@ else (USESYSTEMLIBS)
                 ${LIBS_PREBUILT_DIR}/lib/libvlccore.a
                 )
     endif (WINDOWS)
-endif (USESYSTEMLIBS)
+endif ()
