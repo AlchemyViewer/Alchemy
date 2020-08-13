@@ -1543,6 +1543,7 @@ class Linux_x86_64_Manifest(LinuxManifest):
             self.path("libortp.so")
             self.path("libsndfile.so.1")
             self.path("libvivoxoal.so.1")
+            self.path("libvivoxplatform.so")
             self.path("libvivoxsdk.so")
 
         self.strip_binaries()
