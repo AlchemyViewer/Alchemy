@@ -509,6 +509,33 @@ BOOL LLWindowSDL::createContext(int x, int y, int width, int height, int bits, B
 	SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, depthBits);
 	SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, stencilBits);
 
+	SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
+
+	if (mFSAASamples > 0)
+	{
+		SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, 1);
+		SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, mFSAASamples);
+	}
+
+	if (LLRender::sGLCoreProfile)
+	{
+		SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
+		LLGLSLShader::sNoFixedFunction = true;
+	}
+#if !LL_DARWIN
+	else
+	{
+		SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_COMPATIBILITY);
+	}
+#endif
+
+	U32 context_flags = 0;
+	if (gDebugGL)
+	{
+		context_flags |= SDL_GL_CONTEXT_DEBUG_FLAG;
+	}
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, context_flags);
+
 	if (mWindow == nullptr)
 	{
 		if (width == 0)
@@ -645,32 +672,6 @@ BOOL LLWindowSDL::createContext(int x, int y, int width, int height, int bits, B
         }
     }
 
-	SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
-
-	if (mFSAASamples > 0)
-	{
-		SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, 1);
-		SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, mFSAASamples);
-	}
-
-	if (LLRender::sGLCoreProfile)
-	{
-		SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
-	}
-#if !LL_DARWIN
-	else
-	{
-		SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_COMPATIBILITY);
-	}
-#endif
-
-	U32 context_flags = 0;
-	if (gDebugGL)
-	{
-		context_flags |= SDL_GL_CONTEXT_DEBUG_FLAG;
-	}
-	SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, context_flags);
-
 	U32 major_gl_version = 4;
 	U32 minor_gl_version = 6;
 
@@ -706,11 +707,6 @@ BOOL LLWindowSDL::createContext(int x, int y, int width, int height, int bits, B
 			LL_INFOS() << "Created OpenGL " << llformat("%d.%d", major_gl_version, minor_gl_version) <<
 				(LLRender::sGLCoreProfile ? " core" : " compatibility") << " context." << LL_ENDL;
 			done = true;
-
-			if (LLRender::sGLCoreProfile)
-			{
-				LLGLSLShader::sNoFixedFunction = true;
-			}
 		}
 	}
 
