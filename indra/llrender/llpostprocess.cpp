@@ -239,17 +239,17 @@ void LLPostProcess::applyColorFilterShader(void)
 	gGL.getTexUnit(0)->bindManual(LLTexUnit::TT_RECT_TEXTURE, sceneRenderTexture);
 
 	getShaderUniforms(colorFilterUniforms, gPostColorFilterProgram.mProgramObject);
-	glUniform1iARB(colorFilterUniforms["RenderTexture"], 0);
-	glUniform1fARB(colorFilterUniforms["brightness"], tweaks.getBrightness());
-	glUniform1fARB(colorFilterUniforms["contrast"], tweaks.getContrast());
+	glUniform1i(colorFilterUniforms["RenderTexture"], 0);
+	glUniform1f(colorFilterUniforms["brightness"], tweaks.getBrightness());
+	glUniform1f(colorFilterUniforms["contrast"], tweaks.getContrast());
 	float baseI = (tweaks.getContrastBaseR() + tweaks.getContrastBaseG() + tweaks.getContrastBaseB()) / 3.0f;
 	baseI = tweaks.getContrastBaseIntensity() / ((baseI < 0.001f) ? 0.001f : baseI);
 	float baseR = tweaks.getContrastBaseR() * baseI;
 	float baseG = tweaks.getContrastBaseG() * baseI;
 	float baseB = tweaks.getContrastBaseB() * baseI;
-	glUniform3fARB(colorFilterUniforms["contrastBase"], baseR, baseG, baseB);
-	glUniform1fARB(colorFilterUniforms["saturation"], tweaks.getSaturation());
-	glUniform3fARB(colorFilterUniforms["lumWeights"], LUMINANCE_R, LUMINANCE_G, LUMINANCE_B);
+	glUniform3f(colorFilterUniforms["contrastBase"], baseR, baseG, baseB);
+	glUniform1f(colorFilterUniforms["saturation"], tweaks.getSaturation());
+	glUniform3f(colorFilterUniforms["lumWeights"], LUMINANCE_R, LUMINANCE_G, LUMINANCE_B);
 	
 	LLGLEnable blend(GL_BLEND);
 	gGL.setSceneBlendType(LLRender::BT_REPLACE);
@@ -282,22 +282,22 @@ void LLPostProcess::applyNightVisionShader(void)
 
 	getShaderUniforms(nightVisionUniforms, gPostNightVisionProgram.mProgramObject);
 	gGL.getTexUnit(0)->bindManual(LLTexUnit::TT_RECT_TEXTURE, sceneRenderTexture);
-	glUniform1iARB(nightVisionUniforms["RenderTexture"], 0);
+	glUniform1i(nightVisionUniforms["RenderTexture"], 0);
 
 	gGL.getTexUnit(1)->activate();
 	gGL.getTexUnit(1)->enable(LLTexUnit::TT_TEXTURE);	
 
 	gGL.getTexUnit(1)->bindManual(LLTexUnit::TT_TEXTURE, noiseTexture);
-	glUniform1iARB(nightVisionUniforms["NoiseTexture"], 1);
+	glUniform1i(nightVisionUniforms["NoiseTexture"], 1);
 
 	
-	glUniform1fARB(nightVisionUniforms["brightMult"], tweaks.getBrightMult());
-	glUniform1fARB(nightVisionUniforms["noiseStrength"], tweaks.getNoiseStrength());
+	glUniform1f(nightVisionUniforms["brightMult"], tweaks.getBrightMult());
+	glUniform1f(nightVisionUniforms["noiseStrength"], tweaks.getNoiseStrength());
 	noiseTextureScale = 0.01f + ((101.f - tweaks.getNoiseSize()) / 100.f);
 	noiseTextureScale *= (screenH / NOISE_SIZE);
 
 
-	glUniform3fARB(nightVisionUniforms["lumWeights"], LUMINANCE_R, LUMINANCE_G, LUMINANCE_B);
+	glUniform3f(nightVisionUniforms["lumWeights"], LUMINANCE_R, LUMINANCE_G, LUMINANCE_B);
 	
 	LLGLEnable blend(GL_BLEND);
 	gGL.setSceneBlendType(LLRender::BT_REPLACE);
@@ -350,7 +350,7 @@ void LLPostProcess::getShaderUniforms(glslUniforms & uniforms, GLhandleARB & pro
 	/// Find uniform locations and insert into map	
 	glslUniforms::iterator i;
 	for (i  = uniforms.begin(); i != uniforms.end(); ++i){
-		i->second = glGetUniformLocationARB(prog, i->first.String().c_str());
+		i->second = glGetUniformLocation(prog, i->first.String().c_str());
 	}
 }
 
@@ -410,60 +410,60 @@ void LLPostProcess::drawOrthoQuad(unsigned int width, unsigned int height, QuadT
 
 	glBegin(GL_QUADS);
 		if (type != QUAD_BLOOM_EXTRACT){
-			glMultiTexCoord2fARB(GL_TEXTURE0_ARB, 0.f, (GLfloat) height);
+			glMultiTexCoord2f(GL_TEXTURE0_ARB, 0.f, (GLfloat) height);
 		} else {
-			glMultiTexCoord2fARB(GL_TEXTURE0_ARB, 0.f, (GLfloat) height * 2.0f);
+			glMultiTexCoord2f(GL_TEXTURE0_ARB, 0.f, (GLfloat) height * 2.0f);
 		}
 		if (type == QUAD_NOISE){
-			glMultiTexCoord2fARB(GL_TEXTURE1_ARB,
+			glMultiTexCoord2f(GL_TEXTURE1_ARB,
 									noiseX,
 									noiseTextureScale + noiseY);
 		} else if (type == QUAD_BLOOM_COMBINE){
-			glMultiTexCoord2fARB(GL_TEXTURE1_ARB, 0.f, (GLfloat) height * 0.5f);
+			glMultiTexCoord2f(GL_TEXTURE1_ARB, 0.f, (GLfloat) height * 0.5f);
 		}
 		glVertex2f(0.f, (GLfloat) screenH - height);
 
 		if (type != QUAD_BLOOM_EXTRACT){
-			glMultiTexCoord2fARB(GL_TEXTURE0_ARB, 0.f, 0.f);
+			glMultiTexCoord2f(GL_TEXTURE0_ARB, 0.f, 0.f);
 		} else {
-			glMultiTexCoord2fARB(GL_TEXTURE0_ARB, 0.f, 0.f);
+			glMultiTexCoord2f(GL_TEXTURE0_ARB, 0.f, 0.f);
 		}
 		if (type == QUAD_NOISE){
-			glMultiTexCoord2fARB(GL_TEXTURE1_ARB,
+			glMultiTexCoord2f(GL_TEXTURE1_ARB,
 									noiseX,
 									noiseY);
 		} else if (type == QUAD_BLOOM_COMBINE){
-			glMultiTexCoord2fARB(GL_TEXTURE1_ARB, 0.f, 0.f);
+			glMultiTexCoord2f(GL_TEXTURE1_ARB, 0.f, 0.f);
 		}
 		glVertex2f(0.f, (GLfloat) height + (screenH - height));
 
 		
 		if (type != QUAD_BLOOM_EXTRACT){
-			glMultiTexCoord2fARB(GL_TEXTURE0_ARB, (GLfloat) width, 0.f);
+			glMultiTexCoord2f(GL_TEXTURE0_ARB, (GLfloat) width, 0.f);
 		} else {
-			glMultiTexCoord2fARB(GL_TEXTURE0_ARB, (GLfloat) width * 2.0f, 0.f);
+			glMultiTexCoord2f(GL_TEXTURE0_ARB, (GLfloat) width * 2.0f, 0.f);
 		}
 		if (type == QUAD_NOISE){
-			glMultiTexCoord2fARB(GL_TEXTURE1_ARB,
+			glMultiTexCoord2f(GL_TEXTURE1_ARB,
 									screenRatio * noiseTextureScale + noiseX,
 									noiseY);
 		} else if (type == QUAD_BLOOM_COMBINE){
-			glMultiTexCoord2fARB(GL_TEXTURE1_ARB, (GLfloat) width * 0.5f, 0.f);
+			glMultiTexCoord2f(GL_TEXTURE1_ARB, (GLfloat) width * 0.5f, 0.f);
 		}
 		glVertex2f((GLfloat) width, (GLfloat) height + (screenH - height));
 
 		
 		if (type != QUAD_BLOOM_EXTRACT){
-			glMultiTexCoord2fARB(GL_TEXTURE0_ARB, (GLfloat) width, (GLfloat) height);
+			glMultiTexCoord2f(GL_TEXTURE0_ARB, (GLfloat) width, (GLfloat) height);
 		} else {
-			glMultiTexCoord2fARB(GL_TEXTURE0_ARB, (GLfloat) width * 2.0f, (GLfloat) height * 2.0f);
+			glMultiTexCoord2f(GL_TEXTURE0_ARB, (GLfloat) width * 2.0f, (GLfloat) height * 2.0f);
 		}
 		if (type == QUAD_NOISE){
-			glMultiTexCoord2fARB(GL_TEXTURE1_ARB,
+			glMultiTexCoord2f(GL_TEXTURE1_ARB,
 									screenRatio * noiseTextureScale + noiseX,
 									noiseTextureScale + noiseY);
 		} else if (type == QUAD_BLOOM_COMBINE){
-			glMultiTexCoord2fARB(GL_TEXTURE1_ARB, (GLfloat) width * 0.5f, (GLfloat) height * 0.5f);
+			glMultiTexCoord2f(GL_TEXTURE1_ARB, (GLfloat) width * 0.5f, (GLfloat) height * 0.5f);
 		}
 		glVertex2f((GLfloat) width, (GLfloat) screenH - height);
 	glEnd();
@@ -555,32 +555,4 @@ bool LLPostProcess::checkError(void)
         glErr = glGetError();
     }
     return retCode;
-}
-
-void LLPostProcess::checkShaderError(GLhandleARB shader)
-{
-    GLint infologLength = 0;
-    GLint charsWritten  = 0;
-    GLchar *infoLog;
-
-    checkError();  // Check for OpenGL errors
-
-    glGetObjectParameterivARB(shader, GL_OBJECT_INFO_LOG_LENGTH_ARB, &infologLength);
-
-    checkError();  // Check for OpenGL errors
-
-    if (infologLength > 0)
-    {
-        infoLog = (GLchar *)malloc(infologLength);
-        if (infoLog == NULL)
-        {
-            /// Could not allocate infolog buffer
-            return;
-        }
-        glGetInfoLogARB(shader, infologLength, &charsWritten, infoLog);
-		// shaderErrorLog << (char *) infoLog << std::endl;
-		mShaderErrorString = (char *) infoLog;
-        free(infoLog);
-    }
-    checkError();  // Check for OpenGL errors
 }

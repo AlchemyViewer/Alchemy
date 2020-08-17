@@ -1702,7 +1702,7 @@ void renderOctree(LLSpatialGroup* group)
 	if (group->mBuilt > 0.f)
 	{
 		group->mBuilt -= 2.f * gFrameIntervalSeconds.value();
-		if (group->mBufferUsage == GL_STATIC_DRAW_ARB)
+		if (group->mBufferUsage == GL_STATIC_DRAW)
 		{
 			col.setVec(1.0f, 0, 0, group->mBuilt*0.5f);
 		}
@@ -1712,7 +1712,7 @@ void renderOctree(LLSpatialGroup* group)
 			//col.setVec(1.0f, 1.0f, 0, sinf(group->mBuilt*3.14159f)*0.5f);
 		}
 
-		if (group->mBufferUsage != GL_STATIC_DRAW_ARB)
+		if (group->mBufferUsage != GL_STATIC_DRAW)
 		{
 			LLGLDepthTest gl_depth(FALSE, FALSE);
 			glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
@@ -1776,7 +1776,7 @@ void renderOctree(LLSpatialGroup* group)
 	}
 	else
 	{
-		if (group->mBufferUsage == GL_STATIC_DRAW_ARB && !group->isEmpty() 
+		if (group->mBufferUsage == GL_STATIC_DRAW && !group->isEmpty() 
 			&& group->getSpatialPartition()->mRenderByGroup)
 		{
 			col.setVec(0.8f, 0.4f, 0.1f, 0.1f);

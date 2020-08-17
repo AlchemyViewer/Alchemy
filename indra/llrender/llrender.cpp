@@ -57,8 +57,8 @@ static const U32 LL_NUM_LIGHT_UNITS = 8;
 static const GLenum sGLTextureType[] =
 {
 	GL_TEXTURE_2D,
-	GL_TEXTURE_RECTANGLE_ARB,
-	GL_TEXTURE_CUBE_MAP_ARB,
+	GL_TEXTURE_RECTANGLE,
+	GL_TEXTURE_CUBE_MAP,
 	GL_TEXTURE_2D_MULTISAMPLE,
     GL_TEXTURE_3D
 };
@@ -125,7 +125,7 @@ void LLTexUnit::refreshState(void)
 
 	gGL.flush();
 	
-	glActiveTextureARB(GL_TEXTURE0_ARB + mIndex);
+	glActiveTexture(GL_TEXTURE0 + mIndex);
 
 	//
 	// Per apple spec, don't call glEnable/glDisable when index exceeds max texture units
@@ -173,7 +173,7 @@ void LLTexUnit::activate(void)
 	if ((S32)gGL.mCurrTextureUnitIndex != mIndex || gGL.mDirty)
 	{
 		gGL.flush();
-		glActiveTextureARB(GL_TEXTURE0_ARB + mIndex);
+		glActiveTexture(GL_TEXTURE0 + mIndex);
 		gGL.mCurrTextureUnitIndex = mIndex;
 	}
 }
@@ -362,7 +362,7 @@ bool LLTexUnit::bind(LLCubeMap* cubeMap)
 			activate();
 			enable(LLTexUnit::TT_CUBE_MAP);
             mCurrTexture = cubeMap->mImages[0]->getTexName();
-			glBindTexture(GL_TEXTURE_CUBE_MAP_ARB, mCurrTexture);
+			glBindTexture(GL_TEXTURE_CUBE_MAP, mCurrTexture);
 			mHasMipMaps = cubeMap->mImages[0]->mHasMipMaps;
 			cubeMap->mImages[0]->updateBindStats(cubeMap->mImages[0]->mTextureMemory);
 			if (cubeMap->mImages[0]->mTexOptionsDirty)
@@ -470,7 +470,7 @@ void LLTexUnit::setTextureAddressMode(eTextureAddressMode mode)
 	glTexParameteri (sGLTextureType[mCurrTexType], GL_TEXTURE_WRAP_T, sGLAddressMode[mode]);
 	if (mCurrTexType == TT_CUBE_MAP)
 	{
-		glTexParameteri (GL_TEXTURE_CUBE_MAP_ARB, GL_TEXTURE_WRAP_R, sGLAddressMode[mode]);
+		glTexParameteri (GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, sGLAddressMode[mode]);
 	}
 }
 
@@ -575,7 +575,7 @@ void LLTexUnit::setTextureBlendType(eTextureBlendType type)
 			glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_DECAL);
 			break;
 		case TB_COMBINE:
-			glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_COMBINE_ARB);
+			glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_COMBINE);
 			break;
 		default:
 			LL_ERRS() << "Unknown Texture Blend Type: " << type << LL_ENDL;
@@ -594,7 +594,7 @@ GLint LLTexUnit::getTextureSource(eTextureBlendSrc src)
 		case TBS_PREV_ALPHA:
 		case TBS_ONE_MINUS_PREV_COLOR:
 		case TBS_ONE_MINUS_PREV_ALPHA:
-			return GL_PREVIOUS_ARB;
+			return GL_PREVIOUS;
 
 		// All four cases should return the same value.
 		case TBS_TEX_COLOR:
@@ -608,18 +608,18 @@ GLint LLTexUnit::getTextureSource(eTextureBlendSrc src)
 		case TBS_VERT_ALPHA:
 		case TBS_ONE_MINUS_VERT_COLOR:
 		case TBS_ONE_MINUS_VERT_ALPHA:
-			return GL_PRIMARY_COLOR_ARB;
+			return GL_PRIMARY_COLOR;
 
 		// All four cases should return the same value.
 		case TBS_CONST_COLOR:
 		case TBS_CONST_ALPHA:
 		case TBS_ONE_MINUS_CONST_COLOR:
 		case TBS_ONE_MINUS_CONST_ALPHA:
-			return GL_CONSTANT_ARB;
+			return GL_CONSTANT;
 
 		default:
 			LL_WARNS() << "Unknown eTextureBlendSrc: " << src << ".  Using Vertex Color instead." << LL_ENDL;
-			return GL_PRIMARY_COLOR_ARB;
+			return GL_PRIMARY_COLOR;
 	}
 }
 
@@ -675,7 +675,7 @@ void LLTexUnit::setTextureCombiner(eTextureBlendOp op, eTextureBlendSrc src1, eT
 	{
 		mCurrBlendType = TB_COMBINE;
 		gGL.flush();
-		glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_COMBINE_ARB);
+		glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_COMBINE);
 	}
 	
 	// We want an early out, because this function does a LOT of stuff.
@@ -700,13 +700,13 @@ void LLTexUnit::setTextureCombiner(eTextureBlendOp op, eTextureBlendSrc src1, eT
 	if (isAlpha)
 	{
 		// Set enums to ALPHA ones
-		comb_enum = GL_COMBINE_ALPHA_ARB;
-		src0_enum = GL_SOURCE0_ALPHA_ARB;
-		src1_enum = GL_SOURCE1_ALPHA_ARB;
-		src2_enum = GL_SOURCE2_ALPHA_ARB;
-		operand0_enum = GL_OPERAND0_ALPHA_ARB;
-		operand1_enum = GL_OPERAND1_ALPHA_ARB;
-		operand2_enum = GL_OPERAND2_ALPHA_ARB;
+		comb_enum = GL_COMBINE_ALPHA;
+		src0_enum = GL_SOURCE0_ALPHA;
+		src1_enum = GL_SOURCE1_ALPHA;
+		src2_enum = GL_SOURCE2_ALPHA;
+		operand0_enum = GL_OPERAND0_ALPHA;
+		operand1_enum = GL_OPERAND1_ALPHA;
+		operand2_enum = GL_OPERAND2_ALPHA;
 
 		// cache current combiner
 		mCurrAlphaOp = op;
@@ -716,13 +716,13 @@ void LLTexUnit::setTextureCombiner(eTextureBlendOp op, eTextureBlendSrc src1, eT
 	else 
 	{
 		// Set enums to RGB ones
-		comb_enum = GL_COMBINE_RGB_ARB;
-		src0_enum = GL_SOURCE0_RGB_ARB;
-		src1_enum = GL_SOURCE1_RGB_ARB;
-		src2_enum = GL_SOURCE2_RGB_ARB;
-		operand0_enum = GL_OPERAND0_RGB_ARB;
-		operand1_enum = GL_OPERAND1_RGB_ARB;
-		operand2_enum = GL_OPERAND2_RGB_ARB;
+		comb_enum = GL_COMBINE_RGB;
+		src0_enum = GL_SOURCE0_RGB;
+		src1_enum = GL_SOURCE1_RGB;
+		src2_enum = GL_SOURCE2_RGB;
+		operand0_enum = GL_OPERAND0_RGB;
+		operand1_enum = GL_OPERAND1_RGB;
+		operand2_enum = GL_OPERAND2_RGB;
 
 		// cache current combiner
 		mCurrColorOp = op;
@@ -759,16 +759,16 @@ void LLTexUnit::setTextureCombiner(eTextureBlendOp op, eTextureBlendSrc src1, eT
 			break;
 
 		case TBO_ADD_SIGNED:
-			glTexEnvi(GL_TEXTURE_ENV, comb_enum, GL_ADD_SIGNED_ARB);
+			glTexEnvi(GL_TEXTURE_ENV, comb_enum, GL_ADD_SIGNED);
 			break;
 
 		case TBO_SUBTRACT:
-			glTexEnvi(GL_TEXTURE_ENV, comb_enum, GL_SUBTRACT_ARB);
+			glTexEnvi(GL_TEXTURE_ENV, comb_enum, GL_SUBTRACT);
 			break;
 
 		case TBO_LERP_VERT_ALPHA:
 			glTexEnvi(GL_TEXTURE_ENV, comb_enum, GL_INTERPOLATE);
-			glTexEnvi(GL_TEXTURE_ENV, src2_enum, GL_PRIMARY_COLOR_ARB);
+			glTexEnvi(GL_TEXTURE_ENV, src2_enum, GL_PRIMARY_COLOR);
 			glTexEnvi(GL_TEXTURE_ENV, operand2_enum, GL_SRC_ALPHA);
 			break;
 
@@ -780,19 +780,19 @@ void LLTexUnit::setTextureCombiner(eTextureBlendOp op, eTextureBlendSrc src1, eT
 
 		case TBO_LERP_PREV_ALPHA:
 			glTexEnvi(GL_TEXTURE_ENV, comb_enum, GL_INTERPOLATE);
-			glTexEnvi(GL_TEXTURE_ENV, src2_enum, GL_PREVIOUS_ARB);
+			glTexEnvi(GL_TEXTURE_ENV, src2_enum, GL_PREVIOUS);
 			glTexEnvi(GL_TEXTURE_ENV, operand2_enum, GL_SRC_ALPHA);
 			break;
 
 		case TBO_LERP_CONST_ALPHA:
 			glTexEnvi(GL_TEXTURE_ENV, comb_enum, GL_INTERPOLATE);
-			glTexEnvi(GL_TEXTURE_ENV, src2_enum, GL_CONSTANT_ARB);
+			glTexEnvi(GL_TEXTURE_ENV, src2_enum, GL_CONSTANT);
 			glTexEnvi(GL_TEXTURE_ENV, operand2_enum, GL_SRC_ALPHA);
 			break;
 
 		case TBO_LERP_VERT_COLOR:
 			glTexEnvi(GL_TEXTURE_ENV, comb_enum, GL_INTERPOLATE);
-			glTexEnvi(GL_TEXTURE_ENV, src2_enum, GL_PRIMARY_COLOR_ARB);
+			glTexEnvi(GL_TEXTURE_ENV, src2_enum, GL_PRIMARY_COLOR);
 			glTexEnvi(GL_TEXTURE_ENV, operand2_enum, (isAlpha) ? GL_SRC_ALPHA : GL_SRC_COLOR);
 			break;
 
@@ -841,10 +841,10 @@ void LLTexUnit::debugTextureUnit(void)
 	if (mIndex < 0) return;
 
 	GLint activeTexture;
-	glGetIntegerv(GL_ACTIVE_TEXTURE_ARB, &activeTexture);
-	if ((GL_TEXTURE0_ARB + mIndex) != activeTexture)
+	glGetIntegerv(GL_ACTIVE_TEXTURE, &activeTexture);
+	if ((GL_TEXTURE0 + mIndex) != activeTexture)
 	{
-		U32 set_unit = (activeTexture - GL_TEXTURE0_ARB);
+		U32 set_unit = (activeTexture - GL_TEXTURE0);
 		LL_WARNS() << "Incorrect Texture Unit!  Expected: " << set_unit << " Actual: " << mIndex << LL_ENDL;
 	}
 }
@@ -1793,7 +1793,7 @@ void LLRender::blendFunc(eBlendFactor color_sfactor, eBlendFactor color_dfactor,
 	llassert(alpha_dfactor < BF_UNDEF);
 	if (!gGLManager.mHasBlendFuncSeparate)
 	{
-		LL_WARNS_ONCE("render") << "no glBlendFuncSeparateEXT(), using color-only blend func" << LL_ENDL;
+		LL_WARNS_ONCE("render") << "no glBlendFuncSeparate(), using color-only blend func" << LL_ENDL;
 		blendFunc(color_sfactor, color_dfactor);
 		return;
 	}
@@ -1805,7 +1805,7 @@ void LLRender::blendFunc(eBlendFactor color_sfactor, eBlendFactor color_dfactor,
 		mCurrBlendColorDFactor = color_dfactor;
 		mCurrBlendAlphaDFactor = alpha_dfactor;
 		flush();
-		glBlendFuncSeparateEXT(sGLBlendFactor[color_sfactor], sGLBlendFactor[color_dfactor],
+		glBlendFuncSeparate(sGLBlendFactor[color_sfactor], sGLBlendFactor[color_dfactor],
 				       sGLBlendFactor[alpha_sfactor], sGLBlendFactor[alpha_dfactor]);
 	}
 }

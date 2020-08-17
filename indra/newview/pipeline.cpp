@@ -526,7 +526,7 @@ void LLPipeline::init()
 
 	if (mCubeVB.isNull())
 	{
-		mCubeVB = ll_create_cube_vb(LLVertexBuffer::MAP_VERTEX, GL_STATIC_DRAW_ARB);
+		mCubeVB = ll_create_cube_vb(LLVertexBuffer::MAP_VERTEX, GL_STATIC_DRAW);
 	}
 
 	mDeferredVB = new LLVertexBuffer(DEFERRED_VB_MASK, 0);
@@ -724,7 +724,7 @@ void LLPipeline::destroyGL()
 
 	if (mMeshDirtyQueryObject)
 	{
-		glDeleteQueriesARB(1, &mMeshDirtyQueryObject);
+		glDeleteQueries(1, &mMeshDirtyQueryObject);
 		mMeshDirtyQueryObject = 0;
 	}
 }
@@ -2463,7 +2463,7 @@ void LLPipeline::updateCull(LLCamera& camera, LLCullResult& result, S32 water_cl
 	{
 		if (mCubeVB.isNull())
 		{ //cube VB will be used for issuing occlusion queries
-			mCubeVB = ll_create_cube_vb(LLVertexBuffer::MAP_VERTEX, GL_STATIC_DRAW_ARB);
+			mCubeVB = ll_create_cube_vb(LLVertexBuffer::MAP_VERTEX, GL_STATIC_DRAW);
 		}
 		mCubeVB->setBuffer(LLVertexBuffer::MAP_VERTEX);
 	}
@@ -2735,7 +2735,7 @@ void LLPipeline::doOcclusion(LLCamera& camera)
 
 		if (mCubeVB.isNull())
 		{ //cube VB will be used for issuing occlusion queries
-			mCubeVB = ll_create_cube_vb(LLVertexBuffer::MAP_VERTEX, GL_STATIC_DRAW_ARB);
+			mCubeVB = ll_create_cube_vb(LLVertexBuffer::MAP_VERTEX, GL_STATIC_DRAW);
 		}
 		mCubeVB->setBuffer(LLVertexBuffer::MAP_VERTEX);
 
@@ -3916,11 +3916,11 @@ void LLPipeline::postSort(LLCamera& camera)
 
 		if (!mMeshDirtyQueryObject)
 		{
-			glGenQueriesARB(1, &mMeshDirtyQueryObject);
+			glGenQueries(1, &mMeshDirtyQueryObject);
 		}
 
 		
-		glBeginQueryARB(GL_TRANSFORM_FEEDBACK_PRIMITIVES_WRITTEN, mMeshDirtyQueryObject);
+		glBeginQuery(GL_TRANSFORM_FEEDBACK_PRIMITIVES_WRITTEN, mMeshDirtyQueryObject);
 	}*/
 
 	//pack vertex buffers for groups that chose to delay their updates
@@ -3931,7 +3931,7 @@ void LLPipeline::postSort(LLCamera& camera)
 
 	/*if (use_transform_feedback)
 	{
-		glEndQueryARB(GL_TRANSFORM_FEEDBACK_PRIMITIVES_WRITTEN);
+		glEndQuery(GL_TRANSFORM_FEEDBACK_PRIMITIVES_WRITTEN);
 	}*/
 	
 	mMeshDirtyGroup.clear();
@@ -4057,7 +4057,7 @@ void render_hud_elements()
 
 	if (!LLPipeline::sReflectionRender && gPipeline.hasRenderDebugFeatureMask(LLPipeline::RENDER_DEBUG_FEATURE_UI))
 	{
-		LLGLEnable multisample(LLPipeline::RenderFSAASamples > 0 ? GL_MULTISAMPLE_ARB : 0);
+		LLGLEnable multisample(LLPipeline::RenderFSAASamples > 0 ? GL_MULTISAMPLE : 0);
 		gViewerWindow->renderSelections(FALSE, FALSE, FALSE); // For HUD version in render_ui_3d()
 	
 		// Draw the tracking overlays
@@ -4369,7 +4369,7 @@ void LLPipeline::renderGeom(LLCamera& camera, bool forceVBOUpdate)
 	gGL.matrixMode(LLRender::MM_MODELVIEW);
 
 	LLGLSPipeline gls_pipeline;
-	LLGLEnable multisample(RenderFSAASamples > 0 ? GL_MULTISAMPLE_ARB : 0);
+	LLGLEnable multisample(RenderFSAASamples > 0 ? GL_MULTISAMPLE : 0);
 
 	LLGLState gls_color_material(GL_COLOR_MATERIAL, mLightingDetail < 2);
 				
@@ -4588,7 +4588,7 @@ void LLPipeline::renderGeomDeferred(LLCamera& camera)
 		}
 	}
 
-	LLGLEnable multisample(RenderFSAASamples > 0 ? GL_MULTISAMPLE_ARB : 0);
+	LLGLEnable multisample(RenderFSAASamples > 0 ? GL_MULTISAMPLE : 0);
 
 	LLVertexBuffer::unbind();
 
@@ -4670,7 +4670,7 @@ void LLPipeline::renderGeomPostDeferred(LLCamera& camera, bool do_occlusion)
 
 	LLGLEnable cull(GL_CULL_FACE);
 
-	LLGLEnable multisample(RenderFSAASamples > 0 ? GL_MULTISAMPLE_ARB : 0);
+	LLGLEnable multisample(RenderFSAASamples > 0 ? GL_MULTISAMPLE : 0);
 
 	calcNearbyLights(camera);
 	setupHWLights(NULL);
@@ -8072,7 +8072,7 @@ void LLPipeline::renderBloom(bool for_snapshot, F32 zoom_factor, int subfield)
 		gGL.getTexUnit(0)->bind(&mGlow[1]);
 		gGL.getTexUnit(1)->bind(&mScreen);
 		
-		LLGLEnable multisample(RenderFSAASamples > 0 ? GL_MULTISAMPLE_ARB : 0);
+		LLGLEnable multisample(RenderFSAASamples > 0 ? GL_MULTISAMPLE : 0);
 		
 		buff->setBuffer(mask);
 		buff->drawArrays(LLRender::TRIANGLE_STRIP, 0, 3);
@@ -8254,8 +8254,8 @@ void LLPipeline::bindDeferredShader(LLGLSLShader& shader, LLRenderTarget* light_
 			gGL.getTexUnit(channel)->setTextureAddressMode(LLTexUnit::TAM_CLAMP);
 			stop_glerror();
 			
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE_ARB, GL_COMPARE_R_TO_TEXTURE_ARB);
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_FUNC_ARB, GL_LEQUAL);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_R_TO_TEXTURE);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_FUNC, GL_LEQUAL);
 			stop_glerror();
 		}
 	}
@@ -8276,8 +8276,8 @@ void LLPipeline::bindDeferredShader(LLGLSLShader& shader, LLRenderTarget* light_
 			gGL.getTexUnit(channel)->setTextureAddressMode(LLTexUnit::TAM_CLAMP);
 			stop_glerror();
 			
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE_ARB, GL_COMPARE_R_TO_TEXTURE_ARB);
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_FUNC_ARB, GL_LEQUAL);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_R_TO_TEXTURE);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_FUNC, GL_LEQUAL);
 			stop_glerror();
 		}
 	}
@@ -8451,7 +8451,7 @@ void LLPipeline::renderDeferredLighting(LLRenderTarget* screen_target)
                             0, 0, deferred_depth_target->getWidth(), deferred_depth_target->getHeight(), GL_DEPTH_BUFFER_BIT, GL_NEAREST);  
 		}
 
-		LLGLEnable multisample(RenderFSAASamples > 0 ? GL_MULTISAMPLE_ARB : 0);
+		LLGLEnable multisample(RenderFSAASamples > 0 ? GL_MULTISAMPLE : 0);
 
 		if (gPipeline.hasRenderType(LLPipeline::RENDER_TYPE_HUD))
 		{
@@ -8693,7 +8693,7 @@ void LLPipeline::renderDeferredLighting(LLRenderTarget* screen_target)
 				
 				if (mCubeVB.isNull())
 				{
-					mCubeVB = ll_create_cube_vb(LLVertexBuffer::MAP_VERTEX, GL_STATIC_DRAW_ARB);
+					mCubeVB = ll_create_cube_vb(LLVertexBuffer::MAP_VERTEX, GL_STATIC_DRAW);
 				}
 
 				mCubeVB->setBuffer(LLVertexBuffer::MAP_VERTEX);
@@ -9205,7 +9205,7 @@ void LLPipeline::unbindDeferredShader(LLGLSLShader &shader)
 	{
 		if (shader.disableTexture(LLShaderMgr::DEFERRED_SHADOW0+i) > -1)
 		{
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE_ARB, GL_NONE);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_NONE);
 		}
 	}
 
@@ -9213,7 +9213,7 @@ void LLPipeline::unbindDeferredShader(LLGLSLShader &shader)
 	{
 		if (shader.disableTexture(LLShaderMgr::DEFERRED_SHADOW0+i) > -1)
 		{
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE_ARB, GL_NONE);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_NONE);
 		}
 	}
 
@@ -11086,7 +11086,7 @@ void LLPipeline::generateImpostor(LLVOAvatar* avatar)
 		if (LLPipeline::sRenderDeferred)
 		{
 			GLuint buff = GL_COLOR_ATTACHMENT0;
-			glDrawBuffersARB(1, &buff);
+			glDrawBuffers(1, &buff);
 		}
 
 		LLGLDisable blend(GL_BLEND);
