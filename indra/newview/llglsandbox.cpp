@@ -1034,6 +1034,31 @@ private:
 	LLGLSLShader& mShader;
 };
 
+class VAOHolder
+{
+public:
+	VAOHolder() = default;
+	~VAOHolder()
+	{
+#ifdef GL_ARB_vertex_array_object
+		if (vaoName != 0)
+		{
+			glDeleteVertexArrays(1, &vaoName);
+		}
+#endif
+	}
+
+	void genVAO()
+	{
+#ifdef GL_ARB_vertex_array_object
+		glGenVertexArrays(1, &vaoName);
+		glBindVertexArray(vaoName);
+#endif
+	}
+
+private:
+	GLuint vaoName = 0;
+};
 
 //-----------------------------------------------------------------------------
 // gpu_benchmark()
@@ -1045,6 +1070,12 @@ F32 gpu_benchmark()
       // or venerable drivers which don't support accurate timing anyway
       // and are likely to be correctly identified by the GPU table already.
 		return -1.f;
+	}
+
+	VAOHolder dummVAO;
+	if (LLRender::sGLCoreProfile)
+	{
+		dummVAO.genVAO();
 	}
 
     if (gBenchmarkProgram.mProgramObject == 0)
