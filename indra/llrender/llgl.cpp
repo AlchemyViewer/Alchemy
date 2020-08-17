@@ -71,42 +71,39 @@ static const std::string HEADLESS_VERSION_STRING("1.0");
 
 llofstream gFailLog;
 
-#if GL_ARB_debug_output
-
 #ifndef APIENTRY
 #define APIENTRY
 #endif
 
 void APIENTRY gl_debug_callback(GLenum source,
-                                GLenum type,
-                                GLuint id,
-                                GLenum severity,
-                                GLsizei length,
-                                const GLchar* message,
-                                GLvoid* userParam)
+	GLenum type,
+	GLuint id,
+	GLenum severity,
+	GLsizei length,
+	const GLchar* message,
+	GLvoid* userParam)
 {
 	if (gGLDebugLoggingEnabled)
 	{
-	if (severity == GL_DEBUG_SEVERITY_HIGH)
-	{
-		LL_WARNS() << "----- GL ERROR --------" << LL_ENDL;
-	}
-	else
-	{
-		LL_WARNS() << "----- GL WARNING -------" << LL_ENDL;
-	}
-	LL_WARNS() << "Type: " << std::hex << type << LL_ENDL;
-	LL_WARNS() << "ID: " << std::hex << id << LL_ENDL;
-	LL_WARNS() << "Severity: " << std::hex << severity << LL_ENDL;
-	LL_WARNS() << "Message: " << message << LL_ENDL;
-	LL_WARNS() << "-----------------------" << LL_ENDL;
-	if (severity == GL_DEBUG_SEVERITY_HIGH)
-	{
-		LL_ERRS() << "Halting on GL Error" << LL_ENDL;
+		if (severity == GL_DEBUG_SEVERITY_HIGH)
+		{
+			LL_WARNS() << "----- GL ERROR --------" << LL_ENDL;
+		}
+		else
+		{
+			LL_WARNS() << "----- GL WARNING -------" << LL_ENDL;
+		}
+		LL_WARNS() << "Type: " << std::hex << type << LL_ENDL;
+		LL_WARNS() << "ID: " << std::hex << id << LL_ENDL;
+		LL_WARNS() << "Severity: " << std::hex << severity << LL_ENDL;
+		LL_WARNS() << "Message: " << message << LL_ENDL;
+		LL_WARNS() << "-----------------------" << LL_ENDL;
+		if (severity == GL_DEBUG_SEVERITY_HIGH)
+		{
+			LL_ERRS() << "Halting on GL Error" << LL_ENDL;
+		}
 	}
 }
-}
-#endif
 
 void parse_glsl_version(S32& major, S32& minor);
 

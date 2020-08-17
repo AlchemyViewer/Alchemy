@@ -345,7 +345,7 @@ void LLPostProcess::createBloomShader(void)
 	bloomBlurUniforms[sBlurWidth] = 0;
 }
 
-void LLPostProcess::getShaderUniforms(glslUniforms & uniforms, GLhandleARB & prog)
+void LLPostProcess::getShaderUniforms(glslUniforms & uniforms, GLuint& prog)
 {
 	/// Find uniform locations and insert into map	
 	glslUniforms::iterator i;
@@ -391,7 +391,7 @@ void LLPostProcess::doEffects(void)
 void LLPostProcess::copyFrameBuffer(U32 & texture, unsigned int width, unsigned int height)
 {
 	gGL.getTexUnit(0)->bindManual(LLTexUnit::TT_RECT_TEXTURE, texture);
-	glCopyTexImage2D(GL_TEXTURE_RECTANGLE_ARB, 0, GL_RGBA, 0, 0, width, height, 0);
+	glCopyTexImage2D(GL_TEXTURE_RECTANGLE, 0, GL_RGBA, 0, 0, width, height, 0);
 }
 
 void LLPostProcess::drawOrthoQuad(unsigned int width, unsigned int height, QuadType type)
@@ -410,60 +410,60 @@ void LLPostProcess::drawOrthoQuad(unsigned int width, unsigned int height, QuadT
 
 	glBegin(GL_QUADS);
 		if (type != QUAD_BLOOM_EXTRACT){
-			glMultiTexCoord2f(GL_TEXTURE0_ARB, 0.f, (GLfloat) height);
+			glMultiTexCoord2f(GL_TEXTURE0, 0.f, (GLfloat) height);
 		} else {
-			glMultiTexCoord2f(GL_TEXTURE0_ARB, 0.f, (GLfloat) height * 2.0f);
+			glMultiTexCoord2f(GL_TEXTURE0, 0.f, (GLfloat) height * 2.0f);
 		}
 		if (type == QUAD_NOISE){
-			glMultiTexCoord2f(GL_TEXTURE1_ARB,
+			glMultiTexCoord2f(GL_TEXTURE1,
 									noiseX,
 									noiseTextureScale + noiseY);
 		} else if (type == QUAD_BLOOM_COMBINE){
-			glMultiTexCoord2f(GL_TEXTURE1_ARB, 0.f, (GLfloat) height * 0.5f);
+			glMultiTexCoord2f(GL_TEXTURE1, 0.f, (GLfloat) height * 0.5f);
 		}
 		glVertex2f(0.f, (GLfloat) screenH - height);
 
 		if (type != QUAD_BLOOM_EXTRACT){
-			glMultiTexCoord2f(GL_TEXTURE0_ARB, 0.f, 0.f);
+			glMultiTexCoord2f(GL_TEXTURE0, 0.f, 0.f);
 		} else {
-			glMultiTexCoord2f(GL_TEXTURE0_ARB, 0.f, 0.f);
+			glMultiTexCoord2f(GL_TEXTURE0, 0.f, 0.f);
 		}
 		if (type == QUAD_NOISE){
-			glMultiTexCoord2f(GL_TEXTURE1_ARB,
+			glMultiTexCoord2f(GL_TEXTURE1,
 									noiseX,
 									noiseY);
 		} else if (type == QUAD_BLOOM_COMBINE){
-			glMultiTexCoord2f(GL_TEXTURE1_ARB, 0.f, 0.f);
+			glMultiTexCoord2f(GL_TEXTURE1, 0.f, 0.f);
 		}
 		glVertex2f(0.f, (GLfloat) height + (screenH - height));
 
 		
 		if (type != QUAD_BLOOM_EXTRACT){
-			glMultiTexCoord2f(GL_TEXTURE0_ARB, (GLfloat) width, 0.f);
+			glMultiTexCoord2f(GL_TEXTURE0, (GLfloat) width, 0.f);
 		} else {
-			glMultiTexCoord2f(GL_TEXTURE0_ARB, (GLfloat) width * 2.0f, 0.f);
+			glMultiTexCoord2f(GL_TEXTURE0, (GLfloat) width * 2.0f, 0.f);
 		}
 		if (type == QUAD_NOISE){
-			glMultiTexCoord2f(GL_TEXTURE1_ARB,
+			glMultiTexCoord2f(GL_TEXTURE1,
 									screenRatio * noiseTextureScale + noiseX,
 									noiseY);
 		} else if (type == QUAD_BLOOM_COMBINE){
-			glMultiTexCoord2f(GL_TEXTURE1_ARB, (GLfloat) width * 0.5f, 0.f);
+			glMultiTexCoord2f(GL_TEXTURE1, (GLfloat) width * 0.5f, 0.f);
 		}
 		glVertex2f((GLfloat) width, (GLfloat) height + (screenH - height));
 
 		
 		if (type != QUAD_BLOOM_EXTRACT){
-			glMultiTexCoord2f(GL_TEXTURE0_ARB, (GLfloat) width, (GLfloat) height);
+			glMultiTexCoord2f(GL_TEXTURE0, (GLfloat) width, (GLfloat) height);
 		} else {
-			glMultiTexCoord2f(GL_TEXTURE0_ARB, (GLfloat) width * 2.0f, (GLfloat) height * 2.0f);
+			glMultiTexCoord2f(GL_TEXTURE0, (GLfloat) width * 2.0f, (GLfloat) height * 2.0f);
 		}
 		if (type == QUAD_NOISE){
-			glMultiTexCoord2f(GL_TEXTURE1_ARB,
+			glMultiTexCoord2f(GL_TEXTURE1,
 									screenRatio * noiseTextureScale + noiseX,
 									noiseTextureScale + noiseY);
 		} else if (type == QUAD_BLOOM_COMBINE){
-			glMultiTexCoord2f(GL_TEXTURE1_ARB, (GLfloat) width * 0.5f, (GLfloat) height * 0.5f);
+			glMultiTexCoord2f(GL_TEXTURE1, (GLfloat) width * 0.5f, (GLfloat) height * 0.5f);
 		}
 		glVertex2f((GLfloat) width, (GLfloat) screenH - height);
 	glEnd();
@@ -503,7 +503,7 @@ void LLPostProcess::createTexture(LLPointer<LLImageGL>& texture, unsigned int wi
 	if(texture->createGLTexture())
 	{
 		gGL.getTexUnit(0)->bindManual(LLTexUnit::TT_RECT_TEXTURE, texture->getTexName());
-		glTexImage2D(GL_TEXTURE_RECTANGLE_ARB, 0, 4, width, height, 0,
+		glTexImage2D(GL_TEXTURE_RECTANGLE, 0, 4, width, height, 0,
 			GL_RGBA, GL_UNSIGNED_BYTE, &data[0]);
 		gGL.getTexUnit(0)->setTextureFilteringOption(LLTexUnit::TFO_BILINEAR);
 		gGL.getTexUnit(0)->setTextureAddressMode(LLTexUnit::TAM_CLAMP);
