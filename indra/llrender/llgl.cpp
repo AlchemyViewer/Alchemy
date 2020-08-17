@@ -939,13 +939,6 @@ void LLGLManager::initExtensions()
 		LL_INFOS("RenderInit") << "Disabling mip-map generation for Intel GPUs" << LL_ENDL;
 		mHasMipMapGeneration = FALSE;
 	}
-#if !LL_DARWIN
-	if (mIsATI && mHasMipMapGeneration)
-	{
-		LL_INFOS("RenderInit") << "Disabling mip-map generation for ATI GPUs (performance opt)" << LL_ENDL;
-		mHasMipMapGeneration = FALSE;
-	}
-#endif
 	
 	// Misc
 	glGetIntegerv(GL_MAX_ELEMENTS_VERTICES, (GLint*) &mGLMaxVertexRange);
