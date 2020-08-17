@@ -935,84 +935,6 @@
         <key>version</key>
         <string>2.4.4.539865</string>
       </map>
-      <key>glext</key>
-      <map>
-        <key>copyright</key>
-        <string>Copyright (c) 2007-2010 The Khronos Group Inc.</string>
-        <key>description</key>
-        <string>glext headers define function prototypes and constants for OpenGL extensions</string>
-        <key>license</key>
-        <string>Copyright (c) 2007-2010 The Khronos Group Inc.</string>
-        <key>license_file</key>
-        <string>LICENSES/glext.txt</string>
-        <key>name</key>
-        <string>glext</string>
-        <key>platforms</key>
-        <map>
-          <key>darwin64</key>
-          <map>
-            <key>archive</key>
-            <map>
-              <key>hash</key>
-              <string>1bd3214ac23474ea4c869e386970a1be</string>
-              <key>url</key>
-              <string>http://automated-builds-secondlife-com.s3.amazonaws.com/ct2/54835/510029/glext-68-darwin64-538965.tar.bz2</string>
-            </map>
-            <key>name</key>
-            <string>darwin64</string>
-          </map>
-          <key>linux</key>
-          <map>
-            <key>archive</key>
-            <map>
-              <key>hash</key>
-              <string>baf1fd13e1fe6aef586200fc87a70f53</string>
-              <key>url</key>
-              <string>http://automated-builds-secondlife-com.s3.amazonaws.com/hg/repo/p64_3p-glext/rev/314200/arch/Linux/installer/glext-68-linux-314200.tar.bz2</string>
-            </map>
-            <key>name</key>
-            <string>linux</string>
-          </map>
-          <key>linux64</key>
-          <map>
-            <key>archive</key>
-            <map>
-              <key>hash</key>
-              <string>5f3c9d61b620f949b199ebd8885218ed</string>
-              <key>url</key>
-              <string>http://automated-builds-secondlife-com.s3.amazonaws.com/hg/repo/p64_3p-glext/rev/314200/arch/Linux/installer/glext-68-linux64-314200.tar.bz2</string>
-            </map>
-            <key>name</key>
-            <string>linux64</string>
-          </map>
-          <key>windows</key>
-          <map>
-            <key>archive</key>
-            <map>
-              <key>hash</key>
-              <string>6a311615bce59b01cf73ee65012a9b38</string>
-              <key>url</key>
-              <string>http://automated-builds-secondlife-com.s3.amazonaws.com/ct2/54951/511711/glext-68-windows-538965.tar.bz2</string>
-            </map>
-            <key>name</key>
-            <string>windows</string>
-          </map>
-          <key>windows64</key>
-          <map>
-            <key>archive</key>
-            <map>
-              <key>hash</key>
-              <string>daf619dab1cf7518af6532b18800c4b0</string>
-              <key>url</key>
-              <string>http://automated-builds-secondlife-com.s3.amazonaws.com/ct2/54924/511490/glext-68-windows64-538965.tar.bz2</string>
-            </map>
-            <key>name</key>
-            <string>windows64</string>
-          </map>
-        </map>
-        <key>version</key>
-        <string>68</string>
-      </map>
       <key>glh_linear</key>
       <map>
         <key>copyright</key>
@@ -1666,6 +1588,40 @@
         </map>
         <key>version</key>
         <string>7.10.4.539108</string>
+      </map>
+      <key>libepoxy</key>
+      <map>
+        <key>canonical_repo</key>
+        <string>https://git.alchemyviewer.org/alchemy/thirdparty/3p-libepoxy</string>
+        <key>copyright</key>
+        <string>Copyright © 2013-2014 Intel Corporation</string>
+        <key>description</key>
+        <string>Epoxy is a library for handling OpenGL function pointer management for you.</string>
+        <key>license</key>
+        <string>MIT</string>
+        <key>license_file</key>
+        <string>LICENSES/libepoxy.txt</string>
+        <key>name</key>
+        <string>libepoxy</string>
+        <key>platforms</key>
+        <map>
+          <key>windows64</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>hash</key>
+              <string>254605ce88497d55ac4f935ab6ee5646</string>
+              <key>hash_algorithm</key>
+              <string>md5</string>
+              <key>url</key>
+              <string>https://pkg.alchemyviewer.org/repository/autobuild-external/libepoxy/windows64/libepoxy-1.5.4.202292318-windows64-202292318.tar.bz2</string>
+            </map>
+            <key>name</key>
+            <string>windows64</string>
+          </map>
+        </map>
+        <key>version</key>
+        <string>1.5.4.202292318</string>
       </map>
       <key>libhunspell</key>
       <map>

@@ -61,6 +61,7 @@ if(WINDOWS)
         nghttp2.dll
         glod.dll
         libhunspell.dll
+        epoxy-0.dll
         )
 
     # Filenames are different for 32/64 bit BugSplat file and we don't

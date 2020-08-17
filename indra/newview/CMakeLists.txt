@@ -16,6 +16,7 @@ include(BuildVersion)
 include(CMakeCopyIfDifferent)
 include(DBusGlib)
 include(DragDrop)
+include(Epoxy)
 include(EXPAT)
 include(FMODSTUDIO)
 include(GLOD)
@@ -1860,6 +1861,9 @@ if (WINDOWS)
       ${SHARED_LIB_STAGING_DIR}/Release/libhunspell.dll
       ${SHARED_LIB_STAGING_DIR}/RelWithDebInfo/libhunspell.dll
       ${SHARED_LIB_STAGING_DIR}/Debug/libhunspell.dll
+      ${SHARED_LIB_STAGING_DIR}/Release/epoxy-0.dll
+      ${SHARED_LIB_STAGING_DIR}/RelWithDebInfo/epoxy-0.dll
+      ${SHARED_LIB_STAGING_DIR}/Debug/epoxy-0.dll
       ${SHARED_LIB_STAGING_DIR}/${CMAKE_CFG_INTDIR}/SLVoice.exe
       ${SHARED_LIB_STAGING_DIR}/${CMAKE_CFG_INTDIR}/libsndfile-1.dll
       ${SHARED_LIB_STAGING_DIR}/${CMAKE_CFG_INTDIR}/vivoxoal.dll
@@ -2085,6 +2089,7 @@ target_link_libraries(${VIEWER_BINARY_NAME}
     ${BOOST_FIBER_LIBRARY}
     ${BOOST_CONTEXT_LIBRARY}
     ${DBUSGLIB_LIBRARIES}
+    ${EPOXY_LIBRARIES}
     ${OPENGL_LIBRARIES}
     ${FMODWRAPPER_LIBRARY} # must come after LLAudio
     ${GLOD_LIBRARIES}
