@@ -382,21 +382,7 @@ void LLRenderTarget::release()
 			}
 			mUseDepth = false;
 		}
-	}
-
-	// Detach any extra color buffers (e.g. SRGB spec buffers)
-	//
-	if (mFBO && (mTex.size() > 1))
-	{		
-		glBindFramebuffer(GL_FRAMEBUFFER, mFBO);
-		S32 z;
-		for (z = mTex.size() - 1; z >= 1; z--)
-		{
-			sBytesAllocated -= mResX*mResY*4;
-			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0+z, LLTexUnit::getInternalType(mUsage), 0, 0);
-			stop_glerror();
-			LLImageGL::deleteTextures(1, &mTex[z]);
-		}
+		glBindFramebuffer(GL_FRAMEBUFFER,0);
 	}
 
 	if (mFBO)
@@ -406,10 +392,10 @@ void LLRenderTarget::release()
 		mFBO = 0;
 	}
 
-	if (mTex.size() > 0)
+	if (!mTex.empty())
 	{
-		sBytesAllocated -= mResX*mResY*4;
-		LLImageGL::deleteTextures(1, &mTex[0]);
+		sBytesAllocated -= mResX*mResY*4*mTex.size();
+		LLImageGL::deleteTextures(mTex.size(), &mTex[0]);
 	}
 
 		mTex.clear();
