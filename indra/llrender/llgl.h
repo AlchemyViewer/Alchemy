@@ -68,7 +68,7 @@ public:
 	bool initGL();
 	void shutdownGL();
 
-	void initWGL(); // Initializes stupid WGL extensions
+	void initWGL(HDC dc); // Initializes stupid WGL extensions
 
 	std::string getRawGLString(); // For sending to simulator
 

@@ -1373,9 +1373,13 @@ BOOL LLWindowWin32::switchContext(BOOL fullscreen, const LLCoordScreen &size, BO
 
 	LL_INFOS("Window") << "Drawing context is created." << LL_ENDL ;
 
-	gGLManager.initWGL();
 	
-	if (wglChoosePixelFormatARB)
+	gGLManager.initWGL(mhDC);
+
+	HWND oldWND = nullptr;
+	HDC oldDC = nullptr;
+	HGLRC oldRC = nullptr;
+	if (epoxy_has_wgl_extension(mhDC, "WGL_ARB_pixel_format"))
 	{
 		// OK, at this point, use the ARB wglChoosePixelFormatsARB function to see if we
 		// can get exactly what we want.
@@ -1528,23 +1532,23 @@ BOOL LLWindowWin32::switchContext(BOOL fullscreen, const LLCoordScreen &size, BO
 				--cur_format;
 			}
 		}
-		
-		pixel_format = pixel_formats[cur_format];
-		
-		if (mhDC != 0)											// Does The Window Have A Device Context?
-		{
-			wglMakeCurrent(mhDC, 0);							// Set The Current Active Rendering Context To Zero
-			if (mhRC != 0)										// Does The Window Have A Rendering Context?
-			{
-				wglDeleteContext (mhRC);							// Release The Rendering Context
-				mhRC = 0;										// Zero The Rendering Context
 
+		pixel_format = pixel_formats[cur_format];
+
+		if (mWindowHandle != nullptr)
+		{
+			if (mhDC != nullptr)											// Does The Window Have A Device Context?
+			{
+				if (mhRC != nullptr)										// Does The Window Have A Rendering Context?
+				{
+					oldRC = mhRC;
+					mhRC = nullptr;										// Zero The Rendering Context
+				}
+				oldDC = mhDC;
+				mhDC = nullptr;											// Zero The Device Context
 			}
-			ReleaseDC (mWindowHandle, mhDC);						// Release The Device Context
-			mhDC = 0;											// Zero The Device Context
+			oldWND = mWindowHandle;
 		}
-		DestroyWindow (mWindowHandle);									// Destroy The Window
-		
 
 		mWindowHandle = CreateWindowEx(dw_ex_style,
 			mWindowClassName,
@@ -1643,7 +1647,7 @@ BOOL LLWindowWin32::switchContext(BOOL fullscreen, const LLCoordScreen &size, BO
 	}
 
 	mhRC = 0;
-	if (wglCreateContextAttribsARB)
+	if (epoxy_has_wgl_extension(mhDC, "WGL_ARB_create_context"))
 	{ //attempt to create a specific versioned context
 		S32 attribs[] = 
 		{ //start at 4.2
@@ -1704,6 +1708,23 @@ BOOL LLWindowWin32::switchContext(BOOL fullscreen, const LLCoordScreen &size, BO
 		close();
 		OSMessageBox(mCallbacks->translateString("MBGLContextActErr"), mCallbacks->translateString("MBError"), OSMB_OK);
 		return FALSE;
+	}
+
+	if (oldWND != nullptr)
+	{
+		if (oldDC != nullptr)											// Does The Window Have A Device Context?
+		{
+			if (oldRC != nullptr)										// Does The Window Have A Rendering Context?
+			{
+				wglDeleteContext(oldRC);							// Release The Rendering Context
+				oldRC = nullptr;										// Zero The Rendering Context
+
+			}
+			ReleaseDC(oldWND, oldDC);						// Release The Device Context
+			oldDC = nullptr;											// Zero The Device Context
+		}
+		DestroyWindow(oldWND);									// Destroy The Window
+		oldWND = nullptr;
 	}
 
 	if (!gGLManager.initGL())
