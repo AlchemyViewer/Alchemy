@@ -860,6 +860,7 @@ LLPipeline::eFBOStatus LLPipeline::doAllocateScreenBuffer(U32 resX, U32 resY)
 		ret = FBO_FAILURE;
 
 		releaseScreenBuffers();
+		releaseShadowTargets();
 		//reduce number of samples 
 		while (samples > 0)
 		{
@@ -869,6 +870,7 @@ LLPipeline::eFBOStatus LLPipeline::doAllocateScreenBuffer(U32 resX, U32 resY)
 				return FBO_SUCCESS_LOWRES;
 			}
 			releaseScreenBuffers();
+			releaseShadowTargets();
 		}
 
 		samples = 0;
@@ -882,6 +884,7 @@ LLPipeline::eFBOStatus LLPipeline::doAllocateScreenBuffer(U32 resX, U32 resY)
 				return FBO_SUCCESS_LOWRES;
 			}
 			releaseScreenBuffers();
+			releaseShadowTargets();
 
 			resX /= 2;
 			if (allocateScreenBuffer(resX, resY, samples))
@@ -889,6 +892,7 @@ LLPipeline::eFBOStatus LLPipeline::doAllocateScreenBuffer(U32 resX, U32 resY)
 				return FBO_SUCCESS_LOWRES;
 			}
 			releaseScreenBuffers();
+			releaseShadowTargets();
 		}
 
 		LL_WARNS() << "Unable to allocate screen buffer at any resolution!" << LL_ENDL;
@@ -1046,32 +1050,32 @@ bool LLPipeline::allocateShadowBuffer(U32 resX, U32 resY)
 			}
 		}
 
-		U32 width = (U32) (resX*scale);
+		U32 width = (U32)(resX * scale);
 		U32 height = width;
 
 		if (shadow_detail > 1)
 		{ //allocate two spot shadow maps
 			U32 spot_shadow_map_width = width;
-            U32 spot_shadow_map_height = height;
+			U32 spot_shadow_map_height = height;
 			for (U32 i = 4; i < 6; i++)
 			{
-                if (!mShadow[i].allocate(spot_shadow_map_width, spot_shadow_map_height, 0, TRUE, FALSE))
-		{
-                    return false;
+				if (!mShadow[i].allocate(spot_shadow_map_width, spot_shadow_map_height, 0, TRUE, FALSE))
+				{
+					return false;
+				}
+				if (!mShadowOcclusion[i].allocate(spot_shadow_map_width / occlusion_divisor, height / occlusion_divisor, 0, TRUE, FALSE))
+				{
+					return false;
+				}
 			}
-                if (!mShadowOcclusion[i].allocate(spot_shadow_map_width/occlusion_divisor, height/occlusion_divisor, 0, TRUE, FALSE))
-		{
-			return false;
 		}
-	}
-        }
-	else
-	{
-            for (U32 i = 4; i < 6; i++)
+		else
 		{
-                releaseShadowTarget(i);
+			for (U32 i = 4; i < 6; i++)
+			{
+				releaseShadowTarget(i);
+			}
 		}
-	}
 	}
 
 	return true;
@@ -1229,6 +1233,7 @@ void LLPipeline::releaseGLBuffers()
 	}
 
 	releaseScreenBuffers();
+	releaseShadowTargets();
 
 	gBumpImageList.destroyGL();
 	LLVOAvatar::resetImpostors();
