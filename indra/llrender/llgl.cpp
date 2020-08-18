@@ -285,10 +285,10 @@ bool LLGLManager::initGL()
 
 	// Extract video card strings and convert to upper case to
 	// work around driver-to-driver variation in capitalization.
-	mGLVendor = std::string((const char *)glGetString(GL_VENDOR));
+	mGLVendor = ll_safe_string((const char *)glGetString(GL_VENDOR));
 	LLStringUtil::toUpper(mGLVendor);
 
-	mGLRenderer = std::string((const char *)glGetString(GL_RENDERER));
+	mGLRenderer = ll_safe_string((const char *)glGetString(GL_RENDERER));
 	LLStringUtil::toUpper(mGLRenderer);
 
 	parse_gl_version( &mDriverVersionMajor, 
@@ -597,9 +597,9 @@ void LLGLManager::getGLInfo(LLSD& info)
 	}
 	else
 	{
-		info["GLInfo"]["GLVendor"] = std::string((const char *)glGetString(GL_VENDOR));
-		info["GLInfo"]["GLRenderer"] = std::string((const char *)glGetString(GL_RENDERER));
-		info["GLInfo"]["GLVersion"] = std::string((const char *)glGetString(GL_VERSION));
+		info["GLInfo"]["GLVendor"] = ll_safe_string((const char *)glGetString(GL_VENDOR));
+		info["GLInfo"]["GLRenderer"] = ll_safe_string((const char *)glGetString(GL_RENDERER));
+		info["GLInfo"]["GLVersion"] = ll_safe_string((const char *)glGetString(GL_VERSION));
 	}
 
 #if 0
@@ -649,9 +649,9 @@ void LLGLManager::printGLInfoString()
 	}
 	else
 	{
-		LL_INFOS("RenderInit") << "GL_VENDOR:     " << ((const char *)glGetString(GL_VENDOR)) << LL_ENDL;
-		LL_INFOS("RenderInit") << "GL_RENDERER:   " << ((const char *)glGetString(GL_RENDERER)) << LL_ENDL;
-		LL_INFOS("RenderInit") << "GL_VERSION:    " << ((const char *)glGetString(GL_VERSION)) << LL_ENDL;
+		LL_INFOS("RenderInit") << "GL_VENDOR:     " << ll_safe_string((const char *)glGetString(GL_VENDOR)) << LL_ENDL;
+		LL_INFOS("RenderInit") << "GL_RENDERER:   " << ll_safe_string((const char *)glGetString(GL_RENDERER)) << LL_ENDL;
+		LL_INFOS("RenderInit") << "GL_VERSION:    " << ll_safe_string((const char *)glGetString(GL_VERSION)) << LL_ENDL;
 	}
 
 #if 0
