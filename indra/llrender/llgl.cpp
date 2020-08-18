@@ -192,6 +192,7 @@ LLGLManager::LLGLManager() :
 	mHasCubeMap(FALSE),
 	mHasDebugOutput(FALSE),
 
+	mHasTextureSwizzle(false),
 	mIsATI(FALSE),
 	mIsNVIDIA(FALSE),
 	mIsIntel(FALSE),
@@ -799,6 +800,8 @@ void LLGLManager::initExtensions()
 	mHasVertexShader = mGLVersion >= 2.0f || (epoxy_has_gl_extension("GL_ARB_vertex_program") && epoxy_has_gl_extension("GL_ARB_vertex_shader")
 		&& (LLRender::sGLCoreProfile || epoxy_has_gl_extension("GL_ARB_shading_language_100")));
 	mHasFragmentShader = mGLVersion >= 2.0f || (epoxy_has_gl_extension("GL_ARB_fragment_shader") && (LLRender::sGLCoreProfile || epoxy_has_gl_extension("GL_ARB_shading_language_100")));
+
+	mHasTextureSwizzle = mGLVersion >= 3.3f || epoxy_has_gl_extension("GL_ARB_texture_swizzle");
 #endif
 
 #if LL_LINUX || LL_SOLARIS
@@ -824,6 +827,7 @@ void LLGLManager::initExtensions()
 		mHasShaderObjects = FALSE;
 		mHasVertexShader = FALSE;
 		mHasFragmentShader = FALSE;
+		mHasTextureSwizzle = FALSE;
 		LL_WARNS("RenderInit") << "GL extension support DISABLED via LL_GL_NOEXT" << LL_ENDL;
 	}
 	else if (getenv("LL_GL_BASICEXT"))	/* Flawfinder: ignore */

@@ -120,6 +120,7 @@ public:
 	BOOL mHassRGBTexture;
 	BOOL mHassRGBFramebuffer;
     BOOL mHasTexturesRGBDecode;
+	bool mHasTextureSwizzle;
 
 	// Vendor-specific extensions
 	BOOL mIsATI;
