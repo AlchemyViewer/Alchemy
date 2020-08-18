@@ -3903,11 +3903,11 @@ BOOL LLModelPreview::render()
 
 						if (edges)
 						{
-							glLineWidth(3.f);
+							gGL.setLineWidth(3.f);
 							glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 							buffer->drawRange(LLRender::TRIANGLES, 0, buffer->getNumVerts()-1, buffer->getNumIndices(), 0);
 							glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-							glLineWidth(1.f);
+							gGL.setLineWidth(1.f);
 						}
 					}
 					gGL.popMatrix();
@@ -4021,19 +4021,19 @@ BOOL LLModelPreview::render()
 
 									gGL.diffuseColor3f(1.f, 1.f, 0.f);
 
-									glLineWidth(2.f);
+									gGL.setLineWidth(2.f);
 									glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 									buffer->drawRange(LLRender::TRIANGLES, 0, buffer->getNumVerts()-1, buffer->getNumIndices(), 0);
 
 									glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-									glLineWidth(1.f);
+									gGL.setLineWidth(1.f);
 								}
 							}
 
 							gGL.popMatrix();
 						}
 
-					glLineWidth(3.f);
+					gGL.setLineWidth(3.f);
 					glPointSize(8.f);
 					gPipeline.enableLightsFullbright();
 					//show degenerate triangles
@@ -4104,7 +4104,7 @@ BOOL LLModelPreview::render()
 
 						gGL.popMatrix();
 					}
-					glLineWidth(1.f);
+					gGL.setLineWidth(1.f);
 					glPointSize(1.f);
 					gPipeline.enableLightsPreview();
 					gGL.setSceneBlendType(LLRender::BT_ALPHA);
@@ -4193,11 +4193,11 @@ BOOL LLModelPreview::render()
 
 							if (edges)
 							{
-								glLineWidth(3.f);
+								gGL.setLineWidth(3.f);
 								glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 								buffer->draw(LLRender::TRIANGLES, buffer->getNumIndices(), 0);
 								glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-								glLineWidth(1.f);
+								gGL.setLineWidth(1.f);
 							}
 						}
 					}

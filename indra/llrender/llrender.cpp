@@ -1087,7 +1087,7 @@ LLRender::LLRender()
 	mQuadCycle(0),
     mMode(LLRender::TRIANGLES),
     mCurrTextureUnitIndex(0),
-    mMaxAnisotropy(0.f) 
+    mLineWidth(1.f)
 {	
 	mTexUnits.reserve(LL_NUM_TEXTURE_LAYERS);
 	for (U32 i = 0; i < LL_NUM_TEXTURE_LAYERS; i++)
@@ -1843,6 +1843,22 @@ void LLRender::setAmbientLightColor(const LLColor4& color)
 		{
 			glLightModelfv(GL_LIGHT_MODEL_AMBIENT, color.mV);
 		}
+	}
+}
+void LLRender::setLineWidth(F32 line_width)
+{
+	if (LLRender::sGLCoreProfile)
+	{
+		line_width = 1.f;
+	}
+	if (mLineWidth != line_width || mDirty)
+	{
+		if (mMode == LLRender::LINES || mMode == LLRender::LINE_STRIP)
+		{
+			flush();
+		}
+		mLineWidth = line_width;
+		glLineWidth(line_width);
 	}
 }
 

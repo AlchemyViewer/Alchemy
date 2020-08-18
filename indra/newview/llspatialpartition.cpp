@@ -1719,12 +1719,12 @@ void renderOctree(LLSpatialGroup* group)
 
 			gGL.diffuseColor4f(1,0,0,group->mBuilt);
 			gGL.flush();
-			glLineWidth(5.f);
+			gGL.setLineWidth(5.f);
 
 			const LLVector4a* bounds = group->getObjectBounds();
 			drawBoxOutline(bounds[0], bounds[1]);
 			gGL.flush();
-			glLineWidth(1.f);
+			gGL.setLineWidth(1.f);
 			gGL.flush();
 			for (LLSpatialGroup::element_iter i = group->getDataBegin(), i_end = group->getDataEnd(); i != i_end; ++i)
 			{
@@ -1861,10 +1861,10 @@ void renderVisibility(LLSpatialGroup* group, LLCamera* camera)
 		pushBufferVerts(group, LLVertexBuffer::MAP_VERTEX, false);
 		
 		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-		glLineWidth(4.f);
+		gGL.setLineWidth(4.f);
 		gGL.diffuseColor4f(0.f, 0.5f, 0.f, 1.f);
 		pushBufferVerts(group, LLVertexBuffer::MAP_VERTEX, false);
-		glLineWidth(1.f);
+		gGL.setLineWidth(1.f);
 		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
 		bool selected = false;
@@ -2239,12 +2239,12 @@ void renderBoundingBox(LLDrawable* drawable, BOOL set_color = TRUE)
 	if (vobj && vobj->onActiveList())
 	{
 		gGL.flush();
-		glLineWidth(llmax(4.f*sinf(gFrameTimeSeconds*2.f)+1.f, 1.f));
-		//glLineWidth(4.f*(sinf(gFrameTimeSeconds*2.f)*0.25f+0.75f));
+		gGL.setLineWidth(llmax(4.f*sinf(gFrameTimeSeconds*2.f)+1.f, 1.f));
+		//gGL.setLineWidth(4.f*(sinf(gFrameTimeSeconds*2.f)*0.25f+0.75f));
 		stop_glerror();
 		drawBoxOutline(pos,size);
 		gGL.flush();
-		glLineWidth(1.f);
+		gGL.setLineWidth(1.f);
 	}
 	else
 	{
@@ -2358,10 +2358,10 @@ void render_hull(LLModel::PhysicsMesh& mesh, const LLColor4& color, const LLColo
 	LLGLEnable offset(GL_POLYGON_OFFSET_LINE);
 	glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 	glPolygonOffset(3.f, 3.f);
-	glLineWidth(3.f);
+	gGL.setLineWidth(3.f);
 	gGL.diffuseColor4fv(line_color.mV);
 	LLVertexBuffer::drawArrays(LLRender::TRIANGLES, mesh.mPositions, mesh.mNormals);
-	glLineWidth(1.f);
+	gGL.setLineWidth(1.f);
 	glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 }
 
@@ -3092,7 +3092,7 @@ public:
 			if (i == 1)
 			{
 				gGL.flush();
-				glLineWidth(3.f);
+				gGL.setLineWidth(3.f);
 			}
 
 			gGL.begin(LLRender::TRIANGLES);
@@ -3111,7 +3111,7 @@ public:
 			if (i == 1)
 			{
 				gGL.flush();
-				glLineWidth(1.f);
+				gGL.setLineWidth(1.f);
 			}
 		}
 	}
@@ -3706,11 +3706,11 @@ void LLSpatialPartition::renderPhysicsShapes()
 
 	gGL.flush();
 	gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
-	glLineWidth(3.f);
+	gGL.setLineWidth(3.f);
 	LLOctreeRenderPhysicsShapes render_physics(camera);
 	render_physics.traverse(mOctree);
 	gGL.flush();
-	glLineWidth(1.f);
+	gGL.setLineWidth(1.f);
 }
 
 void LLSpatialPartition::renderDebug()
