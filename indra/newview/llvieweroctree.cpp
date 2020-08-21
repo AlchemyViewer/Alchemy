@@ -796,7 +796,7 @@ public:
 	{
 		GLuint ret = 0;
 
-		glGenQueriesARB(1, &ret);
+		glGenQueries(1, &ret);
 	
 		return ret;
 	}
@@ -806,7 +806,7 @@ public:
 #if LL_TRACK_PENDING_OCCLUSION_QUERIES
 		LLOcclusionCullingGroup::sPendingQueries.erase(name);
 #endif
-		glDeleteQueriesARB(1, &name);
+		glDeleteQueries(1, &name);
 	}
 };
 
@@ -1103,7 +1103,7 @@ void LLOcclusionCullingGroup::checkOcclusion()
 			GLuint available = 0;
 			if (mOcclusionQuery[LLViewerCamera::sCurCameraID])
 			{
-				glGetQueryObjectuivARB(mOcclusionQuery[LLViewerCamera::sCurCameraID], GL_QUERY_RESULT_AVAILABLE_ARB, &available);
+				glGetQueryObjectuiv(mOcclusionQuery[LLViewerCamera::sCurCameraID], GL_QUERY_RESULT_AVAILABLE, &available);
 
 				static LLCachedControl<bool> wait_for_query(gSavedSettings, "RenderSynchronousOcclusion", true);
 
@@ -1113,7 +1113,7 @@ void LLOcclusionCullingGroup::checkOcclusion()
 					LL_RECORD_BLOCK_TIME(FTM_OCCLUSION_WAIT);
 					while (!available && max_loop-- > 0)
 					{
-						glGetQueryObjectuivARB(mOcclusionQuery[LLViewerCamera::sCurCameraID], GL_QUERY_RESULT_AVAILABLE_ARB, &available);
+						glGetQueryObjectuiv(mOcclusionQuery[LLViewerCamera::sCurCameraID], GL_QUERY_RESULT_AVAILABLE, &available);
 					}
 				}
 			}
@@ -1127,7 +1127,7 @@ void LLOcclusionCullingGroup::checkOcclusion()
 				GLuint res = 1;
 				if (!isOcclusionState(DISCARD_QUERY) && mOcclusionQuery[LLViewerCamera::sCurCameraID])
 				{
-					glGetQueryObjectuivARB(mOcclusionQuery[LLViewerCamera::sCurCameraID], GL_QUERY_RESULT_ARB, &res);	
+					glGetQueryObjectuiv(mOcclusionQuery[LLViewerCamera::sCurCameraID], GL_QUERY_RESULT, &res);	
 #if LL_TRACK_PENDING_OCCLUSION_QUERIES
 					sPendingQueries.erase(mOcclusionQuery[LLViewerCamera::sCurCameraID]);
 #endif
@@ -1226,7 +1226,7 @@ void LLOcclusionCullingGroup::doOcclusion(LLCamera* camera, const LLVector4a* sh
 					LLGLEnable clamp(use_depth_clamp ? GL_DEPTH_CLAMP : 0);				
 						
 #if !LL_DARWIN					
-					U32 mode = gGLManager.mHasOcclusionQuery2 ? GL_ANY_SAMPLES_PASSED : GL_SAMPLES_PASSED_ARB;
+					U32 mode = gGLManager.mHasOcclusionQuery2 ? GL_ANY_SAMPLES_PASSED : GL_SAMPLES_PASSED;
 #else
 					U32 mode = GL_SAMPLES_PASSED_ARB;
 #endif
@@ -1244,7 +1244,7 @@ void LLOcclusionCullingGroup::doOcclusion(LLCamera* camera, const LLVector4a* sh
 
 						{
 							LL_RECORD_BLOCK_TIME(FTM_OCCLUSION_BEGIN_QUERY);
-							glBeginQueryARB(mode, mOcclusionQuery[LLViewerCamera::sCurCameraID]);					
+							glBeginQuery(mode, mOcclusionQuery[LLViewerCamera::sCurCameraID]);					
 						}
 					
 						LLGLSLShader* shader = LLGLSLShader::sCurBoundShaderPtr;
@@ -1287,7 +1287,7 @@ void LLOcclusionCullingGroup::doOcclusion(LLCamera* camera, const LLVector4a* sh
 
 						{
 							LL_RECORD_BLOCK_TIME(FTM_OCCLUSION_END_QUERY);
-							glEndQueryARB(mode);
+							glEndQuery(mode);
 						}
 					}
 				}

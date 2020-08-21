@@ -1072,8 +1072,7 @@ void LLFastTimerView::drawLineGraph()
 		//fatten highlighted timer
 		if (mHoverID == idp)
 		{
-			gGL.flush();
-			glLineWidth(3);
+			gGL.setLineWidth(3);
 		}
 
 		llassert(idp->getIndex() < sTimerColors.size());
@@ -1132,8 +1131,7 @@ void LLFastTimerView::drawLineGraph()
 
 		if (mHoverID == idp)
 		{
-			gGL.flush();
-			glLineWidth(1);
+			gGL.setLineWidth(1);
 		}
 
 		if (idp->getTreeNode().mCollapsed)

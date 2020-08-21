@@ -691,7 +691,7 @@ void LLFace::renderOneWireframe(const LLColor4 &color, F32 fogCfx, bool wirefram
 
         LLGLEnable offset(GL_POLYGON_OFFSET_LINE);
         glPolygonOffset(3.f, 3.f);
-        glLineWidth(5.f);
+		gGL.setLineWidth(5.f);
         glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
         renderFace(mDrawablep, this);
     }
@@ -1230,7 +1230,7 @@ void LLFace::cacheFaceInVRAM(const LLVolumeFace& vf)
 		mask |= LLVertexBuffer::MAP_WEIGHT4;
 	}
 
-	LLVertexBuffer* buff = new LLVertexBuffer(mask, GL_STATIC_DRAW_ARB);
+	LLVertexBuffer* buff = new LLVertexBuffer(mask, GL_STATIC_DRAW);
 	vf.mVertexBuffer = buff;
 
 	buff->allocateBuffer(vf.mNumVertices, 0, true);
@@ -1530,7 +1530,7 @@ BOOL LLFace::getGeometryVolume(const LLVolume& volume,
 
 #ifdef GL_TRANSFORM_FEEDBACK_BUFFER
 	if (use_transform_feedback &&
-		mVertexBuffer->getUsage() == GL_DYNAMIC_COPY_ARB &&
+		mVertexBuffer->getUsage() == GL_DYNAMIC_COPY &&
 		gTransformPositionProgram.mProgramObject && //transform shaders are loaded
 		mVertexBuffer->useVBOs() && //target buffer is in VRAM
 		!rebuild_weights && //TODO: add support for weights
@@ -1665,7 +1665,7 @@ BOOL LLFace::getGeometryVolume(const LLVolume& volume,
 			}				
 		}
 
-		glBindBufferARB(GL_TRANSFORM_FEEDBACK_BUFFER, 0);
+		glBindBuffer(GL_TRANSFORM_FEEDBACK_BUFFER, 0);
 		gGL.popMatrix();
 
 		if (cur_shader)
