@@ -40,7 +40,7 @@
 class LLInterpVal
 {
 public:
-	virtual ~LLInterpVal() {}
+	virtual ~LLInterpVal() = default;
 	virtual void interp(LLInterpVal &target, const F32 frac); // Linear interpolation for each type
 };
 
@@ -49,7 +49,7 @@ class LLInterp
 {
 public:
         LLInterp();
-	virtual ~LLInterp() {}
+	virtual ~LLInterp() = default;
 
 	virtual void start();
 	void update(const F32 time);

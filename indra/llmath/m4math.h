@@ -117,8 +117,6 @@ public:
 			  const LLVector4 &pos);						// Initializes Matrix with Euler angles
 	LLMatrix4(const F32 roll, const F32 pitch, const F32 yaw);				// Initializes Matrix with Euler angles
 
-	~LLMatrix4(void);										// Destructor
-
 	LLSD getValue() const;
 	void setValue(const LLSD&);
 

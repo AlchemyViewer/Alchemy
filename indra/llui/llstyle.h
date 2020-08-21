@@ -98,7 +98,7 @@ public:
 	LLFontGL::ShadowType		mDropShadow;
 
 protected:
-	~LLStyle() { }
+	~LLStyle() = default;
 
 private:
 	BOOL				mVisible;

@@ -38,7 +38,7 @@ class LLScrollListItem;
 class LLCtrlSelectionInterface
 {
 public:
-	virtual ~LLCtrlSelectionInterface();
+	virtual ~LLCtrlSelectionInterface()  = default;
 	
 	enum EOperation
 	{
@@ -75,7 +75,7 @@ public:
 class LLCtrlListInterface : public LLCtrlSelectionInterface
 {
 public:
-	virtual ~LLCtrlListInterface();
+	virtual ~LLCtrlListInterface()  = default;
 	
 	virtual void addColumn(const LLSD& column, EAddPosition pos = ADD_BOTTOM) = 0;
 	virtual void clearColumns() = 0;
@@ -94,7 +94,7 @@ public:
 class LLCtrlScrollInterface
 {
 public:
-	virtual ~LLCtrlScrollInterface();
+	virtual ~LLCtrlScrollInterface() = default;
 	
 	virtual S32 getScrollPos() const = 0;
 	virtual void setScrollPos( S32 pos ) = 0;

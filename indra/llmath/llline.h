@@ -40,7 +40,7 @@ class LLLine
 public:
 	LLLine();
 	LLLine( const LLVector3& first_point, const LLVector3& second_point );
-	virtual ~LLLine() {};
+	virtual ~LLLine() = default;
 
 	void setPointDirection( const LLVector3& first_point, const LLVector3& second_point );
 	void setPoints( const LLVector3& first_point, const LLVector3& second_point );

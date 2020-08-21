@@ -57,8 +57,8 @@ public:
 	class LLTabComparator
 	{
 	public:
-		LLTabComparator() {};
-		virtual ~LLTabComparator() {};
+		LLTabComparator() = default;
+		virtual ~LLTabComparator() = default;
 
 		/** Returns true if tab1 < tab2, false otherwise */
 		virtual bool compare(const LLAccordionCtrlTab* tab1, const LLAccordionCtrlTab* tab2) const = 0;

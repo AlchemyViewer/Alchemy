@@ -40,8 +40,7 @@ namespace ll
 			SearchableControl()
 				: mIsHighlighed( false )
 			{ }
-			virtual ~SearchableControl()
-			{ }
+			virtual ~SearchableControl() = default;
 
 			LLColor4 getHighlightColor( ) const
 			{

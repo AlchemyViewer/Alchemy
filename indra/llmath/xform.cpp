@@ -32,10 +32,6 @@ LLXform::LLXform()
 	init();
 }
 
-LLXform::~LLXform()
-{
-}
-
 // Link optimization - don't inline these LL_WARNS()
 void LLXform::warn(const char* const msg)
 {
@@ -60,10 +56,6 @@ BOOL LLXform::isRoot() const
 BOOL LLXform::isRootEdit() const
 {
 	return (!mParent);
-}
-
-LLXformMatrix::~LLXformMatrix()
-{
 }
 
 void LLXformMatrix::update()

@@ -45,7 +45,7 @@ class LLVFS;
 class LLGestureManagerObserver
 {
 public:
-	virtual ~LLGestureManagerObserver() { };
+	virtual ~LLGestureManagerObserver() = default;
 	virtual void changed() = 0;
 };
 

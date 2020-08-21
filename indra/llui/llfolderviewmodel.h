@@ -59,8 +59,8 @@ public:
 
 public:
 
-	LLFolderViewFilter() {}
-	virtual ~LLFolderViewFilter() {}
+	LLFolderViewFilter() = default;
+	virtual ~LLFolderViewFilter() = default;
 
 	// +-------------------------------------------------------------------+
 	// + Execution And Results
@@ -115,7 +115,7 @@ public:
 	:	LLTrace::MemTrackable<LLFolderViewModelInterface>("LLFolderViewModelInterface") 
 	{}
 
-	virtual ~LLFolderViewModelInterface() {}
+	virtual ~LLFolderViewModelInterface() = default;
 	virtual void requestSortAll() = 0;
 
 	virtual void sort(class LLFolderViewFolder*) = 0;
@@ -140,7 +140,7 @@ public:
 	:	LLTrace::MemTrackable<LLFolderViewModelItem>("LLFolderViewModelItem") 
 	{}
 
-	virtual ~LLFolderViewModelItem() { }
+	virtual ~LLFolderViewModelItem() = default;
 
 	virtual void update() {}	//called when drawing
 	virtual const std::string& getName() const = 0;
