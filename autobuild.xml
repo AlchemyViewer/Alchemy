@@ -1605,6 +1605,20 @@
         <string>libepoxy</string>
         <key>platforms</key>
         <map>
+          <key>linux64</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>hash</key>
+              <string>a29210ee9af6221bd5d8d8bfc7c31b95</string>
+              <key>hash_algorithm</key>
+              <string>md5</string>
+              <key>url</key>
+              <string>https://pkg.alchemyviewer.org/repository/autobuild-external/libepoxy/linux64/debian10/libepoxy-1.5.4.202340827-linux64-202340827.tar.bz2</string>
+            </map>
+            <key>name</key>
+            <string>linux64</string>
+          </map>
           <key>windows64</key>
           <map>
             <key>archive</key>
@@ -1621,7 +1635,7 @@
           </map>
         </map>
         <key>version</key>
-        <string>1.5.4.202292318</string>
+        <string>1.5.4.202340827</string>
       </map>
       <key>libhunspell</key>
       <map>
