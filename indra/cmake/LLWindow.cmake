@@ -8,6 +8,7 @@ include(SDL2)
 set(LLWINDOW_INCLUDE_DIRS
     ${GLEXT_INCLUDE_DIR}
     ${EPOXY_INCLUDE_DIRS}
+    ${SDL_INCLUDE_DIRS}
     ${LIBS_OPEN_DIR}/llwindow
     )
 
