@@ -193,53 +193,39 @@ endif (WINDOWS)
 if (LINUX)
   set(CMAKE_SKIP_RPATH TRUE)
 
-  add_definitions(
-    -DLL_LINUX=1
-    -DAPPID=secondlife
-    -DLL_IGNORE_SIGCHLD
-    -D_REENTRANT
-    -DGDK_DISABLE_DEPRECATED 
-    -DGTK_DISABLE_DEPRECATED
-    -DGSEAL_ENABLE
-    -DGTK_DISABLE_SINGLE_INCLUDES
-    )
-  add_compile_options(
-    -fvisibility=hidden
-    -fexceptions
-    -fno-math-errno
-    -fno-strict-aliasing
-    -fsigned-char
-    -g
-    -pthread
-    -msse4.2
-    -mfpmath=sse
-    )
+  set(ALCHEMY_GLOBAL_DEFS "-DLL_LINUX=1 -DAPPID=secondlife -DLL_IGNORE_SIGCHLD -D_REENTRANT -DGDK_DISABLE_DEPRECATED -DGTK_DISABLE_DEPRECATED -DGSEAL_ENABLE -DGTK_DISABLE_SINGLE_INCLUDES -DEXTERNAL_TOS")
+  set(ALCHEMY_GLOBAL_CFLAGS "-fvisibility=hidden -fexceptions -fno-math-errno -fno-strict-aliasing -fsigned-char -g -pthread -msse4.2 -mfpmath=sse")
 
-  # force this platform to accept TOS via external browser
-  add_definitions(-DEXTERNAL_TOS)
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${ALCHEMY_GLOBAL_DEFS} ${ALCHEMY_GLOBAL_CFLAGS}")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${ALCHEMY_GLOBAL_DEFS} ${ALCHEMY_GLOBAL_CFLAGS}")
 
   if (USE_LTO)
-    add_compile_options(-flto=8)
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -flto=auto -fno-fat-lto-objects")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -flto=auto -fno-fat-lto-objects")
   endif (USE_LTO)
 
   if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU" OR "${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
     if (USE_ASAN)
-      add_compile_options(-fsanitize=address)
+      set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=address")
+      set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address")
       link_libraries(-lasan)
     endif (USE_ASAN)
 
     if (USE_LEAKSAN)
-      add_compile_options(-fsanitize=leak)
+      set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=leak")
+      set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=leak")
       link_libraries(-llsan)
     endif (USE_LEAKSAN)
 
     if (USE_UBSAN)
-      add_compile_options(-fsanitize=undefined -fno-sanitize=vptr)
+      set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=undefined -fno-sanitize=vptr")
+      set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=undefined -fno-sanitize=vptr")
       link_libraries(-lubsan)
     endif (USE_UBSAN)
 
     if (USE_THDSAN)
-      add_compile_options(-fsanitize=thread)
+      set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=thread")
+      set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=thread")
     endif (USE_THDSAN)
   endif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU" OR "${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
 
@@ -248,9 +234,11 @@ if (LINUX)
   CHECK_CXX_COMPILER_FLAG(-fstack-protector HAS_STACK_PROTECTOR)
   if (${CMAKE_BUILD_TYPE} STREQUAL "Release")
     if(HAS_STRONG_STACK_PROTECTOR)
-      add_compile_options(-fstack-protector-strong)
+      set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fstack-protector-strong")
+      set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fstack-protector-strong")
     elseif(HAS_STACK_PROTECTOR)
-      add_compile_options(-fstack-protector)
+      set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fstack-protector")
+      set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fstack-protector")
     endif(HAS_STRONG_STACK_PROTECTOR)
     set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=2")
   endif (${CMAKE_BUILD_TYPE} STREQUAL "Release")
