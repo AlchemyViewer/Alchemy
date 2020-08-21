@@ -436,19 +436,19 @@ public:
 	
 	void destroyTree();
 
-	virtual BOOL isSpatialBridge() const		{ return TRUE; }
-	virtual void updateSpatialExtents();
-	virtual void updateBinRadius();
-	virtual void setVisible(LLCamera& camera_in, std::vector<LLDrawable*>* results = NULL, BOOL for_select = FALSE);
-	virtual void updateDistance(LLCamera& camera_in, bool force_update);
-	virtual void makeActive();
-	virtual void move(LLDrawable *drawablep, LLSpatialGroup *curp, BOOL immediate = FALSE);
-	virtual BOOL updateMove();
-	virtual void shiftPos(const LLVector4a& vec);
-	virtual void cleanupReferences();
-	virtual LLSpatialPartition* asPartition()		{ return this; }
+	BOOL isSpatialBridge() const final		{ return TRUE; }
+	void updateSpatialExtents() final;
+	void updateBinRadius() final;
+	void setVisible(LLCamera& camera_in, std::vector<LLDrawable*>* results = NULL, BOOL for_select = FALSE) final;
+	void updateDistance(LLCamera& camera_in, bool force_update) final;
+	void makeActive() final;
+	void move(LLDrawable *drawablep, LLSpatialGroup *curp, BOOL immediate = FALSE) final;
+	BOOL updateMove() final;
+	void shiftPos(const LLVector4a& vec) override;
+	void cleanupReferences() final;
+	LLSpatialPartition* asPartition() final		{ return this; }
 		
-	virtual LLCamera transformCamera(LLCamera& camera);
+	LLCamera transformCamera(LLCamera& camera);
 	
 	LLDrawable* mDrawable;
 };
@@ -553,19 +553,19 @@ class LLWaterPartition : public LLSpatialPartition
 {
 public:
 	LLWaterPartition(LLViewerRegion* regionp);
-	virtual void getGeometry(LLSpatialGroup* group) {  }
-	virtual void addGeometryCount(LLSpatialGroup* group, U32 &vertex_count, U32& index_count) { }
+	void getGeometry(LLSpatialGroup* group) final {  }
+	void addGeometryCount(LLSpatialGroup* group, U32 &vertex_count, U32& index_count) final { }
 };
 
 //spatial partition for hole and edge water (implemented in LLVOWater.cpp)
-class LLVoidWaterPartition : public LLWaterPartition
+class LLVoidWaterPartition final : public LLWaterPartition
 {
 public:
 	LLVoidWaterPartition(LLViewerRegion* regionp);
 };
 
 //spatial partition for terrain (impelmented in LLVOSurfacePatch.cpp)
-class LLTerrainPartition : public LLSpatialPartition
+class LLTerrainPartition final : public LLSpatialPartition
 {
 public:
 	LLTerrainPartition(LLViewerRegion* regionp);
@@ -574,7 +574,7 @@ public:
 };
 
 //spatial partition for trees
-class LLTreePartition : public LLSpatialPartition
+class LLTreePartition final : public LLSpatialPartition
 {
 public:
 	LLTreePartition(LLViewerRegion* regionp);
@@ -588,27 +588,27 @@ class LLParticlePartition : public LLSpatialPartition
 {
 public:
 	LLParticlePartition(LLViewerRegion* regionp);
-	virtual void rebuildGeom(LLSpatialGroup* group);
-	virtual void getGeometry(LLSpatialGroup* group);
-	virtual void addGeometryCount(LLSpatialGroup* group, U32 &vertex_count, U32& index_count);
-	virtual F32 calcPixelArea(LLSpatialGroup* group, LLCamera& camera);
+	void rebuildGeom(LLSpatialGroup* group) final;
+	void getGeometry(LLSpatialGroup* group) final;
+	void addGeometryCount(LLSpatialGroup* group, U32 &vertex_count, U32& index_count) final;
+	F32 calcPixelArea(LLSpatialGroup* group, LLCamera& camera) final;
 protected:
 	U32 mRenderPass;
 };
 
-class LLHUDParticlePartition : public LLParticlePartition
+class LLHUDParticlePartition final : public LLParticlePartition
 {
 public:
 	LLHUDParticlePartition(LLViewerRegion* regionp);
 };
 
 //spatial partition for grass (implemented in LLVOGrass.cpp)
-class LLGrassPartition : public LLSpatialPartition
+class LLGrassPartition final : public LLSpatialPartition
 {
 public:
 	LLGrassPartition(LLViewerRegion* regionp);
-	virtual void getGeometry(LLSpatialGroup* group);
-	virtual void addGeometryCount(LLSpatialGroup* group, U32 &vertex_count, U32& index_count);
+	void getGeometry(LLSpatialGroup* group) override;
+	void addGeometryCount(LLSpatialGroup* group, U32 &vertex_count, U32& index_count) override;
 protected:
 	U32 mRenderPass;
 };
@@ -651,10 +651,10 @@ class LLVolumePartition final : public LLSpatialPartition, public LLVolumeGeomet
 {
 public:
 	LLVolumePartition(LLViewerRegion* regionp);
-	virtual void rebuildGeom(LLSpatialGroup* group) { LLVolumeGeometryManager::rebuildGeom(group); }
-	virtual void getGeometry(LLSpatialGroup* group) { LLVolumeGeometryManager::getGeometry(group); }
-	virtual void rebuildMesh(LLSpatialGroup* group) { LLVolumeGeometryManager::rebuildMesh(group); }
-	virtual void addGeometryCount(LLSpatialGroup* group, U32 &vertex_count, U32& index_count) { LLVolumeGeometryManager::addGeometryCount(group, vertex_count, index_count); }
+	void rebuildGeom(LLSpatialGroup* group) override { LLVolumeGeometryManager::rebuildGeom(group); }
+	void getGeometry(LLSpatialGroup* group) override { LLVolumeGeometryManager::getGeometry(group); }
+	void rebuildMesh(LLSpatialGroup* group) override { LLVolumeGeometryManager::rebuildMesh(group); }
+	void addGeometryCount(LLSpatialGroup* group, U32 &vertex_count, U32& index_count) override { LLVolumeGeometryManager::addGeometryCount(group, vertex_count, index_count); }
 };
 
 //spatial bridge that uses volume geometry manager (implemented in LLVOVolume.cpp)
@@ -662,10 +662,10 @@ class LLVolumeBridge : public LLSpatialBridge, public LLVolumeGeometryManager
 {
 public:
 	LLVolumeBridge(LLDrawable* drawable, LLViewerRegion* regionp);
-	virtual void rebuildGeom(LLSpatialGroup* group) { LLVolumeGeometryManager::rebuildGeom(group); }
-	virtual void getGeometry(LLSpatialGroup* group) { LLVolumeGeometryManager::getGeometry(group); }
-	virtual void rebuildMesh(LLSpatialGroup* group) { LLVolumeGeometryManager::rebuildMesh(group); }
-	virtual void addGeometryCount(LLSpatialGroup* group, U32 &vertex_count, U32& index_count) { LLVolumeGeometryManager::addGeometryCount(group, vertex_count, index_count); }
+	virtual void rebuildGeom(LLSpatialGroup* group) final { LLVolumeGeometryManager::rebuildGeom(group); }
+	virtual void getGeometry(LLSpatialGroup* group) final { LLVolumeGeometryManager::getGeometry(group); }
+	virtual void rebuildMesh(LLSpatialGroup* group) final { LLVolumeGeometryManager::rebuildMesh(group); }
+	virtual void addGeometryCount(LLSpatialGroup* group, U32 &vertex_count, U32& index_count) final { LLVolumeGeometryManager::addGeometryCount(group, vertex_count, index_count); }
 };
 
 class LLHUDBridge final : public LLVolumeBridge
@@ -681,11 +681,11 @@ class LLBridgePartition : public LLSpatialPartition
 {
 public:
 	LLBridgePartition(LLViewerRegion* regionp);
-	virtual void getGeometry(LLSpatialGroup* group) { }
-	virtual void addGeometryCount(LLSpatialGroup* group, U32 &vertex_count, U32& index_count) {  }
+	virtual void getGeometry(LLSpatialGroup* group) final { }
+	virtual void addGeometryCount(LLSpatialGroup* group, U32 &vertex_count, U32& index_count) final {  }
 };
 
-class LLHUDPartition : public LLBridgePartition
+class LLHUDPartition final : public LLBridgePartition
 {
 public:
 	LLHUDPartition(LLViewerRegion* regionp);
