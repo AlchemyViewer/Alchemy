@@ -78,8 +78,8 @@ public:
 	~LLInventoryClipboard();
 private:
 	// please don't implement these
-	LLInventoryClipboard(const LLInventoryClipboard&);
-	LLInventoryClipboard& operator=(const LLInventoryClipboard&);
+	LLInventoryClipboard(const LLInventoryClipboard&) = delete;
+	LLInventoryClipboard& operator=(const LLInventoryClipboard&) = delete;
 };
 
 

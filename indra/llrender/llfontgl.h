@@ -217,8 +217,8 @@ private:
 	friend class LLTextBillboard;
 	friend class LLHUDText;
 
-	LLFontGL(const LLFontGL &source);
-	LLFontGL &operator=(const LLFontGL &source);
+	LLFontGL(const LLFontGL &source) = delete;
+	LLFontGL &operator=(const LLFontGL &source) = delete;
 
 	LLFontDescriptor mFontDescriptor;
 	LLPointer<LLFontFreetype> mFontFreetype;

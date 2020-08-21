@@ -89,8 +89,8 @@ public:
     void setNeedsUpdate(bool val) { mNeedsUpdate = val; }
 private:
     // Not implemented
-    LLJointRiggingInfoTab& operator=(const LLJointRiggingInfoTab& src);
-    LLJointRiggingInfoTab(const LLJointRiggingInfoTab& src);
+    LLJointRiggingInfoTab& operator=(const LLJointRiggingInfoTab& src) = delete;
+    LLJointRiggingInfoTab(const LLJointRiggingInfoTab& src) = delete;
 
     LLJointRiggingInfo *mRigInfoPtr;
     S32 mSize;

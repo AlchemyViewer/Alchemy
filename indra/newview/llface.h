@@ -56,17 +56,8 @@ const F32 MIN_TEX_ANIM_SIZE = 512.f;
 class LLFace : public LLTrace::MemTrackableNonVirtual<LLFace, 16>
 {
 public:
-	LLFace(const LLFace& rhs)
-	:	LLTrace::MemTrackableNonVirtual<LLFace, 16>("LLFace")
-	{
-		*this = rhs;
-	}
-
-	const LLFace& operator=(const LLFace& rhs)
-	{
-		LL_ERRS() << "Illegal operation!" << LL_ENDL;
-		return *this;
-	}
+	LLFace(const LLFace& rhs) = delete;
+	LLFace& operator=(const LLFace& rhs) = delete;
 
 	enum EMasks
 	{
