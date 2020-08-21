@@ -875,9 +875,8 @@ void LLParticlePartition::getGeometry(LLSpatialGroup* group)
 	
 	LLSpatialGroup::drawmap_elem_t& draw_vec = group->mDrawMap[mRenderPass];	
 
-	for (std::vector<LLFace*>::iterator i = mFaceList.begin(); i != mFaceList.end(); ++i)
+	for (LLFace* facep : mFaceList)
 	{
-		LLFace* facep = *i;
 		LLAlphaObject* object = (LLAlphaObject*) facep->getViewerObject();
 
 		if (!facep->isState(LLFace::PARTICLE))
@@ -947,20 +946,20 @@ void LLParticlePartition::getGeometry(LLSpatialGroup* group)
 				info->mBlendFuncDst == bf_dst &&
 				info->mBlendFuncSrc == bf_src)
 			{
-				if (draw_vec[idx]->mEnd == facep->getGeomIndex()-1)
+				if (info->mEnd == facep->getGeomIndex()-1)
 				{
 					batched = true;
 					info->mCount += facep->getIndicesCount();
 					info->mEnd += facep->getGeomCount();
-					info->mVSize = llmax(draw_vec[idx]->mVSize, vsize);
+					info->mVSize = llmax(info->mVSize, vsize);
 				}
-				else if (draw_vec[idx]->mStart == facep->getGeomIndex()+facep->getGeomCount()+1)
+				else if (info->mStart == facep->getGeomIndex()+facep->getGeomCount()+1)
 				{
 					batched = true;
 					info->mCount += facep->getIndicesCount();
 					info->mStart -= facep->getGeomCount();
 					info->mOffset = facep->getIndicesStart();
-					info->mVSize = llmax(draw_vec[idx]->mVSize, vsize);
+					info->mVSize = llmax(info->mVSize, vsize);
 				}
 			}
 		}
