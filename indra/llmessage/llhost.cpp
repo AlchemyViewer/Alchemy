@@ -151,16 +151,6 @@ BOOL LLHost::setHostByName(const std::string& hostname)
 	}
 }
 
-LLHost&	LLHost::operator=(const LLHost &rhs)
-{ 
-	if (this != &rhs)
-	{
-		set(rhs.getAddress(), rhs.getPort());
-	}
-	return *this;		
-}
-
-
 std::ostream& operator<< (std::ostream& os, const LLHost &hh)
 {
 	os << u32_to_ip_string(hh.mIP) << ":" << hh.mPort ;
