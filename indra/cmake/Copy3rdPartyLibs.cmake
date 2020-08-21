@@ -61,6 +61,7 @@ if(WINDOWS)
         nghttp2.dll
         glod.dll
         libhunspell.dll
+        epoxy-0.dll
         )
 
     # Filenames are different for 32/64 bit BugSplat file and we don't
@@ -108,7 +109,7 @@ elseif(DARWIN)
         libndofdev.dylib
         libnghttp2.dylib
         libnghttp2.14.dylib
-        libnghttp2.14.14.0.dylib
+        libnghttp2.14.19.0.dylib
        )
 
     if (USE_FMODSTUDIO)

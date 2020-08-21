@@ -16,6 +16,7 @@ include(BuildVersion)
 include(CMakeCopyIfDifferent)
 include(DBusGlib)
 include(DragDrop)
+include(Epoxy)
 include(EXPAT)
 include(FMODSTUDIO)
 include(GLOD)
@@ -1858,6 +1859,9 @@ if (WINDOWS)
       ${SHARED_LIB_STAGING_DIR}/Release/libhunspell.dll
       ${SHARED_LIB_STAGING_DIR}/RelWithDebInfo/libhunspell.dll
       ${SHARED_LIB_STAGING_DIR}/Debug/libhunspell.dll
+      ${SHARED_LIB_STAGING_DIR}/Release/epoxy-0.dll
+      ${SHARED_LIB_STAGING_DIR}/RelWithDebInfo/epoxy-0.dll
+      ${SHARED_LIB_STAGING_DIR}/Debug/epoxy-0.dll
       ${SHARED_LIB_STAGING_DIR}/${CMAKE_CFG_INTDIR}/SLVoice.exe
       ${SHARED_LIB_STAGING_DIR}/${CMAKE_CFG_INTDIR}/libsndfile-1.dll
       ${SHARED_LIB_STAGING_DIR}/${CMAKE_CFG_INTDIR}/vivoxoal.dll
@@ -1935,21 +1939,6 @@ if (WINDOWS)
     add_dependencies(${VIEWER_BINARY_NAME}
       SLPlugin
     )
-
-    # sets the 'working directory' for debugging from visual studio.
-    if (NOT UNATTENDED)
-        add_custom_command(
-            TARGET ${VIEWER_BINARY_NAME} POST_BUILD
-            COMMAND ${CMAKE_SOURCE_DIR}/tools/vstool/vstool.exe
-            ARGS
-              --solution
-              ${CMAKE_BINARY_DIR}/${CMAKE_PROJECT_NAME}.sln
-              --workingdir
-              ${VIEWER_BINARY_NAME}
-              "${CMAKE_CURRENT_SOURCE_DIR}"
-            COMMENT "Setting the ${VIEWER_BINARY_NAME} working directory for debugging."
-            )
-    endif (NOT UNATTENDED)
 
     # sets the 'working directory' for debugging from visual studio.
     # Condition for version can be moved to requirements once build agents will be updated (see TOOL-3865)
@@ -2081,6 +2070,7 @@ target_link_libraries(${VIEWER_BINARY_NAME}
     ${BOOST_FIBER_LIBRARY}
     ${BOOST_CONTEXT_LIBRARY}
     ${DBUSGLIB_LIBRARIES}
+    ${EPOXY_LIBRARIES}
     ${OPENGL_LIBRARIES}
     ${FMODWRAPPER_LIBRARY} # must come after LLAudio
     ${GLOD_LIBRARIES}

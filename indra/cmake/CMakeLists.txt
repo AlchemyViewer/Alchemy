@@ -21,6 +21,7 @@ set(cmake_SOURCE_FILES
     DBusGlib.cmake
     DeploySharedLibs.cmake
     DragDrop.cmake
+    Epoxy.cmake
     EXPAT.cmake
     FindAPR.cmake
     FindAutobuild.cmake

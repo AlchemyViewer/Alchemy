@@ -55,7 +55,7 @@
 #include "llviewertexturelist.h"
 
 static U32 sDataMask = LLDrawPoolAvatar::VERTEX_DATA_MASK;
-static U32 sBufferUsage = GL_STREAM_DRAW_ARB;
+static U32 sBufferUsage = GL_STREAM_DRAW;
 static U32 sShaderLevel = 0;
 
 LLGLSLShader* LLDrawPoolAvatar::sVertexProgram = NULL;
@@ -159,11 +159,11 @@ void LLDrawPoolAvatar::prerender()
 	
 	if (sShaderLevel > 0)
 	{
-		sBufferUsage = GL_DYNAMIC_DRAW_ARB;
+		sBufferUsage = GL_DYNAMIC_DRAW;
 	}
 	else
 	{
-		sBufferUsage = GL_STREAM_DRAW_ARB;
+		sBufferUsage = GL_STREAM_DRAW;
 	}
 
 	if (!mDrawFace.empty())
@@ -1748,11 +1748,11 @@ void LLDrawPoolAvatar::getRiggedGeometry(
         // make a new buffer
 		if (sShaderLevel > 0)
 		{
-			buffer = new LLVertexBuffer(data_mask, GL_DYNAMIC_DRAW_ARB);
+			buffer = new LLVertexBuffer(data_mask, GL_DYNAMIC_DRAW);
 		}
 		else
 		{
-			buffer = new LLVertexBuffer(data_mask, GL_STREAM_DRAW_ARB);
+			buffer = new LLVertexBuffer(data_mask, GL_STREAM_DRAW);
 		}
 
 		if (!buffer->allocateBuffer(vol_face.mNumVertices, vol_face.mNumIndices, true))
@@ -2549,7 +2549,7 @@ void LLDrawPoolAvatar::removeRiggedFace(LLFace* facep)
 
 LLVertexBufferAvatar::LLVertexBufferAvatar()
 : LLVertexBuffer(sDataMask, 
-	GL_STREAM_DRAW_ARB) //avatars are always stream draw due to morph targets
+	GL_STREAM_DRAW) //avatars are always stream draw due to morph targets
 {
 
 }

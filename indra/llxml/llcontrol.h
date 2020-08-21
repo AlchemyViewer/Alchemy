@@ -34,8 +34,6 @@
 #include "llrefcount.h"
 #include "llinstancetracker.h"
 
-#include "llcontrolgroupreader.h"
-
 #include <vector>
 
 // *NOTE: boost::visit_each<> generates warning 4675 on .net 2003
@@ -69,6 +67,7 @@ class LLVector3;
 class LLVector3d;
 class LLQuaternion;
 class LLColor4;
+class LLColor4U;
 class LLColor3;
 
 // if this is changed, also modify mTypeString in llcontrol.h
