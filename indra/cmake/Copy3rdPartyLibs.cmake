@@ -151,6 +151,9 @@ elseif(LINUX)
         libopenal.so
         libuuid.so.16
         libuuid.so.16.0.22
+        libepoxy.so
+        libepoxy.so.0
+        libepoxy.so.0.0.0
        )
 
     if (USE_FMODSTUDIO)

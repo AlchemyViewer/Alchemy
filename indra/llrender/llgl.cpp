@@ -225,10 +225,11 @@ LLGLManager::LLGLManager() :
 //---------------------------------------------------------------------
 // Global initialization for GL
 //---------------------------------------------------------------------
+#if LL_WINDOWS && !LL_MESA_HEADLESS
 void LLGLManager::initWGL(HDC dc)
 {
 	mHasPBuffer = FALSE;
-#if LL_WINDOWS && !LL_MESA_HEADLESS
+
 	if (!epoxy_has_wgl_extension(dc, "WGL_ARB_pixel_format"))
 	{
 		LL_WARNS("RenderInit") << "No ARB pixel format extensions" << LL_ENDL;
@@ -270,8 +271,8 @@ void LLGLManager::initWGL(HDC dc)
 	mHasPBuffer = epoxy_has_wgl_extension(dc, "WGL_ARB_pbuffer") &&
 					epoxy_has_wgl_extension(dc, "WGL_ARB_render_texture") &&
 					epoxy_has_wgl_extension(dc, "WGL_ARB_pixel_format");
-#endif
 }
+#endif
 
 // return false if unable (or unwilling due to old drivers) to init GL
 bool LLGLManager::initGL()

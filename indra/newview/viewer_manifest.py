@@ -1454,6 +1454,9 @@ class Linux_i686_Manifest(LinuxManifest):
             self.path("libfusion-1.4.so.5")
             self.path("libdirect-1.4.so.5*")
             self.path("libhunspell-1.3.so*")
+            self.path("libepoxy.so")
+            self.path("libepoxy.so.0")
+            self.path("libepoxy.so.0.0.0")
             self.path("libalut.so*")
             self.path("libopenal.so*")
             self.path("libopenal.so", "libvivoxoal.so.1") # vivox's sdk expects this soname
@@ -1528,9 +1531,11 @@ class Linux_x86_64_Manifest(LinuxManifest):
             self.path("libSDL-1.2.so.*")
             self.path("libopenjpeg.so*")
             self.path("libhunspell-1.3.so*")
+            self.path("libepoxy.so")
+            self.path("libepoxy.so.0")
+            self.path("libepoxy.so.0.0.0")
             self.path("libalut.so*")
             self.path("libopenal.so*")
-            self.path("libopenal.so", "libvivoxoal.so.1") # vivox's sdk expects this soname
 
             try:
                 self.path("libfmod.so*")
@@ -1545,7 +1550,7 @@ class Linux_x86_64_Manifest(LinuxManifest):
         with self.prefix(src=relpkgdir, dst="lib"):
             self.path("libortp.so")
             self.path("libsndfile.so.1")
-            #self.path("libvivoxoal.so.1") # no - we'll re-use the viewer's own OpenAL lib
+            self.path("libvivoxoal.so.1") # no - we'll re-use the viewer's own OpenAL lib
             self.path("libvivoxsdk.so")
 
         self.strip_binaries()

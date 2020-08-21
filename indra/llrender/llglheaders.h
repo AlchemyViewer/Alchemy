@@ -42,17 +42,19 @@
 # undef __APPLE__
 
 #else // Use libepoxy
-//----------------------------------------------------------------------------
-// LL_WINDOWS
 
 // windows gl headers depend on things like APIENTRY, so include windows.
 #include "llwin32headerslean.h"
 
 //----------------------------------------------------------------------------
 #include "epoxy/gl.h"
+#if LL_WINDOWS
 #include "epoxy/wgl.h"
+#elif LL_LINUX
+#include "epoxy/glx.h"
+#endif
 
-#include <GL/GLU.h>
+#include <GL/glu.h>
 
 #endif // LL_MESA
 
