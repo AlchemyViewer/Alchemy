@@ -56,8 +56,8 @@ protected:
 class LLMessageThrottle
 {
 public:
-	LLMessageThrottle();
-	~LLMessageThrottle();
+	LLMessageThrottle() = default;
+	~LLMessageThrottle() = default;
 
 	BOOL addViewerAlert	(const LLUUID& to, const std::string& mesg);
 	BOOL addAgentAlert	(const LLUUID& agent, const LLUUID& task, const std::string& mesg);

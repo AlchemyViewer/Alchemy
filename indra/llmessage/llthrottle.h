@@ -38,7 +38,7 @@ class LLThrottle
 {
 public:
 	LLThrottle(const F32 throttle = 1.f);
-	~LLThrottle() { }
+	~LLThrottle() = default;
 
 	void setRate(const F32 rate);
 	BOOL checkOverflow(const F32 amount); // I'm about to add an amount, TRUE if would overflow throttle
@@ -70,7 +70,7 @@ class LLThrottleGroup
 {
 public:
 	LLThrottleGroup();
-	~LLThrottleGroup() { }
+	~LLThrottleGroup() = default;
 
 	void	resetDynamicAdjust();
 	BOOL	checkOverflow(S32 throttle_cat, F32 bits);		// I'm about to send bits, TRUE if would overflow channel

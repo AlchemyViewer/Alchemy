@@ -36,11 +36,11 @@
 #include <dirent.h>
 #include <errno.h>
 
-class LLDir_Linux : public LLDir
+class LLDir_Linux final : public LLDir
 {
 public:
 	LLDir_Linux();
-	virtual ~LLDir_Linux();
+	virtual ~LLDir_Linux() = default;
 
 	/*virtual*/ void initAppDirs(const std::string &app_name,
 		const std::string& app_read_only_data_dir);

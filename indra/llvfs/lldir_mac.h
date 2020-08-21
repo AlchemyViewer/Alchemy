@@ -35,7 +35,7 @@
 
 #include <dirent.h>
 
-class LLDir_Mac : public LLDir
+class LLDir_Mac final : public LLDir
 {
 public:
 	LLDir_Mac();

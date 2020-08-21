@@ -35,7 +35,7 @@
 #include "llpointer.h"
 #include "llrefcount.h"
 
-class LLMaterial : public LLRefCount
+class LLMaterial final : public LLRefCount
 {
 public:
 

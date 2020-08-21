@@ -34,7 +34,7 @@
 #include "lllistener_openal.h"
 #include "llwindgen.h"
 
-class LLAudioEngine_OpenAL : public LLAudioEngine
+class LLAudioEngine_OpenAL final : public LLAudioEngine
 {
 	public:
 		LLAudioEngine_OpenAL();

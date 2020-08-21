@@ -41,7 +41,7 @@ class LLPhysicsMotion;
 //-----------------------------------------------------------------------------
 // class LLPhysicsMotion
 //-----------------------------------------------------------------------------
-class LLPhysicsMotionController :
+class LLPhysicsMotionController final :
 	public LLMotion
 {
 public:

@@ -41,9 +41,9 @@
 class LLHTTPRetryPolicy: public LLThreadSafeRefCount
 {
 public:
-	LLHTTPRetryPolicy() {}
+	LLHTTPRetryPolicy() = default;
 
-	virtual ~LLHTTPRetryPolicy() {}
+	virtual ~LLHTTPRetryPolicy() = default;
 	// Call after a sucess to reset retry state.
 
 	virtual void onSuccess() = 0;
@@ -62,7 +62,7 @@ public:
 
 // Very general policy with geometric back-off after failures,
 // up to a maximum delay, and maximum number of retries.
-class LLAdaptiveRetryPolicy: public LLHTTPRetryPolicy
+class LLAdaptiveRetryPolicy final : public LLHTTPRetryPolicy
 {
 public:
 	LLAdaptiveRetryPolicy(F32 min_delay, F32 max_delay, F32 backoff_factor, U32 max_retries, bool retry_on_4xx = false);

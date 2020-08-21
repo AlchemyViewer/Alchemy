@@ -38,7 +38,7 @@ class LLContextMenu;
 
 ////////////////////////////////////////////////////////////////////////////////
 //
-class LLMediaCtrl :
+class LLMediaCtrl final :
 	public LLPanel,
 	public LLViewerMediaObserver,
 	public LLViewerMediaEventEmitter,

@@ -39,7 +39,7 @@ class domController;
 class domSkin;
 class domMesh;
 
-class LLDAELoader : public LLModelLoader
+class LLDAELoader final : public LLModelLoader
 {
 public:
 	typedef std::map<std::string, LLImportMaterial>							material_map;

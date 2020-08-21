@@ -38,7 +38,7 @@
 //-----------------------------------------------------------------------------
 // class LLHandMotion
 //-----------------------------------------------------------------------------
-class LLHandMotion :
+class LLHandMotion final :
 	public LLMotion
 {
 public:
@@ -65,7 +65,7 @@ public:
 	LLHandMotion(const LLUUID &id);
 
 	// Destructor
-	virtual ~LLHandMotion();
+	virtual ~LLHandMotion() = default;
 
 public:
 	//-------------------------------------------------------------------------

@@ -178,9 +178,7 @@ public:
 		mDefaultTextureID = uuid;		
 	};
 
-	~LLMaterialInfo()
-	{
-	};
+	~LLMaterialInfo() = default;
 
 };
 

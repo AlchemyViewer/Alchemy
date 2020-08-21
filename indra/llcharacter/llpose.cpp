@@ -187,11 +187,6 @@ LLJointStateBlender::LLJointStateBlender()
 	}
 }
 
-LLJointStateBlender::~LLJointStateBlender()
-{
-	
-}
-
 //-----------------------------------------------------------------------------
 // addJointState()
 //-----------------------------------------------------------------------------

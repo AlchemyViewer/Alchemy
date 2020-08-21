@@ -33,7 +33,7 @@
 
 #include "lldir.h"
 
-class LLDir_Win32 : public LLDir
+class LLDir_Win32 final : public LLDir
 {
 public:
 	LLDir_Win32();

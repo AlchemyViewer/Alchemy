@@ -42,7 +42,7 @@
 //-----------------------------------------------------------------------------
 // class LLKeyframeMotionParam
 //-----------------------------------------------------------------------------
-class LLKeyframeMotionParam :
+class LLKeyframeMotionParam final :
 	public LLMotion
 {
 public:

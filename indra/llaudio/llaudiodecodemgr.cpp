@@ -61,7 +61,7 @@ static const S32 WAV_HEADER_SIZE = 44;
 //////////////////////////////////////////////////////////////////////////////
 
 
-class LLVorbisDecodeState : public LLRefCount
+class LLVorbisDecodeState final : public LLRefCount
 {
 public:
 	class WriteResponder : public LLLFSThread::Responder

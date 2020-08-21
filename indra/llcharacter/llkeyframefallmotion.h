@@ -36,7 +36,7 @@
 //-----------------------------------------------------------------------------
 // class LLKeyframeFallMotion
 //-----------------------------------------------------------------------------
-class LLKeyframeFallMotion :
+class LLKeyframeFallMotion final :
 	public LLKeyframeMotion
 {
 public:

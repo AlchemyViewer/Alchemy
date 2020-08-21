@@ -30,7 +30,7 @@
 #include "llkeyboard.h"
 #include <SDL.h>
 
-class LLKeyboardSDL : public LLKeyboard
+class LLKeyboardSDL final : public LLKeyboard
 {
 public:
 	LLKeyboardSDL();

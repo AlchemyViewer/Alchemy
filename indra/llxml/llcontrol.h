@@ -90,7 +90,7 @@ typedef enum e_control_type
 	TYPE_COUNT
 } eControlType;
 
-class LLControlVariable : public LLRefCount
+class LLControlVariable final : public LLRefCount
 {
 	LOG_CLASS(LLControlVariable);
 
@@ -187,7 +187,7 @@ T convert_from_llsd(const LLSD& sd, eControlType type, const std::string& contro
 }
 
 //const U32 STRING_CACHE_SIZE = 10000;
-class LLControlGroup : public LLInstanceTracker<LLControlGroup, std::string>
+class LLControlGroup final : public LLInstanceTracker<LLControlGroup, std::string>
 {
 	LOG_CLASS(LLControlGroup);
 
@@ -326,7 +326,7 @@ public:
 //! without have to manually create and bind a listener to a local
 //! object.
 template <class T>
-class LLControlCache : public LLRefCount, public LLInstanceTracker<LLControlCache<T>, std::string>
+class LLControlCache final : public LLRefCount, public LLInstanceTracker<LLControlCache<T>, std::string>
 {
 public:
 	// This constructor will declare a control if it doesn't exist in the contol group

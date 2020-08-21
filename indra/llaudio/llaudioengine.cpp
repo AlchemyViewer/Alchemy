@@ -57,11 +57,6 @@ LLAudioEngine::LLAudioEngine()
 	setDefaults();
 }
 
-
-LLAudioEngine::~LLAudioEngine()
-{
-}
-
 LLStreamingAudioInterface* LLAudioEngine::getStreamingAudioImpl()
 {
 	return mStreamingAudioImpl;

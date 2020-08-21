@@ -39,7 +39,7 @@
 //-----------------------------------------------------------------------------
 // class LLHeadRotMotion
 //-----------------------------------------------------------------------------
-class LLHeadRotMotion :
+class LLHeadRotMotion final :
 	public LLMotion
 {
 public:

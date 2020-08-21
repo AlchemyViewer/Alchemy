@@ -143,11 +143,6 @@ LLPartSysCompressedPacket::LLPartSysCompressedPacket()
 	gSetInitDataDefaults(&mDefaults);
 }
 
-LLPartSysCompressedPacket::~LLPartSysCompressedPacket()
-{
-	// no dynamic data is stored by this class, do nothing.
-}
-
 void LLPartSysCompressedPacket::writeFlagByte(LLPartInitData *in)
 {
 		mData[0] =  mData[1] = mData[2] = '\0';

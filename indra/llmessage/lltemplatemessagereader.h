@@ -34,7 +34,7 @@
 class LLMessageTemplate;
 class LLMsgData;
 
-class LLTemplateMessageReader : public LLMessageReader
+class LLTemplateMessageReader final : public LLMessageReader
 {
 public:
 

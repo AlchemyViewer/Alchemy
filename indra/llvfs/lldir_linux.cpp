@@ -139,10 +139,6 @@ LLDir_Linux::LLDir_Linux()
 	mTempDir = "/tmp";
 }
 
-LLDir_Linux::~LLDir_Linux()
-{
-}
-
 // Implementation
 
 

@@ -44,14 +44,6 @@ const U64 MAX_MESSAGE_AGE[MTC_EOF] =
 	10 * SEC_TO_USEC	// MTC_AGENT_ALERT
 };
 
-LLMessageThrottle::LLMessageThrottle()
-{
-}
-
-LLMessageThrottle::~LLMessageThrottle()
-{
-}
-
 void LLMessageThrottle::pruneEntries()
 {
 	// Go through each message category, and prune entries older than max age.

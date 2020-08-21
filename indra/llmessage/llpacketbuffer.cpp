@@ -61,12 +61,6 @@ LLPacketBuffer::LLPacketBuffer (S32 hSocket)
 
 ///////////////////////////////////////////////////////////
 
-LLPacketBuffer::~LLPacketBuffer ()
-{
-}
-
-///////////////////////////////////////////////////////////
-
 void LLPacketBuffer::init (S32 hSocket)
 {
 	mSize = receive_packet(hSocket, mData);

@@ -41,7 +41,7 @@ class LLViewerVisualParam;
 //-----------------------------------------------------------------------------
 // class LLBreastMotion
 //-----------------------------------------------------------------------------
-class LLBreastMotion :
+class LLBreastMotion final :
 	public LLMotion
 {
 public:

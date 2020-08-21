@@ -471,10 +471,6 @@ LLPointer<LLSimpleResponse> LLSimpleResponse::create()
 	return new LLSimpleResponse();
 }
 
-LLSimpleResponse::~LLSimpleResponse()
-{
-}
-
 void LLSimpleResponse::result(const LLSD& result)
 {
 	status(HTTP_OK, "OK");

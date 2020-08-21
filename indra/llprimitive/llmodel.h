@@ -59,7 +59,7 @@ public:
     bool mJointNumsInitialized;
 };
 
-class LLModel : public LLVolume
+class LLModel final : public LLVolume
 {
 public:
 
@@ -107,7 +107,7 @@ public:
 	class Decomposition
 	{
 	public:
-		Decomposition() { }
+		Decomposition() = default;
 		Decomposition(LLSD& data);
 		void fromLLSD(LLSD& data);
 		LLSD asLLSD() const;
@@ -303,7 +303,7 @@ public:
 	}
 };
 
-class LLImportMaterial : public LLModelMaterialBase
+class LLImportMaterial final : public LLModelMaterialBase
 {
 public:
     friend class LLMeshUploadThread;
@@ -358,7 +358,7 @@ public:
 
 typedef std::vector<LLModelInstanceBase> model_instance_list;
 
-class LLModelInstance : public LLModelInstanceBase
+class LLModelInstance final : public LLModelInstanceBase
 {
 public:
 	std::string mLabel;

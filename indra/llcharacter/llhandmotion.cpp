@@ -77,14 +77,6 @@ LLHandMotion::LLHandMotion(const LLUUID &id) : LLMotion(id)
 
 
 //-----------------------------------------------------------------------------
-// ~LLHandMotion()
-// Class Destructor
-//-----------------------------------------------------------------------------
-LLHandMotion::~LLHandMotion()
-{
-}
-
-//-----------------------------------------------------------------------------
 // LLHandMotion::onInitialize(LLCharacter *character)
 //-----------------------------------------------------------------------------
 LLMotion::LLMotionInitStatus LLHandMotion::onInitialize(LLCharacter *character)

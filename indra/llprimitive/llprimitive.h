@@ -111,7 +111,7 @@ public:
 	
 public:
 	U16 mType;
-	virtual ~LLNetworkData() {};
+	virtual ~LLNetworkData() = default;
 	virtual BOOL pack(LLDataPacker &dp) const = 0;
 	virtual BOOL unpack(LLDataPacker &dp) = 0;
 	virtual bool operator==(const LLNetworkData& data) const = 0;
@@ -129,7 +129,7 @@ extern const F32 LIGHT_MIN_CUTOFF;
 extern const F32 LIGHT_DEFAULT_CUTOFF;
 extern const F32 LIGHT_MAX_CUTOFF;
 
-class LLLightParams : public LLNetworkData
+class LLLightParams final : public LLNetworkData
 {
 private:
 	LLColor4 mColor; // linear color (not gamma corrected), alpha = intensity
@@ -213,7 +213,7 @@ extern const BOOL FLEXIBLE_OBJECT_DEFAULT_USING_COLLISION_SPHERE;
 extern const BOOL FLEXIBLE_OBJECT_DEFAULT_RENDERING_COLLISION_SPHERE;
 
 
-class LLFlexibleObjectData : public LLNetworkData
+class LLFlexibleObjectData final : public LLNetworkData
 {
 protected:
 	S32			mSimulateLOD;		// 2^n = number of simulated sections
@@ -253,7 +253,7 @@ public:
 
 
 
-class LLSculptParams : public LLNetworkData
+class LLSculptParams final : public LLNetworkData
 {
 protected:
 	LLUUID mSculptTexture;
@@ -274,7 +274,7 @@ public:
 	U8 getSculptType() const                { return mSculptType; }
 };
 
-class LLLightImageParams : public LLNetworkData
+class LLLightImageParams final : public LLNetworkData
 {
 protected:
 	LLUUID mLightTexture;
@@ -298,7 +298,7 @@ public:
 	
 };
 
-class LLExtendedMeshParams : public LLNetworkData
+class LLExtendedMeshParams final : public LLNetworkData
 {
 protected:
 	U32 mFlags;

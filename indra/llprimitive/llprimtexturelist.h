@@ -118,10 +118,7 @@ public:
 protected:
 	texture_list_t mEntryList;
 private:
-	LLPrimTextureList(const LLPrimTextureList& other_list)
-	{
-		// private so that it can't be used
-	}
+	LLPrimTextureList(const LLPrimTextureList& other_list) = delete;
 };
 
 #endif

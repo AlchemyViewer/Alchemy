@@ -41,7 +41,7 @@
 //-----------------------------------------------------------------------------
 // class LLTargetingMotion
 //-----------------------------------------------------------------------------
-class LLTargetingMotion :
+class LLTargetingMotion final :
 	public LLMotion
 {
 public:

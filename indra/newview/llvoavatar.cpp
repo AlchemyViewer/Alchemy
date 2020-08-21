@@ -258,7 +258,7 @@ struct LLAppearanceMessageContents: public LLRefCount
 //-----------------------------------------------------------------------------
 // class LLBodyNoiseMotion
 //-----------------------------------------------------------------------------
-class LLBodyNoiseMotion :
+class LLBodyNoiseMotion final :
 	public LLMotion
 {
 public:
@@ -363,7 +363,7 @@ private:
 //-----------------------------------------------------------------------------
 // class LLBreatheMotionRot
 //-----------------------------------------------------------------------------
-class LLBreatheMotionRot :
+class LLBreatheMotionRot final :
 	public LLMotion
 {
 public:
@@ -476,7 +476,7 @@ private:
 //-----------------------------------------------------------------------------
 // class LLPelvisFixMotion
 //-----------------------------------------------------------------------------
-class LLPelvisFixMotion :
+class LLPelvisFixMotion final :
 	public LLMotion
 {
 public:

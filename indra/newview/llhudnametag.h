@@ -48,7 +48,7 @@ struct llhudnametag_further_away
 	bool operator()(const LLPointer<LLHUDNameTag>& lhs, const LLPointer<LLHUDNameTag>& rhs) const;
 };
 
-class LLHUDNameTag : public LLHUDObject
+class LLHUDNameTag final : public LLHUDObject
 {
 protected:
 	class LLHUDTextSegment

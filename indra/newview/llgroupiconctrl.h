@@ -37,7 +37,7 @@
  * It gets icon id by group id from the LLGroupMgr.
  * If group data is not loaded yet it subscribes as LLGroupMgr observer and requests necessary data.
  */
-class LLGroupIconCtrl
+class LLGroupIconCtrl final
 	: public LLIconCtrl, public LLGroupMgrObserver
 {
 public:

@@ -298,7 +298,7 @@ private:
 
 
 
-class LLSimpleResponse : public LLHTTPNode::Response
+class LLSimpleResponse final : public LLHTTPNode::Response
 {
 public:
 	static LLPointer<LLSimpleResponse> create();
@@ -314,7 +314,7 @@ public:
 	std::string mMessage;
 
 protected:
-	~LLSimpleResponse();
+	~LLSimpleResponse() = default;
 
 private:
         LLSimpleResponse() : mCode(0) {} // Must be accessed through LLPointer.

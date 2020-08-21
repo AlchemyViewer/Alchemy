@@ -201,7 +201,7 @@ class LLPartSysCompressedPacket
 {
 public:
 	LLPartSysCompressedPacket();
-	~LLPartSysCompressedPacket();
+	~LLPartSysCompressedPacket() = default;
 	BOOL	fromLLPartInitData(LLPartInitData *in, U32 &bytesUsed);
 	BOOL	toLLPartInitData(LLPartInitData *out, U32 *bytesUsed);
 	BOOL	fromUnsignedBytes(U8 *in, U32 bytesUsed);

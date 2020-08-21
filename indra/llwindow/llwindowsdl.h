@@ -50,7 +50,7 @@
 #undef require
 
 
-class LLWindowSDL : public LLWindow
+class LLWindowSDL final : public LLWindow
 {
 public:
 	/*virtual*/ void show();

@@ -37,7 +37,7 @@ class LLTextureAnim
 {
 public:
 	LLTextureAnim();
-	virtual ~LLTextureAnim();
+	virtual ~LLTextureAnim() = default;
 
 	virtual void reset();
 	void packTAMessage(LLMessageSystem *mesgsys) const;

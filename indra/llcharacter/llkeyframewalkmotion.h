@@ -40,7 +40,7 @@
 //-----------------------------------------------------------------------------
 // class LLKeyframeWalkMotion
 //-----------------------------------------------------------------------------
-class LLKeyframeWalkMotion :
+class LLKeyframeWalkMotion final :
 	public LLKeyframeMotion
 {
 	friend class LLWalkAdjustMotion;
@@ -80,7 +80,7 @@ public:
 	S32			mDownFoot;
 };
 
-class LLWalkAdjustMotion : public LLMotion
+class LLWalkAdjustMotion final : public LLMotion
 {
 public:
 	// Constructor
@@ -130,7 +130,7 @@ public:
 	F32				mAnkleOffset;
 };
 
-class LLFlyAdjustMotion : public LLMotion
+class LLFlyAdjustMotion final : public LLMotion
 {
 public:
 	// Constructor

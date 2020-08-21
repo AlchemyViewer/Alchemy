@@ -43,11 +43,8 @@ public:
 		mName = (char *)name; 
 	}
 
-	~LLMsgVarData() 
-	{
-		// copy constructor just copies the mData pointer, so only delete mData explicitly
-	}
-	
+	~LLMsgVarData() = default; // copy constructor just copies the mData pointer, so only delete mData explicitly
+
 	void deleteData() 
 	{
 		delete[] mData;

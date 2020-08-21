@@ -42,7 +42,7 @@ class LLTreeParams
 {
 public:
 	LLTreeParams();
-	virtual ~LLTreeParams();
+	virtual ~LLTreeParams() = default;
 
 	static F32 ShapeRatio(EShapeRatio shape, F32 ratio);
 

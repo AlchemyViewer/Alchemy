@@ -38,7 +38,7 @@
 class LLColor4;
 class LLFloaterColorPicker;
 
-class LLColorSwatchCtrl
+class LLColorSwatchCtrl final
 : public LLUICtrl
 {
 public:

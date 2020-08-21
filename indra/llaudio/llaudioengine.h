@@ -96,7 +96,7 @@ public:
 	};
 	
 	LLAudioEngine();
-	virtual ~LLAudioEngine();
+	virtual ~LLAudioEngine() = default;
 
 	// initialization/startup/shutdown
 	virtual bool init(const S32 num_channels, void *userdata, const std::string &app_title);
@@ -445,7 +445,7 @@ protected:
 class LLAudioBuffer
 {
 public:
-	virtual ~LLAudioBuffer() {};
+	virtual ~LLAudioBuffer() = default;
 	virtual bool loadWAV(const std::string& filename) = 0;
 	virtual U32 getLength() = 0;
 

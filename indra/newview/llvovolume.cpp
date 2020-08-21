@@ -114,7 +114,7 @@ static LLTrace::BlockTimerStatHandle FTM_VOLUME_TEXTURES("Volume Textures");
 extern BOOL gGLDebugLoggingEnabled;
 
 // Implementation class of LLMediaDataClientObject.  See llmediadataclient.h
-class LLMediaDataClientObjectImpl : public LLMediaDataClientObject
+class LLMediaDataClientObjectImpl final : public LLMediaDataClientObject
 {
 public:
 	LLMediaDataClientObjectImpl(LLVOVolume *obj, bool isNew) : mObject(obj), mNew(isNew) 

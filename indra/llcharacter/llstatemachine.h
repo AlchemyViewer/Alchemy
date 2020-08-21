@@ -41,18 +41,18 @@ protected:
 	U32			mId;
 public:
 	LLUniqueID(){mId = sNextID++;}
-	virtual ~LLUniqueID(){}
+	virtual ~LLUniqueID() = default;
 	U32		getID() {return mId;}
 };
 
-class LLFSMTransition : public LLUniqueID
+class LLFSMTransition final : public LLUniqueID
 {
 public:
 	LLFSMTransition() : LLUniqueID(){};
 	virtual std::string getName()const { return "unnamed"; }
 };
 
-class LLFSMState : public LLUniqueID
+class LLFSMState final : public LLUniqueID
 {
 public:
 	LLFSMState() : LLUniqueID(){};

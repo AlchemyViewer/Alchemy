@@ -165,12 +165,7 @@ LLTreeParams::LLTreeParams()
 	mLeafQuality = 1.25;
 }
 
-LLTreeParams::~LLTreeParams()
-{
-
-}
-
-F32 LLTreeParams::ShapeRatio(EShapeRatio shape, F32 ratio) 
+F32 LLTreeParams::ShapeRatio(EShapeRatio shape, F32 ratio)
 {
 	switch (shape) {
 		case (SR_CONICAL): 

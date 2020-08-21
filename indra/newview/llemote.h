@@ -44,7 +44,7 @@ class LLVisualParam;
 //-----------------------------------------------------------------------------
 // class LLEmote
 //-----------------------------------------------------------------------------
-class LLEmote :
+class LLEmote final :
 	public LLMotion
 {
 public:

@@ -37,12 +37,6 @@ LLTextureAnim::LLTextureAnim()
 	reset();
 }
 
-
-LLTextureAnim::~LLTextureAnim()
-{
-}
-
-
 void LLTextureAnim::reset()
 {
 	mMode = 0;

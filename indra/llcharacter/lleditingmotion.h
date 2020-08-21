@@ -42,7 +42,7 @@
 //-----------------------------------------------------------------------------
 // class LLEditingMotion
 //-----------------------------------------------------------------------------
-class LLEditingMotion :
+class LLEditingMotion final :
 	public LLMotion
 {
 public:
