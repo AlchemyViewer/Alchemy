@@ -97,7 +97,7 @@ struct LLCoordFloater : LLCoord<LL_COORD_FLOATER>
 {
 	typedef LLCoord<LL_COORD_FLOATER> coord_t;
 
-	LLCoordFloater() {}
+	LLCoordFloater() = default;
 	LLCoordFloater(F32 x, F32 y, LLFloater& floater);
 	LLCoordFloater(const LLCoordCommon& other, LLFloater& floater);
 
@@ -107,14 +107,10 @@ struct LLCoordFloater : LLCoord<LL_COORD_FLOATER>
 		return *this;
 	}
 
-	LLCoordFloater& operator=(const LLCoordFloater& other);
-
 	bool operator==(const LLCoordFloater& other) const;
 	bool operator!=(const LLCoordFloater& other) const { return !(*this == other); }
 
 	void setFloater(LLFloater& floater);
-
-	
 };
 
 class LLFloater : public LLPanel, public LLInstanceTracker<LLFloater>

@@ -3541,13 +3541,6 @@ LLCoordFloater::LLCoordFloater(const LLCoordCommon& other, LLFloater& floater)
 	convertFromCommon(other);
 }
 
-LLCoordFloater& LLCoordFloater::operator=(const LLCoordFloater& other)
-{
-	mFloater = other.mFloater;
-	coord_t::operator =(other);
-	return *this;
-}
-
 void LLCoordFloater::setFloater(LLFloater& floater)
 {
 	mFloater = floater.getHandle();
