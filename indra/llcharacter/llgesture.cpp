@@ -67,30 +67,6 @@ LLGesture::LLGesture(U8 **buffer, S32 max_size)
 	*buffer = deserialize(*buffer, max_size);
 }
 
-LLGesture::LLGesture(const LLGesture &rhs)
-{
-	mKey			= rhs.mKey;
-	mMask			= rhs.mMask;
-	mTrigger		= rhs.mTrigger;
-	mTriggerLower	= rhs.mTriggerLower;
-	mSoundItemID	= rhs.mSoundItemID;
-	mAnimation		= rhs.mAnimation;
-	mOutputString	= rhs.mOutputString;
-}
-
-const LLGesture &LLGesture::operator =(const LLGesture &rhs)
-{
-	mKey			= rhs.mKey;
-	mMask			= rhs.mMask;
-	mTrigger		= rhs.mTrigger;
-	mTriggerLower	= rhs.mTriggerLower;
-	mSoundItemID	= rhs.mSoundItemID;
-	mAnimation		= rhs.mAnimation;
-	mOutputString	= rhs.mOutputString;
-	return (*this);
-}
-
-
 BOOL LLGesture::trigger(KEY key, MASK mask)
 {
 	LL_WARNS() << "Parent class trigger called: you probably didn't mean this." << LL_ENDL;

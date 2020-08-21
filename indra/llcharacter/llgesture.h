@@ -41,10 +41,12 @@ public:
 		const std::string &output_string);
 
 	LLGesture(U8 **buffer, S32 max_size); // deserializes, advances buffer
-	LLGesture(const LLGesture &gesture);
-	const LLGesture &operator=(const LLGesture &rhs);
+    LLGesture(const LLGesture &gesture) = default;
+    LLGesture(LLGesture &&gesture) = default;
+    LLGesture &operator=(const LLGesture &rhs) = default;
+    LLGesture &operator=(LLGesture &&rhs) = default;
 
-	virtual ~LLGesture() {};
+    virtual ~LLGesture() = default;
 
 	// Accessors
 	KEY					getKey() const			{ return mKey; }
