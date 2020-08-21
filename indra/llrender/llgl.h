@@ -75,7 +75,9 @@ public:
 	bool initGL();
 	void shutdownGL();
 
-	void initWGL(); // Initializes stupid WGL extensions
+#if LL_WINDOWS
+	void initWGL(HDC dc); // Initializes stupid WGL extensions
+#endif
 
 	std::string getRawGLString(); // For sending to simulator
 
@@ -127,6 +129,7 @@ public:
 	BOOL mHassRGBTexture;
 	BOOL mHassRGBFramebuffer;
     BOOL mHasTexturesRGBDecode;
+	bool mHasTextureSwizzle;
 
 	// Vendor-specific extensions
 	BOOL mIsATI;

@@ -51,7 +51,7 @@ class LLVertexBufferTerrain final : public LLVertexBuffer
 {
 public:
 	LLVertexBufferTerrain() :
-		LLVertexBuffer(MAP_VERTEX | MAP_NORMAL | MAP_TEXCOORD0 | MAP_TEXCOORD1 | MAP_COLOR, GL_DYNAMIC_DRAW_ARB)
+		LLVertexBuffer(MAP_VERTEX | MAP_NORMAL | MAP_TEXCOORD0 | MAP_TEXCOORD1 | MAP_COLOR, GL_DYNAMIC_DRAW)
 	{
 		//texture coordinates 2 and 3 exist, but use the same data as texture coordinate 1
 	};
@@ -81,27 +81,27 @@ public:
 		}
 		if (data_mask & MAP_TEXCOORD3)
 		{ //substitute tex coord 1 for tex coord 3
-			glClientActiveTextureARB(GL_TEXTURE3_ARB);
+			glClientActiveTexture(GL_TEXTURE3);
 			glTexCoordPointer(2,GL_FLOAT, LLVertexBuffer::sTypeSize[TYPE_TEXCOORD1], (void*)(base + mOffsets[TYPE_TEXCOORD1]));
-			glClientActiveTextureARB(GL_TEXTURE0_ARB);
+			glClientActiveTexture(GL_TEXTURE0);
 		}
 		if (data_mask & MAP_TEXCOORD2)
 		{ //substitute tex coord 0 for tex coord 2
-			glClientActiveTextureARB(GL_TEXTURE2_ARB);
+			glClientActiveTexture(GL_TEXTURE2);
 			glTexCoordPointer(2,GL_FLOAT, LLVertexBuffer::sTypeSize[TYPE_TEXCOORD0], (void*)(base + mOffsets[TYPE_TEXCOORD0]));
-			glClientActiveTextureARB(GL_TEXTURE0_ARB);
+			glClientActiveTexture(GL_TEXTURE0);
 		}
 		if (data_mask & MAP_TEXCOORD1)
 		{
-			glClientActiveTextureARB(GL_TEXTURE1_ARB);
+			glClientActiveTexture(GL_TEXTURE1);
 			glTexCoordPointer(2,GL_FLOAT, LLVertexBuffer::sTypeSize[TYPE_TEXCOORD1], (void*)(base + mOffsets[TYPE_TEXCOORD1]));
-			glClientActiveTextureARB(GL_TEXTURE0_ARB);
+			glClientActiveTexture(GL_TEXTURE0);
 		}
 		if (data_mask & MAP_TANGENT)
 		{
-			glClientActiveTextureARB(GL_TEXTURE2_ARB);
+			glClientActiveTexture(GL_TEXTURE2);
 			glTexCoordPointer(3,GL_FLOAT, LLVertexBuffer::sTypeSize[TYPE_TANGENT], (void*)(base + mOffsets[TYPE_TANGENT]));
-			glClientActiveTextureARB(GL_TEXTURE0_ARB);
+			glClientActiveTexture(GL_TEXTURE0);
 		}
 		if (data_mask & MAP_TEXCOORD0)
 		{
@@ -1057,7 +1057,7 @@ U32 LLVOSurfacePatch::getPartitionType() const
 }
 
 LLTerrainPartition::LLTerrainPartition(LLViewerRegion* regionp)
-: LLSpatialPartition(LLDrawPoolTerrain::VERTEX_DATA_MASK, FALSE, GL_DYNAMIC_DRAW_ARB, regionp)
+: LLSpatialPartition(LLDrawPoolTerrain::VERTEX_DATA_MASK, FALSE, GL_DYNAMIC_DRAW, regionp)
 {
 	mOcclusionEnabled = FALSE;
 	mInfiniteFarClip = TRUE;

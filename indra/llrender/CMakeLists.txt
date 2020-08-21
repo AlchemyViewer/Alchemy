@@ -3,6 +3,7 @@
 project(llrender)
 
 include(00-Common)
+include(Epoxy)
 include(OpenGL)
 include(FreeType)
 include(LLCommon)
@@ -16,6 +17,7 @@ include(LLVFS)
 
 include_directories(
     ${FREETYPE_INCLUDE_DIRS}
+    ${EPOXY_INCLUDE_DIRS}
     ${LLCOMMON_INCLUDE_DIRS}
     ${LLIMAGE_INCLUDE_DIRS}
     ${LLMATH_INCLUDE_DIRS}
@@ -133,5 +135,6 @@ target_link_libraries(llrender
     ${LLVFS_LIBRARIES}
     ${LLWINDOW_LIBRARIES}
     ${FREETYPE_LIBRARIES}
+    ${EPOXY_LIBRARIES}
     ${OPENGL_LIBRARIES})
 

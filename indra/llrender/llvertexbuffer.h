@@ -278,7 +278,7 @@ public:
 	volatile U8* getMappedIndices() const			{ return mMappedIndexData; }
 	S32 getOffset(S32 type) const			{ return mOffsets[type]; }
 	S32 getUsage() const					{ return mUsage; }
-	bool isWriteable() const				{ return (mMappable || mUsage == GL_STREAM_DRAW_ARB) ? true : false; }
+	bool isWriteable() const				{ return (mMappable || mUsage == GL_STREAM_DRAW) ? true : false; }
 
 	void draw(U32 mode, U32 count, U32 indices_offset) const;
 	void drawArrays(U32 mode, U32 offset, U32 count) const;
@@ -339,7 +339,7 @@ public:
 	static bool sMapped;
 	typedef std::list<LLVertexBuffer*> buffer_list_t;
 		
-	static bool sDisableVBOMapping; //disable glMapBufferARB
+	static bool sDisableVBOMapping; //disable glMapBuffer
 	static bool sEnableVBOs;
 	static const S32 sTypeSize[TYPE_MAX];
 	static const U32 sGLMode[LLRender::NUM_MODES];

@@ -1,12 +1,13 @@
 # -*- cmake -*-
 
 include(Variables)
+include(Epoxy)
 include(GLEXT)
 include(SDL2)
 
 set(LLWINDOW_INCLUDE_DIRS
     ${GLEXT_INCLUDE_DIR}
-    ${SDL_INCLUDE_DIRS}
+    ${EPOXY_INCLUDE_DIRS}
     ${LIBS_OPEN_DIR}/llwindow
     )
 

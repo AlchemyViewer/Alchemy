@@ -784,7 +784,7 @@ void gl_stippled_line_3d( const LLVector3& start, const LLVector3& end, const LL
 	gGL.color4f(color.mV[VRED], color.mV[VGREEN], color.mV[VBLUE], color.mV[VALPHA]);
 
 	gGL.flush();
-	glLineWidth(2.5f);
+	gGL.setLineWidth(2.5f);
 
 	if (!LLGLSLShader::sNoFixedFunction)
 	{
@@ -1633,8 +1633,7 @@ void LLRender2D::setScaleFactor(const LLVector2 &scale_factor)
 // static
 void LLRender2D::setLineWidth(F32 width)
 {
-	gGL.flush();
-	glLineWidth(width * lerp(sGLScaleFactor.mV[VX], sGLScaleFactor.mV[VY], 0.5f));
+	gGL.setLineWidth(width * lerp(sGLScaleFactor.mV[VX], sGLScaleFactor.mV[VY], 0.5f));
 }
 
 // static
