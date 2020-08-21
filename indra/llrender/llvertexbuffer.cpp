@@ -2372,7 +2372,7 @@ void LLVertexBuffer::setBuffer(U32 data_mask)
                    LL_INFOS() << "Missing indices" << LL_ENDL;
                 }
 
-				LL_ERRS() << "Shader consumption mismatches data provision." << LL_ENDL;
+				LL_WARNS() << "Shader consumption mismatches data provision." << LL_ENDL;
 			}
 		}
 	}
