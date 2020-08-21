@@ -71,7 +71,7 @@ private:
 		Entry(const LLUUID& id, S32 imagesize, S32 bodysize, U32 time) :
 			mID(id), mImageSize(imagesize), mBodySize(bodysize), mTime(time) {}
 		void init(const LLUUID& id, U32 time) { mID = id, mImageSize = 0; mBodySize = 0; mTime = time; }
-		Entry& operator=(const Entry& entry) {mID = entry.mID, mImageSize = entry.mImageSize; mBodySize = entry.mBodySize; mTime = entry.mTime; return *this;}
+
 		LLUUID mID; // 16 bytes
 		S32 mImageSize; // total size of image if known
 		S32 mBodySize; // size of body file in body cache
