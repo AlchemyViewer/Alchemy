@@ -1157,8 +1157,10 @@ LLView* LLChatHistory::getHeader(const LLChat& chat,const LLStyle::Params& style
 {
 	LLChatHistoryHeader* header = LLChatHistoryHeader::createInstance(mMessageHeaderFilename);
     if (header)
+	{
         header->setup(chat, style_params, args);
-	return header;
+	}
+    return header;
 }
 
 void LLChatHistory::onClickMoreText()
