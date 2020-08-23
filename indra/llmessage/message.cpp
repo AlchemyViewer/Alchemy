@@ -557,7 +557,9 @@ BOOL LLMessageSystem::checkMessages(LockMessageChecker&, S64 frame_count )
 
 			// process the message as normal
 			mIncomingCompressedSize = zeroCodeExpand(&buffer, &receive_size);
-			mCurrentRecvPacketID = ntohl(*((U32*)(&buffer[1])));
+			U32 cur_rec_pkt_id = 0U;
+			memcpy(&cur_rec_pkt_id, buffer + PHL_PACKET_ID, sizeof(cur_rec_pkt_id));
+			mCurrentRecvPacketID = ntohl(cur_rec_pkt_id);
 			host = getSender();
 
 			const bool resetPacketId = true;
@@ -1178,7 +1180,8 @@ S32 LLMessageSystem::sendMessage(const LLHost &host)
 	cdp->nextPacketOutID();
 
 	// Packet ID size is always 4
-	*((S32*)&mSendBuffer[PHL_PACKET_ID]) = htonl(cdp->getPacketOutID());
+	U32 packet_out_id = static_cast<U32>(htonl(cdp->getPacketOutID()));
+	memcpy(mSendBuffer + PHL_PACKET_ID, &packet_out_id, sizeof(packet_out_id));
 
 	// Compress the message, which will usually reduce its size.
 	U8 * buf_ptr = (U8 *)mSendBuffer;
