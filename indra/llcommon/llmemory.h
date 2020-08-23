@@ -48,12 +48,16 @@ class LLMutex ;
 #define LL_ALIGN_OF __align_of__
 #endif
 
-#if LL_WINDOWS
+#if LL_WINDOWS || LL_LINUX
+#if ADDRESS_SIZE == 64
+#define LL_DEFAULT_HEAP_ALIGN 16
+#else
 #define LL_DEFAULT_HEAP_ALIGN 8
+#endif
 #elif LL_DARWIN
 #define LL_DEFAULT_HEAP_ALIGN 16
 #elif LL_LINUX
-#define LL_DEFAULT_HEAP_ALIGN 8
+#error "UNKNOWN PLATFORM HEAP SIZE"
 #endif
 
 
@@ -146,38 +150,49 @@ template <typename T> T* LL_NEXT_ALIGNED_ADDRESS_64(T* address)
 
 inline void* ll_aligned_malloc_16(size_t size) // returned hunk MUST be freed with ll_aligned_free_16().
 {
+#if (ADDRESS_SIZE == 64 && (defined(LL_WINDOWS) || defined(LL_DARWIN) || defined(LL_LINUX)))
+    return malloc(size); // default x86_64 malloc alignment on windows, mac, and linux is 16 byte aligned
+#else
 #if defined(LL_WINDOWS)
 	return _aligned_malloc(size, 16);
 #elif defined(LL_DARWIN)
 	return malloc(size); // default osx malloc is 16 byte aligned.
 #else
-	void *rtn;
+	void *rtn = NULL;
 	if (LL_LIKELY(0 == posix_memalign(&rtn, 16, size)))
 		return rtn;
 	else // bad alignment requested, or out of memory
 		return NULL;
 #endif
+#endif
 }
 
 inline void ll_aligned_free_16(void *p)
 {
+#if (ADDRESS_SIZE == 64 && (defined(LL_WINDOWS) || defined(LL_DARWIN) || defined(LL_LINUX)))
+    free(p); // default x86_64 malloc alignment on windows, mac, and linux is 16 byte aligned
+#else
 #if defined(LL_WINDOWS)
 	_aligned_free(p);
 #elif defined(LL_DARWIN)
-	return free(p);
+	free(p);
 #else
 	free(p); // posix_memalign() is compatible with heap deallocator
+#endif
 #endif
 }
 
 inline void* ll_aligned_realloc_16(void* ptr, size_t size, size_t old_size) // returned hunk MUST be freed with ll_aligned_free_16().
 {
+#if (ADDRESS_SIZE == 64 && (defined(LL_WINDOWS) || defined(LL_DARWIN) || defined(LL_LINUX)))
+    return realloc(ptr, size); // default x86_64 malloc alignment on windows, mac, and linux is 16 byte aligned
+#else
 #if defined(LL_WINDOWS)
 	return _aligned_realloc(ptr, size, 16);
 #elif defined(LL_DARWIN)
 	return realloc(ptr,size); // default osx malloc is 16 byte aligned.
 #else
-	//FIXME: memcpy is SLOW
+	//FIXME: memcpy is SLOW but posix lacks aligned realloc
 	void* ret = ll_aligned_malloc_16(size);
 	if (ptr)
 	{
@@ -190,16 +205,15 @@ inline void* ll_aligned_realloc_16(void* ptr, size_t size, size_t old_size) // r
 	}
 	return ret;
 #endif
+#endif
 }
 
 inline void* ll_aligned_malloc_32(size_t size) // returned hunk MUST be freed with ll_aligned_free_32().
 {
 #if defined(LL_WINDOWS)
 	return _aligned_malloc(size, 32);
-#elif defined(LL_DARWIN)
-	return ll_aligned_malloc_fallback( size, 32 );
 #else
-	void *rtn;
+	void *rtn = NULL;
 	if (LL_LIKELY(0 == posix_memalign(&rtn, 32, size)))
 		return rtn;
 	else // bad alignment requested, or out of memory
@@ -211,8 +225,28 @@ inline void ll_aligned_free_32(void *p)
 {
 #if defined(LL_WINDOWS)
 	_aligned_free(p);
-#elif defined(LL_DARWIN)
-	ll_aligned_free_fallback( p );
+#else
+	free(p); // posix_memalign() is compatible with heap deallocator
+#endif
+}
+
+inline void* ll_aligned_malloc_64(size_t size) // returned hunk MUST be freed with ll_aligned_free_64().
+{
+#if defined(LL_WINDOWS)
+	return _aligned_malloc(size, 64);
+#else
+	void *rtn = NULL;
+	if (LL_LIKELY(0 == posix_memalign(&rtn, 64, size)))
+		return rtn;
+	else // bad alignment requested, or out of memory
+		return NULL;
+#endif
+}
+
+inline void ll_aligned_free_64(void *p)
+{
+#if defined(LL_WINDOWS)
+	_aligned_free(p);
 #else
 	free(p); // posix_memalign() is compatible with heap deallocator
 #endif
@@ -234,6 +268,10 @@ LL_FORCE_INLINE void* ll_aligned_malloc(size_t size)
 	{
 		return ll_aligned_malloc_32(size);
 	}
+	else if (ALIGNMENT == 64)
+	{
+		return ll_aligned_malloc_64(size);
+	}
 	else
 	{
 		return ll_aligned_malloc_fallback(size, ALIGNMENT);
@@ -254,6 +292,10 @@ LL_FORCE_INLINE void ll_aligned_free(void* ptr)
 	else if (ALIGNMENT == 32)
 	{
 		return ll_aligned_free_32(ptr);
+	}
+	else if (ALIGNMENT == 64)
+	{
+		return ll_aligned_free_64(ptr);
 	}
 	else
 	{
@@ -325,6 +367,7 @@ inline void ll_memcpy_nonaliased_aligned_16(char* __restrict dst, const char* __
 
 	// Copy remainder 16b tail chunks (or ALL 16b chunks for sub-64b copies)
 	//
+	llassert(0 == (((U8*) end - (U8*) dst) % 16));
 	while (dst < end)
 	{
 		_mm_store_ps((F32*)dst, _mm_load_ps((F32*)src));
