@@ -35,11 +35,11 @@
 // wrapper for vsnprintf to be called from llformatXXX functions.
 static void va_format(std::string& out, const char *fmt, va_list va)
 {
-	char tstr[1024];	/* Flawfinder: ignore */
+	char tstr[2048];	/* Flawfinder: ignore */
 #if LL_WINDOWS
-	_vsnprintf(tstr, 1024, fmt, va);
+	_vsnprintf(tstr, 2048, fmt, va);
 #else
-	vsnprintf(tstr, 1024, fmt, va);	/* Flawfinder: ignore */
+	vsnprintf(tstr, 2048, fmt, va);	/* Flawfinder: ignore */
 #endif
 	out.assign(tstr);
 }
