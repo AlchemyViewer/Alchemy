@@ -435,6 +435,8 @@ LLPanelOutfitEdit::~LLPanelOutfitEdit()
 
 	delete mCOFDragAndDropObserver;
 
+    delete mWearableListViewItemsComparator;
+
 	while (!mListViewItemTypes.empty()) {
 		delete mListViewItemTypes.back();
 		mListViewItemTypes.pop_back();
