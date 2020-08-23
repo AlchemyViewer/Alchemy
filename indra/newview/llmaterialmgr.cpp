@@ -238,7 +238,7 @@ boost::signals2::connection LLMaterialMgr::get(const LLUUID& region_id, const LL
 		get_callback_map_t::iterator itCallback = mGetCallbacks.find(material_id);
 		if (itCallback == mGetCallbacks.end())
 		{
-			std::pair<get_callback_map_t::iterator, bool> ret = mGetCallbacks.emplace(std::pair<LLMaterialID, get_callback_t*>(material_id, new get_callback_t()));
+			std::pair<get_callback_map_t::iterator, bool> ret = mGetCallbacks.emplace(std::make_pair(material_id, std::make_unique<get_callback_t>()));
 			itCallback = ret.first;
 		}
 		connection = itCallback->second->connect(cb);;
@@ -283,7 +283,7 @@ boost::signals2::connection LLMaterialMgr::getTE(const LLUUID& region_id, const 
 		get_callback_te_map_t::iterator itCallback = mGetTECallbacks.find(te_mat_pair);
 		if (itCallback == mGetTECallbacks.end())
 		{
-			std::pair<get_callback_te_map_t::iterator, bool> ret = mGetTECallbacks.emplace(te_mat_pair, new get_callback_te_t());
+			std::pair<get_callback_te_map_t::iterator, bool> ret = mGetTECallbacks.emplace(std::make_pair(te_mat_pair, std::make_unique<get_callback_te_t>()));
 			itCallback = ret.first;
 		}
 		connection = itCallback->second->connect(cb);
@@ -321,7 +321,7 @@ boost::signals2::connection LLMaterialMgr::getAll(const LLUUID& region_id, LLMat
 	getall_callback_map_t::iterator itCallback = mGetAllCallbacks.find(region_id);
 	if (mGetAllCallbacks.end() == itCallback)
 	{
-		std::pair<getall_callback_map_t::iterator, bool> ret = mGetAllCallbacks.emplace(std::pair<LLUUID, getall_callback_t*>(region_id, new getall_callback_t()));
+		std::pair<getall_callback_map_t::iterator, bool> ret = mGetAllCallbacks.emplace(std::make_pair(region_id, std::make_unique<getall_callback_t>()));
 		itCallback = ret.first;
 	}
 	return itCallback->second->connect(cb);;
@@ -404,7 +404,7 @@ void LLMaterialMgr::setMaterialCallbacks(const LLMaterialID& material_id, const 
 		if (itCallbackTE != mGetTECallbacks.end())
 		{
 			(*itCallbackTE->second)(material_id, material_ptr, te_mat_pair.te);
-			delete itCallbackTE->second;
+
 			mGetTECallbacks.erase(itCallbackTE);
 		}
 	}
@@ -414,7 +414,6 @@ void LLMaterialMgr::setMaterialCallbacks(const LLMaterialID& material_id, const 
 	{
 		(*itCallback->second)(material_id, material_ptr);
 
-		delete itCallback->second;
 		mGetCallbacks.erase(itCallback);
 	}
 }
@@ -517,7 +516,6 @@ void LLMaterialMgr::onGetAllResponse(bool success, const LLSD& content, const LL
 	{
 		(*itCallback->second)(region_id, materials);
 
-		delete itCallback->second;
 		mGetAllCallbacks.erase(itCallback);
 	}
 
