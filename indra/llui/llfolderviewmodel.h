@@ -288,14 +288,10 @@ public:
 	{ 
 		// Avoid duplicates: bail out if that child is already present in the list
 		// Note: this happens when models are created before views
-		child_list_t::const_iterator iter;
-		for (iter = mChildren.begin(); iter != mChildren.end(); iter++)
-		{
-			if (child == *iter)
-			{
-				return;
-			}
-		}
+		
+		if(child->getParent() == this)
+			return;
+
 		mChildren.push_back(child);
 		child->setParent(this); 
 		dirtyFilter();
