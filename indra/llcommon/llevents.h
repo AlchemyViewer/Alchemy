@@ -483,7 +483,7 @@ public:
     const static NameList empty;
 
     /// Get this LLEventPump's name
-    std::string getName() const { return mName; }
+    const std::string& getName() const { return mName; }
 
     /**
      * Register a new listener with a unique name. Specify an optional list
