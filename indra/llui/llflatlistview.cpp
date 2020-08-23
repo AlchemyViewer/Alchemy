@@ -505,6 +505,11 @@ LLFlatListView::LLFlatListView(const LLFlatListView::Params& p)
 	}
 };
 
+LLFlatListView::~LLFlatListView()
+{
+	delete_and_clear(mItemPairs);
+}
+
 // virtual
 void LLFlatListView::draw()
 {
