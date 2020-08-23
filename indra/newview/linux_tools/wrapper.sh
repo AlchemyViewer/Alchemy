@@ -55,6 +55,9 @@ fi
 #export LL_WRAPPER='gdb --args'
 #export LL_WRAPPER='valgrind --smc-check=all --error-limit=no --log-file=secondlife.vg --leak-check=full --suppressions=/usr/lib/valgrind/glibc-2.5.supp --suppressions=secondlife-i686.supp'
 
+## For controlling various sanitizer options
+#export ASAN_OPTIONS="halt_on_error=0 detect_leaks=1 symbolize=1"
+
 ## - Avoids an often-buggy X feature that doesn't really benefit us anyway.
 # export SDL_VIDEO_X11_DGAMOUSE=0
 
