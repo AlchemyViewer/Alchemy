@@ -231,9 +231,9 @@ BOOL LLPolyMeshSharedData::allocateVertexData( U32 numVertices )
         mBaseCoords = (LLVector4a*) ll_aligned_malloc_16(numVertices*sizeof(LLVector4a));
         mBaseNormals = (LLVector4a*) ll_aligned_malloc_16(numVertices*sizeof(LLVector4a));
         mBaseBinormals = (LLVector4a*) ll_aligned_malloc_16(numVertices*sizeof(LLVector4a));
-        mTexCoords = (LLVector2*) ll_aligned_malloc_16(numVertices*sizeof(LLVector2));
-        mDetailTexCoords = (LLVector2*) ll_aligned_malloc_16(numVertices*sizeof(LLVector2));
-        mWeights = (F32*) ll_aligned_malloc_16(numVertices*sizeof(F32));
+        mTexCoords = (LLVector2 *) ll_aligned_malloc_16((numVertices + numVertices % 2) * sizeof(LLVector2));
+        mDetailTexCoords = (LLVector2 *) ll_aligned_malloc_16((numVertices + numVertices % 2) * sizeof(LLVector2));
+        mWeights = (F32 *) ll_aligned_malloc_16(((numVertices) * sizeof(F32) + 0xFU) & ~0xFU);
         for (i = 0; i < numVertices; i++)
         {
 			mBaseCoords[i].clear();
