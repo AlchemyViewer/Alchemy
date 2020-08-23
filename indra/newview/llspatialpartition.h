@@ -184,7 +184,7 @@ public:
 };
 
 LL_ALIGN_PREFIX(64)
-class LLSpatialGroup : public LLOcclusionCullingGroup
+class LLSpatialGroup final : public LLOcclusionCullingGroup
 {
 	friend class LLSpatialPartition;
 	friend class LLOctreeStateCheck;
@@ -192,6 +192,26 @@ public:
 
 	LLSpatialGroup(const LLSpatialGroup& rhs) = delete;
 	LLSpatialGroup& operator=(const LLSpatialGroup& rhs) = delete;
+
+	void* operator new(std::size_t size)
+	{
+		return aligned_new<64>(size);
+	}
+
+	void operator delete(void* ptr, std::size_t size)
+	{
+		aligned_delete<64>(ptr, size);
+	}
+
+	void* operator new[](std::size_t size)
+	{
+		return aligned_new<64>(size);
+	}
+
+	void operator delete[](void* ptr, std::size_t size)
+	{
+		aligned_delete<64>(ptr, size);
+	}
 
 	static U32 sNodeCount;
 	static BOOL sNoDelete; //deletion of spatial groups and draw info not allowed if TRUE
