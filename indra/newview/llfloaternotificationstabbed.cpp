@@ -117,6 +117,7 @@ void LLFloaterNotificationsTabbed::setSysWellChiclet(LLSysWellChiclet* chiclet)
 //---------------------------------------------------------------------------------
 LLFloaterNotificationsTabbed::~LLFloaterNotificationsTabbed()
 {
+    delete mNotificationsSeparator;
 }
 
 //---------------------------------------------------------------------------------
