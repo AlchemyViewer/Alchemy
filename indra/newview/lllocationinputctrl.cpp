@@ -225,7 +225,8 @@ LLLocationInputCtrl::LLLocationInputCtrl(const LLLocationInputCtrl::Params& p)
 	mIconMaturityGeneral(NULL),
 	mIconMaturityAdult(NULL),
 	mIconMaturityModerate(NULL),
-	mMaturityHelpTopic(p.maturity_help_topic)
+	mMaturityHelpTopic(p.maturity_help_topic),
+    isHumanReadableLocationVisible(true)
 {
 	// Lets replace default LLLineEditor with LLLocationLineEditor
 	// to make needed escaping while copying and cutting url
