@@ -57,6 +57,7 @@ fi
 
 ## For controlling various sanitizer options
 #export ASAN_OPTIONS="halt_on_error=0 detect_leaks=1 symbolize=1"
+#export UBSAN_OPTIONS="print_stacktrace=1 print_summary=1 halt_on_error=0"
 
 ## - Avoids an often-buggy X feature that doesn't really benefit us anyway.
 # export SDL_VIDEO_X11_DGAMOUSE=0
