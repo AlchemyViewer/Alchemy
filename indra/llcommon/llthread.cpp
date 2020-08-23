@@ -256,6 +256,7 @@ void LLThread::shutdown()
             mStatus = STOPPED;
             return;
         }
+        delete mThreadp;
         mThreadp = NULL;
     }
 
