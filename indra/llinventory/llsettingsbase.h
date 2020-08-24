@@ -96,7 +96,7 @@ public:
 
     typedef PTR_NAMESPACE::shared_ptr<LLSettingsBase> ptr_t;
 
-    virtual ~LLSettingsBase() { };
+    virtual ~LLSettingsBase() = default;
 
     //---------------------------------------------------------------------
     virtual std::string getSettingsType() const = 0;
@@ -406,7 +406,7 @@ public:
             mFinal = mInitial;
     }
 
-    virtual ~LLSettingsBlender() {}
+    virtual ~LLSettingsBlender() = default;
 
     virtual void reset( LLSettingsBase::ptr_t &initsetting, const LLSettingsBase::ptr_t &endsetting, const LLSettingsBase::TrackPosition&)
     {
@@ -485,9 +485,7 @@ public:
         mLastUpdate = mTimeStart;
     }
 
-    virtual ~LLSettingsBlenderTimeDelta() 
-    {
-    }
+    virtual ~LLSettingsBlenderTimeDelta() = default;
 
     virtual void reset(LLSettingsBase::ptr_t &initsetting, const LLSettingsBase::ptr_t &endsetting, const LLSettingsBase::TrackPosition& blend_span) SETTINGS_OVERRIDE
     {

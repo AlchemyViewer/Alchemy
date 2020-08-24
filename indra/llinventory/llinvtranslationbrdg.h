@@ -33,7 +33,7 @@ public:
     typedef std::shared_ptr<LLTranslationBridge>    ptr_t;
 
     // clang needs this to be happy
-    virtual ~LLTranslationBridge() {}
+    virtual ~LLTranslationBridge() = default;
 
     virtual std::string getString(const std::string &xml_desc) = 0;
 };

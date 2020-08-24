@@ -135,12 +135,6 @@ LLParcel::LLParcel(const LLUUID &owner_id,
 }
 
 
-// virtual
-LLParcel::~LLParcel()
-{
-    // user list cleaned up by std::vector destructor.
-}
-
 void LLParcel::init(const LLUUID &owner_id,
                     BOOL modify, BOOL terraform, BOOL damage,
                     time_t claim_date, S32 claim_price_per_meter,
@@ -463,13 +457,13 @@ BOOL LLParcel::importAccessEntry(std::istream& input_stream, LLAccessEntry* entr
         }
         else if ("time" == keyword)
         {
-            S32 when;
+            S32 when = 0;
             LLStringUtil::convertToS32(value, when);
             entry->mTime = when;
         }
         else if ("flags" == keyword)
         {
-            U32 setting;
+            U32 setting = 0;
             LLStringUtil::convertToU32(value, setting);
             entry->mFlags = setting;
         }

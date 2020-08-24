@@ -53,7 +53,7 @@ public:
 
     //---------------------------------------------------------------------
     LLSettingsWater(const LLSD &data);
-    virtual ~LLSettingsWater() { };
+    virtual ~LLSettingsWater() = default;
 
     virtual ptr_t   buildClone() const = 0;
 

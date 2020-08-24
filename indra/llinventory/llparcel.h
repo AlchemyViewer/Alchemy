@@ -219,7 +219,7 @@ public:
 		S32 sim_object_limit,
 		F32 parcel_object_bonus,
 		BOOL is_group_owned = FALSE);
-	virtual ~LLParcel();
+	virtual ~LLParcel() = default;
 
 	void init(
 		const LLUUID &owner_id,

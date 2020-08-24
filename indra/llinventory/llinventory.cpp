@@ -92,10 +92,6 @@ LLInventoryObject::LLInventoryObject()
 {
 }
 
-LLInventoryObject::~LLInventoryObject()
-{
-}
-
 void LLInventoryObject::copyObject(const LLInventoryObject* other)
 {
 	mUUID = other->mUUID;
@@ -348,10 +344,6 @@ LLInventoryItem::LLInventoryItem(const LLInventoryItem* other) :
 	LLInventoryObject()
 {
 	copyItem(other);
-}
-
-LLInventoryItem::~LLInventoryItem()
-{
 }
 
 // virtual
@@ -1367,10 +1359,6 @@ LLInventoryCategory::LLInventoryCategory(const LLInventoryCategory* other) :
 	LLInventoryObject()
 {
 	copyCategory(other);
-}
-
-LLInventoryCategory::~LLInventoryCategory()
-{
 }
 
 // virtual

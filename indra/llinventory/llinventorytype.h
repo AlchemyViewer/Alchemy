@@ -139,10 +139,9 @@ public:
 
     static bool showInWorldPermissions(EType type);
 
-private:
 	// don't instantiate or derive one of these objects
-	LLInventoryType( void );
-	~LLInventoryType( void );
+	LLInventoryType( void ) = delete;
+	~LLInventoryType( void ) = delete;
 };
 
 // helper function that returns true if inventory type and asset type

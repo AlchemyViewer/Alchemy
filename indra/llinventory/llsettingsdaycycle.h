@@ -77,7 +77,7 @@ public:
 
     //---------------------------------------------------------------------
     LLSettingsDay(const LLSD &data);
-    virtual ~LLSettingsDay() { };
+    virtual ~LLSettingsDay() = default;
 
     bool                        initialize(bool validate_frames = false);
 

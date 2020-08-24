@@ -105,7 +105,7 @@ public:
 
     //---------------------------------------------------------------------
     LLSettingsSky(const LLSD &data);
-    virtual ~LLSettingsSky() { };
+    virtual ~LLSettingsSky() = default;
 
     virtual ptr_t   buildClone() const = 0;
 
