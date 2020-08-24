@@ -210,11 +210,6 @@ LLBaseDownloadRequest::LLBaseDownloadRequest(const LLUUID &uuid, const LLAssetTy
 }
 
 // virtual
-LLBaseDownloadRequest::~LLBaseDownloadRequest()
-{
-}
-
-// virtual
 LLBaseDownloadRequest* LLBaseDownloadRequest::getCopy()
 {
     return new LLBaseDownloadRequest(*this);
@@ -233,11 +228,6 @@ LLAssetRequest::LLAssetRequest(const LLUUID &uuid, const LLAssetType::EType type
         mIsUserWaiting(FALSE),
         mTimeout(LL_ASSET_STORAGE_TIMEOUT),
         mBytesFetched(0)
-{
-}
-
-// virtual
-LLAssetRequest::~LLAssetRequest()
 {
 }
 
@@ -285,11 +275,6 @@ LLInvItemRequest::LLInvItemRequest(const LLUUID &uuid, const LLAssetType::EType 
 {
 }
 
-// virtual
-LLInvItemRequest::~LLInvItemRequest()
-{
-}
-
 LLBaseDownloadRequest* LLInvItemRequest::getCopy()
 {
     return new LLInvItemRequest(*this);
@@ -303,11 +288,6 @@ LLEstateAssetRequest::LLEstateAssetRequest(const LLUUID &uuid, const LLAssetType
                                            EstateAssetType etype)
     :   LLBaseDownloadRequest(uuid, atype),
         mEstateAssetType(etype)
-{
-}
-
-// Virtual
-LLEstateAssetRequest::~LLEstateAssetRequest()
 {
 }
 

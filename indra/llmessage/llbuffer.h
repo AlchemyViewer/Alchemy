@@ -77,7 +77,7 @@ class LLSegment
 public:
 	LLSegment();
 	LLSegment(S32 channel, U8* data, S32 data_len);
-	~LLSegment();
+	~LLSegment() = default;
 
 	/**
 	 * @brief Check if this segment is on the given channel.

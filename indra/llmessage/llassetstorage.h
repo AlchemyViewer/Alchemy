@@ -104,7 +104,7 @@ class LLBaseDownloadRequest
 {
 public:
     LLBaseDownloadRequest(const LLUUID &uuid, const LLAssetType::EType at);
-    virtual ~LLBaseDownloadRequest();
+    virtual ~LLBaseDownloadRequest() = default;
 
     LLUUID getUUID() const					{ return mUUID; }
     LLAssetType::EType getType() const		{ return mType; }
@@ -135,7 +135,7 @@ class LLAssetRequest : public LLBaseDownloadRequest
 {
 public:
     LLAssetRequest(const LLUUID &uuid, const LLAssetType::EType at);
-    virtual ~LLAssetRequest();
+    virtual ~LLAssetRequest() = default;
 
     void setTimeout(F64Seconds timeout) { mTimeout = timeout; }
 
@@ -170,7 +170,7 @@ class LLInvItemRequest : public LLBaseDownloadRequest
 {
 public:
     LLInvItemRequest(const LLUUID &uuid, const LLAssetType::EType at);
-    virtual ~LLInvItemRequest();
+    virtual ~LLInvItemRequest() = default;
 
     virtual LLBaseDownloadRequest* getCopy();
 };
@@ -179,7 +179,7 @@ class LLEstateAssetRequest : public LLBaseDownloadRequest
 {
 public:
     LLEstateAssetRequest(const LLUUID &uuid, const LLAssetType::EType at, EstateAssetType et);
-    virtual ~LLEstateAssetRequest();
+    virtual ~LLEstateAssetRequest() = default;
 
     LLAssetType::EType getAType() const		{ return mType; }
 
