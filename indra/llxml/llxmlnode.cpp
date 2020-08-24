@@ -1684,19 +1684,20 @@ const char *LLXMLNode::parseFloat(const char *str, F64 *dest, U32 precision, Enc
 	{
 		U64 bytes_dest;
 		BOOL is_negative;
-		str = parseInteger(str, (U64 *)&bytes_dest, &is_negative, precision, ENCODING_HEX);
+		str = parseInteger(str, &bytes_dest, &is_negative, precision, ENCODING_HEX);
 		// Upcast to F64
 		switch (precision)
 		{
 		case 32:
 			{
 				U32 short_dest = (U32)bytes_dest;
-				F32 ret_val = *(F32 *)&short_dest;
-				*dest = ret_val;
+				F32 ret_val;
+				memcpy(&ret_val, &short_dest, sizeof(ret_val));
+				*dest = static_cast<F64>(ret_val);
 			}
 			break;
 		case 64:
-			*dest = *(F64 *)&bytes_dest;
+			memcpy(dest, &bytes_dest, sizeof(*dest));
 			break;
 		default:
 			return NULL;

@@ -6762,7 +6762,9 @@ bool LLRayAABB(const LLVector3 &center, const LLVector3 &size, const LLVector3& 
 			Inside		= false;
 
 			// Calculate T distances to candidate planes
-			if(IR(dir.mV[i]))	MaxT.mV[i] = (MinB.mV[i] - origin.mV[i]) / dir.mV[i];
+            U32 tmp;
+            memcpy(&tmp, &dir.mV[i], sizeof(tmp));
+			if(tmp)	MaxT.mV[i] = (MinB.mV[i] - origin.mV[i]) / dir.mV[i];
 		}
 		else if(origin.mV[i] > MaxB.mV[i])
 		{
@@ -6770,7 +6772,9 @@ bool LLRayAABB(const LLVector3 &center, const LLVector3 &size, const LLVector3& 
 			Inside		= false;
 
 			// Calculate T distances to candidate planes
-			if(IR(dir.mV[i]))	MaxT.mV[i] = (MaxB.mV[i] - origin.mV[i]) / dir.mV[i];
+            U32 tmp;
+            memcpy(&tmp, &dir.mV[i], sizeof(tmp));
+			if(tmp)	MaxT.mV[i] = (MaxB.mV[i] - origin.mV[i]) / dir.mV[i];
 		}
 	}
 
@@ -6787,7 +6791,9 @@ bool LLRayAABB(const LLVector3 &center, const LLVector3 &size, const LLVector3& 
 	if(MaxT.mV[2] > MaxT.mV[WhichPlane])	WhichPlane = 2;
 
 	// Check final candidate actually inside box
-	if(IR(MaxT.mV[WhichPlane])&0x80000000) return false;
+    U32 tmp_val;
+    memcpy(&tmp_val, &MaxT.mV[WhichPlane], sizeof(tmp_val));
+	if(tmp_val&0x80000000) return false;
 
 	for(U32 i=0;i<3;i++)
 	{

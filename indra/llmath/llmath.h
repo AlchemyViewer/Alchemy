@@ -27,8 +27,11 @@
 #ifndef LLMATH_H
 #define LLMATH_H
 
+#include "llpreprocessor.h"
+
 #include <cmath>
 #include <cstdlib>
+#include <cstring>
 #include <vector>
 #include <limits>
 #include "lldefs.h"
@@ -121,19 +124,27 @@ inline bool is_approx_zero( F32 f ) { return (-F_APPROXIMATELY_ZERO < f) && (f <
 // handles negative and positive zeros
 inline bool is_zero(F32 x)
 {
-	return (*(U32*)(&x) & 0x7fffffff) == 0;
+	U32 tmp = 0;
+	memcpy(&tmp, &x, sizeof(tmp));
+	return (tmp & 0x7fffffff) == 0;
 }
 
 inline bool is_approx_equal(F32 x, F32 y)
 {
-	const S32 COMPARE_MANTISSA_UP_TO_BIT = 0x02;
-	return (std::abs((S32) ((U32&)x - (U32&)y) ) < COMPARE_MANTISSA_UP_TO_BIT);
+	constexpr S32 COMPARE_MANTISSA_UP_TO_BIT = 0x02;
+	U32 x_tmp, y_tmp;
+	memcpy(&x_tmp, &x, sizeof(x_tmp));
+	memcpy(&y_tmp, &y, sizeof(x_tmp));
+	return (std::abs((S32) (x_tmp - y_tmp) ) < COMPARE_MANTISSA_UP_TO_BIT);
 }
 
 inline bool is_approx_equal(F64 x, F64 y)
 {
-	const S64 COMPARE_MANTISSA_UP_TO_BIT = 0x02;
-	return (std::abs((S32) ((U64&)x - (U64&)y) ) < COMPARE_MANTISSA_UP_TO_BIT);
+	constexpr S64 COMPARE_MANTISSA_UP_TO_BIT = 0x02;
+	U64 x_tmp, y_tmp;
+	memcpy(&x_tmp, &x, sizeof(x_tmp));
+	memcpy(&y_tmp, &y, sizeof(x_tmp));
+	return (std::abs((S32) (x_tmp - y_tmp) ) < COMPARE_MANTISSA_UP_TO_BIT);
 }
 
 inline S32 llabs(const S32 a)
@@ -445,7 +456,7 @@ inline U32 get_lower_power_two(U32 val, U32 max_power_two)
 {
 	if(!max_power_two)
 	{
-		max_power_two = 1 << 31 ;
+		max_power_two = 1U << 31U;
 	}
 	if(max_power_two & (max_power_two - 1))
 	{
@@ -467,7 +478,7 @@ inline U32 get_next_power_two(U32 val, U32 max_power_two)
 {
 	if(!max_power_two)
 	{
-		max_power_two = 1 << 31 ;
+		max_power_two = 1U << 31U;
 	}
 
 	if(val >= max_power_two)
@@ -476,11 +487,11 @@ inline U32 get_next_power_two(U32 val, U32 max_power_two)
 	}
 
 	val--;
-	val = (val >> 1) | val;
-	val = (val >> 2) | val;
-	val = (val >> 4) | val;
-	val = (val >> 8) | val;
-	val = (val >> 16) | val;
+	val = (val >> 1U) | val;
+	val = (val >> 2U) | val;
+	val = (val >> 4U) | val;
+	val = (val >> 8U) | val;
+	val = (val >> 16U) | val;
 	val++;
 
 	return val;

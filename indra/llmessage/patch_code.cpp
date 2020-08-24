@@ -256,7 +256,7 @@ void	decode_patch_header(LLBitPack &bitpack, LLPatchHeader *ph)
 #else
 	bitpack.bitUnpack((U8 *)&retvalu32, 32);
 #endif
-	ph->dc_offset = *(F32 *)&retvalu32;
+	memcpy(&ph->dc_offset, &retvalu32, sizeof(ph->dc_offset));
 
 	U16 retvalu16 = 0;
 #ifdef LL_BIG_ENDIAN
