@@ -54,7 +54,7 @@ public:
  */
 	LL_FORCE_INLINE __m128i load_unaligned_si128(const U8* p) const
 	{
-#if defined(AL_AVX)
+#if defined(AL_AVX) || defined(__SSE3__)
 		return _mm_lddqu_si128(reinterpret_cast<const __m128i*>(p));
 #else
 		return _mm_loadu_si128(reinterpret_cast<const __m128i*>(p));
@@ -67,7 +67,7 @@ public:
 		__m128i mm_right = load_unaligned_si128(rhs.mID);
 
 		__m128i mm_cmp = _mm_cmpeq_epi32(mm_left, mm_right);
-#if defined(AL_AVX)
+#if defined(AL_AVX) || defined(__SSE4_1__)
 		return _mm_test_all_ones(mm_cmp);
 #else
 		return _mm_movemask_epi8(mm_cmp) == 0xFFFF;
@@ -131,7 +131,7 @@ public:
 	bool isNull() const
 	{
 		__m128i mm = load_unaligned_si128(mID);
-#if defined(AL_AVX)
+#if defined(AL_AVX) || defined(__SSE4_1__)
 		return _mm_test_all_zeros(mm, mm) != 0;
 #else
 		mm = _mm_cmpeq_epi8(mm, _mm_setzero_si128());
