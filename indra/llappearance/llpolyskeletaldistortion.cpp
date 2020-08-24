@@ -126,13 +126,6 @@ LLPolySkeletalDistortion::LLPolySkeletalDistortion(const LLPolySkeletalDistortio
 {
 }
 
-//-----------------------------------------------------------------------------
-// ~LLPolySkeletalDistortion()
-//-----------------------------------------------------------------------------
-LLPolySkeletalDistortion::~LLPolySkeletalDistortion()
-{
-}
-
 BOOL LLPolySkeletalDistortion::setInfo(LLPolySkeletalDistortionInfo *info)
 {
     if (info->mID < 0)

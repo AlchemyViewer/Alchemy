@@ -41,7 +41,7 @@ class LLViewerVisualParamInfo : public LLVisualParamInfo
 	friend class LLViewerVisualParam;
 public:
 	LLViewerVisualParamInfo();
-	/*virtual*/ ~LLViewerVisualParamInfo();
+	/*virtual*/ ~LLViewerVisualParamInfo() = default;
 	
 	/*virtual*/ BOOL parseXml(LLXmlTreeNode* node);
 
@@ -70,7 +70,7 @@ class LLViewerVisualParam : public LLVisualParam
 {
 public:
 	LLViewerVisualParam();
-	virtual ~LLViewerVisualParam();
+	virtual ~LLViewerVisualParam() = default;
 
 	// Special: These functions are overridden by child classes
 	LLViewerVisualParamInfo 	*getInfo() const { return (LLViewerVisualParamInfo*)mInfo; };

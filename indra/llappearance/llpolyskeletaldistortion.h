@@ -69,7 +69,7 @@ class LLPolySkeletalDistortionInfo : public LLViewerVisualParamInfo
 public:
 	
 	LLPolySkeletalDistortionInfo();
-	/*virtual*/ ~LLPolySkeletalDistortionInfo() {};
+	/*virtual*/ ~LLPolySkeletalDistortionInfo() = default;
 	
 	/*virtual*/ BOOL parseXml(LLXmlTreeNode* node);
 
@@ -109,7 +109,7 @@ public:
 	}
 
 	LLPolySkeletalDistortion(LLAvatarAppearance *avatarp);
-	~LLPolySkeletalDistortion();
+	~LLPolySkeletalDistortion() = default;
 
 	// Special: These functions are overridden by child classes
 	LLPolySkeletalDistortionInfo*	getInfo() const { return (LLPolySkeletalDistortionInfo*)mInfo; }

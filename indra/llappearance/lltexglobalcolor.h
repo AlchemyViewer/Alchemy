@@ -38,7 +38,9 @@ class LLTexGlobalColor
 {
 public:
 	LLTexGlobalColor( LLAvatarAppearance* appearance );
-	~LLTexGlobalColor();
+
+    // mParamColorList are LLViewerVisualParam's and get deleted with ~LLCharacter()
+	~LLTexGlobalColor() = default;
 
 	LLTexGlobalColorInfo*	getInfo() const { return mInfo; }
 	//   This sets mInfo and calls initialization functions
@@ -73,7 +75,7 @@ class LLTexParamGlobalColor : public LLTexLayerParamColor
 {
 public:
 	LLTexParamGlobalColor(LLTexGlobalColor *tex_color);
-	virtual ~LLTexParamGlobalColor();
+	virtual ~LLTexParamGlobalColor() = default;
 	/*virtual*/ LLViewerVisualParam* cloneParam(LLWearable* wearable) const;
 protected:
 	LLTexParamGlobalColor(const LLTexParamGlobalColor& pOther);

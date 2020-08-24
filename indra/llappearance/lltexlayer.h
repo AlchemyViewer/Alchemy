@@ -63,7 +63,7 @@ public:
 
 	LLTexLayerInterface(LLTexLayerSet* const layer_set);
 	LLTexLayerInterface(const LLTexLayerInterface &layer, LLWearable *wearable);
-	virtual ~LLTexLayerInterface() {}
+	virtual ~LLTexLayerInterface() = default;
 
 	virtual BOOL			render(S32 x, S32 y, S32 width, S32 height, LLRenderTarget* bound_target) = 0;
 	virtual void			deleteCaches() = 0;
@@ -120,7 +120,7 @@ class LLTexLayerTemplate : public LLTexLayerInterface
 public:
 	LLTexLayerTemplate(LLTexLayerSet* const layer_set, LLAvatarAppearance* const appearance);
 	LLTexLayerTemplate(const LLTexLayerTemplate &layer);
-	/*virtual*/ ~LLTexLayerTemplate();
+	/*virtual*/ ~LLTexLayerTemplate() = default;
 	/*virtual*/ BOOL		render(S32 x, S32 y, S32 width, S32 height, LLRenderTarget* bound_target);
 	/*virtual*/ BOOL		setInfo(const LLTexLayerInfo *info, LLWearable* wearable); // This sets mInfo and calls initialization functions
 	/*virtual*/ BOOL		blendAlphaTexture(S32 x, S32 y, S32 width, S32 height); // Multiplies a single alpha texture against the frame buffer
@@ -270,7 +270,7 @@ class LLTexLayerSetBuffer : public virtual LLRefCount
 
 public:
 	LLTexLayerSetBuffer(LLTexLayerSet* const owner);
-	virtual ~LLTexLayerSetBuffer();
+	virtual ~LLTexLayerSetBuffer() = default;
 
 protected:
 	void					pushProjection() const;

@@ -99,10 +99,6 @@ LLTexLayerSetBuffer::LLTexLayerSetBuffer(LLTexLayerSet* const owner) :
 {
 }
 
-LLTexLayerSetBuffer::~LLTexLayerSetBuffer()
-{
-}
-
 void LLTexLayerSetBuffer::pushProjection() const
 {
 	gGL.matrixMode(LLRender::MM_PROJECTION);
@@ -1724,10 +1720,6 @@ LLTexLayerTemplate::LLTexLayerTemplate(LLTexLayerSet* layer_set, LLAvatarAppeara
 LLTexLayerTemplate::LLTexLayerTemplate(const LLTexLayerTemplate &layer) :
 	LLTexLayerInterface(layer),
 	mAvatarAppearance(layer.getAvatarAppearance())
-{
-}
-
-LLTexLayerTemplate::~LLTexLayerTemplate()
 {
 }
 

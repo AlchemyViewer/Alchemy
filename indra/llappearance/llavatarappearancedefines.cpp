@@ -175,11 +175,6 @@ LLAvatarAppearanceDictionary::LLAvatarAppearanceDictionary()
 	createAssociations();
 }
 
-//virtual 
-LLAvatarAppearanceDictionary::~LLAvatarAppearanceDictionary()
-{
-}
-
 // Baked textures are composites of textures; for each such composited texture,
 // map it to the baked texture.
 void LLAvatarAppearanceDictionary::createAssociations()

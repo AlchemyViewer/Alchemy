@@ -127,7 +127,7 @@ class LLTexLayerParamAlphaInfo : public LLViewerVisualParamInfo
 	friend class LLTexLayerParamAlpha;
 public:
 	LLTexLayerParamAlphaInfo();
-	/*virtual*/ ~LLTexLayerParamAlphaInfo() {};
+	/*virtual*/ ~LLTexLayerParamAlphaInfo() = default;
 
 	/*virtual*/ BOOL parseXml(LLXmlTreeNode* node);
 
@@ -171,7 +171,7 @@ public:
 		ll_aligned_free_16(ptr);
 	}
 
-	/* virtual */ ~LLTexLayerParamColor();
+	/* virtual */ ~LLTexLayerParamColor() = default;
 
 	/*virtual*/ LLViewerVisualParam* cloneParam(LLWearable* wearable = NULL) const;
 
@@ -207,7 +207,7 @@ class LLTexLayerParamColorInfo : public LLViewerVisualParamInfo
 
 public:
 	LLTexLayerParamColorInfo();
-	virtual ~LLTexLayerParamColorInfo() {};
+	virtual ~LLTexLayerParamColorInfo() = default;
 	BOOL parseXml( LLXmlTreeNode* node );
 	LLTexLayerParamColor::EColorOperation getOperation() const { return mOperation; }
 private:

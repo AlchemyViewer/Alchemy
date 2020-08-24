@@ -63,7 +63,7 @@ class LLDriverParamInfo final : public LLViewerVisualParamInfo
 	friend class LLDriverParam;
 public:
 	LLDriverParamInfo();
-	/*virtual*/ ~LLDriverParamInfo() {};
+	/*virtual*/ ~LLDriverParamInfo() = default;
 	
 	/*virtual*/ BOOL parseXml(LLXmlTreeNode* node);
 
@@ -85,7 +85,7 @@ private:
 	LLDriverParam() {}
 public:
 	LLDriverParam(LLAvatarAppearance *appearance, LLWearable* wearable = NULL);
-	~LLDriverParam();
+	~LLDriverParam() = default;
 
 	void* operator new(size_t size)
 	{

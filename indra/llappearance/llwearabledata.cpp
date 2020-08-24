@@ -38,11 +38,6 @@ LLWearableData::LLWearableData() :
 {
 }
 
-// virtual
-LLWearableData::~LLWearableData()
-{
-}
-
 using namespace LLAvatarAppearanceDefines;
 
 LLWearable* LLWearableData::getWearable(const LLWearableType::EType type, U32 index)

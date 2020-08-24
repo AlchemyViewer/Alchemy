@@ -43,7 +43,7 @@ class LLWearableData
 	//--------------------------------------------------------------------
 public:
 	LLWearableData();
-	virtual ~LLWearableData();
+	virtual ~LLWearableData() = default;
 
 	void setAvatarAppearance(LLAvatarAppearance* appearance) { mAvatarAppearance = appearance; }
 

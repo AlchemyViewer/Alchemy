@@ -185,10 +185,6 @@ LLDriverParam::LLDriverParam(const LLDriverParam& pOther)
 	llassert((mWearablep == NULL) || mAvatarAppearance->isSelf());
 }
 
-LLDriverParam::~LLDriverParam()
-{
-}
-
 BOOL LLDriverParam::setInfo(LLDriverParamInfo *info)
 {
 	llassert(mInfo == NULL);
