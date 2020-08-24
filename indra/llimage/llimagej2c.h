@@ -41,7 +41,7 @@ class LLImageCompressionTester ;
 class LLImageJ2C final : public LLImageFormatted
 {
 protected:
-	virtual ~LLImageJ2C();
+	virtual ~LLImageJ2C() = default;
 
 public:
 	LLImageJ2C();
@@ -106,7 +106,7 @@ protected:
 class LLImageJ2CImpl
 {
 public:
-	virtual ~LLImageJ2CImpl();
+	virtual ~LLImageJ2CImpl() = default;
 protected:
 	// Find out the image size and number of channels.
 	// Return value:

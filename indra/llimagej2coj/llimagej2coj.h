@@ -33,7 +33,7 @@ class LLImageJ2COJ final : public LLImageJ2CImpl
 {	
 public:
 	LLImageJ2COJ();
-	virtual ~LLImageJ2COJ();
+	virtual ~LLImageJ2COJ() = default;
 protected:
 	virtual bool getMetadata(LLImageJ2C &base);
 	virtual bool decodeImpl(LLImageJ2C &base, LLImageRaw &raw_image, F32 decode_time, S32 first_channel, S32 max_channel_count);

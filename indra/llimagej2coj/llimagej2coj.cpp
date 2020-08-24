@@ -100,10 +100,6 @@ LLImageJ2COJ::LLImageJ2COJ()
 }
 
 
-LLImageJ2COJ::~LLImageJ2COJ()
-{
-}
-
 bool LLImageJ2COJ::initDecode(LLImageJ2C &base, LLImageRaw &raw_image, int discard_level, int* region)
 {
 	// No specific implementation for this method in the OpenJpeg case

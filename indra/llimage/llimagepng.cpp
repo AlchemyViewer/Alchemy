@@ -40,10 +40,6 @@ LLImagePNG::LLImagePNG()
 {
 }
 
-LLImagePNG::~LLImagePNG()
-{
-}
-
 // Virtual
 // Parse PNG image information and set the appropriate
 // width, height and component (channel) information.

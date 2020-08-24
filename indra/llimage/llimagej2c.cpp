@@ -81,9 +81,6 @@ LLImageJ2C::LLImageJ2C() : 	LLImageFormatted(IMG_CODEC_J2C),
 }
 
 // virtual
-LLImageJ2C::~LLImageJ2C() {}
-
-// virtual
 void LLImageJ2C::resetLastError()
 {
 	mLastError.clear();
@@ -440,10 +437,6 @@ void LLImageJ2C::decodeFailed()
 void LLImageJ2C::updateRawDiscardLevel()
 {
 	mRawDiscardLevel = mMaxBytes ? calcDiscardLevelBytes(mMaxBytes) : mDiscardLevel;
-}
-
-LLImageJ2CImpl::~LLImageJ2CImpl()
-{
 }
 
 //----------------------------------------------------------------------------------------------

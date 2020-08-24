@@ -32,7 +32,7 @@
 class LLImagePNG final : public LLImageFormatted
 {
 protected:
-	~LLImagePNG();
+	~LLImagePNG() = default;
 
 public:
 	LLImagePNG();

@@ -90,7 +90,7 @@ public:
 	};
 
 protected:
-	/*virtual*/ ~LLImageDXT();
+	/*virtual*/ ~LLImageDXT() = default;
 
 private:
 	bool encodeDXT(const LLImageRaw* raw_image, F32 decode_time, bool explicit_mips);

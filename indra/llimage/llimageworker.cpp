@@ -92,10 +92,6 @@ S32 LLImageDecodeThread::tut_size()
 	return res;
 }
 
-LLImageDecodeThread::Responder::~Responder()
-{
-}
-
 //----------------------------------------------------------------------------
 
 LLImageDecodeThread::ImageRequest::ImageRequest(handle_t handle, LLImageFormatted* image, 

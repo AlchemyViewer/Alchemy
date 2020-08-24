@@ -37,7 +37,7 @@ public:
 	class Responder : public LLThreadSafeRefCount
 	{
 	protected:
-		virtual ~Responder();
+		virtual ~Responder() = default;
 	public:
 		virtual void completed(bool success, LLImageRaw* raw, LLImageRaw* aux) = 0;
 	};

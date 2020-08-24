@@ -167,10 +167,6 @@ LLImageDXT::LLImageDXT()
 {
 }
 
-LLImageDXT::~LLImageDXT()
-{
-}
-
 // virtual
 bool LLImageDXT::updateData()
 {
