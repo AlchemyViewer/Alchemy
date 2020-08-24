@@ -101,7 +101,7 @@ BOOL LLFontGL::loadFace(const std::string& filename, F32 point_size, F32 vert_dp
 
 S32 LLFontGL::getNumFaces(const std::string& filename)
 {
-	if (mFontFreetype == reinterpret_cast<LLFontFreetype*>(NULL))
+	if (!mFontFreetype)
 	{
 		mFontFreetype = new LLFontFreetype;
 	}

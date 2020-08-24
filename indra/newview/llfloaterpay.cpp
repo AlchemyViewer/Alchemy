@@ -463,7 +463,7 @@ void LLFloaterPay::finishPayUI(const LLUUID& target_id, BOOL is_group)
 // static
 void LLFloaterPay::onCancel(void* data)
 {
-	LLFloaterPay* self = reinterpret_cast<LLFloaterPay*>(data);
+	LLFloaterPay* self = static_cast<LLFloaterPay*>(data);
 	if(self)
 	{
 		self->closeFloater();
@@ -473,7 +473,7 @@ void LLFloaterPay::onCancel(void* data)
 // static
 void LLFloaterPay::onKeystroke(LLLineEditor*, void* data)
 {
-	LLFloaterPay* self = reinterpret_cast<LLFloaterPay*>(data);
+	LLFloaterPay* self = static_cast<LLFloaterPay*>(data);
 	if(self)
 	{
 		// enable the Pay button when amount is non-empty and positive, disable otherwise

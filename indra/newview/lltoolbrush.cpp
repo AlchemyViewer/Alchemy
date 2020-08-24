@@ -618,7 +618,7 @@ void LLToolBrushLand::determineAffectedRegions(region_list_t& regions,
 // static
 void LLToolBrushLand::onIdle( void* brush_tool )
 {
-	LLToolBrushLand* self = reinterpret_cast<LLToolBrushLand*>(brush_tool);
+	LLToolBrushLand* self = static_cast<LLToolBrushLand*>(brush_tool);
 
 	if( LLToolMgr::getInstance()->getCurrentTool() == self )
 	{

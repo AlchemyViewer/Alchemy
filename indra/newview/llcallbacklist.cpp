@@ -128,7 +128,7 @@ public:
 	static void onIdle(void *data)
 	{
 		gIdleCallbacks.deleteFunction(onIdle, data);
-		OnIdleCallbackOneTime* self = reinterpret_cast<OnIdleCallbackOneTime*>(data);
+		OnIdleCallbackOneTime* self = static_cast<OnIdleCallbackOneTime*>(data);
 		self->call();
 		delete self;
 	}
@@ -159,7 +159,7 @@ public:
 	// Will keep getting called until the callable returns true.
 	static void onIdle(void *data)
 	{
-		OnIdleCallbackRepeating* self = reinterpret_cast<OnIdleCallbackRepeating*>(data);
+		OnIdleCallbackRepeating* self = static_cast<OnIdleCallbackRepeating*>(data);
 		bool done = self->call();
 		if (done)
 		{

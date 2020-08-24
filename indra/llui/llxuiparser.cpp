@@ -962,7 +962,7 @@ bool LLXUIParser::writeStringValue(Parser& parser, const void* val_ptr, name_sta
 	LLXMLNodePtr node = self.getNode(stack);
 	if (node.notNull())
 	{
-		const std::string* string_val = reinterpret_cast<const std::string*>(val_ptr);
+		const std::string* string_val = static_cast<const std::string*>(val_ptr);
 		if (string_val->find('\n') != std::string::npos 
 			|| string_val->size() > MAX_STRING_ATTRIBUTE_SIZE)
 		{
