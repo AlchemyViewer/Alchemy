@@ -80,12 +80,7 @@ LLVolumeOctreeListener::LLVolumeOctreeListener(LLOctreeNode<LLVolumeTriangle>* n
 	node->addListener(this);
 }
 
-LLVolumeOctreeListener::~LLVolumeOctreeListener()
-{
-
-}
-	
-void LLVolumeOctreeListener::handleChildAddition(const LLOctreeNode<LLVolumeTriangle>* parent, 
+void LLVolumeOctreeListener::handleChildAddition(const LLOctreeNode<LLVolumeTriangle>* parent,
 	LLOctreeNode<LLVolumeTriangle>* child)
 {
 	new LLVolumeOctreeListener(child);

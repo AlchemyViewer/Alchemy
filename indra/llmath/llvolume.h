@@ -726,7 +726,7 @@ public:
 	friend std::ostream& operator<<(std::ostream &s, const LLProfile &profile);
 
 protected:
-	~LLProfile();
+	~LLProfile() = default;
 
 	static S32 getNumNGonPoints(const LLProfileParams& params, S32 sides, F32 offset=0.0f, F32 bevel = 0.0f, F32 ang_scale = 1.f, S32 split = 0);
 	void genNGon(const LLProfileParams& params, S32 sides, F32 offset=0.0f, F32 bevel = 0.0f, F32 ang_scale = 1.f, S32 split = 0);
@@ -785,7 +785,7 @@ public:
 	{
 	}
 
-	virtual ~LLPath();
+	virtual ~LLPath() = default;
 
 	static S32 getNumPoints(const LLPathParams& params, F32 detail);
 	static S32 getNumNGonPoints(const LLPathParams& params, S32 sides, F32 offset=0.0f, F32 end_scale = 1.f, F32 twist_scale = 1.f);

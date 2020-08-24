@@ -85,7 +85,7 @@ template <class T>
 class LLTreeTraveler
 {
 public:
-	virtual ~LLTreeTraveler() { }; 
+	virtual ~LLTreeTraveler() = default;
 	virtual void traverse(const LLTreeNode<T>* node) = 0;
 	virtual void visit(const LLTreeNode<T>* node) = 0;
 };

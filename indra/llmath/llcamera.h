@@ -150,7 +150,7 @@ public:
 public:
 	LLCamera();
 	LLCamera(F32 vertical_fov_rads, F32 aspect_ratio, S32 view_height_in_pixels, F32 near_plane, F32 far_plane);
-	virtual ~LLCamera();
+	virtual ~LLCamera() = default;
 	
 	bool isChanged(); //check if mAgentPlanes changed since last frame.
 

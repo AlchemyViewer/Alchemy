@@ -70,11 +70,6 @@ LLCamera::LLCamera(F32 vertical_fov_rads, F32 aspect_ratio, S32 view_height_in_p
 	setView(vertical_fov_rads);
 } 
 
-LLCamera::~LLCamera()
-{
-
-}
-
 // ---------------- LLCamera::getFoo() member functions ----------------
 
 F32 LLCamera::getMinView() const 

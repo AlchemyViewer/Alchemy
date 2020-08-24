@@ -90,7 +90,7 @@ public:
 	}
 
 	LLVolumeOctreeListener(LLOctreeNode<LLVolumeTriangle>* node);
-	~LLVolumeOctreeListener();
+	~LLVolumeOctreeListener() = default;
 	
 	LLVolumeOctreeListener(const LLVolumeOctreeListener& rhs) = delete;
     LLVolumeOctreeListener& operator=(const LLVolumeOctreeListener& rhs) = delete;
