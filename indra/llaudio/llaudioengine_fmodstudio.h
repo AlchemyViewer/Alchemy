@@ -54,7 +54,7 @@ public:
 		RESAMPLE_SPLINE
 	};
 	LLAudioEngine_FMODSTUDIO(bool enable_profiler, U32 resample_method);
-	virtual ~LLAudioEngine_FMODSTUDIO();
+	virtual ~LLAudioEngine_FMODSTUDIO() = default;
 
 	// initialization/startup/shutdown
 	bool init(const S32 num_channels, void *user_data, const std::string& app_title) final override;

@@ -61,10 +61,6 @@ LLAudioEngine_FMODSTUDIO::LLAudioEngine_FMODSTUDIO(bool enable_profiler, U32 res
 {
 }
 
-LLAudioEngine_FMODSTUDIO::~LLAudioEngine_FMODSTUDIO()
-{
-}
-
 inline bool Check_FMOD_Error(FMOD_RESULT result, const char *string)
 {
 	if(result == FMOD_OK)
