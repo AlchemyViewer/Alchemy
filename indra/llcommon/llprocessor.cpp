@@ -248,7 +248,7 @@ public:
 		mProcessorInfo["config"] = LLSD::emptyMap();
 		mProcessorInfo["extension"] = LLSD::emptyMap();		
 	}
-	virtual ~LLProcessorInfoImpl() {}
+	virtual ~LLProcessorInfoImpl() = default;
 
 	F64 getCPUFrequency() const 
 	{ 
@@ -620,7 +620,7 @@ public:
 		setInfo(eFrequency, (F64)frequency  / (F64)1000000);
 	}
 
-	virtual ~LLProcessorInfoDarwinImpl() {}
+	virtual ~LLProcessorInfoDarwinImpl() = default;
 
 private:
 	int getSysctlInt(const char* name)
@@ -747,7 +747,7 @@ public:
 		get_proc_cpuinfo();
 	}
 
-	virtual ~LLProcessorInfoLinuxImpl() {}
+	virtual ~LLProcessorInfoLinuxImpl() = default;
 private:
 
 	void get_proc_cpuinfo()
@@ -899,7 +899,6 @@ LLProcessorInfo::LLProcessorInfo() : mImpl(NULL)
 }
 
 
-LLProcessorInfo::~LLProcessorInfo() {}
 F64MegahertzImplicit LLProcessorInfo::getCPUFrequency() const { return mImpl->getCPUFrequency(); }
 bool LLProcessorInfo::hasSSE() const { return mImpl->hasSSE(); }
 bool LLProcessorInfo::hasSSE2() const { return mImpl->hasSSE2(); }

@@ -90,7 +90,7 @@ class LL_COMMON_API LLEventDispatcher
 {
 public:
     LLEventDispatcher(const std::string& desc, const std::string& key);
-    virtual ~LLEventDispatcher();
+    virtual ~LLEventDispatcher() = default;
 
     /// @name Register functions accepting(const LLSD&)
     //@{
@@ -286,7 +286,7 @@ private:
     struct DispatchEntry
     {
         DispatchEntry(const std::string& desc);
-        virtual ~DispatchEntry() {} // suppress MSVC warning, sigh
+        virtual ~DispatchEntry()  = default; // suppress MSVC warning, sigh
 
         std::string mDesc;
 

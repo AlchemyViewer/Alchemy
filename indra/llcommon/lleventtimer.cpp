@@ -50,10 +50,6 @@ LLEventTimer::LLEventTimer(const LLDate& time)
 }
 
 
-LLEventTimer::~LLEventTimer()
-{
-}
-
 //static
 void LLEventTimer::updateClass() 
 {

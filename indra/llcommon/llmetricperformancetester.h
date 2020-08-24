@@ -41,7 +41,7 @@ public:
 	 * @param[in] name - Unique string identifying this tester instance.
 	 */
 	LLMetricPerformanceTesterBasic(std::string name);
-	virtual ~LLMetricPerformanceTesterBasic();
+	virtual ~LLMetricPerformanceTesterBasic() = default;
 
 	/**
 	 * @return Returns true if the instance has been added to the tester map.
@@ -191,7 +191,7 @@ protected:
 	class LL_COMMON_API LLTestSession
 		{
 		public:
-			virtual ~LLTestSession() ;
+			virtual ~LLTestSession() = default;
 		};
 
 	/**

@@ -52,11 +52,6 @@ LLSDXMLFormatter::LLSDXMLFormatter(bool boolAlpha, const std::string& realFormat
 }
 
 // virtual
-LLSDXMLFormatter::~LLSDXMLFormatter()
-{
-}
-
-// virtual
 S32 LLSDXMLFormatter::format(const LLSD& data, std::ostream& ostr,
 							 EFormatterOptions options) const
 {

@@ -40,9 +40,7 @@ public:
 	{
 	}
 
-	~LLNameTable() 
-	{ 
-	}
+	~LLNameTable()  = default;
 
 	void addEntry(const std::string& name, DATA data)
 	{

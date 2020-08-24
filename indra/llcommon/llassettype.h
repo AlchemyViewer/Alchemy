@@ -164,9 +164,8 @@ public:
 
     static const std::string    BADLOOKUP;
 
-protected:
-	LLAssetType() {}
-	~LLAssetType() {}
+	LLAssetType() = delete;
+	~LLAssetType() = delete;
 };
 
 #endif // LL_LLASSETTYPE_H

@@ -48,7 +48,7 @@ public:
 	LLHeartbeat(F32 secs_between_heartbeat = 5.0f,
 		    F32 aggressive_heartbeat_panic_secs = 10.0f,
 		    F32 aggressive_heartbeat_max_blocking_secs = 4.0f);
-	~LLHeartbeat();
+	~LLHeartbeat() = default;
 
 	bool send(F32 timeout_sec = 0.0f);
 	void setSuppressed(bool is_suppressed);

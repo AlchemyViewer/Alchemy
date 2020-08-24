@@ -928,10 +928,6 @@ namespace LLError
 	{
 	}
 
-	Recorder::~Recorder()
-	{
-	}
-
 	bool Recorder::wantsTime()
 	{ 
 		return mWantsTime; 

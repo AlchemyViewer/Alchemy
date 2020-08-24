@@ -182,11 +182,7 @@ LLMetricPerformanceTesterBasic::LLMetricPerformanceTesterBasic(std::string name)
 	mValidInstance = LLMetricPerformanceTesterBasic::addTester(this) ;
 }
 
-LLMetricPerformanceTesterBasic::~LLMetricPerformanceTesterBasic() 
-{
-}
-
-void LLMetricPerformanceTesterBasic::preOutputTestResults(LLSD* sd) 
+void LLMetricPerformanceTesterBasic::preOutputTestResults(LLSD* sd)
 {
 	incrementCurrentCount() ;
 	(*sd)[getCurrentLabelName()]["Name"] = mName ;
@@ -322,14 +318,5 @@ void LLMetricPerformanceTesterWithSession::analyzePerformance(llofstream* os, LL
 		delete mCurrentSessionp ;
 		mCurrentSessionp = NULL ;
 	}
-}
-
-
-//----------------------------------------------------------------------------------------------
-// LLTestSession
-//----------------------------------------------------------------------------------------------
-
-LLMetricPerformanceTesterWithSession::LLTestSession::~LLTestSession() 
-{
 }
 

@@ -44,7 +44,7 @@ protected:
 	/** 
 	 * @brief Destructor
 	 */
-	virtual ~LLSDParser();
+	virtual ~LLSDParser() = default;
 
 public:
 	/** 
@@ -223,13 +223,13 @@ protected:
 	/** 
 	 * @brief Destructor
 	 */
-	virtual ~LLSDNotationParser();
+	virtual ~LLSDNotationParser() = default;
 
 public:
 	/** 
 	 * @brief Constructor
 	 */
-	LLSDNotationParser();
+	LLSDNotationParser() = default;
 
 protected:
 	/** 
@@ -350,13 +350,13 @@ protected:
 	/** 
 	 * @brief Destructor
 	 */
-	virtual ~LLSDBinaryParser();
+	virtual ~LLSDBinaryParser() = default;
 
 public:
 	/** 
 	 * @brief Constructor
 	 */
-	LLSDBinaryParser();
+	LLSDBinaryParser() = default;
 
 protected:
 	/** 
@@ -419,7 +419,7 @@ protected:
 	/** 
 	 * @brief Destructor
 	 */
-	virtual ~LLSDFormatter();
+	virtual ~LLSDFormatter() = default;
 
 public:
 	/**
@@ -515,7 +515,7 @@ protected:
 	/** 
 	 * @brief Destructor
 	 */
-	virtual ~LLSDNotationFormatter();
+	virtual ~LLSDNotationFormatter() = default;
 
 public:
 	/** 
@@ -559,7 +559,7 @@ protected:
 	/** 
 	 * @brief Destructor
 	 */
-	virtual ~LLSDXMLFormatter();
+	virtual ~LLSDXMLFormatter() = default;
 
 public:
 	/** 
@@ -631,7 +631,7 @@ protected:
 	/** 
 	 * @brief Destructor
 	 */
-	virtual ~LLSDBinaryFormatter();
+	virtual ~LLSDBinaryFormatter() = default;
 
 public:
 	/** 

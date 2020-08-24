@@ -49,8 +49,8 @@ class LLSD;
 class LLLineBuffer
 {
 public:
-	LLLineBuffer() {};
-	virtual ~LLLineBuffer() {};
+	LLLineBuffer() = default;
+	virtual ~LLLineBuffer() = default;
 
 	virtual void clear() = 0; // Clear the buffer, and reset it.
 
@@ -142,7 +142,7 @@ namespace LLError
 		// An object that handles the actual output or error messages.
 	public:
 		Recorder();
-		virtual ~Recorder();
+		virtual ~Recorder() = default;
 
 		virtual void recordMessage(LLError::ELevel, const std::string& message) = 0;
 			// use the level for better display, not for filtering

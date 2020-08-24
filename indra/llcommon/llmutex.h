@@ -46,7 +46,7 @@ class LL_COMMON_API LLMutex
 {
 public:
 	LLMutex();
-	virtual ~LLMutex();
+	virtual ~LLMutex() = default;
 	
 	void lock();		// blocks
 	bool trylock();		// non-blocking, returns true if lock held.
@@ -70,7 +70,7 @@ class LL_COMMON_API LLCondition : public LLMutex
 {
 public:
 	LLCondition();
-	~LLCondition();
+	~LLCondition() = default;
 	
 	void wait();		// blocks
 	void signal();

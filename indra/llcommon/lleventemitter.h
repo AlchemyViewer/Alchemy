@@ -51,9 +51,9 @@ class eventEmitter
 		ObserverContainer observers;
 
 	public:
-		eventEmitter () { };
+		eventEmitter() = default;
 
-		~eventEmitter () { };
+		~eventEmitter() = default;
 
 		///////////////////////////////////////////////////////////////////////////////
 		//

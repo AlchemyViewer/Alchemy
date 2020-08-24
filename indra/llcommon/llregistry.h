@@ -123,8 +123,8 @@ public:
 
 	protected:
 		// use currentRegistrar() or defaultRegistrar()
-		Registrar() {}
-		~Registrar() {}
+		Registrar() = default;
+		~Registrar() = default;
 
 	private:
 		registry_map_t											mMap;
@@ -134,10 +134,8 @@ public:
 	typedef typename std::list<Registrar*>::iterator scope_list_iterator_t;
 	typedef typename std::list<Registrar*>::const_iterator scope_list_const_iterator_t;
 	
-	LLRegistry() 
-	{}
-
-	~LLRegistry() {}
+	LLRegistry() = default;
+	~LLRegistry() = default;
 
 	ptr_value_t getValue(ref_const_key_t key)
 	{
@@ -305,7 +303,7 @@ public:
 	class StaticRegistrar : public registry_t::Registrar
 	{
 	public:
-		virtual ~StaticRegistrar() {}
+		virtual ~StaticRegistrar() = default;
 		StaticRegistrar(ref_const_key_t key, ref_const_value_t value)
 		{
 			if (singleton_t::instance().exists(key))

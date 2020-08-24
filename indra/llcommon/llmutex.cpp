@@ -37,11 +37,6 @@ LLMutex::LLMutex() :
 }
 
 
-LLMutex::~LLMutex()
-{
-}
-
-
 void LLMutex::lock()
 {
 	if(isSelfLocked())
@@ -135,11 +130,6 @@ bool LLMutex::trylock()
 
 LLCondition::LLCondition() :
 	LLMutex()
-{
-}
-
-
-LLCondition::~LLCondition()
 {
 }
 

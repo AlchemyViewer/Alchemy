@@ -601,7 +601,7 @@ class LL_COMMON_API LLEventStream: public LLEventPump
 {
 public:
     LLEventStream(const std::string& name, bool tweak=false): LLEventPump(name, tweak) {}
-    virtual ~LLEventStream() {}
+    virtual ~LLEventStream() = default;
 
     /// Post an event to all listeners
     virtual bool post(const LLSD& event);
@@ -632,7 +632,7 @@ class LL_COMMON_API LLEventMailDrop : public LLEventStream
 {
 public:
     LLEventMailDrop(const std::string& name, bool tweak = false) : LLEventStream(name, tweak) {}
-    virtual ~LLEventMailDrop() {}
+    virtual ~LLEventMailDrop() = default;
     
     /// Post an event to all listeners
     virtual bool post(const LLSD& event) override;

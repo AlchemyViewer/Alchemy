@@ -41,10 +41,7 @@ LLLiveAppConfig::LLLiveAppConfig(
 { }
 
 
-LLLiveAppConfig::~LLLiveAppConfig()
-{ }
-
-// virtual 
+// virtual
 bool LLLiveAppConfig::loadFile()
 {
 	LL_INFOS() << "LLLiveAppConfig::loadFile(): reading from "

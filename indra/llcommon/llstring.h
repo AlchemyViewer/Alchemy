@@ -27,7 +27,14 @@
 #ifndef LL_LLSTRING_H
 #define LL_LLSTRING_H
 
+#if LL_GNUC
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-copy-dtor"
+#endif
 #include <boost/optional/optional.hpp>
+#if LL_GNUC
+#pragma GCC diagnostic pop
+#endif
 #include <string>
 #include <cstdio>
 //#include <locale>
@@ -913,7 +920,7 @@ struct InString
 		mIter(b),
 		mEnd(e)
 	{}
-	virtual ~InString() {}
+	virtual ~InString() = default;
 
 	bool done() const { return mIter == mEnd; }
 	/// Is the current character (*mIter) escaped? This implementation can

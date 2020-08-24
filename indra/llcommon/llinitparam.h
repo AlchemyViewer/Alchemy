@@ -598,7 +598,7 @@ namespace LLInitParam
 	{
 		struct UserData
 		{
-			virtual ~UserData() {}
+			virtual ~UserData() = default;
 		};
 
 		typedef bool(*merge_func_t)(Param&, const Param&, bool);
@@ -848,7 +848,7 @@ namespace LLInitParam
 			mParamProvided(false)
 		{}
 
-		virtual ~BaseBlock() {}
+		virtual ~BaseBlock() = default;
 		bool submitValue(Parser::name_stack_t& name_stack, Parser& p, bool silent=false);
 
 		param_handle_t getHandleFromParam(const Param* param) const;

@@ -396,10 +396,6 @@ LLEventDispatcher::LLEventDispatcher(const std::string& desc, const std::string&
 {
 }
 
-LLEventDispatcher::~LLEventDispatcher()
-{
-}
-
 /**
  * DispatchEntry subclass used for callables accepting(const LLSD&)
  */

@@ -43,10 +43,6 @@ LLEventAPI::LLEventAPI(const std::string& name, const std::string& desc, const s
 {
 }
 
-LLEventAPI::~LLEventAPI()
-{
-}
-
 LLEventAPI::Response::Response(const LLSD& seed, const LLSD& request, const LLSD::String& replyKey):
     mResp(seed),
     mReq(request),

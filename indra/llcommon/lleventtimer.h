@@ -39,7 +39,7 @@ public:
 
 	LLEventTimer(F32 period);	// period is the amount of time between each call to tick() in seconds
 	LLEventTimer(const LLDate& time);
-	virtual ~LLEventTimer();
+	virtual ~LLEventTimer() = default;
 
 	//function to be called at the supplied frequency
 	// Normally return FALSE; TRUE will delete the timer after the function returns.

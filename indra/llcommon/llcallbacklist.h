@@ -41,8 +41,8 @@ public:
 	//
 	typedef std::list< callback_pair_t >	callback_list_t; 
 	
-	LLCallbackList();
-	~LLCallbackList();
+	LLCallbackList() = default;
+	~LLCallbackList() = default;
 
 	void addFunction( callback_t func, void *data = NULL );			// register a callback, which will be called as func(data)
 	bool containsFunction( callback_t func, void *data = NULL );	// true if list already contains the function/data pair

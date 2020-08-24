@@ -325,10 +325,6 @@ LLSDParser::LLSDParser()
 {
 }
 
-// virtual
-LLSDParser::~LLSDParser()
-{ }
-
 S32 LLSDParser::parse(std::istream& istr, LLSD& data, S32 max_bytes, S32 max_depth)
 {
 	mCheckLimits = (LLSDSerialize::SIZE_UNLIMITED == max_bytes) ? false : true;
@@ -406,13 +402,6 @@ void LLSDParser::account(S32 bytes) const
 /**
  * LLSDNotationParser
  */
-LLSDNotationParser::LLSDNotationParser()
-{
-}	
-
-// virtual
-LLSDNotationParser::~LLSDNotationParser()
-{ }
 
 // virtual
 S32 LLSDNotationParser::doParse(std::istream& istr, LLSD& data, S32 max_depth) const
@@ -875,14 +864,6 @@ bool LLSDNotationParser::parseBinary(std::istream& istr, LLSD& data) const
 /**
  * LLSDBinaryParser
  */
-LLSDBinaryParser::LLSDBinaryParser()
-{
-}
-
-// virtual
-LLSDBinaryParser::~LLSDBinaryParser()
-{
-}
 
 // virtual
 S32 LLSDBinaryParser::doParse(std::istream& istr, LLSD& data, S32 max_depth) const
@@ -1242,10 +1223,6 @@ LLSDFormatter::LLSDFormatter(bool boolAlpha, const std::string& realFmt, EFormat
     realFormat(realFmt);
 }
 
-// virtual
-LLSDFormatter::~LLSDFormatter()
-{ }
-
 void LLSDFormatter::boolalpha(bool alpha)
 {
 	mBoolAlpha = alpha;
@@ -1281,10 +1258,6 @@ LLSDNotationFormatter::LLSDNotationFormatter(bool boolAlpha, const std::string& 
     LLSDFormatter(boolAlpha, realFormat, options)
 {
 }
-
-// virtual
-LLSDNotationFormatter::~LLSDNotationFormatter()
-{ }
 
 // static
 std::string LLSDNotationFormatter::escapeString(const std::string& in)
@@ -1466,10 +1439,6 @@ LLSDBinaryFormatter::LLSDBinaryFormatter(bool boolAlpha, const std::string& real
     LLSDFormatter(boolAlpha, realFormat, options)
 {
 }
-
-// virtual
-LLSDBinaryFormatter::~LLSDBinaryFormatter()
-{ }
 
 // virtual
 S32 LLSDBinaryFormatter::format_impl(const LLSD& data, std::ostream& ostr,

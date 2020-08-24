@@ -33,7 +33,7 @@ class LL_COMMON_API LLErrorThread : public LLThread
 {
 public:
 	LLErrorThread();
-	~LLErrorThread();
+	~LLErrorThread() = default;
 
 	/*virtual*/ void run(void);
 	void setUserData(void *user_data);

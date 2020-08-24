@@ -53,7 +53,7 @@ public:
 	class WorkRequest : public LLQueuedThread::QueuedRequest
 	{
 	protected:
-		virtual ~WorkRequest(); // use deleteRequest()
+		virtual ~WorkRequest() = default; // use deleteRequest()
 		
 	public:
 		WorkRequest(handle_t handle, U32 priority, LLWorkerClass* workerclass, S32 param);

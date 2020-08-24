@@ -146,8 +146,8 @@ protected:
 class LL_COMMON_API LLRunnable
 {
 public:
-	LLRunnable();
-	virtual ~LLRunnable();
+	LLRunnable() = default;
+	virtual ~LLRunnable() = default;
 
 	/** 
 	 * @brief Do the process.

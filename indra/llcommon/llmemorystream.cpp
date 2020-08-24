@@ -34,10 +34,6 @@ LLMemoryStreamBuf::LLMemoryStreamBuf(const U8* start, S32 length)
 	reset(start, length);
 }
 
-LLMemoryStreamBuf::~LLMemoryStreamBuf()
-{
-}
-
 void LLMemoryStreamBuf::reset(const U8* start, S32 length)
 {
 	setg((char*)start, (char*)start, (char*)start + length);
@@ -62,9 +58,4 @@ LLMemoryStream::LLMemoryStream(const U8* start, S32 length) :
 	mStreamBuf(start, length)
 {
 }
-
-LLMemoryStream::~LLMemoryStream()
-{
-}
-
 

@@ -41,9 +41,9 @@ public:
 	static void 				generateDescriptionFor(LLViewerAssetType::EType asset_type,
 													   std::string& description);
 	static EDragAndDropType   	lookupDragAndDropType(EType asset_type);
-protected:
-	LLViewerAssetType() {}
-	~LLViewerAssetType() {}
+
+	LLViewerAssetType() = delete;
+	~LLViewerAssetType() = delete;
 };
 
 #endif // LL_LLVIEWERASSETTYPE_H

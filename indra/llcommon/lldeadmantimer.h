@@ -100,8 +100,7 @@ public:
 	///					collected and will be zero if queried.
 	LLDeadmanTimer(F64 horizon, bool inc_cpu);
 
-	~LLDeadmanTimer() 
-		{}
+	~LLDeadmanTimer() = default;
 	
 private:
 	LLDeadmanTimer(const LLDeadmanTimer &);				// Not defined

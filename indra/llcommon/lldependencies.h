@@ -101,7 +101,7 @@ struct instance_from_range: public TYPE
 class LL_COMMON_API LLDependenciesBase
 {
 public:
-    virtual ~LLDependenciesBase() {}
+    virtual ~LLDependenciesBase() = default;
 
     /**
      * Exception thrown by sort() if there's a cycle

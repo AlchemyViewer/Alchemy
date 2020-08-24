@@ -50,7 +50,7 @@ class LL_COMMON_API LLMemoryStreamBuf : public std::streambuf
 {
 public:
 	LLMemoryStreamBuf(const U8* start, S32 length);
-	~LLMemoryStreamBuf();
+	~LLMemoryStreamBuf() = default;
 
 	void reset(const U8* start, S32 length);
 
@@ -72,7 +72,7 @@ class LL_COMMON_API LLMemoryStream : public std::istream
 {
 public:
 	LLMemoryStream(const U8* start, S32 length);
-	~LLMemoryStream();
+	~LLMemoryStream() = default;
 
 protected:
 	LLMemoryStreamBuf mStreamBuf;

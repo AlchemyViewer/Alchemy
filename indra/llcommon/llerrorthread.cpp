@@ -35,10 +35,6 @@ LLErrorThread::LLErrorThread()
 {
 }
 
-LLErrorThread::~LLErrorThread()
-{
-}
-
 void LLErrorThread::setUserData(void* user_data)
 {
 	mUserDatap = user_data;

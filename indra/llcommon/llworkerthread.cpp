@@ -174,10 +174,6 @@ LLWorkerThread::WorkRequest::WorkRequest(handle_t handle, U32 priority, LLWorker
 {
 }
 
-LLWorkerThread::WorkRequest::~WorkRequest()
-{
-}
-
 // virtual (required for access by LLWorkerThread)
 void LLWorkerThread::WorkRequest::deleteRequest()
 {

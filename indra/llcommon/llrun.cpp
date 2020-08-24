@@ -165,10 +165,3 @@ LLRunner::LLRunInfo::LLRunInfo(
 	mIncrement(increment)
 {
 }
-
-LLRunnable::LLRunnable()
-{ }
-
-// virtual
-LLRunnable::~LLRunnable()
-{ }

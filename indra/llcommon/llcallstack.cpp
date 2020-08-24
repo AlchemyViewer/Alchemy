@@ -39,9 +39,8 @@ public:
         StackWalker(false,0) // non-verbose, options = 0
     {
     }
-    ~LLCallStackImpl()
-    {
-    }
+    ~LLCallStackImpl() = default;
+
     void getStack(std::vector<std::string>& stack, S32 skip_count=0, bool verbose=false)
     {
         m_stack.clear();
@@ -66,8 +65,8 @@ protected:
 class LLCallStackImpl
 {
 public:
-    LLCallStackImpl() {}
-    ~LLCallStackImpl() {}
+    LLCallStackImpl() = default;
+    ~LLCallStackImpl() = default;
     void getStack(std::vector<std::string>& stack, S32 skip_count=0, bool verbose=false)
     {
         stack.clear();
