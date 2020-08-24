@@ -50,7 +50,7 @@ class HttpPolicyGlobal
 {
 public:
 	HttpPolicyGlobal();
-	~HttpPolicyGlobal();
+	~HttpPolicyGlobal() = default;
 
 	HttpPolicyGlobal & operator=(const HttpPolicyGlobal &);
 	

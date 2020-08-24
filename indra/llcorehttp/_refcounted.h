@@ -62,7 +62,7 @@ public:
 	static const S32			NOT_REF_COUNTED = -1;
 	
 protected:
-	virtual ~RefCounted();
+	virtual ~RefCounted() = default;
 	virtual void destroySelf();
 
 private:

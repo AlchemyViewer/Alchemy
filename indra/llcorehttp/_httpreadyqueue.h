@@ -73,8 +73,7 @@ public:
 		: HttpReadyQueueBase()
 		{}
 	
-	~HttpReadyQueue()
-		{}
+	~HttpReadyQueue() = default;
 	
 protected:
 	HttpReadyQueue(const HttpReadyQueue &);		// Not defined

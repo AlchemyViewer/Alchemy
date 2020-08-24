@@ -274,10 +274,6 @@ BufferArrayStream::BufferArrayStream(BufferArray * ba)
 {}
 	
 			
-BufferArrayStream::~BufferArrayStream()
-{}
-	
-
 }  // end namespace LLCore
 
 

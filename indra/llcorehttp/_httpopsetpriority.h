@@ -51,7 +51,7 @@ class HttpOpSetPriority final : public HttpOperation
 public:
 	HttpOpSetPriority(HttpHandle handle, HttpRequest::priority_t priority);
 
-	virtual ~HttpOpSetPriority();
+	virtual ~HttpOpSetPriority() = default;
 
 private:
 	HttpOpSetPriority(const HttpOpSetPriority &);			// Not defined

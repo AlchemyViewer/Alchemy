@@ -57,7 +57,7 @@ public:
 
 	HttpOpSetGet();
 
-	virtual ~HttpOpSetGet();							// Use release()
+	virtual ~HttpOpSetGet() = default;							// Use release()
 
 private:
 	HttpOpSetGet(const HttpOpSetGet &);					// Not defined

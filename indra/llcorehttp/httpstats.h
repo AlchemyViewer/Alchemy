@@ -38,7 +38,7 @@ namespace LLCore
     class HTTPStats final : public LLSingleton<HTTPStats>
     {
         LLSINGLETON(HTTPStats);
-        virtual ~HTTPStats();
+        virtual ~HTTPStats() = default;
 
     public:
         void resetStats();

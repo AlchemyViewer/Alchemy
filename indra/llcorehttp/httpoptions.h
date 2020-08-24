@@ -62,7 +62,7 @@ public:
 
 	typedef boost::shared_ptr<HttpOptions> ptr_t;
 
-    virtual ~HttpOptions();						// Use release()
+    virtual ~HttpOptions() = default;						// Use release()
 
 protected:
 	

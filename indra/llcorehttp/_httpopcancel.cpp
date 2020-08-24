@@ -48,10 +48,6 @@ HttpOpCancel::HttpOpCancel(HttpHandle handle)
 {}
 
 
-HttpOpCancel::~HttpOpCancel()
-{}
-
-
 // Immediately search for the request on various queues
 // and cancel operations if found.  Return the status of
 // the search and cancel as the status of this request.

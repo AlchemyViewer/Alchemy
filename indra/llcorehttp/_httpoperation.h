@@ -222,7 +222,7 @@ class HttpOpStop final : public HttpOperation
 public:
 	HttpOpStop();
 
-	virtual ~HttpOpStop();
+	virtual ~HttpOpStop() = default;
 
 private:
 	HttpOpStop(const HttpOpStop &);					// Not defined
@@ -244,7 +244,7 @@ class HttpOpNull final : public HttpOperation
 public:
 	HttpOpNull();
 
-	virtual ~HttpOpNull();
+	virtual ~HttpOpNull() = default;
 
 private:
 	HttpOpNull(const HttpOpNull &);					// Not defined
@@ -266,7 +266,7 @@ public:
 	// 1 does a soft spin continuously requeuing itself
 	HttpOpSpin(int mode);
 
-	virtual ~HttpOpSpin();
+	virtual ~HttpOpSpin() = default;
 
 private:
 	HttpOpSpin(const HttpOpSpin &);					// Not defined

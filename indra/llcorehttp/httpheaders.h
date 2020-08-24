@@ -91,14 +91,13 @@ public:
 	/// @post In addition to the instance, caller has a refcount
 	/// to the instance.  A call to @see release() will destroy
 	/// the instance.
-	HttpHeaders();
-    virtual ~HttpHeaders();						// Use release()
+	HttpHeaders() = default;
+    virtual ~HttpHeaders() = default;						// Use release()
 
 	//typedef LLCoreInt::IntrusivePtr<HttpHeaders> ptr_t;
-protected:
 
-	HttpHeaders(const HttpHeaders &);			// Not defined
-	void operator=(const HttpHeaders &);		// Not defined
+	HttpHeaders(const HttpHeaders &) = delete;			// Not defined
+	void operator=(const HttpHeaders &) = delete;		// Not defined
 
 public:
 	// Empty the list of headers.

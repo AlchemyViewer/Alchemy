@@ -137,7 +137,7 @@ public:
 	/// Constructor increments the reference count on the
 	/// BufferArray argument and calls release() on destruction.
 	BufferArrayStream(BufferArray * ba);
-	~BufferArrayStream();
+	~BufferArrayStream() = default;
 
 protected:
 	BufferArrayStream(const BufferArrayStream &);

@@ -56,7 +56,7 @@ public:
 	///					be canceled.
 	HttpOpCancel(HttpHandle handle);
 
-	virtual ~HttpOpCancel();							// Use release()
+	virtual ~HttpOpCancel() = default;							// Use release()
 	
 public:
 	virtual void stageFromRequest(HttpService *);

@@ -229,10 +229,6 @@ HttpOpStop::HttpOpStop()
 {}
 
 
-HttpOpStop::~HttpOpStop()
-{}
-
-
 void HttpOpStop::stageFromRequest(HttpService * service)
 {
 	// Do operations
@@ -250,10 +246,6 @@ void HttpOpStop::stageFromRequest(HttpService * service)
 
 HttpOpNull::HttpOpNull()
 	: HttpOperation()
-{}
-
-
-HttpOpNull::~HttpOpNull()
 {}
 
 
@@ -277,10 +269,6 @@ void HttpOpNull::stageFromRequest(HttpService * service)
 HttpOpSpin::HttpOpSpin(int mode)
 	: HttpOperation(),
 	  mMode(mode)
-{}
-
-
-HttpOpSpin::~HttpOpSpin()
 {}
 
 

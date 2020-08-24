@@ -52,10 +52,6 @@ HttpOpSetGet::HttpOpSetGet()
 {}
 
 
-HttpOpSetGet::~HttpOpSetGet()
-{}
-
-
 HttpStatus HttpOpSetGet::setupGet(HttpRequest::EPolicyOption opt, HttpRequest::policy_t pclass)
 {
 	HttpStatus status;

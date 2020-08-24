@@ -67,8 +67,7 @@ public:
 		: HttpRetryQueueBase()
 		{}
 	
-	~HttpRetryQueue()
-		{}
+	~HttpRetryQueue() = default;
 	
 protected:
 	HttpRetryQueue(const HttpRetryQueue &);		// Not defined

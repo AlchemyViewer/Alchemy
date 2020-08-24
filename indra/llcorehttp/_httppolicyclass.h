@@ -50,7 +50,7 @@ class HttpPolicyClass
 {
 public:
 	HttpPolicyClass();
-	~HttpPolicyClass();
+	~HttpPolicyClass() = default;
 
 	HttpPolicyClass & operator=(const HttpPolicyClass &);
 	HttpPolicyClass(const HttpPolicyClass &);			// Not defined

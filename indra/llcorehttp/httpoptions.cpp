@@ -50,10 +50,6 @@ HttpOptions::HttpOptions() :
 {}
 
 
-HttpOptions::~HttpOptions()
-{}
-
-
 void HttpOptions::setWantHeaders(bool wanted)
 {
 	mWantHeaders = wanted;

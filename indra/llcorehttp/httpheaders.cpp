@@ -33,14 +33,6 @@ namespace LLCore
 {
 
 
-HttpHeaders::HttpHeaders()
-{}
-
-
-HttpHeaders::~HttpHeaders()
-{}
-
-
 void
 HttpHeaders::clear()
 {

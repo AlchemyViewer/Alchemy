@@ -61,8 +61,7 @@ public:
     typedef boost::shared_ptr<HttpHandler>  ptr_t;
     typedef boost::weak_ptr<HttpHandler>    wptr_t;
 
-	virtual ~HttpHandler()
-	{ }
+	virtual ~HttpHandler() = default;
 
 	/// Method invoked during calls to @see update().  Each invocation
 	/// represents the completion of some requested operation.  Caller

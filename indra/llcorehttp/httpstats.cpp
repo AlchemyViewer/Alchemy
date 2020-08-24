@@ -35,10 +35,6 @@ HTTPStats::HTTPStats()
 }
 
 
-HTTPStats::~HTTPStats()
-{
-}
-
 void HTTPStats::resetStats()
 {
     mResutCodes.clear();

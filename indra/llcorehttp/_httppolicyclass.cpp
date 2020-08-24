@@ -41,10 +41,6 @@ HttpPolicyClass::HttpPolicyClass()
 {}
 
 
-HttpPolicyClass::~HttpPolicyClass()
-{}
-
-
 HttpPolicyClass & HttpPolicyClass::operator=(const HttpPolicyClass & other)
 {
 	if (this != &other)

@@ -40,10 +40,6 @@ HttpPolicyGlobal::HttpPolicyGlobal()
 {}
 
 
-HttpPolicyGlobal::~HttpPolicyGlobal()
-{}
-
-
 HttpPolicyGlobal & HttpPolicyGlobal::operator=(const HttpPolicyGlobal & other)
 {
 	if (this != &other)

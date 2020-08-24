@@ -329,9 +329,7 @@ struct HttpStatus
 		mDetails = rhs.mDetails;
 	}
 
-	~HttpStatus()
-	{
-	}
+	~HttpStatus() = default;
 
 	HttpStatus & operator=(const HttpStatus & rhs)
 	{
