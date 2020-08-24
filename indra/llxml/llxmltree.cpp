@@ -523,10 +523,6 @@ LLXmlTreeParser::LLXmlTreeParser(LLXmlTree* tree)
 {
 }
 
-LLXmlTreeParser::~LLXmlTreeParser() 
-{
-}
-
 BOOL LLXmlTreeParser::parseFile(const std::string &path, LLXmlTreeNode** root, BOOL keep_contents)
 {
 	llassert( !mRoot );

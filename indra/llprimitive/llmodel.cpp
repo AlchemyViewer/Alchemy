@@ -1936,10 +1936,6 @@ LLSD LLModelInstance::asLLSD()
 }
 
 
-LLImportMaterial::~LLImportMaterial()
-{
-}
-
 LLImportMaterial::LLImportMaterial(LLSD& data)
 {
 	mDiffuseMapFilename = data["diffuse"]["filename"].asString();

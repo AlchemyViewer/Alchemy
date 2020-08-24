@@ -854,10 +854,6 @@ LLDAELoader::LLDAELoader(
 {
 }
 
-LLDAELoader::~LLDAELoader()
-{
-}
-
 struct ModelSort
 {
 	bool operator()(const LLPointer< LLModel >& lhs, const LLPointer< LLModel >& rhs)

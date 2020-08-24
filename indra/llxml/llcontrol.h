@@ -123,7 +123,7 @@ public:
 					  LLSD initial, const std::string& comment,
 					  ePersist persist = PERSIST_NONDFT, bool hidefromsettingseditor = false);
 
-	virtual ~LLControlVariable();
+	virtual ~LLControlVariable() = default;
 	
 	const std::string& getName() const { return mName; }
 	const std::string& getComment() const { return mComment; }
@@ -210,7 +210,7 @@ public:
 
 	struct ApplyFunctor
 	{
-		virtual ~ApplyFunctor() {};
+		virtual ~ApplyFunctor() = default;
 		virtual void apply(const std::string& name, LLControlVariable* control) = 0;
 	};
 	void applyToAll(ApplyFunctor* func);
@@ -359,9 +359,7 @@ public:
 		bindToControl(group, name);
 	}
 
-	~LLControlCache()
-	{
-	}
+	~LLControlCache() = default;
 
 	const T& getValue() const { return mCachedValue; }
 	

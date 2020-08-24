@@ -183,10 +183,6 @@ LLControlVariable::LLControlVariable(const std::string& name, eControlType type,
 
 
 
-LLControlVariable::~LLControlVariable()
-{
-}
-
 LLSD LLControlVariable::getComparableValue(const LLSD& value)
 {
 	// *FIX:MEP - The following is needed to make the LLSD::ImplString 

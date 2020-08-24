@@ -60,7 +60,7 @@ public:
         U32									maxJointsPerMesh,
 		U32									modelLimit,
         bool								preprocess);
-	virtual ~LLDAELoader() ;
+	virtual ~LLDAELoader() = default;
 
 	virtual bool OpenFile(const std::string& filename);
 

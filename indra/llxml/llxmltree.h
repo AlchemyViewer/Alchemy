@@ -200,7 +200,7 @@ class LLXmlTreeParser : public LLXmlParser
 {
 public:
 	LLXmlTreeParser(LLXmlTree* tree);
-	virtual ~LLXmlTreeParser();
+	virtual ~LLXmlTreeParser()  = default;
 
 	BOOL parseFile(const std::string &path, LLXmlTreeNode** root, BOOL keep_contents );
 
