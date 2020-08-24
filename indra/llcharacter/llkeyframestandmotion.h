@@ -45,7 +45,7 @@ public:
 	LLKeyframeStandMotion(const LLUUID &id);
 
 	// Destructor
-	virtual ~LLKeyframeStandMotion();
+	virtual ~LLKeyframeStandMotion() = default;
 
 public:
 	//-------------------------------------------------------------------------

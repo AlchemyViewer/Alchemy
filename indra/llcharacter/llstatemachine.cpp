@@ -52,11 +52,6 @@ LLStateDiagram::LLStateDiagram()
 	mUseDefaultState = FALSE;
 }
 
-LLStateDiagram::~LLStateDiagram()
-{
-
-}
-
 // add a state to the state graph
 BOOL LLStateDiagram::addState(LLFSMState *state)
 {
@@ -302,11 +297,6 @@ LLStateMachine::LLStateMachine()
 	mLastState = NULL;
 	mLastTransition = NULL;
 	mStateDiagram = NULL;
-}
-
-LLStateMachine::~LLStateMachine()
-{
-
 }
 
 // returns current state

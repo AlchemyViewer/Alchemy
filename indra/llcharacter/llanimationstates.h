@@ -209,7 +209,7 @@ private:
 
 public:
 	LLAnimationLibrary();
-	~LLAnimationLibrary();
+	~LLAnimationLibrary() = default;
 
 	//-----------------------------------------------------------------------------
 	// Return the text name of a single animation state,

@@ -244,9 +244,6 @@ LLGestureStepAnimation::LLGestureStepAnimation()
 	mFlags(0x0)
 { }
 
-LLGestureStepAnimation::~LLGestureStepAnimation()
-{ }
-
 S32 LLGestureStepAnimation::getMaxSerialSize() const
 {
 	S32 max_size = 0;
@@ -329,9 +326,6 @@ LLGestureStepSound::LLGestureStepSound()
 	mFlags(0x0)
 { }
 
-LLGestureStepSound::~LLGestureStepSound()
-{ }
-
 S32 LLGestureStepSound::getMaxSerialSize() const
 {
 	S32 max_size = 0;
@@ -391,9 +385,6 @@ LLGestureStepChat::LLGestureStepChat()
 	mFlags(0x0)
 { }
 
-LLGestureStepChat::~LLGestureStepChat()
-{ }
-
 S32 LLGestureStepChat::getMaxSerialSize() const
 {
 	S32 max_size = 0;
@@ -444,9 +435,6 @@ LLGestureStepWait::LLGestureStepWait()
 :	LLGestureStep(),
 	mWaitSeconds(0.f),
 	mFlags(0x0)
-{ }
-
-LLGestureStepWait::~LLGestureStepWait()
 { }
 
 S32 LLGestureStepWait::getMaxSerialSize() const

@@ -67,14 +67,6 @@ LLEditingMotion::LLEditingMotion( const LLUUID &id) : LLMotion(id)
 
 
 //-----------------------------------------------------------------------------
-// ~LLEditingMotion()
-// Class Destructor
-//-----------------------------------------------------------------------------
-LLEditingMotion::~LLEditingMotion()
-{
-}
-
-//-----------------------------------------------------------------------------
 // LLEditingMotion::onInitialize(LLCharacter *character)
 //-----------------------------------------------------------------------------
 LLMotion::LLMotionInitStatus LLEditingMotion::onInitialize(LLCharacter *character)

@@ -63,14 +63,6 @@ LLKeyframeWalkMotion::LLKeyframeWalkMotion(const LLUUID &id)
 
 
 //-----------------------------------------------------------------------------
-// ~LLKeyframeWalkMotion()
-// Class Destructor
-//-----------------------------------------------------------------------------
-LLKeyframeWalkMotion::~LLKeyframeWalkMotion()
-{}
-
-
-//-----------------------------------------------------------------------------
 // LLKeyframeWalkMotion::onInitialize()
 //-----------------------------------------------------------------------------
 LLMotion::LLMotionInitStatus LLKeyframeWalkMotion::onInitialize(LLCharacter *character)

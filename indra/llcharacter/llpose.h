@@ -65,7 +65,7 @@ public:
 	// Constructor
 	LLPose() : mWeight(0.f) {}
 	// Destructor
-	~LLPose();
+	~LLPose() = default;
 	// add a joint state in this pose
 	BOOL addJointState(const LLPointer<LLJointState>& jointState);
 	// remove a joint state from this pose

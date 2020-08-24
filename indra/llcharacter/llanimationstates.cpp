@@ -340,13 +340,6 @@ LLAnimationLibrary::LLAnimationLibrary() :
 }
 	
 //-----------------------------------------------------------------------------
-// ~LLAnimationLibrary()
-//-----------------------------------------------------------------------------
-LLAnimationLibrary::~LLAnimationLibrary()
-{
-}
-
-//-----------------------------------------------------------------------------
 // Return the text name of an animation state
 //-----------------------------------------------------------------------------
 const char *LLAnimationLibrary::animStateToString( const LLUUID& state )

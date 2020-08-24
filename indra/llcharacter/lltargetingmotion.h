@@ -49,7 +49,7 @@ public:
 	LLTargetingMotion(const LLUUID &id);
 
 	// Destructor
-	virtual ~LLTargetingMotion();
+	virtual ~LLTargetingMotion() = default;
 
 public:
 	//-------------------------------------------------------------------------

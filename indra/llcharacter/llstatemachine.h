@@ -78,7 +78,7 @@ protected:
 
 public:
 	LLStateDiagram();
-	virtual ~LLStateDiagram();
+	virtual ~LLStateDiagram() = default;
 
 protected:
 	// add a state to the state graph, executed implicitly when adding transitions
@@ -123,7 +123,7 @@ protected:
 
 public:
 	LLStateMachine();
-	virtual ~LLStateMachine();
+	virtual ~LLStateMachine() = default;
 
 	// set state diagram
 	void setStateDiagram(LLStateDiagram* diagram);

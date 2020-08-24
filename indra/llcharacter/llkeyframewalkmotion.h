@@ -49,7 +49,7 @@ public:
 	LLKeyframeWalkMotion(const LLUUID &id);
 
 	// Destructor
-	virtual ~LLKeyframeWalkMotion();
+	virtual ~LLKeyframeWalkMotion() = default;
 
 public:
 	//-------------------------------------------------------------------------

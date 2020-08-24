@@ -113,7 +113,7 @@ public:
 	// Constructor/Destructor
 	//-------------------------------------------------------------------------
 	LLJointSolverRP3();
-	virtual ~LLJointSolverRP3();
+	virtual ~LLJointSolverRP3() = default;
 
 	//-------------------------------------------------------------------------
 	// setupJoints()

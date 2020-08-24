@@ -50,7 +50,7 @@ public:
 	LLEditingMotion(const LLUUID &id);
 
 	// Destructor
-	virtual ~LLEditingMotion();
+	virtual ~LLEditingMotion() = default;
 
 public:
 	//-------------------------------------------------------------------------

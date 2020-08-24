@@ -63,7 +63,7 @@ public:
 	LLMotion(const LLUUID &id);
 
 	// Destructor
-	virtual ~LLMotion();
+	virtual ~LLMotion() = default;
 
 public:
 	//-------------------------------------------------------------------------
@@ -194,7 +194,7 @@ class LLTestMotion final : public LLMotion
 {
 public:
 	LLTestMotion(const LLUUID &id) : LLMotion(id){}
-	~LLTestMotion() {}
+	~LLTestMotion() = default;
 	static LLMotion *create(const LLUUID& id) { return new LLTestMotion(id); }
 	BOOL getLoop() { return FALSE; }
 	F32 getDuration() { return 0.0f; }
@@ -218,7 +218,7 @@ class LLNullMotion final : public LLMotion
 {
 public:
 	LLNullMotion(const LLUUID &id) : LLMotion(id) {}
-	~LLNullMotion() {}
+	~LLNullMotion() = default;
 	static LLMotion *create(const LLUUID &id) { return new LLNullMotion(id); }
 
 	// motions must specify whether or not they loop

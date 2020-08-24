@@ -44,7 +44,7 @@ public:
 	LLKeyframeFallMotion(const LLUUID &id);
 
 	// Destructor
-	virtual ~LLKeyframeFallMotion();
+	virtual ~LLKeyframeFallMotion() = default;
 
 public:
 	//-------------------------------------------------------------------------
