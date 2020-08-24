@@ -28,17 +28,6 @@
 #include "llmath.h"
 #include "llquantize.h"
 
-extern const LLQuad F_ZERO_4A		= { 0, 0, 0, 0 };
-extern const LLQuad F_APPROXIMATELY_ZERO_4A = { 
-	F_APPROXIMATELY_ZERO,
-	F_APPROXIMATELY_ZERO,
-	F_APPROXIMATELY_ZERO,
-	F_APPROXIMATELY_ZERO
-};
-
-extern const LLVector4a LL_V4A_ZERO = reinterpret_cast<const LLVector4a&> ( F_ZERO_4A );
-extern const LLVector4a LL_V4A_EPSILON = reinterpret_cast<const LLVector4a&> ( F_APPROXIMATELY_ZERO_4A );
-
 /*static */void LLVector4a::memcpyNonAliased16(F32* __restrict dst, const F32* __restrict src, size_t bytes)
 {
         ll_memcpy_nonaliased_aligned_16((char*)dst, (char*)src, bytes);
@@ -128,7 +117,7 @@ void LLVector4a::quantize8( const LLVector4a& low, const LLVector4a& high )
 	{
 		LLVector4a maxError; maxError.setMul(delta, *reinterpret_cast<const LLVector4a*>(F_OOU8MAX_4A));
 		LLVector4a absVal; absVal.setAbs( val );
-		setSelectWithMask( absVal.lessThan( maxError ), F_ZERO_4A, val );
+		setSelectWithMask( absVal.lessThan( maxError ), getZero(), val );
 	}	
 }
 
@@ -175,6 +164,6 @@ void LLVector4a::quantize16( const LLVector4a& low, const LLVector4a& high )
 	{
 		LLVector4a maxError; maxError.setMul(delta, *reinterpret_cast<const LLVector4a*>(F_OOU16MAX_4A));
 		LLVector4a absVal; absVal.setAbs( val );
-		setSelectWithMask( absVal.lessThan( maxError ), F_ZERO_4A, val );
+		setSelectWithMask( absVal.lessThan( maxError ), getZero(), val );
 	}	
 }

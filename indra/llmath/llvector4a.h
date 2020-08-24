@@ -70,17 +70,15 @@ public:
 	}
 
 	// Return a vector of all zeros
-	static inline const LLVector4a& getZero()
+	static inline LLVector4a getZero()
 	{
-		extern const LLVector4a LL_V4A_ZERO;
-		return LL_V4A_ZERO;
+		return _mm_setzero_ps();
 	}
 	
 	// Return a vector of all epsilon, where epsilon is a small float suitable for approximate equality checks
-	static inline const LLVector4a& getEpsilon()
+	static inline LLVector4a getEpsilon()
 	{
-		extern const LLVector4a LL_V4A_EPSILON;
-		return LL_V4A_EPSILON;
+		return _mm_set1_ps(F_APPROXIMATELY_ZERO);
 	}
 
 	// Copy 16 bytes from src to dst. Source and destination must be 16-byte aligned

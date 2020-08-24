@@ -64,10 +64,9 @@ public:
 		mQ = _mm_set_ss(f); 
 	}
 
-	static inline const LLSimdScalar& getZero()
+	static inline LLSimdScalar getZero()
 	{
-		extern const LLQuad F_ZERO_4A;
-		return reinterpret_cast<const LLSimdScalar&>(F_ZERO_4A);
+		return _mm_setzero_ps();
 	}
 
 	inline F32 getF32() const;
