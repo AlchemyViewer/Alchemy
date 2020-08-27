@@ -14,11 +14,11 @@ if [ -z "$HANDLER" ]; then
 fi
 
 # Register handler for GNOME-aware apps
-LLGCONFTOOL2=gconftool-2
-if which ${LLGCONFTOOL2} >/dev/null; then
-    (${LLGCONFTOOL2} -s -t string /desktop/gnome/url-handlers/secondlife/command "${HANDLER} \"%s\"" && ${LLGCONFTOOL2} -s -t bool /desktop/gnome/url-handlers/secondlife/enabled true) || echo Warning: Did not register secondlife:// handler with GNOME: ${LLGCONFTOOL2} failed.
+LLGCONFTOOL=gconftool
+if which ${LLGCONFTOOL} >/dev/null; then
+    (${LLGCONFTOOL} -s -t string /desktop/gnome/url-handlers/secondlife/command "${HANDLER} \"%s\"" && ${LLGCONFTOOL} -s -t bool /desktop/gnome/url-handlers/secondlife/enabled true) || echo Warning: Did not register secondlife:// handler with GNOME: ${LLGCONFTOOL} failed.
 else
-    echo Warning: Did not register secondlife:// handler with GNOME: ${LLGCONFTOOL2} not found.
+    echo Warning: Did not register secondlife:// handler with GNOME: ${LLGCONFTOOL} not found.
 fi
 
 # Register handler for KDE-aware apps

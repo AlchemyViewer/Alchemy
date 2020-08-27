@@ -1,7 +1,7 @@
 Second Life - Linux Beta README
 -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
-This document contains information about the Second Life Linux
+This document contains information about the Alchemy Viewer Linux
 client, and isn't meant to serve as an introduction to Second
 Life itself - please see <http://www.secondlife.com/whatis/>.
 
@@ -26,19 +26,17 @@ Life itself - please see <http://www.secondlife.com/whatis/>.
 1. INTRODUCTION
 -=-=-=-=-=-=-=-
 
-Hi!  This is a BETA release of the Second Life client for Linux.
+Hi!  This is a BETA release of the Alchemy Viewer client for Linux.
 The 'beta' status means that although we're still smoothing-out a few rough
 edges, this version of the client is functionally complete and should
-work quite well 'out of the box' for accessing Second Life.
+work quite well 'out of the box' for accessing the metaverse.
 
 We encourage you to try it out and let us know of its compatibility
 with your system.  Be aware that although this is a 'beta' client, it connects
 to the main Second Life world and changes you make there are permanent.
 
-You will have either obtained this client from secondlife.com (the official
-site) or from a third-party packager; if you encounter any problems then
-we recommend trying the latest official builds from secondlife.com which are
-updated often.
+You will have either obtained this client from alchemyviewer.org (the official
+site) or from a third-party packager.
 
 Please enjoy!
 
@@ -70,30 +68,24 @@ Minimum requirements:
       that came with your operating system may not be good enough!  See the
       TROUBLESHOOTING section if you encounter problems starting Second Life.
 
-For a more comfortable experience, the RECOMMENDED hardware for the Second
-Life Linux client is very similar to that for Windows, as detailed at:
-<https://secondlife.com/corporate/sysreqs.php>
-
-
 3. INSTALLING & RUNNING
 -=-=-=-=-=-=-=-=-=-=-=-
 
-The Second Life Linux client can entirely run from the directory you have
+The Alchemy Viewer Linux client can entirely run from the directory you have
 unpacked it into - no installation step is required.  If you wish to
 perform a separate installation step anyway, you may run './install.sh'
 
-Run ./secondlife from the installation directory to start Second Life.
+Run ./alchemy from the installation directory to start Second Life.
 
-For in-world MOVIE and MUSIC PLAYBACK, you will need (32-bit) GStreamer 0.10
-installed on your system.  This is optional - it is not required for general
-client functionality.  If you have GStreamer 0.10 installed, the selection of
-in-world movies you can successfully play will depend on the GStreamer
-plugins you have; if you cannot play a certain in-world movie then you are
-probably missing the appropriate GStreamer plugin on your system - you may
-be able to install it (see TROUBLESHOOTING).
+For in-world MOVIE and MUSIC PLAYBACK, you will need libvlc installed on your system.
+This is optional - it is not required for general client functionality.
+If you have libvlc 3.x installed,  the selection of in-world movies you can successfully
+play will depend on your system libvlc installation; if you cannot play a certain in-world movie
+then you are probably missing the appropriate libvlc version on your system - you may be
+able to install it (see TROUBLESHOOTING).
 
-User data is stored in the hidden directory ~/.secondlife by default; you may
-override this location with the SECONDLIFE_USER_DIR environment variable if
+User data is stored in the hidden directory ~/.alchemynext by default; you may
+override this location with the ALCHEMYNEXT_USER_DIR environment variable if
 you wish.
 
 
@@ -107,7 +99,7 @@ you wish.
 -=-=-=-=-=-=-=-=-=
 
 The client prints a lot of diagnostic information to the console it was
-run from.  Most of this is also replicated in ~/.secondlife/logs/SecondLife.log
+run from.  Most of this is also replicated in ~/.alchemynext/logs/Alchemy.log
 - this is helpful to read when troubleshooting, especially 'WARNING' and
 'ERROR' lines.
 
@@ -143,7 +135,7 @@ SOLUTION:- Some residents with ATI cards have reported that running
    'sudo aticonfig --locked-userpages=off' before running Second Life solves
    their stability issues.
 SOLUTION:- As a last resort, you can disable most of Second Life's advanced
-   graphics features by editing the 'secondlife' script and removing the '#'
+   graphics features by editing the 'alchemy' script and removing the '#'
    from the line which reads '#export LL_GL_NOEXT=x'
 
 PROBLEM 3:- After I minimize the Second Life window, it's just blank when
@@ -183,10 +175,10 @@ SOLUTION:- You need to have a working installation of GStreamer 0.10; this
 6. ADVANCED TROUBLESHOOTING
 -=-=-=-=-=-=-=-=-=-=-=-=-=-
 
-The 'secondlife' script which launches Second Life contains some
+The 'alchemy' script which launches Second Life contains some
 configuration options for advanced troubleshooters.
 
-* AUDIO - Edit the 'secondlife' script and you will see these audio
+* AUDIO - Edit the 'alchemy' script and you will see these audio
   options: LL_BAD_OPENAL_DRIVER, LL_BAD_FMODSTUDIO_DRIVER.
   Second Life tries to use OpenAL, FMODSTUDIO (PULSEAUDIO, ALSA)
   audio drivers in this order; you may uncomment the corresponding LL_BAD_*

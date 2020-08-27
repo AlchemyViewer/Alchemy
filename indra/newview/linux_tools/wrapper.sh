@@ -59,6 +59,10 @@ fi
 #export ASAN_OPTIONS="halt_on_error=0 detect_leaks=1 symbolize=1"
 #export UBSAN_OPTIONS="print_stacktrace=1 print_summary=1 halt_on_error=0"
 
+## Allow Gnome 3 to properly display window title in app bar
+export SDL_VIDEO_X11_WMCLASS=Alchemy
+
+
 ## - Avoids an often-buggy X feature that doesn't really benefit us anyway.
 # export SDL_VIDEO_X11_DGAMOUSE=0
 
@@ -145,25 +149,18 @@ LL_RUN_ERR=$?
 
 # Handle any resulting errors
 if [ $LL_RUN_ERR -ne 0 ]; then
-	# generic error running the binary
-	echo '*** Bad shutdown ($LL_RUN_ERR). ***'
+	# generic error running the binaryecho '*** Bad shutdown ($LL_RUN_ERR). ***'
 	if [ "$(uname -m)" = "x86_64" ]; then
 		echo
 		cat << EOFMARKER
-You are running the Second Life Viewer on a x86_64 platform.  The
-most common problems when launching the Viewer (particularly
-'bin/do-not-directly-run-alchemy-bin: not found' and 'error while
-loading shared libraries') may be solved by installing your Linux
-distribution's 32-bit compatibility packages.
-For example, on Ubuntu and other Debian-based Linuxes you might run:
-$ sudo apt-get install ia32-libs ia32-libs-gtk ia32-libs-kde ia32-libs-sdl
+You are running Alchemy Viewer on a x86_64 platform.
 EOFMARKER
 	fi
 fi
 
 echo
 echo '*******************************************************'
-echo 'This is a BETA release of the Second Life linux client.'
+echo 'This is a BETA release of the Alchemy Viewer linux client.'
 echo 'Thank you for testing!'
 echo 'Please see README-linux.txt before reporting problems.'
 echo
