@@ -117,6 +117,7 @@ bool LLVertexBuffer::sMapped = false;
 bool LLVertexBuffer::sUseStreamDraw = true;
 bool LLVertexBuffer::sUseVAO = false;
 bool LLVertexBuffer::sPreferStreamDraw = false;
+LLVertexBuffer* LLVertexBuffer::sUtilityBuffer = nullptr;
 
 
 U32 LLVBOPool::genBuffer()
@@ -590,71 +591,80 @@ void LLVertexBuffer::drawArrays(U32 mode, const std::vector<LLVector3>& pos, con
 		return;
 	}
 
-	unbind();
-	
-	setupClientArrays(MAP_VERTEX | MAP_NORMAL);
-
-	LLGLSLShader* shader = LLGLSLShader::sCurBoundShaderPtr;
-
-	if (shader)
+	if (!sUtilityBuffer)
 	{
-		S32 loc = LLVertexBuffer::TYPE_VERTEX;
-		if (loc > -1)
-		{
-			glVertexAttribPointer(loc, 3, GL_FLOAT, GL_FALSE, 0, pos[0].mV);
-		}
-		loc = LLVertexBuffer::TYPE_NORMAL;
-		if (loc > -1)
-		{
-			glVertexAttribPointer(loc, 3, GL_FLOAT, GL_FALSE, 0, norm[0].mV);
-		}
+		sUtilityBuffer = new LLVertexBuffer(MAP_VERTEX | MAP_NORMAL | MAP_TEXCOORD0, GL_STREAM_DRAW);
+		sUtilityBuffer->allocateBuffer(count, count, true);
 	}
-	else
+	if (sUtilityBuffer->getNumVerts() < (S32) count)
 	{
-		glVertexPointer(3, GL_FLOAT, 0, pos[0].mV);
-		glNormalPointer(GL_FLOAT, 0, norm[0].mV);
+		sUtilityBuffer->resizeBuffer(count, count);
 	}
+
+	LLStrider<LLVector3> vertex_strider;
+	LLStrider<LLVector3> normal_strider;
+	sUtilityBuffer->getVertexStrider(vertex_strider);
+	sUtilityBuffer->getNormalStrider(normal_strider);
+	vertex_strider.copyArray(0, pos.data(), count);
+	normal_strider.copyArray(0, norm.data(), count);
+
+	sUtilityBuffer->setBuffer(MAP_VERTEX | MAP_NORMAL);
 	LLGLSLShader::startProfile();
-	glDrawArrays(sGLMode[mode], 0, count);
+	sUtilityBuffer->drawArrays(mode, 0, pos.size());
 	LLGLSLShader::stopProfile(count, mode);
 }
 
 //static
-void LLVertexBuffer::drawElements(U32 mode, const LLVector4a* pos, const LLVector2* tc, S32 num_indices, const U16* indicesp)
+void LLVertexBuffer::drawElements(U32 mode, const S32 num_vertices, const LLVector4a* pos, const LLVector2* tc, S32 num_indices, const U16* indicesp)
 {
 	llassert(!LLGLSLShader::sNoFixedFunction || LLGLSLShader::sCurBoundShaderPtr != NULL);
 
+	if (num_vertices <= 0)
+	{
+		LL_WARNS() << "Called drawElements with 0 vertices" << LL_ENDL;
+		return;
+	}
+
+	if (num_indices <= 0)
+	{
+		LL_WARNS() << "Called drawElements with 0 indices" << LL_ENDL;
+		return;
+	}
+
 	gGL.syncMatrices();
 
+	if (!sUtilityBuffer)
+	{
+		sUtilityBuffer = new LLVertexBuffer(MAP_VERTEX | MAP_NORMAL | MAP_TEXCOORD0, GL_STREAM_DRAW);
+		sUtilityBuffer->allocateBuffer(num_vertices, num_indices, true);
+	}
+	if (sUtilityBuffer->getNumVerts() < num_vertices || sUtilityBuffer->getNumIndices() < num_indices)
+	{
+		sUtilityBuffer->resizeBuffer(llmax(sUtilityBuffer->getNumVerts(), num_vertices), llmax(sUtilityBuffer->getNumIndices(), num_indices));
+	}
+
 	U32 mask = LLVertexBuffer::MAP_VERTEX;
+
+	LLStrider<U16> index_strider;
+	LLStrider<LLVector4a> vertex_strider;
+	sUtilityBuffer->getIndexStrider(index_strider);
+	sUtilityBuffer->getVertexStrider(vertex_strider);
+	const S32 index_size = ((num_indices * sizeof(U16)) + 0xF) & ~0xF;
+	const S32 vertex_size = ((num_vertices * 4 * sizeof(F32)) + 0xF) & ~0xF;
+	LLVector4a::memcpyNonAliased16((F32*)index_strider.get(), (F32*)indicesp, index_size);
+	LLVector4a::memcpyNonAliased16((F32*)vertex_strider.get(), (F32*)pos, vertex_size);
 	if (tc)
 	{
 		mask = mask | LLVertexBuffer::MAP_TEXCOORD0;
+		LLStrider<LLVector2> tc_strider;
+		sUtilityBuffer->getTexCoord0Strider(tc_strider);
+		const S32 tc_size = ((num_vertices * 2 * sizeof(F32)) + 0xF) & ~0xF;
+		LLVector4a::memcpyNonAliased16((F32*)tc_strider.get(), (F32*)tc, tc_size);
 	}
 
-	unbind();
-	
-	setupClientArrays(mask);
-
-	if (LLGLSLShader::sNoFixedFunction)
-	{
-		S32 loc = LLVertexBuffer::TYPE_VERTEX;
-		glVertexAttribPointer(loc, 3, GL_FLOAT, GL_FALSE, 16, pos);
-
-		if (tc)
-		{
-			loc = LLVertexBuffer::TYPE_TEXCOORD0;
-			glVertexAttribPointer(loc, 2, GL_FLOAT, GL_FALSE, 0, tc);
-		}
-	}
-	else
-	{
-		glTexCoordPointer(2, GL_FLOAT, 0, tc);
-		glVertexPointer(3, GL_FLOAT, 16, pos);
-	}
-
+	sUtilityBuffer->setBuffer(mask);
 	LLGLSLShader::startProfile();
-	glDrawElements(sGLMode[mode], num_indices, GL_UNSIGNED_SHORT, indicesp);
+	sUtilityBuffer->draw(mode, num_indices, 0);
 	LLGLSLShader::stopProfile(num_indices, mode);
 }
 
@@ -917,6 +927,8 @@ void LLVertexBuffer::cleanupClass()
 	sStreamVBOPool.cleanup();
 	sDynamicVBOPool.cleanup();
 	sDynamicCopyVBOPool.cleanup();
+	delete sUtilityBuffer;
+	sUtilityBuffer = nullptr;
 }
 
 //----------------------------------------------------------------------------
