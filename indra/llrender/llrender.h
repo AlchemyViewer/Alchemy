@@ -42,6 +42,8 @@
 #include "llpointer.h"
 #include "llglheaders.h"
 #include "llmatrix4a.h"
+#include "llvector4a.h"
+#include <boost/align/aligned_allocator.hpp>
 #if LL_GNUC
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wmisleading-indentation"
@@ -405,11 +407,12 @@ public:
 
 	void begin(const GLuint& mode);
 	void end();
-	void vertex2i(const GLint& x, const GLint& y);
-	void vertex2f(const GLfloat& x, const GLfloat& y);
-	void vertex3f(const GLfloat& x, const GLfloat& y, const GLfloat& z);
-	void vertex2fv(const GLfloat* v);
-	void vertex3fv(const GLfloat* v);
+	LL_FORCE_INLINE void vertex2i(const GLint& x, const GLint& y) { vertex4a(LLVector4a((GLfloat)x,(GLfloat)y,0.f)); }
+	LL_FORCE_INLINE void vertex2f(const GLfloat& x, const GLfloat& y) { vertex4a(LLVector4a(x,y,0.f)); }
+	LL_FORCE_INLINE void vertex3f(const GLfloat& x, const GLfloat& y, const GLfloat& z) { vertex4a(LLVector4a(x,y,z)); }
+	LL_FORCE_INLINE void vertex2fv(const GLfloat* v) { vertex4a(LLVector4a(v[0],v[1],0.f)); }
+	LL_FORCE_INLINE void vertex3fv(const GLfloat* v) { vertex4a(LLVector4a(v[0],v[1],v[2])); }
+	void vertex4a(const LLVector4a& v);
 	
 	void texCoord2i(const GLint& x, const GLint& y);
 	void texCoord2f(const GLfloat& x, const GLfloat& y);
@@ -429,9 +432,9 @@ public:
 	void diffuseColor4ubv(const U8* c);
 	void diffuseColor4ub(U8 r, U8 g, U8 b, U8 a);
 
-	void vertexBatchPreTransformed(LLVector3* verts, S32 vert_count);
-	void vertexBatchPreTransformed(LLVector3* verts, LLVector2* uvs, S32 vert_count);
-	void vertexBatchPreTransformed(LLVector3* verts, LLVector2* uvs, LLColor4U*, S32 vert_count);
+	void vertexBatchPreTransformed(LLVector4a* verts, S32 vert_count);
+	void vertexBatchPreTransformed(LLVector4a* verts, LLVector2* uvs, S32 vert_count);
+	void vertexBatchPreTransformed(LLVector4a* verts, LLVector2* uvs, LLColor4U*, S32 vert_count);
 
 	void setColorMask(bool writeColor, bool writeAlpha);
 	void setColorMask(bool writeColorR, bool writeColorG, bool writeColorB, bool writeAlpha);
@@ -495,7 +498,7 @@ private:
 	F32				mLineWidth;
 
 	LLPointer<LLVertexBuffer>	mBuffer;
-	LLStrider<LLVector3>		mVerticesp;
+	LLStrider<LLVector4a>		mVerticesp;
 	LLStrider<LLVector2>		mTexcoordsp;
 	LLStrider<LLColor4U>		mColorsp;
 	std::vector<LLTexUnit*>		mTexUnits;
@@ -510,8 +513,8 @@ private:
 	F32				mMaxAnisotropy;
     U32             mDummyVAO;
 
-	std::vector<LLVector3> mUIOffset;
-	std::vector<LLVector3> mUIScale;
+	std::vector<LLVector4a, boost::alignment::aligned_allocator<LLVector4a, 64> > mUIOffset;
+	std::vector<LLVector4a, boost::alignment::aligned_allocator<LLVector4a, 64> > mUIScale;
 
 };
 

@@ -484,7 +484,7 @@ void gl_draw_scaled_image_with_border(S32 x, S32 y, S32 width, S32 height, LLTex
 	
 		const S32 NUM_VERTICES = 9 * 4; // 9 quads
 		LLVector2 uv[NUM_VERTICES];
-		LLVector3 pos[NUM_VERTICES];
+		LLVector4a pos[NUM_VERTICES];
 
 		S32 index = 0;
 
@@ -492,155 +492,155 @@ void gl_draw_scaled_image_with_border(S32 x, S32 y, S32 width, S32 height, LLTex
 		{
 			// draw bottom left
 			uv[index] = LLVector2(uv_outer_rect.mLeft, uv_outer_rect.mBottom);
-			pos[index] = LLVector3(draw_outer_rect.mLeft, draw_outer_rect.mBottom, 0.f);
+			pos[index].set(draw_outer_rect.mLeft, draw_outer_rect.mBottom, 0.f);
 			index++;
 
 			uv[index] = LLVector2(uv_center_rect.mLeft, uv_outer_rect.mBottom);
-			pos[index] = LLVector3(draw_center_rect.mLeft, draw_outer_rect.mBottom, 0.f);
+			pos[index].set(draw_center_rect.mLeft, draw_outer_rect.mBottom, 0.f);
 			index++;
 
 			uv[index] = LLVector2(uv_center_rect.mLeft, uv_center_rect.mBottom);
-			pos[index] = LLVector3(draw_center_rect.mLeft, draw_center_rect.mBottom, 0.f);
+			pos[index].set(draw_center_rect.mLeft, draw_center_rect.mBottom, 0.f);
 			index++;
 
 			uv[index] = LLVector2(uv_outer_rect.mLeft, uv_center_rect.mBottom);
-			pos[index] = LLVector3(draw_outer_rect.mLeft, draw_center_rect.mBottom, 0.f);
+			pos[index].set(draw_outer_rect.mLeft, draw_center_rect.mBottom, 0.f);
 			index++;
 
 			// draw bottom middle
 			uv[index] = LLVector2(uv_center_rect.mLeft, uv_outer_rect.mBottom);
-			pos[index] = LLVector3(draw_center_rect.mLeft, draw_outer_rect.mBottom, 0.f);
+			pos[index].set(draw_center_rect.mLeft, draw_outer_rect.mBottom, 0.f);
 			index++;
 
 			uv[index] = LLVector2(uv_center_rect.mRight, uv_outer_rect.mBottom);
-			pos[index] = LLVector3(draw_center_rect.mRight, draw_outer_rect.mBottom, 0.f);
+			pos[index].set(draw_center_rect.mRight, draw_outer_rect.mBottom, 0.f);
 			index++;
 
 			uv[index] = LLVector2(uv_center_rect.mRight, uv_center_rect.mBottom);
-			pos[index] = LLVector3(draw_center_rect.mRight, draw_center_rect.mBottom, 0.f);
+			pos[index].set(draw_center_rect.mRight, draw_center_rect.mBottom, 0.f);
 			index++;
 
 			uv[index] = LLVector2(uv_center_rect.mLeft, uv_center_rect.mBottom);
-			pos[index] = LLVector3(draw_center_rect.mLeft, draw_center_rect.mBottom, 0.f);
+			pos[index].set(draw_center_rect.mLeft, draw_center_rect.mBottom, 0.f);
 			index++;
 
 			// draw bottom right
 			uv[index] = LLVector2(uv_center_rect.mRight, uv_outer_rect.mBottom);
-			pos[index] = LLVector3(draw_center_rect.mRight, draw_outer_rect.mBottom, 0.f);
+			pos[index].set(draw_center_rect.mRight, draw_outer_rect.mBottom, 0.f);
 			index++;
 
 			uv[index] = LLVector2(uv_outer_rect.mRight, uv_outer_rect.mBottom);
-			pos[index] = LLVector3(draw_outer_rect.mRight, draw_outer_rect.mBottom, 0.f);
+			pos[index].set(draw_outer_rect.mRight, draw_outer_rect.mBottom, 0.f);
 			index++;
 
 			uv[index] = LLVector2(uv_outer_rect.mRight, uv_center_rect.mBottom);
-			pos[index] = LLVector3(draw_outer_rect.mRight, draw_center_rect.mBottom, 0.f);
+			pos[index].set(draw_outer_rect.mRight, draw_center_rect.mBottom, 0.f);
 			index++;
 
 			uv[index] = LLVector2(uv_center_rect.mRight, uv_center_rect.mBottom);
-			pos[index] = LLVector3(draw_center_rect.mRight, draw_center_rect.mBottom, 0.f);
+			pos[index].set(draw_center_rect.mRight, draw_center_rect.mBottom, 0.f);
 			index++;
 
 			// draw left 
 			uv[index] = LLVector2(uv_outer_rect.mLeft, uv_center_rect.mBottom);
-			pos[index] = LLVector3(draw_outer_rect.mLeft, draw_center_rect.mBottom, 0.f);
+			pos[index].set(draw_outer_rect.mLeft, draw_center_rect.mBottom, 0.f);
 			index++;
 
 			uv[index] = LLVector2(uv_center_rect.mLeft, uv_center_rect.mBottom);
-			pos[index] = LLVector3(draw_center_rect.mLeft, draw_center_rect.mBottom, 0.f);
+			pos[index].set(draw_center_rect.mLeft, draw_center_rect.mBottom, 0.f);
 			index++;
 
 			uv[index] = LLVector2(uv_center_rect.mLeft, uv_center_rect.mTop);
-			pos[index] = LLVector3(draw_center_rect.mLeft, draw_center_rect.mTop, 0.f);
+			pos[index].set(draw_center_rect.mLeft, draw_center_rect.mTop, 0.f);
 			index++;
 
 			uv[index] = LLVector2(uv_outer_rect.mLeft, uv_center_rect.mTop);
-			pos[index] = LLVector3(draw_outer_rect.mLeft, draw_center_rect.mTop, 0.f);
+			pos[index].set(draw_outer_rect.mLeft, draw_center_rect.mTop, 0.f);
 			index++;
 
 			// draw middle
 			uv[index] = LLVector2(uv_center_rect.mLeft, uv_center_rect.mBottom);
-			pos[index] = LLVector3(draw_center_rect.mLeft, draw_center_rect.mBottom, 0.f);
+			pos[index].set(draw_center_rect.mLeft, draw_center_rect.mBottom, 0.f);
 			index++;
 
 			uv[index] = LLVector2(uv_center_rect.mRight, uv_center_rect.mBottom);
-			pos[index] = LLVector3(draw_center_rect.mRight, draw_center_rect.mBottom, 0.f);
+			pos[index].set(draw_center_rect.mRight, draw_center_rect.mBottom, 0.f);
 			index++;
 
 			uv[index] = LLVector2(uv_center_rect.mRight, uv_center_rect.mTop);
-			pos[index] = LLVector3(draw_center_rect.mRight, draw_center_rect.mTop, 0.f);
+			pos[index].set(draw_center_rect.mRight, draw_center_rect.mTop, 0.f);
 			index++;
 
 			uv[index] = LLVector2(uv_center_rect.mLeft, uv_center_rect.mTop);
-			pos[index] = LLVector3(draw_center_rect.mLeft, draw_center_rect.mTop, 0.f);
+			pos[index].set(draw_center_rect.mLeft, draw_center_rect.mTop, 0.f);
 			index++;
 
 			// draw right 
 			uv[index] = LLVector2(uv_center_rect.mRight, uv_center_rect.mBottom);
-			pos[index] = LLVector3(draw_center_rect.mRight, draw_center_rect.mBottom, 0.f);
+			pos[index].set(draw_center_rect.mRight, draw_center_rect.mBottom, 0.f);
 			index++;
 
 			uv[index] = LLVector2(uv_outer_rect.mRight, uv_center_rect.mBottom);
-			pos[index] = LLVector3(draw_outer_rect.mRight, draw_center_rect.mBottom, 0.f);
+			pos[index].set(draw_outer_rect.mRight, draw_center_rect.mBottom, 0.f);
 			index++;
 
 			uv[index] = LLVector2(uv_outer_rect.mRight, uv_center_rect.mTop);
-			pos[index] = LLVector3(draw_outer_rect.mRight, draw_center_rect.mTop, 0.f);
+			pos[index].set(draw_outer_rect.mRight, draw_center_rect.mTop, 0.f);
 			index++;
 
 			uv[index] = LLVector2(uv_center_rect.mRight, uv_center_rect.mTop);
-			pos[index] = LLVector3(draw_center_rect.mRight, draw_center_rect.mTop, 0.f);
+			pos[index].set(draw_center_rect.mRight, draw_center_rect.mTop, 0.f);
 			index++;
 
 			// draw top left
 			uv[index] = LLVector2(uv_outer_rect.mLeft, uv_center_rect.mTop);
-			pos[index] = LLVector3(draw_outer_rect.mLeft, draw_center_rect.mTop, 0.f);
+			pos[index].set(draw_outer_rect.mLeft, draw_center_rect.mTop, 0.f);
 			index++;
 
 			uv[index] = LLVector2(uv_center_rect.mLeft, uv_center_rect.mTop);
-			pos[index] = LLVector3(draw_center_rect.mLeft, draw_center_rect.mTop, 0.f);
+			pos[index].set(draw_center_rect.mLeft, draw_center_rect.mTop, 0.f);
 			index++;
 
 			uv[index] = LLVector2(uv_center_rect.mLeft, uv_outer_rect.mTop);
-			pos[index] = LLVector3(draw_center_rect.mLeft, draw_outer_rect.mTop, 0.f);
+			pos[index].set(draw_center_rect.mLeft, draw_outer_rect.mTop, 0.f);
 			index++;
 
 			uv[index] = LLVector2(uv_outer_rect.mLeft, uv_outer_rect.mTop);
-			pos[index] = LLVector3(draw_outer_rect.mLeft, draw_outer_rect.mTop, 0.f);
+			pos[index].set(draw_outer_rect.mLeft, draw_outer_rect.mTop, 0.f);
 			index++;
 
 			// draw top middle
 			uv[index] = LLVector2(uv_center_rect.mLeft, uv_center_rect.mTop);
-			pos[index] = LLVector3(draw_center_rect.mLeft, draw_center_rect.mTop, 0.f);
+			pos[index].set(draw_center_rect.mLeft, draw_center_rect.mTop, 0.f);
 			index++;
 
 			uv[index] = LLVector2(uv_center_rect.mRight, uv_center_rect.mTop);
-			pos[index] = LLVector3(draw_center_rect.mRight, draw_center_rect.mTop, 0.f);
+			pos[index].set(draw_center_rect.mRight, draw_center_rect.mTop, 0.f);
 			index++;
 
 			uv[index] = LLVector2(uv_center_rect.mRight, uv_outer_rect.mTop);
-			pos[index] = LLVector3(draw_center_rect.mRight, draw_outer_rect.mTop, 0.f);
+			pos[index].set(draw_center_rect.mRight, draw_outer_rect.mTop, 0.f);
 			index++;
 
 			uv[index] = LLVector2(uv_center_rect.mLeft, uv_outer_rect.mTop);
-			pos[index] = LLVector3(draw_center_rect.mLeft, draw_outer_rect.mTop, 0.f);
+			pos[index].set(draw_center_rect.mLeft, draw_outer_rect.mTop, 0.f);
 			index++;
 
 			// draw top right
 			uv[index] = LLVector2(uv_center_rect.mRight, uv_center_rect.mTop);
-			pos[index] = LLVector3(draw_center_rect.mRight, draw_center_rect.mTop, 0.f);
+			pos[index].set(draw_center_rect.mRight, draw_center_rect.mTop, 0.f);
 			index++;
 
 			uv[index] = LLVector2(uv_outer_rect.mRight, uv_center_rect.mTop);
-			pos[index] = LLVector3(draw_outer_rect.mRight, draw_center_rect.mTop, 0.f);
+			pos[index].set(draw_outer_rect.mRight, draw_center_rect.mTop, 0.f);
 			index++;
 
 			uv[index] = LLVector2(uv_outer_rect.mRight, uv_outer_rect.mTop);
-			pos[index] = LLVector3(draw_outer_rect.mRight, draw_outer_rect.mTop, 0.f);
+			pos[index].set(draw_outer_rect.mRight, draw_outer_rect.mTop, 0.f);
 			index++;
 
 			uv[index] = LLVector2(uv_center_rect.mRight, uv_outer_rect.mTop);
-			pos[index] = LLVector3(draw_center_rect.mRight, draw_outer_rect.mTop, 0.f);
+			pos[index].set(draw_center_rect.mRight, draw_outer_rect.mTop, 0.f);
 			index++;
 
 			gGL.vertexBatchPreTransformed(pos, uv, NUM_VERTICES);
@@ -691,7 +691,7 @@ void gl_draw_scaled_rotated_image(S32 x, S32 y, S32 width, S32 height, F32 degre
 	{
 		const S32 NUM_VERTICES = 4; // 9 quads
 		LLVector2 uv[NUM_VERTICES];
-		LLVector3 pos[NUM_VERTICES];
+		LLVector4a pos[NUM_VERTICES];
 
 		gGL.begin(LLRender::QUADS);
 		{
@@ -705,19 +705,19 @@ void gl_draw_scaled_rotated_image(S32 x, S32 y, S32 width, S32 height, F32 degre
 			S32 scaled_height = ll_round(height * ui_scale.mV[VY]);
 
 			uv[index] = LLVector2(uv_rect.mRight, uv_rect.mTop);
-			pos[index] = LLVector3(ui_translation.mV[VX] + scaled_width, ui_translation.mV[VY] + scaled_height, 0.f);
+			pos[index].set(ui_translation.mV[VX] + scaled_width, ui_translation.mV[VY] + scaled_height, 0.f);
 			index++;
 
 			uv[index] = LLVector2(uv_rect.mLeft, uv_rect.mTop);
-			pos[index] = LLVector3(ui_translation.mV[VX], ui_translation.mV[VY] + scaled_height, 0.f);
+			pos[index].set(ui_translation.mV[VX], ui_translation.mV[VY] + scaled_height, 0.f);
 			index++;
 
 			uv[index] = LLVector2(uv_rect.mLeft, uv_rect.mBottom);
-			pos[index] = LLVector3(ui_translation.mV[VX], ui_translation.mV[VY], 0.f);
+			pos[index].set(ui_translation.mV[VX], ui_translation.mV[VY], 0.f);
 			index++;
 
 			uv[index] = LLVector2(uv_rect.mRight, uv_rect.mBottom);
-			pos[index] = LLVector3(ui_translation.mV[VX] + scaled_width, ui_translation.mV[VY], 0.f);
+			pos[index].set(ui_translation.mV[VX] + scaled_width, ui_translation.mV[VY], 0.f);
 			index++;
 
 			gGL.vertexBatchPreTransformed(pos, uv, NUM_VERTICES);
