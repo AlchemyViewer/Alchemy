@@ -31,6 +31,7 @@
 
 #include "llwindow.h"
 #include "lltimer.h"
+#include "llpreeditor.h"
 
 #ifndef SDL_MAIN_HANDLED
 #define SDL_MAIN_HANDLED 1
@@ -127,6 +128,8 @@ public:
 	/*virtual*/ void bringToFront();
 
 	void allowLanguageTextInput(LLPreeditor *preeditor, BOOL b) override;
+	/*virtual*/ void updateLanguageTextInputArea() override;
+	/*virtual*/ void setLanguageTextInput( const LLCoordGL & pos ) override;
 
 	/*virtual*/ void spawnWebBrowser(const std::string& escaped_url, bool async);
 	

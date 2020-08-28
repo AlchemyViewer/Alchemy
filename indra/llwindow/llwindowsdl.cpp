@@ -1665,7 +1665,6 @@ BOOL LLWindowSDL::SDLReallyCaptureInput(BOOL capture)
 	}
 
 	bool newGrab = wantGrab;
-#if LL_X11
     if (!mFullscreen) /* only bother if we're windowed anyway */
     {
         if (mSDL_Display)
@@ -1696,7 +1695,6 @@ BOOL LLWindowSDL::SDLReallyCaptureInput(BOOL capture)
             }
         }
     }
-#endif // LL_X11
 		// pretend we got what we wanted, when really we don't care.
 	
 	// return boolean success for whether we ended up in the desired state
@@ -2728,6 +2726,48 @@ void LLWindowSDL::allowLanguageTextInput(LLPreeditor *preeditor, BOOL b)
     {
         SDL_StopTextInput();
     }
+}
+
+void LLWindowSDL::updateLanguageTextInputArea()
+{
+	if (mLanguageTextInputAllowed && mPreeditor)
+	{
+		LLCoordGL caret_coord;
+		LLRect preedit_bounds;
+		if (mPreeditor->getPreeditLocation(-1, &caret_coord, &preedit_bounds, NULL))
+		{
+			LLCoordWindow window_pos;
+			convertCoords(caret_coord, &window_pos);
+
+			SDL_Rect coords;
+			coords.x = window_pos.mX;
+			coords.y = window_pos.mY;
+			coords.w = preedit_bounds.getWidth() - coords.x;
+			coords.h = preedit_bounds.getHeight() - coords.y;
+			SDL_SetTextInputRect(&coords);
+		}
+	}
+}
+
+void LLWindowSDL::setLanguageTextInput( const LLCoordGL & pos )
+{
+	if (mLanguageTextInputAllowed && mPreeditor)
+	{
+		LLCoordGL caret_coord;
+		LLRect preedit_bounds;
+		if (mPreeditor->getPreeditLocation(-1, &caret_coord, &preedit_bounds, NULL))
+		{
+			LLCoordWindow window_pos;
+			convertCoords(pos, &window_pos);
+
+			SDL_Rect coords;
+			coords.x = window_pos.mX;
+			coords.y = window_pos.mY;
+			coords.w = preedit_bounds.getWidth() - coords.x;
+			coords.h = preedit_bounds.getHeight() - coords.y;
+			SDL_SetTextInputRect(&coords);
+		}
+	}
 }
 
 //static
