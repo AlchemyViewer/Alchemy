@@ -114,7 +114,6 @@ public:
 
 	static LLVBOPool sStreamVBOPool;
 	static LLVBOPool sDynamicVBOPool;
-	static LLVBOPool sDynamicCopyVBOPool;
 	static LLVBOPool sStreamIBOPool;
 	static LLVBOPool sDynamicIBOPool;
 	
@@ -218,8 +217,6 @@ public:
 	// map for data access
 	volatile U8*		mapVertexBuffer(S32 type, S32 index, S32 count, bool map_range);
 	volatile U8*		mapIndexBuffer(S32 index, S32 count, bool map_range);
-
-	void bindForFeedback(U32 channel, U32 type, U32 index, U32 count);
 
 	// set for rendering
 	virtual void	setBuffer(U32 data_mask); 	// calls  setupVertexBuffer() if data_mask is not 0

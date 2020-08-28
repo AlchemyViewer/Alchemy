@@ -388,7 +388,6 @@ LLPipeline::LLPipeline() :
 	mInitialized(false),
 	mVertexShadersEnabled(false),
 	mVertexShadersLoaded(0),
-	mTransformFeedbackPrimitives(0),
 	mRenderDebugFeatureMask(0),
 	mRenderDebugMask(0),
 	mOldRenderDebugMask(0),
@@ -3913,32 +3912,12 @@ void LLPipeline::postSort(LLCamera& camera)
 		LL_WARNS_ONCE() << "Missing particle buffer" << LL_ENDL;
 	}
 
-	/*bool use_transform_feedback = gTransformPositionProgram.mProgramObject && !mMeshDirtyGroup.empty();
-
-	if (use_transform_feedback)
-	{ //place a query around potential transform feedback code for synchronization
-		mTransformFeedbackPrimitives = 0;
-
-		if (!mMeshDirtyQueryObject)
-		{
-			glGenQueries(1, &mMeshDirtyQueryObject);
-		}
-
-		
-		glBeginQuery(GL_TRANSFORM_FEEDBACK_PRIMITIVES_WRITTEN, mMeshDirtyQueryObject);
-	}*/
-
 	//pack vertex buffers for groups that chose to delay their updates
 	for (LLSpatialGroup* group : mMeshDirtyGroup)
 	{
 		group->rebuildMesh();
 	}
 
-	/*if (use_transform_feedback)
-	{
-		glEndQuery(GL_TRANSFORM_FEEDBACK_PRIMITIVES_WRITTEN);
-	}*/
-	
 	mMeshDirtyGroup.clear();
 
 	if (!sShadowRender)

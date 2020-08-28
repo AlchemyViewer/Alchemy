@@ -68,13 +68,6 @@ bool				LLViewerShaderMgr::sSkipReload = false;
 
 LLVector4			gShinyOrigin;
 
-//transform shaders
-LLGLSLShader			gTransformPositionProgram;
-LLGLSLShader			gTransformTexCoordProgram;
-LLGLSLShader			gTransformNormalProgram;
-LLGLSLShader			gTransformColorProgram;
-LLGLSLShader			gTransformTangentProgram;
-
 //utility shaders
 LLGLSLShader	gOcclusionProgram;
 LLGLSLShader	gOcclusionCubeProgram;
@@ -471,13 +464,6 @@ void LLViewerShaderMgr::setShaders()
     S32 wl_class = 1;
     S32 water_class = 2;
     S32 deferred_class = 0;
-    S32 transform_class = gGLManager.mHasTransformFeedback ? 1 : 0;
-
-    static LLCachedControl<bool> use_transform_feedback(gSavedSettings, "RenderUseTransformFeedback", false);
-    if (!use_transform_feedback)
-    {
-        transform_class = 0;
-    }
 
     if (useRenderDeferred)
     {
@@ -525,7 +511,6 @@ void LLViewerShaderMgr::setShaders()
     mShaderLevel[SHADER_EFFECT] = effect_class;
     mShaderLevel[SHADER_WINDLIGHT] = wl_class;
     mShaderLevel[SHADER_DEFERRED] = deferred_class;
-    mShaderLevel[SHADER_TRANSFORM] = transform_class;
 
     BOOL loaded = loadBasicShaders();
     if (loaded)
@@ -608,21 +593,6 @@ void LLViewerShaderMgr::setShaders()
             else
             {
                 LL_WARNS() << "Failed to load interface shaders." << LL_ENDL;
-                llassert(loaded);
-            }
-        }
-
-        if (loaded)
-
-        {
-            loaded = loadTransformShaders();
-            if (loaded)
-            {
-                LL_INFOS() << "Loaded transform shaders." << LL_ENDL;
-            }
-            else
-            {
-                LL_WARNS() << "Failed to load transform shaders." << LL_ENDL;
                 llassert(loaded);
             }
         }
@@ -839,12 +809,6 @@ void LLViewerShaderMgr::unloadShaders()
 	gDeferredSkinnedBumpProgram.unload();
 	gDeferredSkinnedAlphaProgram.unload();
 
-	gTransformPositionProgram.unload();
-	gTransformTexCoordProgram.unload();
-	gTransformNormalProgram.unload();
-	gTransformColorProgram.unload();
-	gTransformTangentProgram.unload();
-
 	mShaderLevel[SHADER_LIGHTING] = 0;
 	mShaderLevel[SHADER_OBJECT] = 0;
 	mShaderLevel[SHADER_AVATAR] = 0;
@@ -853,7 +817,6 @@ void LLViewerShaderMgr::unloadShaders()
 	mShaderLevel[SHADER_INTERFACE] = 0;
 	mShaderLevel[SHADER_EFFECT] = 0;
 	mShaderLevel[SHADER_WINDLIGHT] = 0;
-	mShaderLevel[SHADER_TRANSFORM] = 0;
 
 	gPipeline.mVertexShadersLoaded = 0;
 }
@@ -4156,95 +4119,6 @@ BOOL LLViewerShaderMgr::loadShadersWindLight()
         success = gWLMoonProgram.createShader(NULL, NULL);
     }
 
-	return success;
-}
-
-BOOL LLViewerShaderMgr::loadTransformShaders()
-{
-	BOOL success = TRUE;
-	
-	if (mShaderLevel[SHADER_TRANSFORM] < 1)
-	{
-		gTransformPositionProgram.unload();
-		gTransformTexCoordProgram.unload();
-		gTransformNormalProgram.unload();
-		gTransformColorProgram.unload();
-		gTransformTangentProgram.unload();
-		return TRUE;
-	}
-
-	if (success)
-	{
-        gTransformPositionProgram.mName = "Position Transform Shader";
-		gTransformPositionProgram.mShaderFiles.clear();
-		gTransformPositionProgram.mShaderFiles.push_back(make_pair("transform/positionV.glsl", GL_VERTEX_SHADER));
-		gTransformPositionProgram.mShaderLevel = mShaderLevel[SHADER_TRANSFORM];
-
-		const char* varyings[] = {
-			"position_out",
-			"texture_index_out",
-		};
-	
-		success = gTransformPositionProgram.createShader(NULL, NULL, 2, varyings);
-	}
-
-	if (success)
-	{
-		gTransformTexCoordProgram.mName = "TexCoord Transform Shader";
-		gTransformTexCoordProgram.mShaderFiles.clear();
-		gTransformTexCoordProgram.mShaderFiles.push_back(make_pair("transform/texcoordV.glsl", GL_VERTEX_SHADER));
-		gTransformTexCoordProgram.mShaderLevel = mShaderLevel[SHADER_TRANSFORM];
-
-		const char* varyings[] = {
-			"texcoord_out",
-		};
-	
-		success = gTransformTexCoordProgram.createShader(NULL, NULL, 1, varyings);
-	}
-
-	if (success)
-	{
-		gTransformNormalProgram.mName = "Normal Transform Shader";
-		gTransformNormalProgram.mShaderFiles.clear();
-		gTransformNormalProgram.mShaderFiles.push_back(make_pair("transform/normalV.glsl", GL_VERTEX_SHADER));
-		gTransformNormalProgram.mShaderLevel = mShaderLevel[SHADER_TRANSFORM];
-
-		const char* varyings[] = {
-			"normal_out",
-		};
-	
-		success = gTransformNormalProgram.createShader(NULL, NULL, 1, varyings);
-	}
-
-	if (success)
-	{
-		gTransformColorProgram.mName = "Color Transform Shader";
-		gTransformColorProgram.mShaderFiles.clear();
-		gTransformColorProgram.mShaderFiles.push_back(make_pair("transform/colorV.glsl", GL_VERTEX_SHADER));
-		gTransformColorProgram.mShaderLevel = mShaderLevel[SHADER_TRANSFORM];
-
-		const char* varyings[] = {
-			"color_out",
-		};
-	
-		success = gTransformColorProgram.createShader(NULL, NULL, 1, varyings);
-	}
-
-	if (success)
-	{
-		gTransformTangentProgram.mName = "Binormal Transform Shader";
-		gTransformTangentProgram.mShaderFiles.clear();
-		gTransformTangentProgram.mShaderFiles.push_back(make_pair("transform/binormalV.glsl", GL_VERTEX_SHADER));
-        gTransformTangentProgram.mShaderLevel = mShaderLevel[SHADER_TRANSFORM];
-
-		const char* varyings[] = {
-			"tangent_out",
-		};
-	
-		success = gTransformTangentProgram.createShader(NULL, NULL, 1, varyings);
-	}
-
-	
 	return success;
 }
 

@@ -85,7 +85,6 @@ const U32 LL_VBO_POOL_SEED_COUNT = vbo_block_index(LL_VBO_POOL_MAX_SEED_SIZE);
 //static
 LLVBOPool LLVertexBuffer::sStreamVBOPool(GL_STREAM_DRAW, GL_ARRAY_BUFFER);
 LLVBOPool LLVertexBuffer::sDynamicVBOPool(GL_DYNAMIC_DRAW, GL_ARRAY_BUFFER);
-LLVBOPool LLVertexBuffer::sDynamicCopyVBOPool(GL_DYNAMIC_COPY, GL_ARRAY_BUFFER);
 LLVBOPool LLVertexBuffer::sStreamIBOPool(GL_STREAM_DRAW, GL_ELEMENT_ARRAY_BUFFER);
 LLVBOPool LLVertexBuffer::sDynamicIBOPool(GL_DYNAMIC_DRAW, GL_ELEMENT_ARRAY_BUFFER);
 
@@ -188,7 +187,6 @@ volatile U8* LLVBOPool::allocate(U32& name, U32 size, bool for_seed)
 		if (LLVertexBuffer::sDisableVBOMapping || mUsage != GL_DYNAMIC_DRAW)
 		{
 			glBufferData(mType, size, 0, mUsage);
-			if (mUsage != GL_DYNAMIC_COPY)
 			{ //data will be provided by application
 				ret = (U8*) ll_aligned_malloc<64>(size);
 				if (!ret)
@@ -414,7 +412,6 @@ void LLVertexBuffer::seedPools()
 {
 	sStreamVBOPool.seedPool();
 	sDynamicVBOPool.seedPool();
-	sDynamicCopyVBOPool.seedPool();
 	sStreamIBOPool.seedPool();
 	sDynamicIBOPool.seedPool();
 }
@@ -926,7 +923,6 @@ void LLVertexBuffer::cleanupClass()
 	sDynamicIBOPool.cleanup();
 	sStreamVBOPool.cleanup();
 	sDynamicVBOPool.cleanup();
-	sDynamicCopyVBOPool.cleanup();
 
 	while (!sAvailableVAOName.empty())
 	{
@@ -966,23 +962,20 @@ S32 LLVertexBuffer::determineUsage(S32 usage)
 	{ //MUST use VBOs for all rendering
 		ret_usage = GL_STREAM_DRAW;
 	}
-	
-	if (ret_usage && ret_usage != GL_STREAM_DRAW)
-	{ //only stream_draw and dynamic_draw are supported when using VBOs, dynamic draw is the default
-		if (ret_usage != GL_DYNAMIC_COPY)
-		{
-		    if (sDisableVBOMapping)
-		    { //always use stream draw if VBO mapping is disabled
-			    ret_usage = GL_STREAM_DRAW;
-		    }
-		    else
-		    {
-			    ret_usage = GL_DYNAMIC_DRAW;
-		    }
-	    }
-	}
-	
-	return ret_usage;
+
+    if (ret_usage && ret_usage != GL_STREAM_DRAW)
+    { // only stream_draw and dynamic_draw are supported when using VBOs, dynamic draw is the default
+        if (sDisableVBOMapping)
+        { // always use stream draw if VBO mapping is disabled
+            ret_usage = GL_STREAM_DRAW;
+        }
+        else
+        {
+            ret_usage = GL_DYNAMIC_DRAW;
+        }
+    }
+
+    return ret_usage;
 }
 
 LLVertexBuffer::LLVertexBuffer(U32 typemask, S32 usage) 
@@ -1144,12 +1137,7 @@ void LLVertexBuffer::genBuffer(U32 size)
 	{
 		mMappedData = sDynamicVBOPool.allocate(mGLBuffer, mSize);
 	}
-	else
-	{
-		mMappedData = sDynamicCopyVBOPool.allocate(mGLBuffer, mSize);
-	}
-	
-	
+
 	sGLCount++;
 }
 
@@ -2320,16 +2308,6 @@ void LLVertexBuffer::flush()
 	{
 		unmapBuffer();
 	}
-}
-
-// bind for transform feedback (quick 'n dirty)
-void LLVertexBuffer::bindForFeedback(U32 channel, U32 type, U32 index, U32 count)
-{
-#ifdef GL_TRANSFORM_FEEDBACK_BUFFER
-	U32 offset = mOffsets[type] + sTypeSize[type]*index;
-	U32 size= (sTypeSize[type]*count);
-	glBindBufferRange(GL_TRANSFORM_FEEDBACK_BUFFER, channel, mGLBuffer, offset, size);
-#endif
 }
 
 // Set for rendering
