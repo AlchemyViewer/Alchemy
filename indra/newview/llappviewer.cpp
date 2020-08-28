@@ -1493,25 +1493,6 @@ bool LLAppViewer::doFrame()
 
 				display();
 
-				static const LLCachedControl<bool> sleep_main_loop(gSavedSettings, "AlchemyMainLoopSleep", true);
-				if (sleep_main_loop)
-				{
-					static U64 last_call = 0;
-					if (!gTeleportDisplay || gGLManager.mIsIntel) // SL-10625...throttle early, throttle often with Intel
-					{
-						// Frame/draw throttling
-						U64 elapsed_time = LLTimer::getTotalTime() - last_call;
-						if (elapsed_time < mMinMicroSecPerFrame)
-						{
-							LL_RECORD_BLOCK_TIME(FTM_SLEEP);
-							// llclamp for when time function gets funky
-							U64 sleep_time = llclamp(mMinMicroSecPerFrame - elapsed_time, (U64)1, (U64)1e6);
-							micro_sleep(sleep_time);
-						}
-					}
-					last_call = LLTimer::getTotalTime();
-				}
-
 				pingMainloopTimeout("Main:Snapshot");
 				LLFloaterSnapshot::update(); // take snapshots
 					LLFloaterOutfitSnapshot::update();
