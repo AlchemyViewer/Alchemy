@@ -132,6 +132,8 @@ namespace {
 		RecordToFile(const std::string& filename):
 			mName(filename)
 		{
+			showMultiline(true);
+
 			mFile.open(filename, std::ios_base::out | std::ios_base::app);
 			if (!mFile)
 			{
@@ -1197,7 +1199,7 @@ namespace
 				
 			if (r->wantsTags())
 			{
-				message_stream << site.mTagString;
+				message_stream << site.mTagString << " ";
 			}
             message_stream << " ";
 
