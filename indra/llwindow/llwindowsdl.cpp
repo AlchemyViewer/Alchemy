@@ -522,12 +522,6 @@ BOOL LLWindowSDL::createContext(int x, int y, int width, int height, int bits, B
 		SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
 		LLGLSLShader::sNoFixedFunction = true;
 	}
-#if !LL_DARWIN
-	else
-	{
-		SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_COMPATIBILITY);
-	}
-#endif
 
 	U32 context_flags = 0;
 	if (gDebugGL)
@@ -672,45 +666,51 @@ BOOL LLWindowSDL::createContext(int x, int y, int width, int height, int bits, B
         }
     }
 
-	U32 major_gl_version = 4;
-	U32 minor_gl_version = 6;
+    // Create the context
+    if (LLRender::sGLCoreProfile)
+    {
+        U32 major_gl_version = 4;
+        U32 minor_gl_version = 6;
 
-	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, major_gl_version);
-	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, minor_gl_version);
+        SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, major_gl_version);
+        SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, minor_gl_version);
 
-	bool done = false;
-	while (!done)
-	{
-		mGLContext = SDL_GL_CreateContext(mWindow);
+        bool done = false;
+        while (!done)
+        {
+            mGLContext = SDL_GL_CreateContext(mWindow);
 
-		if (!mGLContext)
-		{
-			if (minor_gl_version > 0)
-			{ //decrement minor version
-				minor_gl_version--;
-				SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, minor_gl_version);
-			}
-			else if (major_gl_version > 3)
-			{ //decrement major version and start minor version over at 3
-				major_gl_version--;
-				minor_gl_version = 3;
-				SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, major_gl_version);
-				SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, minor_gl_version);
-			}
-			else
-			{ //we reached 3.0 and still failed, bail out
-				done = true;
-			}
-		}
-		else
-		{
-			LL_INFOS() << "Created OpenGL " << llformat("%d.%d", major_gl_version, minor_gl_version) <<
-				(LLRender::sGLCoreProfile ? " core" : " compatibility") << " context." << LL_ENDL;
-			done = true;
-		}
-	}
+            if (!mGLContext)
+            {
+                if (minor_gl_version > 0)
+                { //decrement minor version
+                    minor_gl_version--;
+                    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, minor_gl_version);
+                }
+                else if (major_gl_version > 3)
+                { //decrement major version and start minor version over at 3
+                    major_gl_version--;
+                    minor_gl_version = 3;
+                    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, major_gl_version);
+                    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, minor_gl_version);
+                }
+                else
+                { //we reached 3.0 and still failed, bail out
+                    done = true;
+                }
+            }
+            else
+            {
+                done = true;
+            }
+        }
+    }
+    else
+    {
+        mGLContext = SDL_GL_CreateContext(mWindow);
+    }
 
-	if (!mGLContext)
+    if (!mGLContext)
 	{
 		LL_WARNS() << "OpenGL context creation failure. SDL: " << SDL_GetError() << LL_ENDL;
 		setupFailure("Context creation error", "Error", OSMB_OK);
@@ -722,6 +722,14 @@ BOOL LLWindowSDL::createContext(int x, int y, int width, int height, int bits, B
 		setupFailure("Context current failure", "Error", OSMB_OK);
 		return FALSE;
 	}
+
+   	int major_gl_version = 0;
+    int minor_gl_version = 0;
+    SDL_GL_GetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, &major_gl_version);
+    SDL_GL_GetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, &minor_gl_version);
+
+    LL_INFOS() << "Created OpenGL " << llformat("%d.%d", major_gl_version, minor_gl_version) <<
+				(LLRender::sGLCoreProfile ? " core" : " compatibility") << " context." << LL_ENDL;
 	
 	int vsync_enable = 1;
 	if(disable_vsync)
