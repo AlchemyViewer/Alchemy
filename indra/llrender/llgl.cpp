@@ -984,11 +984,11 @@ void LLGLManager::initExtensions()
 	}
 
 	// Disable certain things due to known bugs
-	if (mIsIntel && mHasMipMapGeneration)
-	{
-		LL_INFOS("RenderInit") << "Disabling mip-map generation for Intel GPUs" << LL_ENDL;
-		mHasMipMapGeneration = FALSE;
-	}
+//	if (mIsIntel && mHasMipMapGeneration)
+//	{
+//		LL_INFOS("RenderInit") << "Disabling mip-map generation for Intel GPUs" << LL_ENDL;
+//		mHasMipMapGeneration = FALSE;
+//	}
 	
 	// Misc
 	glGetIntegerv(GL_MAX_ELEMENTS_VERTICES, (GLint*) &mGLMaxVertexRange);
