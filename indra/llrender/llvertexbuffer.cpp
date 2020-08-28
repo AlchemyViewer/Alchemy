@@ -927,6 +927,16 @@ void LLVertexBuffer::cleanupClass()
 	sStreamVBOPool.cleanup();
 	sDynamicVBOPool.cleanup();
 	sDynamicCopyVBOPool.cleanup();
+
+	while (!sAvailableVAOName.empty())
+	{
+#if GL_ARB_vertex_array_object
+		glDeleteVertexArrays(1, &sAvailableVAOName.front());
+#endif
+		sAvailableVAOName.pop_front();
+	}
+	sLastMask = 0;
+
 	delete sUtilityBuffer;
 	sUtilityBuffer = nullptr;
 }
