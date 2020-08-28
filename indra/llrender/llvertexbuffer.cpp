@@ -606,9 +606,7 @@ void LLVertexBuffer::drawArrays(U32 mode, const std::vector<LLVector3>& pos, con
 	normal_strider.copyArray(0, norm.data(), count);
 
 	sUtilityBuffer->setBuffer(MAP_VERTEX | MAP_NORMAL);
-	LLGLSLShader::startProfile();
 	sUtilityBuffer->drawArrays(mode, 0, pos.size());
-	LLGLSLShader::stopProfile(count, mode);
 }
 
 //static
@@ -657,9 +655,7 @@ void LLVertexBuffer::drawElements(U32 mode, const S32 num_vertices, const LLVect
 	}
 
 	sUtilityBuffer->setBuffer(mask);
-	LLGLSLShader::startProfile();
 	sUtilityBuffer->draw(mode, num_indices, 0);
-	LLGLSLShader::stopProfile(num_indices, mode);
 }
 
 void LLVertexBuffer::validateRange(U32 start, U32 end, U32 count, U32 indices_offset) const
