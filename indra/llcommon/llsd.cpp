@@ -456,8 +456,8 @@ namespace
 	
 	const LLSD& ImplMap::ref(const LLSD::String& k) const
 	{
-		DataMap::const_iterator i = mData.lower_bound(k);
-		if (i == mData.end()  ||  mData.key_comp()(k, i->first))
+		DataMap::const_iterator i = mData.find(k);
+		if (i == mData.end())
 		{
 			return undef();
 		}
