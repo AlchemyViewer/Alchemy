@@ -31,14 +31,9 @@
 
 // Freetype stuff
 #include <ft2build.h>
-#ifdef LL_WINDOWS
-#include <freetype2\freetype\ftsystem.h>
-#endif
-
-// For some reason, this won't work if it's not wrapped in the ifdef
-#ifdef FT_FREETYPE_H
 #include FT_FREETYPE_H
-#endif
+#include FT_MODULE_H
+#include FT_SYSTEM_H
 
 #include "llerror.h"
 #include "llimage.h"

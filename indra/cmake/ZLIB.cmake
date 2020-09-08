@@ -10,6 +10,10 @@ if (USESYSTEMLIBS)
 else (USESYSTEMLIBS)
   use_prebuilt_binary(zlib)
   if (WINDOWS)
+    set(MINIZIP_LIBRARIES 
+      debug minizipd
+      optimized minizip)
+
     set(ZLIB_LIBRARIES 
       debug zlibd
       optimized zlib)

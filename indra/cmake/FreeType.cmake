@@ -8,7 +8,7 @@ if (LINUX OR USESYSTEMLIBS)
   pkg_check_modules(FONTCONFIG REQUIRED fontconfig)
 else ()
   use_prebuilt_binary(freetype)
-  set(FREETYPE_INCLUDE_DIRS ${LIBS_PREBUILT_DIR}/include/freetype2/)
+  set(FREETYPE_INCLUDE_DIRS ${LIBS_PREBUILT_DIR}/include/)
   set(FREETYPE_LIBRARIES freetype)
 endif ()
 

@@ -132,7 +132,7 @@ if (WINDOWS)
   endif()
 
   set(GLOBAL_CXX_FLAGS 
-      "/GS /W3 /c /Zc:__cplusplus  /Zc:forScope /Zc:rvalueCast /Zc:strictStrings /Zc:ternary /Zc:wchar_t- /nologo"
+      "/GS /W3 /c /Zc:__cplusplus  /Zc:forScope /Zc:rvalueCast /Zc:strictStrings /Zc:ternary /nologo"
       )
 
   if (USE_AVX2)
@@ -171,23 +171,25 @@ if (WINDOWS)
       /DLL_WINDOWS=1
       /DNOMINMAX
       /DUNICODE
-      /DURI_STATIC_BUILD
       /D_UNICODE
       /D_CRT_SECURE_NO_WARNINGS
       /D_CRT_NONSTDC_NO_DEPRECATE
       /D_WINSOCK_DEPRECATED_NO_WARNINGS
+      /D_SILENCE_CXX17_ADAPTOR_TYPEDEFS_DEPRECATION_WARNING
       /D_SILENCE_CXX17_OLD_ALLOCATOR_MEMBERS_DEPRECATION_WARNING
       /DBOOST_CONFIG_SUPPRESS_OUTDATED_MESSAGE
+      /DBOOST_ALLOW_DEPRECATED_HEADERS
       )
 
   # library linkage defines
   add_definitions(
+      /DBOOST_ALL_DYN_LINK
+      /DDLL_IMPORT
+      /DDOM_DYNAMIC
+      /DPNG_USE_DLL
       /DWEBP_DLL
+      /DZLIB_DLL
   )
-
-  if("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
-    add_definitions(-DBOOST_USE_WINDOWS_H)
-  endif()
 
   # configure win32 API for 7 and above compatibility
   set(WINVER "0x0601" CACHE STRING "Win32 API Target version (see http://msdn.microsoft.com/en-us/library/aa383745%28v=VS.85%29.aspx)")

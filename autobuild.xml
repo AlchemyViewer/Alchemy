@@ -194,9 +194,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>7d4b2511976449e9a4ec7be41dc8310f</string>
+              <string>871888bb0d0aae331f00d31e16d64438</string>
+              <key>hash_algorithm</key>
+              <string>md5</string>
               <key>url</key>
-              <string>http://automated-builds-secondlife-com.s3.amazonaws.com/ct2/64092/601270/boost-1.72-windows-545361.tar.bz2</string>
+              <string>https://pkg.alchemyviewer.org/repository/autobuild-external/boost/windows/boost-1.74-windows-312.tar.bz2</string>
             </map>
             <key>name</key>
             <string>windows</string>
@@ -206,16 +208,18 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>4ad8df0700745201cddf6b71d7b0949f</string>
+              <string>33e4a6887d32672ef2c0e2dfcac4ad9c</string>
+              <key>hash_algorithm</key>
+              <string>md5</string>
               <key>url</key>
-              <string>http://automated-builds-secondlife-com.s3.amazonaws.com/ct2/64091/601265/boost-1.72-windows64-545361.tar.bz2</string>
+              <string>https://pkg.alchemyviewer.org/repository/autobuild-external/boost/windows64/boost-1.74-windows64-312.tar.bz2</string>
             </map>
             <key>name</key>
             <string>windows64</string>
           </map>
         </map>
         <key>version</key>
-        <string>1.73</string>
+        <string>1.74</string>
       </map>
       <key>bugsplat</key>
       <map>
@@ -338,9 +342,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>8a02a10fc69c8f504dc5335644db184a</string>
+              <string>72b2de385f5857579d4f0b47bf95c96e</string>
+              <key>hash_algorithm</key>
+              <string>md5</string>
               <key>url</key>
-              <string>http://automated-builds-secondlife-com.s3.amazonaws.com/ct2/64104/601313/colladadom-2.3.545362-windows-545362.tar.bz2</string>
+              <string>https://pkg.alchemyviewer.org/repository/autobuild-external/colladadom/windows/colladadom-2.3.314-windows-314.tar.bz2</string>
             </map>
             <key>name</key>
             <string>windows</string>
@@ -350,16 +356,18 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>742180324fca7ab92b6a61a36aab4f9d</string>
+              <string>d702f005bc263c68238fee52f147f06b</string>
+              <key>hash_algorithm</key>
+              <string>md5</string>
               <key>url</key>
-              <string>http://automated-builds-secondlife-com.s3.amazonaws.com/ct2/64103/601314/colladadom-2.3.545362-windows64-545362.tar.bz2</string>
+              <string>https://pkg.alchemyviewer.org/repository/autobuild-external/colladadom/windows64/colladadom-2.3.314-windows64-314.tar.bz2</string>
             </map>
             <key>name</key>
             <string>windows64</string>
           </map>
         </map>
         <key>version</key>
-        <string>2.3.202210519</string>
+        <string>2.3.314</string>
       </map>
       <key>curl</key>
       <map>
@@ -430,11 +438,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>2796ae7b09e730a55ac03f74ed669520</string>
+              <string>ade52f7c737854df85c2b4b9f1ee91b6</string>
               <key>hash_algorithm</key>
               <string>md5</string>
               <key>url</key>
-              <string>http://automated-builds-secondlife-com.s3.amazonaws.com/ct2/64130/601396/curl-7.54.1.545369-windows-545369.tar.bz2</string>
+              <string>https://pkg.alchemyviewer.org/repository/autobuild-external/curl/windows/curl-7.54.1.318-windows-318.tar.bz2</string>
             </map>
             <key>name</key>
             <string>windows</string>
@@ -444,16 +452,18 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>a8f96e5cdb8128b23d49ff4c3f2233a4</string>
+              <string>46be42a5c3801e59feb8faa57f96813e</string>
+              <key>hash_algorithm</key>
+              <string>md5</string>
               <key>url</key>
-              <string>http://automated-builds-secondlife-com.s3.amazonaws.com/ct2/64129/601382/curl-7.54.1.545369-windows64-545369.tar.bz2</string>
+              <string>https://pkg.alchemyviewer.org/repository/autobuild-external/curl/windows64/curl-7.54.1.318-windows64-318.tar.bz2</string>
             </map>
             <key>name</key>
             <string>windows64</string>
           </map>
         </map>
         <key>version</key>
-        <string>7.54.1.202200953</string>
+        <string>7.54.1.318</string>
       </map>
       <key>db</key>
       <map>
@@ -842,9 +852,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>1d1c7b60f71a5152ced60bee87f5bba8</string>
+              <string>7469c1c916898a8642d8bbce26c66ac8</string>
+              <key>hash_algorithm</key>
+              <string>md5</string>
               <key>url</key>
-              <string>http://automated-builds-secondlife-com.s3.amazonaws.com/ct2/56312/526734/freetype-2.4.4.539865-windows-539865.tar.bz2</string>
+              <string>https://pkg.alchemyviewer.org/repository/autobuild-external/freetype/windows/freetype-2.10.2.321-windows-321.tar.bz2</string>
             </map>
             <key>name</key>
             <string>windows</string>
@@ -854,16 +866,18 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>53e78d4a607e959637e98a82a3cf5bea</string>
+              <string>3f1f9a3383268f4d3ba344577554d03b</string>
+              <key>hash_algorithm</key>
+              <string>md5</string>
               <key>url</key>
-              <string>http://automated-builds-secondlife-com.s3.amazonaws.com/ct2/56310/526723/freetype-2.4.4.539865-windows64-539865.tar.bz2</string>
+              <string>https://pkg.alchemyviewer.org/repository/autobuild-external/freetype/windows64/freetype-2.10.2.321-windows64-321.tar.bz2</string>
             </map>
             <key>name</key>
             <string>windows64</string>
           </map>
         </map>
         <key>version</key>
-        <string>2.10.2.202202106</string>
+        <string>2.10.2.321</string>
       </map>
       <key>glh_linear</key>
       <map>
@@ -1287,96 +1301,6 @@
         <key>version</key>
         <string>8c.538977</string>
       </map>
-      <key>jsoncpp</key>
-      <map>
-        <key>copyright</key>
-        <string>Copyright (c) 2007-2010 Baptiste Lepilleur</string>
-        <key>description</key>
-        <string>jsoncpp is an implementation of a JSON (http://json.org) reader and writer in C++.</string>
-        <key>license</key>
-        <string>public domain</string>
-        <key>license_file</key>
-        <string>LICENSES/jsoncpp.txt</string>
-        <key>name</key>
-        <string>jsoncpp</string>
-        <key>platforms</key>
-        <map>
-          <key>darwin</key>
-          <map>
-            <key>archive</key>
-            <map>
-              <key>hash</key>
-              <string>b25a4f480e07c670ffef00c3da578f87</string>
-              <key>url</key>
-              <string>http://automated-builds-secondlife-com.s3.amazonaws.com/hg/repo/jsoncpp_3p-update-jsoncpp/rev/297281/arch/Darwin/installer/jsoncpp-0.5.0.297281-darwin-297281.tar.bz2</string>
-            </map>
-            <key>name</key>
-            <string>darwin</string>
-          </map>
-          <key>darwin64</key>
-          <map>
-            <key>archive</key>
-            <map>
-              <key>hash</key>
-              <string>87d32aaac4183590c96edd0b6d9bf3e4</string>
-              <key>url</key>
-              <string>http://automated-builds-secondlife-com.s3.amazonaws.com/ct2/54846/510106/jsoncpp-0.5.0.538976-darwin64-538976.tar.bz2</string>
-            </map>
-            <key>name</key>
-            <string>darwin64</string>
-          </map>
-          <key>linux</key>
-          <map>
-            <key>archive</key>
-            <map>
-              <key>hash</key>
-              <string>9d5d9fec28cbbb1651b95728173f8af7</string>
-              <key>url</key>
-              <string>http://automated-builds-secondlife-com.s3.amazonaws.com/hg/repo/p64_3p-jsoncpp/rev/314229/arch/Linux/installer/jsoncpp-0.5.0.314229-linux-314229.tar.bz2</string>
-            </map>
-            <key>name</key>
-            <string>linux</string>
-          </map>
-          <key>linux64</key>
-          <map>
-            <key>archive</key>
-            <map>
-              <key>hash</key>
-              <string>9a658ae561c75e60bd9c0cee56731d21</string>
-              <key>url</key>
-              <string>http://automated-builds-secondlife-com.s3.amazonaws.com/ct2/1475/3274/jsoncpp-0.5.0.501464-linux64-501464.tar.bz2</string>
-            </map>
-            <key>name</key>
-            <string>linux64</string>
-          </map>
-          <key>windows</key>
-          <map>
-            <key>archive</key>
-            <map>
-              <key>hash</key>
-              <string>b73d9addab278eacc100bd312ab6ec5c</string>
-              <key>url</key>
-              <string>http://automated-builds-secondlife-com.s3.amazonaws.com/ct2/54990/511840/jsoncpp-0.5.0.538976-windows-538976.tar.bz2</string>
-            </map>
-            <key>name</key>
-            <string>windows</string>
-          </map>
-          <key>windows64</key>
-          <map>
-            <key>archive</key>
-            <map>
-              <key>hash</key>
-              <string>1b9ac5708cc526d2c5358ef0a427109d</string>
-              <key>url</key>
-              <string>http://automated-builds-secondlife-com.s3.amazonaws.com/ct2/54989/511833/jsoncpp-0.5.0.538976-windows64-538976.tar.bz2</string>
-            </map>
-            <key>name</key>
-            <string>windows64</string>
-          </map>
-        </map>
-        <key>version</key>
-        <string>0.5.0.538976</string>
-      </map>
       <key>kdu</key>
       <map>
         <key>copyright</key>
@@ -1497,23 +1421,37 @@
             <key>name</key>
             <string>linux64</string>
           </map>
+          <key>windows</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>hash</key>
+              <string>1f3b58458bb91f029b6d87b962aa392f</string>
+              <key>hash_algorithm</key>
+              <string>md5</string>
+              <key>url</key>
+              <string>https://pkg.alchemyviewer.org/repository/autobuild-external/libepoxy/windows/libepoxy-1.5.4.296-windows-296.tar.bz2</string>
+            </map>
+            <key>name</key>
+            <string>windows</string>
+          </map>
           <key>windows64</key>
           <map>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>254605ce88497d55ac4f935ab6ee5646</string>
+              <string>a28b2e7d1fc56ee3f5a886d72b943e28</string>
               <key>hash_algorithm</key>
               <string>md5</string>
               <key>url</key>
-              <string>https://pkg.alchemyviewer.org/repository/autobuild-external/libepoxy/windows64/libepoxy-1.5.4.202292318-windows64-202292318.tar.bz2</string>
+              <string>https://pkg.alchemyviewer.org/repository/autobuild-external/libepoxy/windows64/libepoxy-1.5.4.296-windows64-296.tar.bz2</string>
             </map>
             <key>name</key>
             <string>windows64</string>
           </map>
         </map>
         <key>version</key>
-        <string>1.5.4.202340827</string>
+        <string>1.5.4.296</string>
       </map>
       <key>libhunspell</key>
       <map>
@@ -1740,9 +1678,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>f498782698428888113b64a7505c8f7f</string>
+              <string>850426a17cc04e8fc3c4526f78b808b4</string>
+              <key>hash_algorithm</key>
+              <string>md5</string>
               <key>url</key>
-              <string>http://automated-builds-secondlife-com.s3.amazonaws.com/ct2/56319/526770/libpng-1.6.8.539868-windows-539868.tar.bz2</string>
+              <string>https://pkg.alchemyviewer.org/repository/autobuild-external/libpng/windows/libpng-1.6.37.311-windows-311.tar.bz2</string>
             </map>
             <key>name</key>
             <string>windows</string>
@@ -1752,16 +1692,18 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>f8ac4f690a2925418866bccf6eba3cf4</string>
+              <string>d4e6321f7072fbee796c7f95ed122be0</string>
+              <key>hash_algorithm</key>
+              <string>md5</string>
               <key>url</key>
-              <string>http://automated-builds-secondlife-com.s3.amazonaws.com/ct2/56317/526762/libpng-1.6.8.539868-windows64-539868.tar.bz2</string>
+              <string>https://pkg.alchemyviewer.org/repository/autobuild-external/libpng/windows64/libpng-1.6.37.311-windows64-311.tar.bz2</string>
             </map>
             <key>name</key>
             <string>windows64</string>
           </map>
         </map>
         <key>version</key>
-        <string>1.6.37.202201824</string>
+        <string>1.6.37.311</string>
       </map>
       <key>libuuid</key>
       <map>
@@ -1936,9 +1878,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>1b7b979a8387fbb0f278dc681558b9ef</string>
+              <string>6d8971e70b8bf0869c00ab6bced37cd9</string>
+              <key>hash_algorithm</key>
+              <string>md5</string>
               <key>url</key>
-              <string>http://automated-builds-secondlife-com.s3.amazonaws.com/ct2/56316/526755/libxml2-2.9.4.539866-windows-539866.tar.bz2</string>
+              <string>https://pkg.alchemyviewer.org/repository/autobuild-external/libxml2/windows/libxml2-2.9.10.313-windows-313.tar.bz2</string>
             </map>
             <key>name</key>
             <string>windows</string>
@@ -1948,16 +1892,18 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>4f8ff97d6a9ab350306b62eec8adc810</string>
+              <string>ecc9d50d2d5e7c3c5bec32586b2fb83c</string>
+              <key>hash_algorithm</key>
+              <string>md5</string>
               <key>url</key>
-              <string>http://automated-builds-secondlife-com.s3.amazonaws.com/ct2/56314/526748/libxml2-2.9.4.539866-windows64-539866.tar.bz2</string>
+              <string>https://pkg.alchemyviewer.org/repository/autobuild-external/libxml2/windows64/libxml2-2.9.10.313-windows64-313.tar.bz2</string>
             </map>
             <key>name</key>
             <string>windows64</string>
           </map>
         </map>
         <key>version</key>
-        <string>2.9.10.202210350</string>
+        <string>2.9.10.313</string>
       </map>
       <key>llappearance_utility</key>
       <map>
@@ -2270,9 +2216,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>138b881bdf37dff4e626e022a50dd11f</string>
+              <string>ee3101bb435f757d60b137d8df370192</string>
+              <key>hash_algorithm</key>
+              <string>md5</string>
               <key>url</key>
-              <string>http://automated-builds-secondlife-com.s3.amazonaws.com/ct2/64069/601181/nghttp2-1.40.0.545354-windows-545354.tar.bz2</string>
+              <string>https://pkg.alchemyviewer.org/repository/autobuild-external/nghttp2/windows/nghttp2-1.41.0.316-windows-316.tar.bz2</string>
             </map>
             <key>name</key>
             <string>windows</string>
@@ -2282,9 +2230,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>c23c6480c7cbea60a2bd26e257adc0a7</string>
+              <string>750766106346e4eead713914411f9075</string>
+              <key>hash_algorithm</key>
+              <string>md5</string>
               <key>url</key>
-              <string>http://automated-builds-secondlife-com.s3.amazonaws.com/ct2/64068/601177/nghttp2-1.40.0.545354-windows64-545354.tar.bz2</string>
+              <string>https://pkg.alchemyviewer.org/repository/autobuild-external/nghttp2/windows64/nghttp2-1.41.0.316-windows64-316.tar.bz2</string>
             </map>
             <key>name</key>
             <string>windows64</string>
@@ -2293,7 +2243,7 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
         <key>source_type</key>
         <string>hg</string>
         <key>version</key>
-        <string>1.41.0.202200516</string>
+        <string>1.41.0.316</string>
       </map>
       <key>nvapi</key>
       <map>
@@ -2706,9 +2656,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>2b2f61313b1cbd2893c1ba5bf15061fa</string>
+              <string>c17dd910ba85c25186b6249c5f3a826c</string>
+              <key>hash_algorithm</key>
+              <string>md5</string>
               <key>url</key>
-              <string>http://automated-builds-secondlife-com.s3.amazonaws.com/ct2/56328/526826/openssl-1.0.2l.539874-windows-539874.tar.bz2</string>
+              <string>https://pkg.alchemyviewer.org/repository/autobuild-external/openssl/windows/openssl-1.0.2u.315-windows-315.tar.bz2</string>
             </map>
             <key>name</key>
             <string>windows</string>
@@ -2718,82 +2670,18 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>59aae854155bc7119e0dca25e65828c0</string>
+              <string>45205a79ddd62bc2237112a81c49070b</string>
+              <key>hash_algorithm</key>
+              <string>md5</string>
               <key>url</key>
-              <string>http://automated-builds-secondlife-com.s3.amazonaws.com/ct2/56326/526811/openssl-1.0.2l.539874-windows64-539874.tar.bz2</string>
+              <string>https://pkg.alchemyviewer.org/repository/autobuild-external/openssl/windows64/openssl-1.0.2u.315-windows64-315.tar.bz2</string>
             </map>
             <key>name</key>
             <string>windows64</string>
           </map>
         </map>
         <key>version</key>
-        <string>1.0.2u.202200624</string>
-      </map>
-      <key>pcre</key>
-      <map>
-        <key>copyright</key>
-        <string>Copyright (c) 1997-2014 University of Cambridge; Copyright(c) 2009-2014 Zoltan Herczeg; Copyright (c) 2007-2012, Google Inc.</string>
-        <key>description</key>
-        <string>PCRE Perl-compatible regular expression library</string>
-        <key>license</key>
-        <string>bsd</string>
-        <key>license_file</key>
-        <string>LICENSES/pcre-license.txt</string>
-        <key>name</key>
-        <string>pcre</string>
-        <key>platforms</key>
-        <map>
-          <key>darwin</key>
-          <map>
-            <key>archive</key>
-            <map>
-              <key>hash</key>
-              <string>6d2b38897f1adf354b299345d5fc759b</string>
-              <key>url</key>
-              <string>http://automated-builds-secondlife-com.s3.amazonaws.com/hg/repo/pcre_3p-update-pcre/rev/297155/arch/Darwin/installer/pcre-8.35.-darwin-297155.tar.bz2</string>
-            </map>
-            <key>name</key>
-            <string>darwin</string>
-          </map>
-          <key>darwin64</key>
-          <map>
-            <key>archive</key>
-            <map>
-              <key>hash</key>
-              <string>d8c0f97fe5abef43e72b6f84aba698b2</string>
-              <key>url</key>
-              <string>http://automated-builds-secondlife-com.s3.amazonaws.com/ct2/54856/510176/pcre-8.35.538986-darwin64-538986.tar.bz2</string>
-            </map>
-            <key>name</key>
-            <string>darwin64</string>
-          </map>
-          <key>windows</key>
-          <map>
-            <key>archive</key>
-            <map>
-              <key>hash</key>
-              <string>3660db45793df3050b63920bfb7d8479</string>
-              <key>url</key>
-              <string>http://automated-builds-secondlife-com.s3.amazonaws.com/ct2/55041/512002/pcre-8.35.538986-windows-538986.tar.bz2</string>
-            </map>
-            <key>name</key>
-            <string>linux</string>
-          </map>
-          <key>windows64</key>
-          <map>
-            <key>archive</key>
-            <map>
-              <key>hash</key>
-              <string>cdee8e8b48a66266550bf279c40abc22</string>
-              <key>url</key>
-              <string>http://automated-builds-secondlife-com.s3.amazonaws.com/ct2/55038/511992/pcre-8.35.538986-windows64-538986.tar.bz2</string>
-            </map>
-            <key>name</key>
-            <string>windows64</string>
-          </map>
-        </map>
-        <key>version</key>
-        <string>8.35.538986</string>
+        <string>1.0.2u.315</string>
       </map>
       <key>slvoice</key>
       <map>
@@ -2986,9 +2874,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>57a88be57694de6cf9f516125af2c4c9</string>
+              <string>cc6ed6acc98c9ea36b14c3186002c38a</string>
+              <key>hash_algorithm</key>
+              <string>md5</string>
               <key>url</key>
-              <string>http://automated-builds-secondlife-com.s3.amazonaws.com/ct2/54963/511746/uriparser-0.8.0.1-windows-538968.tar.bz2</string>
+              <string>https://pkg.alchemyviewer.org/repository/autobuild-external/uriparser/windows/uriparser-0.9.4-windows-310.tar.bz2</string>
             </map>
             <key>name</key>
             <string>windows</string>
@@ -2998,9 +2888,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>f39cc91f2a5dad13790ec18269844ae4</string>
+              <string>4d83a9d415212138f7ddb656e490b0d5</string>
+              <key>hash_algorithm</key>
+              <string>md5</string>
               <key>url</key>
-              <string>http://automated-builds-secondlife-com.s3.amazonaws.com/ct2/54962/511739/uriparser-0.8.0.1-windows64-538968.tar.bz2</string>
+              <string>https://pkg.alchemyviewer.org/repository/autobuild-external/uriparser/windows64/uriparser-0.9.4-windows64-310.tar.bz2</string>
             </map>
             <key>name</key>
             <string>windows64</string>
@@ -3292,9 +3184,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>ebdb07d4aaa5312005a8773f625032a4</string>
+              <string>23ba44e15affc13b15717f02d98ed61e</string>
+              <key>hash_algorithm</key>
+              <string>md5</string>
               <key>url</key>
-              <string>http://automated-builds-secondlife-com.s3.amazonaws.com/ct2/55048/512031/zlib-1.2.8.538988-windows-538988.tar.bz2</string>
+              <string>https://pkg.alchemyviewer.org/repository/autobuild-external/zlib/windows/zlib-1.2.11.308-windows-308.tar.bz2</string>
             </map>
             <key>name</key>
             <string>windows</string>
@@ -3304,16 +3198,18 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>0ac95f3dece7d575ba45cf5728f53eea</string>
+              <string>b231c0fd98a151a66c890a4bb29cfea3</string>
+              <key>hash_algorithm</key>
+              <string>md5</string>
               <key>url</key>
-              <string>http://automated-builds-secondlife-com.s3.amazonaws.com/ct2/55047/512024/zlib-1.2.8.538988-windows64-538988.tar.bz2</string>
+              <string>https://pkg.alchemyviewer.org/repository/autobuild-external/zlib/windows64/zlib-1.2.11.308-windows64-308.tar.bz2</string>
             </map>
             <key>name</key>
             <string>windows64</string>
           </map>
         </map>
         <key>version</key>
-        <string>1.2.11.202200500</string>
+        <string>1.2.11.308</string>
       </map>
     </map>
     <key>package_description</key>

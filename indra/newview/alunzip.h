@@ -31,10 +31,7 @@
 #ifndef AL_UNZIP_H
 #define AL_UNZIP_H
 
-extern "C"
-{
 #include <minizip/unzip.h>
-}
 
 class ALUnZip
 {

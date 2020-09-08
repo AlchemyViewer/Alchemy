@@ -50,19 +50,36 @@ if(WINDOWS)
     #*******************************
     # Misc shared libs 
 
+    set(addrsfx "-x${ADDRESS_SIZE}")
+
     set(release_src_dir "${ARCH_PREBUILT_DIRS_RELEASE}")
     set(release_files
-        openjpeg.dll
+        boost_context-mt${addrsfx}.dll
+        boost_fiber-mt${addrsfx}.dll
+        boost_filesystem-mt${addrsfx}.dll
+        boost_program_options-mt${addrsfx}.dll
+        boost_regex-mt${addrsfx}.dll
+        boost_stacktrace_windbg-mt${addrsfx}.dll
+        boost_thread-mt${addrsfx}.dll
+        epoxy-0.dll
+        freetype.dll
+        glod.dll
         libapr-1.dll
         libaprutil-1.dll
         libapriconv-1.dll
-        ssleay32.dll
+        libcollada14dom23.dll
+        libcurl.dll
         libeay32.dll
-        nghttp2.dll
-        glod.dll
         libhunspell.dll
-        epoxy-0.dll
+        libpng16.dll
         libwebp.dll
+        libxml2.dll
+        minizip.dll
+        nghttp2.dll
+        openjpeg.dll
+        ssleay32.dll
+        uriparser.dll
+        zlib1.dll
         )
 
     # Filenames are different for 32/64 bit BugSplat file and we don't

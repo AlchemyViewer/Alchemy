@@ -529,7 +529,22 @@ class WindowsManifest(ViewerManifest):
             # For OpenGL extensions
             self.path("epoxy-0.dll")
 
+            self.path("boost_context-mt*.dll")
+            self.path("boost_fiber-mt*.dll")
+            self.path("boost_filesystem-mt*.dll")
+            self.path("boost_program_options-mt*.dll")
+            self.path("boost_regex-mt*.dll")
+            self.path("boost_stacktrace_windbg-mt*.dll")
+            self.path("boost_thread-mt*.dll")
+            self.path("freetype.dll")
+            self.path("libcollada14dom23.dll")
+            self.path("libcurl*.dll")
+            self.path("libpng16*.dll")
             self.path("libwebp.dll")
+            self.path("libxml2.dll")
+            self.path("minizip*.dll")
+            self.path("uriparser.dll")
+            self.path("zlib*1.dll")
 
             # SLVoice executable
             with self.prefix(src=os.path.join(pkgdir, 'bin', 'release')):

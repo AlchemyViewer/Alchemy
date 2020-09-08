@@ -30,7 +30,8 @@ else (LINUX)
     set(LLCOMMON_LIBRARIES llcommon
         ${BOOST_FIBER_LIBRARY} 
         ${BOOST_CONTEXT_LIBRARY} 
-        ${BOOST_THREAD_LIBRARY} 
+        ${BOOST_THREAD_LIBRARY}
+        ${BOOST_STACKTRACE_LIBRARY} 
         ${BOOST_SYSTEM_LIBRARY} )
 endif (LINUX)
 

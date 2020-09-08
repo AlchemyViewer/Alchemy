@@ -26,7 +26,7 @@ else (USESYSTEMLIBS)
   if (WINDOWS)
     if(MSVC80)
       # This should be obsolete at this point
-      set(BOOST_VERSION "1.55")
+      set(BOOST_VERSION "1.74")
       set(BOOST_CONTEXT_LIBRARY 
           optimized libboost_context-vc80-mt-${BOOST_VERSION}
           debug libboost_context-vc80-mt-gd-${BOOST_VERSION})
@@ -51,29 +51,32 @@ else (USESYSTEMLIBS)
     else(MSVC80)
       # MSVC 10.0 config
       set(BOOST_CONTEXT_LIBRARY 
-          optimized libboost_context-mt${addrsfx}
-          debug libboost_context-mt${addrsfx}-gd)
+          optimized boost_context-mt${addrsfx}
+          debug boost_context-mt-gd${addrsfx})
       set(BOOST_FIBER_LIBRARY 
-          optimized libboost_fiber-mt${addrsfx}
-          debug libboost_fiber-mt${addrsfx}-gd)
+          optimized boost_fiber-mt${addrsfx}
+          debug boost_fiber-mt-gd${addrsfx})
       set(BOOST_FILESYSTEM_LIBRARY 
-          optimized libboost_filesystem-mt${addrsfx}
-          debug libboost_filesystem-mt${addrsfx}-gd)
+          optimized boost_filesystem-mt${addrsfx}
+          debug boost_filesystem-mt-gd${addrsfx})
       set(BOOST_PROGRAM_OPTIONS_LIBRARY 
-          optimized libboost_program_options-mt${addrsfx}
-          debug libboost_program_options-mt${addrsfx}-gd)
+          optimized boost_program_options-mt${addrsfx}
+          debug boost_program_options-mt-gd${addrsfx})
       set(BOOST_REGEX_LIBRARY
-          optimized libboost_regex-mt${addrsfx}
-          debug libboost_regex-mt${addrsfx}-gd)
+          optimized boost_regex-mt${addrsfx}
+          debug boost_regex-mt-gd${addrsfx})
       set(BOOST_SIGNALS_LIBRARY 
-          optimized libboost_signals-mt${addrsfx}
-          debug libboost_signals-mt${addrsfx}-gd)
+          optimized boost_signals-mt${addrsfx}
+          debug boost_signals-mt-gd${addrsfx})
+      set(BOOST_STACKTRACE_LIBRARY 
+          optimized boost_stacktrace_windbg-mt${addrsfx}
+          debug boost_stacktrace_windbg-mt-gd${addrsfx})
       set(BOOST_SYSTEM_LIBRARY 
-          optimized libboost_system-mt${addrsfx}
-          debug libboost_system-mt${addrsfx}-gd)
+          optimized boost_system-mt${addrsfx}
+          debug boost_system-mt-gd${addrsfx})
       set(BOOST_THREAD_LIBRARY 
-          optimized libboost_thread-mt${addrsfx}
-          debug libboost_thread-mt${addrsfx}-gd)
+          optimized boost_thread-mt${addrsfx}
+          debug boost_thread-mt-gd${addrsfx})
     endif (MSVC80)
   elseif (LINUX)
     set(BOOST_CONTEXT_LIBRARY

@@ -2087,6 +2087,7 @@ target_link_libraries(${VIEWER_BINARY_NAME}
     ${LLPHYSICS_LIBRARIES}
     ${LLPHYSICSEXTENSIONS_LIBRARIES}
     ${LLAPPEARANCE_LIBRARIES}
+    ${MINIZIP_LIBRARIES}
     absl::flat_hash_map
     absl::node_hash_map
     nlohmann_json::nlohmann_json

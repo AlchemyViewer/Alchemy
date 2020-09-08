@@ -9,7 +9,10 @@ if (USESYSTEMLIBS)
 else (USESYSTEMLIBS)
   use_prebuilt_binary(libpng)
   if (WINDOWS)
-    set(PNG_LIBRARIES libpng16)
+    set(PNG_LIBRARIES
+        debug libpng16d
+        optimized libpng16
+        )
     set(PNG_INCLUDE_DIRS ${LIBS_PREBUILT_DIR}/include/libpng16)
   elseif(DARWIN)
     set(PNG_LIBRARIES png16)
