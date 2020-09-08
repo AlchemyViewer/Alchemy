@@ -48,7 +48,8 @@ DWORD GetDllVersion(LPCTSTR lpszDllName);
 
 namespace
 { // anonymous
-    enum class prst { INIT, OPEN, SKIP } state = prst::INIT;
+	enum class prst { INIT, OPEN, SKIP };
+	prst state = prst::INIT;
     // This is called so early that we can't count on static objects being
     // properly constructed yet, so declare a pointer instead of an instance.
     llofstream* prelogf = nullptr;
