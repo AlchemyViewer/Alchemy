@@ -10619,7 +10619,8 @@ void LLVOAvatar::calculateUpdateRenderComplexity()
 		// Diagnostic output to identify all avatar-related textures.
 		// Does not affect rendering cost calculation.
 		// Could be wrapped in a debug option if output becomes problematic.
-		if (isSelf())
+		static bool arch_detail_dbg_log = debugLoggingEnabled("ARCdetail");
+		if (isSelf() && arch_detail_dbg_log)
 		{
 			// print any attachment textures we didn't already know about.
 			for (LLVOVolume::texture_cost_t::iterator it = textures.begin(); it != textures.end(); ++it)
