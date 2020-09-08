@@ -79,7 +79,7 @@ namespace {
 			//
 			if (s.size())
 			{
-				OutputDebugString(utf8str_to_utf16str(s).c_str());
+				OutputDebugString(ll_convert_string_to_wide(s).c_str());
 				OutputDebugString(TEXT("\n"));
 			}
 		}

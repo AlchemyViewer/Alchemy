@@ -127,7 +127,7 @@ BOOL LLDirPicker::getDir(std::string* filename, bool blocking)
 		{
 			// Set the string value.
 
-			mDir = utf16str_to_utf8str(llutf16string(buffer));
+			mDir = ll_convert_wide_to_string(std::wstring(buffer));
 			success = TRUE;
 		}
 		// free the item id list

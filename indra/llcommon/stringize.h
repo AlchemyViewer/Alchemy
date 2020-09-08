@@ -50,10 +50,10 @@ std::basic_string<CHARTYPE> gstringize(const T& item)
  *partial specialization of stringize for handling wstring
  *TODO: we should have similar specializations for wchar_t[] but not until it is needed.
  */
-inline std::string stringize(const std::wstring& item)
-{
-    return wstring_to_utf8str(item);
-}
+//inline std::string stringize(const std::wstring& item)
+//{
+//    return wstring_to_utf8str(item);
+//}
 
 /**
  * Specialization of gstringize for std::string return types

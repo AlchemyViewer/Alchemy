@@ -4151,7 +4151,7 @@ void dumpVFSCaches()
 	{
 		LL_WARNS() << "Couldn't create dir StaticVFSDump" << LL_ENDL;
 	}
-	SetCurrentDirectory(utf8str_to_utf16str("StaticVFSDump").c_str());
+	SetCurrentDirectory(ll_convert_string_to_wide("StaticVFSDump").c_str());
 	gStaticVFS->dumpFiles();
 	SetCurrentDirectory(w_str);
 #endif
@@ -4165,7 +4165,7 @@ void dumpVFSCaches()
 	{
 		LL_WARNS() << "Couldn't create dir VFSDump" << LL_ENDL;
 	}
-	SetCurrentDirectory(utf8str_to_utf16str("VFSDump").c_str());
+	SetCurrentDirectory(ll_convert_string_to_wide("VFSDump").c_str());
 	gVFS->dumpFiles();
 	SetCurrentDirectory(w_str);
 #endif
