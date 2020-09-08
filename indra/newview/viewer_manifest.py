@@ -529,6 +529,8 @@ class WindowsManifest(ViewerManifest):
             # For OpenGL extensions
             self.path("epoxy-0.dll")
 
+            self.path("libwebp.dll")
+
             # SLVoice executable
             with self.prefix(src=os.path.join(pkgdir, 'bin', 'release')):
                 self.path("SLVoice.exe")

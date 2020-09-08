@@ -1296,15 +1296,16 @@ S32 LLSDNotationFormatter::format_impl(const LLSD& data, std::ostream& ostr,
 		}
 
 		bool need_comma = false;
-		std::map<std::string, LLSD> sorted_map(data.beginMap(), data.endMap());
-		for(const auto& out_pair : sorted_map)
+		LLSD::map_const_iterator iter = data.beginMap();
+		LLSD::map_const_iterator end = data.endMap();
+		for(; iter != end; ++iter)
 		{
 			if(need_comma) ostr << ",";
 			need_comma = true;
 			ostr << post << inner_pre << '\'';
-			serialize_string(out_pair.first, ostr);
+			serialize_string((*iter).first, ostr);
 			ostr << "':";
-			format_count += format_impl(out_pair.second, ostr, options, level + 2);
+			format_count += format_impl((*iter).second, ostr, options, level + 2);
 		}
 		ostr << post << pre << "}";
 		break;
@@ -1452,12 +1453,13 @@ S32 LLSDBinaryFormatter::format_impl(const LLSD& data, std::ostream& ostr,
 		ostr.put('{');
 		U32 size_nbo = htonl(data.size());
 		ostr.write((const char*)(&size_nbo), sizeof(U32));
-		std::map<std::string, LLSD> sorted_map(data.beginMap(), data.endMap());
-		for (const auto& out_pair : sorted_map)
+		LLSD::map_const_iterator iter = data.beginMap();
+		LLSD::map_const_iterator end = data.endMap();
+		for(; iter != end; ++iter)
 		{
 			ostr.put('k');
-			formatString(out_pair.first, ostr);
-			format_count += format_impl(out_pair.second, ostr, options, level+1);
+			formatString((*iter).first, ostr);
+			format_count += format_impl((*iter).second, ostr, options, level+1);
 		}
 		ostr.put('}');
 		break;

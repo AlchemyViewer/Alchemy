@@ -1840,11 +1840,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>3de8bf840cde51ec061ae1c12e39b620</string>
+              <string>9a13d5b3d5a4a038175461defb801963</string>
               <key>hash_algorithm</key>
               <string>md5</string>
               <key>url</key>
-              <string>https://pkg.alchemyviewer.org/repository/autobuild-external/tmpanext/libwebp-1.1.0.200900053-windows-200900053.tar.bz2</string>
+              <string>https://pkg.alchemyviewer.org/repository/autobuild-external/libwebp/windows/libwebp-1.1.0.304-windows-304.tar.bz2</string>
             </map>
             <key>name</key>
             <string>windows</string>
@@ -1854,18 +1854,18 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>0063c0a3053b222014b6bec37a1311d4</string>
+              <string>85c1623e1d7bdf36cc3c7eb937749ea7</string>
               <key>hash_algorithm</key>
               <string>md5</string>
               <key>url</key>
-              <string>https://pkg.alchemyviewer.org/repository/autobuild-external/tmpanext/libwebp-1.1.0.200900052-windows64-200900052.tar.bz2</string>
+              <string>https://pkg.alchemyviewer.org/repository/autobuild-external/libwebp/windows64/libwebp-1.1.0.304-windows64-304.tar.bz2</string>
             </map>
             <key>name</key>
             <string>windows64</string>
           </map>
         </map>
         <key>version</key>
-        <string>1.1.0.202202257</string>
+        <string>1.1.0.304</string>
       </map>
       <key>libxml2</key>
       <map>
@@ -2610,9 +2610,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>222a406ecb4071a9cc9635353afa337e</string>
+              <string>708d1abea051d34a8c40290bb052393e</string>
+              <key>hash_algorithm</key>
+              <string>md5</string>
               <key>url</key>
-              <string>http://automated-builds-secondlife-com.s3.amazonaws.com/ct2/54977/511775/openjpeg-1.5.1.538970-windows-538970.tar.bz2</string>
+              <string>https://pkg.alchemyviewer.org/repository/autobuild-external/openjpeg/windows/openjpeg-1.5.1.309-windows-309.tar.bz2</string>
             </map>
             <key>name</key>
             <string>windows</string>
@@ -2622,18 +2624,18 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>07cff9eafaecfbe6f44e2a05b3465cae</string>
+              <string>590b392ce88b34645f6068e4a02ea44f</string>
               <key>hash_algorithm</key>
               <string>md5</string>
               <key>url</key>
-              <string>https://pkg.alchemyviewer.org/repository/autobuild-external/tmpanext/openjpeg-1.5.1.200900057-windows64-200900057.tar.bz2</string>
+              <string>https://pkg.alchemyviewer.org/repository/autobuild-external/openjpeg/windows64/openjpeg-1.5.1.309-windows64-309.tar.bz2</string>
             </map>
             <key>name</key>
             <string>windows64</string>
           </map>
         </map>
         <key>version</key>
-        <string>1.5.1</string>
+        <string>1.5.1.309</string>
       </map>
       <key>openssl</key>
       <map>
@@ -3663,7 +3665,7 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
         <key>windows</key>
         <map>
           <key>build_directory</key>
-          <string>build-vc${AUTOBUILD_VSVER|150}-$AUTOBUILD_ADDRSIZE</string>
+          <string>build-vc-$AUTOBUILD_ADDRSIZE</string>
           <key>configurations</key>
           <map>
             <key>RelWithDebInfo</key>
