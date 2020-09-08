@@ -1204,7 +1204,7 @@ namespace
 				
 			if (r->wantsTags())
 			{
-				message_stream << site.mTagString << " ";
+				message_stream << site.mTagString;
 			}
             message_stream << " ";
 
