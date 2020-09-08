@@ -179,6 +179,11 @@ if (WINDOWS)
       /DBOOST_CONFIG_SUPPRESS_OUTDATED_MESSAGE
       )
 
+  # library linkage defines
+  add_definitions(
+      /DWEBP_DLL
+  )
+
   if("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
     add_definitions(-DBOOST_USE_WINDOWS_H)
   endif()

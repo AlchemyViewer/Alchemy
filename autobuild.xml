@@ -1946,11 +1946,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>3de8bf840cde51ec061ae1c12e39b620</string>
+              <string>9a13d5b3d5a4a038175461defb801963</string>
               <key>hash_algorithm</key>
               <string>md5</string>
               <key>url</key>
-              <string>https://pkg.alchemyviewer.org/repository/autobuild-external/tmpanext/libwebp-1.1.0.200900053-windows-200900053.tar.bz2</string>
+              <string>https://pkg.alchemyviewer.org/repository/autobuild-external/libwebp/windows/libwebp-1.1.0.304-windows-304.tar.bz2</string>
             </map>
             <key>name</key>
             <string>windows</string>
@@ -1960,18 +1960,18 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>0063c0a3053b222014b6bec37a1311d4</string>
+              <string>85c1623e1d7bdf36cc3c7eb937749ea7</string>
               <key>hash_algorithm</key>
               <string>md5</string>
               <key>url</key>
-              <string>https://pkg.alchemyviewer.org/repository/autobuild-external/tmpanext/libwebp-1.1.0.200900052-windows64-200900052.tar.bz2</string>
+              <string>https://pkg.alchemyviewer.org/repository/autobuild-external/libwebp/windows64/libwebp-1.1.0.304-windows64-304.tar.bz2</string>
             </map>
             <key>name</key>
             <string>windows64</string>
           </map>
         </map>
         <key>version</key>
-        <string>1.1.0.200900052</string>
+        <string>1.1.0.304</string>
       </map>
       <key>libxml2</key>
       <map>

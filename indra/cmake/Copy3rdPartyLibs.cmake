@@ -62,6 +62,7 @@ if(WINDOWS)
         glod.dll
         libhunspell.dll
         epoxy-0.dll
+        libwebp.dll
         )
 
     # Filenames are different for 32/64 bit BugSplat file and we don't
