@@ -11,11 +11,6 @@ FetchContent_Declare(
   GIT_REPOSITORY https://github.com/zeux/meshoptimizer.git
   GIT_TAG        v0.14
   )
-FetchContent_Declare(
-  robin-hood-hashing
-  GIT_REPOSITORY https://git.alchemyviewer.org/alchemy/thirdparty/robin-hood-hashing.git
-  GIT_TAG        alchemy
-  )
 # FetchContent_Declare(
 #   Catch2
 #   GIT_REPOSITORY https://github.com/catchorg/Catch2.git
@@ -34,7 +29,7 @@ FetchContent_Declare(
 FetchContent_Declare(
   absl
   GIT_REPOSITORY https://github.com/abseil/abseil-cpp.git
-  GIT_TAG        1995c6a3c2f9080160d9d8716504dc004e5e1ec0
+  GIT_TAG        3c8b5d7587dc8ecf730ce9996c89e156e408c3ed
   )
 
 # This is a hack because absl has dumb cmake
