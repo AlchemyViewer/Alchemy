@@ -272,7 +272,7 @@ public:
      * Converts the LLCheckedHandle to a bool. Allows for if (chkdHandle) {} 
      * Does not throw.
      */
-    /*explicit*/ operator bool() const // explicit conversion operator not available with Linux compiler
+    explicit operator bool() const // explicit conversion operator not available with Linux compiler
     {
         return (mHandle.get() != NULL);
     }

@@ -162,8 +162,7 @@ public:
     operator T () const { return mHeld; }
     typename boost::remove_pointer<T>::type operator*() const { return *mHeld; }
     typename boost::call_traits<T>::value_type operator->() const { return mHeld; }
-    // uncomment 'explicit' as soon as we allow C++11 compilation
-    /*explicit*/ operator bool() const { return bool(mHeld); }
+    explicit operator bool() const { return bool(mHeld); }
     bool operator!() const { return ! mHeld; }
 
     // support both assignment (dumb ptr idiom) and reset() (smart ptr)
