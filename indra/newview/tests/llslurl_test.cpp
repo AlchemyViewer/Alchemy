@@ -40,9 +40,6 @@ static const char * const TEST_FILENAME("llslurl_test.xml");
 
 }
 
-class LLViewerFetchedTexture : public LLRefCount
-{};
-
 //
 // Stub implementation for LLTrans
 //
