@@ -435,14 +435,14 @@ llifstream::llifstream() {}
 
 // explicit
 llifstream::llifstream(const std::string& _Filename, ios_base::openmode _Mode):
-    std::ifstream(utf8str_to_utf16str( _Filename ).c_str(),
+    std::ifstream(ll_convert_string_to_wide( _Filename ).c_str(),
                   _Mode | ios_base::in)
 {
 }
 
 void llifstream::open(const std::string& _Filename, ios_base::openmode _Mode)
 {
-    std::ifstream::open(utf8str_to_utf16str(_Filename).c_str(),
+    std::ifstream::open(ll_convert_string_to_wide(_Filename).c_str(),
                         _Mode | ios_base::in);
 }
 
@@ -454,14 +454,14 @@ llofstream::llofstream() {}
 
 // explicit
 llofstream::llofstream(const std::string& _Filename, ios_base::openmode _Mode):
-    std::ofstream(utf8str_to_utf16str( _Filename ).c_str(),
+    std::ofstream(ll_convert_string_to_wide( _Filename ).c_str(),
                   _Mode | ios_base::out)
 {
 }
 
 void llofstream::open(const std::string& _Filename, ios_base::openmode _Mode)
 {
-    std::ofstream::open(utf8str_to_utf16str( _Filename ).c_str(),
+    std::ofstream::open(ll_convert_string_to_wide( _Filename ).c_str(),
                         _Mode | ios_base::out);
 }
 
