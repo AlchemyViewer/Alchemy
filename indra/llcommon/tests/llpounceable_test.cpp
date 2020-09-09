@@ -78,6 +78,9 @@ namespace tut
     typedef llpounceable_group::object object;
     llpounceable_group llpounceablegrp("llpounceable");
 
+#if LL_MSVC
+#pragma optimize("", off)
+#endif
     template<> template<>
     void object::test<1>()
     {
@@ -91,6 +94,9 @@ namespace tut
         gForward = &myData;         // should run setter
         ensure_equals("static_check should be &myData", static_check, &myData);
     }
+#if LL_MSVC
+#pragma optimize("", on)
+#endif
 
     template<> template<>
     void object::test<2>()
