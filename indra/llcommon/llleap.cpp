@@ -19,7 +19,6 @@
 // std headers
 // external library headers
 #include <boost/bind.hpp>
-#include <boost/scoped_ptr.hpp>
 #include <boost/tokenizer.hpp>
 // other Linden headers
 #include "llerror.h"
@@ -416,10 +415,10 @@ private:
     LLProcessPtr mChild;
     LLTempBoundListener
         mStdinConnection, mStdoutConnection, mStdoutDataConnection, mStderrConnection;
-    boost::scoped_ptr<LLEventPump::Blocker> mBlocker;
+    std::unique_ptr<LLEventPump::Blocker> mBlocker;
     LLProcess::ReadPipe::size_type mExpect;
     LLError::FatalFunction mPrevFatalFunction;
-    boost::scoped_ptr<LLLeapListener> mListener;
+    std::unique_ptr<LLLeapListener> mListener;
 };
 
 // These must follow the declaration of LLLeapImpl, so they may as well be last.

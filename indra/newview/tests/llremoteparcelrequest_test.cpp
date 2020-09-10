@@ -110,7 +110,7 @@ namespace tut
 	{
 		set_test_name("observer pointer");
 
-		boost::scoped_ptr<TestObserver> observer(new TestObserver());
+		std::unique_ptr<TestObserver> observer(new TestObserver());
 
 		LLRemoteParcelInfoProcessor & processor = LLRemoteParcelInfoProcessor::instance();
 		processor.addObserver(LLUUID(TEST_PARCEL_ID), observer.get());

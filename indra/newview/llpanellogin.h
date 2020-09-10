@@ -30,7 +30,6 @@
 #include "llpanel.h"
 #include "llpointer.h"			// LLPointer<>
 #include "llmediactrl.h"	// LLMediaCtrlObserver
-#include <boost/scoped_ptr.hpp>
 
 class LLLineEditor;
 class LLUIImage;
@@ -110,7 +109,7 @@ private:
 	static void updateServerCombo();
 
 private:
-	boost::scoped_ptr<LLPanelLoginListener> mListener;
+	std::unique_ptr<LLPanelLoginListener> mListener;
 
 	void updateLoginButtons();
 	void populateUserList(LLPointer<LLCredential> credential);

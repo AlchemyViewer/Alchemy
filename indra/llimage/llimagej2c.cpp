@@ -31,7 +31,6 @@
 #include "llmath.h"
 #include "llmemory.h"
 #include "llsd.h"
-#include <boost/scoped_ptr.hpp>
 
 // Declare the prototype for this factory function here. It is implemented in
 // other files which define a LLImageJ2CImpl subclass, but only ONE static
@@ -48,7 +47,7 @@ std::string LLImageJ2C::getEngineInfo()
 {
 	// All known LLImageJ2CImpl implementation subclasses are cheap to
 	// construct.
-	boost::scoped_ptr<LLImageJ2CImpl> impl(fallbackCreateLLImageJ2CImpl());
+	std::unique_ptr<LLImageJ2CImpl> impl(fallbackCreateLLImageJ2CImpl());
 	return impl->getEngineInfo();
 }
 

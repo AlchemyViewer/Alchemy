@@ -59,7 +59,6 @@
 #include "llappviewer.h"
 #include "llsdserialize.h"
 
-#include <boost/scoped_ptr.hpp>
 #include <sstream>
 
 const S32 LOGIN_MAX_RETRIES = 8; // Viewer should not autmatically retry login

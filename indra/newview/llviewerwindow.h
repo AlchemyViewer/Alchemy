@@ -50,7 +50,6 @@
 
 #include <boost/function.hpp>
 #include <boost/signals2.hpp>
-#include <boost/scoped_ptr.hpp>
 
 class LLView;
 class LLViewerObject;
@@ -512,8 +511,8 @@ private:
 	bool			mStatesDirty;
 	U32			mCurrResolutionIndex;
 
-	boost::scoped_ptr<LLWindowListener> mWindowListener;
-	boost::scoped_ptr<LLViewerWindowListener> mViewerWindowListener;
+	std::unique_ptr<LLWindowListener> mWindowListener;
+	std::unique_ptr<LLViewerWindowListener> mViewerWindowListener;
 
 	// Object temporarily hovered over while dragging
 	LLPointer<LLViewerObject>	mDragHoveredObject;

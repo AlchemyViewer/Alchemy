@@ -253,7 +253,7 @@ void LLNotificationsListener::forward(const LLSD& params)
     {
         // This is a request to stop forwarding notifications on the specified
         // channel. The rest of the params don't matter.
-        // Because mForwarders contains scoped_ptrs, erasing the map entry
+        // Because mForwarders contains unique_ptrs, erasing the map entry
         // DOES delete the heap Forwarder object. Because Forwarder derives
         // from LLEventTrackable, destroying it disconnects it from the
         // channel.

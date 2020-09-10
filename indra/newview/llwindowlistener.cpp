@@ -43,7 +43,6 @@
 #include "stringize.h"
 #include <typeinfo>
 #include <map>
-#include <boost/scoped_ptr.hpp>
 #include <boost/bind.hpp>
 
 LLWindowListener::LLWindowListener(LLViewerWindow *window, const KeyboardGetter& kbgetter)
@@ -388,7 +387,7 @@ static void mouseEvent(const MouseFunc& func, const LLSD& request)
 	LLCoordGL pos(request["x"].asInteger(), request["y"].asInteger());
 	bool has_pos(request.has("x") && request.has("y"));
 
-	boost::scoped_ptr<LLView::TemporaryDrilldownFunc> tempfunc;
+	std::unique_ptr<LLView::TemporaryDrilldownFunc> tempfunc;
 
 	// Documentation for mouseDown(), mouseUp() and mouseMove() claims you
 	// must either specify ["path"], or both of ["x"] and ["y"]. You MAY
@@ -464,7 +463,7 @@ static void mouseEvent(const MouseFunc& func, const LLSD& request)
 
 		// Instantiate a TemporaryDrilldownFunc to route incoming mouse events
 		// to the target LLView*. But put it on the heap since "path" is
-		// optional. Nonetheless, manage it with a boost::scoped_ptr so it
+		// optional. Nonetheless, manage it with a std::unique_ptr so it
 		// will be destroyed when we leave.
 		tempfunc.reset(new LLView::TemporaryDrilldownFunc(llview::TargetEvent(target)));
 	}

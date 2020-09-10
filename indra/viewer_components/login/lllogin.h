@@ -26,8 +26,6 @@
 #ifndef LL_LLLOGIN_H
 #define LL_LLLOGIN_H
 
-#include <boost/scoped_ptr.hpp>
-
 class LLSD;
 class LLEventPump;
 
@@ -121,7 +119,7 @@ public:
 
 private:
 	class Impl;
-	boost::scoped_ptr<Impl> mImpl;
+	std::unique_ptr<Impl> mImpl;
 };
 
 #endif // LL_LLLOGIN_H

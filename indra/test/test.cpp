@@ -63,10 +63,8 @@
 #pragma warning (pop)
 #endif
 
-#include <boost/scoped_ptr.hpp>
 #include <boost/shared_ptr.hpp>
 #include <boost/make_shared.hpp>
-#include <boost/foreach.hpp>
 
 #include <fstream>
 
@@ -537,7 +535,7 @@ int main(int argc, char **argv)
 	apr_status_t apr_err;
 	const char* opt_arg = NULL;
 	int opt_id = 0;
-	boost::scoped_ptr<llofstream> output;
+	std::unique_ptr<llofstream> output;
 	const char *touch = NULL;
 
 	while(true)

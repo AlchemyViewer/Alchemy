@@ -987,7 +987,7 @@ private:
 
 	bool mIgnoreAllNotifications;
 
-	boost::scoped_ptr<LLNotificationsListener> mListener;
+	std::unique_ptr<LLNotificationsListener> mListener;
 
 	std::vector<LLNotificationChannelPtr> mDefaultChannels;
 };

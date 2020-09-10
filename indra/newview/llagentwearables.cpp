@@ -56,8 +56,6 @@
 #include "rlvlocks.h"
 // [/RLVa:KB]
 
-#include <boost/scoped_ptr.hpp>
-
 LLAgentWearables gAgentWearables;
 
 BOOL LLAgentWearables::mInitialWearablesUpdateReceived = FALSE;

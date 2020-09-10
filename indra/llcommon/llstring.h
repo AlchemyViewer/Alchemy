@@ -53,7 +53,6 @@
 #endif
 
 #include <string.h>
-#include <boost/scoped_ptr.hpp>
 
 const char LL_UNKNOWN_CHAR = '?';
 class LLSD;
@@ -1161,7 +1160,7 @@ void LLStringUtilBase<T>::getTokens(const string_type& string, std::vector<strin
 {
 	// This overload must deal with escapes. Delegate that to InEscString
 	// (unless there ARE no escapes).
-	boost::scoped_ptr< LLStringUtilBaseImpl::InString<T> > instrp;
+	std::unique_ptr< LLStringUtilBaseImpl::InString<T> > instrp;
 	if (escapes.empty())
 		instrp.reset(new LLStringUtilBaseImpl::InString<T>(string.begin(), string.end()));
 	else
