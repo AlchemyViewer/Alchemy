@@ -55,12 +55,6 @@
 #include <string.h>
 #include <boost/scoped_ptr.hpp>
 
-#if LL_SOLARIS
-// stricmp and strnicmp do not exist on Solaris:
-#define stricmp strcasecmp
-#define strnicmp strncasecmp
-#endif
-
 const char LL_UNKNOWN_CHAR = '?';
 class LLSD;
 
@@ -784,10 +778,6 @@ STRING windows_message(unsigned long error)
 /// There's only one real implementation
 template<>
 LL_COMMON_API std::wstring windows_message<std::wstring>(unsigned long error);
-
-/// Get Windows message string, implicitly calling GetLastError()
-template<typename STRING>
-STRING windows_message() { return windows_message<STRING>(GetLastError()); }
 
 //@}
 
