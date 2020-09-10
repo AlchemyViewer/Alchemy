@@ -32,7 +32,6 @@
 #include "llprocess.h"
 #include "llsdutil.h"
 #include "llstring.h"
-#include <boost/foreach.hpp>
 
 // static
 const std::string LLExternalEditor::sFilenameMarker = "%s";
