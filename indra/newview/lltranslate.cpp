@@ -344,7 +344,7 @@ void LLGoogleTranslationHandler::parseErrorResponse(
 	int &status,
 	std::string &err_msg)
 {
-    const nlohmann::json &error = root.value("error", nlohmann::json::value_t::null);
+    const nlohmann::json &error = root.at("error");
 	if (!error.is_object() || error.find("message") == error.end() || error.find("code") == error.end())
 	{
 		return;
@@ -362,7 +362,7 @@ bool LLGoogleTranslationHandler::parseTranslation(
 {
 	// Json is prone to aborting the program on failed assertions,
 	// so be super-careful and verify the response format.
-	const nlohmann::json &data = root.value("data", nlohmann::json::value_t::null);
+	const nlohmann::json &data = root.at("data");
 	if (!data.is_object() || data.find("translations") == data.end())
 	{
 		return false;
