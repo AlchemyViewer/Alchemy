@@ -34,15 +34,6 @@
 #include <endian.h>
 #endif	//	LL_LINUX
 
-#if LL_SOLARIS
-#   ifdef  __sparc     // Since we're talking Solaris 10 and up, only 64 bit is supported.
-#      define LL_BIG_ENDIAN 1
-#      define LL_SOLARIS_ALIGNED_CPU 1     //  used to designate issues where SPARC alignment is addressed
-#      define LL_SOLARIS_NON_MESA_GL 1      //  The SPARC GL does not provide a MESA-based GL API
-#   endif
-#   include <sys/isa_defs.h> // ensure we know which end is up
-#endif // LL_SOLARIS
-
 #if (defined(LL_WINDOWS) || (defined(LL_LINUX) && (__BYTE_ORDER == __LITTLE_ENDIAN)) || (defined(LL_DARWIN) && defined(__LITTLE_ENDIAN__)) || (defined(LL_SOLARIS) && defined(__i386)))
 #define LL_LITTLE_ENDIAN 1
 #else
@@ -109,23 +100,6 @@
 #else
 # define LL_THREAD_LOCAL __thread
 #endif
-
-// Static linking with apr on windows needs to be declared.
-#if LL_WINDOWS && !LL_COMMON_LINK_SHARED
-#ifndef APR_DECLARE_STATIC
-#define APR_DECLARE_STATIC // For APR on Windows
-#endif
-#ifndef APU_DECLARE_STATIC
-#define APU_DECLARE_STATIC // For APR util on Windows
-#endif
-#endif
-
-#if defined(LL_WINDOWS)
-#ifndef XML_STATIC
-#define XML_STATIC
-#endif
-#endif	//	LL_WINDOWS
-
 
 // Deal with VC6 problems
 #if LL_MSVC

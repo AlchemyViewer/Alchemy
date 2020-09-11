@@ -27,9 +27,6 @@
 #ifndef LL_LLXMLPARSER_H
 #define LL_LLXMLPARSER_H
 
-#ifndef XML_STATIC
-#define XML_STATIC
-#endif
 #ifdef LL_USESYSTEMLIBS
 #include <expat.h>
 #else

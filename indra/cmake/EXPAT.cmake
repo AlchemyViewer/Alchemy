@@ -9,8 +9,10 @@ if (USESYSTEMLIBS)
 else (USESYSTEMLIBS)
     use_prebuilt_binary(expat)
     if (WINDOWS)
-        set(EXPAT_LIBRARIES libexpatMT)
-        set(EXPAT_COPY libexpatMT.dll)
+        set(EXPAT_LIBRARIES
+            debug libexpatd.lib
+            optimized libexpat.lib)
+        set(EXPAT_COPY libexpat.dll)
     else (WINDOWS)
         set(EXPAT_LIBRARIES expat)
         if (DARWIN)

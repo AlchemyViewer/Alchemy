@@ -62,6 +62,7 @@ if(WINDOWS)
         boost_stacktrace_windbg-mt${addrsfx}.dll
         boost_thread-mt${addrsfx}.dll
         epoxy-0.dll
+        ${EXPAT_COPY}
         freetype.dll
         glod.dll
         libapr-1.dll
@@ -79,6 +80,7 @@ if(WINDOWS)
         openjpeg.dll
         ssleay32.dll
         uriparser.dll
+        xmlrpc-epi.dll
         zlib1.dll
         )
 

@@ -509,26 +509,12 @@ class WindowsManifest(ViewerManifest):
         # Get shared libs from the shared libs staging directory
         with self.prefix(src=os.path.join(self.args['build'], os.pardir,
                                           'sharedlibs', self.args['configuration'])):
+            # APR Libraries
+            self.path("libapr-1.dll")
+            self.path("libapriconv-1.dll")
+            self.path("libaprutil-1.dll")
 
-            # Mesh 3rd party libs needed for auto LOD and collada reading
-            try:
-                self.path("glod.dll")
-            except RuntimeError as err:
-                print err.message
-                print "Skipping GLOD library (assumming linked statically)"
-
-            # Get fmodstudio dll, continue if missing
-            if self.args['configuration'].lower() == 'debug':
-                self.path("fmodL.dll")
-            else:
-                self.path("fmod.dll")
-
-            # For textures
-            self.path("openjpeg.dll")
-
-            # For OpenGL extensions
-            self.path("epoxy-0.dll")
-
+            # Boost Libraries
             self.path("boost_context-mt*.dll")
             self.path("boost_fiber-mt*.dll")
             self.path("boost_filesystem-mt*.dll")
@@ -536,15 +522,49 @@ class WindowsManifest(ViewerManifest):
             self.path("boost_regex-mt*.dll")
             self.path("boost_stacktrace_windbg-mt*.dll")
             self.path("boost_thread-mt*.dll")
-            self.path("freetype.dll")
+
+            # Mesh 3rd party libs needed for auto LOD and collada reading
             self.path("libcollada14dom23.dll")
-            self.path("libcurl*.dll")
+
+            try:
+                self.path("glod.dll")
+            except RuntimeError as err:
+                print err.message
+                print "Skipping GLOD library (assumming linked statically)"
+
+            # For image support
             self.path("libpng16*.dll")
             self.path("libwebp.dll")
+            self.path("openjpeg.dll")
+
+            # For OpenGL extensions
+            self.path("epoxy-0.dll")
+
+            # Security
+            self.path("ssleay32.dll")
+            self.path("libeay32.dll")
+
+            # HTTP and Network
+            self.path("libcurl*.dll")
+            self.path("nghttp2.dll")
+            self.path("xmlrpc-epi.dll")
+
+            # Hunspell
+            self.path("libhunspell.dll")
+
+            # Misc
+            self.path("libexpat.dll")
             self.path("libxml2.dll")
             self.path("minizip*.dll")
+            self.path("freetype.dll")
             self.path("uriparser.dll")
             self.path("zlib*1.dll")
+
+            # Get fmodstudio dll for audio engine, continue if missing
+            if self.args['configuration'].lower() == 'debug':
+                self.path("fmodL.dll")
+            else:
+                self.path("fmod.dll")
 
             # SLVoice executable
             with self.prefix(src=os.path.join(pkgdir, 'bin', 'release')):
@@ -557,16 +577,6 @@ class WindowsManifest(ViewerManifest):
             else:
                 self.path("vivoxsdk.dll")
                 self.path("ortp.dll")
-            
-            # Security
-            self.path("ssleay32.dll")
-            self.path("libeay32.dll")
-
-            # HTTP/2
-            self.path("nghttp2.dll")
-
-            # Hunspell
-            self.path("libhunspell.dll")
 
             # BugSplat
             if self.args.get('bugsplat'):

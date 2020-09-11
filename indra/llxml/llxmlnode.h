@@ -27,9 +27,6 @@
 #ifndef LL_LLXMLNODE_H
 #define LL_LLXMLNODE_H
 
-#ifndef XML_STATIC
-#define XML_STATIC
-#endif
 #ifdef LL_USESYSTEMLIBS
 #include <expat.h>
 #else

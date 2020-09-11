@@ -12,11 +12,7 @@ if (USESYSTEMLIBS)
 else (USESYSTEMLIBS)
   use_prebuilt_binary(apr_suite)
   if (WINDOWS)
-    if (LLCOMMON_LINK_SHARED)
-      set(APR_selector "lib")
-    else (LLCOMMON_LINK_SHARED)
-      set(APR_selector "")
-    endif (LLCOMMON_LINK_SHARED)
+    set(APR_selector "lib")
     set(APR_LIBRARIES 
       debug ${ARCH_PREBUILT_DIRS_DEBUG}/${APR_selector}apr-1.lib
       optimized ${ARCH_PREBUILT_DIRS_RELEASE}/${APR_selector}apr-1.lib

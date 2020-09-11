@@ -102,9 +102,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>83b4a047db5f7ee462753d91e6277cba</string>
+              <string>03a9228600bc6aba6ee06f214ef3e64f</string>
+              <key>hash_algorithm</key>
+              <string>md5</string>
               <key>url</key>
-              <string>http://automated-builds-secondlife-com.s3.amazonaws.com/ct2/55143/512317/apr_suite-1.4.5.539073-windows-539073.tar.bz2</string>
+              <string>https://pkg.alchemyviewer.org/repository/autobuild-external/apr-suite/windows/apr_suite-1.4.5.328-windows-328.tar.bz2</string>
             </map>
             <key>name</key>
             <string>windows</string>
@@ -114,16 +116,18 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>b3bbf168b39e25c08cc1febddeb33332</string>
+              <string>bcf0878344c1c9c6af51994d0e95fcf9</string>
+              <key>hash_algorithm</key>
+              <string>md5</string>
               <key>url</key>
-              <string>http://automated-builds-secondlife-com.s3.amazonaws.com/ct2/55139/512304/apr_suite-1.4.5.539073-windows64-539073.tar.bz2</string>
+              <string>https://pkg.alchemyviewer.org/repository/autobuild-external/apr-suite/windows64/apr_suite-1.4.5.328-windows64-328.tar.bz2</string>
             </map>
             <key>name</key>
             <string>windows64</string>
           </map>
         </map>
         <key>version</key>
-        <string>1.4.5.539073</string>
+        <string>1.4.5.328</string>
       </map>
       <key>boost</key>
       <map>
@@ -712,9 +716,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>c509f8afa1e02f4c16232cce7f6855f8</string>
+              <string>4f6ce988932eb420afdb4eacd75dbce8</string>
+              <key>hash_algorithm</key>
+              <string>md5</string>
               <key>url</key>
-              <string>http://automated-builds-secondlife-com.s3.amazonaws.com/ct2/55056/512080/expat-2.1.1.538990-windows-538990.tar.bz2</string>
+              <string>https://pkg.alchemyviewer.org/repository/autobuild-external/expat/windows/expat-2.2.9.323-windows-323.tar.bz2</string>
             </map>
             <key>name</key>
             <string>windows</string>
@@ -724,16 +730,18 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>aba97cfdf44c04dbfcac89c7cb472580</string>
+              <string>49dc81485705a32d345b4af6dab4ac1c</string>
+              <key>hash_algorithm</key>
+              <string>md5</string>
               <key>url</key>
-              <string>http://automated-builds-secondlife-com.s3.amazonaws.com/ct2/55054/512068/expat-2.1.1.538990-windows64-538990.tar.bz2</string>
+              <string>https://pkg.alchemyviewer.org/repository/autobuild-external/expat/windows64/expat-2.2.9.323-windows64-323.tar.bz2</string>
             </map>
             <key>name</key>
             <string>windows64</string>
           </map>
         </map>
         <key>version</key>
-        <string>2.1.1.538990</string>
+        <string>2.2.9.323</string>
       </map>
       <key>fmodstudio</key>
       <map>
@@ -3094,9 +3102,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>94643b7cebb449f049fa9e32ae682bcd</string>
+              <string>eb26c5779a2bf53f2038a89282bed227</string>
+              <key>hash_algorithm</key>
+              <string>md5</string>
               <key>url</key>
-              <string>http://automated-builds-secondlife-com.s3.amazonaws.com/ct2/55138/512288/xmlrpc_epi-0.54.1.539072-windows-539072.tar.bz2</string>
+              <string>https://pkg.alchemyviewer.org/repository/autobuild-external/xmlrpc-epi/windows/xmlrpc_epi-0.54.1.326-windows-326.tar.bz2</string>
             </map>
             <key>name</key>
             <string>windows</string>
@@ -3106,16 +3116,18 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>c409de1974a879291ce7daaf52348d85</string>
+              <string>e33a10439dbd430e158bdca16da2adc4</string>
+              <key>hash_algorithm</key>
+              <string>md5</string>
               <key>url</key>
-              <string>http://automated-builds-secondlife-com.s3.amazonaws.com/ct2/55137/512279/xmlrpc_epi-0.54.1.539072-windows64-539072.tar.bz2</string>
+              <string>https://pkg.alchemyviewer.org/repository/autobuild-external/xmlrpc-epi/windows64/xmlrpc_epi-0.54.1.326-windows64-326.tar.bz2</string>
             </map>
             <key>name</key>
             <string>windows64</string>
           </map>
         </map>
         <key>version</key>
-        <string>0.54.1.539072</string>
+        <string>0.54.1.326</string>
       </map>
       <key>zlib</key>
       <map>
