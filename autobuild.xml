@@ -2962,7 +2962,7 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
       <key>vlc-bin</key>
       <map>
         <key>copyright</key>
-        <string>Copyright (C) 1998-2016 VLC authors and VideoLAN</string>
+        <string>Copyright (C) 1998-2020 VLC authors and VideoLAN</string>
         <key>license</key>
         <string>GPL2</string>
         <key>license_file</key>
@@ -3000,9 +3000,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>ca84b7c5f86e702fb35727eed8f0c8c4</string>
+              <string>bcdb4dd6e18adedb09090fba94e8761a</string>
+              <key>hash_algorithm</key>
+              <string>md5</string>
               <key>url</key>
-              <string>http://automated-builds-secondlife-com.s3.amazonaws.com/ct2/54958/511725/vlc_bin-2.2.8.538966-windows-538966.tar.bz2</string>
+              <string>https://pkg.alchemyviewer.org/repository/autobuild-external/vlc-bin/windows/vlc_bin-3.0.11.322-windows-322.tar.bz2</string>
             </map>
             <key>name</key>
             <string>windows</string>
@@ -3012,16 +3014,18 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>93cd88d90cb8aedbed5cd90ff9262409</string>
+              <string>0fa29e1cbf4c8ed24910d05f691e077c</string>
+              <key>hash_algorithm</key>
+              <string>md5</string>
               <key>url</key>
-              <string>http://automated-builds-secondlife-com.s3.amazonaws.com/ct2/54954/511718/vlc_bin-2.2.8.538966-windows64-538966.tar.bz2</string>
+              <string>https://pkg.alchemyviewer.org/repository/autobuild-external/vlc-bin/windows64/vlc_bin-3.0.11.322-windows64-322.tar.bz2</string>
             </map>
             <key>name</key>
             <string>windows64</string>
           </map>
         </map>
         <key>version</key>
-        <string>2.2.8.538966</string>
+        <string>3.0.11.322</string>
       </map>
       <key>xmlrpc-epi</key>
       <map>
