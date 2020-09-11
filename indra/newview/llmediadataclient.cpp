@@ -154,7 +154,7 @@ void mark_dead_and_remove_if(T &c, const PredicateMatchRequest &matchPred)
         if (matchPred(*it))
         {
             (*it)->markDead();
-            c.erase(it++);
+            it = c.erase(it);
         }
         else
         {
