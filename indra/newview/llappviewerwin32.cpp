@@ -47,8 +47,10 @@
 #include "llviewercontrol.h"
 #include "lldxhardware.h"
 
+#if USE_NVAPI
 #include "nvapi/nvapi.h"
 #include "nvapi/NvApiDriverSettings.h"
+#endif
 
 #include <stdlib.h>
 
@@ -221,6 +223,7 @@ bool create_app_mutex()
 	return result;
 }
 
+#if USE_NVAPI
 #define NVAPI_APPNAME L"Second Life"
 
 /*
@@ -306,6 +309,7 @@ void ll_nvapi_init(NvDRSSessionHandle hSession)
 		return;
 	}
 }
+#endif
 
 //#define DEBUGGING_SEH_FILTER 1
 #if DEBUGGING_SEH_FILTER
@@ -370,7 +374,8 @@ int APIENTRY WINMAIN(HINSTANCE hInstance,
 		LL_WARNS() << "Application init failed." << LL_ENDL;
 		return -1;
 	}
-	
+
+#if USE_NVAPI
 	NvAPI_Status status;
     
 	// Initialize NVAPI
@@ -391,6 +396,7 @@ int APIENTRY WINMAIN(HINSTANCE hInstance,
 			ll_nvapi_init(hSession);
 		}
 	}
+#endif
 
 	// Have to wait until after logging is initialized to display LFH info
 	if (num_heaps > 0)
@@ -448,13 +454,15 @@ int APIENTRY WINMAIN(HINSTANCE hInstance,
 	delete viewer_app_ptr;
 	viewer_app_ptr = NULL;
 
+#if USE_NVAPI
 	// (NVAPI) (6) We clean up. This is analogous to doing a free()
 	if (hSession)
 	{
 		NvAPI_DRS_DestroySession(hSession);
 		hSession = 0;
 	}
-	
+#endif
+
 	return 0;
 }
 

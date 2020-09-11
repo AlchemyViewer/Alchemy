@@ -1,16 +1,20 @@
 # -*- cmake -*-
 include(Prebuilt)
 
-set(NVAPI ON CACHE BOOL "Use NVAPI.")
+set(USE_NVAPI OFF CACHE BOOL "Use NVAPI.")
 
-if (NVAPI)
+if (USE_NVAPI)
   if (WINDOWS)
     use_prebuilt_binary(nvapi)
-    set(NVAPI_LIBRARY nvapi)
+    if (ADDRESS_SIZE EQUAL 32)
+      set(NVAPI_LIBRARY nvapi)
+    elseif (ADDRESS_SIZE EQUAL 64)
+      set(NVAPI_LIBRARY nvapi64)
+    endif (ADDRESS_SIZE EQUAL 32)	
   else (WINDOWS)
     set(NVAPI_LIBRARY "")
   endif (WINDOWS)
-else (NVAPI)
+else (USE_NVAPI)
   set(NVAPI_LIBRARY "")
-endif (NVAPI)
+endif (USE_NVAPI)
 

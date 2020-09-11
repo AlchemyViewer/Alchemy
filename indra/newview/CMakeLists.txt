@@ -1515,10 +1515,15 @@ if (WINDOWS)
          llappviewerwin32.cpp
          llwindebug.cpp
          )
+    set(APP_VWR_WIN32_COMPILE_DEFS ${VIEWER_CHANNEL_VERSION_DEFINES})
+    if(USE_NVAPI)
+	list(APPEND APP_VWR_WIN32_COMPILE_DEFS "USE_NVAPI=1")
+    endif()
+	 
     set_source_files_properties(
       llappviewerwin32.cpp
       PROPERTIES
-      COMPILE_DEFINITIONS "${VIEWER_CHANNEL_VERSION_DEFINES}"
+      COMPILE_DEFINITIONS "${APP_VWR_WIN32_COMPILE_DEFS}"
       )
 
     list(APPEND viewer_HEADER_FILES

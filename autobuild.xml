@@ -2308,13 +2308,13 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
       <key>nvapi</key>
       <map>
         <key>copyright</key>
-        <string>Copyright © 2012 NVIDIA Corporation.  All rights reserved.</string>
+        <string>Copyright (c) 2007- 2020 NVIDIA Corporation. All rights reserved. </string>
         <key>description</key>
         <string>NVAPI provides an interface to NVIDIA devices.</string>
         <key>license</key>
-        <string>NVIDIA Corporation Software License Agreement – NVAPI SDK</string>
+        <string>nvapi</string>
         <key>license_file</key>
-        <string>LICENSES/NVAPI_SDK_License_Agreement.pdf</string>
+        <string>LICENSES/nvapi.txt</string>
         <key>name</key>
         <string>nvapi</string>
         <key>platforms</key>
@@ -2324,9 +2324,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>4305515ad326c911a390388366a9107b</string>
+              <string>f09e4d5689e0565f4a8891e957da1acd</string>
+              <key>hash_algorithm</key>
+              <string>md5</string>
               <key>url</key>
-              <string>http://automated-builds-secondlife-com.s3.amazonaws.com/ct2/54947/511704/nvapi-352.539058-windows-539058.tar.bz2</string>
+              <string>https://pkg.alchemyviewer.org/repository/autobuild-internal/nvapi/windows/nvapi-R450.334-windows-334.tar.bz2</string>
             </map>
             <key>name</key>
             <string>windows</string>
@@ -2336,16 +2338,18 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>25c8ac919f24b8952653d38ec43640e5</string>
+              <string>3f774da46969487d2a38be532ff62c95</string>
+              <key>hash_algorithm</key>
+              <string>md5</string>
               <key>url</key>
-              <string>http://automated-builds-secondlife-com.s3.amazonaws.com/ct2/54945/511697/nvapi-352.539058-windows64-539058.tar.bz2</string>
+              <string>https://pkg.alchemyviewer.org/repository/autobuild-internal/nvapi/windows64/nvapi-R450.334-windows64-334.tar.bz2</string>
             </map>
             <key>name</key>
             <string>windows64</string>
           </map>
         </map>
         <key>version</key>
-        <string>352.539058</string>
+        <string>R450.334</string>
       </map>
       <key>ogg_vorbis</key>
       <map>
