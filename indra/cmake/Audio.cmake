@@ -10,33 +10,27 @@ if (USESYSTEMLIBS)
 else (USESYSTEMLIBS)
   use_prebuilt_binary(ogg_vorbis)
   set(VORBIS_INCLUDE_DIRS ${LIBS_PREBUILT_DIR}/include)
-  set(VORBISENC_INCLUDE_DIRS ${VORBIS_INCLUDE_DIRS})
   set(VORBISFILE_INCLUDE_DIRS ${VORBIS_INCLUDE_DIRS})
 
   if (WINDOWS)
     set(OGG_LIBRARIES
-        optimized ogg_static
-        debug ogg_static_d)
+        optimized libogg
+        debug libogg)
     set(VORBIS_LIBRARIES
-        optimized vorbis_static
-        debug vorbis_static_d)
-    set(VORBISENC_LIBRARIES
-        optimized vorbisenc_static
-        debug vorbisenc_static_d)
+        optimized libvorbis
+        debug libvorbis)
     set(VORBISFILE_LIBRARIES
-        optimized vorbisfile_static
-        debug vorbisfile_static_d)
+        optimized libvorbisfile
+        debug libvorbisfile)
   else (WINDOWS)
     set(OGG_LIBRARIES ogg)
     set(VORBIS_LIBRARIES vorbis)
-    set(VORBISENC_LIBRARIES vorbisenc)
     set(VORBISFILE_LIBRARIES vorbisfile)
   endif (WINDOWS)
 endif (USESYSTEMLIBS)
 
 link_directories(
     ${VORBIS_LIBRARY_DIRS}
-    ${VORBISENC_LIBRARY_DIRS}
     ${VORBISFILE_LIBRARY_DIRS}
     ${OGG_LIBRARY_DIRS}
     )

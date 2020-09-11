@@ -2362,9 +2362,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>d4b8ed3fd679a2b484d2d1a66c063908</string>
+              <string>05efbdbed9162e730c1205e50e7487fe</string>
+              <key>hash_algorithm</key>
+              <string>md5</string>
               <key>url</key>
-              <string>http://automated-builds-secondlife-com.s3.amazonaws.com/ct2/54981/511789/ogg_vorbis-1.3.3-1.3.6.538971-windows-538971.tar.bz2</string>
+              <string>https://pkg.alchemyviewer.org/repository/autobuild-external/ogg-vorbis/windows/ogg_vorbis-1.3.4-1.3.7.330-windows-330.tar.bz2</string>
             </map>
             <key>name</key>
             <string>windows</string>
@@ -2374,16 +2376,18 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>ec4a657fe639bb458ee5132062146a7a</string>
+              <string>66f64b4640c884c0e3ddf269e32f8022</string>
+              <key>hash_algorithm</key>
+              <string>md5</string>
               <key>url</key>
-              <string>http://automated-builds-secondlife-com.s3.amazonaws.com/ct2/54980/511782/ogg_vorbis-1.3.3-1.3.6.538971-windows64-538971.tar.bz2</string>
+              <string>https://pkg.alchemyviewer.org/repository/autobuild-external/ogg-vorbis/windows64/ogg_vorbis-1.3.4-1.3.7.330-windows64-330.tar.bz2</string>
             </map>
             <key>name</key>
             <string>windows64</string>
           </map>
         </map>
         <key>version</key>
-        <string>1.3.3-1.3.6.538971</string>
+        <string>1.3.4-1.3.7.330</string>
       </map>
       <key>open-libndofdev</key>
       <map>

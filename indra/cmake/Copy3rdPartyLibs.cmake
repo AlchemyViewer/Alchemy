@@ -72,7 +72,10 @@ if(WINDOWS)
         libcurl.dll
         libeay32.dll
         libhunspell.dll
+        libogg.dll
         libpng16.dll
+        libvorbis.dll
+        libvorbisfile.dll
         libwebp.dll
         libxml2.dll
         minizip.dll

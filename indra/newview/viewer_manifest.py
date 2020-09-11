@@ -552,6 +552,11 @@ class WindowsManifest(ViewerManifest):
             # Hunspell
             self.path("libhunspell.dll")
 
+            # Audio
+            self.path("libogg.dll")
+            self.path("libvorbis.dll")
+            self.path("libvorbisfile.dll")      
+
             # Misc
             self.path("libexpat.dll")
             self.path("libxml2.dll")
