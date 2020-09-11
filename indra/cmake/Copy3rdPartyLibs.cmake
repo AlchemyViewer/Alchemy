@@ -65,6 +65,7 @@ if(WINDOWS)
         ${EXPAT_COPY}
         freetype.dll
         glod.dll
+        jpeg8.dll
         libapr-1.dll
         libaprutil-1.dll
         libapriconv-1.dll

@@ -533,6 +533,7 @@ class WindowsManifest(ViewerManifest):
                 print "Skipping GLOD library (assumming linked statically)"
 
             # For image support
+            self.path("jpeg8.dll")
             self.path("libpng16*.dll")
             self.path("libwebp.dll")
             self.path("openjpeg.dll")

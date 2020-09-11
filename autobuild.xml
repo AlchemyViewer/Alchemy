@@ -1464,7 +1464,7 @@
       <key>libhunspell</key>
       <map>
         <key>copyright</key>
-        <string>See hunspell.txt</string>
+        <string>LGPL 2.1</string>
         <key>description</key>
         <string>Spell checking library</string>
         <key>license</key>
@@ -1528,9 +1528,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>ec22ec25160bcfd2a74f1c7bc8ff6133</string>
+              <string>a413602360424a4e9526d87f9df78132</string>
+              <key>hash_algorithm</key>
+              <string>md5</string>
               <key>url</key>
-              <string>http://automated-builds-secondlife-com.s3.amazonaws.com/ct2/54986/511824/libhunspell-1.3.2.538974-windows-538974.tar.bz2</string>
+              <string>https://pkg.alchemyviewer.org/repository/autobuild-external/hunspell/windows/libhunspell-1.7.0.335-windows-335.tar.bz2</string>
             </map>
             <key>name</key>
             <string>windows</string>
@@ -1540,16 +1542,66 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>f470c6f3f7b0559e95e76467b808de10</string>
+              <string>9324049a0fd170c3e34542c2a8efcf19</string>
+              <key>hash_algorithm</key>
+              <string>md5</string>
               <key>url</key>
-              <string>http://automated-builds-secondlife-com.s3.amazonaws.com/ct2/54985/511817/libhunspell-1.3.2.538974-windows64-538974.tar.bz2</string>
+              <string>https://pkg.alchemyviewer.org/repository/autobuild-external/hunspell/windows64/libhunspell-1.7.0.335-windows64-335.tar.bz2</string>
             </map>
             <key>name</key>
             <string>windows64</string>
           </map>
         </map>
         <key>version</key>
-        <string>1.3.2.538974</string>
+        <string>1.7.0.335</string>
+      </map>
+      <key>libjpeg-turbo</key>
+      <map>
+        <key>canonical_repo</key>
+        <string>https://git.alchemyviewer.org/alchemy/thirdparty/3p-libjpeg-turbo</string>
+        <key>copyright</key>
+        <string>Copyright (C)2009-2020 D. R. Commander. All Rights Reserved. Copyright (C)2015 Viktor Szathmáry. All Rights Reserved.</string>
+        <key>description</key>
+        <string>JPEG encoding, decoding library</string>
+        <key>license</key>
+        <string>libjpeg-turbo</string>
+        <key>license_file</key>
+        <string>LICENSES/libjpeg-turbo.txt</string>
+        <key>name</key>
+        <string>libjpeg-turbo</string>
+        <key>platforms</key>
+        <map>
+          <key>windows</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>hash</key>
+              <string>f57e40f2be3f1dd392ffce9cbe9fb731</string>
+              <key>hash_algorithm</key>
+              <string>md5</string>
+              <key>url</key>
+              <string>https://pkg.alchemyviewer.org/repository/autobuild-external/libjpeg-turbo/windows/libjpeg_turbo-2.0.5.336-windows-336.tar.bz2</string>
+            </map>
+            <key>name</key>
+            <string>windows</string>
+          </map>
+          <key>windows64</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>hash</key>
+              <string>c3d06364c50d312d7b26a42f380ea3f4</string>
+              <key>hash_algorithm</key>
+              <string>md5</string>
+              <key>url</key>
+              <string>https://pkg.alchemyviewer.org/repository/autobuild-external/libjpeg-turbo/windows64/libjpeg_turbo-2.0.5.336-windows64-336.tar.bz2</string>
+            </map>
+            <key>name</key>
+            <string>windows64</string>
+          </map>
+        </map>
+        <key>version</key>
+        <string>2.0.5.336</string>
       </map>
       <key>libndofdev</key>
       <map>
