@@ -986,11 +986,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>e36c95b0d0fbaa3ff3392facaf5de447</string>
+              <string>fa262f57c4caba78aa7cc45bfe865d50</string>
               <key>hash_algorithm</key>
               <string>md5</string>
               <key>url</key>
-              <string>http://automated-builds-secondlife-com.s3.amazonaws.com/ct2/55008/511893/glod-1.0pre3.538980-windows-538980.tar.bz2</string>
+              <string>https://pkg.alchemyviewer.org/repository/autobuild-external/glod/windows/glod-1.0pre3.338-windows-338.tar.bz2</string>
             </map>
             <key>name</key>
             <string>windows</string>
@@ -1000,16 +1000,18 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>6302ee1903ab419e76565d9eb6acd274</string>
+              <string>0714e9667d7dee66d75a1490c59cb9b0</string>
+              <key>hash_algorithm</key>
+              <string>md5</string>
               <key>url</key>
-              <string>http://automated-builds-secondlife-com.s3.amazonaws.com/ct2/55004/511885/glod-1.0pre3.538980-windows64-538980.tar.bz2</string>
+              <string>https://pkg.alchemyviewer.org/repository/autobuild-external/glod/windows64/glod-1.0pre3.338-windows64-338.tar.bz2</string>
             </map>
             <key>name</key>
             <string>windows64</string>
           </map>
         </map>
         <key>version</key>
-        <string>1.0pre3.538980</string>
+        <string>1.0pre3.338</string>
       </map>
       <key>google_breakpad</key>
       <map>
@@ -1646,9 +1648,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>8abb7d216535009f6c0a7e43b0734b1e</string>
+              <string>dac0ebfb45c40188e67330dfd6842adf</string>
+              <key>hash_algorithm</key>
+              <string>md5</string>
               <key>url</key>
-              <string>http://automated-builds-secondlife-com.s3.amazonaws.com/ct2/54984/511810/libndofdev-0.1.538973-windows-538973.tar.bz2</string>
+              <string>https://pkg.alchemyviewer.org/repository/autobuild-external/libndofdev/windows/libndofdev-0.1.337-windows-337.tar.bz2</string>
             </map>
             <key>name</key>
             <string>windows</string>
@@ -1658,16 +1662,18 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>9da7aed5a914174dcb2be12ecd4a656f</string>
+              <string>e6d6d9b7554110631eb5f1fb56bd2293</string>
+              <key>hash_algorithm</key>
+              <string>md5</string>
               <key>url</key>
-              <string>http://automated-builds-secondlife-com.s3.amazonaws.com/ct2/54983/511803/libndofdev-0.1.538973-windows64-538973.tar.bz2</string>
+              <string>https://pkg.alchemyviewer.org/repository/autobuild-external/libndofdev/windows64/libndofdev-0.1.337-windows64-337.tar.bz2</string>
             </map>
             <key>name</key>
             <string>windows64</string>
           </map>
         </map>
         <key>version</key>
-        <string>0.1.538973</string>
+        <string>0.1.337</string>
       </map>
       <key>libpng</key>
       <map>
