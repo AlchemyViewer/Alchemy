@@ -50,6 +50,33 @@ from indra.util.llmanifest import LLManifest, main, path_ancestors, CHANNEL_VEND
 from llbase import llsd
 
 class ViewerManifest(LLManifest):
+    def path_optional(self, src, dst):
+        """
+        For a number of our self.path() calls, not only do we want
+        to deal with the absence of src, we also want to remember
+        which were present. Return either an empty list (absent)
+        or a list containing dst (present). Concatenate these
+        return values to get a list of all libs that are present.
+        """
+        # This was simple before we started needing to pass
+        # wildcards. Fortunately, self.path() ends up appending a
+        # (source, dest) pair to self.file_list for every expanded
+        # file processed. Remember its size before the call.
+        oldlen = len(self.file_list)
+        try:
+            self.path(src, dst)
+            # The dest appended to self.file_list has been prepended
+            # with self.get_dst_prefix(). Strip it off again.
+            added = [os.path.relpath(d, self.get_dst_prefix())
+                     for s, d in self.file_list[oldlen:]]
+        except MissingError as err:
+            print >> sys.stderr, "Warning: "+err.msg
+            added = []
+        if not added:
+            print "Skipping %s" % dst
+        return added
+    
+    
     def is_packaging_viewer(self):
         # Some commands, files will only be included
         # if we are packaging the viewer on windows.
@@ -525,12 +552,7 @@ class WindowsManifest(ViewerManifest):
 
             # Mesh 3rd party libs needed for auto LOD and collada reading
             self.path("libcollada14dom23.dll")
-
-            try:
-                self.path("glod.dll")
-            except RuntimeError as err:
-                print err.message
-                print "Skipping GLOD library (assumming linked statically)"
+            self.path("glod.dll")
 
             # For image support
             self.path("jpeg8.dll")
@@ -568,9 +590,15 @@ class WindowsManifest(ViewerManifest):
 
             # Get fmodstudio dll for audio engine, continue if missing
             if self.args['configuration'].lower() == 'debug':
-                self.path("fmodL.dll")
+                self.path_optional("fmodL.dll", "fmodL.dll")
             else:
-                self.path("fmod.dll")
+                self.path_optional(src="fmod.dll", dst="fmod.dll")
+
+            # KDU
+            if self.args['configuration'].lower() == 'debug':
+                self.path_optional("kdud.dll", "kdud.dll")
+            else:
+                self.path_optional(src="kdu.dll", dst="kdu.dll")
 
             # SLVoice executable
             with self.prefix(src=os.path.join(pkgdir, 'bin', 'release')):
@@ -1005,32 +1033,6 @@ class DarwinManifest(ViewerManifest):
                 self.path("tr.lproj")
                 self.path("uk.lproj")
                 self.path("zh-Hans.lproj")
-
-                def path_optional(src, dst):
-                    """
-                    For a number of our self.path() calls, not only do we want
-                    to deal with the absence of src, we also want to remember
-                    which were present. Return either an empty list (absent)
-                    or a list containing dst (present). Concatenate these
-                    return values to get a list of all libs that are present.
-                    """
-                    # This was simple before we started needing to pass
-                    # wildcards. Fortunately, self.path() ends up appending a
-                    # (source, dest) pair to self.file_list for every expanded
-                    # file processed. Remember its size before the call.
-                    oldlen = len(self.file_list)
-                    try:
-                        self.path(src, dst)
-                        # The dest appended to self.file_list has been prepended
-                        # with self.get_dst_prefix(). Strip it off again.
-                        added = [os.path.relpath(d, self.get_dst_prefix())
-                                 for s, d in self.file_list[oldlen:]]
-                    except MissingError as err:
-                        print >> sys.stderr, "Warning: "+err.msg
-                        added = []
-                    if not added:
-                        print "Skipping %s" % dst
-                    return added
 
                 # dylibs is a list of all the .dylib files we expect to need
                 # in our bundled sub-apps. For each of these we'll create a

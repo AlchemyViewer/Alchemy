@@ -52,7 +52,14 @@ if (USE_KDU)
   add_library (llkdu ${llkdu_SOURCE_FILES})
 
   target_link_libraries(llkdu
-    ${KDU_LIBRARY})
+    ${KDU_LIBRARY}
+    llcommon)
+
+  target_compile_definitions(llkdu PRIVATE -DKDU_X86_INTRINSICS -DKDU_NO_THREADS -DKDU_NO_AVX -DKDU_NO_AVX2)
+
+  if(WINDOWS)
+    target_compile_definitions(llkdu PRIVATE -DCORESYS_IMPORTS)
+  endif()
   
   # Add tests
   if (LL_TESTS)

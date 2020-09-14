@@ -4,14 +4,17 @@
 # When building using proprietary binaries though (i.e. having access to LL private servers), 
 # we always build with KDU
 if (INSTALL_PROPRIETARY)
-  set(USE_KDU ON CACHE BOOL "Use Kakadu library.")
+  option(USE_KDU "Use Kakadu library." ON)
 endif (INSTALL_PROPRIETARY)
 
 if (USE_KDU)
   include(Prebuilt)
   use_prebuilt_binary(kdu)
   if (WINDOWS)
-    set(KDU_LIBRARY kdu.lib)
+    set(KDU_LIBRARY 
+      debug kdud.lib
+      optimized kdu.lib
+      )
   else (WINDOWS)
     set(KDU_LIBRARY libkdu.a)
   endif (WINDOWS)
