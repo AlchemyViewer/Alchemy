@@ -128,8 +128,6 @@
       <menu_item_call.on_click
        function="Avatar.CopyData"
        parameter="user_name"/>
-      <menu_item_call.on_enable
-       function="RLV.CanShowName" />
     </menu_item_call>
     <menu_item_call
      label="Copy Display Name"
@@ -137,8 +135,6 @@
       <menu_item_call.on_click
        function="Avatar.CopyData"
        parameter="display_name"/>
-      <menu_item_call.on_enable
-       function="RLV.CanShowName" />
     </menu_item_call>
     <menu_item_call
      label="Copy Account Name"
@@ -146,8 +142,6 @@
       <menu_item_call.on_click
        function="Avatar.CopyData"
        parameter="account_name"/>
-      <menu_item_call.on_enable
-       function="RLV.CanShowName" />
     </menu_item_call>
     <menu_item_call
      label="Copy SLurl"
@@ -155,8 +149,6 @@
       <menu_item_call.on_click
        function="Avatar.CopyData"
        parameter="slurl"/>
-      <menu_item_call.on_enable
-       function="RLV.CanShowName" />
     </menu_item_call>
     <menu_item_call
      label="Copy ID"

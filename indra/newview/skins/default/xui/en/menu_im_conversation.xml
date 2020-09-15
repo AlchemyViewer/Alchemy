@@ -105,8 +105,6 @@
       <menu_item_call.on_click
        function="Avatar.GearDoToSelected"
        parameter="copy_username"/>
-      <menu_item_call.on_enable
-       function="RLV.CanShowName" />
     </menu_item_call>
     <menu_item_call
      label="Copy Display Name"
@@ -114,8 +112,6 @@
       <menu_item_call.on_click
        function="Avatar.GearDoToSelected"
        parameter="copy_display_name"/>
-      <menu_item_call.on_enable
-       function="RLV.CanShowName" />
     </menu_item_call>
     <menu_item_call
      label="Copy Account Name"
@@ -123,8 +119,6 @@
       <menu_item_call.on_click
        function="Avatar.GearDoToSelected"
        parameter="copy_account_name"/>
-      <menu_item_call.on_enable
-       function="RLV.CanShowName" />
     </menu_item_call>
     <menu_item_call
      label="Copy SLurl"
@@ -132,8 +126,6 @@
       <menu_item_call.on_click
        function="Avatar.GearDoToSelected"
        parameter="copy_slurl"/>
-      <menu_item_call.on_enable
-       function="RLV.CanShowName" />
     </menu_item_call>
     <menu_item_call
      label="Copy ID"

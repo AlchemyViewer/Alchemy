@@ -7,8 +7,6 @@
   <menu_item_call.on_click
      function="Profile.CopyName"
      parameter="user_name"/>
-    <menu_item_call.on_enable
-     function="RLV.CanShowName" />
   </menu_item_call>
   <menu_item_call
    label="Copy Display Name"
@@ -16,8 +14,6 @@
     <menu_item_call.on_click
      function="Profile.CopyName"
      parameter="display_name"/>
-    <menu_item_call.on_enable
-     function="RLV.CanShowName" />
   </menu_item_call>
   <menu_item_call
    label="Copy Account Name"
@@ -25,8 +21,6 @@
     <menu_item_call.on_click
      function="Profile.CopyName"
      parameter="account_name"/>
-    <menu_item_call.on_enable
-     function="RLV.CanShowName" />
   </menu_item_call>
   <menu_item_call
    label="Copy SLurl"
@@ -34,8 +28,6 @@
     <menu_item_call.on_click
      function="Profile.CopyName"
      parameter="slurl"/>
-    <menu_item_call.on_enable
-     function="RLV.CanShowName" />
   </menu_item_call>
   <menu_item_call
    label="Copy ID"
