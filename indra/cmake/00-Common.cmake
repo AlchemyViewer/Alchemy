@@ -331,9 +331,11 @@ else()
   add_definitions(-URELEASE_SHOW_ASSERT)
 endif()
 
-option(DISABLE_TIMING "Disable all but core fast timers" OFF)
-if(DISABLE_TIMING)
-  add_definitions(-DAL_DISABLE_TIMERS=1)
+option(ENABLE_TIMING "Enable all fast timers" ON)
+if(ENABLE_TIMING)
+  add_definitions(-DAL_ENABLE_ALL_TIMERS=1)
+else()
+  add_definitions(-DAL_ENABLE_ALL_TIMERS=0)
 endif()
 
 
