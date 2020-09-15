@@ -50,33 +50,6 @@ from indra.util.llmanifest import LLManifest, main, path_ancestors, CHANNEL_VEND
 from llbase import llsd
 
 class ViewerManifest(LLManifest):
-    def path_optional(self, src, dst):
-        """
-        For a number of our self.path() calls, not only do we want
-        to deal with the absence of src, we also want to remember
-        which were present. Return either an empty list (absent)
-        or a list containing dst (present). Concatenate these
-        return values to get a list of all libs that are present.
-        """
-        # This was simple before we started needing to pass
-        # wildcards. Fortunately, self.path() ends up appending a
-        # (source, dest) pair to self.file_list for every expanded
-        # file processed. Remember its size before the call.
-        oldlen = len(self.file_list)
-        try:
-            self.path(src, dst)
-            # The dest appended to self.file_list has been prepended
-            # with self.get_dst_prefix(). Strip it off again.
-            added = [os.path.relpath(d, self.get_dst_prefix())
-                     for s, d in self.file_list[oldlen:]]
-        except MissingError as err:
-            print >> sys.stderr, "Warning: "+err.msg
-            added = []
-        if not added:
-            print "Skipping %s" % dst
-        return added
-    
-    
     def is_packaging_viewer(self):
         # Some commands, files will only be included
         # if we are packaging the viewer on windows.

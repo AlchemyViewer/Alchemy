@@ -839,7 +839,7 @@ class LLManifest(object):
         """
         return self.path(os.path.join(path, file), file)
 
-    def path(self, src, dst=None):
+    def path(self, src, dst=None, err_if_missing=True):
         sys.stdout.flush()
         if src == None:
             raise ManifestError("No source file, dst is " + dst)
@@ -875,7 +875,8 @@ class LLManifest(object):
         else:
             # no more prefixes left to try
             print("\nunable to find '%s'; looked in:\n  %s" % (src, '\n  '.join(try_prefixes)))
-            self.missing.append(MissingFile(pattern=src, tried=try_prefixes))
+            if err_if_missing == True:
+                self.missing.append(MissingFile(pattern=src, tried=try_prefixes))
             # At this point 'count' might never have been successfully
             # assigned! Even if it was, though, we can be sure it is 0.
             return 0
@@ -885,6 +886,35 @@ class LLManifest(object):
         # Let caller check whether we processed as many files as expected. In
         # particular, let caller notice 0.
         return count
+
+    def path_optional(self, src, dst=None):
+        """
+        For a number of our self.path() calls, not only do we want
+        to deal with the absence of src, we also want to remember
+        which were present. Return either an empty list (absent)
+        or a list containing dst (present). Concatenate these
+        return values to get a list of all libs that are present.
+        """
+        if dst == None:
+            dst = src
+
+        # This was simple before we started needing to pass
+        # wildcards. Fortunately, self.path() ends up appending a
+        # (source, dest) pair to self.file_list for every expanded
+        # file processed. Remember its size before the call.
+        oldlen = len(self.file_list)
+        try:
+            self.path(src, dst, False)
+            # The dest appended to self.file_list has been prepended
+            # with self.get_dst_prefix(). Strip it off again.
+            added = [os.path.relpath(d, self.get_dst_prefix())
+                     for s, d in self.file_list[oldlen:]]
+        except (ManifestError, MissingError) as err:
+            print >> sys.stderr, "Warning: "+err.msg
+            added = []
+        if not added:
+            print "Skipping %s" % dst
+        return added
 
     def do(self, *actions):
         self.actions = actions
