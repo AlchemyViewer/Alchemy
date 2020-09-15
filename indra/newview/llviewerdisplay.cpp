@@ -282,7 +282,7 @@ static std::string STR_DISPLAY_DONE("Display:Done");
 // Paint the display!
 void display(BOOL rebuild, F32 zoom_factor, int subfield, BOOL for_snapshot)
 {
-	LL_RECORD_BLOCK_TIME(FTM_RENDER);
+	LL_ALWAYS_RECORD_BLOCK_TIME(FTM_RENDER);
 
 	if (gWindowResized)
 	{ //skip render on frames where window has been resized

@@ -38,7 +38,13 @@
 #define LL_FAST_TIMER_ON 1
 #define LL_FASTTIMER_USE_RDTSC 1
 
+#if AL_ENABLE_ALL_TIMERS
 #define LL_RECORD_BLOCK_TIME(timer_stat) const LLTrace::BlockTimer& LL_GLUE_TOKENS(block_time_recorder, __LINE__)(LLTrace::timeThisBlock(timer_stat)); (void)LL_GLUE_TOKENS(block_time_recorder, __LINE__);
+#else
+#define LL_RECORD_BLOCK_TIME(timer_stat)
+#endif
+
+#define LL_ALWAYS_RECORD_BLOCK_TIME(timer_stat) const LLTrace::BlockTimer& LL_GLUE_TOKENS(block_time_recorder, __LINE__)(LLTrace::timeThisBlock(timer_stat)); (void)LL_GLUE_TOKENS(block_time_recorder, __LINE__);
 
 namespace LLTrace
 {
@@ -65,46 +71,20 @@ public:
 	//
 	// Windows implementation of CPU clock
 	//
-
-	//
-	// NOTE: put back in when we aren't using platform sdk anymore
-	//
-	// because MS has different signatures for these functions in winnt.h
-	// need to rename them to avoid conflicts
-	//#define _interlockedbittestandset _renamed_interlockedbittestandset
-	//#define _interlockedbittestandreset _renamed_interlockedbittestandreset
-	//#include <intrin.h>
-	//#undef _interlockedbittestandset
-	//#undef _interlockedbittestandreset
-
-	//inline U32 getCPUClockCount32()
-	//{
-	//	U64 time_stamp = __rdtsc();
-	//	return (U32)(time_stamp >> 8);
-	//}
-	//
-	//// return full timer value, *not* shifted by 8 bits
-	//inline U64 getCPUClockCount64()
-	//{
-	//	return __rdtsc();
-	//}
-
-	
+#if LL_FASTTIMER_USE_RDTSC
 
 	// shift off lower 8 bits for lower resolution but longer term timing
 	// on 1Ghz machine, a 32-bit word will hold ~1000 seconds of timing
-#if LL_FASTTIMER_USE_RDTSC
 	static U32 getCPUClockCount32()
 	{
-		unsigned __int64 val = __rdtsc();
-		val = val >> 8;
-		return static_cast<U32>(val);
+		U64 time_stamp = __rdtsc() >> 8U;
+		return static_cast<U32>(time_stamp);
 	}
 
 	// return full timer value, *not* shifted by 8 bits
 	static U64 getCPUClockCount64()
 	{
-		return static_cast<U64>( __rdtsc() );
+		return static_cast<U64>(__rdtsc());
 	}
 
 #else
@@ -112,7 +92,7 @@ public:
 	// These use QueryPerformanceCounter, which is arguably fine and also works on AMD architectures.
 	static U32 getCPUClockCount32()
 	{
-		return (U32)(get_clock_count()>>8);
+		return (U32)(get_clock_count() >> 8);
 	}
 
 	static U64 getCPUClockCount64()

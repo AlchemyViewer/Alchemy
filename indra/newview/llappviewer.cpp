@@ -1396,7 +1396,7 @@ bool LLAppViewer::doFrame()
 	LLEventPump& mainloop(LLEventPumps::instance().obtain("mainloop"));
 	LLSD newFrame;
 
-	LL_RECORD_BLOCK_TIME(FTM_FRAME);
+	LL_ALWAYS_RECORD_BLOCK_TIME(FTM_FRAME);
 	LLTrace::BlockTimer::processTimes();
 	LLTrace::get_frame_recording().nextPeriod();
 	LLTrace::BlockTimer::logStats();
@@ -1470,7 +1470,7 @@ bool LLAppViewer::doFrame()
 			{
 				pauseMainloopTimeout(); // *TODO: Remove. Messages shouldn't be stalling for 20+ seconds!
 
-				LL_RECORD_BLOCK_TIME(FTM_IDLE);
+				LL_ALWAYS_RECORD_BLOCK_TIME(FTM_IDLE);
 				idle();
 
 				resumeMainloopTimeout();
@@ -1506,7 +1506,7 @@ bool LLAppViewer::doFrame()
 
 		// Sleep and run background threads
 		{
-			LL_RECORD_BLOCK_TIME(FTM_SLEEP);
+			LL_ALWAYS_RECORD_BLOCK_TIME(FTM_SLEEP);
 
 			// yield some time to the os based on command line option
 			static LLCachedControl<S32> yield_time(gSavedSettings, "YieldTime", -1);

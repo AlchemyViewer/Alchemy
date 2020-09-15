@@ -331,4 +331,10 @@ else()
   add_definitions(-URELEASE_SHOW_ASSERT)
 endif()
 
+option(DISABLE_TIMING "Disable all but core fast timers" OFF)
+if(DISABLE_TIMING)
+  add_definitions(-DAL_DISABLE_TIMERS=1)
+endif()
+
+
 endif(NOT DEFINED ${CMAKE_CURRENT_LIST_FILE}_INCLUDED)
