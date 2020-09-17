@@ -1390,16 +1390,18 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>3dfeb869c781a766874f0aedc7d4fcef</string>
+              <string>d4a298dc57828a162f8d01aec0a31e1c</string>
+              <key>hash_algorithm</key>
+              <string>md5</string>
               <key>url</key>
-              <string>http://s3-proxy.lindenlab.com/private-builds-secondlife-com/ct2/55188/512576/kdu-7.10.4.539108-windows64-539108.tar.bz2</string>
+              <string>file:///c:/bld/kdu-v8.0.6.202611808-windows64-202611808.tar.bz2</string>
             </map>
             <key>name</key>
             <string>windows64</string>
           </map>
         </map>
         <key>version</key>
-        <string>7.10.4.539108</string>
+        <string>v8.0.6.202611808</string>
       </map>
       <key>libepoxy</key>
       <map>

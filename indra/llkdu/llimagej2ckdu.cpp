@@ -164,6 +164,7 @@ private:
 	bool mUseYCC;
 	kdu_dims mDims;
 	kdu_sample_allocator mAllocator;
+	kdu_push_pull_params mPushPullParams;
 	kdu_tile_comp mComps[4];
 	kdu_line_buf mLines[4];
 	kdu_pull_ifc mEngines[4];
@@ -1098,6 +1099,10 @@ void set_default_colour_weights(kdu_params *siz)
 	{
 		return;
 	}
+
+	cod = siz->access_cluster(ENC_params);
+	assert(cod != NULL);
+
 	float weight;
 	if (cod->get(Clev_weights,0,0,weight) || cod->get(Cband_weights,0,0,weight))
 	{
@@ -1300,11 +1305,11 @@ LLKDUDecodeState::LLKDUDecodeState(kdu_tile tile, kdu_byte *buf, S32 row_gap,
 		mLines[c].pre_create(&mAllocator,mDims.size.x,mReversible[c],use_shorts,0,0);
 		if (res.which() == 0) // No DWT levels used
 		{
-			mEngines[c] = kdu_decoder(res.access_subband(LL_BAND),&mAllocator,use_shorts);
+			mEngines[c] = kdu_decoder(res.access_subband(LL_BAND),&mAllocator,mPushPullParams,use_shorts);
 		}
 		else
 		{
-			mEngines[c] = kdu_synthesis(res,&mAllocator,use_shorts);
+			mEngines[c] = kdu_synthesis(res,&mAllocator,mPushPullParams,use_shorts);
 		}
 	}
 	mAllocator.finalize(*codestreamp); // Actually creates buffering resources
