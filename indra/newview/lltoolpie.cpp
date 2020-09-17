@@ -1377,7 +1377,7 @@ BOOL LLToolPie::handleTooltipObject( LLViewerObject* hover_object, std::string l
 
 BOOL LLToolPie::handleToolTip(S32 local_x, S32 local_y, MASK mask)
 {
-	static const LLCachedControl<bool> show_hover_tips(gSavedSettings, "ShowHoverTips");
+	static const LLCachedControl<bool> show_hover_tips(gSavedSettings, "ShowHoverTips", true);
 	if (!show_hover_tips) return TRUE;
 	if (!mHoverPick.isValid()) return TRUE;
 

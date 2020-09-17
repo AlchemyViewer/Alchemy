@@ -48,9 +48,9 @@ std::string LLFolderViewModelCommon::getStatusText()
 
 void LLFolderViewModelCommon::filter()
 {
-	static LLUICachedControl<S32> filter_item_max_time_visible("FilterItemsMaxTimePerFrameVisible", 10);
-    getFilter().resetTime(llclamp(filter_item_max_time_visible(), 1, 100));
-	mFolderView->getViewModelItem()->filter(getFilter());
+    static const LLUICachedControl<S32> max_time("FilterItemsMaxTimePerFrameVisible", 10);
+    getFilter().resetTime(llclamp(max_time(), 1, 100));
+    mFolderView->getViewModelItem()->filter(getFilter());
 }
 
 bool LLFolderViewModelItemCommon::hasFilterStringMatch()

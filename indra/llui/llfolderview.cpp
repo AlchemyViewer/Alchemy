@@ -335,9 +335,9 @@ static LLTrace::BlockTimerStatHandle FTM_FILTER("Filter Folder View");
 void LLFolderView::filter( LLFolderViewFilter& filter )
 {
 	LL_RECORD_BLOCK_TIME(FTM_FILTER);
-	static const LLUICachedControl<S32> filter_item_max_time_visible("FilterItemsMaxTimePerFrameVisible", 10);
-	static const LLUICachedControl<S32> filter_item_max_time_unvisible("FilterItemsMaxTimePerFrameUnvisible", 1);
-	filter.resetTime(llclamp(mParentPanel.get()->getVisible() ? static_cast<S32>(filter_item_max_time_visible) : static_cast<S32>(filter_item_max_time_unvisible), 1, 100));
+	static const LLUICachedControl<S32> time_visible("FilterItemsMaxTimePerFrameVisible", 10);
+	static const LLUICachedControl<S32> time_invisible("FilterItemsMaxTimePerFrameUnvisible", 1);
+    filter.resetTime(llclamp((S32)(mParentPanel.get()->getVisible() ? time_visible : time_invisible), 1, 100));
 
     // Note: we filter the model, not the view
 	getViewModelItem()->filter(filter);
@@ -656,7 +656,7 @@ void LLFolderView::draw()
 		closeAutoOpenedFolders();
 	}
 
-	static LLUICachedControl<F32> type_ahead_timeout("TypeAheadTimeout", 0);
+	static LLUICachedControl<F32> type_ahead_timeout("TypeAheadTimeout", 1.5f);
 	if (mSearchTimer.getElapsedTimeF32() > type_ahead_timeout || mSearchString.empty())
 	{
 		mSearchString.clear();
