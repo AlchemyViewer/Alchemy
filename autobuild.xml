@@ -614,16 +614,18 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>d85a32d905b199534e8feafa34b28e39</string>
+              <string>3a1bf9b1ded325f872fefa4ade23efd8</string>
+              <key>hash_algorithm</key>
+              <string>md5</string>
               <key>url</key>
-              <string>http://automated-builds-secondlife-com.s3.amazonaws.com/ct2/62332/588168/dullahan-1.7.0.202006241556_81.3.10_gb223419_chromium-81.0.4044.138-windows64-544091.tar.bz2</string>
+              <string>https://pkg.alchemyviewer.org/repository/autobuild-external/dullahan/windows64/dullahan-1.7.0.202009180903_85.3.9_gb045a6e_chromium-85.0.4183.102-windows64-342.tar.bz2</string>
             </map>
             <key>name</key>
             <string>windows64</string>
           </map>
         </map>
         <key>version</key>
-        <string>1.7.0.202006240858_81.3.10_gb223419_chromium-81.0.4044.138</string>
+        <string>1.7.0.202009180903_85.3.9_gb045a6e_chromium-85.0.4183.102</string>
       </map>
       <key>elfio</key>
       <map>

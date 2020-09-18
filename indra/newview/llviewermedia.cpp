@@ -1754,6 +1754,10 @@ LLPluginClassMedia* LLViewerMediaImpl::newSourceFromMediaType(std::string media_
 		{
 			media_source = new LLPluginClassMedia(owner);
 			media_source->setSize(default_width, default_height);
+#if LL_WINDOWS
+			std::string subprocess_folder = gDirUtilp->getLLPluginDir() + gDirUtilp->getDirDelimiter();
+			media_source->setCEFProgramDirs(subprocess_folder);
+#endif
 			media_source->setUserDataPath(user_data_path_cache, user_data_path_cookies, user_data_path_cef_log);
 			media_source->setLanguageCode(LLUI::getLanguage());
 			media_source->setZoomFactor(zoom_factor);

@@ -83,6 +83,9 @@ private:
 	void checkEditState();
     void setVolume();
 
+	std::string mHelperPath;
+	std::string mResourcesPath;
+	std::string mLocalesPath;
 	bool mEnableMediaPluginDebugging;
 	std::string mHostLanguage;
 	bool mCookiesEnabled;
@@ -534,14 +537,12 @@ void MediaPluginCEF::receiveMessage(const char* message_string)
 				settings.disable_network_service = mDisableNetworkService;
 				settings.use_mock_keychain = mUseMockKeyChain;
 #endif
-				settings.flash_enabled = mPluginsEnabled;
 				settings.flip_mouse_y = false;
 				settings.flip_pixels_y = true;
 				settings.frame_rate = 60;
 				settings.force_wave_audio = true;
 				settings.initial_height = 1024;
 				settings.initial_width = 1024;
-				settings.java_enabled = false;
 				settings.javascript_enabled = mJavascriptEnabled;
 				settings.media_stream_enabled = false; // MAINT-6060 - WebRTC media removed until we can add granualrity/query UI
 				settings.plugins_enabled = mPluginsEnabled;
@@ -550,6 +551,11 @@ void MediaPluginCEF::receiveMessage(const char* message_string)
 				settings.log_file = mCefLogFile;
 				settings.log_verbose = mCefLogVerbose;
 				settings.autoplay_without_gesture = true;
+
+				// Set subprocess helper and cef app data paths
+				settings.browser_subprocess_path = mHelperPath;
+				settings.resources_dir_path = mResourcesPath;
+				settings.locales_dir_path = mLocalesPath;
 
 				std::vector<std::string> custom_schemes(1, "secondlife");
 				mCEFLib->setCustomSchemes(custom_schemes);
@@ -579,6 +585,16 @@ void MediaPluginCEF::receiveMessage(const char* message_string)
 				message.setValueU32("type", GL_UNSIGNED_BYTE);
 				message.setValueBoolean("coords_opengl", true);
 				sendMessage(message);
+			}
+			else if (message_name == "set_cef_data_path")
+			{
+				std::string data_path_helper = message_in.getValue("helper_path");
+				std::string data_path_resources = message_in.getValue("resources_path");
+				std::string data_path_locales = message_in.getValue("locales_path");
+
+				mHelperPath = data_path_helper;
+				mResourcesPath = data_path_resources;
+				mLocalesPath = data_path_locales;
 			}
 			else if (message_name == "set_user_data_path")
 			{

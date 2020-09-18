@@ -856,6 +856,18 @@ void LLPluginClassMedia::paste()
 	sendMessage(message);
 }
 
+void LLPluginClassMedia::setCEFProgramDirs(const std::string& helper_path,
+										   const std::string& resources_path,
+										   const std::string& locales_path)
+{
+	LLPluginMessage message(LLPLUGIN_MESSAGE_CLASS_MEDIA, "set_cef_data_path");
+	message.setValue("helper_path", helper_path);
+	message.setValue("resources_path", resources_path);
+	message.setValue("locales_path", locales_path);
+
+	sendMessage(message);
+}
+
 void LLPluginClassMedia::setUserDataPath(const std::string &user_data_path_cache,
 										 const std::string &user_data_path_cookies,
 										 const std::string &user_data_path_cef_log)

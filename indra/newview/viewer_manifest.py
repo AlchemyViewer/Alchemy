@@ -630,6 +630,11 @@ class WindowsManifest(ViewerManifest):
                 self.path("snapshot_blob.bin")
                 self.path("v8_context_snapshot.bin")
 
+            # CEF software renderer files
+            with self.prefix(src=os.path.join(pkgdir, 'bin', config, 'swiftshader'), dst='swiftshader'):
+                self.path("libEGL.dll")
+                self.path("libGLESv2.dll")
+
             # CEF files common to all configurations
             with self.prefix(src=os.path.join(pkgdir, 'resources')):
                 self.path("cef.pak")
