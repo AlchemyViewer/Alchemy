@@ -91,7 +91,7 @@ LLWearableDictionary::LLWearableDictionary(LLWearableType& wtype)
 // [SL:KB] - Patch: Appearance-Misc | Checked: 2011-05-29 (Catznip-2.6)
 	addEntry(LLWearableType::WT_PHYSICS,      new WearableEntry(wtype, "physics",     "New Physics",		LLAssetType::AT_CLOTHING, 	LLInventoryType::ICONNAME_CLOTHING_PHYSICS, TRUE, FALSE));
 // [/SL:KB]
-//	addEntry(LLWearableType::WT_PHYSICS,      new WearableEntry("physics",     "New Physics",		LLAssetType::AT_CLOTHING, 	LLInventoryType::ICONNAME_CLOTHING_PHYSICS, TRUE, TRUE));
+//	addEntry(LLWearableType::WT_PHYSICS,      new WearableEntry(wtype, "physics",     "New Physics",		LLAssetType::AT_CLOTHING, 	LLInventoryType::ICONNAME_CLOTHING_PHYSICS, TRUE, TRUE));
 
 	addEntry(LLWearableType::WT_INVALID,      new WearableEntry(wtype, "invalid",     "Invalid Wearable", 	LLAssetType::AT_NONE, 		LLInventoryType::ICONNAME_UNKNOWN, FALSE, FALSE));
 	addEntry(LLWearableType::WT_NONE,      	  new WearableEntry(wtype, "none",        "Invalid Wearable", 	LLAssetType::AT_NONE, 		LLInventoryType::ICONNAME_NONE, FALSE, FALSE));

@@ -102,11 +102,11 @@ BOOL LLAgentUI::buildLocationString(std::string& str, ELocationFormat fmt,const 
 
 	// create a default name and description for the landmark
 	bool rlva_has_showloc = gRlvHandler.hasBehaviour(RLV_BHVR_SHOWLOC);
-	const std::string& parcel_name = rlva_has_showloc  ? RlvStrings::getString(RLV_STRING_HIDDEN_PARCEL) : parcelMGr.getAgentParcelName();
-	const std::string& region_name = rlva_has_showloc ? RlvStrings::getString(RLV_STRING_HIDDEN_REGION) : region->getName();
+	const std::string& parcel_name = rlva_has_showloc  ? RlvStrings::getString(RlvStringKeys::Hidden::Parcel) : parcelMGr.getAgentParcelName();
+	const std::string& region_name = rlva_has_showloc ? RlvStrings::getString(RlvStringKeys::Hidden::Region) : region->getName();
 // [RLVa:KB] - Checked: 2010-04-04 (RLVa-1.2.0d) | Modified: RLVa-1.2.0d
 	// RELEASE-RLVa: [SL-2.0.0] Check ELocationFormat to make sure our switch still makes sense
-	if (gRlvHandler.hasBehaviour(RLV_BHVR_SHOWLOC))
+	if (rlva_has_showloc)
 	{
 		if (LOCATION_FORMAT_NO_MATURITY == fmt)
 			fmt = LOCATION_FORMAT_LANDMARK;

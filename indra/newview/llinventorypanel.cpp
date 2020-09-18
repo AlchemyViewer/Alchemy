@@ -1370,7 +1370,7 @@ bool LLInventoryPanel::beginIMSession()
 	if (!fRlvCanStartIM)
 	{
 		make_ui_sound("UISndInvalidOp");
-		RlvUtil::notifyBlocked(RLV_STRING_BLOCKED_STARTCONF);
+		RlvUtil::notifyBlocked(RlvStringKeys::Blocked::StartConference);
 		return true;
 	}
 // [/RLVa:KB]
