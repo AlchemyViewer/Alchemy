@@ -60,6 +60,8 @@ static const S32 LINE_HEIGHT = 15;
 
 S32		LLView::sDepth = 0;
 bool	LLView::sDebugRects = false;
+bool	LLView::sIsRectDirty = false;
+LLRect	LLView::sDirtyRect;
 bool	LLView::sDebugRectsShowNames = true;
 bool	LLView::sDebugKeys = false;
 bool	LLView::sDebugMouseHandling = false;
@@ -1202,7 +1204,7 @@ void LLView::drawChildren()
 			if (viewp->getVisible() && viewp->getRect().isValid())
 			{
 				LLRect screen_rect = viewp->calcScreenRect();
-				if ( rootp->getLocalRect().overlaps(screen_rect)  && uiInst.mDirtyRect.overlaps(screen_rect))
+				if ( rootp->getLocalRect().overlaps(screen_rect)  && sDirtyRect.overlaps(screen_rect))
 				{
 					LLUI::pushMatrix();
 					{
@@ -1244,7 +1246,15 @@ void LLView::dirtyRect()
 		parent = parent->getParent();
 	}
 
-	LLUI::getInstance()->dirtyRect(cur->calcScreenRect());
+    if (!sIsRectDirty)
+    {
+        sDirtyRect = cur->calcScreenRect();
+        sIsRectDirty = true;
+    }
+    else
+    {
+        sDirtyRect.unionWith(cur->calcScreenRect());
+    }
 }
 
 //Draw a box for debugging.

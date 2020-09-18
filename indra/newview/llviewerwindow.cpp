@@ -2570,7 +2570,7 @@ void LLViewerWindow::draw()
 
 	if (!LLPipeline::RenderUIBuffer)
 	{
-		LLUI::getInstance()->mDirtyRect = getWindowRectScaled();
+		LLView::sDirtyRect = getWindowRectScaled();
 	}
 
 	// HACK for timecode debugging
