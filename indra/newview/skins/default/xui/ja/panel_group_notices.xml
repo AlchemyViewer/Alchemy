@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <panel label="通知" name="notices_tab">
 	<panel.string name="help_text">
 		通知でメッセージを送ることができ、通知にアイテムを添付することができます。
