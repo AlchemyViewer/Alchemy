@@ -2181,6 +2181,7 @@ void LLLineEditor::clear()
 void LLLineEditor::onTabInto()
 {
 	selectAll();
+    LLUICtrl::onTabInto();
 }
 
 //virtual

@@ -561,6 +561,12 @@ class WindowsManifest(ViewerManifest):
             self.path("uriparser.dll")
             self.path("zlib*1.dll")
 
+            # Get openal dll for audio engine, continue if missing
+            if self.args['openal'] == 'ON':
+                # Get openal dll
+                self.path("OpenAL32.dll")
+                self.path("alut.dll")
+
             # Get fmodstudio dll for audio engine, continue if missing
             if self.args['configuration'].lower() == 'debug':
                 self.path_optional("fmodL.dll", "fmodL.dll")
@@ -1572,10 +1578,12 @@ if __name__ == "__main__":
     print('%s \\\n%s' %
           (sys.executable,
            ' '.join((("'%s'" % arg) if ' ' in arg else arg) for arg in sys.argv)))
+    # fmodstudio and openal can be used simultaneously and controled by environment
     extra_arguments = [
         dict(name='bugsplat', description="""BugSplat database to which to post crashes,
              if BugSplat crash reporting is desired""", default=''),
         dict(name='fmodstudio', description="""Indication if fmod studio libraries are needed""", default='OFF'),
+        dict(name='openal', description="""Indication openal libraries are needed""", default='OFF'),
         ]
     try:
         main(extra=extra_arguments)

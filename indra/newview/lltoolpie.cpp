@@ -1587,7 +1587,7 @@ LLTool* LLToolPie::getOverrideTool(MASK mask)
 	static const LLCachedControl<bool> enable_grab(gSavedSettings, "EnableGrab");
 	if (enable_grab)
 	{
-		if (mask == MASK_CONTROL)
+		if (mask == DEFAULT_GRAB_MASK)
 		{
 			return LLToolGrab::getInstance();
 		}
