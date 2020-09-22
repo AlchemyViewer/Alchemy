@@ -2576,7 +2576,7 @@ void LLFace::setDefaultTexture(U32 nChannel, bool fShowDefault) const
 		if ((fUpdated) && (mDrawablep))
 		{
 			gPipeline.markTextured(mDrawablep);
-			const_cast<LLDrawable*>(mDrawablep.get())->updateTexture();
+			const_cast<LLDrawable*>(mDrawablep)->updateTexture();
 		}
 	}
 
