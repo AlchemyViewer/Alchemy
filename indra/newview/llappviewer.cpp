@@ -3159,9 +3159,8 @@ LLSD LLAppViewer::getViewerInfo() const
 			info["POSITION"] = ll_sd_from_vector3d(pos);
 			info["POSITION_LOCAL"] = ll_sd_from_vector3(gAgent.getPosAgentFromGlobal(pos));
 			info["REGION"] = gAgent.getRegion()->getName();
-
-		boost::regex regex("sim[0-9]*.");
-			info["HOSTNAME"] = boost::regex_replace(gAgent.getRegion()->getHost().getHostName(), regex, "");
+			info["HOSTNAME"] = gAgent.getRegion()->getHost().getHostName();
+			info["HOSTIP"] = gAgent.getRegion()->getHost().getString();
 //			info["SERVER_VERSION"] = gLastVersionChannel;
 			LLSLURL slurl;
 			LLAgentUI::buildSLURL(slurl);
