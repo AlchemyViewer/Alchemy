@@ -380,7 +380,7 @@ LLGroupNoticeNotificationListItem::~LLGroupNoticeNotificationListItem()
 {
 	if (mInventoryOffer != nullptr)
 	{
-		mInventoryOffer->forceResponse(IOR_ACCEPT);
+		mInventoryOffer->forceResponse(IOR_DECLINE);
 		mInventoryOffer = nullptr;
 	}
 }
