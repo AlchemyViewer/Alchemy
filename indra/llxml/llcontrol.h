@@ -433,7 +433,7 @@ public:
 
 	operator const T&() const { return mCachedControlPtr->getValue(); }
 	operator boost::function<const T&()> () const { return boost::function<const T&()>(*this); }
-	const T& operator()() { return mCachedControlPtr->getValue(); }
+	const T& operator()() const { return mCachedControlPtr->getValue(); }
 
 private:
 	LLPointer<LLControlCache<T> > mCachedControlPtr;

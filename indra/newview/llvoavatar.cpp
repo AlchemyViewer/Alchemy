@@ -3546,11 +3546,25 @@ void LLVOAvatar::idleUpdateNameTagAlpha(BOOL new_name, F32 alpha)
 
 LLColor4 LLVOAvatar::getNameTagColor(bool is_friend)
 {
+	enum ENameColor { NameTagFriend = 0, NameTagMatch, NameTagMismatch, NameTagLegacy, Size};
+	static std::vector<LLUIColor> sNameTagColors;
+	if (sNameTagColors.empty())
+	{
+		sNameTagColors.reserve(ENameColor::Size);
+
+		auto& inst = LLUIColorTable::instance();
+		sNameTagColors[NameTagFriend] = inst.getColor("NameTagFriend");
+		sNameTagColors[NameTagMatch] = inst.getColor("NameTagMatch");
+		sNameTagColors[NameTagMismatch] = inst.getColor("NameTagMismatch");
+		sNameTagColors[NameTagLegacy] = inst.getColor("NameTagLegacy");
+	}
+
 	static LLUICachedControl<bool> show_friends("NameTagShowFriends", false);
-	const char* color_name;
+	ENameColor color_name;
 	if (show_friends && is_friend)
 	{
-		color_name = "NameTagFriend";
+
+		color_name = ENameColor::NameTagFriend;
 	}
 	else if (LLAvatarName::useDisplayNames())
 	{
@@ -3558,19 +3572,19 @@ LLColor4 LLVOAvatar::getNameTagColor(bool is_friend)
 		LLAvatarName av_name;
 		if (LLAvatarNameCache::get(getID(), &av_name) && av_name.isDisplayNameDefault())
 		{
-			color_name = "NameTagMatch";
+			color_name = ENameColor::NameTagMatch;
 		}
 		else
 		{
-			color_name = "NameTagMismatch";
+			color_name = ENameColor::NameTagMismatch;
 		}
 	}
 	else
 	{
 		// ...not using display names
-		color_name = "NameTagLegacy";
+		color_name = ENameColor::NameTagLegacy;
 	}
-	return LLUIColorTable::getInstance()->getColor( color_name );
+	return sNameTagColors[color_name];
 }
 
 void LLVOAvatar::idleUpdateBelowWater()
