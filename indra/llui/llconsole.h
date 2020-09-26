@@ -143,6 +143,7 @@ public:
 private:
 	void		update();
 
+	LLUIImagePtr mBackgroundImagep;
 	F32			mLinePersistTime; // Age at which to stop drawing.
 	F32			mFadeTime; // Age at which to start fading
 	const LLFontGL*	mFont;

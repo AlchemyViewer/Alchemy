@@ -69,6 +69,8 @@ LLConsole::LLConsole(const LLConsole::Params& p)
 	}
 	mFadeTime = mLinePersistTime - FADE_DURATION;
 	setMaxLines(LLUI::getInstance()->mSettingGroups["config"]->getS32("ConsoleMaxLines"));
+
+	mBackgroundImagep = LLUI::getUIImage("transparent");
 }
 
 void LLConsole::setLinePersistTime(F32 seconds)
@@ -178,8 +180,6 @@ void LLConsole::draw()
 	// draw remaining lines
 	F32 y_pos = 0.f;
 
-	LLUIImagePtr imagep = LLUI::getUIImage("transparent");
-
 	static LLUICachedControl<F32> console_bg_opacity("ConsoleBackgroundOpacity", 0.7f);
 	F32 console_opacity = llclamp(console_bg_opacity(), 0.f, 1.f);
 
@@ -196,7 +196,7 @@ void LLConsole::draw()
 		S32 target_width =  llfloor( (*paragraph_it).mMaxWidth + padding_horizontal);
 
 		y_pos += ((*paragraph_it).mLines.size()) * line_height;
-		imagep->drawSolid(-14, (S32)(y_pos + line_height - target_height), target_width, target_height, color);
+		mBackgroundImagep->drawSolid(-14, (S32)(y_pos + line_height - target_height), target_width, target_height, color);
 
 		F32 y_off=0;
 

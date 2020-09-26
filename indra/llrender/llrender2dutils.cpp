@@ -798,7 +798,7 @@ void gl_stippled_line_3d( const LLVector3& start, const LLVector3& end, const LL
 	}
 	gGL.end();
 
-	LLRender2D::getInstance()->setLineWidth(1.f);
+	LLRender2D::setLineWidth(1.f);
 }
 
 void gl_arc_2d(F32 center_x, F32 center_y, F32 radius, S32 steps, BOOL filled, F32 start_angle, F32 end_angle)
@@ -965,7 +965,7 @@ void gl_rect_2d_checkerboard(const LLRect& rect, GLfloat alpha)
 	}
 	else
 	{ //polygon stipple is deprecated, use "Checker" texture
-		LLPointer<LLUIImage> img = LLRender2D::getInstance()->getUIImage("Checker");
+		LLUIImagePtr img = LLRender2D::getInstance()->getUIImage("Checker");
 		gGL.getTexUnit(0)->bind(img->getImage());
 		gGL.getTexUnit(0)->setTextureAddressMode(LLTexUnit::TAM_WRAP);
 		gGL.getTexUnit(0)->setTextureFilteringOption(LLTexUnit::TFO_POINT);
