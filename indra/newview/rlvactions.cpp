@@ -618,11 +618,7 @@ bool RlvActions::isRlvEnabled()
 	return RlvHandler::isEnabled();
 }
 
-#ifdef CATZNIP_STRINGVIEW
-void RlvActions::notifyBlocked(const boost::string_view& strNotifcation, const LLSD& sdArgs)
-#else
-void RlvActions::notifyBlocked(const std::string& strNotifcation, const LLSD& sdArgs)
-#endif // CATZNIP_STRINGVIEW
+void RlvActions::notifyBlocked(std::string_view strNotifcation, const LLSD& sdArgs)
 {
 	RlvUtil::notifyBlocked(strNotifcation, sdArgs);
 }

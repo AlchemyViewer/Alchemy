@@ -5975,7 +5975,7 @@ bool script_question_cb(const LLSD& notification, const LLSD& response)
 // [RLVa:KB] - Checked: 2012-07-28 (RLVa-1.4.7)
 	if ( (allowed) && (notification["payload"].has("rlv_blocked")) )
 	{
-		RlvUtil::notifyBlocked(notification["payload"]["rlv_blocked"], LLSD().with("OBJECT", notification["payload"]["object_name"]));
+		RlvUtil::notifyBlocked(notification["payload"]["rlv_blocked"].asStringRef(), LLSD().with("OBJECT", notification["payload"]["object_name"]));
 	}
 // [/RLVa:KB]
 
