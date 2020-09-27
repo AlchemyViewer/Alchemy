@@ -170,7 +170,7 @@ bool LLFirstUse::processNotification(const LLSD& notify)
 		if (notification)
 		{
 			// disable any future notifications
-			gWarningSettings.setBOOL(notification->getPayload()["control_var"], FALSE);
+			gWarningSettings.setBOOL(notification->getPayload()["control_var"].asStringRef(), FALSE);
 		}
 	}
 	return false;
