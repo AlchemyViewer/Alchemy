@@ -233,10 +233,11 @@ LL_COMMON_API std::string ll_safe_string(const char* in, S32 maxlen);
 class LLFormatMapString
 {
 public:
-	LLFormatMapString() {};
+	LLFormatMapString() = default;
 	LLFormatMapString(const char* s) : mString(ll_safe_string(s)) {};
-	LLFormatMapString(const std::string& s) : mString(s) {};
+	LLFormatMapString(const std::string s) : mString(std::move(s)) {};
 	operator std::string() const { return mString; }
+	operator std::string_view() const { return mString; }
 	bool operator<(const LLFormatMapString& rhs) const { return mString < rhs.mString; }
 	std::size_t length() const { return mString.length(); }
 	
