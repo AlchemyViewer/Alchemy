@@ -531,7 +531,7 @@ namespace LLInitParam
 	{
 		if (control.isProvided() && !control().empty())
 		{
-			updateValue(LLUIColorTable::instance().getColor(control));
+			updateValue(LLUIColorTable::instance().getColor(control.getValue()));
 		}
 		else
 		{
