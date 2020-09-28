@@ -44,6 +44,7 @@
 # include <io.h>
 #endif // !LL_WINDOWS
 #include <vector>
+#include <string_view>
 #include "string.h"
 #include <absl/container/flat_hash_map.h>
 
@@ -316,7 +317,7 @@ namespace
 
 namespace LLError
 {
-	std::string Log::demangle(const char* mangled)
+	std::string Log::demangle(const std::string_view mangled)
 	{
 #ifdef __GNUC__
 		// GCC: type_info::name() returns a mangled class name,st demangle
@@ -329,21 +330,25 @@ namespace LLError
 		return result;
 
 #elif LL_WINDOWS
+		using namespace std::literals;
 		// Visual Studio: type_info::name() includes the text "class " at the start
-		std::string name = mangled;
-		for (const auto& prefix : std::vector<std::string>{ "class ", "struct " })
+		static constexpr auto class_prefix = "class "sv;
+		static constexpr auto struct_prefix = "struct "sv;
+		if (0 == mangled.compare(0, class_prefix.length(), class_prefix))
 		{
-			if (0 == name.compare(0, prefix.length(), prefix))
-			{
-				return name.substr(prefix.length());
-			}
+			return std::string(mangled.substr(class_prefix.length()));
 		}
+		else if (0 == mangled.compare(0, struct_prefix.length(), struct_prefix))
+		{
+			return std::string(mangled.substr(struct_prefix.length()));
+		}
+
 		// huh, that's odd, we should see one or the other prefix -- but don't
 		// try to log unless logging is already initialized
 		// in Python, " or ".join(vector) -- but in C++, a PITB
 		LL_DEBUGS() << "Did not see 'class' or 'struct' prefix on '"
-			<< name << "'" << LL_ENDL;
-		return name;
+			<< mangled << "'" << LL_ENDL;
+		return std::string(mangled);
 
 #else  // neither GCC nor Visual Studio
 		return mangled;
