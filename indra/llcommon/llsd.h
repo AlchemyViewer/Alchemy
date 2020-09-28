@@ -290,7 +290,9 @@ public:
 		LLSD& with(const String&, const LLSD&);
 		
 		LLSD& operator[](const std::string_view);
+		LLSD& operator[](const char* c) { return (*this)[std::string_view(c)]; }
 		const LLSD& operator[](const std::string_view) const;
+		const LLSD& operator[](const char* c) const { return (*this)[std::string_view(c)]; }
 	//@}
 	
 	/** @name Array Values */
