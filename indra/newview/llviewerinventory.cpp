@@ -275,12 +275,12 @@ public:
 			return false;
 		}
 		LLUUID inventory_id;
-		if (!inventory_id.set(params[0], FALSE))
+		if (!inventory_id.set(params[0].asStringRef(), FALSE))
 		{
 			return false;
 		}
 		
-		const std::string verb = params[1].asString();
+		const std::string& verb = params[1].asStringRef();
 		if (verb == "select")
 		{
 			uuid_vec_t items_to_open;

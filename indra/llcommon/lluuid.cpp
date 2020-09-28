@@ -211,10 +211,10 @@ std::string LLUUID::asString() const
 
 BOOL LLUUID::set(const char* in_string, BOOL emit)
 {
-	return set(ll_safe_string(in_string),emit);
+	return set(absl::NullSafeStringView(in_string),emit);
 }
 
-BOOL LLUUID::set(const std::string& in_string, BOOL emit)
+BOOL LLUUID::set(const std::string_view in_string, BOOL emit)
 {
 	BOOL broken_format = FALSE;
 
@@ -318,7 +318,7 @@ BOOL LLUUID::set(const std::string& in_string, BOOL emit)
 	return TRUE;
 }
 
-BOOL LLUUID::validate(const std::string& in_string)
+BOOL LLUUID::validate(const std::string_view in_string)
 {
 	BOOL broken_format = FALSE;
 	if (in_string.length() != (UUID_STR_LENGTH - 1))		/* Flawfinder: ignore */
@@ -1006,23 +1006,11 @@ LLAssetID LLTransactionID::makeAssetID(const LLUUID& session) const
 
  LLUUID::LLUUID(const char *in_string)
 {
-	if (!in_string || in_string[0] == 0)
-	{
-		setNull();
-		return;
-	}
- 
 	set(in_string);
 }
 
- LLUUID::LLUUID(const std::string& in_string)
+ LLUUID::LLUUID(const std::string_view in_string)
 {
-	if (in_string.empty())
-	{
-		setNull();
-		return;
-	}
-
 	set(in_string);
 }
 

@@ -101,7 +101,7 @@ public:
 
         // get the ID for the classified
         LLUUID classified_id;
-        if (!classified_id.set(params[0], FALSE))
+        if (!classified_id.set(params[0].asStringRef(), FALSE))
         {
             return false;
         }

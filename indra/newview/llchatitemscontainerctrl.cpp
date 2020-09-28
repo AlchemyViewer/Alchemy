@@ -65,12 +65,12 @@ public:
 		if (params.size() < 2) return false;
 
 		LLUUID object_id;
-		if (!object_id.set(params[0], FALSE))
+		if (!object_id.set(params[0].asStringRef(), FALSE))
 		{
 			return false;
 		}
 
-		const std::string verb = params[1].asString();
+		const std::string& verb = params[1].asStringRef();
 
 		if (verb == "inspect")
 		{

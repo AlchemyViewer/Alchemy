@@ -93,7 +93,7 @@ public:
 		}
 
 		LLUUID object_id;
-		if (!object_id.set(params[0], FALSE))
+		if (!object_id.set(params[0].asStringRef(), FALSE))
 		{
 			return false;
 		}

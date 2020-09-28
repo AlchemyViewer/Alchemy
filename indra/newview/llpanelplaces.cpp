@@ -104,7 +104,7 @@ public:
 		}
 
 		LLUUID parcel_id;
-		if (!parcel_id.set(params[0], FALSE))
+		if (!parcel_id.set(params[0].asStringRef(), FALSE))
 		{
 			return false;
 		}

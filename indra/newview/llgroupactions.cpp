@@ -96,7 +96,7 @@ public:
 		}
 
 		LLUUID group_id;
-		if (!group_id.set(tokens[0], FALSE))
+		if (!group_id.set(tokens[0].asStringRef(), FALSE))
 		{
 			return false;
 		}
