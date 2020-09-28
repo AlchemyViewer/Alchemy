@@ -18,5 +18,5 @@ else (USESYSTEMLIBS)
     set(OPENJPEG_LIBRARIES openjpeg)
   endif(WINDOWS)
   
-    set(OPENJPEG_INCLUDE_DIR ${LIBS_PREBUILT_DIR}/include/openjpeg)
+    set(OPENJPEG_INCLUDE_DIR ${LIBS_PREBUILT_DIR}/include/openjpeg-1.5)
 endif (USESYSTEMLIBS)

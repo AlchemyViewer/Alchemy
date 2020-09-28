@@ -2624,11 +2624,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>2855cc01de820f3f9c1c43845aa8f308</string>
+              <string>f800062517439cb375a15c443b1da8b5</string>
               <key>hash_algorithm</key>
               <string>md5</string>
               <key>url</key>
-              <string>https://depot.alchemyviewer.org/pub/linux64/lib-xenial/openjpeg-1.5.1-linux64-201609240352.tar.bz2</string>
+              <string>https://pkg.alchemyviewer.org/repository/autobuild-external/openjpeg/linux64/openjpeg-1.5.1.429-linux64-429.tar.bz2</string>
             </map>
             <key>name</key>
             <string>linux64</string>
@@ -2638,11 +2638,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>708d1abea051d34a8c40290bb052393e</string>
+              <string>e1fec9bd01afe5eb2b4ab0353d8e4185</string>
               <key>hash_algorithm</key>
               <string>md5</string>
               <key>url</key>
-              <string>https://pkg.alchemyviewer.org/repository/autobuild-external/openjpeg/windows/openjpeg-1.5.1.309-windows-309.tar.bz2</string>
+              <string>https://pkg.alchemyviewer.org/repository/autobuild-external/openjpeg/windows/openjpeg-1.5.1.429-windows-429.tar.bz2</string>
             </map>
             <key>name</key>
             <string>windows</string>
@@ -2652,18 +2652,18 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>590b392ce88b34645f6068e4a02ea44f</string>
+              <string>677a1f519868140d6ae5b1faf7de9b19</string>
               <key>hash_algorithm</key>
               <string>md5</string>
               <key>url</key>
-              <string>https://pkg.alchemyviewer.org/repository/autobuild-external/openjpeg/windows64/openjpeg-1.5.1.309-windows64-309.tar.bz2</string>
+              <string>https://pkg.alchemyviewer.org/repository/autobuild-external/openjpeg/windows64/openjpeg-1.5.1.429-windows64-429.tar.bz2</string>
             </map>
             <key>name</key>
             <string>windows64</string>
           </map>
         </map>
         <key>version</key>
-        <string>1.5.1.309</string>
+        <string>1.5.1.429</string>
       </map>
       <key>openssl</key>
       <map>
