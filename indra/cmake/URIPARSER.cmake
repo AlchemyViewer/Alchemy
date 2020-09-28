@@ -10,9 +10,7 @@ if (USESYSTEMLIBS)
 else (USESYSTEMLIBS)
   use_prebuilt_binary(uriparser)
   if (WINDOWS)
-    set(URIPARSER_LIBRARIES
-      debug uriparserd
-      optimized uriparser)
+    set(URIPARSER_LIBRARIES uriparser)
   elseif (LINUX)
     #
     # When we have updated static libraries in competition with older

@@ -73,8 +73,8 @@ const double kDobsonUnit = 2.687e20;
 // the ozone density profile defined below, which is equal to 15km).
 const double kMaxOzoneNumberDensity = 300.0 * kDobsonUnit / 15000.0;
 const double kRayleigh = 1.24062e-6;
-const double kRayleighScaleHeight = 8000.0;
-const double kMieScaleHeight = 1200.0;
+const float kRayleighScaleHeight = 8000.0f;
+const float kMieScaleHeight = 1200.0f;
 const double kMieAngstromAlpha = 0.0;
 const double kMieAngstromBeta = 5.328e-3;
 const double kMieSingleScatteringAlbedo = 0.9;
@@ -86,8 +86,8 @@ AtmosphericModelSettings::AtmosphericModelSettings()
     , m_sunArcRadians(0.00045f)
     , m_mieAnisotropy(0.8f)
 {
-    DensityLayer rayleigh_density(0.0, 1.0, -1.0 / kRayleighScaleHeight, 0.0, 0.0);
-    DensityLayer mie_density(0.0, 1.0, -1.0 / kMieScaleHeight, 0.0, 0.0);
+    DensityLayer rayleigh_density(0.0f, 1.0f, -1.0f / kRayleighScaleHeight, 0.0f, 0.0f);
+    DensityLayer mie_density(0.0f, 1.0f, -1.0f / kMieScaleHeight, 0.0f, 0.0f);
 
     m_rayleighProfile.push_back(rayleigh_density);
     m_mieProfile.push_back(mie_density);
@@ -96,8 +96,8 @@ AtmosphericModelSettings::AtmosphericModelSettings()
     // decreasing linearly from 1 to 0 between 25 and 40km. This is an approximate
     // profile from http://www.kln.ac.lk/science/Chemistry/Teaching_Resources/
     // Documents/Introduction%20to%20atmospheric%20chemistry.pdf (page 10).
-    m_absorptionProfile.push_back(DensityLayer(25000.0, 0.0, 0.0, 1.0 / 15000.0, -2.0 / 3.0));
-    m_absorptionProfile.push_back(DensityLayer(0.0, 0.0, 0.0, -1.0 / 15000.0, 8.0 / 3.0));
+    m_absorptionProfile.push_back(DensityLayer(25000.0f, 0.0f, 0.0f, 1.0f / 15000.0f, -2.0f / 3.0f));
+    m_absorptionProfile.push_back(DensityLayer(0.0f, 0.0f, 0.0f, -1.0f / 15000.0f, 8.0f / 3.0f));
 }
 
 AtmosphericModelSettings::AtmosphericModelSettings(

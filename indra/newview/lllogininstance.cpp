@@ -62,9 +62,9 @@
 #include <sstream>
 
 const S32 LOGIN_MAX_RETRIES = 8; // Viewer should not autmatically retry login
-const F32 LOGIN_SRV_TIMEOUT_MIN = 10;
-const F32 LOGIN_SRV_TIMEOUT_MAX = 120;
-const F32 LOGIN_DNS_TIMEOUT_FACTOR = 0.9; // make DNS wait shorter then retry time
+const F32 LOGIN_SRV_TIMEOUT_MIN = 10.f;
+const F32 LOGIN_SRV_TIMEOUT_MAX = 120.f;
+const F32 LOGIN_DNS_TIMEOUT_FACTOR = 0.9f; // make DNS wait shorter then retry time
 
 class LLLoginInstance::Disposable {
 public:
