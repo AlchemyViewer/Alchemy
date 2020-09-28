@@ -32,6 +32,7 @@
 #pragma GCC diagnostic ignored "-Wdeprecated-copy-dtor"
 #endif
 #include <boost/optional/optional.hpp>
+#include <absl/container/flat_hash_map.h>
 #if LL_GNUC
 #pragma GCC diagnostic pop
 #endif
@@ -157,7 +158,7 @@ private:
 	static long sLocalTimeOffset;
 	static bool sPacificDaylightTime;
 
-	static std::map<std::string, std::string> datetimeToCodes;
+	static absl::flat_hash_map<std::string, std::string> datetimeToCodes;
 
 public:
 	static std::vector<std::string> sWeekDayList;
@@ -214,7 +215,7 @@ public:
 	// currently in daylight savings time?
 	static bool getPacificDaylightTime(void) { return sPacificDaylightTime;}
 
-	static std::string getDatetimeCode (std::string key);
+	static std::string getDatetimeCode (std::string_view key);
 
     // Express a value like 1234567 as "1.23M" 
     static std::string getReadableNumber(F64 num);
