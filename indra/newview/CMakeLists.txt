@@ -120,6 +120,7 @@ set(viewer_SOURCE_FILES
     alfloaterregiontracker.cpp
     alpanelaomini.cpp
     alpanelaopulldown.cpp
+    alpanelmusicticker.cpp
     alpanelquicksettings.cpp
     alpanelquicksettingspulldown.cpp
     altoolalign.cpp
@@ -775,6 +776,7 @@ set(viewer_HEADER_FILES
     alfloaterregiontracker.h
     alpanelaomini.h
     alpanelaopulldown.h
+    alpanelmusicticker.h
     alpanelquicksettings.h
     alpanelquicksettingspulldown.h
     altoolalign.h

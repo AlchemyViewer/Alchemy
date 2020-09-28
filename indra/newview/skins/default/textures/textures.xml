@@ -753,6 +753,8 @@ with the same filename but different name
   <texture name="cloud-particle.j2c" use_mips="true" />
   <texture name="transparent.j2c" use_mips="true" />
 
+  <texture name="Ticker_Grid" file_name="ticker_visualizer_grid.tga" preload="false" />
+
   <!--WARNING OLD ART BELOW *do not use*-->
   <texture name="icn_media_web.tga" preload="true" />
   <texture name="icn_media_movie.tga" preload="true" />
