@@ -368,30 +368,30 @@ enum ERlvAttachGroupType
 namespace RlvSettingNames
 {
 	using namespace std::string_view_literals;
-	/*inline*/ constexpr std::string_view Main = "RestrainedLove"sv;
-	/*inline*/ constexpr std::string_view Debug = "RestrainedLoveDebug"sv;
-	/*inline*/ constexpr std::string_view CanOoc = "RestrainedLoveCanOOC"sv;
-	/*inline*/ constexpr std::string_view ForbidGiveToRlv = "RestrainedLoveForbidGiveToRLV"sv;
-	/*inline*/ constexpr std::string_view NoSetEnv = "RestrainedLoveNoSetEnv"sv;
-	/*inline*/ constexpr std::string_view ShowEllipsis = "RestrainedLoveShowEllipsis"sv;
-	/*inline*/ constexpr std::string_view WearAddPrefix = "RestrainedLoveStackWhenFolderBeginsWith"sv;
-	/*inline*/ constexpr std::string_view WearReplacePrefix = "RestrainedLoveReplaceWhenFolderBeginsWith"sv;
+	inline constexpr std::string_view Main = "RestrainedLove"sv;
+	inline constexpr std::string_view Debug = "RestrainedLoveDebug"sv;
+	inline constexpr std::string_view CanOoc = "RestrainedLoveCanOOC"sv;
+	inline constexpr std::string_view ForbidGiveToRlv = "RestrainedLoveForbidGiveToRLV"sv;
+	inline constexpr std::string_view NoSetEnv = "RestrainedLoveNoSetEnv"sv;
+	inline constexpr std::string_view ShowEllipsis = "RestrainedLoveShowEllipsis"sv;
+	inline constexpr std::string_view WearAddPrefix = "RestrainedLoveStackWhenFolderBeginsWith"sv;
+	inline constexpr std::string_view WearReplacePrefix = "RestrainedLoveReplaceWhenFolderBeginsWith"sv;
 
-	/*inline*/ constexpr std::string_view DebugHideUnsetDup = "RLVaDebugHideUnsetDuplicate"sv;
-	/*inline*/ constexpr std::string_view EnableIMQuery = "RLVaEnableIMQuery"sv;
-	/*inline*/ constexpr std::string_view EnableLegacyNaming = "RLVaEnableLegacyNaming"sv;
-	/*inline*/ constexpr std::string_view EnableSharedWear = "RLVaEnableSharedWear"sv;
-	/*inline*/ constexpr std::string_view EnableTempAttach = "RLVaEnableTemporaryAttachments"sv;
-	/*inline*/ constexpr std::string_view HideLockedLayer = "RLVaHideLockedLayers"sv;
-	/*inline*/ constexpr std::string_view HideLockedAttach = "RLVaHideLockedAttachments"sv;
-	/*inline*/ constexpr std::string_view HideLockedInventory = "RLVaHideLockedInventory"sv;
-	/*inline*/ constexpr std::string_view LoginLastLocation = "RLVaLoginLastLocation"sv;
-	/*inline*/ constexpr std::string_view SharedInvAutoRename = "RLVaSharedInvAutoRename"sv;
-	/*inline*/ constexpr std::string_view ShowAssertionFail = "RLVaShowAssertionFailures"sv;
-	/*inline*/ constexpr std::string_view ShowRedirectChatTyping = "RLVaShowRedirectChatTyping"sv;
-	/*inline*/ constexpr std::string_view SplitRedirectChat = "RLVaSplitRedirectChat"sv;
-	/*inline*/ constexpr std::string_view TopLevelMenu = "RLVaTopLevelMenu"sv;
-	/*inline*/ constexpr std::string_view WearReplaceUnlocked = "RLVaWearReplaceUnlocked"sv;
+	inline constexpr std::string_view DebugHideUnsetDup = "RLVaDebugHideUnsetDuplicate"sv;
+	inline constexpr std::string_view EnableIMQuery = "RLVaEnableIMQuery"sv;
+	inline constexpr std::string_view EnableLegacyNaming = "RLVaEnableLegacyNaming"sv;
+	inline constexpr std::string_view EnableSharedWear = "RLVaEnableSharedWear"sv;
+	inline constexpr std::string_view EnableTempAttach = "RLVaEnableTemporaryAttachments"sv;
+	inline constexpr std::string_view HideLockedLayer = "RLVaHideLockedLayers"sv;
+	inline constexpr std::string_view HideLockedAttach = "RLVaHideLockedAttachments"sv;
+	inline constexpr std::string_view HideLockedInventory = "RLVaHideLockedInventory"sv;
+	inline constexpr std::string_view LoginLastLocation = "RLVaLoginLastLocation"sv;
+	inline constexpr std::string_view SharedInvAutoRename = "RLVaSharedInvAutoRename"sv;
+	inline constexpr std::string_view ShowAssertionFail = "RLVaShowAssertionFailures"sv;
+	inline constexpr std::string_view ShowRedirectChatTyping = "RLVaShowRedirectChatTyping"sv;
+	inline constexpr std::string_view SplitRedirectChat = "RLVaSplitRedirectChat"sv;
+	inline constexpr std::string_view TopLevelMenu = "RLVaTopLevelMenu"sv;
+	inline constexpr std::string_view WearReplaceUnlocked = "RLVaWearReplaceUnlocked"sv;
 }
 
 // ============================================================================
@@ -403,38 +403,38 @@ namespace RlvStringKeys
 	namespace Blocked
 	{
 		using namespace std::string_view_literals;
-		/*inline*/ constexpr std::string_view AutoPilot = "blocked_autopilot"sv;
-		/*inline*/ constexpr std::string_view Generic = "blocked_generic"sv;
-		/*inline*/ constexpr std::string_view GroupChange = "blocked_groupchange"sv;
-		/*inline*/ constexpr std::string_view InvFolder = "blocked_invfolder"sv;
-		/*inline*/ constexpr std::string_view PermissionAttach = "blocked_permattach"sv;
-		/*inline*/ constexpr std::string_view PermissionTeleport = "blocked_permteleport"sv;
-		/*inline*/ constexpr std::string_view RecvIm = "blocked_recvim"sv;
-		/*inline*/ constexpr std::string_view RecvImRemote = "blocked_recvim_remote"sv;
-		/*inline*/ constexpr std::string_view SendIm = "blocked_sendim"sv;
-		/*inline*/ constexpr std::string_view StartConference = "blocked_startconf"sv;
-		/*inline*/ constexpr std::string_view StartIm = "blocked_startim"sv;
-		/*inline*/ constexpr std::string_view Teleport = "blocked_teleport"sv;
-		/*inline*/ constexpr std::string_view TeleportOffer = "blocked_teleport_offer"sv;
-		/*inline*/ constexpr std::string_view TpLureRequestRemote = "blocked_tplurerequest_remote"sv;
-		/*inline*/ constexpr std::string_view ViewXxx = "blocked_viewxxx"sv;
-		/*inline*/ constexpr std::string_view Wireframe = "blocked_wireframe"sv;
+		inline constexpr std::string_view AutoPilot = "blocked_autopilot"sv;
+		inline constexpr std::string_view Generic = "blocked_generic"sv;
+		inline constexpr std::string_view GroupChange = "blocked_groupchange"sv;
+		inline constexpr std::string_view InvFolder = "blocked_invfolder"sv;
+		inline constexpr std::string_view PermissionAttach = "blocked_permattach"sv;
+		inline constexpr std::string_view PermissionTeleport = "blocked_permteleport"sv;
+		inline constexpr std::string_view RecvIm = "blocked_recvim"sv;
+		inline constexpr std::string_view RecvImRemote = "blocked_recvim_remote"sv;
+		inline constexpr std::string_view SendIm = "blocked_sendim"sv;
+		inline constexpr std::string_view StartConference = "blocked_startconf"sv;
+		inline constexpr std::string_view StartIm = "blocked_startim"sv;
+		inline constexpr std::string_view Teleport = "blocked_teleport"sv;
+		inline constexpr std::string_view TeleportOffer = "blocked_teleport_offer"sv;
+		inline constexpr std::string_view TpLureRequestRemote = "blocked_tplurerequest_remote"sv;
+		inline constexpr std::string_view ViewXxx = "blocked_viewxxx"sv;
+		inline constexpr std::string_view Wireframe = "blocked_wireframe"sv;
 	}
 
 	namespace Hidden
 	{
 		using namespace std::string_view_literals;
-		/*inline*/ constexpr std::string_view Generic = "hidden_generic"sv;
-		/*inline*/ constexpr std::string_view Parcel = "hidden_parcel"sv;
-		/*inline*/ constexpr std::string_view Region = "hidden_region"sv;
+		inline constexpr std::string_view Generic = "hidden_generic"sv;
+		inline constexpr std::string_view Parcel = "hidden_parcel"sv;
+		inline constexpr std::string_view Region = "hidden_region"sv;
 	}
 
 	namespace StopIm
 	{
 		using namespace std::string_view_literals;
-		/*inline*/ constexpr std::string_view NoSession = "stopim_nosession"sv;
-		/*inline*/ constexpr std::string_view EndSessionRemote = "stopim_endsession_remote"sv;
-		/*inline*/ constexpr std::string_view EndSessionLocal = "stopim_endsession_local"sv;
+		inline constexpr std::string_view NoSession = "stopim_nosession"sv;
+		inline constexpr std::string_view EndSessionRemote = "stopim_endsession_remote"sv;
+		inline constexpr std::string_view EndSessionLocal = "stopim_endsession_local"sv;
 	}
 }
 
