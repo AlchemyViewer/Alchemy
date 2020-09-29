@@ -1522,9 +1522,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>ffbdd109356d66ddfefd8a5d57f63f1f</string>
+              <string>4021b07243767ac7ba913c3eeaf65179</string>
+              <key>hash_algorithm</key>
+              <string>md5</string>
               <key>url</key>
-              <string>http://automated-builds-secondlife-com.s3.amazonaws.com/ct2/533/1144/libhunspell-1.3.2.500526-linux64-500526.tar.bz2</string>
+              <string>https://pkg.alchemyviewer.org/repository/autobuild-external/hunspell/linux64/libhunspell-1.7.0.416-linux64-416.tar.bz2</string>
             </map>
             <key>name</key>
             <string>linux64</string>
@@ -1534,11 +1536,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>a413602360424a4e9526d87f9df78132</string>
+              <string>f48b4450fd4a5dfa20299fcb48138375</string>
               <key>hash_algorithm</key>
               <string>md5</string>
               <key>url</key>
-              <string>https://pkg.alchemyviewer.org/repository/autobuild-external/hunspell/windows/libhunspell-1.7.0.335-windows-335.tar.bz2</string>
+              <string>https://pkg.alchemyviewer.org/repository/autobuild-external/hunspell/windows/libhunspell-1.7.0.416-windows-416.tar.bz2</string>
             </map>
             <key>name</key>
             <string>windows</string>
@@ -1548,18 +1550,18 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>9324049a0fd170c3e34542c2a8efcf19</string>
+              <string>2c003c7bbb1ccef479ab991fc1935b11</string>
               <key>hash_algorithm</key>
               <string>md5</string>
               <key>url</key>
-              <string>https://pkg.alchemyviewer.org/repository/autobuild-external/hunspell/windows64/libhunspell-1.7.0.335-windows64-335.tar.bz2</string>
+              <string>https://pkg.alchemyviewer.org/repository/autobuild-external/hunspell/windows64/libhunspell-1.7.0.416-windows64-416.tar.bz2</string>
             </map>
             <key>name</key>
             <string>windows64</string>
           </map>
         </map>
         <key>version</key>
-        <string>1.7.0.335</string>
+        <string>1.7.0.416</string>
       </map>
       <key>libjpeg-turbo</key>
       <map>
