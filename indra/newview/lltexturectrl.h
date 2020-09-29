@@ -241,7 +241,6 @@ private:
 	std::string				 	mLoadingPlaceholderString;
 	S32						 	mLabelWidth;
 	bool						mOpenTexPreview;
-	BOOL						mBakeTextureEnabled;
 };
 
 //////////////////////////////////////////////////////////////////////////////////////////

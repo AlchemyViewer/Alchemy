@@ -73,6 +73,7 @@
 #include "llviewermedia.h"
 #include "llviewerparcelaskplay.h"
 #include "llviewerparcelmedia.h"
+#include "llviewershadermgr.h"
 #include "llviewermediafocus.h"
 #include "llviewermessage.h"
 #include "llviewerobjectlist.h"
@@ -703,8 +704,7 @@ LLAppViewer::LLAppViewer()
 	mPeriodicSlowFrame(LLCachedControl<bool>(gSavedSettings,"Periodic Slow Frame", FALSE)),
 	mFastTimerLogThread(NULL),
 	mSettingsLocationList(NULL),
-	mIsFirstRun(false),
-	mMinMicroSecPerFrame(0.f)
+	mIsFirstRun(false)
 {
 	if(NULL != sInstance)
 	{
@@ -1273,10 +1273,6 @@ bool LLAppViewer::init()
 
 	joystick = LLViewerJoystick::getInstance();
 	joystick->setNeedsReset(true);
-	/*----------------------------------------------------------------------*/
-
-	gSavedSettings.getControl("FramePerSecondLimit")->getSignal()->connect(boost::bind(&LLAppViewer::onChangeFrameLimit, this, _2));
-	onChangeFrameLimit(gSavedSettings.getLLSD("FramePerSecondLimit"));
 
 	return true;
 }
@@ -5480,19 +5476,6 @@ void LLAppViewer::disconnectViewer()
 	// Pass the connection state to LLUrlEntryParcel not to attempt
 	// parcel info requests while disconnected.
 	LLUrlEntryParcel::setDisconnected(gDisconnected);
-}
-
-bool LLAppViewer::onChangeFrameLimit(LLSD const & evt)
-{
-	if (evt.asInteger() > 0)
-	{
-		mMinMicroSecPerFrame = (U64)(1000000.0f / F32(evt.asInteger()));
-	}
-	else
-	{
-		mMinMicroSecPerFrame = 0;
-	}
-	return false;
 }
 
 void LLAppViewer::forceErrorLLError()
