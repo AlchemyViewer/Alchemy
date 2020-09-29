@@ -71,7 +71,7 @@ void LLFixedBuffer::addWLine(const LLWString& line)
 	mMutex.lock() ;
 	mLines.push_back(line);
 	mLineLengths.push_back((S32)line.length());
-	mAddTimes.push_back(mTimer.getElapsedTimeF32());
+	mAddTimes.emplace_back(mTimer.getElapsedTimeF32());
 	mMutex.unlock() ;
 }
 

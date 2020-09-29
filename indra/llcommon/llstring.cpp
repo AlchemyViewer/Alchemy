@@ -1329,7 +1329,6 @@ bool LLStringUtil::formatDatetime(std::string& replacement, std::string token,
 	// if never fell into those two ifs above, param must be utc
 	if (secFromEpoch < 0) secFromEpoch = 0;
 
-	LLDate datetime((F64)secFromEpoch);
 	std::string code = LLStringOps::getDatetimeCode (token);
 
 	// special case to handle timezone
@@ -1340,7 +1339,7 @@ bool LLStringUtil::formatDatetime(std::string& replacement, std::string token,
 		}
 		else if (param == "local")
 		{
-			replacement = "";		// user knows their own timezone
+			replacement.clear();		// user knows their own timezone
 		}
 		else
 		{
@@ -1400,6 +1399,7 @@ bool LLStringUtil::formatDatetime(std::string& replacement, std::string token,
 	}
 	else
 	{
+		LLDate datetime((F64)secFromEpoch);
 		replacement = datetime.toHTTPDateString(code);
 	}
 

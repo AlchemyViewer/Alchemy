@@ -134,7 +134,7 @@ public:
         // you might have to recopy all previous contents to grow its size. If
         // we want this to scale to large data volumes, better to allocate
         // individual pieces.
-        mBuffer.push_back(string(s, n));
+        mBuffer.emplace_back(string(s, n));
         mSize += n;
         return n;
     }

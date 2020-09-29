@@ -63,9 +63,9 @@ public:
 	}
 	const Index lookup(const std::string_view name) const 
 	{
-		for (const_iterator_t dictionary_iter = map_t::begin();
-			 dictionary_iter != map_t::end();
-			 dictionary_iter++)
+        for (const_iterator_t dictionary_iter = map_t::begin(), end_iter = map_t::end();
+			 dictionary_iter != end_iter;
+			 ++dictionary_iter)
 		{
 			const Entry *entry = dictionary_iter->second;
 			if (entry->mName == name)
