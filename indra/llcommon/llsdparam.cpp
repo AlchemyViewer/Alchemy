@@ -32,6 +32,8 @@
 #include "llsdutil.h"
 #include "boost/bind.hpp"
 
+#include <absl/strings/str_format.h>
+
 static 	LLInitParam::Parser::parser_read_func_map_t sReadFuncs;
 static 	LLInitParam::Parser::parser_write_func_map_t sWriteFuncs;
 static 	LLInitParam::Parser::parser_inspect_func_map_t sInspectFuncs;
@@ -119,7 +121,7 @@ void LLParamSDParser::writeSDImpl(LLSD& sd, const LLInitParam::BaseBlock& block,
 		it != mNameStack.end();
 		++it)
 	{
-		full_name += llformat("[%s]", it->first.c_str());
+		absl::StrAppendFormat(&full_name, "[%s]", it->first);
 	}
 
 	return full_name;
