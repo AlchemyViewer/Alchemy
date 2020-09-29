@@ -100,14 +100,14 @@ void LLAdaptiveRetryPolicy::onSuccess()
 
 void LLAdaptiveRetryPolicy::onFailure(S32 status, const LLSD& headers)
 {
-	F32 retry_header_time;
+	F32 retry_header_time = 0.f;
 	bool has_retry_header_time = getRetryAfter(headers,retry_header_time);
 	onFailureCommon(status, has_retry_header_time, retry_header_time);
 }
   
 void LLAdaptiveRetryPolicy::onFailure(const LLCore::HttpResponse *response)
 {
-	F32 retry_header_time;
+	F32 retry_header_time = 0.f;
 	const LLCore::HttpHeaders::ptr_t headers = response->getHeaders();
 	bool has_retry_header_time = getRetryAfter(headers,retry_header_time);
 	onFailureCommon(response->getStatus().getType(), has_retry_header_time, retry_header_time);
