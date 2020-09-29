@@ -285,6 +285,8 @@ target_link_libraries(
     ${URIPARSER_LIBRARIES}
     absl::flat_hash_map
     absl::node_hash_map
+    absl::strings
+    absl::str_format
     nlohmann_json::nlohmann_json
     ${DL_LIBRARY}
     ${RT_LIBRARY}
