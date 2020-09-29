@@ -157,9 +157,9 @@ void LLFloaterSearch::search(const SearchQuery &p)
 
 	// work out the subdir to use based on the requested category
 	LLSD subs;
-	if (mCategoryPaths.has(p.category))
+	if (mCategoryPaths.has(p.category.getValue()))
 	{
-		subs["CATEGORY"] = mCategoryPaths[p.category].asString();
+		subs["CATEGORY"] = mCategoryPaths[p.category.getValue()].asString();
 	}
 	else
 	{

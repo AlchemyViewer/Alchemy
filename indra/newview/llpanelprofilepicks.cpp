@@ -88,7 +88,7 @@ public:
 
         // get the ID for the pick_id
         LLUUID pick_id;
-        if (!pick_id.set(params[0], FALSE))
+        if (!pick_id.set(params[0].asStringRef(), FALSE))
         {
             return false;
         }

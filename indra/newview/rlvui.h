@@ -55,11 +55,7 @@ protected:
 	 * Floater and sidebar validation callbacks
 	 */
 public:
-#ifdef CATZNIP_STRINGVIEW
-	bool addGenericFloaterFilter(const std::string& strFloaterName, const boost::string_view& strRlvNotification);
-#else
-	bool addGenericFloaterFilter(const std::string& strFloaterName, const std::string& strRlvNotification);
-#endif // CATZNIP_STRINGVIEW
+	bool addGenericFloaterFilter(const std::string& strFloaterName, std::string_view strRlvNotification);
 	bool addGenericFloaterFilter(const std::string& strFloaterName, const std::function<void()>& fn = nullptr);
 	bool removeGenericFloaterFilter(const std::string& strFloaterName);
 

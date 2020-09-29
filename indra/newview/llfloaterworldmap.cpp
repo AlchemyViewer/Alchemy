@@ -179,7 +179,7 @@ public:
 		
 		//Get the ID
 		LLUUID id;
-		if (!id.set( params[0], FALSE ))
+		if (!id.set( params[0].asStringRef(), FALSE ))
 		{
 			return false;
 		}

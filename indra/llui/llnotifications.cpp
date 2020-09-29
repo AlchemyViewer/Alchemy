@@ -217,7 +217,7 @@ LLNotificationForm::LLNotificationForm(const std::string& name, const LLNotifica
 		BOOL show_notification = TRUE;
 		if (p.ignore.control.isProvided())
 		{
-			mIgnoreSetting = ui_inst->mSettingGroups["config"]->getControl(p.ignore.control);
+			mIgnoreSetting = ui_inst->mSettingGroups["config"]->getControl(p.ignore.control.getValue());
 			mInvertSetting = p.ignore.invert_control;
 		}
 		else if (mIgnore > IGNORE_NO)
@@ -424,7 +424,7 @@ LLNotificationTemplate::LLNotificationTemplate(const LLNotificationTemplate::Par
     mSoundName("")
 {
 	if (p.sound.isProvided()
-		&& LLUI::getInstance()->mSettingGroups["config"]->controlExists(p.sound))
+		&& LLUI::getInstance()->mSettingGroups["config"]->controlExists(p.sound.getValue()))
 	{
 		mSoundName = p.sound;
 	}

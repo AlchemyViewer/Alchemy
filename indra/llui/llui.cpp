@@ -89,23 +89,22 @@ static LLDefaultChildRegistry::Register<LLToolBar> register_toolbar("toolbar");
 // Functions
 //
 
-LLUUID find_ui_sound(const char * namep)
+LLUUID find_ui_sound(std::string_view name)
 {
-	std::string name = ll_safe_string(namep);
 	LLUUID uuid = LLUUID(NULL);
-	LLUI *ui_inst = LLUI::getInstance();
-	if (!ui_inst->mSettingGroups["config"]->controlExists(name))
+	LLUI& ui_inst = LLUI::instance();
+	if (!ui_inst.mSettingGroups["config"]->controlExists(name))
 	{
 		LL_WARNS() << "tried to make UI sound for unknown sound name: " << name << LL_ENDL;	
 	}
 	else
 	{
-		uuid = LLUUID(ui_inst->mSettingGroups["config"]->getString(name));
+		uuid = LLUUID(ui_inst.mSettingGroups["config"]->getString(name));
 		if (uuid.isNull())
 		{
-			if (ui_inst->mSettingGroups["config"]->getString(name) == LLUUID::null.asString())
+			if (ui_inst.mSettingGroups["config"]->getString(name) == LLUUID::null.asString())
 			{
-				if (ui_inst->mSettingGroups["config"]->getBOOL("UISndDebugSpamToggle"))
+				if (ui_inst.mSettingGroups["config"]->getBOOL("UISndDebugSpamToggle"))
 				{
 					LL_INFOS() << "UI sound name: " << name << " triggered but silent (null uuid)" << LL_ENDL;	
 				}				
@@ -115,9 +114,9 @@ LLUUID find_ui_sound(const char * namep)
 				LL_WARNS() << "UI sound named: " << name << " does not translate to a valid uuid" << LL_ENDL;	
 			}
 		}
-		else if (ui_inst->mAudioCallback != NULL)
+		else if (ui_inst.mAudioCallback != NULL)
 		{
-			if (ui_inst->mSettingGroups["config"]->getBOOL("UISndDebugSpamToggle"))
+			if (ui_inst.mSettingGroups["config"]->getBOOL("UISndDebugSpamToggle"))
 			{
 				LL_INFOS() << "UI sound name: " << name << LL_ENDL;	
 			}
@@ -127,9 +126,14 @@ LLUUID find_ui_sound(const char * namep)
 	return uuid;
 }
 
+LLUUID find_ui_sound(const char* namep)
+{
+	return find_ui_sound(absl::NullSafeStringView(namep));
+}
+
 void make_ui_sound(const char* namep)
 {
-	LLUUID soundUUID = find_ui_sound(namep);
+	LLUUID soundUUID = find_ui_sound(absl::NullSafeStringView(namep));
 	if(soundUUID.notNull())
 	{
 		LLUI::getInstance()->mAudioCallback(soundUUID);
@@ -138,7 +142,7 @@ void make_ui_sound(const char* namep)
 
 void make_ui_sound_deferred(const char* namep)
 {
-	LLUUID soundUUID = find_ui_sound(namep);
+	LLUUID soundUUID = find_ui_sound(absl::NullSafeStringView(namep));
 	if(soundUUID.notNull())
 	{
 		LLUI::getInstance()->mDeferredAudioCallback(soundUUID);
@@ -531,7 +535,7 @@ namespace LLInitParam
 	{
 		if (control.isProvided() && !control().empty())
 		{
-			updateValue(LLUIColorTable::instance().getColor(control));
+			updateValue(LLUIColorTable::instance().getColor(control.getValue()));
 		}
 		else
 		{

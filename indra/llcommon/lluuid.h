@@ -58,7 +58,7 @@ public:
 	//
 	LLUUID() = default;
 	explicit LLUUID(const char *in_string); // Convert from string.
-	explicit LLUUID(const std::string& in_string); // Convert from string.
+	explicit LLUUID(const std::string_view in_string); // Convert from string.
 
 	//
 	// MANIPULATORS
@@ -71,7 +71,7 @@ public:
 	static LLUUID generateNewID(const std::string& stream);	//static version of above for use in initializer expressions such as constructor params, etc. 
 
 	BOOL	set(const char *in_string, BOOL emit = TRUE);	// Convert from string, if emit is FALSE, do not emit warnings
-	BOOL	set(const std::string& in_string, BOOL emit = TRUE);	// Convert from string, if emit is FALSE, do not emit warnings
+	BOOL	set(const std::string_view in_string, BOOL emit = TRUE);	// Convert from string, if emit is FALSE, do not emit warnings
 	void	setNull();					// Faster than setting to LLUUID::null.
 
     S32     cmpTime(uuid_time_t *t1, uuid_time_t *t2);
@@ -215,7 +215,7 @@ public:
 	U16 getCRC16() const;
 	U32 getCRC32() const;
 
-	static BOOL validate(const std::string& in_string); // Validate that the UUID string is legal.
+	static BOOL validate(const std::string_view in_string); // Validate that the UUID string is legal.
 
 	static const LLUUID null;
 	static LLMutex * mMutex;

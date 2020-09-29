@@ -32,6 +32,7 @@
 #pragma GCC diagnostic ignored "-Wdeprecated-copy-dtor"
 #endif
 #include <boost/optional/optional.hpp>
+#include <absl/container/flat_hash_map.h>
 #if LL_GNUC
 #pragma GCC diagnostic pop
 #endif
@@ -157,7 +158,7 @@ private:
 	static long sLocalTimeOffset;
 	static bool sPacificDaylightTime;
 
-	static std::map<std::string, std::string> datetimeToCodes;
+	static absl::flat_hash_map<std::string, std::string> datetimeToCodes;
 
 public:
 	static std::vector<std::string> sWeekDayList;
@@ -214,7 +215,7 @@ public:
 	// currently in daylight savings time?
 	static bool getPacificDaylightTime(void) { return sPacificDaylightTime;}
 
-	static std::string getDatetimeCode (std::string key);
+	static std::string getDatetimeCode (std::string_view key);
 
     // Express a value like 1234567 as "1.23M" 
     static std::string getReadableNumber(F64 num);
@@ -233,10 +234,11 @@ LL_COMMON_API std::string ll_safe_string(const char* in, S32 maxlen);
 class LLFormatMapString
 {
 public:
-	LLFormatMapString() {};
+	LLFormatMapString() = default;
 	LLFormatMapString(const char* s) : mString(ll_safe_string(s)) {};
-	LLFormatMapString(const std::string& s) : mString(s) {};
+	LLFormatMapString(const std::string s) : mString(std::move(s)) {};
 	operator std::string() const { return mString; }
+	operator std::string_view() const { return mString; }
 	bool operator<(const LLFormatMapString& rhs) const { return mString < rhs.mString; }
 	std::size_t length() const { return mString.length(); }
 	

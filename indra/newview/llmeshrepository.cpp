@@ -3805,8 +3805,8 @@ void LLMeshRepository::notifyLoadedMeshes()
 		{
 			inventory_data& data = mInventoryQ.front();
 
-			LLAssetType::EType asset_type = LLAssetType::lookup(data.mPostData["asset_type"].asString());
-			LLInventoryType::EType inventory_type = LLInventoryType::lookup(data.mPostData["inventory_type"].asString());
+			LLAssetType::EType asset_type = LLAssetType::lookup(data.mPostData["asset_type"].asStringRef());
+			LLInventoryType::EType inventory_type = LLInventoryType::lookup(data.mPostData["inventory_type"].asStringRef());
 
 			// Handle addition of texture, if any.
 			if ( data.mResponse.has("new_texture_folder_id") )

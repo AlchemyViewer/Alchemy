@@ -145,15 +145,15 @@ public:
 
 	// machine transation between type and strings
 	static EType 				lookup(const char* name); // safe conversion to std::string, *TODO: deprecate
-	static EType 				lookup(const std::string& type_name);
+	static EType 				lookup(const std::string_view type_name);
 	static const char*			lookup(EType asset_type);
 
 	// translation from a type to a human readable form.
 	static EType 				lookupHumanReadable(const char* desc_name); // safe conversion to std::string, *TODO: deprecate
-	static EType 				lookupHumanReadable(const std::string& readable_name);
+	static EType 				lookupHumanReadable(const std::string_view readable_name);
 	static const char*			lookupHumanReadable(EType asset_type);
 
-	static EType 				getType(const std::string& desc_name);
+	static EType 				getType(std::string desc_name);
 	static const std::string&	getDesc(EType asset_type);
 
 	static bool 				lookupCanLink(EType asset_type);

@@ -63,21 +63,13 @@ class RlvGCTimer;
 // RlvSettings
 //
 
-#ifdef CATZNIP_STRINGVIEW
-template<typename T> inline T rlvGetSetting(const boost::string_view& strSetting, const T& defaultValue)
-#else
-template<typename T> inline T rlvGetSetting(const std::string& strSetting, const T& defaultValue)
-#endif // CATZNIP_STRINGVIEW
+template<typename T> inline T rlvGetSetting(std::string_view strSetting, const T& defaultValue)
 {
 	RLV_ASSERT_DBG(gSavedSettings.controlExists(strSetting));
 	return (gSavedSettings.controlExists(strSetting)) ? gSavedSettings.get<T>(strSetting) : defaultValue;
 }
 
-#ifdef CATZNIP_STRINGVIEW
-template<typename T> inline T rlvGetPerUserSetting(const boost::string_view& strSetting, const T& defaultValue)
-#else
-template<typename T> inline T rlvGetPerUserSetting(const std::string& strSetting, const T& defaultValue)
-#endif // CATZNIP_STRINGVIEW
+template<typename T> inline T rlvGetPerUserSetting(std::string_view strSetting, const T& defaultValue)
 {
 	RLV_ASSERT_DBG(gSavedPerAccountSettings.controlExists(strSetting));
 	return (gSavedPerAccountSettings.controlExists(strSetting)) ? gSavedPerAccountSettings.get<T>(strSetting) : defaultValue;
@@ -153,11 +145,7 @@ public:
 
 	static const std::string& getAnonym(const LLAvatarName& avName);		// @shownames
 	static const std::string& getAnonym(const std::string& strName);		// @shownames
-#ifdef CATZNIP_STRINGVIEW
-	static const std::string& getString(const boost::string_view& strStringName);
-#else
-	static const std::string& getString(const std::string& strStringName);
-#endif // CATZNIP_STRINGVIEW
+	static const std::string& getString(std::string_view strStringName);
 	static const char*        getStringFromReturnCode(ERlvCmdRet eRet);
 	static const std::string& getStringMapPath() { return m_StringMapPath; }
 	static std::string        getVersion(const LLUUID& idRlvObject, bool fLegacy = false);
@@ -192,12 +180,7 @@ public:
 	static bool isForceTp()	{ return m_fForceTp; }
 	static void forceTp(const LLVector3d& posDest);									// Ignores restrictions that might otherwise prevent tp'ing
 
-#ifdef CATZNIP_STRINGVIEW
-	static void notifyBlocked(const std::string& strNotifcation, const LLSD& sdArgs = LLSD(), bool fLogToChat = false) { notifyBlocked(boost::string_view(strNotifcation), sdArgs, fLogToChat); }
-	static void notifyBlocked(const boost::string_view& strNotifcation, const LLSD& sdArgs = LLSD(), bool fLogToChat = false);
-#else
-	static void notifyBlocked(const std::string& strNotifcation, const LLSD& sdArgs = LLSD(), bool fLogToChat = false);
-#endif // CATZNIP_STRINGVIEW
+	static void notifyBlocked(std::string_view strNotifcation, const LLSD& sdArgs = LLSD(), bool fLogToChat = false);
 	static void notifyBlockedGeneric() { notifyBlocked(RlvStringKeys::Blocked::Generic); }
 	static void notifyBlockedViewXXX(LLAssetType::EType assetType) { notifyBlocked(RlvStringKeys::Blocked::ViewXxx, LLSD().with("[TYPE]", LLAssetType::lookup(assetType))); }
 	static void notifyFailedAssertion(const std::string& strAssert, const std::string& strFile, int nLine);

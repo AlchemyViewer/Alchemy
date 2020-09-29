@@ -104,11 +104,10 @@ LLAssetDictionary::LLAssetDictionary()
 const std::string LLAssetType::BADLOOKUP("llassettype_bad_lookup");
 
 // static
-LLAssetType::EType LLAssetType::getType(const std::string& desc_name)
+LLAssetType::EType LLAssetType::getType(std::string desc_name)
 {
-	std::string s = desc_name;
-	LLStringUtil::toUpper(s);
-	return LLAssetDictionary::getInstance()->lookup(s);
+	LLStringUtil::toUpper(desc_name);
+	return LLAssetDictionary::getInstance()->lookup(desc_name);
 }
 
 // static
@@ -143,21 +142,21 @@ const char *LLAssetType::lookup(LLAssetType::EType asset_type)
 // static
 LLAssetType::EType LLAssetType::lookup(const char* name)
 {
-	return lookup(ll_safe_string(name));
+	return lookup(absl::NullSafeStringView(name));
 }
 
 // static
-LLAssetType::EType LLAssetType::lookup(const std::string& type_name)
+LLAssetType::EType LLAssetType::lookup(const std::string_view type_name)
 {
-	const LLAssetDictionary *dict = LLAssetDictionary::getInstance();
-	for (LLAssetDictionary::const_iterator iter = dict->begin();
-		 iter != dict->end();
-		 iter++)
+	if(type_name.empty()) return AT_UNKNOWN;
+
+	const LLAssetDictionary& dict = LLAssetDictionary::instance();
+	for (const auto& dict_pair : dict)
 	{
-		const AssetEntry *entry = iter->second;
+		const AssetEntry *entry = dict_pair.second;
 		if (type_name == entry->mTypeName)
 		{
-			return iter->first;
+			return dict_pair.first;
 		}
 	}
 	return AT_UNKNOWN;
@@ -181,21 +180,19 @@ const char *LLAssetType::lookupHumanReadable(LLAssetType::EType asset_type)
 // static
 LLAssetType::EType LLAssetType::lookupHumanReadable(const char* name)
 {
-	return lookupHumanReadable(ll_safe_string(name));
+	return lookupHumanReadable(absl::NullSafeStringView(name));
 }
 
 // static
-LLAssetType::EType LLAssetType::lookupHumanReadable(const std::string& readable_name)
+LLAssetType::EType LLAssetType::lookupHumanReadable(const std::string_view readable_name)
 {
-	const LLAssetDictionary *dict = LLAssetDictionary::getInstance();
-	for (LLAssetDictionary::const_iterator iter = dict->begin();
-		 iter != dict->end();
-		 iter++)
+	const LLAssetDictionary& dict = LLAssetDictionary::instance();
+	for (const auto& dict_pair : dict)
 	{
-		const AssetEntry *entry = iter->second;
+		const AssetEntry *entry = dict_pair.second;
 		if (entry->mHumanName && (readable_name == entry->mHumanName))
 		{
-			return iter->first;
+			return dict_pair.first;
 		}
 	}
 	return AT_NONE;

@@ -2327,10 +2327,10 @@ bool LLAppViewer::loadSettingsFromDirectory(const std::string& location_key,
 			std::string full_settings_path;
 
 			if (file.file_name_setting.isProvided()
-				&& gSavedSettings.controlExists(file.file_name_setting))
+				&& gSavedSettings.controlExists(file.file_name_setting.getValue()))
 			{
 				// try to find filename stored in file_name_setting control
-				full_settings_path = gSavedSettings.getString(file.file_name_setting);
+				full_settings_path = gSavedSettings.getString(file.file_name_setting.getValue());
 				if (full_settings_path.empty())
 				{
 					continue;

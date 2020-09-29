@@ -360,11 +360,7 @@ const std::string& RlvStrings::getAnonym(const std::string& strName)
 }
 
 // Checked: 2011-11-08 (RLVa-1.5.0)
-#ifdef CATZNIP_STRINGVIEW
-const std::string& RlvStrings::getString(const boost::string_view& strStringName)
-#else
-const std::string& RlvStrings::getString(const std::string& strStringName)
-#endif // CATZNIP_STRINGVIEW
+const std::string& RlvStrings::getString(std::string_view strStringName)
 {
 	static const std::string strMissing = "(Missing RLVa string)";
 	string_map_t::const_iterator itString = m_StringMap.find(strStringName);
@@ -534,7 +530,7 @@ void RlvUtil::filterScriptQuestions(S32& nQuestions, LLSD& sdPayload)
 	if ((!gRlvAttachmentLocks.canAttach()) && (SCRIPT_PERMISSIONS[SCRIPT_PERMISSION_ATTACH].permbit & nQuestions))
 	{
 		// Notify the user that we blocked it since they're not allowed to wear any new attachments
-		sdPayload["rlv_blocked"] = RlvStringKeys::Blocked::PermissionAttach;
+		sdPayload["rlv_blocked"] = std::string(RlvStringKeys::Blocked::PermissionAttach);
 		nQuestions &= ~SCRIPT_PERMISSIONS[SCRIPT_PERMISSION_ATTACH].permbit;
 	}
 
@@ -542,7 +538,7 @@ void RlvUtil::filterScriptQuestions(S32& nQuestions, LLSD& sdPayload)
 	if ((gRlvHandler.hasBehaviour(RLV_BHVR_TPLOC)) && (SCRIPT_PERMISSIONS[SCRIPT_PERMISSION_TELEPORT].permbit & nQuestions))
 	{
 		// Notify the user that we blocked it since they're not allowed to teleport
-		sdPayload["rlv_blocked"] = RlvStringKeys::Blocked::PermissionTeleport;
+		sdPayload["rlv_blocked"] = std::string(RlvStringKeys::Blocked::PermissionTeleport);
 		nQuestions &= ~SCRIPT_PERMISSIONS[SCRIPT_PERMISSION_TELEPORT].permbit;
 	}
 
@@ -584,11 +580,7 @@ bool RlvUtil::isNearbyRegion(const std::string& strRegion)
 }
 
 // Checked: 2011-04-11 (RLVa-1.3.0h) | Modified: RLVa-1.3.0h
-#ifdef CATZNIP_STRINGVIEW
-void RlvUtil::notifyBlocked(const boost::string_view& strNotifcation, const LLSD& sdArgs, bool fLogToChat)
-#else
-void RlvUtil::notifyBlocked(const std::string& strNotifcation, const LLSD& sdArgs, bool fLogToChat)
-#endif // CATZNIP_STRINGVIEW
+void RlvUtil::notifyBlocked(std::string_view strNotifcation, const LLSD& sdArgs, bool fLogToChat)
 {
 	std::string strMsg = RlvStrings::getString(strNotifcation);
 	LLStringUtil::format(strMsg, sdArgs);

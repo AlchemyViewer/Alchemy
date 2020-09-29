@@ -61,7 +61,7 @@ public:
 		if (dictionary_iter == map_t::end()) return NULL;
 		return dictionary_iter->second;
 	}
-	const Index lookup(const std::string &name) const 
+	const Index lookup(const std::string_view name) const 
 	{
 		for (const_iterator_t dictionary_iter = map_t::begin();
 			 dictionary_iter != map_t::end();

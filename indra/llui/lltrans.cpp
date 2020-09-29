@@ -35,6 +35,9 @@
 
 #include <map>
 
+#include <absl/strings/str_format.h>
+#include <absl/strings/str_cat.h>
+
 LLTrans::template_map_t LLTrans::sStringTemplates;
 LLTrans::template_map_t LLTrans::sDefaultStringTemplates;
 LLStringUtil::format_map_t LLTrans::sDefaultArgs;
@@ -143,7 +146,7 @@ bool LLTrans::parseLanguageStrings(LLXMLNodePtr &root)
 static LLTrace::BlockTimerStatHandle FTM_GET_TRANS("Translate string");
 
 //static 
-std::string LLTrans::getString(const std::string &xml_desc, const LLStringUtil::format_map_t& msg_args, bool def_string)
+std::string LLTrans::getString(std::string_view xml_desc, const LLStringUtil::format_map_t& msg_args, bool def_string)
 {
 	// Don't care about time as much as call count.  Make sure we're not
 	// calling LLTrans::getString() in an inner loop. JC
@@ -167,12 +170,12 @@ std::string LLTrans::getString(const std::string &xml_desc, const LLStringUtil::
 	else
 	{
 		LL_WARNS_ONCE("configuration") << "Missing String in strings.xml: [" << xml_desc << "]" << LL_ENDL;
-		return "MissingString("+xml_desc+")";
+		return absl::StrCat("MissingString(", xml_desc, ")");
 	}
 }
 
 //static 
-std::string LLTrans::getDefString(const std::string &xml_desc, const LLStringUtil::format_map_t& msg_args)
+std::string LLTrans::getDefString(std::string_view xml_desc, const LLStringUtil::format_map_t& msg_args)
 {
 	template_map_t::iterator iter = sDefaultStringTemplates.find(xml_desc);
 	if (iter != sDefaultStringTemplates.end())
@@ -187,12 +190,12 @@ std::string LLTrans::getDefString(const std::string &xml_desc, const LLStringUti
 	else
 	{
 		LL_WARNS_ONCE("configuration") << "Missing String in strings.xml: [" << xml_desc << "]" << LL_ENDL;
-		return "MissingString(" + xml_desc + ")";
+		return absl::StrCat("MissingString(", xml_desc, ")");
 	}
 }
 
 //static
-std::string LLTrans::getString(const std::string &xml_desc, const LLSD& msg_args, bool def_string)
+std::string LLTrans::getString(std::string_view xml_desc, const LLSD& msg_args, bool def_string)
 {
 	// Don't care about time as much as call count.  Make sure we're not
 	// calling LLTrans::getString() in an inner loop. JC
@@ -213,12 +216,12 @@ std::string LLTrans::getString(const std::string &xml_desc, const LLSD& msg_args
 	else
 	{
 		LL_WARNS_ONCE("configuration") << "Missing String in strings.xml: [" << xml_desc << "]" << LL_ENDL;
-		return "MissingString("+xml_desc+")";
+		return absl::StrCat("MissingString(", xml_desc, ")");
 	}
 }
 
 //static
-std::string LLTrans::getDefString(const std::string &xml_desc, const LLSD& msg_args)
+std::string LLTrans::getDefString(std::string_view xml_desc, const LLSD& msg_args)
 {
 	template_map_t::iterator iter = sDefaultStringTemplates.find(xml_desc);
 	if (iter != sDefaultStringTemplates.end())
@@ -230,12 +233,12 @@ std::string LLTrans::getDefString(const std::string &xml_desc, const LLSD& msg_a
 	else
 	{
 		LL_WARNS_ONCE("configuration") << "Missing String in strings.xml: [" << xml_desc << "]" << LL_ENDL;
-		return "MissingString(" + xml_desc + ")";
+		return absl::StrCat("MissingString(", xml_desc, ")");
 	}
 }
 
 //static 
-bool LLTrans::findString(std::string &result, const std::string &xml_desc, const LLStringUtil::format_map_t& msg_args)
+bool LLTrans::findString(std::string &result, std::string_view xml_desc, const LLStringUtil::format_map_t& msg_args)
 {
 	LL_RECORD_BLOCK_TIME(FTM_GET_TRANS);
 	
@@ -257,7 +260,7 @@ bool LLTrans::findString(std::string &result, const std::string &xml_desc, const
 }
 
 //static
-bool LLTrans::findString(std::string &result, const std::string &xml_desc, const LLSD& msg_args)
+bool LLTrans::findString(std::string &result, std::string_view xml_desc, const LLSD& msg_args)
 {
 	LL_RECORD_BLOCK_TIME(FTM_GET_TRANS);
 
@@ -277,7 +280,7 @@ bool LLTrans::findString(std::string &result, const std::string &xml_desc, const
 }
 
 //static
-std::string LLTrans::getCountString(const std::string& language, const std::string& xml_desc, S32 count)
+std::string LLTrans::getCountString(const std::string_view language, const std::string_view xml_desc, S32 count)
 {
 	// Compute which string identifier to use
 	const char* form = "";
@@ -334,14 +337,14 @@ std::string LLTrans::getCountString(const std::string& language, const std::stri
 
 	// Translate that string
 	LLStringUtil::format_map_t args;
-	args["[COUNT]"] = llformat("%d", count);
+	args["[COUNT]"] = std::to_string(count);
 
 	// Look up "AgeYearsB" or "AgeWeeksC" including the "form"
-	std::string key = llformat("%s%s", xml_desc.c_str(), form);
+	std::string key = absl::StrCat(xml_desc, form);
 	return getString(key, args);
 }
 
-void LLTrans::setDefaultArg(const std::string& name, const std::string& value)
+void LLTrans::setDefaultArg(const std::string& name, const std::string value)
 {
-	sDefaultArgs[name] = value;
+	sDefaultArgs[name] = std::move(value);
 }

@@ -185,7 +185,7 @@ public:
 
 	void setAnimationData(const std::string& name, void *data);
 	
-	void *getAnimationData(const std::string& name);
+	void *getAnimationData(const std::string_view name);
 
 	void removeAnimationData(const std::string& name);
 	

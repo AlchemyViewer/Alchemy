@@ -932,7 +932,7 @@ boost::optional<std::string> llstring_getoptenv(const std::string& key)
 long LLStringOps::sPacificTimeOffset = 0;
 long LLStringOps::sLocalTimeOffset = 0;
 bool LLStringOps::sPacificDaylightTime = 0;
-std::map<std::string, std::string> LLStringOps::datetimeToCodes;
+absl::flat_hash_map<std::string, std::string> LLStringOps::datetimeToCodes;
 
 std::vector<std::string> LLStringOps::sWeekDayList;
 std::vector<std::string> LLStringOps::sWeekDayShortList;
@@ -1041,18 +1041,16 @@ void LLStringOps::setupDayFormat(const std::string& data)
 }
 
 
-std::string LLStringOps::getDatetimeCode (std::string key)
+std::string LLStringOps::getDatetimeCode (std::string_view key)
 {
-	std::map<std::string, std::string>::iterator iter;
-
-	iter = datetimeToCodes.find (key);
+	auto iter = datetimeToCodes.find (key);
 	if (iter != datetimeToCodes.end())
 	{
 		return iter->second;
 	}
 	else
 	{
-		return std::string("");
+		return std::string();
 	}
 }
 
@@ -1262,7 +1260,7 @@ bool LLStringUtil::simpleReplacement(std::string &replacement, std::string token
 template<>
 void LLStringUtil::setLocale(std::string inLocale)
 {
-	sLocale = inLocale;
+	sLocale = std::move(inLocale);
 };
 
 //static

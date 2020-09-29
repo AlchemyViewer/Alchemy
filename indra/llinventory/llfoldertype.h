@@ -103,7 +103,7 @@ public:
 		FT_NONE = -1
 	};
 
-	static EType 				lookup(const std::string& type_name);
+	static EType 				lookup(const std::string_view type_name);
 	static const std::string&	lookup(EType folder_type);
 
 	static bool 				lookupIsProtectedType(EType folder_type);

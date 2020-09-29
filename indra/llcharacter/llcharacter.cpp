@@ -265,15 +265,23 @@ void LLCharacter::dumpCharacter( LLJoint* joint )
 //-----------------------------------------------------------------------------
 void LLCharacter::setAnimationData(const std::string& name, void *data)
 {
-	mAnimationData[name] = data;
+	mAnimationData.insert_or_assign(name, data);
 }
 
 //-----------------------------------------------------------------------------
 // getAnimationData()
 //-----------------------------------------------------------------------------
-void* LLCharacter::getAnimationData(const std::string& name)
+void* LLCharacter::getAnimationData(const std::string_view name)
 {
-	return get_if_there(mAnimationData, name, (void*)NULL);
+	auto iter = mAnimationData.find(name);
+	if (iter == mAnimationData.end())
+	{
+		return nullptr;
+	}
+	else
+	{
+		return iter->second;
+	}
 }
 
 //-----------------------------------------------------------------------------

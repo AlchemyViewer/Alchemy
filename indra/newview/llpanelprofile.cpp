@@ -124,7 +124,7 @@ public:
 	{
 		if (params.size() < 2) return false;
 		LLUUID avatar_id;
-		if (!avatar_id.set(params[0], FALSE))
+		if (!avatar_id.set(params[0].asStringRef(), FALSE))
 		{
 			return false;
 		}

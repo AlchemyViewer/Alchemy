@@ -109,7 +109,7 @@ LLFolderDictionary::LLFolderDictionary()
 };
 
 // static
-LLFolderType::EType LLFolderType::lookup(const std::string& name)
+LLFolderType::EType LLFolderType::lookup(const std::string_view name)
 {
 	return LLFolderDictionary::getInstance()->lookup(name);
 }
