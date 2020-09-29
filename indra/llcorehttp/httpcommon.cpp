@@ -143,7 +143,7 @@ std::string HttpStatus::toString() const
 	
 	if (*this)
 	{
-		return std::string("");
+		return std::string();
 	}
 	switch (getType())
 	{

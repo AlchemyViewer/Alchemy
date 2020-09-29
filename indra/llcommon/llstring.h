@@ -236,7 +236,7 @@ class LLFormatMapString
 public:
 	LLFormatMapString() = default;
 	LLFormatMapString(const char* s) : mString(ll_safe_string(s)) {};
-	LLFormatMapString(const std::string s) : mString(std::move(s)) {};
+	LLFormatMapString(std::string s) : mString(std::move(s)) {};
 	operator std::string() const { return mString; }
 	operator std::string_view() const { return mString; }
 	bool operator<(const LLFormatMapString& rhs) const { return mString < rhs.mString; }

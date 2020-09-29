@@ -84,7 +84,7 @@ std::string LLDate::asRFC1123() const
 
 LLTrace::BlockTimerStatHandle FT_DATE_FORMAT("Date Format");
 
-std::string LLDate::toHTTPDateString (std::string fmt) const
+std::string LLDate::toHTTPDateString (const std::string& fmt) const
 {
 	LL_RECORD_BLOCK_TIME(FT_DATE_FORMAT);
 	
@@ -93,7 +93,7 @@ std::string LLDate::toHTTPDateString (std::string fmt) const
 	return toHTTPDateString(gmt, fmt);
 }
 
-std::string LLDate::toHTTPDateString (tm * gmt, std::string fmt)
+std::string LLDate::toHTTPDateString (tm * gmt, const std::string& fmt)
 {
 	LL_RECORD_BLOCK_TIME(FT_DATE_FORMAT);
 
@@ -103,7 +103,7 @@ std::string LLDate::toHTTPDateString (tm * gmt, std::string fmt)
 	if (this_locale != prev_locale)
 	{
 		setlocale(LC_TIME, this_locale.c_str());
-		prev_locale = this_locale;
+		prev_locale = std::move(this_locale);
 	}
 
 	// use strftime() as it appears to be faster than std::time_put

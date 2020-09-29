@@ -1521,9 +1521,8 @@ namespace LLError
 		}
 	}
 
-	std::string abbreviateFile(const std::string& filePath)
+	std::string abbreviateFile(std::string f)
 	{
-		std::string f = filePath;
 #if LL_WINDOWS
 		replaceChar(f, '\\', '/');
 #endif
@@ -1534,7 +1533,6 @@ namespace LLError
 		static std::string newview_prefix = "newview/../";
 		f = removePrefix(f, newview_prefix);
 #endif
-
 		return f;
 	}
 
