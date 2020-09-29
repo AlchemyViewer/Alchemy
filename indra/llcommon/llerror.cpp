@@ -58,6 +58,8 @@
 #include "llstl.h"
 #include "lltimer.h"
 
+#include <boost/make_shared.hpp>
+
 // On Mac, got:
 // #error "Boost.Stacktrace requires `_Unwind_Backtrace` function. Define
 // `_GNU_SOURCE` macro or `BOOST_STACKTRACE_GNU_SOURCE_NOT_REQUIRED` if
@@ -611,7 +613,7 @@ namespace LLError
 	{
 		Globals::getInstance()->invalidateCallSites();
 		SettingsConfigPtr newSettingsConfig(dynamic_cast<SettingsConfig *>(pSettingsStorage.get()));
-		mSettingsConfig = newSettingsConfig;
+		mSettingsConfig = std::move(newSettingsConfig);
 	}
 }
 
@@ -751,8 +753,8 @@ namespace
 		}
 
 #if LL_WINDOWS
-		LLError::RecorderPtr recordToWinDebug(new RecordToWinDebug());
-		LLError::addRecorder(recordToWinDebug);
+		LLError::RecorderPtr recordToWinDebug = boost::make_shared<RecordToWinDebug>();
+		LLError::addRecorder(std::move(recordToWinDebug));
 #endif
 
 		LogControlFile& e = LogControlFile::fromDirectory(user_dir, app_dir);
@@ -1030,7 +1032,7 @@ namespace LLError
 			return;
 		}
 		SettingsConfigPtr s = Settings::getInstance()->getSettingsConfig();
-		s->mRecorders.push_back(recorder);
+		s->mRecorders.emplace_back(std::move(recorder));
 	}
 
 	void removeRecorder(RecorderPtr recorder)
@@ -1114,10 +1116,10 @@ namespace LLError
 
 		if (!file_name.empty())
 		{
-			boost::shared_ptr<RecordToFile> recordToFile(new RecordToFile(file_name));
+			boost::shared_ptr<RecordToFile> recordToFile = boost::make_shared<RecordToFile>(file_name);
 			if (recordToFile->okay())
 			{
-				addRecorder(recordToFile);
+				addRecorder(std::move(recordToFile));
 			}
 		}
 	}
@@ -1132,8 +1134,8 @@ namespace LLError
     {
         if (! findRecorder<RecordToStderr>())
         {
-            RecorderPtr recordToStdErr(new RecordToStderr(stderrLogWantsTime()));
-            addRecorder(recordToStdErr);
+			RecorderPtr recordToStdErr = boost::make_shared<RecordToStderr>(stderrLogWantsTime());
+            addRecorder(std::move(recordToStdErr));
         }
     }
 
@@ -1144,8 +1146,8 @@ namespace LLError
 
 		if (fixedBuffer)
 		{
-			RecorderPtr recordToFixedBuffer(new RecordToFixedBuffer(fixedBuffer));
-			addRecorder(recordToFixedBuffer);
+			RecorderPtr recordToFixedBuffer = boost::make_shared<RecordToFixedBuffer>(fixedBuffer);
+			addRecorder(std::move(recordToFixedBuffer));
 		}
 	}
 }
