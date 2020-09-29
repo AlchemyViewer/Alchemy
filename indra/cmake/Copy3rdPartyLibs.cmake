@@ -176,7 +176,6 @@ elseif(LINUX)
         libaprutil-1.so.0
         ${EXPAT_COPY}
         libGLOD.so
-        libhunspell-1.3.so.0.0.0
         libopenal.so
         libuuid.so.16
         libuuid.so.16.0.22
