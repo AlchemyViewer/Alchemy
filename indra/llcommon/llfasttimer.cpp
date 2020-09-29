@@ -364,12 +364,14 @@ void BlockTimer::logStats()
 				// because of indirect derivation from LLInstanceTracker, have to downcast
 				BlockTimerStatHandle& timer = static_cast<BlockTimerStatHandle&>(base);
 				LLTrace::PeriodicRecording& frame_recording = LLTrace::get_frame_recording();
-				sd[timer.getName()]["Time"] = (LLSD::Real) (frame_recording.getLastRecording().getSum(timer).value());	
-				sd[timer.getName()]["Calls"] = (LLSD::Integer) (frame_recording.getLastRecording().getSum(timer.callCount()));
+				LLTrace::Recording& last_recording = frame_recording.getLastRecording();
+
+				sd[timer.getName()]["Time"] = (LLSD::Real) (last_recording.getSum(timer).value());
+				sd[timer.getName()]["Calls"] = (LLSD::Integer) (last_recording.getSum(timer.callCount()));
 				
 				// computing total time here because getting the root timer's getCountHistory
 				// doesn't work correctly on the first frame
-				total_time += frame_recording.getLastRecording().getSum(timer);
+				total_time += last_recording.getSum(timer);
 			}
 		}
 

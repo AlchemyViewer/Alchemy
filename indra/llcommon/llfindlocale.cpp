@@ -130,22 +130,22 @@ accumulate_locstring(const char *str, FL_Locale *l) {
       return 1;
     }
   }
-  free(lang); free(country); free(variant);
+  if (lang)
+      free(lang); 
+  if (country)
+      free(country); 
+  if (variant)
+      free(variant);
   return 0;
 }
 
 
 static int
 accumulate_env(const char *name, FL_Locale *l) {
-  char *env;
-  char *lang = NULL;
-  char *country = NULL;
-  char *variant = NULL;
-  env = getenv(name);
+  char* env = getenv(name);
   if (env) {
     return accumulate_locstring(env, l);
   }
-  free(lang); free(country); free(variant);
   return 0;
 }
 

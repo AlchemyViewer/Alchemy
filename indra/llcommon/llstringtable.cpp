@@ -226,7 +226,6 @@ LLStringTableEntry* LLStringTable::addStringEntry(const char *str)
 	if (str)
 	{
 		char *ret_val = NULL;
-		LLStringTableEntry	*entry;
 		U32					hash_value = hash_my_string(str, mMaxEntries);
 #if STRING_TABLE_HASH_MAP
 #if 1 // Microsoft
@@ -257,10 +256,8 @@ LLStringTableEntry* LLStringTable::addStringEntry(const char *str)
 
 		if (strlist)
 		{
-			string_list_t::iterator iter;
-			for (iter = strlist->begin(); iter != strlist->end(); iter++)
+            for (LLStringTableEntry *entry : *strlist)
 			{
-				entry = *iter;
 				ret_val = entry->mString;
 				if (!strncmp(ret_val, str, MAX_STRINGS_LENGTH))
 				{
@@ -294,7 +291,6 @@ void LLStringTable::removeString(const char *str)
 	if (str)
 	{
 		char *ret_val;
-		LLStringTableEntry	*entry;
 		U32					hash_value = hash_my_string(str, mMaxEntries);
 #if STRING_TABLE_HASH_MAP
 		{
@@ -328,13 +324,10 @@ void LLStringTable::removeString(const char *str)
 		}
 #else
 		string_list_t		*strlist = mStringList[hash_value];
-
-		if (strlist)
+				if (strlist)
 		{
-			string_list_t::iterator iter;
-			for (iter = strlist->begin(); iter != strlist->end(); iter++)
+            for (LLStringTableEntry *entry : *strlist)
 			{
-				entry = *iter;
 				ret_val = entry->mString;
 				if (!strncmp(ret_val, str, MAX_STRINGS_LENGTH))
 				{

@@ -120,8 +120,8 @@ public:
 	bool operator==(const LLSegment& rhs) const;
 
 protected:
-	S32 mChannel;
 	U8* mData;
+	S32 mChannel;
 	S32 mSize;
 };
 
