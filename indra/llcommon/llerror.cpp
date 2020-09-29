@@ -320,7 +320,11 @@ namespace
 
 namespace LLError
 {
+#if LL_WINDOWS
 	std::string Log::demangle(const std::string_view mangled)
+#else
+	std::string Log::demangle(const char* mangled)
+#endif
 	{
 #ifdef __GNUC__
 		// GCC: type_info::name() returns a mangled class name,st demangle

@@ -203,7 +203,11 @@ namespace LLError
 		static std::ostringstream* out();
 		static void flush(std::ostringstream* out, char* message);
 		static void flush(std::ostringstream*, const CallSite&);
+#if LL_WINDOWS
 		static std::string demangle(const std::string_view mangled);
+#else
+		static std::string demangle(const char* mangled);
+#endif
 		/// classname<TYPE>()
 		template <typename T>
 		static std::string classname()             { return demangle(typeid(T).name()); }
