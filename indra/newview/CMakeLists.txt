@@ -2578,6 +2578,11 @@ if (LL_TESTS)
     ${BOOST_CONTEXT_LIBRARY}
   )
 
+  LL_ADD_INTEGRATION_TEST(llagentaccess 
+    llagentaccess.cpp 
+    "${test_libs}"
+    )
+
   LL_ADD_INTEGRATION_TEST(llsechandler_basic
     llsechandler_basic.cpp
     "${test_libs}"
@@ -2588,18 +2593,15 @@ if (LL_TESTS)
     "${test_libs}"
     )
 
-  if (NOT LINUX)
-    set(llslurl_test_sources
-        llslurl.cpp
-        llviewernetwork.cpp
-    )
-
-
-    LL_ADD_INTEGRATION_TEST(llslurl
-        "${llslurl_test_sources}"
-        "${test_libs}"
+  set(llslurl_test_sources
+      llslurl.cpp
+      llviewernetwork.cpp
       )
-  endif()
+
+  LL_ADD_INTEGRATION_TEST(llslurl
+    "${llslurl_test_sources}"
+    "${test_libs}"
+    )
 
   LL_ADD_INTEGRATION_TEST(llviewernetwork
      llviewernetwork.cpp
@@ -2611,10 +2613,12 @@ if (LL_TESTS)
     "${test_libs}"
     )
 
-# LL_ADD_INTEGRATION_TEST(llhttpretrypolicy "llhttpretrypolicy.cpp" "${test_libs}")
+  LL_ADD_INTEGRATION_TEST(llhttpretrypolicy 
+    llhttpretrypolicy.cpp 
+    "${test_libs}"
+    )
 
   #ADD_VIEWER_BUILD_TEST(llmemoryview viewer)
-  #ADD_VIEWER_BUILD_TEST(llagentaccess viewer)
   #ADD_VIEWER_BUILD_TEST(lltextureinfo viewer)
   #ADD_VIEWER_BUILD_TEST(lltextureinfodetails viewer)
 
