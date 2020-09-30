@@ -82,6 +82,19 @@
           parameter="my_scripts"/>
       </menu_item_call>
       <menu_item_separator/>
+      <menu_item_check
+       label="Music Ticker..."
+       name="music_ticker_check">
+        <menu_item_check.on_check
+         function="Floater.Visible"
+         parameter="music_ticker" />
+        <menu_item_check.on_click
+         function="Floater.Toggle"
+         parameter="music_ticker" />
+        <menu_item_check.on_enable
+         function="EnableMusicTicker" />
+      </menu_item_check>
+      <menu_item_separator/>
       <menu_item_call
        label="Camera Controls..."
        name="Camera Controls">
