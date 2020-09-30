@@ -47,10 +47,6 @@ LLToastPanel::LLToastPanel(const LLNotificationPtr& notification)
 	mNotification = notification;
 }
 
-LLToastPanel::~LLToastPanel() 
-{
-}
-
 //virtual
 std::string LLToastPanel::getTitle()
 {
