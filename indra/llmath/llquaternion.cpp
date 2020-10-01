@@ -61,7 +61,7 @@ LLQuaternion::LLQuaternion(F32 angle, const LLVector4 &vec)
 	F32 mag = sqrtf(vec.mV[VX] * vec.mV[VX] + vec.mV[VY] * vec.mV[VY] + vec.mV[VZ] * vec.mV[VZ]);
 	if (mag > FP_MAG_THRESHOLD)
 	{
-		angle *= 0.5;
+		angle *= 0.5f;
 		F32 c = cosf(angle);
 		F32 s = sinf(angle) / mag;
 		mQ[VX] = vec.mV[VX] * s;
@@ -80,7 +80,7 @@ LLQuaternion::LLQuaternion(F32 angle, const LLVector3 &vec)
 	F32 mag = sqrtf(vec.mV[VX] * vec.mV[VX] + vec.mV[VY] * vec.mV[VY] + vec.mV[VZ] * vec.mV[VZ]);
 	if (mag > FP_MAG_THRESHOLD)
 	{
-		angle *= 0.5;
+		angle *= 0.5f;
 		F32 c = cosf(angle);
 		F32 s = sinf(angle) / mag;
 		mQ[VX] = vec.mV[VX] * s;
@@ -150,7 +150,7 @@ const LLQuaternion&	LLQuaternion::setAngleAxis(F32 angle, F32 x, F32 y, F32 z)
 	F32 mag = sqrtf(x * x + y * y + z * z);
 	if (mag > FP_MAG_THRESHOLD)
 	{
-		angle *= 0.5;
+		angle *= 0.5f;
 		F32 c = cosf(angle);
 		F32 s = sinf(angle) / mag;
 		mQ[VX] = x * s;
@@ -170,7 +170,7 @@ const LLQuaternion&	LLQuaternion::setAngleAxis(F32 angle, const LLVector3 &vec)
 	F32 mag = sqrtf(vec.mV[VX] * vec.mV[VX] + vec.mV[VY] * vec.mV[VY] + vec.mV[VZ] * vec.mV[VZ]);
 	if (mag > FP_MAG_THRESHOLD)
 	{
-		angle *= 0.5;
+		angle *= 0.5f;
 		F32 c = cosf(angle);
 		F32 s = sinf(angle) / mag;
 		mQ[VX] = vec.mV[VX] * s;
@@ -190,7 +190,7 @@ const LLQuaternion&	LLQuaternion::setAngleAxis(F32 angle, const LLVector4 &vec)
 	F32 mag = sqrtf(vec.mV[VX] * vec.mV[VX] + vec.mV[VY] * vec.mV[VY] + vec.mV[VZ] * vec.mV[VZ]);
 	if (mag > FP_MAG_THRESHOLD)
 	{
-		angle *= 0.5;
+		angle *= 0.5f;
 		F32 c = cosf(angle);
 		F32 s = sinf(angle) / mag;
 		mQ[VX] = vec.mV[VX] * s;
@@ -237,7 +237,7 @@ const LLQuaternion&	LLQuaternion::setQuat(F32 angle, F32 x, F32 y, F32 z)
 	F32 mag = sqrtf(x * x + y * y + z * z);
 	if (mag > FP_MAG_THRESHOLD)
 	{
-		angle *= 0.5;
+		angle *= 0.5f;
 		F32 c = cosf(angle);
 		F32 s = sinf(angle) / mag;
 		mQ[VX] = x * s;
@@ -258,7 +258,7 @@ const LLQuaternion&	LLQuaternion::setQuat(F32 angle, const LLVector3 &vec)
 	F32 mag = sqrtf(vec.mV[VX] * vec.mV[VX] + vec.mV[VY] * vec.mV[VY] + vec.mV[VZ] * vec.mV[VZ]);
 	if (mag > FP_MAG_THRESHOLD)
 	{
-		angle *= 0.5;
+		angle *= 0.5f;
 		F32 c = cosf(angle);
 		F32 s = sinf(angle) / mag;
 		mQ[VX] = vec.mV[VX] * s;
@@ -278,7 +278,7 @@ const LLQuaternion&	LLQuaternion::setQuat(F32 angle, const LLVector4 &vec)
 	F32 mag = sqrtf(vec.mV[VX] * vec.mV[VX] + vec.mV[VY] * vec.mV[VY] + vec.mV[VZ] * vec.mV[VZ]);
 	if (mag > FP_MAG_THRESHOLD)
 	{
-		angle *= 0.5;
+		angle *= 0.5f;
 		F32 c = cosf(angle);
 		F32 s = sinf(angle) / mag;
 		mQ[VX] = vec.mV[VX] * s;
@@ -498,7 +498,7 @@ const LLQuaternion &LLQuaternion::constrain(F32 radians)
 	const F32 cos_angle_lim = cosf( radians/2 );	// mQ[VW] limit
 	const F32 sin_angle_lim = sinf( radians/2 );	// rotation axis length	limit
 
-	if (mQ[VW] < 0.f)
+	if (mQ[VW] < 0.0f)
 	{
 		mQ[VX] *= -1.f;
 		mQ[VY] *= -1.f;
@@ -888,8 +888,8 @@ void LLQuaternion::getAzimuthAndAltitude(F32 &azimuthRadians, F32 &altitudeRadia
 // quaternion does not need to be normalized
 void LLQuaternion::getEulerAngles(F32 *roll, F32 *pitch, F32 *yaw) const
 {
-	F32 sx = 2 * (mQ[VX] * mQ[VW] - mQ[VY] * mQ[VZ]); // sine of the roll
-	F32 sy = 2 * (mQ[VY] * mQ[VW] + mQ[VX] * mQ[VZ]); // sine of the pitch
+	F32 sx = 2.f * (mQ[VX] * mQ[VW] - mQ[VY] * mQ[VZ]); // sine of the roll
+	F32 sy = 2.f * (mQ[VY] * mQ[VW] + mQ[VX] * mQ[VZ]); // sine of the pitch
 	F32 ys = mQ[VW] * mQ[VW] - mQ[VY] * mQ[VY]; // intermediate cosine 1
 	F32 xz = mQ[VX] * mQ[VX] - mQ[VZ] * mQ[VZ]; // intermediate cosine 2
 	F32 cx = ys - xz; // cosine of the roll
@@ -902,17 +902,17 @@ void LLQuaternion::getEulerAngles(F32 *roll, F32 *pitch, F32 *yaw) const
 	}
 	else // gimbal lock
 	{
-		if (sy > 0)
+		if (sy > 0.0f)
 		{
 			*pitch = F_PI_BY_TWO;
-			*yaw = 2 * atan2f(mQ[VZ] + mQ[VX], mQ[VW] + mQ[VY]);
+			*yaw = 2.f * atan2f(mQ[VZ] + mQ[VX], mQ[VW] + mQ[VY]);
 		}
 		else
 		{
 			*pitch = -F_PI_BY_TWO;
-			*yaw = 2 * atan2f(mQ[VZ] - mQ[VX], mQ[VW] - mQ[VY]);
+			*yaw = 2.f * atan2f(mQ[VZ] - mQ[VX], mQ[VW] - mQ[VY]);
 		}
-		*roll = 0;
+		*roll = 0.0f;
 	}
 }
 
@@ -930,7 +930,7 @@ LLVector3 LLQuaternion::packToVector3() const
 		y /= mag;
 		z /= mag; // no need to normalize w, it's not used
 	}
-	if( mQ[VW] >= 0 )
+	if( mQ[VW] >= 0.0f)
 	{
 		return LLVector3( x, y , z );
 	}
@@ -946,8 +946,8 @@ void LLQuaternion::unpackFromVector3( const LLVector3& vec )
 	mQ[VX] = vec.mV[VX];
 	mQ[VY] = vec.mV[VY];
 	mQ[VZ] = vec.mV[VZ];
-	F32 t = 1.f - vec.magVecSquared();
-	if( t > 0 )
+	F32 t = 1.0f - vec.magVecSquared();
+	if( t > 0.0f)
 	{
 		mQ[VW] = sqrt( t );
 	}
@@ -955,7 +955,7 @@ void LLQuaternion::unpackFromVector3( const LLVector3& vec )
 	{
 		// Need this to avoid trying to find the square root of a negative number due
 		// to floating point error.
-		mQ[VW] = 0;
+		mQ[VW] = 0.0f;
 	}
 }
 
