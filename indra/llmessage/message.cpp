@@ -2370,8 +2370,8 @@ void process_deny_trusted_circuit(LLMessageSystem *msg, void **)
 void dump_prehash_files()
 {
 	U32 i;
-	std::string filename("../../indra/llmessage/message_prehash.h");
-	LLFILE* fp = LLFile::fopen(filename, "w");	/* Flawfinder: ignore */
+	std::string filename("../../../indra/llmessage/message_prehash.h");
+	LLFILE* fp = LLFile::fopen(filename, "wb");	/* Flawfinder: ignore */
 	if (fp)
 	{
 		fprintf(
@@ -2380,8 +2380,26 @@ void dump_prehash_files()
 			" * @file message_prehash.h\n"
 			" * @brief header file of externs of prehashed variables plus defines.\n"
 			" *\n"
-			" * $LicenseInfo:firstyear=2003&license=viewerlgpl$"
-			" * $/LicenseInfo$"
+			" * $LicenseInfo:firstyear=2003&license=viewerlgpl$\n"
+			" * Second Life Viewer Source Code\n"
+			" * Copyright (C) 2010, Linden Research, Inc.\n"
+			" *\n"
+			" * This library is free software; you can redistribute it and/or\n"
+			" * modify it under the terms of the GNU Lesser General Public\n"
+			" * License as published by the Free Software Foundation;\n"
+			" * version 2.1 of the License only.\n"
+			" *\n"
+			" * This library is distributed in the hope that it will be useful,\n"
+			" * but WITHOUT ANY WARRANTY; without even the implied warranty of\n"
+			" * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU\n"
+			" * Lesser General Public License for more details.\n"
+			" *\n"
+			" * You should have received a copy of the GNU Lesser General Public\n"
+			" * License along with this library; if not, write to the Free Software\n"
+			" * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA\n"
+			" *\n"
+			" * Linden Research, Inc., 945 Battery Street, San Francisco, CA  94111  USA\n"
+			" * $/LicenseInfo$\n"
 			" */\n\n"
 			"#ifndef LL_MESSAGE_PREHASH_H\n#define LL_MESSAGE_PREHASH_H\n\n");
 		fprintf(
@@ -2401,8 +2419,8 @@ void dump_prehash_files()
 		fprintf(fp, "\n\n#endif\n");
 		fclose(fp);
 	}
-	filename = std::string("../../indra/llmessage/message_prehash.cpp");
-	fp = LLFile::fopen(filename, "w");	/* Flawfinder: ignore */
+	filename = std::string("../../../indra/llmessage/message_prehash.cpp");
+	fp = LLFile::fopen(filename, "wb");	/* Flawfinder: ignore */
 	if (fp)
 	{
 		fprintf(
@@ -2411,8 +2429,26 @@ void dump_prehash_files()
 			" * @file message_prehash.cpp\n"
 			" * @brief file of prehashed variables\n"
 			" *\n"
-			" * $LicenseInfo:firstyear=2003&license=viewerlgpl$"
-			" * $/LicenseInfo$"
+			" * $LicenseInfo:firstyear=2003&license=viewerlgpl$\n"
+			" * Second Life Viewer Source Code\n"
+			" * Copyright (C) 2010, Linden Research, Inc.\n"
+			" *\n"
+			" * This library is free software; you can redistribute it and/or\n"
+			" * modify it under the terms of the GNU Lesser General Public\n"
+			" * License as published by the Free Software Foundation;\n"
+			" * version 2.1 of the License only.\n"
+			" *\n"
+			" * This library is distributed in the hope that it will be useful,\n"
+			" * but WITHOUT ANY WARRANTY; without even the implied warranty of\n"
+			" * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU\n"
+			" * Lesser General Public License for more details.\n"
+			" *\n"
+			" * You should have received a copy of the GNU Lesser General Public\n"
+			" * License along with this library; if not, write to the Free Software\n"
+			" * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110 - 1301  USA\n"
+			" *\n"
+			" * Linden Research, Inc., 945 Battery Street, San Francisco, CA  94111  USA\n"
+			" * $/LicenseInfo$\n"
 			" */\n\n"
 			"/**\n"
 			" * Generated from message template version number %.3f\n"
