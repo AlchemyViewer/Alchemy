@@ -3623,8 +3623,7 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
                 <string>make</string>
                 <key>options</key>
                 <array>
-                  <string>-j</string>
-                  <string>7</string>
+                  <string>-j$(nproc)</string>
                 </array>
               </map>
               <key>configure</key>
