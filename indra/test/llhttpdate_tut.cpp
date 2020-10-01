@@ -113,8 +113,8 @@ namespace tut
 	{
 		// test localization of http dates
 #if LL_WINDOWS
-		const char *en_locale = "english";
-		const char *fr_locale = "french";
+		const char *en_locale = "English_United States.1252";
+		const char *fr_locale = "French_France.1252";
 #else
 		const char *en_locale = "en_GB.UTF-8";
 		const char *fr_locale = "fr_FR.UTF-8";
