@@ -1,6 +1,6 @@
 [![Alchemy Logo](https://www.alchemyviewer.org/images/banner.png)](https://www.alchemyviewer.org)
 
-[![Alchemy License](https://img.shields.io/badge/license-LGPL%202.1-blue.svg)](https://raw.githubusercontent.com/nlohmann/json/master/LICENSE.MIT)
+[![Alchemy License](https://img.shields.io/badge/license-LGPL%202.1-blue.svg)](https://git.alchemyviewer.org/alchemy/alchemy-next/-/blob/master/LICENSE.md)
 [![pipeline status](https://git.alchemyviewer.org/alchemy/alchemy-next/badges/master/pipeline.svg)](https://git.alchemyviewer.org/alchemy/alchemy-next/-/commits/master)
 
 ## About
