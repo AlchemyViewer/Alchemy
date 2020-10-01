@@ -3620,10 +3620,15 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
               <key>build</key>
               <map>
                 <key>command</key>
-                <string>make</string>
+                <string>cmake</string>
                 <key>options</key>
                 <array>
-                  <string>-j$(nproc)</string>
+                  <string>--build</string>
+                  <string>.</string>
+                  <string>--config</string>
+                  <string>Release</string>
+                  <string>--parallel</string>
+                  <string>6</string>
                 </array>
               </map>
               <key>configure</key>
