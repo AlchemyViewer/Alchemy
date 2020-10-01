@@ -152,7 +152,7 @@ void LLAvatarName::fromString(const std::string& full_name)
 	else
 	{
 		mLegacyFirstName = full_name;
-		mLegacyLastName = "";
+		mLegacyLastName.clear();
 		mUsername = full_name;
 		mDisplayName = full_name;
 	}

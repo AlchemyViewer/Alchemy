@@ -434,7 +434,7 @@ BOOL LLCacheName::Impl::getName(const LLUUID& id, std::string& first, std::strin
 // static
 void LLCacheName::localizeCacheName(std::string key, std::string value)
 {
-	if (key!="" && value!= "" )
+	if (!key.empty() && !value.empty())
 		sCacheName[key]=value;
 	else
 		LL_WARNS()<< " Error localizing cache key " << key << " To "<< value<<LL_ENDL;

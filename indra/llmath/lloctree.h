@@ -107,16 +107,15 @@ public:
 					const LLVector4a& size, 
 					BaseType* parent, 
 					U8 octant = 255)
-	:	mParent((oct_node*)parent), 
+	:	mCenter(center),
+		mSize(size),
+		mParent((oct_node*)parent), 
 		mOctant(octant) 
 	{ 
 		llassert(size[0] >= gOctreeMinSize*0.5f);
 		//always keep a NULL terminated list to avoid out of bounds exceptions in debug builds
 		mData.push_back(NULL);
 		mDataEnd = &mData[0];
-
-		mCenter = center;
-		mSize = size;
 
 		updateMinMax();
 		if ((mOctant == 255) && mParent)

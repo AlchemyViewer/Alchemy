@@ -400,7 +400,7 @@ bool LLMessageSystem::isTrustedSender() const
 
 static LLMessageSystem::message_template_name_map_t::const_iterator 
 findTemplate(const LLMessageSystem::message_template_name_map_t& templates, 
-			 std::string name)
+			 const std::string& name)
 {
 	const char* namePrehash = LLMessageStringTable::getInstance()->getString(name.c_str());
 	if(NULL == namePrehash) {return templates.end();}
@@ -2054,7 +2054,7 @@ void LLMessageSystem::dispatch(
 		return;
 	}
 	
-	std::string	path = "/message/" + msg_name;
+	std::string	path = absl::StrCat("/message/", msg_name);
 	LLSD context;
 	const LLHTTPNode* handler =	messageRootNode().traverse(path, context);
 	if (!handler)
@@ -2112,7 +2112,7 @@ void LLMessageSystem::setMessageBans(
 	{
 		LLMessageTemplate* mt = iter->second;
 
-		std::string name(mt->mName);
+		std::string_view name(mt->mName);
 		bool ban_from_trusted
 			= trusted.has(name) && trusted.get(name).asBoolean();
 		bool ban_from_untrusted
@@ -2254,8 +2254,7 @@ void process_create_trusted_circuit(LLMessageSystem *msg, void **)
 		return;
 	}
 
-	LLUUID local_id;
-	local_id = cdp->getLocalEndPointID();
+	const LLUUID& local_id = cdp->getLocalEndPointID();
 	if (remote_id == local_id)
 	{
 		//	Don't respond to requests that use the same end point ID
@@ -2328,8 +2327,7 @@ void process_deny_trusted_circuit(LLMessageSystem *msg, void **)
 		return;
 	}
 
-	LLUUID local_id;
-	local_id = cdp->getLocalEndPointID();
+	const LLUUID& local_id = cdp->getLocalEndPointID();
 	if (remote_id == local_id)
 	{
 		//	Don't respond to requests that use the same end point ID

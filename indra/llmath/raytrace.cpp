@@ -35,7 +35,7 @@
 
 
 BOOL line_plane(const LLVector3 &line_point, const LLVector3 &line_direction,
-				const LLVector3 &plane_point, const LLVector3 plane_normal, 
+				const LLVector3 &plane_point, const LLVector3 &plane_normal, 
 				LLVector3 &intersection)
 {
 	F32 N = line_direction * plane_normal;
@@ -55,7 +55,7 @@ BOOL line_plane(const LLVector3 &line_point, const LLVector3 &line_direction,
 
 
 BOOL ray_plane(const LLVector3 &ray_point, const LLVector3 &ray_direction,
-			   const LLVector3 &plane_point, const LLVector3 plane_normal, 
+			   const LLVector3 &plane_point, const LLVector3 &plane_normal, 
 			   LLVector3 &intersection)
 {
 	F32 N = ray_direction * plane_normal;
@@ -81,7 +81,7 @@ BOOL ray_plane(const LLVector3 &ray_point, const LLVector3 &ray_direction,
 
 
 BOOL ray_circle(const LLVector3 &ray_point, const LLVector3 &ray_direction,
-				const LLVector3 &circle_center, const LLVector3 plane_normal, F32 circle_radius,
+				const LLVector3 &circle_center, const LLVector3 &plane_normal, F32 circle_radius,
 				LLVector3 &intersection)
 {
 	if (ray_plane(ray_point, ray_direction, circle_center, plane_normal, intersection))
@@ -1105,7 +1105,7 @@ BOOL ray_pyramid(const LLVector3 &ray_point, const LLVector3 &ray_direction,
 
 
 BOOL linesegment_circle(const LLVector3 &point_a, const LLVector3 &point_b,
-						const LLVector3 &circle_center, const LLVector3 plane_normal, F32 circle_radius,
+						const LLVector3 &circle_center, const LLVector3 &plane_normal, F32 circle_radius,
 						LLVector3 &intersection)
 {
 	LLVector3 ray_direction = point_b - point_a;

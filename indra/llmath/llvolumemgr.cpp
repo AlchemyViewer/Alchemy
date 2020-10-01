@@ -68,7 +68,7 @@ BOOL LLVolumeMgr::cleanup()
 	}
 	for (volume_lod_group_map_t::iterator iter = mVolumeLODGroups.begin(),
 			 end = mVolumeLODGroups.end();
-		 iter != end; iter++)
+		 iter != end; ++iter)
 	{
 		LLVolumeLODGroup *volgroupp = iter->second;
 		if (volgroupp->cleanupRefs() == false)
@@ -196,7 +196,7 @@ void LLVolumeMgr::dump()
 	}
 	for (volume_lod_group_map_t::iterator iter = mVolumeLODGroups.begin(),
 			 end = mVolumeLODGroups.end();
-		 iter != end; iter++)
+		 iter != end; ++iter)
 	{
 		LLVolumeLODGroup *volgroupp = iter->second;
 		avg += volgroupp->dump();

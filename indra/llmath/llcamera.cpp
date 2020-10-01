@@ -568,7 +568,7 @@ void LLCamera::calculateFrustumPlanes()
 	calculateFrustumPlanes(left, right, top, bottom);
 }
 
-LLPlane planeFromPoints(LLVector3 p1, LLVector3 p2, LLVector3 p3)
+LLPlane planeFromPoints(const LLVector3& p1, const LLVector3& p2, const LLVector3& p3)
 {
 	LLVector3 n = ((p2-p1)%(p3-p1));
 	n.normVec();

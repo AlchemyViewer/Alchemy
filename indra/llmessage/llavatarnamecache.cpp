@@ -402,7 +402,6 @@ void LLAvatarNameCache::requestNamesViaLegacy()
 {
 	static const S32 MAX_REQUESTS = 100;
 	F64 now = LLFrameTimer::getTotalSeconds();
-	std::string full_name;
 	ask_queue_t::const_iterator it;
 	for (S32 requests = 0; !mAskQueue.empty() && requests < MAX_REQUESTS; ++requests)
 	{

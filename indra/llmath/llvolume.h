@@ -619,7 +619,7 @@ public:
 	bool setRevolutions(const F32 revolutions);	// 1 to 4
 	bool setRadiusOffset(const F32 radius_offset);
 	bool setSkew(const F32 skew);
-	bool setSculptID(const LLUUID sculpt_id, U8 sculpt_type);
+	bool setSculptID(LLUUID sculpt_id, U8 sculpt_type);
 
 	static bool validate(U8 prof_curve, F32 prof_begin, F32 prof_end, F32 hollow,
 		U8 path_curve, F32 path_begin, F32 path_end,

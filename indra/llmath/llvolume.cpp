@@ -1373,9 +1373,10 @@ void LLPath::genNGon(const LLPathParams& params, S32 sides, F32 startOff, F32 en
 	c		= cos(ang)*lerp(radius_start, radius_end, t);
 
 
-	pt->mPos.set(0 + lerp(0,params.getShear().mV[0],s)
+	const LLVector2& shearval = params.getShear();
+	pt->mPos.set(0 + lerp(0,shearval.mV[0],s)
 					  + lerp(-skew ,skew, t) * 0.5f,
-					c + lerp(0,params.getShear().mV[1],s), 
+					c + lerp(0,shearval.mV[1],s), 
 					s);
 	pt->mScale.set(hole_x * lerp(taper_x_begin, taper_x_end, t),
 		hole_y * lerp(taper_y_begin, taper_y_end, t),
@@ -3556,7 +3557,7 @@ bool LLVolumeParams::setSkew(const F32 skew_value)
 	return valid;
 }
 
-bool LLVolumeParams::setSculptID(const LLUUID sculpt_id, U8 sculpt_type)
+bool LLVolumeParams::setSculptID(LLUUID sculpt_id, U8 sculpt_type)
 {
 	mSculptID = std::move(sculpt_id);
 	mSculptType = sculpt_type;
@@ -3763,19 +3764,19 @@ void LLVolume::generateSilhouetteVertices(std::vector<LLVector3> &vertices,
 
 						LLVector4a t;
 						mat.affineTransform(v[v1], t);
-						vertices.push_back(LLVector3(t[0], t[1], t[2]));
+						vertices.emplace_back(LLVector3(t[0], t[1], t[2]));
 
 						norm_mat.rotate(n[v1], t);
 
 						t.normalize3fast();
-						normals.push_back(LLVector3(t[0], t[1], t[2]));
+						normals.emplace_back(LLVector3(t[0], t[1], t[2]));
 
 						mat.affineTransform(v[v2], t);
-						vertices.push_back(LLVector3(t[0], t[1], t[2]));
+						vertices.emplace_back(LLVector3(t[0], t[1], t[2]));
 
 						norm_mat.rotate(n[v2], t);
 						t.normalize3fast();
-						normals.push_back(LLVector3(t[0], t[1], t[2]));
+						normals.emplace_back(LLVector3(t[0], t[1], t[2]));
 					}
 				}
 			}
@@ -3947,19 +3948,19 @@ void LLVolume::generateSilhouetteVertices(std::vector<LLVector3> &vertices,
 						
 						LLVector4a t;
 						mat.affineTransform(v[v1], t);
-						vertices.push_back(LLVector3(t[0], t[1], t[2]));
+						vertices.emplace_back(LLVector3(t[0], t[1], t[2]));
 
 						norm_mat.rotate(n[v1], t);
 
 						t.normalize3fast();
-						normals.push_back(LLVector3(t[0], t[1], t[2]));
+						normals.emplace_back(LLVector3(t[0], t[1], t[2]));
 
 						mat.affineTransform(v[v2], t);
-						vertices.push_back(LLVector3(t[0], t[1], t[2]));
+						vertices.emplace_back(LLVector3(t[0], t[1], t[2]));
 						
 						norm_mat.rotate(n[v2], t);
 						t.normalize3fast();
-						normals.push_back(LLVector3(t[0], t[1], t[2]));
+						normals.emplace_back(LLVector3(t[0], t[1], t[2]));
 					}
 				}		
 			}
@@ -4131,10 +4132,8 @@ public:
 };
 
 LLVertexIndexPair::LLVertexIndexPair(const LLVector3 &vertex, const S32 index)
-{
-	mVertex = vertex;
-	mIndex = index;
-}
+	: mVertex(vertex), mIndex(index)
+{ }
 
 const F32 VERTEX_SLOP = 0.00001f;
 
@@ -5692,12 +5691,13 @@ BOOL LLVolumeFace::createUnCutCubeCap(LLVolume* volume, BOOL partial_build)
 
 BOOL LLVolumeFace::createCap(LLVolume* volume, BOOL partial_build)
 {
+	const LLPathParams& path_params = volume->getParams().getPathParams();
 	if (!(mTypeMask & HOLLOW_MASK) && 
 		!(mTypeMask & OPEN_MASK) && 
-		((volume->getParams().getPathParams().getBegin()==0.0f)&&
-		(volume->getParams().getPathParams().getEnd()==1.0f))&&
+		((path_params.getBegin()==0.0f)&&
+		(path_params.getEnd()==1.0f))&&
 		(volume->getParams().getProfileParams().getCurveType()==LL_PCODE_PROFILE_SQUARE &&
-		 volume->getParams().getPathParams().getCurveType()==LL_PCODE_PATH_LINE)	
+		 path_params.getCurveType()==LL_PCODE_PATH_LINE)	
 		){
 		return createUnCutCubeCap(volume, partial_build);
 	}

@@ -63,18 +63,18 @@ class LLQuaternion;
 
 // returns TRUE iff line is not parallel to plane.
 BOOL line_plane(const LLVector3 &line_point, const LLVector3 &line_direction, 
-				const LLVector3 &plane_point, const LLVector3 plane_normal, 
+				const LLVector3 &plane_point, const LLVector3 &plane_normal, 
 				LLVector3 &intersection);
 
 
 // returns TRUE iff line is not parallel to plane.
 BOOL ray_plane(const LLVector3 &ray_point, const LLVector3 &ray_direction, 
-			   const LLVector3 &plane_point, const LLVector3 plane_normal, 
+			   const LLVector3 &plane_point, const LLVector3 &plane_normal, 
 			   LLVector3 &intersection);
 
 
 BOOL ray_circle(const LLVector3 &ray_point, const LLVector3 &ray_direction, 
-				const LLVector3 &circle_center, const LLVector3 plane_normal, F32 circle_radius,
+				const LLVector3 &circle_center, const LLVector3 &plane_normal, F32 circle_radius,
 				LLVector3 &intersection);
 
 // point_0 through point_2 define the plane_normal via the right-hand rule:
@@ -171,7 +171,7 @@ BOOL ray_hemicone(const LLVector3 &ray_point, const LLVector3 &ray_direction,
 
 
 BOOL linesegment_circle(const LLVector3 &point_a, const LLVector3 &point_b, 
-						const LLVector3 &circle_center, const LLVector3 plane_normal, F32 circle_radius,
+						const LLVector3 &circle_center, const LLVector3 &plane_normal, F32 circle_radius,
 						LLVector3 &intersection);
 
 // point_0 through point_2 define the plane_normal via the right-hand rule:
