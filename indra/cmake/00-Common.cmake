@@ -299,9 +299,14 @@ if (LINUX OR DARWIN)
   endif (CMAKE_CXX_COMPILER MATCHES ".*clang")
 
   if (CMAKE_COMPILER_IS_GNUCXX)
-    set(GCC_WARNINGS "-Wall -Wno-sign-compare -Wno-unused-parameter -Wno-unused-but-set-parameter -Wno-deprecated-copy -Wno-ignored-qualifiers -Wno-unused-function -Wnon-virtual-dtor")
+    set(GCC_WARNINGS "-Wall -Wno-sign-compare -Wno-unused-parameter -Wno-unused-but-set-parameter -Wno-ignored-qualifiers -Wno-unused-function -Wnon-virtual-dtor")
   elseif (CMAKE_COMPILER_IS_CLANGXX)
     set(GCC_WARNINGS "-Wall -Wno-sign-compare -Wno-trigraphs")
+  endif()
+
+  CHECK_CXX_COMPILER_FLAG(-Wdeprecated-copy HAS_DEPRECATED_COPY)
+  if (HAS_DEPRECATED_COPY)
+    set(GCC_WARNINGS "${GCC_WARNINGS} -Wno-deprecated-copy")
   endif()
 
   if (NOT GCC_DISABLE_FATAL_WARNINGS)

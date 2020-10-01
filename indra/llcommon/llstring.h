@@ -27,7 +27,7 @@
 #ifndef LL_LLSTRING_H
 #define LL_LLSTRING_H
 
-#if LL_GNUC
+#if LL_GNUC && GCC_VERSION >= 90000
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wdeprecated-copy-dtor"
 #endif
