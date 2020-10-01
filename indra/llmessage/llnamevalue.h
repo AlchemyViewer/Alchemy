@@ -165,16 +165,16 @@ private:
 	
 public:
 	char						*mName;
+	UNameValueReference			mNameValueReference;
 
 	char						*mStringType;
-	ENameValueType				mType;
 	char						*mStringClass;
-	ENameValueClass				mClass;
 	char						*mStringSendto;
+	LLStringTable				*mNVNameTable;
+	ENameValueType				mType;
+	ENameValueClass				mClass;
 	ENameValueSendto			mSendto;
 
-	UNameValueReference			mNameValueReference;
-	LLStringTable				*mNVNameTable;
 };
 
 extern LLStringTable	gNVNameTable;
