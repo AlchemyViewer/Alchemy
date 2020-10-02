@@ -39,7 +39,8 @@ variables:
     - linux
     - docker
   script:
-    - | autobuild configure -c ReleaseOS -- -DUSE_FMODSTUDIO=ON -DUSE_NVAPI=ON -DUSE_LTO=ON -DUNIX_DISABLE_FATAL_WARNINGS=ON
+    - | 
+        autobuild configure -c ReleaseOS -- -DUSE_FMODSTUDIO=ON -DUSE_NVAPI=ON -DUSE_LTO=ON -DUNIX_DISABLE_FATAL_WARNINGS=ON
         autobuild build -c ReleaseOS --no-configure
   artifacts:
     name: "$env:CI_COMMIT_REF_NAME-$env:CI_COMMIT_SHORT_SHA"
@@ -55,10 +56,9 @@ build:master:linux64:
     AUTOBUILD_ADDRSIZE: 64
     VIEWER_CHANNEL_TYPE: Test
     VIEWER_USE_CRASHPAD: "FALSE"
-  only:
-    - schedules
-    - web
-
+#   only:
+#     - schedules
+#     - web
 
 # .beta_rules: &beta_rules
 #   only:
