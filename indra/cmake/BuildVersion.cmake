@@ -1,8 +1,37 @@
 # -*- cmake -*-
+#Construct the viewer channel from environment variables or defaults
+if (DEFINED ENV{VIEWER_CHANNEL_BASE})
+  set(VIEWER_CHANNEL_BASE $ENV{VIEWER_CHANNEL_BASE} CACHE STRING "Viewer Channel Base Name" FORCE)
+else()
+  set(VIEWER_CHANNEL_BASE "Alchemy" CACHE STRING "Viewer Channel Base Name")
+endif()
+
+if (DEFINED ENV{VIEWER_CHANNEL_TYPE})
+  set(VIEWER_CHANNEL_TYPE $ENV{VIEWER_CHANNEL_TYPE} CACHE STRING "Viewer Channel Type Name" FORCE)
+else()
+  set(VIEWER_CHANNEL_TYPE "Test" CACHE STRING "Viewer Channel Type Name")
+endif()
+
+if("${VIEWER_CHANNEL_TYPE}" STREQUAL "Project")
+  if (DEFINED ENV{VIEWER_CHANNEL_CODENAME})
+    set(VIEWER_CHANNEL_CODENAME $ENV{VIEWER_CHANNEL_CODENAME} CACHE STRING "Viewer Channel Code Name for Project type" FORCE)
+  else()
+    set(VIEWER_VERSION_CODENAME_FILE "${CMAKE_CURRENT_SOURCE_DIR}/newview/VIEWER_PROJECT_CODENAME.txt")
+
+    if ( EXISTS ${VIEWER_VERSION_CODENAME_FILE} )
+      file(STRINGS ${VIEWER_VERSION_CODENAME_FILE} VIEWER_CHANNEL_CODENAME)
+    else()
+      set(VIEWER_CHANNEL_CODENAME "Default" CACHE STRING "Viewer Channel Code Name for Project type")
+    endif()
+  endif()
+  set(VIEWER_CHANNEL "${VIEWER_CHANNEL_BASE} ${VIEWER_CHANNEL_TYPE} ${VIEWER_CHANNEL_CODENAME}")
+else()
+  set(VIEWER_CHANNEL "${VIEWER_CHANNEL_BASE} ${VIEWER_CHANNEL_TYPE}")
+endif()
+
+
 # Construct the viewer version number based on the indra/VIEWER_VERSION file
-
 option(REVISION_FROM_VCS "Get current revision from vcs" ON)
-
 find_package(Git)
 
 if (NOT DEFINED VIEWER_SHORT_VERSION) # will be true in indra/, false in indra/newview/
