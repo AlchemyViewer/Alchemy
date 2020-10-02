@@ -2,35 +2,41 @@ stages:
   - build
   # - deploy
 
+default:
+  interruptible: true
+
 variables:
-  VIEWER_USE_CRASHPAD: "TRUE"
+  VIEWER_USE_CRASHPAD: "FALSE"
   VIEWER_CRASHPAD_URL: $SENTRY_DSN
 
-# .win_build: &win_build
-#   stage: build
-#   tags:
-#     - autobuild
-#     - windows
-#   before_script:
-#     - pipenv install
-#   script:
-#     - If ($env:VIEWER_CHANNEL_TYPE -eq 'Project') 
-#       { 
-#           $env:VIEWER_CHANNEL_CODENAME = $env:CI_COMMIT_REF_NAME[8..100] -join '' 
-#       }
-#     - pipenv run autobuild configure -c ReleaseOS -- -DUSE_FMODSTUDIO=ON -DUSE_NVAPI=ON -DUSE_LTO=ON -DVS_DISABLE_FATAL_WARNINGS=ON
-#     - pipenv run autobuild build -c ReleaseOS --no-configure
-#     - If ($env:VIEWER_USE_CRASHPAD -eq 'TRUE') {
-#     - Push-Location .\build-vc-*\newview\Release\
-#     - sentry-cli upload-dif --include-sources alchemy-bin.exe alchemy-bin.pdb crashpad_handler.exe crashpad_handler.pdb openjpeg.pdb openjpeg.dll fmod.dll libcrypto-1_1.dll libcrypto-1_1.pdb libssl-1_1.dll libssl-1_1.pdb libcrypto-1_1-x64.dll libcrypto-1_1-x64.pdb libssl-1_1-x64.dll libssl-1_1-x64.pdb vcruntime140.dll msvcp140.dll nghttp2.dll glod.dll
-#     - Pop-Location }
-#   artifacts:
-#     name: "$env:CI_COMMIT_REF_NAME-$env:CI_COMMIT_SHORT_SHA"
-#     expire_in: 2 week
-#     paths:
-#       - build-vc-*/newview/Release/build_data.json
-#       - build-vc-*/newview/Release/alchemy-bin.pdb
-#       - build-vc-*/newview/Release/Alchemy_*_Setup.exe
+.win_build: &win_build
+  stage: build
+  tags:
+    - autobuild
+    - windows
+  before_script:
+    - pipenv install
+  script:
+    - | 
+        If ($env:VIEWER_CHANNEL_TYPE -eq 'Project') 
+        { 
+          $env:VIEWER_CHANNEL_CODENAME = $env:CI_COMMIT_REF_NAME[8..100] -join '' 
+        }
+        pipenv run autobuild configure -c ReleaseOS -- -DUSE_FMODSTUDIO=ON -DUSE_NVAPI=ON -DUSE_LTO=ON -DVS_DISABLE_FATAL_WARNINGS=ON
+        pipenv run autobuild build -c ReleaseOS --no-configure
+        If ($env:VIEWER_USE_CRASHPAD -eq 'TRUE') 
+        {
+          Push-Location .\build-vc-*\newview\Release\
+          sentry-cli upload-dif --include-sources alchemy-bin.exe alchemy-bin.pdb crashpad_handler.exe crashpad_handler.pdb openjpeg.pdb openjpeg.dll fmod.dll libcrypto-1_1.dll libcrypto-1_1.pdb libssl-1_1.dll libssl-1_1.pdb libcrypto-1_1-x64.dll libcrypto-1_1-x64.pdb libssl-1_1-x64.dll libssl-1_1-x64.pdb vcruntime140.dll msvcp140.dll nghttp2.dll glod.dll
+          Pop-Location 
+        }
+  artifacts:
+    name: "$env:CI_COMMIT_REF_NAME-$env:CI_COMMIT_SHORT_SHA"
+    expire_in: 2 week
+    paths:
+      - build-vc-*/newview/Release/build_data.json
+      - build-vc-*/newview/Release/alchemy-bin.pdb
+      - build-vc-*/newview/Release/Alchemy_*_Setup.exe
 
 .lnx_build: &lnx_build
   stage: build
@@ -49,94 +55,115 @@ variables:
       - build-linux-*/build_data.json
       - build-linux-*/newview/Alchemy_*.tar.bz2
 
+.master_rules: &master_rules
+  only:
+    variables:
+      - $BUILD_CHANNEL =~ /Test/
+
+
+.project_rules: &project_rules
+  only:
+    variables:
+      - $BUILD_CHANNEL =~ /Project/
+
+.beta_rules: &beta_rules
+  only:
+    - /^.*-beta$/
+  except:
+    - branches
+
+.release_rules: &release_rules
+  only:
+    - /^.*-release$/
+  except:
+    - branches
+
 build:master:linux64:
   <<: *lnx_build
-  interruptible: true
   variables:
     AUTOBUILD_ADDRSIZE: 64
     VIEWER_CHANNEL_TYPE: Test
     VIEWER_USE_CRASHPAD: "FALSE"
-#   only:
-#     - schedules
-#     - web
+  <<: *master_rules
 
-# .beta_rules: &beta_rules
-#   only:
-#     - /^.*-beta$/
-#   except:
-#     - branches
+build:master:windows32:
+  <<: *win_build
+  variables:
+    AUTOBUILD_ADDRSIZE: 32
+    VIEWER_CHANNEL_TYPE: Test
+    VIEWER_USE_CRASHPAD: "FALSE"
+  <<: *master_rules
 
-# .release_rules: &release_rules
-#   only:
-#     - /^.*-release$/
-#   except:
-#     - branches
+build:master:windows64:
+  <<: *win_build
+  variables:
+    AUTOBUILD_ADDRSIZE: 64
+    VIEWER_CHANNEL_TYPE: Test
+    VIEWER_USE_CRASHPAD: "FALSE"
+  <<: *master_rules
 
-# build:master:windows32:
-#   <<: *win_build
-#   interruptible: true
-#   variables:
-#     AUTOBUILD_ADDRSIZE: 32
-#     VIEWER_CHANNEL_TYPE: Test
-#     VIEWER_USE_CRASHPAD: "FALSE"
-#   only:
-#     - schedules
+build:project:linux64:
+  <<: *lnx_build
+  variables:
+    AUTOBUILD_ADDRSIZE: 64
+    VIEWER_CHANNEL_TYPE: Project
+  <<: *project_rules
 
-# build:master:windows64:
-#   <<: *win_build
-#   interruptible: true
-#   variables:
-#     AUTOBUILD_ADDRSIZE: 64
-#     VIEWER_CHANNEL_TYPE: Test
-#     VIEWER_USE_CRASHPAD: "FALSE"
-#   only:
-#     - schedules
+build:project:windows32:
+  <<: *win_build
+  variables:
+    AUTOBUILD_ADDRSIZE: 32
+    VIEWER_CHANNEL_TYPE: Project
+  <<: *project_rules
 
-# build:project:windows32:
-#   <<: *win_build
-#   interruptible: true
-#   variables:
-#     AUTOBUILD_ADDRSIZE: 32
-#     VIEWER_CHANNEL_TYPE: Project
-#   only:
-#     - /^project-.*$/
+build:project:windows64:
+  <<: *win_build
+  variables:
+    AUTOBUILD_ADDRSIZE: 64
+    VIEWER_CHANNEL_TYPE: Project
+  <<: *project_rules
 
-# build:project:windows64:
-#   <<: *win_build
-#   interruptible: true
-#   variables:
-#     AUTOBUILD_ADDRSIZE: 64
-#     VIEWER_CHANNEL_TYPE: Project
-#   only:
-#     - /^project-.*$/
+build:beta:linux64:
+  <<: *lnx_build
+  variables:
+    AUTOBUILD_ADDRSIZE: 64
+    VIEWER_CHANNEL_TYPE: Beta
+  <<: *beta_rules
 
-# build:beta:windows32:
-#   <<: *win_build
-#   variables:
-#     AUTOBUILD_ADDRSIZE: 32
-#     VIEWER_CHANNEL_TYPE: Beta
-#   <<: *beta_rules
+build:beta:windows32:
+  <<: *win_build
+  variables:
+    AUTOBUILD_ADDRSIZE: 32
+    VIEWER_CHANNEL_TYPE: Beta
+  <<: *beta_rules
 
-# build:beta:windows64:
-#   <<: *win_build
-#   variables:
-#     AUTOBUILD_ADDRSIZE: 64
-#     VIEWER_CHANNEL_TYPE: Beta
-#   <<: *beta_rules
+build:beta:windows64:
+  <<: *win_build
+  variables:
+    AUTOBUILD_ADDRSIZE: 64
+    VIEWER_CHANNEL_TYPE: Beta
+  <<: *beta_rules
 
-# build:release:windows32:
-#   <<: *win_build
-#   variables:
-#     AUTOBUILD_ADDRSIZE: 32
-#     VIEWER_CHANNEL_TYPE: Release
-#   <<: *release_rules
+build:release:linux64:
+  <<: *lnx_build
+  variables:
+    AUTOBUILD_ADDRSIZE: 64
+    VIEWER_CHANNEL_TYPE: Release
+  <<: *release_rules
 
-# build:release:windows64:
-#   <<: *win_build
-#   variables:
-#     AUTOBUILD_ADDRSIZE: 64
-#     VIEWER_CHANNEL_TYPE: Release
-#   <<: *release_rules
+build:release:windows32:
+  <<: *win_build
+  variables:
+    AUTOBUILD_ADDRSIZE: 32
+    VIEWER_CHANNEL_TYPE: Release
+  <<: *release_rules
+
+build:release:windows64:
+  <<: *win_build
+  variables:
+    AUTOBUILD_ADDRSIZE: 64
+    VIEWER_CHANNEL_TYPE: Release
+  <<: *release_rules
 
 # .deploy_template: &deploy_template
 #   stage: deploy
