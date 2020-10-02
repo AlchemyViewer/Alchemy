@@ -39,8 +39,8 @@ variables:
     - linux
     - docker
   script:
-    - autobuild configure -c ReleaseOS -- -DUSE_FMODSTUDIO=ON -DUSE_NVAPI=ON -DUSE_LTO=ON -DUNIX_DISABLE_FATAL_WARNINGS=ON
-    - autobuild build -c ReleaseOS --no-configure
+    - | autobuild configure -c ReleaseOS -- -DUSE_FMODSTUDIO=ON -DUSE_NVAPI=ON -DUSE_LTO=ON -DUNIX_DISABLE_FATAL_WARNINGS=ON
+        autobuild build -c ReleaseOS --no-configure
   artifacts:
     name: "$env:CI_COMMIT_REF_NAME-$env:CI_COMMIT_SHORT_SHA"
     expire_in: 2 week
