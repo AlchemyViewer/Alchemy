@@ -827,19 +827,16 @@ void LLAgentCamera::setCameraZoomFraction(F32 fraction)
 		F32 max_zoom = getCameraMaxZoomDistance();
 
 		if (mFocusObject.notNull())
-		{
-			if (mFocusObject.notNull())
-			{
-				if (mFocusObject->isAvatar())
-				{
-					min_zoom = AVATAR_MIN_ZOOM;
-				}
-				else
-				{
-					min_zoom = OBJECT_MIN_ZOOM;
-				}
-			}
-		}
+        {
+            if (mFocusObject->isAvatar())
+            {
+                min_zoom = AVATAR_MIN_ZOOM;
+            }
+            else
+            {
+                min_zoom = OBJECT_MIN_ZOOM;
+            }
+        }
 
 		LLVector3d camera_offset_dir = mCameraFocusOffsetTarget;
 		camera_offset_dir.normalize();

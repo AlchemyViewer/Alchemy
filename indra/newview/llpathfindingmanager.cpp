@@ -257,12 +257,12 @@ void LLPathfindingManager::requestGetLinksets(request_id_t pRequestId, object_re
 			bool doRequestTerrain = isAllowViewTerrainProperties();
 			LinksetsResponder::ptr_t linksetsResponderPtr(new LinksetsResponder(pRequestId, pLinksetsCallback, true, doRequestTerrain));
 
-            std::string coroname = LLCoros::instance().launch("LLPathfindingManager::linksetObjectsCoro",
+            LLCoros::instance().launch("LLPathfindingManager::linksetObjectsCoro",
                 boost::bind(&LLPathfindingManager::linksetObjectsCoro, this, objectLinksetsURL, linksetsResponderPtr, LLSD()));
 
             if (doRequestTerrain)
 			{
-                std::string coroname = LLCoros::instance().launch("LLPathfindingManager::linksetTerrainCoro",
+                LLCoros::instance().launch("LLPathfindingManager::linksetTerrainCoro",
                     boost::bind(&LLPathfindingManager::linksetTerrainCoro, this, terrainLinksetsURL, linksetsResponderPtr, LLSD()));
 			}
 		}

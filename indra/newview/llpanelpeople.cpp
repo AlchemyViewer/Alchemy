@@ -1179,9 +1179,9 @@ void LLPanelPeople::onAvatarListCommitted(LLAvatarList* list)
 		uuid_vec_t selected_uuids;
 		getCurrentItemIDs(selected_uuids);
 		mMiniMap->setSelected(selected_uuids);
-	} else
+	}
 	// Make sure only one of the friends lists (online/all) has selection.
-	if (getActiveTabName() == FRIENDS_TAB_NAME)
+	else if (getActiveTabName() == FRIENDS_TAB_NAME)
 	{
 		if (list == mOnlineFriendList)
 			mAllFriendList->resetSelection(true);

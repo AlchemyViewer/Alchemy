@@ -3102,9 +3102,10 @@ void LLViewerRegion::setCapability(const std::string& name, const std::string& u
 				mImpl->mCapabilities[name] = VIEWERASSET;
 				mViewerAssetUrl = VIEWERASSET;
 			}
-			else
-			/*==============================================================*/
-			mViewerAssetUrl = url;
+			else /*==============================================================*/
+			{
+				mViewerAssetUrl = url;
+			}
 		}
 	}
 }
@@ -3126,9 +3127,10 @@ void LLViewerRegion::setCapabilityDebug(const std::string& name, const std::stri
 				mImpl->mSecondCapabilitiesTracker[name] = VIEWERASSET;
 				mViewerAssetUrl = VIEWERASSET;
 			}
-			else
-			/*==============================================================*/
-			mViewerAssetUrl = url;
+			else /*==============================================================*/
+			{
+				mViewerAssetUrl = url;
+			}
 		}
 	}
 }

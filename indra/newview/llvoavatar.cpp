@@ -2973,7 +2973,6 @@ void LLVOAvatar::idleUpdateLoadingEffect()
 			// fancy particle cloud designed by Brent
 			particle_parameters.mPartData.mMaxAge            = 4.f;
 			particle_parameters.mPartData.mStartScale.mV[VX] = 0.8f;
-			particle_parameters.mPartData.mStartScale.mV[VX] = 0.8f;
 			particle_parameters.mPartData.mStartScale.mV[VY] = 1.0f;
 			particle_parameters.mPartData.mEndScale.mV[VX]   = 0.02f;
 			particle_parameters.mPartData.mEndScale.mV[VY]   = 0.02f;
