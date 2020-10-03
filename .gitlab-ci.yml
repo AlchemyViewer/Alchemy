@@ -54,21 +54,15 @@ variables:
 
 
 .project_rules: &project_rules
-  environment:
-    name: qa
   only:
     variables:
       - $BUILD_CHANNEL =~ /Project/
 
 .beta_rules: &beta_rules
-  environment:
-    name: beta
   except:
     - branches
 
 .release_rules: &release_rules
-  environment:
-    name: release
   only:
     - /^.*-release$/
   except:
@@ -206,12 +200,18 @@ build:release:windows64:
 
 deploy_project:
   <<: *deploy_template
+  environment:
+    name: qa
   <<: *project_rules
 
 deploy_beta:
   <<: *deploy_template
+  environment:
+    name: beta
   <<: *beta_rules
 
 deploy_release:
   <<: *deploy_template
+  environment:
+    name: release
   <<: *release_rules
