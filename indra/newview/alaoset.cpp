@@ -48,7 +48,7 @@ ALAOSet::ALAOSet(const LLUUID& inventoryID)
 	// ZHAO names first, alternate names following, separated by | characters
 	// keep number and order in sync with the enum in the declaration
 	static const std::array<std::string, AOSTATES_MAX> sStateNames {{
-		"Standing|Stand.1|Stand.2|Stand.3",
+		"Standing|Standing mode 1|Stand.1|Stand.2|Stand.3",
 		"Walking|Walk.N",
 		"Running",
 		"Sitting|Sit.N",
