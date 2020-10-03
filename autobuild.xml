@@ -2836,9 +2836,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>fb1a57a1cf5e38a3d51b32307b93ffba</string>
+              <string>017c4784aea9dffbebfb782cbfeed020</string>
+              <key>hash_algorithm</key>
+              <string>md5</string>
               <key>url</key>
-              <string>http://automated-builds-secondlife-com.s3.amazonaws.com/ct2/55968/524423/slvoice-4.10.0000.32327.5fc3fe7c.539691-windows-539691.tar.bz2</string>
+              <string>https://pkg.alchemyviewer.org/repository/autobuild-external/slvoice/windows/slvoice-4.10.0000.32327.5fc3fe7c.539691-windows-539691.tar.bz2</string>
             </map>
             <key>name</key>
             <string>windows</string>
