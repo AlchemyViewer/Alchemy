@@ -45,46 +45,6 @@ if(NOT DEFINED VIEWER_CHANNEL)
     endif()
 endif()
 
-if(NOT DEFINED VIEWER_COMMIT_LONG_SHA)
-    if(DEFINED ENV{VIEWER_CHANNEL_TYPE})
-        set(VIEWER_COMMIT_SHORT_SHA $ENV{VIEWER_COMMIT_SHORT_SHA})
-    elseif(Git_FOUND)
-        execute_process(
-            COMMAND ${GIT_EXECUTABLE} rev-parse HEAD
-            OUTPUT_VARIABLE GIT_COMMIT_SHA
-            WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-            OUTPUT_STRIP_TRAILING_WHITESPACE)
-
-        if(GIT_COMMIT_SHA)
-            set(VIEWER_COMMIT_LONG_SHA ${GIT_COMMIT_SHA})
-        else()
-            set(VIEWER_COMMIT_LONG_SHA 0)
-        endif()
-    else()
-        set(VIEWER_COMMIT_LONG_SHA 0)
-    endif()
-endif(NOT DEFINED VIEWER_COMMIT_LONG_SHA)
-
-if(NOT DEFINED VIEWER_COMMIT_SHORT_SHA)
-    if(DEFINED ENV{VIEWER_COMMIT_SHORT_SHA})
-        set(VIEWER_COMMIT_SHORT_SHA $ENV{VIEWER_COMMIT_SHORT_SHA})
-    elseif(Git_FOUND)
-        execute_process(
-            COMMAND ${GIT_EXECUTABLE} rev-parse --short HEAD
-            OUTPUT_VARIABLE GIT_COMMIT_SHORT_SHA
-            WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-            OUTPUT_STRIP_TRAILING_WHITESPACE)
-
-        if(GIT_COMMIT_SHORT_SHA)
-            set(VIEWER_COMMIT_SHORT_SHA ${GIT_COMMIT_SHORT_SHA})
-        else()
-            set(VIEWER_COMMIT_SHORT_SHA 0)
-        endif()
-    else()
-        set(VIEWER_COMMIT_SHORT_SHA 0)
-    endif()
-endif(NOT DEFINED VIEWER_COMMIT_SHORT_SHA)
-
 # Construct the viewer version number based on the indra/VIEWER_VERSION file
 if(NOT DEFINED VIEWER_SHORT_VERSION) # will be true in indra/, false in indra/newview/
     set(VIEWER_VERSION_BASE_FILE "${CMAKE_SOURCE_DIR}/newview/VIEWER_VERSION.txt")
@@ -116,7 +76,7 @@ if(NOT DEFINED VIEWER_SHORT_VERSION) # will be true in indra/, false in indra/ne
         else()
             set(VIEWER_VERSION_REVISION 0)
         endif()
-        message("Building '${VIEWER_CHANNEL}' Version ${VIEWER_SHORT_VERSION}.${VIEWER_VERSION_REVISION} from commit '${VIEWER_COMMIT_SHORT_SHA}'")
+        message("Building '${VIEWER_CHANNEL}' Version ${VIEWER_SHORT_VERSION}.${VIEWER_VERSION_REVISION}")
     else(EXISTS ${VIEWER_VERSION_BASE_FILE})
         message(SEND_ERROR "Cannot get viewer version from '${VIEWER_VERSION_BASE_FILE}'")
     endif(EXISTS ${VIEWER_VERSION_BASE_FILE})
@@ -129,8 +89,6 @@ if(NOT DEFINED VIEWER_SHORT_VERSION) # will be true in indra/, false in indra/ne
     set(VIEWER_CHANNEL_VERSION_DEFINES
         "LL_VIEWER_CHANNEL=${VIEWER_CHANNEL}"
         "LL_VIEWER_CHANNEL_CODENAME=${VIEWER_CHANNEL_CODENAME_INTERNAL}"
-        "LL_VIEWER_COMMIT_SHA=${VIEWER_COMMIT_LONG_SHA}"
-        "LL_VIEWER_COMMIT_SHORT_SHA=${VIEWER_COMMIT_SHORT_SHA}"
         "LL_VIEWER_VERSION_MAJOR=${VIEWER_VERSION_MAJOR}" 
         "LL_VIEWER_VERSION_MINOR=${VIEWER_VERSION_MINOR}"
         "LL_VIEWER_VERSION_PATCH=${VIEWER_VERSION_PATCH}" 

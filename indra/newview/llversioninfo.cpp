@@ -53,8 +53,6 @@ LLVersionInfo::LLVersionInfo():
 	// need to turn it into a quoted string. LL_TO_STRING() does that.
 	mWorkingChannelName(LL_TO_STRING(LL_VIEWER_CHANNEL)),
 	build_configuration(LLBUILD_CONFIG), // set in indra/cmake/BuildVersion.cmake
-	commit_sha(LL_TO_STRING(LL_VIEWER_COMMIT_SHA)),
-	commit_sha_short(LL_TO_STRING(LL_VIEWER_COMMIT_SHORT_SHA)),
 	codename(LL_TO_STRING(LL_VIEWER_CHANNEL_CODENAME)),
 	// instantiate an LLEventMailDrop with canonical name to listen for news
 	// from SLVersionChecker
@@ -173,16 +171,6 @@ const std::string& LLVersionInfo::getCodename()
 	return codename;
 }
 
-const std::string& LLVersionInfo::getCommitSHA()
-{
-	return commit_sha;
-}
-
-const std::string& LLVersionInfo::getShortCommitSHA()
-{
-	return commit_sha_short;
-}
-    
 const std::string& LLVersionInfo::getBuildConfig()
 {
     return build_configuration;

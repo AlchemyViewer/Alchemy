@@ -79,12 +79,6 @@ public:
 	/// return the release codename e.g. "FeralFox"
 	const std::string& getCodename();
 
-	/// return the full commit sha
-	const std::string& getCommitSHA();
-
-	/// return the short commit sha;
-	const std::string& getShortCommitSHA();
-
     /// return the CMake build type
 	const std::string& getBuildConfig();
 
@@ -119,9 +113,6 @@ private:
 	std::string mVersionChannel;
 	std::string build_configuration;
 	std::string mReleaseNotes;
-	// Storage for the commit sha.
-	std::string commit_sha;
-	std::string commit_sha_short;
 	// Storage for the build codename.
 	std::string codename;
 	// Store unique_ptrs to the next couple things so we don't have to explain
