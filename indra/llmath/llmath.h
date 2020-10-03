@@ -164,23 +164,7 @@ inline F64 llabs(const F64 a)
 
 inline S32 lltrunc( F32 f )
 {
-#if LL_WINDOWS && !defined( __INTEL_COMPILER ) && (ADDRESS_SIZE == 32)
-		// Avoids changing the floating point control word.
-		// Add or subtract 0.5 - epsilon and then round
-		const static U32 zpfp[] = { 0xBEFFFFFF, 0x3EFFFFFF };
-		S32 result;
-		__asm {
-			fld		f
-			mov		eax,	f
-			shr		eax,	29
-			and		eax,	4
-			fadd	dword ptr [zpfp + eax]
-			fistp	result
-		}
-		return result;
-#else
-		return (S32)f;
-#endif
+	return (S32)f;
 }
 
 inline S32 lltrunc( F64 f )
@@ -190,21 +174,7 @@ inline S32 lltrunc( F64 f )
 
 inline S32 llfloor( F32 f )
 {
-#if LL_WINDOWS && !defined( __INTEL_COMPILER ) && (ADDRESS_SIZE == 32)
-		// Avoids changing the floating point control word.
-		// Accurate (unlike Stereopsis version) for all values between S32_MIN and S32_MAX and slightly faster than Stereopsis version.
-		// Add -(0.5 - epsilon) and then round
-		const U32 zpfp = 0xBEFFFFFF;
-		S32 result;
-		__asm { 
-			fld		f
-			fadd	dword ptr [zpfp]
-			fistp	result
-		}
-		return result;
-#else
-		return (S32)floor(f);
-#endif
+	return (S32)floor(f);
 }
 
 
