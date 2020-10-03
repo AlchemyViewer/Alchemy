@@ -64,29 +64,29 @@ public:
 	S32 getBuild();
 
 	/// return the full viewer version as a string like "2.0.0.200030"
-	std::string getVersion();
+	const std::string& getVersion();
 
 	/// return the viewer version as a string like "2.0.0"
-	std::string getShortVersion();
+	const std::string& getShortVersion();
 
 	/// return the viewer version and channel as a string
 	/// like "Second Life Release 2.0.0.200030"
-	std::string getChannelAndVersion();
+	const std::string& getChannelAndVersion();
 
 	/// return the channel name, e.g. "Second Life"
-	std::string getChannel();
+	const std::string& getChannel();
 	
 	/// return the release codename e.g. "FeralFox"
-	std::string getCodename();
+	const std::string& getCodename();
 
 	/// return the full commit sha
-	std::string getCommitSHA();
+	const std::string& getCommitSHA();
 
 	/// return the short commit sha;
-	std::string getShortCommitSHA();
+	const std::string& getShortCommitSHA();
 
     /// return the CMake build type
-    std::string getBuildConfig();
+	const std::string& getBuildConfig();
 
 	/// reset the channel name used by the viewer.
 	void resetChannel(const std::string& channel);

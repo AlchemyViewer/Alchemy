@@ -67,12 +67,28 @@ namespace tut
 				   << " "
 				   << mVersion;
 			mResetVersionAndChannel = stream.str();
+			stream.str("");
+
+			stream << LL_TO_STRING(LL_VIEWER_CHANNEL_CODENAME);
+			mCodename = stream.str();
+			stream.str("");
+
+			stream << LL_TO_STRING(LL_VIEWER_COMMIT_SHORT_SHA);
+			mShortSHA = stream.str();
+			stream.str("");
+
+			stream << LL_TO_STRING(LL_VIEWER_COMMIT_SHA);
+			mLongSHA = stream.str();
+			stream.str("");
 		}
 		std::string mResetChannel;
 		std::string mVersion;
 		std::string mShortVersion;
 		std::string mVersionAndChannel;
 		std::string mResetVersionAndChannel;
+		std::string mCodename;
+		std::string mShortSHA;
+		std::string mLongSHA;
     };
     
 	typedef test_group<versioninfo> versioninfo_t;
@@ -108,6 +124,15 @@ namespace tut
 		ensure_equals("Version and channel String", 
 					  LLVersionInfo::instance().getChannelAndVersion(), 
 					  mVersionAndChannel);
+		ensure_equals("Channel codename", 
+					  LLVersionInfo::instance().getCodename(), 
+					  mCodename);
+		ensure_equals("Short commit SHA", 
+					  LLVersionInfo::instance().getShortCommitSHA(),
+					  mShortSHA);
+		ensure_equals("Long commit SHA", 
+					  LLVersionInfo::instance().getCommitSHA(),
+					  mLongSHA);
 
 		LLVersionInfo::instance().resetChannel(mResetChannel);
 		ensure_equals("Reset channel version", 
