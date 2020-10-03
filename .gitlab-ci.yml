@@ -176,13 +176,9 @@ build:release:windows64:
            Authorization = "Basic $([System.Convert]::ToBase64String([System.Text.Encoding]::ASCII.GetBytes("$env:AUTOBUILD_HTTP_USER`:$env:AUTOBUILD_HTTP_PASS")))"; };
          Verbose = $true; };
 
-        Push-Location .\build-vc-32\newview\Release\
-          $FileNameWin32 = Get-ChildItem -Path . -Name -Include Alchemy_*_Setup.exe
-          Invoke-WebRequest @UploadParams -InFile .\$FileNameWin32 -Uri "${UploadDestURL}/${FileNameWin32}"
-          If ($env:VIEWER_USE_CRASHPAD -eq 'TRUE') 
-          {
-            sentry-cli upload-dif --include-sources alchemy-bin.exe alchemy-bin.pdb crashpad_handler.exe crashpad_handler.pdb openjpeg.pdb openjpeg.dll fmod.dll libcrypto-1_1.dll libcrypto-1_1.pdb libssl-1_1.dll libssl-1_1.pdb libcrypto-1_1-x64.dll libcrypto-1_1-x64.pdb libssl-1_1-x64.dll libssl-1_1-x64.pdb vcruntime140.dll msvcp140.dll nghttp2.dll glod.dll
-          }
+        Push-Location .\build-linux-64\newview\Release\
+          $FileNameLnx64 = Get-ChildItem -Path . -Name -Include Alchemy_*.tar.bz2
+          Invoke-WebRequest @UploadParams -InFile .\$FileNameLnx64 -Uri "${UploadDestURL}/${FileNameLnx64}"
         Pop-Location
 
         Push-Location .\build-vc-64\newview\Release\
@@ -194,9 +190,12 @@ build:release:windows64:
             sentry-cli upload-dif --include-sources alchemy-bin.exe alchemy-bin.pdb crashpad_handler.exe crashpad_handler.pdb openjpeg.pdb openjpeg.dll fmod.dll libcrypto-1_1.dll libcrypto-1_1.pdb libssl-1_1.dll libssl-1_1.pdb libcrypto-1_1-x64.dll libcrypto-1_1-x64.pdb libssl-1_1-x64.dll libssl-1_1-x64.pdb vcruntime140.dll msvcp140.dll nghttp2.dll glod.dll
           }
         Pop-Location
-        sentry-cli releases new $BuildChannelVersion
-        sentry-cli releases set-commits --auto $BuildChannelVersion
-        sentry-cli releases finalize $BuildChannelVersion
+        If ($env:VIEWER_USE_CRASHPAD -eq 'TRUE') 
+        {
+          sentry-cli releases new $BuildChannelVersion
+          sentry-cli releases set-commits --auto $BuildChannelVersion
+          sentry-cli releases finalize $BuildChannelVersion
+        }
 
 deploy_project:
   <<: *deploy_template
