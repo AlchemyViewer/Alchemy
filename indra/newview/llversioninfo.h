@@ -76,6 +76,15 @@ public:
 	/// return the channel name, e.g. "Second Life"
 	std::string getChannel();
 	
+	/// return the release codename e.g. "FeralFox"
+	std::string getCodename();
+
+	/// return the full commit sha
+	std::string getCommitSHA();
+
+	/// return the short commit sha;
+	std::string getShortCommitSHA();
+
     /// return the CMake build type
     std::string getBuildConfig();
 
@@ -110,6 +119,11 @@ private:
 	std::string mVersionChannel;
 	std::string build_configuration;
 	std::string mReleaseNotes;
+	// Storage for the commit sha.
+	std::string commit_sha;
+	std::string commit_sha_short;
+	// Storage for the build codename.
+	std::string codename;
 	// Store unique_ptrs to the next couple things so we don't have to explain
 	// to every consumer of this header file all the details of each.
 	// mPump is the LLEventMailDrop on which we listen for SLVersionChecker to

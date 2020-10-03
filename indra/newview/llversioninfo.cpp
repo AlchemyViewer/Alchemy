@@ -53,6 +53,9 @@ LLVersionInfo::LLVersionInfo():
 	// need to turn it into a quoted string. LL_TO_STRING() does that.
 	mWorkingChannelName(LL_TO_STRING(LL_VIEWER_CHANNEL)),
 	build_configuration(LLBUILD_CONFIG), // set in indra/cmake/BuildVersion.cmake
+	commit_sha(LL_TO_STRING(LL_VIEWER_COMMIT_SHA)),
+	commit_sha_short(LL_TO_STRING(LL_VIEWER_COMMIT_SHORT_SHA)),
+	codename(LL_TO_STRING(LL_VIEWER_CHANNEL_CODENAME)),
 	// instantiate an LLEventMailDrop with canonical name to listen for news
 	// from SLVersionChecker
 	mPump{new LLEventMailDrop("relnotes")},
@@ -96,17 +99,17 @@ S32 LLVersionInfo::getBuild()
 	return LL_VIEWER_VERSION_BUILD;
 }
 
-std::string LLVersionInfo::getVersion()
+const std::string& LLVersionInfo::getVersion()
 {
 	return version;
 }
 
-std::string LLVersionInfo::getShortVersion()
+const std::string& LLVersionInfo::getShortVersion()
 {
 	return short_version;
 }
 
-std::string LLVersionInfo::getChannelAndVersion()
+const std::string& LLVersionInfo::getChannelAndVersion()
 {
 	if (mVersionChannel.empty())
 	{
@@ -117,7 +120,7 @@ std::string LLVersionInfo::getChannelAndVersion()
 	return mVersionChannel;
 }
 
-std::string LLVersionInfo::getChannel()
+const std::string& LLVersionInfo::getChannel()
 {
 	return mWorkingChannelName;
 }
@@ -132,7 +135,7 @@ LLVersionInfo::ViewerMaturity LLVersionInfo::getViewerMaturity()
 {
     ViewerMaturity maturity;
     
-    std::string channel = getChannel();
+    const std::string& channel = mWorkingChannelName;
 
 	static const boost::regex is_test_channel("\\bTest\\b");
 	static const boost::regex is_beta_channel("\\bBeta\\b");
@@ -165,8 +168,22 @@ LLVersionInfo::ViewerMaturity LLVersionInfo::getViewerMaturity()
     return maturity;
 }
 
+const std::string& LLVersionInfo::getCodename()
+{
+	return codename;
+}
+
+const std::string& LLVersionInfo::getCommitSHA()
+{
+	return commit_sha;
+}
+
+const std::string& LLVersionInfo::getShortCommitSHA()
+{
+	return commit_sha_short;
+}
     
-std::string LLVersionInfo::getBuildConfig()
+const std::string& LLVersionInfo::getBuildConfig()
 {
     return build_configuration;
 }
