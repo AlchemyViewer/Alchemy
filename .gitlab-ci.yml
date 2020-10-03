@@ -76,13 +76,13 @@ build:master:linux64:
     VIEWER_USE_CRASHPAD: "FALSE"
   <<: *master_rules
 
-build:master:windows32:
-  <<: *win_build
-  variables:
-    AUTOBUILD_ADDRSIZE: 32
-    VIEWER_CHANNEL_TYPE: Test
-    VIEWER_USE_CRASHPAD: "FALSE"
-  <<: *master_rules
+#build:master:windows32:
+#  <<: *win_build
+#  variables:
+#    AUTOBUILD_ADDRSIZE: 32
+#    VIEWER_CHANNEL_TYPE: Test
+#    VIEWER_USE_CRASHPAD: "FALSE"
+#  <<: *master_rules
 
 build:master:windows64:
   <<: *win_build
@@ -99,12 +99,12 @@ build:project:linux64:
     VIEWER_CHANNEL_TYPE: Project
   <<: *project_rules
 
-build:project:windows32:
-  <<: *win_build
-  variables:
-    AUTOBUILD_ADDRSIZE: 32
-    VIEWER_CHANNEL_TYPE: Project
-  <<: *project_rules
+#build:project:windows32:
+#  <<: *win_build
+#  variables:
+#    AUTOBUILD_ADDRSIZE: 32
+#    VIEWER_CHANNEL_TYPE: Project
+#  <<: *project_rules
 
 build:project:windows64:
   <<: *win_build
@@ -120,12 +120,12 @@ build:beta:linux64:
     VIEWER_CHANNEL_TYPE: Beta
   <<: *beta_rules
 
-build:beta:windows32:
-  <<: *win_build
-  variables:
-    AUTOBUILD_ADDRSIZE: 32
-    VIEWER_CHANNEL_TYPE: Beta
-  <<: *beta_rules
+#build:beta:windows32:
+#  <<: *win_build
+#  variables:
+#    AUTOBUILD_ADDRSIZE: 32
+#    VIEWER_CHANNEL_TYPE: Beta
+#  <<: *beta_rules
 
 build:beta:windows64:
   <<: *win_build
@@ -141,12 +141,12 @@ build:release:linux64:
     VIEWER_CHANNEL_TYPE: Release
   <<: *release_rules
 
-build:release:windows32:
-  <<: *win_build
-  variables:
-    AUTOBUILD_ADDRSIZE: 32
-    VIEWER_CHANNEL_TYPE: Release
-  <<: *release_rules
+#build:release:windows32:
+#  <<: *win_build
+#  variables:
+#    AUTOBUILD_ADDRSIZE: 32
+#    VIEWER_CHANNEL_TYPE: Release
+#  <<: *release_rules
 
 build:release:windows64:
   <<: *win_build
