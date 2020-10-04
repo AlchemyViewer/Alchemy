@@ -6,6 +6,7 @@ default:
   interruptible: true
 
 variables:
+  AUTOBUILD_BUILD_ID: $CI_PIPELINE_ID
   VIEWER_USE_CRASHPAD: "FALSE"
   VIEWER_CRASHPAD_URL: $SENTRY_DSN
 
