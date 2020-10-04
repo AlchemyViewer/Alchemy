@@ -579,11 +579,7 @@ void LLVOCacheEntry::updateParentBoundingInfo(const LLVOCacheEntry* child)
 	const LLVector4a* parent_exts = getSpatialExtents();
 	update_min_max(newMin, newMax, parent_exts[0]);
 	update_min_max(newMin, newMax, parent_exts[1]);
-	for(S32 i = 0; i < 4; i++)
-	{
-		llclamp(newMin[i], 0.f, 256.f);
-		llclamp(newMax[i], 0.f, 256.f);
-	}
+
 	setSpatialExtents(newMin, newMax);
 
 	//update parent's bbox center
@@ -1330,7 +1326,7 @@ void LLVOCache::writeCacheHeader()
 
 	bool success = true ;
 	{
-		LLAPRFile apr_file(mHeaderFileName, APR_CREATE|APR_WRITE|APR_BINARY, mLocalAPRFilePoolp);
+		LLAPRFile apr_file(mHeaderFileName, APR_FOPEN_CREATE|APR_FOPEN_WRITE|APR_FOPEN_BINARY|APR_FOPEN_TRUNCATE, mLocalAPRFilePoolp);
 
 		//write the meta element
 		success = check_write(&apr_file, &mMetaInfo, sizeof(HeaderMetaInfo)) ;
@@ -1516,7 +1512,7 @@ void LLVOCache::writeToCache(U64 handle, const LLUUID& id, const LLVOCacheEntry:
 	{
 		std::string filename;
 		getObjectCacheFilename(handle, filename);
-		LLAPRFile apr_file(filename, APR_CREATE|APR_WRITE|APR_BINARY, mLocalAPRFilePoolp);
+		LLAPRFile apr_file(filename, APR_FOPEN_CREATE|APR_FOPEN_WRITE|APR_FOPEN_BINARY|APR_FOPEN_TRUNCATE, mLocalAPRFilePoolp);
 	
 		success = check_write(&apr_file, (void*)id.mData, UUID_BYTES) ;
 
