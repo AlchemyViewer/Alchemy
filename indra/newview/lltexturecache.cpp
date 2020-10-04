@@ -2241,7 +2241,7 @@ void LLTextureCache::openFastCache(bool first_time)
 			{
 				mFastCachePadBuffer = (U8*)ll_aligned_malloc_16(TEXTURE_FAST_CACHE_ENTRY_SIZE);
 			}
-			mFastCachePoolp = new LLVolatileAPRPool(); // is_local= true by default, so not thread safe by default
+			mFastCachePoolp = new LLVolatileAPRPool(FALSE); // is_local=false, thread safe mode due to crashes 
 			if (LLAPRFile::isExist(mFastCacheFileName, mFastCachePoolp))
 			{
 				mFastCachep = new LLAPRFile(mFastCacheFileName, APR_READ|APR_WRITE|APR_BINARY, mFastCachePoolp) ;				
