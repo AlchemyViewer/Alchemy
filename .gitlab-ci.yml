@@ -176,7 +176,7 @@ build:release:windows64:
            Authorization = "Basic $([System.Convert]::ToBase64String([System.Text.Encoding]::ASCII.GetBytes("$env:AUTOBUILD_HTTP_USER`:$env:AUTOBUILD_HTTP_PASS")))"; };
          Verbose = $true; };
 
-        Push-Location .\build-linux-64\newview\Release\
+        Push-Location .\build-linux-64\newview\
           $FileNameLnx64 = Get-ChildItem -Path . -Name -Include Alchemy_*.tar.bz2
           Invoke-WebRequest @UploadParams -InFile .\$FileNameLnx64 -Uri "${UploadDestURL}/${FileNameLnx64}"
         Pop-Location
