@@ -902,9 +902,10 @@ std::string LLViewerRegion::regionFlagsToString(U64 flags)
 // static
 const std::string& LLViewerRegion::accessToString(U8 sim_access)
 {
-	static std::vector<std::string> access_strings(5);
+	static std::vector<std::string> access_strings;
 	if (access_strings.empty())
 	{
+		access_strings.reserve(5);
 		access_strings.push_back(LLTrans::getString("SIM_ACCESS_PG"));
 		access_strings.push_back(LLTrans::getString("SIM_ACCESS_MATURE"));
 		access_strings.push_back(LLTrans::getString("SIM_ACCESS_ADULT"));
