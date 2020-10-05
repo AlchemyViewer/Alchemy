@@ -2571,7 +2571,7 @@ void LLAgent::onAnimStop(const LLUUID& id)
 		setControlFlags(AGENT_CONTROL_FINISH_ANIM);
 
 		// now trigger dusting self off animation
-		if (isAgentAvatarValid() && !gAgentAvatarp->mBelowWater && rand() % 3 == 0)
+		if (isAgentAvatarValid() && !gAgentAvatarp->mBelowWater && ll_rand() % 3 == 0)
 			sendAnimationRequest( ANIM_AGENT_BRUSH, ANIM_REQUEST_START );
 	}
 	else if (id == ANIM_AGENT_PRE_JUMP || id == ANIM_AGENT_LAND || id == ANIM_AGENT_MEDIUM_LAND)

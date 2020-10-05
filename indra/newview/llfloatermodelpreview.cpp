@@ -3986,7 +3986,7 @@ BOOL LLModelPreview::render()
 
 											if (i+1 >= hull_colors.size())
 											{
-												hull_colors.push_back(LLColor4U(rand()%128+127, rand()%128+127, rand()%128+127, 128));
+												hull_colors.push_back(LLColor4U(ll_rand()%128+127, ll_rand()%128+127, ll_rand()%128+127, 128));
 											}
 
 											gGL.diffuseColor4ubv(hull_colors[i].mV);

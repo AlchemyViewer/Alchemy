@@ -1535,7 +1535,7 @@ bool LLAppViewer::doFrame()
 
 			if (mRandomizeFramerate)
 			{
-				ms_sleep(rand() % 200);
+				ms_sleep(ll_rand() % 200);
 			}
 
 			if (mPeriodicSlowFrame
@@ -4301,7 +4301,7 @@ bool LLAppViewer::initCache()
 	{
 		do
 		{
-			new_salt = rand();
+			new_salt = ll_rand(S32_MAX);
 		} while(new_salt == old_salt);
 	}
 

@@ -28,6 +28,7 @@
 
 #include "linden_common.h"
 #include "llsd.h"
+#include "llrand.h"
 
 #include "../llinventory.h"
 
@@ -58,9 +59,9 @@ LLPointer<LLInventoryItem> create_random_inventory_item()
 	perm.initMasks(PERM_ALL, PERM_ALL, PERM_COPY, PERM_COPY, PERM_MODIFY | PERM_COPY);
 	LLUUID asset_id;
 	asset_id.generate();
-	S32 price = rand();
+	S32 price = ll_rand();
 	LLSaleInfo sale_info(LLSaleInfo::FS_COPY, price);
-	U32 flags = rand();
+	U32 flags = ll_rand();
 	S32 creation = time(NULL);
 
 	LLPointer<LLInventoryItem> item = new LLInventoryItem(
@@ -190,11 +191,11 @@ namespace tut
 		std::string new_desc = "SecondLife Testing";
 		src->setDescription(new_desc);
 		
-		S32 new_price = rand();
+		S32 new_price = ll_rand();
 		LLSaleInfo new_sale_info(LLSaleInfo::FS_COPY, new_price);
 		src->setSaleInfo(new_sale_info);
 
-		U32 new_flags = rand();
+		U32 new_flags = ll_rand();
 		S32 new_creation = time(NULL);
 
 		LLPermissions new_perm;
@@ -261,11 +262,11 @@ namespace tut
 		std::string new_desc = "SecondLife Testing";
 		src->setDescription(new_desc);
 		
-		S32 new_price = rand();
+		S32 new_price = ll_rand();
 		LLSaleInfo new_sale_info(LLSaleInfo::FS_COPY, new_price);
 		src->setSaleInfo(new_sale_info);
 
-		U32 new_flags = rand();
+		U32 new_flags = ll_rand();
 		S32 new_creation = time(NULL);
 
 		LLPermissions new_perm;

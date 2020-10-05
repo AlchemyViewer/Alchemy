@@ -213,13 +213,13 @@ BOOL LLToolPlacer::addObject( LLPCode pcode, S32 x, S32 y, U8 use_physics )
 	case LL_PCODE_LEGACY_GRASS:
 		//  Randomize size of grass patch 
 		scale.setVec(10.f + ll_frand(20.f), 10.f + ll_frand(20.f),  1.f + ll_frand(2.f));
-		state = rand() % LLVOGrass::sMaxGrassSpecies;
+		state = ll_rand() % LLVOGrass::sMaxGrassSpecies;
 		break;
 
 
 	case LL_PCODE_LEGACY_TREE:
 	case LL_PCODE_TREE_NEW:
-		state = rand() % LLVOTree::sMaxTreeSpecies;
+		state = ll_rand() % LLVOTree::sMaxTreeSpecies;
 		break;
 
 	case LL_PCODE_SPHERE:

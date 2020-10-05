@@ -59,6 +59,7 @@ using namespace boost::phoenix;
 #include "../test/lltut.h"
 #include "../test/namedtempfile.h"
 #include "stringize.h"
+#include "llrand.h"
 
 std::vector<U8> string_to_vector(const std::string& str)
 {
@@ -1660,7 +1661,7 @@ namespace tut
 		for(int ii = 0; ii < 100; ++ii)
 		{
 			srand(ii);		/* Flawfinder: ignore */
-			S32 size = rand() % 100 + 10;
+			S32 size = ll_rand() % 100 + 10;
 			std::generate_n(
 				std::back_insert_iterator<buf_t>(val),
 				size,

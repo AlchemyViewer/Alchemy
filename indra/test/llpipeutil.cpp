@@ -119,7 +119,7 @@ struct random_ascii_generator
 	random_ascii_generator() {}
 	U8 operator()()
 	{
-		int rv = rand();
+		int rv = ll_rand();
 		rv %= (127 - 32);
 		rv += 32;
 		return rv;

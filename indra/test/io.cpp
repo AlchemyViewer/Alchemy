@@ -45,6 +45,7 @@
 #include "llcommon.h"
 #include "lluuid.h"
 #include "llinstantmessage.h"
+#include "llrand.h"
 
 namespace tut
 {
@@ -604,7 +605,7 @@ namespace tut
 			}
 			need_comma = true;
 			srand(69 + i);	/* Flawfinder: ignore */
-			S32 size = rand() % 1000 + 1000;
+			S32 size = ll_rand() % 1000 + 1000;
 			std::generate_n(
 				std::back_insert_iterator<buf_t>(source),
 				size,
@@ -670,7 +671,7 @@ namespace tut
 			ostr << "'" << i << "':";
 			total_size += 7;
 			srand(69 + i);		/* Flawfinder: ignore */
-			S32 size = rand() % 1000 + 1000;
+			S32 size = ll_rand() % 1000 + 1000;
 			std::generate_n(
 				std::back_insert_iterator<buf_t>(source),
 				size,

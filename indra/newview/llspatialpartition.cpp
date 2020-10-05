@@ -4012,7 +4012,7 @@ LLDrawInfo::LLDrawInfo(U16 start, U16 end, U32 count, U32 offset,
 {
 	mVertexBuffer->validateRange(mStart, mEnd, mCount, mOffset);
 	
-	mDebugColor = ((U32)rand() << 16) + rand();
+	mDebugColor = ((U32)ll_rand() << 16) + ll_rand();
 }
 
 LLDrawInfo::~LLDrawInfo()	

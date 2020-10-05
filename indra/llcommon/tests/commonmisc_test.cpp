@@ -43,6 +43,7 @@
 #include "../llsdserialize.h"
 #include "../u64.h"
 #include "../llhash.h"
+#include "../llrand.h"
 
 #include "../test/lltut.h"
 
@@ -118,7 +119,7 @@ namespace tut
 			typedef std::vector<U8> buf_t;
 			buf_t source;
 			srand(i);		/* Flawfinder: ignore */
-			S32 size = rand() % 1000 + 10;
+			S32 size = ll_rand() % 1000 + 10;
 			std::generate_n(
 				std::back_insert_iterator<buf_t>(source),
 				size,
@@ -169,7 +170,7 @@ namespace tut
 			typedef std::vector<U8> buf_t;
 			buf_t source;
 			srand(666 + i);		/* Flawfinder: ignore */
-			S32 size = rand() % 1000 + 10;
+			S32 size = ll_rand() % 1000 + 10;
 			std::generate_n(
 				std::back_insert_iterator<buf_t>(source),
 				size,
@@ -325,7 +326,7 @@ namespace tut
 			// gen up a starting point
 			std::string expected;
 			srand(1337 + i);		/* Flawfinder: ignore */
-			S32 size = rand() % 30 + 5;
+			S32 size = ll_rand() % 30 + 5;
 			std::generate_n(
 				std::back_insert_iterator<std::string>(expected),
 				size,
