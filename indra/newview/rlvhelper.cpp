@@ -27,7 +27,10 @@
 #include "rlvinventory.h"
 #include "rlvmodifiers.h"
 
+#include "absl/strings/match.h"
 #include "absl/strings/str_format.h"
+#include "absl/strings/str_split.h"
+
 #include <boost/algorithm/string.hpp>
 
 // ============================================================================
@@ -397,7 +400,7 @@ void RlvBehaviourDictionary::clearModifiers(const LLUUID& idRlvObj)
 
 const RlvBehaviourInfo* RlvBehaviourDictionary::getBehaviourInfo(const std::string& strBhvr, ERlvParamType eParamType, bool* pfStrict) const
 {
-	bool fStrict = boost::algorithm::ends_with(strBhvr, "_sec");
+	bool fStrict = absl::EndsWith(strBhvr, "_sec");
 	if (pfStrict)
 		*pfStrict = fStrict;
 
@@ -855,7 +858,7 @@ bool RlvCommandOptionHelper::parseOption<RlvCommandOptionGeneric>(const std::str
 bool RlvCommandOptionHelper::parseStringList(const std::string& strOption, std::vector<std::string>& optionList, const std::string& strSeparator)
 {
 	if (!strOption.empty())
-		boost::split(optionList, strOption, boost::is_any_of(strSeparator));
+		optionList = absl::StrSplit(strOption, strSeparator);
 	return !optionList.empty();
 }
 
@@ -998,8 +1001,7 @@ bool RlvCommandOptionGetPath::getItemIDs(LLWearableType::EType wtType, uuid_vec_
 RlvCommandOptionAdjustHeight::RlvCommandOptionAdjustHeight(const RlvCommand& rlvCmd)
 	: m_nPelvisToFoot(0.0f), m_nPelvisToFootDeltaMult(0.0f), m_nPelvisToFootOffset(0.0f)
 {
-	std::vector<std::string> cmdTokens;
-	boost::split(cmdTokens, rlvCmd.getOption(), boost::is_any_of(std::string(";")));
+	std::vector<std::string> cmdTokens = absl::StrSplit(rlvCmd.getOption(), ';');
 	if (1 == cmdTokens.size())
 	{
 		m_fValid = (LLStringUtil::convertToF32(cmdTokens[0], m_nPelvisToFootOffset));

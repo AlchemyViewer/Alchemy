@@ -3311,7 +3311,7 @@ ERlvCmdRet RlvHandler::processReplyCommand(const RlvCommand& rlvCmd) const
 				{
 					// NOTE: specification says response should start with '/' but RLV-1.16.1 returns an empty string when no rules are set
 					for (rlv_object_map_t::const_iterator itObj = m_Objects.begin(); itObj != m_Objects.end(); ++itObj)
-						strReply += itObj->second.getStatusString(strFilter, strSeparator);
+						absl::StrAppend(&strReply, itObj->second.getStatusString(strFilter, strSeparator));
 				}
 			}
 			break;
@@ -3373,7 +3373,7 @@ ERlvCmdRet RlvHandler::onFindFolder(const RlvCommand& rlvCmd, std::string& strRe
 			{
 				if (!strReply.empty())
 					strReply.push_back(',');
-				strReply += RlvInventory::instance().getSharedPath(folders.at(idxFolder));
+				absl::StrAppend(&strReply, RlvInventory::instance().getSharedPath(folders.at(idxFolder)));
 			}
 		}
 	}
@@ -3598,7 +3598,7 @@ ERlvCmdRet RlvHandler::onGetInv(const RlvCommand& rlvCmd, std::string& strReply)
 		{
 			if (!strReply.empty())
 				strReply.push_back(',');
-			strReply += strFolder;
+			absl::StrAppend(&strReply, strFolder);
 		}
 	}
 	return RLV_RET_SUCCESS;
@@ -3779,7 +3779,7 @@ ERlvCmdRet RlvHandler::onGetPath(const RlvCommand& rlvCmd, std::string& strReply
 			{
 				if (!strReply.empty())
 					strReply.push_back(',');
-				strReply += RlvInventory::instance().getSharedPath(folders.at(idxFolder));
+				absl::StrAppend(&strReply, RlvInventory::instance().getSharedPath(folders.at(idxFolder)));
 			}
 		}
 	}

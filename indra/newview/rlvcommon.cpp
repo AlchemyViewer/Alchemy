@@ -131,7 +131,7 @@ void RlvSettings::initClass()
 		int nMinMaturity = gSavedSettings.getS32("RLVaExperienceMaturityThreshold");
 		s_nExperienceMinMaturity = (nMinMaturity == 0) ? 0 : ((nMinMaturity == 1) ? SIM_ACCESS_PG : ((nMinMaturity == 2) ? SIM_ACCESS_MATURE : SIM_ACCESS_ADULT));
 		const std::string& strBlockedExperiences = gSavedSettings.getString("RLVaBlockedExperiences");
-		boost::split(s_BlockedExperiences, strBlockedExperiences, boost::is_any_of(";"));
+		s_BlockedExperiences = absl::StrSplit(strBlockedExperiences, ';');
 
 		fInitialized = true;
 	}
@@ -182,12 +182,12 @@ void RlvSettings::initCompatibilityMode(std::string strCompatList)
 	s_CompatItemCreators.clear();
 	s_CompatItemNames.clear();
 
-	strCompatList.append(";").append(rlvGetSetting<std::string>("RLVaCompatibilityModeList", ""));
+	absl::StrAppend(&strCompatList, ";", rlvGetSetting<std::string>("RLVaCompatibilityModeList", ""));
 
 	boost_tokenizer tokCompatList(strCompatList, boost::char_separator<char>(";", "", boost::drop_empty_tokens));
 	for (const std::string& strCompatEntry : tokCompatList)
 	{
-		if (boost::starts_with(strCompatEntry, "creator:"))
+		if (absl::StartsWith(strCompatEntry, "creator:"))
 		{
 			LLUUID idCreator;
 			if ( (44 == strCompatEntry.size()) && (LLUUID::parseUUID(strCompatEntry.substr(8), &idCreator)) &&
@@ -196,7 +196,7 @@ void RlvSettings::initCompatibilityMode(std::string strCompatList)
 				s_CompatItemCreators.push_back(idCreator);
 			}
 		}
-		else if (boost::starts_with(strCompatEntry, "name:"))
+		else if (absl::StartsWith(strCompatEntry, "name:"))
 		{
 			if (strCompatEntry.size() > 5)
 				s_CompatItemNames.push_back(strCompatEntry.substr(5));
