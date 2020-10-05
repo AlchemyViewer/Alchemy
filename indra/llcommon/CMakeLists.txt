@@ -287,6 +287,8 @@ target_link_libraries(
     absl::node_hash_map
     absl::strings
     absl::str_format
+    absl::random_random
+    absl::random_bit_gen_ref
     nlohmann_json::nlohmann_json
     ${DL_LIBRARY}
     ${RT_LIBRARY}
