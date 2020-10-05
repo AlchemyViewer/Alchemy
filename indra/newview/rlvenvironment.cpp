@@ -18,7 +18,9 @@
 
 #include "llinventoryfunctions.h"
 #include "llsettingsvo.h"
-#include <boost/algorithm/string.hpp>
+
+#include "absl/strings/match.h"
+#include "absl/strings/str_format.h"
 
 #include "rlvactions.h"
 #include "rlvenvironment.h"
@@ -533,7 +535,7 @@ std::string RlvEnvironment::handleGetFn<LLVector2>(const std::function<LLVector2
 {
 	LLSettingsSky::ptr_t pSky = LLEnvironment::instance().getCurrentSky();
 	LLVector2 replyVec = fn(pSky);
-	return llformat("%f/%f", replyVec.mV[VX], replyVec.mV[VY]);
+	return absl::StrFormat("%f/%f", replyVec.mV[VX], replyVec.mV[VY]);
 }
 
 template<>
@@ -541,7 +543,7 @@ std::string RlvEnvironment::handleGetFn<LLColor3>(const std::function<LLColor3(L
 {
 	LLSettingsSky::ptr_t pSky = LLEnvironment::instance().getCurrentSky();
 	LLColor3 replyColor = fn(pSky);
-	return llformat("%f/%f/%f", replyColor.mV[VX], replyColor.mV[VY], replyColor.mV[VZ]);
+	return absl::StrFormat("%f/%f/%f", replyColor.mV[VX], replyColor.mV[VY], replyColor.mV[VZ]);
 }
 
 template<typename T>

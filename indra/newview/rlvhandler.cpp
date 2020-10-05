@@ -70,6 +70,9 @@
 // Boost includes
 #include <boost/algorithm/string.hpp>
 
+// Abseil includes
+#include <absl/strings/str_format.h>
+
 // llappviewer.cpp
 extern BOOL gDoDisconnect;
 
@@ -3459,7 +3462,7 @@ ERlvCmdRet RlvReplyHandler<RLV_BHVR_GETCAM_AVDIST>::onCommand(const RlvCommand& 
 {
 	if (rlvCmd.hasOption())
 		return RLV_RET_FAILED_OPTION;
-	strReply = llformat("%.3lf", (gAgentCamera.getCameraPositionGlobal() - gAgent.getPositionGlobal()).magVec());
+	strReply = absl::StrFormat("%.3lf", (gAgentCamera.getCameraPositionGlobal() - gAgent.getPositionGlobal()).magVec());
 	return RLV_RET_SUCCESS;
 }
 
@@ -3471,7 +3474,7 @@ ERlvCmdRet RlvReplyCamMinMaxModifierHandler::onCommand(const RlvCommand& rlvCmd,
 		return RLV_RET_FAILED_OPTION;
 	ERlvBehaviour eBhvr = RlvBehaviourDictionary::instance().getBehaviourFromString("setcam_" + rlvCmd.getBehaviour().substr(7), RLV_TYPE_ADDREM);
 	if (RlvBehaviourModifier* pBhvrModifier = RlvBehaviourDictionary::instance().getModifierFromBehaviour(eBhvr))
-		strReply = (pBhvrModifier->hasValue()) ? llformat("%.3f", pBhvrModifier->getValue<float>()) : LLStringUtil::null;
+		strReply = (pBhvrModifier->hasValue()) ? absl::StrFormat("%.3f", pBhvrModifier->getValue<float>()) : LLStringUtil::null;
 	return RLV_RET_SUCCESS;
 }
 
@@ -3509,7 +3512,7 @@ ERlvCmdRet RlvReplyHandler<RLV_BHVR_GETCAM_FOV>::onCommand(const RlvCommand& rlv
 {
 	if (rlvCmd.hasOption())
 		return RLV_RET_FAILED_OPTION;
-	strReply = llformat("%.3f", LLViewerCamera::getInstance()->getDefaultFOV());
+	strReply = absl::StrFormat("%.3f", LLViewerCamera::getInstance()->getDefaultFOV());
 	return RLV_RET_SUCCESS;
 }
 
@@ -3562,7 +3565,7 @@ ERlvCmdRet RlvReplyHandler<RLV_BHVR_GETHEIGHTOFFSET>::onCommand(const RlvCommand
 	else if (!isAgentAvatarValid())
 		return RLV_RET_FAILED_UNKNOWN;
 
-	strReply = llformat("%.2f", gAgentAvatarp->getHoverOffset()[VZ] * 100);
+	strReply = absl::StrFormat("%.2f", gAgentAvatarp->getHoverOffset()[VZ] * 100.f);
 	return RLV_RET_SUCCESS;
 }
 
@@ -3665,15 +3668,15 @@ ERlvCmdRet RlvHandler::onGetInvWorn(const RlvCommand& rlvCmd, std::string& strRe
 		wi.cntChildWorn += wiFolder.cntWorn + wiFolder.cntChildWorn;
 		wi.cntChildTotal += wiFolder.cntTotal + wiFolder.cntChildTotal;
 
-		strReply += llformat(",%s|%d%d", gInventory.getCategory(itFolder->first)->getName().c_str(),
+		absl::StrAppend(&strReply, absl::StrFormat(",%s|%d%d", gInventory.getCategory(itFolder->first)->getName(),
 		 (0 == wiFolder.cntTotal) ? 0 : (0 == wiFolder.cntWorn) ? 1 : (wiFolder.cntWorn != wiFolder.cntTotal) ? 2 : 3,
 		 (0 == wiFolder.cntChildTotal) ? 0 : (0 == wiFolder.cntChildWorn) ? 1 : (wiFolder.cntChildWorn != wiFolder.cntChildTotal) ? 2 : 3
-		);
+		));
 	}
 
 	// Now just prepend the root and done
-	strReply = llformat("|%d%d", (0 == wi.cntTotal) ? 0 : (0 == wi.cntWorn) ? 1 : (wi.cntWorn != wi.cntTotal) ? 2 : 3,
-		(0 == wi.cntChildTotal) ? 0 : (0 == wi.cntChildWorn) ? 1 : (wi.cntChildWorn != wi.cntChildTotal) ? 2: 3) + strReply;
+	strReply = absl::StrCat(absl::StrFormat("|%d%d", (0 == wi.cntTotal) ? 0 : (0 == wi.cntWorn) ? 1 : (wi.cntWorn != wi.cntTotal) ? 2 : 3,
+		(0 == wi.cntChildTotal) ? 0 : (0 == wi.cntChildWorn) ? 1 : (wi.cntChildWorn != wi.cntChildTotal) ? 2: 3), strReply);
 
 	return RLV_RET_SUCCESS;
 }

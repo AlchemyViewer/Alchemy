@@ -27,6 +27,7 @@
 #include "rlvinventory.h"
 #include "rlvmodifiers.h"
 
+#include "absl/strings/str_format.h"
 #include <boost/algorithm/string.hpp>
 
 // ============================================================================
@@ -1002,7 +1003,7 @@ RlvCommandOptionAdjustHeight::RlvCommandOptionAdjustHeight(const RlvCommand& rlv
 	if (1 == cmdTokens.size())
 	{
 		m_fValid = (LLStringUtil::convertToF32(cmdTokens[0], m_nPelvisToFootOffset));
-		m_nPelvisToFootOffset /= 100;
+		m_nPelvisToFootOffset /= 100.f;
 	}
 	else if ( (2 <= cmdTokens.size()) && (cmdTokens.size() <= 3) )
 	{
@@ -1747,7 +1748,7 @@ void RlvBehaviourNotifyHandler::onCommand(const RlvCommand& rlvCmd, ERlvCmdRet e
 	{
 		case RLV_TYPE_ADD:
 		case RLV_TYPE_REMOVE:
-			sendNotification(rlvCmd.asString(), "=" + rlvCmd.getParam());
+			sendNotification(rlvCmd.asString(), absl::StrCat("=", rlvCmd.getParam()));
 			break;
 		case RLV_TYPE_CLEAR:
 			sendNotification(rlvCmd.asString());
@@ -1769,7 +1770,7 @@ void RlvBehaviourNotifyHandler::sendNotification(const std::string& strText, con
 				itNotify != pThis->m_Notifications.end(); ++itNotify)
 		{
 			if ( (itNotify->second.strFilter.empty()) || (boost::icontains(strText, itNotify->second.strFilter)) )
-				RlvUtil::sendChatReply(itNotify->second.nChannel, "/" + strText + strSuffix);
+				RlvUtil::sendChatReply(itNotify->second.nChannel, absl::StrCat("/", strText, strSuffix));
 		}
 	}
 }
@@ -1777,31 +1778,31 @@ void RlvBehaviourNotifyHandler::sendNotification(const std::string& strText, con
 // Checked: 2011-03-31 (RLVa-1.3.0f) | Added: RLVa-1.3.0f
 void RlvBehaviourNotifyHandler::onWear(LLWearableType::EType eType, bool fAllowed)
 {
-	sendNotification(llformat("worn %s %s", (fAllowed) ? "legally" : "illegally", LLWearableType::getTypeName(eType).c_str()));
+	sendNotification(absl::StrFormat("worn %s %s", (fAllowed) ? "legally" : "illegally", LLWearableType::getTypeName(eType)));
 }
 
 // Checked: 2011-03-31 (RLVa-1.3.0f) | Added: RLVa-1.3.0f
 void RlvBehaviourNotifyHandler::onTakeOff(LLWearableType::EType eType, bool fAllowed)
 {
-	sendNotification(llformat("unworn %s %s", (fAllowed) ? "legally" : "illegally", LLWearableType::getTypeName(eType).c_str()));
+	sendNotification(absl::StrFormat("unworn %s %s", (fAllowed) ? "legally" : "illegally", LLWearableType::getTypeName(eType)));
 }
 
 // Checked: 2011-03-31 (RLVa-1.3.0f) | Added: RLVa-1.3.0f
 void RlvBehaviourNotifyHandler::onAttach(const LLViewerJointAttachment* pAttachPt, bool fAllowed)
 {
-	sendNotification(llformat("attached %s %s", (fAllowed) ? "legally" : "illegally", pAttachPt->getName().c_str()));
+	sendNotification(absl::StrFormat("attached %s %s", (fAllowed) ? "legally" : "illegally", pAttachPt->getName()));
 }
 
 // Checked: 2011-03-31 (RLVa-1.3.0f) | Added: RLVa-1.3.0f
 void RlvBehaviourNotifyHandler::onDetach(const LLViewerJointAttachment* pAttachPt, bool fAllowed)
 {
-	sendNotification(llformat("detached %s %s", (fAllowed) ? "legally" : "illegally", pAttachPt->getName().c_str()));
+	sendNotification(absl::StrFormat("detached %s %s", (fAllowed) ? "legally" : "illegally", pAttachPt->getName()));
 }
 
 // Checked: 2011-03-31 (RLVa-1.3.0f) | Added: RLVa-1.3.0f
 void RlvBehaviourNotifyHandler::onReattach(const LLViewerJointAttachment* pAttachPt, bool fAllowed)
 {
-	sendNotification(llformat("reattached %s %s", (fAllowed) ? "legally" : "illegally", pAttachPt->getName().c_str()));
+	sendNotification(absl::StrFormat("reattached %s %s", (fAllowed) ? "legally" : "illegally", pAttachPt->getName()));
 }
 
 // =========================================================================

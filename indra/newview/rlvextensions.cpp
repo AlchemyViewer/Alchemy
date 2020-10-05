@@ -23,6 +23,8 @@
 #include "rlvhandler.h"
 #include "rlvhelper.h"
 
+#include "absl/strings/str_format.h"
+
 // ============================================================================
 
 std::map<std::string, S16> RlvExtGetSet::m_DbgAllowed;
@@ -160,11 +162,11 @@ std::string RlvExtGetSet::onGetDebug(std::string strSetting)
 				switch (pSetting->type())
 				{
 					case TYPE_U32:
-						return llformat("%u", gSavedSettings.getU32(strSetting));
+						return absl::StrFormat("%u", gSavedSettings.getU32(strSetting));
 					case TYPE_S32:
-						return llformat("%d", gSavedSettings.getS32(strSetting));
+						return absl::StrFormat("%d", gSavedSettings.getS32(strSetting));
 					case TYPE_BOOLEAN:
-						return llformat("%d", gSavedSettings.getBOOL(strSetting));
+						return absl::StrFormat("%d", gSavedSettings.getBOOL(strSetting));
 					default:
 						RLV_ERRS << "Unexpected debug setting type" << LL_ENDL;
 						break;
@@ -193,7 +195,7 @@ std::string RlvExtGetSet::onGetPseudoDebug(const std::string& strSetting)
 		else
 		{
 			if (isAgentAvatarValid())
-				return llformat("%d", (gAgentAvatarp->getSex() == SEX_MALE)); // [See LLFloaterCustomize::LLFloaterCustomize()]
+				return absl::StrFormat("%d", (gAgentAvatarp->getSex() == SEX_MALE)); // [See LLFloaterCustomize::LLFloaterCustomize()]
 		}
 	}
 	return std::string();
