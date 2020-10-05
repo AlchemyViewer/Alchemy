@@ -1741,6 +1741,12 @@ void ALAOEngine::parseNotecard(std::unique_ptr<char[]>&& buffer)
 		std::string stateName = line.substr(1, endTag - 1);
 		LLStringUtil::trim(stateName);
 
+		// Recognized but not currently implemented. Handled here to avoid misleading "state not found" notification.
+		if ("Standing mode 2" == stateName || "Standing Calm" == stateName)
+		{
+			continue;
+		}
+
 		ALAOSet::AOState* newState = mImportSet->getStateByName(stateName);
 		if (!newState)
 		{
@@ -1769,6 +1775,13 @@ void ALAOEngine::parseNotecard(std::unique_ptr<char[]>&& buffer)
 			animation.mSortOrder = animIndex;
 			newState->mAnimations.push_back(animation);
 			isValid = true;
+		}
+
+		if ("Standing mode 1" == stateName)
+		{
+			newState->mCycle = true;
+			newState->mCycleTime = 30.0f;
+			newState->mDirty = true;
 		}
 	}
 
@@ -1824,6 +1837,16 @@ void ALAOEngine::processImport(bool aFromTimer)
 		ALAOSet::AOState* state = mImportSet->getState(index);
 		if (!state->mAnimations.empty())
 		{
+			if (state->mCycleTime)
+			{
+				const std::string oldName = state->mName;
+				state->mName = llformat("%s%d",oldName + ":CT",state->mCycleTime);
+			}
+			if (state->mCycle)
+			{
+				const std::string oldName = state->mName;
+				state->mName = llformat("%s%s", oldName, ":CY");
+			}
 			allComplete = false;
 			LL_DEBUGS("AOEngine") << "state " << state->mName << " still has animations to link." << LL_ENDL;
 
