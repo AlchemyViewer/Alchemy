@@ -32,6 +32,8 @@
 #include "llviewertexturelist.h"
 #include "math.h"	// log()
 
+#include "absl/strings/str_format.h"
+
 // Turn this on to output tile stats in the standard output
 #define DEBUG_TILES_STAT 0
 
@@ -181,7 +183,7 @@ LLPointer<LLViewerFetchedTexture> LLWorldMipmap::getObjectsTile(U32 grid_x, U32 
 LLPointer<LLViewerFetchedTexture> LLWorldMipmap::loadObjectsTile(U32 grid_x, U32 grid_y, S32 level)
 {
 	// Get the grid coordinates
-	std::string imageurl = gSavedSettings.getString("CurrentMapServerURL") + llformat("map-%d-%d-%d-objects.jpg", level, grid_x, grid_y);
+	std::string imageurl = absl::StrCat(gSavedSettings.getString("CurrentMapServerURL"), absl::StrFormat("map-%d-%d-%d-objects.jpg", level, grid_x, grid_y));
 
 	// DO NOT COMMIT!! DEBUG ONLY!!!
 	// Use a local jpeg for every tile to test map speed without S3 access

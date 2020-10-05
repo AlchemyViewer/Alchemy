@@ -36,6 +36,8 @@
 #include "lltrans.h"
 #include "llgltexture.h"
 
+#include <absl/strings/str_format.h>
+
 // Timers to temporise database requests
 const F32 AGENTS_UPDATE_TIMER = 60.0;			// Seconds between 2 agent requests for a region
 const F32 REQUEST_ITEMS_TIMER = 10.f * 60.f;	// Seconds before we consider re-requesting item data for the grid
@@ -521,17 +523,18 @@ bool LLWorldMap::insertItem(U32 x_world, U32 y_world, std::string& name, LLUUID&
 		{
 			static LLUIString tooltip_fmt = LLTrans::getString("worldmap_item_tooltip_format");
 
-			tooltip_fmt.setArg("[AREA]",  llformat("%d", extra));
-			tooltip_fmt.setArg("[PRICE]", llformat("%d", extra2));
+			tooltip_fmt.setArg("[AREA]",  absl::StrCat(extra));
+			tooltip_fmt.setArg("[PRICE]", absl::StrCat(extra2));
 
 			// Check for division by zero
 			if (extra != 0)
 			{
-				tooltip_fmt.setArg("[SQMPRICE]", llformat("%.1f", (F32)extra2 / (F32)extra));
+				tooltip_fmt.setArg("[SQMPRICE]", absl::StrFormat("%.1f", (F32)extra2 / (F32)extra));
 			}
 			else
 			{
-				tooltip_fmt.setArg("[SQMPRICE]",  LLTrans::getString("Unknown"));
+				static LLUIString unknown_str = LLTrans::getString("Unknown");
+				tooltip_fmt.setArg("[SQMPRICE]", unknown_str);
 			}
 
 			new_item.setTooltip(tooltip_fmt.getString());
