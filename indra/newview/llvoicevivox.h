@@ -736,13 +736,13 @@ private:
 	
 	std::string nameFromAvatar(LLVOAvatar *avatar);
 	std::string nameFromID(const LLUUID &id);
-	bool IDFromName(const std::string name, LLUUID &uuid);
+	bool IDFromName(const std::string& name, LLUUID &uuid);
 	std::string displayNameFromAvatar(LLVOAvatar *avatar);
 	std::string sipURIFromAvatar(LLVOAvatar *avatar);
-	std::string sipURIFromName(std::string &name);
+	std::string sipURIFromName(std::string_view name);
 	
 	// Returns the name portion of the SIP URI if the string looks vaguely like a SIP URI, or an empty string if not.
-	std::string nameFromsipURI(const std::string &uri);		
+	std::string nameFromsipURI(std::string_view uri);		
 
 	bool inSpatialChannel(void);
 	std::string getAudioSessionURI();

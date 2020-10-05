@@ -74,6 +74,9 @@
 // for base64 decoding
 #include "apr_base64.h"
 
+#include <absl/strings/escaping.h>
+#include <absl/strings/str_replace.h>
+
 #define USE_SESSION_GROUPS 0
 #define VX_NULL_POSITION -2147483648.0 /*The Silence*/
 
@@ -4883,12 +4886,7 @@ bool LLVivoxVoiceClient::inProximalChannel()
 
 std::string LLVivoxVoiceClient::sipURIFromID(const LLUUID &id)
 {
-	std::string result;
-	result = "sip:";
-	result += nameFromID(id);
-	result += "@";
-	result += mVoiceSIPURIHostName;
-	
+	std::string result = absl::StrCat("sip:", nameFromID(id), "@", mVoiceSIPURIHostName);
 	return result;
 }
 
@@ -4897,12 +4895,8 @@ std::string LLVivoxVoiceClient::sipURIFromAvatar(LLVOAvatar *avatar)
 	std::string result;
 	if(avatar)
 	{
-		result = "sip:";
-		result += nameFromID(avatar->getID());
-		result += "@";
-		result += mVoiceSIPURIHostName;
+		result = absl::StrCat("sip:", nameFromID(avatar->getID()), "@", mVoiceSIPURIHostName);
 	}
-	
 	return result;
 }
 
@@ -4926,16 +4920,15 @@ std::string LLVivoxVoiceClient::nameFromID(const LLUUID &uuid)
 		LLStringUtil::replaceChar(result, '_', ' ');
 		return result;
 	}
-	// Prepending this apparently prevents conflicts with reserved names inside the vivox code.
-	result = "x";
 	
 	// Base64 encode and replace the pieces of base64 that are less compatible 
 	// with e-mail local-parts.
 	// See RFC-4648 "Base 64 Encoding with URL and Filename Safe Alphabet"
-	result += LLBase64::encode(uuid.mData, UUID_BYTES);
-	LLStringUtil::replaceChar(result, '+', '-');
-	LLStringUtil::replaceChar(result, '/', '_');
-	
+
+	// Prepending this apparently prevents conflicts with reserved names inside the vivox code.
+	result = absl::StrCat("x", absl::Base64Escape(std::string((char*)uuid.mData, UUID_BYTES)));
+	absl::StrReplaceAll({ {"+", "-"}, {"/", "_"} }, &result);
+
 	// If you need to transform a GUID to this form on the Mac OS X command line, this will do so:
 	// echo -n x && (echo e669132a-6c43-4ee1-a78d-6c82fff59f32 |xxd -r -p |openssl base64|tr '/+' '_-')
 	
@@ -4945,7 +4938,7 @@ std::string LLVivoxVoiceClient::nameFromID(const LLUUID &uuid)
 	return result;
 }
 
-bool LLVivoxVoiceClient::IDFromName(const std::string inName, LLUUID &uuid)
+bool LLVivoxVoiceClient::IDFromName(const std::string& inName, LLUUID &uuid)
 {
 	bool result = false;
 	
@@ -4966,16 +4959,12 @@ bool LLVivoxVoiceClient::IDFromName(const std::string inName, LLUUID &uuid)
 		// The name appears to have the right form.
 
 		// Reverse the transforms done by nameFromID
-		std::string temp = name;
-		LLStringUtil::replaceChar(temp, '-', '+');
-		LLStringUtil::replaceChar(temp, '_', '/');
-
-		U8 rawuuid[UUID_BYTES + 1]; 
-		int len = apr_base64_decode_binary(rawuuid, temp.c_str() + 1);
-		if(len == UUID_BYTES)
+		std::string_view temp = name;
+		std::string outstr;
+		if(absl::WebSafeBase64Unescape(temp.substr(1), &outstr) && outstr.size() == UUID_BYTES)
 		{
 			// The decode succeeded.  Stuff the bits into the result's UUID
-			memcpy(uuid.mData, rawuuid, UUID_BYTES);
+			memcpy(uuid.mData, outstr.data(), UUID_BYTES);
 			result = true;
 		}
 	} 
@@ -4995,20 +4984,14 @@ std::string LLVivoxVoiceClient::displayNameFromAvatar(LLVOAvatar *avatar)
 	return avatar->getFullname();
 }
 
-std::string LLVivoxVoiceClient::sipURIFromName(std::string &name)
+std::string LLVivoxVoiceClient::sipURIFromName(std::string_view name)
 {
-	std::string result;
-	result = "sip:";
-	result += name;
-	result += "@";
-	result += mVoiceSIPURIHostName;
-
+	std::string result = absl::StrCat("sip:", name, "@", mVoiceSIPURIHostName);
 //	LLStringUtil::toLower(result);
-
 	return result;
 }
 
-std::string LLVivoxVoiceClient::nameFromsipURI(const std::string &uri)
+std::string LLVivoxVoiceClient::nameFromsipURI(std::string_view uri)
 {
 	std::string result;
 
