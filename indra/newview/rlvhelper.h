@@ -25,6 +25,8 @@
 #include "rlvdefines.h"
 #include "rlvcommon.h"
 
+#include "absl/strings/str_cat.h"
+
 // ============================================================================
 // Forward declarations
 //
@@ -682,10 +684,17 @@ inline void RlvBehaviourInfo::toggleBehaviourFlag(EBehaviourFlags eBhvrFlag, boo
 // Checked: 2009-09-19 (RLVa-1.0.3d)
 inline std::string RlvCommand::asString() const
 {
-	// NOTE: @clear=<param> should be represented as clear:<param>
-	return (m_eParamType != RLV_TYPE_CLEAR)
-		? (!m_strOption.empty()) ? (std::string(getBehaviour())).append(":").append(m_strOption) : (std::string(getBehaviour()))
-	    : (!m_strParam.empty())  ? (std::string(getBehaviour())).append(":").append(m_strParam)  : (std::string(getBehaviour()));
+    // NOTE: @clear=<param> should be represented as clear:<param>
+    std::string bhvr = getBehaviour();
+    if (m_eParamType != RLV_TYPE_CLEAR && !m_strOption.empty())
+    {
+        absl::StrAppend(&bhvr, ":", m_strOption);
+    }
+    else if (!m_strParam.empty())
+    {
+        absl::StrAppend(&bhvr, ":", m_strParam);
+    }
+    return bhvr;
 }
 
 inline bool RlvCommand::operator ==(const RlvCommand& rhs) const
