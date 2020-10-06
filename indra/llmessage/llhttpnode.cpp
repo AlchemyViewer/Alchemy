@@ -343,7 +343,7 @@ static void append_node_paths(LLSD& result,
 	
 	for (; i != end; ++i)
 	{
-		result.append(name + "/" + (*i).asString());
+		result.append(absl::StrCat(name, "/", (*i).asString()));
 	}
 }
 

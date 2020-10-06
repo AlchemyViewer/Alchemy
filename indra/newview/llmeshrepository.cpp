@@ -1232,8 +1232,7 @@ void LLMeshRepoThread::constructUrl(LLUUID mesh_id, std::string * url)
 
 		if (!res_url.empty())
 		{
-			res_url += "/?mesh_id=";
-			res_url += mesh_id.asString();
+			absl::StrAppend(&res_url, "/?mesh_id=", mesh_id.asString());
 		}
 		else
 		{

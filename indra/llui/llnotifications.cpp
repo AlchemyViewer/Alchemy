@@ -650,7 +650,7 @@ std::string LLNotification::getSelectedOptionName(const LLSD& response)
 			return llsd_pair.first;
 		}
 	}
-	return "";
+	return std::string();
 }
 
 
@@ -681,7 +681,7 @@ void LLNotification::respond(const LLSD& response)
 	if (mTemporaryResponder)
 	{
 		LLNotificationFunctorRegistry::instance().unregisterFunctor(mResponseFunctorName);
-		mResponseFunctorName = "";
+		mResponseFunctorName.clear();
 		mTemporaryResponder = false;
 	}
 
@@ -690,7 +690,7 @@ void LLNotification::respond(const LLSD& response)
 		mForm->setIgnored(mIgnored);
 		if (mIgnored && mForm->getIgnoreType() == LLNotificationForm::IGNORE_WITH_LAST_RESPONSE)
 		{
-			LLUI::getInstance()->mSettingGroups["ignores"]->setLLSD("Default" + getName(), response);
+			LLUI::getInstance()->mSettingGroups["ignores"]->setLLSD(absl::StrCat("Default", getName()), response);
 		}
 	}
 
@@ -729,7 +729,7 @@ bool LLNotification::isPersistent() const
 
 std::string LLNotification::getType() const
 {
-	return (mTemplatep ? mTemplatep->mType : "");
+	return (mTemplatep ? mTemplatep->mType : std::string());
 }
 
 S32 LLNotification::getURLOption() const
@@ -873,10 +873,7 @@ void LLNotification::init(const std::string& template_name, const LLSD& form_ele
 
 std::string LLNotification::summarize() const
 {
-	std::string s = "Notification(";
-	s += getName();
-	s += ") : ";
-	s += mTemplatep ? mTemplatep->mMessage : "";
+	std::string s = absl::StrCat("Notification(", getName(), ") : ", mTemplatep ? mTemplatep->mMessage : "");
 	// should also include timestamp and expiration time (but probably not payload)
 	return s;
 }
@@ -906,14 +903,19 @@ std::string LLNotification::getFooter() const
 
 std::string LLNotification::getLabel() const
 {
+	if (!mTemplatep)
+		return std::string();
+
 	std::string label = mTemplatep->mLabel;
 	LLStringUtil::format(label, mSubstitutions);
-	return (mTemplatep ? label : "");
+	return label;
 }
 
 // [SL:KB] - Patch: UI-Notifications | Checked: 2011-04-11 (Catznip-2.5.0a) | Added: Catznip-2.5.0a
 bool LLNotification::hasLabel() const
 {
+	if (!mTemplatep)
+		return false;
 	return !mTemplatep->mLabel.empty();
 }
 // [/SL:KB]
@@ -924,7 +926,7 @@ std::string LLNotification::getURL() const
 		return std::string();
 	std::string url = mTemplatep->mURL;
 	LLStringUtil::format(url, mSubstitutions);
-	return (mTemplatep ? url : "");
+	return url;
 }
 
 bool LLNotification::canLogToChat() const
@@ -1188,13 +1190,10 @@ size_t LLNotificationChannel::size()
 
 std::string LLNotificationChannel::summarize()
 {
-	std::string s("Channel '");
-	s += mName;
-	s += "'\n  ";
+	std::string s = absl::StrCat("Channel '", mName, "'\n  ");
 	for (LLNotificationChannel::Iterator it = begin(); it != end(); ++it)
 	{
-		s += (*it)->summarize();
-		s += "\n  ";
+		absl::StrAppend(&s, (*it)->summarize(), "\n  ");
 	}
 	return s;
 }

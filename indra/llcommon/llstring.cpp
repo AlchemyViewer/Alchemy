@@ -1225,7 +1225,7 @@ bool LLStringUtil::simpleReplacement(std::string &replacement, std::string token
 		return true;
 	}
 	// if not, see if there's one WITH brackets
-	iter = substitutions.find(std::string("[" + token + "]"));
+	iter = substitutions.find(absl::StrCat("[", token, "]"));
 	if (iter != substitutions.end())
 	{
 		replacement = iter->second;
@@ -1248,10 +1248,12 @@ bool LLStringUtil::simpleReplacement(std::string &replacement, std::string token
 		replacement = substitutions[token].asString();
 		return true;
 	}
+
 	// if not, see if there's one WITH brackets
-	else if (substitutions.has(std::string("[" + token + "]")))
+	std::string temp_token = absl::StrCat("[", token, "]");
+	if (substitutions.has(temp_token))
 	{
-		replacement = substitutions[std::string("[" + token + "]")].asString();
+		replacement = substitutions[temp_token].asString();
 		return true;
 	}
 
@@ -1493,7 +1495,7 @@ S32 LLStringUtil::format(std::string& s, const format_map_t& substitutions)
 	}
 	// send the remainder of the string (with no further matches for bracketed names)
 	output += std::string(s, start);
-	s = output;
+	s = std::move(output);
 	return res;
 }
 
@@ -1563,7 +1565,7 @@ S32 LLStringUtil::format(std::string& s, const LLSD& substitutions)
 	}
 	// send the remainder of the string (with no further matches for bracketed names)
 	output += std::string(s, start);
-	s = output;
+	s = std::move(output);
 	return res;
 }
 

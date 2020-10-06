@@ -543,7 +543,7 @@ std::string LLCacheName::buildUsername(const std::string& full_name)
 
 		if (lastname != "Resident")
 		{
-			username = username + "." + lastname;
+			username = absl::StrCat(username, ".", lastname);
 		}
 		
 		LLStringUtil::toLower(username);
@@ -586,7 +586,7 @@ std::string LLCacheName::buildLegacyName(const std::string& complete_name)
 				{
 					cap_letter = last_name.substr(0, 1);
 					LLStringUtil::toUpper(cap_letter);
-					legacy_name = legacy_name + " " + cap_letter + last_name.substr(1);
+					legacy_name = absl::StrCat(legacy_name, " ", cap_letter, last_name.substr(1));
 				}
 			}
 

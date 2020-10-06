@@ -452,7 +452,7 @@ void RlvRenameOnWearObserver::doneIdle()
 				std::string strName = pItem->getName();
 				LLStringUtil::truncate(strName, DB_INV_ITEM_NAME_STR_LEN - strAttachPt.length() - 3);
 
-				strName += " (" + strAttachPt + ")";
+				absl::StrAppend(&strName, " (", strAttachPt, ")");
 
 				pItem->rename(strName);
 				pItem->updateServer(FALSE);
