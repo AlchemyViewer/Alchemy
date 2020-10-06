@@ -10802,7 +10802,7 @@ void LLVOAvatar::calcMutedAVColor()
    {
         // select a color based on the first byte of the agents uuid so any muted agent is always the same color
         F32 color_value = (F32) (av_id.mData[0]);
-        F32 spectrum = (color_value / 256.0);		// spectrum is between 0 and 1.f
+        F32 spectrum = (color_value / 256.f);		// spectrum is between 0 and 1.f
 
         // Array of colors.  These are arranged so only one RGB color changes between each step, 
         // and it loops back to red so there is an even distribution.  It is not a heat map
