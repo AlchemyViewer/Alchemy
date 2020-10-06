@@ -1,8 +1,6 @@
 # -*- cmake -*-
 
 option(REVISION_FROM_VCS "Get current revision from vcs" ON)
-find_package(Git)
-
 # Construct the viewer channel from environment variables or defaults
 if(NOT DEFINED VIEWER_CHANNEL)
     if(DEFINED ENV{VIEWER_CHANNEL_BASE})
@@ -54,6 +52,10 @@ if(NOT DEFINED VIEWER_SHORT_VERSION) # will be true in indra/, false in indra/ne
         string(REGEX REPLACE "^([0-9]+)\\.[0-9]+\\.[0-9]+" "\\1" VIEWER_VERSION_MAJOR ${VIEWER_SHORT_VERSION})
         string(REGEX REPLACE "^[0-9]+\\.([0-9]+)\\.[0-9]+" "\\1" VIEWER_VERSION_MINOR ${VIEWER_SHORT_VERSION})
         string(REGEX REPLACE "^[0-9]+\\.[0-9]+\\.([0-9]+)" "\\1" VIEWER_VERSION_PATCH ${VIEWER_SHORT_VERSION})
+
+        if(REVISION_FROM_VCS)
+            find_package(Git)
+        endif()
 
         if((NOT REVISION_FROM_VCS) AND DEFINED ENV{revision})
             set(VIEWER_VERSION_REVISION $ENV{revision})

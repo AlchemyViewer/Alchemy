@@ -19,7 +19,7 @@ variables:
     - pipenv install
   script:
     - |
-        pipenv run autobuild configure -c ReleaseOS -- -DUSE_FMODSTUDIO=ON -DUSE_NVAPI=ON -DUSE_LTO=ON -DVS_DISABLE_FATAL_WARNINGS=ON
+        pipenv run autobuild configure -c ReleaseOS -- -DUSE_FMODSTUDIO=ON -DUSE_NVAPI=ON -DUSE_LTO=ON -DVS_DISABLE_FATAL_WARNINGS=ON -DREVISION_FROM_VCS=FALSE
         pipenv run autobuild build -c ReleaseOS --no-configure
   artifacts:
     name: "$env:CI_COMMIT_REF_NAME-$env:CI_COMMIT_SHORT_SHA"
@@ -39,7 +39,7 @@ variables:
     - docker
   script:
     - |
-        autobuild configure -c ReleaseOS -- -DUSE_FMODSTUDIO=ON -DUSE_NVAPI=ON -DUSE_LTO=ON -DUNIX_DISABLE_FATAL_WARNINGS=ON
+        autobuild configure -c ReleaseOS -- -DUSE_FMODSTUDIO=ON -DUSE_NVAPI=ON -DUSE_LTO=ON -DUNIX_DISABLE_FATAL_WARNINGS=ON -DREVISION_FROM_VCS=FALSE
         autobuild build -c ReleaseOS --no-configure
   artifacts:
     name: "$env:CI_COMMIT_REF_NAME-$env:CI_COMMIT_SHORT_SHA"
