@@ -27,11 +27,10 @@
 #ifndef LL_TRANS_H
 #define LL_TRANS_H
 
-#include <map>
-#include <set>
-
 #include "llpointer.h"
 #include "llstring.h"
+
+#include <absl/container/node_hash_map.h>
 
 class LLXMLNode;
 
@@ -127,7 +126,7 @@ public:
 	}
 	
 private:
-	typedef std::map<std::string, LLTransTemplate, std::less<>> template_map_t;
+	typedef absl::node_hash_map<std::string, LLTransTemplate> template_map_t;
 	static template_map_t sStringTemplates;
 	static template_map_t sDefaultStringTemplates;
 	static LLStringUtil::format_map_t sDefaultArgs;
