@@ -107,7 +107,7 @@ protected:
 	/**
 	 * @return Returns the label to be used for the current count. It's "TesterName"-"Count".
 	 */
-	std::string getCurrentLabelName() const { return llformat("%s-%d", mName.c_str(), mCount) ;}
+	std::string getCurrentLabelName() const { return absl::StrFormat("%s-%d", mName, mCount) ;}
 
 	/**
 	 * @brief Write a test record to the LLSD. Implementers need to overload this method.

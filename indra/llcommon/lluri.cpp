@@ -518,7 +518,7 @@ LLURI LLURI::buildHTTP(const std::string& host,
 					   const U32& port,
 					   const LLSD& path)
 {
-	return LLURI::buildHTTP(llformat("%s:%u", host.c_str(), port), path);
+	return LLURI::buildHTTP(absl::StrFormat("%s:%u", host, port), path);
 }
 
 // static
@@ -527,7 +527,7 @@ LLURI LLURI::buildHTTP(const std::string& host,
 					   const LLSD& path,
 					   const LLSD& query)
 {
-	return LLURI::buildHTTP(llformat("%s:%u", host.c_str(), port), path, query);
+	return LLURI::buildHTTP(absl::StrFormat("%s:%u", host, port), path, query);
 }
 
 std::string LLURI::asString() const

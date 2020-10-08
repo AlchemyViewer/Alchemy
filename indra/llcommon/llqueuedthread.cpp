@@ -189,7 +189,7 @@ void LLQueuedThread::printQueueStats()
 	if (!mRequestQueue.empty())
 	{
 		QueuedRequest *req = *mRequestQueue.begin();
-		LL_INFOS() << llformat("Pending Requests:%d Current status:%d", mRequestQueue.size(), req->getStatus()) << LL_ENDL;
+		LL_INFOS() << absl::StreamFormat("Pending Requests:%d Current status:%d", mRequestQueue.size(), req->getStatus()) << LL_ENDL;
 	}
 	else
 	{
@@ -224,7 +224,7 @@ bool LLQueuedThread::addRequest(QueuedRequest* req)
 	mRequestQueue.insert(req);
 	mRequestHash.insert(req);
 #if _DEBUG
-// 	LL_INFOS() << llformat("LLQueuedThread::Added req [%08d]",handle) << LL_ENDL;
+// 	LL_INFOS() << absl::StreamFormat("LLQueuedThread::Added req [%08d]",handle) << LL_ENDL;
 #endif
 	mRequestQueueSize = mRequestQueue.size();
 	unlockData();
@@ -356,7 +356,7 @@ bool LLQueuedThread::completeRequest(handle_t handle)
 		llassert_always(req->getStatus() != STATUS_QUEUED);
 		llassert_always(req->getStatus() != STATUS_INPROGRESS);
 #if _DEBUG
-// 		LL_INFOS() << llformat("LLQueuedThread::Completed req [%08d]",handle) << LL_ENDL;
+// 		LL_INFOS() << absl::StreamFormat("LLQueuedThread::Completed req [%08d]",handle) << LL_ENDL;
 #endif
 		mRequestHash.erase(handle);
 		req->deleteRequest();

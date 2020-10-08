@@ -287,10 +287,10 @@ LLOSInfo::LLOSInfo() :
 	mOSString = mOSStringSimple;
 	if (mBuild > 0)
 	{
-		mOSString += llformat("(Build %d", mBuild);
+		absl::StrAppendFormat(&mOSString, "(Build %d", mBuild);
 		if (ubr > 0)
 		{
-			mOSString += llformat(".%d", ubr);
+			absl::StrAppendFormat(&mOSString, ".%d", ubr);
 		}
 		mOSString += ")";
 	}
