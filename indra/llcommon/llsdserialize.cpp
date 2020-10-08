@@ -1246,8 +1246,7 @@ S32 LLSDFormatter::format(const LLSD& data, std::ostream& ostr, EFormatterOption
 
 void LLSDFormatter::formatReal(LLSD::Real real, std::ostream& ostr) const
 {
-	std::string buffer = llformat(mRealFormat.c_str(), real);
-	ostr << buffer;
+	ostr << absl::StreamFormat(mRealFormat.c_str(), real);
 }
 
 /**

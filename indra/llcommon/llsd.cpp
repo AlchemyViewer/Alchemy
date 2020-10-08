@@ -239,7 +239,7 @@ namespace
 	};
 
 	LLSD::String ImplInteger::asString() const
-		{ return llformat("%d", mValue); }
+		{ return absl::StrFormat("%d", mValue); }
 
 
 	class ImplReal
@@ -261,7 +261,7 @@ namespace
 		{ return !llisnan(mValue) ? (LLSD::Integer)mValue : 0; }
 		
 	LLSD::String ImplReal::asString() const
-		{ return llformat("%lg", mValue); }
+		{ return absl::StrFormat("%lg", mValue); }
 
 
 	class ImplString
