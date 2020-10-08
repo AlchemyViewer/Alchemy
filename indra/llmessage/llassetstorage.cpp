@@ -1390,7 +1390,7 @@ void LLAssetStorage::legacyGetDataCallback(LLVFS *vfs,
         std::string uuid_str;
 
         uuid.toString(uuid_str);
-        filename = llformat("%s.%s",gDirUtilp->getExpandedFilename(LL_PATH_CACHE,uuid_str).c_str(),LLAssetType::lookup(type));
+        filename = absl::StrFormat("%s.%s",gDirUtilp->getExpandedFilename(LL_PATH_CACHE,uuid_str),LLAssetType::lookup(type));
 
         LLFILE* fp = LLFile::fopen(filename, "wb");     /* Flawfinder: ignore */ 
         if (fp)

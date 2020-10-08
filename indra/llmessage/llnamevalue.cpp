@@ -896,9 +896,8 @@ void LLNameValue::setVec3(const LLVector3 &a)
 
 std::string LLNameValue::printNameValue() const
 {
-	std::string buffer;
-	buffer = llformat("%s %s %s %s ", mName, mStringType, mStringClass, mStringSendto);
-	buffer += printData();
+	std::string buffer = absl::StrFormat("%s %s %s %s %s", 
+		mName, mStringType, mStringClass, mStringSendto, printData());
 //	LL_INFOS() << "Name Value Length: " << buffer.size() + 1 << LL_ENDL;
 	return buffer;
 }
@@ -913,13 +912,13 @@ std::string LLNameValue::printData() const
 		buffer = mNameValueReference.string;
 		break;
 	case NVT_F32:
-		buffer = llformat("%f", *mNameValueReference.f32);
+		buffer = absl::StrFormat("%f", *mNameValueReference.f32);
 		break;
 	case NVT_S32:
-		buffer = llformat("%d", *mNameValueReference.s32);
+		buffer = absl::StrFormat("%d", *mNameValueReference.s32);
 		break;
 	case NVT_U32:
-	  	buffer = llformat("%u", *mNameValueReference.u32);
+	  	buffer = absl::StrFormat("%u", *mNameValueReference.u32);
 		break;
 	case NVT_U64:
 		{
@@ -929,7 +928,7 @@ std::string LLNameValue::printData() const
 		}
 		break;
 	case NVT_VEC3:
-	  	buffer = llformat( "%f, %f, %f", mNameValueReference.vec3->mV[VX], mNameValueReference.vec3->mV[VY], mNameValueReference.vec3->mV[VZ]);
+	  	buffer = absl::StrFormat("%f, %f, %f", mNameValueReference.vec3->mV[VX], mNameValueReference.vec3->mV[VY], mNameValueReference.vec3->mV[VZ]);
 		break;
 	default:
 		LL_ERRS() << "Trying to print unknown NameValue type " << mStringType << LL_ENDL;

@@ -263,7 +263,7 @@ std::string LLAudioEngine_FMODSTUDIO::getDriverName(bool verbose)
 		U32 version;
 		if(!Check_FMOD_Error(mSystem->getVersion(&version), "FMOD::System::getVersion"))
 		{
-			return llformat("FMOD Studio %1x.%02x.%02x", version >> 16, version >> 8 & 0x000000FF, version & 0x000000FF);
+			return absl::StrFormat("FMOD Studio %1x.%02x.%02x", version >> 16, version >> 8 & 0x000000FF, version & 0x000000FF);
 		}
 	}
 	return "FMOD Studio";
