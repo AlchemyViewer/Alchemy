@@ -95,7 +95,7 @@ std::string LLMaterialID::asString() const
 			materialIDString += "-";
 		}
 		const U32 *value = reinterpret_cast<const U32*>(&get()[i * sizeof(U32)]);
-		materialIDString += llformat("%08x", *value);
+		absl::StrAppendFormat(&materialIDString, "%08x", *value);
 	}
 	return materialIDString;
 }

@@ -314,7 +314,7 @@ void LLTimeCtrl::updateText()
 	if (h12 == 0)
 		h12 = 12;
 
-	mEditor->setText(llformat("%d:%02d %s", h12, m, isPM() ? "PM":"AM"));
+	mEditor->setText(absl::StrFormat("%d:%02d %s", h12, m, isPM() ? "PM":"AM"));
 }
 
 LLTimeCtrl::EEditingPart LLTimeCtrl::getEditingPart()

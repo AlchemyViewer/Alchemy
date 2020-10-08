@@ -273,13 +273,13 @@ bool LLVFSThread::Request::processRequest()
 		llassert(mOffset >= 0);
 		mBytesRead = mVFS->getData(mFileID, mFileType, mBuffer, mOffset, mBytes);
 		complete = true;
-		//LL_INFOS() << llformat("LLVFSThread::READ '%s': %d bytes arg:%d",getFilename(),mBytesRead) << LL_ENDL;
+		//LL_INFOS() << absl::StreamFormat("LLVFSThread::READ '%s': %d bytes arg:%d",getFilename(),mBytesRead) << LL_ENDL;
 	}
 	else if (mOperation ==  FILE_WRITE)
 	{
 		mBytesRead = mVFS->storeData(mFileID, mFileType, mBuffer, mOffset, mBytes);
 		complete = true;
-		//LL_INFOS() << llformat("LLVFSThread::WRITE '%s': %d bytes arg:%d",getFilename(),mBytesRead) << LL_ENDL;
+		//LL_INFOS() << absl::StreamFormat("LLVFSThread::WRITE '%s': %d bytes arg:%d",getFilename(),mBytesRead) << LL_ENDL;
 	}
 	else if (mOperation ==  FILE_RENAME)
 	{
@@ -288,11 +288,11 @@ bool LLVFSThread::Request::processRequest()
 		mVFS->renameFile(mFileID, mFileType, *new_idp, new_type);
 		mFileID = *new_idp;
 		complete = true;
-		//LL_INFOS() << llformat("LLVFSThread::RENAME '%s': %d bytes arg:%d",getFilename(),mBytesRead) << LL_ENDL;
+		//LL_INFOS() << absl::StreamFormat("LLVFSThread::RENAME '%s': %d bytes arg:%d",getFilename(),mBytesRead) << LL_ENDL;
 	}
 	else
 	{
-		LL_ERRS() << llformat("LLVFSThread::unknown operation: %d", mOperation) << LL_ENDL;
+		LL_ERRS() << absl::StreamFormat("LLVFSThread::unknown operation: %d", mOperation) << LL_ENDL;
 	}
 	return complete;
 }

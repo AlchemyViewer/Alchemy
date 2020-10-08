@@ -2728,7 +2728,7 @@ void LLScrollListCtrl::addColumn(const LLScrollListColumn::Params& column_params
 	// if no column name provided, just use ordinal as name
 	if (name.empty())
 	{
-		name = llformat("%d", mColumnsIndexed.size());
+		name = absl::StrCat(mColumnsIndexed.size());
 	}
 
 	if (mColumns.find(name) == mColumns.end())
@@ -2944,7 +2944,7 @@ LLScrollListItem* LLScrollListCtrl::addRow(LLScrollListItem *new_item, const LLS
 		// empty columns strings index by ordinal
 		if (column.empty())
 		{
-			column = llformat("%d", col_index);
+			column = absl::StrFormat("%d", col_index);
 		}
 
 		LLScrollListColumn* columnp = getColumn(column);

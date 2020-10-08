@@ -1332,7 +1332,7 @@ void LLView::drawDebugRect()
 
 			y = rect_height - LINE_HEIGHT * (depth % lines + 1);
 
-			std::string debug_text = llformat("%s (%d x %d)", getName().c_str(),
+			std::string debug_text = absl::StrFormat("%s (%d x %d)", getName(),
 										debug_rect.getWidth(), debug_rect.getHeight());
 			LLFontGL::getFontSansSerifSmall()->renderUTF8(debug_text, 0, (F32)x, (F32)y, border_color,
 												LLFontGL::HCENTER, LLFontGL::BASELINE, LLFontGL::NORMAL, LLFontGL::NO_SHADOW,

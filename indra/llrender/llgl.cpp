@@ -1164,7 +1164,7 @@ void LLGLState::dumpStates()
 	LL_INFOS("RenderState") << "GL States:" << LL_ENDL;
 	for (const auto& state_pair : sStateMap)
 	{
-		LL_INFOS("RenderState") << llformat(" 0x%04x : %s",(S32)state_pair.first, state_pair.second?"TRUE":"FALSE") << LL_ENDL;
+		LL_INFOS("RenderState") << absl::StreamFormat(" 0x%04x : %s",(S32)state_pair.first, state_pair.second?"TRUE":"FALSE") << LL_ENDL;
 	}
 }
 
@@ -1212,12 +1212,12 @@ void LLGLState::checkStates(const std::string& msg)
 			dumpStates();
 			if (gDebugSession)
 			{
-				gFailLog << llformat("LLGLState error. State: 0x%04x",state) << std::endl;
+				gFailLog << absl::StreamFormat("LLGLState error. State: 0x%04x",state) << std::endl;
 				error = TRUE;
 			}
 			else
 			{
-				LL_GL_ERRS << llformat("LLGLState error. State: 0x%04x",state) << LL_ENDL;
+				LL_GL_ERRS << absl::StreamFormat("LLGLState error. State: 0x%04x",state) << LL_ENDL;
 			}
 		}
 	}
