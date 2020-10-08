@@ -281,7 +281,7 @@ void LLCoros::winlevel(const callable_t& callable)
         // Note: it might be better to use _se_set_translator
         // if you want exception to inherit full callstack
         char integer_string[32];
-        sprintf(integer_string, "SEH, code: %lu\n", GetExceptionCode());
+        snprintf(integer_string, 32, "SEH, code: %lu\n", GetExceptionCode());
         throw std::exception(integer_string);
     }
 }
