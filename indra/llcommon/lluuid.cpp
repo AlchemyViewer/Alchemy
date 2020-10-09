@@ -434,7 +434,7 @@ LLUUID LLUUID::combine(const LLUUID &other) const
 
 std::ostream& operator<<(std::ostream& s, const LLUUID &uuid)
 {
-	std::string uuid_str;
+	char uuid_str[UUID_STR_SIZE];
 	uuid.toString(uuid_str);
 	s << uuid_str;
 	return s;

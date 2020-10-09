@@ -65,4 +65,12 @@ namespace tut
 		auto str = absl::StrFormat("%s", TEST_ID);
 		ensure_equals(str, TEST_ID_STR);
 	}
+
+	template<> template<>
+	void uuid_object_t::test<4>()
+	{
+		char out_cstr[UUID_STR_SIZE] = {};
+		absl::SNPrintF(out_cstr, UUID_STR_SIZE, "%s", TEST_ID);
+		ensure_equals(out_cstr, TEST_ID_STR);
+	}
 }
