@@ -275,8 +275,8 @@ S32 start_net(S32& socket_out, int& nPort)
 	nRet = ioctlsocket (hSocket, FIONBIO, &argp);
 	if (nRet == SOCKET_ERROR) 
 	{
-		printf("Failed to set socket non-blocking, Err: %d\n", 
-		WSAGetLastError());
+		LL_WARNS("AppInit") << absl::StreamFormat("Failed to set socket non-blocking, Err: %d", 
+		WSAGetLastError()) << LL_ENDL;
 	}
 
 	// set a large receive buffer

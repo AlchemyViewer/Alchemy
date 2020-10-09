@@ -805,17 +805,11 @@ BOOL LLPermissions::exportLegacyStream(std::ostream& output_stream) const
 	output_stream <<  "\tpermissions 0\n";
 	output_stream <<  "\t{\n";
 
-	std::string buffer;
-	buffer = llformat( "\t\tbase_mask\t%08x\n",		mMaskBase);
-	output_stream << buffer;
-	buffer = llformat( "\t\towner_mask\t%08x\n",		mMaskOwner);
-	output_stream << buffer;
-	buffer = llformat( "\t\tgroup_mask\t%08x\n",		mMaskGroup);
-	output_stream << buffer;
-	buffer = llformat( "\t\teveryone_mask\t%08x\n",	mMaskEveryone);
-	output_stream << buffer;
-	buffer = llformat( "\t\tnext_owner_mask\t%08x\n",	mMaskNextOwner);
-	output_stream << buffer;
+	output_stream << absl::StreamFormat("\t\tbase_mask\t%08x\n", mMaskBase);
+	output_stream << absl::StreamFormat("\t\towner_mask\t%08x\n", mMaskOwner);
+	output_stream << absl::StreamFormat("\t\tgroup_mask\t%08x\n", mMaskGroup);
+	output_stream << absl::StreamFormat("\t\teveryone_mask\t%08x\n", mMaskEveryone);
+	output_stream << absl::StreamFormat("\t\tnext_owner_mask\t%08x\n", mMaskNextOwner);
 
 	mCreator.toString(uuid_str);
 	output_stream <<  "\t\tcreator_id\t" << uuid_str << "\n";
