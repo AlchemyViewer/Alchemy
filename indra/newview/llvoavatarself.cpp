@@ -2919,16 +2919,15 @@ void LLVOAvatarSelf::dumpScratchTextureByteCount()
 	LL_INFOS() << "Scratch Texture GL: " << (sScratchTexBytes/1024) << "KB" << LL_ENDL;
 }
 
-void LLVOAvatarSelf::dumpWearableInfo(LLAPRFile& outfile)
+void LLVOAvatarSelf::dumpWearableInfo(LLFILE* file)
 {
-	apr_file_t* file = outfile.getFileHandle();
 	if (!file)
 	{
 		return;
 	}
 
 	
-	apr_file_printf( file, "\n<wearable_info>\n" );
+	absl::FPrintF( file, "\n<wearable_info>\n" );
 
 	LLWearableData *wd = getWearableData();
 	for (S32 type = 0; type < LLWearableType::WT_COUNT; type++)
@@ -2937,7 +2936,7 @@ void LLVOAvatarSelf::dumpWearableInfo(LLAPRFile& outfile)
 		for (U32 j=0; j< wd->getWearableCount((LLWearableType::EType)type); j++)
 		{
 			LLViewerWearable *wearable = gAgentWearables.getViewerWearable((LLWearableType::EType)type,j);
-			apr_file_printf( file, "\n\t    <wearable type=\"%s\" name=\"%s\"/>\n",
+			absl::FPrintF( file, "\n\t    <wearable type=\"%s\" name=\"%s\"/>\n",
 							 type_name.c_str(), wearable->getName().c_str() );
 			LLWearable::visual_param_vec_t v_params;
 			wearable->getVisualParams(v_params);
@@ -2949,7 +2948,7 @@ void LLVOAvatarSelf::dumpWearableInfo(LLAPRFile& outfile)
 			}
 		}
 	}
-	apr_file_printf( file, "\n</wearable_info>\n" );
+	absl::FPrintF( file, "\n</wearable_info>\n" );
 }
 
 //// [SL:KB] - Patch: Appearance-TeleportAttachKill | Checked: Catznip-4.0

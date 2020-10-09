@@ -229,14 +229,12 @@ BOOL LLInventoryObject::importLegacyStream(std::istream& input_stream)
 BOOL LLInventoryObject::exportFile(LLFILE* fp, BOOL) const
 {
 	std::string uuid_str;
-	fprintf(fp, "\tinv_object\t0\n\t{\n");
-	mUUID.toString(uuid_str);
-	fprintf(fp, "\t\tobj_id\t%s\n", uuid_str.c_str());
-	mParentUUID.toString(uuid_str);
-	fprintf(fp, "\t\tparent_id\t%s\n", uuid_str.c_str());
-	fprintf(fp, "\t\ttype\t%s\n", LLAssetType::lookup(mType));
-	fprintf(fp, "\t\tname\t%s|\n", mName.c_str());
-	fprintf(fp,"\t}\n");
+	absl::FPrintF(fp, "\tinv_object\t0\n\t{\n");
+	absl::FPrintF(fp, "\t\tobj_id\t%s\n", mUUID);
+	absl::FPrintF(fp, "\t\tparent_id\t%s\n", mParentUUID);
+	absl::FPrintF(fp, "\t\ttype\t%s\n", LLAssetType::lookup(mType));
+	absl::FPrintF(fp, "\t\tname\t%s|\n", mName);
+	absl::FPrintF(fp,"\t}\n");
 	return TRUE;
 }
 
@@ -759,12 +757,9 @@ BOOL LLInventoryItem::importFile(LLFILE* fp)
 
 BOOL LLInventoryItem::exportFile(LLFILE* fp, BOOL include_asset_key) const
 {
-	std::string uuid_str;
-	fprintf(fp, "\tinv_item\t0\n\t{\n");
-	mUUID.toString(uuid_str);
-	fprintf(fp, "\t\titem_id\t%s\n", uuid_str.c_str());
-	mParentUUID.toString(uuid_str);
-	fprintf(fp, "\t\tparent_id\t%s\n", uuid_str.c_str());
+	absl::FPrintF(fp, "\tinv_item\t0\n\t{\n");
+	absl::FPrintF(fp, "\t\titem_id\t%s\n", mUUID);
+	absl::FPrintF(fp, "\t\tparent_id\t%s\n", mParentUUID);
 	mPermissions.exportFile(fp);
 
 	// Check for permissions to see the asset id, and if so write it
@@ -775,32 +770,29 @@ BOOL LLInventoryItem::exportFile(LLFILE* fp, BOOL include_asset_key) const
 		if(((mask & PERM_ITEM_UNRESTRICTED) == PERM_ITEM_UNRESTRICTED)
 		   || (mAssetUUID.isNull()))
 		{
-			mAssetUUID.toString(uuid_str);
-			fprintf(fp, "\t\tasset_id\t%s\n", uuid_str.c_str());
+			absl::FPrintF(fp, "\t\tasset_id\t%s\n", mAssetUUID);
 		}
 		else
 		{
 			LLUUID shadow_id(mAssetUUID);
 			LLXORCipher cipher(MAGIC_ID.mData, UUID_BYTES);
 			cipher.encrypt(shadow_id.mData, UUID_BYTES);
-			shadow_id.toString(uuid_str);
-			fprintf(fp, "\t\tshadow_id\t%s\n", uuid_str.c_str());
+			absl::FPrintF(fp, "\t\tshadow_id\t%s\n", shadow_id);
 		}
 	}
 	else
 	{
-		LLUUID::null.toString(uuid_str);
-		fprintf(fp, "\t\tasset_id\t%s\n", uuid_str.c_str());
+		absl::FPrintF(fp, "\t\tasset_id\t%s\n", LLUUID::null);
 	}
-	fprintf(fp, "\t\ttype\t%s\n", LLAssetType::lookup(mType));
+	absl::FPrintF(fp, "\t\ttype\t%s\n", LLAssetType::lookup(mType));
 	const std::string inv_type_str = LLInventoryType::lookup(mInventoryType);
-	if(!inv_type_str.empty()) fprintf(fp, "\t\tinv_type\t%s\n", inv_type_str.c_str());
-	fprintf(fp, "\t\tflags\t%08x\n", mFlags);
+	if(!inv_type_str.empty()) absl::FPrintF(fp, "\t\tinv_type\t%s\n", inv_type_str);
+	absl::FPrintF(fp, "\t\tflags\t%08x\n", mFlags);
 	mSaleInfo.exportFile(fp);
-	fprintf(fp, "\t\tname\t%s|\n", mName.c_str());
-	fprintf(fp, "\t\tdesc\t%s|\n", mDescription.c_str());
-	fprintf(fp, "\t\tcreation_date\t%d\n", (S32) mCreationDate);
-	fprintf(fp,"\t}\n");
+	absl::FPrintF(fp, "\t\tname\t%s|\n", mName);
+	absl::FPrintF(fp, "\t\tdesc\t%s|\n", mDescription);
+	absl::FPrintF(fp, "\t\tcreation_date\t%d\n", (S32) mCreationDate);
+	absl::FPrintF(fp,"\t}\n");
 	return TRUE;
 }
 
@@ -1521,16 +1513,13 @@ BOOL LLInventoryCategory::importFile(LLFILE* fp)
 
 BOOL LLInventoryCategory::exportFile(LLFILE* fp, BOOL) const
 {
-	std::string uuid_str;
-	fprintf(fp, "\tinv_category\t0\n\t{\n");
-	mUUID.toString(uuid_str);
-	fprintf(fp, "\t\tcat_id\t%s\n", uuid_str.c_str());
-	mParentUUID.toString(uuid_str);
-	fprintf(fp, "\t\tparent_id\t%s\n", uuid_str.c_str());
-	fprintf(fp, "\t\ttype\t%s\n", LLAssetType::lookup(mType));
-	fprintf(fp, "\t\tpref_type\t%s\n", LLFolderType::lookup(mPreferredType).c_str());
-	fprintf(fp, "\t\tname\t%s|\n", mName.c_str());
-	fprintf(fp,"\t}\n");
+	absl::FPrintF(fp, "\tinv_category\t0\n\t{\n");
+	absl::FPrintF(fp, "\t\tcat_id\t%s\n", mUUID);
+	absl::FPrintF(fp, "\t\tparent_id\t%s\n", mParentUUID);
+	absl::FPrintF(fp, "\t\ttype\t%s\n", LLAssetType::lookup(mType));
+	absl::FPrintF(fp, "\t\tpref_type\t%s\n", LLFolderType::lookup(mPreferredType).c_str());
+	absl::FPrintF(fp, "\t\tname\t%s|\n", mName.c_str());
+	absl::FPrintF(fp,"\t}\n");
 	return TRUE;
 }
 

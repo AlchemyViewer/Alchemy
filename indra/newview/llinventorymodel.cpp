@@ -2870,14 +2870,14 @@ bool LLInventoryModel::saveToFile(const std::string& filename,
 		return false;
 	}
 	LL_INFOS(LOG_INV) << "LLInventoryModel::saveToFile(" << filename << ")" << LL_ENDL;
-	LLFILE* file = LLFile::fopen(filename, "wb");		/*Flawfinder: ignore*/
+	LLUniqueFile file = LLFile::fopen(filename, "wb");		/*Flawfinder: ignore*/
 	if(!file)
 	{
 		LL_WARNS(LOG_INV) << "unable to save inventory to: " << filename << LL_ENDL;
 		return false;
 	}
 
-	fprintf(file, "\tinv_cache_version\t%d\n",sCurrentInvCacheVersion);
+	absl::FPrintF(file, "\tinv_cache_version\t%d\n",sCurrentInvCacheVersion);
 	S32 count = categories.size();
 	S32 i;
 	for(i = 0; i < count; ++i)
@@ -2895,7 +2895,6 @@ bool LLInventoryModel::saveToFile(const std::string& filename,
 		items[i]->exportFile(file);
 	}
 
-	fclose(file);
 	return true;
 }
 

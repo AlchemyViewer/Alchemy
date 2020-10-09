@@ -547,19 +547,16 @@ bool LLViewerInventoryItem::importFileLocal(LLFILE* fp)
 
 bool LLViewerInventoryItem::exportFileLocal(LLFILE* fp) const
 {
-	std::string uuid_str;
-	fprintf(fp, "\tinv_item\t0\n\t{\n");
-	mUUID.toString(uuid_str);
-	fprintf(fp, "\t\titem_id\t%s\n", uuid_str.c_str());
-	mParentUUID.toString(uuid_str);
-	fprintf(fp, "\t\tparent_id\t%s\n", uuid_str.c_str());
+	absl::FPrintF(fp, "\tinv_item\t0\n\t{\n");
+	absl::FPrintF(fp, "\t\titem_id\t%s\n", mUUID);
+	absl::FPrintF(fp, "\t\tparent_id\t%s\n", mParentUUID);
 	mPermissions.exportFile(fp);
-	fprintf(fp, "\t\ttype\t%s\n", LLAssetType::lookup(mType));
+	absl::FPrintF(fp, "\t\ttype\t%s\n", LLAssetType::lookup(mType));
 	const std::string inv_type_str = LLInventoryType::lookup(mInventoryType);
-	if(!inv_type_str.empty()) fprintf(fp, "\t\tinv_type\t%s\n", inv_type_str.c_str());
-	fprintf(fp, "\t\tname\t%s|\n", mName.c_str());
-	fprintf(fp, "\t\tcreation_date\t%d\n", (S32) mCreationDate);
-	fprintf(fp,"\t}\n");
+	if(!inv_type_str.empty()) absl::FPrintF(fp, "\t\tinv_type\t%s\n", inv_type_str);
+	absl::FPrintF(fp, "\t\tname\t%s|\n", mName);
+	absl::FPrintF(fp, "\t\tcreation_date\t%d\n", (S32) mCreationDate);
+	absl::FPrintF(fp,"\t}\n");
 	return true;
 }
 
@@ -794,19 +791,15 @@ bool LLViewerInventoryCategory::importFileLocal(LLFILE* fp)
 
 bool LLViewerInventoryCategory::exportFileLocal(LLFILE* fp) const
 {
-	std::string uuid_str;
-	fprintf(fp, "\tinv_category\t0\n\t{\n");
-	mUUID.toString(uuid_str);
-	fprintf(fp, "\t\tcat_id\t%s\n", uuid_str.c_str());
-	mParentUUID.toString(uuid_str);
-	fprintf(fp, "\t\tparent_id\t%s\n", uuid_str.c_str());
-	fprintf(fp, "\t\ttype\t%s\n", LLAssetType::lookup(mType));
-	fprintf(fp, "\t\tpref_type\t%s\n", LLFolderType::lookup(mPreferredType).c_str());
-	fprintf(fp, "\t\tname\t%s|\n", mName.c_str());
-	mOwnerID.toString(uuid_str);
-	fprintf(fp, "\t\towner_id\t%s\n", uuid_str.c_str());
-	fprintf(fp, "\t\tversion\t%d\n", mVersion);
-	fprintf(fp,"\t}\n");
+	absl::FPrintF(fp, "\tinv_category\t0\n\t{\n");
+	absl::FPrintF(fp, "\t\tcat_id\t%s\n", mUUID);
+	absl::FPrintF(fp, "\t\tparent_id\t%s\n", mParentUUID);
+	absl::FPrintF(fp, "\t\ttype\t%s\n", LLAssetType::lookup(mType));
+	absl::FPrintF(fp, "\t\tpref_type\t%s\n", LLFolderType::lookup(mPreferredType));
+	absl::FPrintF(fp, "\t\tname\t%s|\n", mName);
+	absl::FPrintF(fp, "\t\towner_id\t%s\n", mOwnerID);
+	absl::FPrintF(fp, "\t\tversion\t%d\n", mVersion);
+	absl::FPrintF(fp,"\t}\n");
 	return true;
 }
 

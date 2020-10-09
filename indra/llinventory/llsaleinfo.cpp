@@ -81,10 +81,10 @@ U32 LLSaleInfo::getCRC32() const
 
 BOOL LLSaleInfo::exportFile(LLFILE* fp) const
 {
-	fprintf(fp, "\tsale_info\t0\n\t{\n");
-	fprintf(fp, "\t\tsale_type\t%s\n", lookup(mSaleType));
-	fprintf(fp, "\t\tsale_price\t%d\n", mSalePrice);
-	fprintf(fp,"\t}\n");
+	absl::FPrintF(fp, "\tsale_info\t0\n\t{\n");
+	absl::FPrintF(fp, "\t\tsale_type\t%s\n", lookup(mSaleType));
+	absl::FPrintF(fp, "\t\tsale_price\t%d\n", mSalePrice);
+	absl::FPrintF(fp,"\t}\n");
 	return TRUE;
 }
 

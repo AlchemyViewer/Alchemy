@@ -598,7 +598,7 @@ BOOL LLMuteList::saveToFile(const std::string& filename)
 		return FALSE;
 	}
 
-	LLFILE* fp = LLFile::fopen(filename, "wb");		/*Flawfinder: ignore*/
+	LLUniqueFile fp = LLFile::fopen(filename, "wb");		/*Flawfinder: ignore*/
 	if (!fp)
 	{
 		LL_WARNS() << "Couldn't open mute list " << filename << LL_ENDL;
@@ -611,7 +611,7 @@ BOOL LLMuteList::saveToFile(const std::string& filename)
 		 it != mLegacyMutes.end();
 		 ++it)
 	{
-		fprintf(fp, "%d %s %s|\n", (S32)LLMute::BY_NAME, id_string.c_str(), it->c_str());
+		absl::FPrintF(fp, "%d %s %s|\n", (S32)LLMute::BY_NAME, id_string, *it);
 	}
 	for (mute_set_t::iterator it = mMutes.begin();
 		 it != mMutes.end();
@@ -621,9 +621,9 @@ BOOL LLMuteList::saveToFile(const std::string& filename)
 		//be valid next time anyway.
 		if (it->mType != LLMute::EXTERNAL)
 		{
-			it->mID.toString(id_string);
+			const LLUUID& id = it->mID;
 			const std::string& name = it->mName;
-			fprintf(fp, "%d %s %s|%u\n", (S32)it->mType, id_string.c_str(), name.c_str(), it->mFlags);
+			absl::FPrintF(fp, "%d %s %s|%u\n", (S32)it->mType, id, name, it->mFlags);
 		}
 	}
 	fclose(fp);
@@ -826,9 +826,7 @@ bool LLRenderMuteList::saveToFile()
     {
         if (it->second != 0)
         {
-            std::string id_string;
-            it->first.toString(id_string);
-            fprintf(fp, "%d %s [%d]\n", (S32)it->second, id_string.c_str(), (S32)sVisuallyMuteDateMap[it->first]);
+            absl::FPrintF(fp, "%d %s [%d]\n", (S32)it->second, it->first, (S32)sVisuallyMuteDateMap[it->first]);
         }
     }
     fclose(fp);

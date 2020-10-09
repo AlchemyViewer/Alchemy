@@ -675,34 +675,25 @@ BOOL LLPermissions::importFile(LLFILE* fp)
 
 BOOL LLPermissions::exportFile(LLFILE* fp) const
 {
-	std::string uuid_str;
+	absl::FPrintF(fp, "\tpermissions 0\n");
+	absl::FPrintF(fp, "\t{\n");
 
-	fprintf(fp, "\tpermissions 0\n");
-	fprintf(fp, "\t{\n");
+	absl::FPrintF(fp, "\t\tbase_mask\t%08x\n",		mMaskBase);
+	absl::FPrintF(fp, "\t\towner_mask\t%08x\n",		mMaskOwner);
+	absl::FPrintF(fp, "\t\tgroup_mask\t%08x\n",		mMaskGroup);
+	absl::FPrintF(fp, "\t\teveryone_mask\t%08x\n",	mMaskEveryone);
+	absl::FPrintF(fp, "\t\tnext_owner_mask\t%08x\n",	mMaskNextOwner);
 
-	fprintf(fp, "\t\tbase_mask\t%08x\n",		mMaskBase);
-	fprintf(fp, "\t\towner_mask\t%08x\n",		mMaskOwner);
-	fprintf(fp, "\t\tgroup_mask\t%08x\n",		mMaskGroup);
-	fprintf(fp, "\t\teveryone_mask\t%08x\n",	mMaskEveryone);
-	fprintf(fp, "\t\tnext_owner_mask\t%08x\n",	mMaskNextOwner);
-
-	mCreator.toString(uuid_str);
-	fprintf(fp, "\t\tcreator_id\t%s\n",			uuid_str.c_str());
-
-	mOwner.toString(uuid_str);
-	fprintf(fp, "\t\towner_id\t%s\n",			uuid_str.c_str());
-
-	mLastOwner.toString(uuid_str);
-	fprintf(fp, "\t\tlast_owner_id\t%s\n",		uuid_str.c_str());
-
-	mGroup.toString(uuid_str);
-	fprintf(fp, "\t\tgroup_id\t%s\n",			uuid_str.c_str());
+	absl::FPrintF(fp, "\t\tcreator_id\t%s\n",			mCreator);
+	absl::FPrintF(fp, "\t\towner_id\t%s\n",			mOwner);
+	absl::FPrintF(fp, "\t\tlast_owner_id\t%s\n",		mLastOwner);
+	absl::FPrintF(fp, "\t\tgroup_id\t%s\n",			mGroup);
 
 	if(mIsGroupOwned)
 	{
-		fprintf(fp, "\t\tgroup_owned\t1\n");
+		absl::FPrintF(fp, "\t\tgroup_owned\t1\n");
 	}
-	fprintf(fp,"\t}\n");
+	absl::FPrintF(fp,"\t}\n");
 	return TRUE;
 }
 
