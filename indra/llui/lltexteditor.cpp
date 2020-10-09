@@ -2669,14 +2669,7 @@ BOOL LLTextEditor::importBuffer(const char* buffer, S32 length )
 
 BOOL LLTextEditor::exportBuffer(std::string &buffer )
 {
-	std::ostringstream outstream(buffer);
-	
-	outstream << "Linden text version 1\n";
-	outstream << "{\n";
-
-	outstream << llformat("Text length %d\n", getLength() );
-	outstream << getText();
-	outstream << "}\n";
+	buffer = absl::StrFormat("Linden text version 1\n{\nText length %d\n%s}\n", getLength(), getText());
 
 	return TRUE;
 }
