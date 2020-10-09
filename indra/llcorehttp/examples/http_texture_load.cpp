@@ -455,11 +455,9 @@ bool WorkingSet::reload(LLCore::HttpRequest * hr, LLCore::HttpOptions::ptr_t & o
 	for (int i(0); i < to_do; ++i)
 	{
 		char buffer[1024];
-#if	defined(WIN32)
-		_snprintf_s(buffer, sizeof(buffer), sizeof(buffer) - 1, mUrl.c_str(), mAssets[mAt].mUuid.c_str());
-#else
-		snprintf(buffer, sizeof(buffer), mUrl.c_str(), mAssets[mAt].mUuid.c_str());
-#endif
+
+		absl::SNPrintF(buffer, sizeof(buffer), mUrl.c_str(), mAssets[mAt].mUuid.c_str());
+
 		int offset(mNoRange
 				   ? 0
 				   : (mRandomRange ? ((unsigned long) rand()) % 1000000UL : mAssets[mAt].mOffset));

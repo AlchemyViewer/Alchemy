@@ -2058,7 +2058,7 @@ BOOL LLKeyframeMotion::serialize(LLDataPacker& dp) const
 		success &= dp.packU8(shared_constraintp->mChainLength, "chain_length");
 		success &= dp.packU8(shared_constraintp->mConstraintType, "constraint_type");
 		char source_volume[16]; /* Flawfinder: ignore */
-		snprintf(source_volume, sizeof(source_volume), "%s",	/* Flawfinder: ignore */
+		absl::SNPrintF(source_volume, sizeof(source_volume), "%s",	/* Flawfinder: ignore */
 				 mCharacter->findCollisionVolume(shared_constraintp->mSourceConstraintVolume)->getName().c_str()); 
         
 		success &= dp.packBinaryDataFixed((U8*)source_volume, 16, "source_volume");
@@ -2066,11 +2066,11 @@ BOOL LLKeyframeMotion::serialize(LLDataPacker& dp) const
 		char target_volume[16];	/* Flawfinder: ignore */
 		if (shared_constraintp->mConstraintTargetType == CONSTRAINT_TARGET_TYPE_GROUND)
 		{
-			snprintf(target_volume,sizeof(target_volume), "%s", "GROUND");	/* Flawfinder: ignore */
+			absl::SNPrintF(target_volume,sizeof(target_volume), "%s", "GROUND");	/* Flawfinder: ignore */
 		}
 		else
 		{
-			snprintf(target_volume, sizeof(target_volume),"%s", /* Flawfinder: ignore */
+			absl::SNPrintF(target_volume, sizeof(target_volume),"%s", /* Flawfinder: ignore */
 					 mCharacter->findCollisionVolume(shared_constraintp->mTargetConstraintVolume)->getName().c_str());	
 		}
 		success &= dp.packBinaryDataFixed((U8*)target_volume, 16, "target_volume");
@@ -2383,8 +2383,6 @@ void LLKeyframeDataCache::dumpDiagInfo()
 	// keep track of totals
 	U32 total_size = 0;
 
-	char buf[1024];		/* Flawfinder: ignore */
-
 	LL_INFOS() << "-----------------------------------------------------" << LL_ENDL;
 	LL_INFOS() << "       Global Motion Table (DEBUG only)" << LL_ENDL;
 	LL_INFOS() << "-----------------------------------------------------" << LL_ENDL;
@@ -2406,8 +2404,7 @@ void LLKeyframeDataCache::dumpDiagInfo()
 
 	LL_INFOS() << "-----------------------------------------------------" << LL_ENDL;
 	LL_INFOS() << "Motions\tTotal Size" << LL_ENDL;
-	snprintf(buf, sizeof(buf), "%d\t\t%d bytes", (S32)sKeyframeDataMap.size(), total_size );		/* Flawfinder: ignore */
-	LL_INFOS() << buf << LL_ENDL;
+	LL_INFOS() << absl::StreamFormat("%d\t\t%d bytes", (S32)sKeyframeDataMap.size(), total_size) << LL_ENDL;
 	LL_INFOS() << "-----------------------------------------------------" << LL_ENDL;
 }
 

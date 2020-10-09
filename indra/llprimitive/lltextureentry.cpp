@@ -626,10 +626,10 @@ std::string LLTextureEntry::touchMediaVersionString(const std::string &in_versio
     // where "nnnnn" is version number
     // *NOTE: not the most efficient code in the world...
     U32 current_version = getVersionFromMediaVersionString(in_version) + 1;
-    const size_t MAX_VERSION_LEN = 10; // 2^32 fits in 10 decimal digits
+    constexpr size_t MAX_VERSION_LEN = 10; // 2^32 fits in 10 decimal digits
     char buf[MAX_VERSION_LEN+1];
-    snprintf(buf, (int)MAX_VERSION_LEN+1, "%0*u", (int)MAX_VERSION_LEN, current_version);  // added int cast to fix warning/breakage on mac.
-    return MEDIA_VERSION_STRING_PREFIX + buf + "/" + agent_id.asString();
+	absl::SNPrintF(buf, MAX_VERSION_LEN+1, "%0*u", MAX_VERSION_LEN, current_version);  // added int cast to fix warning/breakage on mac.
+    return absl::StrCat(MEDIA_VERSION_STRING_PREFIX, buf, "/", agent_id.asString());
 }
 
 //static

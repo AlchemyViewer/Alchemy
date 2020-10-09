@@ -92,7 +92,7 @@ const char *makeNewAutoName()
 {
     static char name[64];
     static S32 auto_namer_number = 0;
-    snprintf(name,64,"auto_name_%d",auto_namer_number);
+    absl::SNPrintF(name,64,"auto_name_%d",auto_namer_number);
     auto_namer_number++;
     return name;
 }

@@ -79,7 +79,7 @@ const char *boolstr(int b)
 const char *fv4(F32 *f)
 {
 	static char str[128];
-	snprintf(str, sizeof(str), "%8.3f %8.3f %8.3f %8.3f", f[0], f[1], f[2], f[3]);
+	absl::SNPrintF(str, sizeof(str), "%8.3f %8.3f %8.3f %8.3f", f[0], f[1], f[2], f[3]);
 	return str;
 }
 
@@ -89,7 +89,7 @@ const char *fv4(F32 *f)
 const char *fv3(F32 *f)
 {
 	static char str[128];	/* Flawfinder: ignore */
-	snprintf(str, sizeof(str), "%8.3f, %8.3f, %8.3f", f[0], f[1], f[2]);	/* Flawfinder: ignore */
+	absl::SNPrintF(str, sizeof(str), "%8.3f, %8.3f, %8.3f", f[0], f[1], f[2]);	/* Flawfinder: ignore */
 	return str;
 }
 
@@ -99,7 +99,7 @@ const char *fv3(F32 *f)
 const char *fv1(F32 *f)
 {
 	static char str[128];	/* Flawfinder: ignore */
-	snprintf(str, sizeof(str), "%8.3f", f[0]);		/* Flawfinder: ignore */
+	absl::SNPrintF(str, sizeof(str), "%8.3f", f[0]);		/* Flawfinder: ignore */
 	return str;
 }
 

@@ -670,29 +670,24 @@ HttpStatus HttpOpRequest::prepareRequest(HttpService * service)
 	// There's a CURLOPT for this now...
 	if ((mReqOffset || mReqLength) && HOR_GET == mReqMethod)
 	{
-		static const char * const fmt1("Range: bytes=%lu-%lu");
-		static const char * const fmt2("Range: bytes=%lu-");
+		constexpr absl::string_view fmt1 = "Range: bytes=%lu-%lu";
+		constexpr absl::string_view fmt2 = "Range: bytes=%lu-";
 
 		char range_line[64];
 
-#if LL_WINDOWS
-		_snprintf_s(range_line, sizeof(range_line), sizeof(range_line) - 1,
-					(mReqLength ? fmt1 : fmt2),
-					(unsigned long) mReqOffset, (unsigned long) (mReqOffset + mReqLength - 1));
-#else
 		if ( mReqLength )
 		{
-			snprintf(range_line, sizeof(range_line),
+			absl::SNPrintF(range_line, sizeof(range_line),
 					 fmt1,
 					 (unsigned long) mReqOffset, (unsigned long) (mReqOffset + mReqLength - 1));
 		}
 		else
 		{
-			snprintf(range_line, sizeof(range_line),
+			absl::SNPrintF(range_line, sizeof(range_line),
 					 fmt2,
 					 (unsigned long) mReqOffset);
 		}
-#endif // LL_WINDOWS
+
 		range_line[sizeof(range_line) - 1] = '\0';
 		mCurlHeaders = curl_slist_append(mCurlHeaders, range_line);
 	}

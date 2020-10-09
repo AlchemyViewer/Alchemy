@@ -126,7 +126,7 @@ void pack_instant_message_block(
 	if(!message.empty())
 	{
 		char buffer[MTUBYTES];
-		int num_written = snprintf(buffer, MTUBYTES, "%s", message.c_str());	/* Flawfinder: ignore */
+		int num_written = absl::SNPrintF(buffer, MTUBYTES, "%s", message);	/* Flawfinder: ignore */
 		// snprintf returns number of bytes that would have been written
 		// had the output not being truncated. In that case, it will
 		// return either -1 or value >= passed in size value . So a check needs to be added
