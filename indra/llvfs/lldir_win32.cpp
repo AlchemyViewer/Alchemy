@@ -171,7 +171,7 @@ LLDir_Win32::LLDir_Win32()
 		{
 			w_str[wcslen(w_str)-1] = '\0'; /* Flawfinder: ignore */ // remove trailing slash
 		}
-		mTempDir = ll_convert_wide_to_string(std::wstring(w_str));
+		mTempDir = ll_convert_wide_to_string(w_str);
 
 		if (mOSUserDir.empty())
 		{
@@ -224,14 +224,14 @@ LLDir_Win32::LLDir_Win32()
 
 	// Set working directory, for LLDir::getWorkingDir()
 	GetCurrentDirectory(MAX_PATH, w_str);
-	mWorkingDir = ll_convert_wide_to_string(std::wstring(w_str));
+	mWorkingDir = ll_convert_wide_to_string(w_str);
 
 	// Set the executable directory
 	S32 size = GetModuleFileName(NULL, w_str, MAX_PATH);
 	if (size)
 	{
 		w_str[size] = '\0';
-		mExecutablePathAndName = ll_convert_wide_to_string(std::wstring(w_str));
+		mExecutablePathAndName = ll_convert_wide_to_string(w_str);
 		S32 path_end = mExecutablePathAndName.find_last_of('\\');
 		if (path_end != std::string::npos)
 		{
@@ -369,7 +369,7 @@ std::string LLDir_Win32::getCurPath()
 	WCHAR w_str[MAX_PATH];
 	GetCurrentDirectory(MAX_PATH, w_str);
 
-	return ll_convert_wide_to_string(std::wstring(w_str));
+	return ll_convert_wide_to_string(w_str);
 }
 
 

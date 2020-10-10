@@ -276,7 +276,7 @@ BOOL LLFilePicker::getOpenFile(ELoadFilter filter, bool blocking)
 	success = GetOpenFileName(&mOFN);
 	if (success)
 	{
-		std::string filename = ll_convert_wide_to_string(std::wstring(mFilesW));
+		std::string filename = ll_convert_wide_to_string(mFilesW);
 		mFiles.push_back(filename);
 	}
 
@@ -333,7 +333,7 @@ BOOL LLFilePicker::getMultipleOpenFiles(ELoadFilter filter, bool blocking)
 		// lengths.
 		if( wcslen(mOFN.lpstrFile) > mOFN.nFileOffset )	/*Flawfinder: ignore*/
 		{
-			std::string filename = ll_convert_wide_to_string(std::wstring(mFilesW));
+			std::string filename = ll_convert_wide_to_string(mFilesW);
 			mFiles.push_back(filename);
 		}
 		else
@@ -347,7 +347,7 @@ BOOL LLFilePicker::getMultipleOpenFiles(ELoadFilter filter, bool blocking)
 					break;
 				if (*tptrw == 0)
 					tptrw++; // shouldn't happen?
-				std::string filename = ll_convert_wide_to_string(std::wstring(tptrw));
+				std::string filename = ll_convert_wide_to_string(tptrw);
 				if (dirname.empty())
 					dirname = filename + "\\";
 				else
@@ -579,7 +579,7 @@ BOOL LLFilePicker::getSaveFile(ESaveFilter filter, const std::string& filename, 
 			success = GetSaveFileName(&mOFN);
 			if (success)
 			{
-				std::string filename = ll_convert_wide_to_string(std::wstring(mFilesW));
+				std::string filename = ll_convert_wide_to_string(mFilesW);
 				mFiles.push_back(filename);
 			}
 		}

@@ -731,79 +731,60 @@ std::string utf8str_removeCRLF(const std::string& utf8str)
 }
 
 #if LL_WINDOWS
-std::string ll_convert_wide_to_string(const wchar_t* in)
+std::string ll_convert_wide_to_string(std::wstring_view in)
 {
 	return ll_convert_wide_to_string(in, CP_UTF8);
 }
 
-std::string ll_convert_wide_to_string(const wchar_t* in, unsigned int code_page)
+std::string ll_convert_wide_to_string(std::wstring_view in, unsigned int code_page)
 {
-	std::string out;
-	if(in)
-	{
-		int len_in = wcslen(in);
-		int len_out = WideCharToMultiByte(
-			code_page,
-			0,
-			in,
-			len_in,
-			NULL,
-			0,
-			0,
-			0);
-		// We will need two more bytes for the double NULL ending
-		// created in WideCharToMultiByte().
-		char* pout = new char [len_out + 2];
-		memset(pout, 0, len_out + 2);
-		if(pout)
-		{
-			WideCharToMultiByte(
-				code_page,
-				0,
-				in,
-				len_in,
-				pout,
-				len_out,
-				0,
-				0);
-			out.assign(pout);
-			delete[] pout;
-		}
-	}
-	return out;
+    std::string out {};
+    if (in.length() > 0)
+    {
+        int len = WideCharToMultiByte(code_page, 0, in.data(), in.length(), NULL, 0, 0, 0);
+        if (len == 0)
+        {
+            return out;
+        }
+
+        out.resize(len);
+
+        WideCharToMultiByte(code_page, 0, in.data(), in.length(), out.data(), out.length(), 0, 0);
+    }
+    return out;
 }
 
-std::wstring ll_convert_string_to_wide(const std::string& in)
+std::wstring ll_convert_string_to_wide(std::string_view in)
 {
 	return ll_convert_string_to_wide(in, CP_UTF8);
 }
 
-std::wstring ll_convert_string_to_wide(const std::string& in, unsigned int code_page)
+std::wstring ll_convert_string_to_wide(std::string_view in, unsigned int code_page)
 {
-	// From review:
-	// We can preallocate a wide char buffer that is the same length (in wchar_t elements) as the utf8 input,
-	// plus one for a null terminator, and be guaranteed to not overflow.
+	std::wstring out{};
 
-	//	Normally, I'd call that sort of thing premature optimization,
-	// but we *are* seeing string operations taking a bunch of time, especially when constructing widgets.
-//	int output_str_len = MultiByteToWideChar(code_page, 0, in.c_str(), in.length(), NULL, 0);
+	if (in.length() > 0)
+	{
+		// Calculate target buffer size (not including the zero terminator).
+		int len = MultiByteToWideChar(code_page, 0,
+			in.data(), in.size(), NULL, 0);
+		if (len == 0)
+		{
+			return out;
+		}
 
-	// reserve an output buffer that will be destroyed on exit, with a place
-	// to put NULL terminator
-	std::vector<wchar_t> w_out(in.length() + 1);
+		out.resize(len);
+		// No error checking. We already know, that the conversion will succeed.
+		MultiByteToWideChar(code_page, 0,
+			in.data(), in.size(), out.data(), out.size());
+		// Use out.data() in place of &out[0] for C++17
+	}
 
-	memset(&w_out[0], 0, w_out.size());
-	int real_output_str_len = MultiByteToWideChar(code_page, 0, in.c_str(), in.length(),
-												  &w_out[0], w_out.size() - 1);
+	return out;
 
-	//looks like MultiByteToWideChar didn't add null terminator to converted string, see EXT-4858.
-	w_out[real_output_str_len] = 0;
-
-	// construct string<wchar_t> from our temporary output buffer
-	return {&w_out[0]};
 }
 
-LLWString ll_convert_wide_to_wstring(const std::wstring& in)
+LLWString ll_convert_wide_to_wstring(std::wstring_view in)
 {
     // This function, like its converse, is a placeholder, encapsulating a
     // guilty little hack: the only "official" way nat has found to convert
@@ -815,16 +796,16 @@ LLWString ll_convert_wide_to_wstring(const std::wstring& in)
     return { in.begin(), in.end() };
 }
 
-std::wstring ll_convert_wstring_to_wide(const LLWString& in)
+std::wstring ll_convert_wstring_to_wide(LLWStringView in)
 {
     // See comments in ll_convert_wide_to_wstring()
     return { in.begin(), in.end() };
 }
 
-std::string ll_convert_string_to_utf8_string(const std::string& in)
+std::string ll_convert_string_to_utf8_string(std::string_view in)
 {
 	auto w_mesg = ll_convert_string_to_wide(in, CP_ACP);
-	std::string out_utf8(ll_convert_wide_to_string(w_mesg.c_str(), CP_UTF8));
+	std::string out_utf8(ll_convert_wide_to_string(w_mesg, CP_UTF8));
 
 	return out_utf8;
 }

@@ -451,6 +451,7 @@ template<class T> std::string LLStringUtilBase<T>::sLocale;
 typedef LLStringUtilBase<char> LLStringUtil;
 typedef LLStringUtilBase<llwchar> LLWStringUtil;
 typedef std::basic_string<llwchar> LLWString;
+typedef std::basic_string_view<llwchar> LLWStringView;
 
 //@ Use this where we want to disallow input in the form of "foo"
 //  This is used to catch places where english text is embedded in the code
@@ -721,44 +722,36 @@ LL_COMMON_API std::string utf8str_removeCRLF(const std::string& utf8str);
  *
  * This replaces the unsafe W2A macro from ATL.
  */
-LL_COMMON_API std::string ll_convert_wide_to_string(const wchar_t* in, unsigned int code_page);
-LL_COMMON_API std::string ll_convert_wide_to_string(const wchar_t* in); // default CP_UTF8
-inline std::string ll_convert_wide_to_string(const std::wstring& in, unsigned int code_page)
-{
-    return ll_convert_wide_to_string(in.c_str(), code_page);
-}
-inline std::string ll_convert_wide_to_string(const std::wstring& in)
-{
-    return ll_convert_wide_to_string(in.c_str());
-}
+LL_COMMON_API std::string ll_convert_wide_to_string(std::wstring_view in, unsigned int code_page);
+LL_COMMON_API std::string ll_convert_wide_to_string(std::wstring_view in); // default CP_UTF8
 ll_convert_alias(std::string, std::wstring, ll_convert_wide_to_string(in));
 
 /**
  * Converts a string to wide string.
  */
-LL_COMMON_API std::wstring ll_convert_string_to_wide(const std::string& in,
-                                                     unsigned int code_page);
-LL_COMMON_API std::wstring ll_convert_string_to_wide(const std::string& in);
-                                                     // default CP_UTF8
+LL_COMMON_API std::wstring ll_convert_string_to_wide(std::string_view in,
+	unsigned int code_page);
+// default CP_UTF8
+LL_COMMON_API std::wstring ll_convert_string_to_wide(std::string_view in);
 ll_convert_alias(std::wstring, std::string, ll_convert_string_to_wide(in));
 
 /**
  * Convert a Windows wide string to our LLWString
  */
-LL_COMMON_API LLWString ll_convert_wide_to_wstring(const std::wstring& in);
+LL_COMMON_API LLWString ll_convert_wide_to_wstring(std::wstring_view in);
 ll_convert_alias(LLWString, std::wstring, ll_convert_wide_to_wstring(in));
 
 /**
  * Convert LLWString to Windows wide string
  */
-LL_COMMON_API std::wstring ll_convert_wstring_to_wide(const LLWString& in);
+LL_COMMON_API std::wstring ll_convert_wstring_to_wide(LLWStringView in);
 ll_convert_alias(std::wstring, LLWString, ll_convert_wstring_to_wide(in));
 
 /**
  * Converts incoming string into utf8 string
  *
  */
-LL_COMMON_API std::string ll_convert_string_to_utf8_string(const std::string& in);
+LL_COMMON_API std::string ll_convert_string_to_utf8_string(std::string_view in);
 
 /// Get Windows message string for passed GetLastError() code
 // VS 2013 doesn't let us forward-declare this template, which is what we
