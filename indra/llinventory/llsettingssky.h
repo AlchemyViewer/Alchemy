@@ -242,8 +242,8 @@ public:
     virtual void loadTextures() { };
 
     //=====================================================================
-    virtual validation_list_t getValidationList() const SETTINGS_OVERRIDE;
-    static validation_list_t validationList();
+    virtual const validation_list_t& getValidationList() const SETTINGS_OVERRIDE;
+    static const validation_list_t& validationList();
 
     static LLSD translateLegacySettings(const LLSD& legacy);
 
@@ -330,8 +330,8 @@ protected:
 
     LLSettingsSky();
 
-    virtual stringset_t getSlerpKeys() const SETTINGS_OVERRIDE;
-    virtual stringset_t getSkipInterpolateKeys() const SETTINGS_OVERRIDE;
+    virtual const stringset_t& getSlerpKeys() const SETTINGS_OVERRIDE;
+    virtual const stringset_t& getSkipInterpolateKeys() const SETTINGS_OVERRIDE;
 
     LLUUID      mNextSunTextureId;
     LLUUID      mNextMoonTextureId;

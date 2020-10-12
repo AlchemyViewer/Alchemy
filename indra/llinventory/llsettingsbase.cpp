@@ -82,7 +82,7 @@ LLSettingsBase::LLSettingsBase(const LLSD setting) :
 }
 
 //=========================================================================
-void LLSettingsBase::lerpSettings(const LLSettingsBase &other, F64 mix) 
+void LLSettingsBase::lerpSettings(const LLSettingsBase &other, BlendFactor mix)
 {
     mSettings = interpolateSDMap(mSettings, other.mSettings, other.getParameterMap(), mix);
     setDirtyFlag(true);
@@ -162,12 +162,12 @@ LLSD LLSettingsBase::combineSDMaps(const LLSD &settings, const LLSD &other) cons
     return newSettings;
 }
 
-LLSD LLSettingsBase::interpolateSDMap(const LLSD &settings, const LLSD &other, const parammapping_t& defaults, F64 mix) const
+LLSD LLSettingsBase::interpolateSDMap(const LLSD &settings, const LLSD &other, const parammapping_t& defaults, BlendFactor mix) const
 {
     LLSD newSettings;
 
-    stringset_t skip = getSkipInterpolateKeys();
-    stringset_t slerps = getSlerpKeys();
+    const stringset_t& skip = getSkipInterpolateKeys();
+    const stringset_t& slerps = getSlerpKeys();
 
     llassert(mix >= 0.0f && mix <= 1.0f);
 
@@ -336,7 +336,7 @@ LLSD LLSettingsBase::interpolateSDValue(const std::string& key_name, const LLSD 
     return new_value;
 }
 
-LLSettingsBase::stringset_t LLSettingsBase::getSkipInterpolateKeys() const
+const LLSettingsBase::stringset_t& LLSettingsBase::getSkipInterpolateKeys() const
 {
     static stringset_t skipSet;
 
@@ -347,6 +347,18 @@ LLSettingsBase::stringset_t LLSettingsBase::getSkipInterpolateKeys() const
     }
 
     return skipSet;
+}
+
+const LLSettingsBase::stringset_t& LLSettingsBase::getSlerpKeys() const
+{ 
+    static stringset_t slerpKeys;
+    return slerpKeys;
+}
+
+const LLSettingsBase::parammapping_t& LLSettingsBase::getParameterMap() const
+{
+    static parammapping_t paramMap;
+    return paramMap;
 }
 
 LLSD LLSettingsBase::getSettings() const
@@ -374,7 +386,7 @@ size_t LLSettingsBase::getHash() const
 
 bool LLSettingsBase::validate()
 {
-    validation_list_t validations = getValidationList();
+    const validation_list_t& validations = getValidationList();
 
     if (!mSettings.has(SETTING_TYPE))
     {
@@ -395,7 +407,7 @@ bool LLSettingsBase::validate()
     return result["success"].asBoolean();
 }
 
-LLSD LLSettingsBase::settingValidation(LLSD &settings, validation_list_t &validations, bool partial)
+LLSD LLSettingsBase::settingValidation(LLSD &settings, const validation_list_t &validations, bool partial)
 {
     static Validator  validateName(SETTING_NAME, false, LLSD::TypeString, boost::bind(&Validator::verifyStringLength, boost::placeholders::_1, 63));
     static Validator  validateId(SETTING_ID, false, LLSD::TypeUUID);
@@ -513,7 +525,7 @@ LLSD LLSettingsBase::settingValidation(LLSD &settings, validation_list_t &valida
 
 //=========================================================================
 
-bool LLSettingsBase::Validator::verify(LLSD &data, U32 flags)
+bool LLSettingsBase::Validator::verify(LLSD &data, U32 flags) const
 {
     if (!data.has(mName) || (data.has(mName) && data[mName].isUndefined()))
     {

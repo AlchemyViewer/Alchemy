@@ -124,8 +124,8 @@ public:
     bool                        replaceCycleTrack(S32 track, const CycleTrack_t &source);
     bool                        isTrackEmpty(S32 track) const;
 
-    virtual validation_list_t   getValidationList() const SETTINGS_OVERRIDE;
-    static validation_list_t    validationList();
+    virtual const validation_list_t&   getValidationList() const SETTINGS_OVERRIDE;
+    static const validation_list_t&    validationList();
 
     virtual LLSettingsBase::ptr_t buildDerivedClone() const SETTINGS_OVERRIDE { return buildClone(); }
 	

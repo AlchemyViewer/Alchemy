@@ -508,7 +508,7 @@ void LLSettingsSky::blend(const LLSettingsBase::ptr_t &end, F64 blendf)
     setBlendFactor(blendf);
 }
 
-LLSettingsSky::stringset_t LLSettingsSky::getSkipInterpolateKeys() const
+const LLSettingsSky::stringset_t& LLSettingsSky::getSkipInterpolateKeys() const
 {
     static stringset_t skipSet;
 
@@ -524,7 +524,7 @@ LLSettingsSky::stringset_t LLSettingsSky::getSkipInterpolateKeys() const
     return skipSet;
 }
 
-LLSettingsSky::stringset_t LLSettingsSky::getSlerpKeys() const 
+const LLSettingsSky::stringset_t& LLSettingsSky::getSlerpKeys() const 
 { 
     static stringset_t slepSet;
 
@@ -537,12 +537,12 @@ LLSettingsSky::stringset_t LLSettingsSky::getSlerpKeys() const
     return slepSet;
 }
 
-LLSettingsSky::validation_list_t LLSettingsSky::getValidationList() const
+const LLSettingsSky::validation_list_t& LLSettingsSky::getValidationList() const
 {
     return LLSettingsSky::validationList();
 }
 
-LLSettingsSky::validation_list_t LLSettingsSky::validationList()
+const LLSettingsSky::validation_list_t& LLSettingsSky::validationList()
 {
     static validation_list_t validation;
 

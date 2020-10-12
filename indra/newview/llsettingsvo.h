@@ -114,7 +114,7 @@ protected:
 
     virtual void    applySpecial(void *, bool) override;
 
-    virtual parammapping_t getParameterMap() const override;
+    virtual const parammapping_t& getParameterMap() const override;
 
     bool m_isAdvanced = false;
     F32 mSceneLightStrength = 3.0f;
@@ -144,7 +144,7 @@ protected:
     virtual void    updateSettings() override;
     virtual void    applySpecial(void *, bool) override;
 
-    virtual parammapping_t getParameterMap() const override;
+    virtual const parammapping_t& getParameterMap() const override;
 
 
 private:

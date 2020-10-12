@@ -220,12 +220,12 @@ void LLSettingsWater::replaceWithWater(LLSettingsWater::ptr_t other)
     mNextTransparentTextureID = other->mNextTransparentTextureID;
 }
 
-LLSettingsWater::validation_list_t LLSettingsWater::getValidationList() const
+const LLSettingsWater::validation_list_t& LLSettingsWater::getValidationList() const
 {
     return LLSettingsWater::validationList();
 }
 
-LLSettingsWater::validation_list_t LLSettingsWater::validationList()
+const LLSettingsWater::validation_list_t& LLSettingsWater::validationList()
 {
     static validation_list_t validation;
 

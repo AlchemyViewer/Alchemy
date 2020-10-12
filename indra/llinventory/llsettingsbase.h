@@ -284,7 +284,7 @@ public:
         bool        isRequired() const { return mRequired; }
         LLSD::Type  getType() const { return mType; }
 
-        bool        verify(LLSD &data, U32 flags);
+        bool        verify(LLSD &data, U32 flags) const;
 
         // Some basic verifications
         static bool verifyColor(LLSD &value);
@@ -306,7 +306,7 @@ public:
     };
     typedef std::vector<Validator> validation_list_t;
 
-    static LLSD settingValidation(LLSD &settings, validation_list_t &validations, bool partial = false);
+    static LLSD settingValidation(LLSD &settings, const validation_list_t &validations, bool partial = false);
 
     inline void setAssetId(LLUUID value)
     {   // note that this skips setLLSD
@@ -326,8 +326,6 @@ protected:
     LLSettingsBase();
     LLSettingsBase(const LLSD setting);
 
-    static LLSD settingValidation(LLSD settings);
-
     typedef std::set<std::string>   stringset_t;
     
     // combining settings objects. Customize for specific setting types
@@ -345,18 +343,18 @@ protected:
     /// when lerping between settings, some may require special handling.  
     /// Get a list of these key to be skipped by the default settings lerp.
     /// (handling should be performed in the override of lerpSettings.
-    virtual stringset_t getSkipInterpolateKeys() const; 
+    virtual const stringset_t& getSkipInterpolateKeys() const; 
 
     // A list of settings that represent quaternions and should be slerped 
     // rather than lerped.
-    virtual stringset_t getSlerpKeys() const { return stringset_t(); }
+    virtual const stringset_t& getSlerpKeys() const;
 
-    virtual validation_list_t getValidationList() const = 0;
+    virtual const validation_list_t& getValidationList() const = 0;
 
     // Apply any settings that need special handling. 
     virtual void applySpecial(void *, bool force = false) { };
 
-    virtual parammapping_t getParameterMap() const { return parammapping_t(); }
+    virtual const parammapping_t& getParameterMap() const;
 
     LLSD        mSettings;
     bool        mIsValid;

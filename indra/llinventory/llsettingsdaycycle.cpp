@@ -543,7 +543,7 @@ namespace
             std::string ftype = frame[LLSettingsBase::SETTING_TYPE];
             if (ftype == "sky")
             {
-                LLSettingsSky::validation_list_t valid_sky = LLSettingsSky::validationList();
+                const LLSettingsSky::validation_list_t& valid_sky = LLSettingsSky::validationList();
                 LLSD res_sky = LLSettingsBase::settingValidation(frame, valid_sky);
                 
                 if (res_sky["success"].asInteger() == 0)
@@ -556,7 +556,7 @@ namespace
             }
             else if (ftype == "water")
             {
-                LLSettingsWater::validation_list_t valid_h2o = LLSettingsWater::validationList();
+                const LLSettingsWater::validation_list_t& valid_h2o = LLSettingsWater::validationList();
                 LLSD res_h2o = LLSettingsBase::settingValidation(frame, valid_h2o);
                 if (res_h2o["success"].asInteger() == 0)
                 {
@@ -589,12 +589,12 @@ namespace
     }
 }
 
-LLSettingsDay::validation_list_t LLSettingsDay::getValidationList() const
+const LLSettingsDay::validation_list_t& LLSettingsDay::getValidationList() const
 {
     return LLSettingsDay::validationList();
 }
 
-LLSettingsDay::validation_list_t LLSettingsDay::validationList()
+const LLSettingsDay::validation_list_t& LLSettingsDay::validationList()
 {
     static validation_list_t validation;
 

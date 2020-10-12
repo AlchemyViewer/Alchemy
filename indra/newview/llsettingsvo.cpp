@@ -440,7 +440,7 @@ LLSettingsVOSky::LLSettingsVOSky()
 //-------------------------------------------------------------------------
 LLSettingsSky::ptr_t LLSettingsVOSky::buildSky(LLSD settings)
 {
-    LLSettingsSky::validation_list_t validations = LLSettingsSky::validationList();
+    const auto& validations = LLSettingsSky::validationList();
 
     LLSD results = LLSettingsBase::settingValidation(settings, validations);
 
@@ -466,7 +466,7 @@ LLSettingsSky::ptr_t LLSettingsVOSky::buildFromLegacyPreset(const std::string &n
 
     newsettings[SETTING_NAME] = name;
 
-    LLSettingsSky::validation_list_t validations = LLSettingsSky::validationList();
+    const auto& validations = LLSettingsSky::validationList();
     LLSD results = LLSettingsBase::settingValidation(newsettings, validations);
     if (!results["success"].asBoolean())
     {
@@ -516,7 +516,7 @@ LLSettingsSky::ptr_t LLSettingsVOSky::buildDefaultSky()
 
         default_settings[SETTING_NAME] = DEFAULT_SETTINGS_NAME;
 
-        LLSettingsSky::validation_list_t validations = LLSettingsSky::validationList();
+        const auto& validations = LLSettingsSky::validationList();
         LLSD results = LLSettingsBase::settingValidation(default_settings, validations);
         if (!results["success"].asBoolean())
         {
@@ -534,7 +534,7 @@ LLSettingsSky::ptr_t LLSettingsVOSky::buildClone() const
     LLSD settings = cloneSettings();
     U32 flags = getFlags();
 
-    LLSettingsSky::validation_list_t validations = LLSettingsSky::validationList();
+    const auto& validations = LLSettingsSky::validationList();
     LLSD results = LLSettingsBase::settingValidation(settings, validations);
     if (!results["success"].asBoolean())
     {
@@ -717,7 +717,7 @@ void LLSettingsVOSky::applySpecial(void *ptarget, bool force)
     shader->uniform1f(LLShaderMgr::GAMMA, getGamma());
 }
 
-LLSettingsSky::parammapping_t LLSettingsVOSky::getParameterMap() const
+const LLSettingsSky::parammapping_t& LLSettingsVOSky::getParameterMap() const
 {
     static parammapping_t param_map;
 
@@ -778,7 +778,7 @@ LLSettingsVOWater::LLSettingsVOWater() :
 
 LLSettingsWater::ptr_t LLSettingsVOWater::buildWater(LLSD settings)
 {
-    LLSettingsWater::validation_list_t validations = LLSettingsWater::validationList();
+    const auto& validations = LLSettingsWater::validationList();
     LLSD results = LLSettingsWater::settingValidation(settings, validations);
     if (!results["success"].asBoolean())
     {
@@ -800,7 +800,7 @@ LLSettingsWater::ptr_t LLSettingsVOWater::buildFromLegacyPreset(const std::strin
     }
 
     newsettings[SETTING_NAME] = name; 
-    LLSettingsWater::validation_list_t validations = LLSettingsWater::validationList();
+    const auto& validations = LLSettingsWater::validationList();
     LLSD results = LLSettingsWater::settingValidation(newsettings, validations);
     if (!results["success"].asBoolean())
     {
@@ -849,7 +849,7 @@ LLSettingsWater::ptr_t LLSettingsVOWater::buildDefaultWater()
 
         default_settings[SETTING_NAME] = DEFAULT_SETTINGS_NAME;
 
-        LLSettingsWater::validation_list_t validations = LLSettingsWater::validationList();
+        const auto& validations = LLSettingsWater::validationList();
         LLSD results = LLSettingsWater::settingValidation(default_settings, validations);
         if (!results["success"].asBoolean())
         {
@@ -867,7 +867,7 @@ LLSettingsWater::ptr_t LLSettingsVOWater::buildClone() const
 {
     LLSD settings = cloneSettings();
     U32 flags = getFlags();
-    LLSettingsWater::validation_list_t validations = LLSettingsWater::validationList();
+    const auto& validations = LLSettingsWater::validationList();
     LLSD results = LLSettingsWater::settingValidation(settings, validations);
     if (!results["success"].asBoolean())
     {
@@ -971,7 +971,7 @@ void LLSettingsVOWater::updateSettings()
     }
 }
 
-LLSettingsWater::parammapping_t LLSettingsVOWater::getParameterMap() const
+const LLSettingsWater::parammapping_t& LLSettingsVOWater::getParameterMap() const
 {
     static parammapping_t param_map;
 
@@ -996,7 +996,7 @@ LLSettingsVODay::LLSettingsVODay():
 
 LLSettingsDay::ptr_t LLSettingsVODay::buildDay(LLSD settings)
 {
-    LLSettingsDay::validation_list_t validations = LLSettingsDay::validationList();
+    const auto& validations = LLSettingsDay::validationList();
     LLSD results = LLSettingsDay::settingValidation(settings, validations);
     if (!results["success"].asBoolean())
     {
@@ -1067,7 +1067,7 @@ LLSettingsDay::ptr_t LLSettingsVODay::buildFromLegacyPreset(const std::string &n
 
     newsettings[SETTING_FRAMES] = frames;
 
-    LLSettingsDay::validation_list_t validations = LLSettingsDay::validationList();
+    const auto& validations = LLSettingsDay::validationList();
     LLSD results = LLSettingsDay::settingValidation(newsettings, validations);
     if (!results["success"].asBoolean())
     {
@@ -1148,7 +1148,7 @@ LLSettingsDay::ptr_t LLSettingsVODay::buildFromLegacyMessage(const LLUUID &regio
         ( SETTING_FRAMES, frames )
         ( SETTING_TYPE, "daycycle" );
 
-    LLSettingsSky::validation_list_t validations = LLSettingsDay::validationList();
+    const auto& validations = LLSettingsDay::validationList();
     LLSD results = LLSettingsDay::settingValidation(newsettings, validations);
     if (!results["success"].asBoolean())
     {
@@ -1177,7 +1177,7 @@ LLSettingsDay::ptr_t LLSettingsVODay::buildDefaultDayCycle()
         default_settings = LLSettingsDay::defaults();
         default_settings[SETTING_NAME] = DEFAULT_SETTINGS_NAME;
 
-        LLSettingsDay::validation_list_t validations = LLSettingsDay::validationList();
+        const auto& validations = LLSettingsDay::validationList();
         LLSD results = LLSettingsDay::settingValidation(default_settings, validations);
         if (!results["success"].asBoolean())
         {
@@ -1194,7 +1194,7 @@ LLSettingsDay::ptr_t LLSettingsVODay::buildDefaultDayCycle()
 
 LLSettingsDay::ptr_t LLSettingsVODay::buildFromEnvironmentMessage(LLSD settings)
 {
-    LLSettingsDay::validation_list_t validations = LLSettingsDay::validationList();
+    const auto& validations = LLSettingsDay::validationList();
     LLSD results = LLSettingsDay::settingValidation(settings, validations);
     if (!results["success"].asBoolean())
     {
@@ -1251,7 +1251,7 @@ LLSettingsDay::ptr_t LLSettingsVODay::buildClone() const
 {
     LLSD settings = cloneSettings();
 
-    LLSettingsDay::validation_list_t validations = LLSettingsDay::validationList();
+    const auto& validations = LLSettingsDay::validationList();
     LLSD results = LLSettingsDay::settingValidation(settings, validations);
     if (!results["success"].asBoolean())
     {

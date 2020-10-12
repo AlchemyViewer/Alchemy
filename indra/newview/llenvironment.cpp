@@ -587,7 +587,7 @@ namespace
                 this->setDirtyFlag(true);
         }
 
-        LLSettingsBase::stringset_t getSpecialKeys() const;
+        const LLSettingsBase::stringset_t& getSpecialKeys() const;
         void                        resetSpecial();
         void                        updateSpecial(const typename Injection::ptr_t &injection, typename LLSettingsBase::BlendFactor mix);
 
@@ -604,7 +604,7 @@ namespace
     };
 
     template<>
-    LLSettingsBase::stringset_t LLSettingsInjected<LLSettingsVOSky>::getSpecialKeys() const
+    const LLSettingsBase::stringset_t& LLSettingsInjected<LLSettingsVOSky>::getSpecialKeys() const
     {
         static LLSettingsBase::stringset_t specialSet;
 
@@ -621,7 +621,7 @@ namespace
     }
 
     template<>
-    LLSettingsBase::stringset_t LLSettingsInjected<LLSettingsVOWater>::getSpecialKeys() const
+    const LLSettingsBase::stringset_t& LLSettingsInjected<LLSettingsVOWater>::getSpecialKeys() const
     {
         static stringset_t specialSet;
 
@@ -1554,7 +1554,7 @@ void LLEnvironment::updateGLVariablesForSettings(LLGLSLShader *shader, const LLS
     LL_RECORD_BLOCK_TIME(FTM_SHADER_PARAM_UPDATE);
 
     //_WARNS("RIDER") << "----------------------------------------------------------------" << LL_ENDL;
-    LLSettingsBase::parammapping_t params = psetting->getParameterMap();
+    const LLSettingsBase::parammapping_t& params = psetting->getParameterMap();
     for (auto &it: params)
     {
         LLSD value;

@@ -213,8 +213,8 @@ public:
         return mNextTransparentTextureID;
     }
 
-    virtual validation_list_t getValidationList() const SETTINGS_OVERRIDE;
-    static validation_list_t validationList();
+    virtual const validation_list_t& getValidationList() const SETTINGS_OVERRIDE;
+    static const validation_list_t& validationList();
 
     static LLSD         translateLegacySettings(LLSD legacy);
 
