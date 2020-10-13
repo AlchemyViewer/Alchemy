@@ -369,7 +369,7 @@ namespace
             mLastHash(0)
         {}
 
-        virtual ~LLSettingsInjected() {};
+        virtual ~LLSettingsInjected() = default;
 
         typename SETTINGT::ptr_t getSource() const                    { return this->mSource; }
         void setSource(const typename SETTINGT::ptr_t &source)        
@@ -560,7 +560,7 @@ namespace
         };
 
 
-        virtual void updateSettings() override
+        void updateSettings() final
         {
             static LLFrameTimer timer;
 
@@ -860,10 +860,6 @@ void LLEnvironment::initSingleton()
 void LLEnvironment::cleanupSingleton()
 {
     LLEventPumps::instance().obtain(PUMP_EXPERIENCE).stopListening(LISTENER_NAME);
-}
-
-LLEnvironment::~LLEnvironment()
-{
 }
 
 bool LLEnvironment::canEdit() const

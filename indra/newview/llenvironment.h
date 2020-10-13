@@ -114,7 +114,7 @@ public:
     typedef std::array<F32, 4>                                      altitude_list_t;
     typedef std::vector<F32>                                        altitudes_vect_t;
 
-    virtual                     ~LLEnvironment();
+    virtual                     ~LLEnvironment() = default;
 
     bool                        canEdit() const;
     bool                        isExtendedEnvironmentEnabled() const;
@@ -223,8 +223,6 @@ public:
     void                        updateParcel(S32 parcel_id, const LLSettingsWater::ptr_t &pwater, S32 day_length, S32 day_offset, altitudes_vect_t altitudes = altitudes_vect_t(), environment_apply_fn cb = environment_apply_fn());
     void                        resetParcel(S32 parcel_id, environment_apply_fn cb = environment_apply_fn());
 
-    void                        selectAgentEnvironment();
-
     S32                         calculateSkyTrackForAltitude(F64 altitude);
 
     const altitude_list_t &     getRegionAltitudes() const { return mTrackAltitudes; }
@@ -240,7 +238,7 @@ public:
         static const U32                NO_ANIMATE_WATER;
 
                                         DayInstance(EnvSelection_t env);
-        virtual                         ~DayInstance() { };
+        virtual                         ~DayInstance() = default;
 
         virtual ptr_t                   clone() const;
 
@@ -307,7 +305,7 @@ public:
     {
     public:
                                     DayTransition(const LLSettingsSky::ptr_t &skystart, const LLSettingsWater::ptr_t &waterstart, DayInstance::ptr_t &end, LLSettingsDay::Seconds time);
-        virtual                     ~DayTransition() { };
+        virtual                     ~DayTransition() = default;
 
         virtual bool                applyTimeDelta(const LLSettingsBase::Seconds& delta) override;
         virtual void                animate() override;

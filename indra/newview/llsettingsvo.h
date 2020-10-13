@@ -43,7 +43,7 @@ class LLInventoryItem;
 class LLGLSLShader;
 
 //=========================================================================
-class LLSettingsVOBase : public LLSettingsBase
+class LLSettingsVOBase final : public LLSettingsBase
 {
 public:
     typedef std::function<void(LLUUID asset_id, LLSettingsBase::ptr_t settins, S32 status, LLExtStat extstat)>  asset_download_fn;
@@ -74,7 +74,7 @@ private:
         LLTransactionID         mTransId;
     };
 
-    LLSettingsVOBase() {}
+    LLSettingsVOBase() = default;
 
     static void     onInventoryItemCreated(const LLUUID &inventoryId, LLSettingsBase::ptr_t settings, inventory_result_fn callback);
 
@@ -94,7 +94,7 @@ public:
 
     static ptr_t buildFromLegacyPreset(const std::string &name, const LLSD &oldsettings, LLSD &messages);
     static ptr_t    buildDefaultSky();
-    virtual ptr_t   buildClone() const SETTINGS_OVERRIDE;
+    ptr_t   buildClone() const final;
 
     static ptr_t buildFromLegacyPresetFile(const std::string &name, const std::string &path, LLSD &messages);
 
@@ -102,7 +102,7 @@ public:
 
     bool isAdvanced() const { return  m_isAdvanced; }
 
-    virtual void updateShader(LLGLSLShader* shader) { applySpecial(shader, true); }
+    void updateShader(LLGLSLShader* shader) { applySpecial(shader, true); }
 
 protected:
     LLSettingsVOSky();
@@ -110,11 +110,11 @@ protected:
     // Interpret new settings in terms of old atmospherics params
     static void convertAtmosphericsToLegacy(LLSD& legacy, LLSD& settings);
 
-    virtual void    updateSettings() override;
+    void    updateSettings() override;
 
-    virtual void    applySpecial(void *, bool) override;
+    void    applySpecial(void *, bool) final;
 
-    virtual const parammapping_t& getParameterMap() const override;
+    const parammapping_t& getParameterMap() const final;
 
     bool m_isAdvanced = false;
     F32 mSceneLightStrength = 3.0f;
@@ -130,21 +130,21 @@ public:
 
     static ptr_t buildFromLegacyPreset(const std::string &name, const LLSD &oldsettings, LLSD &messages);
     static ptr_t    buildDefaultWater();
-    virtual ptr_t   buildClone() const SETTINGS_OVERRIDE;
+    ptr_t   buildClone() const final;
 
     static ptr_t buildFromLegacyPresetFile(const std::string &name, const std::string &path, LLSD &messages);
 
     static LLSD     convertToLegacy(const ptr_t &);
 
-    virtual void    updateShader(LLGLSLShader* shader) { applySpecial(shader, true); }
+    void    updateShader(LLGLSLShader* shader) { applySpecial(shader, true); }
 
 protected:
     LLSettingsVOWater();
 
-    virtual void    updateSettings() override;
-    virtual void    applySpecial(void *, bool) override;
+    void    updateSettings() override;
+    void    applySpecial(void *, bool) final;
 
-    virtual const parammapping_t& getParameterMap() const override;
+    const parammapping_t& getParameterMap() const final;
 
 
 private:
