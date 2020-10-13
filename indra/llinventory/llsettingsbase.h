@@ -33,6 +33,9 @@
 #include <vector>
 #include <boost/signals2.hpp>
 
+#include "absl/container/flat_hash_set.h"
+#include "absl/container/flat_hash_map.h"
+
 #include "llsd.h"
 #include "llsdutil.h"
 #include "v2math.h"
@@ -92,7 +95,7 @@ public:
     };
     // Contains settings' names (map key), related shader id-key and default
     // value for revert in case we need to reset shader (no need to search each time)
-    typedef std::map<std::string, DefaultParam>  parammapping_t;
+    typedef absl::flat_hash_map<std::string, DefaultParam>  parammapping_t;
 
     typedef PTR_NAMESPACE::shared_ptr<LLSettingsBase> ptr_t;
 
@@ -326,7 +329,7 @@ protected:
     LLSettingsBase();
     LLSettingsBase(const LLSD setting);
 
-    typedef std::set<std::string>   stringset_t;
+    typedef absl::flat_hash_set<std::string>   stringset_t;
     
     // combining settings objects. Customize for specific setting types
     virtual void lerpSettings(const LLSettingsBase &other, BlendFactor mix);
