@@ -347,7 +347,7 @@ void LLDrawPoolTerrain::renderFullShader()
 	shader->uniform4fv(LLShaderMgr::OBJECT_PLANE_S, 1, tp0.mV);
 	shader->uniform4fv(LLShaderMgr::OBJECT_PLANE_T, 1, tp1.mV);
 
-    LLSettingsWater::ptr_t pwater = LLEnvironment::instance().getCurrentWater();
+	const LLSettingsWater::ptr_t& pwater = LLEnvironment::instance().getCurrentWater();
 
     ((LLSettingsVOWater*)pwater.get())->updateShader(shader);
 

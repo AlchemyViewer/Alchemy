@@ -204,7 +204,7 @@ void LLAtmospherics::init()
 
 LLColor4 LLAtmospherics::calcSkyColorInDir(AtmosphericsVars& vars, const LLVector3 &dir, bool isShiny)
 {
-    LLSettingsSky::ptr_t psky = LLEnvironment::instance().getCurrentSky();
+	const LLSettingsSky::ptr_t& psky = LLEnvironment::instance().getCurrentSky();
     return calcSkyColorInDir(psky, vars, dir, isShiny);
 }
 
@@ -434,7 +434,9 @@ void LLAtmospherics::updateFog(const F32 distance, const LLVector3& tosun_in)
 	// Sky colors, just slightly above the horizon in the direction of the sun, perpendicular to the sun, and at a 45 degree angle to the sun.
     AtmosphericsVars vars;
 
-    LLSettingsSky::ptr_t psky = LLEnvironment::instance().getCurrentSky();
+	LLEnvironment& env = LLEnvironment::instance();
+
+	const LLSettingsSky::ptr_t& psky = env.getCurrentSky();
 
     // invariants across whole sky tex process...
     vars.blue_density = psky->getBlueDensity();    
@@ -444,7 +446,7 @@ void LLAtmospherics::updateFog(const F32 distance, const LLVector3& tosun_in)
     vars.density_multiplier = psky->getDensityMultiplier();    
     vars.distance_multiplier = psky->getDistanceMultiplier();
     vars.max_y = psky->getMaxY();
-    vars.sun_norm = LLEnvironment::instance().getSunDirectionCFR();
+    vars.sun_norm = env.getSunDirectionCFR();
     vars.sunlight = psky->getSunlightColor();
     vars.ambient = psky->getAmbientColor();
     vars.glow = psky->getGlow();
@@ -514,7 +516,7 @@ void LLAtmospherics::updateFog(const F32 distance, const LLVector3& tosun_in)
 	}
 	else
 	{
-        LLSettingsWater::ptr_t pwater = LLEnvironment::instance().getCurrentWater();
+        const LLSettingsWater::ptr_t& pwater = env.getCurrentWater();
 		F32 depth = water_height - camera_height;
 		
 		// get the water param manager variables

@@ -871,9 +871,9 @@ bool LLEnvironment::canEdit() const
     return true;
 }
 
-LLSettingsSky::ptr_t LLEnvironment::getCurrentSky() const 
+const LLSettingsSky::ptr_t& LLEnvironment::getCurrentSky() const 
 { 
-    LLSettingsSky::ptr_t psky = mCurrentEnvironment->getSky(); 
+    const LLSettingsSky::ptr_t& psky = mCurrentEnvironment->getSky(); 
 
     if (!psky && mCurrentEnvironment->getEnvironmentSelection() >= ENV_EDIT)
     {
@@ -881,7 +881,7 @@ LLSettingsSky::ptr_t LLEnvironment::getCurrentSky() const
         {
             if (mEnvironments[idx]->getSky())
             {
-                psky = mEnvironments[idx]->getSky();
+                return mEnvironments[idx]->getSky();
                 break;
             }
         }
@@ -889,9 +889,9 @@ LLSettingsSky::ptr_t LLEnvironment::getCurrentSky() const
     return psky;
 }
 
-LLSettingsWater::ptr_t LLEnvironment::getCurrentWater() const 
+const LLSettingsWater::ptr_t& LLEnvironment::getCurrentWater() const 
 {
-    LLSettingsWater::ptr_t pwater = mCurrentEnvironment->getWater(); 
+    const LLSettingsWater::ptr_t& pwater = mCurrentEnvironment->getWater(); 
 
     if (!pwater && mCurrentEnvironment->getEnvironmentSelection() >= ENV_EDIT)
     {
@@ -899,7 +899,7 @@ LLSettingsWater::ptr_t LLEnvironment::getCurrentWater() const
         {
             if (mEnvironments[idx]->getWater())
             {
-                pwater = mEnvironments[idx]->getWater();
+                return mEnvironments[idx]->getWater();
                 break;
             }
         }
@@ -968,7 +968,7 @@ bool LLEnvironment::canAgentUpdateParcelEnvironment(LLParcel *parcel) const
     if (!parcel)
         return false;
 
-    if (!LLEnvironment::instance().isExtendedEnvironmentEnabled())
+    if (!isExtendedEnvironmentEnabled())
         return false;
 
     if (gAgent.isGodlike())
@@ -1406,7 +1406,7 @@ LLVector4 LLEnvironment::toLightNorm(const LLVector3 vec) const
 
 LLVector3 LLEnvironment::getLightDirection() const
 {
-    LLSettingsSky::ptr_t psky = mCurrentEnvironment->getSky();
+    const LLSettingsSky::ptr_t& psky = mCurrentEnvironment->getSky();
     if (!psky)
     {
         return LLVector3(0, 0, 1);
@@ -1416,7 +1416,7 @@ LLVector3 LLEnvironment::getLightDirection() const
 
 LLVector3 LLEnvironment::getSunDirection() const
 {
-    LLSettingsSky::ptr_t psky = mCurrentEnvironment->getSky();
+    const LLSettingsSky::ptr_t& psky = mCurrentEnvironment->getSky();
     if (!psky)
     {
         return LLVector3(0, 0, 1);
@@ -1426,7 +1426,7 @@ LLVector3 LLEnvironment::getSunDirection() const
 
 LLVector3 LLEnvironment::getMoonDirection() const
 {
-    LLSettingsSky::ptr_t psky = mCurrentEnvironment->getSky();
+    const LLSettingsSky::ptr_t& psky = mCurrentEnvironment->getSky();
     if (!psky)
     {
         return LLVector3(0, 0, -1);
@@ -1555,7 +1555,7 @@ void LLEnvironment::updateGLVariablesForSettings(LLGLSLShader *shader, const LLS
 
     //_WARNS("RIDER") << "----------------------------------------------------------------" << LL_ENDL;
     const LLSettingsBase::parammapping_t& params = psetting->getParameterMap();
-    for (auto &it: params)
+    for (const auto &it: params)
     {
         LLSD value;
         // legacy first since it contains ambient color and we prioritize value from legacy, see getAmbientColor()

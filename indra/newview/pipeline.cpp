@@ -5945,8 +5945,6 @@ void LLPipeline::setupAvatarLights(bool for_edit)
 	assertInitialized();
 
     LLEnvironment& environment = LLEnvironment::instance();
-    LLSettingsSky::ptr_t psky = environment.getCurrentSky();
-
     bool sun_up = environment.getIsSunUp();
 
 
@@ -6190,7 +6188,7 @@ void LLPipeline::setupHWLights(LLDrawPool* pool)
 	assertInitialized();
 	
     LLEnvironment& environment = LLEnvironment::instance();
-    LLSettingsSky::ptr_t psky = environment.getCurrentSky();
+	const LLSettingsSky::ptr_t& psky = environment.getCurrentSky();
 
 	if (!LLGLSLShader::sNoFixedFunction)
 	{
@@ -8342,7 +8340,7 @@ void LLPipeline::bindDeferredShader(LLGLSLShader& shader, LLRenderTarget* light_
     shader.uniform4fv(LLShaderMgr::MOONLIGHT_COLOR, 1, mMoonDiffuse.mV);
 
     LLEnvironment& environment = LLEnvironment::instance();
-    LLSettingsSky::ptr_t sky = environment.getCurrentSky();
+	const LLSettingsSky::ptr_t& sky = environment.getCurrentSky();
 
     static_cast<LLSettingsVOSky*>(sky.get())->updateShader(&shader);
 }

@@ -69,7 +69,7 @@ LLDrawPoolWater::~LLDrawPoolWater()
 
 void LLDrawPoolWater::setTransparentTextures(const LLUUID& transparentTextureId, const LLUUID& nextTransparentTextureId)
 {
-    LLSettingsWater::ptr_t pwater = LLEnvironment::instance().getCurrentWater();
+	const LLSettingsWater::ptr_t& pwater = LLEnvironment::instance().getCurrentWater();
     mWaterImagep[0] = LLViewerTextureManager::getFetchedTexture(!transparentTextureId.isNull() ? transparentTextureId : pwater->GetDefaultTransparentTextureAssetId());
     mWaterImagep[1] = LLViewerTextureManager::getFetchedTexture(!nextTransparentTextureId.isNull() ? nextTransparentTextureId : (!transparentTextureId.isNull() ? transparentTextureId : pwater->GetDefaultTransparentTextureAssetId()));
     mWaterImagep[0]->addTextureStats(1024.f*1024.f);
@@ -78,14 +78,13 @@ void LLDrawPoolWater::setTransparentTextures(const LLUUID& transparentTextureId,
 
 void LLDrawPoolWater::setOpaqueTexture(const LLUUID& opaqueTextureId)
 {
-    LLSettingsWater::ptr_t pwater = LLEnvironment::instance().getCurrentWater();
     mOpaqueWaterImagep = LLViewerTextureManager::getFetchedTexture(opaqueTextureId);
     mOpaqueWaterImagep->addTextureStats(1024.f*1024.f);
 }
 
 void LLDrawPoolWater::setNormalMaps(const LLUUID& normalMapId, const LLUUID& nextNormalMapId)
 {
-    LLSettingsWater::ptr_t pwater = LLEnvironment::instance().getCurrentWater();
+	const LLSettingsWater::ptr_t& pwater = LLEnvironment::instance().getCurrentWater();
     mWaterNormp[0] = LLViewerTextureManager::getFetchedTexture(!normalMapId.isNull() ? normalMapId : pwater->GetDefaultWaterNormalAssetId());
     mWaterNormp[1] = LLViewerTextureManager::getFetchedTexture(!nextNormalMapId.isNull() ? nextNormalMapId : (!normalMapId.isNull() ? normalMapId : pwater->GetDefaultWaterNormalAssetId()));
     mWaterNormp[0]->addTextureStats(1024.f*1024.f);
@@ -472,8 +471,8 @@ void LLDrawPoolWater::shade2(bool edge, LLGLSLShader* shader, const LLColor3& li
     F32  eyedepth      = camera_height - water_height;
     bool underwater    = eyedepth <= 0.0f;
 
-    LLSettingsWater::ptr_t pwater = environment.getCurrentWater();
-    LLSettingsSky::ptr_t   psky   = environment.getCurrentSky();
+	const LLSettingsWater::ptr_t& pwater = environment.getCurrentWater();
+    const LLSettingsSky::ptr_t& psky   = environment.getCurrentSky();
 
     shader->bind();
 
@@ -675,8 +674,7 @@ void LLDrawPoolWater::shade()
 	LLVector3 light_dir;
 
     LLEnvironment& environment = LLEnvironment::instance();
-    LLSettingsWater::ptr_t pwater = environment.getCurrentWater();
-    LLSettingsSky::ptr_t   psky   = environment.getCurrentSky();
+	const LLSettingsSky::ptr_t& psky   = environment.getCurrentSky();
 
     light_dir = environment.getLightDirection();
     light_dir.normalize();

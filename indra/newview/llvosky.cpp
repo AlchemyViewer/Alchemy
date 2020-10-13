@@ -472,7 +472,7 @@ void LLVOSky::init()
 
 	updateDirections();
 
-    LLSettingsSky::ptr_t psky = LLEnvironment::instance().getCurrentSky();
+    const LLSettingsSky::ptr_t& psky = LLEnvironment::instance().getCurrentSky();
 
     // invariants across whole sky tex process...
     m_atmosphericsVars.blue_density = psky->getBlueDensity();    
@@ -518,7 +518,7 @@ void LLVOSky::init()
 
 void LLVOSky::calc()
 {
-    LLSettingsSky::ptr_t psky = LLEnvironment::instance().getCurrentSky();
+	const LLSettingsSky::ptr_t& psky = LLEnvironment::instance().getCurrentSky();
 
     // invariants across whole sky tex process...
     m_atmosphericsVars.blue_density = psky->getBlueDensity();    
@@ -591,7 +591,7 @@ void LLVOSky::restoreGL()
 		mSkyTex[i].restoreGL();
 	}
 
-    LLSettingsSky::ptr_t psky = LLEnvironment::instance().getCurrentSky();
+	const LLSettingsSky::ptr_t& psky = LLEnvironment::instance().getCurrentSky();
 
     if (psky)
 	{
@@ -649,7 +649,7 @@ void LLVOSky::initSkyTextureDirs(const S32 side, const S32 tile)
 
 void LLVOSky::createSkyTexture(AtmosphericsVars& vars, const S32 side, const S32 tile)
 {
-	LLSettingsSky::ptr_t psky = LLEnvironment::instance().getCurrentSky();
+	const LLSettingsSky::ptr_t& psky = LLEnvironment::instance().getCurrentSky();
 
 	S32 tile_x = tile % NUM_TILES_X;
 	S32 tile_y = tile / NUM_TILES_X;
@@ -670,7 +670,7 @@ void LLVOSky::createSkyTexture(AtmosphericsVars& vars, const S32 side, const S32
 
 void LLVOSky::updateDirections(void)
 {
-    LLSettingsSky::ptr_t psky = LLEnvironment::instance().getCurrentSky();
+	const LLSettingsSky::ptr_t& psky = LLEnvironment::instance().getCurrentSky();
 
     mSun.setDirection(psky->getSunDirection());
 	mMoon.setDirection(psky->getMoonDirection());
@@ -695,8 +695,6 @@ void LLVOSky::forceSkyUpdate()
 
 bool LLVOSky::updateSky()
 {
-    LLSettingsSky::ptr_t psky = LLEnvironment::instance().getCurrentSky();
-
 	if (mDead || !(gPipeline.hasRenderType(LLPipeline::RENDER_TYPE_SKY)))
 	{
 		return TRUE;
@@ -940,9 +938,7 @@ void LLVOSky::setSunTextures(const LLUUID& sun_texture, const LLUUID& sun_textur
 			}
 
 void LLVOSky::setMoonTextures(const LLUUID& moon_texture, const LLUUID& moon_texture_next)
-			{
-    LLSettingsSky::ptr_t psky = LLEnvironment::instance().getCurrentSky();
-			
+{
     bool can_use_wl = gPipeline.canUseWindLightShaders();
 
     mMoonTexturep[0] = moon_texture.isNull()      ? nullptr : LLViewerTextureManager::getFetchedTexture(moon_texture, FTT_DEFAULT, TRUE, LLGLTexture::BOOST_UI);
@@ -966,8 +962,6 @@ void LLVOSky::setMoonTextures(const LLUUID& moon_texture, const LLUUID& moon_tex
 
 void LLVOSky::setCloudNoiseTextures(const LLUUID& cloud_noise_texture, const LLUUID& cloud_noise_texture_next)
 {
-    LLSettingsSky::ptr_t psky = LLEnvironment::instance().getCurrentSky();
-
     mCloudNoiseTexturep[0] = cloud_noise_texture.isNull() ? nullptr : LLViewerTextureManager::getFetchedTexture(cloud_noise_texture, FTT_DEFAULT, TRUE, LLGLTexture::BOOST_UI);
     mCloudNoiseTexturep[1] = cloud_noise_texture_next.isNull() ? nullptr : LLViewerTextureManager::getFetchedTexture(cloud_noise_texture_next, FTT_DEFAULT, TRUE, LLGLTexture::BOOST_UI);
 	
@@ -984,7 +978,7 @@ void LLVOSky::setCloudNoiseTextures(const LLUUID& cloud_noise_texture, const LLU
 
 void LLVOSky::setBloomTextures(const LLUUID& bloom_texture, const LLUUID& bloom_texture_next)
 {
-    LLSettingsSky::ptr_t psky = LLEnvironment::instance().getCurrentSky();
+    const LLSettingsSky::ptr_t& psky = LLEnvironment::instance().getCurrentSky();
 
     LLUUID bloom_tex = bloom_texture.isNull() ? psky->GetDefaultBloomTextureId() : bloom_texture;
     LLUUID bloom_tex_next = bloom_texture_next.isNull() ? (bloom_texture.isNull() ? psky->GetDefaultBloomTextureId() : bloom_texture) : bloom_texture_next;

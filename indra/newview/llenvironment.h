@@ -124,8 +124,8 @@ public:
     bool                        canAgentUpdateRegionEnvironment() const;
 
     LLSettingsDay::ptr_t        getCurrentDay() const { return mCurrentEnvironment->getDayCycle(); }
-    LLSettingsSky::ptr_t        getCurrentSky() const;
-    LLSettingsWater::ptr_t      getCurrentWater() const;
+    const LLSettingsSky::ptr_t&     getCurrentSky() const;
+    const LLSettingsWater::ptr_t&   getCurrentWater() const;
 
     static void                 getAtmosphericModelSettings(AtmosphericModelSettings& settingsOut, const LLSettingsSky::ptr_t &psky);
 
@@ -257,9 +257,9 @@ public:
 
         void                            setSkyTrack(S32 trackno);
 
-        LLSettingsDay::ptr_t            getDayCycle() const     { return mDayCycle; }
-        LLSettingsSky::ptr_t            getSky() const          { return mSky; }
-        LLSettingsWater::ptr_t          getWater() const        { return mWater; }
+        const LLSettingsDay::ptr_t&     getDayCycle() const     { return mDayCycle; }
+        const LLSettingsSky::ptr_t&     getSky() const          { return mSky; }
+        const LLSettingsWater::ptr_t&   getWater() const        { return mWater; }
         LLSettingsDay::Seconds          getDayLength() const    { return mDayLength; }
         LLSettingsDay::Seconds          getDayOffset() const    { return mDayOffset; }
         S32                             getSkyTrack() const     { return mSkyTrack; }

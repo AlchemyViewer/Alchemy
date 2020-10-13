@@ -210,7 +210,7 @@ void LLDrawPoolWLSky::renderSkyHaze(const LLVector3& camPosLocal, F32 camHeightL
 {
 	if (gPipeline.canUseWindLightShaders() && gPipeline.hasRenderType(LLPipeline::RENDER_TYPE_SKY))
 	{
-        LLSettingsSky::ptr_t psky = LLEnvironment::instance().getCurrentSky();
+        const LLSettingsSky::ptr_t& psky = LLEnvironment::instance().getCurrentSky();
         LLGLSPipelineDepthTestSkyBox sky(true, false);
         sky_shader->bind();
         sky_shader->uniform1i(LLShaderMgr::SUN_UP_FACTOR, 1);
@@ -591,7 +591,7 @@ void LLDrawPoolWLSky::renderDeferred(S32 pass)
 
     if (gPipeline.canUseWindLightShaders())
     {
-        LLSettingsSky::ptr_t psky = environment.getCurrentSky();
+        const LLSettingsSky::ptr_t& psky = environment.getCurrentSky();
 
         renderSkyHazeDeferred(psky, origin, camHeightLocal);
         renderStarsDeferred(psky);
@@ -614,7 +614,7 @@ void LLDrawPoolWLSky::render(S32 pass)
     const F32 camHeightLocal = environment.getCamHeight();
     LLVector3 const & origin = LLViewerCamera::getInstance()->getOrigin();
 
-    LLSettingsSky::ptr_t psky = environment.getCurrentSky();
+    const LLSettingsSky::ptr_t& psky = environment.getCurrentSky();
     
 	renderSkyHaze(origin, camHeightLocal);    
     renderStars(psky);
