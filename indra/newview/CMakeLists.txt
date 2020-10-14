@@ -57,11 +57,13 @@ include(VisualLeakDetector)
 include(ZLIB)
 include(URIPARSER)
 
-if (NOT HAVOK_TPV)
-   # When using HAVOK_TPV, the library is precompiled, so no need for this
-   add_subdirectory(${LLPHYSICSEXTENSIONS_SRC_DIR} llphysicsextensions)
-   target_link_libraries(${LLPHYSICSEXTENSIONS_LIBRARIES} llcommon)
-endif (NOT HAVOK_TPV)
+if( LLPHYSICSEXTENSIONS_SRC_DIR )
+  if (NOT HAVOK_TPV)
+    # When using HAVOK_TPV, the library is precompiled, so no need for this
+    add_subdirectory(${LLPHYSICSEXTENSIONS_SRC_DIR} llphysicsextensions)
+    target_link_libraries(${LLPHYSICSEXTENSIONS_LIBRARIES} llcommon)
+  endif (NOT HAVOK_TPV)
+endif( LLPHYSICSEXTENSIONS_SRC_DIR )
 
 if(USE_FMODSTUDIO)
   include_directories(${FMODSTUDIO_INCLUDE_DIR})

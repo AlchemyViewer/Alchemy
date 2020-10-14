@@ -878,10 +878,10 @@ LLMeshRepoThread::~LLMeshRepoThread()
 void LLMeshRepoThread::run()
 {
 	LLCDResult res = LLConvexDecomposition::initThread();
-	if (res != LLCD_OK && LLConvexDecomposition::isFunctional())
-	{
-		//LL_WARNS(LOG_MESH) << "Convex decomposition unable to be loaded.  Expect severe problems." << LL_ENDL;
-	}
+	//if (res != LLCD_OK && LLConvexDecomposition::isFunctional())
+	//{
+	//	LL_WARNS(LOG_MESH) << "Convex decomposition unable to be loaded.  Expect severe problems." << LL_ENDL;
+	//}
 
 	while (!LLApp::isQuitting())
 	{
@@ -1138,10 +1138,10 @@ void LLMeshRepoThread::run()
 	}
 
 	res = LLConvexDecomposition::quitThread();
-	if (res != LLCD_OK && LLConvexDecomposition::isFunctional())
-	{
-		LL_WARNS(LOG_MESH) << "Convex decomposition unable to be quit." << LL_ENDL;
-	}
+	//if (res != LLCD_OK && LLConvexDecomposition::isFunctional())
+	//{
+	//	LL_WARNS(LOG_MESH) << "Convex decomposition unable to be quit." << LL_ENDL;
+	//}
 }
 
 // Mutex:  LLMeshRepoThread::mMutex must be held on entry
@@ -3565,10 +3565,10 @@ void LLMeshRepository::init()
 	
 	LLConvexDecomposition::getInstance()->initSystem();
 
-    if (!LLConvexDecomposition::isFunctional())
-    {
-        LL_INFOS(LOG_MESH) << "Using STUB for LLConvexDecomposition" << LL_ENDL;
-    }
+    //if (!LLConvexDecomposition::isFunctional())
+    //{
+    //    LL_INFOS(LOG_MESH) << "Using STUB for LLConvexDecomposition" << LL_ENDL;
+    //}
 
 	mDecompThread = new LLPhysicsDecomp();
 	mDecompThread->start();
@@ -4789,8 +4789,40 @@ S32 LLPhysicsDecomp::llcdCallback(const char* status, S32 p1, S32 p2)
 	return 1;
 }
 
+bool needTriangles( LLConvexDecomposition *aDC )
+{
+	if( !aDC )
+		return false;
+
+	LLCDParam const  *pParams(nullptr);
+	int nParams = aDC->getParameters( &pParams );
+
+	if( nParams <= 0 )
+		return false;
+
+	for( int i = 0; i < nParams; ++i )
+	{
+		if( pParams[i].mName && strcmp( "nd_AlwaysNeedTriangles", pParams[i].mName ) == 0 )
+		{
+			if( LLCDParam::LLCD_BOOLEAN == pParams[i].mType && pParams[i].mDefault.mBool )
+				return true;
+			else
+				return false;
+		}
+	}
+
+	return false;
+}
+
 void LLPhysicsDecomp::setMeshData(LLCDMeshData& mesh, bool vertex_based)
 {
+	LLConvexDecomposition *pDeComp = LLConvexDecomposition::getInstance();
+	if( !pDeComp )
+		return;
+
+	if( vertex_based )
+		vertex_based = !needTriangles( pDeComp );
+
 	mesh.mVertexBase = mCurRequest->mPositions[0].mV;
 	mesh.mVertexStrideBytes = 12;
 	mesh.mNumVertices = mCurRequest->mPositions.size();
@@ -5181,7 +5213,6 @@ void LLPhysicsDecomp::Request::assignData(LLModel* mdl)
 		index_offset += face.mNumVertices;
 	}
 
-	return ;
 }
 
 void LLPhysicsDecomp::Request::updateTriangleAreaThreshold() 

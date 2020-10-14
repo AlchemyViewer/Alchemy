@@ -2236,6 +2236,66 @@
         <key>version</key>
         <string>7.11.1.297294</string>
       </map>
+      <key>ndPhysicsStub</key>
+      <map>
+        <key>copyright</key>
+        <string>Copyright (c)2011-2013 Nicky Dasmijn</string>
+        <key>description</key>
+        <string>ndPhysicsStub</string>
+        <key>license</key>
+        <string>LGPL</string>
+        <key>license_file</key>
+        <string>LICENSES/ndphysicsstub.txt</string>
+        <key>name</key>
+        <string>ndPhysicsStub</string>
+        <key>platforms</key>
+        <map>
+          <key>linux64</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>hash</key>
+              <string>6ddb016aefab1240427be2c370c2e98d</string>
+              <key>hash_algorithm</key>
+              <string>md5</string>
+              <key>url</key>
+              <string>https://pkg.alchemyviewer.org/repository/autobuild-external/ndPhysicsStub/linux64/ndPhysicsStub-0.1.2-linux64-483.tar.bz2</string>
+            </map>
+            <key>name</key>
+            <string>linux64</string>
+          </map>
+          <key>windows</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>hash</key>
+              <string>3a98b405933c2f1d639d4bd2491f8adc</string>
+              <key>hash_algorithm</key>
+              <string>md5</string>
+              <key>url</key>
+              <string>https://pkg.alchemyviewer.org/repository/autobuild-external/ndPhysicsStub/windows/ndPhysicsStub-0.1.2-windows-483.tar.bz2</string>
+            </map>
+            <key>name</key>
+            <string>windows</string>
+          </map>
+          <key>windows64</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>hash</key>
+              <string>23f4b28f033139fec0da0a305e22c5e4</string>
+              <key>hash_algorithm</key>
+              <string>md5</string>
+              <key>url</key>
+              <string>https://pkg.alchemyviewer.org/repository/autobuild-external/ndPhysicsStub/windows64/ndPhysicsStub-0.1.2-windows64-483.tar.bz2</string>
+            </map>
+            <key>name</key>
+            <string>windows64</string>
+          </map>
+        </map>
+        <key>version</key>
+        <string>0.1.2</string>
+      </map>
       <key>nghttp2</key>
       <map>
         <key>copyright</key>
