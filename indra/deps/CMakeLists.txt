@@ -18,7 +18,7 @@ endif()
 
 FetchContent_Declare(
   meshoptimizer
-  GIT_REPOSITORY https://github.com/zeux/meshoptimizer.git
+  GIT_REPOSITORY https://git.alchemyviewer.org/alchemy/mirrors/meshoptimizer.git
   GIT_TAG        v0.14
   )
 # FetchContent_Declare(
@@ -33,13 +33,13 @@ FetchContent_Declare(
 #   )
 FetchContent_Declare(
   nlohmann_json
-  GIT_REPOSITORY https://github.com/nlohmann/json.git
+  GIT_REPOSITORY https://git.alchemyviewer.org/alchemy/mirrors/modernjson.git
   GIT_TAG        v3.9.1
   )
 FetchContent_Declare(
   absl
-  GIT_REPOSITORY https://github.com/abseil/abseil-cpp.git
-  GIT_TAG        3c8b5d7587dc8ecf730ce9996c89e156e408c3ed
+  GIT_REPOSITORY https://git.alchemyviewer.org/alchemy/mirrors/abseil-cpp.git
+  GIT_TAG        f3f785ab59478dd0312bf1b5df65d380650bf0dc
   )
 
 # This is a hack because absl has dumb cmake
