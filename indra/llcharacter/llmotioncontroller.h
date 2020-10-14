@@ -87,7 +87,7 @@ class LLMotionController
 {
 public:
 	typedef std::list<LLMotion*> motion_list_t;
-	typedef std::set<LLMotion*> motion_set_t;
+	typedef absl::flat_hash_set<LLMotion*> motion_set_t;
 	BOOL mIsSelf;
 	
 public:

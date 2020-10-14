@@ -179,7 +179,7 @@ void LLMotionController::deleteAllMotions()
 	// mAllMotions to mDeprecatedMotions in method
 	// LLMotionController::deprecateMotionInstance().  Thus, we should also clean
 	// up the mDeprecatedMotions list as well.
-	for_each(mDeprecatedMotions.begin(), mDeprecatedMotions.end(), DeletePointer());
+	std::for_each(mDeprecatedMotions.begin(), mDeprecatedMotions.end(), DeletePointer());
 	mDeprecatedMotions.clear();
 }
 
