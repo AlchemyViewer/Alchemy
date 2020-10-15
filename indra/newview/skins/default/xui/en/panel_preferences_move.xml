@@ -82,10 +82,20 @@
    follows="left|top"
    height="16"
    label="Appearance"
-   layout="topleft"
    name="appearance_camera_movement"
+   layout="topleft"
    tool_tip="Use automatic camera positioning while in edit mode"
    width="242" />
+  <check_box
+     control_name="AlchemyShowTeleportScreen"
+     height="20"
+     follows="left|top"
+     label="Show teleport screen"
+     layout="topleft"
+     left="75"
+     name="show_teleport_screen"
+     width="280"
+     top_pad="5" />
   <icon
 	 follows="left|top"
 	 height="18"
