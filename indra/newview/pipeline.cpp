@@ -1287,7 +1287,7 @@ void LLPipeline::createGLBuffers()
 	}
 
     // Use FBO for bake tex
-    mBake.allocate(512, 512, GL_RGBA, TRUE, FALSE, LLTexUnit::TT_TEXTURE, true); // SL-12781 Build > Upload > Model; 3D Preview
+    mBake.allocate(1024, 1024, GL_RGBA, TRUE, FALSE, LLTexUnit::TT_TEXTURE, true); // SL-12781 Build > Upload > Model; 3D Preview
 
 	mHighlight.allocate(256,256,GL_RGBA, FALSE, FALSE);
 

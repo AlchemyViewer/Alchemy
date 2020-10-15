@@ -3034,11 +3034,11 @@ BOOL LLModelPreview::render()
                     gGL.diffuseColor4fv(PREVIEW_EDGE_COL.mV);
                     if (edges)
                     {
-                        glLineWidth(PREVIEW_EDGE_WIDTH);
+                        gGL.setLineWidth(PREVIEW_EDGE_WIDTH);
                         glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
                         buffer->drawRange(LLRender::TRIANGLES, 0, buffer->getNumVerts() - 1, buffer->getNumIndices(), 0);
                         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-                        glLineWidth(1.f);
+                        gGL.setLineWidth(1.f);
                     }
                 }
                 gGL.popMatrix();
@@ -3151,12 +3151,12 @@ BOOL LLModelPreview::render()
                                     buffer->drawRange(LLRender::TRIANGLES, 0, buffer->getNumVerts() - 1, buffer->getNumIndices(), 0);
 
                                     gGL.diffuseColor4fv(PREVIEW_PSYH_EDGE_COL.mV);
-                                    glLineWidth(PREVIEW_PSYH_EDGE_WIDTH);
+                                    gGL.setLineWidth(PREVIEW_PSYH_EDGE_WIDTH);
                                     glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
                                     buffer->drawRange(LLRender::TRIANGLES, 0, buffer->getNumVerts() - 1, buffer->getNumIndices(), 0);
 
                                     glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-                                    glLineWidth(1.f);
+                                    gGL.setLineWidth(1.f);
                                 }
                             }
                         }
@@ -3166,7 +3166,7 @@ BOOL LLModelPreview::render()
                     // only do this if mDegenerate was set in the preceding mesh checks [Check this if the ordering ever breaks]
                     if (mHasDegenerate)
                     {
-                        glLineWidth(PREVIEW_DEG_EDGE_WIDTH);
+                        gGL.setLineWidth(PREVIEW_DEG_EDGE_WIDTH);
                         glPointSize(PREVIEW_DEG_POINT_SIZE);
                         gPipeline.enableLightsFullbright();
                         //show degenerate triangles
@@ -3238,7 +3238,7 @@ BOOL LLModelPreview::render()
 
                             gGL.popMatrix();
                         }
-                        glLineWidth(1.f);
+                        gGL.setLineWidth(1.f);
                         glPointSize(1.f);
                         gPipeline.enableLightsPreview();
                         gGL.setSceneBlendType(LLRender::BT_ALPHA);
@@ -3334,7 +3334,7 @@ BOOL LLModelPreview::render()
                             //build matrix palette
 
                             LLMatrix4a mat[LL_MAX_JOINTS_PER_MESH_OBJECT];
-                            LLSkinningUtil::initSkinningMatrixPalette((LLMatrix4*)mat, joint_count,
+                            LLSkinningUtil::initSkinningMatrixPalette(mat, joint_count,
                                 skin, getPreviewAvatar());
 
                             LLMatrix4a bind_shape_matrix;
@@ -3380,11 +3380,11 @@ BOOL LLModelPreview::render()
                             if (edges)
                             {
                                 gGL.diffuseColor4fv(PREVIEW_EDGE_COL.mV);
-                                glLineWidth(PREVIEW_EDGE_WIDTH);
+                                gGL.setLineWidth(PREVIEW_EDGE_WIDTH);
                                 glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
                                 buffer->draw(LLRender::TRIANGLES, buffer->getNumIndices(), 0);
                                 glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-                                glLineWidth(1.f);
+                                gGL.setLineWidth(1.f);
                             }
                         }
                     }

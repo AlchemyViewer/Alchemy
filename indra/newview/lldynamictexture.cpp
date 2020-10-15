@@ -126,10 +126,10 @@ BOOL LLViewerDynamicTexture::render()
 void LLViewerDynamicTexture::preRender(BOOL clear_depth)
 {
 	gPipeline.allocatePhysicsBuffer();
-	llassert(mFullWidth <= static_cast<S32>(gPipeline.mPhysicsDisplay.getWidth()));
-	llassert(mFullHeight <= static_cast<S32>(gPipeline.mPhysicsDisplay.getHeight()));
+	llassert(mFullWidth <= static_cast<S32>(gPipeline.mBake.getWidth()));
+	llassert(mFullHeight <= static_cast<S32>(gPipeline.mBake.getHeight()));
 
-	if (gGLManager.mHasFramebufferObject && gPipeline.mPhysicsDisplay.isComplete() && !gGLManager.mIsATI)
+	if (gGLManager.mHasFramebufferObject && gPipeline.mBake.isComplete())
 	{ //using offscreen render target, just use the bottom left corner
 		mOrigin.set(0, 0);
 	}
@@ -216,7 +216,7 @@ BOOL LLViewerDynamicTexture::updateAllInstances()
 		return TRUE;
 	}
 
-	bool use_fbo = gGLManager.mHasFramebufferObject && gPipeline.mBake.isComplete() && !gGLManager.mIsATI;
+	bool use_fbo = gGLManager.mHasFramebufferObject && gPipeline.mBake.isComplete();
 
 	if (use_fbo)
 	{
