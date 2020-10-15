@@ -451,7 +451,7 @@ namespace
 	}
 
 
-	typedef std::map<std::string, LLError::ELevel> LevelMap;
+	typedef absl::flat_hash_map<std::string, LLError::ELevel> LevelMap;
 	typedef std::vector<LLError::RecorderPtr> Recorders;
 	typedef std::vector<LLError::CallSite*> CallSiteVector;
 
@@ -900,10 +900,9 @@ namespace LLError
 namespace {
 	void setLevels(LevelMap& map, const LLSD& list, LLError::ELevel level)
 	{
-		LLSD::array_const_iterator i, end;
-		for (i = list.beginArray(), end = list.endArray(); i != end; ++i)
+		for (const auto& i : list.array())
 		{
-			map[*i] = level;
+			map[i.asString()] = level;
 		}
 	}
 }
