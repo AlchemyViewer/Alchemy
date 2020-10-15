@@ -161,6 +161,17 @@
    name="first_person_avatar_visible"
    top_pad="5"
    width="256" />
+  <check_box
+   control_name="AlchemyDisableMouseSteering"
+   follows="left|top"
+   height="20"
+   label="Disable mouse steering"
+   layout="topleft"
+   left_delta="0"
+   name="disable_mouse_steering"
+   tool_tip="Mouse steering resets your camera and avatar position to face away from the camera when you click your avatar."
+   top_pad="0"
+   width="256" />
   <text
    type="string"
    length="1"

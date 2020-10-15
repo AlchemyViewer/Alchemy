@@ -233,6 +233,17 @@
       <key>Value</key>
       <integer>0</integer>
     </map>
+    <key>AlchemyDisableMouseSteering</key>
+    <map>
+      <key>Comment</key>
+      <string>Disable mouse steering. Doing so will stop your camera from resetting, and your avatar from rotating when you click yourself (escape key-like behaviour).</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <integer>0</integer>
+    </map>
     <key>AlchemyLookAtShow</key>
     <map>
       <key>Comment</key>
