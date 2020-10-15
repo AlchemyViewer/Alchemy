@@ -66,7 +66,7 @@ F32 FALL_TIME = 0.6f;
 S32 BORDER_WIDTH = 6;
 S32 TOP_PANEL_HEIGHT = 30;
 
-const S32 MAX_TEXTURE_SIZE = 512 ; //max upload texture size 512 * 512
+const S32 MAX_TEXTURE_SIZE = 1024 ; //max upload texture size 1024 * 1024
 
 std::set<LLSnapshotLivePreview*> LLSnapshotLivePreview::sList;
 LLPointer<LLImageFormatted> LLSnapshotLivePreview::sSaveLocalImage = NULL;

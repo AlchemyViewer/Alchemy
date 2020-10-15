@@ -52,7 +52,7 @@ LLSnapshotFloaterView* gSnapshotFloaterView = NULL;
 const F32 AUTO_SNAPSHOT_TIME_DELAY = 1.f;
 
 const S32 MAX_POSTCARD_DATASIZE = 1572864; // 1.5 megabyte, similar to simulator limit
-const S32 MAX_TEXTURE_SIZE = 512 ; //max upload texture size 512 * 512
+const S32 MAX_TEXTURE_SIZE = 1024 ; //max upload texture size 1024 * 1024
 
 static LLDefaultChildRegistry::Register<LLSnapshotFloaterView> r("snapshot_floater_view");
 
@@ -702,7 +702,7 @@ void LLFloaterSnapshot::Impl::updateResolution(LLUICtrl* ctrl, void* data, BOOL 
 				new_width = spanel->getTypedPreviewWidth();
 				new_height = spanel->getTypedPreviewHeight();
 
-				// Limit custom size for inventory snapshots to 512x512 px.
+				// Limit custom size for inventory snapshots to 1024x1024 px.
 				if (getActiveSnapshotType(view) == LLSnapshotModel::SNAPSHOT_TEXTURE)
 				{
 					new_width = llmin(new_width, MAX_TEXTURE_SIZE);

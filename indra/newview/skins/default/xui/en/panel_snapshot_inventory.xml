@@ -48,6 +48,10 @@
      right="-5"
      top_pad="5">
         <combo_box.item
+         label="Current Window(1024x1024)"
+         name="CurrentWindow"
+         value="[i0,i0]" />
+        <combo_box.item
          label="Small (128x128)"
          name="Small(128x128)"
          value="[i128,i128]" />
@@ -60,9 +64,9 @@
          name="Large(512x512)"
          value="[i512,i512]" />
         <combo_box.item
-         label="Current Window(512x512)"
-         name="CurrentWindow"
-         value="[i0,i0]" />
+         label="Extra Large (1024x1024)"
+         name="Large(1024x1024)"
+         value="[i1024,i1024]" />
         <combo_box.item
          label="Custom"
          name="Custom"
