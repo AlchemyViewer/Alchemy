@@ -192,6 +192,7 @@ set(llcommon_HEADER_FILES
     llmetrics.h
     llmetricperformancetester.h
     llmortician.h
+    llmutex.h
     llnametable.h
     llpointer.h
     llpounceable.h
