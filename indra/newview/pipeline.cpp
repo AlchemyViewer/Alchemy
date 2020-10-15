@@ -4963,7 +4963,7 @@ void LLPipeline::renderDebug()
 					if ( pathfindingConsole->isRenderNavMesh() )
 					{	
 						gGL.flush();
-						glLineWidth(2.0f);	
+						gGL.setLineWidth(2.0f);	
 						LLGLEnable cull(GL_CULL_FACE);
 						LLGLDisable blend(GL_BLEND);
 						
@@ -4994,7 +4994,7 @@ void LLPipeline::renderDebug()
 
 						gGL.flush();
 						glPolygonMode( GL_FRONT_AND_BACK, GL_FILL );	
-						glLineWidth(1.0f);	
+						gGL.setLineWidth(1.0f);	
 						gGL.flush();
 					}
 					//User designated path
@@ -5131,11 +5131,11 @@ void LLPipeline::renderDebug()
 									gPathfindingProgram.uniform1f(sTint, 1.f);
 									gPathfindingProgram.uniform1f(sAlphaScale, 1.f);
 
-									glLineWidth(gSavedSettings.getF32("PathfindingLineWidth"));
+									gGL.setLineWidth(gSavedSettings.getF32("PathfindingLineWidth"));
 									LLGLDisable blendOut(GL_BLEND);
 									llPathingLibInstance->renderNavMeshShapesVBO( render_order[i] );				
 									gGL.flush();
-									glLineWidth(1.f);
+									gGL.setLineWidth(1.f);
 								}
 				
 								glPolygonMode( GL_FRONT_AND_BACK, GL_FILL );
@@ -5158,7 +5158,7 @@ void LLPipeline::renderDebug()
 						LLGLEnable blend(GL_BLEND);
 						LLGLDepthTest depth(GL_TRUE, GL_FALSE, GL_GREATER);
 						gGL.flush();				
-						glLineWidth(2.0f);	
+						gGL.setLineWidth(2.0f);	
 						LLGLEnable cull(GL_CULL_FACE);
 																		
 						gPathfindingProgram.uniform1f(sTint, gSavedSettings.getF32("PathfindingXRayTint"));
@@ -5192,7 +5192,7 @@ void LLPipeline::renderDebug()
 						}
 					
 						gGL.flush();
-						glLineWidth(1.0f);	
+						gGL.setLineWidth(1.0f);	
 					}
 			
 					glPolygonOffset(0.f, 0.f);
@@ -5455,7 +5455,7 @@ void LLPipeline::renderDebug()
 			}
 
 			/*gGL.flush();
-			glLineWidth(16-i*2);
+			gGL.setLineWidth(16-i*2);
 			for (LLWorld::region_list_t::const_iterator iter = LLWorld::getInstance()->getRegionList().begin(); 
 					iter != LLWorld::getInstance()->getRegionList().end(); ++iter)
 			{
@@ -5473,7 +5473,7 @@ void LLPipeline::renderDebug()
 				}
 			}
 			gGL.flush();
-			glLineWidth(1.f);*/
+			gGL.setLineWidth(1.f);*/
 		}
 	}
 
