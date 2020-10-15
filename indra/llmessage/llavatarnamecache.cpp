@@ -329,17 +329,15 @@ void LLAvatarNameCache::requestNamesViaCapability()
 		if (url.empty())
 		{
 			// ...starting new request
-			url += mNameLookupURL;
-			url += "?ids=";
+			absl::StrAppend(&url, mNameLookupURL, "?ids=", agent_id.asString());
 			ids = 1;
 		}
 		else
 		{
 			// ...continuing existing request
-			url += "&ids=";
+			absl::StrAppend(&url, "&ids=", agent_id.asString());
 			ids++;
 		}
-		url += agent_id.asString();
 		agent_ids.push_back(agent_id);
 
 		// mark request as pending

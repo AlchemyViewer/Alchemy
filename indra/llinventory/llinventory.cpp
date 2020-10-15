@@ -228,7 +228,6 @@ BOOL LLInventoryObject::importLegacyStream(std::istream& input_stream)
 // not sure whether exportLegacyStream(llofstream(fp)) would work, fp may need to get icramented...
 BOOL LLInventoryObject::exportFile(LLFILE* fp, BOOL) const
 {
-	std::string uuid_str;
 	absl::FPrintF(fp, "\tinv_object\t0\n\t{\n");
 	absl::FPrintF(fp, "\t\tobj_id\t%s\n", mUUID);
 	absl::FPrintF(fp, "\t\tparent_id\t%s\n", mParentUUID);

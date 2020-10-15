@@ -434,12 +434,9 @@ void LLControlGroup::cleanup()
 			F64 end_time = LLTimer::getTotalSeconds();
 			U32 total_seconds = (U32)(end_time - start_time);
 
-			std::string msg = llformat("Runtime (seconds): %d\n\n No. accesses   Avg. accesses/sec  Name\n", total_seconds);
-			std::ostringstream data_msg;
-
-			data_msg << msg;
-			size_t data_size = data_msg.str().size();
-			if (fwrite(data_msg.str().c_str(), 1, data_size, out) != data_size)
+			std::string msg = absl::StrFormat("Runtime (seconds): %d\n\n No. accesses   Avg. accesses/sec  Name\n", total_seconds);
+			size_t data_size = msg.size();
+			if (fwrite(msg.c_str(), 1, data_size, out) != data_size)
 			{
 				LL_WARNS("SettingsProfile") << "Failed to write settings profile header" << LL_ENDL;
 			}
@@ -459,11 +456,9 @@ void LLControlGroup::cleanup()
 				}
 				if (access_rate >= 2)
 				{
-					std::ostringstream data_msg;
-					msg = llformat("%13d        %7d       %s", iter->second, access_rate, iter->first.c_str());
-					data_msg << msg << "\n";
-					size_t data_size = data_msg.str().size();
-					if (fwrite(data_msg.str().c_str(), 1, data_size, out) != data_size)
+					msg = absl::StrFormat("%13d        %7d       %s\n", iter->second, access_rate, iter->first);
+					size_t data_size = msg.size();
+					if (fwrite(msg.c_str(), 1, data_size, out) != data_size)
 					{
 						LL_WARNS("SettingsProfile") << "Failed to write settings profile" << LL_ENDL;
 					}
