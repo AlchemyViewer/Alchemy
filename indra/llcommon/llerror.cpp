@@ -46,8 +46,10 @@
 #include <vector>
 #include <string_view>
 #include "string.h"
-#include <absl/container/flat_hash_map.h>
-#include <absl/strings/str_format.h>
+
+#include "absl/synchronization/mutex.h"
+#include "absl/container/flat_hash_map.h"
+#include "absl/strings/str_format.h"
 
 #include "llapp.h"
 #include "llapr.h"
@@ -1276,16 +1278,26 @@ namespace {
 		LOG_MUTEX,
 		STACKS_MUTEX
 	};
-	// Some logging calls happen very early in processing -- so early that our
-	// module-static variables aren't yet initialized. getMutex() wraps a
-	// function-static LLMutex so that early calls can still have a valid
-	// LLMutex instance.
+
+	ABSL_CONST_INIT absl::Mutex sLogMutex(absl::kConstInit);
+	ABSL_CONST_INIT absl::Mutex sStackMutex(absl::kConstInit);
+
 	template <MutexDiscriminator MTX>
-	LLMutex* getMutex()
+	absl::Mutex* getMutex()
 	{
-		// guaranteed to be initialized the first time control reaches here
-		static LLMutex sMutex;
-		return &sMutex;
+		return nullptr;
+	}
+
+	template <>
+	absl::Mutex* getMutex<LOG_MUTEX>()
+	{
+		return &sLogMutex;
+	}
+
+	template <>
+	absl::Mutex* getMutex<STACKS_MUTEX>()
+	{
+		return &sStackMutex;
 	}
 
 	bool checkLevelMap(const LevelMap& map, const std::string& key,
@@ -1334,7 +1346,7 @@ namespace LLError
 
 	bool Log::shouldLog(CallSite& site)
 	{
-		LLMutexTrylock lock(getMutex<LOG_MUTEX>(), 5);
+		AbslMutexMaybeTrylock lock(getMutex<LOG_MUTEX>(), 5);
 		if (!lock.isLocked())
 		{
 			return false;
@@ -1377,7 +1389,7 @@ namespace LLError
 
 	std::ostringstream* Log::out()
 	{
-		LLMutexTrylock lock(getMutex<LOG_MUTEX>(),5);
+		AbslMutexMaybeTrylock lock(getMutex<LOG_MUTEX>(),5);
 
 		if (lock.isLocked())
 		{
@@ -1395,7 +1407,7 @@ namespace LLError
 
 	void Log::flush(std::ostringstream* out, char* message)
 	{
-		LLMutexTrylock lock(getMutex<LOG_MUTEX>(),5);
+		AbslMutexMaybeTrylock lock(getMutex<LOG_MUTEX>(),5);
 		if (!lock.isLocked())
 		{
 			return;
@@ -1427,7 +1439,7 @@ namespace LLError
 
 	void Log::flush(std::ostringstream* out, const CallSite& site)
 	{
-		LLMutexTrylock lock(getMutex<LOG_MUTEX>(),5);
+		AbslMutexMaybeTrylock lock(getMutex<LOG_MUTEX>(),5);
 		if (!lock.isLocked())
 		{
 			return;
@@ -1616,7 +1628,7 @@ namespace LLError
     //static
     void LLCallStacks::push(const char* function, const int line)
     {
-        LLMutexTrylock lock(getMutex<STACKS_MUTEX>(), 5);
+		AbslMutexMaybeTrylock lock(getMutex<STACKS_MUTEX>(), 5);
         if (!lock.isLocked())
         {
             return;
@@ -1650,7 +1662,7 @@ namespace LLError
     //static
     void LLCallStacks::end(std::ostringstream* _out)
     {
-        LLMutexTrylock lock(getMutex<STACKS_MUTEX>(), 5);
+		AbslMutexMaybeTrylock lock(getMutex<STACKS_MUTEX>(), 5);
         if (!lock.isLocked())
         {
             return;
@@ -1672,7 +1684,7 @@ namespace LLError
     //static
     void LLCallStacks::print()
     {
-        LLMutexTrylock lock(getMutex<STACKS_MUTEX>(), 5);
+		AbslMutexMaybeTrylock lock(getMutex<STACKS_MUTEX>(), 5);
         if (!lock.isLocked())
         {
             return;
@@ -1715,7 +1727,7 @@ namespace LLError
 
 bool debugLoggingEnabled(const std::string& tag)
 {
-    LLMutexTrylock lock(getMutex<LOG_MUTEX>(), 5);
+	AbslMutexMaybeTrylock lock(getMutex<LOG_MUTEX>(), 5);
     if (!lock.isLocked())
     {
         return false;
