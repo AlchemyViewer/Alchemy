@@ -1736,7 +1736,7 @@ LLUIImagePtr LLUIImageList::loadUIImage(LLViewerFetchedTexture* imagep, const st
 		// Don't add downloadable content into this list
 		// all UI images are non-deletable and list does not support deletion
 		imagep->setNoDelete();
-		mUIImages.insert(std::make_pair(name, new_imagep));
+		mUIImages.emplace(name, new_imagep);
 		mUITextureList.push_back(imagep);
 	}
 

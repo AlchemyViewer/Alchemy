@@ -344,7 +344,7 @@ std::string LLTrans::getCountString(const std::string_view language, const std::
 	return getString(key, args);
 }
 
-void LLTrans::setDefaultArg(const std::string& name, const std::string value)
+void LLTrans::setDefaultArg(const std::string& name, std::string value)
 {
 	sDefaultArgs[name] = std::move(value);
 }

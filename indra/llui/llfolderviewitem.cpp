@@ -494,8 +494,7 @@ void LLFolderViewItem::rename(const std::string& new_name)
 
 const std::string& LLFolderViewItem::getName( void ) const
 {
-	static const std::string noName("");
-	return getViewModelItem() ? getViewModelItem()->getName() : noName;
+	return getViewModelItem() ? getViewModelItem()->getName() : LLStringUtil::null;
 }
 
 // LLView functionality

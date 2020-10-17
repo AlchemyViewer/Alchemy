@@ -45,8 +45,8 @@ LLInspect::~LLInspect()
 // virtual
 void LLInspect::draw()
 {
-	static LLCachedControl<F32> FADE_TIME(*LLUI::getInstance()->mSettingGroups["config"], "InspectorFadeTime", 1.f);
-	static LLCachedControl<F32> STAY_TIME(*LLUI::getInstance()->mSettingGroups["config"], "InspectorShowTime", 1.f);
+	static LLUICachedControl<F32> FADE_TIME("InspectorFadeTime", 1.f);
+	static LLUICachedControl<F32> STAY_TIME("InspectorShowTime", 1.f);
 	if (mOpenTimer.getStarted())
 	{
 		LLFloater::draw();
