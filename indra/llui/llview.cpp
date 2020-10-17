@@ -84,7 +84,7 @@ BOOL LLView::sIsDrawing = FALSE;
 
 // Compiler optimization, generate extern template
 template class LLView* LLView::getChild<class LLView>(
-	const std::string& name, BOOL recurse) const;
+	std::string_view name, BOOL recurse) const;
 
 static LLDefaultChildRegistry::Register<LLView> r("view");
 
@@ -718,7 +718,7 @@ void LLView::logMouseEvent()
 }
 
 template <typename METHOD, typename CHARTYPE>
-LLView* LLView::childrenHandleCharEvent(const std::string& desc, const METHOD& method,
+LLView* LLView::childrenHandleCharEvent(std::string_view desc, const METHOD& method,
 										CHARTYPE c, MASK mask)
 {
 	if ( getVisible() && getEnabled() )
@@ -1574,7 +1574,7 @@ BOOL LLView::hasAncestor(const LLView* parentp) const
 
 //-----------------------------------------------------------------------------
 
-BOOL LLView::childHasKeyboardFocus( const std::string& childname ) const
+BOOL LLView::childHasKeyboardFocus(std::string_view childname) const
 {
 	LLView *focus = dynamic_cast<LLView *>(gFocusMgr.getKeyboardFocus());
 	
@@ -1593,7 +1593,7 @@ BOOL LLView::childHasKeyboardFocus( const std::string& childname ) const
 
 //-----------------------------------------------------------------------------
 
-BOOL LLView::hasChild(const std::string& childname, BOOL recurse) const
+BOOL LLView::hasChild(std::string_view childname, BOOL recurse) const
 {
 	return findChildView(childname, recurse) != NULL;
 }
@@ -1601,14 +1601,14 @@ BOOL LLView::hasChild(const std::string& childname, BOOL recurse) const
 //-----------------------------------------------------------------------------
 // getChildView()
 //-----------------------------------------------------------------------------
-LLView* LLView::getChildView(const std::string& name, BOOL recurse) const
+LLView* LLView::getChildView(std::string_view name, BOOL recurse) const
 {
 	return getChild<LLView>(name, recurse);
 }
 
 static LLTrace::BlockTimerStatHandle FTM_FIND_VIEWS("Find Widgets");
 
-LLView* LLView::findChildView(const std::string& name, BOOL recurse) const
+LLView* LLView::findChildView(std::string_view name, BOOL recurse) const
 {
 	LL_RECORD_BLOCK_TIME(FTM_FIND_VIEWS);
 	//richard: should we allow empty names?
@@ -2265,13 +2265,13 @@ LLView*	LLView::findSnapEdge(S32& new_edge_val, const LLCoordGL& mouse_dir, ESna
 //-----------------------------------------------------------------------------
 
 
-LLControlVariable *LLView::findControl(const std::string& name)
+LLControlVariable *LLView::findControl(std::string_view name)
 {
 	// parse the name to locate which group it belongs to
-	std::size_t key_pos= name.find(".");
-	if(key_pos!=  std::string::npos )
+	std::size_t key_pos = name.find('.');
+	if(key_pos !=  std::string::npos )
 	{
-		std::string control_group_key = name.substr(0, key_pos);
+		std::string control_group_key(name.substr(0, key_pos));
 		LLControlVariable* control;
 		// check if it's in the control group that name indicated
 		if(LLUI::getInstance()->mSettingGroups[control_group_key])

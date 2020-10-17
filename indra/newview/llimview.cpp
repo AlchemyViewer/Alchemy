@@ -2305,12 +2305,12 @@ BOOL LLIncomingCallDialog::postBuild()
 		if (gAgent.getGroupData(session_id, data))
 		{
 			args["[GROUP]"] = data.mName;
-			call_type = getString(mPayload["notify_box_type"], args);
+			call_type = getString(mPayload["notify_box_type"].asStringRef(), args);
 		}
 	}
 	else
 	{
-		call_type = getString(mPayload["notify_box_type"]);
+		call_type = getString(mPayload["notify_box_type"].asStringRef());
 	}
 		
 	

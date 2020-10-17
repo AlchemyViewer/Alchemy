@@ -664,8 +664,8 @@ public:
 
 	virtual void openMenu();
 
-	virtual LLView* getChildView(const std::string& name, BOOL recurse = TRUE) const;
-	virtual LLView* findChildView(const std::string& name, BOOL recurse = TRUE) const;
+	LLView* getChildView(std::string_view name, BOOL recurse = TRUE) const final;
+	LLView* findChildView(std::string_view name, BOOL recurse = TRUE) const final;
 
 private:
 	LLHandle<LLView> mBranchHandle;

@@ -147,8 +147,8 @@ public:
 	/*virtual*/ BOOL handleDragAndDrop(S32 x, S32 y, MASK mask,	BOOL drop,
 									   EDragAndDropType type, void* cargo_data,
 									   EAcceptance* accept, std::string& tooltip);
-	/*virtual*/ LLView* getChildView(const std::string& name, BOOL recurse = TRUE) const;
-	/*virtual*/ LLView* findChildView(const std::string& name, BOOL recurse = TRUE) const;
+	/*virtual*/ LLView* getChildView(std::string_view name, BOOL recurse = TRUE) const final;
+	/*virtual*/ LLView* findChildView(std::string_view name, BOOL recurse = TRUE) const final;
 	/*virtual*/ void initFromParams(const LLPanel::Params& p);
 	/*virtual*/ bool addChild(LLView* view, S32 tab_group = 0);
 	/*virtual*/ BOOL postBuild();

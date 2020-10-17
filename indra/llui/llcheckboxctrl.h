@@ -151,7 +151,7 @@ protected:
 // Build time optimization, generate once in .cpp file
 #ifndef LLCHECKBOXCTRL_CPP
 extern template class LLCheckBoxCtrl* LLView::getChild<class LLCheckBoxCtrl>(
-	const std::string& name, BOOL recurse) const;
+	std::string_view name, BOOL recurse) const;
 #endif
 
 #endif  // LL_LLCHECKBOXCTRL_H

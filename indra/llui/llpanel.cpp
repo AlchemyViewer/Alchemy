@@ -55,7 +55,7 @@ LLPanel::factory_stack_t	LLPanel::sFactoryStack;
 
 // Compiler optimization, generate extern template
 template class LLPanel* LLView::getChild<class LLPanel>(
-	const std::string& name, BOOL recurse) const;
+	std::string_view name, BOOL recurse) const;
 
 LLPanel::LocalizedString::LocalizedString()
 :	name("name"),
@@ -275,7 +275,7 @@ void LLPanel::setDefaultBtn(LLButton* btn)
 	}
 }
 
-void LLPanel::setDefaultBtn(const std::string& id)
+void LLPanel::setDefaultBtn(std::string_view id)
 {
 	LLButton *button = getChild<LLButton>(id);
 	if (button)
@@ -461,7 +461,7 @@ void LLPanel::initFromParams(const LLPanel::Params& p)
 		it != p.strings.end();
 		++it)
 	{
-		mUIStrings[it->name] = it->value;
+		mUIStrings[it->name()] = it->value;
 	}
 
 	setLabel(p.label());
@@ -591,12 +591,12 @@ BOOL LLPanel::initPanelXML(LLXMLNodePtr node, LLView *parent, LLXMLNodePtr outpu
 	return TRUE;
 }
 
-bool LLPanel::hasString(const std::string& name)
+bool LLPanel::hasString(std::string_view name)
 {
 	return mUIStrings.find(name) != mUIStrings.end();
 }
 
-std::string LLPanel::getString(const std::string& name, const LLStringUtil::format_map_t& args) const
+std::string LLPanel::getString(std::string_view name, const LLStringUtil::format_map_t& args) const
 {
 	ui_string_map_t::const_iterator found_it = mUIStrings.find(name);
 	if (found_it != mUIStrings.end())
@@ -606,7 +606,7 @@ std::string LLPanel::getString(const std::string& name, const LLStringUtil::form
 		formatted_string.setArgList(args);
 		return formatted_string.getString();
 	}
-	std::string err_str("Failed to find string " + name + " in panel " + getName()); //*TODO: Translate
+	std::string err_str = absl::StrCat("Failed to find string ", name, " in panel ", getName()); //*TODO: Translate
 	if(LLUI::getInstance()->mSettingGroups["config"]->getBOOL("QAMode"))
 	{
 		LL_ERRS() << err_str << LL_ENDL;
@@ -618,14 +618,14 @@ std::string LLPanel::getString(const std::string& name, const LLStringUtil::form
 	return LLStringUtil::null;
 }
 
-std::string LLPanel::getString(const std::string& name) const
+std::string LLPanel::getString(std::string_view name) const
 {
 	ui_string_map_t::const_iterator found_it = mUIStrings.find(name);
 	if (found_it != mUIStrings.end())
 	{
 		return found_it->second;
 	}
-	std::string err_str("Failed to find string " + name + " in panel " + getName()); //*TODO: Translate
+	std::string err_str = absl::StrCat("Failed to find string ", name, " in panel ", getName()); //*TODO: Translate
 	if(LLUI::getInstance()->mSettingGroups["config"]->getBOOL("QAMode"))
 	{
 		LL_ERRS() << err_str << LL_ENDL;
@@ -634,11 +634,11 @@ std::string LLPanel::getString(const std::string& name) const
 	{
 		LL_WARNS() << err_str << LL_ENDL;
 	}
-	return LLStringUtil::null;
+	return {};
 }
 
 
-void LLPanel::childSetVisible(const std::string& id, bool visible)
+void LLPanel::childSetVisible(std::string_view id, bool visible)
 {
 	LLView* child = findChild<LLView>(id);
 	if (child)
@@ -647,7 +647,7 @@ void LLPanel::childSetVisible(const std::string& id, bool visible)
 	}
 }
 
-void LLPanel::childSetEnabled(const std::string& id, bool enabled)
+void LLPanel::childSetEnabled(std::string_view id, bool enabled)
 {
 	LLView* child = findChild<LLView>(id);
 	if (child)
@@ -656,7 +656,7 @@ void LLPanel::childSetEnabled(const std::string& id, bool enabled)
 	}
 }
 
-void LLPanel::childSetFocus(const std::string& id, BOOL focus)
+void LLPanel::childSetFocus(std::string_view id, BOOL focus)
 {
 	LLUICtrl* child = findChild<LLUICtrl>(id);
 	if (child)
@@ -665,7 +665,7 @@ void LLPanel::childSetFocus(const std::string& id, BOOL focus)
 	}
 }
 
-BOOL LLPanel::childHasFocus(const std::string& id)
+BOOL LLPanel::childHasFocus(std::string_view id)
 {
 	LLUICtrl* child = findChild<LLUICtrl>(id);
 	if (child)
@@ -682,7 +682,7 @@ BOOL LLPanel::childHasFocus(const std::string& id)
 // Prefer getChild<LLUICtrl>("foo")->setCommitCallback(boost:bind(...)),
 // which takes a generic slot.  Or use mCommitCallbackRegistrar.add() with
 // a named callback and reference it in XML.
-void LLPanel::childSetCommitCallback(const std::string& id, boost::function<void (LLUICtrl*,void*)> cb, void* data)
+void LLPanel::childSetCommitCallback(std::string_view id, boost::function<void (LLUICtrl*,void*)> cb, void* data)
 {
 	LLUICtrl* child = findChild<LLUICtrl>(id);
 	if (child)
@@ -691,7 +691,7 @@ void LLPanel::childSetCommitCallback(const std::string& id, boost::function<void
 	}
 }
 
-void LLPanel::childSetColor(const std::string& id, const LLColor4& color)
+void LLPanel::childSetColor(std::string_view id, const LLColor4& color)
 {
 	LLUICtrl* child = findChild<LLUICtrl>(id);
 	if (child)
@@ -700,7 +700,7 @@ void LLPanel::childSetColor(const std::string& id, const LLColor4& color)
 	}
 }
 
-LLCtrlSelectionInterface* LLPanel::childGetSelectionInterface(const std::string& id) const
+LLCtrlSelectionInterface* LLPanel::childGetSelectionInterface(std::string_view id) const
 {
 	LLUICtrl* child = findChild<LLUICtrl>(id);
 	if (child)
@@ -710,7 +710,7 @@ LLCtrlSelectionInterface* LLPanel::childGetSelectionInterface(const std::string&
 	return NULL;
 }
 
-LLCtrlListInterface* LLPanel::childGetListInterface(const std::string& id) const
+LLCtrlListInterface* LLPanel::childGetListInterface(std::string_view id) const
 {
 	LLUICtrl* child = findChild<LLUICtrl>(id);
 	if (child)
@@ -720,7 +720,7 @@ LLCtrlListInterface* LLPanel::childGetListInterface(const std::string& id) const
 	return NULL;
 }
 
-LLCtrlScrollInterface* LLPanel::childGetScrollInterface(const std::string& id) const
+LLCtrlScrollInterface* LLPanel::childGetScrollInterface(std::string_view id) const
 {
 	LLUICtrl* child = findChild<LLUICtrl>(id);
 	if (child)
@@ -730,7 +730,7 @@ LLCtrlScrollInterface* LLPanel::childGetScrollInterface(const std::string& id) c
 	return NULL;
 }
 
-void LLPanel::childSetValue(const std::string& id, LLSD value)
+void LLPanel::childSetValue(std::string_view id, LLSD value)
 {
 	LLUICtrl* child = findChild<LLUICtrl>(id);
 	if (child)
@@ -739,7 +739,7 @@ void LLPanel::childSetValue(const std::string& id, LLSD value)
 	}
 }
 
-LLSD LLPanel::childGetValue(const std::string& id) const
+LLSD LLPanel::childGetValue(std::string_view id) const
 {
 	LLUICtrl* child = findChild<LLUICtrl>(id);
 	if (child)
@@ -750,7 +750,7 @@ LLSD LLPanel::childGetValue(const std::string& id) const
 	return LLSD();
 }
 
-BOOL LLPanel::childSetTextArg(const std::string& id, const std::string& key, const LLStringExplicit& text)
+BOOL LLPanel::childSetTextArg(std::string_view id, const std::string& key, const LLStringExplicit& text)
 {
 	LLUICtrl* child = findChild<LLUICtrl>(id);
 	if (child)
@@ -760,7 +760,7 @@ BOOL LLPanel::childSetTextArg(const std::string& id, const std::string& key, con
 	return FALSE;
 }
 
-BOOL LLPanel::childSetLabelArg(const std::string& id, const std::string& key, const LLStringExplicit& text)
+BOOL LLPanel::childSetLabelArg(std::string_view id, const std::string& key, const LLStringExplicit& text)
 {
 	LLView* child = findChild<LLView>(id);
 	if (child)
@@ -770,7 +770,7 @@ BOOL LLPanel::childSetLabelArg(const std::string& id, const std::string& key, co
 	return FALSE;
 }
 
-void LLPanel::childSetAction(const std::string& id, const commit_signal_t::slot_type& function)
+void LLPanel::childSetAction(std::string_view id, const commit_signal_t::slot_type& function)
 {
 	LLButton* button = findChild<LLButton>(id);
 	if (button)
@@ -779,7 +779,7 @@ void LLPanel::childSetAction(const std::string& id, const commit_signal_t::slot_
 	}
 }
 
-void LLPanel::childSetAction(const std::string& id, boost::function<void(void*)> function, void* value)
+void LLPanel::childSetAction(std::string_view id, boost::function<void(void*)> function, void* value)
 {
 	LLButton* button = findChild<LLButton>(id);
 	if (button)

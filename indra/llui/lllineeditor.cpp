@@ -74,7 +74,7 @@ static LLDefaultChildRegistry::Register<LLLineEditor> r1("line_editor");
 
 // Compiler optimization, generate extern template
 template class LLLineEditor* LLView::getChild<class LLLineEditor>(
-	const std::string& name, BOOL recurse) const;
+	std::string_view name, BOOL recurse) const;
 
 //
 // Member functions

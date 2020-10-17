@@ -328,7 +328,7 @@ private:
 // Build time optimization, generate once in .cpp file
 #ifndef LLUICTRL_CPP
 extern template class LLUICtrl* LLView::getChild<class LLUICtrl>(
-	const std::string& name, BOOL recurse) const;
+	std::string_view name, BOOL recurse) const;
 #endif
 
 #endif  // LL_LLUICTRL_H

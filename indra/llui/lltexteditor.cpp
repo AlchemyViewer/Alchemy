@@ -70,7 +70,7 @@ static LLDefaultChildRegistry::Register<LLTextEditor> r("simple_text_editor");
 
 // Compiler optimization, generate extern template
 template class LLTextEditor* LLView::getChild<class LLTextEditor>(
-	const std::string& name, BOOL recurse) const;
+	std::string_view name, BOOL recurse) const;
 
 //
 // Constants
