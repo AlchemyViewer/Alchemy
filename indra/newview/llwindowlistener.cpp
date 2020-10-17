@@ -68,7 +68,7 @@ LLWindowListener::LLWindowListener(LLViewerWindow *window, const KeyboardGetter&
 	std::string buttonExplain =
 		"(button values \"LEFT\", \"MIDDLE\", \"RIGHT\")\n";
 	std::string paramsExplain =
-		"[\"path\"] is as for LLUI::getInstance()->resolvePath(), described in\n"
+		"[\"path\"] is as for LLUI::resolvePath(), described in\n"
 		"http://bitbucket.org/lindenlab/viewer-release/src/tip/indra/llui/llui.h\n"
 		"If you omit [\"path\"], you must specify both [\"x\"] and [\"y\"].\n"
 		"If you specify [\"path\"] without both [\"x\"] and [\"y\"], will synthesize (x, y)\n"
@@ -208,7 +208,7 @@ void LLWindowListener::getInfo(LLSD const & evt)
 	if (evt.has("path"))
 	{
 		std::string path(evt["path"]);
-		LLView * target_view = LLUI::getInstance()->resolvePath(LLUI::getInstance()->getRootView(), path);
+		LLView * target_view = LLUI::resolvePath(LLUI::getRootView(), path);
 		if (target_view != 0)
 		{
 			response.setResponse(target_view->getInfo());
@@ -229,7 +229,7 @@ void LLWindowListener::getInfo(LLSD const & evt)
 void LLWindowListener::getPaths(LLSD const & request)
 {
 	Response response(LLSD(), request);
-	LLView *root(LLUI::getInstance()->getRootView()), *base(NULL);
+	LLView *root(LLUI::getRootView()), *base(NULL);
 	// Capturing request["under"] as string means we conflate the case in
 	// which there is no ["under"] key with the case in which its value is the
 	// empty string. That seems to make sense to me.
@@ -242,7 +242,7 @@ void LLWindowListener::getPaths(LLSD const & request)
 	}
 	else
 	{
-		base = LLUI::getInstance()->resolvePath(root, under);
+		base = LLUI::resolvePath(root, under);
 		if (! base)
 		{
 			return response.error(STRINGIZE(request["op"].asString() << " request "
@@ -267,7 +267,7 @@ void LLWindowListener::keyDown(LLSD const & evt)
 	if (evt.has("path"))
 	{
 		std::string path(evt["path"]);
-		LLView * target_view = LLUI::getInstance()->resolvePath(LLUI::getInstance()->getRootView(), path);
+		LLView * target_view = LLUI::resolvePath(LLUI::getRootView(), path);
 		if (target_view == 0) 
 		{
 			response.error(STRINGIZE(evt["op"].asString() << " request "
@@ -302,7 +302,7 @@ void LLWindowListener::keyUp(LLSD const & evt)
 	if (evt.has("path"))
 	{
 		std::string path(evt["path"]);
-		LLView * target_view = LLUI::getInstance()->resolvePath(LLUI::getInstance()->getRootView(), path);
+		LLView * target_view = LLUI::resolvePath(LLUI::getRootView(), path);
 		if (target_view == 0 )
 		{
 			response.error(STRINGIZE(evt["op"].asString() << " request "
@@ -406,8 +406,8 @@ static void mouseEvent(const MouseFunc& func, const LLSD& request)
 	}
 	else // ! path.empty()
 	{
-		LLView* root   = LLUI::getInstance()->getRootView();
-		LLView* target = LLUI::getInstance()->resolvePath(root, path);
+		LLView* root   = LLUI::getRootView();
+		LLView* target = LLUI::resolvePath(root, path);
 		if (! target)
 		{
 			return response.error(STRINGIZE(request["op"].asString() << " request "

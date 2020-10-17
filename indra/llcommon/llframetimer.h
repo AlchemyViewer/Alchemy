@@ -41,6 +41,11 @@ class LL_COMMON_API LLFrameTimer
 public:
 	LLFrameTimer() : mStartTime( sFrameTime ), mExpiry(0), mStarted(TRUE) {}
 
+	enum ConstInitType {
+		kConstInit,
+	};
+	explicit constexpr LLFrameTimer(ConstInitType) : mStartTime(0), mExpiry(0), mStarted(TRUE) {}
+
 	// Return the number of seconds since the start of this
 	// application instance.
 	static F64SecondsImplicit getElapsedSeconds()

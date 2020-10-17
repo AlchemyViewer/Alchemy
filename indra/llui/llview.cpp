@@ -844,7 +844,7 @@ LLView* LLView::childrenHandleHover(S32 x, S32 y, MASK mask)
 		}
 
 		// This call differentiates this method from childrenHandleMouseEvent().
-		LLUI::getInstance()->mWindow->setCursor(viewp->getHoverCursor());
+		LLUI::getWindow()->setCursor(viewp->getHoverCursor());
 
 		if (viewp->handleHover(local_x, local_y, mask)
 			|| viewp->blockMouseEvent(local_x, local_y))
@@ -1190,8 +1190,7 @@ void LLView::drawChildren()
 {
 	if (!mChildList.empty())
 	{
-		auto& uiInst = LLUI::instance();
-		LLView* rootp = uiInst.getRootView();
+		LLView* rootp = LLUI::getRootView();
 		++sDepth;
 
 		for (LLView* viewp : boost::adaptors::reverse(mChildList))

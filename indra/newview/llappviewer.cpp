@@ -3078,7 +3078,7 @@ bool LLAppViewer::initWindow()
 		gViewerWindow->getWindow()->maximize();
 	}
 
-	LLUI::getInstance()->mWindow = gViewerWindow->getWindow();
+	LLUI::sWindow = gViewerWindow->getWindow();
 
 	// Show watch cursor
 	gViewerWindow->setCursor(UI_CURSOR_WAIT);

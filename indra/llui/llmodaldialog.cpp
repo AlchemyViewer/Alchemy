@@ -165,7 +165,7 @@ BOOL LLModalDialog::handleMouseDown(S32 x, S32 y, MASK mask)
 	if (popup_menu != NULL)
 	{
 		S32 mx, my;
-		LLUI::getInstance()->getMousePositionScreen(&mx, &my);
+		LLUI::getMousePositionScreen(&mx, &my);
 		LLRect menu_screen_rc = popup_menu->calcScreenRect();
 		if(!menu_screen_rc.pointInRect(mx, my))
 		{
@@ -202,7 +202,7 @@ BOOL LLModalDialog::handleHover(S32 x, S32 y, MASK mask)
 	if (popup_menu != NULL)
 	{
 		S32 mx, my;
-		LLUI::getInstance()->getMousePositionScreen(&mx, &my);
+		LLUI::getMousePositionScreen(&mx, &my);
 		LLRect menu_screen_rc = popup_menu->calcScreenRect();
 		if(menu_screen_rc.pointInRect(mx, my))
 		{
@@ -286,7 +286,7 @@ void LLModalDialog::draw()
 
 void LLModalDialog::centerOnScreen()
 {
-	LLVector2 window_size = LLUI::getInstance()->getWindowSize();
+	LLVector2 window_size = LLUI::getWindowSize();
 	centerWithin(LLRect(0, 0, ll_round(window_size.mV[VX]), ll_round(window_size.mV[VY])));
 }
 

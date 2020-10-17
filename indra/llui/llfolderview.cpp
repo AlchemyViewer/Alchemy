@@ -1842,7 +1842,7 @@ void LLFolderView::updateRenamerPosition()
 		screenPointToLocal( x, y, &x, &y );
 		mRenamer->setOrigin( x, y );
 
-		LLRect scroller_rect(0, 0, (S32)LLUI::getInstance()->getWindowSize().mV[VX], 0);
+		LLRect scroller_rect(0, 0, (S32)LLUI::getWindowSize().mV[VX], 0);
 		if (mScrollContainer)
 		{
 			scroller_rect = mScrollContainer->getContentWindowRect();

@@ -85,6 +85,10 @@ static LLDefaultChildRegistry::Register<LLSearchEditor> register_search_editor("
 static LLDefaultChildRegistry::Register<LLLoadingIndicator> register_loading_indicator("loading_indicator");
 static LLDefaultChildRegistry::Register<LLToolBar> register_toolbar("toolbar");
 
+LLWindow* LLUI::sWindow = nullptr;
+LLView* LLUI::sRootView = nullptr;
+LLFrameTimer LLUI::sMouseIdleTimer(LLFrameTimer::kConstInit);
+
 //
 // Functions
 //
@@ -156,10 +160,10 @@ LLUI::LLUI(const settings_map_t& settings,
 : mSettingGroups(settings),
 mAudioCallback(audio_callback),
 mDeferredAudioCallback(deferred_audio_callback),
-mWindow(NULL), // set later in startup
-mRootView(NULL),
 mHelpImpl(NULL)
 {
+	resetMouseIdleTimer();
+
 	LLRender2D::initParamSingleton(image_provider);
 
 	if ((get_ptr_in_map(mSettingGroups, std::string("config")) == NULL) ||
@@ -202,6 +206,12 @@ mHelpImpl(NULL)
 	LLCommandManager::load();
 }
 
+LLUI::~LLUI()
+{
+	sWindow = nullptr;
+	sRootView = nullptr;
+}
+
 void LLUI::setPopupFuncs(const add_popup_t& add_popup, const remove_popup_t& remove_popup,  const clear_popups_t& clear_popups)
 {
 	mAddPopupFunc = add_popup;
@@ -209,6 +219,7 @@ void LLUI::setPopupFuncs(const add_popup_t& add_popup, const remove_popup_t& rem
 	mClearPopupsFunc = clear_popups;
 }
 
+// static
 void LLUI::setMousePositionScreen(S32 x, S32 y)
 {
 #if defined(LL_DARWIN)
@@ -219,9 +230,10 @@ void LLUI::setMousePositionScreen(S32 x, S32 y)
     S32 screen_y = ll_round((F32)y * getScaleFactor().mV[VY]);
 #endif
 	
-	LLView::getWindow()->setCursorPosition(LLCoordGL(screen_x, screen_y).convert());
+	getWindow()->setCursorPosition(LLCoordGL(screen_x, screen_y).convert());
 }
 
+// static
 void LLUI::getMousePositionScreen(S32 *x, S32 *y)
 {
 	LLCoordWindow cursor_pos_window;
@@ -231,6 +243,7 @@ void LLUI::getMousePositionScreen(S32 *x, S32 *y)
 	*y = ll_round((F32)cursor_pos_gl.mY / getScaleFactor().mV[VY]);
 }
 
+// static
 void LLUI::setMousePositionLocal(const LLView* viewp, S32 x, S32 y)
 {
 	S32 screen_x, screen_y;
@@ -239,6 +252,7 @@ void LLUI::setMousePositionLocal(const LLView* viewp, S32 x, S32 y)
 	setMousePositionScreen(screen_x, screen_y);
 }
 
+// static
 void LLUI::getMousePositionLocal(const LLView* viewp, S32 *x, S32 *y)
 {
 	S32 screen_x, screen_y;
@@ -340,32 +354,37 @@ std::string LLUI::locateSkin(const std::string& filename)
 	return "";
 }
 
+// static
 LLVector2 LLUI::getWindowSize()
 {
 	LLCoordWindow window_rect;
-	mWindow->getSize(&window_rect);
+	getWindow()->getSize(&window_rect);
 
 	return LLVector2(window_rect.mX / getScaleFactor().mV[VX], window_rect.mY / getScaleFactor().mV[VY]);
 }
 
+// static
 void LLUI::screenPointToGL(S32 screen_x, S32 screen_y, S32 *gl_x, S32 *gl_y)
 {
 	*gl_x = ll_round((F32)screen_x * getScaleFactor().mV[VX]);
 	*gl_y = ll_round((F32)screen_y * getScaleFactor().mV[VY]);
 }
 
+// static
 void LLUI::glPointToScreen(S32 gl_x, S32 gl_y, S32 *screen_x, S32 *screen_y)
 {
 	*screen_x = ll_round((F32)gl_x / getScaleFactor().mV[VX]);
 	*screen_y = ll_round((F32)gl_y / getScaleFactor().mV[VY]);
 }
 
+// static
 void LLUI::screenRectToGL(const LLRect& screen, LLRect *gl)
 {
 	screenPointToGL(screen.mLeft, screen.mTop, &gl->mLeft, &gl->mTop);
 	screenPointToGL(screen.mRight, screen.mBottom, &gl->mRight, &gl->mBottom);
 }
 
+// static
 void LLUI::glRectToScreen(const LLRect& gl, LLRect *screen)
 {
 	glPointToScreen(gl.mLeft, gl.mTop, &screen->mLeft, &screen->mTop);
@@ -373,7 +392,7 @@ void LLUI::glRectToScreen(const LLRect& gl, LLRect *screen)
 }
 
 
-LLControlGroup& LLUI::getControlControlGroup (const std::string& controlname)
+LLControlGroup& LLUI::getControlControlGroup(std::string_view controlname)
 {
 	for (settings_map_t::iterator itor = mSettingGroups.begin();
 		 itor != mSettingGroups.end(); ++itor)
@@ -413,12 +432,14 @@ void LLUI::clearPopups()
 	}
 }
 
+// static
 void LLUI::reportBadKeystroke()
 {
 	make_ui_sound("UISndBadKeystroke");
 }
 
 // spawn_x and spawn_y are top left corner of view in screen GL coordinates
+// static
 void LLUI::positionViewNearMouse(LLView* view, S32 spawn_x, S32 spawn_y)
 {
 	const S32 CURSOR_HEIGHT = 16;		// Approximate "normal" cursor size
@@ -456,6 +477,7 @@ void LLUI::positionViewNearMouse(LLView* view, S32 spawn_x, S32 spawn_y)
 	view->translateIntoRectWithExclusion( virtual_window_rect, mouse_rect );
 }
 
+// static
 LLView* LLUI::resolvePath(LLView* context, const std::string& path)
 {
 	// Nothing about resolvePath() should require non-const LLView*. If caller
@@ -463,6 +485,7 @@ LLView* LLUI::resolvePath(LLView* context, const std::string& path)
 	return const_cast<LLView*>(resolvePath(const_cast<const LLView*>(context), path));
 }
 
+// static
 const LLView* LLUI::resolvePath(const LLView* context, const std::string& path)
 {
 	// Create an iterator over slash-separated parts of 'path'. Dereferencing

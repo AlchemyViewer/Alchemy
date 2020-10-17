@@ -296,12 +296,12 @@ BOOL LLToolCamera::handleMouseUp(S32 x, S32 y, MASK mask)
 				BOOL success = LLViewerCamera::getInstance()->projectPosAgentToScreen(focus_pos, mouse_pos);
 				if (success)
 				{
-					LLUI::getInstance()->setMousePositionScreen(mouse_pos.mX, mouse_pos.mY);
+					LLUI::setMousePositionScreen(mouse_pos.mX, mouse_pos.mY);
 				}
 			}
 			else if (mMouseSteering)
 			{
-				LLUI::getInstance()->setMousePositionScreen(mMouseDownX, mMouseDownY);
+				LLUI::setMousePositionScreen(mMouseDownX, mMouseDownY);
 			}
 			else
 			{
@@ -311,7 +311,7 @@ BOOL LLToolCamera::handleMouseUp(S32 x, S32 y, MASK mask)
 		else
 		{
 			// not a valid zoomable object
-			LLUI::getInstance()->setMousePositionScreen(mMouseDownX, mMouseDownY);
+			LLUI::setMousePositionScreen(mMouseDownX, mMouseDownY);
 		}
 
 		// calls releaseMouse() internally

@@ -138,7 +138,7 @@ bool LLInspect::childHasVisiblePopupMenu()
 		LLRect floater_rc = calcScreenRect();
 		LLRect menu_screen_rc = child_menu->calcScreenRect();
 		S32 mx, my;
-		LLUI::getInstance()->getMousePositionScreen(&mx, &my);
+		LLUI::getMousePositionScreen(&mx, &my);
 
 		// This works wrong if we spawn a menu near Inspector and menu overlaps Inspector.
 		if(floater_rc.overlaps(menu_screen_rc) && menu_screen_rc.pointInRect(mx, my))
@@ -156,11 +156,11 @@ void LLInspect::repositionInspector(const LLSD& data)
 	// See LLToolTipMgr::createToolTip
 	if (data.has("pos"))
 	{
-		LLUI::getInstance()->positionViewNearMouse(this, data["pos"]["x"].asInteger(), data["pos"]["y"].asInteger());
+		LLUI::positionViewNearMouse(this, data["pos"]["x"].asInteger(), data["pos"]["y"].asInteger());
 	}
 	else
 	{
-		LLUI::getInstance()->positionViewNearMouse(this);
+		LLUI::positionViewNearMouse(this);
 	}
 	applyRectControl();
 }

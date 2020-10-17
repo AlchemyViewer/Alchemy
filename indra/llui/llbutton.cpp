@@ -641,7 +641,7 @@ void LLButton::draw()
 	{
 		S32 local_mouse_x ;
 		S32 local_mouse_y;
-		LLUI::getInstance()->getMousePositionLocal(this, &local_mouse_x, &local_mouse_y);
+		LLUI::getMousePositionLocal(this, &local_mouse_x, &local_mouse_y);
 		mouse_pressed_and_over = pointInView(local_mouse_x, local_mouse_y);
 	}
 
