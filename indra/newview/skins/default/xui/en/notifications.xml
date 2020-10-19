@@ -11722,6 +11722,30 @@ Unable to load the track from [TRACK1] into [TRACK2].
   </notification>
   
   <!-- ALCHEMY BELOW THIS LINE -->
+    <notification
+   icon="notifytip.tga"
+   name="ChatCommandCalc"
+   type="notifytip"
+   log_to_im="true">
+   Calculation: [EXPRESSION] = [RESULT]
+  </notification>
+
+  <notification
+   icon="notifytip.tga"
+   name="ChatCommandCalcFailed"
+   type="notifytip"
+   log_to_im="true">
+   Calculation failed.
+  </notification>
+
+  <notification
+   icon="notifytip.tga"
+   name="ChatCommandDiceRoll"
+   type="notifytip"
+   log_to_im="true">
+    Dice Roll: [RESULT]
+  </notification>
+
   <notification
    icon="alertmodal.tga"
    name="ConfirmRemoveSkin"
