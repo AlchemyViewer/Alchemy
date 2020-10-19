@@ -12049,5 +12049,21 @@ The LSL script to create this particle system has been copied to your clipboard.
     </form>
   </notification>
 
+  <notification
+    icon="alertmodal.tga"
+    name="RevokedMapRights"
+    persist="true"
+    log_to_im="true"
+    type="notify">
+    Your privilege to find [NAME]&apos;s map location has been revoked.
+  </notification>
+  <notification
+    icon="alertmodal.tga"
+    name="GrantedMapRights"
+    persist="true"
+    log_to_im="true"
+    type="notify">
+    [NAME] has given you permission to find their location on the map.
+  </notification>
   
 </notifications>

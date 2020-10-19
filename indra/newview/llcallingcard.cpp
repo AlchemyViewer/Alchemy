@@ -636,33 +636,35 @@ void LLAvatarTracker::processChange(LLMessageSystem* msg)
 		msg->getS32Fast(_PREHASH_Rights,_PREHASH_RelatedRights, new_rights, i);
 		if(agent_id == gAgent.getID())
 		{
-			if(mBuddyInfo.find(agent_related) != mBuddyInfo.end())
+			auto buddy_it = mBuddyInfo.find(agent_related);
+			if(buddy_it != mBuddyInfo.end())
 			{
-				(mBuddyInfo[agent_related])->setRightsTo(new_rights);
-				mChangedBuddyIDs.insert(agent_related);
+				
+				buddy_it->second->setRightsTo(new_rights);
 			}
 		}
 		else
 		{
+			auto buddy_it = mBuddyInfo.find(agent_id);
 			if(mBuddyInfo.find(agent_id) != mBuddyInfo.end())
 			{
-				if((mBuddyInfo[agent_id]->getRightsGrantedFrom() ^  new_rights) & LLRelationship::GRANT_MODIFY_OBJECTS)
+				S32 change = buddy_it->second->getRightsGrantedFrom() ^ new_rights;
+				if (change)
 				{
-					LLSD args;
-					args["NAME"] = LLSLURL("agent", agent_id, "displayname").getSLURLString();
-					
-					LLSD payload;
-					payload["from_id"] = agent_id;
-					if(LLRelationship::GRANT_MODIFY_OBJECTS & new_rights)
+					LLSD args = LLSD().with("NAME", LLSLURL("agent", agent_id, "displayname").getSLURLString());
+					LLSD payload = LLSD().with("from_id", agent_id);
+					if (change & LLRelationship::GRANT_MODIFY_OBJECTS)
 					{
-						LLNotifications::instance().add("GrantedModifyRights",args, payload);
+						LLNotifications::instance().add(LLRelationship::GRANT_MODIFY_OBJECTS & new_rights
+							? "GrantedModifyRights" : "RevokedModifyRights", args, payload);
 					}
-					else
+					if (change & LLRelationship::GRANT_MAP_LOCATION)
 					{
-						LLNotifications::instance().add("RevokedModifyRights",args, payload);
+						LLNotifications::instance().add(LLRelationship::GRANT_MAP_LOCATION & new_rights
+							? "GrantedMapRights" : "RevokedMapRights", args, payload);
 					}
 				}
-				(mBuddyInfo[agent_id])->setRightsFrom(new_rights);
+				buddy_it->second->setRightsFrom(new_rights);
 			}
 		}
 	}
