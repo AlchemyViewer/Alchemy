@@ -5168,10 +5168,12 @@ U32 LLVOAvatar::renderImpostor(LLColor4U color, S32 diffuse_channel)
 		return 0;
 	}
 
+	auto& camera = LLViewerCamera::instance();
+
 	LLVector3 pos(getRenderPosition()+mImpostorOffset);
-	LLVector3 at = (pos - LLViewerCamera::getInstance()->getOrigin());
+	LLVector3 at = (pos - camera.getOrigin());
 	at.normalize();
-	LLVector3 left = LLViewerCamera::getInstance()->getUpAxis() % at;
+	LLVector3 left = camera.getUpAxis() % at;
 	LLVector3 up = at%left;
 
 	left *= mImpostorDim.mV[0];
@@ -5190,11 +5192,11 @@ U32 LLVOAvatar::renderImpostor(LLColor4U color, S32 diffuse_channel)
 		// gGL.vertex3fv((pos+left+up).mV);
 		// gGL.end();
 
+		F32 thickness = llmax(F32(5.0f - 5.0f * (gFrameTimeSeconds - mLastImpostorUpdateFrameTime)), 1.0f);
+		gGL.setLineWidth(thickness);
 
 		gGL.begin(LLRender::LINES); 
 		gGL.color4f(1.f,1.f,1.f,1.f);
-		F32 thickness = llmax(F32(5.0f-5.0f*(gFrameTimeSeconds-mLastImpostorUpdateFrameTime)),1.0f);
-		gGL.setLineWidth(thickness);
 		gGL.vertex3fv((pos+left-up).mV);
 		gGL.vertex3fv((pos-left-up).mV);
 		gGL.vertex3fv((pos-left-up).mV);
