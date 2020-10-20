@@ -24,11 +24,11 @@ namespace llthread
 // instance of Static while holding a lock on that instance. Use of
 // Static::mMutex presumes that Static declares some suitable mMutex.
 template <typename Static>
-class LockStatic
+class LockStaticStd
 {
     typedef std::unique_lock<decltype(Static::mMutex)> lock_t;
 public:
-    LockStatic():
+    LockStaticStd():
         mData(getStatic()),
         mLock(mData->mMutex)
     {}

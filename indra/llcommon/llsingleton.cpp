@@ -32,6 +32,7 @@
 #include "lldependencies.h"
 #include "llexception.h"
 #include "llcoros.h"
+#include "llmutex.h"
 #include <algorithm>
 #include <iostream>                 // std::cerr in dire emergency
 #include <sstream>
@@ -63,8 +64,8 @@ private:
     // manipulating some data in the master list, we must also check whether
     // it's safe to log -- which involves querying a different LLSingleton --
     // which requires accessing the master list.
-    typedef std::recursive_mutex mutex_t;
-    typedef std::unique_lock<mutex_t> lock_t;
+    typedef LLMutex mutex_t;
+    typedef LLMutexLock lock_t;
 
     mutex_t mMutex;
 
@@ -76,7 +77,7 @@ public:
     public:
         Lock():
             mMasterList(MasterList::instance()),
-            mLock(mMasterList.mMutex)
+            mLock(&mMasterList.mMutex)
         {}
         Lock(const Lock&) = delete;
         Lock& operator=(const Lock&) = delete;

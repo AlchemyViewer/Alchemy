@@ -33,6 +33,7 @@
 #include "mutex.h"
 #include "lockstatic.h"
 #include "llthread.h"               // on_main_thread()
+#include "llmutex.h"
 #include "llmainthreadtask.h"
 
 class LLSingletonBase: private boost::noncopyable
@@ -292,13 +293,13 @@ private:
     {
         // Use a recursive_mutex in case of constructor circularity. With a
         // non-recursive mutex, that would result in deadlock.
-        typedef std::recursive_mutex mutex_t;
+        typedef LLMutex mutex_t;
         mutex_t mMutex;             // LockStatic looks for mMutex
 
         EInitState      mInitState{UNINITIALIZED};
         DERIVED_TYPE*   mInstance{nullptr};
     };
-    typedef llthread::LockStatic<SingletonData> LockStatic;
+    typedef llthread::LockStaticLL<SingletonData> LockStatic;
 
     // Allow LLParamSingleton subclass -- but NOT DERIVED_TYPE itself -- to
     // access our private members.
