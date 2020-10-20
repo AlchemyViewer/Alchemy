@@ -29,7 +29,6 @@
 
 #include "stdtypes.h"
 #include "llthread.h"
-#include <boost/noncopyable.hpp>
 
 #include "absl/synchronization/mutex.h"
 
@@ -186,46 +185,6 @@ namespace llthread
 		}
 	};
 }
-
-
-/**
-* @class LLScopedLock
-* @brief Small class to help lock and unlock mutexes.
-*
-* The constructor handles the lock, and the destructor handles
-* the unlock. Instances of this class are <b>not</b> thread safe.
-*/
-class LL_COMMON_API LLScopedLock : private boost::noncopyable
-{
-public:
-    /**
-    * @brief Constructor which accepts a mutex, and locks it.
-    *
-    * @param mutex An allocated mutex. If you pass in NULL,
-    * this wrapper will not lock.
-    */
-    LLScopedLock(std::mutex* mutex);
-
-    /**
-    * @brief Destructor which unlocks the mutex if still locked.
-    */
-    ~LLScopedLock();
-
-    /**
-    * @brief Check lock.
-    */
-    bool isLocked() const { return mLocked; }
-
-    /**
-    * @brief This method unlocks the mutex.
-    */
-    void unlock();
-
-protected:
-    bool mLocked;
-    std::mutex* mMutex;
-};
-
 
 class AbslMutexMaybeTrylock
 {

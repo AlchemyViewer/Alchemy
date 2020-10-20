@@ -182,36 +182,4 @@ LLMutexTrylock::~LLMutexTrylock()
         mMutex->unlock();
 }
 
-
-//---------------------------------------------------------------------
-//
-// LLScopedLock
-//
-LLScopedLock::LLScopedLock(std::mutex* mutex) : mMutex(mutex)
-{
-	if(mutex)
-	{
-		mutex->lock();
-		mLocked = true;
-	}
-	else
-	{
-		mLocked = false;
-	}
-}
-
-LLScopedLock::~LLScopedLock()
-{
-	unlock();
-}
-
-void LLScopedLock::unlock()
-{
-	if(mLocked)
-	{
-		mMutex->unlock();
-		mLocked = false;
-	}
-}
-
 //============================================================================
