@@ -284,6 +284,7 @@ target_link_libraries(
     ${BOOST_SYSTEM_LIBRARY}
     ${GOOGLE_PERFTOOLS_LIBRARIES}
     ${URIPARSER_LIBRARIES}
+    absl::synchronization
     absl::flat_hash_map
     absl::node_hash_map
     absl::strings

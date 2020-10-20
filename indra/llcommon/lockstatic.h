@@ -13,7 +13,9 @@
 #if ! defined(LL_LOCKSTATIC_H)
 #define LL_LOCKSTATIC_H
 
-#include "mutex.h"                  // std::unique_lock
+#include <mutex>
+
+#include "absl/synchronization/mutex.h"
 
 namespace llthread
 {
@@ -43,6 +45,100 @@ public:
 protected:
     Static* mData;
     lock_t mLock;
+private:
+    Static* getStatic()
+    {
+        // Static::mMutex must be function-local static rather than class-
+        // static. Some of our consumers must function properly (therefore
+        // lock properly) even when the containing module's static variables
+        // have not yet been runtime-initialized. A mutex requires
+        // construction. A static class member might not yet have been
+        // constructed.
+        //
+        // We could store a dumb mutex_t*, notice when it's NULL and allocate a
+        // heap mutex -- but that's vulnerable to race conditions. And we can't
+        // defend the dumb pointer with another mutex.
+        //
+        // We could store a std::atomic<mutex_t*> -- but a default-constructed
+        // std::atomic<T> does not contain a valid T, even a default-constructed
+        // T! Which means std::atomic, too, requires runtime initialization.
+        //
+        // But a function-local static is guaranteed to be initialized exactly
+        // once: the first time control reaches that declaration.
+        static Static sData;
+        return &sData;
+    }
+};
+
+
+// The same as above but for absl::Mutex
+template <typename Static>
+class LockStaticAbsl
+{
+    typedef absl::ReleasableMutexLock lock_t;
+public:
+    LockStaticAbsl() :
+        mData(getStatic()),
+        mLock(&mData->mMutex)
+    {}
+    Static* get() const { return mData; }
+    operator Static* () const { return get(); }
+    Static* operator->() const { return get(); }
+    // sometimes we must explicitly unlock...
+    void unlock()
+    {
+        // but once we do, access is no longer permitted
+        mData = nullptr;
+        mLock.Release();
+    }
+protected:
+    Static* mData;
+    lock_t mLock;
+private:
+    Static* getStatic()
+    {
+        // Static::mMutex must be function-local static rather than class-
+        // static. Some of our consumers must function properly (therefore
+        // lock properly) even when the containing module's static variables
+        // have not yet been runtime-initialized. A mutex requires
+        // construction. A static class member might not yet have been
+        // constructed.
+        //
+        // We could store a dumb mutex_t*, notice when it's NULL and allocate a
+        // heap mutex -- but that's vulnerable to race conditions. And we can't
+        // defend the dumb pointer with another mutex.
+        //
+        // We could store a std::atomic<mutex_t*> -- but a default-constructed
+        // std::atomic<T> does not contain a valid T, even a default-constructed
+        // T! Which means std::atomic, too, requires runtime initialization.
+        //
+        // But a function-local static is guaranteed to be initialized exactly
+        // once: the first time control reaches that declaration.
+        static Static sData;
+        return &sData;
+    }
+};
+
+// Instantiate this template to obtain a pointer to the canonical static
+// instance of Static with no lock. Aka NoOp
+template <typename Static>
+class LockStaticNoOp
+{
+public:
+    LockStaticNoOp():
+        mData(getStatic())
+    {}
+    Static* get() const { return mData; }
+    operator Static*() const { return get(); }
+    Static* operator->() const { return get(); }
+    // sometimes we must explicitly unlock...
+    void unlock()
+    {
+        // but once we do, access is no longer permitted
+        mData = nullptr;
+    }
+protected:
+    Static* mData;
 private:
     Static* getStatic()
     {

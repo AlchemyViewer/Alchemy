@@ -34,8 +34,9 @@
 #include <typeinfo>
 #include <memory>
 #include <type_traits>
+#include <mutex>
 
-#include "mutex.h"
+#include "absl/synchronization/mutex.h"
 
 #include <boost/iterator/transform_iterator.hpp>
 #include <boost/iterator/indirect_iterator.hpp>
@@ -52,7 +53,7 @@ namespace LLInstanceTrackerPrivate
     struct StaticBase
     {
         // We need to be able to lock static data while manipulating it.
-        std::mutex mMutex;
+        absl::Mutex mMutex;
     };
 
     void logerrs(const char* cls, const std::string&, const std::string&, const std::string&);
@@ -80,7 +81,7 @@ class LLInstanceTracker
     {
         InstanceMap mMap;
     };
-    typedef llthread::LockStatic<StaticData> LockStatic;
+    typedef llthread::LockStaticAbsl<StaticData> LockStatic;
 
 public:
     // snapshot of std::pair<const KEY, std::shared_ptr<T>> pairs
@@ -307,7 +308,7 @@ class LLInstanceTracker<T, void, KEY_COLLISION_BEHAVIOR>
     {
         InstanceSet mSet;
     };
-    typedef llthread::LockStatic<StaticData> LockStatic;
+    typedef llthread::LockStaticAbsl<StaticData> LockStatic;
 
 public:
     /**
