@@ -294,7 +294,7 @@ static LLTrace::BlockTimerStatHandle FTM_PROCESS_TIMES("Process FastTimer Times"
 void BlockTimer::processTimes()
 {
 #if LL_TRACE_ENABLED
-	LL_RECORD_BLOCK_TIME(FTM_PROCESS_TIMES);
+	LL_ALWAYS_RECORD_BLOCK_TIME(FTM_PROCESS_TIMES);
 	get_clock_count(); // good place to calculate clock frequency
 
 	// set up initial tree
