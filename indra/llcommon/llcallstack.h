@@ -25,6 +25,7 @@
  */
 
 #include <map>
+#include <vector>
 
 class LLCallStackImpl;
 

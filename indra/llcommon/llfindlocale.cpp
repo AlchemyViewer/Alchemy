@@ -33,7 +33,7 @@
 #include <ctype.h>
 
 #ifdef WIN32
-#include "llwin32headers.h"
+#include "llwin32headerslean.h"
 #include <winnt.h>
 #endif
 

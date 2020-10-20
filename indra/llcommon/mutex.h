@@ -9,6 +9,8 @@
  * $/LicenseInfo$
  */
 
+#pragma once
+
 #if LL_WINDOWS
 #pragma warning (push)
 #pragma warning (disable:4265)

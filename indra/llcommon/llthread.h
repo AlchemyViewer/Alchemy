@@ -29,7 +29,6 @@
 
 #include "llapp.h"
 #include "llapr.h"
-#include "boost/intrusive_ptr.hpp"
 #include "llrefcount.h"
 #include <thread>
 

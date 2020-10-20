@@ -26,7 +26,7 @@
  * $/LicenseInfo$
  */
 
-#include "llwin32headers.h"
+#include "llwin32headerslean.h"
 
 // Precompiled header
 #include "linden_common.h"
