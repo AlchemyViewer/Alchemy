@@ -500,7 +500,7 @@ bool filter_llsd_with_template(
 *   Helpers for llsd_matches()
 *****************************************************************************/
 // raw data used for LLSD::Type lookup
-struct Data
+struct LLSDTypeData
 {
     LLSD::Type type;
     const char* name;
@@ -529,7 +529,7 @@ class TypeLookup
 public:
     TypeLookup()
     {
-        for (const Data *di(boost::begin(typedata)), *dend(boost::end(typedata)); di != dend; ++di)
+        for (const LLSDTypeData *di(boost::begin(typedata)), *dend(boost::end(typedata)); di != dend; ++di)
         {
             mMap[di->type] = di->name;
         }
