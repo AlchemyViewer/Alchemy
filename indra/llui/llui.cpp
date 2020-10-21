@@ -178,10 +178,10 @@ mHelpImpl(NULL)
 	LLUICtrl::CommitCallbackRegistry::Registrar& reg = LLUICtrl::CommitCallbackRegistry::defaultRegistrar();
 
 	// Callbacks for associating controls with floater visibility:
-	reg.add("Floater.Toggle", boost::bind(&LLFloaterReg::toggleInstance, _2, LLSD()));
-	reg.add("Floater.ToggleOrBringToFront", boost::bind(&LLFloaterReg::toggleInstanceOrBringToFront, _2, LLSD()));
-	reg.add("Floater.Show", boost::bind(&LLFloaterReg::showInstance, _2, LLSD(), FALSE));
-	reg.add("Floater.Hide", boost::bind(&LLFloaterReg::hideInstance, _2, LLSD()));
+	reg.add("Floater.Toggle", [](LLUICtrl* ctrl, const LLSD& param) -> void { LLFloaterReg::toggleInstance(param.asStringRef()); });
+	reg.add("Floater.ToggleOrBringToFront", [](LLUICtrl* ctrl, const LLSD& param) -> void { LLFloaterReg::toggleInstanceOrBringToFront(param.asStringRef()); });
+	reg.add("Floater.Show", [](LLUICtrl* ctrl, const LLSD& param) -> void { LLFloaterReg::showInstance(param.asStringRef(), LLSD(), FALSE); });
+	reg.add("Floater.Hide", [](LLUICtrl* ctrl, const LLSD& param) -> void { LLFloaterReg::hideInstance(param.asStringRef()); });
 	
 	// Button initialization callback for toggle buttons
 	reg.add("Button.SetFloaterToggle", boost::bind(&LLButton::setFloaterToggle, _1, _2));
@@ -196,10 +196,10 @@ mHelpImpl(NULL)
 	reg.add("Button.ToggleFloater", boost::bind(&LLButton::toggleFloaterAndSetToggleState, _1, _2));
 	
 	// Used by menus along with Floater.Toggle to display visibility as a check-mark
-	LLUICtrl::EnableCallbackRegistry::defaultRegistrar().add("Floater.Visible", boost::bind(&LLFloaterReg::instanceVisible, _2, LLSD()));
-	LLUICtrl::EnableCallbackRegistry::defaultRegistrar().add("Floater.IsOpen", boost::bind(&LLFloaterReg::instanceVisible, _2, LLSD()));
+	LLUICtrl::EnableCallbackRegistry::defaultRegistrar().add("Floater.Visible", [](LLUICtrl* ctrl, const LLSD& param) -> bool { return LLFloaterReg::instanceVisible(param.asStringRef(), LLSD()); });
+	LLUICtrl::EnableCallbackRegistry::defaultRegistrar().add("Floater.IsOpen",  [](LLUICtrl* ctrl, const LLSD& param) -> bool { return LLFloaterReg::instanceVisible(param.asStringRef(), LLSD()); });
 // [RLVa:KB] - Checked: 2012-02-07 (RLVa-1.4.5) | Added: RLVa-1.4.5
-	LLUICtrl::EnableCallbackRegistry::defaultRegistrar().add("Floater.CanShow", boost::bind(&LLFloaterReg::canShowInstance, _2, LLSD()));
+	LLUICtrl::EnableCallbackRegistry::defaultRegistrar().add("Floater.CanShow", [](LLUICtrl* ctrl, const LLSD& param) -> bool { return LLFloaterReg::canShowInstance(param.asStringRef(), LLSD()); });
 // [/RLVa:KB]
 
 	// Parse the master list of commands

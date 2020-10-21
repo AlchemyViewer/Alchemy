@@ -221,7 +221,7 @@ static std::string gTOSType;
 static LLEventPump * gTOSReplyPump = NULL;
 
 //static
-LLFloater* LLFloaterReg::showInstance(const std::string& name, const LLSD& key, BOOL focus)
+LLFloater* LLFloaterReg::showInstance(std::string_view name, const LLSD& key, BOOL focus)
 {
 	gTOSType = name;
 	gTOSReplyPump = &LLEventPumps::instance().obtain(key["reply_pump"]);

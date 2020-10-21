@@ -83,7 +83,7 @@ private:
 // [RLVa:KB] - Checked: 2010-02-28 (RLVa-1.4.0a) | Modified: RLVa-1.2.0a
 	// Used to determine whether a floater can be shown
 public:
-	typedef boost::signals2::signal<bool(const std::string&, const LLSD&), boost_boolean_combiner> validate_signal_t;
+	typedef boost::signals2::signal<bool(std::string_view, const LLSD&), boost_boolean_combiner> validate_signal_t;
 	static boost::signals2::connection setValidateCallback(const validate_signal_t::slot_type& cb) { return mValidateSignal.connect(cb); }
 private:
 	static validate_signal_t mValidateSignal;
@@ -104,31 +104,31 @@ public:
 					const std::string& groupname = LLStringUtil::null);
 
 	// Helpers
-	static LLFloater* getLastFloaterInGroup(const std::string& name);
+	static LLFloater* getLastFloaterInGroup(std::string_view name);
 	static LLFloater* getLastFloaterCascading();
 	
 	// Find / get (create) / remove / destroy
-	static LLFloater* findInstance(const std::string& name, const LLSD& key = LLSD());
-	static LLFloater* getInstance(const std::string& name, const LLSD& key = LLSD());
-	static LLFloater* removeInstance(const std::string& name, const LLSD& key = LLSD());
-	static bool destroyInstance(const std::string& name, const LLSD& key = LLSD());
+	static LLFloater* findInstance(std::string_view name, const LLSD& key = LLSD());
+	static LLFloater* getInstance(std::string_view name, const LLSD& key = LLSD());
+	static LLFloater* removeInstance(std::string_view name, const LLSD& key = LLSD());
+	static bool destroyInstance(std::string_view name, const LLSD& key = LLSD());
 	
 	// Iterators
-	static const_instance_list_t& getFloaterList(const std::string& name);
+	static const_instance_list_t& getFloaterList(std::string_view name);
 
 	// Visibility Management
 // [RLVa:KB] - Checked: 2012-02-07 (RLVa-1.4.5) | Added: RLVa-1.4.5
 	// return false if floater can not be shown (=doesn't pass the validation filter)
-	static bool canShowInstance(const std::string& name, const LLSD& key = LLSD());
+	static bool canShowInstance(std::string_view name, const LLSD& key = LLSD());
 // [/RLVa:KB]
 	// return NULL if instance not found or can't create instance (no builder)
-	static LLFloater* showInstance(const std::string& name, const LLSD& key = LLSD(), BOOL focus = FALSE);
+	static LLFloater* showInstance(std::string_view name, const LLSD& key = LLSD(), BOOL focus = FALSE);
 	// Close a floater (may destroy or set invisible)
 	// return false if can't find instance
-	static bool hideInstance(const std::string& name, const LLSD& key = LLSD());
+	static bool hideInstance(std::string_view name, const LLSD& key = LLSD());
 	// return true if instance is visible:
-	static bool toggleInstance(const std::string& name, const LLSD& key = LLSD());
-	static bool instanceVisible(const std::string& name, const LLSD& key = LLSD());
+	static bool toggleInstance(std::string_view name, const LLSD& key = LLSD());
+	static bool instanceVisible(std::string_view name, const LLSD& key = LLSD());
 
 	static void showInitialVisibleInstances();
 	static void hideVisibleInstances(const std::set<std::string>& exceptions = std::set<std::string>());
@@ -152,19 +152,19 @@ public:
 	
 	// Typed find / get / show
 	template <class T>
-	static T* findTypedInstance(const std::string& name, const LLSD& key = LLSD())
+	static T* findTypedInstance(std::string_view name, const LLSD& key = LLSD())
 	{
 		return static_cast<T*>(findInstance(name, key));
 	}
 
 	template <class T>
-	static T* getTypedInstance(const std::string& name, const LLSD& key = LLSD())
+	static T* getTypedInstance(std::string_view name, const LLSD& key = LLSD())
 	{
 		return static_cast<T*>(getInstance(name, key));
 	}
 
 	template <class T>
-	static T* showTypedInstance(const std::string& name, const LLSD& key = LLSD(), BOOL focus = FALSE)
+	static T* showTypedInstance(std::string_view name, const LLSD& key = LLSD(), BOOL focus = FALSE)
 	{
 		return static_cast<T*>(showInstance(name, key, focus));
 	}

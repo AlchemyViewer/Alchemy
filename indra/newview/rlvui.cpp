@@ -315,7 +315,7 @@ bool RlvUIEnabler::removeGenericFloaterFilter(const std::string& strFloaterName)
 	return true;
 }
 
-bool RlvUIEnabler::filterFloaterGeneric(const std::string& strFloaterName, const LLSD&)
+bool RlvUIEnabler::filterFloaterGeneric(std::string_view strFloaterName, const LLSD&)
 {
 	auto itFloater = m_FilteredFloaterMap.find(strFloaterName);
 	if (m_FilteredFloaterMap.end() != itFloater)
@@ -329,7 +329,7 @@ bool RlvUIEnabler::filterFloaterGeneric(const std::string& strFloaterName, const
 }
 
 // Checked: 2010-04-22 (RLVa-1.4.5) | Added: RLVa-1.2.0
-bool RlvUIEnabler::filterFloaterShowLoc(const std::string& strName, const LLSD&)
+bool RlvUIEnabler::filterFloaterShowLoc(std::string_view strName, const LLSD&)
 {
 	if ("about_land" == strName)
 		return canViewParcelProperties();
@@ -355,7 +355,7 @@ bool RlvUIEnabler::filterPanelShowLoc(const std::string& strFloater, const std::
 }
 
 // Checked: 2010-03-01 (RLVa-1.2.0b) | Added: RLVa-1.2.0a
-bool RlvUIEnabler::filterFloaterViewXXX(const std::string& strName, const LLSD&)
+bool RlvUIEnabler::filterFloaterViewXXX(std::string_view strName, const LLSD&)
 {
 	if ( (gRlvHandler.hasBehaviour(RLV_BHVR_VIEWNOTE)) && ("preview_notecard" == strName) )
 	{
