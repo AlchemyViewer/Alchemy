@@ -96,6 +96,7 @@ public:
 	{
 		if (mMutex)
 			mMutex->unlock();
+		mMutex = nullptr;
 	}
 private:
 	LLMutex* mMutex;
