@@ -32,10 +32,6 @@
 
 #include "absl/synchronization/mutex.h"
 
-#include <mutex>
-#include <condition_variable>
-
-
 //============================================================================
 
 #define MUTEX_DEBUG (LL_DEBUG || LL_RELEASE_WITH_DEBUG_INFO)
@@ -50,7 +46,6 @@ class LL_COMMON_API LLMutex
 {
 public:
 	LLMutex();
-	virtual ~LLMutex() = default;
 	
 	void lock();		// blocks
 	bool trylock();		// non-blocking, returns true if lock held.
@@ -60,7 +55,7 @@ public:
 	LLThread::id_t lockingThread() const; //get ID of locking thread
 
 protected:
-	std::mutex			mMutex;
+	absl::Mutex			mMutex;
 	mutable U32			mCount;
 	mutable LLThread::id_t	mLockingThread;
 	
@@ -70,18 +65,17 @@ protected:
 };
 
 // Actually a condition/mutex pair (since each condition needs to be associated with a mutex).
-class LL_COMMON_API LLCondition : public LLMutex
+class LL_COMMON_API LLCondition final : public LLMutex
 {
 public:
 	LLCondition();
-	~LLCondition() = default;
 	
 	void wait();		// blocks
 	void signal();
 	void broadcast();
 	
 protected:
-	std::condition_variable mCond;
+	absl::CondVar mCond;
 };
 
 class LLMutexLock
@@ -120,9 +114,35 @@ private:
 class LLMutexTrylock
 {
 public:
-	LLMutexTrylock(LLMutex* mutex);
-	LLMutexTrylock(LLMutex* mutex, U32 aTries, U32 delay_ms = 10);
-	~LLMutexTrylock();
+	LLMutexTrylock(LLMutex* mutex)
+		: mMutex(mutex),
+		mLocked(false)
+	{
+		if (mMutex)
+			mLocked = mMutex->trylock();
+	}
+
+	LLMutexTrylock(LLMutex* mutex, U32 aTries, U32 delay_ms)
+		: mMutex(mutex),
+		mLocked(false)
+	{
+		if (!mMutex)
+			return;
+
+		for (U32 i = 0; i < aTries; ++i)
+		{
+			mLocked = mMutex->trylock();
+			if (mLocked)
+				break;
+			std::this_thread::sleep_for(std::chrono::milliseconds(delay_ms));
+		}
+	}
+
+	~LLMutexTrylock()
+	{
+		if (mMutex && mLocked)
+			mMutex->unlock();
+	}
 
 	bool isLocked() const
 	{

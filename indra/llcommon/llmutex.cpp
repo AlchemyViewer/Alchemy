@@ -45,7 +45,7 @@ void LLMutex::lock()
 		return;
 	}
 	
-	mMutex.lock();
+	mMutex.Lock();
 	
 #if MUTEX_DEBUG
 	// Have to have the lock before we can access the debug info
@@ -75,18 +75,18 @@ void LLMutex::unlock()
 #endif
 
 	mLockingThread = LLThread::id_t();
-	mMutex.unlock();
+	mMutex.Unlock();
 }
 
 bool LLMutex::isLocked()
 {
-	if (!mMutex.try_lock())
+	if (!mMutex.TryLock())
 	{
 		return true;
 	}
 	else
 	{
-		mMutex.unlock();
+		mMutex.Unlock();
 		return false;
 	}
 }
@@ -109,7 +109,7 @@ bool LLMutex::trylock()
 		return true;
 	}
 	
-	if (!mMutex.try_lock())
+	if (!mMutex.TryLock())
 	{
 		return false;
 	}
@@ -136,50 +136,19 @@ LLCondition::LLCondition() :
 
 void LLCondition::wait()
 {
-	std::unique_lock< std::mutex > lock(mMutex);
-	mCond.wait(lock);
+	mMutex.Lock();
+	mCond.Wait(&mMutex);
+	mMutex.Unlock();
 }
 
 void LLCondition::signal()
 {
-	mCond.notify_one();
+	mCond.Signal();
 }
 
 void LLCondition::broadcast()
 {
-	mCond.notify_all();
-}
-
-
-
-LLMutexTrylock::LLMutexTrylock(LLMutex* mutex)
-    : mMutex(mutex),
-    mLocked(false)
-{
-    if (mMutex)
-        mLocked = mMutex->trylock();
-}
-
-LLMutexTrylock::LLMutexTrylock(LLMutex* mutex, U32 aTries, U32 delay_ms)
-    : mMutex(mutex),
-    mLocked(false)
-{
-    if (!mMutex)
-        return;
-
-    for (U32 i = 0; i < aTries; ++i)
-    {
-        mLocked = mMutex->trylock();
-        if (mLocked)
-            break;
-        ms_sleep(delay_ms);
-    }
-}
-
-LLMutexTrylock::~LLMutexTrylock()
-{
-    if (mMutex && mLocked)
-        mMutex->unlock();
+	mCond.SignalAll();
 }
 
 //============================================================================
