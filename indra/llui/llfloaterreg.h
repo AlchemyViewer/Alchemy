@@ -101,7 +101,7 @@ public:
 	}
 	
 	static void add(const std::string& name, const std::string& file, const LLFloaterBuildFunc& func,
-					const std::string& groupname = LLStringUtil::null);
+					const std::string& groupname = std::string());
 
 	// Helpers
 	static LLFloater* getLastFloaterInGroup(std::string_view name);

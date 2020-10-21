@@ -164,7 +164,7 @@ std::string LLKeywords::getArguments(LLSD& arguments)
 std::string LLKeywords::getAttribute(const std::string& key)
 {
 	attribute_iterator_t it = mAttributes.find(key);
-	return (it != mAttributes.end()) ? it->second : "";
+	return (it != mAttributes.end()) ? it->second : std::string();
 }
 
 LLColor4 LLKeywords::getColorGroup(const std::string& key_in)
