@@ -61,16 +61,16 @@ namespace tut
 
     struct StaticData
     {
-        std::mutex mMutex;          // LockStatic looks for mMutex
+        LLMutex mMutex;          // LockStatic looks for mMutex
         bool ran{false};
     };
-    typedef llthread::LockStatic<StaticData> LockStatic;
+    typedef llthread::LockStaticLL<StaticData> LockStatic;
 
     template<> template<>
     void object::test<2>()
     {
         set_test_name("cross-thread");
-        skip("This test is prone to build-time hangs");
+        //skip("This test is prone to build-time hangs");
         std::atomic_bool result(false);
         // wrapping our thread lambda in a packaged_task will catch any
         // exceptions it might throw and deliver them via future
