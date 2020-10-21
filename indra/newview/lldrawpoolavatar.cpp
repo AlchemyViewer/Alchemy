@@ -2066,6 +2066,13 @@ void LLDrawPoolAvatar::renderRigged(LLVOAvatar* avatar, U32 type, bool glow)
 		{
 			continue;
 		}
+		const LLTextureEntry* tex_entry = face->getTextureEntry();
+
+		// Don't render invisible faces even when they are in a linkset.
+		if (tex_entry && tex_entry->getColor().mV[VW] == 0.0f)
+		{
+			continue;
+		}
 
 		//stop_glerror();
 
@@ -2078,7 +2085,6 @@ void LLDrawPoolAvatar::renderRigged(LLVOAvatar* avatar, U32 type, bool glow)
 
 		LLVertexBuffer* buff = face->getVertexBuffer();
 
-        const LLTextureEntry* tex_entry = face->getTextureEntry();
 		LLMaterial* mat = tex_entry ? tex_entry->getMaterialParams().get() : nullptr;
 
         if (LLDrawPoolAvatar::sShadowPass >= 0)
