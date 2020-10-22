@@ -3970,12 +3970,9 @@ F32 LLViewerObject::recursiveGetScaledSurfaceArea() const
 				const LLVector3& scale = volume->getScale();
                 area += volume->getVolume()->getSurfaceArea() * llmax(llmax(scale.mV[0], scale.mV[1]), scale.mV[2]);
             }
-            LLViewerObject::const_child_list_t children = volume->getChildren();
-            for (LLViewerObject::const_child_list_t::const_iterator child_iter = children.begin();
-                 child_iter != children.end();
-                 ++child_iter)
+            const LLViewerObject::const_child_list_t& children = volume->getChildren();
+            for (LLViewerObject* child_obj : children)
             {
-                LLViewerObject* child_obj = *child_iter;
 				if(!child_obj) continue;
 
                 LLVOVolume *child = child_obj->asVolume();

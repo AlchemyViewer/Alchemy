@@ -2051,7 +2051,7 @@ void renderComplexityDisplay(LLDrawable* drawablep)
 	F32 cost = (F32) voVol->getRenderCost(textures);
 
 	// add any child volumes
-	LLViewerObject::const_child_list_t children = voVol->getChildren();
+	LLViewerObject::const_child_list_t& children = voVol->getChildren();
 	for (LLViewerObject::const_child_list_t::const_iterator iter = children.begin(); iter != children.end(); ++iter)
 	{
 		LLViewerObject *child = *iter;
@@ -2116,7 +2116,7 @@ void renderComplexityDisplay(LLDrawable* drawablep)
 				pushVerts(drawablep->getFace(i), LLVertexBuffer::MAP_VERTEX);
 			}
 		}
-		LLViewerObject::const_child_list_t children = voVol->getChildren();
+		LLViewerObject::const_child_list_t& children = voVol->getChildren();
 		for (LLViewerObject::const_child_list_t::const_iterator iter = children.begin(); iter != children.end(); ++iter)
 		{
 			const LLViewerObject *child = *iter;

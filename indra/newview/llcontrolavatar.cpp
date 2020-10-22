@@ -277,10 +277,8 @@ void LLControlAvatar::updateVolumeGeom()
 	mRootVolp->mDrawable->setState(LLDrawable::USE_BACKLIGHT);
 
 	LLViewerObject::const_child_list_t& child_list = mRootVolp->getChildren();
-	for (LLViewerObject::child_list_t::const_iterator iter = child_list.begin();
-		 iter != child_list.end(); ++iter)
+	for (LLViewerObject* childp : child_list)
 	{
-		LLViewerObject* childp = *iter;
 		if (childp && childp->mDrawable.notNull())
 		{
 			childp->mDrawable->setState(LLDrawable::USE_BACKLIGHT);
@@ -491,10 +489,8 @@ void LLControlAvatar::getAnimatedVolumes(std::vector<LLVOVolume*>& volumes)
     volumes.push_back(mRootVolp);
     
 	LLViewerObject::const_child_list_t& child_list = mRootVolp->getChildren();
-	for (LLViewerObject::const_child_list_t::const_iterator iter = child_list.begin();
-		 iter != child_list.end(); ++iter)
+	for (LLViewerObject* childp : child_list)
 	{
-		LLViewerObject* childp = *iter;
         LLVOVolume *child_volp = childp ? childp->asVolume() : nullptr;
         if (child_volp && child_volp->isAnimatedObject())
         {
