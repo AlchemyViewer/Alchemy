@@ -246,6 +246,15 @@ protected:
 
 public:
 	typedef std::list<LLSelectNode*> list_t;
+	template <typename IT>
+	struct create_range_for
+	{
+		create_range_for() = delete;
+		create_range_for(list_t& inlist) : _list(inlist) {};
+		auto begin() { return IT(_list.begin(), _list.end()); }
+		auto end() { return IT(_list.end(), _list.end()); }
+		list_t& _list;
+	};
 
 	// Iterators
 	struct is_non_null
@@ -258,6 +267,7 @@ public:
 	typedef boost::filter_iterator<is_non_null, list_t::iterator > iterator;
 	iterator begin() { return iterator(mList.begin(), mList.end()); }
 	iterator end() { return iterator(mList.end(), mList.end()); }
+	auto begin_end() { return create_range_for<iterator>(mList); }
 
 	struct is_valid
 	{
@@ -269,6 +279,7 @@ public:
 	typedef boost::filter_iterator<is_valid, list_t::iterator > valid_iterator;
 	valid_iterator valid_begin() { return valid_iterator(mList.begin(), mList.end()); }
 	valid_iterator valid_end() { return valid_iterator(mList.end(), mList.end()); }
+	auto valid_begin_end() { return create_range_for<valid_iterator>(mList); }
 
 	struct is_root
 	{
@@ -277,7 +288,8 @@ public:
 	typedef boost::filter_iterator<is_root, list_t::iterator > root_iterator;
 	root_iterator root_begin() { return root_iterator(mList.begin(), mList.end()); }
 	root_iterator root_end() { return root_iterator(mList.end(), mList.end()); }
-	
+	auto root_begin_end() { return create_range_for<root_iterator>(mList); }
+
 	struct is_valid_root
 	{
 		bool operator()(LLSelectNode* node);
@@ -285,7 +297,8 @@ public:
 	typedef boost::filter_iterator<is_valid_root, list_t::iterator > valid_root_iterator;
 	valid_root_iterator valid_root_begin() { return valid_root_iterator(mList.begin(), mList.end()); }
 	valid_root_iterator valid_root_end() { return valid_root_iterator(mList.end(), mList.end()); }
-	
+	auto valid_root_begin_end() { return create_range_for<valid_root_iterator>(mList); }
+
 	struct is_root_object
 	{
 		bool operator()(LLSelectNode* node);
@@ -293,7 +306,8 @@ public:
 	typedef boost::filter_iterator<is_root_object, list_t::iterator > root_object_iterator;
 	root_object_iterator root_object_begin() { return root_object_iterator(mList.begin(), mList.end()); }
 	root_object_iterator root_object_end() { return root_object_iterator(mList.end(), mList.end()); }
-	
+	auto root_object_begin_end() { return create_range_for<root_object_iterator>(mList); }
+
 public:
 	LLObjectSelection();
 
