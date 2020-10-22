@@ -905,11 +905,8 @@ void LLSelectMgr::deselectObjectOnly(LLViewerObject* object, BOOL send_to_sim)
 
 void LLSelectMgr::addAsFamily(std::vector<LLViewerObject*>& objects, BOOL add_to_end)
 {
-	for (std::vector<LLViewerObject*>::iterator iter = objects.begin();
-		 iter != objects.end(); ++iter)
+	for (LLViewerObject* objectp : objects)
 	{
-		LLViewerObject* objectp = *iter;
-		
 		// Can't select yourself
 		if (objectp->mID == gAgentID
 			&& !mAllowSelectAvatar)
@@ -1051,10 +1048,8 @@ LLObjectSelectionHandle LLSelectMgr::setHoverObject(LLViewerObject *objectp, S32
 		objectp->addThisAndNonJointChildren(objects);
 
 		mHoverObjects->deleteAllNodes();
-		for (std::vector<LLViewerObject*>::iterator iter = objects.begin();
-			 iter != objects.end(); ++iter)
+		for (LLViewerObject* cur_objectp : objects)
 		{
-			LLViewerObject* cur_objectp = *iter;
 			if(!cur_objectp || cur_objectp->isDead())
 			{
 				continue;
@@ -1168,10 +1163,8 @@ void LLSelectMgr::unhighlightObjectAndFamily(LLViewerObject* objectp)
 	unhighlightObjectOnly(root_obj);
 
 	LLViewerObject::const_child_list_t& child_list = root_obj->getChildren();
-	for (LLViewerObject::child_list_t::const_iterator iter = child_list.begin();
-		 iter != child_list.end(); iter++)
+	for (LLViewerObject* child : child_list)
 	{
-		LLViewerObject* child = *iter;
 		unhighlightObjectOnly(child);
 	}
 }
@@ -1246,10 +1239,8 @@ LLObjectSelectionHandle LLSelectMgr::selectHighlightedObjects()
 void LLSelectMgr::deselectHighlightedObjects()
 {
 	BOOL select_linked_set = !ALControlCache::EditLinkedParts;
-	for (std::set<LLPointer<LLViewerObject> >::iterator iter = mRectSelectedObjects.begin();
-		 iter != mRectSelectedObjects.end(); iter++)
+	for (LLViewerObject* objectp : mRectSelectedObjects)
 	{
-		LLViewerObject *objectp = *iter;
 		if (!select_linked_set)
 		{
 			deselectObjectOnly(objectp);
@@ -6204,17 +6195,8 @@ LLSelectNode::LLSelectNode(const LLSelectNode& nodep)
 	mSilhouetteExists = nodep.mSilhouetteExists;
 	mObject = nodep.mObject;
 
-	std::vector<LLColor4>::const_iterator color_iter;
-	mSavedColors.clear();
-	for (color_iter = nodep.mSavedColors.begin(); color_iter != nodep.mSavedColors.end(); ++color_iter)
-	{
-		mSavedColors.push_back(*color_iter);
-	}
-	mSavedShinyColors.clear();
-	for (color_iter = nodep.mSavedShinyColors.begin(); color_iter != nodep.mSavedShinyColors.end(); ++color_iter)
-	{
-		mSavedShinyColors.push_back(*color_iter);
-	}
+	mSavedColors = nodep.mSavedColors;
+	mSavedShinyColors = nodep.mSavedShinyColors;
 	
 	saveTextures(nodep.mSavedTextures);
 }
@@ -6322,13 +6304,7 @@ void LLSelectNode::saveTextures(const uuid_vec_t& textures)
 {
 	if (mObject.notNull())
 	{
-		mSavedTextures.clear();
-
-		for (uuid_vec_t::const_iterator texture_it = textures.begin();
-			 texture_it != textures.end(); ++texture_it)
-		{
-			mSavedTextures.push_back(*texture_it);
-		}
+		mSavedTextures = textures;
 	}
 }
 
@@ -7401,14 +7377,9 @@ S32 LLObjectSelection::getSelectedObjectRenderCost()
        typedef std::set<LLUUID> uuid_list_t;
        uuid_list_t computed_objects;
 
-	   typedef std::list<LLPointer<LLViewerObject> > child_list_t;
-	   typedef const child_list_t const_child_list_t;
-
 	   // add render cost of complete linksets first, to get accurate texture counts
-       for (list_t::iterator iter = mList.begin(); iter != mList.end(); ++iter)
+       for (LLSelectNode* node : mList)
        {
-               LLSelectNode* node = *iter;
-			   
                LLVOVolume* object = (LLVOVolume*)node->getObject();
 
                if (object && object->isRootEdit())
@@ -7416,12 +7387,9 @@ S32 LLObjectSelection::getSelectedObjectRenderCost()
 				   cost += object->getRenderCost(textures);
 				   computed_objects.insert(object->getID());
 
-				   const_child_list_t children = object->getChildren();
-				   for (const_child_list_t::const_iterator child_iter = children.begin();
-						 child_iter != children.end();
-						 ++child_iter)
+				   LLViewerObject::const_child_list_t& children = object->getChildren();
+				   for (LLViewerObject* child_obj : children)
 				   {
-					   LLViewerObject* child_obj = *child_iter;
 					   LLVOVolume *child = child_obj ? child_obj->asVolume() : nullptr;
 					   if (child)
 					   {
@@ -7430,10 +7398,10 @@ S32 LLObjectSelection::getSelectedObjectRenderCost()
 					   }
 				   }
 
-				   for (LLVOVolume::texture_cost_t::iterator iter = textures.begin(); iter != textures.end(); ++iter)
+				   for (const auto& tex_cost_pair : textures)
 				   {
 					   // add the cost of each individual texture in the linkset
-					   cost += iter->second;
+					   cost += tex_cost_pair.second;
 				   }
 
 				   textures.clear();
