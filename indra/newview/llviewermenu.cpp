@@ -4788,9 +4788,10 @@ void handle_take()
 {
 	// we want to use the folder this was derezzed from if it's
 	// available. Otherwise, derez to the normal place.
+	LLObjectSelectionHandle selection = LLSelectMgr::getInstance()->getSelection();
 //	if(LLSelectMgr::getInstance()->getSelection()->isEmpty())
 // [RLVa:KB] - Checked: 2010-03-24 (RLVa-1.2.0e) | Modified: RLVa-1.0.0b
-	if ( (LLSelectMgr::getInstance()->getSelection()->isEmpty()) || ((rlv_handler_t::isEnabled()) && (!rlvCanDeleteOrReturn())) )
+	if ( (selection->isEmpty()) || ((rlv_handler_t::isEnabled()) && (!rlvCanDeleteOrReturn())) )
 // [/RLVa:KB]
 	{
 		return;
@@ -4800,10 +4801,8 @@ void handle_take()
 	BOOL locked_but_takeable_object = FALSE;
 	LLUUID category_id;
 	
-	for (LLObjectSelection::root_iterator iter = LLSelectMgr::getInstance()->getSelection()->root_begin();
-		 iter != LLSelectMgr::getInstance()->getSelection()->root_end(); iter++)
+	for (LLSelectNode* node : selection->root_begin_end())
 	{
-		LLSelectNode* node = *iter;
 		LLViewerObject* object = node->getObject();
 		if(object)
 		{
@@ -4876,7 +4875,7 @@ void handle_take()
 	// MAINT-290
 	// Reason: Showing the confirmation dialog resets object selection,	thus there is nothing to derez.
 	// Fix: pass selection to the confirm_take, so that selection doesn't "die" after confirmation dialog is opened
-	params.functor.function(boost::bind(confirm_take, _1, _2, LLSelectMgr::instance().getSelection()));
+	params.functor.function(boost::bind(confirm_take, _1, _2, selection));
 
 	if(locked_but_takeable_object ||
 	   !you_own_everything)
@@ -4952,10 +4951,8 @@ BOOL enable_take()
 		return FALSE;
 	}
 
-	for (LLObjectSelection::valid_root_iterator iter = LLSelectMgr::getInstance()->getSelection()->valid_root_begin();
-		 iter != LLSelectMgr::getInstance()->getSelection()->valid_root_end(); iter++)
+	for (LLSelectNode* node : LLSelectMgr::getInstance()->getSelection()->valid_root_begin_end())
 	{
-		LLSelectNode* node = *iter;
 		LLViewerObject* object = node->getObject();
 		if (object->isAvatar())
 		{
@@ -5069,10 +5066,8 @@ class LLToolsEnableBuyOrTake : public view_listener_t
 //                FALSE if selection is a 'take'
 BOOL is_selection_buy_not_take()
 {
-	for (LLObjectSelection::root_iterator iter = LLSelectMgr::getInstance()->getSelection()->root_begin();
-		 iter != LLSelectMgr::getInstance()->getSelection()->root_end(); iter++)
+	for (LLSelectNode* node : LLSelectMgr::getInstance()->getSelection()->root_begin_end())
 	{
-		LLSelectNode* node = *iter;
 		LLViewerObject* obj = node->getObject();
 		if(obj && !(obj->permYouOwner()) && (node->mSaleInfo.isForSale()))
 		{
@@ -5092,10 +5087,8 @@ BOOL is_selection_buy_not_take()
 S32 selection_price()
 {
 	S32 total_price = 0;
-	for (LLObjectSelection::root_iterator iter = LLSelectMgr::getInstance()->getSelection()->root_begin();
-		 iter != LLSelectMgr::getInstance()->getSelection()->root_end(); iter++)
+	for (LLSelectNode* node : LLSelectMgr::getInstance()->getSelection()->root_begin_end())
 	{
-		LLSelectNode* node = *iter;
 		LLViewerObject* obj = node->getObject();
 		if(obj && !(obj->permYouOwner()) && (node->mSaleInfo.isForSale()))
 		{
@@ -5275,10 +5268,8 @@ class LLToolsSnapObjectXY : public view_listener_t
 	{
 		F64 snap_size = (F64)ALControlCache::GridResolution;
 
-		for (LLObjectSelection::root_iterator iter = LLSelectMgr::getInstance()->getSelection()->root_begin();
-			 iter != LLSelectMgr::getInstance()->getSelection()->root_end(); iter++)
+		for (LLSelectNode* node : LLSelectMgr::getInstance()->getSelection()->root_begin_end())
 		{
-			LLSelectNode* node = *iter;
 			LLViewerObject* obj = node->getObject();
 			if (obj->permModify())
 			{
@@ -7407,10 +7398,8 @@ BOOL object_is_wearable()
         return FALSE;
     }
 	LLObjectSelectionHandle selection = LLSelectMgr::getInstance()->getSelection();
-	for (LLObjectSelection::valid_root_iterator iter = LLSelectMgr::getInstance()->getSelection()->valid_root_begin();
-		 iter != LLSelectMgr::getInstance()->getSelection()->valid_root_end(); iter++)
+	for (LLSelectNode* node : selection->valid_root_begin_end())
 	{
-		LLSelectNode* node = *iter;		
 		if (node->mPermissions->getOwner() == gAgent.getID())
 		{
 			return TRUE;
@@ -7621,11 +7610,8 @@ class LLToolsSelectedScriptAction : public view_listener_t
 
 void handle_selected_texture_info(void*)
 {
-	for (LLObjectSelection::valid_iterator iter = LLSelectMgr::getInstance()->getSelection()->valid_begin();
-   		iter != LLSelectMgr::getInstance()->getSelection()->valid_end(); iter++)
+	for (LLSelectNode* node : LLSelectMgr::getInstance()->getSelection()->valid_begin_end())
 	{
-		LLSelectNode* node = *iter;
-	   	
    		std::string msg;
    		msg.assign("Texture info for: ");
    		msg.append(node->mName);
@@ -7668,11 +7654,8 @@ void handle_selected_texture_info(void*)
 
 void handle_selected_material_info()
 {
-	for (LLObjectSelection::valid_iterator iter = LLSelectMgr::getInstance()->getSelection()->valid_begin();
-		iter != LLSelectMgr::getInstance()->getSelection()->valid_end(); iter++)
+	for (LLSelectNode* node : LLSelectMgr::getInstance()->getSelection()->valid_begin_end())
 	{
-		LLSelectNode* node = *iter;
-		
 		std::string msg;
 		msg.assign("Material info for: \n");
 		msg.append(node->mName);

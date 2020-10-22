@@ -730,10 +730,8 @@ void LLManipRotate::drag( S32 x, S32 y )
 	}
 
 	// store changes to override updates
-	for (LLObjectSelection::iterator iter = LLSelectMgr::getInstance()->getSelection()->begin();
-		 iter != LLSelectMgr::getInstance()->getSelection()->end(); iter++)
+	for (LLSelectNode* selectNode : LLSelectMgr::getInstance()->getSelection()->begin_end())
 	{
-		LLSelectNode* selectNode = *iter;
 		LLViewerObject*cur = selectNode->getObject();
 		LLViewerObject *root_object = (cur == NULL) ? NULL : cur->getRootEdit();
 		if( cur->permModify() && cur->permMove() && !cur->isPermanentEnforced() &&

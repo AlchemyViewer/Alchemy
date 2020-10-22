@@ -292,14 +292,12 @@ const std::string &LLViewerFolderType::lookupNewCategoryName(LLFolderType::EType
 
 LLFolderType::EType LLViewerFolderType::lookupTypeFromNewCategoryName(const std::string& name)
 {
-	for (LLViewerFolderDictionary::const_iterator iter = LLViewerFolderDictionary::getInstance()->begin();
-		 iter != LLViewerFolderDictionary::getInstance()->end();
-		 iter++)
+	for (const auto& pair : LLViewerFolderDictionary::instance())
 	{
-		const ViewerFolderEntry *entry = iter->second;
+		const ViewerFolderEntry *entry = pair.second;
 		if (entry->mNewCategoryName == name)
 		{
-			return iter->first;
+			return pair.first;
 		}
 	}
 	return FT_NONE;
@@ -309,14 +307,12 @@ LLFolderType::EType LLViewerFolderType::lookupTypeFromNewCategoryName(const std:
 U64 LLViewerFolderType::lookupValidFolderTypes(const std::string& item_name)
 {
 	U64 matching_folders = 0;
-	for (LLViewerFolderDictionary::const_iterator iter = LLViewerFolderDictionary::getInstance()->begin();
-		 iter != LLViewerFolderDictionary::getInstance()->end();
-		 iter++)
+	for (const auto& pair : LLViewerFolderDictionary::instance())
 	{
-		const ViewerFolderEntry *entry = iter->second;
+		const ViewerFolderEntry *entry = pair.second;
 		if (entry->getIsAllowedName(item_name))
 		{
-			matching_folders |= 1LL << iter->first;
+			matching_folders |= 1LL << pair.first;
 		}
 	}
 	return matching_folders;

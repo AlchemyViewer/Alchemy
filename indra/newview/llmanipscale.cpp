@@ -391,16 +391,17 @@ BOOL LLManipScale::handleMouseUp(S32 x, S32 y, MASK mask)
 		}
 
 		//send texture update
-		LLSelectMgr::getInstance()->adjustTexturesByScale(TRUE, getStretchTextures());
+		auto& select_mgr = LLSelectMgr::instance();
+		select_mgr.adjustTexturesByScale(TRUE, getStretchTextures());
 
-		LLSelectMgr::getInstance()->enableSilhouette(TRUE);
+		select_mgr.enableSilhouette(TRUE);
 		mManipPart = LL_NO_PART;
 
 		// Might have missed last update due to UPDATE_DELAY timing
-		LLSelectMgr::getInstance()->sendMultipleUpdate( mLastUpdateFlags );
+		select_mgr.sendMultipleUpdate( mLastUpdateFlags );
 
 		//gAgent.setObjectTracking(gSavedSettings.getBOOL("TrackFocusObject"));
-		LLSelectMgr::getInstance()->saveSelectedObjectTransform(SELECT_ACTION_TYPE_PICK);
+		select_mgr.saveSelectedObjectTransform(SELECT_ACTION_TYPE_PICK);
 	}
 	return LLManip::handleMouseUp(x, y, mask);
 }
@@ -810,10 +811,9 @@ void LLManipScale::drag( S32 x, S32 y )
 	}
 
 	// store changes to override updates
-	for (LLObjectSelection::iterator iter = LLSelectMgr::getInstance()->getSelection()->begin();
-		 iter != LLSelectMgr::getInstance()->getSelection()->end(); iter++)
+	auto& select_mgr = LLSelectMgr::instance();
+	for (LLSelectNode* selectNode : select_mgr.getSelection()->begin_end())
 	{
-		LLSelectNode* selectNode = *iter;
 		LLViewerObject*cur = selectNode->getObject();
 		LLViewerObject *root_object = (cur == NULL) ? NULL : cur->getRootEdit();
 		if( cur->permModify() && cur->permMove() && !cur->isPermanentEnforced() &&
@@ -825,7 +825,7 @@ void LLManipScale::drag( S32 x, S32 y )
 		}
 	}
 
-	LLSelectMgr::getInstance()->updateSelectionCenter();
+	select_mgr.updateSelectionCenter();
 	gAgentCamera.clearFocusObject();
 }
 

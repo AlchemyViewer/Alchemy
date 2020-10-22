@@ -231,18 +231,16 @@ void render_cone_bbox(LLBBox bbox)
 // should this be cached in the selection manager?  yes.
 LLBBox get_selection_axis_aligned_bbox()
 {
-	LLBBox selection_bbox = LLSelectMgr::getInstance()->getBBoxOfSelection();
+	auto& select_mgr = LLSelectMgr::instance();
+	LLBBox selection_bbox = select_mgr.getBBoxOfSelection();
 	LLVector3 position = selection_bbox.getPositionAgent();
 
 	LLBBox axis_aligned_bbox = LLBBox(position, LLQuaternion(), LLVector3(), LLVector3());
 	axis_aligned_bbox.addPointLocal(LLVector3());
 
 	// cycle over the nodes in selection
-	for (LLObjectSelection::iterator selection_iter = LLSelectMgr::getInstance()->getSelection()->begin();
-		selection_iter != LLSelectMgr::getInstance()->getSelection()->end();
-		++selection_iter)
+	for (LLSelectNode* select_node : select_mgr.getSelection()->begin_end())
 	{
-		LLSelectNode *select_node = *selection_iter;
 		if (select_node)
 		{
 			LLViewerObject* object = select_node->getObject();
@@ -425,17 +423,15 @@ public:
 void ALToolAlign::align()
 {
 	// no linkset parts, please
-	LLSelectMgr::getInstance()->promoteSelectionToRoot();
+	auto& select_mgr = LLSelectMgr::instance();
+	select_mgr.promoteSelectionToRoot();
 
 	std::vector<LLPointer<LLViewerObject> > objects;
 	std::map<LLPointer<LLViewerObject>, LLBBox > original_bboxes;
 
 	// cycle over the nodes in selection and collect them into an array
-	for (LLObjectSelection::root_iterator selection_iter = LLSelectMgr::getInstance()->getSelection()->root_begin();
-		 selection_iter != LLSelectMgr::getInstance()->getSelection()->root_end();
-		 ++selection_iter)
+	for (LLSelectNode* select_node : select_mgr.getSelection()->root_begin_end())
 	{
-		LLSelectNode *select_node = *selection_iter;
 		if (select_node)
 		{
 			LLViewerObject* object = select_node->getObject();
@@ -564,5 +560,5 @@ void ALToolAlign::align()
 		object->setPosition(new_position);
 	}
 
-	LLSelectMgr::getInstance()->sendMultipleUpdate(UPD_POSITION);
+	select_mgr.sendMultipleUpdate(UPD_POSITION);
 }

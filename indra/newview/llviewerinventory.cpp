@@ -1110,16 +1110,12 @@ void create_inventory_item(const LLUUID& agent_id, const LLUUID& session_id,
 	std::string server_name = name;
 
 	{
-		std::map<std::string, std::string>::const_iterator dictionary_iter;
-
-		for (dictionary_iter = LLLocalizedInventoryItemsDictionary::getInstance()->mInventoryItemsDict.begin();
-			 dictionary_iter != LLLocalizedInventoryItemsDictionary::getInstance()->mInventoryItemsDict.end();
-			 dictionary_iter++)
+		for (const auto& pair : LLLocalizedInventoryItemsDictionary::getInstance()->mInventoryItemsDict)
 		{
-			const std::string& localized_name = dictionary_iter->second;
+			const std::string& localized_name = pair.second;
 			if(localized_name == name)
 			{
-				server_name = dictionary_iter->first;
+				server_name = pair.first;
 			}
 		}
 	}
