@@ -131,7 +131,7 @@ public:
 
 	typedef std::vector<LLDrivenEntry> entry_list_t;
     entry_list_t&                   getDrivenList() { return mDriven; }
-    void                            setDrivenList(entry_list_t& driven_list) { mDriven = driven_list; }
+    void                            setDrivenList(entry_list_t driven_list) { mDriven = std::move(driven_list); }
 
 protected:
 	LLDriverParam(const LLDriverParam& pOther);
