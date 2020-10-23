@@ -10875,17 +10875,12 @@ void LLPipeline::generateImpostor(LLVOAvatar* avatar)
 		markVisible(avatar->mDrawable, viewer_camera);
 		LLVOAvatar::sUseImpostors = false; // @TODO ???
 
-		LLVOAvatar::attachment_map_t::iterator iter;
-		for (iter = avatar->mAttachmentPoints.begin();
-			iter != avatar->mAttachmentPoints.end();
-			++iter)
+		for (const auto& attach_pair : avatar->mAttachmentPoints)
 		{
-			LLViewerJointAttachment *attachment = iter->second;
-			for (LLViewerJointAttachment::attachedobjs_vec_t::iterator attachment_iter = attachment->mAttachedObjects.begin();
-				 attachment_iter != attachment->mAttachedObjects.end();
-				 ++attachment_iter)
+			LLViewerJointAttachment *attachment = attach_pair.second;
+			for (LLViewerObject* attached_object : attachment->mAttachedObjects)
 			{
-				if (LLViewerObject* attached_object = attachment_iter->get())
+				if (attached_object)
 				{
 					markVisible(attached_object->mDrawable->getSpatialBridge(), viewer_camera);
 				}

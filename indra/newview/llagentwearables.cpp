@@ -1418,15 +1418,11 @@ std::vector<LLViewerObject*> LLAgentWearables::getTempAttachments()
 	llvo_vec_t temp_attachs;
 	if (isAgentAvatarValid())
 	{
-		for (LLVOAvatar::attachment_map_t::iterator iter = gAgentAvatarp->mAttachmentPoints.begin(); iter != gAgentAvatarp->mAttachmentPoints.end();)
+		for (const auto& attach_pair : gAgentAvatarp->mAttachmentPoints)
 		{
-			LLVOAvatar::attachment_map_t::iterator curiter = iter++;
-			LLViewerJointAttachment* attachment = curiter->second;
-			for (LLViewerJointAttachment::attachedobjs_vec_t::iterator attachment_iter = attachment->mAttachedObjects.begin();
-				attachment_iter != attachment->mAttachedObjects.end();
-				++attachment_iter)
+			LLViewerJointAttachment* attachment = attach_pair.second;
+			for (LLViewerObject* objectp : attachment->mAttachedObjects)
 			{
-				LLViewerObject *objectp = attachment_iter->get();
 				if (objectp && objectp->isTempAttachment())
 				{
 					temp_attachs.push_back(objectp);

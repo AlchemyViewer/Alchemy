@@ -445,11 +445,9 @@ BOOL LLVOAvatarSelf::buildMenus()
 		}
 		else
 		{
-			for (attachment_map_t::iterator iter = mAttachmentPoints.begin(); 
-				 iter != mAttachmentPoints.end();
-				 ++iter)
+			for (const auto& attach_pair : mAttachmentPoints)
 			{
-				LLViewerJointAttachment* attachment = iter->second;
+				const LLViewerJointAttachment* attachment = attach_pair.second;
 				if (attachment && attachment->getGroup() == i)
 				{
 					LLMenuItemCallGL::Params item_params;
@@ -465,10 +463,10 @@ BOOL LLVOAvatarSelf::buildMenus()
 					}
 					item_params.name =(item_params.label );
 					item_params.on_click.function_name = "Object.AttachToAvatar";
-					item_params.on_click.parameter = iter->first;
+					item_params.on_click.parameter = attach_pair.first;
 					// [RLVa:KB] - No changes, but we do need the parameter to always be idxAttachPt for object_selected_and_point_valid()
 					item_params.on_enable.function_name = "Object.EnableWear";
-					item_params.on_enable.parameter = iter->first;
+					item_params.on_enable.parameter = attach_pair.first;
 					LLMenuItemCallGL* item = LLUICtrlFactory::create<LLMenuItemCallGL>(item_params);
 
 					gAttachPieMenu->addChild(item);
@@ -485,11 +483,9 @@ BOOL LLVOAvatarSelf::buildMenus()
 		}
 		else
 		{
-			for (attachment_map_t::iterator iter = mAttachmentPoints.begin(); 
-				 iter != mAttachmentPoints.end();
-				 ++iter)
+			for (const auto& attach_pair : mAttachmentPoints)
 			{
-				LLViewerJointAttachment* attachment = iter->second;
+				const LLViewerJointAttachment* attachment = attach_pair.second;
 				if (attachment && attachment->getGroup() == i)
 				{
 					LLMenuItemCallGL::Params item_params;
@@ -504,9 +500,9 @@ BOOL LLVOAvatarSelf::buildMenus()
 					}
 					item_params.name =(item_params.label );
 					item_params.on_click.function_name = "Attachment.DetachFromPoint";
-					item_params.on_click.parameter = iter->first;
+					item_params.on_click.parameter = attach_pair.first;
 					item_params.on_enable.function_name = "Attachment.PointFilled";
-					item_params.on_enable.parameter = iter->first;
+					item_params.on_enable.parameter = attach_pair.first;
 					LLMenuItemCallGL* item = LLUICtrlFactory::create<LLMenuItemCallGL>(item_params);
 
 					gDetachPieMenu->addChild(item);
@@ -518,11 +514,9 @@ BOOL LLVOAvatarSelf::buildMenus()
 	}
 
 	// add screen attachments
-	for (attachment_map_t::iterator iter = mAttachmentPoints.begin(); 
-		 iter != mAttachmentPoints.end();
-		 ++iter)
+	for (const auto& attach_pair : mAttachmentPoints)
 	{
-		LLViewerJointAttachment* attachment = iter->second;
+		const LLViewerJointAttachment* attachment = attach_pair.second;
 		if (attachment->getGroup() == 9)
 		{
 			LLMenuItemCallGL::Params item_params;
@@ -537,17 +531,17 @@ BOOL LLVOAvatarSelf::buildMenus()
 			}
 			item_params.name =(item_params.label );
 			item_params.on_click.function_name = "Object.AttachToAvatar";
-			item_params.on_click.parameter = iter->first;
+			item_params.on_click.parameter = attach_pair.first;
 			// [RLVa:KB] - No changes, but we do need the parameter to always be idxAttachPt for object_selected_and_point_valid()
 			item_params.on_enable.function_name = "Object.EnableWear";
-			item_params.on_enable.parameter = iter->first;
+			item_params.on_enable.parameter = attach_pair.first;
 			LLMenuItemCallGL* item = LLUICtrlFactory::create<LLMenuItemCallGL>(item_params);
 			gAttachScreenPieMenu->addChild(item);
 
 			item_params.on_click.function_name = "Attachment.DetachFromPoint";
-			item_params.on_click.parameter = iter->first;
+			item_params.on_click.parameter = attach_pair.first;
 			item_params.on_enable.function_name = "Attachment.PointFilled";
-			item_params.on_enable.parameter = iter->first;
+			item_params.on_enable.parameter = attach_pair.first;
 			item = LLUICtrlFactory::create<LLMenuItemCallGL>(item_params);
 			gDetachScreenPieMenu->addChild(item);
 		}
@@ -560,11 +554,9 @@ BOOL LLVOAvatarSelf::buildMenus()
 		{
 			break;
 		}
-		for (attachment_map_t::iterator iter = mAttachmentPoints.begin(); 
-			 iter != mAttachmentPoints.end();
-			 ++iter)
+		for (const auto& attach_pair : mAttachmentPoints)
 		{
-			LLViewerJointAttachment* attachment = iter->second;
+			const LLViewerJointAttachment* attachment = attach_pair.second;
 			if (attachment->getIsHUDAttachment() != (pass == 1))
 			{
 				continue;
@@ -581,10 +573,10 @@ BOOL LLVOAvatarSelf::buildMenus()
 			}
 			item_params.name =(item_params.label );
 			item_params.on_click.function_name = "Object.AttachToAvatar";
-			item_params.on_click.parameter = iter->first;
+			item_params.on_click.parameter = attach_pair.first;
 			// [RLVa:KB] - No changes, but we do need the parameter to always be idxAttachPt for object_selected_and_point_valid()
 			item_params.on_enable.function_name = "Object.EnableWear";
-			item_params.on_enable.parameter = iter->first;
+			item_params.on_enable.parameter = attach_pair.first;
 			//* TODO: Skinning:
 			//LLSD params;
 			//params["index"] = iter->first;
@@ -595,9 +587,9 @@ BOOL LLVOAvatarSelf::buildMenus()
 			gAttachSubMenu->addChild(item);
 
 			item_params.on_click.function_name = "Attachment.DetachFromPoint";
-			item_params.on_click.parameter = iter->first;
+			item_params.on_click.parameter = attach_pair.first;
 			item_params.on_enable.function_name = "Attachment.PointFilled";
-			item_params.on_enable.parameter = iter->first;
+			item_params.on_enable.parameter = attach_pair.first;
 			//* TODO: Skinning: item->addEventHandler("on_enable", LLMenuItemCallGL::MenuCallback().function_name("Attachment.Label").parameter(params));
 
 			item = LLUICtrlFactory::create<LLMenuItemCallGL>(item_params);
@@ -622,16 +614,14 @@ BOOL LLVOAvatarSelf::buildMenus()
 		std::multimap<S32, S32> attachment_pie_menu_map;
 
 		// gather up all attachment points assigned to this group, and throw into map sorted by pie slice number
-		for (attachment_map_t::iterator iter = mAttachmentPoints.begin(); 
-			 iter != mAttachmentPoints.end();
-			 ++iter)
+		for (const auto& attach_pair : mAttachmentPoints)
 		{
-			LLViewerJointAttachment* attachment = iter->second;
+			LLViewerJointAttachment* attachment = attach_pair.second;
 			if(attachment && attachment->getGroup() == group)
 			{
 				// use multimap to provide a partial order off of the pie slice key
 				S32 pie_index = attachment->getPieSlice();
-				attachment_pie_menu_map.insert(std::make_pair(pie_index, iter->first));
+				attachment_pie_menu_map.insert(std::make_pair(pie_index, attach_pair.first));
 			}
 		}
 
@@ -1066,11 +1056,9 @@ void LLVOAvatarSelf::restoreMeshData()
 //-----------------------------------------------------------------------------
 void LLVOAvatarSelf::updateAttachmentVisibility(U32 camera_mode)
 {
-	for (attachment_map_t::iterator iter = mAttachmentPoints.begin(); 
-		 iter != mAttachmentPoints.end();
-		 ++iter)
+	for (const auto& attach_pair : mAttachmentPoints)
 	{
-		LLViewerJointAttachment* attachment = iter->second;
+		LLViewerJointAttachment* attachment = attach_pair.second;
 		if (attachment->getIsHUDAttachment())
 		{
 			attachment->setAttachmentVisibility(TRUE);
@@ -1127,11 +1115,8 @@ void LLVOAvatarSelf::wearableUpdated(LLWearableType::EType type)
 
 		if (baked_dict)
 		{
-			for (LLAvatarAppearanceDefines::wearables_vec_t::const_iterator type_iter = baked_dict->mWearables.begin();
-				type_iter != baked_dict->mWearables.end();
-				 ++type_iter)
+			for (const LLWearableType::EType comp_type : baked_dict->mWearables)
 			{
-				const LLWearableType::EType comp_type = *type_iter;
 				if (comp_type == type)
 				{
 					LLViewerTexLayerSet *layerset = getLayerSet(index);
@@ -1153,11 +1138,9 @@ void LLVOAvatarSelf::wearableUpdated(LLWearableType::EType type)
 BOOL LLVOAvatarSelf::isWearingAttachment(const LLUUID& inv_item_id) const
 {
 	const LLUUID& base_inv_item_id = gInventory.getLinkedItemID(inv_item_id);
-	for (attachment_map_t::const_iterator iter = mAttachmentPoints.begin(); 
-		 iter != mAttachmentPoints.end();
-		 ++iter)
+	for (const auto& attach_pair : mAttachmentPoints)
 	{
-		const LLViewerJointAttachment* attachment = iter->second;
+		const LLViewerJointAttachment* attachment = attach_pair.second;
 		if (attachment->getAttachedObject(base_inv_item_id))
 		{
 			return TRUE;
@@ -1172,11 +1155,9 @@ BOOL LLVOAvatarSelf::isWearingAttachment(const LLUUID& inv_item_id) const
 LLViewerObject* LLVOAvatarSelf::getWornAttachment(const LLUUID& inv_item_id)
 {
 	const LLUUID& base_inv_item_id = gInventory.getLinkedItemID(inv_item_id);
-	for (attachment_map_t::const_iterator iter = mAttachmentPoints.begin(); 
-		 iter != mAttachmentPoints.end();
-		 ++iter)
+	for (const auto& attach_pair : mAttachmentPoints)
 	{
-		LLViewerJointAttachment* attachment = iter->second;
+		LLViewerJointAttachment* attachment = attach_pair.second;
  		if (LLViewerObject *attached_object = attachment->getAttachedObject(base_inv_item_id))
 		{
 			return attached_object;
@@ -1197,9 +1178,9 @@ boost::signals2::connection LLVOAvatarSelf::setAttachmentCallback(const attachme
 LLViewerJointAttachment* LLVOAvatarSelf::getWornAttachmentPoint(const LLUUID& idItem) const
 {
 	const LLUUID& idItemBase = gInventory.getLinkedItemID(idItem);
-	for (attachment_map_t::const_iterator itAttachPt = mAttachmentPoints.begin(); itAttachPt != mAttachmentPoints.end(); ++itAttachPt)
+	for (const auto& attach_pair : mAttachmentPoints)
 	{
-		LLViewerJointAttachment* pAttachPt = itAttachPt->second;
+		LLViewerJointAttachment* pAttachPt = attach_pair.second;
  		if (pAttachPt->getAttachedObject(idItemBase))
 			return pAttachPt;
 	}
@@ -1220,11 +1201,9 @@ bool LLVOAvatarSelf::getAttachedPointName(const LLUUID& inv_item_id, std::string
 		name = "ATTACHMENT_MISSING_BASE_ITEM";
 		return false;
 	}
-	for (attachment_map_t::const_iterator iter = mAttachmentPoints.begin(); 
-		 iter != mAttachmentPoints.end(); 
-		 ++iter)
+	for (const auto& attach_pair : mAttachmentPoints)
 	{
-		const LLViewerJointAttachment* attachment = iter->second;
+		const LLViewerJointAttachment* attachment = attach_pair.second;
 		if (attachment->getAttachedObject(base_inv_item_id))
 		{
 			name = attachment->getName();
@@ -1285,9 +1264,9 @@ BOOL LLVOAvatarSelf::detachObject(LLViewerObject *viewer_object)
 	// NOTE: RLVa event handlers should be invoked *before* LLVOAvatar::detachObject() calls LLViewerJointAttachment::removeObject()
 	if (rlv_handler_t::isEnabled())
 	{
-		for (attachment_map_t::const_iterator itAttachPt = mAttachmentPoints.begin(); itAttachPt != mAttachmentPoints.end(); ++itAttachPt)
+		for (const auto& attach_pair : mAttachmentPoints)
 		{
-			const LLViewerJointAttachment* pAttachPt = itAttachPt->second;
+			const LLViewerJointAttachment* pAttachPt = attach_pair.second;
 			if (pAttachPt->isObjectAttached(viewer_object))
 			{
 				RlvAttachmentLockWatchdog::instance().onDetach(viewer_object, pAttachPt);
@@ -1309,11 +1288,8 @@ BOOL LLVOAvatarSelf::detachObject(LLViewerObject *viewer_object)
 		LLFollowCamMgr::getInstance()->setCameraActive(viewer_object->getID(), FALSE);
 		
 		LLViewerObject::const_child_list_t& child_list = viewer_object->getChildren();
-		for (LLViewerObject::child_list_t::const_iterator iter = child_list.begin();
-			 iter != child_list.end(); 
-			 ++iter)
+		for (LLViewerObject* child_objectp : child_list)
 		{
-			LLViewerObject* child_objectp = *iter;
 			// the simulator should automatically handle
 			// permissions revocation
 			
@@ -1501,11 +1477,8 @@ BOOL LLVOAvatarSelf::isLocalTextureDataAvailable(const LLViewerTexLayerSet* laye
 		{
 			BOOL ret = true;
 			const LLAvatarAppearanceDictionary::BakedEntry *baked_dict = baked_pair.second;
-			for (texture_vec_t::const_iterator local_tex_iter = baked_dict->mLocalTextures.begin();
-				 local_tex_iter != baked_dict->mLocalTextures.end();
-				 ++local_tex_iter)
+			for (const ETextureIndex tex_index : baked_dict->mLocalTextures)
 			{
-				const ETextureIndex tex_index = *local_tex_iter;
 				const LLWearableType::EType wearable_type = LLAvatarAppearanceDictionary::getTEWearableType(tex_index);
 				const U32 wearable_count = gAgentWearables.getWearableCount(wearable_type);
 				for (U32 wearable_index = 0; wearable_index < wearable_count; wearable_index++)
@@ -1538,16 +1511,13 @@ BOOL LLVOAvatarSelf::isLocalTextureDataFinal(const LLViewerTexLayerSet* layerset
 		if (layerset == mBakedTextureDatas[i].mTexLayerSet)
 		{
 			const LLAvatarAppearanceDictionary::BakedEntry *baked_dict = avApprDict.getBakedTexture((EBakedTextureIndex)i);
-			for (texture_vec_t::const_iterator local_tex_iter = baked_dict->mLocalTextures.begin();
-				 local_tex_iter != baked_dict->mLocalTextures.end();
-				 ++local_tex_iter)
+			for (const ETextureIndex tex_index : baked_dict->mLocalTextures)
 			{
-				const ETextureIndex tex_index = *local_tex_iter;
 				const LLWearableType::EType wearable_type = LLAvatarAppearanceDictionary::getTEWearableType(tex_index);
 				const U32 wearable_count = gAgentWearables.getWearableCount(wearable_type);
 				for (U32 wearable_index = 0; wearable_index < wearable_count; wearable_index++)
 				{
-					S32 local_discard_level = getLocalDiscardLevel(*local_tex_iter, wearable_index);
+					S32 local_discard_level = getLocalDiscardLevel(tex_index, wearable_index);
 					if ((local_discard_level > (S32)(desired_tex_discard_level)) ||
 						(local_discard_level < 0 ))
 					{
@@ -1572,16 +1542,13 @@ BOOL LLVOAvatarSelf::isAllLocalTextureDataFinal() const
 	for (U32 i = 0; i < mBakedTextureDatas.size(); i++)
 	{
 		const LLAvatarAppearanceDictionary::BakedEntry *baked_dict = avApprDict.getBakedTexture((EBakedTextureIndex)i);
-		for (texture_vec_t::const_iterator local_tex_iter = baked_dict->mLocalTextures.begin();
-			 local_tex_iter != baked_dict->mLocalTextures.end();
-			 ++local_tex_iter)
+		for (const ETextureIndex tex_index : baked_dict->mLocalTextures)
 		{
-			const ETextureIndex tex_index = *local_tex_iter;
 			const LLWearableType::EType wearable_type = LLAvatarAppearanceDictionary::getTEWearableType(tex_index);
 			const U32 wearable_count = gAgentWearables.getWearableCount(wearable_type);
 			for (U32 wearable_index = 0; wearable_index < wearable_count; wearable_index++)
 			{
-				S32 local_discard_level = getLocalDiscardLevel(*local_tex_iter, wearable_index);
+				S32 local_discard_level = getLocalDiscardLevel(tex_index, wearable_index);
 				if ((local_discard_level > (S32)(desired_tex_discard_level)) ||
 					(local_discard_level < 0 ))
 				{

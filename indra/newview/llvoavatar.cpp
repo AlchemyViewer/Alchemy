@@ -928,10 +928,9 @@ BOOL LLVOAvatar::areAllNearbyInstancesBaked(S32& grey_avatars)
 {
 	BOOL res = TRUE;
 	grey_avatars = 0;
-	for (std::vector<LLCharacter*>::iterator iter = LLCharacter::sInstances.begin();
-		 iter != LLCharacter::sInstances.end(); ++iter)
+	for (LLCharacter* character : LLCharacter::sInstances)
 	{
-		LLVOAvatar* inst = (LLVOAvatar*) *iter;
+		LLVOAvatar* inst = static_cast<LLVOAvatar*>(character);
 		if( inst->isDead() )
 		{
 			continue;
@@ -953,10 +952,9 @@ void LLVOAvatar::getNearbyRezzedStats(std::vector<S32>& counts)
 {
 	counts.clear();
 	counts.resize(4);
-	for (std::vector<LLCharacter*>::iterator iter = LLCharacter::sInstances.begin();
-		 iter != LLCharacter::sInstances.end(); ++iter)
+	for (LLCharacter* character : LLCharacter::sInstances)
 	{
-		LLVOAvatar* inst = (LLVOAvatar*) *iter;
+		LLVOAvatar* inst = static_cast<LLVOAvatar*>(character);
 		if (inst)
 		{
 			S32 rez_status = inst->getRezzedStatus();
@@ -980,10 +978,9 @@ void LLVOAvatar::dumpBakedStatus()
 {
 	LLVector3d camera_pos_global = gAgentCamera.getCameraPositionGlobal();
 
-	for (std::vector<LLCharacter*>::iterator iter = LLCharacter::sInstances.begin();
-		 iter != LLCharacter::sInstances.end(); ++iter)
+	for (LLCharacter* character : LLCharacter::sInstances)
 	{
-		LLVOAvatar* inst = (LLVOAvatar*) *iter;
+		LLVOAvatar* inst = static_cast<LLVOAvatar*>(character);
 		LL_INFOS() << "Avatar ";
 
 		LLNameValue* firstname = inst->getNVPair("FirstName");
@@ -1076,10 +1073,9 @@ void LLVOAvatar::destroyGL()
 //static
 void LLVOAvatar::resetImpostors()
 {
-	for (std::vector<LLCharacter*>::iterator iter = LLCharacter::sInstances.begin();
-		 iter != LLCharacter::sInstances.end(); ++iter)
+	for (LLCharacter* character : LLCharacter::sInstances)
 	{
-		LLVOAvatar* avatar = (LLVOAvatar*) *iter;
+		LLVOAvatar* avatar = static_cast<LLVOAvatar*>(character);
 		avatar->mImpostor.release();
 		avatar->mNeedsImpostorUpdate = TRUE;
 	}
@@ -1090,10 +1086,9 @@ void LLVOAvatar::deleteCachedImages(bool clearAll)
 {	
 	if (LLViewerTexLayerSet::sHasCaches)
 	{
-		for (std::vector<LLCharacter*>::iterator iter = LLCharacter::sInstances.begin();
-			 iter != LLCharacter::sInstances.end(); ++iter)
+		for (LLCharacter* character : LLCharacter::sInstances)
 		{
-			LLVOAvatar* inst = (LLVOAvatar*) *iter;
+			LLVOAvatar* inst = static_cast<LLVOAvatar*>(character);
 			inst->deleteLayerSetCaches(clearAll);
 		}
 		LLViewerTexLayerSet::sHasCaches = FALSE;
@@ -1347,19 +1342,18 @@ void LLVOAvatar::calculateSpatialExtents(LLVector4a& newMin, LLVector4a& newMax)
 	//stretch bounding box by joint positions. Doing this for
 	//control avs, where the polymeshes aren't maintained or
 	//displayed, can give inaccurate boxes due to joints stuck at (0,0,0).
-    if ((box_detail>=1) && !isControlAvatar())
+    if ((box_detail >= 1) && !isControlAvatar())
     {
-	for (polymesh_map_t::iterator i = mPolyMeshes.begin(); i != mPolyMeshes.end(); ++i)
-	{
-		LLPolyMesh* mesh = i->second;
-		for (S32 joint_num = 0; joint_num < mesh->mJointRenderData.size(); joint_num++)
-		{
-			LLVector4a trans;
-			trans.load3( mesh->mJointRenderData[joint_num]->mWorldMatrix->getTranslation().mV);
-			update_min_max(newMin, newMax, trans);
-		}
-	}
-
+        for (const auto &polymesh_pair : mPolyMeshes)
+        {
+            LLPolyMesh *mesh = polymesh_pair.second;
+            for (S32 joint_num = 0; joint_num < mesh->mJointRenderData.size(); joint_num++)
+            {
+                LLVector4a trans;
+                trans.load3(mesh->mJointRenderData[joint_num]->mWorldMatrix->getTranslation().mV);
+                update_min_max(newMin, newMax, trans);
+            }
+        }
     }
 
 	// Pad bounding box for starting joint, plus polymesh if
@@ -1370,38 +1364,36 @@ void LLVOAvatar::calculateSpatialExtents(LLVector4a& newMin, LLVector4a& newMax)
 	newMax.add(padding);
 
 
-	//stretch bounding box by static attachments
+	// stretch bounding box by static attachments
     if (box_detail >= 2)
     {
         float max_attachment_span = get_default_max_prim_scale() * 5.0f;
-	
-	for (attachment_map_t::iterator iter = mAttachmentPoints.begin(); 
-		 iter != mAttachmentPoints.end();
-		 ++iter)
-	{
-		LLViewerJointAttachment* attachment = iter->second;
 
-		if (attachment->getValid())
-		{
-			for (LLViewerObject* attached_object : attachment->mAttachedObjects)
-			{
-                // Don't we need to look at children of attached_object as well?
-				if (attached_object && !attached_object->isHUDAttachment())
-				{
-                        const LLVOVolume *vol = attached_object->asVolume();
+        for (const auto& attach_pair : mAttachmentPoints)
+        {
+            LLViewerJointAttachment* attachment = attach_pair.second;
+
+            if (attachment->getValid())
+            {
+                for (LLViewerObject* attached_object : attachment->mAttachedObjects)
+                {
+                    // Don't we need to look at children of attached_object as well?
+                    if (attached_object && !attached_object->isHUDAttachment())
+                    {
+                        const LLVOVolume* vol = attached_object->asVolume();
                         if (vol && vol->isAnimatedObject())
                         {
-                            // Animated objects already have a bounding box in their control av, use that. 
+                            // Animated objects already have a bounding box in their control av, use that.
                             // Could lag by a frame if there's no guarantee on order of processing for avatars.
-                            const LLControlAvatar *cav = vol->getControlAvatar();
+                            const LLControlAvatar* cav = vol->getControlAvatar();
                             if (cav)
                             {
                                 LLVector4a cav_min;
                                 cav_min.load3(cav->mLastAnimExtents[0].mV);
                                 LLVector4a cav_max;
                                 cav_max.load3(cav->mLastAnimExtents[1].mV);
-                                update_min_max(newMin,newMax,cav_min);
-                                update_min_max(newMin,newMax,cav_max);
+                                update_min_max(newMin, newMax, cav_min);
+                                update_min_max(newMin, newMax, cav_max);
                                 continue;
                             }
                         }
@@ -1409,33 +1401,33 @@ void LLVOAvatar::calculateSpatialExtents(LLVector4a& newMin, LLVector4a& newMax)
                         {
                             continue;
                         }
-					LLDrawable* drawable = attached_object->mDrawable;
-					if (drawable && !drawable->isState(LLDrawable::RIGGED))
-					{
-						const LLSpatialBridge* bridge = drawable->getSpatialBridge();
-						if (bridge)
-						{
-							const LLVector4a* ext = bridge->getSpatialExtents();
-							LLVector4a distance;
-							distance.setSub(ext[1], ext[0]);
-							LLVector4a max_span(max_attachment_span);
+                        LLDrawable* drawable = attached_object->mDrawable;
+                        if (drawable && !drawable->isState(LLDrawable::RIGGED))
+                        {
+                            const LLSpatialBridge* bridge = drawable->getSpatialBridge();
+                            if (bridge)
+                            {
+                                const LLVector4a* ext = bridge->getSpatialExtents();
+                                LLVector4a        distance;
+                                distance.setSub(ext[1], ext[0]);
+                                LLVector4a max_span(max_attachment_span);
 
-							S32 lt = distance.lessThan(max_span).getGatheredBits() & 0x7;
-						
-							// Only add the prim to spatial extents calculations if it isn't a megaprim.
-							// max_attachment_span calculated at the start of the function 
-							// (currently 5 times our max prim size) 
-							if (lt == 0x7)
-							{
-								update_min_max(newMin,newMax,ext[0]);
-								update_min_max(newMin,newMax,ext[1]);
-							}
-						}
-					}
-				}
-			}
-		}
-	}
+                                S32 lt = distance.lessThan(max_span).getGatheredBits() & 0x7;
+
+                                // Only add the prim to spatial extents calculations if it isn't a megaprim.
+                                // max_attachment_span calculated at the start of the function
+                                // (currently 5 times our max prim size)
+                                if (lt == 0x7)
+                                {
+                                    update_min_max(newMin, newMax, ext[0]);
+                                    update_min_max(newMin, newMax, ext[1]);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 
     // Stretch bounding box by rigged mesh joint boxes
@@ -1585,9 +1577,6 @@ void LLVOAvatar::renderBones(const std::string &selected_joint)
 {
     LLGLEnable blend(GL_BLEND);
 
-	avatar_joint_list_t::iterator iter = mSkeleton.begin();
-    avatar_joint_list_t::iterator end = mSkeleton.end();
-
     // For selected joints
     static LLVector3 SELECTED_COLOR_OCCLUDED(1.0f, 1.0f, 0.0f);
     static LLVector3 SELECTED_COLOR_VISIBLE(0.5f, 0.5f, 0.5f);
@@ -1603,9 +1592,8 @@ void LLVOAvatar::renderBones(const std::string &selected_joint)
     
     static F32 SPHERE_SCALEF = 0.001f;
 
-	for (; iter != end; ++iter)
+	for (LLJoint* jointp : mSkeleton)
 	{
-		LLJoint* jointp = *iter;
 		if (!jointp)
 		{
 			continue;
@@ -1811,18 +1799,12 @@ BOOL LLVOAvatar::lineSegmentIntersect(const LLVector4a& start, const LLVector4a&
 
 		if (isSelf())
 		{
-			for (attachment_map_t::iterator iter = mAttachmentPoints.begin(); 
-			 iter != mAttachmentPoints.end();
-			 ++iter)
+			for (const auto& attach_pair : mAttachmentPoints)
 			{
-				LLViewerJointAttachment* attachment = iter->second;
+				LLViewerJointAttachment* attachment = attach_pair.second;
 
-				for (LLViewerJointAttachment::attachedobjs_vec_t::iterator attachment_iter = attachment->mAttachedObjects.begin();
-					 attachment_iter != attachment->mAttachedObjects.end();
-					 ++attachment_iter)
+				for (LLViewerObject* attached_object : attachment->mAttachedObjects)
 				{
-					LLViewerObject* attached_object = attachment_iter->get();
-					
 					if (attached_object && !attached_object->isDead() && attachment->getValid())
 					{
 						LLDrawable* drawable = attached_object->mDrawable;
@@ -1875,18 +1857,12 @@ LLViewerObject* LLVOAvatar::lineSegmentIntersectRiggedAttachments(const LLVector
 		LLVector4a local_end = end;
 		LLVector4a local_intersection;
 
-		for (attachment_map_t::iterator iter = mAttachmentPoints.begin(); 
-			iter != mAttachmentPoints.end();
-			++iter)
+		for (const auto& attach_pair : mAttachmentPoints)
 		{
-			LLViewerJointAttachment* attachment = iter->second;
+			LLViewerJointAttachment* attachment = attach_pair.second;
 
-			for (LLViewerJointAttachment::attachedobjs_vec_t::iterator attachment_iter = attachment->mAttachedObjects.begin();
-					attachment_iter != attachment->mAttachedObjects.end();
-					++attachment_iter)
+			for (LLViewerObject* attached_object : attachment->mAttachedObjects)
 			{
-				LLViewerObject* attached_object = attachment_iter->get();
-					
 				if (attached_object->lineSegmentIntersect(start, local_end, face, pick_transparent, pick_rigged, face_hit, &local_intersection, tex_coord, normal, tangent))
 				{
 					local_end = local_intersection;
@@ -1994,11 +1970,9 @@ void LLVOAvatar::resetVisualParams()
 	// Skeletal params
 	{
 		LLAvatarXmlInfo::skeletal_distortion_info_list_t::iterator iter;
-		for (iter = sAvatarXmlInfo->mSkeletalDistortionInfoList.begin();
-			 iter != sAvatarXmlInfo->mSkeletalDistortionInfoList.end(); 
-			 ++iter)
+		for (LLViewerVisualParamInfo* vparam : sAvatarXmlInfo->mSkeletalDistortionInfoList)
 		{
-			LLPolySkeletalDistortionInfo *info = (LLPolySkeletalDistortionInfo*)*iter;
+			LLPolySkeletalDistortionInfo *info = static_cast<LLPolySkeletalDistortionInfo*>(vparam);
 			LLPolySkeletalDistortion *param = static_cast<LLPolySkeletalDistortion*>(getVisualParam(info->getID()));
             *param = LLPolySkeletalDistortion(this);
             llassert(param);
@@ -2010,13 +1984,10 @@ void LLVOAvatar::resetVisualParams()
 	}
 
 	// Driver parameters
-	for (LLAvatarXmlInfo::driver_info_list_t::iterator iter = sAvatarXmlInfo->mDriverInfoList.begin();
-		 iter != sAvatarXmlInfo->mDriverInfoList.end(); 
-		 ++iter)
+	for (LLDriverParamInfo* info : sAvatarXmlInfo->mDriverInfoList)
 	{
-		LLDriverParamInfo *info = *iter;
         LLDriverParam *param = static_cast<LLDriverParam*>(getVisualParam(info->getID()));
-        LLDriverParam::entry_list_t driven_list = param->getDrivenList();
+        LLDriverParam::entry_list_t& driven_list = param->getDrivenList();
         *param = LLDriverParam(this);
         llassert(param);
         if (!param->setInfo(info))
@@ -2130,11 +2101,8 @@ void LLVOAvatar::releaseMeshData()
 	}
 
 	// cleanup mesh data
-	for (avatar_joint_list_t::iterator iter = mMeshLOD.begin();
-		 iter != mMeshLOD.end(); 
-		 ++iter)
+	for (LLAvatarJoint* joint : mMeshLOD)
 	{
-		LLAvatarJoint* joint = (*iter);
 		joint->setValid(FALSE, TRUE);
 	}
 
@@ -2156,11 +2124,9 @@ void LLVOAvatar::releaseMeshData()
 		}
 	}
 	
-	for (attachment_map_t::iterator iter = mAttachmentPoints.begin(); 
-		 iter != mAttachmentPoints.end();
-		 ++iter)
+	for (const auto& attach_pair : mAttachmentPoints)
 	{
-		LLViewerJointAttachment* attachment = iter->second;
+		LLViewerJointAttachment* attachment = attach_pair.second;
 		if (!attachment->getIsHUDAttachment())
 		{
 			attachment->setAttachmentVisibility(FALSE);
@@ -2185,11 +2151,9 @@ void LLVOAvatar::restoreMeshData()
 	mMeshValid = TRUE;
 	updateJointLODs();
 
-	for (attachment_map_t::iterator iter = mAttachmentPoints.begin(); 
-		 iter != mAttachmentPoints.end();
-		 ++iter)
+	for (const auto& attach_pair : mAttachmentPoints)
 	{
-		LLViewerJointAttachment* attachment = iter->second;
+		LLViewerJointAttachment* attachment = attach_pair.second;
 		if (!attachment->getIsHUDAttachment())
 		{
 			attachment->setAttachmentVisibility(TRUE);
@@ -2439,19 +2403,19 @@ static LLTrace::BlockTimerStatHandle FTM_JOINT_UPDATE("Update Joints");
 void LLVOAvatar::dumpAnimationState()
 {
 	LL_INFOS() << "==============================================" << LL_ENDL;
-	for (LLVOAvatar::AnimIterator it = mSignaledAnimations.begin(); it != mSignaledAnimations.end(); ++it)
+	for (const auto& sig_anim_pair : mSignaledAnimations)
 	{
-		LLUUID id = it->first;
-		std::string playtag = "";
+		const LLUUID& id = sig_anim_pair.first;
+		std::string playtag;
 		if (mPlayingAnimations.find(id) != mPlayingAnimations.end())
 		{
 			playtag = "*";
 		}
 		LL_INFOS() << gAnimLibrary.animationName(id) << playtag << LL_ENDL;
 	}
-	for (LLVOAvatar::AnimIterator it = mPlayingAnimations.begin(); it != mPlayingAnimations.end(); ++it)
+	for (const auto& playing_anim_pair : mPlayingAnimations)
 	{
-		LLUUID id = it->first;
+		const LLUUID& id = playing_anim_pair.first;
 		bool is_signaled = mSignaledAnimations.find(id) != mSignaledAnimations.end();
 		if (!is_signaled)
 		{
@@ -3372,7 +3336,7 @@ void LLVOAvatar::idleUpdateNameTagText(BOOL new_name)
 		mNameText->setTextAlignment(LLHUDNameTag::ALIGN_TEXT_LEFT);
 		mNameText->setFadeDistance(CHAT_NORMAL_RADIUS * 2.f, 5.f);
 
-		std::deque<LLChat>::iterator chat_iter = mChats.begin();
+		std::deque<LLChat>::iterator chat_iter = mChats.begin(), chat_iter_end = mChats.end();
 		mNameText->clearString();
 
 		static LLUIColor user_chat_color = LLUIColorTable::instance().getColor("UserChatColor");
@@ -3386,7 +3350,7 @@ void LLVOAvatar::idleUpdateNameTagText(BOOL new_name)
 			++chat_iter;
 		}
 
-		for(; chat_iter != mChats.end(); ++chat_iter)
+		for(; chat_iter != chat_iter_end; ++chat_iter)
 		{
 			F32 chat_fade_amt = llclamp((F32)((LLFrameTimer::getElapsedSeconds() - chat_iter->mTime) / CHAT_FADE_TIME), 0.f, 4.f);
 			LLFontGL::StyleFlags style;
@@ -3487,10 +3451,9 @@ void LLVOAvatar::invalidateNameTag(const LLUUID& agent_id)
 //static
 void LLVOAvatar::invalidateNameTags()
 {
-	std::vector<LLCharacter*>::iterator it = LLCharacter::sInstances.begin();
-	for ( ; it != LLCharacter::sInstances.end(); ++it)
+	for (LLCharacter* character : LLCharacter::sInstances)
 	{
-		LLVOAvatar* avatar = static_cast<LLVOAvatar*>(*it);
+		LLVOAvatar* avatar = static_cast<LLVOAvatar*>(character);
 		if (!avatar) continue;
 		if (avatar->isDead()) continue;
 
@@ -3804,10 +3767,8 @@ LLViewerInventoryItem* recursiveGetObjectInventoryItem(LLViewerObject *vobj, LLU
     if (!item)
     {
         LLViewerObject::const_child_list_t& children = vobj->getChildren();
-        for (LLViewerObject::const_child_list_t::const_iterator it = children.begin();
-             it != children.end(); ++it)
+        for (LLViewerObject* childp : children)
         {
-            LLViewerObject *childp = *it;
             item = getObjectInventoryItem(childp, asset_id);
             if (item)
 	{
