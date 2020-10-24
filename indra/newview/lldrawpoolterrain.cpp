@@ -289,6 +289,9 @@ void LLDrawPoolTerrain::drawLoop()
 	{
 		for (LLFace* facep : mDrawFace)
 		{
+			if (!facep || !facep->getDrawable() || !facep->getDrawable()->getRegion())
+				continue;
+
 			LLMatrix4* model_matrix = &(facep->getDrawable()->getRegion()->mRenderMatrix);
 
 			if (model_matrix != gGLLastMatrix)

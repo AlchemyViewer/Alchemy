@@ -101,6 +101,9 @@ void LLDrawPoolTree::render(S32 pass)
 				
 	for (LLFace* face : mDrawFace)
 	{
+		if (!face || !face->getDrawable() || !face->getDrawable()->getRegion())
+			continue;
+
 		LLVertexBuffer* buff = face->getVertexBuffer();
 
 		if(buff)
