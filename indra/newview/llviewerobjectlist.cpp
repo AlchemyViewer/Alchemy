@@ -842,7 +842,7 @@ void LLViewerObjectList::updateApparentAngles(LLAgent &agent)
 	for (i = mCurLazyUpdateIndex; i < max_value; i++)
 	{
 		objectp = mObjects[i];
-		if (!objectp->isDead())
+		if (objectp && !objectp->isDead())
 		{
 			num_objects++;
 
