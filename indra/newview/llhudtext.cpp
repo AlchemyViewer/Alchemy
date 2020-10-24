@@ -356,6 +356,7 @@ void LLHUDText::updateVisibility()
 	
 	mPositionAgent = gAgent.getPosAgentFromGlobal(mPositionGlobal);
 
+#if 0
 	if (!mSourceObject)
 	{
 		//LL_WARNS() << "LLHUDText::updateScreenPos -- mSourceObject is NULL!" << LL_ENDL;
@@ -370,9 +371,10 @@ void LLHUDText::updateVisibility()
 		}
 		return;
 	}
+#endif
 
 	// Not visible if parent object is dead
-	if (mSourceObject->isDead())
+	if (!mSourceObject || mSourceObject->isDead())
 	{
 		mVisible = FALSE;
 		return;
