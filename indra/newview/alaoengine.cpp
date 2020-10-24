@@ -835,45 +835,51 @@ bool ALAOEngine::findForeignItems(const LLUUID& uuid) const
 	LLInventoryModel::cat_array_t* cats;
 
 	gInventory.getDirectDescendentsOf(uuid, cats, items);
-	for (auto& cat : *cats)
-    {
-		// recurse into subfolders
-		if (findForeignItems(cat->getUUID()))
+	if (cats)
+	{
+		for (auto& cat : *cats)
 		{
-			moved = true;
+			// recurse into subfolders
+			if (findForeignItems(cat->getUUID()))
+			{
+				moved = true;
+			}
 		}
 	}
 
 	// count backwards in case we have to remove items
-	for (S32 index = items->size() - 1; index >= 0; --index)
+	if (items)
 	{
-		bool move = false;
-
-		LLPointer<LLViewerInventoryItem> item = items->at(index);
-		if (item->getIsLinkType())
+		for (S32 index = items->size() - 1; index >= 0; --index)
 		{
-			if (item->getInventoryType() != LLInventoryType::IT_ANIMATION)
+			bool move = false;
+
+			LLPointer<LLViewerInventoryItem> item = items->at(index);
+			if (item->getIsLinkType())
 			{
-				LL_DEBUGS("AOEngine") << item->getName() << " is a link but does not point to an animation." << LL_ENDL;
-				move = true;
+				if (item->getInventoryType() != LLInventoryType::IT_ANIMATION)
+				{
+					LL_DEBUGS("AOEngine") << item->getName() << " is a link but does not point to an animation." << LL_ENDL;
+					move = true;
+				}
+				else
+				{
+					LL_DEBUGS("AOEngine") << item->getName() << " is an animation link." << LL_ENDL;
+				}
 			}
 			else
 			{
-				LL_DEBUGS("AOEngine") << item->getName() << " is an animation link." << LL_ENDL;
+				LL_DEBUGS("AOEngine") << item->getName() << " is not a link!" << LL_ENDL;
+				move = true;
 			}
-		}
-		else
-		{
-			LL_DEBUGS("AOEngine") << item->getName() << " is not a link!" << LL_ENDL;
-			move = true;
-		}
 
-		if (move)
-		{
-			moved = true;
-			LLInventoryModel* model = &gInventory;
-			model->changeItemParent(item, gInventory.findCategoryUUIDForType(LLFolderType::FT_LOST_AND_FOUND), FALSE);
-			LL_DEBUGS("AOEngine") << item->getName() << " moved to lost and found!" << LL_ENDL;
+			if (move)
+			{
+				moved = true;
+				LLInventoryModel* model = &gInventory;
+				model->changeItemParent(item, gInventory.findCategoryUUIDForType(LLFolderType::FT_LOST_AND_FOUND), FALSE);
+				LL_DEBUGS("AOEngine") << item->getName() << " moved to lost and found!" << LL_ENDL;
+			}
 		}
 	}
 
