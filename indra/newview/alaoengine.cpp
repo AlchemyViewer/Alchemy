@@ -179,10 +179,10 @@ bool ALAOEngine::foreignAnimations(const LLUUID& seat)
 			}
 
 			// find the source object where the animation came from
-			LLViewerObject* source=gObjectList.findObject(animation_source.first);
+			LLViewerObject* source = gObjectList.findObject(animation_source.first);
 
 			// proceed if it's not an attachment
-			if(!source->isAttachment())
+			if(source && !source->isAttachment())
 			{
 				// get the source's root prim
 				LLViewerObject* sourceRoot=dynamic_cast<LLViewerObject*>(source->getRoot());
