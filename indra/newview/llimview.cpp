@@ -1989,6 +1989,10 @@ LLDockControl::DocAt LLCallDialog::getDockControlPos(const std::string& toolbarB
 		case LLToolBarEnums::TOOLBAR_RIGHT:
 			doc_at = LLDockControl::LEFT;
 			break;
+
+		case LLToolBarEnums::TOOLBAR_TOP:
+			doc_at = LLDockControl::BOTTOM;
+			break;
 	}
 	
 	return doc_at;

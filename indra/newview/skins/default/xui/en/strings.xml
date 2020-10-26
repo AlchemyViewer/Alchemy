@@ -4196,6 +4196,7 @@ Try enclosing path to the editor with double quotes.
   <string name="Command_Voice_Tooltip">Volume controls for calls and people near you in world</string>
   <string name="Command_Webbrowser_Tooltip">Open a web browser inside [APP_NAME]</string>
 
+  <string name="Toolbar_Top_Tooltip">currently in your top toolbar</string>
   <string name="Toolbar_Bottom_Tooltip">currently in your bottom toolbar</string>
   <string name="Toolbar_Left_Tooltip"  >currently in your left toolbar</string>
   <string name="Toolbar_Right_Tooltip" >currently in your right toolbar</string>
