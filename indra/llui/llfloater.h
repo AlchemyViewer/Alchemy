@@ -107,6 +107,8 @@ struct LLCoordFloater : LLCoord<LL_COORD_FLOATER>
 		return *this;
 	}
 
+	LLCoordFloater& operator=(const LLCoordFloater& other);
+
 	bool operator==(const LLCoordFloater& other) const;
 	bool operator!=(const LLCoordFloater& other) const { return !(*this == other); }
 

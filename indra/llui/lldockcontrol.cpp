@@ -74,8 +74,6 @@ LLDockControl::LLDockControl(LLView* dockWidget, LLFloater* dockableFloater,
 	{
 		mDockWidgetVisible = false;
 	}
-
-	mNonToolbarPanelHandle = dockableFloater->getRootView()->getChild<LLView>("non_toolbar_panel")->getHandle();
 }
 
 LLDockControl::~LLDockControl()
@@ -99,10 +97,11 @@ void LLDockControl::setDock(LLView* dockWidget)
 
 void LLDockControl::getAllowedRect(LLRect& rect)
 {
-	if (!mNonToolbarPanelHandle.isDead())
+	if (!mNonToolbarPanelHandle.get())
 	{
-		rect = mNonToolbarPanelHandle.get()->getRect();
+		mNonToolbarPanelHandle = LLUI::getRootView()->getChild<LLLayoutPanel>("non_toolbar_panel")->getHandle();
 	}
+	rect = mNonToolbarPanelHandle.get()->getRect();
 }
 
 void LLDockControl::repositionDockable()
