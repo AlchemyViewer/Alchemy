@@ -327,7 +327,7 @@ void LLDrawPoolTerrain::renderFullShader()
 //	LLViewerTexture *detail_texture2p = compp->mDetailTextures[2];
 //	LLViewerTexture *detail_texture3p = compp->mDetailTextures[3];
 
-	LLVector3d region_origin_global = gAgent.getRegion()->getOriginGlobal();
+	const LLVector3d& region_origin_global = gAgent.getRegion()->getOriginGlobal();
 	F32 offset_x = (F32)fmod(region_origin_global.mdV[VX], 1.0/(F64)sDetailScale)*sDetailScale;
 	F32 offset_y = (F32)fmod(region_origin_global.mdV[VY], 1.0/(F64)sDetailScale)*sDetailScale;
 
