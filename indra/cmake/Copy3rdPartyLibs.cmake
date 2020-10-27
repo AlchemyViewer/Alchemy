@@ -186,7 +186,7 @@ elseif(LINUX)
 
     if (USE_FMODSTUDIO)
       list(APPEND debug_files libfmodL.so)
-      list(APPEND release_files libfmod.so libfmod.so.11 libfmod.so.11.10)
+      list(APPEND release_files libfmod.so)
     endif (USE_FMODSTUDIO)
 
 else(WINDOWS)
