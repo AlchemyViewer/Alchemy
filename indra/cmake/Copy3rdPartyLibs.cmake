@@ -182,6 +182,10 @@ elseif(LINUX)
         libepoxy.so
         libepoxy.so.0
         libepoxy.so.0.0.0
+        libogg.so
+        libvorbis.so
+        libvorbisenc.so
+        libvorbisfile.so
        )
 
     if (USE_FMODSTUDIO)

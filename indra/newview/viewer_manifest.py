@@ -1548,6 +1548,10 @@ class Linux_x86_64_Manifest(LinuxManifest):
             self.path("libepoxy.so.0.0.0")
             self.path("libalut.so*")
             self.path("libopenal.so*")
+            self.path("libogg.so*")
+            self.path("libvorbis.so*")
+            self.path("libvorbisenc.so*")
+            self.path("libvorbisfile.so*")
 
             try:
                 self.path_optional("libfmod.so*")
