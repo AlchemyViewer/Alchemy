@@ -1987,14 +1987,14 @@ void LLVOAvatar::resetVisualParams()
 	for (LLDriverParamInfo* info : sAvatarXmlInfo->mDriverInfoList)
 	{
         LLDriverParam *param = static_cast<LLDriverParam*>(getVisualParam(info->getID()));
-        LLDriverParam::entry_list_t& driven_list = param->getDrivenList();
+        LLDriverParam::entry_list_t driven_list = param->getDrivenList();
         *param = LLDriverParam(this);
         llassert(param);
         if (!param->setInfo(info))
         {
             llassert(false);
         }			
-        param->setDrivenList(driven_list);
+        param->setDrivenList(std::move(driven_list));
 	}
 }
 
