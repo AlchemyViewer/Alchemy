@@ -1035,7 +1035,7 @@ class DarwinManifest(ViewerManifest):
                                 # libnghttp2.version.dylib. Get all of them.
                                 "libnghttp2.*dylib",
                                 ):
-                    dylibs += path_optional(os.path.join(relpkgdir, libfile), libfile)
+                    dylibs += self.path_optional(os.path.join(relpkgdir, libfile), libfile)
 
                 # SLVoice executable
                 with self.prefix(src=os.path.join(pkgdir, 'bin', 'release')):
@@ -1053,12 +1053,12 @@ class DarwinManifest(ViewerManifest):
                     for libfile in (
                                 "libfmodL.dylib",
                                 ):
-                        dylibs += path_optional(os.path.join(debpkgdir, libfile), libfile)
+                        dylibs += self.path_optional(os.path.join(debpkgdir, libfile), libfile)
                 else:
                     for libfile in (
                                 "libfmod.dylib",
                                 ):
-                        dylibs += path_optional(os.path.join(relpkgdir, libfile), libfile)
+                        dylibs += self.path_optional(os.path.join(relpkgdir, libfile), libfile)
 
                 # our apps
                 executable_path = {}
@@ -1502,7 +1502,7 @@ class Linux_i686_Manifest(LinuxManifest):
                 pass
 
             try:
-                self.path("libfmod.so*")
+                self.path_optional("libfmod.so*")
                 pass
             except:
                 print "Skipping libfmod.so - not found"
@@ -1550,7 +1550,7 @@ class Linux_x86_64_Manifest(LinuxManifest):
             self.path("libopenal.so*")
 
             try:
-                self.path("libfmod.so*")
+                self.path_optional("libfmod.so*")
                 pass
             except:
                 print "Skipping libfmod.so - not found"
