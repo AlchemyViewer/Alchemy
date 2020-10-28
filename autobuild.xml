@@ -842,9 +842,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>9aef5cd576ace19568da01d9bc3db29c</string>
+              <string>bf368ecabce95e2daa6d71c74c09682167508e0e44848dea21ed78a16992b00cccfdb6cf4c31f6994317a3051420b3d9</string>
+              <key>hash_algorithm</key>
+              <string>sha3_384</string>
               <key>url</key>
-              <string>http://automated-builds-secondlife-com.s3.amazonaws.com/ct2/1625/3628/glod-1.0pre3.501614-linux64-501614.tar.bz2</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/116/packages/generic/glod-612/1.0.3/glod-1.0.3-linux64-612.tar.xz</string>
             </map>
             <key>name</key>
             <string>linux64</string>
@@ -854,11 +856,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>fa262f57c4caba78aa7cc45bfe865d50</string>
+              <string>797a8e468b5fc69b367e8b71c154fe1783ef664bfe7a0502dc1be5c47f1dafb7a9292ff15f8223e9debdb5d30706541a</string>
               <key>hash_algorithm</key>
-              <string>md5</string>
+              <string>sha3_384</string>
               <key>url</key>
-              <string>https://pkg.alchemyviewer.org/repository/autobuild-external/glod/windows/glod-1.0pre3.338-windows-338.tar.bz2</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/116/packages/generic/glod-612/1.0.3/glod-1.0.3-windows-612.tar.xz</string>
             </map>
             <key>name</key>
             <string>windows</string>
@@ -868,18 +870,18 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>0714e9667d7dee66d75a1490c59cb9b0</string>
+              <string>3c8eb4e8dfa94cabc1a3948c850f077873d81afce6b0be5cdf22d53014f46ed47c64057f498cfd7dd4882736e392f12f</string>
               <key>hash_algorithm</key>
-              <string>md5</string>
+              <string>sha3_384</string>
               <key>url</key>
-              <string>https://pkg.alchemyviewer.org/repository/autobuild-external/glod/windows64/glod-1.0pre3.338-windows64-338.tar.bz2</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/116/packages/generic/glod-612/1.0.3/glod-1.0.3-windows64-612.tar.xz</string>
             </map>
             <key>name</key>
             <string>windows64</string>
           </map>
         </map>
         <key>version</key>
-        <string>1.0pre3.338</string>
+        <string>1.0.3</string>
       </map>
       <key>gstreamer</key>
       <map>
