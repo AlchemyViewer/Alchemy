@@ -384,7 +384,7 @@ void LLProgressView::initLogos()
     const S32 default_height = 28;
     const S32 default_pad = 15;
 
-    S32 icon_width, icon_height;
+    S32 icon_width;
 
     // We don't know final screen rect yet, so we can't precalculate position fully
     LLTextBox *logos_label = getChild<LLTextBox>("logos_lbl");
@@ -398,6 +398,10 @@ void LLProgressView::initLogos()
     std::string temp_str = gDirUtilp->getExpandedFilename(LL_PATH_DEFAULT_SKIN, "textures", "3p_icons");
 
     temp_str += gDirUtilp->getDirDelimiter();
+
+#if defined(USE_FMODSTUDIO) || defined(LL_HAVOK)
+	S32 icon_height;
+#endif
 
 #ifdef USE_FMODSTUDIO
     // original image size is 264x96, it is on longer side but

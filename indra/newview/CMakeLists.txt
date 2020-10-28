@@ -93,7 +93,8 @@ include_directories(
     ${LLLOGIN_INCLUDE_DIRS}
     ${LIBS_PREBUILT_DIR}/include/collada
     ${LIBS_PREBUILD_DIR}/include/hunspell
-    ${OPENAL_LIB_INCLUDE_DIRS}
+    ${OPENAL_INCLUDE_DIRS}
+    ${FREEALUT_INCLUDE_DIRS}
     ${LIBS_PREBUILT_DIR}/include/collada/1.4
     ${LLAPPEARANCE_INCLUDE_DIRS}
     ${CMAKE_CURRENT_SOURCE_DIR}
@@ -1512,7 +1513,7 @@ if (LINUX)
         Xinerama
         )
     if (OPENAL)
-      LIST(APPEND viewer_LIBRARIES ${OPENAL_LIBRARIES})
+      LIST(APPEND viewer_LIBRARIES ${OPENAL_LIBRARIES} ${FREEALUT_LIBRARIES})
     endif (OPENAL)
 endif (LINUX)
 
@@ -1688,7 +1689,7 @@ if (WINDOWS)
     endif (ADDRESS_SIZE EQUAL 64)
 
     if (OPENAL)
-      LIST(APPEND viewer_LIBRARIES ${OPENAL_LIBRARIES})
+      LIST(APPEND viewer_LIBRARIES ${OPENAL_LIBRARIES} ${FREEALUT_LIBRARIES})
     endif (OPENAL)
 endif (WINDOWS)
 
@@ -1784,7 +1785,7 @@ if (WINDOWS)
 endif (WINDOWS)
 
 if (OPENAL)
-  set(LLSTARTUP_COMPILE_FLAGS "${LLSTARTUP_COMPILE_FLAGS} -DLL_OPENAL")
+  set(LLSTARTUP_COMPILE_FLAGS "${LLSTARTUP_COMPILE_FLAGS} -DLL_OPENAL=1")
 endif (OPENAL)
 
 if (USE_FMODSTUDIO)
@@ -1933,7 +1934,7 @@ if (WINDOWS)
         --arch=${ARCH}
         --artwork=${ARTWORK_DIR}
         "--bugsplat=${BUGSPLAT_DB}"
-        "--fmodstudio=${FMODSTUDIO}"
+        "--fmodstudio=${USE_FMODSTUDIO}"
         "--openal=${OPENAL}"
         --build=${CMAKE_CURRENT_BINARY_DIR}
         --buildtype=${CMAKE_BUILD_TYPE}
@@ -1995,7 +1996,7 @@ if (WINDOWS)
           --arch=${ARCH}
           --artwork=${ARTWORK_DIR}
           "--bugsplat=${BUGSPLAT_DB}"
-          "--fmodstudio=${FMODSTUDIO}"
+          "--fmodstudio=${USE_FMODSTUDIO}"
           "--openal=${OPENAL}"
           --build=${CMAKE_CURRENT_BINARY_DIR}
           --buildtype=${CMAKE_BUILD_TYPE}
@@ -2145,7 +2146,7 @@ if (LINUX)
         --arch=${ARCH}
         --artwork=${ARTWORK_DIR}
         "--bugsplat=${BUGSPLAT_DB}"
-        "--fmodstudio=${FMODSTUDIO}"
+        "--fmodstudio=${USE_FMODSTUDIO}"
         "--openal=${OPENAL}"
         --build=${CMAKE_CURRENT_BINARY_DIR}
         --buildtype=${CMAKE_BUILD_TYPE}
@@ -2173,7 +2174,7 @@ if (LINUX)
       --arch=${ARCH}
       --artwork=${ARTWORK_DIR}
       "--bugsplat=${BUGSPLAT_DB}"
-      "--fmodstudio=${FMODSTUDIO}"
+      "--fmodstudio=${USE_FMODSTUDIO}"
       "--openal=${OPENAL}"
       --build=${CMAKE_CURRENT_BINARY_DIR}
       --buildtype=${CMAKE_BUILD_TYPE}
@@ -2251,7 +2252,7 @@ if (DARWIN)
       --arch=${ARCH}
       --artwork=${ARTWORK_DIR}
       "--bugsplat=${BUGSPLAT_DB}"
-      "--fmodstudio=${FMODSTUDIO}"
+      "--fmodstudio=${USE_FMODSTUDIO}"
       "--openal=${OPENAL}"
       --build=${CMAKE_CURRENT_BINARY_DIR}
       --buildtype=${CMAKE_BUILD_TYPE}
@@ -2286,7 +2287,7 @@ if (DARWIN)
           --arch=${ARCH}
           --artwork=${ARTWORK_DIR}
           "--bugsplat=${BUGSPLAT_DB}"
-          "--fmodstudio=${FMODSTUDIO}"
+          "--fmodstudio=${USE_FMODSTUDIO}"
           "--openal=${OPENAL}"
           --build=${CMAKE_CURRENT_BINARY_DIR}
           --buildtype=${CMAKE_BUILD_TYPE}

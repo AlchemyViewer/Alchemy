@@ -107,6 +107,10 @@ if(WINDOWS)
       list(APPEND release_files fmod.dll)
     endif (USE_FMODSTUDIO)
 
+    if (OPENAL)
+        list(APPEND release_files OpenAL32.dll alut.dll)
+    endif (OPENAL)
+
     if (USE_KDU)
       list(APPEND debug_files kdud.dll)
       list(APPEND release_files kdu.dll)

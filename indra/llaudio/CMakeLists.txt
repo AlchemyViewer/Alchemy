@@ -21,8 +21,8 @@ include_directories(
     ${VORBISENC_INCLUDE_DIRS}
     ${VORBISFILE_INCLUDE_DIRS}
     ${VORBIS_INCLUDE_DIRS}
-    ${OPENAL_LIB_INCLUDE_DIRS}
-    ${FREEAULT_LIB_INCLUDE_DIRS}
+    ${OPENAL_INCLUDE_DIRS}
+    ${FREEAULT_INCLUDE_DIRS}
     )
 
 set(llaudio_SOURCE_FILES
@@ -63,6 +63,7 @@ endif (USE_FMODSTUDIO)
 if (OPENAL)
   include_directories(
     ${OPENAL_LIBRARIES}
+    ${FREEALUT_LIBRARIES}
     )
 
   list(APPEND llaudio_SOURCE_FILES

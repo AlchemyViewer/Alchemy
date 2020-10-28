@@ -568,10 +568,11 @@ class WindowsManifest(ViewerManifest):
                 self.path("alut.dll")
 
             # Get fmodstudio dll for audio engine, continue if missing
-            if self.args['configuration'].lower() == 'debug':
-                self.path_optional("fmodL.dll", "fmodL.dll")
-            else:
-                self.path_optional(src="fmod.dll", dst="fmod.dll")
+            if self.args['fmodstudio'] == 'ON':
+                if self.args['configuration'].lower() == 'debug':
+                    self.path("fmodL.dll", "fmodL.dll")
+                else:
+                    self.path(src="fmod.dll", dst="fmod.dll")
 
             # KDU
             if self.args['configuration'].lower() == 'debug':
@@ -1470,8 +1471,7 @@ class Linux_i686_Manifest(LinuxManifest):
             self.path("libepoxy.so")
             self.path("libepoxy.so.0")
             self.path("libepoxy.so.0.0.0")
-            self.path("libalut.so*")
-            self.path("libopenal.so*")
+
             # KLUDGE: As of 2012-04-11, the 'fontconfig' package installs
             # libfontconfig.so.1.4.4, along with symlinks libfontconfig.so.1
             # and libfontconfig.so. Before we added support for library-file
@@ -1501,12 +1501,12 @@ class Linux_i686_Manifest(LinuxManifest):
                 print "tcmalloc files not found, skipping"
                 pass
 
-            try:
-                self.path_optional("libfmod.so*")
-                pass
-            except:
-                print "Skipping libfmod.so - not found"
-                pass
+            if self.args['openal'] == 'ON':
+                self.path("libalut.so*")
+                self.path("libopenal.so*")
+
+            if self.args['fmodstudio'] == 'ON':
+                self.path("libfmod.so*")
 
         # Vivox runtimes
         with self.prefix(src=relpkgdir, dst="bin"):
@@ -1546,15 +1546,13 @@ class Linux_x86_64_Manifest(LinuxManifest):
             self.path("libepoxy.so")
             self.path("libepoxy.so.0")
             self.path("libepoxy.so.0.0.0")
-            self.path("libalut.so*")
-            self.path("libopenal.so*")
 
-            try:
-                self.path_optional("libfmod.so*")
-                pass
-            except:
-                print "Skipping libfmod.so - not found"
-                pass
+            if self.args['openal'] == 'ON':
+                self.path("libalut.so*")
+                self.path("libopenal.so*")
+
+            if self.args['fmodstudio'] == 'ON':
+                self.path("libfmod.so*")
 
         # Vivox runtimes
         with self.prefix(src=relpkgdir, dst="bin"):
