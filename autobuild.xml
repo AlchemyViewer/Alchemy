@@ -1571,36 +1571,6 @@
         <key>version</key>
         <string>1.6.37.311</string>
       </map>
-      <key>libuuid</key>
-      <map>
-        <key>copyright</key>
-        <string>Copyright (c) 2004-2008 The OSSP Project &lt;http://www.ossp.org/&gt;</string>
-        <key>description</key>
-        <string>OSSP uuid is a ISO-C:1999 application programming interface (API) and corresponding command line interface (CLI) for the generation of DCE 1.1, ISO/IEC 11578:1996 and RFC 4122 compliant Universally Unique Identifier (UUID). </string>
-        <key>license</key>
-        <string>UUID</string>
-        <key>license_file</key>
-        <string>LICENSES/uuid.txt</string>
-        <key>name</key>
-        <string>libuuid</string>
-        <key>platforms</key>
-        <map>
-          <key>linux64</key>
-          <map>
-            <key>archive</key>
-            <map>
-              <key>hash</key>
-              <string>fb89f1281dd54d8b99b339fc5b712b27</string>
-              <key>url</key>
-              <string>http://automated-builds-secondlife-com.s3.amazonaws.com/hg/repo/p64_3p-libuuid/rev/314269/arch/Linux/installer/libuuid-1.6.2-linux64-314269.tar.bz2</string>
-            </map>
-            <key>name</key>
-            <string>linux64</string>
-          </map>
-        </map>
-        <key>version</key>
-        <string>1.6.2</string>
-      </map>
       <key>libwebp</key>
       <map>
         <key>canonical_repo</key>
@@ -2226,11 +2196,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>ad9f9a9ff399844c6269c3f7c5102e3b86caee535cbd2b6dbb9c2573309adfe0cbc207265467947158c180efafe4ce5c</string>
+              <string>ec0cff5e43a62c5814b97bd70499ae824ad937e0a5d6e7d04e39507766c8a4a955174aaccd201961a7fde9f200a08c1e</string>
               <key>hash_algorithm</key>
               <string>sha3_384</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/112/packages/generic/ogg_vorbis-546/1.3.4/ogg_vorbis-1.3.4-linux64-546.tar.xz</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/112/packages/generic/ogg_vorbis-596/1.3.4/ogg_vorbis-1.3.4-linux64-596.tar.xz</string>
             </map>
             <key>name</key>
             <string>linux64</string>
@@ -2240,11 +2210,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>9cbcf8f2ffacc465e2ecec3906e4882a40d0b4c1002187e53f95a8314fb621529ef66fafc4b4ced80646aed6e25d60ef</string>
+              <string>28187678704036e7f03f6438040d6fec6c233c0897cf708e6b62f40b9a2dce95fe9233c54788c368207609d7025e6420</string>
               <key>hash_algorithm</key>
               <string>sha3_384</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/112/packages/generic/ogg_vorbis-546/1.3.4/ogg_vorbis-1.3.4-windows-546.tar.xz</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/112/packages/generic/ogg_vorbis-596/1.3.4/ogg_vorbis-1.3.4-windows-596.tar.xz</string>
             </map>
             <key>name</key>
             <string>windows</string>
@@ -2254,11 +2224,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>4fd821c68715521d43e9253a7cf514155b440e6781341561c3091ba557482d160a7ce1bfab3c4a47082c3e6c17851cc7</string>
+              <string>976ecebc3dab7f1bdf0083de09164093e76be1755fc1f21a4a9ba58362fb542af586d4fc1d68ebb4a1d5886b3feffe9d</string>
               <key>hash_algorithm</key>
               <string>sha3_384</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/112/packages/generic/ogg_vorbis-546/1.3.4/ogg_vorbis-1.3.4-windows64-546.tar.xz</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/112/packages/generic/ogg_vorbis-596/1.3.4/ogg_vorbis-1.3.4-windows64-596.tar.xz</string>
             </map>
             <key>name</key>
             <string>windows64</string>

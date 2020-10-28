@@ -181,16 +181,18 @@ elseif(LINUX)
         ${EXPAT_COPY}
         libGLOD.so
         libopenal.so
-        libuuid.so.16
-        libuuid.so.16.0.22
         libepoxy.so
         libepoxy.so.0
         libepoxy.so.0.0.0
+        libogg.so
+        libvorbis.so
+        libvorbisenc.so
+        libvorbisfile.so
        )
 
     if (USE_FMODSTUDIO)
       list(APPEND debug_files libfmodL.so)
-      list(APPEND release_files libfmod.so libfmod.so.11 libfmod.so.11.10)
+      list(APPEND release_files libfmod.so)
     endif (USE_FMODSTUDIO)
 
 else(WINDOWS)
