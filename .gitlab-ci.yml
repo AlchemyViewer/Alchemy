@@ -1,29 +1,44 @@
 stages:
   - build
-  - deploy
-
+  - upload
+ 
 default:
   interruptible: true
+  timeout: 4h
 
 variables:
   AUTOBUILD_BUILD_ID: $CI_PIPELINE_ID
+  AUTOBUILD_INSTALLABLE_CACHE: "$CI_PROJECT_DIR/.cache/autobuild"
+  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
   VIEWER_USE_CRASHPAD: "FALSE"
   VIEWER_CRASHPAD_URL: $SENTRY_DSN
 
-.win_build: &win_build
+.win_build:
   stage: build
   tags:
     - autobuild
     - windows
+  cache:
+    key:
+      files:
+        - autobuild.xml
+      prefix: ${CI_JOB_NAME}
+    paths:
+      - .cache/autobuild
+      - .cache/pip
+      - .venv/
+    when: 'always'
   before_script:
-    - pipenv install
+    - virtualenv .venv
+    - .\.venv\Scripts\activate.ps1
+    - pip install --upgrade autobuild -i https://pkg.alchemyviewer.org/repository/autobuild/simple --extra-index-url https://pypi.org/simple
   script:
     - |
-        pipenv run autobuild configure -c ReleaseOS -- -DUSE_FMODSTUDIO=ON -DUSE_NVAPI=ON -DUSE_LTO=ON -DVS_DISABLE_FATAL_WARNINGS=ON -DREVISION_FROM_VCS=FALSE
-        pipenv run autobuild build -c ReleaseOS --no-configure
+        autobuild configure -c ReleaseOS -- -DUSE_FMODSTUDIO=ON -DUSE_NVAPI=ON -DUSE_LTO=ON -DVS_DISABLE_FATAL_WARNINGS=ON -DREVISION_FROM_VCS=FALSE
+        autobuild build -c ReleaseOS --no-configure
   artifacts:
     name: "$env:CI_COMMIT_REF_NAME-$env:CI_COMMIT_SHORT_SHA"
-    expire_in: 2 week
+    expire_in: 1 week
     paths:
       - build-vc-*/newview/Release/build_data.json
       - build-vc-*/newview/Release/alchemy-bin.exe
@@ -31,137 +46,168 @@ variables:
       - build-vc-*/newview/Release/*.dll
       - build-vc-*/newview/Release/Alchemy_*_Setup.exe
 
-.lnx_build: &lnx_build
+.linux_build:
   stage: build
   image: r.alchemyviewer.org/alchemy/infrastructure/debian-build-image:latest
   tags:
     - linux
     - docker
+  cache:
+    key:
+      files:
+        - autobuild.xml
+      prefix: ${CI_JOB_NAME}
+    paths:
+      - .cache/autobuild
+      - .cache/pip
+      - .venv
+    when: 'always'
+  before_script:
+    - virtualenv .venv -p python2
+    - source .venv/bin/activate
+    - pip install --upgrade autobuild -i https://pkg.alchemyviewer.org/repository/autobuild/simple --extra-index-url https://pypi.org/simple
   script:
     - |
         autobuild configure -c ReleaseOS -- -DUSE_FMODSTUDIO=ON -DUSE_NVAPI=ON -DUSE_LTO=ON -DUNIX_DISABLE_FATAL_WARNINGS=ON -DREVISION_FROM_VCS=FALSE
         autobuild build -c ReleaseOS --no-configure
   artifacts:
     name: "$env:CI_COMMIT_REF_NAME-$env:CI_COMMIT_SHORT_SHA"
-    expire_in: 2 week
+    expire_in: 1 week
     paths:
       - build-linux-*/build_data.json
       - build-linux-*/newview/Alchemy_*.tar.bz2
 
-.master_rules: &master_rules
-  only:
-    variables:
-      - $BUILD_CHANNEL =~ /Test/
+.win32_build:
+  extends: .win_build
+  variables:
+    AUTOBUILD_ADDRSIZE: 32
+  cache:
+    key:
+      prefix: windows32
 
+.win64_build:
+  extends: .win_build
+  variables:
+    AUTOBUILD_ADDRSIZE: 64
+  cache:
+    key:
+      prefix: windows64
 
-.project_rules: &project_rules
-  only:
-    variables:
-      - $BUILD_CHANNEL =~ /Project/
+.linux32_build:
+  extends: .linux_build
+  variables:
+    AUTOBUILD_ADDRSIZE: 32
+  cache:
+    key:
+      prefix: linux32
 
-.beta_rules: &beta_rules
-  except:
-    - branches
+.linux64_build:
+  extends: .linux_build
+  variables:
+    AUTOBUILD_ADDRSIZE: 64
+  cache:
+    key:
+      prefix: linux64
 
-.release_rules: &release_rules
-  only:
-    - /^.*-release$/
-  except:
-    - branches
+.master_rules:
+  rules:
+    - if: $BUILD_CHANNEL || $CI_COMMIT_TAG
+      when: never
+    - if: '$CI_PIPELINE_SOURCE == "web"'
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
+    - if: '$CI_PIPELINE_SOURCE == "push"'
+      when: delayed
+      start_in: '12 hours'
+  variables:
+    VIEWER_CHANNEL_TYPE: Test
+    VIEWER_USE_CRASHPAD: "FALSE"
+
+.project_rules:
+  rules:
+    - if: '$BUILD_CHANNEL == "Project" && ($CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "schedule")'
+    - if: '$CI_COMMIT_TAG =~ /.*-project/'
+  variables:
+    VIEWER_CHANNEL_TYPE: Project
+
+.beta_rules:
+  rules:
+    - if: '$BUILD_CHANNEL == "Beta" && ($CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "schedule")'
+    - if: '$CI_COMMIT_TAG =~ /.*-beta/'
+  variables:
+    VIEWER_CHANNEL_TYPE: Beta
+
+.release_rules:
+  rules:
+    - if: '$BUILD_CHANNEL == "Release" && ($CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "schedule")'
+    - if: '$CI_COMMIT_TAG =~ /.*-release/'
+  variables:
+    VIEWER_CHANNEL_TYPE: Release
 
 build:master:linux64:
-  <<: *lnx_build
-  variables:
-    AUTOBUILD_ADDRSIZE: 64
-    VIEWER_CHANNEL_TYPE: Test
-    VIEWER_USE_CRASHPAD: "FALSE"
-  <<: *master_rules
+  extends: 
+    - .linux64_build 
+    - .master_rules
 
-#build:master:windows32:
-#  <<: *win_build
-#  variables:
-#    AUTOBUILD_ADDRSIZE: 32
-#    VIEWER_CHANNEL_TYPE: Test
-#    VIEWER_USE_CRASHPAD: "FALSE"
-#  <<: *master_rules
+.build:master:windows32:
+  extends: 
+    - .win32_build
+    - .master_rules
 
 build:master:windows64:
-  <<: *win_build
-  variables:
-    AUTOBUILD_ADDRSIZE: 64
-    VIEWER_CHANNEL_TYPE: Test
-    VIEWER_USE_CRASHPAD: "FALSE"
-  <<: *master_rules
+  extends: 
+    - .win64_build
+    - .master_rules
 
 build:project:linux64:
-  <<: *lnx_build
-  variables:
-    AUTOBUILD_ADDRSIZE: 64
-    VIEWER_CHANNEL_TYPE: Project
-  <<: *project_rules
+  extends: 
+    - .linux64_build
+    - .project_rules
 
-#build:project:windows32:
-#  <<: *win_build
-#  variables:
-#    AUTOBUILD_ADDRSIZE: 32
-#    VIEWER_CHANNEL_TYPE: Project
-#  <<: *project_rules
+.build:project:windows64:
+  extends: 
+    - .win32_build
+    - .project_rules
 
 build:project:windows64:
-  <<: *win_build
-  variables:
-    AUTOBUILD_ADDRSIZE: 64
-    VIEWER_CHANNEL_TYPE: Project
-  <<: *project_rules
+  extends: 
+    - .win64_build
+    - .project_rules
 
 build:beta:linux64:
-  <<: *lnx_build
-  variables:
-    AUTOBUILD_ADDRSIZE: 64
-    VIEWER_CHANNEL_TYPE: Beta
-  <<: *beta_rules
+  extends: 
+    - .linux64_build
+    - .beta_rules
 
-#build:beta:windows32:
-#  <<: *win_build
-#  variables:
-#    AUTOBUILD_ADDRSIZE: 32
-#    VIEWER_CHANNEL_TYPE: Beta
-#  <<: *beta_rules
+.build:beta:windows32:
+  extends: 
+    - .win32_build
+    - .beta_rules
 
 build:beta:windows64:
-  <<: *win_build
-  variables:
-    AUTOBUILD_ADDRSIZE: 64
-    VIEWER_CHANNEL_TYPE: Beta
-  <<: *beta_rules
+  extends: 
+    - .win64_build
+    - .beta_rules
 
 build:release:linux64:
-  <<: *lnx_build
-  variables:
-    AUTOBUILD_ADDRSIZE: 64
-    VIEWER_CHANNEL_TYPE: Release
-  <<: *release_rules
+  extends: 
+    - .linux64_build
+    - .release_rules
 
-#build:release:windows32:
-#  <<: *win_build
-#  variables:
-#    AUTOBUILD_ADDRSIZE: 32
-#    VIEWER_CHANNEL_TYPE: Release
-#  <<: *release_rules
+.build:release:windows32:
+  extends: 
+    - .win32_build
+    - .release_rules
 
 build:release:windows64:
-  <<: *win_build
-  variables:
-    AUTOBUILD_ADDRSIZE: 64
-    VIEWER_CHANNEL_TYPE: Release
-  <<: *release_rules
+  extends: 
+    - .win64_build
+    - .release_rules
 
-.deploy_template: &deploy_template
-  stage: deploy
+.upload_template:
+  stage: upload
   tags:
     - autobuild
     - windows
-  when: manual
   allow_failure: false
   script:
     - |
@@ -198,20 +244,35 @@ build:release:windows64:
           sentry-cli releases finalize $BuildChannelVersion
         }
 
-deploy_project:
-  <<: *deploy_template
+upload:project:
+  extends:
+    - .upload_template
+  rules:
+    - if: '$BUILD_CHANNEL == "Project" && ($CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "schedule")'
+      when: manual
+    - if: '$CI_COMMIT_TAG =~ /.*-project/'
+      when: manual
   environment:
     name: qa
-  <<: *project_rules
 
-deploy_beta:
-  <<: *deploy_template
+upload:beta:
+  extends:
+    - .upload_template
+  rules:
+    - if: '$BUILD_CHANNEL == "Beta" && ($CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "schedule")'
+      when: manual
+    - if: '$CI_COMMIT_TAG =~ /.*-beta/'
+      when: manual
   environment:
     name: beta
-  <<: *beta_rules
 
-deploy_release:
-  <<: *deploy_template
+upload:release:
+  extends:
+    - .upload_template
+  rules:
+    - if: '$BUILD_CHANNEL == "Release" && ($CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "schedule")'
+      when: manual
+    - if: '$CI_COMMIT_TAG =~ /.*-release/'
+      when: manual
   environment:
     name: release
-  <<: *release_rules

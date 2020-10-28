@@ -188,6 +188,9 @@ elseif(LINUX)
         libvorbis.so
         libvorbisenc.so
         libvorbisfile.so
+        libjpeg.so
+        libjpeg.so.8
+        libjpeg.so.8.2.2
        )
 
     if (USE_FMODSTUDIO)

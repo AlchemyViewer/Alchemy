@@ -1470,35 +1470,7 @@ class Linux_i686_Manifest(LinuxManifest):
             self.path("libepoxy.so")
             self.path("libepoxy.so.0")
             self.path("libepoxy.so.0.0.0")
-
-            # KLUDGE: As of 2012-04-11, the 'fontconfig' package installs
-            # libfontconfig.so.1.4.4, along with symlinks libfontconfig.so.1
-            # and libfontconfig.so. Before we added support for library-file
-            # wildcards, though, this self.path() call specifically named
-            # libfontconfig.so.1.4.4 WITHOUT also copying the symlinks. When I
-            # (nat) changed the call to self.path("libfontconfig.so.*"), we
-            # ended up with the libfontconfig.so.1 symlink in the target
-            # directory as well. But guess what! At least on Ubuntu 10.04,
-            # certain viewer fonts look terrible with libfontconfig.so.1
-            # present in the target directory. Removing that symlink suffices
-            # to improve them. I suspect that means we actually do better when
-            # the viewer fails to find our packaged libfontconfig.so*, falling
-            # back on the system one instead -- but diagnosing and fixing that
-            # is a bit out of scope for the present project. Meanwhile, this
-            # particular wildcard specification gets us exactly what the
-            # previous call did, without having to explicitly state the
-            # version number.
-            self.path("libfontconfig.so.*.*")
-
-            # Include libfreetype.so. but have it work as libfontconfig does.
-            self.path("libfreetype.so.*.*")
-
-            try:
-                self.path("libtcmalloc.so*") #formerly called google perf tools
-                pass
-            except:
-                print "tcmalloc files not found, skipping"
-                pass
+            self.path("libjpeg.so*")
 
             if self.args['openal'] == 'ON':
                 self.path("libalut.so*")
@@ -1548,6 +1520,7 @@ class Linux_x86_64_Manifest(LinuxManifest):
             self.path("libvorbis.so*")
             self.path("libvorbisenc.so*")
             self.path("libvorbisfile.so*")
+            self.path("libjpeg.so*")
 
             if self.args['openal'] == 'ON':
                 self.path("libalut.so*")
