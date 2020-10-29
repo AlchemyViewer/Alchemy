@@ -521,7 +521,7 @@ void LLControlAvatar::updateAnimations()
     {
         //LL_INFOS("AnimatedObjects") << "updating anim for vol " << volp->getID() << " root " << mRootVolp->getID() << LL_ENDL;
         signaled_animation_map_t& signaled_animations = LLObjectSignaledAnimationMap::instance().getMap()[volp->getID()];
-        for (const auto anim_pair : signaled_animations)
+        for (const auto& anim_pair : signaled_animations)
         {
             std::map<LLUUID,S32>::iterator found_anim_it = anims.find(anim_pair.first);
             if (found_anim_it != anims.end())
