@@ -105,7 +105,7 @@ S32  LLViewerRegion::sLastCameraUpdated = 0;
 S32  LLViewerRegion::sNewObjectCreationThrottle = -1;
 LLViewerRegion::vocache_entry_map_t LLViewerRegion::sRegionCacheCleanup;
 
-typedef std::map<std::string, std::string> CapabilityMap;
+typedef std::map<std::string, std::string, std::less<>> CapabilityMap;
 
 static void log_capabilities(const CapabilityMap &capmap);
 
@@ -3136,7 +3136,7 @@ void LLViewerRegion::setCapabilityDebug(const std::string& name, const std::stri
 	}
 }
 
-std::string LLViewerRegion::getCapabilityDebug(const std::string& name) const
+std::string LLViewerRegion::getCapabilityDebug(std::string_view name) const
 {
     CapabilityMap::const_iterator iter = mImpl->mSecondCapabilitiesTracker.find(name);
     if (iter == mImpl->mSecondCapabilitiesTracker.end())
@@ -3148,14 +3148,15 @@ std::string LLViewerRegion::getCapabilityDebug(const std::string& name) const
 }
 
 
-bool LLViewerRegion::isSpecialCapabilityName(const std::string &name)
+bool LLViewerRegion::isSpecialCapabilityName(std::string_view name)
 {
 	return name == "EventQueueGet" || name == "UntrustedSimulatorMessage";
 }
 
-std::string LLViewerRegion::getCapability(const std::string& name) const
+std::string LLViewerRegion::getCapability(std::string_view name) const
 {
-	if (!capabilitiesReceived() && (name!=std::string("Seed")) && (name!=std::string("ObjectMedia")))
+	using namespace std::string_view_literals;
+	if (!capabilitiesReceived() && (name != "Seed"sv) && (name != "ObjectMedia"sv))
 	{
 		LL_WARNS() << "getCapability called before caps received for " << name << LL_ENDL;
 	}
@@ -3169,9 +3170,10 @@ std::string LLViewerRegion::getCapability(const std::string& name) const
 	return iter->second;
 }
 
-bool LLViewerRegion::isCapabilityAvailable(const std::string& name) const
+bool LLViewerRegion::isCapabilityAvailable(std::string_view name) const
 {
-	if (!capabilitiesReceived() && (name!=std::string("Seed")) && (name!=std::string("ObjectMedia")))
+	using namespace std::string_view_literals;
+    if (!capabilitiesReceived() && (name != "Seed"sv) && (name != "ObjectMedia"sv))
 	{
 		LL_WARNS() << "isCapabilityAvailable called before caps received for " << name << LL_ENDL;
 	}
