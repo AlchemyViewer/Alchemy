@@ -2407,7 +2407,10 @@ void LLAgent::heardChat(const LLUUID& id)
 	if (ll_rand(2) == 0) 
 	{
 		LLViewerObject *chatter = gObjectList.findObject(mLastChatterID);
-		gAgentCamera.setLookAt(LOOKAT_TARGET_AUTO_LISTEN, chatter, LLVector3::zero);
+		if (chatter)
+		{
+			gAgentCamera.setLookAt(LOOKAT_TARGET_AUTO_LISTEN, chatter, LLVector3::zero);
+		}
 	}			
 
 	mLastChatterID = id;

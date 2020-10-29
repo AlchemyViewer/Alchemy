@@ -2302,22 +2302,24 @@ BOOL LLIncomingCallDialog::postBuild()
 	}
 
 	std::string call_type;
-	if (gAgent.isInGroup(session_id))
+	if (mPayload.has("notify_box_type"))
 	{
-		LLStringUtil::format_map_t args;
-		LLGroupData data;
-		if (gAgent.getGroupData(session_id, data))
+		if (gAgent.isInGroup(session_id))
 		{
-			args["[GROUP]"] = data.mName;
-			call_type = getString(mPayload["notify_box_type"].asStringRef(), args);
+			LLStringUtil::format_map_t args;
+			LLGroupData data;
+			if (gAgent.getGroupData(session_id, data))
+			{
+				args["[GROUP]"] = data.mName;
+				call_type = getString(mPayload["notify_box_type"].asStringRef(), args);
+			}
+		}
+		else
+		{
+			call_type = getString(mPayload["notify_box_type"].asStringRef());
 		}
 	}
-	else
-	{
-		call_type = getString(mPayload["notify_box_type"].asStringRef());
-	}
-		
-	
+
 	// check to see if this is an Avaline call
 	bool is_avatar = LLVoiceClient::getInstance()->isParticipantAvatar(session_id);
 	if (caller_name == "anonymous")

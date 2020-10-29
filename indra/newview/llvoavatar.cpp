@@ -7303,11 +7303,10 @@ void LLVOAvatar::lazyAttach()
 {
 	std::vector<LLPointer<LLViewerObject> > still_pending;
 	
-	for (U32 i = 0; i < mPendingAttachment.size(); i++)
+	for (LLPointer<LLViewerObject> cur_attachment : mPendingAttachment)
 	{
-		LLPointer<LLViewerObject> cur_attachment = mPendingAttachment[i];
 		// Object might have died while we were waiting for drawable
-		if (!cur_attachment->isDead())
+		if (cur_attachment.notNull() && !cur_attachment->isDead())
 		{
 			if (cur_attachment->mDrawable)
 			{
