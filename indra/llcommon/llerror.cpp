@@ -1365,7 +1365,7 @@ namespace LLError
 		if (site.mClassInfo != typeid(NoClassInfo))
 #endif // LL_LINUX
 		{
-			function_name = class_name + "::" + function_name;
+			function_name = absl::StrCat(class_name, "::", function_name);
 		}
 
 		ELevel compareLevel = s->mDefaultLevel;

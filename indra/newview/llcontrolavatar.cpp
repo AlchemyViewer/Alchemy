@@ -517,25 +517,22 @@ void LLControlAvatar::updateAnimations()
     
     // Rebuild mSignaledAnimations from the associated volumes.
 	std::map<LLUUID, S32> anims;
-    for (std::vector<LLVOVolume*>::iterator vol_it = volumes.begin(); vol_it != volumes.end(); ++vol_it)
+    for (LLVOVolume* volp : volumes)
     {
-        LLVOVolume *volp = *vol_it;
         //LL_INFOS("AnimatedObjects") << "updating anim for vol " << volp->getID() << " root " << mRootVolp->getID() << LL_ENDL;
         signaled_animation_map_t& signaled_animations = LLObjectSignaledAnimationMap::instance().getMap()[volp->getID()];
-        for (std::map<LLUUID,S32>::iterator anim_it = signaled_animations.begin();
-             anim_it != signaled_animations.end();
-             ++anim_it)
+        for (const auto anim_pair : signaled_animations)
         {
-            std::map<LLUUID,S32>::iterator found_anim_it = anims.find(anim_it->first);
+            std::map<LLUUID,S32>::iterator found_anim_it = anims.find(anim_pair.first);
             if (found_anim_it != anims.end())
             {
                 // Animation already present, use the larger sequence id
-                anims[anim_it->first] = llmax(found_anim_it->second, anim_it->second);
+                anims[anim_pair.first] = llmax(found_anim_it->second, anim_pair.second);
             }
             else
             {
                 // Animation not already present, use this sequence id.
-                anims[anim_it->first] = anim_it->second;
+                anims[anim_pair.first] = anim_pair.second;
             }
 #if SHOW_DEBUG
             LL_DEBUGS("AnimatedObjectsNotify") << "found anim for vol " << volp->getID() << " anim " << anim_it->first << " root " << mRootVolp->getID() << LL_ENDL;
