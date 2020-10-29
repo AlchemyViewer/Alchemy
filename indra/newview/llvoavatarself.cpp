@@ -2050,8 +2050,9 @@ bool LLVOAvatarSelf::getIsCloud() const
 				return true;
 			}
 		}
-
+#if SHOW_DEBUG
 		LL_DEBUGS() << "Avatar de-clouded" << LL_ENDL;
+#endif
 	}
 	return false;
 }

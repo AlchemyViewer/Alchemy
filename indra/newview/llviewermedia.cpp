@@ -914,7 +914,9 @@ void LLViewerMedia::updateMedia(void *dummy_arg)
 		proximity_order[i]->mProximity = i;
 	}
 
+#if SHOW_DEBUG
 	LL_DEBUGS("PluginPriority") << "Total reported CPU usage is " << total_cpu << LL_ENDL;
+#endif
 
 }
 
@@ -2813,14 +2815,18 @@ void LLViewerMediaImpl::update()
 			// This media may need to be loaded.
 			if(sMediaCreateTimer.hasExpired())
 			{
+#if SHOW_DEBUG
 				LL_DEBUGS("PluginPriority") << this << ": creating media based on timer expiration" << LL_ENDL;
+#endif
 				createMediaSource();
 				sMediaCreateTimer.setTimerExpirySec(LLVIEWERMEDIA_CREATE_DELAY);
 			}
+#if SHOW_DEBUG
 			else
 			{
 				LL_DEBUGS("PluginPriority") << this << ": NOT creating media (waiting on timer)" << LL_ENDL;
 			}
+#endif
 		}
 	}
 	else

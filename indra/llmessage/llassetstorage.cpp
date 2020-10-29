@@ -469,9 +469,11 @@ void LLAssetStorage::getAssetData(const LLUUID uuid,
                                   void *user_data, 
                                   BOOL is_priority)
 {
+#if SHOW_DEBUG
     LL_DEBUGS("AssetStorage") << "LLAssetStorage::getAssetData() - " << uuid << "," << LLAssetType::lookup(type) << LL_ENDL;
 
     LL_DEBUGS("AssetStorage") << "ASSET_TRACE requesting " << uuid << " type " << LLAssetType::lookup(type) << LL_ENDL;
+#endif
 
     if (user_data)
     {
@@ -481,7 +483,9 @@ void LLAssetStorage::getAssetData(const LLUUID uuid,
 
     if (mShutDown)
     {
+#if SHOW_DEBUG
         LL_DEBUGS("AssetStorage") << "ASSET_TRACE cancelled " << uuid << " type " << LLAssetType::lookup(type) << " shutting down" << LL_ENDL;
+#endif
 
         if (callback)
         {
@@ -505,7 +509,9 @@ void LLAssetStorage::getAssetData(const LLUUID uuid,
     // Try static VFS first.
     if (findInStaticVFSAndInvokeCallback(uuid,type,callback,user_data))
     {
+#if SHOW_DEBUG
         LL_DEBUGS("AssetStorage") << "ASSET_TRACE asset " << uuid << " found in static VFS" << LL_ENDL;
+#endif
         return;
     }
 
@@ -522,8 +528,9 @@ void LLAssetStorage::getAssetData(const LLUUID uuid,
         {
             callback(mVFS, uuid, type, user_data, LL_ERR_NOERR, LLExtStat::VFS_CACHED);
         }
-
+#if SHOW_DEBUG
         LL_DEBUGS("AssetStorage") << "ASSET_TRACE asset " << uuid << " found in VFS" << LL_ENDL;
+#endif
     }
     else
     {
@@ -555,11 +562,13 @@ void LLAssetStorage::getAssetData(const LLUUID uuid,
                 duplicate = TRUE;
             }
         }
+#if SHOW_DEBUG
         if (duplicate)
         {
             LL_DEBUGS("AssetStorage") << "Adding additional non-duplicate request for asset " << uuid 
                                       << "." << LLAssetType::lookup(type) << LL_ENDL;
         }
+#endif
         
         _queueDataRequest(uuid, type, callback, user_data, duplicate, is_priority);     
     }
@@ -1353,7 +1362,9 @@ void LLAssetStorage::getAssetData(const LLUUID uuid,
             user_data == ((LLLegacyAssetRequest *)tmp->mUserData)->mUserData)
         {
             // this is a duplicate from the same subsystem - throw it away
+#if SHOW_DEBUG
             LL_DEBUGS("AssetStorage") << "Discarding duplicate request for UUID " << uuid << LL_ENDL;
+#endif
             return;
         }
     }

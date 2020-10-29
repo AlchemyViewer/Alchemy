@@ -304,8 +304,9 @@ bool LLPluginMessagePipe::pumpInput(F64 timeout)
 
 				if(status == APR_SUCCESS)
 				{
+#if SHOW_DEBUG
 					LL_DEBUGS("PluginSocket") << "success, read " << size << LL_ENDL;
-
+#endif
 					if(size != request_size)
 					{
 						// This was a short read, so we're done.
@@ -314,15 +315,17 @@ bool LLPluginMessagePipe::pumpInput(F64 timeout)
 				}
 				else if(APR_STATUS_IS_TIMEUP(status))
 				{
+#if SHOW_DEBUG
 					LL_DEBUGS("PluginSocket") << "TIMEUP, read " << size << LL_ENDL;
-
+#endif
 					// Timeout was hit.  Since the initial read is 1 byte, this should never be a partial read.
 					break;
 				}
 				else if(APR_STATUS_IS_EAGAIN(status))
 				{
+#if SHOW_DEBUG
 					LL_DEBUGS("PluginSocket") << "EAGAIN, read " << size << LL_ENDL;
-
+#endif
 					// Non-blocking read returned immediately.
 					break;
 				}

@@ -5939,8 +5939,10 @@ LLUUID LLVOAvatar::remapMotionID(const LLUUID& id)
 //-----------------------------------------------------------------------------
 BOOL LLVOAvatar::startMotion(const LLUUID& id, F32 time_offset)
 {
+#if SHOW_DEBUG
 	LL_DEBUGS("Motion") << "motion requested " << id.asString() << " " << gAnimLibrary.animationName(id) << LL_ENDL;
-	
+#endif
+
 	LLUUID remap_id;
 	if(isSelf())
 	{
@@ -5955,10 +5957,12 @@ BOOL LLVOAvatar::startMotion(const LLUUID& id, F32 time_offset)
 		remap_id = remapMotionID(id);
 	}
 	
+#if SHOW_DEBUG
 	if (remap_id != id)
 	{
 		LL_DEBUGS("Motion") << "motion resultant " << remap_id.asString() << " " << gAnimLibrary.animationName(remap_id) << LL_ENDL;
 	}
+#endif
 
 	if (isSelf() && remap_id == ANIM_AGENT_AWAY)
 	{
@@ -5973,7 +5977,9 @@ BOOL LLVOAvatar::startMotion(const LLUUID& id, F32 time_offset)
 //-----------------------------------------------------------------------------
 BOOL LLVOAvatar::stopMotion(const LLUUID& id, BOOL stop_immediate)
 {
+#if SHOW_DEBUG
 	LL_DEBUGS("Motion") << "Motion requested " << id.asString() << " " << gAnimLibrary.animationName(id) << LL_ENDL;
+#endif
 
 	LLUUID remap_id;
 	if(isSelf())
@@ -5989,10 +5995,12 @@ BOOL LLVOAvatar::stopMotion(const LLUUID& id, BOOL stop_immediate)
 		remap_id = remapMotionID(id);
 	}
 	
+#if SHOW_DEBUG
 	if (remap_id != id)
 	{
 		LL_DEBUGS("Motion") << "motion resultant " << remap_id.asString() << " " << gAnimLibrary.animationName(remap_id) << LL_ENDL;
 	}
+#endif
 
 	if (isSelf())
 	{
@@ -6367,12 +6375,16 @@ void LLVOAvatar::addAttachmentOverridesForObject(LLViewerObject *vo, std::set<LL
 		return;
 	}
 
-	LLViewerObject *root_object = (LLViewerObject*)vobj->getRoot();
-    LL_DEBUGS("AnimatedObjects") << "trying to add attachment overrides for root object " << root_object->getID() << " prim is " << vobj << LL_ENDL;
+#ifdef SHOW_DEBUG
+	LLViewerObject* root_object = (LLViewerObject*)vobj->getRoot();
+	LL_DEBUGS("AnimatedObjects") << "trying to add attachment overrides for root object " << root_object->getID() << " prim is " << vobj << LL_ENDL;
+#endif
 	if (vobj->isMesh() &&
 		((vobj->getVolume() && !vobj->getVolume()->isMeshAssetLoaded()) || !gMeshRepo.meshRezEnabled()))
 	{
+#ifdef SHOW_DEBUG
         LL_DEBUGS("AnimatedObjects") << "failed to add attachment overrides for root object " << root_object->getID() << " mesh asset not loaded" << LL_ENDL;
+#endif
 		return;
 	}
 	const LLMeshSkinInfo*  pSkinData = nullptr;
@@ -6395,6 +6407,7 @@ void LLVOAvatar::addAttachmentOverridesForObject(LLViewerObject *vo, std::set<LL
                 meshes_seen->insert(mesh_id);
             }
             bool mesh_overrides_loaded = (mActiveOverrideMeshes.find(mesh_id) != mActiveOverrideMeshes.end());
+#ifdef SHOW_DEBUG
             if (mesh_overrides_loaded)
             {
                 LL_DEBUGS("AnimatedObjects") << "skipping add attachment overrides for " << mesh_id 
@@ -6407,6 +6420,7 @@ void LLVOAvatar::addAttachmentOverridesForObject(LLViewerObject *vo, std::set<LL
                 LL_DEBUGS("AnimatedObjects") << "adding attachment overrides for " << mesh_id 
                                              << " to root object " << root_object->getID() << LL_ENDL;
             }
+#endif
 			bool fullRig = (jointCnt>=JOINT_COUNT_REQUIRED_FOR_FULLRIG) ? true : false;								
 			if ( fullRig && !mesh_overrides_loaded )
 			{								
@@ -6457,10 +6471,12 @@ void LLVOAvatar::addAttachmentOverridesForObject(LLViewerObject *vo, std::set<LL
 			}							
 		}
 	}
+#ifdef SHOW_DEBUG
     else
     {
         LL_DEBUGS("AnimatedObjects") << "failed to add attachment overrides for root object " << root_object->getID() << " not mesh or no pSkinData" << LL_ENDL;
     }
+#endif
 					
 	//Rebuild body data if we altered joints/pelvis
 	if ( pelvisGotSet ) 
@@ -7846,11 +7862,15 @@ void LLVOAvatar::startPhase(const std::string& phase_name)
 	{
 		if (!completed)
 		{
+#if SHOW_DEBUG
 			LL_DEBUGS("Avatar") << avString() << "no-op, start when started already for " << phase_name << LL_ENDL;
+#endif
 			return;
 		}
 	}
+#if SHOW_DEBUG
 	LL_DEBUGS("Avatar") << "started phase " << phase_name << LL_ENDL;
+#endif
 	getPhases().startPhase(phase_name);
 }
 
@@ -7865,8 +7885,11 @@ void LLVOAvatar::stopPhase(const std::string& phase_name, bool err_check)
 			getPhases().stopPhase(phase_name);
 			completed = true;
 			logMetricsTimerRecord(phase_name, elapsed, completed);
+#if SHOW_DEBUG
 			LL_DEBUGS("Avatar") << avString() << "stopped phase " << phase_name << " elapsed " << elapsed << LL_ENDL;
+#endif
 		}
+#if SHOW_DEBUG
 		else
 		{
 			if (err_check)
@@ -7874,7 +7897,9 @@ void LLVOAvatar::stopPhase(const std::string& phase_name, bool err_check)
 				LL_DEBUGS("Avatar") << "no-op, stop when stopped already for " << phase_name << LL_ENDL;
 			}
 		}
+#endif
 	}
+#if SHOW_DEBUG
 	else
 	{
 		if (err_check)
@@ -7882,6 +7907,7 @@ void LLVOAvatar::stopPhase(const std::string& phase_name, bool err_check)
 			LL_DEBUGS("Avatar") << "no-op, stop when not started for " << phase_name << LL_ENDL;
 		}
 	}
+#endif
 }
 
 void LLVOAvatar::logPendingPhases()
@@ -10052,7 +10078,9 @@ void LLVOAvatar::updateRiggingInfo()
 {
     LL_RECORD_BLOCK_TIME(FTM_AVATAR_RIGGING_INFO_UPDATE);
 
+#if SHOW_DEBUG
     LL_DEBUGS("RigSpammish") << getFullname() << " updating rig tab" << LL_ENDL;
+#endif
 
     std::vector<LLVOVolume*> volumes;
 
@@ -10317,7 +10345,9 @@ void LLVOAvatar::idleUpdateDebugInfo()
 
 void LLVOAvatar::updateVisualComplexity()
 {
+#if SHOW_DEBUG
 	LL_DEBUGS("AvatarRender") << "avatar " << getID() << " appearance changed" << LL_ENDL;
+#endif
 	// Set the cache time to in the past so it's updated ASAP
 	mVisualComplexityStale = true;
 }
@@ -10373,6 +10403,7 @@ void LLVOAvatar::accountRenderComplexityForObject(
 								attachment_texture_cost += volume_texture.second;
 							}
                             attachment_total_cost = attachment_volume_cost + attachment_texture_cost + attachment_children_cost;
+#if SHOW_DEBUG
                             LL_DEBUGS("ARCdetail") << "Attachment costs " << attached_object->getAttachmentItemID()
                                                    << " total: " << attachment_total_cost
                                                    << ", volume: " << attachment_volume_cost
@@ -10380,6 +10411,7 @@ void LLVOAvatar::accountRenderComplexityForObject(
                                                    << ", " << volume->numChildren()
                                                    << " children: " << attachment_children_cost
                                                    << LL_ENDL;
+#endif
                             // Limit attachment complexity to avoid signed integer flipping of the wearer's ACI
                             cost += (U32)llclamp(attachment_total_cost, MIN_ATTACHMENT_COMPLEXITY, max_attachment_complexity);
 						}

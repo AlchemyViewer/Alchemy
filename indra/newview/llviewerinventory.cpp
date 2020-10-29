@@ -111,7 +111,9 @@ public:
 	 */
 	bool localizeInventoryObjectName(std::string& object_name)
 	{
+#if SHOW_DEBUG
 		LL_DEBUGS(LOG_LOCAL) << "Searching for localization: " << object_name << LL_ENDL;
+#endif
 
 		std::map<std::string, std::string>::const_iterator dictionary_iter = mInventoryItemsDict.find(object_name);
 
@@ -119,7 +121,9 @@ public:
 		if(found)
 		{
 			object_name = dictionary_iter->second;
+#if SHOW_DEBUG
 			LL_DEBUGS(LOG_LOCAL) << "Found, new name is: " << object_name << LL_ENDL;
+#endif
 		}
 		return found;
 	}

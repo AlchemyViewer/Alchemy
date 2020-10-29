@@ -259,10 +259,12 @@ std::string LLAvatarName::getUserName(bool lowercase) const
 
 void LLAvatarName::dump() const
 {
+#if SHOW_DEBUG
 	LL_DEBUGS("AvNameCache") << "LLAvatarName: "
 	                         << "user '" << mUsername << "' "
 							 << "display '" << mDisplayName << "' "
 	                         << "expires in " << mExpires - LLFrameTimer::getTotalSeconds() << " seconds"
 							 << LL_ENDL;
+#endif
 }
 

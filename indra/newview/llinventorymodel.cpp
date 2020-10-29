@@ -2105,7 +2105,9 @@ bool LLInventoryModel::loadSkeleton(
 	const LLSD& options,
 	const LLUUID& owner_id)
 {
+#if SHOW_DEBUG
 	LL_DEBUGS(LOG_INV) << "importing inventory skeleton for " << owner_id << LL_ENDL;
+#endif
 
 	typedef std::set<LLPointer<LLViewerInventoryCategory>, InventoryIDPtrLess> cat_set_t;
 	cat_set_t temp_cats;
@@ -2263,10 +2265,12 @@ bool LLInventoryModel::loadSkeleton(
 						if (item->getIsBrokenLink())
 						{
 							//bad_link_count++;
+#if SHOW_DEBUG
 							LL_DEBUGS(LOG_INV) << "Attempted to add cached link item without baseobj present ( name: "
 											   << item->getName() << " itemID: " << item->getUUID()
 											   << " assetID: " << item->getAssetUUID()
 											   << " ).  Ignoring and invalidating " << cat->getName() << " . " << LL_ENDL;
+#endif
 							possible_broken_links.push_back(item);
 							continue;
 						}
@@ -2333,7 +2337,9 @@ bool LLInventoryModel::loadSkeleton(
 		{
 			LLViewerInventoryCategory* cat = (*invalid_cat_it).get();
 			cat->setVersion(NO_VERSION);
+#if SHOW_DEBUG
 			LL_DEBUGS(LOG_INV) << "Invalidating category name: " << cat->getName() << " UUID: " << cat->getUUID() << " due to invalid descendents cache" << LL_ENDL;
+#endif
 		}
 		LL_INFOS(LOG_INV) << "Invalidated " << invalid_categories.size() << " categories due to invalid descendents cache" << LL_ENDL;
 

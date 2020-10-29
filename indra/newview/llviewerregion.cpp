@@ -2484,8 +2484,10 @@ LLViewerRegion::eCacheUpdateResult LLViewerRegion::cacheFullUpdate(LLDataPackerB
 		// we've seen this object before
 		if (entry->getCRC() == crc)
 		{
+#if SHOW_DEBUG
             LL_DEBUGS("AnimatedObjects") << " got dupe for local_id " << local_id << LL_ENDL;
             dumpStack("AnimatedObjectsStack");
+#endif
 
 			// Record a hit
 			entry->recordDupe();
@@ -2493,8 +2495,10 @@ LLViewerRegion::eCacheUpdateResult LLViewerRegion::cacheFullUpdate(LLDataPackerB
 		}
 		else //CRC changed
 		{
+#if SHOW_DEBUG
             LL_DEBUGS("AnimatedObjects") << " got update for local_id " << local_id << LL_ENDL;
             dumpStack("AnimatedObjectsStack");
+#endif
 
 			// Update the cache entry
 			entry->updateEntry(crc, dp);
@@ -2506,8 +2510,10 @@ LLViewerRegion::eCacheUpdateResult LLViewerRegion::cacheFullUpdate(LLDataPackerB
 	}
 	else
 	{
+#if SHOW_DEBUG
         LL_DEBUGS("AnimatedObjects") << " got first notification for local_id " << local_id << LL_ENDL;
         dumpStack("AnimatedObjectsStack");
+#endif
 
 		// we haven't seen this object before
 		// Create new entry and add to map

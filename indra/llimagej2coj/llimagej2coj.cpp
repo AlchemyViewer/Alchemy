@@ -128,10 +128,12 @@ bool LLImageJ2COJ::decodeImpl(LLImageJ2C &base, LLImageRaw &raw_image, F32 decod
 	opj_cio_t *cio = nullptr;
 
 
+#if SHOW_DEBUG
 	/* configure the event callbacks (not required) */
 	event_mgr.error_handler = error_callback;
 	event_mgr.warning_handler = warning_callback;
 	event_mgr.info_handler = info_callback;
+#endif
 
 	/* set decoding parameters to default values */
 	opj_set_default_decoder_parameters(&parameters);

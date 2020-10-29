@@ -610,9 +610,11 @@ std::string LLDir::getExpandedFilename(ELLPath location, const std::string& subd
 	expanded_filename += mDirDelimiter;
 	expanded_filename += in_filename;
 
+#if SHOW_DEBUG
 	LL_DEBUGS("LLDir") << ELLPathToString(location)
 					   << ", '" << subdir1 << "', '" << subdir2 << "', '" << in_filename
 					   << "' => '" << expanded_filename << "'" << LL_ENDL;
+#endif
 	return expanded_filename;
 }
 
@@ -725,10 +727,12 @@ std::vector<std::string> LLDir::findSkinnedFilenames(const std::string& subdir,
 		("textures")                // textures not localized
 	;
 
+#if SHOW_DEBUG
 	LL_DEBUGS("LLDir") << "subdir '" << subdir << "', filename '" << filename
 					   << "', constraint "
 					   << ((constraint == CURRENT_SKIN)? "CURRENT_SKIN" : "ALL_SKINS")
 					   << LL_ENDL;
+#endif
 
 	// Build results vector.
 	std::vector<std::string> results;
@@ -850,6 +854,7 @@ std::vector<std::string> LLDir::findSkinnedFilenames(const std::string& subdir,
 		}
 	}
 
+#if SHOW_DEBUG
 	LL_DEBUGS("LLDir") << empty;
 	const char* comma = "";
 	for (const std::string& path : results)
@@ -858,6 +863,7 @@ std::vector<std::string> LLDir::findSkinnedFilenames(const std::string& subdir,
 		comma = ", ";
 	}
 	LL_CONT << LL_ENDL;
+#endif
 
 	return results;
 }

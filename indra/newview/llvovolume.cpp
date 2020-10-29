@@ -353,8 +353,10 @@ U32 LLVOVolume::processUpdateMessage(LLMessageSystem *mesgsys,
 		sculpt_id = sculpt_params->getSculptTexture();
 		sculpt_type = sculpt_params->getSculptType();
 
+#if SHOW_DEBUG
         LL_DEBUGS("ObjectUpdate") << "uuid " << mID << " set sculpt_id " << sculpt_id << LL_ENDL;
         dumpStack("ObjectUpdateStack");
+#endif
 	}
 
 	if (!dp)
@@ -1686,10 +1688,12 @@ BOOL LLVOVolume::genBBoxes(BOOL force_global)
 
     bool any_valid_boxes = false;
     
+#if SHOW_DEBUG
     if (getRiggedVolume())
     {
         LL_DEBUGS("RiggedBox") << "rebuilding box, volume face count " << getVolume()->getNumVolumeFaces() << " drawable face count " << mDrawable->getNumFaces() << LL_ENDL;
     }
+#endif
     // There's no guarantee that getVolume()->getNumFaces() == mDrawable->getNumFaces()
 	for (S32 i = 0;
 		 i < getVolume()->getNumVolumeFaces() && i < mDrawable->getNumFaces() && i < getNumTEs();
@@ -1713,10 +1717,12 @@ BOOL LLVOVolume::genBBoxes(BOOL force_global)
         }
 		if (rebuild)
 		{
+#if SHOW_DEBUG
             if (getRiggedVolume())
             {
                 LL_DEBUGS("RiggedBox") << "rebuilding box, face " << i << " extents " << face->mExtents[0] << ", " << face->mExtents[1] << LL_ENDL;
             }
+#endif
 			if (!any_valid_boxes)
 			{
 				min = face->mExtents[0];
@@ -1735,10 +1741,12 @@ BOOL LLVOVolume::genBBoxes(BOOL force_global)
     {
         if (rebuild)
         {
+#if SHOW_DEBUG
             if (getRiggedVolume())
             {
                 LL_DEBUGS("RiggedBox") << "rebuilding got extents " << min << ", " << max << LL_ENDL;
             }
+#endif
             mDrawable->setSpatialExtents(min,max);
             min.add(max);
             min.mul(0.5f);
@@ -1748,10 +1756,12 @@ BOOL LLVOVolume::genBBoxes(BOOL force_global)
         updateRadius();
         mDrawable->movePartition();
     }
+#if SHOW_DEBUG
     else
     {
         LL_DEBUGS("RiggedBox") << "genBBoxes failed to find any valid face boxes" << LL_ENDL;
     }
+#endif
 				
 	return res;
 }
@@ -2275,7 +2285,9 @@ void LLVOVolume::setTEMaterialParamsCallbackTE(const LLUUID& objectID, const LLM
 	LLVOVolume* pVol = (LLVOVolume*)gObjectList.findObject(objectID);
 	if (pVol)
 	{
+#if SHOW_DEBUG
 		LL_DEBUGS("MaterialTEs") << "materialid " << pMaterialID.asString() << " to TE " << te << LL_ENDL;
+#endif
 		if (te >= pVol->getNumTEs())
 			return;
 
@@ -2290,11 +2302,13 @@ void LLVOVolume::setTEMaterialParamsCallbackTE(const LLUUID& objectID, const LLM
 S32 LLVOVolume::setTEMaterialID(const U8 te, const LLMaterialID& pMaterialID)
 {
 	S32 res = LLViewerObject::setTEMaterialID(te, pMaterialID);
+#if SHOW_DEBUG
 	LL_DEBUGS("MaterialTEs") << "te "<< (S32)te << " materialid " << pMaterialID.asString() << " res " << res
 								<< ( LLSelectMgr::getInstance()->getSelection()->contains(const_cast<LLVOVolume*>(this), te) ? " selected" : " not selected" )
 								<< LL_ENDL;
 		
 	LL_DEBUGS("MaterialTEs") << " " << pMaterialID.asString() << LL_ENDL;
+#endif
 	if (res)
 	{
 		LLMaterialMgr::instance().getTE(getRegion()->getRegionID(), pMaterialID, te, boost::bind(&LLVOVolume::setTEMaterialParamsCallbackTE, getID(), _1, _2, _3));
@@ -2548,11 +2562,16 @@ S32 LLVOVolume::setTEMaterialParams(const U8 te, const LLMaterialPtr pMaterialPa
 		}
 	}
 
-	S32 res = LLViewerObject::setTEMaterialParams(te, pMaterial);
+#if SHOW_DEBUG
+	S32 res = 
+#endif
+		LLViewerObject::setTEMaterialParams(te, pMaterial);
 
+#if SHOW_DEBUG
 	LL_DEBUGS("MaterialTEs") << "te " << (S32)te << " material " << ((pMaterial) ? pMaterial->asLLSD() : LLSD("null")) << " res " << res
 							 << ( LLSelectMgr::getInstance()->getSelection()->contains(const_cast<LLVOVolume*>(this), te) ? " selected" : " not selected" )
 							 << LL_ENDL;
+#endif
 	setChanged(ALL_CHANGED);
 	if (!mDrawable.isNull())
 	{
@@ -3706,15 +3725,19 @@ void LLVOVolume::onReparent(LLViewerObject *old_parent, LLViewerObject *new_pare
 // virtual
 void LLVOVolume::afterReparent()
 {
+#if SHOW_DEBUG
     {
         LL_DEBUGS("AnimatedObjects") << "new child added for parent " 
             << ((LLViewerObject*)getParent())->getID() << LL_ENDL;
     }
-                                                                                             
+#endif                                
+
     if (isAnimatedObject() && getControlAvatar())
     {
+#if SHOW_DEBUG
         LL_DEBUGS("AnimatedObjects") << "adding attachment overrides, parent is animated object " 
             << ((LLViewerObject*)getParent())->getID() << LL_ENDL;
+#endif
 
         // MAINT-8239 - doing a full rebuild whenever parent is set
         // makes the joint overrides load more robustly. In theory,
@@ -3726,6 +3749,7 @@ void LLVOVolume::afterReparent()
         //getControlAvatar()->rebuildAttachmentOverrides();
         getControlAvatar()->updateAnimations();
     }
+#if SHOW_DEBUG
     else
     {
         LL_DEBUGS("AnimatedObjects") << "not adding overrides, parent: " 
@@ -3733,6 +3757,7 @@ void LLVOVolume::afterReparent()
                                      << " isAnimated: "  << isAnimatedObject() << " cav "
                                      << getControlAvatar() << LL_ENDL;
     }
+#endif
 }
 
 //----------------------------------------------------------------------------
@@ -3748,7 +3773,9 @@ void LLVOVolume::updateRiggingInfo()
         LLVolume *volume = getVolume();
         if (skin && avatar && volume)
         {
+#if SHOW_DEBUG
             LL_DEBUGS("RigSpammish") << "starting, vovol " << this << " lod " << getLOD() << " last " << mLastRiggingInfoLOD << LL_ENDL;
+#endif
             if (getLOD()>mLastRiggingInfoLOD || getLOD()==3)
             {
                 // Rigging info may need update
@@ -3764,9 +3791,11 @@ void LLVOVolume::updateRiggingInfo()
                 }
                 // Keep the highest LOD info available.
                 mLastRiggingInfoLOD = getLOD();
+#if SHOW_DEBUG
                 LL_DEBUGS("RigSpammish") << "updated rigging info for LLVOVolume " 
                                          << this << " lod " << mLastRiggingInfoLOD 
                                          << LL_ENDL;
+#endif
             }
         }
     }

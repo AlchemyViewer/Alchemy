@@ -118,7 +118,9 @@ private:
 		// centralize such calls, using "mainloop" to ensure it happens once
 		// per frame, and refcounting running LLProcess objects to remain
 		// registered only while needed.
+#if SHOW_DEBUG
 		LL_DEBUGS("LLProcess") << "calling apr_proc_other_child_refresh_all()" << LL_ENDL;
+#endif
 		apr_proc_other_child_refresh_all(APR_OC_REASON_RUNNING);
 		return false;
 	}
@@ -933,6 +935,7 @@ static struct ReasonCode
 // Object-oriented callback
 void LLProcess::handle_status(int reason, int status)
 {
+#if SHOW_DEBUG
 	{
 		// This odd appearance of LL_DEBUGS is just to bracket a lookup that will
 		// only be performed if in fact we're going to produce the log message.
@@ -952,6 +955,7 @@ void LLProcess::handle_status(int reason, int status)
 		}
 		LL_CONT << mDesc << ": handle_status(" << reason_str << ", " << status << ")" << LL_ENDL;
 	}
+#endif
 
 	if (! (reason == APR_OC_REASON_DEATH || reason == APR_OC_REASON_LOST))
 	{

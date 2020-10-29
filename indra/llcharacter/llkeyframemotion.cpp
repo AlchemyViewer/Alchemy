@@ -498,7 +498,9 @@ LLMotion::LLMotionInitStatus LLKeyframeMotion::onInitialize(LLCharacter *charact
 		// request asset
 		mAssetStatus = ASSET_FETCHED;
 
+#if SHOW_DEBUG
         LL_DEBUGS("Animation") << "Requesting data fetch for: " << mID << LL_ENDL;
+#endif
 		character_id = new LLUUID(mCharacter->getID());
 		gAssetStorage->getAssetData(mID,
 						LLAssetType::AT_ANIMATION,
@@ -599,7 +601,9 @@ LLMotion::LLMotionInitStatus LLKeyframeMotion::onInitialize(LLCharacter *charact
 		return STATUS_FAILURE;
 	}
 
+#if SHOW_DEBUG
 	LL_DEBUGS() << "Loading keyframe data for: " << getName() << ":" << getID() << " (" << anim_file_size << " bytes)" << LL_ENDL;
+#endif
 
 	LLDataPackerBinaryBuffer dp(anim_data, anim_file_size);
 

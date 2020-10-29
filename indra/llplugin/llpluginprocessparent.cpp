@@ -668,7 +668,9 @@ void LLPluginProcessParent::sendMessage(const LLPluginMessage &message)
 	}
 	
 	std::string buffer = message.generate();
+#if SHOW_DEBUG
 	LL_DEBUGS("Plugin") << "Sending: " << buffer << LL_ENDL;	
+#endif
 	writeMessageRaw(buffer);
 	
 	// Try to send message immediately.
@@ -920,7 +922,9 @@ void LLPluginProcessParent::servicePoll()
 
 void LLPluginProcessParent::receiveMessageRaw(const std::string &message)
 {
+#if SHOW_DEBUG
 	LL_DEBUGS("Plugin") << "Received: " << message << LL_ENDL;
+#endif
 	
 	LLPluginMessage parsed;
 	if(LLSDParser::PARSE_FAILURE != parsed.parse(message))

@@ -155,8 +155,10 @@ static LLTrace::BlockTimerStatHandle FTM_CREATE_OBJECT("Create Object");
 // static
 LLViewerObject *LLViewerObject::createObject(const LLUUID &id, const LLPCode pcode, LLViewerRegion *regionp, S32 flags)
 {
+#if SHOW_DEBUG
     LL_DEBUGS("ObjectUpdate") << "creating " << id << LL_ENDL;
     dumpStack("ObjectUpdateStack");
+#endif
     
 	LLViewerObject *res = NULL;
 	LL_RECORD_BLOCK_TIME(FTM_CREATE_OBJECT);
@@ -1134,10 +1136,12 @@ U32 LLViewerObject::processUpdateMessage(LLMessageSystem *mesgsys,
 					 const EObjectUpdateType update_type,
 					 LLDataPacker *dp)
 {
+#if SHOW_DEBUG
 	LL_DEBUGS_ONCE("SceneLoadTiming") << "Received viewer object data" << LL_ENDL;
 
     LL_DEBUGS("ObjectUpdate") << " mesgsys " << mesgsys << " dp " << dp << " id " << getID() << " update_type " << (S32) update_type << LL_ENDL;
     dumpStack("ObjectUpdateStack");
+#endif
 
 	U32 retval = 0x0;
 	
@@ -5238,10 +5242,12 @@ S32 LLViewerObject::setTEMaterialID(const U8 te, const LLMaterialID& pMaterialID
 	}
 	//else if (pMaterialID != tep->getMaterialID())
 	{
+#if SHOW_DEBUG
 		LL_DEBUGS("Material") << "Changing texture entry for te " << (S32)te
 							 << ", object " << mID
 							 << ", material " << pMaterialID
 							 << LL_ENDL;
+#endif
 		retval = LLPrimitive::setTEMaterialID(te, pMaterialID);
 		refreshMaterials();
 	}
@@ -5259,10 +5265,12 @@ S32 LLViewerObject::setTEMaterialParams(const U8 te, const LLMaterialPtr pMateri
 	}
 
 	retval = LLPrimitive::setTEMaterialParams(te, pMaterialParams);
+#if SHOW_DEBUG
 	LL_DEBUGS("Material") << "Changing material params for te " << (S32)te
 							<< ", object " << mID
 			               << " (" << retval << ")"
 							<< LL_ENDL;
+#endif
 	setTENormalMap(te, (pMaterialParams) ? pMaterialParams->getNormalID() : LLUUID::null);
 	setTESpecularMap(te, (pMaterialParams) ? pMaterialParams->getSpecularID() : LLUUID::null);
 

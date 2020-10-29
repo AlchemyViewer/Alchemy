@@ -781,9 +781,11 @@ F32 LLSpatialPartition::calcDistance(LLSpatialGroup* group, LLCamera& camera)
 		dist = eye.getLength3().getF32();
 	}
 
+#if SHOW_DEBUG
     LL_DEBUGS("RiggedBox") << "calcDistance, group " << group << " camera " << origin << " obj bounds " 
                            << group->mObjectBounds[0] << ", " << group->mObjectBounds[1] 
                            << " dist " << dist << " radius " << group->mRadius << LL_ENDL;
+#endif
 
 	if (dist < 16.f)
 	{
@@ -839,6 +841,7 @@ BOOL LLSpatialGroup::changeLOD()
 
 		if (fabsf(ratio) >= getSpatialPartition()->mSlopRatio)
 		{
+#if SHOW_DEBUG
             LL_DEBUGS("RiggedBox") << "changeLOD true because of ratio compare "
                                    << fabsf(ratio) << " " << getSpatialPartition()->mSlopRatio << LL_ENDL;
             LL_DEBUGS("RiggedBox") << "sg " << this << "\nmDistance " << mDistance
@@ -846,6 +849,7 @@ BOOL LLSpatialGroup::changeLOD()
                                    << " mRadius " << mRadius
                                    << " fab ratio " << fabsf(ratio) 
                                    << " slop " << getSpatialPartition()->mSlopRatio << LL_ENDL;
+#endif
        
 			return TRUE;
 		}

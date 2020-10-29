@@ -1765,7 +1765,9 @@ LLNotificationPtr LLNotifications::find(LLUUID uuid)
 	LLNotificationSet::iterator it=mItems.find(target);
 	if (it == mItems.end())
 	{
+#if SHOW_DEBUG
 		LL_DEBUGS("Notifications") << "Tried to dereference uuid '" << uuid << "' as a notification key but didn't find it." << LL_ENDL;
+#endif
 		return LLNotificationPtr((LLNotification*)NULL);
 	}
 	else
@@ -1828,6 +1830,7 @@ bool LLNotifications::isVisibleByRules(LLNotificationPtr n)
 	for(it = mVisibilityRules.begin(); it != mVisibilityRules.end(); it++)
 	{
 		// An empty type/tag/name string will match any notification, so only do the comparison when the string is non-empty in the rule.
+#if SHOW_DEBUG
 		LL_DEBUGS("Notifications")
 			<< "notification \"" << n->getName() << "\" " 
 			<< "testing against " << ((*it)->mVisible?"show":"hide") << " rule, "
@@ -1835,6 +1838,7 @@ bool LLNotifications::isVisibleByRules(LLNotificationPtr n)
 			<< "tag = \"" << (*it)->mTag << "\" "
 			<< "type = \"" << (*it)->mType << "\" "
 			<< LL_ENDL;
+#endif
 
 		if(!(*it)->mType.empty())
 		{
@@ -1873,7 +1877,9 @@ bool LLNotifications::isVisibleByRules(LLNotificationPtr n)
 			if((*it)->mResponse.empty())
 			{
 				// Response property is empty.  Cancel this notification.
+#if SHOW_DEBUG
 				LL_DEBUGS("Notifications") << "cancelling notification " << n->getName() << LL_ENDL;
+#endif
 
 				cancel(n);
 			}
@@ -1884,7 +1890,9 @@ bool LLNotifications::isVisibleByRules(LLNotificationPtr n)
 				// TODO: verify that the response template has an item with the correct name
 				response[(*it)->mResponse] = true;
 
+#if SHOW_DEBUG
 				LL_DEBUGS("Notifications") << "responding to notification " << n->getName() << " with response = " << response << LL_ENDL;
+#endif
 				
 				n->respond(response);
 			}
@@ -1896,7 +1904,9 @@ bool LLNotifications::isVisibleByRules(LLNotificationPtr n)
 		break;
 	}
 	
+#if SHOW_DEBUG
 	LL_DEBUGS("Notifications") << "allowing notification " << n->getName() << LL_ENDL;
+#endif
 
 	return true;
 }

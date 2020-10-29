@@ -7075,17 +7075,23 @@ void LLVivoxProtocolParser::StartTag(const char *tag, const char **attr)
 				}
 			}
 		}
+#if SHOW_DEBUG
 		LL_DEBUGS("VivoxProtocolParser") << tag << " (" << responseDepth << ")"  << LL_ENDL;
+#endif
 	}
 	else
 	{
+#if SHOW_DEBUG
 		if (ignoringTags)
 		{
 			LL_DEBUGS("VivoxProtocolParser") << "ignoring tag " << tag << " (depth = " << responseDepth << ")" << LL_ENDL;
 		}
 		else
+#endif
 		{
+#if SHOW_DEBUG
 			LL_DEBUGS("VivoxProtocolParser") << tag << " (" << responseDepth << ")"  << LL_ENDL;
+#endif
 			
 			// Ignore the InputXml stuff so we don't get confused
 			if (!stricmp("InputXml", tag))
@@ -7094,7 +7100,9 @@ void LLVivoxProtocolParser::StartTag(const char *tag, const char **attr)
 				ignoreDepth = responseDepth;
 				accumulateText = false;
 				
+#if SHOW_DEBUG
 				LL_DEBUGS("VivoxProtocolParser") << "starting ignore, ignoreDepth is " << ignoreDepth << LL_ENDL;
+#endif
 			}
 			else if (!stricmp("CaptureDevices", tag))
 			{
@@ -7153,18 +7161,24 @@ void LLVivoxProtocolParser::EndTag(const char *tag)
 	{
 		if (ignoreDepth == responseDepth)
 		{
+#if SHOW_DEBUG
 			LL_DEBUGS("VivoxProtocolParser") << "end of ignore" << LL_ENDL;
+#endif
 			ignoringTags = false;
 		}
+#if SHOW_DEBUG
 		else
 		{
 			LL_DEBUGS("VivoxProtocolParser") << "ignoring tag " << tag << " (depth = " << responseDepth << ")" << LL_ENDL;
 		}
+#endif
 	}
 	
 	if (!ignoringTags)
 	{
+#if SHOW_DEBUG
 		LL_DEBUGS("VivoxProtocolParser") << "processing tag " << tag << " (depth = " << responseDepth << ")" << LL_ENDL;
+#endif
 		
 		// Closing a tag. Finalize the text we've accumulated and reset
 		if (!stricmp("ReturnCode", tag))

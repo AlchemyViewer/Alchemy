@@ -310,7 +310,9 @@ BOOL LLMenuItemGL::addToAcceleratorList(std::list <LLKeyBinding*> *listp)
 void LLMenuItemGL::appendAcceleratorString( std::string& st ) const
 {
 	st = LLKeyboard::stringFromAccelerator( mAcceleratorMask, mAcceleratorKey );
+#if SHOW_DEBUG
 	LL_DEBUGS("HotKeys") << "appendAcceleratorString: " << st << LL_ENDL;
+#endif
 }
 
 void LLMenuItemGL::setJumpKey(KEY key)

@@ -610,11 +610,13 @@ BOOL LLAvatarAppearance::setupBone(const LLAvatarBoneInfo* info, LLJoint* parent
 {
 	LLJoint* joint = NULL;
 
+#if SHOW_DEBUG
     LL_DEBUGS("BVH") << "bone info: name " << info->mName
                      << " isJoint " << info->mIsJoint
                      << " volume_num " << volume_num
                      << " joint_num " << joint_num
                      << LL_ENDL;
+#endif
 
 	if (info->mIsJoint)
 	{

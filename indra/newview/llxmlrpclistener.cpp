@@ -418,24 +418,32 @@ private:
              current = XMLRPC_VectorNext(param))
         {
             std::string key(XMLRPC_GetValueID(current));
+#if SHOW_DEBUG
             LL_DEBUGS("LLXMLRPCListener") << "key: " << key_pfx << key << LL_ENDL;
+#endif
             XMLRPC_VALUE_TYPE_EASY type = XMLRPC_GetValueTypeEasy(current);
             if (xmlrpc_type_string == type)
             {
                 LLSD::String val(XMLRPC_GetValueString(current));
+#if SHOW_DEBUG
                 LL_DEBUGS("LLXMLRPCListener") << "val: " << val << LL_ENDL;
+#endif
                 responses.insert(key, val);
             }
             else if (xmlrpc_type_int == type)
             {
                 LLSD::Integer val(XMLRPC_GetValueInt(current));
+#if SHOW_DEBUG
                 LL_DEBUGS("LLXMLRPCListener") << "val: " << val << LL_ENDL;
+#endif
                 responses.insert(key, val);
             }
             else if (xmlrpc_type_double == type)
             {
                 LLSD::Real val(XMLRPC_GetValueDouble(current));
+#if SHOW_DEBUG
                 LL_DEBUGS("LLXMLRPCListener") << "val: " << val << LL_ENDL;
+#endif
                 responses.insert(key, val);
             }
             else if (xmlrpc_type_array == type)

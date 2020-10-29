@@ -216,7 +216,9 @@ void LLControlAvatar::matchVolumeTransform()
 	        const LLMeshSkinInfo* skin_info = mRootVolp->getSkinInfo();
 			if (skin_info)
 			{
+#if SHOW_DEBUG
                 LL_DEBUGS("BindShape") << getFullname() << " bind shape " << skin_info->mBindShapeMatrix << LL_ENDL;
+#endif
                 bind_rot = LLSkinningUtil::getUnscaledQuaternion(skin_info->mBindShapeMatrix);
 			}
 #endif
@@ -535,7 +537,9 @@ void LLControlAvatar::updateAnimations()
                 // Animation not already present, use this sequence id.
                 anims[anim_it->first] = anim_it->second;
             }
+#if SHOW_DEBUG
             LL_DEBUGS("AnimatedObjectsNotify") << "found anim for vol " << volp->getID() << " anim " << anim_it->first << " root " << mRootVolp->getID() << LL_ENDL;
+#endif
         }
     }
     if (!mPlaying)
