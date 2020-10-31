@@ -2370,7 +2370,9 @@ bool LLVolume::unpackVolumeFaces(std::istream& is, S32 size)
 	U32 uzip_result = LLUZipHelper::unzip_llsd(mdl, is, size);
 	if (uzip_result != LLUZipHelper::ZR_OK)
 	{
+#if SHOW_DEBUG
 		LL_DEBUGS("MeshStreaming") << "Failed to unzip LLSD blob for LoD with code " << uzip_result << " , will probably fetch from sim again." << LL_ENDL;
+#endif
 		return false;
 	}
 	

@@ -532,13 +532,17 @@ void LLViewerAssetStorage::assetRequestCoro(
     LLCore::HttpStatus status = LLCoreHttpUtil::HttpCoroutineAdapter::getStatusFromLLSD(httpResults);
     if (!status)
     {
+#if SHOW_DEBUG
         LL_DEBUGS("ViewerAsset") << "request failed, status " << status.toTerseString() << LL_ENDL;
+#endif
         result_code = LL_ERR_ASSET_REQUEST_FAILED;
         ext_status = LLExtStat::NONE;
     }
     else
     {
+#if SHOW_DEBUG
         LL_DEBUGS("ViewerAsset") << "request succeeded, url " << url << LL_ENDL;
+#endif
 
         const LLSD::Binary &raw = result[LLCoreHttpUtil::HttpCoroutineAdapter::HTTP_RESULTS_RAW].asBinary();
 

@@ -2367,7 +2367,9 @@ LLViewerFetchedTexture *LLVOAvatar::getBakedTextureImage(const U8 te, const LLUU
 			LL_WARNS() << "unable to determine URL for te " << te << " uuid " << uuid << LL_ENDL;
 			return NULL;
 		}
+#if SHOW_DEBUG
 		LL_DEBUGS("Avatar") << avString() << "get server-bake image from URL " << url << LL_ENDL;
+#endif
 		result = LLViewerTextureManager::getFetchedTextureFromUrl(
 			url, FTT_SERVER_BAKE, TRUE, LLGLTexture::BOOST_NONE, LLViewerTexture::LOD_TEXTURE, 0, 0, uuid);
 		if (result->isMissingAsset())
@@ -9222,7 +9224,9 @@ void LLVOAvatar::applyParsedAppearanceMessage(LLAppearanceMessageContents& conte
 		// Got an update for some other avatar
 		// Ignore updates for self, because we have a more authoritative value in the preferences.
 		setHoverOffset(contents.mHoverOffset);
+#if SHOW_DEBUG
 		LL_DEBUGS("Avatar") << avString() << "setting hover to " << contents.mHoverOffset[2] << LL_ENDL;
+#endif
 	}
 
 	if (!contents.mHoverOffsetWasSet && !isSelf())

@@ -2686,7 +2686,9 @@ void LLViewerRegion::requestCacheMisses()
 		msg->addU8Fast(_PREHASH_CacheMissType, (*iter).mType);
 		msg->addU32Fast(_PREHASH_ID, (*iter).mID);
 
+#if SHOW_DEBUG
         LL_DEBUGS("AnimatedObjects") << "Requesting cache missed object " << (*iter).mID << LL_ENDL;
+#endif
         
 		blocks++;
 

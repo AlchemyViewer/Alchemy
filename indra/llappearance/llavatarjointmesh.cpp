@@ -53,7 +53,9 @@ LLAvatarJoint *getBaseSkeletonAncestor(LLAvatarJoint* joint)
     LLJoint *ancestor = joint->getParent();
     while (ancestor->getParent() && (ancestor->getSupport() != LLJoint::SUPPORT_BASE))
     {
+#if SHOW_DEBUG
         LL_DEBUGS("Avatar") << "skipping non-base ancestor " << ancestor->getName() << LL_ENDL;
+#endif
         ancestor = ancestor->getParent();
     }
     return (LLAvatarJoint*) ancestor;

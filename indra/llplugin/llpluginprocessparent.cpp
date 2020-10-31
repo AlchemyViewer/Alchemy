@@ -1033,8 +1033,9 @@ void LLPluginProcessParent::receiveMessage(const LLPluginMessage &message)
 			mHeartbeat.setTimerExpirySec(mPluginLockupTimeout);
 
 			mCPUUsage = message.getValueReal("cpu_usage");
-
+#if SHOW_DEBUG
 			LL_DEBUGS("Plugin") << "cpu usage reported as " << mCPUUsage << LL_ENDL;
+#endif
 			
 		}
 		else if(message_name == "shm_add_response")
