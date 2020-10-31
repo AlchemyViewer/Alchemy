@@ -530,8 +530,10 @@ U32 LLVOVolume::processUpdateMessage(LLMessageSystem *mesgsys,
 				 ! LLTextureEntry::isMediaVersionString(mMedia->mMediaURL) ) )
 		{
 			// If the media changed at all, request new media data
+#if SHOW_DEBUG
 			LL_DEBUGS("MediaOnAPrim") << "Media update: " << getID() << ": retval=" << retval << " Media URL: " <<
                 ((mMedia) ?  mMedia->mMediaURL : std::string("")) << LL_ENDL;
+#endif
 			requestMediaDataUpdate(retval & MEDIA_FLAGS_CHANGED);
 		}
         else {
@@ -1511,6 +1513,7 @@ BOOL LLVOVolume::updateLOD()
 
 	if (lod_changed)
 	{
+#if SHOW_DEBUG
 		static const bool enable_log = debugLoggingEnabled("AnimatedObjectsLinkset");
         if (enable_log)
         {
@@ -1521,6 +1524,7 @@ BOOL LLVOVolume::updateLOD()
                 LL_DEBUGS("AnimatedObjectsLinkset") << vobj_name << " updateLOD to " << getLOD() << ", tris " << est_tris << LL_ENDL; 
             }
         }
+#endif
 
 		gPipeline.markRebuild(mDrawable, LLDrawable::REBUILD_VOLUME, FALSE);
 		mLODChanged = TRUE;
@@ -2728,9 +2732,11 @@ void LLVOVolume::syncMediaData(S32 texture_index, const LLSD &media_data, bool m
 		return ;
 	}
 
+#if SHOW_DEBUG
 	LL_DEBUGS("MediaOnAPrim") << "BEFORE: texture_index = " << texture_index
 		<< " hasMedia = " << te->hasMedia() << " : " 
 		<< ((NULL == te->getMediaData()) ? "NULL MEDIA DATA" : ll_pretty_print_sd(te->getMediaData()->asLLSD())) << LL_ENDL;
+#endif
 
 	std::string previous_url;
 	LLMediaEntry* mep = te->getMediaData();
@@ -2770,9 +2776,11 @@ void LLVOVolume::syncMediaData(S32 texture_index, const LLSD &media_data, bool m
 		removeMediaImpl(texture_index);
 	}
 
+#if SHOW_DEBUG
 	LL_DEBUGS("MediaOnAPrim") << "AFTER: texture_index = " << texture_index
 		<< " hasMedia = " << te->hasMedia() << " : " 
 		<< ((NULL == te->getMediaData()) ? "NULL MEDIA DATA" : ll_pretty_print_sd(te->getMediaData()->asLLSD())) << LL_ENDL;
+#endif
 }
 
 void LLVOVolume::mediaNavigateBounceBack(U8 texture_index)
@@ -2906,8 +2914,9 @@ void LLVOVolume::mediaNavigated(LLViewerMediaImpl *impl, LLPluginClassMedia* plu
 	}
 	else if (sObjectMediaNavigateClient)
 	{
-		
+#if SHOW_DEBUG
 		LL_DEBUGS("MediaOnAPrim") << "broadcasting navigate with URI " << new_location << LL_ENDL;
+#endif
 
 		sObjectMediaNavigateClient->navigate(new LLMediaDataClientObjectImpl(this, false), face_index, new_location);
 	}
@@ -2960,7 +2969,9 @@ void LLVOVolume::mediaEvent(LLViewerMediaImpl *impl, LLPluginClassMedia* plugin,
 				
 				case LLViewerMediaImpl::MEDIANAVSTATE_COMPLETE_BEFORE_LOCATION_CHANGED_SPURIOUS:
 					// This navigate didn't change the current URL.  
+#if SHOW_DEBUG
 					LL_DEBUGS("MediaOnAPrim") << "	NOT broadcasting navigate (spurious)" << LL_ENDL;
+#endif
 				break;
 
 				case LLViewerMediaImpl::MEDIANAVSTATE_SERVER_COMPLETE_BEFORE_LOCATION_CHANGED:
@@ -3663,10 +3674,12 @@ void LLVOVolume::setExtendedMeshFlags(U32 flags)
             param_block->setFlags(flags);
         }
         parameterChanged(LLNetworkData::PARAMS_EXTENDED_MESH, true);
+#if SHOW_DEBUG
         LL_DEBUGS("AnimatedObjects") << this
                                      << " new flags " << flags << " curr_flags " << curr_flags
                                      << ", calling onSetExtendedMeshFlags()"
                                      << LL_ENDL;
+#endif
         onSetExtendedMeshFlags(flags);
     }
 }
@@ -4335,11 +4348,14 @@ void LLVOVolume::parameterChanged(U16 param_type, LLNetworkData* data, BOOL in_u
         bool was_enabled = (getControlAvatar() != NULL);
         if (enabled != was_enabled)
         {
+#if SHOW_DEBUG
             LL_DEBUGS("AnimatedObjects") << this
                                          << " calling onSetExtendedMeshFlags, enabled " << (U32) enabled
                                          << " was_enabled " << (U32) was_enabled
                                          << " local_origin " << (U32) local_origin
                                          << LL_ENDL;
+#endif
+
             onSetExtendedMeshFlags(extended_mesh_flags);
         }
     }
@@ -4484,6 +4500,7 @@ const LLMatrix4& LLVOVolume::getWorldMatrix(LLXformMatrix* xform) const
 
 void LLVOVolume::markForUpdate(BOOL priority)
 { 
+#if SHOW_DEBUG
 	static const bool enable_log = debugLoggingEnabled("AnimatedObjectsLinkset");
     if (enable_log)
     {
@@ -4494,6 +4511,7 @@ void LLVOVolume::markForUpdate(BOOL priority)
             LL_DEBUGS("AnimatedObjectsLinkset") << vobj_name << " markForUpdate, tris " << est_tris << LL_ENDL; 
         }
     }
+#endif
 
     LLViewerObject::markForUpdate(priority); 
     mVolumeChanged = TRUE; 
@@ -6108,6 +6126,8 @@ void LLVolumeGeometryManager::rebuildMesh(LLSpatialGroup* group)
 			if (drawablep && !drawablep->isDead() && drawablep->isState(LLDrawable::REBUILD_ALL) && !drawablep->isState(LLDrawable::RIGGED) )
 			{
 				LLVOVolume* vobj = drawablep->getVOVolume();
+
+#if SHOW_DEBUG
 				static const bool enable_log = debugLoggingEnabled("AnimatedObjectsLinkset");
                 if (enable_log)
                 {
@@ -6118,6 +6138,8 @@ void LLVolumeGeometryManager::rebuildMesh(LLSpatialGroup* group)
                         LL_DEBUGS("AnimatedObjectsLinkset") << vobj_name << " rebuildMesh, tris " << est_tris << LL_ENDL; 
                     }
                 }
+#endif
+
 				if (vobj->isNoLOD()) continue;
 
 				vobj->preRebuild();

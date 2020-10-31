@@ -289,13 +289,20 @@ bool LLVOAvatarSelf::checkStuckAppearance()
 	
 	if (gAgentWearables.isCOFChangeInProgress())
 	{
+#if SHOW_DEBUG
 		LL_DEBUGS("Avatar") << "checking for stuck appearance" << LL_ENDL;
+#endif
 		F32 change_time = gAgentWearables.getCOFChangeTime();
+#if SHOW_DEBUG
 		LL_DEBUGS("Avatar") << "change in progress for " << change_time << " seconds" << LL_ENDL;
+
 		S32 active_hp = LLAppearanceMgr::instance().countActiveHoldingPatterns();
 		LL_DEBUGS("Avatar") << "active holding patterns " << active_hp << " seconds" << LL_ENDL;
+#endif
 		S32 active_copies = LLAppearanceMgr::instance().getActiveCopyOperations();
+#if SHOW_DEBUG
 		LL_DEBUGS("Avatar") << "active copy operations " << active_copies << LL_ENDL;
+#endif
 
 		if ((change_time > CONDITIONAL_UNSTICK_INTERVAL && active_copies == 0) ||
 			(change_time > UNCONDITIONAL_UNSTICK_INTERVAL))
@@ -2288,7 +2295,9 @@ void LLVOAvatarSelf::appearanceChangeMetricsCoro(std::string url)
 
     mPendingTimerRecords.clear();
 
+#if SHOW_DEBUG
     LL_DEBUGS("Avatar") << avString() << "message: " << ll_pretty_print_sd(msg) << LL_ENDL;
+#endif
 
     gPendingMetricsUploads++;
 
@@ -2622,10 +2631,12 @@ void LLVOAvatarSelf::outputRezDiagnostics() const
 
 void LLVOAvatarSelf::outputRezTiming(const std::string& msg) const
 {
+#if SHOW_DEBUG
 	LL_DEBUGS("Avatar")
 		<< avString()
 		<< llformat("%s. Time from avatar creation: %.2f", msg.c_str(), mDebugSelfLoadTimer.getElapsedTimeF32())
 		<< LL_ENDL;
+#endif
 }
 
 void LLVOAvatarSelf::reportAvatarRezTime() const
@@ -2818,7 +2829,9 @@ void LLVOAvatarSelf::sendHoverHeight() const
 		const LLVector3& hover_offset = getHoverOffset();
 		update["hover_height"] = hover_offset[2];
 
+#if SHOW_DEBUG
 		LL_DEBUGS("Avatar") << avString() << "sending hover height value " << hover_offset[2] << LL_ENDL;
+#endif
 
         // *TODO: - this class doesn't really do anything, could just use a base
         // class responder if nothing else gets added. 
@@ -2873,7 +2886,9 @@ void LLVOAvatarSelf::deleteScratchTextures()
 
 	if( sScratchTexBytes.value() )
 	{
+#if SHOW_DEBUG
 		LL_DEBUGS() << "Clearing Scratch Textures " << (S32Kilobytes)sScratchTexBytes << LL_ENDL;
+#endif
 
 		delete_and_clear(sScratchTexNames);
 		LLImageGL::sGlobalTextureMemory -= sScratchTexBytes;

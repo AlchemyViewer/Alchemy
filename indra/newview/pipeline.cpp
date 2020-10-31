@@ -3313,6 +3313,7 @@ void LLPipeline::markRebuild(LLDrawable *drawablep, LLDrawable::EDrawableFlags f
 {
 	if (drawablep && !drawablep->isDead() && assertInitialized())
 	{
+#if SHOW_DEBUG
 		static const bool enable_log = debugLoggingEnabled("AnimatedObjectsLinkset");
         if (enable_log)
         {
@@ -3325,6 +3326,7 @@ void LLPipeline::markRebuild(LLDrawable *drawablep, LLDrawable::EDrawableFlags f
                                                     << " priority " << (S32) priority << " flag " << std::hex << flag << LL_ENDL; 
             }
         }
+#endif
     
 		if (!drawablep->isState(LLDrawable::BUILT))
 		{
@@ -10810,18 +10812,24 @@ void LLPipeline::generateImpostor(LLVOAvatar* avatar)
         LL_WARNS_ONCE("AvatarRenderPipeline") << "Avatar is " << (avatar ? "not drawable" : "null") << LL_ENDL;
 		return;
 	}
+#if SHOW_DEBUG
     LL_DEBUGS_ONCE("AvatarRenderPipeline") << "Avatar " << avatar->getID() << " is drawable" << LL_ENDL;
+#endif
 
 	assertInitialized();
 
-	bool visually_muted = avatar->isVisuallyMuted();		
+	bool visually_muted = avatar->isVisuallyMuted();	
+#if SHOW_DEBUG
     LL_DEBUGS_ONCE("AvatarRenderPipeline") << "Avatar " << avatar->getID()
                               << " is " << ( visually_muted ? "" : "not ") << "visually muted"
                               << LL_ENDL;
+#endif
 	bool too_complex = avatar->isTooComplex();		
+#if SHOW_DEBUG
     LL_DEBUGS_ONCE("AvatarRenderPipeline") << "Avatar " << avatar->getID()
                               << " is " << ( too_complex ? "" : "not ") << "too complex"
                               << LL_ENDL;
+#endif
 
 	pushRenderTypeMask();
 	
@@ -11074,13 +11082,17 @@ void LLPipeline::generateImpostor(LLVOAvatar* avatar)
 
 		if (visually_muted)
 		{	// Visually muted avatar
-            LLColor4 muted_color(avatar->getMutedAVColor());
+            const LLColor4& muted_color(avatar->getMutedAVColor());
+#if SHOW_DEBUG
             LL_DEBUGS_ONCE("AvatarRenderPipeline") << "Avatar " << avatar->getID() << " MUTED set solid color " << muted_color << LL_ENDL;
+#endif
 			gGL.diffuseColor4fv( muted_color.mV );
 		}
 		else
 		{ //grey muted avatar
+#if SHOW_DEBUG
             LL_DEBUGS_ONCE("AvatarRenderPipeline") << "Avatar " << avatar->getID() << " MUTED set grey" << LL_ENDL;
+#endif
 			gGL.diffuseColor4fv(LLColor4::pink.mV );
 		}
 

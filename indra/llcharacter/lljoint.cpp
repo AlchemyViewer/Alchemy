@@ -443,10 +443,12 @@ void LLJoint::addAttachmentPosOverride( const LLVector3& pos, const LLUUID& mesh
     bool has_active_override_before = hasAttachmentPosOverride( before_pos, before_mesh_id );
 	if (!m_attachmentPosOverrides.count())
 	{
+#if SHOW_DEBUG
 		if (do_debug_joint(getName()))
 		{
 			LL_DEBUGS("Avatar") << "av " << av_info << " joint " << getName() << " saving m_posBeforeOverrides " << getPosition() << LL_ENDL;
 		}
+#endif
 		m_posBeforeOverrides = getPosition();
 	}
 	m_attachmentPosOverrides.add(mesh_id,pos);
@@ -456,10 +458,12 @@ void LLJoint::addAttachmentPosOverride( const LLVector3& pos, const LLUUID& mesh
     if (!has_active_override_before || (after_pos != before_pos))
     {
         active_override_changed = true; 
+#if SHOW_DEBUG
         if (do_debug_joint(getName()))
         {
             LL_DEBUGS("Avatar") << "av " << av_info << " joint " << getName() << " addAttachmentPosOverride for mesh " << mesh_id << " pos " << pos << LL_ENDL;
         }
+#endif
         updatePos(av_info);
     }
 }
@@ -485,12 +489,14 @@ void LLJoint::removeAttachmentPosOverride( const LLUUID& mesh_id, const std::str
         if (!has_active_override_after || (after_pos != before_pos))
         {
             active_override_changed = true;
+#if SHOW_DEBUG
             if (do_debug_joint(getName()))
             {
                 LL_DEBUGS("Avatar") << "av " << av_info << " joint " << getName()
                                     << " removeAttachmentPosOverride for " << mesh_id << LL_ENDL;
                 showJointPosOverrides(*this, "remove", av_info);
             }
+#endif
             updatePos(av_info);
         }
 	}
@@ -596,18 +602,22 @@ void LLJoint::updatePos(const std::string& av_info)
 	LLUUID mesh_id;
 	if (m_attachmentPosOverrides.findActiveOverride(mesh_id,found_pos))
 	{
+#if SHOW_DEBUG
         if (do_debug_joint(getName()))
         {
             LL_DEBUGS("Avatar") << "av " << av_info << " joint " << getName() << " updatePos, winner of " << m_attachmentPosOverrides.count() << " is mesh " << mesh_id << " pos " << found_pos << LL_ENDL;
         }
+#endif
 		pos = found_pos;
 	}
 	else
 	{
+#if SHOW_DEBUG
         if (do_debug_joint(getName()))
         {
             LL_DEBUGS("Avatar") << "av " << av_info << " joint " << getName() << " updatePos, winner is posBeforeOverrides " << m_posBeforeOverrides << LL_ENDL;
         }
+#endif
 		pos = m_posBeforeOverrides;
 	}
 	setPosition(pos);
@@ -622,18 +632,22 @@ void LLJoint::updateScale(const std::string& av_info)
 	LLUUID mesh_id;
 	if (m_attachmentScaleOverrides.findActiveOverride(mesh_id,found_scale))
 	{
+#if SHOW_DEBUG
         if (do_debug_joint(getName()))
         {
             LL_DEBUGS("Avatar") << "av " << av_info << " joint " << getName() << " updateScale, winner of " << m_attachmentScaleOverrides.count() << " is mesh " << mesh_id << " scale " << found_scale << LL_ENDL;
         }
+#endif
 		scale = found_scale;
 	}
 	else
 	{
+#if SHOW_DEBUG
         if (do_debug_joint(getName()))
         {
             LL_DEBUGS("Avatar") << "av " << av_info << " joint " << getName() << " updateScale, winner is scaleBeforeOverrides " << m_scaleBeforeOverrides << LL_ENDL;
         }
+#endif
 		scale = m_scaleBeforeOverrides;
 	}
 	setScale(scale);
@@ -650,17 +664,21 @@ void LLJoint::addAttachmentScaleOverride( const LLVector3& scale, const LLUUID& 
 	}
 	if (!m_attachmentScaleOverrides.count())
 	{
+#if SHOW_DEBUG
 		if (do_debug_joint(getName()))
 		{
 			LL_DEBUGS("Avatar") << "av " << av_info << " joint " << getName() << " saving m_scaleBeforeOverrides " << getScale() << LL_ENDL;
 		}
+#endif
 		m_scaleBeforeOverrides = getScale();
 	}
 	m_attachmentScaleOverrides.add(mesh_id,scale);
+#if SHOW_DEBUG
 	if (do_debug_joint(getName()))
 	{
 		LL_DEBUGS("Avatar") << "av " << av_info << " joint " << getName() << " addAttachmentScaleOverride for mesh " << mesh_id << " scale " << scale << LL_ENDL;
 	}
+#endif
 	updateScale(av_info);
 }
 
@@ -675,12 +693,14 @@ void LLJoint::removeAttachmentScaleOverride( const LLUUID& mesh_id, const std::s
 	}
 	if (m_attachmentScaleOverrides.remove(mesh_id))
 	{
+#if SHOW_DEBUG
 		if (do_debug_joint(getName()))
 		{
 			LL_DEBUGS("Avatar") << "av " << av_info << " joint " << getName()
 								<< " removeAttachmentScaleOverride for " << mesh_id << LL_ENDL;
 			showJointScaleOverrides(*this, "remove", av_info);
 		}
+#endif
 		updateScale(av_info);
 	}
 }

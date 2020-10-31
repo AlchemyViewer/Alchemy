@@ -4755,10 +4755,12 @@ void LLVOAvatar::updateVisibility()
 		}
 	}
 
+#if SHOW_DEBUG
     if ( visible != mVisible )
     {
         LL_DEBUGS("AvatarRender") << "visible was " << mVisible << " now " << visible << LL_ENDL;
     }
+#endif
 	mVisible = visible;
 }
 
@@ -6196,8 +6198,10 @@ void LLVOAvatar::rebuildAttachmentOverrides()
         LLVOVolume *volp = static_cast<LLControlAvatar*>(this)->mRootVolp;
         if (volp)
         {
+#if SHOW_DEBUG
             LL_DEBUGS("Avatar") << volp->getID() << " adding attachment overrides for root vol, prim count " 
                                 << (S32) (1+volp->numChildren()) << LL_ENDL;
+#endif
             addAttachmentOverridesForObject(volp);
         }
     }
@@ -6246,8 +6250,10 @@ void LLVOAvatar::updateAttachmentOverrides()
 		LLVOVolume *volp = control_av->mRootVolp;
         if (volp)
         {
+#if SHOW_DEBUG
             LL_DEBUGS("Avatar") << volp->getID() << " adding attachment overrides for root vol, prim count " 
                                 << (S32) (1+volp->numChildren()) << LL_ENDL;
+#endif
             addAttachmentOverridesForObject(volp, &meshes_seen);
         }
     }
@@ -9099,15 +9105,19 @@ void LLVOAvatar::applyParsedAppearanceMessage(LLAppearanceMessageContents& conte
 			&& mBakedTextureDatas[baked_index].mLastTextureID != IMG_DEFAULT
 			&& baked_index != BAKED_SKIRT && baked_index != BAKED_LEFT_ARM && baked_index != BAKED_LEFT_LEG && baked_index != BAKED_AUX1 && baked_index != BAKED_AUX2 && baked_index != BAKED_AUX3)
 		{
+#if SHOW_DEBUG
 			LL_DEBUGS("Avatar") << avString() << " baked_index " << (S32) baked_index << " using mLastTextureID " << mBakedTextureDatas[baked_index].mLastTextureID << LL_ENDL;
+#endif
 			setTEImage(mBakedTextureDatas[baked_index].mTextureIndex, 
 				LLViewerTextureManager::getFetchedTexture(mBakedTextureDatas[baked_index].mLastTextureID, FTT_DEFAULT, TRUE, LLGLTexture::BOOST_NONE, LLViewerTexture::LOD_TEXTURE));
 		}
+#if SHOW_DEBUG
 		else
 		{
 			LL_DEBUGS("Avatar") << avString() << " baked_index " << (S32) baked_index << " using texture id "
 								<< getTE(mBakedTextureDatas[baked_index].mTextureIndex)->getID() << LL_ENDL;
 		}
+#endif
 	}
 
 	// runway - was
@@ -9159,12 +9169,14 @@ void LLVOAvatar::applyParsedAppearanceMessage(LLAppearanceMessageContents& conte
 		}
 		const S32 expected_tweakable_count = getVisualParamCountInGroup(VISUAL_PARAM_GROUP_TWEAKABLE) +
 											 getVisualParamCountInGroup(VISUAL_PARAM_GROUP_TRANSMIT_NOT_TWEAKABLE); // don't worry about VISUAL_PARAM_GROUP_TWEAKABLE_NO_TRANSMIT
+#if SHOW_DEBUG
 		if (num_params != expected_tweakable_count)
 		{
 			LL_DEBUGS("Avatar") << "Number of params in AvatarAppearance msg (" << num_params << ") does not match number of tweakable params in avatar xml file (" << expected_tweakable_count << ").  Processing what we can.  object: " << getID() << LL_ENDL;
 		}
 
 		LL_DEBUGS("Avatar") << "Changed " << params_changed_count << " params" << LL_ENDL;
+#endif
 		if (params_changed)
 		{
 			if (interp_params)
@@ -9185,7 +9197,9 @@ void LLVOAvatar::applyParsedAppearanceMessage(LLAppearanceMessageContents& conte
 	else
 	{
 		// AvatarAppearance message arrived without visual params
+#if SHOW_DEBUG
 		LL_DEBUGS("Avatar") << avString() << "no visual params" << LL_ENDL;
+#endif
 
 		const F32 LOADING_TIMEOUT_SECONDS = 60.f;
 		// this isn't really a problem if we already have a non-default shape
@@ -9513,7 +9527,9 @@ void dump_sequential_xml(const std::string outprefix, const LLSD& content)
 	std::string fullpath = gDirUtilp->getExpandedFilename(LL_PATH_LOGS,outfilename);
 	llofstream ofs(fullpath.c_str(), std::ios_base::out);
 	ofs << LLSDOStreamer<LLSDXMLFormatter>(content, LLSDFormatter::OPTIONS_PRETTY);
+#if SHOW_DEBUG
 	LL_DEBUGS("Avatar") << "results saved to: " << fullpath << LL_ENDL;
+#endif
 }
 
 void LLVOAvatar::getSortedJointNames(S32 joint_type, std::vector<std::string>& result) const
@@ -9852,7 +9868,9 @@ void LLVOAvatar::cullAvatarsByPixelArea()
 		if (inst->mCulled != culled)
 		{
 			inst->mCulled = culled;
+#if SHOW_DEBUG
 			LL_DEBUGS() << "avatar " << inst->getID() << (culled ? " start culled" : " start not culled" ) << LL_ENDL;
+#endif
 			inst->updateMeshTextures();
 		}
 
@@ -10222,9 +10240,11 @@ const U32 LLVOAvatar::IMPOSTORS_OFF = 66; /* Must equal the maximum allowed the 
 // static
 void LLVOAvatar::updateImpostorRendering(U32 newMaxNonImpostorsValue)
 {
+#if SHOW_DEBUG
 	U32  oldmax = sMaxNonImpostors;
 	bool oldflg = sUseImpostors;
-	
+#endif
+
 	if (IMPOSTORS_OFF <= newMaxNonImpostorsValue)
 	{
 		sMaxNonImpostors = 0;
@@ -10235,6 +10255,7 @@ void LLVOAvatar::updateImpostorRendering(U32 newMaxNonImpostorsValue)
 	}
 	// the sUseImpostors flag depends on whether or not sMaxNonImpostors is set to the no-limit value (0)
 	sUseImpostors = (0 != sMaxNonImpostors);
+#if SHOW_DEBUG
     if ( oldflg != sUseImpostors )
     {
         LL_DEBUGS("AvatarRender")
@@ -10242,6 +10263,7 @@ void LLVOAvatar::updateImpostorRendering(U32 newMaxNonImpostorsValue)
             << "now " << (sUseImpostors ? "use" : "don't use" ) << " impostors (max " << sMaxNonImpostors << "); "
             << LL_ENDL;
     }
+#endif
 }
 
 
@@ -10518,7 +10540,9 @@ void LLVOAvatar::calculateUpdateRenderComplexity()
 				}
 			}
 		}
+#if SHOW_DEBUG
         LL_DEBUGS("ARCdetail") << "Avatar body parts complexity: " << cost << LL_ENDL;
+#endif
 
         mAttachmentVisibleTriangleCount = 0;
         mAttachmentEstTriangleCount = 0.f;
@@ -10552,6 +10576,7 @@ void LLVOAvatar::calculateUpdateRenderComplexity()
 		// Diagnostic output to identify all avatar-related textures.
 		// Does not affect rendering cost calculation.
 		// Could be wrapped in a debug option if output becomes problematic.
+#if SHOW_DEBUG
 		static bool arch_detail_dbg_log = debugLoggingEnabled("ARCdetail");
 		if (isSelf() && arch_detail_dbg_log)
 		{
@@ -10601,6 +10626,8 @@ void LLVOAvatar::calculateUpdateRenderComplexity()
                                       << " reported " << mReportedVisualComplexity
                                       << LL_ENDL;
         }
+#endif
+
 		mVisualComplexity = cost;
 		mVisualComplexityStale = false;
 		static const F64 SECONDS_BETWEEN_COMPLEXITY_RECALC = 1.f;
@@ -10690,7 +10717,9 @@ void LLVOAvatar::calcMutedAVColor()
 
     if (mMutedAVColor != new_color) 
     {
+#if SHOW_DEBUG
         LL_DEBUGS("AvatarRender") << "avatar "<< av_id << change_msg << std::setprecision(3) << new_color << LL_ENDL;
+#endif
         mMutedAVColor = new_color;
     }
 }
