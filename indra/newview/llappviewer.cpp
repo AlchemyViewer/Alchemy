@@ -5233,7 +5233,7 @@ void LLAppViewer::idleNameCache()
 	// do it in the move-into-region code because cap not guaranteed to be
 	// granted yet, for example on teleport.
 	LLAvatarNameCache *name_cache = LLAvatarNameCache::getInstance();
-	bool had_capability = LLAvatarNameCache::getInstance()->hasNameLookupURL();
+	bool had_capability = name_cache->hasNameLookupURL();
 	std::string name_lookup_url;
 	name_lookup_url.reserve(128); // avoid a memory allocation below
 	name_lookup_url = region->getCapability("GetDisplayNames");
