@@ -209,7 +209,9 @@ bool LLMediaDataClient::isInQueue(const LLMediaDataClientObject::ptr_t &object)
 
 void LLMediaDataClient::removeFromQueue(const LLMediaDataClientObject::ptr_t &object)
 {
+#if SHOW_DEBUG
 	LL_DEBUGS("LLMediaDataClient") << "removing requests matching ID " << object->getID() << LL_ENDL;
+#endif
     PredicateMatchRequest upred(object->getID());
 
     mark_dead_and_remove_if(mQueue, upred);
@@ -220,7 +222,9 @@ void LLMediaDataClient::startQueueTimer()
 {
 	if (! mQueueTimerIsRunning)
 	{
+#if SHOW_DEBUG
 		LL_DEBUGS("LLMediaDataClient") << "starting queue timer (delay=" << mQueueTimerDelay << " seconds)" << LL_ENDL;
+#endif
 		// LLEventTimer automagically takes care of the lifetime of this object
 		new QueueTimer(mQueueTimerDelay, this);
 	}
@@ -239,14 +243,18 @@ bool LLMediaDataClient::processQueueTimer()
     if (isDoneProcessing())
 		return true;
 
+#if SHOW_DEBUG
 	LL_DEBUGS("LLMediaDataClient") << "QueueTimer::tick() started, queue size is:	  " << mQueue.size() << LL_ENDL;
 	LL_DEBUGS("LLMediaDataClientQueue") << "QueueTimer::tick() started, SORTED queue is:	  " << mQueue << LL_ENDL;
-			
+#endif	
+
 	serviceQueue();
     serviceHttp();
 
+#if SHOW_DEBUG
 	LL_DEBUGS("LLMediaDataClient") << "QueueTimer::tick() finished, queue size is:	  " << mQueue.size() << LL_ENDL;
 	LL_DEBUGS("LLMediaDataClientQueue") << "QueueTimer::tick() finished, SORTED queue is:	  " << mQueue << LL_ENDL;
+#endif
 	
     return isDoneProcessing();
 }
@@ -258,7 +266,9 @@ LLMediaDataClient::Request::ptr_t LLMediaDataClient::dequeue()
 	
 	if (queue_p->empty())
 	{
+#if SHOW_DEBUG
 		LL_DEBUGS("LLMediaDataClient") << "queue empty: " << (*queue_p) << LL_ENDL;
+#endif
 	}
 	else
 	{
@@ -564,7 +574,9 @@ void LLMediaDataClient::Request::updateScore()
 	F64 tmp = mObject->getMediaInterest();
 	if (tmp != mScore)
 	{
+#if SHOW_DEBUG
 		LL_DEBUGS("LLMediaDataClient") << "Score for " << mObject->getID() << " changed from " << mScore << " to " << tmp << LL_ENDL; 
+#endif
 		mScore = tmp;
 	}
 }
@@ -618,8 +630,9 @@ void LLMediaDataClient::Handler::onSuccess(LLCore::HttpResponse * response, cons
         LL_WARNS("LLMediaDataClient") << "dead request " << *mRequest << LL_ENDL;
         return;
     }
-
+#if SHOW_DEBUG
     LL_DEBUGS("LLMediaDataClientResponse") << *mRequest << LL_ENDL;
+#endif
 }
 
 void LLMediaDataClient::Handler::onFailure(LLCore::HttpResponse * response, LLCore::HttpStatus status)
@@ -721,13 +734,17 @@ void LLObjectMediaDataClient::enqueue(Request::ptr_t request)
 	static LLCachedControl<bool> audio_streaming_enabled(gSavedSettings, "AudioStreamingMedia", true);
 	if (!audio_streaming_enabled)
 	{
+#if SHOW_DEBUG
 		LL_DEBUGS("LLMediaDataClient") << "not queueing request when Media is disabled " << *request << LL_ENDL;
+#endif
 		return;
 	}
 
 	if(request->isDead())
 	{
+#if SHOW_DEBUG
 		LL_DEBUGS("LLMediaDataClient") << "not queueing dead request " << *request << LL_ENDL;
+#endif
 		return;
 	}
 
@@ -747,7 +764,9 @@ void LLObjectMediaDataClient::enqueue(Request::ptr_t request)
 
 		if( (iter != mRoundRobinQueue.end()) || (iter2 != mUnQueuedRequests.end()) )
 		{
+#if SHOW_DEBUG
 			LL_DEBUGS("LLMediaDataClient") << "ALREADY THERE: NOT Queuing request for " << *request << LL_ENDL;
+#endif
 
 			return;
 		}
@@ -765,26 +784,36 @@ void LLObjectMediaDataClient::enqueue(Request::ptr_t request)
 
 	if (is_new)
 	{
+#if SHOW_DEBUG
 		LL_DEBUGS("LLMediaDataClient") << "Queuing SORTED request for " << *request << LL_ENDL;
+#endif
 		
 		mQueue.push_back(request);
 		
+#if SHOW_DEBUG
 		LL_DEBUGS("LLMediaDataClientQueue") << "SORTED queue:" << mQueue << LL_ENDL;
+#endif
 	}
 	else
 	{
 		if (mRoundRobinQueue.size() > mMaxRoundRobinQueueSize) 
 		{
 			LL_INFOS_ONCE("LLMediaDataClient") << "RR QUEUE MAXED OUT!!!" << LL_ENDL;
+#if SHOW_DEBUG
 			LL_DEBUGS("LLMediaDataClient") << "Not queuing " << *request << LL_ENDL;
+#endif
 			return;
 		}
 				
+#if SHOW_DEBUG
 		LL_DEBUGS("LLMediaDataClient") << "Queuing RR request for " << *request << LL_ENDL;
+#endif
 		// Push the request on the pending queue
 		mRoundRobinQueue.push_back(request);
 		
+#if SHOW_DEBUG
 		LL_DEBUGS("LLMediaDataClientQueue") << "RR queue:" << mRoundRobinQueue << LL_ENDL;			
+#endif
 	}	
 	// Start the timer if not already running
 	startQueueTimer();
@@ -796,7 +825,9 @@ bool LLObjectMediaDataClient::canServiceRequest(Request::ptr_t request)
 	{
 		if(!request->getObject()->isInterestingEnough())
 		{
+#if SHOW_DEBUG
 			LL_DEBUGS("LLMediaDataClient") << "Not fetching " << *request << ": not interesting enough" << LL_ENDL;
+#endif
 			return false;
 		}
 	}
@@ -845,26 +876,32 @@ bool LLObjectMediaDataClient::processQueueTimer()
     if (isDoneProcessing())
 		return true;
 		
+#if SHOW_DEBUG
 	LL_DEBUGS("LLMediaDataClient") << "started, SORTED queue size is:	  " << mQueue.size() 
 		<< ", RR queue size is:	  " << mRoundRobinQueue.size() << LL_ENDL;
 	LL_DEBUGS("LLMediaDataClientQueue") << "    SORTED queue is:	  " << mQueue << LL_ENDL;
 	LL_DEBUGS("LLMediaDataClientQueue") << "    RR queue is:	  " << mRoundRobinQueue << LL_ENDL;
+#endif
 
 //	purgeDeadRequests();
 
 	sortQueue();
 
+#if SHOW_DEBUG
 	LL_DEBUGS("LLMediaDataClientQueue") << "after sort, SORTED queue is:	  " << mQueue << LL_ENDL;
+#endif
 	
 	serviceQueue();
     serviceHttp();
 
 	swapCurrentQueue();
 	
+#if SHOW_DEBUG
 	LL_DEBUGS("LLMediaDataClient") << "finished, SORTED queue size is:	  " << mQueue.size() 
 		<< ", RR queue size is:	  " << mRoundRobinQueue.size() << LL_ENDL;
 	LL_DEBUGS("LLMediaDataClientQueue") << "    SORTED queue is:	  " << mQueue << LL_ENDL;
 	LL_DEBUGS("LLMediaDataClientQueue") << "    RR queue is:	  " << mRoundRobinQueue << LL_ENDL;
+#endif
 	
     return isDoneProcessing();
 }
