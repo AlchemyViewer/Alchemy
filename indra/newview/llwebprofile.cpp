@@ -73,7 +73,9 @@ void LLWebProfile::uploadImage(LLPointer<LLImageFormatted> image, const std::str
 // static
 void LLWebProfile::setAuthCookie(const std::string& cookie)
 {
+#if SHOW_DEBUG
 	LL_DEBUGS("Snapshots") << "Setting auth cookie: " << cookie << LL_ENDL;
+#endif
 	sAuthCookie = cookie;
 }
 
@@ -118,7 +120,9 @@ void LLWebProfile::uploadImageCoro(LLPointer<LLImageFormatted> image, std::strin
     configUrl += "?caption=" + LLURI::escape(caption);
     configUrl += "&add_loc=" + std::string(addLocation ? "1" : "0");
 
+#if SHOW_DEBUG
     LL_DEBUGS("Snapshots") << "Requesting " << configUrl << LL_ENDL;
+#endif
 
     httpHeaders = buildDefaultHeaders();
     httpHeaders->append(HTTP_OUT_HEADER_COOKIE, getAuthCookie());
@@ -175,7 +179,9 @@ void LLWebProfile::uploadImageCoro(LLPointer<LLImageFormatted> image, std::strin
         LLWebProfile::reportImageUploadStatus(false);
     }
 
+#if SHOW_DEBUG
     LL_DEBUGS("Snapshots") << "Got redirection URL: " << redirUrl << LL_ENDL;
+#endif
 
     result = httpAdapter->getRawAndSuspend(httpRequest, redirUrl, httpOpts, httpHeaders);
 

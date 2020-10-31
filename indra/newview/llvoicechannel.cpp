@@ -648,12 +648,14 @@ void LLVoiceChannelGroup::voiceCallCapCoro(std::string url)
 
     result.erase(LLCoreHttpUtil::HttpCoroutineAdapter::HTTP_RESULTS);
 
+#if SHOW_DEBUG
     LLSD::map_const_iterator iter;
     for (iter = result.beginMap(); iter != result.endMap(); ++iter)
     {
         LL_DEBUGS("Voice") << "LLVoiceCallCapResponder::result got "
             << iter->first << LL_ENDL;
     }
+#endif
 
     channelp->setChannelInfo(
         result["voice_credentials"]["channel_uri"].asString(),

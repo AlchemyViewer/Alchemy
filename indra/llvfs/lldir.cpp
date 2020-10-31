@@ -527,10 +527,12 @@ std::string LLDir::getExpandedFilename(ELLPath location, const std::string& subd
 			// which to build this string), then intentionally return a blank
 			// string to the caller and skip the below warning about a blank
 			// prefix.
+#if SHOW_DEBUG
 			LL_DEBUGS("LLDir") << "getLindenUserDir() not yet set: "
 							   << ELLPathToString(location)
 							   << ", '" << subdir1 << "', '" << subdir2 << "', '" << in_filename
 							   << "' => ''" << LL_ENDL;
+#endif
 			return std::string();
 		}
 		break;

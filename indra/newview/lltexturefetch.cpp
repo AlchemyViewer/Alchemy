@@ -4001,8 +4001,10 @@ public:
 
 		if (status)
 		{
+#if SHOW_DEBUG
 			LL_DEBUGS(LOG_TXT) << "Successfully delivered asset metrics to grid."
 							   << LL_ENDL;
+#endif
 		}
 		else
 		{

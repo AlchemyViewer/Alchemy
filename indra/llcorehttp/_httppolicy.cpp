@@ -175,12 +175,14 @@ void HttpPolicy::retryOp(const HttpOpRequest::ptr_t &op)
 	{
 		++op->mPolicy503Retries;
 	}
+#if SHOW_DEBUG
 	LL_DEBUGS(LOG_CORE) << "HTTP request " << op->getHandle()
 						<< " retry " << op->mPolicyRetries
 						<< " scheduled in " << (delta / HttpTime(1000))
 						<< " mS (" << (external_delta ? "external" : "internal")
 						<< ").  Status:  " << op->mStatus.toTerseString()
 						<< LL_ENDL;
+#endif
 	if (op->mTracing > HTTP_TRACE_OFF)
 	{
 		LL_INFOS(LOG_CORE) << "TRACE, ToRetryQueue, Handle:  "

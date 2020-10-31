@@ -906,7 +906,9 @@ void AISUpdate::doUpdate()
 	for (std::map<LLUUID,S32>::const_iterator catit = mCatDescendentDeltas.begin();
 		 catit != mCatDescendentDeltas.end(); ++catit)
 	{
+#if SHOW_DEBUG
 		LL_DEBUGS("Inventory") << "descendant accounting for " << catit->first << LL_ENDL;
+#endif
 
 		const LLUUID cat_id(catit->first);
 		// Don't account for update if we just created this category.

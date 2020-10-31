@@ -387,14 +387,18 @@ private:
         XMLRPC_REQUEST response = mTransaction->response();
         if (! response)
         {
+#if SHOW_DEBUG
             LL_DEBUGS("LLXMLRPCListener") << "No response" << LL_ENDL;
+#endif
             return LLSD();
         }
 
         XMLRPC_VALUE param = XMLRPC_RequestGetData(response);
         if (! param)
         {
+#if SHOW_DEBUG
             LL_DEBUGS("LLXMLRPCListener") << "Response contains no data" << LL_ENDL;
+#endif
             return LLSD();
         }
 

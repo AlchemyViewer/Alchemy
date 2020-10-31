@@ -2708,9 +2708,11 @@ void LLViewerObject::interpolateLinearMotion(const F64SecondsImplicit& frame_tim
 			{
 				// Was clipped, so this means we hit a edge where there is no region to enter
 				LLVector3 clip_pos = mRegionp->getPosRegionFromGlobal(clip_pos_global);
+#if SHOW_DEBUG
 				LL_DEBUGS("Interpolate") << "Hit empty region edge, clipped predicted position to "
 										 << clip_pos
 										 << " from " << new_pos << LL_ENDL;
+#endif
 				new_pos = clip_pos;
 				
 				// Stop motion and get server update for bouncing on the edge
@@ -2728,14 +2730,18 @@ void LLViewerObject::interpolateLinearMotion(const F64SecondsImplicit& frame_tim
 					// Workaround: we can't accurately figure out time when we cross border
 					// so just write down time 'after the fact', it is far from optimal in
 					// case of lags, but for lags sMaxUpdateInterpolationTime will kick in first
+#if SHOW_DEBUG
 					LL_DEBUGS("Interpolate") << "Predicted region crossing, new position " << new_pos << LL_ENDL;
+#endif
 					mRegionCrossExpire = frame_time + sMaxRegionCrossingInterpolationTime;
 				}
 				else if (frame_time > mRegionCrossExpire)
 				{
 					// Predicting crossing over 1s, stop motion
 					// Stop motion
+#if SHOW_DEBUG
 					LL_DEBUGS("Interpolate") << "Predicting region crossing for too long, stopping at " << new_pos << LL_ENDL;
+#endif
 					new_v.clear();
 					setAcceleration(LLVector3::zero);
 					mRegionCrossExpire = 0;
@@ -3133,13 +3139,17 @@ void LLViewerObject::updateControlAvatar()
     if (should_have_control_avatar && !has_control_avatar)
     {
         std::string vobj_name = llformat("Vol%p", root);
+#if SHOW_DEBUG
         LL_DEBUGS("AnimatedObjects") << vobj_name << " calling linkControlAvatar()" << LL_ENDL;
+#endif
         root->linkControlAvatar();
     }
     if (!should_have_control_avatar && has_control_avatar)
     {
         std::string vobj_name = llformat("Vol%p", root);
+#if SHOW_DEBUG
         LL_DEBUGS("AnimatedObjects") << vobj_name << " calling unlinkControlAvatar()" << LL_ENDL;
+#endif
         root->unlinkControlAvatar();
     }
     if (getControlAvatar())
@@ -3163,9 +3173,11 @@ void LLViewerObject::linkControlAvatar()
             return;
         }
         mControlAvatar = LLControlAvatar::createControlAvatar(volp);
+#if SHOW_DEBUG
         LL_DEBUGS("AnimatedObjects") << volp->getID() 
                                      << " created control av for " 
                                      << (S32) (1+volp->numChildren()) << " prims" << LL_ENDL;
+#endif
     }
     LLControlAvatar *cav = getControlAvatar();
     if (cav)

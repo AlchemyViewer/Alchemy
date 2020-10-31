@@ -6753,7 +6753,9 @@ void LLVivoxVoiceClient::enablePreviewBuffer(bool enable)
 
 	if(mCaptureBufferMode && mIsInChannel)
 	{
+#if SHOW_DEBUG
 		LL_DEBUGS("Voice") << "no channel" << LL_ENDL;
+#endif
 		sessionTerminate();
 	}
 }
@@ -6762,7 +6764,9 @@ void LLVivoxVoiceClient::recordPreviewBuffer()
 {
 	if (!mCaptureBufferMode)
 	{
+#if SHOW_DEBUG
 		LL_DEBUGS("Voice") << "Not in voice effect preview mode, cannot start recording." << LL_ENDL;
+#endif
 		mCaptureBufferRecording = false;
 		return;
 	}
@@ -6777,7 +6781,9 @@ void LLVivoxVoiceClient::playPreviewBuffer(const LLUUID& effect_id)
 {
 	if (!mCaptureBufferMode)
 	{
+#if SHOW_DEBUG
 		LL_DEBUGS("Voice") << "Not in voice effect preview mode, no buffer to play." << LL_ENDL;
+#endif
 		mCaptureBufferRecording = false;
 		return;
 	}
@@ -6820,7 +6826,9 @@ void LLVivoxVoiceClient::captureBufferRecordStartSendMessage()
 	{
 		std::ostringstream stream;
 
+#if SHOW_DEBUG
 		LL_DEBUGS("Voice") << "Starting audio capture to buffer." << LL_ENDL;
+#endif
 
 		// Start capture
 		stream
@@ -6847,7 +6855,9 @@ void LLVivoxVoiceClient::captureBufferRecordStopSendMessage()
 	{
 		std::ostringstream stream;
 
+#if SHOW_DEBUG
 		LL_DEBUGS("Voice") << "Stopping audio capture to buffer." << LL_ENDL;
+#endif
 
 		// Mute the mic. Mic mute state was dirtied at recording start, so will be reset when finished previewing.
 		stream << "<Request requestId=\"" << mCommandCookie++ << "\" action=\"Connector.MuteLocalMic.1\">"
@@ -6876,10 +6886,14 @@ void LLVivoxVoiceClient::captureBufferPlayStartSendMessage(const LLUUID& voice_f
 
 		std::ostringstream stream;
 
+#if SHOW_DEBUG
 		LL_DEBUGS("Voice") << "Starting audio buffer playback." << LL_ENDL;
+#endif
 
 		S32 font_index = getVoiceFontTemplateIndex(voice_font_id);
+#if SHOW_DEBUG
 		LL_DEBUGS("Voice") << "With voice font: " << voice_font_id << " (" << font_index << ")" << LL_ENDL;
+#endif
 
 		stream
 		<< "<Request requestId=\"" << mCommandCookie++ << "\" action=\"Aux.PlayAudioBuffer.1\">"
@@ -6899,7 +6913,9 @@ void LLVivoxVoiceClient::captureBufferPlayStopSendMessage()
 	{
 		std::ostringstream stream;
 
+#if SHOW_DEBUG
 		LL_DEBUGS("Voice") << "Stopping audio buffer playback." << LL_ENDL;
+#endif
 
 		stream
 		<< "<Request requestId=\"" << mCommandCookie++ << "\" action=\"Aux.RenderAudioStop.1\">"
@@ -6989,14 +7005,18 @@ LLIOPipe::EStatus LLVivoxProtocolParser::process_impl(
 		XML_SetUserData(parser, this);	
 		XML_Parse(parser, mInput.data() + start, delim - start, false);
 		
+#if SHOW_DEBUG
         LL_DEBUGS("VivoxProtocolParser") << "parsing: " << mInput.substr(start, delim - start) << LL_ENDL;
+#endif
 		start = delim + 3;
 	}
 	
 	if(start != 0)
 		mInput = mInput.substr(start);
 	
+#if SHOW_DEBUG
 	LL_DEBUGS("VivoxProtocolParser") << "at end, mInput is: " << mInput << LL_ENDL;
+#endif
 	
 	if(!LLVivoxVoiceClient::getInstance()->mConnected)
 	{
@@ -7364,7 +7384,9 @@ LLDate LLVivoxProtocolParser::expiryTimeStampToLLDate(const std::string& vivox_t
 	std::string time_stamp = vivox_ts.substr(0, 10);
 	time_stamp += VOICE_FONT_EXPIRY_TIME;
 
+#if SHOW_DEBUG
 	LL_DEBUGS("VivoxProtocolParser") << "Vivox timestamp " << vivox_ts << " modified to: " << time_stamp << LL_ENDL;
+#endif
 
 	return LLDate(time_stamp);
 }
@@ -7373,8 +7395,10 @@ LLDate LLVivoxProtocolParser::expiryTimeStampToLLDate(const std::string& vivox_t
 
 void LLVivoxProtocolParser::processResponse(std::string tag)
 {
+#if SHOW_DEBUG
 	LL_DEBUGS("VivoxProtocolParser") << tag << LL_ENDL;
-	
+#endif
+
 	// SLIM SDK: the SDK now returns a statusCode of "200" (OK) for success.  This is a change vs. previous SDKs.
 	// According to Mike S., "The actual API convention is that responses with return codes of 0 are successful, regardless of the status code returned",
 	// so I believe this will give correct behavior.
@@ -7385,12 +7409,16 @@ void LLVivoxProtocolParser::processResponse(std::string tag)
 	if (isEvent)
 	{
 		const char *eventTypeCstr = eventTypeString.c_str();
+#if SHOW_DEBUG
         LL_DEBUGS("LowVoice") << eventTypeCstr << LL_ENDL;
+#endif
 
 		if (!stricmp(eventTypeCstr, "ParticipantUpdatedEvent"))
 		{
 			// These happen so often that logging them is pretty useless.
+#if SHOW_DEBUG
             LL_DEBUGS("LowVoice") << "Updated Params: " << sessionHandle << ", " << sessionGroupHandle << ", " << uriString << ", " << alias << ", " << isModeratorMuted << ", " << isSpeaking << ", " << volume << ", " << energy << LL_ENDL;
+#endif
             LLVivoxVoiceClient::getInstance()->participantUpdatedEvent(sessionHandle, sessionGroupHandle, uriString, alias, isModeratorMuted, isSpeaking, volume, energy);
 		}
 		else if (!stricmp(eventTypeCstr, "AccountLoginStateChangeEvent"))
@@ -7459,7 +7487,9 @@ void LLVivoxProtocolParser::processResponse(std::string tag)
 			 <ParticipantType>0</ParticipantType>
 			 </Event>
 			 */
+#if SHOW_DEBUG
             LL_DEBUGS("LowVoice") << "Added Params: " << sessionHandle << ", " << sessionGroupHandle << ", " << uriString << ", " << alias << ", " << nameString << ", " << displayNameString << ", " << participantType << LL_ENDL;
+#endif
 			LLVivoxVoiceClient::getInstance()->participantAddedEvent(sessionHandle, sessionGroupHandle, uriString, alias, nameString, displayNameString, participantType);
 		}
 		else if (!stricmp(eventTypeCstr, "ParticipantRemovedEvent"))
@@ -7472,7 +7502,9 @@ void LLVivoxProtocolParser::processResponse(std::string tag)
 			 <AccountName>xtx7YNV-3SGiG7rA1fo5Ndw==</AccountName>
 			 </Event>
 			 */
+#if SHOW_DEBUG
             LL_DEBUGS("LowVoice") << "Removed params:" << sessionHandle << ", " << sessionGroupHandle << ", " << uriString << ", " << alias << ", " << nameString << LL_ENDL;
+#endif
 
 			LLVivoxVoiceClient::getInstance()->participantRemovedEvent(sessionHandle, sessionGroupHandle, uriString, alias, nameString);
 		}
@@ -7539,7 +7571,9 @@ void LLVivoxProtocolParser::processResponse(std::string tag)
 	else
 	{
 		const char *actionCstr = actionString.c_str();
+#if SHOW_DEBUG
         LL_DEBUGS("LowVoice") << actionCstr << LL_ENDL;
+#endif
 
 		if (!stricmp(actionCstr, "Session.Set3DPosition.1"))
 		{

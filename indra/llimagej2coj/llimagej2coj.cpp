@@ -174,7 +174,9 @@ bool LLImageJ2COJ::decodeImpl(LLImageJ2C &base, LLImageRaw &raw_image, F32 decod
 	// dereference the array.
 	if(!image || !image->numcomps)
 	{
+#if SHOW_DEBUG
 		LL_DEBUGS("Texture") << "ERROR -> decodeImpl: failed to decode image!" << LL_ENDL;
+#endif
 		if (image)
 		{
 			opj_image_destroy(image);
@@ -251,7 +253,9 @@ bool LLImageJ2COJ::decodeImpl(LLImageJ2C &base, LLImageRaw &raw_image, F32 decod
 		}
 		else // Some rare OpenJPEG versions have this bug.
 		{
+#if SHOW_DEBUG
 			LL_DEBUGS("Texture") << "ERROR -> decodeImpl: failed to decode image! (NULL comp data - OpenJPEG bug)" << LL_ENDL;
+#endif
 			opj_image_destroy(image);
 			base.decodeFailed();
 			return true; // done

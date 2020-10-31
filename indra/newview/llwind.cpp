@@ -71,7 +71,9 @@ LLWind::~LLWind()
 
 void LLWind::init()
 {
+#if SHOW_DEBUG
 	LL_DEBUGS("Wind") << "initializing wind size: "<< mSize << LL_ENDL;
+#endif
 	
 	// Initialize vector data
 	mVelX = new F32[mSize*mSize];
