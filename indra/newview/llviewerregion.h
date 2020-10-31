@@ -263,8 +263,8 @@ public:
 	void setCapabilityDebug(const std::string& name, const std::string& url);
 	bool isCapabilityAvailable(std::string_view name) const;
 	// implements LLCapabilityProvider
-    virtual std::string getCapability(std::string_view name) const;
-    std::string getCapabilityDebug(std::string_view name) const;
+    virtual const std::string& getCapability(std::string_view name) const;
+    const std::string& getCapabilityDebug(std::string_view name) const;
 
 
 	// has region received its final (not seed) capability list?

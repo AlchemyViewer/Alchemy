@@ -1049,10 +1049,10 @@ BOOL LLAgent::inPrelude()
 }
 
 
-std::string LLAgent::getRegionCapability(std::string_view name)
+const std::string& LLAgent::getRegionCapability(std::string_view name) const
 {
     if (!mRegionp)
-        return std::string();
+        return LLStringUtil::null;
     
     return mRegionp->getCapability(name);
 }

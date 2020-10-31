@@ -274,7 +274,7 @@ public:
 	BOOL			inPrelude();
 
     // Capability 
-    std::string     getRegionCapability(std::string_view name); // short hand for if (getRegion()) { getRegion()->getCapability(name) }
+    const std::string&     getRegionCapability(std::string_view name) const; // short hand for if (getRegion()) { getRegion()->getCapability(name) }
 
 	/**
 	 * Register a boost callback to be called when the agent changes regions

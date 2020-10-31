@@ -393,7 +393,7 @@ void LLViewerRegionImpl::requestBaseCapabilitiesCompleteCoro(U64 regionHandle)
             break; // this error condition is not recoverable.
         }
 
-        std::string url = regionp->getCapabilityDebug("Seed");
+        const std::string& url = regionp->getCapabilityDebug("Seed");
         if (url.empty())
         {
             LL_WARNS("AppInit", "Capabilities") << "Failed to get seed capabilities, and can not determine url!" << LL_ENDL;
@@ -434,10 +434,9 @@ void LLViewerRegionImpl::requestBaseCapabilitiesCompleteCoro(U64 regionHandle)
         // remove the http_result from the llsd
         result.erase("http_result");
 
-        LLSD::map_const_iterator iter;
-        for (iter = result.beginMap(); iter != result.endMap(); ++iter)
+         for (const auto& llsd_pair : result.map())
         {
-            regionp->setCapabilityDebug(iter->first, iter->second);
+            regionp->setCapabilityDebug(llsd_pair.first, llsd_pair.second);
             //LL_INFOS()<<"BaseCapabilitiesCompleteTracker New Caps "<<iter->first<<" "<< iter->second<<LL_ENDL;
         }
 
@@ -3142,12 +3141,12 @@ void LLViewerRegion::setCapabilityDebug(const std::string& name, const std::stri
 	}
 }
 
-std::string LLViewerRegion::getCapabilityDebug(std::string_view name) const
+const std::string& LLViewerRegion::getCapabilityDebug(std::string_view name) const
 {
     CapabilityMap::const_iterator iter = mImpl->mSecondCapabilitiesTracker.find(name);
     if (iter == mImpl->mSecondCapabilitiesTracker.end())
     {
-        return "";
+        return LLStringUtil::null;
     }
 
     return iter->second;
@@ -3159,7 +3158,7 @@ bool LLViewerRegion::isSpecialCapabilityName(std::string_view name)
 	return name == "EventQueueGet" || name == "UntrustedSimulatorMessage";
 }
 
-std::string LLViewerRegion::getCapability(std::string_view name) const
+const std::string& LLViewerRegion::getCapability(std::string_view name) const
 {
 	using namespace std::string_view_literals;
 	if (!capabilitiesReceived() && (name != "Seed"sv) && (name != "ObjectMedia"sv))
@@ -3170,7 +3169,7 @@ std::string LLViewerRegion::getCapability(std::string_view name) const
 	CapabilityMap::const_iterator iter = mImpl->mCapabilities.find(name);
 	if(iter == mImpl->mCapabilities.end())
 	{
-		return "";
+		return LLStringUtil::null;
 	}
 
 	return iter->second;
