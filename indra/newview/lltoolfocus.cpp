@@ -356,7 +356,9 @@ BOOL LLToolCamera::handleHover(S32 x, S32 y, MASK mask)
 	{
 		if (!mValidClickPoint)
 		{
+#if SHOW_DEBUG
 			LL_DEBUGS("UserInput") << "hover handled by LLToolFocus [invalid point]" << LL_ENDL;
+#endif
 			gViewerWindow->setCursor(UI_CURSOR_NO);
 			gViewerWindow->showCursor();
 			return TRUE;
@@ -383,7 +385,9 @@ BOOL LLToolCamera::handleHover(S32 x, S32 y, MASK mask)
 
 				gViewerWindow->moveCursorToCenter();
 			}
+#if SHOW_DEBUG
 			LL_DEBUGS("UserInput") << "hover handled by LLToolFocus [active]" << LL_ENDL;
+#endif
 		}
 		else if (	gCameraBtnPan ||
 					mask == MASK_PAN ||
@@ -411,7 +415,9 @@ BOOL LLToolCamera::handleHover(S32 x, S32 y, MASK mask)
 
 				gViewerWindow->moveCursorToCenter();
 			}
+#if SHOW_DEBUG
 			LL_DEBUGS("UserInput") << "hover handled by LLToolPan" << LL_ENDL;
+#endif
 		}
 		else if (gCameraBtnZoom)
 		{
@@ -443,7 +449,9 @@ BOOL LLToolCamera::handleHover(S32 x, S32 y, MASK mask)
 				gViewerWindow->moveCursorToCenter();
 			}
 
-			LL_DEBUGS("UserInput") << "hover handled by LLToolZoom" << LL_ENDL;		
+#if SHOW_DEBUG
+			LL_DEBUGS("UserInput") << "hover handled by LLToolZoom" << LL_ENDL;	
+#endif
 		}
 	}
 

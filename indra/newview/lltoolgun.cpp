@@ -143,12 +143,16 @@ BOOL LLToolGun::handleHover(S32 x, S32 y, MASK mask)
 			gViewerWindow->hideCursor();
 		}
 
+#if SHOW_DEBUG
 		LL_DEBUGS("UserInput") << "hover handled by LLToolGun (mouselook)" << LL_ENDL;
+#endif
 	}
+#if SHOW_DEBUG
 	else
 	{
 		LL_DEBUGS("UserInput") << "hover handled by LLToolGun (not mouselook)" << LL_ENDL;
 	}
+#endif
 
 	// HACK to avoid assert: error checking system makes sure that the cursor is set during every handleHover.  This is actually a no-op since the cursor is hidden.
 	gViewerWindow->setCursor(UI_CURSOR_ARROW);  

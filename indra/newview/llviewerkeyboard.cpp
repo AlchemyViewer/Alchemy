@@ -727,7 +727,9 @@ BOOL LLViewerKeyboard::handleKey(KEY translated_key,  MASK translated_mask, BOOL
 		return FALSE;
 	}
 
+#if SHOW_DEBUG
 	LL_DEBUGS("UserInput") << "keydown -" << translated_key << "-" << LL_ENDL;
+#endif
 	// skip skipped keys
 	if(mKeysSkippedByUI.find(translated_key) != mKeysSkippedByUI.end()) 
 	{

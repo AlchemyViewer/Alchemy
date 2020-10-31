@@ -365,13 +365,17 @@ BOOL LLDragHandle::handleHover(S32 x, S32 y, MASK mask)
 		mDragLastScreenY += delta_y;
 
 		getWindow()->setCursor(UI_CURSOR_ARROW);
+#if SHOW_DEBUG
 		LL_DEBUGS("UserInput") << "hover handled by " << getName() << " (active)" <<LL_ENDL;		
+#endif
 		handled = TRUE;
 	}
 	else
 	{
 		getWindow()->setCursor(UI_CURSOR_ARROW);
+#if SHOW_DEBUG
 		LL_DEBUGS("UserInput") << "hover handled by " << getName() << " (inactive)" << LL_ENDL;		
+#endif
 		handled = TRUE;
 	}
 

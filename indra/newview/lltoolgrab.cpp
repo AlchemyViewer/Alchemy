@@ -762,7 +762,9 @@ void LLToolGrabBase::handleHoverActive(S32 x, S32 y, MASK mask)
 	// HACK to avoid assert: error checking system makes sure that the cursor is set during every handleHover.  This is actually a no-op since the cursor is hidden.
 	gViewerWindow->setCursor(UI_CURSOR_ARROW);  
 
-	LL_DEBUGS("UserInput") << "hover handled by LLToolGrab (active) [cursor hidden]" << LL_ENDL;		
+#if SHOW_DEBUG
+	LL_DEBUGS("UserInput") << "hover handled by LLToolGrab (active) [cursor hidden]" << LL_ENDL;	
+#endif
 }
  
 
@@ -927,7 +929,9 @@ void LLToolGrabBase::handleHoverNonPhysical(S32 x, S32 y, MASK mask)
 void LLToolGrabBase::handleHoverInactive(S32 x, S32 y, MASK mask)
 {
 	// JC - TODO - change cursor based on gGrabBtnVertical, gGrabBtnSpin
+#if SHOW_DEBUG
 	LL_DEBUGS("UserInput") << "hover handled by LLToolGrab (inactive-not over editable object)" << LL_ENDL;		
+#endif
 	gViewerWindow->setCursor(UI_CURSOR_TOOLGRAB);
 }
 
@@ -937,7 +941,9 @@ void LLToolGrabBase::handleHoverFailed(S32 x, S32 y, MASK mask)
 	if( GRAB_NOOBJECT == mMode )
 	{
 		gViewerWindow->setCursor(UI_CURSOR_NO);
-		LL_DEBUGS("UserInput") << "hover handled by LLToolGrab (not on object)" << LL_ENDL;		
+#if SHOW_DEBUG
+		LL_DEBUGS("UserInput") << "hover handled by LLToolGrab (not on object)" << LL_ENDL;	
+#endif
 	}
 	else
 	{
@@ -950,7 +956,9 @@ void LLToolGrabBase::handleHoverFailed(S32 x, S32 y, MASK mask)
 			{
 			case GRAB_LOCKED:
 				gViewerWindow->setCursor(UI_CURSOR_GRABLOCKED);
+#if SHOW_DEBUG
 				LL_DEBUGS("UserInput") << "hover handled by LLToolGrab (grab failed, no move permission)" << LL_ENDL;		
+#endif
 				break;
 
 //  Non physical now handled by handleHoverActive - CRO				
@@ -965,7 +973,9 @@ void LLToolGrabBase::handleHoverFailed(S32 x, S32 y, MASK mask)
 		else
 		{
 			gViewerWindow->setCursor(UI_CURSOR_ARROW);
+#if SHOW_DEBUG
 			LL_DEBUGS("UserInput") << "hover handled by LLToolGrab (grab failed but within slop)" << LL_ENDL;		
+#endif
 		}
 	}
 }

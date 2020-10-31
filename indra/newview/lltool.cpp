@@ -103,7 +103,9 @@ BOOL LLTool::handleMouseUp(S32 x, S32 y, MASK mask)
 BOOL LLTool::handleHover(S32 x, S32 y, MASK mask)
 {
 	gViewerWindow->setCursor(UI_CURSOR_ARROW);
+#if SHOW_DEBUG
 	LL_DEBUGS("UserInput") << "hover handled by a tool" << LL_ENDL;		
+#endif
 	// by default, do nothing, say we handled it
 	return TRUE;
 }

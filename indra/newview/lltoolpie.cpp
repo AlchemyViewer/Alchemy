@@ -710,7 +710,9 @@ BOOL LLToolPie::handleHover(S32 x, S32 y, MASK mask)
 		// could disable it here.
 		show_highlight = true;
 		// cursor set by media object
+#if SHOW_DEBUG
 		LL_DEBUGS("UserInput") << "hover handled by LLToolPie (inactive)" << LL_ENDL;
+#endif
 	}
 	else if (!mMouseOutsideSlop 
 		&& mMouseButtonDown 
@@ -748,7 +750,9 @@ BOOL LLToolPie::handleHover(S32 x, S32 y, MASK mask)
 			show_highlight = true;
 			ECursorType cursor = cursorFromObject(click_action_object);
 			gViewerWindow->setCursor(cursor);
+#if SHOW_DEBUG
 			LL_DEBUGS("UserInput") << "hover handled by LLToolPie (inactive)" << LL_ENDL;
+#endif
 		}
 // [RLVa:KB] - Checked: RLVa-1.1.0
 		else if ( (object) && (RlvActions::isRlvEnabled()) && (!RlvActions::canTouch(object, mHoverPick.mObjectOffset)) )
@@ -762,19 +766,25 @@ BOOL LLToolPie::handleHover(S32 x, S32 y, MASK mask)
 		{
 			show_highlight = true;
 			gViewerWindow->setCursor(UI_CURSOR_TOOLGRAB);
+#if SHOW_DEBUG
 			LL_DEBUGS("UserInput") << "hover handled by LLToolPie (inactive)" << LL_ENDL;
+#endif
 		}
 		else if ((!object || !object->isAttachment() || object->getClickAction() != CLICK_ACTION_DISABLED)
 				 && ((object && object->flagHandleTouch()) || (parent && parent->flagHandleTouch())))
 		{
 			show_highlight = true;
 			gViewerWindow->setCursor(UI_CURSOR_HAND);
+#if SHOW_DEBUG
 			LL_DEBUGS("UserInput") << "hover handled by LLToolPie (inactive)" << LL_ENDL;
+#endif
 		}
 		else
 		{
 			gViewerWindow->setCursor(UI_CURSOR_ARROW);
+#if SHOW_DEBUG
 			LL_DEBUGS("UserInput") << "hover handled by LLToolPie (inactive)" << LL_ENDL;
+#endif
 		}
 	}
 

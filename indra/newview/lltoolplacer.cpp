@@ -545,7 +545,9 @@ BOOL LLToolPlacer::placeObject(S32 x, S32 y, MASK mask)
 
 BOOL LLToolPlacer::handleHover(S32 x, S32 y, MASK mask)
 {
-	LL_DEBUGS("UserInput") << "hover handled by LLToolPlacer" << LL_ENDL;		
+#if SHOW_DEBUG
+	LL_DEBUGS("UserInput") << "hover handled by LLToolPlacer" << LL_ENDL;	
+#endif
 	gViewerWindow->setCursor(UI_CURSOR_TOOLCREATE);
 	return TRUE;
 }
