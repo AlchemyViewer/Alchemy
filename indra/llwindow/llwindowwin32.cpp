@@ -2061,7 +2061,7 @@ LRESULT CALLBACK LLWindowWin32::mainWindowProc(HWND h_wnd, UINT u_msg, WPARAM w_
 
 	LLWindowWin32 *window_imp = (LLWindowWin32 *)GetWindowLongPtr( h_wnd, GWLP_USERDATA );
 
-	bool debug_window_proc = gDebugWindowProc || debugLoggingEnabled("Window");
+	bool debug_window_proc = gDebugWindowProc;
 
 
 	if (NULL != window_imp)
