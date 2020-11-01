@@ -115,9 +115,9 @@ variables:
       when: never
     - if: '$CI_PIPELINE_SOURCE == "web"'
     - if: '$CI_PIPELINE_SOURCE == "schedule"'
-    - if: '$CI_PIPELINE_SOURCE == "push"'
-      when: delayed
-      start_in: '12 hours'
+    #- if: '$CI_COMMIT_BRANCH == "master" && $CI_PIPELINE_SOURCE == "push"'
+    #  when: delayed
+    #  start_in: '12 hours'
   variables:
     VIEWER_CHANNEL_TYPE: Test
     VIEWER_USE_CRASHPAD: "FALSE"
