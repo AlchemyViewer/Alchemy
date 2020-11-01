@@ -201,12 +201,10 @@ void LLAvatarAppearance::initInstance()
 	mRoot = createAvatarJoint();
 	mRoot->setName( "mRoot" );
 
-	for (LLAvatarAppearanceDictionary::MeshEntries::const_iterator iter = LLAvatarAppearanceDictionary::getInstance()->getMeshEntries().begin();
-		 iter != LLAvatarAppearanceDictionary::getInstance()->getMeshEntries().end();
-		 ++iter)
+	for (const auto& mesh_entry_pair : LLAvatarAppearanceDictionary::getInstance()->getMeshEntries())
 	{
-		const EMeshIndex mesh_index = iter->first;
-		const LLAvatarAppearanceDictionary::MeshEntry *mesh_dict = iter->second;
+		const EMeshIndex mesh_index = mesh_entry_pair.first;
+		const LLAvatarAppearanceDictionary::MeshEntry *mesh_dict = mesh_entry_pair.second;
 		LLAvatarJoint* joint = createAvatarJoint();
 		joint->setName(mesh_dict->mName);
 		joint->setMeshID(mesh_index);
@@ -247,21 +245,16 @@ void LLAvatarAppearance::initInstance()
 	//-------------------------------------------------------------------------
 	// associate baked textures with meshes
 	//-------------------------------------------------------------------------
-	for (LLAvatarAppearanceDictionary::MeshEntries::const_iterator iter = LLAvatarAppearanceDictionary::getInstance()->getMeshEntries().begin();
-		 iter != LLAvatarAppearanceDictionary::getInstance()->getMeshEntries().end();
-		 ++iter)
+	for (const auto& mesh_entry_pair : LLAvatarAppearanceDictionary::getInstance()->getMeshEntries())
 	{
-		const EMeshIndex mesh_index = iter->first;
-		const LLAvatarAppearanceDictionary::MeshEntry *mesh_dict = iter->second;
+		const EMeshIndex mesh_index = mesh_entry_pair.first;
+		const LLAvatarAppearanceDictionary::MeshEntry *mesh_dict = mesh_entry_pair.second;
 		const EBakedTextureIndex baked_texture_index = mesh_dict->mBakedID;
 		// Skip it if there's no associated baked texture.
 		if (baked_texture_index == BAKED_NUM_INDICES) continue;
 		
-		for (avatar_joint_mesh_list_t::iterator iter = mMeshLOD[mesh_index]->mMeshParts.begin();
-			 iter != mMeshLOD[mesh_index]->mMeshParts.end(); 
-			 ++iter)
+		for (LLAvatarJointMesh* mesh : mMeshLOD[mesh_index]->mMeshParts)
 		{
-			LLAvatarJointMesh* mesh = (*iter);
 			mBakedTextureDatas[(S32)baked_texture_index].mJointMeshes.push_back(mesh);
 		}
 	}
@@ -1127,12 +1120,10 @@ BOOL LLAvatarAppearance::loadMeshNodes()
 			switch(lod)
 			  case 0:
 				mesh = &mHairMesh0; */
-		for (LLAvatarAppearanceDictionary::MeshEntries::const_iterator mesh_iter = LLAvatarAppearanceDictionary::getInstance()->getMeshEntries().begin();
-			 mesh_iter != LLAvatarAppearanceDictionary::getInstance()->getMeshEntries().end();
-			 ++mesh_iter)
+		for (const auto& mesh_entry_pair : LLAvatarAppearanceDictionary::getInstance()->getMeshEntries())
 		{
-			const EMeshIndex mesh_index = mesh_iter->first;
-			const LLAvatarAppearanceDictionary::MeshEntry *mesh_dict = mesh_iter->second;
+			const EMeshIndex mesh_index = mesh_entry_pair.first;
+			const LLAvatarAppearanceDictionary::MeshEntry *mesh_dict = mesh_entry_pair.second;
 			if (type.compare(mesh_dict->mName) == 0)
 			{
 				mesh_id = mesh_index;
@@ -1256,14 +1247,12 @@ BOOL LLAvatarAppearance::loadLayersets()
 
 			// scan baked textures and associate the layerset with the appropriate one
 			EBakedTextureIndex baked_index = BAKED_NUM_INDICES;
-			for (LLAvatarAppearanceDictionary::BakedTextures::const_iterator baked_iter = LLAvatarAppearanceDictionary::getInstance()->getBakedTextures().begin();
-				 baked_iter != LLAvatarAppearanceDictionary::getInstance()->getBakedTextures().end();
-				 ++baked_iter)
+			for (const auto& baked_tex_pair : LLAvatarAppearanceDictionary::getInstance()->getBakedTextures())
 			{
-				const LLAvatarAppearanceDictionary::BakedEntry *baked_dict = baked_iter->second;
+				const LLAvatarAppearanceDictionary::BakedEntry *baked_dict = baked_tex_pair.second;
 				if (layer_set->isBodyRegion(baked_dict->mName))
 				{
-					baked_index = baked_iter->first;
+					baked_index = baked_tex_pair.first;
 					// ensure both structures are aware of each other
 					mBakedTextureDatas[baked_index].mTexLayerSet = layer_set;
 					layer_set->setBakedTexIndex(baked_index);

@@ -547,7 +547,8 @@ void LLPanelGroupSubTab::buildActionsList(LLScrollListCtrl* ctrl,
 										  BOOL filter,
 										  BOOL is_owner_role)
 {
-	if (LLGroupMgr::getInstance()->mRoleActionSets.empty())
+	auto& group_manager = LLGroupMgr::instance();
+	if (group_manager.mRoleActionSets.empty())
 	{
 		LL_WARNS() << "Can't build action list - no actions found." << LL_ENDL;
 		return;
@@ -555,14 +556,12 @@ void LLPanelGroupSubTab::buildActionsList(LLScrollListCtrl* ctrl,
 
 	mHasGroupBanPower = false;
 
-	std::vector<LLRoleActionSet*>::iterator ras_it = LLGroupMgr::getInstance()->mRoleActionSets.begin();
-	std::vector<LLRoleActionSet*>::iterator ras_end = LLGroupMgr::getInstance()->mRoleActionSets.end();
-	for ( ; ras_it != ras_end; ++ras_it)
+	for (LLRoleActionSet* ras : group_manager.mRoleActionSets)
 	{
 		buildActionCategory(ctrl,
 							allowed_by_some,
 							allowed_by_all,
-							(*ras_it),
+							ras,
 							commit_callback,
 							show_all,
 							filter,

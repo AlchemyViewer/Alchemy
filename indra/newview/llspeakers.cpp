@@ -359,11 +359,13 @@ void LLSpeakerMgr::initVoiceModerateMode()
 
 void LLSpeakerMgr::update(BOOL resort_ok)
 {
-	if (!LLVoiceClient::getInstance())
+	if (!LLVoiceClient::instanceExists())
 	{
 		return;
 	}
 	
+	auto& voice_client = LLVoiceClient::instance();
+
 	static const LLUIColor speaking_color = LLUIColorTable::instance().getColor("SpeakingColor");
 	static const LLUIColor overdriven_color = LLUIColorTable::instance().getColor("OverdrivenColor");
 
@@ -373,16 +375,16 @@ void LLSpeakerMgr::update(BOOL resort_ok)
 	}
 
 	// update status of all current speakers
-	BOOL voice_channel_active = (!mVoiceChannel && LLVoiceClient::getInstance()->inProximalChannel()) || (mVoiceChannel && mVoiceChannel->isActive());
-	for (speaker_map_t::iterator speaker_it = mSpeakers.begin(); speaker_it != mSpeakers.end(); speaker_it++)
+	BOOL voice_channel_active = (!mVoiceChannel && voice_client.inProximalChannel()) || (mVoiceChannel && mVoiceChannel->isActive());
+	for (const auto& speaker_pair : mSpeakers)
 	{
-		LLUUID speaker_id = speaker_it->first;
-		LLSpeaker* speakerp = speaker_it->second;
+		const LLUUID& speaker_id = speaker_pair.first;
+		LLSpeaker* speakerp = speaker_pair.second;
 
-		if (voice_channel_active && LLVoiceClient::getInstance()->getVoiceEnabled(speaker_id))
+		if (voice_channel_active && voice_client.getVoiceEnabled(speaker_id))
 		{
-			speakerp->mSpeechVolume = LLVoiceClient::getInstance()->getCurrentPower(speaker_id);
-			BOOL moderator_muted_voice = LLVoiceClient::getInstance()->getIsModeratorMuted(speaker_id);
+			speakerp->mSpeechVolume = voice_client.getCurrentPower(speaker_id);
+			BOOL moderator_muted_voice = voice_client.getIsModeratorMuted(speaker_id);
 			if (moderator_muted_voice != speakerp->mModeratorMutedVoice)
 			{
 				speakerp->mModeratorMutedVoice = moderator_muted_voice;
@@ -390,11 +392,11 @@ void LLSpeakerMgr::update(BOOL resort_ok)
 				speakerp->fireEvent(new LLSpeakerVoiceModerationEvent(speakerp));
 			}
 
-			if (LLVoiceClient::getInstance()->getOnMuteList(speaker_id) || speakerp->mModeratorMutedVoice)
+			if (voice_client.getOnMuteList(speaker_id) || speakerp->mModeratorMutedVoice)
 			{
 				speakerp->mStatus = LLSpeaker::STATUS_MUTED;
 			}
-			else if (LLVoiceClient::getInstance()->getIsSpeaking(speaker_id))
+			else if (voice_client.getIsSpeaking(speaker_id))
 			{
 				// reset inactivity expiration
 				if (speakerp->mStatus != LLSpeaker::STATUS_SPEAKING)
@@ -457,11 +459,8 @@ void LLSpeakerMgr::update(BOOL resort_ok)
 	S32 recent_speaker_count = 0;
 	S32 sort_index = 0;
 	speaker_list_t::iterator sorted_speaker_it;
-	for(sorted_speaker_it = mSpeakersSorted.begin(); 
-		sorted_speaker_it != mSpeakersSorted.end(); ++sorted_speaker_it)
+	for(LLPointer<LLSpeaker> speakerp : mSpeakersSorted)
 	{
-		LLPointer<LLSpeaker> speakerp = *sorted_speaker_it;
-		
 		// color code recent speakers who are not currently speaking
 		if (speakerp->mStatus == LLSpeaker::STATUS_HAS_SPOKEN)
 		{
@@ -477,17 +476,18 @@ void LLSpeakerMgr::update(BOOL resort_ok)
 void LLSpeakerMgr::updateSpeakerList()
 {
 	// Are we bound to the currently active voice channel?
-	if ((!mVoiceChannel && LLVoiceClient::getInstance()->inProximalChannel()) || (mVoiceChannel && mVoiceChannel->isActive()))
+	auto& voice_client = LLVoiceClient::instance();
+	if ((!mVoiceChannel && voice_client.inProximalChannel()) || (mVoiceChannel && mVoiceChannel->isActive()))
 	{
 		std::set<LLUUID> participants;
-		LLVoiceClient::getInstance()->getParticipantList(participants);
+		voice_client.getParticipantList(participants);
 		// If we are, add all voice client participants to our list of known speakers
 		for (std::set<LLUUID>::iterator participant_it = participants.begin(); participant_it != participants.end(); ++participant_it)
 		{
 				setSpeaker(*participant_it, 
-						   LLVoiceClient::getInstance()->getDisplayName(*participant_it),
+						   voice_client.getDisplayName(*participant_it),
 						   LLSpeaker::STATUS_VOICE_ACTIVE, 
-						   (LLVoiceClient::getInstance()->isParticipantAvatar(*participant_it)?LLSpeaker::SPEAKER_AGENT:LLSpeaker::SPEAKER_EXTERNAL));
+						   (voice_client.isParticipantAvatar(*participant_it)?LLSpeaker::SPEAKER_AGENT:LLSpeaker::SPEAKER_EXTERNAL));
 		}
 	}
 	else 

@@ -313,7 +313,7 @@ std::string LLPanelVoiceDeviceSettings::getLocalizedDeviceName(const std::string
 
 void LLPanelVoiceDeviceSettings::onCommitInputDevice()
 {
-	if(LLVoiceClient::getInstance())
+	if(LLVoiceClient::instanceExists())
 	{
 		mInputDevice = mCtrlInputDevices->getValue().asString();
 		LLVoiceClient::getInstance()->setRenderDevice(mInputDevice);
@@ -322,7 +322,7 @@ void LLPanelVoiceDeviceSettings::onCommitInputDevice()
 
 void LLPanelVoiceDeviceSettings::onCommitOutputDevice()
 {
-	if(LLVoiceClient::getInstance())
+	if(LLVoiceClient::instanceExists())
 	{
 		
 		mOutputDevice = mCtrlOutputDevices->getValue().asString(); 

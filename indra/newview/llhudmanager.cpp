@@ -154,25 +154,27 @@ void LLHUDManager::processViewerEffect(LLMessageSystem *mesgsys, void **user_dat
 	S32 number_blocks = mesgsys->getNumberOfBlocksFast(_PREHASH_Effect);
 	S32 k;
 
+	auto& hudMgr = LLHUDManager::instance();
+
 	for (k = 0; k < number_blocks; k++)
 	{
 		effectp = NULL;
 		LLHUDEffect::getIDType(mesgsys, k, effect_id, effect_type);
 		S32 i;
-		for (i = 0; i < LLHUDManager::getInstance()->mHUDEffects.size(); i++)
+		for (i = 0; i < hudMgr.mHUDEffects.size(); i++)
 		{
-			LLHUDEffect *cur_effectp = LLHUDManager::getInstance()->mHUDEffects[i];
+			LLHUDEffect *cur_effectp = hudMgr.mHUDEffects[i];
 			if (!cur_effectp)
 			{
 				LL_WARNS() << "Null effect in effect manager, skipping" << LL_ENDL;
-				LLHUDManager::getInstance()->mHUDEffects.erase(LLHUDManager::getInstance()->mHUDEffects.begin() + i);
+				hudMgr.mHUDEffects.erase(hudMgr.mHUDEffects.begin() + i);
 				i--;
 				continue;
 			}
 			if (cur_effectp->isDead())
 			{
 	//			LL_WARNS() << "Dead effect in effect manager, removing" << LL_ENDL;
-				LLHUDManager::getInstance()->mHUDEffects.erase(LLHUDManager::getInstance()->mHUDEffects.begin() + i);
+				hudMgr.mHUDEffects.erase(hudMgr.mHUDEffects.begin() + i);
 				i--;
 				continue;
 			}
@@ -191,7 +193,7 @@ void LLHUDManager::processViewerEffect(LLMessageSystem *mesgsys, void **user_dat
 		{
 			if (!effectp)
 			{
-				effectp = LLHUDManager::getInstance()->createViewerEffect(effect_type, FALSE, FALSE);
+				effectp = hudMgr.createViewerEffect(effect_type, FALSE, FALSE);
 			}
 
 			if (effectp)

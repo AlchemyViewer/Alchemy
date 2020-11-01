@@ -739,7 +739,7 @@ LLIMModel::LLIMSession::~LLIMSession()
 	mSpeakers = NULL;
 
 	// End the text IM session if necessary
-	if(LLVoiceClient::getInstance() && mOtherParticipantID.notNull())
+	if(LLVoiceClient::instanceExists() && mOtherParticipantID.notNull())
 	{
 		switch(mType)
 		{
@@ -2538,7 +2538,7 @@ void LLIncomingCallDialog::processCallResponse(S32 response, const LLSD &payload
 	{
 		if (type == IM_SESSION_P2P_INVITE)
 		{
-			if(LLVoiceClient::getInstance())
+			if(LLVoiceClient::instanceExists())
 			{
 				std::string s = payload["session_handle"].asString();
 				LLVoiceClient::getInstance()->declineInvite(s);
@@ -3347,12 +3347,12 @@ bool LLIMMgr::isVoiceCall(const LLUUID& session_id)
 
 void LLIMMgr::updateDNDMessageStatus()
 {
-	if (LLIMModel::getInstance()->mId2SessionMap.empty()) return;
+	auto& im_model = LLIMModel::instance();
+	if (im_model.mId2SessionMap.empty()) return;
 
-	std::map<LLUUID, LLIMModel::LLIMSession*>::const_iterator it = LLIMModel::getInstance()->mId2SessionMap.begin();
-	for (; it != LLIMModel::getInstance()->mId2SessionMap.end(); ++it)
+	for (const auto& id_sess_pair : im_model.mId2SessionMap)
 	{
-		LLIMModel::LLIMSession* session = (*it).second;
+		LLIMModel::LLIMSession* session = id_sess_pair.second;
 
 		if (session->isP2P())
 		{
