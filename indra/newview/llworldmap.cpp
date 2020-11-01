@@ -380,12 +380,13 @@ void LLWorldMap::reloadItems(bool force)
 	//LL_INFOS("WorldMap") << "LLWorldMap::reloadItems()" << LL_ENDL;
 	if (clearItems(force))
 	{
-		LLWorldMapMessage::getInstance()->sendItemRequest(MAP_ITEM_TELEHUB);
-		LLWorldMapMessage::getInstance()->sendItemRequest(MAP_ITEM_PG_EVENT);
-		LLWorldMapMessage::getInstance()->sendItemRequest(MAP_ITEM_MATURE_EVENT);
-		LLWorldMapMessage::getInstance()->sendItemRequest(MAP_ITEM_ADULT_EVENT);
-		LLWorldMapMessage::getInstance()->sendItemRequest(MAP_ITEM_LAND_FOR_SALE);
-		LLWorldMapMessage::getInstance()->sendItemRequest(MAP_ITEM_LAND_FOR_SALE_ADULT);
+		auto& world_map_message = LLWorldMapMessage::instance();
+		world_map_message.sendItemRequest(MAP_ITEM_TELEHUB);
+		world_map_message.sendItemRequest(MAP_ITEM_PG_EVENT);
+		world_map_message.sendItemRequest(MAP_ITEM_MATURE_EVENT);
+		world_map_message.sendItemRequest(MAP_ITEM_ADULT_EVENT);
+		world_map_message.sendItemRequest(MAP_ITEM_LAND_FOR_SALE);
+		world_map_message.sendItemRequest(MAP_ITEM_LAND_FOR_SALE_ADULT);
 	}
 }
 
@@ -399,9 +400,9 @@ bool LLWorldMap::insertRegion(U32 x_world, U32 y_world, std::string& name, LLUUI
 	if (accesscode == 255)
 	{
 		// Checks if the track point is in it and invalidates it if it is
-		if (LLWorldMap::getInstance()->isTrackingInRectangle( x_world, y_world, x_world + REGION_WIDTH_UNITS, y_world + REGION_WIDTH_UNITS))
+		if (isTrackingInRectangle( x_world, y_world, x_world + REGION_WIDTH_UNITS, y_world + REGION_WIDTH_UNITS))
 		{
-			LLWorldMap::getInstance()->setTrackingInvalid();
+			setTrackingInvalid();
 		}
 		// return failure to insert
 		return false;
@@ -412,10 +413,10 @@ bool LLWorldMap::insertRegion(U32 x_world, U32 y_world, std::string& name, LLUUI
  		//LL_INFOS("WorldMap") << "Map sim : " << name << ", ID : " << image_id.getString() << LL_ENDL;
 		// Insert the region in the region map of the world map
 		// Loading the LLSimInfo object with what we got and insert it in the map
-		LLSimInfo* siminfo = LLWorldMap::getInstance()->simInfoFromHandle(handle);
+		LLSimInfo* siminfo = simInfoFromHandle(handle);
 		if (siminfo == NULL)
 		{
-			siminfo = LLWorldMap::getInstance()->createSimInfoFromHandle(handle);
+			siminfo = createSimInfoFromHandle(handle);
 		}
 		siminfo->setName(name);
 		siminfo->setAccess(accesscode);
@@ -424,17 +425,17 @@ bool LLWorldMap::insertRegion(U32 x_world, U32 y_world, std::string& name, LLUUI
 		siminfo->setLandForSaleImage(image_id);
 
 		// Handle the location tracking (for teleport, UI feedback and info display)
-		if (LLWorldMap::getInstance()->isTrackingInRectangle( x_world, y_world, x_world + REGION_WIDTH_UNITS, y_world + REGION_WIDTH_UNITS))
+		if (isTrackingInRectangle( x_world, y_world, x_world + REGION_WIDTH_UNITS, y_world + REGION_WIDTH_UNITS))
 		{
 			if (siminfo->isDown())
 			{
 				// We were tracking this location, but it's no available
-				LLWorldMap::getInstance()->setTrackingInvalid();
+				setTrackingInvalid();
 			}
 			else
 			{
 				// We were tracking this location, and it does exist and is available
-				LLWorldMap::getInstance()->setTrackingValid();
+				setTrackingValid();
 			}
 		}
 		// return insert region success
@@ -455,10 +456,10 @@ bool LLWorldMap::insertItem(U32 x_world, U32 y_world, std::string& name, LLUUID&
 	U64 handle = to_region_handle(pos);
 
 	// Get the region record for that handle or NULL if we haven't browsed it yet
-	LLSimInfo* siminfo = LLWorldMap::getInstance()->simInfoFromHandle(handle);
+	LLSimInfo* siminfo = simInfoFromHandle(handle);
 	if (siminfo == NULL)
 	{
-		siminfo = LLWorldMap::getInstance()->createSimInfoFromHandle(handle);
+		siminfo = createSimInfoFromHandle(handle);
 	}
 
 	//LL_INFOS("WorldMap") << "Process item : type = " << type << LL_ENDL;
@@ -600,6 +601,7 @@ void LLWorldMap::updateRegions(S32 x0, S32 y0, S32 x1, S32 y1)
 	y1 = y1 / MAP_BLOCK_SIZE;
 
 	// Load the region info those blocks
+	auto& world_map_message = LLWorldMapMessage::instance();
 	for (S32 block_x = llmax(x0, 0); block_x <= llmin(x1, MAP_BLOCK_RES-1); ++block_x)
 	{
 		for (S32 block_y = llmax(y0, 0); block_y <= llmin(y1, MAP_BLOCK_RES-1); ++block_y)
@@ -608,7 +610,7 @@ void LLWorldMap::updateRegions(S32 x0, S32 y0, S32 x1, S32 y1)
 			if (!mMapBlockLoaded[offset])
 			{
  				//LL_INFOS("WorldMap") << "Loading Block (" << block_x << "," << block_y << ")" << LL_ENDL;
-				LLWorldMapMessage::getInstance()->sendMapBlockRequest(block_x * MAP_BLOCK_SIZE, block_y * MAP_BLOCK_SIZE, (block_x * MAP_BLOCK_SIZE) + MAP_BLOCK_SIZE - 1, (block_y * MAP_BLOCK_SIZE) + MAP_BLOCK_SIZE - 1);
+				world_map_message.sendMapBlockRequest(block_x * MAP_BLOCK_SIZE, block_y * MAP_BLOCK_SIZE, (block_x * MAP_BLOCK_SIZE) + MAP_BLOCK_SIZE - 1, (block_y * MAP_BLOCK_SIZE) + MAP_BLOCK_SIZE - 1);
 				mMapBlockLoaded[offset] = true;
 			}
 		}

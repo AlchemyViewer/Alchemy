@@ -228,6 +228,8 @@ void LLNetMap::draw()
 
 	gGL.scalef(scale.mV[0], scale.mV[1], scale.mV[2]);
 	gGL.translatef(offset.mV[0], offset.mV[1], offset.mV[2]);
+
+	auto& viewer_camera = LLViewerCamera::instance();
 	
 	{
 		LLLocalClipRect clip(getLocalRect());
@@ -254,7 +256,7 @@ void LLNetMap::draw()
 		if( rotate_map )
 		{
 			// rotate subsequent draws to agent rotation
-			rotation = atan2( LLViewerCamera::getInstance()->getAtAxis().mV[VX], LLViewerCamera::getInstance()->getAtAxis().mV[VY] );
+			rotation = atan2(viewer_camera.getAtAxis().mV[VX], viewer_camera.getAtAxis().mV[VY] );
 			gGL.rotatef( rotation * RAD_TO_DEG, 0.f, 0.f, 1.f);
 		}
 
@@ -592,8 +594,8 @@ void LLNetMap::draw()
 		// Draw frustum
 		F32 meters_to_pixels = mScale/ worldInst.getRegionWidthInMeters();
 
-		F32 horiz_fov = LLViewerCamera::getInstance()->getView() * LLViewerCamera::getInstance()->getAspect();
-		F32 far_clip_meters = LLViewerCamera::getInstance()->getFar();
+		F32 horiz_fov = viewer_camera.getView() * viewer_camera.getAspect();
+		F32 far_clip_meters = viewer_camera.getFar();
 		F32 far_clip_pixels = far_clip_meters * meters_to_pixels;
 
 		F32 half_width_meters = far_clip_meters * tan( horiz_fov / 2 );
@@ -643,7 +645,7 @@ void LLNetMap::draw()
 			gGL.pushMatrix();
 			{
 				gGL.translatef( ctr_x, ctr_y, 0 );
-				gGL.rotatef( atan2( LLViewerCamera::getInstance()->getAtAxis().mV[VX], LLViewerCamera::getInstance()->getAtAxis().mV[VY] ) * RAD_TO_DEG, 0.f, 0.f, -1.f);
+				gGL.rotatef( atan2(viewer_camera.getAtAxis().mV[VX], viewer_camera.getAtAxis().mV[VY] ) * RAD_TO_DEG, 0.f, 0.f, -1.f);
 				gGL.begin( LLRender::TRIANGLES  );
 					gGL.vertex2f( 0.f, 0.f );
 					gGL.vertex2f(  half_width_pixels, far_clip_pixels );

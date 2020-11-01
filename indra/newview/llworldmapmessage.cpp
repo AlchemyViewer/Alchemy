@@ -165,6 +165,9 @@ void LLWorldMapMessage::processMapBlockReply(LLMessageSystem* msg, void**)
 
 	bool found_null_sim = false;
 
+	auto& world_map = LLWorldMap::instance();
+	auto& world_map_message = LLWorldMapMessage::instance();
+
 	for (S32 block=0; block<num_blocks; ++block)
 	{
 		U16 x_regions;
@@ -191,16 +194,16 @@ void LLWorldMapMessage::processMapBlockReply(LLMessageSystem* msg, void**)
 		llassert(!name.empty());
 
 		// Insert that region in the world map, if failure, flag it as a "null_sim"
-		if (!(LLWorldMap::getInstance()->insertRegion(x_world, y_world, name, image_id, (U32)accesscode, region_flags)))
+		if (!(world_map.insertRegion(x_world, y_world, name, image_id, (U32)accesscode, region_flags)))
 		{
 			found_null_sim = true;
 		}
 
 		// If we hit a valid tracking location, do what needs to be done app level wise
-		if (LLWorldMap::getInstance()->isTrackingValidLocation())
+		if (world_map.isTrackingValidLocation())
 		{
-			LLVector3d pos_global = LLWorldMap::getInstance()->getTrackedPositionGlobal();
-			if (LLWorldMap::getInstance()->isTrackingDoubleClick())
+			LLVector3d pos_global = world_map.getTrackedPositionGlobal();
+			if (world_map.isTrackingDoubleClick())
 			{
 				// Teleport if the user double clicked
 				gAgent.teleportViaLocation(pos_global);
@@ -210,19 +213,19 @@ void LLWorldMapMessage::processMapBlockReply(LLMessageSystem* msg, void**)
 		}
 
 		// Handle the SLURL callback if any
-		url_callback_t callback = LLWorldMapMessage::getInstance()->mSLURLCallback;
+		url_callback_t callback = world_map_message.mSLURLCallback;
 		if(callback != NULL)
 		{
 			U64 handle = to_region_handle(x_world, y_world);
 			// Check if we reached the requested region
-			if ((LLStringUtil::compareInsensitive(LLWorldMapMessage::getInstance()->mSLURLRegionName, name)==0)
-				|| (LLWorldMapMessage::getInstance()->mSLURLRegionHandle == handle))
+			if ((LLStringUtil::compareInsensitive(world_map_message.mSLURLRegionName, name)==0)
+				|| (world_map_message.mSLURLRegionHandle == handle))
 			{
-				LLWorldMapMessage::getInstance()->mSLURLCallback = NULL;
-				LLWorldMapMessage::getInstance()->mSLURLRegionName.clear();
-				LLWorldMapMessage::getInstance()->mSLURLRegionHandle = 0;
+				world_map_message.mSLURLCallback = NULL;
+				world_map_message.mSLURLRegionName.clear();
+				world_map_message.mSLURLRegionHandle = 0;
 
-				callback(handle, LLWorldMapMessage::getInstance()->mSLURL, image_id, LLWorldMapMessage::getInstance()->mSLURLTeleport);
+				callback(handle, world_map_message.mSLURL, image_id, world_map_message.mSLURLTeleport);
 			}
 		}
 	}
@@ -239,6 +242,8 @@ void LLWorldMapMessage::processMapItemReply(LLMessageSystem* msg, void**)
 
 	S32 num_blocks = msg->getNumberOfBlocks("Data");
 
+	auto& world_map = LLWorldMap::instance();
+
 	for (S32 block=0; block<num_blocks; ++block)
 	{
 		U32 X, Y;
@@ -252,7 +257,7 @@ void LLWorldMapMessage::processMapItemReply(LLMessageSystem* msg, void**)
 		msg->getS32Fast(_PREHASH_Data, _PREHASH_Extra, extra, block);
 		msg->getS32Fast(_PREHASH_Data, _PREHASH_Extra2, extra2, block);
 
-		LLWorldMap::getInstance()->insertItem(X, Y, name, uuid, type, extra, extra2);
+		world_map.insertItem(X, Y, name, uuid, type, extra, extra2);
 	}
 }
 

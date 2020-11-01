@@ -213,8 +213,8 @@ public:
 
 	// Insert a region and items in the map global instance
 	// Note: x_world and y_world in world coordinates (meters)
-	static bool insertRegion(U32 x_world, U32 y_world, std::string& name, LLUUID& uuid, U32 accesscode, U32 region_flags);
-	static bool insertItem(U32 x_world, U32 y_world, std::string& name, LLUUID& uuid, U32 type, S32 extra, S32 extra2);
+	bool insertRegion(U32 x_world, U32 y_world, std::string& name, LLUUID& uuid, U32 accesscode, U32 region_flags);
+	bool insertItem(U32 x_world, U32 y_world, std::string& name, LLUUID& uuid, U32 type, S32 extra, S32 extra2);
 
 	// Get info on sims (region) : note that those methods only search the range of loaded sims (the one that are being browsed)
 	// *not* the entire world. So a NULL return does not mean a down or unexisting region, just an out of range region.
