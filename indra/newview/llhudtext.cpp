@@ -51,6 +51,7 @@
 #include "rlvcommon.h"
 // [/RLVa:KB]
 #include <boost/tokenizer.hpp>
+#include "alcinematicmode.h"
 
 const F32 HORIZONTAL_PADDING = 15.f;
 const F32 VERTICAL_PADDING = 12.f;
@@ -242,6 +243,10 @@ void LLHUDText::setString(const std::string &text_utf8)
 //	addLine(text_utf8, mColor);
 // [RLVa:KB] - Checked: RLVa-2.0.3
 	// NOTE: setString() is called for debug and map beacons as well
+	if (ALCinematicMode::isEnabled() && gSavedSettings.getBool("AlchemyCinematicModeHideHoverText"))
+	{
+		return;
+	}
 	if (RlvActions::isRlvEnabled())
 	{
 		std::string text(text_utf8);

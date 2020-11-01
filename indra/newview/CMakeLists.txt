@@ -113,6 +113,7 @@ include_directories(SYSTEM
     )
 
 set(viewer_SOURCE_FILES
+    alcinematicmode.cpp
     alaoengine.cpp
     alaoset.cpp
     alavataractions.cpp
@@ -773,6 +774,7 @@ set(VIEWER_BINARY_NAME "alchemy-bin" CACHE STRING
 set(viewer_HEADER_FILES
     CMakeLists.txt
     ViewerInstall.cmake
+    alcinematicmode.h
     alaoengine.h
     alaoset.h
     alavataractions.h
