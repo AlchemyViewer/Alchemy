@@ -6,6 +6,19 @@ include(FetchContent)
 set(CMAKE_FOLDER "Third Party")
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
+set(deps_SOURCE_FILES
+    CMakeLists.txt
+    ../cmake/cmake_dummy.cpp
+    )
+
+set_source_files_properties(${cmake_SOURCE_FILES} ${deps_SOURCE_FILES}
+                            PROPERTIES HEADER_FILE_ONLY TRUE)
+
+add_library(deps
+            ${deps_SOURCE_FILES}
+            )
+
+
 if(${CMAKE_VERSION} VERSION_LESS 3.14)
     macro(FetchContent_MakeAvailable NAME)
         FetchContent_GetProperties(${NAME})

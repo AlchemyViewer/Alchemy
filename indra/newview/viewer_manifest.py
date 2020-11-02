@@ -562,23 +562,24 @@ class WindowsManifest(ViewerManifest):
             self.path("zlib*1.dll")
 
             # Get openal dll for audio engine, continue if missing
-            if self.args['openal'] == 'ON':
+            if self.args['openal'] == 'ON' or self.args['openal'] == 'TRUE':
                 # Get openal dll
                 self.path("OpenAL32.dll")
                 self.path("alut.dll")
 
             # Get fmodstudio dll for audio engine, continue if missing
-            if self.args['fmodstudio'] == 'ON':
+            if self.args['fmodstudio'] == 'ON' or self.args['fmodstudio'] == 'TRUE':
                 if self.args['configuration'].lower() == 'debug':
                     self.path("fmodL.dll", "fmodL.dll")
                 else:
                     self.path(src="fmod.dll", dst="fmod.dll")
 
             # KDU
-            if self.args['configuration'].lower() == 'debug':
-                self.path_optional("kdud.dll", "kdud.dll")
-            else:
-                self.path_optional(src="kdu.dll", dst="kdu.dll")
+            if self.args['kdu'] == 'ON' or self.args['kdu'] == 'TRUE':
+                if self.args['configuration'].lower() == 'debug':
+                    self.path("kdud.dll", "kdud.dll")
+                else:
+                    self.path(src="kdu.dll", dst="kdu.dll")
 
             # SLVoice executable
             with self.prefix(src=os.path.join(pkgdir, 'bin', 'release')):
@@ -1472,11 +1473,11 @@ class Linux_i686_Manifest(LinuxManifest):
             self.path("libepoxy.so.0.0.0")
             self.path("libjpeg.so*")
 
-            if self.args['openal'] == 'ON':
+            if self.args['openal'] == 'ON' or self.args['openal'] == 'TRUE':
                 self.path("libalut.so*")
                 self.path("libopenal.so*")
 
-            if self.args['fmodstudio'] == 'ON':
+            if self.args['fmodstudio'] == 'ON' or self.args['fmodstudio'] == 'TRUE':
                 self.path("libfmod.so*")
 
         # Vivox runtimes
@@ -1522,11 +1523,11 @@ class Linux_x86_64_Manifest(LinuxManifest):
             self.path("libvorbisfile.so*")
             self.path("libjpeg.so*")
 
-            if self.args['openal'] == 'ON':
+            if self.args['openal'] == 'ON' or self.args['openal'] == 'TRUE':
                 self.path("libalut.so*")
                 self.path("libopenal.so*")
 
-            if self.args['fmodstudio'] == 'ON':
+            if self.args['fmodstudio'] == 'ON' or self.args['fmodstudio'] == 'TRUE':
                 self.path("libfmod.so*")
 
         # Vivox runtimes
@@ -1554,7 +1555,8 @@ if __name__ == "__main__":
         dict(name='bugsplat', description="""BugSplat database to which to post crashes,
              if BugSplat crash reporting is desired""", default=''),
         dict(name='fmodstudio', description="""Indication if fmod studio libraries are needed""", default='OFF'),
-        dict(name='openal', description="""Indication openal libraries are needed""", default='OFF'),
+        dict(name='openal', description="""Indication if openal libraries are needed""", default='OFF'),
+        dict(name='kdu', description="""Indication if kdu libraries are needed""", default='OFF'),
         ]
     try:
         main(extra=extra_arguments)

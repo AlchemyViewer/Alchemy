@@ -1667,18 +1667,6 @@ if (WINDOWS)
         winspool
         )
 
-    find_library(INTEL_MEMOPS_LIBRARY
-                 NAMES ll_intel_memops
-                 PATHS
-                 optimized ${ARCH_PREBUILT_DIRS_RELEASE}
-                 debug ${ARCH_PREBUILT_DIRS_DEBUG}
-                 )
-    mark_as_advanced(INTEL_MEMOPS_LIBRARY)
-
-    if (INTEL_MEMOPS_LIBRARY)
-      list(APPEND viewer_LIBRARIES ${INTEL_MEMOPS_LIBRARY})
-    endif (INTEL_MEMOPS_LIBRARY)
-
     if (ADDRESS_SIZE EQUAL 64)
         # We deliberately omit this from the 32bit build because it declares that
         # the viewer is compatible with Windows 10; we need that to properly detect
@@ -1708,14 +1696,9 @@ file(GLOB DEFAULT_WIDGET_FILE_GLOB_LIST
      ${CMAKE_CURRENT_SOURCE_DIR}/skins/*/xui/en/widgets/*.xml)
 list(APPEND viewer_XUI_FILES ${DEFAULT_WIDGET_FILE_GLOB_LIST})
 
-# Cannot append empty lists in CMake, wait until we have files here.
-#file(GLOB SILVER_WIDGET_FILE_GLOB_LIST
-#     ${CMAKE_CURRENT_SOURCE_DIR}/skins/silver/xui/en-us/widgets/*.xml)
-#list(APPEND viewer_XUI_FILES ${SILVER_WIDGET_FILE_GLOB_LIST})
-
 list(SORT viewer_XUI_FILES)
 
-source_group("XUI Files" FILES ${viewer_XUI_FILES})
+source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/skins" PREFIX "XUI Files" FILES ${viewer_XUI_FILES})
 
 set_source_files_properties(${viewer_XUI_FILES}
                             PROPERTIES HEADER_FILE_ONLY TRUE)
@@ -1757,6 +1740,15 @@ set_source_files_properties(${viewer_APPSETTINGS_FILES}
 
 list(APPEND viewer_SOURCE_FILES ${viewer_APPSETTINGS_FILES})
 
+file(GLOB_RECURSE viewer_SHADER_FILES ${CMAKE_CURRENT_SOURCE_DIR}/app_settings/shaders/*)
+
+source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/app_settings/shaders" PREFIX "Shaders" FILES ${viewer_SHADER_FILES})
+
+set_source_files_properties(${viewer_SHADER_FILES}
+                            PROPERTIES HEADER_FILE_ONLY TRUE)
+
+list(APPEND viewer_SOURCE_FILES ${viewer_SHADER_FILES})
+
 set(viewer_CHARACTER_FILES
     character/attentions.xml
     character/attentionsN.xml
@@ -1772,6 +1764,15 @@ set_source_files_properties(${viewer_CHARACTER_FILES}
 if (NOT USESYSTEMLIBS)
     list(APPEND viewer_SOURCE_FILES ${viewer_CHARACTER_FILES})
 endif (NOT USESYSTEMLIBS)
+
+set(viewer_MISC_FILES
+    viewer_manifest.py
+    )
+
+set_source_files_properties(${viewer_MISC_FILES}
+                            PROPERTIES HEADER_FILE_ONLY TRUE)
+
+list(APPEND viewer_SOURCE_FILES ${viewer_MISC_FILES})
 
 if (WINDOWS)
   file(GLOB viewer_INSTALLER_FILES installers/windows/*.nsi)
@@ -1936,6 +1937,7 @@ if (WINDOWS)
         "--bugsplat=${BUGSPLAT_DB}"
         "--fmodstudio=${USE_FMODSTUDIO}"
         "--openal=${OPENAL}"
+        "--kdu=${USE_KDU}"
         --build=${CMAKE_CURRENT_BINARY_DIR}
         --buildtype=${CMAKE_BUILD_TYPE}
         "--channel=${VIEWER_CHANNEL}"
@@ -1998,6 +2000,7 @@ if (WINDOWS)
           "--bugsplat=${BUGSPLAT_DB}"
           "--fmodstudio=${USE_FMODSTUDIO}"
           "--openal=${OPENAL}"
+          "--kdu=${USE_KDU}"
           --build=${CMAKE_CURRENT_BINARY_DIR}
           --buildtype=${CMAKE_BUILD_TYPE}
           "--channel=${VIEWER_CHANNEL}"
@@ -2148,6 +2151,7 @@ if (LINUX)
         "--bugsplat=${BUGSPLAT_DB}"
         "--fmodstudio=${USE_FMODSTUDIO}"
         "--openal=${OPENAL}"
+        "--kdu=${USE_KDU}"
         --build=${CMAKE_CURRENT_BINARY_DIR}
         --buildtype=${CMAKE_BUILD_TYPE}
         "--channel=${VIEWER_CHANNEL}"
@@ -2176,6 +2180,7 @@ if (LINUX)
       "--bugsplat=${BUGSPLAT_DB}"
       "--fmodstudio=${USE_FMODSTUDIO}"
       "--openal=${OPENAL}"
+      "--kdu=${USE_KDU}"
       --build=${CMAKE_CURRENT_BINARY_DIR}
       --buildtype=${CMAKE_BUILD_TYPE}
       "--channel=${VIEWER_CHANNEL}"
@@ -2254,6 +2259,7 @@ if (DARWIN)
       "--bugsplat=${BUGSPLAT_DB}"
       "--fmodstudio=${USE_FMODSTUDIO}"
       "--openal=${OPENAL}"
+      "--kdu=${USE_KDU}"
       --build=${CMAKE_CURRENT_BINARY_DIR}
       --buildtype=${CMAKE_BUILD_TYPE}
       --bundleid=${MACOSX_BUNDLE_GUI_IDENTIFIER}
@@ -2289,6 +2295,7 @@ if (DARWIN)
           "--bugsplat=${BUGSPLAT_DB}"
           "--fmodstudio=${USE_FMODSTUDIO}"
           "--openal=${OPENAL}"
+          "--kdu=${USE_KDU}"
           --build=${CMAKE_CURRENT_BINARY_DIR}
           --buildtype=${CMAKE_BUILD_TYPE}
           "--channel=${VIEWER_CHANNEL}"
