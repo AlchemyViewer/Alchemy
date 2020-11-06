@@ -651,16 +651,30 @@
             <key>name</key>
             <string>darwin</string>
           </map>
+          <key>darwin64</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>hash</key>
+              <string>6102d745784c55c0e119ed1d5503f2db1475fdb0b219f7e5b78f4f142bb832aca9f5799acbde61b6dc357245300e2503</string>
+              <key>hash_algorithm</key>
+              <string>sha3_384</string>
+              <key>url</key>
+              <string>https://git.alchemyviewer.org/api/v4/projects/49/packages/generic/fmodstudio-630/2.01.05/fmodstudio-2.01.05-darwin64-630.tar.xz</string>
+            </map>
+            <key>name</key>
+            <string>darwin64</string>
+          </map>
           <key>linux64</key>
           <map>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>fd9fa19902088cbcd4f4806b5868a12d6778767dc28df78f888896f41ec813be4a264ef08e6a2d5cbe03ea73101f575a</string>
+              <string>805a1ea614e3c50930ae788f8f4ee9fc9242d9f74227f5de02468fd91793e320b08caae69d0efd36112ea671b29b7518</string>
               <key>hash_algorithm</key>
               <string>sha3_384</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/49/packages/generic/fmodstudio-531/2.01.05/fmodstudio-2.01.05-linux64-531.tar.xz</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/49/packages/generic/fmodstudio-630/2.01.05/fmodstudio-2.01.05-linux64-630.tar.xz</string>
             </map>
             <key>name</key>
             <string>linux64</string>
@@ -670,11 +684,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>10c133dbe2741548c4e8df55b042cdb9a37805fdc97d4584b7790b7fc0b069d3dad465c74851a95a248f53e86b53d54d</string>
+              <string>99a4c03dbcb6f476288f9934a0c2e8b45db790905f0dc67395624cb78949d2cddf3ff46c3fcfa811f261bef90c656126</string>
               <key>hash_algorithm</key>
               <string>sha3_384</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/49/packages/generic/fmodstudio-531/2.01.05/fmodstudio-2.01.05-windows-531.tar.xz</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/49/packages/generic/fmodstudio-630/2.01.05/fmodstudio-2.01.05-windows-630.tar.xz</string>
             </map>
             <key>name</key>
             <string>windows</string>
@@ -684,11 +698,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>85a598e8fdec15eb062050ec99e18f5895089e5d9305976e71a22ae7d47787985887be3065fe8f8e610eec1a75b66138</string>
+              <string>80223c0d181f12dc4870a6b82ba1943724f8411a6f1d49d9195379e6918c7b2298362193fb912bdf2714b808c4f58445</string>
               <key>hash_algorithm</key>
               <string>sha3_384</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/49/packages/generic/fmodstudio-531/2.01.05/fmodstudio-2.01.05-windows64-531.tar.xz</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/49/packages/generic/fmodstudio-630/2.01.05/fmodstudio-2.01.05-windows64-630.tar.xz</string>
             </map>
             <key>name</key>
             <string>windows64</string>
@@ -1085,16 +1099,30 @@
         <string>libepoxy</string>
         <key>platforms</key>
         <map>
+          <key>darwin64</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>hash</key>
+              <string>9c8631a1cf8e803784c749241278f6b202111e043b62336bb6cf23e54b6aadf7a114431bd86d45e3eee3031ba9f4b1e5</string>
+              <key>hash_algorithm</key>
+              <string>sha3_384</string>
+              <key>url</key>
+              <string>https://git.alchemyviewer.org/api/v4/projects/101/packages/generic/libepoxy-640/1.5.4/libepoxy-1.5.4-darwin64-640.tar.xz</string>
+            </map>
+            <key>name</key>
+            <string>darwin64</string>
+          </map>
           <key>linux64</key>
           <map>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>086bc23ed894704f78cd5e5c8760c8d5989ea5950f60d8d8c49eb383e204e4d74469d55d9d7c2ead9d8aa2afe9d59752</string>
+              <string>3563e579c391ab4eb0179dd3ed1bfcc21de712a8f03eb39e0dc40d2cdf3d24184a6b014234b524089e23b313d8aed0d0</string>
               <key>hash_algorithm</key>
               <string>sha3_384</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/101/packages/generic/libepoxy-551/1.5.4/libepoxy-1.5.4-linux64-551.tar.xz</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/101/packages/generic/libepoxy-640/1.5.4/libepoxy-1.5.4-linux64-640.tar.xz</string>
             </map>
             <key>name</key>
             <string>linux64</string>
@@ -1104,11 +1132,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>1d2a5026e23d482165d7a490295e15caf9c6111c584b4ffbe195f551074a6f723f2d0dd35ac7b160edb59afff5bd6b29</string>
+              <string>c90213365bb006760385ccfcaaf1acedfff972a819c059300fec135b794eff371359d833dafcdb203cc32168575da24e</string>
               <key>hash_algorithm</key>
               <string>sha3_384</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/101/packages/generic/libepoxy-551/1.5.4/libepoxy-1.5.4-windows-551.tar.xz</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/101/packages/generic/libepoxy-640/1.5.4/libepoxy-1.5.4-windows-640.tar.xz</string>
             </map>
             <key>name</key>
             <string>windows</string>
@@ -1118,11 +1146,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>92874f4f672d5f66845872eba7c05e26a8396a78ec1e31ef6c10938b530298009d9aca51bb83108a78afcab426c98bc3</string>
+              <string>ff3dedc57239ecfc45b97ccdf984e23cc40ee1c22af54527d2d9edade96fe7a7333b72b086622497eca88b49cc68cab1</string>
               <key>hash_algorithm</key>
               <string>sha3_384</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/101/packages/generic/libepoxy-551/1.5.4/libepoxy-1.5.4-windows64-551.tar.xz</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/101/packages/generic/libepoxy-640/1.5.4/libepoxy-1.5.4-windows64-640.tar.xz</string>
             </map>
             <key>name</key>
             <string>windows64</string>
@@ -1231,16 +1259,30 @@
         <string>libjpeg-turbo</string>
         <key>platforms</key>
         <map>
+          <key>darwin64</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>hash</key>
+              <string>06b11aa572faaaf44df739bb46d980546ce69f0cb0983416b813b45b0836b7bd69476a6f948c91081300b87a673e0c6d</string>
+              <key>hash_algorithm</key>
+              <string>sha3_384</string>
+              <key>url</key>
+              <string>https://git.alchemyviewer.org/api/v4/projects/115/packages/generic/libjpeg-turbo-639/2.0.5/libjpeg_turbo-2.0.5-darwin64-639.tar.xz</string>
+            </map>
+            <key>name</key>
+            <string>darwin64</string>
+          </map>
           <key>linux64</key>
           <map>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>a37a168d901e5826b616ee94e077bbe416b8f5f4f67322b5d4a846d085d94121f3905c758413c6931d2b98fa347a9a10</string>
+              <string>378bc4580f2382e150368d50412e65a360a76f4bb576fed64cea412ba7c355af9ab7a1f4027117eaf6aed5badec4df24</string>
               <key>hash_algorithm</key>
               <string>sha3_384</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/115/packages/generic/libjpeg-turbo-613/2.0.5/libjpeg_turbo-2.0.5-linux64-613.tar.xz</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/115/packages/generic/libjpeg-turbo-639/2.0.5/libjpeg_turbo-2.0.5-linux64-639.tar.xz</string>
             </map>
             <key>name</key>
             <string>linux64</string>
@@ -1250,11 +1292,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>914a5bff9495ab2fe919df3a4b755854cb2ec38e8e25b7ebae9b1fec9da8a6acbf404b09b5d7020af6d20373499f03ca</string>
+              <string>ea7f88129bb341d40408230e34d8cea32d531f9637906506fc5b173b47bf962cc4cbf531a8196a58228feaad419afb82</string>
               <key>hash_algorithm</key>
               <string>sha3_384</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/115/packages/generic/libjpeg-turbo-613/2.0.5/libjpeg_turbo-2.0.5-windows-613.tar.xz</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/115/packages/generic/libjpeg-turbo-639/2.0.5/libjpeg_turbo-2.0.5-windows-639.tar.xz</string>
             </map>
             <key>name</key>
             <string>windows</string>
@@ -1264,11 +1306,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>ea030cef8238a7978b4a030aedecf8f996380e08035beeb8b8fe6a994a4b9f926a910c5418c66eb13b51723d220e8f44</string>
+              <string>97e62aee5f3250031dc9140f8d126a55de3d350eb7233029d8b6b6c06630d5462a9420df626a32170f2f37448dbb6697</string>
               <key>hash_algorithm</key>
               <string>sha3_384</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/115/packages/generic/libjpeg-turbo-613/2.0.5/libjpeg_turbo-2.0.5-windows64-613.tar.xz</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/115/packages/generic/libjpeg-turbo-639/2.0.5/libjpeg_turbo-2.0.5-windows64-639.tar.xz</string>
             </map>
             <key>name</key>
             <string>windows64</string>
@@ -1447,16 +1489,30 @@
         <string>libwebp</string>
         <key>platforms</key>
         <map>
+          <key>darwin64</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>hash</key>
+              <string>cf22b956da0f6a6b7b3fcf78035aecdc326b0ae54f25bca097ab15c07746f9fa7b77826bb1ea48c0b5c3d53448e793d5</string>
+              <key>hash_algorithm</key>
+              <string>sha3_384</string>
+              <key>url</key>
+              <string>https://git.alchemyviewer.org/api/v4/projects/82/packages/generic/libwebp-638/1.1.0/libwebp-1.1.0-darwin64-638.tar.xz</string>
+            </map>
+            <key>name</key>
+            <string>darwin64</string>
+          </map>
           <key>linux64</key>
           <map>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>abaddbba19b080576046434821d61316f36051084df83029ed8eaca9e4806ced2acfd4a9e40cae95addf06189c834973</string>
+              <string>60d9e9cdcde0235c0eeff77e91e1c430a19b439b7429f25d06fc75dba017bb665df0ccf9798f93423ec1ed2df2be27f4</string>
               <key>hash_algorithm</key>
               <string>sha3_384</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/82/packages/generic/libwebp-547/1.1.0/libwebp-1.1.0-linux64-547.tar.xz</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/82/packages/generic/libwebp-638/1.1.0/libwebp-1.1.0-linux64-638.tar.xz</string>
             </map>
             <key>name</key>
             <string>linux64</string>
@@ -1466,11 +1522,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>e59adba5c4cf4b67f9e99a5f55933f3225f722d1ce17a20280e6158a6857f26d41cb7a0d17f142bcf6c44436b5c10870</string>
+              <string>9c468a9c13603d2360125bfaa82dae64356e28bab83bf4ea1e0d71fe4f497988c182b005890c7403cce27fb36a275cc3</string>
               <key>hash_algorithm</key>
               <string>sha3_384</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/82/packages/generic/libwebp-547/1.1.0/libwebp-1.1.0-windows-547.tar.xz</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/82/packages/generic/libwebp-638/1.1.0/libwebp-1.1.0-windows-638.tar.xz</string>
             </map>
             <key>name</key>
             <string>windows</string>
@@ -1480,11 +1536,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>8c51f710ef23dacbd40e5ed55e96d5af6e9f1521e7a76e0446ccb9093174eeab7bc0f0a980f303263f9c49ed0b8c51ed</string>
+              <string>b4eceb7f0488e156a309ea695cfea60a1e2174c27fcfce6b7c36ed798cb6b2dcf94e9cad220c321d36a8b82a02ef727c</string>
               <key>hash_algorithm</key>
               <string>sha3_384</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/82/packages/generic/libwebp-547/1.1.0/libwebp-1.1.0-windows64-547.tar.xz</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/82/packages/generic/libwebp-638/1.1.0/libwebp-1.1.0-windows64-638.tar.xz</string>
             </map>
             <key>name</key>
             <string>windows64</string>
@@ -2143,16 +2199,30 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
         <string>openal</string>
         <key>platforms</key>
         <map>
+          <key>darwin64</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>hash</key>
+              <string>d91d311729c0530b4e3edebb582fc24bdd8444717c83b10ded87b45362c1be02cbfe82246b54533e49331116f356eb7e</string>
+              <key>hash_algorithm</key>
+              <string>sha3_384</string>
+              <key>url</key>
+              <string>https://git.alchemyviewer.org/api/v4/projects/141/packages/generic/openal-637/1.20.1/openal-1.20.1-darwin64-637.tar.xz</string>
+            </map>
+            <key>name</key>
+            <string>darwin64</string>
+          </map>
           <key>linux64</key>
           <map>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>418f9bd3f8c221c0bcdfb8574c7fa223eba1d7146729a46b883e9ece7b4a164d4502ca4c7ee619b1f93d231ca124c69d</string>
+              <string>8d9c6080e0041c0da955b362d04e69abe4357ddf70d0985ef4c9ba752ffeef265359541e866381a34a749a5d575b5868</string>
               <key>hash_algorithm</key>
               <string>sha3_384</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/141/packages/generic/openal-603/1.20.1/openal-1.20.1-linux64-603.tar.xz</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/141/packages/generic/openal-637/1.20.1/openal-1.20.1-linux64-637.tar.xz</string>
             </map>
             <key>name</key>
             <string>linux64</string>
@@ -2162,11 +2232,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>a5ead11c24b4ac7182ddaff3287949308534e576cbcc71a18a51408d902f28d605801a596db40d2f3d056632f83f895f</string>
+              <string>aaf7c9fa67c70cf740a286483f0041a58da8b92be679a6b6106bdb7e7f7f3162c6a5e717f31df9206e043998cc6b871e</string>
               <key>hash_algorithm</key>
               <string>sha3_384</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/141/packages/generic/openal-603/1.20.1/openal-1.20.1-windows-603.tar.xz</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/141/packages/generic/openal-637/1.20.1/openal-1.20.1-windows-637.tar.xz</string>
             </map>
             <key>name</key>
             <string>windows</string>
@@ -2176,11 +2246,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>c3ff4d0470b5c784624796bd70561e4ecfc8bb2ad0d5ce9dc7042713075a028719f82bb1d6f429e6d503510b016274c7</string>
+              <string>939620e0b14993f199017b957f17796b9ec1fcf7afd93b080cb8eeb6abd0e975bfdec12a9fc3f634b1db502849d53746</string>
               <key>hash_algorithm</key>
               <string>sha3_384</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/141/packages/generic/openal-603/1.20.1/openal-1.20.1-windows64-603.tar.xz</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/141/packages/generic/openal-637/1.20.1/openal-1.20.1-windows64-637.tar.xz</string>
             </map>
             <key>name</key>
             <string>windows64</string>
@@ -2220,9 +2290,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>5abf2d9c0b250821c59cc60cd94fd8af</string>
+              <string>3d8435efb9a29d0e02db30221e58de512dde217fc0b6deda26543a102bdd1487d55658fc44b311d8eb1413d070fe3a07</string>
+              <key>hash_algorithm</key>
+              <string>sha3_384</string>
               <key>url</key>
-              <string>http://automated-builds-secondlife-com.s3.amazonaws.com/ct2/54840/510064/openjpeg-1.5.1.538970-darwin64-538970.tar.bz2</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/105/packages/generic/openjpeg-641/1.5.1/openjpeg-1.5.1-darwin64-641.tar.xz</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
@@ -2232,11 +2304,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>fc646fd26d43da18ab12af90d991676e8662e2cf2871082dbc7d77b96aea412d1e8c1edef736259749c2aa88bc2da21e</string>
+              <string>60a1ca9b97ad74a8e3a33d33caf503cdb5e7f1684d6316ed484471c02124d603878c8526f7166a16064cd7c88b9905db</string>
               <key>hash_algorithm</key>
               <string>sha3_384</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/105/packages/generic/openjpeg-534/1.5.1/openjpeg-1.5.1-linux64-534.tar.xz</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/105/packages/generic/openjpeg-641/1.5.1/openjpeg-1.5.1-linux64-641.tar.xz</string>
             </map>
             <key>name</key>
             <string>linux64</string>
@@ -2246,11 +2318,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>4a29e53aa16c31266df7ddfcd9028043a229cecac47b3165dbbc282875df2aaf232346db396ec430c0bc09dd4641b8d1</string>
+              <string>474913320ea038660a73810b6563d0b2174cef5a9445f3454fb6e8d9efac89fddb9fb0be007001a434ec3c8125917f6d</string>
               <key>hash_algorithm</key>
               <string>sha3_384</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/105/packages/generic/openjpeg-534/1.5.1/openjpeg-1.5.1-windows-534.tar.xz</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/105/packages/generic/openjpeg-641/1.5.1/openjpeg-1.5.1-windows-641.tar.xz</string>
             </map>
             <key>name</key>
             <string>windows</string>
@@ -2260,11 +2332,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>a1a5eb80cc0995569c15647c5367bf9ddede03676e725562f6f1023351109c831d5cdbf9e732f4186e374d819f01a4d0</string>
+              <string>044b5655aecdc9e22f013509ec3a0a8297955cfc993465256e182d519876d55bc3b33df56b861f587a8086e79b8aa090</string>
               <key>hash_algorithm</key>
               <string>sha3_384</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/105/packages/generic/openjpeg-534/1.5.1/openjpeg-1.5.1-windows64-534.tar.xz</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/105/packages/generic/openjpeg-641/1.5.1/openjpeg-1.5.1-windows64-641.tar.xz</string>
             </map>
             <key>name</key>
             <string>windows64</string>
@@ -2356,6 +2428,96 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
         </map>
         <key>version</key>
         <string>1.0.2u.315</string>
+      </map>
+      <key>pcre</key>
+      <map>
+        <key>copyright</key>
+        <string>Copyright (c) 1997-2014 University of Cambridge; Copyright(c) 2009-2014 Zoltan Herczeg; Copyright (c) 2007-2012, Google Inc.</string>
+        <key>description</key>
+        <string>PCRE Perl-compatible regular expression library</string>
+        <key>license</key>
+        <string>bsd</string>
+        <key>license_file</key>
+        <string>LICENSES/pcre-license.txt</string>
+        <key>name</key>
+        <string>pcre</string>
+        <key>platforms</key>
+        <map>
+          <key>darwin</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>hash</key>
+              <string>6d2b38897f1adf354b299345d5fc759b</string>
+              <key>url</key>
+              <string>http://automated-builds-secondlife-com.s3.amazonaws.com/hg/repo/pcre_3p-update-pcre/rev/297155/arch/Darwin/installer/pcre-8.35.-darwin-297155.tar.bz2</string>
+            </map>
+            <key>name</key>
+            <string>darwin</string>
+          </map>
+          <key>darwin64</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>hash</key>
+              <string>d8c0f97fe5abef43e72b6f84aba698b2</string>
+              <key>url</key>
+              <string>http://automated-builds-secondlife-com.s3.amazonaws.com/ct2/54856/510176/pcre-8.35.538986-darwin64-538986.tar.bz2</string>
+            </map>
+            <key>name</key>
+            <string>darwin64</string>
+          </map>
+          <key>linux</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>hash</key>
+              <string>24a119b18e63017ad932ad54df8161bc</string>
+              <key>url</key>
+              <string>http://automated-builds-secondlife-com.s3.amazonaws.com/hg/repo/p64_3p-pcre/rev/314136/arch/Linux/installer/pcre-8.35.314136-linux-314136.tar.bz2</string>
+            </map>
+            <key>name</key>
+            <string>linux</string>
+          </map>
+          <key>linux64</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>hash</key>
+              <string>0f058ca2176e7d02d51e54c66a96f336</string>
+              <key>url</key>
+              <string>http://automated-builds-secondlife-com.s3.amazonaws.com/ct2/908/2010/pcre-8.35.500898-linux64-500898.tar.bz2</string>
+            </map>
+            <key>name</key>
+            <string>linux64</string>
+          </map>
+          <key>windows</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>hash</key>
+              <string>3660db45793df3050b63920bfb7d8479</string>
+              <key>url</key>
+              <string>http://automated-builds-secondlife-com.s3.amazonaws.com/ct2/55041/512002/pcre-8.35.538986-windows-538986.tar.bz2</string>
+            </map>
+            <key>name</key>
+            <string>linux</string>
+          </map>
+          <key>windows64</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>hash</key>
+              <string>cdee8e8b48a66266550bf279c40abc22</string>
+              <key>url</key>
+              <string>http://automated-builds-secondlife-com.s3.amazonaws.com/ct2/55038/511992/pcre-8.35.538986-windows64-538986.tar.bz2</string>
+            </map>
+            <key>name</key>
+            <string>windows64</string>
+          </map>
+        </map>
+        <key>version</key>
+        <string>8.35.538986</string>
       </map>
       <key>slvoice</key>
       <map>
