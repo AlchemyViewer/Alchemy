@@ -916,6 +916,7 @@ void LLProcess::status_callback(int reason, void* data, int status)
 	static_cast<LLProcess*>(data)->handle_status(reason, status);
 }
 
+#ifdef SHOW_DEBUG
 #define tabent(symbol) { symbol, #symbol }
 static struct ReasonCode
 {
@@ -931,11 +932,12 @@ static struct ReasonCode
 	tabent(APR_OC_REASON_RUNNING)
 };
 #undef tabent
+#endif
 
 // Object-oriented callback
 void LLProcess::handle_status(int reason, int status)
 {
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 	{
 		// This odd appearance of LL_DEBUGS is just to bracket a lookup that will
 		// only be performed if in fact we're going to produce the log message.
