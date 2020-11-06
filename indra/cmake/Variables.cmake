@@ -151,60 +151,39 @@ endif (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
 if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
   set(DARWIN 1)
 
-  string(REGEX MATCH "-mmacosx-version-min=([^ ]+)" scratch "$ENV{LL_BUILD}")
-  set(CMAKE_OSX_DEPLOYMENT_TARGET "${CMAKE_MATCH_1}")
-  message(STATUS "CMAKE_OSX_DEPLOYMENT_TARGET = '${CMAKE_OSX_DEPLOYMENT_TARGET}'")
-
-  string(REGEX MATCH "-stdlib=([^ ]+)" scratch "$ENV{LL_BUILD}")
-  set(CMAKE_XCODE_ATTRIBUTE_CLANG_CXX_LIBRARY "${CMAKE_MATCH_1}")
-  message(STATUS "CMAKE_XCODE_ATTRIBUTE_CLANG_CXX_LIBRARY = '${CMAKE_XCODE_ATTRIBUTE_CLANG_CXX_LIBRARY}'")
-
-  string(REGEX MATCH " -g([^ ]*)" scratch "$ENV{LL_BUILD}")
-  set(CMAKE_XCODE_ATTRIBUTE_DEBUG_INFORMATION_FORMAT "${CMAKE_MATCH_1}")
-  # -gdwarf-2 is passed in LL_BUILD according to 00-COMPILE-LINK-RUN.txt.
-  # However, when CMake 3.9.2 sees -gdwarf-2, it silently deletes the whole -g
-  # switch, producing no symbols at all! The same thing happens if we specify
-  # plain -g ourselves, i.e. CMAKE_XCODE_ATTRIBUTE_DEBUG_INFORMATION_FORMAT is
-  # the empty string. Specifying -gdwarf-with-dsym or just -gdwarf drives a
-  # different CMake behavior: it substitutes plain -g. As of 2017-09-19,
-  # viewer-build-variables/variables still passes -gdwarf-2, which is the
-  # no-symbols case. Set -gdwarf, triggering CMake to substitute plain -g --
-  # at least that way we should get symbols, albeit mangled ones. It Would Be
-  # Nice if CMake's behavior could be predicted from a consistent mental
-  # model, instead of only observed experimentally.
-  string(REPLACE "dwarf-2" "dwarf"
-    CMAKE_XCODE_ATTRIBUTE_DEBUG_INFORMATION_FORMAT
-    "${CMAKE_XCODE_ATTRIBUTE_DEBUG_INFORMATION_FORMAT}")
-  message(STATUS "CMAKE_XCODE_ATTRIBUTE_DEBUG_INFORMATION_FORMAT = '${CMAKE_XCODE_ATTRIBUTE_DEBUG_INFORMATION_FORMAT}'")
-
-  string(REGEX MATCH "-O([^ ]*)" scratch "$ENV{LL_BUILD}")
-  set(CMAKE_XCODE_ATTRIBUTE_GCC_OPTIMIZATION_LEVEL "${CMAKE_MATCH_1}")
-  message(STATUS "CMAKE_XCODE_ATTRIBUTE_GCC_OPTIMIZATION_LEVEL = '${CMAKE_XCODE_ATTRIBUTE_GCC_OPTIMIZATION_LEVEL}'")
-
-  string(REGEX MATCHALL "[^ ]+" LL_BUILD_LIST "$ENV{LL_BUILD}")
-  list(FIND LL_BUILD_LIST "-iwithsysroot" sysroot_idx)
-  if ("${sysroot_idx}" LESS 0)
-    message(FATAL_ERROR "Environment variable LL_BUILD must contain '-iwithsysroot'")
+  # Xcode setup
+  if (XCODE_VERSION LESS 12.0.0)
+    message( FATAL_ERROR "Xcode 12.0.0 or greater is required." )
   endif ()
-  math(EXPR sysroot_idx "${sysroot_idx} + 1")
-  list(GET LL_BUILD_LIST "${sysroot_idx}" CMAKE_OSX_SYSROOT)
-  message(STATUS "CMAKE_OSX_SYSROOT = '${CMAKE_OSX_SYSROOT}'")
+  message( "Building with " ${CMAKE_OSX_SYSROOT} )
+  set(CMAKE_OSX_DEPLOYMENT_TARGET 10.13)
 
-  set(CMAKE_XCODE_ATTRIBUTE_GCC_VERSION "com.apple.compilers.llvm.clang.1_0")
+
+  set(CMAKE_XCODE_ATTRIBUTE_GCC_OPTIMIZATION_LEVEL fast)
+  set(CMAKE_XCODE_ATTRIBUTE_GCC_FAST_MATH YES)
   set(CMAKE_XCODE_ATTRIBUTE_GCC_STRICT_ALIASING NO)
-  set(CMAKE_XCODE_ATTRIBUTE_GCC_FAST_MATH NO)
-  set(CMAKE_XCODE_ATTRIBUTE_CLANG_X86_VECTOR_INSTRUCTIONS ssse3)
-  # we must hard code this to off for now.  xcode's built in signing does not
-  # handle embedded app bundles such as CEF and others. Any signing for local
-  # development must be done after the build as we do in viewer_manifest.py for
-  # released builds
-  # https://stackoverflow.com/a/54296008
-  # "-" represents "Sign to Run Locally" and empty string represents "Do Not Sign"
-  set(CMAKE_XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY "")
+  set(CMAKE_XCODE_ATTRIBUTE_GCC_SYMBOLS_PRIVATE_EXTERN YES)
+  set(CMAKE_XCODE_ATTRIBUTE_DEBUG_INFORMATION_FORMAT dwarf-with-dsym)
+  set(CMAKE_XCODE_ATTRIBUTE_DEAD_CODE_STRIPPING YES)
 
-  set(CMAKE_OSX_ARCHITECTURES "${ARCH}")
-  string(REPLACE "i686"  "i386"   CMAKE_OSX_ARCHITECTURES "${CMAKE_OSX_ARCHITECTURES}")
-  string(REPLACE "AMD64" "x86_64" CMAKE_OSX_ARCHITECTURES "${CMAKE_OSX_ARCHITECTURES}")
+  set(CMAKE_XCODE_ATTRIBUTE_CLANG_X86_VECTOR_INSTRUCTIONS sse4.2)
+  # C++ specifics
+  set(CMAKE_XCODE_ATTRIBUTE_CLANG_CXX_LANGUAGE_STANDARD "c++17")
+  set(CMAKE_XCODE_ATTRIBUTE_CLANG_CXX_LIBRARY "libc++")
+
+  # Disable codesigning, for now it's handled with snake
+  set(CMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_REQUIRED NO)
+  set(CMAKE_XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY "")
+  set(CMAKE_XCODE_ATTRIBUTE_CODE_SIGN_ENTITLEMENTS "")
+
+  set(CMAKE_XCODE_ATTRIBUTE_GCC_WARN_NON_VIRTUAL_DESTRUCTOR YES)
+  set(CMAKE_XCODE_ATTRIBUTE_GCC_WARN_HIDDEN_VIRTUAL_FUNCTIONS YES)
+  set(CMAKE_XCODE_ATTRIBUTE_CLANG_WARN_SUSPICIOUS_MOVE YES)
+  set(CMAKE_XCODE_ATTRIBUTE_CLANG_WARN_RANGE_LOOP_ANALYSIS YES)
+
+  set(ADDRESS_SIZE 64)
+  set(ARCH x86_64)
+  set(CMAKE_OSX_ARCHITECTURES x86_64)
 
   set(LL_ARCH ${ARCH}_darwin)
   set(LL_ARCH_DIR universal-darwin)

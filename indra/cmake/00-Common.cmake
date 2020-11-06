@@ -270,26 +270,14 @@ endif (LINUX)
 if (DARWIN)
   # Warnings should be fatal -- thanks, Nicky Perian, for spotting reversed default
   set(CLANG_DISABLE_FATAL_WARNINGS OFF)
+  add_definitions(-DLL_DARWIN=1 -DGL_SILENCE_DEPRECATION)
   set(CMAKE_CXX_LINK_FLAGS "-Wl,-headerpad_max_install_names,-search_paths_first")
   set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_CXX_LINK_FLAGS}")
-  set(DARWIN_extra_cstar_flags "-Wno-unused-local-typedef -Wno-deprecated-declarations")
-  # Ensure that CMAKE_CXX_FLAGS has the correct -g debug information format --
-  # see Variables.cmake.
-  string(REPLACE "-gdwarf-2" "-g${CMAKE_XCODE_ATTRIBUTE_DEBUG_INFORMATION_FORMAT}"
-    CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
-  # The viewer code base can now be successfully compiled with -std=c++14. But
-  # turning that on in the generic viewer-build-variables/variables file would
-  # potentially require tweaking each of our ~50 third-party library builds.
-  # Until we decide to set -std=c++14 in viewer-build-variables/variables, set
-  # it locally here: we want to at least prevent inadvertently reintroducing
-  # viewer code that would fail with C++14.
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${DARWIN_extra_cstar_flags} -std=c++14")
+  set(DARWIN_extra_cstar_flags "-gdwarf-2 -Wno-unused-local-typedef -Wno-deprecated-declarations")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${DARWIN_extra_cstar_flags}")
   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS}  ${DARWIN_extra_cstar_flags}")
   # NOTE: it's critical that the optimization flag is put in front.
   # NOTE: it's critical to have both CXX_FLAGS and C_FLAGS covered.
-## Really?? On developer machines too?
-##set(ENABLE_SIGNING TRUE)
-##set(SIGNING_IDENTITY "Developer ID Application: Linden Research, Inc.")
 endif (DARWIN)
 
 
