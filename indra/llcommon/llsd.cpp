@@ -361,7 +361,7 @@ namespace
 	};
 
 
-	class ImplMap : public LLSD::Impl
+	class ImplMap final : public LLSD::Impl
 	{
 	private:
 		typedef LLSD::map_t	DataMap;
@@ -374,31 +374,31 @@ namespace
 	public:
 		ImplMap() { }
 		
-		virtual ImplMap& makeMap(LLSD::Impl*&);
+        ImplMap& makeMap(LLSD::Impl*&) override;
 
-		virtual LLSD::Type type() const { return LLSD::TypeMap; }
+        LLSD::Type type() const override { return LLSD::TypeMap; }
 
-		virtual LLSD::Boolean asBoolean() const { return !mData.empty(); }
+        LLSD::Boolean asBoolean() const override { return !mData.empty(); }
 
-		virtual bool has(const std::string_view) const;
+        bool has(const std::string_view) const override;
 
 		using LLSD::Impl::get; // Unhiding get(LLSD::Integer)
 		using LLSD::Impl::erase; // Unhiding erase(LLSD::Integer)
 		using LLSD::Impl::ref; // Unhiding ref(LLSD::Integer)
-		virtual LLSD get(const std::string_view) const;
-		virtual LLSD getKeys() const; 
+        LLSD get(const std::string_view) const override;
+        LLSD getKeys() const override;
 		        void insert(const LLSD::String& k, const LLSD& v);
-		virtual void erase(const LLSD::String&);
+        void erase(const LLSD::String&) override;
 		              LLSD& ref(const std::string_view);
-		virtual const LLSD& ref(const std::string_view) const;
+        const LLSD& ref(const std::string_view) const override;
 
-		virtual int size() const { return mData.size(); }
+        int size() const override { return mData.size(); }
 
 		DataMap& map() final override { return mData; }
 		const DataMap& map() const final override { return mData; }
 
-		virtual void dumpStats() const;
-		virtual void calcStats(S32 type_counts[], S32 share_counts[]) const;
+        void dumpStats() const override;
+        void calcStats(S32 type_counts[], S32 share_counts[]) const override;
 	};
 	
 	ImplMap& ImplMap::makeMap(LLSD::Impl*& var)
@@ -499,7 +499,7 @@ namespace
 	}
 
 
-	class ImplArray : public LLSD::Impl
+	class ImplArray final : public LLSD::Impl
 	{
 	private:
 		typedef std::vector<LLSD>	DataVector;
@@ -510,30 +510,30 @@ namespace
 		ImplArray(const DataVector& data) : mData(data) { }
 		
 	public:
-		ImplArray() { }
+        ImplArray() = default;
 		
-		virtual ImplArray& makeArray(Impl*&);
+        ImplArray& makeArray(Impl*&) override;
 
-		virtual LLSD::Type type() const { return LLSD::TypeArray; }
+        LLSD::Type type() const override { return LLSD::TypeArray; }
 
-		virtual LLSD::Boolean asBoolean() const { return !mData.empty(); }
+        LLSD::Boolean asBoolean() const override { return !mData.empty(); }
 
 		using LLSD::Impl::get; // Unhiding get(LLSD::String)
 		using LLSD::Impl::erase; // Unhiding erase(LLSD::String)
 		using LLSD::Impl::ref; // Unhiding ref(LLSD::String)
-		virtual int size() const; 
-		virtual LLSD get(LLSD::Integer) const;
+        int size() const override;
+        LLSD get(LLSD::Integer) const override;
 		        void set(LLSD::Integer, const LLSD&);
 		        void insert(LLSD::Integer, const LLSD&);
 		        LLSD& append(const LLSD&);
-		virtual void erase(LLSD::Integer);
+        void erase(LLSD::Integer) override;
 		              LLSD& ref(LLSD::Integer);
-		virtual const LLSD& ref(LLSD::Integer) const; 
+        const LLSD& ref(LLSD::Integer) const override;
 
 		DataVector& array() final override { return mData; }
 		const DataVector& array() const final override { return mData; }
 
-		virtual void calcStats(S32 type_counts[], S32 share_counts[]) const;
+        void calcStats(S32 type_counts[], S32 share_counts[]) const override;
 	};
 
 	ImplArray& ImplArray::makeArray(Impl*& var)
