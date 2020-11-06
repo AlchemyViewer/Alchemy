@@ -76,7 +76,6 @@ const char
 	*LLDir::TEXTURES = "textures",
 	*LLDir::SKINBASE = "";
 
-static const char* const empty = "";
 std::string LLDir::sDumpDir = "";
 
 LLDir::LLDir()
