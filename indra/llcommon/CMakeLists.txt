@@ -299,7 +299,7 @@ target_link_libraries(
 if (DARWIN)
   include(CMakeFindFrameworks)
   find_library(CARBON_LIBRARY Carbon)
-  target_link_libraries(llcommon ${CARBON_LIBRARY})
+  target_link_libraries(llcommon PUBLIC ${CARBON_LIBRARY})
 endif (DARWIN)
 
 add_dependencies(llcommon stage_third_party_libs)
