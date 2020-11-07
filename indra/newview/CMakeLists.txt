@@ -1497,6 +1497,10 @@ if (DARWIN)
     )
   SOURCE_GROUP("Resources" FILES ${viewer_RESOURCE_FILES})
   list(APPEND viewer_SOURCE_FILES ${viewer_RESOURCE_FILES})
+  
+  if (OPENAL)
+    LIST(APPEND viewer_LIBRARIES ${OPENAL_LIBRARIES} ${FREEALUT_LIBRARIES})
+  endif (OPENAL)
 endif (DARWIN)
 
 if (LINUX)
