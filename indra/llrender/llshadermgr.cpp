@@ -29,10 +29,6 @@
 #include "llrender.h"
 #include "llfile.h"
 
-#if LL_DARWIN
-#include "OpenGL/OpenGL.h"
-#endif
-
 // Lots of STL stuff in here, using namespace std to keep things more readable
 using std::vector;
 using std::pair;
@@ -1082,7 +1078,7 @@ BOOL LLShaderMgr::linkProgramObject(GLuint obj, BOOL suppress_errors)
 #if LL_DARWIN
 
 	// For some reason this absolutely kills the frame rate when VBO's are enabled
-	if (0)
+	/*if (0)
 	{
 		// Force an evaluation of the gl state so the driver can tell if the shader will run in hardware or software
 		// per Apple's suggestion
@@ -1113,7 +1109,7 @@ BOOL LLShaderMgr::linkProgramObject(GLuint obj, BOOL suppress_errors)
 			success = GL_FALSE;
 			suppress_errors = FALSE;		
 		}
-	}
+	}*/
 
 #else
 	std::string log = get_program_log(obj);
