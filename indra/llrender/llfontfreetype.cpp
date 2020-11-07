@@ -448,7 +448,7 @@ LLFontGlyphInfo* LLFontFreetype::addGlyph(llwchar wch) const
 	if (glyph_index == 0)
 	{
 		//LL_INFOS() << "Trying to add glyph from fallback font!" << LL_ENDL;
-		for (const auto fallback_fontp : mFallbackFonts)
+		for (const auto& fallback_fontp : mFallbackFonts)
         {
 			glyph_index = FT_Get_Char_Index(fallback_fontp->mFTFace, wch);
 			if (glyph_index)
