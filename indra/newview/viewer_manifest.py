@@ -927,6 +927,8 @@ class DarwinManifest(ViewerManifest):
                 for libfile in (
                                 'libjpeg.*.dylib',
                                 'libepoxy.*.dylib',
+                                'libhunspell-*.dylib',
+                                'libndofdev.dylib',
                                 'libopenjpeg.*.dylib',
                                 'libwebp.*.dylib',
                                 ):
@@ -1005,10 +1007,6 @@ class DarwinManifest(ViewerManifest):
                     with self.prefix(src="vmp_icons", dst=""):
                         self.path("*.png")
                         self.path("*.gif")
-
-                with self.prefix(src=relpkgdir, dst=""):
-                    self.path("libndofdev.dylib")
-                    self.path("libhunspell-*.dylib")   
 
                 with self.prefix(src_dst="cursors_mac"):
                     self.path("*.tif")

@@ -137,7 +137,7 @@ elseif(DARWIN)
         libaprutil-1.dylib
         ${EXPAT_COPY}
         libGLOD.dylib
-        libhunspell-1.3.0.dylib
+        libhunspell-1.7.0.dylib
         libndofdev.dylib
         libnghttp2.dylib
         libnghttp2.14.dylib

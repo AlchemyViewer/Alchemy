@@ -1190,9 +1190,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>c327e6d6573fc0a808677de47f08acd9</string>
+              <string>04efd8a320243f77466d64df837f277f8724e9c46bf50318b4c46a166203c74b740e07c0561d0877867fe8226b42815a</string>
+              <key>hash_algorithm</key>
+              <string>sha3_384</string>
               <key>url</key>
-              <string>http://automated-builds-secondlife-com.s3.amazonaws.com/ct2/54844/510092/libhunspell-1.3.2.538974-darwin64-538974.tar.bz2</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/107/packages/generic/libhunspell-643/1.7.0/libhunspell-1.7.0-darwin64-643.tar.xz</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
@@ -1202,11 +1204,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>bd802998bdfe6b1fdaef3092e3eea85e08e7f6da27133d5046812b4efc7505b53419ede488ec34da8660677be5556647</string>
+              <string>aa93e2e144ffa269e1b35cfeee3ed2a8dc6362a4b85cb053341a2a399832aeb7eb0012aace3e4c020dce92f5d0aec6ed</string>
               <key>hash_algorithm</key>
               <string>sha3_384</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/107/packages/generic/libhunspell-535/1.7.0/libhunspell-1.7.0-linux64-535.tar.xz</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/107/packages/generic/libhunspell-643/1.7.0/libhunspell-1.7.0-linux64-643.tar.xz</string>
             </map>
             <key>name</key>
             <string>linux64</string>
@@ -1216,11 +1218,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>a3e08aa2140d1126c448b87c176dc4456971f5d3d2bd12dcd2a6ffd40b8686e26be324a5c86ae9147eeeaf14c26be5be</string>
+              <string>43b2cf86dc4beec187b9647cfbb509e250b6f4cce963b953cba841e788e2d450a5e838b07f733127440477d403454b91</string>
               <key>hash_algorithm</key>
               <string>sha3_384</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/107/packages/generic/libhunspell-535/1.7.0/libhunspell-1.7.0-windows-535.tar.xz</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/107/packages/generic/libhunspell-643/1.7.0/libhunspell-1.7.0-windows-643.tar.xz</string>
             </map>
             <key>name</key>
             <string>windows</string>
@@ -1230,11 +1232,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>33d49d97447889e912355ca5db3958ba402b54926e511eb0c673b58be9f97475c9e6fcb4779da2640a0855a1e061cf53</string>
+              <string>dc75c091535c2514313ea2ab555e82c159e6c4047ae34c0223fc09df384f0c9a5d2205ad35949bf1f25b381246b96bbb</string>
               <key>hash_algorithm</key>
               <string>sha3_384</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/107/packages/generic/libhunspell-535/1.7.0/libhunspell-1.7.0-windows64-535.tar.xz</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/107/packages/generic/libhunspell-643/1.7.0/libhunspell-1.7.0-windows64-643.tar.xz</string>
             </map>
             <key>name</key>
             <string>windows64</string>
@@ -1350,9 +1352,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>bf765dfe0b928ef3c531cd9618fee89b</string>
+              <string>8922b3c06c9bccf5bb6e2cb47fb95f39f022a41ebce10d0de039bf2a28fbe916a11461f4c8c30aa3d5ce86d760933741</string>
+              <key>hash_algorithm</key>
+              <string>sha3_384</string>
               <key>url</key>
-              <string>http://automated-builds-secondlife-com.s3.amazonaws.com/ct2/54843/510085/libndofdev-0.1.538973-darwin64-538973.tar.bz2</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/117/packages/generic/libndofdev-645/0.1.0/libndofdev-0.1.0-darwin64-645.tar.xz</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
@@ -1362,11 +1366,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>cbb264744a5ef9bc4ae712f6e12037cef4d2f9ab1623550ac9310c1c164bba68220f43abc76ab18365f14bd177e4c5a4</string>
+              <string>d3d2b703280d166b358194395cc7d1c56c3877caec30fa7fbf7f97cc68aa1b249c75fbdaefc420c3b32bb8ec6a547cf3</string>
               <key>hash_algorithm</key>
               <string>sha3_384</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/117/packages/generic/libndofdev-539/0.1.0/libndofdev-0.1.0-windows-539.tar.xz</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/117/packages/generic/libndofdev-645/0.1.0/libndofdev-0.1.0-windows-645.tar.xz</string>
             </map>
             <key>name</key>
             <string>windows</string>
@@ -1376,11 +1380,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>c42ec73239878eacf298a6cbc1b056cc896788bf31a0ab93897965bc53453dac8251e8ebd8ddb9edc53a46e24d8272b2</string>
+              <string>b947e7482408e17e89c81c4af06521286ba1b7a5d49b42e428bd3fb26126e4a4379bc0a29dc41259e87aacefb12c0515</string>
               <key>hash_algorithm</key>
               <string>sha3_384</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/117/packages/generic/libndofdev-539/0.1.0/libndofdev-0.1.0-windows64-539.tar.xz</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/117/packages/generic/libndofdev-645/0.1.0/libndofdev-0.1.0-windows64-645.tar.xz</string>
             </map>
             <key>name</key>
             <string>windows64</string>
