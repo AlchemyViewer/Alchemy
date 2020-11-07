@@ -224,7 +224,6 @@ void LLFloaterGodTools::processRegionInfo(LLMessageSystem* msg)
 	S32 price_per_meter;
 	S32 redirect_grid_x;
 	S32 redirect_grid_y;
-	LLUUID cache_id;
 
 	LLHost host = msg->getSender();
 

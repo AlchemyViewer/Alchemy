@@ -5352,7 +5352,6 @@ void LLSelectMgr::processObjectProperties(LLMessageSystem* msg, void** user_data
 		LLUUID group_id;
 		LLUUID last_owner_id;
 		U64 creation_date;
-		LLUUID extra_id;
 		U32 base_mask, owner_mask, group_mask, everyone_mask, next_owner_mask;
 		LLSaleInfo sale_info;
 		LLCategory category;
@@ -5512,10 +5511,8 @@ void LLSelectMgr::processObjectPropertiesFamily(LLMessageSystem* msg, void** use
 	LLUUID id;
 
 	U32 request_flags;
-	LLUUID creator_id;
 	LLUUID owner_id;
 	LLUUID group_id;
-	LLUUID extra_id;
 	U32 base_mask, owner_mask, group_mask, everyone_mask, next_owner_mask;
 	LLSaleInfo sale_info;
 	LLCategory category;

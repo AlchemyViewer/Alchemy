@@ -81,7 +81,6 @@ void no_op_llsd_func(const LLSD&) {}
 void no_op() {}
 
 static const char * const LOG_INV("Inventory");
-static const char * const LOG_LOCAL("InventoryLocalize");
 static const char * const LOG_NOTECARD("copy_inventory_from_notecard");
 
 #if 1

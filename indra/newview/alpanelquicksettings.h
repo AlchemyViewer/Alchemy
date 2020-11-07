@@ -52,8 +52,6 @@ private:
 	void onSimulatorFeaturesReceived(const LLUUID &region_id);
 	void updateEditHoverEnabled();
 
-	LLCheckBoxCtrl* mRegionSettingsCheckBox;
-	
 	LLSlider* mHoverSlider;
 	LLSpinCtrl* mHoverSpinner;
 	

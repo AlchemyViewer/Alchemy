@@ -2405,7 +2405,6 @@ bool callingcard_offer_callback(const LLSD& notification, const LLSD& response)
 {
 	S32 option = LLNotificationsUtil::getSelectedOption(notification, response);
 	LLUUID fid;
-	LLUUID from_id;
 	LLMessageSystem* msg = gMessageSystem;
 	switch(option)
 	{

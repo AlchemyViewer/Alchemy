@@ -458,8 +458,7 @@ void LLSpeakerMgr::update(BOOL resort_ok)
 
 	S32 recent_speaker_count = 0;
 	S32 sort_index = 0;
-	speaker_list_t::iterator sorted_speaker_it;
-	for(LLPointer<LLSpeaker> speakerp : mSpeakersSorted)
+	for(LLPointer<LLSpeaker>& speakerp : mSpeakersSorted)
 	{
 		// color code recent speakers who are not currently speaking
 		if (speakerp->mStatus == LLSpeaker::STATUS_HAS_SPOKEN)
