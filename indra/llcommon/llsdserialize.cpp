@@ -1230,7 +1230,14 @@ void LLSDFormatter::boolalpha(bool alpha)
 
 void LLSDFormatter::realFormat(const std::string& format)
 {
-	mRealFormat = format;
+    if(!format.empty())
+    {
+        mRealFormat = absl::ParsedFormat<absl::FormatConversionCharSet::kFloating>::New(format);
+        if(!mRealFormat)
+        {
+            LL_WARNS() << "Invalid real format spec: " << format << LL_ENDL;
+        }
+    }
 }
 
 S32 LLSDFormatter::format(const LLSD& data, std::ostream& ostr) const
@@ -1246,7 +1253,7 @@ S32 LLSDFormatter::format(const LLSD& data, std::ostream& ostr, EFormatterOption
 
 void LLSDFormatter::formatReal(LLSD::Real real, std::ostream& ostr) const
 {
-	ostr << absl::StreamFormat(mRealFormat.c_str(), real);
+	ostr << absl::StreamFormat(*mRealFormat, real);
 }
 
 /**
@@ -1354,7 +1361,7 @@ S32 LLSDNotationFormatter::format_impl(const LLSD& data, std::ostream& ostr,
 
 	case LLSD::TypeReal:
 		ostr << "r";
-		if(mRealFormat.empty())
+		if(!mRealFormat)
 		{
 			ostr << data.asReal();
 		}
