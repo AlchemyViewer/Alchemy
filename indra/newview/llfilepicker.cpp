@@ -660,7 +660,7 @@ std::vector<std::string>* LLFilePicker::navOpenFilterProc(ELoadFilter filter) //
             allowedv->push_back("xcu");
             break;
         case FFLOAD_ZIP:
-            allowedv.push_back("zip");
+            allowedv->push_back("zip");
             break;
         case FFLOAD_DIRECTORY:
             break;
