@@ -28,7 +28,7 @@
 #include "llurl.h"
 #include "llerror.h"
 
-#if LL_GNUC
+#if LL_GNUC && GCC_VERSION >= 80000
 #pragma GCC diagnostic ignored "-Wstringop-truncation"
 #endif
 
