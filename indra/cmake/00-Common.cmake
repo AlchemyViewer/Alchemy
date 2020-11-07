@@ -278,6 +278,8 @@ if (DARWIN)
   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS}  ${DARWIN_extra_cstar_flags}")
   # NOTE: it's critical that the optimization flag is put in front.
   # NOTE: it's critical to have both CXX_FLAGS and C_FLAGS covered.
+
+  add_definitions(-D_LIBCPP_ENABLE_CXX17_REMOVED_AUTO_PTR=1)
 endif (DARWIN)
 
 
