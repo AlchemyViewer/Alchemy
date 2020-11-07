@@ -39,7 +39,6 @@
 #include "indra_constants.h"
 
 #include <OpenGL/OpenGL.h>
-#include <Carbon/Carbon.h>
 #include <CoreServices/CoreServices.h>
 
 extern BOOL gDebugWindowProc;
@@ -1815,6 +1814,7 @@ LLSD LLWindowMacOSX::getNativeKeyData()
 
 BOOL LLWindowMacOSX::dialogColorPicker( F32 *r, F32 *g, F32 *b)
 {
+#if 0
 	BOOL	retval = FALSE;
 	OSErr	error = noErr;
 	NColorPickerInfo	info;
@@ -1839,6 +1839,8 @@ BOOL LLWindowMacOSX::dialogColorPicker( F32 *r, F32 *g, F32 *b)
 	}
 
 	return (retval);
+#endif
+    return FALSE;
 }
 
 void *LLWindowMacOSX::getPlatformWindow()

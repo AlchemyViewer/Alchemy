@@ -72,7 +72,7 @@
 #include <map>
 
 #if LL_DARWIN
-#include <CoreFoundation/CFURL.h>
+#include <CoreFoundation/CoreFoundation.h>
 #endif
 
 // Static initialization

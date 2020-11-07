@@ -1457,16 +1457,17 @@ if (DARWIN)
     COMPILE_FLAGS "-fmodules -fcxx-modules -Wno-nullability-completeness"
     )
 
-  find_library(AGL_LIBRARY AGL)
   find_library(APPKIT_LIBRARY AppKit)
   find_library(COCOA_LIBRARY Cocoa)
   find_library(IOKIT_LIBRARY IOKit)
+  find_library(COREFOUNDATION_LIBRARY CoreFoundation)
   find_library(COREAUDIO_LIBRARY CoreAudio)
 
   set(viewer_LIBRARIES
     ${COCOA_LIBRARY}
-    ${AGL_LIBRARY}
+    ${APPKIT_LIBRARY}
     ${IOKIT_LIBRARY}
+    ${COREFOUNDATION_LIBRARY}
     ${COREAUDIO_LIBRARY}
     )
 

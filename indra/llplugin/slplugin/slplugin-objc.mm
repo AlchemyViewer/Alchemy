@@ -49,9 +49,6 @@ void LLCocoaPlugin::setupCocoa()
 		// when init'ing the Cocoa App window.		
 		[[NSUserDefaults standardUserDefaults] setObject:@"NO" forKey:@"NSTreatUnknownArgumentsAsOpen"];
 		
-		// This is a bit of voodoo taken from the Apple sample code "CarbonCocoa_PictureCursor":
-		//   http://developer.apple.com/samplecode/CarbonCocoa_PictureCursor/index.html
-		
 		//	Needed for Carbon based applications which call into Cocoa
 		NSApplicationLoad();
 

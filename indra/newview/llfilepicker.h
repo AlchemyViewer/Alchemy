@@ -36,7 +36,6 @@
 #include "stdtypes.h"
 
 #if LL_DARWIN
-#include <Carbon/Carbon.h>
 
 // AssertMacros.h does bad things.
 #undef verify
