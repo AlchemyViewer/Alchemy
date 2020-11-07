@@ -768,7 +768,6 @@ void LLFolderView::removeSelectedItems()
 
 		// iterate through the new container.
 		count = items.size();
-		LLUUID new_selection_id;
 		LLFolderViewItem* item_to_select = getNextUnselectedItem();
 
 		if(count == 1)
