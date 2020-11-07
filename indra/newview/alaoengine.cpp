@@ -1891,12 +1891,12 @@ void ALAOEngine::processImport(bool aFromTimer)
 			if (state->mCycleTime)
 			{
 				const std::string oldName = state->mName;
-				state->mName = llformat("%s%d",oldName + ":CT",state->mCycleTime);
+				state->mName = absl::StrFormat("%s%d",oldName + ":CT",state->mCycleTime);
 			}
 			if (state->mCycle)
 			{
 				const std::string oldName = state->mName;
-				state->mName = llformat("%s%s", oldName, ":CY");
+				state->mName = absl::StrFormat("%s%s", oldName, ":CY");
 			}
 			allComplete = false;
 			LL_DEBUGS("AOEngine") << "state " << state->mName << " still has animations to link." << LL_ENDL;
