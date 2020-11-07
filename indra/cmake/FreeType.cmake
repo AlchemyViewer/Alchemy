@@ -15,5 +15,3 @@ else ()
   endif()
   set(FREETYPE_LIBRARIES freetype)
 endif ()
-
-link_directories(${FREETYPE_LIBRARY_DIRS})
