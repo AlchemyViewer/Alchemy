@@ -660,26 +660,24 @@ BOOL LLWindowMacOSX::createContext(int x, int y, int width, int height, int bits
 		frames_per_swap = 1;
 	}
 	
-	CGLSetParameter(mContext, kCGLCPSwapInterval, &frames_per_swap);
-
-	//enable multi-threaded OpenGL
-	if (sUseMultGL)
-	{
-		CGLError cgl_err;
-		CGLContextObj ctx = CGLGetCurrentContext();
-
-		cgl_err =  CGLEnable( ctx, kCGLCEMPEngine);
-
-		if (cgl_err != kCGLNoError )
-		{
-			LL_DEBUGS("GLInit") << "Multi-threaded OpenGL not available." << LL_ENDL;
-		}
-		else
-		{
-			LL_DEBUGS("GLInit") << "Multi-threaded OpenGL enabled." << LL_ENDL;
-		}
-	}
-	makeFirstResponder(mWindow, mGLView);
+    CGLSetParameter(mContext, kCGLCPSwapInterval, &frames_per_swap);
+    
+    //enable multi-threaded OpenGL
+    CGLError cgl_err;
+    CGLContextObj ctx = CGLGetCurrentContext();
+    
+    cgl_err =  CGLEnable(ctx, kCGLCEMPEngine);
+    
+    if (cgl_err != kCGLNoError )
+    {
+        LL_INFOS("GLInit") << "Multi-threaded OpenGL not available." << LL_ENDL;
+    }
+    else
+    {
+        LL_INFOS("GLInit") << "Multi-threaded OpenGL enabled." << LL_ENDL;
+    }
+    
+    makeFirstResponder(mWindow, mGLView);
     
 	return TRUE;
 }
