@@ -64,7 +64,7 @@ LLDir_Mac::LLDir_Mac()
 {
 	mDirDelimiter = "/";
 
-    const std::string     secondLifeString = "SecondLife";
+    const std::string     secondLifeString = "AlchemyNext";
     
     std::string *executablepathstr = getSystemExecutableFolder();
 
