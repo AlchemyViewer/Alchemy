@@ -1902,16 +1902,30 @@
         <string>ndPhysicsStub</string>
         <key>platforms</key>
         <map>
+          <key>darwin64</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>hash</key>
+              <string>2d73eb791ec9f0a739bbf86b2d55e6600c736b1a0109555df03256883298d6942cd3b51e022e49e70f57f5750b3c807a</string>
+              <key>hash_algorithm</key>
+              <string>sha3_384</string>
+              <key>url</key>
+              <string>https://git.alchemyviewer.org/api/v4/projects/127/packages/generic/ndPhysicsStub-642/0.1.2/ndPhysicsStub-0.1.2-darwin64-642.tar.xz</string>
+            </map>
+            <key>name</key>
+            <string>darwin64</string>
+          </map>
           <key>linux64</key>
           <map>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>f49947e28fdfe84cb107ae17ea8f88fca3f2dde3c2868d0c8726e038e16d93f7ccd1158ac9c69f460bdd262c35cae33d</string>
+              <string>9c179321a1e61a55541eb3d156d935d4d2919c5ad928725f2e3b8ec8fcd110996e8fd876f7e0695f8849b70f435f72c4</string>
               <key>hash_algorithm</key>
               <string>sha3_384</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/127/packages/generic/ndPhysicsStub-537/0.1.2/ndPhysicsStub-0.1.2-linux64-537.tar.xz</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/127/packages/generic/ndPhysicsStub-642/0.1.2/ndPhysicsStub-0.1.2-linux64-642.tar.xz</string>
             </map>
             <key>name</key>
             <string>linux64</string>
@@ -1921,11 +1935,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>bdd8121de3054c37e6fc589dbd7e656da8aa81eff6852414388aef44a067c644eef891176df7044f895443b2003ab0b9</string>
+              <string>41548f8e9fc78cc6396c56f464bfc40875545ca6f6fe3faa58ee2da643d93072328d03be85510ecad17b3a45f9702671</string>
               <key>hash_algorithm</key>
               <string>sha3_384</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/127/packages/generic/ndPhysicsStub-537/0.1.2/ndPhysicsStub-0.1.2-windows-537.tar.xz</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/127/packages/generic/ndPhysicsStub-642/0.1.2/ndPhysicsStub-0.1.2-windows-642.tar.xz</string>
             </map>
             <key>name</key>
             <string>windows</string>
@@ -1935,11 +1949,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>096b10a4c88519b7b8001f89c1bb34a3625268a6d9457bfbef21bffb4a12e439531331d53d2183c0f960da914d0524f8</string>
+              <string>3a7f09b873c8f63c5901e4fe6d98bb6e6d8a9f663d64ee77a056cfcb6c9bcea0edcbb1404933061c64c67b36b7696ea8</string>
               <key>hash_algorithm</key>
               <string>sha3_384</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/127/packages/generic/ndPhysicsStub-537/0.1.2/ndPhysicsStub-0.1.2-windows64-537.tar.xz</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/127/packages/generic/ndPhysicsStub-642/0.1.2/ndPhysicsStub-0.1.2-windows64-642.tar.xz</string>
             </map>
             <key>name</key>
             <string>windows64</string>
