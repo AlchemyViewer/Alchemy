@@ -43,7 +43,7 @@ class LLInventoryItem;
 class LLGLSLShader;
 
 //=========================================================================
-class LLSettingsVOBase final : public LLSettingsBase
+class LLSettingsVOBase : public LLSettingsBase
 {
 public:
     typedef std::function<void(LLUUID asset_id, LLSettingsBase::ptr_t settins, S32 status, LLExtStat extstat)>  asset_download_fn;
