@@ -930,8 +930,12 @@ class DarwinManifest(ViewerManifest):
                                 'libGLOD.dylib',
                                 'libhunspell-*.dylib',
                                 'libndofdev.dylib',
+                                'libogg.*.dylib',
                                 'libopenjpeg.*.dylib',
                                 'liburiparser.*.dylib',
+                                'libvorbis.*.dylib',
+                                'libvorbisenc.*.dylib',
+                                'libvorbisfile.*.dylib',
                                 'libwebp.*.dylib',
                                 ):
                     self.path(libfile)
