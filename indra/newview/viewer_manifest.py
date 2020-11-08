@@ -927,9 +927,11 @@ class DarwinManifest(ViewerManifest):
                 for libfile in (
                                 'libjpeg.*.dylib',
                                 'libepoxy.*.dylib',
+                                'libGLOD.dylib',
                                 'libhunspell-*.dylib',
                                 'libndofdev.dylib',
                                 'libopenjpeg.*.dylib',
+                                'liburiparser.*.dylib',
                                 'libwebp.*.dylib',
                                 ):
                     self.path(libfile)
@@ -1050,7 +1052,6 @@ class DarwinManifest(ViewerManifest):
                                 "libapr-1.0.dylib",
                                 "libaprutil-1.0.dylib",
                                 "libexpat.1.dylib",
-                                "libGLOD.dylib",
                                 # libnghttp2.dylib is a symlink to
                                 # libnghttp2.major.dylib, which is a symlink to
                                 # libnghttp2.version.dylib. Get all of them.

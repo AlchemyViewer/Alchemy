@@ -55,9 +55,11 @@ set_target_properties(SLPlugin
   PROPERTIES
   LINK_FLAGS_DEBUG "/NODEFAULTLIB:\"LIBCMTD\""
   )
-else ()
+elseif (DARWIN)
 set_target_properties(SLPlugin
   PROPERTIES
+  BUILD_WITH_INSTALL_RPATH 1
+  INSTALL_RPATH "@executable_path/../../../../Frameworks"
   MACOSX_BUNDLE_INFO_PLIST ${CMAKE_CURRENT_SOURCE_DIR}/slplugin_info.plist
   )
 endif ()
