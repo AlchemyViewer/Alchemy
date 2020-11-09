@@ -348,13 +348,13 @@ attributedStringInfo getSegments(NSAttributedString *str)
     mMousePos[1] = mPoint.y;
 
     // Apparently people still use this?
-    if ([theEvent modifierFlags] & NSCommandKeyMask &&
-        !([theEvent modifierFlags] & NSControlKeyMask) &&
-        !([theEvent modifierFlags] & NSShiftKeyMask) &&
-        !([theEvent modifierFlags] & NSAlternateKeyMask) &&
-        !([theEvent modifierFlags] & NSAlphaShiftKeyMask) &&
-        !([theEvent modifierFlags] & NSFunctionKeyMask) &&
-        !([theEvent modifierFlags] & NSHelpKeyMask))
+    if ([theEvent modifierFlags] & NSEventModifierFlagCommand &&
+        !([theEvent modifierFlags] & NSEventModifierFlagControl) &&
+        !([theEvent modifierFlags] & NSEventModifierFlagShift) &&
+        !([theEvent modifierFlags] & NSEventModifierFlagOption) &&
+        !([theEvent modifierFlags] & NSEventModifierFlagCapsLock) &&
+        !([theEvent modifierFlags] & NSEventModifierFlagFunction) &&
+        !([theEvent modifierFlags] & NSEventModifierFlagHelp))
     {
         callRightMouseDown(mMousePos, [theEvent modifierFlags]);
         mSimulatedRightClick = true;
@@ -498,7 +498,7 @@ attributedStringInfo getSegments(NSAttributedString *str)
     unichar ch;
     if (acceptsText &&
         !mMarkedTextAllowed &&
-        !(mModifiers & (NSControlKeyMask | NSCommandKeyMask)) &&  // commands don't invoke InputWindow
+        !(mModifiers & (NSEventModifierFlagControl | NSEventModifierFlagCommand)) &&  // commands don't invoke InputWindow
         ![(LLAppDelegate*)[NSApp delegate] romanScript] &&
         (ch = [[theEvent charactersIgnoringModifiers] characterAtIndex:0]) > ' ' &&
         ch != NSDeleteCharacter &&
@@ -522,13 +522,13 @@ attributedStringInfo getSegments(NSAttributedString *str)
     switch([theEvent keyCode])
     {        
         case 56:
-            mask = NSShiftKeyMask;
+            mask = NSEventModifierFlagShift;
             break;
         case 58:
-            mask = NSAlternateKeyMask;
+            mask = NSEventModifierFlagOption;
             break;
         case 59:
-            mask = NSControlKeyMask;
+            mask = NSEventModifierFlagControl;
             break;
         default:
             return;            
@@ -732,9 +732,9 @@ attributedStringInfo getSegments(NSAttributedString *str)
 
 - (void) insertNewline:(id)sender
 {
-	if (!(mModifiers & NSCommandKeyMask) &&
-		!(mModifiers & NSShiftKeyMask) &&
-		!(mModifiers & NSAlternateKeyMask))
+    if (!(mModifiers & NSEventModifierFlagCommand) &&
+        !(mModifiers & NSEventModifierFlagShift) &&
+        !(mModifiers & NSEventModifierFlagOption))
 	{
 		callUnicodeCallback(13, 0);
 	} else {

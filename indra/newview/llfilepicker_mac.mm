@@ -78,7 +78,7 @@ std::vector<std::string>* doLoadDialog(const std::vector<std::string>* allowed_t
         result = [panel runModal];
     }
     
-    if (result == NSOKButton) 
+    if (result == NSModalResponseOK) 
     {
         NSArray *filesToOpen = [panel URLs];
         int i, count = [filesToOpen count];
@@ -120,7 +120,7 @@ std::string* doSaveDialog(const std::string* file,
     [panel setNameFieldStringValue: fileName];
     [panel setDirectoryURL: url];
     if([panel runModal] == 
-       NSFileHandlingPanelOKButton) 
+       NSModalResponseOK) 
     {
         NSURL* url = [panel URL];
         NSString* p = [url path];
