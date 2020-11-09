@@ -242,8 +242,8 @@ void LLWatchdog::run()
 	{
 		SuspectsRegistry::iterator result = 
 			std::find_if(mSuspects.begin(), 
-				mSuspects.end(), 
-				std::not1(std::mem_fn(&LLWatchdogEntry::isAlive))
+                mSuspects.end(),
+                [](LLWatchdogEntry* entry){ return !entry->isAlive(); }
 				);
 		if(result != mSuspects.end())
 		{
