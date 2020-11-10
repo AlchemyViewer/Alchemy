@@ -1056,11 +1056,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>04efd8a320243f77466d64df837f277f8724e9c46bf50318b4c46a166203c74b740e07c0561d0877867fe8226b42815a</string>
+              <string>4450df2596f2b8248773d2c11080c8137b135bd5e17af4d4d9086d12e77af2affc88cfdb60ded02bd0355737b6287dd6</string>
               <key>hash_algorithm</key>
               <string>sha3_384</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/107/packages/generic/libhunspell-643/1.7.0/libhunspell-1.7.0-darwin64-643.tar.xz</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/107/packages/generic/libhunspell-654/1.7.0/libhunspell-1.7.0-darwin64-654.tar.xz</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
@@ -1070,11 +1070,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>aa93e2e144ffa269e1b35cfeee3ed2a8dc6362a4b85cb053341a2a399832aeb7eb0012aace3e4c020dce92f5d0aec6ed</string>
+              <string>b19405654764890352ceb796f40ca56085c7e711e35cd1fb4fb3606d972de0c457698425c33cc36434c2e4a5a30d7ec5</string>
               <key>hash_algorithm</key>
               <string>sha3_384</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/107/packages/generic/libhunspell-643/1.7.0/libhunspell-1.7.0-linux64-643.tar.xz</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/107/packages/generic/libhunspell-654/1.7.0/libhunspell-1.7.0-linux64-654.tar.xz</string>
             </map>
             <key>name</key>
             <string>linux64</string>
@@ -1084,11 +1084,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>43b2cf86dc4beec187b9647cfbb509e250b6f4cce963b953cba841e788e2d450a5e838b07f733127440477d403454b91</string>
+              <string>4b8b2f04113e39c762b582710fbc65f69e3e37bc5f868868198aea16e75af0b8cb8daa8e26cbe6bd337786bade67355d</string>
               <key>hash_algorithm</key>
               <string>sha3_384</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/107/packages/generic/libhunspell-643/1.7.0/libhunspell-1.7.0-windows-643.tar.xz</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/107/packages/generic/libhunspell-654/1.7.0/libhunspell-1.7.0-windows-654.tar.xz</string>
             </map>
             <key>name</key>
             <string>windows</string>
@@ -1098,11 +1098,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>dc75c091535c2514313ea2ab555e82c159e6c4047ae34c0223fc09df384f0c9a5d2205ad35949bf1f25b381246b96bbb</string>
+              <string>0928658489a5010e983ec926ae77ef8a8bee9086b68d8dfc8350cbb5a4202042d8f71abae914c9c9ade8ce1c31225d1c</string>
               <key>hash_algorithm</key>
               <string>sha3_384</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/107/packages/generic/libhunspell-643/1.7.0/libhunspell-1.7.0-windows64-643.tar.xz</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/107/packages/generic/libhunspell-654/1.7.0/libhunspell-1.7.0-windows64-654.tar.xz</string>
             </map>
             <key>name</key>
             <string>windows64</string>
@@ -1340,11 +1340,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>cf22b956da0f6a6b7b3fcf78035aecdc326b0ae54f25bca097ab15c07746f9fa7b77826bb1ea48c0b5c3d53448e793d5</string>
+              <string>cb9c58dc7a84ec6798fbb455fe76ff93848db5c424b57519a03eb7db10db8c1ddd25cb55a93761b6b205a5b88918e5fd</string>
               <key>hash_algorithm</key>
               <string>sha3_384</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/82/packages/generic/libwebp-638/1.1.0/libwebp-1.1.0-darwin64-638.tar.xz</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/82/packages/generic/libwebp-653/1.1.0/libwebp-1.1.0-darwin64-653.tar.xz</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
@@ -1354,11 +1354,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>60d9e9cdcde0235c0eeff77e91e1c430a19b439b7429f25d06fc75dba017bb665df0ccf9798f93423ec1ed2df2be27f4</string>
+              <string>c99702693f5918b87a66e13f84ea3bfeb37bcb0d244e74c602dc3e64f70139ec5b8ec21a3c87ea2595134fb8e05754ce</string>
               <key>hash_algorithm</key>
               <string>sha3_384</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/82/packages/generic/libwebp-638/1.1.0/libwebp-1.1.0-linux64-638.tar.xz</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/82/packages/generic/libwebp-653/1.1.0/libwebp-1.1.0-linux64-653.tar.xz</string>
             </map>
             <key>name</key>
             <string>linux64</string>
@@ -1368,11 +1368,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>9c468a9c13603d2360125bfaa82dae64356e28bab83bf4ea1e0d71fe4f497988c182b005890c7403cce27fb36a275cc3</string>
+              <string>e1b0f042dabbb65a9280b408eb3b577cd11264019ac4eb04d025edf44910b7382ba48ae50b6f9424c5a3acaaa2e03eca</string>
               <key>hash_algorithm</key>
               <string>sha3_384</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/82/packages/generic/libwebp-638/1.1.0/libwebp-1.1.0-windows-638.tar.xz</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/82/packages/generic/libwebp-653/1.1.0/libwebp-1.1.0-windows-653.tar.xz</string>
             </map>
             <key>name</key>
             <string>windows</string>
@@ -1382,11 +1382,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>b4eceb7f0488e156a309ea695cfea60a1e2174c27fcfce6b7c36ed798cb6b2dcf94e9cad220c321d36a8b82a02ef727c</string>
+              <string>51384482c354420556b0f7f740ae2e6bdebcef2dbde093fa7fd59980a7b27c04779d8734d4ab35537ef1d5419c5f7c2c</string>
               <key>hash_algorithm</key>
               <string>sha3_384</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/82/packages/generic/libwebp-638/1.1.0/libwebp-1.1.0-windows64-638.tar.xz</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/82/packages/generic/libwebp-653/1.1.0/libwebp-1.1.0-windows64-653.tar.xz</string>
             </map>
             <key>name</key>
             <string>windows64</string>
@@ -2442,11 +2442,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>e67c6f1000de8ef61c6dd13638adadc56180d7c62edffcd988dc786f949b8980ef5456a2654ad81134b599e362584e31</string>
+              <string>860b03d04da117ec8fd5e56cbf10ece213e4880c7f02e07ddffa23e4c4c0d1333a1de5be960569ab71b4fbb52ea90255</string>
               <key>hash_algorithm</key>
               <string>sha3_384</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/96/packages/generic/uriparser-646/0.9.4/uriparser-0.9.4-darwin64-646.tar.xz</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/96/packages/generic/uriparser-655/0.9.4/uriparser-0.9.4-darwin64-655.tar.xz</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
@@ -2456,11 +2456,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>5f4488690e73a537faca51805089277dd95767ae330db6857c78d68d736aa6ed308a97158d46a0ce550eda901351a528</string>
+              <string>f4b130c9d0fa4a8bbe407b2fdd65acfa6be1de2d01082d49cf23bc84f1b9069cf0a76d4334e232ecc0f02042b699ae64</string>
               <key>hash_algorithm</key>
               <string>sha3_384</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/96/packages/generic/uriparser-646/0.9.4/uriparser-0.9.4-linux64-646.tar.xz</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/96/packages/generic/uriparser-655/0.9.4/uriparser-0.9.4-linux64-655.tar.xz</string>
             </map>
             <key>name</key>
             <string>linux64</string>
@@ -2470,11 +2470,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>9b87b10906f93f5bcdf8b7269c09a5686360f191812ef2049833e70aae0259ec3fea94852453bbcecfafc96887da8e7e</string>
+              <string>1c9aaaabd10a4db5a3e4104448db6a7213b954f5069ceaa12b1f550b9fa6b9b4414768e39ab8317604cab75f4021da68</string>
               <key>hash_algorithm</key>
               <string>sha3_384</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/96/packages/generic/uriparser-646/0.9.4/uriparser-0.9.4-windows-646.tar.xz</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/96/packages/generic/uriparser-655/0.9.4/uriparser-0.9.4-windows-655.tar.xz</string>
             </map>
             <key>name</key>
             <string>windows</string>
@@ -2484,11 +2484,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>758f30cb62f7cc1135c6f23d032848f25625dc4aaef5a65faf308a47d2ff4171a189a2905aa38e417f7298040a22ad6a</string>
+              <string>f2ce84167d065d9105fcb76686664dde6965e16db49ca71acecf07f2452e16bc4ba1a14fe8641d1bf275bc9b67a413b7</string>
               <key>hash_algorithm</key>
               <string>sha3_384</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/96/packages/generic/uriparser-646/0.9.4/uriparser-0.9.4-windows64-646.tar.xz</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/96/packages/generic/uriparser-655/0.9.4/uriparser-0.9.4-windows64-655.tar.xz</string>
             </map>
             <key>name</key>
             <string>windows64</string>
