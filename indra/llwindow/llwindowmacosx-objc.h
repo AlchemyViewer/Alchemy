@@ -95,7 +95,6 @@ void setCrossCursor();
 void setNotAllowedCursor();
 void hideNSCursor();
 void showNSCursor();
-bool isCGCursorVisible();
 void hideNSCursorTillMove(bool hide);
 void requestUserAttention();
 long showAlert(std::string title, std::string text, int type);

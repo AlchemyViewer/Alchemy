@@ -1494,11 +1494,6 @@ void LLWindowMacOSX::updateCursor()
 	
     if(mCurrentCursor == mNextCursor)
     {
-        if(mCursorHidden && mHideCursorPermanent && isCGCursorVisible())
-        {
-            hideNSCursor();            
-            adjustCursorDecouple();
-        }
         return;
     }
 
@@ -1713,12 +1708,6 @@ void LLSplashScreenMacOSX::showImpl()
 
 void LLSplashScreenMacOSX::updateImpl(const std::string& mesg)
 {
-	if(mWindow != NULL)
-	{
-		CFStringRef string = NULL;
-
-		string = CFStringCreateWithCString(NULL, mesg.c_str(), kCFStringEncodingUTF8);
-	}
 }
 
 
@@ -1813,32 +1802,6 @@ LLSD LLWindowMacOSX::getNativeKeyData()
 
 BOOL LLWindowMacOSX::dialogColorPicker( F32 *r, F32 *g, F32 *b)
 {
-#if 0
-	BOOL	retval = FALSE;
-	OSErr	error = noErr;
-	NColorPickerInfo	info;
-	
-	memset(&info, 0, sizeof(info));
-	info.theColor.color.rgb.red = (UInt16)(*r * 65535.f);
-	info.theColor.color.rgb.green = (UInt16)(*g * 65535.f);
-	info.theColor.color.rgb.blue = (UInt16)(*b * 65535.f);
-	info.placeWhere = kCenterOnMainScreen;
-
-	error = NPickColor(&info);
-	
-	if (error == noErr)
-	{
-		retval = info.newColorChosen;
-		if (info.newColorChosen)
-		{
-			*r = ((float) info.theColor.color.rgb.red) / 65535.0;
-			*g = ((float) info.theColor.color.rgb.green) / 65535.0;
-			*b = ((float) info.theColor.color.rgb.blue) / 65535.0;
-		}
-	}
-
-	return (retval);
-#endif
     return FALSE;
 }
 
