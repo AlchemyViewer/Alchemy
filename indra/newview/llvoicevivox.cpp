@@ -36,8 +36,8 @@
 #include "llbufferstream.h"
 #include "llfile.h"
 #include "llmenugl.h"
-#ifdef LL_USESYSTEMLIBS
-# include "expat.h"
+#if LL_DARWIN || defined(LL_USESYSTEMLIBS)
+# include <expat.h>
 #else
 # include "expat/expat.h"
 #endif

@@ -145,6 +145,8 @@ elseif(DARWIN)
         liburiparser.dylib
         liburiparser.1.dylib
         liburiparser.1.0.27.dylib
+        libxmlrpc-epi.dylib
+        libxmlrpc-epi.0.dylib
        )
 
     if (USE_FMODSTUDIO)

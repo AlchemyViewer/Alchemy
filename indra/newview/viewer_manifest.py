@@ -925,6 +925,8 @@ class DarwinManifest(ViewerManifest):
                 CEF_framework = self.dst_path_of(CEF_framework)
 
                 for libfile in (
+                                'libapr-1.*.dylib',
+                                'libaprutil-1.*.dylib',
                                 'libjpeg.*.dylib',
                                 'libepoxy.*.dylib',
                                 'libGLOD.dylib',
@@ -937,6 +939,7 @@ class DarwinManifest(ViewerManifest):
                                 'libvorbisenc.*.dylib',
                                 'libvorbisfile.*.dylib',
                                 'libwebp.*.dylib',
+                                'libxmlrpc-epi.*.dylib',
                                 ):
                     self.path(libfile)
 
@@ -1053,9 +1056,6 @@ class DarwinManifest(ViewerManifest):
                 libfile_parent = self.get_dst_prefix()
                 dylibs=[]
                 for libfile in (
-                                "libapr-1.0.dylib",
-                                "libaprutil-1.0.dylib",
-                                "libexpat.1.dylib",
                                 # libnghttp2.dylib is a symlink to
                                 # libnghttp2.major.dylib, which is a symlink to
                                 # libnghttp2.version.dylib. Get all of them.

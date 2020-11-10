@@ -54,9 +54,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>9b8bcc3be6dbe40a04c9c81c313f70dc</string>
+              <string>045acdfadb2d3890f95182ad78bcc5c37d46fb2065982f5e10f69bf8e9319bcb747e8b0bc11268e8065123abe3ebd561</string>
+              <key>hash_algorithm</key>
+              <string>sha3_384</string>
               <key>url</key>
-              <string>http://automated-builds-secondlife-com.s3.amazonaws.com/ct2/68333/658209/apr_suite-1.4.5.548882-darwin64-548882.tar.bz2</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/111/packages/generic/apr_suite-668/1.7.0/apr_suite-1.7.0-darwin64-668.tar.xz</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
@@ -66,9 +68,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>84a1a140f20b25d714949185e854d14b</string>
+              <string>7fdeae0b56042a597fb135c677dbf2952dda101a6e8dff326560672cc8637c8ea4bbf19feaefa73b2384ca12d14f6c1b</string>
+              <key>hash_algorithm</key>
+              <string>sha3_384</string>
               <key>url</key>
-              <string>http://automated-builds-secondlife-com.s3.amazonaws.com/ct2/4811/15302/apr_suite-1.4.5.504800-linux64-504800.tar.bz2</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/111/packages/generic/apr_suite-668/1.7.0/apr_suite-1.7.0-linux64-668.tar.xz</string>
             </map>
             <key>name</key>
             <string>linux64</string>
@@ -103,7 +107,7 @@
           </map>
         </map>
         <key>version</key>
-        <string>1.4.5.328</string>
+        <string>1.7.0</string>
       </map>
       <key>boost</key>
       <map>
@@ -507,26 +511,16 @@
         <string>expat</string>
         <key>platforms</key>
         <map>
-          <key>darwin64</key>
-          <map>
-            <key>archive</key>
-            <map>
-              <key>hash</key>
-              <string>3656b7f7b655cb267fd94f089d2e145c</string>
-              <key>url</key>
-              <string>http://automated-builds-secondlife-com.s3.amazonaws.com/ct2/54860/510198/expat-2.1.1.538990-darwin64-538990.tar.bz2</string>
-            </map>
-            <key>name</key>
-            <string>darwin64</string>
-          </map>
           <key>linux64</key>
           <map>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>5e1f025d1cebd12db542080aa755257f</string>
+              <string>29fa7170d908e84c6b456064ad51f1f9feba11effd12d7c0f9600597fb51085ec4d72eee8473420167568018b3c53282</string>
+              <key>hash_algorithm</key>
+              <string>sha3_384</string>
               <key>url</key>
-              <string>http://automated-builds-secondlife-com.s3.amazonaws.com/ct2/380/943/expat-2.1.1.500375-linux64-500375.tar.bz2</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/109/packages/generic/expat-658/2.2.10/expat-2.2.10-linux64-658.tar.xz</string>
             </map>
             <key>name</key>
             <string>linux64</string>
@@ -536,11 +530,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>4f6ce988932eb420afdb4eacd75dbce8</string>
+              <string>af1d89aa93916ee8ef9382f057b47abf31ebc6e44f1f9ecd8bc16193ef40a98669a821c2c0dd3c9368c14630a5144119</string>
               <key>hash_algorithm</key>
-              <string>md5</string>
+              <string>sha3_384</string>
               <key>url</key>
-              <string>https://pkg.alchemyviewer.org/repository/autobuild-external/expat/windows/expat-2.2.9.323-windows-323.tar.bz2</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/109/packages/generic/expat-658/2.2.10/expat-2.2.10-windows-658.tar.xz</string>
             </map>
             <key>name</key>
             <string>windows</string>
@@ -550,18 +544,18 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>49dc81485705a32d345b4af6dab4ac1c</string>
+              <string>b8f16fdb8a3034a0c9ea616bb2ab4950ba88b2e597e92d4d346305ac6fbf4b9b8ff2b44db9696cd499641b80cf6cce28</string>
               <key>hash_algorithm</key>
-              <string>md5</string>
+              <string>sha3_384</string>
               <key>url</key>
-              <string>https://pkg.alchemyviewer.org/repository/autobuild-external/expat/windows64/expat-2.2.9.323-windows64-323.tar.bz2</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/109/packages/generic/expat-658/2.2.10/expat-2.2.10-windows64-658.tar.xz</string>
             </map>
             <key>name</key>
             <string>windows64</string>
           </map>
         </map>
         <key>version</key>
-        <string>2.2.9.323</string>
+        <string>2.2.10</string>
       </map>
       <key>fmodstudio</key>
       <map>
@@ -2618,9 +2612,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>99ea1808ee9f5b55029daa9fdef86776</string>
+              <string>8363cf19c3218df7454f06227e32443f3fdbfc4cca945bec7987d4b0e42ef3e59df879d0d9387dc5675d56e5976f6e05</string>
+              <key>hash_algorithm</key>
+              <string>sha3_384</string>
               <key>url</key>
-              <string>http://automated-builds-secondlife-com.s3.amazonaws.com/ct2/55063/512104/xmlrpc_epi-0.54.1.539072-darwin64-539072.tar.bz2</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/110/packages/generic/xmlrpc-epi-669/0.54.1/xmlrpc_epi-0.54.1-darwin64-669.tar.xz</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
@@ -2630,9 +2626,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>35df17c3eb673030dea4bde9191aa506</string>
+              <string>048906c305677f634b2fa05191ee312c201fe1030d050abdb3c161ca82e11c291bdc10969b99d8bb8286531eb49c48a7</string>
+              <key>hash_algorithm</key>
+              <string>sha3_384</string>
               <key>url</key>
-              <string>http://automated-builds-secondlife-com.s3.amazonaws.com/ct2/727/1489/xmlrpc_epi-0.54.1.500719-linux64-500719.tar.bz2</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/110/packages/generic/xmlrpc-epi-669/0.54.1/xmlrpc_epi-0.54.1-linux64-669.tar.xz</string>
             </map>
             <key>name</key>
             <string>linux64</string>
@@ -2642,11 +2640,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>eb26c5779a2bf53f2038a89282bed227</string>
+              <string>f1878aaff7046b5a44eb992bb9c1d3334b404f4a4cc2c3e04b16a91e00370c7c12676063bfed8e2f2445763f11da5400</string>
               <key>hash_algorithm</key>
-              <string>md5</string>
+              <string>sha3_384</string>
               <key>url</key>
-              <string>https://pkg.alchemyviewer.org/repository/autobuild-external/xmlrpc-epi/windows/xmlrpc_epi-0.54.1.326-windows-326.tar.bz2</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/110/packages/generic/xmlrpc-epi-669/0.54.1/xmlrpc_epi-0.54.1-windows-669.tar.xz</string>
             </map>
             <key>name</key>
             <string>windows</string>
@@ -2656,18 +2654,18 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>e33a10439dbd430e158bdca16da2adc4</string>
+              <string>927932400fbede3bbaf7f8ba2ddfd46f1ea89029efeff595fc481a1a4fd9ee715f6653c6ae69719259b6b8d9ce50d925</string>
               <key>hash_algorithm</key>
-              <string>md5</string>
+              <string>sha3_384</string>
               <key>url</key>
-              <string>https://pkg.alchemyviewer.org/repository/autobuild-external/xmlrpc-epi/windows64/xmlrpc_epi-0.54.1.326-windows64-326.tar.bz2</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/110/packages/generic/xmlrpc-epi-669/0.54.1/xmlrpc_epi-0.54.1-windows64-669.tar.xz</string>
             </map>
             <key>name</key>
             <string>windows64</string>
           </map>
         </map>
         <key>version</key>
-        <string>0.54.1.326</string>
+        <string>0.54.1</string>
       </map>
       <key>zlib</key>
       <map>

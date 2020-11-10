@@ -35,7 +35,7 @@
 
 extern "C"
 {
-#ifdef LL_USESYSTEMLIBS
+#if LL_DARWIN || defined(LL_USESYSTEMLIBS)
 # include <expat.h>
 #else
 # include "expat/expat.h"
