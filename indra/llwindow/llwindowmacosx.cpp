@@ -1282,7 +1282,7 @@ LLWindow::LLWindowResolution* LLWindowMacOSX::getSupportedResolutions(S32 &num_r
 {
 	if (!mSupportedResolutions)
 	{
-		CFArrayRef modes = CGDisplayAvailableModes(mDisplay);
+		CFArrayRef modes = CGDisplayCopyAllDisplayModes(mDisplay, NULL);
 
 		if(modes != NULL)
 		{
@@ -1321,6 +1321,7 @@ LLWindow::LLWindowResolution* LLWindowMacOSX::getSupportedResolutions(S32 &num_r
 					}
 				}
 			}
+			CFRelease(modes);
 		}
 	}
 
