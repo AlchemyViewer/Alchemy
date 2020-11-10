@@ -54,19 +54,12 @@
 #endif
 
 #if LL_GTK
-#if LL_GNUC
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-#endif
 extern "C" {
 // mostly for Linux, possible on others
 #include <gtk/gtk.h>
 #include <gdk/gdk.h>
 #include <gdk/gdkx.h>
 }
-#if LL_GNUC
-#pragma GCC diagnostic pop
-#endif // LL_GNUC
 #endif // LL_GTK
 
 class LLFilePicker
