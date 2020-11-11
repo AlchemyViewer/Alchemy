@@ -207,57 +207,61 @@ attributedStringInfo getSegments(NSAttributedString *str)
 
 - (id) initWithFrame:(NSRect)frame withSamples:(NSUInteger)samples andVsync:(BOOL)vsync
 {
-	[self registerForDraggedTypes:[NSArray arrayWithObject:NSURLPboardType]];
-	[self initWithFrame:frame];
-	
-	// Initialize with a default "safe" pixel format that will work with versions dating back to OS X 10.6.
-	// Any specialized pixel formats, i.e. a core profile pixel format, should be initialized through rebuildContextWithFormat.
-	// 10.7 and 10.8 don't really care if we're defining a profile or not.  If we don't explicitly request a core or legacy profile, it'll always assume a legacy profile (for compatibility reasons).
-	NSOpenGLPixelFormatAttribute attrs[] = {
-        NSOpenGLPFANoRecovery,
-		NSOpenGLPFADoubleBuffer,
-		NSOpenGLPFAClosestPolicy,
-		NSOpenGLPFAAccelerated,
-		NSOpenGLPFASampleBuffers, static_cast<NSOpenGLPixelFormatAttribute>(samples > 0 ? 1 : 0),
-		NSOpenGLPFASamples, static_cast<NSOpenGLPixelFormatAttribute>(samples),
-		NSOpenGLPFAStencilSize, 8,
-		NSOpenGLPFADepthSize, 24,
-		NSOpenGLPFAAlphaSize, 8,
-		NSOpenGLPFAColorSize, 24,
-		0
-    };
-	
-	NSOpenGLPixelFormat *pixelFormat = [[[NSOpenGLPixelFormat alloc] initWithAttributes:attrs] autorelease];
-	
-	if (pixelFormat == nil)
-	{
-		NSLog(@"Failed to create pixel format!", nil);
-		return nil;
-	}
-	
-	NSOpenGLContext *glContext = [[NSOpenGLContext alloc] initWithFormat:pixelFormat shareContext:nil];
-	
-	if (glContext == nil)
-	{
-		NSLog(@"Failed to create OpenGL context!", nil);
-		return nil;
-	}
+	self = [super initWithFrame:frame];
+	if (!self) { return self; }	// Despite what this may look like, returning nil self is a-ok.
+    @autoreleasepool {
+        [self registerForDraggedTypes:[NSArray arrayWithObject:NSURLPboardType]];
+        
+        // Initialize with a default "safe" pixel format that will work with versions dating back to OS X 10.6.
+        // Any specialized pixel formats, i.e. a core profile pixel format, should be initialized through rebuildContextWithFormat.
+        // 10.7 and 10.8 don't really care if we're defining a profile or not.  If we don't explicitly request a core or legacy profile, it'll always assume a legacy profile (for compatibility reasons).
+        NSOpenGLPixelFormatAttribute attrs[] = {
+            NSOpenGLPFANoRecovery,
+            NSOpenGLPFADoubleBuffer,
+            NSOpenGLPFAClosestPolicy,
+            NSOpenGLPFAAccelerated,
+            NSOpenGLPFAMultisample,
+            NSOpenGLPFASampleBuffers, static_cast<NSOpenGLPixelFormatAttribute>((samples > 0 ? 1 : 0)),
+            NSOpenGLPFASamples, static_cast<NSOpenGLPixelFormatAttribute>(samples),
+            NSOpenGLPFAStencilSize, static_cast<NSOpenGLPixelFormatAttribute>(8),
+            NSOpenGLPFADepthSize, static_cast<NSOpenGLPixelFormatAttribute>(24),
+            NSOpenGLPFAAlphaSize, static_cast<NSOpenGLPixelFormatAttribute>(8),
+            NSOpenGLPFAColorSize, static_cast<NSOpenGLPixelFormatAttribute>(24),
+            0
+        };
+        
+        NSOpenGLPixelFormat *pixelFormat = [[[NSOpenGLPixelFormat alloc] initWithAttributes:attrs] autorelease];
+        
+        if (pixelFormat == nil)
+        {
+            NSLog(@"Failed to create pixel format!", nil);
+            return nil;
+        }
+        
+        NSOpenGLContext *glContext = [[[NSOpenGLContext alloc] initWithFormat:pixelFormat shareContext:nil] autorelease];
+        
+        if (glContext == nil)
+        {
+            NSLog(@"Failed to create OpenGL context!", nil);
+            return nil;
+        }
+        
+        //for retina support
+        [self setWantsBestResolutionOpenGLSurface:YES];
+        
+        [self setPixelFormat:pixelFormat];
+        
+        [self setOpenGLContext:glContext];
+        
+        [glContext setView:self];
+        
+        [glContext makeCurrentContext];
+        
+        GLint glVsync = vsync ? 1 : 0;
+        [glContext setValues:&glVsync forParameter:NSOpenGLCPSwapInterval];
 
-	//for retina support
-	[self setWantsBestResolutionOpenGLSurface:YES];
+    }
 
-	[self setPixelFormat:pixelFormat];
-
-	[self setOpenGLContext:glContext];
-	
-	[glContext setView:self];
-	
-	[glContext makeCurrentContext];
-	
-	GLint glVsync = vsync ? 1 : 0;
-	[glContext setValues:&glVsync forParameter:NSOpenGLCPSwapInterval];
-
-    
 	return self;
 }
 
@@ -268,20 +272,23 @@ attributedStringInfo getSegments(NSAttributedString *str)
 
 - (BOOL) rebuildContextWithFormat:(NSOpenGLPixelFormat *)format
 {
-	NSOpenGLContext *ctx = [self openGLContext];
-	
-	[ctx clearDrawable];
-	[ctx initWithFormat:format shareContext:nil];
-	
-	if (ctx == nil)
-	{
-		NSLog(@"Failed to create OpenGL context!", nil);
-		return false;
-	}
-	
-	[self setOpenGLContext:ctx];
-	[ctx setView:self];
-	[ctx makeCurrentContext];
+    @autoreleasepool {
+        NSOpenGLContext *ctx = [self openGLContext];
+        
+        [ctx clearDrawable];
+        ctx = [[[NSOpenGLContext alloc] initWithFormat:format shareContext:nil] autorelease];
+        
+        if (ctx == nil)
+        {
+            NSLog(@"Failed to create OpenGL context!", nil);
+            return false;
+        }
+        
+        [self setOpenGLContext:ctx];
+        [ctx setView:self];
+        [ctx makeCurrentContext];
+    }
+
 	return true;
 }
 

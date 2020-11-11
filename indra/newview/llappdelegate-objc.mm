@@ -358,7 +358,7 @@ struct AttachmentInfo
     }
     else
     {
-	[super sendEvent:event];
+        [super sendEvent:event];
     }
 }
 

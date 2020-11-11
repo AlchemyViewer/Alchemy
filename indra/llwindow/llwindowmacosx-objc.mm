@@ -49,14 +49,12 @@ void setupCocoa()
 	
 	if(!inited)
 	{
-		NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
-		
-		// The following prevents the Cocoa command line parser from trying to open 'unknown' arguements as documents.
-		// ie. running './secondlife -set Language fr' would cause a pop-up saying can't open document 'fr'
-		// when init'ing the Cocoa App window.
-		[[NSUserDefaults standardUserDefaults] setObject:@"NO" forKey:@"NSTreatUnknownArgumentsAsOpen"];
-		
-		[pool release];
+        @autoreleasepool {
+            // The following prevents the Cocoa command line parser from trying to open 'unknown' arguements as documents.
+            // ie. running './secondlife -set Language fr' would cause a pop-up saying can't open document 'fr'
+            // when init'ing the Cocoa App window.
+            [[NSUserDefaults standardUserDefaults] setObject:@"NO" forKey:@"NSTreatUnknownArgumentsAsOpen"];
+        }
 
 		inited = true;
 	}
@@ -102,21 +100,19 @@ unsigned short *copyFromPBoard()
 
 CursorRef createImageCursor(const char *fullpath, int hotspotX, int hotspotY)
 {
-	NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
-	
-	// extra retain on the NSCursor since we want it to live for the lifetime of the app.
-	NSCursor *cursor =
-	[[[NSCursor alloc]
-	  initWithImage:
-	  [[[NSImage alloc] initWithContentsOfFile:
-		[NSString stringWithFormat:@"%s", fullpath]
-		]autorelease]
-	  hotSpot:NSMakePoint(hotspotX, hotspotY)
-	  ]retain];
-	
-	[pool release];
-	
-	return (CursorRef)cursor;
+    @autoreleasepool {
+        // extra retain on the NSCursor since we want it to live for the lifetime of the app.
+        NSCursor *cursor =
+        [[[NSCursor alloc]
+          initWithImage:
+          [[[NSImage alloc] initWithContentsOfFile:
+            [NSString stringWithFormat:@"%s", fullpath]
+            ]autorelease]
+          hotSpot:NSMakePoint(hotspotX, hotspotY)
+          ] retain];
+        
+        return (CursorRef)cursor;
+    }
 }
 
 void setArrowCursor()
@@ -176,10 +172,10 @@ OSErr releaseImageCursor(CursorRef ref)
 {
 	if( ref != NULL )
 	{
-		NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
-		NSCursor *cursor = (NSCursor*)ref;
-		[cursor release];
-		[pool release];
+        @autoreleasepool {
+            NSCursor *cursor = (NSCursor*)ref;
+            [cursor release];
+        }
 	}
 	else
 	{
@@ -193,10 +189,10 @@ OSErr setImageCursor(CursorRef ref)
 {
 	if( ref != NULL )
 	{
-		NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
-		NSCursor *cursor = (NSCursor*)ref;
-		[cursor set];
-		[pool release];
+        @autoreleasepool {
+            NSCursor *cursor = (NSCursor*)ref;
+            [cursor set];
+        }
 	}
 	else
 	{
@@ -395,46 +391,47 @@ void requestUserAttention()
 
 long showAlert(std::string text, std::string title, int type)
 {
-    NSAlert *alert = [[NSAlert alloc] init];
-    
-    [alert setMessageText:[NSString stringWithCString:title.c_str() encoding:[NSString defaultCStringEncoding]]];
-    [alert setInformativeText:[NSString stringWithCString:text.c_str() encoding:[NSString defaultCStringEncoding]]];
-    if (type == 0)
-    {
-        [alert addButtonWithTitle:@"Okay"];
-    } else if (type == 1)
-    {
-        [alert addButtonWithTitle:@"Okay"];
-        [alert addButtonWithTitle:@"Cancel"];
-    } else if (type == 2)
-    {
-        [alert addButtonWithTitle:@"Yes"];
-        [alert addButtonWithTitle:@"No"];
-    }
-    long ret = [alert runModal];
-    [alert dealloc];
-    
-    if (ret == NSAlertFirstButtonReturn)
-    {
-        if (type == 1)
+    @autoreleasepool {
+        NSAlert *alert = [[[NSAlert alloc] init] autorelease];
+        
+        [alert setMessageText:[NSString stringWithCString:title.c_str() encoding:[NSString defaultCStringEncoding]]];
+        [alert setInformativeText:[NSString stringWithCString:text.c_str() encoding:[NSString defaultCStringEncoding]]];
+        if (type == 0)
         {
-            ret = 3;
+            [alert addButtonWithTitle:@"Okay"];
+        } else if (type == 1)
+        {
+            [alert addButtonWithTitle:@"Okay"];
+            [alert addButtonWithTitle:@"Cancel"];
         } else if (type == 2)
         {
-            ret = 0;
+            [alert addButtonWithTitle:@"Yes"];
+            [alert addButtonWithTitle:@"No"];
         }
-    } else if (ret == NSAlertSecondButtonReturn)
-    {
-        if (type == 0 || type == 1)
+        long ret = [alert runModal];
+        
+        if (ret == NSAlertFirstButtonReturn)
         {
-            ret = 2;
-        } else if (type == 2)
+            if (type == 1)
+            {
+                ret = 3;
+            } else if (type == 2)
+            {
+                ret = 0;
+            }
+        } else if (ret == NSAlertSecondButtonReturn)
         {
-            ret = 1;
+            if (type == 0 || type == 1)
+            {
+                ret = 2;
+            } else if (type == 2)
+            {
+                ret = 1;
+            }
         }
+        
+        return ret;
     }
-    
-    return ret;
 }
 
 unsigned int getModifiers()
@@ -444,10 +441,10 @@ unsigned int getModifiers()
 
 void setTitle(const std::string& title)
 {
-	NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
-	LLNSWindow *winRef = [(LLAppDelegate*)[[LLApplication sharedApplication] delegate] window];
-	NSString *nsTitle = [NSString stringWithUTF8String:title.c_str()];
-	[winRef setTitle:nsTitle];
-	[pool release];
+    @autoreleasepool {
+        LLNSWindow *winRef = [(LLAppDelegate*)[[LLApplication sharedApplication] delegate] window];
+        NSString *nsTitle = [NSString stringWithUTF8String:title.c_str()];
+        [winRef setTitle:nsTitle];
+    }
 }
 
