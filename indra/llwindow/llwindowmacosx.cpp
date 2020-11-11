@@ -597,8 +597,6 @@ void LLWindowMacOSX::getMouseDeltas(float* delta)
 
 BOOL LLWindowMacOSX::createContext(int x, int y, int width, int height, int bits, BOOL fullscreen, BOOL disable_vsync)
 {
-	BOOL			glNeedsInit = FALSE;
-
 	mFullscreen = fullscreen;
 	
 	if (mWindow == NULL)
@@ -612,10 +610,7 @@ BOOL LLWindowMacOSX::createContext(int x, int y, int width, int height, int bits
 		// Get the view instead.
 		mGLView = createOpenGLView(mWindow, mFSAASamples, !disable_vsync);
 		mContext = getCGLContextObj(mGLView);
-		
-		// Since we just created the context, it needs to be set up.
-		glNeedsInit = TRUE;
-		
+
 		gGLManager.mVRAM = getVramSize(mGLView);
 	}
 	

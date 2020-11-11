@@ -201,7 +201,7 @@ S32 utf16chars_to_wchar(const U16* inchars, llwchar* outchar)
 {
 	const U16* base = inchars;
 	U16 cur_char = *inchars++;
-	llwchar char32 = cur_char;
+	llwchar char32;
 	if ((cur_char >= 0xD800) && (cur_char <= 0xDFFF))
 	{
 		// Surrogates
