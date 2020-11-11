@@ -1022,7 +1022,6 @@ class DarwinManifest(ViewerManifest):
 
                 self.path("licenses-mac.txt", dst="licenses.txt")
                 self.path("featuretable_mac.txt")
-                self.path("SecondLife.nib")
 
                 with self.prefix(src=pkgdir,dst=""):
                     self.path("ca-bundle.crt")
