@@ -64,13 +64,14 @@ void setupCocoa()
 
 bool copyToPBoard(const unsigned short *str, unsigned int len)
 {
-	NSAutoreleasePool *pool = [[NSAutoreleasePool alloc]init];
-	NSPasteboard *pboard = [NSPasteboard generalPasteboard];
-	[pboard clearContents];
-	
-	NSArray *contentsToPaste = [[NSArray alloc] initWithObjects:[NSString stringWithCharacters:str length:len], nil];
-	[pool release];
-	return [pboard writeObjects:contentsToPaste];
+    @autoreleasepool {
+        NSPasteboard *pboard = [NSPasteboard generalPasteboard];
+        [pboard clearContents];
+        
+        NSArray *contentsToPaste = [[[NSArray alloc] initWithObjects:[NSString stringWithCharacters:str length:len], nil] autorelease];
+        BOOL ret = [pboard writeObjects:contentsToPaste];
+        return ret;
+    }
 }
 
 bool pasteBoardAvailable()
