@@ -608,59 +608,59 @@ std::vector<std::string>* LLFilePicker::navOpenFilterProc(ELoadFilter filter) //
     switch(filter)
     {
         case FFLOAD_ALL:
-            allowedv->push_back("wav");
-            allowedv->push_back("bvh");
-            allowedv->push_back("anim");
-            allowedv->push_back("dae");
-            allowedv->push_back("raw");
-            allowedv->push_back("lsl");
-            allowedv->push_back("dic");
-            allowedv->push_back("xcu");
-            allowedv->push_back("gif");
+            allowedv->emplace_back("wav");
+            allowedv->emplace_back("bvh");
+            allowedv->emplace_back("anim");
+            allowedv->emplace_back("dae");
+            allowedv->emplace_back("raw");
+            allowedv->emplace_back("lsl");
+            allowedv->emplace_back("dic");
+            allowedv->emplace_back("xcu");
+            allowedv->emplace_back("gif");
         case FFLOAD_IMAGE:
-            allowedv->push_back("jpg");
-            allowedv->push_back("jpeg");
-            allowedv->push_back("bmp");
-            allowedv->push_back("tga");
-            allowedv->push_back("bmpf");
-            allowedv->push_back("tpic");
-            allowedv->push_back("png");
-			allowedv->push_back("webp");
+            allowedv->emplace_back("jpg");
+            allowedv->emplace_back("jpeg");
+            allowedv->emplace_back("bmp");
+            allowedv->emplace_back("tga");
+            allowedv->emplace_back("bmpf");
+            allowedv->emplace_back("tpic");
+            allowedv->emplace_back("png");
+			allowedv->emplace_back("webp");
             break;
         case FFLOAD_EXE:
-            allowedv->push_back("app");
-            allowedv->push_back("exe");
+            allowedv->emplace_back("app");
+            allowedv->emplace_back("exe");
             break;
         case FFLOAD_WAV:
-            allowedv->push_back("wav");
+            allowedv->emplace_back("wav");
             break;
         case FFLOAD_ANIM:
-            allowedv->push_back("bvh");
-            allowedv->push_back("anim");
+            allowedv->emplace_back("bvh");
+            allowedv->emplace_back("anim");
             break;
         case FFLOAD_COLLADA:
-            allowedv->push_back("dae");
+            allowedv->emplace_back("dae");
             break;
 #ifdef _CORY_TESTING
         case FFLOAD_GEOMETRY:
-            allowedv->push_back("slg");
+            allowedv->emplace_back("slg");
             break;
 #endif
         case FFLOAD_XML:
-            allowedv->push_back("xml");
+            allowedv->emplace_back("xml");
             break;
         case FFLOAD_RAW:
-            allowedv->push_back("raw");
+            allowedv->emplace_back("raw");
             break;
         case FFLOAD_SCRIPT:
-            allowedv->push_back("lsl");
+            allowedv->emplace_back("lsl");
             break;
         case FFLOAD_DICTIONARY:
-            allowedv->push_back("dic");
-            allowedv->push_back("xcu");
+            allowedv->emplace_back("dic");
+            allowedv->emplace_back("xcu");
             break;
         case FFLOAD_ZIP:
-            allowedv->push_back("zip");
+            allowedv->emplace_back("zip");
             break;
         case FFLOAD_DIRECTORY:
             break;
@@ -681,13 +681,13 @@ bool	LLFilePicker::doNavChooseDialog(ELoadFilter filter)
     
 	gViewerWindow->getWindow()->beforeDialog();
     
-    std::vector<std::string> *allowed_types=navOpenFilterProc(filter);
+    std::unique_ptr<std::vector<std::string>> allowed_types;
+    allowed_types.reset(navOpenFilterProc(filter));
     
-    std::vector<std::string> *filev  = doLoadDialog(allowed_types, 
-                                                    mPickOptions);
+    std::unique_ptr<std::vector<std::string>> filev;
+    filev.reset(doLoadDialog(allowed_types.get(), mPickOptions));
 
 	gViewerWindow->getWindow()->afterDialog();
-
 
     if (filev && filev->size() > 0)
     {
@@ -702,93 +702,63 @@ bool	LLFilePicker::doNavSaveDialog(ESaveFilter filter, const std::string& filena
 {
 	
 	// Setup the type, creator, and extension
-    std::string		extension, type, creator;
+    std::string extension;
     
 	switch (filter)
 	{
 		case FFSAVE_WAV:
-			type = "WAVE";
-			creator = "TVOD";
 			extension = "wav";
 			break;
 		case FFSAVE_TGA:
-			type = "TPIC";
-			creator = "prvw";
 			extension = "tga";
 			break;
 		case FFSAVE_TGAPNGWEBP:
-			type = "PNG";
-			creator = "prvw";
 			extension = "png,tga,webp";
 			break;
 		case FFSAVE_BMP:
-			type = "BMPf";
-			creator = "prvw";
 			extension = "bmp";
 			break;
 		case FFSAVE_JPEG:
-			type = "JPEG";
-			creator = "prvw";
 			extension = "jpeg";
 			break;
 		case FFSAVE_PNG:
-			type = "PNG ";
-			creator = "prvw";
 			extension = "png";
 			break;
 		case FFSAVE_WEBP:
-			type = "WebP";
-			creator = "prvw";
 			extension = "webp";
 			break;
 		case FFSAVE_AVI:
-			type = "\?\?\?\?";
-			creator = "\?\?\?\?";
 			extension = "mov";
 			break;
 
 		case FFSAVE_ANIM:
-			type = "\?\?\?\?";
-			creator = "\?\?\?\?";
 			extension = "xaf";
 			break;
 
 #ifdef _CORY_TESTING
 		case FFSAVE_GEOMETRY:
-			type = "\?\?\?\?";
-			creator = "\?\?\?\?";
 			extension = "slg";
 			break;
 #endif	
 			
 		case FFSAVE_XML:
-			type = "\?\?\?\?";
-			creator = "\?\?\?\?";
 			extension = "xml";
 			break;
 			
 		case FFSAVE_RAW:
-			type = "\?\?\?\?";
-			creator = "\?\?\?\?";
 			extension = "raw";
 			break;
 
 		case FFSAVE_J2C:
-			type = "\?\?\?\?";
-			creator = "prvw";
 			extension = "j2c";
 			break;
 		
 		case FFSAVE_SCRIPT:
-			type = "LSL ";
-			creator = "\?\?\?\?";
 			extension = "lsl";
 			break;
 		
 		case FFSAVE_ALL:
 		default:
-			type = "\?\?\?\?";
-			creator = "\?\?\?\?";
 			extension = "";
 			break;
 	}
@@ -805,11 +775,9 @@ bool	LLFilePicker::doNavSaveDialog(ESaveFilter filter, const std::string& filena
 	gViewerWindow->getWindow()->beforeDialog();
 
 	// Run the dialog
-    std::string* filev = doSaveDialog(&namestring, 
-                 &type,
-                 &creator,
+    std::unique_ptr<std::string> filev(doSaveDialog(&namestring,
                  &extension,
-                 mPickOptions);
+                 mPickOptions));
 
 	gViewerWindow->getWindow()->afterDialog();
 
