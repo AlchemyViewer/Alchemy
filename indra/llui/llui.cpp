@@ -222,13 +222,8 @@ void LLUI::setPopupFuncs(const add_popup_t& add_popup, const remove_popup_t& rem
 // static
 void LLUI::setMousePositionScreen(S32 x, S32 y)
 {
-#if defined(LL_DARWIN)
-    S32 screen_x = ll_round(((F32)x * getScaleFactor().mV[VX]) / LLView::getWindow()->getSystemUISize());
-    S32 screen_y = ll_round(((F32)y * getScaleFactor().mV[VY]) / LLView::getWindow()->getSystemUISize());
-#else
     S32 screen_x = ll_round((F32)x * getScaleFactor().mV[VX]);
     S32 screen_y = ll_round((F32)y * getScaleFactor().mV[VY]);
-#endif
 	
 	getWindow()->setCursorPosition(LLCoordGL(screen_x, screen_y).convert());
 }

@@ -42,7 +42,6 @@
 #include <CoreServices/CoreServices.h>
 
 extern BOOL gDebugWindowProc;
-BOOL gHiDPISupport = TRUE;
 
 const S32	BITS_PER_PIXEL = 32;
 const S32	MAX_NUM_RESOLUTIONS = 32;
@@ -641,7 +640,7 @@ BOOL LLWindowMacOSX::createContext(int x, int y, int width, int height, int bits
 	{
 		
 		
-		U32 err = CGLSetCurrentContext(mContext);
+		CGLError err = CGLSetCurrentContext(mContext);
 		if (err != kCGLNoError)
 		{
 			setupFailure("Can't activate GL rendering context", "Error", OSMB_OK);
@@ -808,7 +807,8 @@ BOOL LLWindowMacOSX::getVisible()
 	if(mFullscreen)
 	{
 		result = TRUE;
-	}if (mWindow)
+	}
+	if (mWindow)
 	{
 			result = TRUE;
 	}
@@ -857,10 +857,11 @@ BOOL LLWindowMacOSX::getPosition(LLCoordScreen *position)
 	}
 	else if(mWindow)
 	{
-		const CGPoint & pos = getContentViewBoundsPosition(mWindow);
+		float rect[4];
+		getContentViewBounds(mWindow, rect);
 
-		position->mX = pos.x;
-		position->mY = pos.y;
+		position->mX = rect[0];
+		position->mY = rect[1];
 
 		err = noErr;
 	}
@@ -884,10 +885,11 @@ BOOL LLWindowMacOSX::getSize(LLCoordScreen *size)
 	}
 	else if(mWindow)
 	{
-		const CGSize & sz = gHiDPISupport ? getDeviceContentViewSize(mWindow, mGLView) : getContentViewBoundsSize(mWindow);
+		float rect[4];
+		getScaledContentViewBounds(mWindow, mGLView, rect);
 
-		size->mX = sz.width;
-		size->mY = sz.height;
+		size->mX = rect[2];
+		size->mY = rect[3];
         err = noErr;
 	}
 	else
@@ -900,6 +902,7 @@ BOOL LLWindowMacOSX::getSize(LLCoordScreen *size)
 
 BOOL LLWindowMacOSX::getSize(LLCoordWindow *size)
 {
+	float rect[4];
 	S32 err = -1;
 	
 	if(mFullscreen)
@@ -910,13 +913,11 @@ BOOL LLWindowMacOSX::getSize(LLCoordWindow *size)
 	}
 	else if(mWindow)
 	{
-		const CGSize & sz = gHiDPISupport ? getDeviceContentViewSize(mWindow, mGLView) : getContentViewBoundsSize(mWindow);
+		getScaledContentViewBounds(mWindow, mGLView, rect);
 		
-		size->mX = sz.width;
-		size->mY = sz.height;
-        err = noErr;
-        
-        
+		size->mX = rect[2];
+		size->mY = rect[3];
+        err = noErr;     
 	}
 	else
 	{
@@ -1352,14 +1353,14 @@ BOOL LLWindowMacOSX::convertCoords(LLCoordScreen from, LLCoordWindow* to)
 	if(mWindow)
 	{
 		float mouse_point[2];
-
+		float scale_factor = getSystemUISize();
 		mouse_point[0] = from.mX;
 		mouse_point[1] = from.mY;
 		
 		convertScreenToWindow(mWindow, mouse_point);
 
-		to->mX = mouse_point[0];
-		to->mY = mouse_point[1];
+		to->mX = mouse_point[0] * scale_factor;
+		to->mY = mouse_point[1] * scale_factor;
 
 		return TRUE;
 	}
@@ -1371,10 +1372,9 @@ BOOL LLWindowMacOSX::convertCoords(LLCoordWindow from, LLCoordScreen *to)
 	if(mWindow)
 	{
 		float mouse_point[2];
-
-		mouse_point[0] = from.mX;
-		mouse_point[1] = from.mY;
-		
+		float scale_factor = getSystemUISize();
+		mouse_point[0] = from.mX / scale_factor;
+		mouse_point[1] = from.mY / scale_factor;
 		convertWindowToScreen(mWindow, mouse_point);
 
 		to->mX = mouse_point[0];
@@ -1898,7 +1898,7 @@ MASK LLWindowMacOSX::modifiersToMask(S16 modifiers)
 
 F32 LLWindowMacOSX::getSystemUISize()
 {
-	return gHiDPISupport ? ::getDeviceUnitSize(mGLView) : LLWindow::getSystemUISize();
+	return ::getDeviceUnitSize(mGLView);
 }
 
 #if LL_OS_DRAGDROP_ENABLED

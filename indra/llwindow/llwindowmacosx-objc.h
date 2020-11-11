@@ -31,7 +31,7 @@
 #include <map>
 #include <vector>
 
-//fir CGSize
+//for CGSize
 #include <CoreGraphics/CGGeometry.h>
 
 typedef std::vector<std::pair<int, bool> > segment_t;
@@ -108,16 +108,14 @@ void glSwapBuffers(void* context);
 CGLContextObj getCGLContextObj(GLViewRef view);
 unsigned long getVramSize(GLViewRef view);
 float getDeviceUnitSize(GLViewRef view);
-CGPoint getContentViewBoundsPosition(NSWindowRef window);
-CGSize getContentViewBoundsSize(NSWindowRef window);
-CGSize getDeviceContentViewSize(NSWindowRef window, GLViewRef view);
+void getContentViewBounds(NSWindowRef window, float* bounds);
+void getScaledContentViewBounds(NSWindowRef window, GLViewRef view, float* bounds);
 void getWindowSize(NSWindowRef window, float* size);
 void setWindowSize(NSWindowRef window, int width, int height);
 void getCursorPos(NSWindowRef window, float* pos);
 void makeWindowOrderFront(NSWindowRef window);
 void convertScreenToWindow(NSWindowRef window, float *coord);
 void convertWindowToScreen(NSWindowRef window, float *coord);
-void convertScreenToView(NSWindowRef window, float *coord);
 void convertRectToScreen(NSWindowRef window, float *coord);
 void convertRectFromScreen(NSWindowRef window, float *coord);
 void setWindowPos(NSWindowRef window, float* pos);

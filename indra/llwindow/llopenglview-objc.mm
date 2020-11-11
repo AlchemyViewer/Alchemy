@@ -28,8 +28,6 @@
 #import "llwindowmacosx-objc.h"
 #import "llappdelegate-objc.h"
 
-extern BOOL gHiDPISupport;
-
 #pragma mark local functions
 
 NativeKeyEventData extractKeyDataFromKeyEvent(NSEvent* theEvent)
@@ -104,21 +102,6 @@ attributedStringInfo getSegments(NSAttributedString *str)
     
     return screen;
 }
-
-
-- (NSPoint)convertPointToScreenCoordinates:(NSPoint)aPoint
-{
-    float normalizedX = fabs(fabs(self.frame.origin.x) - fabs(aPoint.x));
-    float normalizedY = aPoint.y - self.frame.origin.y;
-    
-    return NSMakePoint(normalizedX, normalizedY);
-}
-
-- (NSPoint)flipPoint:(NSPoint)aPoint
-{
-    return NSMakePoint(aPoint.x, self.frame.size.height - aPoint.y);
-}
-
 @end
 
 @implementation LLOpenGLView
@@ -144,38 +127,38 @@ attributedStringInfo getSegments(NSAttributedString *str)
 
 - (void)viewDidMoveToWindow
 {
-	[[NSNotificationCenter defaultCenter] addObserver:self
-											 selector:@selector(windowResized:) name:NSWindowDidResizeNotification
-											   object:[self window]];
+    [[NSNotificationCenter defaultCenter] addObserver:self
+                                             selector:@selector(windowResized:) name:NSWindowDidResizeNotification
+                                               object:[self window]];
     
     [[NSNotificationCenter defaultCenter] addObserver:self
-											 selector:@selector(windowWillMiniaturize:) name:NSWindowWillMiniaturizeNotification
-											   object:[self window]];
+                                             selector:@selector(windowWillMiniaturize:) name:NSWindowWillMiniaturizeNotification
+                                               object:[self window]];
     
     [[NSNotificationCenter defaultCenter] addObserver:self
-											 selector:@selector(windowDidDeminiaturize:) name:NSWindowDidDeminiaturizeNotification
-											   object:[self window]];
+                                             selector:@selector(windowDidDeminiaturize:) name:NSWindowDidDeminiaturizeNotification
+                                               object:[self window]];
     
     [[NSNotificationCenter defaultCenter] addObserver:self
-											 selector:@selector(windowDidBecomeKey:) name:NSWindowDidBecomeKeyNotification
-											   object:[self window]];
-	[[NSNotificationCenter defaultCenter] addObserver:self
-											 selector:@selector(windowDidChangeScreen:) name:NSWindowDidChangeScreenNotification
-											   object:[self window]];
-
-
-    NSRect wnd_rect = [[self window] frame];
-    NSRect dev_rect = [self convertRectToBacking:wnd_rect];
-    if (!NSEqualSizes(wnd_rect.size,dev_rect.size))
+                                             selector:@selector(windowDidBecomeKey:) name:NSWindowDidBecomeKeyNotification
+                                               object:[self window]];
+    [[NSNotificationCenter defaultCenter] addObserver:self
+                                             selector:@selector(windowDidChangeScreen:) name:NSWindowDidChangeScreenNotification
+                                               object:[self window]];
+    
+    NSRect rect = [[self window] frame];
+    NSRect scaled_rect = [self convertRectToBacking:rect];
+    if (NSEqualSizes(rect.size, scaled_rect.size))
     {
-        callResize(dev_rect.size.width, dev_rect.size.height);
+        callResize(scaled_rect.size.width, scaled_rect.size.height);
     }
 }
 
 - (void)windowResized:(NSNotification *)notification;
 {
-    NSSize dev_sz = gHiDPISupport ? [self convertSizeToBacking:[self frame].size] : [self frame].size;
-    callResize(dev_sz.width, dev_sz.height);
+    NSSize size = [self frame].size;
+    NSSize scaled_size = [self convertSizeToBacking:size];
+    callResize(scaled_size.width, scaled_size.height);
 }
 
 - (void)windowWillMiniaturize:(NSNotification *)notification;
@@ -256,11 +239,11 @@ attributedStringInfo getSegments(NSAttributedString *str)
 		NSLog(@"Failed to create OpenGL context!", nil);
 		return nil;
 	}
-	
-	[self setPixelFormat:pixelFormat];
 
 	//for retina support
-	[self setWantsBestResolutionOpenGLSurface:gHiDPISupport];
+	[self setWantsBestResolutionOpenGLSurface:YES];
+
+	[self setPixelFormat:pixelFormat];
 
 	[self setOpenGLContext:glContext];
 	
@@ -268,16 +251,9 @@ attributedStringInfo getSegments(NSAttributedString *str)
 	
 	[glContext makeCurrentContext];
 	
-	if (vsync)
-	{
-		[glContext setValues:(const GLint*)1 forParameter:NSOpenGLCPSwapInterval];
-	} else {
-		// supress this error after move to Xcode 7:
-		// error: null passed to a callee that requires a non-null argument [-Werror,-Wnonnull]
-		// Tried using ObjC 'nonnull' keyword as per SO article but didn't build
-		GLint swapInterval=0;
-		[glContext setValues:&swapInterval forParameter:NSOpenGLCPSwapInterval];
-	}
+	GLint glVsync = vsync ? 1 : 0;
+	[glContext setValues:&glVsync forParameter:NSOpenGLCPSwapInterval];
+
     
 	return self;
 }
@@ -323,10 +299,6 @@ attributedStringInfo getSegments(NSAttributedString *str)
 
 - (void) mouseDown:(NSEvent *)theEvent
 {
-    NSPoint mPoint = gHiDPISupport ? [self convertPointToBacking:[theEvent locationInWindow]] : [theEvent locationInWindow];
-    mMousePos[0] = mPoint.x;
-    mMousePos[1] = mPoint.y;
-
     // Apparently people still use this?
     if ([theEvent modifierFlags] & NSEventModifierFlagCommand &&
         !([theEvent modifierFlags] & NSEventModifierFlagControl) &&
@@ -355,7 +327,7 @@ attributedStringInfo getSegments(NSAttributedString *str)
         callRightMouseUp(mMousePos, [theEvent modifierFlags]);
         mSimulatedRightClick = false;
     } else {
-        NSPoint mPoint = gHiDPISupport ? [self convertPointToBacking:[theEvent locationInWindow]] : [theEvent locationInWindow];
+        NSPoint mPoint = [self convertPointToBacking:[theEvent locationInWindow]];
         mMousePos[0] = mPoint.x;
         mMousePos[1] = mPoint.y;
         callLeftMouseUp(mMousePos, [theEvent modifierFlags]);
@@ -364,32 +336,28 @@ attributedStringInfo getSegments(NSAttributedString *str)
 
 - (void) rightMouseDown:(NSEvent *)theEvent
 {
-    NSPoint mPoint = gHiDPISupport ? [self convertPointToBacking:[theEvent locationInWindow]] : [theEvent locationInWindow];
-    mMousePos[0] = mPoint.x;
-    mMousePos[1] = mPoint.y;
 	callRightMouseDown(mMousePos, [theEvent modifierFlags]);
 }
 
 - (void) rightMouseUp:(NSEvent *)theEvent
 {
-    NSPoint mPoint = gHiDPISupport ? [self convertPointToBacking:[theEvent locationInWindow]] : [theEvent locationInWindow];
-    mMousePos[0] = mPoint.x;
-    mMousePos[1] = mPoint.y;
 	callRightMouseUp(mMousePos, [theEvent modifierFlags]);
 }
 
 - (void)mouseMoved:(NSEvent *)theEvent
 {
-    NSPoint dev_delta = gHiDPISupport ? [self convertPointToBacking:NSMakePoint([theEvent deltaX], [theEvent deltaY])] : NSMakePoint([theEvent deltaX], [theEvent deltaY]);
+	// We need a point to be able to convert these.
+	NSPoint delta = NSMakePoint([theEvent deltaX], [theEvent deltaY]);
+	NSPoint scaled_delta = [self convertPointToBacking:delta];
 
 	float mouseDeltas[] = {
-		float(dev_delta.x),
-		float(dev_delta.y)
+		float(scaled_delta.x),
+		float(scaled_delta.y)
 	};
-	
+
 	callDeltaUpdate(mouseDeltas, 0);
-	
-    NSPoint mPoint = gHiDPISupport ? [self convertPointToBacking:[theEvent locationInWindow]] : [theEvent locationInWindow];
+    
+	NSPoint mPoint = [self convertPointToBacking:[theEvent locationInWindow]];
 	mMousePos[0] = mPoint.x;
 	mMousePos[1] = mPoint.y;
 	callMouseMoved(mMousePos, 0);
@@ -403,35 +371,30 @@ attributedStringInfo getSegments(NSAttributedString *str)
 	// Trust the deltas supplied by NSEvent.
 	// The old CoreGraphics APIs we previously relied on are now flagged as obsolete.
 	// NSEvent isn't obsolete, and provides us with the correct deltas.
-
-    NSPoint dev_delta = gHiDPISupport ? [self convertPointToBacking:NSMakePoint([theEvent deltaX], [theEvent deltaY])] : NSMakePoint([theEvent deltaX], [theEvent deltaY]);
-
+	// We need a point to be able to convert these.
+	NSPoint delta = NSMakePoint([theEvent deltaX], [theEvent deltaY]);
+	NSPoint scaled_delta = [self convertPointToBacking:delta];
+	
 	float mouseDeltas[] = {
-		float(dev_delta.x),
-		float(dev_delta.y)
+		float(scaled_delta.x),
+		float(scaled_delta.y)
 	};
 	
 	callDeltaUpdate(mouseDeltas, 0);
 	
-	NSPoint mPoint = gHiDPISupport ? [self convertPointToBacking:[theEvent locationInWindow]] : [theEvent locationInWindow];
+	NSPoint mPoint = [self convertPointToBacking:[theEvent locationInWindow]];
 	mMousePos[0] = mPoint.x;
 	mMousePos[1] = mPoint.y;
-	callMouseDragged(mMousePos, 0);
+	callMouseMoved(mMousePos, 0);
 }
 
 - (void) otherMouseDown:(NSEvent *)theEvent
 {
-    NSPoint mPoint = gHiDPISupport ? [self convertPointToBacking:[theEvent locationInWindow]] : [theEvent locationInWindow];
-    mMousePos[0] = mPoint.x;
-    mMousePos[1] = mPoint.y;
     callOtherMouseDown(mMousePos, [theEvent modifierFlags], [theEvent buttonNumber]);
 }
 
 - (void) otherMouseUp:(NSEvent *)theEvent
 {
-    NSPoint mPoint = gHiDPISupport ? [self convertPointToBacking:[theEvent locationInWindow]] : [theEvent locationInWindow];
-    mMousePos[0] = mPoint.x;
-    mMousePos[1] = mPoint.y;
     callOtherMouseUp(mMousePos, [theEvent modifierFlags], [theEvent buttonNumber]);
 }
 
@@ -534,7 +497,7 @@ attributedStringInfo getSegments(NSAttributedString *str)
 - (NSDragOperation) draggingEntered:(id<NSDraggingInfo>)sender
 {
 	NSPasteboard *pboard;
-    NSDragOperation sourceDragMask;
+	NSDragOperation sourceDragMask;
 	
 	sourceDragMask = [sender draggingSourceOperationMask];
 	
@@ -545,8 +508,8 @@ attributedStringInfo getSegments(NSAttributedString *str)
 		if (sourceDragMask & NSDragOperationLink) {
 			NSURL *fileUrl = [[pboard readObjectsForClasses:[NSArray arrayWithObject:[NSURL class]] options:[NSDictionary dictionary]] objectAtIndex:0];
 			mLastDraggedUrl = [[fileUrl absoluteString] UTF8String];
-            return NSDragOperationLink;
-        }
+			return NSDragOperationLink;
+		}
 	}
 	return NSDragOperationNone;
 }
@@ -831,27 +794,6 @@ attributedStringInfo getSegments(NSAttributedString *str)
 - (id) init
 {
 	return self;
-}
-
-- (NSPoint)convertToScreenFromLocalPoint:(NSPoint)point relativeToView:(NSView *)view
-{
-	NSScreen *currentScreen = [NSScreen currentScreenForMouseLocation];
-	if(currentScreen)
-	{
-		NSPoint windowPoint = [view convertPoint:point toView:nil];
-		NSPoint screenPoint = [[view window] convertBaseToScreen:windowPoint];
-		NSPoint flippedScreenPoint = [currentScreen flipPoint:screenPoint];
-		flippedScreenPoint.y += [currentScreen frame].origin.y;
-		
-		return flippedScreenPoint;
-	}
-	
-	return NSZeroPoint;
-}
-
-- (NSPoint)flipPoint:(NSPoint)aPoint
-{
-    return NSMakePoint(aPoint.x, self.frame.size.height - aPoint.y);
 }
 
 - (BOOL) becomeFirstResponder

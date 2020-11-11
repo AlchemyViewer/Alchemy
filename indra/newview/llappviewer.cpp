@@ -286,10 +286,6 @@ extern BOOL gRandomizeFramerate;
 extern BOOL gPeriodicSlowFrame;
 extern BOOL gDebugGL;
 
-#if LL_DARWIN
-extern BOOL gHiDPISupport;
-#endif
-
 ////////////////////////////////////////////////////////////
 // All from the last globals push...
 
@@ -611,10 +607,6 @@ static void settings_to_globals()
 	gDebugWindowProc = gSavedSettings.getBOOL("DebugWindowProc");
 	gShowObjectUpdates = gSavedSettings.getBOOL("ShowObjectUpdates");
 	LLWorldMapView::sMapScale = gSavedSettings.getF32("MapScale");
-	
-#if LL_DARWIN
-	gHiDPISupport = gSavedSettings.getBOOL("RenderHiDPI");
-#endif
 }
 
 static void settings_modify()
@@ -3205,7 +3197,7 @@ LLSD LLAppViewer::getViewerInfo() const
     info["VFS_TIME"] = LLTrans::getString("AboutTime", substitution);
 
 #if LL_DARWIN
-    info["HIDPI"] = gHiDPISupport;
+    info["HIDPI"] = TRUE;
 #endif
 
 	// Libraries
