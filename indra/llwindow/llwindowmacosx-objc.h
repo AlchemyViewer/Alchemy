@@ -179,5 +179,6 @@ NSWindowRef getMainAppWindow();
 GLViewRef getGLView();
 
 unsigned int getModifiers();
+void setTitle(const std::string& title);
 
 #endif // LL_LLWINDOWMACOSX_OBJC_H

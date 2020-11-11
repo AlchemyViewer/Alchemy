@@ -451,14 +451,17 @@ long showAlert(std::string text, std::string title, int type)
     return ret;
 }
 
-/*
- GLViewRef getGLView()
- {
- return [(LLAppDelegate*)[[NSApplication sharedApplication] delegate] glview];
- }
- */
-
 unsigned int getModifiers()
 {
 	return [NSEvent modifierFlags];
 }
+
+void setTitle(const std::string& title)
+{
+	NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+	LLNSWindow *winRef = [(LLAppDelegate*)[[LLApplication sharedApplication] delegate] window];
+	NSString *nsTitle = [NSString stringWithUTF8String:title.c_str()];
+	[winRef setTitle:nsTitle];
+	[pool release];
+}
+
