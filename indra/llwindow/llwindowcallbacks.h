@@ -54,7 +54,6 @@ public:
 	virtual BOOL handleActivate(LLWindow *window, BOOL activated);
 	virtual BOOL handleActivateApp(LLWindow *window, BOOL activating);
 	virtual void handleMouseMove(LLWindow *window,  LLCoordGL pos, MASK mask);
-    virtual void handleMouseDragged(LLWindow *window,  LLCoordGL pos, MASK mask);
 	virtual void handleScrollWheel(LLWindow *window,  S32 clicks);
 	virtual void handleScrollHWheel(LLWindow *window,  S32 clicks);
 	virtual void handleResize(LLWindow *window,  S32 width,  S32 height);
