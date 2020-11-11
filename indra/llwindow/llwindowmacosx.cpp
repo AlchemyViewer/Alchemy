@@ -696,17 +696,17 @@ void LLWindowMacOSX::destroyContext()
 		mPixelFormat = NULL;
 	}
 
-	// Clean up the GL context
-	if(mContext != NULL)
-	{
-		CGLDestroyContext(mContext);
-	}
-	
 	// Destroy our LLOpenGLView
 	if(mGLView != NULL)
 	{
 		removeGLView(mGLView);
 		mGLView = NULL;
+	}
+	
+	// Clean up the GL context
+	if(mContext != NULL)
+	{
+		CGLDestroyContext(mContext);
 	}
 	
 	// Close the window

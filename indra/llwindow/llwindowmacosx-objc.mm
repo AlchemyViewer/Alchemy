@@ -357,6 +357,7 @@ void removeGLView(GLViewRef view)
 {
 	[(LLOpenGLView*)view clearGLContext];
 	[(LLOpenGLView*)view removeFromSuperview];
+	[(LLOpenGLView*)view release];
 }
 
 void setupInputWindow(NSWindowRef window, GLViewRef glview)
