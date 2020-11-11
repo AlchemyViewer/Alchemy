@@ -60,7 +60,7 @@ public:
 class LL_COMMON_API LLStringTable
 {
 public:
-	LLStringTable(int tablesize);
+	LLStringTable(U32 tablesize);
 	~LLStringTable();
 
 	char *checkString(const char *str);
@@ -74,7 +74,7 @@ public:
 	LLStringTableEntry *addStringEntry(const std::string& str);
 	void  removeString(const char *str);
 
-	S32 mMaxEntries;
+	U32 mMaxEntries;
 	S32 mUniqueEntries;
 	
 #if STRING_TABLE_HASH_MAP
