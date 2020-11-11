@@ -46,6 +46,7 @@
 
 - (void)dealloc
 {
+    [currentInputLanguage release];
     [super dealloc];
 }
 
@@ -196,15 +197,18 @@
 
 - (bool) romanScript
 {
-	// How to add support for new languages with the input window:
-	// Simply append this array with the language code (ja for japanese, ko for korean, zh for chinese, etc.)
-	NSArray *nonRomanScript = [[NSArray alloc] initWithObjects:@"ja", @"ko", @"zh-Hant", @"zh-Hans", nil];
-	if ([nonRomanScript containsObject:currentInputLanguage])
+    @autoreleasepool
     {
-        return false;
+        // How to add support for new languages with the input window:
+        // Simply append this array with the language code (ja for japanese, ko for korean, zh for chinese, etc.)
+        NSArray *nonRomanScript = [[NSArray alloc] initWithObjects:@"ja", @"ko", @"zh-Hant", @"zh-Hans", nil];
+        if ([nonRomanScript containsObject:currentInputLanguage])
+        {
+            return false;
+        }
+        
+        return true;
     }
-    
-    return true;
 }
 
 #if defined(LL_BUGSPLAT)
@@ -348,10 +352,13 @@ struct AttachmentInfo
 
 - (void)sendEvent:(NSEvent *)event
 {
-    [super sendEvent:event];
     if ([event type] == NSEventTypeKeyUp && ([event modifierFlags] & NSEventModifierFlagCommand))
     {   
         [[self keyWindow] sendEvent:event];
+    }
+    else
+    {
+	[super sendEvent:event];
     }
 }
 
