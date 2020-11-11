@@ -79,22 +79,24 @@ bool pasteBoardAvailable()
 	return [[NSPasteboard generalPasteboard] canReadObjectForClasses:classArray options:[NSDictionary dictionary]];
 }
 
-const unsigned short *copyFromPBoard()
+unsigned short *copyFromPBoard()
 {
-	NSAutoreleasePool *pool = [[NSAutoreleasePool alloc]init];
-	NSPasteboard *pboard = [NSPasteboard generalPasteboard];
-	NSArray *classArray = [NSArray arrayWithObject:[NSString class]];
-	NSString *str = NULL;
-	BOOL ok = [pboard canReadObjectForClasses:classArray options:[NSDictionary dictionary]];
-	if (ok)
-	{
-		NSArray *objToPaste = [pboard readObjectsForClasses:classArray options:[NSDictionary dictionary]];
-		str = [objToPaste objectAtIndex:0];
-	}
-	unichar* temp = (unichar*)calloc([str length]+1, sizeof(unichar));
-	[str getCharacters:temp];
-	[pool release];
-	return temp;
+    @autoreleasepool {
+        NSPasteboard *pboard = [NSPasteboard generalPasteboard];
+        NSArray *classArray = [NSArray arrayWithObject:[NSString class]];
+        NSString *str = NULL;
+        BOOL ok = [pboard canReadObjectForClasses:classArray options:[NSDictionary dictionary]];
+        if (ok)
+        {
+            NSArray *objToPaste = [pboard readObjectsForClasses:classArray options:[NSDictionary dictionary]];
+            str = [objToPaste objectAtIndex:0];
+        }
+        NSUInteger len = [str length];
+        unichar* temp = (unichar*)calloc(len+1, sizeof(unichar));
+        [str getCharacters:temp range:NSMakeRange(0, len)];
+        
+        return temp;
+    }
 }
 
 CursorRef createImageCursor(const char *fullpath, int hotspotX, int hotspotY)

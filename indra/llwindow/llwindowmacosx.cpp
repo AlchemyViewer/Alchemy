@@ -1237,8 +1237,10 @@ BOOL LLWindowMacOSX::isClipboardTextAvailable()
 }
 
 BOOL LLWindowMacOSX::pasteTextFromClipboard(LLWString &dst)
-{	
-	llutf16string str(copyFromPBoard());
+{
+    unsigned short* temp = copyFromPBoard();
+	llutf16string str(temp);
+    free(temp);
 	dst = utf16str_to_wstring(str);
 	if (dst != L"")
 	{
