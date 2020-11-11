@@ -1390,11 +1390,6 @@ void LLPipeline::createLUTBuffers()
 			}
 			
 			U32 pix_format = GL_R16F;
-#if LL_DARWIN
-			// Need to work around limited precision with 10.6.8 and older drivers
-			//
-			pix_format = GL_R32F;
-#endif
 			LLImageGL::generateTextures(1, &mLightFunc);
 			gGL.getTexUnit(0)->bindManual(LLTexUnit::TT_TEXTURE, mLightFunc);
 			LLImageGL::setManualImage(LLTexUnit::getInternalType(LLTexUnit::TT_TEXTURE), 0, pix_format, lightResX, lightResY, GL_RED, GL_FLOAT, ls, false);
