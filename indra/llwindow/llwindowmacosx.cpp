@@ -406,11 +406,11 @@ void callWindowUnhide()
 	}
 }
 
-void callWindowDidChangeScreen()
+void callHandleDPIChanged(unsigned int width, unsigned int height, float scale_factor)
 {
 	if ( gWindowImplementation && gWindowImplementation->getCallbacks() )
 	{
-		gWindowImplementation->getCallbacks()->handleWindowDidChangeScreen(gWindowImplementation);
+		gWindowImplementation->getCallbacks()->handleDPIChanged(gWindowImplementation, scale_factor, width, height);
 	}
 }
 

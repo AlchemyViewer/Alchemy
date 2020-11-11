@@ -143,7 +143,7 @@ attributedStringInfo getSegments(NSAttributedString *str)
                                              selector:@selector(windowDidBecomeKey:) name:NSWindowDidBecomeKeyNotification
                                                object:[self window]];
     [[NSNotificationCenter defaultCenter] addObserver:self
-                                             selector:@selector(windowDidChangeScreen:) name:NSWindowDidChangeScreenNotification
+                                             selector:@selector(windowDidChangeBackingProperties:) name:NSWindowDidChangeBackingPropertiesNotification
                                                object:[self window]];
     
     NSRect rect = [[self window] frame];
@@ -176,9 +176,12 @@ attributedStringInfo getSegments(NSAttributedString *str)
     mModifiers = [NSEvent modifierFlags];
 }
 
--(void)windowDidChangeScreen:(NSNotification *)notification;
+-(void)windowDidChangeBackingProperties:(NSNotification *)notification;
 {
-	callWindowDidChangeScreen();
+    NSSize size = [self frame].size;
+    NSSize scaled_size = [self convertSizeToBacking:size];
+    float scale_factor = [self convertSizeToBacking:NSMakeSize(1, 1)].width;
+    callHandleDPIChanged(scaled_size.width, scaled_size.height, scale_factor);
 }
 
 - (void)dealloc

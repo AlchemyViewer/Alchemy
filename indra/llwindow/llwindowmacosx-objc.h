@@ -144,7 +144,7 @@ void callWindowFocus();
 void callWindowUnfocus();
 void callWindowHide();
 void callWindowUnhide();
-void callWindowDidChangeScreen();
+void callHandleDPIChanged(unsigned int width, unsigned int height, float scale_factor);
 void callDeltaUpdate(float *delta, unsigned int mask);
 void callOtherMouseDown(float *pos, unsigned int mask, int button);
 void callOtherMouseUp(float *pos, unsigned int mask, int button);
