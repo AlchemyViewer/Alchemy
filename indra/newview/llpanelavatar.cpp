@@ -30,6 +30,7 @@
 #include "llagent.h"
 #include "llloadingindicator.h"
 #include "lltooldraganddrop.h"
+#include "llviewermenu.h" // is_agent_mappable
 
 //////////////////////////////////////////////////////////////////////////
 // LLProfileDropTarget

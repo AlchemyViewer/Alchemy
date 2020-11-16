@@ -155,7 +155,7 @@ LLApp::~LLApp()
 		mThreadErrorp = NULL;
 	}
 	
-	SUBSYSTEM_CLEANUP(LLCommon);
+	SUBSYSTEM_CLEANUP_DBG(LLCommon);
 }
 
 // static

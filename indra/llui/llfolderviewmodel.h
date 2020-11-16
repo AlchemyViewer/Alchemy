@@ -285,13 +285,7 @@ public:
 	typedef std::list<LLFolderViewModelItem*> child_list_t;
 
 	virtual void addChild(LLFolderViewModelItem* child) 
-	{ 
-		// Avoid duplicates: bail out if that child is already present in the list
-		// Note: this happens when models are created before views
-		
-		if(child->getParent() == this)
-			return;
-
+	{
 		mChildren.push_back(child);
 		child->setParent(this); 
 		dirtyFilter();

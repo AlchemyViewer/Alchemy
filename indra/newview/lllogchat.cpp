@@ -132,6 +132,16 @@ void append_to_last_message(std::list<LLSD>& messages, const std::string& line)
 	messages.back()[LL_IM_TEXT] = im_text;
 }
 
+std::string remove_utf8_bom(const char* buf)
+{
+	std::string res(buf);
+	if (res[0] == (char)0xEF && res[1] == (char)0xBB && res[2] == (char)0xBF)
+	{
+		res.erase(0, 3);
+	}
+	return res;
+}
+
 class LLLogChatTimeScanner final : public LLSingleton<LLLogChatTimeScanner>
 {
 	LLSINGLETON(LLLogChatTimeScanner);
@@ -412,7 +422,7 @@ void LLLogChat::loadChatHistory(const std::string& file_name, std::list<LLSD>& m
 			continue;
 		}
 
-		std::string line(buffer);
+		std::string line(remove_utf8_bom(buffer));
 
 		//updated 1.23 plain text log format requires a space added before subsequent lines in a multilined message
 		if (' ' == line[0])
@@ -797,7 +807,7 @@ bool LLLogChat::isTranscriptFileFound(std::string fullname)
 		{
 			//matching a timestamp
 			boost::match_results<std::string::const_iterator> matches;
-			if (boost::regex_match(std::string(buffer), matches, TIMESTAMP))
+			if (boost::regex_match(remove_utf8_bom(buffer), matches, TIMESTAMP))
 			{
 				result = true;
 			}
@@ -1118,7 +1128,7 @@ void LLLoadHistoryThread::loadHistory(const std::string& file_name, std::list<LL
 			firstline = FALSE;
 			continue;
 		}
-		std::string line(buffer);
+		std::string line(remove_utf8_bom(buffer));
 
 		//updated 1.23 plaint text log format requires a space added before subsequent lines in a multilined message
 		if (' ' == line[0])

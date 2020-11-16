@@ -41,7 +41,7 @@
 /// Exported functions
 ///----------------------------------------------------------------------------
 static const std::string INV_ITEM_ID_LABEL("item_id");
-static const std::string INV_FOLDER_ID_LABEL("folder_id");
+static const std::string INV_FOLDER_ID_LABEL("cat_id");
 static const std::string INV_PARENT_ID_LABEL("parent_id");
 static const std::string INV_ASSET_TYPE_LABEL("type");
 static const std::string INV_PREFERRED_TYPE_LABEL("preferred_type");
@@ -221,19 +221,6 @@ BOOL LLInventoryObject::importLegacyStream(std::istream& input_stream)
 					<< "' in LLInventoryObject::importLegacyStream() for object " << mUUID << LL_ENDL;
 		}
 	}
-	return TRUE;
-}
-
-// exportFile should be replaced with exportLegacyStream
-// not sure whether exportLegacyStream(llofstream(fp)) would work, fp may need to get icramented...
-BOOL LLInventoryObject::exportFile(LLFILE* fp, BOOL) const
-{
-	absl::FPrintF(fp, "\tinv_object\t0\n\t{\n");
-	absl::FPrintF(fp, "\t\tobj_id\t%s\n", mUUID);
-	absl::FPrintF(fp, "\t\tparent_id\t%s\n", mParentUUID);
-	absl::FPrintF(fp, "\t\ttype\t%s\n", LLAssetType::lookup(mType));
-	absl::FPrintF(fp, "\t\tname\t%s|\n", mName);
-	absl::FPrintF(fp,"\t}\n");
 	return TRUE;
 }
 
@@ -590,209 +577,6 @@ BOOL LLInventoryItem::unpackMessage(LLMessageSystem* msg, const char* block, S32
 #else
 	return (local_crc == remote_crc);
 #endif
-}
-
-// virtual
-BOOL LLInventoryItem::importFile(LLFILE* fp)
-{
-	// *NOTE: Changing the buffer size will require changing the scanf
-	// calls below.
-	char buffer[MAX_STRING];	/* Flawfinder: ignore */
-	char keyword[MAX_STRING];	/* Flawfinder: ignore */	
-	char valuestr[MAX_STRING];	/* Flawfinder: ignore */
-	char junk[MAX_STRING];	/* Flawfinder: ignore */
-	BOOL success = TRUE;
-
-	keyword[0] = '\0';
-	valuestr[0] = '\0';
-
-	mInventoryType = LLInventoryType::IT_NONE;
-	mAssetUUID.setNull();
-	while(success && (!feof(fp)))
-	{
-		if (fgets(buffer, MAX_STRING, fp) == NULL)
-		{
-			buffer[0] = '\0';
-		}
-		
-		sscanf(buffer, " %254s %254s", keyword, valuestr);	/* Flawfinder: ignore */
-		if(0 == strcmp("{",keyword))
-		{
-			continue;
-		}
-		if(0 == strcmp("}", keyword))
-		{
-			break;
-		}
-		else if(0 == strcmp("item_id", keyword))
-		{
-			mUUID.set(valuestr);
-		}
-		else if(0 == strcmp("parent_id", keyword))
-		{
-			mParentUUID.set(valuestr);
-		}
-		else if(0 == strcmp("permissions", keyword))
-		{
-			success = mPermissions.importFile(fp);
-		}
-		else if(0 == strcmp("sale_info", keyword))
-		{
-			// Sale info used to contain next owner perm. It is now in
-			// the permissions. Thus, we read that out, and fix legacy
-			// objects. It's possible this op would fail, but it
-			// should pick up the vast majority of the tasks.
-			BOOL has_perm_mask = FALSE;
-			U32 perm_mask = 0;
-			success = mSaleInfo.importFile(fp, has_perm_mask, perm_mask);
-			if(has_perm_mask)
-			{
-				if(perm_mask == PERM_NONE)
-				{
-					perm_mask = mPermissions.getMaskOwner();
-				}
-				// fair use fix.
-				if(!(perm_mask & PERM_COPY))
-				{
-					perm_mask |= PERM_TRANSFER;
-				}
-				mPermissions.setMaskNext(perm_mask);
-			}
-		}
-		else if(0 == strcmp("shadow_id", keyword))
-		{
-			mAssetUUID.set(valuestr);
-			LLXORCipher cipher(MAGIC_ID.mData, UUID_BYTES);
-			cipher.decrypt(mAssetUUID.mData, UUID_BYTES);
-		}
-		else if(0 == strcmp("asset_id", keyword))
-		{
-			mAssetUUID.set(valuestr);
-		}
-		else if(0 == strcmp("type", keyword))
-		{
-			mType = LLAssetType::lookup(valuestr);
-		}
-		else if(0 == strcmp("inv_type", keyword))
-		{
-			mInventoryType = LLInventoryType::lookup(std::string(valuestr));
-		}
-		else if(0 == strcmp("flags", keyword))
-		{
-			sscanf(valuestr, "%x", &mFlags);
-		}
-		else if(0 == strcmp("name", keyword))
-		{
-			//strcpy(valuestr, buffer + strlen(keyword) + 3);
-			// *NOTE: Not ANSI C, but widely supported.
-			sscanf(	/* Flawfinder: ignore */
-				buffer,
-				" %254s%254[\t]%254[^|]",
-				keyword, junk, valuestr);
-
-			// IW: sscanf chokes and puts | in valuestr if there's no name
-			if (valuestr[0] == '|')
-			{
-				valuestr[0] = '\000';
-			}
-
-			mName.assign(valuestr);
-			LLStringUtil::replaceNonstandardASCII(mName, ' ');
-			LLStringUtil::replaceChar(mName, '|', ' ');
-		}
-		else if(0 == strcmp("desc", keyword))
-		{
-			//strcpy(valuestr, buffer + strlen(keyword) + 3);
-			// *NOTE: Not ANSI C, but widely supported.
-			sscanf(	/* Flawfinder: ignore */
-				buffer,
-				" %254s%254[\t]%254[^|]",
-				keyword, junk, valuestr);
-
-			if (valuestr[0] == '|')
-			{
-				valuestr[0] = '\000';
-			}
-
-			disclaimMem(mDescription);
-			mDescription.assign(valuestr);
-			claimMem(mDescription);
-			LLStringUtil::replaceNonstandardASCII(mDescription, ' ');
-			/* TODO -- ask Ian about this code
-			const char *donkey = mDescription.c_str();
-			if (donkey[0] == '|')
-			{
-				LL_ERRS() << "Donkey" << LL_ENDL;
-			}
-			*/
-		}
-		else if(0 == strcmp("creation_date", keyword))
-		{
-			S32 date;
-			sscanf(valuestr, "%d", &date);
-			mCreationDate = date;
-		}
-		else
-		{
-			LL_WARNS() << "unknown keyword '" << keyword
-					<< "' in inventory import of item " << mUUID << LL_ENDL;
-		}
-	}
-
-	// Need to convert 1.0 simstate files to a useful inventory type
-	// and potentially deal with bad inventory tyes eg, a landmark
-	// marked as a texture.
-	if((LLInventoryType::IT_NONE == mInventoryType)
-	   || !inventory_and_asset_types_match(mInventoryType, mType))
-	{
-		LL_DEBUGS() << "Resetting inventory type for " << mUUID << LL_ENDL;
-		mInventoryType = LLInventoryType::defaultForAssetType(mType);
-	}
-
-	mPermissions.initMasks(mInventoryType);
-
-	return success;
-}
-
-BOOL LLInventoryItem::exportFile(LLFILE* fp, BOOL include_asset_key) const
-{
-	absl::FPrintF(fp, "\tinv_item\t0\n\t{\n");
-	absl::FPrintF(fp, "\t\titem_id\t%s\n", mUUID);
-	absl::FPrintF(fp, "\t\tparent_id\t%s\n", mParentUUID);
-	mPermissions.exportFile(fp);
-
-	// Check for permissions to see the asset id, and if so write it
-	// out as an asset id. Otherwise, apply our cheesy encryption.
-	if(include_asset_key)
-	{
-		U32 mask = mPermissions.getMaskBase();
-		if(((mask & PERM_ITEM_UNRESTRICTED) == PERM_ITEM_UNRESTRICTED)
-		   || (mAssetUUID.isNull()))
-		{
-			absl::FPrintF(fp, "\t\tasset_id\t%s\n", mAssetUUID);
-		}
-		else
-		{
-			LLUUID shadow_id(mAssetUUID);
-			LLXORCipher cipher(MAGIC_ID.mData, UUID_BYTES);
-			cipher.encrypt(shadow_id.mData, UUID_BYTES);
-			absl::FPrintF(fp, "\t\tshadow_id\t%s\n", shadow_id);
-		}
-	}
-	else
-	{
-		absl::FPrintF(fp, "\t\tasset_id\t%s\n", LLUUID::null);
-	}
-	absl::FPrintF(fp, "\t\ttype\t%s\n", LLAssetType::lookup(mType));
-	const std::string inv_type_str = LLInventoryType::lookup(mInventoryType);
-	if(!inv_type_str.empty()) absl::FPrintF(fp, "\t\tinv_type\t%s\n", inv_type_str);
-	absl::FPrintF(fp, "\t\tflags\t%08x\n", mFlags);
-	mSaleInfo.exportFile(fp);
-	absl::FPrintF(fp, "\t\tname\t%s|\n", mName);
-	absl::FPrintF(fp, "\t\tdesc\t%s|\n", mDescription);
-	absl::FPrintF(fp, "\t\tcreation_date\t%d\n", (S32) mCreationDate);
-	absl::FPrintF(fp,"\t}\n");
-	return TRUE;
 }
 
 // virtual
@@ -1441,87 +1225,7 @@ void LLInventoryCategory::unpackMessage(LLMessageSystem* msg,
 	msg->getStringFast(block, _PREHASH_Name, mName, block_num);
 	LLStringUtil::replaceNonstandardASCII(mName, ' ');
 }
-	
-// virtual
-BOOL LLInventoryCategory::importFile(LLFILE* fp)
-{
-	// *NOTE: Changing the buffer size will require changing the scanf
-	// calls below.
-	char buffer[MAX_STRING];	/* Flawfinder: ignore */
-	char keyword[MAX_STRING];	/* Flawfinder: ignore */
-	char valuestr[MAX_STRING];	/* Flawfinder: ignore */
 
-	keyword[0] = '\0';
-	valuestr[0] = '\0';
-	while(!feof(fp))
-	{
-		if (fgets(buffer, MAX_STRING, fp) == NULL)
-		{
-			buffer[0] = '\0';
-		}
-		
-		sscanf(	/* Flawfinder: ignore */
-			buffer,
-			" %254s %254s",
-			keyword, valuestr);
-		if(0 == strcmp("{",keyword))
-		{
-			continue;
-		}
-		if(0 == strcmp("}", keyword))
-		{
-			break;
-		}
-		else if(0 == strcmp("cat_id", keyword))
-		{
-			mUUID.set(valuestr);
-		}
-		else if(0 == strcmp("parent_id", keyword))
-		{
-			mParentUUID.set(valuestr);
-		}
-		else if(0 == strcmp("type", keyword))
-		{
-			mType = LLAssetType::lookup(valuestr);
-		}
-		else if(0 == strcmp("pref_type", keyword))
-		{
-			mPreferredType = LLFolderType::lookup(valuestr);
-		}
-		else if(0 == strcmp("name", keyword))
-		{
-			//strcpy(valuestr, buffer + strlen(keyword) + 3);
-			// *NOTE: Not ANSI C, but widely supported.
-			sscanf(	/* Flawfinder: ignore */
-				buffer,
-				" %254s %254[^|]",
-				keyword, valuestr);
-			mName.assign(valuestr);
-			LLStringUtil::replaceNonstandardASCII(mName, ' ');
-			LLStringUtil::replaceChar(mName, '|', ' ');
-		}
-		else
-		{
-			LL_WARNS() << "unknown keyword '" << keyword
-					<< "' in inventory import category "  << mUUID << LL_ENDL;
-		}
-	}
-	return TRUE;
-}
-
-BOOL LLInventoryCategory::exportFile(LLFILE* fp, BOOL) const
-{
-	absl::FPrintF(fp, "\tinv_category\t0\n\t{\n");
-	absl::FPrintF(fp, "\t\tcat_id\t%s\n", mUUID);
-	absl::FPrintF(fp, "\t\tparent_id\t%s\n", mParentUUID);
-	absl::FPrintF(fp, "\t\ttype\t%s\n", LLAssetType::lookup(mType));
-	absl::FPrintF(fp, "\t\tpref_type\t%s\n", LLFolderType::lookup(mPreferredType).c_str());
-	absl::FPrintF(fp, "\t\tname\t%s|\n", mName.c_str());
-	absl::FPrintF(fp,"\t}\n");
-	return TRUE;
-}
-
-	
 // virtual
 BOOL LLInventoryCategory::importLegacyStream(std::istream& input_stream)
 {
@@ -1600,6 +1304,45 @@ BOOL LLInventoryCategory::exportLegacyStream(std::ostream& output_stream, BOOL) 
 	return TRUE;
 }
 
+LLSD LLInventoryCategory::exportLLSD() const
+{
+	LLSD cat_data;
+	cat_data[INV_FOLDER_ID_LABEL] = mUUID;
+	cat_data[INV_PARENT_ID_LABEL] = mParentUUID;
+	cat_data[INV_ASSET_TYPE_LABEL] = LLAssetType::lookup(mType);
+	cat_data[INV_PREFERRED_TYPE_LABEL] = LLFolderType::lookup(mPreferredType);
+	cat_data[INV_NAME_LABEL] = mName;
+
+	return cat_data;
+}
+
+bool LLInventoryCategory::importLLSD(const LLSD& cat_data)
+{
+	if (cat_data.has(INV_FOLDER_ID_LABEL))
+	{
+		setUUID(cat_data[INV_FOLDER_ID_LABEL].asUUID());
+	}
+	if (cat_data.has(INV_PARENT_ID_LABEL))
+	{
+		setParent(cat_data[INV_PARENT_ID_LABEL].asUUID());
+	}
+	if (cat_data.has(INV_ASSET_TYPE_LABEL))
+	{
+		setType(LLAssetType::lookup(cat_data[INV_ASSET_TYPE_LABEL].asString()));
+	}
+	if (cat_data.has(INV_PREFERRED_TYPE_LABEL))
+	{
+		setPreferredType(LLFolderType::lookup(cat_data[INV_PREFERRED_TYPE_LABEL].asString()));
+	}
+	if (cat_data.has(INV_NAME_LABEL))
+	{
+		mName = cat_data[INV_NAME_LABEL].asString();
+		LLStringUtil::replaceNonstandardASCII(mName, ' ');
+		LLStringUtil::replaceChar(mName, '|', ' ');
+	}
+
+	return true;
+}
 ///----------------------------------------------------------------------------
 /// Local function definitions
 ///----------------------------------------------------------------------------

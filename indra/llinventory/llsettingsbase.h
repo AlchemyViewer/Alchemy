@@ -360,7 +360,6 @@ protected:
     virtual const parammapping_t& getParameterMap() const;
 
     LLSD        mSettings;
-    bool        mIsValid;
 
     LLSD        cloneSettings() const;
 

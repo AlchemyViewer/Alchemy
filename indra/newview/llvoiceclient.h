@@ -499,9 +499,13 @@ protected:
  **/
 class LLSpeakerVolumeStorage final : public LLSingleton<LLSpeakerVolumeStorage>
 {
-	LLSINGLETON(LLSpeakerVolumeStorage);
+	LLSINGLETON_C11(LLSpeakerVolumeStorage);
 	~LLSpeakerVolumeStorage();
 	LOG_CLASS(LLSpeakerVolumeStorage);
+
+protected:
+    virtual void cleanupSingleton() override;
+
 public:
 
 	/**

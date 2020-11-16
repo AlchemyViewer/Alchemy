@@ -337,6 +337,7 @@ bool	LLPipeline::sDelayVBUpdate = true;
 bool	LLPipeline::sAutoMaskAlphaDeferred = true;
 bool	LLPipeline::sAutoMaskAlphaNonDeferred = false;
 bool	LLPipeline::sDisableShaders = false;
+bool	LLPipeline::sRenderTransparentWater = true;
 bool	LLPipeline::sRenderBump = true;
 bool	LLPipeline::sBakeSunlight = false;
 bool	LLPipeline::sNoAlpha = false;
@@ -1081,6 +1082,12 @@ bool LLPipeline::allocateShadowBuffer(U32 resX, U32 resY)
 }
 
 //static
+void LLPipeline::updateRenderTransparentWater()
+{
+    sRenderTransparentWater = gSavedSettings.getBOOL("RenderTransparentWater");
+}
+
+//static
 void LLPipeline::updateRenderBump()
 {
 	sRenderBump = gSavedSettings.getBOOL("RenderObjectBump");
@@ -1093,6 +1100,7 @@ void LLPipeline::updateRenderDeferred()
                       RenderDeferred &&
                       LLRenderTarget::sUseFBO &&
                       LLPipeline::sRenderBump &&
+                      LLPipeline::sRenderTransparentWater &&
                       RenderAvatarVP &&
                       WindLightUseAtmosShaders &&
                       (bool) LLFeatureManager::getInstance()->isFeatureAvailable("RenderDeferred");
@@ -6038,25 +6046,18 @@ static F32 calc_light_dist(LLVOVolume* light, const LLVector3& cam_pos, F32 max_
 	{
 		return max_dist;
 	}
-	F32 radius = light->getLightRadius();
 	bool selected = light->isSelected();
-	LLVector3 dpos = light->getRenderPosition() - cam_pos;
-	F32 dist2 = dpos.lengthSquared();
-	if (!selected && dist2 > (max_dist + radius)*(max_dist + radius))
-	{
-		return max_dist;
-	}
-	F32 dist = (F32) sqrt(dist2);
-	dist *= 1.f / inten;
-	dist -= radius;
 	if (selected)
 	{
-		dist -= 10000.f; // selected lights get highest priority
+        return 0.f; // selected lights get highest priority
 	}
+    F32 radius = light->getLightRadius();
+    F32 dist = dist_vec(light->getRenderPosition(), cam_pos);
+    dist = llmax(dist - radius, 0.f);
 	if (light->mDrawable.notNull() && light->mDrawable->isState(LLDrawable::ACTIVE))
 	{
 		// moving lights get a little higher priority (too much causes artifacts)
-		dist -= light->getLightRadius()*0.25f;
+        dist = llmax(dist - light->getLightRadius()*0.25f, 0.f);
 	}
 	return dist;
 }
@@ -6075,13 +6076,18 @@ void LLPipeline::calcNearbyLights(LLCamera& camera)
 		// mNearbyLight (and all light_set_t's) are sorted such that
 		// begin() == the closest light and rbegin() == the farthest light
 		const S32 MAX_LOCAL_LIGHTS = 6;
-// 		LLVector3 cam_pos = gAgent.getCameraPositionAgent();
-		LLVector3 cam_pos = LLViewerJoystick::getInstance()->getOverrideCamera() ?
-						camera.getOrigin() : 
-						gAgent.getPositionAgent();
-
-		F32 max_dist = LIGHT_MAX_RADIUS * 4.f; // ignore enitrely lights > 4 * max light rad
+        LLVector3 cam_pos = camera.getOrigin();
 		
+        F32 max_dist;
+        if (LLPipeline::sRenderDeferred)
+        {
+            max_dist = RenderFarClip;
+        }
+        else
+        {
+            max_dist = llmin(RenderFarClip, LIGHT_MAX_RADIUS * 4.f);
+        }
+
 		// UPDATE THE EXISTING NEARBY LIGHTS
 		light_set_t cur_nearby_lights;
 		for (const Light& light : mNearbyLights)
@@ -6113,10 +6119,40 @@ void LLPipeline::calcNearbyLights(LLCamera& camera)
 				continue;
 			}
 
-			F32 dist = calc_light_dist(volight, cam_pos, max_dist);
-			cur_nearby_lights.insert(Light(drawable, dist, light.fade));
+            F32 dist = calc_light_dist(volight, cam_pos, max_dist);
+            F32 fade = light.fade;
+            // actual fade gets decreased/increased by setupHWLights
+            // light->fade value is 'time'.
+            // >=0 and light will become visible as value increases
+            // <0 and light will fade out
+            if (dist < max_dist)
+            {
+                if (fade < 0)
+                {
+                    // mark light to fade in
+                    // if fade was -LIGHT_FADE_TIME - it was fully invisible
+                    // if fade -0 - it was fully visible
+                    // visibility goes up from 0 to LIGHT_FADE_TIME.
+                    fade += LIGHT_FADE_TIME;
+                }
+            }
+            else
+            {
+                // mark light to fade out
+                // visibility goes down from -0 to -LIGHT_FADE_TIME.
+                if (fade >= LIGHT_FADE_TIME)
+                {
+                    fade = -0.0001f; // was fully visible
+                }
+                else if (fade >= 0)
+                {
+                    // 0.75 visible light should stay 0.75 visible, but should reverse direction
+                    fade -= LIGHT_FADE_TIME;
+                }
+            }
+            cur_nearby_lights.insert(Light(drawable, dist, fade));
 		}
-		mNearbyLights = std::move(cur_nearby_lights);
+		mNearbyLights = cur_nearby_lights;
 				
 		// FIND NEW LIGHTS THAT ARE IN RANGE
 		light_set_t new_nearby_lights;
@@ -6131,17 +6167,23 @@ void LLPipeline::calcNearbyLights(LLCamera& camera)
 			{
 				continue; // no lighting from HUD objects
 			}
-			F32 dist = calc_light_dist(light, cam_pos, max_dist);
-			if (dist >= max_dist)
+            if (!sRenderAttachedLights && light && light->isAttachment())
 			{
 				continue;
 			}
-			if (!sRenderAttachedLights && light && light->isAttachment())
+            LLVOAvatar * av = light->getAvatar();
+            if (av && (av->isTooComplex() || av->isInMuteList()))
+            {
+                // avatars that are already in the list will be removed by removeMutedAVsLights
+                continue;
+            }
+            F32 dist = calc_light_dist(light, cam_pos, max_dist);
+            if (dist >= max_dist)
 			{
 				continue;
 			}
 			new_nearby_lights.insert(Light(drawable, dist, 0.f));
-			if (new_nearby_lights.size() > (U32)MAX_LOCAL_LIGHTS)
+            if (!LLPipeline::sRenderDeferred && new_nearby_lights.size() > (U32)MAX_LOCAL_LIGHTS)
 			{
 				new_nearby_lights.erase(--new_nearby_lights.end());
 				const Light& last = *new_nearby_lights.rbegin();
@@ -6152,7 +6194,7 @@ void LLPipeline::calcNearbyLights(LLCamera& camera)
 		// INSERT ANY NEW LIGHTS
 		for (const Light& light : new_nearby_lights)
 		{
-			if (mNearbyLights.size() < (U32)MAX_LOCAL_LIGHTS)
+            if (LLPipeline::sRenderDeferred || mNearbyLights.size() < (U32)MAX_LOCAL_LIGHTS)
 			{
 				mNearbyLights.insert(light);
 				((LLDrawable*) light.drawable)->setState(LLDrawable::NEARBY_LIGHT);
@@ -6165,10 +6207,22 @@ void LLPipeline::calcNearbyLights(LLCamera& camera)
 				Light* farthest_light = (const_cast<Light*>(&(*(mNearbyLights.rbegin()))));
 				if (light.dist < farthest_light->dist)
 				{
-					if (farthest_light->fade >= 0.f)
-					{
-						farthest_light->fade = -(gFrameIntervalSeconds.value());
-					}
+                    // mark light to fade out
+                    // visibility goes down from -0 to -LIGHT_FADE_TIME.
+                    //
+                    // This is a mess, but for now it needs to be in sync
+                    // with fade code above. Ex: code above detects distance < max,
+                    // sets fade time to positive, this code then detects closer
+                    // lights and sets fade time negative, fully compensating
+                    // for the code above
+                    if (farthest_light->fade >= LIGHT_FADE_TIME)
+                    {
+                        farthest_light->fade = -0.0001f; // was fully visible
+                    }
+                    else if (farthest_light->fade >= 0)
+                    {
+                        farthest_light->fade -= LIGHT_FADE_TIME;
+                    }
 				}
 				else
 				{
@@ -6284,12 +6338,6 @@ void LLPipeline::setupHWLights(LLDrawPool* pool)
                 {
                     continue;
                 }
-            }
-
-            const LLViewerObject *vobj = drawable->getVObj();
-            if(vobj && vobj->getAvatar() && vobj->getAvatar()->isInMuteList())
-            {
-                continue;
             }
 
 			if (drawable->isState(LLDrawable::ACTIVE))
@@ -8653,10 +8701,13 @@ void LLPipeline::renderDeferredLighting(LLRenderTarget *screen_target)
                 mCubeVB->setBuffer(LLVertexBuffer::MAP_VERTEX);
 
                 LLGLDepthTest depth(GL_TRUE, GL_FALSE);
-				for (LLDrawable* drawablep : mLights)
+                // mNearbyLights already includes distance calculation and excludes muted avatars.
+                // It is calculated from mLights
+                // mNearbyLights also provides fade value to gracefully fade-out out of range lights
+                for (light_set_t::iterator iter = mNearbyLights.begin(); iter != mNearbyLights.end(); ++iter)
                 {
-					
-                    LLVOVolume *volume = drawablep->getVOVolume();
+                    LLDrawable * drawablep = iter->drawable;
+                    LLVOVolume * volume = drawablep->getVOVolume();
                     if (!volume)
                     {
                         continue;
@@ -8670,24 +8721,8 @@ void LLPipeline::renderDeferredLighting(LLRenderTarget *screen_target)
                         }
                     }
 
-                    const LLViewerObject *vobj = drawablep->getVObj();
-                    if (vobj)
-                    {
-                        LLVOAvatar *av = vobj->getAvatar();
-                        if (av && (av->isTooComplex() || av->isInMuteList()))
-                        {
-                            continue;
-                        }
-                    }
-
-                    const LLVector3 position = drawablep->getPositionAgent();
-                    if (dist_vec(position, camera.getOrigin()) > RenderFarClip + volume->getLightRadius())
-                    {
-                        continue;
-                    }
-
                     LLVector4a center;
-                    center.load3(position.mV);
+                    center.load3(drawablep->getPositionAgent().mV);
                     const F32 *c = center.getF32ptr();
                     F32        s = volume->getLightRadius() * 1.5f;
 
