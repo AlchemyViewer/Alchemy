@@ -531,9 +531,9 @@ void MediaPluginCEF::receiveMessage(const char* message_string)
 				settings.accept_language_list = mHostLanguage;
 				settings.background_color = 0xffffffff;
 				settings.cache_enabled = true;
-				settings.root_cache_path = mRootCachePath;
+				//settings.root_cache_path = mRootCachePath;
 				settings.cache_path = mCachePath;
-				settings.context_cache_path = mContextCachePath;
+				//settings.context_cache_path = mContextCachePath;
 				settings.cookies_enabled = mCookiesEnabled;
 				settings.disable_gpu = mDisableGPU;
 #if LL_DARWIN

@@ -64,6 +64,7 @@
 #include "llpanelprofilepicks.h"
 #include "lltrans.h"
 #include "llviewercontrol.h"
+#include "llviewermenu.h"
 #include "llvoiceclient.h"
 #include "llweb.h"
 #include "rlvhandler.h"
