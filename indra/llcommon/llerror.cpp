@@ -49,7 +49,6 @@
 
 #include "absl/synchronization/mutex.h"
 #include "absl/container/flat_hash_map.h"
-#include "absl/strings/str_format.h"
 
 #include "llapp.h"
 #include "llapr.h"
@@ -654,7 +653,7 @@ namespace LLError
         default:          mLevelString = "XXX";     break;
 		};
 
-		mLocationString = absl::StrFormat("%s(%d)", abbreviateFile(mFile), mLine);
+		mLocationString = llformat("%s(%d)", abbreviateFile(mFile).c_str(), mLine);
 #if LL_WINDOWS
 		// DevStudio: __FUNCTION__ already includes the full class name
 #else
@@ -1413,7 +1412,7 @@ namespace LLError
 			return;
 		}
 
-		if (out->str().length() < 128)
+		if(strlen(out->str().c_str()) < 128)
 		{
 			strcpy(message, out->str().c_str());
 		}

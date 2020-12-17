@@ -37,8 +37,6 @@
 #include <winnls.h> // for WideCharToMultiByte
 #endif
 
-#include <absl/strings/str_format.h>
-
 LLTrace::BlockTimerStatHandle FT_STRING_FORMAT("String Format");
 
 
@@ -1041,19 +1039,19 @@ std::string LLStringOps::getReadableNumber(F64 num)
 {
     if (fabs(num)>=1e9)
     {
-		return absl::StrFormat("%.2lfB", num / 1e9);
+		return llformat("%.2lfB", num / 1e9);
     }
     else if (fabs(num)>=1e6)
     {
-		return absl::StrFormat("%.2lfM", num / 1e6);
+		return llformat("%.2lfM", num / 1e6);
     }
     else if (fabs(num)>=1e3)
     {
-		return absl::StrFormat("%.2lfK", num / 1e3);
+		return llformat("%.2lfK", num / 1e3);
     }
     else
     {
-		return absl::StrFormat("%.2lf", num);
+		return llformat("%.2lf", num);
     }
 }
 
@@ -1361,14 +1359,14 @@ bool LLStringUtil::formatDatetime(std::string& replacement, std::string token,
 	{
 		struct tm * gmt = gmtime (&loc_seconds);
 		LLStringUtil::format_map_t args;
-		args["[MDAY]"] = absl::StrFormat("%d", gmt->tm_mday);
+		args["[MDAY]"] = llformat ("%d", gmt->tm_mday);
 		replacement = LLStringOps::sDayFormat;
 		LLStringUtil::format(replacement, args);
 	}
 	else if (code == "%-d")
 	{
 		struct tm * gmt = gmtime (&loc_seconds);
-		replacement = absl::StrFormat("%d", gmt->tm_mday); // day of the month without leading zero
+		replacement = llformat ("%d", gmt->tm_mday); // day of the month without leading zero
 	}
 	else if( !LLStringOps::sAM.empty() && !LLStringOps::sPM.empty() && code == "%p" )
 	{

@@ -45,8 +45,6 @@
 #include "llthread.h"
 #include "llmutex.h"
 
-#include <absl/strings/str_format.h>
-
 const LLUUID LLUUID::null;
 const LLTransactionID LLTransactionID::tnull;
 
@@ -156,7 +154,7 @@ U32 janky_fast_random_seeded_bytes(U32 seed, U32 val)
 // Common to all UUID implementations
 void LLUUID::toString(std::string& out) const
 {
-	out = absl::StrFormat(
+	out = llformat(
 		"%02x%02x%02x%02x-%02x%02x-%02x%02x-%02x%02x-%02x%02x%02x%02x%02x%02x",
 		(U8)(mData[0]),
 		(U8)(mData[1]),
