@@ -179,24 +179,9 @@ void LLUUID::toString(std::string& out) const
 // *TODO: deprecate
 void LLUUID::toString(char *out) const
 {
-	absl::SNPrintF(out,UUID_STR_SIZE,
-		"%02x%02x%02x%02x-%02x%02x-%02x%02x-%02x%02x-%02x%02x%02x%02x%02x%02x",
-		(U8)(mData[0]),
-		(U8)(mData[1]),
-		(U8)(mData[2]),
-		(U8)(mData[3]),
-		(U8)(mData[4]),
-		(U8)(mData[5]),
-		(U8)(mData[6]),
-		(U8)(mData[7]),
-		(U8)(mData[8]),
-		(U8)(mData[9]),
-		(U8)(mData[10]),
-		(U8)(mData[11]),
-		(U8)(mData[12]),
-		(U8)(mData[13]),
-		(U8)(mData[14]),
-		(U8)(mData[15]));
+	std::string buffer;
+	toString(buffer);
+	strcpy(out,buffer.c_str()); /* Flawfinder: ignore */
 }
 
 void LLUUID::toCompressedString(std::string& out) const

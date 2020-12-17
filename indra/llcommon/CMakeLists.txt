@@ -348,7 +348,6 @@ if (LL_TESTS)
   LL_ADD_INTEGRATION_TEST(lltreeiterators "" "${test_libs}")
   LL_ADD_INTEGRATION_TEST(lluri "" "${test_libs}")
   LL_ADD_INTEGRATION_TEST(llunits "" "${test_libs}")
-  LL_ADD_INTEGRATION_TEST(lluuid "" "${test_libs}")
   LL_ADD_INTEGRATION_TEST(stringize "" "${test_libs}")
 
 ## llexception_test.cpp isn't a regression test, and doesn't need to be run
