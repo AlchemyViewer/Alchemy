@@ -62,8 +62,6 @@
 
 #include "llglheaders.h"
 
-#include "absl/strings/str_format.h"
-
 // Basically a C++ implementation of the OCEAN_COLOR defined in mapstitcher.py 
 // Please ensure consistency between those 2 files (TODO: would be better to get that color from an asset source...)
 // # Constants
@@ -459,7 +457,7 @@ void LLWorldMapView::draw()
 			std::string mesg;
 			if (info->isDown())
 			{
-				mesg = absl::StrFormat( "%s (%s) (%s)", info->getName(), sStringsMap["offline"], info->getShortAccessString());
+				mesg = llformat( "%s (%s) (%s)", info->getName().c_str(), sStringsMap["offline"].c_str(), info->getShortAccessString().c_str());
 			}
 			else if (mapShowAgentCount)
 			{
@@ -471,12 +469,12 @@ void LLWorldMapView::draw()
 				}
 				if (agent_count > 0)
 				{
-					mesg = absl::StrFormat( "%s (%d) (%s)", info->getName(), agent_count, info->getShortAccessString());
+					mesg = llformat( "%s (%d) (%s)", info->getName().c_str(), agent_count, info->getShortAccessString().c_str());
 				}
 			}
 			if (mesg.empty())
 			{
-				mesg = absl::StrFormat( "%s (%s)", info->getName(), info->getShortAccessString());
+				mesg = llformat( "%s (%s)", info->getName().c_str(), info->getShortAccessString().c_str());
 			}
 
 //			if (!mesg.empty())
@@ -1085,11 +1083,11 @@ BOOL LLWorldMapView::handleToolTip( S32 x, S32 y, MASK mask )
 		LLViewerRegion *region = gAgent.getRegion();
 
 // [RLVa:KB] - Checked: 2010-04-19 (RLVa-1.4.5) | Modified: RLVa-1.4.5
-		std::string message = absl::StrFormat("%s (%s)",
-			(RlvActions::canShowLocation()) ? info->getName() : RlvStrings::getString(RlvStringKeys::Hidden::Region),
-			info->getAccessString());
+		std::string message = llformat("%s (%s)", 
+			(RlvActions::canShowLocation()) ? info->getName().c_str() : RlvStrings::getString(RlvStringKeys::Hidden::Region).c_str(),
+			info->getAccessString().c_str());
 // [/RLVa:KB]
-//		std::string message = absl::StrFormat("%s (%s)", info->getName(), info->getAccessString());
+//		std::string message = llformat("%s (%s)", info->getName().c_str(), info->getAccessString().c_str());
 
 		if (!info->isDown())
 		{
@@ -1104,19 +1102,20 @@ BOOL LLWorldMapView::handleToolTip( S32 x, S32 y, MASK mask )
 			if (agent_count > 0)
 			{
 				LLStringUtil::format_map_t string_args;
-				string_args["[NUMBER]"] = absl::StrCat(agent_count);
-				absl::StrAppend(&message, "\n", 
-					getString((agent_count == 1 ? "world_map_person" : "world_map_people") , string_args));
+				string_args["[NUMBER]"] = llformat("%d", agent_count);
+				message += '\n';
+				message += getString((agent_count == 1 ? "world_map_person" : "world_map_people") , string_args);
 			}
 		}
-		tooltip_msg = std::move(message); // do not use message after this point
+		tooltip_msg.assign( message );
 
 		// Optionally show region flags
 		std::string region_flags = info->getFlagsString();
 
 		if (!region_flags.empty())
 		{
-			absl::StrAppend(&tooltip_msg, "\n", region_flags);
+			tooltip_msg += '\n';
+			tooltip_msg += region_flags;
 		}
 					
 		const S32 SLOP = 9;
