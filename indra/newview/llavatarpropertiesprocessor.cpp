@@ -168,7 +168,7 @@ void LLAvatarPropertiesProcessor::sendAvatarClassifiedsRequest(const LLUUID& ava
 
 void LLAvatarPropertiesProcessor::sendAvatarPropertiesUpdate(const LLAvatarData* avatar_props)
 {
-	if (!gAgent.isInitialized() || (gAgent.getID() == LLUUID::null))
+	if (!gAgent.isInitialized() || (gAgent.getID().isNull()))
 	{
 		LL_WARNS() << "Sending avatarinfo update DENIED - invalid agent" << LL_ENDL;
 		return;

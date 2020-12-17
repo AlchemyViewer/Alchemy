@@ -168,7 +168,6 @@ void main()
 	vec3 screenspacewavef = normalize((norm_mat*vec4(wavef, 1.0)).xyz);
 
 	frag_data[0] = color;
-
 	frag_data[1] = vec4(specular * 0.5, 0.35);		// speccolor, spec
 	frag_data[2] = vec4(encode_normal(screenspacewavef.xyz), 0.05, 0);// normalxy, 0, 0
 }
