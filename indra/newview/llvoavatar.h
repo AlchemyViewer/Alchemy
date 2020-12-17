@@ -1126,7 +1126,7 @@ extern const F32 MIN_HOVER_Z;
 std::string get_sequential_numbered_file_name(const std::string& prefix,
 											  const std::string& suffix);
 void dump_sequential_xml(const std::string outprefix, const LLSD& content);
-void dump_visual_param(LLFILE* file, LLVisualParam* viewer_param, F32 value);
+void dump_visual_param(apr_file_t* file, LLVisualParam* viewer_param, F32 value);
 
 #endif // LL_VOAVATAR_H
 

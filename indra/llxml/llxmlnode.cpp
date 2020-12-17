@@ -881,7 +881,7 @@ bool LLXMLNode::getLayeredXMLNode(LLXMLNodePtr& root,
 // static
 void LLXMLNode::writeHeaderToFile(LLFILE *out_file)
 {
-	absl::FPrintF(out_file, "<?xml version=\"1.0\" encoding=\"utf-8\" standalone=\"yes\" ?>\n");
+	fprintf(out_file, "<?xml version=\"1.0\" encoding=\"utf-8\" standalone=\"yes\" ?>\n");
 }
 
 void LLXMLNode::writeToFile(LLFILE *out_file, const std::string& indent, bool use_type_decorations)

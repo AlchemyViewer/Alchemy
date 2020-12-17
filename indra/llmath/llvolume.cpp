@@ -1158,13 +1158,13 @@ BOOL LLProfileParams::importFile(LLFILE *fp)
 
 BOOL LLProfileParams::exportFile(LLFILE *fp) const
 {
-	absl::FPrintF(fp,"\t\tprofile 0\n");
-	absl::FPrintF(fp,"\t\t{\n");
-	absl::FPrintF(fp,"\t\t\tcurve\t%d\n", getCurveType());
-	absl::FPrintF(fp,"\t\t\tbegin\t%g\n", getBegin());
-	absl::FPrintF(fp,"\t\t\tend\t%g\n", getEnd());
-	absl::FPrintF(fp,"\t\t\thollow\t%g\n", getHollow());
-	absl::FPrintF(fp, "\t\t}\n");
+	fprintf(fp,"\t\tprofile 0\n");
+	fprintf(fp,"\t\t{\n");
+	fprintf(fp,"\t\t\tcurve\t%d\n", getCurveType());
+	fprintf(fp,"\t\t\tbegin\t%g\n", getBegin());
+	fprintf(fp,"\t\t\tend\t%g\n", getEnd());
+	fprintf(fp,"\t\t\thollow\t%g\n", getHollow());
+	fprintf(fp, "\t\t}\n");
 	return TRUE;
 }
 
@@ -1811,25 +1811,25 @@ BOOL LLPathParams::importFile(LLFILE *fp)
 
 BOOL LLPathParams::exportFile(LLFILE *fp) const
 {
-	absl::FPrintF(fp, "\t\tpath 0\n");
-	absl::FPrintF(fp, "\t\t{\n");
-	absl::FPrintF(fp, "\t\t\tcurve\t%d\n", getCurveType());
-	absl::FPrintF(fp, "\t\t\tbegin\t%g\n", getBegin());
-	absl::FPrintF(fp, "\t\t\tend\t%g\n", getEnd());
-	absl::FPrintF(fp, "\t\t\tscale_x\t%g\n", getScaleX() );
-	absl::FPrintF(fp, "\t\t\tscale_y\t%g\n", getScaleY() );
-	absl::FPrintF(fp, "\t\t\tshear_x\t%g\n", getShearX() );
-	absl::FPrintF(fp, "\t\t\tshear_y\t%g\n", getShearY() );
-	absl::FPrintF(fp,"\t\t\ttwist\t%g\n", getTwist());
+	fprintf(fp, "\t\tpath 0\n");
+	fprintf(fp, "\t\t{\n");
+	fprintf(fp, "\t\t\tcurve\t%d\n", getCurveType());
+	fprintf(fp, "\t\t\tbegin\t%g\n", getBegin());
+	fprintf(fp, "\t\t\tend\t%g\n", getEnd());
+	fprintf(fp, "\t\t\tscale_x\t%g\n", getScaleX() );
+	fprintf(fp, "\t\t\tscale_y\t%g\n", getScaleY() );
+	fprintf(fp, "\t\t\tshear_x\t%g\n", getShearX() );
+	fprintf(fp, "\t\t\tshear_y\t%g\n", getShearY() );
+	fprintf(fp,"\t\t\ttwist\t%g\n", getTwist());
 	
-	absl::FPrintF(fp,"\t\t\ttwist_begin\t%g\n", getTwistBegin());
-	absl::FPrintF(fp,"\t\t\tradius_offset\t%g\n", getRadiusOffset());
-	absl::FPrintF(fp,"\t\t\ttaper_x\t%g\n", getTaperX());
-	absl::FPrintF(fp,"\t\t\ttaper_y\t%g\n", getTaperY());
-	absl::FPrintF(fp,"\t\t\trevolutions\t%g\n", getRevolutions());
-	absl::FPrintF(fp,"\t\t\tskew\t%g\n", getSkew());
+	fprintf(fp,"\t\t\ttwist_begin\t%g\n", getTwistBegin());
+	fprintf(fp,"\t\t\tradius_offset\t%g\n", getRadiusOffset());
+	fprintf(fp,"\t\t\ttaper_x\t%g\n", getTaperX());
+	fprintf(fp,"\t\t\ttaper_y\t%g\n", getTaperY());
+	fprintf(fp,"\t\t\trevolutions\t%g\n", getRevolutions());
+	fprintf(fp,"\t\t\tskew\t%g\n", getSkew());
 
-	absl::FPrintF(fp, "\t\t}\n");
+	fprintf(fp, "\t\t}\n");
 	return TRUE;
 }
 
@@ -4265,11 +4265,11 @@ BOOL LLVolumeParams::importFile(LLFILE *fp)
 
 BOOL LLVolumeParams::exportFile(LLFILE *fp) const
 {
-	absl::FPrintF(fp,"\tshape 0\n");
-	absl::FPrintF(fp,"\t{\n");
+	fprintf(fp,"\tshape 0\n");
+	fprintf(fp,"\t{\n");
 	mPathParams.exportFile(fp);
 	mProfileParams.exportFile(fp);
-	absl::FPrintF(fp, "\t}\n");
+	fprintf(fp, "\t}\n");
 	return TRUE;
 }
 

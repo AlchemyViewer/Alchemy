@@ -234,7 +234,7 @@ namespace {
 			}
             else
             {
-                absl::FPrintF(stderr, "%s\n", message);
+                 fprintf(stderr, "%s\n", message.c_str());
             }
 		}
 	
@@ -247,7 +247,7 @@ namespace {
             static std::string s_ansi_reset = createANSI("0");  // reset
 			// ANSI color code escape sequence, message, and reset in one fprintf call
             // Default all message levels to bold so we can distinguish our own messages from those dumped by subprocesses and libraries.
-			absl::FPrintF(stderr, "%s%s%s\n%s", s_ansi_bold, ansi_code, message, s_ansi_reset);
+			fprintf(stderr, "%s%s%s\n%s", s_ansi_bold.c_str(), ansi_code.c_str(), message.c_str(), s_ansi_reset.c_str() );
 		}
 
 		static bool checkANSI(void)

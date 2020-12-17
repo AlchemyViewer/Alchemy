@@ -2369,10 +2369,10 @@ void dump_prehash_files()
 {
 	U32 i;
 	std::string filename("../../../indra/llmessage/message_prehash.h");
-	LLUniqueFile fp = LLFile::fopen(filename, "wb");	/* Flawfinder: ignore */
+	LLFILE* fp = LLFile::fopen(filename, "wb");	/* Flawfinder: ignore */
 	if (fp)
 	{
-		absl::FPrintF(
+		fprintf(
 			fp,
 			"/**\n"
 			" * @file message_prehash.h\n"
@@ -2400,27 +2400,28 @@ void dump_prehash_files()
 			" * $/LicenseInfo$\n"
 			" */\n\n"
 			"#ifndef LL_MESSAGE_PREHASH_H\n#define LL_MESSAGE_PREHASH_H\n\n");
-		absl::FPrintF(
+		fprintf(
 			fp,
 			"/**\n"
 			" * Generated from message template version number %.3f\n"
 			" */\n",
 			gMessageSystem->mMessageFileVersionNumber);
-		absl::FPrintF(fp, "\n\nextern F32 const gPrehashVersionNumber;\n\n");
+		fprintf(fp, "\n\nextern F32 const gPrehashVersionNumber;\n\n");
 		for (i = 0; i < MESSAGE_NUMBER_OF_HASH_BUCKETS; i++)
 		{
 			if (!LLMessageStringTable::getInstance()->mEmpty[i] && LLMessageStringTable::getInstance()->mString[i][0] != '.')
 			{
-				absl::FPrintF(fp, "extern char const* const _PREHASH_%s;\n", LLMessageStringTable::getInstance()->mString[i]);
+				fprintf(fp, "extern char const* const _PREHASH_%s;\n", LLMessageStringTable::getInstance()->mString[i]);
 			}
 		}
-		absl::FPrintF(fp, "\n\n#endif\n");
+		fprintf(fp, "\n\n#endif\n");
+		fclose(fp);
 	}
 	filename = std::string("../../../indra/llmessage/message_prehash.cpp");
 	fp = LLFile::fopen(filename, "wb");	/* Flawfinder: ignore */
 	if (fp)
 	{
-		absl::FPrintF(
+		fprintf(
 			fp,
 			"/**\n"
 			" * @file message_prehash.cpp\n"
@@ -2451,16 +2452,17 @@ void dump_prehash_files()
 			" * Generated from message template version number %.3f\n"
 			" */\n",
 			gMessageSystem->mMessageFileVersionNumber);
-		absl::FPrintF(fp, "#include \"linden_common.h\"\n");
-		absl::FPrintF(fp, "#include \"message.h\"\n\n");
-		absl::FPrintF(fp, "\n\nF32 const gPrehashVersionNumber = %.3ff;\n\n", gMessageSystem->mMessageFileVersionNumber);
+		fprintf(fp, "#include \"linden_common.h\"\n");
+		fprintf(fp, "#include \"message.h\"\n\n");
+		fprintf(fp, "\n\nF32 const gPrehashVersionNumber = %.3ff;\n\n", gMessageSystem->mMessageFileVersionNumber);
 		for (i = 0; i < MESSAGE_NUMBER_OF_HASH_BUCKETS; i++)
 		{
 			if (!LLMessageStringTable::getInstance()->mEmpty[i] && LLMessageStringTable::getInstance()->mString[i][0] != '.')
 			{
-				absl::FPrintF(fp, "char const* const _PREHASH_%s = LLMessageStringTable::getInstance()->getString(\"%s\");\n", LLMessageStringTable::getInstance()->mString[i], LLMessageStringTable::getInstance()->mString[i]);
+				fprintf(fp, "char const* const _PREHASH_%s = LLMessageStringTable::getInstance()->getString(\"%s\");\n", LLMessageStringTable::getInstance()->mString[i], LLMessageStringTable::getInstance()->mString[i]);
 			}
 		}
+		fclose(fp);
 	}
 }
 

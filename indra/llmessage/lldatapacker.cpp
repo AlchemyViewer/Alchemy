@@ -1444,7 +1444,7 @@ BOOL LLDataPackerAsciiFile::packString(const std::string& value, const char *nam
 	writeIndentedName(name);
 	if (mFP)
 	{
-		absl::FPrintF(mFP,"%s\n", value.c_str());	
+		fprintf(mFP,"%s\n", value.c_str());	
 	}
 	else if (mOutputStream)
 	{
@@ -1473,14 +1473,14 @@ BOOL LLDataPackerAsciiFile::packBinaryData(const U8 *value, S32 size, const char
 	
 	if (mFP)
 	{
-		absl::FPrintF(mFP, "%010d ", size);
+		fprintf(mFP, "%010d ", size);
 
 		S32 i;
 		for (i = 0; i < size; i++)
 		{
-			absl::FPrintF(mFP, "%02x ", value[i]);
+			fprintf(mFP, "%02x ", value[i]);
 		}
-		absl::FPrintF(mFP, "\n");
+		fprintf(mFP, "\n");
 	}
 	else if (mOutputStream)
 	{
@@ -1535,9 +1535,9 @@ BOOL LLDataPackerAsciiFile::packBinaryDataFixed(const U8 *value, S32 size, const
 		S32 i;
 		for (i = 0; i < size; i++)
 		{
-			absl::FPrintF(mFP, "%02x ", value[i]);
+			fprintf(mFP, "%02x ", value[i]);
 		}
-		absl::FPrintF(mFP, "\n");
+		fprintf(mFP, "\n");
 	}
 	else if (mOutputStream)
 	{
@@ -1584,7 +1584,7 @@ BOOL LLDataPackerAsciiFile::packU8(const U8 value, const char *name)
 	writeIndentedName(name);
 	if (mFP)
 	{
-		absl::FPrintF(mFP,"%d\n", value);	
+		fprintf(mFP,"%d\n", value);	
 	}
 	else if (mOutputStream)
 	{
@@ -1617,7 +1617,7 @@ BOOL LLDataPackerAsciiFile::packU16(const U16 value, const char *name)
 	writeIndentedName(name);
 	if (mFP)
 	{
-		absl::FPrintF(mFP,"%d\n", value);	
+		fprintf(mFP,"%d\n", value);	
 	}
 	else if (mOutputStream)
 	{
@@ -1649,7 +1649,7 @@ BOOL LLDataPackerAsciiFile::packU32(const U32 value, const char *name)
 	writeIndentedName(name);
 	if (mFP)
 	{
-		absl::FPrintF(mFP,"%u\n", value);	
+		fprintf(mFP,"%u\n", value);	
 	}
 	else if (mOutputStream)
 	{
@@ -1679,7 +1679,7 @@ BOOL LLDataPackerAsciiFile::packS32(const S32 value, const char *name)
 	writeIndentedName(name);
 	if (mFP)
 	{
-		absl::FPrintF(mFP,"%d\n", value);	
+		fprintf(mFP,"%d\n", value);	
 	}
 	else if (mOutputStream)
 	{
@@ -1709,7 +1709,7 @@ BOOL LLDataPackerAsciiFile::packF32(const F32 value, const char *name)
 	writeIndentedName(name);
 	if (mFP)
 	{
-		absl::FPrintF(mFP,"%f\n", value);	
+		fprintf(mFP,"%f\n", value);	
 	}
 	else if (mOutputStream)
 	{
@@ -1739,7 +1739,7 @@ BOOL LLDataPackerAsciiFile::packColor4(const LLColor4 &value, const char *name)
 	writeIndentedName(name);
 	if (mFP)
 	{
-		absl::FPrintF(mFP,"%f %f %f %f\n", value.mV[0], value.mV[1], value.mV[2], value.mV[3]);	
+		fprintf(mFP,"%f %f %f %f\n", value.mV[0], value.mV[1], value.mV[2], value.mV[3]);	
 	}
 	else if (mOutputStream)
 	{
@@ -1768,7 +1768,7 @@ BOOL LLDataPackerAsciiFile::packColor4U(const LLColor4U &value, const char *name
 	writeIndentedName(name);
 	if (mFP)
 	{
-		absl::FPrintF(mFP,"%d %d %d %d\n", value.mV[0], value.mV[1], value.mV[2], value.mV[3]);	
+		fprintf(mFP,"%d %d %d %d\n", value.mV[0], value.mV[1], value.mV[2], value.mV[3]);	
 	}
 	else if (mOutputStream)
 	{
@@ -1804,7 +1804,7 @@ BOOL LLDataPackerAsciiFile::packVector2(const LLVector2 &value, const char *name
 	writeIndentedName(name);
 	if (mFP)
 	{
-		absl::FPrintF(mFP,"%f %f\n", value.mV[0], value.mV[1]);	
+		fprintf(mFP,"%f %f\n", value.mV[0], value.mV[1]);	
 	}
 	else if (mOutputStream)
 	{
@@ -1834,7 +1834,7 @@ BOOL LLDataPackerAsciiFile::packVector3(const LLVector3 &value, const char *name
 	writeIndentedName(name);
 	if (mFP)
 	{
-		absl::FPrintF(mFP,"%f %f %f\n", value.mV[0], value.mV[1], value.mV[2]);	
+		fprintf(mFP,"%f %f %f\n", value.mV[0], value.mV[1], value.mV[2]);	
 	}
 	else if (mOutputStream)
 	{
@@ -1863,7 +1863,7 @@ BOOL LLDataPackerAsciiFile::packVector4(const LLVector4 &value, const char *name
 	writeIndentedName(name);
 	if (mFP)
 	{
-		absl::FPrintF(mFP,"%f %f %f %f\n", value.mV[0], value.mV[1], value.mV[2], value.mV[3]);	
+		fprintf(mFP,"%f %f %f %f\n", value.mV[0], value.mV[1], value.mV[2], value.mV[3]);	
 	}
 	else if (mOutputStream)
 	{
@@ -1895,7 +1895,7 @@ BOOL LLDataPackerAsciiFile::packUUID(const LLUUID &value, const char *name)
 	value.toString(tmp_str);
 	if (mFP)
 	{
-		absl::FPrintF(mFP,"%s\n", tmp_str);
+		fprintf(mFP,"%s\n", tmp_str.c_str());
 	}
 	else if (mOutputStream)
 	{
@@ -1935,7 +1935,7 @@ void LLDataPackerAsciiFile::writeIndentedName(const char *name)
 	indent_buf[i] = 0;
 	if (mFP)
 	{
-		absl::FPrintF(mFP,"%s%s\t",indent_buf, name);
+		fprintf(mFP,"%s%s\t",indent_buf.c_str(), name);		
 	}
 	else if (mOutputStream)
 	{
