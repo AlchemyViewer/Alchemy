@@ -779,8 +779,9 @@ BOOL LLInventoryItem::exportLegacyStream(std::ostream& output_stream, BOOL inclu
 	const std::string inv_type_str = LLInventoryType::lookup(mInventoryType);
 	if(!inv_type_str.empty()) 
 		output_stream << "\t\tinv_type\t" << inv_type_str << "\n";
-
-	output_stream << absl::StreamFormat("\t\tflags\t%08x\n", mFlags);
+	std::string buffer;
+	buffer = llformat( "\t\tflags\t%08x\n", mFlags);
+	output_stream << buffer;
 	mSaleInfo.exportLegacyStream(output_stream);
 	output_stream << "\t\tname\t" << mName.c_str() << "|\n";
 	output_stream << "\t\tdesc\t" << mDescription.c_str() << "|\n";
