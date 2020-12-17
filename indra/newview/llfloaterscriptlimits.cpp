@@ -406,7 +406,7 @@ void LLPanelScriptLimitsRegionMemory::setRegionDetails(LLSD content)
 	S32 number_parcels = content["parcels"].size();
 
 	LLStringUtil::format_map_t args_parcels;
-	args_parcels["[PARCELS]"] = absl::StrCat(number_parcels);
+	args_parcels["[PARCELS]"] = llformat ("%d", number_parcels);
 	std::string msg_parcels = LLTrans::getString("ScriptLimitsParcelsOwned", args_parcels);
 	getChild<LLUICtrl>("parcels_listed")->setValue(LLSD(msg_parcels));
 
@@ -611,15 +611,15 @@ void LLPanelScriptLimitsRegionMemory::setRegionSummary(LLSD content)
 	if((mParcelMemoryUsed >= 0) && (mParcelMemoryMax >= 0))
 	{
 		LLStringUtil::format_map_t args_parcel_memory;
-		args_parcel_memory["[COUNT]"] = absl::StrCat(mParcelMemoryUsed);
+		args_parcel_memory["[COUNT]"] = llformat ("%d", mParcelMemoryUsed);
 		std::string translate_message = "ScriptLimitsMemoryUsedSimple";
 
 		if (0 < mParcelMemoryMax)
 		{
 			S32 parcel_memory_available = mParcelMemoryMax - mParcelMemoryUsed;
 
-			args_parcel_memory["[MAX]"] = absl::StrCat(mParcelMemoryMax);
-			args_parcel_memory["[AVAILABLE]"] = absl::StrCat(parcel_memory_available);
+			args_parcel_memory["[MAX]"] = llformat ("%d", mParcelMemoryMax);
+			args_parcel_memory["[AVAILABLE]"] = llformat ("%d", parcel_memory_available);
 			translate_message = "ScriptLimitsMemoryUsed";
 		}
 
@@ -632,9 +632,9 @@ void LLPanelScriptLimitsRegionMemory::setRegionSummary(LLSD content)
 		S32 parcel_urls_available = mParcelURLsMax - mParcelURLsUsed;
 
 		LLStringUtil::format_map_t args_parcel_urls;
-		args_parcel_urls["[COUNT]"] = absl::StrCat(mParcelURLsUsed);
-		args_parcel_urls["[MAX]"] = absl::StrCat(mParcelURLsMax);
-		args_parcel_urls["[AVAILABLE]"] = absl::StrCat(parcel_urls_available);
+		args_parcel_urls["[COUNT]"] = llformat ("%d", mParcelURLsUsed);
+		args_parcel_urls["[MAX]"] = llformat ("%d", mParcelURLsMax);
+		args_parcel_urls["[AVAILABLE]"] = llformat ("%d", parcel_urls_available);
 		std::string msg_parcel_urls = LLTrans::getString("ScriptLimitsURLsUsed", args_parcel_urls);
 		getChild<LLUICtrl>("urls_used")->setValue(LLSD(msg_parcel_urls));
 	}

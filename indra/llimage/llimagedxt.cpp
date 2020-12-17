@@ -422,7 +422,7 @@ bool LLImageDXT::convertToDXR()
 	  case FORMAT_DXT4: newformat = FORMAT_DXR4; break;
 	  case FORMAT_DXT5: newformat = FORMAT_DXR5; break;
 	  default:
-		LL_WARNS() << absl::StreamFormat("convertToDXR: can not convert format: 0x%08x",getFourCC(mFileFormat)) << LL_ENDL;
+		LL_WARNS() << "convertToDXR: can not convert format: " << llformat("0x%08x",getFourCC(mFileFormat)) << LL_ENDL;
 		return false;
 	}
 	mFileFormat = newformat;

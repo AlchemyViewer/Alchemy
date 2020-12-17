@@ -355,7 +355,7 @@ void LLCOFWearables::setAttachmentsTitle()
 		U32 free_slots = gAgentAvatarp->getMaxAttachments() - mAttachments->size();
 
 		LLStringUtil::format_map_t args_attachments;
-		args_attachments["[COUNT]"] = absl::StrCat(free_slots);
+		args_attachments["[COUNT]"] = llformat ("%d", free_slots);
 		std::string attachments_title = LLTrans::getString("Attachments remain", args_attachments);
 		mAttachmentsTab->setTitle(attachments_title);
 	}

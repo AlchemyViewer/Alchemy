@@ -725,8 +725,8 @@ LLWindowWin32::LLWindowWin32(LLWindowCallbacks* callbacks,
 			mFullscreenRefresh = -1;
 
 			std::map<std::string,std::string> args;
-			args["[WIDTH]"] = absl::StrCat(width);
-			args["[HEIGHT]"] = absl::StrCat(height);
+			args["[WIDTH]"] = llformat("%d", width);
+			args["[HEIGHT]"] = llformat ("%d", height);
 			OSMessageBox(mCallbacks->translateString("MBFullScreenErr", args),
 				mCallbacks->translateString("MBError"), OSMB_OK);
 		}
@@ -1698,8 +1698,8 @@ BOOL LLWindowWin32::switchContext(BOOL fullscreen, const LLCoordScreen &size, BO
 			}
 			else
 			{
-				LL_INFOS() << absl::StreamFormat("Created OpenGL %d.%d %s context.", attribs[1], 
-					attribs[3], LLRender::sGLCoreProfile ? "core" : "compatibility") << LL_ENDL;
+				LL_INFOS() << "Created OpenGL " << llformat("%d.%d", attribs[1], attribs[3]) << 
+					(LLRender::sGLCoreProfile ? " core" : " compatibility") << " context." << LL_ENDL;
 				done = true;
 
 			// force sNoFixedFunction iff we're trying to use nsight debugging which does not support many legacy API uses

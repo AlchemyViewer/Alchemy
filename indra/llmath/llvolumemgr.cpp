@@ -391,8 +391,9 @@ F32 LLVolumeLODGroup::dump()
 	}
 	usage = usage / (F32)NUM_LODS;
 
-	LL_INFOS() << absl::StrFormat("%.3f %d %d %d %d", usage, 
-		mAccessCount[0], mAccessCount[1], mAccessCount[2], mAccessCount[3]) << LL_ENDL;
+	std::string dump_str = llformat("%.3f %d %d %d %d", usage, mAccessCount[0], mAccessCount[1], mAccessCount[2], mAccessCount[3]);
+
+	LL_INFOS() << dump_str << LL_ENDL;
 	return usage;
 }
 

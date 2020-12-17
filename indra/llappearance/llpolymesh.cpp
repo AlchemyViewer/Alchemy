@@ -880,6 +880,8 @@ void LLPolyMesh::dumpDiagInfo()
         U32 total_faces = 0;
         U32 total_kb = 0;
 
+        std::string buf;
+
         LL_INFOS() << "-----------------------------------------------------" << LL_ENDL;
         LL_INFOS() << "       Global PolyMesh Table (DEBUG only)" << LL_ENDL;
         LL_INFOS() << "   Verts    Faces  Mem(KB) Name" << LL_ENDL;
@@ -896,7 +898,8 @@ void LLPolyMesh::dumpDiagInfo()
                 S32 num_faces = mesh->mNumFaces;
                 U32 num_kb = mesh->getNumKB();
 
-                LL_INFOS() << absl::StreamFormat("%8d %8d %8d %s", num_verts, num_faces, num_kb, mesh_name) << LL_ENDL;
+                buf = llformat("%8d %8d %8d %s", num_verts, num_faces, num_kb, mesh_name.c_str());
+                LL_INFOS() << buf << LL_ENDL;
 
                 total_verts += num_verts;
                 total_faces += num_faces;
@@ -904,7 +907,8 @@ void LLPolyMesh::dumpDiagInfo()
         }
 
         LL_INFOS() << "-----------------------------------------------------" << LL_ENDL;
-        LL_INFOS() << absl::StreamFormat("%8d %8d %8d TOTAL", total_verts, total_faces, total_kb) << LL_ENDL;
+        buf = llformat("%8d %8d %8d TOTAL", total_verts, total_faces, total_kb );
+        LL_INFOS() << buf << LL_ENDL;
         LL_INFOS() << "-----------------------------------------------------" << LL_ENDL;
 }
 

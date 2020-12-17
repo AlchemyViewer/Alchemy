@@ -230,7 +230,7 @@ bool LLNotecard::exportEmbeddedItemsStream( std::ostream& out_stream )
 	out_stream << "LLEmbeddedItems version 1\n";
 	out_stream << "{\n";
 
-	out_stream << absl::StreamFormat("count %d\n", mItems.size() );
+	out_stream << llformat("count %d\n", mItems.size() );
 
 	S32 idx = 0;
 	for (std::vector<LLPointer<LLInventoryItem> >::iterator iter = mItems.begin();
@@ -240,7 +240,7 @@ bool LLNotecard::exportEmbeddedItemsStream( std::ostream& out_stream )
 		if (item)
 		{
 			out_stream << "{\n";
-			out_stream << absl::StreamFormat("ext char index %d\n", idx  );
+			out_stream << llformat("ext char index %d\n", idx  );
 			if( !item->exportLegacyStream( out_stream ) )
 			{
 				return FALSE;
@@ -265,7 +265,7 @@ bool LLNotecard::exportStream( std::ostream& out_stream )
 		return FALSE;
 	}
 
-	out_stream << absl::StreamFormat("Text length %d\n", mText.length() );
+	out_stream << llformat("Text length %d\n", mText.length() );
 	out_stream << mText;
 	out_stream << "}\n";
 

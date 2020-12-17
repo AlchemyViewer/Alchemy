@@ -32,7 +32,7 @@
 #include "llnotificationsutil.h"
 #include "lltrans.h"
 
-#include "absl/strings/str_format.h"
+#include "boost/lexical_cast.hpp"
 
 const S32Days CONVERSATION_LIFETIME = (S32Days)30; // lifetime of LLConversation is 30 days by spec
 
@@ -415,7 +415,7 @@ bool LLConversationLog::moveLog(const std::string &originDirectory, const std::s
 			while(LLFile::isfile(backupFileName))
 			{
 				++backupFileCount;
-				backupFileName = absl::StrCat(targetDirectory, ".backup", backupFileCount);
+				backupFileName = targetDirectory + ".backup" + boost::lexical_cast<std::string>(backupFileCount);
 			}
 
 			//Rename the file to its backup name so it is not overwritten

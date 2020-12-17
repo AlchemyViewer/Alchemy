@@ -776,7 +776,7 @@ void LLWearable::writeToAvatar(LLAvatarAppearance* avatarp)
 
 std::string terse_F32_to_string(F32 f)
 {
-	std::string r = absl::StrFormat("%.2f", f);
+	std::string r = llformat("%.2f", f);
 	S32 len = r.length();
 
     // "1.20"  -> "1.2"
