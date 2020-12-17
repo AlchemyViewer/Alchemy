@@ -222,8 +222,7 @@ void LLMetricPerformanceTesterBasic::analyzePerformance(llofstream* os, LLSD* ba
 		if(in_base && in_current)
 		{				
 			LLSD::String label = current_label;
-
-			*os << absl::StreamFormat("%s\n", label) ;
+			*os << llformat("%s\n", label.c_str()) ;
 
 			for(U32 index = 0 ; index < mMetricStrings.size() ; index++)
 			{
