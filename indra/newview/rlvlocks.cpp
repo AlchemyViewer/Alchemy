@@ -27,7 +27,6 @@
 #include "rlvhelper.h"
 #include "rlvinventory.h"
 
-#include "absl/strings/str_format.h"
 
 // ============================================================================
 // RlvAttachPtLookup member functions
@@ -453,9 +452,9 @@ void RlvAttachmentLockWatchdog::RlvWearInfo::dumpInstance() const
 	const LLViewerInventoryItem* pItem = gInventory.getItem(idItem);
 	std::string strItemId = idItem.asString();
 
-	RLV_INFOS << absl::StreamFormat("Wear %s '%s' (%s)",
-		(RLV_WEAR_ADD == eWearAction) ? "add" : "replace", (pItem) ? pItem->getName() : "missing", strItemId)
-		<< RLV_ENDL;
+	std::string strTemp = llformat("Wear %s '%s' (%s)", 
+		(RLV_WEAR_ADD == eWearAction) ? "add" : "replace", (pItem) ? pItem->getName().c_str() : "missing", strItemId.c_str());
+	RLV_INFOS << strTemp.c_str() << RLV_ENDL;
 
 	if (!attachPts.empty())
 	{
@@ -469,10 +468,11 @@ void RlvAttachmentLockWatchdog::RlvWearInfo::dumpInstance() const
 				for (uuid_vec_t::const_iterator itAttach = itAttachPt->second.begin(); itAttach != itAttachPt->second.end(); ++itAttach)
 				{
 					pItem = gInventory.getItem(*itAttach);
-	
-					RLV_INFOS << absl::StreamFormat("  -> %s : %s (%s)",
-						pAttachPt->getName(), (pItem) ? pItem->getName() : "missing", (*itAttach).asString())
-						<< RLV_ENDL;
+					strItemId = (*itAttach).asString();
+
+					strTemp = llformat("  -> %s : %s (%s)",
+						pAttachPt->getName().c_str(), (pItem) ? pItem->getName().c_str() : "missing", strItemId.c_str());
+					RLV_INFOS << strTemp.c_str() << RLV_ENDL;
 				}
 			}
 			else

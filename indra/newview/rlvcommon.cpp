@@ -40,10 +40,6 @@
 #include "rlvhandler.h"
 #include "rlvlocks.h"
 
-#include <absl/strings/str_format.h>
-#include <absl/strings/str_replace.h>
-#include <absl/strings/str_split.h>
-
 #include <boost/algorithm/string.hpp>
 #include <boost/regex.hpp>
 
