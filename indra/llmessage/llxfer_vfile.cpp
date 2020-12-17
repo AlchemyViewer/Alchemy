@@ -72,7 +72,7 @@ void LLXfer_VFile::init (LLVFS *vfs, const LLUUID &local_id, LLAssetType::EType 
 	std::string id_string;
 	mLocalID.toString(id_string);
 
-	mName = absl::StrFormat("VFile %s:%s", id_string, LLAssetType::lookup(mType));
+	mName = llformat("VFile %s:%s", id_string.c_str(), LLAssetType::lookup(mType));
 }
 	
 ///////////////////////////////////////////////////////////
@@ -128,7 +128,7 @@ S32 LLXfer_VFile::initializeRequest(U64 xfer_id,
 	std::string id_string;
 	mLocalID.toString(id_string);
 
-	mName = absl::StrFormat("VFile %s:%s", id_string, LLAssetType::lookup(mType));
+	mName = llformat("VFile %s:%s", id_string.c_str(), LLAssetType::lookup(mType));
 
 	LL_INFOS("Xfer") << "Requesting " << mName << LL_ENDL;
 

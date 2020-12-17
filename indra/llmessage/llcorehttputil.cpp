@@ -1181,7 +1181,7 @@ void HttpCoroutineAdapter::checkDefaultHeaders(LLCore::HttpHeaders::ptr_t &heade
 
     if (!headers->find("X-SecondLife-UDP-Listen-Port") && gMessageSystem)
     {
-        headers->append("X-SecondLife-UDP-Listen-Port", absl::StrFormat("%d", gMessageSystem->mPort));
+        headers->append("X-SecondLife-UDP-Listen-Port", llformat("%d", gMessageSystem->mPort));
     }
 }
 

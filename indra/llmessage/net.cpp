@@ -462,7 +462,7 @@ S32 start_net(S32& socket_out, int& nPort)
 			// Some other socket error
 			else
 			{
-				LL_WARNS() << absl::StrFormat("bind() port: %d failed, Err: %s\n", nPort, strerror(errno)) << LL_ENDL;
+				LL_WARNS() << llformat ("bind() port: %d failed, Err: %s\n", nPort, strerror(errno)) << LL_ENDL;
 				// Fail gracefully in release.
 				return 4;
 			}
