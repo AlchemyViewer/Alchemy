@@ -99,7 +99,7 @@ bool LLTrans::parseStrings(LLXMLNodePtr &root, const std::set<std::string>& defa
 		{
 			std::string name = *iter;
 			if (name[0] != '[')
-				name = absl::StrFormat("[%s]", name);
+				name = llformat("[%s]",name.c_str());
 			sDefaultArgs[name] = xml_template.mText;
 		}
 	}

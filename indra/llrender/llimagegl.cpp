@@ -536,7 +536,7 @@ bool LLImageGL::setSize(S32 width, S32 height, S32 ncomponents, S32 discard_leve
 		// Check if dimensions are a power of two!
 		if (!checkSize(width,height))
 		{
-			LL_WARNS() << absl::StreamFormat("Texture has non power of two dimension: %dx%d",width,height) << LL_ENDL;
+			LL_WARNS() << llformat("Texture has non power of two dimension: %dx%d",width,height) << LL_ENDL;
 			return false;
 		}
 		
@@ -1635,7 +1635,7 @@ BOOL LLImageGL::readBackRaw(S32 discard_level, LLImageRaw* imageraw, bool compre
 
 	if (width <= 0 || width > 2048 || height <= 0 || height > 2048 || ncomponents < 1 || ncomponents > 4)
 	{
-		LL_ERRS() << absl::StreamFormat("LLImageGL::readBackRaw: bogus params: %d x %d x %d",width,height,ncomponents) << LL_ENDL;
+		LL_ERRS() << llformat("LLImageGL::readBackRaw: bogus params: %d x %d x %d",width,height,ncomponents) << LL_ENDL;
 	}
 	
 	LLGLint is_compressed = 0;

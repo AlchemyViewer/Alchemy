@@ -482,7 +482,7 @@ bool LLVolumeMessage::constrainVolumeParams(LLVolumeParams& params)
 	{
 		LL_WARNS() << "LLVolumeMessage::constrainVolumeParams() - "
 				<< "forced to constrain incoming volume params: "
-				<< absl::StreamFormat("0x%04x",bad) << LL_ENDL;
+				<< llformat("0x%04x",bad) << LL_ENDL;
 	}
 	return bad ? false : true;
 }

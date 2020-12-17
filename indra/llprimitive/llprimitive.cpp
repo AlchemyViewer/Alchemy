@@ -623,7 +623,7 @@ std::string LLPrimitive::pCodeToString(const LLPCode pcode)
 		  pcode_string = "tree_new";
 			break;
 		default:
-		  pcode_string = absl::StrFormat( "unknown legacy pcode %d", pcode);
+		  pcode_string = llformat( "unknown legacy pcode %i",(U32)pcode);
 		}
 	}
 	else
@@ -674,7 +674,7 @@ std::string LLPrimitive::pCodeToString(const LLPCode pcode)
 		U8 mask_code = pcode & (~LL_PCODE_BASE_MASK);
 		if (base_code == LL_PCODE_APP)
 		{
-			mask = absl::StrFormat("%x", mask_code);
+			mask = llformat( "%x", mask_code);
 		}
 		else if (mask_code & LL_PCODE_HEMI_MASK)
 		{
@@ -682,16 +682,16 @@ std::string LLPrimitive::pCodeToString(const LLPCode pcode)
 		}
 		else 
 		{
-			mask = absl::StrFormat("%x", mask_code);
+			mask = llformat( "%x", mask_code);
 		}
 
 		if (mask[0])
 		{
-			pcode_string = absl::StrFormat("%s-%s", shape, mask);
+			pcode_string = llformat( "%s-%s", shape.c_str(), mask.c_str());
 		}
 		else
 		{
-			pcode_string = absl::StrFormat("%s", shape);
+			pcode_string = llformat( "%s", shape.c_str());
 		}
 	}
 
@@ -1111,10 +1111,10 @@ S32 LLPrimitive::unpackTEField(U8 *cur_ptr, U8 *buffer_end, U8 *data_ptr, U8 dat
 			if (i & 0x01)
 			{
 				htolememcpy(data_ptr+(j*data_size),cur_ptr,type,data_size);
-#if SHOW_DEBUG
 				LL_DEBUGS("TEFieldDecode") << "Assigning " ;
-				LL_CONT << absl::StreamFormat("%x %x", * (data_ptr + (j * data_size)), * (data_ptr + (j * data_size) + 1)) << " to face " << j << LL_ENDL;
-#endif
+				char foo[64];
+				sprintf(foo,"%x %x",*(data_ptr+(j*data_size)), *(data_ptr+(j*data_size)+1));
+				LL_CONT << foo << " to face " << j << LL_ENDL;
 			}
 			i = i >> 1;
 		}

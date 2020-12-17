@@ -2644,7 +2644,7 @@ BOOL LLTextEditor::importBuffer(const char* buffer, S32 length )
 	text[text_len] = '\0';
 	if( text_len != (S32)strlen(text) )/* Flawfinder: ignore */
 	{
-		LL_WARNS() << absl::StreamFormat("Invalid text length: %d != %d ",strlen(text),text_len) << LL_ENDL;/* Flawfinder: ignore */
+		LL_WARNS() << llformat("Invalid text length: %d != %d ",strlen(text),text_len) << LL_ENDL;/* Flawfinder: ignore */
 		success = FALSE;
 	}
 

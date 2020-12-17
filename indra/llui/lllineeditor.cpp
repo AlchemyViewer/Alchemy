@@ -2356,7 +2356,7 @@ BOOL LLLineEditor::evaluateFloat()
 	else
 	{
 		// Replace the expression with the result
-		std::string result_str = absl::StrFormat("%f", result);
+		std::string result_str = llformat("%f",result);
 		setText(result_str);
 		selectAll();
 	}

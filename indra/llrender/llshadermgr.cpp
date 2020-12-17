@@ -846,7 +846,7 @@ GLuint LLShaderMgr::loadShaderFile(const std::string& filename, S32 & shader_lev
 		//uniform declartion
 		for (S32 i = 0; i < texture_index_channels; ++i)
 		{
-			std::string decl = absl::StrFormat("uniform sampler2D tex%d;\n", i);
+			std::string decl = llformat("uniform sampler2D tex%d;\n", i);
 			extra_code_text[extra_code_count++] = strdup(decl.c_str());
 		}
 
@@ -870,7 +870,7 @@ GLuint LLShaderMgr::loadShaderFile(const std::string& filename, S32 & shader_lev
 			{ //switches are unreliable on some NVIDIA drivers
 				for (U32 i = 0; i < texture_index_channels; ++i)
 				{
-					std::string if_string = absl::StrFormat("\t%sif (vary_texture_index == %d) { return texture2D(tex%d, texcoord); }\n", i > 0 ? "else " : "", i, i); 
+					std::string if_string = llformat("\t%sif (vary_texture_index == %d) { return texture2D(tex%d, texcoord); }\n", i > 0 ? "else " : "", i, i); 
 					extra_code_text[extra_code_count++] = strdup(if_string.c_str());
 				}
 				extra_code_text[extra_code_count++] = strdup("\treturn vec4(1,0,1,1);\n");
@@ -885,7 +885,7 @@ GLuint LLShaderMgr::loadShaderFile(const std::string& filename, S32 & shader_lev
 				//switch body
 				for (S32 i = 0; i < texture_index_channels; ++i)
 				{
-					std::string case_str = absl::StrFormat("\t\tcase %d: return texture2D(tex%d, texcoord);\n", i, i);
+					std::string case_str = llformat("\t\tcase %d: return texture2D(tex%d, texcoord);\n", i, i);
 					extra_code_text[extra_code_count++] = strdup(case_str.c_str());
 				}
 

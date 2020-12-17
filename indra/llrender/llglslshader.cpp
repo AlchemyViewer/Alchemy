@@ -141,9 +141,9 @@ void LLGLSLShader::finishProfile(bool emit_report)
         }
             
     LL_INFOS() << "-----------------------------------" << LL_ENDL;
-    LL_INFOS() << absl::StreamFormat("Total rendering time: %.4f ms", sTotalTimeElapsed/1000000.f) << LL_ENDL;
-    LL_INFOS() << absl::StreamFormat("Total samples drawn: %.4f million", sTotalSamplesDrawn/1000000.f) << LL_ENDL;
-    LL_INFOS() << absl::StreamFormat("Total triangles drawn: %.3f million", sTotalTrianglesDrawn/1000000.f) << LL_ENDL;
+    LL_INFOS() << "Total rendering time: " << llformat("%.4f ms", sTotalTimeElapsed/1000000.f) << LL_ENDL;
+    LL_INFOS() << "Total samples drawn: " << llformat("%.4f million", sTotalSamplesDrawn/1000000.f) << LL_ENDL;
+    LL_INFOS() << "Total triangles drawn: " << llformat("%.3f million", sTotalTrianglesDrawn/1000000.f) << LL_ENDL;
     }
 }
 
@@ -194,10 +194,10 @@ void LLGLSLShader::dumpStats()
         F32 pct_calls = (F32) mDrawCalls/(F32)sTotalDrawCalls*100.f;
         U32 avg_batch = mTrianglesDrawn/mDrawCalls;
 
-        LL_INFOS() << absl::StreamFormat("Triangles Drawn: %u (%.2f pct of total, %.3f million/sec)", mTrianglesDrawn, pct_tris, tris_sec ) << LL_ENDL;
-        LL_INFOS() << absl::StreamFormat("Draw Calls: %u (%.2f pct of total, avg %d tris/call)", mDrawCalls, pct_calls, avg_batch) << LL_ENDL;
-        LL_INFOS() << absl::StreamFormat("SamplesDrawn: %ull (%.2f pct of total, %.3f billion/sec)", mSamplesDrawn, pct_samples, samples_sec) << LL_ENDL;
-        LL_INFOS() << absl::StreamFormat("Time Elapsed: %ull (%.2f pct of total, %.5f ms)", mTimeElapsed, (F32) ((F64)mTimeElapsed/(F64)sTotalTimeElapsed)*100.f, ms) << LL_ENDL;
+        LL_INFOS() << "Triangles Drawn: " << mTrianglesDrawn <<  " " << llformat("(%.2f pct of total, %.3f million/sec)", pct_tris, tris_sec ) << LL_ENDL;
+        LL_INFOS() << "Draw Calls: " << mDrawCalls << " " << llformat("(%.2f pct of total, avg %d tris/call)", pct_calls, avg_batch) << LL_ENDL;
+        LL_INFOS() << "SamplesDrawn: " << mSamplesDrawn << " " << llformat("(%.2f pct of total, %.3f billion/sec)", pct_samples, samples_sec) << LL_ENDL;
+        LL_INFOS() << "Time Elapsed: " << mTimeElapsed << " " << llformat("(%.2f pct of total, %.5f ms)\n", (F32) ((F64)mTimeElapsed/(F64)sTotalTimeElapsed)*100.f, ms) << LL_ENDL;
     }
 }
 
@@ -458,7 +458,7 @@ BOOL LLGLSLShader::createShader(std::vector<LLStaticHashedString> * attributes,
 
         for (S32 i = 0; i < channel_count; i++)
         {
-            LLStaticHashedString uniName(absl::StrFormat("tex%d", i));
+            LLStaticHashedString uniName(llformat("tex%d", i));
             uniform1i(uniName, i);
         }
 

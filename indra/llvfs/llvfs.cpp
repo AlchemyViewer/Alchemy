@@ -613,8 +613,8 @@ LLVFS * LLVFS::createLLVFS(const std::string& index_filename,
 		while (!new_vfs->isValid() &&
 				count < 256)
 		{	// Append '.<number>' to end of filenames
-			retry_vfs_index_name = index_filename + absl::StrFormat(".%d",count);
-			retry_vfs_data_name = data_filename + absl::StrFormat(".%d", count);
+			retry_vfs_index_name = index_filename + llformat(".%u",count);
+			retry_vfs_data_name = data_filename + llformat(".%u", count);
 
 			delete new_vfs;	// Delete bad VFS and try again
 			new_vfs = new LLVFS(retry_vfs_index_name, retry_vfs_data_name, read_only, presize, remove_after_crash);
@@ -1181,7 +1181,7 @@ S32 LLVFS::storeData(const LLUUID &file_id, const LLAssetType::EType file_type, 
 			S32 write_len = (S32)fwrite(buffer, 1, length, mDataFP);
 			if (write_len != length)
 			{
-				LL_WARNS() << absl::StreamFormat("VFS Write Error: %d != %d",write_len,length) << LL_ENDL;
+				LL_WARNS() << llformat("VFS Write Error: %d != %d",write_len,length) << LL_ENDL;
 			}
 			// fflush(mDataFP);
 			
@@ -1986,7 +1986,7 @@ void LLVFS::dumpStatistics()
 	LL_INFOS() << "Total file size: " << total_file_size/1024 << "K" << LL_ENDL;
 	LL_INFOS() << "Total free size: " << total_free_size/1024 << "K" << LL_ENDL;
 	LL_INFOS() << "Sum: " << (total_file_size + total_free_size) << " bytes" << LL_ENDL;
-	LL_INFOS() << absl::StreamFormat("%.0f%% full",((F32)(total_file_size)/(F32)(total_file_size+total_free_size))*100.f) << LL_ENDL;
+	LL_INFOS() << llformat("%.0f%% full",((F32)(total_file_size)/(F32)(total_file_size+total_free_size))*100.f) << LL_ENDL;
 
 	LL_INFOS() << " " << LL_ENDL;
 	for (std::map<LLAssetType::EType, std::pair<S32,S32> >::iterator iter = filetype_counts.begin();
