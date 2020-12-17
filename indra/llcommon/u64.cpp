@@ -66,15 +66,15 @@ std::string U64_to_str(U64 value)
 	
 	if (part1)
 	{
-		res = absl::StrFormat("%u%07u%07u",part1,part2,part3);
+		res = llformat("%u%07u%07u",part1,part2,part3);
 	}
 	else if (part2)
 	{
-		res = absl::StrFormat("%u%07u",part2,part3);
+		res = llformat("%u%07u",part2,part3);
 	}
 	else
 	{
-		res = absl::StrFormat("%u",part3);
+		res = llformat("%u",part3);	
 	}
 	return res;
 } 
