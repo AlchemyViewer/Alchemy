@@ -2762,7 +2762,7 @@ void HttpRequestTestObjectType::test<22>()
 		for (int i(0); i < test_count; ++i)
 		{
 			char buffer[128];
-			absl::SNPrintF(buffer, sizeof(buffer), "/bug2295/%d/", i);
+			snprintf(buffer, sizeof(buffer), "/bug2295/%d/", i);
 			HttpHandle handle = req->requestGetByteRange(HttpRequest::DEFAULT_POLICY_ID,
 														 0U,
 														 url_base + buffer,
@@ -2794,7 +2794,7 @@ void HttpRequestTestObjectType::test<22>()
 		for (int i(0); i < test2_count; ++i)
 		{
 			char buffer[128];
-			absl::SNPrintF(buffer, sizeof(buffer), "/bug2295/00000012/%d/", i);
+			snprintf(buffer, sizeof(buffer), "/bug2295/00000012/%d/", i);
 			HttpHandle handle = req->requestGetByteRange(HttpRequest::DEFAULT_POLICY_ID,
 														 0U,
 														 url_base + buffer,
@@ -2826,7 +2826,7 @@ void HttpRequestTestObjectType::test<22>()
 		for (int i(0); i < test3_count; ++i)
 		{
 			char buffer[128];
-			absl::SNPrintF(buffer, sizeof(buffer), "/bug2295/inv_cont_range/%d/", i);
+			snprintf(buffer, sizeof(buffer), "/bug2295/inv_cont_range/%d/", i);
 			HttpHandle handle = req->requestGetByteRange(HttpRequest::DEFAULT_POLICY_ID,
 														 0U,
 														 url_base + buffer,

@@ -466,24 +466,24 @@ BOOL LLGestureStepWait::deserialize(LLDataPacker& dp)
 std::vector<std::string> LLGestureStepWait::getLabel() const
 {
 	std::vector<std::string> strings;
-	strings.emplace_back( "Wait" );
+	strings.push_back( "Wait" );
 	
 //	std::string label("--- Wait: ");
 	if (mFlags & WAIT_FLAG_TIME)
 	{
-		std::string str = absl::StrFormat("%.1f seconds", mWaitSeconds);
-
-		strings.push_back(std::move(str));
+		char buffer[64];		/* Flawfinder: ignore */
+		snprintf(buffer, sizeof(buffer), "%.1f seconds", (double)mWaitSeconds);	/* Flawfinder: ignore */
+		strings.push_back(buffer);
 //		label += buffer;
 	}
 	else if (mFlags & WAIT_FLAG_ALL_ANIM)
 	{
-		strings.emplace_back("until animations are done");
+		strings.push_back("until animations are done");
 	//	label += "until animations are done";
 	}
 	else
 	{
-		strings.emplace_back("");
+		strings.push_back("");
 	}
 
 	return strings;
