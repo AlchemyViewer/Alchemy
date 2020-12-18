@@ -43,7 +43,6 @@ static LLPanelInjector<ALPanelQuickSettings> t_quick_settings("quick_settings");
 
 ALPanelQuickSettings::ALPanelQuickSettings()
 	: LLPanel(),
-	mRegionSettingsCheckBox(nullptr),
 	mHoverSlider(nullptr),
 	mHoverSpinner(nullptr)
 {

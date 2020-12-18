@@ -34,6 +34,8 @@
 #include "llrefcount.h"
 #include "llsd.h"
 
+#include "absl/strings/str_format.h"
+
 /** 
  * @class LLSDParser
  * @brief Abstract base class for LLSD parsers.
@@ -500,7 +502,7 @@ protected:
 	void formatReal(LLSD::Real real, std::ostream& ostr) const;
 
 	bool mBoolAlpha;
-	std::string mRealFormat;
+    std::unique_ptr<absl::ParsedFormat<absl::FormatConversionCharSet::kFloating> > mRealFormat;
 	EFormatterOptions mOptions;
 };
 

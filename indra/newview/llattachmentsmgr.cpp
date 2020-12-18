@@ -43,7 +43,6 @@
 const F32 COF_LINK_BATCH_TIME = 5.0F;
 const F32 MAX_ATTACHMENT_REQUEST_LIFETIME = 30.0F;
 const F32 MIN_RETRY_REQUEST_TIME = 5.0F;
-const F32 MAX_BAD_COF_TIME = 30.0F;
 
 // [SL:KB] - Patch: Appearance-SyncAttach | Checked: Catznip-3.7
 class LLRegisterAttachmentCallback : public LLRequestServerAppearanceUpdateOnDestroy

@@ -1077,9 +1077,6 @@ void LLPanelObject::getState( )
 	// sculpt texture
 	if (selected_item == MI_SCULPT)
 	{
-
-
-		LLUUID id;
 		LLSculptParams *sculpt_params = (LLSculptParams *)objectp->getParameterEntry(LLNetworkData::PARAMS_SCULPT);
 
 		

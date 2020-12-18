@@ -49,14 +49,12 @@ void setupCocoa()
 	
 	if(!inited)
 	{
-		NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
-		
-		// The following prevents the Cocoa command line parser from trying to open 'unknown' arguements as documents.
-		// ie. running './secondlife -set Language fr' would cause a pop-up saying can't open document 'fr'
-		// when init'ing the Cocoa App window.
-		[[NSUserDefaults standardUserDefaults] setObject:@"NO" forKey:@"NSTreatUnknownArgumentsAsOpen"];
-		
-		[pool release];
+        @autoreleasepool {
+            // The following prevents the Cocoa command line parser from trying to open 'unknown' arguements as documents.
+            // ie. running './secondlife -set Language fr' would cause a pop-up saying can't open document 'fr'
+            // when init'ing the Cocoa App window.
+            [[NSUserDefaults standardUserDefaults] setObject:@"NO" forKey:@"NSTreatUnknownArgumentsAsOpen"];
+        }
 
 		inited = true;
 	}
@@ -64,13 +62,14 @@ void setupCocoa()
 
 bool copyToPBoard(const unsigned short *str, unsigned int len)
 {
-	NSAutoreleasePool *pool = [[NSAutoreleasePool alloc]init];
-	NSPasteboard *pboard = [NSPasteboard generalPasteboard];
-	[pboard clearContents];
-	
-	NSArray *contentsToPaste = [[NSArray alloc] initWithObjects:[NSString stringWithCharacters:str length:len], nil];
-	[pool release];
-	return [pboard writeObjects:contentsToPaste];
+    @autoreleasepool {
+        NSPasteboard *pboard = [NSPasteboard generalPasteboard];
+        [pboard clearContents];
+        
+        NSArray *contentsToPaste = [[[NSArray alloc] initWithObjects:[NSString stringWithCharacters:str length:len], nil] autorelease];
+        BOOL ret = [pboard writeObjects:contentsToPaste];
+        return ret;
+    }
 }
 
 bool pasteBoardAvailable()
@@ -79,41 +78,41 @@ bool pasteBoardAvailable()
 	return [[NSPasteboard generalPasteboard] canReadObjectForClasses:classArray options:[NSDictionary dictionary]];
 }
 
-const unsigned short *copyFromPBoard()
+unsigned short *copyFromPBoard()
 {
-	NSAutoreleasePool *pool = [[NSAutoreleasePool alloc]init];
-	NSPasteboard *pboard = [NSPasteboard generalPasteboard];
-	NSArray *classArray = [NSArray arrayWithObject:[NSString class]];
-	NSString *str = NULL;
-	BOOL ok = [pboard canReadObjectForClasses:classArray options:[NSDictionary dictionary]];
-	if (ok)
-	{
-		NSArray *objToPaste = [pboard readObjectsForClasses:classArray options:[NSDictionary dictionary]];
-		str = [objToPaste objectAtIndex:0];
-	}
-	unichar* temp = (unichar*)calloc([str length]+1, sizeof(unichar));
-	[str getCharacters:temp];
-	[pool release];
-	return temp;
+    @autoreleasepool {
+        NSPasteboard *pboard = [NSPasteboard generalPasteboard];
+        NSArray *classArray = [NSArray arrayWithObject:[NSString class]];
+        NSString *str = NULL;
+        BOOL ok = [pboard canReadObjectForClasses:classArray options:[NSDictionary dictionary]];
+        if (ok)
+        {
+            NSArray *objToPaste = [pboard readObjectsForClasses:classArray options:[NSDictionary dictionary]];
+            str = [objToPaste objectAtIndex:0];
+        }
+        NSUInteger len = [str length];
+        unichar* temp = (unichar*)calloc(len+1, sizeof(unichar));
+        [str getCharacters:temp range:NSMakeRange(0, len)];
+        
+        return temp;
+    }
 }
 
 CursorRef createImageCursor(const char *fullpath, int hotspotX, int hotspotY)
 {
-	NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
-	
-	// extra retain on the NSCursor since we want it to live for the lifetime of the app.
-	NSCursor *cursor =
-	[[[NSCursor alloc]
-	  initWithImage:
-	  [[[NSImage alloc] initWithContentsOfFile:
-		[NSString stringWithFormat:@"%s", fullpath]
-		]autorelease]
-	  hotSpot:NSMakePoint(hotspotX, hotspotY)
-	  ]retain];
-	
-	[pool release];
-	
-	return (CursorRef)cursor;
+    @autoreleasepool {
+        // extra retain on the NSCursor since we want it to live for the lifetime of the app.
+        NSCursor *cursor =
+        [[[NSCursor alloc]
+          initWithImage:
+          [[[NSImage alloc] initWithContentsOfFile:
+            [NSString stringWithFormat:@"%s", fullpath]
+            ]autorelease]
+          hotSpot:NSMakePoint(hotspotX, hotspotY)
+          ] retain];
+        
+        return (CursorRef)cursor;
+    }
 }
 
 void setArrowCursor()
@@ -163,11 +162,6 @@ void showNSCursor()
 	[NSCursor unhide];
 }
 
-bool isCGCursorVisible()
-{
-    return CGCursorIsVisible();
-}
-
 void hideNSCursorTillMove(bool hide)
 {
 	[NSCursor setHiddenUntilMouseMoves:hide];
@@ -178,10 +172,10 @@ OSErr releaseImageCursor(CursorRef ref)
 {
 	if( ref != NULL )
 	{
-		NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
-		NSCursor *cursor = (NSCursor*)ref;
-		[cursor release];
-		[pool release];
+        @autoreleasepool {
+            NSCursor *cursor = (NSCursor*)ref;
+            [cursor release];
+        }
 	}
 	else
 	{
@@ -195,10 +189,10 @@ OSErr setImageCursor(CursorRef ref)
 {
 	if( ref != NULL )
 	{
-		NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
-		NSCursor *cursor = (NSCursor*)ref;
-		[cursor set];
-		[pool release];
+        @autoreleasepool {
+            NSCursor *cursor = (NSCursor*)ref;
+            [cursor set];
+        }
 	}
 	else
 	{
@@ -214,7 +208,7 @@ OSErr setImageCursor(CursorRef ref)
 NSWindowRef createNSWindow(int x, int y, int width, int height)
 {
 	LLNSWindow *window = [[LLNSWindow alloc]initWithContentRect:NSMakeRect(x, y, width, height)
-													  styleMask:NSTitledWindowMask | NSResizableWindowMask | NSClosableWindowMask | NSMiniaturizableWindowMask | NSTexturedBackgroundWindowMask backing:NSBackingStoreBuffered defer:NO];
+                                                      styleMask:NSWindowStyleMaskTitled | NSWindowStyleMaskResizable | NSWindowStyleMaskClosable | NSWindowStyleMaskMiniaturizable | NSWindowStyleMaskTexturedBackground backing:NSBackingStoreBuffered defer:NO];
 	[window makeKeyAndOrderFront:nil];
 	[window setAcceptsMouseMovedEvents:TRUE];
 	return window;
@@ -225,11 +219,6 @@ GLViewRef createOpenGLView(NSWindowRef window, unsigned int samples, bool vsync)
 	LLOpenGLView *glview = [[LLOpenGLView alloc]initWithFrame:[(LLNSWindow*)window frame] withSamples:samples andVsync:vsync];
 	[(LLNSWindow*)window setContentView:glview];
 	return glview;
-}
-
-void setResizeMode(bool oldresize, void* glview)
-{
-    [(LLOpenGLView *)glview setOldResize:oldresize];
 }
 
 void glSwapBuffers(void* context)
@@ -258,19 +247,21 @@ float getDeviceUnitSize(GLViewRef view)
 	return [(LLOpenGLView*)view convertSizeToBacking:NSMakeSize(1, 1)].width;
 }
 
-CGPoint getContentViewBoundsPosition(NSWindowRef window)
+void getContentViewBounds(NSWindowRef window, float* bounds)
 {
-	return [[(LLNSWindow*)window contentView] bounds].origin;
+	bounds[0] = [[(LLNSWindow*)window contentView] bounds].origin.x;
+	bounds[1] = [[(LLNSWindow*)window contentView] bounds].origin.y;
+	bounds[2] = [[(LLNSWindow*)window contentView] bounds].size.width;
+	bounds[3] = [[(LLNSWindow*)window contentView] bounds].size.height;
 }
 
-CGSize getContentViewBoundsSize(NSWindowRef window)
+void getScaledContentViewBounds(NSWindowRef window, GLViewRef view, float* bounds)
 {
-	return [[(LLNSWindow*)window contentView] bounds].size;
-}
-
-CGSize getDeviceContentViewSize(NSWindowRef window, GLViewRef view)
-{
-    return [(NSOpenGLView*)view convertRectToBacking:[[(LLNSWindow*)window contentView] bounds]].size;
+    NSRect b = [(NSOpenGLView*)view convertRectToBacking:[[(LLNSWindow*)window contentView] bounds]];
+	bounds[0] = b.origin.x;
+	bounds[1] = b.origin.y;
+	bounds[2] = b.size.width;
+	bounds[3] = b.size.height;
 }
 
 void getWindowSize(NSWindowRef window, float* size)
@@ -313,9 +304,7 @@ void makeWindowOrderFront(NSWindowRef window)
 
 void convertScreenToWindow(NSWindowRef window, float *coord)
 {
-	NSRect point;
-	point.origin.x = coord[0];
-	point.origin.y = coord[1];
+	NSRect point = NSMakeRect(coord[0], coord[1], 0, 0);
 	point = [(LLNSWindow*)window convertRectFromScreen:point];
 	coord[0] = point.origin.x;
 	coord[1] = point.origin.y;
@@ -323,12 +312,7 @@ void convertScreenToWindow(NSWindowRef window, float *coord)
 
 void convertRectToScreen(NSWindowRef window, float *coord)
 {
-	NSRect point;
-	point.origin.x = coord[0];
-	point.origin.y = coord[1];
-	point.size.width = coord[2];
-	point.size.height = coord[3];
-	
+	NSRect point = NSMakeRect(coord[0], coord[1], coord[2], coord[3]);
 	point = [(LLNSWindow*)window convertRectToScreen:point];
 	
 	coord[0] = point.origin.x;
@@ -339,12 +323,7 @@ void convertRectToScreen(NSWindowRef window, float *coord)
 
 void convertRectFromScreen(NSWindowRef window, float *coord)
 {
-	NSRect point;
-	point.origin.x = coord[0];
-	point.origin.y = coord[1];
-	point.size.width = coord[2];
-	point.size.height = coord[3];
-	
+	NSRect point = NSMakeRect(coord[0], coord[1], coord[2], coord[3]);
 	point = [(LLNSWindow*)window convertRectFromScreen:point];
 	
 	coord[0] = point.origin.x;
@@ -353,23 +332,15 @@ void convertRectFromScreen(NSWindowRef window, float *coord)
 	coord[3] = point.size.height;
 }
 
-void convertScreenToView(NSWindowRef window, float *coord)
-{
-	NSRect point;
-	point.origin.x = coord[0];
-	point.origin.y = coord[1];
-	point.origin = [(LLNSWindow*)window convertScreenToBase:point.origin];
-	point.origin = [[(LLNSWindow*)window contentView] convertPoint:point.origin fromView:nil];
-}
-
 void convertWindowToScreen(NSWindowRef window, float *coord)
 {
-	NSPoint point;
-	point.x = coord[0];
-	point.y = coord[1];
-	point = [(LLNSWindow*)window convertToScreenFromLocalPoint:point relativeToView:[(LLNSWindow*)window contentView]];
-	coord[0] = point.x;
-	coord[1] = point.y;
+	LLNSWindow *nsWindow = (LLNSWindow*)window;
+	NSRect rect = NSMakeRect(coord[0], coord[1], 0, 0);
+	rect = [nsWindow convertRectToScreen:rect];
+	NSRect screenRect = [[nsWindow screen] frame];
+	NSPoint retPoint = NSMakePoint(rect.origin.x, screenRect.origin.y + screenRect.size.height - rect.origin.y);
+	coord[0] = retPoint.x;
+	coord[1] = retPoint.y;
 }
 
 void closeWindow(NSWindowRef window)
@@ -382,6 +353,7 @@ void removeGLView(GLViewRef view)
 {
 	[(LLOpenGLView*)view clearGLContext];
 	[(LLOpenGLView*)view removeFromSuperview];
+	[(LLOpenGLView*)view release];
 }
 
 void setupInputWindow(NSWindowRef window, GLViewRef glview)
@@ -401,7 +373,7 @@ void allowDirectMarkedTextInput(bool allow, GLViewRef glView)
 
 NSWindowRef getMainAppWindow()
 {
-	LLNSWindow *winRef = [(LLAppDelegate*)[[NSApplication sharedApplication] delegate] window];
+	LLNSWindow *winRef = [(LLAppDelegate*)[[LLApplication sharedApplication] delegate] window];
 	
 	[winRef setAcceptsMouseMovedEvents:TRUE];
 	return winRef;
@@ -414,61 +386,65 @@ void makeFirstResponder(NSWindowRef window, GLViewRef view)
 
 void requestUserAttention()
 {
-	[[NSApplication sharedApplication] requestUserAttention:NSInformationalRequest];
+	[[LLApplication sharedApplication] requestUserAttention:NSInformationalRequest];
 }
 
 long showAlert(std::string text, std::string title, int type)
 {
-    NSAlert *alert = [[NSAlert alloc] init];
-    
-    [alert setMessageText:[NSString stringWithCString:title.c_str() encoding:[NSString defaultCStringEncoding]]];
-    [alert setInformativeText:[NSString stringWithCString:text.c_str() encoding:[NSString defaultCStringEncoding]]];
-    if (type == 0)
-    {
-        [alert addButtonWithTitle:@"Okay"];
-    } else if (type == 1)
-    {
-        [alert addButtonWithTitle:@"Okay"];
-        [alert addButtonWithTitle:@"Cancel"];
-    } else if (type == 2)
-    {
-        [alert addButtonWithTitle:@"Yes"];
-        [alert addButtonWithTitle:@"No"];
-    }
-    long ret = [alert runModal];
-    [alert dealloc];
-    
-    if (ret == NSAlertFirstButtonReturn)
-    {
-        if (type == 1)
+    @autoreleasepool {
+        NSAlert *alert = [[[NSAlert alloc] init] autorelease];
+        
+        [alert setMessageText:[NSString stringWithCString:title.c_str() encoding:[NSString defaultCStringEncoding]]];
+        [alert setInformativeText:[NSString stringWithCString:text.c_str() encoding:[NSString defaultCStringEncoding]]];
+        if (type == 0)
         {
-            ret = 3;
+            [alert addButtonWithTitle:@"Okay"];
+        } else if (type == 1)
+        {
+            [alert addButtonWithTitle:@"Okay"];
+            [alert addButtonWithTitle:@"Cancel"];
         } else if (type == 2)
         {
-            ret = 0;
+            [alert addButtonWithTitle:@"Yes"];
+            [alert addButtonWithTitle:@"No"];
         }
-    } else if (ret == NSAlertSecondButtonReturn)
-    {
-        if (type == 0 || type == 1)
+        long ret = [alert runModal];
+        
+        if (ret == NSAlertFirstButtonReturn)
         {
-            ret = 2;
-        } else if (type == 2)
+            if (type == 1)
+            {
+                ret = 3;
+            } else if (type == 2)
+            {
+                ret = 0;
+            }
+        } else if (ret == NSAlertSecondButtonReturn)
         {
-            ret = 1;
+            if (type == 0 || type == 1)
+            {
+                ret = 2;
+            } else if (type == 2)
+            {
+                ret = 1;
+            }
         }
+        
+        return ret;
     }
-    
-    return ret;
 }
-
-/*
- GLViewRef getGLView()
- {
- return [(LLAppDelegate*)[[NSApplication sharedApplication] delegate] glview];
- }
- */
 
 unsigned int getModifiers()
 {
 	return [NSEvent modifierFlags];
 }
+
+void setTitle(const std::string& title)
+{
+    @autoreleasepool {
+        LLNSWindow *winRef = [(LLAppDelegate*)[[LLApplication sharedApplication] delegate] window];
+        NSString *nsTitle = [NSString stringWithUTF8String:title.c_str()];
+        [winRef setTitle:nsTitle];
+    }
+}
+

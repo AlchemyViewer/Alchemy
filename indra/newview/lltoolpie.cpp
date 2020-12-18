@@ -1880,7 +1880,6 @@ static void handle_click_action_open_media(LLPointer<LLViewerObject> objectp)
 	}
 
 	std::string media_url = std::string ( parcel->getMediaURL () );
-	std::string media_type = std::string ( parcel->getMediaType() );
 	LLStringUtil::trim(media_url);
 
 	LLWeb::loadURL(media_url);
@@ -1896,10 +1895,6 @@ static ECursorType cursor_from_parcel_media(U8 click_action)
 	ECursorType open_cursor = UI_CURSOR_ARROW;
 	LLParcel* parcel = LLViewerParcelMgr::getInstance()->getAgentParcel();
 	if (!parcel) return open_cursor;
-
-	std::string media_url = std::string ( parcel->getMediaURL () );
-	std::string media_type = std::string ( parcel->getMediaType() );
-	LLStringUtil::trim(media_url);
 
 	open_cursor = UI_CURSOR_TOOLMEDIAOPEN;
 

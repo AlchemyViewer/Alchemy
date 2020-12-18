@@ -1008,10 +1008,6 @@ void LLMediaCtrl::handleMediaEvent(LLPluginClassMedia* self, EMediaEvent event)
 		case MEDIA_EVENT_NAVIGATE_COMPLETE:
 		{
 			LL_DEBUGS("Media") <<  "Media event:  MEDIA_EVENT_NAVIGATE_COMPLETE, result string is: " << self->getNavigateResultString() << LL_ENDL;
-			if(mHidingInitialLoad)
-			{
-				mHidingInitialLoad = false;
-			}
 		};
 		break;
 

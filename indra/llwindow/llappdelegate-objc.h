@@ -27,6 +27,9 @@
 #import <Cocoa/Cocoa.h>
 #import "llopenglview-objc.h"
 
+@interface LLApplication : NSApplication
+@end
+
 @interface LLAppDelegate : NSObject <NSApplicationDelegate> {
 	LLNSWindow *window;
 	NSWindow *inputWindow;
@@ -47,5 +50,3 @@
 - (bool) romanScript;
 @end
 
-@interface LLApplication : NSApplication
-@end

@@ -2120,9 +2120,10 @@ time_t LLVFS::creationTime()
     int errors = LLFile::stat(mDataFilename, &data_file_stat);
     if (0 == errors)
     {
-        time_t creation_time = data_file_stat.st_ctime;
 #if LL_DARWIN
-        creation_time = data_file_stat.st_birthtime;
+        time_t creation_time = data_file_stat.st_birthtime;
+#else
+        time_t creation_time = data_file_stat.st_ctime;
 #endif
         return creation_time;
     }

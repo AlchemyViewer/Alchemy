@@ -54,7 +54,11 @@
 #include "epoxy/glx.h"
 #endif
 
+#if LL_DARWIN
+#include <OpenGL/glu.h>
+#else
 #include <GL/glu.h>
+#endif
 
 #endif // LL_MESA
 

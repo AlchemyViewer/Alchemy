@@ -27,10 +27,10 @@
 #ifndef LL_LLXMLNODE_H
 #define LL_LLXMLNODE_H
 
-#ifdef LL_USESYSTEMLIBS
-#include <expat.h>
+#if LL_DARWIN || defined(LL_USESYSTEMLIBS)
+# include <expat.h>
 #else
-#include "expat/expat.h"
+# include "expat/expat.h"
 #endif
 #include <map>
 

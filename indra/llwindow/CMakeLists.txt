@@ -118,14 +118,6 @@ if (DARWIN)
     llopenglview-objc.h
     llappdelegate-objc.h
     )
-
-  # We use a bunch of deprecated system APIs.
-  set_source_files_properties(
-      llkeyboardmacosx.cpp
-      llwindowmacosx.cpp
-      PROPERTIES
-      COMPILE_FLAGS "-Wno-deprecated-declarations -fpascal-strings"
-      )
 endif (DARWIN)
 
 

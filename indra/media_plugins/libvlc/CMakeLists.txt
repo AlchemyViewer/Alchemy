@@ -66,7 +66,7 @@ if (DARWIN)
     media_plugin_libvlc
     PROPERTIES
     PREFIX ""
-    BUILD_WITH_INSTALL_RPATH 1
+    BUILD_WITH_INSTALL_NAME_DIR 1
     INSTALL_NAME_DIR "@executable_path"
     LINK_FLAGS "-exported_symbols_list ${CMAKE_CURRENT_SOURCE_DIR}/../base/media_plugin_base.exp"
   )

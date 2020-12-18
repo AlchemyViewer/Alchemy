@@ -556,9 +556,11 @@ void MediaPluginCEF::receiveMessage(const char* message_string)
 				settings.autoplay_without_gesture = true;
 
 				// Set subprocess helper and cef app data paths
+#if !LL_DARWIN
 				settings.browser_subprocess_path = mHelperPath;
 				settings.resources_dir_path = mResourcesPath;
-				settings.locales_dir_path = mLocalesPath;
+#endif
+                settings.locales_dir_path = mLocalesPath;
 
 				std::vector<std::string> custom_schemes(1, "secondlife");
 				mCEFLib->setCustomSchemes(custom_schemes);

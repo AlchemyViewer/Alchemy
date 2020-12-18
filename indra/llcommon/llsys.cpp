@@ -62,6 +62,7 @@ using namespace llsd;
 #   include <psapi.h>               // GetPerformanceInfo() et al.
 #	include <VersionHelpers.h>
 #elif LL_DARWIN
+#   include "llsys_objc.h"
 #	include <errno.h>
 #	include <sys/sysctl.h>
 #	include <sys/utsname.h>
@@ -72,12 +73,6 @@ using namespace llsd;
 #	include <mach/mach_host.h>
 #	include <mach/task.h>
 #	include <mach/task_info.h>
-
-// disable warnings about Gestalt calls being deprecated
-// until Apple get's on the ball and provides an alternative
-//
-#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-
 #elif LL_LINUX
 #	include <errno.h>
 #	include <sys/utsname.h>
@@ -301,21 +296,18 @@ LLOSInfo::LLOSInfo() :
 #elif LL_DARWIN
 	
 	// Initialize mOSStringSimple to something like:
-	// "Mac OS X 10.6.7"
+	// "macOS 10.6.7"
 	{
-		const char * DARWIN_PRODUCT_NAME = "Mac OS X";
-		
-		SInt32 major_version, minor_version, bugfix_version;
-		OSErr r1 = Gestalt(gestaltSystemVersionMajor, &major_version);
-		OSErr r2 = Gestalt(gestaltSystemVersionMinor, &minor_version);
-		OSErr r3 = Gestalt(gestaltSystemVersionBugFix, &bugfix_version);
+		S32 major_version, minor_version, bugfix_version = 0;
 
-		if((r1 == noErr) && (r2 == noErr) && (r3 == noErr))
+		if (LLSysDarwin::getOperatingSystemInfo(major_version, minor_version, bugfix_version))
 		{
 			mMajorVer = major_version;
 			mMinorVer = minor_version;
 			mBuild = bugfix_version;
 
+            const char * DARWIN_PRODUCT_NAME = "macOS";
+            
 			std::stringstream os_version_string;
 			os_version_string << DARWIN_PRODUCT_NAME << " " << mMajorVer << "." << mMinorVer << "." << mBuild;
 			
@@ -329,7 +321,7 @@ LLOSInfo::LLOSInfo() :
 	}
 	
 	// Initialize mOSString to something like:
-	// "Mac OS X 10.6.7 Darwin Kernel Version 10.7.0: Sat Jan 29 15:17:16 PST 2011; root:xnu-1504.9.37~1/RELEASE_I386 i386"
+	// "macOS 10.6.7 Darwin Kernel Version 10.7.0: Sat Jan 29 15:17:16 PST 2011; root:xnu-1504.9.37~1/RELEASE_I386 i386"
 	struct utsname un;
 	if(uname(&un) != -1)
 	{		
@@ -988,9 +980,15 @@ LLSD LLMemoryInfo::loadStatsMap()
 	stats.add("PrivateUsage KB",               pmem.PrivateUsage/div);
 
 #elif LL_DARWIN
-
-	const vm_size_t pagekb(vm_page_size / 1024);
+	vm_size_t page_size_kb;
+	if (host_page_size(mach_host_self(), &page_size_kb) != KERN_SUCCESS)
+	{
+		LL_WARNS() << "Unable to get host page size. Using default value." << LL_ENDL;
+		page_size_kb = 4096;
+	}
 	
+	page_size_kb = page_size_kb / 1024;
+
 	//
 	// Collect the vm_stat's
 	//
@@ -1005,10 +1003,10 @@ LLSD LLMemoryInfo::loadStatsMap()
 		}
 		else
 		{
-			stats.add("Pages free KB",		pagekb * vmstat.free_count);
-			stats.add("Pages active KB",	pagekb * vmstat.active_count);
-			stats.add("Pages inactive KB",	pagekb * vmstat.inactive_count);
-			stats.add("Pages wired KB",		pagekb * vmstat.wire_count);
+			stats.add("Pages free KB",		page_size_kb * vmstat.free_count);
+			stats.add("Pages active KB",	page_size_kb * vmstat.active_count);
+			stats.add("Pages inactive KB",	page_size_kb * vmstat.inactive_count);
+			stats.add("Pages wired KB",		page_size_kb * vmstat.wire_count);
 
 			stats.add("Pages zero fill",		vmstat.zero_fill_count);
 			stats.add("Page reactivations",		vmstat.reactivations);
@@ -1072,13 +1070,6 @@ LLSD LLMemoryInfo::loadStatsMap()
 				stats.add("Basic suspend count", taskinfo.suspend_count);
 			}
 	}
-
-#elif LL_SOLARIS
-	U64 phys = 0;
-
-	phys = (U64)(sysconf(_SC_PHYS_PAGES)) * (U64)(sysconf(_SC_PAGESIZE)/1024);
-
-	stats.add("Total Physical KB", phys);
 
 #elif LL_LINUX
 	llifstream meminfo(MEMINFO_FILE);
@@ -1392,10 +1383,3 @@ BOOL gzip_file(const std::string& srcfile, const std::string& dstfile)
 	if (dst != NULL) gzclose(dst);
 	return retval;
 }
-
-#if LL_DARWIN
-// disable warnings about Gestalt calls being deprecated
-// until Apple get's on the ball and provides an alternative
-//
-#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-#endif

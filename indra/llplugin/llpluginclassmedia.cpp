@@ -34,9 +34,6 @@
 #include "llcontrol.h"
 
 extern LLControlGroup gSavedSettings;
-#if LL_DARWIN
-extern BOOL gHiDPISupport;
-#endif
 
 static int LOW_PRIORITY_TEXTURE_SIZE_DEFAULT = 256;
 
@@ -368,9 +365,6 @@ void LLPluginClassMedia::setSizeInternal(void)
 		mRequestedMediaHeight = nextPowerOf2(mRequestedMediaHeight);
 	}
 
-#if LL_DARWIN
-    if (!gHiDPISupport)
-#endif
     {
         if (mRequestedMediaWidth > 8192)
             mRequestedMediaWidth = 8192;

@@ -85,7 +85,7 @@ class LLDir
 	virtual std::string getLLPluginFilename(std::string base_name) = 0; // full path and name to the plugin DSO for this base_name (i.e. 'FOO' -> '/bar/baz/libFOO.so')
 
 	const std::string &getExecutablePathAndName() const;	// Full pathname of the executable
-	const std::string &getAppName() const;			// install directory under progams/ ie "SecondLife"
+	const std::string &getAppName() const;			// install directory under progams/ ie "Alchemy"
 	const std::string &getExecutableDir() const;	// Directory where the executable is located
 	const std::string &getExecutableFilename() const;// Filename of .exe
 	const std::string &getWorkingDir() const; // Current working directory

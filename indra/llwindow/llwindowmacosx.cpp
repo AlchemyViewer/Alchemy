@@ -39,11 +39,9 @@
 #include "indra_constants.h"
 
 #include <OpenGL/OpenGL.h>
-#include <Carbon/Carbon.h>
 #include <CoreServices/CoreServices.h>
 
 extern BOOL gDebugWindowProc;
-BOOL gHiDPISupport = TRUE;
 
 const S32	BITS_PER_PIXEL = 32;
 const S32	MAX_NUM_RESOLUTIONS = 32;
@@ -344,18 +342,6 @@ void callMouseMoved(float *pos, MASK mask)
 	//gWindowImplementation->getCallbacks()->handleScrollWheel(gWindowImplementation, 0);
 }
 
-void callMouseDragged(float *pos, MASK mask)
-{
-    LLCoordGL		outCoords;
-    outCoords.mX = ll_round(pos[0]);
-    outCoords.mY = ll_round(pos[1]);
-    float deltas[2];
-    gWindowImplementation->getMouseDeltas(deltas);
-    outCoords.mX += deltas[0];
-    outCoords.mY += deltas[1];
-    gWindowImplementation->getCallbacks()->handleMouseDragged(gWindowImplementation, outCoords, gKeyboard->currentMask(TRUE));
-}
-
 void callScrollMoved(float deltaX, float deltaY)
 {
 	if ( gWindowImplementation && gWindowImplementation->getCallbacks() )
@@ -408,11 +394,11 @@ void callWindowUnhide()
 	}
 }
 
-void callWindowDidChangeScreen()
+void callHandleDPIChanged(unsigned int width, unsigned int height, float scale_factor)
 {
 	if ( gWindowImplementation && gWindowImplementation->getCallbacks() )
 	{
-		gWindowImplementation->getCallbacks()->handleWindowDidChangeScreen(gWindowImplementation);
+		gWindowImplementation->getCallbacks()->handleDPIChanged(gWindowImplementation, scale_factor, width, height);
 	}
 }
 
@@ -611,8 +597,6 @@ void LLWindowMacOSX::getMouseDeltas(float* delta)
 
 BOOL LLWindowMacOSX::createContext(int x, int y, int width, int height, int bits, BOOL fullscreen, BOOL disable_vsync)
 {
-	BOOL			glNeedsInit = FALSE;
-
 	mFullscreen = fullscreen;
 	
 	if (mWindow == NULL)
@@ -626,10 +610,7 @@ BOOL LLWindowMacOSX::createContext(int x, int y, int width, int height, int bits
 		// Get the view instead.
 		mGLView = createOpenGLView(mWindow, mFSAASamples, !disable_vsync);
 		mContext = getCGLContextObj(mGLView);
-		
-		// Since we just created the context, it needs to be set up.
-		glNeedsInit = TRUE;
-		
+
 		gGLManager.mVRAM = getVramSize(mGLView);
 	}
 	
@@ -642,7 +623,7 @@ BOOL LLWindowMacOSX::createContext(int x, int y, int width, int height, int bits
 	{
 		
 		
-		U32 err = CGLSetCurrentContext(mContext);
+		CGLError err = CGLSetCurrentContext(mContext);
 		if (err != kCGLNoError)
 		{
 			setupFailure("Can't activate GL rendering context", "Error", OSMB_OK);
@@ -661,26 +642,24 @@ BOOL LLWindowMacOSX::createContext(int x, int y, int width, int height, int bits
 		frames_per_swap = 1;
 	}
 	
-	CGLSetParameter(mContext, kCGLCPSwapInterval, &frames_per_swap);
-
-	//enable multi-threaded OpenGL
-	if (sUseMultGL)
-	{
-		CGLError cgl_err;
-		CGLContextObj ctx = CGLGetCurrentContext();
-
-		cgl_err =  CGLEnable( ctx, kCGLCEMPEngine);
-
-		if (cgl_err != kCGLNoError )
-		{
-			LL_DEBUGS("GLInit") << "Multi-threaded OpenGL not available." << LL_ENDL;
-		}
-		else
-		{
-			LL_DEBUGS("GLInit") << "Multi-threaded OpenGL enabled." << LL_ENDL;
-		}
-	}
-	makeFirstResponder(mWindow, mGLView);
+    CGLSetParameter(mContext, kCGLCPSwapInterval, &frames_per_swap);
+    
+    //enable multi-threaded OpenGL
+    CGLError cgl_err;
+    CGLContextObj ctx = CGLGetCurrentContext();
+    
+    cgl_err =  CGLEnable(ctx, kCGLCEMPEngine);
+    
+    if (cgl_err != kCGLNoError )
+    {
+        LL_INFOS("GLInit") << "Multi-threaded OpenGL not available." << LL_ENDL;
+    }
+    else
+    {
+        LL_INFOS("GLInit") << "Multi-threaded OpenGL enabled." << LL_ENDL;
+    }
+    
+    makeFirstResponder(mWindow, mGLView);
     
 	return TRUE;
 }
@@ -717,17 +696,17 @@ void LLWindowMacOSX::destroyContext()
 		mPixelFormat = NULL;
 	}
 
-	// Clean up the GL context
-	if(mContext != NULL)
-	{
-		CGLDestroyContext(mContext);
-	}
-	
 	// Destroy our LLOpenGLView
 	if(mGLView != NULL)
 	{
 		removeGLView(mGLView);
 		mGLView = NULL;
+	}
+	
+	// Clean up the GL context
+	if(mContext != NULL)
+	{
+		CGLDestroyContext(mContext);
 	}
 	
 	// Close the window
@@ -811,7 +790,8 @@ BOOL LLWindowMacOSX::getVisible()
 	if(mFullscreen)
 	{
 		result = TRUE;
-	}if (mWindow)
+	}
+	if (mWindow)
 	{
 			result = TRUE;
 	}
@@ -860,10 +840,11 @@ BOOL LLWindowMacOSX::getPosition(LLCoordScreen *position)
 	}
 	else if(mWindow)
 	{
-		const CGPoint & pos = getContentViewBoundsPosition(mWindow);
+		float rect[4];
+		getContentViewBounds(mWindow, rect);
 
-		position->mX = pos.x;
-		position->mY = pos.y;
+		position->mX = rect[0];
+		position->mY = rect[1];
 
 		err = noErr;
 	}
@@ -887,10 +868,11 @@ BOOL LLWindowMacOSX::getSize(LLCoordScreen *size)
 	}
 	else if(mWindow)
 	{
-		const CGSize & sz = gHiDPISupport ? getDeviceContentViewSize(mWindow, mGLView) : getContentViewBoundsSize(mWindow);
+		float rect[4];
+		getScaledContentViewBounds(mWindow, mGLView, rect);
 
-		size->mX = sz.width;
-		size->mY = sz.height;
+		size->mX = rect[2];
+		size->mY = rect[3];
         err = noErr;
 	}
 	else
@@ -903,6 +885,7 @@ BOOL LLWindowMacOSX::getSize(LLCoordScreen *size)
 
 BOOL LLWindowMacOSX::getSize(LLCoordWindow *size)
 {
+	float rect[4];
 	S32 err = -1;
 	
 	if(mFullscreen)
@@ -913,13 +896,11 @@ BOOL LLWindowMacOSX::getSize(LLCoordWindow *size)
 	}
 	else if(mWindow)
 	{
-		const CGSize & sz = gHiDPISupport ? getDeviceContentViewSize(mWindow, mGLView) : getContentViewBoundsSize(mWindow);
+		getScaledContentViewBounds(mWindow, mGLView, rect);
 		
-		size->mX = sz.width;
-		size->mY = sz.height;
-        err = noErr;
-        
-        
+		size->mX = rect[2];
+		size->mY = rect[3];
+        err = noErr;     
 	}
 	else
 	{
@@ -1251,8 +1232,10 @@ BOOL LLWindowMacOSX::isClipboardTextAvailable()
 }
 
 BOOL LLWindowMacOSX::pasteTextFromClipboard(LLWString &dst)
-{	
-	llutf16string str(copyFromPBoard());
+{
+    unsigned short* temp = copyFromPBoard();
+	llutf16string str(temp);
+    free(temp);
 	dst = utf16str_to_wstring(str);
 	if (dst != L"")
 	{
@@ -1272,6 +1255,10 @@ BOOL LLWindowMacOSX::copyTextToClipboard(const LLWString &s)
 	return result;
 }
 
+void LLWindowMacOSX::setWindowTitle(const std::string& title)
+{
+	setTitle(title);
+}
 
 // protected
 BOOL LLWindowMacOSX::resetDisplayResolution()
@@ -1285,7 +1272,7 @@ LLWindow::LLWindowResolution* LLWindowMacOSX::getSupportedResolutions(S32 &num_r
 {
 	if (!mSupportedResolutions)
 	{
-		CFArrayRef modes = CGDisplayAvailableModes(mDisplay);
+		CFArrayRef modes = CGDisplayCopyAllDisplayModes(mDisplay, NULL);
 
 		if(modes != NULL)
 		{
@@ -1324,6 +1311,7 @@ LLWindow::LLWindowResolution* LLWindowMacOSX::getSupportedResolutions(S32 &num_r
 					}
 				}
 			}
+			CFRelease(modes);
 		}
 	}
 
@@ -1350,14 +1338,14 @@ BOOL LLWindowMacOSX::convertCoords(LLCoordScreen from, LLCoordWindow* to)
 	if(mWindow)
 	{
 		float mouse_point[2];
-
+		float scale_factor = getSystemUISize();
 		mouse_point[0] = from.mX;
 		mouse_point[1] = from.mY;
 		
 		convertScreenToWindow(mWindow, mouse_point);
 
-		to->mX = mouse_point[0];
-		to->mY = mouse_point[1];
+		to->mX = mouse_point[0] * scale_factor;
+		to->mY = mouse_point[1] * scale_factor;
 
 		return TRUE;
 	}
@@ -1369,10 +1357,9 @@ BOOL LLWindowMacOSX::convertCoords(LLCoordWindow from, LLCoordScreen *to)
 	if(mWindow)
 	{
 		float mouse_point[2];
-
-		mouse_point[0] = from.mX;
-		mouse_point[1] = from.mY;
-		
+		float scale_factor = getSystemUISize();
+		mouse_point[0] = from.mX / scale_factor;
+		mouse_point[1] = from.mY / scale_factor;
 		convertWindowToScreen(mWindow, mouse_point);
 
 		to->mX = mouse_point[0];
@@ -1496,11 +1483,6 @@ void LLWindowMacOSX::updateCursor()
 	
     if(mCurrentCursor == mNextCursor)
     {
-        if(mCursorHidden && mHideCursorPermanent && isCGCursorVisible())
-        {
-            hideNSCursor();            
-            adjustCursorDecouple();
-        }
         return;
     }
 
@@ -1715,12 +1697,6 @@ void LLSplashScreenMacOSX::showImpl()
 
 void LLSplashScreenMacOSX::updateImpl(const std::string& mesg)
 {
-	if(mWindow != NULL)
-	{
-		CFStringRef string = NULL;
-
-		string = CFStringCreateWithCString(NULL, mesg.c_str(), kCFStringEncodingUTF8);
-	}
 }
 
 
@@ -1815,30 +1791,7 @@ LLSD LLWindowMacOSX::getNativeKeyData()
 
 BOOL LLWindowMacOSX::dialogColorPicker( F32 *r, F32 *g, F32 *b)
 {
-	BOOL	retval = FALSE;
-	OSErr	error = noErr;
-	NColorPickerInfo	info;
-	
-	memset(&info, 0, sizeof(info));
-	info.theColor.color.rgb.red = (UInt16)(*r * 65535.f);
-	info.theColor.color.rgb.green = (UInt16)(*g * 65535.f);
-	info.theColor.color.rgb.blue = (UInt16)(*b * 65535.f);
-	info.placeWhere = kCenterOnMainScreen;
-
-	error = NPickColor(&info);
-	
-	if (error == noErr)
-	{
-		retval = info.newColorChosen;
-		if (info.newColorChosen)
-		{
-			*r = ((float) info.theColor.color.rgb.red) / 65535.0;
-			*g = ((float) info.theColor.color.rgb.green) / 65535.0;
-			*b = ((float) info.theColor.color.rgb.blue) / 65535.0;
-		}
-	}
-
-	return (retval);
+    return FALSE;
 }
 
 void *LLWindowMacOSX::getPlatformWindow()
@@ -1930,7 +1883,7 @@ MASK LLWindowMacOSX::modifiersToMask(S16 modifiers)
 
 F32 LLWindowMacOSX::getSystemUISize()
 {
-	return gHiDPISupport ? ::getDeviceUnitSize(mGLView) : LLWindow::getSystemUISize();
+	return ::getDeviceUnitSize(mGLView);
 }
 
 #if LL_OS_DRAGDROP_ENABLED

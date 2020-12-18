@@ -33,11 +33,11 @@
 
 #include <iostream>
 
-std::string* getSystemTempFolder();
-std::string* getSystemCacheFolder();
-std::string* getSystemApplicationSupportFolder();
-std::string* getSystemResourceFolder();
-std::string* getSystemExecutableFolder();
+std::string getSystemTempFolder();
+std::string getSystemCacheFolder();
+std::string getSystemApplicationSupportFolder();
+std::string getSystemResourceFolder();
+std::string getSystemExecutableFolder();
 
 
 #endif // LL_LLVFS_OBJC_H

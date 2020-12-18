@@ -77,6 +77,7 @@ public:
 	/*virtual*/ BOOL isClipboardTextAvailable();
 	/*virtual*/ BOOL pasteTextFromClipboard(LLWString &dst);
 	/*virtual*/ BOOL copyTextToClipboard(const LLWString & src);
+	/*virtual*/ void setWindowTitle(const std::string& title);
 	/*virtual*/ void flashIcon(F32 seconds);
 	/*virtual*/ F32 getGamma();
 	/*virtual*/ BOOL setGamma(const F32 gamma); // Set the gamma
@@ -153,9 +154,6 @@ protected:
 	BOOL	resetDisplayResolution();
 
 	BOOL	shouldPostQuit() { return mPostQuit; }
-    
-    //Satisfy MAINT-3135 and MAINT-3288 with a flag.
-    /*virtual */ void setOldResize(bool oldresize) {setResizeMode(oldresize, mGLView); }
 
 private:
     void restoreGLContext();

@@ -2463,7 +2463,6 @@ bool LLDispatchSetEstateExperience::operator()(
 	++it; // U32 estate_id = strtol((*it).c_str(), NULL, 10);
 	++it; // U32 send_to_agent_only = strtoul((*(++it)).c_str(), NULL, 10);
 
-	LLUUID id;
 	S32 num_blocked = strtol((*(it++)).c_str(), NULL, 10);
 	S32 num_trusted = strtol((*(it++)).c_str(), NULL, 10);
 	S32 num_allowed = strtol((*(it++)).c_str(), NULL, 10);

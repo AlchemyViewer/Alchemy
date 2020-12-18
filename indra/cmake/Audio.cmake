@@ -30,10 +30,3 @@ else (USESYSTEMLIBS)
     set(VORBISFILE_LIBRARIES vorbisfile)
   endif (WINDOWS)
 endif (USESYSTEMLIBS)
-
-link_directories(
-    ${VORBIS_LIBRARY_DIRS}
-    ${VORBISENC_INCLUDE_DIRS}
-    ${VORBISFILE_LIBRARY_DIRS}
-    ${OGG_LIBRARY_DIRS}
-    )

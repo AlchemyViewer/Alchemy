@@ -17,7 +17,7 @@ class LLToolSelectRect;
 class ALToolAlign final
 :	public LLTool, public LLSingleton<ALToolAlign>
 {
-	LLSINGLETON(ALToolAlign);
+    LLSINGLETON_C11(ALToolAlign);
 	~ALToolAlign() = default;
     
 public:

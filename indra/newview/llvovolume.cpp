@@ -6291,7 +6291,7 @@ U32 LLVolumeGeometryManager::genDrawInfo(LLSpatialGroup* group, U32 mask, LLFace
 	U32 geometryBytes = 0;
 	U32 buffer_usage = group->mBufferUsage;
 	
-#if LL_DARWIN
+#if 0
 	// HACK from Leslie:
 	// Disable VBO usage for alpha on Mac OS X because it kills the framerate
 	// due to implicit calls to glTexSubImage that are beyond our control.

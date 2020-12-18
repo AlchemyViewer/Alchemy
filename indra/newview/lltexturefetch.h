@@ -64,7 +64,7 @@ public:
 	class TFRequest;
 	
     // Threads:  Tmain
-	/*virtual*/ S32 update(F32 max_time_ms);
+	/*virtual*/ S32 update(F32 max_time_ms) override;
 	
 	// called in the main thread after the TextureCacheThread shuts down.
     // Threads:  Tmain
@@ -247,20 +247,20 @@ protected:
 	
 	// Overrides from the LLThread tree
 	// Locks:  Ct
-	bool runCondition();
+	bool runCondition() override;
 
 private:
     // Threads:  Tmain
 	void sendRequestListToSimulators();
 	
 	// Threads:  Ttf
-	/*virtual*/ void startThread(void);
+	/*virtual*/ void startThread(void) override;
 	
 	// Threads:  Ttf
-	/*virtual*/ void endThread(void);
+	/*virtual*/ void endThread(void) override;
 	
 	// Threads:  Ttf
-	/*virtual*/ void threadedUpdate(void);
+	/*virtual*/ void threadedUpdate(void) override;
 
 	// Threads:  Ttf
 	void commonUpdate();

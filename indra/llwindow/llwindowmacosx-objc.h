@@ -31,7 +31,7 @@
 #include <map>
 #include <vector>
 
-//fir CGSize
+//for CGSize
 #include <CoreGraphics/CGGeometry.h>
 
 typedef std::vector<std::pair<int, bool> > segment_t;
@@ -83,7 +83,7 @@ int createNSApp(int argc, const char **argv);
 void setupCocoa();
 bool pasteBoardAvailable();
 bool copyToPBoard(const unsigned short *str, unsigned int len);
-const unsigned short *copyFromPBoard();
+unsigned short *copyFromPBoard();
 CursorRef createImageCursor(const char *fullpath, int hotspotX, int hotspotY);
 short releaseImageCursor(CursorRef ref);
 short setImageCursor(CursorRef ref);
@@ -95,11 +95,9 @@ void setCrossCursor();
 void setNotAllowedCursor();
 void hideNSCursor();
 void showNSCursor();
-bool isCGCursorVisible();
 void hideNSCursorTillMove(bool hide);
 void requestUserAttention();
 long showAlert(std::string title, std::string text, int type);
-void setResizeMode(bool oldresize, void* glview);
 
 NSWindowRef createNSWindow(int x, int y, int width, int height);
 
@@ -110,16 +108,14 @@ void glSwapBuffers(void* context);
 CGLContextObj getCGLContextObj(GLViewRef view);
 unsigned long getVramSize(GLViewRef view);
 float getDeviceUnitSize(GLViewRef view);
-CGPoint getContentViewBoundsPosition(NSWindowRef window);
-CGSize getContentViewBoundsSize(NSWindowRef window);
-CGSize getDeviceContentViewSize(NSWindowRef window, GLViewRef view);
+void getContentViewBounds(NSWindowRef window, float* bounds);
+void getScaledContentViewBounds(NSWindowRef window, GLViewRef view, float* bounds);
 void getWindowSize(NSWindowRef window, float* size);
 void setWindowSize(NSWindowRef window, int width, int height);
 void getCursorPos(NSWindowRef window, float* pos);
 void makeWindowOrderFront(NSWindowRef window);
 void convertScreenToWindow(NSWindowRef window, float *coord);
 void convertWindowToScreen(NSWindowRef window, float *coord);
-void convertScreenToView(NSWindowRef window, float *coord);
 void convertRectToScreen(NSWindowRef window, float *coord);
 void convertRectFromScreen(NSWindowRef window, float *coord);
 void setWindowPos(NSWindowRef window, float* pos);
@@ -141,14 +137,13 @@ void callLeftMouseUp(float *pos, unsigned int mask);
 void callDoubleClick(float *pos, unsigned int mask);
 void callResize(unsigned int width, unsigned int height);
 void callMouseMoved(float *pos, unsigned int mask);
-void callMouseDragged(float *pos, unsigned int mask);
 void callScrollMoved(float deltaX, float deltaY);
 void callMouseExit();
 void callWindowFocus();
 void callWindowUnfocus();
 void callWindowHide();
 void callWindowUnhide();
-void callWindowDidChangeScreen();
+void callHandleDPIChanged(unsigned int width, unsigned int height, float scale_factor);
 void callDeltaUpdate(float *delta, unsigned int mask);
 void callOtherMouseDown(float *pos, unsigned int mask, int button);
 void callOtherMouseUp(float *pos, unsigned int mask, int button);
@@ -181,5 +176,6 @@ NSWindowRef getMainAppWindow();
 GLViewRef getGLView();
 
 unsigned int getModifiers();
+void setTitle(const std::string& title);
 
 #endif // LL_LLWINDOWMACOSX_OBJC_H

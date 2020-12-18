@@ -30,8 +30,6 @@
 	#error "Use only with Mac OS X"
 #endif
 
-#define LL_CARBON_CRASH_HANDLER 1
-
 #include "llwindowmacosx.h"
 #include "llappviewermacosx-objc.h"
 
@@ -49,9 +47,6 @@
 #include "llerrorcontrol.h"
 #include "llvoavatarself.h"         // for gAgentAvatarp->getFullname()
 #include <ApplicationServices/ApplicationServices.h>
-#ifdef LL_CARBON_CRASH_HANDLER
-#include <Carbon/Carbon.h>
-#endif
 #include <vector>
 #include <exception>
 #include <fstream>

@@ -901,6 +901,7 @@ class DarwinManifest(ViewerManifest):
         pkgdir = os.path.join(self.args['build'], os.pardir, 'packages')
         relpkgdir = os.path.join(pkgdir, "lib", "release")
         debpkgdir = os.path.join(pkgdir, "lib", "debug")
+        libdir = debpkgdir if self.args['configuration'].lower() == 'debug' else relpkgdir
 
         with self.prefix(src="", dst="Contents"):  # everything goes in Contents
             bugsplat_db = self.args.get('bugsplat')
@@ -918,13 +919,45 @@ class DarwinManifest(ViewerManifest):
 
             # CEF framework goes inside Contents/Frameworks.
             # Remember where we parked this car.
-            with self.prefix(src="", dst="Frameworks"):
+            with self.prefix(src=libdir, dst="Frameworks"):
                 CEF_framework = "Chromium Embedded Framework.framework"
-                self.path2basename(relpkgdir, CEF_framework)
+                self.path2basename(libdir, CEF_framework)
                 CEF_framework = self.dst_path_of(CEF_framework)
 
+                for libfile in (
+                                'libapr-1.*.dylib',
+                                'libaprutil-1.*.dylib',
+                                'libjpeg.*.dylib',
+                                'libepoxy.*.dylib',
+                                'libGLOD.dylib',
+                                'libhunspell-*.dylib',
+                                'libndofdev.dylib',
+                                'libogg.*.dylib',
+                                'libopenjpeg.*.dylib',
+                                'liburiparser.*.dylib',
+                                'libvorbis.*.dylib',
+                                'libvorbisenc.*.dylib',
+                                'libvorbisfile.*.dylib',
+                                'libwebp.*.dylib',
+                                'libxmlrpc-epi.*.dylib',
+                                ):
+                    self.path(libfile)
+
                 if self.args.get('bugsplat'):
-                    self.path2basename(relpkgdir, "BugsplatMac.framework")
+                    self.path("BugsplatMac.framework")
+
+                if self.args['openal'] == 'ON' or self.args['openal'] == 'TRUE':
+                    for libfile in (
+                                    'libopenal.*.dylib',
+                                    'libalut.*.dylib',
+                                    ):
+                        self.path(libfile)
+
+                if self.args['fmodstudio'] == 'ON' or self.args['fmodstudio'] == 'TRUE':
+                    if self.args['configuration'].lower() == 'debug':
+                        self.path("libfmodL.dylib")
+                    else:
+                        self.path("libfmod.dylib")
 
             with self.prefix(dst="MacOS"):
                 executable = self.dst_path_of(self.channel())
@@ -984,16 +1017,11 @@ class DarwinManifest(ViewerManifest):
                         self.path("*.png")
                         self.path("*.gif")
 
-                with self.prefix(src=relpkgdir, dst=""):
-                    self.path("libndofdev.dylib")
-                    self.path("libhunspell-*.dylib")   
-
                 with self.prefix(src_dst="cursors_mac"):
                     self.path("*.tif")
 
                 self.path("licenses-mac.txt", dst="licenses.txt")
                 self.path("featuretable_mac.txt")
-                self.path("SecondLife.nib")
 
                 with self.prefix(src=pkgdir,dst=""):
                     self.path("ca-bundle.crt")
@@ -1027,11 +1055,6 @@ class DarwinManifest(ViewerManifest):
                 libfile_parent = self.get_dst_prefix()
                 dylibs=[]
                 for libfile in (
-                                "libapr-1.0.dylib",
-                                "libaprutil-1.0.dylib",
-                                "libexpat.1.dylib",
-                                "libexception_handler.dylib",
-                                "libGLOD.dylib",
                                 # libnghttp2.dylib is a symlink to
                                 # libnghttp2.major.dylib, which is a symlink to
                                 # libnghttp2.version.dylib. Get all of them.
@@ -1049,18 +1072,6 @@ class DarwinManifest(ViewerManifest):
                                 'libvivoxsdk.dylib',
                                 ):
                     self.path2basename(relpkgdir, libfile)
-
-                # dylibs that vary based on configuration
-                if self.args['configuration'].lower() == 'debug':
-                    for libfile in (
-                                "libfmodL.dylib",
-                                ):
-                        dylibs += self.path_optional(os.path.join(debpkgdir, libfile), libfile)
-                else:
-                    for libfile in (
-                                "libfmod.dylib",
-                                ):
-                        dylibs += self.path_optional(os.path.join(relpkgdir, libfile), libfile)
 
                 # our apps
                 executable_path = {}

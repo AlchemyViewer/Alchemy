@@ -1,4 +1,4 @@
-﻿/** 
+/** 
  * @File llvoavatar.cpp
  * @brief Implementation of LLVOAvatar class which is a derivation of LLViewerObject
  *
@@ -1969,7 +1969,6 @@ void LLVOAvatar::resetVisualParams()
 {
 	// Skeletal params
 	{
-		LLAvatarXmlInfo::skeletal_distortion_info_list_t::iterator iter;
 		for (LLViewerVisualParamInfo* vparam : sAvatarXmlInfo->mSkeletalDistortionInfoList)
 		{
 			LLPolySkeletalDistortionInfo *info = static_cast<LLPolySkeletalDistortionInfo*>(vparam);
@@ -9171,9 +9170,11 @@ void LLVOAvatar::applyParsedAppearanceMessage(LLAppearanceMessageContents& conte
 				}
 			}
 		}
+        
+#ifdef SHOW_DEBUG
 		const S32 expected_tweakable_count = getVisualParamCountInGroup(VISUAL_PARAM_GROUP_TWEAKABLE) +
 											 getVisualParamCountInGroup(VISUAL_PARAM_GROUP_TRANSMIT_NOT_TWEAKABLE); // don't worry about VISUAL_PARAM_GROUP_TWEAKABLE_NO_TRANSMIT
-#if SHOW_DEBUG
+
 		if (num_params != expected_tweakable_count)
 		{
 			LL_DEBUGS("Avatar") << "Number of params in AvatarAppearance msg (" << num_params << ") does not match number of tweakable params in avatar xml file (" << expected_tweakable_count << ").  Processing what we can.  object: " << getID() << LL_ENDL;

@@ -286,10 +286,6 @@ extern BOOL gRandomizeFramerate;
 extern BOOL gPeriodicSlowFrame;
 extern BOOL gDebugGL;
 
-#if LL_DARWIN
-extern BOOL gHiDPISupport;
-#endif
-
 ////////////////////////////////////////////////////////////
 // All from the last globals push...
 
@@ -612,10 +608,6 @@ static void settings_to_globals()
 	gDebugWindowProc = gSavedSettings.getBOOL("DebugWindowProc");
 	gShowObjectUpdates = gSavedSettings.getBOOL("ShowObjectUpdates");
 	LLWorldMapView::sMapScale = gSavedSettings.getF32("MapScale");
-	
-#if LL_DARWIN
-	gHiDPISupport = gSavedSettings.getBOOL("RenderHiDPI");
-#endif
 }
 
 static void settings_modify()
@@ -1225,7 +1217,7 @@ bool LLAppViewer::init()
 		LLSD item(LeapCommand);
 		LeapCommand.append(item);
 	}
-	for (const std::string& leap : llsd::inArray(LeapCommand))
+	for (const LLSD& leap : llsd::inArray(LeapCommand))
 	{
 		LL_INFOS("InitInfo") << "processing --leap \"" << leap << '"' << LL_ENDL;
 		// We don't have any better description of this plugin than the
@@ -1234,7 +1226,7 @@ bool LLAppViewer::init()
 		// Suppress LLLeap::Error exception: trust LLLeap's own logging. We
 		// don't consider any one --leap command mission-critical, so if one
 		// fails, log it, shrug and carry on.
-		LLLeap::create("", leap, false); // exception=false
+		LLLeap::create("", leap.asString(), false); // exception=false
 	}
 
 	if (gSavedSettings.getBOOL("QAMode") && gSavedSettings.getS32("QAModeEventHostPort") > 0)
@@ -3036,17 +3028,6 @@ bool LLAppViewer::initWindow()
 
 	LLNotificationsUI::LLNotificationManager::getInstance();
 
-
-#ifdef LL_DARWIN
-	//Satisfy both MAINT-3135 (OSX 10.6 and earlier) MAINT-3288 (OSX 10.7 and later)
-	LLOSInfo& os_info = LLOSInfo::instance();
-	if (os_info.mMajorVer == 10 && os_info.mMinorVer < 7)
-	{
-		if ( os_info.mMinorVer == 6 && os_info.mBuild < 8 )
-			gViewerWindow->getWindow()->setOldResize(true);
-	}
-#endif
-
 	if (gSavedSettings.getBOOL("WindowMaximized"))
 	{
 		gViewerWindow->getWindow()->maximize();
@@ -3234,7 +3215,7 @@ LLSD LLAppViewer::getViewerInfo() const
     info["VFS_TIME"] = LLTrans::getString("AboutTime", substitution);
 
 #if LL_DARWIN
-    info["HIDPI"] = gHiDPISupport;
+    info["HIDPI"] = TRUE;
 #endif
 
 	// Libraries
@@ -3386,9 +3367,7 @@ std::string LLAppViewer::getViewerInfoString(bool default_string) const
 	}
 	support << "\n" << LLTrans::getString("AboutOGL", args, default_string);
 	support << "\n\n" << LLTrans::getString("AboutSettings", args, default_string);
-#if LL_DARWIN
-	support << "\n" << LLTrans::getString("AboutOSXHiDPI", args, default_string);
-#endif
+
 	support << "\n\n" << LLTrans::getString("AboutLibs", args, default_string);
 	if (info.has("COMPILER"))
 	{

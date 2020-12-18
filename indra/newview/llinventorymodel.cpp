@@ -3110,7 +3110,7 @@ void LLInventoryModel::removeInventoryItem(LLUUID agent_id, LLMessageSystem* msg
 void LLInventoryModel::processRemoveInventoryItem(LLMessageSystem* msg, void**)
 {
 	LL_DEBUGS(LOG_INV) << "LLInventoryModel::processRemoveInventoryItem()" << LL_ENDL;
-	LLUUID agent_id, item_id;
+	LLUUID agent_id;
 	msg->getUUIDFast(_PREHASH_AgentData, _PREHASH_AgentID, agent_id);
 	if(agent_id != gAgent.getID())
 	{
@@ -3127,7 +3127,7 @@ void LLInventoryModel::processUpdateInventoryFolder(LLMessageSystem* msg,
 													void**)
 {
 	LL_DEBUGS(LOG_INV) << "LLInventoryModel::processUpdateInventoryFolder()" << LL_ENDL;
-	LLUUID agent_id, folder_id, parent_id;
+	LLUUID agent_id;
 	//char name[DB_INV_ITEM_NAME_BUF_SIZE];
 	msg->getUUIDFast(_PREHASH_FolderData, _PREHASH_AgentID, agent_id);
 	if(agent_id != gAgent.getID())

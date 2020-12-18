@@ -279,7 +279,6 @@ LLUUID LLFloaterInspect::getSelectedUUID()
 
 void LLFloaterInspect::refresh()
 {
-	LLUUID creator_id;
 	std::string creator_name;
 	S32 pos = mObjectList->getScrollPos();
 	getChildView("button owner")->setEnabled(false);

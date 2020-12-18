@@ -102,6 +102,13 @@ MACRO(LL_ADD_PROJECT_UNIT_TESTS project sources)
     # Setup target
     ADD_EXECUTABLE(PROJECT_${project}_TEST_${name} ${${name}_test_SOURCE_FILES})
     SET_TARGET_PROPERTIES(PROJECT_${project}_TEST_${name} PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${EXE_STAGING_DIR}")
+    if (DARWIN)
+      SET_TARGET_PROPERTIES(PROJECT_${project}_TEST_${name} 
+          PROPERTIES
+          BUILD_WITH_INSTALL_RPATH 1
+          INSTALL_RPATH "@executable_path/Resources"
+          )
+    endif(DARWIN)
 
     #
     # Per-codefile additional / external project dep and lib dep property extraction
@@ -229,6 +236,14 @@ FUNCTION(LL_ADD_INTEGRATION_TEST
         LINK_FLAGS_RELEASE ""
         )
   endif (WINDOWS)
+
+  if (DARWIN)
+    SET_TARGET_PROPERTIES(INTEGRATION_TEST_${testname}
+        PROPERTIES
+        BUILD_WITH_INSTALL_RPATH 1
+        INSTALL_RPATH "@executable_path/Resources"
+        )
+  endif(DARWIN)
 
   # Add link deps to the executable
   if(TEST_DEBUG)

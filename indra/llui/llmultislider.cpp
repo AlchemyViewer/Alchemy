@@ -666,8 +666,6 @@ void LLMultiSlider::draw()
 	// drawing solids requires texturing be disabled
 	gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
 
-	LLRect rect(mDragStartThumbRect);
-
 	F32 opacity = getEnabled() ? 1.f : 0.3f;
 
 	// Track

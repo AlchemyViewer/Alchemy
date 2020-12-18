@@ -49,9 +49,6 @@ void LLCocoaPlugin::setupCocoa()
 		// when init'ing the Cocoa App window.		
 		[[NSUserDefaults standardUserDefaults] setObject:@"NO" forKey:@"NSTreatUnknownArgumentsAsOpen"];
 		
-		// This is a bit of voodoo taken from the Apple sample code "CarbonCocoa_PictureCursor":
-		//   http://developer.apple.com/samplecode/CarbonCocoa_PictureCursor/index.html
-		
 		//	Needed for Carbon based applications which call into Cocoa
 		NSApplicationLoad();
 
@@ -95,7 +92,7 @@ void LLCocoaPlugin::processEvents()
 {
      // Some plugins (webkit at least) will want an event loop.  This qualifies.
     NSEvent * event;
-    event = [NSApp nextEventMatchingMask:NSAnyEventMask untilDate:[NSDate distantPast] inMode:NSDefaultRunLoopMode dequeue:YES];
+    event = [NSApp nextEventMatchingMask:NSEventMaskAny untilDate:[NSDate distantPast] inMode:NSDefaultRunLoopMode dequeue:YES];
     [NSApp sendEvent: event];
 }
 

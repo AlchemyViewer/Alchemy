@@ -33,7 +33,7 @@
 #endif
 #include <boost/optional/optional.hpp>
 #include <absl/container/flat_hash_map.h>
-#if LL_GNUC
+#if LL_GNUC && GCC_VERSION >= 90000
 #pragma GCC diagnostic pop
 #endif
 #include <string>

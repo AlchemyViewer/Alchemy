@@ -35,7 +35,7 @@
 
 extern "C"
 {
-#ifdef LL_USESYSTEMLIBS
+#if LL_DARWIN || defined(LL_USESYSTEMLIBS)
 # include <expat.h>
 #else
 # include "expat/expat.h"
@@ -150,7 +150,7 @@ S32 LLSDXMLFormatter::format_impl(const LLSD& data, std::ostream& ostr,
 
 	case LLSD::TypeReal:
 		ostr << pre << "<real>";
-		if(mRealFormat.empty())
+		if(!mRealFormat)
 		{
 			ostr << data.asReal();
 		}

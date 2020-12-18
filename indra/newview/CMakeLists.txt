@@ -1457,16 +1457,17 @@ if (DARWIN)
     COMPILE_FLAGS "-fmodules -fcxx-modules -Wno-nullability-completeness"
     )
 
-  find_library(AGL_LIBRARY AGL)
   find_library(APPKIT_LIBRARY AppKit)
   find_library(COCOA_LIBRARY Cocoa)
   find_library(IOKIT_LIBRARY IOKit)
+  find_library(COREFOUNDATION_LIBRARY CoreFoundation)
   find_library(COREAUDIO_LIBRARY CoreAudio)
 
   set(viewer_LIBRARIES
     ${COCOA_LIBRARY}
-    ${AGL_LIBRARY}
+    ${APPKIT_LIBRARY}
     ${IOKIT_LIBRARY}
+    ${COREFOUNDATION_LIBRARY}
     ${COREAUDIO_LIBRARY}
     )
 
@@ -1480,8 +1481,8 @@ if (DARWIN)
   set(viewer_RESOURCE_FILES
     alchemy.icns
     macview.r
-    Info-SecondLife.plist
-    SecondLife.xib/
+    Info-Alchemy.plist
+    Alchemy.xib/
     # CMake doesn't seem to support Xcode language variants well just yet
     English.lproj/InfoPlist.strings
     English.lproj/language.txt
@@ -1497,6 +1498,10 @@ if (DARWIN)
     )
   SOURCE_GROUP("Resources" FILES ${viewer_RESOURCE_FILES})
   list(APPEND viewer_SOURCE_FILES ${viewer_RESOURCE_FILES})
+  
+  if (OPENAL)
+    LIST(APPEND viewer_LIBRARIES ${OPENAL_LIBRARIES} ${FREEALUT_LIBRARIES})
+  endif (OPENAL)
 endif (DARWIN)
 
 if (LINUX)
@@ -2219,34 +2224,48 @@ if (DARWIN)
   set(MACOSX_BUNDLE_SHORT_VERSION_STRING "${VIEWER_SHORT_VERSION}.${VIEWER_VERSION_REVISION}")
   set(MACOSX_BUNDLE_BUNDLE_VERSION "${VIEWER_SHORT_VERSION}${VIEWER_MACOSX_PHASE}${VIEWER_REVISION}")
   set(MACOSX_BUNDLE_COPYRIGHT "Copyright (C) 2013-2020 Alchemy Development Group")
-  set(MACOSX_BUNDLE_NSMAIN_NIB_FILE "SecondLife.nib")
+  set(MACOSX_BUNDLE_NSMAIN_NIB_FILE "Alchemy.nib")
   set(MACOSX_BUNDLE_NSPRINCIPAL_CLASS "LLApplication")
 
   # https://blog.kitware.com/upcoming-in-cmake-2-8-12-osx-rpath-support/
   set(CMAKE_MACOSX_RPATH 1)
   
-  set_target_properties(
-    ${VIEWER_BINARY_NAME}
-    PROPERTIES
-    OUTPUT_NAME "${product}"
-    # From Contents/MacOS/SecondLife, look in Contents/Frameworks
-    INSTALL_RPATH "@loader_path/../Frameworks"
-    # SIGH, as of 2018-05-24 (cmake 3.11.1) the INSTALL_RPATH property simply
-    # does not work. Try this:
-    LINK_FLAGS "-rpath @loader_path/../Frameworks"
-    MACOSX_BUNDLE_INFO_PLIST
-    "${CMAKE_CURRENT_SOURCE_DIR}/Info-SecondLife.plist"
-    )
-
   set(VIEWER_APP_BUNDLE "${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/${product}.app")
   set(VIEWER_APP_EXE "${VIEWER_APP_BUNDLE}/Contents/MacOS/${product}")
   set(VIEWER_APP_DSYM "${VIEWER_APP_EXE}.dSYM")
   set(VIEWER_APP_XCARCHIVE "${VIEWER_APP_BUNDLE}/../${product}.xcarchive.zip")
 
   configure_file(
-     "${CMAKE_CURRENT_SOURCE_DIR}/Info-SecondLife.plist"
-     "${VIEWER_APP_BUNDLE}/Contents/Info.plist"
+     "${CMAKE_CURRENT_SOURCE_DIR}/Info-Alchemy.plist"
+     "${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/Info-Alchemy.plist"
     )
+
+  set_target_properties(
+    ${VIEWER_BINARY_NAME}
+    PROPERTIES
+    OUTPUT_NAME "${product}"
+    # From Contents/MacOS/Alchemy, look in Contents/Frameworks
+    BUILD_WITH_INSTALL_RPATH 1
+    INSTALL_RPATH "@loader_path/../Frameworks"
+    MACOSX_BUNDLE_INFO_PLIST
+    "${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/Info-Alchemy.plist"
+    )
+
+  # Make sure we can find the 'ibtool' program. If we can NOT find it we
+  # skip generation of this project
+  find_program(IBTOOL ibtool HINTS "/usr/bin" "${OSX_DEVELOPER_ROOT}/usr/bin")
+  if (${IBTOOL} STREQUAL "IBTOOL-NOTFOUND")
+    message(SEND_ERROR "ibtool can not be found and is needed to compile the .xib files. It should have been installed with
+                      the Apple developer tools. The default system paths were searched in addition to ${OSX_DEVELOPER_ROOT}/usr/bin")
+  endif()
+
+  # Compile the .xib files using the 'ibtool' program with the destination being the app package
+  add_custom_command (TARGET ${VIEWER_BINARY_NAME} POST_BUILD
+                      COMMAND ${IBTOOL} --errors --warnings --notices
+                              --compile ${VIEWER_APP_BUNDLE}/Contents/Resources/Alchemy.nib
+                              ${CMAKE_CURRENT_SOURCE_DIR}/Alchemy.xib
+                      COMMENT "Compiling ${CMAKE_CURRENT_SOURCE_DIR}/Alchemy.xib")
+
 
   add_custom_command(
     TARGET ${VIEWER_BINARY_NAME} POST_BUILD
