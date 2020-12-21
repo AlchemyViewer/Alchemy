@@ -2645,7 +2645,7 @@ bool LLVOVolume::hasMedia() const
 	for (U8 i = 0; i < numTEs; i++)
 	{
 		const LLTextureEntry* te = getTE(i);
-		if(te->hasMedia())
+		if(te && te->hasMedia())
 		{
 			result = true;
 			break;
@@ -2698,7 +2698,7 @@ void LLVOVolume::cleanUpMediaImpls()
 	for (U8 i = 0; i < numTEs; i++)
 	{
 		const LLTextureEntry* te = getTE(i);
-		if( ! te->hasMedia())
+		if(te && !te->hasMedia())
 		{
 			// Delete the media IMPL!
 			removeMediaImpl(i) ;

@@ -176,7 +176,7 @@ void LLControlAvatar::matchVolumeTransform()
                 LLVector3 joint_pos = attach->getWorldPosition();
                 LLQuaternion joint_rot = attach->getWorldRotation();
                 LLVector3 obj_pos = mRootVolp->mDrawable->getPosition();
-                LLQuaternion obj_rot = mRootVolp->mDrawable->getRotation();
+                const LLQuaternion& obj_rot = mRootVolp->mDrawable->getRotation();
                 obj_pos.rotVec(joint_rot);
                 mRoot->setWorldPosition(obj_pos + joint_pos);
                 mRoot->setWorldRotation(obj_rot * joint_rot);
@@ -282,7 +282,7 @@ void LLControlAvatar::updateVolumeGeom()
 	gPipeline.markTextured(mRootVolp->mDrawable); // face may need to change draw pool to/from POOL_HUD
 	mRootVolp->mDrawable->setState(LLDrawable::USE_BACKLIGHT);
 
-	LLViewerObject::const_child_list_t& child_list = mRootVolp->getChildren();
+	const LLViewerObject::const_child_list_t& child_list = mRootVolp->getChildren();
 	for (LLViewerObject* childp : child_list)
 	{
 		if (childp && childp->mDrawable.notNull())
@@ -365,8 +365,8 @@ BOOL LLControlAvatar::updateCharacter(LLAgent &agent)
 //virtual
 void LLControlAvatar::updateDebugText()
 {
-    static const LLCachedControl<bool> debug_anim_obj(gSavedSettings, "DebugAnimatedObjects");
-	if (debug_anim_obj)
+    static const LLCachedControl<bool> debug_animated_objects(gSavedSettings, "DebugAnimatedObjects");
+	if (debug_animated_objects)
     {
         S32 total_linkset_count = 0;
         if (mRootVolp)
@@ -494,7 +494,7 @@ void LLControlAvatar::getAnimatedVolumes(std::vector<LLVOVolume*>& volumes)
 
     volumes.push_back(mRootVolp);
     
-	LLViewerObject::const_child_list_t& child_list = mRootVolp->getChildren();
+    const LLViewerObject::const_child_list_t& child_list = mRootVolp->getChildren();
 	for (LLViewerObject* childp : child_list)
 	{
         LLVOVolume *child_volp = childp ? childp->asVolume() : nullptr;
@@ -520,11 +520,13 @@ void LLControlAvatar::updateAnimations()
     getAnimatedVolumes(volumes);
     
     // Rebuild mSignaledAnimations from the associated volumes.
+    auto& signaled_anim_map = LLObjectSignaledAnimationMap::instance().getMap();
+
 	std::map<LLUUID, S32> anims;
     for (LLVOVolume* volp : volumes)
     {
         //LL_INFOS("AnimatedObjects") << "updating anim for vol " << volp->getID() << " root " << mRootVolp->getID() << LL_ENDL;
-        signaled_animation_map_t& signaled_animations = LLObjectSignaledAnimationMap::instance().getMap()[volp->getID()];
+        signaled_animation_map_t& signaled_animations = signaled_anim_map[volp->getID()];
         for (const auto& anim_pair : signaled_animations)
         {
             std::map<LLUUID,S32>::iterator found_anim_it = anims.find(anim_pair.first);
@@ -553,7 +555,7 @@ void LLControlAvatar::updateAnimations()
         }
     }
 
-    mSignaledAnimations = anims;
+    mSignaledAnimations = std::move(anims);
     processAnimationStateChanges();
 }
 
