@@ -2097,7 +2097,8 @@ std::string zip_llsd(LLSD& data)
 		{ //copy result into output
 			if (strm.avail_out >= CHUNK)
 			{
-				free(output);
+				if(output)
+					free(output);
 				LL_WARNS() << "Failed to compress LLSD block." << LL_ENDL;
 				return std::string();
 			}
@@ -2120,7 +2121,8 @@ std::string zip_llsd(LLSD& data)
 		}
 		else 
 		{
-			free(output);
+			if(output)
+				free(output);
 			LL_WARNS() << "Failed to compress LLSD block." << LL_ENDL;
 			return std::string();
 		}
@@ -2131,7 +2133,8 @@ std::string zip_llsd(LLSD& data)
 
 	std::string result((char*) output, size);
 	deflateEnd(&strm);
-	free(output);
+	if(output)
+		free(output);
 
 	return result;
 }

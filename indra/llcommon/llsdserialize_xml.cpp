@@ -150,7 +150,7 @@ S32 LLSDXMLFormatter::format_impl(const LLSD& data, std::ostream& ostr,
 
 	case LLSD::TypeReal:
 		ostr << pre << "<real>";
-		if(!mRealFormat)
+		if(mRealFormat.empty())
 		{
 			ostr << data.asReal();
 		}

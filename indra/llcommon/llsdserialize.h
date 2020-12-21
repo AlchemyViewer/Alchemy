@@ -502,7 +502,7 @@ protected:
 	void formatReal(LLSD::Real real, std::ostream& ostr) const;
 
 	bool mBoolAlpha;
-    std::unique_ptr<absl::ParsedFormat<absl::FormatConversionCharSet::kFloating> > mRealFormat;
+	std::string mRealFormat;
 	EFormatterOptions mOptions;
 };
 
