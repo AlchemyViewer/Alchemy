@@ -396,7 +396,7 @@ void RlvBehaviourDictionary::clearModifiers(const LLUUID& idRlvObj)
 
 const RlvBehaviourInfo* RlvBehaviourDictionary::getBehaviourInfo(const std::string& strBhvr, ERlvParamType eParamType, bool* pfStrict) const
 {
-	bool fStrict = absl::EndsWith(strBhvr, "_sec");
+	bool fStrict = boost::algorithm::ends_with(strBhvr, "_sec");
 	if (pfStrict)
 		*pfStrict = fStrict;
 

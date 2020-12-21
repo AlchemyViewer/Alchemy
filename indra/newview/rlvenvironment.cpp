@@ -173,7 +173,7 @@ public:
 		{
 			return
 				(m_eSettingsType == LLSettingsType::fromInventoryFlags(pItem->getFlags())) &&
-				( (m_strNameMatch.empty()) || (absl::EqualsIgnoreCase(pItem->getName(), m_strNameMatch)) );
+				( (m_strNameMatch.empty()) || (boost::iequals(pItem->getName(), m_strNameMatch)) );
 		}
 		return false;
 	}
@@ -475,7 +475,7 @@ LLEnvironment::EnvSelection_t RlvEnvironment::getTargetEnvironment()
 // static
 bool RlvEnvironment::onHandleCommand(const RlvCommand& rlvCmd, ERlvCmdRet& cmdRet, const std::string& strCmdPrefix, const handler_map_t& fnLookup, const legacy_handler_map_t& legacyFnLookup)
 {
-	if ( (rlvCmd.getBehaviour().length() > strCmdPrefix.length() + 2) && (absl::StartsWith(rlvCmd.getBehaviour(), strCmdPrefix)) )
+	if ( (rlvCmd.getBehaviour().length() > strCmdPrefix.length() + 2) && (boost::starts_with(rlvCmd.getBehaviour(), strCmdPrefix)) )
 	{
 		std::string strEnvCommand = rlvCmd.getBehaviour().substr(strCmdPrefix.length());
 

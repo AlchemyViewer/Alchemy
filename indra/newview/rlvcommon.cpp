@@ -40,6 +40,9 @@
 #include "rlvhandler.h"
 #include "rlvlocks.h"
 
+#include "llscriptruntimeperms.h"
+#include <boost/algorithm/string/predicate.hpp> // icontains
+#include <boost/algorithm/string/regex.hpp> // regex_replace_all
 #include <boost/algorithm/string.hpp>
 #include <boost/regex.hpp>
 
@@ -127,7 +130,7 @@ void RlvSettings::initClass()
 		int nMinMaturity = gSavedSettings.getS32("RLVaExperienceMaturityThreshold");
 		s_nExperienceMinMaturity = (nMinMaturity == 0) ? 0 : ((nMinMaturity == 1) ? SIM_ACCESS_PG : ((nMinMaturity == 2) ? SIM_ACCESS_MATURE : SIM_ACCESS_ADULT));
 		const std::string& strBlockedExperiences = gSavedSettings.getString("RLVaBlockedExperiences");
-		s_BlockedExperiences = absl::StrSplit(strBlockedExperiences, ';');
+		boost::split(s_BlockedExperiences, strBlockedExperiences, boost::is_any_of(";"));
 
 		fInitialized = true;
 	}
@@ -178,12 +181,12 @@ void RlvSettings::initCompatibilityMode(std::string strCompatList)
 	s_CompatItemCreators.clear();
 	s_CompatItemNames.clear();
 
-	absl::StrAppend(&strCompatList, ";", rlvGetSetting<std::string>("RLVaCompatibilityModeList", ""));
+	strCompatList.append(";").append(rlvGetSetting<std::string>("RLVaCompatibilityModeList", ""));
 
 	boost_tokenizer tokCompatList(strCompatList, boost::char_separator<char>(";", "", boost::drop_empty_tokens));
 	for (const std::string& strCompatEntry : tokCompatList)
 	{
-		if (absl::StartsWith(strCompatEntry, "creator:"))
+		if (boost::starts_with(strCompatEntry, "creator:"))
 		{
 			LLUUID idCreator;
 			if ( (44 == strCompatEntry.size()) && (LLUUID::parseUUID(strCompatEntry.substr(8), &idCreator)) &&
@@ -192,7 +195,7 @@ void RlvSettings::initCompatibilityMode(std::string strCompatList)
 				s_CompatItemCreators.push_back(idCreator);
 			}
 		}
-		else if (absl::StartsWith(strCompatEntry, "name:"))
+		else if (boost::starts_with(strCompatEntry, "name:"))
 		{
 			if (strCompatEntry.size() > 5)
 				s_CompatItemNames.push_back(strCompatEntry.substr(5));
@@ -442,7 +445,7 @@ std::string RlvStrings::getVersionNum(const LLUUID& idRlvObject)
 
 std::string RlvStrings::getVersionImplNum()
 {
-	return llformat("%d%02d%02d%02d", RLVa_VERSION_MAJOR, RLVa_VERSION_MAJOR, RLVa_VERSION_PATCH, RLVa_IMPL_ID);
+	return llformat("%d%02d%02d%02d", RLVa_VERSION_MAJOR, RLVa_VERSION_MINOR, RLVa_VERSION_PATCH, RLVa_IMPL_ID);
 }
 
 // Checked: 2011-11-08 (RLVa-1.5.0)
