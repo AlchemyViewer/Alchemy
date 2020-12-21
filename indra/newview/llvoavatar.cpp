@@ -1,4 +1,4 @@
-/** 
+﻿/** 
  * @File llvoavatar.cpp
  * @brief Implementation of LLVOAvatar class which is a derivation of LLViewerObject
  *
@@ -3289,7 +3289,7 @@ void LLVOAvatar::idleUpdateNameTagText(BOOL new_name)
 				if (show_display_names)
 				{
 					addNameTagLine(av_name.getDisplayName(), name_tag_color, LLFontGL::NORMAL,
-					LLFontGL::getFontSansSerif(), true);
+						LLFontGL::getFontSansSerif(), true);
 				}
 				// Suppress SLID display if display name matches exactly (ugh)
 				if (show_usernames && !av_name.isDisplayNameDefault())
