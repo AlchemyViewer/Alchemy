@@ -747,7 +747,7 @@ void RlvHandler::changed(const LLUUID& idGroup, LLGroupChange change)
 
 bool RlvHandler::handleEvent(LLPointer<LLOldEvents::LLEvent> event, const LLSD& sdUserdata)
 {
-	// NOTE: we'll fire once for every group the user belongs to so we need to manually keep track of changes
+	// NOTE: we'll fire once for every group the user belongs to so we need to manually keep track of pending changes
 	static LLUUID s_idLastAgentGroup = LLUUID::null;
 	if (s_idLastAgentGroup != gAgent.getGroupID())
 	{
@@ -3308,7 +3308,7 @@ ERlvCmdRet RlvHandler::processReplyCommand(const RlvCommand& rlvCmd) const
 				{
 					// NOTE: specification says response should start with '/' but RLV-1.16.1 returns an empty string when no rules are set
 					for (rlv_object_map_t::const_iterator itObj = m_Objects.begin(); itObj != m_Objects.end(); ++itObj)
-						absl::StrAppend(&strReply, itObj->second.getStatusString(strFilter, strSeparator));
+						strReply += itObj->second.getStatusString(strFilter, strSeparator);
 				}
 			}
 			break;
@@ -3370,7 +3370,7 @@ ERlvCmdRet RlvHandler::onFindFolder(const RlvCommand& rlvCmd, std::string& strRe
 			{
 				if (!strReply.empty())
 					strReply.push_back(',');
-				absl::StrAppend(&strReply, RlvInventory::instance().getSharedPath(folders.at(idxFolder)));
+				strReply += RlvInventory::instance().getSharedPath(folders.at(idxFolder));
 			}
 		}
 	}
@@ -3595,7 +3595,7 @@ ERlvCmdRet RlvHandler::onGetInv(const RlvCommand& rlvCmd, std::string& strReply)
 		{
 			if (!strReply.empty())
 				strReply.push_back(',');
-			absl::StrAppend(&strReply, strFolder);
+			strReply += strFolder;
 		}
 	}
 	return RLV_RET_SUCCESS;
@@ -3776,7 +3776,7 @@ ERlvCmdRet RlvHandler::onGetPath(const RlvCommand& rlvCmd, std::string& strReply
 			{
 				if (!strReply.empty())
 					strReply.push_back(',');
-				absl::StrAppend(&strReply, RlvInventory::instance().getSharedPath(folders.at(idxFolder)));
+				strReply += RlvInventory::instance().getSharedPath(folders.at(idxFolder));
 			}
 		}
 	}
