@@ -783,7 +783,7 @@ void LLXferManager::processFileRequest (LLMessageSystem *mesgsys, void ** /*user
 
 	LLXfer *xferp;
 
-	if (uuid != LLUUID::null)
+	if (uuid.notNull())
 	{	// Request for an asset - use a VFS file
 		if(NULL == LLAssetType::lookup(type))
 		{

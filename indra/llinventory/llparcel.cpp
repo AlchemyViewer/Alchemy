@@ -359,7 +359,7 @@ void LLParcel::setParcelFlag(U32 flag, BOOL b)
 
 BOOL LLParcel::allowModifyBy(const LLUUID &agent_id, const LLUUID &group_id) const
 {
-    if (agent_id == LLUUID::null)
+    if (agent_id.isNull())
     {
         // system always can enter
         return TRUE;
@@ -388,7 +388,7 @@ BOOL LLParcel::allowModifyBy(const LLUUID &agent_id, const LLUUID &group_id) con
 
 BOOL LLParcel::allowTerraformBy(const LLUUID &agent_id) const
 {
-    if (agent_id == LLUUID::null)
+    if (agent_id.isNull())
     {
         // system always can enter
         return TRUE;

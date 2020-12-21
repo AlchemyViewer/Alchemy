@@ -291,7 +291,8 @@ template <class Type> LLRectBase<Type> LLRectBase<Type>::null(0,0,0,0);
 typedef LLRectBase<S32> LLRect;
 typedef LLRectBase<F32> LLRectf;
 
-static_assert(std::is_trivially_copyable<LLRect>::value, "LLRect must be a trivially copyable type");
+static_assert(std::is_trivially_copyable<LLRect>::value, "LLRect must be trivially copyable");
+static_assert(std::is_trivially_destructible<LLRect>::value, "LLRect must be trivially destructible");
 static_assert(std::is_standard_layout<LLRect>::value, "LLRect must be a standard layout type");
 
 #endif

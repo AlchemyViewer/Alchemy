@@ -97,7 +97,7 @@ bool LLTextUtil::processUrlMatch(LLUrlMatch* match,LLTextBase* text_base, bool i
 	if (match == 0 || text_base == 0)
 		return false;
 
-	if(match->getID() != LLUUID::null && TextHelpers::iconCallbackCreationFunction)
+	if(match->getID().notNull() && TextHelpers::iconCallbackCreationFunction)
 	{
 		bool segment_created = TextHelpers::iconCallbackCreationFunction(match,text_base);
 		if(segment_created)

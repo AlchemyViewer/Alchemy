@@ -498,7 +498,7 @@ const LLQuaternion &LLQuaternion::constrain(F32 radians)
 	const F32 cos_angle_lim = cosf( radians/2 );	// mQ[VW] limit
 	const F32 sin_angle_lim = sinf( radians/2 );	// rotation axis length	limit
 
-	if (mQ[VW] < 0.0f)
+	if (mQ[VW] < 0.f)
 	{
 		mQ[VX] *= -1.f;
 		mQ[VY] *= -1.f;

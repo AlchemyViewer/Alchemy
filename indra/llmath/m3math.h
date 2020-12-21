@@ -141,6 +141,9 @@ class LLMatrix3
 
 		friend std::ostream&	 operator<<(std::ostream& s, const LLMatrix3 &a);	// Stream a
 };
+static_assert(std::is_trivially_copyable<LLMatrix3>::value, "LLMatrix3 must be trivially copyable");
+static_assert(std::is_trivially_destructible<LLMatrix3>::value, "LLMatrix3 must be trivially destructible");
+static_assert(std::is_standard_layout<LLMatrix3>::value, "LLMatrix3 must be a standard layout type");
 
 inline LLMatrix3::LLMatrix3(void)
 {

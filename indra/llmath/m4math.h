@@ -238,6 +238,12 @@ public:
 	friend std::ostream&	 operator<<(std::ostream& s, const LLMatrix4 &a);	// Stream a
 };
 
+#ifndef SHOW_ASSERT
+static_assert(std::is_trivially_copyable<LLMatrix4>::value, "LLMatrix4 must be trivially copyable");
+static_assert(std::is_trivially_destructible<LLMatrix4>::value, "LLMatrix4 must be trivially destructible");
+static_assert(std::is_standard_layout<LLMatrix4>::value, "LLMatrix4 must be a standard layout type");
+#endif
+
 inline const LLMatrix4&	LLMatrix4::setIdentity()
 {
 	mMatrix[0][0] = 1.f;

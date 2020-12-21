@@ -141,6 +141,9 @@ class LLVector4
 
 		static BOOL parseVector4(const std::string& buf, LLVector4* value);
 };
+static_assert(std::is_trivially_copyable<LLVector4>::value, "LLVector4 must be trivially copyable");
+static_assert(std::is_trivially_destructible<LLVector4>::value, "LLVector4 must be trivially destructible");
+static_assert(std::is_standard_layout<LLVector4>::value, "LLVector4 must be a standard layout type");
 
 // Non-member functions 
 F32 angle_between(const LLVector4 &a, const LLVector4 &b);		// Returns angle (radians) between a and b

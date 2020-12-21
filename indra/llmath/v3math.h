@@ -148,6 +148,9 @@ class LLVector3
 
 		static BOOL parseVector3(const std::string& buf, LLVector3* value);
 };
+static_assert(std::is_trivially_copyable<LLVector3>::value, "LLVector3 must be trivially copyable");
+static_assert(std::is_trivially_destructible<LLVector3>::value, "LLVector3 must be trivially destructible");
+static_assert(std::is_standard_layout<LLVector3>::value, "LLVector3 must be a standard layout type");
 
 typedef LLVector3 LLSimLocalVec;
 

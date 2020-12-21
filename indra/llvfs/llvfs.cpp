@@ -1742,7 +1742,7 @@ void LLVFS::audit()
 			block->mFileType >= LLAssetType::AT_NONE &&
 			block->mFileType < LLAssetType::AT_COUNT &&
 			block->mAccessTime <= cur_time &&
-			block->mFileID != LLUUID::null)
+			block->mFileID.notNull())
 		{
 			if (mFileBlocks.find(*block) == mFileBlocks.end())
 			{
@@ -1851,7 +1851,7 @@ void LLVFS::checkMem()
 		LLVFSFileBlock *block = (*it).second;
 		llassert(block->mFileType >= LLAssetType::AT_NONE &&
 				 block->mFileType < LLAssetType::AT_COUNT &&
-				 block->mFileID != LLUUID::null);
+				 block->mFileID.notNull());
     
 		for (std::deque<S32>::iterator iter = mIndexHoles.begin();
 			 iter != mIndexHoles.end(); ++iter)

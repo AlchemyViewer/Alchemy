@@ -258,6 +258,7 @@ LLSocket::~LLSocket()
 	if(mPool)
 	{
 		apr_pool_destroy(mPool);
+		mPool = NULL;
 	}
 }
 
