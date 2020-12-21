@@ -138,7 +138,7 @@ void LLSkinningUtil::initSkinningMatrixPalette(
             LLMatrix4a bind, world;
             bind.loadu(skin->mInvBindMatrix[j]);
             world.loadu(joint->getWorldMatrix());
-            matMul(bind,world, mat[j]);
+            mat[j].setMul(world, bind);
 #else
             mat[j] = skin->mInvBindMatrix[j];
             mat[j] *= joint->getWorldMatrix();
@@ -322,6 +322,15 @@ void LLSkinningUtil::updateRiggingInfo(const LLMeshSkinInfo* skin, LLVOAvatar *a
                 //S32 active_verts = 0;
                 vol_face.mJointRiggingInfoTab.resize(LL_CHARACTER_MAX_ANIMATED_JOINTS);
                 LLJointRiggingInfoTab &rig_info_tab = vol_face.mJointRiggingInfoTab;
+                LLMatrix4a bind_shape;
+                bind_shape.loadu(skin->mBindShapeMatrix);
+                LLMatrix4a matrixPalette[LL_CHARACTER_MAX_ANIMATED_JOINTS];
+                for (U32 i = 0; i < llmin(skin->mInvBindMatrix.size(), (size_t)LL_CHARACTER_MAX_ANIMATED_JOINTS); ++i)
+                {
+                    LLMatrix4a inverse_bind;
+                    inverse_bind.loadu(skin->mInvBindMatrix[i]);
+                    matrixPalette[i].setMul(inverse_bind, bind_shape);
+                }
                 for (S32 i=0; i<vol_face.mNumVertices; i++)
                 {
                     LLVector4a& pos = vol_face.mPositions[i];
@@ -353,18 +362,8 @@ void LLSkinningUtil::updateRiggingInfo(const LLMeshSkinInfo* skin, LLVOAvatar *a
                             if (joint_num >= 0 && joint_num < LL_CHARACTER_MAX_ANIMATED_JOINTS)
                             {
                                 rig_info_tab[joint_num].setIsRiggedTo(true);
-
-                                // FIXME could precompute these matMuls.
-                                LLMatrix4a bind_shape;
-                                LLMatrix4a inv_bind;
-                                LLMatrix4a mat;
                                 LLVector4a pos_joint_space;
-
-                                bind_shape.loadu(skin->mBindShapeMatrix);
-                                inv_bind.loadu(skin->mInvBindMatrix[joint_index]);
-                                matMul(bind_shape, inv_bind, mat);
-
-                                mat.affineTransform(pos, pos_joint_space);
+                                matrixPalette[joint_index].affineTransform(pos, pos_joint_space);
                                 pos_joint_space.mul(wght[k]);
 
                                 LLVector4a *extents = rig_info_tab[joint_num].getRiggedExtents();
@@ -416,7 +415,7 @@ void LLSkinningUtil::updateRiggingInfo_(LLMeshSkinInfo* skin, LLVOAvatar *avatar
                 LLMatrix4a inv_bind;
                 inv_bind.loadu(skin->mInvBindMatrix[joint_indices[k]]);
                 LLMatrix4a mat;
-                matMul(bind_shape, inv_bind, mat);
+                mat.setMul(bind_shape, inv_bind);
                 LLVector4a pos_joint_space;
                 mat.affineTransform(pos, pos_joint_space);
                 pos_joint_space.mul(wght[k]);

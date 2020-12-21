@@ -84,6 +84,8 @@ public:
 	// Quantize this quaternion to 16 bit precision
 	inline void quantize16();
 
+	inline void mul(const LLQuaternion2& b);
+
 	/////////////////////////
 	// Quaternion inspection
 	/////////////////////////
@@ -98,7 +100,7 @@ public:
 
 protected:
 
-	LLVector4a mQ;
+	LL_ALIGN_16(LLVector4a mQ);
 
 };
 #ifndef SHOW_ASSERT

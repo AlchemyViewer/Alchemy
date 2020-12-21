@@ -1454,7 +1454,7 @@ void LLVOAvatar::calculateSpatialExtents(LLVector4a& newMin, LLVector4a& newMax)
                 LLMatrix4a mat;
                 LLVector4a new_extents[2];
                 mat.loadu(joint->getWorldMatrix());
-                matMulBoundBox(mat, rig_info->getRiggedExtents(), new_extents);
+				mat.mulBoundBox(rig_info->getRiggedExtents(), new_extents);
                 update_min_max(newMin, newMax, new_extents[0]);
                 update_min_max(newMin, newMax, new_extents[1]);
                 //if (isSelf())
@@ -9768,7 +9768,7 @@ void LLVOAvatar::dumpArchetypeXML(const std::string& prefix, bool group_by_weara
                     LLMatrix4a mat;
                     LLVector4a new_extents[2];
                     mat.loadu(joint->getWorldMatrix());
-                    matMulBoundBox(mat, rig_info.getRiggedExtents(), new_extents);
+                    mat.mulBoundBox(rig_info.getRiggedExtents(), new_extents);
                     LLVector4a rrp[2];
                     rrp[0].setSub(new_extents[0],rpv);
                     rrp[1].setSub(new_extents[1],rpv);

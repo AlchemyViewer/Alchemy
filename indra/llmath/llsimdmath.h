@@ -39,6 +39,7 @@
 #include <stdint.h>
 #endif
 
+#include <immintrin.h>
 #include <xmmintrin.h>
 #include <emmintrin.h>
 
