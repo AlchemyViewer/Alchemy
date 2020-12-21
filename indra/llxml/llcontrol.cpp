@@ -113,7 +113,6 @@ const S32 CURRENT_VERSION = 101;
 typedef std::pair<std::string, U32> settings_pair_t;
 typedef std::vector<settings_pair_t> settings_vec_t;
 std::map<std::string, int, std::less<>> getCount;
-settings_vec_t getCount_v;
 F64 start_time = 0;
 std::string SETTINGS_PROFILE = "settings_profile.log";
 
@@ -431,10 +430,12 @@ void LLControlGroup::cleanup()
 		}
 		else
 		{
+			static settings_vec_t getCount_v;
+
 			F64 end_time = LLTimer::getTotalSeconds();
 			U32 total_seconds = (U32)(end_time - start_time);
 
-			std::string msg = absl::StrFormat("Runtime (seconds): %d\n\n No. accesses   Avg. accesses/sec  Name\n", total_seconds);
+			std::string msg = llformat("Runtime (seconds): %d\n\n No. accesses   Avg. accesses/sec  Name\n", total_seconds);
 			size_t data_size = msg.size();
 			if (fwrite(msg.c_str(), 1, data_size, out) != data_size)
 			{
@@ -456,7 +457,7 @@ void LLControlGroup::cleanup()
 				}
 				if (access_rate >= 2)
 				{
-					msg = absl::StrFormat("%13d        %7d       %s\n", iter->second, access_rate, iter->first);
+					msg = llformat("%13d        %7d       %s\n", iter->second, access_rate, iter->first.c_str());
 					size_t data_size = msg.size();
 					if (fwrite(msg.c_str(), 1, data_size, out) != data_size)
 					{
