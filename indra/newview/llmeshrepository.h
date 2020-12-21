@@ -40,6 +40,8 @@
 #include "httphandler.h"
 #include "llthread.h"
 
+#include "absl/container/node_hash_map.h"
+
 #define LLCONVEXDECOMPINTER_STATIC 1
 
 #include "llconvexdecomposition.h"
@@ -210,10 +212,8 @@ public:
 	LLCondition* mSignal;
 
 	//map of known mesh headers
-	typedef std::map<LLUUID, LLSD> mesh_header_map;
+	typedef absl::node_hash_map<LLUUID, std::pair<U32, LLSD>> mesh_header_map;
 	mesh_header_map mMeshHeader;
-	
-	std::map<LLUUID, U32> mMeshHeaderSize;
 
 	class HeaderRequest : public RequestStats
 	{ 
@@ -313,7 +313,7 @@ public:
 	std::queue<LoadedMesh> mLoadedQ;
 
 	//map of pending header requests and currently desired LODs
-	typedef std::map<LLVolumeParams, std::vector<S32> > pending_lod_map;
+	typedef absl::node_hash_map<LLUUID, std::vector<S32>> pending_lod_map;
 	pending_lod_map mPendingLOD;
 
 	// llcorehttp library interface objects.
@@ -569,7 +569,7 @@ public:
 	F32 getStreamingCostLegacy(LLUUID mesh_id, F32 radius, S32* bytes = NULL, S32* visible_bytes = NULL, S32 detail = -1, F32 *unscaled_value = NULL);
 	static F32 getStreamingCostLegacy(LLSD& header, F32 radius, S32* bytes = NULL, S32* visible_bytes = NULL, S32 detail = -1, F32 *unscaled_value = NULL);
     bool getCostData(LLUUID mesh_id, LLMeshCostData& data);
-    bool getCostData(LLSD& header, LLMeshCostData& data);
+    bool getCostData(const LLSD& header, LLMeshCostData& data);
 
 	LLMeshRepository();
 
@@ -615,10 +615,10 @@ public:
 	static void metricsProgress(unsigned int count);
 	static void metricsUpdate();
 	
-	typedef std::map<LLVolumeParams, std::vector<LLVOVolume*> > mesh_load_map;
+	typedef absl::node_hash_map<LLUUID, std::vector<LLVOVolume*> > mesh_load_map;
 	mesh_load_map mLoadingMeshes[4];
 	
-	typedef std::map<LLUUID, LLMeshSkinInfo> skin_map;
+	typedef absl::node_hash_map<LLUUID, LLMeshSkinInfo> skin_map;
 	skin_map mSkinMap;
 
 	typedef std::map<LLUUID, LLModel::Decomposition*> decomposition_map;
@@ -629,7 +629,7 @@ public:
 	std::vector<LLMeshRepoThread::LODRequest> mPendingRequests;
 	
 	//list of mesh ids awaiting skin info
-	typedef std::map<LLUUID, std::vector<LLVOVolume*> > skin_load_map;
+	typedef absl::node_hash_map<LLUUID, std::vector<LLVOVolume*> > skin_load_map;
 	skin_load_map mLoadingSkins;
 
 	//list of mesh ids that need to send skin info fetch requests
@@ -649,8 +649,6 @@ public:
 	
 	U32 mMeshThreadCount;
 
-	void cacheOutgoingMesh(LLMeshUploadData& data, LLSD& header);
-	
 	LLMeshRepoThread* mThread;
 	std::vector<LLMeshUploadThread*> mUploads;
 	std::vector<LLMeshUploadThread*> mUploadWaitList;
