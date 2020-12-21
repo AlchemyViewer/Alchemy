@@ -34,6 +34,7 @@
 #undef WIN32_LEAN_AND_MEAN
 #include <winsock2.h>
 #include <windows.h>
+#include <Ws2ipdef.h>
 // reset to default, which is lean
 #define WIN32_LEAN_AND_MEAN
 #undef NOMINMAX

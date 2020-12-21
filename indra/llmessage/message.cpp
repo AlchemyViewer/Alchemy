@@ -40,6 +40,8 @@
 #include <iterator>
 #include <sstream>
 
+#include "llwin32headerslean.h"
+
 #include "llapr.h"
 #include "apr_portable.h"
 #include "apr_network_io.h"

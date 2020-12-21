@@ -29,7 +29,7 @@
 #include "llmail.h"
 
 // APR on Windows needs full windows headers
-#include "llwin32headers.h"
+#include "llwin32headerslean.h"
 #include <string>
 #include <sstream>
 

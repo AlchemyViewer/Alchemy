@@ -54,11 +54,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>045acdfadb2d3890f95182ad78bcc5c37d46fb2065982f5e10f69bf8e9319bcb747e8b0bc11268e8065123abe3ebd561</string>
+              <string>7f04c12f67d5deb8c0d2776e947fa0c8e28de6011a944812a2e08ea0c68cb5c3ab39392be6c6e8e631c919ae4ea78eeb</string>
               <key>hash_algorithm</key>
               <string>sha3_384</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/111/packages/generic/apr_suite-668/1.7.0/apr_suite-1.7.0-darwin64-668.tar.xz</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/111/packages/generic/apr_suite-695/1.7.0/apr_suite-1.7.0-darwin64-695.tar.xz</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
@@ -68,11 +68,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>7fdeae0b56042a597fb135c677dbf2952dda101a6e8dff326560672cc8637c8ea4bbf19feaefa73b2384ca12d14f6c1b</string>
+              <string>9c41a71517247e1546879f0a0b6d4eef11f2870244725e3e2e2fc955c19b3d672c2abfe6e953057c2d65833e8aef1423</string>
               <key>hash_algorithm</key>
               <string>sha3_384</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/111/packages/generic/apr_suite-668/1.7.0/apr_suite-1.7.0-linux64-668.tar.xz</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/111/packages/generic/apr_suite-695/1.7.0/apr_suite-1.7.0-linux64-695.tar.xz</string>
             </map>
             <key>name</key>
             <string>linux64</string>
@@ -82,11 +82,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>03a9228600bc6aba6ee06f214ef3e64f</string>
+              <string>ff88140ab91e7dd7ea9bdea1647e8d63d46782c9534ac87a849e77d6c85514fa48c40a6cdc0cda0331bc5b39bb04f4e5</string>
               <key>hash_algorithm</key>
-              <string>md5</string>
+              <string>sha3_384</string>
               <key>url</key>
-              <string>https://pkg.alchemyviewer.org/repository/autobuild-external/apr-suite/windows/apr_suite-1.4.5.328-windows-328.tar.bz2</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/111/packages/generic/apr_suite-695/1.7.0/apr_suite-1.7.0-windows-695.tar.xz</string>
             </map>
             <key>name</key>
             <string>windows</string>
@@ -96,11 +96,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>bcf0878344c1c9c6af51994d0e95fcf9</string>
+              <string>defcd88e073273bfde4bea905e13dafda59a3356741019a93911d872d48ee14dc7db576b7e19481b40c01102610ffa12</string>
               <key>hash_algorithm</key>
-              <string>md5</string>
+              <string>sha3_384</string>
               <key>url</key>
-              <string>https://pkg.alchemyviewer.org/repository/autobuild-external/apr-suite/windows64/apr_suite-1.4.5.328-windows64-328.tar.bz2</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/111/packages/generic/apr_suite-695/1.7.0/apr_suite-1.7.0-windows64-695.tar.xz</string>
             </map>
             <key>name</key>
             <string>windows64</string>
@@ -264,11 +264,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>55bac36687633e27220248b671f69d38</string>
+              <string>c1adc7653833a7000090ae989e542bd650d28d7c12d557336f9a905c5217b193a39aa46f821944c92f345712f3622422</string>
               <key>hash_algorithm</key>
-              <string>md5</string>
+              <string>sha3_384</string>
               <key>url</key>
-              <string>https://pkg.alchemyviewer.org/repository/autobuild-external/colladadom/linux64/debian10/colladadom-2.3.202210519-linux64-202210519.tar.bz2</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/98/packages/generic/colladadom-696/2.3.0/colladadom-2.3.0-linux64-696.tar.xz</string>
             </map>
             <key>name</key>
             <string>linux64</string>
@@ -278,11 +278,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>72b2de385f5857579d4f0b47bf95c96e</string>
+              <string>a5c0d47fca78ab8ce4123de50f5b93e422555c525dddcc396d144c2d43f7c0a09ae13333be106944b5f1e5f956f7cec3</string>
               <key>hash_algorithm</key>
-              <string>md5</string>
+              <string>sha3_384</string>
               <key>url</key>
-              <string>https://pkg.alchemyviewer.org/repository/autobuild-external/colladadom/windows/colladadom-2.3.314-windows-314.tar.bz2</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/98/packages/generic/colladadom-696/2.3.0/colladadom-2.3.0-windows-696.tar.xz</string>
             </map>
             <key>name</key>
             <string>windows</string>
@@ -292,18 +292,18 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>d702f005bc263c68238fee52f147f06b</string>
+              <string>40a600bc58af9f2b0fe14ddcce3fd70af39cf521d63305ec2ba562daec8ec690bedb8512ea7284192bd44915f4087733</string>
               <key>hash_algorithm</key>
-              <string>md5</string>
+              <string>sha3_384</string>
               <key>url</key>
-              <string>https://pkg.alchemyviewer.org/repository/autobuild-external/colladadom/windows64/colladadom-2.3.314-windows64-314.tar.bz2</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/98/packages/generic/colladadom-696/2.3.0/colladadom-2.3.0-windows64-696.tar.xz</string>
             </map>
             <key>name</key>
             <string>windows64</string>
           </map>
         </map>
         <key>version</key>
-        <string>2.3.314</string>
+        <string>2.3.0</string>
       </map>
       <key>curl</key>
       <map>
