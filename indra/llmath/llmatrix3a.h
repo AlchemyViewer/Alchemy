@@ -54,7 +54,7 @@ public:
 	//////////////////////////
 	// Ctors
 	//////////////////////////
-	
+
 	// Ctor
 	LLMatrix3a() = default;
 
@@ -122,9 +122,8 @@ static_assert(std::is_standard_layout<LLMatrix3a>::value, "LLMatrix3a must be a 
 class LLRotation : public LLMatrix3a
 {
 public:
-	
 	LLRotation() = default;
-	
+
 	// Returns true if this rotation is orthonormal with det ~= 1
 	inline bool isOkRotation() const;		
 };

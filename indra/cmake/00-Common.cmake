@@ -44,9 +44,15 @@ endif()
 set(CMAKE_CONFIGURATION_TYPES "RelWithDebInfo;Release;Debug" CACHE STRING
     "Supported build types." FORCE)
 
+# SIMD config
+option(USE_SSE41 "Enable usage of the SSE4.2 instruction set" OFF)
+option(USE_AVX "Enable usage of the AVX instruction set" OFF)
+option(USE_AVX2 "Enable usage of the AVX2 instruction set" OFF)
+if((USE_SSE41 AND USE_AVX) OR (USE_SSE41 AND USE_AVX AND USE_AVX2) OR (USE_AVX AND USE_AVX2))
+  message(FATAL_ERROR "Usage of multiple SIMD flags is unsupported")
+endif()
 
 # Platform-specific compilation flags.
-
 if (WINDOWS)
   # Don't build DLLs.
   set(BUILD_SHARED_LIBS OFF)
@@ -141,6 +147,8 @@ if (WINDOWS)
   elseif (USE_AVX)
     set(GLOBAL_CXX_FLAGS "${GLOBAL_CXX_FLAGS} /arch:AVX")
     add_definitions(/DAL_AVX=1)
+  elseif (USE_SSE41)
+    add_definitions(/D__SSE3__=1 /D__SSSE3__=1 /D__SSE4__=1 /D__SSE4_1__=1)
   elseif (ADDRESS_SIZE EQUAL 32)
     set(GLOBAL_CXX_FLAGS "${GLOBAL_CXX_FLAGS} /arch:SSE2")
   endif ()

@@ -84,7 +84,7 @@ void logMessageSuccess(std::string logAuth, std::string url, std::string message
 
 void logMessageFail(std::string logAuth, std::string url, std::string message)
 {
-    LL_INFOS("CoreHTTP") << logAuth << " Possible failure '" << message << "' for " << url << LL_ENDL;
+    LL_WARNS("CoreHTTP") << logAuth << " Possible failure '" << message << "' for " << url << LL_ENDL;
 }
 
 //=========================================================================
@@ -279,7 +279,7 @@ void HttpCoroHandler::onCompleted(LLCore::HttpHandle handle, LLCore::HttpRespons
         result = LLSD::emptyMap();
         LLCore::HttpStatus::type_enum_t errType = status.getType();
 
-        LL_INFOS()
+        LL_WARNS("CoreHTTP")
             << "Possible failure [" << status.toTerseString() << "] cannot "<< response->getRequestMethod() 
             << " url '" << response->getRequestURL()
             << "' because " << status.toString() 

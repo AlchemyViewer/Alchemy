@@ -36,6 +36,7 @@
 #include <immintrin.h>
 
 #include "absl/hash/hash.h"
+#include "absl/strings/str_format.h"
 
 class LLMutex;
 
@@ -92,7 +93,7 @@ public:
 	 */
 	LL_FORCE_INLINE __m128i load_unaligned_si128(const U8* p) const
 	{
-#if defined(AL_AVX) || defined(__SSE3__)
+#if defined(__SSE3__)
 		return _mm_lddqu_si128(reinterpret_cast<const __m128i*>(p));
 #else
 		return _mm_loadu_si128(reinterpret_cast<const __m128i*>(p));
@@ -102,7 +103,7 @@ public:
 	BOOL isNull() const // Faster than comparing to LLUUID::null.
 	{
 		__m128i mm = load_unaligned_si128(mData);
-#if defined(AL_AVX) || defined(__SSE4_1__)
+#if defined(__SSE4_1__)
 		return _mm_test_all_zeros(mm, mm) != 0;
 #else
 		mm = _mm_cmpeq_epi8(mm, _mm_setzero_si128());
@@ -126,7 +127,7 @@ public:
 		__m128i mm_right = load_unaligned_si128(rhs.mData);
 
 		__m128i mm_cmp = _mm_cmpeq_epi32(mm_left, mm_right);
-#if defined(AL_AVX) || defined(__SSE4_1__)
+#if defined(__SSE4_1__)
 		return _mm_test_all_ones(mm_cmp);
 #else
 		return _mm_movemask_epi8(mm_cmp) == 0xFFFF;
@@ -176,16 +177,29 @@ public:
 	{
 		return rhs < (*this);
 	}
+	// END BOOST
+
 
 	inline size_t hash() const
 	{
 		return absl::Hash<LLUUID>{}(*this);
 	}
-	// END BOOST
-	
+
 	template <typename H>
 	friend H AbslHashValue(H h, const LLUUID& id) {
 		return H::combine_contiguous(std::move(h), id.mData, UUID_BYTES);
+	}
+
+	friend absl::FormatConvertResult<absl::FormatConversionCharSet::kString>
+		AbslFormatConvert(const LLUUID& id,
+			const absl::FormatConversionSpec& spec,
+			absl::FormatSink* s) {
+		if (spec.conversion_char() == absl::FormatConversionChar::s) {
+			char uuid_str[UUID_STR_SIZE];
+			id.toString(uuid_str);
+			s->Append(uuid_str);
+		}
+		return { true };
 	}
 
 	// xor functions. Useful since any two random uuids xored together
@@ -260,8 +274,9 @@ namespace std {
 	};
 }
 
-namespace boost {
-	template<> struct hash<LLUUID>
+namespace boost 
+{
+	template <> struct hash<LLUUID>
 	{
 		size_t operator()(const LLUUID& id) const
 		{

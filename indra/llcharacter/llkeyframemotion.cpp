@@ -1469,7 +1469,7 @@ BOOL LLKeyframeMotion::deserialize(LLDataPacker& dp, const LLUUID& asset_id)
 			//return FALSE;
 		}
 
-		joint_motion->mJointName = std::move(joint_name);
+		joint_motion->mJointName = std::move(joint_name); // Do not use joint_name after this point.
 		
 		LLPointer<LLJointState> joint_state = new LLJointState;
 		mJointStates.push_back(joint_state);
