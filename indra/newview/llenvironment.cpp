@@ -1574,10 +1574,16 @@ void LLEnvironment::update(const LLViewerCamera * cam)
         end_shaders = LLViewerShaderMgr::instance()->endShaders();
         for (shaders_iter = LLViewerShaderMgr::instance()->beginShaders(); shaders_iter != end_shaders; ++shaders_iter)
         {
-            if ((shaders_iter->mProgramObject != 0)
-                && (gPipeline.canUseWindLightShaders()
-                || shaders_iter->mShaderGroup == LLGLSLShader::SG_WATER))
-            {
+			if ((shaders_iter->mProgramObject != 0) &&
+				(shaders_iter->mFeatures.atmosphericHelpers
+					|| shaders_iter->mFeatures.calculatesAtmospherics
+					|| shaders_iter->mFeatures.hasAtmospherics
+					|| shaders_iter->mFeatures.hasGamma
+					|| shaders_iter->mFeatures.hasTransport
+					|| shaders_iter->mFeatures.hasWaterFog) &&
+				(gPipeline.canUseWindLightShaders()
+					|| shaders_iter->mShaderGroup == LLGLSLShader::SG_WATER))
+			{
                 shaders_iter->mUniformsDirty = TRUE;
             }
         }
@@ -2215,9 +2221,10 @@ LLEnvironment::EnvironmentInfo::ptr_t LLEnvironment::EnvironmentInfo::extractLeg
         pinfo->mDayHash = pinfo->mDayCycle->getHash();
 
     pinfo->mAltitudes[0] = 0;
-    pinfo->mAltitudes[2] = 10001;
-    pinfo->mAltitudes[3] = 10002;
-    pinfo->mAltitudes[4] = 10003;
+    pinfo->mAltitudes[1] = 10001;
+    pinfo->mAltitudes[2] = 10002;
+    pinfo->mAltitudes[3] = 10003;
+
 
     return pinfo;
 }
