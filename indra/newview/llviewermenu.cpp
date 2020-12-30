@@ -6198,26 +6198,21 @@ void handle_look_at_selection(const LLSD& param)
 
 void handle_zoom_to_object(LLUUID object_id)
 {
-	const F32 PADDING_FACTOR = 2.f;
-
 	LLViewerObject* object = gObjectList.findObject(object_id);
 
 	if (object)
 	{
 		gAgentCamera.setFocusOnAvatar(FALSE, ANIMATE);
 
-		LLBBox bbox = object->getBoundingBoxAgent() ;
-		F32 angle_of_view = llmax(0.1f, LLViewerCamera::getInstance()->getAspect() > 1.f ? LLViewerCamera::getInstance()->getView() * LLViewerCamera::getInstance()->getAspect() : LLViewerCamera::getInstance()->getView());
-		F32 distance = bbox.getExtentLocal().magVec() * PADDING_FACTOR / atan(angle_of_view);
+		LLVector3d object_center_global=object->getPositionGlobal();
 
-		LLVector3 obj_to_cam = LLViewerCamera::getInstance()->getOrigin() - bbox.getCenterAgent();
-		obj_to_cam.normVec();
+		LLVector3d focus_z_offset=LLVector3d(0.0f, 0.0f, 0.6f);
 
+		LLVector3d eye_offset(2.5f, 0.0f, 1.0f);
+		eye_offset = eye_offset*object->getRotationRegion();
 
-			LLVector3d object_center_global = gAgent.getPosGlobalFromAgent(bbox.getCenterAgent());
-
-			gAgentCamera.setCameraPosAndFocusGlobal(object_center_global + LLVector3d(obj_to_cam * distance), 
-											object_center_global, 
+		gAgentCamera.setCameraPosAndFocusGlobal(object_center_global+eye_offset, 
+										object_center_global + focus_z_offset, 
 											object_id );
 	}
 }

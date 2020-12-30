@@ -30,6 +30,7 @@
 #include "llsd.h"
 #include "mean_collision_data.h"
 
+#include "alavataractions.h"
 #include "llavataractions.h"
 #include "llfloaterbump.h"
 #include "llfloaterreg.h"
@@ -255,7 +256,7 @@ void LLFloaterBump::payAvatar()
 
 void LLFloaterBump::zoomInAvatar()
 {
-	handle_zoom_to_object(mItemUUID);
+	ALAvatarActions::zoomIn(mItemUUID);
 }
 
 bool LLFloaterBump::enableMute()

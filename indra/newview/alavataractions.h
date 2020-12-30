@@ -55,14 +55,22 @@ public:
 		E_DATA_UUID
 	};
 
+	// Copy various data types about avatar(name, slurl, uuid) to clipboard
 	static void copyData(const LLUUID& id, ECopyDataType type);
 	static void copyData(const uuid_vec_t& ids, ECopyDataType type);
 	static void copyData(const LLUUID& id, const LLSD& userdata);
 	static void copyData(const uuid_vec_t& id, const LLSD& userdata);
 
+	// Local actions
+	static bool canZoomIn(const LLUUID& idAgent);
+	static void zoomIn(const LLUUID& idAgent);
 	static bool canTeleportTo(const LLUUID& avatar_id);
 	static void teleportTo(const LLUUID& avatar_id);
 
+	// Global actions
+	static void reportAbuse(const LLUUID& idAgent);
+
+	// Parcel actions
 	static bool canFreezeEject(const LLUUID& avatar_id);
 	static bool canFreezeEject(const uuid_vec_t& ids);
 	static void parcelFreeze(const LLUUID& avatar_id);
@@ -70,6 +78,7 @@ public:
 	static void parcelEject(const LLUUID& avatar_id);
 	static void parcelEject(const uuid_vec_t& ids);
 
+	// Estate actions
 	static bool canManageAvatarsEstate(const LLUUID& avatar_id);
 	static bool canManageAvatarsEstate(const uuid_vec_t& ids);
 	static void estateTeleportHome(const LLUUID& avatar_id);
@@ -79,19 +88,9 @@ public:
 	static void estateBan(const LLUUID& avatar_id);
 	static void estateBan(const uuid_vec_t& ids);
 
-	/**
-	 * Kick avatar off grid
-	 */	
+	// God actions
 	static void godKick(const LLUUID& id);
-
-	/**
-	 * God Freeze avatar
-	 */	
 	static void godFreeze(const LLUUID& id);
-
-	/**
-	 * God Unfreeze avatar
-	 */	
 	static void godUnfreeze(const LLUUID& id);
 
 private:

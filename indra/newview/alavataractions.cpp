@@ -37,8 +37,11 @@
 
 #include "llagent.h"
 #include "llfloaterregioninfo.h"
+#include "llfloaterreporter.h"
 #include "llslurl.h"
 #include "llviewercontrol.h"
+#include "llviewermenu.h"
+#include "llviewerobjectlist.h"
 #include "llviewerparcelmgr.h"
 #include "llviewerregion.h"
 #include "llworld.h"
@@ -169,6 +172,18 @@ void ALAvatarActions::copyData(const uuid_vec_t& ids, const LLSD& userdata)
 }
 
 // static
+bool ALAvatarActions::canZoomIn(const LLUUID& idAgent)
+{
+	return gObjectList.findObject(idAgent) != nullptr;
+}
+
+// static
+void ALAvatarActions::zoomIn(const LLUUID& idAgent)
+{
+	handle_zoom_to_object(idAgent);
+}
+
+// static
 bool ALAvatarActions::canTeleportTo(const LLUUID& avatar_id)
 {
 	if (avatar_id.isNull())
@@ -207,6 +222,14 @@ void ALAvatarActions::teleportTo(const LLUUID& avatar_id)
 			gAgent.teleportViaLocation(pos);
 		}
 	}
+}
+
+void ALAvatarActions::reportAbuse(const LLUUID& idAgent)
+{
+	LLAvatarName avName;
+	LLAvatarNameCache::get(idAgent, &avName);
+
+	LLFloaterReporter::showFromAvatar(idAgent, avName.getCompleteName());
 }
 
 // static 

@@ -1177,7 +1177,7 @@ void LLFloaterIMContainer::doToParticipants(const std::string& command, uuid_vec
 		}
 		else if ("zoom_in" == command)
 		{
-			handle_zoom_to_object(userID);
+			ALAvatarActions::zoomIn(userID);
 		}
 		else if ("map" == command)
 		{
@@ -1545,7 +1545,7 @@ bool LLFloaterIMContainer::enableContextMenuItem(const std::string& item, uuid_v
     }
 	else if ("can_zoom_in" == item)
 	{
-		return is_single_select && gObjectList.findObject(single_id);
+		return is_single_select && ALAvatarActions::canZoomIn(single_id);
 	}
     else if ("can_show_on_map" == item)
     {

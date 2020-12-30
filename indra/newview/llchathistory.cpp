@@ -413,7 +413,7 @@ public:
 		}
 		else if (level == "zoom_in")
 		{
-			handle_zoom_to_object(getAvatarId());
+			ALAvatarActions::zoomIn(getAvatarId());
 		}
 		else if (level == "map")
 		{
