@@ -628,8 +628,8 @@ void LLDrawPoolAlpha::renderAlpha(U32 mask, S32 pass)
 		if (group->getSpatialPartition()->mRenderByGroup &&
 		    !group->isDead())
 		{
-            std::vector<LLDrawInfo*> emissives;
-            std::vector<LLDrawInfo*> fullbrights;
+            static std::vector<LLDrawInfo*> emissives;
+            static std::vector<LLDrawInfo*> fullbrights;
 
 			bool is_particle_or_hud_particle = group->getSpatialPartition()->mPartitionType == LLViewerRegion::PARTITION_PARTICLE
 													  || group->getSpatialPartition()->mPartitionType == LLViewerRegion::PARTITION_HUD_PARTICLE;
@@ -849,6 +849,9 @@ void LLDrawPoolAlpha::renderAlpha(U32 mask, S32 pass)
             {
                 current_shader->bind();
             }
+
+			emissives.clear();
+			fullbrights.clear();
 		}        
 	}
 
