@@ -71,14 +71,12 @@ public:
 	static void cleanupGL();
 	static void restoreGL();
 private:
-    void renderFsSky(const LLVector3& camPosLocal, F32 camHeightLocal, LLGLSLShader * shader) const;
 	void renderDome(const LLVector3& camPosLocal, F32 camHeightLocal, LLGLSLShader * shader) const;
 
     void renderSkyHaze(const LLVector3& camPosLocal, F32 camHeightLocal) const;
     void renderSkyClouds(const LLSettingsSky::ptr_t& psky, const LLVector3& camPosLocal, F32 camHeightLocal, LLGLSLShader* cloudshader) const;
 
 	void renderSkyHazeDeferred(const LLSettingsSky::ptr_t& psky, const LLVector3& camPosLocal, F32 camHeightLocal) const;
-    void renderSkyCloudsDeferred(const LLSettingsSky::ptr_t& psky, const LLVector3& camPosLocal, F32 camHeightLocal, LLGLSLShader* cloudshader) const;
 
     void renderStarsDeferred(const LLSettingsSky::ptr_t& psky) const;
 	void renderStars(const LLSettingsSky::ptr_t& psky) const;
