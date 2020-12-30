@@ -111,7 +111,7 @@ void main()
 	vec3 n = normalize((mat*vec4(normal.xyz+position.xyz,1.0)).xyz-pos.xyz);
 #ifdef HAS_NORMAL_MAP
 	vec3 t = normalize((mat*vec4(tangent.xyz+position.xyz,1.0)).xyz-pos.xyz);
-	vec3 b = cross(n, t)*tangent.w;
+	vec3 b = normalize(cross(n, t)*tangent.w);
 	
 	vary_mat0 = vec3(t.x, b.x, n.x);
 	vary_mat1 = vec3(t.y, b.y, n.y);
@@ -123,7 +123,7 @@ vary_normal  = n;
 	vec3 n = normalize(normal_matrix * normal);
 #ifdef HAS_NORMAL_MAP
 	vec3 t = normalize(normal_matrix * tangent.xyz);
-	vec3 b = cross(n,t)*tangent.w;
+	vec3 b = normalize(cross(n,t)*tangent.w);
 	//vec3 t = cross(b,n) * binormal.w;
 	
 	vary_mat0 = vec3(t.x, b.x, n.x);
