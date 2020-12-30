@@ -32,10 +32,10 @@
 #include "m4math.h"
 #include "m3math.h"
 
-class alignas(16) LLMatrix4a
+LL_ALIGN_PREFIX(16) class LLMatrix4a
 {
 public:
-	LLVector4a mMatrix[4];
+	LL_ALIGN_PREFIX(16) LLVector4a mMatrix[4] LL_ALIGN_POSTFIX(16);
 public:
 	enum
 	{
@@ -44,6 +44,26 @@ public:
 		ROW_UP,
 		ROW_TRANS
 	};
+
+	void* operator new(size_t size)
+	{
+		return ll_aligned_malloc_16(size);
+	}
+
+	void* operator new[](size_t size)
+	{
+		return ll_aligned_malloc_16(size);
+	}
+
+	void operator delete(void* ptr)
+	{
+		ll_aligned_free_16(ptr);
+	}
+
+	void operator delete[](void* ptr)
+	{
+		ll_aligned_free_16(ptr);
+	}
 
 	LLMatrix4a() = default;
 	LLMatrix4a(const LLQuad& q1,const LLQuad& q2,const LLQuad& q3,const LLQuad& q4)
@@ -767,7 +787,7 @@ public:
 
 		return _mm_movemask_epi8(_mm_castps_si128(_mm_and_ps(mask1, mask2))) == 0xFFFF;
 	}
-};
+} LL_ALIGN_POSTFIX(16);
 
 #ifndef SHOW_ASSERT
 static_assert(std::is_trivial<LLMatrix4a>::value, "LLMatrix4a must be a trivial type");

@@ -66,11 +66,6 @@ public:
 		mQ = _mm_set_ss(f); 
 	}
 
-	static inline LLSimdScalar getZero()
-	{
-		return _mm_setzero_ps();
-	}
-
 	inline F32 getF32() const;
 
 	inline LLBool32 isApproximatelyEqual(const LLSimdScalar& rhs, F32 tolerance = F_APPROXIMATELY_ZERO) const;

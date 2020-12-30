@@ -94,6 +94,26 @@ public:
 	static void memcpyNonAliased16(F32* __restrict dst, const F32* __restrict src, size_t bytes);
 
 
+	void* operator new(size_t size)
+	{
+		return ll_aligned_malloc_16(size);
+	}
+
+	void* operator new[](size_t size)
+	{
+		return ll_aligned_malloc_16(size);
+	}
+
+	void operator delete(void* ptr)
+	{
+		ll_aligned_free_16(ptr);
+	}
+
+	void operator delete[](void* ptr)
+	{
+		ll_aligned_free_16(ptr);
+	}
+
 	////////////////////////////////////
 	// CONSTRUCTORS 
 	////////////////////////////////////
@@ -380,7 +400,8 @@ inline std::ostream& operator<<(std::ostream& s, const LLVector4a& v)
     return s;
 }
 
-struct alignas(16) LLIVector4a
+LL_ALIGN_PREFIX(16)
+struct LLIVector4a
 {
 	friend struct LLVector4a;
 
@@ -389,6 +410,26 @@ struct alignas(16) LLIVector4a
 	inline LLIVector4a getZero()
 	{
 		return _mm_setzero_si128();
+	}
+
+	void* operator new(size_t size)
+	{
+		return ll_aligned_malloc_16(size);
+	}
+
+	void* operator new[](size_t size)
+	{
+		return ll_aligned_malloc_16(size);
+	}
+
+	void operator delete(void* ptr)
+	{
+		ll_aligned_free_16(ptr);
+	}
+
+	void operator delete[](void* ptr)
+	{
+		ll_aligned_free_16(ptr);
 	}
 
 	////////////////////////////////////
@@ -498,7 +539,7 @@ struct alignas(16) LLIVector4a
 	}
 
 	LLIQuad mQ;
-};
+} LL_ALIGN_POSTFIX(16);
 
 static_assert(std::is_trivial<LLIVector4a>{}, "LLIVector4a must be a trivial type");
 static_assert(std::is_standard_layout<LLIVector4a>{}, "LLIVector4a must be a standard layout type");
