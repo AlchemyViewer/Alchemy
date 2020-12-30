@@ -3121,7 +3121,7 @@ BOOL LLWindowWin32::pasteTextFromClipboard(LLWString &dst)
 				WCHAR *utf16str = (WCHAR*) GlobalLock(h_data);
 				if (utf16str)
 				{
-					dst = utf8str_to_wstring(ll_convert_wide_to_string(utf16str));
+					dst = ll_convert_wide_to_wstring(utf16str);
 					LLWStringUtil::removeWindowsCR(dst);
 					GlobalUnlock(h_data);
 					success = TRUE;
@@ -3983,7 +3983,7 @@ void LLWindowWin32::handleCompositionMessage(const U32 indexes)
 			size = LLWinImm::getCompositionString(himc, GCS_RESULTSTR, data, size);
 			if (size > 0)
 			{
-				result_string = utf8str_to_wstring(ll_convert_wide_to_string(std::wstring(data, size / sizeof(WCHAR))));
+				result_string = ll_convert_wide_to_wstring(std::wstring(data, size / sizeof(WCHAR)));
 			}
 			delete[] data;
 			needs_update = TRUE;
@@ -4000,7 +4000,7 @@ void LLWindowWin32::handleCompositionMessage(const U32 indexes)
 			if (size > 0)
 			{
 				preedit_string_utf16_length = size / sizeof(WCHAR);
-				preedit_string = utf8str_to_wstring(ll_convert_wide_to_string(std::wstring(data, size / sizeof(WCHAR))));
+				preedit_string = ll_convert_wide_to_wstring(std::wstring(data, size / sizeof(WCHAR)));
 			}
 			delete[] data;
 			needs_update = TRUE;

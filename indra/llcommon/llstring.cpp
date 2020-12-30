@@ -782,22 +782,63 @@ std::wstring ll_convert_string_to_wide(std::string_view in, unsigned int code_pa
 
 }
 
+S32 wchart_to_llwchar(const wchar_t* inchars, llwchar* outchar)
+{
+	const wchar_t* base = inchars;
+	wchar_t cur_char = *inchars++;
+	llwchar char32;
+	if ((cur_char >= 0xD800) && (cur_char <= 0xDFFF))
+	{
+		// Surrogates
+		char32 = ((llwchar)(cur_char - 0xD800)) << 10;
+		cur_char = *inchars++;
+		char32 += (llwchar)(cur_char - 0xDC00) + 0x0010000UL;
+	}
+	else
+	{
+		char32 = (llwchar)cur_char;
+	}
+	*outchar = char32;
+	return inchars - base;
+}
+
 LLWString ll_convert_wide_to_wstring(std::wstring_view in)
 {
-    // This function, like its converse, is a placeholder, encapsulating a
-    // guilty little hack: the only "official" way nat has found to convert
-    // between std::wstring (16 bits on Windows) and LLWString (UTF-32) is
-    // by using iconv, which we've avoided so far. It kinda sorta works to
-    // just copy individual characters...
-    // The point is that if/when we DO introduce some more official way to
-    // perform such conversions, we should only have to call it here.
-    return { in.begin(), in.end() };
+	LLWString wout;
+	if (in.empty()) return wout;
+
+	S32 i = 0;
+	// craziness to make gcc happy (llutf16string.c_str() is tweaked on linux):
+	const wchar_t* chars16 = &(*(in.begin()));
+	while (i < in.size())
+	{
+		llwchar cur_char;
+		i += wchart_to_llwchar(chars16 + i, &cur_char);
+		wout += cur_char;
+	}
+	return wout;
 }
 
 std::wstring ll_convert_wstring_to_wide(LLWStringView in)
 {
-    // See comments in ll_convert_wide_to_wstring()
-    return { in.begin(), in.end() };
+	std::wstring out;
+
+	S32 i = 0;
+	while (i < in.size())
+	{
+		U32 cur_char = in[i];
+		if (cur_char > 0xFFFF)
+		{
+			out += (0xD7C0 + (cur_char >> 10));
+			out += (0xDC00 | (cur_char & 0x3FF));
+		}
+		else
+		{
+			out += cur_char;
+		}
+		i++;
+	}
+	return out;
 }
 
 std::string ll_convert_string_to_utf8_string(std::string_view in)
