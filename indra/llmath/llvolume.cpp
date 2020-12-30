@@ -50,7 +50,6 @@
 #include "llvector4a.h"
 #include "llmatrix4a.h"
 #include "lltimer.h"
-#include <meshoptimizer.h>
 
 #define DEBUG_SILHOUETTE_BINORMALS 0
 #define DEBUG_SILHOUETTE_NORMALS 0 // TomY: Use this to display normals using the silhouette
@@ -2370,9 +2369,7 @@ bool LLVolume::unpackVolumeFaces(std::istream& is, S32 size)
 	U32 uzip_result = LLUZipHelper::unzip_llsd(mdl, is, size);
 	if (uzip_result != LLUZipHelper::ZR_OK)
 	{
-#if SHOW_DEBUG
 		LL_DEBUGS("MeshStreaming") << "Failed to unzip LLSD blob for LoD with code " << uzip_result << " , will probably fetch from sim again." << LL_ENDL;
-#endif
 		return false;
 	}
 	
@@ -3766,19 +3763,19 @@ void LLVolume::generateSilhouetteVertices(std::vector<LLVector3> &vertices,
 
 						LLVector4a t;
 						mat.affineTransform(v[v1], t);
-						vertices.emplace_back(LLVector3(t[0], t[1], t[2]));
+						vertices.emplace_back(t[0], t[1], t[2]);
 
 						norm_mat.rotate(n[v1], t);
 
 						t.normalize3fast();
-						normals.emplace_back(LLVector3(t[0], t[1], t[2]));
+						normals.emplace_back(t[0], t[1], t[2]);
 
 						mat.affineTransform(v[v2], t);
-						vertices.emplace_back(LLVector3(t[0], t[1], t[2]));
+						vertices.emplace_back(t[0], t[1], t[2]);
 
 						norm_mat.rotate(n[v2], t);
 						t.normalize3fast();
-						normals.emplace_back(LLVector3(t[0], t[1], t[2]));
+						normals.emplace_back(t[0], t[1], t[2]);
 					}
 				}
 			}
@@ -3950,19 +3947,19 @@ void LLVolume::generateSilhouetteVertices(std::vector<LLVector3> &vertices,
 						
 						LLVector4a t;
 						mat.affineTransform(v[v1], t);
-						vertices.emplace_back(LLVector3(t[0], t[1], t[2]));
+						vertices.emplace_back(t[0], t[1], t[2]);
 
 						norm_mat.rotate(n[v1], t);
 
 						t.normalize3fast();
-						normals.emplace_back(LLVector3(t[0], t[1], t[2]));
+						normals.emplace_back(t[0], t[1], t[2]);
 
 						mat.affineTransform(v[v2], t);
-						vertices.emplace_back(LLVector3(t[0], t[1], t[2]));
+						vertices.emplace_back(t[0], t[1], t[2]);
 						
 						norm_mat.rotate(n[v2], t);
 						t.normalize3fast();
-						normals.emplace_back(LLVector3(t[0], t[1], t[2]));
+						normals.emplace_back(t[0], t[1], t[2]);
 					}
 				}		
 			}
@@ -4658,10 +4655,6 @@ LLVolumeFace::LLVolumeFace() :
 	mTexCoords(NULL),
 	mIndices(NULL),
 	mWeights(NULL),
-#if USE_SEPARATE_JOINT_INDICES_AND_WEIGHTS
-    mJustWeights(NULL),
-    mJointIndices(NULL),
-#endif
     mWeightsScrubbed(FALSE),
 	mOctree(NULL),
 	mOptimized(FALSE)
@@ -4688,10 +4681,6 @@ LLVolumeFace::LLVolumeFace(const LLVolumeFace& src)
 	mTexCoords(NULL),
 	mIndices(NULL),
 	mWeights(NULL),
-#if USE_SEPARATE_JOINT_INDICES_AND_WEIGHTS
-    mJustWeights(NULL),
-    mJointIndices(NULL),
-#endif
     mWeightsScrubbed(FALSE),
 	mOctree(NULL),
 	mOptimized(FALSE)
@@ -5229,113 +5218,168 @@ bool LLVolumeFace::cacheOptimize()
 	llassert(!mOptimized);
 	mOptimized = TRUE;
 
+	LLVCacheLRU cache;
+	
 	if (mNumVertices < 3 || mNumIndices < 3)
 	{ //nothing to do
 		return true;
 	}
 
-	struct buffer_data_t {
-		void** dst;		// Double pointer to volume attribute data. Avoids fixup after reallocating buffers on resize.
-		void* scratch;	// Scratch buffer. Allocated with vert count from meshopt_generateVertexRemapMulti
-		size_t stride;	// Stride between continguous attributes
-	};
-	std::vector< meshopt_Stream > streams;	// Contains data necessary for meshopt_generateVertexRemapMulti call
-	std::vector< buffer_data_t > buffers;	// Contains data necessary for meshopt_remapVertexBuffer calls.
+	//mapping of vertices to triangles and indices
+	std::vector<LLVCacheVertexData> vertex_data;
 
-	{
-		static struct { size_t offs; size_t size; size_t stride; } ref_streams[] = {
-			{ offsetof(LLVolumeFace, mPositions),	sizeof(float) * 3, sizeof(mPositions[0]) },
-			{ offsetof(LLVolumeFace, mNormals),		sizeof(float) * 3, sizeof(mNormals[0]) },	// Subsection of mPositions allocation
-			{ offsetof(LLVolumeFace, mTexCoords),	sizeof(float) * 2, sizeof(mTexCoords[0]) },	// Subsection of mPositions allocation
-			{ offsetof(LLVolumeFace, mWeights),		sizeof(float) * 3, sizeof(mWeights[0]) },
-			{ offsetof(LLVolumeFace, mTangents),	sizeof(float) * 3, sizeof(mTangents[0]) },
-		};
+	//mapping of triangles do vertices
+	std::vector<LLVCacheTriangleData> triangle_data;
 
-		for (size_t i = 0; i < sizeof(ref_streams) / sizeof(ref_streams[0]); ++i)
-		{
-			void** ptr = reinterpret_cast<void**>((char*)this + ref_streams[i].offs);
-			if (*ptr)
-			{
-				streams.push_back({ *ptr, ref_streams[i].size, ref_streams[i].stride });
-				buffers.push_back({ ptr, nullptr, ref_streams[i].stride });
-			}
-		}
-	}
-
-	std::vector<unsigned int> remap(mNumIndices);
-	std::vector<U16> indices(mNumIndices);
 	try
 	{
-		remap.reserve(mNumIndices);
-		indices.reserve(mNumIndices);
+		triangle_data.resize(mNumIndices / 3);
+		vertex_data.resize(mNumVertices);
 	}
 	catch (const std::bad_alloc&)
 	{
+		LL_WARNS("LLVOLUME") << "Resize failed" << LL_ENDL;
 		return false;
 	}
 
-	size_t total_vertices = meshopt_generateVertexRemapMulti(remap.data(), mIndices, mNumIndices, mNumVertices, streams.data(), streams.size());
-	meshopt_remapIndexBuffer(indices.data(), mIndices, mNumIndices, remap.data());
-	bool failed = false;
-	for (auto& entry : buffers)
-	{
-		// Create scratch buffer for attribute data. Avoids extra allocs in meshopt_remapVertexBuffer calls
-		void* buf_tmp = ll_aligned_malloc_16(entry.stride * total_vertices);
-		if (!buf_tmp)
-		{
-			failed = true;
-			break;
-		}
-		entry.scratch = buf_tmp;
-		// Write to scratch buffer
-		meshopt_remapVertexBuffer(entry.scratch, *entry.dst, mNumVertices, entry.stride, remap.data());
+	for (S32 i = 0; i < mNumIndices; i++)
+	{ //populate vertex data and triangle data arrays
+		U16 idx = mIndices[i];
+		U32 tri_idx = i/3;
+
+		vertex_data[idx].mTriangles.push_back(&(triangle_data[tri_idx]));
+		vertex_data[idx].mIdx = idx;
+		triangle_data[tri_idx].mVertex[i%3] = &(vertex_data[idx]);
 	}
-	if (failed)
+
+	std::vector<size_t> v;
+	for (size_t j = 0; j < triangle_data.size(); ++j)
+		v.push_back(j);
+	
+	/*F32 pre_acmr = 1.f;
+	//measure cache misses from before rebuild
 	{
-		for (auto& entry : buffers)
+		LLVCacheFIFO test_cache;
+		for (U32 i = 0; i < mNumIndices; ++i)
 		{
-			// Release scratch buffer
-			ll_aligned_free_16(entry.scratch);
+			test_cache.addVertex(&vertex_data[mIndices[i]]);
 		}
+
+		for (U32 i = 0; i < mNumVertices; i++)
+		{
+			vertex_data[i].mCacheTag = -1;
+		}
+
+		pre_acmr = (F32) test_cache.mMisses/(mNumIndices/3);
+	}*/
+
+	for (S32 i = 0; i < mNumVertices; i++)
+	{ //initialize score values (no cache -- might try a fifo cache here)
+		LLVCacheVertexData& data = vertex_data[i];
+
+		data.mScore = find_vertex_score(data);
+		data.mActiveTriangles = data.mTriangles.size();
+
+		for (U32 j = 0; j < data.mActiveTriangles; ++j)
+		{
+			data.mTriangles[j]->mScore += data.mScore;
+		}
+	}
+
+	//sort triangle data by score
+	std::sort( v.begin(), v.end(),
+			   [&triangle_data](size_t rhs, size_t lhs )
+			   { return triangle_data[rhs].mScore > triangle_data[lhs].mScore; }
+			   );
+		
+	std::vector<U16> new_indices;
+
+	LLVCacheTriangleData* tri;
+
+	//prime pump by adding first triangle to cache;
+	tri = &(triangle_data[v[0]]);
+	
+	cache.addTriangle(tri);
+	new_indices.push_back(tri->mVertex[0]->mIdx);
+	new_indices.push_back(tri->mVertex[1]->mIdx);
+	new_indices.push_back(tri->mVertex[2]->mIdx);
+	tri->complete();
+
+	U32 breaks = 0;
+	for (S32 i = 1; i < mNumIndices/3; ++i)
+	{
+		cache.updateScores();
+		tri = cache.mBestTriangle;
+		if (!tri)
+		{
+			breaks++;
+			for (size_t j = 0; j < triangle_data.size(); ++j)
+			{
+				if (triangle_data[v[j]].mActive)
+				{
+					tri = &(triangle_data[v[j]]);
+					break;
+				}
+			}
+		}	
+		
+		cache.addTriangle(tri);
+		new_indices.push_back(tri->mVertex[0]->mIdx);
+		new_indices.push_back(tri->mVertex[1]->mIdx);
+		new_indices.push_back(tri->mVertex[2]->mIdx);
+		tri->complete();
+	}
+
+	for (S32 i = 0; i < mNumIndices; ++i)
+	{
+		mIndices[i] = new_indices[i];
+	}
+
+	/*F32 post_acmr = 1.f;
+	//measure cache misses from after rebuild
+	{
+		LLVCacheFIFO test_cache;
+		for (U32 i = 0; i < mNumVertices; i++)
+		{
+			vertex_data[i].mCacheTag = -1;
+		}
+
+		for (U32 i = 0; i < mNumIndices; ++i)
+		{
+			test_cache.addVertex(&vertex_data[mIndices[i]]);
+		}
+		
+		post_acmr = (F32) test_cache.mMisses/(mNumIndices/3);
+	}*/
+
+	//optimize for pre-TnL cache
+	
+	//allocate space for new buffer
+	S32 num_verts = mNumVertices;
+
+	LLVector4a* old_pos = mPositions;
+	LLVector4a* old_norm = old_pos + num_verts;
+	LLVector2* old_tc = (LLVector2*)(old_norm + num_verts);
+	mPositions = nullptr;
+	if (old_pos)
+	{
+		if (!allocateVertices(num_verts))
+		{
+			return false;
+		}
+	}
+	else
+	{
+		LL_WARNS("LLVOLUME") << "Posititions vector was null" << LL_ENDL;
 		return false;
 	}
 
-	if (mNumAllocatedVertices != total_vertices)
+	LLVector4a* old_wght = mWeights;
+	mWeights = nullptr;
+	if (old_wght)
 	{
-		// New allocations will be transparently accessable through dereffing dest_buffers.
-		if (!allocateVertices(total_vertices))
+		if(!allocateWeights(num_verts))
 		{
-			for (auto& entry : buffers)
-			{
-				// Release scratch buffer
-				ll_aligned_free_16(entry.scratch);
-			}
-			allocateVertices(0);
-			allocateWeights(0);
-			allocateTangents(0);
-			return false;
-		}
-
-		if (mWeights && !allocateWeights(total_vertices))
-		{
-			for (auto& entry : buffers)
-			{
-				// Release scratch buffer
-				ll_aligned_free_16(entry.scratch);
-			}
-			allocateVertices(0);
-			allocateWeights(0);
-			allocateTangents(0);
-			return false;
-		}
-
-		if (mTangents && !allocateTangents(total_vertices))
-		{
-			for (auto& entry : buffers)
-			{
-				// Release scratch buffer
-				ll_aligned_free_16(entry.scratch);
-			}
 			allocateVertices(0);
 			allocateWeights(0);
 			allocateTangents(0);
@@ -5343,18 +5387,72 @@ bool LLVolumeFace::cacheOptimize()
 		}
 	}
 
-	meshopt_optimizeVertexCache(mIndices, indices.data(), mNumIndices, total_vertices);
-	meshopt_optimizeOverdraw(indices.data(), mIndices, mNumIndices, (float*)buffers[0].scratch, total_vertices, buffers[0].stride, 1.05f);
-	meshopt_optimizeVertexFetchRemap(remap.data(), indices.data(), mNumIndices, total_vertices);
-	meshopt_remapIndexBuffer(mIndices, indices.data(), mNumIndices, remap.data());
-	for (auto& entry : buffers)
+	LLVector4a* old_tangent = mTangents;
+	mTangents = nullptr;
+	if (old_tangent)
 	{
-		// Write to llvolume attribute buffer
-		meshopt_remapVertexBuffer(*entry.dst, entry.scratch, total_vertices, entry.stride, remap.data());
-		// Release scratch buffer
-		ll_aligned_free_16(entry.scratch);
+		if (!allocateTangents(num_verts))
+		{
+			allocateVertices(0);
+			allocateWeights(0);
+			allocateTangents(0);
+			return false;
+		}
 	}
-	mNumVertices = total_vertices;
+
+	//allocate mapping of old indices to new indices
+	std::vector<S32> new_idx;
+
+	try
+	{
+		new_idx.resize(mNumVertices, -1);
+	}
+	catch (const std::bad_alloc&)
+	{
+		allocateVertices(0);
+		allocateWeights(0);
+		allocateTangents(0);
+		LL_WARNS("LLVOLUME") << "Resize failed: " << mNumVertices << LL_ENDL;
+		return false;
+	}
+
+	S32 cur_idx = 0;
+	for (S32 i = 0; i < mNumIndices; ++i)
+	{
+		U16 idx = mIndices[i];
+		if (new_idx[idx] == -1)
+		{ //this vertex hasn't been added yet
+			new_idx[idx] = cur_idx;
+
+			//copy vertex data
+			mPositions[cur_idx] = old_pos[idx];
+			mNormals[cur_idx] = old_norm[idx];
+			mTexCoords[cur_idx] = old_tc[idx];
+			if (mWeights)
+			{
+				mWeights[cur_idx] = old_wght[idx];
+			}
+			if (mTangents)
+			{
+				mTangents[cur_idx] = old_tangent[idx];
+			}
+
+			cur_idx++;
+		}
+	}
+
+	for (S32 i = 0; i < mNumIndices; ++i)
+	{
+		mIndices[i] = new_idx[mIndices[i]];
+	}
+
+	ll_aligned_free<64>(old_pos);
+	// DO NOT free mNormals and mTexCoords as they are part of mPositions buffer
+	ll_aligned_free_16(old_wght);
+	ll_aligned_free_16(old_tangent);
+
+	//std::string result = llformat("ACMR pre/post: %.3f/%.3f  --  %d triangles %d breaks", pre_acmr, post_acmr, mNumIndices/3, breaks);
+	//LL_INFOS() << result << LL_ENDL;
 
 	return true;
 }
