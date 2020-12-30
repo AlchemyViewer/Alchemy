@@ -983,7 +983,7 @@ class LLVolume : public LLRefCount
 	friend class LLVolumeLODGroup;
 
 protected:
-	~LLVolume(); // use unref
+	~LLVolume() override; // use unref
 
 public:
 	typedef std::vector<LLVolumeFace> face_list_t;
@@ -1085,10 +1085,10 @@ protected:
 	BOOL generate();
 	void createVolumeFaces();
 public:
-	virtual bool unpackVolumeFaces(std::istream& is, S32 size);
+	bool unpackVolumeFaces(std::istream& is, S32 size);
 
-	virtual void setMeshAssetLoaded(BOOL loaded);
-	virtual BOOL isMeshAssetLoaded();
+	void setMeshAssetLoaded(BOOL loaded);
+	BOOL isMeshAssetLoaded();
 
  protected:
 	BOOL mUnique;
