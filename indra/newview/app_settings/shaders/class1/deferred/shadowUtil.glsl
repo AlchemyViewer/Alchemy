@@ -70,8 +70,7 @@ float pcfSpotShadow(sampler2DShadow shadowMap, vec4 stc, float bias_scale, vec2 
     float cs = shadow2D(shadowMap, stc.xyz).x;
     float shadow = cs;
 
-    vec2 off = 1.0/proj_shadow_res;
-    off.y *= 1.5;
+    vec2 off = vec2(1.0, 1.5) / proj_shadow_res.xy;
     
     shadow += shadow2D(shadowMap, stc.xyz+vec3(off.x*2.0, off.y, 0.0)).x;
     shadow += shadow2D(shadowMap, stc.xyz+vec3(off.x, -off.y, 0.0)).x;
