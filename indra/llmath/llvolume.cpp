@@ -3688,7 +3688,7 @@ S32 LLVolume::getNumTriangles(S32* vcount) const
 	U32 triangle_count = 0;
 	U32 vertex_count = 0;
 
-	for (S32 i = 0; i < getNumVolumeFaces(); ++i)
+	for (S32 i = 0, end = getNumVolumeFaces(); i < end; ++i)
 	{
 		const LLVolumeFace& face = getVolumeFace(i);
 		triangle_count += face.mNumIndices/3;
@@ -4546,7 +4546,7 @@ LLFaceID LLVolume::generateFaceMask()
 BOOL LLVolume::isFaceMaskValid(LLFaceID face_mask)
 {
 	LLFaceID test_mask = 0;
-	for(S32 i = 0; i < getNumFaces(); i++)
+	for(S32 i = 0, i_end = getNumFaces(); i < i_end; i++)
 	{
 		test_mask |= mProfilep->mFaces[i].mFaceID;
 	}

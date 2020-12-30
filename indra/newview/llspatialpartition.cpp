@@ -953,7 +953,7 @@ void LLSpatialGroup::destroyGL(bool keep_occlusion)
 		{
 			continue;
 		}
-		for (S32 j = 0; j < drawable->getNumFaces(); j++)
+		for (S32 j = 0, j_end = drawable->getNumFaces(); j < j_end; ++j)
 		{
 			LLFace* facep = drawable->getFace(j);
 			if (facep)
@@ -1608,7 +1608,7 @@ void pushVerts(LLFace* face, U32 mask)
 
 void pushVerts(LLDrawable* drawable, U32 mask)
 {
-	for (S32 i = 0; i < drawable->getNumFaces(); ++i)
+	for (S32 i = 0, i_end = drawable->getNumFaces(); i < i_end; ++i)
 	{
 		pushVerts(drawable->getFace(i), mask);
 	}
@@ -1746,7 +1746,7 @@ void renderOctree(LLSpatialGroup* group)
 					gGL.translatef(trans.mV[0], trans.mV[1], trans.mV[2]);
 				}
 				
-				for (S32 j = 0; j < drawable->getNumFaces(); j++)
+				for (S32 j = 0, j_end = drawable->getNumFaces(); j < j_end; ++j)
 				{
 					LLFace* face = drawable->getFace(j);
 					if (face && face->getVertexBuffer())

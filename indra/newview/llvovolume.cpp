@@ -522,7 +522,9 @@ U32 LLVOVolume::processUpdateMessage(LLMessageSystem *mesgsys,
 			}
 		}
 	}
-	if (retval & (MEDIA_URL_REMOVED | MEDIA_URL_ADDED | MEDIA_URL_UPDATED | MEDIA_FLAGS_CHANGED)) 
+
+	// OS returns a zero. Don't request MediaData where MOAP isn't supported
+	if (retval != 0 && retval & (MEDIA_URL_REMOVED | MEDIA_URL_ADDED | MEDIA_URL_UPDATED | MEDIA_FLAGS_CHANGED)) 
 	{
 		// If only the media URL changed, and it isn't a media version URL,
 		// ignore it
@@ -531,7 +533,7 @@ U32 LLVOVolume::processUpdateMessage(LLMessageSystem *mesgsys,
 				 ! LLTextureEntry::isMediaVersionString(mMedia->mMediaURL) ) )
 		{
 			// If the media changed at all, request new media data
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 			LL_DEBUGS("MediaOnAPrim") << "Media update: " << getID() << ": retval=" << retval << " Media URL: " <<
                 ((mMedia) ?  mMedia->mMediaURL : std::string("")) << LL_ENDL;
 #endif
@@ -937,7 +939,7 @@ LLFace* LLVOVolume::addFace(S32 f)
 {
 	const LLTextureEntry* te = getTE(f);
 	LLViewerTexture* imagep = getTEImage(f);
-	if (te->getMaterialParams().notNull())
+	if (te && te->getMaterialParams().notNull())
 	{
 		LLViewerTexture* normalp = getTENormalMap(f);
 		LLViewerTexture* specularp = getTESpecularMap(f);
@@ -1583,8 +1585,12 @@ BOOL LLVOVolume::setDrawableParent(LLDrawable* parentp)
 void LLVOVolume::updateFaceFlags()
 {
 	// There's no guarantee that getVolume()->getNumFaces() == mDrawable->getNumFaces()
-	for (S32 i = 0; i < getVolume()->getNumFaces() && i < mDrawable->getNumFaces(); i++)
+	for (S32 i = 0, num_vol_face = getVolume()->getNumFaces(), num_face = mDrawable->getNumFaces(), num_te = getNumTEs();
+		i < num_vol_face&& i < num_face; ++i)
 	{
+		if (num_face <= i || num_te <= i)
+			return;
+
 		LLFace *face = mDrawable->getFace(i);
 		if (face)
 		{
@@ -1702,17 +1708,20 @@ BOOL LLVOVolume::genBBoxes(BOOL force_global)
 
     bool any_valid_boxes = false;
     
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
     if (getRiggedVolume())
     {
         LL_DEBUGS("RiggedBox") << "rebuilding box, volume face count " << getVolume()->getNumVolumeFaces() << " drawable face count " << mDrawable->getNumFaces() << LL_ENDL;
     }
 #endif
     // There's no guarantee that getVolume()->getNumFaces() == mDrawable->getNumFaces()
-	for (S32 i = 0;
-		 i < getVolume()->getNumVolumeFaces() && i < mDrawable->getNumFaces() && i < getNumTEs();
-		 i++)
+	for (S32 i = 0, num_vol_face = getVolume()->getNumVolumeFaces(), num_face = mDrawable->getNumFaces(), num_te = getNumTEs();
+		 i < num_vol_face && i < num_face&& i < num_te;
+		 ++i)
 	{
+		if(num_face <= i )
+			break;
+
 		LLFace *face = mDrawable->getFace(i);
 		if (!face)
 		{
@@ -1731,7 +1740,7 @@ BOOL LLVOVolume::genBBoxes(BOOL force_global)
         }
 		if (rebuild)
 		{
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
             if (getRiggedVolume())
             {
                 LL_DEBUGS("RiggedBox") << "rebuilding box, face " << i << " extents " << face->mExtents[0] << ", " << face->mExtents[1] << LL_ENDL;
@@ -1755,7 +1764,7 @@ BOOL LLVOVolume::genBBoxes(BOOL force_global)
     {
         if (rebuild)
         {
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
             if (getRiggedVolume())
             {
                 LL_DEBUGS("RiggedBox") << "rebuilding got extents " << min << ", " << max << LL_ENDL;
@@ -1770,7 +1779,7 @@ BOOL LLVOVolume::genBBoxes(BOOL force_global)
         updateRadius();
         mDrawable->movePartition();
     }
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
     else
     {
         LL_DEBUGS("RiggedBox") << "genBBoxes failed to find any valid face boxes" << LL_ENDL;
@@ -3803,7 +3812,7 @@ void LLVOVolume::updateRiggingInfo()
             {
                 // Rigging info may need update
                 mJointRiggingInfoTab.clear();
-                for (S32 f = 0; f < volume->getNumVolumeFaces(); ++f)
+                for (S32 f = 0, f_end = volume->getNumVolumeFaces(); f < f_end; ++f)
                 {
                     LLVolumeFace& vol_face = volume->getVolumeFace(f);
                     LLSkinningUtil::updateRiggingInfo(skin, avatar, vol_face);
@@ -4422,7 +4431,7 @@ F32 LLVOVolume::getBinRadius()
 
 	if (!isHUDAttachment())
 	{
-		for (S32 i = 0; i < mDrawable->getNumFaces(); i++)
+		for (S32 i = 0, i_end = mDrawable->getNumFaces(); i < i_end; ++i)
 		{
 			LLFace* face = mDrawable->getFace(i);
 			if (!face) continue;
@@ -4580,7 +4589,6 @@ LLVector3 LLVOVolume::volumeDirectionToAgent(const LLVector3& dir) const
 
 BOOL LLVOVolume::lineSegmentIntersect(const LLVector4a& start, const LLVector4a& end, S32 face, BOOL pick_transparent, BOOL pick_rigged, S32 *face_hitp,
 									  LLVector4a* intersection,LLVector2* tex_coord, LLVector4a* normal, LLVector4a* tangent)
-	
 {
 	if (!mbCanSelect 
 		|| mDrawable->isDead() 
@@ -4845,12 +4853,13 @@ static LLTrace::BlockTimerStatHandle FTM_RIGGED_OCTREE("Octree");
 void LLRiggedVolume::update(const LLMeshSkinInfo* skin, LLVOAvatar* avatar, const LLVolume* volume)
 {
 	bool copy = false;
-	if (volume->getNumVolumeFaces() != getNumVolumeFaces())
+	S32 vol_num_faces = volume->getNumVolumeFaces();
+	if (vol_num_faces != getNumVolumeFaces())
 	{ 
 		copy = true;
 	}
 
-	for (S32 i = 0; i < volume->getNumVolumeFaces() && !copy; ++i)
+	for (S32 i = 0; i < vol_num_faces && !copy; ++i)
 	{
 		const LLVolumeFace& src_face = volume->getVolumeFace(i);
 		const LLVolumeFace& dst_face = getVolumeFace(i);
@@ -4890,7 +4899,7 @@ void LLRiggedVolume::update(const LLMeshSkinInfo* skin, LLVOAvatar* avatar, cons
     S32 rigged_vert_count = 0;
     S32 rigged_face_count = 0;
     LLVector4a box_min, box_max;
-	for (S32 i = 0; i < volume->getNumVolumeFaces(); ++i)
+	for (S32 i = 0; i < vol_num_faces; ++i)
 	{
 		const LLVolumeFace& vol_face = volume->getVolumeFace(i);
 		
@@ -5641,7 +5650,7 @@ void LLVolumeGeometryManager::rebuildGeom(LLSpatialGroup* group)
 			bool any_rigged_face = false;
 
 			//for each face
-			for (S32 i = 0; i < drawablep->getNumFaces(); i++)
+			for (S32 i = 0, i_end = drawablep->getNumFaces(); i < i_end; ++i)
 			{
 				LLFace* facep = drawablep->getFace(i);
 				if (!facep)
@@ -6160,7 +6169,7 @@ void LLVolumeGeometryManager::rebuildMesh(LLSpatialGroup* group)
 				}
 
 				LLVolume* volume = vobj->getVolume();
-				for (S32 i = 0; i < drawablep->getNumFaces(); ++i)
+				for (S32 i = 0, i_end = drawablep->getNumFaces(); i < i_end; ++i)
 				{
 					LLFace* face = drawablep->getFace(i);
 					if (face)
@@ -6223,7 +6232,7 @@ void LLVolumeGeometryManager::rebuildMesh(LLSpatialGroup* group)
 				{
 					continue;
 				}
-				for (S32 i = 0; i < drawablep->getNumFaces(); ++i)
+				for (S32 i = 0, i_end = drawablep->getNumFaces(); i < i_end; ++i)
 				{
 					LLFace* face = drawablep->getFace(i);
 					if (face)
@@ -6894,10 +6903,11 @@ U32 LLVolumeGeometryManager::genDrawInfo(LLSpatialGroup* group, U32 mask, LLFace
 		}
 	}
 
-	group->mBufferMap[mask].clear();
-	for (LLSpatialGroup::buffer_texture_map_t::iterator i = buffer_map[mask].begin(); i != buffer_map[mask].end(); ++i)
+	auto& group_buffer_map = group->mBufferMap[mask];
+	group_buffer_map.clear();
+	for (const auto& buffer_pair : buffer_map[mask])
 	{
-		group->mBufferMap[mask][i->first] = i->second;
+		group_buffer_map[buffer_pair.first] = buffer_pair.second;
 	}
 
 	return geometryBytes;
@@ -6928,7 +6938,7 @@ void LLGeometryManager::addGeometryCount(LLSpatialGroup* group, U32 &vertex_coun
 		}
 
 		//for each face
-		for (S32 i = 0; i < drawablep->getNumFaces(); i++)
+		for (S32 i = 0, i_end = drawablep->getNumFaces(); i < i_end; ++i)
 		{
 			//sum up face verts and indices
 			drawablep->updateFaceSize(i);

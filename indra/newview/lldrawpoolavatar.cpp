@@ -1897,7 +1897,7 @@ void LLDrawPoolAvatar::updateRiggedFaceVertexBuffer(
 		if (drawable && drawable->isState(LLDrawable::REBUILD_ALL))
 		{
             //rebuild EVERY face in the drawable, not just this one, to avoid missing drawable wide rebuild issues
-			for (S32 i = 0; i < drawable->getNumFaces(); ++i)
+			for (S32 i = 0, i_end = drawable->getNumFaces(); i < i_end; ++i)
 			{
 				LLFace* facep = drawable->getFace(i);
 				U32 face_data_mask = facep->getRiggedVertexBufferDataMask();
@@ -2029,10 +2029,8 @@ void LLDrawPoolAvatar::renderRigged(LLVOAvatar* avatar, U32 type, bool glow)
 
 	stop_glerror();
 
-	for (U32 i = 0; i < mRiggedFace[type].size(); ++i)
+	for (LLFace* face : mRiggedFace[type])
 	{
-		LLFace* face = mRiggedFace[type][i];
-
         S32 offset = face->getIndicesStart();
 		U32 count = face->getIndicesCount();
 
@@ -2345,9 +2343,8 @@ void LLDrawPoolAvatar::updateRiggedVertexBuffers(LLVOAvatar* avatar)
 	//update rigged vertex buffers
 	for (U32 type = 0; type < NUM_RIGGED_PASSES; ++type)
 	{
-		for (U32 i = 0; i < mRiggedFace[type].size(); ++i)
+		for (LLFace* face : mRiggedFace[type])
 		{
-			LLFace* face = mRiggedFace[type][i];
 			LLDrawable* drawable = face->getDrawable();
 			if (!drawable)
 			{
