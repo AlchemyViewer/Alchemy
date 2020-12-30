@@ -78,8 +78,8 @@ private:
 
 	void renderSkyHazeDeferred(const LLSettingsSky::ptr_t& psky, const LLVector3& camPosLocal, F32 camHeightLocal) const;
 
-    void renderStarsDeferred(const LLSettingsSky::ptr_t& psky) const;
-	void renderStars(const LLSettingsSky::ptr_t& psky) const;
+    void renderStarsDeferred(const LLSettingsSky::ptr_t& psky, const LLVector3& camPosLocal) const;
+	void renderStars(const LLSettingsSky::ptr_t& psky, const LLVector3& camPosLocal) const;
 	void renderHeavenlyBodies(const LLSettingsSky::ptr_t& psky, const LLVector3& camPosLocal);
 };
 

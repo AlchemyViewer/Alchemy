@@ -215,7 +215,7 @@ void LLDrawPoolWLSky::renderSkyHaze(const LLVector3& camPosLocal, F32 camHeightL
     }
 }
 
-void LLDrawPoolWLSky::renderStars(const LLSettingsSky::ptr_t& psky) const
+void LLDrawPoolWLSky::renderStars(const LLSettingsSky::ptr_t& psky, const LLVector3& camPosLocal) const
 {
     LLGLSPipelineBlendSkyBox gls_skybox(true, false);
 	
@@ -257,7 +257,7 @@ void LLDrawPoolWLSky::renderStars(const LLSettingsSky::ptr_t& psky) const
     }
 
 	gGL.pushMatrix();
-	gGL.rotatef(gFrameTimeSeconds*0.01f, 0.f, 0.f, 1.f);
+    gGL.translatef(camPosLocal.mV[0], camPosLocal.mV[1], camPosLocal.mV[2]);
 	if (LLGLSLShader::sNoFixedFunction)
 	{
 		gCustomAlphaProgram.bind();
@@ -287,7 +287,7 @@ void LLDrawPoolWLSky::renderStars(const LLSettingsSky::ptr_t& psky) const
 	}
 }
 
-void LLDrawPoolWLSky::renderStarsDeferred(const LLSettingsSky::ptr_t& psky) const
+void LLDrawPoolWLSky::renderStarsDeferred(const LLSettingsSky::ptr_t& psky, const LLVector3& camPosLocal) const
 {
 	LLGLSPipelineBlendSkyBox gls_sky(true, false);
 
@@ -304,7 +304,7 @@ void LLDrawPoolWLSky::renderStarsDeferred(const LLSettingsSky::ptr_t& psky) cons
 		return;
 	}
 
-	gDeferredStarProgram.bind();	
+
 
     LLViewerTexture* tex_a = gSky.mVOSkyp->getBloomTex();
     LLViewerTexture* tex_b = gSky.mVOSkyp->getBloomTexNext();
@@ -330,6 +330,11 @@ void LLDrawPoolWLSky::renderStarsDeferred(const LLSettingsSky::ptr_t& psky) cons
         gGL.getTexUnit(1)->bind(tex_b);
     }
 
+    gGL.pushMatrix();
+    gGL.translatef(camPosLocal.mV[0], camPosLocal.mV[1], camPosLocal.mV[2]);
+
+    gDeferredStarProgram.bind();
+
     gDeferredStarProgram.uniform1f(LLShaderMgr::BLEND_FACTOR, blend_factor);
 
     if (LLPipeline::sReflectionRender)
@@ -346,6 +351,8 @@ void LLDrawPoolWLSky::renderStarsDeferred(const LLSettingsSky::ptr_t& psky) cons
 
     gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
     gGL.getTexUnit(1)->unbind(LLTexUnit::TT_TEXTURE);
+
+    gGL.popMatrix();
 
     gDeferredStarProgram.unbind();
 }
@@ -539,7 +546,7 @@ void LLDrawPoolWLSky::renderDeferred(S32 pass)
         const LLSettingsSky::ptr_t& psky = environment.getCurrentSky();
 
         renderSkyHazeDeferred(psky, origin, camHeightLocal);
-        renderStarsDeferred(psky);
+        renderStarsDeferred(psky, origin);
         renderHeavenlyBodies(psky, origin);
         renderSkyClouds(psky, origin, camHeightLocal, cloud_shader);
     }
@@ -562,7 +569,7 @@ void LLDrawPoolWLSky::render(S32 pass)
     const LLSettingsSky::ptr_t& psky = environment.getCurrentSky();
     
 	renderSkyHaze(origin, camHeightLocal);    
-    renderStars(psky);
+    renderStars(psky, origin);
     renderHeavenlyBodies(psky, origin);
 	renderSkyClouds(psky, origin, camHeightLocal, cloud_shader);
 
