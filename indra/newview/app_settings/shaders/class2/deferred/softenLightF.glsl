@@ -88,6 +88,10 @@ void main()
     da                = pow(da, light_gamma);
 
     vec4 diffuse = texture2DRect(diffuseRect, tc);
+
+    //convert to gamma space
+    diffuse.rgb = linear_to_srgb(diffuse.rgb);
+
     vec4 spec    = texture2DRect(specularRect, vary_fragcoord.xy);
 
     vec2 scol_ambocc = texture2DRect(lightMap, vary_fragcoord.xy).rg;

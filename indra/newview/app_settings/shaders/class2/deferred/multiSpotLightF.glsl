@@ -36,9 +36,6 @@ out vec4 frag_color;
 
 uniform sampler2DRect diffuseRect;
 uniform sampler2DRect specularRect;
-uniform sampler2DRect depthMap;
-uniform sampler2DRect normalMap;
-uniform samplerCube environmentMap;
 uniform sampler2DRect lightMap;
 uniform sampler2D noiseMap;
 uniform sampler2D projectionMap;
@@ -187,11 +184,6 @@ void main()
     float da = dot(norm, lv);
         
     vec3 diff_tex = texture2DRect(diffuseRect, frag.xy).rgb;
-    // SL-12005 Projector light pops as we get closer, more objectionable than being in wrong color space.
-    //          We can't switch to linear here unless we do it everywhere*
-    // *gbuffer IS sRGB, convert to linear since this shader outputs linear
-    diff_tex.rgb = srgb_to_linear(diff_tex.rgb);
- 
     vec4 spec = texture2DRect(specularRect, frag.xy);
 
     vec3 dlit = vec3(0, 0, 0);
