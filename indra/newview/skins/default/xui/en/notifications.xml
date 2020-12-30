@@ -12061,7 +12061,7 @@ The LSL script to create this particle system has been copied to your clipboard.
     persist="true"
     log_to_im="true"
     type="notify">
-    Your privilege to find [NAME]&apos;s map location has been revoked.
+Your privilege to find [NAME]&apos;s map location has been revoked.
   </notification>
   <notification
     icon="alertmodal.tga"
@@ -12069,7 +12069,24 @@ The LSL script to create this particle system has been copied to your clipboard.
     persist="true"
     log_to_im="true"
     type="notify">
-    [NAME] has given you permission to find their location on the map.
+[NAME] has given you permission to find their location on the map.
+  </notification>
+  
+    <notification
+    icon="notifytip.tga"
+    name="AlwaysRunEnabled"
+    persist="true"
+    log_to_chat="true"
+    type="notifytip">
+Always Run enabled.
+    </notification>
+  <notification
+    icon="notifytip.tga"
+    name="AlwaysRunDisabled"
+    persist="true"
+    log_to_chat="true"
+    type="notifytip">
+Always Run disabled.
   </notification>
   
 </notifications>
