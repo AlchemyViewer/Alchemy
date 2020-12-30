@@ -97,7 +97,7 @@ LLContextMenu* PeopleContextMenu::createMenu()
 			case 2:	ALAvatarActions::estateBan(id);	break;
 			} });
 		registrar.add("Avatar.TeleportTo", [&](LLUICtrl*, const LLSD&) { ALAvatarActions::teleportTo(id); });
-		registrar.add("Avatar.ReportAbuse", [&](LLUICtrl*, const LLSD&) { LLFloaterReporter::showFromObject(id); });
+		registrar.add("Avatar.ReportAbuse", [&](LLUICtrl*, const LLSD&) { ALAvatarActions::reportAbuse(id); });
 
 		enable_registrar.add("Avatar.EnableItem", boost::bind(&PeopleContextMenu::enableContextMenuItem, this, _2));
 		enable_registrar.add("Avatar.CheckItem",  boost::bind(&PeopleContextMenu::checkContextMenuItem,	this, _2));
@@ -176,8 +176,10 @@ void PeopleContextMenu::buildContextMenu(class LLMenuGL& menu, U32 flags)
 		items.push_back(std::string("map"));
 		items.push_back(std::string("share"));
 		items.push_back(std::string("pay"));
-		items.push_back(std::string("block_unblock"));
 		items.push_back(std::string("separator_utils"));
+		items.push_back(std::string("manage_menu"));
+		items.push_back(std::string("block_unblock"));
+		items.push_back(std::string("report_abuse"));
 		items.push_back(std::string("utils_menu"));
 		items.push_back(std::string("copy_username"));
 		items.push_back(std::string("copy_display_name"));
@@ -393,7 +395,10 @@ void NearbyPeopleContextMenu::buildContextMenu(class LLMenuGL& menu, U32 flags)
 			items.push_back(std::string("request_teleport"));
 			items.push_back(std::string("separator_invite_to_group"));
 			items.push_back(std::string("zoom_in"));
+			items.push_back(std::string("separator_utils"));
+			items.push_back(std::string("manage_menu"));
 			items.push_back(std::string("block_unblock"));
+			items.push_back(std::string("report_abuse"));
 		}
 	}
 	else if (flags & ITEM_IN_MULTI_SELECTION)
