@@ -50,11 +50,6 @@ public:
 	LLDate();
 
 	/** 
-	 * @brief Construct a date equal to the source date.
-	 */
-	LLDate(const LLDate& date) = default;
-
-	/** 
 	 * @brief Construct a date from a seconds since epoch value.
 	 *
 	 * @param seconds_since_epoch The number of seconds since UTC epoch.

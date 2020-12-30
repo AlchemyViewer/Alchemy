@@ -2056,7 +2056,7 @@ void LLMessageSystem::dispatch(
 		return;
 	}
 	
-	std::string	path = absl::StrCat("/message/", msg_name);
+	std::string	path = "/message/" + msg_name;
 	LLSD context;
 	const LLHTTPNode* handler =	messageRootNode().traverse(path, context);
 	if (!handler)

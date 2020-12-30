@@ -104,7 +104,7 @@ class LLSimpleIOFactory : public LLChainIOFactory
 public:
 	virtual bool build(LLPumpIO::chain_t& chain, LLSD context) const
 	{
-		chain.emplace_back(LLIOPipe::ptr_t(new Pipe));
+		chain.push_back(LLIOPipe::ptr_t(new Pipe));
 		return true;
 	}
 };
@@ -123,7 +123,7 @@ public:
 
 	virtual bool build(LLPumpIO::chain_t& chain, LLSD context) const
 	{
-		chain.emplace_back(LLIOPipe::ptr_t(new Pipe(*mOriginal)));
+		chain.push_back(LLIOPipe::ptr_t(new Pipe(*mOriginal)));
 		return true;
 	}
 

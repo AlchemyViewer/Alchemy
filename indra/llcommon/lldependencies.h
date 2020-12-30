@@ -583,7 +583,7 @@ public:
                 if (found != non_const_this->mNodes.end())
                 {
                     // Make an iterator of appropriate type.
-                    mCache.emplace_back(iterator(found, value_extract));
+                    mCache.push_back(iterator(found, value_extract));
                 }
             }
         }

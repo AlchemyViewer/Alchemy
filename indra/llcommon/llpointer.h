@@ -341,7 +341,6 @@ public:
 		return *this;
 	}
 	
-	// support assignment up the type hierarchy. See Item 45 in Effective C++, 3rd Ed.
 	inline void swap(LLConstPointer<Type>& ptr) noexcept
     {
 		Type* temp = mPointer;

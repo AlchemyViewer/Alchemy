@@ -931,8 +931,8 @@ U32 LLPartSysCompressedPacket::readUUID(LLPartInitData *in, U32 startByte)
 	}
 
 	startByte++; // cause we actually have to read the UUID now.
-	memcpy(in->mImageUuid.mData, bufPtr, 16);		/* Flawfinder: ignore */
-	return (startByte+16);
+	memcpy(in->mImageUuid.mData, bufPtr, UUID_BYTES);		/* Flawfinder: ignore */
+	return (startByte + UUID_BYTES);
 }
 
 

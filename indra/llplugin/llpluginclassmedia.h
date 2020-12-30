@@ -148,7 +148,7 @@ public:
 	// "Exited" means any regular or error state after "Running" (plugin may have crashed or exited normally)
 	bool isPluginExited(void) { return mPlugin?mPlugin->isDone():false; };
 
-	std::string getPluginVersion() { return mPlugin?mPlugin->getPluginVersion():std::string(""); };
+	std::string getPluginVersion() { return mPlugin?mPlugin->getPluginVersion():std::string(); };
 
 	bool getDisableTimeout() { return mPlugin?mPlugin->getDisableTimeout():false; };
 	void setDisableTimeout(bool disable) { if(mPlugin) mPlugin->setDisableTimeout(disable); };

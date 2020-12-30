@@ -49,7 +49,7 @@ void LLTrustedMessageService::post(LLHTTPNode::ResponsePtr response,
 		["x-secondlife-udp-listen-port"];
 
 	LLSD message_data;
-	std::string sender = absl::StrCat(senderIP, ":", senderPort);
+	std::string sender = senderIP + ":" + senderPort;
 	message_data["sender"] = sender;
 	message_data["body"] = input;
 	

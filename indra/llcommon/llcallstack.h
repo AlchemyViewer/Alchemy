@@ -59,7 +59,7 @@ private:
 class LLScopedContextString
 {
 public:
-    LLScopedContextString(const std::string str):
+    LLScopedContextString(std::string str):
         m_str(std::move(str))
     {
         LLContextStrings::addContextString(m_str);
