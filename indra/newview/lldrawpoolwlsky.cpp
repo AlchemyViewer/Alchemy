@@ -52,8 +52,7 @@ static LLGLSLShader* cloud_shader = NULL;
 static LLGLSLShader* sky_shader   = NULL;
 static LLGLSLShader* sun_shader   = NULL;
 static LLGLSLShader* moon_shader  = NULL;
-
-static float sStarTime;
+static LLGLSLShader* star_shader = NULL;
 
 LLDrawPoolWLSky::LLDrawPoolWLSky(void) :
 	LLDrawPool(POOL_WL_SKY)
@@ -90,6 +89,11 @@ void LLDrawPoolWLSky::beginRenderPass( S32 pass )
 			LLPipeline::sUnderWaterRender ?
 				&gObjectFullbrightNoColorWaterProgram :
 				&gWLMoonProgram;
+
+    star_shader =
+			LLPipeline::sUnderWaterRender ?
+				&gObjectFullbrightNoColorWaterProgram :
+				&gCustomAlphaProgram;
 }
 
 void LLDrawPoolWLSky::endRenderPass( S32 pass )
@@ -98,6 +102,7 @@ void LLDrawPoolWLSky::endRenderPass( S32 pass )
     cloud_shader = nullptr;
     sun_shader   = nullptr;
     moon_shader  = nullptr;
+    star_shader  = nullptr;
 }
 
 void LLDrawPoolWLSky::beginDeferredPass(S32 pass)
@@ -114,6 +119,11 @@ void LLDrawPoolWLSky::beginDeferredPass(S32 pass)
 			LLPipeline::sUnderWaterRender ?
 				&gObjectFullbrightNoColorWaterProgram :
 				&gDeferredWLMoonProgram;
+
+    star_shader =
+			LLPipeline::sUnderWaterRender ?
+				&gObjectFullbrightNoColorWaterProgram :
+				&gDeferredStarProgram;
 }
 
 void LLDrawPoolWLSky::endDeferredPass(S32 pass)
@@ -122,6 +132,7 @@ void LLDrawPoolWLSky::endDeferredPass(S32 pass)
     cloud_shader = nullptr;
     sun_shader   = nullptr;
     moon_shader  = nullptr;
+    star_shader  = nullptr;
 }
 
 void LLDrawPoolWLSky::renderDome(const LLVector3& camPosLocal, F32 camHeightLocal, LLGLSLShader * shader) const
@@ -260,8 +271,8 @@ void LLDrawPoolWLSky::renderStars(const LLSettingsSky::ptr_t& psky, const LLVect
     gGL.translatef(camPosLocal.mV[0], camPosLocal.mV[1], camPosLocal.mV[2]);
 	if (LLGLSLShader::sNoFixedFunction)
 	{
-		gCustomAlphaProgram.bind();
-		gCustomAlphaProgram.uniform1f(sCustomAlpha, star_alpha.mV[3]);
+        star_shader->bind();
+        star_shader->uniform1f(sCustomAlpha, star_alpha.mV[3]);
 	}
 	else
 	{
@@ -278,7 +289,7 @@ void LLDrawPoolWLSky::renderStars(const LLSettingsSky::ptr_t& psky, const LLVect
 
 	if (LLGLSLShader::sNoFixedFunction)
 	{
-		gCustomAlphaProgram.unbind();
+        star_shader->unbind();
 	}
 	else
 	{
@@ -303,8 +314,6 @@ void LLDrawPoolWLSky::renderStarsDeferred(const LLSettingsSky::ptr_t& psky, cons
 #endif
 		return;
 	}
-
-
 
     LLViewerTexture* tex_a = gSky.mVOSkyp->getBloomTex();
     LLViewerTexture* tex_b = gSky.mVOSkyp->getBloomTexNext();
@@ -333,19 +342,17 @@ void LLDrawPoolWLSky::renderStarsDeferred(const LLSettingsSky::ptr_t& psky, cons
     gGL.pushMatrix();
     gGL.translatef(camPosLocal.mV[0], camPosLocal.mV[1], camPosLocal.mV[2]);
 
-    gDeferredStarProgram.bind();
+    star_shader->bind();
 
-    gDeferredStarProgram.uniform1f(LLShaderMgr::BLEND_FACTOR, blend_factor);
+    star_shader->uniform1f(LLShaderMgr::BLEND_FACTOR, blend_factor);
 
     if (LLPipeline::sReflectionRender)
     {
         star_alpha = 1.0f;
     }
-	gDeferredStarProgram.uniform1f(sCustomAlpha, star_alpha);
+    star_shader->uniform1f(sCustomAlpha, star_alpha);
 
-    sStarTime = (F32)LLFrameTimer::getElapsedSeconds() * 0.5f;
-
-    gDeferredStarProgram.uniform1f(LLShaderMgr::WATER_TIME, sStarTime);
+    star_shader->uniform1f(LLShaderMgr::WATER_TIME, (F32)LLFrameTimer::getElapsedSeconds() * 0.5f);
 
 	gSky.mVOWLSkyp->drawStars();
 
@@ -354,7 +361,7 @@ void LLDrawPoolWLSky::renderStarsDeferred(const LLSettingsSky::ptr_t& psky, cons
 
     gGL.popMatrix();
 
-    gDeferredStarProgram.unbind();
+    star_shader->unbind();
 }
 
 void LLDrawPoolWLSky::renderSkyClouds(const LLSettingsSky::ptr_t& psky, const LLVector3& camPosLocal, F32 camHeightLocal, LLGLSLShader* cloudshader) const
