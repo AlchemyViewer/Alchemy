@@ -4330,4 +4330,7 @@ and report the problem.
 
   <string name="outfit_photo_load_codec_error">Invalid image format. Please use another image</string>
 
+  <!-- Alchemy Strings -->
+  <string name="UnknownAvatar">Unknown Avatar</string>
+  
 </strings>

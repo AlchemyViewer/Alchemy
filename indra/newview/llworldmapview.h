@@ -152,6 +152,7 @@ public:
 	static LLUIImagePtr	sClassifiedsImage;
 	static LLUIImagePtr	sForSaleImage;
 	static LLUIImagePtr	sForSaleAdultImage;
+	static LLUIImagePtr	sIFFArrowImage;
 
 	static F32		sMapScale;				// scale = size of a region in pixels
 
