@@ -2426,9 +2426,9 @@ Your search terms were too short so no search was performed.
   <!-- Generic Teleport failure modes - strings will be inserted from
        teleport_strings.xml if available. -->
   <notification
-   icon="alertmodal.tga"
+   icon="notify.tga"
    name="CouldNotTeleportReason"
-   type="alertmodal">
+   type="notify">
     <unique/>
 Teleport failed.
 [REASON]
