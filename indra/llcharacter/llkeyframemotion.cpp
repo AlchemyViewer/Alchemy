@@ -124,257 +124,6 @@ U32 LLKeyframeMotion::JointMotionList::dumpDiagInfo()
 
 //-----------------------------------------------------------------------------
 //-----------------------------------------------------------------------------
-// ****Curve classes
-//-----------------------------------------------------------------------------
-//-----------------------------------------------------------------------------
-
-
-//-----------------------------------------------------------------------------
-// ScaleCurve::ScaleCurve()
-//-----------------------------------------------------------------------------
-LLKeyframeMotion::ScaleCurve::ScaleCurve()
-{
-	mInterpolationType = LLKeyframeMotion::IT_LINEAR;
-	mNumKeys = 0;
-}
-
-//-----------------------------------------------------------------------------
-// ScaleCurve::~ScaleCurve()
-//-----------------------------------------------------------------------------
-LLKeyframeMotion::ScaleCurve::~ScaleCurve() 
-{
-	mKeys.clear();
-	mNumKeys = 0;
-}
-
-//-----------------------------------------------------------------------------
-// getValue()
-//-----------------------------------------------------------------------------
-LLVector3 LLKeyframeMotion::ScaleCurve::getValue(F32 time, F32 duration)
-{
-	LLVector3 value;
-
-	if (mKeys.empty())
-	{
-		value.clearVec();
-		return value;
-	}
-	
-	key_map_t::iterator right = std::lower_bound(mKeys.begin(), mKeys.end(), time, [](const key_map_t::value_type& a, const F32 b) { return a.first < b; });
-	if (right == mKeys.end())
-	{
-		// Past last key
-		--right;
-		value = right->second.mScale;
-	}
-	else if (right == mKeys.begin() || right->first == time)
-	{
-		// Before first key or exactly on a key
-		value = right->second.mScale;
-	}
-	else
-	{
-		// Between two keys
-		key_map_t::iterator left = right; --left;
-		F32 index_before = left->first;
-		F32 index_after = right->first;
-		ScaleKey& scale_before = left->second;
-		ScaleKey& scale_after = right->second;
-		if (right == mKeys.end())
-		{
-			scale_after = mLoopInKey;
-			index_after = duration;
-		}
-
-		F32 u = (time - index_before) / (index_after - index_before);
-		value = interp(u, scale_before, scale_after);
-	}
-	return value;
-}
-
-//-----------------------------------------------------------------------------
-// interp()
-//-----------------------------------------------------------------------------
-LLVector3 LLKeyframeMotion::ScaleCurve::interp(F32 u, ScaleKey& before, ScaleKey& after)
-{
-	switch (mInterpolationType)
-	{
-	case IT_STEP:
-		return before.mScale;
-
-	default:
-	case IT_LINEAR:
-	case IT_SPLINE:
-		return lerp(before.mScale, after.mScale, u);
-	}
-}
-
-//-----------------------------------------------------------------------------
-// RotationCurve::RotationCurve()
-//-----------------------------------------------------------------------------
-LLKeyframeMotion::RotationCurve::RotationCurve()
-{
-	mInterpolationType = LLKeyframeMotion::IT_LINEAR;
-	mNumKeys = 0;
-}
-
-//-----------------------------------------------------------------------------
-// RotationCurve::~RotationCurve()
-//-----------------------------------------------------------------------------
-LLKeyframeMotion::RotationCurve::~RotationCurve()
-{
-	mKeys.clear();
-	mNumKeys = 0;
-}
-
-//-----------------------------------------------------------------------------
-// RotationCurve::getValue()
-//-----------------------------------------------------------------------------
-LLQuaternion LLKeyframeMotion::RotationCurve::getValue(F32 time, F32 duration)
-{
-	LLQuaternion value;
-
-	if (mKeys.empty())
-	{
-		value = LLQuaternion::DEFAULT;
-		return value;
-	}
-	
-	key_map_t::iterator right = std::lower_bound(mKeys.begin(), mKeys.end(), time, [](const key_map_t::value_type& a, const F32 b) { return a.first < b; });
-	if (right == mKeys.end())
-	{
-		// Past last key
-		--right;
-		value = right->second.mRotation;
-	}
-	else if (right == mKeys.begin() || right->first == time)
-	{
-		// Before first key or exactly on a key
-		value = right->second.mRotation;
-	}
-	else
-	{
-		// Between two keys
-		key_map_t::iterator left = right; --left;
-		F32 index_before = left->first;
-		F32 index_after = right->first;
-		RotationKey& rot_before = left->second;
-		RotationKey& rot_after = right->second;
-		if (right == mKeys.end())
-		{
-			rot_after = mLoopInKey;
-			index_after = duration;
-		}
-
-		F32 u = (time - index_before) / (index_after - index_before);
-		value = interp(u, rot_before, rot_after);
-	}
-	return value;
-}
-
-//-----------------------------------------------------------------------------
-// interp()
-//-----------------------------------------------------------------------------
-LLQuaternion LLKeyframeMotion::RotationCurve::interp(F32 u, RotationKey& before, RotationKey& after)
-{
-	switch (mInterpolationType)
-	{
-	case IT_STEP:
-		return before.mRotation;
-
-	default:
-	case IT_LINEAR:
-	case IT_SPLINE:
-		return nlerp(u, before.mRotation, after.mRotation);
-	}
-}
-
-
-//-----------------------------------------------------------------------------
-// PositionCurve::PositionCurve()
-//-----------------------------------------------------------------------------
-LLKeyframeMotion::PositionCurve::PositionCurve()
-{
-	mInterpolationType = LLKeyframeMotion::IT_LINEAR;
-	mNumKeys = 0;
-}
-
-//-----------------------------------------------------------------------------
-// PositionCurve::~PositionCurve()
-//-----------------------------------------------------------------------------
-LLKeyframeMotion::PositionCurve::~PositionCurve()
-{
-	mKeys.clear();
-	mNumKeys = 0;
-}
-
-//-----------------------------------------------------------------------------
-// PositionCurve::getValue()
-//-----------------------------------------------------------------------------
-LLVector3 LLKeyframeMotion::PositionCurve::getValue(F32 time, F32 duration)
-{
-	LLVector3 value;
-
-	if (mKeys.empty())
-	{
-		value.clearVec();
-		return value;
-	}
-	
-	key_map_t::iterator right = std::lower_bound(mKeys.begin(), mKeys.end(), time, [](const key_map_t::value_type& a, const F32 b) { return a.first < b; });
-	if (right == mKeys.end())
-	{
-		// Past last key
-		--right;
-		value = right->second.mPosition;
-	}
-	else if (right == mKeys.begin() || right->first == time)
-	{
-		// Before first key or exactly on a key
-		value = right->second.mPosition;
-	}
-	else
-	{
-		// Between two keys
-		key_map_t::iterator left = right; --left;
-		F32 index_before = left->first;
-		F32 index_after = right->first;
-		PositionKey& pos_before = left->second;
-		PositionKey& pos_after = right->second;
-		if (right == mKeys.end())
-		{
-			pos_after = mLoopInKey;
-			index_after = duration;
-		}
-
-		F32 u = (time - index_before) / (index_after - index_before);
-		value = interp(u, pos_before, pos_after);
-	}
-
-	llassert(value.isFinite());
-	
-	return value;
-}
-
-//-----------------------------------------------------------------------------
-// interp()
-//-----------------------------------------------------------------------------
-LLVector3 LLKeyframeMotion::PositionCurve::interp(F32 u, PositionKey& before, PositionKey& after)
-{
-	switch (mInterpolationType)
-	{
-	case IT_STEP:
-		return before.mPosition;
-	default:
-	case IT_LINEAR:
-	case IT_SPLINE:
-		return lerp(before.mPosition, after.mPosition, u);
-	}
-}
-
-
-//-----------------------------------------------------------------------------
-//-----------------------------------------------------------------------------
 // JointMotion class
 //-----------------------------------------------------------------------------
 //-----------------------------------------------------------------------------
@@ -433,6 +182,7 @@ LLKeyframeMotion::LLKeyframeMotion(const LLUUID &id)
 	: LLMotion(id),
 		mJointMotionList(NULL),
 		mPelvisp(NULL),
+		mCharacter(NULL),
 		mLastSkeletonSerialNum(0),
 		mLastUpdateTime(0.f),
 		mLastLoopedTime(0.f),
@@ -498,9 +248,7 @@ LLMotion::LLMotionInitStatus LLKeyframeMotion::onInitialize(LLCharacter *charact
 		// request asset
 		mAssetStatus = ASSET_FETCHED;
 
-#if SHOW_DEBUG
         LL_DEBUGS("Animation") << "Requesting data fetch for: " << mID << LL_ENDL;
-#endif
 		character_id = new LLUUID(mCharacter->getID());
 		gAssetStorage->getAssetData(mID,
 						LLAssetType::AT_ANIMATION,
@@ -601,9 +349,7 @@ LLMotion::LLMotionInitStatus LLKeyframeMotion::onInitialize(LLCharacter *charact
 		return STATUS_FAILURE;
 	}
 
-#if SHOW_DEBUG
 	LL_DEBUGS() << "Loading keyframe data for: " << getName() << ":" << getID() << " (" << anim_file_size << " bytes)" << LL_ENDL;
-#endif
 
 	LLDataPackerBinaryBuffer dp(anim_data, anim_file_size);
 
@@ -1578,7 +1324,7 @@ BOOL LLKeyframeMotion::deserialize(LLDataPacker& dp, const LLUUID& asset_id)
 				}
 
 				LLQuaternion::Order ro = StringToOrder("ZYX");
-				rot_key.mRotation = mayaQ(rot_angles.mV[VX], rot_angles.mV[VY], rot_angles.mV[VZ], ro);
+				rot_key.mValue = mayaQ(rot_angles.mV[VX], rot_angles.mV[VY], rot_angles.mV[VZ], ro);
 			}
 			else
 			{
@@ -1604,23 +1350,24 @@ BOOL LLKeyframeMotion::deserialize(LLDataPacker& dp, const LLUUID& asset_id)
 				rot_vec.mV[VZ] = U16_to_F32(z, -1.f, 1.f);
 				if (!rot_vec.isFinite())
 				{
-					LL_WARNS() << "non-finite angle in rotation key (" << k << ")" << LL_ENDL;
+					LL_WARNS() << "non-finite angle in rotation key (" << k << ")"
+						<< " for animation " << asset_id << LL_ENDL;
 					return FALSE;
 				}
-				rot_key.mRotation.unpackFromVector3(rot_vec);
+				rot_key.mValue.unpackFromVector3(rot_vec);
 			}
 
-			if( !(rot_key.mRotation.isFinite()) )
+			if( !(rot_key.mValue.isFinite()) )
 			{
 				LL_WARNS() << "non-finite angle in rotation key (" << k << ")"
-                           << " for animation " << asset_id << LL_ENDL;
+					<< " for animation " << asset_id << LL_ENDL;
 				return FALSE;
 			}
-
+			
 			rCurve->mKeys.emplace_back(time, rot_key);
 		}
 
-		std::sort(rCurve->mKeys.begin(), rCurve->mKeys.end(), [](const RotationCurve::key_map_t::value_type& a, const RotationCurve::key_map_t::value_type& b) { return a.first < b.first; });
+		std::sort(rCurve->mKeys.begin(), rCurve->mKeys.end(), [](const auto& a, const auto& b) { return a.first < b.first; });
 
 		//---------------------------------------------------------------------
 		// scan position curve header
@@ -1672,16 +1419,16 @@ BOOL LLKeyframeMotion::deserialize(LLDataPacker& dp, const LLUUID& asset_id)
 
 			if (old_version)
 			{
-				if (!dp.unpackVector3(pos_key.mPosition, "pos"))
+				if (!dp.unpackVector3(pos_key.mValue, "pos"))
 				{
 					LL_WARNS() << "can't read pos in position key (" << k << ")" << LL_ENDL;
 					return FALSE;
 				}
                 
                 //MAINT-6162
-                pos_key.mPosition.mV[VX] = llclamp( pos_key.mPosition.mV[VX], -LL_MAX_PELVIS_OFFSET, LL_MAX_PELVIS_OFFSET);
-                pos_key.mPosition.mV[VY] = llclamp( pos_key.mPosition.mV[VY], -LL_MAX_PELVIS_OFFSET, LL_MAX_PELVIS_OFFSET);
-                pos_key.mPosition.mV[VZ] = llclamp( pos_key.mPosition.mV[VZ], -LL_MAX_PELVIS_OFFSET, LL_MAX_PELVIS_OFFSET);
+                pos_key.mValue.mV[VX] = llclamp( pos_key.mValue.mV[VX], -LL_MAX_PELVIS_OFFSET, LL_MAX_PELVIS_OFFSET);
+                pos_key.mValue.mV[VY] = llclamp( pos_key.mValue.mV[VY], -LL_MAX_PELVIS_OFFSET, LL_MAX_PELVIS_OFFSET);
+                pos_key.mValue.mV[VZ] = llclamp( pos_key.mValue.mV[VZ], -LL_MAX_PELVIS_OFFSET, LL_MAX_PELVIS_OFFSET);
                 
 			}
 			else
@@ -1704,12 +1451,12 @@ BOOL LLKeyframeMotion::deserialize(LLDataPacker& dp, const LLUUID& asset_id)
 					return FALSE;
 				}
 
-				pos_key.mPosition.mV[VX] = U16_to_F32(x, -LL_MAX_PELVIS_OFFSET, LL_MAX_PELVIS_OFFSET);
-				pos_key.mPosition.mV[VY] = U16_to_F32(y, -LL_MAX_PELVIS_OFFSET, LL_MAX_PELVIS_OFFSET);
-				pos_key.mPosition.mV[VZ] = U16_to_F32(z, -LL_MAX_PELVIS_OFFSET, LL_MAX_PELVIS_OFFSET);
+				pos_key.mValue.mV[VX] = U16_to_F32(x, -LL_MAX_PELVIS_OFFSET, LL_MAX_PELVIS_OFFSET);
+				pos_key.mValue.mV[VY] = U16_to_F32(y, -LL_MAX_PELVIS_OFFSET, LL_MAX_PELVIS_OFFSET);
+				pos_key.mValue.mV[VZ] = U16_to_F32(z, -LL_MAX_PELVIS_OFFSET, LL_MAX_PELVIS_OFFSET);
 			}
 			
-			if( !(pos_key.mPosition.isFinite()) )
+			if( !(pos_key.mValue.isFinite()) )
 			{
 				LL_WARNS() << "non-finite position in key (" << k << ")" 
                            << " for animation " << asset_id << LL_ENDL;
@@ -1720,11 +1467,11 @@ BOOL LLKeyframeMotion::deserialize(LLDataPacker& dp, const LLUUID& asset_id)
 
 			if (is_pelvis)
 			{
-				joint_motion_list->mPelvisBBox.addPoint(pos_key.mPosition);
+				joint_motion_list->mPelvisBBox.addPoint(pos_key.mValue);
 			}
 		}
 
-		std::sort(pCurve->mKeys.begin(), pCurve->mKeys.end(), [](const PositionCurve::key_map_t::value_type& a, const PositionCurve::key_map_t::value_type& b) { return a.first < b.first; });
+		std::sort(pCurve->mKeys.begin(), pCurve->mKeys.end(), [](const auto& a, const auto& b) { return a.first < b.first; });
 
 		joint_motion->mUsage = joint_state->getUsage();
 	}
@@ -2018,7 +1765,7 @@ BOOL LLKeyframeMotion::serialize(LLDataPacker& dp) const
 			U16 time_short = F32_to_U16(rot_key.mTime, 0.f, mJointMotionList->mDuration);
 			success &= dp.packU16(time_short, "time");
 
-			LLVector3 rot_angles = rot_key.mRotation.packToVector3();
+			LLVector3 rot_angles = rot_key.mValue.packToVector3();
 			
 			U16 x, y, z;
 			rot_angles.quantize16(-1.f, 1.f, -1.f, 1.f);
@@ -2041,15 +1788,15 @@ BOOL LLKeyframeMotion::serialize(LLDataPacker& dp) const
 			success &= dp.packU16(time_short, "time");
 
 			U16 x, y, z;
-			pos_key.mPosition.quantize16(-LL_MAX_PELVIS_OFFSET, LL_MAX_PELVIS_OFFSET, -LL_MAX_PELVIS_OFFSET, LL_MAX_PELVIS_OFFSET);
-			x = F32_to_U16(pos_key.mPosition.mV[VX], -LL_MAX_PELVIS_OFFSET, LL_MAX_PELVIS_OFFSET);
-			y = F32_to_U16(pos_key.mPosition.mV[VY], -LL_MAX_PELVIS_OFFSET, LL_MAX_PELVIS_OFFSET);
-			z = F32_to_U16(pos_key.mPosition.mV[VZ], -LL_MAX_PELVIS_OFFSET, LL_MAX_PELVIS_OFFSET);
+			pos_key.mValue.quantize16(-LL_MAX_PELVIS_OFFSET, LL_MAX_PELVIS_OFFSET, -LL_MAX_PELVIS_OFFSET, LL_MAX_PELVIS_OFFSET);
+			x = F32_to_U16(pos_key.mValue.mV[VX], -LL_MAX_PELVIS_OFFSET, LL_MAX_PELVIS_OFFSET);
+			y = F32_to_U16(pos_key.mValue.mV[VY], -LL_MAX_PELVIS_OFFSET, LL_MAX_PELVIS_OFFSET);
+			z = F32_to_U16(pos_key.mValue.mV[VZ], -LL_MAX_PELVIS_OFFSET, LL_MAX_PELVIS_OFFSET);
 			success &= dp.packU16(x, "pos_x");
 			success &= dp.packU16(y, "pos_y");
 			success &= dp.packU16(z, "pos_z");
 
-			LL_DEBUGS("BVH") << "  pos: t " << pos_key.mTime << " pos " << pos_key.mPosition.mV[VX] <<","<< pos_key.mPosition.mV[VY] <<","<< pos_key.mPosition.mV[VZ] << LL_ENDL;
+			LL_DEBUGS("BVH") << "  pos: t " << pos_key.mTime << " pos " << pos_key.mValue.mV[VX] <<","<< pos_key.mValue.mV[VY] <<","<< pos_key.mValue.mV[VZ] << LL_ENDL;
 		}
 	}	
 
@@ -2272,9 +2019,9 @@ void LLKeyframeMotion::setLoopIn(F32 in_point)
 			rot_curve->mLoopInKey.mTime = mJointMotionList->mLoopInPoint;
 			scale_curve->mLoopInKey.mTime = mJointMotionList->mLoopInPoint;
 
-			pos_curve->mLoopInKey.mPosition = pos_curve->getValue(mJointMotionList->mLoopInPoint, mJointMotionList->mDuration);
-			rot_curve->mLoopInKey.mRotation = rot_curve->getValue(mJointMotionList->mLoopInPoint, mJointMotionList->mDuration);
-			scale_curve->mLoopInKey.mScale = scale_curve->getValue(mJointMotionList->mLoopInPoint, mJointMotionList->mDuration);
+			pos_curve->mLoopInKey.mValue = pos_curve->getValue(mJointMotionList->mLoopInPoint, mJointMotionList->mDuration);
+			rot_curve->mLoopInKey.mValue = rot_curve->getValue(mJointMotionList->mLoopInPoint, mJointMotionList->mDuration);
+			scale_curve->mLoopInKey.mValue = scale_curve->getValue(mJointMotionList->mLoopInPoint, mJointMotionList->mDuration);
 		}
 	}
 }
@@ -2301,9 +2048,9 @@ void LLKeyframeMotion::setLoopOut(F32 out_point)
 			rot_curve->mLoopOutKey.mTime = mJointMotionList->mLoopOutPoint;
 			scale_curve->mLoopOutKey.mTime = mJointMotionList->mLoopOutPoint;
 
-			pos_curve->mLoopOutKey.mPosition = pos_curve->getValue(mJointMotionList->mLoopOutPoint, mJointMotionList->mDuration);
-			rot_curve->mLoopOutKey.mRotation = rot_curve->getValue(mJointMotionList->mLoopOutPoint, mJointMotionList->mDuration);
-			scale_curve->mLoopOutKey.mScale = scale_curve->getValue(mJointMotionList->mLoopOutPoint, mJointMotionList->mDuration);
+			pos_curve->mLoopOutKey.mValue = pos_curve->getValue(mJointMotionList->mLoopOutPoint, mJointMotionList->mDuration);
+			rot_curve->mLoopOutKey.mValue = rot_curve->getValue(mJointMotionList->mLoopOutPoint, mJointMotionList->mDuration);
+			scale_curve->mLoopOutKey.mValue = scale_curve->getValue(mJointMotionList->mLoopOutPoint, mJointMotionList->mDuration);
 		}
 	}
 }
