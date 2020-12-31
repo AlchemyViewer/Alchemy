@@ -71,16 +71,20 @@ public:
 	static void cleanupGL();
 	static void restoreGL();
 private:
-	void renderDome(const LLVector3& camPosLocal, F32 camHeightLocal, LLGLSLShader * shader) const;
+	void renderDome(LLGLSLShader * shader) const;
 
-    void renderSkyHaze(const LLVector3& camPosLocal, F32 camHeightLocal) const;
-    void renderSkyClouds(const LLSettingsSky::ptr_t& psky, const LLVector3& camPosLocal, F32 camHeightLocal, LLGLSLShader* cloudshader) const;
+    void renderSkyHaze() const;
+    void renderSkyClouds() const;
 
-	void renderSkyHazeDeferred(const LLSettingsSky::ptr_t& psky, const LLVector3& camPosLocal, F32 camHeightLocal) const;
+	void renderSkyHazeDeferred() const;
 
-    void renderStarsDeferred(const LLSettingsSky::ptr_t& psky, const LLVector3& camPosLocal) const;
-	void renderStars(const LLSettingsSky::ptr_t& psky, const LLVector3& camPosLocal) const;
-	void renderHeavenlyBodies(const LLSettingsSky::ptr_t& psky, const LLVector3& camPosLocal);
+    void renderStarsDeferred() const;
+	void renderStars() const;
+	void renderHeavenlyBodies();
+
+	LLVector3 mCameraOrigin;
+	LLSettingsSky::ptr_t mCurrentSky;
+	F32 mCamHeightLocal = 0.f;
 };
 
 #endif // LL_DRAWPOOLWLSKY_H
