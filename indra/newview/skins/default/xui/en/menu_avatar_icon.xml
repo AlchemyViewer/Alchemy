@@ -111,6 +111,12 @@
        <on_click function="AvatarIcon.Action" parameter="mute_unmute" />
        <on_check function="AvatarIcon.Check" parameter="is_muted" />   
     </menu_item_check>
+    <menu_item_call
+     label="Report"
+     layout="topleft"
+     name="Report">
+       <on_click function="AvatarIcon.Action" parameter="report_abuse" />
+    </menu_item_call>
     <menu_item_separator layout="topleft" name="Moderator Options Separator"/>
     <context_menu
      label="Moderator Options"

@@ -149,6 +149,12 @@
      <on_enable  function="Avatar.EnableItem" parameter="can_block" />
     </menu_item_check>
     <menu_item_call
+     label="Report"
+     layout="topleft"
+     name="report_abuse">
+        <on_click function="Avatar.DoToSelected" parameter="report_abuse" />
+    </menu_item_call>
+    <menu_item_call
      label="Group Profile"
      layout="topleft"
      name="group_profile">

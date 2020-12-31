@@ -53,8 +53,8 @@
        label="Zoom In"
        layout="topleft"
        name="zoom_in">
-      <on_click function="Avatar.DoToSelected" parameter="zoom_in" />
-      <on_enable function="Avatar.EnableItem" parameter="can_zoom_in" />
+      <on_click function="Avatar.GearDoToSelected" parameter="zoom_in" />
+      <on_enable function="Avatar.EnableGearItem" parameter="can_zoom_in" />
     </menu_item_call>
     <menu_item_call
      label="Map"
@@ -95,6 +95,12 @@
         <on_click function="Avatar.GearDoToSelected" parameter="mute_unmute" />
         <on_enable function="Avatar.EnableGearItem" parameter="can_block" />
     </menu_item_check>
+    <menu_item_call
+     label="Report"
+     layout="topleft"
+     name="report_abuse">
+        <on_click function="Avatar.GearDoToSelected" parameter="report_abuse" />
+    </menu_item_call>
   <menu_item_separator name="separator_utils"/>
   <context_menu
    label="Utilities"

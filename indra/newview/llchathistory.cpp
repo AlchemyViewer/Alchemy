@@ -435,6 +435,10 @@ public:
 		{
 			LLAvatarActions::toggleMute(getAvatarId(), LLMute::flagTextChat);
 		}
+		else if (level == "report_abuse")
+		{
+			ALAvatarActions::reportAbuse(getAvatarId());
+		}
 		else if(level == "toggle_allow_text_chat")
 		{
 			LLIMSpeakerMgr* speaker_mgr = LLIMModel::getInstance()->getSpeakerManager(mSessionID);
@@ -918,6 +922,7 @@ protected:
 				menu->setItemEnabled("Pay", false);
 				menu->setItemEnabled("Block Unblock", false);
 				menu->setItemEnabled("Mute Text", false);
+				menu->setItemEnabled("Report", false);
 			}
 			else
 			{
@@ -930,9 +935,7 @@ protected:
 				menu->setItemEnabled("Request Teleport", LLAvatarActions::canOfferTeleport(mAvatarID));
 				menu->setItemEnabled("Voice Call", LLAvatarActions::canCall());
 
-				// We should only show 'Zoom in' item in a nearby chat
-				bool should_show_zoom = !LLIMModel::getInstance()->findIMSession(currentSessionID);
-				menu->setItemVisible("Zoom In", should_show_zoom && gObjectList.findObject(mAvatarID));	
+				menu->setItemVisible("Zoom In", ALAvatarActions::canZoomIn(mAvatarID));	
 				menu->setItemEnabled("Block Unblock", LLAvatarActions::canBlock(mAvatarID));
 				menu->setItemEnabled("Mute Text", LLAvatarActions::canBlock(mAvatarID));
 				menu->setItemEnabled("Chat History", LLLogChat::isTranscriptExist(mAvatarID));

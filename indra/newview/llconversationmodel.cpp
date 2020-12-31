@@ -184,6 +184,7 @@ void LLConversationItem::buildParticipantMenuOptions(menuentry_vec_t& items, U32
 		items.push_back(std::string("pay"));
 		items.push_back(std::string("block_unblock"));
 		items.push_back(std::string("MuteText"));
+		items.push_back(std::string("report_abuse"));
 
 		if ((getType() != CONV_SESSION_1_ON_1) && mDisplayModeratorOptions)
 		{

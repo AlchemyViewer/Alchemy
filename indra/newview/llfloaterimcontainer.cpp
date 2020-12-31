@@ -1195,6 +1195,10 @@ void LLFloaterIMContainer::doToParticipants(const std::string& command, uuid_vec
 		{
 			LLAvatarActions::toggleMute(userID, LLMute::flagVoiceChat);
 		}
+		else if ("report_abuse" == command)
+		{
+			ALAvatarActions::reportAbuse(userID);
+		}
 		else if ("mute_unmute" == command)
 		{
 			LLAvatarActions::toggleMute(userID, LLMute::flagTextChat);
