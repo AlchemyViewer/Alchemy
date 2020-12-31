@@ -442,6 +442,28 @@
       <key>Value</key>
       <real>380.0</real>
     </map>
+    <key>AlchemyMouseLookZoomTime</key>
+    <map>
+      <key>Comment</key>
+      <string>Scalar for smooth mouselook zoom time</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>F32</string>
+      <key>Value</key>
+      <real>6.66</real>
+    </map>
+    <key>AlchemyMouseLookZoomTimeout</key>
+    <map>
+      <key>Comment</key>
+      <string>Cuttoff to force zoom to target fov</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>F32</string>
+      <key>Value</key>
+      <real>0.15</real>
+    </map>
     <key>AlchemyPointAtPrivate</key>
     <map>
       <key>Comment</key>

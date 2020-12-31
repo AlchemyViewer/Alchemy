@@ -102,10 +102,15 @@ public:
 	LLVector3 roundToPixel(const LLVector3 &pos_agent);
 
 	// Sets the current matrix
-	/* virtual */ void setView(F32 vertical_fov_rads);
+	/* virtual */ void setView(F32 vertical_fov_rads) override;
 
 	void setDefaultFOV(F32 fov) ;
 	F32 getDefaultFOV() { return mCameraFOVDefault; }
+
+	bool mSavedFOVLoaded;
+	F32 getAndSaveDefaultFOV() { mSavedFOVLoaded = false; return mSavedFOVDefault = mCameraFOVDefault; }
+	void setAndSaveDefaultFOV(F32 fov) { mSavedFOVDefault = fov; setDefaultFOV(mSavedFOVDefault); }
+	void loadDefaultFOV();
 
 	BOOL isDefaultFOVChanged();
 
@@ -133,6 +138,7 @@ protected:
 	mutable LLMatrix4	mModelviewMatrix;
 	F32					mCameraFOVDefault;
 	F32					mPrevCameraFOVDefault;
+	F32					mSavedFOVDefault;
 	F32					mCosHalfCameraFOV;
 	LLVector3			mLastPointOfInterest;
 	F32					mPixelMeterRatio; // Divide by distance from camera to get pixels per meter at that distance.

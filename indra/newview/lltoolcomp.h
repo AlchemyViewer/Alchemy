@@ -53,6 +53,7 @@ public:
     virtual BOOL			handleHover(S32 x, S32 y, MASK mask)			{ return mCur->handleHover( x, y, mask ); }
 	virtual BOOL			handleScrollWheel(S32 x, S32 y, S32 clicks)		{ return mCur->handleScrollWheel( x, y, clicks ); }
 	virtual BOOL			handleRightMouseDown(S32 x, S32 y, MASK mask)	{ return mCur->handleRightMouseDown( x, y, mask ); }
+	virtual BOOL			handleRightMouseUp(S32 x, S32 y, MASK mask)		{ return mCur->handleRightMouseUp( x, y, mask ); }
 
 	virtual LLViewerObject*	getEditingObject()								{ return mCur->getEditingObject(); }
 	virtual LLVector3d		getEditingPointGlobal()							{ return mCur->getEditingPointGlobal(); }
@@ -223,22 +224,31 @@ class LLToolCompGun final : public LLToolComposite, public LLSingleton<LLToolCom
 	virtual ~LLToolCompGun();
 public:
 
+	void			draw() override;
+
 	// Overridden from LLToolComposite
-    virtual BOOL			handleHover(S32 x, S32 y, MASK mask);
-	virtual BOOL			handleMouseDown(S32 x, S32 y, MASK mask);
-	virtual BOOL			handleDoubleClick(S32 x, S32 y, MASK mask);
-	virtual BOOL			handleRightMouseDown(S32 x, S32 y, MASK mask);
-	virtual BOOL			handleMouseUp(S32 x, S32 y, MASK mask);
-	virtual BOOL			handleScrollWheel(S32 x, S32 y, S32 clicks);
-	virtual void			onMouseCaptureLost();
-	virtual void			handleSelect();
-	virtual void			handleDeselect();
-	virtual LLTool*			getOverrideTool(MASK mask) { return NULL; }
+    BOOL			handleHover(S32 x, S32 y, MASK mask) override;
+	BOOL			handleMouseDown(S32 x, S32 y, MASK mask) override;
+	BOOL			handleDoubleClick(S32 x, S32 y, MASK mask) override;
+	BOOL			handleRightMouseDown(S32 x, S32 y, MASK mask) override;
+	BOOL			handleRightMouseUp(S32 x, S32 y, MASK mask) override;
+	BOOL			handleMouseUp(S32 x, S32 y, MASK mask) override;
+	BOOL			handleScrollWheel(S32 x, S32 y, S32 clicks) override;
+	void			onMouseCaptureLost() override;
+	void			handleSelect() override;
+	void			handleDeselect() override;
+	LLTool*			getOverrideTool(MASK mask) override { return NULL; }
 
 protected:
 	LLToolGun*			mGun;
 	LLToolGrabBase*		mGrab;
 	LLTool*				mNull;
+
+	bool				mRightMouseDown;
+	LLTimer				mTimerFOV;
+	F32				mOriginalFOV,
+					mStartFOV,
+					mTargetFOV;
 };
 
 

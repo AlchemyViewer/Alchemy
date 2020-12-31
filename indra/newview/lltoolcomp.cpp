@@ -51,8 +51,8 @@
 #include "llagentcamera.h"
 #include "llfloatertools.h"
 #include "llviewercontrol.h"
-
-extern LLControlGroup gSavedSettings;
+#include "llviewercamera.h"
+#include "lleventtimer.h"
 
 // we use this in various places instead of NULL
 static LLPointer<LLTool> sNullTool(new LLTool(std::string("null"), NULL)); 
@@ -681,6 +681,8 @@ void LLToolCompRotate::render()
 
 LLToolCompGun::LLToolCompGun()
 	: LLToolComposite(std::string("Mouselook"))
+	, mRightMouseDown(false)
+	, mTimerFOV()
 {
 	mGun = new LLToolGun(this);
 	mGrab = new LLToolGrabBase(this);
@@ -688,6 +690,9 @@ LLToolCompGun::LLToolCompGun()
 
 	setCurrentTool(mGun);
 	mDefault = mGun;
+
+	mTimerFOV.stop();
+	mStartFOV = mOriginalFOV = mTargetFOV = LLViewerCamera::getInstance()->getAndSaveDefaultFOV();
 }
 
 
@@ -776,21 +781,38 @@ BOOL LLToolCompGun::handleDoubleClick(S32 x, S32 y, MASK mask)
 
 BOOL LLToolCompGun::handleRightMouseDown(S32 x, S32 y, MASK mask)
 {
-	/* JC - suppress context menu 8/29/2002
+	if (!(gKeyboard->currentMask(TRUE) & MASK_ALT))
+	{
+		mRightMouseDown = true;
 
-	// On right mouse, go through some convoluted steps to
-	// make the build menu appear.
-	setCurrentTool( (LLTool*) mNull );
+		if (!mTimerFOV.getStarted())
+		{
+			mStartFOV = LLViewerCamera::getInstance()->getAndSaveDefaultFOV();
+			mOriginalFOV = mStartFOV;
+		}
+		else
+			mStartFOV = LLViewerCamera::getInstance()->getDefaultFOV();
 
-	// This should return FALSE, meaning the context menu will
-	// be shown.
-	return FALSE;
-	*/
+		mTargetFOV = gSavedPerAccountSettings.getF32("AlchemyMouselookAlternativeFOV");
+		mTimerFOV.start();
+
+		return TRUE;
+	}
 
 	// Returning true will suppress the context menu
 	return TRUE;
 }
 
+BOOL LLToolCompGun::handleRightMouseUp(S32 x, S32 y, MASK mask)
+{
+	mRightMouseDown = false;
+
+	mStartFOV = LLViewerCamera::getInstance()->getDefaultFOV();
+	mTargetFOV = mOriginalFOV;
+	mTimerFOV.start();
+
+	return TRUE;
+}
 
 BOOL LLToolCompGun::handleMouseUp(S32 x, S32 y, MASK mask)
 {
@@ -818,16 +840,56 @@ void	LLToolCompGun::handleSelect()
 void	LLToolCompGun::handleDeselect()
 {
 	LLToolComposite::handleDeselect();
+	if (mRightMouseDown || mTimerFOV.getStarted())
+	{
+		LLViewerCamera::getInstance()->loadDefaultFOV();
+		mRightMouseDown = false;
+		mTimerFOV.stop();
+	}
 	setMouseCapture(FALSE);
 }
 
 
 BOOL LLToolCompGun::handleScrollWheel(S32 x, S32 y, S32 clicks)
 {
-	if (clicks > 0)
+	if(mRightMouseDown)
+	{
+		mStartFOV = LLViewerCamera::getInstance()->getDefaultFOV();
+
+		gSavedPerAccountSettings.setF32(
+			"AlchemyMouselookAlternativeFOV",
+			mTargetFOV = clicks > 0 ?
+				llclamp(mTargetFOV += (0.05f * clicks), 0.1f, 3.0f) :
+				llclamp(mTargetFOV -= (0.05f * -clicks), 0.1f, 3.0f)
+		);
+
+		mTimerFOV.start();
+	}
+	else if (clicks > 0)
 	{
 		gAgentCamera.changeCameraToDefault();
-
 	}
 	return TRUE;
+}
+
+void LLToolCompGun::draw()
+{
+	if(mTimerFOV.getStarted())
+	{
+		if(!LLViewerCamera::getInstance()->mSavedFOVLoaded && mStartFOV != mTargetFOV)
+		{
+			F32 timer = mTimerFOV.getElapsedTimeF32();
+
+			static LLCachedControl<F32> ml_zoom_timeout(gSavedSettings, "AlchemyMouseLookZoomTimeout", 0.15f);
+			static LLCachedControl<F32> ml_zoom_time(gSavedSettings, "AlchemyMouseLookZoomTime", 6.66f);
+			if(timer > ml_zoom_timeout)
+			{
+				LLViewerCamera::getInstance()->setDefaultFOV(mTargetFOV);
+				mTimerFOV.stop();
+			}
+			else LLViewerCamera::getInstance()->setDefaultFOV(lerp(mStartFOV, mTargetFOV, timer * ml_zoom_time));
+		}
+		else mTimerFOV.stop();
+	}
+	LLToolComposite::draw();
 }
