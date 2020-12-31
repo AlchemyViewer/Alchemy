@@ -819,7 +819,8 @@ void LLAudioEngine::triggerSound(const LLUUID &audio_uuid, const LLUUID& owner_i
 	// Create a new source (since this can't be associated with an existing source.
 	//LL_INFOS() << "Localized: " << audio_uuid << LL_ENDL;
 
-	if (mMuted)
+	// Do not load mutex or silent sounds.
+	if (mMuted || gain <FLT_EPSILON*2)
 	{
 		return;
 	}
