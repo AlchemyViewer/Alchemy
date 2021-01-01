@@ -1510,6 +1510,9 @@ void LLViewerObjectList::cleanDeadObjects(BOOL use_timer)
 
 	S32 num_removed = 0;
 	LLViewerObject *objectp;
+
+	static const F64 max_time = 0.01; // Let's try 10ms per frame
+	LLTimer timer;
 	
 	vobj_list_t::reverse_iterator target = mObjects.rbegin();
 
@@ -1525,12 +1528,16 @@ void LLViewerObjectList::cleanDeadObjects(BOOL use_timer)
 
 		if (objectp->isDead())
 		{
+			if (use_timer)
+			{
+				mDeadObjects.erase(objectp->mID); // <FS:Ansariel> Use timer for cleaning up dead objects
+			}
 			LLPointer<LLViewerObject>::swap(*iter, *target);
 			*target = NULL;
 			++target;
 			num_removed++;
 
-			if (num_removed == mNumDeadObjects || iter->isNull())
+			if (num_removed == mNumDeadObjects || iter->isNull() || (use_timer && timer.getElapsedTimeF64() > max_time))
 			{
 				// We've cleaned up all of the dead objects or caught up to the dead tail
 				break;
@@ -1542,15 +1549,29 @@ void LLViewerObjectList::cleanDeadObjects(BOOL use_timer)
 		}
 	}
 
-	llassert(num_removed == mNumDeadObjects);
+	// Use timer for cleaning up dead objects per-frame, slam otherwise.
+	if (use_timer)
+	{
+		mObjects.erase(mObjects.begin() + (mObjects.size() - num_removed), mObjects.end());
+		mNumDeadObjects -= num_removed;
+	}
+	else
+	{
+		llassert(num_removed == mNumDeadObjects);
 
-	//erase as a block
-	mObjects.erase(mObjects.begin()+(mObjects.size()-mNumDeadObjects), mObjects.end());
+		//erase as a block
+		mObjects.erase(mObjects.begin() + (mObjects.size() - mNumDeadObjects), mObjects.end());
 
-	// We've cleaned the global object list, now let's do some paranoia testing on objects
-	// before blowing away the dead list.
-	mDeadObjects.clear();
-	mNumDeadObjects = 0;
+		// We've cleaned the global object list, now let's do some paranoia testing on objects
+		// before blowing away the dead list.
+		mDeadObjects.clear();
+		mNumDeadObjects = 0;
+	}
+
+	if (mNumDeadObjects != mDeadObjects.size())
+	{
+		LL_WARNS() << "Num dead objects != dead object list size (" << mNumDeadObjects << " != " << mDeadObjects.size() << ")" << LL_ENDL;
+	}
 }
 
 void LLViewerObjectList::removeFromActiveList(LLViewerObject* objectp)
