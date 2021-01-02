@@ -890,6 +890,9 @@
      name="TextBgFocusColor"
      reference="MouseGray" /> <!-- example: LSL Editor -->
     <color
+     name="TextBgHighlightColor"
+     reference="AlWarningOrange" />
+    <color
      name="TextBgReadOnlyColor"
 	 reference="AlchemyBlack1" />
     <color

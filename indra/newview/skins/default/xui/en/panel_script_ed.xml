@@ -49,7 +49,8 @@
       <menu_item_call
         label="Save"
         layout="topleft"
-        name="Save" />
+        name="Save"
+        shortcut="control|S" />
       <menu_item_separator
         layout="topleft" />
       <menu_item_call
@@ -89,57 +90,63 @@
         enabled="false"
         label="Undo"
         layout="topleft"
-        name="Undo" />
+        name="Undo"
+        shortcut="control|Z" />
       <menu_item_call
         enabled="false"
         label="Redo"
         layout="topleft"
-        name="Redo" />
+        name="Redo"
+        shortcut="control|Y" />
       <menu_item_separator
         layout="topleft" />
       <menu_item_call
         enabled="false"
         label="Cut"
         layout="topleft"
-        name="Cut" />
+        name="Cut"
+        shortcut="control|X" />
       <menu_item_call
         enabled="false"
         label="Copy"
         layout="topleft"
-        name="Copy" />
+        name="Copy"
+        shortcut="control|C" />
       <menu_item_call
         enabled="false"
         label="Paste"
         layout="topleft"
-        name="Paste" />
-      <menu_item_separator
+        name="Paste"
+        shortcut="control|V" />
+      <menu_item_call
+        enabled="false"
+        label="Delete"
         layout="topleft"
-        name="separator2" />
+        name="Delete"
+        shortcut="Del" />
       <menu_item_call
         label="Select All"
         layout="topleft"
-        name="Select All" />
-      <menu_item_call
-        enabled="false"
-        label="Deselect"
-        layout="topleft"
-        name="Deselect" />
+        name="Select All"
+        shortcut="control|A" />
       <menu_item_separator
         layout="topleft"
         name="separator3" />
       <menu_item_call
         label="Search / Replace..."
         layout="topleft"
-        name="Search / Replace..." />
+             name="Search / Replace..."
+             shortcut="control|F" />
             <menu_item_call
              label="Go to line..."
              layout="topleft"
-             name="Go to line..." />
+             name="Go to line..."
+             shortcut="control|G" />
     </menu>
     <menu
       top="0"
       height="34"
-      label="Help"
+      label="LSL Reference"
       layout="topleft"
       mouse_opaque="false"
       name="Help"
@@ -147,11 +154,13 @@
       <menu_item_call
         label="Help..."
         layout="topleft"
-        name="Help..." />
+             name="Help..."
+             shortcut="F1" />
       <menu_item_call
         label="Keyword Help..."
         layout="topleft"
-        name="Keyword Help..." />
+             name="Keyword Help..."
+             shortcut="shift|F1" />
     </menu>
   </menu_bar>
     <script_editor

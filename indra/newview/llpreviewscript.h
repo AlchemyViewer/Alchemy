@@ -46,7 +46,7 @@ class LLScrollListCtrl;
 class LLViewerObject;
 struct 	LLEntryAndEdCore;
 class LLMenuBarGL;
-class LLFloaterScriptSearch;
+//class LLFloaterScriptSearch;
 class LLKeywordToken;
 class LLVFS;
 class LLViewerInventoryItem;
@@ -77,7 +77,7 @@ class LLScriptEdCore final : public LLPanel
 	friend class LLPreviewScript;
 	friend class LLPreviewLSL;
 	friend class LLLiveLSLEditor;
-	friend class LLFloaterScriptSearch;
+//	friend class LLFloaterScriptSearch;
 	friend class LLScriptEdContainer;
 	friend class LLFloaterGotoLine;
 
@@ -89,7 +89,7 @@ protected:
 		const LLHandle<LLFloater>& floater_handle,
 		void (*load_callback)(void* userdata),
 		void (*save_callback)(void* userdata, BOOL close_after_save),
-		void (*search_replace_callback)(void* userdata),
+//		void (*search_replace_callback)(void* userdata),
 		void* userdata,
 		bool live,
 		S32 bottom_pad = 0);	// pad below bottom row of buttons
@@ -169,10 +169,13 @@ protected:
 private:
 	std::string		mSampleText;
 	std::string		mScriptName;
+// [SL:KB] - Patch: Build-ScriptEditor | Checked: 2014-01-29 (Catznip-3.6)
+	LLMenuBarGL*    mMenuBar;
+// [/SL:KB]
 	LLScriptEditor*	mEditor;
 	void			(*mLoadCallback)(void* userdata);
 	void			(*mSaveCallback)(void* userdata, BOOL close_after_save);
-	void			(*mSearchReplaceCallback) (void* userdata);
+//	void			(*mSearchReplaceCallback) (void* userdata);
     void*			mUserdata;
     LLComboBox		*mFunctions;
 	BOOL			mForceClose;
@@ -223,6 +226,10 @@ public:
 
 	/*virtual*/ BOOL postBuild();
 
+// [SL:KB] - Patch: UI-FloaterSearchReplace | Checked: 2010-11-05 (Catznip-2.3)
+	LLScriptEditor* getEditor() { return (mScriptEd) ? mScriptEd->mEditor : NULL; }
+// [/SL:KB]
+
 protected:
 	virtual void draw();
 	virtual BOOL canClose();
@@ -231,7 +238,7 @@ protected:
 	virtual void loadAsset();
 	/*virtual*/ void saveIfNeeded(bool sync = true);
 
-	static void onSearchReplace(void* userdata);
+//	static void onSearchReplace(void* userdata);
 	static void onLoad(void* userdata);
 	static void onSave(void* userdata, BOOL close_after_save);
 	
@@ -281,6 +288,10 @@ public:
 	void experienceChanged();
 	void addAssociatedExperience(const LLSD& experience);
 	
+// [SL:KB] - Patch: UI-FloaterSearchReplace | Checked: 2010-11-05 (Catznip-2.3)
+	LLScriptEditor* getEditor() { return (mScriptEd) ? mScriptEd->mEditor : NULL; }
+// [/SL:KB]
+
 private:
 	virtual BOOL canClose();
 	void closeIfNeeded();
@@ -292,7 +303,7 @@ private:
 	BOOL monoChecked() const;
 
 
-	static void onSearchReplace(void* userdata);
+//	static void onSearchReplace(void* userdata);
 	static void onLoad(void* userdata);
 	static void onSave(void* userdata, BOOL close_after_save);
 

@@ -792,6 +792,9 @@
      name="TextBgFocusColor"
      reference="White" />
     <color
+     name="TextBgHighlightColor"
+     value="0.95 0.90 0 1" />
+    <color
      name="TextBgReadOnlyColor"
 	 reference="White_05" />
     <color
