@@ -107,6 +107,7 @@ public:
 		PARAMS_RESERVED = 0x50, // Used on server-side
 		PARAMS_MESH     = 0x60,
         PARAMS_EXTENDED_MESH = 0x70,
+		PARAMS_MAX = PARAMS_EXTENDED_MESH
 	};
 	
 public:

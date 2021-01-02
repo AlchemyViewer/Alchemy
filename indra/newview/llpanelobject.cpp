@@ -628,7 +628,7 @@ void LLPanelObject::getState( )
 		}
 
 
-		if (objectp->getParameterEntryInUse(LLNetworkData::PARAMS_SCULPT))
+		if (objectp->getSculptParams())
 		{
 			selected_item = MI_SCULPT;
 			//LLFirstUse::useSculptedPrim();
@@ -1077,7 +1077,7 @@ void LLPanelObject::getState( )
 	// sculpt texture
 	if (selected_item == MI_SCULPT)
 	{
-		LLSculptParams *sculpt_params = (LLSculptParams *)objectp->getParameterEntry(LLNetworkData::PARAMS_SCULPT);
+		LLSculptParams *sculpt_params = (LLSculptParams *)objectp->getSculptParams();
 
 		
 		if (sculpt_params) // if we have a legal sculpt param block for this object:
@@ -1244,13 +1244,13 @@ void LLPanelObject::onCommitParametric( LLUICtrl* ctrl, void* userdata )
 	if (selected_type == MI_SCULPT)
 	{
 		self->mObject->setParameterEntryInUse(LLNetworkData::PARAMS_SCULPT, TRUE, TRUE);
-		LLSculptParams *sculpt_params = (LLSculptParams *)self->mObject->getParameterEntry(LLNetworkData::PARAMS_SCULPT);
+		LLSculptParams *sculpt_params = (LLSculptParams *)self->mObject->getSculptParams();
 		if (sculpt_params)
 			volume_params.setSculptID(sculpt_params->getSculptTexture(), sculpt_params->getSculptType());
 	}
 	else
 	{
-		LLSculptParams *sculpt_params = (LLSculptParams *)self->mObject->getParameterEntry(LLNetworkData::PARAMS_SCULPT);
+		LLSculptParams *sculpt_params = (LLSculptParams *)self->mObject->getSculptParams();
 		if (sculpt_params)
 			self->mObject->setParameterEntryInUse(LLNetworkData::PARAMS_SCULPT, FALSE, TRUE);
 	}
