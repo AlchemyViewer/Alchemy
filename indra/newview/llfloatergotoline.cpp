@@ -110,7 +110,10 @@ void LLFloaterGotoLine::handleBtnGoto()
                 if (mEditorCore && mEditorCore->mEditor)
                 {
 			mEditorCore->mEditor->deselect();
-			mEditorCore->mEditor->setCursor(row, column);
+// [SL:KB] - Patch: UI-ScriptGoToLine | Checked: 2013-12-31 (Catznip-3.6)
+			mEditorCore->mEditor->scrollTo(row, column);
+// [/SL:KB]
+//			mEditorCore->mEditor->setCursor(row, column);
 			mEditorCore->mEditor->setFocus(TRUE);
                 }
         }
@@ -144,7 +147,10 @@ void LLFloaterGotoLine::onGotoBoxCommit()
         {
                 if (mEditorCore && mEditorCore->mEditor)
                 {
-			mEditorCore->mEditor->setCursor(row, column);
+// [SL:KB] - Patch: UI-ScriptGoToLine | Checked: 2013-12-31 (Catznip-3.6)
+			mEditorCore->mEditor->scrollTo(row, column);
+// [/SL:KB]
+//			mEditorCore->mEditor->setCursor(row, column);
 
 			S32 rownew = 0;
 			S32 columnnew = 0;

@@ -472,6 +472,9 @@ public:
 	void					endOfDoc();
 	void					changePage( S32 delta );
 	void					changeLine( S32 delta );
+// [SL:KB] - Patch: Control-TextEditor | Checked: 2013-12-31 (Catznip-3.6)
+	void					scrollTo(S32 nLine, S32 nColumn);
+// [/SL:KB
 
 	bool					scrolledToStart();
 	bool					scrolledToEnd();
@@ -596,7 +599,13 @@ protected:
 	const LLStyle::Params&			getStyleParams();
 
 	//  manage lines
-	S32								getLineStart( S32 line ) const;
+// [SL:KB] - Patch: Control-TextEditor | Checked: Catznip-5.2
+public:
+// [/SL:KB
+//	S32								getLineStart( S32 line ) const;
+// [SL:KB] - Patch: Control-TextEditor | Checked: 2013-12-31 (Catznip-3.6)
+	S32								getLineStart(S32 line, bool include_wordwrap = true) const;
+// [/SL:KB]
 	S32								getLineEnd( S32 line ) const;
 	S32								getLineNumFromDocIndex( S32 doc_index, bool include_wordwrap = true) const;
 	S32								getLineOffsetFromDocIndex( S32 doc_index, bool include_wordwrap = true) const;

@@ -1764,13 +1764,31 @@ void LLTextBase::clearSegments()
 	createDefaultSegment();
 }
 
-S32 LLTextBase::getLineStart( S32 line ) const
+//S32 LLTextBase::getLineStart( S32 line ) const
+// [SL:KB] - Patch: Control-TextEditor | Checked: 2013-12-31 (Catznip-3.6)
+S32 LLTextBase::getLineStart(S32 line, bool include_wordwrap) const
+// [/SL:KB]
 {
 	S32 num_lines = getLineCount();
 	if (num_lines == 0)
 	{
 		return 0;
 	}
+
+// [SL:KB] - Patch: Control-TextEditor | Checked: 2013-12-31 (Catznip-3.6)
+	if (!include_wordwrap)
+	{
+		for (S32 line_it = line; line_it < num_lines; ++line_it)
+		{
+			const line_info& liLine = mLineInfoList[line_it];
+			if (liLine.mLineNum == line)
+			{
+				line = line_it;
+				break;
+			}
+		}
+	}
+// [/SL:KB]
 
 	line = llclamp(line, 0, num_lines-1);
 	return mLineInfoList[line].mDocIndexStart;
@@ -2827,6 +2845,41 @@ void LLTextBase::changeLine( S32 delta )
         setCursorPos(new_cursor_pos, true);
     }
 }
+
+// [SL:KB] - Patch: Control-TextEditor | Checked: 2013-12-31 (Catznip-3.6)
+void LLTextBase::scrollTo(S32 nLine, S32 nColumn)
+{
+	// Make sure we have an up-to-date mLineInfoList
+	reflow();
+
+	LLRect rctVisible = getVisibleDocumentRect();
+	line_list_t::const_iterator itFirst = std::lower_bound(mLineInfoList.begin(), mLineInfoList.end(), rctVisible.mTop, compare_top());
+	line_list_t::const_iterator itLast = std::upper_bound(mLineInfoList.begin(), mLineInfoList.end(), rctVisible.mBottom, compare_bottom());
+
+	// We'd like to scroll to three lines above, or three lines below the requested line
+	S32 nScrollPos = mCursorPos;
+	if (itFirst->mLineNum + 3 > nLine)
+	{
+		// Scroll up
+		nScrollPos = getLineStart(llmax(0, nLine - 3), false);
+	}
+	else if (itLast->mLineNum - 3 < nLine)
+	{
+		// Scroll down
+		nScrollPos = getLineStart(llmin(nLine + 3, getLineCount()), false);
+	}
+
+	if ( (mScroller) && (nScrollPos != mCursorPos) )
+	{
+		// Scroll so that the cursor is at the top of the page
+		LLRect rctDesired = getDocRectFromDocIndex(nScrollPos);
+		mScroller->scrollToShowRect(rctDesired, LLRect(0, rctVisible.getHeight() - 5, rctVisible.getWidth(), 5));
+	}
+
+	setCursor(nLine, nColumn);
+	mScrollNeeded = FALSE; 
+}
+// [/SL:KB
 
 bool LLTextBase::scrolledToStart()
 {
