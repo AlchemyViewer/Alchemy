@@ -1752,14 +1752,18 @@ BOOL LLWindowWin32::switchContext(BOOL fullscreen, const LLCoordScreen &size, BO
 	}
 	
 	// Disable vertical sync for swap
-	if (disable_vsync && wglSwapIntervalEXT)
+	if (epoxy_has_wgl_extension(mhDC, "WGL_EXT_swap_control"))
 	{
-		LL_DEBUGS("Window") << "Disabling vertical sync" << LL_ENDL;
-		wglSwapIntervalEXT(0);
-	}
-	else
-	{
-		LL_DEBUGS("Window") << "Keeping vertical sync" << LL_ENDL;
+		if (disable_vsync)
+		{
+			LL_INFOS("Window") << "Disabling vertical sync" << LL_ENDL;
+			wglSwapIntervalEXT(0);
+		}
+		else
+		{
+			LL_INFOS("Window") << "Keeping vertical sync" << LL_ENDL;
+			wglSwapIntervalEXT(1);
+		}
 	}
 
 	SetWindowLongPtr(mWindowHandle, GWLP_USERDATA, (LONG_PTR)this);
