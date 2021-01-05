@@ -481,10 +481,7 @@ void LLTextBase::drawHighlightsBackground(const highlight_list_t& highlights, co
 							segmentp->getDimensions(segment_offset, num_chars, segment_width, segment_height);
 							selection_rect.mRight += segment_width;
 
-// [SL:KB] - Patch: Control-TextHighlight | Checked: 2013-12-30 (Catznip-3.6)
-							continue;
-// [/SL:KB]
-//							break;
+							break;
 						}
 					}
 					selection_rects.push_back(selection_rect);
