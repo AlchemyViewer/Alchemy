@@ -2740,6 +2740,66 @@ BOOL LLTextEditor::exportBuffer(std::string &buffer )
 	return TRUE;
 }
 
+// [SL:KB] - Patch: Build-AssetRecovery | Checked: 2013-07-28 (Catznip-3.6)
+
+// Copy/paste from LLScriptEdCore
+bool LLTextEditor::loadFromFile(const std::string& filename)
+{
+	if (filename.empty())
+	{
+		LL_WARNS() << "Empty file name" << LL_ENDL;
+		return false;
+	}
+
+	LLFILE* file = LLFile::fopen(filename, "rb");		/*Flawfinder: ignore*/
+	if (!file)
+	{
+		LL_WARNS() << "Error opening " << filename << LL_ENDL;
+		return false;
+	}
+
+	// read in the whole file
+	fseek(file, 0L, SEEK_END);
+	size_t file_length = (size_t) ftell(file);
+	fseek(file, 0L, SEEK_SET);
+	char* buffer = new char[file_length+1];
+	size_t nread = fread(buffer, 1, file_length, file);
+	if (nread < file_length)
+	{
+		LL_WARNS() << "Short read" << LL_ENDL;
+	}
+	buffer[nread] = '\0';
+	fclose(file);
+
+	setText(LLStringExplicit(buffer));
+	delete[] buffer;
+
+	return true;
+}
+
+// Copy/paste from LLScriptEdCore
+bool LLTextEditor::writeToFile(const std::string& filename)
+{
+	LLFILE* fp = LLFile::fopen(filename, "wb");
+	if (!fp)
+	{
+		return false;
+	}
+
+	std::string utf8text = getText();
+
+	// Special case for a completely empty script - stuff in one space so it can store properly.  See SL-46889
+	if (utf8text.size() == 0)
+	{
+		utf8text = " ";
+	}
+
+	fputs(utf8text.c_str(), fp);
+	fclose(fp);
+	return true;
+}
+// [/SL:KB]
+
 void LLTextEditor::updateAllowingLanguageInput()
 {
 	LLWindow* window = getWindow();

@@ -83,6 +83,10 @@ public:
 
 	void syncExternal();
 
+// [SL:KB] - Patch: Build-AssetRecovery | Checked: 2013-07-28 (Catznip-3.6)
+	void callbackSaveComplete();
+// [/SL:KB]
+
 protected:
 
 	void updateTitleButtons() override;
@@ -90,6 +94,10 @@ protected:
 	bool saveIfNeeded(LLInventoryItem* copyitem = NULL, bool sync = true);
 
 	void deleteNotecard();
+
+// [SL:KB] - Patch: Build-AssetRecovery | Checked: 2013-07-28 (Catznip-3.6)
+	/*virtual*/ void onBackupTimer();
+// [/SL:KB]
 
 	static void onLoadComplete(LLVFS *vfs,
 							   const LLUUID& asset_uuid,

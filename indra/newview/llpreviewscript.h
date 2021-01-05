@@ -210,6 +210,10 @@ public:
 
 protected:
 	std::string		getTmpFileName();
+// [SL:KB] - Patch: Build-ScriptRecover | Checked: 2011-11-23 (Catznip-3.2)
+	/*virtual*/ void onBackupTimer();
+// [/SL:KB]
+
 	bool			onExternalChange(const std::string& filename);
 	virtual void	saveIfNeeded(bool sync = true) = 0;
 

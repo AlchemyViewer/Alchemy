@@ -42,6 +42,9 @@
 #include "llinventorydefines.h"
 #include "llinventorymodel.h"
 #include "lllineeditor.h"
+// [SL:KB] - Patch: Build-AssetRecovery | Checked: 2013-07-28 (Catznip-3.6)
+#include "llnotecard.h"
+// [/SL:KB]
 #include "llnotificationsutil.h"
 #include "llresmgr.h"
 #include "roles_constants.h"
@@ -268,6 +271,14 @@ void LLPreviewNotecard::loadAsset()
 				editor->makePristine();
 				editor->setEnabled(TRUE);
 				mAssetStatus = PREVIEW_ASSET_LOADED;
+
+// [SL:KB] - Patch: Build-AssetRecovery | Checked: 2013-07-28 (Catznip-3.6)
+				// Start the timer which will perform regular backup saves
+				if (!isBackupRunning())
+				{
+					startBackupTimer(60.0f);
+				}
+// [/SL:KB]
 			}
 			else
 			{
@@ -409,6 +420,14 @@ void LLPreviewNotecard::onLoadComplete(LLVFS *vfs,
 			LL_WARNS() << "Problem loading notecard: " << status << LL_ENDL;
 			preview->mAssetStatus = PREVIEW_ASSET_ERROR;
 		}
+
+// [SL:KB] - Patch: Build-AssetRecovery | Checked: 2013-07-28 (Catznip-3.6)
+		// Start the timer which will perform regular backup saves
+		if (!preview->isBackupRunning())
+		{
+			preview->startBackupTimer(60.0f);
+		}
+// [/SL:KB]
 	}
 	delete floater_key;
 }
@@ -623,6 +642,44 @@ void LLPreviewNotecard::deleteNotecard()
 {
 	LLNotificationsUtil::add("DeleteNotecard", LLSD(), LLSD(), boost::bind(&LLPreviewNotecard::handleConfirmDeleteDialog,this, _1, _2));
 }
+
+// [SL:KB] - Patch: Build-AssetRecovery | Checked: 2013-07-28 (Catznip-3.6)
+void LLPreviewNotecard::onBackupTimer()
+{
+	LLViewerTextEditor* pEditor = findChild<LLViewerTextEditor>("Notecard Editor");
+	if ( (pEditor) && (!pEditor->isPristine()) )
+	{
+		if (mBackupFilename.empty())
+			mBackupFilename = getBackupFileName();
+
+		if (!mBackupFilename.empty())
+		{
+			LLNotecard notecard(LLNotecard::MAX_SIZE);
+			notecard.setText(pEditor->getText());
+
+			std::stringstream strmNotecard;
+			notecard.exportStream(strmNotecard);
+
+			std::ofstream outNotecardFile(mBackupFilename.c_str(), std::ios::out | std::ios::binary | std::ios::trunc);
+			if (outNotecardFile.is_open())
+			{
+				outNotecardFile << strmNotecard.rdbuf();
+				outNotecardFile.close();
+			}
+		}
+	}
+}
+
+void LLPreviewNotecard::callbackSaveComplete()
+{
+	// Notecard was successfully saved so delete our backup copy if we have one and the editor is still pristine
+	LLViewerTextEditor* pEditor = findChild<LLViewerTextEditor>("Notecard Editor");
+	if ( (pEditor) && (pEditor->isPristine()) && (hasBackupFile()) )
+	{
+		removeBackupFile();
+	}
+}
+// [/SL:KB]
 
 // static
 void LLPreviewNotecard::onSaveComplete(const LLUUID& asset_uuid, void* user_data, S32 status, LLExtStat ext_status) // StoreAssetData callback (fixed)

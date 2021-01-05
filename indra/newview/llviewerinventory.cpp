@@ -129,6 +129,25 @@ public:
 		}
 		return found;
 	}
+
+// [SL:KB] - Patch: Build-ScriptRecover | Checked: 2013-03-10 (Catznip-3.4)
+	bool revertInventoryObjectName(std::string& object_name)
+	{
+		LL_DEBUGS("InventoryLocalize") << "Searching for localization: " << object_name << LL_ENDL;
+
+		for (auto itDict = mInventoryItemsDict.cbegin(); itDict != mInventoryItemsDict.cend(); ++itDict)
+		{
+			if (itDict->second == object_name)
+			{
+				object_name = itDict->first;
+				LL_DEBUGS("InventoryLocalize") << "Found, new name is: " << object_name << LL_ENDL;
+				return true;
+			}
+		}
+		return false;
+	}
+// [/SL:KB]
+
 };
 
 LLLocalizedInventoryItemsDictionary::LLLocalizedInventoryItemsDictionary()
@@ -2060,6 +2079,18 @@ BOOL LLViewerInventoryItem::extractSortFieldAndDisplayName(const std::string& na
 
 	return result;
 }
+
+// [SL:KB] - Patch: Build-ScriptRecover | Checked: 2013-03-10 (Catznip-3.4)
+bool LLViewerInventoryItem::lookupLocalizedName(std::string& name)
+{
+	return LLLocalizedInventoryItemsDictionary::instance().localizeInventoryObjectName(name);
+}
+
+bool LLViewerInventoryItem::lookupSystemName(std::string& name)
+{
+	return LLLocalizedInventoryItemsDictionary::instance().revertInventoryObjectName(name);
+}
+// [/SL:KB]
 
 // This returns true if the item that this item points to 
 // doesn't exist in memory (i.e. LLInventoryModel).  The baseitem

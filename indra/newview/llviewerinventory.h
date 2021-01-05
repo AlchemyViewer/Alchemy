@@ -83,6 +83,10 @@ public:
 	virtual U32 getCRC32() const; // really more of a checksum.
 
 	static BOOL extractSortFieldAndDisplayName(const std::string& name, S32* sortField, std::string* displayName);
+// [SL:KB] - Patch: Build-ScriptRecover | Checked: 2013-03-10 (Catznip-3.4)
+	static bool lookupLocalizedName(std::string& name);
+	static bool lookupSystemName(std::string& name);
+// [/SL:KB]
 
 	// construct a complete viewer inventory item
 	LLViewerInventoryItem(const LLUUID& uuid, const LLUUID& parent_uuid,
