@@ -476,7 +476,7 @@ public:
 		{
 			return LLMuteList::getInstance()->isMuted(getAvatarId(), LLMute::flagVoiceChat);
 		}
-		if (level == "is_muted")
+		else if (level == "is_muted")
 		{
 			return LLMuteList::getInstance()->isMuted(getAvatarId(), LLMute::flagTextChat);
 		}
