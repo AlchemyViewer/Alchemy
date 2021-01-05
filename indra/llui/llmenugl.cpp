@@ -187,7 +187,7 @@ LLMenuItemGL::LLMenuItemGL(const LLMenuItemGL::Params& p)
 	{
 		mAcceleratorMask |= MASK_SHIFT;
 	}
-	S32 pipe_pos = shortcut.rfind("|");
+	size_t pipe_pos = shortcut.rfind("|");
 	std::string key_str = shortcut.substr(pipe_pos+1);
 
 	LLKeyboard::keyFromString(key_str, &mAcceleratorKey);

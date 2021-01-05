@@ -2530,7 +2530,7 @@ void LLTextBase::appendAndHighlightText(const std::string &new_text, S32 highlig
 	std::string::size_type start = 0;
 	std::string::size_type pos = new_text.find("\n",start);
 	
-	while(pos!=-1)
+	while(pos != std::string::npos)
 	{
 		if(pos!=start)
 		{

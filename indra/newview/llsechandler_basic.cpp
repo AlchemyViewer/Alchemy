@@ -747,7 +747,7 @@ bool _cert_subdomain_wildcard_match(const std::string& subdomain,
 {
 	// split wildcard into the portion before the *, and the portion after
 
-	int wildcard_pos = wildcard.find_first_of('*');	
+	std::string::size_type wildcard_pos = wildcard.find_first_of('*');	
 	// check the case where there is no wildcard.
 	if(wildcard_pos == wildcard.npos)
 	{
@@ -779,7 +779,7 @@ bool _cert_subdomain_wildcard_match(const std::string& subdomain,
 	std::string new_subdomain = subdomain.substr(wildcard_pos, subdomain.npos);
 	
 	// iterate through the current subdomain, finding instances of the match string.
-	int sub_pos = new_subdomain.find_first_of(new_wildcard_match_string);
+	std::string::size_type sub_pos = new_subdomain.find_first_of(new_wildcard_match_string);
 	while(sub_pos != std::string::npos)
 	{
 		new_subdomain = new_subdomain.substr(sub_pos, std::string::npos);
@@ -811,8 +811,8 @@ bool _cert_hostname_wildcard_match(const std::string& hostname, const std::strin
 	std::string new_cn = common_name;
 	
 	// find the last '.' in the hostname and the match name.
-	int subdomain_pos = new_hostname.find_last_of('.');
-	int subcn_pos = new_cn.find_last_of('.');
+	std::string::size_type subdomain_pos = new_hostname.find_last_of('.');
+	std::string::size_type subcn_pos = new_cn.find_last_of('.');
 	
 	// if the last char is a '.', strip it
 	if(subdomain_pos == (new_hostname.length()-1))
