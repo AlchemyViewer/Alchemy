@@ -35,6 +35,9 @@
 #define DIFFUSE_ALPHA_MODE_EMISSIVE 3
 
 uniform float emissive_brightness;  // fullbright flag, 1.0 == fullbright, 0.0 otherwise
+
+#if (DIFFUSE_ALPHA_MODE == DIFFUSE_ALPHA_MODE_BLEND)
+
 uniform int sun_up_factor;
 
 #ifdef WATER_FOG
@@ -51,8 +54,6 @@ void calcAtmosphericVars(vec3 inPositionEye, vec3 light_dir, float ambFactor, ou
 
 vec3 srgb_to_linear(vec3 cs);
 vec3 linear_to_srgb(vec3 cs);
-
-#if (DIFFUSE_ALPHA_MODE == DIFFUSE_ALPHA_MODE_BLEND)
 
 #ifdef DEFINE_GL_FRAGCOLOR
 out vec4 frag_color;

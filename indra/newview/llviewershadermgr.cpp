@@ -1530,12 +1530,12 @@ BOOL LLViewerShaderMgr::loadShadersDeferred()
 
             bool has_skin = i & 0x10;
             gDeferredMaterialProgram[i].mFeatures.hasSrgb = true;
-            gDeferredMaterialProgram[i].mFeatures.hasTransport = true;
-            gDeferredMaterialProgram[i].mFeatures.encodesNormal = true;
-            gDeferredMaterialProgram[i].mFeatures.calculatesAtmospherics = true;
-            gDeferredMaterialProgram[i].mFeatures.hasAtmospherics = true;
-            gDeferredMaterialProgram[i].mFeatures.hasGamma = true;
-            gDeferredMaterialProgram[i].mFeatures.hasShadows = use_sun_shadow;
+			gDeferredMaterialProgram[i].mFeatures.encodesNormal = true;
+            gDeferredMaterialProgram[i].mFeatures.calculatesAtmospherics = (alpha_mode == 1);
+            gDeferredMaterialProgram[i].mFeatures.hasAtmospherics = (alpha_mode == 1);
+            gDeferredMaterialProgram[i].mFeatures.hasGamma = (alpha_mode == 1);
+			gDeferredMaterialProgram[i].mFeatures.hasTransport = (alpha_mode == 1);
+			gDeferredMaterialProgram[i].mFeatures.hasShadows = use_sun_shadow;
             
             if (has_skin)
             {
@@ -1604,14 +1604,13 @@ BOOL LLViewerShaderMgr::loadShadersDeferred()
                 gDeferredMaterialWaterProgram[i].addPermutation("LOCAL_LIGHT_KILL", "1");
             }
 
-            gDeferredMaterialWaterProgram[i].mFeatures.hasWaterFog = true;
             gDeferredMaterialWaterProgram[i].mFeatures.hasSrgb = true;
             gDeferredMaterialWaterProgram[i].mFeatures.encodesNormal = true;
-            gDeferredMaterialWaterProgram[i].mFeatures.calculatesAtmospherics = true;
-            gDeferredMaterialWaterProgram[i].mFeatures.hasAtmospherics = true;
-            gDeferredMaterialWaterProgram[i].mFeatures.hasGamma = true;
-
-            gDeferredMaterialWaterProgram[i].mFeatures.hasTransport = true;
+            gDeferredMaterialWaterProgram[i].mFeatures.calculatesAtmospherics = (alpha_mode == 1);
+            gDeferredMaterialWaterProgram[i].mFeatures.hasAtmospherics = (alpha_mode == 1);
+			gDeferredMaterialWaterProgram[i].mFeatures.hasWaterFog = (alpha_mode == 1);
+			gDeferredMaterialWaterProgram[i].mFeatures.hasGamma = (alpha_mode == 1);
+			gDeferredMaterialWaterProgram[i].mFeatures.hasTransport = (alpha_mode == 1);
             gDeferredMaterialWaterProgram[i].mFeatures.hasShadows = use_sun_shadow;
             
             if (has_skin)
@@ -2026,15 +2025,10 @@ BOOL LLViewerShaderMgr::loadShadersDeferred()
 	if (success)
 	{
 		gDeferredAvatarEyesProgram.mName = "Deferred Avatar Eyes Shader";
-		gDeferredAvatarEyesProgram.mFeatures.calculatesAtmospherics = true;
-		gDeferredAvatarEyesProgram.mFeatures.hasGamma = true;
-		gDeferredAvatarEyesProgram.mFeatures.hasTransport = true;
 		gDeferredAvatarEyesProgram.mFeatures.disableTextureIndex = true;
 		gDeferredAvatarEyesProgram.mFeatures.hasSrgb = true;
 		gDeferredAvatarEyesProgram.mFeatures.encodesNormal = true;
-		gDeferredAvatarEyesProgram.mFeatures.hasShadows = true;
-
-		gDeferredAvatarEyesProgram.mShaderFiles.clear();
+			gDeferredAvatarEyesProgram.mShaderFiles.clear();
 		gDeferredAvatarEyesProgram.mShaderFiles.push_back(make_pair("deferred/avatarEyesV.glsl", GL_VERTEX_SHADER));
 		gDeferredAvatarEyesProgram.mShaderFiles.push_back(make_pair("deferred/diffuseF.glsl", GL_FRAGMENT_SHADER));
 		gDeferredAvatarEyesProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
@@ -2470,15 +2464,7 @@ BOOL LLViewerShaderMgr::loadShadersDeferred()
 		gDeferredTerrainProgram.mName = "Deferred Terrain Shader";
 		gDeferredTerrainProgram.mFeatures.encodesNormal = true;
 		gDeferredTerrainProgram.mFeatures.hasSrgb = true;
-		gDeferredTerrainProgram.mFeatures.calculatesLighting = false;
-		gDeferredTerrainProgram.mFeatures.hasLighting = false;
-		gDeferredTerrainProgram.mFeatures.isAlphaLighting = true;
 		gDeferredTerrainProgram.mFeatures.disableTextureIndex = true; //hack to disable auto-setup of texture channels
-		gDeferredTerrainProgram.mFeatures.hasWaterFog = true;
-		gDeferredTerrainProgram.mFeatures.calculatesAtmospherics = true;
-		gDeferredTerrainProgram.mFeatures.hasAtmospherics = true;
-		gDeferredTerrainProgram.mFeatures.hasGamma = true;
-		gDeferredTerrainProgram.mFeatures.hasTransport = true;
 
 		gDeferredTerrainProgram.mShaderFiles.clear();
 		gDeferredTerrainProgram.mShaderFiles.push_back(make_pair("deferred/terrainV.glsl", GL_VERTEX_SHADER));
@@ -2493,15 +2479,7 @@ BOOL LLViewerShaderMgr::loadShadersDeferred()
 		gDeferredTerrainWaterProgram.mName = "Deferred Terrain Underwater Shader";
 		gDeferredTerrainWaterProgram.mFeatures.encodesNormal = true;
 		gDeferredTerrainWaterProgram.mFeatures.hasSrgb = true;
-		gDeferredTerrainWaterProgram.mFeatures.calculatesLighting = false;
-		gDeferredTerrainWaterProgram.mFeatures.hasLighting = false;
-		gDeferredTerrainWaterProgram.mFeatures.isAlphaLighting = true;
 		gDeferredTerrainWaterProgram.mFeatures.disableTextureIndex = true; //hack to disable auto-setup of texture channels
-		gDeferredTerrainWaterProgram.mFeatures.hasWaterFog = true;
-		gDeferredTerrainWaterProgram.mFeatures.calculatesAtmospherics = true;
-		gDeferredTerrainWaterProgram.mFeatures.hasAtmospherics = true;
-		gDeferredTerrainWaterProgram.mFeatures.hasGamma = true;
-		gDeferredTerrainWaterProgram.mFeatures.hasTransport = true;
 
 		gDeferredTerrainWaterProgram.mShaderFiles.clear();
 		gDeferredTerrainWaterProgram.mShaderFiles.push_back(make_pair("deferred/terrainV.glsl", GL_VERTEX_SHADER));
