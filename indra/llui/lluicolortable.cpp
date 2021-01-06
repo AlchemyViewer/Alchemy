@@ -220,19 +220,20 @@ bool LLUIColorTable::loadFromSettings()
 	return result;
 }
 
-void LLUIColorTable::saveUserSettings() const
+void LLUIColorTable::saveUserSettings(const bool scrub /* = false */) const
 {
 	Params params;
 
-	for(string_color_map_t::const_iterator it = mUserSetColors.begin();
-		it != mUserSetColors.end();
-		++it)
+	if (!scrub)
 	{
-		ColorEntryParams color_entry;
-		color_entry.name = it->first;
-		color_entry.color.value = it->second;
+		for (const auto& color_pair : mUserSetColors)
+        {
+			ColorEntryParams color_entry;
+			color_entry.name = color_pair.first;
+			color_entry.color.value = color_pair.second;
 
-		params.color_entries.add(color_entry);
+			params.color_entries.add(color_entry);
+		}
 	}
 
 	LLXMLNodePtr output_node = new LLXMLNode("colors", false);
@@ -274,15 +275,14 @@ void LLUIColorTable::clearTable(string_color_map_t& table)
 // if the color already exists it changes the color
 void LLUIColorTable::setColor(std::string_view name, const LLColor4& color, string_color_map_t& table)
 {
-	string_color_map_t::iterator it = table.lower_bound(name);
-	if(it != table.end()
-	&& !(table.key_comp()(name, it->first)))
+	string_color_map_t::iterator it = table.find(name);
+	if(it != table.end())
 	{
 		it->second = color;
 	}
 	else
 	{
-		table.insert(it, string_color_map_t::value_type(name, color));
+		table.emplace(name, color);
 	}
 }
 
