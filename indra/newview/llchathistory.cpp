@@ -1539,9 +1539,7 @@ void LLChatHistory::appendMessage(const LLChat& chat, const LLSD &args, const LL
 			}
 		}
 	}
-
-	// usual messages showing
-	else
+	else // usual messages showing
 	{
 		std::string message = irc_me ? chat.mText.substr(3) : chat.mText;
 
@@ -1568,7 +1566,10 @@ void LLChatHistory::appendMessage(const LLChat& chat, const LLSD &args, const LL
 			{
 				from_name = av_name.getCompleteName();
 			}
-			message = from_name + message;
+// [AL:SE] - Patch: Chat-Alerts | Checked: 2020-01-05
+			mEditor->appendText(from_name, prependNewLineState, body_message_params);
+// [AL:SE]
+//			message = from_name + message;
 		}
 		
 		if (square_brackets)
@@ -1581,7 +1582,7 @@ void LLChatHistory::appendMessage(const LLChat& chat, const LLSD &args, const LL
 		if (sEnableChatAlerts)
 		{
 			S32 nHighlightMask = mEditor->getHighlightsMask();
-			if ( (CHAT_STYLE_HISTORY != chat.mChatStyle) && (gAgentID != chat.mFromID) )
+			if ( (CHAT_STYLE_HISTORY != chat.mChatStyle) && chat.mFromID.notNull() && (gAgentID != chat.mFromID) && (chat.mFromName != SYSTEM_FROM))
 			{
 				const LLIMModel::LLIMSession* pSession = NULL;
 				if (chat.mSessionID.isNull())
