@@ -249,6 +249,7 @@ set(viewer_SOURCE_FILES
     llfloaterbuyland.cpp
     llfloatercamera.cpp
     llfloatercamerapresets.cpp
+    llfloaterchatalerts.cpp
     llfloaterchatvoicevolume.cpp
     llfloatercolorpicker.cpp
     llfloaterconversationlog.cpp
@@ -910,6 +911,7 @@ set(viewer_HEADER_FILES
     llfloaterbuyland.h
     llfloatercamerapresets.h
     llfloatercamera.h
+    llfloaterchatalerts.h
     llfloaterchatvoicevolume.h
     llfloatercolorpicker.h
     llfloaterconversationlog.h

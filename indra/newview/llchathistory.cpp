@@ -64,6 +64,12 @@
 #include "lluiconstants.h"
 #include "llstring.h"
 #include "llurlaction.h"
+// [SL:KB] - Patch: Chat-Alerts | Checked: 2012-07-10 (Catznip-3.3)
+#include "llaudioengine.h"
+#include "lltextparser.h"
+#include "llviewerwindow.h"
+#include "llwindow.h"
+// [/SL:KB]
 #include "llviewercontrol.h"
 #include "llviewermenu.h"
 #include "llviewerobjectlist.h"
@@ -1099,6 +1105,9 @@ private:
 
 LLChatHistory::LLChatHistory(const LLChatHistory::Params& p)
 :	LLUICtrl(p),
+// [SL:KB] - Patch: Chat-Alerts | Checked: 2012-08-27 (Catznip-3.3)
+	mParseHighlightTypeMask(PARSE_ALL),
+// [/SL:KB]
 	mMessageHeaderFilename(p.message_header),
 	mMessageSeparatorFilename(p.message_separator),
 	mLeftTextPad(p.left_text_pad),
@@ -1121,7 +1130,9 @@ LLChatHistory::LLChatHistory(const LLChatHistory::Params& p)
 	mEditor = LLUICtrlFactory::create<LLTextEditor>(editor_params, this);
 	mEditor->setIsFriendCallback(LLAvatarActions::isFriend);
 	mEditor->setIsObjectBlockedCallback(boost::bind(&LLMuteList::isMuted, LLMuteList::getInstance(), _1, _2, 0));
-
+// [SL:KB] - Patch: Chat-Alerts | Checked: 2012-07-10 (Catznip-3.3)
+	mEditor->setHighlightsCallback(boost::bind(&LLChatHistory::onTextHighlight, this, _1, _2));
+// [/SL:KB]
 }
 
 LLSD LLChatHistory::getValue() const
@@ -1565,7 +1576,40 @@ void LLChatHistory::appendMessage(const LLChat& chat, const LLSD &args, const LL
 			message += "]";
 	}
 
-		mEditor->appendText(message, prependNewLineState, body_message_params);
+// [SL:KB] - Patch: Chat-Alerts | Checked: 2012-07-10 (Catznip-3.3)
+		static LLCachedControl<bool> sEnableChatAlerts(gSavedSettings, "ChatAlerts", false);
+		if (sEnableChatAlerts)
+		{
+			S32 nHighlightMask = mEditor->getHighlightsMask();
+			if ( (CHAT_STYLE_HISTORY != chat.mChatStyle) && (gAgentID != chat.mFromID) )
+			{
+				const LLIMModel::LLIMSession* pSession = NULL;
+				if (chat.mSessionID.isNull())
+				{
+					mEditor->setHighlightsMask(nHighlightMask| LLHighlightEntry::CAT_NEARBYCHAT);
+				}
+				else if (pSession = LLIMModel::getInstance()->findIMSession(chat.mSessionID))
+				{
+					if (pSession->isP2PSessionType())
+						mEditor->setHighlightsMask(nHighlightMask | LLHighlightEntry::CAT_IM);
+					else if ( (pSession->isGroupSessionType()) || (pSession->isAdHocSessionType()) )
+						mEditor->setHighlightsMask(nHighlightMask | LLHighlightEntry::CAT_GROUP);
+				}
+			}
+			else
+			{
+				mEditor->setHighlightsMask(LLHighlightEntry::CAT_GENERAL);
+			}
+
+			mEditor->appendText(message, prependNewLineState, body_message_params);
+			mEditor->setHighlightsMask(nHighlightMask & ~(LLHighlightEntry::CAT_NEARBYCHAT | LLHighlightEntry::CAT_IM | LLHighlightEntry::CAT_GROUP));
+		}
+		else
+		{
+			mEditor->appendText(message, prependNewLineState, body_message_params);
+		}
+// [/SL:KB]
+//		mEditor->appendText(message, prependNewLineState, body_message_params);
 		prependNewLineState = false;
 	}
 
@@ -1588,3 +1632,24 @@ void LLChatHistory::draw()
 
 	LLUICtrl::draw();
 }
+
+// [SL:KB] - Patch: Chat-Alerts | Checked: 2012-08-27 (Catznip-3.3)
+void LLChatHistory::onTextHighlight(const std::string& strText, const LLHighlightEntry* pEntry)
+{
+	if (!pEntry)
+	{
+		return;
+	}
+
+	if ( (mParseHighlightTypeMask && PARSE_SOUND) && (pEntry->mSoundAsset.notNull()) && (gAudiop) )
+	{
+		gAudiop->triggerSound(pEntry->mSoundAsset, gAgent.getID(), 1.f, LLAudioEngine::AUDIO_TYPE_UI, gAgent.getPositionGlobal());
+	}
+	if ( (mParseHighlightTypeMask && PARSE_FLASH) && (pEntry->mFlashWindow) )
+	{
+		LLWindow* pWindow = gViewerWindow->getWindow();
+		if ( (pWindow) && (pWindow->getMinimized()) )
+			pWindow->flashIcon(5.f);
+	}
+}
+// [/SL:KB]

@@ -37,6 +37,9 @@
 #include "lllocalcliprect.h"
 #include "lltrans.h"
 #include "llfloaterimnearbychat.h"
+// [SL:KB] - Patch: Chat-Alerts | Checked: 2012-08-29 (Catznip-3.3)
+#include "lltextparser.h"
+// [/SL:KB]
 
 #include "llviewercontrol.h"
 #include "llagentdata.h"
@@ -66,12 +69,12 @@ public:
 		if (params.size() < 2) return false;
 
 		LLUUID object_id;
-		if (!object_id.set(params[0].asStringRef(), FALSE))
+		if (!object_id.set(params[0].asString(), FALSE))
 		{
 			return false;
 		}
 
-		const std::string& verb = params[1].asStringRef();
+		const std::string verb = params[1].asString();
 
 		if (verb == "inspect")
 		{
@@ -131,7 +134,10 @@ BOOL LLFloaterIMNearbyChatToastPanel::postBuild()
 	return LLPanel::postBuild();
 }
 
-void LLFloaterIMNearbyChatToastPanel::addMessage(LLSD& notification)
+//void LLFloaterIMNearbyChatToastPanel::addMessage(LLSD& notification)
+// [SL:KB] - Patch: Chat-Alerts | Checked: 2012-08-29 (Catznip-3.3)
+void LLFloaterIMNearbyChatToastPanel::addMessage(const LLSD& notification, bool prepend_newline)
+// [/SL:KB]
 {
 	std::string		messageText = notification["message"].asString();		// UTF-8 line of text
 
@@ -151,6 +157,36 @@ void LLFloaterIMNearbyChatToastPanel::addMessage(LLSD& notification)
 		case 1: messageFont = LLFontGL::getFontSansSerif();	    break;
 		case 2:	messageFont = LLFontGL::getFontSansSerifBig();	break;
 	}
+
+// [SL:KB] - Patch: Chat-Alerts | Checked: Catznip-5.3
+	// Copied from LLFloaterIMNearbyChatToastPanel::init(LLSD& notification)
+	S32 chars_in_line = mMsgText->getRect().getWidth() / messageFont->getWidth("c");
+	S32 max_lines = notification["available_height"].asInteger() / (mMsgText->getTextPixelHeight() + 4);
+	int lines = 0;
+	int chars = 0;
+
+	//Remove excessive chars if message does not fit in available height. MAINT-6891
+	std::string::iterator it;
+	for (it = messageText.begin(); it < messageText.end() && lines < max_lines; it++)
+	{
+		if (*it == '\n')
+			++lines;
+		else
+			++chars;
+
+		if (chars >= chars_in_line)
+		{
+			chars = 0;
+			++lines;
+		}
+	}
+
+	if (it < messageText.end())
+	{
+		messageText.erase(it, messageText.end());
+		messageText += " ...";
+	}
+// [/SL:KB]
 
 	//append text
 	{
@@ -175,7 +211,22 @@ void LLFloaterIMNearbyChatToastPanel::addMessage(LLSD& notification)
 		{
 			style_params.font.style = "ITALIC";
 		}
-		mMsgText->appendText(messageText, TRUE, style_params);
+
+// [SL:KB] - Patch: Chat-Alerts | Checked: 2012-08-29 (Catznip-3.3)
+		static LLCachedControl<bool> sEnableChatAlerts(gSavedSettings, "ChatAlerts", false);
+		if ( (sEnableChatAlerts) && (gAgentID != mFromID) )
+		{
+			S32 nHighlightMask = mMsgText->getHighlightsMask();
+			mMsgText->setHighlightsMask(nHighlightMask | LLHighlightEntry::CAT_NEARBYCHAT);
+			mMsgText->appendText(messageText, prepend_newline, style_params);
+			mMsgText->setHighlightsMask(nHighlightMask & ~LLHighlightEntry::CAT_NEARBYCHAT);
+		}
+		else
+		{
+			mMsgText->appendText(messageText, TRUE, style_params);
+		}
+// [/SL:KB]
+//		mMsgText->appendText(messageText, TRUE, style_params);
 	}
 
 	snapToMessageHeight();
@@ -184,7 +235,7 @@ void LLFloaterIMNearbyChatToastPanel::addMessage(LLSD& notification)
 
 void LLFloaterIMNearbyChatToastPanel::init(LLSD& notification)
 {
-	std::string		messageText = notification["message"].asString();		// UTF-8 line of text
+//	std::string		messageText = notification["message"].asString();		// UTF-8 line of text
 	std::string		fromName = notification["from"].asString();	// agent or object name
 	mFromID = notification["from_id"].asUUID();		// agent id or object id
 	mFromName = fromName;
@@ -196,10 +247,10 @@ void LLFloaterIMNearbyChatToastPanel::init(LLSD& notification)
 	int sType = notification["source"].asInteger();
     mSourceType = (EChatSourceType)sType;
 	
-	std::string color_name = notification["text_color"].asString();
-	
-	LLColor4 textColor = LLUIColorTable::instance().getColor(color_name);
-	textColor.mV[VALPHA] =notification["color_alpha"].asReal();
+//	std::string color_name = notification["text_color"].asString();
+//	
+//	LLColor4 textColor = LLUIColorTable::instance().getColor(color_name);
+//	textColor.mV[VALPHA] =notification["color_alpha"].asReal();
 	
 	S32 font_size = notification["font_size"].asInteger();
 
@@ -258,61 +309,64 @@ void LLFloaterIMNearbyChatToastPanel::init(LLSD& notification)
 		}
 	}
 
-	S32 chars_in_line = mMsgText->getRect().getWidth() / messageFont->getWidth("c");
-	S32 max_lines = notification["available_height"].asInteger() / (mMsgText->getTextPixelHeight() + 4);
-	int lines = 0;
-	int chars = 0;
-
-	//Remove excessive chars if message does not fit in available height. MAINT-6891
-	std::string::iterator it;
-	for (it = messageText.begin(); it < messageText.end() && lines < max_lines; it++)
-	{
-		if (*it == '\n')
-			++lines;
-		else
-			++chars;
-
-		if (chars >= chars_in_line)
-		{
-			chars = 0;
-			++lines;
-		}
-	}
-
-	if (it < messageText.end())
-	{
-		messageText.erase(it, messageText.end());
-		messageText += " ...";
-	}
-
-	//append text
-	{
-		LLStyle::Params style_params;
-		style_params.color(textColor);
-		std::string font_name = LLFontGL::nameFromFont(messageFont);
-		std::string font_style_size = LLFontGL::sizeFromFont(messageFont);
-		style_params.font.name(font_name);
-		style_params.font.size(font_style_size);
-
-		int chat_type = notification["chat_type"].asInteger();
-
-		if(notification["chat_style"].asInteger()== CHAT_STYLE_IRC)
-		{
-			style_params.font.style = "ITALIC";
-		}
-		else if( chat_type == CHAT_TYPE_SHOUT)
-		{
-			style_params.font.style = "BOLD";
-		}
-		else if( chat_type == CHAT_TYPE_WHISPER)
-		{
-			style_params.font.style = "ITALIC";
-		}
-		mMsgText->appendText(messageText, FALSE, style_params);
-	}
-
-
-	snapToMessageHeight();
+// [SL:KB] - Patch: Chat-Alerts | Checked: 2012-08-29 (Catznip-3.3)
+	addMessage(notification, false);
+// [/SL:KB]
+//	S32 chars_in_line = mMsgText->getRect().getWidth() / messageFont->getWidth("c");
+//	S32 max_lines = notification["available_height"].asInteger() / (mMsgText->getTextPixelHeight() + 4);
+//	int lines = 0;
+//	int chars = 0;
+//
+//	//Remove excessive chars if message does not fit in available height. MAINT-6891
+//	std::string::iterator it;
+//	for (it = messageText.begin(); it < messageText.end() && lines < max_lines; it++)
+//	{
+//		if (*it == '\n')
+//			++lines;
+//		else
+//			++chars;
+//
+//		if (chars >= chars_in_line)
+//		{
+//			chars = 0;
+//			++lines;
+//		}
+//	}
+//
+//	if (it < messageText.end())
+//	{
+//		messageText.erase(it, messageText.end());
+//		messageText += " ...";
+//	}
+//
+//	//append text
+//	{
+//		LLStyle::Params style_params;
+//		style_params.color(textColor);
+//		std::string font_name = LLFontGL::nameFromFont(messageFont);
+//		std::string font_style_size = LLFontGL::sizeFromFont(messageFont);
+//		style_params.font.name(font_name);
+//		style_params.font.size(font_style_size);
+//
+//		int chat_type = notification["chat_type"].asInteger();
+//
+//		if(notification["chat_style"].asInteger()== CHAT_STYLE_IRC)
+//		{
+//			style_params.font.style = "ITALIC";
+//		}
+//		else if( chat_type == CHAT_TYPE_SHOUT)
+//		{
+//			style_params.font.style = "BOLD";
+//		}
+//		else if( chat_type == CHAT_TYPE_WHISPER)
+//		{
+//			style_params.font.style = "ITALIC";
+//		}
+//		mMsgText->appendText(messageText, FALSE, style_params);
+//	}
+//
+//
+//	snapToMessageHeight();
 
 	mIsDirty = true;//will set Avatar Icon in draw
 }

@@ -80,7 +80,10 @@ public:
 	BOOL	handleRightMouseDown(S32 x, S32 y, MASK mask);
 
 	virtual void init(LLSD& data);
-	virtual void addMessage(LLSD& data);
+// [SL:KB] - Patch: Chat-Alerts | Checked: 2012-08-29 (Catznip-3.3)
+	virtual void addMessage(const LLSD& notification, bool prepend_newline = true);
+// [/SL:KB]
+//	virtual void addMessage(LLSD& data);
 
 	virtual void draw();
 

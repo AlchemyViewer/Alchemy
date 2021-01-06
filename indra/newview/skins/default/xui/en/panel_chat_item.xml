@@ -23,6 +23,7 @@
       text_color="white"
       word_wrap="true"
       mouse_opaque="true"
+      parse_highlights="true"
       valign="top"
       name="msg_text">
 	</text_chat>

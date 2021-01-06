@@ -137,6 +137,9 @@
 #include "llstatview.h"
 #include "llstatusbar.h"		// sendMoneyBalanceRequest(), owns L$ balance
 #include "llsurface.h"
+// [SL:KB] - Patch: Control-TextParser | Checked: 2012-07-17 (Catznip-3.3)
+#include "lltextparser.h"
+// [/SL:KB]
 #include "lltexturecache.h"
 #include "lltexturefetch.h"
 #include "lltoolmgr.h"
@@ -283,6 +286,9 @@ void apply_udp_blacklist(const std::string& csv);
 bool process_login_success_response();
 void on_benefits_failed_callback(const LLSD& notification, const LLSD& response);
 void transition_back_to_login_panel(const std::string& emsg);
+// [SL:KB] - Patch: Chat-Alerts | Checked: 2012-09-22 (Catznip-3.3)
+void handleLoadChatAlertSounds();
+// [/SL:KB]
 
 void callback_cache_name(const LLUUID& id, const std::string& full_name, bool is_group)
 {
@@ -994,6 +1000,13 @@ bool idle_startup()
 		LLAvatarIconIDCache::getInstance()->load();
 		
 		LLRenderMuteList::getInstance()->loadFromFile();
+
+// [SL:KB] - Patch: Control-TextParser | Checked: 2012-09-22 (Catznip-3.3)
+		if ( (LLTextParser::instance().loadKeywords()) && (LLTextParser::instance().getHighlightCount() > 0) )
+		{
+			LLAppViewer::instance()->setOnLoginCompletedCallback(boost::bind(&handleLoadChatAlertSounds));
+		}
+// [/SL:KB]
 
 		//-------------------------------------------------
 		// Handle startup progress screen
@@ -3671,3 +3684,28 @@ void transition_back_to_login_panel(const std::string& emsg)
 	gSavedSettings.setBOOL("AutoLogin", FALSE);
 }
 
+
+// [SL:KB] - Patch: Chat--Alerts | Checked: 2012-09-22 (Catznip-3.3)
+void handleLoadChatAlertSounds()
+{
+	const LLTextParser::highlight_list_t& highlights = LLTextParser::instance().getHighlights();
+
+	uuid_vec_t assetIDs;
+	for (LLTextParser::highlight_list_t::const_iterator itHighlight = highlights.begin(); itHighlight != highlights.end(); ++itHighlight)
+	{
+		const LLHighlightEntry& entry = *itHighlight;
+		if ( (entry.mSoundAsset.notNull()) && (assetIDs.end() == std::find(assetIDs.begin(), assetIDs.end(), entry.mSoundAsset)) )
+		{
+			assetIDs.push_back(entry.mSoundAsset);
+		}
+	}
+
+	for (uuid_vec_t::const_iterator itAssetID = assetIDs.begin(); itAssetID != assetIDs.end(); ++itAssetID)
+	{
+		if ( (gAssetStorage) && (!gAssetStorage->hasLocalAsset(*itAssetID, LLAssetType::AT_SOUND)) && (gAudiop) )
+		{
+			gAssetStorage->getAssetData(*itAssetID, LLAssetType::AT_SOUND, LLAudioEngine::assetCallback, NULL);
+		}
+	}
+}
+// [/SL:KB]

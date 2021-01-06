@@ -44,6 +44,9 @@
 class LLScrollContainer;
 class LLContextMenu;
 class LLUrlMatch;
+// [SL:KB] - Patch: Control-TextParser | Checked: 2012-07-10 (Catznip-3.3)
+class LLHighlightEntry;
+// [/SL:KB]
 
 ///
 /// A text segment is used to specify a subsection of a text string
@@ -501,6 +504,14 @@ public:
 	void					setWordWrap(bool wrap);
 	LLScrollContainer*		getScrollContainer() const { return mScroller; }
 
+// [SL:KB] - Patch: Control-TextParser | Checked: 2012-07-10 (Catznip-3.3)
+	void setParseHighlights(bool parse)       { mParseHighlights = parse; }
+	S32  getHighlightsMask() const            { return mHighlightsMask; }
+	void setHighlightsMask(S32 category_mask) { mHighlightsMask = category_mask; }
+
+	typedef boost::signals2::signal<void(const std::string&, const LLHighlightEntry*)> highlights_signal_t;
+	boost::signals2::connection	setHighlightsCallback(const highlights_signal_t::slot_type& cb);
+// [/SL:KB]
 protected:
 	// protected member variables
 	// List of offsets and segment index of the start of each line.  Always has at least one node (0).
@@ -731,6 +742,10 @@ protected:
 	bool                		mParseHTML;			// make URLs interactive
 	bool						mForceUrlsExternal; // URLs from this textbox will be opened in external browser
 	bool						mParseHighlights;	// highlight user-defined keywords
+// [SL:KB] - Patch: Control-TextParser | Checked: 2012-07-10 (Catznip-3.3)
+	S32							mHighlightsMask;	// category mask for matching highlights
+	highlights_signal_t* 		mHighlightsSignal;	// signal fires whenever a highlighted segment is appended
+// [/SL:KB]
 	bool                		mWordWrap;
 	bool						mUseEllipses;
 	bool						mTrackEnd;			// if true, keeps scroll position at end of document during resize

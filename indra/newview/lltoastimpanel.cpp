@@ -36,7 +36,10 @@
 #include "llnotifications.h"
 #include "llinstantmessage.h"
 #include "lltooltip.h"
-
+// [SL:KB] - Patch: Chat-Alerts | Checked: 2012-08-29 (Catznip-3.3)
+#include "lltextparser.h"
+#include "llviewercontrol.h"
+// [/SL:KB]
 #include "llviewerchat.h"
 
 const S32 LLToastIMPanel::DEFAULT_MESSAGE_MAX_LINE_COUNT	= 6;
@@ -68,30 +71,83 @@ LLToastIMPanel::LLToastIMPanel(LLToastIMPanel::Params &p) :	LLToastPanel(p.notif
 	std::string title = mIsGroupMsg ? im_session->mName : p.from;
 	mAvatarName->setValue(title);
 
+// [SL:KB] - Patch: Chat-Alerts | Checked: 2012-08-29 (Catznip-3.3)
+	mMessage->clear();
+
 	//Handle IRC styled /me messages.
 	std::string prefix = p.message.substr(0, 4);
+	std::string message;
 	if (prefix == "/me " || prefix == "/me'")
 	{
-		//style_params.font.style = "UNDERLINE";
-		mMessage->clear();
-		
-		style_params.font.style ="ITALIC";
+		style_params.font.style = "ITALIC";
 		mMessage->appendText(p.from, FALSE, style_params);
 
 		style_params.font.style = "ITALIC";
-		mMessage->appendText(p.message.substr(3), FALSE, style_params);
+		message = p.message.substr(3);
 	}
 	else
 	{
+		message = p.message;
+		style_params.font.style = "NORMAL";
+
 		if (mIsGroupMsg)
 		{
 			LLAvatarName avatar_name;
 			LLAvatarNameCache::get(p.avatar_id, &avatar_name);
-			p.message = "[From " + avatar_name.getDisplayName() + "]\n" + p.message;
+			mMessage->appendText("[From " + avatar_name.getDisplayName() + "]\n", FALSE, style_params);
 		}
-		style_params.font.style =  "NORMAL";
-		mMessage->setText(p.message, style_params);
 	}
+
+	static LLCachedControl<bool> sEnableChatAlerts(gSavedSettings, "ChatAlerts", false);
+	if ( (sEnableChatAlerts) && (im_session) )
+	{
+		S32 nHighlightMask = mMessage->getHighlightsMask();
+
+		switch (im_session->mSessionType)
+		{
+			case LLIMModel::LLIMSession::P2P_SESSION:
+				mMessage->setHighlightsMask(nHighlightMask | LLHighlightEntry::CAT_IM);
+				break;
+			case LLIMModel::LLIMSession::GROUP_SESSION:
+			case LLIMModel::LLIMSession::ADHOC_SESSION:
+				mMessage->setHighlightsMask(nHighlightMask | LLHighlightEntry::CAT_GROUP);
+				break;
+			default:
+				break;
+		}
+
+		mMessage->appendText(message, FALSE, style_params);
+		mMessage->setHighlightsMask(nHighlightMask & ~(LLHighlightEntry::CAT_IM | LLHighlightEntry::CAT_GROUP));
+	}
+	else
+	{
+		mMessage->appendText(message, FALSE, style_params);
+	}
+// [/SL:KB]
+//	//Handle IRC styled /me messages.
+//	std::string prefix = p.message.substr(0, 4);
+//	if (prefix == "/me " || prefix == "/me'")
+//	{
+//		//style_params.font.style = "UNDERLINE";
+//		mMessage->clear();
+//		
+//		style_params.font.style ="ITALIC";
+//		mMessage->appendText(p.from, FALSE, style_params);
+//
+//		style_params.font.style = "ITALIC";
+//		mMessage->appendText(p.message.substr(3), FALSE, style_params);
+//	}
+//	else
+//	{
+//		if (mIsGroupMsg)
+//		{
+//			LLAvatarName avatar_name;
+//			LLAvatarNameCache::get(p.avatar_id, &avatar_name);
+//			p.message = "[From " + avatar_name.getDisplayName() + "]\n" + p.message;
+//		}
+//		style_params.font.style =  "NORMAL";
+//		mMessage->setText(p.message, style_params);
+//	}
 
 	mTime->setValue(p.time);
 	mSessionID = p.session_id;
