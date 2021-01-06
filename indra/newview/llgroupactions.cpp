@@ -53,11 +53,11 @@
 //
 static GroupChatListener sGroupChatListener;
 
-class LLGroupHandler : public LLCommandHandler
+class LLGroupCommandHandler : public LLCommandHandler
 {
 public:
 	// requires trusted browser to trigger
-	LLGroupHandler() : LLCommandHandler("group", UNTRUSTED_THROTTLE) { }
+	LLGroupCommandHandler() : LLCommandHandler("group", UNTRUSTED_THROTTLE) { }
 	bool handle(const LLSD& tokens, const LLSD& query_map,
 				LLMediaCtrl* web)
 	{
@@ -120,7 +120,7 @@ public:
 		return false;
 	}
 };
-LLGroupHandler gGroupHandler;
+LLGroupCommandHandler gGroupHandler;
 
 // This object represents a pending request for specified group member information
 // which is needed to check whether avatar can leave group
