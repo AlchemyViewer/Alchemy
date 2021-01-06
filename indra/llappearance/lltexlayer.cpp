@@ -1055,11 +1055,10 @@ LLTexLayer::~LLTexLayer()
 	//std::for_each(mParamAlphaList.begin(), mParamAlphaList.end(), DeletePointer());
 	//std::for_each(mParamColorList.begin(), mParamColorList.end(), DeletePointer());
 	
-	for( alpha_cache_t::iterator iter = mAlphaCache.begin();
-		 iter != mAlphaCache.end(); iter++ )
-	{
-		U8* alpha_data = iter->second;
-		ll_aligned_free_32(alpha_data);
+	for (auto& iter : mAlphaCache)
+    {
+		U8* alpha_data = iter.second;
+		delete [] alpha_data;
 	}
 
 }
@@ -1554,7 +1553,7 @@ void LLTexLayer::renderMorphMasks(S32 x, S32 y, S32 width, S32 height, const LLC
 		}
 
 		U32 cache_index = alpha_mask_crc.getCRC();
-		U8* alpha_data = NULL; 
+		U8* alpha_data = nullptr; 
                 // We believe we need to generate morph masks, do not assume that the cached version is accurate.
                 // We can get bad morph masks during login, on minimize, and occasional gl errors.
                 // We should only be doing this when we believe something has changed with respect to the user's appearance.
@@ -1566,60 +1565,23 @@ void LLTexLayer::renderMorphMasks(S32 x, S32 y, S32 width, S32 height, const LLC
 			{
 				alpha_cache_t::iterator iter2 = mAlphaCache.begin(); // arbitrarily grab the first entry
 				alpha_data = iter2->second;
-                ll_aligned_free_32(alpha_data);
+				delete [] alpha_data;
 				mAlphaCache.erase(iter2);
 			}
-			
-            // GPUs tend to be very uptight about memory alignment as the DMA used to convey
-            // said data to the card works better when well-aligned so plain old default-aligned heap mem is a no-no
-            //new U8[width * height];
-            size_t bytes_per_pixel = 1; // unsigned byte alpha channel only...
-            size_t row_size        = (width + 3) & ~0x3; // OpenGL 4-byte row align (even for things < 4 bpp...)
-            size_t pixels          = (row_size * height);
-            size_t mem_size        = pixels * bytes_per_pixel;
-
-            alpha_data = (U8*)ll_aligned_malloc_32(mem_size);
-
-            bool skip_readback = LLRender::sNsightDebugSupport; // nSight doesn't support use of glReadPixels
-
-			if (!skip_readback)
+			alpha_data = new U8[width * height];
+			// nSight doesn't support use of glReadPixels
+			if (!LLRender::sNsightDebugSupport)
 			{
-                if (gGLManager.mIsIntel)
-                { // work-around for broken intel drivers which cannot do glReadPixels on an RGBA FBO
-                  // returning only the alpha portion without locking up downstream 
-                    U8* temp = (U8*)ll_aligned_malloc_32(mem_size << 2); // allocate same size, but RGBA
-
-                    if (bound_target)
-                    {
-                        gGL.getTexUnit(0)->bind(bound_target);
-                    }
-                    else
-                    {
-                        gGL.getTexUnit(0)->bindManual(LLTexUnit::TT_TEXTURE, 0);
-                    }
-
-                    glGetTexImage(LLTexUnit::getInternalType(LLTexUnit::TT_TEXTURE), 0, GL_RGBA, GL_UNSIGNED_BYTE, temp);
-
-                    U8* alpha_cursor = alpha_data;
-                    U8* pixel        = temp;
-                    for (int i = 0; i < pixels; i++)
-                    {
-                        *alpha_cursor++ = pixel[3];
-                        pixel += 4;
-                    }
-
-                    gGL.getTexUnit(0)->disable();
-
-                    ll_aligned_free_32(temp);
-                }
-                else
-                { // platforms with working drivers...
-				    glReadPixels(x, y, width, height, GL_ALPHA, GL_UNSIGNED_BYTE, alpha_data);                
-                }
+				U8* pixels_tmp = new U8[width * height * 4];
+				
+				glReadPixels(x, y, width, height, GL_RGBA, GL_UNSIGNED_BYTE, pixels_tmp);
+				for (int i = 0; i < width * height; ++i)
+					alpha_data[i] = pixels_tmp[i * 4 + 3];
+				delete[] pixels_tmp;
 			}
             else
             {
-                ll_aligned_free_32(alpha_data);
+                delete[] alpha_data;
                 alpha_data = nullptr;
             }
 
