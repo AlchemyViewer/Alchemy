@@ -23,6 +23,9 @@
 	<color
 	 name="White_10"
 	 value="1 1 1 0.1" />
+  <color
+	 name="White_20"
+	 value="1 1 1 0.20" />
 	<color
 	 name="White_25"
 	 value="1 1 1 0.25" />
@@ -509,19 +512,19 @@
      value="0.53125 0 0.498047 1" />
     <color
      name="MapChatRingColor"
-     reference="White_10" />
+     reference="White_25" />
     <color
      name="MapShoutRingColor"
-     reference="White_10" />
+     reference="White_25" />
     <color
      name="MapFrustumColor"
-     reference="White_10" />
+     reference="White_20" />
     <color
      name="MapFrustumRotatingColor"
-     reference="White_10" />
+     reference="White_20" />
     <color
      name="MapParcelBoundryLine"
-     reference="White_10" />
+     reference="White" />
     <color
      name="MapTrackColor"
      reference="Red" />
