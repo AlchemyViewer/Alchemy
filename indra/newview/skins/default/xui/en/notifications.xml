@@ -1954,7 +1954,7 @@ You do not have permission to transfer the selected folder.
    icon="alertmodal.tga"
    name="FreezeAvatar"
    type="alertmodal">
-Freeze this avatar?
+Freeze [AVATAR_NAMES]?
 He or she will temporarily be unable to move, chat, or interact with the world.
     <tag>confirm</tag>
     <usetemplate
@@ -1966,10 +1966,12 @@ He or she will temporarily be unable to move, chat, or interact with the world.
 
   <notification
    icon="alertmodal.tga"
-   name="FreezeAvatarFullname"
+   name="FreezeAvatarMultiple"
    type="alertmodal">
-Freeze [AVATAR_NAME]?
-He or she will temporarily be unable to move, chat, or interact with the world.
+Freeze the following residents?
+They will temporarily be unable to move, chat, or interact with the world.
+
+[AVATAR_NAMES]
     <tag>confirm</tag>
     <usetemplate
      canceltext="Cancel"
@@ -1982,7 +1984,7 @@ He or she will temporarily be unable to move, chat, or interact with the world.
    icon="alertmodal.tga"
    name="EjectAvatarFullname"
    type="alertmodal">
-Eject [AVATAR_NAME] from your land?
+Eject [AVATAR_NAMES] from your land?
     <tag>confirm</tag>
     <usetemplate
      canceltext="Cancel"
@@ -1993,9 +1995,38 @@ Eject [AVATAR_NAME] from your land?
 
   <notification
    icon="alertmodal.tga"
-   name="EjectAvatarNoBan"
+   name="EjectAvatarFullnameNoBan"
    type="alertmodal">
-Eject this avatar from your land?
+Eject [AVATAR_NAMES] from your land?
+    <tag>confirm</tag>
+    <usetemplate
+     name="okcancelbuttons"
+     notext="Cancel"
+     yestext="Eject"/>
+  </notification>
+  
+  <notification
+   icon="alertmodal.tga"
+   name="EjectAvatarMultiple"
+   type="alertmodal">
+Eject the following residents from your land?
+
+[AVATAR_NAMES]
+    <tag>confirm</tag>
+    <usetemplate
+     canceltext="Cancel"
+     name="yesnocancelbuttons"
+     notext="Eject and Ban"
+     yestext="Eject"/>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="EjectAvatarMultipleNoBan"
+   type="alertmodal">
+Eject the following residents from your land?
+
+[AVATAR_NAMES]
     <tag>confirm</tag>
     <usetemplate
      name="okcancelbuttons"
@@ -2004,15 +2035,86 @@ Eject this avatar from your land?
   </notification>
 
   <notification
-   icon="alertmodal.tga"
-   name="EjectAvatarFullnameNoBan"
-   type="alertmodal">
-Eject [AVATAR_NAME] from your land?
+   icon="alert.tga"
+   label="Confirm Teleport Home"
+   name="EstateTeleportHomeSingle"
+   type="alert">
+Teleport [AVATAR_NAMES] home?
     <tag>confirm</tag>
     <usetemplate
      name="okcancelbuttons"
      notext="Cancel"
-     yestext="Eject"/>
+     yestext="OK"/>
+  </notification>
+ 
+  <notification
+   icon="alert.tga"
+   label="Confirm Teleport Home"
+   name="EstateTeleportHomeMultiple"
+   type="alert">
+Teleport the following residents home?
+
+[AVATAR_NAMES]
+    <usetemplate
+     name="okcancelbuttons"
+     notext="Cancel"
+     yestext="OK"/>
+  </notification>
+
+  <notification
+   icon="alert.tga"
+   label="Confirm Kick"
+   name="EstateKickSingle"
+   type="alert">
+Kick [AVATAR_NAMES] from this estate?
+    <tag>confirm</tag>
+    <usetemplate
+     name="okcancelbuttons"
+     notext="Cancel"
+     yestext="OK"/>
+  </notification>
+
+  <notification
+   icon="alert.tga"
+   label="Confirm Kick"
+   name="EstateKickMultiple"
+   type="alert">
+Kick the following residents from this estate?
+
+[AVATAR_NAMES]
+    <tag>confirm</tag>
+    <usetemplate
+     name="okcancelbuttons"
+     notext="Cancel"
+     yestext="OK"/>
+  </notification>
+
+  <notification
+   icon="alert.tga"
+   label="Confirm Ban"
+   name="EstateBanSingle"
+   type="alert">
+Deny [AVATAR_NAMES] access to this estate only or for [ALL_ESTATES]?
+    <usetemplate
+     name="yesnocancelbuttons"
+     canceltext="Cancel"
+     notext="All Estates"
+     yestext="This Estate"/>
+  </notification>
+  
+  <notification
+   icon="alert.tga"
+   label="Confirm Ban"
+   name="EstateBanMultiple"
+   type="alert">
+Deny access for the following residents to this estate only or for [ALL_ESTATES]?
+
+[AVATAR_NAMES]
+    <usetemplate
+     name="yesnocancelbuttons"
+     canceltext="Cancel"
+     notext="All Estates"
+     yestext="This Estate"/>
   </notification>
 
   <notification
@@ -4434,7 +4536,7 @@ memberships allow up to [MAX_PREMIUM_PLUS]. [https://secondlife.com/my/account/m
    name="KickUser"
    type="alert">
    <tag>win</tag>
-Kick this Resident with what message?
+Log out [AVATAR_NAME] with what message?
     <tag>confirm</tag>
     <form name="form">
       <input name="message" type="text">
@@ -4481,7 +4583,7 @@ An administrator has logged you off.
    type="alert">
     <tag>win</tag>
     <tag>confirm</tag>
-Freeze this Resident with what message?
+Freeze [AVATAR_NAME] with what message?
     <form name="form">
       <input name="message" type="text">
 You have been frozen. You cannot move or chat. An administrator will contact you via instant message (IM).
@@ -4504,7 +4606,7 @@ You have been frozen. You cannot move or chat. An administrator will contact you
    type="alert">
    <tag>win</tag>
     <tag>confirm</tag>
-Unfreeze this Resident with what message?
+Unfreeze [AVATAR_NAME] with what message?
     <form name="form">
       <input name="message" type="text">
 You are no longer frozen.
