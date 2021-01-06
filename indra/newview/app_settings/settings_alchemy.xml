@@ -508,5 +508,16 @@
       <key>Value</key>
       <boolean>0</boolean>
     </map>
+    <key>ResetUserColorsOnLogout</key>
+    <map>
+      <key>Comment</key>
+      <string>Saves an empty color file on login to start fresh on next launch</string>
+      <key>Persist</key>
+      <integer>0</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <integer>0</integer>
+    </map>
   </map>
 </llsd>

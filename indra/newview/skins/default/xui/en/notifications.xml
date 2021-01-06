@@ -1607,6 +1607,13 @@ This debug setting change will take effect after you restart [APP_NAME].
    name="ChangeSkin"
    type="alertmodal">
 The new skin will appear after you restart [APP_NAME].
+Would you like to reset modified colors back to their defaults?
+   <tag>confirm</tag>
+   <usetemplate
+    canceltext="Cancel"
+    name="yesnocancelbuttons"
+    notext="No"
+    yestext="Yes"/>
   </notification>
 
   <notification
