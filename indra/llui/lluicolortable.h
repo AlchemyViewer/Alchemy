@@ -42,7 +42,7 @@ class LLUIColorTable final : public LLSingleton<LLUIColorTable>
 	LOG_CLASS(LLUIColorTable);
 
 	// consider using sorted vector, can be much faster
-	typedef std::map<std::string, LLUIColor, std::less<>>  string_color_map_t;
+	typedef absl::node_hash_map<std::string, LLUIColor>  string_color_map_t;
 
 public:
 	struct ColorParams : LLInitParam::ChoiceBlock<ColorParams>
