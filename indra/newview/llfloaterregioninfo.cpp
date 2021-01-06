@@ -1324,7 +1324,10 @@ BOOL LLPanelRegionTerrainInfo::validateTextureSizes()
 			return FALSE;
 		}
 
-		if (width > 512 || height > 512)
+//		if (width > 512 || height > 512)
+// [AL:SE] - Patch: Estate-LargeTerrain
+		if (width > 1024 || height > 1024)
+// [/AL:SE]
 		{
 
 			LLSD args;
