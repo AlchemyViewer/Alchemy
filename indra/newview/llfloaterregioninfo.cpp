@@ -1265,8 +1265,11 @@ void LLPanelRegionDebugInfo::onClickTopScripts(void* data)
 // static
 void LLPanelRegionDebugInfo::onClickRestart(void* data)
 {
-	LLNotificationsUtil::add("ConfirmRestart", LLSD(), LLSD(), 
-		boost::bind(&LLPanelRegionDebugInfo::callbackRestart, (LLPanelRegionDebugInfo*)data, _1, _2));
+	LLPanelRegionDebugInfo* self = static_cast<LLPanelRegionDebugInfo*>(data);
+	LLSD payload;
+	payload["SECONDS"] = self->getChild<LLUICtrl>("restart_timer")->getValue().asString();
+	LLNotificationsUtil::add("ConfirmRestart", payload, payload,
+		boost::bind(&LLPanelRegionDebugInfo::callbackRestart, self, _1, _2));
 }
 
 bool LLPanelRegionDebugInfo::callbackRestart(const LLSD& notification, const LLSD& response)
@@ -1275,7 +1278,7 @@ bool LLPanelRegionDebugInfo::callbackRestart(const LLSD& notification, const LLS
 	if (option != 0) return false;
 
 	strings_t strings;
-	strings.push_back("120");
+	strings.push_back(notification["payload"]["SECONDS"].asString());
 	LLUUID invoice(LLFloaterRegionInfo::getLastInvoice());
 	sendEstateOwnerMessage(gMessageSystem, "restart", invoice, strings);
 	return false;
