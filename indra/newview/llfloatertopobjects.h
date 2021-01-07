@@ -28,8 +28,10 @@
 #define LL_LLFLOATERTOPOBJECTS_H
 
 #include "llfloater.h"
+#include "llavatarname.h"
 
 class LLUICtrl;
+class LLScrollListCtrl;
 
 // Bits for simulator performance query flags
 enum LAND_STAT_FLAGS
@@ -83,6 +85,13 @@ private:
 	void onReturnAll();
 	void onReturnSelected();
 
+	void onTeleportTo();
+	void onProfile();
+	void onEstateKick();
+	void onEstateBan();
+
+	void callbackAvatarName(const LLUUID& avatar_id, const LLAvatarName av_name);
+
 	static bool callbackReturnAll(const LLSD& notification, const LLSD& response);
 
 	void onGetByOwnerName();
@@ -92,6 +101,8 @@ private:
 	void showBeacon();
 
 private:
+	LLScrollListCtrl* mObjectList;
+
 	std::string mMethod;
 
 	LLSD mObjectListData;
