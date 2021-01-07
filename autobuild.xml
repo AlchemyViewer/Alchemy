@@ -82,11 +82,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>ff88140ab91e7dd7ea9bdea1647e8d63d46782c9534ac87a849e77d6c85514fa48c40a6cdc0cda0331bc5b39bb04f4e5</string>
+              <string>9c694514ca2555cee7db565c6ed1f02d4c46329d4fcba24dbd02093b65429221616aa201fb230062e7a256e430c8587f</string>
               <key>hash_algorithm</key>
               <string>sha3_384</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/111/packages/generic/apr_suite-695/1.7.0/apr_suite-1.7.0-windows-695.tar.xz</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/111/packages/generic/apr_suite-704/1.4.5/apr_suite-1.4.5-windows-704.tar.xz</string>
             </map>
             <key>name</key>
             <string>windows</string>
@@ -96,18 +96,18 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>defcd88e073273bfde4bea905e13dafda59a3356741019a93911d872d48ee14dc7db576b7e19481b40c01102610ffa12</string>
+              <string>dd7b318a6d355d77f327c7eb24cacc68f09f2affe3cdf624ee06eaaa76b503cd51d41fe8e5c13756c4dd1a889ccfe24d</string>
               <key>hash_algorithm</key>
               <string>sha3_384</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/111/packages/generic/apr_suite-695/1.7.0/apr_suite-1.7.0-windows64-695.tar.xz</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/111/packages/generic/apr_suite-704/1.4.5/apr_suite-1.4.5-windows64-704.tar.xz</string>
             </map>
             <key>name</key>
             <string>windows64</string>
           </map>
         </map>
         <key>version</key>
-        <string>1.7.0</string>
+        <string>1.4.5</string>
       </map>
       <key>boost</key>
       <map>
@@ -3162,7 +3162,6 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
                   <string>-A</string>
                   <string>${AUTOBUILD_WIN_VSPLATFORM|NOTWIN}</string>
                   <string>-DUNATTENDED:BOOL=ON</string>
-=========
                   <string>-DINSTALL_PROPRIETARY=FALSE</string>
                   <string>-DUSE_KDU=FALSE</string>
                 </array>
