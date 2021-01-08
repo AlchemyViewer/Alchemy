@@ -1589,7 +1589,7 @@ void LLChatHistory::appendMessage(const LLChat& chat, const LLSD &args, const LL
 				{
 					mEditor->setHighlightsMask(nHighlightMask| LLHighlightEntry::CAT_NEARBYCHAT);
 				}
-				else if (pSession = LLIMModel::getInstance()->findIMSession(chat.mSessionID))
+				else if ((pSession = LLIMModel::getInstance()->findIMSession(chat.mSessionID)))
 				{
 					if (pSession->isP2PSessionType())
 						mEditor->setHighlightsMask(nHighlightMask | LLHighlightEntry::CAT_IM);
@@ -1642,11 +1642,11 @@ void LLChatHistory::onTextHighlight(const std::string& strText, const LLHighligh
 		return;
 	}
 
-	if ( (mParseHighlightTypeMask && PARSE_SOUND) && (pEntry->mSoundAsset.notNull()) && (gAudiop) )
+	if ( (mParseHighlightTypeMask & PARSE_SOUND) && (pEntry->mSoundAsset.notNull()) && (gAudiop) )
 	{
 		gAudiop->triggerSound(pEntry->mSoundAsset, gAgent.getID(), 1.f, LLAudioEngine::AUDIO_TYPE_UI, gAgent.getPositionGlobal());
 	}
-	if ( (mParseHighlightTypeMask && PARSE_FLASH) && (pEntry->mFlashWindow) )
+	if ( (mParseHighlightTypeMask & PARSE_FLASH) && (pEntry->mFlashWindow) )
 	{
 		LLWindow* pWindow = gViewerWindow->getWindow();
 		if ( (pWindow) && (pWindow->getMinimized()) )
