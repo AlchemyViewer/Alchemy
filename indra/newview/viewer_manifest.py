@@ -1468,12 +1468,8 @@ class Linux_i686_Manifest(LinuxManifest):
         debpkgdir = os.path.join(pkgdir, "lib", "debug")
 
         with self.prefix(src=relpkgdir, dst="lib"):
-            self.path("libapr-1.so")
-            self.path("libapr-1.so.0")
-            self.path("libapr-1.so.0.4.5")
-            self.path("libaprutil-1.so")
-            self.path("libaprutil-1.so.0")
-            self.path("libaprutil-1.so.0.4.1")
+            self.path("libapr-1.so*")
+            self.path("libaprutil-1.so*")
             self.path("libdb*.so")
             self.path("libexpat.so.*")
             self.path("libGLOD.so")
@@ -1515,12 +1511,8 @@ class Linux_x86_64_Manifest(LinuxManifest):
         debpkgdir = os.path.join(pkgdir, "lib", "debug")
 
         with self.prefix(src=relpkgdir, dst="lib"):
-            self.path("libapr-1.so")
-            self.path("libapr-1.so.0")
-            self.path("libapr-1.so.0.4.5")
-            self.path("libaprutil-1.so")
-            self.path("libaprutil-1.so.0")
-            self.path("libaprutil-1.so.0.4.1")
+            self.path("libapr-1.so*")
+            self.path("libaprutil-1.so*")
             self.path("libexpat.so.*")
             self.path("libGLOD.so")
             self.path("libSDL2*.so*")
