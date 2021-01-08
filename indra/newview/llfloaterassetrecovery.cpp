@@ -246,9 +246,11 @@ LLAssetRecoverQueue::LLAssetRecoverQueue(const LLSD& sdFiles)
 					recoveryItem.nNextOwnerPerm = LLFloaterPerms::getNextOwnerPerms("Notecards");
 					removeEmbeddedMarkers(recoveryItem.strPath);
 					break;
+				default:
+					break;
 			}
 
-			if (recoveryItem.eAssetType != LLAssetType::AT_NONE)
+			if (recoveryItem.eAssetType == LLAssetType::AT_LSL_TEXT || recoveryItem.eAssetType == LLAssetType::AT_NOTECARD)
 				m_RecoveryQueue.push_back(recoveryItem);
 		}
 	}
