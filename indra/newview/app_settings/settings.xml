@@ -9333,7 +9333,7 @@
     <key>Type</key>
     <string>F32</string>
     <key>Value</key>
-    <real>500.0</real>
+    <real>1500.0</real>
   </map>
   <key>RenderSSAOMaxScale</key>
   <map>
@@ -9344,7 +9344,7 @@
     <key>Type</key>
     <string>U32</string>
     <key>Value</key>
-    <integer>200</integer>
+    <integer>400</integer>
   </map>
   <key>RenderSSAOFactor</key>
   <map>
@@ -9355,7 +9355,7 @@
     <key>Type</key>
     <string>F32</string>
     <key>Value</key>
-    <real>0.30</real>
+    <real>5.0</real>
   </map>
   <key>RenderSSAOEffect</key>
   <map>
@@ -9367,7 +9367,7 @@
     <string>Vector3</string>
     <key>Value</key>
     <array>
-      <real>0.80</real>
+      <real>0.50</real>
       <real>1.00</real>
       <real>0.00</real>
     </array>
@@ -9608,7 +9608,7 @@
     <key>Type</key>
     <string>F32</string>
     <key>Value</key>
-    <real>-0.004</real>
+    <real>-0.003</real>
   </map>
   <key>RenderShadowOffset</key>
   <map>
@@ -9713,7 +9713,7 @@
     <key>Type</key>
     <string>F32</string>
     <key>Value</key>
-    <real>-0.001</real>
+    <real>0.0</real>
   </map>
   <key>RenderSpotShadowOffset</key>
   <map>
@@ -9724,7 +9724,7 @@
     <key>Type</key>
     <string>F32</string>
     <key>Value</key>
-    <real>0.04</real>
+    <real>0.15</real>
   </map>
 
   <key>RenderShadowResolutionScale</key>
@@ -9989,7 +9989,7 @@
     <string>Vector3</string>
     <key>Value</key>
     <array>
-      <real>3.0</real>
+      <real>1.0</real>
       <real>2.0</real>
       <real>0.0</real>
     </array>
@@ -10004,7 +10004,7 @@
     <key>Type</key>
     <string>F32</string>
     <key>Value</key>
-    <real>1.4</real>
+    <real>3.0</real>
   </map>
   <key>RenderShadowBlurSamples</key>
   <map>
