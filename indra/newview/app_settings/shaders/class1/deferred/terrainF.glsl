@@ -37,7 +37,6 @@ uniform sampler2D detail_2;
 uniform sampler2D detail_3;
 uniform sampler2D alpha_ramp;
 
-VARYING vec3 pos;
 VARYING vec3 vary_normal;
 VARYING vec4 vary_texcoord0;
 VARYING vec4 vary_texcoord1;
