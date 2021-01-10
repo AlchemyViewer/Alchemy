@@ -213,7 +213,7 @@ void renderBadgeBackground(F32 centerX, F32 centerY, F32 width, F32 height, cons
 		gGL.vertexBatchPreTransformed(vertices, 4);
 	}
 	gGL.end();
-	
+	gGL.setSceneBlendType(LLRender::BT_ALPHA);
 	gGL.popUIMatrix();
 }
 
