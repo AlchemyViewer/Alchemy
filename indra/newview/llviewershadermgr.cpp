@@ -2499,6 +2499,7 @@ BOOL LLViewerShaderMgr::loadShadersDeferred()
 		gDeferredAvatarProgram.mShaderFiles.clear();
 		gDeferredAvatarProgram.mShaderFiles.push_back(make_pair("deferred/avatarV.glsl", GL_VERTEX_SHADER));
 		gDeferredAvatarProgram.mShaderFiles.push_back(make_pair("deferred/avatarF.glsl", GL_FRAGMENT_SHADER));
+		gDeferredAvatarProgram.addPermutation("AVATAR_CLOTH", (mShaderLevel[SHADER_AVATAR] == 3) ? "1" : "0");
 		gDeferredAvatarProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
 		success = gDeferredAvatarProgram.createShader(NULL, NULL);
 		llassert(success);
