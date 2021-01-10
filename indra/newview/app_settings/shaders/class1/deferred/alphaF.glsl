@@ -162,15 +162,14 @@ vec3 calcPointLightOrSpotLight(vec3 light_col, vec3 diffuse, vec3 v, vec3 n, vec
 
 void main() 
 {
-    vec2 frag = vary_fragcoord.xy/vary_fragcoord.z*0.5+0.5;
-    frag *= screen_res;
-    
     vec4 pos = vec4(vary_position, 1.0);
     vec3 norm = vary_norm;
 
     float shadow = 1.0f;
 
 #ifdef HAS_SHADOW
+    vec2 frag = vary_fragcoord.xy/vary_fragcoord.z*0.5+0.5;
+    frag *= screen_res;
     shadow = sampleDirectionalShadow(pos.xyz, norm.xyz, frag);
 #endif
 
@@ -183,7 +182,6 @@ void main()
 #endif
 
     vec4 diffuse_srgb = diffuse_tap;
-    vec4 diffuse_linear = vec4(srgb_to_linear(diffuse_srgb.rgb), diffuse_srgb.a);
 
 #ifdef FOR_IMPOSTOR
     vec4 color;
@@ -192,8 +190,7 @@ void main()
 
     float final_alpha = diffuse_srgb.a * vertex_color.a;
     diffuse_srgb.rgb *= vertex_color.rgb;
-    diffuse_linear.rgb = srgb_to_linear(diffuse_srgb.rgb); 
-    
+
     // Insure we don't pollute depth with invis pixels in impostor rendering
     //
     if (final_alpha < 0.01)
@@ -201,16 +198,16 @@ void main()
         discard;
     }
 #else
-    
     vec3 light_dir = (sun_up_factor == 1) ? sun_dir: moon_dir;
 
-    float final_alpha = diffuse_linear.a;
+    float final_alpha = diffuse_srgb.a;
 
 #ifdef USE_VERTEX_COLOR
     final_alpha *= vertex_color.a;
     diffuse_srgb.rgb *= vertex_color.rgb;
-    diffuse_linear.rgb = srgb_to_linear(diffuse_srgb.rgb);
 #endif
+
+    vec3 diffuse_linear = srgb_to_linear(diffuse_srgb.rgb);
 
     vec3 sunlit;
     vec3 amblit;
@@ -218,8 +215,6 @@ void main()
     vec3 atten;
 
     calcAtmosphericVars(pos.xyz, light_dir, 1.0, sunlit, amblit, additive, atten, false);
-
-    vec2 abnormal = encode_normal(norm.xyz);
 
     float da = dot(norm.xyz, light_dir.xyz);
           da = clamp(da, -1.0, 1.0);
