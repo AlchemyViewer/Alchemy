@@ -7853,6 +7853,7 @@ void LLPipeline::renderFinalize()
                 if (channel > -1)
                 {
                     mDeferredLight.bindTexture(0, channel);
+					gGL.getTexUnit(channel)->setTextureFilteringOption(LLTexUnit::TFO_BILINEAR); // scale fairly pleasantly
                 }
 
                 shader->uniform1f(LLShaderMgr::DOF_MAX_COF, CameraMaxCoF);
