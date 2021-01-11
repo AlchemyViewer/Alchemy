@@ -1338,7 +1338,7 @@ BOOL LLFace::getGeometryVolume(const LLVolume& volume,
 		clearState(GLOBAL);
 	}
 
-	LLColor4U color = tep->getColor();
+	LLColor4U color = (tep ? tep->getColor() : LLColor4());
 
 	if (rebuild_color)
 	{ //decide if shiny goes in alpha channel of color
@@ -1519,7 +1519,7 @@ BOOL LLFace::getGeometryVolume(const LLVolume& volume,
 				bump_t_primary_light_ray.load3((offset_multiple * t_scale * primary_light_ray).mV);
 			}
 
-			U8 texgen = getTextureEntry()->getTexGen();
+			U8 texgen = getTextureEntry() ? getTextureEntry()->getTexGen() : LLTextureEntry::TEX_GEN_DEFAULT;
 			if (rebuild_tcoord && texgen != LLTextureEntry::TEX_GEN_DEFAULT)
 			{ //planar texgen needs binormals
 				mVObjp->getVolume()->genTangents(f);
@@ -1563,7 +1563,7 @@ BOOL LLFace::getGeometryVolume(const LLVolume& volume,
 			LLVector4a scalea;
 			scalea.load3(scale.mV);
 
-			LLMaterial* mat = tep->getMaterialParams().get();
+			LLMaterial* mat = tep ? tep->getMaterialParams().get() : nullptr;
 
 			bool do_bump = bump_code && mVertexBuffer->hasDataType(LLVertexBuffer::TYPE_TEXCOORD1);
 
@@ -1651,8 +1651,8 @@ BOOL LLFace::getGeometryVolume(const LLVolume& volume,
 						for (S32 i = 0; i < num_vertices; i++)
 						{	
 							LLVector2 tc(vf.mTexCoords[i]);
-							LLVector4a& norm = vf.mNormals[i];
-							LLVector4a& center = *(vf.mCenter);
+							const LLVector4a& norm = vf.mNormals[i];
+							const LLVector4a& center = *(vf.mCenter);
 							LLVector4a vec = vf.mPositions[i];	
 							vec.mul(scalea);
 							planarProjection(tc, norm, center, vec);
@@ -1670,8 +1670,8 @@ BOOL LLFace::getGeometryVolume(const LLVolume& volume,
 						for (S32 i = 0; i < num_vertices; i++)
 						{	
 							LLVector2 tc(vf.mTexCoords[i]);
-							LLVector4a& norm = vf.mNormals[i];
-							LLVector4a& center = *(vf.mCenter);
+							const LLVector4a& norm = vf.mNormals[i];
+							const LLVector4a& center = *(vf.mCenter);
 							LLVector4a vec = vf.mPositions[i];	
 							vec.mul(scalea);
 							planarProjection(tc, norm, center, vec);
