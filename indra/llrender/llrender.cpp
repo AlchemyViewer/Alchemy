@@ -1427,6 +1427,41 @@ void LLRender::syncMatrices()
 	stop_glerror();
 }
 
+LLMatrix4a LLRender::genRot(const GLfloat& a, const LLVector4a& axis) const
+{
+	F32 r = a * DEG_TO_RAD;
+
+	F32 c = cosf(r);
+	F32 s = sinf(r);
+
+	F32 ic = 1.f-c;
+
+	const LLVector4a add1(c,axis[VZ]*s,-axis[VY]*s);	//1,z,-y
+	const LLVector4a add2(-axis[VZ]*s,c,axis[VX]*s);	//-z,1,x
+	const LLVector4a add3(axis[VY]*s,-axis[VX]*s,c);	//y,-x,1
+
+	LLVector4a axis_x;
+	axis_x.splat<0>(axis);
+	LLVector4a axis_y;
+	axis_y.splat<1>(axis);
+	LLVector4a axis_z;
+	axis_z.splat<2>(axis);
+
+	LLVector4a c_axis;
+	c_axis.setMul(axis,ic);
+
+	LLMatrix4a rot_mat;
+	rot_mat.getRow<0>().setMul(c_axis,axis_x);
+	rot_mat.getRow<0>().add(add1);
+	rot_mat.getRow<1>().setMul(c_axis,axis_y);
+	rot_mat.getRow<1>().add(add2);
+	rot_mat.getRow<2>().setMul(c_axis,axis_z);
+	rot_mat.getRow<2>().add(add3);
+	rot_mat.setRow<3>(LLVector4a(0,0,0,1));
+
+	return rot_mat;
+}
+
 void LLRender::translatef(const GLfloat& x, const GLfloat& y, const GLfloat& z)
 {
 	flush();

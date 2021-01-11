@@ -1323,6 +1323,13 @@ BOOL LLFace::getGeometryVolume(const LLVolume& volume,
 
 	const LLTextureEntry *tep = mVObjp->getTE(f);
 	const U8 bump_code = tep ? tep->getBumpmap() : 0;
+	
+	if ( bump_code && rebuild_tcoord && mVertexBuffer->hasDataType(LLVertexBuffer::TYPE_TANGENT) )
+	{
+		LLMaterial* mat = tep->getMaterialParams().get();
+		if(!mat || mat->getNormalID().isNull())
+			rebuild_tangent = true;
+	}
 
 	BOOL is_static = mDrawablep->isStatic();
 	BOOL is_global = is_static;
@@ -1416,6 +1423,8 @@ BOOL LLFace::getGeometryVolume(const LLVolume& volume,
 	
 	LLMatrix4a mat_normal;
 	mat_normal.loadu(mat_norm_in);
+	LLMatrix4a mat_tan;
+	mat_tan.loadu(mat_vert_in);
 	
 	F32 r = 0, os = 0, ot = 0, ms = 0, mt = 0, cos_ang = 0, sin_ang = 0;
 	bool do_xform = false;
@@ -1466,57 +1475,60 @@ BOOL LLFace::getGeometryVolume(const LLVolume& volume,
 			LLVector4a bump_t_primary_light_ray(0.f, 0.f, 0.f);
 
 			LLQuaternion bump_quat;
-			if (mDrawablep->isActive())
+			if (!LLPipeline::sRenderDeferred)
 			{
-				bump_quat = LLQuaternion(mDrawablep->getRenderMatrix());
-			}
-		
-			if (bump_code)
-			{
-				mVObjp->getVolume()->genTangents(f);
-				F32 offset_multiple; 
-				switch( bump_code )
+				if (mDrawablep->isActive())
 				{
+					bump_quat = LLQuaternion(mDrawablep->getRenderMatrix());
+				}
+
+				if (bump_code)
+				{
+					mVObjp->getVolume()->genTangents(f);
+					F32 offset_multiple;
+					switch (bump_code)
+					{
 					case BE_NO_BUMP:
-					offset_multiple = 0.f;
-					break;
+						offset_multiple = 0.f;
+						break;
 					case BE_BRIGHTNESS:
 					case BE_DARKNESS:
-					if( mTexture[LLRender::DIFFUSE_MAP].notNull() && mTexture[LLRender::DIFFUSE_MAP]->hasGLTexture())
-					{
-						// Offset by approximately one texel
-						S32 cur_discard = mTexture[LLRender::DIFFUSE_MAP]->getDiscardLevel();
-						S32 max_size = llmax( mTexture[LLRender::DIFFUSE_MAP]->getWidth(), mTexture[LLRender::DIFFUSE_MAP]->getHeight() );
-						max_size <<= cur_discard;
-						const F32 ARTIFICIAL_OFFSET = 2.f;
-						offset_multiple = ARTIFICIAL_OFFSET / (F32)max_size;
-					}
-					else
-					{
-						offset_multiple = 1.f/256;
-					}
-					break;
+						if (mTexture[LLRender::DIFFUSE_MAP].notNull() && mTexture[LLRender::DIFFUSE_MAP]->hasGLTexture())
+						{
+							// Offset by approximately one texel
+							S32 cur_discard = mTexture[LLRender::DIFFUSE_MAP]->getDiscardLevel();
+							S32 max_size = llmax(mTexture[LLRender::DIFFUSE_MAP]->getWidth(), mTexture[LLRender::DIFFUSE_MAP]->getHeight());
+							max_size <<= cur_discard;
+							const F32 ARTIFICIAL_OFFSET = 2.f;
+							offset_multiple = ARTIFICIAL_OFFSET / (F32) max_size;
+						}
+						else
+						{
+							offset_multiple = 1.f / 256;
+						}
+						break;
 
 					default:  // Standard bumpmap textures.  Assumed to be 256x256
-					offset_multiple = 1.f / 256;
-					break;
-				}
+						offset_multiple = 1.f / 256;
+						break;
+					}
 
-				F32 s_scale = 1.f;
-				F32 t_scale = 1.f;
-				if( tep )
-				{
-					tep->getScale( &s_scale, &t_scale );
-				}
-				// Use the nudged south when coming from above sun angle, such
-				// that emboss mapping always shows up on the upward faces of cubes when 
-				// it's noon (since a lot of builders build with the sun forced to noon).
-				LLVector3   sun_ray  = gSky.mVOSkyp->mBumpSunDir;
-				LLVector3   moon_ray = gSky.mVOSkyp->getMoon().getDirection();
-				LLVector3& primary_light_ray = (sun_ray.mV[VZ] > 0) ? sun_ray : moon_ray;
+					F32 s_scale = 1.f;
+					F32 t_scale = 1.f;
+					if (tep)
+					{
+						tep->getScale(&s_scale, &t_scale);
+					}
+					// Use the nudged south when coming from above sun angle, such
+					// that emboss mapping always shows up on the upward faces of cubes when 
+					// it's noon (since a lot of builders build with the sun forced to noon).
+					LLVector3   sun_ray = gSky.mVOSkyp->mBumpSunDir;
+					LLVector3   moon_ray = gSky.mVOSkyp->getMoon().getDirection();
+					LLVector3& primary_light_ray = (sun_ray.mV[VZ] > 0) ? sun_ray : moon_ray;
 
-				bump_s_primary_light_ray.load3((offset_multiple * s_scale * primary_light_ray).mV);
-				bump_t_primary_light_ray.load3((offset_multiple * t_scale * primary_light_ray).mV);
+					bump_s_primary_light_ray.load3((offset_multiple * s_scale * primary_light_ray).mV);
+					bump_t_primary_light_ray.load3((offset_multiple * t_scale * primary_light_ray).mV);
+				}
 			}
 
 			U8 texgen = getTextureEntry() ? getTextureEntry()->getTexGen() : LLTextureEntry::TEX_GEN_DEFAULT;
@@ -1693,7 +1705,7 @@ BOOL LLFace::getGeometryVolume(const LLVolume& volume,
 				LL_RECORD_BLOCK_TIME(FTM_FACE_TEX_DEFAULT);
 
 				std::vector<LLVector2> bump_tc;
-				if (!mat && do_bump)
+				if (!LLPipeline::sRenderDeferred && !mat && do_bump)
 				{
 					bump_tc.reserve(num_vertices);
 				}
@@ -1787,7 +1799,7 @@ BOOL LLFace::getGeometryVolume(const LLVolume& volume,
 					}
 
 					*dst++ = tc;
-					if (!mat && do_bump)
+					if (!LLPipeline::sRenderDeferred && !mat && do_bump)
 					{
 						bump_tc.push_back(tc);
 					}
@@ -1799,7 +1811,7 @@ BOOL LLFace::getGeometryVolume(const LLVolume& volume,
 					mVertexBuffer->flush();
 				}
 
-				if (!mat && do_bump)
+				if (!LLPipeline::sRenderDeferred && !mat && do_bump)
 				{
 					mVertexBuffer->getTexCoord1Strider(tex_coords1, mGeomIndex, mGeomCount, map_range);
 		
@@ -1816,7 +1828,7 @@ BOOL LLFace::getGeometryVolume(const LLVolume& volume,
 						LLVector4a t;
 						tangent_to_object.rotate(binormal_dir, t);
 						LLVector4a binormal;
-						mat_normal.rotate(t, binormal);
+						mat_tan.rotate(t, binormal);
 						
 						//VECTORIZE THIS
 						if (mDrawablep->isActive())
@@ -1981,11 +1993,20 @@ BOOL LLFace::getGeometryVolume(const LLVolume& volume,
 
 			LLVector4a* src = vf.mTangents;
 			LLVector4a* end = vf.mTangents+num_vertices;
+			LLVector4a* src2 = vf.mNormals;
+			LLVector4a* end2 = vf.mNormals+num_vertices;
 
+			LLMaterial* mat = tep->getMaterialParams().get();
+			F32 rot = RAD_TO_DEG * ( (mat && mat->getNormalID().notNull()) ? mat->getNormalRotation() : r);
+			bool rotate_tangent = src2 && !is_approx_equal(rot, 360.f) && !is_approx_zero(rot);
 			while (src < end)
 			{
-				LLVector4a tangent_out;
-				mat_normal.rotate(*src, tangent_out);
+				LLVector4a tangent_out = *src;
+				if (rotate_tangent && src2 < end2)
+				{
+					gGL.genRot(rot, *src2++).rotate(tangent_out, tangent_out);
+				}
+				mat_tan.rotate(tangent_out, tangent_out);
 				tangent_out.normalize3fast();
 				tangent_out.setSelectWithMask(mask, *src, tangent_out);
 				tangent_out.store4a(tangents);

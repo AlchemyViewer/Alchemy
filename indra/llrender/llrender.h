@@ -376,6 +376,8 @@ public:
 	// Needed when the render context has changed and invalidated the current state
 	void refreshState(void);
 
+	LLMatrix4a genRot(const GLfloat& a, const LLVector4a& axis) const;
+	LLMatrix4a genRot(const GLfloat& a, const GLfloat& x, const GLfloat& y, const GLfloat& z) const { return genRot(a,LLVector4a(x,y,z)); }
 	void translatef(const GLfloat& x, const GLfloat& y, const GLfloat& z);
 	void scalef(const GLfloat& x, const GLfloat& y, const GLfloat& z);
 	void rotatef(const GLfloat& a, const GLfloat& x, const GLfloat& y, const GLfloat& z);
