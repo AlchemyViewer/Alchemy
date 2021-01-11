@@ -920,10 +920,7 @@ void LLSettingsVOWater::applySpecial(void *ptarget, bool force)
         glh::vec3f p(0.f, 0.f, water_height + 0.1f);
 
         F32 modelView[16];
-        for (U32 i = 0; i < 16; i++)
-        {
-            modelView[i] = (F32)gGLModelView[i];
-        }
+        memcpy(modelView, gGLModelView, sizeof(F32) * 16);
 
         glh::matrix4f mat(modelView);
         glh::matrix4f invtrans = mat.inverse().transpose();

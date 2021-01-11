@@ -2465,10 +2465,7 @@ glh::matrix4f get_last_projection()
 
 void copy_matrix(const glh::matrix4f& src, F32* dst)
 {
-	for (U32 i = 0; i < 16; i++)
-	{
-		dst[i] = src.m[i];
-	}
+	memcpy(dst, src.m, sizeof(F32) * 16);
 }
 
 void set_current_modelview(const glh::matrix4f& mat)

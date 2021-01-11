@@ -4322,11 +4322,8 @@ void LLPipeline::renderGeom(LLCamera& camera, bool forceVBOUpdate)
 	//HACK: preserve/restore matrices around HUD render
 	if (gPipeline.hasRenderType(LLPipeline::RENDER_TYPE_HUD))
 	{
-		for (U32 i = 0; i < 16; i++)
-		{
-			saved_modelview[i] = gGLModelView[i];
-			saved_projection[i] = gGLProjection[i];
-		}
+		memcpy(saved_modelview, gGLModelView, sizeof(F32) * 16);
+		memcpy(saved_projection, gGLProjection, sizeof(F32) * 16);
 	}
 
 	///////////////////////////////////////////
@@ -4546,11 +4543,8 @@ void LLPipeline::renderGeom(LLCamera& camera, bool forceVBOUpdate)
 		//HACK: preserve/restore matrices around HUD render
 		if (gPipeline.hasRenderType(LLPipeline::RENDER_TYPE_HUD))
 		{
-			for (U32 i = 0; i < 16; i++)
-			{
-				gGLModelView[i] = saved_modelview[i];
-				gGLProjection[i] = saved_projection[i];
-			}
+			memcpy(gGLModelView, saved_modelview, sizeof(F32) * 16);
+			memcpy(gGLProjection, saved_projection, sizeof(F32) * 16);
 		}
 	}
 
@@ -8284,20 +8278,21 @@ void LLPipeline::bindDeferredShader(LLGLSLShader& shader, LLRenderTarget* light_
 
 	stop_glerror();
 
-	F32 mat[16*6];
-	for (U32 i = 0; i < 16; i++)
+
+	if(shader.getUniformLocation(LLShaderMgr::DEFERRED_SHADOW_MATRIX) > -1)
 	{
-		mat[i] = mSunShadowMatrix[0].m[i];
-		mat[i+16] = mSunShadowMatrix[1].m[i];
-		mat[i+32] = mSunShadowMatrix[2].m[i];
-		mat[i+48] = mSunShadowMatrix[3].m[i];
-		mat[i+64] = mSunShadowMatrix[4].m[i];
-		mat[i+80] = mSunShadowMatrix[5].m[i];
+		F32 mat[16*6];
+		memcpy(mat,		 mSunShadowMatrix[0].m, sizeof(F32) * 16);
+		memcpy(mat + 16, mSunShadowMatrix[1].m, sizeof(F32) * 16);
+		memcpy(mat + 32, mSunShadowMatrix[2].m, sizeof(F32) * 16);
+		memcpy(mat + 48, mSunShadowMatrix[3].m, sizeof(F32) * 16);
+		memcpy(mat + 64, mSunShadowMatrix[4].m, sizeof(F32) * 16);
+		memcpy(mat + 80, mSunShadowMatrix[5].m, sizeof(F32) * 16);
+
+		shader.uniformMatrix4fv(LLShaderMgr::DEFERRED_SHADOW_MATRIX, 6, FALSE, mat);
+
+		stop_glerror();
 	}
-
-	shader.uniformMatrix4fv(LLShaderMgr::DEFERRED_SHADOW_MATRIX, 6, FALSE, mat);
-
-	stop_glerror();
 
 	channel = shader.enableTexture(LLShaderMgr::ENVIRONMENT_MAP, LLTexUnit::TT_CUBE_MAP);
 	if (channel > -1)
@@ -10078,13 +10073,10 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
 		gAgentAvatarp->updateAttachmentVisibility(CAMERA_MODE_THIRD_PERSON);
 	}
 
-	F64 last_modelview[16];
-	F64 last_projection[16];
-	for (U32 i = 0; i < 16; i++)
-	{ //store last_modelview of world camera
-		last_modelview[i] = gGLLastModelView[i];
-		last_projection[i] = gGLLastProjection[i];
-	}
+	F32 last_modelview[16];
+	F32 last_projection[16];
+	memcpy(last_modelview, gGLLastModelView, sizeof(F32) * 16);
+	memcpy(last_projection, gGLLastProjection, sizeof(F32) * 16);
 
 	pushRenderTypeMask();
 	andRenderTypeMask(LLPipeline::RENDER_TYPE_SIMPLE,
@@ -10624,11 +10616,8 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
 			set_current_modelview(view[j]);
 			set_current_projection(proj[j]);
 
-			for (U32 i = 0; i < 16; i++)
-			{
-				gGLLastModelView[i] = mShadowModelview[j].m[i];
-				gGLLastProjection[i] = mShadowProjection[j].m[i];
-			}
+			memcpy(gGLLastModelView, mShadowModelview[j].m, sizeof(F32) * 16);
+			memcpy(gGLLastProjection, mShadowProjection[j].m, sizeof(F32) * 16);
 
 			mShadowModelview[j] = view[j];
 			mShadowProjection[j] = proj[j];
@@ -10763,11 +10752,8 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
 
 			mSunShadowMatrix[i+4] = trans*proj[i+4]*view[i+4]*inv_view;
 			
-			for (U32 j = 0; j < 16; j++)
-			{
-				gGLLastModelView[j] = mShadowModelview[i+4].m[j];
-				gGLLastProjection[j] = mShadowProjection[i+4].m[j];
-			}
+			memcpy(gGLLastModelView, mShadowModelview[i + 4].m, sizeof(F32) * 16);
+			memcpy(gGLLastProjection, mShadowProjection[i + 4].m, sizeof(F32) * 16);
 
 			mShadowModelview[i+4] = view[i+4];
 			mShadowProjection[i+4] = proj[i+4];
@@ -10821,11 +10807,8 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
 	}
 	gGL.setColorMask(true, false);
 
-	for (U32 i = 0; i < 16; i++)
-	{
-		gGLLastModelView[i] = last_modelview[i];
-		gGLLastProjection[i] = last_projection[i];
-	}
+	memcpy(gGLLastModelView, last_modelview, sizeof(F32) * 16);
+	memcpy(gGLLastProjection, last_projection, sizeof(F32) * 16);
 
 	popRenderTypeMask();
 
