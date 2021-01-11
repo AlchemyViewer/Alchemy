@@ -8958,6 +8958,7 @@ void LLPipeline::renderDeferredLighting(LLRenderTarget *screen_target)
                 gGL.matrixMode(LLRender::MM_MODELVIEW);
                 gGL.popMatrix();
             }
+			gGL.setSceneBlendType(LLRender::BT_ALPHA);
         }
 
         gGL.setColorMask(true, true);
