@@ -321,11 +321,11 @@ LLGLenum LLGLTexture::getPrimaryFormat() const
 	return mGLTexturep->getPrimaryFormat() ;
 }
 
-BOOL LLGLTexture::getIsAlphaMask() const
+BOOL LLGLTexture::getIsAlphaMask(const F32 max_rmse, const F32 max_mid) const
 {
 	llassert(mGLTexturep.notNull()) ;
 
-	return mGLTexturep->getIsAlphaMask() ;
+	return mGLTexturep->getIsAlphaMask(max_rmse, max_mid) ;
 }
 
 //BOOL LLGLTexture::getMask(const LLVector2 &tc)

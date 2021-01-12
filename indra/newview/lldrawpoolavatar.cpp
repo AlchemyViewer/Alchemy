@@ -2093,7 +2093,7 @@ void LLDrawPoolAvatar::renderRigged(LLVOAvatar* avatar, U32 type, bool glow)
             LLViewerTexture* tex = face->getTexture(LLRender::DIFFUSE_MAP);
             if (tex)
             {
-                if (tex->getIsAlphaMask())
+                if (tex->getIsAlphaMask(-1.f, -1.f))
                 {
                     is_alpha_mask = true;
                 }

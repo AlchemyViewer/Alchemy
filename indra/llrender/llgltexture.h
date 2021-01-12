@@ -143,7 +143,7 @@ public:
 	BOOL       getBoundRecently() const;
 	S64Bytes   getTextureMemory() const ;
 	LLGLenum   getPrimaryFormat() const;
-	BOOL       getIsAlphaMask() const ;
+	BOOL       getIsAlphaMask(const F32 max_rmse, const F32 max_mid) const ;
 	LLTexUnit::eTextureType getTarget(void) const ;
 // [RLVa:KB] - Checked: RLVa-2.2 (@setoverlay)
 	bool       getMask(const LLVector2 &tc) const;
@@ -171,6 +171,12 @@ public:
 	void dontDiscard() { mDontDiscard = 1; mTextureState = NO_DELETE; }
 	BOOL getDontDiscard() const { return mDontDiscard; }
 	//-----------------	
+
+	void setNeedsAlphaAndPickMask(BOOL need_mask) 
+	{ 
+		if (mGLTexturep.notNull())
+			mGLTexturep->setNeedsAlphaAndPickMask(need_mask);
+	}
 
 private:
 	void cleanup();

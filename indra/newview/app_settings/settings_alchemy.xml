@@ -508,6 +508,39 @@
       <key>Value</key>
       <boolean>0</boolean>
     </map>
+    <key>RenderAutoMaskAlphaUseRMSE</key>
+    <map>
+      <key>Comment</key>
+      <string>Use alternative method of detecing suitable textures for alphamasking. Less prone to excluding textures than standard method.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <real>1</real>
+    </map>
+    <key>RenderAutoMaskAlphaMaxRMSE</key>
+    <map>
+      <key>Comment</key>
+      <string>Sets the maximum random mean square error cutoff used when detecting suitable textures for alphamasking. (RenderAutoMaskAlphaUseRMSE must be TRUE for this to have any effect)</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>F32</string>
+      <key>Value</key>
+      <real>0.18</real>
+    </map>
+    <key>RenderAutoMaskAlphaMaxMid</key>
+    <map>
+      <key>Comment</key>
+      <string>Sets the maximum percent of mid-range alpha pixels textures for alphamasking. (RenderAutoMaskAlphaUseRMSE must be TRUE for this to have any effect)</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>F32</string>
+      <key>Value</key>
+      <real>0.275</real>
+    </map>
     <key>ResetUserColorsOnLogout</key>
     <map>
       <key>Comment</key>
