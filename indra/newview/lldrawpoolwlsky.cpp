@@ -182,36 +182,39 @@ void LLDrawPoolWLSky::renderDome(LLGLSLShader * shader) const
 	gGL.popMatrix();
 }
 
-void LLDrawPoolWLSky::renderSkyHazeDeferred() const
+void LLDrawPoolWLSky::renderSkyHaze() const
 {
 	if (gPipeline.canUseWindLightShaders() && gPipeline.hasRenderType(LLPipeline::RENDER_TYPE_SKY))
 	{
-        LLGLSPipelineDepthTestSkyBox sky(true, true);
+        LLGLSPipelineDepthTestSkyBox sky(true, LLPipeline::sRenderDeferred ? true : false);
 
         sky_shader->bind();
 
-        LLViewerTexture* rainbow_tex = gSky.mVOSkyp->getRainbowTex();
-        LLViewerTexture* halo_tex  = gSky.mVOSkyp->getHaloTex();
-
-        sky_shader->bindTexture(LLShaderMgr::RAINBOW_MAP, rainbow_tex);
-        sky_shader->bindTexture(LLShaderMgr::HALO_MAP,  halo_tex);
-
-        ((LLSettingsVOSky*)mCurrentSky.get())->updateShader(sky_shader);
-
-        F32 moisture_level  = (float)mCurrentSky->getSkyMoistureLevel();
-        F32 droplet_radius  = (float)mCurrentSky->getSkyDropletRadius();
-        F32 ice_level       = (float)mCurrentSky->getSkyIceLevel();
-
-        // hobble halos and rainbows when there's no light source to generate them
-        if (!mCurrentSky->getIsSunUp() && !mCurrentSky->getIsMoonUp())
+        if (LLPipeline::sRenderDeferred)
         {
-            moisture_level = 0.0f;
-            ice_level      = 0.0f;
-        }
+            LLViewerTexture* rainbow_tex = gSky.mVOSkyp->getRainbowTex();
+            LLViewerTexture* halo_tex = gSky.mVOSkyp->getHaloTex();
 
-        sky_shader->uniform1f(LLShaderMgr::MOISTURE_LEVEL, moisture_level);
-        sky_shader->uniform1f(LLShaderMgr::DROPLET_RADIUS, droplet_radius);
-        sky_shader->uniform1f(LLShaderMgr::ICE_LEVEL, ice_level);
+            sky_shader->bindTexture(LLShaderMgr::RAINBOW_MAP, rainbow_tex);
+            sky_shader->bindTexture(LLShaderMgr::HALO_MAP, halo_tex);
+
+            ((LLSettingsVOSky*)mCurrentSky.get())->updateShader(sky_shader);
+
+            F32 moisture_level = (float)mCurrentSky->getSkyMoistureLevel();
+            F32 droplet_radius = (float)mCurrentSky->getSkyDropletRadius();
+            F32 ice_level = (float)mCurrentSky->getSkyIceLevel();
+
+            // hobble halos and rainbows when there's no light source to generate them
+            if (!mCurrentSky->getIsSunUp() && !mCurrentSky->getIsMoonUp())
+            {
+                moisture_level = 0.0f;
+                ice_level = 0.0f;
+            }
+
+            sky_shader->uniform1f(LLShaderMgr::MOISTURE_LEVEL, moisture_level);
+            sky_shader->uniform1f(LLShaderMgr::DROPLET_RADIUS, droplet_radius);
+            sky_shader->uniform1f(LLShaderMgr::ICE_LEVEL, ice_level);
+        }
 
         sky_shader->uniform1f(LLShaderMgr::SUN_MOON_GLOW_FACTOR, mCurrentSky->getSunMoonGlowFactor());
 
@@ -220,20 +223,6 @@ void LLDrawPoolWLSky::renderSkyHazeDeferred() const
         /// Render the skydome
         renderDome(sky_shader);
 
-		sky_shader->unbind();
-    }
-}
-
-void LLDrawPoolWLSky::renderSkyHaze() const
-{
-	if (gPipeline.canUseWindLightShaders() && gPipeline.hasRenderType(LLPipeline::RENDER_TYPE_SKY))
-	{
-        const LLSettingsSky::ptr_t& psky = LLEnvironment::instance().getCurrentSky();
-        LLGLSPipelineDepthTestSkyBox sky(true, false);
-        sky_shader->bind();
-        sky_shader->uniform1i(LLShaderMgr::SUN_UP_FACTOR, 1);
-        sky_shader->uniform1f(LLShaderMgr::SUN_MOON_GLOW_FACTOR, psky->getSunMoonGlowFactor());
-        renderDome(sky_shader);
 		sky_shader->unbind();
     }
 }
@@ -556,7 +545,7 @@ void LLDrawPoolWLSky::renderDeferred(S32 pass)
 
     if (gPipeline.canUseWindLightShaders())
     {
-        renderSkyHazeDeferred();
+        renderSkyHaze();
         renderStarsDeferred();
         renderHeavenlyBodies();
         renderSkyClouds();
@@ -572,7 +561,7 @@ void LLDrawPoolWLSky::render(S32 pass)
 	}
 	LL_RECORD_BLOCK_TIME(FTM_RENDER_WL_SKY);
 
-	renderSkyHaze();    
+    renderSkyHaze();
     renderStars();
     renderHeavenlyBodies();
 	renderSkyClouds();

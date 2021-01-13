@@ -76,8 +76,6 @@ private:
     void renderSkyHaze() const;
     void renderSkyClouds() const;
 
-	void renderSkyHazeDeferred() const;
-
     void renderStarsDeferred() const;
 	void renderStars() const;
 	void renderHeavenlyBodies();
