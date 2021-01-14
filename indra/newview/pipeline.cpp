@@ -2426,11 +2426,7 @@ void LLPipeline::updateCull(LLCamera& camera, LLCullResult& result, S32 water_cl
 
 	sCull->clear();
 
-	bool to_texture =	LLPipeline::sUseOcclusion > 1 &&
-						!hasRenderType(LLPipeline::RENDER_TYPE_HUD) && 
-						LLViewerCamera::sCurCameraID == LLViewerCamera::CAMERA_WORLD &&
-						gPipeline.canUseVertexShaders() &&
-						sRenderGlow;
+	bool to_texture = LLPipeline::sUseOcclusion > 1 && gPipeline.canUseVertexShaders();
 
 	if (to_texture)
 	{
@@ -2461,35 +2457,6 @@ void LLPipeline::updateCull(LLCamera& camera, LLCullResult& result, S32 water_cl
 	LLGLDisable test(GL_ALPHA_TEST);
 	gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
 
-	//setup a clip plane in projection matrix for reflection renders (prevents flickering from occlusion culling)
-	LLViewerRegion* region = gAgent.getRegion();
-	LLPlane plane;
-
-	if (planep)
-	{
-		plane = *planep;
-	}
-	else 
-	{
-		if (region)
-		{
-			LLVector3 pnorm;
-			F32 height = region->getWaterHeight();
-			if (water_clip < 0)
-			{ //camera is above water, clip plane points up
-				pnorm.setVec(0,0,1);
-				plane.setVec(pnorm, -height);
-			}
-			else if (water_clip > 0)
-			{	//camera is below water, clip plane points down
-				pnorm = LLVector3(0,0,-1);
-				plane.setVec(pnorm, height);
-			}
-		}
-	}
-
-	LLGLUserClipPlane clip(plane, get_last_modelview(), get_last_projection(), water_clip != 0 && LLPipeline::sReflectionRender);
-
 	LLGLDepthTest depth(GL_TRUE, GL_FALSE);
 
 	bool bound_shader = false;
@@ -2509,17 +2476,13 @@ void LLPipeline::updateCull(LLCamera& camera, LLCullResult& result, S32 water_cl
 		mCubeVB->setBuffer(LLVertexBuffer::MAP_VERTEX);
 	}
 	
-	for(LLViewerRegion* region : LLWorld::getInstance()->getRegionList())
-	{
-		if (water_clip != 0)
+    if (!sReflectionRender)
     {
-			LLPlane plane(LLVector3(0,0, (F32) -water_clip), (F32) water_clip*region->getWaterHeight());
-			camera.setUserClipPlane(plane);
+        camera.disableUserClipPlane();
     }
-		else
+
+	for (LLViewerRegion* region : LLWorld::getInstance()->getRegionList())
 	{
-			camera.disableUserClipPlane();
-		}
 		for (U32 i = 0; i < LLViewerRegion::NUM_PARTITIONS; i++)
 		{
 			LLSpatialPartition* part = region->getSpatialPartition(i);
@@ -2537,6 +2500,7 @@ void LLPipeline::updateCull(LLCamera& camera, LLCullResult& result, S32 water_cl
 		if(vo_part)
 		{
 			bool do_occlusion_cull = can_use_occlusion && use_occlusion && !gUseWireframe && 0 > water_clip /* && !gViewerWindow->getProgressView()->getVisible()*/;
+            do_occlusion_cull &= !sReflectionRender;
 			vo_part->cull(camera, do_occlusion_cull);
 		}
 	}
@@ -2545,8 +2509,6 @@ void LLPipeline::updateCull(LLCamera& camera, LLCullResult& result, S32 water_cl
 	{
 		gOcclusionCubeProgram.unbind();
 	}
-
-	camera.disableUserClipPlane();
 
 	if (hasRenderType(LLPipeline::RENDER_TYPE_SKY) && 
 		gSky.mVOSkyp.notNull() && 
@@ -9277,7 +9239,7 @@ void LLPipeline::generateWaterReflection(LLCamera& camera_in)
         }
 
         LLCamera camera = camera_in;
-        camera.setFar(camera_in.getFar() *0.87654321f);
+        camera.setFar(camera_in.getFar() * 0.75f);
 
         bool camera_is_underwater = LLViewerCamera::getInstance()->cameraUnderWater();
 
@@ -9306,23 +9268,20 @@ void LLPipeline::generateWaterReflection(LLCamera& camera_in)
         //plane params
         LLPlane plane;
         LLVector3 pnorm;
-		F32 pd;
         S32 water_clip = 0;
         if (!camera_is_underwater)
         {
             //camera is above water, clip plane points up
             pnorm.setVec(0,0,1);
-			pd = -water_height;
             plane.setVec(pnorm, -water_height);
-            water_clip = -1;
+            water_clip = 1;
         }
         else
         {
             //camera is below water, clip plane points down
             pnorm = LLVector3(0,0,-1);
-			pd = water_height;
             plane.setVec(pnorm, water_height);
-            water_clip = 1;
+            water_clip = -1;
         }
 
         S32 occlusion = LLPipeline::sUseOcclusion;
@@ -9488,11 +9447,11 @@ void LLPipeline::generateWaterReflection(LLCamera& camera_in)
                 mWaterDis.bindTarget();
                 mWaterDis.getViewport(gGLViewport);
 
+                F32 water_dist = water_height * LLPipeline::sDistortionWaterClipPlaneMargin;
+
                 //clip out geometry on the same side of water as the camera w/ enough margin to not include the water geo itself,
                 // but not so much as to clip out parts of avatars that should be seen under the water in the distortion map
-				F32 to_clip = fabsf(camera_height - water_height);
-				F32 pad = -to_clip * 0.05f; //amount to "pad" clip plane by
-                LLPlane plane(-pnorm, -(pd+pad));
+                LLPlane plane(-pnorm, water_dist);
                 LLGLUserClipPlane clip_plane(plane, saved_modelview, saved_projection);
 
                 gGL.setColorMask(true, true);
