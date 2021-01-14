@@ -106,6 +106,7 @@ void main()
     }
     if (rel_pos.y < 0.)
     {
+        altitude_blend_factor = 0;  // SL-11589 Fix clouds drooping below horizon
         rel_pos *= (-32000. / rel_pos.y);
     }
 
