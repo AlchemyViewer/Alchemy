@@ -1722,8 +1722,7 @@ LLFolderViewItem* LLInventoryPanel::getItemByID(const LLUUID& id)
 {
 	LL_RECORD_BLOCK_TIME(FTM_GET_ITEM_BY_ID);
 
-	std::map<LLUUID, LLFolderViewItem*>::iterator map_it;
-	map_it = mItemMap.find(id);
+	auto map_it = mItemMap.find(id);
 	if (map_it != mItemMap.end())
 	{
 		return map_it->second;
