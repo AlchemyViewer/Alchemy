@@ -270,6 +270,8 @@ void LLDrawPoolWLSky::renderStars() const
 
 	gGL.pushMatrix();
     gGL.translatef(mCameraOrigin.mV[0], mCameraOrigin.mV[1], mCameraOrigin.mV[2]);
+    gGL.rotatef(gFrameTimeSeconds * 0.01f, 0.f, 0.f, 1.f);
+
 	if (LLGLSLShader::sNoFixedFunction)
 	{
         star_shader->bind();
