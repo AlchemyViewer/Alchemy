@@ -125,7 +125,5 @@ void main()
     frag_data[0] = vec4(color.rgb, alpha1);
     frag_data[1] = vec4(0.0,0.0,0.0,0.0);
     frag_data[2] = vec4(0,0,0,1);
-
-    gl_FragDepth = 0.99995f;
 }
 
