@@ -34,9 +34,10 @@
 #include "llrefcount.h"
 #include "llinstancetracker.h"
 
-#include <absl/strings/string_view.h>
+#include "absl/container/flat_hash_map.h"
 
 #include <vector>
+#include <string_view>
 
 // *NOTE: boost::visit_each<> generates warning 4675 on .net 2003
 // Disable the warning for the boost includes.
@@ -194,7 +195,7 @@ class LLControlGroup final : public LLInstanceTracker<LLControlGroup, std::strin
 	LOG_CLASS(LLControlGroup);
 
 protected:
-	typedef std::map<std::string, LLControlVariablePtr, std::less<>> ctrl_name_table_t;
+	typedef absl::flat_hash_map<std::string, LLControlVariablePtr> ctrl_name_table_t;
 	ctrl_name_table_t mNameTable;
 	static const std::string mTypeString[TYPE_COUNT];
 
