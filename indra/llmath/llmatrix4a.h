@@ -32,7 +32,7 @@
 #include "m4math.h"
 #include "m3math.h"
 
-LL_ALIGN_PREFIX(16) class LLMatrix4a
+class alignas(16) LLMatrix4a
 {
 public:
 	LL_ALIGN_PREFIX(16) LLVector4a mMatrix[4] LL_ALIGN_POSTFIX(16);
@@ -787,7 +787,7 @@ public:
 
 		return _mm_movemask_epi8(_mm_castps_si128(_mm_and_ps(mask1, mask2))) == 0xFFFF;
 	}
-} LL_ALIGN_POSTFIX(16);
+};
 
 #ifndef SHOW_ASSERT
 static_assert(std::is_trivial<LLMatrix4a>::value, "LLMatrix4a must be a trivial type");

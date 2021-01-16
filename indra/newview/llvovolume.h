@@ -300,6 +300,7 @@ public:
 	BOOL setIsFlexible(BOOL is_flexible);
 
     const LLMeshSkinInfo* getSkinInfo() const;
+	std::optional<std::pair<LLMatrix4a*, F32*>> getCachedSkinRenderMatrix(U32& joint_count, LLVOAvatar* avatar, const LLMeshSkinInfo* skin = nullptr);
     
     // Extended Mesh Properties
     U32 getExtendedMeshFlags() const;
@@ -438,6 +439,10 @@ private:
 
 	bool mSkinInfoFailed;
 	const LLMeshSkinInfo *mSkinInfo;
+	std::unique_ptr <LLMatrix4a[]> mSkinMatrixCache;
+	std::unique_ptr <F32[]> mSkinRenderMatrixCache;
+	U32 mSkinRenderMatrixJointCount;
+	U32 mSkinLastRenderFrame;
 	
 	// statics
 public:

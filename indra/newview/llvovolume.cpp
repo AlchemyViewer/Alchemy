@@ -237,6 +237,8 @@ LLVOVolume::LLVOVolume(const LLUUID &id, const LLPCode pcode, LLViewerRegion *re
 
 	mSkinInfoFailed = false;
 	mSkinInfo = NULL;
+	mSkinRenderMatrixJointCount = 0;
+	mSkinLastRenderFrame = 0;
 
 	mMediaImplList.resize(getNumTEs());
 	mLastFetchedMediaVersion = -1;
@@ -3623,6 +3625,62 @@ const LLMeshSkinInfo* LLVOVolume::getSkinInfo() const
          return mSkinInfo;
     }
     return nullptr;
+}
+
+std::optional<std::pair<LLMatrix4a*, F32*>> LLVOVolume::getCachedSkinRenderMatrix(U32& joint_count, LLVOAvatar *avatar, const LLMeshSkinInfo* skin)
+{
+	// Calculate this only once per frame
+	const U32 curFrameCount = LLFrameTimer::getFrameCount();
+	if (curFrameCount == mSkinLastRenderFrame && (!mLODChanged || !mSculptChanged || !avatar->isEditingAppearance()))
+	{
+		joint_count = mSkinRenderMatrixJointCount;
+		return { {mSkinMatrixCache.get(), mSkinRenderMatrixCache.get()} };
+	}
+
+	if (!skin)
+	{
+		skin = getSkinInfo();
+		if (!skin)
+		{
+			joint_count = 0;
+			return {};
+		}
+	}
+	joint_count = LLSkinningUtil::getMeshJointCount(skin);
+
+	if ((!mSkinMatrixCache || !mSkinRenderMatrixCache) || (joint_count != mSkinRenderMatrixJointCount))
+	{
+		mSkinMatrixCache = std::make_unique<LLMatrix4a[]>(joint_count);
+		mSkinRenderMatrixCache = std::make_unique<F32[]>(joint_count * 12);
+		mSkinRenderMatrixJointCount = joint_count;
+	}
+
+	LLSkinningUtil::initSkinningMatrixPalette(mSkinMatrixCache.get(), joint_count, skin, avatar);
+
+	for (U32 i = 0; i < joint_count; ++i)
+	{
+		F32* m = (F32*)mSkinMatrixCache[i].mMatrix[0].getF32ptr();
+
+		U32 idx = i * 12;
+
+		mSkinRenderMatrixCache[idx + 0] = m[0];
+		mSkinRenderMatrixCache[idx + 1] = m[1];
+		mSkinRenderMatrixCache[idx + 2] = m[2];
+		mSkinRenderMatrixCache[idx + 3] = m[12];
+
+		mSkinRenderMatrixCache[idx + 4] = m[4];
+		mSkinRenderMatrixCache[idx + 5] = m[5];
+		mSkinRenderMatrixCache[idx + 6] = m[6];
+		mSkinRenderMatrixCache[idx + 7] = m[13];
+
+		mSkinRenderMatrixCache[idx + 8] = m[8];
+		mSkinRenderMatrixCache[idx + 9] = m[9];
+		mSkinRenderMatrixCache[idx + 10] = m[10];
+		mSkinRenderMatrixCache[idx + 11] = m[14];
+	}
+
+	mSkinLastRenderFrame = curFrameCount;
+	return { {mSkinMatrixCache.get(), mSkinRenderMatrixCache.get()} };
 }
 
 // virtual

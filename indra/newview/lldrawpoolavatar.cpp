@@ -1834,7 +1834,8 @@ void LLDrawPoolAvatar::updateRiggedFaceVertexBuffer(
 	LLPointer<LLVertexBuffer> buffer = face->getVertexBuffer();
 	LLDrawable* drawable = face->getDrawable();
 
-	if (drawable->getVOVolume() && drawable->getVOVolume()->isNoLOD())
+	LLVOVolume* vobj = drawable->getVOVolume();
+	if (vobj && vobj->isNoLOD())
 	{
 		return;
 	}
@@ -1949,9 +1950,17 @@ void LLDrawPoolAvatar::updateRiggedFaceVertexBuffer(
 		LLVector4a* norm = has_normal ? (LLVector4a*) normal.get() : NULL;
 		
 		//build matrix palette
-		LLMatrix4a mat[LL_MAX_JOINTS_PER_MESH_OBJECT];
-        U32 count = LLSkinningUtil::getMeshJointCount(skin);
-        LLSkinningUtil::initSkinningMatrixPalette(mat, count, skin, avatar);
+//		LLMatrix4a mat[LL_MAX_JOINTS_PER_MESH_OBJECT];
+//      U32 count = LLSkinningUtil::getMeshJointCount(skin);
+//      LLSkinningUtil::initSkinningMatrixPalette(mat, count, skin, avatar);
+
+		U32 count = 0;
+		auto mat_pair = vobj->getCachedSkinRenderMatrix(count, avatar, skin);
+		if (!mat_pair.has_value())
+			return;
+
+		LLMatrix4a* mat = mat_pair.value().first;
+
         LLSkinningUtil::checkSkinWeights(weights, buffer->getNumVerts(), skin);
 
 		LLMatrix4a bind_shape_matrix;
@@ -2167,41 +2176,47 @@ void LLDrawPoolAvatar::renderRigged(LLVOAvatar* avatar, U32 type, bool glow)
 		{        
 			if (sShaderLevel > 0)
 			{
-                // upload matrix palette to shader
-				LLMatrix4a mat[LL_MAX_JOINTS_PER_MESH_OBJECT];
-				U32 count = LLSkinningUtil::getMeshJointCount(skin);
-                LLSkinningUtil::initSkinningMatrixPalette(mat, count, skin, avatar);
+    //            // upload matrix palette to shader
+				//LLMatrix4a mat[LL_MAX_JOINTS_PER_MESH_OBJECT];
+				//U32 count = LLSkinningUtil::getMeshJointCount(skin);
+    //            LLSkinningUtil::initSkinningMatrixPalette(mat, count, skin, avatar);
 
-				stop_glerror();
+				//stop_glerror();
 
-				F32 mp[LL_MAX_JOINTS_PER_MESH_OBJECT*12];
+				//F32 mp[LL_MAX_JOINTS_PER_MESH_OBJECT*12];
 
-				for (U32 i = 0; i < count; ++i)
-				{
-					F32* m = (F32*) mat[i].mMatrix[0].getF32ptr();
+				//for (U32 i = 0; i < count; ++i)
+				//{
+				//	F32* m = (F32*) mat[i].mMatrix[0].getF32ptr();
 
-					U32 idx = i*12;
+				//	U32 idx = i*12;
 
-					mp[idx+0] = m[0];
-					mp[idx+1] = m[1];
-					mp[idx+2] = m[2];
-					mp[idx+3] = m[12];
+				//	mp[idx+0] = m[0];
+				//	mp[idx+1] = m[1];
+				//	mp[idx+2] = m[2];
+				//	mp[idx+3] = m[12];
 
-					mp[idx+4] = m[4];
-					mp[idx+5] = m[5];
-					mp[idx+6] = m[6];
-					mp[idx+7] = m[13];
+				//	mp[idx+4] = m[4];
+				//	mp[idx+5] = m[5];
+				//	mp[idx+6] = m[6];
+				//	mp[idx+7] = m[13];
 
-					mp[idx+8] = m[8];
-					mp[idx+9] = m[9];
-					mp[idx+10] = m[10];
-					mp[idx+11] = m[14];
-				}
+				//	mp[idx+8] = m[8];
+				//	mp[idx+9] = m[9];
+				//	mp[idx+10] = m[10];
+				//	mp[idx+11] = m[14];
+				//}
+				U32 count = 0;
+				auto mat_pair = vobj->getCachedSkinRenderMatrix(count, avatar, skin);
+				if (!mat_pair.has_value())
+					continue;
+
+				F32* mp = mat_pair.value().second;
 
 				LLDrawPoolAvatar::sVertexProgram->uniformMatrix3x4fv(LLViewerShaderMgr::AVATAR_MATRIX, 
 					count,
 					FALSE,
-					(GLfloat*) mp);
+					(GLfloat*)mp);
 
 				stop_glerror();
 			}
