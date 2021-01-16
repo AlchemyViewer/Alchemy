@@ -4812,6 +4812,7 @@ void LLPipeline::renderGeomShadow(LLCamera& camera)
 
 void LLPipeline::addTrianglesDrawn(S32 index_count, U32 render_type)
 {
+#ifndef LL_RELEASE_FOR_DOWNLOAD
 	assertInitialized();
 	S32 count = 0;
 	if (render_type == LLRender::TRIANGLE_STRIP)
@@ -4831,6 +4832,7 @@ void LLPipeline::addTrianglesDrawn(S32 index_count, U32 render_type)
 		gViewerWindow->getWindow()->swapBuffers();
 		ms_sleep(16);
 	}
+#endif
 }
 
 void LLPipeline::renderPhysicsDisplay()
