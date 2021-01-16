@@ -4973,29 +4973,6 @@ void LLRiggedVolume::update(const LLMeshSkinInfo* skin, LLVOAvatar* avatar, cons
                 rigged_vert_count += dst_face.mNumVertices;
                 rigged_face_count++;
 
-            #if USE_SEPARATE_JOINT_INDICES_AND_WEIGHTS
-                if (vol_face.mJointIndices) // fast path with preconditioned joint indices
-                {
-                    LLMatrix4a src[4];
-                    U8* joint_indices_cursor = vol_face.mJointIndices;
-                    LLVector4a* just_weights = vol_face.mJustWeights;
-                    for (U32 j = 0; j < dst_face.mNumVertices; ++j)
-				    {
-					    LLMatrix4a final_mat;
-                        F32* w = just_weights[j].getF32ptr();
-                        LLSkinningUtil::getPerVertexSkinMatrixWithIndices(w, joint_indices_cursor, mat, final_mat, src);
-                        joint_indices_cursor += 4;
-
-					    LLVector4a& v = vol_face.mPositions[j];
-					    LLVector4a t;
-					    LLVector4a dst;
-					    bind_shape_matrix.affineTransform(v, t);
-					    final_mat.affineTransform(t, dst);
-					    pos[j] = dst;
-				    }
-                }
-                else
-            #endif
                 {
 				    for (U32 j = 0; j < dst_face.mNumVertices; ++j)
 				    {

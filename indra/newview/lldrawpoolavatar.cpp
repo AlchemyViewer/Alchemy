@@ -1842,43 +1842,6 @@ void LLDrawPoolAvatar::updateRiggedFaceVertexBuffer(
 
     const U32 max_joints = LLSkinningUtil::getMaxJointCount();
 
-#if USE_SEPARATE_JOINT_INDICES_AND_WEIGHTS
-    #define CONDITION_WEIGHT(f) ((U8)llclamp((S32)f, (S32)0, (S32)max_joints-1))
-    LLVector4a* just_weights = vol_face.mJustWeights;
-    // we need to calculate the separated indices and store just the matrix weights for this vol...
-    if (!vol_face.mJointIndices)
-    {
-        // not very consty after all...
-        vol_face.allocateJointIndices(vol_face.mNumVertices);
-        just_weights = vol_face.mJustWeights;
-
-        U8* joint_indices_cursor = vol_face.mJointIndices;
-        for (int i = 0; i < vol_face.mNumVertices; i++)
-        {
-            F32* w = weights[i].getF32ptr();
-            F32* w_ = just_weights[i].getF32ptr();
-
-            F32 w0 = floorf(w[0]);
-            F32 w1 = floorf(w[1]);
-            F32 w2 = floorf(w[2]);
-            F32 w3 = floorf(w[3]);
-
-            joint_indices_cursor[0] = CONDITION_WEIGHT(w0);
-            joint_indices_cursor[1] = CONDITION_WEIGHT(w1);
-            joint_indices_cursor[2] = CONDITION_WEIGHT(w2);
-            joint_indices_cursor[3] = CONDITION_WEIGHT(w3);
-
-            // remove joint portion of combined weight
-            w_[0] = w[0] - w0;
-            w_[1] = w[1] - w1;
-            w_[2] = w[2] - w2;
-            w_[3] = w[3] - w3;
-
-            joint_indices_cursor += 4;
-        }
-    }
-#endif
-
     // FIXME ugly const cast
     LLSkinningUtil::scrubInvalidJoints(avatar, const_cast<LLMeshSkinInfo*>(skin));
 
@@ -1966,44 +1929,6 @@ void LLDrawPoolAvatar::updateRiggedFaceVertexBuffer(
 		LLMatrix4a bind_shape_matrix;
 		bind_shape_matrix.loadu(skin->mBindShapeMatrix);
 
-#if USE_SEPARATE_JOINT_INDICES_AND_WEIGHTS
-        U8* joint_indices_cursor = vol_face.mJointIndices;
-        // fast path with joint indices separate from weights
-        if (joint_indices_cursor)
-        {
-            LLMatrix4a src[4];
-		    for (U32 j = 0; j < buffer->getNumVerts(); ++j)
-		    {
-			    LLMatrix4a final_mat;
-                //LLMatrix4a final_mat_correct;
-
-                F32* jw = just_weights[j].getF32ptr();
-
-                LLSkinningUtil::getPerVertexSkinMatrixWithIndices(jw, joint_indices_cursor, mat, final_mat, src);                
-
-                joint_indices_cursor += 4;
-
-			    LLVector4a& v = vol_face.mPositions[j];
-
-			    LLVector4a t;
-			    LLVector4a dst;
-			    bind_shape_matrix.affineTransform(v, t);
-			    final_mat.affineTransform(t, dst);
-			    pos[j] = dst;
-
-			    if (norm)
-			    {
-				    LLVector4a& n = vol_face.mNormals[j];
-				    bind_shape_matrix.rotate(n, t);
-				    final_mat.rotate(t, dst);
-				    dst.normalize3fast();
-				    norm[j] = dst;
-			    }
-		    }
-        }
-        // slow path with joint indices calculated from weights
-        else
-#endif
         {
             for (U32 j = 0; j < buffer->getNumVerts(); ++j)
 		    {
