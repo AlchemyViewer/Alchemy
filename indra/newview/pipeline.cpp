@@ -9447,6 +9447,10 @@ void LLPipeline::generateWaterReflection(LLCamera& camera_in)
                 mWaterDis.bindTarget();
                 mWaterDis.getViewport(gGLViewport);
 
+                gGL.setColorMask(true, true);
+                mWaterDis.clear();
+                gGL.setColorMask(true, false);
+
                 F32 water_dist = water_height * LLPipeline::sDistortionWaterClipPlaneMargin;
 
                 //clip out geometry on the same side of water as the camera w/ enough margin to not include the water geo itself,
@@ -9627,7 +9631,7 @@ void LLPipeline::renderShadow(glh::matrix4f& view, glh::matrix4f& proj, LLCamera
 	LLGLEnable cull(GL_CULL_FACE);
 
 	//enable depth clamping if available
-	//LLGLEnable depth_clamp(gGLManager.mHasDepthClamp ? GL_DEPTH_CLAMP : 0);
+	LLGLEnable depth_clamp(gGLManager.mHasDepthClamp ? GL_DEPTH_CLAMP : 0);
 
 	if (use_shader)
 	{
