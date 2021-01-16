@@ -1930,7 +1930,7 @@ void LLDrawPoolAvatar::updateRiggedFaceVertexBuffer(
 		bind_shape_matrix.loadu(skin->mBindShapeMatrix);
 
         {
-            for (U32 j = 0; j < buffer->getNumVerts(); ++j)
+            for (S32 j = 0, j_end = buffer->getNumVerts(); j < j_end; ++j)
 		    {
 			    LLMatrix4a final_mat;
                 LLSkinningUtil::getPerVertexSkinMatrix(weights[j].getF32ptr(), mat, false, final_mat, max_joints);
