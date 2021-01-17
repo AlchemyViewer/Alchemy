@@ -204,8 +204,6 @@ protected:
 	int				mSDLFlags;
 
 	SDL_Cursor*		mSDLCursors[UI_CURSOR_COUNT];
-	int             mHaveInputFocus; /* 0=no, 1=yes, else unknown */
-	int             mIsMinimized; /* 0=no, 1=yes, else unknown */
 
 	friend class LLWindowManager;
 

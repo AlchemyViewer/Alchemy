@@ -264,8 +264,6 @@ LLWindowSDL::LLWindowSDL(LLWindowCallbacks* callbacks,
 	mOverrideAspectRatio = 0.f;
 	mGrabbyKeyFlags = 0;
 	mReallyCapturedCount = 0;
-	mHaveInputFocus = -1;
-	mIsMinimized = -1;
 	mFSAASamples = fsaa_samples;
 	mPreeditor = nullptr;
 	mLanguageTextInputAllowed = false;
@@ -2020,23 +2018,23 @@ void LLWindowSDL::gatherInput()
             case SDL_WINDOWEVENT_MAXIMIZED:
                 [[fallthrough]];
             case SDL_WINDOWEVENT_RESTORED:
-                mIsMinimized = (event.window.event == SDL_WINDOWEVENT_MINIMIZED);
+            {
+                Uint32 flags = SDL_GetWindowFlags(mWindow);
+                bool minimized = (flags & SDL_WINDOW_MINIMIZED);
 
-                mCallbacks->handleActivate(this, !mIsMinimized);
-                LL_INFOS() << "SDL deiconification state switched to " << mIsMinimized << LL_ENDL;
+                mCallbacks->handleActivate(this, !minimized);
+                LL_INFOS() << "SDL deiconification state switched to " << minimized << LL_ENDL;
                 break;
-
+            }
             case SDL_WINDOWEVENT_ENTER:
                 break;
             case SDL_WINDOWEVENT_LEAVE:
 				mCallbacks->handleMouseLeave(this);
                 break;
             case SDL_WINDOWEVENT_FOCUS_GAINED:
-                mHaveInputFocus = true;
                 mCallbacks->handleFocus(this);
                 break;
             case SDL_WINDOWEVENT_FOCUS_LOST:
-                mHaveInputFocus = false;
                 mCallbacks->handleFocusLost(this);
                 break;
             case SDL_WINDOWEVENT_CLOSE:
