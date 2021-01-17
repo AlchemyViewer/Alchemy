@@ -17,23 +17,37 @@
         <string>SDL2</string>
         <key>platforms</key>
         <map>
+          <key>darwin64</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>hash</key>
+              <string>baef27e1e299e7730ca6995c102da6700d40da8c47b4e7ad52918adb72c295b7d660afcb35a1791aa0013bbc326af023</string>
+              <key>hash_algorithm</key>
+              <string>sha3_384</string>
+              <key>url</key>
+              <string>https://git.alchemyviewer.org/api/v4/projects/100/packages/generic/SDL2-718/2.0.14/SDL2-2.0.14-darwin64-718.tar.xz</string>
+            </map>
+            <key>name</key>
+            <string>darwin64</string>
+          </map>
           <key>linux64</key>
           <map>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>2c4eec8593920e781479ca70bfdc9d6e8129e7dd870f737f1698d09c83634f1cdec9051aa766805e9c9b0cac7e1c227b</string>
+              <string>9946cc673a45404bb4e82b4e4e2d89f490633d8753c9799cc613970b879f9bb174455722f2605c42539b5bfc91965097</string>
               <key>hash_algorithm</key>
               <string>sha3_384</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/100/packages/generic/SDL2-538/2.0.12/SDL2-2.0.12-linux64-538.tar.xz</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/100/packages/generic/SDL2-718/2.0.14/SDL2-2.0.14-linux64-718.tar.xz</string>
             </map>
             <key>name</key>
             <string>linux64</string>
           </map>
         </map>
         <key>version</key>
-        <string>2.0.12</string>
+        <string>2.0.14</string>
       </map>
       <key>apr_suite</key>
       <map>
@@ -2004,11 +2018,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>33a47664235edc04f046ddd5350e523c0f04511049a548ec17ab277063472d94fc61266c8e71e1ea78116e6902345066</string>
+              <string>389879a217a3d7b3c2e033dc84e2f506b85bd0b260055057b9f8bfb8fa9f59227e1ba4a3d66b331a5779ae9feed010a0</string>
               <key>hash_algorithm</key>
               <string>sha3_384</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/99/packages/generic/open-libndofdev-540/0.12.0/open_libndofdev-0.12.0-linux64-540.tar.xz</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/99/packages/generic/open-libndofdev-719/0.12.0/open_libndofdev-0.12.0-linux64-719.tar.xz</string>
             </map>
             <key>name</key>
             <string>linux64</string>
