@@ -346,6 +346,9 @@ void LLAssetRecoverQueue::onCreateItem(const LLUUID& idItem)
 				strCapsUrl = gAgent.getRegion()->getCapability("UpdateNotecardAgentInventory");
 				uploadInfo = LLResourceUploadInfo::ptr_t(new LLBufferedAssetUploadInfo(itItem->idItem, LLAssetType::AT_NOTECARD, strBuffer, boost::bind(&LLAssetRecoverQueue::onSavedAsset, this, _1, _4)));
 				break;
+			default:
+				LL_WARNS() << "Unsupported iventory type '" << pItem->getType() << "' for asset recovery" << LL_ENDL;
+				return;
 		}
 
 		if ( (!strCapsUrl.empty()) && (uploadInfo) )
