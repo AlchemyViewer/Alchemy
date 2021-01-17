@@ -932,9 +932,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>a705a665810a71e7b0114a97ae9a2224</string>
+              <string>bbba57141b2e9fab07bd344e29f59347e4c9e10261a76cb733a22bf24c918bf45b2f7b923de1081d6da73092c2303408</string>
+              <key>hash_algorithm</key>
+              <string>sha3_384</string>
               <key>url</key>
-              <string>http://s3-proxy.lindenlab.com/private-builds-secondlife-com/ct2/15256/98457/kdu-7.10.4.513518-linux64-513518.tar.bz2</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/120/packages/generic/kdu-721/8.0.6/kdu-8.0.6-linux64-721.tar.xz</string>
             </map>
             <key>name</key>
             <string>linux64</string>
@@ -944,9 +946,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>38574fbcb6c94c42745ef48748002e58</string>
+              <string>5b8afd59538609e830e0b54b09b5947e5cd7f17383d35f8d861b4445bfbbe9876725db77d73d3acd70886e9009dab3f9</string>
+              <key>hash_algorithm</key>
+              <string>sha3_384</string>
               <key>url</key>
-              <string>http://s3-proxy.lindenlab.com/private-builds-secondlife-com/ct2/55189/512583/kdu-7.10.4.539108-windows-539108.tar.bz2</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/120/packages/generic/kdu-721/8.0.6/kdu-8.0.6-windows-721.tar.xz</string>
             </map>
             <key>name</key>
             <string>windows</string>
@@ -956,18 +960,18 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>d4a298dc57828a162f8d01aec0a31e1c</string>
+              <string>8ec74c7fbad6a3b4562f26b4cb6887f339c534736e34e70227730fa0a33a69a15c2e2b3d51487fdc2fc1e66a676f29a9</string>
               <key>hash_algorithm</key>
-              <string>md5</string>
+              <string>sha3_384</string>
               <key>url</key>
-              <string>file:///c:/bld/kdu-v8.0.6.202611808-windows64-202611808.tar.bz2</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/120/packages/generic/kdu-721/8.0.6/kdu-8.0.6-windows64-721.tar.xz</string>
             </map>
             <key>name</key>
             <string>windows64</string>
           </map>
         </map>
         <key>version</key>
-        <string>v8.0.6.202611808</string>
+        <string>8.0.6</string>
       </map>
       <key>libepoxy</key>
       <map>
