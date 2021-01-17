@@ -4894,13 +4894,13 @@ void LLVOVolume::updateRiggedVolume(bool force_update)
 		updateRelativeXform();
 	}
 
-	mRiggedVolume->update(mSkinInfo, avatar, volume);
+	mRiggedVolume->update(mSkinInfo, avatar, volume, this);
 }
 
 static LLTrace::BlockTimerStatHandle FTM_SKIN_RIGGED("Skin");
 static LLTrace::BlockTimerStatHandle FTM_RIGGED_OCTREE("Octree");
 
-void LLRiggedVolume::update(const LLMeshSkinInfo* skin, LLVOAvatar* avatar, const LLVolume* volume)
+void LLRiggedVolume::update(const LLMeshSkinInfo* skin, LLVOAvatar* avatar, const LLVolume* volume, LLVOVolume* src_object)
 {
 	bool copy = false;
 	S32 vol_num_faces = volume->getNumVolumeFaces();
@@ -4942,9 +4942,10 @@ void LLRiggedVolume::update(const LLMeshSkinInfo* skin, LLVOAvatar* avatar, cons
 	//build matrix palette
 	static const size_t kMaxJoints = LL_MAX_JOINTS_PER_MESH_OBJECT;
 
-	LLMatrix4a mat[kMaxJoints];
-	U32 maxJoints = LLSkinningUtil::getMeshJointCount(skin);
-    LLSkinningUtil::initSkinningMatrixPalette(mat, maxJoints, skin, avatar);
+	U32 maxJoints = 0;
+    auto ret = src_object->getCachedSkinRenderMatrix(maxJoints, avatar, skin);
+
+    LLMatrix4a* mat = ret.value().first;
 
     S32 rigged_vert_count = 0;
     S32 rigged_face_count = 0;

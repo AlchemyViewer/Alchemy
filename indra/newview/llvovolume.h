@@ -45,6 +45,7 @@ class LLSelectNode;
 class LLObjectMediaDataClient;
 class LLObjectMediaNavigateClient;
 class LLVOAvatar;
+class LLVOVolume;
 class LLMeshSkinInfo;
 
 typedef std::vector<viewer_media_t> media_list_t;
@@ -65,7 +66,7 @@ public:
 	{
 	}
 
-	void update(const LLMeshSkinInfo* skin, LLVOAvatar* avatar, const LLVolume* src_volume);
+	void update(const LLMeshSkinInfo* skin, LLVOAvatar* avatar, const LLVolume* src_volume, LLVOVolume* src_object);
 
     std::string mExtraDebugText;
 };
