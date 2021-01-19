@@ -150,7 +150,7 @@ void main()
     combined_haze = sqrt(combined_haze);  // less atmos opacity (more transparency) below clouds
 
     // At horizon, blend high altitude sky color towards the darker color below the clouds
-    color += (add_below_cloud - color) * (1. - sqrt(combined_haze));
+    color += (add_below_cloud - color) * (1. - combined_haze);
 
     // Haze color above cloud
     vary_HazeColor = color;
