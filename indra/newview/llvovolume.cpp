@@ -4940,7 +4940,7 @@ void LLRiggedVolume::update(const LLMeshSkinInfo* skin, LLVOAvatar* avatar, cons
 
 
 	//build matrix palette
-	static const size_t kMaxJoints = LL_MAX_JOINTS_PER_MESH_OBJECT;
+	static const size_t kMaxJoints = LLSkinningUtil::getMaxJointCount();
 
 	U32 maxJoints = 0;
     auto ret = src_object->getCachedSkinRenderMatrix(maxJoints, avatar, skin);
@@ -4969,8 +4969,6 @@ void LLRiggedVolume::update(const LLMeshSkinInfo* skin, LLVOAvatar* avatar, cons
 			if (pos && dst_face.mExtents)
 			{
 				LL_RECORD_BLOCK_TIME(FTM_SKIN_RIGGED);
-
-                U32 max_joints = LLSkinningUtil::getMaxJointCount();
                 rigged_vert_count += dst_face.mNumVertices;
                 rigged_face_count++;
 
@@ -4978,7 +4976,7 @@ void LLRiggedVolume::update(const LLMeshSkinInfo* skin, LLVOAvatar* avatar, cons
 				    for (U32 j = 0; j < dst_face.mNumVertices; ++j)
 				    {
 					    LLMatrix4a final_mat;
-                        LLSkinningUtil::getPerVertexSkinMatrix(weight[j].getF32ptr(), mat, false, final_mat, max_joints);
+                        LLSkinningUtil::getPerVertexSkinMatrix(weight[j].getF32ptr(), mat, false, final_mat, kMaxJoints);
 				
 					    LLVector4a& v = vol_face.mPositions[j];
 					    LLVector4a t;
