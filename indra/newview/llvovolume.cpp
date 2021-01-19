@@ -3631,7 +3631,7 @@ std::optional<std::pair<LLMatrix4a*, F32*>> LLVOVolume::getCachedSkinRenderMatri
 {
 	// Calculate this only once per frame
 	const U32 curFrameCount = LLFrameTimer::getFrameCount();
-	if (curFrameCount == mSkinLastRenderFrame && (!mLODChanged || !mSculptChanged || !avatar->isEditingAppearance()))
+	if (curFrameCount == mSkinLastRenderFrame && (!mLODChanged && !mSculptChanged && !avatar->isEditingAppearance()))
 	{
 		joint_count = mSkinRenderMatrixJointCount;
 		return { {mSkinMatrixCache.get(), mSkinRenderMatrixCache.get()} };
