@@ -956,7 +956,7 @@ bool LLPipeline::allocateScreenBuffer(U32 resX, U32 resY, U32 samples)
 		if (!addDeferredAttachments(mDeferredScreen)) return false;
 	
 		GLuint screenFormat = GL_RGBA16;
-		if (gGLManager.mIsATI)
+		if (gGLManager.mGLVersion < 4.f && gGLManager.mIsATI)
 		{
 			screenFormat = GL_RGBA12;
 		}
@@ -965,7 +965,7 @@ bool LLPipeline::allocateScreenBuffer(U32 resX, U32 resY, U32 samples)
 		{
 			screenFormat = GL_RGBA16F;
 		}
-        
+
 		if (!mScreen.allocate(resX, resY, screenFormat, FALSE, FALSE, LLTexUnit::TT_RECT_TEXTURE, FALSE, samples)) return false;
 		if (samples > 0)
 		{
