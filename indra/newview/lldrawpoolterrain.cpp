@@ -354,6 +354,7 @@ void LLDrawPoolTerrain::renderFullShader()
 
     ((LLSettingsVOWater*)pwater.get())->updateShader(shader);
 
+    // TERRAIN TEXTURE COORDS 0:
 	gGL.matrixMode(LLRender::MM_TEXTURE);
 	gGL.loadIdentity();
 	gGL.matrixMode(LLRender::MM_MODELVIEW);
@@ -366,7 +367,7 @@ void LLDrawPoolTerrain::renderFullShader()
 	gGL.getTexUnit(detail1)->setTextureAddressMode(LLTexUnit::TAM_WRAP);
 	gGL.getTexUnit(detail1)->activate();
 
-	/// ALPHA TEXTURE COORDS 0:
+    // TERRAIN TEXTURE COORDS 1:
 	gGL.matrixMode(LLRender::MM_TEXTURE);
 	gGL.loadIdentity();
 	gGL.matrixMode(LLRender::MM_MODELVIEW);
@@ -377,8 +378,8 @@ void LLDrawPoolTerrain::renderFullShader()
 	gGL.getTexUnit(detail2)->bind(detail_texture2p);
     gGL.getTexUnit(detail2)->setTextureAddressMode(LLTexUnit::TAM_WRAP);
 	gGL.getTexUnit(detail2)->activate();
-	
-	/// ALPHA TEXTURE COORDS 1:
+
+    // TERRAIN TEXTURE COORDS 2:
 	gGL.matrixMode(LLRender::MM_TEXTURE);
 	gGL.loadIdentity();
 	gGL.translatef(-2.f, 0.f, 0.f);
@@ -391,7 +392,7 @@ void LLDrawPoolTerrain::renderFullShader()
 	gGL.getTexUnit(detail3)->setTextureAddressMode(LLTexUnit::TAM_WRAP);
 	gGL.getTexUnit(detail3)->activate();
 
-	/// ALPHA TEXTURE COORDS 2:
+    // TERRAIN TEXTURE COORDS 3:
 	gGL.matrixMode(LLRender::MM_TEXTURE);
 	gGL.loadIdentity();
 	gGL.translatef(-1.f, 0.f, 0.f);
