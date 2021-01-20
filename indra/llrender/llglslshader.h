@@ -76,6 +76,13 @@ public:
 		SG_SKY,
 		SG_WATER
 	};
+
+	struct gl_uniform_data_t {
+		std::string name;
+		GLenum type = (GLenum)-1;
+		GLint size = -1;
+		U32 texunit_priority = UINT_MAX; // Lower gets earlier texunits indices.
+	};
 	
 	static std::set<LLGLSLShader*> sInstances;
 	static bool sProfileEnabled;
@@ -110,7 +117,7 @@ public:
 	void attachObjects(GLuint* objects = NULL, S32 count = 0);
 	BOOL mapAttributes(const std::vector<LLStaticHashedString> * attributes);
 	BOOL mapUniforms(const std::vector<LLStaticHashedString> *);
-	void mapUniform(GLint index, const std::vector<LLStaticHashedString> *);
+	void mapUniform(const gl_uniform_data_t& gl_uniform, const std::vector<LLStaticHashedString> *);
 	void uniform1i(U32 index, GLint i);
 	void uniform1f(U32 index, GLfloat v);
 	void uniform2f(U32 index, GLfloat x, GLfloat y);
