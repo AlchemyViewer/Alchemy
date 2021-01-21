@@ -345,7 +345,10 @@ void LLGLSLShader::unloadInternal()
         for (GLsizei i = 0; i < count; i++)
         {
             glDetachShader(mProgramObject, obj[i]);
-            glDeleteShader(obj[i]);
+            if (glIsShader(obj[i]))
+            {
+                glDeleteShader(obj[i]);
+            }
         }
 
         glDeleteProgram(mProgramObject);
