@@ -1531,20 +1531,25 @@ BOOL LLWindowWin32::switchContext(BOOL fullscreen, const LLCoordScreen &size, BO
 		LL_INFOS("Window") << "pixel formats done." << LL_ENDL ;
 
 		S32 swap_method = 0;
-		S32 cur_format = num_formats-1;
+		S32 cur_format = 0;
 		GLint swap_query = WGL_SWAP_METHOD_ARB;
 
 		BOOL found_format = FALSE;
 
-		while (!found_format && wglGetPixelFormatAttribivARB(mhDC, pixel_format, 0, 1, &swap_query, &swap_method))
+		while (!found_format && wglGetPixelFormatAttribivARB(mhDC, pixel_formats[cur_format], 0, 1, &swap_query, &swap_method))
 		{
-			if (swap_method == WGL_SWAP_UNDEFINED_ARB || cur_format <= 0)
+			if (swap_method == WGL_SWAP_UNDEFINED_ARB)
 			{
+				found_format = TRUE;
+			}
+			else if(cur_format >= (S32)num_formats-1)
+			{
+				cur_format = 0;
 				found_format = TRUE;
 			}
 			else
 			{
-				--cur_format;
+				++cur_format;
 			}
 		}
 
