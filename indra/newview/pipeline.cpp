@@ -327,8 +327,6 @@ LLVertexBuffer* ll_create_cube_vb(U32 type_mask, U32 usage);
 void display_update_camera();
 //----------------------------------------
 
-S32		LLPipeline::sCompiles = 0;
-
 bool	LLPipeline::sPickAvatar = true;
 bool	LLPipeline::sDynamicLOD = true;
 bool	LLPipeline::sShowHUDAttachments = true;
@@ -1950,7 +1948,6 @@ void LLPipeline::resetFrameStats()
 {
 	assertInitialized();
 
-	sCompiles        = 0;
 	mNumVisibleFaces = 0;
 
 	if (mOldRenderDebugMask != mRenderDebugMask)

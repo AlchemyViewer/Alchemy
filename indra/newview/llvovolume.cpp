@@ -2062,11 +2062,6 @@ BOOL LLVOVolume::updateGeometry(LLDrawable *drawable)
 	// Update face flags
 	updateFaceFlags();
 	
-	if(compiled)
-	{
-		LLPipeline::sCompiles++;
-	}
-		
 	mVolumeChanged = FALSE;
 	mLODChanged = FALSE;
 	mSculptChanged = FALSE;

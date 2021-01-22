@@ -1116,7 +1116,6 @@ BOOL LLVOSky::updateGeometry(LLDrawable *drawable)
 				updateReflectionGeometry(drawable, height_above_water, mSun);
 			}
 
-	LLPipeline::sCompiles++;
 	return TRUE;
 }
 

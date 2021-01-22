@@ -161,6 +161,5 @@ BOOL LLVOGround::updateGeometry(LLDrawable *drawable)
 	*(texCoordsp++) = LLVector2(0.5f, 0.5f);
 	
 	face->getVertexBuffer()->flush();
-	LLPipeline::sCompiles++;
 	return TRUE;
 }

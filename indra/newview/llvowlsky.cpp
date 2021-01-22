@@ -267,8 +267,6 @@ BOOL LLVOWLSky::updateGeometry(LLDrawable * drawable)
 	updateStarColors();
 	updateStarGeometry(drawable);
 
-	LLPipeline::sCompiles++;
-
 	return TRUE;
 }
 

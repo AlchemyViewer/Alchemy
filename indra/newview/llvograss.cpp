@@ -459,7 +459,6 @@ void LLVOGrass::plantBlades()
 	mDepth = (face->mCenterLocal - viewerCamera.getOrigin())* viewerCamera.getAtAxis();
 	mDrawable->setPosition(face->mCenterLocal);
 	mDrawable->movePartition();
-	LLPipeline::sCompiles++;
 }
 
 void LLVOGrass::getGeometry(S32 idx,
@@ -586,8 +585,6 @@ void LLVOGrass::getGeometry(S32 idx,
 		*indicesp++     = index_offset + 7;
 		index_offset   += 8;
 	}
-
-	LLPipeline::sCompiles++;
 }
 
 U32 LLVOGrass::getPartitionType() const
