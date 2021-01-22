@@ -1039,7 +1039,6 @@ void LLVOTree::genBranchPipeline(LLStrider<LLVector3>& vertices,
 				glh::matrix4f norm((F32*) scale_mat.mMatrix);
 				LLMatrix4 norm_mat = LLMatrix4(norm.inverse().transpose().m);
 
-				norm_mat.invert();
 				appendMesh(vertices, normals, tex_coords, colors, indices, index_offset, scale_mat, norm_mat, 
 							sLODVertexOffset[trunk_LOD], sLODVertexCount[trunk_LOD], sLODIndexCount[trunk_LOD], sLODIndexOffset[trunk_LOD]);
 			}
