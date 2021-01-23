@@ -63,6 +63,7 @@
     label_width="185"
     layout="topleft"
     left="30"
+    min_val="1"
     max_val="8192"
     name="MaxParticleCount"
     top_delta="16"
