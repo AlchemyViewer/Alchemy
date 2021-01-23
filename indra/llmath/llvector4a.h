@@ -407,7 +407,7 @@ struct LLIVector4a
 
 	// Constants
 	// Return a vector of all zeros
-	inline LLIVector4a getZero()
+	static inline LLIVector4a getZero()
 	{
 		return _mm_setzero_si128();
 	}
