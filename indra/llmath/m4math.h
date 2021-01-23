@@ -96,11 +96,17 @@ class LLMatrix4
 public:
 	F32	mMatrix[NUM_VALUES_IN_MAT4][NUM_VALUES_IN_MAT4];
 
+
+	enum InitType {
+		kUninitialized,
+	};
+
 	// Initializes Matrix to identity matrix
 	LLMatrix4()
 	{
 		setIdentity();
 	}
+	explicit LLMatrix4(InitType) {};
 	explicit LLMatrix4(const F32 *mat);								// Initializes Matrix to values in mat
 	explicit LLMatrix4(const LLMatrix3 &mat);						// Initializes Matrix to values in mat and sets position to (0,0,0)
 	explicit LLMatrix4(const LLQuaternion &q);						// Initializes Matrix with rotation q and sets position to (0,0,0)
