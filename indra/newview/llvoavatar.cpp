@@ -119,6 +119,7 @@
 #include "llrendersphere.h"
 
 #include <boost/lexical_cast.hpp>
+#include "alcinematicmode.h"
 
 extern F32 SPEED_ADJUST_MAX;
 extern F32 SPEED_ADJUST_MAX_SEC;

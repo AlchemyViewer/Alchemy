@@ -74,6 +74,7 @@
 #include "rlvactions.h"
 #include "rlvhandler.h"
 // [/RLVa:KB]
+#include "alcinematicmode.h"
 
 extern BOOL gDebugClicks;
 
@@ -1408,6 +1409,10 @@ BOOL LLToolPie::handleToolTip(S32 local_x, S32 local_y, MASK mask)
 	std::string tooltip_msg;
 	std::string line;
 
+	if (ALCinematicMode::isEnabled())
+	{
+		return TRUE;
+	}
 	if ( hover_object )
 	{
 		handleTooltipObject(hover_object, line, tooltip_msg  );

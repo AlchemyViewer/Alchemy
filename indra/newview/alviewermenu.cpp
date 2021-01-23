@@ -27,9 +27,12 @@
 
 // newview
 #include "alavataractions.h"
+#include "alcinematicmode.h"
 #include "alfloaterparticleeditor.h"
 #include "llagent.h"
 #include "llhudobject.h"
+#include "llnotifications.h"
+#include "llnotificationsutil.h"
 #include "llselectmgr.h"
 #include "llviewermenu.h"
 #include "llviewerobject.h"
@@ -194,6 +197,36 @@ namespace
 	}
 }
 
+
+void confirm_cinematic_mode(const LLSD& notification, const LLSD& response)
+{
+	S32 option = LLNotificationsUtil::getSelectedOption(notification, response);
+	if (option == 0) // OK
+	{
+		ALCinematicMode::toggle();
+	}
+}
+
+bool toggle_cinematic_mode()
+{
+	LLNotification::Params params("CinematicConfirmHideUI");
+	params.functor.function(boost::bind(&confirm_cinematic_mode, _1, _2));
+	LLSD substitutions;
+	substitutions["SHORTCUT"] = "Alt+Shift+C";
+	params.substitutions = substitutions;
+	if (!ALCinematicMode::isEnabled())
+	{
+		// hiding, so show notification
+		LLNotifications::instance().add(params);
+	}
+	else
+	{
+		LLNotifications::instance().forceResponse(params, 0);
+	}
+	return true;
+}
+
+
 ////////////////////////////////////////////////////////
 
 void ALViewerMenu::initialize_menus()
@@ -215,4 +248,6 @@ void ALViewerMenu::initialize_menus()
 
 	commit.add("World.ClearEffects",	[](LLUICtrl* ctrl, const LLSD& param) { world_clear_effects(); });
 	commit.add("World.SyncAnimations",	[](LLUICtrl* ctrl, const LLSD& param) { world_sync_animations(); });
+
+	commit.add("View.ToggleCinematicMode", [](LLUICtrl* ctrl, const LLSD& param) { toggle_cinematic_mode(); });
 }

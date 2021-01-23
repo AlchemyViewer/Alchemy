@@ -12197,5 +12197,20 @@ Always Run enabled.
     type="notifytip">
 Always Run disabled.
   </notification>
+
+  <notification
+     name="CinematicConfirmHideUI"
+     label=""
+     type="alertmodal">
+    <unique/>
+    <tag>confirm</tag>
+    Cinematic Mode hides most of the UI, hover text, the voice dots and your huds.
+    To get them back, press [SHORTCUT].
+    <usetemplate
+    name="okcancelignore"
+    yestext="OK"
+    notext="Cancel"
+    ignoretext="Confirm before enabling Cinematic Mode"/>
+  </notification>
   
 </notifications>

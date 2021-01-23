@@ -82,6 +82,7 @@
 // [/RLVa:KB]
 
 #include "llenvironment.h"
+#include "alcinematicmode.h"
 
 extern LLPointer<LLViewerTexture> gStartTexture;
 extern bool gShiftFrame;
@@ -421,7 +422,7 @@ void display(BOOL rebuild, F32 zoom_factor, int subfield, BOOL for_snapshot)
 	static const LLCachedControl<S32> av_name_tag_mode(gSavedSettings, "AvatarNameTagMode");
 	static const LLCachedControl<bool> name_tag_show_grp_title(gSavedSettings, "NameTagShowGroupTitles");
 
-	LLVOAvatar::sRenderName = av_name_tag_mode;
+	LLVOAvatar::sRenderName = (ALCinematicMode::isEnabled() ? 0 : (S32)av_name_tag_mode);;
 	LLVOAvatar::sRenderGroupTitles = (name_tag_show_grp_title && av_name_tag_mode);
 	
 	gPipeline.mBackfaceCull = TRUE;
@@ -1121,7 +1122,7 @@ void render_hud_attachments()
 	// smoothly interpolate current zoom level
 	gAgentCamera.mHUDCurZoom = lerp(gAgentCamera.mHUDCurZoom, gAgentCamera.getAgentHUDTargetZoom(), LLSmoothInterpolation::getInterpolant(0.03f));
 
-	if (LLPipeline::sShowHUDAttachments && !gDisconnected && setup_hud_matrices())
+	if (!ALCinematicMode::isEnabled() && LLPipeline::sShowHUDAttachments && !gDisconnected && setup_hud_matrices())
 	{
 		LLPipeline::sRenderingHUDs = TRUE;
 		LLCamera hud_cam = *LLViewerCamera::getInstance();
