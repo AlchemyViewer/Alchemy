@@ -2445,7 +2445,7 @@ void LLModelPreview::genBuffers(S32 lod, bool include_skin_weights)
             LLStrider<LLVector3> normal_strider;
             LLStrider<LLVector2> tc_strider;
             LLStrider<U16> index_strider;
-            LLStrider<LLVector4> weights_strider;
+            LLStrider<LLVector4a> weights_strider;
 
             vb->getVertexStrider(vertex_strider);
             vb->getIndexStrider(index_strider);
@@ -2491,7 +2491,7 @@ void LLModelPreview::genBuffers(S32 lod, bool include_skin_weights)
                         //should not cause floating point precision issues.
                     }
 
-                    *(weights_strider++) = w;
+                    (*(weights_strider++)).loadua(w.mV);
                 }
             }
 
@@ -3334,7 +3334,7 @@ BOOL LLModelPreview::render()
                             LLStrider<LLVector3> position;
                             buffer->getVertexStrider(position);
 
-                            LLStrider<LLVector4> weight;
+                            LLStrider<LLVector4a> weight;
                             buffer->getWeight4Strider(weight);
 
                             //quick 'n dirty software vertex skinning
@@ -3350,7 +3350,7 @@ BOOL LLModelPreview::render()
                             for (U32 j = 0; j < buffer->getNumVerts(); ++j)
                             {
                                 LLMatrix4a final_mat;
-                                F32 *wptr = weight[j].mV;
+                                F32 *wptr = weight[j].getF32ptr();
                                 LLSkinningUtil::getPerVertexSkinMatrix(wptr, mat, true, final_mat, max_joints);
 
                                 //VECTORIZE THIS
