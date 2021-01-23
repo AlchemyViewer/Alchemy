@@ -4956,8 +4956,7 @@ void LLRiggedVolume::update(const LLMeshSkinInfo* skin, LLVOAvatar* avatar, cons
 		if ( weight )
 		{
             LLSkinningUtil::checkSkinWeights(weight, dst_face.mNumVertices, skin);
-			LLMatrix4a bind_shape_matrix;
-			bind_shape_matrix.loadu(skin->mBindShapeMatrix);
+			LLMatrix4a bind_shape_matrix = skin->mBindShapeMatrix;
 
 			LLVector4a* pos = dst_face.mPositions;
 

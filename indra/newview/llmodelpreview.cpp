@@ -591,7 +591,9 @@ void LLModelPreview::rebuildUploadData()
                 bool upload_skinweights = fmp && fmp->childGetValue("upload_skin").asBoolean();
                 if (upload_skinweights && high_lod_model->mSkinInfo.mJointNames.size() > 0)
                 {
-                    LLQuaternion bind_rot = LLSkinningUtil::getUnscaledQuaternion(high_lod_model->mSkinInfo.mBindShapeMatrix);
+                    alignas(16) LLMatrix4 bind_mat(LLMatrix4::kUninitialized);
+                    high_lod_model->mSkinInfo.mBindShapeMatrix.store4a((F32*)bind_mat.mMatrix);
+                    LLQuaternion bind_rot = LLSkinningUtil::getUnscaledQuaternion(bind_mat);
                     LLQuaternion identity;
                     if (!bind_rot.isEqualEps(identity, 0.01))
                     {
@@ -3343,8 +3345,7 @@ BOOL LLModelPreview::render()
                             LLSkinningUtil::initSkinningMatrixPalette(mat, joint_count,
                                 skin, getPreviewAvatar());
 
-                            LLMatrix4a bind_shape_matrix;
-                            bind_shape_matrix.loadu(skin->mBindShapeMatrix);
+                            LLMatrix4a bind_shape_matrix = skin->mBindShapeMatrix;
                             U32 max_joints = LLSkinningUtil::getMaxJointCount();
                             for (U32 j = 0; j < buffer->getNumVerts(); ++j)
                             {

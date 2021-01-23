@@ -1176,17 +1176,18 @@ void LLDAELoader::processDomModel(LLModel* model, DAE* dae, daeElement* root, do
 
 			LLMeshSkinInfo& skin_info = model->mSkinInfo;
 
-			for (int i = 0; i < 4; i++)
+			LLMatrix4 mat;
+			for (auto i = 0; i < 4; i++)
 			{
-				for(int j = 0; j < 4; j++)
+				for(auto j = 0; j < 4; j++)
 				{
-					skin_info.mBindShapeMatrix.mMatrix[i][j] = dom_value[i + j*4];
+					mat.mMatrix[i][j] = dom_value[i + j*4];
 				}
 			}
 
 			LLMatrix4 trans = normalized_transformation;
-			trans *= skin_info.mBindShapeMatrix;
-			skin_info.mBindShapeMatrix = trans;							
+			trans *= mat;
+			skin_info.mBindShapeMatrix.loadu(trans);							
 		}
 
 
@@ -1393,18 +1394,21 @@ void LLDAELoader::processDomModel(LLModel* model, DAE* dae, daeElement* root, do
 						domListOfFloats& transform = t->getValue();
 						S32 count = transform.getCount()/16;
 
-						for (S32 k = 0; k < count; ++k)
+						for (auto k = 0; k < count; ++k)
 						{
 							LLMatrix4 mat;
 
-							for (int i = 0; i < 4; i++)
+							for (auto i = 0; i < 4; i++)
 							{
-								for(int j = 0; j < 4; j++)
+								for(auto j = 0; j < 4; j++)
 								{
 									mat.mMatrix[i][j] = transform[k*16 + i + j*4];
 								}
 							}
-							model->mSkinInfo.mInvBindMatrix.push_back(mat);
+							
+							LLMatrix4a mat4a;
+							mat4a.loadu(mat);
+							model->mSkinInfo.mInvBindMatrix.push_back(mat4a);
 						}
 					}
 				}
@@ -1477,7 +1481,9 @@ void LLDAELoader::processDomModel(LLModel* model, DAE* dae, daeElement* root, do
 			//and store it in the alternate bind matrix
 			if ( mJointMap.find( lookingForJoint ) != mJointMap.end() )
 			{
-				LLMatrix4 newInverse = model->mSkinInfo.mInvBindMatrix[i];
+				alignas(16) F32 bind_matrix[16];
+				model->mSkinInfo.mInvBindMatrix[i].store4a(bind_matrix);
+				LLMatrix4 newInverse(bind_matrix);
 				newInverse.setTranslation( mJointList[lookingForJoint].getTranslation() );
 				model->mSkinInfo.mAlternateBindMatrix.push_back( newInverse );
             }

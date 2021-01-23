@@ -1779,16 +1779,12 @@ void LLDrawPoolAvatar::getRiggedGeometry(
 
 	U16 offset = 0;
 		
-	LLMatrix4 mat_vert = skin->mBindShapeMatrix;
-	glh::matrix4f m((F32*) mat_vert.mMatrix);
-	m = m.inverse().transpose();
-		
-	F32 mat3[] = 
-        { m.m[0], m.m[1], m.m[2],
-          m.m[4], m.m[5], m.m[6],
-          m.m[8], m.m[9], m.m[10] };
+	LLMatrix4a mat_norm4a = skin->mBindShapeMatrix;
+	mat_norm4a.invert();
+	mat_norm4a.transpose();
 
-	LLMatrix3 mat_normal(mat3);				
+	alignas(16) LLMatrix4 mat_normal(LLMatrix4::kUninitialized);
+	mat_norm4a.store4a((F32*)mat_normal.mMatrix);
 
 	//let getGeometryVolume know if alpha should override shiny
 	U32 type = gPipeline.getPoolTypeFromTE(face->getTextureEntry(), face->getTexture());
@@ -1813,7 +1809,10 @@ void LLDrawPoolAvatar::getRiggedGeometry(
 	{
 		face->clearState(LLFace::TEXTURE_ANIM);
 	}
-	face->getGeometryVolume(*volume, face->getTEOffset(), mat_vert, mat_normal, offset, true);
+
+	alignas(16) LLMatrix4 mat_vert(LLMatrix4::kUninitialized);
+	skin->mBindShapeMatrix.store4a((F32*)mat_vert.mMatrix);
+	face->getGeometryVolume(*volume, face->getTEOffset(), mat_vert, mat_normal.getMat3(), offset, true);
 
 	buffer->flush();
 }
@@ -1926,8 +1925,7 @@ void LLDrawPoolAvatar::updateRiggedFaceVertexBuffer(
 
         LLSkinningUtil::checkSkinWeights(weights, buffer->getNumVerts(), skin);
 
-		LLMatrix4a bind_shape_matrix;
-		bind_shape_matrix.loadu(skin->mBindShapeMatrix);
+		LLMatrix4a bind_shape_matrix = skin->mBindShapeMatrix;
 
         {
             for (S32 j = 0, j_end = buffer->getNumVerts(); j < j_end; ++j)

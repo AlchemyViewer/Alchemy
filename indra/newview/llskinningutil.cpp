@@ -134,19 +134,13 @@ void LLSkinningUtil::initSkinningMatrixPalette(
         llassert(joint);
         if (joint)
         {
-#ifdef MAT_USE_SSE
-            LLMatrix4a bind, world;
-            bind.loadu(skin->mInvBindMatrix[j]);
+            LLMatrix4a world;
             world.loadu(joint->getWorldMatrix());
-            mat[j].setMul(world, bind);
-#else
-            mat[j] = skin->mInvBindMatrix[j];
-            mat[j] *= joint->getWorldMatrix();
-#endif
+            mat[j].setMul(world, skin->mInvBindMatrix[j]);
         }
         else
         {
-            mat[j].loadu(skin->mInvBindMatrix[j]);
+            mat[j] = skin->mInvBindMatrix[j];
 #if DEBUG_SKINNING
             // This  shouldn't  happen   -  in  mesh  upload,  skinned
             // rendering  should  be disabled  unless  all joints  are
@@ -158,8 +152,8 @@ void LLSkinningUtil::initSkinningMatrixPalette(
             LL_WARNS_ONCE("Avatar") << avatar->getFullname() 
                                     << " avatar build state: isBuilt() " << avatar->isBuilt() 
                                     << " mInitFlags " << avatar->mInitFlags << LL_ENDL;
-#endif
             dump_avatar_and_skin_state("initSkinningMatrixPalette joint not found", avatar, skin);
+#endif
         }
     }
 }
@@ -313,7 +307,7 @@ void LLSkinningUtil::updateRiggingInfo(const LLMeshSkinInfo* skin, LLVOAvatar *a
     if (vol_face.mJointRiggingInfoTab.needsUpdate())
     {
         S32 num_verts = vol_face.mNumVertices;
-        if (num_verts>0 && vol_face.mWeights && (skin->mJointNames.size()>0))
+        if (num_verts>0 && vol_face.mWeights && (!skin->mJointNames.empty()))
         {
             initJointNums(const_cast<LLMeshSkinInfo*>(skin), avatar);
             if (vol_face.mJointRiggingInfoTab.size()==0)
@@ -322,14 +316,11 @@ void LLSkinningUtil::updateRiggingInfo(const LLMeshSkinInfo* skin, LLVOAvatar *a
                 //S32 active_verts = 0;
                 vol_face.mJointRiggingInfoTab.resize(LL_CHARACTER_MAX_ANIMATED_JOINTS);
                 LLJointRiggingInfoTab &rig_info_tab = vol_face.mJointRiggingInfoTab;
-                LLMatrix4a bind_shape;
-                bind_shape.loadu(skin->mBindShapeMatrix);
+                LLMatrix4a bind_shape = skin->mBindShapeMatrix;
                 LLMatrix4a matrixPalette[LL_CHARACTER_MAX_ANIMATED_JOINTS];
                 for (U32 i = 0; i < llmin(skin->mInvBindMatrix.size(), (size_t)LL_CHARACTER_MAX_ANIMATED_JOINTS); ++i)
                 {
-                    LLMatrix4a inverse_bind;
-                    inverse_bind.loadu(skin->mInvBindMatrix[i]);
-                    matrixPalette[i].setMul(inverse_bind, bind_shape);
+                    matrixPalette[i].setMul(skin->mInvBindMatrix[i], bind_shape);
                 }
                 for (S32 i=0; i<vol_face.mNumVertices; i++)
                 {
@@ -410,10 +401,8 @@ void LLSkinningUtil::updateRiggingInfo_(LLMeshSkinInfo* skin, LLVOAvatar *avatar
             llassert(joint_num >= 0 && joint_num < LL_CHARACTER_MAX_ANIMATED_JOINTS);
             {
                 rig_info_tab[joint_num].setIsRiggedTo(true);
-                LLMatrix4a bind_shape;
-                bind_shape.loadu(skin->mBindShapeMatrix);
-                LLMatrix4a inv_bind;
-                inv_bind.loadu(skin->mInvBindMatrix[joint_indices[k]]);
+                LLMatrix4a bind_shape = skin->mBindShapeMatrix;
+                LLMatrix4a inv_bind = skin->mInvBindMatrix[joint_indices[k]];
                 LLMatrix4a mat;
                 mat.setMul(bind_shape, inv_bind);
                 LLVector4a pos_joint_space;

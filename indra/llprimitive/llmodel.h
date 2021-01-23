@@ -49,10 +49,10 @@ public:
 	LLUUID mMeshID;
 	std::vector<std::string> mJointNames;
     mutable std::vector<S32> mJointNums;
-	std::vector<LLMatrix4> mInvBindMatrix;
+	std::vector<LLMatrix4a> mInvBindMatrix;
 	std::vector<LLMatrix4> mAlternateBindMatrix;
 
-	LLMatrix4 mBindShapeMatrix;
+	LLMatrix4a mBindShapeMatrix;
 	float mPelvisOffset;
     bool mLockScaleIfJointPosition;
     bool mInvalidJointsScrubbed;

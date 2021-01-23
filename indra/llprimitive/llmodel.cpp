@@ -1373,55 +1373,63 @@ void LLMeshSkinInfo::fromLLSD(LLSD& skin)
 {
 	if (skin.has("joint_names"))
 	{
-		for (U32 i = 0; i < skin["joint_names"].size(); ++i)
+		const auto& joint_names = skin["joint_names"];
+		for(const auto& jnt_llsd : joint_names.array())
 		{
-			mJointNames.push_back(skin["joint_names"][i]);
-            mJointNums.push_back(-1);
+			mJointNames.emplace_back(jnt_llsd.asString());
+			mJointNums.emplace_back(-1);
 		}
 	}
 
 	if (skin.has("inverse_bind_matrix"))
 	{
-		for (U32 i = 0; i < skin["inverse_bind_matrix"].size(); ++i)
+		const auto& inv_bind_mat = skin["inverse_bind_matrix"];
+		for (auto i = 0; i < inv_bind_mat.size(); ++i)
 		{
 			LLMatrix4 mat;
-			for (U32 j = 0; j < 4; j++)
+			for (auto j = 0; j < 4; j++)
 			{
-				for (U32 k = 0; k < 4; k++)
+				for (auto k = 0; k < 4; k++)
 				{
-					mat.mMatrix[j][k] = skin["inverse_bind_matrix"][i][j*4+k].asReal();
+					mat.mMatrix[j][k] = inv_bind_mat[i][j*4+k].asReal();
 				}
 			}
+			LLMatrix4a in_mat;
+			in_mat.loadu(mat);
 
-			mInvBindMatrix.push_back(mat);
+			mInvBindMatrix.emplace_back(in_mat);
 		}
 	}
 
 	if (skin.has("bind_shape_matrix"))
 	{
-		for (U32 j = 0; j < 4; j++)
+		const auto& bind_shape_mat = skin["bind_shape_matrix"];
+		LLMatrix4 mat;
+		for (auto j = 0; j < 4; j++)
 		{
-			for (U32 k = 0; k < 4; k++)
+			for (auto k = 0; k < 4; k++)
 			{
-				mBindShapeMatrix.mMatrix[j][k] = skin["bind_shape_matrix"][j*4+k].asReal();
+				mat.mMatrix[j][k] = bind_shape_mat[j*4+k].asReal();
 			}
 		}
+		mBindShapeMatrix.loadu(mat);
 	}
 
 	if (skin.has("alt_inverse_bind_matrix"))
 	{
-		for (U32 i = 0; i < skin["alt_inverse_bind_matrix"].size(); ++i)
+		const auto& alt_inv_bind_mat = skin["alt_inverse_bind_matrix"];
+		for (auto i = 0; i < alt_inv_bind_mat.size(); ++i)
 		{
 			LLMatrix4 mat;
-			for (U32 j = 0; j < 4; j++)
+			for (auto j = 0; j < 4; j++)
 			{
-				for (U32 k = 0; k < 4; k++)
+				for (auto k = 0; k < 4; k++)
 				{
-					mat.mMatrix[j][k] = skin["alt_inverse_bind_matrix"][i][j*4+k].asReal();
+					mat.mMatrix[j][k] = alt_inv_bind_mat[i][j*4+k].asReal();
 				}
 			}
 			
-			mAlternateBindMatrix.push_back(mat);
+			mAlternateBindMatrix.emplace_back(mat);
 		}
 	}
 
@@ -1444,34 +1452,38 @@ LLSD LLMeshSkinInfo::asLLSD(bool include_joints, bool lock_scale_if_joint_positi
 {
 	LLSD ret;
 
-	for (U32 i = 0; i < mJointNames.size(); ++i)
+	for (auto i = 0; i < mJointNames.size(); ++i)
 	{
 		ret["joint_names"][i] = mJointNames[i];
 
-		for (U32 j = 0; j < 4; j++)
+		alignas(16) F32 inv_bind_mat[16];
+		mInvBindMatrix[i].store4a(inv_bind_mat);
+		for (auto j = 0; j < 4; j++)
 		{
-			for (U32 k = 0; k < 4; k++)
+			for (auto k = 0; k < 4; k++)
 			{
-				ret["inverse_bind_matrix"][i][j*4+k] = mInvBindMatrix[i].mMatrix[j][k]; 
+				ret["inverse_bind_matrix"][i][j * 4 + k] = inv_bind_mat[j * 4 + k];
 			}
 		}
 	}
 
-	for (U32 i = 0; i < 4; i++)
+	alignas(16) F32 bind_shape_mat[16];
+	mBindShapeMatrix.store4a(bind_shape_mat);
+	for (auto i = 0; i < 4; i++)
 	{
-		for (U32 j = 0; j < 4; j++)
+		for (auto j = 0; j < 4; j++)
 		{
-			ret["bind_shape_matrix"][i*4+j] = mBindShapeMatrix.mMatrix[i][j];
+			ret["bind_shape_matrix"][i * 4 + j] = bind_shape_mat[i * 4  + j];
 		}
 	}
 		
-	if ( include_joints && mAlternateBindMatrix.size() > 0 )
+	if ( include_joints && !mAlternateBindMatrix.empty())
 	{
-		for (U32 i = 0; i < mJointNames.size(); ++i)
+		for (auto i = 0; i < mJointNames.size(); ++i)
 		{
-			for (U32 j = 0; j < 4; j++)
+			for (auto j = 0; j < 4; j++)
 			{
-				for (U32 k = 0; k < 4; k++)
+				for (auto k = 0; k < 4; k++)
 				{
 					ret["alt_inverse_bind_matrix"][i][j*4+k] = mAlternateBindMatrix[i].mMatrix[j][k]; 
 				}
