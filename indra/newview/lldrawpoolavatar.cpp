@@ -1931,7 +1931,7 @@ void LLDrawPoolAvatar::updateRiggedFaceVertexBuffer(
             for (S32 j = 0, j_end = buffer->getNumVerts(); j < j_end; ++j)
 		    {
 			    LLMatrix4a final_mat;
-                LLSkinningUtil::getPerVertexSkinMatrix(weights[j].getF32ptr(), mat, false, final_mat, max_joints);
+				LLSkinningUtil::getPerVertexSkinMatrixUnchecked(weights[j], mat, final_mat, max_joints);
 
 			    LLVector4a& v = vol_face.mPositions[j];
 			    LLVector4a t;

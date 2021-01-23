@@ -34,7 +34,6 @@
 #include "llvolume.h"
 #include "llrigginginfo.h"
 
-#define DEBUG_SKINNING  LL_DEBUG
 #define MAT_USE_SSE     1
 
 void dump_avatar_and_skin_state(const std::string& reason, LLVOAvatar *avatar, const LLMeshSkinInfo *skin)
@@ -177,24 +176,6 @@ void LLSkinningUtil::checkSkinWeights(LLVector4a* weights, U32 num_vertices, con
         llassert(wsum > 0.0f);
     }
 #endif
-}
-
-void LLSkinningUtil::scrubSkinWeights(LLVector4a* weights, U32 num_vertices, const LLMeshSkinInfo* skin)
-{
-    const S32 max_joints = skin->mJointNames.size();
-    for (U32 j=0; j<num_vertices; j++)
-    {
-        F32 *w = weights[j].getF32ptr();
-
-        for (U32 k=0; k<4; ++k)
-        {
-            S32 i = llfloor(w[k]);
-            F32 f = w[k]-i;
-            i = llclamp(i,0,max_joints-1);
-            w[k] = i + f;
-        }
-    }
-	checkSkinWeights(weights, num_vertices, skin);
 }
 
 void LLSkinningUtil::getPerVertexSkinMatrix(
@@ -386,31 +367,4 @@ void LLSkinningUtil::updateRiggingInfo(const LLMeshSkinInfo* skin, LLVOAvatar *a
 #endif
 
     }
-}
-
-// This is used for extracting rotation from a bind shape matrix that
-// already has scales baked in
-LLQuaternion LLSkinningUtil::getUnscaledQuaternion(const LLMatrix4& mat4)
-{
-    LLMatrix3 bind_mat = mat4.getMat3();
-    for (auto i = 0; i < 3; i++)
-    {
-        F32 len = 0.0f;
-        for (auto j = 0; j < 3; j++)
-        {
-            len += bind_mat.mMatrix[i][j] * bind_mat.mMatrix[i][j];
-        }
-        if (len > 0.0f)
-        {
-            len = sqrt(len);
-            for (auto j = 0; j < 3; j++)
-            {
-                bind_mat.mMatrix[i][j] /= len;
-            }
-        }
-    }
-    bind_mat.invert();
-    LLQuaternion bind_rot = bind_mat.quaternion();
-    bind_rot.normalize();
-    return bind_rot;
 }

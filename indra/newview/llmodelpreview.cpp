@@ -3350,8 +3350,7 @@ BOOL LLModelPreview::render()
                             for (U32 j = 0; j < buffer->getNumVerts(); ++j)
                             {
                                 LLMatrix4a final_mat;
-                                F32 *wptr = weight[j].getF32ptr();
-                                LLSkinningUtil::getPerVertexSkinMatrix(wptr, mat, true, final_mat, max_joints);
+                                 LLSkinningUtil::getPerVertexSkinMatrixChecked(weight[j], mat, final_mat, max_joints);
 
                                 //VECTORIZE THIS
                                 LLVector4a& v = face.mPositions[j];

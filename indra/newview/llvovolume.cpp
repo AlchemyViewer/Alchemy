@@ -4970,7 +4970,7 @@ void LLRiggedVolume::update(const LLMeshSkinInfo* skin, LLVOAvatar* avatar, cons
 				    for (U32 j = 0; j < dst_face.mNumVertices; ++j)
 				    {
 					    LLMatrix4a final_mat;
-                        LLSkinningUtil::getPerVertexSkinMatrix(weight[j].getF32ptr(), mat, false, final_mat, kMaxJoints);
+                        LLSkinningUtil::getPerVertexSkinMatrixUnchecked(weight[j], mat, final_mat, kMaxJoints);
 				
 					    LLVector4a& v = vol_face.mPositions[j];
 					    LLVector4a t;
