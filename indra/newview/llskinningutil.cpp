@@ -388,33 +388,6 @@ void LLSkinningUtil::updateRiggingInfo(const LLMeshSkinInfo* skin, LLVOAvatar *a
     }
 }
 
-void LLSkinningUtil::updateRiggingInfo_(LLMeshSkinInfo* skin, LLVOAvatar *avatar, S32 num_verts, LLVector4a* weights, LLVector4a* positions, U8* joint_indices, LLJointRiggingInfoTab &rig_info_tab)
-{
-    LL_RECORD_BLOCK_TIME(FTM_FACE_RIGGING_INFO);
-    for (S32 i=0; i < num_verts; i++)
-    {
-        LLVector4a& pos  = positions[i];
-        LLVector4a& wght = weights[i];
-        for (U32 k=0; k<4; ++k)
-        {
-            S32 joint_num = skin->mJointNums[joint_indices[k]];
-            llassert(joint_num >= 0 && joint_num < LL_CHARACTER_MAX_ANIMATED_JOINTS);
-            {
-                rig_info_tab[joint_num].setIsRiggedTo(true);
-                LLMatrix4a bind_shape = skin->mBindShapeMatrix;
-                LLMatrix4a inv_bind = skin->mInvBindMatrix[joint_indices[k]];
-                LLMatrix4a mat;
-                mat.setMul(bind_shape, inv_bind);
-                LLVector4a pos_joint_space;
-                mat.affineTransform(pos, pos_joint_space);
-                pos_joint_space.mul(wght[k]);
-                LLVector4a *extents = rig_info_tab[joint_num].getRiggedExtents();
-                update_min_max(extents[0], extents[1], pos_joint_space);
-            }
-        }
-    }
-}
-
 // This is used for extracting rotation from a bind shape matrix that
 // already has scales baked in
 LLQuaternion LLSkinningUtil::getUnscaledQuaternion(const LLMatrix4& mat4)
