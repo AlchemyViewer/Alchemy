@@ -3664,20 +3664,42 @@ bool LLVolumeParams::validate(U8 prof_curve, F32 prof_begin, F32 prof_end, F32 h
 	return true;
 }
 
-void LLVolume::getLoDTriangleCounts(const LLVolumeParams& params, S32* counts)
+void LLVolume::getLoDTriangleCounts(S32* counts)
 { //attempt to approximate the number of triangles that will result from generating a volume LoD set for the 
 	//supplied LLVolumeParams -- inaccurate, but a close enough approximation for determining streaming cost
+
+	const LLVolumeParams& params = getParams();
+	const LLPathParams& path_params = params.getPathParams();
+	const LLProfileParams& profile_params = params.getProfileParams();
+
+	// Check the cached data first
+	if (mTrianglesCache && mTrianglesCache->mPathParams == path_params && mTrianglesCache->mProfileParams == profile_params)
+	{
+		counts[ 0 ] = mTrianglesCache->mTriangles[0];
+		counts[ 1 ] = mTrianglesCache->mTriangles[1];
+		counts[ 2 ] = mTrianglesCache->mTriangles[2];
+		counts[ 3 ] = mTrianglesCache->mTriangles[3];
+		return;
+	}
+
+	if(!mTrianglesCache)
+		mTrianglesCache = std::make_unique<TrianglesPerLODCache>();
+
+	mTrianglesCache->mPathParams = params.getPathParams();
+	mTrianglesCache->mProfileParams = params.getProfileParams();
+
 	F32 detail[] = {1.f, 1.5f, 2.5f, 4.f};	
 	for (S32 i = 0; i < 4; i++)
 	{
 		S32 count = 0;
-		S32 path_points = LLPath::getNumPoints(params.getPathParams(), detail[i]);
-		S32 profile_points = LLProfile::getNumPoints(params.getProfileParams(), false, detail[i]);
+		S32 path_points = LLPath::getNumPoints(path_params, detail[i]);
+		S32 profile_points = LLProfile::getNumPoints(profile_params, false, detail[i]);
 
 		count = (profile_points-1)*2*(path_points-1);
 		count += profile_points*2;
 
 		counts[i] = count;
+		mTrianglesCache->mTriangles[i] = count;
 	}
 }
 

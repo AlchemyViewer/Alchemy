@@ -4312,7 +4312,7 @@ bool LLVOVolume::getCostData(LLMeshCostData& costs) const
     {
 		LLVolume* volume = getVolume();
 		S32 counts[4];
-		LLVolume::getLoDTriangleCounts(volume->getParams(), counts);
+		volume->getLoDTriangleCounts(counts);
 
 		LLSD header;
 		header["lowest_lod"]["size"] = counts[0] * 10;

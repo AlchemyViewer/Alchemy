@@ -1028,7 +1028,7 @@ public:
 	void setSculptLevel(S32 level)							{ mSculptLevel = level; }
 
 	
-	static void getLoDTriangleCounts(const LLVolumeParams& params, S32* counts);
+	void getLoDTriangleCounts(S32* counts);
 
 	S32 getNumTriangles(S32* vcount = NULL) const;
 
@@ -1111,6 +1111,15 @@ public:
 	U16* mHullIndices;
 	S32 mNumHullPoints;
 	S32 mNumHullIndices;
+private:
+	struct TrianglesPerLODCache
+	{
+		LLProfileParams mProfileParams;
+		LLPathParams mPathParams;
+		S32 mTriangles[4];
+	};
+
+	std::unique_ptr<TrianglesPerLODCache> mTrianglesCache;
 };
 
 std::ostream& operator<<(std::ostream &s, const LLVolumeParams &volume_params);
