@@ -59,6 +59,18 @@ public:
 	 */
 	static void show(const LLUUID& group_id);
 
+// [SL:KB] - Patch: Notification-GroupCreateNotice | Checked: 2012-02-16 (Catznip-3.2)
+	/**
+	 * Show group information panel.
+	 */
+	static void showNotices(const LLUUID& group_id);
+
+	/**
+	 * Show the group's chat history.
+	 */
+	static void viewChatHistory(const LLUUID& group_id);
+// [/SL:KB]
+
 	/**
 	 * Show group inspector floater.
 	 */

@@ -62,6 +62,12 @@
 #include "llnotificationmanager.h"
 #include "llautoreplace.h"
 #include "llcorehttputil.h"
+// [SL:KB] - Patch: Chat-Misc | Checked: 2014-03-22 (Catznip-3.6)
+#include "llfloatergroupinvite.h"
+#include "llgroupactions.h"
+#include "llslurl.h"
+#include <boost/lexical_cast.hpp>
+// [/SL:KB]
 // [RLVa:KB] - Checked: 2013-05-10 (RLVa-1.4.9)
 #include "rlvactions.h"
 #include "rlvcommon.h"
@@ -245,6 +251,62 @@ bool LLFloaterIMSession::checkGearMenuItem(const LLSD& userdata)
 	return floater_container->checkContextMenuItem(command, selected_uuids);
 }
 
+// [SL:KB] - Patch: Chat-BaseGearBtn | Checked: 2014-04-10 (Catznip-3.6)
+void LLFloaterIMSession::GearDoToSelectedGroup(const LLSD& userdata)
+{
+	const std::string action = userdata.asString();
+
+	if ("view_profile" == action)
+	{
+		LLGroupActions::show(mSessionID);
+	}
+	else if ("chat_history" == action)
+	{
+		LLGroupActions::viewChatHistory(mSessionID);
+	}
+	else if ("view_notices" == action)
+	{
+		LLGroupActions::showNotices(mSessionID);
+	}
+	else if ("end_session" == action)
+	{
+		LLGroupActions::leaveIM(mSessionID);
+	}
+	else if ("snooze_session" == action)
+	{
+		LLGroupActions::snoozeIM(mSessionID);
+	}
+}
+// [/SL:KB]
+
+// [SL:KB] - Patch: Chat-Misc | Checked: 2014-03-22 (Catznip-3.6)
+void LLFloaterIMSession::onSnoozeGroupClicked(const LLUICtrl* pCtrl)
+{
+	if (pCtrl)
+	{
+		const std::string strValue = pCtrl->getValue().asString();
+		if (strValue.empty())
+			LLGroupActions::snoozeIM(mSessionID);
+		else if ("-1" == strValue)
+			LLGroupActions::leaveIM(mSessionID);
+		else
+			LLGroupActions::snoozeIM(mSessionID, boost::lexical_cast<int>(strValue) * 60);
+	}
+}
+
+void LLFloaterIMSession::onTeleportClicked(const LLUICtrl* pCtrl)
+{
+	if (pCtrl)
+	{
+		const std::string strValue = pCtrl->getValue().asString();
+		if ( (strValue.empty()) || ("offer_teleport" == strValue) )
+			GearDoToSelected("offer_teleport");
+		else if ("request_teleport" == strValue)
+			GearDoToSelected("request_teleport");
+	}
+}
+// [/SL:KB]
+
 void LLFloaterIMSession::sendMsgFromInputEditor()
 {
 	if (gAgent.isGodlike()
@@ -404,9 +466,32 @@ void LLFloaterIMSession::initIMFloater()
 //virtual
 BOOL LLFloaterIMSession::postBuild()
 {
+// [SL:KB] - Patch: Chat-Misc | Checked: 2014-03-22 (Catznip-3.6)
+	if (mIsP2PChat)
+	{
+		mExtendedButtonPanel = getChild<LLPanel>("p2p_toolbar");
+		mExtendedButtonPanel->setVisible(true);
+
+		mExtendedButtonPanel->getChild<LLUICtrl>("profile_btn")->setCommitCallback(boost::bind(&LLFloaterIMSession::GearDoToSelected, this, "view_profile"));
+		mExtendedButtonPanel->getChild<LLUICtrl>("teleport_btn")->setCommitCallback(boost::bind(&LLFloaterIMSession::onTeleportClicked, this, _1));
+		mExtendedButtonPanel->getChild<LLUICtrl>("chat_history_btn")->setCommitCallback(boost::bind(&LLFloaterIMSession::GearDoToSelected, this, "chat_history"));
+		mExtendedButtonPanel->getChild<LLUICtrl>("pay_btn")->setCommitCallback(boost::bind(&LLFloaterIMSession::GearDoToSelected, this, "pay"));
+	}
+	else if ( (mSession) && (mSession->isGroupSessionType()) )
+	{
+		mExtendedButtonPanel = getChild<LLPanel>("group_toolbar");
+		mExtendedButtonPanel->setVisible(true);
+
+		mExtendedButtonPanel->getChild<LLUICtrl>("profile_btn")->setCommitCallback(boost::bind(&LLFloaterIMSession::GearDoToSelectedGroup, this, "view_profile"));
+		mExtendedButtonPanel->getChild<LLUICtrl>("chat_history_btn")->setCommitCallback(boost::bind(&LLFloaterIMSession::GearDoToSelectedGroup, this, "chat_history"));
+		mExtendedButtonPanel->getChild<LLUICtrl>("view_notices_btn")->setCommitCallback(boost::bind(&LLFloaterIMSession::GearDoToSelectedGroup, this, "view_notices"));
+		mExtendedButtonPanel->getChild<LLUICtrl>("snooze_groupt_btn")->setCommitCallback(boost::bind(&LLFloaterIMSession::onSnoozeGroupClicked, this, _1));
+	}
+// [/SL:KB]
+
 	BOOL result = LLFloaterIMSessionTab::postBuild();
 
-	mInputEditor->setMaxTextLength(1023);
+	mInputEditor->setMaxTextLength(DB_CHAT_MSG_STR_LEN);
 	mInputEditor->setAutoreplaceCallback(boost::bind(&LLAutoReplace::autoreplaceCallback, LLAutoReplace::getInstance(), _1, _2, _3, _4, _5));
 	mInputEditor->setFocusReceivedCallback( boost::bind(onInputEditorFocusReceived, _1, this) );
 	mInputEditor->setFocusLostCallback( boost::bind(onInputEditorFocusLost, _1, this) );

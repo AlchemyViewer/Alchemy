@@ -186,6 +186,9 @@ protected:
 	LLButton* mGearBtn;
 	LLButton* mAddBtn;
     LLButton* mVoiceButton;
+// [SL:KB] - Patch: Chat-Misc | Checked: 2014-03-22 (Catznip-3.6)
+	LLPanel* mExtendedButtonPanel = nullptr;
+// [/SL:KB]
     LLUICtrl* mTranslationCheckBox;
 
 private:

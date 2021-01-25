@@ -865,6 +865,24 @@ void LLAccordionCtrl::expandDefaultTab()
 	}
 }
 
+// [SL:KB] - Patch: Notification-GroupCreateNotice | Checked: 2012-02-16 (Catznip-3.2)
+void LLAccordionCtrl::expandTab(const std::string& tab_name)
+{
+	if (mAccordionTabs.size() > 0)
+	{
+//		std::for_each(mAccordionTabs.begin(), mAccordionTabs.end(), 
+//					  [&tab_name](LLAccordionCtrlTab* t) { t->setDisplayChildren((tab_name == t->getName())); });
+		for (std::vector<LLAccordionCtrlTab*>::const_iterator itTab = mAccordionTabs.begin(); itTab != mAccordionTabs.end(); ++itTab)
+		{
+			LLAccordionCtrlTab* pTab = *itTab;
+			pTab->setDisplayChildren((tab_name == pTab->getName()));
+		}
+
+		arrange();
+	}
+}
+// [/SL:KB]
+
 void LLAccordionCtrl::sort()
 {
 	if (!mTabComparator)
