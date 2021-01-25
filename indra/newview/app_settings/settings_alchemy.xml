@@ -519,6 +519,17 @@
       <key>Value</key>
       <boolean>0</boolean>
     </map>
+    <key>GroupSnoozeTime</key>
+    <map>
+      <key>Comment</key>
+      <string>Amount of time (in seconds) group chat will be snoozed for</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>S32</string>
+      <key>Value</key>
+      <integer>900</integer>
+    </map>
     <key>RenderAutoMaskAlphaUseRMSE</key>
     <map>
       <key>Comment</key>

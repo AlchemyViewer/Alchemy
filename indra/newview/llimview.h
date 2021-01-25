@@ -5,6 +5,7 @@
  * $LicenseInfo:firstyear=2001&license=viewerlgpl$
  * Second Life Viewer Source Code
  * Copyright (C) 2010, Linden Research, Inc.
+ * Copyright (C) 2010-2017, Kitty Barnett
  * 
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -27,7 +28,7 @@
 #ifndef LL_LLIMVIEW_H
 #define LL_LLIMVIEW_H
 
-#include "../llui/lldockablefloater.h"
+#include "lldockablefloater.h"
 #include "lleventtimer.h"
 #include "llinstantmessage.h"
 
@@ -76,6 +77,15 @@ public:
 			NONE_SESSION,
 		} SType;
 
+// [SL:KB] - Patch: Chat-GroupSnooze | Checked: Catznip-3.6
+		enum class SCloseAction
+		{
+			CLOSE_DEFAULT,
+			CLOSE_LEAVE,
+			CLOSE_SNOOZE
+		};
+// [/SL:KB]
+
 		LLIMSession(const LLUUID& session_id, const std::string& name, 
 			const EInstantMessage& type, const LLUUID& other_participant_id, const uuid_vec_t& ids, bool voice, bool has_offline_msg);
 		virtual ~LLIMSession();
@@ -111,12 +121,20 @@ public:
 		std::string mName;
 		EInstantMessage mType;
 		SType mSessionType;
+// [SL:KB] - Patch: Chat-GroupSnooze | Checked: Catznip-3.6
+		SCloseAction mCloseAction = SCloseAction::CLOSE_DEFAULT;
+		int mSnoozeDuration = -1;
+// [/SL:KB]
 		LLUUID mOtherParticipantID;
 		uuid_vec_t mInitialTargetIDs;
 		std::string mHistoryFileName;
 
 		// connection to voice channel state change signal
 		boost::signals2::connection mVoiceChannelStateChangeConnection;
+
+// [SL:KB] - Patch: Chat-GroupSnooze | Checked: Catznip-3.3
+		LLDate mParticipantLastMessageTime = LLDate::now();
+// [/SL:KB]
 
 		//does NOT include system messages and agent's messages
 		S32 mParticipantUnreadMessageCount;
@@ -414,6 +432,12 @@ public:
 
 	BOOL hasSession(const LLUUID& session_id);
 
+// [SL:KB] - Patch: Chat-GroupSnooze | Checked: Catznip-3.3
+	bool checkSnoozeExpiration(const LLUUID& session_id) const;
+	bool isSnoozedSession(const LLUUID& session_id) const;
+	bool restoreSnoozedSession(const LLUUID& session_id);
+// [/SL:KB]
+
 	static LLUUID computeSessionID(EInstantMessage dialog, const LLUUID& other_participant_id);
 
 	void clearPendingInvitation(const LLUUID& session_id);
@@ -498,6 +522,11 @@ private:
 
 	LLSD mPendingInvitations;
 	LLSD mPendingAgentListUpdates;
+
+// [SL:KB] - Patch: Chat-GroupSnooze | Checked: Catznip-3.3
+	typedef absl::flat_hash_map<LLUUID, F64> snoozed_sessions_t;
+	snoozed_sessions_t mSnoozedSessions;
+// [/SL:KB]
 };
 
 class LLCallDialogManager final : public LLSingleton<LLCallDialogManager>

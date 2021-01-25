@@ -70,6 +70,9 @@ private:
 	static void onCommitAny(LLUICtrl* ctrl, void* data);
 	static void onCommitUserOnly(LLUICtrl* ctrl, void* data);
 	static void onCommitEnrollment(LLUICtrl* ctrl, void* data);
+// [SL:KB] - Patch: Chat-GroupOptions | Checked: Catznip-5.2
+	       void onCommitSnoozeChat();
+// [/SL:KB]
 	static void onClickInfo(void* userdata);
 	static void onReceiveNotices(LLUICtrl* ctrl, void* data);
 
@@ -95,6 +98,11 @@ private:
 	LLSpinCtrl      *mSpinEnrollmentFee;
 	LLCheckBoxCtrl	*mCtrlReceiveNotices;
 	LLCheckBoxCtrl  *mCtrlListGroup;
+// [SL:KB] - Patch: Chat-GroupOptions | Checked: 2012-06-21 (Catznip-3.3)
+	LLCheckBoxCtrl	*mCtrlReceiveChat = nullptr;
+	LLCheckBoxCtrl	*mCtrlSnoozeOnClose = nullptr;
+	LLComboBox		*mCtrlSnoozeDuration = nullptr;
+// [/SL:KB]
 	LLTextBox       *mActiveTitleLabel;
 	LLComboBox		*mComboActiveTitle;
 	LLComboBox		*mComboMature;

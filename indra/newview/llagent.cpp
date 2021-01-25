@@ -53,6 +53,9 @@
 #include "llfloatersnapshot.h"
 #include "llfloatertools.h"
 #include "llgroupactions.h"
+// [SL:KB] - Patch: Chat-GroupOptions | Checked: 2012-06-21 (Catznip-3.3)
+#include "llgroupoptions.h"
+// [/SL:KB]
 #include "llgroupmgr.h"
 #include "llhudmanager.h"
 #include "lljoystickbutton.h"
@@ -3457,6 +3460,9 @@ void LLAgent::processAgentDropGroup(LLMessageSystem *msg, void **)
 	if (found_it != gAgent.mGroups.end())
 	{
 		gAgent.mGroups.erase(found_it);
+// [SL:KB] - Patch: Chat-GroupOptions | Checked: 2012-06-21 (Catznip-3.3)
+		LLGroupOptionsMgr::instance().clearOptions(group_id);
+// [/SL:KB]
 		if (gAgent.getGroupID() == group_id)
 		{
 			gAgent.mGroupID.setNull();
@@ -3533,6 +3539,9 @@ class LLAgentDropGroupViewerNode : public LLHTTPNode
 			if (found_it != gAgent.mGroups.end())
 			{
 				gAgent.mGroups.erase(found_it);
+// [SL:KB] - Patch: Chat-GroupOptions | Checked: 2012-06-21 (Catznip-3.3)
+				LLGroupOptionsMgr::instance().clearOptions(group_id);
+// [/SL:KB]
 				if (gAgent.getGroupID() == group_id)
 				{
 					gAgent.mGroupID.setNull();

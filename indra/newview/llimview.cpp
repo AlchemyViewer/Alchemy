@@ -52,6 +52,9 @@
 #include "llfloaterimsession.h"
 #include "llfloaterimcontainer.h"
 #include "llgroupiconctrl.h"
+// [SL:KB] - Patch: Chat-GroupOptions | Checked: 2012-06-21 (Catznip-3.3)
+#include "llgroupoptions.h"
+// [/SL:KB]
 #include "llmd5.h"
 #include "llmutelist.h"
 #include "llrecentpeople.h"
@@ -1254,6 +1257,9 @@ LLIMModel::LLIMSession* LLIMModel::addMessageSilently(const LLUUID& session_id, 
 			|| INTERACTIVE_SYSTEM_FROM == from)
 	{
 		++(session->mParticipantUnreadMessageCount);
+// [SL:KB] - Patch: Chat-GroupSnooze | Checked: Catznip-3.3
+		session->mParticipantLastMessageTime = LLDate::now();
+// [/SL:K]
 	}
 
 	return session;
@@ -2975,7 +2981,48 @@ bool LLIMMgr::leaveSession(const LLUUID& session_id)
 	LLIMModel::LLIMSession* im_session = LLIMModel::getInstance()->findIMSession(session_id);
 	if (!im_session) return false;
 
-	LLIMModel::getInstance()->sendLeaveSession(session_id, im_session->mOtherParticipantID);
+// [SL:KB] - Patch: Chat-GroupSnooze | Checked: Catznip-3.3
+	// Only group sessions can be snoozed
+	if (im_session->isGroupSessionType())
+	{
+		LLIMModel::LLIMSession::SCloseAction eCloseAction = im_session->mCloseAction;
+		int nSnoozeDuration = im_session->mSnoozeDuration;
+
+		if (LLIMModel::LLIMSession::SCloseAction::CLOSE_DEFAULT == eCloseAction)
+		{
+			if (const LLGroupOptions* pOptions = LLGroupOptionsMgr::instance().getOptions(session_id))
+			{
+				eCloseAction = (pOptions->mSnoozeOnClose) ? LLIMModel::LLIMSession::SCloseAction::CLOSE_SNOOZE : LLIMModel::LLIMSession::SCloseAction::CLOSE_LEAVE;
+				nSnoozeDuration = pOptions->mSnoozeDuration * 60;
+			}
+		}
+
+		if (LLIMModel::LLIMSession::SCloseAction::CLOSE_SNOOZE == eCloseAction)
+		{
+			static LLCachedControl<S32> s_nSnoozeTime(gSavedSettings, "GroupSnoozeTime", 900);
+			if (-1 == nSnoozeDuration)
+			{
+				const LLGroupOptions* pOptions = LLGroupOptionsMgr::instance().getOptions(session_id);
+				nSnoozeDuration = ((pOptions) && (pOptions->mSnoozeOnClose)) ? pOptions->mSnoozeDuration * 60 : s_nSnoozeTime;
+			}
+
+			snoozed_sessions_t::iterator itSession = mSnoozedSessions.find(session_id);
+			if (mSnoozedSessions.end() != itSession)
+				itSession->second = im_session->mParticipantLastMessageTime.secondsSinceEpoch() + static_cast<F64>(nSnoozeDuration);
+			else
+				mSnoozedSessions.emplace(session_id, im_session->mParticipantLastMessageTime.secondsSinceEpoch() + static_cast<F64>(nSnoozeDuration));
+		}
+		else
+		{
+			LLIMModel::getInstance()->sendLeaveSession(session_id, im_session->mOtherParticipantID);
+		}
+	}
+	else
+	{
+		LLIMModel::getInstance()->sendLeaveSession(session_id, im_session->mOtherParticipantID);
+	}
+// [/SL:KB]
+//	LLIMModel::getInstance()->sendLeaveSession(session_id, im_session->mOtherParticipantID);
 	gIMMgr->removeSession(session_id);
 	return true;
 }
@@ -3155,6 +3202,41 @@ BOOL LLIMMgr::hasSession(const LLUUID& session_id)
 {
 	return LLIMModel::getInstance()->findIMSession(session_id) != NULL;
 }
+
+// [SL:KB] - Patch: Chat-GroupSnooze | Checked: Catznip-3.3
+bool LLIMMgr::checkSnoozeExpiration(const LLUUID& session_id) const
+{
+ 	snoozed_sessions_t::const_iterator itSession = mSnoozedSessions.find(session_id);
+	return (mSnoozedSessions.end() != itSession) && (itSession->second < LLTimer::getTotalSeconds());
+}
+
+bool LLIMMgr::isSnoozedSession(const LLUUID& session_id) const
+{
+	return (mSnoozedSessions.end() != mSnoozedSessions.find(session_id));
+}
+
+bool LLIMMgr::restoreSnoozedSession(const LLUUID& session_id)
+{
+	snoozed_sessions_t::iterator itSession = mSnoozedSessions.find(session_id);
+	if (mSnoozedSessions.end() != itSession)
+	{
+		mSnoozedSessions.erase(itSession);
+
+		LLGroupData groupData;
+		if (gAgent.getGroupData(session_id, groupData))
+		{
+			gIMMgr->addSession(groupData.mName, IM_SESSION_INVITE, session_id);
+
+			uuid_vec_t ids;
+			LLIMModel::sendStartSession(session_id, session_id, ids, IM_SESSION_GROUP_START);
+
+			make_ui_sound("UISndStartIM");
+			return true;
+		}
+	}
+	return false;
+}
+// [/SL:KB]
 
 void LLIMMgr::clearPendingInvitation(const LLUUID& session_id)
 {
@@ -3667,6 +3749,24 @@ public:
 				}
 			}
 // [/RLVa:KB]
+
+// [SL:KB] - Patch: Chat-GroupOptions | Checked: 2012-06-21 (Catznip-3.3)
+			const LLGroupOptions* pGroupOptions = LLGroupOptionsMgr::getInstance()->getOptions(session_id);
+			if ( (pGroupOptions) && (!pGroupOptions->mReceiveGroupChat) )
+			{
+				const std::string strUrl = gAgent.getRegion()->getCapability("ChatSessionRequest");
+				if (!strUrl.empty())
+				{
+					LLSD sdData;
+					sdData["method"] = "decline invitation";
+					sdData["session-id"] = session_id;
+
+					LLCoreHttpUtil::HttpCoroutineAdapter::messageHttpPost(strUrl, sdData, "Invitation declined", "Invitation decline failed.");
+				}
+
+				return;
+			}
+// [/SL:KB]
 
 			// standard message, not from system
 			std::string saved;
