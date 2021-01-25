@@ -27,18 +27,18 @@ class LLScrollListCtrl;
 
 // ============================================================================
 
-class LLFloaterChatAlerts : public LLFloater
+class LLFloaterChatAlerts final : public LLFloater
 {
 	friend class LLFloaterReg;
 private:
 	LLFloaterChatAlerts(const LLSD& sdKey);
 public:
-	/*virtual*/ ~LLFloaterChatAlerts();
-	/*virtual*/ BOOL canClose();
-	/*virtual*/ void onOpen(const LLSD& sdKey);
-	/*virtual*/ void onClose(bool app_quitting);
-	/*virtual*/ BOOL postBuild();
-	/*virtual*/ S32  notifyParent(const LLSD& sdInfo);
+	~LLFloaterChatAlerts() override;
+	BOOL canClose() override;
+	void onOpen(const LLSD& sdKey) override;
+	void onClose(bool app_quitting) override;
+	BOOL postBuild() override;
+	S32  notifyParent(const LLSD& sdInfo) override;
 
 public:
 	bool isEntryDirty() const;
@@ -85,7 +85,7 @@ protected:
 // LLSoundDropTarget helper class
 //
 
-class LLSoundDropTarget : public LLView
+class LLSoundDropTarget final : public LLView
 {
 public:
 	struct Params : public LLInitParam::Block<Params, LLView::Params>
@@ -98,7 +98,7 @@ public:
 	};
 
 	LLSoundDropTarget(const Params&);
-	virtual ~LLSoundDropTarget();
+	~LLSoundDropTarget() override;
 
 	/*
 	 * Member functions
@@ -111,7 +111,7 @@ public:
 	 * LLView overrides
 	 */
 public:
-	/*virtual*/ BOOL handleDragAndDrop(S32 x, S32 y, MASK mask, BOOL drop, EDragAndDropType cargo_type, void* cargo_data, EAcceptance* accept, std::string& tooltip_msg);
+	BOOL handleDragAndDrop(S32 x, S32 y, MASK mask, BOOL drop, EDragAndDropType cargo_type, void* cargo_data, EAcceptance* accept, std::string& tooltip_msg) override;
 
 	/*
 	 * Member variables

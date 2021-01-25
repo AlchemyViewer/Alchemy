@@ -73,7 +73,7 @@ protected:
 // [/SL:KB]
 
 // [SL:KB] - Patch: Control-TextParser | Checked: 2012-07-10 (Catznip-3.3)
-class LLTextParser : public LLSingleton<LLTextParser>
+class LLTextParser final : public LLSingleton<LLTextParser>
 {
 	LLSINGLETON(LLTextParser);
 public:
