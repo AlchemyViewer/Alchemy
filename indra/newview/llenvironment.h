@@ -48,7 +48,7 @@ class LLParcel;
 //-------------------------------------------------------------------------
 class LLEnvironment final : public LLSingleton<LLEnvironment>
 {
-    LLSINGLETON_C11(LLEnvironment);
+    LLSINGLETON(LLEnvironment);
     LOG_CLASS(LLEnvironment);
 
 public:

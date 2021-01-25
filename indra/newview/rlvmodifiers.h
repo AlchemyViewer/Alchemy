@@ -92,7 +92,7 @@ struct RlvBehaviourModifierTween
 
 class RlvBehaviourModifierAnimator final : public LLSingleton<RlvBehaviourModifierAnimator>
 {
-    LLSINGLETON_EMPTY_CTOR_C11(RlvBehaviourModifierAnimator);
+    LLSINGLETON_EMPTY_CTOR(RlvBehaviourModifierAnimator);
 public:
 	~RlvBehaviourModifierAnimator() override;
 
