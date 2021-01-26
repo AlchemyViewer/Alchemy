@@ -51,6 +51,7 @@ set(llmath_SOURCE_FILES
 set(llmath_HEADER_FILES
     CMakeLists.txt
 
+    alglmath.h
     camera.h
     coordframe.h
     llbbox.h

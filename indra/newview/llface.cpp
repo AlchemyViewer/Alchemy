@@ -59,6 +59,7 @@
 // [RLVa:KB] - Checked: RLVa-2.0.0
 #include "rlvhandler.h"
 // [/RLVa:KB]
+#include "alglmath.h"
 
 #if LL_LINUX
 // Work-around spurious used before init warning on Vector4a
@@ -2007,7 +2008,7 @@ BOOL LLFace::getGeometryVolume(const LLVolume& volume,
 				LLVector4a tangent_out = *src;
 				if (rotate_tangent && src2 < end2)
 				{
-					gGL.genRot(rot, *src2++).rotate(tangent_out, tangent_out);
+					ALGLMath::genRot(rot, *src2++).rotate(tangent_out, tangent_out);
 				}
 				mat_tan.rotate(tangent_out, tangent_out);
 				tangent_out.normalize3fast();

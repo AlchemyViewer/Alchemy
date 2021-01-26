@@ -37,6 +37,7 @@
 #include "llglheaders.h"
 #include "llviewerwindow.h"
 #include "llui.h"
+#include "alglmath.h"
 
 void hud_render_utf8text(const std::string &str, const LLVector3 &pos_agent,
 					 const LLFontGL &font,
@@ -99,27 +100,18 @@ void hud_render_text(const LLWString &wstr, const LLVector3 &pos_agent,
 	LLVector3 render_pos = pos_agent + (floorf(x_offset) * right_axis) + (floorf(y_offset) * up_axis);
 
 	//get the render_pos in screen space
-	
-	F64 winX, winY, winZ;
-	LLRect world_view_rect = gViewerWindow->getWorldViewRectRaw();
-	S32	viewport[4];
-	viewport[0] = world_view_rect.mLeft;
-	viewport[1] = world_view_rect.mBottom;
-	viewport[2] = world_view_rect.getWidth();
-	viewport[3] = world_view_rect.getHeight();
+	LLMatrix4a modelview, projection;
+	modelview.loadu(gGLModelView);
+	projection.loadu(gGLProjection);
 
-	F64 mdlv[16];
-	F64 proj[16];
+	LLVector3 window_coordinates;
+	F32& winX = window_coordinates.mV[VX];
+	F32& winY = window_coordinates.mV[VY];
+	F32& winZ = window_coordinates.mV[VZ];
 
-	for (U32 i = 0; i < 16; i++)
-	{
-		mdlv[i] = (F64) gGLModelView[i];
-		proj[i] = (F64) gGLProjection[i];
-	}
+	const LLRect& world_view_rect = gViewerWindow->getWorldViewRectRaw();
 
-	gluProject(render_pos.mV[0], render_pos.mV[1], render_pos.mV[2],
-				mdlv, proj, (GLint*) viewport,
-				&winX, &winY, &winZ);
+	ALGLMath::projectf(render_pos, modelview, projection, world_view_rect, window_coordinates);
 		
 	//fonts all render orthographically, set up projection``
 	gGL.matrixMode(LLRender::MM_PROJECTION);

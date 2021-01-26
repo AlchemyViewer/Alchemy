@@ -531,28 +531,28 @@ void LLPostProcess::createNoiseTexture(LLPointer<LLImageGL>& texture)
 
 bool LLPostProcess::checkError(void)
 {
-	GLenum glErr;
+//	GLenum glErr;
     bool    retCode = false;
 
-    glErr = glGetError();
-    while (glErr != GL_NO_ERROR)
-    {
-		// shaderErrorLog << (const char *) gluErrorString(glErr) << std::endl;
-		char const * err_str_raw = (const char *) gluErrorString(glErr);
+  //  glErr = glGetError();
+  //  while (glErr != GL_NO_ERROR)
+  //  {
+		//// shaderErrorLog << (const char *) gluErrorString(glErr) << std::endl;
+		//char const * err_str_raw = (const char *) gluErrorString(glErr);
 
-		if(err_str_raw == NULL)
-		{
-			std::ostringstream err_builder;
-			err_builder << "unknown error number " << glErr;
-			mShaderErrorString = err_builder.str();
-		}
-		else
-		{
-			mShaderErrorString = err_str_raw;
-		}
+		//if(err_str_raw == NULL)
+		//{
+		//	std::ostringstream err_builder;
+		//	err_builder << "unknown error number " << glErr;
+		//	mShaderErrorString = err_builder.str();
+		//}
+		//else
+		//{
+		//	mShaderErrorString = err_str_raw;
+		//}
 
-        retCode = true;
-        glErr = glGetError();
-    }
+  //      retCode = true;
+  //      glErr = glGetError();
+  //  }
     return retCode;
 }
