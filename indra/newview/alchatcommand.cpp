@@ -135,17 +135,7 @@ bool ALChatCommand::parseCommand(std::string data)
 			msg->nextBlockFast(_PREHASH_AgentData);
 			msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID());
 			msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
-			LLUUID group_id = gAgent.getGroupID();
-			if (gSavedSettings.getBOOL("AlchemyRezUnderLandGroup"))
-			{
-				LLParcel* land_parcel = LLViewerParcelMgr::getInstance()->getAgentParcel();
-				// Is the agent in the land group
-				if (gAgent.isInGroup(land_parcel->getGroupID()))
-					group_id = land_parcel->getGroupID();
-				// Is the agent in the land group (the group owns the land)
-				else if (gAgent.isInGroup(land_parcel->getOwnerID()))
-					group_id = land_parcel->getOwnerID();
-			}
+			LLUUID group_id = gAgent.getGroupForRezzing();
 			msg->addUUIDFast(_PREHASH_GroupID, group_id);
 			msg->nextBlockFast(_PREHASH_ObjectData);
 			msg->addU8Fast(_PREHASH_PCode, LL_PCODE_VOLUME);

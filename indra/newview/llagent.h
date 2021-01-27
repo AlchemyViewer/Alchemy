@@ -905,6 +905,7 @@ public:
 public:
 	void			setHideGroupTitle(BOOL hide)	{ mHideGroupTitle = hide; }
 	BOOL			isGroupTitleHidden() const 		{ return mHideGroupTitle; }
+	LLUUID			getGroupForRezzing();
 private:
 	std::string		mGroupTitle; 					// Honorific, like "Sir"
 	BOOL			mHideGroupTitle;
