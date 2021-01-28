@@ -350,7 +350,6 @@ public:
   GL_MODELVIEW_MATRIX is active whenever program execution
   leaves this class.
   Does not stack.
-  Caches inverse of projection matrix used in gGLObliqueProjectionInverse
 */
 class LLGLUserClipPlane 
 {
@@ -444,8 +443,6 @@ public:
 	bool isCompleted();
 	void wait();
 };
-
-extern LLMatrix4 gGLObliqueProjectionInverse;
 
 #include "llglstates.h"
 

@@ -146,10 +146,6 @@ void ll_close_fail_log()
 	gFailLog.close();
 }
 
-LLMatrix4 gGLObliqueProjectionInverse;
-
-#define LL_GL_NAME_POOLING 0
-
 std::list<LLGLUpdate*> LLGLUpdate::sGLQ;
 
 LLGLManager gGLManager;
@@ -1871,7 +1867,6 @@ void LLGLUserClipPlane::setPlane(F32 a, F32 b, F32 c, F32 d)
     gGL.matrixMode(LLRender::MM_PROJECTION);
 	gGL.pushMatrix();
     gGL.loadMatrix(newP.m);
-	gGLObliqueProjectionInverse = LLMatrix4(newP.inverse().transpose().m);
     gGL.matrixMode(LLRender::MM_MODELVIEW);
 }
 
