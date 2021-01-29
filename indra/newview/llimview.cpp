@@ -2317,12 +2317,12 @@ BOOL LLIncomingCallDialog::postBuild()
 			if (gAgent.getGroupData(session_id, data))
 			{
 				args["[GROUP]"] = data.mName;
-				call_type = getString(mPayload["notify_box_type"].asStringRef(), args);
+				call_type = getString(mPayload["notify_box_type"].asString(), args);
 			}
 		}
 		else
 		{
-			call_type = getString(mPayload["notify_box_type"].asStringRef());
+			call_type = getString(mPayload["notify_box_type"].asString());
 		}
 	}
 
@@ -2601,7 +2601,7 @@ void LLIncomingCallDialog::processCallResponse(S32 response, const LLSD &payload
 //			}
 //			else
 //			{
-//				gIMMgr->addSession(
+//				LLUUID new_session_id = gIMMgr->addSession(
 //					payload["session_name"].asString(),
 //					type,
 //					session_id, true);
