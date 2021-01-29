@@ -514,10 +514,11 @@ void LLFloaterTopObjects::showBeacon()
 	std::string name = first_selected->getColumn(1)->getValue().asString();
 	std::string pos_string =  first_selected->getColumn(3)->getValue().asString();
 
-	LLVector3 pos_agent;
-	S32 count = sscanf(pos_string.c_str(), "%f %f %f", pos_agent.mV + 0, pos_agent.mV + 1, pos_agent.mV + 2);
-	if (count != 3) return;
+	F32 x, y, z;
+	S32 matched = sscanf(pos_string.c_str(), "<%g,%g,%g>", &x, &y, &z);
+	if (matched != 3) return;
 
+	LLVector3 pos_agent(x, y, z);
 	LLVector3d pos_global = gAgent.getPosGlobalFromAgent(pos_agent);
 	LLTracker::trackLocation(pos_global, name, std::string(), LLTracker::LOCATION_ITEM);
 }
@@ -542,11 +543,14 @@ void LLFloaterTopObjects::onTeleportTo()
 
 	std::string pos_string = first_selected->getColumn(3)->getValue().asString();
 
-	LLVector3 pos_agent;
-	S32 count = sscanf(pos_string.c_str(), "%f %f %f", pos_agent.mV + 0, pos_agent.mV + 1, pos_agent.mV + 2);
-	if (count != 3) return;
+	F32 x, y, z;
+	S32 matched = sscanf(pos_string.c_str(), "<%g,%g,%g>", &x, &y, &z);
+	if (matched != 3) return;
 
-	gAgent.teleportViaLocation(gAgent.getPosGlobalFromAgent(pos_agent));
+	LLVector3 pos_agent(x, y, z);
+	LLVector3d pos_global = gAgent.getPosGlobalFromAgent(pos_agent);
+
+	gAgent.teleportViaLocation(pos_global);
 }
 
 void LLFloaterTopObjects::onEstateKick()
