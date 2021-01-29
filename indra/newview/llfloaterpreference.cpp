@@ -2224,6 +2224,8 @@ void LLFloaterPreference::setPersonalInfo(const std::string& visibility, bool im
 	getChildView("conversation_log_combo")->setEnabled(TRUE);
 	getChild<LLUICtrl>("voice_call_friends_only_check")->setEnabled(TRUE);
 	getChild<LLUICtrl>("voice_call_friends_only_check")->setValue(gSavedPerAccountSettings.getBOOL("VoiceCallsFriendsOnly"));
+	getChild<LLUICtrl>("conferences_friends_only_check")->setEnabled(TRUE);
+	getChild<LLUICtrl>("conferences_friends_only_check")->setValue(gSavedPerAccountSettings.getBOOL("ConferencesFriendsOnly"));
 }
 
 

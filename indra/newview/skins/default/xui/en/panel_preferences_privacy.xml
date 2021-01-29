@@ -69,10 +69,22 @@
      width="350" />
     <check_box
      control_name="VoiceCallsFriendsOnly"
+     enabled="false"
      height="16"
      label="Only friends and groups can call or IM me"
      layout="topleft"
      name="voice_call_friends_only_check"
+     left_delta="0"
+     top_pad="5"
+     width="350">
+    </check_box>
+    <check_box
+     control_name="ConferencesFriendsOnly"
+     enabled="false"
+     height="16"
+     label="Only friends can add me to conference chats"
+     layout="topleft"
+     name="conferences_friends_only_check"
      left_delta="0"
      top_pad="5"
      width="350">

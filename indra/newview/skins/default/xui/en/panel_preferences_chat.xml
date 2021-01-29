@@ -8,27 +8,26 @@
     name="chat"
     top="1"
     width="517">
-    
-  <check_box
-      control_name="ChatAutocompleteGestures"
-      height="16"
-      initial_value="true"
-      label="Auto-complete gestures in nearby chat"
-      layout="topleft"
-      top="17"
-      left="13"
-      name="auto_complete_gestures"
-      width="330">
-  </check_box>
-
   <panel
       border="false"
       height="60"
       layout="topleft"
+      follows="left|top"
       name="general_chat_settings" 
       top="10"
       left="13"
       width="517">
+
+    <check_box
+        control_name="ChatAutocompleteGestures"
+        height="16"
+        initial_value="true"
+        label="Auto-complete gestures in nearby chat"
+        layout="topleft"
+        top="0"
+        name="auto_complete_gestures"
+        width="330">
+    </check_box>
 
     <check_box
         control_name="PlayTypingAnim"
@@ -36,7 +35,7 @@
         initial_value="true"
         label="Play typing animation when chatting"
         layout="topleft"
-        top="0"
+        top_pad="4"
         name="play_typing_animation"
         width="330">
     </check_box>
@@ -47,18 +46,8 @@
         label="Email me IMs when I'm offline"
         layout="topleft"
         name="send_im_to_email"
-        top_pad="6"
+        top_pad="4"
         width="330">
-    </check_box>
-
-    <check_box
-        enabled="false"
-        height="16"
-        label="Only friends and groups can call or IM me"
-        layout="topleft"
-        name="voice_call_friends_only_check"
-        top_pad="6"
-        width="350">     
     </check_box>
 
     <text
@@ -110,6 +99,7 @@
       border="false"
       height="165"
       layout="topleft"
+      follows="left|top"
       name="im_notification_settings" 	
       left="13"
       width="517">
@@ -396,6 +386,7 @@
       border="false"
       height="50"
       layout="topleft"
+      follows="left|top"
       name="play_sound_settings"  	
       left="13"
       top_pad="10"
@@ -457,6 +448,7 @@
   <panel
       height="50"
       layout="topleft"
+      follows="left|top"
       name="log_settings" 	
       left="13"
       top_pad="10"
@@ -567,6 +559,7 @@
       height="23"
       label="Translation..."
       layout="topleft"
+      follows="left|top"
       left="9"
       name="ok_btn"
       top="-29"
@@ -577,6 +570,7 @@
   <button
       height="23"
       layout="topleft"
+      follows="left|top"
       top_pad="-23"
       left_pad="5"
       name="autoreplace_showgui"
@@ -587,6 +581,7 @@
   <button
       height="23"
       layout="topleft"
+      follows="left|top"
       top_pad="-23"
       left_pad="5"
       name="spellcheck_showgui"

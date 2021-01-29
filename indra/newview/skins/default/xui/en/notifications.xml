@@ -8408,6 +8408,15 @@ Click Accept to join the chat or Decline to decline the invitation. Click Block 
   </notification>
 
   <notification
+   icon="alertmodal.tga"
+   name="InviteAdHocBlocked"
+   persist="false"
+   type="notify">
+[NAME_SLURL] tried to add you to a conference which was blocked due to your privacy settings.
+    <tag>group</tag>
+  </notification>
+
+  <notification
    icon="notifytip.tga"
    name="VoiceChannelFull"
    type="notifytip">

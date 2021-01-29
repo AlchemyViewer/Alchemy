@@ -22,5 +22,16 @@
       <key>Value</key>
       <real>0.5</real>
     </map>
+    <key>ConferencesFriendsOnly</key>
+    <map>
+      <key>Comment</key>
+      <string>Only accept conferences from residents on your friends list</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <boolean>0</boolean>
+    </map>
   </map>
 </llsd>
