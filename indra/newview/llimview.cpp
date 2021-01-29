@@ -2570,89 +2570,91 @@ void LLIncomingCallDialog::processCallResponse(S32 response, const LLSD &payload
 	}
 }
 
-bool inviteUserResponse(const LLSD& notification, const LLSD& response)
-{
-	if (!gIMMgr)
-		return false;
-
-	const LLSD& payload = notification["payload"];
-	LLUUID session_id = payload["session_id"].asUUID();
-	EInstantMessage type = (EInstantMessage)payload["type"].asInteger();
-	LLIMMgr::EInvitationType inv_type = (LLIMMgr::EInvitationType)payload["inv_type"].asInteger();
-	S32 option = LLNotificationsUtil::getSelectedOption(notification, response);
-	switch(option) 
-	{
-	case 0: // accept
-		{
-			if (type == IM_SESSION_P2P_INVITE)
-			{
-				// create a normal IM session
-				session_id = gIMMgr->addP2PSession(
-					payload["session_name"].asString(),
-					payload["caller_id"].asUUID(),
-					payload["session_handle"].asString(),
-					payload["session_uri"].asString());
-
-				gIMMgr->startCall(session_id);
-
-				gIMMgr->clearPendingAgentListUpdates(session_id);
-				gIMMgr->clearPendingInvitation(session_id);
-			}
-			else
-			{
-				gIMMgr->addSession(
-					payload["session_name"].asString(),
-					type,
-					session_id, true);
-
-				std::string url = gAgent.getRegion()->getCapability(
-					"ChatSessionRequest");
-
-                LLCoros::instance().launch("chatterBoxInvitationCoro",
-                    boost::bind(&chatterBoxInvitationCoro, url,
-                    session_id, inv_type));
-			}
-		}
-		break;
-	case 2: // mute (also implies ignore, so this falls through to the "ignore" case below)
-	{
-		// mute the sender of this invite
-		if (!LLMuteList::getInstance()->isMuted(payload["caller_id"].asUUID()))
-		{
-			LLMute mute(payload["caller_id"].asUUID(), payload["caller_name"].asString(), LLMute::AGENT);
-			LLMuteList::getInstance()->add(mute);
-		}
-	}
-	/* FALLTHROUGH */
-	
-	case 1: // decline
-	{
-		if (type == IM_SESSION_P2P_INVITE)
-		{
-		  std::string s = payload["session_handle"].asString();
-		  LLVoiceClient::getInstance()->declineInvite(s);
-		}
-		else
-		{
-			std::string url = gAgent.getRegion()->getCapability(
-				"ChatSessionRequest");
-
-			LLSD data;
-			data["method"] = "decline invitation";
-			data["session-id"] = session_id;
-            LLCoreHttpUtil::HttpCoroutineAdapter::messageHttpPost(url, data, 
-                "Invitation declined.", 
-                "Invitation decline failed.");
-		}
-	}
-
-	gIMMgr->clearPendingAgentListUpdates(session_id);
-	gIMMgr->clearPendingInvitation(session_id);
-	break;
-	}
-	
-	return false;
-}
+// [AL:SE] - DEAD CODE
+//bool inviteUserResponse(const LLSD& notification, const LLSD& response)
+//{
+//	if (!gIMMgr)
+//		return false;
+//
+//	const LLSD& payload = notification["payload"];
+//	LLUUID session_id = payload["session_id"].asUUID();
+//	EInstantMessage type = (EInstantMessage)payload["type"].asInteger();
+//	LLIMMgr::EInvitationType inv_type = (LLIMMgr::EInvitationType)payload["inv_type"].asInteger();
+//	S32 option = LLNotificationsUtil::getSelectedOption(notification, response);
+//	switch(option) 
+//	{
+//	case 0: // accept
+//		{
+//			if (type == IM_SESSION_P2P_INVITE)
+//			{
+//				// create a normal IM session
+//				session_id = gIMMgr->addP2PSession(
+//					payload["session_name"].asString(),
+//					payload["caller_id"].asUUID(),
+//					payload["session_handle"].asString(),
+//					payload["session_uri"].asString());
+//
+//				gIMMgr->startCall(session_id);
+//
+//				gIMMgr->clearPendingAgentListUpdates(session_id);
+//				gIMMgr->clearPendingInvitation(session_id);
+//			}
+//			else
+//			{
+//				gIMMgr->addSession(
+//					payload["session_name"].asString(),
+//					type,
+//					session_id, true);
+//
+//				std::string url = gAgent.getRegion()->getCapability(
+//					"ChatSessionRequest");
+//
+//                LLCoros::instance().launch("chatterBoxInvitationCoro",
+//                    boost::bind(&chatterBoxInvitationCoro, url,
+//                    session_id, inv_type));
+//			}
+//		}
+//		break;
+//	case 2: // mute (also implies ignore, so this falls through to the "ignore" case below)
+//	{
+//		// mute the sender of this invite
+//		if (!LLMuteList::getInstance()->isMuted(payload["caller_id"].asUUID()))
+//		{
+//			LLMute mute(payload["caller_id"].asUUID(), payload["caller_name"].asString(), LLMute::AGENT);
+//			LLMuteList::getInstance()->add(mute);
+//		}
+//	}
+//	/* FALLTHROUGH */
+//	
+//	case 1: // decline
+//	{
+//		if (type == IM_SESSION_P2P_INVITE)
+//		{
+//		  std::string s = payload["session_handle"].asString();
+//		  LLVoiceClient::getInstance()->declineInvite(s);
+//		}
+//		else
+//		{
+//			std::string url = gAgent.getRegion()->getCapability(
+//				"ChatSessionRequest");
+//
+//			LLSD data;
+//			data["method"] = "decline invitation";
+//			data["session-id"] = session_id;
+//            LLCoreHttpUtil::HttpCoroutineAdapter::messageHttpPost(url, data, 
+//                "Invitation declined.", 
+//                "Invitation decline failed.");
+//		}
+//	}
+//
+//	gIMMgr->clearPendingAgentListUpdates(session_id);
+//	gIMMgr->clearPendingInvitation(session_id);
+//	break;
+//	}
+//	
+//	return false;
+//}
+// [/AL:SE]
 
 //
 // Member Functions
