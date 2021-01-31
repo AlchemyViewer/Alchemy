@@ -190,6 +190,9 @@ LLFontGL* LLViewerChat::getChatFont()
 	LLFontGL* fontp = NULL;
 	switch(font_size)
 	{
+		case -1:
+			fontp = LLFontGL::getFontMonospace();
+			break;
 		case 0:
 			fontp = LLFontGL::getFontSansSerifSmall();
 			break;
@@ -199,6 +202,9 @@ LLFontGL* LLViewerChat::getChatFont()
 			break;
 		case 2:
 			fontp = LLFontGL::getFontSansSerifBig();
+			break;
+		case 3:
+			fontp = LLFontGL::getFontSansSerifHuge();
 			break;
 	}
 	

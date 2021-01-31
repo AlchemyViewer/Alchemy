@@ -224,6 +224,7 @@ void LLFloaterIMNearbyChat::reloadMessages(bool clean_messages/* = false*/)
 		// Update the messages without re-writing them to a log file.
 		addMessage(*it,false, do_not_log);
 	}
+	mInputEditor->setFont(LLViewerChat::getChatFont());
 }
 
 void LLFloaterIMNearbyChat::loadHistory()

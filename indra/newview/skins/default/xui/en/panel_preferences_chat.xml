@@ -69,6 +69,10 @@
         top_pad="5"
         width="100">
       <item
+          label="Monospace"
+          name="Monospace"
+          value="-1"/>
+      <item
           label="Small"
           name="Small"
           value="0"/>
@@ -79,7 +83,11 @@
       <item
           label="Large"
           name="Large"
-          value="2"/>  
+          value="2"/>
+      <item
+          label="Huge"
+          name="Huge"
+          value="3"/>
     </combo_box>
 
     <check_box

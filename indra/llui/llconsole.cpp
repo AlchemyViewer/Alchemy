@@ -103,22 +103,26 @@ void LLConsole::reshape(S32 width, S32 height, BOOL called_from_parent)
 
 void LLConsole::setFontSize(S32 size_index)
 {
-	if (-1 == size_index)
+	switch (size_index)
 	{
+	case -1:
 		mFont = LLFontGL::getFontMonospace();
-	}
-	else if (0 == size_index)
-	{
+		break;
+	case 0:
+		mFont = LLFontGL::getFontSansSerifSmall();
+		break;
+	default:
+	case 1:
 		mFont = LLFontGL::getFontSansSerif();
-	}
-	else if (1 == size_index)
-	{
+		break;
+	case 2:
 		mFont = LLFontGL::getFontSansSerifBig();
-	}
-	else
-	{
+		break;
+	case 3:
 		mFont = LLFontGL::getFontSansSerifHuge();
+		break;
 	}
+
 	// Make sure the font exists
 	if (mFont == NULL)
 	{

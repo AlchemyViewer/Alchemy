@@ -79,6 +79,8 @@
 #include "rlvactions.h"
 #include "rlvcommon.h"
 // [/RLVa:KB]
+#include "llfloaterimsessiontab.h"
+#include "llviewerchat.h"
 
 // Third party library includes
 #include <boost/algorithm/string.hpp>
@@ -342,6 +344,10 @@ static bool handleChatFontSizeChanged(const LLSD& newvalue)
 	{
 		gConsole->setFontSize(newvalue.asInteger());
 	}
+
+	LLViewerChat::signalChatFontChanged();
+	LLFloaterIMSessionTab::processChatHistoryStyleUpdate(false);
+
 	return true;
 }
 

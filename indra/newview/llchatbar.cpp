@@ -59,6 +59,7 @@
 #include "llmultigesture.h"
 #include "llui.h"
 #include "lluictrlfactory.h"
+#include "llviewerchat.h"
 // [RLVa:KB] - Checked: 2010-02-27 (RLVa-1.2.0b)
 #include "rlvactions.h"
 #include "rlvcommon.h"
@@ -133,6 +134,8 @@ BOOL LLChatBar::postBuild()
 
 	mInputEditor->setMaxTextLength(DB_CHAT_MSG_STR_LEN);
 	mInputEditor->setEnableLineHistory(TRUE);
+	
+	mInputEditor->setFont(LLViewerChat::getChatFont());
 
 	mIsBuilt = TRUE;
 
