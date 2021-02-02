@@ -150,7 +150,7 @@ class LLAvatarAppearanceDictionary
 	//--------------------------------------------------------------------
 public:
 	LLAvatarAppearanceDictionary();
-	~LLAvatarAppearanceDictionary();
+	~LLAvatarAppearanceDictionary() = default;
 private:
 	void createAssociations();
 	

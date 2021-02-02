@@ -287,7 +287,7 @@ void LLAvatarNameCache::processName(const LLUUID& agent_id, const LLAvatarName& 
 
     bool updated_account = true; // assume obsolete value for new arrivals by default
 
-    std::map<LLUUID, LLAvatarName>::iterator it = mCache.find(agent_id);
+    auto it = mCache.find(agent_id);
     if (it != mCache.end()
         && (*it).second.getAccountName() == av_name.getAccountName())
     {

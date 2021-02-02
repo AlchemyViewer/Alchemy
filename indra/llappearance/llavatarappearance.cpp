@@ -1267,7 +1267,7 @@ BOOL LLAvatarAppearance::loadLayersets()
 
 			// scan baked textures and associate the layerset with the appropriate one
 			EBakedTextureIndex baked_index = BAKED_NUM_INDICES;
-			for (const auto& baked_tex_pair : sAvatarDictionary->getMeshEntries())
+			for (const auto& baked_tex_pair : sAvatarDictionary->getBakedTextures())
 			{
 				const LLAvatarAppearanceDictionary::BakedEntry *baked_dict = baked_tex_pair.second;
 				if (layer_set->isBodyRegion(baked_dict->mName))
@@ -1971,7 +1971,7 @@ BOOL LLAvatarAppearance::LLAvatarXmlInfo::parseXmlMeshNodes(LLXmlTreeNode* root)
 			{
 				delete morphinfo;
 				delete info;
-				return -1;
+				return FALSE;
 			}
 			BOOL shared = FALSE;
 			static LLStdStringHandle shared_string = LLXmlTree::addAttributeString("shared");

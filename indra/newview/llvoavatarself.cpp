@@ -1512,7 +1512,6 @@ BOOL LLVOAvatarSelf::isLocalTextureDataFinal(const LLViewerTexLayerSet* layerset
 	static const LLCachedControl<U32> desired_tex_discard_level(gSavedSettings, "TextureDiscardLevel");
 	// const U32 desired_tex_discard_level = 0; // hack to not bake textures on lower discard levels.
 
-	auto& avApprDict = LLAvatarAppearanceDictionary::instance();
 	for (U32 i = 0; i < mBakedTextureDatas.size(); i++)
 	{
 		if (layerset == mBakedTextureDatas[i].mTexLayerSet)
@@ -1545,7 +1544,6 @@ BOOL LLVOAvatarSelf::isAllLocalTextureDataFinal() const
 	static const LLCachedControl<U32> desired_tex_discard_level(gSavedSettings, "TextureDiscardLevel");
 	// const U32 desired_tex_discard_level = 0; // hack to not bake textures on lower discard levels
 
-	auto& avApprDict = LLAvatarAppearanceDictionary::instance();
 	for (U32 i = 0; i < mBakedTextureDatas.size(); i++)
 	{
 		const LLAvatarAppearanceDictionary::BakedEntry *baked_dict = sAvatarDictionary->getBakedTexture((EBakedTextureIndex)i);

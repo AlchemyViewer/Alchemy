@@ -7672,7 +7672,7 @@ BOOL LLVOAvatar::isWearingWearableType(LLWearableType::EType type) const
 			if (texture_dict->mIsUsedByBakedTexture)
 			{
 				const EBakedTextureIndex baked_index = texture_dict->mBakedTextureIndex;
-				return isTextureDefined(LLAvatarAppearanceDictionary::getInstance()->getBakedTexture(baked_index)->mTextureIndex);
+				return isTextureDefined(LLAvatarAppearance::getDictionary()->getBakedTexture(baked_index)->mTextureIndex);
 			}
 			return FALSE;
 		}
@@ -8425,7 +8425,7 @@ void LLVOAvatar::updateMeshTextures()
 	} 
 	
 	
-	for (const auto& baked_pair : LLAvatarAppearanceDictionary::getInstance()->getBakedTextures())
+	for (const auto& baked_pair : LLAvatarAppearance::getDictionary()->getBakedTextures())
 	{
 		const EBakedTextureIndex baked_index = baked_pair.first;
 		const LLAvatarAppearanceDictionary::BakedEntry *baked_dict = baked_pair.second;
@@ -10746,8 +10746,7 @@ const std::string LLVOAvatar::getBakedStatusForPrintout() const
 {
 	std::string line;
 
-	for (LLAvatarAppearanceDictionary::Textures::const_iterator iter = LLAvatarAppearanceDictionary::getInstance()->getTextures().begin();
-		 iter != LLAvatarAppearanceDictionary::getInstance()->getTextures().end();
+	for (const auto& tex_pair : LLAvatarAppearance::getDictionary()->getTextures())
 	{
 		const ETextureIndex index = tex_pair.first;
 		const LLAvatarAppearanceDictionary::TextureEntry *texture_dict = tex_pair.second;

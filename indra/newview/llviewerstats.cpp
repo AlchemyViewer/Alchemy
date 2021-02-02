@@ -636,7 +636,8 @@ void send_viewer_stats(bool include_preferences)
 
 
 	LL_INFOS("LogViewerStatsPacket") << "Sending viewer statistics: " << body << LL_ENDL;
-	if (debugLoggingEnabled("LogViewerStatsPacket"))
+	static bool enable_debug_log = debugLoggingEnabled("LogViewerStatsPacket");
+	if (enable_debug_log)
 	{
 		std::string filename("viewer_stats_packet.xml");
 		llofstream of(filename.c_str());

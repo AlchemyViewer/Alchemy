@@ -144,7 +144,7 @@ BOOL CALLBACK di8_devices_callback(LPCDIDEVICEINSTANCE device_instance_ptr, LPVO
     // Capable of detecting devices like Oculus Rift
     if (device_instance_ptr)
     {
-        std::string product_name = utf16str_to_utf8str(llutf16string(device_instance_ptr->tszProductName));
+        std::string product_name = ll_convert_wide_to_string(std::wstring(device_instance_ptr->tszProductName));
 
         LLSD guid = LLViewerJoystick::getInstance()->getDeviceUUID();
 
@@ -192,10 +192,11 @@ BOOL CALLBACK di8_devices_callback(LPCDIDEVICEINSTANCE device_instance_ptr, LPVO
                 LL_DEBUGS("Joystick") << "Properties updated" << LL_ENDL;
 
                 S32 size = sizeof(GUID);
-                LLSD::Binary data; //just an std::vector
-                data.resize(size);
-                memcpy(&data[0], &device_instance_ptr->guidInstance /*POD _GUID*/, size);
-                LLViewerJoystick::getInstance()->initDevice(&device, product_name, LLSD(data));
+                LLSD::Binary binary_data; //just an std::vector
+				binary_data.resize(size);
+                memcpy(&binary_data[0], &device_instance_ptr->guidInstance /*POD _GUID*/, size);
+				LLSD data(binary_data);
+                LLViewerJoystick::getInstance()->initDevice(&device, product_name, data);
                 return DIENUM_STOP;
             }
         }
@@ -211,7 +212,7 @@ BOOL CALLBACK di8_devices_callback(LPCDIDEVICEINSTANCE device_instance_ptr, LPVO
 // This is GUID2 so teoretically it can be memcpy copied into LLUUID
 void guid_from_string(GUID &guid, const std::string &input)
 {
-    CLSIDFromString(utf8str_to_utf16str(input).c_str(), &guid);
+    CLSIDFromString(ll_convert_string_to_wide(input).c_str(), &guid);
 }
 
 std::string string_from_guid(const GUID &guid)
@@ -221,7 +222,7 @@ std::string string_from_guid(const GUID &guid)
 
     // use guidString...
 
-    std::string res = utf16str_to_utf8str(llutf16string(guidString));
+    std::string res = ll_convert_wide_to_string(std::wstring(guidString));
     // ensure memory is freed
     ::CoTaskMemFree(guidString);
 
