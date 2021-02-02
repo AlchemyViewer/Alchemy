@@ -1479,7 +1479,8 @@ void LLDAELoader::processDomModel(LLModel* model, DAE* dae, daeElement* root, do
 			std::string lookingForJoint = (*jointIt).c_str();
 			//Look for the joint xform that we extracted from the skeleton, using the jointIt as the key
 			//and store it in the alternate bind matrix
-			if ( mJointMap.find( lookingForJoint ) != mJointMap.end() )
+			if (mJointMap.find(lookingForJoint) != mJointMap.end()
+				&& model->mSkinInfo.mInvBindMatrix.size() > i)
 			{
 				alignas(16) F32 bind_matrix[16];
 				model->mSkinInfo.mInvBindMatrix[i].store4a(bind_matrix);

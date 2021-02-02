@@ -426,6 +426,7 @@ void LLLoginInstance::handleLoginSuccess(const LLSD& event)
 	LL_INFOS("LLLogin") << "LLLoginInstance::handleLoginSuccess" << LL_ENDL;
 
 	attemptComplete();
+	mRequestData.clear();
 }
 
 void LLLoginInstance::handleDisconnect(const LLSD& event)

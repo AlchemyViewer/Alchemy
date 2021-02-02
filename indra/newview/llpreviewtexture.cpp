@@ -419,7 +419,7 @@ void LLPreviewTexture::onFileLoadedForSave(BOOL success,
 		{
 			extension = self->mSaveFileName.substr(extpos + 1);
 		}
-
+		LLStringUtil::toLower(extension);
 		// We only support saving in PNG or TGA format
 		LLPointer<LLImageFormatted> image;
 		if(extension == "png")

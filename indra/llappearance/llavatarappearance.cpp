@@ -171,10 +171,9 @@ LLAvatarAppearance::LLAvatarXmlInfo::~LLAvatarXmlInfo()
 //-----------------------------------------------------------------------------
 // Static Data
 //-----------------------------------------------------------------------------
-LLXmlTree LLAvatarAppearance::sXMLTree;
-LLXmlTree LLAvatarAppearance::sSkeletonXMLTree;
 LLAvatarSkeletonInfo* LLAvatarAppearance::sAvatarSkeletonInfo = NULL;
 LLAvatarAppearance::LLAvatarXmlInfo* LLAvatarAppearance::sAvatarXmlInfo = NULL;
+LLAvatarAppearanceDefines::LLAvatarAppearanceDictionary* LLAvatarAppearance::sAvatarDictionary = NULL;
 
 
 LLAvatarAppearance::LLAvatarAppearance(LLWearableData* wearable_data) :
@@ -202,7 +201,7 @@ LLAvatarAppearance::LLAvatarAppearance(LLWearableData* wearable_data) :
 		mBakedTextureDatas[i].mIsLoaded = false;
 		mBakedTextureDatas[i].mIsUsed = false;
 		mBakedTextureDatas[i].mMaskTexName = 0;
-		mBakedTextureDatas[i].mTextureIndex = LLAvatarAppearanceDefines::LLAvatarAppearanceDictionary::bakedToLocalTextureIndex((LLAvatarAppearanceDefines::EBakedTextureIndex)i);
+		mBakedTextureDatas[i].mTextureIndex = sAvatarDictionary->bakedToLocalTextureIndex((LLAvatarAppearanceDefines::EBakedTextureIndex)i);
 	}
 }
 
@@ -215,7 +214,7 @@ void LLAvatarAppearance::initInstance()
 	mRoot = createAvatarJoint();
 	mRoot->setName( "mRoot" );
 
-	for (const auto& mesh_entry_pair : LLAvatarAppearanceDictionary::getInstance()->getMeshEntries())
+	for (const auto& mesh_entry_pair : sAvatarDictionary->getMeshEntries())
 	{
 		const EMeshIndex mesh_index = mesh_entry_pair.first;
 		const LLAvatarAppearanceDictionary::MeshEntry *mesh_dict = mesh_entry_pair.second;
@@ -259,7 +258,7 @@ void LLAvatarAppearance::initInstance()
 	//-------------------------------------------------------------------------
 	// associate baked textures with meshes
 	//-------------------------------------------------------------------------
-	for (const auto& mesh_entry_pair : LLAvatarAppearanceDictionary::getInstance()->getMeshEntries())
+	for (const auto& mesh_entry_pair : sAvatarDictionary->getMeshEntries())
 	{
 		const EMeshIndex mesh_index = mesh_entry_pair.first;
 		const LLAvatarAppearanceDictionary::MeshEntry *mesh_dict = mesh_entry_pair.second;
@@ -333,6 +332,12 @@ void LLAvatarAppearance::initClass()
 //static
 void LLAvatarAppearance::initClass(const std::string& avatar_file_name_arg, const std::string& skeleton_file_name_arg)
 {
+    // init dictionary (don't repeat on second login attempt)
+    if (!sAvatarDictionary)
+    {
+        sAvatarDictionary = new LLAvatarAppearanceDefines::LLAvatarAppearanceDictionary();
+    }
+
 	std::string avatar_file_name;
 
     if (!avatar_file_name_arg.empty())
@@ -343,14 +348,15 @@ void LLAvatarAppearance::initClass(const std::string& avatar_file_name_arg, cons
     {
         avatar_file_name = gDirUtilp->getExpandedFilename(LL_PATH_CHARACTER,AVATAR_DEFAULT_CHAR + "_lad.xml");
     }
-	BOOL success = sXMLTree.parseFile( avatar_file_name, FALSE );
+	LLXmlTree xml_tree;
+	BOOL success = xml_tree.parseFile( avatar_file_name, FALSE );
 	if (!success)
 	{
 		LL_ERRS() << "Problem reading avatar configuration file:" << avatar_file_name << LL_ENDL;
 	}
 
 	// now sanity check xml file
-	LLXmlTreeNode* root = sXMLTree.getRoot();
+	LLXmlTreeNode* root = xml_tree.getRoot();
 	if (!root) 
 	{
 		LL_ERRS() << "No root node found in avatar configuration file: " << avatar_file_name << LL_ENDL;
@@ -395,8 +401,9 @@ void LLAvatarAppearance::initClass(const std::string& avatar_file_name_arg, cons
     }
 	
 	std::string skeleton_path;
+	LLXmlTree skeleton_xml_tree;
 	skeleton_path = gDirUtilp->getExpandedFilename(LL_PATH_CHARACTER,skeleton_file_name);
-	if (!parseSkeletonFile(skeleton_path))
+	if (!parseSkeletonFile(skeleton_path, skeleton_xml_tree))
 	{
 		LL_ERRS() << "Error parsing skeleton file: " << skeleton_path << LL_ENDL;
 	}
@@ -409,7 +416,7 @@ void LLAvatarAppearance::initClass(const std::string& avatar_file_name_arg, cons
 		delete sAvatarSkeletonInfo;
 	}
 	sAvatarSkeletonInfo = new LLAvatarSkeletonInfo;
-	if (!sAvatarSkeletonInfo->parseXml(sSkeletonXMLTree.getRoot()))
+	if (!sAvatarSkeletonInfo->parseXml(skeleton_xml_tree.getRoot()))
 	{
 		LL_ERRS() << "Error parsing skeleton XML file: " << skeleton_path << LL_ENDL;
 	}
@@ -448,9 +455,8 @@ void LLAvatarAppearance::initClass(const std::string& avatar_file_name_arg, cons
 void LLAvatarAppearance::cleanupClass()
 {
 	delete_and_clear(sAvatarXmlInfo);
-	delete_and_clear(sAvatarSkeletonInfo);
-	sSkeletonXMLTree.cleanup();
-	sXMLTree.cleanup();
+    delete_and_clear(sAvatarDictionary);
+    delete_and_clear(sAvatarSkeletonInfo);
 }
 
 using namespace LLAvatarAppearanceDefines;
@@ -574,12 +580,12 @@ void LLAvatarAppearance::computeBodySize()
 //-----------------------------------------------------------------------------
 // parseSkeletonFile()
 //-----------------------------------------------------------------------------
-BOOL LLAvatarAppearance::parseSkeletonFile(const std::string& filename)
+BOOL LLAvatarAppearance::parseSkeletonFile(const std::string& filename, LLXmlTree& skeleton_xml_tree)
 {
 	//-------------------------------------------------------------------------
 	// parse the file
 	//-------------------------------------------------------------------------
-	BOOL parsesuccess = sSkeletonXMLTree.parseFile( filename, FALSE );
+	BOOL parsesuccess = skeleton_xml_tree.parseFile( filename, FALSE );
 
 	if (!parsesuccess)
 	{
@@ -588,7 +594,7 @@ BOOL LLAvatarAppearance::parseSkeletonFile(const std::string& filename)
 	}
 
 	// now sanity check xml file
-	LLXmlTreeNode* root = sSkeletonXMLTree.getRoot();
+	LLXmlTreeNode* root = skeleton_xml_tree.getRoot();
 	if (!root) 
 	{
 		LL_ERRS() << "No root node found in avatar skeleton file: " << filename << LL_ENDL;
@@ -998,7 +1004,7 @@ BOOL LLAvatarAppearance::loadAvatar()
 	{
 		LLAvatarXmlInfo::LLAvatarMorphInfo *info = *iter;
 
-		EBakedTextureIndex baked = LLAvatarAppearanceDictionary::findBakedByRegionName(info->mRegion); 
+		EBakedTextureIndex baked = sAvatarDictionary->findBakedByRegionName(info->mRegion);
 		if (baked != BAKED_NUM_INDICES)
 		{
 			LLVisualParam* morph_param;
@@ -1134,7 +1140,7 @@ BOOL LLAvatarAppearance::loadMeshNodes()
 			switch(lod)
 			  case 0:
 				mesh = &mHairMesh0; */
-		for (const auto& mesh_entry_pair : LLAvatarAppearanceDictionary::getInstance()->getMeshEntries())
+		for (const auto& mesh_entry_pair : sAvatarDictionary->getMeshEntries())
 		{
 			const EMeshIndex mesh_index = mesh_entry_pair.first;
 			const LLAvatarAppearanceDictionary::MeshEntry *mesh_dict = mesh_entry_pair.second;
@@ -1261,7 +1267,7 @@ BOOL LLAvatarAppearance::loadLayersets()
 
 			// scan baked textures and associate the layerset with the appropriate one
 			EBakedTextureIndex baked_index = BAKED_NUM_INDICES;
-			for (const auto& baked_tex_pair : LLAvatarAppearanceDictionary::getInstance()->getBakedTextures())
+			for (const auto& baked_tex_pair : sAvatarDictionary->getMeshEntries())
 			{
 				const LLAvatarAppearanceDictionary::BakedEntry *baked_dict = baked_tex_pair.second;
 				if (layer_set->isBodyRegion(baked_dict->mName))

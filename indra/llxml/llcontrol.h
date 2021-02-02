@@ -256,6 +256,8 @@ public:
 	LLColor4	getColor4(std::string_view  name);
 	LLColor3	getColor3(std::string_view  name);
 
+	LLSD		asLLSD(bool diffs_only);
+	
 	// generic getter
 	template<typename T> T get(std::string_view  name)
 	{

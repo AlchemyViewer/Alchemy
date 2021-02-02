@@ -84,6 +84,7 @@ LLUrlRegistry::LLUrlRegistry()
 	mUrlEntrySLLabel = new LLUrlEntrySLLabel();
 	registerUrl(mUrlEntrySLLabel);
 	registerUrl(new LLUrlEntryEmail());
+	registerUrl(new LLUrlEntryIPv6());
 }
 
 LLUrlRegistry::~LLUrlRegistry()

@@ -724,7 +724,7 @@ BOOL LLTexLayerInfo::parseXml(LLXmlTreeNode* node)
 			/* if ("upper_shirt" == local_texture_name)
 				mLocalTexture = TEX_UPPER_SHIRT; */
 			mLocalTexture = TEX_NUM_INDICES;
-			for (const auto& tex_pair : LLAvatarAppearanceDictionary::getInstance()->getTextures())
+			for (const auto& tex_pair : LLAvatarAppearance::getDictionary()->getTextures())
 			{
 				const LLAvatarAppearanceDictionary::TextureEntry *texture_dict = tex_pair.second;
 				if (local_texture_name == texture_dict->mName)
@@ -973,7 +973,7 @@ LLWearableType::EType LLTexLayerInterface::getWearableType() const
 
 		return type;
 	}
-	return LLAvatarAppearanceDictionary::getTEWearableType(te);
+	return LLAvatarAppearance::getDictionary()->getTEWearableType(te);
 }
 
 LLTexLayerInterface::ERenderPass LLTexLayerInterface::getRenderPass() const

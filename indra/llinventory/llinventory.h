@@ -244,7 +244,7 @@ public:
 	LLInventoryCategory(const LLInventoryCategory* other);
 	void copyCategory(const LLInventoryCategory* other); // LLRefCount requires custom copy
 protected:
-	~LLInventoryCategory() = default;
+	virtual ~LLInventoryCategory() = default;
 
 	//--------------------------------------------------------------------
 	// Accessors And Mutators

@@ -697,6 +697,24 @@ LLSD LLControlGroup::getLLSD(std::string_view name)
 	return get<LLSD>(name);
 }
 
+LLSD LLControlGroup::asLLSD(bool diffs_only)
+{
+	// Dump all stored values as LLSD
+	LLSD result = LLSD::emptyArray();
+	for (ctrl_name_table_t::iterator iter = mNameTable.begin();
+		 iter != mNameTable.end(); iter++)
+	{
+		LLControlVariable *control = iter->second;
+		if (!control || control->isType(TYPE_STRING) || (diffs_only && control->isDefault()))
+		{
+			continue;
+		}
+		const std::string& name = iter->first;
+		result[name] = getLLSD(name);
+	}
+	return result;
+}
+
 BOOL LLControlGroup::controlExists(std::string_view name)
 {
 	ctrl_name_table_t::iterator iter = mNameTable.find(name);

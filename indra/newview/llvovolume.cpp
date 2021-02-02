@@ -717,6 +717,11 @@ void LLVOVolume::updateTextureVirtualSize(bool forced)
 	LL_RECORD_BLOCK_TIME(FTM_VOLUME_TEXTURES);
 	// Update the pixel area of all faces
 
+    if (mDrawable.isNull())
+    {
+        return;
+    }
+
 	if(!forced)
 	{
 		if(!isVisible())
@@ -2389,7 +2394,8 @@ bool LLVOVolume::notifyAboutCreatingTexture(LLViewerTexture *texture)
 	auto& matMgr = LLMaterialMgr::instance();
 	for(map_te_material::const_iterator it = new_material.begin(), end = new_material.end(); it != end; ++it)
 	{
-		matMgr.put(getID(), it->first, *it->second);
+		// These are placeholder materials, they shouldn't be sent to server
+		matMgr.setLocalMaterial(getRegion()->getRegionID(), it->second);
 		LLViewerObject::setTEMaterialParams(it->first, it->second);
 	}
 

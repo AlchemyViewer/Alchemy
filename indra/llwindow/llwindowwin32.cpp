@@ -53,9 +53,16 @@
 #include <shellapi.h>
 #include <fstream>
 #include <Imm.h>
+
+// Require DirectInput version 8
+#define DIRECTINPUT_VERSION 0x0800
+
+#include <dinput.h>
 #include <Dbt.h.>
 #include <wingdi.h>
 #include <Windowsx.h>
+#pragma comment(lib, "dxguid.lib") // needed for llurlentry test to build on some systems
+#pragma comment(lib, "dinput8")
 
 #include "../newview/res/resource.h"
 
@@ -63,6 +70,8 @@ const S32	MAX_MESSAGE_PER_UPDATE = 20;
 const S32	BITS_PER_PIXEL = 32;
 const S32	MAX_NUM_RESOLUTIONS = 32;
 const F32	ICON_FLASH_TIME = 0.5f;
+
+LPDIRECTINPUT8 gDirectInput8;
 
 //
 // LLWindowWin32
@@ -516,6 +525,21 @@ LLWindowWin32::LLWindowWin32(LLWindowCallbacks* callbacks,
 	// Make an instance of our window then define the window class
 	mhInstance = GetModuleHandle(NULL);
 	mWndProc = NULL;
+
+    // Init Direct Input - needed for joystick / Spacemouse
+
+    LPDIRECTINPUT8 di8_interface;
+    HRESULT status = DirectInput8Create(
+        mhInstance, // HINSTANCE hinst,
+        DIRECTINPUT_VERSION, // DWORD dwVersion,
+        IID_IDirectInput8, // REFIID riidltf,
+        (LPVOID*)&di8_interface, // LPVOID * ppvOut,
+        NULL                     // LPUNKNOWN punkOuter
+        );
+    if (status == DI_OK)
+    {
+        gDirectInput8 = di8_interface;
+    }
 
 	mSwapMethod = SWAP_METHOD_UNDEFINED;
 
@@ -4282,6 +4306,28 @@ BOOL LLWindowWin32::handleImeRequests(WPARAM request, LPARAM param, LRESULT *res
 	}
 
 	return FALSE;
+}
+
+void* LLWindowWin32::getDirectInput8()
+{
+    return &gDirectInput8;
+}
+
+bool LLWindowWin32::getInputDevices(U32 device_type_filter, void * di8_devices_callback, void* userdata)
+{
+    if (gDirectInput8 != NULL)
+    {
+        // Enumerate devices
+        HRESULT status = gDirectInput8->EnumDevices(
+            (DWORD) device_type_filter,        // DWORD dwDevType,
+            (LPDIENUMDEVICESCALLBACK)di8_devices_callback,  // LPDIENUMDEVICESCALLBACK lpCallback, // BOOL DIEnumDevicesCallback( LPCDIDEVICEINSTANCE lpddi, LPVOID pvRef ) // BOOL CALLBACK DinputDevice::DevicesCallback
+            (LPVOID*)userdata, // LPVOID pvRef
+            DIEDFL_ATTACHEDONLY       // DWORD dwFlags
+            );
+
+        return status == DI_OK;
+    }
+    return false;
 }
 
 F32 LLWindowWin32::getSystemUISize()
