@@ -693,9 +693,8 @@ void LLHUDText::refreshAllObjectText(EObjectTextFilter eObjFilter)
 
 void LLHUDText::onFadeSettingsChanged()
 {
-	for (TextObjectIterator it = sTextObjects.begin(); it != sTextObjects.end(); ++it)
+	for (LLHUDText* text : sTextObjects)
 	{
-		LLHUDText* text = *it;
 		if (text)
 		{
 			text->mFadeDistance = gSavedSettings.getF32("AlchemyHudTextFadeDistance");
