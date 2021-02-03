@@ -255,6 +255,28 @@
       <key>Value</key>
       <integer>0</integer>
     </map>
+    <key>AlchemyHudTextFadeDistance</key>
+    <map>
+      <key>Comment</key>
+      <string>Distance at which hover text starts fading.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>F32</string>
+      <key>Value</key>
+      <real>4.0</real>
+    </map>
+    <key>AlchemyHudTextFadeRange</key>
+    <map>
+      <key>Comment</key>
+      <string>Distance over which hover text will fade out.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>F32</string>
+      <key>Value</key>
+      <real>8.0</real>
+    </map>
     <key>AlchemyLookAtShow</key>
     <map>
       <key>Comment</key>
