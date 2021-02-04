@@ -1330,7 +1330,7 @@ void LLToolDragAndDrop::dropObject(LLViewerObject* raycast_target,
 	msg->nextBlockFast(_PREHASH_AgentData);
 	msg->addUUIDFast(_PREHASH_AgentID,  gAgent.getID());
 	msg->addUUIDFast(_PREHASH_SessionID,  gAgent.getSessionID());
-	msg->addUUIDFast(_PREHASH_GroupID, gAgent.getGroupID());
+	msg->addUUIDFast(_PREHASH_GroupID, gAgent.getGroupForRezzing());
 
 	msg->nextBlock("RezData");
 	// if it's being rezzed from task inventory, we need to enable
