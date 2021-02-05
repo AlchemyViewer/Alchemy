@@ -43,6 +43,7 @@
 #include "llfeaturemanager.h"
 #include "llviewershadermgr.h"
 
+#include "llhudtext.h"
 #include "llsky.h"
 #include "llvieweraudio.h"
 #include "llviewermenu.h"
@@ -799,6 +800,8 @@ void settings_setup_listeners()
 // [RLVa:KB] - Checked: 2015-12-27 (RLVa-1.5.0)
 	gSavedSettings.getControl(RlvSettingNames::Main)->getSignal()->connect(boost::bind(&RlvSettings::onChangedSettingMain, _2));
 // [/RLVa:KB]
+	gSavedSettings.getControl("AlchemyHudTextFadeDistance")->getSignal()->connect(boost::bind(&LLHUDText::onFadeSettingsChanged));
+	gSavedSettings.getControl("AlchemyHudTextFadeRange")->getSignal()->connect(boost::bind(&LLHUDText::onFadeSettingsChanged));
 }
 
 #if TEST_CACHED_CONTROL

@@ -5195,4 +5195,19 @@ void LLTeleportRequestViaLocationLookAt::restartTeleport()
 //    gAgent.doTeleportViaLocationLookAt(getPosGlobal());
 }
 
+LLUUID LLAgent::getGroupForRezzing()
+{
+	if (gSavedSettings.getBOOL("AlchemyRezUnderLandGroup"))
+	{
+		LLParcel* land_parcel = LLViewerParcelMgr::getInstance()->getAgentParcel();
+		// Is the agent in the land group
+		if (gAgent.isInGroup(land_parcel->getGroupID()))
+			return land_parcel->getGroupID();
+		// Is the agent in the land group (the group owns the land)
+		else if (gAgent.isInGroup(land_parcel->getOwnerID()))
+			return land_parcel->getOwnerID();
+	}
+	return LLUUID::null;
+}
+
 // EOF

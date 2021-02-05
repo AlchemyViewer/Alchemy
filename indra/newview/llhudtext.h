@@ -131,6 +131,7 @@ public:
 	enum EObjectTextFilter { OTF_NONE, OTF_HUD_ATTACHMENTS };
 	static void        refreshAllObjectText(EObjectTextFilter eObjFilter = OTF_NONE);
 // [/RLVa:KB]
+	static void onFadeSettingsChanged();
 protected:
 	LLHUDText(const U8 type);
 
