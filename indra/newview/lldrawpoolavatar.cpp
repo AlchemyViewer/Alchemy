@@ -297,7 +297,15 @@ void LLDrawPoolAvatar::beginPostDeferredAlpha()
 {
 	sSkipOpaque = TRUE;
 	sShaderLevel = mShaderLevel;
-	sVertexProgram = &gDeferredAvatarAlphaProgram;
+	if (LLPipeline::sUnderWaterRender)
+	{
+		sVertexProgram = &gDeferredAvatarAlphaWaterProgram;
+	}
+	else
+	{
+		sVertexProgram = &gDeferredAvatarAlphaProgram;
+	}
+	
 	sRenderingSkinned = TRUE;
 
 	gPipeline.bindDeferredShader(*sVertexProgram);
@@ -309,7 +317,15 @@ void LLDrawPoolAvatar::beginPostDeferredAlpha()
 
 void LLDrawPoolAvatar::beginDeferredRiggedAlpha()
 {
-	sVertexProgram = &gDeferredSkinnedAlphaProgram;
+	if (LLPipeline::sUnderWaterRender)
+	{
+		sVertexProgram = &gDeferredSkinnedAlphaWaterProgram;
+	}
+	else
+	{
+		sVertexProgram = &gDeferredSkinnedAlphaProgram;
+	}
+
 	gPipeline.bindDeferredShader(*sVertexProgram);
 	sDiffuseChannel = sVertexProgram->enableTexture(LLViewerShaderMgr::DIFFUSE_MAP);
 	gPipeline.enableLightsDynamic();
