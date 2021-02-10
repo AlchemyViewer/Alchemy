@@ -1467,6 +1467,7 @@ BOOL LLViewerShaderMgr::loadShadersDeferred()
 		gDeferredSkinnedAlphaWaterProgram.mFeatures.hasAtmospherics = true;
 		gDeferredSkinnedAlphaWaterProgram.mFeatures.hasTransport = true;
 		gDeferredSkinnedAlphaWaterProgram.mFeatures.hasGamma = true;
+		gDeferredSkinnedAlphaWaterProgram.mFeatures.hasWaterFog = true;
 		gDeferredSkinnedAlphaWaterProgram.mFeatures.hasShadows = true;
 
 		gDeferredSkinnedAlphaWaterProgram.mShaderFiles.clear();
@@ -2634,6 +2635,7 @@ BOOL LLViewerShaderMgr::loadShadersDeferred()
 		gDeferredAvatarAlphaWaterProgram.mFeatures.hasAtmospherics = true;
 		gDeferredAvatarAlphaWaterProgram.mFeatures.hasTransport = true;
 		gDeferredAvatarAlphaWaterProgram.mFeatures.hasGamma = true;
+		gDeferredAvatarAlphaWaterProgram.mFeatures.hasWaterFog = true;
 		gDeferredAvatarAlphaWaterProgram.mFeatures.isDeferred = true;
 		gDeferredAvatarAlphaWaterProgram.mFeatures.hasShadows = true;
 
