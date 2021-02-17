@@ -84,6 +84,7 @@ LLFloaterTexturePicker::LLFloaterTexturePicker(
 	LLView* owner,
 	LLUUID image_asset_id,
 	LLUUID default_image_asset_id,
+	LLUUID transparent_image_asset_id,
 	LLUUID blank_image_asset_id,
 	BOOL tentative,
 	BOOL allow_no_texture,
@@ -99,6 +100,7 @@ LLFloaterTexturePicker::LLFloaterTexturePicker(
 	mOriginalImageAssetID(image_asset_id),
 	mFallbackImage(fallback_image),
 	mDefaultImageAssetID(default_image_asset_id),
+	mTransparentImageAssetID(transparent_image_asset_id),
 	mBlankImageAssetID(blank_image_asset_id),
 	mTentative(tentative),
 	mAllowNoTexture(allow_no_texture),
@@ -353,6 +355,7 @@ BOOL LLFloaterTexturePicker::postBuild()
 	childSetAction("Default",LLFloaterTexturePicker::onBtnSetToDefault,this);
 	childSetAction("None", LLFloaterTexturePicker::onBtnNone,this);
 	childSetAction("Blank", LLFloaterTexturePicker::onBtnBlank,this);
+	childSetAction("Transparent", LLFloaterTexturePicker::onBtnTransparent,this);
 
 
 	childSetCommitCallback("show_folders_check", onShowFolders, this);
@@ -408,6 +411,9 @@ BOOL LLFloaterTexturePicker::postBuild()
 	mLocalScrollCtrl = getChild<LLScrollListCtrl>("l_name_list");
 	mLocalScrollCtrl->setCommitCallback(onLocalScrollCommit, this);
 	LLLocalBitmapMgr::getInstance()->feedScrollList(mLocalScrollCtrl);
+
+	getChild<LLLineEditor>("uuid_editor")->setCommitCallback(boost::bind(&onApplyUUID, this));
+	getChild<LLButton>("apply_uuid_btn")->setClickedCallback(boost::bind(&onApplyUUID, this));
 
 	mNoCopyTextureSelected = FALSE;
 
@@ -483,6 +489,7 @@ void LLFloaterTexturePicker::draw()
 		}
 
 		getChildView("Default")->setEnabled(mImageAssetID != mDefaultImageAssetID || mTentative);
+		getChildView("Transparent")->setEnabled(mImageAssetID != mTransparentImageAssetID || mTentative);
 		getChildView("Blank")->setEnabled(mImageAssetID != mBlankImageAssetID || mTentative);
 		getChildView("None")->setEnabled(mAllowNoTexture && (!mImageAssetID.isNull() || mTentative));
 
@@ -637,6 +644,15 @@ void LLFloaterTexturePicker::onBtnSetToDefault(void* userdata)
 }
 
 // static
+void LLFloaterTexturePicker::onBtnTransparent(void* userdata)
+{
+	LLFloaterTexturePicker* self = (LLFloaterTexturePicker*) userdata;
+	self->setCanApply(true, true);
+	self->setImageID( self->getTransparentImageAssetID() );
+	self->commitIfImmediateSet();
+}
+
+// static
 void LLFloaterTexturePicker::onBtnBlank(void* userdata)
 {
 	LLFloaterTexturePicker* self = (LLFloaterTexturePicker*) userdata;
@@ -714,6 +730,18 @@ void LLFloaterTexturePicker::onBtnPipette()
 	}
 }
 
+// static
+void LLFloaterTexturePicker::onApplyUUID(void* userdata)
+{
+	LLFloaterTexturePicker* self = (LLFloaterTexturePicker*) userdata;
+	LLUUID id(self->getChild<LLLineEditor>("uuid_editor")->getText());
+	if (id.notNull())
+	{
+		self->setImageID(id);
+		self->commitIfImmediateSet();
+	}
+}
+
 void LLFloaterTexturePicker::onSelectionChange(const std::deque<LLFolderViewItem*> &items, BOOL user_action)
 {
 	if (items.size())
@@ -759,11 +787,14 @@ void LLFloaterTexturePicker::onModeSelect(LLUICtrl* ctrl, void *userdata)
     int index = self->mModeSelector->getValue().asInteger();
 
 	self->getChild<LLButton>("Default")->setVisible(index == 0 ? TRUE : FALSE);
+	self->getChild<LLButton>("Transparent")->setVisible(index == 0 ? TRUE : FALSE);
 	self->getChild<LLButton>("Blank")->setVisible(index == 0 ? TRUE : FALSE);
 	self->getChild<LLButton>("None")->setVisible(index == 0 ? TRUE : FALSE);
 	self->getChild<LLButton>("Pipette")->setVisible(index == 0 ? TRUE : FALSE);
 	self->getChild<LLFilterEditor>("inventory search editor")->setVisible(index == 0 ? TRUE : FALSE);
 	self->getChild<LLInventoryPanel>("inventory panel")->setVisible(index == 0 ? TRUE : FALSE);
+	self->getChild<LLLineEditor>("uuid_editor")->setVisible(index == 0 ? TRUE : FALSE);
+	self->getChild<LLButton>("apply_uuid_btn")->setVisible(index == 0 ? TRUE : FALSE);
 
 	/*self->getChild<LLCheckBox>("show_folders_check")->setVisible(mode);
 	  no idea under which conditions the above is even shown, needs testing. */
@@ -1161,6 +1192,9 @@ LLTextureCtrl::LLTextureCtrl(const LLTextureCtrl::Params& p)
 	mFallbackImage(p.fallback_image)
 {
 
+	LLUUID transparentImage( gSavedSettings.getString( "UIImgTransparentUUID" ) );
+	setTransparentImageAssetID( transparentImage );
+
 	// Default of defaults is white image for diff tex
 	//
 	LLUUID whiteImage( gSavedSettings.getString( "UIImgWhiteUUID" ) );
@@ -1321,6 +1355,7 @@ void LLTextureCtrl::showPicker(BOOL take_focus)
 			this,
 			getImageAssetID(),
 			getDefaultImageAssetID(),
+			getTransparentImageAssetID(),
 			getBlankImageAssetID(),
 			getTentative(),
 			getAllowNoTexture(),

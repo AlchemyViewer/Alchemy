@@ -161,6 +161,9 @@ public:
 
 	void			setOpenTexPreview(bool open_preview) { mOpenTexPreview = open_preview; }
 
+	void			setTransparentImageAssetID( const LLUUID& id )	{ mTransparentImageAssetID = id; }
+	const LLUUID&	getTransparentImageAssetID() const { return mTransparentImageAssetID; }
+
 	void			setCaption(const std::string& caption);
 	void			setCanApplyImmediately(BOOL b);
 
@@ -221,6 +224,7 @@ private:
 	LLUUID					 	mImageAssetID;
 	LLUUID					 	mDefaultImageAssetID;
 	LLUUID					 	mBlankImageAssetID;
+	LLUUID					 	mTransparentImageAssetID;
 	LLUIImagePtr				mFallbackImage;
 	std::string					mDefaultImageName;
 	LLHandle<LLFloater>			mFloaterHandle;
@@ -257,6 +261,7 @@ public:
 		LLView* owner,
 		LLUUID image_asset_id,
 		LLUUID default_image_asset_id,
+		LLUUID transparent_image_asset_id,
 		LLUUID blank_image_asset_id,
 		BOOL tentative,
 		BOOL allow_no_texture,
@@ -309,6 +314,7 @@ public:
 	void setSetImageAssetIDCallback(const set_image_asset_id_callback& cb) { mSetImageAssetIDCallback = cb; }
 	void setOnUpdateImageStatsCallback(const set_on_update_image_stats_callback& cb) { mOnUpdateImageStatsCallback = cb; }
 	const LLUUID& getDefaultImageAssetID() { return mDefaultImageAssetID; }
+	const LLUUID& getTransparentImageAssetID() { return mTransparentImageAssetID; }
 	const LLUUID& getBlankImageAssetID() { return mBlankImageAssetID; }
 
 	static void		onBtnSetToDefault(void* userdata);
@@ -316,9 +322,11 @@ public:
 	static void		onBtnCancel(void* userdata);
 	void			onBtnPipette();
 	//static void		onBtnRevert( void* userdata );
+	static void		onBtnTransparent(void* userdata);
 	static void		onBtnBlank(void* userdata);
 	static void		onBtnNone(void* userdata);
 	static void		onBtnClear(void* userdata);
+	static void		onApplyUUID(void* userdata);
 	void			onSelectionChange(const std::deque<LLFolderViewItem*> &items, BOOL user_action);
 	static void		onShowFolders(LLUICtrl* ctrl, void* userdata);
 	static void		onApplyImmediateCheck(LLUICtrl* ctrl, void* userdata);
@@ -343,6 +351,7 @@ protected:
 	LLUUID				mImageAssetID; // Currently selected texture
 	LLUIImagePtr		mFallbackImage; // What to show if currently selected texture is null.
 	LLUUID				mDefaultImageAssetID;
+	LLUUID				mTransparentImageAssetID;
 	LLUUID				mBlankImageAssetID;
 	BOOL				mTentative;
 	BOOL				mAllowNoTexture;

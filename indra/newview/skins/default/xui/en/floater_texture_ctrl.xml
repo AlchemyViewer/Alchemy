@@ -3,9 +3,9 @@
  legacy_header_height="18"
  can_minimize="false"
  can_resize="true"
- height="330"
+ height="375"
  layout="topleft"
- min_height="330"
+ min_height="375"
  min_width="410"
  name="texture picker"
  help_topic="texture_picker"
@@ -63,6 +63,10 @@
          value="0" />
       <combo_box.item
          label="Local"
+         left_pad="0"
+         layout="topleft"
+         top_delta="0" 
+         height="16" 
          name="local"
          value="1" />
       <combo_box.item
@@ -88,7 +92,7 @@
     <button
      enabled="false"
      follows="left|top"
-     height="18"
+     height="20"
      label="Default"
      label_selected="Default"
      layout="topleft"
@@ -96,6 +100,16 @@
      width="73"
 	 left="94"
      top="215"/>
+    <button
+     follows="left|top"
+     height="20"
+     label="Transparent"
+     label_selected="Transparent"
+     layout="topleft"
+     left_delta="0"
+     name="Transparent"
+     top_pad="5"
+     width="73" />
     <button
      follows="left|top"
      height="20"
@@ -123,21 +137,21 @@
      image_selected="eye_button_active.tga"
      image_unselected="eye_button_inactive.tga"
      layout="topleft"
-     left="18"
-     top_delta="-23"
+     left_delta="-80"
+     top_delta="-25"
      name="Pipette"
      width="28" />
    <text
      follows="left|bottom"
-     height="40"
+     height="20"
      layout="topleft"
      left="8"
      name="preview_disabled"
-     top="285"
+     top="266"
      value="Preview Disabled"
      word_wrap="true"
      visible="false"
-     width="87" />
+     width="120" />
     <filter_editor
      follows="left|top|right"
      height="23"
@@ -153,38 +167,57 @@
      bg_alpha_color="DkGray2"
      border="false"
      follows="all"
-     height="233"
+     height="262"
      layout="topleft"
      left_delta="0"
      name="inventory panel"
      top_pad="4"
-     width="231"
-     filter_asset_type="texture"/>
+     width="231" />
      <check_box
-     height="14"
+     visible="false"
+     height="0"
      initial_value="false"
      label="Show folders"
      layout="topleft"
      name="show_folders_check"
      top_pad="0"
      left_delta="-3"
-     width="200" />
+     width="0" />
+    <line_editor
+     follows="left|bottom|right"
+     layout="topleft"
+     name="uuid_editor"
+     label="Enter Texture UUID"
+     max_length_chars="36"
+     top_pad="7"
+     height="20"
+     width="296"
+     left="5" />
+    <button
+     follows="bottom|right"
+     layout="topleft"
+     name="apply_uuid_btn"
+     label="Apply Key"
+     left_pad="5"
+     top_delta="0"
+     height="20"
+     width="100" />
 
 <!--  middle: local mode -->
     <button
-     follows="left|top"
+     follows="left|bottom"
      height="18"
      label="Add"
      label_selected="Add"
      layout="topleft"
      left="94"
-     top="215"
+     top="272"
      name="l_add_btn"
      width="73"
      visible="false"/>
     <button
      enabled="false"
-     follows="left|top"
+     follows="left|bottom"
      height="20"
      label="Remove"
      label_selected="Remove"
@@ -196,7 +229,7 @@
      visible="false"/>
     <button
      enabled="false"
-     follows="left|top"
+     follows="left|bottom"
      height="20"
      label="Upload"
      label_selected="Upload"
@@ -209,9 +242,9 @@
     <scroll_list
      name="l_name_list"
      left="170"
-     top="22"
+     top="20"
      width="235"
-     height="260"
+     height="320"
      follows="left|top|right|bottom"
      column_padding="0"
      draw_heading="true"
@@ -298,22 +331,22 @@ layout="topleft"
      visible="false"/>
 <!-- bottom static -->
     <button
-     follows="bottom"
+     follows="bottom|right"
      height="20"
      label="OK"
      label_selected="OK"
      layout="topleft"
-     left="176"
+     left="-209"
      top="-30"
      name="Select"
      width="100" />
     <button
-     follows="bottom"
+     follows="bottom|right"
      height="20"
      label="Cancel"
      label_selected="Cancel"
      layout="topleft"
-     left_delta="120"
+     left_delta="105"
      top_delta="0"
      name="Cancel"
      width="100" />
@@ -326,5 +359,5 @@ layout="topleft"
      left="6"
      name="apply_immediate_check"
      top_delta="0"
-     width="150" />
+     width="120" />
 </floater>
