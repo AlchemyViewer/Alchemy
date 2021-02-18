@@ -774,6 +774,23 @@ void MediaPluginCEF::receiveMessage(const char* message_string)
 				}
 
 				keyEvent(key_event, native_key_data);
+
+#elif LL_LINUX
+				std::string event = message_in.getValue("event");
+				LLSD native_key_data = message_in.getValueLLSD("native_key_data");
+
+				// Treat unknown events as key-up for safety.
+				dullahan::EKeyEvent key_event = dullahan::KE_KEY_UP;
+				if (event == "down")
+				{
+					key_event = dullahan::KE_KEY_DOWN;
+				}
+				else if (event == "repeat")
+				{
+					key_event = dullahan::KE_KEY_REPEAT;
+				}
+
+				keyEvent(key_event, native_key_data);
 #endif
 			}
 			else if (message_name == "enable_media_plugin_debugging")
@@ -908,12 +925,12 @@ void MediaPluginCEF::keyEvent(dullahan::EKeyEvent key_event, LLSD native_key_dat
 
 	mCEFLib->nativeKeyboardEventWin(msg, wparam, lparam);
 #elif LL_LINUX
-	uint32_t native_scan_code = (uint32_t)(native_key_data["sdl_sym"].asInteger());
+	uint32_t native_scan_code = (uint32_t)(native_key_data["scan_code"].asInteger());
 	uint32_t native_virtual_key = (uint32_t)(native_key_data["virtual_key"].asInteger());
-	uint32_t native_modifiers = (uint32_t)(native_key_data["cef_modifiers"].asInteger());
+	uint32_t native_modifiers = (uint32_t)(native_key_data["modifiers"].asInteger());
 	if( native_scan_code == '\n' )
 		native_scan_code = '\r';
-	mCEFLib->nativeKeyboardEvent(key_event, native_scan_code, native_virtual_key, native_modifiers);
+	mCEFLib->nativeKeyboardEventSDL2(key_event, native_virtual_key, native_modifiers, false);
 #endif
 };
 
