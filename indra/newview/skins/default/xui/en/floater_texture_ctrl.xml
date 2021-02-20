@@ -172,6 +172,7 @@
      left_delta="0"
      name="inventory panel"
      top_pad="4"
+     filter_asset_type="texture"
      width="231" />
      <check_box
      visible="false"
