@@ -1353,6 +1353,7 @@ void LLOutfitGallery::onSelectPhoto(LLUUID selected_outfit_id)
                 getPhotoAssetId(selected_outfit_id),
                 getPhotoAssetId(selected_outfit_id),
                 getPhotoAssetId(selected_outfit_id),
+                getPhotoAssetId(selected_outfit_id),
                 FALSE,
                 TRUE,
                 "SELECT PHOTO",
