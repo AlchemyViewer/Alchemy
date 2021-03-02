@@ -16,7 +16,7 @@ include(LLCommon)
 include(LLImage)
 include(LLMath)
 include(LLRender)
-include(LLVFS)
+include(LLFileSystem)
 include(LLWindow)
 include(LLXML)
 include(UI)
@@ -27,7 +27,7 @@ include_directories(
     ${LLIMAGE_INCLUDE_DIRS}
     ${LLMATH_INCLUDE_DIRS}
     ${LLRENDER_INCLUDE_DIRS}
-    ${LLVFS_INCLUDE_DIRS}
+    ${LLFILESYSTEM_INCLUDE_DIRS}
     ${LLWINDOW_INCLUDE_DIRS}
     ${LLXML_INCLUDE_DIRS}
     )
@@ -73,7 +73,7 @@ if (LINUX)
       ${LLIMAGE_LIBRARIES}
       ${LLMATH_LIBRARIES}
       ${LLRENDER_LIBRARIES}
-      ${LLVFS_LIBRARIES}
+      ${LLFILESYSTEM_LIBRARIES}
       ${LLXML_LIBRARIES}
       ${UI_LIBRARIES}     # for GTK
       ${SDL_LIBRARIES}
@@ -95,7 +95,7 @@ if (LINUX)
         ${LLIMAGE_LIBRARIES}
         ${LLMATH_LIBRARIES}
         ${LLRENDER_HEADLESS_LIBRARIES}
-        ${LLVFS_LIBRARIES}
+        ${LLFILESYSTEM_LIBRARIES}
         ${LLWINDOW_HEADLESS_LIBRARIES}
         ${LLXML_LIBRARIES}
         fontconfig          # For FCInit and other FC* functions.

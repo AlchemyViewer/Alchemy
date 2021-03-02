@@ -689,7 +689,7 @@ LLVOAvatarSelf::~LLVOAvatarSelf()
  *********************************************************************************/
 
 // virtual
-BOOL LLVOAvatarSelf::updateCharacter(LLAgent &agent)
+bool LLVOAvatarSelf::updateCharacter(LLAgent &agent)
 {
 	// update screen joint size
 	if (mScreenp)
