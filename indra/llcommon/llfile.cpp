@@ -173,6 +173,70 @@ int warnif(const std::string& desc, const std::string& filename, int rc, int acc
 	return rc;
 }
 
+int warnif(const std::string& desc, const boost::filesystem::path& filename, int rc, int accept = 0)
+{
+	if (rc < 0)
+	{
+		// Capture errno before we start emitting output
+		int errn = errno;
+		// For certain operations, a particular errno value might be
+		// acceptable -- e.g. stat() could permit ENOENT, mkdir() could permit
+		// EEXIST. Don't warn if caller explicitly says this errno is okay.
+		if (errn != accept)
+		{
+#if LL_WINDOWS
+			LL_WARNS("LLFile") << "Couldn't " << desc << " '" << ll_convert_wide_to_string(filename.native())
+				<< "' (errno " << errn << "): " << strerr(errn) << LL_ENDL;
+#else
+			LL_WARNS("LLFile") << "Couldn't " << desc << " '" << filename.native()
+				<< "' (errno " << errn << "): " << strerr(errn) << LL_ENDL;
+#endif
+		}
+#if 0 && LL_WINDOWS                 // turn on to debug file-locking problems
+		// If the problem is "Permission denied," maybe it's because another
+		// process has the file open. Try to find out.
+		if (errn == EACCES)         // *not* EPERM
+		{
+			// Only do any of this stuff (before LL_ENDL) if it will be logged.
+			LL_DEBUGS("LLFile") << empty;
+			// would be nice to use LLDir for this, but dependency goes the
+			// wrong way
+			const char* TEMP = LLFile::tmpdir();
+			if (!(TEMP && *TEMP))
+			{
+				LL_CONT << "No $TEMP, not running 'handle'";
+			}
+			else
+			{
+				std::string tf(TEMP);
+				tf += "\\handle.tmp";
+				// http://technet.microsoft.com/en-us/sysinternals/bb896655
+				std::string cmd(STRINGIZE("handle \"" << filename
+					// "openfiles /query /v | fgrep -i \"" << filename
+					<< "\" > \"" << tf << '"'));
+				LL_CONT << cmd;
+				if (system(cmd.c_str()) != 0)
+				{
+					LL_CONT << "\nDownload 'handle.exe' from http://technet.microsoft.com/en-us/sysinternals/bb896655";
+				}
+				else
+				{
+					std::ifstream inf(tf);
+					std::string line;
+					while (std::getline(inf, line))
+					{
+						LL_CONT << '\n' << line;
+					}
+				}
+				LLFile::remove(tf);
+			}
+			LL_CONT << LL_ENDL;
+		}
+#endif  // LL_WINDOWS hack to identify processes holding file open
+	}
+	return rc;
+}
+
 // static
 int	LLFile::mkdir(const std::string& dirname, int perms)
 {
@@ -220,6 +284,16 @@ LLFILE*	LLFile::fopen(const std::string& filename, const char* mode)	/* Flawfind
 #endif
 }
 
+// static
+LLFILE* LLFile::fopen(const boost::filesystem::path& filename, MODE_T accessmode)	/* Flawfinder: ignore */
+{
+#if	LL_WINDOWS
+	return _wfopen(filename.c_str(), accessmode);
+#else
+	return ::fopen(filename.c_str(), accessmode);	/* Flawfinder: ignore */
+#endif
+}
+
 LLFILE*	LLFile::_fsopen(const std::string& filename, const char* mode, int sharingFlag)
 {
 #if	LL_WINDOWS
@@ -248,6 +322,16 @@ int	LLFile::remove(const std::string& filename, int supress_error)
 #if	LL_WINDOWS
 	std::wstring utf16filename = ll_convert_string_to_wide(filename);
 	int rc = _wremove(utf16filename.c_str());
+#else
+	int rc = ::remove(filename.c_str());
+#endif
+	return warnif("remove", filename, rc, supress_error);
+}
+
+int	LLFile::remove(const boost::filesystem::path& filename, int supress_error)
+{
+#if	LL_WINDOWS
+	int rc = _wremove(filename.c_str());
 #else
 	int rc = ::remove(filename.c_str());
 #endif
@@ -297,6 +381,48 @@ int	LLFile::rename(const std::string& filename, const std::string& newname, int 
 	return warnif(STRINGIZE("rename to '" << newname << "' from"), filename, rc, supress_error);
 }
 
+int	LLFile::rename(const boost::filesystem::path& filename, const boost::filesystem::path& newname, int supress_error)
+{
+#if	LL_WINDOWS
+	int rc = _wrename(filename.c_str(), newname.c_str());
+	return warnif(STRINGIZE("rename to '" << ll_convert_wide_to_string(newname.native()) << "' from"), filename, rc, supress_error);
+#else
+	int rc = ::rename(filename.c_str(), newname.c_str());
+	// Note: This workaround generalises the solution previously applied in llxfer_file.
+	// In doing this we add more failure modes to the operation, the copy can fail, the unlink can fail, in fact the copy can fail for multiple reasons.
+	// "A common mistake that people make when trying to design something completely foolproof is to underestimate the ingenuity of complete fools." - Douglas Adams, Mostly harmless
+	if (rc)
+	{
+		S32 error_number = errno;
+		LL_INFOS("LLFile") << "Rename failure (" << error_number << ") - " << filename << " to " << newname << LL_ENDL;
+		if (EXDEV == error_number)
+		{
+			if (copy(filename, newname) == true) // sigh in their wisdom LL decided that copy returns bool true not 0 whjen no error. using == true to make that clear.
+			{
+				LL_INFOS("LLFile") << "Rename across mounts not supported; copying+unlinking the file instead." << LL_ENDL;
+				rc = LLFile::remove(filename);
+				if (rc)
+				{
+					LL_WARNS("LLFile") << "unlink failed during copy/unlink workaround. Please check for stray file: " << filename << LL_ENDL;
+				}
+			}
+			else
+			{
+				LL_WARNS("LLFile") << "Copy failure during rename workaround for rename " << filename << " to " << newname << " (check both filenames and maunally rectify)" << LL_ENDL;
+			}
+			rc = 0; // We need to reset rc here to avoid the higher level function taking corrective action on what could be bad files. 
+		}
+		else
+		{
+			LL_WARNS("LLFile") << "Rename fatally failed, no workaround attempted for errno="
+				<< errno << "." << LL_ENDL;
+			// rc will propogate alllowing corrective action above. Not entirely happy with this but it is what already happens so we're not making it worse.
+		}
+	}
+	return warnif(STRINGIZE("rename to '" << newname << "' from"), filename, rc, supress_error);
+#endif
+}
+
 bool LLFile::copy(const std::string& from, const std::string& to)
 {
 	bool copied = false;
@@ -335,6 +461,18 @@ int	LLFile::stat(const std::string& filename, llstat* filestatus)
 	int rc = _wstat(utf16filename.c_str(),filestatus);
 #else
 	int rc = ::stat(filename.c_str(),filestatus);
+#endif
+	// We use stat() to determine existence (see isfile(), isdir()).
+	// Don't spam the log if the subject pathname doesn't exist.
+	return warnif("stat", filename, rc, ENOENT);
+}
+
+int	LLFile::stat(const boost::filesystem::path& filename, llstat* filestatus)
+{
+#if LL_WINDOWS
+	int rc = _wstat(filename.c_str(), filestatus);
+#else
+	int rc = ::stat(filename.c_str(), filestatus);
 #endif
 	// We use stat() to determine existence (see isfile(), isdir()).
 	// Don't spam the log if the subject pathname doesn't exist.

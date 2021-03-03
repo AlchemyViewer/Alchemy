@@ -34,6 +34,8 @@
 #include "llassettype.h"
 #include "lldiskcache.h"
 
+#include <boost/filesystem.hpp>
+
 class LLFileSystem
 {
     public:
@@ -52,19 +54,19 @@ class LLFileSystem
         S32 getMaxSize();
         BOOL rename(const LLUUID& new_id, const LLAssetType::EType new_type);
         BOOL remove();
+        BOOL exists();
 
         /**
          * Update the "last write time" of a file to "now". This must be called whenever a
          * file in the cache is read (not written) so that the last time the file was
          * accessed is up to date (This is used in the mechanism for purging the cache)
          */
-        void updateFileAccessTime(const std::string& file_path);
+        void updateFileAccessTime();
 
         static bool getExists(const LLUUID& file_id, const LLAssetType::EType file_type);
         static bool removeFile(const LLUUID& file_id, const LLAssetType::EType file_type);
         static bool renameFile(const LLUUID& old_file_id, const LLAssetType::EType old_file_type,
                                const LLUUID& new_file_id, const LLAssetType::EType new_file_type);
-        static S32 getFileSize(const LLUUID& file_id, const LLAssetType::EType file_type);
 
     public:
 		enum
@@ -76,8 +78,9 @@ class LLFileSystem
 		};
 
     protected:
-        LLAssetType::EType mFileType;
+        boost::filesystem::path mFilePath;
         LLUUID  mFileID;
+        LLAssetType::EType mFileType;
         S32     mPosition;
         S32     mMode;
         S32     mBytesRead;

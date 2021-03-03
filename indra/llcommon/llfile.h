@@ -58,11 +58,20 @@ typedef struct stat		llstat;
 
 #include "llstring.h" // safe char* -> std::string conversion
 
+#include <boost/filesystem.hpp>
+
+#if LL_WINDOWS
+#define MODE_T const wchar_t*
+#else
+#define MODE_T const char*
+#endif
+
 class LL_COMMON_API LLFile
 {
 public:
 	// All these functions take UTF8 path/filenames.
 	static	LLFILE*	fopen(const std::string& filename,const char* accessmode);	/* Flawfinder: ignore */
+	static	LLFILE* fopen(const boost::filesystem::path& filename, MODE_T accessmode);	/* Flawfinder: ignore */
 	static	LLFILE*	_fsopen(const std::string& filename,const char* accessmode,int	sharingFlag);
 
 	static	int		close(LLFILE * file);
@@ -74,10 +83,13 @@ public:
 
 	static	int		rmdir(const std::string& filename);
 	static	int		remove(const std::string& filename, int supress_error = 0);
+	static	int		remove(const boost::filesystem::path& filename, int supress_error = 0);
 	static	int		rename(const std::string& filename,const std::string& newname, int supress_error = 0);
+	static	int		rename(const boost::filesystem::path& filename, const boost::filesystem::path& newname, int supress_error = 0);
 	static  bool	copy(const std::string& from, const std::string& to);
 
-	static	int		stat(const std::string&	filename,llstat*	file_status);
+	static	int		stat(const std::string&	filename, llstat* file_status);
+	static	int		stat(const boost::filesystem::path& filename, llstat* file_status);
 	static	bool	isdir(const std::string&	filename);
 	static	bool	isfile(const std::string&	filename);
 	static	LLFILE *	_Fiopen(const std::string& filename, 

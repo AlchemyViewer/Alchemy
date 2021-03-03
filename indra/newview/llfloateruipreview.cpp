@@ -890,7 +890,7 @@ void LLFloaterUIPreview::displayFloater(BOOL click, S32 ID)
 	std::string full_path = getLocalizedDirectory() + path;
 	std::string floater_lang = "EN";
 	llstat dummy;
-	if(!LLFile::stat(full_path.c_str(), &dummy))	// if the file does not exist
+	if(!LLFile::stat(full_path, &dummy))	// if the file does not exist
 	{
 		floater_lang = getLocStr(ID);
 	}
@@ -965,7 +965,7 @@ void LLFloaterUIPreview::onClickEditFloater()
 
 		// stat file to see if it exists (some localized versions may not have it there are no diffs, and then we try to open an nonexistent file)
 		llstat dummy;
-		if(LLFile::stat(file_path.c_str(), &dummy))								// if the file does not exist
+		if(LLFile::stat(file_path, &dummy))								// if the file does not exist
 		{
 			popupAndPrintWarning("No file for this floater exists in the selected localization.  Opening the EN version instead.");
 			file_path = get_xui_dir() + mDelim + "en" + mDelim + file_name; // open the en version instead, by default
@@ -1119,7 +1119,7 @@ void LLFloaterUIPreview::onClickToggleDiffHighlighting()
 		}
 
 		llstat dummy;
-		if(LLFile::stat(path_in_textfield.c_str(), &dummy) && !error)			// check if the file exists (empty check is reduntant but useful for the informative error message)
+		if(LLFile::stat(path_in_textfield, &dummy) && !error)			// check if the file exists (empty check is reduntant but useful for the informative error message)
 		{
 			std::string warning = std::string("Unable to highlight differences because an invalid path to a difference file was provided:\"") + path_in_textfield + "\"";
 			popupAndPrintWarning(warning);
