@@ -48,10 +48,7 @@ LLFileSystem::LLFileSystem(const LLUUID& file_id, const LLAssetType::EType file_
 // static
 bool LLFileSystem::getExists(const LLUUID& file_id, const LLAssetType::EType file_type)
 {
-    std::string id_str;
-    file_id.toString(id_str);
-    const std::string extra_info = "";
-    const std::string filename = LLDiskCache::getInstance()->metaDataToFilepath(id_str, file_type, extra_info);
+    const std::string filename = LLDiskCache::getInstance()->metaDataToFilepath(file_id, file_type);
 
     llifstream file(filename, std::ios::binary);
     if (file.is_open())
@@ -65,10 +62,7 @@ bool LLFileSystem::getExists(const LLUUID& file_id, const LLAssetType::EType fil
 // static
 bool LLFileSystem::removeFile(const LLUUID& file_id, const LLAssetType::EType file_type)
 {
-    std::string id_str;
-    file_id.toString(id_str);
-    const std::string extra_info = "";
-    const std::string filename =  LLDiskCache::getInstance()->metaDataToFilepath(id_str, file_type, extra_info);
+    const std::string filename =  LLDiskCache::getInstance()->metaDataToFilepath(file_id, file_type);
 
     LLFile::remove(filename.c_str());
 
@@ -79,14 +73,8 @@ bool LLFileSystem::removeFile(const LLUUID& file_id, const LLAssetType::EType fi
 bool LLFileSystem::renameFile(const LLUUID& old_file_id, const LLAssetType::EType old_file_type,
                               const LLUUID& new_file_id, const LLAssetType::EType new_file_type)
 {
-    std::string old_id_str;
-    old_file_id.toString(old_id_str);
-    const std::string extra_info = "";
-    const std::string old_filename =  LLDiskCache::getInstance()->metaDataToFilepath(old_id_str, old_file_type, extra_info);
-
-    std::string new_id_str;
-    new_file_id.toString(new_id_str);
-    const std::string new_filename =  LLDiskCache::getInstance()->metaDataToFilepath(new_id_str, new_file_type, extra_info);
+    const std::string old_filename =  LLDiskCache::getInstance()->metaDataToFilepath(old_file_id, old_file_type);
+    const std::string new_filename =  LLDiskCache::getInstance()->metaDataToFilepath(new_file_id, new_file_type);
 
     // Rename needs the new file to not exist.
     LLFileSystem::removeFile(new_file_id, new_file_type);
@@ -97,7 +85,7 @@ bool LLFileSystem::renameFile(const LLUUID& old_file_id, const LLAssetType::ETyp
         // failed but the original code does not and doing so seems to
         // break a lot of things so we go with the flow...
         //return FALSE;
-        LL_WARNS() << "Failed to rename " << old_file_id << " to " << new_id_str << " reason: "  << strerror(errno) << LL_ENDL;
+        LL_WARNS() << "Failed to rename " << old_file_id << " to " << new_file_id << " reason: "  << strerror(errno) << LL_ENDL;
     }
 
     return TRUE;
@@ -106,10 +94,7 @@ bool LLFileSystem::renameFile(const LLUUID& old_file_id, const LLAssetType::ETyp
 // static
 S32 LLFileSystem::getFileSize(const LLUUID& file_id, const LLAssetType::EType file_type)
 {
-    std::string id_str;
-    file_id.toString(id_str);
-    const std::string extra_info = "";
-    const std::string filename =  LLDiskCache::getInstance()->metaDataToFilepath(id_str, file_type, extra_info);
+    const std::string filename = LLDiskCache::getInstance()->metaDataToFilepath(file_id, file_type);
 
     S32 file_size = 0;
     llifstream file(filename, std::ios::binary);
@@ -126,10 +111,7 @@ BOOL LLFileSystem::read(U8* buffer, S32 bytes)
 {
     BOOL success = TRUE;
 
-    std::string id;
-    mFileID.toString(id);
-    const std::string extra_info = "";
-    const std::string filename =  LLDiskCache::getInstance()->metaDataToFilepath(id, mFileType, extra_info);
+    const std::string filename = LLDiskCache::getInstance()->metaDataToFilepath(mFileID, mFileType);
 
     llifstream file(filename, std::ios::binary);
     if (file.is_open())
@@ -177,10 +159,7 @@ BOOL LLFileSystem::eof()
 
 BOOL LLFileSystem::write(const U8* buffer, S32 bytes)
 {
-    std::string id_str;
-    mFileID.toString(id_str);
-    const std::string extra_info = "";
-    const std::string filename =  LLDiskCache::getInstance()->metaDataToFilepath(id_str, mFileType, extra_info);
+    const std::string filename =  LLDiskCache::getInstance()->metaDataToFilepath(mFileID, mFileType);
 
     BOOL success = FALSE;
 

@@ -104,9 +104,8 @@ class LLDiskCache :
          * so many things had to be pushed back there to accomodate it, that I
          * decided to move it here.  Still not sure that's completely right.
          */
-        const std::string metaDataToFilepath(const std::string id,
-                                             LLAssetType::EType at,
-                                             const std::string extra_info);
+        const std::string metaDataToFilepath(const LLUUID& id,
+                                             LLAssetType::EType at);
 
         /**
          * Update the "last write time" of a file to "now". This must be called whenever a

@@ -179,11 +179,12 @@ const std::string LLDiskCache::assetTypeToString(LLAssetType::EType at)
     return std::string("UNKNOWN");
 }
 
-const std::string LLDiskCache::metaDataToFilepath(const std::string id,
-        LLAssetType::EType at,
-        const std::string extra_info)
+const std::string LLDiskCache::metaDataToFilepath(const LLUUID& id,
+        LLAssetType::EType at)
 {
-    return llformat("%s%s%s_%s_%s", mCacheDir.c_str(), gDirUtilp->getDirDelimiter().c_str(), mCacheFilenamePrefix.c_str(), id.c_str(), (extra_info.empty() ? "0" : extra_info.c_str()));
+    std::string uuidstr;
+    id.toString(uuidstr);
+    return llformat("%s%s%s_%s", mCacheDir.c_str(), gDirUtilp->getDirDelimiter().c_str(), mCacheFilenamePrefix.c_str(), uuidstr.c_str());
 }
 
 void LLDiskCache::updateFileAccessTime(const std::string file_path)
@@ -250,9 +251,9 @@ void LLDiskCache::clearCache()
      * likely just fine
      */
 #if LL_WINDOWS
-    std::wstring cache_path(ll_convert_string_to_wide(mCacheDir));
+    boost::filesystem::path cache_path(ll_convert_string_to_wide(mCacheDir));
 #else
-    std::string cache_path(mCacheDir);
+    boost::filesystem::path cache_path(mCacheDir);
 #endif
     if (boost::filesystem::is_directory(cache_path))
     {
@@ -283,9 +284,9 @@ uintmax_t LLDiskCache::dirFileSize(const std::string dir)
      * is an easy win.
      */
 #if LL_WINDOWS
-    std::wstring dir_path(ll_convert_string_to_wide(dir));
+    boost::filesystem::path dir_path(ll_convert_string_to_wide(dir));
 #else
-    std::string dir_path(dir);
+    boost::filesystem::path dir_path(dir);
 #endif
     if (boost::filesystem::is_directory(dir_path))
     {
