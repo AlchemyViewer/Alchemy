@@ -187,53 +187,6 @@ const std::string LLDiskCache::metaDataToFilepath(const LLUUID& id,
     return llformat("%s%s%s_%s", mCacheDir.c_str(), gDirUtilp->getDirDelimiter().c_str(), mCacheFilenamePrefix.c_str(), uuidstr.c_str());
 }
 
-void LLDiskCache::updateFileAccessTime(const std::string file_path)
-{
-    /**
-     * Threshold in time_t units that is used to decide if the last access time
-     * time of the file is updated or not. Added as a precaution for the concern
-     * outlined in SL-14582  about frequent writes on older SSDs reducing their
-     * lifespan. I think this is the right place for the threshold value - rather
-     * than it being a pref - do comment on that Jira if you disagree...
-     *
-     * Let's start with 1 hour in time_t units and see how that unfolds
-     */
-    const std::time_t time_threshold = 1 * 60 * 60;
-
-    // current time
-    const std::time_t cur_time = std::time(nullptr);
-
-#if LL_WINDOWS
-    std::wstring wpath = ll_convert_string_to_wide(file_path);
-
-    // file last write time
-    const std::time_t last_write_time = boost::filesystem::last_write_time(wpath);
-
-    // delta between cur time and last time the file was written
-    const std::time_t delta_time = cur_time - last_write_time;
-
-    // we only write the new value if the time in time_threshold has elapsed
-    // before the last one
-    if (delta_time > time_threshold)
-    {
-        boost::filesystem::last_write_time(wpath, cur_time);
-    }
-#else
-    // file last write time
-    const std::time_t last_write_time = boost::filesystem::last_write_time(file_path);
-
-    // delta between cur time and last time the file was written
-    const std::time_t delta_time = cur_time - last_write_time;
-
-    // we only write the new value if the time in time_threshold has elapsed
-    // before the last one
-    if (delta_time > time_threshold)
-    {
-        boost::filesystem::last_write_time(file_path, cur_time);
-    }
-#endif
-}
-
 const std::string LLDiskCache::getCacheInfo()
 {
     F32 max_in_mb = (F32)mMaxSizeBytes / (1024.0 * 1024.0);

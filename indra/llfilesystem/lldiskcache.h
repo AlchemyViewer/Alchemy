@@ -108,13 +108,6 @@ class LLDiskCache :
                                              LLAssetType::EType at);
 
         /**
-         * Update the "last write time" of a file to "now". This must be called whenever a
-         * file in the cache is read (not written) so that the last time the file was
-         * accessed is up to date (This is used in the mechanism for purging the cache)
-         */
-        void updateFileAccessTime(const std::string file_path);
-
-        /**
          * Purge the oldest items in the cache so that the combined size of all files
          * is no bigger than mMaxSizeBytes.
          */
