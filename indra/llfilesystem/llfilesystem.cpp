@@ -34,6 +34,8 @@
 #include "llfasttimer.h"
 #include "lldiskcache.h"
 
+#include <boost/filesystem.hpp>
+
 static LLTrace::BlockTimerStatHandle FTM_VFILE_WAIT("VFile Wait");
 
 LLFileSystem::LLFileSystem(const LLUUID& file_id, const LLAssetType::EType file_type, S32 mode)
