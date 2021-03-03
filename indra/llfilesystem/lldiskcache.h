@@ -139,6 +139,12 @@ class LLDiskCache :
          */
         const std::string assetTypeToString(LLAssetType::EType at);
 
+        /**
+         * Utility function to create the cache directory structure
+         */
+        void createCache();
+
+
     private:
         /**
          * The maximum size of the cache in bytes. After purge is called, the
@@ -156,14 +162,14 @@ class LLDiskCache :
         std::string mCacheDir;
 
         /**
-         * The prefix inserted at the start of a cache file filename to
+         * The extension inserted at the end of a cache file filename to
          * help identify it as a cache file. It's probably not required
          * (just the presence in the cache folder is enough) but I am
          * paranoid about the cache folder being set to something bad
          * like the users' OS system dir by mistake or maliciously and
          * this will help to offset any damage if that happens.
          */
-        std::string mCacheFilenamePrefix;
+        std::string mCacheFilenameExt;
 
         /**
          * When enabled, displays additional debugging information in

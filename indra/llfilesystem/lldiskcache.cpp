@@ -46,9 +46,19 @@ LLDiskCache::LLDiskCache(const std::string cache_dir,
     mMaxSizeBytes(max_size_bytes),
     mEnableCacheDebugInfo(enable_cache_debug_info)
 {
-    mCacheFilenamePrefix = "sl_cache";
+    mCacheFilenameExt = ".sl_cache";
 
-    LLFile::mkdir(cache_dir);
+    createCache();
+}
+
+void LLDiskCache::createCache()
+{
+    LLFile::mkdir(mCacheDir);
+    std::vector<std::string> uuidprefix = { "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "a", "b", "c", "d", "e", "f" };
+    for (auto& prefixchar : uuidprefix)
+    {
+        LLFile::mkdir(absl::StrCat(mCacheDir, gDirUtilp->getDirDelimiter(), prefixchar));
+    }
 }
 
 void LLDiskCache::purge()
@@ -70,11 +80,11 @@ void LLDiskCache::purge()
 #endif
     if (boost::filesystem::is_directory(cache_path))
     {
-        for (auto& entry : boost::make_iterator_range(boost::filesystem::directory_iterator(cache_path), {}))
+        for (auto& entry : boost::make_iterator_range(boost::filesystem::recursive_directory_iterator(cache_path), {}))
         {
             if (boost::filesystem::is_regular_file(entry))
             {
-                if (entry.path().string().find(mCacheFilenamePrefix) != std::string::npos)
+                if (entry.path().string().rfind(mCacheFilenameExt) != std::string::npos)
                 {
                     uintmax_t file_size = boost::filesystem::file_size(entry);
                     const std::string file_path = entry.path().string();
@@ -182,9 +192,9 @@ const std::string LLDiskCache::assetTypeToString(LLAssetType::EType at)
 const std::string LLDiskCache::metaDataToFilepath(const LLUUID& id,
         LLAssetType::EType at)
 {
-    std::string uuidstr;
-    id.toString(uuidstr);
-    return llformat("%s%s%s_%s", mCacheDir.c_str(), gDirUtilp->getDirDelimiter().c_str(), mCacheFilenamePrefix.c_str(), uuidstr.c_str());
+    std::string uuidstr = id.asString();
+    const auto& dirdelim = gDirUtilp->getDirDelimiter();
+    return absl::StrCat(mCacheDir, dirdelim, absl::string_view(&uuidstr[0], 1), dirdelim, uuidstr, mCacheFilenameExt);
 }
 
 const std::string LLDiskCache::getCacheInfo()
@@ -210,16 +220,9 @@ void LLDiskCache::clearCache()
 #endif
     if (boost::filesystem::is_directory(cache_path))
     {
-        for (auto& entry : boost::make_iterator_range(boost::filesystem::directory_iterator(cache_path), {}))
-        {
-            if (boost::filesystem::is_regular_file(entry))
-            {
-                if (entry.path().string().find(mCacheFilenamePrefix) != std::string::npos)
-                {
-                    boost::filesystem::remove(entry);
-                }
-            }
-        }
+        boost::filesystem::remove_all(cache_path);
+
+        createCache();
     }
 }
 
@@ -243,11 +246,11 @@ uintmax_t LLDiskCache::dirFileSize(const std::string dir)
 #endif
     if (boost::filesystem::is_directory(dir_path))
     {
-        for (auto& entry : boost::make_iterator_range(boost::filesystem::directory_iterator(dir_path), {}))
+        for (auto& entry : boost::make_iterator_range(boost::filesystem::recursive_directory_iterator(dir_path), {}))
         {
             if (boost::filesystem::is_regular_file(entry))
             {
-                if (entry.path().string().find(mCacheFilenamePrefix) != std::string::npos)
+                if (entry.path().string().rfind(mCacheFilenameExt) != std::string::npos)
                 {
                     total_file_size += boost::filesystem::file_size(entry);
                 }
