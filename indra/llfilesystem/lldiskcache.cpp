@@ -183,24 +183,7 @@ const std::string LLDiskCache::metaDataToFilepath(const std::string id,
         LLAssetType::EType at,
         const std::string extra_info)
 {
-    std::ostringstream file_path;
-
-    file_path << mCacheDir;
-    file_path << gDirUtilp->getDirDelimiter();
-    file_path << mCacheFilenamePrefix;
-    file_path << "_";
-    file_path << id;
-    file_path << "_";
-    file_path << (extra_info.empty() ? "0" : extra_info);
-    //file_path << "_";
-    //file_path << assetTypeToString(at); // see  SL-14210 Prune descriptive tag from new cache filenames
-                                          // for details of why it was removed. Note that if you put it
-                                          // back or change the format of the filename, the cache files
-                                          // files will be invalidated (and perhaps, more importantly,
-                                          // never deleted unless you delete them manually).
-    file_path << ".asset";
-
-    return file_path.str();
+    return llformat("%s%s%s_%s_%s", mCacheDir.c_str(), gDirUtilp->getDirDelimiter().c_str(), mCacheFilenamePrefix.c_str(), id.c_str(), (extra_info.empty() ? "0" : extra_info.c_str()));
 }
 
 void LLDiskCache::updateFileAccessTime(const std::string file_path)
@@ -252,17 +235,10 @@ void LLDiskCache::updateFileAccessTime(const std::string file_path)
 
 const std::string LLDiskCache::getCacheInfo()
 {
-    std::ostringstream cache_info;
-
     F32 max_in_mb = (F32)mMaxSizeBytes / (1024.0 * 1024.0);
     F32 percent_used = ((F32)dirFileSize(mCacheDir) / (F32)mMaxSizeBytes) * 100.0;
 
-    cache_info << std::fixed;
-    cache_info << std::setprecision(1);
-    cache_info << "Max size " << max_in_mb << " MB ";
-    cache_info << "(" << percent_used << "% used)";
-
-    return cache_info.str();
+    return llformat("Max size %1.f MB (%.1f %% used)", max_in_mb, percent_used);
 }
 
 void LLDiskCache::clearCache()
