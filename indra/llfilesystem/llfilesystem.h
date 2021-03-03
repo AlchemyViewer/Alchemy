@@ -38,7 +38,7 @@ class LLFileSystem
 {
     public:
         LLFileSystem(const LLUUID& file_id, const LLAssetType::EType file_type, S32 mode = LLFileSystem::READ);
-        ~LLFileSystem();
+        ~LLFileSystem() = default;
 
         BOOL read(U8* buffer, S32 bytes);
         S32  getLastBytesRead();
@@ -60,10 +60,13 @@ class LLFileSystem
         static S32 getFileSize(const LLUUID& file_id, const LLAssetType::EType file_type);
 
     public:
-        static const S32 READ;
-        static const S32 WRITE;
-        static const S32 READ_WRITE;
-        static const S32 APPEND;
+		enum
+		{
+			READ = 0x00000001,
+			WRITE = 0x00000002,
+			READ_WRITE = 0x00000003,  // LLFileSystem::READ & LLFileSystem::WRITE
+			APPEND = 0x00000006,  // 0x00000004 & LLFileSystem::WRITE
+		};
 
     protected:
         LLAssetType::EType mFileType;
