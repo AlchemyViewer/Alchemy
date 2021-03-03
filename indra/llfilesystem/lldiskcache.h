@@ -104,7 +104,7 @@ class LLDiskCache :
          * so many things had to be pushed back there to accomodate it, that I
          * decided to move it here.  Still not sure that's completely right.
          */
-        const std::string metaDataToFilepath(const LLUUID& id,
+        static const std::string metaDataToFilepath(const LLUUID& id,
                                              LLAssetType::EType at);
 
         /**
@@ -159,7 +159,7 @@ class LLDiskCache :
          * setting could potentially point it at a non-cache directory (for example,
          * the Windows System dir) with disastrous results.
          */
-        std::string mCacheDir;
+        static std::string sCacheDir;
 
         /**
          * The extension inserted at the end of a cache file filename to
@@ -169,7 +169,7 @@ class LLDiskCache :
          * like the users' OS system dir by mistake or maliciously and
          * this will help to offset any damage if that happens.
          */
-        std::string mCacheFilenameExt;
+        static std::string sCacheFilenameExt;
 
         /**
          * When enabled, displays additional debugging information in

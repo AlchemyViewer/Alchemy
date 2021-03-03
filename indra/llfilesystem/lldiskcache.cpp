@@ -39,25 +39,27 @@
 
 #include "lldiskcache.h"
 
+std::string LLDiskCache::sCacheDir = "";
+std::string LLDiskCache::sCacheFilenameExt = ".sl_cache";
+
 LLDiskCache::LLDiskCache(const std::string cache_dir,
                          const int max_size_bytes,
                          const bool enable_cache_debug_info) :
-    mCacheDir(cache_dir),
     mMaxSizeBytes(max_size_bytes),
     mEnableCacheDebugInfo(enable_cache_debug_info)
 {
-    mCacheFilenameExt = ".sl_cache";
+    sCacheDir = cache_dir;
 
     createCache();
 }
 
 void LLDiskCache::createCache()
 {
-    LLFile::mkdir(mCacheDir);
+    LLFile::mkdir(sCacheDir);
     std::vector<std::string> uuidprefix = { "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "a", "b", "c", "d", "e", "f" };
     for (auto& prefixchar : uuidprefix)
     {
-        LLFile::mkdir(absl::StrCat(mCacheDir, gDirUtilp->getDirDelimiter(), prefixchar));
+        LLFile::mkdir(absl::StrCat(sCacheDir, gDirUtilp->getDirDelimiter(), prefixchar));
     }
 }
 
@@ -65,7 +67,7 @@ void LLDiskCache::purge()
 {
     if (mEnableCacheDebugInfo)
     {
-        LL_INFOS() << "Total dir size before purge is " << dirFileSize(mCacheDir) << LL_ENDL;
+        LL_INFOS() << "Total dir size before purge is " << dirFileSize(sCacheDir) << LL_ENDL;
     }
 
     auto start_time = std::chrono::high_resolution_clock::now();
@@ -74,7 +76,7 @@ void LLDiskCache::purge()
     std::vector<file_info_t> file_info;
 
 #if LL_WINDOWS
-    std::wstring cache_path(ll_convert_string_to_wide(mCacheDir));
+    std::wstring cache_path(ll_convert_string_to_wide(sCacheDir));
 #else
     std::string cache_path(mCacheDir);
 #endif
@@ -84,7 +86,7 @@ void LLDiskCache::purge()
         {
             if (boost::filesystem::is_regular_file(entry))
             {
-                if (entry.path().string().rfind(mCacheFilenameExt) != std::string::npos)
+                if (entry.path().string().rfind(sCacheFilenameExt) != std::string::npos)
                 {
                     uintmax_t file_size = boost::filesystem::file_size(entry);
                     const std::string file_path = entry.path().string();
@@ -137,7 +139,7 @@ void LLDiskCache::purge()
     {
         auto end_time = std::chrono::high_resolution_clock::now();
         auto execute_time = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
-        LL_INFOS() << "Total dir size after purge is " << dirFileSize(mCacheDir) << LL_ENDL;
+        LL_INFOS() << "Total dir size after purge is " << dirFileSize(sCacheDir) << LL_ENDL;
         LL_INFOS() << "Cache purge took " << execute_time << " ms to execute for " << file_info.size() << " files" << LL_ENDL;
     }
 }
@@ -189,18 +191,19 @@ const std::string LLDiskCache::assetTypeToString(LLAssetType::EType at)
     return std::string("UNKNOWN");
 }
 
+// static
 const std::string LLDiskCache::metaDataToFilepath(const LLUUID& id,
         LLAssetType::EType at)
 {
     std::string uuidstr = id.asString();
     const auto& dirdelim = gDirUtilp->getDirDelimiter();
-    return absl::StrCat(mCacheDir, dirdelim, absl::string_view(&uuidstr[0], 1), dirdelim, uuidstr, mCacheFilenameExt);
+    return absl::StrCat(sCacheDir, dirdelim, absl::string_view(&uuidstr[0], 1), dirdelim, uuidstr, sCacheFilenameExt);
 }
 
 const std::string LLDiskCache::getCacheInfo()
 {
     F32 max_in_mb = (F32)mMaxSizeBytes / (1024.0 * 1024.0);
-    F32 percent_used = ((F32)dirFileSize(mCacheDir) / (F32)mMaxSizeBytes) * 100.0;
+    F32 percent_used = ((F32)dirFileSize(sCacheDir) / (F32)mMaxSizeBytes) * 100.0;
 
     return llformat("Max size %1.f MB (%.1f %% used)", max_in_mb, percent_used);
 }
@@ -214,7 +217,7 @@ void LLDiskCache::clearCache()
      * likely just fine
      */
 #if LL_WINDOWS
-    boost::filesystem::path cache_path(ll_convert_string_to_wide(mCacheDir));
+    boost::filesystem::path cache_path(ll_convert_string_to_wide(sCacheDir));
 #else
     boost::filesystem::path cache_path(mCacheDir);
 #endif
@@ -250,7 +253,7 @@ uintmax_t LLDiskCache::dirFileSize(const std::string dir)
         {
             if (boost::filesystem::is_regular_file(entry))
             {
-                if (entry.path().string().rfind(mCacheFilenameExt) != std::string::npos)
+                if (entry.path().string().rfind(sCacheFilenameExt) != std::string::npos)
                 {
                     total_file_size += boost::filesystem::file_size(entry);
                 }

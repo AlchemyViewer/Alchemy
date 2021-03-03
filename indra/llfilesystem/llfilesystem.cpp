@@ -50,7 +50,7 @@ LLFileSystem::LLFileSystem(const LLUUID& file_id, const LLAssetType::EType file_
 // static
 bool LLFileSystem::getExists(const LLUUID& file_id, const LLAssetType::EType file_type)
 {
-    const std::string filename = LLDiskCache::getInstance()->metaDataToFilepath(file_id, file_type);
+    const std::string filename = LLDiskCache::metaDataToFilepath(file_id, file_type);
 
     llstat stat;
     if (LLFile::stat(filename, &stat) == 0)
@@ -63,7 +63,7 @@ bool LLFileSystem::getExists(const LLUUID& file_id, const LLAssetType::EType fil
 // static
 bool LLFileSystem::removeFile(const LLUUID& file_id, const LLAssetType::EType file_type)
 {
-    const std::string filename =  LLDiskCache::getInstance()->metaDataToFilepath(file_id, file_type);
+    const std::string filename =  LLDiskCache::metaDataToFilepath(file_id, file_type);
 
     LLFile::remove(filename, ENOENT);
 
@@ -74,8 +74,8 @@ bool LLFileSystem::removeFile(const LLUUID& file_id, const LLAssetType::EType fi
 bool LLFileSystem::renameFile(const LLUUID& old_file_id, const LLAssetType::EType old_file_type,
                               const LLUUID& new_file_id, const LLAssetType::EType new_file_type)
 {
-    const std::string old_filename =  LLDiskCache::getInstance()->metaDataToFilepath(old_file_id, old_file_type);
-    const std::string new_filename =  LLDiskCache::getInstance()->metaDataToFilepath(new_file_id, new_file_type);
+    const std::string old_filename =  LLDiskCache::metaDataToFilepath(old_file_id, old_file_type);
+    const std::string new_filename =  LLDiskCache::metaDataToFilepath(new_file_id, new_file_type);
 
     // Rename needs the new file to not exist.
     LLFile::remove(new_filename, ENOENT);
@@ -95,7 +95,7 @@ bool LLFileSystem::renameFile(const LLUUID& old_file_id, const LLAssetType::ETyp
 // static
 S32 LLFileSystem::getFileSize(const LLUUID& file_id, const LLAssetType::EType file_type)
 {
-    const std::string filename = LLDiskCache::getInstance()->metaDataToFilepath(file_id, file_type);
+    const std::string filename = LLDiskCache::metaDataToFilepath(file_id, file_type);
 
     S32 file_size = 0;
     llstat stat;
@@ -111,7 +111,7 @@ BOOL LLFileSystem::read(U8* buffer, S32 bytes)
 {
     BOOL success = TRUE;
 
-    const std::string filename = LLDiskCache::getInstance()->metaDataToFilepath(mFileID, mFileType);
+    const std::string filename = LLDiskCache::metaDataToFilepath(mFileID, mFileType);
 
     LLUniqueFile filep = LLFile::fopen(filename, "rb");
     if (filep)
@@ -175,7 +175,7 @@ BOOL LLFileSystem::eof()
 
 BOOL LLFileSystem::write(const U8* buffer, S32 bytes)
 {
-    const std::string filename =  LLDiskCache::getInstance()->metaDataToFilepath(mFileID, mFileType);
+    const std::string filename =  LLDiskCache::metaDataToFilepath(mFileID, mFileType);
 
     BOOL success = FALSE;
 
