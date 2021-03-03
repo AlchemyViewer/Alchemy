@@ -72,7 +72,7 @@ void LLDiskCache::purge()
 
     auto start_time = std::chrono::high_resolution_clock::now();
 
-    typedef std::pair<std::time_t, std::pair<uintmax_t, std::string>> file_info_t;
+    typedef std::pair<std::time_t, std::pair<uintmax_t, boost::filesystem::path>> file_info_t;
     std::vector<file_info_t> file_info;
 
 #if LL_WINDOWS
@@ -89,16 +89,15 @@ void LLDiskCache::purge()
                 if (entry.path().string().rfind(sCacheFilenameExt) != std::string::npos)
                 {
                     uintmax_t file_size = boost::filesystem::file_size(entry);
-                    const std::string file_path = entry.path().string();
                     const std::time_t file_time = boost::filesystem::last_write_time(entry);
 
-                    file_info.push_back(file_info_t(file_time, { file_size, file_path }));
+                    file_info.push_back(file_info_t(file_time, { file_size, entry.path() }));
                 }
             }
         }
     }
 
-    std::sort(file_info.begin(), file_info.end(), [](file_info_t& x, file_info_t& y)
+    std::sort(file_info.begin(), file_info.end(), [](const file_info_t& x, const file_info_t& y)
     {
         return x.first > y.first;
     });
@@ -106,19 +105,15 @@ void LLDiskCache::purge()
     LL_INFOS() << "Purging cache to a maximum of " << mMaxSizeBytes << " bytes" << LL_ENDL;
 
     uintmax_t file_size_total = 0;
-    for (file_info_t& entry : file_info)
+    for (const file_info_t& entry : file_info)
     {
         file_size_total += entry.second.first;
 
-        std::string action = "";
+        bool remove_file = false;
         if (file_size_total > mMaxSizeBytes)
         {
-            action = "DELETE:";
+            remove_file = true;
             boost::filesystem::remove(entry.second.second);
-        }
-        else
-        {
-            action = "  KEEP:";
         }
 
         if (mEnableCacheDebugInfo)
@@ -126,7 +121,7 @@ void LLDiskCache::purge()
             // have to do this because of LL_INFO/LL_END weirdness
             std::ostringstream line;
 
-            line << action << "  ";
+            line << (remove_file ? "DELETE:" : "  KEEP:" ) << "  ";
             line << entry.first << "  ";
             line << entry.second.first << "  ";
             line << entry.second.second;
