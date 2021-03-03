@@ -52,11 +52,10 @@ bool LLFileSystem::getExists(const LLUUID& file_id, const LLAssetType::EType fil
 {
     const std::string filename = LLDiskCache::getInstance()->metaDataToFilepath(file_id, file_type);
 
-    llifstream file(filename, std::ios::binary);
-    if (file.is_open())
+    llstat stat;
+    if (LLFile::stat(filename, &stat) == 0)
     {
-        file.seekg(0, std::ios::end);
-        return file.tellg() > 0;
+        return S_ISREG(stat.st_mode) && stat.st_size > 0;
     }
     return false;
 }
@@ -99,11 +98,10 @@ S32 LLFileSystem::getFileSize(const LLUUID& file_id, const LLAssetType::EType fi
     const std::string filename = LLDiskCache::getInstance()->metaDataToFilepath(file_id, file_type);
 
     S32 file_size = 0;
-    llifstream file(filename, std::ios::binary);
-    if (file.is_open())
+    llstat stat;
+    if (LLFile::stat(filename, &stat) == 0)
     {
-        file.seekg(0, std::ios::end);
-        file_size = file.tellg();
+        file_size = stat.st_size;
     }
 
     return file_size;
@@ -115,29 +113,45 @@ BOOL LLFileSystem::read(U8* buffer, S32 bytes)
 
     const std::string filename = LLDiskCache::getInstance()->metaDataToFilepath(mFileID, mFileType);
 
-    llifstream file(filename, std::ios::binary);
-    if (file.is_open())
+    LLUniqueFile filep = LLFile::fopen(filename, "rb");
+    if (filep)
     {
-        file.seekg(mPosition, std::ios::beg);
-
-        file.read((char*)buffer, bytes);
-
-        if (file)
+        fseek(filep, mPosition, SEEK_SET);
+        if (fread((void*)buffer, bytes, 1, filep) > 0)
         {
             mBytesRead = bytes;
         }
         else
         {
-            mBytesRead = file.gcount();
+            fseek(filep, 0L, SEEK_END);
+            long fsize = ftell(filep);
+            fseek(filep, mPosition, SEEK_SET);
+            if (mPosition < fsize)
+            {
+                long rsize = fsize - mPosition;
+                if (fread((void*)buffer, rsize, 1, filep) > 0)
+                {
+                    mBytesRead = rsize;
+                }
+                else
+                {
+                    success = FALSE;
+                }
+            }
+            else
+            {
+                success = FALSE;
+            }
         }
 
-        file.close();
+        if (!success)
+        {
+            mBytesRead = 0;
+        }
+
+        filep.close();
 
         mPosition += mBytesRead;
-        if (!mBytesRead)
-        {
-            success = FALSE;
-        }
     }
 
     // update the last access time for the file - this is required
@@ -167,20 +181,20 @@ BOOL LLFileSystem::write(const U8* buffer, S32 bytes)
 
     if (mMode == APPEND)
     {
-        llofstream ofs(filename, std::ios::app | std::ios::binary);
-        if (ofs)
+        LLUniqueFile filep = LLFile::fopen(filename, "ab");
+        if (filep)
         {
-            ofs.write((const char*)buffer, bytes);
+            fwrite((const void*)buffer, bytes, 1, filep);
 
             success = TRUE;
         }
     }
     else
     {
-        llofstream ofs(filename, std::ios::binary);
-        if (ofs)
+        LLUniqueFile filep = LLFile::fopen(filename, "wb");
+        if (filep)
         {
-            ofs.write((const char*)buffer, bytes);
+            fwrite((const void*)buffer, bytes, 1, filep);
 
             mPosition += bytes;
 
