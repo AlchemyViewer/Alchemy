@@ -64,7 +64,7 @@ void LLDiskCache::purge()
     std::vector<file_info_t> file_info;
 
 #if LL_WINDOWS
-    std::wstring cache_path(utf8str_to_utf16str(mCacheDir));
+    std::wstring cache_path(ll_convert_string_to_wide(mCacheDir));
 #else
     std::string cache_path(mCacheDir);
 #endif
@@ -220,8 +220,10 @@ void LLDiskCache::updateFileAccessTime(const std::string file_path)
     const std::time_t cur_time = std::time(nullptr);
 
 #if LL_WINDOWS
+    std::wstring wpath = ll_convert_string_to_wide(file_path);
+
     // file last write time
-    const std::time_t last_write_time = boost::filesystem::last_write_time(utf8str_to_utf16str(file_path));
+    const std::time_t last_write_time = boost::filesystem::last_write_time(wpath);
 
     // delta between cur time and last time the file was written
     const std::time_t delta_time = cur_time - last_write_time;
@@ -230,7 +232,7 @@ void LLDiskCache::updateFileAccessTime(const std::string file_path)
     // before the last one
     if (delta_time > time_threshold)
     {
-        boost::filesystem::last_write_time(utf8str_to_utf16str(file_path), cur_time);
+        boost::filesystem::last_write_time(wpath, cur_time);
     }
 #else
     // file last write time
@@ -272,7 +274,7 @@ void LLDiskCache::clearCache()
      * likely just fine
      */
 #if LL_WINDOWS
-    std::wstring cache_path(utf8str_to_utf16str(mCacheDir));
+    std::wstring cache_path(ll_convert_string_to_wide(mCacheDir));
 #else
     std::string cache_path(mCacheDir);
 #endif
@@ -305,7 +307,7 @@ uintmax_t LLDiskCache::dirFileSize(const std::string dir)
      * is an easy win.
      */
 #if LL_WINDOWS
-    std::wstring dir_path(utf8str_to_utf16str(dir));
+    std::wstring dir_path(ll_convert_string_to_wide(dir));
 #else
     std::string dir_path(dir);
 #endif

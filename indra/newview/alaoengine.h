@@ -186,9 +186,10 @@ protected:
 	void onRegionChange();
 
 	void onToggleAOControl();
-	static void onNotecardLoadComplete(LLVFS* vfs, const LLUUID& assetUUID, LLAssetType::EType type,
+	static void onNotecardLoadComplete(const LLUUID& assetUUID, LLAssetType::EType type,
 												void* userdata, S32 status, LLExtStat extStatus);
-	void parseNotecard(std::unique_ptr<char[]>&& buffer);
+
+	void parseNotecard(std::unique_ptr<char[]> buffer);
 
 	updated_signal_t mUpdatedSignal;
 	animation_changed_signal_t mAnimationChangedSignal;

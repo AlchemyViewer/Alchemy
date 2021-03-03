@@ -71,7 +71,7 @@ target_link_libraries(llfilesystem
     )
 
 if (WINDOWS)
-  target_link_libraries(llvfs Shlwapi)
+  target_link_libraries(llfilesystem Shlwapi)
 endif (WINDOWS)
 
 if (DARWIN)

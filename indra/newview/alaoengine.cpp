@@ -25,7 +25,6 @@
 
 #include "llviewerprecompiledheaders.h"
 
-
 #include "roles_constants.h"
 
 #include "alaoengine.h"
@@ -35,11 +34,11 @@
 #include "llagentcamera.h"
 #include "llanimationstates.h"
 #include "llassetstorage.h"
+#include "llfilesystem.h"
 #include "llinventorydefines.h"
 #include "llinventoryfunctions.h"
 #include "llinventorymodel.h"
 #include "llnotificationsutil.h"
-#include "llvfs.h"
 #include "llviewercontrol.h"
 #include "llviewerinventory.h"
 #include "llviewerobjectlist.h"
@@ -1667,7 +1666,7 @@ bool ALAOEngine::importNotecard(const LLInventoryItem* item)
 }
 
 // static
-void ALAOEngine::onNotecardLoadComplete(LLVFS* vfs, const LLUUID& assetUUID, LLAssetType::EType type,
+void ALAOEngine::onNotecardLoadComplete(const LLUUID& assetUUID, LLAssetType::EType type,
 											void* userdata, S32 status, LLExtStat extStatus)
 {
 	if (status != LL_ERR_NOERR)
@@ -1680,11 +1679,13 @@ void ALAOEngine::onNotecardLoadComplete(LLVFS* vfs, const LLUUID& assetUUID, LLA
 	}
 	LL_DEBUGS("AOEngine") << "Downloading import notecard complete." << LL_ENDL;
 
-	S32 notecardSize = vfs->getSize(assetUUID, type);
+	LLFileSystem file(assetUUID, type, LLFileSystem::READ);
+
+	S32 notecardSize = file.getSize();
 	auto buffer = std::make_unique<char[]>(notecardSize + 1);
 	buffer[notecardSize] = '\0';
-	S32 ret = vfs->getData(assetUUID, type, reinterpret_cast<U8*>(buffer.get()), 0, notecardSize);
-	if (ret > 0)
+
+	if (file.read((U8*)buffer.get(), notecardSize) != FALSE)
 	{
 		ALAOEngine::instance().parseNotecard(std::move(buffer));
 	}
@@ -1694,7 +1695,7 @@ void ALAOEngine::onNotecardLoadComplete(LLVFS* vfs, const LLUUID& assetUUID, LLA
 	}
 }
 
-void ALAOEngine::parseNotecard(std::unique_ptr<char[]>&& buffer)
+void ALAOEngine::parseNotecard(std::unique_ptr<char[]> buffer)
 {
 	LL_DEBUGS("AOEngine") << "parsing import notecard" << LL_ENDL;
 

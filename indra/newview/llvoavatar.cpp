@@ -1325,7 +1325,8 @@ void LLVOAvatar::calculateSpatialExtents(LLVector4a& newMin, LLVector4a& newMax)
 {
     LL_RECORD_BLOCK_TIME(FTM_AVATAR_EXTENT_UPDATE);
 
-    static const LLCachedControl<S32> box_detail(gSavedSettings, "AvatarBoundingBoxComplexity");
+    static const LLCachedControl<S32> box_detail_cc(gSavedSettings, "AvatarBoundingBoxComplexity");
+	S32 box_detail = box_detail_cc;
     if (getOverallAppearance() != AOA_NORMAL)
     {
         if (isControlAvatar())
