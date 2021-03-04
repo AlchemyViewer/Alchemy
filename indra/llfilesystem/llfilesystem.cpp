@@ -36,10 +36,6 @@
 
 #include <boost/filesystem.hpp>
 
-#ifndef TEXT
-#define TEXT(quote)
-#endif
-
 LLFileSystem::LLFileSystem(const LLUUID& file_id, const LLAssetType::EType file_type, S32 mode)
 	: mFileID(file_id), 
     mFileType(file_type),

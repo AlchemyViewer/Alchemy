@@ -64,6 +64,7 @@ typedef struct stat		llstat;
 #define MODE_T const wchar_t*
 #else
 #define MODE_T const char*
+#define TEXT(quote)
 #endif
 
 class LL_COMMON_API LLFile
@@ -87,6 +88,7 @@ public:
 	static	int		rename(const std::string& filename,const std::string& newname, int supress_error = 0);
 	static	int		rename(const boost::filesystem::path& filename, const boost::filesystem::path& newname, int supress_error = 0);
 	static  bool	copy(const std::string& from, const std::string& to);
+	static  bool	copy(const boost::filesystem::path& from, const boost::filesystem::path& to);
 
 	static	int		stat(const std::string&	filename, llstat* file_status);
 	static	int		stat(const boost::filesystem::path& filename, llstat* file_status);
