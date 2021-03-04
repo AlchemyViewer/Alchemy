@@ -273,6 +273,18 @@ int	LLFile::rmdir(const std::string& dirname)
 }
 
 // static
+LLFILE* LLFile::fopen(const char* filename, const char* mode)	/* Flawfinder: ignore */
+{
+#if	LL_WINDOWS
+	std::wstring utf16filename = ll_convert_string_to_wide(filename);
+	std::wstring utf16mode = ll_convert_string_to_wide(mode);
+	return _wfopen(utf16filename.c_str(), utf16mode.c_str());
+#else
+	return ::fopen(filename, mode);	/* Flawfinder: ignore */
+#endif
+}
+
+// static
 LLFILE*	LLFile::fopen(const std::string& filename, const char* mode)	/* Flawfinder: ignore */
 {
 #if	LL_WINDOWS

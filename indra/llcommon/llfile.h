@@ -71,6 +71,7 @@ class LL_COMMON_API LLFile
 {
 public:
 	// All these functions take UTF8 path/filenames.
+	static	LLFILE* fopen(const char* filename, const char* accessmode);	/* Flawfinder: ignore */
 	static	LLFILE*	fopen(const std::string& filename,const char* accessmode);	/* Flawfinder: ignore */
 	static	LLFILE* fopen(const boost::filesystem::path& filename, MODE_T accessmode);	/* Flawfinder: ignore */
 	static	LLFILE*	_fsopen(const std::string& filename,const char* accessmode,int	sharingFlag);
