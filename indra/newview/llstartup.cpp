@@ -483,7 +483,7 @@ bool idle_startup()
 			if (!found_template)
 			{
 				message_template_path = gDirUtilp->getExpandedFilename(LL_PATH_EXECUTABLE, "app_settings", "message_template.msg");
-				found_template = LLFile::fopen(message_template_path.c_str(), "r");		/* Flawfinder: ignore */
+				found_template = LLFile::fopen(message_template_path, "r");		/* Flawfinder: ignore */
 			}	
 		#elif LL_DARWIN
 			// On Mac dev builds, message_template.msg lives in:
@@ -493,7 +493,7 @@ bool idle_startup()
 				message_template_path =
 					gDirUtilp->getExpandedFilename(LL_PATH_APP_SETTINGS,
 												   "message_template.msg");
-				found_template = LLFile::fopen(message_template_path.c_str(), "r");		/* Flawfinder: ignore */
+				found_template = LLFile::fopen(message_template_path, "r");		/* Flawfinder: ignore */
 			}		
 		#endif
 
@@ -539,7 +539,7 @@ bool idle_startup()
 				// be located in indra/build-vc**/newview/<config>/app_settings.
 				std::string message_path = gDirUtilp->getExpandedFilename(LL_PATH_APP_SETTINGS,"message.xml");
 							
-				if (!LLFile::isfile(message_path.c_str())) 
+				if (!LLFile::isfile(message_path)) 
 				{
 					LLMessageConfig::initClass("viewer", gDirUtilp->getExpandedFilename(LL_PATH_EXECUTABLE, "app_settings", ""));
 				}

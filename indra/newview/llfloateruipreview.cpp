@@ -493,7 +493,7 @@ BOOL LLFloaterUIPreview::postBuild()
 		if((found = iter.next(language_directory)))							// get next directory
 		{
 			std::string full_path = gDirUtilp->add(xui_dir, language_directory);
-			if(LLFile::isfile(full_path.c_str()))																	// if it's not a directory, skip it
+			if(LLFile::isfile(full_path))																	// if it's not a directory, skip it
 			{
 				continue;
 			}

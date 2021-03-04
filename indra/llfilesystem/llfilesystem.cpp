@@ -206,7 +206,7 @@ S32 LLFileSystem::getSize()
 {
     S32 file_size = 0;
     llstat stat;
-    if (LLFile::stat(mFilePath.c_str(), &stat) == 0)
+    if (LLFile::stat(mFilePath, &stat) == 0)
     {
         file_size = stat.st_size;
     }
