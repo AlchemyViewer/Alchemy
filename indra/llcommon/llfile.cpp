@@ -328,6 +328,16 @@ int	LLFile::close(LLFILE * file)
 	return ret_value;
 }
 
+int	LLFile::remove(const char* filename, int supress_error)
+{
+#if	LL_WINDOWS
+	std::wstring utf16filename = ll_convert_string_to_wide(filename);
+	int rc = _wremove(utf16filename.c_str());
+#else
+	int rc = ::remove(filename);
+#endif
+	return warnif("remove", std::string(filename), rc, supress_error);
+}
 
 int	LLFile::remove(const std::string& filename, int supress_error)
 {
