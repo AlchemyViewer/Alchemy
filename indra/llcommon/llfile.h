@@ -64,7 +64,7 @@ typedef struct stat		llstat;
 #define MODE_T const wchar_t*
 #else
 #define MODE_T const char*
-#define TEXT(quote)
+#define TEXT(quote) ##quote
 #endif
 
 class LL_COMMON_API LLFile
