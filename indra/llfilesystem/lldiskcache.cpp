@@ -78,7 +78,7 @@ void LLDiskCache::purge()
 #if LL_WINDOWS
     std::wstring cache_path(ll_convert_string_to_wide(sCacheDir));
 #else
-    std::string cache_path(mCacheDir);
+    std::string cache_path(sCacheDir);
 #endif
     if (boost::filesystem::is_directory(cache_path))
     {
@@ -214,7 +214,7 @@ void LLDiskCache::clearCache()
 #if LL_WINDOWS
     boost::filesystem::path cache_path(ll_convert_string_to_wide(sCacheDir));
 #else
-    boost::filesystem::path cache_path(mCacheDir);
+    boost::filesystem::path cache_path(sCacheDir);
 #endif
     if (boost::filesystem::is_directory(cache_path))
     {
