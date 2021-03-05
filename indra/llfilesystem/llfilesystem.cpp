@@ -205,10 +205,11 @@ S32 LLFileSystem::tell() const
 S32 LLFileSystem::getSize()
 {
     S32 file_size = 0;
-    llstat stat;
-    if (LLFile::stat(mFilePath, &stat) == 0)
+    LLUniqueFile filep = LLFile::fopen(mFilePath, TEXT("rb"));
+    if (filep)
     {
-        file_size = stat.st_size;
+        fseek(filep, 0L, SEEK_END);
+        file_size = ftell(filep);
     }
 
     return file_size;
