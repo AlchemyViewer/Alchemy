@@ -172,7 +172,12 @@ BOOL LLFileSystem::write(const U8* buffer, S32 bytes)
         LLUniqueFile filep = LLFile::fopen(mFilePath, TEXT("ab"));
         if (filep)
         {
-            fwrite((const void*)buffer, bytes, 1, filep);
+            fseek(filep, 0L, SEEK_END);
+            long fsize = ftell(filep);
+
+            fwrite((const void*)buffer, 1, bytes, filep);
+
+            mPosition = fsize + bytes;
 
             success = TRUE;
         }
@@ -182,9 +187,9 @@ BOOL LLFileSystem::write(const U8* buffer, S32 bytes)
         LLUniqueFile filep = LLFile::fopen(mFilePath, TEXT("wb"));
         if (filep)
         {
-            fwrite((const void*)buffer, bytes, 1, filep);
+            fwrite((const void*)buffer, 1, bytes, filep);
 
-            mPosition += bytes;
+            mPosition = bytes;
 
             success = TRUE;
         }
