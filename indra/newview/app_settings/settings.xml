@@ -1751,6 +1751,28 @@
       <key>Value</key>
       <integer>128</integer>
     </map>
+    <key>DiskCacheSize</key>
+    <map>
+      <key>Comment</key>
+      <string>Controls amount of hard drive space reserved for local file caching in MB</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>U32</string>
+      <key>Value</key>
+      <integer>1024</integer>
+    </map>
+    <key>TextureCacheSize</key>
+    <map>
+      <key>Comment</key>
+      <string>Controls amount of hard drive space reserved for texture file caching in MB</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>U32</string>
+      <key>Value</key>
+      <integer>1024</integer>
+    </map>
     <key>CacheSize</key>
     <map>
       <key>Comment</key>

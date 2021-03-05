@@ -4162,10 +4162,9 @@ bool LLAppViewer::initCache()
 
     // note that the maximum size of this cache is defined as a percentage of the 
     // total cache size - the 'CacheSize' pref - for all caches. 
-    const unsigned int cache_total_size_mb = gSavedSettings.getU32("CacheSize");
-    const double disk_cache_percent = gSavedSettings.getF32("DiskCachePercentOfTotal");
-    const unsigned int disk_cache_mb = cache_total_size_mb * disk_cache_percent / 100;
-    const unsigned int disk_cache_bytes = disk_cache_mb * 1024 * 1024;
+    const unsigned int cache_total_size_mb = gSavedSettings.getU32("DiskCacheSize");
+    const uintmax_t disk_cache_mb = cache_total_size_mb;
+    const uintmax_t disk_cache_bytes = disk_cache_mb * 1024 * 1024;
 
 	bool texture_cache_mismatch = false;
 	if (gSavedSettings.getS32("LocalCacheVersion") != LLAppViewer::getTextureCacheVersion())
@@ -4239,16 +4238,13 @@ bool LLAppViewer::initCache()
 	// Init the texture cache
 	// Allocate 80% of the cache size for textures
 	const S32 MB = 1024 * 1024;
-	const S64 MIN_CACHE_SIZE = 256 * MB;
+	const S64 MIN_CACHE_SIZE = 512 * MB;
 	const S64 MAX_CACHE_SIZE = 9984ll * MB;
 
-	S64 cache_size = (S64)(gSavedSettings.getU32("CacheSize")) * MB;
-	cache_size = llclamp(cache_size, MIN_CACHE_SIZE, MAX_CACHE_SIZE);
+	S64 texture_cache_size = (S64)(gSavedSettings.getU32("TextureCacheSize")) * MB;
+	texture_cache_size = llclamp(texture_cache_size, MIN_CACHE_SIZE, MAX_CACHE_SIZE);
 
-	S64 texture_cache_size = cache_size;
-
-	S64 extra = LLAppViewer::getTextureCache()->initCache(LL_PATH_CACHE, texture_cache_size, texture_cache_mismatch);
-	texture_cache_size -= extra;
+	LLAppViewer::getTextureCache()->initCache(LL_PATH_CACHE, texture_cache_size, texture_cache_mismatch);
 
 	LLVOCache::getInstance()->initCache(LL_PATH_CACHE, gSavedSettings.getU32("CacheNumberOfRegionsForObjects"), getObjectCacheVersion());
 

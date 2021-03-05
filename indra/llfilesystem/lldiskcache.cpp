@@ -43,7 +43,7 @@ std::string LLDiskCache::sCacheDir = "";
 std::string LLDiskCache::sCacheFilenameExt = ".sl_cache";
 
 LLDiskCache::LLDiskCache(const std::string cache_dir,
-                         const int max_size_bytes,
+                         const uintmax_t max_size_bytes,
                          const bool enable_cache_debug_info) :
     mMaxSizeBytes(max_size_bytes),
     mEnableCacheDebugInfo(enable_cache_debug_info)
