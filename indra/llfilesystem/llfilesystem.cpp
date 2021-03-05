@@ -141,7 +141,33 @@ BOOL LLFileSystem::write(const U8* buffer, S32 bytes)
 {
     BOOL success = FALSE;
 
-    if (mMode == APPEND)
+    if (mMode == READ_WRITE)
+    {
+        LLUniqueFile filep = LLFile::fopen(mFilePath, TEXT("rb+"));
+        if (filep)
+        {
+            fseek(filep, mPosition, SEEK_SET);
+
+            fwrite((const void*)buffer, 1, bytes, filep);
+
+            mPosition += bytes;
+
+            success = TRUE;
+        }
+        else
+        {
+            filep = LLFile::fopen(mFilePath, TEXT("wb"));
+            if (filep)
+            {
+                fwrite((const void*)buffer, 1, bytes, filep);
+
+                mPosition = bytes;
+
+                success = TRUE;
+            }
+        }
+    }
+    else if (mMode == APPEND)
     {
         LLUniqueFile filep = LLFile::fopen(mFilePath, TEXT("ab"));
         if (filep)
