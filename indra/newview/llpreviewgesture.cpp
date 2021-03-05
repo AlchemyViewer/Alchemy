@@ -1147,7 +1147,7 @@ void LLPreviewGesture::saveIfNeeded()
             tid.generate();
             assetId = tid.makeAssetID(gAgent.getSecureSessionID());
 
-            LLFileSystem file(assetId, LLAssetType::AT_GESTURE, LLFileSystem::APPEND);
+            LLFileSystem file(assetId, LLAssetType::AT_GESTURE, LLFileSystem::WRITE);
 
             S32 size = dp.getCurrentSize();
             file.write((U8*)buffer, size);

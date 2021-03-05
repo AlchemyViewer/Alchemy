@@ -564,7 +564,7 @@ LLSD LLBufferedAssetUploadInfo::prepareUpload()
     if (getAssetId().isNull())
         generateNewAssetId();
 
-    LLFileSystem file(getAssetId(), getAssetType(), LLFileSystem::APPEND);
+    LLFileSystem file(getAssetId(), getAssetType(), LLFileSystem::WRITE);
 
     S32 size = mContents.length() + 1;
     file.write((U8*)mContents.c_str(), size);

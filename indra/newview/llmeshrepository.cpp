@@ -1339,7 +1339,7 @@ bool LLMeshRepoThread::fetchMeshSkinInfo(const LLUUID& mesh_id, bool can_retry)
 		if (version <= MAX_MESH_VERSION && offset >= 0 && size > 0)
 		{
 			//check cache for mesh skin info
-			LLFileSystem file(mesh_id, LLAssetType::AT_MESH);
+			LLFileSystem file(mesh_id, LLAssetType::AT_MESH, LLFileSystem::READ);
 			if (file.getSize() >= offset+size)
 			{
 				U8* buffer = new(std::nothrow) U8[size];
@@ -1452,7 +1452,7 @@ bool LLMeshRepoThread::fetchMeshDecomposition(const LLUUID& mesh_id)
 		if (version <= MAX_MESH_VERSION && offset >= 0 && size > 0)
 		{
 			//check cache for mesh skin info
-			LLFileSystem file(mesh_id, LLAssetType::AT_MESH);
+			LLFileSystem file(mesh_id, LLAssetType::AT_MESH, LLFileSystem::READ);
 			if (file.getSize() >= offset+size)
 			{
 				U8* buffer = new(std::nothrow) U8[size];
@@ -1551,7 +1551,7 @@ bool LLMeshRepoThread::fetchMeshPhysicsShape(const LLUUID& mesh_id)
 		if (version <= MAX_MESH_VERSION && offset >= 0 && size > 0)
 		{
 			//check cache for mesh physics shape info
-			LLFileSystem file(mesh_id, LLAssetType::AT_MESH);
+			LLFileSystem file(mesh_id, LLAssetType::AT_MESH, LLFileSystem::READ);
 			if (file.getSize() >= offset+size)
 			{
 				LLMeshRepository::sCacheBytesRead += size;
@@ -1656,7 +1656,7 @@ bool LLMeshRepoThread::fetchMeshHeader(const LLVolumeParams& mesh_params, bool c
 
 	{
 		//look for mesh in asset in cache
-		LLFileSystem file(mesh_params.getSculptID(), LLAssetType::AT_MESH);
+		LLFileSystem file(mesh_params.getSculptID(), LLAssetType::AT_MESH, LLFileSystem::READ);
 			
 		S32 size = file.getSize();
 
@@ -1740,7 +1740,7 @@ bool LLMeshRepoThread::fetchMeshLOD(const LLVolumeParams& mesh_params, S32 lod, 
 		{
 
 			//check cache for mesh asset
-			LLFileSystem file(mesh_id, LLAssetType::AT_MESH);
+			LLFileSystem file(mesh_id, LLAssetType::AT_MESH, LLFileSystem::READ);
 			if (file.getSize() >= offset+size)
 			{
 				U8* buffer = new(std::nothrow) U8[size];
@@ -3343,7 +3343,7 @@ void LLMeshLODHandler::processData(LLCore::BufferArray * /* body */, S32 /* body
 		if (result == MESH_OK)
 		{
 			// good fetch from sim, write to cache
-			LLFileSystem file(mMeshParams.getSculptID(), LLAssetType::AT_MESH, LLFileSystem::WRITE);
+			LLFileSystem file(mMeshParams.getSculptID(), LLAssetType::AT_MESH, LLFileSystem::READ_WRITE);
 
 			S32 offset = mOffset;
 			S32 size = mRequestedBytes;
@@ -3406,7 +3406,7 @@ void LLMeshSkinInfoHandler::processData(LLCore::BufferArray * /* body */, S32 /*
 		&& gMeshRepo.mThread->skinInfoReceived(mMeshID, data, data_size))
 	{
 		// good fetch from sim, write to cache
-		LLFileSystem file(mMeshID, LLAssetType::AT_MESH, LLFileSystem::WRITE);
+		LLFileSystem file(mMeshID, LLAssetType::AT_MESH, LLFileSystem::READ_WRITE);
 
 		S32 offset = mOffset;
 		S32 size = mRequestedBytes;
@@ -3455,7 +3455,7 @@ void LLMeshDecompositionHandler::processData(LLCore::BufferArray * /* body */, S
 		&& gMeshRepo.mThread->decompositionReceived(mMeshID, data, data_size))
 	{
 		// good fetch from sim, write to cache
-		LLFileSystem file(mMeshID, LLAssetType::AT_MESH, LLFileSystem::WRITE);
+		LLFileSystem file(mMeshID, LLAssetType::AT_MESH, LLFileSystem::READ_WRITE);
 
 		S32 offset = mOffset;
 		S32 size = mRequestedBytes;
@@ -3502,7 +3502,7 @@ void LLMeshPhysicsShapeHandler::processData(LLCore::BufferArray * /* body */, S3
 		&& gMeshRepo.mThread->physicsShapeReceived(mMeshID, data, data_size) == MESH_OK)
 	{
 		// good fetch from sim, write to cache for caching
-		LLFileSystem file(mMeshID, LLAssetType::AT_MESH, LLFileSystem::WRITE);
+		LLFileSystem file(mMeshID, LLAssetType::AT_MESH, LLFileSystem::READ_WRITE);
 
 		S32 offset = mOffset;
 		S32 size = mRequestedBytes;
