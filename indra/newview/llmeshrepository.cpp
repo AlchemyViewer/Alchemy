@@ -3289,7 +3289,7 @@ void LLMeshHeaderHandler::processData(LLCore::BufferArray * /* body */, S32 /* b
 			LLFileSystem file(mesh_id, LLAssetType::AT_MESH, LLFileSystem::WRITE);
 			if (file.getMaxSize() >= padded_data.size())
 			{
-				LLMeshRepository::sCacheBytesWritten += padded_data.size();
+				LLMeshRepository::sCacheBytesWritten += data_size;
 				++LLMeshRepository::sCacheWrites;
 
 				file.write(padded_data.data(), padded_data.size());
