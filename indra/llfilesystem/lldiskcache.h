@@ -137,7 +137,7 @@ class LLDiskCache :
          * Utility function to convert an LLAssetType enum into a
          * string that we use as part of the cache file filename
          */
-        const std::string assetTypeToString(LLAssetType::EType at);
+        static const std::string assetTypeToString(LLAssetType::EType at);
 
         /**
          * Utility function to create the cache directory structure

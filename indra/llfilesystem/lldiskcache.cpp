@@ -139,6 +139,7 @@ void LLDiskCache::purge()
     }
 }
 
+//static
 const std::string LLDiskCache::assetTypeToString(LLAssetType::EType at)
 {
     /**
@@ -146,7 +147,7 @@ const std::string LLDiskCache::assetTypeToString(LLAssetType::EType at)
      * for inline initialization of an std::map<>
      */
     typedef std::map<LLAssetType::EType, std::string> asset_type_to_name_t;
-    asset_type_to_name_t asset_type_to_name =
+    static asset_type_to_name_t asset_type_to_name =
     {
         { LLAssetType::AT_TEXTURE, "TEXTURE" },
         { LLAssetType::AT_SOUND, "SOUND" },
