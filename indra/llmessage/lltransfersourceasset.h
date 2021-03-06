@@ -30,8 +30,6 @@
 #include "lltransfermanager.h"
 #include "llassetstorage.h"
 
-class LLFileSystem;
-
 class LLTransferSourceParamsAsset : public LLTransferSourceParams
 {
 public:

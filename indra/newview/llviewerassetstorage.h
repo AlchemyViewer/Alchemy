@@ -30,8 +30,6 @@
 #include "llassetstorage.h"
 #include "llcorehttputil.h"
 
-class LLFileSystem;
-
 class LLViewerAssetRequest;
 
 class LLViewerAssetStorage : public LLAssetStorage
