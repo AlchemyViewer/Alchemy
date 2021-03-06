@@ -341,6 +341,11 @@ void LLMotionController::removeMotionInstance(LLMotion* motionp)
 //-----------------------------------------------------------------------------
 LLMotion* LLMotionController::createMotion( const LLUUID &id )
 {
+	if (id.isNull())
+	{
+		return NULL;
+	}
+
 	// do we have an instance of this motion for this character?
 	LLMotion *motion = findMotion(id);
 
