@@ -3279,7 +3279,8 @@ void LLMeshHeaderHandler::processData(LLCore::BufferArray * /* body */, S32 /* b
 
 			S32 bytes = lod_bytes + header_bytes; 
 
-			// It's possible for the data portion to be smaller then the actual data size...clamp to avoid buffer hammer
+			// It's possible for the remote asset to have more data than is needed for the local cache
+			// only allocate as much space in the cache as is needed for the local cache
 			data_size = llmin(data_size, bytes);
 
 			LLFileSystem file(mesh_id, LLAssetType::AT_MESH, LLFileSystem::READ_WRITE);
@@ -3290,14 +3291,18 @@ void LLMeshHeaderHandler::processData(LLCore::BufferArray * /* body */, S32 /* b
 
 				file.write(data, data_size);
 
+				// zero out the rest of the file 
+				U8 block[MESH_HEADER_SIZE] = {};
+
+				while (bytes - file.tell() > sizeof(block))
+				{
+					file.write(block, sizeof(block));
+				}
+
 				S32 remaining = bytes - file.tell();
 				if (remaining > 0)
 				{
-					auto pad = std::make_unique<U8[]>(remaining);
-					if (pad)
-					{
-						file.write(pad.get(), remaining);
-					}
+					file.write(block, remaining);
 				}
 
 			}
