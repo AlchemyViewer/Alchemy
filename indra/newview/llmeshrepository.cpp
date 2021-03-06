@@ -3282,17 +3282,24 @@ void LLMeshHeaderHandler::processData(LLCore::BufferArray * /* body */, S32 /* b
 			// It's possible for the data portion to be smaller then the actual data size...clamp to avoid buffer hammer
 			data_size = llmin(data_size, bytes);
 
-			std::vector<U8> padded_data;
-			padded_data.resize(bytes);
-			memcpy(padded_data.data(), data, data_size);
-
-			LLFileSystem file(mesh_id, LLAssetType::AT_MESH, LLFileSystem::WRITE);
-			if (file.getMaxSize() >= padded_data.size())
+			LLFileSystem file(mesh_id, LLAssetType::AT_MESH, LLFileSystem::READ_WRITE);
+			if (file.getMaxSize() >= bytes)
 			{
 				LLMeshRepository::sCacheBytesWritten += data_size;
 				++LLMeshRepository::sCacheWrites;
 
-				file.write(padded_data.data(), padded_data.size());
+				file.write(data, data_size);
+
+				S32 remaining = bytes - file.tell();
+				if (remaining > 0)
+				{
+					auto pad = std::make_unique<U8[]>(remaining);
+					if (pad)
+					{
+						file.write(pad.get(), remaining);
+					}
+				}
+
 			}
 		}
 		else

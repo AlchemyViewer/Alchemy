@@ -81,7 +81,7 @@ BOOL LLFileSystem::read(U8* buffer, S32 bytes)
     if (filep)
     {
         fseek(filep, mPosition, SEEK_SET);
-        if (fread((void*)buffer, bytes, 1, filep) > 0)
+        if (fread((void*)buffer, 1, bytes, filep) > 0)
         {
             mBytesRead = bytes;
         }
@@ -93,7 +93,7 @@ BOOL LLFileSystem::read(U8* buffer, S32 bytes)
             if (mPosition < fsize)
             {
                 long rsize = fsize - mPosition;
-                if (fread((void*)buffer, rsize, 1, filep) > 0)
+                if (fread((void*)buffer, 1, rsize, filep) > 0)
                 {
                     mBytesRead = rsize;
                 }
@@ -141,16 +141,17 @@ BOOL LLFileSystem::write(const U8* buffer, S32 bytes)
 {
     BOOL success = FALSE;
 
+    LLUniqueFile filep;
     if (mMode == READ_WRITE)
     {
-        LLUniqueFile filep = LLFile::fopen(mFilePath, TEXT("rb+"));
+        filep = LLFile::fopen(mFilePath, TEXT("rb+"));
         if (filep)
         {
             fseek(filep, mPosition, SEEK_SET);
 
-            fwrite((const void*)buffer, 1, bytes, filep);
+            size_t bytes_written = fwrite((const void*)buffer, 1, bytes, filep);
 
-            mPosition += bytes;
+            mPosition += bytes_written;
 
             success = TRUE;
         }
@@ -159,9 +160,9 @@ BOOL LLFileSystem::write(const U8* buffer, S32 bytes)
             filep = LLFile::fopen(mFilePath, TEXT("wb"));
             if (filep)
             {
-                fwrite((const void*)buffer, 1, bytes, filep);
+                size_t bytes_written = fwrite((const void*)buffer, 1, bytes, filep);
 
-                mPosition = bytes;
+                mPosition = bytes_written;
 
                 success = TRUE;
             }
@@ -169,27 +170,27 @@ BOOL LLFileSystem::write(const U8* buffer, S32 bytes)
     }
     else if (mMode == APPEND)
     {
-        LLUniqueFile filep = LLFile::fopen(mFilePath, TEXT("ab"));
+        filep = LLFile::fopen(mFilePath, TEXT("ab"));
         if (filep)
         {
             fseek(filep, 0L, SEEK_END);
             long fsize = ftell(filep);
 
-            fwrite((const void*)buffer, 1, bytes, filep);
+            size_t bytes_written = fwrite((const void*)buffer, 1, bytes, filep);
 
-            mPosition = fsize + bytes;
+            mPosition = fsize + bytes_written;
 
             success = TRUE;
         }
     }
     else
     {
-        LLUniqueFile filep = LLFile::fopen(mFilePath, TEXT("wb"));
+        filep = LLFile::fopen(mFilePath, TEXT("wb"));
         if (filep)
         {
-            fwrite((const void*)buffer, 1, bytes, filep);
+            size_t bytes_written = fwrite((const void*)buffer, 1, bytes, filep);
 
-            mPosition = bytes;
+            mPosition = bytes_written;
 
             success = TRUE;
         }
