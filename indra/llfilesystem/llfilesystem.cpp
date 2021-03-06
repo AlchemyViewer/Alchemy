@@ -81,7 +81,8 @@ BOOL LLFileSystem::read(U8* buffer, S32 bytes)
     if (filep)
     {
         fseek(filep, mPosition, SEEK_SET);
-        if (fread((void*)buffer, 1, bytes, filep) > 0)
+        size_t bytes_read = fread((void*)buffer, 1, bytes, filep);
+        if (bytes_read == bytes)
         {
             mBytesRead = bytes;
         }
@@ -93,7 +94,8 @@ BOOL LLFileSystem::read(U8* buffer, S32 bytes)
             if (mPosition < fsize)
             {
                 long rsize = fsize - mPosition;
-                if (fread((void*)buffer, 1, rsize, filep) > 0)
+                size_t bytes_read = fread((void*)buffer, 1, rsize, filep);
+                if (bytes_read == rsize)
                 {
                     mBytesRead = rsize;
                 }
@@ -150,10 +152,12 @@ BOOL LLFileSystem::write(const U8* buffer, S32 bytes)
             fseek(filep, mPosition, SEEK_SET);
 
             size_t bytes_written = fwrite((const void*)buffer, 1, bytes, filep);
+            if (bytes_written == bytes)
+            {
+                mPosition += bytes_written;
 
-            mPosition += bytes_written;
-
-            success = TRUE;
+                success = TRUE;
+            }
         }
         else
         {
@@ -162,9 +166,12 @@ BOOL LLFileSystem::write(const U8* buffer, S32 bytes)
             {
                 size_t bytes_written = fwrite((const void*)buffer, 1, bytes, filep);
 
-                mPosition = bytes_written;
+                if (bytes_written == bytes)
+                {
+                    mPosition = bytes_written;
 
-                success = TRUE;
+                    success = TRUE;
+                }
             }
         }
     }
@@ -178,9 +185,12 @@ BOOL LLFileSystem::write(const U8* buffer, S32 bytes)
 
             size_t bytes_written = fwrite((const void*)buffer, 1, bytes, filep);
 
-            mPosition = fsize + bytes_written;
+            if (bytes_written == bytes)
+            {
+                mPosition = fsize + bytes_written;
 
-            success = TRUE;
+                success = TRUE;
+            }
         }
     }
     else
@@ -190,9 +200,12 @@ BOOL LLFileSystem::write(const U8* buffer, S32 bytes)
         {
             size_t bytes_written = fwrite((const void*)buffer, 1, bytes, filep);
 
-            mPosition = bytes_written;
+            if (bytes_written == bytes)
+            {
+                mPosition = bytes_written;
 
-            success = TRUE;
+                success = TRUE;
+            }
         }
     }
 
