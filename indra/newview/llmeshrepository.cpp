@@ -3292,7 +3292,7 @@ void LLMeshHeaderHandler::processData(LLCore::BufferArray * /* body */, S32 /* b
 				file.write(data, data_size);
 
 				// zero out the rest of the file 
-				U8 block[MESH_HEADER_SIZE] = {};
+				U8 block[65536] = {};
 
 				while (bytes - file.tell() > sizeof(block))
 				{
