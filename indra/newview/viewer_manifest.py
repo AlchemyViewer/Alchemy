@@ -134,6 +134,8 @@ class ViewerManifest(LLManifest):
 
 
             with self.prefix(src_dst="character"):
+                with self.prefix(src_dst="animations"):
+                    self.path("*.animatn")
                 self.path("*.llm")
                 self.path("*.xml")
                 self.path("*.tga")

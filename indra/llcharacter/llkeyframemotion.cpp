@@ -301,39 +301,81 @@ LLMotion::LLMotionInitStatus LLKeyframeMotion::onInitialize(LLCharacter *charact
 		return STATUS_SUCCESS;
 	}
 
-	//-------------------------------------------------------------------------
-	// Load named file by concatenating the character prefix with the motion name.
-	// Load data into a buffer to be parsed.
-	//-------------------------------------------------------------------------
-	U8 *anim_data;
-	S32 anim_file_size;
-
 	BOOL success = FALSE;
-	LLFileSystem* anim_file = new LLFileSystem(mID, LLAssetType::AT_ANIMATION);
-	if (!anim_file || !anim_file->getSize())
-	{
-		delete anim_file;
-		anim_file = NULL;
-		
-		// request asset over network on next call to load
-		mAssetStatus = ASSET_NEEDS_FETCH;
+	U8* anim_data = nullptr;
+	S32 anim_file_size = 0;
 
-		return STATUS_HOLD;
-	}
-	else
+	//-------------------------------------------------------------------------
+	// First attempt to find the animation in the static animation cache.
+	//-------------------------------------------------------------------------
+	std::string filename = gDirUtilp->getExpandedFilename(LL_PATH_CHARACTER,
+		"animmations", gDirUtilp->getDirDelimiter(), mID.asString() + ".animatn");
+	LLUniqueFile fp = LLFile::fopen(filename, "rb");
+	if (fp)	// If the file exists
 	{
-		anim_file_size = anim_file->getSize();
-		anim_data = new(std::nothrow) U8[anim_file_size];
+		fseek(fp, 0L, SEEK_END);
+		anim_file_size = ftell(fp);
+		fseek(fp, 0L, SEEK_SET);
+
+		anim_data = new (std::nothrow) U8[anim_file_size];
 		if (anim_data)
 		{
-			success = anim_file->read(anim_data, anim_file_size);	/*Flawfinder: ignore*/
+			success = fread(anim_data, 1,
+				anim_file_size, fp) == anim_file_size;
+			if (!success)
+			{
+				delete[] anim_data;
+				anim_data = nullptr;
+			}
 		}
 		else
 		{
 			LL_WARNS() << "Failed to allocate buffer: " << anim_file_size << mID << LL_ENDL;
 		}
-		delete anim_file;
-		anim_file = NULL;
+		fp.close();
+	}
+
+	if (!success)
+	{
+		//-------------------------------------------------------------------------
+		// Load named file by concatenating the character prefix with the motion name.
+		// Load data into a buffer to be parsed.
+		//-------------------------------------------------------------------------
+		LLFileSystem* anim_file = new LLFileSystem(mID, LLAssetType::AT_ANIMATION);
+		if (!anim_file || !anim_file->getSize())
+		{
+			delete anim_file;
+			anim_file = NULL;
+
+			// request asset over network on next call to load
+			mAssetStatus = ASSET_NEEDS_FETCH;
+
+			return STATUS_HOLD;
+		}
+		else
+		{
+			anim_file_size = anim_file->getSize();
+			anim_data = new(std::nothrow) U8[anim_file_size];
+			if (anim_data)
+			{
+				success = anim_file->read(anim_data, anim_file_size);	/*Flawfinder: ignore*/
+				if (!success)
+				{
+					delete[] anim_data;
+					anim_data = nullptr;
+				}
+			}
+			else
+			{
+				LL_WARNS() << "Failed to allocate buffer: " << anim_file_size << mID << LL_ENDL;
+			}
+			delete anim_file;
+			anim_file = NULL;
+		}
+	}
+	else
+	{
+		LL_DEBUGS() << "Loaded keyframe data from static anim cache: " << mID << LL_ENDL;
 	}
 
 	if (!success)
