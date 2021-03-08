@@ -498,18 +498,18 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>aebf74ece9d0b13fdd7b8aedde83e67089de8e93f266097e727f73d57ccd37607a6eb34b792433210fe8f67c40bae0db</string>
+              <string>7fe96f02947c6d165608fed13d49df7aeab8cf551519ba1bfa21bedc72aaa54cc650773e00825be5038101b39f3f420b</string>
               <key>hash_algorithm</key>
               <string>sha3_384</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/103/packages/generic/dullahan-731/0.0.731/dullahan-1.7.0.202102131032_88.2.6_gd717f0e_chromium-88.0.4324.150-windows64-731.tar.xz</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/103/packages/generic/dullahan-743/0.0.743/dullahan-1.7.0.202103080204_89.0.6_g6f30454_chromium-89.0.4389.72-windows64-743.tar.xz</string>
             </map>
             <key>name</key>
             <string>windows64</string>
           </map>
         </map>
         <key>version</key>
-        <string>1.7.0.202102131032_88.2.6_gd717f0e_chromium-88.0.4324.150</string>
+        <string>1.7.0.202103080204_89.0.6_g6f30454_chromium-89.0.4389.72</string>
       </map>
       <key>expat</key>
       <map>
