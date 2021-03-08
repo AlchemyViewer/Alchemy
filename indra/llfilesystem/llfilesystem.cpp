@@ -37,10 +37,10 @@
 #include <boost/filesystem.hpp>
 
 LLFileSystem::LLFileSystem(const LLUUID& file_id, const LLAssetType::EType file_type, S32 mode)
-	: mFileID(file_id), 
+    : mFileID(file_id),
     mFileType(file_type),
-	mPosition(0),
-	mMode(mode),
+    mPosition(0),
+    mMode(mode),
     mBytesRead(0)
 {
     const std::string filename = LLDiskCache::metaDataToFilepath(file_id, file_type);
@@ -51,74 +51,78 @@ LLFileSystem::LLFileSystem(const LLUUID& file_id, const LLAssetType::EType file_
 #endif
 }
 
-// static
-bool LLFileSystem::getExists(const LLUUID& file_id, const LLAssetType::EType file_type)
+bool LLFileSystem::open()
 {
-    LLFileSystem file(file_id, file_type, READ);
-    return file.exists();
+    switch (mMode)
+    {
+    case READ: mFile = LLFile::fopen(mFilePath, TEXT("rb")); break;
+    case WRITE: mFile = LLFile::fopen(mFilePath, TEXT("wb")); break;
+    case READ_WRITE: mFile = LLFile::fopen(mFilePath, TEXT("rb+")); break;
+    case APPEND: mFile = LLFile::fopen(mFilePath, TEXT("ab")); break;
+    }
+    if (mMode == READ_WRITE && !mFile)
+        mFile = LLFile::fopen(mFilePath, TEXT("wb+"));
+
+    return mFile;
 }
 
-// static
-bool LLFileSystem::removeFile(const LLUUID& file_id, const LLAssetType::EType file_type)
+void LLFileSystem::close()
 {
-    LLFileSystem file(file_id, file_type, READ_WRITE);
-    return file.remove();
-}
-
-// static
-bool LLFileSystem::renameFile(const LLUUID& old_file_id, const LLAssetType::EType old_file_type,
-                              const LLUUID& new_file_id, const LLAssetType::EType new_file_type)
-{
-    LLFileSystem file(old_file_id, old_file_type, READ_WRITE);
-    return file.rename(new_file_id, new_file_type);
+    mFile.close();
 }
 
 BOOL LLFileSystem::read(U8* buffer, S32 bytes)
 {
+    if (!mFile)
+    {
+        LL_WARNS() << "Attempt to write to file " << mFileID << " that is not open" << LL_ENDL;
+        return FALSE;
+    }
+
+    if (!(mMode & READ))
+    {
+        LL_WARNS() << "Attempt to read from file " << mFileID << " opened with mode " << std::hex << mMode << std::dec << LL_ENDL;
+        return FALSE;
+    }
+
     BOOL success = TRUE;
 
-    LLUniqueFile filep = LLFile::fopen(mFilePath, TEXT("rb"));
-    if (filep)
+    fseek(mFile, mPosition, SEEK_SET);
+    size_t bytes_read = fread((void*)buffer, 1, bytes, mFile);
+    if (bytes_read == bytes)
     {
-        fseek(filep, mPosition, SEEK_SET);
-        size_t bytes_read = fread((void*)buffer, 1, bytes, filep);
-        if (bytes_read == bytes)
+        mBytesRead = bytes_read;
+    }
+    else
+    {
+        fseek(mFile, 0L, SEEK_END);
+        long fsize = ftell(mFile);
+        if (mPosition < fsize)
         {
-            mBytesRead = bytes;
-        }
-        else
-        {
-            fseek(filep, 0L, SEEK_END);
-            long fsize = ftell(filep);
-            fseek(filep, mPosition, SEEK_SET);
-            if (mPosition < fsize)
+            fseek(mFile, mPosition, SEEK_SET);
+            long rsize = fsize - mPosition;
+            size_t bytes_read = fread((void*)buffer, 1, rsize, mFile);
+            if (bytes_read == rsize)
             {
-                long rsize = fsize - mPosition;
-                size_t bytes_read = fread((void*)buffer, 1, rsize, filep);
-                if (bytes_read == rsize)
-                {
-                    mBytesRead = rsize;
-                }
-                else
-                {
-                    success = FALSE;
-                }
+                mBytesRead = bytes_read;
             }
             else
             {
                 success = FALSE;
             }
         }
-
-        if (!success)
+        else
         {
-            mBytesRead = 0;
+            success = FALSE;
         }
-
-        filep.close();
-
-        mPosition += mBytesRead;
     }
+
+    if (success == FALSE)
+    {
+        mBytesRead = 0;
+    }
+
+    mPosition += mBytesRead;
 
     // update the last access time for the file - this is required
     // even though we are reading and not writing because this is the
@@ -141,71 +145,53 @@ BOOL LLFileSystem::eof()
 
 BOOL LLFileSystem::write(const U8* buffer, S32 bytes)
 {
-    BOOL success = FALSE;
+    if (!mFile)
+    {
+        LL_WARNS() << "Attempt to write to file " << mFileID << " that is not open" << LL_ENDL;
+        return FALSE;
+    }
 
-    LLUniqueFile filep;
+    if (!(mMode & WRITE) || !(mMode & APPEND))
+    {
+        LL_WARNS() << "Attempt to write to file " << mFileID << " opened with mode " << std::hex << mMode << std::dec << LL_ENDL;
+        return FALSE;
+    }
+
+    BOOL success = FALSE;
     if (mMode == READ_WRITE)
     {
-        filep = LLFile::fopen(mFilePath, TEXT("rb+"));
-        if (filep)
+        fseek(mFile, mPosition, SEEK_SET);
+
+        size_t bytes_written = fwrite((const void*)buffer, 1, bytes, mFile);
+        if (bytes_written == bytes)
         {
-            fseek(filep, mPosition, SEEK_SET);
+            mPosition += bytes_written;
 
-            size_t bytes_written = fwrite((const void*)buffer, 1, bytes, filep);
-            if (bytes_written == bytes)
-            {
-                mPosition += bytes_written;
-
-                success = TRUE;
-            }
-        }
-        else
-        {
-            filep = LLFile::fopen(mFilePath, TEXT("wb"));
-            if (filep)
-            {
-                size_t bytes_written = fwrite((const void*)buffer, 1, bytes, filep);
-
-                if (bytes_written == bytes)
-                {
-                    mPosition = bytes_written;
-
-                    success = TRUE;
-                }
-            }
+            success = TRUE;
         }
     }
     else if (mMode == APPEND)
     {
-        filep = LLFile::fopen(mFilePath, TEXT("ab"));
-        if (filep)
+        fseek(mFile, 0L, SEEK_END);
+        long fsize = ftell(mFile);
+
+        size_t bytes_written = fwrite((const void*)buffer, 1, bytes, mFile);
+        if (bytes_written == bytes)
         {
-            fseek(filep, 0L, SEEK_END);
-            long fsize = ftell(filep);
+            mPosition = fsize + bytes_written;
 
-            size_t bytes_written = fwrite((const void*)buffer, 1, bytes, filep);
-
-            if (bytes_written == bytes)
-            {
-                mPosition = fsize + bytes_written;
-
-                success = TRUE;
-            }
+            success = TRUE;
         }
     }
     else
     {
-        filep = LLFile::fopen(mFilePath, TEXT("wb"));
-        if (filep)
+        size_t bytes_written = fwrite((const void*)buffer, 1, bytes, mFile);
+
+        if (bytes_written == bytes)
         {
-            size_t bytes_written = fwrite((const void*)buffer, 1, bytes, filep);
+            mPosition = bytes_written;
 
-            if (bytes_written == bytes)
-            {
-                mPosition = bytes_written;
-
-                success = TRUE;
-            }
+            success = TRUE;
         }
     }
 
@@ -250,11 +236,19 @@ S32 LLFileSystem::tell() const
 S32 LLFileSystem::getSize()
 {
     S32 file_size = 0;
-    LLUniqueFile filep = LLFile::fopen(mFilePath, TEXT("rb"));
-    if (filep)
+    if (mFile)
     {
-        fseek(filep, 0L, SEEK_END);
-        file_size = ftell(filep);
+        fseek(mFile, 0L, SEEK_END);
+        file_size = ftell(mFile);
+        fseek(mFile, mPosition, SEEK_SET);
+    }
+    else
+    {
+        llstat stat;
+        if (LLFile::stat(mFilePath, &stat) == 0)
+        {
+            file_size = stat.st_size;
+        }
     }
 
     return file_size;
@@ -268,6 +262,8 @@ S32 LLFileSystem::getMaxSize()
 
 BOOL LLFileSystem::rename(const LLUUID& new_id, const LLAssetType::EType new_type)
 {
+    close();
+
 #if LL_WINDOWS
     boost::filesystem::path new_filename = ll_convert_string_to_wide(LLDiskCache::metaDataToFilepath(new_id, new_type));
 #else
@@ -296,6 +292,8 @@ BOOL LLFileSystem::rename(const LLUUID& new_id, const LLAssetType::EType new_typ
 
 BOOL LLFileSystem::remove()
 {
+    close();
+
     LLFile::remove(mFilePath, ENOENT);
 
     return TRUE;
@@ -339,4 +337,26 @@ void LLFileSystem::updateFileAccessTime()
     {
         boost::filesystem::last_write_time(mFilePath, cur_time);
     }
+}
+
+// static
+bool LLFileSystem::getExists(const LLUUID& file_id, const LLAssetType::EType file_type)
+{
+    LLFileSystem file(file_id, file_type, READ);
+    return file.exists();
+}
+
+// static
+bool LLFileSystem::removeFile(const LLUUID& file_id, const LLAssetType::EType file_type)
+{
+    LLFileSystem file(file_id, file_type, READ_WRITE);
+    return file.remove();
+}
+
+// static
+bool LLFileSystem::renameFile(const LLUUID& old_file_id, const LLAssetType::EType old_file_type,
+    const LLUUID& new_file_id, const LLAssetType::EType new_file_type)
+{
+    LLFileSystem file(old_file_id, old_file_type, READ_WRITE);
+    return file.rename(new_file_id, new_file_type);
 }

@@ -7304,36 +7304,52 @@ void onCovenantLoadComplete(const LLUUID& asset_uuid,
 	if(0 == status)
 	{
 		LLFileSystem file(asset_uuid, type, LLFileSystem::READ);
-		
-		S32 file_length = file.getSize();
-		
-		std::vector<char> buffer(file_length+1);
-		file.read((U8*)&buffer[0], file_length);		
-		// put a EOS at the end
-		buffer[file_length] = '\0';
-		
-		if( (file_length > 19) && !strncmp( &buffer[0], "Linden text version", 19 ) )
+		if (file.open())
 		{
-			LLViewerTextEditor::Params params;
-			params.name("temp");
-			params.max_text_length(file_length+1);
-			LLViewerTextEditor * editor = LLUICtrlFactory::create<LLViewerTextEditor> (params);
-			if( !editor->importBuffer( &buffer[0], file_length+1 ) )
+			S32 file_length = file.getSize();
+
+			std::vector<char> buffer(file_length + 1);
+			if (file.read((U8*)&buffer[0], file_length))
 			{
-				LL_WARNS("Messaging") << "Problem importing estate covenant." << LL_ENDL;
-				covenant_text = "Problem importing estate covenant.";
+				file.close(); // close file
+
+				// put a EOS at the end
+				buffer[file_length] = '\0';
+
+				if ((file_length > 19) && !strncmp(&buffer[0], "Linden text version", 19))
+				{
+					LLViewerTextEditor::Params params;
+					params.name("temp");
+					params.max_text_length(file_length + 1);
+					LLViewerTextEditor* editor = LLUICtrlFactory::create<LLViewerTextEditor>(params);
+					if (!editor->importBuffer(&buffer[0], file_length + 1))
+					{
+						LL_WARNS("Messaging") << "Problem importing estate covenant." << LL_ENDL;
+						covenant_text = "Problem importing estate covenant.";
+					}
+					else
+					{
+						// Version 0 (just text, doesn't include version number)
+						covenant_text = editor->getText();
+					}
+					delete editor;
+				}
+				else
+				{
+					LL_WARNS("Messaging") << "Problem importing estate covenant: Covenant file format error." << LL_ENDL;
+					covenant_text = "Problem importing estate covenant: Covenant file format error.";
+				}
 			}
 			else
 			{
-				// Version 0 (just text, doesn't include version number)
-				covenant_text = editor->getText();
+				LL_WARNS("Messaging") << "Problem importing estate covenant: Asset read error." << LL_ENDL;
+				covenant_text = "Problem importing estate covenant: Asset read error.";
 			}
-			delete editor;
 		}
 		else
 		{
-			LL_WARNS("Messaging") << "Problem importing estate covenant: Covenant file format error." << LL_ENDL;
-			covenant_text = "Problem importing estate covenant: Covenant file format error.";
+			LL_WARNS("Messaging") << "Problem importing estate covenant: Asset load error." << LL_ENDL;
+			covenant_text = "Problem importing estate covenant: Asset load error.";
 		}
 	}
 	else

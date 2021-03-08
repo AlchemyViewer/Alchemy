@@ -158,13 +158,25 @@ void LLViewerAssetStorage::storeAssetData(
     
     if (mUpstreamHost.isOk())
     {
-        if (LLFileSystem::getExists(asset_id, asset_type))
+        LLFileSystem vfile(asset_id, asset_type, LLFileSystem::READ);
+        if (vfile.exists())
         {
             // Pack data into this packet if we can fit it.
             U8 buffer[MTUBYTES];
             buffer[0] = 0;
 
-            LLFileSystem vfile(asset_id, asset_type, LLFileSystem::READ);
+            if (!vfile.open())
+            {
+                // This can happen if there's a bug in our code or if the cache has been corrupted.
+                LL_WARNS("AssetStorage") << "Failed to open cached asset. Data _should_ already be in the cache, but it's not! " << asset_id << LL_ENDL;
+
+                if (callback)
+                {
+                    callback(asset_id, user_data, LL_ERR_ASSET_REQUEST_FAILED, LLExtStat::CACHE_CORRUPT);
+                }
+                return;
+            }
+
             S32 asset_size = vfile.getSize();
 
             LLAssetRequest *req = new LLAssetRequest(asset_id, asset_type);
@@ -285,7 +297,7 @@ void LLViewerAssetStorage::storeAssetData(
 #endif
 
     S32 size = 0;
-    LLFILE* fp = LLFile::fopen(filename, "rb");
+    LLUniqueFile fp = LLFile::fopen(filename, "rb");
     if (fp)
     {
         fseek(fp, 0, SEEK_END);
@@ -301,13 +313,18 @@ void LLViewerAssetStorage::storeAssetData(
 
         LLFileSystem file(asset_id, asset_type, LLFileSystem::APPEND);
 
-        const S32 buf_size = 65536;
-        U8 copy_buf[buf_size];
-        while ((size = (S32)fread(copy_buf, 1, buf_size, fp)))
+        if (file.open())
         {
-            file.write(copy_buf, size);
+            const S32 buf_size = 65536;
+            U8 copy_buf[buf_size];
+            while ((size = (S32)fread(copy_buf, 1, buf_size, fp)))
+            {
+                file.write(copy_buf, size);
+            }
+            file.close();
         }
-        fclose(fp);
+        fp.close();
+
 
         // if this upload fails, the caller needs to setup a new tempfile for us
         if (temp_file)
@@ -544,7 +561,7 @@ void LLViewerAssetStorage::assetRequestCoro(
             temp_id.generate();
             LLFileSystem vf(temp_id, atype, LLFileSystem::WRITE);
             req->mBytesFetched = size;
-            if (!vf.write(raw.data(),size))
+            if (!vf.open() || !vf.write(raw.data(), size))
             {
                 // TODO asset-http: handle error
                 LL_WARNS("ViewerAsset") << "Failure in vf.write()" << LL_ENDL;

@@ -1000,8 +1000,10 @@ void LLFloaterBvhPreview::onBtnOK(void* userdata)
 			LLFileSystem file(motionp->getID(), LLAssetType::AT_ANIMATION, LLFileSystem::APPEND);
 
 			S32 size = dp.getCurrentSize();
-			if (file.write((U8*)buffer, size))
+			if (file.open() && file.write((U8*)buffer, size))
 			{
+				file.close();
+
 				std::string name = floaterp->getChild<LLUICtrl>("name_form")->getValue().asString();
 				std::string desc = floaterp->getChild<LLUICtrl>("description_form")->getValue().asString();
 				S32 expected_upload_cost = LLAgentBenefitsMgr::current().getAnimationUploadCost();

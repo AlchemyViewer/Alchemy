@@ -304,27 +304,43 @@ void LLSettingsVOBase::onAssetDownloadComplete(const LLUUID &asset_id, S32 statu
     if (!status)
     {
         LLFileSystem file(asset_id, LLAssetType::AT_SETTINGS, LLFileSystem::READ);
-        S32 size = file.getSize();
-
-        std::string buffer(size + 1, '\0');
-        file.read((U8 *)buffer.data(), size);
-
-        std::stringstream llsdstream(buffer);
-        LLSD llsdsettings;
-
-        if (LLSDSerialize::deserialize(llsdsettings, llsdstream, -1))
+        if (file.open())
         {
-            settings = createFromLLSD(llsdsettings);
-        }
+            S32 size = file.getSize();
 
-        if (!settings)
-        {
-            status = 1;
-            LL_WARNS("SETTINGS") << "Unable to create settings object." << LL_ENDL;
+            std::string buffer(size + 1, '\0');
+            if (file.read((U8*)buffer.data(), size))
+            {
+                file.close();
+
+                std::stringstream llsdstream(buffer);
+                LLSD llsdsettings;
+
+                if (LLSDSerialize::deserialize(llsdsettings, llsdstream, -1))
+                {
+                    settings = createFromLLSD(llsdsettings);
+                }
+
+                if (!settings)
+                {
+                    status = 1;
+                    LL_WARNS("SETTINGS") << "Unable to create settings object." << LL_ENDL;
+                }
+                else
+                {
+                    settings->setAssetId(asset_id);
+                }
+            }
+            else
+            {
+                status = 1;
+                LL_WARNS("SETTINGS") << "Unable to read settings object from cache." << LL_ENDL;
+            }
         }
         else
         {
-            settings->setAssetId(asset_id);
+            status = 1;
+            LL_WARNS("SETTINGS") << "Unable to open settings object from cache." << LL_ENDL;
         }
     }
     else

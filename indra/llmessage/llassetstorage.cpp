@@ -430,12 +430,11 @@ bool LLAssetStorage::findInCacheAndInvokeCallback(const LLUUID& uuid, LLAssetTyp
         llassert(callback != NULL);
     }
 
-    BOOL exists = LLFileSystem::getExists(uuid, type);
-    if (exists)
+    LLFileSystem file(uuid, type);
+    if (file.exists())
     {
-        LLFileSystem file(uuid, type);
-        U32 size = file.getSize();
-        if (size > 0)
+       
+        if (file.getSize() > 0)
         {
             // we've already got the file
             if (callback)
@@ -503,8 +502,8 @@ void LLAssetStorage::getAssetData(const LLUUID uuid,
         return;
     }
 
-    BOOL exists = LLFileSystem::getExists(uuid, type);
     LLFileSystem file(uuid, type);
+    bool exists = file.exists();
     U32 size = exists ? file.getSize() : 0;
 
     if (size > 0)
@@ -523,7 +522,7 @@ void LLAssetStorage::getAssetData(const LLUUID uuid,
     {
         if (exists)
         {
-            LL_WARNS("AssetStorage") << "Asset vfile " << uuid << ":" << type << " found with bad size " << file.getSize() << ", removing" << LL_ENDL;
+            LL_WARNS("AssetStorage") << "Asset vfile " << uuid << ":" << type << " found with bad size " << size << ", removing" << LL_ENDL;
             file.remove();
         }
         
@@ -704,8 +703,8 @@ void LLAssetStorage::getEstateAsset(
         return;
     }
     
-    BOOL exists = LLFileSystem::getExists(asset_id, atype);
     LLFileSystem file(asset_id, atype);
+    bool exists = file.exists();
     U32 size = exists ? file.getSize() : 0;
 
     if (size > 0)
@@ -722,7 +721,7 @@ void LLAssetStorage::getEstateAsset(
     {
         if (exists)
         {
-            LL_WARNS("AssetStorage") << "Asset vfile " << asset_id << ":" << atype << " found with bad size " << file.getSize() << ", removing" << LL_ENDL;
+            LL_WARNS("AssetStorage") << "Asset vfile " << asset_id << ":" << atype << " found with bad size " << size << ", removing" << LL_ENDL;
             file.remove();
         }
 
@@ -840,8 +839,8 @@ void LLAssetStorage::getInvItemAsset(
             return;
         }
 
-        exists = LLFileSystem::getExists(asset_id, atype);
         LLFileSystem file(asset_id, atype);
+        exists = file.exists();
         size = exists ? file.getSize() : 0;
         if(exists && size < 1)
         {
@@ -1377,27 +1376,33 @@ void LLAssetStorage::legacyGetDataCallback(const LLUUID &uuid,
          && !toxic )
     {
         LLFileSystem file(uuid, type);
-
-        std::string uuid_str;
-
-        uuid.toString(uuid_str);
-        filename = llformat("%s.%s",gDirUtilp->getExpandedFilename(LL_PATH_CACHE,uuid_str).c_str(),LLAssetType::lookup(type));
-
-        LLFILE* fp = LLFile::fopen(filename, "wb");     /* Flawfinder: ignore */ 
-        if (fp)
+        if (file.open())
         {
-            const S32 buf_size = 65536;
-            U8 copy_buf[buf_size];
-            while (file.read(copy_buf, buf_size))   /* Flawfinder: ignore */
-            {
-                if (fwrite(copy_buf, file.getLastBytesRead(), 1, fp) < 1)
-                {
-                    // return a bad file error if we can't write the whole thing
-                    status = LL_ERR_CANNOT_OPEN_FILE;
-                }
-            }
+            std::string uuid_str;
 
-            fclose(fp);
+            uuid.toString(uuid_str);
+            filename = llformat("%s.%s", gDirUtilp->getExpandedFilename(LL_PATH_CACHE, uuid_str).c_str(), LLAssetType::lookup(type));
+
+            LLUniqueFile fp = LLFile::fopen(filename, "wb");     /* Flawfinder: ignore */
+            if (fp)
+            {
+                const S32 buf_size = 65536;
+                U8 copy_buf[buf_size];
+                while (file.read(copy_buf, buf_size))   /* Flawfinder: ignore */
+                {
+                    if (fwrite(copy_buf, file.getLastBytesRead(), 1, fp) < 1)
+                    {
+                        // return a bad file error if we can't write the whole thing
+                        status = LL_ERR_CANNOT_OPEN_FILE;
+                    }
+                }
+
+                fp.close();
+            }
+            else
+            {
+                status = LL_ERR_CANNOT_OPEN_FILE;
+            }
         }
         else
         {

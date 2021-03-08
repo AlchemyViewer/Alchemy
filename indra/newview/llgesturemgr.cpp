@@ -1069,87 +1069,94 @@ void LLGestureMgr::onLoadComplete(const LLUUID& asset_uuid,
 	if (0 == status)
 	{
 		LLFileSystem file(asset_uuid, type, LLFileSystem::READ);
-		S32 size = file.getSize();
-
-		std::vector<char> buffer(size+1);
-
-		file.read((U8*)&buffer[0], size);
-		// ensure there's a trailing NULL so strlen will work.
-		buffer[size] = '\0';
-
-		LLMultiGesture* gesture = new LLMultiGesture();
-
-		LLDataPackerAsciiBuffer dp(&buffer[0], size+1);
-		BOOL ok = gesture->deserialize(dp);
-
-		if (ok)
+		if (file.open())
 		{
-			if (deactivate_similar)
-			{
-				self.deactivateSimilarGestures(gesture, item_id);
+			S32 size = file.getSize();
 
-				// Display deactivation message if this was the last of the bunch.
-				if (self.mLoadingCount == 0
-					&& self.mDeactivateSimilarNames.length() > 0)
+			std::vector<char> buffer(size + 1);
+
+			if (file.read((U8*)&buffer[0], size))
+			{
+				file.close();
+
+				// ensure there's a trailing NULL so strlen will work.
+				buffer[size] = '\0';
+
+				LLMultiGesture* gesture = new LLMultiGesture();
+
+				LLDataPackerAsciiBuffer dp(&buffer[0], size + 1);
+				BOOL ok = gesture->deserialize(dp);
+
+				if (ok)
 				{
-					// we're done with this set of deactivations
-					LLSD args;
-					args["NAMES"] = self.mDeactivateSimilarNames;
-					LLNotificationsUtil::add("DeactivatedGesturesTrigger", args);
+					if (deactivate_similar)
+					{
+						self.deactivateSimilarGestures(gesture, item_id);
+
+						// Display deactivation message if this was the last of the bunch.
+						if (self.mLoadingCount == 0
+							&& self.mDeactivateSimilarNames.length() > 0)
+						{
+							// we're done with this set of deactivations
+							LLSD args;
+							args["NAMES"] = self.mDeactivateSimilarNames;
+							LLNotificationsUtil::add("DeactivatedGesturesTrigger", args);
+						}
+					}
+
+					LLViewerInventoryItem* item = gInventory.getItem(item_id);
+					if (item)
+					{
+						gesture->mName = item->getName();
+					}
+					else
+					{
+						// Watch this item and set gesture name when item exists in inventory
+						self.setFetchID(item_id);
+						self.startFetch();
+					}
+					self.mActive[item_id] = gesture;
+
+					// Everything has been successful.  Add to the active list.
+					gInventory.addChangedMask(LLInventoryObserver::LABEL, item_id);
+
+					if (inform_server)
+					{
+						// Inform the database of this change
+						LLMessageSystem* msg = gMessageSystem;
+						msg->newMessage("ActivateGestures");
+						msg->nextBlock("AgentData");
+						msg->addUUID("AgentID", gAgent.getID());
+						msg->addUUID("SessionID", gAgent.getSessionID());
+						msg->addU32("Flags", 0x0);
+
+						msg->nextBlock("Data");
+						msg->addUUID("ItemID", item_id);
+						msg->addUUID("AssetID", asset_uuid);
+						msg->addU32("GestureFlags", 0x0);
+
+						gAgent.sendReliableMessage();
+					}
+					callback_map_t::iterator i_cb = self.mCallbackMap.find(item_id);
+
+					if (i_cb != self.mCallbackMap.end())
+					{
+						i_cb->second(gesture);
+						self.mCallbackMap.erase(i_cb);
+					}
+
+					self.notifyObservers();
+				}
+				else
+				{
+					LL_WARNS() << "Unable to load gesture" << LL_ENDL;
+
+					self.mActive.erase(item_id);
+
+					delete gesture;
+					gesture = NULL;
 				}
 			}
-
-			LLViewerInventoryItem* item = gInventory.getItem(item_id);
-			if(item)
-			{
-				gesture->mName = item->getName();
-			}
-			else
-			{
-				// Watch this item and set gesture name when item exists in inventory
-				self.setFetchID(item_id);
-				self.startFetch();
-			}
-			self.mActive[item_id] = gesture;
-
-			// Everything has been successful.  Add to the active list.
-			gInventory.addChangedMask(LLInventoryObserver::LABEL, item_id);
-
-			if (inform_server)
-			{
-				// Inform the database of this change
-				LLMessageSystem* msg = gMessageSystem;
-				msg->newMessage("ActivateGestures");
-				msg->nextBlock("AgentData");
-				msg->addUUID("AgentID", gAgent.getID());
-				msg->addUUID("SessionID", gAgent.getSessionID());
-				msg->addU32("Flags", 0x0);
-				
-				msg->nextBlock("Data");
-				msg->addUUID("ItemID", item_id);
-				msg->addUUID("AssetID", asset_uuid);
-				msg->addU32("GestureFlags", 0x0);
-
-				gAgent.sendReliableMessage();
-			}
-			callback_map_t::iterator i_cb = self.mCallbackMap.find(item_id);
-			
-			if(i_cb != self.mCallbackMap.end())
-			{
-				i_cb->second(gesture);
-				self.mCallbackMap.erase(i_cb);
-			}
-
-			self.notifyObservers();
-		}
-		else
-		{
-			LL_WARNS() << "Unable to load gesture" << LL_ENDL;
-
-			self.mActive.erase(item_id);
-			
-			delete gesture;
-			gesture = NULL;
 		}
 	}
 	else

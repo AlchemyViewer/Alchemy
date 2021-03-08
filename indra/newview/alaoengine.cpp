@@ -1680,18 +1680,21 @@ void ALAOEngine::onNotecardLoadComplete(const LLUUID& assetUUID, LLAssetType::ET
 	LL_DEBUGS("AOEngine") << "Downloading import notecard complete." << LL_ENDL;
 
 	LLFileSystem file(assetUUID, type, LLFileSystem::READ);
-
-	S32 notecardSize = file.getSize();
-	auto buffer = std::make_unique<char[]>(notecardSize + 1);
-	buffer[notecardSize] = '\0';
-
-	if (file.read((U8*)buffer.get(), notecardSize) != FALSE)
+	if (file.open())
 	{
-		ALAOEngine::instance().parseNotecard(std::move(buffer));
-	}
-	else
-	{
-		ALAOEngine::instance().parseNotecard(nullptr);
+		S32 notecardSize = file.getSize();
+		auto buffer = std::make_unique<char[]>(notecardSize + 1);
+		buffer[notecardSize] = '\0';
+
+		if (file.read((U8*)buffer.get(), notecardSize) != FALSE)
+		{
+			ALAOEngine::instance().parseNotecard(std::move(buffer));
+		}
+		else
+		{
+			ALAOEngine::instance().parseNotecard(nullptr);
+		}
+		file.close();
 	}
 }
 

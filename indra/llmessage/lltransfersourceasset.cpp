@@ -101,7 +101,7 @@ LLTSCode LLTransferSourceAsset::dataCallback(const S32 packet_id,
 
 	LLFileSystem vf(mParams.getAssetID(), mParams.getAssetType(), LLFileSystem::READ);
 
-	if (!vf.getSize())
+	if (!vf.open() || !vf.getSize())
 	{
 		// Something bad happened with the asset request!
 		return LLTS_ERROR;

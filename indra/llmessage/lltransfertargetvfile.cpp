@@ -149,7 +149,7 @@ LLTSCode LLTransferTargetVFile::dataCallback(const S32 packet_id, U8 *in_datap, 
 		return LLTS_OK;
 	}
 
-	if (!vf.write(in_datap, in_size))
+	if (!vf.open() || !vf.write(in_datap, in_size))
 	{
 		LL_WARNS() << "Failure in LLTransferTargetVFile::dataCallback!" << LL_ENDL;
 		return LLTS_ERROR;
@@ -175,8 +175,7 @@ void LLTransferTargetVFile::completionCallback(const LLTSCode status)
 	  case LLTS_DONE:
 		if (!mNeedsCreate)
 		{
-			LLFileSystem file(mTempID, mParams.getAssetType(), LLFileSystem::WRITE);
-			if (!file.rename(mParams.getAssetID(), mParams.getAssetType()))
+			if (!LLFileSystem::renameFile(mTempID, mParams.getAssetType(), mParams.getAssetID(), mParams.getAssetType()))
 			{
 				LL_ERRS() << "LLTransferTargetVFile: rename failed" << LL_ENDL;
 			}
@@ -194,8 +193,7 @@ void LLTransferTargetVFile::completionCallback(const LLTSCode status)
 	  {
 		  // We're aborting this transfer, we don't want to keep this file.
 		  LL_WARNS() << "Aborting vfile transfer for " << mParams.getAssetID() << LL_ENDL;
-		  LLFileSystem vf(mTempID, mParams.getAssetType(), LLFileSystem::APPEND);
-		  vf.remove();
+		  LLFileSystem::removeFile(mTempID, mParams.getAssetType());
 	  }
 	  break;
 	}

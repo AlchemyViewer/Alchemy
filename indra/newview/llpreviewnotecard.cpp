@@ -369,36 +369,54 @@ void LLPreviewNotecard::onLoadComplete(const LLUUID& asset_uuid,
 		if(0 == status)
 		{
 			LLFileSystem file(asset_uuid, type, LLFileSystem::READ);
-
-			S32 file_length = file.getSize();
-
-			std::vector<char> buffer(file_length+1);
-			file.read((U8*)&buffer[0], file_length);
-
-			// put a EOS at the end
-			buffer[file_length] = 0;
-
-			
-			LLViewerTextEditor* previewEditor = preview->getChild<LLViewerTextEditor>("Notecard Editor");
-
-			if( (file_length > 19) && !strncmp( &buffer[0], "Linden text version", 19 ) )
+			if (file.open())
 			{
-				if( !previewEditor->importBuffer( &buffer[0], file_length+1 ) )
+				S32 file_length = file.getSize();
+
+				std::vector<char> buffer(file_length + 1);
+				if (file.read((U8*)&buffer[0], file_length))
 				{
-					LL_WARNS() << "Problem importing notecard" << LL_ENDL;
+					file.close();
+
+					// put a EOS at the end
+					buffer[file_length] = 0;
+
+					LLViewerTextEditor* previewEditor = preview->getChild<LLViewerTextEditor>("Notecard Editor");
+
+					if ((file_length > 19) && !strncmp(&buffer[0], "Linden text version", 19))
+					{
+						if (!previewEditor->importBuffer(&buffer[0], file_length + 1))
+						{
+							LL_WARNS() << "Problem importing notecard" << LL_ENDL;
+						}
+					}
+					else
+					{
+						// Version 0 (just text, doesn't include version number)
+						previewEditor->setText(LLStringExplicit(&buffer[0]));
+					}
+
+					previewEditor->makePristine();
+					BOOL modifiable = preview->canModify(preview->mObjectID, preview->getItem());
+					preview->setEnabled(modifiable);
+					preview->syncExternal();
+					preview->mAssetStatus = PREVIEW_ASSET_LOADED;
+				}
+				else
+				{
+					LLNotificationsUtil::add("NotecardMissing");
+
+					LL_WARNS() << "Problem loading notecard: " << status << LL_ENDL;
+					preview->mAssetStatus = PREVIEW_ASSET_ERROR;
 				}
 			}
 			else
 			{
-				// Version 0 (just text, doesn't include version number)
-				previewEditor->setText(LLStringExplicit(&buffer[0]));
-			}
+				LLNotificationsUtil::add("NotecardMissing");
 
-			previewEditor->makePristine();
-			BOOL modifiable = preview->canModify(preview->mObjectID, preview->getItem());
-			preview->setEnabled(modifiable);
-			preview->syncExternal();
-			preview->mAssetStatus = PREVIEW_ASSET_LOADED;
+				LL_WARNS() << "Problem loading notecard: " << status << LL_ENDL;
+				preview->mAssetStatus = PREVIEW_ASSET_ERROR;
+			}
 		}
 		else
 		{
@@ -596,19 +614,31 @@ bool LLPreviewNotecard::saveIfNeeded(LLInventoryItem* copyitem, bool sync)
                 asset_id = tid.makeAssetID(gAgent.getSecureSessionID());
 
                 LLFileSystem file(asset_id, LLAssetType::AT_NOTECARD, LLFileSystem::WRITE);
+				if(file.open())
+				{
+					LLSaveNotecardInfo* info = new LLSaveNotecardInfo(this, mItemUUID, mObjectUUID,
+																	tid, copyitem);
 
-
-				LLSaveNotecardInfo* info = new LLSaveNotecardInfo(this, mItemUUID, mObjectUUID,
-																tid, copyitem);
-
-                S32 size = buffer.length() + 1;
-                file.write((U8*)buffer.c_str(), size);
-
-				gAssetStorage->storeAssetData(tid, LLAssetType::AT_NOTECARD,
-												&onSaveComplete,
-												(void*)info,
-												FALSE);
-				return true;
+					S32 size = buffer.length() + 1;
+					if(file.write((U8*)buffer.c_str(), size))
+					{
+						gAssetStorage->storeAssetData(tid, LLAssetType::AT_NOTECARD,
+														&onSaveComplete,
+														(void*)info,
+														FALSE);
+						return true;
+					}
+					else
+					{
+						LL_WARNS() << "Unable to write notecard to cache." << LL_ENDL;
+						return false;
+					}
+				}
+				else
+				{
+					LL_WARNS() << "Unable to open cache file for write." << LL_ENDL;
+					return false;
+				}
 			}
 			else // !gAssetStorage
 			{

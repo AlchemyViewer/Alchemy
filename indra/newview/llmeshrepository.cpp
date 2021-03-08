@@ -1340,7 +1340,7 @@ bool LLMeshRepoThread::fetchMeshSkinInfo(const LLUUID& mesh_id, bool can_retry)
 		{
 			//check cache for mesh skin info
 			LLFileSystem file(mesh_id, LLAssetType::AT_MESH, LLFileSystem::READ);
-			if (file.getSize() >= offset+size)
+			if (file.open() && file.getSize() >= offset+size)
 			{
 				U8* buffer = new(std::nothrow) U8[size];
 				if (!buffer)
@@ -1352,6 +1352,7 @@ bool LLMeshRepoThread::fetchMeshSkinInfo(const LLUUID& mesh_id, bool can_retry)
 				++LLMeshRepository::sCacheReads;
 				file.seek(offset);
 				file.read(buffer, size);
+				file.close();
 
 				//make sure buffer isn't all 0's by checking the first 1KB (reserved block but not written)
 				bool zero = true;
@@ -1453,7 +1454,7 @@ bool LLMeshRepoThread::fetchMeshDecomposition(const LLUUID& mesh_id)
 		{
 			//check cache for mesh skin info
 			LLFileSystem file(mesh_id, LLAssetType::AT_MESH, LLFileSystem::READ);
-			if (file.getSize() >= offset+size)
+			if (file.open() && file.getSize() >= offset+size)
 			{
 				U8* buffer = new(std::nothrow) U8[size];
 				if (!buffer)
@@ -1466,6 +1467,7 @@ bool LLMeshRepoThread::fetchMeshDecomposition(const LLUUID& mesh_id)
 
 				file.seek(offset);
 				file.read(buffer, size);
+				file.close();
 
 				//make sure buffer isn't all 0's by checking the first 1KB (reserved block but not written)
 				bool zero = true;
@@ -1552,7 +1554,7 @@ bool LLMeshRepoThread::fetchMeshPhysicsShape(const LLUUID& mesh_id)
 		{
 			//check cache for mesh physics shape info
 			LLFileSystem file(mesh_id, LLAssetType::AT_MESH, LLFileSystem::READ);
-			if (file.getSize() >= offset+size)
+			if (file.open() && file.getSize() >= offset+size)
 			{
 				LLMeshRepository::sCacheBytesRead += size;
 				++LLMeshRepository::sCacheReads;
@@ -1564,6 +1566,7 @@ bool LLMeshRepoThread::fetchMeshPhysicsShape(const LLUUID& mesh_id)
 					return false;
 				}
 				file.read(buffer, size);
+				file.close();
 
 				//make sure buffer isn't all 0's by checking the first 1KB (reserved block but not written)
 				bool zero = true;
@@ -1660,7 +1663,7 @@ bool LLMeshRepoThread::fetchMeshHeader(const LLVolumeParams& mesh_params, bool c
 			
 		S32 size = file.getSize();
 
-		if (size > 0)
+		if (size > 0 && file.open())
 		{
 			// *NOTE:  if the header size is ever more than 4KB, this will break
 			U8 buffer[MESH_HEADER_SIZE];
@@ -1668,6 +1671,7 @@ bool LLMeshRepoThread::fetchMeshHeader(const LLVolumeParams& mesh_params, bool c
 			LLMeshRepository::sCacheBytesRead += bytes;	
 			++LLMeshRepository::sCacheReads;
 			file.read(buffer, bytes);
+			file.close();
 			if (headerReceived(mesh_params, buffer, bytes) == MESH_OK)
 			{
 				// Found mesh in cache
@@ -1741,7 +1745,7 @@ bool LLMeshRepoThread::fetchMeshLOD(const LLVolumeParams& mesh_params, S32 lod, 
 
 			//check cache for mesh asset
 			LLFileSystem file(mesh_id, LLAssetType::AT_MESH, LLFileSystem::READ);
-			if (file.getSize() >= offset+size)
+			if (file.open() && file.getSize() >= offset+size)
 			{
 				U8* buffer = new(std::nothrow) U8[size];
 				if (!buffer)
@@ -1755,6 +1759,7 @@ bool LLMeshRepoThread::fetchMeshLOD(const LLVolumeParams& mesh_params, S32 lod, 
 				++LLMeshRepository::sCacheReads;
 				file.seek(offset);
 				file.read(buffer, size);
+				file.close();
 
 				//make sure buffer isn't all 0's by checking the first 1KB (reserved block but not written)
 				bool zero = true;
@@ -3283,8 +3288,8 @@ void LLMeshHeaderHandler::processData(LLCore::BufferArray * /* body */, S32 /* b
 			// only allocate as much space in the cache as is needed for the local cache
 			data_size = llmin(data_size, bytes);
 
-			LLFileSystem file(mesh_id, LLAssetType::AT_MESH, LLFileSystem::READ_WRITE);
-			if (file.getMaxSize() >= bytes)
+			LLFileSystem file(mesh_id, LLAssetType::AT_MESH, LLFileSystem::APPEND);
+			if (file.open() && file.getMaxSize() >= bytes)
 			{
 				LLMeshRepository::sCacheBytesWritten += data_size;
 				++LLMeshRepository::sCacheWrites;
@@ -3304,6 +3309,7 @@ void LLMeshHeaderHandler::processData(LLCore::BufferArray * /* body */, S32 /* b
 				{
 					file.write(block, remaining);
 				}
+				file.close();
 
 			}
 		}
@@ -3362,10 +3368,11 @@ void LLMeshLODHandler::processData(LLCore::BufferArray * /* body */, S32 /* body
 			S32 offset = mOffset;
 			S32 size = mRequestedBytes;
 
-			if (file.getSize() >= offset+size)
+			if (file.open() && file.getSize() >= offset+size)
 			{
 				file.seek(offset);
 				file.write(data, size);
+				file.close();
 				LLMeshRepository::sCacheBytesWritten += size;
 				++LLMeshRepository::sCacheWrites;
 			}
@@ -3425,12 +3432,13 @@ void LLMeshSkinInfoHandler::processData(LLCore::BufferArray * /* body */, S32 /*
 		S32 offset = mOffset;
 		S32 size = mRequestedBytes;
 
-		if (file.getSize() >= offset+size)
+		if (file.open() && file.getSize() >= offset+size)
 		{
 			LLMeshRepository::sCacheBytesWritten += size;
 			++LLMeshRepository::sCacheWrites;
 			file.seek(offset);
 			file.write(data, size);
+			file.close();
 		}
 	}
 	else
@@ -3474,12 +3482,13 @@ void LLMeshDecompositionHandler::processData(LLCore::BufferArray * /* body */, S
 		S32 offset = mOffset;
 		S32 size = mRequestedBytes;
 
-		if (file.getSize() >= offset+size)
+		if (file.open() && file.getSize() >= offset+size)
 		{
 			LLMeshRepository::sCacheBytesWritten += size;
 			++LLMeshRepository::sCacheWrites;
 			file.seek(offset);
 			file.write(data, size);
+			file.close();
 		}
 	}
 	else
@@ -3521,12 +3530,13 @@ void LLMeshPhysicsShapeHandler::processData(LLCore::BufferArray * /* body */, S3
 		S32 offset = mOffset;
 		S32 size = mRequestedBytes;
 
-		if (file.getSize() >= offset+size)
+		if (file.open() && file.getSize() >= offset+size)
 		{
 			LLMeshRepository::sCacheBytesWritten += size;
 			++LLMeshRepository::sCacheWrites;
 			file.seek(offset);
 			file.write(data, size);
+			file.close();
 		}
 	}
 	else

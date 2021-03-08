@@ -341,12 +341,11 @@ LLMotion::LLMotionInitStatus LLKeyframeMotion::onInitialize(LLCharacter *charact
 		// Load named file by concatenating the character prefix with the motion name.
 		// Load data into a buffer to be parsed.
 		//-------------------------------------------------------------------------
-		LLFileSystem* anim_file = new LLFileSystem(mID, LLAssetType::AT_ANIMATION);
-		if (!anim_file || !anim_file->getSize())
-		{
-			delete anim_file;
-			anim_file = NULL;
 
+
+		LLFileSystem anim_file(mID, LLAssetType::AT_ANIMATION);
+		if (!anim_file.open() || !anim_file.getSize())
+		{
 			// request asset over network on next call to load
 			mAssetStatus = ASSET_NEEDS_FETCH;
 
@@ -354,11 +353,11 @@ LLMotion::LLMotionInitStatus LLKeyframeMotion::onInitialize(LLCharacter *charact
 		}
 		else
 		{
-			anim_file_size = anim_file->getSize();
+			anim_file_size = anim_file.getSize();
 			anim_data = new(std::nothrow) U8[anim_file_size];
 			if (anim_data)
 			{
-				success = anim_file->read(anim_data, anim_file_size);	/*Flawfinder: ignore*/
+				success = anim_file.read(anim_data, anim_file_size);	/*Flawfinder: ignore*/
 				if (!success)
 				{
 					delete[] anim_data;
@@ -369,8 +368,6 @@ LLMotion::LLMotionInitStatus LLKeyframeMotion::onInitialize(LLCharacter *charact
 			{
 				LL_WARNS() << "Failed to allocate buffer: " << anim_file_size << mID << LL_ENDL;
 			}
-			delete anim_file;
-			anim_file = NULL;
 		}
 	}
 	else
@@ -2129,10 +2126,18 @@ void LLKeyframeMotion::onLoadComplete(const LLUUID& asset_uuid,
 				return;
 			}
 			LLFileSystem file(asset_uuid, type, LLFileSystem::READ);
+			if (!file.open())
+			{
+				return;
+			}
 			S32 size = file.getSize();
 			
 			U8* buffer = new U8[size];
-			file.read((U8*)buffer, size);	/*Flawfinder: ignore*/
+			if (!file.read((U8*)buffer, size))	/*Flawfinder: ignore*/
+			{
+				delete[] buffer;
+				return;
+			}
 
 			LL_DEBUGS("Animation") << "Loading keyframe data for: " << motionp->getName() << ":" << motionp->getID() << " (" << size << " bytes)" << LL_ENDL;
 			

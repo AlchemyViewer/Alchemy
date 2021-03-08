@@ -861,37 +861,58 @@ void LLPreviewGesture::onLoadComplete(const LLUUID& asset_uuid,
 		if (0 == status)
 		{
 			LLFileSystem file(asset_uuid, type, LLFileSystem::READ);
-			S32 size = file.getSize();
-
-			std::vector<char> buffer(size+1);
-			file.read((U8*)&buffer[0], size);
-			buffer[size] = '\0';
-
-			LLMultiGesture* gesture = new LLMultiGesture();
-
-			LLDataPackerAsciiBuffer dp(&buffer[0], size+1);
-			BOOL ok = gesture->deserialize(dp);
-
-			if (ok)
+			if (file.open())
 			{
-				// Everything has been successful.  Load up the UI.
-				self->loadUIFromGesture(gesture);
+				S32 size = file.getSize();
 
-				self->mStepList->selectFirstItem();
+				std::vector<char> buffer(size + 1);
+				if (file.read((U8*)&buffer[0], size))
+				{
+					file.close();
 
-				self->mDirty = FALSE;
-				self->refresh();
-				self->refreshFromItem(); // to update description and title
+					buffer[size] = '\0';
+
+						LLMultiGesture* gesture = new LLMultiGesture();
+
+						LLDataPackerAsciiBuffer dp(&buffer[0], size + 1);
+						BOOL ok = gesture->deserialize(dp);
+
+						if (ok)
+						{
+							// Everything has been successful.  Load up the UI.
+							self->loadUIFromGesture(gesture);
+
+							self->mStepList->selectFirstItem();
+
+							self->mDirty = FALSE;
+							self->refresh();
+							self->refreshFromItem(); // to update description and title
+						}
+						else
+						{
+							LL_WARNS() << "Unable to load gesture" << LL_ENDL;
+						}
+
+					delete gesture;
+					gesture = NULL;
+
+					self->mAssetStatus = PREVIEW_ASSET_LOADED;
+				}
+				else
+				{
+					LLDelayedGestureError::gestureFailedToLoad(*item_idp);
+
+					LL_WARNS() << "Problem loading gesture: " << status << LL_ENDL;
+					self->mAssetStatus = PREVIEW_ASSET_ERROR;
+				}
 			}
 			else
 			{
-				LL_WARNS() << "Unable to load gesture" << LL_ENDL;
+				LLDelayedGestureError::gestureFailedToLoad(*item_idp);
+
+				LL_WARNS() << "Problem loading gesture: " << status << LL_ENDL;
+				self->mAssetStatus = PREVIEW_ASSET_ERROR;
 			}
-
-			delete gesture;
-			gesture = NULL;
-
-			self->mAssetStatus = PREVIEW_ASSET_LOADED;
 		}
 		else
 		{
@@ -1148,13 +1169,17 @@ void LLPreviewGesture::saveIfNeeded()
             assetId = tid.makeAssetID(gAgent.getSecureSessionID());
 
             LLFileSystem file(assetId, LLAssetType::AT_GESTURE, LLFileSystem::WRITE);
-
-            S32 size = dp.getCurrentSize();
-            file.write((U8*)buffer, size);
-
-            LLLineEditor* descEditor = getChild<LLLineEditor>("desc");
-            LLSaveInfo* info = new LLSaveInfo(mItemUUID, mObjectUUID, descEditor->getText(), tid);
-            gAssetStorage->storeAssetData(tid, LLAssetType::AT_GESTURE, onSaveComplete, info, FALSE);
+			if (file.open())
+			{
+				S32 size = dp.getCurrentSize();
+				if (file.write((U8*)buffer, size))
+				{
+					file.close();
+					LLLineEditor* descEditor = getChild<LLLineEditor>("desc");
+					LLSaveInfo* info = new LLSaveInfo(mItemUUID, mObjectUUID, descEditor->getText(), tid);
+					gAssetStorage->storeAssetData(tid, LLAssetType::AT_GESTURE, onSaveComplete, info, FALSE);
+				}
+			}
         }
 
     }
