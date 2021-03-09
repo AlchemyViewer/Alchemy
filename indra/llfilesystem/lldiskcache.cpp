@@ -198,10 +198,11 @@ const std::string LLDiskCache::metaDataToFilepath(const LLUUID& id,
 
 const std::string LLDiskCache::getCacheInfo()
 {
-    F32 max_in_mb = (F32)mMaxSizeBytes / (1024.0 * 1024.0);
-    F32 percent_used = ((F32)dirFileSize(sCacheDir) / (F32)mMaxSizeBytes) * 100.0;
+    uintmax_t cache_used_mb = dirFileSize(sCacheDir) / (1024U * 1024U);
+    uintmax_t max_in_mb = mMaxSizeBytes / (1024U * 1024U);
+    F64 percent_used = ((F64)cache_used_mb / (F64)max_in_mb) * 100.0;
 
-    return llformat("Max size %1.f MB (%.1f %% used)", max_in_mb, percent_used);
+    return llformat("%juMB / %juMB (%.1f%% used)", cache_used_mb, max_in_mb, percent_used);
 }
 
 void LLDiskCache::clearCache()

@@ -3300,6 +3300,12 @@ LLSD LLAppViewer::getViewerInfo() const
 		info["SERVER_RELEASE_NOTES_URL"] = mServerReleaseNotesURL;
 	}
 
+	// populate field for the texture cache with some details
+	S64Bytes texture_cache_used = getTextureCache()->getUsage();
+	S64Bytes texture_cache_max = getTextureCache()->getMaxUsage();
+	F64 percent_used = ((F64)texture_cache_used.value() / (F64)texture_cache_max.value()) * 100.0;
+	info["TEXTURE_CACHE_INFO"] = llformat("%dMB / %dMB (%.1f%% used)", S32Megabytes(texture_cache_used).value(), S32Megabytes(texture_cache_max).value(), percent_used);
+
     // populate field for new local disk cache with some details
     info["DISK_CACHE_INFO"] = LLDiskCache::getInstance()->getCacheInfo();
 
