@@ -3136,6 +3136,20 @@ LLSD LLAppViewer::getViewerInfo() const
     }
 	info["VIEWER_RELEASE_NOTES_URL"] = url;
 
+#if LL_MSVC && !defined(LL_CLANG)
+	info["COMPILER"] = "MSVC";
+	info["COMPILER_VERSION"] = _MSC_FULL_VER;
+#elif LL_GNUC
+	info["COMPILER"] = "GCC";
+	info["COMPILER_VERSION"] = GCC_VERSION;
+#elif LL_CLANG
+	info["COMPILER"] = "Clang";
+	info["COMPILER_VERSION"] = __clang_version__;
+#elif LL_INTELC
+	info["COMPILER"] = "ICC";
+	info["COMPILER_VERSION"] = __ICC;
+#endif
+
 	// Position
 	LLViewerRegion* region = gAgent.getRegion();
 	if (region)
@@ -3214,7 +3228,7 @@ LLSD LLAppViewer::getViewerInfo() const
 #endif
 
 	// Libraries
-
+	info["LIBCURL_VERSION"] = LLCore::LLHttp::getCURLVersion();
 	info["J2C_VERSION"] = LLImageJ2C::getEngineInfo();
 	bool want_fullname = true;
 	info["AUDIO_DRIVER_VERSION"] = gAudiop ? LLSD(gAudiop->getDriverName(want_fullname)) : "Undefined";
@@ -3230,7 +3244,7 @@ LLSD LLAppViewer::getViewerInfo() const
 		info["VOICE_VERSION"] = LLTrans::getString("NotConnected");
 	}
 
-#if !LL_LINUX
+#if defined(CEF_VERSION)
 	std::ostringstream cef_ver_codec;
 	cef_ver_codec << "Dullahan: ";
 	cef_ver_codec << DULLAHAN_VERSION_MAJOR;
