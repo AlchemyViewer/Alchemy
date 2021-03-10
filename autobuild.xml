@@ -2112,7 +2112,7 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
       <key>openjpeg</key>
       <map>
         <key>copyright</key>
-        <string>Copyright (c) 2002-2012, Communications and Remote Sensing Laboratory, Universite catholique de Louvain (UCL), Belgium, Copyright (c) 2002-2012, Professor Benoit Macq, Copyright (c) 2003-2012, Antonin Descampe, Copyright (c) 2003-2009, Francois-Olivier Devaux, Copyright (c) 2005, Herve Drolon, FreeImage Team, Copyright (c) 2002-2003, Yannick Verschueren, Copyright (c) 2001-2003, David Janssens</string>
+        <string>Copyright (c) 2002-2014, Universite catholique de Louvain, Belgium, Copyright (c) 2002-2012, Professor Benoit Macq, Copyright (c) 2003-2012, Antonin Descampe, Copyright (c) 2003-2009, Francois-Olivier Devaux, Copyright (c) 2005, Herve Drolon, FreeImage Team, Copyright (c) 2002-2003, Yannick Verschueren, Copyright (c) 2001-2003, David Janssens</string>
         <key>description</key>
         <string>The OpenJPEG library is an open-source JPEG 2000 codec written in C language.</string>
         <key>license</key>
@@ -2142,11 +2142,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>60a1ca9b97ad74a8e3a33d33caf503cdb5e7f1684d6316ed484471c02124d603878c8526f7166a16064cd7c88b9905db</string>
+              <string>80c7062c95c45e6851ddbdf19f61885280728ec40a5dfdcfbdaea9c4eed0bfe7dcbfb71b7e7e6d01fff4eb357f7c02ae</string>
               <key>hash_algorithm</key>
               <string>sha3_384</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/105/packages/generic/openjpeg-641/1.5.1/openjpeg-1.5.1-linux64-641.tar.xz</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/147/packages/generic/openjpeg-753/2.4.0/openjpeg-2.4.0-linux64-753.tar.xz</string>
             </map>
             <key>name</key>
             <string>linux64</string>
@@ -2156,11 +2156,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>474913320ea038660a73810b6563d0b2174cef5a9445f3454fb6e8d9efac89fddb9fb0be007001a434ec3c8125917f6d</string>
+              <string>d6984ea9ff046e2e541071182833365cc0d15edfcad59c4ded1f15c3d1ba88f3627c784f5c0f789a003244a816788cde</string>
               <key>hash_algorithm</key>
               <string>sha3_384</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/105/packages/generic/openjpeg-641/1.5.1/openjpeg-1.5.1-windows-641.tar.xz</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/147/packages/generic/openjpeg-753/2.4.0/openjpeg-2.4.0-windows-753.tar.xz</string>
             </map>
             <key>name</key>
             <string>windows</string>
@@ -2170,18 +2170,18 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>044b5655aecdc9e22f013509ec3a0a8297955cfc993465256e182d519876d55bc3b33df56b861f587a8086e79b8aa090</string>
+              <string>993058a8a028842c7e65c49612c893fcf3e6961eb13b9be88a2080f6f5b4b782791bd5bb3eed79d05ca3734b26b0102e</string>
               <key>hash_algorithm</key>
               <string>sha3_384</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/105/packages/generic/openjpeg-641/1.5.1/openjpeg-1.5.1-windows64-641.tar.xz</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/147/packages/generic/openjpeg-753/2.4.0/openjpeg-2.4.0-windows64-753.tar.xz</string>
             </map>
             <key>name</key>
             <string>windows64</string>
           </map>
         </map>
         <key>version</key>
-        <string>1.5.1</string>
+        <string>2.4.0</string>
       </map>
       <key>openssl</key>
       <map>

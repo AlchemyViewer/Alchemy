@@ -81,7 +81,7 @@ if(WINDOWS)
         libxml2.dll
         minizip.dll
         nghttp2.dll
-        openjpeg.dll
+        openjp2.dll
         ssleay32.dll
         uriparser.dll
         xmlrpc-epi.dll

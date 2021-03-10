@@ -531,7 +531,7 @@ class WindowsManifest(ViewerManifest):
             self.path("jpeg8.dll")
             self.path("libpng16*.dll")
             self.path("libwebp.dll")
-            self.path("openjpeg.dll")
+            self.path("openjp2.dll")
 
             # For OpenGL extensions
             self.path("epoxy-0.dll")
@@ -933,7 +933,7 @@ class DarwinManifest(ViewerManifest):
                                 'libhunspell-*.dylib',
                                 'libndofdev.dylib',
                                 'libogg.*.dylib',
-                                'libopenjpeg.*.dylib',
+                                'libopenjp2.*.dylib',
                                 'liburiparser.*.dylib',
                                 'libvorbis.*.dylib',
                                 'libvorbisenc.*.dylib',
@@ -1474,7 +1474,7 @@ class Linux_i686_Manifest(LinuxManifest):
             self.path("libexpat.so.*")
             self.path("libGLOD.so")
             self.path("libSDL2*.so*")
-            self.path("libopenjpeg.so*")
+            self.path("libopenjp2.*so*")
             self.path("libepoxy.so")
             self.path("libepoxy.so.0")
             self.path("libepoxy.so.0.0.0")
@@ -1516,7 +1516,7 @@ class Linux_x86_64_Manifest(LinuxManifest):
             self.path("libexpat.so.*")
             self.path("libGLOD.so")
             self.path("libSDL2*.so*")
-            self.path("libopenjpeg.so*")
+            self.path("libopenjp2.*so*")
             self.path("libepoxy.so")
             self.path("libepoxy.so.0")
             self.path("libepoxy.so.0.0.0")
