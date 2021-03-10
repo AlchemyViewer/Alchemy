@@ -1892,7 +1892,7 @@ if (WINDOWS)
       #${SHARED_LIB_STAGING_DIR}/Debug/libcollada14dom23-d.dll
       ${SHARED_LIB_STAGING_DIR}/Release/openjp2.dll
       ${SHARED_LIB_STAGING_DIR}/RelWithDebInfo/openjp2.dll
-      #${SHARED_LIB_STAGING_DIR}/Debug/openjpegd.dll
+      #${SHARED_LIB_STAGING_DIR}/Debug/openjp2.dll
       ${SHARED_LIB_STAGING_DIR}/Release/libhunspell.dll
       ${SHARED_LIB_STAGING_DIR}/RelWithDebInfo/libhunspell.dll
       #${SHARED_LIB_STAGING_DIR}/Debug/libhunspell.dll

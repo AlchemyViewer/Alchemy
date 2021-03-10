@@ -29,8 +29,6 @@
 
 // this is defined so that we get static linking.
 #include "openjpeg.h"
-#include "cio.h"
-#include "event.h"
 
 #include "lltimer.h"
 
