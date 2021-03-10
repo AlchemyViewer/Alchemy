@@ -2724,11 +2724,11 @@ void LLIMMgr::addMessage(
 
 	//*NOTE session_name is empty in case of incoming P2P sessions
 	std::string fixed_session_name = from;
-	bool name_is_setted = false;
+//	bool name_is_setted = false;
 	if(!session_name.empty() && session_name.size()>1)
 	{
 		fixed_session_name = session_name;
-		name_is_setted = true;
+//		name_is_setted = true;
 	}
 //	bool skip_message = false;
 //	bool from_linden = LLMuteList::getInstance()->isLinden(from);

@@ -299,7 +299,7 @@ enum HttpError
 struct HttpStatus
 {
 	typedef unsigned short type_enum_t;
-	enum : type_enum_t
+	enum EType : type_enum_t
 	{
 		EXT_CURL_EASY = 0,  ///< mStatus is an error from a curl_easy_*() call
 		EXT_CURL_MULTI = 1, ///< mStatus is an error from a curl_multi_*() call
