@@ -81,8 +81,53 @@ LLFontManager::LLFontManager()
 LLFontManager::~LLFontManager()
 {
 	FT_Done_FreeType(gFTLibrary);
+	unloadAllFonts(); 	// Only load/mmap fonts once. Release everything here.
 }
 
+const U8* LLFontManager::loadFont(const std::string& filename, long& out_size)
+{
+	out_size = 0;
+
+	auto itr = mLoadedFonts.find(filename);
+	if (itr != mLoadedFonts.cend())
+	{
+		out_size = itr->second->mSize;
+		return itr->second->mAddress.get();
+	}
+
+	LLUniqueFile filep = LLFile::fopen(filename, "rb");
+	if (!filep)
+	{
+		return nullptr;
+	}
+
+	fseek(filep, 0L, SEEK_END);
+	out_size = ftell(filep);
+	fseek(filep, 0L, SEEK_SET);
+
+	if (0 >= out_size)
+	{
+		return nullptr;
+	}
+
+	U8* in_buf = new U8[out_size];
+	if (fread(in_buf, 1, out_size, filep) != out_size)
+	{
+		out_size = 0;
+		return nullptr;
+	}
+	filep.close();
+
+	std::unique_ptr<U8[]> out_ptr(in_buf);
+	auto pCache = std::make_unique<LoadedFont>(filename, std::move(out_ptr), out_size);
+	itr = mLoadedFonts.emplace(filename, std::move(pCache)).first;
+	return itr->second->mAddress.get();
+}
+
+void LLFontManager::unloadAllFonts()
+{
+	mLoadedFonts.clear();
+}
 
 LLFontGlyphInfo::LLFontGlyphInfo(U32 index)
 :	mGlyphIndex(index),
@@ -104,10 +149,6 @@ LLFontFreetype::LLFontFreetype()
 	mAscender(0.f),
 	mDescender(0.f),
 	mLineHeight(0.f),
-#ifdef LL_WINDOWS
-	pFileStream(NULL),
-	pFtStream(NULL),
-#endif
 	mIsFallback(FALSE),
 	mFTFace(NULL),
 	mRenderGlyphCount(0),
@@ -131,28 +172,9 @@ LLFontFreetype::~LLFontFreetype()
 	std::for_each(mCharGlyphInfoMap.begin(), mCharGlyphInfoMap.end(), DeletePairedPointer());
 	mCharGlyphInfoMap.clear();
 
-#ifdef LL_WINDOWS
-	delete pFileStream; // closed by FT_Done_Face
-	delete pFtStream;
-#endif
 	delete mFontBitmapCachep;
 	// mFallbackFonts cleaned up by LLPointer destructor
 }
-
-#ifdef LL_WINDOWS
-unsigned long ft_read_cb(FT_Stream stream, unsigned long offset, unsigned char *buffer, unsigned long count) {
-	if (count <= 0) return count;
-	llifstream *file_stream = static_cast<llifstream *>(stream->descriptor.pointer);
-	file_stream->seekg(offset, std::ios::beg);
-	file_stream->read((char*)buffer, count);
-	return file_stream->gcount();
-}
-
-void ft_close_cb(FT_Stream stream) {
-	llifstream *file_stream = static_cast<llifstream *>(stream->descriptor.pointer);
-	file_stream->close();
-}
-#endif
 
 BOOL LLFontFreetype::loadFace(const std::string& filename, F32 point_size, F32 vert_dpi, F32 horz_dpi, S32 components, BOOL is_fallback, S32 face_n)
 {
@@ -165,20 +187,20 @@ BOOL LLFontFreetype::loadFace(const std::string& filename, F32 point_size, F32 v
 	}
 	
 	int error;
-#ifdef LL_WINDOWS
-	error = ftOpenFace(filename, face_n);
-#else
-	error = FT_New_Face( gFTLibrary,
-						 filename.c_str(),
-						 0,
-						 &mFTFace);
-#endif
+
+	FT_Open_Args openArgs;
+	memset(&openArgs, 0, sizeof(openArgs));
+	openArgs.memory_base = gFontManagerp->loadFont(filename, openArgs.memory_size);
+
+	if( !openArgs.memory_base )
+		return FALSE;
+
+	openArgs.flags = FT_OPEN_MEMORY;
+
+	error = FT_Open_Face( gFTLibrary, &openArgs, face_n, &mFTFace );
 
 	if (error)
 	{
-#ifdef LL_WINDOWS
-		clearFontStreams();
-#endif
 		return FALSE;
 	}
 
@@ -195,9 +217,6 @@ BOOL LLFontFreetype::loadFace(const std::string& filename, F32 point_size, F32 v
 	{
 		// Clean up freetype libs.
 		FT_Done_Face(mFTFace);
-#ifdef LL_WINDOWS
-		clearFontStreams();
-#endif
 		mFTFace = NULL;
 		return FALSE;
 	}
@@ -262,9 +281,15 @@ S32 LLFontFreetype::getNumFaces(const std::string& filename)
 
 	S32 num_faces = 1;
 
-#ifdef LL_WINDOWS
-	int error = ftOpenFace(filename, 0);
-		
+	FT_Open_Args openArgs;
+	memset( &openArgs, 0, sizeof( openArgs ) );
+	openArgs.memory_base = gFontManagerp->loadFont( filename, openArgs.memory_size );
+	if( !openArgs.memory_base )
+		return 0;
+
+	openArgs.flags = FT_OPEN_MEMORY;
+
+	int error = FT_Open_Face( gFTLibrary, &openArgs, 0, &mFTFace );
 	if (error)
 	{
 		return 0;
@@ -275,54 +300,10 @@ S32 LLFontFreetype::getNumFaces(const std::string& filename)
 	}
 	
 	FT_Done_Face(mFTFace);
-	clearFontStreams();
 	mFTFace = NULL;
-#endif
 
 	return num_faces;
 }
-
-#ifdef LL_WINDOWS
-S32 LLFontFreetype::ftOpenFace(const std::string& filename, S32 face_n)
-{
-	S32 error = -1;
-	pFileStream = new llifstream(filename, std::ios::binary);
-	if (pFileStream->is_open())
-	{
-		std::streampos beg = pFileStream->tellg();
-		pFileStream->seekg(0, std::ios::end);
-		std::streampos end = pFileStream->tellg();
-		std::size_t file_size = end - beg;
-		pFileStream->seekg(0, std::ios::beg);
-
-		pFtStream = new LLFT_Stream();
-		pFtStream->base = 0;
-		pFtStream->pos = 0;
-		pFtStream->size = file_size;
-		pFtStream->descriptor.pointer = pFileStream;
-		pFtStream->read = ft_read_cb;
-		pFtStream->close = ft_close_cb;
-
-		FT_Open_Args args;
-		args.flags = FT_OPEN_STREAM;
-		args.stream = (FT_StreamRec*)pFtStream;
-		error = FT_Open_Face(gFTLibrary, &args, face_n, &mFTFace);
-	}
-	return error;
-}
-
-void LLFontFreetype::clearFontStreams()
-{
-	if (pFileStream)
-	{
-		pFileStream->close();
-	}
-	delete pFileStream;
-	delete pFtStream;
-	pFileStream = NULL;
-	pFtStream = NULL;
-}
-#endif
 
 void LLFontFreetype::setFallbackFonts(const font_vector_t &font)
 {

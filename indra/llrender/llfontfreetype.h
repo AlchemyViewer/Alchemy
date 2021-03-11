@@ -52,6 +52,25 @@ public:
 private:
 	LLFontManager();
 	~LLFontManager();
+public:
+	const U8* loadFont(const std::string& filename, long &size );
+
+private:
+	struct LoadedFont
+	{
+		LoadedFont(std::string name, std::unique_ptr<U8[]> address, long size)
+			: mName(std::move(name))
+			, mAddress(std::move(address))
+			, mSize(size)
+		{ }
+
+		std::string mName;
+		std::unique_ptr<U8[]> mAddress;
+		long mSize;
+	};
+
+	void unloadAllFonts();
+	absl::flat_hash_map< std::string, std::unique_ptr<LoadedFont> > mLoadedFonts;
 };
 
 struct LLFontGlyphInfo
@@ -87,11 +106,6 @@ public:
 	BOOL loadFace(const std::string& filename, F32 point_size, F32 vert_dpi, F32 horz_dpi, S32 components, BOOL is_fallback, S32 face_n = 0);
 
 	S32 getNumFaces(const std::string& filename);
-
-#ifdef LL_WINDOWS
-	S32 ftOpenFace(const std::string& filename, S32 face_n);
-	void clearFontStreams();
-#endif
 
 	typedef std::vector<LLPointer<LLFontFreetype> > font_vector_t;
 
@@ -148,6 +162,8 @@ public:
 	void setStyle(U8 style);
 	U8 getStyle() const;
 
+	static std::string getVersionString();
+
 private:
 	void resetBitmapCache();
 	void setSubImageLuminanceAlpha(U32 x, U32 y, U32 bitmap_num, U32 width, U32 height, U8 *data, S32 stride = 0) const;
@@ -172,11 +188,6 @@ private:
 	F32 mLineHeight;
 
 	LLFT_Face mFTFace;
-
-#ifdef LL_WINDOWS
-	llifstream *pFileStream;
-	LLFT_Stream *pFtStream;
-#endif
 
 	BOOL mIsFallback;
 	font_vector_t mFallbackFonts; // A list of fallback fonts to look for glyphs in (for Unicode chars)
