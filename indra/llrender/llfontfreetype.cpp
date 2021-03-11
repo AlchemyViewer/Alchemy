@@ -44,8 +44,6 @@
 #include "llfontbitmapcache.h"
 #include "llgl.h"
 
-FT_Render_Mode gFontRenderMode = FT_RENDER_MODE_NORMAL;
-
 LLFontManager *gFontManagerp = NULL;
 
 FT_Library gFTLibrary = NULL;
@@ -584,7 +582,11 @@ void LLFontFreetype::renderGlyph(U32 glyph_index) const
 	if (mFTFace == NULL)
 		return;
 
-	llassert_always(! FT_Load_Glyph(mFTFace, glyph_index, FT_LOAD_DEFAULT | FT_LOAD_RENDER | FT_LOAD_TARGET_LIGHT) );
+	if (FT_Load_Glyph(mFTFace, glyph_index, FT_LOAD_DEFAULT | FT_LOAD_RENDER | FT_LOAD_TARGET_LIGHT) != 0)
+	{
+		// If glyph fails to load and/or render, render a fallback character
+		llassert_always(!FT_Load_Char(mFTFace, L'?', FT_LOAD_RENDER | FT_LOAD_TARGET_LIGHT));
+	}
 
 	mRenderGlyphCount++;
 }
