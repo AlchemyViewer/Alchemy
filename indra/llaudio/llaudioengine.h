@@ -40,6 +40,7 @@
 #include "llextendedstatus.h"
 
 #include "lllistener.h"
+#include "absl/container/flat_hash_map.h"
 
 const F32 LL_WIND_UPDATE_INTERVAL = 0.1f;
 const F32 LL_WIND_UNDERWATER_CENTER_FREQ = 20.f;
@@ -94,7 +95,7 @@ public:
 
 	// Used by the mechanics of the engine
 	//virtual void processQueue(const LLUUID &sound_guid);
-	virtual void setListener(LLVector3 pos,LLVector3 vel,LLVector3 up,LLVector3 at);
+	virtual void setListener(const LLVector3& pos, const LLVector3& vel, const LLVector3& up, const LLVector3& at);
 	virtual void updateWind(LLVector3 direction, F32 camera_height_above_water) = 0;
 	virtual void idle(F32 max_decode_time = 0.f);
 	virtual void updateChannels();
@@ -133,7 +134,7 @@ public:
 	void triggerSound(const LLUUID &sound_id, const LLUUID& owner_id, const F32 gain,
 					  const S32 type = LLAudioEngine::AUDIO_TYPE_NONE,
 					  const LLVector3d &pos_global = LLVector3d::zero);
-	void triggerSound(SoundData& soundData);
+	void triggerSound(const SoundData& soundData);
 
 	bool preloadSound(const LLUUID &id);
 
@@ -191,15 +192,15 @@ protected:
 
 
 	// listener methods
-	virtual void setListenerPos(LLVector3 vec);
-	virtual void setListenerVelocity(LLVector3 vec);
-	virtual void orientListener(LLVector3 up, LLVector3 at);
-	virtual void translateListener(LLVector3 vec);
+	virtual void setListenerPos(const LLVector3& vec);
+	virtual void setListenerVelocity(const LLVector3& vec);
+	virtual void orientListener(const LLVector3& up, const LLVector3& at);
+	virtual void translateListener(const LLVector3& vec);
 
 
-	F64 mapWindVecToGain(LLVector3 wind_vec);
-	F64 mapWindVecToPitch(LLVector3 wind_vec);
-	F64 mapWindVecToPan(LLVector3 wind_vec);
+	F64 mapWindVecToGain(const LLVector3& wind_vec);
+	F64 mapWindVecToPitch(const LLVector3& wind_vec);
+	F64 mapWindVecToPan(const LLVector3& wind_vec);
 
 protected:
 	LLListener *mListenerp;
@@ -218,8 +219,8 @@ protected:
 	// A list of all audio sources that are known to the viewer at this time.
 	// This is most likely a superset of the ones that we actually have audio
 	// data for, or are playing back.
-	typedef std::map<LLUUID, LLAudioSource *> source_map;
-	typedef std::map<LLUUID, LLAudioData *> data_map;
+	typedef absl::flat_hash_map<LLUUID, LLAudioSource *> source_map;
+	typedef absl::flat_hash_map<LLUUID, LLAudioData *> data_map;
 
 	source_map mAllSources;
 	data_map mAllData;
@@ -336,7 +337,7 @@ protected:
 	LLAudioData		*mCurrentDatap;
 	LLAudioData		*mQueuedDatap;
 
-	typedef std::map<LLUUID, LLAudioData *> data_map;
+	typedef absl::flat_hash_map<LLUUID, LLAudioData *> data_map;
 	data_map mPreloadMap;
 
 	LLFrameTimer mAgeTimer;
@@ -455,17 +456,17 @@ struct SoundData
 	S32 type;
 	LLVector3d pos_global;
 
-	SoundData(const LLUUID &audio_uuid, 
-		const LLUUID& owner_id, 
-		const F32 gain, 					  
-		const S32 type = LLAudioEngine::AUDIO_TYPE_NONE,
-		const LLVector3d &pos_global = LLVector3d::zero)
+	SoundData(const LLUUID &audio_uuid_in, 
+		const LLUUID& owner_id_in, 
+		const F32 gain_in,
+		const S32 type_in = LLAudioEngine::AUDIO_TYPE_NONE,
+		const LLVector3d &pos_global_in = LLVector3d::zero) :
+		audio_uuid(audio_uuid_in),
+		owner_id(owner_id_in),
+		gain(gain_in),
+		type(type_in),
+		pos_global(pos_global_in)
 	{
-		this->audio_uuid = audio_uuid;
-		this->owner_id = owner_id;
-		this->gain = gain;
-		this->type = type;
-		this->pos_global = pos_global;
 	}
 };
 
