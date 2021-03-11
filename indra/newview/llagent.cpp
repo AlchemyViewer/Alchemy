@@ -3974,7 +3974,7 @@ bool LLAgent::teleportCore(bool is_local)
 	// Stop all animation before actual teleporting 
         if (isAgentAvatarValid())
 	{
-		for ( LLVOAvatar::AnimIterator anim_it= gAgentAvatarp->mPlayingAnimations.begin();
+		for (auto  anim_it = gAgentAvatarp->mPlayingAnimations.begin();
 		      anim_it != gAgentAvatarp->mPlayingAnimations.end();
 		      ++anim_it)
                {
@@ -4548,13 +4548,10 @@ void LLAgent::stopCurrentAnimations()
 	{
 		std::vector<LLUUID> anim_ids;
 
-		for ( LLVOAvatar::AnimIterator anim_it =
-			      gAgentAvatarp->mPlayingAnimations.begin();
-		      anim_it != gAgentAvatarp->mPlayingAnimations.end();
-		      anim_it++)
+		for (const auto& anim_pair : gAgentAvatarp->mPlayingAnimations)
 		{
-			if ((anim_it->first == ANIM_AGENT_DO_NOT_DISTURB)||
-				(anim_it->first == ANIM_AGENT_SIT_GROUND_CONSTRAINED))
+			if ((anim_pair.first == ANIM_AGENT_DO_NOT_DISTURB)||
+				(anim_pair.first == ANIM_AGENT_SIT_GROUND_CONSTRAINED))
 			{
 				// don't cancel a ground-sit anim, as viewers
 				// use this animation's status in
@@ -4564,9 +4561,9 @@ void LLAgent::stopCurrentAnimations()
 			else
 			{
 				// stop this animation locally
-				gAgentAvatarp->stopMotion(anim_it->first, TRUE);
+				gAgentAvatarp->stopMotion(anim_pair.first, TRUE);
 				// ...and tell the server to tell everyone.
-				anim_ids.push_back(anim_it->first);
+				anim_ids.push_back(anim_pair.first);
 			}
 		}
 

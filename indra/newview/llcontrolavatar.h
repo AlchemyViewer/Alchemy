@@ -101,7 +101,7 @@ public:
 	static boost::signals2::connection sRegionChangedSlot;
 };
 
-typedef std::map<LLUUID, S32> signaled_animation_map_t;
+typedef absl::flat_hash_map<LLUUID, S32> signaled_animation_map_t;
 typedef std::map<LLUUID, signaled_animation_map_t> object_signaled_animation_map_t;
 
 // Stores information about previously requested animations, by object id.
