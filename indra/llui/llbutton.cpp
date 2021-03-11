@@ -964,7 +964,7 @@ void LLButton::draw()
 			label_color % alpha,
 			mHAlign, LLFontGL::VCENTER,
 			LLFontGL::NORMAL,
-			mDropShadowedText ? LLFontGL::DROP_SHADOW_SOFT : LLFontGL::NO_SHADOW,
+			mDropShadowedText ? LLFontGL::DROP_SHADOW : LLFontGL::NO_SHADOW,
 			S32_MAX, text_width,
 			NULL, mUseEllipses);
 	}
