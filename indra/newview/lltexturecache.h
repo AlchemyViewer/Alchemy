@@ -225,7 +225,7 @@ private:
 	EntriesInfo mHeaderEntriesInfo;
 	std::set<S32> mFreeList; // deleted entries
 	std::set<LLUUID> mLRU;
-	typedef std::map<LLUUID, S32> id_map_t;
+	typedef absl::flat_hash_map<LLUUID, S32> id_map_t;
 	id_map_t mHeaderIDMap;
 
 	LLAPRFile*   mFastCachep;
@@ -234,12 +234,12 @@ private:
 
 	// BODIES (TEXTURES minus headers)
 	std::string mTexturesDirName;
-	typedef std::map<LLUUID,S32> size_map_t;
+	typedef absl::flat_hash_map<LLUUID,S32> size_map_t;
 	size_map_t mTexturesSizeMap;
 	S64 mTexturesSizeTotal;
 	LLAtomicBool mDoPurge;
 
-	typedef std::map<S32, Entry> idx_entry_map_t;
+	typedef absl::flat_hash_map<S32, Entry> idx_entry_map_t;
 	idx_entry_map_t mUpdatedEntryMap;
 	typedef std::vector<std::pair<S32, Entry> > idx_entry_vector_t;
 	idx_entry_vector_t mPurgeEntryList;
