@@ -657,6 +657,20 @@ U8 LLFontFreetype::getStyle() const
 	return mStyle;
 }
 
+std::string LLFontFreetype::getVersionString()
+{
+	if (gFTLibrary != nullptr)
+	{
+		int major, minor, patch;
+		FT_Library_Version(gFTLibrary, &major, &minor, &patch);
+		return std::string(llformat("FreeType %i.%i.%i", major, minor, patch));
+	}
+	else
+	{
+		return std::string();
+	}
+}
+
 void LLFontFreetype::setSubImageLuminanceAlpha(U32 x, U32 y, U32 bitmap_num, U32 width, U32 height, U8 *data, S32 stride) const
 {
 	LLImageRaw *image_raw = mFontBitmapCachep->getImageRaw(bitmap_num);
