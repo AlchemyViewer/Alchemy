@@ -251,15 +251,18 @@ void LLOutfitsList::updateRemovedCategory(LLUUID cat_id)
 //virtual
 void LLOutfitsList::onHighlightBaseOutfit(LLUUID base_id, LLUUID prev_id)
 {
-    if (mOutfitsMap[prev_id])
+    auto prev_it = mOutfitsMap.find(prev_id);
+    if (prev_it != mOutfitsMap.end())
     {
-        mOutfitsMap[prev_id]->setTitleFontStyle("NORMAL");
-        mOutfitsMap[prev_id]->setTitleColor(LLUIColorTable::instance().getColor("AccordionHeaderTextColor"));
+        prev_it->second->setTitleFontStyle("NORMAL");
+        prev_it->second->setTitleColor(LLUIColorTable::instance().getColor("AccordionHeaderTextColor"));
     }
-    if (mOutfitsMap[base_id])
+
+    auto base_it = mOutfitsMap.find(base_id);
+    if (base_it != mOutfitsMap.end())
 	{
-		mOutfitsMap[base_id]->setTitleFontStyle("BOLD");
-		mOutfitsMap[base_id]->setTitleColor(LLUIColorTable::instance().getColor("SelectedOutfitTextColor"));
+        base_it->second->setTitleFontStyle("BOLD");
+        base_it->second->setTitleColor(LLUIColorTable::instance().getColor("SelectedOutfitTextColor"));
 	}
 }
 
@@ -297,24 +300,20 @@ void LLOutfitListBase::performAction(std::string action)
 
 void LLOutfitsList::onSetSelectedOutfitByUUID(const LLUUID& outfit_uuid)
 {
-	for (outfits_map_t::iterator iter = mOutfitsMap.begin();
-			iter != mOutfitsMap.end();
-			++iter)
-	{
-		if (outfit_uuid == iter->first)
-		{
-			LLAccordionCtrlTab* tab = iter->second;
-			if (!tab) continue;
+    auto iter = mOutfitsMap.find(outfit_uuid);
+    if (iter != mOutfitsMap.end())
+    {
+        LLAccordionCtrlTab* tab = iter->second;
+        if (!tab) return;
 
-			LLWearableItemsList* list = dynamic_cast<LLWearableItemsList*>(tab->getAccordionView());
-			if (!list) continue;
+        LLWearableItemsList* list = dynamic_cast<LLWearableItemsList*>(tab->getAccordionView());
+        if (!list) return;
 
-			tab->setFocus(TRUE);
-			ChangeOutfitSelection(list, outfit_uuid);
+        tab->setFocus(TRUE);
+        ChangeOutfitSelection(list, outfit_uuid);
 
-			tab->changeOpenClose(false);
-		}
-	}
+        tab->changeOpenClose(false);
+    }
 }
 
 // virtual
@@ -381,12 +380,10 @@ bool LLOutfitListBase::isActionEnabled(const LLSD& userdata)
 void LLOutfitsList::getSelectedItemsUUIDs(uuid_vec_t& selected_uuids) const
 {
 	// Collect selected items from all selected lists.
-	for (wearables_lists_map_t::const_iterator iter = mSelectedListsMap.begin();
-			iter != mSelectedListsMap.end();
-			++iter)
+    for (const auto& selected_pair : mSelectedListsMap)
 	{
 		uuid_vec_t uuids;
-		(*iter).second->getSelectedUUIDs(uuids);
+        selected_pair.second->getSelectedUUIDs(uuids);
 
 		S32 prev_size = selected_uuids.size();
 		selected_uuids.resize(prev_size + uuids.size());
@@ -396,11 +393,9 @@ void LLOutfitsList::getSelectedItemsUUIDs(uuid_vec_t& selected_uuids) const
 
 void LLOutfitsList::onCollapseAllFolders()
 {
-	for (outfits_map_t::iterator iter = mOutfitsMap.begin();
-			iter != mOutfitsMap.end();
-			++iter)
+	for (const auto& outfit_pair : mOutfitsMap)
 	{
-		LLAccordionCtrlTab*	tab = iter->second;
+		LLAccordionCtrlTab*	tab = outfit_pair.second;
 		if(tab && tab->isExpanded())
 		{
 			tab->changeOpenClose(true);
@@ -410,11 +405,9 @@ void LLOutfitsList::onCollapseAllFolders()
 
 void LLOutfitsList::onExpandAllFolders()
 {
-	for (outfits_map_t::iterator iter = mOutfitsMap.begin();
-			iter != mOutfitsMap.end();
-			++iter)
+    for (const auto& outfit_pair : mOutfitsMap)
 	{
-		LLAccordionCtrlTab*	tab = iter->second;
+		LLAccordionCtrlTab*	tab = outfit_pair.second;
 		if(tab && !tab->isExpanded())
 		{
 			tab->changeOpenClose(false);
@@ -461,11 +454,9 @@ void LLOutfitsList::onChangeOutfitSelection(LLWearableItemsList* list, const LLU
 	// if new selection is started.
 	if (list && !(mask & MASK_CONTROL))
 	{
-		for (wearables_lists_map_t::iterator iter = mSelectedListsMap.begin();
-				iter != mSelectedListsMap.end();
-				++iter)
+		for (const auto& selected_pair : mSelectedListsMap)
 		{
-			LLWearableItemsList* selected_list = (*iter).second;
+			LLWearableItemsList* selected_list = selected_pair.second;
 			if (selected_list != list)
 			{
 				selected_list->resetSelection();
@@ -478,7 +469,7 @@ void LLOutfitsList::onChangeOutfitSelection(LLWearableItemsList* list, const LLU
 
 	mItemSelected = list && (list->getSelectedItem() != NULL);
 
-	mSelectedListsMap.insert(wearables_lists_map_value_t(category_id, list));
+	mSelectedListsMap.emplace(category_id, list);
 }
 
 void LLOutfitsList::deselectOutfit(const LLUUID& category_id)
@@ -503,18 +494,15 @@ void LLOutfitsList::onFilteredWearableItemsListRefresh(LLUICtrl* ctrl)
 	if (!ctrl || sFilterSubString.empty())
 		return;
 
-	for (outfits_map_t::iterator
-			 iter = mOutfitsMap.begin(),
-			 iter_end = mOutfitsMap.end();
-		 iter != iter_end; ++iter)
+    for (const auto& outfit_pair : mOutfitsMap)
 	{
-		LLAccordionCtrlTab* tab = iter->second;
+		LLAccordionCtrlTab* tab = outfit_pair.second;
 		if (!tab) continue;
 
 		LLWearableItemsList* list = dynamic_cast<LLWearableItemsList*>(tab->getAccordionView());
 		if (list != ctrl) continue;
 
-		applyFilterToTab(iter->first, tab, sFilterSubString);
+		applyFilterToTab(outfit_pair.first, tab, sFilterSubString);
 	}
 }
 
@@ -522,12 +510,9 @@ void LLOutfitsList::applyFilter(const std::string& new_filter_substring)
 {
 	mAccordion->setFilterSubString(new_filter_substring);
 
-	for (outfits_map_t::iterator
-			 iter = mOutfitsMap.begin(),
-			 iter_end = mOutfitsMap.end();
-		 iter != iter_end; ++iter)
+    for (const auto& outfit_pair : mOutfitsMap)
 	{
-		LLAccordionCtrlTab* tab = iter->second;
+		LLAccordionCtrlTab* tab = outfit_pair.second;
 		if (!tab) continue;
 
 		bool more_restrictive = sFilterSubString.size() < new_filter_substring.size() && !new_filter_substring.substr(0, sFilterSubString.size()).compare(sFilterSubString);
@@ -553,7 +538,7 @@ void LLOutfitsList::applyFilter(const std::string& new_filter_substring)
 
 		if (!new_filter_substring.empty())
 		{
-			applyFilterToTab(iter->first, tab, new_filter_substring);
+			applyFilterToTab(outfit_pair.first, tab, new_filter_substring);
 		}
 		else
 		{
@@ -564,7 +549,7 @@ void LLOutfitsList::applyFilter(const std::string& new_filter_substring)
 			tab->notifyChildren(LLSD().with("action","restore_state"));
 
 			// Try restoring the tab selection.
-			restoreOutfitSelection(tab, iter->first);
+			restoreOutfitSelection(tab, outfit_pair.first);
 		}
 	}
 
@@ -715,11 +700,9 @@ void LLOutfitsList::onCOFChanged()
 	// Store the ids of items currently linked from COF.
 	mCOFLinkedItems = vnew;
 
-	for (outfits_map_t::iterator iter = mOutfitsMap.begin();
-			iter != mOutfitsMap.end();
-			++iter)
+    for (const auto& outfit_pair : mOutfitsMap)
 	{
-		LLAccordionCtrlTab* tab = iter->second;
+		LLAccordionCtrlTab* tab = outfit_pair.second;
 		if (!tab) continue;
 
 		LLWearableItemsList* list = dynamic_cast<LLWearableItemsList*>(tab->getAccordionView());
@@ -738,11 +721,9 @@ void LLOutfitsList::onCOFChanged()
 void LLOutfitsList::getCurrentCategories(uuid_vec_t& vcur)
 {
     // Creating a vector of currently displayed sub-categories UUIDs.
-    for (outfits_map_t::const_iterator iter = mOutfitsMap.begin();
-        iter != mOutfitsMap.end();
-        iter++)
+    for (const auto& outfit_pair : mOutfitsMap)
     {
-        vcur.push_back((*iter).first);
+        vcur.push_back(outfit_pair.first);
     }
 }
 

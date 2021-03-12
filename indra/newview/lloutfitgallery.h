@@ -192,7 +192,7 @@ private:
 
     LLHandle<LLFloater> mFloaterHandle;
 
-    typedef std::map<LLUUID, LLOutfitGalleryItem*>      outfit_map_t;
+    typedef absl::flat_hash_map<LLUUID, LLOutfitGalleryItem*>      outfit_map_t;
     typedef outfit_map_t::value_type                    outfit_map_value_t;
     outfit_map_t                                        mOutfitMap;
     typedef std::map<LLOutfitGalleryItem*, int>         item_num_map_t;

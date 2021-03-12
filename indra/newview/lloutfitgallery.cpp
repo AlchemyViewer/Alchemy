@@ -464,13 +464,16 @@ void LLOutfitGallery::setFilterSubString(const std::string& string)
 
 void LLOutfitGallery::onHighlightBaseOutfit(LLUUID base_id, LLUUID prev_id)
 {
-    if (mOutfitMap[base_id])
+    auto base_it = mOutfitMap.find(base_id);
+    if (base_it != mOutfitMap.end())
     {
-        mOutfitMap[base_id]->setOutfitWorn(true);
+        base_it->second->setOutfitWorn(true);
     }
-    if (mOutfitMap[prev_id])
+
+    auto prev_it = mOutfitMap.find(prev_id);
+    if (prev_it != mOutfitMap.end())
     {
-        mOutfitMap[prev_id]->setOutfitWorn(false);
+        prev_it->second->setOutfitWorn(false);
     }
 }
 
@@ -494,13 +497,11 @@ void LLOutfitGallery::onSetSelectedOutfitByUUID(const LLUUID& outfit_uuid)
 
 void LLOutfitGallery::getCurrentCategories(uuid_vec_t& vcur)
 {
-    for (outfit_map_t::const_iterator iter = mOutfitMap.begin();
-        iter != mOutfitMap.end();
-        iter++)
+    for (const auto& outfit_pair : mOutfitMap)
     {
-        if ((*iter).second != NULL)
+        if (outfit_pair.second != NULL)
         {
-            vcur.push_back((*iter).first);
+            vcur.push_back(outfit_pair.first);
         }
     }
 }
@@ -512,7 +513,7 @@ void LLOutfitGallery::updateAddedCategory(LLUUID cat_id)
 
     std::string name = cat->getName();
     LLOutfitGalleryItem* item = buildGalleryItem(name, cat_id);
-    mOutfitMap.insert(LLOutfitGallery::outfit_map_value_t(cat_id, item));
+    mOutfitMap.emplace(cat_id, item);
     item->setRightMouseDownCallback(boost::bind(&LLOutfitListBase::outfitRightClickCallBack, this,
         _1, _2, _3, cat_id));
     LLWearableItemsList* list = NULL;
@@ -598,13 +599,16 @@ void LLOutfitGallery::onChangeOutfitSelection(LLWearableItemsList* list, const L
 {
     if (mSelectedOutfitUUID == category_id)
         return;
-    if (mOutfitMap[mSelectedOutfitUUID])
+
+    auto selected_it = mOutfitMap.find(mSelectedOutfitUUID);
+    if (selected_it != mOutfitMap.end())
     {
-        mOutfitMap[mSelectedOutfitUUID]->setSelected(FALSE);
+        selected_it->second->setSelected(FALSE);
     }
-    if (mOutfitMap[category_id])
+    auto category_it = mOutfitMap.find(category_id);
+    if (category_it != mOutfitMap.end())
     {
-        mOutfitMap[category_id]->setSelected(TRUE);
+        category_it->second->setSelected(TRUE);
     }
 }
 
@@ -625,9 +629,10 @@ bool LLOutfitGallery::canWearSelected()
 
 bool LLOutfitGallery::hasDefaultImage(const LLUUID& outfit_cat_id)
 {
-    if (mOutfitMap[outfit_cat_id])
+    auto outfit_it = mOutfitMap.find(outfit_cat_id);
+    if (outfit_it != mOutfitMap.end())
     {
-        return mOutfitMap[outfit_cat_id]->isDefaultImage();
+        return outfit_it->second->isDefaultImage();
     }
     return false;
 }
@@ -1058,6 +1063,9 @@ void LLOutfitGallery::refreshOutfit(const LLUUID& category_id)
             sub_cat_array,
             outfit_item_array,
             LLInventoryModel::EXCLUDE_TRASH);
+
+        LLOutfitGalleryItem* gallery_item = mOutfitMap[category_id];
+
         for (LLViewerInventoryItem* outfit_item : outfit_item_array)
         {
             LLViewerInventoryItem* linked_item = outfit_item->getLinkedItem();
@@ -1080,7 +1088,7 @@ void LLOutfitGallery::refreshOutfit(const LLUUID& category_id)
             }
             if (asset_id.notNull())
             {
-                photo_loaded |= mOutfitMap[category_id]->setImageAssetId(asset_id);
+                photo_loaded |= gallery_item->setImageAssetId(asset_id);
                 // Rename links
                 if (!mOutfitRenamePending.isNull() && mOutfitRenamePending.asString() == item_name)
                 {
@@ -1106,7 +1114,7 @@ void LLOutfitGallery::refreshOutfit(const LLUUID& category_id)
             }
             if (!photo_loaded)
             {
-                mOutfitMap[category_id]->setDefaultImage();
+                gallery_item->setDefaultImage();
             }
         }
     }
