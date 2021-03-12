@@ -174,7 +174,7 @@ public:
 
 
 	/** Session id to session object */
-	std::map<LLUUID, LLIMSession*> mId2SessionMap;
+	absl::flat_hash_map<LLUUID, LLIMSession*> mId2SessionMap;
 
 	typedef boost::signals2::signal<void(const LLSD&)> session_signal_t;
 	session_signal_t mNewMsgSignal;

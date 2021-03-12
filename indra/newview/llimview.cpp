@@ -871,7 +871,7 @@ LLIMModel::LLIMSession* LLIMModel::findAdHocIMSession(const uuid_vec_t& ids)
 
 	if (mId2SessionMap.empty()) return NULL;
 
-	std::map<LLUUID, LLIMSession*>::const_iterator it = mId2SessionMap.begin();
+	auto it = mId2SessionMap.begin();
 	for (; it != mId2SessionMap.end(); ++it)
 	{
 		LLIMSession* session = (*it).second;
@@ -1097,9 +1097,10 @@ bool LLIMModel::newSession(const LLUUID& session_id, const std::string& name, co
 
 bool LLIMModel::clearSession(const LLUUID& session_id)
 {
-	if (mId2SessionMap.find(session_id) == mId2SessionMap.end()) return false;
-	delete (mId2SessionMap[session_id]);
-	mId2SessionMap.erase(session_id);
+	auto it = mId2SessionMap.find(session_id);
+	if (it == mId2SessionMap.end()) return false;
+	delete it->second;
+	mId2SessionMap.erase(it);
 	return true;
 }
 
