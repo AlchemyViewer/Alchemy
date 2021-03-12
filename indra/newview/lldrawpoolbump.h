@@ -161,7 +161,7 @@ private:
 	static void onSourceLoaded( BOOL success, LLViewerTexture *src_vi, LLImageRaw* src, LLUUID& source_asset_id, EBumpEffect bump );
 
 private:
-	typedef std::map<LLUUID, LLPointer<LLViewerTexture> > bump_image_map_t;
+	typedef absl::flat_hash_map<LLUUID, LLPointer<LLViewerTexture> > bump_image_map_t;
 	bump_image_map_t mBrightnessEntries;
 	bump_image_map_t mDarknessEntries;
 };
