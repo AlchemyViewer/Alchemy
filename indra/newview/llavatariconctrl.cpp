@@ -121,7 +121,7 @@ void LLAvatarIconIDCache::save	()
 		return;
 	}
 
-	for(std::map<LLUUID,LLAvatarIconIDCacheItem>::iterator it = mCache.begin();it!=mCache.end();++it)
+	for(auto it = mCache.begin();it!=mCache.end();++it)
 	{
 		if(!it->second.expired())
 		{
@@ -134,7 +134,7 @@ void LLAvatarIconIDCache::save	()
 
 LLUUID*	LLAvatarIconIDCache::get		(const LLUUID& avatar_id)
 {
-	std::map<LLUUID,LLAvatarIconIDCacheItem>::iterator it = mCache.find(avatar_id);
+	auto it = mCache.find(avatar_id);
 	if(it==mCache.end())
 		return 0;
 	if(it->second.expired())
