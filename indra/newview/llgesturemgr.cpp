@@ -1173,7 +1173,7 @@ void LLGestureMgr::onLoadComplete(const LLUUID& asset_uuid,
 
 		LL_WARNS() << "Problem loading gesture: " << status << LL_ENDL;
 		
-		LLGestureMgr::instance().mActive.erase(item_id);			
+		self.mActive.erase(item_id);
 	}
 }
 
