@@ -102,13 +102,9 @@ LLGroupMemberData::LLGroupMemberData(const LLUUID& id,
 {
 }
 
-LLGroupMemberData::~LLGroupMemberData()
-{
-}
-
 void LLGroupMemberData::addRole(const LLUUID& role, LLGroupRoleData* rd)
 {
-	mRolesList[role] = rd;
+	mRolesList.insert_or_assign(role, rd);
 }
 
 bool LLGroupMemberData::removeRole(const LLUUID& role)
@@ -154,10 +150,6 @@ LLGroupRoleData::LLGroupRoleData(const LLUUID& role_id,
 	mMembersNeedsSort(FALSE)
 {
 
-}
-
-LLGroupRoleData::~LLGroupRoleData()
-{	
 }
 
 S32 LLGroupRoleData::getMembersInRole(uuid_vec_t members,
@@ -551,7 +543,7 @@ bool LLGroupMgrGroupData::changeRoleMember(const LLUUID& role_id,
 			{
 				LL_WARNS() << "changeRoleMember: existing entry with 'RMC_NONE' change! This shouldn't happen." << LL_ENDL;
 				LLRoleMemberChange rc(role_id,member_id,rmc);
-				mRoleMemberChanges[role_member] = rc;
+				mRoleMemberChanges.insert_or_assign(role_member, rc);
 			}
 			else
 			{
@@ -1127,10 +1119,11 @@ void LLGroupMgr::processGroupPropertiesReply(LLMessageSystem* msg, void** data)
 	group_datap->mGroupPropertiesDataComplete = true;
 	group_datap->mChanged = TRUE;
 
-    properties_request_map_t::iterator request = LLGroupMgr::getInstance()->mPropRequests.find(group_id);
-    if (request != LLGroupMgr::getInstance()->mPropRequests.end())
+	auto& group_mgr = LLGroupMgr::instance();
+    properties_request_map_t::iterator request = group_mgr.mPropRequests.find(group_id);
+    if (request != group_mgr.mPropRequests.end())
     {
-        LLGroupMgr::getInstance()->mPropRequests.erase(request);
+		group_mgr.mPropRequests.erase(request);
     }
     else
     {
@@ -1530,16 +1523,17 @@ bool LLGroupMgr::hasPendingPropertyRequest(const LLUUID & id)
 
 void LLGroupMgr::addPendingPropertyRequest(const LLUUID& id)
 {
-    LLGroupMgr::getInstance()->mPropRequests[id] = gFrameTime;
+    LLGroupMgr::getInstance()->mPropRequests.insert_or_assign(id, gFrameTime);
 }
 
 void LLGroupMgr::notifyObservers(LLGroupChange gc)
 {
 	for (group_map_t::iterator gi = mGroups.begin(); gi != mGroups.end(); ++gi)
 	{
-		LLUUID group_id = gi->first;
 		if (gi->second->mChanged)
 		{
+			LLUUID group_id = gi->first;
+
 			// notify LLGroupMgrObserver
 			// Copy the map because observers may remove themselves on update
 			observer_multimap_t observers = mObservers;
@@ -1557,7 +1551,7 @@ void LLGroupMgr::notifyObservers(LLGroupChange gc)
 			// notify LLParticularGroupObserver
 		    observer_map_t::iterator obs_it = mParticularObservers.find(group_id);
 		    if(obs_it == mParticularObservers.end())
-		        return;
+		        continue;
 
 //		    observer_set_t& obs = obs_it->second;
 // [RLVa:KB] - Checked: RLVa-2.2 (General bugfix)

@@ -3280,7 +3280,7 @@ void LLPanelGroupBanListSubTab::populateBanList()
 	}
 
 	mBanList->deleteAllItems();
-	std::map<LLUUID,LLGroupBanData>::const_iterator entry = gdatap->mBanList.begin();
+	auto entry = gdatap->mBanList.begin();
 	for(; entry != gdatap->mBanList.end(); entry++)
 	{
 		LLNameListCtrl::NameItem ban_entry;

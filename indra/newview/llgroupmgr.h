@@ -58,7 +58,7 @@ class LLGroupMgrObserver
 public:
 	LLGroupMgrObserver(const LLUUID& id) : mID(id){};
 	LLGroupMgrObserver() : mID(LLUUID::null){};
-	virtual ~LLGroupMgrObserver(){};
+	virtual ~LLGroupMgrObserver() = default;
 	virtual void changed(LLGroupChange gc) = 0;
 	const LLUUID& getID() { return mID; }
 protected:
@@ -68,7 +68,7 @@ protected:
 class LLParticularGroupObserver
 {
 public:
-	virtual ~LLParticularGroupObserver(){}
+	virtual ~LLParticularGroupObserver() = default;
 	virtual void changed(const LLUUID& group_id, LLGroupChange gc) = 0;
 };
 
@@ -77,7 +77,7 @@ class LLGroupMemberData
 friend class LLGroupMgrGroupData;
 
 public:
-	typedef std::map<LLUUID,LLGroupRoleData*> role_list_t;
+	typedef absl::flat_hash_map<LLUUID, LLGroupRoleData*> role_list_t;
 	
 	LLGroupMemberData(const LLUUID& id, 
 						S32 contribution,
@@ -86,7 +86,7 @@ public:
 						const std::string& online_status,
 						BOOL is_owner);
 
-	~LLGroupMemberData();
+	~LLGroupMemberData() = default;
 
 	const LLUUID& getID() const { return mID; }
 	S32 getContribution() const { return mContribution; }
@@ -115,12 +115,6 @@ private:
 struct LLRoleData
 {
 	LLRoleData() : mRolePowers(0), mChangeType(RC_UPDATE_NONE) { }
-	LLRoleData(const LLRoleData& rd)
-	: 	mRoleName(rd.mRoleName),
-		mRoleTitle(rd.mRoleTitle),
-		mRoleDescription(rd.mRoleDescription),
-		mRolePowers(rd.mRolePowers),
-		mChangeType(rd.mChangeType) { }
 
 	std::string mRoleName;
 	std::string mRoleTitle;
@@ -145,7 +139,7 @@ public:
 					LLRoleData role_data,
 					const S32 member_count);
 
-	~LLGroupRoleData();
+	~LLGroupRoleData() = default;
 
 	const LLUUID& getID() const { return mRoleID; }
 
@@ -154,7 +148,7 @@ public:
 	S32 getTotalMembersInRole() { return mMemberCount ? mMemberCount : mMemberIDs.size(); } //FIXME: Returns 0 for Everyone role when Member list isn't yet loaded, see MAINT-5225
 
 	LLRoleData getRoleData() const { return mRoleData; }
-	void setRoleData(LLRoleData data) { mRoleData = data; }
+	void setRoleData(LLRoleData data) { mRoleData = std::move(data); }
 	
 	void addMember(const LLUUID& member);
 	bool removeMember(const LLUUID& member);
@@ -210,7 +204,7 @@ struct lluuid_pair_less
 struct LLGroupBanData
 {
 	LLGroupBanData(): mBanDate()	{}
-	~LLGroupBanData()	{}
+	~LLGroupBanData() = default;
 	
 	LLDate mBanDate;
 	// TODO: std:string ban_reason;
@@ -279,7 +273,7 @@ public:
 	void banMemberById(const LLUUID& participant_uuid);
 	
 public:
-	typedef	std::map<LLUUID,LLGroupMemberData*> member_list_t;
+	typedef	absl::flat_hash_map<LLUUID, LLGroupMemberData*> member_list_t;
 	typedef	std::map<LLUUID,LLGroupRoleData*> role_list_t;
 	typedef std::map<lluuid_pair,LLRoleMemberChange,lluuid_pair_less> change_map_t;
 	typedef std::map<LLUUID,LLRoleData> role_data_map_t;
@@ -454,11 +448,11 @@ private:
 	typedef std::multimap<LLUUID,LLGroupMgrObserver*> observer_multimap_t;
 	observer_multimap_t mObservers;
 
-	typedef std::map<LLUUID, LLGroupMgrGroupData*> group_map_t;
+	typedef absl::flat_hash_map<LLUUID, LLGroupMgrGroupData*> group_map_t;
 	group_map_t mGroups;
 
 	const U64MicrosecondsImplicit MIN_GROUP_PROPERTY_REQUEST_FREQ = 100000;//100ms between requests should be enough to avoid spamming.
-	typedef std::map<LLUUID, U64MicrosecondsImplicit> properties_request_map_t;
+	typedef absl::flat_hash_map<LLUUID, U64MicrosecondsImplicit> properties_request_map_t;
 	properties_request_map_t mPropRequests;
 
 	typedef std::set<LLParticularGroupObserver*> observer_set_t;
