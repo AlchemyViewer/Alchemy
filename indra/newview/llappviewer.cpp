@@ -140,9 +140,8 @@
 #include "stringize.h"
 #include "llcoros.h"
 #include "llexception.h"
-#if !LL_LINUX
+
 #include "cef/dullahan_version.h"
-#endif // LL_LINUX
 #include "vlc/libvlc_version.h"
 
 // Third party library includes

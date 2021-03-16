@@ -1401,6 +1401,7 @@ class LinuxManifest(ViewerManifest):
         #              "libmedia_plugin_gstreamer.so")
             self.path2basename("example", "libmedia_plugin_example.so")
             self.path2basename("libvlc", "libmedia_plugin_libvlc.so")
+            self.path("../media_plugins/cef/libmedia_plugin_cef.so", "libmedia_plugin_cef.so")
 
         # with self.prefix(src=os.path.join(pkgdir, 'lib', 'vlc', 'plugins'), dst="bin/llplugin/vlc/plugins"):
         #     self.path( "plugins.dat" )
@@ -1408,6 +1409,86 @@ class LinuxManifest(ViewerManifest):
 
         # with self.prefix(src=os.path.join(pkgdir, 'lib' ), dst="lib"):
         #     self.path( "libvlc*.so*" )
+
+        # CEF files 
+        with self.prefix(src=os.path.join(pkgdir, 'bin', 'release'), dst="bin"):
+            self.path("chrome-sandbox")
+            self.path("dullahan_host")
+
+        with self.prefix(src=os.path.join(pkgdir, 'bin', 'release'), dst="lib"):
+            self.path("snapshot_blob.bin")
+            self.path("v8_context_snapshot.bin")
+
+        with self.prefix(src=os.path.join(pkgdir, 'lib', 'release'), dst="lib"):
+            self.path("libcef.so")
+
+        with self.prefix(src=os.path.join(pkgdir, 'resources'), dst="lib"):
+            self.path("cef_100_percent.pak")
+            self.path("cef_200_percent.pak")
+            self.path("cef_extensions.pak")
+            self.path("cef.pak")
+            self.path("devtools_resources.pak")
+            self.path("icudtl.dat")
+
+        with self.prefix(src=os.path.join(pkgdir, 'lib', 'release', 'swiftshader'), dst=os.path.join("bin", "swiftshader") ):
+            self.path( "*.so" )
+        with self.prefix(src=os.path.join(pkgdir, 'lib', 'release', 'swiftshader'), dst=os.path.join("lib", "swiftshader") ):
+            self.path( "*.so" )
+
+        with self.prefix(src=os.path.join(pkgdir, 'resources', 'locales'), dst=os.path.join('bin', 'locales')):
+            self.path("am.pak")
+            self.path("ar.pak")
+            self.path("bg.pak")
+            self.path("bn.pak")
+            self.path("ca.pak")
+            self.path("cs.pak")
+            self.path("da.pak")
+            self.path("de.pak")
+            self.path("el.pak")
+            self.path("en-GB.pak")
+            self.path("en-US.pak")
+            self.path("es-419.pak")
+            self.path("es.pak")
+            self.path("et.pak")
+            self.path("fa.pak")
+            self.path("fi.pak")
+            self.path("fil.pak")
+            self.path("fr.pak")
+            self.path("gu.pak")
+            self.path("he.pak")
+            self.path("hi.pak")
+            self.path("hr.pak")
+            self.path("hu.pak")
+            self.path("id.pak")
+            self.path("it.pak")
+            self.path("ja.pak")
+            self.path("kn.pak")
+            self.path("ko.pak")
+            self.path("lt.pak")
+            self.path("lv.pak")
+            self.path("ml.pak")
+            self.path("mr.pak")
+            self.path("ms.pak")
+            self.path("nb.pak")
+            self.path("nl.pak")
+            self.path("pl.pak")
+            self.path("pt-BR.pak")
+            self.path("pt-PT.pak")
+            self.path("ro.pak")
+            self.path("ru.pak")
+            self.path("sk.pak")
+            self.path("sl.pak")
+            self.path("sr.pak")
+            self.path("sv.pak")
+            self.path("sw.pak")
+            self.path("ta.pak")
+            self.path("te.pak")
+            self.path("th.pak")
+            self.path("tr.pak")
+            self.path("uk.pak")
+            self.path("vi.pak")
+            self.path("zh-CN.pak")
+            self.path("zh-TW.pak")
 
         self.path("featuretable_linux.txt")
 

@@ -907,6 +907,13 @@ void MediaPluginCEF::keyEvent(dullahan::EKeyEvent key_event, LLSD native_key_dat
 	U64 lparam = ll_U32_from_sd(native_key_data["l_param"]);
 
 	mCEFLib->nativeKeyboardEventWin(msg, wparam, lparam);
+#elif LL_LINUX
+	uint32_t native_scan_code = (uint32_t)(native_key_data["sdl_sym"].asInteger());
+	uint32_t native_virtual_key = (uint32_t)(native_key_data["virtual_key"].asInteger());
+	uint32_t native_modifiers = (uint32_t)(native_key_data["cef_modifiers"].asInteger());
+	if( native_scan_code == '\n' )
+		native_scan_code = '\r';
+	mCEFLib->nativeKeyboardEvent(key_event, native_scan_code, native_virtual_key, native_modifiers);
 #endif
 };
 
