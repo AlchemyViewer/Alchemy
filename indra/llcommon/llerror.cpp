@@ -1452,13 +1452,14 @@ namespace LLError
 			return;
 		}
 
-		if(strlen(out->str().c_str()) < 128)
+		auto out_str = out->str();
+		if(out_str.size() < 128)
 		{
-			strcpy(message, out->str().c_str());
+			strcpy(message, out_str.c_str());
 		}
 		else
 		{
-			strncpy(message, out->str().c_str(), 127);
+			strncpy(message, out_str.c_str(), 127);
 			message[127] = '\0' ;
 		}
 
