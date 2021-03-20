@@ -52,7 +52,7 @@ FetchContent_Declare(
 FetchContent_Declare(
   absl
   GIT_REPOSITORY https://git.alchemyviewer.org/alchemy/mirrors/abseil-cpp.git
-  GIT_TAG        a76698790753d2ec71f655cdc84d61bcb27780d4
+  GIT_TAG        090646f973df94c2ca9e27589b85dc662ae4873b
   )
 
 # This is a hack because absl has dumb cmake
