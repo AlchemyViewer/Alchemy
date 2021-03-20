@@ -2148,11 +2148,11 @@ LLUZipHelper::EZipRresult LLUZipHelper::unzip_llsd(LLSD& data, std::istream& is,
 	U32 cur_size = 0;
 	z_stream strm;
 		
-	const U32 CHUNK = 65536;
+	constexpr U32 CHUNK = 1024 * 256;
 	std::unique_ptr<U8[]> in;
 	try
 	{
-		in = std::make_unique<U8[]>(size);
+		in = std::unique_ptr<U8[]>(new U8[size]);
 	}
 	catch(const std::bad_alloc&)
 	{
@@ -2160,7 +2160,15 @@ LLUZipHelper::EZipRresult LLUZipHelper::unzip_llsd(LLSD& data, std::istream& is,
 	}
 	is.read((char*) in.get(), size); 
 
-	U8 out[CHUNK];
+	std::unique_ptr<U8[]> out;
+	try
+	{
+		out = std::unique_ptr<U8[]>(new U8[CHUNK]);
+	}
+	catch (const std::bad_alloc&)
+	{
+		return ZR_MEM_ERROR;
+	}
 		
 	strm.zalloc = Z_NULL;
 	strm.zfree = Z_NULL;
@@ -2169,29 +2177,44 @@ LLUZipHelper::EZipRresult LLUZipHelper::unzip_llsd(LLSD& data, std::istream& is,
 	strm.next_in = in.get();
 
 	S32 ret = inflateInit(&strm);
-	
+	switch (ret)
+	{
+	case Z_STREAM_ERROR:
+		return ZR_DATA_ERROR;
+	case Z_VERSION_ERROR:
+		return ZR_VERSION_ERROR;
+	case Z_MEM_ERROR:
+		return ZR_MEM_ERROR;
+	}
+
 	do
 	{
 		strm.avail_out = CHUNK;
-		strm.next_out = out;
+		strm.next_out = out.get();
 		ret = inflate(&strm, Z_NO_FLUSH);
-		if (ret == Z_STREAM_ERROR)
+		switch (ret)
+		{
+		case Z_NEED_DICT:
+		case Z_DATA_ERROR:
 		{
 			inflateEnd(&strm);
 			free(result);
 			return ZR_DATA_ERROR;
 		}
-		
-		switch (ret)
+		case Z_STREAM_ERROR:
+		case Z_BUF_ERROR:
 		{
-		case Z_NEED_DICT:
-			ret = Z_DATA_ERROR;
-			[[fallthrough]];
-		case Z_DATA_ERROR:
+			inflateEnd(&strm);
+			free(result);
+			return ZR_BUFFER_ERROR;
+		}
+
 		case Z_MEM_ERROR:
+		{
 			inflateEnd(&strm);
 			free(result);
 			return ZR_MEM_ERROR;
+		}
 		}
 
 		U32 have = CHUNK-strm.avail_out;
@@ -2207,13 +2230,14 @@ LLUZipHelper::EZipRresult LLUZipHelper::unzip_llsd(LLSD& data, std::istream& is,
 			return ZR_MEM_ERROR;
 		}
 		result = new_result;
-		memcpy(result+cur_size, out, have);
+		memcpy(result+cur_size, out.get(), have);
 		cur_size += have;
 
-	} while (ret == Z_OK);
+	} while (ret == Z_OK && ret != Z_STREAM_END);
 
 	inflateEnd(&strm);
 	in.reset();
+	out.reset();
 
 	if (ret != Z_STREAM_END)
 	{

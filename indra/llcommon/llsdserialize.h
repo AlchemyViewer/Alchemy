@@ -860,6 +860,8 @@ public:
         ZR_SIZE_ERROR,
         ZR_DATA_ERROR,
         ZR_PARSE_ERROR,
+		ZR_BUFFER_ERROR,
+		ZR_VERSION_ERROR
     } EZipRresult;
     // return OK or reason for failure
     static EZipRresult unzip_llsd(LLSD& data, std::istream& is, S32 size);
