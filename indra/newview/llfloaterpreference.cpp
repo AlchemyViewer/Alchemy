@@ -650,7 +650,7 @@ skin_t manifestFromJson(const std::string& filename, const ESkinType type)
             skin.mAuthor = root.value("author", "Unknown");
             skin.mUrl = root.value("url", "Unknown");
 			skin.mCompatVer = root.value("compatibility", "Unknown");
-			skin.mDate = LLDate(root.value("date", "1983-04-20T00:00:00Z"));
+			skin.mDate = LLDate(root.value("date", LLDate::now().asString()));
 			skin.mNotes = root.value("notes", "");
 			// If it's a system skin, the compatability version is always the current build
 			if (type == SYSTEM_SKIN)
