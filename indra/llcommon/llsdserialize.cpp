@@ -2061,7 +2061,7 @@ std::string zip_llsd(LLSD& data)
 
 	LLSDSerialize::toBinary(data, llsd_strm);
 
-	const U32 CHUNK = 65536;
+	const U32 CHUNK = 1024 * 256;
 
 	z_stream strm;
 	strm.zalloc = Z_NULL;
@@ -2077,7 +2077,19 @@ std::string zip_llsd(LLSD& data)
 
 	std::string source = llsd_strm.str();
 
-	U8 out[CHUNK];
+	static thread_local std::unique_ptr<U8[]> out;
+	if (!out)
+	{
+		try
+		{
+			out = std::unique_ptr<U8[]>(new U8[CHUNK]);
+		}
+		catch (const std::bad_alloc&)
+		{
+			deflateEnd(&strm);
+			return std::string();
+		}
+	}
 
 	strm.avail_in = source.size();
 	strm.next_in = (U8*) source.data();
@@ -2090,13 +2102,14 @@ std::string zip_llsd(LLSD& data)
 	do
 	{
 		strm.avail_out = CHUNK;
-		strm.next_out = out;
+		strm.next_out = out.get();
 
 		ret = deflate(&strm, Z_FINISH);
 		if (ret == Z_OK || ret == Z_STREAM_END)
 		{ //copy result into output
 			if (strm.avail_out >= CHUNK)
 			{
+				deflateEnd(&strm);
 				if(output)
 					free(output);
 				LL_WARNS() << "Failed to compress LLSD block." << LL_ENDL;
@@ -2107,20 +2120,21 @@ std::string zip_llsd(LLSD& data)
 			U8* new_output = (U8*) realloc(output, cur_size+have);
 			if (new_output == NULL)
 			{
-				LL_WARNS() << "Failed to compress LLSD block: can't reallocate memory, current size: " << cur_size << " bytes; requested " << cur_size + have << " bytes." << LL_ENDL;
 				deflateEnd(&strm);
 				if (output)
 				{
 					free(output);
 				}
+				LL_WARNS() << "Failed to compress LLSD block: can't reallocate memory, current size: " << cur_size << " bytes; requested " << cur_size + have << " bytes." << LL_ENDL;
 				return std::string();
 			}
 			output = new_output;
-			memcpy(output+cur_size, out, have);
+			memcpy(output+cur_size, out.get(), have);
 			cur_size += have;
 		}
 		else 
 		{
+			deflateEnd(&strm);
 			if(output)
 				free(output);
 			LL_WARNS() << "Failed to compress LLSD block." << LL_ENDL;
@@ -2160,14 +2174,17 @@ LLUZipHelper::EZipRresult LLUZipHelper::unzip_llsd(LLSD& data, std::istream& is,
 	}
 	is.read((char*) in.get(), size); 
 
-	std::unique_ptr<U8[]> out;
-	try
+	static thread_local std::unique_ptr<U8[]> out;
+	if (!out)
 	{
-		out = std::unique_ptr<U8[]>(new U8[CHUNK]);
-	}
-	catch (const std::bad_alloc&)
-	{
-		return ZR_MEM_ERROR;
+		try
+		{
+			out = std::unique_ptr<U8[]>(new U8[CHUNK]);
+		}
+		catch (const std::bad_alloc&)
+		{
+			return ZR_MEM_ERROR;
+		}
 	}
 		
 	strm.zalloc = Z_NULL;
@@ -2237,7 +2254,6 @@ LLUZipHelper::EZipRresult LLUZipHelper::unzip_llsd(LLSD& data, std::istream& is,
 
 	inflateEnd(&strm);
 	in.reset();
-	out.reset();
 
 	if (ret != Z_STREAM_END)
 	{
@@ -2254,7 +2270,7 @@ LLUZipHelper::EZipRresult LLUZipHelper::unzip_llsd(LLSD& data, std::istream& is,
 		{
 			std::string res_str((char*)result, cur_size);
 
-			std::string deprecated_header("<? LLSD/Binary ?>");
+			static std::string deprecated_header("<? LLSD/Binary ?>");
 
 			if (res_str.substr(0, deprecated_header.size()) == deprecated_header)
 			{
