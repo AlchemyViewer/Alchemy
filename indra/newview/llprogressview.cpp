@@ -399,9 +399,7 @@ void LLProgressView::initLogos()
 
     temp_str += gDirUtilp->getDirDelimiter();
 
-#if defined(USE_FMODSTUDIO) || defined(LL_HAVOK)
 	S32 icon_height;
-#endif
 
 #ifdef USE_FMODSTUDIO
     // original image size is 264x96, it is on longer side but
