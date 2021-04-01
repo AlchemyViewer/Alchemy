@@ -30,13 +30,16 @@
 #include "llkeyboard.h" // For EKeystate
 #include "llinitparam.h"
 
+#include "absl/container/flat_hash_set.h"
+#include "absl/container/flat_hash_map.h"
+
 const S32 MAX_KEY_BINDINGS = 128; // was 60
 
 class LLNamedFunction
 {
 public:
 	LLNamedFunction() : mFunction(NULL) { };
-	~LLNamedFunction() { };
+	~LLNamedFunction() = default;
 
 	std::string	mName;
 	LLKeyFunc	mFunction;
@@ -164,9 +167,9 @@ private:
     std::vector<LLKeyboardBinding>	mKeyBindings[MODE_COUNT];
     std::vector<LLMouseBinding>		mMouseBindings[MODE_COUNT];
 
-	typedef std::map<U32, U32> key_remap_t;
+	typedef absl::flat_hash_map<U32, U32> key_remap_t;
 	key_remap_t		mRemapKeys[MODE_COUNT];
-	std::set<KEY>	mKeysSkippedByUI;
+	absl::flat_hash_set<KEY>	mKeysSkippedByUI;
 	BOOL			mKeyHandledByUI[KEY_COUNT];		// key processed successfully by UI
 
     // This is indentical to what llkeyboard does (mKeyRepeated, mKeyLevel, mKeyDown e t c),
