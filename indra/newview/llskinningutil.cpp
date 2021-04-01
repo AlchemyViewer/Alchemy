@@ -288,7 +288,8 @@ void LLSkinningUtil::updateRiggingInfo(const LLMeshSkinInfo* skin, LLVOAvatar *a
     if (vol_face.mJointRiggingInfoTab.needsUpdate())
     {
         S32 num_verts = vol_face.mNumVertices;
-        if (num_verts>0 && vol_face.mWeights && (!skin->mJointNames.empty()))
+        S32 num_joints = skin->mJointNames.size();
+        if (num_verts > 0 && vol_face.mWeights && num_joints > 0)
         {
             initJointNums(const_cast<LLMeshSkinInfo*>(skin), avatar);
             if (vol_face.mJointRiggingInfoTab.size()==0)
@@ -328,7 +329,7 @@ void LLSkinningUtil::updateRiggingInfo(const LLMeshSkinInfo* skin, LLVOAvatar *a
                     for (U32 k=0; k<4; ++k)
                     {
 						S32 joint_index = idx[k];
-                        if (wght[k] > 0.0f)
+                        if (wght[k] > 0.0f && num_joints > joint_index)
                         {
                             S32 joint_num = skin->mJointNums[joint_index];
                             if (joint_num >= 0 && joint_num < LL_CHARACTER_MAX_ANIMATED_JOINTS)

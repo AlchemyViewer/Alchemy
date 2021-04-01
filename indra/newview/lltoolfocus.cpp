@@ -63,7 +63,7 @@ BOOL gCameraBtnPan = FALSE;
 
 const S32 SLOP_RANGE = 4;
 
-extern void agent_push_forward(EKeystate s);
+extern bool agent_push_forward(EKeystate s);
 
 //
 // Camera - shared functionality

@@ -170,6 +170,13 @@ https://accounts.secondlife.com/change_email/
          help_topic="preferences_uploads_tab"
          name="uploads" />
         <panel
+         class="panel_preference_controls"
+         filename="panel_preferences_controls.xml"
+         label="Controls"
+         layout="topleft"
+         help_topic="preferences_controls_tab"
+         name="controls" />
+        <panel
          filename="panel_preferences_skins.xml"
          label="Skinning"
          layout="topleft"
