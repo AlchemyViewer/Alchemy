@@ -256,8 +256,8 @@ S32 LLFileSystem::getSize()
 
 S32 LLFileSystem::getMaxSize()
 {
-    // offer up a huge size since we don't care what the max is
-    return INT_MAX;
+    // Max size at 50mb to avoid error conditions resulting in huge files on disk
+    return 52428800;
 }
 
 BOOL LLFileSystem::rename(const LLUUID& new_id, const LLAssetType::EType new_type)
