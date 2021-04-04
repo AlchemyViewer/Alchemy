@@ -51,8 +51,8 @@ protected:
 	MASK	updateModifiers();
 	//void	setModifierKeyLevel( KEY key, BOOL new_state );
 private:
-	std::map<U32, KEY> mTranslateNumpadMap;
-	std::map<KEY, U32> mInvTranslateNumpadMap;
+	absl::flat_hash_map<U32, KEY> mTranslateNumpadMap;
+	absl::flat_hash_map<KEY, U32> mInvTranslateNumpadMap;
 };
 
 #endif

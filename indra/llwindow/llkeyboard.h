@@ -108,8 +108,8 @@ protected:
 	void 			addKeyName(KEY key, const std::string& name);
 
 protected:
-	std::map<U32, KEY>	mTranslateKeyMap;		// Map of translations from OS keys to Linden KEYs
-	std::map<KEY, U32>	mInvTranslateKeyMap;	// Map of translations from Linden KEYs to OS keys
+	absl::flat_hash_map<U32, KEY>	mTranslateKeyMap;		// Map of translations from OS keys to Linden KEYs
+	absl::flat_hash_map<KEY, U32>	mInvTranslateKeyMap;	// Map of translations from Linden KEYs to OS keys
 	LLWindowCallbacks *mCallbacks;
 
 	LLTimer			mKeyLevelTimer[KEY_COUNT];	// Time since level was set

@@ -114,30 +114,29 @@ LLKeyboardWin32::LLKeyboardWin32()
 	mTranslateKeyMap[VK_CLEAR] = KEY_PAD_CENTER;
 
 	// Build inverse map
-	std::map<U32, KEY>::iterator iter;
-	for (iter = mTranslateKeyMap.begin(); iter != mTranslateKeyMap.end(); iter++)
+	for (auto iter = mTranslateKeyMap.begin(); iter != mTranslateKeyMap.end(); iter++)
 	{
 		mInvTranslateKeyMap[iter->second] = iter->first;
 	}
 
 	// numpad map
-	mTranslateNumpadMap[0x60] = KEY_PAD_INS;	// keypad 0
-	mTranslateNumpadMap[0x61] = KEY_PAD_END;	// keypad 1
-	mTranslateNumpadMap[0x62] = KEY_PAD_DOWN;	// keypad 2
-	mTranslateNumpadMap[0x63] = KEY_PAD_PGDN;	// keypad 3
-	mTranslateNumpadMap[0x64] = KEY_PAD_LEFT;	// keypad 4
-	mTranslateNumpadMap[0x65] = KEY_PAD_CENTER;	// keypad 5
-	mTranslateNumpadMap[0x66] = KEY_PAD_RIGHT;	// keypad 6
-	mTranslateNumpadMap[0x67] = KEY_PAD_HOME;	// keypad 7
-	mTranslateNumpadMap[0x68] = KEY_PAD_UP;		// keypad 8
-	mTranslateNumpadMap[0x69] = KEY_PAD_PGUP;	// keypad 9
-	mTranslateNumpadMap[0x6A] = KEY_PAD_MULTIPLY;	// keypad *
-	mTranslateNumpadMap[0x6B] = KEY_PAD_ADD;	// keypad +
-	mTranslateNumpadMap[0x6D] = KEY_PAD_SUBTRACT;	// keypad -
-	mTranslateNumpadMap[0x6E] = KEY_PAD_DEL;	// keypad .
-	mTranslateNumpadMap[0x6F] = KEY_PAD_DIVIDE;	// keypad /
+	mTranslateNumpadMap[VK_NUMPAD0] = KEY_PAD_INS;	// keypad 0
+	mTranslateNumpadMap[VK_NUMPAD1] = KEY_PAD_END;	// keypad 1
+	mTranslateNumpadMap[VK_NUMPAD2] = KEY_PAD_DOWN;	// keypad 2
+	mTranslateNumpadMap[VK_NUMPAD3] = KEY_PAD_PGDN;	// keypad 3
+	mTranslateNumpadMap[VK_NUMPAD4] = KEY_PAD_LEFT;	// keypad 4
+	mTranslateNumpadMap[VK_NUMPAD5] = KEY_PAD_CENTER;	// keypad 5
+	mTranslateNumpadMap[VK_NUMPAD6] = KEY_PAD_RIGHT;	// keypad 6
+	mTranslateNumpadMap[VK_NUMPAD7] = KEY_PAD_HOME;	// keypad 7
+	mTranslateNumpadMap[VK_NUMPAD8] = KEY_PAD_UP;		// keypad 8
+	mTranslateNumpadMap[VK_NUMPAD9] = KEY_PAD_PGUP;	// keypad 9
+	mTranslateNumpadMap[VK_MULTIPLY] = KEY_PAD_MULTIPLY;	// keypad *
+	mTranslateNumpadMap[VK_ADD] = KEY_PAD_ADD;	// keypad +
+	mTranslateNumpadMap[VK_SUBTRACT] = KEY_PAD_SUBTRACT;	// keypad -
+	mTranslateNumpadMap[VK_DECIMAL] = KEY_PAD_DEL;	// keypad .
+	mTranslateNumpadMap[VK_DIVIDE] = KEY_PAD_DIVIDE;	// keypad /
 
-	for (iter = mTranslateNumpadMap.begin(); iter != mTranslateNumpadMap.end(); iter++)
+	for (auto iter = mTranslateNumpadMap.begin(); iter != mTranslateNumpadMap.end(); iter++)
 	{
 		mInvTranslateNumpadMap[iter->second] = iter->first;
 	}
@@ -304,7 +303,7 @@ U32  LLKeyboardWin32::inverseTranslateExtendedKey(const KEY translated_key)
 	// if numlock is on, then we need to translate KEY_PAD_FOO to the corresponding number pad number
 	if(GetKeyState(VK_NUMLOCK) & 1)
 	{
-		std::map<KEY, U32>::iterator iter = mInvTranslateNumpadMap.find(translated_key);
+		auto iter = mInvTranslateNumpadMap.find(translated_key);
 		if (iter != mInvTranslateNumpadMap.end())
 		{
 			return iter->second;
