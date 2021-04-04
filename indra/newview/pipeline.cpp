@@ -7395,6 +7395,7 @@ void LLPipeline::doResetVertexBuffers(bool forced)
 	}
 	LLVOPartGroup::destroyGL();
 
+	gGL.resetVertexBuffers();
 	SUBSYSTEM_CLEANUP(LLVertexBuffer);
 	
 	if (LLVertexBuffer::sGLCount > 0)
@@ -7420,6 +7421,7 @@ void LLPipeline::doResetVertexBuffers(bool forced)
 	LLVertexBuffer::initClass(LLVertexBuffer::sEnableVBOs, LLVertexBuffer::sDisableVBOMapping);
 
 	LLVOPartGroup::restoreGL();
+	gGL.restoreVertexBuffers();
 }
 
 void LLPipeline::renderObjects(U32 type, U32 mask, bool texture, bool batch_texture)

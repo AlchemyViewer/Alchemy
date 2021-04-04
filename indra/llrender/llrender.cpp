@@ -1140,6 +1140,14 @@ LLRender::~LLRender()
 
 void LLRender::init()
 {
+	if (mDummyVAO != 0)
+	{ //bind a dummy vertex array object so we're core profile compliant
+#ifdef GL_ARB_vertex_array_object
+		glDeleteVertexArrays(1, &mDummyVAO);
+#endif
+		mDummyVAO = 0;
+	}
+
 	if (sGLCoreProfile && !LLVertexBuffer::sUseVAO)
 	{ //bind a dummy vertex array object so we're core profile compliant
 #ifdef GL_ARB_vertex_array_object
@@ -1147,28 +1155,12 @@ void LLRender::init()
 		glBindVertexArray(mDummyVAO);
 #endif
 	}
-
-
-	llassert_always(mBuffer.isNull()) ;
 	stop_glerror();
-	mBuffer = new LLVertexBuffer(immediate_mask, 0);
-	mBuffer->allocateBuffer(4096, 0, TRUE);
-	mBuffer->getVertexStrider(mVerticesp);
-	mBuffer->getTexCoord0Strider(mTexcoordsp);
-	mBuffer->getColorStrider(mColorsp);
-	stop_glerror();
+	restoreVertexBuffers();
 }
 
 void LLRender::shutdown()
 {
-    if (mDummyVAO != 0)
-    { //bind a dummy vertex array object so we're core profile compliant
-#ifdef GL_ARB_vertex_array_object
-        glDeleteVertexArrays(1, &mDummyVAO);
-#endif
-        mDummyVAO = 0;
-    }
-
 	for (U32 i = 0; i < mTexUnits.size(); i++)
 	{
 		delete mTexUnits[i];
@@ -1182,7 +1174,16 @@ void LLRender::shutdown()
 		delete mLightState[i];
 	}
 	mLightState.clear();
-	mBuffer = NULL ;
+
+	mBuffer = nullptr;
+	
+	if (mDummyVAO != 0)
+    { //bind a dummy vertex array object so we're core profile compliant
+#ifdef GL_ARB_vertex_array_object
+        glDeleteVertexArrays(1, &mDummyVAO);
+#endif
+        mDummyVAO = 0;
+    }
 }
 
 void LLRender::refreshState(void)
@@ -1197,12 +1198,36 @@ void LLRender::refreshState(void)
 	}
 	
 	mTexUnits[active_unit]->activate();
+	stop_glerror();
 
 	setColorMask(mCurrColorMask[0], mCurrColorMask[1], mCurrColorMask[2], mCurrColorMask[3]);
+	stop_glerror();
 	
 	setAlphaRejectSettings(mCurrAlphaFunc, mCurrAlphaFuncVal);
+	stop_glerror();
 
 	mDirty = false;
+}
+
+void LLRender::resetVertexBuffers()
+{
+	mBuffer = nullptr;
+}
+
+void LLRender::restoreVertexBuffers()
+{
+	llassert_always(mBuffer.isNull());
+	stop_glerror();
+	mBuffer = new LLVertexBuffer(immediate_mask, 0);
+	stop_glerror();
+	mBuffer->allocateBuffer(4096, 0, TRUE);
+	stop_glerror();
+	mBuffer->getVertexStrider(mVerticesp);
+	stop_glerror();
+	mBuffer->getTexCoord0Strider(mTexcoordsp);
+	stop_glerror();
+	mBuffer->getColorStrider(mColorsp);
+	stop_glerror();
 }
 
 void LLRender::syncLightState()

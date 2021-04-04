@@ -5498,6 +5498,7 @@ void LLViewerWindow::stopGL(BOOL save_state)
 		stop_glerror();
 
 		LLVOPartGroup::destroyGL();
+		stop_glerror();
 
 		LLViewerDynamicTexture::destroyGL();
 		stop_glerror();
@@ -5506,8 +5507,10 @@ void LLViewerWindow::stopGL(BOOL save_state)
 		{
 			gPipeline.destroyGL();
 		}
+		stop_glerror();
 		
 		gBox.cleanupGL();
+		stop_glerror();
 		
 		if(gPostProcess)
 		{
@@ -5521,11 +5524,17 @@ void LLViewerWindow::stopGL(BOOL save_state)
 		stop_glerror();
 
 		//unload shader's
-		while (LLGLSLShader::sInstances.size())
+		while (!LLGLSLShader::sInstances.empty())
 		{
 			LLGLSLShader* shader = *(LLGLSLShader::sInstances.begin());
 			shader->unload();
 		}
+		
+		gGL.resetVertexBuffers();
+
+		LLVertexBuffer::cleanupClass();
+
+		stop_glerror();
 		
 		LL_INFOS() << "Remaining allocated texture memory: " << LLImageGL::sGlobalTextureMemory.value() << " bytes" << LL_ENDL;
 	}
@@ -5542,7 +5551,9 @@ void LLViewerWindow::restoreGL(const std::string& progress_message)
 		LL_INFOS() << "Restoring GL..." << LL_ENDL;
 		gGLManager.mIsDisabled = FALSE;
 		
+		gGL.init();
 		initGLDefaults();
+		gGL.refreshState();
 		LLGLState::restoreGL();
 		
 		gTextureList.restoreGL();

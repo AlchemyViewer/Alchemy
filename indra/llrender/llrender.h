@@ -376,6 +376,9 @@ public:
 	// Needed when the render context has changed and invalidated the current state
 	void refreshState(void);
 
+	void resetVertexBuffers();
+	void restoreVertexBuffers();
+
 	void translatef(const GLfloat& x, const GLfloat& y, const GLfloat& z);
 	void scalef(const GLfloat& x, const GLfloat& y, const GLfloat& z);
 	void rotatef(const GLfloat& a, const GLfloat& x, const GLfloat& y, const GLfloat& z);
