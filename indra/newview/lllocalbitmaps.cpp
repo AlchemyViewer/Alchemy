@@ -180,7 +180,7 @@ bool LLLocalBitmap::updateSelf(EUpdateType optional_firstupdate)
 	if (mLinkStatus == LS_ON)
 	{
 		// verifying that the file exists
-		if (gDirUtilp->fileExists(mFilename))
+		if (LLFile::isfile(mFilename))
 		{
 			// verifying that the file has indeed been modified
 

@@ -343,7 +343,7 @@ bool LLAudioBufferOpenAL::loadWAV(const std::string& filename)
 	if(mALBuffer == AL_NONE)
 	{
 		ALenum error = alutGetError(); 
-		if (gDirUtilp->fileExists(filename))
+		if (LLFile::isfile(filename))
 		{
 			LL_WARNS() <<
 				"LLAudioBufferOpenAL::loadWAV() Error loading "

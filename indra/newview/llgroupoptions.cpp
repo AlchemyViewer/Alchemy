@@ -123,7 +123,7 @@ LLGroupOptions* LLGroupOptionsMgr::getOptions(const LLUUID& idGroup)
 bool LLGroupOptionsMgr::load()
 {
 	const std::string strFile = gDirUtilp->getExpandedFilename(LL_PATH_PER_SL_ACCOUNT, GROUP_OPTIONS_FILENAME);
-	if (!gDirUtilp->fileExists(strFile))
+	if (!LLFile::isfile(strFile))
 	{
 		return false;
 	}

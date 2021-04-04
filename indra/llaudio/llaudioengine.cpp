@@ -1011,7 +1011,7 @@ bool LLAudioEngine::hasDecodedFile(const LLUUID &uuid)
 	wav_path = gDirUtilp->getExpandedFilename(LL_PATH_CACHE,uuid_str);
 	wav_path += ".dsf";
 
-	if (gDirUtilp->fileExists(wav_path))
+	if (LLFile::isfile(wav_path))
 	{
 		return true;
 	}

@@ -322,13 +322,13 @@ struct Paths : public LLInitParam::Block<Paths>
 std::string LLUI::locateSkin(const std::string& filename)
 {
 	std::string found_file = filename;
-	if (gDirUtilp->fileExists(found_file))
+	if (LLFile::isfile(found_file))
 	{
 		return found_file;
 	}
 
 	found_file = gDirUtilp->getExpandedFilename(LL_PATH_USER_SETTINGS, filename); // Should be CUSTOM_SKINS?
-	if (gDirUtilp->fileExists(found_file))
+	if (LLFile::isfile(found_file))
 	{
 		return found_file;
 	}
@@ -340,7 +340,7 @@ std::string LLUI::locateSkin(const std::string& filename)
 	}
 
 	found_file = gDirUtilp->getExpandedFilename(LL_PATH_APP_SETTINGS, filename);
-	if (gDirUtilp->fileExists(found_file))
+	if (LLFile::isfile(found_file))
 	{
 		return found_file;
 	}

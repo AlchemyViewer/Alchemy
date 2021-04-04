@@ -2915,7 +2915,7 @@ bool LLEnvironment::loadFromSettings()
         return false;
     }
     std::string user_filepath(user_path + gDirUtilp->getDirDelimiter() + LOCAL_ENV_STORAGE_FILE);
-    if (!gDirUtilp->fileExists(user_filepath))
+    if (!LLFile::isfile(user_filepath))
     {
         // No previous environment
         return false;
