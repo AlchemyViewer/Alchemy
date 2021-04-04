@@ -55,16 +55,20 @@
 class LLVBOPool
 {
 public:
-	static U32 sBytesPooled;
-	static U32 sIndexBytesPooled;
-	
+	static U64 sBytesPooled;
+	static U64 sIndexBytesPooled;
+	static std::vector<U32> sPendingDeletions;
+
+	// Periodically call from render loop. Batches VBO deletions together in a single call.
+	static void deleteReleasedBuffers();
+
 	LLVBOPool(U32 vboUsage, U32 vboType);
 		
 	const U32 mUsage;
 	const U32 mType;
 
 	//size MUST be a power of 2
-	volatile U8* allocate(U32& name, U32 size, bool for_seed = false);
+	volatile U8* allocate(U32& name, U32 size, U32 seed = 0);
 	
 	//size MUST be the size provided to allocate that returned the given name
 	void release(U32 name, volatile U8* buffer, U32 size);
@@ -94,7 +98,6 @@ public:
 
 //============================================================================
 // base class 
-class LLPrivateMemoryPool;
 class LLVertexBuffer : public LLRefCount, public LLTrace::MemTrackable<LLVertexBuffer>
 {
 public:
@@ -102,15 +105,16 @@ public:
 	{
 	public:
 		S32 mType;
-		S32 mIndex;
-		S32 mCount;
-		S32 mEnd;
+		U32 mOffset;
+		U32 mLength;
 		
-		MappedRegion(S32 type, S32 index, S32 count);
+		MappedRegion(S32 type, U32 offset, U32 length);
 	};
 
 	LLVertexBuffer(const LLVertexBuffer& rhs) = delete;
 	const LLVertexBuffer& operator=(const LLVertexBuffer& rhs) = delete;
+
+	static const std::string& getTypeName(U8 i);
 
 	static LLVBOPool sStreamVBOPool;
 	static LLVBOPool sDynamicVBOPool;
@@ -132,7 +136,6 @@ public:
 	static void initClass(bool use_vbo, bool no_vbo_mapping);
 	static void cleanupClass();
 	static void setupClientArrays(U32 data_mask);
-	static void pushPositions(U32 mode, const LLVector4a* pos, U32 count);
 	static void drawArrays(U32 mode, const std::vector<LLVector3>& pos, const std::vector<LLVector3>& norm);
 	static void drawElements(U32 mode, const S32 num_vertices, const LLVector4a* pos, const LLVector2* tc, S32 num_indices, const U16* indicesp);
 
@@ -239,6 +242,7 @@ public:
 	bool getTexCoord1Strider(LLStrider<LLVector2>& strider, S32 index=0, S32 count = -1, bool map_range = false);
 	bool getTexCoord2Strider(LLStrider<LLVector2>& strider, S32 index=0, S32 count = -1, bool map_range = false);
 	bool getNormalStrider(LLStrider<LLVector3>& strider, S32 index=0, S32 count = -1, bool map_range = false);
+	bool getNormalStrider(LLStrider<LLVector4a>& strider, S32 index=0, S32 count = -1, bool map_range = false);
 	bool getTangentStrider(LLStrider<LLVector3>& strider, S32 index=0, S32 count = -1, bool map_range = false);
 	bool getTangentStrider(LLStrider<LLVector4a>& strider, S32 index=0, S32 count = -1, bool map_range = false);
 	bool getColorStrider(LLStrider<LLColor4U>& strider, S32 index=0, S32 count = -1, bool map_range = false);
@@ -283,7 +287,9 @@ protected:
 	ptrdiff_t mAlignedOffset;
 	ptrdiff_t mAlignedIndexOffset;
 	S32		mSize;
+	U32		mResidentSize;
 	S32		mIndicesSize;
+	U32		mResidentIndicesSize;
 	U32		mTypeMask;
 
 	const S32		mUsage;			// GL usage
@@ -316,9 +322,6 @@ protected:
 
 	static S32 determineUsage(S32 usage);
 
-private:
-	static LLPrivateMemoryPool* sPrivatePoolp;
-
 public:
 	static S32 sCount;
 	static S32 sGLCount;
@@ -336,8 +339,8 @@ public:
 	static bool sVBOActive;
 	static bool sIBOActive;
 	static U32 sLastMask;
-	static U32 sAllocatedBytes;
-	static U32 sAllocatedIndexBytes;
+	static U64 sAllocatedBytes;
+	static U64 sAllocatedIndexBytes;
 	static U32 sVertexCount;
 	static U32 sIndexCount;
 	static U32 sBindCount;

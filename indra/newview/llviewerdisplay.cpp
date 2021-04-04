@@ -284,6 +284,7 @@ static std::string STR_DISPLAY_DONE("Display:Done");
 void display(BOOL rebuild, F32 zoom_factor, int subfield, BOOL for_snapshot)
 {
 	LL_ALWAYS_RECORD_BLOCK_TIME(FTM_RENDER);
+	LLVBOPool::deleteReleasedBuffers();
 
 	if (gWindowResized)
 	{ //skip render on frames where window has been resized
@@ -354,8 +355,6 @@ void display(BOOL rebuild, F32 zoom_factor, int subfield, BOOL for_snapshot)
 		stop_glerror();
 		return; 
 	}
-
-	gViewerWindow->checkSettings();
 	
 	{
 		LL_RECORD_BLOCK_TIME(FTM_PICK);
@@ -911,6 +910,8 @@ void display(BOOL rebuild, F32 zoom_factor, int subfield, BOOL for_snapshot)
 			glClear(GL_COLOR_BUFFER_BIT);
 			glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 		}
+
+		LLVBOPool::deleteReleasedBuffers();
 
 		LLAppViewer::instance()->pingMainloopTimeout(STR_DISPLAY_RENDER_START);
 		
