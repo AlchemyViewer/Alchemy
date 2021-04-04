@@ -6929,12 +6929,11 @@ U32 LLVolumeGeometryManager::genDrawInfo(LLSpatialGroup* group, U32 mask, LLFace
 		}
 	}
 
+	auto& mask_buffer_map = buffer_map[mask];
+
 	auto& group_buffer_map = group->mBufferMap[mask];
 	group_buffer_map.clear();
-	for (const auto& buffer_pair : buffer_map[mask])
-	{
-		group_buffer_map[buffer_pair.first] = buffer_pair.second;
-	}
+	group_buffer_map.insert(mask_buffer_map.begin(), mask_buffer_map.end());
 
 	return geometryBytes;
 }
