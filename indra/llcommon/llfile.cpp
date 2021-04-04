@@ -641,42 +641,6 @@ LLFILE *	LLFile::_Fiopen(const std::string& filename,
 
 
 #if LL_WINDOWS
-/************** input file stream ********************************/
-
-llifstream::llifstream() {}
-
-// explicit
-llifstream::llifstream(const std::string& _Filename, ios_base::openmode _Mode):
-    std::ifstream(ll_convert_string_to_wide( _Filename ).c_str(),
-                  _Mode | ios_base::in)
-{
-}
-
-void llifstream::open(const std::string& _Filename, ios_base::openmode _Mode)
-{
-    std::ifstream::open(ll_convert_string_to_wide(_Filename).c_str(),
-                        _Mode | ios_base::in);
-}
-
-
-/************** output file stream ********************************/
-
-
-llofstream::llofstream() {}
-
-// explicit
-llofstream::llofstream(const std::string& _Filename, ios_base::openmode _Mode):
-    std::ofstream(ll_convert_string_to_wide( _Filename ).c_str(),
-                  _Mode | ios_base::out)
-{
-}
-
-void llofstream::open(const std::string& _Filename, ios_base::openmode _Mode)
-{
-    std::ofstream::open(ll_convert_string_to_wide( _Filename ).c_str(),
-                        _Mode | ios_base::out);
-}
-
 /************** helper functions ********************************/
 
 std::streamsize llifstream_size(llifstream& ifstr)

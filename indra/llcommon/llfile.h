@@ -167,91 +167,36 @@ private:
 
 #if LL_WINDOWS
 /**
- *  @brief  Controlling input for files.
- *
- *  This class supports reading from named files, using the inherited
- *  functions from std::ifstream. The only added value is that our constructor
- *  Does The Right Thing when passed a non-ASCII pathname. Sadly, that isn't
- *  true of Microsoft's std::ifstream.
- */
-class LL_COMMON_API llifstream	:	public	std::ifstream
-{
-	// input stream associated with a C stream
-  public:
-	// Constructors:
-	/**
-	 *  @brief  Default constructor.
-	 *
-	 *  Initializes @c sb using its default constructor, and passes
-	 *  @c &sb to the base class initializer.  Does not open any files
-	 *  (you haven't given it a filename to open).
-     */
-	llifstream();
-
-	/**
-	 *  @brief  Create an input file stream.
-	 *  @param  Filename  String specifying the filename.
-	 *  @param  Mode  Open file in specified mode (see std::ios_base).
-	 *
-     *  @c ios_base::in is automatically included in @a mode.
-     */
-	explicit llifstream(const std::string& _Filename,
-                        ios_base::openmode _Mode = ios_base::in);
-
-	/**
-	 *  @brief  Opens an external file.
-	 *  @param  Filename  The name of the file.
-	 *  @param  Node  The open mode flags.
-	 *
-	 *  Calls @c llstdio_filebuf::open(s,mode|in).  If that function
-	 *  fails, @c failbit is set in the stream's error state.
-     */
-	void open(const std::string& _Filename,
-              ios_base::openmode _Mode = ios_base::in);
-};
-
-
-/**
- *  @brief  Controlling output for files.
- *
- *  This class supports writing to named files, using the inherited functions
- *  from std::ofstream. The only added value is that our constructor Does The
- *  Right Thing when passed a non-ASCII pathname. Sadly, that isn't true of
- *  Microsoft's std::ofstream.
+*  @brief  Wrapper for UTF16 path compatibility on windows operating systems
 */
-class LL_COMMON_API llofstream	:	public	std::ofstream
-{
-  public:
-	// Constructors:
-	/**
-	 *  @brief  Default constructor.
-	 *
-	 *  Initializes @c sb using its default constructor, and passes
-	 *  @c &sb to the base class initializer.  Does not open any files
-	 *  (you haven't given it a filename to open).
-     */
-	llofstream();
+template< typename BaseType, std::ios_base::openmode DEFAULT_MODE>
+class LL_COMMON_API stream_wrapper : public BaseType {
+public:
 
-	/**
-	 *  @brief  Create an output file stream.
-	 *  @param  Filename  String specifying the filename.
-	 *  @param  Mode  Open file in specified mode (see std::ios_base).
-	 *
-	 *  @c ios_base::out is automatically included in @a mode.
-     */
-	explicit llofstream(const std::string& _Filename,
-                        ios_base::openmode _Mode = ios_base::out|ios_base::trunc);
+    stream_wrapper() = default;
 
-	/**
-	 *  @brief  Opens an external file.
-	 *  @param  Filename  The name of the file.
-	 *  @param  Node  The open mode flags.
-	 *
-	 *  @c ios_base::out is automatically included in @a mode.
-     */
-	void open(const std::string& _Filename,
-              ios_base::openmode _Mode = ios_base::out|ios_base::trunc);
+    explicit stream_wrapper(char const* _Filename, std::ios_base::openmode _Mode = DEFAULT_MODE)
+        : BaseType(ll_convert_string_to_wide(_Filename).c_str(), _Mode)
+    {
+    }
+
+    explicit stream_wrapper(const std::string& _Filename, std::ios_base::openmode _Mode = DEFAULT_MODE)
+        : BaseType(ll_convert_string_to_wide(_Filename), _Mode)
+    {
+    }
+
+    void open(char const* _Filename, std::ios_base::openmode _Mode = DEFAULT_MODE) {
+        BaseType::open(ll_convert_string_to_wide(_Filename).c_str(), _Mode);
+    }
+
+    void open(const std::string& _Filename, std::ios_base::openmode _Mode = DEFAULT_MODE) {
+        BaseType::open(ll_convert_string_to_wide(_Filename), _Mode);
+    }
 };
+
+typedef stream_wrapper<std::fstream, std::ios_base::in | std::ios_base::out > llfstream;
+typedef stream_wrapper<std::ifstream, std::ios_base::in > llifstream;
+typedef stream_wrapper<std::ofstream, std::ios_base::out | std::ios_base::trunc > llofstream;
 
 
 /**
@@ -267,6 +212,7 @@ std::streamsize LL_COMMON_API llofstream_size(llofstream& fstr);
 #else // ! LL_WINDOWS
 
 // on non-windows, llifstream and llofstream are just mapped directly to the std:: equivalents
+typedef std::fstream  llfstream;
 typedef std::ifstream llifstream;
 typedef std::ofstream llofstream;
 
