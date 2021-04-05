@@ -305,10 +305,9 @@ add_dependencies(llcommon stage_third_party_libs)
 
 if(${CMAKE_VERSION} VERSION_GREATER "3.15.0") 
   target_precompile_headers(llcommon
-    PUBLIC
+    PRIVATE
     linden_common.h
     llwin32headerslean.h
-    PRIVATE
     <algorithm>
     <atomic>
     <functional>

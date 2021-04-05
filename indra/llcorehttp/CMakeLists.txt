@@ -104,10 +104,9 @@ target_link_libraries(
 
 if(${CMAKE_VERSION} VERSION_GREATER "3.15.0") 
   target_precompile_headers(llcorehttp
-    PUBLIC
+  PRIVATE
   [["linden_common.h"]]
   [["llsd.h"]]
-  PRIVATE
   <boost/intrusive_ptr.hpp>
   <boost/shared_ptr.hpp>
   <boost/make_shared.hpp>
