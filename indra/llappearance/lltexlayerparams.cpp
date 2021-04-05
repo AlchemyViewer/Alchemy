@@ -33,9 +33,9 @@
 #include "llquantize.h"
 #include "lltexlayer.h"
 #include "lltexturemanagerbridge.h"
-#include "../llui/llui.h"
 #include "llwearable.h"
 #include "llfasttimer.h"
+#include "llrender2dutils.h"
 
 //-----------------------------------------------------------------------------
 // LLTexLayerParam

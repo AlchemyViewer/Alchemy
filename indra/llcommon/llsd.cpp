@@ -31,7 +31,7 @@
 #include "llsd.h"
 
 #include "llerror.h"
-#include "../llmath/llmath.h"
+#include "llmath.h"
 #include "llformat.h"
 #include "llsdserialize.h"
 #include "stringize.h"
