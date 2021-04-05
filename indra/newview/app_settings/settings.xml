@@ -17011,6 +17011,28 @@
       <key>Value</key>
       <integer>1</integer>
     </map>
+    <key>EnableDiskCacheDebugInfo</key>
+    <map>
+      <key>Comment</key>
+      <string>Enable debug output for filesystem cache</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <integer>0</integer>
+    </map>
+    <key>MemProfiling</key>
+    <map>
+      <key>Comment</key>
+      <string>Enable allocator profiling</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <integer>0</integer>
+    </map>
 </map>
 </llsd>
 
