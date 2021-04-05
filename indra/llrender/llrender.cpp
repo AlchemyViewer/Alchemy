@@ -1141,7 +1141,7 @@ LLRender::~LLRender()
 void LLRender::init()
 {
 	if (mDummyVAO != 0)
-	{ //bind a dummy vertex array object so we're core profile compliant
+	{ 
 #ifdef GL_ARB_vertex_array_object
 		glDeleteVertexArrays(1, &mDummyVAO);
 #endif

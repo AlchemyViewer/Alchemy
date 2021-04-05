@@ -7362,6 +7362,8 @@ void LLPipeline::doResetVertexBuffers(bool forced)
 	LL_RECORD_BLOCK_TIME(FTM_RESET_VB);
 	mResetVertexBuffers = false;
 
+	mDeferredVB = NULL;
+
 	mCubeVB = NULL;
 
 	for (LLViewerRegion* region : LLWorld::getInstance()->getRegionList())
@@ -7422,6 +7424,16 @@ void LLPipeline::doResetVertexBuffers(bool forced)
 
 	LLVOPartGroup::restoreGL();
 	gGL.restoreVertexBuffers();
+
+	if (mCubeVB.isNull())
+	{
+		mCubeVB = ll_create_cube_vb(LLVertexBuffer::MAP_VERTEX, GL_STATIC_DRAW);
+	}
+
+	mDeferredVB = new LLVertexBuffer(DEFERRED_VB_MASK, 0);
+	mDeferredVB->allocateBuffer(8, 0, true);
+
+
 }
 
 void LLPipeline::renderObjects(U32 type, U32 mask, bool texture, bool batch_texture)

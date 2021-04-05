@@ -57,19 +57,20 @@ public:
 	/*virtual*/ U32 processUpdateMessage(LLMessageSystem *mesgsys,
 											void **user_data,
 											U32 block_num, const EObjectUpdateType update_type,
-											LLDataPacker *dp);
-	/*virtual*/ void idleUpdate(LLAgent &agent, const F64 &time);
+											LLDataPacker *dp) override;
+	/*virtual*/ void idleUpdate(LLAgent &agent, const F64 &time) override;
 	
 	// Graphical stuff for objects - maybe broken out into render class later?
 	/*virtual*/ void render(LLAgent &agent);
-	/*virtual*/ void setPixelAreaAndAngle(LLAgent &agent);
-	/*virtual*/ void updateTextures();
+	/*virtual*/ void setPixelAreaAndAngle(LLAgent &agent) override;
+	/*virtual*/ void updateTextures() override;
 
-	/*virtual*/ LLDrawable* createDrawable(LLPipeline *pipeline);
-	/*virtual*/ BOOL		updateGeometry(LLDrawable *drawable);
-	/*virtual*/ void		updateSpatialExtents(LLVector4a &min, LLVector4a &max);
+	/*virtual*/ LLDrawable* createDrawable(LLPipeline *pipeline) override;
+	/*virtual*/ BOOL		updateGeometry(LLDrawable *drawable) override;
+	/*virtual*/ void		updateSpatialExtents(LLVector4a &min, LLVector4a &max) override;
 
-	virtual U32 getPartitionType() const;
+	void resetVertexBuffers() override;
+	U32 getPartitionType() const override;
 
 	void updateRadius();
 

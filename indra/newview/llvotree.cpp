@@ -480,6 +480,11 @@ const S32 LEAF_VERTICES = 16;
 
 static LLTrace::BlockTimerStatHandle FTM_UPDATE_TREE("Update Tree");
 
+void LLVOTree::resetVertexBuffers()
+{
+	mReferenceBuffer = NULL;
+}
+
 BOOL LLVOTree::updateGeometry(LLDrawable *drawable)
 {
 	LL_RECORD_BLOCK_TIME(FTM_UPDATE_TREE);

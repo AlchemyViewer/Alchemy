@@ -1452,6 +1452,10 @@ public:
 			{
 				continue;
 			}
+			if (drawable->getVObj().notNull())
+			{
+				drawable->getVObj()->resetVertexBuffers();
+			}
 			if (!mNoRebuild && drawable->getVObj().notNull() && !group->getSpatialPartition()->mRenderByGroup)
 			{
 				gPipeline.markRebuild(drawable, LLDrawable::REBUILD_ALL, TRUE);
