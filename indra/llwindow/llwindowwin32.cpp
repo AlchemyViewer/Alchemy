@@ -860,7 +860,14 @@ bool destroy_window_handler(HWND &hWnd)
     bool res;
     __try
     {
-        res = DestroyWindow(hWnd);
+		if (hWnd)
+		{
+			res = DestroyWindow(hWnd);
+		}
+		else
+		{
+			res = true;
+		}
     }
     __except (EXCEPTION_EXECUTE_HANDLER)
     {
@@ -1769,7 +1776,7 @@ BOOL LLWindowWin32::switchContext(BOOL fullscreen, const LLCoordScreen &size, BO
 			ReleaseDC(oldWND, oldDC);						// Release The Device Context
 			oldDC = nullptr;											// Zero The Device Context
 		}
-		DestroyWindow(oldWND);									// Destroy The Window
+		destroy_window_handler(oldWND);									// Destroy The Window
 		oldWND = nullptr;
 	}
 
