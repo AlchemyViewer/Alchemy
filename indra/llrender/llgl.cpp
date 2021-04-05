@@ -431,7 +431,7 @@ bool LLGLManager::initGL()
 		}
 		if (mVRAM != 0)
 		{
-			LL_WARNS("RenderInit") << "VRAM Detected (AMDAssociations):" << mVRAM << LL_ENDL;
+			LL_INFOS("RenderInit") << "VRAM Detected (AMDAssociations):" << mVRAM << LL_ENDL;
 		}
 	}
 #endif
@@ -442,7 +442,7 @@ bool LLGLManager::initGL()
 		glGetIntegerv(GL_TEXTURE_FREE_MEMORY_ATI, meminfo);
 
 		mVRAM = meminfo[0] / 1024;
-		LL_WARNS("RenderInit") << "VRAM Detected (ATIMemInfo):" << mVRAM << LL_ENDL;
+		LL_INFOS("RenderInit") << "VRAM Detected (ATIMemInfo):" << mVRAM << LL_ENDL;
 	}
 
 	if (mHasNVXMemInfo && mVRAM == 0)
@@ -450,7 +450,7 @@ bool LLGLManager::initGL()
 		S32 dedicated_memory;
 		glGetIntegerv(GL_GPU_MEMORY_INFO_DEDICATED_VIDMEM_NVX, &dedicated_memory);
 		mVRAM = dedicated_memory/1024;
-		LL_WARNS("RenderInit") << "VRAM Detected (NVXMemInfo):" << mVRAM << LL_ENDL;
+		LL_INFOS("RenderInit") << "VRAM Detected (NVXMemInfo):" << mVRAM << LL_ENDL;
 	}
 
 #if LL_WINDOWS
@@ -465,7 +465,7 @@ bool LLGLManager::initGL()
 		if (mem != 0)
 		{
 			mVRAM = mem;
-			LL_WARNS("RenderInit") << "VRAM Detected (WMI):" << mVRAM<< LL_ENDL;
+			LL_INFOS("RenderInit") << "VRAM Detected (WMI):" << mVRAM<< LL_ENDL;
 		}
 	}
 #endif
