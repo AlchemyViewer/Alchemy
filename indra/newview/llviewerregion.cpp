@@ -83,10 +83,6 @@
 #include "llsettingsdaycycle.h"
 #include "llviewerparcelmgr.h"
 
-#ifdef LL_WINDOWS
-	#pragma warning(disable:4355)
-#endif
-
 // When we receive a base grant of capabilities that has a different number of 
 // capabilities than the original base grant received for the region, print 
 // out the two lists of capabilities for analysis.

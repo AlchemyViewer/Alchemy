@@ -47,10 +47,6 @@
 #include "llxmlrpctransaction.h"
 #include "llsecapi.h"
 
-#if LL_WINDOWS
-#pragma warning (disable : 4355) // 'this' used in initializer list: yes, intentionally
-#endif
-
 template <typename STATUS>
 class StatusMapperBase
 {
