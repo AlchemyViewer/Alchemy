@@ -102,6 +102,24 @@ target_link_libraries(
   ${BOOST_SYSTEM_LIBRARY}
   )
 
+if(${CMAKE_VERSION} VERSION_GREATER "3.15.0") 
+  target_precompile_headers(llcorehttp
+    PUBLIC
+  [["linden_common.h"]]
+  [["llsd.h"]]
+  PRIVATE
+  <boost/intrusive_ptr.hpp>
+  <boost/shared_ptr.hpp>
+  <boost/make_shared.hpp>
+  <boost/weak_ptr.hpp>
+  <boost/function.hpp>
+  <boost/noncopyable.hpp>
+  <string>
+  <curl/curl.h>
+  )
+endif()
+
+
 # tests
 set(LLCOREHTTP_TESTS ON CACHE BOOL
     "Build and run llcorehttp integration tests specifically")

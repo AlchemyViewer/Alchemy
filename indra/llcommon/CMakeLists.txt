@@ -303,6 +303,25 @@ target_link_libraries(
 
 add_dependencies(llcommon stage_third_party_libs)
 
+if(${CMAKE_VERSION} VERSION_GREATER "3.15.0") 
+  target_precompile_headers(llcommon
+    PUBLIC
+    linden_common.h
+    llwin32headerslean.h
+    PRIVATE
+    <algorithm>
+    <atomic>
+    <functional>
+    <map>
+    <mutex>
+    <string>
+    <string_view>
+    <thread>
+    <absl/container/node_hash_map.h>
+    <absl/container/flat_hash_map.h>
+    )
+endif()
+
 if (LL_TESTS)
   include(LLAddBuildTest)
   SET(llcommon_TEST_SOURCE_FILES
