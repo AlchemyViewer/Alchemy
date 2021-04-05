@@ -1557,19 +1557,6 @@ if (WINDOWS)
          llwindebug.h
          )
 
-    # precompiled header configuration
-    # llviewerprecompiledheaders.cpp generates
-    # the .pch file.
-    # All sources added to viewer_SOURCE_FILES
-    # at this point use it.
-    if(USE_PRECOMPILED_HEADERS)
-        set_source_files_properties(llviewerprecompiledheaders.cpp
-            PROPERTIES
-            COMPILE_FLAGS "/Ycllviewerprecompiledheaders.h"
-            )
-        set(viewer_SOURCE_FILES "${viewer_SOURCE_FILES}" llviewerprecompiledheaders.cpp)
-    endif(USE_PRECOMPILED_HEADERS)
-
     # Replace the icons with the appropriate ones for the channel
     # ('test' is the default)
     set(ICON_PATH "test")
@@ -1852,6 +1839,20 @@ list(APPEND EVENT_HOST_SCRIPTS ${EVENT_HOST_SCRIPT_GLOB_LIST})
 set(PACKAGE ON CACHE BOOL
     "Add a package target that builds an installer package.")
 
+if(USE_PRECOMPILED_HEADERS)
+  # precompiled header configuration
+  # llviewerprecompiledheaders.cpp generates
+  # the .pch file.
+  # All sources added to viewer_SOURCE_FILES
+  # at this point use it.
+  if(${CMAKE_VERSION} VERSION_GREATER "3.15.0") 
+    target_precompile_headers(${VIEWER_BINARY_NAME}
+      PRIVATE
+      [["llviewerprecompiledheaders.h"]]
+      )
+  endif()
+endif(USE_PRECOMPILED_HEADERS)
+    
 if (WINDOWS)
     set_target_properties(${VIEWER_BINARY_NAME}
         PROPERTIES
@@ -1860,14 +1861,6 @@ if (WINDOWS)
         LINK_FLAGS_DEBUG "/NODEFAULTLIB:\"LIBCMT;LIBCMTD;MSVCRT\" /INCREMENTAL:NO /LARGEADDRESSAWARE"
         LINK_FLAGS_RELEASE "/MAP\"alchemy-bin.MAP\" /OPT:REF /LARGEADDRESSAWARE"
         )
-
-    if(USE_PRECOMPILED_HEADERS)
-        set_target_properties(
-            ${VIEWER_BINARY_NAME}
-            PROPERTIES
-            COMPILE_FLAGS "/Yullviewerprecompiledheaders.h"
-            )
-    endif(USE_PRECOMPILED_HEADERS)
 
     # If adding a file to viewer_manifest.py in the WindowsManifest.construct() method, be sure to add the dependency
     # here.
