@@ -42,6 +42,11 @@
 #include <functional>
 #include <map>
 #include <set>
+#include <string>
+#include <string_view>
+
+#include "absl/container/flat_hash_set.h"
+#include "absl/container/flat_hash_map.h"
 
 // Library headers from llcommon project:
 #include "indra_constants.h"
@@ -54,6 +59,7 @@
 #include "llerror.h"
 #include "llfasttimer.h"
 #include "llframetimer.h"
+#include "llinstancetracker.h"
 #include "llpointer.h"
 #include "llprocessor.h"
 #include "llrefcount.h"
@@ -65,6 +71,7 @@
 #include "llstring.h"
 #include "llsys.h"
 #include "lltimer.h"
+#include "lltrace.h"
 #include "stdtypes.h"
 #include "u64.h"
 
@@ -92,10 +99,18 @@
 #include "v4math.h"
 #include "xform.h"
 
+// Library includes from llfilesystem project
 #include "lldir.h"
 
 // Library includes from llmessage project
+#include "llavatarnamecache.h"
 #include "llcachename.h"
 
+// Library includes from llrender project
+#include "llglheaders.h"
+
+// Library includes from llui project
+#include "llui.h"
+#include "lluictrl.h"
 
 #endif
