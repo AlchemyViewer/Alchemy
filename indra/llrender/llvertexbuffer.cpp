@@ -37,6 +37,8 @@
 #include "llglslshader.h"
 #include "llmemory.h"
 
+#include "absl/container/flat_hash_set.h"
+
 //Next Highest Power Of Two
 //helper function, returns first number > v that is a power of 2, or v if v is already a power of 2
 U32 nhpo2(U32 v)
@@ -120,12 +122,12 @@ bool LLVertexBuffer::sPreferStreamDraw = false;
 LLVertexBuffer* LLVertexBuffer::sUtilityBuffer = nullptr;
 
 #if LL_DEBUG || LL_RELEASE_WITH_DEBUG_INFO
-static std::vector<U32> sActiveBufferNames;
-static std::vector<U32> sDeletedBufferNames;
+static absl::flat_hash_set<U32> sActiveBufferNames;
+static absl::flat_hash_set<U32> sDeletedBufferNames;
 
 void validate_add_buffer(U32 name)
 {
-	auto found = std::find(sActiveBufferNames.begin(), sActiveBufferNames.end(), name);
+	auto found = sActiveBufferNames.find(name);
 	if (found != sActiveBufferNames.end())
 	{
 		LL_ERRS() << "Allocating allocated buffer name " << name << LL_ENDL;
@@ -133,16 +135,16 @@ void validate_add_buffer(U32 name)
 	else
 	{
 		//LL_INFOS() << "Allocated buffer name " << name << LL_ENDL;
-		sActiveBufferNames.push_back(name);
+		sActiveBufferNames.emplace(name);
 	}
 }
 
 void validate_del_buffer(U32 name)
 {
-	auto found = std::find(sActiveBufferNames.begin(), sActiveBufferNames.end(), name);
+	auto found = sActiveBufferNames.find(name);
 	if (found == sActiveBufferNames.end())
 	{
-		if (std::find(sDeletedBufferNames.begin(), sDeletedBufferNames.end(), name) == sDeletedBufferNames.end())
+		if (sDeletedBufferNames.find(name) == sDeletedBufferNames.end())
 		{
 			LL_ERRS() << "Deleting unknown buffer name " << name << LL_ENDL;
 		}
@@ -155,16 +157,16 @@ void validate_del_buffer(U32 name)
 	{
 		//LL_INFOS() << "Deleted buffer name " << name << LL_ENDL;
 		sActiveBufferNames.erase(found);
-		sDeletedBufferNames.push_back(name);
+		sDeletedBufferNames.emplace(name);
 	}
 }
 
 void validate_bind_buffer(U32 name)
 {
-	auto found = std::find(sActiveBufferNames.begin(), sActiveBufferNames.end(), name);
+	auto found = sActiveBufferNames.find(name);
 	if (found == sActiveBufferNames.end())
 	{
-		if (std::find(sDeletedBufferNames.begin(), sDeletedBufferNames.end(), name) == sDeletedBufferNames.end())
+		if (sDeletedBufferNames.find(name) == sDeletedBufferNames.end())
 		{
 			LL_ERRS() << "Binding unknown buffer name " << name << LL_ENDL;
 		}
