@@ -356,6 +356,8 @@ void display(BOOL rebuild, F32 zoom_factor, int subfield, BOOL for_snapshot)
 		return; 
 	}
 	
+	gViewerWindow->checkSettings();
+
 	{
 		LL_RECORD_BLOCK_TIME(FTM_PICK);
 		LLAppViewer::instance()->pingMainloopTimeout(STR_DISPLAY_PICK);
