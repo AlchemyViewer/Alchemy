@@ -292,6 +292,39 @@ target_link_libraries(llui
     ${LLCOMMON_LIBRARIES} # must be after llimage, llwindow, llrender
     )
 
+if(${CMAKE_VERSION} VERSION_GREATER "3.15.0") 
+  target_precompile_headers(llui
+    PRIVATE
+    [["linden_common.h"]]
+    [["llcursortypes.h"]]
+    [["llframetimer.h"]]
+    [["llhandle.h"]]
+    [["llmortician.h"]]
+    [["llpointer.h"]]
+    [["llrefcount.h"]]
+    [["llregistry.h"]]
+    [["llsd.h"]]
+    [["lltrace.h"]]
+    [["llinitparam.h"]]
+    [["llstring.h"]]
+    [["llcoord.h"]]
+    [["llrect.h"]]
+    [["llfontgl.h"]]
+    [["llrender2dutils.h"]]
+    [["llmousehandler.h"]]
+    <map>
+    <limits>
+    <list>
+    <set>
+    <string>
+    <boost/function.hpp>
+    <boost/noncopyable.hpp>
+    <boost/signals2.hpp>
+    <absl/container/flat_hash_set.h>
+    <absl/container/flat_hash_map.h>
+    )
+endif()
+
 # Add tests
 if(LL_TESTS)
   include(LLAddBuildTest)

@@ -75,6 +75,12 @@ target_link_libraries(
     llcommon
     )
 
+if(${CMAKE_VERSION} VERSION_GREATER "3.15.0") 
+  target_precompile_headers(llinventory
+    PRIVATE
+    [["linden_common.h"]]
+    )
+endif()
 
 #add unit tests
 if (LL_TESTS)

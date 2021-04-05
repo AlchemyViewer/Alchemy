@@ -92,6 +92,13 @@ target_link_libraries(llappearance
     ${LLCOMMON_LIBRARIES}
     )
 
+if(${CMAKE_VERSION} VERSION_GREATER "3.15.0") 
+    target_precompile_headers(llappearance
+        PRIVATE
+        [["linden_common.h"]]
+        )
+endif()
+
 if (BUILD_HEADLESS)
   add_library (llappearanceheadless ${llappearance_SOURCE_FILES})
   

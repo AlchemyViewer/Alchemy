@@ -239,6 +239,13 @@ target_link_libraries(
   )
 endif(LINUX)
 
+if(${CMAKE_VERSION} VERSION_GREATER "3.15.0") 
+  target_precompile_headers(llmessage
+    PRIVATE
+    [["linden_common.h"]]
+    )
+endif()
+
 # tests
 if (LL_TESTS)
   SET(llmessage_TEST_SOURCE_FILES

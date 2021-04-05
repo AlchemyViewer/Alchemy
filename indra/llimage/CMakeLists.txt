@@ -81,6 +81,13 @@ target_link_libraries(llimage
     ${ZLIB_LIBRARIES}
     )
 
+if(${CMAKE_VERSION} VERSION_GREATER "3.15.0") 
+  target_precompile_headers(llimage
+    PRIVATE
+    [["linden_common.h"]]
+    )
+endif()
+
 # Add tests
 if (LL_TESTS)
   SET(llimage_TEST_SOURCE_FILES

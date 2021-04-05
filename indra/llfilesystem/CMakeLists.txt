@@ -80,6 +80,12 @@ if (DARWIN)
   target_link_libraries(llfilesystem ${COCOA_LIBRARY})
 endif (DARWIN)
 
+if(${CMAKE_VERSION} VERSION_GREATER "3.15.0") 
+  target_precompile_headers(llfilesystem
+    PRIVATE
+    [["linden_common.h"]]
+    )
+endif()
 
 # Add tests
 if (LL_TESTS)

@@ -134,3 +134,16 @@ target_link_libraries(llrender
     ${EPOXY_LIBRARIES}
     ${OPENGL_LIBRARIES})
 
+if(${CMAKE_VERSION} VERSION_GREATER "3.15.0") 
+  target_precompile_headers(llrender
+    PRIVATE
+    [["linden_common.h"]]
+    llglheaders.h
+    llgltypes.h
+    <map>
+    <list>
+    <string>
+    <absl/container/flat_hash_set.h>
+    <absl/container/flat_hash_map.h>
+    )
+endif()

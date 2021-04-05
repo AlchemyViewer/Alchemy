@@ -84,3 +84,10 @@ target_link_libraries(
     ${LLFILESYSTEM_LIBRARIES}
     ${LLXML_LIBRARIES}
     )
+
+if(${CMAKE_VERSION} VERSION_GREATER "3.15.0") 
+  target_precompile_headers(llcharacter
+    PRIVATE
+    [["linden_common.h"]]
+    )
+endif()

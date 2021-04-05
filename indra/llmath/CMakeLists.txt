@@ -116,6 +116,13 @@ target_link_libraries(llmath
     meshoptimizer
     )
 
+if(${CMAKE_VERSION} VERSION_GREATER "3.15.0") 
+  target_precompile_headers(llmath
+    PRIVATE
+    [["linden_common.h"]]
+    )
+endif()
+
 # Add tests
 if (LL_TESTS)
   include(LLAddBuildTest)

@@ -178,10 +178,10 @@ endif (llwindow_HEADER_FILES)
 
   list(APPEND viewer_SOURCE_FILES ${viewer_HEADER_FILES})
 
-  add_library (llwindow
-    ${llwindow_SOURCE_FILES}
-    ${viewer_SOURCE_FILES}
-    )
+add_library (llwindow
+  ${llwindow_SOURCE_FILES}
+  ${viewer_SOURCE_FILES}
+  )
 
 if (SDL_FOUND)
   set_property(TARGET llwindow
@@ -189,5 +189,11 @@ if (SDL_FOUND)
     )
 endif (SDL_FOUND)
 
-  target_link_libraries (llwindow llcommon ${llwindow_LINK_LIBRARIES})
+target_link_libraries (llwindow llcommon ${llwindow_LINK_LIBRARIES})
 
+if(${CMAKE_VERSION} VERSION_GREATER "3.15.0") 
+  target_precompile_headers(llwindow
+    PRIVATE
+    [["linden_common.h"]]
+    )
+endif()

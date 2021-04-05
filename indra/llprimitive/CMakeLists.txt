@@ -84,6 +84,12 @@ target_link_libraries(llprimitive
     ${BOOST_CONTEXT_LIBRARY}
     )
 
+if(${CMAKE_VERSION} VERSION_GREATER "3.15.0") 
+  target_precompile_headers(llprimitive
+    PRIVATE
+    [["linden_common.h"]]
+    )
+endif()
 
 #add unit tests
 if (LL_TESTS)

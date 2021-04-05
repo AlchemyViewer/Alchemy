@@ -64,5 +64,12 @@ target_link_libraries(llplugin PUBLIC
 
 set_target_properties(llplugin PROPERTIES POSITION_INDEPENDENT_CODE TRUE)
 
+if(${CMAKE_VERSION} VERSION_GREATER "3.15.0") 
+  target_precompile_headers(llplugin
+    PRIVATE
+    [["linden_common.h"]]
+    )
+endif()
+
 add_subdirectory(slplugin)
 
