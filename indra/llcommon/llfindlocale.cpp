@@ -140,16 +140,6 @@ accumulate_locstring(const char *str, FL_Locale *l) {
 }
 
 
-static int
-accumulate_env(const char *name, FL_Locale *l) {
-  char* env = getenv(name);
-  if (env) {
-    return accumulate_locstring(env, l);
-  }
-  return 0;
-}
-
-
 static void
 canonise_fl(FL_Locale *l) {
   /* this function fixes some common locale-specifying mistakes */

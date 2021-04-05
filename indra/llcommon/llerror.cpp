@@ -95,7 +95,7 @@ namespace {
 		}
 	}
 #else
-	class RecordToSyslog : public LLError::Recorder
+	class RecordToSyslog final : public LLError::Recorder
 	{
 	public:
 		RecordToSyslog(const std::string& identity)
@@ -136,7 +136,7 @@ namespace {
 	};
 #endif
 
-	class RecordToFile : public LLError::Recorder
+	class RecordToFile final : public LLError::Recorder
 	{
 	public:
 		RecordToFile(const std::string& filename):
@@ -195,7 +195,7 @@ namespace {
 	};
 	
 	
-	class RecordToStderr : public LLError::Recorder
+	class RecordToStderr final : public LLError::Recorder
 	{
 	public:
 		RecordToStderr(bool timestamp) : mUseANSI(checkANSI()) 
@@ -300,7 +300,7 @@ namespace {
 		}
 	};
 
-	class RecordToFixedBuffer : public LLError::Recorder
+	class RecordToFixedBuffer final : public LLError::Recorder
 	{
 	public:
 		RecordToFixedBuffer(LLLineBuffer* buffer)
@@ -327,7 +327,7 @@ namespace {
 	};
 
 #if LL_WINDOWS
-	class RecordToWinDebug: public LLError::Recorder
+	class RecordToWinDebug final : public LLError::Recorder
 	{
 	public:
 		RecordToWinDebug()
@@ -672,7 +672,7 @@ namespace LLError
 					const std::type_info& class_info, 
 					const char* function, 
 					bool printOnce,
-					const char** tags, 
+					const char** tags_in, 
 					size_t tag_count)
 	:	mLevel(level), 
 		mFile(file), 
@@ -712,11 +712,11 @@ namespace LLError
 
 		for (int i = 0; i < tag_count; i++)
 		{
-            if (strchr(tags[i], ' '))
+            if (strchr(tags_in[i], ' '))
             {
                 LL_ERRS() << "Space is not allowed in a log tag at " << mLocationString << LL_ENDL;
             }
-			mTags[i] = tags[i];
+			mTags[i] = tags_in[i];
 		}
 
         mTagString.append("#");
@@ -730,7 +730,7 @@ namespace LLError
 
 	CallSite::~CallSite()
 	{
-		delete []mTags;
+		delete[] mTags;
 	}
 
 	void CallSite::invalidate()
