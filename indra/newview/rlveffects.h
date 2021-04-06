@@ -29,7 +29,7 @@ class LLViewerFetchedTexture;
 // RlvOverlayEffect class
 //
 
-class RlvOverlayEffect : public LLVisualEffect
+class RlvOverlayEffect final : public LLVisualEffect
 {
 public:
 	RlvOverlayEffect(const LLUUID& idRlvObj);
@@ -64,7 +64,7 @@ protected:
 // RlvSphereEffect class
 //
 
-class RlvSphereEffect : public LLVisualEffect
+class RlvSphereEffect final : public LLVisualEffect
 {
 public:
 	RlvSphereEffect(const LLUUID& idRlvObj);

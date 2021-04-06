@@ -49,7 +49,7 @@ struct LLVisualEffectParams
 	virtual void step(bool isLast) = 0;
 };
 
-struct LLShaderEffectParams : LLVisualEffectParams
+struct LLShaderEffectParams final : LLVisualEffectParams
 {
 	explicit LLShaderEffectParams(LLRenderTarget* pSrcBuffer, LLRenderTarget* pScratchBuffer, bool fBindLast) : m_pSrcBuffer(pScratchBuffer), m_pDstBuffer(pSrcBuffer), m_fBindLast(fBindLast) {}
 
@@ -103,7 +103,7 @@ class LLTweenableValue
 {
 public:
 	LLTweenableValue(const T& defaultValue) : m_CurValue(defaultValue) {}
-	virtual ~LLTweenableValue() {}
+	virtual ~LLTweenableValue() = default;
 
 	virtual T    get() = 0;
 	virtual void start(const T& endValue, double duration) = 0;
@@ -118,7 +118,7 @@ protected:
 };
 
 template<typename T>
-class LLTweenableValueLerp : public LLTweenableValue<T>
+class LLTweenableValueLerp final : public LLTweenableValue<T>
 {
 public:
 	LLTweenableValueLerp(const T& defaultValue) : LLTweenableValue<T>(defaultValue) {}
@@ -148,11 +148,11 @@ protected:
 //
 //
 
-class LLVfxManager : public LLSingleton<LLVfxManager>
+class LLVfxManager final : public LLSingleton<LLVfxManager>
 {
 	LLSINGLETON(LLVfxManager);
 protected:
-	~LLVfxManager() {}
+	~LLVfxManager() = default;
 
 	/*
 	 * Member functions
