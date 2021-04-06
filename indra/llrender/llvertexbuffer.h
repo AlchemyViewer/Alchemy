@@ -194,7 +194,7 @@ public:
 protected:
 	friend class LLRender;
 
-	virtual ~LLVertexBuffer(); // use unref()
+	~LLVertexBuffer() override; // use unref()
 
 	virtual void setupVertexBuffer(U32 data_mask); // pure virtual, called from mapBuffer()
 	void setupVertexArray();
@@ -222,11 +222,11 @@ public:
 	volatile U8*		mapIndexBuffer(S32 index, S32 count, bool map_range);
 
 	// set for rendering
-	virtual void	setBuffer(U32 data_mask); 	// calls  setupVertexBuffer() if data_mask is not 0
+	void setBuffer(U32 data_mask); 	// calls  setupVertexBuffer() if data_mask is not 0
 	void flush(); //flush pending data to GL memory
 	// allocate buffer
-	bool	allocateBuffer(S32 nverts, S32 nindices, bool create);
-	virtual bool resizeBuffer(S32 newnverts, S32 newnindices);
+	bool allocateBuffer(S32 nverts, S32 nindices, bool create);
+	bool resizeBuffer(S32 newnverts, S32 newnindices);
 			
 	// Only call each getVertexPointer, etc, once before calling unmapBuffer()
 	// call unmapBuffer() after calls to getXXXStrider() before any cals to setBuffer()

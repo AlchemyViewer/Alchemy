@@ -2300,7 +2300,7 @@ void LLVOAvatar::updateMeshData()
 			LLVertexBuffer* buff = facep->getVertexBuffer();
 			if(!facep->getVertexBuffer())
 			{
-				buff = new LLVertexBufferAvatar();
+				buff = new LLVertexBuffer(LLDrawPoolAvatar::VERTEX_DATA_MASK, GL_STREAM_DRAW);
 				if (!buff->allocateBuffer(num_vertices, num_indices, TRUE))
 				{
 					LL_WARNS() << "Failed to allocate Vertex Buffer for Mesh to "

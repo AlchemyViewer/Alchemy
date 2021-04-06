@@ -2507,12 +2507,3 @@ void LLDrawPoolAvatar::removeRiggedFace(LLFace* facep)
 		}
 	}
 }
-
-LLVertexBufferAvatar::LLVertexBufferAvatar()
-: LLVertexBuffer(sDataMask, 
-	GL_STREAM_DRAW) //avatars are always stream draw due to morph targets
-{
-
-}
-
-
