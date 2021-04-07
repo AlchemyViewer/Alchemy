@@ -1134,7 +1134,7 @@ void LLMeshRepoThread::run()
 		mSignal->unlock();
 	}
 
-	res = LLConvexDecomposition::quitThread();
+	/*res = */LLConvexDecomposition::quitThread();
 	//if (res != LLCD_OK && LLConvexDecomposition::isFunctional())
 	//{
 	//	LL_WARNS(LOG_MESH) << "Convex decomposition unable to be quit." << LL_ENDL;
