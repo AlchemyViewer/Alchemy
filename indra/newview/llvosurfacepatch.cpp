@@ -47,80 +47,6 @@ F32 LLVOSurfacePatch::sLODFactor = 1.f;
 
 //============================================================================
 
-class LLVertexBufferTerrain final : public LLVertexBuffer
-{
-public:
-	LLVertexBufferTerrain() :
-		LLVertexBuffer(MAP_VERTEX | MAP_NORMAL | MAP_TEXCOORD0 | MAP_TEXCOORD1 | MAP_COLOR, GL_DYNAMIC_DRAW)
-	{
-		//texture coordinates 2 and 3 exist, but use the same data as texture coordinate 1
-	};
-
-	// virtual
-	void setupVertexBuffer(U32 data_mask)
-	{	
-		if (LLGLSLShader::sNoFixedFunction)
-		{ //just use default if shaders are in play
-			LLVertexBuffer::setupVertexBuffer(data_mask & ~(MAP_TEXCOORD2 | MAP_TEXCOORD3));
-			return;
-		}
-
-		volatile U8* base = useVBOs() ? (U8*) mAlignedOffset : mMappedData;
-
-		//assume tex coords 2 and 3 are present
-		U32 type_mask = mTypeMask | MAP_TEXCOORD2 | MAP_TEXCOORD3;
-
-		if ((data_mask & type_mask) != data_mask)
-		{
-			LL_ERRS() << "LLVertexBuffer::setupVertexBuffer missing required components for supplied data mask." << LL_ENDL;
-		}
-
-		if (data_mask & MAP_NORMAL)
-		{
-			glNormalPointer(GL_FLOAT, LLVertexBuffer::sTypeSize[TYPE_NORMAL], (void*)(base + mOffsets[TYPE_NORMAL]));
-		}
-		if (data_mask & MAP_TEXCOORD3)
-		{ //substitute tex coord 1 for tex coord 3
-			glClientActiveTexture(GL_TEXTURE3);
-			glTexCoordPointer(2,GL_FLOAT, LLVertexBuffer::sTypeSize[TYPE_TEXCOORD1], (void*)(base + mOffsets[TYPE_TEXCOORD1]));
-			glClientActiveTexture(GL_TEXTURE0);
-		}
-		if (data_mask & MAP_TEXCOORD2)
-		{ //substitute tex coord 0 for tex coord 2
-			glClientActiveTexture(GL_TEXTURE2);
-			glTexCoordPointer(2,GL_FLOAT, LLVertexBuffer::sTypeSize[TYPE_TEXCOORD0], (void*)(base + mOffsets[TYPE_TEXCOORD0]));
-			glClientActiveTexture(GL_TEXTURE0);
-		}
-		if (data_mask & MAP_TEXCOORD1)
-		{
-			glClientActiveTexture(GL_TEXTURE1);
-			glTexCoordPointer(2,GL_FLOAT, LLVertexBuffer::sTypeSize[TYPE_TEXCOORD1], (void*)(base + mOffsets[TYPE_TEXCOORD1]));
-			glClientActiveTexture(GL_TEXTURE0);
-		}
-		if (data_mask & MAP_TANGENT)
-		{
-			glClientActiveTexture(GL_TEXTURE2);
-			glTexCoordPointer(3,GL_FLOAT, LLVertexBuffer::sTypeSize[TYPE_TANGENT], (void*)(base + mOffsets[TYPE_TANGENT]));
-			glClientActiveTexture(GL_TEXTURE0);
-		}
-		if (data_mask & MAP_TEXCOORD0)
-		{
-			glTexCoordPointer(2,GL_FLOAT, LLVertexBuffer::sTypeSize[TYPE_TEXCOORD0], (void*)(base + mOffsets[TYPE_TEXCOORD0]));
-		}
-		if (data_mask & MAP_COLOR)
-		{
-			glColorPointer(4, GL_UNSIGNED_BYTE, LLVertexBuffer::sTypeSize[TYPE_COLOR], (void*)(base + mOffsets[TYPE_COLOR]));
-		}
-		
-		if (data_mask & MAP_VERTEX)
-		{
-			glVertexPointer(3,GL_FLOAT, LLVertexBuffer::sTypeSize[TYPE_VERTEX], (void*)(base + 0));
-		}
-	}
-};
-
-//============================================================================
-
 LLVOSurfacePatch::LLVOSurfacePatch(const LLUUID &id, const LLPCode pcode, LLViewerRegion *regionp)
 	:	LLStaticViewerObject(id, pcode, regionp),
 		mDirtiedPatch(FALSE),
@@ -1067,7 +993,7 @@ LLTerrainPartition::LLTerrainPartition(LLViewerRegion* regionp)
 
 LLVertexBuffer* LLTerrainPartition::createVertexBuffer(U32 type_mask, U32 usage)
 {
-	return new LLVertexBufferTerrain();
+	return new LLVertexBuffer(LLVOSurfacePatch::VERTEX_DATA_MASK, GL_DYNAMIC_DRAW);
 }
 
 static LLTrace::BlockTimerStatHandle FTM_REBUILD_TERRAIN_VB("Terrain VB");

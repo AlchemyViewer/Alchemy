@@ -98,7 +98,7 @@ public:
 
 //============================================================================
 // base class 
-class LLVertexBuffer : public LLRefCount, public LLTrace::MemTrackable<LLVertexBuffer>
+class LLVertexBuffer final : public LLRefCount, public LLTrace::MemTrackable<LLVertexBuffer>
 {
 public:
 	class MappedRegion
@@ -196,7 +196,7 @@ protected:
 
 	~LLVertexBuffer() override; // use unref()
 
-	virtual void setupVertexBuffer(U32 data_mask); // pure virtual, called from mapBuffer()
+	void setupVertexBuffer(U32 data_mask); // called from mapBuffer()
 	void setupVertexArray();
 	
 	void	genBuffer(U32 size);
