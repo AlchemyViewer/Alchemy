@@ -53,7 +53,6 @@
 #include "llviewercontrol.h" // for gSavedSettings
 #include "llviewertexturelist.h"
 
-static U32 sDataMask = LLDrawPoolAvatar::VERTEX_DATA_MASK;
 static U32 sBufferUsage = GL_STREAM_DRAW;
 static U32 sShaderLevel = 0;
 

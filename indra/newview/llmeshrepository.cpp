@@ -874,7 +874,7 @@ LLMeshRepoThread::~LLMeshRepoThread()
 
 void LLMeshRepoThread::run()
 {
-	LLCDResult res = LLConvexDecomposition::initThread();
+	/*LLCDResult res = */LLConvexDecomposition::initThread();
 	//if (res != LLCD_OK && LLConvexDecomposition::isFunctional())
 	//{
 	//	LL_WARNS(LOG_MESH) << "Convex decomposition unable to be loaded.  Expect severe problems." << LL_ENDL;

@@ -46,6 +46,7 @@ enum class EVisualEffectType
 
 struct LLVisualEffectParams
 {
+	virtual ~LLVisualEffectParams() = default;
 	virtual void step(bool isLast) = 0;
 };
 
