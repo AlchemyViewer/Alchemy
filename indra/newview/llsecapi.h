@@ -53,6 +53,7 @@
 #define CERT_VALID_FROM "valid_from"
 #define CERT_VALID_TO "valid_to"
 #define CERT_SHA1_DIGEST "sha1_digest"
+#define CERT_SHA256_DIGEST "sha256_digest"
 #define CERT_MD5_DIGEST "md5_digest"
 #define CERT_HOSTNAME "hostname"
 #define CERT_BASIC_CONSTRAINTS "basicConstraints"

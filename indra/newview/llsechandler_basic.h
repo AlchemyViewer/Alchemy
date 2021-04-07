@@ -181,7 +181,7 @@ public:
 protected:
 	std::vector<LLPointer<LLCertificate> >            mCerts;
 	
-	// cache of cert sha1 hashes to from/to date pairs, to improve
+	// cache of cert sha256 hashes to from/to date pairs, to improve
 	// performance of cert trust.  Note, these are not the CA certs,
 	// but the certs that have been validated against this store.
 	typedef std::map<std::string, std::pair<LLDate, LLDate> > t_cert_cache;

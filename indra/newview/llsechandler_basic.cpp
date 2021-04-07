@@ -64,6 +64,7 @@ LLSD _basic_constraints_ext(X509* cert);
 LLSD _key_usage_ext(X509* cert);
 LLSD _ext_key_usage_ext(X509* cert);
 std::string _subject_key_identifier(X509 *cert);
+std::string _cert_sha256_digest(X509* cert);
 LLSD _authority_key_identifier(X509* cert);
 void _validateCert(int validation_policy,
                    LLPointer<LLCertificate> cert,
@@ -188,6 +189,7 @@ LLSD& LLBasicCertificate::_initLLSD()
 	mLLSDInfo[CERT_EXTENDED_KEY_USAGE] = _ext_key_usage_ext(mCert);
 	mLLSDInfo[CERT_SUBJECT_KEY_IDENTFIER] = _subject_key_identifier(mCert);
 	mLLSDInfo[CERT_AUTHORITY_KEY_IDENTIFIER] = _authority_key_identifier(mCert);
+	mLLSDInfo[CERT_SHA256_DIGEST] = _cert_sha256_digest(mCert);
 	return mLLSDInfo; 
 }
 
@@ -1005,6 +1007,24 @@ bool _verify_signature(LLPointer<LLCertificate> parent,
 	return verify_result;
 }
 
+std::string _cert_sha256_digest(X509* cert)
+{
+	unsigned char digest_data[BUFFER_READ_SIZE];
+	unsigned int len = sizeof(digest_data);
+	std::stringstream result;
+	const EVP_MD* digest = EVP_sha256();
+	X509_digest(cert, digest, digest_data, &len);
+	result << std::hex << std::setprecision(2);
+	for (unsigned int i = 0; i < len; i++)
+	{
+		if (i != 0)
+		{
+			result << ":";
+		}
+		result << std::setfill('0') << std::setw(2) << (int)digest_data[i];
+	}
+	return result.str();
+}
 
 // validate the certificate chain against a store.
 // There are many aspects of cert validatioin policy involved in
@@ -1076,6 +1096,7 @@ void LLBasicCertificateStore::validate(int validation_policy,
 
     std::string subject_name(cert_string_name_from_X509_NAME(X509_get_subject_name(cert_x509)));
     std::string skeyid(_subject_key_identifier(cert_x509));
+	std::string sha256_digest(_cert_sha256_digest(cert_x509));
 
     LL_DEBUGS("SECAPI") << "attempting to validate cert "
                         << " for '" << (validation_params.has(CERT_HOSTNAME) ? validation_params[CERT_HOSTNAME].asString() : "(unknown hostname)") << "'"
@@ -1090,7 +1111,11 @@ void LLBasicCertificateStore::validate(int validation_policy,
         LLTHROW(LLCertException(current_cert_info, "No Subject Key Id"));
     }
     
-	t_cert_cache::iterator cache_entry = mTrustedCertCache.find(skeyid);
+	if (sha256_digest.empty())
+	{
+		LLTHROW(LLCertException(current_cert_info, "No SHA256 digest"));
+	}
+	t_cert_cache::iterator cache_entry = mTrustedCertCache.find(sha256_digest);
 	if(cache_entry != mTrustedCertCache.end())
 	{
 		// this cert is in the cache, so validate the time.
@@ -1157,11 +1182,11 @@ void LLBasicCertificateStore::validate(int validation_policy,
 		// look for a CA in the CA store that may belong to this chain.
 		LLSD cert_search_params = LLSD::emptyMap();		
 		// is the cert itself in the store?
-		cert_search_params[CERT_SUBJECT_KEY_IDENTFIER] = current_cert_info[CERT_SUBJECT_KEY_IDENTFIER];
+		cert_search_params[CERT_SHA256_DIGEST] = current_cert_info[CERT_SHA256_DIGEST];
 		LLCertificateStore::iterator found_store_cert = find(cert_search_params);
 		if(found_store_cert != end())
 		{
-			mTrustedCertCache[skeyid] = std::pair<LLDate, LLDate>(from_time, to_time);
+			mTrustedCertCache[sha256_digest] = std::pair<LLDate, LLDate>(from_time, to_time);
             LL_DEBUGS("SECAPI") << "Valid cert "
                                 << " for '" << (validation_params.has(CERT_HOSTNAME) ? validation_params[CERT_HOSTNAME].asString() : "(unknown hostname)") << "'";
             X509* cert_x509 = (*found_store_cert)->getOpenSSLX509();
@@ -1169,6 +1194,7 @@ void LLBasicCertificateStore::validate(int validation_policy,
             X509_free(cert_x509);
             LL_CONT << " as '" << found_cert_subject_name << "'"
                     << " skeyid '" << current_cert_info[CERT_SUBJECT_KEY_IDENTFIER].asString() << "'"
+                    << " sha256 digest '" << current_cert_info[CERT_SHA256_DIGEST].asString() << "'"
                     << " found in cert store"
                     << LL_ENDL;	
 			return;
@@ -1207,10 +1233,11 @@ void LLBasicCertificateStore::validate(int validation_policy,
 				LLTHROW(LLCertValidationInvalidSignatureException(current_cert_info));
 			}			
 			// successfully validated.
-			mTrustedCertCache[skeyid] = std::pair<LLDate, LLDate>(from_time, to_time);		
+			mTrustedCertCache[sha256_digest] = std::pair<LLDate, LLDate>(from_time, to_time);
             LL_DEBUGS("SECAPI") << "Verified and cached cert for '" << validation_params[CERT_HOSTNAME].asString() << "'"
                                 << " as '" << subject_name << "'"
                                 << " id '" << skeyid << "'"
+                                << " hash '" << sha256_digest << "'"
                                 << " using CA '" << cert_search_params[CERT_SUBJECT_NAME_STRING] << "'"
                                 << " with id '" <<  cert_search_params[CERT_SUBJECT_KEY_IDENTFIER].asString() << "' found in cert store"
                                 << LL_ENDL;	
@@ -1234,9 +1261,10 @@ void LLBasicCertificateStore::validate(int validation_policy,
     else
     {
         LL_DEBUGS("SECAPI") << "! Caching untrusted cert for '" << subject_name << "'"
-                            << " skeyid '" << skeyid << "' in cert store because ! VALIDATION_POLICY_TRUSTED"
+                            << " skeyid '" << skeyid << "'"
+                            << " sha256_digest '" << sha256_digest << "' in cert store because ! VALIDATION_POLICY_TRUSTED"
                             << LL_ENDL;	
-        mTrustedCertCache[skeyid] = std::pair<LLDate, LLDate>(from_time, to_time);	
+        mTrustedCertCache[sha256_digest] = std::pair<LLDate, LLDate>(from_time, to_time);
     }
 }
 
