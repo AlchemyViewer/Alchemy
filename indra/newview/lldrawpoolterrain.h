@@ -79,8 +79,6 @@ protected:
 	void renderSimple();
 	void renderOwnership();
 
-	void renderFull2TU();
-	void renderFull4TU();
 	void renderFullShader();
 	void drawLoop();
 
