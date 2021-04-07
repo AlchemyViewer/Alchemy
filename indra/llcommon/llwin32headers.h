@@ -31,10 +31,14 @@
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif
+#ifndef PSAPI_VERSION
+#define	PSAPI_VERSION	2
+#endif
 #undef WIN32_LEAN_AND_MEAN
-#include <winsock2.h>
-#include <windows.h>
+#include <WinSock2.h>
+#include <Windows.h>
 #include <Ws2ipdef.h>
+#include <Psapi.h>
 // reset to default, which is lean
 #define WIN32_LEAN_AND_MEAN
 #undef NOMINMAX

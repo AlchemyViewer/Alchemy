@@ -40,7 +40,7 @@
 #endif
 
 #if LL_WINDOWS
-#include "winsock2.h" // htons etc.
+#include "llwin32headerslean.h" // htons etc.
 #endif
 
 #include "llerror.h"

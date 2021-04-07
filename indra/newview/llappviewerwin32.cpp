@@ -29,7 +29,7 @@
 #ifdef INCLUDE_VLD
 #include "vld.h"
 #endif
-#include "llwin32headers.h"
+#include "llwin32headerslean.h"
 
 #include "llwindowwin32.h" // *FIX: for setting gIconResource.
 

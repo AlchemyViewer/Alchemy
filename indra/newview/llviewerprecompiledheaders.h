@@ -29,7 +29,7 @@
 #ifndef LL_LLVIEWERPRECOMPILEDHEADERS_H
 #define LL_LLVIEWERPRECOMPILEDHEADERS_H
 
-#include "llwin32headers.h"
+#include "llwin32headerslean.h"
 
 // This file MUST be the first one included by each .cpp file
 // in viewer.

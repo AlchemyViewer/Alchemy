@@ -23,8 +23,10 @@
  * $/LicenseInfo$
  */
 
-#include "llwin32headers.h"
 #include "linden_common.h"
+
+#include "llwin32headerslean.h"
+
 #include "llsd.h"
 #include "llsdutil.h"
 

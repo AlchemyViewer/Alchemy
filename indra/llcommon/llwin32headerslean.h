@@ -31,10 +31,16 @@
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif
+#ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
+#endif
+#ifndef PSAPI_VERSION
+#define	PSAPI_VERSION	2
+#endif
 #include <winsock2.h>
 #include <windows.h>
 #include <Ws2ipdef.h>
+#include <psapi.h>
 #undef NOMINMAX
 #endif
 

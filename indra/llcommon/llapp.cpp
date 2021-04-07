@@ -57,7 +57,7 @@
 // Windows uses structured exceptions, so it's handled a bit differently.
 //
 #if LL_WINDOWS
-#include "windows.h"
+#include "llwin32headerslean.h"
 
 LONG WINAPI default_windows_exception_handler(struct _EXCEPTION_POINTERS *exception_infop);
 BOOL ConsoleCtrlHandler(DWORD fdwCtrlType);

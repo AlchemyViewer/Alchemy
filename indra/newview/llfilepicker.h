@@ -49,7 +49,7 @@
 
 // Need commdlg.h for OPENFILENAMEA
 #ifdef LL_WINDOWS
-#include "llwin32headers.h"
+#include "llwin32headerslean.h"
 #include <commdlg.h>
 #endif
 

@@ -71,6 +71,9 @@
  */
 
 #include "linden_common.h"
+
+#include "llwin32headerslean.h"
+
 #include "llfiltersd2xmlrpc.h"
 
 #include <sstream>

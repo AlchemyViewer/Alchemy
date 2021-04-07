@@ -30,6 +30,7 @@
 #include "llthread.h"
 
 #if defined(LL_WINDOWS)
+#include "llwin32headerslean.h"
 # include <psapi.h>
 #elif defined(LL_DARWIN)
 # include <sys/types.h>

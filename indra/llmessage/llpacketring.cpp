@@ -29,7 +29,7 @@
 #include "llpacketring.h"
 
 #if LL_WINDOWS
-	#include <winsock2.h>
+	#include "llwin32headerslean.h"
 #else
 	#include <sys/socket.h>
 	#include <netinet/in.h>
