@@ -32,7 +32,7 @@ endif()
 FetchContent_Declare(
   meshoptimizer
   GIT_REPOSITORY https://git.alchemyviewer.org/alchemy/mirrors/meshoptimizer.git
-  GIT_TAG        v0.15
+  GIT_TAG        v0.16
   )
 # FetchContent_Declare(
 #   Catch2
@@ -52,7 +52,7 @@ FetchContent_Declare(
 FetchContent_Declare(
   absl
   GIT_REPOSITORY https://git.alchemyviewer.org/alchemy/mirrors/abseil-cpp.git
-  GIT_TAG        354030bec37f8d90092245e07323628da50c6996
+  GIT_TAG        3b4a16abad2c2ddc494371cc39a2946e36d35d11
   )
 
 # This is a hack because absl has dumb cmake
