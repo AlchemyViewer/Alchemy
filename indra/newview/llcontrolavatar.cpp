@@ -569,14 +569,14 @@ void LLControlAvatar::updateAnimations()
     // Rebuild mSignaledAnimations from the associated volumes.
     auto& signaled_anim_map = LLObjectSignaledAnimationMap::instance().getMap();
 
-    anim_map_t anims;
+	std::map<LLUUID, S32> anims;
     for (LLVOVolume* volp : volumes)
     {
         //LL_INFOS("AnimatedObjects") << "updating anim for vol " << volp->getID() << " root " << mRootVolp->getID() << LL_ENDL;
         signaled_animation_map_t& signaled_animations = signaled_anim_map[volp->getID()];
         for (const auto& anim_pair : signaled_animations)
         {
-            auto found_anim_it = anims.find(anim_pair.first);
+            std::map<LLUUID,S32>::iterator found_anim_it = anims.find(anim_pair.first);
             if (found_anim_it != anims.end())
             {
                 // Animation already present, use the larger sequence id

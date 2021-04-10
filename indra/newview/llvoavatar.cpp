@@ -5917,15 +5917,17 @@ void LLVOAvatar::processAnimationStateChanges()
 	// clear all current animations
 	for (auto anim_it = mPlayingAnimations.begin(); anim_it != mPlayingAnimations.end();)
 	{
-		auto copy_anim_it = anim_it++;
-
-		auto found_anim = mSignaledAnimations.find(copy_anim_it->first);
+		AnimIterator found_anim = mSignaledAnimations.find(anim_it->first);
 
 		// playing, but not signaled, so stop
 		if (found_anim == mSignaledAnimations.end())
 		{
-			processSingleAnimationStateChange(copy_anim_it->first, FALSE);
-			mPlayingAnimations.erase(copy_anim_it);
+			processSingleAnimationStateChange(anim_it->first, FALSE);
+			anim_it = mPlayingAnimations.erase(anim_it);
+		}
+		else
+		{
+			++anim_it;
 		}
 	}
 
@@ -5940,7 +5942,7 @@ void LLVOAvatar::processAnimationStateChanges()
 	{
 		for (auto anim_it = mSignaledAnimations.begin(); anim_it != mSignaledAnimations.end();)
 		{
-			auto found_anim = mPlayingAnimations.find(anim_it->first);
+			AnimIterator found_anim = mPlayingAnimations.find(anim_it->first);
 
 			// signaled but not playing, or different sequence id, start motion
 			if (found_anim == mPlayingAnimations.end() || found_anim->second != anim_it->second)
@@ -5964,11 +5966,13 @@ void LLVOAvatar::processAnimationStateChanges()
 
 		for (source_it = mAnimationSources.begin(); source_it != mAnimationSources.end();)
 		{
-			auto copy_source_it = source_it++;
-
 			if (mSignaledAnimations.find(source_it->second) == mSignaledAnimations.end())
 			{
-				mAnimationSources.erase(copy_source_it);
+				mAnimationSources.erase(source_it++);
+			}
+			else
+			{
+				++source_it;
 			}
 		}
 	}
@@ -10916,10 +10920,12 @@ void LLVOAvatar::setOverallAppearanceJellyDoll()
 
 	// stop current animations
 	{
-		for (const auto& anim_pair : mPlayingAnimations)
+		for ( LLVOAvatar::AnimIterator anim_it= mPlayingAnimations.begin();
+			  anim_it != mPlayingAnimations.end();
+			  ++anim_it)
 		{
 			{
-				stopMotion(anim_pair.first, TRUE);
+				stopMotion(anim_it->first, TRUE);
 			}
 		}
 	}

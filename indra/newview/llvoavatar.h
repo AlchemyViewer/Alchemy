@@ -908,10 +908,9 @@ private:
 	// Animation state data
 	//--------------------------------------------------------------------
 public:
-
-	using anim_map_t = absl::flat_hash_map<LLUUID, S32>;
-	anim_map_t		mSignaledAnimations; // requested state of Animation name/value
-	anim_map_t		mPlayingAnimations; // current state of Animation name/value
+	typedef std::map<LLUUID, S32>::iterator AnimIterator;
+	std::map<LLUUID, S32> 					mSignaledAnimations; // requested state of Animation name/value
+	std::map<LLUUID, S32> 					mPlayingAnimations; // current state of Animation name/value
 
 	typedef std::multimap<LLUUID, LLUUID> 	AnimationSourceMap;
 	typedef AnimationSourceMap::iterator 	AnimSourceIterator;
