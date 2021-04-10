@@ -2505,8 +2505,9 @@ void LLVOAvatar::idleUpdate(LLAgent &agent, const F64 &time)
 		return;
 	}	
 
+	static LLCachedControl<bool> disable_all_render_types(gSavedSettings, "DisableAllRenderTypes");
 	if (!(gPipeline.hasRenderType(mIsControlAvatar ? LLPipeline::RENDER_TYPE_CONTROL_AV : LLPipeline::RENDER_TYPE_AVATAR))
-		&& !(gSavedSettings.getBOOL("DisableAllRenderTypes")) && !isSelf())
+		&& !(disable_all_render_types) && !isSelf())
 	{
 		return;
 	}
@@ -6146,9 +6147,18 @@ BOOL LLVOAvatar::startMotion(const LLUUID& id, F32 time_offset)
 	{
         remap_id = ALAOEngine::getInstance()->override(id, true);
 		if(remap_id.isNull())
+		{
 			remap_id = remapMotionID(id);
+		}
 		else
+		{
 			gAgent.sendAnimationRequest(remap_id, ANIM_REQUEST_START);
+
+			// since we did an override, there is no need to do anything else,
+			// specifically not the startMotion() part at the bottom of this function
+			// See FIRE-29020
+			return true;
+		}
 	}
 	else
 	{
@@ -6183,10 +6193,19 @@ BOOL LLVOAvatar::stopMotion(const LLUUID& id, BOOL stop_immediate)
 	if(isSelf())
 	{
         remap_id = ALAOEngine::getInstance()->override(id, false);
-		if(remap_id.isNull())
+		if (remap_id.isNull())
+		{
 			remap_id = remapMotionID(id);
+		}
 		else
+		{
 			gAgent.sendAnimationRequest(remap_id, ANIM_REQUEST_STOP);
+
+			// since we did an override, there is no need to do anything else,
+			// specifically not the stopMotion() part at the bottom of this function
+			// See FIRE-29020
+			return true;
+		}
 	}
 	else
 	{
