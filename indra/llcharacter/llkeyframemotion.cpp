@@ -2136,6 +2136,8 @@ void LLKeyframeMotion::onLoadComplete(const LLUUID& asset_uuid,
 			if (!file.read((U8*)buffer, size))	/*Flawfinder: ignore*/
 			{
 				delete[] buffer;
+			   LL_WARNS() << "Failed to load asset for animation from cache " << motionp->getName() << ":" << motionp->getID() << LL_ENDL;
+				motionp->mAssetStatus = ASSET_FETCH_FAILED;
 				return;
 			}
 
@@ -2148,6 +2150,7 @@ void LLKeyframeMotion::onLoadComplete(const LLUUID& asset_uuid,
 			}
 			else
 			{
+				delete[] buffer;
 				LL_WARNS() << "Failed to decode asset for animation " << motionp->getName() << ":" << motionp->getID() << LL_ENDL;
 				motionp->mAssetStatus = ASSET_FETCH_FAILED;
 			}
