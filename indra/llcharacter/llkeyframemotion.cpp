@@ -2132,30 +2132,27 @@ void LLKeyframeMotion::onLoadComplete(const LLUUID& asset_uuid,
 			}
 			S32 size = file.getSize();
 			
-			U8* buffer = new U8[size];
-			if (!file.read((U8*)buffer, size))	/*Flawfinder: ignore*/
+			std::unique_ptr<U8[]> buffer(new U8[size]);
+			if (!file.read((U8*)buffer.get(), size))	/*Flawfinder: ignore*/
 			{
-				delete[] buffer;
-			   LL_WARNS() << "Failed to load asset for animation from cache " << motionp->getName() << ":" << motionp->getID() << LL_ENDL;
+				LL_WARNS() << "Failed to load asset for animation from cache " << motionp->getName() << ":" << motionp->getID() << LL_ENDL;
 				motionp->mAssetStatus = ASSET_FETCH_FAILED;
 				return;
 			}
 
 			LL_DEBUGS("Animation") << "Loading keyframe data for: " << motionp->getName() << ":" << motionp->getID() << " (" << size << " bytes)" << LL_ENDL;
 			
-			LLDataPackerBinaryBuffer dp(buffer, size);
+			LLDataPackerBinaryBuffer dp(buffer.get(), size);
 			if (motionp->deserialize(dp, asset_uuid))
 			{
 				motionp->mAssetStatus = ASSET_LOADED;
 			}
 			else
 			{
-				delete[] buffer;
 				LL_WARNS() << "Failed to decode asset for animation " << motionp->getName() << ":" << motionp->getID() << LL_ENDL;
 				motionp->mAssetStatus = ASSET_FETCH_FAILED;
+				return;
 			}
-			
-			delete[] buffer;
 		}
 		else
 		{
