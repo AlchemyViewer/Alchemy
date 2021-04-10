@@ -5963,9 +5963,7 @@ void LLVOAvatar::processAnimationStateChanges()
 	// clear source information for animations which have been stopped
 	if (isSelf())
 	{
-		AnimSourceIterator source_it = mAnimationSources.begin();
-
-		for (source_it = mAnimationSources.begin(); source_it != mAnimationSources.end();)
+		for (auto source_it = mAnimationSources.begin(); source_it != mAnimationSources.end();)
 		{
 			if (mSignaledAnimations.find(source_it->second) == mSignaledAnimations.end())
 			{
