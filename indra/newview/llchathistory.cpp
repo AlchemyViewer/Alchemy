@@ -1415,8 +1415,9 @@ void LLChatHistory::appendMessage(const LLChat& chat, const LLSD &args, const LL
 				link_params.overwriteFrom(LLStyleMap::instance().lookupAgent(chat.mFromID));
 
 				// Add link to avatar's inspector and delimiter to message.
-				mEditor->appendText(std::string(link_params.link_href) + delimiter,
-					prependNewLineState, link_params);
+				mEditor->appendText(std::string(link_params.link_href), prependNewLineState, link_params);
+				mEditor->appendText(delimiter, prependNewLineState, body_message_params);
+
 				prependNewLineState = false;
 			}
 			else
