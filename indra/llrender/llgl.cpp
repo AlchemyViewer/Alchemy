@@ -27,8 +27,6 @@
 // This file sets some global GL parameters, and implements some 
 // useful functions for GL operations.
 
-#define GLH_EXT_SINGLE_FILE
-
 #include "linden_common.h"
 
 #include "boost/tokenizer.hpp"
@@ -54,17 +52,7 @@
 #include "lldxhardware.h"
 #endif
 
-#ifdef _DEBUG
-//#define GL_STATE_VERIFY
-#endif
-
-#if LL_SDL
-#include <SDL.h>
-#endif
-
-
 BOOL gDebugSession = FALSE;
-BOOL gClothRipple = FALSE;
 BOOL gHeadlessClient = FALSE;
 BOOL gGLActive = FALSE;
 BOOL gGLDebugLoggingEnabled = TRUE;
