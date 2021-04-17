@@ -34,6 +34,11 @@
 S32 CASE_SENTITIVITY = 1;
 size_t WRITE_BUFFER_SIZE = 8192;
 
+int compare_filename_mz(unzFile file, const char* filename1, const char* filename2)
+{
+	return strcmp(filename1, filename2);
+}
+
 ALUnZip::ALUnZip(const std::string& filename)
 :	mFilename(filename)
 ,	mValid(false)
@@ -61,7 +66,7 @@ bool ALUnZip::extract(const std::string& path)
 		return false;
 	}
 	
-	for (uLong i = 0; i < gi.number_entry ; i++)
+	for (uint64_t i = 0; i < gi.number_entry ; i++)
 	{
 		if (extractCurrentFile(path) != UNZ_OK)
 			break;
@@ -163,7 +168,7 @@ S32 ALUnZip::extractCurrentFile(const std::string& path)
 
 bool ALUnZip::extractFile(const std::string& file_to_extract, char *buf, size_t bufsize)
 {
-	if (unzLocateFile(mZipfile, file_to_extract.c_str(), CASE_SENTITIVITY) != UNZ_OK)
+	if (unzLocateFile(mZipfile, file_to_extract.c_str(), compare_filename_mz) != UNZ_OK)
 	{
 		LL_WARNS("ALUNZIP") << file_to_extract << " was not found in " << mFilename << LL_ENDL;
 		return false;
@@ -188,7 +193,7 @@ bool ALUnZip::extractFile(const std::string& file_to_extract, char *buf, size_t 
 
 size_t ALUnZip::getSizeFile(const std::string& file_to_size)
 {
-	if (unzLocateFile(mZipfile, file_to_size.c_str(), CASE_SENTITIVITY) != UNZ_OK)
+	if (unzLocateFile(mZipfile, file_to_size.c_str(), compare_filename_mz) != UNZ_OK)
 	{
 		LL_WARNS("ALUNZIP") << file_to_size << " was not found in " << mFilename << LL_ENDL;
 		return 0;
