@@ -8,16 +8,18 @@ include(Prebuilt)
 if (USESYSTEMLIBS)
   include(FindZLIB)
 else (USESYSTEMLIBS)
-  use_prebuilt_binary(zlib)
+  use_prebuilt_binary(zlib-ng)
+  use_prebuilt_binary(minizip-ng)
   if (WINDOWS)
     set(MINIZIP_LIBRARIES 
-      debug minizipd
-      optimized minizip)
+      debug libminizip
+      optimized libminizip)
 
     set(ZLIB_LIBRARIES 
       debug zlibd
       optimized zlib)
   elseif (LINUX)
+    set(MINIZIP_LIBRARIES minizip)
     #
     # When we have updated static libraries in competition with older
     # shared libraries and we want the former to win, we need to do some
@@ -33,6 +35,7 @@ else (USESYSTEMLIBS)
     set(ZLIB_PRELOAD_ARCHIVES -Wl,--whole-archive z -Wl,--no-whole-archive)
     set(ZLIB_LIBRARIES z)
   elseif (DARWIN)
+    set(MINIZIP_LIBRARIES minizip)
     set(ZLIB_LIBRARIES z)
   endif (WINDOWS)
   set(ZLIB_INCLUDE_DIRS ${LIBS_PREBUILT_DIR}/include/zlib)

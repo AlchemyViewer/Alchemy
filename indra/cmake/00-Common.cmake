@@ -191,12 +191,9 @@ if (WINDOWS)
 
   # library linkage defines
   add_definitions(
-      /DBOOST_ALL_DYN_LINK
-      /DDLL_IMPORT
-      /DDOM_DYNAMIC
-      /DPNG_USE_DLL
-      /DWEBP_DLL
-      /DZLIB_DLL
+      /DCURL_STATICLIB=1
+      /DURI_STATIC_BUILD=1
+      /DWEBP_DLL=1
   )
 
   # configure win32 API for 7 and above compatibility

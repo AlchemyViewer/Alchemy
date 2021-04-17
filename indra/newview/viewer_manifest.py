@@ -514,35 +514,18 @@ class WindowsManifest(ViewerManifest):
             self.path("libapriconv-1.dll")
             self.path("libaprutil-1.dll")
 
-            # Boost Libraries
-            self.path("boost_context-mt*.dll")
-            self.path("boost_fiber-mt*.dll")
-            self.path("boost_filesystem-mt*.dll")
-            self.path("boost_program_options-mt*.dll")
-            self.path("boost_regex-mt*.dll")
-            self.path("boost_stacktrace_windbg-mt*.dll")
-            self.path("boost_thread-mt*.dll")
-
             # Mesh 3rd party libs needed for auto LOD and collada reading
-            self.path("libcollada14dom23.dll")
             self.path("glod.dll")
 
             # For image support
             self.path("jpeg8.dll")
-            self.path("libpng16*.dll")
             self.path("libwebp.dll")
             self.path("openjp2.dll")
 
             # For OpenGL extensions
             self.path("epoxy-0.dll")
 
-            # Security
-            self.path("ssleay32.dll")
-            self.path("libeay32.dll")
-
             # HTTP and Network
-            self.path("libcurl*.dll")
-            self.path("nghttp2.dll")
             self.path("xmlrpc-epi.dll")
 
             # Hunspell
@@ -555,11 +538,6 @@ class WindowsManifest(ViewerManifest):
 
             # Misc
             self.path("libexpat.dll")
-            self.path("libxml2.dll")
-            self.path("minizip*.dll")
-            self.path("freetype.dll")
-            self.path("uriparser.dll")
-            self.path("zlib*1.dll")
 
             # Get openal dll for audio engine, continue if missing
             if self.args['openal'] == 'ON' or self.args['openal'] == 'TRUE':
