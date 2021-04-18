@@ -72,7 +72,7 @@ public:
 	void resetVertexBuffers() override;
 	U32 getPartitionType() const override;
 
-	void updateRadius();
+	void updateRadius() override;
 
 	void calcNumVerts(U32& vert_count, U32& index_count, S32 trunk_LOD, S32 stop_level, U16 depth, U16 trunk_depth, F32 branches);
 
@@ -117,7 +117,7 @@ public:
 										  LLVector2* tex_coord = NULL,          // return the texture coordinates of the intersection point
 										  LLVector4a* normal = NULL,             // return the surface normal at the intersection point
 										  LLVector4a* tangent = NULL           // return the surface tangent at the intersection point
-		);
+		) override;
 
 	static S32 sMaxTreeSpecies;
 

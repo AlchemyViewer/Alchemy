@@ -65,7 +65,7 @@ public:
 	// on Idle is where the land modification actually occurs
 	static void onIdle(void* brush_tool);  
 
-	void			onMouseCaptureLost();
+	void			onMouseCaptureLost() override;
 
 	void modifyLandInSelectionGlobal();
 	virtual void	undo() override;

@@ -101,7 +101,7 @@ class LLFeatureManager final : public LLFeatureList, public LLSingleton<LLFeatur
 	~LLFeatureManager() {cleanupFeatureTables();}
 
 	// initialize this by loading feature table and gpu table
-	void initSingleton();
+	void initSingleton() override;
 
 public:
 

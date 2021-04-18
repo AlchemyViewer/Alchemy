@@ -53,7 +53,7 @@ protected:
 	void onSoundClearItem();
 	void onToggleChatAlerts(const LLSD& sdValue);
 	void onToggleTriggerType();
-	void refresh();
+	void refresh() override;
 	void refreshList();
 	void refreshEntry(bool fNewEntry);
 	void refreshSound();

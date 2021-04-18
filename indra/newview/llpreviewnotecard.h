@@ -56,7 +56,7 @@ public:
 	// llview
 	void draw() override;
 // [SL:KB] - Patch: UI-FloaterSearchReplace | Checked: 2010-11-05 (Catznip-2.3)
-	virtual bool hasAccelerators() const { return true; }
+	virtual bool hasAccelerators() const override { return true; }
 // [/SL:KB]
 	BOOL handleKeyHere(KEY key, MASK mask) override;
 	void setEnabled( BOOL enabled ) override;
@@ -96,7 +96,7 @@ protected:
 	void deleteNotecard();
 
 // [SL:KB] - Patch: Build-AssetRecovery | Checked: 2013-07-28 (Catznip-3.6)
-	/*virtual*/ void onBackupTimer();
+	/*virtual*/ void onBackupTimer() override;
 // [/SL:KB]
 
 	static void onLoadComplete(const LLUUID& asset_uuid,
