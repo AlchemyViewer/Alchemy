@@ -284,7 +284,11 @@ if (DARWIN)
   # NOTE: it's critical that the optimization flag is put in front.
   # NOTE: it's critical to have both CXX_FLAGS and C_FLAGS covered.
 
-  add_definitions(-D_LIBCPP_ENABLE_CXX17_REMOVED_AUTO_PTR=1)
+  add_definitions(
+      -D_LIBCPP_ENABLE_CXX17_REMOVED_AUTO_PTR=1
+      -DBOOST_CONFIG_SUPPRESS_OUTDATED_MESSAGE=1
+      -DBOOST_ALLOW_DEPRECATED_HEADERS=1
+      )
 endif (DARWIN)
 
 
