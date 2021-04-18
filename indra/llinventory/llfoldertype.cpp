@@ -53,7 +53,7 @@ class LLFolderDictionary final : public LLSingleton<LLFolderDictionary>,
 {
 	LLSINGLETON(LLFolderDictionary);
 protected:
-	virtual LLFolderType::EType notFound() const
+	virtual LLFolderType::EType notFound() const override
 	{
 		return LLFolderType::FT_NONE;
 	}
