@@ -1466,6 +1466,7 @@ if (DARWIN)
   set_source_files_properties(
     llappdelegate-objc.mm
     PROPERTIES
+    SKIP_PRECOMPILE_HEADERS TRUE
     COMPILE_DEFINITIONS "${VIEWER_CHANNEL_VERSION_DEFINES}"
     # BugsplatMac is a module, imported with @import. That language feature
     # demands these -f switches.
@@ -1475,6 +1476,18 @@ if (DARWIN)
     # warnings.
     COMPILE_FLAGS "-fmodules -fcxx-modules -Wno-nullability-completeness"
     )
+
+    set_source_files_properties(
+      llappviewermacosx-objc.mm
+      PROPERTIES 
+      SKIP_PRECOMPILE_HEADERS TRUE
+      )
+
+    set_source_files_properties(
+      llfilepicker_mac.mm
+      PROPERTIES 
+      SKIP_PRECOMPILE_HEADERS TRUE
+      )
 
   find_library(APPKIT_LIBRARY AppKit)
   find_library(COCOA_LIBRARY Cocoa)
