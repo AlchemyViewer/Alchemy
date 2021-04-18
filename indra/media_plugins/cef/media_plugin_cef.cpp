@@ -78,7 +78,7 @@ private:
 	void authResponse(LLPluginMessage &message);
 
 	void keyEvent(dullahan::EKeyEvent key_event, LLSD native_key_data);
-	void unicodeInput(std::string event, LLSD native_key_data);
+	void unicodeInput(std::string event, LLSD native_key_data, std::string text);
 
 	void checkEditState();
     void setVolume();
@@ -738,7 +738,8 @@ void MediaPluginCEF::receiveMessage(const char* message_string)
 			{
 				std::string event = message_in.getValue("event");
 				LLSD native_key_data = message_in.getValueLLSD("native_key_data");
-				unicodeInput(event, native_key_data);
+				std::string text = message_in.getValue("text");
+				unicodeInput(event, native_key_data, text);
 			}
 			else if (message_name == "key_event")
 			{
@@ -925,16 +926,15 @@ void MediaPluginCEF::keyEvent(dullahan::EKeyEvent key_event, LLSD native_key_dat
 
 	mCEFLib->nativeKeyboardEventWin(msg, wparam, lparam);
 #elif LL_LINUX
-	uint32_t native_scan_code = (uint32_t)(native_key_data["scan_code"].asInteger());
 	uint32_t native_virtual_key = (uint32_t)(native_key_data["virtual_key"].asInteger());
 	uint32_t native_modifiers = (uint32_t)(native_key_data["modifiers"].asInteger());
 	if( native_scan_code == '\n' )
 		native_scan_code = '\r';
-	mCEFLib->nativeKeyboardEventSDL2(key_event, native_virtual_key, native_modifiers, false);
+	mCEFLib->nativeKeyboardEventSDL2(key_event, native_virtual_key, native_modifiers, 0, false);
 #endif
 };
 
-void MediaPluginCEF::unicodeInput(std::string event, LLSD native_key_data = LLSD::emptyMap())
+void MediaPluginCEF::unicodeInput(std::string event, LLSD native_key_data = LLSD::emptyMap(), std::string text = "")
 {
 #if LL_DARWIN
 	// i didn't think this code was needed for macOS but without it, the IME
@@ -961,6 +961,10 @@ void MediaPluginCEF::unicodeInput(std::string event, LLSD native_key_data = LLSD
 	U32 wparam = ll_U32_from_sd(native_key_data["w_param"]);
 	U64 lparam = ll_U32_from_sd(native_key_data["l_param"]);
 	mCEFLib->nativeKeyboardEventWin(msg, wparam, lparam);
+#elif LL_LINUX
+	uint32_t native_virtual_key = (uint32_t)(native_key_data["virtual_key"].asInteger());
+	uint32_t native_modifiers = (uint32_t)(native_key_data["modifiers"].asInteger());
+	mCEFLib->nativeKeyboardEventSDL2(dullahan::KE_KEY_CHAR, native_virtual_key, native_modifiers, utf8str_to_wstring(text)[0], false);
 #endif
 };
 
