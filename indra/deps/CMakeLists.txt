@@ -84,6 +84,7 @@ endif()
 
 # #Download the rest of the libraries
 # FetchContent_MakeAvailable(fmt)
+set(MESHOPT_BUILD_SHARED_LIBS OFF)
 FetchContent_MakeAvailable(meshoptimizer)
 
 # # Typically you don't care so much for a third party library's tests to be
