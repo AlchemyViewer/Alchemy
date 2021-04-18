@@ -3628,7 +3628,7 @@ const LLMeshSkinInfo* LLVOVolume::getSkinInfo() const
     return nullptr;
 }
 
-std::optional<std::pair<LLMatrix4a*, F32*>> LLVOVolume::getCachedSkinRenderMatrix(U32& joint_count, LLVOAvatar *avatar, const LLMeshSkinInfo* skin)
+absl::optional<std::pair<LLMatrix4a*, F32*>> LLVOVolume::getCachedSkinRenderMatrix(U32& joint_count, LLVOAvatar *avatar, const LLMeshSkinInfo* skin)
 {
 	// Calculate this only once per frame
 	const U32 curFrameCount = LLFrameTimer::getFrameCount();
