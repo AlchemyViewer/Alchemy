@@ -825,7 +825,7 @@ BOOL LLToolPie::handleHover(S32 x, S32 y, MASK mask)
 		// could disable it here.
 		show_highlight = true;
 		// cursor set by media object
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 		LL_DEBUGS("UserInput") << "hover handled by LLToolPie (inactive)" << LL_ENDL;
 #endif
 	}
@@ -866,7 +866,7 @@ BOOL LLToolPie::handleHover(S32 x, S32 y, MASK mask)
 			show_highlight = true;
 			ECursorType cursor = cursorFromObject(click_action_object);
 			gViewerWindow->setCursor(cursor);
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 			LL_DEBUGS("UserInput") << "hover handled by LLToolPie (inactive)" << LL_ENDL;
 #endif
 		}
@@ -882,7 +882,7 @@ BOOL LLToolPie::handleHover(S32 x, S32 y, MASK mask)
 		{
 			show_highlight = true;
 			gViewerWindow->setCursor(UI_CURSOR_TOOLGRAB);
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 			LL_DEBUGS("UserInput") << "hover handled by LLToolPie (inactive)" << LL_ENDL;
 #endif
 		}
@@ -891,14 +891,14 @@ BOOL LLToolPie::handleHover(S32 x, S32 y, MASK mask)
 		{
 			show_highlight = true;
 			gViewerWindow->setCursor(UI_CURSOR_HAND);
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 			LL_DEBUGS("UserInput") << "hover handled by LLToolPie (inactive)" << LL_ENDL;
 #endif
 		}
 		else
 		{
 			gViewerWindow->setCursor(UI_CURSOR_ARROW);
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 			LL_DEBUGS("UserInput") << "hover handled by LLToolPie (inactive)" << LL_ENDL;
 #endif
 		}

@@ -966,7 +966,7 @@ void LLPluginClassMedia::receivePluginMessage(const LLPluginMessage &message)
 					mDirtyRect.unionWith(newDirtyRect);
 				}
 
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 				LL_DEBUGS("Plugin") << "adjusted incoming rect is: ("
 					<< newDirtyRect.mLeft << ", "
 					<< newDirtyRect.mTop << ", "

@@ -349,7 +349,7 @@ void ALAOEngine::setStateCycleTimer(const ALAOSet::AOState* state)
 
 const LLUUID ALAOEngine::override(const LLUUID& pMotion, const bool start)
 {
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 	LL_DEBUGS("AOEngine") << "override(" << pMotion << "," << start << ")" << LL_ENDL;
 #endif
 
@@ -365,13 +365,13 @@ const LLUUID ALAOEngine::override(const LLUUID& pMotion, const bool start)
 			if (state)
 			{
 				setLastMotion(motion);
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 				LL_DEBUGS("AOEngine") << "(disabled AO) setting last motion id to " <<  gAnimLibrary.animationName(mLastMotion) << LL_ENDL;
 #endif
 				if (!state->mAnimations.empty())
 				{
 					setLastOverriddenMotion(motion);
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 					LL_DEBUGS("AOEngine") << "(disabled AO) setting last overridden motion id to " <<  gAnimLibrary.animationName(mLastOverriddenMotion) << LL_ENDL;
 #endif
 				}
@@ -382,7 +382,7 @@ const LLUUID ALAOEngine::override(const LLUUID& pMotion, const bool start)
 
 	if (mSets.empty())
 	{
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 		LL_DEBUGS("AOEngine") << "No sets loaded. Skipping overrider." << LL_ENDL;
 #endif
 		return animation;
@@ -390,7 +390,7 @@ const LLUUID ALAOEngine::override(const LLUUID& pMotion, const bool start)
 
 	if (!mCurrentSet)
 	{
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 		LL_DEBUGS("AOEngine") << "No current AO set chosen. Skipping overrider." << LL_ENDL;
 #endif
 		return animation;
@@ -405,7 +405,7 @@ const LLUUID ALAOEngine::override(const LLUUID& pMotion, const bool start)
 	ALAOSet::AOState* state = mCurrentSet->getStateByRemapID(motion);
 	if (!state)
 	{
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 		LL_DEBUGS("AOEngine") << "No current AO state for motion " << motion << " (" << gAnimLibrary.animationName(motion) << ")." << LL_ENDL;
 #endif
 		return animation;
@@ -417,7 +417,7 @@ const LLUUID ALAOEngine::override(const LLUUID& pMotion, const bool start)
 	if (start)
 	{
 		setLastMotion(motion);
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 		LL_DEBUGS("AOEngine") << "(enabled AO) setting last motion id to " <<  gAnimLibrary.animationName(mLastMotion) << LL_ENDL;
 #endif
 
@@ -426,7 +426,7 @@ const LLUUID ALAOEngine::override(const LLUUID& pMotion, const bool start)
 			motion == ANIM_AGENT_STAND &&
 			mInMouselook)
 		{
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 			LL_DEBUGS("AOEngine") << "(enabled AO, mouselook stand stopped) setting last motion id to " <<  gAnimLibrary.animationName(mLastMotion) << LL_ENDL;
 #endif
 			return animation;
@@ -435,7 +435,7 @@ const LLUUID ALAOEngine::override(const LLUUID& pMotion, const bool start)
 		// Do not start override sits if not selected
 		if (!mCurrentSet->getSitOverride() && motion == ANIM_AGENT_SIT)
 		{
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 			LL_DEBUGS("AOEngine") << "(enabled AO, sit override stopped) setting last motion id to " <<  gAnimLibrary.animationName(mLastMotion) << LL_ENDL;
 #endif
 			return animation;
@@ -447,7 +447,7 @@ const LLUUID ALAOEngine::override(const LLUUID& pMotion, const bool start)
 			const LLViewerObject* agentRoot = dynamic_cast<LLViewerObject*>(gAgentAvatarp->getRoot());
 			if (agentRoot && agentRoot->getID() != gAgentID)
 			{
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 				LL_DEBUGS("AOEngine") << "Ground sit animation playing but sitting on a prim - disabling overrider." << LL_ENDL;
 #endif
 				return animation;
@@ -457,7 +457,7 @@ const LLUUID ALAOEngine::override(const LLUUID& pMotion, const bool start)
 		if (!state->mAnimations.empty())
 		{
 			setLastOverriddenMotion(motion);
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 			LL_DEBUGS("AOEngine") << "(enabled AO) setting last overridden motion id to " <<  gAnimLibrary.animationName(mLastOverriddenMotion) << LL_ENDL;
 #endif
 		}
@@ -481,7 +481,7 @@ const LLUUID ALAOEngine::override(const LLUUID& pMotion, const bool start)
 
 		if (state->mCurrentAnimationID.notNull())
 		{
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 			LL_DEBUGS("AOEngine")	<< "Previous animation for state "
 						<< gAnimLibrary.animationName(motion)
 						<< " was not stopped, but we were asked to start a new one. Killing old animation." << LL_ENDL;
@@ -491,7 +491,7 @@ const LLUUID ALAOEngine::override(const LLUUID& pMotion, const bool start)
 		}
 
 		state->mCurrentAnimationID = animation;
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 		LL_DEBUGS("AOEngine")	<< "overriding " <<  gAnimLibrary.animationName(motion)
 					<< " with " << animation
 					<< " in state " << state->mName
@@ -571,7 +571,7 @@ const LLUUID ALAOEngine::override(const LLUUID& pMotion, const bool start)
 		{
 			stopAllSitVariants();
 		}
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 		LL_DEBUGS("AOEngine") << "stopping cycle timer for motion " <<  gAnimLibrary.animationName(motion) <<
 					" using animation " << animation <<
 					" in state " << state->mName << LL_ENDL;
@@ -885,12 +885,12 @@ bool ALAOEngine::findForeignItems(const LLUUID& uuid) const
 			{
 				if (item->getInventoryType() != LLInventoryType::IT_ANIMATION)
 				{
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 					LL_DEBUGS("AOEngine") << item->getName() << " is a link but does not point to an animation." << LL_ENDL;
 #endif
 					move = true;
 				}
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 				else
 				{
 					LL_DEBUGS("AOEngine") << item->getName() << " is an animation link." << LL_ENDL;
@@ -899,7 +899,7 @@ bool ALAOEngine::findForeignItems(const LLUUID& uuid) const
 			}
 			else
 			{
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 				LL_DEBUGS("AOEngine") << item->getName() << " is not a link!" << LL_ENDL;
 #endif
 				move = true;
@@ -910,7 +910,7 @@ bool ALAOEngine::findForeignItems(const LLUUID& uuid) const
 				moved = true;
 				LLInventoryModel* model = &gInventory;
 				model->changeItemParent(item, gInventory.findCategoryUUIDForType(LLFolderType::FT_LOST_AND_FOUND), FALSE);
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 				LL_DEBUGS("AOEngine") << item->getName() << " moved to lost and found!" << LL_ENDL;
 #endif
 			}
@@ -1056,7 +1056,7 @@ void ALAOEngine::reloadStateAnimations(ALAOSet::AOState* state)
 	gInventory.getDirectDescendentsOf(state->mInventoryUUID, dummy, items);
 	for (auto& item : *items)
     {
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 		LL_DEBUGS("AOEngine")	<< "Found animation link " << item->LLInventoryItem::getName()
 					<< " desc " << item->LLInventoryItem::getDescription()
 					<< " asset " << item->getAssetUUID() << LL_ENDL;
@@ -1075,7 +1075,7 @@ void ALAOEngine::reloadStateAnimations(ALAOSet::AOState* state)
 			sortOrder = -1;
 		}
 
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 		LL_DEBUGS("AOEngine") << "current sort order is " << sortOrder << LL_ENDL;
 #endif
 
@@ -1091,7 +1091,7 @@ void ALAOEngine::reloadStateAnimations(ALAOSet::AOState* state)
 			{
 				if (state->mAnimations[index].mSortOrder > sortOrder)
 				{
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 					LL_DEBUGS("AOEngine") << "inserting at index " << index << LL_ENDL;
 #endif
 					state->mAnimations.emplace(state->mAnimations.begin() + index, 
@@ -1102,13 +1102,13 @@ void ALAOEngine::reloadStateAnimations(ALAOSet::AOState* state)
 			}
 			if (!inserted)
 			{
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 				LL_DEBUGS("AOEngine") << "not inserted yet, appending to the list instead" << LL_ENDL;
 #endif
 				state->mAnimations.emplace_back(linkedItem->LLInventoryItem::getName(), item->getAssetUUID(), item->getUUID(), sortOrder);
 			}
 		}
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 		LL_DEBUGS("AOEngine") << "Animation count now: " << state->mAnimations.size() << LL_ENDL;
 #endif
 	}

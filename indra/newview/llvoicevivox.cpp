@@ -6759,7 +6759,7 @@ void LLVivoxVoiceClient::enablePreviewBuffer(bool enable)
 
 	if(mCaptureBufferMode && mIsInChannel)
 	{
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 		LL_DEBUGS("Voice") << "no channel" << LL_ENDL;
 #endif
 		sessionTerminate();
@@ -6770,7 +6770,7 @@ void LLVivoxVoiceClient::recordPreviewBuffer()
 {
 	if (!mCaptureBufferMode)
 	{
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 		LL_DEBUGS("Voice") << "Not in voice effect preview mode, cannot start recording." << LL_ENDL;
 #endif
 		mCaptureBufferRecording = false;
@@ -6787,7 +6787,7 @@ void LLVivoxVoiceClient::playPreviewBuffer(const LLUUID& effect_id)
 {
 	if (!mCaptureBufferMode)
 	{
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 		LL_DEBUGS("Voice") << "Not in voice effect preview mode, no buffer to play." << LL_ENDL;
 #endif
 		mCaptureBufferRecording = false;
@@ -6832,7 +6832,7 @@ void LLVivoxVoiceClient::captureBufferRecordStartSendMessage()
 	{
 		std::ostringstream stream;
 
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 		LL_DEBUGS("Voice") << "Starting audio capture to buffer." << LL_ENDL;
 #endif
 
@@ -6861,7 +6861,7 @@ void LLVivoxVoiceClient::captureBufferRecordStopSendMessage()
 	{
 		std::ostringstream stream;
 
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 		LL_DEBUGS("Voice") << "Stopping audio capture to buffer." << LL_ENDL;
 #endif
 
@@ -6892,12 +6892,12 @@ void LLVivoxVoiceClient::captureBufferPlayStartSendMessage(const LLUUID& voice_f
 
 		std::ostringstream stream;
 
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 		LL_DEBUGS("Voice") << "Starting audio buffer playback." << LL_ENDL;
 #endif
 
 		S32 font_index = getVoiceFontTemplateIndex(voice_font_id);
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 		LL_DEBUGS("Voice") << "With voice font: " << voice_font_id << " (" << font_index << ")" << LL_ENDL;
 #endif
 
@@ -6919,7 +6919,7 @@ void LLVivoxVoiceClient::captureBufferPlayStopSendMessage()
 	{
 		std::ostringstream stream;
 
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 		LL_DEBUGS("Voice") << "Stopping audio buffer playback." << LL_ENDL;
 #endif
 
@@ -7011,7 +7011,7 @@ LLIOPipe::EStatus LLVivoxProtocolParser::process_impl(
 		XML_SetUserData(parser, this);	
 		XML_Parse(parser, mInput.data() + start, delim - start, false);
 		
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
         LL_DEBUGS("VivoxProtocolParser") << "parsing: " << mInput.substr(start, delim - start) << LL_ENDL;
 #endif
 		start = delim + 3;
@@ -7020,7 +7020,7 @@ LLIOPipe::EStatus LLVivoxProtocolParser::process_impl(
 	if(start != 0)
 		mInput = mInput.substr(start);
 	
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 	LL_DEBUGS("VivoxProtocolParser") << "at end, mInput is: " << mInput << LL_ENDL;
 #endif
 	
@@ -7101,13 +7101,13 @@ void LLVivoxProtocolParser::StartTag(const char *tag, const char **attr)
 				}
 			}
 		}
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 		LL_DEBUGS("VivoxProtocolParser") << tag << " (" << responseDepth << ")"  << LL_ENDL;
 #endif
 	}
 	else
 	{
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 		if (ignoringTags)
 		{
 			LL_DEBUGS("VivoxProtocolParser") << "ignoring tag " << tag << " (depth = " << responseDepth << ")" << LL_ENDL;
@@ -7115,7 +7115,7 @@ void LLVivoxProtocolParser::StartTag(const char *tag, const char **attr)
 		else
 #endif
 		{
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 			LL_DEBUGS("VivoxProtocolParser") << tag << " (" << responseDepth << ")"  << LL_ENDL;
 #endif
 			
@@ -7126,7 +7126,7 @@ void LLVivoxProtocolParser::StartTag(const char *tag, const char **attr)
 				ignoreDepth = responseDepth;
 				accumulateText = false;
 				
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 				LL_DEBUGS("VivoxProtocolParser") << "starting ignore, ignoreDepth is " << ignoreDepth << LL_ENDL;
 #endif
 			}
@@ -7187,12 +7187,12 @@ void LLVivoxProtocolParser::EndTag(const char *tag)
 	{
 		if (ignoreDepth == responseDepth)
 		{
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 			LL_DEBUGS("VivoxProtocolParser") << "end of ignore" << LL_ENDL;
 #endif
 			ignoringTags = false;
 		}
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 		else
 		{
 			LL_DEBUGS("VivoxProtocolParser") << "ignoring tag " << tag << " (depth = " << responseDepth << ")" << LL_ENDL;
@@ -7202,7 +7202,7 @@ void LLVivoxProtocolParser::EndTag(const char *tag)
 	
 	if (!ignoringTags)
 	{
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 		LL_DEBUGS("VivoxProtocolParser") << "processing tag " << tag << " (depth = " << responseDepth << ")" << LL_ENDL;
 #endif
 		
@@ -7390,7 +7390,7 @@ LLDate LLVivoxProtocolParser::expiryTimeStampToLLDate(const std::string& vivox_t
 	std::string time_stamp = vivox_ts.substr(0, 10);
 	time_stamp += VOICE_FONT_EXPIRY_TIME;
 
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 	LL_DEBUGS("VivoxProtocolParser") << "Vivox timestamp " << vivox_ts << " modified to: " << time_stamp << LL_ENDL;
 #endif
 
@@ -7401,7 +7401,7 @@ LLDate LLVivoxProtocolParser::expiryTimeStampToLLDate(const std::string& vivox_t
 
 void LLVivoxProtocolParser::processResponse(std::string tag)
 {
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 	LL_DEBUGS("VivoxProtocolParser") << tag << LL_ENDL;
 #endif
 
@@ -7415,14 +7415,14 @@ void LLVivoxProtocolParser::processResponse(std::string tag)
 	if (isEvent)
 	{
 		const char *eventTypeCstr = eventTypeString.c_str();
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
         LL_DEBUGS("LowVoice") << eventTypeCstr << LL_ENDL;
 #endif
 
 		if (!stricmp(eventTypeCstr, "ParticipantUpdatedEvent"))
 		{
 			// These happen so often that logging them is pretty useless.
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
             LL_DEBUGS("LowVoice") << "Updated Params: " << sessionHandle << ", " << sessionGroupHandle << ", " << uriString << ", " << alias << ", " << isModeratorMuted << ", " << isSpeaking << ", " << volume << ", " << energy << LL_ENDL;
 #endif
             LLVivoxVoiceClient::getInstance()->participantUpdatedEvent(sessionHandle, sessionGroupHandle, uriString, alias, isModeratorMuted, isSpeaking, volume, energy);
@@ -7493,7 +7493,7 @@ void LLVivoxProtocolParser::processResponse(std::string tag)
 			 <ParticipantType>0</ParticipantType>
 			 </Event>
 			 */
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
             LL_DEBUGS("LowVoice") << "Added Params: " << sessionHandle << ", " << sessionGroupHandle << ", " << uriString << ", " << alias << ", " << nameString << ", " << displayNameString << ", " << participantType << LL_ENDL;
 #endif
 			LLVivoxVoiceClient::getInstance()->participantAddedEvent(sessionHandle, sessionGroupHandle, uriString, alias, nameString, displayNameString, participantType);
@@ -7508,7 +7508,7 @@ void LLVivoxProtocolParser::processResponse(std::string tag)
 			 <AccountName>xtx7YNV-3SGiG7rA1fo5Ndw==</AccountName>
 			 </Event>
 			 */
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
             LL_DEBUGS("LowVoice") << "Removed params:" << sessionHandle << ", " << sessionGroupHandle << ", " << uriString << ", " << alias << ", " << nameString << LL_ENDL;
 #endif
 
@@ -7577,7 +7577,7 @@ void LLVivoxProtocolParser::processResponse(std::string tag)
 	else
 	{
 		const char *actionCstr = actionString.c_str();
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
         LL_DEBUGS("LowVoice") << actionCstr << LL_ENDL;
 #endif
 

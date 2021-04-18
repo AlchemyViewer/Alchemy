@@ -4342,7 +4342,7 @@ void process_avatar_animation(LLMessageSystem *mesgsys, void **user_data)
 	S32 num_blocks = mesgsys->getNumberOfBlocksFast(_PREHASH_AnimationList);
 	S32 num_source_blocks = mesgsys->getNumberOfBlocksFast(_PREHASH_AnimationSourceList);
 
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 	LL_DEBUGS("Messaging", "Motion") << "Processing " << num_blocks << " Animations" << LL_ENDL;
 #endif
 
@@ -4396,13 +4396,13 @@ void process_avatar_animation(LLMessageSystem *mesgsys, void **user_data)
 						avatarp->mAnimationSources.insert(LLVOAvatar::AnimationSourceMap::value_type(object_id, animation_id));
 					}
 				}
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 				LL_DEBUGS("Messaging", "Motion") << "Anim sequence ID: " << anim_sequence_id
 									<< " Animation id: " << animation_id
 									<< " From block: " << object_id << LL_ENDL;
 #endif
 			}
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 			else
 			{
 				LL_DEBUGS("Messaging", "Motion") << "Anim sequence ID: " << anim_sequence_id
@@ -4436,13 +4436,13 @@ void process_object_animation(LLMessageSystem *mesgsys, void **user_data)
 	
 	mesgsys->getUUIDFast(_PREHASH_Sender, _PREHASH_ID, uuid);
 
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
     LL_DEBUGS("AnimatedObjectsNotify") << "Received animation state for object " << uuid << LL_ENDL;
 #endif
 
     signaled_animation_map_t signaled_anims;
 	S32 num_blocks = mesgsys->getNumberOfBlocksFast(_PREHASH_AnimationList);
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 	LL_DEBUGS("AnimatedObjectsNotify") << "processing object animation requests, num_blocks " << num_blocks << " uuid " << uuid << LL_ENDL;
 #endif
     for( S32 i = 0; i < num_blocks; i++ )
@@ -4450,7 +4450,7 @@ void process_object_animation(LLMessageSystem *mesgsys, void **user_data)
         mesgsys->getUUIDFast(_PREHASH_AnimationList, _PREHASH_AnimID, animation_id, i);
         mesgsys->getS32Fast(_PREHASH_AnimationList, _PREHASH_AnimSequenceID, anim_sequence_id, i);
         signaled_anims[animation_id] = anim_sequence_id;
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
         LL_DEBUGS("AnimatedObjectsNotify") << "added signaled_anims animation request for object " 
                                     << uuid << " animation id " << animation_id << LL_ENDL;
 #endif
@@ -4460,7 +4460,7 @@ void process_object_animation(LLMessageSystem *mesgsys, void **user_data)
     LLViewerObject *objp = gObjectList.findObject(uuid);
     if (!objp)
     {
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 		LL_DEBUGS("AnimatedObjectsNotify") << "Received animation state for unknown object " << uuid << LL_ENDL;
 #endif
         return;
@@ -4469,7 +4469,7 @@ void process_object_animation(LLMessageSystem *mesgsys, void **user_data)
 	LLVOVolume *volp = objp->asVolume();
     if (!volp)
     {
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 		LL_DEBUGS("AnimatedObjectsNotify") << "Received animation state for non-volume object " << uuid << LL_ENDL;
 #endif
         return;
@@ -4477,7 +4477,7 @@ void process_object_animation(LLMessageSystem *mesgsys, void **user_data)
 
     if (!volp->isAnimatedObject())
     {
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 		LL_DEBUGS("AnimatedObjectsNotify") << "Received animation state for non-animated object " << uuid << LL_ENDL;
 #endif
         return;
@@ -4487,7 +4487,7 @@ void process_object_animation(LLMessageSystem *mesgsys, void **user_data)
     LLControlAvatar *avatarp = volp->getControlAvatar();
     if (!avatarp)
     {
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
         LL_DEBUGS("AnimatedObjectsNotify") << "Received animation request for object with no control avatar, ignoring " << uuid << LL_ENDL;
 #endif
         return;

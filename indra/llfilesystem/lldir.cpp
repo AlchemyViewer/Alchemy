@@ -526,7 +526,7 @@ std::string LLDir::getExpandedFilename(ELLPath location, const std::string& subd
 			// which to build this string), then intentionally return a blank
 			// string to the caller and skip the below warning about a blank
 			// prefix.
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 			LL_DEBUGS("LLDir") << "getLindenUserDir() not yet set: "
 							   << ELLPathToString(location)
 							   << ", '" << subdir1 << "', '" << subdir2 << "', '" << in_filename
@@ -611,7 +611,7 @@ std::string LLDir::getExpandedFilename(ELLPath location, const std::string& subd
 	expanded_filename += mDirDelimiter;
 	expanded_filename += in_filename;
 
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 	LL_DEBUGS("LLDir") << ELLPathToString(location)
 					   << ", '" << subdir1 << "', '" << subdir2 << "', '" << in_filename
 					   << "' => '" << expanded_filename << "'" << LL_ENDL;
@@ -728,7 +728,7 @@ std::vector<std::string> LLDir::findSkinnedFilenames(const std::string& subdir,
 		("textures")                // textures not localized
 	;
 
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 	LL_DEBUGS("LLDir") << "subdir '" << subdir << "', filename '" << filename
 					   << "', constraint "
 					   << ((constraint == CURRENT_SKIN)? "CURRENT_SKIN" : "ALL_SKINS")
@@ -855,8 +855,8 @@ std::vector<std::string> LLDir::findSkinnedFilenames(const std::string& subdir,
 		}
 	}
 
-#if SHOW_DEBUG
-	LL_DEBUGS("LLDir") << empty;
+#ifdef SHOW_DEBUG
+	LL_DEBUGS("LLDir") << std::string();
 	const char* comma = "";
 	for (const std::string& path : results)
 	{

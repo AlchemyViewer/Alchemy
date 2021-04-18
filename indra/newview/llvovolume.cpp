@@ -356,7 +356,7 @@ U32 LLVOVolume::processUpdateMessage(LLMessageSystem *mesgsys,
 		sculpt_id = sculpt_params->getSculptTexture();
 		sculpt_type = sculpt_params->getSculptType();
 
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
         LL_DEBUGS("ObjectUpdate") << "uuid " << mID << " set sculpt_id " << sculpt_id << LL_ENDL;
         dumpStack("ObjectUpdateStack");
 #endif
@@ -1532,7 +1532,7 @@ BOOL LLVOVolume::updateLOD()
 
 	if (lod_changed)
 	{
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 		static const bool enable_log = debugLoggingEnabled("AnimatedObjectsLinkset");
         if (enable_log)
         {
@@ -2310,7 +2310,7 @@ void LLVOVolume::setTEMaterialParamsCallbackTE(const LLUUID& objectID, const LLM
 	LLVOVolume* pVol = (LLVOVolume*)gObjectList.findObject(objectID);
 	if (pVol)
 	{
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 		LL_DEBUGS("MaterialTEs") << "materialid " << pMaterialID.asString() << " to TE " << te << LL_ENDL;
 #endif
 		if (te >= pVol->getNumTEs())
@@ -2327,7 +2327,7 @@ void LLVOVolume::setTEMaterialParamsCallbackTE(const LLUUID& objectID, const LLM
 S32 LLVOVolume::setTEMaterialID(const U8 te, const LLMaterialID& pMaterialID)
 {
 	S32 res = LLViewerObject::setTEMaterialID(te, pMaterialID);
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 	LL_DEBUGS("MaterialTEs") << "te "<< (S32)te << " materialid " << pMaterialID.asString() << " res " << res
 								<< ( LLSelectMgr::getInstance()->getSelection()->contains(const_cast<LLVOVolume*>(this), te) ? " selected" : " not selected" )
 								<< LL_ENDL;
@@ -2588,12 +2588,12 @@ S32 LLVOVolume::setTEMaterialParams(const U8 te, const LLMaterialPtr pMaterialPa
 		}
 	}
 
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 	S32 res = 
 #endif
 		LLViewerObject::setTEMaterialParams(te, pMaterial);
 
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 	LL_DEBUGS("MaterialTEs") << "te " << (S32)te << " material " << ((pMaterial) ? pMaterial->asLLSD() : LLSD("null")) << " res " << res
 							 << ( LLSelectMgr::getInstance()->getSelection()->contains(const_cast<LLVOVolume*>(this), te) ? " selected" : " not selected" )
 							 << LL_ENDL;
@@ -2754,7 +2754,7 @@ void LLVOVolume::syncMediaData(S32 texture_index, const LLSD &media_data, bool m
 		return ;
 	}
 
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 	LL_DEBUGS("MediaOnAPrim") << "BEFORE: texture_index = " << texture_index
 		<< " hasMedia = " << te->hasMedia() << " : " 
 		<< ((NULL == te->getMediaData()) ? "NULL MEDIA DATA" : ll_pretty_print_sd(te->getMediaData()->asLLSD())) << LL_ENDL;
@@ -2798,7 +2798,7 @@ void LLVOVolume::syncMediaData(S32 texture_index, const LLSD &media_data, bool m
 		removeMediaImpl(texture_index);
 	}
 
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 	LL_DEBUGS("MediaOnAPrim") << "AFTER: texture_index = " << texture_index
 		<< " hasMedia = " << te->hasMedia() << " : " 
 		<< ((NULL == te->getMediaData()) ? "NULL MEDIA DATA" : ll_pretty_print_sd(te->getMediaData()->asLLSD())) << LL_ENDL;
@@ -2936,7 +2936,7 @@ void LLVOVolume::mediaNavigated(LLViewerMediaImpl *impl, LLPluginClassMedia* plu
 	}
 	else if (sObjectMediaNavigateClient)
 	{
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 		LL_DEBUGS("MediaOnAPrim") << "broadcasting navigate with URI " << new_location << LL_ENDL;
 #endif
 
@@ -2991,7 +2991,7 @@ void LLVOVolume::mediaEvent(LLViewerMediaImpl *impl, LLPluginClassMedia* plugin,
 				
 				case LLViewerMediaImpl::MEDIANAVSTATE_COMPLETE_BEFORE_LOCATION_CHANGED_SPURIOUS:
 					// This navigate didn't change the current URL.  
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 					LL_DEBUGS("MediaOnAPrim") << "	NOT broadcasting navigate (spurious)" << LL_ENDL;
 #endif
 				break;
@@ -3744,7 +3744,7 @@ void LLVOVolume::setExtendedMeshFlags(U32 flags)
             param_block->setFlags(flags);
         }
         parameterChanged(LLNetworkData::PARAMS_EXTENDED_MESH, true);
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
         LL_DEBUGS("AnimatedObjects") << this
                                      << " new flags " << flags << " curr_flags " << curr_flags
                                      << ", calling onSetExtendedMeshFlags()"
@@ -3808,7 +3808,7 @@ void LLVOVolume::onReparent(LLViewerObject *old_parent, LLViewerObject *new_pare
 // virtual
 void LLVOVolume::afterReparent()
 {
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
     {
         LL_DEBUGS("AnimatedObjects") << "new child added for parent " 
             << ((LLViewerObject*)getParent())->getID() << LL_ENDL;
@@ -3817,7 +3817,7 @@ void LLVOVolume::afterReparent()
 
     if (isAnimatedObject() && getControlAvatar())
     {
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
         LL_DEBUGS("AnimatedObjects") << "adding attachment overrides, parent is animated object " 
             << ((LLViewerObject*)getParent())->getID() << LL_ENDL;
 #endif
@@ -3832,7 +3832,7 @@ void LLVOVolume::afterReparent()
         //getControlAvatar()->rebuildAttachmentOverrides();
         getControlAvatar()->updateAnimations();
     }
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
     else
     {
         LL_DEBUGS("AnimatedObjects") << "not adding overrides, parent: " 
@@ -3856,7 +3856,7 @@ void LLVOVolume::updateRiggingInfo()
         LLVolume *volume = getVolume();
         if (skin && avatar && volume)
         {
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
             LL_DEBUGS("RigSpammish") << "starting, vovol " << this << " lod " << getLOD() << " last " << mLastRiggingInfoLOD << LL_ENDL;
 #endif
             if (getLOD()>mLastRiggingInfoLOD || getLOD()==3)
@@ -3874,7 +3874,7 @@ void LLVOVolume::updateRiggingInfo()
                 }
                 // Keep the highest LOD info available.
                 mLastRiggingInfoLOD = getLOD();
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
                 LL_DEBUGS("RigSpammish") << "updated rigging info for LLVOVolume " 
                                          << this << " lod " << mLastRiggingInfoLOD 
                                          << LL_ENDL;
@@ -4418,7 +4418,7 @@ void LLVOVolume::parameterChanged(U16 param_type, LLNetworkData* data, BOOL in_u
         bool was_enabled = (getControlAvatar() != NULL);
         if (enabled != was_enabled)
         {
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
             LL_DEBUGS("AnimatedObjects") << this
                                          << " calling onSetExtendedMeshFlags, enabled " << (U32) enabled
                                          << " was_enabled " << (U32) was_enabled
@@ -4570,7 +4570,7 @@ const LLMatrix4& LLVOVolume::getWorldMatrix(LLXformMatrix* xform) const
 
 void LLVOVolume::markForUpdate(BOOL priority)
 { 
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 	static const bool enable_log = debugLoggingEnabled("AnimatedObjectsLinkset");
     if (enable_log)
     {
@@ -6172,7 +6172,7 @@ void LLVolumeGeometryManager::rebuildMesh(LLSpatialGroup* group)
 			{
 				LLVOVolume* vobj = drawablep->getVOVolume();
 
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 				static const bool enable_log = debugLoggingEnabled("AnimatedObjectsLinkset");
                 if (enable_log)
                 {

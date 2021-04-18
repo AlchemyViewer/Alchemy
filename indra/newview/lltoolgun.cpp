@@ -147,11 +147,11 @@ BOOL LLToolGun::handleHover(S32 x, S32 y, MASK mask)
 			gViewerWindow->hideCursor();
 		}
 
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 		LL_DEBUGS("UserInput") << "hover handled by LLToolGun (mouselook)" << LL_ENDL;
 #endif
 	}
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 	else
 	{
 		LL_DEBUGS("UserInput") << "hover handled by LLToolGun (not mouselook)" << LL_ENDL;
