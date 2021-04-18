@@ -911,8 +911,6 @@ class DarwinManifest(ViewerManifest):
                                 'libhunspell-*.dylib',
                                 'libndofdev.dylib',
                                 'libogg.*.dylib',
-                                'libopenjp2.*.dylib',
-                                'liburiparser.*.dylib',
                                 'libvorbis.*.dylib',
                                 'libvorbisenc.*.dylib',
                                 'libvorbisfile.*.dylib',
@@ -1032,13 +1030,6 @@ class DarwinManifest(ViewerManifest):
                 # Need to get the llcommon dll from any of the build directories as well.
                 libfile_parent = self.get_dst_prefix()
                 dylibs=[]
-                for libfile in (
-                                # libnghttp2.dylib is a symlink to
-                                # libnghttp2.major.dylib, which is a symlink to
-                                # libnghttp2.version.dylib. Get all of them.
-                                "libnghttp2.*dylib",
-                                ):
-                    dylibs += self.path_optional(os.path.join(relpkgdir, libfile), libfile)
 
                 # SLVoice executable
                 with self.prefix(src=os.path.join(pkgdir, 'bin', 'release')):

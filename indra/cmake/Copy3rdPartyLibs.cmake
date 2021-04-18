@@ -121,12 +121,6 @@ elseif(DARWIN)
         libGLOD.dylib
         libhunspell-1.7.0.dylib
         libndofdev.dylib
-        libnghttp2.dylib
-        libnghttp2.14.dylib
-        libnghttp2.14.19.0.dylib
-        liburiparser.dylib
-        liburiparser.1.dylib
-        liburiparser.1.0.27.dylib
         libxmlrpc-epi.dylib
         libxmlrpc-epi.0.dylib
        )

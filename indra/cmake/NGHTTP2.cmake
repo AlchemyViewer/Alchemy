@@ -12,7 +12,7 @@ else (USESYSTEMLIBS)
       ${ARCH_PREBUILT_DIRS_RELEASE}/nghttp2.lib
       )
   elseif (DARWIN)
-    set(NGHTTP2_LIBRARIES libnghttp2.dylib)
+    set(NGHTTP2_LIBRARIES libnghttp2.a)
   else (WINDOWS)
     set(NGHTTP2_LIBRARIES libnghttp2.a)
   endif (WINDOWS)
