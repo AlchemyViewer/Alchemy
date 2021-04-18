@@ -11076,7 +11076,9 @@ void LLVOAvatar::calcMutedAVColor()
 {
     LLColor4 new_color(mMutedAVColor);
     std::string change_msg;
+#if defined(COLORIZE_JELLYDOLLS) || defined(SHOW_DEBUG)
     LLUUID av_id(getID());
+#endif
 
     if (getVisualMuteSettings() == AV_DO_NOT_RENDER)
     {
