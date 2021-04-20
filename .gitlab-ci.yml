@@ -46,6 +46,35 @@ variables:
       - build-vc-*/newview/Release/*.dll
       - build-vc-*/newview/Release/Alchemy_*_Setup.exe
 
+.mac_build:
+  stage: build
+  tags:
+    - mac
+  cache:
+    key:
+      files:
+        - autobuild.xml
+      prefix: ${CI_JOB_NAME}
+    paths:
+      - .cache/autobuild
+      - .cache/pip
+      - .venv
+    when: 'always'
+  before_script:
+    - virtualenv .venv -p python2
+    - source .venv/bin/activate
+    - pip install --upgrade autobuild -i https://pkg.alchemyviewer.org/repository/autobuild/simple --extra-index-url https://pypi.org/simple
+  script:
+    - |
+        autobuild configure -c ReleaseOS -- -DUSE_FMODSTUDIO=ON -DUSE_NVAPI=ON -DUSE_LTO=ON -DDISABLE_FATAL_WARNINGS=ON -DREVISION_FROM_VCS=FALSE
+        autobuild build -c ReleaseOS --no-configure
+  artifacts:
+    name: "$env:CI_COMMIT_REF_NAME-$env:CI_COMMIT_SHORT_SHA"
+    expire_in: 1 week
+    paths:
+      - build-darwin-*/build_data.json
+      - build-darwin-*/newview/Alchemy_*.dmg
+
 .linux_build:
   stage: build
   image: r.alchemyviewer.org/alchemy/infrastructure/debian-build-image:latest
@@ -92,6 +121,14 @@ variables:
   cache:
     key:
       prefix: windows64
+
+.mac64_build:
+  extends: .mac_build
+  variables:
+    AUTOBUILD_ADDRSIZE: 64
+  cache:
+    key:
+      prefix: darwin64
 
 .linux32_build:
   extends: .linux_build
@@ -148,6 +185,11 @@ build:master:linux64:
     - .linux64_build 
     - .master_rules
 
+build:master:mac64:
+  extends: 
+    - .mac64_build
+    - .master_rules
+
 .build:master:windows32:
   extends: 
     - .win32_build
@@ -161,6 +203,11 @@ build:master:windows64:
 build:project:linux64:
   extends: 
     - .linux64_build
+    - .project_rules
+
+build:project:mac64:
+  extends: 
+    - .mac64_build
     - .project_rules
 
 .build:project:windows64:
@@ -178,6 +225,11 @@ build:beta:linux64:
     - .linux64_build
     - .beta_rules
 
+build:beta:mac64:
+  extends: 
+    - .mac64_build
+    - .beta_rules
+
 .build:beta:windows32:
   extends: 
     - .win32_build
@@ -191,6 +243,11 @@ build:beta:windows64:
 build:release:linux64:
   extends: 
     - .linux64_build
+    - .release_rules
+
+build:release:mac64:
+  extends: 
+    - .mac64_build
     - .release_rules
 
 .build:release:windows32:
@@ -226,6 +283,11 @@ build:release:windows64:
         Push-Location .\build-linux-64\newview\
           $FileNameLnx64 = Get-ChildItem -Path . -Name -Include Alchemy_*.tar.bz2
           Invoke-WebRequest @UploadParams -InFile .\$FileNameLnx64 -Uri "${UploadDestURL}/${FileNameLnx64}"
+        Pop-Location
+
+        Push-Location .\build-darwin-64\newview\
+          $FileNameMac64 = Get-ChildItem -Path . -Name -Include Alchemy_*.dmg
+          Invoke-WebRequest @UploadParams -InFile .\$FileNameMac64 -Uri "${UploadDestURL}/${FileNameMac64}"
         Pop-Location
 
         Push-Location .\build-vc-64\newview\Release\
