@@ -52,6 +52,9 @@ if((USE_SSE41 AND USE_AVX) OR (USE_SSE41 AND USE_AVX AND USE_AVX2) OR (USE_AVX A
   message(FATAL_ERROR "Usage of multiple SIMD flags is unsupported")
 endif()
 
+# Warnings
+option(DISABLE_FATAL_WARNINGS "Disable warnings as errors" ON)
+
 # Platform-specific compilation flags.
 if (WINDOWS)
   # Don't build DLLs.
@@ -167,9 +170,9 @@ if (WINDOWS)
       set(GLOBAL_CXX_FLAGS "${GLOBAL_CXX_FLAGS} /favor:INTEL64")
   endif()
 
-  if (NOT VS_DISABLE_FATAL_WARNINGS)
+  if (NOT DISABLE_FATAL_WARNINGS)
     set(GLOBAL_CXX_FLAGS "${GLOBAL_CXX_FLAGS} /WX")
-  endif (NOT VS_DISABLE_FATAL_WARNINGS)
+  endif (NOT DISABLE_FATAL_WARNINGS)
 
   set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} ${GLOBAL_CXX_FLAGS}" CACHE STRING "C++ compiler debug options" FORCE)
   set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} ${GLOBAL_CXX_FLAGS}" CACHE STRING "C++ compiler release-with-debug options" FORCE)
@@ -308,9 +311,9 @@ if (LINUX OR DARWIN)
     set(GCC_WARNINGS "${GCC_WARNINGS} -Wno-deprecated-copy")
   endif()
 
-  if (NOT GCC_DISABLE_FATAL_WARNINGS)
-  #  set(GCC_WARNINGS "${GCC_WARNINGS} -Werror")
-  endif (NOT GCC_DISABLE_FATAL_WARNINGS)
+  if (NOT DISABLE_FATAL_WARNINGS)
+    set(GCC_WARNINGS "${GCC_WARNINGS} -Werror")
+  endif (NOT DISABLE_FATAL_WARNINGS)
 
   set(GCC_CXX_WARNINGS "${GCC_WARNINGS} -Wno-reorder")
 
