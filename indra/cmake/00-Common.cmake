@@ -296,14 +296,10 @@ endif (DARWIN)
 
 
 if (LINUX OR DARWIN)
-  if (CMAKE_CXX_COMPILER MATCHES ".*clang")
-    set(CMAKE_COMPILER_IS_CLANGXX 1)
-  endif (CMAKE_CXX_COMPILER MATCHES ".*clang")
-
-  if (CMAKE_COMPILER_IS_GNUCXX)
+  if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
     set(GCC_WARNINGS "-Wall -Wno-sign-compare -Wno-unused-parameter -Wno-unused-but-set-parameter -Wno-ignored-qualifiers -Wno-unused-function -Wnon-virtual-dtor")
-  elseif (CMAKE_COMPILER_IS_CLANGXX)
-    set(GCC_WARNINGS "-Wall -Wno-sign-compare -Wno-trigraphs")
+  elseif (CMAKE_CXX_COMPILER_ID STREQUAL "Clang" OR CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang")
+    set(GCC_WARNINGS "-Wall -Wno-sign-compare -Wno-trigraphs -Wno-unused-local-typedef -Wno-unknown-warning-option")
   endif()
 
   CHECK_CXX_COMPILER_FLAG(-Wdeprecated-copy HAS_DEPRECATED_COPY)
