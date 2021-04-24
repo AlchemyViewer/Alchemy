@@ -142,11 +142,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>80f590261c09f3980660b7d3122e7c0a20a76580248680de7deed4ef3f3979528f0adcc10fb96cb4a55cbc580cddbb0e</string>
+              <string>9929206e82426b44c7b3a69ad46a8bb579a1f490164e7e178db583a22aa29bd2bbf2675a179509065e222a4e6963b953</string>
               <key>hash_algorithm</key>
               <string>sha3_384</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/92/packages/generic/boost-828/1.75.0/boost-1.75.0-darwin64-828.tar.xz</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/92/packages/generic/boost-834/1.76.0/boost-1.76.0-darwin64-834.tar.xz</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
@@ -170,11 +170,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>e1c6cdb34c24db4da20aee13945650557f8bb52ac96c63d8d14dadd1e356d0ecc7c35e7f3dc0b9255ec0a13618ec7300</string>
+              <string>e5e39adb84df7356388f37296d9f41bfce9115219758a06e26d7d3dc04a88eb2e83220397a9cb5a9a2a32624ad6d64d3</string>
               <key>hash_algorithm</key>
               <string>sha3_384</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/92/packages/generic/boost-828/1.75.0/boost-1.75.0-windows-828.tar.xz</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/92/packages/generic/boost-834/1.76.0/boost-1.76.0-windows-834.tar.xz</string>
             </map>
             <key>name</key>
             <string>windows</string>
@@ -184,18 +184,18 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>ed957c6889ec5a634a119c62acc27da9da3f00f83228a2caacc0b94e215c860ac98a7a2624d74489ea53f753b71f01a4</string>
+              <string>741f7fd97e9937250c15e7b31254c1ce5b3c01ecc3e7ef0f09c555124d634e6d926bfa5e711ecc36b021d880e2da505d</string>
               <key>hash_algorithm</key>
               <string>sha3_384</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/92/packages/generic/boost-828/1.75.0/boost-1.75.0-windows64-828.tar.xz</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/92/packages/generic/boost-834/1.76.0/boost-1.76.0-windows64-834.tar.xz</string>
             </map>
             <key>name</key>
             <string>windows64</string>
           </map>
         </map>
         <key>version</key>
-        <string>1.75.0</string>
+        <string>1.76.0</string>
       </map>
       <key>bugsplat</key>
       <map>
@@ -268,11 +268,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>435a062257d33866cca927636fcd20d7c3dae40782d0352e49288b99449156abe9b7117adfda3f24b11c180070971001</string>
+              <string>26af39c48251c7a5e1db5778f56269c6a23e5ab57074c1e884ae51dafde7d834ff93fd7e5a8ee6fc556a5910fd1c132c</string>
               <key>hash_algorithm</key>
               <string>sha3_384</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/98/packages/generic/colladadom-829/2.3.0/colladadom-2.3.0-darwin64-829.tar.xz</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/98/packages/generic/colladadom-835/2.3.0/colladadom-2.3.0-darwin64-835.tar.xz</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
@@ -296,11 +296,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>250941ff84e55f306f27e91d4f3cf60c7e2c4d2555d09331a133b849d4a417ebb2ad1f76a869aeb8c282587bd7f88dee</string>
+              <string>14aec8f7d5a3c48af44c1089a4d0ab682c4e50061017eafb976d4148a161a0fd6a1c086c25e5d9d09c1c2a803412558d</string>
               <key>hash_algorithm</key>
               <string>sha3_384</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/98/packages/generic/colladadom-829/2.3.0/colladadom-2.3.0-windows-829.tar.xz</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/98/packages/generic/colladadom-835/2.3.0/colladadom-2.3.0-windows-835.tar.xz</string>
             </map>
             <key>name</key>
             <string>windows</string>
@@ -310,11 +310,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>afffb1bc331feb24482d7661abaa6e9e4f726eacc4cac37dc2d39545758df883ff88e9cdf7f48a08ac7170918773ddad</string>
+              <string>17b78470954eaa2b3c8707adb077911a013dae0eb382c80ffaf4fb6c9873958836c7eecf183e1cbf3941a3ee980dc131</string>
               <key>hash_algorithm</key>
               <string>sha3_384</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/98/packages/generic/colladadom-829/2.3.0/colladadom-2.3.0-windows64-829.tar.xz</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/98/packages/generic/colladadom-835/2.3.0/colladadom-2.3.0-windows64-835.tar.xz</string>
             </map>
             <key>name</key>
             <string>windows64</string>
