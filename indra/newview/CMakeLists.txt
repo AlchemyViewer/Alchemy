@@ -1511,7 +1511,6 @@ if (DARWIN)
 
   # Add resource files to the project.
   set(viewer_RESOURCE_FILES
-    alchemy.icns
     macview.r
     Info-Alchemy.plist
     Alchemy.xib/
