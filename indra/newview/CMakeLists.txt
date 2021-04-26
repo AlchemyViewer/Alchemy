@@ -2278,7 +2278,8 @@ if (DARWIN)
 
   # Compile the .xib files using the 'ibtool' program with the destination being the app package
   add_custom_command (TARGET ${VIEWER_BINARY_NAME} POST_BUILD
-                      COMMAND ${IBTOOL} --errors --warnings --notices
+                      COMMAND ${IBTOOL} --errors --warnings --notices --target-device mac 
+                              --minimum-deployment-target ${CMAKE_OSX_DEPLOYMENT_TARGET}
                               --compile ${VIEWER_APP_BUNDLE}/Contents/Resources/Alchemy.nib
                               ${CMAKE_CURRENT_SOURCE_DIR}/Alchemy.xib
                       COMMENT "Compiling ${CMAKE_CURRENT_SOURCE_DIR}/Alchemy.xib")
