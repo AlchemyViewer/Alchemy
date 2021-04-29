@@ -112,8 +112,6 @@ LLViewerAssetStorage::LLViewerAssetStorage(LLMessageSystem *msg, LLXferManager *
       mCountSucceeded(0),
       mTotalBytesFetched(0)
 {
-    // <FS:Ansariel> Explicitly create the VAAssetStorage pool
-    LLCoprocedureManager::instance().createPool(VIEWER_ASSET_STORAGE_CORO_POOL);
 }
 
 LLViewerAssetStorage::LLViewerAssetStorage(LLMessageSystem *msg, LLXferManager *xfer)
@@ -125,8 +123,6 @@ LLViewerAssetStorage::LLViewerAssetStorage(LLMessageSystem *msg, LLXferManager *
       mCountSucceeded(0),
       mTotalBytesFetched(0)
 {
-    // <FS:Ansariel> Explicitly create the VAAssetStorage pool
-    LLCoprocedureManager::instance().createPool(VIEWER_ASSET_STORAGE_CORO_POOL);
 }
 
 LLViewerAssetStorage::~LLViewerAssetStorage()
