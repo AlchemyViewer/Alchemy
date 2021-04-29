@@ -518,7 +518,6 @@ class WindowsManifest(ViewerManifest):
             self.path("glod.dll")
 
             # For image support
-            self.path("jpeg8.dll")
             self.path("libwebp.dll")
             self.path("openjp2.dll")
 

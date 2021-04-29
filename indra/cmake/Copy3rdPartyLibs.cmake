@@ -57,7 +57,6 @@ if(WINDOWS)
         epoxy-0.dll
         ${EXPAT_COPY}
         glod.dll
-        jpeg8.dll
         libapr-1.dll
         libaprutil-1.dll
         libapriconv-1.dll
