@@ -220,7 +220,6 @@ public:
 			}
 		}
 		mAvatarNameCacheConnections.clear();
-
 	}
 	/*virtual*/ std::string getLabel(const std::string &url, const LLUrlLabelCallback &cb);
 	/*virtual*/ std::string getIcon(const std::string &url);

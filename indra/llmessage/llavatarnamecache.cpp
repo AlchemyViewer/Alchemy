@@ -764,11 +764,11 @@ void LLAvatarNameCache::insert(const LLUUID& agent_id, const LLAvatarName& av_na
 
 LLUUID LLAvatarNameCache::findIdByName(const std::string& name)
 {
-    for (auto it = mCache.begin(), end = mCache.end(); it != end; ++it)
+    for (const auto& cache_pair : mCache)
     {
-        if (it->second.getUserName() == name)
+        if (cache_pair.second.getUserName() == name)
         {
-            return it->first;
+            return cache_pair.first;
         }
     }
 

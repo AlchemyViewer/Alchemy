@@ -356,7 +356,7 @@ void LLViewerAssetStorage::storeAssetData(
         {
             // LLAssetStorage metric: Zero size
             reportMetric( asset_id, asset_type, filename, LLUUID::null, 0, MR_ZERO_SIZE, __FILE__, __LINE__, "The file was zero length" );
-			fclose(fp);
+			fp.close();
         }
         else
         {
