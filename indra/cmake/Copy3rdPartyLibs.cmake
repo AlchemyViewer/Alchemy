@@ -64,7 +64,6 @@ if(WINDOWS)
         libogg.dll
         libvorbis.dll
         libvorbisfile.dll
-        libwebp.dll
         openjp2.dll
         xmlrpc-epi.dll
         )

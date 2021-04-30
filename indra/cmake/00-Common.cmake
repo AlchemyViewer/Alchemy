@@ -196,7 +196,6 @@ if (WINDOWS)
   add_definitions(
       /DCURL_STATICLIB=1
       /DURI_STATIC_BUILD=1
-      /DWEBP_DLL=1
   )
 
   # configure win32 API for 7 and above compatibility

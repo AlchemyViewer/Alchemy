@@ -518,7 +518,6 @@ class WindowsManifest(ViewerManifest):
             self.path("glod.dll")
 
             # For image support
-            self.path("libwebp.dll")
             self.path("openjp2.dll")
 
             # For OpenGL extensions
@@ -904,7 +903,6 @@ class DarwinManifest(ViewerManifest):
                 for libfile in (
                                 'libapr-1.*.dylib',
                                 'libaprutil-1.*.dylib',
-                                'libjpeg.*.dylib',
                                 'libepoxy.*.dylib',
                                 'libGLOD.dylib',
                                 'libhunspell-*.dylib',
@@ -913,7 +911,6 @@ class DarwinManifest(ViewerManifest):
                                 'libvorbis.*.dylib',
                                 'libvorbisenc.*.dylib',
                                 'libvorbisfile.*.dylib',
-                                'libwebp.*.dylib',
                                 'libxmlrpc-epi.*.dylib',
                                 ):
                     self.path(libfile)
