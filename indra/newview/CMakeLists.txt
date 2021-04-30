@@ -2225,7 +2225,6 @@ if (LINUX)
     add_custom_target(llpackage ALL DEPENDS ${product}.tar.bz2)
     # Make sure we don't run two instances of viewer_manifest.py at the same time.
     add_dependencies(llpackage copy_l_viewer_manifest)
-    check_message_template(llpackage)
   endif (PACKAGE)
 endif (LINUX)
 
