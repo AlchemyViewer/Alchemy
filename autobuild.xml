@@ -1362,11 +1362,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>4c827b03e43d25446feab4733128a455285c9e4687af3723d30da2f6e63b4e4167f4c4f1a4d1052258d636ebad26cb54</string>
+              <string>32a134a64f4787d96c096534324135bfd7af977dd4cd5a60edc39e279ea22fd498bb205df78aba64a04243b3a41b682f</string>
               <key>hash_algorithm</key>
               <string>sha3_384</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/82/packages/generic/libwebp-843/1.1.0/libwebp-1.1.0-darwin64-843.tar.xz</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/82/packages/generic/libwebp-858/1.2.0/libwebp-1.2.0-darwin64-858.tar.xz</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
@@ -1376,11 +1376,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>2e78c7b172af0e926fae6641b46c475cf9a4f30d384a8c7c1ff9b025a53039f1f30b11c18ae389e7e967fc168a3db220</string>
+              <string>220423437c40a2a1bfd0214af16f196a198c5a9d1a92c5ee24ad78ec80a8180ce219d15c6d527637442afde2235b6f13</string>
               <key>hash_algorithm</key>
               <string>sha3_384</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/82/packages/generic/libwebp-843/1.1.0/libwebp-1.1.0-linux64-843.tar.xz</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/82/packages/generic/libwebp-858/1.2.0/libwebp-1.2.0-linux64-858.tar.xz</string>
             </map>
             <key>name</key>
             <string>linux64</string>
@@ -1390,11 +1390,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>6f6b36e0b603539d035924fb48d677e791f2a79ee9b878ff715f568e359bea3cfda1e772f44d05016df0d4ec671cebe6</string>
+              <string>fc292933b8706b24389f19399967ff7667a280eafcace607ce463f491e200319bb02cb9c03e6a8d550d7a877f25b2961</string>
               <key>hash_algorithm</key>
               <string>sha3_384</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/82/packages/generic/libwebp-843/1.1.0/libwebp-1.1.0-windows-843.tar.xz</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/82/packages/generic/libwebp-858/1.2.0/libwebp-1.2.0-windows-858.tar.xz</string>
             </map>
             <key>name</key>
             <string>windows</string>
@@ -1404,18 +1404,18 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>a30c427adf8b40a45f073f54265ba5110c2ac447a26236f09bf26b18fa72348d29a7246e58ab657861527aa42e8fe44f</string>
+              <string>e4bbde1c771a361e643bcc89385f77b506c82d58e2d35d651045270ad526d9550217c0b84b67891f992b93db05a007ce</string>
               <key>hash_algorithm</key>
               <string>sha3_384</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/82/packages/generic/libwebp-843/1.1.0/libwebp-1.1.0-windows64-843.tar.xz</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/82/packages/generic/libwebp-858/1.2.0/libwebp-1.2.0-windows64-858.tar.xz</string>
             </map>
             <key>name</key>
             <string>windows64</string>
           </map>
         </map>
         <key>version</key>
-        <string>1.1.0</string>
+        <string>1.2.0</string>
       </map>
       <key>libxml2</key>
       <map>
