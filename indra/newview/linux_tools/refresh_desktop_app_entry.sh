@@ -20,7 +20,7 @@ Terminal=false\n\
 Type=Application\n\
 Categories=Game;Simulation;\n\
 StartupNotify=true\n\
-StartupWMClass=Alchemy\m\
+StartupWMClass=Alchemy\n\
 X-Desktop-File-Install-Version=3.0"
 
     echo " - Installing menu entries in ${desktop_entries_dir}"
