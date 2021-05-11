@@ -79,7 +79,7 @@ LLProgressView * LLViewerWindow::getProgressView(void) const { return 0; }
 
 LLViewerWindow* gViewerWindow;
 
-std::string LLTrans::getString(const std::string &xml_desc, const LLStringUtil::format_map_t& args, bool def_string)
+std::string LLTrans::getString(std::string_view xml_desc, const LLStringUtil::format_map_t& args, bool def_string)
 {
     return std::string("test_trans");
 }
