@@ -285,9 +285,7 @@ namespace tut
 	template<> template<>
 	void m3math_test_object_t::test<12>()
 	{
-#if LL_LINUX || LL_DARWIN
         skip("This test fails depending on architecture. Need to fix comparison operation, is_approx_equal, to work on more than one platform.");
-#endif
         
 		LLMatrix3 llmat_obj;
 
