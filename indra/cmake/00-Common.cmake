@@ -279,8 +279,8 @@ if (DARWIN)
   set(CMAKE_CXX_LINK_FLAGS "-Wl,-headerpad_max_install_names,-search_paths_first")
   set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_CXX_LINK_FLAGS}")
   set(DARWIN_extra_cstar_flags "-gdwarf-2")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Ofast ${DARWIN_extra_cstar_flags}")
-  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Ofast ${DARWIN_extra_cstar_flags}")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 ${DARWIN_extra_cstar_flags}")
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O3 ${DARWIN_extra_cstar_flags}")
   # NOTE: it's critical that the optimization flag is put in front.
   # NOTE: it's critical to have both CXX_FLAGS and C_FLAGS covered.
 
