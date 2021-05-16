@@ -1423,15 +1423,14 @@ class LinuxManifest(ViewerManifest):
             self.path("libcef.so")
 
         with self.prefix(src=os.path.join(pkgdir, 'resources'), dst=os.path.join('bin', 'llplugin')):
-            self.path("cef_100_percent.pak")
-            self.path("cef_200_percent.pak")
-            self.path("cef_extensions.pak")
-            self.path("cef.pak")
-            self.path("devtools_resources.pak")
+            self.path("chrome_100_percent.pak")
+            self.path("chrome_200_percent.pak")
+            self.path("resources.pak")
             self.path("icudtl.dat")
 
         with self.prefix(src=os.path.join(pkgdir, 'lib', 'release', 'swiftshader'), dst=os.path.join('bin', 'llplugin', 'swiftshader') ):
-            self.path( "*.so" )
+            self.path( "libEGL.so" )
+            self.path( "libGLESv2.so" )
 
         with self.prefix(src=os.path.join(pkgdir, 'resources', 'locales'), dst=os.path.join('bin', 'locales')):
             self.path("*.pak")
