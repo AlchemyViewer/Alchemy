@@ -207,11 +207,21 @@ U32 LLDir::deleteDirAndContents(const std::string& dir_name)
 	   {
 	      if (!boost::filesystem::is_empty (dir_path))
 		  {   // Directory has content
-		     num_deleted = boost::filesystem::remove_all (dir_path);
+			  boost::system::error_code ec;
+			  num_deleted = boost::filesystem::remove_all(dir_path, ec);
+			  if (ec.failed())
+			  {
+				  LL_WARNS() << "Failed to delete file " << dir_path << ": " << ec.message() << LL_ENDL;
+			  }
 		  }
 		  else
 		  {   // Directory is empty
-		     boost::filesystem::remove (dir_path);
+			 boost::system::error_code ec;
+			 num_deleted = boost::filesystem::remove(dir_path, ec);
+			 if (ec.failed())
+			 {
+				 LL_WARNS() << "Failed to delete folder " << dir_path << ": " << ec.message() << LL_ENDL;
+			 }
 		  }
 	   }
 	}
