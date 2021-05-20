@@ -295,6 +295,13 @@ void LLFolderView::closeAllFolders()
 	arrangeAll();
 }
 
+void LLFolderView::openAllFolders()
+{
+	// Open all the folders
+	setOpenArrangeRecursively(TRUE, LLFolderViewFolder::RECURSE_DOWN);
+	arrangeAll();
+}
+
 void LLFolderView::openTopLevelFolders()
 {
 	for (folders_t::iterator iter = mFolders.begin();

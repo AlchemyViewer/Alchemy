@@ -184,6 +184,52 @@
            width="31" />
       </layout_panel>
       <layout_panel
+       auto_resize="false"
+       height="25"
+       layout="topleft"
+       name="open_folder_btn_panel"
+       width="32">
+          <button
+           follows="bottom|left"
+           height="25"
+           image_hover_unselected="Toolbar_Middle_Over"
+           image_overlay="Inv_FolderClosed"
+           image_selected="Toolbar_Middle_Selected"
+           image_unselected="Toolbar_Middle_Off"
+           layout="topleft"
+           left="0"
+           name="close_folder_btn"
+           tool_tip="Close all folders"
+           top="0"
+           width="31">
+            <button.commit_callback
+             function="Inventory.CloseAllFolders" />
+         </button>	   
+      </layout_panel>
+      <layout_panel
+       auto_resize="false"
+       height="25"
+       layout="topleft"
+       name="close_folder_btn_panel"
+       width="32">
+          <button
+           follows="bottom|left"
+           height="25"
+           image_hover_unselected="Toolbar_Middle_Over"
+           image_overlay="Inv_FolderOpen"
+           image_selected="Toolbar_Middle_Selected"
+           image_unselected="Toolbar_Middle_Off"
+           layout="topleft"
+           left="0"
+           name="open_folder_btn"
+           tool_tip="Open all folders"
+           top="0"
+           width="31">
+            <button.commit_callback
+             function="Inventory.OpenAllFolders" />
+         </button>
+      </layout_panel>
+      <layout_panel
        auto_resize="true"
        height="25"
        layout="topleft"
