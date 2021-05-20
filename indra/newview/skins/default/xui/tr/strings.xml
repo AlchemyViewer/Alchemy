@@ -78,7 +78,7 @@ Doku belleği: [TEXTURE_MEMORY]MB
 	<string name="AboutLibs">
 		J2C Kod Çözücü Sürümü: [J2C_VERSION] 
 Ses Sürücüsü Sürümü: [AUDIO_DRIVER_VERSION] 
-[LIBCEF_VERSION] 
+[CEF_VERSION] 
 LibVLC Sürümü: [LIBVLC_VERSION] 
 Ses Sunucusu Sürümü: [VOICE_VERSION]
 	</string>

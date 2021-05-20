@@ -78,7 +78,7 @@ SLURL: &lt;nolink&gt;[SLURL]&lt;/nolink&gt;
 	<string name="AboutLibs">
 		Версия декодера J2C: [J2C_VERSION] 
 Версия аудиодрайвера: [AUDIO_DRIVER_VERSION] 
-[LIBCEF_VERSION] 
+[CEF_VERSION] 
 Версия LibVLC: [LIBVLC_VERSION] 
 Версия речевого сервера: [VOICE_VERSION]
 	</string>

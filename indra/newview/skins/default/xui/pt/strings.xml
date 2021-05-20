@@ -69,7 +69,7 @@ Memória de textura: [TEXTURE_MEMORY]MB
 	<string name="AboutLibs">
 		Versão do J2C Decoder: [J2C_VERSION] 
 Versão do driver de áudio: [AUDIO_DRIVER_VERSION]
-[LIBCEF_VERSION] 
+[CEF_VERSION] 
 Versão do LibVLC: [LIBVLC_VERSION] 
 Versão do servidor de voz: [VOICE_VERSION]
 	</string>
