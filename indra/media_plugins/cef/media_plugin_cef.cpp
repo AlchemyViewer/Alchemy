@@ -928,8 +928,6 @@ void MediaPluginCEF::keyEvent(dullahan::EKeyEvent key_event, LLSD native_key_dat
 #elif LL_LINUX
 	uint32_t native_virtual_key = (uint32_t)(native_key_data["virtual_key"].asInteger());
 	uint32_t native_modifiers = (uint32_t)(native_key_data["modifiers"].asInteger());
-	if( native_scan_code == '\n' )
-		native_scan_code = '\r';
 	mCEFLib->nativeKeyboardEventSDL2(key_event, native_virtual_key, native_modifiers, 0, false);
 #endif
 };
