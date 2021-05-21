@@ -338,14 +338,26 @@ public:
 	/*virtual*/ void handleMediaEvent(LLPluginClassMedia* plugin, LLPluginClassMediaOwner::EMediaEvent);
 
 	// LLEditMenuHandler overrides
-	/*virtual*/ void	cut();
-	/*virtual*/ BOOL	canCut() const;
+	/*virtual*/ void	undo() override;
+	/*virtual*/ BOOL	canUndo() const override;
 
-	/*virtual*/ void	copy();
-	/*virtual*/ BOOL	canCopy() const;
+	/*virtual*/ void	redo() override;
+	/*virtual*/ BOOL	canRedo() const override;
 
-	/*virtual*/ void	paste();
-	/*virtual*/ BOOL	canPaste() const;
+	/*virtual*/ void	cut() override;
+	/*virtual*/ BOOL	canCut() const override;
+
+	/*virtual*/ void	copy() override;
+	/*virtual*/ BOOL	canCopy() const override;
+
+	/*virtual*/ void	paste() override;
+	/*virtual*/ BOOL	canPaste() const override;
+
+	/*virtual*/ void	doDelete() override;
+	/*virtual*/ BOOL	canDoDelete() const override;
+
+	/*virtual*/ void	selectAll() override;
+	/*virtual*/ BOOL	canSelectAll() const override;
 	
 	void addObject(LLVOVolume* obj) ;
 	void removeObject(LLVOVolume* obj) ;

@@ -185,6 +185,12 @@ public:
 
 	LLPluginClassMediaOwner::EMediaStatus getStatus() const { return mStatus; }
 
+	void	undo();
+	bool	canUndo() const { return mCanUndo; };
+
+	void	redo();
+	bool	canRedo() const { return mCanRedo; };
+
 	void	cut();
 	bool	canCut() const { return mCanCut; };
 
@@ -193,7 +199,15 @@ public:
 
 	void	paste();
 	bool	canPaste() const { return mCanPaste; };
+
+	void	doDelete();
+	bool	canDoDelete() const { return mCanDoDelete; };
+
+	void	selectAll();
+	bool	canSelectAll() const { return mCanSelectAll; };
 	
+	void	showPageSource();
+
 	// These can be called before init(), and they will be queued and sent before the media init message.
 	void	setCEFProgramDirs(const std::string& helper_path, const std::string& resources_path = std::string(), const std::string& locales_path = std::string());
 	void	setUserDataPath(const std::string &user_data_path_cache, const std::string &username, const std::string &user_data_path_cef_log, bool verbose_log);
@@ -402,9 +416,13 @@ protected:
 	
 	F64				mSleepTime;
 
+	bool			mCanUndo;
+	bool			mCanRedo;
 	bool			mCanCut;
 	bool			mCanCopy;
 	bool			mCanPaste;
+	bool			mCanDoDelete;
+	bool			mCanSelectAll;
 	
 	std::string		mMediaName;
 	std::string		mMediaDescription;

@@ -3407,6 +3407,24 @@ void LLViewerMediaImpl::handleMediaEvent(LLPluginClassMedia* plugin, LLPluginCla
 		}
 		break;
 
+		case MEDIA_EVENT_DEBUG_MESSAGE:
+		{
+			std::string level = plugin->getDebugMessageLevel();
+			if (level == "debug")
+			{
+				LL_DEBUGS("Media") << plugin->getDebugMessageText() << LL_ENDL;
+			}
+			else if (level == "info")
+			{
+				LL_INFOS("Media") << plugin->getDebugMessageText() << LL_ENDL;
+			}
+			else
+			{
+				LL_WARNS("Media") << plugin->getDebugMessageText() << LL_ENDL;
+			}
+		};
+		break;
+
 		default:
 		break;
 	}
@@ -3416,6 +3434,46 @@ void LLViewerMediaImpl::handleMediaEvent(LLPluginClassMedia* plugin, LLPluginCla
 		// Just chain the event to observers.
 		emitEvent(plugin, event);
 	}
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// virtual
+void
+LLViewerMediaImpl::undo()
+{
+	if (mMediaSource)
+		mMediaSource->undo();
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// virtual
+BOOL
+LLViewerMediaImpl::canUndo() const
+{
+	if (mMediaSource)
+		return mMediaSource->canUndo();
+	else
+		return FALSE;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// virtual
+void
+LLViewerMediaImpl::redo()
+{
+	if (mMediaSource)
+		mMediaSource->redo();
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// virtual
+BOOL
+LLViewerMediaImpl::canRedo() const
+{
+	if (mMediaSource)
+		return mMediaSource->canRedo();
+	else
+		return FALSE;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -3474,6 +3532,46 @@ LLViewerMediaImpl::canPaste() const
 {
 	if (mMediaSource)
 		return mMediaSource->canPaste();
+	else
+		return FALSE;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// virtual
+void
+LLViewerMediaImpl::doDelete()
+{
+	if (mMediaSource)
+		mMediaSource->doDelete();
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// virtual
+BOOL
+LLViewerMediaImpl::canDoDelete() const
+{
+	if (mMediaSource)
+		return mMediaSource->canDoDelete();
+	else
+		return FALSE;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// virtual
+void
+LLViewerMediaImpl::selectAll()
+{
+	if (mMediaSource)
+		mMediaSource->selectAll();
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// virtual
+BOOL
+LLViewerMediaImpl::canSelectAll() const
+{
+	if (mMediaSource)
+		return mMediaSource->canSelectAll();
 	else
 		return FALSE;
 }

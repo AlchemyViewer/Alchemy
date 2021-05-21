@@ -345,6 +345,7 @@ BOOL LLMediaCtrl::handleRightMouseDown( S32 x, S32 y, MASK mask )
 	{
 		LLUICtrl::CommitCallbackRegistry::ScopedRegistrar registar;
 		registar.add("Open.WebInspector", boost::bind(&LLMediaCtrl::onOpenWebInspector, this));
+		registar.add("Open.ShowSource", boost::bind(&LLMediaCtrl::onShowSource, this));
 
 		// stinson 05/05/2014 : use this as the parent of the context menu if the static menu
 		// container has yet to be created
@@ -362,8 +363,9 @@ BOOL LLMediaCtrl::handleRightMouseDown( S32 x, S32 y, MASK mask )
 	{
 		// hide/show debugging options
 		bool media_plugin_debugging_enabled = gSavedSettings.getBOOL("MediaPluginDebugging");
+		menu->setItemVisible("debug_separator", media_plugin_debugging_enabled);
 		menu->setItemVisible("open_webinspector", media_plugin_debugging_enabled );
-		menu->setItemVisible("debug_separator", media_plugin_debugging_enabled );
+		menu->setItemVisible("show_page_source", media_plugin_debugging_enabled);
 
 		menu->show(x, y);
 		LLMenuGL::showPopup(this, menu, x, y);
@@ -440,6 +442,12 @@ void LLMediaCtrl::onOpenWebInspector()
 {
 	if (mMediaSource && mMediaSource->hasMedia())
 		mMediaSource->getMediaPlugin()->showWebInspector( true );
+}
+
+void LLMediaCtrl::onShowSource()
+{
+	if (mMediaSource && mMediaSource->hasMedia())
+		mMediaSource->getMediaPlugin()->showPageSource();
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -1147,7 +1155,20 @@ void LLMediaCtrl::handleMediaEvent(LLPluginClassMedia* self, EMediaEvent event)
 
 		case MEDIA_EVENT_DEBUG_MESSAGE:
 		{
-			LL_INFOS("media") << self->getDebugMessageText() << LL_ENDL; 
+			std::string level = self->getDebugMessageLevel();
+			if (level == "debug")
+			{
+				LL_DEBUGS("Media") << self->getDebugMessageText() << LL_ENDL;
+			}
+			else if (level == "info")
+			{
+				LL_INFOS("Media") << self->getDebugMessageText() << LL_ENDL;
+			}
+			else
+			{
+				LL_WARNS("Media") << self->getDebugMessageText() << LL_ENDL;
+			}
+
 		};
 		break;
 	};
