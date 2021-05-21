@@ -16,6 +16,7 @@
 		Maus:
 	</text>
 	<check_box label="Mich im Mouselook anzeigen" name="first_person_avatar_visible"/>
+    <check_box label="Realistischer Mouselook" name="AlchemyRealisticMouselook" tool_tip="Kamera folgt den Körperbewegungen und Animationen des Avatars im Mouselook." />
 	<text name=" Mouse Sensitivity">
 		Mausempfindlichkeit für Mouselook:
 	</text>
