@@ -162,6 +162,17 @@
    top_pad="5"
    width="256" />
   <check_box
+   control_name="AlchemyRealisticMouselook"
+   follows="left|top"
+   height="16"
+   label="Realistic mouselook"
+   layout="topleft"
+   left_delta="0"
+   name="AlchemyRealisticMouselook"
+   tool_tip="Make the camera follow avatar body movements and animations while in mouselook"
+   top_pad="5"
+   width="256" />
+  <check_box
    control_name="AlchemyDisableMouseSteering"
    follows="left|top"
    height="20"
