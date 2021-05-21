@@ -31,9 +31,6 @@
 
 #include "llpluginclassmedia.h"
 #include "llpluginmessageclasses.h"
-#include "llcontrol.h"
-
-extern LLControlGroup gSavedSettings;
 
 static int LOW_PRIORITY_TEXTURE_SIZE_DEFAULT = 256;
 
@@ -864,15 +861,15 @@ void LLPluginClassMedia::setCEFProgramDirs(const std::string& helper_path,
 
 void LLPluginClassMedia::setUserDataPath(const std::string &user_data_path_cache,
 										 const std::string &username,
-										 const std::string &user_data_path_cef_log)
+										 const std::string &user_data_path_cef_log,
+										 bool verbose_log)
 {
 	LLPluginMessage message(LLPLUGIN_MESSAGE_CLASS_MEDIA, "set_user_data_path");
     message.setValue("cache_path", user_data_path_cache);
     message.setValue("username", username); // cef shares cache between users but creates user-based contexts
 	message.setValue("cef_log_file", user_data_path_cef_log);
 
-	bool cef_verbose_log = gSavedSettings.getBOOL("CefVerboseLog");
-	message.setValueBoolean("cef_verbose_log", cef_verbose_log);
+	message.setValueBoolean("cef_verbose_log", verbose_log);
 	sendMessage(message);
 }
 
@@ -1069,7 +1066,6 @@ void LLPluginClassMedia::receivePluginMessage(const LLPluginMessage &message)
 		{
 			S32 width = message.getValueS32("width");
 			S32 height = message.getValueS32("height");
-			std::string name = message.getValue("name");
 
 			// TODO: check that name matches?
 			mNaturalMediaWidth = width;
@@ -1079,10 +1075,6 @@ void LLPluginClassMedia::receivePluginMessage(const LLPluginMessage &message)
 		}
 		else if(message_name == "size_change_response")
 		{
-			std::string name = message.getValue("name");
-
-			// TODO: check that name matches?
-
 			mTextureWidth = message.getValueS32("texture_width");
 			mTextureHeight = message.getValueS32("texture_height");
 			mMediaWidth = message.getValueS32("width");

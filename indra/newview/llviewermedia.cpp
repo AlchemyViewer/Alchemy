@@ -1744,7 +1744,7 @@ LLPluginClassMedia* LLViewerMediaImpl::newSourceFromMediaType(std::string media_
 			std::string subprocess_folder = gDirUtilp->getLLPluginDir() + gDirUtilp->getDirDelimiter();
 			media_source->setCEFProgramDirs(subprocess_folder);
 #endif
-			media_source->setUserDataPath(user_data_path_cache, gDirUtilp->getUserName(), user_data_path_cef_log);
+			media_source->setUserDataPath(user_data_path_cache, gDirUtilp->getUserName(), user_data_path_cef_log, gSavedSettings.getBOOL("CefVerboseLog"));
 			media_source->setLanguageCode(LLUI::getLanguage());
 			media_source->setZoomFactor(zoom_factor);
 
