@@ -128,8 +128,8 @@ public:
 	bool getAllowDrag() { return mAllowDrag; }
 
 	// Close all folders in the view
-	void closeAllFolders();
 	void openAllFolders();
+	void closeAllFolders();
 	void openTopLevelFolders();
 
 	virtual void addFolder( LLFolderViewFolder* folder);

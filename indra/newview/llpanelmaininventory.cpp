@@ -354,14 +354,14 @@ void LLPanelMainInventory::doToSelected(const LLSD& userdata)
 	getPanel()->doToSelected(userdata);
 }
 
-void LLPanelMainInventory::closeAllFolders()
-{
-	getPanel()->getRootFolder()->closeAllFolders();
-}
-
 void LLPanelMainInventory::openAllFolders()
 {
 	getPanel()->getRootFolder()->openAllFolders();
+}
+
+void LLPanelMainInventory::closeAllFolders()
+{
+	getPanel()->getRootFolder()->closeAllFolders();
 }
 
 void LLPanelMainInventory::newWindow()
