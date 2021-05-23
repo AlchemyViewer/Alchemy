@@ -1052,17 +1052,7 @@ class DarwinManifest(ViewerManifest):
                             self.relsymlinkf(os.path.join(libfile_parent, libfile))
 
                 # Dullahan helper apps go inside SLPlugin.app
-                with self.prefix(src=os.path.join(pkgdir, 'bin', 'release'), dst=os.path.join(
-                    "SLPlugin.app", "Contents", "Frameworks")):
-                    self.path("Chromium Embedded Framework.framework")
-                    self.path("DullahanHost.app")
-                    self.path("DullahanHost (GPU).app")
-                    self.path("DullahanHost (Renderer).app")
-                    self.path("DullahanHost (Plugin).app")
-
-
-                # SLPlugin plugins
-                with self.prefix(dst="llplugin"):
+                with self.prefix(dst=os.path.join("SLPlugin.app", "Contents", "Frameworks")):
                     # copy CEF plugin
                     self.path2basename("../media_plugins/cef/" + self.args['configuration'],
                                        "media_plugin_cef.dylib")
@@ -1071,13 +1061,19 @@ class DarwinManifest(ViewerManifest):
                     self.path2basename("../media_plugins/libvlc/" + self.args['configuration'],
                                        "media_plugin_libvlc.dylib")
 
-                    # copy LibVLC dynamic libraries
-                    with self.prefix(src=relpkgdir, dst="lib"):
+                    with self.prefix(src=os.path.join(pkgdir, 'bin', 'release')):
+                        self.path("Chromium Embedded Framework.framework")
+                        self.path("DullahanHost.app")
+                        self.path("DullahanHost (GPU).app")
+                        self.path("DullahanHost (Renderer).app")
+                        self.path("DullahanHost (Plugin).app")
+                    with self.prefix(src=os.path.join(pkgdir, 'lib', 'release')):
                         self.path( "libvlc*.dylib*" )
                         # copy LibVLC plugins folder
-                        with self.prefix(src='plugins', dst=""):
+                        with self.prefix(src='plugins', dst="plugins"):
                             self.path( "*.dylib" )
                             self.path( "plugins.dat" )
+
 
     def package_finish(self):
         import dmgbuild
