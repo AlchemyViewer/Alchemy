@@ -478,12 +478,28 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>856ba0e5b7be4bf683cf2849bce845e0</string>
+              <string>561a091b9e917ac3bc64d6f4ff92e9f21c285f1d606cd5217ec1957b351adec439b4d2c2139c5dcc56ce5907d416202c</string>
+              <key>hash_algorithm</key>
+              <string>sha3_384</string>
               <key>url</key>
-              <string>https://automated-builds-secondlife-com.s3.amazonaws.com/ct2/72458/699860/dullahan-1.7.0.202011160759_81.3.10_gb223419_chromium-81.0.4044.138-darwin64-552313.tar.bz2</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/103/packages/generic/dullahan-875/0.0.875/dullahan-1.7.0.202105221841_90.6.5_g7a604aa_chromium-90.0.4430.93-darwin64-875.tar.xz</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
+          </map>
+          <key>linux64</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>hash</key>
+              <string>f03c999b2793500e5ab1dded633339a39ce8250dcb79b379e0ce157e720429340ca92f1056fb583dd82dc42ad4305a97</string>
+              <key>hash_algorithm</key>
+              <string>sha3_384</string>
+              <key>url</key>
+              <string>https://git.alchemyviewer.org/api/v4/projects/103/packages/generic/dullahan-875/0.0.875/dullahan-1.7.0.202105230140_90.6.5_g7a604aa_chromium-90.0.4430.93-linux64-875.tar.xz</string>
+            </map>
+            <key>name</key>
+            <string>linux64</string>
           </map>
           <key>windows</key>
           <map>
@@ -504,18 +520,18 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>46bc03976e53f244cbbd3d673f87f500e708b1fefecf1f172323160a2dad6051d234c9b3b71e50e7ed11a398157e2085</string>
+              <string>a75ff3fb775b12927883d20f65cb999953b98cdcacc90666621d1187c4146d96b257fe71aba8b0a45b587e2257901dac</string>
               <key>hash_algorithm</key>
               <string>sha3_384</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/103/packages/generic/dullahan-871/0.0.871/dullahan-1.7.0.202105210516_90.6.5_g7a604aa_chromium-90.0.4430.93-windows64-871.tar.xz</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/103/packages/generic/dullahan-875/0.0.875/dullahan-1.7.0.202105222040_90.6.5_g7a604aa_chromium-90.0.4430.93-windows64-875.tar.xz</string>
             </map>
             <key>name</key>
             <string>windows64</string>
           </map>
         </map>
         <key>version</key>
-        <string>1.7.0.202105210516_90.6.5_g7a604aa_chromium-90.0.4430.93</string>
+        <string>1.7.0.202105230140_90.6.5_g7a604aa_chromium-90.0.4430.93</string>
       </map>
       <key>expat</key>
       <map>
