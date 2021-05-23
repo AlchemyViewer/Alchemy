@@ -2602,9 +2602,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>5e553a4358203f283c74744aed2fcd8c</string>
+              <string>03cfbbacf0e6bf8816a9fc7698c0a0bdae61a53180cbb9afb364219b9b1b55ee690cdac83d3542a3410082da60805a79</string>
+              <key>hash_algorithm</key>
+              <string>sha3_384</string>
               <key>url</key>
-              <string>http://automated-builds-secondlife-com.s3.amazonaws.com/ct2/54836/510036/vlc_bin-2.2.8.538966-darwin64-538966.tar.bz2</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/108/packages/generic/vlc-bin-877/3.0.14/vlc_bin-3.0.14-darwin64-877.tar.xz</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
@@ -2614,11 +2616,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>9d43d1be1fb4af65cd1ea921da41542650c644de6ef24eb280c809230150733da195bafb46c77d9ac100dcc880cddff5</string>
+              <string>176d9fb19f17bb215d57b76dbfcabcff89bb64f8d57555775e40eba2b045a55cf3b8186cdbd99979e1eb3a379cdc945b</string>
               <key>hash_algorithm</key>
               <string>sha3_384</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/108/packages/generic/vlc-bin-548/3.0.11/vlc_bin-3.0.11-windows-548.tar.xz</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/108/packages/generic/vlc-bin-877/3.0.14/vlc_bin-3.0.14-windows-877.tar.xz</string>
             </map>
             <key>name</key>
             <string>windows</string>
@@ -2628,18 +2630,18 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>7faa8e702b112c3ea766e6c85731fc292006f863bd8e3e8f20bcdd45db55b4370acb58197f67df1388422e78df1ab25c</string>
+              <string>429085da4d78c37923e9bff8ae9ecd3ae3daccff9261db1b4033290980e2021b77fb449a51fc0791c92d4b0286cd45c8</string>
               <key>hash_algorithm</key>
               <string>sha3_384</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/108/packages/generic/vlc-bin-548/3.0.11/vlc_bin-3.0.11-windows64-548.tar.xz</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/108/packages/generic/vlc-bin-877/3.0.14/vlc_bin-3.0.14-windows64-877.tar.xz</string>
             </map>
             <key>name</key>
             <string>windows64</string>
           </map>
         </map>
         <key>version</key>
-        <string>3.0.11</string>
+        <string>3.0.14</string>
       </map>
       <key>xmlrpc-epi</key>
       <map>
