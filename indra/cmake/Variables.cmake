@@ -150,6 +150,7 @@ endif (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
 
 if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
   set(DARWIN 1)
+  set(CMAKE_MACOSX_RPATH TRUE)
 
   # Xcode setup
   if (XCODE_VERSION LESS 12.0.0)
