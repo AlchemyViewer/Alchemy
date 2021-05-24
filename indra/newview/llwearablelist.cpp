@@ -81,7 +81,7 @@ void LLWearableList::getAsset(const LLAssetID& assetID, const std::string& weara
 	LLViewerWearable* instance = get_if_there(mList, assetID, (LLViewerWearable*)NULL );
 	if( instance )
 	{
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 		LL_DEBUGS("Avatar") << "wearable " << assetID << " found in LLWearableList" << LL_ENDL;
 #endif
 		asset_arrived_callback( instance, userdata );
@@ -106,7 +106,7 @@ void LLWearableList::processGetAssetReply( const char* filename, const LLAssetID
 	LLViewerWearable* wearable = get_if_there(LLWearableList::instance().mList, uuid, (LLViewerWearable*)NULL);
 	if (wearable)
 	{
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 		LL_DEBUGS("Wearable") << "processGetAssetReply()" << LL_ENDL;
 		LL_DEBUGS("Wearable") << wearable << LL_ENDL;
 #endif
@@ -203,7 +203,7 @@ void LLWearableList::processGetAssetReply( const char* filename, const LLAssetID
 	if (wearable) // success
 	{
 		LLWearableList::instance().mList[ uuid ] = wearable;
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 		LL_DEBUGS("Wearable") << "processGetAssetReply()" << LL_ENDL;
 		LL_DEBUGS("Wearable") << wearable << LL_ENDL;
 #endif
@@ -239,7 +239,7 @@ void LLWearableList::processGetAssetReply( const char* filename, const LLAssetID
 
 LLViewerWearable* LLWearableList::createCopy(const LLViewerWearable* old_wearable, const std::string& new_name)
 {
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 	LL_DEBUGS() << "LLWearableList::createCopy()" << LL_ENDL;
 #endif
 
@@ -260,7 +260,7 @@ LLViewerWearable* LLWearableList::createCopy(const LLViewerWearable* old_wearabl
 
 LLViewerWearable* LLWearableList::createNewWearable( LLWearableType::EType type, LLAvatarAppearance *avatarp )
 {
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 	LL_DEBUGS() << "LLWearableList::createNewWearable()" << LL_ENDL;
 #endif
 

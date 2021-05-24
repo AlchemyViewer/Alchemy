@@ -247,7 +247,7 @@ void LLViewerTextureList::doPrefetchImages()
 			}
 		}
 	}
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
     LL_DEBUGS() << "fetched " << texture_count << " images from " << filename << LL_ENDL;
 #endif
 }
@@ -312,7 +312,7 @@ void LLViewerTextureList::shutdown()
 		std::string filename = get_texture_list_name();
 		llofstream file;
 		file.open(filename.c_str());
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
         LL_DEBUGS() << "saving " << imagelist.size() << " image list entries" << LL_ENDL;
 #endif
 		LLSDSerialize::toPrettyXML(imagelist, file);
@@ -433,7 +433,7 @@ LLViewerFetchedTexture* LLViewerTextureList::getImageFromUrl(const std::string& 
 		{
 			LL_WARNS() << "Requested texture " << new_id << " already exists but does not have a URL" << LL_ENDL;
 		}
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 		else if (texture->getUrl() != url)
 		{
 			// This is not an error as long as the images really match -
@@ -1250,12 +1250,12 @@ void LLViewerTextureList::decodeAllImages(F32 max_time)
 	}
 	max_time -= timer.getElapsedTimeF32();
 	max_time = llmax(max_time, .001f);
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 	F32 create_time = 
 #endif
 		updateImagesCreateTextures(max_time);
 	
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 	LL_DEBUGS("ViewerImages") << "decodeAllImages() took " << timer.getElapsedTimeF32() << " seconds. " 
 	<< " fetch_pending " << fetch_pending
 	<< " create_time " << create_time

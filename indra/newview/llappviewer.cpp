@@ -3139,12 +3139,12 @@ LLSD LLAppViewer::getViewerInfo() const
 #if LL_MSVC && !defined(LL_CLANG)
 	info["COMPILER"] = "MSVC";
 	info["COMPILER_VERSION"] = _MSC_FULL_VER;
+#elif LL_CLANG
+    info["COMPILER"] = "Clang";
+    info["COMPILER_VERSION"] = __clang_version__;
 #elif LL_GNUC
 	info["COMPILER"] = "GCC";
 	info["COMPILER_VERSION"] = GCC_VERSION;
-#elif LL_CLANG
-	info["COMPILER"] = "Clang";
-	info["COMPILER_VERSION"] = __clang_version__;
 #elif LL_INTELC
 	info["COMPILER"] = "ICC";
 	info["COMPILER_VERSION"] = __ICC;
@@ -3252,8 +3252,6 @@ LLSD LLAppViewer::getViewerInfo() const
 	cef_ver_codec << DULLAHAN_VERSION_MINOR;
 	cef_ver_codec << ".";
 	cef_ver_codec << DULLAHAN_VERSION_POINT;
-	cef_ver_codec << ".";
-	cef_ver_codec << DULLAHAN_VERSION_BUILD;
 
 	cef_ver_codec << std::endl;
 	cef_ver_codec << "  CEF: ";

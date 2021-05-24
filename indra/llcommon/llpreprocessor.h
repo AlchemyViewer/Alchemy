@@ -63,7 +63,17 @@
 
 
 // Figure out differences between compilers
-#if defined(__GNUC__)
+#if defined(__clang__)
+    #define GCC_VERSION (__GNUC__ * 10000 \
+                        + __GNUC_MINOR__ * 100 \
+                        + __GNUC_PATCHLEVEL__)
+    #ifndef LL_CLANG
+        #define LL_CLANG 1
+    #endif
+    #ifndef LL_GNUC
+        #define LL_GNUC 1
+    #endif
+#elif defined(__GNUC__)
 	#define GCC_VERSION (__GNUC__ * 10000 \
 						+ __GNUC_MINOR__ * 100 \
 						+ __GNUC_PATCHLEVEL__)
@@ -73,9 +83,6 @@
 #elif defined(__MSVC_VER__) || defined(_MSC_VER)
 	#ifndef LL_MSVC
 		#define LL_MSVC 1
-	#endif
-	#if _MSC_VER < 1400
-		#define LL_MSVC7 //Visual C++ 2003 or earlier
 	#endif
 #endif
 

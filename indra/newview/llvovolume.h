@@ -37,6 +37,7 @@
 #include <map>
 #include <set>
 
+#include "absl/types/optional.h"
 
 class LLViewerTextureAnim;
 class LLDrawPool;
@@ -300,7 +301,7 @@ public:
 	BOOL setIsFlexible(BOOL is_flexible);
 
     const LLMeshSkinInfo* getSkinInfo() const;
-	std::optional<std::pair<LLMatrix4a*, F32*>> getCachedSkinRenderMatrix(U32& joint_count, LLVOAvatar* avatar, const LLMeshSkinInfo* skin = nullptr);
+	absl::optional<std::pair<LLMatrix4a*, F32*>> getCachedSkinRenderMatrix(U32& joint_count, LLVOAvatar* avatar, const LLMeshSkinInfo* skin = nullptr);
     
     // Extended Mesh Properties
     U32 getExtendedMeshFlags() const;

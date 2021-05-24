@@ -113,7 +113,12 @@ void LLDiskCache::purge()
         if (file_size_total > mMaxSizeBytes)
         {
             remove_file = true;
-            boost::filesystem::remove(entry.second.second);
+            boost::system::error_code ec;
+            boost::filesystem::remove(entry.second.second, ec);
+            if (ec.failed())
+            {
+                LL_WARNS() << "Failed to delete cached file " << entry.second.second << ": " << ec.message() << LL_ENDL;
+            }
         }
 
         if (mEnableCacheDebugInfo)
@@ -220,7 +225,12 @@ void LLDiskCache::clearCache()
 #endif
     if (boost::filesystem::is_directory(cache_path))
     {
-        boost::filesystem::remove_all(cache_path);
+        boost::system::error_code ec;
+        boost::filesystem::remove_all(cache_path, ec);
+        if (ec.failed())
+        {
+            LL_WARNS() << "Failed to delete cached files " << cache_path << ": " << ec.message() << LL_ENDL;
+        }
 
         createCache();
     }

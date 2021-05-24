@@ -31,9 +31,6 @@
 
 #include "llpluginclassmedia.h"
 #include "llpluginmessageclasses.h"
-#include "llcontrol.h"
-
-extern LLControlGroup gSavedSettings;
 
 static int LOW_PRIORITY_TEXTURE_SIZE_DEFAULT = 256;
 
@@ -129,9 +126,13 @@ void LLPluginClassMedia::reset()
 	mLastMouseY = 0;
 	mStatus = LLPluginClassMediaOwner::MEDIA_NONE;
 	mSleepTime = 1.0f / 100.0f;
+	mCanUndo = false;
+	mCanRedo = false;
 	mCanCut = false;
 	mCanCopy = false;
 	mCanPaste = false;
+	mCanDoDelete = false;
+	mCanSelectAll = false;
 	mMediaName.clear();
 	mMediaDescription.clear();
 	mBackgroundColor = LLColor4(1.0f, 1.0f, 1.0f, 1.0f);
@@ -832,6 +833,18 @@ void LLPluginClassMedia::sendAuthResponse(bool ok, const std::string &username, 
 	sendMessage(message);
 }
 
+void LLPluginClassMedia::undo()
+{
+	LLPluginMessage message(LLPLUGIN_MESSAGE_CLASS_MEDIA, "edit_undo");
+	sendMessage(message);
+}
+
+void LLPluginClassMedia::redo()
+{
+	LLPluginMessage message(LLPLUGIN_MESSAGE_CLASS_MEDIA, "edit_redo");
+	sendMessage(message);
+}
+
 void LLPluginClassMedia::cut()
 {
 	LLPluginMessage message(LLPLUGIN_MESSAGE_CLASS_MEDIA, "edit_cut");
@@ -850,6 +863,24 @@ void LLPluginClassMedia::paste()
 	sendMessage(message);
 }
 
+void LLPluginClassMedia::doDelete()
+{
+	LLPluginMessage message(LLPLUGIN_MESSAGE_CLASS_MEDIA, "edit_delete");
+	sendMessage(message);
+}
+
+void LLPluginClassMedia::selectAll()
+{
+	LLPluginMessage message(LLPLUGIN_MESSAGE_CLASS_MEDIA, "edit_select_all");
+	sendMessage(message);
+}
+
+void LLPluginClassMedia::showPageSource()
+{
+	LLPluginMessage message(LLPLUGIN_MESSAGE_CLASS_MEDIA, "edit_show_source");
+	sendMessage(message);
+}
+
 void LLPluginClassMedia::setCEFProgramDirs(const std::string& helper_path,
 										   const std::string& resources_path,
 										   const std::string& locales_path)
@@ -864,15 +895,15 @@ void LLPluginClassMedia::setCEFProgramDirs(const std::string& helper_path,
 
 void LLPluginClassMedia::setUserDataPath(const std::string &user_data_path_cache,
 										 const std::string &username,
-										 const std::string &user_data_path_cef_log)
+										 const std::string &user_data_path_cef_log,
+										 bool verbose_log)
 {
 	LLPluginMessage message(LLPLUGIN_MESSAGE_CLASS_MEDIA, "set_user_data_path");
     message.setValue("cache_path", user_data_path_cache);
     message.setValue("username", username); // cef shares cache between users but creates user-based contexts
 	message.setValue("cef_log_file", user_data_path_cef_log);
 
-	bool cef_verbose_log = gSavedSettings.getBOOL("CefVerboseLog");
-	message.setValueBoolean("cef_verbose_log", cef_verbose_log);
+	message.setValueBoolean("cef_verbose_log", verbose_log);
 	sendMessage(message);
 }
 
@@ -966,7 +997,7 @@ void LLPluginClassMedia::receivePluginMessage(const LLPluginMessage &message)
 					mDirtyRect.unionWith(newDirtyRect);
 				}
 
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 				LL_DEBUGS("Plugin") << "adjusted incoming rect is: ("
 					<< newDirtyRect.mLeft << ", "
 					<< newDirtyRect.mTop << ", "
@@ -1069,7 +1100,6 @@ void LLPluginClassMedia::receivePluginMessage(const LLPluginMessage &message)
 		{
 			S32 width = message.getValueS32("width");
 			S32 height = message.getValueS32("height");
-			std::string name = message.getValue("name");
 
 			// TODO: check that name matches?
 			mNaturalMediaWidth = width;
@@ -1079,10 +1109,6 @@ void LLPluginClassMedia::receivePluginMessage(const LLPluginMessage &message)
 		}
 		else if(message_name == "size_change_response")
 		{
-			std::string name = message.getValue("name");
-
-			// TODO: check that name matches?
-
 			mTextureWidth = message.getValueS32("texture_width");
 			mTextureHeight = message.getValueS32("texture_height");
 			mMediaWidth = message.getValueS32("width");
@@ -1104,6 +1130,14 @@ void LLPluginClassMedia::receivePluginMessage(const LLPluginMessage &message)
 		}
 		else if(message_name == "edit_state")
 		{
+			if(message.hasValue("undo"))
+			{
+				mCanUndo = message.getValueBoolean("undo");
+			}
+			if(message.hasValue("redo"))
+			{
+				mCanRedo = message.getValueBoolean("redo");
+			}
 			if(message.hasValue("cut"))
 			{
 				mCanCut = message.getValueBoolean("cut");
@@ -1115,6 +1149,14 @@ void LLPluginClassMedia::receivePluginMessage(const LLPluginMessage &message)
 			if(message.hasValue("paste"))
 			{
 				mCanPaste = message.getValueBoolean("paste");
+			}
+			if (message.hasValue("delete"))
+			{
+				mCanDoDelete = message.getValueBoolean("delete");
+			}
+			if (message.hasValue("select_all"))
+			{
+				mCanSelectAll = message.getValueBoolean("select_all");
 			}
 		}
 		else if(message_name == "name_text")

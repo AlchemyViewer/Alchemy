@@ -155,7 +155,7 @@ void LLViewerAssetStorage::storeAssetData(
     F64Seconds timeout)
 {
     LLAssetID asset_id = tid.makeAssetID(gAgent.getSecureSessionID());
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
     LL_DEBUGS("AssetStorage") << "LLViewerAssetStorage::storeAssetData (legacy) " << tid << ":" << LLAssetType::lookup(asset_type)
                               << " ASSET_ID: " << asset_id << LL_ENDL;
 #endif
@@ -294,7 +294,7 @@ void LLViewerAssetStorage::storeAssetData(
     }
     
     LLAssetID asset_id = tid.makeAssetID(gAgent.getSecureSessionID());
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
     LL_DEBUGS("AssetStorage") << "LLViewerAssetStorage::storeAssetData (legacy)" << asset_id << ":" << LLAssetType::lookup(asset_type) << LL_ENDL;
 
     LL_DEBUGS("AssetStorage") << "ASSET_ID: " << asset_id << LL_ENDL;
@@ -426,7 +426,7 @@ void LLViewerAssetStorage::queueRequestHttp(
     BOOL duplicate,
     BOOL is_priority)
 {
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
     LL_DEBUGS("ViewerAsset") << "Request asset via HTTP " << uuid << " type " << LLAssetType::lookup(atype) << LL_ENDL;
 #endif
 
@@ -544,7 +544,7 @@ void LLViewerAssetStorage::assetRequestCoro(
 		return;
     }
     std::string url = getAssetURL(mViewerAssetUrl, uuid,atype);
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
     LL_DEBUGS("ViewerAsset") << "request url: " << url << LL_ENDL;
 #endif
 
@@ -568,7 +568,7 @@ void LLViewerAssetStorage::assetRequestCoro(
     LLCore::HttpStatus status = LLCoreHttpUtil::HttpCoroutineAdapter::getStatusFromLLSD(httpResults);
     if (!status)
     {
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
         LL_DEBUGS("ViewerAsset") << "request failed, status " << status.toTerseString() << LL_ENDL;
 #endif
         result_code = LL_ERR_ASSET_REQUEST_FAILED;
@@ -576,7 +576,7 @@ void LLViewerAssetStorage::assetRequestCoro(
     }
     else
     {
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
         LL_DEBUGS("ViewerAsset") << "request succeeded, url " << url << LL_ENDL;
 #endif
 

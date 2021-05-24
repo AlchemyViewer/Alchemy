@@ -195,7 +195,7 @@ BOOL LLModalDialog::handleHover(S32 x, S32 y, MASK mask)
 	if( childrenHandleHover(x, y, mask) == NULL )
 	{
 		getWindow()->setCursor(UI_CURSOR_ARROW);
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 		LL_DEBUGS("UserInput") << "hover handled by " << getName() << LL_ENDL;	
 #endif
 	}

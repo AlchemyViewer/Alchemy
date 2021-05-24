@@ -72,12 +72,4 @@ macro(ll_stage_sharedlib DSO_TARGET)
           COMMENT "Copying llcommon to the staging folder."
         )
     endif(NOT WINDOWS)
-
-  if (DARWIN)
-    set_target_properties(${DSO_TARGET} PROPERTIES
-      BUILD_WITH_INSTALL_NAME_DIR 1
-      INSTALL_NAME_DIR "@executable_path/../Frameworks"
-      )
-  endif(DARWIN)
-
 endmacro(ll_stage_sharedlib)

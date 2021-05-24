@@ -259,7 +259,7 @@ std::string LLAvatarName::getUserName(bool lowercase) const
 
 void LLAvatarName::dump() const
 {
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 	LL_DEBUGS("AvNameCache") << "LLAvatarName: "
 	                         << "user '" << mUsername << "' "
 							 << "display '" << mDisplayName << "' "

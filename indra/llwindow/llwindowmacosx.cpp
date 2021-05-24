@@ -198,7 +198,7 @@ LLWindowMacOSX::LLWindowMacOSX(LLWindowCallbacks* callbacks,
 // These functions are used as wrappers for our internal event handling callbacks.
 // It's a good idea to wrap these to avoid reworking more code than we need to within LLWindow.
 
-bool callKeyUp(NSKeyEventRef event, unsigned short key, unsigned int mask)
+bool callKeyUp(NSKeyEventRef event, unsigned int key, unsigned int mask)
 {
     mRawKeyEvent = event;
 	bool retVal = gKeyboard->handleKeyUp(key, mask);
@@ -206,7 +206,7 @@ bool callKeyUp(NSKeyEventRef event, unsigned short key, unsigned int mask)
     return retVal;
 }
 
-bool callKeyDown(NSKeyEventRef event, unsigned short key, unsigned int mask)
+bool callKeyDown(NSKeyEventRef event, unsigned int key, unsigned int mask)
 {
     mRawKeyEvent = event;
 	bool retVal = gKeyboard->handleKeyDown(key, mask);

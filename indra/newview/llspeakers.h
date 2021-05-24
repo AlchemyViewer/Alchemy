@@ -346,7 +346,7 @@ class LLActiveSpeakerMgr final : public LLSpeakerMgr, public LLSingleton<LLActiv
 	LOG_CLASS(LLActiveSpeakerMgr);
 
 protected:
-	virtual void updateSpeakerList();
+	virtual void updateSpeakerList() override;
 };
 
 class LLLocalSpeakerMgr final : public LLSpeakerMgr, public LLSingleton<LLLocalSpeakerMgr>
@@ -355,7 +355,7 @@ class LLLocalSpeakerMgr final : public LLSpeakerMgr, public LLSingleton<LLLocalS
 	~LLLocalSpeakerMgr ();
 	LOG_CLASS(LLLocalSpeakerMgr);
 protected:
-	virtual void updateSpeakerList();
+	virtual void updateSpeakerList() override;
 };
 
 #endif // LL_LLSPEAKERS_H

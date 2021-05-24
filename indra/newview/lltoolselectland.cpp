@@ -168,7 +168,7 @@ BOOL LLToolSelectLand::handleHover(S32 x, S32 y, MASK mask)
 				roundXY(mWestSouthBottom);
 				roundXY(mEastNorthTop);
 
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 				LL_DEBUGS("UserInput") << "hover handled by LLToolSelectLand (active, land)" << LL_ENDL;
 #endif
 				gViewerWindow->setCursor(UI_CURSOR_ARROW);
@@ -176,7 +176,7 @@ BOOL LLToolSelectLand::handleHover(S32 x, S32 y, MASK mask)
 			else
 			{
 				mDragEndValid = FALSE;
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 				LL_DEBUGS("UserInput") << "hover handled by LLToolSelectLand (active, no land)" << LL_ENDL;
 #endif
 				gViewerWindow->setCursor(UI_CURSOR_NO);
@@ -187,7 +187,7 @@ BOOL LLToolSelectLand::handleHover(S32 x, S32 y, MASK mask)
 		}
 		else
 		{
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 			LL_DEBUGS("UserInput") << "hover handled by LLToolSelectLand (active, in slop)" << LL_ENDL;
 #endif
 			gViewerWindow->setCursor(UI_CURSOR_ARROW);
@@ -195,7 +195,7 @@ BOOL LLToolSelectLand::handleHover(S32 x, S32 y, MASK mask)
 	}
 	else
 	{
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 		LL_DEBUGS("UserInput") << "hover handled by LLToolSelectLand (inactive)" << LL_ENDL;	
 #endif
 		gViewerWindow->setCursor(UI_CURSOR_ARROW);

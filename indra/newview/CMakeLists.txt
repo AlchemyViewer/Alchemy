@@ -1468,6 +1468,7 @@ if (DARWIN)
   set_source_files_properties(
     llappdelegate-objc.mm
     PROPERTIES
+    SKIP_PRECOMPILE_HEADERS TRUE
     COMPILE_DEFINITIONS "${VIEWER_CHANNEL_VERSION_DEFINES}"
     # BugsplatMac is a module, imported with @import. That language feature
     # demands these -f switches.
@@ -1477,6 +1478,18 @@ if (DARWIN)
     # warnings.
     COMPILE_FLAGS "-fmodules -fcxx-modules -Wno-nullability-completeness"
     )
+
+    set_source_files_properties(
+      llappviewermacosx-objc.mm
+      PROPERTIES 
+      SKIP_PRECOMPILE_HEADERS TRUE
+      )
+
+    set_source_files_properties(
+      llfilepicker_mac.mm
+      PROPERTIES 
+      SKIP_PRECOMPILE_HEADERS TRUE
+      )
 
   find_library(APPKIT_LIBRARY AppKit)
   find_library(COCOA_LIBRARY Cocoa)
@@ -1500,7 +1513,6 @@ if (DARWIN)
 
   # Add resource files to the project.
   set(viewer_RESOURCE_FILES
-    alchemy.icns
     macview.r
     Info-Alchemy.plist
     Alchemy.xib/
@@ -1891,9 +1903,6 @@ if (WINDOWS)
       ${SHARED_LIB_STAGING_DIR}/Release/glod.dll
       ${SHARED_LIB_STAGING_DIR}/RelWithDebInfo/glod.dll
       #${SHARED_LIB_STAGING_DIR}/Debug/glod.dll
-      ${SHARED_LIB_STAGING_DIR}/Release/libcollada14dom23.dll
-      ${SHARED_LIB_STAGING_DIR}/RelWithDebInfo/libcollada14dom23.dll
-      #${SHARED_LIB_STAGING_DIR}/Debug/libcollada14dom23-d.dll
       ${SHARED_LIB_STAGING_DIR}/Release/openjp2.dll
       ${SHARED_LIB_STAGING_DIR}/RelWithDebInfo/openjp2.dll
       #${SHARED_LIB_STAGING_DIR}/Debug/openjp2.dll
@@ -1907,10 +1916,6 @@ if (WINDOWS)
       ${GOOGLE_PERF_TOOLS_SOURCE}
       ${CMAKE_CURRENT_SOURCE_DIR}/licenses-win32.txt
       ${CMAKE_CURRENT_SOURCE_DIR}/featuretable.txt
-      ${ARCH_PREBUILT_DIRS_RELEASE}/libeay32.dll
-      ${ARCH_PREBUILT_DIRS_RELEASE}/ssleay32.dll
-      ${ARCH_PREBUILT_DIRS_DEBUG}/libeay32.dll
-      ${ARCH_PREBUILT_DIRS_DEBUG}/ssleay32.dll
       ${viewer_APPSETTINGS_FILES}
       SLPlugin
       media_plugin_cef
@@ -2236,7 +2241,7 @@ if (DARWIN)
   set(MACOSX_BUNDLE_BUNDLE_NAME "Alchemy")
   set(MACOSX_BUNDLE_SHORT_VERSION_STRING "${VIEWER_SHORT_VERSION}.${VIEWER_VERSION_REVISION}")
   set(MACOSX_BUNDLE_BUNDLE_VERSION "${VIEWER_SHORT_VERSION}${VIEWER_MACOSX_PHASE}${VIEWER_REVISION}")
-  set(MACOSX_BUNDLE_COPYRIGHT "Copyright (C) 2013-2020 Alchemy Development Group")
+  set(MACOSX_BUNDLE_COPYRIGHT "Copyright (C) 2013-2021 Alchemy Development Group")
   set(MACOSX_BUNDLE_NSMAIN_NIB_FILE "Alchemy.nib")
   set(MACOSX_BUNDLE_NSPRINCIPAL_CLASS "LLApplication")
 
@@ -2274,7 +2279,8 @@ if (DARWIN)
 
   # Compile the .xib files using the 'ibtool' program with the destination being the app package
   add_custom_command (TARGET ${VIEWER_BINARY_NAME} POST_BUILD
-                      COMMAND ${IBTOOL} --errors --warnings --notices
+                      COMMAND ${IBTOOL} --errors --warnings --notices --target-device mac 
+                              --minimum-deployment-target ${CMAKE_OSX_DEPLOYMENT_TARGET}
                               --compile ${VIEWER_APP_BUNDLE}/Contents/Resources/Alchemy.nib
                               ${CMAKE_CURRENT_SOURCE_DIR}/Alchemy.xib
                       COMMENT "Compiling ${CMAKE_CURRENT_SOURCE_DIR}/Alchemy.xib")

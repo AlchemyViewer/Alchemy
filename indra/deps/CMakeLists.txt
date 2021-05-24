@@ -52,7 +52,7 @@ FetchContent_Declare(
 FetchContent_Declare(
   absl
   GIT_REPOSITORY https://git.alchemyviewer.org/alchemy/mirrors/abseil-cpp.git
-  GIT_TAG        3b4a16abad2c2ddc494371cc39a2946e36d35d11
+  GIT_TAG        079cf662544a14bd1cfaae6d6512645541ba10fb
   )
 
 # This is a hack because absl has dumb cmake
@@ -84,6 +84,7 @@ endif()
 
 # #Download the rest of the libraries
 # FetchContent_MakeAvailable(fmt)
+set(MESHOPT_BUILD_SHARED_LIBS OFF)
 FetchContent_MakeAvailable(meshoptimizer)
 
 # # Typically you don't care so much for a third party library's tests to be

@@ -52,6 +52,9 @@ if((USE_SSE41 AND USE_AVX) OR (USE_SSE41 AND USE_AVX AND USE_AVX2) OR (USE_AVX A
   message(FATAL_ERROR "Usage of multiple SIMD flags is unsupported")
 endif()
 
+# Warnings
+option(DISABLE_FATAL_WARNINGS "Disable warnings as errors" ON)
+
 # Platform-specific compilation flags.
 if (WINDOWS)
   # Don't build DLLs.
@@ -167,9 +170,9 @@ if (WINDOWS)
       set(GLOBAL_CXX_FLAGS "${GLOBAL_CXX_FLAGS} /favor:INTEL64")
   endif()
 
-  if (NOT VS_DISABLE_FATAL_WARNINGS)
+  if (NOT DISABLE_FATAL_WARNINGS)
     set(GLOBAL_CXX_FLAGS "${GLOBAL_CXX_FLAGS} /WX")
-  endif (NOT VS_DISABLE_FATAL_WARNINGS)
+  endif (NOT DISABLE_FATAL_WARNINGS)
 
   set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} ${GLOBAL_CXX_FLAGS}" CACHE STRING "C++ compiler debug options" FORCE)
   set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} ${GLOBAL_CXX_FLAGS}" CACHE STRING "C++ compiler release-with-debug options" FORCE)
@@ -191,12 +194,9 @@ if (WINDOWS)
 
   # library linkage defines
   add_definitions(
-      /DBOOST_ALL_DYN_LINK
-      /DDLL_IMPORT
-      /DDOM_DYNAMIC
-      /DPNG_USE_DLL
-      /DWEBP_DLL
-      /DZLIB_DLL
+      /DCURL_STATICLIB=1
+      /DURI_STATIC_BUILD=1
+      /DLIBXML_STATIC=1
   )
 
   # configure win32 API for 7 and above compatibility
@@ -276,30 +276,28 @@ endif (LINUX)
 
 
 if (DARWIN)
-  # Warnings should be fatal -- thanks, Nicky Perian, for spotting reversed default
-  set(CLANG_DISABLE_FATAL_WARNINGS OFF)
   add_definitions(-DLL_DARWIN=1 -DGL_SILENCE_DEPRECATION)
   set(CMAKE_CXX_LINK_FLAGS "-Wl,-headerpad_max_install_names,-search_paths_first")
   set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_CXX_LINK_FLAGS}")
-  set(DARWIN_extra_cstar_flags "-gdwarf-2 -Wno-unused-local-typedef")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${DARWIN_extra_cstar_flags}")
-  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS}  ${DARWIN_extra_cstar_flags}")
+  set(DARWIN_extra_cstar_flags "-gdwarf-2")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 ${DARWIN_extra_cstar_flags}")
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O3 ${DARWIN_extra_cstar_flags}")
   # NOTE: it's critical that the optimization flag is put in front.
   # NOTE: it's critical to have both CXX_FLAGS and C_FLAGS covered.
 
-  add_definitions(-D_LIBCPP_ENABLE_CXX17_REMOVED_AUTO_PTR=1)
+  add_definitions(
+      -D_LIBCPP_ENABLE_CXX17_REMOVED_AUTO_PTR=1
+      -DBOOST_CONFIG_SUPPRESS_OUTDATED_MESSAGE=1
+      -DBOOST_ALLOW_DEPRECATED_HEADERS=1
+      )
 endif (DARWIN)
 
 
 if (LINUX OR DARWIN)
-  if (CMAKE_CXX_COMPILER MATCHES ".*clang")
-    set(CMAKE_COMPILER_IS_CLANGXX 1)
-  endif (CMAKE_CXX_COMPILER MATCHES ".*clang")
-
-  if (CMAKE_COMPILER_IS_GNUCXX)
+  if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
     set(GCC_WARNINGS "-Wall -Wno-sign-compare -Wno-unused-parameter -Wno-unused-but-set-parameter -Wno-ignored-qualifiers -Wno-unused-function -Wnon-virtual-dtor")
-  elseif (CMAKE_COMPILER_IS_CLANGXX)
-    set(GCC_WARNINGS "-Wall -Wno-sign-compare -Wno-trigraphs")
+  elseif (CMAKE_CXX_COMPILER_ID STREQUAL "Clang" OR CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang")
+    set(GCC_WARNINGS "-Wall -Wno-sign-compare -Wno-trigraphs -Wno-unused-local-typedef -Wno-unknown-warning-option")
   endif()
 
   CHECK_CXX_COMPILER_FLAG(-Wdeprecated-copy HAS_DEPRECATED_COPY)
@@ -307,9 +305,9 @@ if (LINUX OR DARWIN)
     set(GCC_WARNINGS "${GCC_WARNINGS} -Wno-deprecated-copy")
   endif()
 
-  if (NOT GCC_DISABLE_FATAL_WARNINGS)
-  #  set(GCC_WARNINGS "${GCC_WARNINGS} -Werror")
-  endif (NOT GCC_DISABLE_FATAL_WARNINGS)
+  if (NOT DISABLE_FATAL_WARNINGS)
+    set(GCC_WARNINGS "${GCC_WARNINGS} -Werror")
+  endif (NOT DISABLE_FATAL_WARNINGS)
 
   set(GCC_CXX_WARNINGS "${GCC_WARNINGS} -Wno-reorder")
 

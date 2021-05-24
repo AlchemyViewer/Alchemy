@@ -34,6 +34,9 @@ if (DARWIN)
   LIST(APPEND llfilesystem_SOURCE_FILES lldir_utils_objc.h)
   LIST(APPEND llfilesystem_SOURCE_FILES lldir_mac.cpp)
   LIST(APPEND llfilesystem_HEADER_FILES lldir_mac.h)
+
+  set_source_files_properties(lldir_utils_objc.mm
+                            PROPERTIES SKIP_PRECOMPILE_HEADERS TRUE)
 endif (DARWIN)
 
 if (LINUX)

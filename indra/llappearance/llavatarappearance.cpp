@@ -559,7 +559,7 @@ void LLAvatarAppearance::computeBodySize()
 	{
 		mBodySize = new_body_size;
 
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
         compareJointStateMaps(mLastBodySizeState, mCurrBodySizeState);
 #endif
 	}
@@ -613,7 +613,7 @@ BOOL LLAvatarAppearance::setupBone(const LLAvatarBoneInfo* info, LLJoint* parent
 {
 	LLJoint* joint = NULL;
 
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
     LL_DEBUGS("BVH") << "bone info: name " << info->mName
                      << " isJoint " << info->mIsJoint
                      << " volume_num " << volume_num

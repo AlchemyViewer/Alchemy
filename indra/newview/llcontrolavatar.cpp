@@ -135,7 +135,7 @@ void LLControlAvatar::getNewConstraintFixups(LLVector3& new_pos_fixup, F32& new_
 				F32 target_dist = (offset_dist - max_legal_offset);
 				new_pos_fixup = (target_dist/offset_dist)*pos_box_offset;
 			}
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 			if (new_pos_fixup != mPositionConstraintFixup)
 			{
 				LL_DEBUGS("ConstraintFix") << getFullname() << " pos fix, offset_dist " << offset_dist << " pos fixup " 
@@ -150,7 +150,7 @@ void LLControlAvatar::getNewConstraintFixups(LLVector3& new_pos_fixup, F32& new_
         if (box_size/mScaleConstraintFixup > max_legal_size)
         {
             new_scale_fixup = mScaleConstraintFixup*max_legal_size/box_size;
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
             LL_DEBUGS("ConstraintFix") << getFullname() << " scale fix, box_size " << box_size << " fixup " 
 									   << mScaleConstraintFixup << " max legal " << max_legal_size 
 									   << " -> new scale " << new_scale_fixup << LL_ENDL;
@@ -238,7 +238,7 @@ void LLControlAvatar::matchVolumeTransform()
 	        const LLMeshSkinInfo* skin_info = mRootVolp->getSkinInfo();
 			if (skin_info)
 			{
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
                 LL_DEBUGS("BindShape") << getFullname() << " bind shape " << skin_info->mBindShapeMatrix << LL_ENDL;
 #endif
                 alignas(16) LLMatrix4 mat(LLMatrix4::kUninitialized);
@@ -587,7 +587,7 @@ void LLControlAvatar::updateAnimations()
                 // Animation not already present, use this sequence id.
                 anims[anim_pair.first] = anim_pair.second;
             }
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
             LL_DEBUGS("AnimatedObjectsNotify") << "found anim for vol " << volp->getID() << " anim " << anim_it->first << " root " << mRootVolp->getID() << LL_ENDL;
 #endif
         }

@@ -1,4 +1,4 @@
-﻿/** 
+/** 
  * @File llvoavatar.cpp
  * @brief Implementation of LLVOAvatar class which is a derivation of LLViewerObject
  *
@@ -2433,7 +2433,7 @@ LLViewerFetchedTexture *LLVOAvatar::getBakedTextureImage(const U8 te, const LLUU
 			LL_WARNS() << "unable to determine URL for te " << te << " uuid " << uuid << LL_ENDL;
 			return NULL;
 		}
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 		LL_DEBUGS("Avatar") << avString() << "get server-bake image from URL " << url << LL_ENDL;
 #endif
 		result = LLViewerTextureManager::getFetchedTextureFromUrl(
@@ -4945,7 +4945,7 @@ void LLVOAvatar::updateVisibility()
 		}
 	}
 
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
     if ( visible != mVisible )
     {
         LL_DEBUGS("AvatarRender") << "visible was " << mVisible << " now " << visible << LL_ENDL;
@@ -6136,7 +6136,7 @@ LLUUID LLVOAvatar::remapMotionID(const LLUUID& id)
 //-----------------------------------------------------------------------------
 BOOL LLVOAvatar::startMotion(const LLUUID& id, F32 time_offset)
 {
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 	LL_DEBUGS("Motion") << "motion requested " << id.asString() << " " << gAnimLibrary.animationName(id) << LL_ENDL;
 #endif
 
@@ -6163,7 +6163,7 @@ BOOL LLVOAvatar::startMotion(const LLUUID& id, F32 time_offset)
 		remap_id = remapMotionID(id);
 	}
 	
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 	if (remap_id != id)
 	{
 		LL_DEBUGS("Motion") << "motion resultant " << remap_id.asString() << " " << gAnimLibrary.animationName(remap_id) << LL_ENDL;
@@ -6183,7 +6183,7 @@ BOOL LLVOAvatar::startMotion(const LLUUID& id, F32 time_offset)
 //-----------------------------------------------------------------------------
 BOOL LLVOAvatar::stopMotion(const LLUUID& id, BOOL stop_immediate)
 {
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 	LL_DEBUGS("Motion") << "Motion requested " << id.asString() << " " << gAnimLibrary.animationName(id) << LL_ENDL;
 #endif
 
@@ -6210,7 +6210,7 @@ BOOL LLVOAvatar::stopMotion(const LLUUID& id, BOOL stop_immediate)
 		remap_id = remapMotionID(id);
 	}
 	
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 	if (remap_id != id)
 	{
 		LL_DEBUGS("Motion") << "motion resultant " << remap_id.asString() << " " << gAnimLibrary.animationName(remap_id) << LL_ENDL;
@@ -6411,7 +6411,7 @@ void LLVOAvatar::rebuildAttachmentOverrides()
         LLVOVolume *volp = static_cast<LLControlAvatar*>(this)->mRootVolp;
         if (volp)
         {
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
             LL_DEBUGS("Avatar") << volp->getID() << " adding attachment overrides for root vol, prim count " 
                                 << (S32) (1+volp->numChildren()) << LL_ENDL;
 #endif
@@ -6463,7 +6463,7 @@ void LLVOAvatar::updateAttachmentOverrides()
 		LLVOVolume *volp = control_av->mRootVolp;
         if (volp)
         {
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
             LL_DEBUGS("Avatar") << volp->getID() << " adding attachment overrides for root vol, prim count " 
                                 << (S32) (1+volp->numChildren()) << LL_ENDL;
 #endif
@@ -8091,13 +8091,13 @@ void LLVOAvatar::startPhase(const std::string& phase_name)
 	{
 		if (!completed)
 		{
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 			LL_DEBUGS("Avatar") << avString() << "no-op, start when started already for " << phase_name << LL_ENDL;
 #endif
 			return;
 		}
 	}
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 	LL_DEBUGS("Avatar") << "started phase " << phase_name << LL_ENDL;
 #endif
 	getPhases().startPhase(phase_name);
@@ -8114,11 +8114,11 @@ void LLVOAvatar::stopPhase(const std::string& phase_name, bool err_check)
 			getPhases().stopPhase(phase_name);
 			completed = true;
 			logMetricsTimerRecord(phase_name, elapsed, completed);
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 			LL_DEBUGS("Avatar") << avString() << "stopped phase " << phase_name << " elapsed " << elapsed << LL_ENDL;
 #endif
 		}
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 		else
 		{
 			if (err_check)
@@ -8128,7 +8128,7 @@ void LLVOAvatar::stopPhase(const std::string& phase_name, bool err_check)
 		}
 #endif
 	}
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 	else
 	{
 		if (err_check)
@@ -9344,13 +9344,13 @@ void LLVOAvatar::applyParsedAppearanceMessage(LLAppearanceMessageContents& conte
 			&& mBakedTextureDatas[baked_index].mLastTextureID != IMG_DEFAULT
 			&& baked_index != BAKED_SKIRT && baked_index != BAKED_LEFT_ARM && baked_index != BAKED_LEFT_LEG && baked_index != BAKED_AUX1 && baked_index != BAKED_AUX2 && baked_index != BAKED_AUX3)
 		{
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 			LL_DEBUGS("Avatar") << avString() << " baked_index " << (S32) baked_index << " using mLastTextureID " << mBakedTextureDatas[baked_index].mLastTextureID << LL_ENDL;
 #endif
 			setTEImage(mBakedTextureDatas[baked_index].mTextureIndex, 
 				LLViewerTextureManager::getFetchedTexture(mBakedTextureDatas[baked_index].mLastTextureID, FTT_DEFAULT, TRUE, LLGLTexture::BOOST_NONE, LLViewerTexture::LOD_TEXTURE));
 		}
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 		else
 		{
 			LL_DEBUGS("Avatar") << avString() << " baked_index " << (S32) baked_index << " using texture id "
@@ -9438,7 +9438,7 @@ void LLVOAvatar::applyParsedAppearanceMessage(LLAppearanceMessageContents& conte
 	else
 	{
 		// AvatarAppearance message arrived without visual params
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 		LL_DEBUGS("Avatar") << avString() << "no visual params" << LL_ENDL;
 #endif
 
@@ -9463,7 +9463,7 @@ void LLVOAvatar::applyParsedAppearanceMessage(LLAppearanceMessageContents& conte
 		// Got an update for some other avatar
 		// Ignore updates for self, because we have a more authoritative value in the preferences.
 		setHoverOffset(contents.mHoverOffset);
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 		LL_DEBUGS("Avatar") << avString() << "setting hover to " << contents.mHoverOffset[2] << LL_ENDL;
 #endif
 	}
@@ -9769,7 +9769,7 @@ void dump_sequential_xml(const std::string outprefix, const LLSD& content)
 	std::string fullpath = gDirUtilp->getExpandedFilename(LL_PATH_LOGS,outfilename);
 	llofstream ofs(fullpath.c_str(), std::ios_base::out);
 	ofs << LLSDOStreamer<LLSDXMLFormatter>(content, LLSDFormatter::OPTIONS_PRETTY);
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 	LL_DEBUGS("Avatar") << "results saved to: " << fullpath << LL_ENDL;
 #endif
 }
@@ -10110,7 +10110,7 @@ void LLVOAvatar::cullAvatarsByPixelArea()
 		if (inst->mCulled != culled)
 		{
 			inst->mCulled = culled;
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 			LL_DEBUGS() << "avatar " << inst->getID() << (culled ? " start culled" : " start not culled" ) << LL_ENDL;
 #endif
 			inst->updateMeshTextures();
@@ -10338,7 +10338,7 @@ void LLVOAvatar::updateRiggingInfo()
 {
     LL_RECORD_BLOCK_TIME(FTM_AVATAR_RIGGING_INFO_UPDATE);
 
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
     LL_DEBUGS("RigSpammish") << getFullname() << " updating rig tab" << LL_ENDL;
 #endif
 
@@ -10490,7 +10490,7 @@ const U32 LLVOAvatar::NON_IMPOSTORS_MAX_SLIDER = 66; /* Must equal the maximum a
 // static
 void LLVOAvatar::updateImpostorRendering(U32 newMaxNonImpostorsValue)
 {
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 	U32  oldmax = sMaxNonImpostors;
 	bool oldflg = sLimitNonImpostors;
 #endif
@@ -10505,7 +10505,7 @@ void LLVOAvatar::updateImpostorRendering(U32 newMaxNonImpostorsValue)
 	}
 	// the sLimitNonImpostors flag depends on whether or not sMaxNonImpostors is set to the no-limit value (0)
 	sLimitNonImpostors = (0 != sMaxNonImpostors);
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
     if ( oldflg != sLimitNonImpostors )
     {
         LL_DEBUGS("AvatarRender")
@@ -10617,7 +10617,7 @@ void LLVOAvatar::idleUpdateDebugInfo()
 
 void LLVOAvatar::updateVisualComplexity()
 {
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 	LL_DEBUGS("AvatarRender") << "avatar " << getID() << " appearance changed" << LL_ENDL;
 #endif
 	// Set the cache time to in the past so it's updated ASAP
@@ -10675,7 +10675,7 @@ void LLVOAvatar::accountRenderComplexityForObject(
 								attachment_texture_cost += volume_texture.second;
 							}
                             attachment_total_cost = attachment_volume_cost + attachment_texture_cost + attachment_children_cost;
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
                             LL_DEBUGS("ARCdetail") << "Attachment costs " << attached_object->getAttachmentItemID()
                                                    << " total: " << attachment_total_cost
                                                    << ", volume: " << attachment_volume_cost
@@ -10789,7 +10789,7 @@ void LLVOAvatar::calculateUpdateRenderComplexity()
 				}
 			}
 		}
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
         LL_DEBUGS("ARCdetail") << "Avatar body parts complexity: " << cost << LL_ENDL;
 #endif
 
@@ -10825,7 +10825,7 @@ void LLVOAvatar::calculateUpdateRenderComplexity()
 		// Diagnostic output to identify all avatar-related textures.
 		// Does not affect rendering cost calculation.
 		// Could be wrapped in a debug option if output becomes problematic.
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 		static bool arch_detail_dbg_log = debugLoggingEnabled("ARCdetail");
 		if (isSelf() && arch_detail_dbg_log)
 		{
@@ -11076,7 +11076,9 @@ void LLVOAvatar::calcMutedAVColor()
 {
     LLColor4 new_color(mMutedAVColor);
     std::string change_msg;
+#if defined(COLORIZE_JELLYDOLLS) || defined(SHOW_DEBUG)
     LLUUID av_id(getID());
+#endif
 
     if (getVisualMuteSettings() == AV_DO_NOT_RENDER)
     {
@@ -11140,7 +11142,7 @@ void LLVOAvatar::calcMutedAVColor()
 
     if (mMutedAVColor != new_color) 
     {
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
         LL_DEBUGS("AvatarRender") << "avatar "<< av_id << change_msg << std::setprecision(3) << new_color << LL_ENDL;
 #endif
         mMutedAVColor = new_color;

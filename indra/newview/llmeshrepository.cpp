@@ -3285,7 +3285,7 @@ void LLMeshHeaderHandler::processData(LLCore::BufferArray * /* body */, S32 /* b
 			data_size = llmin(data_size, bytes);
 
 			LLFileSystem file(mesh_id, LLAssetType::AT_MESH, LLFileSystem::APPEND);
-			if (file.open() && file.getMaxSize() >= bytes)
+			if (file.open() && file.getMaxSize() >= bytes && file.getMaxSize() >= data_size)
 			{
 				LLMeshRepository::sCacheBytesWritten += data_size;
 				++LLMeshRepository::sCacheWrites;
@@ -3364,7 +3364,7 @@ void LLMeshLODHandler::processData(LLCore::BufferArray * /* body */, S32 /* body
 			S32 offset = mOffset;
 			S32 size = mRequestedBytes;
 
-			if (file.open() && file.getSize() >= offset+size)
+			if (file.open() && file.getSize() >= offset+size && file.getMaxSize() >= offset + size)
 			{
 				file.seek(offset);
 				file.write(data, size);
@@ -3428,7 +3428,7 @@ void LLMeshSkinInfoHandler::processData(LLCore::BufferArray * /* body */, S32 /*
 		S32 offset = mOffset;
 		S32 size = mRequestedBytes;
 
-		if (file.open() && file.getSize() >= offset+size)
+		if (file.open() && file.getSize() >= offset+size && file.getMaxSize() >= offset + size)
 		{
 			LLMeshRepository::sCacheBytesWritten += size;
 			++LLMeshRepository::sCacheWrites;
@@ -3478,7 +3478,7 @@ void LLMeshDecompositionHandler::processData(LLCore::BufferArray * /* body */, S
 		S32 offset = mOffset;
 		S32 size = mRequestedBytes;
 
-		if (file.open() && file.getSize() >= offset+size)
+		if (file.open() && file.getSize() >= offset+size && file.getMaxSize() >= offset + size)
 		{
 			LLMeshRepository::sCacheBytesWritten += size;
 			++LLMeshRepository::sCacheWrites;
@@ -3526,7 +3526,7 @@ void LLMeshPhysicsShapeHandler::processData(LLCore::BufferArray * /* body */, S3
 		S32 offset = mOffset;
 		S32 size = mRequestedBytes;
 
-		if (file.open() && file.getSize() >= offset+size)
+		if (file.open() && file.getSize() >= offset+size && file.getMaxSize() >= offset + size)
 		{
 			LLMeshRepository::sCacheBytesWritten += size;
 			++LLMeshRepository::sCacheWrites;

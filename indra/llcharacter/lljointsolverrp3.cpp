@@ -142,7 +142,7 @@ void LLJointSolverRP3::solve()
 	LLVector3 cPos = mJointC->getWorldPosition();
 	LLVector3 gPos = mJointGoal->getWorldPosition();
 
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 	LL_DEBUGS("JointSolver") << "LLJointSolverRP3::solve()" << LL_NEWLINE
 							<< "bPosLocal = " << mJointB->getPosition() << LL_NEWLINE
 							<< "cPosLocal = " << mJointC->getPosition() << LL_NEWLINE
@@ -188,7 +188,7 @@ void LLJointSolverRP3::solve()
 	//-------------------------------------------------------------------------
 	LLVector3 abacCompOrthoVec = abVec - acVec * ((abVec * acVec)/(acVec * acVec));
 
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 	LL_DEBUGS("JointSolver") << "abVec : " << abVec << LL_NEWLINE
 		<< "bcVec : " << bcVec << LL_NEWLINE
 		<< "acVec : " << acVec << LL_NEWLINE
@@ -265,7 +265,7 @@ void LLJointSolverRP3::solve()
 
 	LLQuaternion bRot(theta - abbcAng, abbcOrthoVec);
 
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 	LL_DEBUGS("JointSolver") << "abbcAng      : " << abbcAng << LL_NEWLINE
 							<< "abbcOrthoVec : " << abbcOrthoVec << LL_NEWLINE
 							<< "agLenSq      : " << agLenSq << LL_NEWLINE
@@ -291,7 +291,7 @@ void LLJointSolverRP3::solve()
 	LLQuaternion cgRot;
 	cgRot.shortestArc( acVec, agVec );
 
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 	LL_DEBUGS("JointSolver") << "bcVec : " << bcVec << LL_NEWLINE
 							<< "acVec : " << acVec << LL_NEWLINE
 							<< "cgRot : " << cgRot << LL_ENDL;
@@ -358,7 +358,7 @@ void LLJointSolverRP3::solve()
 	//-------------------------------------------------------------------------
 	LLQuaternion twistRot( mTwist, agVec );
 
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 	LL_DEBUGS("JointSolver") << "abcNorm = " << abcNorm << LL_NEWLINE
 							<< "apgNorm = " << apgNorm << LL_NEWLINE
 							<< "pRot = " << pRot << LL_NEWLINE
