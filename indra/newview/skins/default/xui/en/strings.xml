@@ -4168,6 +4168,7 @@ Try enclosing path to the editor with double quotes.
   <string name="Command_Stats_Label">Statistics</string>
   <string name="Command_Search_Label">Search</string>
   <string name="Command_Snapshot_Label">Snapshot</string>
+  <string name="Command_Snapshot_Disk_Label">Snapshot to Disk</string>
   <string name="Command_Speak_Label">Speak</string>
   <string name="Command_View_Label">Camera</string>
   <string name="Command_Voice_Label">Voice Settings</string>
@@ -4205,7 +4206,8 @@ Try enclosing path to the editor with double quotes.
   <string name="Command_Scripts_Tooltip">Scripts attached to your avatar</string>
   <string name="Command_Stats_Tooltip">Statistics like FPS, network usage and sim performance</string>
   <string name="Command_Search_Tooltip">Find places, events, people</string>
-  <string name="Command_Snapshot_Tooltip">Take a picture</string>
+  <string name="Command_Snapshot_Tooltip">Open the snapshot floater</string>
+  <string name="Command_Snapshot_Disk_Tooltip">Take a picture immediately</string>
   <string name="Command_Speak_Tooltip">Speak with people nearby using your microphone</string>
   <string name="Command_View_Tooltip">Changing camera angle</string>
   <string name="Command_Voice_Tooltip">Volume controls for calls and people near you in world</string>

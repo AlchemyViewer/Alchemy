@@ -1251,7 +1251,7 @@ void LLAgentCamera::updateCamera()
 	U32 camera_mode = mCameraAnimating ? mLastCameraMode : mCameraMode;
 
 	validateFocusObject();
-
+	static LLCachedControl<bool> useRealisticMouselook(gSavedSettings, "AlchemyRealisticMouselook", false);
 	if (isAgentAvatarValid() && 
 		gAgentAvatarp->isSitting() &&
 		camera_mode == CAMERA_MODE_MOUSELOOK)
@@ -1556,8 +1556,35 @@ void LLAgentCamera::updateCamera()
 			diff.mV[VZ] = 0.f;
 		}
 
-		// SL-315
-		gAgentAvatarp->mPelvisp->setPosition(gAgentAvatarp->mPelvisp->getPosition() + diff);
+		if (useRealisticMouselook)
+		{
+			auto frame_agent = gAgent.getFrameAgent();
+			LLQuaternion agent_rot(frame_agent.getQuaternion());
+			auto avatarp_parent = (LLViewerObject*)gAgentAvatarp->getParent();
+			if(avatarp_parent)
+			{
+				auto avatarp_root = (LLViewerObject*)gAgentAvatarp->getRoot();
+				if(avatarp_root)
+				{
+					auto decoupled = avatarp_root->flagCameraDecoupled();
+					if(decoupled)
+					{
+						agent_rot *= avatarp_parent->getRenderRotation();
+					}
+					
+				}
+			}
+			auto camera_instance = LLViewerCamera::getInstance();
+			if(camera_instance)
+			{
+				camera_instance->updateCameraLocation(head_pos, mCameraUpVector, gAgentAvatarp->mHeadp->getWorldPosition() + LLVector3(1.0, 0.0, 0.0) * agent_rot);
+			}
+		}
+		else
+		{
+			// SL-315
+			gAgentAvatarp->mPelvisp->setPosition(gAgentAvatarp->mPelvisp->getPosition() + diff);
+		}
 
 		gAgentAvatarp->mRoot->updateWorldMatrixChildren();
 

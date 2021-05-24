@@ -115,6 +115,7 @@ protected:
 
 	// menu callbacks
 	void doToSelected(const LLSD& userdata);
+	void openAllFolders();
 	void closeAllFolders();
 	void doCreate(const LLSD& userdata);
 	void resetFilters();

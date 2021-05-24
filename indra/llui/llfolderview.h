@@ -128,6 +128,7 @@ public:
 	bool getAllowDrag() { return mAllowDrag; }
 
 	// Close all folders in the view
+	void openAllFolders();
 	void closeAllFolders();
 	void openTopLevelFolders();
 

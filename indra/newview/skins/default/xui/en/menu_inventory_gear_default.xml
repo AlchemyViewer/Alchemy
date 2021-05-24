@@ -80,6 +80,14 @@
          parameter="reset_filters" />
     </menu_item_call>
     <menu_item_call
+     label="Open All Folders"
+     layout="topleft"
+     name="open_folders">
+        <on_click
+         function="Inventory.GearDefault.Custom.Action"
+         parameter="open_folders" />
+    </menu_item_call>
+    <menu_item_call
      label="Close All Folders"
      layout="topleft"
      name="close_folders">
