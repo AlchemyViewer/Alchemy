@@ -3252,8 +3252,6 @@ LLSD LLAppViewer::getViewerInfo() const
 	cef_ver_codec << DULLAHAN_VERSION_MINOR;
 	cef_ver_codec << ".";
 	cef_ver_codec << DULLAHAN_VERSION_POINT;
-	cef_ver_codec << ".";
-	cef_ver_codec << DULLAHAN_VERSION_BUILD;
 
 	cef_ver_codec << std::endl;
 	cef_ver_codec << "  CEF: ";
