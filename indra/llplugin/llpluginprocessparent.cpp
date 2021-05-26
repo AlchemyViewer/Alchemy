@@ -154,9 +154,9 @@ void LLPluginProcessParent::shutdown()
     {
         EState state = (*it).second->mState;
         if (state != STATE_CLEANUP
-            || state != STATE_EXITING
-            || state != STATE_DONE
-            || state != STATE_ERROR)
+            && state != STATE_EXITING
+            && state != STATE_DONE
+            && state != STATE_ERROR)
         {
             (*it).second->setState(STATE_GOODBYE);
         }
@@ -678,7 +678,7 @@ void LLPluginProcessParent::sendMessage(const LLPluginMessage &message)
 	}
 	
 	std::string buffer = message.generate();
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 	LL_DEBUGS("Plugin") << "Sending: " << buffer << LL_ENDL;	
 #endif
 	writeMessageRaw(buffer);
@@ -932,7 +932,7 @@ void LLPluginProcessParent::servicePoll()
 
 void LLPluginProcessParent::receiveMessageRaw(const std::string &message)
 {
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 	LL_DEBUGS("Plugin") << "Received: " << message << LL_ENDL;
 #endif
 	
@@ -1043,7 +1043,7 @@ void LLPluginProcessParent::receiveMessage(const LLPluginMessage &message)
 			mHeartbeat.setTimerExpirySec(mPluginLockupTimeout);
 
 			mCPUUsage = message.getValueReal("cpu_usage");
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 			LL_DEBUGS("Plugin") << "cpu usage reported as " << mCPUUsage << LL_ENDL;
 #endif
 			

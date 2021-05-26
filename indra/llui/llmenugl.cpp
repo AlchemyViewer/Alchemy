@@ -316,7 +316,7 @@ BOOL LLMenuItemGL::addToAcceleratorList(std::list <LLMenuKeyboardBinding*> *list
 void LLMenuItemGL::appendAcceleratorString( std::string& st ) const
 {
 	st = LLKeyboard::stringFromAccelerator( mAcceleratorMask, mAcceleratorKey );
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 	LL_DEBUGS("HotKeys") << "appendAcceleratorString: " << st << LL_ENDL;
 #endif
 }

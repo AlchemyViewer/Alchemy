@@ -237,9 +237,9 @@ class LLUIImageList final : public LLImageProviderInterface, public LLSingleton<
 	LLSINGLETON_EMPTY_CTOR(LLUIImageList);
 public:
 	// LLImageProviderInterface
-	/*virtual*/ LLPointer<LLUIImage> getUIImageByID(const LLUUID& id, S32 priority);
-	/*virtual*/ LLPointer<LLUIImage> getUIImage(const std::string& name, S32 priority);
-	void cleanUp();
+	/*virtual*/ LLPointer<LLUIImage> getUIImageByID(const LLUUID& id, S32 priority) override;
+	/*virtual*/ LLPointer<LLUIImage> getUIImage(const std::string& name, S32 priority) override;
+	void cleanUp() override;
 
 	bool initFromFile();
 

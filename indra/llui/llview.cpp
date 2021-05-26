@@ -755,7 +755,7 @@ LLView* LLView::childrenHandleMouseEvent(const METHOD& method, S32 x, S32 y, XDA
 		if ((viewp->*method)( local_x, local_y, extra )
 			|| (allow_mouse_block && viewp->blockMouseEvent( local_x, local_y )))
 		{
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 			LL_DEBUGS() << "LLView::childrenHandleMouseEvent calling updatemouseeventinfo - local_x|global x  "<< local_x << " " << x	<< "local/global y " << local_y << " " << y << LL_ENDL;
 			LL_DEBUGS() << "LLView::childrenHandleMouseEvent  getPathname for viewp result: " << viewp->getPathname() << "for this view: " << getPathname() << LL_ENDL;
 #endif
@@ -947,7 +947,7 @@ BOOL LLView::handleKey(KEY key, MASK mask, BOOL called_from_parent)
 			// For event logging we don't care which widget handles it
 			// So we capture the key at the end of this function once we know if it was handled
 			handled = handleKeyHere( key, mask );
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 			if (handled)
 			{
 				LL_DEBUGS() << "Key handled by " << getName() << LL_ENDL;
@@ -981,7 +981,7 @@ BOOL LLView::handleKeyUp(KEY key, MASK mask, BOOL called_from_parent)
 			// For event logging we don't care which widget handles it
 			// So we capture the key at the end of this function once we know if it was handled
 			handled = handleKeyUpHere(key, mask);
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 			if (handled)
 			{
 				LL_DEBUGS() << "Key handled by " << getName() << LL_ENDL;
@@ -1974,7 +1974,7 @@ private:
 class SortByTabOrder final : public LLQuerySorter, public LLSingleton<SortByTabOrder>
 {
 	LLSINGLETON_EMPTY_CTOR(SortByTabOrder);
-	/*virtual*/ void sort(LLView * parent, LLView::child_list_t &children) const 
+	/*virtual*/ void sort(LLView * parent, LLView::child_list_t &children) const override
 	{
 		children.sort(CompareByTabOrder(parent->getTabOrder(), parent->getDefaultTabGroup()));
 	}
@@ -1998,7 +1998,7 @@ const LLViewQuery & LLView::getTabOrderQuery()
 class LLFocusRootsFilter final : public LLQueryFilter, public LLSingleton<LLFocusRootsFilter>
 {
 	LLSINGLETON_EMPTY_CTOR(LLFocusRootsFilter);
-	/*virtual*/ filterResult_t operator() (const LLView* const view, const viewList_t & children) const 
+	/*virtual*/ filterResult_t operator() (const LLView* const view, const viewList_t & children) const override
 	{
 		return filterResult_t(view->isCtrl() && view->isFocusRoot(), !view->isFocusRoot());
 	}

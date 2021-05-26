@@ -113,7 +113,7 @@ public:
 	 */
 	bool localizeInventoryObjectName(std::string& object_name)
 	{
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 		LL_DEBUGS(LOG_LOCAL) << "Searching for localization: " << object_name << LL_ENDL;
 #endif
 
@@ -123,7 +123,7 @@ public:
 		if(found)
 		{
 			object_name = dictionary_iter->second;
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 			LL_DEBUGS(LOG_LOCAL) << "Found, new name is: " << object_name << LL_ENDL;
 #endif
 		}

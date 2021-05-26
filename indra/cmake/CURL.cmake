@@ -10,7 +10,7 @@ else (USESYSTEMLIBS)
   use_prebuilt_binary(curl)
   if (WINDOWS)
     set(CURL_LIBRARIES 
-    debug libcurl_debug.lib
+    debug libcurld.lib
     optimized libcurl.lib)
   else (WINDOWS)
     set(CURL_LIBRARIES libcurl.a)

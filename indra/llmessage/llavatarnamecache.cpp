@@ -226,7 +226,7 @@ void LLAvatarNameCache::handleAvNameCacheSuccess(const LLSD &data, const LLSD &h
         // Use expiration time from header
         av_name.mExpires = expires;
 
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
         LL_DEBUGS("AvNameCache") << "LLAvatarNameResponder::result for " << agent_id << LL_ENDL;
 #endif
         av_name.dump();
@@ -254,7 +254,7 @@ void LLAvatarNameCache::handleAvNameCacheSuccess(const LLSD &data, const LLSD &h
             LLAvatarNameCache::handleAgentError(agent_id);
         }
     }
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
     LL_DEBUGS("AvNameCache") << "LLAvatarNameResponder::result "
         << LLAvatarNameCache::mCache.size() << " cached names"
         << LL_ENDL;
@@ -628,7 +628,7 @@ bool LLAvatarNameCache::getName(const LLUUID& agent_id, LLAvatarName *av_name)
 			{
 				if (!isRequestPending(agent_id))
 				{
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 					LL_DEBUGS("AvNameCache") << "LLAvatarNameCache refresh agent " << agent_id
 											 << LL_ENDL;
 #endif
@@ -642,7 +642,7 @@ bool LLAvatarNameCache::getName(const LLUUID& agent_id, LLAvatarName *av_name)
 
 	if (!isRequestPending(agent_id))
 	{
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 		LL_DEBUGS("AvNameCache") << "LLAvatarNameCache queue request for agent " << agent_id << LL_ENDL;
 #endif
 		mAskQueue.insert(agent_id);

@@ -71,7 +71,7 @@ LLWind::~LLWind()
 
 void LLWind::init()
 {
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 	LL_DEBUGS("Wind") << "initializing wind size: "<< mSize << LL_ENDL;
 #endif
 	

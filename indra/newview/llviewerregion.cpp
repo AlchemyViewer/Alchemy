@@ -2481,7 +2481,7 @@ LLViewerRegion::eCacheUpdateResult LLViewerRegion::cacheFullUpdate(LLDataPackerB
 		// we've seen this object before
 		if (entry->getCRC() == crc)
 		{
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
             LL_DEBUGS("AnimatedObjects") << " got dupe for local_id " << local_id << LL_ENDL;
             dumpStack("AnimatedObjectsStack");
 #endif
@@ -2492,7 +2492,7 @@ LLViewerRegion::eCacheUpdateResult LLViewerRegion::cacheFullUpdate(LLDataPackerB
 		}
 		else //CRC changed
 		{
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
             LL_DEBUGS("AnimatedObjects") << " got update for local_id " << local_id << LL_ENDL;
             dumpStack("AnimatedObjectsStack");
 #endif
@@ -2507,7 +2507,7 @@ LLViewerRegion::eCacheUpdateResult LLViewerRegion::cacheFullUpdate(LLDataPackerB
 	}
 	else
 	{
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
         LL_DEBUGS("AnimatedObjects") << " got first notification for local_id " << local_id << LL_ENDL;
         dumpStack("AnimatedObjectsStack");
 #endif
@@ -2684,7 +2684,7 @@ void LLViewerRegion::requestCacheMisses()
 		msg->addU8Fast(_PREHASH_CacheMissType, (*iter).mType);
 		msg->addU32Fast(_PREHASH_ID, (*iter).mID);
 
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
         LL_DEBUGS("AnimatedObjects") << "Requesting cache missed object " << (*iter).mID << LL_ENDL;
 #endif
         

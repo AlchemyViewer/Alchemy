@@ -41,7 +41,7 @@ class LLOutfitObserver final : public LLInventoryObserver, public LLSingleton<LL
 
 public:
 
-	virtual void changed(U32 mask);
+	virtual void changed(U32 mask) override;
 
 	void notifyOutfitLockChanged() { mOutfitLockChanged();  }
 

@@ -162,14 +162,14 @@ void HttpPolicy::retryOp(const HttpOpRequest::ptr_t &op)
 	// mPolicyRetries limited to 100
 	U32 delta_factor = op->mPolicyRetries <= 10 ? 1 << op->mPolicyRetries : 1024;
 	HttpTime delta = llmin(delta_min * delta_factor, delta_max);
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 	bool external_delta(false);
 #endif
 
 	if (op->mReplyRetryAfter > 0 && op->mReplyRetryAfter < 30)
 	{
 		delta = op->mReplyRetryAfter * U64L(1000000);
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 		external_delta = true;
 #endif
 	}
@@ -179,7 +179,7 @@ void HttpPolicy::retryOp(const HttpOpRequest::ptr_t &op)
 	{
 		++op->mPolicy503Retries;
 	}
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 	LL_DEBUGS(LOG_CORE) << "HTTP request " << op->getHandle()
 						<< " retry " << op->mPolicyRetries
 						<< " scheduled in " << (delta / HttpTime(1000))

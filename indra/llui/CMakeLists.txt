@@ -333,12 +333,18 @@ if(LL_TESTS)
       )
   LL_ADD_PROJECT_UNIT_TESTS(llui "${llui_TEST_SOURCE_FILES}")
   # INTEGRATION TESTS
-  set(test_libs llui llmessage llcorehttp llcommon
+  set(test_libs 
+      llui
+      llmessage
+      llcorehttp
+      llcommon
       ${HUNSPELL_LIBRARY}
       ${LLCOMMON_LIBRARIES}
-      ${BOOST_FIBER_LIBRARY} ${BOOST_CONTEXT_LIBRARY} ${BOOST_SYSTEM_LIBRARY}
+      ${BOOST_FIBER_LIBRARY} 
+      ${BOOST_CONTEXT_LIBRARY} 
+      ${BOOST_SYSTEM_LIBRARY}
       ${WINDOWS_LIBRARIES})
-  if(NOT LINUX)
+  if(NOT LINUX AND NOT DARWIN)
     LL_ADD_INTEGRATION_TEST(llurlentry llurlentry.cpp "${test_libs}")
-  endif(NOT LINUX)
+  endif()
 endif(LL_TESTS)

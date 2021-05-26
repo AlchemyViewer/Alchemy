@@ -118,7 +118,7 @@ private:
 		// centralize such calls, using "mainloop" to ensure it happens once
 		// per frame, and refcounting running LLProcess objects to remain
 		// registered only while needed.
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 		LL_DEBUGS("LLProcess") << "calling apr_proc_other_child_refresh_all()" << LL_ENDL;
 #endif
 		apr_proc_other_child_refresh_all(APR_OC_REASON_RUNNING);

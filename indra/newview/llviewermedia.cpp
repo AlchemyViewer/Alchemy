@@ -913,7 +913,7 @@ void LLViewerMedia::updateMedia(void *dummy_arg)
 		proximity_order[i]->mProximity = i;
 	}
 
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 	LL_DEBUGS("PluginPriority") << "Total reported CPU usage is " << total_cpu << LL_ENDL;
 #endif
 
@@ -1745,7 +1745,8 @@ LLPluginClassMedia* LLViewerMediaImpl::newSourceFromMediaType(std::string media_
 			std::string subprocess_folder = gDirUtilp->getLLPluginDir() + gDirUtilp->getDirDelimiter() + "llplugin" + gDirUtilp->getDirDelimiter();
 			media_source->setCEFProgramDirs(subprocess_folder);
 #endif				
-			media_source->setUserDataPath(user_data_path_cache, gDirUtilp->getUserName(), user_data_path_cef_log);
+			media_source->setUserDataPath(user_data_path_cache, gDirUtilp->getUserName(), user_data_path_cef_log, gSavedSettings.getBOOL("CefVerboseLog"));
+
 			media_source->setLanguageCode(LLUI::getLanguage());
 			media_source->setZoomFactor(zoom_factor);
 
@@ -2800,13 +2801,13 @@ void LLViewerMediaImpl::update()
 			// This media may need to be loaded.
 			if(sMediaCreateTimer.hasExpired())
 			{
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 				LL_DEBUGS("PluginPriority") << this << ": creating media based on timer expiration" << LL_ENDL;
 #endif
 				createMediaSource();
 				sMediaCreateTimer.setTimerExpirySec(LLVIEWERMEDIA_CREATE_DELAY);
 			}
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 			else
 			{
 				LL_DEBUGS("PluginPriority") << this << ": NOT creating media (waiting on timer)" << LL_ENDL;
@@ -3408,6 +3409,24 @@ void LLViewerMediaImpl::handleMediaEvent(LLPluginClassMedia* plugin, LLPluginCla
 		}
 		break;
 
+		case MEDIA_EVENT_DEBUG_MESSAGE:
+		{
+			std::string level = plugin->getDebugMessageLevel();
+			if (level == "debug")
+			{
+				LL_DEBUGS("Media") << plugin->getDebugMessageText() << LL_ENDL;
+			}
+			else if (level == "info")
+			{
+				LL_INFOS("Media") << plugin->getDebugMessageText() << LL_ENDL;
+			}
+			else
+			{
+				LL_WARNS("Media") << plugin->getDebugMessageText() << LL_ENDL;
+			}
+		};
+		break;
+
 		default:
 		break;
 	}
@@ -3417,6 +3436,46 @@ void LLViewerMediaImpl::handleMediaEvent(LLPluginClassMedia* plugin, LLPluginCla
 		// Just chain the event to observers.
 		emitEvent(plugin, event);
 	}
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// virtual
+void
+LLViewerMediaImpl::undo()
+{
+	if (mMediaSource)
+		mMediaSource->undo();
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// virtual
+BOOL
+LLViewerMediaImpl::canUndo() const
+{
+	if (mMediaSource)
+		return mMediaSource->canUndo();
+	else
+		return FALSE;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// virtual
+void
+LLViewerMediaImpl::redo()
+{
+	if (mMediaSource)
+		mMediaSource->redo();
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// virtual
+BOOL
+LLViewerMediaImpl::canRedo() const
+{
+	if (mMediaSource)
+		return mMediaSource->canRedo();
+	else
+		return FALSE;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -3475,6 +3534,46 @@ LLViewerMediaImpl::canPaste() const
 {
 	if (mMediaSource)
 		return mMediaSource->canPaste();
+	else
+		return FALSE;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// virtual
+void
+LLViewerMediaImpl::doDelete()
+{
+	if (mMediaSource)
+		mMediaSource->doDelete();
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// virtual
+BOOL
+LLViewerMediaImpl::canDoDelete() const
+{
+	if (mMediaSource)
+		return mMediaSource->canDoDelete();
+	else
+		return FALSE;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// virtual
+void
+LLViewerMediaImpl::selectAll()
+{
+	if (mMediaSource)
+		mMediaSource->selectAll();
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// virtual
+BOOL
+LLViewerMediaImpl::canSelectAll() const
+{
+	if (mMediaSource)
+		return mMediaSource->canSelectAll();
 	else
 		return FALSE;
 }

@@ -259,6 +259,9 @@ set(llcommon_HEADER_FILES
 if (DARWIN)
   list(APPEND llcommon_HEADER_FILES llsys_objc.h)
   list(APPEND llcommon_SOURCE_FILES llsys_objc.mm)
+
+  set_source_files_properties(llsys_objc.mm
+                              PROPERTIES SKIP_PRECOMPILE_HEADERS TRUE)
 endif (DARWIN)
 
 set_source_files_properties(${llcommon_HEADER_FILES}

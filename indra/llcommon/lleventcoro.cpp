@@ -176,7 +176,7 @@ postAndSuspendSetup(const std::string& callerName,
                 auto& statsd = status["status"];
                 if (statsd.asString() != "running")
                 {
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
                     LL_DEBUGS("lleventcoro") << listenerName
                                              << " spotted status " << statsd
                                              << ", throwing Stopping" << LL_ENDL;
@@ -213,7 +213,7 @@ postAndSuspendSetup(const std::string& callerName,
                 catch(const boost::fibers::promise_already_satisfied & ex)
                 {
                     (void)ex;
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
                     LL_DEBUGS("lleventcoro") << "promise already satisfied in '"
                         << listenerName << "': "  << ex.what() << LL_ENDL;
 #else
@@ -233,7 +233,7 @@ postAndSuspendSetup(const std::string& callerName,
         // request event.
         LLSD modevent(event);
         storeToLLSDPath(modevent, replyPumpNamePath, replyPump.getName());
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
         LL_DEBUGS("lleventcoro") << callerName << ": coroutine " << listenerName
                                  << " posting to " << requestPump.getName()
                                  << LL_ENDL;
@@ -243,7 +243,7 @@ postAndSuspendSetup(const std::string& callerName,
         //                         << ": " << modevent << LL_ENDL;
         requestPump.post(modevent);
     }
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
     LL_DEBUGS("lleventcoro") << callerName << ": coroutine " << listenerName
                              << " about to wait on LLEventPump " << replyPump.getName()
                              << LL_ENDL;
@@ -271,7 +271,7 @@ LLSD llcoro::postAndSuspend(const LLSD& event, const LLEventPumpOrPumpName& requ
     // calling get() on the future makes us wait for it
     LLCoros::TempStatus st(STRINGIZE("waiting for " << replyPump.getPump().getName()));
     LLSD value(future.get());
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
     LL_DEBUGS("lleventcoro") << "postAndSuspend(): coroutine " << listenerName
                              << " resuming with " << value << LL_ENDL;
 #endif
@@ -311,7 +311,7 @@ LLSD llcoro::postAndSuspendWithTimeout(const LLSD& event,
     // if the future is NOT yet ready, return timeoutResult instead
     if (status == boost::fibers::future_status::timeout)
     {
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
         LL_DEBUGS("lleventcoro") << "postAndSuspendWithTimeout(): coroutine " << listenerName
                                  << " timed out after " << timeout << " seconds,"
                                  << " resuming with " << timeoutResult << LL_ENDL;
@@ -324,7 +324,7 @@ LLSD llcoro::postAndSuspendWithTimeout(const LLSD& event,
 
         // future is now ready, no more waiting
         LLSD value(future.get());
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
         LL_DEBUGS("lleventcoro") << "postAndSuspendWithTimeout(): coroutine " << listenerName
                                  << " resuming with " << value << LL_ENDL;
 #endif

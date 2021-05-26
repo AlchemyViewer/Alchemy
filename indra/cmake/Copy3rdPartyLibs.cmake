@@ -54,38 +54,18 @@ if(WINDOWS)
 
     set(release_src_dir "${ARCH_PREBUILT_DIRS_RELEASE}")
     set(release_files
-        boost_context-mt${addrsfx}.dll
-        boost_fiber-mt${addrsfx}.dll
-        boost_filesystem-mt${addrsfx}.dll
-        boost_program_options-mt${addrsfx}.dll
-        boost_regex-mt${addrsfx}.dll
-        boost_stacktrace_windbg-mt${addrsfx}.dll
-        boost_thread-mt${addrsfx}.dll
         epoxy-0.dll
         ${EXPAT_COPY}
-        freetype.dll
         glod.dll
-        jpeg8.dll
         libapr-1.dll
         libaprutil-1.dll
         libapriconv-1.dll
-        libcollada14dom23.dll
-        libcurl.dll
-        libeay32.dll
         libhunspell.dll
         libogg.dll
-        libpng16.dll
         libvorbis.dll
         libvorbisfile.dll
-        libwebp.dll
-        libxml2.dll
-        minizip.dll
-        nghttp2.dll
         openjp2.dll
-        ssleay32.dll
-        uriparser.dll
         xmlrpc-epi.dll
-        zlib1.dll
         )
 
     # Filenames are different for 32/64 bit BugSplat file and we don't
@@ -139,12 +119,6 @@ elseif(DARWIN)
         libGLOD.dylib
         libhunspell-1.7.0.dylib
         libndofdev.dylib
-        libnghttp2.dylib
-        libnghttp2.14.dylib
-        libnghttp2.14.19.0.dylib
-        liburiparser.dylib
-        liburiparser.1.dylib
-        liburiparser.1.0.27.dylib
         libxmlrpc-epi.dylib
         libxmlrpc-epi.0.dylib
        )

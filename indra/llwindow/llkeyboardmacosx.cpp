@@ -133,8 +133,7 @@ LLKeyboardMacOSX::LLKeyboardMacOSX()
 	mTranslateKeyMap[0x7e] = KEY_UP;
 
 	// Build inverse map
-	std::map<U32, KEY>::iterator iter;
-	for (iter = mTranslateKeyMap.begin(); iter != mTranslateKeyMap.end(); iter++)
+	for (auto iter = mTranslateKeyMap.begin(); iter != mTranslateKeyMap.end(); iter++)
 	{
 		mInvTranslateKeyMap[iter->second] = iter->first;
 	}
@@ -154,7 +153,7 @@ LLKeyboardMacOSX::LLKeyboardMacOSX()
 	mTranslateNumpadMap[0x4c] = KEY_PAD_RETURN;	// keypad enter
 	
 	// Build inverse numpad map
-	for (iter = mTranslateNumpadMap.begin(); iter != mTranslateNumpadMap.end(); iter++)
+	for (auto iter = mTranslateNumpadMap.begin(); iter != mTranslateNumpadMap.end(); iter++)
 	{
 		mInvTranslateNumpadMap[iter->second] = iter->first;
 	}
@@ -279,7 +278,7 @@ MASK LLKeyboardMacOSX::currentMask(BOOL for_mouse_event)
 
 void LLKeyboardMacOSX::scanKeyboard()
 {
-	S32 key;
+	U32 key;
 	for (key = 0; key < KEY_COUNT; key++)
 	{
 		// Generate callback if any event has occurred on this key this frame.

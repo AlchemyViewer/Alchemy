@@ -44,9 +44,9 @@ namespace LLNotificationsUI
 class LLChannelManager final : public LLSingleton<LLChannelManager>
 {
 	LLSINGLETON(LLChannelManager);
-	virtual ~LLChannelManager();
+	virtual ~LLChannelManager() override;
 
-	void cleanupSingleton();
+	void cleanupSingleton() override;
 public:
 
 

@@ -55,37 +55,37 @@ public:
 class LLLeavesFilter final : public LLQueryFilter, public LLSingleton<LLLeavesFilter>
 {
 	LLSINGLETON_EMPTY_CTOR(LLLeavesFilter);
-	/*virtual*/ filterResult_t operator() (const LLView* const view, const viewList_t & children) const;
+	/*virtual*/ filterResult_t operator() (const LLView* const view, const viewList_t & children) const override;
 };
 
 class LLRootsFilter final : public LLQueryFilter, public LLSingleton<LLRootsFilter>
 {
 	LLSINGLETON_EMPTY_CTOR(LLRootsFilter);
-	/*virtual*/ filterResult_t operator() (const LLView* const view, const viewList_t & children) const;
+	/*virtual*/ filterResult_t operator() (const LLView* const view, const viewList_t & children) const override;
 };
 
 class LLVisibleFilter final : public LLQueryFilter, public LLSingleton<LLVisibleFilter>
 {
 	LLSINGLETON_EMPTY_CTOR(LLVisibleFilter);
-	/*virtual*/ filterResult_t operator() (const LLView* const view, const viewList_t & children) const;
+	/*virtual*/ filterResult_t operator() (const LLView* const view, const viewList_t & children) const override;
 };
 
 class LLEnabledFilter final : public LLQueryFilter, public LLSingleton<LLEnabledFilter>
 {
 	LLSINGLETON_EMPTY_CTOR(LLEnabledFilter);
-	/*virtual*/ filterResult_t operator() (const LLView* const view, const viewList_t & children) const;
+	/*virtual*/ filterResult_t operator() (const LLView* const view, const viewList_t & children) const override;
 };
 
 class LLTabStopFilter final : public LLQueryFilter, public LLSingleton<LLTabStopFilter>
 {
 	LLSINGLETON_EMPTY_CTOR(LLTabStopFilter);
-	/*virtual*/ filterResult_t operator() (const LLView* const view, const viewList_t & children) const;
+	/*virtual*/ filterResult_t operator() (const LLView* const view, const viewList_t & children) const override;
 };
 
 class LLCtrlFilter final : public LLQueryFilter, public LLSingleton<LLCtrlFilter>
 {
 	LLSINGLETON_EMPTY_CTOR(LLCtrlFilter);
-	/*virtual*/ filterResult_t operator() (const LLView* const view, const viewList_t & children) const;
+	/*virtual*/ filterResult_t operator() (const LLView* const view, const viewList_t & children) const override;
 };
 
 template <class T>

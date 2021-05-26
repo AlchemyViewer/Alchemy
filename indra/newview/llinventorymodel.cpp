@@ -2167,7 +2167,7 @@ bool LLInventoryModel::loadSkeleton(
 	const LLSD& options,
 	const LLUUID& owner_id)
 {
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 	LL_DEBUGS(LOG_INV) << "importing inventory skeleton for " << owner_id << LL_ENDL;
 #endif
 
@@ -2327,7 +2327,7 @@ bool LLInventoryModel::loadSkeleton(
 						if (item->getIsBrokenLink())
 						{
 							//bad_link_count++;
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 							LL_DEBUGS(LOG_INV) << "Attempted to add cached link item without baseobj present ( name: "
 											   << item->getName() << " itemID: " << item->getUUID()
 											   << " assetID: " << item->getAssetUUID()
@@ -2399,7 +2399,7 @@ bool LLInventoryModel::loadSkeleton(
 		{
 			LLViewerInventoryCategory* cat = (*invalid_cat_it).get();
 			cat->setVersion(NO_VERSION);
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 			LL_DEBUGS(LOG_INV) << "Invalidating category name: " << cat->getName() << " UUID: " << cat->getUUID() << " due to invalid descendents cache" << LL_ENDL;
 #endif
 		}

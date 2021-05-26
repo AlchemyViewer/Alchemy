@@ -155,7 +155,7 @@ BEGIN
             VALUE "FileDescription", "Alchemy"
             VALUE "FileVersion", "${VIEWER_VERSION_MAJOR}.${VIEWER_VERSION_MINOR}.${VIEWER_VERSION_PATCH}.${VIEWER_VERSION_REVISION}"
             VALUE "InternalName", "Alchemy"
-            VALUE "LegalCopyright", "Copyright (C) 2013-2020 Alchemy Development Group"
+            VALUE "LegalCopyright", "Copyright (C) 2013-2021 Alchemy Development Group"
             VALUE "OriginalFilename", "Alchemy.exe"
             VALUE "ProductName", "Alchemy"
             VALUE "ProductVersion", "${VIEWER_VERSION_MAJOR}.${VIEWER_VERSION_MINOR}.${VIEWER_VERSION_PATCH}.${VIEWER_VERSION_REVISION}"

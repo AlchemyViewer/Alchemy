@@ -69,7 +69,7 @@ private:
 	void onLoadError(int status, const std::string error_text);
 	void onAddressChangeCallback(std::string url);
 	void onOpenPopupCallback(std::string url, std::string target);
-	bool onHTTPAuthCallback(const std::string host, const std::string realm, std::string& username, std::string& password);
+	bool onHTTPAuthCallback(const std::string host, const std::string realm, bool isproxy, std::string& username, std::string& password);
 	void onCursorChangedCallback(dullahan::ECursorType type);
 	const std::vector<std::string> onFileDialog(dullahan::EFileDialogType dialog_type, const std::string dialog_title, const std::string default_file, const std::string dialog_accept_filter, bool& use_default);
 	bool onJSDialogCallback(const std::string origin_url, const std::string message_text, const std::string default_prompt_text);
@@ -98,15 +98,25 @@ private:
 	std::string mAuthUsername;
 	std::string mAuthPassword;
 	bool mAuthOK;
+	bool mCanUndo;
+	bool mCanRedo;
 	bool mCanCut;
 	bool mCanCopy;
 	bool mCanPaste;
+	bool mCanDelete;
+	bool mCanSelectAll;
     std::string mRootCachePath;
 	std::string mCachePath;
 	std::string mContextCachePath;
 	std::string mCefLogFile;
 	bool mCefLogVerbose;
 	std::vector<std::string> mPickedFiles;
+	bool mProxyEnabled;
+	int mProxyType;
+	std::string mProxyHost;
+	int mProxyPort;
+	std::string mProxyUsername;
+	std::string mProxyPassword;
 	VolumeCatcher mVolumeCatcher;
 	F32 mCurVolume;
 	dullahan* mCEFLib;
@@ -133,14 +143,22 @@ MediaPluginBase(host_send_func, host_user_data)
 	mAuthUsername = "";
 	mAuthPassword = "";
 	mAuthOK = false;
+	mCanUndo = false;
+	mCanRedo = false;
 	mCanCut = false;
 	mCanCopy = false;
 	mCanPaste = false;
+	mCanDelete = false;
+	mCanSelectAll = false;
 	mCachePath = "";
 	mCefLogFile = "";
 	mCefLogVerbose = false;
 	mPickedFiles.clear();
-	mCurVolume = 0.0;
+	mCurVolume = 0.0f;
+
+	mProxyEnabled = false;
+	mProxyType = 0;
+	mProxyPort = 3128;
 
 	mCEFLib = new dullahan();
 
@@ -303,8 +321,16 @@ void MediaPluginCEF::onCustomSchemeURLCallback(std::string url)
 
 ////////////////////////////////////////////////////////////////////////////////
 //
-bool MediaPluginCEF::onHTTPAuthCallback(const std::string host, const std::string realm, std::string& username, std::string& password)
+bool MediaPluginCEF::onHTTPAuthCallback(const std::string host, const std::string realm, bool isproxy, std::string& username, std::string& password)
 {
+	// For proxy auth
+	if (isproxy)
+	{
+		username = mProxyUsername;
+		password = mProxyPassword;
+		return true;
+	}
+	// Otherwise fall through for other auth routines
 	mAuthOK = false;
 
 	LLPluginMessage message(LLPLUGIN_MESSAGE_CLASS_MEDIA, "auth_request");
@@ -521,7 +547,7 @@ void MediaPluginCEF::receiveMessage(const char* message_string)
 				mCEFLib->setOnLoadErrorCallback(std::bind(&MediaPluginCEF::onLoadError, this, std::placeholders::_1, std::placeholders::_2));
 				mCEFLib->setOnAddressChangeCallback(std::bind(&MediaPluginCEF::onAddressChangeCallback, this, std::placeholders::_1));
 				mCEFLib->setOnOpenPopupCallback(std::bind(&MediaPluginCEF::onOpenPopupCallback, this, std::placeholders::_1, std::placeholders::_2));
-				mCEFLib->setOnHTTPAuthCallback(std::bind(&MediaPluginCEF::onHTTPAuthCallback, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4));
+				mCEFLib->setOnHTTPAuthCallback(std::bind(&MediaPluginCEF::onHTTPAuthCallback, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5));
 				mCEFLib->setOnFileDialogCallback(std::bind(&MediaPluginCEF::onFileDialog, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5));
 				mCEFLib->setOnCursorChangedCallback(std::bind(&MediaPluginCEF::onCursorChangedCallback, this, std::placeholders::_1));
 				mCEFLib->setOnRequestExitCallback(std::bind(&MediaPluginCEF::onRequestExitCallback, this));
@@ -554,6 +580,12 @@ void MediaPluginCEF::receiveMessage(const char* message_string)
 				settings.log_file = mCefLogFile;
 				settings.log_verbose = mCefLogVerbose;
 				settings.autoplay_without_gesture = true;
+
+				// Setup proxy config for CEF startup
+				settings.proxy_enabled = mProxyEnabled;
+				settings.proxy_type = mProxyType;
+				settings.proxy_host = mProxyHost;
+				settings.proxy_port = mProxyPort;
 
 				// Set subprocess helper and cef app data paths
 #if !LL_DARWIN
@@ -813,6 +845,14 @@ void MediaPluginCEF::receiveMessage(const char* message_string)
 			{
 				authResponse(message_in);
 			}
+			if (message_name == "edit_undo")
+			{
+				mCEFLib->editUndo();
+			}
+			if (message_name == "edit_redo")
+			{
+				mCEFLib->editRedo();
+			}
 			if (message_name == "edit_cut")
 			{
 				mCEFLib->editCut();
@@ -824,6 +864,18 @@ void MediaPluginCEF::receiveMessage(const char* message_string)
 			if (message_name == "edit_paste")
 			{
 				mCEFLib->editPaste();
+			}
+			if (message_name == "edit_delete")
+			{
+				mCEFLib->editDelete();
+			}
+			if (message_name == "edit_select_all")
+			{
+				mCEFLib->editSelectAll();
+			}
+			if (message_name == "edit_show_source")
+			{
+				mCEFLib->viewSource();
 			}
 		}
 		else if (message_class == LLPLUGIN_MESSAGE_CLASS_MEDIA_BROWSER)
@@ -881,6 +933,15 @@ void MediaPluginCEF::receiveMessage(const char* message_string)
 			else if (message_name == "gpu_disabled")
 			{
 				mDisableGPU = message_in.getValueBoolean("disable");
+			}
+			else if (message_name == "proxy_setup")
+			{
+				mProxyEnabled = message_in.getValueBoolean("enable");
+				mProxyType = message_in.getValueS32("proxy_type");
+				mProxyHost = message_in.getValue("host");
+				mProxyPort = message_in.getValueS32("port");
+				mProxyUsername = message_in.getValue("username");
+				mProxyPassword = message_in.getValue("password");
 			}
 		}
         else if (message_class == LLPLUGIN_MESSAGE_CLASS_MEDIA_TIME)
@@ -970,13 +1031,30 @@ void MediaPluginCEF::unicodeInput(std::string event, LLSD native_key_data = LLSD
 //
 void MediaPluginCEF::checkEditState()
 {
+	bool can_undo = mCEFLib->editCanUndo();
+	bool can_redo = mCEFLib->editCanRedo();
 	bool can_cut = mCEFLib->editCanCut();
 	bool can_copy = mCEFLib->editCanCopy();
 	bool can_paste = mCEFLib->editCanPaste();
+	bool can_delete = mCEFLib->editCanDelete();
+	bool can_select_all = mCEFLib->editCanSelectAll();
 
-	if ((can_cut != mCanCut) || (can_copy != mCanCopy) || (can_paste != mCanPaste))
+	if ((can_undo != mCanUndo) || (can_redo != mCanRedo) || (can_cut != mCanCut) || (can_copy != mCanCopy) 
+		|| (can_paste != mCanPaste) || (can_delete != mCanDelete) || (can_select_all != mCanSelectAll))
 	{
 		LLPluginMessage message(LLPLUGIN_MESSAGE_CLASS_MEDIA, "edit_state");
+
+		if (can_undo != mCanUndo)
+		{
+			mCanUndo = can_undo;
+			message.setValueBoolean("undo", can_undo);
+		}
+
+		if (can_redo != mCanRedo)
+		{
+			mCanRedo = can_redo;
+			message.setValueBoolean("redo", can_redo);
+		}
 
 		if (can_cut != mCanCut)
 		{
@@ -994,6 +1072,18 @@ void MediaPluginCEF::checkEditState()
 		{
 			mCanPaste = can_paste;
 			message.setValueBoolean("paste", can_paste);
+		}
+
+		if (can_delete != mCanDelete)
+		{
+			mCanDelete = can_delete;
+			message.setValueBoolean("delete", can_delete);
+		}
+
+		if (can_select_all != mCanSelectAll)
+		{
+			mCanSelectAll = can_select_all;
+			message.setValueBoolean("select_all", can_select_all);
 		}
 
 		sendMessage(message);

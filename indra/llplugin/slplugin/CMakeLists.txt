@@ -59,7 +59,7 @@ elseif (DARWIN)
 set_target_properties(SLPlugin
   PROPERTIES
   BUILD_WITH_INSTALL_RPATH 1
-  INSTALL_RPATH "@executable_path/../../../../Frameworks"
+  INSTALL_RPATH "@executable_path/../../../../Frameworks;@executable_path/../Frameworks;@executable_path/../Frameworks/plugins"
   MACOSX_BUNDLE_INFO_PLIST ${CMAKE_CURRENT_SOURCE_DIR}/slplugin_info.plist
   )
 endif ()

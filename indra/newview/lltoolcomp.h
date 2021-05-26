@@ -109,11 +109,11 @@ class LLToolCompInspect final : public LLToolComposite, public LLSingleton<LLToo
 public:
 
 	// Overridden from LLToolComposite
-    virtual BOOL		handleMouseDown(S32 x, S32 y, MASK mask);
-	virtual BOOL		handleMouseUp(S32 x, S32 y, MASK mask);
-    virtual BOOL		handleDoubleClick(S32 x, S32 y, MASK mask);
-	virtual BOOL		handleKey(KEY key, MASK mask);
-	virtual void		onMouseCaptureLost();
+    virtual BOOL		handleMouseDown(S32 x, S32 y, MASK mask) override;
+	virtual BOOL		handleMouseUp(S32 x, S32 y, MASK mask) override;
+    virtual BOOL		handleDoubleClick(S32 x, S32 y, MASK mask) override;
+	virtual BOOL		handleKey(KEY key, MASK mask) override;
+	virtual void		onMouseCaptureLost() override;
 			void		keyUp(KEY key, MASK mask);
 
 	static void pickCallback(const LLPickInfo& pick_info);
@@ -134,13 +134,13 @@ class LLToolCompTranslate final : public LLToolComposite, public LLSingleton<LLT
 public:
 
 	// Overridden from LLToolComposite
-	virtual BOOL		handleMouseDown(S32 x, S32 y, MASK mask);
-	virtual BOOL		handleDoubleClick(S32 x, S32 y, MASK mask);
-	virtual BOOL		handleHover(S32 x, S32 y, MASK mask);
-	virtual BOOL		handleMouseUp(S32 x, S32 y, MASK mask);			// Returns to the default tool
-	virtual void		render();
+	virtual BOOL		handleMouseDown(S32 x, S32 y, MASK mask) override;
+	virtual BOOL		handleDoubleClick(S32 x, S32 y, MASK mask) override;
+	virtual BOOL		handleHover(S32 x, S32 y, MASK mask) override;
+	virtual BOOL		handleMouseUp(S32 x, S32 y, MASK mask) override;			// Returns to the default tool
+	virtual void		render() override;
 
-	virtual LLTool*		getOverrideTool(MASK mask);
+	virtual LLTool*		getOverrideTool(MASK mask) override;
 
 	static void pickCallback(const LLPickInfo& pick_info);
 };
@@ -155,13 +155,13 @@ class LLToolCompScale final : public LLToolComposite, public LLSingleton<LLToolC
 public:
 
 	// Overridden from LLToolComposite
-    virtual BOOL		handleMouseDown(S32 x, S32 y, MASK mask);
-    virtual BOOL		handleDoubleClick(S32 x, S32 y, MASK mask);
-    virtual BOOL		handleHover(S32 x, S32 y, MASK mask);
-	virtual BOOL		handleMouseUp(S32 x, S32 y, MASK mask);			// Returns to the default tool
-	virtual void		render();
+    virtual BOOL		handleMouseDown(S32 x, S32 y, MASK mask) override;
+    virtual BOOL		handleDoubleClick(S32 x, S32 y, MASK mask) override;
+    virtual BOOL		handleHover(S32 x, S32 y, MASK mask) override;
+	virtual BOOL		handleMouseUp(S32 x, S32 y, MASK mask) override;			// Returns to the default tool
+	virtual void		render() override;
 
-	virtual LLTool*		getOverrideTool(MASK mask);
+	virtual LLTool*		getOverrideTool(MASK mask) override;
 	
 	static void pickCallback(const LLPickInfo& pick_info);
 };
@@ -177,13 +177,13 @@ class LLToolCompRotate final : public LLToolComposite, public LLSingleton<LLTool
 public:
 
 	// Overridden from LLToolComposite
-    virtual BOOL		handleMouseDown(S32 x, S32 y, MASK mask);
-    virtual BOOL		handleDoubleClick(S32 x, S32 y, MASK mask);
-    virtual BOOL		handleHover(S32 x, S32 y, MASK mask);
-	virtual BOOL		handleMouseUp(S32 x, S32 y, MASK mask);
-	virtual void		render();
+    virtual BOOL		handleMouseDown(S32 x, S32 y, MASK mask) override;
+    virtual BOOL		handleDoubleClick(S32 x, S32 y, MASK mask) override;
+    virtual BOOL		handleHover(S32 x, S32 y, MASK mask) override;
+	virtual BOOL		handleMouseUp(S32 x, S32 y, MASK mask) override;
+	virtual void		render() override;
 
-	virtual LLTool*		getOverrideTool(MASK mask);
+	virtual LLTool*		getOverrideTool(MASK mask) override;
 
 	static void pickCallback(const LLPickInfo& pick_info);
 
@@ -200,9 +200,9 @@ class LLToolCompCreate final : public LLToolComposite, public LLSingleton<LLTool
 public:
 
 	// Overridden from LLToolComposite
-    virtual BOOL		handleMouseDown(S32 x, S32 y, MASK mask);
-    virtual BOOL		handleDoubleClick(S32 x, S32 y, MASK mask);
-	virtual BOOL		handleMouseUp(S32 x, S32 y, MASK mask);
+    virtual BOOL		handleMouseDown(S32 x, S32 y, MASK mask) override;
+    virtual BOOL		handleDoubleClick(S32 x, S32 y, MASK mask) override;
+	virtual BOOL		handleMouseUp(S32 x, S32 y, MASK mask) override;
 	
 	static void pickCallback(const LLPickInfo& pick_info);
 protected:
