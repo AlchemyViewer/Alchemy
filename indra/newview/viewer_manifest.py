@@ -1216,7 +1216,7 @@ class LinuxManifest(ViewerManifest):
         #              "libmedia_plugin_gstreamer.so")
             self.path2basename("example", "libmedia_plugin_example.so")
             self.path2basename("libvlc", "libmedia_plugin_libvlc.so")
-            self.path("../media_plugins/cef/libmedia_plugin_cef.so", "libmedia_plugin_cef.so")
+            self.path2basename("cef", "libmedia_plugin_cef.so")
 
         # with self.prefix(src=os.path.join(pkgdir, 'lib', 'vlc', 'plugins'), dst="bin/llplugin/vlc/plugins"):
         #     self.path( "plugins.dat" )
