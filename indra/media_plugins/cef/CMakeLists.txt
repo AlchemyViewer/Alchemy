@@ -59,6 +59,13 @@ if (LINUX)
   list(APPEND media_plugin_webkit_LINK_LIBRARIES
        ${UI_LIBRARIES}     # for glib/GTK
        )
+elseif (DARWIN)
+  list(APPEND media_plugin_cef_SOURCE_FILES mac_volume_catcher_null.cpp)
+  find_library(CORESERVICES_LIBRARY CoreServices)
+  find_library(AUDIOUNIT_LIBRARY AudioUnit)
+  list(APPEND media_plugin_cef_LINK_LIBRARIES
+       ${CORESERVICES_LIBRARY}     # for Component Manager calls
+       ${AUDIOUNIT_LIBRARY}        # for AudioUnit calls
 elseif (WINDOWS)
   list(APPEND media_plugin_cef_SOURCE_FILES windows_volume_catcher.cpp)
 endif (LINUX)
