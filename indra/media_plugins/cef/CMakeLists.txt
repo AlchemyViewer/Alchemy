@@ -66,6 +66,7 @@ elseif (DARWIN)
   list(APPEND media_plugin_cef_LINK_LIBRARIES
        ${CORESERVICES_LIBRARY}     # for Component Manager calls
        ${AUDIOUNIT_LIBRARY}        # for AudioUnit calls
+  )
 elseif (WINDOWS)
   list(APPEND media_plugin_cef_SOURCE_FILES windows_volume_catcher.cpp)
 endif (LINUX)
