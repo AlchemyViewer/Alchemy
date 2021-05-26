@@ -1236,6 +1236,8 @@ class LinuxManifest(ViewerManifest):
 
         with self.prefix(src=os.path.join(pkgdir, 'lib', 'release'), dst=os.path.join('bin', 'llplugin')):
             self.path("libcef.so")
+            self.path("libEGL.so")
+            self.path("libGLESv2.so")
 
         with self.prefix(src=os.path.join(pkgdir, 'resources'), dst=os.path.join('bin', 'llplugin')):
             self.path("chrome_100_percent.pak")
@@ -1244,8 +1246,8 @@ class LinuxManifest(ViewerManifest):
             self.path("icudtl.dat")
 
         with self.prefix(src=os.path.join(pkgdir, 'lib', 'release', 'swiftshader'), dst=os.path.join('bin', 'llplugin', 'swiftshader') ):
-            self.path( "libEGL.so" )
-            self.path( "libGLESv2.so" )
+            self.path("libEGL.so")
+            self.path("libGLESv2.so")
 
         with self.prefix(src=os.path.join(pkgdir, 'resources', 'locales'), dst=os.path.join('bin', 'locales')):
             self.path("*.pak")
