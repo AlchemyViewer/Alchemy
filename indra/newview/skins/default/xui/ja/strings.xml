@@ -78,7 +78,7 @@ LOD 係数: [LOD_FACTOR]
 	<string name="AboutLibs">
 		J2C デコーダバージョン： [J2C_VERSION] 
 オーディオドライババージョン： [AUDIO_DRIVER_VERSION] 
-[LIBCEF_VERSION] LibVLC バージョン： [LIBVLC_VERSION] 
+[CEF_VERSION] LibVLC バージョン： [LIBVLC_VERSION] 
 ボイスサーバーバージョン: [VOICE_VERSION]
 	</string>
 	<string name="AboutTraffic">

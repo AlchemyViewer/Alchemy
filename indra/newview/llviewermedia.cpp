@@ -1732,9 +1732,7 @@ LLPluginClassMedia* LLViewerMediaImpl::newSourceFromMediaType(std::string media_
 		}
 		else if(LLFile::stat(plugin_name, &s))
 		{
-#if !LL_LINUX
 			LL_WARNS_ONCE("Media") << "Couldn't find plugin at " << plugin_name << LL_ENDL;
-#endif
 		}
 		else
 		{
@@ -1743,8 +1741,12 @@ LLPluginClassMedia* LLViewerMediaImpl::newSourceFromMediaType(std::string media_
 #if LL_WINDOWS
 			std::string subprocess_folder = gDirUtilp->getLLPluginDir() + gDirUtilp->getDirDelimiter();
 			media_source->setCEFProgramDirs(subprocess_folder);
-#endif
+#elif LL_LINUX
+			std::string subprocess_folder = gDirUtilp->getLLPluginDir() + gDirUtilp->getDirDelimiter() + "llplugin" + gDirUtilp->getDirDelimiter();
+			media_source->setCEFProgramDirs(subprocess_folder);
+#endif				
 			media_source->setUserDataPath(user_data_path_cache, gDirUtilp->getUserName(), user_data_path_cef_log, gSavedSettings.getBOOL("CefVerboseLog"));
+
 			media_source->setLanguageCode(LLUI::getLanguage());
 			media_source->setZoomFactor(zoom_factor);
 
@@ -1780,9 +1782,9 @@ LLPluginClassMedia* LLViewerMediaImpl::newSourceFromMediaType(std::string media_
 			}
 		}
 	}
-#if !LL_LINUX
+
 	LL_WARNS_ONCE("Plugin") << "plugin initialization failed for mime type: " << media_type << LL_ENDL;
-#endif
+
 
 	if(gAgent.isInitialized())
 	{
@@ -2742,7 +2744,7 @@ bool LLViewerMediaImpl::handleUnicodeCharHere(llwchar uni_char)
 		{
 			LLSD native_key_data = gViewerWindow->getWindow()->getNativeKeyData();
 
-			mMediaSource->textInput(wstring_to_utf8str(LLWString(1, uni_char)), gKeyboard->currentMask(FALSE), native_key_data);
+			result = mMediaSource->textInput(wstring_to_utf8str(LLWString(1, uni_char)), gKeyboard->currentMask(FALSE), native_key_data);
 		}
 	}
 

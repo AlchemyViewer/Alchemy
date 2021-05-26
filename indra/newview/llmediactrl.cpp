@@ -46,6 +46,7 @@
 #include "lluictrlfactory.h"	// LLDefaultChildRegistry
 #include "llkeyboard.h"
 #include "llviewermenu.h"
+#include "llwindow.h"
 
 // linden library includes
 #include "llfocusmgr.h"
@@ -385,6 +386,7 @@ BOOL LLMediaCtrl::handleDoubleClick( S32 x, S32 y, MASK mask )
 		mMediaSource->mouseDoubleClick( x, y, mask);
 
 	gFocusMgr.setMouseCapture( this );
+	gFocusMgr.setKeyboardFocus( this );
 
 	if (mTakeFocusOnClick)
 	{
@@ -401,6 +403,7 @@ void LLMediaCtrl::onFocusReceived()
 	if (mMediaSource)
 	{
 		mMediaSource->focus(true);
+		getWindow()->allowLanguageTextInput(NULL, TRUE);
 		
 		// Set focus for edit menu items
 		LLEditMenuHandler::gEditMenuHandler = mMediaSource;
@@ -416,6 +419,7 @@ void LLMediaCtrl::onFocusLost()
 	if (mMediaSource)
 	{
 		mMediaSource->focus(false);
+		getWindow()->allowLanguageTextInput(NULL, FALSE);
 
 		if( LLEditMenuHandler::gEditMenuHandler == mMediaSource )
 		{

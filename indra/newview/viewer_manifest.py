@@ -1216,6 +1216,7 @@ class LinuxManifest(ViewerManifest):
         #              "libmedia_plugin_gstreamer.so")
             self.path2basename("example", "libmedia_plugin_example.so")
             self.path2basename("libvlc", "libmedia_plugin_libvlc.so")
+            self.path2basename("cef", "libmedia_plugin_cef.so")
 
         # with self.prefix(src=os.path.join(pkgdir, 'lib', 'vlc', 'plugins'), dst="bin/llplugin/vlc/plugins"):
         #     self.path( "plugins.dat" )
@@ -1223,6 +1224,33 @@ class LinuxManifest(ViewerManifest):
 
         # with self.prefix(src=os.path.join(pkgdir, 'lib' ), dst="lib"):
         #     self.path( "libvlc*.so*" )
+
+        # CEF files 
+        with self.prefix(src=os.path.join(pkgdir, 'bin', 'release'), dst='bin'):
+            self.path("chrome-sandbox")
+            self.path("dullahan_host")
+
+        with self.prefix(src=os.path.join(pkgdir, 'bin', 'release'), dst=os.path.join('bin', 'llplugin')):
+            self.path("snapshot_blob.bin")
+            self.path("v8_context_snapshot.bin")
+
+        with self.prefix(src=os.path.join(pkgdir, 'lib', 'release'), dst=os.path.join('bin', 'llplugin')):
+            self.path("libcef.so")
+            self.path("libEGL.so")
+            self.path("libGLESv2.so")
+
+        with self.prefix(src=os.path.join(pkgdir, 'resources'), dst=os.path.join('bin', 'llplugin')):
+            self.path("chrome_100_percent.pak")
+            self.path("chrome_200_percent.pak")
+            self.path("resources.pak")
+            self.path("icudtl.dat")
+
+        with self.prefix(src=os.path.join(pkgdir, 'lib', 'release', 'swiftshader'), dst=os.path.join('bin', 'llplugin', 'swiftshader') ):
+            self.path("libEGL.so")
+            self.path("libGLESv2.so")
+
+        with self.prefix(src=os.path.join(pkgdir, 'resources', 'locales'), dst=os.path.join('bin', 'locales')):
+            self.path("*.pak")
 
         self.path("featuretable_linux.txt")
 

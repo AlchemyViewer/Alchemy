@@ -51,8 +51,14 @@ set (media_plugin_cef_LINK_LIBRARIES
 
 # Select which VolumeCatcher implementation to use
 if (LINUX)
-  message(FATAL_ERROR "CEF plugin has been enabled for a Linux compile.\n"
-    "  Please create a volume_catcher implementation for this platform.")
+  if (PULSEAUDIO_FOUND)
+    list(APPEND media_plugin_cef_SOURCE_FILES linux_volume_catcher.cpp)
+  else (PULSEAUDIO_FOUND)
+    list(APPEND media_plugin_cef_SOURCE_FILES dummy_volume_catcher.cpp)
+  endif (PULSEAUDIO_FOUND)
+  list(APPEND media_plugin_webkit_LINK_LIBRARIES
+       ${UI_LIBRARIES}     # for glib/GTK
+       )
 elseif (DARWIN)
   list(APPEND media_plugin_cef_SOURCE_FILES mac_volume_catcher_null.cpp)
   find_library(CORESERVICES_LIBRARY CoreServices)
@@ -60,7 +66,7 @@ elseif (DARWIN)
   list(APPEND media_plugin_cef_LINK_LIBRARIES
        ${CORESERVICES_LIBRARY}     # for Component Manager calls
        ${AUDIOUNIT_LIBRARY}        # for AudioUnit calls
-       )
+  )
 elseif (WINDOWS)
   list(APPEND media_plugin_cef_SOURCE_FILES windows_volume_catcher.cpp)
 endif (LINUX)
