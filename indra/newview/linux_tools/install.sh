@@ -88,6 +88,18 @@ function install_to_prefix()
     echo " - Installing to $1"
 
     cp -a "${tarball_path}"/* "$1/" || die "Failed to complete the installation!"
+    
+    SANDBOX_BIN="$1/bin/llplugin/chrome-sandbox"
+    if [ "$UID" == "0" ]; then
+        "$1/etc/chrome_sandboxing_permissions_setup.sh"
+    else
+        echo "Permissions on $SANDBOX_BIN need to be set to enable security sandboxing for the integrated browser. You may be asked to authorize this step with administrative credentials."
+        prompt "This step is optional, though recommended for safety and security. Proceed with the installation? [Y/N]: "
+        if [[ $? == 0 ]]; then
+            exit 0 
+        fi
+        pkexec "$1/etc/chrome_sandboxing_permissions_setup.sh" || die "Failed to set permissions on chrome-sandbox"
+    fi
 }
 
 function backup_previous_installation()
