@@ -1249,7 +1249,7 @@ class LinuxManifest(ViewerManifest):
             self.path("libEGL.so")
             self.path("libGLESv2.so")
 
-        with self.prefix(src=os.path.join(pkgdir, 'resources', 'locales'), dst=os.path.join('bin', 'locales')):
+        with self.prefix(src=os.path.join(pkgdir, 'resources', 'locales'), dst=os.path.join('bin', 'llplugin', 'locales')):
             self.path("*.pak")
 
         self.path("featuretable_linux.txt")
