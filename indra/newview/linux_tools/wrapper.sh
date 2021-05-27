@@ -101,7 +101,7 @@ for ARG in "$@"; do
 done
 
 # Check chrome-sandbox permissions, and try to set them if they are not already
-SANDBOX_BIN=bin/chrome-sandbox
+SANDBOX_BIN=bin/llplugin/chrome-sandbox
 # if set-user-id = false || is writable || executable = false || read is false || is owned by effective uid || is owned by effective gid
 if [[ !(-u $SANDBOX_BIN) || (-w $SANDBOX_BIN) || !(-x $SANDBOX_BIN) || !(-r $SANDBOX_BIN) || ( -O $SANDBOX_BIN) || (-G $SANDBOX_BIN) ]]; then
     echo "$SANDBOX_BIN permissions are incorrect and will be reset"
