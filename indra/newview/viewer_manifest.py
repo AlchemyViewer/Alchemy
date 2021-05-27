@@ -1218,19 +1218,10 @@ class LinuxManifest(ViewerManifest):
             self.path2basename("libvlc", "libmedia_plugin_libvlc.so")
             self.path2basename("cef", "libmedia_plugin_cef.so")
 
-        # with self.prefix(src=os.path.join(pkgdir, 'lib', 'vlc', 'plugins'), dst="bin/llplugin/vlc/plugins"):
-        #     self.path( "plugins.dat" )
-        #     self.path( "*/*.so" )
-
-        # with self.prefix(src=os.path.join(pkgdir, 'lib' ), dst="lib"):
-        #     self.path( "libvlc*.so*" )
-
         # CEF files 
-        with self.prefix(src=os.path.join(pkgdir, 'bin', 'release'), dst='bin'):
+        with self.prefix(src=os.path.join(pkgdir, 'bin', 'release'), dst=os.path.join('bin', 'llplugin')):
             self.path("chrome-sandbox")
             self.path("dullahan_host")
-
-        with self.prefix(src=os.path.join(pkgdir, 'bin', 'release'), dst=os.path.join('bin', 'llplugin')):
             self.path("snapshot_blob.bin")
             self.path("v8_context_snapshot.bin")
 
@@ -1249,7 +1240,7 @@ class LinuxManifest(ViewerManifest):
             self.path("libEGL.so")
             self.path("libGLESv2.so")
 
-        with self.prefix(src=os.path.join(pkgdir, 'resources', 'locales'), dst=os.path.join('bin', 'locales')):
+        with self.prefix(src=os.path.join(pkgdir, 'resources', 'locales'), dst=os.path.join('bin', 'llplugin', 'locales')):
             self.path("*.pak")
 
         self.path("featuretable_linux.txt")
@@ -1297,7 +1288,7 @@ class LinuxManifest(ViewerManifest):
             self.run_command(
                 ["find"] +
                 [os.path.join(self.get_dst_prefix(), dir) for dir in ('bin', 'lib')] +
-                ['-type', 'f', '!', '-name', '*.py',
+                ['-type', 'f', '!', '-name', '*.py', '!', '-name', '*.pak', '!', '-name', '*.bin',
                  '!', '-name', 'update_install', '-exec', 'strip', '-S', '{}', ';'])
 
 class Linux_i686_Manifest(LinuxManifest):
