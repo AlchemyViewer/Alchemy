@@ -50,20 +50,6 @@ add_executable(SLPlugin
     ${SLPlugin_SOURCE_FILES}
     )
 
-if (WINDOWS)
-set_target_properties(SLPlugin
-  PROPERTIES
-  LINK_FLAGS_DEBUG "/NODEFAULTLIB:\"LIBCMTD\""
-  )
-elseif (DARWIN)
-set_target_properties(SLPlugin
-  PROPERTIES
-  BUILD_WITH_INSTALL_RPATH 1
-  INSTALL_RPATH "@executable_path/../../../../Frameworks;@executable_path/../Frameworks;@executable_path/../Frameworks/plugins"
-  MACOSX_BUNDLE_INFO_PLIST ${CMAKE_CURRENT_SOURCE_DIR}/slplugin_info.plist
-  )
-endif ()
-
 target_link_libraries(SLPlugin
   ${LEGACY_STDIO_LIBS}
   ${LLPLUGIN_LIBRARIES}
@@ -72,7 +58,25 @@ target_link_libraries(SLPlugin
   ${PLUGIN_API_WINDOWS_LIBRARIES}
 )
 
-if (DARWIN)
+if (WINDOWS)
+  set_target_properties(SLPlugin
+    PROPERTIES
+    LINK_FLAGS_DEBUG "/NODEFAULTLIB:\"LIBCMTD\""
+    )
+elseif (LINUX)
+  set_target_properties(SLPlugin 
+    PROPERTIES
+    SKIP_BUILD_RPATH FALSE
+    BUILD_WITH_INSTALL_RPATH TRUE
+    INSTALL_RPATH "$ORIGIN/../lib;$ORIGIN/llplugin")
+elseif (DARWIN)
+  set_target_properties(SLPlugin
+    PROPERTIES
+    BUILD_WITH_INSTALL_RPATH 1
+    INSTALL_RPATH "@executable_path/../../../../Frameworks;@executable_path/../Frameworks;@executable_path/../Frameworks/plugins"
+    MACOSX_BUNDLE_INFO_PLIST ${CMAKE_CURRENT_SOURCE_DIR}/slplugin_info.plist
+    )
+
   # Mac version needs to link against Cocoa
   target_link_libraries(SLPlugin ${COCOA_LIBRARY})
   # Make sure the app bundle has a Resources directory (it will get populated by viewer-manifest.py later)
@@ -83,4 +87,4 @@ if (DARWIN)
       -p
       ${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/SLPlugin.app/Contents/Resources
   )
-endif (DARWIN)
+endif ()

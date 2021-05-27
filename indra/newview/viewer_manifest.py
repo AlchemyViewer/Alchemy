@@ -1218,19 +1218,10 @@ class LinuxManifest(ViewerManifest):
             self.path2basename("libvlc", "libmedia_plugin_libvlc.so")
             self.path2basename("cef", "libmedia_plugin_cef.so")
 
-        # with self.prefix(src=os.path.join(pkgdir, 'lib', 'vlc', 'plugins'), dst="bin/llplugin/vlc/plugins"):
-        #     self.path( "plugins.dat" )
-        #     self.path( "*/*.so" )
-
-        # with self.prefix(src=os.path.join(pkgdir, 'lib' ), dst="lib"):
-        #     self.path( "libvlc*.so*" )
-
         # CEF files 
-        with self.prefix(src=os.path.join(pkgdir, 'bin', 'release'), dst='bin'):
+        with self.prefix(src=os.path.join(pkgdir, 'bin', 'release'), dst=os.path.join('bin', 'llplugin')):
             self.path("chrome-sandbox")
             self.path("dullahan_host")
-
-        with self.prefix(src=os.path.join(pkgdir, 'bin', 'release'), dst=os.path.join('bin', 'llplugin')):
             self.path("snapshot_blob.bin")
             self.path("v8_context_snapshot.bin")
 
