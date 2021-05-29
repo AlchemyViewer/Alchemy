@@ -277,6 +277,17 @@
       <key>Value</key>
       <real>8.0</real>
     </map>
+    <key>AlchemyMoonWalk</key>
+      <map>
+      <key>Comment</key>
+      <string>Walking backwards when moving backwards</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <integer>0</integer>
+    </map>
     <key>AlchemyLookAtShow</key>
     <map>
       <key>Comment</key>

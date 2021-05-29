@@ -4205,7 +4205,8 @@ void LLVOAvatar::updateOrientation(LLAgent& agent, F32 speed, F32 delta_time)
 			}
 			LLVector3 velDir = getVelocity();
 			velDir.normalize();
-			if ( mSignaledAnimations.find(ANIM_AGENT_WALK) != mSignaledAnimations.end())
+			static LLCachedControl<bool> moon_walk(gSavedSettings, "AlchemyMoonWalk", false);
+			if (!moon_walk && mSignaledAnimations.find(ANIM_AGENT_WALK) != mSignaledAnimations.end())
 			{
 				F32 vpD = velDir * primDir;
 				if (vpD < -0.5f)
