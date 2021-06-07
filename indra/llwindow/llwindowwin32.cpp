@@ -819,7 +819,7 @@ LLWindowWin32::LLWindowWin32(LLWindowCallbacks* callbacks,
 	//	}
 
     // SL-12971 dual GPU display
-    DISPLAY_DEVICEA display_device;
+    DISPLAY_DEVICEW display_device;
     int             display_index = -1;
     DWORD           display_flags = 0; // EDD_GET_DEVICE_INTERFACE_NAME ?
     const size_t    display_bytes = sizeof(display_device);
@@ -830,23 +830,23 @@ LLWindowWin32::LLWindowWin32(LLWindowCallbacks* callbacks,
         {
             // CHAR DeviceName  [ 32] Adapter name
             // CHAR DeviceString[128]
-            CHAR text[256];
+            WCHAR text[256];
 
-            size_t name_len = strlen(display_device.DeviceName  );
-            size_t desc_len = strlen(display_device.DeviceString);
+            size_t name_len = wcslen(display_device.DeviceName  );
+            size_t desc_len = wcslen(display_device.DeviceString);
 
-            CHAR *name = name_len ? display_device.DeviceName   : "???";
-            CHAR *desc = desc_len ? display_device.DeviceString : "???";
+            const WCHAR* name = name_len ? display_device.DeviceName   : TEXT("???");
+			const WCHAR* desc = desc_len ? display_device.DeviceString : TEXT("???");
 
-            sprintf(text, "Display Device %d: %s, %s", display_index, name, desc);
-            LL_INFOS("Window") << text << LL_ENDL;
+			_snwprintf(text, 256, TEXT("Display Device %d: %s, %s"), display_index, name, desc);
+            LL_INFOS("Window") << ll_convert_wide_to_string(text) << LL_ENDL;
         }
 
-        ::ZeroMemory(&display_device,display_bytes);
+        ::ZeroMemory(&display_device, display_bytes);
         display_device.cb = display_bytes;
 
         display_index++;
-    }  while( EnumDisplayDevicesA(NULL, display_index, &display_device, display_flags ));
+    }  while( EnumDisplayDevicesW(NULL, display_index, &display_device, display_flags ));
 
     LL_INFOS("Window") << "Total Display Devices: " << display_index << LL_ENDL;
 
