@@ -4957,6 +4957,7 @@ void LLViewerObject::setTEImage(const U8 te, LLViewerTexture *imagep)
 
 S32 LLViewerObject::setTETextureCore(const U8 te, LLViewerTexture *image)
 {
+	LLUUID old_image_id = getTE(te)->getID();
 	const LLUUID& uuid = image->getID();
 	S32 retval = 0;
 	if (uuid != getTE(te)->getID() ||
@@ -4965,7 +4966,7 @@ S32 LLViewerObject::setTETextureCore(const U8 te, LLViewerTexture *image)
 		retval = LLPrimitive::setTETexture(te, uuid);
 		LLViewerTexture* baked_texture = getBakedTextureForMagicId(uuid);
 		mTEImages[te] = baked_texture ? baked_texture : image;
-		updateAvatarMeshVisibility(uuid,old_image_id);
+		updateAvatarMeshVisibility(uuid, old_image_id);
 		setChanged(TEXTURE);
 		if (mDrawable.notNull())
 		{
