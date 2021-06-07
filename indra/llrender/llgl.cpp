@@ -196,8 +196,6 @@ LLGLManager::LLGLManager() :
 
 	mHasSeparateSpecularColor(FALSE),
 
-	mDebugGPU(FALSE),
-
 	mDriverVersionMajor(1),
 	mDriverVersionMinor(0),
 	mDriverVersionRelease(0),
@@ -553,26 +551,11 @@ bool LLGLManager::initGL()
 
 	stop_glerror();
 	
-	setToDebugGPU();
-
-	stop_glerror();
-
 	initGLStates();
 
 	stop_glerror();
 
 	return true;
-}
-
-void LLGLManager::setToDebugGPU()
-{
-	//"MOBILE INTEL(R) 965 EXPRESS CHIP", 
-	if (mGLRenderer.find("INTEL") != std::string::npos && mGLRenderer.find("965") != std::string::npos)
-	{
-		mDebugGPU = TRUE ;
-	}
-
-	return ;
 }
 
 void LLGLManager::getGLInfo(LLSD& info)
@@ -775,7 +758,6 @@ void LLGLManager::asLLSD(LLSD& info)
 	// Other fields
 	info["has_requirements"] = mHasRequirements;
 	info["has_separate_specular_color"] = mHasSeparateSpecularColor;
-	info["debug_gpu"] = mDebugGPU;
 	info["max_vertex_range"] = mGLMaxVertexRange;
 	info["max_index_range"] = mGLMaxIndexRange;
 	info["max_texture_size"] = mGLMaxTextureSize;
@@ -911,7 +893,7 @@ void LLGLManager::initExtensions()
 	mHasTextureSwizzle = mGLVersion >= 3.3f || epoxy_has_gl_extension("GL_ARB_texture_swizzle");
 #endif
 
-#if LL_LINUX || LL_SOLARIS
+#if LL_LINUX
 	LL_INFOS() << "initExtensions() checking shell variables to adjust features..." << LL_ENDL;
 	// Our extension support for the Linux Client is very young with some
 	// potential driver gotchas, so offer a semi-secret way to turn it off.
@@ -982,7 +964,7 @@ void LLGLManager::initExtensions()
 		if (strchr(blacklist,'u')) mHasDepthClamp = FALSE;
 		
 	}
-#endif // LL_LINUX || LL_SOLARIS
+#endif // LL_LINUX
 	
 	if (!mHasMultitexture)
 	{
@@ -2162,8 +2144,9 @@ LLGLSPipelineBlendSkyBox::LLGLSPipelineBlendSkyBox(bool depth_test, bool depth_w
 
 #if LL_WINDOWS
 // Expose desired use of high-performance graphics processor to Optimus driver and to AMD driver
+// https://docs.nvidia.com/gameworks/content/technologies/desktop/optimus.htm
 extern "C" 
-{
+{ 
     __declspec(dllexport) DWORD NvOptimusEnablement = 0x00000001;
     __declspec(dllexport) int AmdPowerXpressRequestHighPerformance = 1;
 }

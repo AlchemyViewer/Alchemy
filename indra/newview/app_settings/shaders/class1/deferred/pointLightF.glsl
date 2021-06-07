@@ -123,7 +123,7 @@ void main()
     {
         discard;
     }
-//col.rgb = vec3(0);        
+
     frag_color.rgb = col;   
     frag_color.a = 0.0;
 }

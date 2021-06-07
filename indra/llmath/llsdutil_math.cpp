@@ -39,7 +39,7 @@
 
 #if LL_WINDOWS
 #include "llwin32headerslean.h"
-#elif LL_LINUX || LL_SOLARIS
+#elif LL_LINUX
 #	include <netinet/in.h>
 #elif LL_DARWIN
 #	include <arpa/inet.h>

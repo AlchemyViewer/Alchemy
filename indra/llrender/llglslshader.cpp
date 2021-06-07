@@ -33,6 +33,10 @@
 #include "llrender.h"
 #include "llvertexbuffer.h"
 
+// Print-print list of shader included source files that are linked together via glAttachObjectARB()
+// i.e. On macOS / OSX the AMD GLSL linker will display an error if a varying is left in an undefined state.
+#define DEBUG_SHADER_INCLUDES 0
+
 // Lots of STL stuff in here, using namespace std to keep things more readable
 using std::vector;
 using std::pair;
@@ -391,16 +395,28 @@ BOOL LLGLSLShader::createShader(std::vector<LLStaticHashedString> * attributes,
     mLightHash = 0xFFFFFFFF;
 
     llassert_always(!mShaderFiles.empty());
-    BOOL success = TRUE;
 
     // Create program
     mProgramObject = glCreateProgram();
+    if (mProgramObject == 0)
+    {
+        // Shouldn't happen if shader related extensions, like ARB_vertex_shader, exist.
+        LL_SHADER_LOADING_WARNS() << "Failed to create handle for shader: " << mName << LL_ENDL;
+        unloadInternal();
+        return FALSE;
+    }
+
+    BOOL success = TRUE;
     
 #if LL_DARWIN
     // work-around missing mix(vec3,vec3,bvec3)
     mDefines["OLD_SELECT"] = "1";
 #endif
     
+#if DEBUG_SHADER_INCLUDES
+    fprintf(stderr, "--- %s ---\n", mName.c_str());
+#endif // DEBUG_SHADER_INCLUDES
+
     //compile new source
     vector< pair<string,GLenum> >::iterator fileIter = mShaderFiles.begin();
     for ( ; fileIter != mShaderFiles.end(); fileIter++ )
@@ -454,11 +470,36 @@ BOOL LLGLSLShader::createShader(std::vector<LLStaticHashedString> * attributes,
     return success;
 }
 
-BOOL LLGLSLShader::attachVertexObject(std::string object_path) {
+#if DEBUG_SHADER_INCLUDES
+void dumpAttachObject( const char *func_name, GLhandleARB program_object, const std::string &object_path )
+{
+    GLcharARB* info_log;
+    GLint      info_len_expect = 0;
+    GLint      info_len_actual = 0;
+
+    glGetObjectParameterivARB(program_object, GL_OBJECT_INFO_LOG_LENGTH_ARB, &info_len_expect);
+    fprintf(stderr, " * %-20s(), log size: %d, %s\n", func_name, info_len_expect, object_path.c_str());
+
+    if (info_len_expect > 0)
+    {
+        fprintf(stderr, " ========== %s() ========== \n", func_name);
+        info_log = new GLcharARB [ info_len_expect ];
+        glGetInfoLogARB(program_object, info_len_expect, &info_len_actual, info_log);
+        fprintf(stderr, "%s\n",  info_log);
+        delete [] info_log;
+    }
+}
+#endif // DEBUG_SHADER_INCLUDES
+
+BOOL LLGLSLShader::attachVertexObject(std::string object_path)
+{
     if (LLShaderMgr::instance()->mVertexShaderObjects.count(object_path) > 0)
     {
         stop_glerror();
         glAttachShader(mProgramObject, LLShaderMgr::instance()->mVertexShaderObjects[object_path]);
+#if DEBUG_SHADER_INCLUDES
+        dumpAttachObject("attachVertexObject", mProgramObject, object_path);
+#endif // DEBUG_SHADER_INCLUDES
         stop_glerror();
         return TRUE;
     }
@@ -475,6 +516,9 @@ BOOL LLGLSLShader::attachFragmentObject(std::string object_path)
     {
         stop_glerror();
         glAttachShader(mProgramObject, LLShaderMgr::instance()->mFragmentShaderObjects[object_path]);
+#if DEBUG_SHADER_INCLUDES
+        dumpAttachObject("attachFragmentObject", mProgramObject, object_path);
+#endif // DEBUG_SHADER_INCLUDES
         stop_glerror();
         return TRUE;
     }
@@ -491,6 +535,10 @@ void LLGLSLShader::attachObject(GLuint object)
     {
         stop_glerror();
         glAttachShader(mProgramObject, object);
+#if DEBUG_SHADER_INCLUDES
+        std::string object_path("???");
+        dumpAttachObject("attachObject", mProgramObject, object_path);
+#endif // DEBUG_SHADER_INCLUDES
         stop_glerror();
     }
     else

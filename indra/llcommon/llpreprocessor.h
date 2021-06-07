@@ -34,7 +34,7 @@
 #include <endian.h>
 #endif	//	LL_LINUX
 
-#if (defined(LL_WINDOWS) || (defined(LL_LINUX) && (__BYTE_ORDER == __LITTLE_ENDIAN)) || (defined(LL_DARWIN) && defined(__LITTLE_ENDIAN__)) || (defined(LL_SOLARIS) && defined(__i386)))
+#if (defined(LL_WINDOWS) || (defined(LL_LINUX) && (__BYTE_ORDER == __LITTLE_ENDIAN)) || (defined(LL_DARWIN) && defined(__LITTLE_ENDIAN__)))
 #define LL_LITTLE_ENDIAN 1
 #else
 #define LL_BIG_ENDIAN 1

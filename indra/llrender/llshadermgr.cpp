@@ -625,13 +625,11 @@ GLuint LLShaderMgr::loadShaderFile(const std::string& filename, S32 & shader_lev
 #endif
 
 	GLenum error = GL_NO_ERROR;
-	if (gDebugGL)
+
+	error = glGetError();
+	if (error != GL_NO_ERROR)
 	{
-		error = glGetError();
-		if (error != GL_NO_ERROR)
-		{
-			LL_SHADER_LOADING_WARNS() << "GL ERROR entering loadShaderFile(): " << error << LL_ENDL;
-		}
+		LL_SHADER_LOADING_WARNS() << "GL ERROR entering loadShaderFile(): " << error << " for file: " << filename << LL_ENDL;
 	}
 	
 	if (filename.empty()) 
@@ -980,55 +978,45 @@ GLuint LLShaderMgr::loadShaderFile(const std::string& filename, S32 & shader_lev
 
 	//create shader object
 	GLuint ret = glCreateShader(type);
-	if (gDebugGL)
+
+	error = glGetError();
+	if (error != GL_NO_ERROR)
 	{
-		error = glGetError();
-		if (error != GL_NO_ERROR)
-		{
-			LL_WARNS("ShaderLoading") << "GL ERROR in glCreateShader: " << error << LL_ENDL;
-		}
+		LL_WARNS("ShaderLoading") << "GL ERROR in glCreateShader: " << error << " for file: " << open_file_name << LL_ENDL;
 	}
-	
+
 	//load source
 	glShaderSource(ret, shader_code_count, (const GLchar**) shader_code_text, NULL);
 
-	if (gDebugGL)
+	error = glGetError();
+	if (error != GL_NO_ERROR)
 	{
-		error = glGetError();
-		if (error != GL_NO_ERROR)
-		{
-			LL_WARNS("ShaderLoading") << "GL ERROR in glShaderSource: " << error << LL_ENDL;
-		}
+		LL_WARNS("ShaderLoading") << "GL ERROR in glShaderSource: " << error << " for file: " << open_file_name << LL_ENDL;
 	}
 
 	//compile source
 	glCompileShader(ret);
 
-	if (gDebugGL)
+	error = glGetError();
+	if (error != GL_NO_ERROR)
 	{
-		error = glGetError();
-		if (error != GL_NO_ERROR)
-		{
-			LL_WARNS("ShaderLoading") << "GL ERROR in glCompileShader: " << error << LL_ENDL;
-		}
+		LL_WARNS("ShaderLoading") << "GL ERROR in glCompileShader: " << error << " for file: " << open_file_name << LL_ENDL;
 	}
-		
+
 	if (error == GL_NO_ERROR)
 	{
 		//check for errors
 		GLint success = GL_TRUE;
 		glGetShaderiv(ret, GL_COMPILE_STATUS, &success);
-		if (gDebugGL || success == GL_FALSE)
+
+		error = glGetError();
+		if (error != GL_NO_ERROR || success == GL_FALSE) 
 		{
-			error = glGetError();
-			if (error != GL_NO_ERROR || success == GL_FALSE) 
-			{
-				//an error occured, print log
-				LL_WARNS("ShaderLoading") << "GLSL Compilation Error:" << LL_ENDL;
+			//an error occured, print log
+			LL_WARNS("ShaderLoading") << "GLSL Compilation Error:" << LL_ENDL;
 				dumpObjectLog(false, ret, TRUE, open_file_name);
-                dumpShaderSource(shader_code_count, shader_code_text);
-				ret = 0;
-			}
+			dumpShaderSource(shader_code_count, shader_code_text);
+			ret = 0;
 		}
 	}
 	else

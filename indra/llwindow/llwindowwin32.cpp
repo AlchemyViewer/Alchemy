@@ -521,7 +521,7 @@ LLWindowWin32::LLWindowWin32(LLWindowCallbacks* callbacks,
 	memset(mPrevGammaRamp, 0, sizeof(mPrevGammaRamp));
 	mCustomGammaSet = FALSE;
 	mWindowHandle = NULL;
-
+	
 	if (!SystemParametersInfo(SPI_GETMOUSEVANISH, 0, &mMouseVanish, 0))
 	{
 		mMouseVanish = TRUE;
@@ -818,6 +818,37 @@ LLWindowWin32::LLWindowWin32(LLWindowCallbacks* callbacks,
 	//		TrackMouseEvent( &track_mouse_event ); 
 	//	}
 
+    // SL-12971 dual GPU display
+    DISPLAY_DEVICEA display_device;
+    int             display_index = -1;
+    DWORD           display_flags = 0; // EDD_GET_DEVICE_INTERFACE_NAME ?
+    const size_t    display_bytes = sizeof(display_device);
+
+    do
+    {
+        if (display_index >= 0)
+        {
+            // CHAR DeviceName  [ 32] Adapter name
+            // CHAR DeviceString[128]
+            CHAR text[256];
+
+            size_t name_len = strlen(display_device.DeviceName  );
+            size_t desc_len = strlen(display_device.DeviceString);
+
+            CHAR *name = name_len ? display_device.DeviceName   : "???";
+            CHAR *desc = desc_len ? display_device.DeviceString : "???";
+
+            sprintf(text, "Display Device %d: %s, %s", display_index, name, desc);
+            LL_INFOS("Window") << text << LL_ENDL;
+        }
+
+        ::ZeroMemory(&display_device,display_bytes);
+        display_device.cb = display_bytes;
+
+        display_index++;
+    }  while( EnumDisplayDevicesA(NULL, display_index, &display_device, display_flags ));
+
+    LL_INFOS("Window") << "Total Display Devices: " << display_index << LL_ENDL;
 
 	//-----------------------------------------------------------------------
 	// Create GL drawing context
@@ -1380,22 +1411,22 @@ BOOL LLWindowWin32::switchContext(BOOL fullscreen, const LLCoordScreen &size, BO
     {
         // Looks like ChoosePixelFormat can crash in case of faulty driver
         if (!(pixel_format = SafeChoosePixelFormat(mhDC, &pfd)))
-        {
+	{
             LL_WARNS("Window") << "ChoosePixelFormat failed, code: " << GetLastError() << LL_ENDL;
             OSMessageBox(mCallbacks->translateString("MBPixelFmtErr"),
                 mCallbacks->translateString("MBError"), OSMB_OK);
-            close();
+		close();
             return FALSE;
         }
     }
     catch (...)
     {
         LOG_UNHANDLED_EXCEPTION("ChoosePixelFormat");
-        OSMessageBox(mCallbacks->translateString("MBPixelFmtErr"),
-            mCallbacks->translateString("MBError"), OSMB_OK);
+		OSMessageBox(mCallbacks->translateString("MBPixelFmtErr"),
+			mCallbacks->translateString("MBError"), OSMB_OK);
         close();
-        return FALSE;
-    }
+		return FALSE;
+	}
 
 	LL_INFOS("Window") << "Pixel format chosen." << LL_ENDL ;
 
@@ -1626,26 +1657,27 @@ BOOL LLWindowWin32::switchContext(BOOL fullscreen, const LLCoordScreen &size, BO
 		LL_INFOS("Window") << "pixel formats done." << LL_ENDL ;
 
 		S32 swap_method = 0;
-		S32 cur_format = 0;
+		S32   cur_format  = 0;
+const	S32   max_format  = (S32)num_formats - 1;
 		GLint swap_query = WGL_SWAP_METHOD_ARB;
 
-		BOOL found_format = FALSE;
-
-		while (!found_format && wglGetPixelFormatAttribivARB(mhDC, pixel_formats[cur_format], 0, 1, &swap_query, &swap_method))
+		// SL-14705 Fix name tags showing in front of objects with AMD GPUs.
+		// On AMD hardware we need to iterate from the first pixel format to the end.
+		// Spec:
+		//     https://www.khronos.org/registry/OpenGL/extensions/ARB/WGL_ARB_pixel_format.txt
+		while (wglGetPixelFormatAttribivARB(mhDC, pixel_formats[cur_format], 0, 1, &swap_query, &swap_method))
 		{
 			if (swap_method == WGL_SWAP_UNDEFINED_ARB)
 			{
-				found_format = TRUE;
+				break;
 			}
-			else if(cur_format >= (S32)num_formats-1)
+			else if (cur_format >= max_format)
 			{
 				cur_format = 0;
-				found_format = TRUE;
+				break;
 			}
-			else
-			{
-				++cur_format;
-			}
+
+			++cur_format;
 		}
 
 		pixel_format = pixel_formats[cur_format];

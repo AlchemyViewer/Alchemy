@@ -32,7 +32,7 @@
 
 #if LL_WINDOWS
 #	include "llwin32headerslean.h"
-#elif LL_LINUX || LL_SOLARIS || LL_DARWIN
+#elif LL_LINUX || LL_DARWIN
 #   include <errno.h>
 #	include <sys/time.h>
 #else 
@@ -106,7 +106,7 @@ F64 calc_clock_frequency()
 #endif // LL_WINDOWS
 
 
-#if LL_LINUX || LL_DARWIN || LL_SOLARIS
+#if LL_LINUX || LL_DARWIN
 // Both Linux and Mac use gettimeofday for accurate time
 F64 calc_clock_frequency()
 {

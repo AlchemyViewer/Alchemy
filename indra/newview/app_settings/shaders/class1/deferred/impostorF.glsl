@@ -40,7 +40,8 @@ uniform sampler2D specularMap;
 
 VARYING vec2 vary_texcoord0;
 
-vec3 linear_to_srgb(vec3 cl);
+vec3 linear_to_srgb(vec3 c);
+
 void main() 
 {
 	vec4 col = texture2D(diffuseMap, vary_texcoord0.xy);
