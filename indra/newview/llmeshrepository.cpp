@@ -75,6 +75,8 @@
 
 #include "boost/lexical_cast.hpp"
 #include <boost/smart_ptr/make_shared.hpp>
+#include <boost/iostreams/device/array.hpp>
+#include <boost/iostreams/stream.hpp>
 
 #ifndef LL_WINDOWS
 #include "netdb.h"
@@ -1832,27 +1834,12 @@ EMeshProcessingResult LLMeshRepoThread::headerReceived(const LLVolumeParams& mes
 	U32 header_size = 0;
 	if (data_size > 0)
 	{
-        std::istringstream stream;
-        try
-        {
-            std::string res_str((char*)data, data_size);
+		U32 dsize = data_size;
+		char* result_ptr = strip_deprecated_header((char*)data, dsize, &header_size);
 
-            std::string deprecated_header("<? LLSD/Binary ?>");
+		data_size = dsize;
 
-            if (res_str.substr(0, deprecated_header.size()) == deprecated_header)
-            {
-                res_str = res_str.substr(deprecated_header.size() + 1, data_size);
-                header_size = deprecated_header.size() + 1;
-            }
-            data_size = res_str.size();
-
-            stream.str(res_str);
-        }
-        catch (std::bad_alloc&)
-        {
-            // out of memory, we won't be able to process this mesh
-            return MESH_OUT_OF_MEMORY;
-        }
+		boost::iostreams::stream<boost::iostreams::array_source> stream(result_ptr, data_size);
 
 		if (!LLSDSerialize::fromBinary(header, stream, data_size))
 		{
