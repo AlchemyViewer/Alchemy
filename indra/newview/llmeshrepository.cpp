@@ -1938,10 +1938,7 @@ bool LLMeshRepoThread::skinInfoReceived(const LLUUID& mesh_id, U8* data, S32 dat
 	{
         try
         {
-            std::string res_str((char*)data, data_size);
-            std::istringstream stream(res_str);
-
-            U32 uzip_result = LLUZipHelper::unzip_llsd(skin, stream, data_size);
+            U32 uzip_result = LLUZipHelper::unzip_llsd(skin, data, data_size);
             if (uzip_result != LLUZipHelper::ZR_OK)
             {
                 LL_WARNS(LOG_MESH) << "Mesh skin info parse error.  Not a valid mesh asset!  ID:  " << mesh_id
@@ -1979,10 +1976,7 @@ bool LLMeshRepoThread::decompositionReceived(const LLUUID& mesh_id, U8* data, S3
     {
         try
         {
-            std::string res_str((char*)data, data_size);
-            std::istringstream stream(res_str);
-
-            U32 uzip_result = LLUZipHelper::unzip_llsd(decomp, stream, data_size);
+            U32 uzip_result = LLUZipHelper::unzip_llsd(decomp, data, data_size);
             if (uzip_result != LLUZipHelper::ZR_OK)
             {
                 LL_WARNS(LOG_MESH) << "Mesh decomposition parse error.  Not a valid mesh asset!  ID:  " << mesh_id
@@ -1991,7 +1985,7 @@ bool LLMeshRepoThread::decompositionReceived(const LLUUID& mesh_id, U8* data, S3
                 return false;
             }
         }
-        catch (std::bad_alloc&)
+        catch (const std::bad_alloc&)
         {
             LL_WARNS(LOG_MESH) << "Out of memory for mesh ID " << mesh_id << " of size: " << data_size << LL_ENDL;
             return false;
