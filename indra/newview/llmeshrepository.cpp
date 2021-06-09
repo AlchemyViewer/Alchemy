@@ -1907,19 +1907,8 @@ EMeshProcessingResult LLMeshRepoThread::lodReceived(const LLVolumeParams& mesh_p
 	}
 
 	LLPointer<LLVolume> volume = new LLVolume(mesh_params, LLVolumeLODGroup::getVolumeScaleFromDetail(lod));
-	std::istringstream stream;
-	try
-	{
-		std::string mesh_string((char*)data, data_size);
-		stream.str(mesh_string);
-	}
-	catch (const std::bad_alloc&)
-	{
-		// out of memory, we won't be able to process this mesh
-		return MESH_OUT_OF_MEMORY;
-	}
 
-	if (volume->unpackVolumeFaces(stream, data_size))
+	if (volume->unpackVolumeFaces(data, data_size))
 	{
 		if (volume->getNumFaces() > 0)
 		{
@@ -2039,20 +2028,7 @@ EMeshProcessingResult LLMeshRepoThread::physicsShapeReceived(const LLUUID& mesh_
 		volume_params.setSculptID(mesh_id, LL_SCULPT_TYPE_MESH);
 		LLPointer<LLVolume> volume = new LLVolume(volume_params,0);
 
-        std::istringstream stream;
-        try
-        {
-            std::string mesh_string((char*)data, data_size);
-            stream.str(mesh_string);
-        }
-        catch (std::bad_alloc&)
-        {
-            // out of memory, we won't be able to process this mesh
-            delete d;
-            return MESH_OUT_OF_MEMORY;
-        }
-
-		if (volume->unpackVolumeFaces(stream, data_size))
+		if (volume->unpackVolumeFaces(data, data_size))
 		{
 			//load volume faces into decomposition buffer
 			S32 vertex_count = 0;
