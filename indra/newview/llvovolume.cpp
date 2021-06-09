@@ -2582,8 +2582,10 @@ S32 LLVOVolume::setTEMaterialParams(const U8 te, const LLMaterialPtr pMaterialPa
 			LLMaterialMgr::getInstance()->setLocalMaterial(getRegion()->getRegionID(), pMaterial);
 		}
 	}
-
-	S32 res = LLViewerObject::setTEMaterialParams(te, pMaterial);
+#ifdef SHOW_DEBUG
+	S32 res = 
+#endif
+		LLViewerObject::setTEMaterialParams(te, pMaterial);
 
 #ifdef SHOW_DEBUG
 	LL_DEBUGS("MaterialTEs") << "te " << (S32)te << " material " << ((pMaterial) ? pMaterial->asLLSD() : LLSD("null")) << " res " << res
