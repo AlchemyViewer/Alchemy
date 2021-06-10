@@ -281,23 +281,9 @@ public:
 
 	};
 
-	//set of requested skin info
-	std::queue<UUIDBasedRequest> mSkinReqQ;
-
-	// list of skin info requests that have failed or are unavailaibe
-	std::queue<UUIDBasedRequest> mSkinUnavailableQ;
-
-	// list of completed skin info requests
-	std::queue<LLMeshSkinInfo> mSkinInfoQ;
-
-	//set of requested decompositions
-	std::set<UUIDBasedRequest> mDecompositionRequests;
-
-	//set of requested physics shapes
-	std::set<UUIDBasedRequest> mPhysicsShapeRequests;
-
-	// list of completed Decomposition info requests
-	std::list<LLModel::Decomposition*> mDecompositionQ;
+	/////////
+	// In flight queues
+	/////////
 
 	//queue of requested headers
 	std::queue<HeaderRequest> mHeaderReqQ;
@@ -305,11 +291,35 @@ public:
 	//queue of requested LODs
 	std::queue<LODRequest> mLODReqQ;
 
-	//queue of unavailable LODs (either asset doesn't exist or asset doesn't have desired LOD)
-	std::queue<LODRequest> mUnavailableQ;
+	//set of requested skin info
+	std::queue<UUIDBasedRequest> mSkinReqQ;
+
+	//set of requested decompositions
+	std::set<UUIDBasedRequest> mDecompositionRequests;
+
+	//set of requested physics shapes
+	std::set<UUIDBasedRequest> mPhysicsShapeRequests;
+
+	/////////
+	// Fetched and failed request queues
+	/////////
 
 	//queue of successfully loaded meshes
-	std::queue<LoadedMesh> mLoadedQ;
+	std::deque<LoadedMesh> mLoadedQ;
+
+	//queue of unavailable LODs (either asset doesn't exist or asset doesn't have desired LOD)
+	std::deque<LODRequest> mUnavailableQ;
+
+	// list of completed skin info requests
+	std::deque<LLMeshSkinInfo> mSkinInfoQ;
+
+	// list of skin info requests that have failed or are unavailaibe
+	std::deque<UUIDBasedRequest> mSkinUnavailableQ;
+
+	// list of completed Decomposition info requests
+	std::deque<LLModel::Decomposition*> mDecompositionQ;
+
+	// End
 
 	//map of pending header requests and currently desired LODs
 	typedef absl::node_hash_map<LLUUID, std::vector<S32>> pending_lod_map;
@@ -347,7 +357,7 @@ public:
 	EMeshProcessingResult physicsShapeReceived(const LLUUID& mesh_id, U8* data, S32 data_size);
 	bool hasPhysicsShapeInHeader(const LLUUID& mesh_id);
 
-	void notifyLoadedMeshes();
+	void notifyLoadedMeshes(); // Only call from main thread.
 	S32 getActualMeshLOD(const LLVolumeParams& mesh_params, S32 lod);
 	
 	void loadMeshSkinInfo(const LLUUID& mesh_id);

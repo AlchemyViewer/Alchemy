@@ -944,7 +944,7 @@ void LLMeshRepoThread::run()
                     {
                         // too many fails
 						LLMutexLock lock(mMutex);
-                        mUnavailableQ.push(req);
+                        mUnavailableQ.push_back(req);
                         LL_WARNS() << "Failed to load " << req.mMeshParams << " , skip" << LL_ENDL;
                     }
                 }
@@ -1031,7 +1031,7 @@ void LLMeshRepoThread::run()
 					else
 					{
 						LLMutexLock locker(mMutex);
-						mSkinUnavailableQ.push(req);
+						mSkinUnavailableQ.push_back(req);
 						LL_DEBUGS() << "mSkinReqQ failed: " << req.mId << LL_ENDL;
 					}
 				}
@@ -1395,19 +1395,19 @@ bool LLMeshRepoThread::fetchMeshSkinInfo(const LLUUID& mesh_id, bool can_retry)
 				else
 				{
 					LLMutexLock locker(mMutex);
-					mSkinUnavailableQ.emplace(mesh_id);
+					mSkinUnavailableQ.emplace_back(mesh_id);
 				}
 			}
 			else
 			{
 				LLMutexLock locker(mMutex);
-				mSkinUnavailableQ.emplace(mesh_id);
+				mSkinUnavailableQ.emplace_back(mesh_id);
 			}
 		}
 		else
 		{
 			LLMutexLock locker(mMutex);
-			mSkinUnavailableQ.emplace(mesh_id);
+			mSkinUnavailableQ.emplace_back(mesh_id);
 		}
 	}
 	else
@@ -1803,19 +1803,19 @@ bool LLMeshRepoThread::fetchMeshLOD(const LLVolumeParams& mesh_params, S32 lod, 
 				else
 				{
 					LLMutexLock lock(mMutex);
-					mUnavailableQ.push(LODRequest(mesh_params, lod));
+					mUnavailableQ.emplace_back(mesh_params, lod);
 				}
 			}
 			else
 			{
 				LLMutexLock lock(mMutex);
-				mUnavailableQ.push(LODRequest(mesh_params, lod));
+				mUnavailableQ.emplace_back(mesh_params, lod);
 			}
 		}
 		else
 		{
 			LLMutexLock lock(mMutex);
-			mUnavailableQ.push(LODRequest(mesh_params, lod));
+			mUnavailableQ.emplace_back(mesh_params, lod);
 		}
 	}
 	else
@@ -1915,7 +1915,7 @@ EMeshProcessingResult LLMeshRepoThread::lodReceived(const LLVolumeParams& mesh_p
 			LoadedMesh mesh(volume, mesh_params, lod);
 			{
 				LLMutexLock lock(mMutex);
-				mLoadedQ.push(mesh);
+				mLoadedQ.push_back(mesh);
 				// LLPointer is not thread safe, since we added this pointer into
 				// threaded list, make sure counter gets decreased inside mutex lock
 				// and won't affect mLoadedQ processing
@@ -1961,7 +1961,7 @@ bool LLMeshRepoThread::skinInfoReceived(const LLUUID& mesh_id, U8* data, S32 dat
 		// LL_DEBUGS(LOG_MESH) << "info pelvis offset" << info.mPelvisOffset << LL_ENDL;
 		{
 			LLMutexLock lock(mMutex);
-			mSkinInfoQ.emplace(std::move(info));
+			mSkinInfoQ.emplace_back(std::move(info));
 		}
 	}
 
@@ -2837,7 +2837,7 @@ void LLMeshUploadThread::onCompleted(LLCore::HttpHandle handle, LLCore::HttpResp
 	}
 }
 
-
+// Only call from main thread.
 void LLMeshRepoThread::notifyLoadedMeshes()
 {
 	bool update_metrics(false);
@@ -2847,103 +2847,104 @@ void LLMeshRepoThread::notifyLoadedMeshes()
 		return;
 	}
 
-	while (!mLoadedQ.empty())
+	if (!mLoadedQ.empty())
 	{
-		mMutex->lock();
-		if (mLoadedQ.empty())
+		std::deque<LoadedMesh> loaded_queue;
+
+		LLMutexLock mtx_lock(mMutex);
+		if (!mLoadedQ.empty())
 		{
-			mMutex->unlock();
-			break;
-		}
-		LoadedMesh mesh = mLoadedQ.front(); // make sure nothing else owns volume pointer by this point
-		mLoadedQ.pop();
-		mMutex->unlock();
-		
-		update_metrics = true;
-		if (mesh.mVolume->getNumVolumeFaces() > 0)
-		{
-			gMeshRepo.notifyMeshLoaded(mesh.mMeshParams, mesh.mVolume);
-		}
-		else
-		{
-			gMeshRepo.notifyMeshUnavailable(mesh.mMeshParams, 
-				LLVolumeLODGroup::getVolumeDetailFromScale(mesh.mVolume->getDetail()));
+			loaded_queue.swap(mLoadedQ);
+			mtx_lock.unlock();
+
+			update_metrics = true;
+
+			// Process the elements free of the lock
+			for (const auto& mesh : loaded_queue)
+			{
+				if (mesh.mVolume->getNumVolumeFaces() > 0)
+				{
+					gMeshRepo.notifyMeshLoaded(mesh.mMeshParams, mesh.mVolume);
+				}
+				else
+				{
+					gMeshRepo.notifyMeshUnavailable(mesh.mMeshParams,
+						LLVolumeLODGroup::getVolumeDetailFromScale(mesh.mVolume->getDetail()));
+				}
+			}
 		}
 	}
 
-	while (!mUnavailableQ.empty())
+	if (!mUnavailableQ.empty())
 	{
-		mMutex->lock();
-		if (mUnavailableQ.empty())
-		{
-			mMutex->unlock();
-			break;
-		}
-		
-		LODRequest req = mUnavailableQ.front();
-		mUnavailableQ.pop();
-		mMutex->unlock();
+		std::deque<LODRequest> unavil_queue;
 
-		update_metrics = true;
-		gMeshRepo.notifyMeshUnavailable(req.mMeshParams, req.mLOD);
+		LLMutexLock mtx_lock(mMutex);
+		if (!mUnavailableQ.empty())
+		{
+			unavil_queue.swap(mUnavailableQ);
+			mtx_lock.unlock();
+
+			update_metrics = true;
+
+			// Process the elements free of the lock
+			for (const auto& req : unavil_queue)
+			{
+				gMeshRepo.notifyMeshUnavailable(req.mMeshParams, req.mLOD);
+			}
+		}
 	}
 
 	if (!mSkinInfoQ.empty())
 	{
-		if (mMutex->trylock())
+		std::deque<LLMeshSkinInfo> skin_info_q;
+
+		LLMutexTrylock mtx_lock(mMutex);
+		if (mtx_lock.isLocked() && !mSkinInfoQ.empty())
 		{
-			std::queue<LLMeshSkinInfo> skin_info_q;
-			if (! mSkinInfoQ.empty())
-			{
-				skin_info_q.swap(mSkinInfoQ);
-			}
-			mMutex->unlock();
+			skin_info_q.swap(mSkinInfoQ);
+			mtx_lock.unlock();
 
 			// Process the elements free of the lock
-			while (!skin_info_q.empty())
+			for (auto& skin_info : skin_info_q)
 			{
-				gMeshRepo.notifySkinInfoReceived(skin_info_q.front());
-				skin_info_q.pop();
+				gMeshRepo.notifySkinInfoReceived(skin_info);
 			}
 		}
 	}
 
 	if (!mSkinUnavailableQ.empty())
 	{
-		if (mMutex->trylock())
+		std::deque<UUIDBasedRequest> skin_info_unavail_q;
+
+		LLMutexTrylock mtx_lock(mMutex);
+		if (mtx_lock.isLocked() && !mSkinUnavailableQ.empty())
 		{
-			std::queue<UUIDBasedRequest> skin_info_unavail_q;
-			if (!mSkinUnavailableQ.empty())
-			{
-				skin_info_unavail_q.swap(mSkinUnavailableQ);
-			}
-			mMutex->unlock();
+			skin_info_unavail_q.swap(mSkinUnavailableQ);
+			mtx_lock.unlock();
 
 			// Process the elements free of the lock
-			while (!skin_info_unavail_q.empty())
+			for (const auto& skin_info : skin_info_unavail_q)
 			{
-				gMeshRepo.notifySkinInfoUnavailable(skin_info_unavail_q.front().mId);
-				skin_info_unavail_q.pop();
+				gMeshRepo.notifySkinInfoUnavailable(skin_info.mId);
 			}
 		}
 	}
 
 	if (!mDecompositionQ.empty())
 	{
-		if (mMutex->trylock())
+		std::deque<LLModel::Decomposition*> decomp_q;
+
+		LLMutexTrylock mtx_lock(mMutex);
+		if (mtx_lock.isLocked() && !mDecompositionQ.empty())
 		{
-			std::list<LLModel::Decomposition*> decomp_q;
-			if (! mDecompositionQ.empty())
-			{
-				decomp_q.swap(mDecompositionQ);
-			}
-			mMutex->unlock();
+			decomp_q.swap(mDecompositionQ);
+			mtx_lock.unlock();
 
 			// Process the elements free of the lock
-			while (! decomp_q.empty())
+			for (auto decomp : decomp_q)
 			{
-				gMeshRepo.notifyDecompositionReceived(decomp_q.front());
-				decomp_q.pop_front();
+				gMeshRepo.notifyDecompositionReceived(decomp);
 			}
 		}
 	}
@@ -3166,7 +3167,7 @@ void LLMeshHeaderHandler::processFailure(LLCore::HttpStatus status)
 	LLMutexLock lock(gMeshRepo.mThread->mMutex);
 	for (int i(0); i < 4; ++i)
 	{
-		gMeshRepo.mThread->mUnavailableQ.push(LLMeshRepoThread::LODRequest(mMeshParams, i));
+		gMeshRepo.mThread->mUnavailableQ.emplace_back(mMeshParams, i);
 	}
 }
 
@@ -3195,7 +3196,7 @@ void LLMeshHeaderHandler::processData(LLCore::BufferArray * /* body */, S32 /* b
 		LLMutexLock lock(gMeshRepo.mThread->mMutex);
 		for (int i(0); i < 4; ++i)
 		{
-			gMeshRepo.mThread->mUnavailableQ.push(LLMeshRepoThread::LODRequest(mMeshParams, i));
+			gMeshRepo.mThread->mUnavailableQ.emplace_back(mMeshParams, i);
 		}
 	}
 	else if (data && data_size > 0)
@@ -3276,7 +3277,7 @@ void LLMeshHeaderHandler::processData(LLCore::BufferArray * /* body */, S32 /* b
 			LLMutexLock lock(gMeshRepo.mThread->mMutex);
 			for (int i(0); i < 4; ++i)
 			{
-				gMeshRepo.mThread->mUnavailableQ.push(LLMeshRepoThread::LODRequest(mMeshParams, i));
+				gMeshRepo.mThread->mUnavailableQ.emplace_back(mMeshParams, i);
 			}
 		}
 	}
@@ -3303,7 +3304,7 @@ void LLMeshLODHandler::processFailure(LLCore::HttpStatus status)
 					   << LL_ENDL;
 
 	LLMutexLock lock(gMeshRepo.mThread->mMutex);
-	gMeshRepo.mThread->mUnavailableQ.push(LLMeshRepoThread::LODRequest(mMeshParams, mLOD));
+	gMeshRepo.mThread->mUnavailableQ.emplace_back(mMeshParams, mLOD);
 }
 
 void LLMeshLODHandler::processData(LLCore::BufferArray * /* body */, S32 /* body_offset */,
@@ -3339,7 +3340,7 @@ void LLMeshLODHandler::processData(LLCore::BufferArray * /* body */, S32 /* body
 							   << " Not retrying."
 							   << LL_ENDL;
 			LLMutexLock lock(gMeshRepo.mThread->mMutex);
-			gMeshRepo.mThread->mUnavailableQ.push(LLMeshRepoThread::LODRequest(mMeshParams, mLOD));
+			gMeshRepo.mThread->mUnavailableQ.emplace_back(mMeshParams, mLOD);
 		}
 	}
 	else
@@ -3350,7 +3351,7 @@ void LLMeshLODHandler::processData(LLCore::BufferArray * /* body */, S32 /* body
 						   << " Data size: " << data_size
 						   << LL_ENDL;
 		LLMutexLock lock(gMeshRepo.mThread->mMutex);
-		gMeshRepo.mThread->mUnavailableQ.push(LLMeshRepoThread::LODRequest(mMeshParams, mLOD));
+		gMeshRepo.mThread->mUnavailableQ.emplace_back(mMeshParams, mLOD);
 	}
 }
 
@@ -3369,7 +3370,7 @@ void LLMeshSkinInfoHandler::processFailure(LLCore::HttpStatus status)
 					   << " (" << status.toTerseString() << ").  Not retrying."
 					   << LL_ENDL;
 		LLMutexLock lock(gMeshRepo.mThread->mMutex);
-		gMeshRepo.mThread->mSkinUnavailableQ.emplace(mMeshID);
+		gMeshRepo.mThread->mSkinUnavailableQ.emplace_back(mMeshID);
 }
 
 void LLMeshSkinInfoHandler::processData(LLCore::BufferArray * /* body */, S32 /* body_offset */,
@@ -3400,7 +3401,7 @@ void LLMeshSkinInfoHandler::processData(LLCore::BufferArray * /* body */, S32 /*
 						   << ", Unknown reason.  Not retrying."
 						   << LL_ENDL;
 		LLMutexLock lock(gMeshRepo.mThread->mMutex);
-		gMeshRepo.mThread->mSkinUnavailableQ.emplace(mMeshID);
+		gMeshRepo.mThread->mSkinUnavailableQ.emplace_back(mMeshID);
 	}
 }
 
