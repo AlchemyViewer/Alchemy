@@ -82,24 +82,37 @@ class LLMutexLock
 {
 public:
 	LLMutexLock(LLMutex* mutex)
+		: mMutex(mutex)
+		, mLocked(false)
 	{
-		mMutex = mutex;
-		
-		if(mMutex)
-			mMutex->lock();
+		lock();
 	}
+
 	~LLMutexLock()
 	{
 		unlock();
 	}
+
+	void lock()
+	{
+		if (mMutex && !mLocked)
+		{
+			mMutex->lock();
+			mLocked = true;
+		}
+	}
+
 	void unlock()
 	{
-		if (mMutex)
+		if (mMutex && mLocked)
+		{
 			mMutex->unlock();
-		mMutex = nullptr;
+			mLocked = false;
+		}
 	}
 private:
 	LLMutex* mMutex;
+	bool		mLocked;
 };
 
 //============================================================================
@@ -127,27 +140,48 @@ public:
 		: mMutex(mutex),
 		mLocked(false)
 	{
-		if (!mMutex)
-			return;
-
-		for (U32 i = 0; i < aTries; ++i)
-		{
-			mLocked = mMutex->trylock();
-			if (mLocked)
-				break;
-			std::this_thread::sleep_for(std::chrono::milliseconds(delay_ms));
-		}
+		lock(aTries, delay_ms);
 	}
 
 	~LLMutexTrylock()
 	{
-		if (mMutex && mLocked)
-			mMutex->unlock();
+		unlock();
 	}
 
 	bool isLocked() const
 	{
 		return mLocked;
+	}
+
+	void lock()
+	{
+		if (mMutex && !mLocked)
+		{
+			mLocked = mMutex->trylock();
+		}
+	}
+
+	void lock(U32 aTries, U32 delay_ms)
+	{
+		if (mMutex && !mLocked)
+		{
+			for (U32 i = 0; i < aTries; ++i)
+			{
+				mLocked = mMutex->trylock();
+				if (mLocked)
+					break;
+				std::this_thread::sleep_for(std::chrono::milliseconds(delay_ms));
+			}
+		}
+	}
+
+	void unlock()
+	{
+		if (mMutex && mLocked)
+		{
+			mMutex->unlock();
+			mLocked = false;
+		}
 	}
 	
 private:
