@@ -32,8 +32,6 @@
 #include "llframetimer.h"
 
 // This is used for the stl search_n function.
-bool eq_message_throttle_entry(const LLMessageThrottleEntry& a, const LLMessageThrottleEntry& b)
- 		{ return a.getHash() == b.getHash(); }
 
 const U64 SEC_TO_USEC = 1000000;
 		
@@ -100,8 +98,8 @@ BOOL LLMessageThrottle::addViewerAlert(const LLUUID& to, const std::string& mesg
 	LLMessageThrottleEntry entry(hash, LLFrameTimer::getTotalTime());
 
 	// Check if this message is already in the list.
-	message_list_iterator_t found = std::search_n(message_list->begin(), message_list->end(),
-												  1, entry, eq_message_throttle_entry);
+	message_list_iterator_t found = std::find_if(message_list->begin(), message_list->end(),
+												 [&entry](const message_list_t::value_type& e) { return e.getHash() == entry.getHash(); });
 
 	if (found == message_list->end())
 	{
@@ -129,8 +127,8 @@ BOOL LLMessageThrottle::addAgentAlert(const LLUUID& agent, const LLUUID& task, c
 	LLMessageThrottleEntry entry(hash, LLFrameTimer::getTotalTime());
 
 	// Check if this message is already in the list.
-	message_list_iterator_t found = std::search_n(message_list->begin(), message_list->end(),
-												  1, entry, eq_message_throttle_entry);
+	message_list_iterator_t found = std::find_if(message_list->begin(), message_list->end(),
+												 [&entry](const message_list_t::value_type& e) { return e.getHash() == entry.getHash(); });
 	
 	if (found == message_list->end())
 	{

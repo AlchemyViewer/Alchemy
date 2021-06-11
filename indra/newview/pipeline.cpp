@@ -1111,6 +1111,13 @@ void LLPipeline::updateRenderDeferred()
                       RenderAvatarVP &&
                       WindLightUseAtmosShaders &&
                       (bool) LLFeatureManager::getInstance()->isFeatureAvailable("RenderDeferred");
+// [RLVa:KB] - @setsphere
+	if (!sRenderDeferred && RlvActions::hasBehaviour(RLV_BHVR_SETSPHERE) && WindLightUseAtmosShaders)
+	{
+		LLRenderTarget::sUseFBO = true;
+		LLPipeline::sUseDepthTexture = true;
+	}
+// [/RLVa:KB]
 }
 
 // static
@@ -4429,7 +4436,7 @@ void LLPipeline::renderGeom(LLCamera& camera, bool forceVBOUpdate)
 				gGL.loadMatrix(gGLModelView);
 				LLGLSLShader::bindNoShader();
 // [RLVa:KB] - @setsphere
-				if (LLPipeline::RenderDeferred || !LLRenderTarget::sUseFBO || !LLPipeline::sUseDepthTexture)
+				if (LLPipeline::sRenderDeferred || !LLRenderTarget::sUseFBO || !LLPipeline::sUseDepthTexture)
 				{
 					doOcclusion(camera);
 				}
