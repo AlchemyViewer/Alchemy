@@ -4856,13 +4856,20 @@ void LLViewerWindow::saveImageLocal(LLImageFormatted *image, const snapshot_save
 		return;
 	}
 
-// Check if there is enough free space to save snapshot
+	// Check if there is enough free space to save snapshot
+	boost::system::error_code ec;
 #ifdef LL_WINDOWS
 	boost::filesystem::path b_path(ll_convert_string_to_wide(lastSnapshotDir));
 #else
 	boost::filesystem::path b_path(lastSnapshotDir);
 #endif
-	if (!boost::filesystem::is_directory(b_path))
+	bool is_dir = boost::filesystem::is_directory(b_path, ec);
+	if (ec.failed())
+	{
+		LL_WARNS() << "Failed check for is directory for filesystem path " << lastSnapshotDir << " : " << ec.message() << LL_ENDL;
+		return;
+	}
+	if (!is_dir)
 	{
 		LLSD args;
 		args["PATH"] = lastSnapshotDir;
@@ -4871,7 +4878,12 @@ void LLViewerWindow::saveImageLocal(LLImageFormatted *image, const snapshot_save
 		failure_cb();
 		return;
 	}
-	boost::filesystem::space_info b_space = boost::filesystem::space(b_path);
+	boost::filesystem::space_info b_space = boost::filesystem::space(b_path, ec);
+	if (ec.failed())
+	{
+		LL_WARNS() << "Failed to read disk space for filesystem path " << lastSnapshotDir << " : " << ec.message() << LL_ENDL;
+		return;
+	}
 	if (b_space.free < image->getDataSize())
 	{
 		LLSD args;
@@ -4888,6 +4900,7 @@ void LLViewerWindow::saveImageLocal(LLImageFormatted *image, const snapshot_save
 		LLNotificationsUtil::add("SnapshotToComputerFailed", args);
 
 		failure_cb();
+		return;
 	}
 	
 	// Look for an unused file name

@@ -311,6 +311,7 @@ BOOL LLFileSystem::exists()
 
 void LLFileSystem::updateFileAccessTime()
 {
+    boost::system::error_code ec;
     /**
      * Threshold in time_t units that is used to decide if the last access time
      * time of the file is updated or not. Added as a precaution for the concern
@@ -326,7 +327,12 @@ void LLFileSystem::updateFileAccessTime()
     const std::time_t cur_time = std::time(nullptr);
 
     // file last write time
-    const std::time_t last_write_time = boost::filesystem::last_write_time(mFilePath);
+    const std::time_t last_write_time = boost::filesystem::last_write_time(mFilePath, ec);
+    if (ec.failed())
+    {
+        LL_WARNS() << "Failed to read last write time for cache file " << mFilePath << ": " << ec.message() << LL_ENDL;
+        return;
+    }
 
     // delta between cur time and last time the file was written
     const std::time_t delta_time = cur_time - last_write_time;
@@ -335,7 +341,11 @@ void LLFileSystem::updateFileAccessTime()
     // before the last one
     if (delta_time > time_threshold)
     {
-        boost::filesystem::last_write_time(mFilePath, cur_time);
+        boost::filesystem::last_write_time(mFilePath, cur_time, ec);
+		if (ec.failed())
+		{
+			LL_WARNS() << "Failed to update last write time for cache file " << mFilePath << ": " << ec.message() << LL_ENDL;
+		}
     }
 }
 
