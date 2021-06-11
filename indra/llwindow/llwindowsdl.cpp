@@ -553,7 +553,7 @@ BOOL LLWindowSDL::createContext(int x, int y, int width, int height, int bits, B
         if (bmpsurface)
         {
             // This attempts to give a black-keyed mask to the icon.
-            SDL_SetColorKey(bmpsurface, SDL_TRUE, SDL_MapRGB(bmpsurface->format, 0, 0, 0));
+            SDL_SetColorKey(bmpsurface, SDL_TRUE, SDL_MapRGB(bmpsurface->format, 255, 0, 246));
             SDL_SetWindowIcon(mWindow, bmpsurface);
             // The SDL examples cheerfully avoid freeing the icon
             // surface, but I'm betting that's leaky.
