@@ -608,6 +608,7 @@ with the same filename but different name
   <texture name="SliderThumb_Disabled" file_name="widgets/SliderThumb_Disabled.png" />
   <texture name="SliderThumb_Press" file_name="widgets/SliderThumb_Press.png" />
 
+  <texture name="AL_Logo" file_name="icons/AL_Logo.png" preload="true" />
   <texture name="SL_Logo" file_name="icons/SL_Logo.png" preload="true" />
   <texture name="OBJECT_Icon" file_name="icons/object_icon.png" preload="true" />
   <texture name="Unknown_Icon" file_name="icons/unknown_icon.png" preload="true" />
