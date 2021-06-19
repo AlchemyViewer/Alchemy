@@ -51,7 +51,7 @@ const int LL_ERR_NOERR = 0;
 #define SHOW_ASSERT
 #else // _DEBUG
 
-#ifdef LL_RELEASE_WITH_DEBUG_INFO
+#if defined(LL_RELEASE_WITH_DEBUG_INFO) || defined(RELEASE_SHOW_ASSERT)
 #define SHOW_ASSERT
 #endif // LL_RELEASE_WITH_DEBUG_INFO
 
@@ -65,10 +65,6 @@ const int LL_ERR_NOERR = 0;
 
 #ifdef RELEASE_SHOW_INFO
 #define SHOW_INFO
-#endif
-
-#ifdef RELEASE_SHOW_ASSERT
-#define SHOW_ASSERT
 #endif
 
 #endif // !_DEBUG

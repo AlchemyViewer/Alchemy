@@ -121,7 +121,7 @@ bool LLVertexBuffer::sUseVAO = false;
 bool LLVertexBuffer::sPreferStreamDraw = false;
 LLVertexBuffer* LLVertexBuffer::sUtilityBuffer = nullptr;
 
-#if LL_DEBUG || LL_RELEASE_WITH_DEBUG_INFO
+#if LL_DEBUG || LL_RELEASE_WITH_DEBUG_INFO || defined(RELEASE_SHOW_ASSERT)
 static absl::flat_hash_set<U32> sActiveBufferNames;
 static absl::flat_hash_set<U32> sDeletedBufferNames;
 
