@@ -1080,55 +1080,71 @@ LLFontGL* LLFontGL::getFontDefault()
 // static 
 std::string LLFontGL::getFontPathSystem()
 {
+	static std::string sSystemFontPath;
+	if (!sSystemFontPath.empty()) return sSystemFontPath;
+
 #if LL_DARWIN
     // HACK for Mac OS X
-    return "/System/Library/Fonts/";
+	sSystemFontPath = "/System/Library/Fonts/";
 
 #elif LL_WINDOWS
-    auto system_root = LLStringUtil::getenv("SystemRoot");
-    if (! system_root.empty())
-    {
-        std::string fontpath(gDirUtilp->add(system_root, "fonts") + gDirUtilp->getDirDelimiter());
-        LL_INFOS() << "from SystemRoot: " << fontpath << LL_ENDL;
-        return fontpath;
-    }
 
-    wchar_t *pwstr = NULL;
-    HRESULT okay = SHGetKnownFolderPath(FOLDERID_Fonts, 0, NULL, &pwstr);
-    if (SUCCEEDED(okay) && pwstr)
-    {
-        std::string fontpath(ll_convert_wide_to_string(pwstr));
-        // SHGetKnownFolderPath() contract requires us to free pwstr
-        CoTaskMemFree(pwstr);
-        LL_INFOS() << "from SHGetKnownFolderPath(): " << fontpath << LL_ENDL;
-        return fontpath;
-    }
+	wchar_t* pPath = nullptr;
+	if (SHGetKnownFolderPath(FOLDERID_Fonts, 0, nullptr, &pPath) == S_OK)
+	{
+		sSystemFontPath = ll_convert_wide_to_string(pPath) + gDirUtilp->getDirDelimiter();
+		LL_INFOS() << "from SHGetKnownFolderPath(): " << sSystemFontPath << LL_ENDL;
+		CoTaskMemFree(pPath);
+		pPath = nullptr;
+	}
+	else
+	{
+		LL_WARNS() << "Unable to get system font path via SHGetKnownFolderPath, falling back to SystemRoot Env." << LL_ENDL;
+
+		// Try to figure out where the system's font files are stored.
+		auto system_root = LLStringUtil::getenv("SystemRoot");
+		if (!system_root.empty())
+		{
+			sSystemFontPath = gDirUtilp->add(system_root, "fonts") + gDirUtilp->getDirDelimiter();
+			LL_INFOS() << "from SystemRoot: " << sSystemFontPath << LL_ENDL;
+		}
+		else
+		{
+			LL_WARNS() << "SystemRoot not found, attempting to load fonts from default path." << LL_ENDL;
+			// HACK for windows 98/Me
+			sSystemFontPath = "/WINDOWS/FONTS/";
+		}
+	}
 #endif
 
-    LL_WARNS() << "Could not determine system fonts path" << LL_ENDL;
-    return {};
+	if (sSystemFontPath.empty())
+	{
+		LL_WARNS() << "Could not determine system fonts path" << LL_ENDL;
+	}
+    return sSystemFontPath;
 }
 
 
 // static 
 std::string LLFontGL::getFontPathLocal()
 {
-	std::string local_path;
+	static std::string sLocalFontPath;
+	if (!sLocalFontPath.empty()) return sLocalFontPath;
 
 	// Backup files if we can't load from system fonts directory.
 	// We could store this in an end-user writable directory to allow
 	// end users to switch fonts.
-	if (LLFontGL::sAppDir.length())
+	if (!LLFontGL::sAppDir.empty())
 	{
 		// use specified application dir to look for fonts
-		local_path = LLFontGL::sAppDir + "/fonts/";
+		sLocalFontPath = LLFontGL::sAppDir + "/fonts/";
 	}
 	else
 	{
 		// assume working directory is executable directory
-		local_path = "./fonts/";
+		sLocalFontPath = "./fonts/";
 	}
-	return local_path;
+	return sLocalFontPath;
 }
 
 void LLFontGL::renderQuad(LLVector4a* vertex_out, LLVector2* uv_out, LLColor4U* colors_out, const LLRectf& screen_rect, const LLRectf& uv_rect, const LLColor4U& color, F32 slant_amt) const
