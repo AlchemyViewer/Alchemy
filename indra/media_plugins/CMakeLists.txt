@@ -3,18 +3,9 @@
 add_subdirectory(base)
 add_subdirectory(example)
 
-if (LINUX)
-    #add_subdirectory(gstreamer010)
+if (USE_CEF)
     add_subdirectory(cef)
+endif()
+if (USE_VLC)
     add_subdirectory(libvlc)
-endif (LINUX)
-
-if (DARWIN)
-    add_subdirectory(cef)
-    add_subdirectory(libvlc)
-endif (DARWIN)
-
-if (WINDOWS)
-    add_subdirectory(cef)
-    add_subdirectory(libvlc)
-endif (WINDOWS)
+endif()

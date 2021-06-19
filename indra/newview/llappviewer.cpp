@@ -26,6 +26,8 @@
 
 #include "llviewerprecompiledheaders.h"
 
+#include "llviewerbuildconfig.h"
+
 #include "llappviewer.h"
 
 // Viewer includes
@@ -142,8 +144,13 @@
 #include "llcoros.h"
 #include "llexception.h"
 
+#if USE_CEF
 #include "cef/dullahan_version.h"
+#endif
+
+#if USE_VLC
 #include "vlc/libvlc_version.h"
+#endif
 
 // Third party library includes
 #include <boost/bind.hpp>
@@ -3253,7 +3260,7 @@ LLSD LLAppViewer::getViewerInfo() const
 		info["VOICE_VERSION"] = LLTrans::getString("NotConnected");
 	}
 
-#if defined(CEF_VERSION)
+#if USE_CEF
 	std::ostringstream cef_ver_codec;
 	cef_ver_codec << "Dullahan: ";
 	cef_ver_codec << DULLAHAN_VERSION_MAJOR;
@@ -3281,7 +3288,7 @@ LLSD LLAppViewer::getViewerInfo() const
 	info["CEF_VERSION"] = "Web Engine: Undefined";
 #endif
 
-#if defined(LIBVLC_VERSION)
+#if USE_VLC
 	std::ostringstream vlc_ver_codec;
 	vlc_ver_codec << LIBVLC_VERSION_MAJOR;
 	vlc_ver_codec << ".";

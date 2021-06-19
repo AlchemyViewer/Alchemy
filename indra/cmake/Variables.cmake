@@ -43,6 +43,9 @@ endif(USE_ASAN AND USE_LEAKSAN)
 set(VIEWER_SYMBOL_FILE "" CACHE STRING "Name of tarball into which to place symbol files")
 set(BUGSPLAT_DB "" CACHE STRING "BugSplat database name, if BugSplat crash reporting is desired")
 
+option(USE_CEF "Enable CEF media plugin" ON)
+option(USE_VLC "Enable VLC media plugin" ON)
+
 if(LIBS_CLOSED_DIR)
   file(TO_CMAKE_PATH "${LIBS_CLOSED_DIR}" LIBS_CLOSED_DIR)
 else(LIBS_CLOSED_DIR)

@@ -49,6 +49,10 @@
 #cmakedefine01 USE_FMODSTUDIO
 #cmakedefine01 USE_OPENAL
 
+// Media Plugins
+#cmakedefine01 USE_CEF
+#cmakedefine01 USE_VLC
+
 // Havok
 #cmakedefine01 HAVOK
 #cmakedefine01 HAVOK_TPV

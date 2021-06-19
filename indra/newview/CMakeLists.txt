@@ -1874,8 +1874,6 @@ if (WINDOWS)
       ${CMAKE_CURRENT_SOURCE_DIR}/featuretable.txt
       ${viewer_APPSETTINGS_FILES}
       SLPlugin
-      media_plugin_cef
-      media_plugin_libvlc
       media_plugin_example
       )
 
@@ -1890,6 +1888,18 @@ if (WINDOWS)
             ${SHARED_LIB_STAGING_DIR}/${CMAKE_CFG_INTDIR}/ortp.dll
             )
     endif (ADDRESS_SIZE EQUAL 64)
+
+    if (USE_CEF)
+      list(APPEND COPY_INPUT_DEPENDENCIES
+           media_plugin_cef
+           )
+    endif ()
+
+    if (USE_VLC)
+      list(APPEND COPY_INPUT_DEPENDENCIES
+           media_plugin_libvlc
+           )
+    endif ()
 
     if (USE_FMODSTUDIO)
       list(APPEND COPY_INPUT_DEPENDENCIES
@@ -2268,7 +2278,15 @@ if (DARWIN)
       ${CMAKE_CURRENT_SOURCE_DIR}/viewer_manifest.py
     )
 
-  add_dependencies(${VIEWER_BINARY_NAME} SLPlugin media_plugin_libvlc media_plugin_cef)
+  add_dependencies(${VIEWER_BINARY_NAME} SLPlugin)
+
+  if (USE_CEF)
+      add_dependencies(${VIEWER_BINARY_NAME} media_plugin_cef)
+  endif ()
+
+  if (USE_VLC)
+      add_dependencies(${VIEWER_BINARY_NAME} media_plugin_libvlc)
+  endif ()
 
   if (ENABLE_SIGNING)
       set(SIGNING_SETTING "--signature=${SIGNING_IDENTITY}")
