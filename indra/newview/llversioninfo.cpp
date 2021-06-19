@@ -26,6 +26,7 @@
  */
 
 #include "llviewerprecompiledheaders.h"
+#include "llviewerbuildconfig.h"
 #include "llevents.h"
 #include "lleventfilter.h"
 #include "llversioninfo.h"
@@ -51,9 +52,9 @@ LLVersionInfo::LLVersionInfo():
 	// LL_VIEWER_CHANNEL is a macro defined on the compiler command line. The
 	// macro expands to the string name of the channel, but without quotes. We
 	// need to turn it into a quoted string. LL_TO_STRING() does that.
-	mWorkingChannelName(LL_TO_STRING(LL_VIEWER_CHANNEL)),
+	mWorkingChannelName(LL_VIEWER_CHANNEL),
 	build_configuration(LLBUILD_CONFIG), // set in indra/cmake/BuildVersion.cmake
-	codename(LL_TO_STRING(LL_VIEWER_CHANNEL_CODENAME)),
+	codename(LL_VIEWER_CHANNEL_CODENAME),
 	// instantiate an LLEventMailDrop with canonical name to listen for news
 	// from SLVersionChecker
 	mPump{new LLEventMailDrop("relnotes")},

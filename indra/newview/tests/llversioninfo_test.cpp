@@ -25,16 +25,13 @@
 
 #include "linden_common.h"
 
+#include "llviewerbuildconfig.h"
+
 #include "../test/lltut.h"
 
 #include "../llversioninfo.h"
 
  #include <iostream>
-
-// LL_VIEWER_CHANNEL is a macro defined on the compiler command line. The
-// macro expands to the string name of the channel, but without quotes. We
-// need to turn it into a quoted string. LL_TO_STRING() does that.
-#define ll_viewer_channel LL_TO_STRING(LL_VIEWER_CHANNEL)
 
 namespace tut
 {
@@ -57,7 +54,7 @@ namespace tut
 			mShortVersion = stream.str();
 			stream.str("");
 
-			stream << ll_viewer_channel
+			stream << LL_VIEWER_CHANNEL
 				   << " "
 				   << mVersion;
 			mVersionAndChannel = stream.str();
@@ -69,7 +66,7 @@ namespace tut
 			mResetVersionAndChannel = stream.str();
 			stream.str("");
 
-			stream << LL_TO_STRING(LL_VIEWER_CHANNEL_CODENAME);
+			stream << LL_VIEWER_CHANNEL_CODENAME;
 			mCodename = stream.str();
 			stream.str("");
 		}
@@ -106,7 +103,7 @@ namespace tut
 					  LL_VIEWER_VERSION_BUILD);
 		ensure_equals("Channel version", 
 					  LLVersionInfo::instance().getChannel(), 
-					  ll_viewer_channel);
+					  LL_VIEWER_CHANNEL);
 		ensure_equals("Version String", 
 					  LLVersionInfo::instance().getVersion(), 
 					  mVersion);

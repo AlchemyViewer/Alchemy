@@ -26,6 +26,8 @@
 
 #include "llviewerprecompiledheaders.h"
 
+#include "llviewerbuildconfig.h"
+
 #include "llappviewer.h"
 #include "llstartup.h"
 #include "llcallstack.h"
@@ -43,8 +45,8 @@
 # include "llaudioengine_fmodstudio.h"
 #endif
 
-#ifdef LL_OPENAL
-#include "llaudioengine_openal.h"
+#if USE_OPENAL
+# include "llaudioengine_openal.h"
 #endif
 
 #include "llavatarnamecache.h"
@@ -644,7 +646,7 @@ bool idle_startup()
 			}
 #endif
 
-#ifdef LL_OPENAL
+#if USE_OPENAL
 			if (!gAudiop
 #if !LL_WINDOWS
 				&& NULL == getenv("LL_BAD_OPENAL_DRIVER")

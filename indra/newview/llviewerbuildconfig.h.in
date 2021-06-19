@@ -1,0 +1,57 @@
+/** 
+ * @file llviewerbuildconfig.h
+ * @brief Viewer build-time config options.
+ * @author Rye Mutt <rye@alchemyviewer.org>
+ *
+ * $LicenseInfo:firstyear=2019&license=viewerlgpl$
+ * Alchemy Viewer Source Code
+ * Copyright (C) 2019, Rye Mutt <rye@alchemyviewer.org>
+ * 
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation;
+ * version 2.1 of the License only.
+ * 
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ * 
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * 
+ * $/LicenseInfo$
+ */
+
+#ifndef LL_LLVIEWERBUILDCONFIG_H
+#define LL_LLVIEWERBUILDCONFIG_H
+
+// Commit SHA
+#define LL_VIEWER_COMMIT_SHA "@VIEWER_COMMIT_LONG_SHA@"
+#define LL_VIEWER_COMMIT_SHORT_SHA "@VIEWER_COMMIT_SHORT_SHA@"
+
+// Build Configuration
+#define LLBUILD_CONFIG "@CMAKE_BUILD_TYPE@"
+
+// Version Information
+#define LL_VIEWER_CHANNEL "@VIEWER_CHANNEL@"
+#define LL_VIEWER_CHANNEL_CODENAME "@VIEWER_CHANNEL_CODENAME_INTERNAL@"
+#define LL_VIEWER_VERSION_MAJOR @VIEWER_VERSION_MAJOR@
+#define LL_VIEWER_VERSION_MINOR @VIEWER_VERSION_MINOR@
+#define LL_VIEWER_VERSION_PATCH @VIEWER_VERSION_PATCH@
+#define LL_VIEWER_VERSION_BUILD @VIEWER_VERSION_REVISION@
+
+// Graphics Utils
+#cmakedefine01 USE_NVAPI
+
+// Audio Engines
+#cmakedefine01 USE_FMODSTUDIO
+#cmakedefine01 USE_OPENAL
+
+// Havok
+#cmakedefine01 HAVOK
+#cmakedefine01 HAVOK_TPV
+#define LL_HAVOK (HAVOK || HAVOK_TPV)
+
+#endif // LL_LLVIEWERBUILDCONFIG_H

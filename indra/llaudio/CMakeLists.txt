@@ -60,7 +60,7 @@ if (USE_FMODSTUDIO)
          )
 endif (USE_FMODSTUDIO)
 
-if (OPENAL)
+if (USE_OPENAL)
   include_directories(
     ${OPENAL_LIBRARIES}
     ${FREEALUT_LIBRARIES}
@@ -75,7 +75,7 @@ if (OPENAL)
     llaudioengine_openal.h
     lllistener_openal.h
     )
-endif (OPENAL)
+endif (USE_OPENAL)
 
 set_source_files_properties(${llaudio_HEADER_FILES}
                             PROPERTIES HEADER_FILE_ONLY TRUE)

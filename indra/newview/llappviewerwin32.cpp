@@ -26,6 +26,8 @@
 
 #include "llviewerprecompiledheaders.h"
 
+#include "llviewerbuildconfig.h"
+
 #ifdef INCLUDE_VLD
 #include "vld.h"
 #endif

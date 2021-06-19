@@ -65,11 +65,11 @@ if( LLPHYSICSEXTENSIONS_SRC_DIR )
   endif (NOT HAVOK_TPV)
 endif( LLPHYSICSEXTENSIONS_SRC_DIR )
 
-if(USE_FMODSTUDIO)
-  include_directories(${FMODSTUDIO_INCLUDE_DIR})
-endif(USE_FMODSTUDIO)
+message(STATUS "CMAKE_CURRENT_BINARY_DIR = ${CMAKE_CURRENT_BINARY_DIR}")
 
 include_directories(
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_BINARY_DIR}
     ${DBUSGLIB_INCLUDE_DIRS}
     ${ZLIB_INCLUDE_DIRS}
     ${GLOD_INCLUDE_DIR}
@@ -91,14 +91,17 @@ include_directories(
     ${LLWINDOW_INCLUDE_DIRS}
     ${LLXML_INCLUDE_DIRS}
     ${LLLOGIN_INCLUDE_DIRS}
-    ${LIBS_PREBUILT_DIR}/include/collada
-    ${LIBS_PREBUILD_DIR}/include/hunspell
+    "${LIBS_PREBUILT_DIR}/include/collada"
+    "${LIBS_PREBUILD_DIR}/include/hunspell"
     ${OPENAL_INCLUDE_DIRS}
     ${FREEALUT_INCLUDE_DIRS}
-    ${LIBS_PREBUILT_DIR}/include/collada/1.4
+    "${LIBS_PREBUILT_DIR}/include/collada/1.4"
     ${LLAPPEARANCE_INCLUDE_DIRS}
-    ${CMAKE_CURRENT_SOURCE_DIR}
     )
+
+if(USE_FMODSTUDIO)
+  include_directories(${FMODSTUDIO_INCLUDE_DIR})
+endif(USE_FMODSTUDIO)
 
 if (BUGSPLAT_DB)
   include_directories(
@@ -1451,16 +1454,13 @@ source_group("CMake Rules" FILES ViewerInstall.cmake)
 file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/viewer_version.txt"
            "${VIEWER_SHORT_VERSION}.${VIEWER_VERSION_REVISION}\n")
 
-set_source_files_properties(
-   llversioninfo.cpp tests/llversioninfo_test.cpp 
-   PROPERTIES
-   COMPILE_DEFINITIONS "${VIEWER_CHANNEL_VERSION_DEFINES}" # see BuildVersion.cmake
-   )
+configure_file(llviewerbuildconfig.h.in llviewerbuildconfig.h @ONLY)
+LIST(APPEND viewer_HEADER_FILES ${CMAKE_CURRENT_BINARY_DIR}/llviewerbuildconfig.h)
 
 if (DARWIN)
   LIST(APPEND viewer_SOURCE_FILES llappviewermacosx.cpp)
   LIST(APPEND viewer_SOURCE_FILES llappviewermacosx-objc.mm)
-  LIST(APPEND viewer_SOURCE_FILES llappviewermacosx-objc.h)
+  LIST(APPEND viewer_HEADER_FILES llappviewermacosx-objc.h)
   LIST(APPEND viewer_SOURCE_FILES llfilepicker_mac.mm)
   LIST(APPEND viewer_HEADER_FILES llfilepicker_mac.h)
 
@@ -1470,7 +1470,6 @@ if (DARWIN)
     llappdelegate-objc.mm
     PROPERTIES
     SKIP_PRECOMPILE_HEADERS TRUE
-    COMPILE_DEFINITIONS "${VIEWER_CHANNEL_VERSION_DEFINES}"
     # BugsplatMac is a module, imported with @import. That language feature
     # demands these -f switches.
     # Xcode 10.2 requires that Objective-C++ headers declare nullability of
@@ -1532,28 +1531,16 @@ if (DARWIN)
     )
   SOURCE_GROUP("Resources" FILES ${viewer_RESOURCE_FILES})
   list(APPEND viewer_SOURCE_FILES ${viewer_RESOURCE_FILES})
-  
-  if (OPENAL)
-    LIST(APPEND viewer_LIBRARIES ${OPENAL_LIBRARIES} ${FREEALUT_LIBRARIES})
-  endif (OPENAL)
 endif (DARWIN)
 
 if (LINUX)
     LIST(APPEND viewer_SOURCE_FILES llappviewerlinux.cpp)
-    set_source_files_properties(
-      llappviewerlinux.cpp
-      PROPERTIES
-      COMPILE_DEFINITIONS "${VIEWER_CHANNEL_VERSION_DEFINES}"
-      )
     LIST(APPEND viewer_SOURCE_FILES llappviewerlinux_api_dbus.cpp)
     SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,--as-needed")
 
     set(viewer_LIBRARIES
         Xinerama
         )
-    if (OPENAL)
-      LIST(APPEND viewer_LIBRARIES ${OPENAL_LIBRARIES} ${FREEALUT_LIBRARIES})
-    endif (OPENAL)
 endif (LINUX)
 
 if (WINDOWS)
@@ -1561,16 +1548,6 @@ if (WINDOWS)
          llappviewerwin32.cpp
          llwindebug.cpp
          )
-    set(APP_VWR_WIN32_COMPILE_DEFS ${VIEWER_CHANNEL_VERSION_DEFINES})
-    if(USE_NVAPI)
-	list(APPEND APP_VWR_WIN32_COMPILE_DEFS "USE_NVAPI=1")
-    endif()
-	 
-    set_source_files_properties(
-      llappviewerwin32.cpp
-      PROPERTIES
-      COMPILE_DEFINITIONS "${APP_VWR_WIN32_COMPILE_DEFS}"
-      )
 
     list(APPEND viewer_HEADER_FILES
          llappviewerwin32.h
@@ -1662,16 +1639,17 @@ if (WINDOWS)
     configure_file( ${CMAKE_CURRENT_SOURCE_DIR}/res/viewerRes.rc
                     ${CMAKE_CURRENT_BINARY_DIR}/viewerRes.rc
                     )
-    set(viewer_RESOURCE_FILES
+
+    list(APPEND viewer_RESOURCE_FILES
+    	windows.manifest
         ${CMAKE_CURRENT_BINARY_DIR}/viewerRes.rc
-        ${viewer_RESOURCE_FILES}
         )
 
     set_source_files_properties(${CMAKE_CURRENT_BINARY_DIR}/viewerRes.rc
       PROPERTIES COMPILE_FLAGS "-I${CMAKE_CURRENT_SOURCE_DIR}/res"
       )
 
-    SOURCE_GROUP("Resource Files" FILES ${viewer_RESOURCE_FILES})
+    source_group("Resource Files" FILES ${viewer_RESOURCE_FILES})
 
     if (NOT USESYSTEMLIBS)
         list(APPEND viewer_SOURCE_FILES ${viewer_RESOURCE_FILES})
@@ -1692,20 +1670,11 @@ if (WINDOWS)
         wer
         winspool
         )
-
-    if (ADDRESS_SIZE EQUAL 64)
-        # We deliberately omit this from the 32bit build because it declares that
-        # the viewer is compatible with Windows 10; we need that to properly detect
-        # the Windows version, but doing so causes systems with certain HD video
-        # cards to fail because Windows 10 does not support them.  Leaving this out
-        # causes those systems to run in a Windows 8 compatibility mode, which works.
-        LIST(APPEND viewer_SOURCE_FILES windows.manifest)
-    endif (ADDRESS_SIZE EQUAL 64)
-
-    if (OPENAL)
-      LIST(APPEND viewer_LIBRARIES ${OPENAL_LIBRARIES} ${FREEALUT_LIBRARIES})
-    endif (OPENAL)
 endif (WINDOWS)
+
+if (USE_OPENAL)
+    LIST(APPEND viewer_LIBRARIES ${OPENAL_LIBRARIES} ${FREEALUT_LIBRARIES})
+endif ()
 
 # Add the xui files. This is handy for searching for xui elements
 # from within the IDE.
@@ -1811,23 +1780,9 @@ if (WINDOWS)
   list(APPEND viewer_SOURCE_FILES ${viewer_INSTALLER_FILES})
 endif (WINDOWS)
 
-if (OPENAL)
-  set(LLSTARTUP_COMPILE_FLAGS "${LLSTARTUP_COMPILE_FLAGS} -DLL_OPENAL=1")
-endif (OPENAL)
-
 if (USE_FMODSTUDIO)
-  set(LLSTARTUP_COMPILE_FLAGS "${LLSTARTUP_COMPILE_FLAGS} -DUSE_FMODSTUDIO=1")
   set(FMODWRAPPER_LIBRARY ${FMODSTUDIO_LIBRARY})
 endif (USE_FMODSTUDIO)
-
-set_source_files_properties(llstartup.cpp PROPERTIES COMPILE_FLAGS "${LLSTARTUP_COMPILE_FLAGS}")
-
-if (HAVOK OR HAVOK_TPV)
-  set(LLSTARTUP_COMPILE_FLAGS "${LLSTARTUP_COMPILE_FLAGS} -DLL_HAVOK")
-endif (HAVOK OR HAVOK_TPV)
-
-# progress view disables/enables icons based on available packages
-set_source_files_properties(llprogressview.cpp PROPERTIES COMPILE_FLAGS "${LLSTARTUP_COMPILE_FLAGS}")
 
 list(APPEND viewer_SOURCE_FILES ${viewer_HEADER_FILES})
 
@@ -1944,12 +1899,12 @@ if (WINDOWS)
           )
     endif (USE_FMODSTUDIO)
 
-    if (OPENAL)
+    if (USE_OPENAL)
       list(APPEND COPY_INPUT_DEPENDENCIES
            ${SHARED_LIB_STAGING_DIR}/${CMAKE_CFG_INTDIR}/OpenAL32.dll
            ${SHARED_LIB_STAGING_DIR}/${CMAKE_CFG_INTDIR}/alut.dll
           )
-    endif (OPENAL)
+    endif ()
 
     add_custom_command(
       OUTPUT  ${CMAKE_CFG_INTDIR}/copy_touched.bat
@@ -2683,4 +2638,3 @@ set_source_files_properties(
 endif (LL_TESTS)
 
 check_message_template(${VIEWER_BINARY_NAME})
-
