@@ -28,6 +28,9 @@
 #ifndef LL_LLFORMAT_H
 #define LL_LLFORMAT_H
 
+#include <fmt/format.h>
+#include <fmt/compile.h>
+
 // Use as follows:
 // LL_INFOS() << llformat("Test:%d (%.2f %.2f)", idx, x, y) << LL_ENDL;
 //
