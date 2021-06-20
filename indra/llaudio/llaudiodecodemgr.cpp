@@ -644,14 +644,7 @@ void LLAudioDecodeMgr::Impl::processQueue(const F32 num_secs)
 
 				LL_DEBUGS() << "Decoding " << uuid << " from audio queue!" << LL_ENDL;
 
-				std::string uuid_str;
-				std::string d_path;
-
-				LLTimer timer;
-				timer.reset();
-
-				uuid.toString(uuid_str);
-				d_path = gDirUtilp->getExpandedFilename(LL_PATH_CACHE,uuid_str) + ".dsf";
+				std::string d_path = gDirUtilp->getExpandedFilename(LL_PATH_CACHE, uuid.asString()) + ".dsf";
 
 				mCurrentDecodep = new LLVorbisDecodeState(uuid, d_path);
 				if (!mCurrentDecodep->initDecode())

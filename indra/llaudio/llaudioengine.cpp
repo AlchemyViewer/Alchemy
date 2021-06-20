@@ -1836,11 +1836,7 @@ bool LLAudioData::load()
 		return true;
 	}
 
-	std::string uuid_str;
-	std::string wav_path;
-	mID.toString(uuid_str);
-	wav_path= gDirUtilp->getExpandedFilename(LL_PATH_CACHE,uuid_str) + ".dsf";
-
+	std::string wav_path = gDirUtilp->getExpandedFilename(LL_PATH_CACHE, mID.asString()) + ".dsf";
 	if (!mBufferp->loadWAV(wav_path))
 	{
 		// Hrm.  Right now, let's unset the buffer, since it's empty.
