@@ -403,9 +403,9 @@ namespace {
 }
 
 static S32 dump_num = 0;
-std::string make_dump_name(std::string prefix, S32 num)
+std::string make_dump_name(std::string_view prefix, S32 num)
 {
-	return prefix + boost::lexical_cast<std::string>(num) + std::string(".xml");
+	return fmt::format(FMT_STRING("{:s}{:d}.xml"), prefix, num);
 }
 void dump_llsd_to_file(const LLSD& content, std::string filename);
 LLSD llsd_from_file(std::string filename);

@@ -1216,7 +1216,7 @@ bool LLOutfitListGearMenuBase::onEnable(LLSD::String param)
 
 bool LLOutfitListGearMenuBase::onVisible(LLSD::String param)
 {
-	getMenu()->getChild<LLUICtrl>("upload_photo")->setLabelArg("[UPLOAD_COST]", std::to_string(LLAgentBenefitsMgr::current().getTextureUploadCost()));
+	getMenu()->getChild<LLUICtrl>("upload_photo")->setLabelArg("[UPLOAD_COST]", fmt::to_string(LLAgentBenefitsMgr::current().getTextureUploadCost()));
     const LLUUID& selected_outfit_id = getSelectedOutfitID();
     if (selected_outfit_id.isNull()) // no selection or invalid outfit selected
     {

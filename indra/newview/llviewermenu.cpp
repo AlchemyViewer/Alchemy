@@ -512,9 +512,9 @@ void init_menus()
         LLGridManager::getInstance()->isInProductionGrid());
 
 	// *TODO:Also fix cost in llfolderview.cpp for Inventory menus
-	const std::string texture_upload_cost_str = std::to_string(LLAgentBenefitsMgr::current().getTextureUploadCost());
-	const std::string sound_upload_cost_str = std::to_string(LLAgentBenefitsMgr::current().getSoundUploadCost());
-	const std::string animation_upload_cost_str = std::to_string(LLAgentBenefitsMgr::current().getAnimationUploadCost());
+	const std::string texture_upload_cost_str = fmt::to_string(LLAgentBenefitsMgr::current().getTextureUploadCost());
+	const std::string sound_upload_cost_str = fmt::to_string(LLAgentBenefitsMgr::current().getSoundUploadCost());
+	const std::string animation_upload_cost_str = fmt::to_string(LLAgentBenefitsMgr::current().getAnimationUploadCost());
 	gMenuHolder->childSetLabelArg("Upload Image", "[COST]", texture_upload_cost_str);
 	gMenuHolder->childSetLabelArg("Upload Sound", "[COST]", sound_upload_cost_str);
 	gMenuHolder->childSetLabelArg("Upload Animation", "[COST]", animation_upload_cost_str);
@@ -9248,7 +9248,7 @@ void LLUploadCostCalculator::calculateCost(const std::string& asset_type_str)
 	{
 		LL_WARNS() << "Unable to find upload cost for asset_type_str " << asset_type_str << LL_ENDL;
 	}
-	mCostStr = std::to_string(upload_cost);
+	mCostStr = fmt::to_string(upload_cost);
 }
 
 void show_navbar_context_menu(LLView* ctrl, S32 x, S32 y)

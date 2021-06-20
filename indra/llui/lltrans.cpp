@@ -337,7 +337,7 @@ std::string LLTrans::getCountString(const std::string_view language, const std::
 
 	// Translate that string
 	LLStringUtil::format_map_t args;
-	args["[COUNT]"] = std::to_string(count);
+	args["[COUNT]"] = fmt::to_string(count);
 
 	// Look up "AgeYearsB" or "AgeWeeksC" including the "form"
 	std::string key = absl::StrCat(xml_desc, form);

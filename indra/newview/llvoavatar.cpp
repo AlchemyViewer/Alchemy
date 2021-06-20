@@ -118,7 +118,6 @@
 #include "llcallstack.h"
 #include "llrendersphere.h"
 
-#include <boost/lexical_cast.hpp>
 #include "alcinematicmode.h"
 
 extern F32 SPEED_ADJUST_MAX;
@@ -4593,8 +4592,8 @@ bool LLVOAvatar::updateCharacter(LLAgent &agent)
 	}
 
     LLScopedContextString str("updateCharacter " + getFullname() + " is_control_avatar "
-                              + boost::lexical_cast<std::string>(is_control_avatar) 
-                              + " is_attachment " + boost::lexical_cast<std::string>(is_attachment));
+                              + fmt::to_string(is_control_avatar) 
+                              + " is_attachment " + fmt::to_string(is_attachment));
 #endif
 
 	// For fading out the names above heads, only let the timer

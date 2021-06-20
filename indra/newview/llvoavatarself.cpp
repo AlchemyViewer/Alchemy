@@ -71,8 +71,6 @@
 extern BOOL gTeleportDisplay;
 // [/SL:KB]
 
-#include <boost/lexical_cast.hpp>
-
 LLPointer<LLVOAvatarSelf> gAgentAvatarp = NULL;
 
 BOOL isAgentAvatarValid()
