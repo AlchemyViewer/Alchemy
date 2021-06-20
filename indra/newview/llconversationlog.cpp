@@ -431,7 +431,7 @@ bool LLConversationLog::moveLog(const std::string &originDirectory, const std::s
 			while(LLFile::isfile(backupFileName))
 			{
 				++backupFileCount;
-				backupFileName = fmt::format(FMT_COMPILE("{}{}{}"), targetDirectory, ".backup", backupFileCount);
+				backupFileName = fmt::format(FMT_STRING("{:s}{:s}{:d}"), targetDirectory, ".backup", backupFileCount);
 			}
 
 			//Rename the file to its backup name so it is not overwritten
