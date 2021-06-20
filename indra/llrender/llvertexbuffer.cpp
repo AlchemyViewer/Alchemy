@@ -224,8 +224,9 @@ void LLVBOPool::deleteBuffer(U32 name)
 
 
 LLVBOPool::LLVBOPool(U32 vboUsage, U32 vboType)
-: mUsage(vboUsage), mType(vboType)
+: mUsage(vboUsage), mType(vboType), mMissCountDirty(true)
 {
+	mFreeList.resize(LL_VBO_POOL_SEED_COUNT);
 	mMissCount.resize(LL_VBO_POOL_SEED_COUNT);
 	std::fill(mMissCount.begin(), mMissCount.end(), 0);
 }
@@ -255,6 +256,8 @@ volatile U8* LLVBOPool::allocate(U32& name, U32 size, U32 seed)
 		{ //record this miss
 			mMissCount[i]++;
 		}
+
+		mMissCountDirty = true;  // signal to ::seedPool()
 
 		if (mType == GL_ARRAY_BUFFER)
 		{
@@ -309,6 +312,7 @@ volatile U8* LLVBOPool::allocate(U32& name, U32 size, U32 seed)
 				sIndexBytesPooled += size;
 			}
 			mFreeList[i].push_back(rec);
+			mMissCountDirty = true;  // signal to ::seedPool()
 		}
 	}
 	else
@@ -326,6 +330,7 @@ volatile U8* LLVBOPool::allocate(U32& name, U32 size, U32 seed)
 		}
 
 		mFreeList[i].pop_front();
+		mMissCountDirty = true;  // signal to ::seedPool()
 	}
 
 	return ret;
@@ -350,43 +355,44 @@ void LLVBOPool::release(U32 name, volatile U8* buffer, U32 size)
 
 void LLVBOPool::seedPool()
 {
-	U32 dummy_name = 0;
-
-	if (mFreeList.size() < LL_VBO_POOL_SEED_COUNT)
+	if (mMissCountDirty)
 	{
-		mFreeList.resize(LL_VBO_POOL_SEED_COUNT);
-	}
+		U32 dummy_name = 0;
 
-	static std::vector< U32 > sizes;
-	for (U32 i = 0; i < LL_VBO_POOL_SEED_COUNT; i++)
-	{
-		if (mMissCount[i] > mFreeList[i].size())
+		static std::vector< U32 > sizes;
+		for (U32 i = 0; i < LL_VBO_POOL_SEED_COUNT; i++)
 		{
-			U32 size = i * LL_VBO_BLOCK_SIZE + LL_VBO_BLOCK_SIZE;
-
-			S32 count = mMissCount[i] - mFreeList[i].size();
-			for (S32 j = 0; j < count; ++j)
+			if (mMissCount[i] > mFreeList[i].size())
 			{
-				sizes.push_back(size);
+				U32 size = i * LL_VBO_BLOCK_SIZE + LL_VBO_BLOCK_SIZE;
+
+				S32 count = mMissCount[i] - mFreeList[i].size();
+				for (S32 j = 0; j < count; ++j)
+				{
+					sizes.push_back(size);
+				}
 			}
 		}
-	}
 
 
-	if (!sizes.empty())
-	{
-		const U32 len = sizes.size();
-		U32* names = new U32[len];
-		glGenBuffers(len, names);
-		for (U32 i = 0; i < len; ++i)
+		if (!sizes.empty())
 		{
-			validate_add_buffer(names[i]);
-			allocate(dummy_name, sizes[i], names[i]);
+			const U32 len = sizes.size();
+			U32* names = new U32[len];
+			glGenBuffers(len, names);
+			for (U32 i = 0; i < len; ++i)
+			{
+				validate_add_buffer(names[i]);
+				allocate(dummy_name, sizes[i], names[i]);
+			}
+			delete[] names;
+			glBindBuffer(mType, 0);
+
+			sizes.clear();
 		}
-		delete[] names;
-		glBindBuffer(mType, 0);
+
+		mMissCountDirty = false;
 	}
-	sizes.clear();
 }
 
 void LLVBOPool::deleteReleasedBuffers()

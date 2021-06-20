@@ -92,6 +92,7 @@ public:
 	typedef std::list<Record> record_list_t;
 	std::vector<record_list_t> mFreeList;
 	std::vector<U32> mMissCount;
+	bool mMissCountDirty;   // flag any changes to mFreeList or mMissCount
 
 };
 
