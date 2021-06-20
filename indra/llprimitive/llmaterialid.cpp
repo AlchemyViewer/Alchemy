@@ -87,17 +87,23 @@ LLSD LLMaterialID::asLLSD() const
 
 std::string LLMaterialID::asString() const
 {
-	std::string materialIDString;
-	for (unsigned int i = 0U; i < static_cast<unsigned int>(MATERIAL_ID_SIZE / sizeof(U32)); ++i)
-	{
-		if (i != 0U)
-		{
-			materialIDString += "-";
-		}
-		const U32 *value = reinterpret_cast<const U32*>(&get()[i * sizeof(U32)]);
-		materialIDString += llformat("%08x", *value);
-	}
-	return materialIDString;
+	return fmt::format(FMT_COMPILE("{:02x}{:02x}{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}"),
+		(U8)(mID[0]),
+		(U8)(mID[1]),
+		(U8)(mID[2]),
+		(U8)(mID[3]),
+		(U8)(mID[4]),
+		(U8)(mID[5]),
+		(U8)(mID[6]),
+		(U8)(mID[7]),
+		(U8)(mID[8]),
+		(U8)(mID[9]),
+		(U8)(mID[10]),
+		(U8)(mID[11]),
+		(U8)(mID[12]),
+		(U8)(mID[13]),
+		(U8)(mID[14]),
+		(U8)(mID[15]));
 }
 
 std::ostream& operator<<(std::ostream& s, const LLMaterialID &material_id)

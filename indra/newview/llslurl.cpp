@@ -397,24 +397,22 @@ std::string LLSLURL::getSLURLString() const
 // [RLVa:KB] - Checked: 2010-04-05 (RLVa-1.2.0d) | Added: RLVa-1.2.0d
 				return LLGridManager::getInstance()->getSLURLBase(mGrid) +
 					( ((!gRlvHandler.hasBehaviour(RLV_BHVR_SHOWLOC)) || (!RlvUtil::isNearbyRegion(mRegion)))
-						? (LLURI::escape(mRegion) + llformat("/%d/%d/%d",x,y,z)) : RlvStrings::getString(RlvStringKeys::Hidden::Region) );
+						? (fmt::format(FMT_COMPILE("{:s}/{:d}/{:d}/{:d}"), LLURI::escape(mRegion), x, y, z)) : RlvStrings::getString(RlvStringKeys::Hidden::Region) );
 // [/RLVa:KB]
 			}
 		case APP:
 		{
-			std::ostringstream app_url;
-			app_url << LLGridManager::getInstance()->getAppSLURLBase() << "/" << mAppCmd;
-			for(LLSD::array_const_iterator i = mAppPath.beginArray();
-				i != mAppPath.endArray();
-				i++)
+			std::string app_url;
+			absl::StrAppend(&app_url, LLGridManager::getInstance()->getAppSLURLBase(), "/", mAppCmd);
+			for(const LLSD& entry : mAppPath.array())
 			{
-				app_url << "/" << i->asString();
+				absl::StrAppend(&app_url, "/", entry.asString());
 			}
 			if(mAppQuery.length() > 0)
 			{
-				app_url << "?" << mAppQuery;
+				absl::StrAppend(&app_url, "?", mAppQuery);
 			}
-			return app_url.str();
+			return app_url;
 		}	
 		default:
 			LL_WARNS("AppInit") << "Unexpected SLURL type for SLURL string" << (int)mType << LL_ENDL;			

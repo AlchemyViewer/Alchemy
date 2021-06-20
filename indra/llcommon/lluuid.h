@@ -195,7 +195,7 @@ public:
 			const absl::FormatConversionSpec& spec,
 			absl::FormatSink* s) {
 		if (spec.conversion_char() == absl::FormatConversionChar::s) {
-			char uuid_str[UUID_STR_SIZE];
+			std::string uuid_str;
 			id.toString(uuid_str);
 			s->Append(uuid_str);
 		}

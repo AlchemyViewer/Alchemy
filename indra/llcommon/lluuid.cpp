@@ -154,8 +154,7 @@ U32 janky_fast_random_seeded_bytes(U32 seed, U32 val)
 // Common to all UUID implementations
 void LLUUID::toString(std::string& out) const
 {
-	out = llformat(
-		"%02x%02x%02x%02x-%02x%02x-%02x%02x-%02x%02x-%02x%02x%02x%02x%02x%02x",
+	out = fmt::format(FMT_COMPILE("{:02x}{:02x}{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}"),
 		(U8)(mData[0]),
 		(U8)(mData[1]),
 		(U8)(mData[2]),
@@ -417,7 +416,7 @@ LLUUID LLUUID::combine(const LLUUID &other) const
 
 std::ostream& operator<<(std::ostream& s, const LLUUID &uuid)
 {
-	char uuid_str[UUID_STR_SIZE];
+	std::string uuid_str;
 	uuid.toString(uuid_str);
 	s << uuid_str;
 	return s;
