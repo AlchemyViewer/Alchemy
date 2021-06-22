@@ -882,14 +882,13 @@ LLSD LLMemoryInfo::loadStatsMap()
 	GlobalMemoryStatusEx(&state);
 
 	DWORDLONG div = 1024;
-	DWORDLONG div_mb = 1024 * 1024;
 	stats.add("Percent Memory use", state.dwMemoryLoad);
-	stats.add("Total Physical MB",  state.ullTotalPhys/div_mb);
-	stats.add("Avail Physical MB",  state.ullAvailPhys/div_mb);
-	stats.add("Total page MB",      state.ullTotalPageFile/div_mb);
-	stats.add("Avail page MB",      state.ullAvailPageFile/div_mb);
-	stats.add("Total Virtual MB",   state.ullTotalVirtual/div_mb);
-	stats.add("Avail Virtual MB",   state.ullAvailVirtual/div_mb);
+	stats.add("Total Physical KB",  state.ullTotalPhys/div);
+	stats.add("Avail Physical KB",  state.ullAvailPhys/div);
+	stats.add("Total page KB",      state.ullTotalPageFile/div);
+	stats.add("Avail page KB",      state.ullAvailPageFile/div);
+	stats.add("Total Virtual KB",   state.ullTotalVirtual/div);
+	stats.add("Avail Virtual KB",   state.ullAvailVirtual/div);
 
 	// SL-12122 - Call to GetPerformanceInfo() was removed here. Took
 	// on order of 10 ms, causing unacceptable frame time spike every
