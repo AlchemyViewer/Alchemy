@@ -401,7 +401,7 @@ void LLDXHardware::cleanup()
 
 BOOL LLDXHardware::updateVRAM()
 {
-	SIZE_T vram = getMBVideoMemoryViaDXGI();
+	U64 vram = getMBVideoMemoryViaDXGI();
 
 	if (vram > 0)
 	{
@@ -411,12 +411,11 @@ BOOL LLDXHardware::updateVRAM()
 	return FALSE;
 }
 
-S32 LLDXHardware::getMBVideoMemoryViaDXGI()
+U64 LLDXHardware::getMBVideoMemoryViaDXGI()
 {
 	HRESULT hr;
-	BOOL bGotMemory = FALSE;
 	HRESULT hrCoInitialize = S_OK;
-	SIZE_T vram = 0;
+	U64 vram = 0;
 
 	hrCoInitialize = CoInitialize(0);
 	if (SUCCEEDED(hrCoInitialize))
@@ -426,34 +425,35 @@ S32 LLDXHardware::getMBVideoMemoryViaDXGI()
 		hr = CreateDXGIFactory1(IID_PPV_ARGS(&pDXGIFactory));
 		if (SUCCEEDED(hr))
 		{
-			assert(pDXGIFactory != 0);
-
-			for (UINT index = 0; ; ++index)
+			llassert(pDXGIFactory != 0);
+			IDXGIAdapter1* dxgiAdapter = nullptr;
+			IDXGIAdapter1* tmpDxgiAdapter = nullptr;
+			UINT adapterIndex = 0;
+			while (pDXGIFactory->EnumAdapters1(adapterIndex, &tmpDxgiAdapter) != DXGI_ERROR_NOT_FOUND)
 			{
-				IDXGIAdapter1* pAdapter = nullptr;
-				hr = pDXGIFactory->EnumAdapters1(index, &pAdapter);
-				if (FAILED(hr)) // DXGIERR_NOT_FOUND is expected when the end of the list is hit
-					break;
-
 				DXGI_ADAPTER_DESC1 desc;
-				memset(&desc, 0, sizeof(DXGI_ADAPTER_DESC1));
-				if (SUCCEEDED(pAdapter->GetDesc1(&desc)))
+				hr = tmpDxgiAdapter->GetDesc1(&desc);
+				if (SUCCEEDED(hr) && !dxgiAdapter && desc.Flags == 0 && tmpDxgiAdapter)
 				{
-					if (desc.Flags == 0)
-					{
-						vram = desc.DedicatedVideoMemory;
-						bGotMemory = TRUE;
-					}
+					tmpDxgiAdapter->QueryInterface(IID_PPV_ARGS(&dxgiAdapter));
 				}
-				SAFE_RELEASE(pAdapter);
-				if (bGotMemory != FALSE)
-					break;
+				SAFE_RELEASE(tmpDxgiAdapter);
+				++adapterIndex;
 			}
+			if (dxgiAdapter != nullptr)
+			{
+				DXGI_ADAPTER_DESC1 desc;
+				dxgiAdapter->GetDesc1(&desc);
+				vram = desc.DedicatedVideoMemory;
+
+				SAFE_RELEASE(dxgiAdapter);
+			}
+
 			SAFE_RELEASE(pDXGIFactory);
 		}
 		CoUninitialize();
 	}
-	return vram / (1024 * 1024);
+	return vram;
 }
 
 LLSD LLDXHardware::getDisplayInfo()
