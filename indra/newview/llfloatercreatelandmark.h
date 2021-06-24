@@ -35,7 +35,7 @@ class LLLineEditor;
 class LLTextEditor;
 class LLLandmarksInventoryObserver;
 
-class LLFloaterCreateLandmark:
+class LLFloaterCreateLandmark final :
 	public LLFloater
 {
 	friend class LLFloaterReg;
@@ -45,8 +45,9 @@ public:
 	LLFloaterCreateLandmark(const LLSD& key);
 	~LLFloaterCreateLandmark();
 
-	BOOL postBuild();
-	void onOpen(const LLSD& key);
+	BOOL postBuild() override;
+	void onOpen(const LLSD& key) override;
+	void onClose(bool app_quitting) override;
 
 	void setItem(const uuid_set_t& items);
 

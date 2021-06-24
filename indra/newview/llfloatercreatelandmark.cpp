@@ -109,6 +109,16 @@ void LLFloaterCreateLandmark::onOpen(const LLSD& key)
 	populateFoldersList(dest_folder);
 }
 
+void LLFloaterCreateLandmark::onClose(bool app_quitting)
+{
+	if (!mItem.isNull())
+	{
+		LLUUID item_id = mItem->getUUID();
+		remove_inventory_item(item_id, NULL);
+		mItem = nullptr;
+	}
+}
+
 void LLFloaterCreateLandmark::setLandmarkInfo(const LLUUID &folder_id)
 {
 	LLViewerParcelMgr* parcel_mgr = LLViewerParcelMgr::getInstance();
@@ -281,6 +291,8 @@ void LLFloaterCreateLandmark::onSaveClicked()
 	gInventory.updateItem(new_item);
 	gInventory.notifyObservers();
 
+	mItem = nullptr;
+
 	closeFloater();
 }
 
@@ -290,6 +302,7 @@ void LLFloaterCreateLandmark::onCancelClicked()
 	{
 		LLUUID item_id = mItem->getUUID();
 		remove_inventory_item(item_id, NULL);
+		mItem = nullptr;
 	}
 	closeFloater();
 }

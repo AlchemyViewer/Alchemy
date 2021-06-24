@@ -3,7 +3,7 @@
  can_resize="false"
  show_title="false"
  can_minimize="false"
- can_close="false"
+ can_close="true"
  header_height="10"
  bg_opaque_image="Window_NoTitle_Foreground"
  bg_alpha_image="Window_NoTitle_Background"
