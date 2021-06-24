@@ -76,6 +76,7 @@ LLNotificationForm::FormButton::FormButton()
 	text("text"),
 	ignore("ignore"),
 	is_default("default"),
+	width("width", 0),
 	type("type")
 {
 	// set type here so it gets serialized

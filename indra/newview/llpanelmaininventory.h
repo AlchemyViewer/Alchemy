@@ -93,6 +93,8 @@ public:
 
 	void toggleFindOptions();
 
+    void resetFilters();
+
 protected:
 	//
 	// Misc functions
@@ -118,7 +120,6 @@ protected:
 	void openAllFolders();
 	void closeAllFolders();
 	void doCreate(const LLSD& userdata);
-	void resetFilters();
 	void setSortBy(const LLSD& userdata);
 	void saveTexture(const LLSD& userdata);
 	bool isSaveTextureEnabled(const LLSD& userdata);
@@ -170,7 +171,9 @@ protected:
 private:
 	LLDragAndDropButton*		mTrashButton;
 	LLToggleableMenu*			mMenuGearDefault;
+	LLToggleableMenu*			mMenuVisibility;
 	LLMenuButton*				mGearMenuButton;
+	LLMenuButton*				mVisibilityMenuButton;
 	LLHandle<LLView>			mMenuAddHandle;
 
 	bool						mNeedUploadCost;

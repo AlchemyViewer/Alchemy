@@ -188,6 +188,8 @@
        function="Particle.Mute" />
       <menu_item_call.on_enable
        function="EnableMuteParticle" />
+      <menu_item_call.on_visible
+       function="EnableMuteParticle" />
     </menu_item_call>
     <menu_item_call
      label="Report"

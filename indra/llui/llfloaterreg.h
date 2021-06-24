@@ -102,6 +102,7 @@ public:
 	
 	static void add(const std::string& name, const std::string& file, const LLFloaterBuildFunc& func,
 					const std::string& groupname = std::string());
+	static bool isRegistered(const std::string& name);
 
 	// Helpers
 	static LLFloater* getLastFloaterInGroup(std::string_view name);
