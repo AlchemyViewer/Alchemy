@@ -35,7 +35,6 @@
 #include "lluictrlfactory.h"
 #include "lltabcontainer.h"
 #include "llaccordionctrltab.h"
-#include "lluiusage.h"
 
 static LLDefaultChildRegistry::Register<LLUICtrl> r("ui_ctrl");
 
@@ -439,8 +438,6 @@ void LLUICtrl::onCommit()
 		if (!mFunctionName.empty())
 		{
 			LL_DEBUGS("UIUsage") << "calling commit function " << mFunctionName << LL_ENDL;
-			LLUIUsage::instance().logCommand(mFunctionName);
-			LLUIUsage::instance().logControl(getPathname());
 		}
 		else
 		{

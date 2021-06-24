@@ -38,7 +38,6 @@
 #include "llrender.h"
 #include "llfloater.h"
 #include "lltrans.h"
-#include "lluiusage.h"
 
 //----------------------------------------------------------------------------
 
@@ -1569,8 +1568,6 @@ BOOL LLTabContainer::setTab(S32 which)
 			
 			if (is_selected)
 			{
-				LLUIUsage::instance().logPanel(tuple->mTabPanel->getName());
-
 				// Make sure selected tab is within scroll region
 				if (mIsVertical)
 				{

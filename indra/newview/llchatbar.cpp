@@ -59,7 +59,6 @@
 #include "llmultigesture.h"
 #include "llui.h"
 #include "lluictrlfactory.h"
-#include "lluiusage.h"
 #include "llviewerchat.h"
 // [RLVa:KB] - Checked: 2010-02-27 (RLVa-1.2.0b)
 #include "rlvactions.h"
@@ -579,8 +578,6 @@ void LLChatBar::sendChatFromViewer(const LLWString &wtext, EChatType type, BOOL 
 	// how to chat
 	gWarningSettings.setBOOL("FirstOtherChatBeforeUser", FALSE);
 
-	LLUIUsage::instance().logCommand("Chat.Send"); // Pseudo-command
-	
 	// Look for "/20 foo" channel chats.
 	S32 channel = 0;
 	LLWString out_text = stripChannelNumber(wtext, &channel);

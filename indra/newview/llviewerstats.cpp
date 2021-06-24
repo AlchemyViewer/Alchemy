@@ -62,7 +62,6 @@
 #include "llsdutil.h"
 #include "llcorehttputil.h"
 #include "llvoicevivox.h"
-#include "lluiusage.h"
 
 namespace LLStatViewer
 {
@@ -577,7 +576,7 @@ void send_viewer_stats(bool include_preferences)
 	fail["invalid"] = (S32) gMessageSystem->mInvalidOnCircuitPackets;
 	fail["missing_updater"] = (S32) LLAppViewer::instance()->isUpdaterMissing();
 
-	body["ui"] = LLUIUsage::instance().asLLSD();
+	body["ui"] = LLSD();
 		
 	body["stats"]["voice"] = LLVoiceVivoxStats::getInstance()->read();
 

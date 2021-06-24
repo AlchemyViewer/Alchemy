@@ -32,7 +32,6 @@
 #include "llfloater.h"
 #include "llmultifloater.h"
 #include "llfloaterreglistener.h"
-#include "lluiusage.h"
 
 //*******************************************************
 
