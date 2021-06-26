@@ -650,7 +650,7 @@ public:
 	void add(const LLSD::String& name, const T& value,
 			 typename boost::enable_if<boost::is_integral<T> >::type* = 0)
 	{
-		mStats[name] = LLSD::Integer(value);
+		mStats[name] = LLSD::Integer(llmin<T>(value, S32_MAX));
 	}
 
 	// Store every floating-point type as LLSD::Real.
@@ -699,8 +699,10 @@ static U32Kilobytes LLMemoryAdjustKBResult(U32Kilobytes inKB)
 U32Kilobytes LLMemoryInfo::getPhysicalMemoryKB() const
 {
 #if LL_WINDOWS
-	return LLMemoryAdjustKBResult(U32Kilobytes(mStatsMap["Total Physical KB"].asInteger()));
-
+	MEMORYSTATUSEX state = {};
+	state.dwLength = sizeof(state);
+	GlobalMemoryStatusEx(&state);
+	return LLMemoryAdjustKBResult(U64Bytes(state.ullTotalPhys));
 #elif LL_DARWIN
 	// This might work on Linux as well.  Someone check...
 	uint64_t phys = 0;
@@ -726,7 +728,7 @@ U32Kilobytes LLMemoryInfo::getPhysicalMemoryKB() const
 void LLMemoryInfo::getAvailableMemoryKB(U32Kilobytes& avail_physical_mem_kb, U32Kilobytes& avail_virtual_mem_kb)
 {
 #if LL_WINDOWS
-	MEMORYSTATUSEX state;
+	MEMORYSTATUSEX state = {};
 	state.dwLength = sizeof(state);
 	GlobalMemoryStatusEx(&state);
 
