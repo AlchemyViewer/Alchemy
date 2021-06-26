@@ -80,7 +80,7 @@
    layout="topleft"
    left_pad="3"
    max_length_chars="300"
-   highlight_text_field="true"
+   highlight_text_field="false"
    name="inventory search editor"
    width="177" />
   <tab_container

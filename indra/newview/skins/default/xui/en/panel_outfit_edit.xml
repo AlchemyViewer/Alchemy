@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes" ?>
 <!-- Side tray Outfit Edit panel -->
 <panel
-        background_visible="true"
         border="false"
         height="600"
         follows="all"
@@ -79,7 +78,7 @@
             layout="topleft"
             left_pad="10"
             name="title"
-            text_color="LtGray"
+            text_color="White"
             top="0"
             value="Edit outfit parts"
             use_ellipses="true"
@@ -135,7 +134,7 @@
                     layout="topleft"
                     name="curr_outfit_name"
                     parse_urls="false"
-                    text_color="LtGray"
+                    text_color="White"
                     top_pad="2"
                     value="[Current Outfit]"
                     use_ellipses="true"

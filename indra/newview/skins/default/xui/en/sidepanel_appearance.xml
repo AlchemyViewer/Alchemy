@@ -1,6 +1,5 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes" ?>
 <panel
-background_visible="true"
 default_tab_group="1"
 follows="all"
 height="570"
@@ -25,9 +24,8 @@ width="333">
    name="Changing outfits"
    value="Changing outfits" />
    <panel
-   background_opaque="true"
    background_visible="true"
-   bg_opaque_color="DkGray2"
+   bg_alpha_color="DkGray2"
    left="10"
    top="5"
    follows="left|top|right"
