@@ -10843,8 +10843,7 @@ void LLVOAvatar::calculateUpdateRenderComplexity()
 			}
 
 			// print any avatar textures we didn't already know about
-		    for (LLAvatarAppearanceDictionary::Textures::const_iterator iter = LLAvatarAppearanceDictionary::getInstance()->getTextures().begin();
-			 iter != LLAvatarAppearanceDictionary::getInstance()->getTextures().end();
+		    for (const auto& tex_pair :LLAvatarAppearance::getDictionary()->getTextures())
 			{
 			    const LLAvatarAppearanceDictionary::TextureEntry *texture_dict = tex_pair.second;
 				// TODO: MULTI-WEARABLE: handle multiple textures for self

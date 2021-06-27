@@ -588,7 +588,7 @@ void LLControlAvatar::updateAnimations()
                 anims[anim_pair.first] = anim_pair.second;
             }
 #ifdef SHOW_DEBUG
-            LL_DEBUGS("AnimatedObjectsNotify") << "found anim for vol " << volp->getID() << " anim " << anim_it->first << " root " << mRootVolp->getID() << LL_ENDL;
+            LL_DEBUGS("AnimatedObjectsNotify") << "found anim for vol " << volp->getID() << " anim " << anim_pair.first << " root " << mRootVolp->getID() << LL_ENDL;
 #endif
         }
     }
