@@ -73,11 +73,6 @@ endif (EXISTS ${CMAKE_SOURCE_DIR}/Server.cmake)
 set(TEMPLATE_VERIFIER_OPTIONS "" CACHE STRING "Options for scripts/template_verifier.py")
 set(TEMPLATE_VERIFIER_MASTER_URL "https://git.alchemyviewer.org/alchemy/master-message-template/-/raw/master/message_template.msg" CACHE STRING "Location of the master message template")
 
-if (NOT CMAKE_BUILD_TYPE)
-  set(CMAKE_BUILD_TYPE RelWithDebInfo CACHE STRING
-      "Build type.  One of: Debug Release RelWithDebInfo" FORCE)
-endif (NOT CMAKE_BUILD_TYPE)
-
 # If someone has specified an address size, use that to determine the
 # architecture.  Otherwise, let the architecture specify the address size.
 if (ADDRESS_SIZE EQUAL 32)
