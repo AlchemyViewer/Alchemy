@@ -3592,7 +3592,7 @@ LLColor4 LLVOAvatar::getNameTagColor(bool is_friend)
 	static std::vector<LLUIColor> sNameTagColors;
 	if (sNameTagColors.empty())
 	{
-		sNameTagColors.reserve(ENameColor::Size);
+		sNameTagColors.resize(ENameColor::Size);
 
 		auto& inst = LLUIColorTable::instance();
 		sNameTagColors[NameTagFriend] = inst.getColor("NameTagFriend");
