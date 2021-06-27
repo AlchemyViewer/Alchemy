@@ -1663,6 +1663,9 @@ if (WINDOWS)
         list(APPEND viewer_SOURCE_FILES ${viewer_RESOURCE_FILES})
     endif (NOT USESYSTEMLIBS)
 
+    set_source_files_properties(llappviewer.cpp PROPERTIES COMPILE_FLAGS /bigobj)
+    set_source_files_properties(llviewermenu.cpp PROPERTIES COMPILE_FLAGS /bigobj)
+
 # see EXP-1765 - theory is opengl32.lib needs to be included before gdi32.lib (windows libs)
     set(viewer_LIBRARIES
         opengl32
@@ -1864,20 +1867,11 @@ if (WINDOWS)
       ${SHARED_LIB_STAGING_DIR}/${CMAKE_CFG_INTDIR}/libapr-1.dll
       ${SHARED_LIB_STAGING_DIR}/${CMAKE_CFG_INTDIR}/libaprutil-1.dll
       ${SHARED_LIB_STAGING_DIR}/${CMAKE_CFG_INTDIR}/libapriconv-1.dll
-      ${SHARED_LIB_STAGING_DIR}/Release/glod.dll
-      ${SHARED_LIB_STAGING_DIR}/RelWithDebInfo/glod.dll
-      #${SHARED_LIB_STAGING_DIR}/Debug/glod.dll
-      ${SHARED_LIB_STAGING_DIR}/Release/openjp2.dll
-      ${SHARED_LIB_STAGING_DIR}/RelWithDebInfo/openjp2.dll
-      #${SHARED_LIB_STAGING_DIR}/Debug/openjp2.dll
-      ${SHARED_LIB_STAGING_DIR}/Release/libhunspell.dll
-      ${SHARED_LIB_STAGING_DIR}/RelWithDebInfo/libhunspell.dll
-      #${SHARED_LIB_STAGING_DIR}/Debug/libhunspell.dll
-      ${SHARED_LIB_STAGING_DIR}/Release/epoxy-0.dll
-      ${SHARED_LIB_STAGING_DIR}/RelWithDebInfo/epoxy-0.dll
-      #${SHARED_LIB_STAGING_DIR}/Debug/epoxy-0.dll
+      ${SHARED_LIB_STAGING_DIR}/${CMAKE_CFG_INTDIR}/glod.dll
+      ${SHARED_LIB_STAGING_DIR}/${CMAKE_CFG_INTDIR}/openjp2.dll
+      ${SHARED_LIB_STAGING_DIR}/${CMAKE_CFG_INTDIR}/libhunspell.dll
+      ${SHARED_LIB_STAGING_DIR}/${CMAKE_CFG_INTDIR}/epoxy-0.dll
       ${SHARED_LIB_STAGING_DIR}/${CMAKE_CFG_INTDIR}/SLVoice.exe
-      ${GOOGLE_PERF_TOOLS_SOURCE}
       ${CMAKE_CURRENT_SOURCE_DIR}/licenses-win32.txt
       ${CMAKE_CURRENT_SOURCE_DIR}/featuretable.txt
       ${viewer_APPSETTINGS_FILES}
@@ -1885,6 +1879,39 @@ if (WINDOWS)
       media_plugin_example
       )
 
+
+    if (GEN_IS_MULTI_CONFIG)
+      list(APPEND COPY_INPUT_DEPENDENCIES
+          ${SHARED_LIB_STAGING_DIR}/Release/libexpat.dll
+          ${SHARED_LIB_STAGING_DIR}/RelWithDebInfo/libexpat.dll
+          ${SHARED_LIB_STAGING_DIR}/Debug/libexpatd.dll
+          )
+    elseif (uppercase_CMAKE_BUILD_TYPE MATCHES DEBUG)
+      list(APPEND COPY_INPUT_DEPENDENCIES
+          ${SHARED_LIB_STAGING_DIR}/${CMAKE_CFG_INTDIR}/libexpatd.dll
+          )
+    else()
+      list(APPEND COPY_INPUT_DEPENDENCIES
+          ${SHARED_LIB_STAGING_DIR}/${CMAKE_CFG_INTDIR}/libexpat.dll
+          )
+    endif()
+
+    if (GEN_IS_MULTI_CONFIG)
+      list(APPEND COPY_INPUT_DEPENDENCIES
+          ${SHARED_LIB_STAGING_DIR}/Release/xmlrpc-epi.dll
+          ${SHARED_LIB_STAGING_DIR}/RelWithDebInfo/xmlrpc-epi.dll
+          ${SHARED_LIB_STAGING_DIR}/Debug/xmlrpc-epid.dll
+          )
+    elseif (uppercase_CMAKE_BUILD_TYPE MATCHES DEBUG)
+      list(APPEND COPY_INPUT_DEPENDENCIES
+          ${SHARED_LIB_STAGING_DIR}/${CMAKE_CFG_INTDIR}/xmlrpc-epid.dll
+          )
+    else()
+      list(APPEND COPY_INPUT_DEPENDENCIES
+          ${SHARED_LIB_STAGING_DIR}/${CMAKE_CFG_INTDIR}/xmlrpc-epi.dll
+          )
+    endif()
+    
     if (ADDRESS_SIZE EQUAL 64)
         list(APPEND COPY_INPUT_DEPENDENCIES
             ${SHARED_LIB_STAGING_DIR}/${CMAKE_CFG_INTDIR}/vivoxsdk_x64.dll
@@ -1910,11 +1937,21 @@ if (WINDOWS)
     endif ()
 
     if (USE_FMODSTUDIO)
-      list(APPEND COPY_INPUT_DEPENDENCIES
-           ${SHARED_LIB_STAGING_DIR}/Release/fmod.dll
-           ${SHARED_LIB_STAGING_DIR}/RelWithDebInfo/fmod.dll
-           #${SHARED_LIB_STAGING_DIR}/Debug/fmodL.dll
-          )
+      if (GEN_IS_MULTI_CONFIG)
+        list(APPEND COPY_INPUT_DEPENDENCIES
+            ${SHARED_LIB_STAGING_DIR}/Release/fmod.dll
+            ${SHARED_LIB_STAGING_DIR}/RelWithDebInfo/fmod.dll
+            ${SHARED_LIB_STAGING_DIR}/Debug/fmodL.dll
+            )
+      elseif (uppercase_CMAKE_BUILD_TYPE MATCHES DEBUG)
+        list(APPEND COPY_INPUT_DEPENDENCIES
+            ${SHARED_LIB_STAGING_DIR}/${CMAKE_CFG_INTDIR}/fmodL.dll
+            )
+      else()
+        list(APPEND COPY_INPUT_DEPENDENCIES
+            ${SHARED_LIB_STAGING_DIR}/${CMAKE_CFG_INTDIR}/fmod.dll
+            )
+      endif()
     endif (USE_FMODSTUDIO)
 
     if (USE_OPENAL)
@@ -2017,12 +2054,10 @@ if (WINDOWS)
 
       add_custom_target(llpackage ALL DEPENDS
         ${CMAKE_CFG_INTDIR}/touched.bat
-        windows-setup-build-all
         )
         # temporarily disable packaging of event_host until hg subrepos get
         # sorted out on the parabuild cluster...
         #${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/event_host.tar.bz2)
-
     endif (PACKAGE)
 elseif (DARWIN)
     set_target_properties(${VIEWER_BINARY_NAME}

@@ -13,22 +13,48 @@ include(Linking)
 # copy_if_different commands. Encapsulate that usage.
 # Pass FROM_DIR, TARGETS and the files to copy. TO_DIR is implicit.
 # to_staging_dirs diverges from copy_if_different in that it appends to TARGETS.
-MACRO(to_staging_dirs from_dir targets)
+MACRO(to_debug_staging_dirs from_dir targets)
   foreach(staging_dir
-          "${SHARED_LIB_STAGING_DIR_RELEASE}"
+          "${SHARED_LIB_STAGING_DIR_DEBUG}")
+    copy_if_different("${from_dir}" "${staging_dir}" out_targets ${ARGN})
+    list(APPEND "${targets}" "${out_targets}")
+  endforeach()
+ENDMACRO(to_debug_staging_dirs from_dir to_dir targets)
+
+MACRO(to_relwithdeb_staging_dirs from_dir targets)
+  foreach(staging_dir
           "${SHARED_LIB_STAGING_DIR_RELWITHDEBINFO}")
     copy_if_different("${from_dir}" "${staging_dir}" out_targets ${ARGN})
     list(APPEND "${targets}" "${out_targets}")
   endforeach()
-ENDMACRO(to_staging_dirs from_dir to_dir targets)
+ENDMACRO(to_relwithdeb_staging_dirs from_dir to_dir targets)
+
+MACRO(to_release_staging_dirs from_dir targets)
+  foreach(staging_dir
+          "${SHARED_LIB_STAGING_DIR_RELEASE}")
+    copy_if_different("${from_dir}" "${staging_dir}" out_targets ${ARGN})
+    list(APPEND "${targets}" "${out_targets}")
+  endforeach()
+ENDMACRO(to_release_staging_dirs from_dir to_dir targets)
+
+string(TOUPPER "${CMAKE_BUILD_TYPE}" uppercase_CMAKE_BUILD_TYPE)
 
 ###################################################################
 # set up platform specific lists of files that need to be copied
 ###################################################################
 if(WINDOWS)
-    set(SHARED_LIB_STAGING_DIR_DEBUG            "${SHARED_LIB_STAGING_DIR}/Debug")
-    set(SHARED_LIB_STAGING_DIR_RELWITHDEBINFO   "${SHARED_LIB_STAGING_DIR}/RelWithDebInfo")
-    set(SHARED_LIB_STAGING_DIR_RELEASE          "${SHARED_LIB_STAGING_DIR}/Release")
+message(STATUS "FUK: ${uppercase_CMAKE_BUILD_TYPE}")
+    if(GEN_IS_MULTI_CONFIG)
+        set(SHARED_LIB_STAGING_DIR_DEBUG            "${SHARED_LIB_STAGING_DIR}/Debug")
+        set(SHARED_LIB_STAGING_DIR_RELWITHDEBINFO   "${SHARED_LIB_STAGING_DIR}/RelWithDebInfo")
+        set(SHARED_LIB_STAGING_DIR_RELEASE          "${SHARED_LIB_STAGING_DIR}/Release")
+    elseif (uppercase_CMAKE_BUILD_TYPE MATCHES DEBUG)
+        set(SHARED_LIB_STAGING_DIR_DEBUG            "${SHARED_LIB_STAGING_DIR}")
+    elseif (uppercase_CMAKE_BUILD_TYPE MATCHES RELWITHDEBINFO)
+        set(SHARED_LIB_STAGING_DIR_RELWITHDEBINFO   "${SHARED_LIB_STAGING_DIR}")
+    elseif (uppercase_CMAKE_BUILD_TYPE MATCHES RELEASE)
+        set(SHARED_LIB_STAGING_DIR_RELEASE          "${SHARED_LIB_STAGING_DIR}")
+    endif()
 
     #*******************************
     # VIVOX - *NOTE: no debug version
@@ -52,10 +78,26 @@ if(WINDOWS)
 
     set(addrsfx "-x${ADDRESS_SIZE}")
 
+    set(debug_src_dir "${ARCH_PREBUILT_DIRS_DEBUG}")
+    set(debug_files
+        epoxy-0.dll
+        libexpatd.dll
+        glod.dll
+        libapr-1.dll
+        libaprutil-1.dll
+        libapriconv-1.dll
+        libhunspell.dll
+        libogg.dll
+        libvorbis.dll
+        libvorbisfile.dll
+        openjp2.dll
+        xmlrpc-epid.dll
+        )
+
     set(release_src_dir "${ARCH_PREBUILT_DIRS_RELEASE}")
     set(release_files
         epoxy-0.dll
-        ${EXPAT_COPY}
+        libexpat.dll
         glod.dll
         libapr-1.dll
         libaprutil-1.dll
@@ -88,6 +130,7 @@ if(WINDOWS)
     endif (USE_FMODSTUDIO)
 
     if (USE_OPENAL)
+        list(APPEND debug_files OpenAL32.dll alut.dll)
         list(APPEND release_files OpenAL32.dll alut.dll)
     endif ()
 
@@ -201,28 +244,71 @@ endif(WINDOWS)
 # Done building the file lists, now set up the copy commands.
 ################################################################
 
-# Curiously, slvoice_files are only copied to SHARED_LIB_STAGING_DIR_RELEASE.
-# It's unclear whether this is oversight or intentional, but anyway leave the
-# single copy_if_different command rather than using to_staging_dirs.
-copy_if_different(
-    ${slvoice_src_dir}
-    "${SHARED_LIB_STAGING_DIR_RELEASE}"
-    out_targets
-    ${slvoice_files}
-    )
-list(APPEND third_party_targets ${out_targets})
+if (GEN_IS_MULTI_CONFIG OR uppercase_CMAKE_BUILD_TYPE MATCHES DEBUG)
+    copy_if_different(
+        ${slvoice_src_dir}
+        "${SHARED_LIB_STAGING_DIR_DEBUG}"
+        out_targets
+        ${slvoice_files}
+        )
+    list(APPEND third_party_targets ${out_targets})
 
-to_staging_dirs(
-    ${vivox_lib_dir}
-    third_party_targets
-    ${vivox_libs}
-    )
+    to_debug_staging_dirs(
+        ${vivox_lib_dir}
+        third_party_targets
+        ${vivox_libs}
+        )
 
-to_staging_dirs(
-    ${release_src_dir}
-    third_party_targets
-    ${release_files}
-    )
+    to_debug_staging_dirs(
+        ${debug_src_dir}
+        third_party_targets
+        ${debug_files}
+        )
+endif()
+
+if (GEN_IS_MULTI_CONFIG OR uppercase_CMAKE_BUILD_TYPE MATCHES RELWITHDEBINFO)
+    copy_if_different(
+        ${slvoice_src_dir}
+        "${SHARED_LIB_STAGING_DIR_RELWITHDEBINFO}"
+        out_targets
+        ${slvoice_files}
+        )
+    list(APPEND third_party_targets ${out_targets})
+
+    to_relwithdeb_staging_dirs(
+        ${vivox_lib_dir}
+        third_party_targets
+        ${vivox_libs}
+        )
+
+    to_relwithdeb_staging_dirs(
+        ${release_src_dir}
+        third_party_targets
+        ${release_files}
+        )
+endif()
+
+if (GEN_IS_MULTI_CONFIG OR uppercase_CMAKE_BUILD_TYPE MATCHES RELEASE)
+    copy_if_different(
+        ${slvoice_src_dir}
+        "${SHARED_LIB_STAGING_DIR_RELEASE}"
+        out_targets
+        ${slvoice_files}
+        )
+    list(APPEND third_party_targets ${out_targets})
+
+    to_release_staging_dirs(
+        ${vivox_lib_dir}
+        third_party_targets
+        ${vivox_libs}
+        )
+
+    to_release_staging_dirs(
+        ${release_src_dir}
+        third_party_targets
+        ${release_files}
+        )
+endif()
 
 if(NOT USESYSTEMLIBS)
   add_custom_target(
