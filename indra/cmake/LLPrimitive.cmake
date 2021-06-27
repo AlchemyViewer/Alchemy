@@ -1,6 +1,7 @@
 # -*- cmake -*-
 
 # these should be moved to their own cmake file
+include(Linking)
 include(Prebuilt)
 include(Boost)
 include(URIPARSER)
@@ -17,11 +18,12 @@ if (WINDOWS)
     set(LLPRIMITIVE_LIBRARIES 
         debug llprimitive
         optimized llprimitive
-        debug libcollada14dom23-sd
-        optimized libcollada14dom23-s
+        debug ${ARCH_PREBUILT_DIRS_DEBUG}/libcollada14dom23-sd.lib
+        optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libcollada14dom23-s.lib
         ${BOOST_FILESYSTEM_LIBRARY}
         ${BOOST_SYSTEM_LIBRARIES}
-        libxml2_a
+        debug ${ARCH_PREBUILT_DIRS_DEBUG}/libxml2_a.lib
+        optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libxml2_a.lib
         ${URIPARSER_LIBRARIES}
         ${MINIZIP_LIBRARIES}
         ${ZLIB_LIBRARIES}

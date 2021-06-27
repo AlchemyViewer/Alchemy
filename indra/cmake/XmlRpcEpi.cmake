@@ -10,8 +10,8 @@ else (USESYSTEMLIBS)
     use_prebuilt_binary(xmlrpc-epi)
     if (WINDOWS)
         set(XMLRPCEPI_LIBRARIES
-            debug xmlrpc-epid
-            optimized xmlrpc-epi
+            debug ${ARCH_PREBUILT_DIRS_DEBUG}/xmlrpc-epid.lib
+            optimized ${ARCH_PREBUILT_DIRS_RELEASE}/xmlrpc-epi.lib
         )
     else (WINDOWS)
         set(XMLRPCEPI_LIBRARIES xmlrpc-epi)

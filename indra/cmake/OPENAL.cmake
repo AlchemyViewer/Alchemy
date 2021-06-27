@@ -10,13 +10,16 @@ if (USE_OPENAL)
   else (USESYSTEMLIBS)
     use_prebuilt_binary(openal)
     if(WINDOWS)
-      set(OPENAL_LIBRARIES OpenAL32)
+      set(OPENAL_LIBRARIES
+        debug ${ARCH_PREBUILT_DIRS_DEBUG}/OpenAL32.lib
+        optimized ${ARCH_PREBUILT_DIRS_RELEASE}/OpenAL32.lib)
+      set(FREEALUT_LIBRARIES
+          debug ${ARCH_PREBUILT_DIRS_DEBUG}/alut.lib
+          optimized ${ARCH_PREBUILT_DIRS_RELEASE}/alut.lib)
     else()
       set(OPENAL_LIBRARIES openal)
+      set(FREEALUT_LIBRARIES alut)
     endif()
-    set(OPENAL_INCLUDE_DIRS "${LIBS_PREBUILT_DIR}/include/")
-
-    set(FREEALUT_LIBRARIES alut)
     set(OPENAL_INCLUDE_DIRS "${LIBS_PREBUILT_DIR}/include/")
   endif (USESYSTEMLIBS)
 endif (USE_OPENAL)

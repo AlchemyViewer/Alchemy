@@ -1,4 +1,5 @@
 # -*- cmake -*-
+include(Linking)
 include(Prebuilt)
 
 if (USESYSTEMLIBS)
@@ -15,14 +16,14 @@ else (USESYSTEMLIBS)
 
   if (WINDOWS)
     set(OGG_LIBRARIES
-        optimized libogg
-        debug libogg)
+        optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libogg.lib
+        debug ${ARCH_PREBUILT_DIRS_DEBUG}/libogg.lib)
     set(VORBIS_LIBRARIES
-        optimized libvorbis
-        debug libvorbis)
+        optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libvorbis.lib
+        debug ${ARCH_PREBUILT_DIRS_DEBUG}/libvorbis.lib)
     set(VORBISFILE_LIBRARIES
-        optimized libvorbisfile
-        debug libvorbisfile)
+        optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libvorbisfile.lib
+        debug ${ARCH_PREBUILT_DIRS_DEBUG}/libvorbisfile.lib)
   else (WINDOWS)
     set(OGG_LIBRARIES ogg)
     set(VORBIS_LIBRARIES vorbis)

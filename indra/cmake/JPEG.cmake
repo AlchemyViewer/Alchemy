@@ -14,7 +14,9 @@ else (USESYSTEMLIBS)
   elseif (DARWIN)
     set(JPEG_LIBRARIES jpeg)
   elseif (WINDOWS)
-    set(JPEG_LIBRARIES jpeg)
+    set(JPEG_LIBRARIES
+      debug ${ARCH_PREBUILT_DIRS_DEBUG}/jpeg.lib
+      optimized ${ARCH_PREBUILT_DIRS_RELEASE}/jpeg.lib)
   endif (LINUX)
   set(JPEG_INCLUDE_DIRS ${LIBS_PREBUILT_DIR}/include)
 endif (USESYSTEMLIBS)

@@ -14,9 +14,9 @@ endif (USESYSTEMLIBS)
 
 if (WINDOWS)
     set(CEF_PLUGIN_LIBRARIES
-        libcef.lib
-        libcef_dll_wrapper.lib
-        dullahan.lib
+        ${ARCH_PREBUILT_DIRS_RELEASE}/libcef.lib
+        ${ARCH_PREBUILT_DIRS_RELEASE}/libcef_dll_wrapper.lib
+        ${ARCH_PREBUILT_DIRS_RELEASE}/dullahan.lib
     )
 elseif (DARWIN)
     FIND_LIBRARY(APPKIT_LIBRARY AppKit)

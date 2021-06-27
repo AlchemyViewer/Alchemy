@@ -1,4 +1,5 @@
 # -*- cmake -*-
+include(Linking)
 include(Prebuilt)
 
 set(HUNSPELL_FIND_QUIETLY ON)
@@ -9,7 +10,10 @@ if (USESYSTEMLIBS)
 else (USESYSTEMLIBS)
   use_prebuilt_binary(libhunspell)
   if (WINDOWS)
-    set(HUNSPELL_LIBRARY libhunspell)
+    set(HUNSPELL_LIBRARY 
+        debug ${ARCH_PREBUILT_DIRS_DEBUG}/libhunspell.lib
+        optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libhunspell.lib
+        )
   elseif(DARWIN)
     set(HUNSPELL_LIBRARY hunspell-1.7)
   elseif(LINUX)

@@ -4,6 +4,7 @@ set(ZLIB_FIND_QUIETLY ON)
 set(ZLIB_FIND_REQUIRED ON)
 
 include(Prebuilt)
+include(Linking)
 
 if (USESYSTEMLIBS)
   include(FindZLIB)
@@ -12,12 +13,12 @@ else (USESYSTEMLIBS)
   use_prebuilt_binary(minizip-ng)
   if (WINDOWS)
     set(MINIZIP_LIBRARIES 
-      debug libminizip
-      optimized libminizip)
+      debug ${ARCH_PREBUILT_DIRS_DEBUG}/libminizip.lib
+      optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libminizip.lib)
 
     set(ZLIB_LIBRARIES 
-      debug zlibd
-      optimized zlib)
+      debug ${ARCH_PREBUILT_DIRS_DEBUG}/zlibd.lib
+      optimized ${ARCH_PREBUILT_DIRS_RELEASE}/zlib.lib)
   elseif (LINUX)
     set(MINIZIP_LIBRARIES minizip)
     #

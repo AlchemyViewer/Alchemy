@@ -13,5 +13,11 @@ else ()
   else()
     set(FREETYPE_INCLUDE_DIRS ${LIBS_PREBUILT_DIR}/include/)
   endif()
-  set(FREETYPE_LIBRARIES freetype)
+  if (WINDOWS)
+    set(FREETYPE_LIBRARIES
+      debug ${ARCH_PREBUILT_DIRS_DEBUG}/freetyped.lib
+      optimized ${ARCH_PREBUILT_DIRS_RELEASE}/freetype.lib)
+  else()
+    set(FREETYPE_LIBRARIES freetype)
+  endif()
 endif ()

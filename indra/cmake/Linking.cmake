@@ -23,6 +23,7 @@ elseif (DARWIN)
   set(EXE_STAGING_DIR "${CMAKE_BINARY_DIR}/sharedlibs")
 endif (WINDOWS)
 
+if (NOT WINDOWS)
 # Autobuild packages must provide 'release' versions of libraries, but may provide versions for
 # specific build types.  AUTOBUILD_LIBS_INSTALL_DIRS lists first the build type directory and then
 # the 'release' directory (as a default fallback).
@@ -48,6 +49,7 @@ if (NOT "${CMAKE_BUILD_TYPE}" STREQUAL "Release")
 endif (NOT "${CMAKE_BUILD_TYPE}" STREQUAL "Release")
 
 link_directories(${AUTOBUILD_LIBS_INSTALL_DIRS})
+endif()
 
 if (LINUX)
   set(DL_LIBRARY dl)

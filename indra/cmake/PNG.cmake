@@ -1,4 +1,5 @@
 # -*- cmake -*-
+include(Linking)
 include(Prebuilt)
 
 set(PNG_FIND_QUIETLY ON)
@@ -10,8 +11,8 @@ else (USESYSTEMLIBS)
   use_prebuilt_binary(libpng)
   if (WINDOWS)
     set(PNG_LIBRARIES
-        debug libpng16d
-        optimized libpng16
+        debug ${ARCH_PREBUILT_DIRS_DEBUG}/libpng16d.lib
+        optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libpng16.lib
         )
     set(PNG_INCLUDE_DIRS ${LIBS_PREBUILT_DIR}/include/libpng16)
   elseif(DARWIN)

@@ -1,4 +1,5 @@
 # -*- cmake -*-
+include(Linking)
 include(Prebuilt)
 
 if (NOT USESYSTEMLIBS)
@@ -6,4 +7,10 @@ if (NOT USESYSTEMLIBS)
 endif (NOT USESYSTEMLIBS)
 
 set(GLOD_INCLUDE_DIR ${LIBS_PREBUILT_DIR}/include)
-set(GLOD_LIBRARIES GLOD)
+if (WINDOWS)
+  set(GLOD_LIBRARIES 
+      debug ${ARCH_PREBUILT_DIRS_DEBUG}/glod.lib
+      optimized ${ARCH_PREBUILT_DIRS_RELEASE}/glod.lib)
+else ()
+  set(GLOD_LIBRARIES GLOD)
+endif ()

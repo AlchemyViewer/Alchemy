@@ -1,4 +1,5 @@
 include(Prebuilt)
+include(Linking)
 
 set(NGHTTP2_FIND_QUIETLY ON)
 set(NGHTTP2_FIND_REQUIRED ON)
@@ -9,7 +10,8 @@ else (USESYSTEMLIBS)
   use_prebuilt_binary(nghttp2)
   if (WINDOWS)
     set(NGHTTP2_LIBRARIES 
-      ${ARCH_PREBUILT_DIRS_RELEASE}/nghttp2.lib
+      debug ${ARCH_PREBUILT_DIRS_DEBUG}/nghttp2.lib
+      optimized ${ARCH_PREBUILT_DIRS_RELEASE}/nghttp2.lib
       )
   elseif (DARWIN)
     set(NGHTTP2_LIBRARIES libnghttp2.a)

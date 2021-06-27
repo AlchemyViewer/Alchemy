@@ -1,5 +1,7 @@
 # -*- cmake -*-
 include(Linking)
+include(Prebuilt)
+
 if (USESYSTEMLIBS OR LINUX)
     include(FindPkgConfig)
 
@@ -12,8 +14,8 @@ else ()
 
     if (WINDOWS)
         set(VLC_LIBRARIES
-                libvlc.lib
-                libvlccore.lib
+                ${ARCH_PREBUILT_DIRS_RELEASE}/libvlc.lib
+                ${ARCH_PREBUILT_DIRS_RELEASE}/libvlccore.lib
                 )
     elseif (DARWIN)
         set(VLC_LIBRARIES

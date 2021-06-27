@@ -1,4 +1,5 @@
 # -*- cmake -*-
+include(Linking)
 include(Prebuilt)
 
 # There are three possible solutions to provide the llphysicsextensions:
@@ -28,7 +29,17 @@ elseif (HAVOK_TPV)
 else (HAVOK)
 if (NOT USE_LL_STUBS)
    use_prebuilt_binary( ndPhysicsStub )
-   set(LLPHYSICSEXTENSIONS_LIBRARIES nd_hacdConvexDecomposition hacd nd_Pathing )
+   if (WINDOWS)
+      set(LLPHYSICSEXTENSIONS_LIBRARIES 
+         debug ${ARCH_PREBUILT_DIRS_DEBUG}/nd_hacdConvexDecomposition.lib
+         optimized ${ARCH_PREBUILT_DIRS_RELEASE}/nd_hacdConvexDecomposition.lib
+         debug ${ARCH_PREBUILT_DIRS_DEBUG}/hacd.lib
+         optimized ${ARCH_PREBUILT_DIRS_RELEASE}/hacd.lib
+         debug ${ARCH_PREBUILT_DIRS_DEBUG}/nd_Pathing.lib
+         optimized ${ARCH_PREBUILT_DIRS_RELEASE}/nd_Pathing.lib)
+   else ()
+      set(LLPHYSICSEXTENSIONS_LIBRARIES nd_hacdConvexDecomposition hacd nd_Pathing )
+   endif ()
    set(LLPHYSICSEXTENSIONS_INCLUDE_DIRS ${LIBS_PREBUILT_DIR}/include/ )
 else (NOT USE_LL_STUBS)
    use_prebuilt_binary(llphysicsextensions_stub)

@@ -15,7 +15,9 @@ if (NDOF)
     endif (WINDOWS OR DARWIN)
 
     if (WINDOWS)
-      set(NDOF_LIBRARY libndofdev)
+      set(NDOF_LIBRARY
+        debug ${ARCH_PREBUILT_DIRS_DEBUG}/libndofdev.lib
+        optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libndofdev.lib)
     elseif (DARWIN OR LINUX)
       set(NDOF_LIBRARY ndofdev)
     endif (WINDOWS)

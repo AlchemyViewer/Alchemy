@@ -1,5 +1,6 @@
 # -*- cmake -*-
 include(Prebuilt)
+include(Linking)
 
 set(OpenSSL_FIND_QUIETLY ON)
 set(OpenSSL_FIND_REQUIRED ON)
@@ -9,7 +10,13 @@ if (USESYSTEMLIBS)
 else (USESYSTEMLIBS)
   use_prebuilt_binary(openssl)
   if (WINDOWS)
-    set(OPENSSL_LIBRARIES ssleay32 libeay32)
+    set(SSLEAY_LIBRARY
+        debug ${ARCH_PREBUILT_DIRS_DEBUG}/ssleay32.lib
+        optimized ${ARCH_PREBUILT_DIRS_RELEASE}/ssleay32.lib)
+    set(LIBEAY_LIBRARY
+        debug ${ARCH_PREBUILT_DIRS_DEBUG}/libeay32.lib
+        optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libeay32.lib)
+    set(OPENSSL_LIBRARIES ${SSLEAY_LIBRARY} ${LIBEAY_LIBRARY})
   else (WINDOWS)
     set(OPENSSL_LIBRARIES ssl crypto)
   endif (WINDOWS)

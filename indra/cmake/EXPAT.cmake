@@ -12,8 +12,8 @@ else (USESYSTEMLIBS)
     use_prebuilt_binary(expat)
     if (WINDOWS)
         set(EXPAT_LIBRARIES
-            debug libexpatd.lib
-            optimized libexpat.lib)
+            debug ${ARCH_PREBUILT_DIRS_DEBUG}/libexpatd.lib
+            optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libexpat.lib)
         set(EXPAT_COPY libexpat.dll)
     else ()
         set(EXPAT_LIBRARIES expat)

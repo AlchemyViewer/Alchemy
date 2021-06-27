@@ -1,5 +1,6 @@
 # -*- cmake -*-
 include(Prebuilt)
+include(Linking)
 
 set(Boost_FIND_QUIETLY ON)
 set(Boost_FIND_REQUIRED ON)
@@ -25,32 +26,32 @@ else (USESYSTEMLIBS)
 
   if (WINDOWS)
     set(BOOST_CONTEXT_LIBRARY 
-        optimized libboost_context-mt${addrsfx}
-        debug libboost_context-mt-gd${addrsfx})
+        optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libboost_context-mt${addrsfx}.lib
+        debug ${ARCH_PREBUILT_DIRS_DEBUG}/libboost_context-mt-gd${addrsfx}.lib)
     set(BOOST_FIBER_LIBRARY 
-        optimized libboost_fiber-mt${addrsfx}
-        debug libboost_fiber-mt-gd${addrsfx})
+        optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libboost_fiber-mt${addrsfx}.lib
+        debug ${ARCH_PREBUILT_DIRS_DEBUG}/libboost_fiber-mt-gd${addrsfx}.lib)
     set(BOOST_FILESYSTEM_LIBRARY 
-        optimized libboost_filesystem-mt${addrsfx}
-        debug libboost_filesystem-mt-gd${addrsfx})
+        optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libboost_filesystem-mt${addrsfx}.lib
+        debug ${ARCH_PREBUILT_DIRS_DEBUG}/libboost_filesystem-mt-gd${addrsfx}.lib)
     set(BOOST_PROGRAM_OPTIONS_LIBRARY 
-        optimized libboost_program_options-mt${addrsfx}
-        debug libboost_program_options-mt-gd${addrsfx})
+        optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libboost_program_options-mt${addrsfx}.lib
+        debug ${ARCH_PREBUILT_DIRS_DEBUG}/libboost_program_options-mt-gd${addrsfx}.lib)
     set(BOOST_REGEX_LIBRARY
-        optimized libboost_regex-mt${addrsfx}
-        debug libboost_regex-mt-gd${addrsfx})
+        optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libboost_regex-mt${addrsfx}.lib
+        debug ${ARCH_PREBUILT_DIRS_DEBUG}/libboost_regex-mt-gd${addrsfx}.lib)
     set(BOOST_SIGNALS_LIBRARY 
-        optimized libboost_signals-mt${addrsfx}
-        debug libboost_signals-mt-gd${addrsfx})
+        optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libboost_signals-mt${addrsfx}.lib
+        debug ${ARCH_PREBUILT_DIRS_DEBUG}/libboost_signals-mt-gd${addrsfx}.lib)
     set(BOOST_STACKTRACE_LIBRARY 
-        optimized libboost_stacktrace_windbg-mt${addrsfx}
-        debug libboost_stacktrace_windbg-mt-gd${addrsfx})
+        optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libboost_stacktrace_windbg-mt${addrsfx}.lib
+        debug ${ARCH_PREBUILT_DIRS_DEBUG}/libboost_stacktrace_windbg-mt-gd${addrsfx}.lib)
     set(BOOST_SYSTEM_LIBRARY 
-        optimized libboost_system-mt${addrsfx}
-        debug libboost_system-mt-gd${addrsfx})
+        optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libboost_system-mt${addrsfx}.lib
+        debug ${ARCH_PREBUILT_DIRS_DEBUG}/libboost_system-mt-gd${addrsfx}.lib)
     set(BOOST_THREAD_LIBRARY 
-        optimized libboost_thread-mt${addrsfx}
-        debug libboost_thread-mt-gd${addrsfx})
+        optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libboost_thread-mt${addrsfx}.lib
+        debug ${ARCH_PREBUILT_DIRS_DEBUG}/libboost_thread-mt-gd${addrsfx}.lib)
   elseif (LINUX)
     set(BOOST_CONTEXT_LIBRARY
         optimized boost_context-mt${addrsfx}
