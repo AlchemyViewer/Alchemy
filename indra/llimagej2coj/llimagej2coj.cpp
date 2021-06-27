@@ -258,7 +258,7 @@ bool LLImageJ2COJ::decodeImpl(LLImageJ2C &base, LLImageRaw &raw_image, F32 decod
 		return true; // done
 	}
 
-#ifdef SHOW_DEBUG
+#if 0
 	/* catch events using our callbacks and give a local context */
 	opj_set_error_handler(opj_decoder_p, error_callback, nullptr);
 	opj_set_warning_handler(opj_decoder_p, warning_callback, nullptr);
