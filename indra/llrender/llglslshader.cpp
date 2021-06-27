@@ -491,12 +491,13 @@ void dumpAttachObject( const char *func_name, GLhandleARB program_object, const 
 }
 #endif // DEBUG_SHADER_INCLUDES
 
-BOOL LLGLSLShader::attachVertexObject(std::string object_path)
+BOOL LLGLSLShader::attachVertexObject(std::string_view object_path)
 {
-    if (LLShaderMgr::instance()->mVertexShaderObjects.count(object_path) > 0)
+    auto it = LLShaderMgr::instance()->mVertexShaderObjects.find(object_path);
+    if (it != LLShaderMgr::instance()->mVertexShaderObjects.end())
     {
         stop_glerror();
-        glAttachShader(mProgramObject, LLShaderMgr::instance()->mVertexShaderObjects[object_path]);
+        glAttachShader(mProgramObject, it->second);
 #if DEBUG_SHADER_INCLUDES
         dumpAttachObject("attachVertexObject", mProgramObject, object_path);
 #endif // DEBUG_SHADER_INCLUDES
@@ -510,12 +511,13 @@ BOOL LLGLSLShader::attachVertexObject(std::string object_path)
     }
 }
 
-BOOL LLGLSLShader::attachFragmentObject(std::string object_path)
+BOOL LLGLSLShader::attachFragmentObject(std::string_view object_path)
 {
-    if (LLShaderMgr::instance()->mFragmentShaderObjects.count(object_path) > 0)
+    auto it = LLShaderMgr::instance()->mFragmentShaderObjects.find(object_path);
+    if (it != LLShaderMgr::instance()->mFragmentShaderObjects.end())
     {
         stop_glerror();
-        glAttachShader(mProgramObject, LLShaderMgr::instance()->mFragmentShaderObjects[object_path]);
+        glAttachShader(mProgramObject, it->second);
 #if DEBUG_SHADER_INCLUDES
         dumpAttachObject("attachFragmentObject", mProgramObject, object_path);
 #endif // DEBUG_SHADER_INCLUDES
