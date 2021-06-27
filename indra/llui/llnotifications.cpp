@@ -1119,7 +1119,7 @@ bool LLNotificationChannelBase::updateItem(const LLSD& payload, LLNotificationPt
 	{
 		// should be no reason we'd ever get an add if we already have it
 		// if passes filter send an add message, else do nothing
-		assert(!wasFound);
+		llassert(!wasFound);
 		if (passesFilter)
 		{
 			// not in our list, add it and say so
