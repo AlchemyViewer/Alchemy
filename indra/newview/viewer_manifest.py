@@ -428,56 +428,6 @@ class WindowsManifest(ViewerManifest):
         build_data_dict['AppName']    = self.app_name()
         return build_data_dict
 
-    def test_msvcrt_and_copy_action(self, src, dst):
-        # This is used to test a dll manifest.
-        # It is used as a temporary override during the construct method
-        from test_win32_manifest import test_assembly_binding
-        # TODO: This is redundant with LLManifest.copy_action(). Why aren't we
-        # calling copy_action() in conjunction with test_assembly_binding()?
-        if src and (os.path.exists(src) or os.path.islink(src)):
-            # ensure that destination path exists
-            self.cmakedirs(os.path.dirname(dst))
-            self.created_paths.append(dst)
-            if not os.path.isdir(src):
-                if(self.args['configuration'].lower() == 'debug'):
-                    test_assembly_binding(src, "Microsoft.VC80.DebugCRT", "8.0.50727.4053")
-                else:
-                    test_assembly_binding(src, "Microsoft.VC80.CRT", "8.0.50727.4053")
-                self.ccopy(src,dst)
-            else:
-                raise Exception("Directories are not supported by test_CRT_and_copy_action()")
-        else:
-            print "Doesn't exist:", src
-
-    def test_for_no_msvcrt_manifest_and_copy_action(self, src, dst):
-        # This is used to test that no manifest for the msvcrt exists.
-        # It is used as a temporary override during the construct method
-        from test_win32_manifest import test_assembly_binding
-        from test_win32_manifest import NoManifestException, NoMatchingAssemblyException
-        # TODO: This is redundant with LLManifest.copy_action(). Why aren't we
-        # calling copy_action() in conjunction with test_assembly_binding()?
-        if src and (os.path.exists(src) or os.path.islink(src)):
-            # ensure that destination path exists
-            self.cmakedirs(os.path.dirname(dst))
-            self.created_paths.append(dst)
-            if not os.path.isdir(src):
-                try:
-                    if(self.args['configuration'].lower() == 'debug'):
-                        test_assembly_binding(src, "Microsoft.VC80.DebugCRT", "")
-                    else:
-                        test_assembly_binding(src, "Microsoft.VC80.CRT", "")
-                    raise Exception("Unknown condition")
-                except NoManifestException as err:
-                    pass
-                except NoMatchingAssemblyException as err:
-                    pass
-
-                self.ccopy(src,dst)
-            else:
-                raise Exception("Directories are not supported by test_CRT_and_copy_action()")
-        else:
-            print "Doesn't exist:", src
-        
     def construct(self):
         super(WindowsManifest, self).construct()
 
