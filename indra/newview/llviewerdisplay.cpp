@@ -74,7 +74,6 @@
 #include "llviewerregion.h"
 #include "lldrawpoolwater.h"
 #include "lldrawpoolbump.h"
-#include "llpostprocess.h"
 #include "llscenemonitor.h"
 // [RLVa:KB] - Checked: 2011-05-22 (RLVa-1.3.1a)
 #include "llvisualeffect.h"
