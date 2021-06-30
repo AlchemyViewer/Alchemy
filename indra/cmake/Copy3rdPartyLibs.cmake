@@ -43,7 +43,6 @@ string(TOUPPER "${CMAKE_BUILD_TYPE}" uppercase_CMAKE_BUILD_TYPE)
 # set up platform specific lists of files that need to be copied
 ###################################################################
 if(WINDOWS)
-message(STATUS "FUK: ${uppercase_CMAKE_BUILD_TYPE}")
     if(GEN_IS_MULTI_CONFIG)
         set(SHARED_LIB_STAGING_DIR_DEBUG            "${SHARED_LIB_STAGING_DIR}/Debug")
         set(SHARED_LIB_STAGING_DIR_RELWITHDEBINFO   "${SHARED_LIB_STAGING_DIR}/RelWithDebInfo")
