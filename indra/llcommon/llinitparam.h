@@ -967,21 +967,17 @@ namespace LLInitParam
 			// get address of enclosing BLOCK class using stored offset to enclosing BaseBlock class
 			return *const_cast<BaseBlock*>
 				(reinterpret_cast<const BaseBlock*>
-					(my_addr - (ptrdiff_t)getEnclosingBlockOffset()));
+					(my_addr - getEnclosingBlockOffset()));
 		}
 
-		U32 getEnclosingBlockOffset() const
-	{
-			return ((U32)mEnclosingBlockOffsetHigh << 16) | (U32)mEnclosingBlockOffsetLow;
-		}
+		ptrdiff_t getEnclosingBlockOffset() const { return mEnclosingBlockOffset; }
 
 	private:
 		friend class BaseBlock;
 
-		//24 bits for member offset field and 1 bit for provided flag
-		U16		mEnclosingBlockOffsetLow;
-		U8		mEnclosingBlockOffsetHigh:7;
-		U8		mIsProvided:1;
+		//8 bytes for member offset, 1 bytes for flag
+        ptrdiff_t mEnclosingBlockOffset;
+		bool	  mIsProvided;
 
 	};
 

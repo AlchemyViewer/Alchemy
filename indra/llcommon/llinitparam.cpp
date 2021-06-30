@@ -47,9 +47,8 @@ namespace LLInitParam
 	{
 		const U8* my_addr = reinterpret_cast<const U8*>(this);
 		const U8* block_addr = reinterpret_cast<const U8*>(enclosing_block);
-		U32 enclosing_block_offset = 0x7FFFffff & (U32)(my_addr - block_addr);
-		mEnclosingBlockOffsetLow = enclosing_block_offset & 0x0000ffff;
-		mEnclosingBlockOffsetHigh = (enclosing_block_offset & 0x007f0000) >> 16;
+        ptrdiff_t enclosing_block_offset = (ptrdiff_t)(my_addr - block_addr);
+		mEnclosingBlockOffset = enclosing_block_offset;
 	}
 
 	//
