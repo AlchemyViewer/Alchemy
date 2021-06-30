@@ -189,7 +189,7 @@ namespace
 	public:
 		ImplBase(DataRef value) : mValue(value) { }
 		
-		virtual LLSD::Type type() const { return T; }
+		LLSD::Type type() const override { return T; }
 
 		using LLSD::Impl::assign; // Unhiding base class virtuals...
 		virtual void assign(LLSD::Impl*& var, DataRef value) {
@@ -205,7 +205,7 @@ namespace
 	};
 
 	
-	class ImplBoolean
+	class ImplBoolean final
 		: public ImplBase<LLSD::TypeBoolean, LLSD::Boolean>
 	{
 	public:
@@ -226,7 +226,7 @@ namespace
 		{ return mValue ? "true" : ""; }
 
 
-	class ImplInteger
+	class ImplInteger final
 		: public ImplBase<LLSD::TypeInteger, LLSD::Integer>
 	{
 	public:
@@ -242,7 +242,7 @@ namespace
 		{ return llformat("%d", mValue); }
 
 
-	class ImplReal
+	class ImplReal final
 		: public ImplBase<LLSD::TypeReal, LLSD::Real>
 	{
 	public:
@@ -264,7 +264,7 @@ namespace
 		{ return llformat("%lg", mValue); }
 
 
-	class ImplString
+	class ImplString final
 		: public ImplBase<LLSD::TypeString, LLSD::String, const LLSD::String&>
 	{
 	public:
@@ -308,7 +308,7 @@ namespace
 	}
 	
 
-	class ImplUUID
+	class ImplUUID final
 		: public ImplBase<LLSD::TypeUUID, LLSD::UUID, const LLSD::UUID&>
 	{
 	public:
@@ -319,7 +319,7 @@ namespace
 	};
 
 
-	class ImplDate
+	class ImplDate final
 		: public ImplBase<LLSD::TypeDate, LLSD::Date, const LLSD::Date&>
 	{
 	public:
@@ -340,7 +340,7 @@ namespace
 	};
 
 
-	class ImplURI
+	class ImplURI final
 		: public ImplBase<LLSD::TypeURI, LLSD::URI, const LLSD::URI&>
 	{
 	public:
@@ -351,7 +351,7 @@ namespace
 	};
 
 
-	class ImplBinary
+	class ImplBinary final
 		: public ImplBase<LLSD::TypeBinary, LLSD::Binary, const LLSD::Binary&>
 	{
 	public:
@@ -372,7 +372,7 @@ namespace
 		ImplMap(const DataMap& data) : mData(data) { }
 		
 	public:
-		ImplMap() { }
+		ImplMap() = default;
 		
         ImplMap& makeMap(LLSD::Impl*&) override;
 
@@ -491,7 +491,7 @@ namespace
 		{
 			//std::cout << "  " << (*iter).first << ": " << (*iter).second << std::endl;
 			Impl::calcStats((*iter).second, type_counts, share_counts);
-			iter++;
+			++iter;
 		}
 
 		// Add in the values for this map
@@ -637,7 +637,7 @@ namespace
 		while (iter != endArray())
 		{	// Add values for all items held in the array
 			Impl::calcStats((*iter), type_counts, share_counts);
-			iter++;
+			++iter;
 		}
 
 		// Add in the values for this array
@@ -818,10 +818,10 @@ namespace
 }
 
 
-LLSD::LLSD() : impl(0)					{ ALLOC_LLSD_OBJECT; }
-LLSD::~LLSD()							{ FREE_LLSD_OBJECT; Impl::reset(impl, 0); }
+LLSD::LLSD() : impl(nullptr)					{ ALLOC_LLSD_OBJECT; }
+LLSD::~LLSD()							{ FREE_LLSD_OBJECT; Impl::reset(impl, nullptr); }
 
-LLSD::LLSD(const LLSD& other) : impl(0) { ALLOC_LLSD_OBJECT;  assign(other); }
+LLSD::LLSD(const LLSD& other) : impl(nullptr) { ALLOC_LLSD_OBJECT;  assign(other); }
 void LLSD::assign(const LLSD& other)	{ Impl::assign(impl, other.impl); }
 
 
