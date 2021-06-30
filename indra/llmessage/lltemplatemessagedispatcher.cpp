@@ -43,7 +43,7 @@ void LLTemplateMessageDispatcher::dispatch(const std::string& msg_name,
 										   const LLSD& message,
 										   LLHTTPNode::ResponsePtr responsep)
 {
-	std::vector<U8> data = message["body"]["binary-template-data"].asBinary();
+	const std::vector<U8>& data = message["body"]["binary-template-data"].asBinary();
 	U32 size = data.size();
 	if(size == 0)
 	{

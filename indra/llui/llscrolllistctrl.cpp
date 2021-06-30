@@ -1438,8 +1438,8 @@ BOOL LLScrollListCtrl::setSelectedByValue(const LLSD& value, BOOL selected)
             {
                 if (item->getValue().isBinary())
                 {
-                    LLSD::Binary data1 = value.asBinary();
-                    LLSD::Binary data2 = item->getValue().asBinary();
+                    const LLSD::Binary& data1 = value.asBinary();
+                    const LLSD::Binary& data2 = item->getValue().asBinary();
                     found = std::equal(data1.begin(), data1.end(), data2.begin()) ? TRUE : FALSE;
                 }
             }

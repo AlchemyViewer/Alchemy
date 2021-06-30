@@ -267,7 +267,7 @@ void LLFilterSD2XMLRPC::streamOut(std::ostream& ostr, const LLSD& sd)
 		// this is pretty inefficient, but we'll deal with that
 		// problem when it becomes one.
 		ostr << "<base64>";
-		LLSD::Binary buffer = sd.asBinary();
+		const LLSD::Binary& buffer = sd.asBinary();
 		if(!buffer.empty())
 		{
 			// *TODO: convert to LLBase64
@@ -275,7 +275,7 @@ void LLFilterSD2XMLRPC::streamOut(std::ostream& ostr, const LLSD& sd)
 			char* b64_buffer = new char[b64_buffer_length];
 			b64_buffer_length = apr_base64_encode_binary(
 				b64_buffer,
-				&buffer[0],
+				buffer.data(),
 				buffer.size());
 			ostr.write(b64_buffer, b64_buffer_length - 1);
 			delete[] b64_buffer;

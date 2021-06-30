@@ -441,7 +441,7 @@ void LLMaterialMgr::onGetResponse(bool success, const LLSD& content, const LLUUI
 	llassert(content.has(MATERIALS_CAP_ZIP_FIELD));
 	llassert(content[MATERIALS_CAP_ZIP_FIELD].isBinary());
 
-	LLSD::Binary content_binary = content[MATERIALS_CAP_ZIP_FIELD].asBinary();
+	const LLSD::Binary& content_binary = content[MATERIALS_CAP_ZIP_FIELD].asBinary();
 
 	LLSD response_data;
 	U32 uzip_result = LLUZipHelper::unzip_llsd(response_data, content_binary.data(), content_binary.size());
@@ -482,7 +482,7 @@ void LLMaterialMgr::onGetAllResponse(bool success, const LLSD& content, const LL
 	llassert(content.has(MATERIALS_CAP_ZIP_FIELD));
 	llassert(content[MATERIALS_CAP_ZIP_FIELD].isBinary());
 
-	LLSD::Binary content_binary = content[MATERIALS_CAP_ZIP_FIELD].asBinary();
+	const LLSD::Binary& content_binary = content[MATERIALS_CAP_ZIP_FIELD].asBinary();
 
 	LLSD response_data;
 	U32 uzip_result = LLUZipHelper::unzip_llsd(response_data, content_binary.data(), content_binary.size());
@@ -548,7 +548,7 @@ void LLMaterialMgr::onPutResponse(bool success, const LLSD& content)
 	llassert(content.has(MATERIALS_CAP_ZIP_FIELD));
 	llassert(content[MATERIALS_CAP_ZIP_FIELD].isBinary());
 
-	LLSD::Binary content_binary = content[MATERIALS_CAP_ZIP_FIELD].asBinary();
+	const LLSD::Binary& content_binary = content[MATERIALS_CAP_ZIP_FIELD].asBinary();
 
 	LLSD response_data;
 	U32 uzip_result = LLUZipHelper::unzip_llsd(response_data, content_binary.data(), content_binary.size());
