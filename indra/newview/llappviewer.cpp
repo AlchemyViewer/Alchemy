@@ -2864,6 +2864,8 @@ bool LLAppViewer::initConfiguration()
 	}
 #if LL_DEBUG
 	gWindowTitle += std::string(" [DEBUG]");
+#elif defined(LL_RELEASE_WITH_DEBUG_INFO) || defined(SHOW_ASSERT)
+    gWindowTitle += std::string(" [ASSERT]");
 #endif
 	if (!gArgs.empty())
 	{
