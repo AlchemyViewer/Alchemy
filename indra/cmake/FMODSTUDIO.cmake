@@ -1,4 +1,6 @@
 # -*- cmake -*-
+include(Linking)
+include(Prebuilt)
 
 # FMOD can be set when launching the make using the argument -DUSE_FMODSTUDIO:BOOL=ON
 # When building using proprietary binaries though (i.e. having access to LL private servers),
@@ -27,8 +29,8 @@ if (USE_FMODSTUDIO)
       use_prebuilt_binary(fmodstudio)    
       if (WINDOWS)
         set(FMODSTUDIO_LIBRARY 
-            debug fmodL_vc
-            optimized fmod_vc)
+            debug ${ARCH_PREBUILT_DIRS_DEBUG}/fmodL_vc.lib
+            optimized ${ARCH_PREBUILT_DIRS_RELEASE}/fmod_vc.lib)
       elseif (DARWIN)
         set(FMODSTUDIO_LIBRARY 
             debug fmodL

@@ -12,8 +12,8 @@ if (USE_KDU)
   use_prebuilt_binary(kdu)
   if (WINDOWS)
     set(KDU_LIBRARY 
-      debug kdud.lib
-      optimized kdu.lib
+      debug ${ARCH_PREBUILT_DIRS_DEBUG}/kdud.lib
+      optimized ${ARCH_PREBUILT_DIRS_RELEASE}/kdu.lib
       )
   else (WINDOWS)
     set(KDU_LIBRARY libkdu.a)
