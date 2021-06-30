@@ -1848,6 +1848,14 @@ if (WINDOWS)
         LINK_FLAGS_RELEASE "/MAP\"alchemy-bin.MAP\" /OPT:REF /LARGEADDRESSAWARE"
         )
 
+    if(GEN_IS_MULTI_CONFIG)
+      set(VIEWER_BUILD_DEST_DIR "${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}")
+    else()
+      set(VIEWER_BUILD_DEST_DIR "${CMAKE_CURRENT_BINARY_DIR}/package")
+      set_target_properties(${VIEWER_BINARY_NAME} PROPERTIES
+       			    RUNTIME_OUTPUT_DIRECTORY "${VIEWER_BUILD_DEST_DIR}")
+    endif()
+
     # If adding a file to viewer_manifest.py in the WindowsManifest.construct() method, be sure to add the dependency
     # here.
     # *NOTE:Mani - This is a crappy hack to have important dependencies for the viewer_manifest copy action
@@ -1962,7 +1970,7 @@ if (WINDOWS)
     endif ()
 
     add_custom_command(
-      OUTPUT  ${CMAKE_CFG_INTDIR}/copy_touched.bat
+      OUTPUT  ${VIEWER_BUILD_DEST_DIR}/copy_touched.bat
       COMMAND ${Python2_EXECUTABLE}
       ARGS
         ${CMAKE_CURRENT_SOURCE_DIR}/viewer_manifest.py
@@ -1977,10 +1985,10 @@ if (WINDOWS)
         --buildtype=${CMAKE_BUILD_TYPE}
         "--channel=${VIEWER_CHANNEL}"
         --configuration=${CMAKE_CFG_INTDIR}
-        --dest=${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}
+        --dest=${VIEWER_BUILD_DEST_DIR}
         --grid=${GRID}
         --source=${CMAKE_CURRENT_SOURCE_DIR}
-        --touch=${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/copy_touched.bat
+        --touch=${VIEWER_BUILD_DEST_DIR}/copy_touched.bat
         --versionfile=${CMAKE_CURRENT_BINARY_DIR}/viewer_version.txt
       DEPENDS
         ${CMAKE_CURRENT_SOURCE_DIR}/viewer_manifest.py
@@ -1989,7 +1997,7 @@ if (WINDOWS)
       COMMENT "Performing viewer_manifest copy"
       )
 
-    add_custom_target(copy_w_viewer_manifest ALL DEPENDS ${CMAKE_CFG_INTDIR}/copy_touched.bat)
+    add_custom_target(copy_w_viewer_manifest ALL DEPENDS ${VIEWER_BUILD_DEST_DIR}/copy_touched.bat)
 
     add_dependencies(${VIEWER_BINARY_NAME} stage_third_party_libs llcommon copy_w_viewer_manifest)
 
@@ -2018,7 +2026,7 @@ if (WINDOWS)
           ${CMAKE_CURRENT_SOURCE_DIR}/event_host_manifest.py
           ${CMAKE_CURRENT_SOURCE_DIR}/..
           ${CMAKE_CURRENT_BINARY_DIR}
-          ${CMAKE_CFG_INTDIR}
+          ${VIEWER_BUILD_DEST_DIR}
         DEPENDS
           lleventhost
           ${EVENT_HOST_SCRIPTS}
@@ -2026,7 +2034,7 @@ if (WINDOWS)
         )
 
       add_custom_command(
-        OUTPUT ${CMAKE_CFG_INTDIR}/touched.bat
+        OUTPUT ${VIEWER_BUILD_DEST_DIR}/touched.bat
         COMMAND ${Python2_EXECUTABLE}
         ARGS
           ${CMAKE_CURRENT_SOURCE_DIR}/viewer_manifest.py
@@ -2040,10 +2048,10 @@ if (WINDOWS)
           --buildtype=${CMAKE_BUILD_TYPE}
           "--channel=${VIEWER_CHANNEL}"
           --configuration=${CMAKE_CFG_INTDIR}
-          --dest=${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}
+          --dest=${VIEWER_BUILD_DEST_DIR}
           --grid=${GRID}
           --source=${CMAKE_CURRENT_SOURCE_DIR}
-          --touch=${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/touched.bat
+          --touch=${VIEWER_BUILD_DEST_DIR}/touched.bat
           --versionfile=${CMAKE_CURRENT_BINARY_DIR}/viewer_version.txt
         DEPENDS
             ${VIEWER_BINARY_NAME}
@@ -2053,7 +2061,7 @@ if (WINDOWS)
         )
 
       add_custom_target(llpackage ALL DEPENDS
-        ${CMAKE_CFG_INTDIR}/touched.bat
+        ${VIEWER_BUILD_DEST_DIR}/touched.bat
         )
         # temporarily disable packaging of event_host until hg subrepos get
         # sorted out on the parabuild cluster...
