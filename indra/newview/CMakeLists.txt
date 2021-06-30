@@ -1892,7 +1892,7 @@ if (WINDOWS)
           ${SHARED_LIB_STAGING_DIR}/RelWithDebInfo/libexpat.dll
           ${SHARED_LIB_STAGING_DIR}/Debug/libexpatd.dll
           )
-    elseif (uppercase_CMAKE_BUILD_TYPE MATCHES DEBUG)
+    elseif (UPPERCASE_CMAKE_BUILD_TYPE MATCHES DEBUG)
       list(APPEND COPY_INPUT_DEPENDENCIES
           ${SHARED_LIB_STAGING_DIR}/${CMAKE_CFG_INTDIR}/libexpatd.dll
           )
@@ -1908,7 +1908,7 @@ if (WINDOWS)
           ${SHARED_LIB_STAGING_DIR}/RelWithDebInfo/xmlrpc-epi.dll
           ${SHARED_LIB_STAGING_DIR}/Debug/xmlrpc-epid.dll
           )
-    elseif (uppercase_CMAKE_BUILD_TYPE MATCHES DEBUG)
+    elseif (UPPERCASE_CMAKE_BUILD_TYPE MATCHES DEBUG)
       list(APPEND COPY_INPUT_DEPENDENCIES
           ${SHARED_LIB_STAGING_DIR}/${CMAKE_CFG_INTDIR}/xmlrpc-epid.dll
           )
@@ -1949,7 +1949,7 @@ if (WINDOWS)
             ${SHARED_LIB_STAGING_DIR}/RelWithDebInfo/fmod.dll
             ${SHARED_LIB_STAGING_DIR}/Debug/fmodL.dll
             )
-      elseif (uppercase_CMAKE_BUILD_TYPE MATCHES DEBUG)
+      elseif (UPPERCASE_CMAKE_BUILD_TYPE MATCHES DEBUG)
         list(APPEND COPY_INPUT_DEPENDENCIES
             ${SHARED_LIB_STAGING_DIR}/${CMAKE_CFG_INTDIR}/fmodL.dll
             )

@@ -37,8 +37,6 @@ MACRO(to_release_staging_dirs from_dir targets)
   endforeach()
 ENDMACRO(to_release_staging_dirs from_dir to_dir targets)
 
-string(TOUPPER "${CMAKE_BUILD_TYPE}" uppercase_CMAKE_BUILD_TYPE)
-
 ###################################################################
 # set up platform specific lists of files that need to be copied
 ###################################################################
@@ -47,11 +45,11 @@ if(WINDOWS)
         set(SHARED_LIB_STAGING_DIR_DEBUG            "${SHARED_LIB_STAGING_DIR}/Debug")
         set(SHARED_LIB_STAGING_DIR_RELWITHDEBINFO   "${SHARED_LIB_STAGING_DIR}/RelWithDebInfo")
         set(SHARED_LIB_STAGING_DIR_RELEASE          "${SHARED_LIB_STAGING_DIR}/Release")
-    elseif (uppercase_CMAKE_BUILD_TYPE MATCHES DEBUG)
+    elseif (UPPERCASE_CMAKE_BUILD_TYPE MATCHES DEBUG)
         set(SHARED_LIB_STAGING_DIR_DEBUG            "${SHARED_LIB_STAGING_DIR}")
-    elseif (uppercase_CMAKE_BUILD_TYPE MATCHES RELWITHDEBINFO)
+    elseif (UPPERCASE_CMAKE_BUILD_TYPE MATCHES RELWITHDEBINFO)
         set(SHARED_LIB_STAGING_DIR_RELWITHDEBINFO   "${SHARED_LIB_STAGING_DIR}")
-    elseif (uppercase_CMAKE_BUILD_TYPE MATCHES RELEASE)
+    elseif (UPPERCASE_CMAKE_BUILD_TYPE MATCHES RELEASE)
         set(SHARED_LIB_STAGING_DIR_RELEASE          "${SHARED_LIB_STAGING_DIR}")
     endif()
 
@@ -243,7 +241,7 @@ endif(WINDOWS)
 # Done building the file lists, now set up the copy commands.
 ################################################################
 
-if (GEN_IS_MULTI_CONFIG OR uppercase_CMAKE_BUILD_TYPE MATCHES DEBUG)
+if (GEN_IS_MULTI_CONFIG OR UPPERCASE_CMAKE_BUILD_TYPE MATCHES DEBUG)
     copy_if_different(
         ${slvoice_src_dir}
         "${SHARED_LIB_STAGING_DIR_DEBUG}"
@@ -265,7 +263,7 @@ if (GEN_IS_MULTI_CONFIG OR uppercase_CMAKE_BUILD_TYPE MATCHES DEBUG)
         )
 endif()
 
-if (GEN_IS_MULTI_CONFIG OR uppercase_CMAKE_BUILD_TYPE MATCHES RELWITHDEBINFO)
+if (GEN_IS_MULTI_CONFIG OR UPPERCASE_CMAKE_BUILD_TYPE MATCHES RELWITHDEBINFO)
     copy_if_different(
         ${slvoice_src_dir}
         "${SHARED_LIB_STAGING_DIR_RELWITHDEBINFO}"
@@ -287,7 +285,7 @@ if (GEN_IS_MULTI_CONFIG OR uppercase_CMAKE_BUILD_TYPE MATCHES RELWITHDEBINFO)
         )
 endif()
 
-if (GEN_IS_MULTI_CONFIG OR uppercase_CMAKE_BUILD_TYPE MATCHES RELEASE)
+if (GEN_IS_MULTI_CONFIG OR UPPERCASE_CMAKE_BUILD_TYPE MATCHES RELEASE)
     copy_if_different(
         ${slvoice_src_dir}
         "${SHARED_LIB_STAGING_DIR_RELEASE}"
