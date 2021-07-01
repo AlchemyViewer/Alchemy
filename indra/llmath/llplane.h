@@ -65,9 +65,9 @@ public:
 		setVec(w, d);
 	}
 	
-	inline LLPlane& operator=(const LLVector4& v2) {  mV.set(v2[0],v2[1],v2[2],v2[3]); return *this;}
+	inline LLPlane& operator=(const LLVector4& v2) {mV.loadua(v2.mV); return *this; }
 	
-	inline LLPlane& operator=(const LLVector4a& v2) {  mV.set(v2[0],v2[1],v2[2],v2[3]); return *this;}	
+	inline LLPlane& operator=(const LLVector4a& v2) {  mV = v2; return *this;}	
 	
 	inline void set(const LLPlane& p2) { mV = p2.mV; }
 	
