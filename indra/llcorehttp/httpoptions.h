@@ -64,12 +64,8 @@ public:
 
     virtual ~HttpOptions() = default;						// Use release()
 
-protected:
-	
-	HttpOptions(const HttpOptions &);			// Not defined
-	void operator=(const HttpOptions &);		// Not defined
-
-public:
+	HttpOptions(const HttpOptions &) = delete;			// Not defined
+	void operator=(const HttpOptions &) = delete;		// Not defined
 
 	// Default:   false
 	void				setWantHeaders(bool wanted);

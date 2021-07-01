@@ -60,11 +60,9 @@ public:
 	HttpLibcurl(HttpService * service);
 	virtual ~HttpLibcurl();
 
-private:
-	HttpLibcurl(const HttpLibcurl &);			// Not defined
-	void operator=(const HttpLibcurl &);		// Not defined
+    HttpLibcurl(const HttpLibcurl&) = delete;               // Not defined
+	void operator=(const HttpLibcurl&) = delete;  // Not defined
 
-public:
     typedef boost::shared_ptr<HttpOpRequest> opReqPtr_t;
 
 	/// Give cycles to libcurl to run active requests.  Completed
