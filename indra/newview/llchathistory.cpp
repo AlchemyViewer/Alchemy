@@ -697,12 +697,11 @@ public:
             && chat.mChatStyle == CHAT_STYLE_TELEPORT_SEP)
         {
             mFrom = chat.mFromName;
-            mNeedsTimeBox = false;
             user_name->setValue(mFrom);
             updateMinUserNameWidth();
             LLColor4 sep_color = LLUIColorTable::instance().getColor("ChatTeleportSeparatorColor");
             setTransparentColor(sep_color);
-            mTimeBoxTextBox->setVisible(FALSE);
+            mTimeBoxTextBox->setColor(LLColor4::white);
         }
         else if (chat.mFromName.empty()
                  || mSourceType == CHAT_SOURCE_SYSTEM)
@@ -1374,7 +1373,7 @@ void LLChatHistory::appendMessage(const LLChat& chat, const LLSD &args, const LL
 		LLStyle::Params timestamp_style(body_message_params);
 
 		// out of the timestamp
-		if (args["show_time"].asBoolean() && !teleport_separator)
+		if (args["show_time"].asBoolean())
 		{
 			if (!message_from_log)
 			{
