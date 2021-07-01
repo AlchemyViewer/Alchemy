@@ -41,10 +41,23 @@ LLUIString::LLUIString(const std::string& instring, const LLStringUtil::format_m
 	dirty();
 }
 
+LLUIString::LLUIString(std::string&& instring, const LLStringUtil::format_map_t& args)
+:	mOrig(std::move(instring)),
+	mArgs(new LLStringUtil::format_map_t(args))
+{
+	dirty();
+}
+
 void LLUIString::assign(const std::string& s)
 {
 	mOrig = s;
 	dirty();
+}
+
+void LLUIString::assign(std::string&& s)
+{
+    mOrig = std::move(s);
+    dirty();
 }
 
 void LLUIString::setArgList(const LLStringUtil::format_map_t& args)

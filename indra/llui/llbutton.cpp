@@ -1086,7 +1086,7 @@ void LLButton::autoResize()
 	resize(getCurrentLabel());
 }
 
-void LLButton::resize(LLUIString label)
+void LLButton::resize(const LLUIString& label)
 {
 	// get label length 
 	S32 label_width = mGLFont->getWidth(label.getString());
