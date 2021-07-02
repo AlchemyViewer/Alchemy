@@ -474,13 +474,6 @@ private:
 			mErrorData()
 		{}
 
-		Details(const Details &rhs) :
-			mType(rhs.mType),
-			mStatus(rhs.mStatus),
-			mMessage(rhs.mMessage),
-			mErrorData(rhs.mErrorData)
-		{}
-
         bool operator == (const Details &rhs) const
         {
             return (mType == rhs.mType) && (mStatus == rhs.mStatus);

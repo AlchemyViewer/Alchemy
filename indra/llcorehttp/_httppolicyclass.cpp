@@ -41,27 +41,6 @@ HttpPolicyClass::HttpPolicyClass()
 {}
 
 
-HttpPolicyClass & HttpPolicyClass::operator=(const HttpPolicyClass & other)
-{
-	if (this != &other)
-	{
-		mConnectionLimit = other.mConnectionLimit;
-		mPerHostConnectionLimit = other.mPerHostConnectionLimit;
-		mPipelining = other.mPipelining;
-		mThrottleRate = other.mThrottleRate;
-	}
-	return *this;
-}
-
-
-HttpPolicyClass::HttpPolicyClass(const HttpPolicyClass & other)
-	: mConnectionLimit(other.mConnectionLimit),
-	  mPerHostConnectionLimit(other.mPerHostConnectionLimit),
-	  mPipelining(other.mPipelining),
-	  mThrottleRate(other.mThrottleRate)
-{}
-
-
 HttpStatus HttpPolicyClass::set(HttpRequest::EPolicyOption opt, long value)
 {
 	switch (opt)

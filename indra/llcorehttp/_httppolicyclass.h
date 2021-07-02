@@ -52,8 +52,8 @@ public:
 	HttpPolicyClass();
 	~HttpPolicyClass() = default;
 
-	HttpPolicyClass & operator=(const HttpPolicyClass &);
-	HttpPolicyClass(const HttpPolicyClass &);			// Not defined
+	HttpPolicyClass & operator=(const HttpPolicyClass &) = default;
+    HttpPolicyClass(const HttpPolicyClass&)            = default;
 
 public:
 	HttpStatus set(HttpRequest::EPolicyOption opt, long value);
