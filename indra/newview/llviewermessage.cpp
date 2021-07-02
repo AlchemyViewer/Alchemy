@@ -2360,18 +2360,19 @@ void process_improved_im(LLMessageSystem *msg, void **user_data)
     EInstantMessage dialog = (EInstantMessage)d;
     LLHost sender = msg->getSender();
 
-    LLIMProcessing::processNewMessage(from_id,
+    LLIMProcessing::processNewMessage(
+		std::move(from_id),
         from_group,
-        to_id,
+        std::move(to_id),
         offline,
         dialog,
-        session_id,
+        std::move(session_id),
         timestamp,
-        agentName,
-        message,
+        std::move(agentName),
+        std::move(message),
         parent_estate_id,
-        region_id,
-        position,
+        std::move(region_id),
+        std::move(position),
         binary_bucket,
         binary_bucket_size,
         sender);

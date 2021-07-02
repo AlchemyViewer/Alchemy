@@ -466,7 +466,7 @@ void LLIMProcessing::processNewMessage(LLUUID from_id,
     EInstantMessage dialog, // U8
     LLUUID session_id,
     U32 timestamp,
-    std::string agentName,
+    std::string name,
     std::string message,
     U32 parent_estate_id,
     LLUUID region_id,
@@ -478,7 +478,6 @@ void LLIMProcessing::processNewMessage(LLUUID from_id,
 {
     LLChat chat;
     std::string buffer;
-    std::string name = agentName;
 
     // make sure that we don't have an empty or all-whitespace name
     LLStringUtil::trim(name);
