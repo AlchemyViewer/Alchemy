@@ -182,10 +182,16 @@ namespace LLInitParam
 
 		ParamValue(): mValue() {}
 		ParamValue(const default_value_t& other) : mValue(other) {}
+        ParamValue(default_value_t&& other) : mValue(std::move(other)) {}
 
 		void setValue(const value_t& val)
 		{
 			mValue = val;
+		}
+
+		void setValue(value_t&& val)
+		{
+			mValue = std::move(val);
 		}
 
 		const value_t& getValue() const
@@ -221,9 +227,18 @@ namespace LLInitParam
 		:	T(other)
 		{}
 
+		ParamValue(default_value_t&& other)
+		:	T(std::move(other))
+		{}
+
 		void setValue(const value_t& val)
 		{
 			*this = val;
+		}
+
+		void setValue(value_t&& val)
+		{
+			*this = std::move(val);
 		}
 
 		const value_t& getValue() const
@@ -257,12 +272,17 @@ namespace LLInitParam
 		:	param_value_t(val)
 		{}
 
+		TypeValues(typename param_value_t::value_t&& val)
+		:	param_value_t(std::move(val))
+		{}
+
 		void setValueName(const std::string& key) {}
-		std::string getValueName() const { return ""; }
-		std::string calcValueName(const value_t& value) const { return ""; }
+		void setValueName(std::string&& key) {}
+		std::string getValueName() const { return std::string(); }
+        std::string calcValueName(const value_t& value) const { return std::string(); }
 		void clearValueName() const {}
 
-		static bool getValueFromName(const std::string& name, value_t& value)
+		static bool getValueFromName(std::string_view name, value_t& value)
 		{
 			return false;
 		}
@@ -278,6 +298,9 @@ namespace LLInitParam
 		}
 
 		void assignNamedValue(const Inaccessable& name)
+		{}
+
+		void assignNamedValue(Inaccessable&& name)
 		{}
 
 		operator const value_t&() const
@@ -301,7 +324,7 @@ namespace LLInitParam
 	{
 		typedef TypeValuesHelper<T, DERIVED_TYPE, IS_SPECIALIZED> self_t;
 	public:
-		typedef typename std::map<std::string, T> value_name_map_t;
+		typedef typename std::map<std::string, T, std::less<>> value_name_map_t;
 		typedef std::string name_t;
 		typedef self_t type_value_t;
 		typedef ParamValue<typename LLTypeTags::Sorted<T>::value_t> param_value_t;
@@ -311,10 +334,19 @@ namespace LLInitParam
 		:	param_value_t(val)
 		{}
 
+		TypeValuesHelper(typename param_value_t::value_t&& val)
+		:	param_value_t(std::move(val))
+		{}
+
 		//TODO: cache key by index to save on param block size
 		void setValueName(const std::string& value_name) 
 		{
 			mValueName = value_name; 
+		}
+
+		void setValueName(std::string&& value_name) 
+		{
+			mValueName = std::move(value_name); 
 		}
 
 		std::string getValueName() const
@@ -335,7 +367,7 @@ namespace LLInitParam
 				}
 			}
 
-			return "";
+			return {};
 		}
 
 		void clearValueName() const
@@ -343,7 +375,7 @@ namespace LLInitParam
 			mValueName.clear();
 		}
 
-		static bool getValueFromName(const std::string& name, value_t& value)
+		static bool getValueFromName(std::string_view name, value_t& value)
 		{
 			value_name_map_t* map = getValueNames();
 			typename value_name_map_t::iterator found_it = map->find(name);
@@ -387,7 +419,22 @@ namespace LLInitParam
 
 		static void declare(const std::string& name, const value_t& value)
 		{
-			(*getValueNames())[name] = value;
+            getValueNames()->insert_or_assign(name, value);
+		}
+
+		static void declare(const std::string& name, value_t&& value)
+		{
+            getValueNames()->insert_or_assign(name, std::move(value));
+		}
+
+		static void declare(std::string&& name, const value_t& value)
+		{
+            getValueNames()->insert_or_assign(std::move(name), value);
+		}
+
+		static void declare(std::string&& name, value_t&& value)
+		{
+            getValueNames()->insert_or_assign(std::move(name), std::move(value));
 		}
 
 		void operator ()(const std::string& name)
@@ -402,6 +449,14 @@ namespace LLInitParam
 				setValueName(name);
 			}
 		}
+
+		void assignNamedValue(std::string&& name)
+        {
+            if (getValueFromName(name, param_value_t::getValue()))
+            {
+                setValueName(std::move(name));
+            }
+        }
 
 		operator const value_t&() const
 		{
@@ -438,9 +493,18 @@ namespace LLInitParam
 		:	base_t(val)
 		{}
 
+		TypeValuesHelper(std::string&& val)
+		:	base_t(std::move(val))
+		{}
+
 		void operator ()(const std::string& name)
-	{
+		{
 			*this = name;
+		}
+
+		void operator ()(std::string&& name)
+		{
+			*this = std::move(name);
 		}
 
 		self_t& operator =(const std::string& name)
@@ -452,6 +516,19 @@ namespace LLInitParam
 			else
 			{
 				ParamValue<std::string>::setValue(name);
+			}
+			return *this;
+		}
+
+		self_t& operator =(std::string&& name)
+		{
+			if (base_t::getValueFromName(name, ParamValue<std::string>::getValue()))
+			{
+				base_t::setValueName(std::move(name));
+			}
+			else
+			{
+				ParamValue<std::string>::setValue(std::move(name));
 			}
 			return *this;
 		}
@@ -663,105 +740,105 @@ namespace LLInitParam
 		class BaseBlock*				mCurrentBlockPtr;		// pointer to block currently being constructed
 	};
 
-		//TODO: implement in terms of owned_ptr
-		template<typename T>
+    template <typename T> 
 	class LazyValue
-		{
-		public:
-		LazyValue()
-				: mPtr(NULL)
-			{}
+    {
+      public:
+        LazyValue() = default;
+        ~LazyValue() = default;
 
-		~LazyValue()
-			{
-				delete mPtr;
-			}
+        LazyValue(const T& value) { mPtr = std::make_unique<T>(value); }
+        LazyValue(T&& value) { mPtr = std::make_unique<T>(std::move(value)); }
 
-		LazyValue(const T& value)
-			{
-			mPtr = new T(value);
-		}
+        LazyValue(const LazyValue& other) { *this = other; }
+        LazyValue(LazyValue&& other) { *this = std::move(other); }
 
-		LazyValue(const LazyValue& other)
-		:	mPtr(NULL)
-				{
-			*this = other;
-				}
+        LazyValue& operator=(const LazyValue& other)
+        {
+            if (!other.mPtr)
+            {
+                mPtr.reset();
+            }
+            else
+            {
+                if (!mPtr)
+                {
+                    mPtr = std::make_unique<T>(*other.mPtr);
+                }
+                else
+                {
+                    *mPtr = *(other.mPtr);
+                }
+            }
+            return *this;
+        }
 
-		LazyValue& operator = (const LazyValue& other)
-				{
-			if (!other.mPtr)
-			{
-				delete mPtr;
-					mPtr = NULL;
-				}
-			else
-			{
-				if (!mPtr)
-				{
-					mPtr = new T(*other.mPtr);
-				}
-				else
-				{
-					*mPtr = *(other.mPtr);
-				}
-				}
-				return *this;
-			}
+        LazyValue& operator=(LazyValue&& other)
+        {
+            if (!other.mPtr)
+            {
+                mPtr.reset();
+            }
+            else
+            {
+                mPtr = std::move(other.mPtr);
+            }
+            return *this;
+        }
 
-		bool operator==(const LazyValue& other) const
-		{
-			if (empty() || other.empty()) return false;
-			return *mPtr == *other.mPtr;
-		}
+        bool operator==(const LazyValue& other) const
+        {
+            if (empty() || other.empty())
+                return false;
+            return *mPtr == *other.mPtr;
+        }
 
-			bool empty() const
-			{
-				return mPtr == NULL;
-			}
+        bool empty() const { return mPtr == nullptr; }
 
-			void set(const T& other)
-			{
-			if (!mPtr)
-			{
-				mPtr = new T(other);
-			}
-			else
-			{
-				*mPtr = other;
-			}
-		}
+        void set(const T& other)
+        {
+            if (!mPtr)
+            {
+                mPtr = std::make_unique<T>(other);
+            }
+            else
+            {
+                *mPtr = other;
+            }
+        }
 
-			const T& get() const
-			{
-			return *ensureInstance();
-			}
+        void set(T&& other)
+        {
+            if (!mPtr)
+            {
+                mPtr = std::make_unique<T>(std::move(other));
+            }
+            else
+            {
+                *mPtr = std::move(other);
+            }
+        }
 
-			T& get()
-			{
-			return *ensureInstance();
-		}
+        const T& get() const { return *ensureInstance(); }
 
-		operator const T&() const
-		{ 
-			return get(); 
-			}
+        T& get() { return *ensureInstance(); }
 
-		private:
-			// lazily allocate an instance of T
-			T* ensureInstance() const
-			{
-				if (mPtr == NULL)
-				{
-					mPtr = new T();
-				}
-				return mPtr;
-			}
+        operator const T&() const { return get(); }
 
-		private:
+      private:
+        // lazily allocate an instance of T
+        T* ensureInstance() const
+        {
+            if (!mPtr)
+            {
+                mPtr = std::make_unique<T>();
+            }
+            return mPtr.get();
+        }
 
-			mutable T* mPtr;
-		};
+      private:
+        mutable std::unique_ptr<T> mPtr;
+    };
 
 	// root class of all parameter blocks
 
@@ -954,6 +1031,7 @@ namespace LLInitParam
 			// don't change mEnclosingblockoffset
 			return *this;
 		}
+
 	protected:
 
 		bool anyProvided() const { return mIsProvided; }
@@ -1039,7 +1117,7 @@ namespace LLInitParam
 					&& parser.readValue(name)
 					&& named_value_t::getValueFromName(name, typed_param.getValue()))
 				{
-					typed_param.setValueName(name);
+                    typed_param.setValueName(std::move(name));
 					typed_param.setProvided();
 					return true;
 				}
@@ -1124,11 +1202,24 @@ namespace LLInitParam
 			setProvided(flag_as_provided);
 		}
 
+		void set(value_t&& val, bool flag_as_provided = true)
+		{
+			named_value_t::clearValueName();
+			named_value_t::setValue(std::move(val));
+			setProvided(flag_as_provided);
+		}
+
 		self_t& operator =(const typename named_value_t::name_t& name)
 		{
 			named_value_t::assignNamedValue(name);
 			return *this;
 		}
+
+		self_t& operator=(typename named_value_t::name_t&& name)
+        {
+            named_value_t::assignNamedValue(std::move(name));
+            return *this;
+        }
 
 	protected:
 
@@ -1204,7 +1295,7 @@ namespace LLInitParam
 					&& parser.readValue(name)				
 					&& named_value_t::getValueFromName(name, typed_param.getValue()))
 			{
-				typed_param.setValueName(name);
+				typed_param.setValueName(std::move(name));
 				typed_param.setProvided();
 				return true;
 			}
@@ -1289,9 +1380,22 @@ namespace LLInitParam
 			setProvided(flag_as_provided);
 		}
 
+		void set(value_t&& val, bool flag_as_provided = true)
+		{
+			named_value_t::setValue(std::move(val));
+			named_value_t::clearValueName();
+			setProvided(flag_as_provided);
+		}
+
 		self_t& operator =(const typename named_value_t::name_t& name)
 		{
 			named_value_t::assignNamedValue(name);
+			return *this;
+		}
+
+		self_t& operator =(typename named_value_t::name_t&& name)
+		{
+			named_value_t::assignNamedValue(std::move(name));
 			return *this;
 		}
 
@@ -1412,7 +1516,7 @@ namespace LLInitParam
 					&& named_value_t::getValueFromName(name, value))
 				{
 					typed_param.add(value);
-					typed_param.mValues.back().setValueName(name);
+                    typed_param.mValues.back().setValueName(std::move(name));
 					return true;
 				}
 				else if (parser.readValue(value)) 	// attempt to read value directly
@@ -1493,6 +1597,12 @@ namespace LLInitParam
 			setProvided(flag_as_provided);
 		}
 
+		void set(container_t&& val, bool flag_as_provided = true)
+		{
+			mValues = std::move(val);
+			setProvided(flag_as_provided);
+		}
+
 		param_value_t& add()
 		{
 			mValues.push_back(value_t());
@@ -1507,6 +1617,13 @@ namespace LLInitParam
 			return *this;
 		}
 
+		self_t& add(value_t&& item)
+		{
+			mValues.push_back(std::move(item));
+			setProvided();
+			return *this;
+		}
+
 		self_t& add(const typename named_value_t::name_t& name)
 		{
 			value_t value;
@@ -1514,8 +1631,22 @@ namespace LLInitParam
 			// try to parse a per type named value
 			if (named_value_t::getValueFromName(name, value))
 			{
-				add(value);
+				add(std::move(value));
 				mValues.back().setValueName(name);
+			}
+
+			return *this;
+		}
+
+		self_t& add(typename named_value_t::name_t&& name)
+		{
+			value_t value;
+
+			// try to parse a per type named value
+			if (named_value_t::getValueFromName(name, value))
+			{
+				add(std::move(value));
+				mValues.back().setValueName(std::move(name));
 			}
 
 			return *this;
@@ -1650,7 +1781,7 @@ namespace LLInitParam
 					&& parser.readValue(name)
 					&& named_value_t::getValueFromName(name, value.getValue()))
 				{
-					typed_param.mValues.back().setValueName(name);
+					typed_param.mValues.back().setValueName(std::move(name));
 					typed_param.setProvided();
 					if (new_array_value)
 					{
@@ -1745,17 +1876,24 @@ namespace LLInitParam
 
 		param_value_t& add()
 		{
-			mValues.push_back(value_t());
+            mValues.emplace_back(value_t());
 			setProvided();
 			return mValues.back();
 		}
 
 		self_t& add(const value_t& item)
 		{
-			mValues.push_back(item);
+            mValues.emplace_back(item);
 			setProvided();
 			return *this;
 		}
+
+		self_t& add(value_t&& item)
+        {
+            mValues.emplace_back(std::move(item));
+            setProvided();
+            return *this;
+        }
 
 		self_t& add(const typename named_value_t::name_t& name)
 		{
@@ -1764,8 +1902,21 @@ namespace LLInitParam
 			// try to parse a per type named value
 			if (named_value_t::getValueFromName(name, value))
 			{
-				add(value);
+				add(std::move(value));
 				mValues.back().setValueName(name);
+			}
+			return *this;
+		}
+
+		self_t& add(typename named_value_t::name_t&& name)
+		{
+			value_t value;
+
+			// try to parse a per type named value
+			if (named_value_t::getValueFromName(name, value))
+			{
+				add(std::move(value));
+				mValues.back().setValueName(std::move(name));
 			}
 			return *this;
 		}
@@ -1946,14 +2097,29 @@ namespace LLInitParam
 				super_t::set(val);
 			}
 
+			void chooseAs(value_t&& val)
+			{
+				super_t::set(std::move(val));
+			}
+
 			void operator =(const value_t& val)
 			{
 				super_t::set(val);
 			}
 
+			void operator =(value_t&& val)
+			{
+				super_t::set(std::move(val));
+			}
+
 			void operator()(const value_t& val) 
 			{ 
 				super_t::set(val);
+			}
+
+			void operator()(value_t&& val) 
+			{ 
+				super_t::set(std::move(val));
 			}
 
 			operator const value_t&() const 
@@ -2055,9 +2221,21 @@ namespace LLInitParam
 				return *this;
 			}
 
+			Optional& operator =(value_t&& val)
+			{
+				super_t::set(std::move(val));
+				return *this;
+			}
+
 			DERIVED_BLOCK& operator()(const value_t& val)
 			{
 				super_t::set(val);
+				return static_cast<DERIVED_BLOCK&>(Param::enclosingBlock());
+			}
+
+			DERIVED_BLOCK& operator()(value_t&& val)
+			{
+				super_t::set(std::move(val));
 				return static_cast<DERIVED_BLOCK&>(Param::enclosingBlock());
 			}
 		};
@@ -2085,9 +2263,21 @@ namespace LLInitParam
 				return *this;
 			}
 
+			Mandatory& operator =(value_t&& val)
+			{
+				super_t::set(std::move(val));
+				return *this;
+			}
+
 			DERIVED_BLOCK& operator()(const value_t& val)
 			{
 				super_t::set(val);
+				return static_cast<DERIVED_BLOCK&>(Param::enclosingBlock());
+			}
+
+			DERIVED_BLOCK& operator()(value_t&& val)
+			{
+				super_t::set(std::move(val));
 				return static_cast<DERIVED_BLOCK&>(Param::enclosingBlock());
 			}
 
@@ -2124,9 +2314,21 @@ namespace LLInitParam
 				return *this;
 			}
 
+			Multiple& operator =(container_t&& val)
+			{
+				super_t::set(std::move(val));
+				return *this;
+			}
+
 			DERIVED_BLOCK& operator()(const container_t& val)
 			{
 				super_t::set(val);
+				return static_cast<DERIVED_BLOCK&>(Param::enclosingBlock());
+			}
+
+			DERIVED_BLOCK& operator()(container_t&& val)
+			{
+				super_t::set(std::move(val));
 				return static_cast<DERIVED_BLOCK&>(Param::enclosingBlock());
 			}
 
@@ -2183,13 +2385,28 @@ namespace LLInitParam
 			// dummy writer interfaces
 			template<typename T>
 			Deprecated& operator =(const T& val)
-		{
+			{
+				// do nothing
+				return *this;
+			}
+
+			// dummy writer interfaces
+			template<typename T>
+			Deprecated& operator =(T&& val)
+			{
 				// do nothing
 				return *this;
 			}
 
 			template<typename T>
 			DERIVED_BLOCK& operator()(const T& val)
+			{
+				// do nothing
+				return static_cast<DERIVED_BLOCK&>(Param::enclosingBlock());
+			}
+
+			template<typename T>
+			DERIVED_BLOCK& operator()(T&& val)
 			{
 				// do nothing
 				return static_cast<DERIVED_BLOCK&>(Param::enclosingBlock());
@@ -2282,9 +2499,18 @@ namespace LLInitParam
 		:	mValue(value)
 		{}
 
+		ParamValue(default_value_t&& value)
+		:	mValue(std::move(value))
+		{}
+
 		void setValue(const value_t& val)
 		{
 			mValue.setValue(val);
+		}
+
+		void setValue(value_t&& val)
+		{
+			mValue.setValue(std::move(val));
 		}
 
 		const value_t& getValue() const
@@ -2378,9 +2604,20 @@ namespace LLInitParam
 			mCurParam = getBlockDescriptor().mAllParams.begin();
 		}
 
+		ParamValue(default_value_t&& value)
+		:	mValue(std::move(value))
+		{
+			mCurParam = getBlockDescriptor().mAllParams.begin();
+		}
+
 		void setValue(const value_t& val)
 		{
 			mValue.setValue(val);
+		}
+
+		void setValue(value_t&& val)
+		{
+			mValue.setValue(std::move(val));
 		}
 
 		const value_t& getValue() const
@@ -2502,13 +2739,26 @@ namespace LLInitParam
 		:	mValue(other)
 		{}
 
+		ParamValue(default_value_t&& other)
+		:	mValue(std::move(other))
+		{}
+
 		ParamValue(const T& value)
 		:	mValue(value)
+		{}
+
+		ParamValue(T&& value)
+		:	mValue(std::move(value))
 		{}
 
 		void setValue(const value_t& val)
 		{
 			mValue.set(val);
+		}
+
+		void setValue(value_t&& val)
+		{
+			mValue.set(std::move(val));
 		}
 
 		const value_t& getValue() const
@@ -2582,13 +2832,26 @@ namespace LLInitParam
 		:	mValue(other)
 		{}
 
+		ParamValue(default_value_t&& other)
+		:	mValue(std::move(other))
+		{}
+
 		ParamValue(const T& value)
 		:	mValue(value)
+		{}
+
+		ParamValue(T&& value)
+		:	mValue(std::move(value))
 		{}
 			
 		void setValue(const value_t& val)
 		{
 			mValue.set(val);
+		}
+
+		void setValue(value_t&& val)
+		{
+			mValue.set(std::move(val));
 		}
 
 		const value_t& getValue() const
@@ -2625,7 +2888,12 @@ namespace LLInitParam
 		:	mValue(other)
 		{}
 
+		ParamValue(default_value_t&& other)
+		:	mValue(std::move(other))
+		{}
+
 		void setValue(const value_t& val) { mValue = val; }
+		void setValue(value_t&& val) { mValue = std::move(val); }
 
 		const value_t& getValue() const { return mValue; }
 		LLSD& getValue() { return mValue; }
@@ -2665,8 +2933,13 @@ namespace LLInitParam
 		typedef void					baseblock_base_class_t;
 
 
-		CustomParamValue(const default_value_t& value = T())
+		CustomParamValue(const default_value_t& value)
 		:	mValue(value),
+			mValueAge(VALUE_AUTHORITATIVE)
+		{}
+
+		CustomParamValue(default_value_t&& value = T())
+		:	mValue(std::move(value)),
 			mValueAge(VALUE_AUTHORITATIVE)
 		{}
 
@@ -2781,6 +3054,14 @@ namespace LLInitParam
 			// set param version number to be up to date, so we ignore block contents
 			mValueAge = VALUE_AUTHORITATIVE;
 			mValue = val;
+			static_cast<derived_t*>(this)->updateBlockFromValue(false);
+		}
+
+		void setValue(value_t&& val)
+		{
+			// set param version number to be up to date, so we ignore block contents
+			mValueAge = VALUE_AUTHORITATIVE;
+			mValue = std::move(val);
 			static_cast<derived_t*>(this)->updateBlockFromValue(false);
 		}
 
