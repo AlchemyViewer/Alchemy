@@ -67,7 +67,7 @@ const S32 TEM_TEX_GEN_SHIFT		= 1;
 // forward declarations
 class LLMediaEntry;
 
-class LLTextureEntry
+class LLTextureEntry final
 {
 public:	
 	static LLTextureEntry* newTextureEntry();
@@ -99,8 +99,8 @@ public:
 	operator LLSD() const { return asLLSD(); }
 	bool fromLLSD(const LLSD& sd);
 
-	virtual LLTextureEntry* newBlank() const;
-	virtual LLTextureEntry* newCopy() const;
+	LLTextureEntry* newBlank() const;
+	LLTextureEntry* newCopy() const;
 
 	void init(const LLUUID& tex_id, F32 scale_s, F32 scale_t, F32 offset_s, F32 offset_t, F32 rotation, U8 bump);
 
@@ -134,7 +134,7 @@ public:
 	S32  setMaterialID(const LLMaterialID& pMaterialID);
 	S32  setMaterialParams(const LLMaterialPtr pMaterialParams);
 	
-	virtual const LLUUID &getID() const { return mID; }
+	const LLUUID &getID() const { return mID; }
 	const LLColor4 &getColor() const { return mColor; }
     const F32 getAlpha() const { return mColor.mV[VALPHA]; }
 

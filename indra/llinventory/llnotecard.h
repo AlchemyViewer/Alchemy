@@ -30,7 +30,7 @@
 #include "llpointer.h"
 #include "llinventory.h"
 
-class LLNotecard
+class LLNotecard final
 {
 public:
 	/**
@@ -42,7 +42,7 @@ public:
 	};
 	
 	LLNotecard(S32 max_text = LLNotecard::MAX_SIZE);
-	virtual ~LLNotecard() = default;
+	~LLNotecard() = default;
 
 	bool importStream(std::istream& str);
 	bool exportStream(std::ostream& str);

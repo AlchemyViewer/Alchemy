@@ -29,11 +29,11 @@
 #include "png.h"
 #include "llimage.h"
 
-class LLPngWrapper
+class LLPngWrapper final
 {
 public:
 	LLPngWrapper();
-	virtual ~LLPngWrapper();
+	~LLPngWrapper();
 
 public:
 	struct ImageInfo

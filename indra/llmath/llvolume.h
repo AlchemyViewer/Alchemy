@@ -815,7 +815,7 @@ protected:
 	F32           mStep;
 };
 
-class LLDynamicPath : public LLPath
+class LLDynamicPath final : public LLPath
 {
 public:
 	LLDynamicPath() : LLPath() { }

@@ -152,7 +152,7 @@ public:
 };
 
 
-class LLParcel
+class LLParcel final
 {
 public:
 	enum EOwnershipStatus
@@ -219,7 +219,7 @@ public:
 		S32 sim_object_limit,
 		F32 parcel_object_bonus,
 		BOOL is_group_owned = FALSE);
-	virtual ~LLParcel() = default;
+	~LLParcel() = default;
 
 	void init(
 		const LLUUID &owner_id,
@@ -261,7 +261,7 @@ public:
 	void setMediaPreventCameraZoom(U8 enable) { mMediaPreventCameraZoom = enable; }
 
 	void setMediaURLResetTimer(F32 time);
-	virtual void	setLocalID(S32 local_id);
+	void setLocalID(S32 local_id);
 
 	// blow away all the extra stuff lurking in parcels, including urls, access lists, etc
 	void clearParcel();
@@ -285,7 +285,7 @@ public:
 	void	setAllParcelFlags(U32 flags);
 	void	setParcelFlag(U32 flag, BOOL b);
 
-	virtual void setArea(S32 area, S32 sim_object_limit);
+	void	setArea(S32 area, S32 sim_object_limit);
 	void	setDiscountRate(F32 rate);
 
 	void	setAllowModify(BOOL b)	{ setParcelFlag(PF_CREATE_OBJECTS, b); }

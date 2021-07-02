@@ -34,7 +34,7 @@
 
 class LLMessageSystem;
 
-class LLViewerGesture : public LLGesture
+class LLViewerGesture final : public LLGesture
 {
 public:
 	LLViewerGesture();
@@ -57,7 +57,7 @@ protected:
 	static const F32	SOUND_VOLUME;
 };
 
-class LLViewerGestureList : public LLGestureList
+class LLViewerGestureList final : public LLGestureList
 {
 public:
 	LLViewerGestureList();

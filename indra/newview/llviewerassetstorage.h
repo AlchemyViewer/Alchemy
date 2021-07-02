@@ -32,7 +32,7 @@
 
 class LLViewerAssetRequest;
 
-class LLViewerAssetStorage : public LLAssetStorage
+class LLViewerAssetStorage final : public LLAssetStorage
 {
 public:
 	LLViewerAssetStorage(LLMessageSystem *msg, LLXferManager *xfer, const LLHost &upstream_host);
