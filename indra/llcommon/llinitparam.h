@@ -262,7 +262,7 @@ namespace LLInitParam
 	private:
 		struct Inaccessable{};
 	public:
-		typedef std::map<std::string, T> value_name_map_t;
+		typedef absl::flat_hash_map<std::string, T> value_name_map_t;
 		typedef Inaccessable name_t;
 		typedef TypeValues<T> type_value_t;
 		typedef ParamValue<typename LLTypeTags::Sorted<T>::value_t>	param_value_t;
@@ -324,7 +324,7 @@ namespace LLInitParam
 	{
 		typedef TypeValuesHelper<T, DERIVED_TYPE, IS_SPECIALIZED> self_t;
 	public:
-		typedef typename std::map<std::string, T, std::less<>> value_name_map_t;
+		typedef typename absl::flat_hash_map<std::string, T> value_name_map_t;
 		typedef std::string name_t;
 		typedef self_t type_value_t;
 		typedef ParamValue<typename LLTypeTags::Sorted<T>::value_t> param_value_t;
@@ -558,9 +558,9 @@ namespace LLInitParam
 		typedef bool (*parser_write_func_t)(Parser& parser, const void*, name_stack_t&);
 		typedef boost::function<void (name_stack_t&, S32, S32, const possible_values_t*)>	parser_inspect_func_t;
 
-		typedef std::map<const std::type_info*, parser_read_func_t>		parser_read_func_map_t;
-		typedef std::map<const std::type_info*, parser_write_func_t>	parser_write_func_map_t;
-		typedef std::map<const std::type_info*, parser_inspect_func_t>	parser_inspect_func_map_t;
+		typedef absl::flat_hash_map<const std::type_info*, parser_read_func_t>		parser_read_func_map_t;
+        typedef absl::flat_hash_map<const std::type_info*, parser_write_func_t>		parser_write_func_map_t;
+        typedef absl::flat_hash_map<const std::type_info*, parser_inspect_func_t>   parser_inspect_func_map_t;
 
 	public:
 
