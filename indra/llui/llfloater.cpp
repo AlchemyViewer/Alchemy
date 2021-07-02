@@ -3475,7 +3475,8 @@ bool LLFloater::buildFromFile(const std::string& filename)
 	bool res = true;
 	
 	LL_DEBUGS() << "Building floater " << filename << LL_ENDL;
-	LLUICtrlFactory::instance().pushFileName(filename);
+    auto& uictrl_factory = LLUICtrlFactory::instance();
+    uictrl_factory.pushFileName(filename);
 	{
 		if (!getFactoryMap().empty())
 		{
@@ -3498,7 +3499,7 @@ bool LLFloater::buildFromFile(const std::string& filename)
 			LLPanel::sFactoryStack.pop_front();
 		}
 	}
-	LLUICtrlFactory::instance().popFileName();
+    uictrl_factory.popFileName();
 	
 	return res;
 }
