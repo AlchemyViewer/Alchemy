@@ -98,35 +98,95 @@ LLTextureEntry::LLTextureEntry(const LLTextureEntry &rhs)
 	}
 }
 
-LLTextureEntry &LLTextureEntry::operator=(const LLTextureEntry &rhs)
+LLTextureEntry::LLTextureEntry(LLTextureEntry&& rhs) noexcept : mMediaEntry(NULL), mSelected(false), mMaterialUpdatePending(false)
 {
-	if (this != &rhs)
-	{
-		mID = rhs.mID;
-		mScaleS = rhs.mScaleS;
-		mScaleT = rhs.mScaleT;
-		mOffsetS = rhs.mOffsetS;
-		mOffsetT = rhs.mOffsetT;
-		mRotation = rhs.mRotation;
-		mColor = rhs.mColor;
-		mBump = rhs.mBump;
-		mMediaFlags = rhs.mMediaFlags;
-		mGlow = rhs.mGlow;
-		mMaterialID = rhs.mMaterialID;
-		mMaterial = rhs.mMaterial;
-		if (mMediaEntry != NULL) {
-			delete mMediaEntry;
-		}
-		if (rhs.mMediaEntry != NULL) {
-			// Make a copy
-			mMediaEntry = new LLMediaEntry(*rhs.mMediaEntry);
-		}
-		else {
-			mMediaEntry = NULL;
-		}
-	}
+    mID         = std::move(rhs.mID);
+    mScaleS     = rhs.mScaleS;
+    mScaleT     = rhs.mScaleT;
+    mOffsetS    = rhs.mOffsetS;
+    mOffsetT    = rhs.mOffsetT;
+    mRotation   = rhs.mRotation;
+    mColor      = std::move(rhs.mColor);
+    mBump       = rhs.mBump;
+    mMediaFlags = rhs.mMediaFlags;
+    mGlow       = rhs.mGlow;
+    mMaterialID = std::move(rhs.mMaterialID);
+    mMaterial   = std::move(rhs.mMaterial);
+    if (rhs.mMediaEntry != nullptr)
+    {
+        // Make a copy
+        mMediaEntry     = rhs.mMediaEntry;
+        rhs.mMediaEntry = nullptr;
+    }
+}
 
-	return *this;
+LLTextureEntry& LLTextureEntry::operator=(const LLTextureEntry& rhs)
+{
+    if (this != &rhs)
+    {
+        mID         = rhs.mID;
+        mScaleS     = rhs.mScaleS;
+        mScaleT     = rhs.mScaleT;
+        mOffsetS    = rhs.mOffsetS;
+        mOffsetT    = rhs.mOffsetT;
+        mRotation   = rhs.mRotation;
+        mColor      = rhs.mColor;
+        mBump       = rhs.mBump;
+        mMediaFlags = rhs.mMediaFlags;
+        mGlow       = rhs.mGlow;
+        mMaterialID = rhs.mMaterialID;
+        mMaterial   = rhs.mMaterial;
+        if (mMediaEntry != NULL)
+        {
+            delete mMediaEntry;
+        }
+        if (rhs.mMediaEntry != NULL)
+        {
+            // Make a copy
+            mMediaEntry = new LLMediaEntry(*rhs.mMediaEntry);
+        }
+        else
+        {
+            mMediaEntry = NULL;
+        }
+    }
+
+    return *this;
+}
+
+LLTextureEntry& LLTextureEntry::operator=(LLTextureEntry&& rhs) noexcept
+{
+    if (this != &rhs)
+    {
+        mID         = std::move(rhs.mID);
+        mScaleS     = rhs.mScaleS;
+        mScaleT     = rhs.mScaleT;
+        mOffsetS    = rhs.mOffsetS;
+        mOffsetT    = rhs.mOffsetT;
+        mRotation   = rhs.mRotation;
+        mColor      = std::move(rhs.mColor);
+        mBump       = rhs.mBump;
+        mMediaFlags = rhs.mMediaFlags;
+        mGlow       = rhs.mGlow;
+        mMaterialID = std::move(rhs.mMaterialID);
+        mMaterial   = std::move(rhs.mMaterial);
+        if (mMediaEntry != nullptr)
+        {
+            delete mMediaEntry;
+        }
+        if (rhs.mMediaEntry != nullptr)
+        {
+            // Steal it
+            mMediaEntry = rhs.mMediaEntry;
+            rhs.mMediaEntry = nullptr;
+        }
+        else
+        {
+            mMediaEntry = nullptr;
+        }
+    }
+
+    return *this;
 }
 
 void LLTextureEntry::init(const LLUUID& tex_id, F32 scale_s, F32 scale_t, F32 offset_s, F32 offset_t, F32 rotation, U8 bump)

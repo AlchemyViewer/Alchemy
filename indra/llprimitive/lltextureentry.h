@@ -83,9 +83,11 @@ public:
 	LLTextureEntry();
 	LLTextureEntry(const LLUUID& tex_id);
 	LLTextureEntry(const LLTextureEntry &rhs);
+    LLTextureEntry(LLTextureEntry&& rhs) noexcept;
 
-	LLTextureEntry &operator=(const LLTextureEntry &rhs);
-    virtual ~LLTextureEntry();
+	LLTextureEntry& operator=(const LLTextureEntry &rhs);
+    LLTextureEntry& operator=(LLTextureEntry&& rhs) noexcept;
+    ~LLTextureEntry();
 
 	bool operator==(const LLTextureEntry &rhs) const;
 	bool operator!=(const LLTextureEntry &rhs) const;
