@@ -708,7 +708,7 @@ namespace LLInitParam
 		UserData*			mUserData;
 	};
 
-	typedef boost::shared_ptr<ParamDescriptor> ParamDescriptorPtr;
+	typedef std::shared_ptr<ParamDescriptor> ParamDescriptorPtr;
 
 	// each derived Block class keeps a static data structure maintaining offsets to various params
 	class LL_COMMON_API BlockDescriptor
@@ -956,7 +956,7 @@ namespace LLInitParam
 			return reinterpret_cast<const Param*>(baseblock_address + param_handle);
 		}
 
-		void addSynonym(Param& param, const std::string& synonym);
+		void addSynonym(Param& param, std::string_view synonym);
 
 		// Blocks can override this to do custom tracking of changes
 		virtual void paramChanged(const Param& changed_param, bool user_provided) 
@@ -1246,15 +1246,15 @@ namespace LLInitParam
 	private:
 		void init( BlockDescriptor &block_descriptor, ParamDescriptor::validation_func_t validate_func, S32 min_count, S32 max_count, const char* name ) 
 		{
-			ParamDescriptorPtr param_descriptor = ParamDescriptorPtr(new ParamDescriptor(
+			ParamDescriptorPtr param_descriptor = std::make_shared<ParamDescriptor>(
 				block_descriptor.mCurrentBlockPtr->getHandleFromParam(this),
 				&mergeWith,
 				&deserializeParam,
 				&serializeParam,
 				validate_func,
 				&inspectParam,
-				min_count, max_count));
-			block_descriptor.addParam(param_descriptor, name);
+				min_count, max_count);
+			block_descriptor.addParam(std::move(param_descriptor), name);
 		}
 	};
 
@@ -1444,15 +1444,15 @@ namespace LLInitParam
 	private:
 		void init( BlockDescriptor &block_descriptor, ParamDescriptor::validation_func_t validate_func, S32 min_count, S32 max_count, const char* name ) 
 		{
-			ParamDescriptorPtr param_descriptor = ParamDescriptorPtr(new ParamDescriptor(
+            ParamDescriptorPtr param_descriptor = std::make_shared<ParamDescriptor>(
 				block_descriptor.mCurrentBlockPtr->getHandleFromParam(this),
 				&mergeWith,
 				&deserializeParam,
 				&serializeParam,
 				validate_func, 
 				&inspectParam,
-				min_count, max_count));
-			block_descriptor.addParam(param_descriptor, name);
+				min_count, max_count);
+			block_descriptor.addParam(std::move(param_descriptor), name);
 		}
 	};
 
@@ -1702,15 +1702,15 @@ namespace LLInitParam
 	private:
 		void init( BlockDescriptor &block_descriptor, ParamDescriptor::validation_func_t validate_func, S32 min_count, S32 max_count, const char* name ) 
 		{
-			ParamDescriptorPtr param_descriptor = ParamDescriptorPtr(new ParamDescriptor(
+            ParamDescriptorPtr param_descriptor = std::make_shared<ParamDescriptor>(
 				block_descriptor.mCurrentBlockPtr->getHandleFromParam(this),
 				&mergeWith,
 				&deserializeParam,
 				&serializeParam,
 				validate_func,
 				&inspectParam,
-				min_count, max_count));
-			block_descriptor.addParam(param_descriptor, name);
+				min_count, max_count);
+			block_descriptor.addParam(std::move(param_descriptor), name);
 		}
 	};
 
@@ -1978,15 +1978,15 @@ namespace LLInitParam
 	private:
 		void init( BlockDescriptor &block_descriptor, ParamDescriptor::validation_func_t validate_func, S32 min_count, S32 max_count, const char* name ) 
 		{
-			ParamDescriptorPtr param_descriptor = ParamDescriptorPtr(new ParamDescriptor(
+            ParamDescriptorPtr param_descriptor = std::make_shared<ParamDescriptor>(
 				block_descriptor.mCurrentBlockPtr->getHandleFromParam(this),
 				&mergeWith,
 				&deserializeParam,
 				&serializeParam,
 				validate_func,
 				&inspectParam,
-				min_count, max_count));
-			block_descriptor.addParam(param_descriptor, name);
+				min_count, max_count);
+			block_descriptor.addParam(std::move(param_descriptor), name);
 		}
 	};
 
@@ -2350,15 +2350,15 @@ namespace LLInitParam
 				BlockDescriptor& block_descriptor = DERIVED_BLOCK::getBlockDescriptor();
 				if (LL_UNLIKELY(block_descriptor.mInitializationState == BlockDescriptor::INITIALIZING))
 				{
-					ParamDescriptorPtr param_descriptor = ParamDescriptorPtr(new ParamDescriptor(
+                    ParamDescriptorPtr param_descriptor = std::make_shared<ParamDescriptor>(
 													block_descriptor.mCurrentBlockPtr->getHandleFromParam(this),
-													NULL,
+													nullptr,
 													&deserializeParam,
-													NULL,
-													NULL,
-													NULL, 
-													0, S32_MAX));
-					block_descriptor.addParam(param_descriptor, name);
+													nullptr,
+													nullptr,
+													nullptr, 
+													0, S32_MAX);
+					block_descriptor.addParam(std::move(param_descriptor), name);
 				}
 			}
 			

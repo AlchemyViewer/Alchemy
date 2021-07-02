@@ -120,19 +120,18 @@ namespace LLInitParam
 		std::copy(src_block_data.mAllParams.begin(), src_block_data.mAllParams.end(), std::back_inserter(mAllParams));
 	}
 
-	void BlockDescriptor::addParam(const ParamDescriptorPtr in_param, const char* char_name)
+	void BlockDescriptor::addParam(const ParamDescriptorPtr param, const char* char_name)
 	{
-		// create a copy of the param descriptor in mAllParams
-		// so other data structures can store a pointer to it
-		mAllParams.push_back(in_param);
-		ParamDescriptorPtr param(mAllParams.back());
-
-		std::string name(char_name);
 		if ((size_t)param->mParamHandle > mMaxParamOffset)
 		{
 			LL_ERRS() << "Attempted to register param with block defined for parent class, make sure to derive from LLInitParam::Block<YOUR_CLASS, PARAM_BLOCK_BASE_CLASS>" << LL_ENDL;
 		}
 
+        // create a copy of the param descriptor in mAllParams
+        // so other data structures can store a pointer to it
+        mAllParams.push_back(param);
+
+		std::string name(char_name);
 		if (name.empty())
 		{
 			mUnnamedParams.push_back(param);
@@ -405,7 +404,7 @@ namespace LLInitParam
 		return false;
 	}
 
-	void BaseBlock::addSynonym(Param& param, const std::string& synonym)
+	void BaseBlock::addSynonym(Param& param, std::string_view synonym)
 	{
 		BlockDescriptor& block_data = mostDerivedBlockDescriptor();
 		if (block_data.mInitializationState == BlockDescriptor::INITIALIZING)
@@ -424,11 +423,11 @@ namespace LLInitParam
 			{
 				if (synonym.empty())
 				{
-					block_data.mUnnamedParams.push_back(param_descriptor);
+					block_data.mUnnamedParams.push_back(std::move(param_descriptor));
 				}
 				else
-				{
-					block_data.mNamedParams[synonym] = param_descriptor;
+                {
+					block_data.mNamedParams.insert_or_assign(std::string(synonym), std::move(param_descriptor));
 				}
 			}
 		}
