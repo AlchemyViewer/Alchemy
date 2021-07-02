@@ -74,7 +74,7 @@ public:
 	const std::string &getName() const { return mName; }
 
 	// set the name of this instance
-	void setName(const std::string &name) { mName = name; }
+	void setName(std::string name) { mName = std::move(name); }
 
 	const LLUUID& getID() const { return mID; }
 
