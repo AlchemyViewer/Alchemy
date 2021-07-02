@@ -3742,15 +3742,6 @@ void handle_dump_focus()
 	LL_INFOS() << "Keyboard focus " << (ctrl ? ctrl->getName() : "(none)") << LL_ENDL;
 }
 
-class LLSelfStandUp : public view_listener_t
-{
-	bool handleEvent(const LLSD& userdata)
-	{
-		gAgent.standUp();
-		return true;
-	}
-};
-
 bool enable_standup_self()
 {
 // [RLVa:KB] - Checked: 2010-04-01 (RLVa-1.2.0c) | Modified: RLVa-1.0.0g
@@ -3758,17 +3749,6 @@ bool enable_standup_self()
 // [/RLVa:KB]
 //	return isAgentAvatarValid() && gAgentAvatarp->isSitting();
 }
-
-class LLSelfSitDown : public view_listener_t
-    {
-        bool handleEvent(const LLSD& userdata)
-        {
-            gAgent.sitDown();
-            return true;
-        }
-    };
-
-
 
 bool show_sitdown_self()
 {

@@ -317,7 +317,7 @@ void LLKeyConflictHandler::loadFromSettings(const LLViewerInput::KeyMode& keymod
         {
             LLKeyboard::keyFromString(it->key, &key);
         }
-        LLKeyboard::maskFromString(it->mask, &mask);
+        LLKeyboard::maskFromString(it->mask.getValue(), &mask);
         // Note: it->command is also the name of UI element, howhever xml we are loading from
         // might not know all the commands, so UI will have to know what to fill by its own
         // Assumes U32_MAX conflict mask, and is assignable by default,

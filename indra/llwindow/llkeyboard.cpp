@@ -418,9 +418,8 @@ std::string LLKeyboard::stringFromAccelerator( MASK accel_mask, KEY key )
 
 
 //static
-BOOL LLKeyboard::maskFromString(const std::string& str, MASK *mask)
+BOOL LLKeyboard::maskFromString(std::string_view instring, MASK* mask)
 {
-	std::string instring(str);
 	if (instring == "NONE")
 	{
 		*mask = MASK_NONE;

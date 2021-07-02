@@ -1268,7 +1268,7 @@ S32 LLViewerInput::loadBindingMode(const LLViewerInput::KeyMode& keymode, S32 mo
             if (key != KEY_NONE)
             {
                 MASK mask;
-                LLKeyboard::maskFromString(it->mask, &mask);
+                LLKeyboard::maskFromString(it->mask.getValue(), &mask);
                 bindKey(mode, key, mask, it->command);
                 processed = true;
             }
@@ -1284,7 +1284,7 @@ S32 LLViewerInput::loadBindingMode(const LLViewerInput::KeyMode& keymode, S32 mo
             if (mouse != CLICK_NONE)
             {
                 MASK mask;
-                LLKeyboard::maskFromString(it->mask, &mask);
+                LLKeyboard::maskFromString(it->mask.getValue(), &mask);
                 bindMouse(mode, mouse, mask, it->command);
                 processed = true;
             }
