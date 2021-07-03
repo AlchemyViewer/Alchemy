@@ -68,7 +68,7 @@ bool LLTrans::parseStrings(LLXMLNodePtr &root, const std::set<std::string>& defa
 	if (!root->hasName("strings"))
 	{
 		LL_ERRS() << "Invalid root node name in " << xml_filename 
-			<< ": was " << root->getName() << ", expected \"strings\"" << LL_ENDL;
+			<< ": was " << root->getName()->mString << ", expected \"strings\"" << LL_ENDL;
 	}
 
 	StringTable string_table;
@@ -116,7 +116,7 @@ bool LLTrans::parseLanguageStrings(LLXMLNodePtr &root)
 	if (!root->hasName("strings"))
 	{
 		LL_ERRS() << "Invalid root node name in " << xml_filename 
-		<< ": was " << root->getName() << ", expected \"strings\"" << LL_ENDL;
+		<< ": was " << root->getName()->mString << ", expected \"strings\"" << LL_ENDL;
 	}
 	
 	StringTable string_table;
