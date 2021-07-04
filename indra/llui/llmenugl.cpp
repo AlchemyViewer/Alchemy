@@ -2706,7 +2706,7 @@ void LLMenuGL::setEnabledSubMenus(BOOL enable)
 
 // setItemEnabled() - pass the label and the enable flag for a menu
 // item. TRUE will make sure it's enabled, FALSE will disable it.
-void LLMenuGL::setItemEnabled( const std::string& name, BOOL enable )
+void LLMenuGL::setItemEnabled(std::string_view name, BOOL enable)
 {
 	item_list_t::iterator item_iter;
 	for (item_iter = mItems.begin(); item_iter != mItems.end(); ++item_iter)
@@ -2720,7 +2720,7 @@ void LLMenuGL::setItemEnabled( const std::string& name, BOOL enable )
 	}
 }
 
-void LLMenuGL::setItemVisible( const std::string& name, BOOL visible )
+void LLMenuGL::setItemVisible(std::string_view name, BOOL visible)
 {
 	item_list_t::iterator item_iter;
 	for (item_iter = mItems.begin(); item_iter != mItems.end(); ++item_iter)
@@ -2735,7 +2735,7 @@ void LLMenuGL::setItemVisible( const std::string& name, BOOL visible )
 }
 
 
-void LLMenuGL::setItemLabel(const std::string &name, const std::string &label)
+void LLMenuGL::setItemLabel(std::string_view name, const std::string &label)
 {
     LLMenuItemGL *item = getItem(name);
 
@@ -2787,14 +2787,13 @@ LLMenuItemGL* LLMenuGL::getItem(S32 number)
 	return NULL;
 }
 
-LLMenuItemGL* LLMenuGL::getItem(std::string name)
+LLMenuItemGL* LLMenuGL::getItem(std::string_view name)
 {
-    item_list_t::iterator item_iter;
-    for (item_iter = mItems.begin(); item_iter != mItems.end(); ++item_iter)
+    for (LLMenuItemGL* menu_item : mItems)
     {
-        if ((*item_iter)->getName() == name)
+        if (menu_item->getName() == name)
         {
-            return (*item_iter);
+            return menu_item;
         }
     }
     return NULL;
@@ -2802,12 +2801,11 @@ LLMenuItemGL* LLMenuGL::getItem(std::string name)
 
 LLMenuItemGL* LLMenuGL::getHighlightedItem()
 {
-	item_list_t::iterator item_iter;
-	for (item_iter = mItems.begin(); item_iter != mItems.end(); ++item_iter)
+    for (LLMenuItemGL* menu_item : mItems)
 	{
-		if ((*item_iter)->getHighlight())
+        if (menu_item->getHighlight())
 		{
-			return (*item_iter);
+            return menu_item;
 		}
 	}
 	return NULL;
@@ -3232,7 +3230,7 @@ void LLMenuGL::setVisible(BOOL visible)
 	}
 }
 
-LLMenuGL* LLMenuGL::findChildMenuByName(const std::string& name, BOOL recurse) const
+LLMenuGL* LLMenuGL::findChildMenuByName(std::string_view name, BOOL recurse) const
 {
 	LLView* view = findChildView(name, recurse);
 	if (view)

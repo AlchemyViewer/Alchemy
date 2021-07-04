@@ -122,7 +122,7 @@ public:
 	BOOL getAllowKeyRepeat() const { return mAllowKeyRepeat; }
 
 	// change the label
-	void setLabel( const LLStringExplicit& label ) { mLabel = label; }	
+	void setLabel(LLStringExplicit label ) { mLabel = std::move(label); }	
 	std::string getLabel( void ) const { return mLabel.getString(); }
 	virtual BOOL setLabelArg( const std::string& key, const LLStringExplicit& text );
 
@@ -448,7 +448,7 @@ public:
 	virtual bool hasAccelerator(const KEY &key, const MASK &mask) const;
 	virtual BOOL handleAcceleratorKey(KEY key, MASK mask);
 
-	LLMenuGL* findChildMenuByName(const std::string& name, BOOL recurse) const;
+	LLMenuGL* findChildMenuByName(std::string_view name, BOOL recurse) const;
 	
 	BOOL clearHoverItem();
 
@@ -471,14 +471,14 @@ public:
 	// setItemEnabled() - pass the name and the enable flag for a
 	// menu item. TRUE will make sure it's enabled, FALSE will disable
 	// it.
-	void setItemEnabled( const std::string& name, BOOL enable ); 
+    void setItemEnabled(std::string_view name, BOOL enable); 
 	
 	// propagate message to submenus
 	void setEnabledSubMenus(BOOL enable);
 
-	void setItemVisible( const std::string& name, BOOL visible);
+	void setItemVisible(std::string_view name, BOOL visible);
 
-    void setItemLabel(const std::string &name, const std::string &label);
+    void setItemLabel(std::string_view name, const std::string &label);
 	
 	// sets the left,bottom corner of menu, useful for popups
 	void setLeftAndBottom(S32 left, S32 bottom);
@@ -509,7 +509,7 @@ public:
 	void			setItemLastSelected(LLMenuItemGL* item);	// must be in menu
 	U32				getItemCount();				// number of menu items
 	LLMenuItemGL*	getItem(S32 number);		// 0 = first item
-    LLMenuItemGL*   getItem(std::string name);
+    LLMenuItemGL*   getItem(std::string_view name);
 	LLMenuItemGL*	getHighlightedItem();				
 
 	LLMenuItemGL*	highlightNextItem(LLMenuItemGL* cur_item, BOOL skip_disabled = TRUE);

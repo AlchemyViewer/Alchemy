@@ -265,7 +265,7 @@ LLSD LLNotificationForm::asLLSD() const
 	return mFormData; 
 }
 
-LLSD LLNotificationForm::getElement(const std::string& element_name)
+LLSD LLNotificationForm::getElement(std::string_view element_name)
 {
 	for (const LLSD& llsd_val : mFormData.array())
 	{
@@ -275,7 +275,7 @@ LLSD LLNotificationForm::getElement(const std::string& element_name)
 }
 
 
-bool LLNotificationForm::hasElement(const std::string& element_name) const
+bool LLNotificationForm::hasElement(std::string_view element_name) const
 {
 	for (const LLSD& llsd_val : mFormData.array())
 	{
@@ -297,7 +297,7 @@ void LLNotificationForm::getElements(LLSD& elements, S32 offset)
     }
 }
 
-bool LLNotificationForm::getElementEnabled(const std::string& element_name) const
+bool LLNotificationForm::getElementEnabled(std::string_view element_name) const
 {
 	for (const LLSD& llsd_val : mFormData.array())
 	{
@@ -310,7 +310,7 @@ bool LLNotificationForm::getElementEnabled(const std::string& element_name) cons
 	return false;
 }
 
-void LLNotificationForm::setElementEnabled(const std::string& element_name, bool enabled)
+void LLNotificationForm::setElementEnabled(std::string_view element_name, bool enabled)
 {
 	for (LLSD& llsd_val : mFormData.array())
 	{
@@ -753,7 +753,7 @@ bool LLNotification::hasUniquenessConstraints() const
 	return (mTemplatep ? mTemplatep->mUnique : false);
 }
 
-bool LLNotification::matchesTag(const std::string& tag)
+bool LLNotification::matchesTag(std::string_view tag)
 {
 	bool result = false;
 	
@@ -1427,11 +1427,12 @@ void LLNotifications::createDefaultChannels()
 }
 
 
-LLNotificationTemplatePtr LLNotifications::getTemplate(const std::string& name)
+LLNotificationTemplatePtr LLNotifications::getTemplate(std::string_view name)
 {
-	if (mTemplates.count(name))
+    auto it = mTemplates.find(name);
+    if (it != mTemplates.end())
 	{
-		return mTemplates[name];
+		return it->second;
 	}
 	else
 	{
@@ -1439,9 +1440,9 @@ LLNotificationTemplatePtr LLNotifications::getTemplate(const std::string& name)
 	}
 }
 
-bool LLNotifications::templateExists(const std::string& name)
+bool LLNotifications::templateExists(std::string_view name)
 {
-	return (mTemplates.count(name) != 0);
+	return (mTemplates.find(name) != mTemplates.end());
 }
 
 void LLNotifications::forceResponse(const LLNotification::Params& params, S32 option)
@@ -1702,7 +1703,7 @@ void LLNotifications::cancel(LLNotificationPtr pNotif)
 	}
 }
 
-void LLNotifications::cancelByName(const std::string& name)
+void LLNotifications::cancelByName(std::string_view name)
 {
 	std::vector<LLNotificationPtr> notifs_to_cancel;
 	for (LLNotificationSet::iterator it=mItems.begin(), end_it = mItems.end();
@@ -1782,7 +1783,7 @@ void LLNotifications::forEachNotification(NotificationProcess process)
 	std::for_each(mItems.begin(), mItems.end(), process);
 }
 
-std::string LLNotifications::getGlobalString(const std::string& key) const
+std::string LLNotifications::getGlobalString(std::string_view key) const
 {
 	GlobalStringMap::const_iterator it = mGlobalStrings.find(key);
 	if (it != mGlobalStrings.end())
@@ -1793,7 +1794,7 @@ std::string LLNotifications::getGlobalString(const std::string& key) const
 	{
 		// if we don't have the key as a global, return the key itself so that the error
 		// is self-diagnosing.
-		return key;
+		return std::string(key);
 	}
 }
 
@@ -1806,13 +1807,13 @@ bool LLNotifications::getIgnoreAllNotifications()
 	return mIgnoreAllNotifications; 
 }
 
-void LLNotifications::setIgnored(const std::string& name, bool ignored)
+void LLNotifications::setIgnored(std::string_view name, bool ignored)
 {
 	LLNotificationTemplatePtr templatep = getTemplate(name);
 	templatep->mForm->setIgnored(ignored);
 }
 
-bool LLNotifications::getIgnored(const std::string& name)
+bool LLNotifications::getIgnored(std::string_view name)
 {
 	LLNotificationTemplatePtr templatep = getTemplate(name);
 	return (mIgnoreAllNotifications) || ( (templatep->mForm->getIgnoreType() != LLNotificationForm::IGNORE_NO) && (templatep->mForm->getIgnored()) );
