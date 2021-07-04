@@ -244,10 +244,10 @@ std::string LLHandMotion::getHandPoseName(eHandPose pose)
 	{
 		return std::string(gHandPoseNames[pose]);
 	}
-	return LLStringUtil::null;
+	return std::string();
 }
 
-LLHandMotion::eHandPose LLHandMotion::getHandPose(std::string posename)
+LLHandMotion::eHandPose LLHandMotion::getHandPose(std::string_view posename)
 {
 	for (S32 pose = 0; pose < LLHandMotion::NUM_HAND_POSES; ++pose)
 	{

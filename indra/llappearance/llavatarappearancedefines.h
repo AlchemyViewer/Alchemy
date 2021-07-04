@@ -238,8 +238,8 @@ public:
 	ETextureIndex 		bakedToLocalTextureIndex(EBakedTextureIndex t) const;
 
 	// find a baked texture index based on its name
-	EBakedTextureIndex 	findBakedByRegionName(std::string name);
-	EBakedTextureIndex 	findBakedByImageName(std::string name);
+	EBakedTextureIndex 	findBakedByRegionName(std::string_view name);
+	EBakedTextureIndex 	findBakedByImageName(std::string_view name);
 
 	// Given a texture entry, determine which wearable type owns it.
 	LLWearableType::EType 		getTEWearableType(ETextureIndex index) const;

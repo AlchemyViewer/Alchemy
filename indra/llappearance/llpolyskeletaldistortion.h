@@ -51,10 +51,10 @@ class LLAvatarAppearance;
 //-----------------------------------------------------------------------------
 struct LLPolySkeletalBoneInfo
 {
-	LLPolySkeletalBoneInfo(std::string &name, LLVector3 &scale, LLVector3 &pos, BOOL haspos)
-		: mBoneName(name),
-		  mScaleDeformation(scale),
-		  mPositionDeformation(pos),
+	LLPolySkeletalBoneInfo(std::string name, LLVector3 scale, LLVector3 pos, BOOL haspos)
+		: mBoneName(std::move(name)),
+		  mScaleDeformation(std::move(scale)),
+		  mPositionDeformation(std::move(pos)),
 		  mHasPositionDeformation(haspos) {}
 	std::string mBoneName;
 	LLVector3 mScaleDeformation;

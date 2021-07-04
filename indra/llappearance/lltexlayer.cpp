@@ -1845,7 +1845,7 @@ LLTexLayer* LLTexLayerTemplate::getLayer(U32 i) const
 //-----------------------------------------------------------------------------
 // finds a specific layer based on a passed in name
 //-----------------------------------------------------------------------------
-LLTexLayerInterface*  LLTexLayerSet::findLayerByName(const std::string& name)
+LLTexLayerInterface*  LLTexLayerSet::findLayerByName(std::string_view name)
 {
 	for (layer_list_t::iterator iter = mLayerList.begin(); iter != mLayerList.end(); iter++ )
 	{

@@ -181,13 +181,13 @@ public:
 	
 	virtual LLJoint* findCollisionVolume(S32 volume_id) { return NULL; }
 
-	virtual S32 getCollisionVolumeID(std::string &name) { return -1; }
+	virtual S32 getCollisionVolumeID(std::string_view name) { return -1; }
 
-	void setAnimationData(const std::string& name, void *data);
+	void setAnimationData(std::string name, void *data);
 	
-	void *getAnimationData(const std::string_view name);
+	void *getAnimationData(std::string_view name);
 
-	void removeAnimationData(const std::string& name);
+	void removeAnimationData(std::string_view name);
 	
 	void addVisualParam(LLVisualParam *param);
 	void addSharedVisualParam(LLVisualParam *param);

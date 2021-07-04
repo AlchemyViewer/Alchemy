@@ -96,7 +96,7 @@ public:
 	/*virtual*/ const char*		getAnimationPrefix() { return "avatar"; }
 	/*virtual*/ LLVector3		getVolumePos(S32 joint_index, LLVector3& volume_offset);
 	/*virtual*/ LLJoint*		findCollisionVolume(S32 volume_id);
-	/*virtual*/ S32				getCollisionVolumeID(std::string &name);
+	/*virtual*/ S32				getCollisionVolumeID(std::string_view name);
 	/*virtual*/ LLPolyMesh*		getHeadMesh();
 	/*virtual*/ LLPolyMesh*		getUpperBodyMesh();
 

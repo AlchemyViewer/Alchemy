@@ -208,7 +208,7 @@ public:
 	virtual void				requestUpdate() = 0;
 	void						invalidateMorphMasks();
 	void						deleteCaches();
-	LLTexLayerInterface*		findLayerByName(const std::string& name);
+	LLTexLayerInterface*		findLayerByName(std::string_view name);
 	void						cloneTemplates(LLLocalTextureObject *lto, LLAvatarAppearanceDefines::ETextureIndex tex_index, LLWearable* wearable);
 	
 	LLAvatarAppearance*			getAvatarAppearance()	const		{ return mAvatarAppearance; }

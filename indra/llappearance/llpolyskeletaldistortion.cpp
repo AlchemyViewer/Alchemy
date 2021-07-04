@@ -90,7 +90,7 @@ BOOL LLPolySkeletalDistortionInfo::parseXml(LLXmlTreeNode* node)
                         {
                                 haspos = TRUE;
                         }
-                        mBoneInfoList.emplace_back(LLPolySkeletalBoneInfo(name, scale, pos, haspos));
+                        mBoneInfoList.emplace_back(LLPolySkeletalBoneInfo(std::move(name), std::move(scale), std::move(pos), haspos));
                 }
                 else
                 {

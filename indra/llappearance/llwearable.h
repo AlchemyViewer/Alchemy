@@ -56,7 +56,7 @@ public:
 	LLWearableType::EType		getType() const	{ return mType; }
 	void						setType(LLWearableType::EType type, LLAvatarAppearance *avatarp);
 	const std::string&			getName() const	{ return mName; }
-	void						setName(const std::string& name) { mName = name; }
+	void						setName(std::string name) { mName = std::move(name); }
 	const std::string&			getDescription() const { return mDescription; }
 	void						setDescription(const std::string& desc)	{ mDescription = desc; }
 	const LLPermissions& 		getPermissions() const { return mPermissions; }

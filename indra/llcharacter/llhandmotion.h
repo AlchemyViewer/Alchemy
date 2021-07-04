@@ -122,7 +122,7 @@ public:
 	virtual BOOL canDeprecate() { return FALSE; }
 
 	static std::string getHandPoseName(eHandPose pose);
-	static eHandPose getHandPose(std::string posename);
+	static eHandPose getHandPose(std::string_view posename);
 
 public:
 	//-------------------------------------------------------------------------
