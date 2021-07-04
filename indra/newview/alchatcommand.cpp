@@ -78,7 +78,7 @@ bool ALChatCommand::parseCommand(std::string data)
 		static LLCachedControl<std::string> sHoverHeight(gSavedSettings, "AlchemyChatCommandHoverHeight", "/hover");
 		static LLCachedControl<std::string> sAOCommand(gSavedSettings, "AlchemyChatCommandAnimationOverride", "/ao");
 
-		if (cmd == utf8str_tolower(sDrawDistanceCommand)) // dd
+		if (cmd == utf8str_tolower(sDrawDistanceCommand()))  // dd
 		{
 			F32 dist;
 			if (input >> dist)
@@ -89,7 +89,7 @@ bool ALChatCommand::parseCommand(std::string data)
 				return true;
 			}
 		}
-		else if (cmd == utf8str_tolower(sHeightCommand)) // gth
+        else if (cmd == utf8str_tolower(sHeightCommand()))  // gth
 		{
 			F64 z;
 			if (input >> z)
@@ -100,14 +100,14 @@ bool ALChatCommand::parseCommand(std::string data)
 				return true;
 			}
 		}
-		else if (cmd == utf8str_tolower(sGroundCommand)) // flr
+        else if (cmd == utf8str_tolower(sGroundCommand()))  // flr
 		{
 			LLVector3d pos_global = gAgent.getPositionGlobal();
 			pos_global.mdV[VZ] = 0.0;
 			gAgent.teleportViaLocation(pos_global);
 			return true;
 		}
-		else if (cmd == utf8str_tolower(sPosCommand)) // pos
+        else if (cmd == utf8str_tolower(sPosCommand()))  // pos
 		{
 			F64 x, y, z;
 			if ((input >> x) && (input >> y) && (input >> z))
@@ -121,7 +121,7 @@ bool ALChatCommand::parseCommand(std::string data)
 				return true;
 			}
 		}
-		else if (cmd == utf8str_tolower(sRezPlatCommand)) // plat
+        else if (cmd == utf8str_tolower(sRezPlatCommand()))  // plat
 		{
 			F32 size;
 			if (!(input >> size))
@@ -162,17 +162,17 @@ bool ALChatCommand::parseCommand(std::string data)
 
 			return true;
 		}
-		else if (cmd == utf8str_tolower(sHomeCommand)) // home
+        else if (cmd == utf8str_tolower(sHomeCommand()))  // home
 		{
 			gAgent.teleportHome();
 			return true;
 		}
-		else if (cmd == utf8str_tolower(sSetHomeCommand)) // sethome
+        else if (cmd == utf8str_tolower(sSetHomeCommand()))  // sethome
 		{
 			gAgent.setStartPosition(START_LOCATION_ID_HOME);
 			return true;
 		}
-		else if (cmd == utf8str_tolower(sCalcCommand)) // calc
+        else if (cmd == utf8str_tolower(sCalcCommand()))  // calc
 		{
 			if (data.length() > cmd.length() + 1)
 			{
@@ -191,7 +191,7 @@ bool ALChatCommand::parseCommand(std::string data)
 				return true;
 			}
 		}
-		else if (cmd == utf8str_tolower(sMaptoCommand)) // mapto
+        else if (cmd == utf8str_tolower(sMaptoCommand()))  // mapto
 		{
 			const std::string::size_type length = cmd.length() + 1;
 			if (data.length() > length)
@@ -206,7 +206,7 @@ bool ALChatCommand::parseCommand(std::string data)
 				return true;
 			}
 		}
-		else if (cmd == utf8str_tolower(sClearCommand))
+        else if (cmd == utf8str_tolower(sClearCommand()))
 		{
 			LLFloaterIMNearbyChat* nearby_chat = LLFloaterReg::findTypedInstance<LLFloaterIMNearbyChat>("nearby_chat");
 			if (nearby_chat)
@@ -225,7 +225,7 @@ bool ALChatCommand::parseCommand(std::string data)
 			LLNotificationsUtil::add("ChatCommandDiceRoll", args);
 			return true;
 		}
-		else if (cmd == utf8str_tolower(sRegionMsgCommand)) // Region Message / Dialog
+		else if (cmd == utf8str_tolower(sRegionMsgCommand())) // Region Message / Dialog
 		{
 			if (data.length() > cmd.length() + 1)
 			{
@@ -243,7 +243,7 @@ bool ALChatCommand::parseCommand(std::string data)
 				return true;
 			}
 		}
-		else if (cmd == utf8str_tolower(sSetNearbyChatChannelCmd)) // Set nearby chat channel
+        else if (cmd == utf8str_tolower(sSetNearbyChatChannelCmd()))  // Set nearby chat channel
 		{
 			S32 chan;
 			if (input >> chan)
@@ -252,12 +252,12 @@ bool ALChatCommand::parseCommand(std::string data)
 				return true;
 			}
 		}
-		else if (cmd == utf8str_tolower(sTeleportToCam))
+        else if (cmd == utf8str_tolower(sTeleportToCam()))
 		{
 			gAgent.teleportViaLocation(gAgentCamera.getCameraPositionGlobal());
 			return true;
 		}
-		else if (cmd == utf8str_tolower(sHoverHeight)) // Hover height
+        else if (cmd == utf8str_tolower(sHoverHeight()))  // Hover height
 		{
 			F32 height;
 			if (input >> height)
@@ -267,7 +267,7 @@ bool ALChatCommand::parseCommand(std::string data)
 				return true;
 			}
 		}
-		else if (cmd == utf8str_tolower(sResyncAnimCommand)) // Resync Animations
+        else if (cmd == utf8str_tolower(sResyncAnimCommand()))  // Resync Animations
 		{
 			for (S32 i = 0; i < gObjectList.getNumObjects(); i++)
 			{
@@ -287,7 +287,7 @@ bool ALChatCommand::parseCommand(std::string data)
 			}
 			return true;
 		}
-		else if (cmd == utf8str_tolower(sAOCommand))
+        else if (cmd == utf8str_tolower(sAOCommand()))
 		{
 			std::string subcmd;
 			if (input >> subcmd)

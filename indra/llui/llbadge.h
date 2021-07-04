@@ -134,7 +134,7 @@ public:
 
 	virtual void		draw();
 
-	const std::string	getLabel() const { return wstring_to_utf8str(mLabel); }
+	const std::string&	getLabel() const { return mLabel.getString(); }
 	void				setLabel( const LLStringExplicit& label);
 
 	void				setDrawAtParentTop(bool draw_at_top) { mDrawAtParentTop = draw_at_top;}

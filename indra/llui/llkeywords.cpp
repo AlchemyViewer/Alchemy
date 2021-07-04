@@ -327,7 +327,7 @@ void LLKeywords::processTokensGroup(const LLSD& tokens, const std::string& group
 					case LLKeywordToken::TT_CONSTANT:
 						if (getAttribute("type").length() > 0)
 						{
-							color_group = getColorGroup(group + "-" + getAttribute("type"));
+							color_group = getColorGroup(absl::StrCat(group, "-", getAttribute("type")));
 						}
 						else
 						{

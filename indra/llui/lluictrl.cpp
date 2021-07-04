@@ -130,7 +130,7 @@ void LLUICtrl::initFromParams(const Params& p)
 	mRequestsFront = p.requests_front;
 
 	setIsChrome(p.chrome);
-	setControlName(p.control_name);
+	setControlName(p.control_name());
 	if(p.enabled_controls.isProvided())
 	{
 		if (p.enabled_controls.enabled.isChosen())

@@ -227,7 +227,7 @@ BOOL LLFloaterGesture::postBuild()
 		mGestureList->setFocus(TRUE);
 
 		const BOOL ascending = TRUE;
-		mGestureList->sortByColumn(std::string("name"), ascending);
+		mGestureList->sortByColumn("name", ascending);
 		mGestureList->selectFirstItem();
 	}
 	

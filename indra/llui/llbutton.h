@@ -218,8 +218,8 @@ public:
 	void 			setImageOverlayBottomPad( S32 pad )			{ mImageOverlayBottomPad = pad; }
 	S32 			getImageOverlayBottomPad() const			{ return mImageOverlayBottomPad; }
 
-	const std::string	getLabelUnselected() const { return wstring_to_utf8str(mUnselectedLabel); }
-	const std::string	getLabelSelected() const { return wstring_to_utf8str(mSelectedLabel); }
+	const std::string&	getLabelUnselected() const { return mUnselectedLabel.getString(); }
+    const std::string&	getLabelSelected() const { return mSelectedLabel.getString(); }
 
 	void			setImageColor(const std::string& color_control);
 	void			setImageColor(const LLColor4& c);

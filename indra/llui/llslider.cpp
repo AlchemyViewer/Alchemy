@@ -74,7 +74,7 @@ LLSlider::LLSlider(const LLSlider::Params& p)
     mViewModel->setValue(p.initial_value);
 	updateThumbRect();
 	mDragStartThumbRect = mThumbRect;
-	setControlName(p.control_name, NULL);
+	setControlName(p.control_name(), NULL);
 	setValue(getValueF32());
 	
 	if (p.mouse_down_callback.isProvided())

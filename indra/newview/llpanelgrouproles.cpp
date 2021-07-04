@@ -2209,7 +2209,7 @@ void LLPanelGroupRolesSubTab::update(LLGroupChange gc)
 			}
 		}
 
-		mRolesList->sortByColumn(std::string("name"), TRUE);
+		mRolesList->sortByColumn("name", TRUE);
 
 		if ( (gdatap->mRoles.size() < (U32)MAX_ROLES)
 			&& gAgent.hasPowerInGroup(mGroupID, GP_ROLE_CREATE) )

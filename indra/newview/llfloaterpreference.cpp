@@ -2458,7 +2458,7 @@ void LLFloaterPreference::setCacheLocation(const LLStringExplicit& location)
 void LLFloaterPreference::selectPanel(const LLSD& name)
 {
 	LLTabContainer * tab_containerp = getChild<LLTabContainer>("pref core");
-	LLPanel * panel = tab_containerp->getPanelByName(name);
+	LLPanel * panel = tab_containerp->getPanelByName(name.asString());
 	if (NULL != panel)
 	{
 		tab_containerp->selectTabPanel(panel);
@@ -3825,7 +3825,7 @@ void LLFloaterPreferenceProxy::onChangeSocksSettings()
 
 void LLFloaterPreference::onUpdateFilterTerm(bool force)
 {
-	LLWString seachValue = utf8str_to_wstring( mFilterEdit->getValue() );
+	LLWString seachValue = utf8str_to_wstring( mFilterEdit->getValue().asString() );
 	LLWStringUtil::toLower( seachValue );
 
 	if( !mSearchData || (mSearchData->mLastFilter == seachValue && !force))

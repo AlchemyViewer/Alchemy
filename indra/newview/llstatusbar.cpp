@@ -740,7 +740,7 @@ void LLStatusBar::onVolumeChanged(const LLSD& newvalue)
 
 void LLStatusBar::onUpdateFilterTerm()
 {
-	LLWString searchValue = utf8str_to_wstring( mFilterEdit->getValue() );
+	LLWString searchValue = utf8str_to_wstring( mFilterEdit->getValue().asString() );
 	LLWStringUtil::toLower( searchValue );
 
 	if( !mSearchData || mSearchData->mLastFilter == searchValue )
