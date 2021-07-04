@@ -2,6 +2,31 @@
 <context_menu
  layout="topleft"
  name="Self Pie">
+  <menu_item_call
+    label="My Profile"
+    layout="topleft"
+    name="Profile...">
+      <menu_item_call.on_click
+       function="ShowAgentProfile"
+       parameter="agent" />
+  </menu_item_call>
+  <menu_item_call
+    label="My Friends"
+    layout="topleft"
+    name="Friends...">
+      <menu_item_call.on_click
+       function="SideTray.PanelPeopleTab"
+       parameter="friends_panel" />
+  </menu_item_call>
+  <menu_item_call
+    label="My Groups"
+    layout="topleft"
+    name="Groups...">
+      <menu_item_call.on_click
+       function="SideTray.PanelPeopleTab"
+       parameter="groups_panel" />
+  </menu_item_call>
+  <menu_item_separator/>
     <menu_item_call
      label="Now wearing..."
      layout="topleft"
