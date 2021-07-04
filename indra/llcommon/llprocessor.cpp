@@ -283,11 +283,12 @@ public:
 		out << "//////////////////////////" << std::endl;
 		out << "Processor Name:   " << getCPUBrandName() << std::endl;
 		out << "Frequency:        " << getCPUFrequency() << " MHz" << std::endl;
-		out << "Vendor:			  " << getInfo(eVendor, "Unset vendor").asString() << std::endl;
+		out << "Vendor:           " << getInfo(eVendor, "Unset vendor").asString() << std::endl;
 		out << "Family:           " << getCPUFamilyName() << " (" << getInfo(eFamily, 0) << ")" << std::endl;
 		out << "Extended family:  " << getInfo(eExtendedFamily, 0) << std::endl;
 		out << "Model:            " << getInfo(eModel, 0) << std::endl;
 		out << "Extended model:   " << getInfo(eExtendedModel, 0) << std::endl;
+        out << "Stepping:         " << getInfo(eStepping, 0) << std::endl;
 		out << "Type:             " << getInfo(eType, 0) << std::endl;
 		out << "Brand ID:         " << getInfo(eBrandID, 0) << std::endl;
 		out << std::endl;
