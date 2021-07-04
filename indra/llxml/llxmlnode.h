@@ -210,8 +210,7 @@ public:
 	std::string getSanitizedValue() const;
 	std::string getTextContents() const;
     const LLStringTableEntry* getName() const { return mName; }
-	BOOL hasName(const char* name) const { return mName == gStringTable.checkStringEntry(name); }
-	BOOL hasName(const std::string& name) const { return mName == gStringTable.checkStringEntry(name.c_str()); }
+	BOOL hasName(std::string_view name) const { return mName == gStringTable.checkStringEntry(name); }
     const std::string& getID() const { return mID; }
 
     U32 getChildCount() const;

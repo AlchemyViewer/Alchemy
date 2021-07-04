@@ -144,17 +144,15 @@ LLXMLNodePtr LLXMLNode::deepCopy()
 	LLXMLNodePtr newnode = LLXMLNodePtr(new LLXMLNode(*this));
 	if (mChildren.notNull())
 	{
-		for (LLXMLChildList::iterator iter = mChildren->map.begin();
-			 iter != mChildren->map.end(); ++iter)	
-		{
-			LLXMLNodePtr temp_ptr_for_gcc(iter->second->deepCopy());
+		for (auto& map_pair : mChildren->map)
+        {
+			LLXMLNodePtr temp_ptr_for_gcc(map_pair.second->deepCopy());
 			newnode->addChild(temp_ptr_for_gcc);
 		}
 	}
-	for (LLXMLAttribList::iterator iter = mAttributes.begin();
-		 iter != mAttributes.end(); ++iter)
-	{
-		LLXMLNodePtr temp_ptr_for_gcc(iter->second->deepCopy());
+	for (auto& attrib_pair : mAttributes)
+    {
+		LLXMLNodePtr temp_ptr_for_gcc(attrib_pair.second->deepCopy());
 		newnode->addChild(temp_ptr_for_gcc);
 	}
 
@@ -170,10 +168,9 @@ LLXMLNode::~LLXMLNode()
 	// mess.
 	if (mChildren.notNull())
 	{
-		for (LLXMLChildList::iterator iter = mChildren->map.begin();
-			 iter != mChildren->map.end(); ++iter)
-		{
-			LLXMLNodePtr child = iter->second;
+		for (auto& map_pair : mChildren->map)
+        {
+			LLXMLNodePtr child = map_pair.second;
 			child->mParent = NULL;
 			child->mNext = NULL;
 			child->mPrev = NULL;
@@ -183,10 +180,9 @@ LLXMLNode::~LLXMLNode()
 		mChildren->tail = NULL;
 		mChildren = NULL;
 	}
-	for (LLXMLAttribList::iterator iter = mAttributes.begin();
-		 iter != mAttributes.end(); ++iter)
-	{
-		LLXMLNodePtr attr = iter->second;
+	for (auto& attrib_pair : mAttributes)
+    {
+		LLXMLNodePtr attr = attrib_pair.second;
 		attr->mParent = NULL;
 		attr->mNext = NULL;
 		attr->mPrev = NULL;
@@ -290,7 +286,7 @@ void LLXMLNode::addChild(LLXMLNodePtr& new_child)
 			mChildren->head = new_child;
 			mChildren->tail = new_child;
 		}
-		mChildren->map.insert(std::make_pair(new_child->mName, new_child));
+		mChildren->map.emplace(new_child->mName, new_child);
 
 		if (mChildren->tail != new_child)
 		{
@@ -511,10 +507,9 @@ void XMLCALL EndXMLNode(void *userData,
 	{
 		std::string value = node->getValue();
 		BOOL is_empty = TRUE;
-		for (std::string::size_type s = 0; s < value.length(); s++)
-		{
-			char c = value[s];
-			if (c != ' ' && c != '\t' && c != '\n')
+		for (char c : value)
+        {
+            if (c != ' ' && c != '\t' && c != '\n')
 			{
 				is_empty = FALSE;
 				break;
@@ -1204,7 +1199,7 @@ void LLXMLNode::getChildren(const LLStringTableEntry* name, LLXMLNodeList &child
 			}
 		}
 	}
-	if (children.size() == 0 && use_default_if_missing && !mDefault.isNull())
+	if (children.empty() && use_default_if_missing && !mDefault.isNull())
 	{
 		mDefault->getChildren(name, children, FALSE);
 	}
@@ -1215,10 +1210,9 @@ void LLXMLNode::getDescendants(const LLStringTableEntry* name, LLXMLNodeList &ch
 {
 	if (mChildren.notNull())
 	{
-		for (LLXMLChildList::const_iterator child_itr = mChildren->map.begin();
-			 child_itr != mChildren->map.end(); ++child_itr)
-		{
-			LLXMLNodePtr child = (*child_itr).second;
+		for (const auto& child_itr : mChildren->map)
+        {
+			LLXMLNodePtr child = child_itr.second;
 			if (name == child->mName)
 			{
 				children.insert(std::make_pair(child->mName->mString, child));

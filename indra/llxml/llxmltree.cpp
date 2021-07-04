@@ -99,8 +99,8 @@ void LLXmlTree::dumpNode( LLXmlTreeNode* node, const std::string& prefix )
 //////////////////////////////////////////////////////////////
 // LLXmlTreeNode
 
-LLXmlTreeNode::LLXmlTreeNode( const std::string& name, LLXmlTreeNode* parent, LLXmlTree* tree )
-	: mName(name),
+LLXmlTreeNode::LLXmlTreeNode(std::string name, LLXmlTreeNode* parent, LLXmlTree* tree )
+	: mName(std::move(name)),
 	  mParent(parent),
 	  mTree(tree)
 {
@@ -108,16 +108,19 @@ LLXmlTreeNode::LLXmlTreeNode( const std::string& name, LLXmlTreeNode* parent, LL
 
 LLXmlTreeNode::~LLXmlTreeNode()
 {
-	attribute_map_t::iterator iter;
-	for (iter=mAttributes.begin(); iter != mAttributes.end(); iter++)
-		delete iter->second;
-        for(LLXmlTreeNode* node : mChildren)
-        {
-            delete node;
-        }
-        mChildren.clear();
+    for (auto& attrib_pair : mAttributes) 
+	{
+        delete attrib_pair.second;
+    }
+    mAttributes.clear();
+
+    for (LLXmlTreeNode* node : mChildren)
+    {
+        delete node;
+    }
+    mChildren.clear();
 }
- 
+
 void LLXmlTreeNode::dump( const std::string& prefix )
 {
 	LL_INFOS() << prefix << mName ;
@@ -548,7 +551,7 @@ BOOL LLXmlTreeParser::parseFile(const std::string &path, LLXmlTreeNode** root, B
 const std::string& LLXmlTreeParser::tabs()
 {
 	static std::string s;
-	s = "";
+	s.clear();
 	S32 num_tabs = getDepth() - 1;
 	for( S32 i = 0; i < num_tabs; i++)
 	{
