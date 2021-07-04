@@ -173,11 +173,11 @@ public:
 	// Overwrites the default column (See LLScrollListCtrl for format)
     void 	addColumn(const LLSD& column, EAddPosition pos = ADD_BOTTOM) override;
     void 	clearColumns() override;
-    void	setColumnLabel(const std::string& column, const std::string& label) override;
+    void	setColumnLabel(std::string_view column, const std::string& label) override;
     LLScrollListItem* addElement(const LLSD& value, EAddPosition pos = ADD_BOTTOM, void* userdata = NULL) override;
     LLScrollListItem* addSimpleElement(const std::string& value, EAddPosition pos = ADD_BOTTOM, const LLSD& id = LLSD()) override;
     void 	clearRows() override;
-    void 	sortByColumn(const std::string& name, BOOL ascending) override;
+    void 	sortByColumn(std::string_view name, BOOL ascending) override;
 
 	// LLCtrlSelectionInterface functions
     BOOL	getCanSelect() const override				{ return TRUE; }

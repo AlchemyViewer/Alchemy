@@ -174,7 +174,7 @@ public:
 
 	bool setControlValue(const LLSD& value);
 	void setControlVariable(LLControlVariable* control);
-	virtual void setControlName(const std::string& control, LLView *context = NULL);
+    virtual void setControlName(std::string_view control, LLView* context = NULL);
 	
 	LLControlVariable* getControlVariable() { return mControlVariable; } 
 	
@@ -183,7 +183,7 @@ public:
 	void setMakeVisibleControlVariable(LLControlVariable* control);
 	void setMakeInvisibleControlVariable(LLControlVariable* control);
 
-	void setFunctionName(const std::string& function_name);
+	void setFunctionName(std::string function_name);
 	
 	virtual void	setTentative(BOOL b);
 	virtual BOOL	getTentative() const;

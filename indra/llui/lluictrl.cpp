@@ -540,7 +540,7 @@ void LLUICtrl::setControlVariable(LLControlVariable* control)
 }
 
 //virtual
-void LLUICtrl::setControlName(const std::string& control_name, LLView *context)
+void LLUICtrl::setControlName(std::string_view control_name, LLView *context)
 {
 	if (context == NULL)
 	{
@@ -620,9 +620,9 @@ void LLUICtrl::setMakeInvisibleControlVariable(LLControlVariable* control)
 	}
 }
 
-void LLUICtrl::setFunctionName(const std::string& function_name)
+void LLUICtrl::setFunctionName(std::string function_name)
 {
-	mFunctionName = function_name;
+	mFunctionName = std::move(function_name);
 }
 
 // static

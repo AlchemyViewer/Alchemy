@@ -518,7 +518,7 @@ void LLMultiSliderCtrl::reportInvalidData()
 }
 
 // virtual
-void LLMultiSliderCtrl::setControlName(const std::string& control_name, LLView* context)
+void LLMultiSliderCtrl::setControlName(std::string_view control_name, LLView* context)
 {
 	mMultiSlider->setControlName(control_name, context);
 }

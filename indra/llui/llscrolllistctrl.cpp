@@ -2668,7 +2668,7 @@ void LLScrollListCtrl::onScrollChange( S32 new_pos, LLScrollbar* scrollbar )
 }
 
 
-void LLScrollListCtrl::sortByColumn(const std::string& name, BOOL ascending)
+void LLScrollListCtrl::sortByColumn(std::string_view name, BOOL ascending)
 {
 	column_map_t::iterator itor = mColumns.find(name);
 	if (itor != mColumns.end())
@@ -3025,7 +3025,7 @@ void LLScrollListCtrl::clearColumns()
 	mTotalColumnPadding = 0;
 }
 
-void LLScrollListCtrl::setColumnLabel(const std::string& column, const std::string& label)
+void LLScrollListCtrl::setColumnLabel(std::string_view column, const std::string& label)
 {
 	LLScrollListColumn* columnp = getColumn(column);
 	if (columnp)
@@ -3047,7 +3047,7 @@ LLScrollListColumn* LLScrollListCtrl::getColumn(S32 index)
 	return mColumnsIndexed[index];
 }
 
-LLScrollListColumn* LLScrollListCtrl::getColumn(const std::string& name)
+LLScrollListColumn* LLScrollListCtrl::getColumn(std::string_view name)
 {
 	column_map_t::iterator column_itor = mColumns.find(name);
 	if (column_itor != mColumns.end()) 

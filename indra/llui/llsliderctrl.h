@@ -119,7 +119,7 @@ public:
 	/*virtual*/ void	setTentative(BOOL b);			// marks value as tentative
 	/*virtual*/ void	onCommit();						// mark not tentative, then commit
 
-	/*virtual*/ void	setControlName(const std::string& control_name, LLView* context)
+	/*virtual*/ void	setControlName(std::string_view control_name, LLView* context)
 	{
 		LLUICtrl::setControlName(control_name, context);
 		mSlider->setControlName(control_name, context);

@@ -266,7 +266,7 @@ public:
 	boost::signals2::connection setButtonRemoveCallback(const button_signal_t::slot_type& cb);
 
 	// append the specified string to end of tooltip
-	void setTooltipButtonSuffix(const std::string& suffix) { mButtonTooltipSuffix = suffix; } 
+	void setTooltipButtonSuffix(std::string suffix) { mButtonTooltipSuffix = std::move(suffix); } 
 
 	LLToolBarEnums::SideType getSideType() const { return mSideType; }
 	bool hasButtons() const { return !mButtons.empty(); }

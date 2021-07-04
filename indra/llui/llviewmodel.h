@@ -135,13 +135,13 @@ public:
 
     virtual void addColumn(const LLSD& column, EAddPosition pos = ADD_BOTTOM);
     virtual void clearColumns();
-    virtual void setColumnLabel(const std::string& column, const std::string& label);
+    virtual void setColumnLabel(std::string_view column, const std::string& label);
     virtual LLScrollListItem* addElement(const LLSD& value, EAddPosition pos = ADD_BOTTOM,
                                          void* userdata = NULL);
     virtual LLScrollListItem* addSimpleElement(const std::string& value, EAddPosition pos,
                                                const LLSD& id);
     virtual void clearRows();
-    virtual void sortByColumn(const std::string& name, bool ascending);
+    virtual void sortByColumn(std::string_view name, bool ascending);
 };
 
 //namespace LLViewModel

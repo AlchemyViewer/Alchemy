@@ -1057,7 +1057,7 @@ void LLComboBox::clearColumns()
 	mList->clearColumns();
 }
 
-void LLComboBox::setColumnLabel(const std::string& column, const std::string& label)
+void LLComboBox::setColumnLabel(std::string_view column, const std::string& label)
 {
 	mList->setColumnLabel(column, label);
 }
@@ -1077,7 +1077,7 @@ void LLComboBox::clearRows()
 	mList->clearRows();
 }
 
-void LLComboBox::sortByColumn(const std::string& name, BOOL ascending)
+void LLComboBox::sortByColumn(std::string_view name, BOOL ascending)
 {
 	mList->sortByColumn(name, ascending);
 }

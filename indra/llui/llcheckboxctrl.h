@@ -119,7 +119,7 @@ public:
 	void				setFont( const LLFontGL* font ) { mFont = font; }
 	const LLFontGL*		getFont() { return mFont; }
 	
-	virtual void		setControlName(const std::string& control_name, LLView* context);
+	virtual void		setControlName(std::string_view control_name, LLView* context);
 
 	virtual BOOL		isDirty()	const;		// Returns TRUE if the user has modified this control.
 	virtual void		resetDirty();			// Clear dirty state

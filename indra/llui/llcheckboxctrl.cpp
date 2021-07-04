@@ -279,7 +279,7 @@ BOOL LLCheckBoxCtrl::setLabelArg( const std::string& key, const LLStringExplicit
 }
 
 // virtual
-void LLCheckBoxCtrl::setControlName(const std::string& control_name, LLView* context)
+void LLCheckBoxCtrl::setControlName(std::string_view control_name, LLView* context)
 {
 	mButton->setControlName(control_name, context);
 }

@@ -146,7 +146,7 @@ void LLListViewModel::clearColumns()
 {
 }
 
-void LLListViewModel::setColumnLabel(const std::string& column, const std::string& label)
+void LLListViewModel::setColumnLabel(std::string_view column, const std::string& label)
 {
 }
 
@@ -166,6 +166,6 @@ void LLListViewModel::clearRows()
 {
 }
 
-void LLListViewModel::sortByColumn(const std::string& name, bool ascending)
+void LLListViewModel::sortByColumn(std::string_view name, bool ascending)
 {
 }

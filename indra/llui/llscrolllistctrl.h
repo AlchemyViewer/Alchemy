@@ -174,10 +174,10 @@ public:
 	virtual void addColumn(const LLScrollListColumn::Params& column, EAddPosition pos = ADD_BOTTOM);
 	virtual void addColumn(const LLSD& column, EAddPosition pos = ADD_BOTTOM);	
 	virtual void clearColumns();
-	virtual void setColumnLabel(const std::string& column, const std::string& label);
+	virtual void setColumnLabel(std::string_view column, const std::string& label);
 	virtual bool 	preProcessChildNode(LLXMLNodePtr child);
 	virtual LLScrollListColumn* getColumn(S32 index);
-	virtual LLScrollListColumn* getColumn(const std::string& name);
+    virtual LLScrollListColumn* getColumn(std::string_view name);
 	virtual S32 getNumColumns() const { return mColumnsIndexed.size(); }
 
 	// Adds a single element, from an array of:
@@ -189,7 +189,7 @@ public:
 	// Simple add element. Takes a single array of:
 	// [ "value" => value, "font" => font, "font-style" => style ]
 	virtual void clearRows(); // clears all elements
-	virtual void sortByColumn(const std::string& name, BOOL ascending);
+    virtual void sortByColumn(std::string_view name, BOOL ascending);
 
 	// These functions take and return an array of arrays of elements, as above
 	virtual void	setValue(const LLSD& value );
@@ -526,7 +526,7 @@ private:
 
 	mutable bool	mSorted;
 	
-	typedef std::map<std::string, LLScrollListColumn*> column_map_t;
+	typedef std::map<std::string, LLScrollListColumn*, std::less<>> column_map_t;
 	column_map_t mColumns;
 
 	bool			mDirty;

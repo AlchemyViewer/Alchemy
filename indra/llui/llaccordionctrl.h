@@ -119,7 +119,7 @@ public:
 	void	reset		();
 	void	expandDefaultTab();
 // [SL:KB] - Patch: Notification-GroupCreateNotice | Checked: 2012-02-16 (Catznip-3.2)
-	void	expandTab(const std::string& tab_name);
+	void	expandTab(std::string_view tab_name);
 // [/SL:KB]
 
 	void	setComparator(const LLTabComparator* comp) { mTabComparator = comp; }
