@@ -9502,7 +9502,7 @@ void LLPipeline::generateWaterReflection(LLCamera& camera_in)
             set_current_modelview(saved_modelview);
         }
 
-        LLPipeline::sUseOcclusion = occlusion;
+        //LLPipeline::sUseOcclusion = occlusion;
 
         camera.setOrigin(camera_in.getOrigin());
         //render distortion map
