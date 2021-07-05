@@ -70,6 +70,7 @@ std::string LLTrans::getString(const std::string_view, const LLStringUtil::forma
 void LLUIString::updateResult() const { }
 void LLUIString::setArg(const std::string& , const std::string& ) { }
 void LLUIString::assign(const std::string& ) { }
+void LLUIString::assign(std::string&& ) { }
 
 // End Stubbing
 // -------------------------------------------------------------------------------------------
