@@ -51,6 +51,7 @@ static LLStaticHashedString sTexture0("texture0");
 static LLStaticHashedString sTexture1("texture1");
 static LLStaticHashedString sTex0("tex0");
 static LLStaticHashedString sTex1("tex1");
+static LLStaticHashedString sTex2("tex2");
 static LLStaticHashedString sDitherTex("dither_tex");
 static LLStaticHashedString sGlowMap("glowMap");
 static LLStaticHashedString sScreenMap("screenMap");
@@ -175,6 +176,10 @@ LLGLSLShader			gGlowProgram;
 LLGLSLShader			gGlowExtractProgram;
 LLGLSLShader			gPostColorFilterProgram;
 LLGLSLShader			gPostNightVisionProgram;
+LLGLSLShader            gPostSMAAEdgeDetect;
+LLGLSLShader            gPostSMAABlendWeights;
+LLGLSLShader            gPostSMAANeighborhoodBlend;
+
 
 // Deferred rendering shaders
 LLGLSLShader			gDeferredImpostorProgram;
@@ -424,9 +429,6 @@ void LLViewerShaderMgr::setShaders()
 
     reentrance = true;
 
-    //setup preprocessor definitions
-    LLShaderMgr::instance()->mDefinitions["NUM_TEX_UNITS"] = llformat("%d", gGLManager.mNumTextureImageUnits);
-    
     // Make sure the compiled shader map is cleared before we recompile shaders.
     mVertexShaderObjects.clear();
     mFragmentShaderObjects.clear();
@@ -817,6 +819,7 @@ void LLViewerShaderMgr::unloadShaders()
 	gPostColorFilterProgram.unload();
 	gPostNightVisionProgram.unload();
 
+
 	gDeferredDiffuseProgram.unload();
 	gDeferredDiffuseAlphaMaskProgram.unload();
 	gDeferredNonIndexedDiffuseAlphaMaskProgram.unload();
@@ -1191,7 +1194,7 @@ BOOL LLViewerShaderMgr::loadShadersEffects()
 			LLPipeline::sRenderGlow = FALSE;
 		}
 	}
-	
+
 	return success;
 
 }
@@ -1258,6 +1261,9 @@ BOOL LLViewerShaderMgr::loadShadersDeferred()
 		gDeferredDoFCombineProgram.unload();
 		gDeferredPostGammaCorrectProgram.unload();
 		gFXAAProgram.unload();
+        gPostSMAAEdgeDetect.unload();
+        gPostSMAABlendWeights.unload();
+        gPostSMAANeighborhoodBlend.unload();
 		gDeferredWaterProgram.unload();
 		gDeferredUnderWaterProgram.unload();
 		gDeferredWLSkyProgram.unload();
@@ -2706,10 +2712,84 @@ BOOL LLViewerShaderMgr::loadShadersDeferred()
 		llassert(success);
 	}
 
+	{
+        std::map<std::string, std::string> defines;
+        if (gGLManager.mGLVersion >= 4.f)
+            defines.emplace("SMAA_GLSL_4", "1");
+        else
+            defines.emplace("SMAA_GLSL_3", "1");
+        defines.emplace("SMAA_PRESET_ULTRA", "1");
+
+        if (success)
+        {
+            gPostSMAAEdgeDetect.mName = "SMAA Edge Detection (Post)";
+            gPostSMAAEdgeDetect.mFeatures.isDeferred = true;
+            gPostSMAAEdgeDetect.addPremutations(defines);
+            gPostSMAAEdgeDetect.mShaderFiles.clear();
+            gPostSMAAEdgeDetect.mShaderFiles.push_back(make_pair("effects/SMAAEdgeDetectF.glsl", GL_FRAGMENT_SHADER_ARB));
+            gPostSMAAEdgeDetect.mShaderFiles.push_back(make_pair("effects/SMAAEdgeDetectV.glsl", GL_VERTEX_SHADER_ARB));
+            gPostSMAAEdgeDetect.mShaderFiles.push_back(make_pair("effects/SMAA.glsl", GL_FRAGMENT_SHADER_ARB));
+            gPostSMAAEdgeDetect.mShaderFiles.push_back(make_pair("effects/SMAA.glsl", GL_VERTEX_SHADER_ARB));
+            gPostSMAAEdgeDetect.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
+            success = gPostSMAAEdgeDetect.createShader(NULL, NULL);
+            if (success)
+            {
+                gPostSMAAEdgeDetect.bind();
+                gPostSMAAEdgeDetect.uniform1i(sTex0, 0);
+                gPostSMAAEdgeDetect.uniform1i(sTex1, 1);
+            }
+            gPostSMAAEdgeDetect.removePermutations(defines);
+        }
+
+        if (success)
+        {
+            gPostSMAABlendWeights.mName = "SMAA Blending Weights (Post)";
+            gPostSMAABlendWeights.mFeatures.isDeferred = true;
+            gPostSMAABlendWeights.addPremutations(defines);
+            gPostSMAABlendWeights.mShaderFiles.clear();
+            gPostSMAABlendWeights.mShaderFiles.push_back(make_pair("effects/SMAABlendWeightsF.glsl", GL_FRAGMENT_SHADER_ARB));
+            gPostSMAABlendWeights.mShaderFiles.push_back(make_pair("effects/SMAABlendWeightsV.glsl", GL_VERTEX_SHADER_ARB));
+            gPostSMAABlendWeights.mShaderFiles.push_back(make_pair("effects/SMAA.glsl", GL_FRAGMENT_SHADER_ARB));
+            gPostSMAABlendWeights.mShaderFiles.push_back(make_pair("effects/SMAA.glsl", GL_VERTEX_SHADER_ARB));
+            gPostSMAABlendWeights.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
+            success = gPostSMAABlendWeights.createShader(NULL, NULL);
+            if (success)
+            {
+                gPostSMAABlendWeights.bind();
+                gPostSMAABlendWeights.uniform1i(sTex0, 0);
+                gPostSMAABlendWeights.uniform1i(sTex1, 1);
+                gPostSMAABlendWeights.uniform1i(sTex2, 2);
+            }
+            gPostSMAABlendWeights.removePermutations(defines);
+        }
+
+        if (success)
+        {
+            gPostSMAANeighborhoodBlend.mName = "SMAA Neighborhood Blending (Post)";
+            gDeferredPostProgram.mFeatures.isDeferred = true;
+            gPostSMAANeighborhoodBlend.addPremutations(defines);
+            gPostSMAANeighborhoodBlend.mShaderFiles.clear();
+            gPostSMAANeighborhoodBlend.mShaderFiles.push_back(make_pair("effects/SMAANeighborhoodBlendF.glsl", GL_FRAGMENT_SHADER_ARB));
+            gPostSMAANeighborhoodBlend.mShaderFiles.push_back(make_pair("effects/SMAANeighborhoodBlendV.glsl", GL_VERTEX_SHADER_ARB));
+            gPostSMAANeighborhoodBlend.mShaderFiles.push_back(make_pair("effects/SMAA.glsl", GL_FRAGMENT_SHADER_ARB));
+            gPostSMAANeighborhoodBlend.mShaderFiles.push_back(make_pair("effects/SMAA.glsl", GL_VERTEX_SHADER_ARB));
+            gPostSMAANeighborhoodBlend.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
+            success = gPostSMAANeighborhoodBlend.createShader(NULL, NULL);
+            if (success)
+            {
+                gPostSMAANeighborhoodBlend.bind();
+                gPostSMAANeighborhoodBlend.uniform1i(sTex0, 0);
+                gPostSMAANeighborhoodBlend.uniform1i(sTex1, 1);
+                gPostSMAANeighborhoodBlend.uniform1i(sTex2, 2);
+            }
+            gPostSMAANeighborhoodBlend.removePermutations(defines);
+        }
+    }
+
 	if (success)
 	{
 		gDeferredPostProgram.mName = "Deferred Post Shader";
-		gFXAAProgram.mFeatures.isDeferred = true;
+        gDeferredPostProgram.mFeatures.isDeferred = true;
 		gDeferredPostProgram.mShaderFiles.clear();
 		gDeferredPostProgram.mShaderFiles.push_back(make_pair("deferred/postDeferredNoTCV.glsl", GL_VERTEX_SHADER));
 		gDeferredPostProgram.mShaderFiles.push_back(make_pair("deferred/postDeferredF.glsl", GL_FRAGMENT_SHADER));

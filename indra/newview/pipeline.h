@@ -432,6 +432,9 @@ private:
 	void connectRefreshCachedSettingsSafe(const std::string name);
 	void hideDrawable( LLDrawable *pDrawable );
 	void unhideDrawable( LLDrawable *pDrawable );
+
+	void drawFullScreenRect();
+
 public:
 	enum {GPU_CLASS_MAX = 3 };
 
@@ -615,6 +618,8 @@ public:
 	LLRenderTarget			mUIScreen;
 	LLRenderTarget			mDeferredScreen;
 	LLRenderTarget			mFXAABuffer;
+    LLRenderTarget          mSMAAEdgeBuffer;
+    LLRenderTarget          mSMAABlendBuffer;
 	LLRenderTarget			mDeferredDepth;
 	LLRenderTarget			mOcclusionDepth;
 	LLRenderTarget			mDeferredLight;
@@ -627,6 +632,7 @@ public:
 
 	//utility buffer for rendering post effects, gets abused by renderDeferredLighting
 	LLPointer<LLVertexBuffer> mDeferredVB;
+	LLPointer<LLVertexBuffer> mAuxScreenRectVB;
 
 	//utility buffer for rendering cubes, 8 vertices are corners of a cube [-1, 1]
 	LLPointer<LLVertexBuffer> mCubeVB;
@@ -668,6 +674,10 @@ public:
 	U32					mNoiseMap;
 	U32					mTrueNoiseMap;
 	U32					mLightFunc;
+    U32					mAreaMap;
+    U32					mSearchMap;
+    U32					mSampleMap;
+    U32                 mStencilMap;
 
 	LLColor4			mSunDiffuse;
     LLColor4			mMoonDiffuse;

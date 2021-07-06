@@ -156,7 +156,18 @@ public:
 	GLint mapUniformTextureChannel(GLint location, GLenum type);
 	
     void clearPermutations();
+	void addPremutations(std::map<std::string, std::string>& map)
+	{
+		mDefines.insert(map.begin(), map.end());
+	}
 	void addPermutation(std::string name, std::string value);
+    void removePermutations(std::map<std::string, std::string>& map)
+    {
+        for (auto entry : map)
+        {
+            mDefines.erase(entry.first);
+        }
+    }
 	void removePermutation(std::string name);
 	
 	//enable/disable texture channel for specified uniform

@@ -123,6 +123,10 @@
 #include "llenvironment.h"
 #include "llsettingsvo.h"
 
+#include "SMAA/AreaTex.h"
+#include "SMAA/SearchTex.h"
+#include "llimagepng.h"
+
 #ifdef _DEBUG
 // Debug indices is disabled for now for debug performance - djs 4/24/02
 //#define DEBUG_INDICES
@@ -294,6 +298,7 @@ static LLStaticHashedString sDelta("delta");
 static LLStaticHashedString sDistFactor("dist_factor");
 static LLStaticHashedString sKern("kern");
 static LLStaticHashedString sKernScale("kern_scale");
+static LLStaticHashedString sSmaaRTMetrics("SMAA_RT_METRICS");
 
 //----------------------------------------
 std::string gPoolNames[] = 
@@ -432,6 +437,9 @@ LLPipeline::LLPipeline() :
 	mNoiseMap = 0;
 	mTrueNoiseMap = 0;
 	mLightFunc = 0;
+    mAreaMap      = 0;
+    mSearchMap    = 0;
+    mSampleMap    = 0;
 
     for(U32 i = 0; i < 8; i++)
     {
@@ -953,10 +961,15 @@ bool LLPipeline::allocateScreenBuffer(U32 resX, U32 resY, U32 samples)
 		if (samples > 0)
 		{
 			if (!mFXAABuffer.allocate(resX, resY, GL_RGBA, FALSE, FALSE, LLTexUnit::TT_TEXTURE, FALSE, samples)) return false;
+			if (!mSMAAEdgeBuffer.allocate(resX, resY, GL_RGBA, TRUE, TRUE, LLTexUnit::TT_TEXTURE, FALSE, samples)) return false;
+			if (!mSMAABlendBuffer.allocate(resX, resY, GL_RGBA, FALSE, FALSE, LLTexUnit::TT_TEXTURE, FALSE, samples)) return false;
+			mSMAAEdgeBuffer.shareDepthBuffer(mSMAABlendBuffer);
 		}
 		else
 		{
 			mFXAABuffer.release();
+            mSMAABlendBuffer.release();
+            mSMAAEdgeBuffer.release();
 		}
 		
 		if (shadow_detail > 0 || ssao || RenderDepthOfField || samples > 0)
@@ -983,6 +996,8 @@ bool LLPipeline::allocateScreenBuffer(U32 resX, U32 resY, U32 samples)
         releaseShadowTargets();
 
 		mFXAABuffer.release();
+        mSMAABlendBuffer.release();
+        mSMAAEdgeBuffer.release();
 		mScreen.release();
 		mDeferredScreen.release(); //make sure to release any render targets that share a depth buffer with mDeferredScreen first
 // [RLVa:KB] - @setsphere
@@ -1235,6 +1250,24 @@ void LLPipeline::releaseGLBuffers()
 		mTrueNoiseMap = 0;
 	}
 
+	if (mAreaMap)
+    {
+        LLImageGL::deleteTextures(1, &mAreaMap);
+        mAreaMap = 0;
+    }
+
+    if (mSearchMap)
+    {
+        LLImageGL::deleteTextures(1, &mSearchMap);
+        mSearchMap = 0;
+    }
+
+    if (mSampleMap)
+    {
+        LLImageGL::deleteTextures(1, &mSampleMap);
+        mSampleMap = 0;
+    }
+
 	releaseLUTBuffers();
 
 	mWaterRef.release();
@@ -1273,6 +1306,8 @@ void LLPipeline::releaseScreenBuffers()
 	mUIScreen.release();
 	mScreen.release();
 	mFXAABuffer.release();
+    mSMAABlendBuffer.release();
+    mSMAAEdgeBuffer.release();
 	mPhysicsDisplay.release();
 	mDeferredScreen.release();
 	mDeferredDepth.release();
@@ -1365,6 +1400,76 @@ void LLPipeline::createGLBuffers()
 			LLImageGL::setManualImage(LLTexUnit::getInternalType(LLTexUnit::TT_TEXTURE), 0, GL_RGB16F, noiseRes, noiseRes, GL_RGB,GL_FLOAT, noise, false);
 			gGL.getTexUnit(0)->setTextureFilteringOption(LLTexUnit::TFO_POINT);
 		}
+
+		if (!mAreaMap)
+        {
+            std::vector<unsigned char> tempBuffer(AREATEX_SIZE);
+            for (unsigned int y = 0; y < AREATEX_HEIGHT; y++)
+            {
+                unsigned int srcY = AREATEX_HEIGHT - 1 - y;
+                // unsigned int srcY = y;
+                memcpy(&tempBuffer[y * AREATEX_PITCH], areaTexBytes + srcY * AREATEX_PITCH, AREATEX_PITCH);
+            }
+
+            LLImageGL::generateTextures(1, &mAreaMap);
+            gGL.getTexUnit(0)->bindManual(LLTexUnit::TT_TEXTURE, mAreaMap);
+            LLImageGL::setManualImage(LLTexUnit::getInternalType(LLTexUnit::TT_TEXTURE), 0, GL_RG8, AREATEX_WIDTH, AREATEX_HEIGHT, GL_RG,
+                                      GL_UNSIGNED_BYTE, tempBuffer.data(), false);
+            gGL.getTexUnit(0)->setTextureFilteringOption(LLTexUnit::TFO_BILINEAR);
+            gGL.getTexUnit(0)->setTextureAddressMode(LLTexUnit::TAM_CLAMP);
+        }
+
+        if (!mSearchMap)
+        {
+            std::vector<unsigned char> tempBuffer(SEARCHTEX_SIZE);
+            for (unsigned int y = 0; y < SEARCHTEX_HEIGHT; y++)
+            {
+                unsigned int srcY = SEARCHTEX_HEIGHT - 1 - y;
+                // unsigned int srcY = y;
+                memcpy(&tempBuffer[y * SEARCHTEX_PITCH], searchTexBytes + srcY * SEARCHTEX_PITCH, SEARCHTEX_PITCH);
+            }
+
+            LLImageGL::generateTextures(1, &mSearchMap);
+            gGL.getTexUnit(0)->bindManual(LLTexUnit::TT_TEXTURE, mSearchMap);
+            LLImageGL::setManualImage(LLTexUnit::getInternalType(LLTexUnit::TT_TEXTURE), 0, GL_R8, SEARCHTEX_WIDTH, SEARCHTEX_HEIGHT,
+                                      GL_RED, GL_UNSIGNED_BYTE, tempBuffer.data(), false);
+            gGL.getTexUnit(0)->setTextureFilteringOption(LLTexUnit::TFO_BILINEAR);
+            gGL.getTexUnit(0)->setTextureAddressMode(LLTexUnit::TAM_CLAMP);
+        }
+        if (!mSampleMap)
+        {
+            LLPointer<LLImageRaw>               raw_image = new LLImageRaw;
+            LLPointer<LLImagePNG>               png_image = new LLImagePNG;
+            static LLCachedControl<std::string> sample_path(gSavedSettings, "SamplePath", "");
+            if (png_image->load(sample_path()) && png_image->decode(raw_image, 0.0f))
+            {
+                U32 format = 0;
+                switch (raw_image->getComponents())
+                {
+                    case 1:
+                        format = GL_RED;
+                        break;
+                    case 2:
+                        format = GL_RG;
+                        break;
+                    case 3:
+                        format = GL_RGB;
+                        break;
+                    case 4:
+                        format = GL_RGBA;
+                        break;
+                    default:
+                        return;
+                };
+                LLImageGL::generateTextures(1, &mSampleMap);
+                gGL.getTexUnit(0)->bindManual(LLTexUnit::TT_TEXTURE, mSampleMap);
+                LLImageGL::setManualImage(LLTexUnit::getInternalType(LLTexUnit::TT_TEXTURE), 0, GL_RGB, raw_image->getWidth(),
+                                          raw_image->getHeight(), format, GL_UNSIGNED_BYTE, raw_image->getData(), false);
+                stop_glerror();
+                gGL.getTexUnit(0)->setTextureFilteringOption(LLTexUnit::TFO_BILINEAR);
+                gGL.getTexUnit(0)->setTextureAddressMode(LLTexUnit::TAM_CLAMP);
+            }
+        }
 
 		createLUTBuffers();
 	}
@@ -7383,6 +7488,8 @@ void LLPipeline::doResetVertexBuffers(bool forced)
 	LL_RECORD_BLOCK_TIME(FTM_RESET_VB);
 	mResetVertexBuffers = false;
 
+	mAuxScreenRectVB = NULL;
+
 	mDeferredVB = NULL;
 
 	mCubeVB = NULL;
@@ -7727,7 +7834,7 @@ void LLPipeline::renderFinalize()
                            (RenderDepthOfFieldInEditMode || !LLToolMgr::getInstance()->inBuildMode()) &&
                            RenderDepthOfField;
 
-        bool multisample = RenderFSAASamples > 1 && mFXAABuffer.isComplete();
+        bool multisample = RenderFSAASamples > 1 && (mFXAABuffer.isComplete() || (mSMAAEdgeBuffer.isComplete() && mSMAABlendBuffer.isComplete()));
 // [RLVa:KB] - @setsphere
 		if (multisample && !pRenderBuffer)
 		{
@@ -8035,79 +8142,208 @@ void LLPipeline::renderFinalize()
 
         if (multisample)
         {
-            // bake out texture2D with RGBL for FXAA shader
-            mFXAABuffer.bindTarget();
-
-            S32 width = mScreen.getWidth();
-            S32 height = mScreen.getHeight();
-            glViewport(0, 0, width, height);
-
-            LLGLSLShader *shader = &gGlowCombineFXAAProgram;
-
-            shader->bind();
-            shader->uniform2f(LLShaderMgr::DEFERRED_SCREEN_RES, width, height);
-
-//            S32 channel = shader->enableTexture(LLShaderMgr::DEFERRED_DIFFUSE, mDeferredLight.getUsage());
-//            if (channel > -1)
-//            {
-//                mDeferredLight.bindTexture(0, channel);
-//            }
-// [RLVa:KB] - @setsphere
-			S32 channel = shader->enableTexture(LLShaderMgr::DEFERRED_DIFFUSE, pRenderBuffer->getUsage());
-            if (channel > -1)
+            static LLCachedControl<bool> use_fxaa(gSavedSettings, "AlchemyRenderFXAA", false);
+            if (use_fxaa)
             {
-				pRenderBuffer->bindTexture(0, channel);
+                // bake out texture2D with RGBL for FXAA shader
+                mFXAABuffer.bindTarget();
+
+                S32 width  = mScreen.getWidth();
+                S32 height = mScreen.getHeight();
+                glViewport(0, 0, width, height);
+
+                LLGLSLShader* shader = &gGlowCombineFXAAProgram;
+
+                shader->bind();
+                shader->uniform2f(LLShaderMgr::DEFERRED_SCREEN_RES, width, height);
+
+                //            S32 channel = shader->enableTexture(LLShaderMgr::DEFERRED_DIFFUSE, mDeferredLight.getUsage());
+                //            if (channel > -1)
+                //            {
+                //                mDeferredLight.bindTexture(0, channel);
+                //            }
+                // [RLVa:KB] - @setsphere
+                S32 channel = shader->enableTexture(LLShaderMgr::DEFERRED_DIFFUSE, pRenderBuffer->getUsage());
+                if (channel > -1)
+                {
+                    pRenderBuffer->bindTexture(0, channel);
+                }
+                // [RLVa:KB]
+
+                gGL.begin(LLRender::TRIANGLE_STRIP);
+                gGL.vertex2f(-1, -1);
+                gGL.vertex2f(-1, 3);
+                gGL.vertex2f(3, -1);
+                gGL.end();
+
+                gGL.flush();
+
+                // [RLVa:KB] - @setsphere
+                shader->disableTexture(LLShaderMgr::DEFERRED_DIFFUSE, pRenderBuffer->getUsage());
+                // [/RLVa:KB]
+                //            shader->disableTexture(LLShaderMgr::DEFERRED_DIFFUSE, mDeferredLight.getUsage());
+                shader->unbind();
+
+                mFXAABuffer.flush();
+
+                shader = &gFXAAProgram;
+                shader->bind();
+
+                channel = shader->enableTexture(LLShaderMgr::DIFFUSE_MAP, mFXAABuffer.getUsage());
+                if (channel > -1)
+                {
+                    mFXAABuffer.bindTexture(0, channel, LLTexUnit::TFO_BILINEAR);
+                }
+
+                gGLViewport[0] = gViewerWindow->getWorldViewRectRaw().mLeft;
+                gGLViewport[1] = gViewerWindow->getWorldViewRectRaw().mBottom;
+                gGLViewport[2] = gViewerWindow->getWorldViewRectRaw().getWidth();
+                gGLViewport[3] = gViewerWindow->getWorldViewRectRaw().getHeight();
+                glViewport(gGLViewport[0], gGLViewport[1], gGLViewport[2], gGLViewport[3]);
+
+                F32 scale_x = (F32) width / mFXAABuffer.getWidth();
+                F32 scale_y = (F32) height / mFXAABuffer.getHeight();
+                shader->uniform2f(LLShaderMgr::FXAA_TC_SCALE, scale_x, scale_y);
+                shader->uniform2f(LLShaderMgr::FXAA_RCP_SCREEN_RES, 1.f / width * scale_x, 1.f / height * scale_y);
+                shader->uniform4f(LLShaderMgr::FXAA_RCP_FRAME_OPT, -0.5f / width * scale_x, -0.5f / height * scale_y,
+                                  0.5f / width * scale_x, 0.5f / height * scale_y);
+                shader->uniform4f(LLShaderMgr::FXAA_RCP_FRAME_OPT2, -2.f / width * scale_x, -2.f / height * scale_y, 2.f / width * scale_x,
+                                  2.f / height * scale_y);
+
+                gGL.begin(LLRender::TRIANGLE_STRIP);
+                gGL.vertex2f(-1, -1);
+                gGL.vertex2f(-1, 3);
+                gGL.vertex2f(3, -1);
+                gGL.end();
+
+                gGL.flush();
+                shader->unbind();
             }
-// [RLVa:KB]
-
-            gGL.begin(LLRender::TRIANGLE_STRIP);
-            gGL.vertex2f(-1, -1);
-            gGL.vertex2f(-1, 3);
-            gGL.vertex2f(3, -1);
-            gGL.end();
-
-            gGL.flush();
-
-// [RLVa:KB] - @setsphere
-            shader->disableTexture(LLShaderMgr::DEFERRED_DIFFUSE, pRenderBuffer->getUsage());
-// [/RLVa:KB]
-//            shader->disableTexture(LLShaderMgr::DEFERRED_DIFFUSE, mDeferredLight.getUsage());
-            shader->unbind();
-
-            mFXAABuffer.flush();
-
-            shader = &gFXAAProgram;
-            shader->bind();
-
-            channel = shader->enableTexture(LLShaderMgr::DIFFUSE_MAP, mFXAABuffer.getUsage());
-            if (channel > -1)
+            else
             {
-                mFXAABuffer.bindTexture(0, channel, LLTexUnit::TFO_BILINEAR);
+                if (gPostSMAAEdgeDetect.mProgramObject && gPostSMAABlendWeights.mProgramObject && gPostSMAANeighborhoodBlend.mProgramObject)
+                {
+                    mFXAABuffer.copyContents(*pRenderBuffer, 0, 0, mSMAAEdgeBuffer.getWidth(), mSMAAEdgeBuffer.getHeight(), 0, 0,
+                                             mSMAAEdgeBuffer.getWidth(), mSMAAEdgeBuffer.getHeight(), GL_COLOR_BUFFER_BIT, GL_NEAREST);
+
+                    LLRenderTarget* input  = &mFXAABuffer;
+                    S32             width  = input->getWidth();
+                    S32             height = input->getHeight();
+                    glViewport(0, 0, width, height);
+
+                    float rt_metrics[] = {1.f / width, 1.f / height, (float) width, (float) height};
+
+                    LLGLDepthTest    depth(GL_FALSE, GL_FALSE);
+                    LLGLSNoAlphaTest alpha_test;
+
+                    LLRenderTarget* bound_target = pRenderBuffer;
+                    LLGLSLShader*   bound_shader = nullptr;
+
+                    static LLCachedControl<U32>  show_step(gSavedSettings, "ShowStep", 3);
+                    static LLCachedControl<bool> use_sample(gSavedSettings, "UseSample", false);
+                    static LLCachedControl<bool> use_stencil(gSavedSettings, "UseStencil", true);
+
+                    if (show_step >= 1)
+                    {
+                        LLGLState stencil(GL_STENCIL_TEST, use_stencil);
+
+                        // Bind setup:
+                        bound_target = &mSMAAEdgeBuffer;
+                        bound_shader = &gPostSMAAEdgeDetect;
+
+                        if (!use_sample)
+                            input->bindTexture(0, 0);
+                        else
+                            gGL.getTexUnit(0)->bindManual(LLTexUnit::TT_TEXTURE, mSampleMap);
+                        gGL.getTexUnit(0)->setTextureFilteringOption(LLTexUnit::TFO_BILINEAR);
+
+                        bound_shader->bind();
+                        bound_shader->uniform4fv(sSmaaRTMetrics, 1, rt_metrics);
+                        bound_target->bindTarget();
+                        bound_target->clear(GL_COLOR_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
+                        if (use_stencil)
+                        {
+                            glStencilFunc(GL_ALWAYS, 1, 0xFF);
+                            glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
+                            glStencilMask(0xFF);
+                        }
+                        drawFullScreenRect();
+                        bound_target->flush();
+                        bound_shader->unbind();
+                    }
+                    if (show_step >= 2)
+                    {
+                        LLGLState stencil(GL_STENCIL_TEST, use_stencil);
+
+                        // Bind setup:
+                        bound_target = &mSMAABlendBuffer;
+                        bound_shader = &gPostSMAABlendWeights;
+
+                        mSMAAEdgeBuffer.bindTexture(0, 0);
+                        gGL.getTexUnit(1)->bindManual(LLTexUnit::TT_TEXTURE, mAreaMap);
+                        gGL.getTexUnit(2)->bindManual(LLTexUnit::TT_TEXTURE, mSearchMap);
+                        gGL.getTexUnit(0)->setTextureFilteringOption(LLTexUnit::TFO_BILINEAR);
+
+                        bound_shader->bind();
+                        bound_shader->uniform4fv(sSmaaRTMetrics, 1, rt_metrics);
+                        bound_target->bindTarget();
+                        bound_target->clear(GL_COLOR_BUFFER_BIT);
+                        if (use_stencil)
+                        {
+                            glStencilFunc(GL_EQUAL, 1, 0xFF);
+                            glStencilMask(0x00);
+                        }
+                        drawFullScreenRect();
+                        if (use_stencil)
+                        {
+                            glStencilFunc(GL_ALWAYS, 0, 0xFF);
+                        }
+                        bound_target->flush();
+                        bound_shader->unbind();
+                    }
+
+                    if (show_step >= 3)
+                    {
+                        LLGLDisable stencil(GL_STENCIL_TEST);
+                        // LLGLEnable<GL_FRAMEBUFFER_SRGB> srgb;
+
+                        // Bind setup:
+                        bound_target = &mScreen;
+                        bound_shader = &gPostSMAANeighborhoodBlend;
+
+                        if (!use_sample)
+                            input->bindTexture(0, 0);
+                        else
+                            gGL.getTexUnit(0)->bindManual(LLTexUnit::TT_TEXTURE, mSampleMap);
+                        mSMAABlendBuffer.bindTexture(0, 1);
+                        gGL.getTexUnit(0)->setTextureFilteringOption(LLTexUnit::TFO_BILINEAR);
+                        gGL.getTexUnit(1)->setTextureFilteringOption(LLTexUnit::TFO_BILINEAR);
+
+                        bound_shader->bind();
+                        bound_shader->uniform4fv(sSmaaRTMetrics, 1, rt_metrics);
+                        bound_target->bindTarget();
+                        drawFullScreenRect();
+                        bound_target->flush();
+                        bound_shader->unbind();
+                    }
+
+                    if (bound_target)
+                    {  // copy color buffer from mScreen to framebuffer
+                        // LLGLState<GL_FRAMEBUFFER_SRGB> srgb(show_step >= 3);
+                        LLRenderTarget::copyContentsToFramebuffer(*bound_target, 0, 0, mSMAAEdgeBuffer.getWidth(),
+                                                                  mSMAAEdgeBuffer.getHeight(), 0, 0, mSMAAEdgeBuffer.getWidth(),
+                                                                  mSMAAEdgeBuffer.getHeight(), GL_COLOR_BUFFER_BIT, GL_NEAREST);
+                    }
+
+					gGLViewport[0] = gViewerWindow->getWorldViewRectRaw().mLeft;
+                    gGLViewport[1] = gViewerWindow->getWorldViewRectRaw().mBottom;
+                    gGLViewport[2] = gViewerWindow->getWorldViewRectRaw().getWidth();
+                    gGLViewport[3] = gViewerWindow->getWorldViewRectRaw().getHeight();
+                    glViewport(gGLViewport[0], gGLViewport[1], gGLViewport[2], gGLViewport[3]);
+
+                    gGL.flush();
+				}
             }
-
-            gGLViewport[0] = gViewerWindow->getWorldViewRectRaw().mLeft;
-            gGLViewport[1] = gViewerWindow->getWorldViewRectRaw().mBottom;
-            gGLViewport[2] = gViewerWindow->getWorldViewRectRaw().getWidth();
-            gGLViewport[3] = gViewerWindow->getWorldViewRectRaw().getHeight();
-            glViewport(gGLViewport[0], gGLViewport[1], gGLViewport[2], gGLViewport[3]);
-
-            F32 scale_x = (F32) width / mFXAABuffer.getWidth();
-            F32 scale_y = (F32) height / mFXAABuffer.getHeight();
-            shader->uniform2f(LLShaderMgr::FXAA_TC_SCALE, scale_x, scale_y);
-            shader->uniform2f(LLShaderMgr::FXAA_RCP_SCREEN_RES, 1.f / width * scale_x, 1.f / height * scale_y);
-            shader->uniform4f(LLShaderMgr::FXAA_RCP_FRAME_OPT, -0.5f / width * scale_x, -0.5f / height * scale_y,
-                              0.5f / width * scale_x, 0.5f / height * scale_y);
-            shader->uniform4f(LLShaderMgr::FXAA_RCP_FRAME_OPT2, -2.f / width * scale_x, -2.f / height * scale_y,
-                              2.f / width * scale_x, 2.f / height * scale_y);
-
-            gGL.begin(LLRender::TRIANGLE_STRIP);
-            gGL.vertex2f(-1, -1);
-            gGL.vertex2f(-1, 3);
-            gGL.vertex2f(3, -1);
-            gGL.end();
-
-            gGL.flush();
-            shader->unbind();
         }
     }
     else // not deferred
@@ -11587,5 +11823,23 @@ void LLPipeline::restoreHiddenObject( const LLUUID& id )
 			unhideDrawable( pDrawable );			
 		}
 	}
+}
+
+void LLPipeline::drawFullScreenRect()
+{
+	if(mAuxScreenRectVB.isNull())
+	{
+        mAuxScreenRectVB = new LLVertexBuffer(DEFERRED_VB_MASK, 0);
+		mAuxScreenRectVB->allocateBuffer(3, 0, true);
+		LLStrider<LLVector3> vert;
+		mAuxScreenRectVB->getVertexStrider(vert);
+
+		vert[0].set(-1.f,-1.f,0.f);
+		vert[1].set(3.f,-1.f,0.f);
+		vert[2].set(-1.f,3.f,0.f);
+
+	}
+	mAuxScreenRectVB->setBuffer(LLVertexBuffer::MAP_VERTEX);
+	mAuxScreenRectVB->drawArrays(LLRender::TRIANGLES, 0, 3);
 }
 
