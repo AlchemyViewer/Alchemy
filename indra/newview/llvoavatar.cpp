@@ -639,6 +639,7 @@ LLVOAvatar::LLVOAvatar(const LLUUID& id,
 	mIsSitting(FALSE),
 	mTimeVisible(),
 	mTyping(FALSE),
+	mTypingLast(false),
 	mMeshValid(FALSE),
 	mVisible(FALSE),
 	mLastImpostorUpdateFrameTime(0.f),
@@ -3264,6 +3265,8 @@ void LLVOAvatar::idleUpdateNameTagText(BOOL new_name)
 	bool is_friend = (fRlvShowAvName) && isInBuddyList();
 // [/RLVa:KB]
 	bool is_cloud = getIsCloud();
+	static LLCachedControl<bool> sShowTyping(gSavedSettings, "AlchemyNearbyTypingIndicators", true);
+	bool is_typing = sShowTyping && mTyping;
 
 	if (is_appearance != mNameAppearance)
 	{
@@ -3287,13 +3290,14 @@ void LLVOAvatar::idleUpdateNameTagText(BOOL new_name)
 		|| is_muted != mNameMute
 		|| is_appearance != mNameAppearance 
 		|| is_friend != mNameFriend
-		|| is_cloud != mNameCloud)
+		|| is_cloud != mNameCloud
+		|| is_typing != mTypingLast)
 	{
 		LLColor4 name_tag_color = getNameTagColor(is_friend);
 
 		clearNameTag();
 
-		if (is_away || is_muted || is_do_not_disturb || is_appearance)
+		if (is_away || is_muted || is_do_not_disturb || is_appearance || is_typing)
 		{
 			std::string line;
 			if (is_away)
@@ -3319,6 +3323,11 @@ void LLVOAvatar::idleUpdateNameTagText(BOOL new_name)
 			if (is_cloud)
 			{
 				line += LLTrans::getString("LoadingData");
+				line += ", ";
+			}
+			if (is_typing)
+			{
+				line += LLTrans::getString("AvatarTyping");
 				line += ", ";
 			}
 			// trim last ", "
@@ -3397,6 +3406,7 @@ void LLVOAvatar::idleUpdateNameTagText(BOOL new_name)
 		mNameAppearance = is_appearance;
 		mNameFriend = is_friend;
 		mNameCloud = is_cloud;
+		mTypingLast = is_typing;
 		mTitle = title ? title->getString() : "";
 		LLStringFn::replace_ascii_controlchars(mTitle,LL_UNKNOWN_CHAR);
 		new_name = TRUE;
@@ -3456,7 +3466,7 @@ void LLVOAvatar::idleUpdateNameTagText(BOOL new_name)
 		}
 		mNameText->setVisibleOffScreen(TRUE);
 
-		if (mTyping)
+		if (is_typing)
 		{
 			S32 dot_count = (llfloor(mTypingTimer.getElapsedTimeF32() * 3.f) + 2) % 3 + 1;
 			switch(dot_count)

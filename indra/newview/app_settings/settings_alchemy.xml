@@ -211,6 +211,17 @@
       <key>Value</key>
       <string>/tp2cam</string>
     </map>
+    <key>AlchemyChatMarkUnnamedObjects</key>
+    <map>
+      <key>Comment</key>
+      <string>Marks unnamed objects in chat and IMs.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <integer>1</integer>
+    </map>
     <key>AlchemyCinematicModeHideHoverText</key>
     <map>
       <key>Comment</key>
@@ -507,6 +518,28 @@
       <string>F32</string>
       <key>Value</key>
       <real>0.15</real>
+    </map>
+    <key>AlchemyNearbyTypingIndicators</key>
+    <map>
+      <key>Comment</key>
+      <string>Show nearby chat typing indicator in nametags</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <integer>1</integer>
+    </map>
+    <key>AlchemyNotifyIncomingMessage</key>
+    <map>
+      <key>Comment</key>
+      <string>Notify of incoming messages by looking for typing indicator</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <integer>0</integer>
     </map>
     <key>AlchemyPointAtPrivate</key>
     <map>
