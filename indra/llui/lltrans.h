@@ -42,7 +42,7 @@ class LLSD;
 class LLTransTemplate
 {
 public:
-	LLTransTemplate(const std::string name = std::string(), const std::string text = std::string()) : mName(std::move(name)), mText(std::move(text)) {}
+	LLTransTemplate(std::string name = std::string(), std::string text = std::string()) : mName(std::move(name)), mText(std::move(text)) {}
 
 	std::string mName;
 	std::string mText;
