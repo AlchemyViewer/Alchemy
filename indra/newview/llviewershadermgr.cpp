@@ -176,9 +176,9 @@ LLGLSLShader			gGlowProgram;
 LLGLSLShader			gGlowExtractProgram;
 LLGLSLShader			gPostColorFilterProgram;
 LLGLSLShader			gPostNightVisionProgram;
-LLGLSLShader            gPostSMAAEdgeDetect;
-LLGLSLShader            gPostSMAABlendWeights;
-LLGLSLShader            gPostSMAANeighborhoodBlend;
+LLGLSLShader            gPostSMAAEdgeDetect[4];
+LLGLSLShader            gPostSMAABlendWeights[4];
+LLGLSLShader            gPostSMAANeighborhoodBlend[4];
 
 
 // Deferred rendering shaders
@@ -1261,9 +1261,12 @@ BOOL LLViewerShaderMgr::loadShadersDeferred()
 		gDeferredDoFCombineProgram.unload();
 		gDeferredPostGammaCorrectProgram.unload();
 		gFXAAProgram.unload();
-        gPostSMAAEdgeDetect.unload();
-        gPostSMAABlendWeights.unload();
-        gPostSMAANeighborhoodBlend.unload();
+        for (auto i = 0; i < 3; ++i)
+        {
+            gPostSMAAEdgeDetect[i].unload();
+            gPostSMAABlendWeights[i].unload();
+            gPostSMAANeighborhoodBlend[i].unload();
+        }
 		gDeferredWaterProgram.unload();
 		gDeferredUnderWaterProgram.unload();
 		gDeferredWLSkyProgram.unload();
@@ -2712,77 +2715,87 @@ BOOL LLViewerShaderMgr::loadShadersDeferred()
 		llassert(success);
 	}
 
-	{
-        std::map<std::string, std::string> defines;
-        if (gGLManager.mGLVersion >= 4.f)
-            defines.emplace("SMAA_GLSL_4", "1");
-        else
-            defines.emplace("SMAA_GLSL_3", "1");
-        defines.emplace("SMAA_PRESET_ULTRA", "1");
-
-        if (success)
+	if (gGLManager.mGLVersion >= 3.1f)
+    {
+        std::vector<std::pair<std::string, std::string>> smaa_preset_pair = {{"SMAA_PRESET_LOW", "Low"},
+                                                                             {"SMAA_PRESET_MEDIUM", "Medium"},
+                                                                             {"SMAA_PRESET_HIGH", "High"},
+                                                                             {"SMAA_PRESET_ULTRA", "Ultra"}};
+        int i = 0;
+        for (const auto& smaa_pair : smaa_preset_pair)
         {
-            gPostSMAAEdgeDetect.mName = "SMAA Edge Detection (Post)";
-            gPostSMAAEdgeDetect.mFeatures.isDeferred = true;
-            gPostSMAAEdgeDetect.addPremutations(defines);
-            gPostSMAAEdgeDetect.mShaderFiles.clear();
-            gPostSMAAEdgeDetect.mShaderFiles.push_back(make_pair("effects/SMAAEdgeDetectF.glsl", GL_FRAGMENT_SHADER_ARB));
-            gPostSMAAEdgeDetect.mShaderFiles.push_back(make_pair("effects/SMAAEdgeDetectV.glsl", GL_VERTEX_SHADER_ARB));
-            gPostSMAAEdgeDetect.mShaderFiles.push_back(make_pair("effects/SMAA.glsl", GL_FRAGMENT_SHADER_ARB));
-            gPostSMAAEdgeDetect.mShaderFiles.push_back(make_pair("effects/SMAA.glsl", GL_VERTEX_SHADER_ARB));
-            gPostSMAAEdgeDetect.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
-            success = gPostSMAAEdgeDetect.createShader(NULL, NULL);
+            std::map<std::string, std::string> defines;
+            if (gGLManager.mGLVersion >= 4.f)
+                defines.emplace("SMAA_GLSL_4", "1");
+            else
+                defines.emplace("SMAA_GLSL_3", "1");
+            defines.emplace(smaa_pair.first, "1");
+
             if (success)
             {
-                gPostSMAAEdgeDetect.bind();
-                gPostSMAAEdgeDetect.uniform1i(sTex0, 0);
-                gPostSMAAEdgeDetect.uniform1i(sTex1, 1);
+                gPostSMAAEdgeDetect[i].mName = fmt::format("SMAA Edge Detection ({:s})", smaa_pair.second);
+                gPostSMAAEdgeDetect[i].mFeatures.isDeferred = true;
+                gPostSMAAEdgeDetect[i].addPremutations(defines);
+                gPostSMAAEdgeDetect[i].mShaderFiles.clear();
+                gPostSMAAEdgeDetect[i].mShaderFiles.push_back(make_pair("effects/SMAAEdgeDetectF.glsl", GL_FRAGMENT_SHADER_ARB));
+                gPostSMAAEdgeDetect[i].mShaderFiles.push_back(make_pair("effects/SMAAEdgeDetectV.glsl", GL_VERTEX_SHADER_ARB));
+                gPostSMAAEdgeDetect[i].mShaderFiles.push_back(make_pair("effects/SMAA.glsl", GL_FRAGMENT_SHADER_ARB));
+                gPostSMAAEdgeDetect[i].mShaderFiles.push_back(make_pair("effects/SMAA.glsl", GL_VERTEX_SHADER_ARB));
+                gPostSMAAEdgeDetect[i].mShaderLevel = mShaderLevel[SHADER_DEFERRED];
+                success                             = gPostSMAAEdgeDetect[i].createShader(NULL, NULL);
+                if (success)
+                {
+                    gPostSMAAEdgeDetect[i].bind();
+                    gPostSMAAEdgeDetect[i].uniform1i(sTex0, 0);
+                    gPostSMAAEdgeDetect[i].uniform1i(sTex1, 1);
+                }
+                gPostSMAAEdgeDetect[i].removePermutations(defines);
             }
-            gPostSMAAEdgeDetect.removePermutations(defines);
-        }
 
-        if (success)
-        {
-            gPostSMAABlendWeights.mName = "SMAA Blending Weights (Post)";
-            gPostSMAABlendWeights.mFeatures.isDeferred = true;
-            gPostSMAABlendWeights.addPremutations(defines);
-            gPostSMAABlendWeights.mShaderFiles.clear();
-            gPostSMAABlendWeights.mShaderFiles.push_back(make_pair("effects/SMAABlendWeightsF.glsl", GL_FRAGMENT_SHADER_ARB));
-            gPostSMAABlendWeights.mShaderFiles.push_back(make_pair("effects/SMAABlendWeightsV.glsl", GL_VERTEX_SHADER_ARB));
-            gPostSMAABlendWeights.mShaderFiles.push_back(make_pair("effects/SMAA.glsl", GL_FRAGMENT_SHADER_ARB));
-            gPostSMAABlendWeights.mShaderFiles.push_back(make_pair("effects/SMAA.glsl", GL_VERTEX_SHADER_ARB));
-            gPostSMAABlendWeights.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
-            success = gPostSMAABlendWeights.createShader(NULL, NULL);
             if (success)
             {
-                gPostSMAABlendWeights.bind();
-                gPostSMAABlendWeights.uniform1i(sTex0, 0);
-                gPostSMAABlendWeights.uniform1i(sTex1, 1);
-                gPostSMAABlendWeights.uniform1i(sTex2, 2);
+                gPostSMAABlendWeights[i].mName = fmt::format("SMAA Blending Weights ({:s})", smaa_pair.second);
+                gPostSMAABlendWeights[i].mFeatures.isDeferred = true;
+                gPostSMAABlendWeights[i].addPremutations(defines);
+                gPostSMAABlendWeights[i].mShaderFiles.clear();
+                gPostSMAABlendWeights[i].mShaderFiles.push_back(make_pair("effects/SMAABlendWeightsF.glsl", GL_FRAGMENT_SHADER_ARB));
+                gPostSMAABlendWeights[i].mShaderFiles.push_back(make_pair("effects/SMAABlendWeightsV.glsl", GL_VERTEX_SHADER_ARB));
+                gPostSMAABlendWeights[i].mShaderFiles.push_back(make_pair("effects/SMAA.glsl", GL_FRAGMENT_SHADER_ARB));
+                gPostSMAABlendWeights[i].mShaderFiles.push_back(make_pair("effects/SMAA.glsl", GL_VERTEX_SHADER_ARB));
+                gPostSMAABlendWeights[i].mShaderLevel = mShaderLevel[SHADER_DEFERRED];
+                success                               = gPostSMAABlendWeights[i].createShader(NULL, NULL);
+                if (success)
+                {
+                    gPostSMAABlendWeights[i].bind();
+                    gPostSMAABlendWeights[i].uniform1i(sTex0, 0);
+                    gPostSMAABlendWeights[i].uniform1i(sTex1, 1);
+                    gPostSMAABlendWeights[i].uniform1i(sTex2, 2);
+                }
+                gPostSMAABlendWeights[i].removePermutations(defines);
             }
-            gPostSMAABlendWeights.removePermutations(defines);
-        }
 
-        if (success)
-        {
-            gPostSMAANeighborhoodBlend.mName = "SMAA Neighborhood Blending (Post)";
-            gDeferredPostProgram.mFeatures.isDeferred = true;
-            gPostSMAANeighborhoodBlend.addPremutations(defines);
-            gPostSMAANeighborhoodBlend.mShaderFiles.clear();
-            gPostSMAANeighborhoodBlend.mShaderFiles.push_back(make_pair("effects/SMAANeighborhoodBlendF.glsl", GL_FRAGMENT_SHADER_ARB));
-            gPostSMAANeighborhoodBlend.mShaderFiles.push_back(make_pair("effects/SMAANeighborhoodBlendV.glsl", GL_VERTEX_SHADER_ARB));
-            gPostSMAANeighborhoodBlend.mShaderFiles.push_back(make_pair("effects/SMAA.glsl", GL_FRAGMENT_SHADER_ARB));
-            gPostSMAANeighborhoodBlend.mShaderFiles.push_back(make_pair("effects/SMAA.glsl", GL_VERTEX_SHADER_ARB));
-            gPostSMAANeighborhoodBlend.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
-            success = gPostSMAANeighborhoodBlend.createShader(NULL, NULL);
             if (success)
             {
-                gPostSMAANeighborhoodBlend.bind();
-                gPostSMAANeighborhoodBlend.uniform1i(sTex0, 0);
-                gPostSMAANeighborhoodBlend.uniform1i(sTex1, 1);
-                gPostSMAANeighborhoodBlend.uniform1i(sTex2, 2);
+                gPostSMAANeighborhoodBlend[i].mName = fmt::format("SMAA Neighborhood Blending ({:s})", smaa_pair.second);
+                gPostSMAANeighborhoodBlend[i].mFeatures.isDeferred = true;
+                gPostSMAANeighborhoodBlend[i].addPremutations(defines);
+                gPostSMAANeighborhoodBlend[i].mShaderFiles.clear();
+                gPostSMAANeighborhoodBlend[i].mShaderFiles.push_back(make_pair("effects/SMAANeighborhoodBlendF.glsl", GL_FRAGMENT_SHADER_ARB));
+                gPostSMAANeighborhoodBlend[i].mShaderFiles.push_back(make_pair("effects/SMAANeighborhoodBlendV.glsl", GL_VERTEX_SHADER_ARB));
+                gPostSMAANeighborhoodBlend[i].mShaderFiles.push_back(make_pair("effects/SMAA.glsl", GL_FRAGMENT_SHADER_ARB));
+                gPostSMAANeighborhoodBlend[i].mShaderFiles.push_back(make_pair("effects/SMAA.glsl", GL_VERTEX_SHADER_ARB));
+                gPostSMAANeighborhoodBlend[i].mShaderLevel = mShaderLevel[SHADER_DEFERRED];
+                success                                    = gPostSMAANeighborhoodBlend[i].createShader(NULL, NULL);
+                if (success)
+                {
+                    gPostSMAANeighborhoodBlend[i].bind();
+                    gPostSMAANeighborhoodBlend[i].uniform1i(sTex0, 0);
+                    gPostSMAANeighborhoodBlend[i].uniform1i(sTex1, 1);
+                    gPostSMAANeighborhoodBlend[i].uniform1i(sTex2, 2);
+                }
+                gPostSMAANeighborhoodBlend[i].removePermutations(defines);
             }
-            gPostSMAANeighborhoodBlend.removePermutations(defines);
+            ++i;
         }
     }
 

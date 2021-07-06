@@ -8142,8 +8142,147 @@ void LLPipeline::renderFinalize()
 
         if (multisample)
         {
-            static LLCachedControl<bool> use_fxaa(gSavedSettings, "AlchemyRenderFXAA", false);
-            if (use_fxaa)
+            static LLCachedControl<bool> use_smaa(gSavedSettings, "AlchemyRenderUseSMAA", true);
+            if (use_smaa && gGLManager.mGLVersion >= 3.1)
+            {
+                mFXAABuffer.copyContents(*pRenderBuffer, 0, 0, mSMAAEdgeBuffer.getWidth(), mSMAAEdgeBuffer.getHeight(), 0, 0,
+                                         mSMAAEdgeBuffer.getWidth(), mSMAAEdgeBuffer.getHeight(), GL_COLOR_BUFFER_BIT, GL_NEAREST);
+
+                LLRenderTarget* input  = &mFXAABuffer;
+                S32             width  = input->getWidth();
+                S32             height = input->getHeight();
+                glViewport(0, 0, width, height);
+
+                float rt_metrics[] = {1.f / width, 1.f / height, (float) width, (float) height};
+
+                LLGLDepthTest    depth(GL_FALSE, GL_FALSE);
+                LLGLSNoAlphaTest alpha_test;
+
+                LLRenderTarget* bound_target = pRenderBuffer;
+                LLGLSLShader*   bound_shader = nullptr;
+
+                static LLCachedControl<U32>  show_step(gSavedSettings, "AlchemyRenderSMAAShowStep", 3);
+                static LLCachedControl<bool> use_sample(gSavedSettings, "AlchemyRenderSMAAUseSample", false);
+                static LLCachedControl<bool> use_stencil(gSavedSettings, "AlchemyRenderSMAAUseStencil", true);
+
+                U32 smaa_quality = 0;
+                switch (RenderFSAASamples)
+                {
+                    case 2:
+                        smaa_quality = 0;
+                        break;
+                    case 4:
+                        smaa_quality = 1;
+                        break;
+                    default:
+                    case 8:
+                        smaa_quality = 2;
+                        break;
+                    case 16:
+                        smaa_quality = 3;
+                        break;
+                }
+
+                if (show_step >= 1)
+                {
+                    LLGLState stencil(GL_STENCIL_TEST, use_stencil);
+
+                    // Bind setup:
+                    bound_target = &mSMAAEdgeBuffer;
+                    bound_shader = &gPostSMAAEdgeDetect[smaa_quality];
+
+                    if (!use_sample)
+                        input->bindTexture(0, 0);
+                    else
+                        gGL.getTexUnit(0)->bindManual(LLTexUnit::TT_TEXTURE, mSampleMap);
+                    gGL.getTexUnit(0)->setTextureFilteringOption(LLTexUnit::TFO_BILINEAR);
+
+                    bound_shader->bind();
+                    bound_shader->uniform4fv(sSmaaRTMetrics, 1, rt_metrics);
+                    bound_target->bindTarget();
+                    bound_target->clear(GL_COLOR_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
+                    if (use_stencil)
+                    {
+                        glStencilFunc(GL_ALWAYS, 1, 0xFF);
+                        glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
+                        glStencilMask(0xFF);
+                    }
+                    drawFullScreenRect();
+                    bound_target->flush();
+                    bound_shader->unbind();
+                }
+                if (show_step >= 2)
+                {
+                    LLGLState stencil(GL_STENCIL_TEST, use_stencil);
+
+                    // Bind setup:
+                    bound_target = &mSMAABlendBuffer;
+                    bound_shader = &gPostSMAABlendWeights[smaa_quality];
+
+                    mSMAAEdgeBuffer.bindTexture(0, 0);
+                    gGL.getTexUnit(1)->bindManual(LLTexUnit::TT_TEXTURE, mAreaMap);
+                    gGL.getTexUnit(2)->bindManual(LLTexUnit::TT_TEXTURE, mSearchMap);
+                    gGL.getTexUnit(0)->setTextureFilteringOption(LLTexUnit::TFO_BILINEAR);
+
+                    bound_shader->bind();
+                    bound_shader->uniform4fv(sSmaaRTMetrics, 1, rt_metrics);
+                    bound_target->bindTarget();
+                    bound_target->clear(GL_COLOR_BUFFER_BIT);
+                    if (use_stencil)
+                    {
+                        glStencilFunc(GL_EQUAL, 1, 0xFF);
+                        glStencilMask(0x00);
+                    }
+                    drawFullScreenRect();
+                    if (use_stencil)
+                    {
+                        glStencilFunc(GL_ALWAYS, 0, 0xFF);
+                    }
+                    bound_target->flush();
+                    bound_shader->unbind();
+                }
+
+                if (show_step >= 3)
+                {
+                    LLGLDisable stencil(GL_STENCIL_TEST);
+
+                    // Bind setup:
+                    bound_target = &mScreen;
+                    bound_shader = &gPostSMAANeighborhoodBlend[smaa_quality];
+
+                    if (!use_sample)
+                        input->bindTexture(0, 0);
+                    else
+                        gGL.getTexUnit(0)->bindManual(LLTexUnit::TT_TEXTURE, mSampleMap);
+                    mSMAABlendBuffer.bindTexture(0, 1);
+                    gGL.getTexUnit(0)->setTextureFilteringOption(LLTexUnit::TFO_BILINEAR);
+                    gGL.getTexUnit(1)->setTextureFilteringOption(LLTexUnit::TFO_BILINEAR);
+
+                    bound_shader->bind();
+                    bound_shader->uniform4fv(sSmaaRTMetrics, 1, rt_metrics);
+                    bound_target->bindTarget();
+                    bound_target->clear(GL_COLOR_BUFFER_BIT);
+                    drawFullScreenRect();
+                    bound_target->flush();
+                    bound_shader->unbind();
+                }
+
+                if (bound_target)
+                {  // copy color buffer from mScreen to framebuffer
+                    LLRenderTarget::copyContentsToFramebuffer(*bound_target, 0, 0, mSMAAEdgeBuffer.getWidth(), mSMAAEdgeBuffer.getHeight(),
+                                                              0, 0, mSMAAEdgeBuffer.getWidth(), mSMAAEdgeBuffer.getHeight(),
+                                                              GL_COLOR_BUFFER_BIT, GL_NEAREST);
+                }
+
+                gGLViewport[0] = gViewerWindow->getWorldViewRectRaw().mLeft;
+                gGLViewport[1] = gViewerWindow->getWorldViewRectRaw().mBottom;
+                gGLViewport[2] = gViewerWindow->getWorldViewRectRaw().getWidth();
+                gGLViewport[3] = gViewerWindow->getWorldViewRectRaw().getHeight();
+                glViewport(gGLViewport[0], gGLViewport[1], gGLViewport[2], gGLViewport[3]);
+
+                gGL.flush();
+            }
+            else
             {
                 // bake out texture2D with RGBL for FXAA shader
                 mFXAABuffer.bindTarget();
@@ -8218,131 +8357,6 @@ void LLPipeline::renderFinalize()
 
                 gGL.flush();
                 shader->unbind();
-            }
-            else
-            {
-                if (gPostSMAAEdgeDetect.mProgramObject && gPostSMAABlendWeights.mProgramObject && gPostSMAANeighborhoodBlend.mProgramObject)
-                {
-                    mFXAABuffer.copyContents(*pRenderBuffer, 0, 0, mSMAAEdgeBuffer.getWidth(), mSMAAEdgeBuffer.getHeight(), 0, 0,
-                                             mSMAAEdgeBuffer.getWidth(), mSMAAEdgeBuffer.getHeight(), GL_COLOR_BUFFER_BIT, GL_NEAREST);
-
-                    LLRenderTarget* input  = &mFXAABuffer;
-                    S32             width  = input->getWidth();
-                    S32             height = input->getHeight();
-                    glViewport(0, 0, width, height);
-
-                    float rt_metrics[] = {1.f / width, 1.f / height, (float) width, (float) height};
-
-                    LLGLDepthTest    depth(GL_FALSE, GL_FALSE);
-                    LLGLSNoAlphaTest alpha_test;
-
-                    LLRenderTarget* bound_target = pRenderBuffer;
-                    LLGLSLShader*   bound_shader = nullptr;
-
-                    static LLCachedControl<U32>  show_step(gSavedSettings, "ShowStep", 3);
-                    static LLCachedControl<bool> use_sample(gSavedSettings, "UseSample", false);
-                    static LLCachedControl<bool> use_stencil(gSavedSettings, "UseStencil", true);
-
-                    if (show_step >= 1)
-                    {
-                        LLGLState stencil(GL_STENCIL_TEST, use_stencil);
-
-                        // Bind setup:
-                        bound_target = &mSMAAEdgeBuffer;
-                        bound_shader = &gPostSMAAEdgeDetect;
-
-                        if (!use_sample)
-                            input->bindTexture(0, 0);
-                        else
-                            gGL.getTexUnit(0)->bindManual(LLTexUnit::TT_TEXTURE, mSampleMap);
-                        gGL.getTexUnit(0)->setTextureFilteringOption(LLTexUnit::TFO_BILINEAR);
-
-                        bound_shader->bind();
-                        bound_shader->uniform4fv(sSmaaRTMetrics, 1, rt_metrics);
-                        bound_target->bindTarget();
-                        bound_target->clear(GL_COLOR_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
-                        if (use_stencil)
-                        {
-                            glStencilFunc(GL_ALWAYS, 1, 0xFF);
-                            glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
-                            glStencilMask(0xFF);
-                        }
-                        drawFullScreenRect();
-                        bound_target->flush();
-                        bound_shader->unbind();
-                    }
-                    if (show_step >= 2)
-                    {
-                        LLGLState stencil(GL_STENCIL_TEST, use_stencil);
-
-                        // Bind setup:
-                        bound_target = &mSMAABlendBuffer;
-                        bound_shader = &gPostSMAABlendWeights;
-
-                        mSMAAEdgeBuffer.bindTexture(0, 0);
-                        gGL.getTexUnit(1)->bindManual(LLTexUnit::TT_TEXTURE, mAreaMap);
-                        gGL.getTexUnit(2)->bindManual(LLTexUnit::TT_TEXTURE, mSearchMap);
-                        gGL.getTexUnit(0)->setTextureFilteringOption(LLTexUnit::TFO_BILINEAR);
-
-                        bound_shader->bind();
-                        bound_shader->uniform4fv(sSmaaRTMetrics, 1, rt_metrics);
-                        bound_target->bindTarget();
-                        bound_target->clear(GL_COLOR_BUFFER_BIT);
-                        if (use_stencil)
-                        {
-                            glStencilFunc(GL_EQUAL, 1, 0xFF);
-                            glStencilMask(0x00);
-                        }
-                        drawFullScreenRect();
-                        if (use_stencil)
-                        {
-                            glStencilFunc(GL_ALWAYS, 0, 0xFF);
-                        }
-                        bound_target->flush();
-                        bound_shader->unbind();
-                    }
-
-                    if (show_step >= 3)
-                    {
-                        LLGLDisable stencil(GL_STENCIL_TEST);
-                        // LLGLEnable<GL_FRAMEBUFFER_SRGB> srgb;
-
-                        // Bind setup:
-                        bound_target = &mScreen;
-                        bound_shader = &gPostSMAANeighborhoodBlend;
-
-                        if (!use_sample)
-                            input->bindTexture(0, 0);
-                        else
-                            gGL.getTexUnit(0)->bindManual(LLTexUnit::TT_TEXTURE, mSampleMap);
-                        mSMAABlendBuffer.bindTexture(0, 1);
-                        gGL.getTexUnit(0)->setTextureFilteringOption(LLTexUnit::TFO_BILINEAR);
-                        gGL.getTexUnit(1)->setTextureFilteringOption(LLTexUnit::TFO_BILINEAR);
-
-                        bound_shader->bind();
-                        bound_shader->uniform4fv(sSmaaRTMetrics, 1, rt_metrics);
-                        bound_target->bindTarget();
-                        drawFullScreenRect();
-                        bound_target->flush();
-                        bound_shader->unbind();
-                    }
-
-                    if (bound_target)
-                    {  // copy color buffer from mScreen to framebuffer
-                        // LLGLState<GL_FRAMEBUFFER_SRGB> srgb(show_step >= 3);
-                        LLRenderTarget::copyContentsToFramebuffer(*bound_target, 0, 0, mSMAAEdgeBuffer.getWidth(),
-                                                                  mSMAAEdgeBuffer.getHeight(), 0, 0, mSMAAEdgeBuffer.getWidth(),
-                                                                  mSMAAEdgeBuffer.getHeight(), GL_COLOR_BUFFER_BIT, GL_NEAREST);
-                    }
-
-					gGLViewport[0] = gViewerWindow->getWorldViewRectRaw().mLeft;
-                    gGLViewport[1] = gViewerWindow->getWorldViewRectRaw().mBottom;
-                    gGLViewport[2] = gViewerWindow->getWorldViewRectRaw().getWidth();
-                    gGLViewport[3] = gViewerWindow->getWorldViewRectRaw().getHeight();
-                    glViewport(gGLViewport[0], gGLViewport[1], gGLViewport[2], gGLViewport[3]);
-
-                    gGL.flush();
-				}
             }
         }
     }

@@ -227,7 +227,7 @@ RenderDeferredSSAO			1	0
 RenderUseAdvancedAtmospherics 1 0
 RenderShadowDetail			1	0
 WLSkyDetail					1	48
-RenderFSAASamples			1	2
+RenderFSAASamples			1	8
 
 //
 // High Graphics Settings (deferred + SSAO)
@@ -258,7 +258,7 @@ RenderDeferredSSAO			1	1
 RenderUseAdvancedAtmospherics 1 0
 RenderShadowDetail			1	0
 WLSkyDetail					1	48
-RenderFSAASamples			1	2
+RenderFSAASamples			1	8
 
 //
 // High Ultra Graphics Settings (deferred + SSAO + shadows)
@@ -289,7 +289,7 @@ RenderDeferredSSAO			1	1
 RenderUseAdvancedAtmospherics 1 0
 RenderShadowDetail			1	2
 WLSkyDetail					1	48
-RenderFSAASamples			1	2
+RenderFSAASamples			1	16
 
 //
 // Ultra graphics (REALLY PURTY!)
@@ -319,7 +319,7 @@ RenderDeferred				1	1
 RenderDeferredSSAO			1	1
 RenderUseAdvancedAtmospherics 1 0
 RenderShadowDetail			1	2
-RenderFSAASamples			1	2
+RenderFSAASamples			1	16
 
 //
 // Class Unknown Hardware (unknown)
