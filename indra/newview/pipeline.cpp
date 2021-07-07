@@ -965,12 +965,14 @@ bool LLPipeline::allocateScreenBuffer(U32 resX, U32 resY, U32 samples)
 			if (!mSMAAEdgeBuffer.allocate(resX, resY, GL_RGBA, TRUE, TRUE, LLTexUnit::TT_TEXTURE, FALSE, samples)) return false;
 			if (!mSMAABlendBuffer.allocate(resX, resY, GL_RGBA, FALSE, FALSE, LLTexUnit::TT_TEXTURE, FALSE, samples)) return false;
 			mSMAAEdgeBuffer.shareDepthBuffer(mSMAABlendBuffer);
+			if (!mScratchBuffer.allocate(resX, resY, GL_RGBA, FALSE, FALSE, LLTexUnit::TT_TEXTURE, FALSE, samples)) return false;
 		}
 		else
 		{
 			mFXAABuffer.release();
             mSMAABlendBuffer.release();
             mSMAAEdgeBuffer.release();
+            mScratchBuffer.release();
 		}
 		
 		if (shadow_detail > 0 || ssao || RenderDepthOfField || samples > 0)
@@ -999,6 +1001,7 @@ bool LLPipeline::allocateScreenBuffer(U32 resX, U32 resY, U32 samples)
 		mFXAABuffer.release();
         mSMAABlendBuffer.release();
         mSMAAEdgeBuffer.release();
+        mScratchBuffer.release();
 		mScreen.release();
 		mDeferredScreen.release(); //make sure to release any render targets that share a depth buffer with mDeferredScreen first
 // [RLVa:KB] - @setsphere
@@ -1309,6 +1312,7 @@ void LLPipeline::releaseScreenBuffers()
 	mFXAABuffer.release();
     mSMAABlendBuffer.release();
     mSMAAEdgeBuffer.release();
+    mScratchBuffer.release();
 	mPhysicsDisplay.release();
 	mDeferredScreen.release();
 	mDeferredDepth.release();
@@ -8249,17 +8253,31 @@ void LLPipeline::renderFinalize()
                 {
                     LLGLDisable stencil(GL_STENCIL_TEST);
 
-                    // Bind setup:
-                    bound_target = &mSMAAEdgeBuffer;
-                    bound_shader = &gPostSMAANeighborhoodBlend[smaa_quality];
+					// Bind setup:
+                    bound_target = &mScratchBuffer;
+                    bound_shader = &gPostSRGBToLinearProgram;
 
-                    if (!use_sample)
-                        input->bindTexture(0, 0);
+					if (!use_sample)
+                        input->bindTexture(0, 0, LLTexUnit::TFO_BILINEAR);
                     else
                     {
                         gGL.getTexUnit(0)->bindManual(LLTexUnit::TT_TEXTURE, mSampleMap);
                         gGL.getTexUnit(0)->setTextureFilteringOption(LLTexUnit::TFO_BILINEAR);
                     }
+
+                    // Draw
+                    bound_shader->bind();
+                    bound_target->bindTarget();
+                    bound_target->clear(GL_COLOR_BUFFER_BIT);
+                    drawFullScreenRect();
+                    bound_target->flush();
+                    bound_shader->unbind();
+
+                    // Bind setup:
+                    bound_target = &mSMAAEdgeBuffer;
+                    bound_shader = &gPostSMAANeighborhoodBlend[smaa_quality];
+
+                    mScratchBuffer.bindTexture(0, 0, LLTexUnit::TFO_BILINEAR);
                     mSMAABlendBuffer.bindTexture(0, 1, LLTexUnit::TFO_BILINEAR);
 
                     bound_shader->bind();

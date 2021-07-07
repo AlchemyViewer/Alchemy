@@ -620,6 +620,7 @@ public:
 	LLRenderTarget			mFXAABuffer;
     LLRenderTarget          mSMAAEdgeBuffer;
     LLRenderTarget          mSMAABlendBuffer;
+    LLRenderTarget          mScratchBuffer;
 	LLRenderTarget			mDeferredDepth;
 	LLRenderTarget			mOcclusionDepth;
 	LLRenderTarget			mDeferredLight;
