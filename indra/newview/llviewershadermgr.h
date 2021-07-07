@@ -259,6 +259,9 @@ extern LLGLSLShader			gWLMoonProgram;
 // Post Process Shaders
 extern LLGLSLShader			gPostColorFilterProgram;
 extern LLGLSLShader			gPostNightVisionProgram;
+extern LLGLSLShader         gPostSRGBToLinearProgram;
+extern LLGLSLShader         gPostLinearToSRGBProgram;
+extern LLGLSLShader         gPostCASProgram;
 extern LLGLSLShader         gPostSMAAEdgeDetect[4];
 extern LLGLSLShader         gPostSMAABlendWeights[4];
 extern LLGLSLShader         gPostSMAANeighborhoodBlend[4];

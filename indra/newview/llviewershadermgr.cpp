@@ -176,6 +176,9 @@ LLGLSLShader			gGlowProgram;
 LLGLSLShader			gGlowExtractProgram;
 LLGLSLShader			gPostColorFilterProgram;
 LLGLSLShader			gPostNightVisionProgram;
+LLGLSLShader		    gPostSRGBToLinearProgram;
+LLGLSLShader			gPostLinearToSRGBProgram;
+LLGLSLShader            gPostCASProgram;
 LLGLSLShader            gPostSMAAEdgeDetect[4];
 LLGLSLShader            gPostSMAABlendWeights[4];
 LLGLSLShader            gPostSMAANeighborhoodBlend[4];
@@ -818,7 +821,9 @@ void LLViewerShaderMgr::unloadShaders()
 
 	gPostColorFilterProgram.unload();
 	gPostNightVisionProgram.unload();
-
+    gPostSRGBToLinearProgram.unload();
+    gPostLinearToSRGBProgram.unload();
+    gPostCASProgram.unload();
 
 	gDeferredDiffuseProgram.unload();
 	gDeferredDiffuseAlphaMaskProgram.unload();
@@ -1164,6 +1169,9 @@ BOOL LLViewerShaderMgr::loadShadersEffects()
 		gGlowExtractProgram.unload();
 		gPostColorFilterProgram.unload();	
 		gPostNightVisionProgram.unload();
+        gPostSRGBToLinearProgram.unload();
+        gPostLinearToSRGBProgram.unload();
+        gPostCASProgram.unload();
 		return TRUE;
 	}
 
@@ -1194,6 +1202,39 @@ BOOL LLViewerShaderMgr::loadShadersEffects()
 			LLPipeline::sRenderGlow = FALSE;
 		}
 	}
+
+	if (success)
+    {
+        gPostLinearToSRGBProgram.mName = "Linear To SRGB Shader";
+        gPostLinearToSRGBProgram.mFeatures.hasSrgb = true;
+        gPostLinearToSRGBProgram.mShaderFiles.clear();
+        gPostLinearToSRGBProgram.mShaderFiles.push_back(make_pair("effects/postNoTCV.glsl", GL_VERTEX_SHADER));
+        gPostLinearToSRGBProgram.mShaderFiles.push_back(make_pair("effects/linearToSRGBF.glsl", GL_FRAGMENT_SHADER));
+        gPostLinearToSRGBProgram.mShaderLevel = mShaderLevel[SHADER_EFFECT];
+        success = gPostLinearToSRGBProgram.createShader(NULL, NULL);
+    }
+
+	if (success)
+    {
+        gPostSRGBToLinearProgram.mName = "SRGB To Linear Shader";
+        gPostSRGBToLinearProgram.mFeatures.hasSrgb = true;
+        gPostSRGBToLinearProgram.mShaderFiles.clear();
+        gPostSRGBToLinearProgram.mShaderFiles.push_back(make_pair("effects/postNoTCV.glsl", GL_VERTEX_SHADER));
+        gPostSRGBToLinearProgram.mShaderFiles.push_back(make_pair("effects/SRGBToLinearF.glsl", GL_FRAGMENT_SHADER));
+        gPostSRGBToLinearProgram.mShaderLevel = mShaderLevel[SHADER_EFFECT];
+        success = gPostSRGBToLinearProgram.createShader(NULL, NULL);
+    }
+
+	if (success)
+    {
+        gPostCASProgram.mName = "Contrast Adaptive Sharpen Shader";
+        gPostCASProgram.mFeatures.hasSrgb = true;
+        gPostCASProgram.mShaderFiles.clear();
+        gPostCASProgram.mShaderFiles.push_back(make_pair("effects/postNoTCV.glsl", GL_VERTEX_SHADER));
+        gPostCASProgram.mShaderFiles.push_back(make_pair("effects/CASF.glsl", GL_FRAGMENT_SHADER));
+        gPostCASProgram.mShaderLevel = mShaderLevel[SHADER_EFFECT];
+        success = gPostCASProgram.createShader(NULL, NULL);
+    }
 
 	return success;
 
