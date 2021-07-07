@@ -39,5 +39,5 @@ void main()
 										  , tex1
 										  #endif
 										  );
-	frag_color = float4(val,0.0,1.0);
+	frag_color = float4(val,0.0,0.0);
 }

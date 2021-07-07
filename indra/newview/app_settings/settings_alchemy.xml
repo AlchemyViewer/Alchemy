@@ -594,7 +594,7 @@
       <key>Type</key>
       <string>F32</string>
       <key>Value</key>
-      <real>0.6</real>
+      <real>0.8</real>
     </map>
     <key>AlchemyRenderSMAA</key>
     <map>

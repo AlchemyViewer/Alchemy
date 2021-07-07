@@ -961,11 +961,11 @@ bool LLPipeline::allocateScreenBuffer(U32 resX, U32 resY, U32 samples)
 		if (!mScreen.allocate(resX, resY, screenFormat, FALSE, FALSE, LLTexUnit::TT_RECT_TEXTURE, FALSE, samples)) return false;
 		if (samples > 0)
 		{
-			if (!mFXAABuffer.allocate(resX, resY, GL_RGBA, FALSE, FALSE, LLTexUnit::TT_TEXTURE, FALSE, samples)) return false;
-			if (!mSMAAEdgeBuffer.allocate(resX, resY, GL_RGBA, TRUE, TRUE, LLTexUnit::TT_TEXTURE, FALSE, samples)) return false;
-			if (!mSMAABlendBuffer.allocate(resX, resY, GL_RGBA, FALSE, FALSE, LLTexUnit::TT_TEXTURE, FALSE, samples)) return false;
+			if (!mFXAABuffer.allocate(resX, resY, GL_SRGB8_ALPHA8, FALSE, FALSE, LLTexUnit::TT_TEXTURE, FALSE, samples)) return false;
+			if (!mSMAAEdgeBuffer.allocate(resX, resY, GL_RGBA8, TRUE, TRUE, LLTexUnit::TT_TEXTURE, FALSE, samples)) return false;
+			if (!mSMAABlendBuffer.allocate(resX, resY, GL_RGBA8, FALSE, FALSE, LLTexUnit::TT_TEXTURE, FALSE, samples)) return false;
 			mSMAAEdgeBuffer.shareDepthBuffer(mSMAABlendBuffer);
-			if (!mScratchBuffer.allocate(resX, resY, GL_RGBA, FALSE, FALSE, LLTexUnit::TT_TEXTURE, FALSE, samples)) return false;
+			if (!mScratchBuffer.allocate(resX, resY, GL_SRGB8_ALPHA8, FALSE, FALSE, LLTexUnit::TT_TEXTURE, FALSE, samples)) return false;
 		}
 		else
 		{
@@ -8088,7 +8088,7 @@ void LLPipeline::renderFinalize()
 //                }
             }
         }
-        else
+        else // !dof_enabled
         {
 //            if (multisample)
 //            {
@@ -8171,12 +8171,11 @@ void LLPipeline::renderFinalize()
             static LLCachedControl<bool> use_smaa(gSavedSettings, "AlchemyRenderSMAA", true);
             if (use_smaa && gGLManager.mGLVersion >= 3.1)
             {
-                mFXAABuffer.copyContents(*pRenderBuffer, 0, 0, mSMAAEdgeBuffer.getWidth(), mSMAAEdgeBuffer.getHeight(), 0, 0,
-                                         mSMAAEdgeBuffer.getWidth(), mSMAAEdgeBuffer.getHeight(), GL_COLOR_BUFFER_BIT, GL_NEAREST);
+                mFXAABuffer.copyContents(*pRenderBuffer, 0, 0, mFXAABuffer.getWidth(), mFXAABuffer.getHeight(), 0, 0,
+                                         mFXAABuffer.getWidth(), mFXAABuffer.getHeight(), GL_COLOR_BUFFER_BIT, GL_NEAREST);
 
-                LLRenderTarget* input  = &mFXAABuffer;
-                S32             width  = input->getWidth();
-                S32             height = input->getHeight();
+                S32 width = mScreen.getWidth();
+                S32 height = mScreen.getHeight();
                 glViewport(0, 0, width, height);
 
                 float rt_metrics[] = {1.f / width, 1.f / height, (float) width, (float) height};
@@ -8197,7 +8196,10 @@ void LLPipeline::renderFinalize()
                     bound_shader = &gPostSMAAEdgeDetect[fsaa_quality];
 
                     if (!use_sample)
-                        input->bindTexture(0, 0, LLTexUnit::TFO_BILINEAR);
+                    {
+                        mFXAABuffer.bindTexture(0, 0, LLTexUnit::TFO_BILINEAR);
+                        gGL.getTexUnit(0)->setTextureColorSpace(LLTexUnit::TCS_LINEAR);
+                    }
                     else
                     {
                         gGL.getTexUnit(0)->bindManual(LLTexUnit::TT_TEXTURE, mSampleMap);
@@ -8217,6 +8219,7 @@ void LLPipeline::renderFinalize()
                     drawFullScreenRect();
                     bound_target->flush();
                     bound_shader->unbind();
+                    gGL.getTexUnit(0)->disable();
                 }
                 if (show_step >= 2)
                 {
@@ -8226,10 +8229,11 @@ void LLPipeline::renderFinalize()
                     bound_target = &mSMAABlendBuffer;
                     bound_shader = &gPostSMAABlendWeights[fsaa_quality];
 
-                    mSMAAEdgeBuffer.bindTexture(0, 0);
+                    mSMAAEdgeBuffer.bindTexture(0, 0, LLTexUnit::TFO_BILINEAR);
                     gGL.getTexUnit(1)->bindManual(LLTexUnit::TT_TEXTURE, mAreaMap);
-                    gGL.getTexUnit(2)->bindManual(LLTexUnit::TT_TEXTURE, mSearchMap);
-                    gGL.getTexUnit(0)->setTextureFilteringOption(LLTexUnit::TFO_BILINEAR);
+                    gGL.getTexUnit(1)->setTextureFilteringOption(LLTexUnit::TFO_BILINEAR);
+					gGL.getTexUnit(2)->bindManual(LLTexUnit::TT_TEXTURE, mSearchMap);
+                    gGL.getTexUnit(2)->setTextureFilteringOption(LLTexUnit::TFO_BILINEAR);
 
                     bound_shader->bind();
                     bound_shader->uniform4fv(sSmaaRTMetrics, 1, rt_metrics);
@@ -8247,37 +8251,23 @@ void LLPipeline::renderFinalize()
                     }
                     bound_target->flush();
                     bound_shader->unbind();
+                    gGL.getTexUnit(0)->disable();
+                    gGL.getTexUnit(1)->disable();
+                    gGL.getTexUnit(2)->disable();
                 }
 
                 if (show_step >= 3)
                 {
                     LLGLDisable stencil(GL_STENCIL_TEST);
-
-					// Bind setup:
-                    bound_target = &mScratchBuffer;
-                    bound_shader = &gPostSRGBToLinearProgram;
-
-					if (!use_sample)
-                        input->bindTexture(0, 0, LLTexUnit::TFO_BILINEAR);
-                    else
-                    {
-                        gGL.getTexUnit(0)->bindManual(LLTexUnit::TT_TEXTURE, mSampleMap);
-                        gGL.getTexUnit(0)->setTextureFilteringOption(LLTexUnit::TFO_BILINEAR);
-                    }
-
-                    // Draw
-                    bound_shader->bind();
-                    bound_target->bindTarget();
-                    bound_target->clear(GL_COLOR_BUFFER_BIT);
-                    drawFullScreenRect();
-                    bound_target->flush();
-                    bound_shader->unbind();
+                    LLGLState srgb_state(GL_FRAMEBUFFER_SRGB, gGLManager.mHasTexturesRGBDecode);
 
                     // Bind setup:
-                    bound_target = &mSMAAEdgeBuffer;
+                    bound_target = &mScratchBuffer;
                     bound_shader = &gPostSMAANeighborhoodBlend[fsaa_quality];
 
-                    mScratchBuffer.bindTexture(0, 0, LLTexUnit::TFO_BILINEAR);
+                    mFXAABuffer.bindTexture(0, 0, LLTexUnit::TFO_BILINEAR);
+                    gGL.getTexUnit(0)->setTextureColorSpace(LLTexUnit::TCS_LINEAR);
+
                     mSMAABlendBuffer.bindTexture(0, 1, LLTexUnit::TFO_BILINEAR);
 
                     bound_shader->bind();
@@ -8287,10 +8277,14 @@ void LLPipeline::renderFinalize()
                     drawFullScreenRect();
                     bound_target->flush();
                     bound_shader->unbind();
+                    gGL.getTexUnit(0)->disable();
+                    gGL.getTexUnit(1)->disable();
                 }
             }
             else
             {
+                LLGLState srgb(GL_FRAMEBUFFER_SRGB, false);
+
                 // bake out texture2D with RGBL for FXAA shader
                 bound_target = &mFXAABuffer;
                 bound_shader = &gGlowCombineFXAAProgram;
@@ -8326,14 +8320,14 @@ void LLPipeline::renderFinalize()
                 bound_shader->unbind();
 
 				// Now Draw FXAA
-				bound_target = &mSMAAEdgeBuffer;
+				bound_target = &mScratchBuffer;
                 bound_shader = &gFXAAProgram[fsaa_quality];
                 bound_shader->bind();
 
                 channel = bound_shader->enableTexture(LLShaderMgr::DIFFUSE_MAP, mFXAABuffer.getUsage());
                 if (channel > -1)
                 {
-                    mFXAABuffer.bindTexture(0, channel, LLTexUnit::TFO_BILINEAR);
+                    mFXAABuffer.bindTexture(0, channel, LLTexUnit::TFO_BILINEAR, LLTexUnit::TCS_SRGB);
                 }
 
                 F32 scale_x = (F32) width / mFXAABuffer.getWidth();
@@ -8351,20 +8345,23 @@ void LLPipeline::renderFinalize()
 				drawFullScreenRect();
                 bound_target->flush();
 				bound_shader->unbind();
+                gGL.getTexUnit(channel)->disable();
             }
 
 			static LLCachedControl<bool> enable_cas(gSavedSettings, "AlchemyRenderCAS", true);
             if (enable_cas)
             {
-                static LLCachedControl<F32> sharpness_cc(gSavedSettings, "AlchemyRenderCASSharpness", 0.6f);
-				LLRenderTarget* previous_target = bound_target;
+                static LLCachedControl<F32> sharpness_cc(gSavedSettings, "AlchemyRenderCASSharpness", 0.8f);
+                LLGLState srgb(GL_FRAMEBUFFER_SRGB, gGLManager.mHasTexturesRGBDecode);
 
 				// Bind setup:
-                bound_target = &mScreen;
+                bound_target = &mFXAABuffer;
                 bound_shader = &gPostCASProgram;
 
 				// Draw
-                previous_target->bindTexture(0, 0, LLTexUnit::TFO_BILINEAR);
+                mScratchBuffer.bindTexture(0, 0, LLTexUnit::TFO_BILINEAR);
+                gGL.getTexUnit(0)->setTextureColorSpace(LLTexUnit::TCS_LINEAR);
+
                 bound_shader->bind();
                 bound_shader->uniform1f(sSharpness, sharpness_cc);
                 bound_target->bindTarget();
@@ -8372,6 +8369,7 @@ void LLPipeline::renderFinalize()
                 drawFullScreenRect();
                 bound_target->flush();
                 bound_shader->unbind();
+                gGL.getTexUnit(0)->disable();
             }
 
             if (bound_target) // Sanity check
