@@ -106,7 +106,7 @@ LLTexUnit::LLTexUnit(S32 index)
 	mCurrColorOp(TBO_MULT), mCurrAlphaOp(TBO_MULT),
 	mCurrColorSrc1(TBS_TEX_COLOR), mCurrColorSrc2(TBS_PREV_COLOR),
 	mCurrAlphaSrc1(TBS_TEX_ALPHA), mCurrAlphaSrc2(TBS_PREV_ALPHA),
-    mCurrColorScale(1), mCurrAlphaScale(1), mCurrTexture(0), mTexColorSpace(TCS_LINEAR),
+    mCurrColorScale(1), mCurrAlphaScale(1), mCurrTexture(0), mTexColorSpace(TCS_SRGB),
 	mHasMipMaps(false),
 	mIndex(index)
 {
@@ -223,7 +223,7 @@ void LLTexUnit::disable(void)
 			glDisable(sGLTextureType[mCurrTexType]);
 		}
 
-        setTextureColorSpace(TCS_LINEAR);
+        setTextureColorSpace(TCS_SRGB);
 		
 		mCurrTexType = TT_NONE;
 	}
@@ -446,7 +446,7 @@ void LLTexUnit::unbind(eTextureType type)
 		mCurrTexture = 0;
 
         // Always make sure our texture color space is reset to linear.  SRGB sampling should be opt-in in the vast majority of cases.  Also prevents color space "popping".
-        mTexColorSpace = TCS_LINEAR;
+        mTexColorSpace = TCS_SRGB;
 		if (LLGLSLShader::sNoFixedFunction && type == LLTexUnit::TT_TEXTURE)
 		{
 			glBindTexture(sGLTextureType[type], sWhiteTexture);
@@ -854,10 +854,9 @@ void LLTexUnit::setTextureColorSpace(eTextureColorSpace space)
 {
     mTexColorSpace = space;
 
-#if USE_SRGB_DECODE
     if (gGLManager.mHasTexturesRGBDecode)
     {
-        if (space == TCS_SRGB)
+        if (space == TCS_LINEAR)
         {
             glTexParameteri(sGLTextureType[mCurrTexType], GL_TEXTURE_SRGB_DECODE_EXT, GL_DECODE_EXT);
         }
@@ -871,11 +870,6 @@ void LLTexUnit::setTextureColorSpace(eTextureColorSpace space)
 			stop_glerror();
         }
     }
-    else
-    {
-        glTexParameteri(sGLTextureType[mCurrTexType], GL_TEXTURE_SRGB_DECODE_EXT, GL_SKIP_DECODE_EXT);
-    }
-#endif
 }
 
 LLLightState::LLLightState(S32 index)

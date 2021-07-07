@@ -487,7 +487,7 @@ U32 LLRenderTarget::getNumTextures() const
 	return mTex.size();
 }
 
-void LLRenderTarget::bindTexture(U32 index, S32 channel, LLTexUnit::eTextureFilterOptions filter_options)
+void LLRenderTarget::bindTexture(U32 index, S32 channel, LLTexUnit::eTextureFilterOptions filter_options, LLTexUnit::eTextureColorSpace color_space)
 {
     gGL.getTexUnit(channel)->bindManual(mUsage, getTexture(index));
 
@@ -507,7 +507,7 @@ void LLRenderTarget::bindTexture(U32 index, S32 channel, LLTexUnit::eTextureFilt
     }
 
     gGL.getTexUnit(channel)->setTextureFilteringOption(filter_options);
-    gGL.getTexUnit(channel)->setTextureColorSpace(isSRGB ? LLTexUnit::TCS_SRGB : LLTexUnit::TCS_LINEAR);
+    gGL.getTexUnit(channel)->setTextureColorSpace(color_space);
 }
 
 void LLRenderTarget::flush(bool fetch_depth)
