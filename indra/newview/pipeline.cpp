@@ -8338,7 +8338,7 @@ void LLPipeline::renderFinalize()
 			static LLCachedControl<bool> enable_cas(gSavedSettings, "AlchemyRenderCAS", true);
             if (enable_cas)
             {
-                static LLCachedControl<F32> sharpness_cc(gSavedSettings, "AlchemyRenderCASSharpness", 0.8f);
+                static LLCachedControl<F32> sharpness_cc(gSavedSettings, "AlchemyRenderCASSharpness", 0.6f);
 				LLRenderTarget* previous_target = bound_target;
 
 				// Bind setup:
