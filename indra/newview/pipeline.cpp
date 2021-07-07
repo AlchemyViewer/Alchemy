@@ -8150,6 +8150,24 @@ void LLPipeline::renderFinalize()
             LLRenderTarget* bound_target = pRenderBuffer;
             LLGLSLShader*   bound_shader = nullptr;
 
+			U32 fsaa_quality = 0;
+            switch (RenderFSAASamples)
+            {
+                case 2:
+                    fsaa_quality = 0;
+                    break;
+                case 4:
+                    fsaa_quality = 1;
+                    break;
+                default:
+                case 8:
+                    fsaa_quality = 2;
+                    break;
+                case 16:
+                    fsaa_quality = 3;
+                    break;
+            }
+
             static LLCachedControl<bool> use_smaa(gSavedSettings, "AlchemyRenderSMAA", true);
             if (use_smaa && gGLManager.mGLVersion >= 3.1)
             {
@@ -8170,31 +8188,13 @@ void LLPipeline::renderFinalize()
                 static LLCachedControl<bool> use_sample(gSavedSettings, "AlchemyRenderSMAAUseSample", false);
                 static LLCachedControl<bool> use_stencil(gSavedSettings, "AlchemyRenderSMAAUseStencil", true);
 
-                U32 smaa_quality = 0;
-                switch (RenderFSAASamples)
-                {
-                    case 2:
-                        smaa_quality = 0;
-                        break;
-                    case 4:
-                        smaa_quality = 1;
-                        break;
-                    default:
-                    case 8:
-                        smaa_quality = 2;
-                        break;
-                    case 16:
-                        smaa_quality = 3;
-                        break;
-                }
-
                 if (show_step >= 1)
                 {
                     LLGLState stencil(GL_STENCIL_TEST, use_stencil);
 
                     // Bind setup:
                     bound_target = &mSMAAEdgeBuffer;
-                    bound_shader = &gPostSMAAEdgeDetect[smaa_quality];
+                    bound_shader = &gPostSMAAEdgeDetect[fsaa_quality];
 
                     if (!use_sample)
                         input->bindTexture(0, 0, LLTexUnit::TFO_BILINEAR);
@@ -8224,7 +8224,7 @@ void LLPipeline::renderFinalize()
 
                     // Bind setup:
                     bound_target = &mSMAABlendBuffer;
-                    bound_shader = &gPostSMAABlendWeights[smaa_quality];
+                    bound_shader = &gPostSMAABlendWeights[fsaa_quality];
 
                     mSMAAEdgeBuffer.bindTexture(0, 0);
                     gGL.getTexUnit(1)->bindManual(LLTexUnit::TT_TEXTURE, mAreaMap);
@@ -8275,7 +8275,7 @@ void LLPipeline::renderFinalize()
 
                     // Bind setup:
                     bound_target = &mSMAAEdgeBuffer;
-                    bound_shader = &gPostSMAANeighborhoodBlend[smaa_quality];
+                    bound_shader = &gPostSMAANeighborhoodBlend[fsaa_quality];
 
                     mScratchBuffer.bindTexture(0, 0, LLTexUnit::TFO_BILINEAR);
                     mSMAABlendBuffer.bindTexture(0, 1, LLTexUnit::TFO_BILINEAR);
@@ -8327,7 +8327,7 @@ void LLPipeline::renderFinalize()
 
 				// Now Draw FXAA
 				bound_target = &mSMAAEdgeBuffer;
-                bound_shader = &gFXAAProgram;
+                bound_shader = &gFXAAProgram[fsaa_quality];
                 bound_shader->bind();
 
                 channel = bound_shader->enableTexture(LLShaderMgr::DIFFUSE_MAP, mFXAABuffer.getUsage());

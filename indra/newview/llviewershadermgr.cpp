@@ -236,7 +236,7 @@ LLGLSLShader			gDeferredPostProgram;
 LLGLSLShader			gDeferredCoFProgram;
 LLGLSLShader			gDeferredDoFCombineProgram;
 LLGLSLShader			gDeferredPostGammaCorrectProgram;
-LLGLSLShader			gFXAAProgram;
+LLGLSLShader			gFXAAProgram[4];
 LLGLSLShader			gDeferredPostNoDoFProgram;
 LLGLSLShader			gDeferredWLSkyProgram;
 LLGLSLShader			gDeferredWLCloudProgram;
@@ -1301,10 +1301,10 @@ BOOL LLViewerShaderMgr::loadShadersDeferred()
 		gDeferredCoFProgram.unload();		
 		gDeferredDoFCombineProgram.unload();
 		gDeferredPostGammaCorrectProgram.unload();
-		gFXAAProgram.unload();
         for (auto i = 0; i < 3; ++i)
         {
-            gPostSMAAEdgeDetect[i].unload();
+            gFXAAProgram[i].unload();
+			gPostSMAAEdgeDetect[i].unload();
             gPostSMAABlendWeights[i].unload();
             gPostSMAANeighborhoodBlend[i].unload();
         }
@@ -2744,17 +2744,30 @@ BOOL LLViewerShaderMgr::loadShadersDeferred()
 		llassert(success);
 	}
 
-	if (success)
 	{
-		gFXAAProgram.mName = "FXAA Shader";
-		gFXAAProgram.mFeatures.isDeferred = true;
-		gFXAAProgram.mShaderFiles.clear();
-		gFXAAProgram.mShaderFiles.push_back(make_pair("deferred/postDeferredV.glsl", GL_VERTEX_SHADER));
-		gFXAAProgram.mShaderFiles.push_back(make_pair("deferred/fxaaF.glsl", GL_FRAGMENT_SHADER));
-		gFXAAProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
-		success = gFXAAProgram.createShader(NULL, NULL);
-		llassert(success);
-	}
+        std::vector<std::pair<std::string, std::string>> smaa_preset_pair = {{"12", "Low"},
+                                                                             {"23", "Medium"},
+                                                                             {"29", "High"},
+                                                                             {"39", "Ultra"}};
+        int i = 0;
+        for (const auto& smaa_pair : smaa_preset_pair)
+        {
+            if (success)
+            {
+                gFXAAProgram[i].mName = fmt::format("FXAA {:s} Shader", smaa_pair.second);
+                gFXAAProgram[i].mFeatures.isDeferred = true;
+                gFXAAProgram[i].mShaderFiles.clear();
+                gFXAAProgram[i].mShaderFiles.push_back(make_pair("deferred/postDeferredV.glsl", GL_VERTEX_SHADER));
+                gFXAAProgram[i].mShaderFiles.push_back(make_pair("deferred/fxaaF.glsl", GL_FRAGMENT_SHADER));
+                gFXAAProgram[i].mShaderLevel = mShaderLevel[SHADER_DEFERRED];
+                gFXAAProgram[i].addPermutation("FXAA_QUALITY__PRESET", smaa_pair.first);
+                success = gFXAAProgram[i].createShader(NULL, NULL);
+                gFXAAProgram[i].removePermutation("FXAA_QUALITY__PRESET");
+                llassert(success);
+            }
+            ++i;
+        }
+    }
 
 	if (gGLManager.mGLVersion >= 3.1f)
     {
