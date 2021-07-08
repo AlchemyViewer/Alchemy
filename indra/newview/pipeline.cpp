@@ -8892,26 +8892,6 @@ void LLPipeline::renderDeferredLighting(LLRenderTarget *screen_target)
                 deferred_light_target->clear(GL_COLOR_BUFFER_BIT);
                 glClearColor(0, 0, 0, 0);
 
-                glh::matrix4f inv_trans = get_current_modelview().inverse().transpose();
-
-                const U32 slice = 32;
-                F32       offset[slice * 3];
-                for (U32 i = 0; i < 4; i++)
-                {
-                    for (U32 j = 0; j < 8; j++)
-                    {
-                        glh::vec3f v;
-                        v.set_value(sinf(6.284f / 8 * j), cosf(6.284f / 8 * j), -(F32) i);
-                        v.normalize();
-                        inv_trans.mult_matrix_vec(v);
-                        v.normalize();
-                        offset[(i * 8 + j) * 3 + 0] = v.v[0];
-                        offset[(i * 8 + j) * 3 + 1] = v.v[2];
-                        offset[(i * 8 + j) * 3 + 2] = v.v[1];
-                    }
-                }
-
-                gDeferredSunProgram.uniform3fv(sOffset, slice, offset);
                 gDeferredSunProgram.uniform2f(LLShaderMgr::DEFERRED_SCREEN_RES,
                                               deferred_light_target->getWidth(),
                                               deferred_light_target->getHeight());
@@ -8948,7 +8928,7 @@ void LLPipeline::renderDeferredLighting(LLRenderTarget *screen_target)
             // sample symmetrically with the middle sample falling exactly on 0.0
             F32 x = 0.f;
 
-            LLVector3 gauss[32];  // xweight, yweight, offset
+            LLVector3 gauss[4];  // xweight, yweight, offset
 
             for (U32 i = 0; i < kern_length; i++)
             {

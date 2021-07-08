@@ -33,7 +33,6 @@ out vec4 frag_color;
 #define frag_color gl_FragColor
 #endif
 
-uniform sampler2DRect normalMap;
 uniform sampler2DRect lightMap;
 
 uniform float dist_factor;
