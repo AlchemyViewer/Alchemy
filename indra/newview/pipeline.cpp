@@ -8354,12 +8354,14 @@ void LLPipeline::renderFinalize()
                 static LLCachedControl<F32> sharpness_cc(gSavedSettings, "AlchemyRenderCASSharpness", 0.8f);
                 LLGLState srgb(GL_FRAMEBUFFER_SRGB, gGLManager.mHasTexturesRGBDecode);
 
+				LLRenderTarget* previous_target = bound_target;
+
 				// Bind setup:
                 bound_target = &mFXAABuffer;
                 bound_shader = &gPostCASProgram;
 
 				// Draw
-                mScratchBuffer.bindTexture(0, 0, LLTexUnit::TFO_BILINEAR);
+                previous_target->bindTexture(0, 0, LLTexUnit::TFO_BILINEAR);
                 gGL.getTexUnit(0)->setTextureColorSpace(LLTexUnit::TCS_LINEAR);
 
                 bound_shader->bind();
