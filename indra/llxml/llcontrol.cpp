@@ -315,7 +315,10 @@ void LLControlVariable::resetToDefault(bool fire_signal)
 		mValues.pop_back();
 	}
 	
-	if(fire_signal) 
+	// don't fire if the value didn't actually change
+	LLSD previous_value = getComparableValue(getValue());
+	bool value_changed = (llsd_compare(originalValue, previous_value) == FALSE);
+	if(fire_signal && value_changed)
 	{
 		firePropertyChanged(originalValue);
 	}
