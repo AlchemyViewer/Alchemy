@@ -8990,6 +8990,12 @@ void LLPipeline::renderDeferredLighting(LLRenderTarget *screen_target)
             LL_RECORD_BLOCK_TIME(FTM_ATMOSPHERICS);
             bindDeferredShader(soften_shader);
 
+			S32 channel = soften_shader.enableTexture(LLShaderMgr::DEFERRED_DIFFUSE, mDeferredScreen.getUsage());
+            if (channel > -1)
+            {
+                gGL.getTexUnit(channel)->setTextureColorSpace(LLTexUnit::TCS_SRGB);
+            }
+
             LLEnvironment &environment = LLEnvironment::instance();
             soften_shader.uniform1i(LLShaderMgr::SUN_UP_FACTOR, environment.getIsSunUp() ? 1 : 0);
             soften_shader.uniform4fv(LLShaderMgr::LIGHTNORM, 1, environment.getClampedLightNorm().mV);
@@ -9015,6 +9021,10 @@ void LLPipeline::renderDeferredLighting(LLRenderTarget *screen_target)
                 gGL.popMatrix();
             }
 
+			if (channel > -1)
+            {
+                gGL.getTexUnit(channel)->setTextureColorSpace(LLTexUnit::TCS_LINEAR);
+            }
             unbindDeferredShader(LLPipeline::sUnderWaterRender ? gDeferredSoftenWaterProgram : gDeferredSoftenProgram);
         }
 
@@ -9530,6 +9540,7 @@ void LLPipeline::setupSpotLight(LLGLSLShader& shader, LLDrawable* drawablep)
 		if (img)
 		{
 			gGL.getTexUnit(channel)->bind(img);
+            gGL.getTexUnit(channel)->setTextureColorSpace(LLTexUnit::TCS_LINEAR);
 
 			F32 lod_range = logf(img->getWidth())/logf(2.f);
 

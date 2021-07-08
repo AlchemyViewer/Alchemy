@@ -55,7 +55,6 @@ uniform vec4 viewport;
 
 vec3 getNorm(vec2 pos_screen);
 vec4 getPosition(vec2 pos_screen);
-vec3 srgb_to_linear(vec3 c);
 
 void main() 
 {
