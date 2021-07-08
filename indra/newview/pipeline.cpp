@@ -8361,7 +8361,7 @@ void LLPipeline::renderFinalize()
 				LLRenderTarget* previous_target = bound_target;
 
 				// Bind setup:
-                bound_target = &mFXAABuffer;
+                bound_target = &mScreen;
                 bound_shader = &gPostCASProgram;
 
 				// Draw

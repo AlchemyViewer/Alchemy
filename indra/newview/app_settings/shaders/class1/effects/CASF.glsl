@@ -107,6 +107,6 @@ void main()
     vec3 window = (b + d) + (f + h);
     vec3 outColor = clamp((window * wRGB + e) * rcpWeightRGB,0,1);
 
-    frag_color = vec4(outColor,alpha);
+    frag_color = vec4(linear_to_srgb(outColor),alpha);
 }
 
