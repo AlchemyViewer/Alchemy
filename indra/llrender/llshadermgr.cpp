@@ -727,6 +727,7 @@ GLuint LLShaderMgr::loadShaderFile(const std::string& filename, S32 & shader_lev
         {
             //set version to 400
 			shader_code_text[shader_code_count++] = strdup("#version 400\n");
+			extra_code_text[extra_code_count++] = strdup("#define FXAA_GLSL_400 1\n");
         }
         else if (major_version == 3)
         {
@@ -746,6 +747,7 @@ GLuint LLShaderMgr::loadShaderFile(const std::string& filename, S32 & shader_lev
             {
                 shader_code_text[shader_code_count++] = strdup("#version 330\n");
             }
+			extra_code_text[extra_code_count++] = strdup("#define FXAA_GLSL_130 1\n");
         }
 		else
 		{
@@ -754,10 +756,10 @@ GLuint LLShaderMgr::loadShaderFile(const std::string& filename, S32 & shader_lev
 			//some implementations of GLSL 1.30 require integer precision be explicitly declared
 			extra_code_text[extra_code_count++] = strdup("precision mediump int;\n");
 			extra_code_text[extra_code_count++] = strdup("precision highp float;\n");
+			extra_code_text[extra_code_count++] = strdup("#define FXAA_GLSL_130 1\n");
 		}
 
 		extra_code_text[extra_code_count++] = strdup("#define DEFINE_GL_FRAGCOLOR 1\n");
-		extra_code_text[extra_code_count++] = strdup("#define FXAA_GLSL_130 1\n");
 
 		extra_code_text[extra_code_count++] = strdup("#define ATTRIBUTE in\n");
 
