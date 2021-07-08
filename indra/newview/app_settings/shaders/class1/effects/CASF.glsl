@@ -39,9 +39,6 @@ uniform float sharpness;
 
 vec3 linear_to_srgb(vec3 cl);
 
-#define textureLod0Offset(img, coord, offset) textureLodOffset(img, coord, 0.0f, offset)
-#define textureLod0(img, coord) textureLod(img, coord, 0.0f)
-
 void main()
 {
     // LICENSE
@@ -65,18 +62,18 @@ void main()
     //  a b c
     //  d(e)f
     //  g h i
-    vec4 inputColor = textureLod0(tex0,vary_texcoord0);
+    vec4 inputColor = texture2DLod(tex0, vary_texcoord0, 0.0f);
     float alpha = inputColor.a;
 
-    vec3 a = textureLod0Offset(tex0, vary_texcoord0, ivec2(-1,-1)).rgb;
-    vec3 b = textureLod0Offset(tex0, vary_texcoord0, ivec2( 0,-1)).rgb;
-    vec3 c = textureLod0Offset(tex0, vary_texcoord0, ivec2( 1,-1)).rgb;
-    vec3 d = textureLod0Offset(tex0, vary_texcoord0, ivec2(-1, 0)).rgb;
+    vec3 a = texture2DLodOffset(tex0, vary_texcoord0, 0.0f, ivec2(-1,-1)).rgb;
+    vec3 b = texture2DLodOffset(tex0, vary_texcoord0, 0.0f, ivec2( 0,-1)).rgb;
+    vec3 c = texture2DLodOffset(tex0, vary_texcoord0, 0.0f, ivec2( 1,-1)).rgb;
+    vec3 d = texture2DLodOffset(tex0, vary_texcoord0, 0.0f, ivec2(-1, 0)).rgb;
     vec3 e = inputColor.rgb;
-    vec3 f = textureLod0Offset(tex0, vary_texcoord0, ivec2( 1, 0)).rgb;
-    vec3 g = textureLod0Offset(tex0, vary_texcoord0, ivec2(-1, 1)).rgb;
-    vec3 h = textureLod0Offset(tex0, vary_texcoord0, ivec2( 0, 1)).rgb;
-    vec3 i = textureLod0Offset(tex0, vary_texcoord0, ivec2( 1, 1)).rgb;
+    vec3 f = texture2DLodOffset(tex0, vary_texcoord0, 0.0f, ivec2( 1, 0)).rgb;
+    vec3 g = texture2DLodOffset(tex0, vary_texcoord0, 0.0f, ivec2(-1, 1)).rgb;
+    vec3 h = texture2DLodOffset(tex0, vary_texcoord0, 0.0f, ivec2( 0, 1)).rgb;
+    vec3 i = texture2DLodOffset(tex0, vary_texcoord0, 0.0f, ivec2( 1, 1)).rgb;
 
     // Soft min and max.
     //  a b c             b
