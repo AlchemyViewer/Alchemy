@@ -907,10 +907,6 @@ bool LLPipeline::allocateScreenBuffer(U32 resX, U32 resY, U32 samples)
 {
 	refreshCachedSettings();
 
-	// remember these dimensions
-	mScreenWidth = resX;
-	mScreenHeight = resY;
-	
 	U32 res_mod = RenderResolutionDivisor;
 
 	if (res_mod > 1 && res_mod < resX && res_mod < resY)
@@ -925,6 +921,10 @@ bool LLPipeline::allocateScreenBuffer(U32 resX, U32 resY, U32 samples)
 		resY *= RenderResolutionMultiplier;
 	}
 // [/SL:KB]
+
+	// remember these dimensions
+    mScreenWidth  = resX;
+    mScreenHeight = resY;
 
 	if (RenderUIBuffer)
 	{
@@ -1366,8 +1366,6 @@ void LLPipeline::createGLBuffers()
     }
 
     allocateScreenBuffer(resX, resY);
-    mScreenWidth = 0;
-    mScreenHeight = 0;
 
     if (sRenderDeferred)
     {
