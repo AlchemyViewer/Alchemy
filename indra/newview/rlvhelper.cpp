@@ -1404,10 +1404,9 @@ bool RlvForceWear::isForceDetachable(const LLViewerObject* pAttachObj, bool fChe
 bool RlvForceWear::isForceDetachable(const LLViewerJointAttachment* pAttachPt, bool fCheckComposite /*=true*/, const LLUUID& idExcept /*=LLUUID::null*/)
 {
 	// Attachment point can be detached by an RLV command if there's at least one attachment that can be removed
-	for (LLViewerJointAttachment::attachedobjs_vec_t::const_iterator itAttachObj = pAttachPt->mAttachedObjects.begin();
-			itAttachObj != pAttachPt->mAttachedObjects.end(); ++itAttachObj)
-	{
-		if (isForceDetachable(*itAttachObj, fCheckComposite, idExcept))
+    for (LLViewerObject* pAttachObj : pAttachPt->mAttachedObjects)
+    {
+        if (isForceDetachable(pAttachObj, fCheckComposite, idExcept))
 			return true;
 	}
 	return false;
@@ -1442,10 +1441,9 @@ void RlvForceWear::forceDetach(const LLViewerObject* pAttachObj)
 // Checked: 2010-03-19 (RLVa-1.2.0a) | Added: RLVa-1.2.0a
 void RlvForceWear::forceDetach(const LLViewerJointAttachment* pAttachPt)
 {
-	for (LLViewerJointAttachment::attachedobjs_vec_t::const_iterator itAttachObj = pAttachPt->mAttachedObjects.begin();
-			itAttachObj != pAttachPt->mAttachedObjects.end(); ++itAttachObj)
-	{
-		forceDetach(*itAttachObj);
+    for (LLViewerObject* pAttachObj : pAttachPt->mAttachedObjects)
+    {
+        forceDetach(pAttachObj);
 	}
 }
 

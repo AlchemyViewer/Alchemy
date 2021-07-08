@@ -6715,11 +6715,9 @@ void LLObjectBridge::buildContextMenu(LLMenuGL& menu, U32 flags)
 					&& (attach_hud_menu->getChildCount() == 0)
 					&& isAgentAvatarValid())
 				{
-					for (LLVOAvatar::attachment_map_t::iterator iter = gAgentAvatarp->mAttachmentPoints.begin();
-						 iter != gAgentAvatarp->mAttachmentPoints.end(); )
+					for (const auto& attach_pair : gAgentAvatarp->mAttachmentPoints)
 					{
-						LLVOAvatar::attachment_map_t::iterator curiter = iter++;
-						LLViewerJointAttachment* attachment = curiter->second;
+                        LLViewerJointAttachment* attachment = attach_pair.second;
 						LLMenuItemCallGL::Params p;
 						std::string submenu_name = attachment->getName();
 						if (LLTrans::getString(submenu_name) != "")
@@ -6731,7 +6729,7 @@ void LLObjectBridge::buildContextMenu(LLMenuGL& menu, U32 flags)
 							p.name = submenu_name;
 						}
 						LLSD cbparams;
-						cbparams["index"] = curiter->first;
+						cbparams["index"] = attach_pair.first;
 						cbparams["label"] = p.name;
 						p.on_click.function_name = "Inventory.AttachObject";
 						p.on_click.parameter = LLSD(attachment->getName());

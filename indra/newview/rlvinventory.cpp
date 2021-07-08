@@ -174,16 +174,13 @@ void RlvInventory::fetchWornItems()
 	// Fetch all currently worn attachments
 	if (isAgentAvatarValid())
 	{
-		for (LLVOAvatar::attachment_map_t::const_iterator itAttachPt = gAgentAvatarp->mAttachmentPoints.begin(); 
-				itAttachPt != gAgentAvatarp->mAttachmentPoints.end(); ++itAttachPt)
+		for (const auto& attach_pair : gAgentAvatarp->mAttachmentPoints)
 		{
-			const LLViewerJointAttachment* pAttachPt = itAttachPt->second;
+            const LLViewerJointAttachment* pAttachPt = attach_pair.second;
 			if (pAttachPt)
 			{
-				for (LLViewerJointAttachment::attachedobjs_vec_t::const_iterator itAttachObj = pAttachPt->mAttachedObjects.begin();
-					 itAttachObj != pAttachPt->mAttachedObjects.end(); ++itAttachObj)
-				{
-					const LLViewerObject* pAttachObj = (*itAttachObj);
+                for (const LLViewerObject* pAttachObj : pAttachPt->mAttachedObjects)
+                {
 					if ( (pAttachObj) && (pAttachObj->getAttachmentItemID().notNull()) )
 						idItems.push_back(pAttachObj->getAttachmentItemID());
 				}

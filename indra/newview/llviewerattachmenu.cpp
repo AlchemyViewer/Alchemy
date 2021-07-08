@@ -58,11 +58,9 @@ void LLViewerAttachMenu::populateMenus(const std::string& attach_to_menu_name, c
 	}
 
 	// Populate "Attach to..." / "Attach to HUD..." submenus.
-	for (LLVOAvatar::attachment_map_t::iterator iter = gAgentAvatarp->mAttachmentPoints.begin();
-		 iter != gAgentAvatarp->mAttachmentPoints.end(); )
+	for (const auto& attach_pair : gAgentAvatarp->mAttachmentPoints)
 	{
-		LLVOAvatar::attachment_map_t::iterator curiter = iter++;
-		LLViewerJointAttachment* attachment = curiter->second;
+        LLViewerJointAttachment* attachment = attach_pair.second;
 		LLMenuItemCallGL::Params p;
 		std::string submenu_name = attachment->getName();
 		std::string translated_submenu_name;
@@ -77,7 +75,7 @@ void LLViewerAttachMenu::populateMenus(const std::string& attach_to_menu_name, c
 		}
 
 		LLSD cbparams;
-		cbparams["index"] = curiter->first;
+		cbparams["index"] = attach_pair.first;
 		cbparams["label"] = p.name;
 		p.on_click.function_name = "Object.Attach";
 		p.on_click.parameter = LLSD(attachment->getName());
@@ -94,11 +92,9 @@ void LLViewerAttachMenu::populateMenus(const std::string& attach_to_menu_name, c
 void LLViewerAttachMenu::attachObjects(const uuid_vec_t& items, const std::string& joint_name)
 {
 	LLViewerJointAttachment* attachmentp = NULL;
-	for (LLVOAvatar::attachment_map_t::iterator iter = gAgentAvatarp->mAttachmentPoints.begin(); 
-		 iter != gAgentAvatarp->mAttachmentPoints.end(); )
-	{
-		LLVOAvatar::attachment_map_t::iterator curiter = iter++;
-		LLViewerJointAttachment* attachment = curiter->second;
+    for (const auto& attach_pair : gAgentAvatarp->mAttachmentPoints)
+    {
+        LLViewerJointAttachment* attachment = attach_pair.second;
 		if (attachment->getName() == joint_name)
 		{
 			attachmentp = attachment;
@@ -110,9 +106,8 @@ void LLViewerAttachMenu::attachObjects(const uuid_vec_t& items, const std::strin
 		return;
 	}
 
-	for (uuid_vec_t::const_iterator it = items.begin(); it != items.end(); ++it)
+	for (const LLUUID& id : items)
 	{
-		const LLUUID &id = *it;
 		LLViewerInventoryItem* item = (LLViewerInventoryItem*)gInventory.getLinkedItem(id);
 		if(item && gInventory.isObjectDescendentOf(id, gInventory.getRootFolderID()))
 		{

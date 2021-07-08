@@ -7134,12 +7134,9 @@ class LLAttachmentDetachFromPoint : public view_listener_t
 		if ( (attachment->getNumObjects() > 0) && ((!rlv_handler_t::isEnabled()) || (gRlvAttachmentLocks.canDetach(attachment))) )
 // [/RLVa:KB]
 		{
-			for (LLViewerJointAttachment::attachedobjs_vec_t::const_iterator iter = attachment->mAttachedObjects.begin();
-				 iter != attachment->mAttachedObjects.end();
-				 iter++)
-			{
-				LLViewerObject *attached_object = iter->get();
-// [RLVa:KB] - Checked: 2010-03-04 (RLVa-1.2.0a) | Added: RLVa-1.2.0a
+            for (LLViewerObject* attached_object : attachment->mAttachedObjects)
+            {
+                // [RLVa:KB] - Checked: 2010-03-04 (RLVa-1.2.0a) | Added: RLVa-1.2.0a
 				if ( (rlv_handler_t::isEnabled()) && (gRlvAttachmentLocks.isLockedAttachment(attached_object)) )
 					continue;
 				ids_to_remove.push_back(attached_object->getAttachmentItemID());
@@ -7168,11 +7165,8 @@ static bool onEnableAttachmentLabel(LLUICtrl* ctrl, const LLSD& data)
 		if (attachment)
 		{
 			label = data["label"].asString();
-			for (LLViewerJointAttachment::attachedobjs_vec_t::const_iterator attachment_iter = attachment->mAttachedObjects.begin();
-				 attachment_iter != attachment->mAttachedObjects.end();
-				 ++attachment_iter)
-			{
-				const LLViewerObject* attached_object = attachment_iter->get();
+            for (const LLViewerObject* attached_object : attachment->mAttachedObjects)
+            {
 				if (attached_object)
 				{
 					LLViewerInventoryItem* itemp = gInventory.getItem(attached_object->getAttachmentItemID());
@@ -7299,20 +7293,18 @@ class LLAttachmentEnableDrop : public view_listener_t
 
 			if (attachment)
 			{
-				for (LLViewerJointAttachment::attachedobjs_vec_t::iterator attachment_iter = attachment->mAttachedObjects.begin();
-					 attachment_iter != attachment->mAttachedObjects.end();
-					 ++attachment_iter)
-				{
+                for (LLViewerObject* attached_object : attachment->mAttachedObjects)
+                {
 					// make sure item is in your inventory (it could be a delayed attach message being sent from the sim)
 					// so check to see if the item is in the inventory already
-					item = gInventory.getItem(attachment_iter->get()->getAttachmentItemID());
+                    item = gInventory.getItem(attached_object->getAttachmentItemID());
 					if (!item)
 					{
 						// Item does not exist, make an observer to enable the pie menu 
 						// when the item finishes fetching worst case scenario 
 						// if a fetch is already out there (being sent from a slow sim)
 						// we refetch and there are 2 fetches
-						LLWornItemFetchedObserver* worn_item_fetched = new LLWornItemFetchedObserver((*attachment_iter)->getAttachmentItemID());		
+						LLWornItemFetchedObserver* worn_item_fetched = new LLWornItemFetchedObserver(attached_object->getAttachmentItemID());		
 						worn_item_fetched->startFetch();
 						gInventory.addObserver(worn_item_fetched);
 					}
@@ -7784,17 +7776,12 @@ void handle_dump_attachments(void*)
 {
 	if(!isAgentAvatarValid()) return;
 
-	for (LLVOAvatar::attachment_map_t::iterator iter = gAgentAvatarp->mAttachmentPoints.begin(); 
-		 iter != gAgentAvatarp->mAttachmentPoints.end(); )
+	for (const auto& attach_pair : gAgentAvatarp->mAttachmentPoints)
 	{
-		LLVOAvatar::attachment_map_t::iterator curiter = iter++;
-		LLViewerJointAttachment* attachment = curiter->second;
-		S32 key = curiter->first;
-		for (LLViewerJointAttachment::attachedobjs_vec_t::iterator attachment_iter = attachment->mAttachedObjects.begin();
-			 attachment_iter != attachment->mAttachedObjects.end();
-			 ++attachment_iter)
+        LLViewerJointAttachment* attachment = attach_pair.second;
+		S32 key = attach_pair.first;
+        for (LLViewerObject * attached_object : attachment->mAttachedObjects)
 		{
-			LLViewerObject *attached_object = attachment_iter->get();
 			BOOL visible = (attached_object != NULL &&
 							attached_object->mDrawable.notNull() && 
 							!attached_object->mDrawable->isRenderType(0));

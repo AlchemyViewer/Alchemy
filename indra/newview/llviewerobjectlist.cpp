@@ -1958,25 +1958,19 @@ void LLViewerObjectList::generatePickList(LLCamera &camera)
 		// add all hud objects to pick list
 		if (isAgentAvatarValid())
 		{
-			for (LLVOAvatar::attachment_map_t::iterator iter = gAgentAvatarp->mAttachmentPoints.begin(); 
-				 iter != gAgentAvatarp->mAttachmentPoints.end(); )
+			for (const auto& attach_pair : gAgentAvatarp->mAttachmentPoints)
 			{
-				LLVOAvatar::attachment_map_t::iterator curiter = iter++;
-				LLViewerJointAttachment* attachment = curiter->second;
+                LLViewerJointAttachment* attachment = attach_pair.second;
 				if (attachment->getIsHUDAttachment())
 				{
-					for (LLViewerJointAttachment::attachedobjs_vec_t::iterator attachment_iter = attachment->mAttachedObjects.begin();
-						 attachment_iter != attachment->mAttachedObjects.end();
-						 ++attachment_iter)
+                    for (LLViewerObject * attached_object : attachment->mAttachedObjects)
 					{
-						if (LLViewerObject* attached_object = attachment_iter->get())
+						if (attached_object)
 						{
 							mSelectPickList.insert(attached_object);
 							LLViewerObject::const_child_list_t& child_list = attached_object->getChildren();
-							for (LLViewerObject::child_list_t::const_iterator iter = child_list.begin();
-								 iter != child_list.end(); iter++)
+                            for (LLViewerObject* childp : child_list)
 							{
-								LLViewerObject* childp = *iter;
 								if (childp)
 								{
 									mSelectPickList.insert(childp);

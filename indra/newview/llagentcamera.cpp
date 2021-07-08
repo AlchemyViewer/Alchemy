@@ -1588,16 +1588,11 @@ void LLAgentCamera::updateCamera()
 
 		gAgentAvatarp->mRoot->updateWorldMatrixChildren();
 
-		for (LLVOAvatar::attachment_map_t::iterator iter = gAgentAvatarp->mAttachmentPoints.begin(); 
-			 iter != gAgentAvatarp->mAttachmentPoints.end(); )
+		for (auto& attach_point_pair : gAgentAvatarp->mAttachmentPoints)
 		{
-			LLVOAvatar::attachment_map_t::iterator curiter = iter++;
-			LLViewerJointAttachment* attachment = curiter->second;
-			for (LLViewerJointAttachment::attachedobjs_vec_t::iterator attachment_iter = attachment->mAttachedObjects.begin();
-				 attachment_iter != attachment->mAttachedObjects.end();
-				 ++attachment_iter)
+            LLViewerJointAttachment* attachment = attach_point_pair.second;
+            for (LLViewerObject* attached_object : attachment->mAttachedObjects)
 			{
-				LLViewerObject *attached_object = attachment_iter->get();
 				if (attached_object && !attached_object->isDead() && attached_object->mDrawable.notNull())
 				{
 					// clear any existing "early" movements of attachment

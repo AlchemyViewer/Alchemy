@@ -494,16 +494,12 @@ void LLSidepanelAppearance::fetchInventory()
 
 	if (isAgentAvatarValid())
 	{
-		for (LLVOAvatar::attachment_map_t::const_iterator iter = gAgentAvatarp->mAttachmentPoints.begin(); 
-			 iter != gAgentAvatarp->mAttachmentPoints.end(); ++iter)
+		for (const auto& attach_pair : gAgentAvatarp->mAttachmentPoints)
 		{
-			LLViewerJointAttachment* attachment = iter->second;
+            LLViewerJointAttachment* attachment = attach_pair.second;
 			if (!attachment) continue;
-			for (LLViewerJointAttachment::attachedobjs_vec_t::iterator attachment_iter = attachment->mAttachedObjects.begin();
-				 attachment_iter != attachment->mAttachedObjects.end();
-				 ++attachment_iter)
-			{
-				LLViewerObject* attached_object = attachment_iter->get();
+            for (LLViewerObject* attached_object : attachment->mAttachedObjects)
+            {
 				if (!attached_object) continue;
 				const LLUUID& item_id = attached_object->getAttachmentItemID();
 				if (item_id.isNull()) continue;

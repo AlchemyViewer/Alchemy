@@ -1346,16 +1346,11 @@ void LLAgentWearables::findAttachmentsAddRemoveInfo(LLInventoryModel::item_array
 	}
 
 	// Build up list of objects to be removed and items currently attached.
-	for (LLVOAvatar::attachment_map_t::iterator iter = gAgentAvatarp->mAttachmentPoints.begin(); 
-		 iter != gAgentAvatarp->mAttachmentPoints.end();)
+	for (const auto& attach_pair : gAgentAvatarp->mAttachmentPoints)
 	{
-		LLVOAvatar::attachment_map_t::iterator curiter = iter++;
-		LLViewerJointAttachment* attachment = curiter->second;
-		for (LLViewerJointAttachment::attachedobjs_vec_t::iterator attachment_iter = attachment->mAttachedObjects.begin();
-			 attachment_iter != attachment->mAttachedObjects.end();
-			 ++attachment_iter)
+        LLViewerJointAttachment* attachment = attach_pair.second;
+        for (LLViewerObject* objectp : attachment->mAttachedObjects)
 		{
-			LLViewerObject *objectp = attachment_iter->get();
 			if (objectp)
 			{
 				LLUUID object_item_id = objectp->getAttachmentItemID();
