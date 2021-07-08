@@ -8199,11 +8199,13 @@ void LLPipeline::renderFinalize()
                     {
                         mFXAABuffer.bindTexture(0, 0, LLTexUnit::TFO_BILINEAR);
                         gGL.getTexUnit(0)->setTextureColorSpace(LLTexUnit::TCS_LINEAR);
+                        gGL.getTexUnit(0)->setTextureAddressMode(LLTexUnit::TAM_CLAMP);
                     }
                     else
                     {
                         gGL.getTexUnit(0)->bindManual(LLTexUnit::TT_TEXTURE, mSampleMap);
                         gGL.getTexUnit(0)->setTextureFilteringOption(LLTexUnit::TFO_BILINEAR);
+                        gGL.getTexUnit(0)->setTextureAddressMode(LLTexUnit::TAM_CLAMP);
                     }
 
                     bound_shader->bind();
@@ -8230,10 +8232,13 @@ void LLPipeline::renderFinalize()
                     bound_shader = &gPostSMAABlendWeights[fsaa_quality];
 
                     mSMAAEdgeBuffer.bindTexture(0, 0, LLTexUnit::TFO_BILINEAR);
+                    gGL.getTexUnit(0)->setTextureAddressMode(LLTexUnit::TAM_CLAMP);
                     gGL.getTexUnit(1)->bindManual(LLTexUnit::TT_TEXTURE, mAreaMap);
                     gGL.getTexUnit(1)->setTextureFilteringOption(LLTexUnit::TFO_BILINEAR);
+                    gGL.getTexUnit(1)->setTextureAddressMode(LLTexUnit::TAM_CLAMP);
 					gGL.getTexUnit(2)->bindManual(LLTexUnit::TT_TEXTURE, mSearchMap);
                     gGL.getTexUnit(2)->setTextureFilteringOption(LLTexUnit::TFO_BILINEAR);
+                    gGL.getTexUnit(2)->setTextureAddressMode(LLTexUnit::TAM_CLAMP);
 
                     bound_shader->bind();
                     bound_shader->uniform4fv(sSmaaRTMetrics, 1, rt_metrics);
@@ -8266,6 +8271,7 @@ void LLPipeline::renderFinalize()
                     bound_shader = &gPostSMAANeighborhoodBlend[fsaa_quality];
 
                     mFXAABuffer.bindTexture(0, 0, LLTexUnit::TFO_BILINEAR);
+                    gGL.getTexUnit(0)->setTextureAddressMode(LLTexUnit::TAM_CLAMP);
                     gGL.getTexUnit(0)->setTextureColorSpace(LLTexUnit::TCS_LINEAR);
 
                     mSMAABlendBuffer.bindTexture(0, 1, LLTexUnit::TFO_BILINEAR);
