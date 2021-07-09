@@ -715,7 +715,14 @@ GLuint LLShaderMgr::loadShaderFile(const std::string& filename, S32 & shader_lev
 			//set version to 1.20
 			shader_code_text[shader_code_count++] = strdup("#version 120\n");
        		extra_code_text[extra_code_count++] = strdup("#define FXAA_GLSL_120 1\n");
-			extra_code_text[extra_code_count++] = strdup("#define FXAA_FAST_PIXEL_OFFSET 0\n");
+            if (gGLManager.mHasGPUShader4) 
+			{
+                extra_code_text[extra_code_count++] = strdup("#define FXAA_FAST_PIXEL_OFFSET 1\n");
+			}
+            else
+            {
+                extra_code_text[extra_code_count++] = strdup("#define FXAA_FAST_PIXEL_OFFSET 0\n");
+            }
 			extra_code_text[extra_code_count++] = strdup("#define ATTRIBUTE attribute\n");
 			extra_code_text[extra_code_count++] = strdup("#define VARYING varying\n");
 			extra_code_text[extra_code_count++] = strdup("#define VARYING_FLAT varying\n");
