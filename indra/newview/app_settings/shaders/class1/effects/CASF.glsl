@@ -23,6 +23,9 @@
  * $/LicenseInfo$
  */
 
+#extension GL_ARB_shader_texture_lod : enable
+#extension GL_EXT_gpu_shader4 : enable
+
 /*[EXTRA_CODE_HERE]*/
 
 #ifdef DEFINE_GL_FRAGCOLOR
