@@ -4945,7 +4945,7 @@ void LLSelectMgr::packAgentAndSessionAndGroupID(void* user_data)
 // static
 void LLSelectMgr::packDuplicateHeader(void* data)
 {
-	LLUUID group_id(gAgent.getGroupID());
+	LLUUID group_id(gAgent.getGroupForRezzing());
 	packAgentAndSessionAndGroupID(&group_id);
 
 	LLDuplicateData* dup_data = (LLDuplicateData*) data;
