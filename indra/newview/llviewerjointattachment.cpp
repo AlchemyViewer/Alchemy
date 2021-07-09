@@ -251,15 +251,17 @@ BOOL LLViewerJointAttachment::addObject(LLViewerObject* object)
 //-----------------------------------------------------------------------------
 void LLViewerJointAttachment::removeObject(LLViewerObject *object)
 {
-	attachedobjs_vec_t::iterator iter;
-    for (LLViewerObject* attached_object : mAttachedObjects)
+	attachedobjs_vec_t::iterator iter, end;
+    end = mAttachedObjects.end();
+    for (iter = mAttachedObjects.begin(); iter != end; ++iter)
     {
+        LLViewerObject* attached_object = iter->get();
 		if (attached_object == object)
 		{
 			break;
 		}
 	}
-	if (iter == mAttachedObjects.end())
+    if (iter == end)
 	{
 		LL_WARNS() << "Could not find object to detach" << LL_ENDL;
 		return;
