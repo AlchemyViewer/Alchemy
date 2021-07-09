@@ -73,7 +73,7 @@ public:
 	//allocate resources for rendering
 	//must be called before use
 	//multiple calls will release previously allocated resources
-	bool allocate(U32 resx, U32 resy, U32 color_fmt, bool depth, bool stencil, LLTexUnit::eTextureType usage = LLTexUnit::TT_TEXTURE, bool use_fbo = false, S32 samples = 0);
+	bool allocate(U32 resx, U32 resy, U32 color_fmt, bool depth, bool stencil, LLTexUnit::eTextureType usage = LLTexUnit::TT_TEXTURE, bool use_fbo = false, S32 samples = 0, U32 pix_format = GL_RGBA, U32 pix_type = GL_UNSIGNED_BYTE);
 
 	//resize existing attachments to use new resolution and color format
 	// CAUTION: if the GL runs out of memory attempting to resize, this render target will be undefined
@@ -83,7 +83,7 @@ public:
 
 	//add color buffer attachment
 	//limit of 4 color attachments per render target
-	bool addColorAttachment(U32 color_fmt);
+	bool addColorAttachment(U32 color_fmt, U32 pix_format = GL_RGBA, U32 pix_type = GL_UNSIGNED_BYTE);
 
 	//allocate a depth texture
 	bool allocateDepth();
@@ -147,7 +147,7 @@ protected:
 	U32 mResX;
 	U32 mResY;
 	std::vector<U32> mTex;
-	std::vector<U32> mInternalFormat;
+	std::vector<std::tuple<U32, U32, U32> > mInternalFormat;
 	U32 mFBO;
 	U32 mPreviousFBO;
 	U32 mPreviousResX;

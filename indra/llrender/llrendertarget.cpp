@@ -43,7 +43,7 @@ void check_framebuffer_status()
 		case GL_FRAMEBUFFER_COMPLETE:
 			break;
 		default:
-			LL_WARNS() << "check_framebuffer_status failed -- " << std::hex << status << LL_ENDL;
+			LL_WARNS() << "check_framebuffer_status failed -- " << std::hex << status << std::dec << LL_ENDL;
 			ll_fail("check_framebuffer_status failed");	
 			break;
 		}
@@ -92,7 +92,9 @@ void LLRenderTarget::resize(U32 resx, U32 resy)
 	for (U32 i = 0; i < mTex.size(); ++i)
 	{ //resize color attachments
 		gGL.getTexUnit(0)->bindManual(mUsage, mTex[i]);
-		LLImageGL::setManualImage(LLTexUnit::getInternalType(mUsage), 0, mInternalFormat[i], mResX, mResY, GL_RGBA, GL_UNSIGNED_BYTE, NULL, false);
+		const auto& internal_format = mInternalFormat[i];
+		LLImageGL::setManualImage(LLTexUnit::getInternalType(mUsage), 0, std::get<0>(internal_format), mResX, mResY, 
+			std::get<1>(internal_format), std::get<2>(internal_format), nullptr, false);
 		sBytesAllocated += pix_diff*4;
 	}
 
@@ -109,7 +111,7 @@ void LLRenderTarget::resize(U32 resx, U32 resy)
 		{
 			gGL.getTexUnit(0)->bindManual(mUsage, mDepth);
 			U32 internal_type = LLTexUnit::getInternalType(mUsage);
-			LLImageGL::setManualImage(internal_type, 0, GL_DEPTH_COMPONENT24, mResX, mResY, GL_DEPTH_COMPONENT, GL_UNSIGNED_INT, NULL, false);
+			LLImageGL::setManualImage(internal_type, 0, GL_DEPTH_COMPONENT24, mResX, mResY, GL_DEPTH_COMPONENT, GL_UNSIGNED_INT, nullptr, false);
 		}
 
 		sBytesAllocated += pix_diff*4;
@@ -117,7 +119,7 @@ void LLRenderTarget::resize(U32 resx, U32 resy)
 }
 	
 
-bool LLRenderTarget::allocate(U32 resx, U32 resy, U32 color_fmt, bool depth, bool stencil, LLTexUnit::eTextureType usage, bool use_fbo, S32 samples)
+bool LLRenderTarget::allocate(U32 resx, U32 resy, U32 color_fmt, bool depth, bool stencil, LLTexUnit::eTextureType usage, bool use_fbo, S32 samples, U32 pix_format, U32 pix_type)
 {
 	resx = llmin(resx, (U32) gGLManager.mGLMaxTextureSize);
 	resy = llmin(resy, (U32) gGLManager.mGLMaxTextureSize);
@@ -167,10 +169,10 @@ bool LLRenderTarget::allocate(U32 resx, U32 resy, U32 color_fmt, bool depth, boo
 		stop_glerror();
 	}
 
-	return addColorAttachment(color_fmt);
+	return addColorAttachment(color_fmt, pix_format, pix_type);
 }
 
-bool LLRenderTarget::addColorAttachment(U32 color_fmt)
+bool LLRenderTarget::addColorAttachment(U32 color_fmt, U32 pix_format, U32 pix_type)
 {
 	if (color_fmt == 0)
 	{
@@ -202,10 +204,10 @@ bool LLRenderTarget::addColorAttachment(U32 color_fmt)
 
 	{
 		clear_glerror();
-		LLImageGL::setManualImage(LLTexUnit::getInternalType(mUsage), 0, color_fmt, mResX, mResY, GL_RGBA, GL_UNSIGNED_BYTE, NULL, false);
+		LLImageGL::setManualImage(LLTexUnit::getInternalType(mUsage), 0, color_fmt, mResX, mResY, pix_format, pix_type, nullptr, false);
 		if (glGetError() != GL_NO_ERROR)
 		{
-			LL_WARNS() << "Could not allocate color buffer for render target." << LL_ENDL;
+			LL_WARNS() << "Could not allocate color buffer for render target." << "format:" << color_fmt << " pixformat:" << pix_format << " pixtype:" << pix_type << LL_ENDL;
 			return false;
 		}
 	}
@@ -252,7 +254,7 @@ bool LLRenderTarget::addColorAttachment(U32 color_fmt)
 	}
 
 	mTex.push_back(tex);
-	mInternalFormat.push_back(color_fmt);
+	mInternalFormat.emplace_back(color_fmt, pix_format, pix_type);
 
 #if !LL_DARWIN
 	if (gDebugGL)
@@ -290,13 +292,13 @@ bool LLRenderTarget::allocateDepth()
 		gGL.getTexUnit(0)->setTextureFilteringOption(LLTexUnit::TFO_POINT);
 	}
 
-	sBytesAllocated += mResX*mResY*4;
-
 	if (glGetError() != GL_NO_ERROR)
 	{
 		LL_WARNS() << "Unable to allocate depth buffer for render target." << LL_ENDL;
 		return false;
 	}
+
+	sBytesAllocated += mResX*mResY*4;
 
 	return true;
 }
@@ -490,22 +492,6 @@ U32 LLRenderTarget::getNumTextures() const
 void LLRenderTarget::bindTexture(U32 index, S32 channel, LLTexUnit::eTextureFilterOptions filter_options, LLTexUnit::eTextureColorSpace color_space)
 {
     gGL.getTexUnit(channel)->bindManual(mUsage, getTexture(index));
-
-    bool isSRGB = false;
-    llassert(mInternalFormat.size() > index);
-    switch (mInternalFormat[index])
-    {
-        case GL_SRGB:
-        case GL_SRGB8:
-        case GL_SRGB_ALPHA:
-        case GL_SRGB8_ALPHA8:
-            isSRGB = true;
-            break;
-
-        default:
-            break;
-    }
-
     gGL.getTexUnit(channel)->setTextureFilteringOption(filter_options);
     gGL.getTexUnit(channel)->setTextureColorSpace(color_space);
 }
@@ -517,6 +503,7 @@ void LLRenderTarget::flush(bool fetch_depth)
 	{
 		gGL.getTexUnit(0)->bind(this);
 		glCopyTexSubImage2D(LLTexUnit::getInternalType(mUsage), 0, 0, 0, 0, 0, mResX, mResY);
+		stop_glerror();
 
 		if (fetch_depth)
 		{
