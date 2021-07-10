@@ -36,6 +36,8 @@
 #include <set>
 #include "lluiimage.h"
 
+#include "absl/container/flat_hash_map.h"
+
 const U32 LL_IMAGE_REZ_LOSSLESS_CUTOFF = 128;
 
 const BOOL MIPMAP_YES = TRUE;
@@ -83,6 +85,17 @@ struct LLTextureKey
             return key1.textureType < key2.textureType;
         }
     }
+
+	friend bool operator==(const LLTextureKey& lhs, const LLTextureKey& rhs)
+	{
+		return lhs.textureId == rhs.textureId && lhs.textureType == rhs.textureType;
+	}
+
+	template <typename H>
+	friend H AbslHashValue(H h, const LLTextureKey& id) 
+	{
+		return H::combine(std::move(h), id.textureId, id.textureType);
+	}
 };
 
 class LLViewerTextureList
@@ -194,7 +207,7 @@ private:
 	
 	// Request image from a specific host, used for baked avatar textures.
 	// Implemented in header in case someone changes default params above. JC
-	LLViewerFetchedTexture* getImageFromHost(const LLUUID& image_id, FTType f_type, LLHost host)
+	LLViewerFetchedTexture* getImageFromHost(const LLUUID& image_id, FTType f_type, const LLHost& host)
 	{ return getImage(image_id, f_type, TRUE, LLGLTexture::BOOST_NONE, LLViewerTexture::LOD_TEXTURE, 0, 0, host); }	
 
 public:
@@ -210,8 +223,10 @@ public:
 	BOOL mForceResetTextureStats;
     
 private:
-    typedef std::map< LLTextureKey, LLPointer<LLViewerFetchedTexture> > uuid_map_t;
+    using uuid_map_t = std::map< LLTextureKey, LLPointer<LLViewerFetchedTexture> >;
+    using uuid_hash_map_t = absl::flat_hash_map< LLTextureKey, LLViewerFetchedTexture* >;
     uuid_map_t mUUIDMap;
+    uuid_hash_map_t mUUIDHashMap;
     LLTextureKey mLastUpdateKey;
     LLTextureKey mLastFetchKey;
 	
@@ -268,7 +283,7 @@ private:
 		LLRect mImageClipRegion;
 	};
 
-	typedef std::map< std::string, LLPointer<LLUIImage> > uuid_ui_image_map_t;
+	typedef absl::flat_hash_map< std::string, LLPointer<LLUIImage> > uuid_ui_image_map_t;
 	uuid_ui_image_map_t mUIImages;
 
 	//
