@@ -276,8 +276,6 @@ vec3 post_atmo = color.rgb;
 #if !defined(LOCAL_LIGHT_KILL)
     color.rgb += light.rgb;
 #endif
-    // back to sRGB as we're going directly to the final RT post-deferred gamma correction
-    color.rgb = linear_to_srgb(color.rgb);
 
 //color.rgb = amblit;
 //color.rgb = vec3(ambient);
@@ -291,7 +289,9 @@ vec3 post_atmo = color.rgb;
 //color.rgb = post_atmo;
 
 #ifdef WATER_FOG
+    color.rgb = linear_to_srgb(color.rgb);
     color = applyWaterFogView(pos.xyz, color);
+    color.rgb = srgb_to_linear(color.rgb);
 #endif // WATER_FOG
 
 #endif

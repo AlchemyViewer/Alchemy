@@ -2284,6 +2284,7 @@ BOOL LLViewerShaderMgr::loadShadersDeferred()
 		gDeferredEmissiveProgram.mFeatures.calculatesAtmospherics = true;
 		gDeferredEmissiveProgram.mFeatures.hasGamma = true;
 		gDeferredEmissiveProgram.mFeatures.hasTransport = true;
+        gDeferredEmissiveProgram.mFeatures.hasSrgb = true;
 		gDeferredEmissiveProgram.mFeatures.mIndexedTextureChannels = LLGLSLShader::sIndexedTextureChannels;
 		gDeferredEmissiveProgram.mShaderFiles.clear();
 		gDeferredEmissiveProgram.mShaderFiles.push_back(make_pair("deferred/emissiveV.glsl", GL_VERTEX_SHADER));

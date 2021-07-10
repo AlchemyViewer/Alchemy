@@ -9319,6 +9319,43 @@ void LLPipeline::renderDeferredLighting(LLRenderTarget *screen_target)
 
     screen_target->flush();
 
+	screen_target->bindTarget();
+
+    {  // render non-deferred geometry (alpha, fullbright, glow)
+        LLGLDisable blend(GL_BLEND);
+        LLGLDisable stencil(GL_STENCIL_TEST);
+
+        pushRenderTypeMask();
+        andRenderTypeMask(LLPipeline::RENDER_TYPE_ALPHA,
+                          LLPipeline::RENDER_TYPE_FULLBRIGHT,
+                          LLPipeline::RENDER_TYPE_VOLUME,
+                          LLPipeline::RENDER_TYPE_GLOW,
+                          LLPipeline::RENDER_TYPE_BUMP,
+                          LLPipeline::RENDER_TYPE_PASS_SIMPLE,
+                          LLPipeline::RENDER_TYPE_PASS_ALPHA,
+                          LLPipeline::RENDER_TYPE_PASS_ALPHA_MASK,
+                          LLPipeline::RENDER_TYPE_PASS_BUMP,
+                          LLPipeline::RENDER_TYPE_PASS_POST_BUMP,
+                          LLPipeline::RENDER_TYPE_PASS_FULLBRIGHT,
+                          LLPipeline::RENDER_TYPE_PASS_FULLBRIGHT_ALPHA_MASK,
+                          LLPipeline::RENDER_TYPE_PASS_FULLBRIGHT_SHINY,
+                          LLPipeline::RENDER_TYPE_PASS_GLOW,
+                          LLPipeline::RENDER_TYPE_PASS_GRASS,
+                          LLPipeline::RENDER_TYPE_PASS_SHINY,
+                          LLPipeline::RENDER_TYPE_PASS_INVISIBLE,
+                          LLPipeline::RENDER_TYPE_PASS_INVISI_SHINY,
+                          LLPipeline::RENDER_TYPE_AVATAR,
+                          LLPipeline::RENDER_TYPE_CONTROL_AV,
+                          LLPipeline::RENDER_TYPE_ALPHA_MASK,
+                          LLPipeline::RENDER_TYPE_FULLBRIGHT_ALPHA_MASK,
+                          END_RENDER_TYPES);
+
+        renderGeomPostDeferred(camera);
+        popRenderTypeMask();
+    }
+
+	 screen_target->flush();
+
     // gamma correct lighting
     gGL.matrixMode(LLRender::MM_PROJECTION);
     gGL.pushMatrix();
@@ -9336,9 +9373,8 @@ void LLPipeline::renderDeferredLighting(LLRenderTarget *screen_target)
         screen_target->bindTarget();
         // Apply gamma correction to the frame here.
         gDeferredPostGammaCorrectProgram.bind();
-        // mDeferredVB->setBuffer(LLVertexBuffer::MAP_VERTEX);
-        S32 channel = 0;
-        channel     = gDeferredPostGammaCorrectProgram.enableTexture(LLShaderMgr::DEFERRED_DIFFUSE, screen_target->getUsage());
+
+		S32 channel = gDeferredPostGammaCorrectProgram.enableTexture(LLShaderMgr::DEFERRED_DIFFUSE, screen_target->getUsage());
         if (channel > -1)
         {
             screen_target->bindTexture(0, channel, LLTexUnit::TFO_POINT);
@@ -9370,39 +9406,6 @@ void LLPipeline::renderDeferredLighting(LLRenderTarget *screen_target)
     gGL.popMatrix();
 
     screen_target->bindTarget();
-
-    {  // render non-deferred geometry (alpha, fullbright, glow)
-        LLGLDisable blend(GL_BLEND);
-        LLGLDisable stencil(GL_STENCIL_TEST);
-
-        pushRenderTypeMask();
-        andRenderTypeMask(LLPipeline::RENDER_TYPE_ALPHA,
-                          LLPipeline::RENDER_TYPE_FULLBRIGHT,
-                          LLPipeline::RENDER_TYPE_VOLUME,
-                          LLPipeline::RENDER_TYPE_GLOW,
-                          LLPipeline::RENDER_TYPE_BUMP,
-                          LLPipeline::RENDER_TYPE_PASS_SIMPLE,
-                          LLPipeline::RENDER_TYPE_PASS_ALPHA,
-                          LLPipeline::RENDER_TYPE_PASS_ALPHA_MASK,
-                          LLPipeline::RENDER_TYPE_PASS_BUMP,
-                          LLPipeline::RENDER_TYPE_PASS_POST_BUMP,
-                          LLPipeline::RENDER_TYPE_PASS_FULLBRIGHT,
-                          LLPipeline::RENDER_TYPE_PASS_FULLBRIGHT_ALPHA_MASK,
-                          LLPipeline::RENDER_TYPE_PASS_FULLBRIGHT_SHINY,
-                          LLPipeline::RENDER_TYPE_PASS_GLOW,
-                          LLPipeline::RENDER_TYPE_PASS_GRASS,
-                          LLPipeline::RENDER_TYPE_PASS_SHINY,
-                          LLPipeline::RENDER_TYPE_PASS_INVISIBLE,
-                          LLPipeline::RENDER_TYPE_PASS_INVISI_SHINY,
-                          LLPipeline::RENDER_TYPE_AVATAR,
-                          LLPipeline::RENDER_TYPE_CONTROL_AV,
-                          LLPipeline::RENDER_TYPE_ALPHA_MASK,
-                          LLPipeline::RENDER_TYPE_FULLBRIGHT_ALPHA_MASK,
-                          END_RENDER_TYPES);
-
-		renderGeomPostDeferred(camera);
-        popRenderTypeMask();
-    }
 
     {
         // render highlights, etc.
