@@ -261,7 +261,7 @@ BOOL	LLPanelFace::postBuild()
 	if(mCtrlColorTransp)
 	{
 		mCtrlColorTransp->setCommitCallback(boost::bind(&LLPanelFace::onCommitAlpha, this, _2));
-		mCtrlColorTransp->setPrecision(0);
+		mCtrlColorTransp->setPrecision(3);
 		mCtrlColorTransp->setFollowsTop();
 		mCtrlColorTransp->setFollowsLeft();
 	}
@@ -418,7 +418,7 @@ void LLPanelFace::sendAlpha()
 {	
 	LLSpinCtrl*	mCtrlColorTransp = getChild<LLSpinCtrl>("ColorTrans");
 	if(!mCtrlColorTransp)return;
-	F32 alpha = (100.f - mCtrlColorTransp->get()) / 100.f;
+	F32 alpha = mCtrlColorTransp->get();
 
 	LLSelectMgr::getInstance()->selectionSetAlphaOnly( alpha );
 }
@@ -879,7 +879,7 @@ void LLPanelFace::updateUI(bool force_set_values /*false*/)
 		// Color transparency
 		getChildView("color trans")->setEnabled(editable);
 
-		F32 transparency = (1.f - color.mV[VALPHA]) * 100.f;
+		F32 transparency = color.mV[VALPHA];
 		getChild<LLUICtrl>("ColorTrans")->setValue(editable ? transparency : 0);
 		getChildView("ColorTrans")->setEnabled(editable);
 

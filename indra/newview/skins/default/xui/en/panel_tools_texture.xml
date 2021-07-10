@@ -48,17 +48,17 @@
              text_readonly_color="LabelDisabledColor"
              top="6"
              width="110">
-                Transparency %
+                Transparency
             </text>
             <spinner
-             decimal_digits="0"
+             decimal_digits="3"
              follows="left|top"
              height="19"
-             increment="2"
+             increment="0.01"
              initial_value="0"
              layout="topleft"
              left_delta="0"
-             max_val="100"
+             max_val="1"
              name="ColorTrans"
              top_pad="4"
              width="80" />
@@ -76,7 +76,7 @@
                 Glow
             </text>
             <spinner
-             decimal_digits="2"
+             decimal_digits="3"
              follows="left|top"
              height="19"
              initial_value="0"
