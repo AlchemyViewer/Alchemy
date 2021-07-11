@@ -47,6 +47,7 @@ class LLUICtrl;
 class LLViewerObject;
 class LLFloater;
 class LLMaterialID;
+class LLRadioGroup;
 
 // Represents an edit for use in replicating the op across one or more materials in the selection set.
 //
@@ -207,7 +208,31 @@ protected:
 
 	static F32     valueGlow(LLViewerObject* object, S32 face);
 
-	
+public:
+	LLTextureCtrl*     mTextureCtrl      = nullptr;
+    LLTextureCtrl*     mShinyTextureCtrl = nullptr;
+    LLTextureCtrl*     mBumpyTextureCtrl = nullptr;
+    LLColorSwatchCtrl* mColorSwatch      = nullptr;
+    LLColorSwatchCtrl* mShinyColorSwatch = nullptr;
+
+    LLComboBox* mComboTexGen   = nullptr;
+    LLComboBox* mComboMatMedia = nullptr;
+    LLComboBox* mComboBumpiness = nullptr;
+    LLComboBox* mComboShininess = nullptr;
+    LLComboBox* mComboAlphaMode    = nullptr;
+
+	LLRadioGroup* mRadioMatType = nullptr;
+
+    LLCheckBoxCtrl* mCheckFullbright = nullptr;
+
+    LLTextBox*  mLabelColorTransp = nullptr;
+    LLSpinCtrl* mCtrlColorTransp  = nullptr;  // transparency = 1 - alpha
+
+    LLSpinCtrl* mCtrlGlow = nullptr;
+
+	LLSpinCtrl* mSpinGlossiness = nullptr;
+    LLSpinCtrl* mSpinEnvironment = nullptr;
+    LLSpinCtrl* mSpinMaskCutoff  = nullptr;
 
 private:
 

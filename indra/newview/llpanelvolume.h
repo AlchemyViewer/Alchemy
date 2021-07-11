@@ -40,6 +40,7 @@ class LLButton;
 class LLViewerObject;
 class LLComboBox;
 class LLColorSwatchCtrl;
+class LLTextureCtrl;
 
 class LLPanelVolume final : public LLPanel
 {
@@ -87,39 +88,50 @@ protected:
 
 	void            handleResponseChangeToFlexible(const LLSD &pNotification, const LLSD &pResponse);
 
-/*
-	LLTextBox*		mLabelSelectSingleMessage;
+
+	//Animesh
+    LLCheckBoxCtrl* mCheckAnimesh = nullptr;
+
+	LLTextBox* mLabelEditObject = nullptr;
+	LLTextBox* mLabelSelectSingle = nullptr;
+
 	// Light
-	LLCheckBoxCtrl*	mCheckLight;
-	LLCheckBoxCtrl*	mCheckFlexible1D;
-	LLTextBox*		mLabelColor;
-	LLColorSwatchCtrl* mLightColorSwatch;
-	LLSpinCtrl*		mLightIntensity;
-	LLSpinCtrl*		mLightRadius;
-	LLSpinCtrl*		mLightFalloff;
-	LLSpinCtrl*		mLightCutoff;
+    LLCheckBoxCtrl*    mCheckLight		 = nullptr;
+    LLTextBox*         mLabelColor       = nullptr;
+    LLTextureCtrl*     mLightTextureCtrl = nullptr;
+    LLColorSwatchCtrl* mLightColorSwatch = nullptr;
+    LLSpinCtrl*        mLightIntensity   = nullptr;
+    LLSpinCtrl*        mLightRadius      = nullptr;
+    LLSpinCtrl*        mLightFalloff     = nullptr;
+    LLSpinCtrl*        mLightFOV		 = nullptr;
+    LLSpinCtrl*        mLightFocus       = nullptr;
+    LLSpinCtrl*        mLightAmbiance    = nullptr;
+
 	// Flexibile
-	LLSpinCtrl*		mSpinSections;
-	LLSpinCtrl*		mSpinGravity;
-	LLSpinCtrl*		mSpinTension;
-	LLSpinCtrl*		mSpinFriction;
-	LLSpinCtrl*		mSpinWind;
-	LLSpinCtrl*		mSpinForce[3];
-*/
+    LLCheckBoxCtrl* mCheckFlexible1D = nullptr;
+	LLSpinCtrl*     mSpinSections = nullptr;
+    LLSpinCtrl*     mSpinGravity  = nullptr;
+    LLSpinCtrl*     mSpinTension  = nullptr;
+    LLSpinCtrl*     mSpinFriction = nullptr;
+    LLSpinCtrl*     mSpinWind     = nullptr;
+    LLSpinCtrl*     mSpinForceX   = nullptr;
+    LLSpinCtrl*     mSpinForceY   = nullptr;
+    LLSpinCtrl*     mSpinForceZ   = nullptr;
 
 	S32			mComboMaterialItemCount;
-	LLComboBox*		mComboMaterial;
+	LLComboBox*		mComboMaterial = nullptr;
 	
 
 	LLColor4		mLightSavedColor;
 	LLPointer<LLViewerObject> mObject;
 	LLPointer<LLViewerObject> mRootObject;
 
-	LLComboBox*     mComboPhysicsShapeType;
-	LLSpinCtrl*     mSpinPhysicsGravity;
-	LLSpinCtrl*     mSpinPhysicsFriction;
-	LLSpinCtrl*     mSpinPhysicsDensity;
-	LLSpinCtrl*     mSpinPhysicsRestitution;
+	LLTextBox*      mLabelPhysicsShapeType = nullptr;
+	LLComboBox*     mComboPhysicsShapeType = nullptr;
+    LLSpinCtrl*     mSpinPhysicsGravity    = nullptr;
+    LLSpinCtrl*     mSpinPhysicsFriction   = nullptr;
+    LLSpinCtrl*     mSpinPhysicsDensity    = nullptr;
+    LLSpinCtrl*     mSpinPhysicsRestitution = nullptr;
 };
 
 #endif
