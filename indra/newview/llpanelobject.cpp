@@ -817,6 +817,7 @@ void LLPanelObject::getState( )
 		// Radius offset.
 		F32 radius_offset = volume_params.getRadiusOffset();
 		// Limit radius offset, based on taper and hole size y.
+#if 0 // Limit removal
 		F32 radius_mag = fabs(radius_offset);
 		F32 hole_y_mag = fabs(scale_y);
 		F32 taper_y_mag  = fabs(taper_y);
@@ -841,6 +842,7 @@ void LLPanelObject::getState( )
 				radius_offset = max_radius_mag;
 			}
 		}
+#endif
 		mSpinRadiusOffset->set( radius_offset);
 		calcp->setVar(LLCalc::RADIUS_OFFSET, radius_offset);
 
@@ -852,6 +854,7 @@ void LLPanelObject::getState( )
 		// Skew
 		F32 skew	= volume_params.getSkew();
 		// Limit skew, based on revolutions hole size x.
+#if 0 // Limit removal
 		F32 skew_mag= fabs(skew);
 		F32 min_skew_mag = 1.0f - 1.0f / (revolutions * scale_x + 1.0f);
 		// Discontinuity; A revolution of 1 allows skews below 0.5.
@@ -871,6 +874,7 @@ void LLPanelObject::getState( )
 				skew = min_skew_mag;
 			}
 		}
+#endif
 		mSpinSkew->set( skew );
 		calcp->setVar(LLCalc::SKEW, skew);
 	}
@@ -884,11 +888,11 @@ void LLPanelObject::getState( )
 	BOOL top_shear_x_visible		= TRUE;
 	BOOL top_shear_y_visible		= TRUE;
 	BOOL twist_visible				= TRUE;
-	BOOL advanced_cut_visible		= FALSE;
-	BOOL taper_visible				= FALSE;
-	BOOL skew_visible				= FALSE;
-	BOOL radius_offset_visible		= FALSE;
-	BOOL revolutions_visible		= FALSE;
+	BOOL advanced_cut_visible		= TRUE;
+	BOOL taper_visible				= TRUE;
+	BOOL skew_visible				= TRUE;
+	BOOL radius_offset_visible		= TRUE;
+	BOOL revolutions_visible		= TRUE;
 	BOOL sculpt_texture_visible     = FALSE;
 	F32	 twist_min					= OBJECT_TWIST_LINEAR_MIN;
 	F32	 twist_max					= OBJECT_TWIST_LINEAR_MAX;
@@ -902,11 +906,11 @@ void LLPanelObject::getState( )
 	switch (selected_item)
 	{
 	case MI_SPHERE:
-		top_size_x_visible		= FALSE;
-		top_size_y_visible		= FALSE;
-		top_shear_x_visible		= FALSE;
-		top_shear_y_visible		= FALSE;
-		//twist_visible			= FALSE;
+		top_size_x_visible		= TRUE;
+		top_size_y_visible		= TRUE;
+		top_shear_x_visible		= TRUE;
+		top_shear_y_visible		= TRUE;
+		twist_visible			= TRUE;
 		advanced_cut_visible	= TRUE;
 		advanced_is_dimple		= TRUE;
 		twist_min				= OBJECT_TWIST_MIN;
@@ -951,6 +955,7 @@ void LLPanelObject::getState( )
 	case MI_BOX:
 		advanced_cut_visible	= TRUE;
 		advanced_is_slice		= TRUE;
+		taper_visible			= FALSE;
 		break;
 
 	case MI_CYLINDER:
@@ -971,6 +976,15 @@ void LLPanelObject::getState( )
 	switch (selected_item)
 	{
 	case MI_SPHERE:
+		mSpinScaleX->set( scale_x );
+		mSpinScaleY->set( scale_y );
+		calcp->setVar(LLCalc::X_HOLE, scale_x);
+		calcp->setVar(LLCalc::Y_HOLE, scale_y);
+		mSpinScaleX->setMinValue(0.0f);
+		mSpinScaleX->setMaxValue(1.0f);
+		mSpinScaleY->setMinValue(0.0f);
+		mSpinScaleY->setMaxValue(1.0f);
+		break;
 	case MI_TORUS:
 	case MI_TUBE:
 	case MI_RING:
@@ -1017,6 +1031,7 @@ void LLPanelObject::getState( )
 	}
 
 	// Check if we need to limit the hollow based on the hole type.
+#if 0 // Limit removal
 	if (  selected_hole == MI_HOLE_SQUARE && 
 		  ( selected_item == MI_CYLINDER || selected_item == MI_TORUS ||
 		    selected_item == MI_PRISM    || selected_item == MI_RING  ||
@@ -1026,6 +1041,7 @@ void LLPanelObject::getState( )
 		mSpinHollow->setMaxValue(70.f);
 	}
 	else 
+#endif
 	{
 		mSpinHollow->setMinValue(0.f);
 		mSpinHollow->setMaxValue(95.f);
@@ -1559,6 +1575,7 @@ void LLPanelObject::getVolumeParams(LLVolumeParams& volume_params)
 	// Hollowness
 	F32 hollow = mSpinHollow->get() / 100.f;
 
+#if 0 // Limit removal
 	if (  selected_hole == MI_HOLE_SQUARE && 
 		( selected_type == MI_CYLINDER || selected_type == MI_TORUS ||
 		  selected_type == MI_PRISM    || selected_type == MI_RING  ||
@@ -1566,6 +1583,7 @@ void LLPanelObject::getVolumeParams(LLVolumeParams& volume_params)
 	{
 		if (hollow > 0.7f) hollow = 0.7f;
 	}
+#endif
 
 	volume_params.setHollow( hollow );
 
@@ -1609,6 +1627,7 @@ void LLPanelObject::getVolumeParams(LLVolumeParams& volume_params)
 	// Revolutions
 	F32 revolutions	  = mSpinRevolutions->get();
 
+#if 0 // Limit removal
 	if ( selected_type == MI_SPHERE )
 	{
 		// Snap values to valid sphere parameters.
@@ -1679,6 +1698,7 @@ void LLPanelObject::getVolumeParams(LLVolumeParams& volume_params)
 			}
 		}
 	}
+#endif
 
 	volume_params.setRatio( scale_x, scale_y );
 	volume_params.setSkew(skew);
@@ -1773,9 +1793,9 @@ void LLPanelObject::sendScale(BOOL btn_down)
 	LLVector3 newscale(mCtrlScaleX->get(), mCtrlScaleY->get(), mCtrlScaleZ->get());
 
 	LLVector3 delta = newscale - mObject->getScale();
-	if (delta.magVec() >= 0.0005f || (mSizeChanged && !btn_down))
+	if (delta.magVec() >= 0.00005f || (mSizeChanged && !btn_down))
 	{
-		// scale changed by more than 1/2 millimeter
+		// scale changed by more than 1/20 millimeter
 		mSizeChanged = btn_down;
 
 		// check to see if we aren't scaling the textures
@@ -1887,8 +1907,8 @@ void LLPanelObject::sendPosition(BOOL btn_down)
 		// send only if the position is changed, that is, the delta vector is not zero
 		LLVector3d old_pos_global = mObject->getPositionGlobal();
 		LLVector3d delta = new_pos_global - old_pos_global;
-		// moved more than 1/2 millimeter
-		if (delta.magVec() >= 0.0005f)
+		// moved more than 1/20 millimeter
+		if (delta.magVec() >= 0.00005f)
 		{			
 			if (mRootObject != mObject)
 			{
