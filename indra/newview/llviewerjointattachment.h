@@ -37,6 +37,8 @@
 class LLDrawable;
 class LLViewerObject;
 
+extern const F32 MAX_ATTACHMENT_DIST;
+
 //-----------------------------------------------------------------------------
 // class LLViewerJointAttachment
 //-----------------------------------------------------------------------------

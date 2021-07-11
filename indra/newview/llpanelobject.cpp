@@ -71,7 +71,7 @@
 // [/RLVa:KB]
 
 #include "lldrawpool.h"
-
+#include "llviewerjointattachment.h"
 //
 // Constants
 //
@@ -394,6 +394,16 @@ void LLPanelObject::getState( )
 	mCtrlPosX->setEnabled(enable_move);
 	mCtrlPosY->setEnabled(enable_move);
 	mCtrlPosZ->setEnabled(enable_move);
+
+	LLViewerRegion* regionp = objectp->getRegion();
+	F32 width = regionp != nullptr ? regionp->getWidth() : REGION_WIDTH_METERS;
+	bool is_attachment = objectp->isAttachment();
+	mCtrlPosX->setMinValue(is_attachment ? -MAX_ATTACHMENT_DIST : -width);
+	mCtrlPosX->setMaxValue(is_attachment ? MAX_ATTACHMENT_DIST : width);
+	mCtrlPosY->setMinValue(is_attachment ? -MAX_ATTACHMENT_DIST : -width);
+	mCtrlPosY->setMaxValue(is_attachment ? MAX_ATTACHMENT_DIST : width);
+	mCtrlPosZ->setMinValue(is_attachment ? -MAX_ATTACHMENT_DIST : 0);
+	mCtrlPosZ->setMaxValue(is_attachment ? MAX_ATTACHMENT_DIST : 4096);
 
 	if (enable_scale)
 	{
