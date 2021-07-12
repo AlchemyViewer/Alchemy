@@ -393,7 +393,7 @@ public:
 	void updateStaticColumnWidth(LLScrollListColumn* col, S32 new_width);
 	S32 getTotalStaticColumnWidth() { return mTotalStaticColumnWidth; }
 
-	std::string     getSortColumnName();
+	const std::string&     getSortColumnName();
 	BOOL			getSortAscending() { return mSortColumns.empty() ? TRUE : mSortColumns.back().second; }
 	BOOL			hasSortOrder() const;
 	void			clearSortOrder();

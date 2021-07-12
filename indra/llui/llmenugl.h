@@ -123,7 +123,7 @@ public:
 
 	// change the label
 	void setLabel(LLStringExplicit label ) { mLabel = std::move(label); }	
-	std::string getLabel( void ) const { return mLabel.getString(); }
+	const std::string& getLabel() const { return mLabel.getString(); }
 	virtual BOOL setLabelArg( const std::string& key, const LLStringExplicit& text );
 
 	// Get the parent menu for this item

@@ -148,7 +148,7 @@ void LLScrollListItem::draw(const LLRect& rect, const LLColor4& fg_color, const 
 {
 	// draw background rect
 	gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
-	LLRect bg_rect = rect;
+	const LLRect& bg_rect = rect;
     if (mSelectedIndex < 0 && getSelected())
     {
         // Whole item is highlighted/selected

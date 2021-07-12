@@ -2988,12 +2988,14 @@ void LLScrollListCtrl::onClickColumn(void *userdata)
 	}
 }
 
-std::string LLScrollListCtrl::getSortColumnName()
+const std::string& LLScrollListCtrl::getSortColumnName()
 {
 	LLScrollListColumn* column = mSortColumns.empty() ? NULL : mColumnsIndexed[mSortColumns.back().first];
 
-	if (column) return column->mName;
-	else return "";
+	if (column) 
+		return column->mName;
+	else 
+		return LLStringUtil::null;
 }
 
 BOOL LLScrollListCtrl::hasSortOrder() const

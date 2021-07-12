@@ -385,7 +385,7 @@ void LLMenuItemGL::buildDrawLabel( void )
 	mDrawAccelLabel.clear();
 	std::string st = mDrawAccelLabel.getString();
 	appendAcceleratorString( st );
-	mDrawAccelLabel = st;
+	mDrawAccelLabel = std::move(st);
 }
 
 void LLMenuItemGL::onCommit( void )

@@ -73,7 +73,7 @@ LLScrollColumnHeader::~LLScrollColumnHeader()
 
 void LLScrollColumnHeader::draw()
 {
-	std::string sort_column = mColumn->mParentCtrl->getSortColumnName();
+	const std::string& sort_column = mColumn->mParentCtrl->getSortColumnName();
 	BOOL draw_arrow = !mColumn->mLabel.empty() 
 			&& mColumn->mParentCtrl->isSorted()
 			// check for indirect sorting column as well as column's sorting name

@@ -111,7 +111,7 @@ void ALFloaterRegionTracker::refresh()
 
 	const std::string& saved_selected_value = mRegionScrollList->getSelectedValue().asString();
 	S32 saved_scroll_pos = mRegionScrollList->getScrollPos();
-	auto sort_column_name = mRegionScrollList->getSortColumnName();
+	const auto& sort_column_name = mRegionScrollList->getSortColumnName();
 	auto sort_asending = mRegionScrollList->getSortAscending();
 	mRegionScrollList->deleteAllItems();
 
