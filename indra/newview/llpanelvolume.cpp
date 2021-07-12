@@ -115,19 +115,19 @@ BOOL	LLPanelVolume::postBuild()
         mSpinFriction->setValidateBeforeCommit(precommitValidate);
         mSpinFriction->setCommitCallback(std::bind(onCommitFlexible, std::placeholders::_1, this));
 
-        mSpinWind     = getChild<LLSpinCtrl>("FlexWind");
+        mSpinWind = getChild<LLSpinCtrl>("FlexWind");
         mSpinWind->setValidateBeforeCommit(precommitValidate);
         mSpinWind->setCommitCallback(std::bind(onCommitFlexible, std::placeholders::_1, this));
 
-        mSpinForceX   = getChild<LLSpinCtrl>("FlexForceX");
+        mSpinForceX = getChild<LLSpinCtrl>("FlexForceX");
         mSpinForceX->setValidateBeforeCommit(precommitValidate);
         mSpinForceX->setCommitCallback(std::bind(onCommitFlexible, std::placeholders::_1, this));
 
-        mSpinForceY   = getChild<LLSpinCtrl>("FlexForceY");
+        mSpinForceY = getChild<LLSpinCtrl>("FlexForceY");
         mSpinForceY->setValidateBeforeCommit(precommitValidate);
         mSpinForceY->setCommitCallback(std::bind(onCommitFlexible, std::placeholders::_1, this));
 
-        mSpinForceZ   = getChild<LLSpinCtrl>("FlexForceZ");
+        mSpinForceZ = getChild<LLSpinCtrl>("FlexForceZ");
         mSpinForceZ->setValidateBeforeCommit(precommitValidate);
         mSpinForceZ->setCommitCallback(std::bind(onCommitFlexible, std::placeholders::_1, this));
 	}

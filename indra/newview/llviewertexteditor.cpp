@@ -981,9 +981,10 @@ std::string LLViewerTextEditor::getEmbeddedText()
 	// New version (Version 2)
 	mEmbeddedItemList->copyUsedCharsToIndexed();
 	LLWString outtextw;
-	for (S32 i=0; i<(S32)getWText().size(); i++)
+    const LLWString& wtext = getWText();
+    for (S32 i = 0; i < (S32) wtext.size(); i++)
 	{
-		llwchar wch = getWText()[i];
+        llwchar wch = wtext[i];
 		if( wch >= FIRST_EMBEDDED_CHAR && wch <= LAST_EMBEDDED_CHAR )
 		{
 			S32 index = mEmbeddedItemList->getIndexFromEmbeddedChar(wch);
@@ -1063,7 +1064,7 @@ void LLViewerTextEditor::onValueChange(S32 start, S32 end)
 
 void LLViewerTextEditor::findEmbeddedItemSegments(S32 start, S32 end)
 {
-	LLWString text = getWText();
+	const LLWString& text = getWText();
 
 	// Start with i just after the first embedded item
 	for(S32 idx = start; idx < end; idx++ )

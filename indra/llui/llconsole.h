@@ -84,7 +84,7 @@ public:
 	class LineColorSegment
 	{
 		public:
-			LineColorSegment(LLWString text, LLColor4 color, F32 xpos) : mText(text), mColor(color), mXPosition(xpos) {}
+            LineColorSegment(LLWString text, LLColor4 color, F32 xpos) : mText(std::move(text)), mColor(std::move(color)), mXPosition(xpos) {}
 		public:
 			LLWString mText;
 			LLColor4  mColor;

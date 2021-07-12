@@ -231,7 +231,7 @@ void LLBadge::draw()
 			// Calculate badge size based on label text
 			//
 
-			LLWString badge_label_wstring = mLabel;
+			const LLWString& badge_label_wstring = mLabel.getWString();
 
 			S32 badge_label_begin_offset = 0;
 			S32 badge_char_length = S32_MAX;

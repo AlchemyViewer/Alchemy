@@ -453,7 +453,7 @@ BOOL LLTextEditor::replaceText(const std::string& search_text_in, const std::str
 	LLWString search_text = utf8str_to_wstring(search_text_in);
 	if (mIsSelecting)
 	{
-		LLWString text = getWText();
+		const LLWString& text = getWText();
 		LLWString selected_text = text.substr(mSelectionEnd, mSelectionStart - mSelectionEnd);
 
 		if (case_insensitive)
@@ -490,7 +490,7 @@ void LLTextEditor::replaceTextAll(const std::string& search_text, const std::str
 
 S32 LLTextEditor::prevWordPos(S32 cursorPos) const
 {
-	LLWString wtext(getWText());
+    const LLWString& wtext = getWText();
 	while( (cursorPos > 0) && (wtext[cursorPos-1] == ' ') )
 	{
 		cursorPos--;
@@ -504,7 +504,7 @@ S32 LLTextEditor::prevWordPos(S32 cursorPos) const
 
 S32 LLTextEditor::nextWordPos(S32 cursorPos) const
 {
-	LLWString wtext(getWText());
+	const LLWString& wtext = getWText();
 	while( (cursorPos < getLength()) && LLWStringUtil::isPartOfWord( wtext[cursorPos] ) )
 	{
 		cursorPos++;
@@ -569,7 +569,7 @@ BOOL LLTextEditor::selectionContainsLineBreaks()
 		S32 left = llmin(mSelectionStart, mSelectionEnd);
 		S32 right = left + llabs(mSelectionStart - mSelectionEnd);
 
-		LLWString wtext = getWText();
+		const LLWString& wtext = getWText();
 		for( S32 i = left; i < right; i++ )
 		{
 			if (wtext[i] == '\n')
@@ -606,7 +606,7 @@ S32 LLTextEditor::indentLine( S32 pos, S32 spaces )
 		// Unindent
 		for(S32 i=0; i < -spaces; i++)
 		{
-			LLWString wtext = getWText();
+            const LLWString& wtext = getWText();
 			if (wtext[pos] == ' ')
 			{
 				delta_spaces += remove( pos, 1, FALSE );
@@ -1836,7 +1836,7 @@ void LLTextEditor::unindentLineBeforeCloseBrace()
 {
 	if( mCursorPos >= 1 )
 	{
-		LLWString text = getWText();
+		const LLWString& text = getWText();
 		if( ' ' == text[ mCursorPos - 1 ] )
 		{
 			S32 line = getLineNumFromDocIndex(mCursorPos, false);
@@ -1985,7 +1985,7 @@ void LLTextEditor::doDelete()
 	{	
 		S32 i;
 		S32 chars_to_remove = 1;
-		LLWString text = getWText();
+		const LLWString& text = getWText();
 		if( (text[ mCursorPos ] == ' ') && (mCursorPos + SPACES_PER_TAB < getLength()) )
 		{
 			// Try to remove a full tab's worth of spaces
@@ -2231,7 +2231,7 @@ void LLTextEditor::drawPreeditMarker()
 		return;
 	}
 
-    const LLWString textString(getWText());
+    const LLWString& textString = getWText();
 	const llwchar *text = textString.c_str();
 	const S32 text_len = getLength();
 	const S32 num_lines = getLineCount();
@@ -2401,7 +2401,7 @@ void LLTextEditor::autoIndent()
 	S32 space_count = 0;
 	S32 i;
 
-	LLWString text = getWText();
+	const LLWString& text = getWText();
 	S32 offset = getLineOffsetFromDocIndex(mCursorPos);
 	while(( ' ' == text[line_start] ) && (space_count < offset))
 	{
@@ -2586,7 +2586,7 @@ BOOL LLTextEditor::tryToRevertToPristineState()
 
 void LLTextEditor::updateLinkSegments()
 {
-	LLWString wtext = getWText();
+	const LLWString& wtext = getWText();
 
 	// update any segments that contain a link
 	for (segment_set_t::iterator it = mSegments.begin(); it != mSegments.end(); ++it)
@@ -2959,7 +2959,7 @@ BOOL LLTextEditor::getPreeditLocation(S32 query_offset, LLCoordGL *coord, LLRect
 		current_line++;
 	}
 
-    const LLWString textString(getWText());
+    const LLWString& textString = getWText();
 	const llwchar * const text = textString.c_str();
 	const S32 line_height = mFont->getLineHeight();
 

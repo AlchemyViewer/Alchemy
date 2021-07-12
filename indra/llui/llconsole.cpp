@@ -332,9 +332,9 @@ void LLConsole::Paragraph::updateLines(F32 screen_width, const LLFontGL* font, b
 				&& current_color != mParagraphColorSegments.end() )
 			{
 				LLWString color_text = mParagraphText.substr( paragraph_offset + drawn, current_color_length );
-				line.mLineColorSegments.push_back( LineColorSegment( color_text,			//Append segment to line.
+				line.mLineColorSegments.emplace_back(color_text,			//Append segment to line.
 												(*current_color).mColor, 
-												x_position ) );
+												x_position);
 												
 				x_position += font->getWidth( color_text.c_str() );	//Set up next screen position.
 				
