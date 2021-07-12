@@ -435,8 +435,8 @@ namespace RlvStringKeys
 		inline constexpr std::string_view RecvIm = "blocked_recvim"sv;
 		inline constexpr std::string_view RecvImRemote = "blocked_recvim_remote"sv;
 		inline constexpr std::string_view SendIm = "blocked_sendim"sv;
-		inline constexpr std::string_view Share = make_string_view("blocked_share");
-		inline constexpr std::string_view ShareGeneric = make_string_view("blocked_share_generic");
+		inline constexpr std::string_view Share = "blocked_share";
+		inline constexpr std::string_view ShareGeneric = "blocked_share_generic";
 		inline constexpr std::string_view StartConference = "blocked_startconf"sv;
 		inline constexpr std::string_view StartIm = "blocked_startim"sv;
 		inline constexpr std::string_view Teleport = "blocked_teleport"sv;
