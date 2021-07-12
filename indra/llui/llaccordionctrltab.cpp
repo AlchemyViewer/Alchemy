@@ -48,7 +48,7 @@ static const S32 PARENT_BORDER_MARGIN = 5;
 
 static LLDefaultChildRegistry::Register<LLAccordionCtrlTab> t1("accordion_tab");
 
-class LLAccordionCtrlTab::LLAccordionCtrlTabHeader : public LLUICtrl
+class LLAccordionCtrlTab::LLAccordionCtrlTabHeader final : public LLUICtrl
 {
 public:
 	friend class LLUICtrlFactory;
@@ -60,7 +60,7 @@ public:
 
 	LLAccordionCtrlTabHeader(const LLAccordionCtrlTabHeader::Params& p);
 	
-	virtual ~LLAccordionCtrlTabHeader();
+	virtual ~LLAccordionCtrlTabHeader() = default;
 
 	virtual void draw();
 
@@ -146,10 +146,6 @@ LLAccordionCtrlTab::LLAccordionCtrlTabHeader::LLAccordionCtrlTabHeader(
 	addChild(mHeaderTextbox);
 }
 
-LLAccordionCtrlTab::LLAccordionCtrlTabHeader::~LLAccordionCtrlTabHeader()
-{
-}
-
 BOOL LLAccordionCtrlTab::LLAccordionCtrlTabHeader::postBuild()
 {
 	return TRUE;
@@ -206,7 +202,7 @@ void LLAccordionCtrlTab::LLAccordionCtrlTabHeader::draw()
 	F32 alpha = getCurrentTransparency();
 	gl_rect_2d(0,0,width - 1 ,height - 1,mHeaderBGColor.get() % alpha,true);
 
-	LLAccordionCtrlTab* parent = dynamic_cast<LLAccordionCtrlTab*>(getParent());
+	LLAccordionCtrlTab* parent = static_cast<LLAccordionCtrlTab*>(getParent());
 	bool collapsible = (parent && parent->getCollapsible());
 	bool expanded = (parent && parent->getDisplayChildren());
 
@@ -601,10 +597,8 @@ void LLAccordionCtrlTab::setSelected(bool is_selected)
 
 LLView*	LLAccordionCtrlTab::findContainerView()
 {
-	for(child_list_const_iter_t it = getChildList()->begin(); 
-		getChildList()->end() != it; ++it)
+    for (LLView* child : *getChildList())
 	{
-		LLView* child = *it;
 		if(DD_HEADER_NAME == child->getName())
 			continue;
 		if(!child->getVisible())
