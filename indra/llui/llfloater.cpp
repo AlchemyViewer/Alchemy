@@ -2362,9 +2362,8 @@ void LLFloaterView::reshape(S32 width, S32 height, BOOL called_from_parent)
 
 	mLastSnapRect = getSnapRect();
 
-	for ( child_list_const_iter_t child_it = getChildList()->begin(); child_it != getChildList()->end(); ++child_it)
+	for (LLView* viewp  : *getChildList())
 	{
-		LLView* viewp = *child_it;
 		LLFloater* floaterp = dynamic_cast<LLFloater*>(viewp);
 		if (floaterp->isDependent())
 		{
@@ -2420,10 +2419,10 @@ void LLFloaterView::reshape(S32 width, S32 height, BOOL called_from_parent)
 void LLFloaterView::restoreAll()
 {
 	// make sure all subwindows aren't minimized
-	child_list_t child_list = *(getChildList());
-	for (child_list_const_iter_t child_it = child_list.begin(); child_it != child_list.end(); ++child_it)
+    child_list_t child_list = *(getChildList()); // Copy as list order can change during visibility
+    for (LLView* viewp : child_list)
 	{
-		LLFloater* floaterp = dynamic_cast<LLFloater*>(*child_it);
+        LLFloater* floaterp = dynamic_cast<LLFloater*>(viewp);
 		if (floaterp)
 		{
 			floaterp->setMinimized(FALSE);
@@ -2526,9 +2525,9 @@ void LLFloaterView::bringToFront(LLFloater* child, BOOL give_focus, BOOL restore
 	}
 	std::vector<LLFloater*> floaters_to_move;
 	// Look at all floaters...tab
-	for (child_list_const_iter_t child_it = beginChild(); child_it != endChild(); ++child_it)
+	for (LLView* childp : *getChildList())
 	{
-		LLFloater* floater = dynamic_cast<LLFloater*>(*child_it);
+        LLFloater* floater = dynamic_cast<LLFloater*>(childp);
 
 		// ...but if I'm a dependent floater...
 		if (floater && child->isDependent())
@@ -2554,10 +2553,8 @@ void LLFloaterView::bringToFront(LLFloater* child, BOOL give_focus, BOOL restore
 		}
 	}
 
-	std::vector<LLFloater*>::iterator floater_it;
-	for(floater_it = floaters_to_move.begin(); floater_it != floaters_to_move.end(); ++floater_it)
+    for (LLFloater* floaterp : floaters_to_move)
 	{
-		LLFloater* floaterp = *floater_it;
 		sendChildToFront(floaterp);
 
 		// always unminimize dependee, but allow dependents to stay minimized
@@ -2569,10 +2566,9 @@ void LLFloaterView::bringToFront(LLFloater* child, BOOL give_focus, BOOL restore
 	floaters_to_move.clear();
 
 	// ...then bringing my own dependents to the front...
-	for (LLFloater::handle_set_iter_t dependent_it = child->mDependents.begin();
-		dependent_it != child->mDependents.end(); ++dependent_it)
-	{
-		LLFloater* dependent = dependent_it->get();
+    for (const auto& dep_handle : child->mDependents)
+    {
+        LLFloater* dependent = dep_handle.get();
 		if (dependent)
 		{
 			sendChildToFront(dependent);
@@ -2615,11 +2611,9 @@ void LLFloaterView::highlightFocusedFloater()
 		}
 
 		BOOL floater_or_dependent_has_focus = gFocusMgr.childHasKeyboardFocus(floater);
-		for(LLFloater::handle_set_iter_t dependent_it = floater->mDependents.begin();
-			dependent_it != floater->mDependents.end(); 
-			++dependent_it)
+		for(const auto& dep_handle : floater->mDependents)
 		{
-			LLFloater* dependent_floaterp = dependent_it->get();
+            LLFloater* dependent_floaterp = dep_handle.get();
 			if (dependent_floaterp && gFocusMgr.childHasKeyboardFocus(dependent_floaterp))
 			{
 				floater_or_dependent_has_focus = TRUE;
@@ -2629,15 +2623,13 @@ void LLFloaterView::highlightFocusedFloater()
 		// now set this floater and all its dependents
 		floater->setForeground(floater_or_dependent_has_focus);
 
-		for(LLFloater::handle_set_iter_t dependent_it = floater->mDependents.begin();
-			dependent_it != floater->mDependents.end(); )
-		{
-			LLFloater* dependent_floaterp = dependent_it->get();
+		for (const auto& dep_handle : floater->mDependents)
+        {
+            LLFloater* dependent_floaterp = dep_handle.get();
 			if (dependent_floaterp)
 			{
 				dependent_floaterp->setForeground(floater_or_dependent_has_focus);
 			}
-			++dependent_it;
 		}
 			
 		floater->cleanupHandles();
@@ -2802,16 +2794,14 @@ void LLFloaterView::hideAllFloaters()
 
 void LLFloaterView::showHiddenFloaters()
 {
-	for (hidden_floaters_t::iterator it = mHiddenFloaters.begin(), end_it = mHiddenFloaters.end();
-		it != end_it;
-		++it)
-	{
-		LLFloater* floaterp = it->first.get();
+	for (auto& hidden_floater : mHiddenFloaters)
+    {
+		LLFloater* floaterp = hidden_floater.first.get();
 		if (floaterp)
 		{
 			floaterp->setVisible(true);
 		}
-		it->second.disconnect();
+        hidden_floater.second.disconnect();
 	}
 	mHiddenFloaters.clear();
 }
@@ -2820,9 +2810,9 @@ BOOL LLFloaterView::allChildrenClosed()
 {
 	// see if there are any visible floaters (some floaters "close"
 	// by setting themselves invisible)
-	for (child_list_const_iter_t it = getChildList()->begin(); it != getChildList()->end(); ++it)
+	for (LLView* viewp : *getChildList())
 	{
-		LLFloater* floaterp = dynamic_cast<LLFloater*>(*it);
+		LLFloater* floaterp = dynamic_cast<LLFloater*>(viewp);
 
 		if (floaterp->getVisible() && !floaterp->isDead() && floaterp->isCloseable())
 		{
@@ -2834,9 +2824,9 @@ BOOL LLFloaterView::allChildrenClosed()
 
 void LLFloaterView::shiftFloaters(S32 x_offset, S32 y_offset)
 {
-	for (child_list_const_iter_t it = getChildList()->begin(); it != getChildList()->end(); ++it)
+	for (LLView* viewp : *getChildList())
 	{
-		LLFloater* floaterp = dynamic_cast<LLFloater*>(*it);
+		LLFloater* floaterp = dynamic_cast<LLFloater*>(viewp);
 
 		if (floaterp && floaterp->isMinimized())
 		{
@@ -2854,9 +2844,9 @@ void LLFloaterView::refresh()
 	}
 
 	// Constrain children to be entirely on the screen
-	for ( child_list_const_iter_t child_it = getChildList()->begin(); child_it != getChildList()->end(); ++child_it)
+	for (LLView* viewp : *getChildList())
 	{
-		LLFloater* floaterp = dynamic_cast<LLFloater*>(*child_it);
+        LLFloater* floaterp = dynamic_cast<LLFloater*>(viewp);
 		if (floaterp && floaterp->getVisible() )
 		{
 			// minimized floaters are kept fully onscreen
@@ -2951,12 +2941,11 @@ void LLFloaterView::draw()
 
 	if (mFocusCycleMode && focused_floater)
 	{
-		child_list_const_iter_t child_it = getChildList()->begin();
-		for (;child_it != getChildList()->end(); ++child_it)
+        for (LLView* viewp : *getChildList())
 		{
-			if ((*child_it) != focused_floater)
+            if (viewp != focused_floater)
 			{
-				drawChild(*child_it);
+                drawChild(viewp);
 			}
 		}
 
@@ -2983,11 +2972,11 @@ LLRect LLFloaterView::getSnapRect() const
 
 LLFloater *LLFloaterView::getFocusedFloater() const
 {
-	for ( child_list_const_iter_t child_it = getChildList()->begin(); child_it != getChildList()->end(); ++child_it)
+	for (LLView* viewp : *getChildList())
 	{
-		if ((*child_it)->isCtrl())
+		if (viewp->isCtrl())
 		{
-			LLFloater* ctrlp = dynamic_cast<LLFloater*>(*child_it);
+			LLFloater* ctrlp = dynamic_cast<LLFloater*>(viewp);
 			if ( ctrlp && ctrlp->hasFocus() )
 			{
 				return ctrlp;
@@ -2999,9 +2988,8 @@ LLFloater *LLFloaterView::getFocusedFloater() const
 
 LLFloater *LLFloaterView::getFrontmost() const
 {
-	for ( child_list_const_iter_t child_it = getChildList()->begin(); child_it != getChildList()->end(); ++child_it)
+	for (LLView* viewp : *getChildList())
 	{
-		LLView* viewp = *child_it;
 		if ( viewp->getVisible() && !viewp->isDead())
 		{
 			return (LLFloater *)viewp;
@@ -3013,9 +3001,8 @@ LLFloater *LLFloaterView::getFrontmost() const
 LLFloater *LLFloaterView::getBackmost() const
 {
 	LLFloater* back_most = NULL;
-	for ( child_list_const_iter_t child_it = getChildList()->begin(); child_it != getChildList()->end(); ++child_it)
+	for (LLView* viewp : *getChildList())
 	{
-		LLView* viewp = *child_it;
 		if ( viewp->getVisible() )
 		{
 			back_most = (LLFloater *)viewp;
@@ -3028,9 +3015,9 @@ void LLFloaterView::syncFloaterTabOrder()
 {
 	// look for a visible modal dialog, starting from first
 	LLModalDialog* modal_dialog = NULL;
-	for ( child_list_const_iter_t child_it = getChildList()->begin(); child_it != getChildList()->end(); ++child_it)
+	for (LLView* viewp : *getChildList())
 	{
-		LLModalDialog* dialog = dynamic_cast<LLModalDialog*>(*child_it);
+		LLModalDialog* dialog = dynamic_cast<LLModalDialog*>(viewp);
 		if (dialog && dialog->isModal() && dialog->getVisible())
 		{
 			modal_dialog = dialog;
@@ -3089,9 +3076,8 @@ LLFloater*	LLFloaterView::getParentFloater(LLView* viewp) const
 S32 LLFloaterView::getZOrder(LLFloater* child)
 {
 	S32 rv = 0;
-	for ( child_list_const_iter_t child_it = getChildList()->begin(); child_it != getChildList()->end(); ++child_it)
+	for (LLView* viewp : *getChildList())
 	{
-		LLView* viewp = *child_it;
 		if(viewp == child)
 		{
 			break;
@@ -3103,10 +3089,8 @@ S32 LLFloaterView::getZOrder(LLFloater* child)
 
 void LLFloaterView::pushVisibleAll(BOOL visible, const skip_list_t& skip_list)
 {
-	for (child_list_const_iter_t child_iter = getChildList()->begin();
-		 child_iter != getChildList()->end(); ++child_iter)
+	for (LLView* view : *getChildList())
 	{
-		LLView *view = *child_iter;
 		if (skip_list.find(view) == skip_list.end())
 		{
 			view->pushVisible(visible);

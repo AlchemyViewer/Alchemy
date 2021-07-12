@@ -876,11 +876,9 @@ void LLChicletPanel::showScrollButtonsIfNeeded()
 
 void LLChicletPanel::draw()
 {
-	child_list_const_iter_t it = getChildList()->begin();
-	for( ; getChildList()->end() != it; ++it)
+    for (LLView* child : *getChildList())
 	{
-		LLView* child = *it;
-		if(child == dynamic_cast<LLView*>(mScrollArea))
+		if(child == static_cast<LLView*>(mScrollArea))
 		{
 			LLLocalClipRect clip(mScrollArea->getRect());
 			drawChild(mScrollArea);
