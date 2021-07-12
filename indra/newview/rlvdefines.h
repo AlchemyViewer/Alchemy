@@ -127,6 +127,7 @@ enum ERlvBehaviour {
 	RLV_BHVR_SENDGESTURE,
 	RLV_BHVR_PERMISSIVE,			// "permissive"
 	RLV_BHVR_NOTIFY,				// "notify"
+	RLV_BHVR_SHARE,
 	RLV_BHVR_SHOWINV,				// "showinv"
 	RLV_BHVR_SHOWMINIMAP,			// "showminimap"
 	RLV_BHVR_SHOWWORLDMAP,			// "showworldmap"
@@ -154,7 +155,9 @@ enum ERlvBehaviour {
 	RLV_BHVR_ALLOWIDLE,				// "allowidle"
 	RLV_BHVR_BUY,					// "buy"
 	RLV_BHVR_EDIT,					// "edit"
+	RLV_BHVR_EDITATTACH,
 	RLV_BHVR_EDITOBJ,				// "editobj"
+	RLV_BHVR_EDITWORLD,
 	RLV_BHVR_VIEWTRANSPARENT,
 	RLV_BHVR_VIEWWIREFRAME,
 	RLV_BHVR_PAY,					// "pay"
@@ -174,6 +177,7 @@ enum ERlvBehaviour {
 	RLV_BHVR_SETGROUP,				// "setgroup"
 	RLV_BHVR_UNSIT,					// "unsit"
 	RLV_BHVR_SIT,					// "sit"
+	RLV_BHVR_SITGROUND,
 	RLV_BHVR_SITTP,					// "sittp"
 	RLV_BHVR_STANDTP,				// "standtp"
 	RLV_BHVR_SETDEBUG,				// "setdebug"
@@ -431,6 +435,8 @@ namespace RlvStringKeys
 		inline constexpr std::string_view RecvIm = "blocked_recvim"sv;
 		inline constexpr std::string_view RecvImRemote = "blocked_recvim_remote"sv;
 		inline constexpr std::string_view SendIm = "blocked_sendim"sv;
+		inline constexpr std::string_view Share = make_string_view("blocked_share");
+		inline constexpr std::string_view ShareGeneric = make_string_view("blocked_share_generic");
 		inline constexpr std::string_view StartConference = "blocked_startconf"sv;
 		inline constexpr std::string_view StartIm = "blocked_startim"sv;
 		inline constexpr std::string_view Teleport = "blocked_teleport"sv;
