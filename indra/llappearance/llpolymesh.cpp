@@ -991,14 +991,12 @@ void LLPolyMesh::initializeForMorph()
 //-----------------------------------------------------------------------------
 // getMorphData()
 //-----------------------------------------------------------------------------
-LLPolyMorphData*        LLPolyMesh::getMorphData(const std::string& morph_name)
+LLPolyMorphData*        LLPolyMesh::getMorphData(const std::string_view morph_name)
 {
         if (!mSharedData)
                 return NULL;
-        for (LLPolyMeshSharedData::morphdata_list_t::iterator iter = mSharedData->mMorphData.begin();
-             iter != mSharedData->mMorphData.end(); ++iter)
+        for (LLPolyMorphData* morph_data : mSharedData->mMorphData)
         {
-                LLPolyMorphData *morph_data = *iter;
                 if (morph_data->getName() == morph_name)
                 {
                         return morph_data;

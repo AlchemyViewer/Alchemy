@@ -306,7 +306,7 @@ public:
 		return mSharedData->mJointNames;
 	}
 
-	LLPolyMorphData*	getMorphData(const std::string& morph_name);
+	LLPolyMorphData*	getMorphData(std::string_view morph_name);
 // 	void	removeMorphData(LLPolyMorphData *morph_target);
 // 	void	deleteAllMorphData();
 

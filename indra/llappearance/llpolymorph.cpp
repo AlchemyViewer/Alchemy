@@ -378,7 +378,7 @@ BOOL LLPolyMorphTarget::setInfo(LLPolyMorphTargetInfo* info)
 		}
 	}
 
-	std::string morph_param_name = getInfo()->mMorphName;
+	std::string_view morph_param_name = getInfo()->mMorphName;
 	
 	mMorphData = mMesh->getMorphData(morph_param_name);
 	if (!mMorphData)
