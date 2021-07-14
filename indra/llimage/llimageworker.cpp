@@ -84,6 +84,7 @@ private:
 LLImageDecodeThread::LLImageDecodeThread(bool threaded, U32 pool_size)
 	: LLQueuedThread("imagedecode", threaded)
 	, mCreationListSize(0)
+	, mLastPoolAllocation(0)
 {
 	mCreationMutex = new LLMutex();
 
@@ -126,6 +127,10 @@ LLImageDecodeThread::LLImageDecodeThread(bool threaded, U32 pool_size)
 //virtual 
 LLImageDecodeThread::~LLImageDecodeThread()
 {
+    if (sImageThreads > 0) 
+	{
+        LL_INFOS() << "Requests failed to queue to pool: " << mFailedRequests << LL_ENDL;
+	}
 	delete mCreationMutex ;
 }
 
@@ -332,13 +337,18 @@ bool LLImageDecodeThread::ImageRequest::tut_isOK()
 
 bool LLImageDecodeThread::enqueRequest(ImageRequest * req)
 {
-	for (auto &pThread : mThreadPool)
-	{
-		if (!pThread->isBusy())
-		{
-			if( pThread->setRequest(req) )
-				return true;
-		}
-	}
+    for (U32 i = 0, count = mThreadPool.size(); i < count; ++i)
+    {
+        if (mLastPoolAllocation >= count)
+        {
+            mLastPoolAllocation = 0;
+        }
+        auto& thread = mThreadPool[mLastPoolAllocation++];
+        if (!thread->isBusy() && thread->setRequest(req))
+        {
+            return true;
+        }
+    }
+    ++mFailedRequests;
 	return false;
 }

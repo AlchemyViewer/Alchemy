@@ -109,7 +109,9 @@ private:
 	LLMutex* mCreationMutex;
 
 	std::vector<std::unique_ptr<PoolWorkerThread>> mThreadPool;
+    U32 mLastPoolAllocation;
 	bool enqueRequest(ImageRequest*);
+	size_t mFailedRequests = 0;
 };
 
 #endif
