@@ -182,6 +182,7 @@ LLGLManager::LLGLManager() :
 
 	mHasTextureSwizzle(false),
     mHasGPUShader4(false),
+    mHasClipControl(false),
 	mIsATI(FALSE),
 	mIsNVIDIA(FALSE),
 	mIsIntel(FALSE),
@@ -745,7 +746,8 @@ void LLGLManager::asLLSD(LLSD& info)
 	info["has_srgb_texture"] = mHassRGBTexture;
 	info["has_srgb_framebuffer"] = mHassRGBFramebuffer;
     info["has_texture_srgb_decode"] = mHasTexturesRGBDecode;
-    info["has_gpu_shader_4"] = mHasGPUShader4;
+    info["has_gpu_shader4"] = mHasGPUShader4;
+    info["has_clip_control"] = mHasClipControl;
 
 	// Vendor-specific extensions
 	info["is_ati"] = mIsATI;
@@ -894,6 +896,7 @@ void LLGLManager::initExtensions()
 
 	mHasTextureSwizzle = mGLVersion >= 3.3f || epoxy_has_gl_extension("GL_ARB_texture_swizzle");
     mHasGPUShader4 = mGLVersion >= 3.0f || epoxy_has_gl_extension("GL_EXT_gpu_shader4");
+    mHasClipControl = mGLVersion >= 4.5 || epoxy_has_gl_extension("GL_ARB_clip_control");
 #endif
 
 #if LL_LINUX
@@ -921,6 +924,7 @@ void LLGLManager::initExtensions()
 		mHasFragmentShader = FALSE;
 		mHasTextureSwizzle = FALSE;
         mHasGPUShader4 = FALSE;
+        mHasClipControl = FALSE;
 		LL_WARNS("RenderInit") << "GL extension support DISABLED via LL_GL_NOEXT" << LL_ENDL;
 	}
 	else if (getenv("LL_GL_BASICEXT"))	/* Flawfinder: ignore */

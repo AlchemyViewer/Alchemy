@@ -129,8 +129,9 @@ public:
 	BOOL mHassRGBTexture;
 	BOOL mHassRGBFramebuffer;
     BOOL mHasTexturesRGBDecode;
-	bool mHasTextureSwizzle;
-    bool mHasGPUShader4;
+    bool mHasTextureSwizzle = false;
+    bool mHasGPUShader4  = false;
+    bool mHasClipControl = false;
 
 	// Vendor-specific extensions
 	BOOL mIsATI;
