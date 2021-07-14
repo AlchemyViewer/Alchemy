@@ -8170,7 +8170,8 @@ void LLPipeline::renderFinalize()
             }
 
             static LLCachedControl<bool> use_smaa(gSavedSettings, "AlchemyRenderSMAA", true);
-            if (use_smaa && gGLManager.mGLVersion >= 3.1)
+            static LLCachedControl<bool> enable_cas(gSavedSettings, "AlchemyRenderCAS", true);
+			if (use_smaa && gGLManager.mGLVersion >= 3.1)
             {
                 mFXAABuffer.copyContents(*pRenderBuffer, 0, 0, mFXAABuffer.getWidth(), mFXAABuffer.getHeight(), 0, 0,
                                          mFXAABuffer.getWidth(), mFXAABuffer.getHeight(), GL_COLOR_BUFFER_BIT, GL_NEAREST);
@@ -8184,11 +8185,8 @@ void LLPipeline::renderFinalize()
                 LLGLDepthTest    depth(GL_FALSE, GL_FALSE);
                 LLGLSNoAlphaTest alpha_test;
 
-                static LLCachedControl<U32>  show_step(gSavedSettings, "AlchemyRenderSMAAShowStep", 3);
                 static LLCachedControl<bool> use_sample(gSavedSettings, "AlchemyRenderSMAAUseSample", false);
                 static LLCachedControl<bool> use_stencil(gSavedSettings, "AlchemyRenderSMAAUseStencil", true);
-
-                if (show_step >= 1)
                 {
                     LLGLState stencil(GL_STENCIL_TEST, use_stencil);
 
@@ -8224,7 +8222,6 @@ void LLPipeline::renderFinalize()
                     bound_shader->unbind();
                     gGL.getTexUnit(0)->disable();
                 }
-                if (show_step >= 2)
                 {
                     LLGLState stencil(GL_STENCIL_TEST, use_stencil);
 
@@ -8262,7 +8259,6 @@ void LLPipeline::renderFinalize()
                     gGL.getTexUnit(2)->disable();
                 }
 
-                if (show_step >= 3)
                 {
                     LLGLDisable stencil(GL_STENCIL_TEST);
                     LLGLState srgb_state(GL_FRAMEBUFFER_SRGB, gGLManager.mHasTexturesRGBDecode);
@@ -8279,10 +8275,20 @@ void LLPipeline::renderFinalize()
 
                     bound_shader->bind();
                     bound_shader->uniform4fv(sSmaaRTMetrics, 1, rt_metrics);
-                    bound_target->bindTarget();
-                    bound_target->clear(GL_COLOR_BUFFER_BIT);
+                    if (enable_cas)
+                    {
+                        bound_target->bindTarget();
+                        bound_target->clear(GL_COLOR_BUFFER_BIT);
+					}
                     drawFullScreenRect();
-                    bound_target->flush();
+                    if (enable_cas)
+                    {
+                        bound_target->flush();
+                    }
+                    else
+                    {
+                        gGL.flush();
+                    }
                     bound_shader->unbind();
                     gGL.getTexUnit(0)->disable();
                     gGL.getTexUnit(1)->disable();
@@ -8347,49 +8353,44 @@ void LLPipeline::renderFinalize()
                                         2.f / width * scale_x,
                                   2.f / height * scale_y);
 
-				bound_target->bindTarget();
-                bound_target->clear(GL_COLOR_BUFFER_BIT);
+				if (enable_cas)
+                {
+                    bound_target->bindTarget();
+                    bound_target->clear(GL_COLOR_BUFFER_BIT);
+                }
 				drawFullScreenRect();
-                bound_target->flush();
+                if (enable_cas)
+                {
+                    bound_target->flush();
+                }
+                else
+                {
+                    gGL.flush();
+                }
 				bound_shader->unbind();
                 gGL.getTexUnit(channel)->disable();
             }
 
-			static LLCachedControl<bool> enable_cas(gSavedSettings, "AlchemyRenderCAS", true);
             if (enable_cas)
             {
                 static LLCachedControl<F32> sharpness_cc(gSavedSettings, "AlchemyRenderCASSharpness", 0.8f);
-                LLGLState srgb(GL_FRAMEBUFFER_SRGB, gGLManager.mHasTexturesRGBDecode);
+
+				LLGLDisable srgb(GL_FRAMEBUFFER_SRGB);
 
 				LLRenderTarget* previous_target = bound_target;
 
 				// Bind setup:
-                bound_target = &mScreen;
                 bound_shader = &gPostCASProgram;
 
 				// Draw
-                previous_target->bindTexture(0, 0, LLTexUnit::TFO_BILINEAR);
+                previous_target->bindTexture(0, 0, LLTexUnit::TFO_POINT);
                 gGL.getTexUnit(0)->setTextureColorSpace(LLTexUnit::TCS_LINEAR);
 
                 bound_shader->bind();
                 bound_shader->uniform1f(sSharpness, sharpness_cc);
-                bound_target->bindTarget();
-                bound_target->clear(GL_COLOR_BUFFER_BIT);
                 drawFullScreenRect();
-                bound_target->flush();
                 bound_shader->unbind();
                 gGL.getTexUnit(0)->disable();
-            }
-
-            if (bound_target) // Sanity check
-            {  // copy color buffer from mScreen to framebuffer
-                LLRenderTarget::copyContentsToFramebuffer(*bound_target, 0, 0, mScreen.getWidth(), mScreen.getHeight(), 0, 0,
-                                                          mScreen.getWidth(), mScreen.getHeight(), GL_COLOR_BUFFER_BIT,
-                                                          GL_NEAREST);
-            }
-            else
-            {
-                LL_ERRS() << "MISSING FINAL TARGET" << LL_ENDL;
             }
 
             gGLViewport[0] = gViewerWindow->getWorldViewRectRaw().mLeft;
