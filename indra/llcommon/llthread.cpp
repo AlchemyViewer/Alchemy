@@ -54,12 +54,12 @@ typedef struct tagTHREADNAME_INFO
 } THREADNAME_INFO;
 #pragma pack(pop)
 
-void set_thread_name( DWORD dwThreadID, const char* threadName)
+void set_thread_name(const char* threadName)
 {
     THREADNAME_INFO info;
     info.dwType = 0x1000;
     info.szName = threadName;
-    info.dwThreadID = dwThreadID;
+    info.dwThreadID = (DWORD)-1;
     info.dwFlags = 0;
 
     __try
@@ -132,7 +132,7 @@ void LLThread::registerThreadID() {}
 void LLThread::threadRun()
 {
 #ifdef LL_WINDOWS
-    set_thread_name(-1, mName.c_str());
+    set_thread_name(mName.c_str());
 #endif
 
     // this is the first point at which we're actually running in the new thread

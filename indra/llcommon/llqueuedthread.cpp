@@ -126,8 +126,6 @@ S32 LLQueuedThread::update(F32 max_time_ms)
 
 S32 LLQueuedThread::updateQueue(F32 max_time_ms)
 {
-	F64 max_time = (F64)max_time_ms * .001;
-	LLTimer timer;
 	S32 pending = 1;
 
 	// Frame Update
@@ -141,6 +139,8 @@ S32 LLQueuedThread::updateQueue(F32 max_time_ms)
 	}
 	else
 	{
+		F64 max_time = (F64)max_time_ms * .001;
+		LLTimer timer;
 		while (pending > 0)
 		{
 			pending = processNextRequest();
@@ -154,19 +154,16 @@ S32 LLQueuedThread::updateQueue(F32 max_time_ms)
 void LLQueuedThread::incQueue()
 {
 	// Something has been added to the queue
-	if (!isPaused())
+	if (mThreaded && !isPaused())
 	{
-		if (mThreaded)
-		{
-			wake(); // Wake the thread up if necessary.
-		}
+		wake(); // Wake the thread up if necessary.
 	}
 }
 
 // MAIN thread
 void LLQueuedThread::waitOnPending()
 {
-	while(1)
+	while (true)
 	{
 		update(0);
 
@@ -179,7 +176,6 @@ void LLQueuedThread::waitOnPending()
 			yield();
 		}
 	}
-	return;
 }
 
 // MAIN thread
@@ -204,7 +200,7 @@ LLQueuedThread::handle_t LLQueuedThread::generateHandle()
 	lockData();
 	while ((mNextHandle == nullHandle()) || (mRequestHash.find(mNextHandle)))
 	{
-		mNextHandle++;
+		++mNextHandle;
 	}
 	const LLQueuedThread::handle_t res = mNextHandle++;
 	unlockData();
@@ -396,7 +392,7 @@ S32 LLQueuedThread::processNextRequest()
 	// Get next request from pool
 	lockData();
 	
-	while(1)
+	while (true)
 	{
 		req = NULL;
 		if (mRequestQueue.empty())
