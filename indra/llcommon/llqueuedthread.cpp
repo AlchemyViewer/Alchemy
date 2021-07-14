@@ -437,7 +437,13 @@ S32 LLQueuedThread::processNextRequest()
 	// safe to access req.
 	if (req)
 	{
-		// process request		
+		if (req->getFlags() & FLAG_ASYNC)
+		{
+			req->processRequest();
+			return getPending();
+		}
+
+		// process request
 		bool complete = req->processRequest();
 
 		if (complete)

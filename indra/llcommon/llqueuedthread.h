@@ -66,7 +66,8 @@ public:
 	enum flags_t {
 		FLAG_AUTO_COMPLETE = 1,
 		FLAG_AUTO_DELETE = 2, // child-class dependent
-		FLAG_ABORT = 4
+		FLAG_ABORT = 4,
+		FLAG_ASYNC = 8
 	};
 
 	typedef U32 handle_t;

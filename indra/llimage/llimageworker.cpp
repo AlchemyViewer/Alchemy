@@ -29,14 +29,98 @@
 #include "llimageworker.h"
 #include "llimagedxt.h"
 
+std::atomic< U32 > sImageThreads;
+
+class PoolWorkerThread : public LLThread
+{
+public:
+	PoolWorkerThread(std::string name) : LLThread(name),
+		mCurrentRequest(NULL)
+	{
+	}
+	virtual void run()
+	{
+		while (!isQuitting())
+		{
+			auto *pReq = mCurrentRequest.exchange(nullptr);
+
+			if (pReq)
+				pReq->processRequestIntern();
+			checkPause();
+		}
+	}
+	bool isBusy()
+	{
+		auto *pReq = mCurrentRequest.load();
+		if (!pReq)
+			return false;
+
+		auto status = pReq->getStatus();
+
+		return status  == LLQueuedThread::STATUS_QUEUED || status == LLQueuedThread::STATUS_INPROGRESS;
+	}
+
+	bool runCondition()
+	{
+		return mCurrentRequest != NULL;
+	}
+
+	bool setRequest(LLImageDecodeThread::ImageRequest* req)
+	{
+		LLImageDecodeThread::ImageRequest* pOld{ nullptr };
+		bool bSuccess = mCurrentRequest.compare_exchange_strong(pOld, req);
+		wake();
+
+		return bSuccess;
+	}
+
+private:
+	std::atomic< LLImageDecodeThread::ImageRequest * > mCurrentRequest;
+};
+
 //----------------------------------------------------------------------------
 
 // MAIN THREAD
-LLImageDecodeThread::LLImageDecodeThread(bool threaded)
+LLImageDecodeThread::LLImageDecodeThread(bool threaded, U32 pool_size)
 	: LLQueuedThread("imagedecode", threaded)
 	, mCreationListSize(0)
 {
 	mCreationMutex = new LLMutex();
+
+    if (pool_size == 0)
+	{
+        pool_size = std::thread::hardware_concurrency();
+        if (!pool_size == 0)
+            pool_size = 4U;  // Use a sane default: 2 cores
+        if (pool_size >= 8U)
+		{
+			// Using number of (virtual) cores minus 3 for:
+			// - main image worker
+			// - viewer main loop thread
+			// - mesh repo thread
+			// further bound to a maximum of 16 threads (more than that is totally useless, even
+			// when flying over main land with 512m draw distance).
+            pool_size = llmin(pool_size - 3U, 16U);
+		}
+        else if (pool_size > 2U)
+		{
+			// Using number of (virtual) cores - 1 (for the main image worker
+			// thread).
+            --pool_size;
+		}
+	}
+    else if (pool_size == 1)  // Disable if only 1
+        pool_size = 0;
+
+	sImageThreads = pool_size;
+	
+	LL_INFOS() << "Initializing with " << sImageThreads << " image decode threads" << LL_ENDL;
+	
+	for (U32 i = 0; i < pool_size; ++i)
+	{
+		mThreadPool.push_back(std::make_unique<PoolWorkerThread>(fmt::format("Image Decode Thread {}", i)));
+		mThreadPool[i]->start();
+	}
 }
 
 //virtual 
@@ -56,14 +140,18 @@ S32 LLImageDecodeThread::update(F32 max_time_ms)
 			 iter != mCreationList.end(); ++iter)
 		{
 			creation_info& info = *iter;
+		// ImageRequest* req = new ImageRequest(info.handle, info.image,
+		//				     info.priority, info.discard, info.needs_aux,
+		//				     info.responder);
 			ImageRequest* req = new ImageRequest(info.handle, info.image,
 				info.priority, info.discard, info.needs_aux,
-				info.responder);
+				info.responder, this);
 
 			bool res = addRequest(req);
 			if (!res)
 			{
-				LL_ERRS() << "request added after LLLFSThread::cleanupClass()" << LL_ENDL;
+				LL_WARNS() << "request added after LLLFSThread::cleanupClass()" << LL_ENDL;
+				return 0;
 			}
 		}
 		mCreationList.clear();
@@ -76,10 +164,28 @@ S32 LLImageDecodeThread::update(F32 max_time_ms)
 LLImageDecodeThread::handle_t LLImageDecodeThread::decodeImage(LLImageFormatted* image, 
 	U32 priority, S32 discard, BOOL needs_aux, Responder* responder)
 {
-	LLMutexLock lock(mCreationMutex);
 	handle_t handle = generateHandle();
-	mCreationList.push_back(creation_info(handle, image, priority, discard, needs_aux, responder));
-	mCreationListSize = mCreationList.size();
+	// If we have a thread pool dispatch this directly.
+	// Note: addRequest could cause the handling to take place on the fetch thread, this is unlikely to be an issue. 
+	// if this is an actual problem we move the fallback to here and place the unfulfilled request into the legacy queue
+    if (sImageThreads > 0)
+	{
+		ImageRequest* req = new ImageRequest(handle, image,
+			priority, discard, needs_aux,
+			responder, this);
+		bool res = addRequest(req);
+		if (!res)
+		{
+			LL_WARNS() << "Decode request not added because we are exiting." << LL_ENDL;
+			return 0;
+		}
+	}
+	else
+	{
+		LLMutexLock lock(mCreationMutex);
+		mCreationList.push_back(creation_info(handle, image, priority, discard, needs_aux, responder));
+		mCreationListSize = mCreationList.size();
+	}
 	return handle;
 }
 
@@ -96,15 +202,19 @@ S32 LLImageDecodeThread::tut_size()
 
 LLImageDecodeThread::ImageRequest::ImageRequest(handle_t handle, LLImageFormatted* image, 
 												U32 priority, S32 discard, BOOL needs_aux,
-												LLImageDecodeThread::Responder* responder)
+												LLImageDecodeThread::Responder* responder,
+												LLImageDecodeThread *aQueue)
 	: LLQueuedThread::QueuedRequest(handle, priority, FLAG_AUTO_COMPLETE),
 	  mFormattedImage(image),
 	  mDiscardLevel(discard),
 	  mNeedsAux(needs_aux),
 	  mDecodedRaw(FALSE),
 	  mDecodedAux(FALSE),
-	  mResponder(responder)
+	  mResponder(responder),
+      mQueue( aQueue )
 {
+    if (sImageThreads > 0)
+		mFlags |= FLAG_ASYNC;
 }
 
 LLImageDecodeThread::ImageRequest::~ImageRequest()
@@ -120,7 +230,24 @@ LLImageDecodeThread::ImageRequest::~ImageRequest()
 // Returns true when done, whether or not decode was successful.
 bool LLImageDecodeThread::ImageRequest::processRequest()
 {
-	const F32 decode_time_slice = .1f;
+	// If not async, decode using this thread
+	if ((mFlags & FLAG_ASYNC) == 0)
+		return processRequestIntern();
+
+	// Try to dispatch to a new thread, if this isn't possible decode on this thread
+	if (!mQueue->enqueRequest(this))
+		return processRequestIntern();
+	return true;
+}
+
+bool LLImageDecodeThread::ImageRequest::processRequestIntern()
+{
+	F32 decode_time_slice = .1f;
+	if(mFlags & FLAG_ASYNC)
+	{
+		decode_time_slice = 10.0f;// long time out as this is not an issue with async
+	}
+
 	bool done = true;
 	if (!mDecodedRaw && mFormattedImage.notNull())
 	{
@@ -144,7 +271,16 @@ bool LLImageDecodeThread::ImageRequest::processRequest()
 											  mFormattedImage->getHeight(),
 											  mFormattedImage->getComponents());
 		}
-		done = mFormattedImage->decode(mDecodedImageRaw, decode_time_slice); // 1ms
+
+		if( mDecodedImageRaw->getData() )
+			done = mFormattedImage->decode(mDecodedImageRaw, decode_time_slice); // 1ms
+		else
+		{
+			LL_WARNS() << "No memory for LLImageRaw of size " << (U32)mFormattedImage->getWidth() << "x" << (U32)mFormattedImage->getHeight() << "x"
+					   << (U32)mFormattedImage->getComponents() << LL_ENDL;
+			done = false;
+		}
+		
 		// some decoders are removing data when task is complete and there were errors
 		mDecodedRaw = done && mDecodedImageRaw->getData();
 	}
@@ -159,6 +295,19 @@ bool LLImageDecodeThread::ImageRequest::processRequest()
 		}
 		done = mFormattedImage->decodeChannels(mDecodedImageAux, decode_time_slice, 4, 4); // 1ms
 		mDecodedAux = done && mDecodedImageAux->getData();
+	}
+
+	if(!done)
+	{
+		LL_WARNS("ImageDecode") << "Image decoding failed to complete with time slice=" << decode_time_slice << LL_ENDL;
+	}
+
+	if (mFlags & FLAG_ASYNC)
+	{
+		setStatus(STATUS_COMPLETE);
+		finishRequest(true);
+		// always autocomplete
+		mQueue->completeRequest(mHashKey);
 	}
 
 	return done;
@@ -179,4 +328,17 @@ void LLImageDecodeThread::ImageRequest::finishRequest(bool completed)
 bool LLImageDecodeThread::ImageRequest::tut_isOK()
 {
 	return mResponder.notNull();
+}
+
+bool LLImageDecodeThread::enqueRequest(ImageRequest * req)
+{
+	for (auto &pThread : mThreadPool)
+	{
+		if (!pThread->isBusy())
+		{
+			if( pThread->setRequest(req) )
+				return true;
+		}
+	}
+	return false;
 }
