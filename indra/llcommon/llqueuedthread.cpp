@@ -464,7 +464,7 @@ S32 LLQueuedThread::processNextRequest()
 			unlockData();
 			if (mThreaded && start_priority < PRIORITY_NORMAL)
 			{
-				ms_sleep(1); // sleep the thread a little
+				yield();
 			}
 		}
 		
@@ -511,7 +511,7 @@ void LLQueuedThread::run()
 		if (pending_work == 0)
 		{
 			mIdleThread = true;
-			ms_sleep(1);
+			yield();
 		}
 		//LLThread::yield(); // thread should yield after each request		
 	}

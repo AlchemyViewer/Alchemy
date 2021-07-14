@@ -204,7 +204,7 @@ protected:
 	request_queue_t mRequestQueue;
 	std::atomic<S32> mRequestQueueSize;
 
-	enum { REQUEST_HASH_SIZE = 512 }; // must be power of 2
+	enum { REQUEST_HASH_SIZE = 1024 }; // must be power of 2
 	typedef LLSimpleHash<handle_t, REQUEST_HASH_SIZE> request_hash_t;
 	request_hash_t mRequestHash;
 
