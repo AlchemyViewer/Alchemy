@@ -91,7 +91,7 @@ LLImageDecodeThread::LLImageDecodeThread(bool threaded, U32 pool_size)
     if (pool_size == 0)
 	{
         pool_size = std::thread::hardware_concurrency();
-        if (!pool_size == 0)
+        if (pool_size == 0)
             pool_size = 4U;  // Use a sane default: 2 cores
         if (pool_size >= 8U)
 		{
