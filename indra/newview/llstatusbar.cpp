@@ -108,6 +108,7 @@ const F32 ICON_TIMER_EXPIRY		= 3.f; // How long the balance and health icons sho
 LLStatusBar::LLStatusBar(const LLRect& rect)
 :	LLPanel(),
 	mTextTime(NULL),
+	mTextFPS(nullptr),
 	mSGBandwidth(NULL),
 	mSGPacketLoss(NULL),
 	mPanelPopupHolder(nullptr),
@@ -129,6 +130,7 @@ LLStatusBar::LLStatusBar(const LLRect& rect)
 
 	mBalanceTimer = new LLFrameTimer();
 	mHealthTimer = new LLFrameTimer();
+	mFPSUpdateTimer = new LLFrameTimer();
 
 	buildFromFile("panel_status_bar.xml");
 }
@@ -147,6 +149,25 @@ LLStatusBar::~LLStatusBar()
 //-----------------------------------------------------------------------
 // Overrides
 //-----------------------------------------------------------------------
+
+static int32_t fastFloor(const float* in, const ptrdiff_t length = 1)
+{
+  int32_t* out;
+  #define ALIGNMENT alignof(max_align_t)
+  static_assert(sizeof(float) == sizeof(int32_t), "");
+  assert((uintptr_t)(void*)in % ALIGNMENT == 0);
+  assert((uintptr_t)(void*)out % ALIGNMENT == 0);
+  assert((size_t)length % (ALIGNMENT/sizeof(int32_t)) == 0);
+
+  alignas(ALIGNMENT) const float* const input = in;
+  alignas(ALIGNMENT) int32_t* const output = out;
+
+  // Do the conversion
+  for (int i = 0; i < length; ++i) {
+    output[i] = static_cast<int32_t>(std::floor(input[i]));
+  }
+  return *out;
+}
 
 // virtual
 void LLStatusBar::draw()
@@ -203,6 +224,8 @@ BOOL LLStatusBar::postBuild()
 
 	gSavedSettings.getControl("MuteAudio")->getSignal()->connect(boost::bind(&LLStatusBar::onVolumeChanged, this, _2));
 	gSavedPerAccountSettings.getControl("AlchemyAOEnable")->getCommitSignal()->connect(boost::bind(&LLStatusBar::onAOStateChanged, this));
+
+	mTextFPS = getChild<LLTextBox>("FPSText");
 
 	// Adding Net Stat Graph
 	S32 x = getRect().getWidth() - 2;
@@ -300,6 +323,7 @@ BOOL LLStatusBar::postBuild()
 void LLStatusBar::refresh()
 {
 	static LLCachedControl<bool> show_net_stats(gSavedSettings, "ShowNetStats", false);
+	static LLCachedControl<bool> show_fps(gSavedSettings, "ShowStatusBarFPS", false);
 	bool net_stats_visible = show_net_stats;
 
 	if (net_stats_visible)
@@ -365,6 +389,13 @@ void LLStatusBar::refresh()
 							  media_inst->isParcelMediaPlaying() ||
 							  media_inst->isParcelAudioPlaying());
 	mMediaToggle->setValue(!any_media_playing);
+
+	if (show_fps && mFPSUpdateTimer->getElapsedTimeF32() > 0.125f)
+	{
+		mFPSUpdateTimer->reset();
+		auto fps = (float)LLTrace::get_frame_recording().getPeriodMean(LLStatViewer::FPS);
+		mTextFPS->setText(fmt::format(FMT_STRING("{:d}"), fastFloor(&fps)));
+	}
 }
 
 void LLStatusBar::setVisibleForMouselook(bool visible)
@@ -382,6 +413,7 @@ void LLStatusBar::setVisibleForMouselook(bool visible)
 	setBackgroundVisible(visible);
 	mIconPresetsCamera->setVisible(visible);
 	mIconPresetsGraphic->setVisible(visible);
+	mTextFPS->setVisible(visible);
 }
 
 void LLStatusBar::debitBalance(S32 debit)

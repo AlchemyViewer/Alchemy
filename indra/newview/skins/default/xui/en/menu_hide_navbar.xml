@@ -30,4 +30,15 @@
              function="CheckControl"
              parameter="ShowMiniLocationPanel" />
     </menu_item_check>
+    <menu_item_check
+         label="Show FPS"
+         layout="topleft"
+         name="ShowStatusBarFPS">
+           <on_click
+             function="ToggleControl"
+             parameter="ShowStatusBarFPS" /> 
+             <on_check
+             function="CheckControl"
+             parameter="ShowStatusBarFPS" />
+    </menu_item_check>
 </menu>
