@@ -334,8 +334,10 @@ private:
 	cancel_queue_t mCancelQueue;										// Mfnq
 	F32 mTextureBandwidth;												// <none>
 	std::atomic<F32> mMaxBandwidth;
+#ifndef LL_RELEASE_FOR_DOWNLOAD
 	LLTextureInfo mTextureInfo;
 	LLTextureInfo mTextureInfoMainThread;
+#endif
 
 	// XXX possible delete
 	std::atomic<U32Bits> mHTTPTextureBits;

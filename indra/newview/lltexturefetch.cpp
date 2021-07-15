@@ -2071,14 +2071,17 @@ bool LLTextureFetchWorker::doWork(S32 param)
 // virtual
 void LLTextureFetchWorker::onCompleted(LLCore::HttpHandle handle, LLCore::HttpResponse * response)
 {
+#ifndef LL_RELEASE_FOR_DOWNLOAD
 	static LLCachedControl<bool> log_to_viewer_log(gSavedSettings, "LogTextureDownloadsToViewerLog", false);
 	static LLCachedControl<bool> log_to_sim(gSavedSettings, "LogTextureDownloadsToSimulator", false);
+#endif
 	static LLCachedControl<bool> log_texture_traffic(gSavedSettings, "LogTextureNetworkTraffic", false) ;
 
 	LLMutexLock lock(&mWorkMutex);										// +Mw
 
 	mHttpActive = false;
 	
+#ifndef LL_RELEASE_FOR_DOWNLOAD
 	if (log_to_viewer_log || log_to_sim)
 	{
 		mFetcher->mTextureInfo.setRequestStartTime(mID, mMetricsStartTime.value());
@@ -2087,6 +2090,7 @@ void LLTextureFetchWorker::onCompleted(LLCore::HttpHandle handle, LLCore::HttpRe
 		mFetcher->mTextureInfo.setRequestOffset(mID, mRequestedOffset);
 		mFetcher->mTextureInfo.setRequestCompleteTimeAndLog(mID, LLTimer::getTotalTime());
 	}
+#endif
 
 	static LLCachedControl<F32> fake_failure_rate(gSavedSettings, "TextureFetchFakeFailureRate", 0.0f);
 	F32 rand_val = ll_frand();
@@ -2633,11 +2637,15 @@ LLTextureFetch::LLTextureFetch(LLTextureCache* cache, LLImageDecodeThread* image
 	  mFetchDebugger(NULL),
 	  mFetchSource(LLTextureFetch::FROM_ALL),
 	  mOriginFetchSource(LLTextureFetch::FROM_ALL),
-	  mFetcherLocked(FALSE),
-	  mTextureInfoMainThread(false)
+	  mFetcherLocked(FALSE)
+#ifndef LL_RELEASE_FOR_DOWNLOAD
+	  , mTextureInfoMainThread(false)
+#endif
 {
 	mMaxBandwidth = gSavedSettings.getF32("ThrottleBandwidthKBPS");
+#ifndef LL_RELEASE_FOR_DOWNLOAD
 	mTextureInfo.setLogging(true);
+#endif
 
 	LLAppCoreHttp & app_core_http(LLAppViewer::instance()->getAppCoreHttp());
 	mHttpRequest = new LLCore::HttpRequest;
@@ -3182,7 +3190,9 @@ void LLTextureFetch::shutDownImageDecodeThread()
 // Threads:  Ttf
 void LLTextureFetch::startThread()
 {
+#ifndef LL_RELEASE_FOR_DOWNLOAD
 	mTextureInfo.startRecording();
+#endif
 }
 
 // Threads:  Ttf
@@ -3193,8 +3203,9 @@ void LLTextureFetch::endThread()
 					  << ", ResWaits:  " << mTotalResourceWaitCount
 					  << ", TotalHTTPReq:  " << getTotalNumHTTPRequests()
 					  << LL_ENDL;
-
+#ifndef LL_RELEASE_FOR_DOWNLOAD
 	mTextureInfo.stopRecording();
+#endif
 }
 
 // Threads:  Ttf
@@ -3340,6 +3351,7 @@ void LLTextureFetch::sendRequestListToSimulators()
 // 				LL_INFOS(LOG_TXT) << "IMAGE REQUEST: " << req->mID << " Discard: " << req->mDesiredDiscard
 // 						<< " Packet: " << packet << " Priority: " << req->mImagePriority << LL_ENDL;
 
+#ifndef LL_RELEASE_FOR_DOWNLOAD
 				static LLCachedControl<bool> log_to_viewer_log(gSavedSettings,"LogTextureDownloadsToViewerLog", false);
 				static LLCachedControl<bool> log_to_sim(gSavedSettings,"LogTextureDownloadsToSimulator", false);
 				if (log_to_viewer_log || log_to_sim)
@@ -3349,6 +3361,7 @@ void LLTextureFetch::sendRequestListToSimulators()
 					mTextureInfo.setRequestSize(req->mID, 0);
 					mTextureInfo.setRequestType(req->mID, LLTextureInfoDetails::REQUEST_TYPE_UDP);
 				}
+#endif
 
 				req->lockWorkMutex();									// +Mw
 				req->mSentRequest = LLTextureFetchWorker::SENT_SIM;
@@ -3587,6 +3600,7 @@ bool LLTextureFetch::receiveImagePacket(const LLHost& host, const LLUUID& id, U1
 		removeFromNetworkQueue(worker, true); // failsafe
 	}
 
+#ifndef LL_RELEASE_FOR_DOWNLOAD
 	if (packet_num >= (worker->mTotalPackets - 1))
 	{
 		static LLCachedControl<bool> log_to_viewer_log(gSavedSettings,"LogTextureDownloadsToViewerLog", false);
@@ -3599,6 +3613,7 @@ bool LLTextureFetch::receiveImagePacket(const LLHost& host, const LLUUID& id, U1
 			mTextureInfoMainThread.setRequestCompleteTimeAndLog(id, timeNow);
 		}
 	}
+#endif
 	worker->unlockWorkMutex();											// -Mw
 
 	return res;
