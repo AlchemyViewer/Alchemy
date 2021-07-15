@@ -91,6 +91,13 @@ endif()
 
 # Add tests
 if (LL_TESTS)
+
+set_source_files_properties(
+    llimageworker.cpp
+    PROPERTIES
+    LL_TEST_ADDITIONAL_LIBRARIES "${LLPRIMITIVE_LIBRARIES};readerwriterqueue"
+  )
+
   SET(llimage_TEST_SOURCE_FILES
     llimageworker.cpp
     )

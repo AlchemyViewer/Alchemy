@@ -30,7 +30,7 @@
 #include "llimagedxt.h"
 #include <readerwriterqueue.h>
 
-std::atomic< U32 > sImageThreads;
+std::atomic< U32 > sImageThreads = 0;
 
 class PoolWorkerThread : public LLThread
 {
@@ -235,7 +235,7 @@ bool LLImageDecodeThread::ImageRequest::processRequest()
 		return processRequestIntern();
 
 	// Try to dispatch to a new thread, if this isn't possible decode on this thread
-	if (!mQueue->enqueRequest(this))
+	if (!mQueue || !mQueue->enqueRequest(this))
 		return processRequestIntern();
 	return true;
 }

@@ -143,7 +143,7 @@ namespace tut
 
 			mRequest = new LLImageDecodeThread::ImageRequest(0, 0,
 											 LLQueuedThread::PRIORITY_NORMAL, 0, FALSE,
-											 new responder_test(&done));
+											 new responder_test(&done), nullptr);
 		}
 		~imagerequest_test()
 		{
@@ -193,7 +193,7 @@ namespace tut
 	void imagedecodethread_object_t::test<1>()
 	{
 		// Test a *non threaded* instance of the class
-		mThread = new LLImageDecodeThread(false);
+		mThread = new LLImageDecodeThread(false, 1);
 		ensure("LLImageDecodeThread: non threaded constructor failed", mThread != NULL);
 		// Test that we start with an empty list right at creation
 		ensure("LLImageDecodeThread: non threaded init state incorrect", mThread->tut_size() == 0);
@@ -216,7 +216,7 @@ namespace tut
 	void imagedecodethread_object_t::test<2>()
 	{
 		// Test a *threaded* instance of the class
-		mThread = new LLImageDecodeThread(true);
+		mThread = new LLImageDecodeThread(true, 1);
 		ensure("LLImageDecodeThread: threaded constructor failed", mThread != NULL);
 		// Test that we start with an empty list right at creation
 		ensure("LLImageDecodeThread: threaded init state incorrect", mThread->tut_size() == 0);
