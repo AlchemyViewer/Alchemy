@@ -128,6 +128,7 @@ private:
 	void onAOStateChanged();
 
 	LLTextBox	*mTextTime;
+	LLTextBox	*mTextFPS;
 
 	LLStatGraph *mSGBandwidth;
 	LLStatGraph *mSGPacketLoss;
@@ -141,6 +142,7 @@ private:
 	LLTextBox	*mBoxBalance;
 	LLButton	*mMediaToggle;
 	LLFrameTimer	mClockUpdateTimer;
+	LLFrameTimer*	mFPSUpdateTimer;
 
 	S32				mBalance;
 	S32				mHealth;
