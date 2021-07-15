@@ -150,25 +150,6 @@ LLStatusBar::~LLStatusBar()
 // Overrides
 //-----------------------------------------------------------------------
 
-static int32_t fastFloor(const float* in, const ptrdiff_t length = 1)
-{
-  int32_t* out;
-  #define ALIGNMENT alignof(max_align_t)
-  static_assert(sizeof(float) == sizeof(int32_t), "");
-  assert((uintptr_t)(void*)in % ALIGNMENT == 0);
-  assert((uintptr_t)(void*)out % ALIGNMENT == 0);
-  assert((size_t)length % (ALIGNMENT/sizeof(int32_t)) == 0);
-
-  alignas(ALIGNMENT) const float* const input = in;
-  alignas(ALIGNMENT) int32_t* const output = out;
-
-  // Do the conversion
-  for (int i = 0; i < length; ++i) {
-    output[i] = static_cast<int32_t>(std::floor(input[i]));
-  }
-  return *out;
-}
-
 // virtual
 void LLStatusBar::draw()
 {
@@ -393,8 +374,8 @@ void LLStatusBar::refresh()
 	if (show_fps && mFPSUpdateTimer->getElapsedTimeF32() > 0.125f)
 	{
 		mFPSUpdateTimer->reset();
-		auto fps = (float)LLTrace::get_frame_recording().getPeriodMean(LLStatViewer::FPS);
-		mTextFPS->setText(fmt::format(FMT_STRING("{:d}"), fastFloor(&fps)));
+		F32 fps = (F32)LLTrace::get_frame_recording().getLastRecording().getMean(LLStatViewer::FPS_SAMPLE);
+		mTextFPS->setText(fmt::format(FMT_STRING("{:d}"), llfloor(fps)));
 	}
 }
 

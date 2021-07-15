@@ -220,10 +220,13 @@
     name="fps_bg">
      <text
       type="string"
+      font="SansSerifLarge"
+      text_color="FPSTextColor"
       follows="right|top"
       halign="center"
       height="16"
-      top="3"
+      top="1"
+      v_pad="-1"
       left="0"
       name="FPSText"
       tool_tip="Current FPS"
