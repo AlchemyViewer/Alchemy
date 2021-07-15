@@ -79,6 +79,7 @@ target_link_libraries(llimage
     ${JPEG_LIBRARIES}
     ${PNG_LIBRARIES}
     ${ZLIB_LIBRARIES}
+    readerwriterqueue
     )
 
 if(${CMAKE_VERSION} VERSION_GREATER "3.15.0") 

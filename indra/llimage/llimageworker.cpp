@@ -28,54 +28,49 @@
 
 #include "llimageworker.h"
 #include "llimagedxt.h"
+#include <readerwriterqueue.h>
 
 std::atomic< U32 > sImageThreads;
 
 class PoolWorkerThread : public LLThread
 {
 public:
-	PoolWorkerThread(std::string name) : LLThread(name),
-		mCurrentRequest(NULL)
+	PoolWorkerThread(std::string name) : LLThread(name), mRequestQueue(30)
 	{
 	}
+
 	virtual void run()
 	{
 		while (!isQuitting())
 		{
-			auto *pReq = mCurrentRequest.exchange(nullptr);
+            checkPause();
 
-			if (pReq)
-				pReq->processRequestIntern();
-			checkPause();
+			LLImageDecodeThread::ImageRequest* req  = nullptr;
+            while (!isQuitting() && mRequestQueue.try_dequeue(req))
+            {
+                if (req)
+                {
+                    req->processRequestIntern();
+                }
+            }
 		}
-	}
-	bool isBusy()
-	{
-		auto *pReq = mCurrentRequest.load();
-		if (!pReq)
-			return false;
-
-		auto status = pReq->getStatus();
-
-		return status  == LLQueuedThread::STATUS_QUEUED || status == LLQueuedThread::STATUS_INPROGRESS;
 	}
 
 	bool runCondition()
-	{
-		return mCurrentRequest != NULL;
+    {
+        return mRequestQueue.size_approx() > 0;
 	}
 
 	bool setRequest(LLImageDecodeThread::ImageRequest* req)
 	{
-		LLImageDecodeThread::ImageRequest* pOld{ nullptr };
-		bool bSuccess = mCurrentRequest.compare_exchange_strong(pOld, req);
+        bool bSuccess = mRequestQueue.try_enqueue(req);
 		wake();
 
 		return bSuccess;
 	}
 
 private:
-	std::atomic< LLImageDecodeThread::ImageRequest * > mCurrentRequest;
+    moodycamel::ReaderWriterQueue<LLImageDecodeThread::ImageRequest*> mRequestQueue;
 };
 
 //----------------------------------------------------------------------------
@@ -344,7 +339,7 @@ bool LLImageDecodeThread::enqueRequest(ImageRequest * req)
             mLastPoolAllocation = 0;
         }
         auto& thread = mThreadPool[mLastPoolAllocation++];
-        if (!thread->isBusy() && thread->setRequest(req))
+        if (thread->setRequest(req))
         {
             return true;
         }

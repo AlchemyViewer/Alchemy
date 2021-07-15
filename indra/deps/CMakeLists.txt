@@ -54,6 +54,11 @@ FetchContent_Declare(
   GIT_REPOSITORY https://git.alchemyviewer.org/alchemy/mirrors/abseil-cpp.git
   GIT_TAG        9a7e447c511dae7276ab65fde4d04f6ed52b39c9
   )
+FetchContent_Declare(
+  readerwriterqueue
+  GIT_REPOSITORY    https://github.com/cameron314/readerwriterqueue
+  GIT_TAG           v1.0.5
+)
 
 # This is a hack because absl has dumb cmake
 set(OLD_BUILD_TEST ${BUILD_TESTING})
@@ -93,6 +98,8 @@ FetchContent_MakeAvailable(meshoptimizer)
 set(JSON_Install OFF CACHE INTERNAL "")
 set(JSON_BuildTests OFF CACHE INTERNAL "")
 FetchContent_MakeAvailable(nlohmann_json)
+
+FetchContent_MakeAvailable(readerwriterqueue)
 
 unset(CMAKE_FOLDER)
 unset(CMAKE_POSITION_INDEPENDENT_CODE)
