@@ -3129,7 +3129,7 @@ void LLVOAvatar::idleUpdateNameTag(const LLVector3& root_pos_last)
 	}
 // [/RLVa:KB]
 	BOOL visible_avatar = isVisible() || mNeedsAnimUpdate;
-	static const LLCachedControl<bool> use_chat_bubble(gSavedSettings, "UseChatBubbles"); // seconds
+	static const LLCachedControl<bool> use_chat_bubble(gSavedSettings, "UseChatBubbles");
 	BOOL visible_chat = use_chat_bubble && (mChats.size() || mTyping);
 	BOOL render_name =	visible_chat ||
 		                (visible_avatar &&
@@ -3266,6 +3266,7 @@ void LLVOAvatar::idleUpdateNameTagText(BOOL new_name)
 // [/RLVa:KB]
 	bool is_cloud = getIsCloud();
 	static LLCachedControl<bool> sShowTyping(gSavedSettings, "AlchemyNearbyTypingIndicators", true);
+	static LLCachedControl<bool> use_chat_bubble(gSavedSettings, "UseChatBubbles");
 	bool is_typing = sShowTyping && mTyping;
 
 	if (is_appearance != mNameAppearance)
@@ -3297,7 +3298,7 @@ void LLVOAvatar::idleUpdateNameTagText(BOOL new_name)
 
 		clearNameTag();
 
-		if (is_away || is_muted || is_do_not_disturb || is_appearance || is_typing)
+		if (is_away || is_muted || is_do_not_disturb || is_appearance || (is_typing && !use_chat_bubble))
 		{
 			std::string line;
 			if (is_away)
