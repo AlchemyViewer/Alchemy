@@ -3063,7 +3063,7 @@ bool enable_object_edit()
 	// there.  Eventually this needs to be replaced with code that only 
 	// lets you edit objects if you have permission to do so (edit perms,
 	// group edit, god).  See also lltoolbar.cpp.  JC
-	bool enable = false;
+	bool enable = true;
 	if (gAgent.inPrelude())
 	{
 		enable = LLViewerParcelMgr::getInstance()->allowAgentBuild()
