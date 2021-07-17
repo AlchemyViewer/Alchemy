@@ -38,11 +38,6 @@
 #include <sstream>
 #include <stdexcept>
 
-namespace {
-void log(LLError::ELevel level,
-         const char* p1, const char* p2, const char* p3, const char* p4);
-} // anonymous namespace
-
 // Our master list of all LLSingletons is itself an LLSingleton. We used to
 // store it in a function-local static, but that could get destroyed before
 // the last of the LLSingletons -- and ~LLSingletonBase() definitely wants to
@@ -216,8 +211,8 @@ void LLSingletonBase::pop_initializing()
 
     if (list.empty())
     {
-        logerrs("Underflow in stack of currently-initializing LLSingletons at ",
-                classname(this).c_str(), "::getInstance()");
+        logerrs({"Underflow in stack of currently-initializing LLSingletons at ",
+                classname(this), "::getInstance()"});
     }
 
     // Now we know list.back() exists: capture it
@@ -238,9 +233,9 @@ void LLSingletonBase::pop_initializing()
     // Now validate the newly-popped LLSingleton.
     if (back != this)
     {
-        logerrs("Push/pop mismatch in stack of currently-initializing LLSingletons: ",
-                classname(this).c_str(), "::getInstance() trying to pop ",
-                classname(back).c_str());
+        logerrs({"Push/pop mismatch in stack of currently-initializing LLSingletons: ",
+                classname(this), "::getInstance() trying to pop ",
+                classname(back)});
     }
 
     // log AFTER popping so logging singletons don't cry circularity
@@ -329,15 +324,15 @@ void LLSingletonBase::capture_dependency()
                 //
                 // Example: LLNotifications singleton initializes default channels.
                 // Channels register themselves with singleton once done.
-                logdebugs("LLSingleton circularity: ", out.str().c_str(),
-                    classname(this).c_str(), "");
+                logdebugs({"LLSingleton circularity: ", out.str(),
+                          classname(this)});
             }
             else
             {
                 // Actual circularity with other singleton (or single singleton is used extensively).
                 // Dependency can be unclear.
-                logwarns("LLSingleton circularity: ", out.str().c_str(),
-                    classname(this).c_str(), "");
+                logwarns({"LLSingleton circularity: ", out.str(),
+                         classname(this)});
             }
         }
         else
@@ -350,8 +345,8 @@ void LLSingletonBase::capture_dependency()
             if (current->mDepends.insert(this).second)
             {
                 // only log the FIRST time we hit this dependency!
-                logdebugs(classname(current).c_str(),
-                          " depends on ", classname(this).c_str());
+                logdebugs({classname(current),
+                          " depends on ", classname(this)});
             }
         }
     }
@@ -399,7 +394,7 @@ LLSingletonBase::vec_t LLSingletonBase::dep_sort()
 
 void LLSingletonBase::cleanup_()
 {
-    logdebugs("calling ", classname(this).c_str(), "::cleanupSingleton()");
+    logdebugs({"calling ", classname(this), "::cleanupSingleton()"});
     try
     {
         cleanupSingleton();
@@ -425,23 +420,23 @@ void LLSingletonBase::deleteAll()
             if (! sp->mDeleteSingleton)
             {
                 // This Should Not Happen... but carry on.
-                logwarns(name.c_str(), "::mDeleteSingleton not initialized!");
+                logwarns({name, "::mDeleteSingleton not initialized!"});
             }
             else
             {
                 // properly initialized: call it.
-                logdebugs("calling ", name.c_str(), "::deleteSingleton()");
+                logdebugs({"calling ", name, "::deleteSingleton()"});
                 // From this point on, DO NOT DEREFERENCE sp!
                 sp->mDeleteSingleton();
             }
         }
         catch (const std::exception& e)
         {
-            logwarns("Exception in ", name.c_str(), "::deleteSingleton(): ", e.what());
+            logwarns({"Exception in ", name, "::deleteSingleton(): ", e.what()});
         }
         catch (...)
         {
-            logwarns("Unknown exception in ", name.c_str(), "::deleteSingleton()");
+            logwarns({"Unknown exception in ", name, "::deleteSingleton()"});
         }
     }
 }
@@ -449,49 +444,40 @@ void LLSingletonBase::deleteAll()
 /*---------------------------- Logging helpers -----------------------------*/
 namespace {
 
-void log(LLError::ELevel level,
-         const char* p1, const char* p2, const char* p3, const char* p4)
+std::ostream& operator<<(std::ostream& out, const LLSingletonBase::string_params& args)
 {
-    LL_VLOGS(level, "LLSingleton") << p1 << p2 << p3 << p4 << LL_ENDL;
+    // However many args there are in args, stream each of them to 'out'.
+    for (auto arg : args)
+    {
+        out << arg;
+    }
+    return out;
 }
 
 } // anonymous namespace        
 
 //static
-void LLSingletonBase::logwarns(const char* p1, const char* p2, const char* p3, const char* p4)
+void LLSingletonBase::logwarns(const string_params& args)
 {
-    log(LLError::LEVEL_WARN, p1, p2, p3, p4);
+    LL_WARNS("LLSingleton") << args << LL_ENDL;
 }
 
 //static
-void LLSingletonBase::loginfos(const char* p1, const char* p2, const char* p3, const char* p4)
+void LLSingletonBase::loginfos(const string_params& args)
 {
-    log(LLError::LEVEL_INFO, p1, p2, p3, p4);
+    LL_INFOS("LLSingleton") << args << LL_ENDL;
 }
 
 //static
-void LLSingletonBase::logdebugs(const char* p1, const char* p2, const char* p3, const char* p4)
+void LLSingletonBase::logdebugs(const string_params& args)
 {
-    log(LLError::LEVEL_DEBUG, p1, p2, p3, p4);
+    LL_DEBUGS("LLSingleton") << args << LL_ENDL;
 }
 
 //static
-void LLSingletonBase::logerrs(const char* p1, const char* p2, const char* p3, const char* p4)
+void LLSingletonBase::logerrs(const string_params& args)
 {
-    log(LLError::LEVEL_ERROR, p1, p2, p3, p4);
-    // The other important side effect of LL_ERRS() is
-    // https://www.youtube.com/watch?v=OMG7paGJqhQ (emphasis on OMG)
-    std::ostringstream out;
-    out << p1 << p2 << p3 << p4;
-    auto crash = LLError::getFatalFunction();
-    if (crash)
-    {
-        crash(out.str());
-    }
-    else
-    {
-        LLError::crashAndLoop(out.str());
-    }
+    LL_ERRS("LLSingleton") << args << LL_ENDL;
 }
 
 std::string LLSingletonBase::demangle(const char* mangled)

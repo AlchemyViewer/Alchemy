@@ -47,7 +47,6 @@ elseif((USE_ASAN OR USE_LEAKSAN) AND USE_THDSAN)
   message(FATAL_ERROR "Address and Leak sanitizers are incompatible with thread sanitizer")
 endif(USE_ASAN AND USE_LEAKSAN)
 set(VIEWER_SYMBOL_FILE "" CACHE STRING "Name of tarball into which to place symbol files")
-set(BUGSPLAT_DB "" CACHE STRING "BugSplat database name, if BugSplat crash reporting is desired")
 
 option(USE_CEF "Enable CEF media plugin" ON)
 option(USE_VLC "Enable VLC media plugin" ON)

@@ -10690,7 +10690,8 @@ void LLVOAvatar::accountRenderComplexityForObject(
                             LL_DEBUGS("ARCdetail") << "Attachment costs " << attached_object->getAttachmentItemID()
                                                    << " total: " << attachment_total_cost
                                                    << ", volume: " << attachment_volume_cost
-                                                   << ", textures: " << attachment_texture_cost
+                                                   << ", " << textures.size()
+                                                   << " textures: " << attachment_texture_cost
                                                    << ", " << volume->numChildren()
                                                    << " children: " << attachment_children_cost
                                                    << LL_ENDL;
@@ -10794,10 +10795,23 @@ void LLVOAvatar::calculateUpdateRenderComplexity()
 			ETextureIndex tex_index = baked_dict->mTextureIndex;
 			if ((tex_index != TEX_SKIRT_BAKED) || (isWearingWearableType(LLWearableType::WT_SKIRT)))
 			{
-				if (isTextureVisible(tex_index))
-				{
-					cost +=COMPLEXITY_BODY_PART_COST;
-				}
+                // Same as isTextureVisible(), but doesn't account for isSelf to ensure identical numbers for all avatars
+                if (isIndexLocalTexture(tex_index))
+                {
+                    if (isTextureDefined(tex_index, 0))
+                    {
+                        cost += COMPLEXITY_BODY_PART_COST;
+                    }
+                }
+                else
+                {
+                    // baked textures can use TE images directly
+                    if (isTextureDefined(tex_index)
+                        && (getTEImage(tex_index)->getID() != IMG_INVISIBLE || LLDrawPoolAlpha::sShowDebugAlpha))
+                    {
+                        cost += COMPLEXITY_BODY_PART_COST;
+                    }
+                }
 			}
 		}
 #ifdef SHOW_DEBUG

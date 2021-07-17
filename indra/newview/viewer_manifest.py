@@ -643,7 +643,6 @@ class WindowsManifest(ViewerManifest):
                     self.path("libvlc.dll")
                     self.path("libvlccore.dll")
                     self.path("plugins/")
-
         if not self.is_packaging_viewer():
             self.package_file = "copied_deps"    
 
@@ -992,10 +991,8 @@ class DarwinManifest(ViewerManifest):
 
                 # our apps
                 executable_path = {}
-                for app_bld_dir, app in (
-                                         # plugin launcher
-                                         (os.path.join("llplugin", "slplugin"), "SLPlugin.app"),
-                                         ):
+                embedded_apps = [ (os.path.join("llplugin", "slplugin"), "SLPlugin.app") ]
+                for app_bld_dir, app in embedded_apps:
                     self.path2basename(os.path.join(os.pardir,
                                                     app_bld_dir, self.args['configuration']),
                                        app)

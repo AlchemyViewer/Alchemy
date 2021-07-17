@@ -58,6 +58,7 @@ class LLImageDecodeThread;
 class LLTextureFetch;
 class LLWatchdogTimeout;
 class LLViewerJoystick;
+class LLViewerRegion;
 
 extern LLTrace::BlockTimerStatHandle FTM_FRAME;
 
@@ -151,6 +152,8 @@ public:
     virtual void forceErrorInfiniteLoop();
     virtual void forceErrorSoftwareException();
     virtual void forceErrorDriverCrash();
+    virtual void forceErrorCoroutineCrash();
+    virtual void forceErrorThreadCrash();
 
 	// The list is found in app_settings/settings_files.xml
 	// but since they are used explicitly in code,
@@ -210,7 +213,7 @@ public:
 	// llcorehttp init/shutdown/config information.
 	LLAppCoreHttp & getAppCoreHttp()			{ return mAppCoreHttp; }
 
-    void updateNameLookupUrl();
+    void updateNameLookupUrl(const LLViewerRegion* regionp);
 
 protected:
 	virtual bool initWindow(); // Initialize the viewer's window.

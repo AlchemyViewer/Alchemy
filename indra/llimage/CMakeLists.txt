@@ -12,6 +12,7 @@ include(LLImageJ2COJ)
 include(WebP)
 include(ZLIB)
 include(LLAddBuildTest)
+include(bugsplat)
 include(Tut)
 
 include_directories(

@@ -24,6 +24,7 @@ if (NOT CMAKE_BUILD_TYPE)
 endif (NOT CMAKE_BUILD_TYPE)
 
 include(Variables)
+include(bugsplat)
 include(BuildVersion)
 
 set(LEGACY_STDIO_LIBS)
@@ -76,16 +77,24 @@ if (LINUX)
   endif (INSTALL_PROPRIETARY)
 endif (LINUX)
 
-add_subdirectory(${VIEWER_PREFIX}newview)
-add_dependencies(viewer alchemy-bin)
-
-add_subdirectory(${VIEWER_PREFIX}doxygen EXCLUDE_FROM_ALL)
-
 # sets the 'startup project' for debugging from visual studio.
 set_property(
     DIRECTORY ${VIEWER_PREFIX}
     PROPERTY VS_STARTUP_PROJECT alchemy-bin
     )
+
+if (USE_BUGSPLAT)
+    if (BUGSPLAT_DB)
+        message(STATUS "Building with BugSplat; database '${BUGSPLAT_DB}'")
+    else (BUGSPLAT_DB)
+        message(WARNING "Building with BugSplat, but no database name set (BUGSPLAT_DB)")
+    endif (BUGSPLAT_DB)
+endif (USE_BUGSPLAT)
+
+add_subdirectory(${VIEWER_PREFIX}newview)
+add_dependencies(viewer alchemy-bin)
+
+add_subdirectory(${VIEWER_PREFIX}doxygen EXCLUDE_FROM_ALL)
 
 if (LL_TESTS)
   # Define after the custom targets are created so

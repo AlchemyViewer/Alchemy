@@ -5,6 +5,7 @@ project(llmath)
 include(00-Common)
 include(LLCommon)
 include(LLMath)
+include(bugsplat)
 include(Boost)
 
 include_directories(

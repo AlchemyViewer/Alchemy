@@ -211,7 +211,7 @@ public:
 	LLScriptEdContainer(const LLSD& key, const bool live);
 
 protected:
-	std::string		getTmpFileName();
+	std::string		getTmpFileName(const std::string& script_name);
 // [SL:KB] - Patch: Build-ScriptRecover | Checked: 2011-11-23 (Catznip-3.2)
 	/*virtual*/ void onBackupTimer();
 // [/SL:KB]
