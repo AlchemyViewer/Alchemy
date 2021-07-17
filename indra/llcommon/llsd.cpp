@@ -195,7 +195,7 @@ namespace
 		LLSD::Type type() const override { return T; }
 
 		using LLSD::Impl::assign; // Unhiding base class virtuals...
-		virtual void assign(LLSD::Impl*& var, Data value) 
+        void assign(LLSD::Impl*& var, Data value) override
 		{
 			if (shared())
 			{
@@ -900,8 +900,8 @@ const LLSD::String& LLSD::asStringRef() const { return safe(impl).asStringRef();
 LLSD::LLSD(const char* v) : impl(0)		{ ALLOC_LLSD_OBJECT;	assign(v); }
 void LLSD::assign(const char* v)
 {
-	if(v) assign(std::move(std::string(v)));
-	else assign(std::move(std::string()));
+	if(v) assign(std::string(v));
+	else assign(std::string());
 }
 
 
