@@ -217,6 +217,8 @@ void LLUI::setPopupFuncs(const add_popup_t& add_popup, const remove_popup_t& rem
 	mAddPopupFunc = add_popup;
 	mRemovePopupFunc = remove_popup;
 	mClearPopupsFunc = clear_popups;
+}
+
 // static
 void LLUI::setMousePositionScreen(S32 x, S32 y)
 {

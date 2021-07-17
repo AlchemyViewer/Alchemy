@@ -316,8 +316,9 @@ namespace LLError
 #define llcallstacks                                                                      \
 	if (false)																			  \
 	{                                                                                     \
-       std::ostringstream* _out = LLError::LLCallStacks::insert(__FUNCTION__, __LINE__) ; \
-       (*_out)
+        std::ostringstream _out;                                                          \
+        LLError::LLCallStacks::insert(_out, __FUNCTION__, __LINE__) ;                     \
+        _out
 
 #define llcallstacksendl                   \
 		LLError::End();                    \
@@ -381,8 +382,8 @@ typedef LLError::NoClassInfo _LL_CLASS_TO_LOG;
 #define lllog_test_debug_()                                       \
 		if (LL_UNLIKELY(_site.shouldLog()))                 \
 		{                                                   \
-			std::ostringstream* _out = LLError::Log::out(); \
-			(*_out)
+			std::ostringstream _out; \
+			_out
 #else
 #define lllog_debug(level, once, ...)                                         \
 	do {                                                                \
@@ -390,8 +391,8 @@ typedef LLError::NoClassInfo _LL_CLASS_TO_LOG;
 		{                                                   \
 			const char* tags[] = {"", ##__VA_ARGS__};                       \
 			LLError::CallSite _site(lllog_site_args_(level, once, tags)); \
-			std::ostringstream* _out = LLError::Log::out(); \
-			(*_out)
+			std::ostringstream _out; \
+			_out
 #endif
 
 #define lllog_site_args_(level, once, tags)                 \
