@@ -487,8 +487,14 @@ static bool handleRenderDebugPipelineChanged(const LLSD& newvalue)
 	return true;
 }
 
-static bool handleRenderResolutionDivisorChanged(const LLSD&)
+static bool validateRenderResolutionDivisor(const LLSD& newvalue)
 {
+	return (newvalue.asReal() > 0.01f);
+}
+
+static bool handleRenderResolutionDivisorChanged(const LLSD& newvalue)
+{
+	LLPipeline::RenderResolutionMultiplier = llmin((F32)newvalue.asReal(), 0.01f);
 	gResizeScreenTexture = TRUE;
 	return true;
 }
@@ -692,6 +698,7 @@ void settings_setup_listeners()
 	gSavedSettings.getControl("RenderDeferredNoise")->getSignal()->connect(boost::bind(&handleReleaseGLBufferChanged, _2));
 	gSavedSettings.getControl("RenderDebugGL")->getSignal()->connect(boost::bind(&handleRenderDebugGLChanged, _2));
 	gSavedSettings.getControl("RenderDebugPipeline")->getSignal()->connect(boost::bind(&handleRenderDebugPipelineChanged, _2));
+	gSavedSettings.getControl("RenderResolutionDivisor")->getValidateSignal()->connect(boost::bind(&validateRenderResolutionDivisor, _2));
 	gSavedSettings.getControl("RenderResolutionDivisor")->getSignal()->connect(boost::bind(&handleRenderResolutionDivisorChanged, _2));
 // [SL:KB] - Patch: Settings-RenderResolutionMultiplier | Checked: Catznip-5.4
 	gSavedSettings.getControl("RenderResolutionMultiplier")->getSignal()->connect(boost::bind(&handleRenderResolutionDivisorChanged, _2));
