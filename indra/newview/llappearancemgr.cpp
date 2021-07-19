@@ -3253,7 +3253,7 @@ void LLAppearanceMgr::removeAllAttachmentsFromAvatar()
 
 	LLAgentWearables::llvo_vec_t objects_to_remove;
 	
-	for (const auto attach_pair : gAgentAvatarp->mAttachmentPoints)
+	for (const auto& attach_pair : gAgentAvatarp->mAttachmentPoints)
 	{
         LLViewerJointAttachment* attachment = attach_pair.second;
         for (LLViewerObject * attached_object : attachment->mAttachedObjects)
