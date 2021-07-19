@@ -166,6 +166,16 @@
          value="Toggle Run" />
     </rows>
     <rows
+     name="toggle_down"
+     value="toggle_down">
+        <columns
+         column="lst_action"
+         font="SansSerif"
+         halign="left"
+         name="lst_action"
+         value="Toggle Crouch" />
+    </rows>
+    <rows
      name="toggle_fly"
      value="toggle_fly">
         <columns

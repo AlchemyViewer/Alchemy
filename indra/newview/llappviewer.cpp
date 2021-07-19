@@ -1487,6 +1487,8 @@ bool LLAppViewer::doFrame()
 				joystick->scanJoystick();
 				gKeyboard->scanKeyboard();
                 gViewerInput.scanMouse();
+                if (gAgent.isCrouching())
+                    gAgent.moveUp(-1);
 			}
 
 			// Update state based on messages, user input, object idle.

@@ -7,6 +7,7 @@
     <binding key="S" mask="NONE" command="push_backward"/>
     <binding key="E" mask="NONE" command="jump"/>
     <binding key="C" mask="NONE" command="push_down"/>
+    <binding key="C" mask="SHIFT" command="toggle_down"/>
     <binding key="F" mask="NONE" command="toggle_fly"/>
 
     <binding key="LEFT" mask="NONE" command="slide_left"/>
@@ -43,6 +44,7 @@
     <binding key="S" mask="NONE" command="push_backward"/>
     <binding key="E" mask="NONE" command="jump"/>
     <binding key="C" mask="NONE" command="push_down"/>
+    <binding key="C" mask="SHIFT" command="toggle_down"/>
 
     <binding key="F" mask="NONE" command="toggle_fly"/>
 

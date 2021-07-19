@@ -469,7 +469,7 @@ LLAgent::LLAgent() :
 	mCurrentFidget(0),
 	mFirstLogin(FALSE),
 	mOutfitChosen(FALSE),
-
+    mCrouch(false),
 	mVoiceConnected(false),
 
 	mMouselookModeInSignal(NULL),
@@ -721,13 +721,15 @@ void LLAgent::moveUp(S32 direction)
 	if (direction > 0)
 	{
 		setControlFlags(AGENT_CONTROL_UP_POS | AGENT_CONTROL_FAST_UP);
+        mCrouch = false;
 	}
 	else if (direction < 0)
 	{
 		setControlFlags(AGENT_CONTROL_UP_NEG | AGENT_CONTROL_FAST_UP);
 	}
 
-	gAgentCamera.resetView(mMovementResetCamera);
+    if (!mCrouch)
+        gAgentCamera.resetView(mMovementResetCamera);
 }
 
 //-----------------------------------------------------------------------------
@@ -769,6 +771,10 @@ void LLAgent::movePitch(F32 mag)
 	}
 }
 
+bool LLAgent::isCrouching() const
+{
+    return mCrouch && !getFlying();
+}
 
 // Does this parcel allow you to fly?
 BOOL LLAgent::canFly()
@@ -850,6 +856,7 @@ void LLAgent::setFlying(BOOL fly, BOOL fail_sound)
 		{
 			add(LLStatViewer::FLY, 1);
 		}
+        mCrouch = false;
 		setControlFlags(AGENT_CONTROL_FLY);
 	}
 	else

@@ -102,6 +102,19 @@ bool agent_push_down( EKeystate s )
 	return true;
 }
 
+bool agent_toggle_down( EKeystate s )
+{
+    if( KEYSTATE_UP == s ) return true;
+
+    if (KEYSTATE_DOWN == s
+        && !gAgent.getFlying())
+    {
+        gAgent.toggleCrouch();
+    }
+    gAgent.moveUp(-1);
+    return true;
+}
+
 static void agent_check_temporary_run(LLAgent::EDoubleTapRunMode mode)
 {
 // [RLVa:KB] - Checked: 2011-05-11 (RLVa-1.3.0i) | Added: RLVa-1.3.0i
@@ -935,6 +948,7 @@ REGISTER_KEYBOARD_ACTION("run_backward", run_backward);
 REGISTER_KEYBOARD_ACTION("run_left", run_left);
 REGISTER_KEYBOARD_ACTION("run_right", run_right);
 REGISTER_KEYBOARD_ACTION("toggle_run", toggle_run);
+REGISTER_KEYBOARD_ACTION("toggle_down", agent_toggle_down);
 REGISTER_KEYBOARD_ACTION("toggle_sit", toggle_sit);
 REGISTER_KEYBOARD_ACTION("toggle_pause_media", toggle_pause_media);
 REGISTER_KEYBOARD_ACTION("toggle_enable_media", toggle_enable_media);
