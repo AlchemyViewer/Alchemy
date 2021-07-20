@@ -230,7 +230,7 @@ BOOL LLFloaterBvhPreview::postBuild()
 		// loading a bvh file
 
 		// now load bvh file
-		S32 file_size;
+		apr_off_t file_size;
 		
 		LLAPRFile infile ;
 		infile.open(mFilenameAndPath, LL_APR_RB, NULL, &file_size);

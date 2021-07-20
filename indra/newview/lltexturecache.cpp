@@ -845,7 +845,7 @@ LLTextureCache::LLTextureCache(bool threaded)
 	  mFastCachePoolp(NULL),
 	  mFastCachePadBuffer(NULL)
 {
-    mHeaderAPRFilePoolp = new LLVolatileAPRPool(); // is_local = true, because this pool is for headers, headers are under own mutex
+    mHeaderAPRFilePoolp = new LLVolatileAPRPool("Texture Cache Pool"); // is_local = true, because this pool is for headers, headers are under own mutex
 }
 
 LLTextureCache::~LLTextureCache()
@@ -2175,7 +2175,7 @@ void LLTextureCache::openFastCache(bool first_time)
 			{
 				mFastCachePadBuffer = (U8*)ll_aligned_malloc_16(TEXTURE_FAST_CACHE_ENTRY_SIZE);
 			}
-			mFastCachePoolp = new LLVolatileAPRPool(FALSE); // is_local=false, thread safe mode due to crashes 
+			mFastCachePoolp = new LLVolatileAPRPool("Fast Cache Pool", FALSE); // is_local=false, thread safe mode due to crashes 
 			if (LLAPRFile::isExist(mFastCacheFileName, mFastCachePoolp))
 			{
 				mFastCachep = new LLAPRFile(mFastCacheFileName, APR_READ|APR_WRITE|APR_BINARY, mFastCachePoolp) ;				

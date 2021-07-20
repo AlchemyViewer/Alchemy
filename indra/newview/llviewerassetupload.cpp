@@ -468,7 +468,7 @@ LLSD LLNewFileResourceUploadInfo::exportTempFile()
     setAssetType(assetType);
 
     // copy this file into the cache for upload
-    S32 file_size;
+    apr_off_t file_size;
     LLAPRFile infile;
     infile.open(filename, LL_APR_RB, NULL, &file_size);
     if (infile.getFileHandle())

@@ -41,7 +41,7 @@ bool LLImageDimensionsInfo::load(const std::string& src_filename,U32 codec)
 
 	mSrcFilename = src_filename;
 
-	S32 file_size = 0;
+	apr_off_t file_size = 0;
 	apr_status_t s = mInfile.open(src_filename, LL_APR_RB, NULL, &file_size);
 
 	if (s != APR_SUCCESS)
@@ -167,22 +167,26 @@ bool LLImageDimensionsInfo::getImageDimensionsWebP()
 	}
 
 	auto image_size = LLAPRFile::size(mSrcFilename);
-	auto image_buf = std::make_unique<U8[]>(image_size);
+    if(image_size > 0)
+    {
+        auto image_buf = std::make_unique<U8[]>(image_size);
 
-	mInfile.read(image_buf.get(), image_size);
+        mInfile.read(image_buf.get(), image_size);
 
-	WebPBitstreamFeatures features;
-	// Decode the WebP data and extract sizing information
-	if (WebPGetFeatures(image_buf.get(), image_size, &features) != VP8_STATUS_OK)
-	{
-		LL_WARNS() << "Not a WebP" << LL_ENDL;
-		return false;
-	}
+        WebPBitstreamFeatures features;
+        // Decode the WebP data and extract sizing information
+        if (WebPGetFeatures(image_buf.get(), image_size, &features) != VP8_STATUS_OK)
+        {
+            LL_WARNS() << "Not a WebP" << LL_ENDL;
+            return false;
+        }
 
-	mWidth = features.width;
-	mHeight = features.height;
+        mWidth = features.width;
+        mHeight = features.height;
 
-	return true;
+        return true;
+    }
+    return false;
 }
 
 // Called instead of exit() if Libjpeg encounters an error.

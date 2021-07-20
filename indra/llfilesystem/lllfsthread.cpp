@@ -70,7 +70,7 @@ LLLFSThread::LLLFSThread(bool threaded) :
 {
 	if(!mLocalAPRFilePoolp)
 	{
-		mLocalAPRFilePoolp = new LLVolatileAPRPool() ;
+		mLocalAPRFilePoolp = new LLVolatileAPRPool("LFS Pool");
 	}
 }
 

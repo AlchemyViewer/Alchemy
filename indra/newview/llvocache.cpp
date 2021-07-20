@@ -1028,7 +1028,7 @@ LLVOCache::LLVOCache(bool read_only) :
 	mCacheSize(1)
 {
 	mEnabled = gSavedSettings.getBOOL("ObjectCacheEnabled");
-	mLocalAPRFilePoolp = new LLVolatileAPRPool() ;
+	mLocalAPRFilePoolp = new LLVolatileAPRPool("VOCache Pool") ;
 }
 
 LLVOCache::~LLVOCache()
