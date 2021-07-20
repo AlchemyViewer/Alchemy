@@ -612,11 +612,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>991871873d9660075f5412452ecb1eb5386b3cbd69fef2933f921dcbc9423b405fda23ea1781ee9eca4d3d5c9a2d3c5b</string>
+              <string>866af7629decfe6bd01bc4a2c7fcc614b08898526090383ff5514c26f4dd917a3ff01784479885c40763b9e85f218a5c</string>
               <key>hash_algorithm</key>
               <string>sha3_384</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/49/packages/generic/fmodstudio-767/2.01.08/fmodstudio-2.01.08-darwin64-767.tar.xz</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/49/packages/generic/fmodstudio-947/2.01.10/fmodstudio-2.01.10-darwin64-947.tar.xz</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
@@ -626,11 +626,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>380dfa9aea499aaa29c86b6bf7f4f7519b91c859e4c9d01ef96e4502c50c84cad7613341551f9d9b65e562b4ce0ee73c</string>
+              <string>ceedc2c0d4194986b775dda13f662501a7ee77b821a9373371034fd7c72acefcf5134c83fa88da20d4874b2cb2c0a4e4</string>
               <key>hash_algorithm</key>
               <string>sha3_384</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/49/packages/generic/fmodstudio-767/2.01.08/fmodstudio-2.01.08-linux64-767.tar.xz</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/49/packages/generic/fmodstudio-947/2.01.10/fmodstudio-2.01.10-linux64-947.tar.xz</string>
             </map>
             <key>name</key>
             <string>linux64</string>
@@ -640,11 +640,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>731a33df6551669c715b57882e35bc874d79889216354954190593c6efe8342fd197b68f6a2d05a6b1c7486ac02731c5</string>
+              <string>2ff7242e45cae633304e69cd929f700919401aaf41700f141dd03158f7c36237fcedec24a681619053f32be417c99643</string>
               <key>hash_algorithm</key>
               <string>sha3_384</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/49/packages/generic/fmodstudio-767/2.01.08/fmodstudio-2.01.08-windows-767.tar.xz</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/49/packages/generic/fmodstudio-947/2.01.10/fmodstudio-2.01.10-windows-947.tar.xz</string>
             </map>
             <key>name</key>
             <string>windows</string>
@@ -654,18 +654,18 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>a9e1891e3f22b5a6766cad59a2932f969af2e0227dd7e478d28c82f29c7bba3448d0928d5b6fe18f557e66a9f329ccaa</string>
+              <string>cbc34821cd5834f31d3ae0828555d28debb6a3ec39381911b9f8542bd4ba470668fe9790f4227552764c69e0d1e3b49c</string>
               <key>hash_algorithm</key>
               <string>sha3_384</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/49/packages/generic/fmodstudio-767/2.01.08/fmodstudio-2.01.08-windows64-767.tar.xz</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/49/packages/generic/fmodstudio-947/2.01.10/fmodstudio-2.01.10-windows64-947.tar.xz</string>
             </map>
             <key>name</key>
             <string>windows64</string>
           </map>
         </map>
         <key>version</key>
-        <string>2.01.08</string>
+        <string>2.01.10</string>
       </map>
       <key>freetype</key>
       <map>
