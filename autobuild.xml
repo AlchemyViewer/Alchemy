@@ -268,11 +268,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>cb2a793e809430d87a38b28357b649dc6d6b0ba08bf5a0530f3d5b9b08c4f6bce63f84fdb319687e482ce018366025e8</string>
+              <string>7e6c73d261c26192a1eb70befd36963280c4d067cac6a78231b971ba94210384a57271764734da3a55c3646709354eb3</string>
               <key>hash_algorithm</key>
               <string>sha3_384</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/98/packages/generic/colladadom-904/2.3.0/colladadom-2.3.0-darwin64-904.tar.xz</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/98/packages/generic/colladadom-951/2.3.0/colladadom-2.3.0-darwin64-951.tar.xz</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
@@ -282,11 +282,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>54b45d40cf81d662b1d14bac5919fdb8e33f0e750aa96fb2a6683438a415579bb12fe20e78ffa56c9da4a48f3ea490ee</string>
+              <string>5f5d70f149665c8fb4711fd040823c20d2e8c7d6bfe9d8b7b25c51c5b3d4f71284d66a1ba718bc0d234aea58399cb97d</string>
               <key>hash_algorithm</key>
               <string>sha3_384</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/98/packages/generic/colladadom-904/2.3.0/colladadom-2.3.0-linux64-904.tar.xz</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/98/packages/generic/colladadom-951/2.3.0/colladadom-2.3.0-linux64-951.tar.xz</string>
             </map>
             <key>name</key>
             <string>linux64</string>
@@ -296,11 +296,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>0793a2d2e827b53c74c66d8808f0f6ef431f04be7827c3c8c774cf67cd279dfde4ea4b7199d1a58411f9b83c39209a2d</string>
+              <string>6b0c05cf813f1cb239486ba56513635e7bff99c5d57a48f0117d1438984011a2d0962496edc4d09c1f971fc1ea8932cb</string>
               <key>hash_algorithm</key>
               <string>sha3_384</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/98/packages/generic/colladadom-904/2.3.0/colladadom-2.3.0-windows-904.tar.xz</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/98/packages/generic/colladadom-951/2.3.0/colladadom-2.3.0-windows-951.tar.xz</string>
             </map>
             <key>name</key>
             <string>windows</string>
@@ -310,11 +310,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>bd837ef622f51a02238218a92f4fe3c2ff9c67db9a7ab44c8e72a8218e0da8741e9f7689a8880df910c56f5fe9614608</string>
+              <string>bfb6bcb8ca265417e9a9ce910d259c6c98df5d499596e1a43a54d3f05f7e5e45e07f9612595e548f3184d613f2a82a64</string>
               <key>hash_algorithm</key>
               <string>sha3_384</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/98/packages/generic/colladadom-904/2.3.0/colladadom-2.3.0-windows64-904.tar.xz</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/98/packages/generic/colladadom-951/2.3.0/colladadom-2.3.0-windows64-951.tar.xz</string>
             </map>
             <key>name</key>
             <string>windows64</string>
