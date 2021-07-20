@@ -75,7 +75,7 @@ void LLInboxInventoryPanel::initFromParams(const LLInventoryPanel::Params& param
 
 LLFolderViewFolder * LLInboxInventoryPanel::createFolderViewFolder(LLInvFVBridge * bridge, bool allow_drop)
 {
-	LLUIColor item_color = LLUIColorTable::instance().getColor("MenuItemEnabledColor", DEFAULT_WHITE);
+	static LLUIColor item_color = LLUIColorTable::instance().getColor("MenuItemEnabledColor", LLColor4::white);
 
 	LLInboxFolderViewFolder::Params params;
 	
@@ -92,7 +92,7 @@ LLFolderViewFolder * LLInboxInventoryPanel::createFolderViewFolder(LLInvFVBridge
 
 LLFolderViewItem * LLInboxInventoryPanel::createFolderViewItem(LLInvFVBridge * bridge)
 {
-	LLUIColor item_color = LLUIColorTable::instance().getColor("MenuItemEnabledColor", DEFAULT_WHITE);
+	static LLUIColor item_color = LLUIColorTable::instance().getColor("MenuItemEnabledColor", LLColor4::white);
 
 	LLInboxFolderViewItem::Params params;
 
