@@ -224,6 +224,8 @@ public:
 
     // virtual
     void 					updateRiggingInfo();
+    
+    size_t mLastAssocVolSize = 0;
 	// This encodes mesh id and LOD, so we can see whether display is up-to-date.
     using rigging_info_hash_vec_t = std::vector<std::pair<LLUUID, S32>>;
 	size_t mLastRiggingInfoKeyHash = 0;

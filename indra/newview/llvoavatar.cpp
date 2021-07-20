@@ -10305,8 +10305,8 @@ void LLVOAvatar::getAssociatedVolumes(std::vector<LLVOVolume*>& volumes)
                     continue;
                 }
             }
-            LLViewerObject::const_child_list_t& children = attached_object->getChildren();
-            for (LLViewerObject* childp : children)
+
+            for (LLViewerObject* childp : attached_object->getChildren())
             {
 				if (!childp) 
 					continue;
@@ -10327,8 +10327,8 @@ void LLVOAvatar::getAssociatedVolumes(std::vector<LLVOVolume*>& volumes)
         if (volp)
         {
             volumes.push_back(volp);
-            LLViewerObject::const_child_list_t& children = volp->getChildren();
-            for (LLViewerObject* childp : children)
+
+            for (LLViewerObject* childp : volp->getChildren())
             {
                 LLVOVolume *volume = childp ? childp->asVolume() : nullptr;
                 if (volume)
@@ -10354,11 +10354,12 @@ void LLVOAvatar::updateRiggingInfo()
 #endif
 
     std::vector<LLVOVolume*> volumes;
-
+    volumes.reserve(mLastAssocVolSize);
 	{
 		LL_RECORD_BLOCK_TIME(FTM_AVATAR_RIGGING_AVOL_UPDATE);
 		getAssociatedVolumes(volumes);
 	}
+    mLastAssocVolSize = volumes.size();
 
     size_t rig_hash;
     size_t rig_count;
@@ -10377,7 +10378,7 @@ void LLVOAvatar::updateRiggingInfo()
                 curr_rigging_info_key.emplace_back(mesh_id, max_lod);
             }
         }
-        rig_count =curr_rigging_info_key.size();
+        rig_count = curr_rigging_info_key.size();
         rig_hash = absl::Hash<rigging_info_hash_vec_t>{}(curr_rigging_info_key);
         // Check for key change, which indicates some change in volume composition or LOD.
         if (rig_hash == mLastRiggingInfoKeyHash)
