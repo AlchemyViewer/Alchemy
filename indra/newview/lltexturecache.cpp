@@ -1404,18 +1404,21 @@ U32 LLTextureCache::openAndReadEntries(std::vector<Entry>& entries)
 		}
 		aprfile->seek(APR_SET, (S32)sizeof(EntriesInfo));
 	}
+    
+    entries.resize(num_entries);
+    size_t total_entries_size = sizeof(Entry) * num_entries;
+    size_t bytes_read = aprfile->read((void*)entries.data(), total_entries_size);
+    if (bytes_read != total_entries_size)
+    {
+        LL_WARNS() << "Corrupted header entries, expected " << total_entries_size << " bytes but got " << bytes_read << " bytes" << LL_ENDL;
+        closeHeaderEntriesFile();
+        purgeAllTextures(false);
+        return 0;
+    }
+    
 	for (U32 idx=0; idx<num_entries; idx++)
 	{
-		Entry entry;
-		S32 bytes_read = aprfile->read((void*)(&entry), (S32)sizeof(Entry));
-		if (bytes_read < sizeof(Entry))
-		{
-			LL_WARNS() << "Corrupted header entries, failed at " << idx << " / " << num_entries << LL_ENDL;
-			closeHeaderEntriesFile();
-			purgeAllTextures(false);
-			return 0;
-		}
-		entries.push_back(entry);
+		const Entry& entry = entries[idx];
 // 		LL_INFOS() << "ENTRY: " << entry.mTime << " TEX: " << entry.mID << " IDX: " << idx << " Size: " << entry.mImageSize << LL_ENDL;
 		if(entry.mImageSize > entry.mBodySize)
 		{
@@ -1434,20 +1437,18 @@ U32 LLTextureCache::openAndReadEntries(std::vector<Entry>& entries)
 
 void LLTextureCache::writeEntriesAndClose(const std::vector<Entry>& entries)
 {
-	S32 num_entries = entries.size();
+	size_t num_entries = entries.size();
 	llassert_always(num_entries == mHeaderEntriesInfo.mEntries);
 	
 	if (!mReadOnly)
 	{
 		LLAPRFile* aprfile = openHeaderEntriesFile(false, (S32)sizeof(EntriesInfo));
-		for (S32 idx=0; idx<num_entries; idx++)
+		size_t write_size = size_t(sizeof(Entry)) * num_entries;
+		size_t bytes_written = aprfile->write((void*) (entries.data()), write_size);
+		if (bytes_written != write_size)
 		{
-			S32 bytes_written = aprfile->write((void*)(&entries[idx]), (S32)sizeof(Entry));
-			if(bytes_written != sizeof(Entry))
-			{
-				clearCorruptedCache() ; //clear the cache.
-				return ;
-			}
+			clearCorruptedCache(); //clear the cache.
+			return;
 		}
 		closeHeaderEntriesFile();
 	}
@@ -1573,9 +1574,9 @@ void LLTextureCache::readHeaderCache()
 
 			{
 				S32 lru_entries = (S32)((F32)sCacheMaxEntries * TEXTURE_CACHE_LRU_SIZE);
-				for (std::set<lru_data_t>::iterator iter = lru.begin(); iter != lru.end(); ++iter)
+				for (const auto& lru_pair : lru)
 				{
-					mLRU.insert(entries[iter->second].mID);
+					mLRU.insert(entries[lru_pair.second].mID);
 // 					LL_INFOS() << "LRU: " << iter->first << " : " << iter->second << LL_ENDL;
 					if (--lru_entries <= 0)
 						break;
@@ -1585,10 +1586,10 @@ void LLTextureCache::readHeaderCache()
 			if (purge_list.size() > 0)
 			{
 				LLTimer timer;
-				for (std::set<U32>::iterator iter = purge_list.begin(); iter != purge_list.end(); ++iter)
+				for (U32 idx : purge_list)
 				{
-					std::string tex_filename = getTextureFileName(entries[*iter].mID);
-					removeEntry((S32)*iter, entries[*iter], tex_filename);
+					std::string tex_filename = getTextureFileName(entries[idx].mID);
+					removeEntry((S32)idx, entries[idx], tex_filename);
 
 					//make sure that pruning entries doesn't take too much time
 					if (timer.getElapsedTimeF32() > TEXTURE_PRUNING_MAX_TIME)
