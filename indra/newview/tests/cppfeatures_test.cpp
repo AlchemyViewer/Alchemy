@@ -137,6 +137,7 @@ void cpp_features_test_object_t::test<3>()
 class Foo
 {
 public:
+    virtual ~Foo() = default;
 	virtual bool is_happy() const = 0;
 };
 
@@ -166,6 +167,7 @@ void cpp_features_test_object_t::test<4>()
 class Vehicle
 {
 public:
+    virtual ~Vehicle() = default;
 	virtual bool has_wheels() const = 0;
 };
 
