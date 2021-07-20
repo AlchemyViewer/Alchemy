@@ -225,7 +225,9 @@ public:
     // virtual
     void 					updateRiggingInfo();
 	// This encodes mesh id and LOD, so we can see whether display is up-to-date.
-	std::map<LLUUID,S32>	mLastRiggingInfoKey;
+    using rigging_info_hash_vec_t = std::vector<std::pair<LLUUID, S32>>;
+	size_t mLastRiggingInfoKeyHash = 0;
+    size_t mLastRiggingInfoMeshCount = 0;
 	
     std::set<LLUUID>		mActiveOverrideMeshes;
     virtual void			onActiveOverrideMeshesChanged();

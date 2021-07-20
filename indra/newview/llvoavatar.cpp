@@ -10360,29 +10360,35 @@ void LLVOAvatar::updateRiggingInfo()
 		getAssociatedVolumes(volumes);
 	}
 
-	std::map<LLUUID,S32> curr_rigging_info_key;
-	{
-		LL_RECORD_BLOCK_TIME(FTM_AVATAR_RIGGING_KEY_UPDATE);
-		// Get current rigging info key
-		for (LLVOVolume* vol : volumes)
-		{
-			if (vol->isRiggedMesh() && vol->getVolume() && vol->getVolume()->isMeshAssetLoaded())
-			{
-				const LLUUID& mesh_id = vol->getVolume()->getParams().getSculptID();
-				S32 max_lod = llmax(vol->getLOD(), vol->mLastRiggingInfoLOD);
-				curr_rigging_info_key[mesh_id] = max_lod;
-			}
-		}
-		
-		// Check for key change, which indicates some change in volume composition or LOD.
-		if (curr_rigging_info_key == mLastRiggingInfoKey)
-		{
-			return;
-		}
-	}
+    size_t rig_hash;
+    size_t rig_count;
+    {
+        LL_RECORD_BLOCK_TIME(FTM_AVATAR_RIGGING_KEY_UPDATE);
+        
+        // Get current rigging info key
+        rigging_info_hash_vec_t curr_rigging_info_key;
+        curr_rigging_info_key.reserve(mLastRiggingInfoMeshCount);
+        for (LLVOVolume *vol : volumes)
+        {
+            if (vol->isRiggedMesh() && vol->getVolume() && vol->getVolume()->isMeshAssetLoaded())
+            {
+                const LLUUID& mesh_id = vol->getVolume()->getParams().getSculptID();
+                S32 max_lod = llmax(vol->getLOD(), vol->mLastRiggingInfoLOD);
+                curr_rigging_info_key.emplace_back(mesh_id, max_lod);
+            }
+        }
+        rig_count =curr_rigging_info_key.size();
+        rig_hash = absl::Hash<rigging_info_hash_vec_t>{}(curr_rigging_info_key);
+        // Check for key change, which indicates some change in volume composition or LOD.
+        if (rig_hash == mLastRiggingInfoKeyHash)
+        {
+            return;
+        }
+    }
 
 	// Something changed. Update.
-	mLastRiggingInfoKey = std::move(curr_rigging_info_key);
+	mLastRiggingInfoKeyHash = rig_hash;
+    mLastRiggingInfoMeshCount = rig_count;
     mJointRiggingInfoTab.clear();
     for (LLVOVolume* vol : volumes)
     {
