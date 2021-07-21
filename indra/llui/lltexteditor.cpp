@@ -2161,6 +2161,11 @@ void LLTextEditor::showContextMenu(S32 x, S32 y)
 		menu = LLUICtrlFactory::instance().createFromFile<LLContextMenu>("menu_text_editor.xml", 
 																				LLMenuGL::sMenuContainer, 
 																				LLMenuHolderGL::child_registry_t::instance());
+        if(!menu)
+        {
+            LL_WARNS() << "Failed to create menu for LLTextEditor: " << getName() << LL_ENDL;
+            return;
+        }
 		mContextMenuHandle = menu->getHandle();
 	}
 
