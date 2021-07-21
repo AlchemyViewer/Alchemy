@@ -40,11 +40,11 @@
 
 class LLMutex;
 
-const S32 UUID_BYTES = 16;
-const S32 UUID_WORDS = 4;
-const S32 UUID_STR_LENGTH = 37;	// actually wrong, should be 36 and use size below
-const S32 UUID_STR_SIZE = 37;
-const S32 UUID_BASE85_LENGTH = 21; // including the trailing NULL.
+static constexpr S32 UUID_BYTES = 16;
+static constexpr S32 UUID_WORDS = 4;
+static constexpr S32 UUID_STR_LENGTH = 37;	// actually wrong, should be 36 and use size below
+static constexpr S32 UUID_STR_SIZE = 37;
+static constexpr S32 UUID_BASE85_LENGTH = 21; // including the trailing NULL.
 
 struct uuid_time_t {
 	U32 high;
@@ -195,8 +195,8 @@ public:
 			const absl::FormatConversionSpec& spec,
 			absl::FormatSink* s) {
 		if (spec.conversion_char() == absl::FormatConversionChar::s) {
-			std::string uuid_str;
-			id.toString(uuid_str);
+            char uuid_str[UUID_STR_SIZE] = {}; // will be null-terminated
+            id.to_chars(uuid_str);
 			s->Append(uuid_str);
 		}
 		return { true };
@@ -218,13 +218,30 @@ public:
 	friend LL_COMMON_API std::ostream&	 operator<<(std::ostream& s, const LLUUID &uuid);
 	friend LL_COMMON_API std::istream&	 operator>>(std::istream& s, LLUUID &uuid);
 
-	void toString(char *out) const;		// Does not allocate memory, needs 36 characters (including \0)
-	void toString(std::string& out) const;
+    void to_chars(char* outstr) const; // Does not allocate memory, needs 36 characters (does not null terminate)
+	void toString(char* outstr) const		// Does not allocate memory, needs 37 characters (including \0)
+    {
+        to_chars(outstr);
+        outstr[UUID_STR_SIZE-1] = '\0';
+    }
+
+	void toString(std::string& outstr) const
+    {
+        outstr.resize(UUID_STR_SIZE-1);
+        to_chars(&outstr[0]);
+    }
+    
 	void toCompressedString(char *out) const;	// Does not allocate memory, needs 17 characters (including \0)
 	void toCompressedString(std::string& out) const;
 
-	std::string asString() const;
-	std::string getString() const;
+	std::string asString() const
+    {
+        std::string result(36, char());
+        to_chars(&result[0]);
+        return result;
+    }
+
+	std::string getString() const { return asString(); }
 
 	U16 getCRC16() const;
 	U32 getCRC32() const;

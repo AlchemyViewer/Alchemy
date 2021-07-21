@@ -152,33 +152,75 @@ U32 janky_fast_random_seeded_bytes(U32 seed, U32 val)
 #endif
 
 // Common to all UUID implementations
-void LLUUID::toString(std::string& out) const
+void LLUUID::to_chars(char* out) const
 {
-	out = fmt::format(FMT_COMPILE("{:02x}{:02x}{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}"),
-		(U8)(mData[0]),
-		(U8)(mData[1]),
-		(U8)(mData[2]),
-		(U8)(mData[3]),
-		(U8)(mData[4]),
-		(U8)(mData[5]),
-		(U8)(mData[6]),
-		(U8)(mData[7]),
-		(U8)(mData[8]),
-		(U8)(mData[9]),
-		(U8)(mData[10]),
-		(U8)(mData[11]),
-		(U8)(mData[12]),
-		(U8)(mData[13]),
-		(U8)(mData[14]),
-		(U8)(mData[15]));
-}
-
-// *TODO: deprecate
-void LLUUID::toString(char *out) const
-{
-	std::string buffer;
-	toString(buffer);
-	strcpy(out,buffer.c_str()); /* Flawfinder: ignore */
+#if defined(__SSE4_1__)
+    alignas(16) char buffer[UUID_STR_SIZE-1]; // Temporary aligned output buffer for simd op
+    
+    __m128i lower = load_unaligned_si128(mData);
+    __m128i upper = _mm_and_si128(_mm_set1_epi8(0xFF >> 4), _mm_srli_epi32(lower, 4));
+    
+    const __m128i a = _mm_set1_epi8(0x0F);
+    lower = _mm_and_si128(lower, a);
+    upper = _mm_and_si128(upper, a);
+    
+    const __m128i pastNine = _mm_set1_epi8(9 + 1);
+    const __m128i lowerMask = _mm_cmplt_epi8(lower, pastNine);
+    const __m128i upperMask = _mm_cmplt_epi8(upper, pastNine);
+    
+    __m128i letterMask1 = _mm_and_si128(lower, lowerMask);
+    __m128i letterMask2 = _mm_and_si128(upper, upperMask);
+    __m128i letterMask3 = _mm_or_si128(lower, lowerMask);
+    __m128i letterMask4 = _mm_or_si128(upper, upperMask);
+    
+    const __m128i first = _mm_set1_epi8('0');
+    const __m128i second = _mm_set1_epi8('a' - 10);
+    
+    letterMask1 = _mm_add_epi8(letterMask1, first);
+    letterMask2 = _mm_add_epi8(letterMask2, first);
+    letterMask3 = _mm_add_epi8(letterMask3, second);
+    letterMask4 = _mm_add_epi8(letterMask4, second);
+    
+    lower = _mm_blendv_epi8(letterMask3, letterMask1, lowerMask);
+    upper = _mm_blendv_epi8(letterMask4, letterMask2, upperMask);
+    
+    const __m128i mask1 = _mm_shuffle_epi8(lower, _mm_setr_epi8(-1, 0, -1, 1, -1, 2, -1, 3, -1, -1, 4, -1, 5, -1, -1, 6));
+    const __m128i mask2 = _mm_shuffle_epi8(upper, _mm_setr_epi8(0, -1, 1, -1, 2, -1, 3, -1, -1, 4, -1, 5, -1, -1, 6, -1));
+    const __m128i mask3 = _mm_shuffle_epi8(lower, _mm_setr_epi8(-1, 7, -1, -1, 8, -1, 9, -1, -1, 10, -1, 11, -1, 12, -1, 13));
+    const __m128i mask4 = _mm_shuffle_epi8(upper, _mm_setr_epi8(7, -1, -1, 8, -1, 9, -1, -1, 10, -1, 11, -1, 12, -1, 13, -1));
+    const __m128i hypens = _mm_set_epi8(0, 0, '-', 0, 0, 0, 0, '-', 0, 0, 0, 0, 0, 0, 0, 0);
+    const __m128i hypens2 = _mm_set_epi8(0, 0, 0, 0, 0, 0, 0, 0, '-', 0, 0, 0, 0, '-', 0, 0);
+    const __m128i upperSorted = _mm_or_si128(_mm_or_si128(mask1, mask2), hypens);
+    const __m128i lowerSorted = _mm_or_si128(_mm_or_si128(mask3, mask4), hypens2);
+    
+    _mm_store_si128(reinterpret_cast<__m128i *>(buffer), upperSorted);
+    _mm_store_si128(reinterpret_cast<__m128i *>(buffer + UUID_BYTES), lowerSorted);
+    
+    // Did not fit the last four chars. Extract and append them.
+    const int v1 = _mm_extract_epi16(upper, 7);
+    const int v2 = _mm_extract_epi16(lower, 7);
+    buffer[32] = (v1 & 0xff);
+    buffer[33] = (v2 & 0xff);
+    buffer[34] = ((v1 >> 8) & 0xff);
+    buffer[35] = ((v2 >> 8) & 0xff);
+    
+    memcpy(out, buffer, UUID_STR_SIZE-1);
+#else
+    for (size_t i = 0; i < UUID_BYTES; ++i)
+    {
+        const auto uuid_byte = mData[i];
+        const size_t hi = ((uuid_byte) >> 4) & 0x0F;
+        *out++ = (i <= 9) ? static_cast<char>('0' + hi) : static_cast<char>('a' + (hi-10));;
+        
+        const size_t lo = (uuid_byte) & 0x0F;
+        *out++ = (i <= 9) ? static_cast<char>('0' + lo) : static_cast<char>('a' + (lo-10));;
+        
+        if (i == 3 || i == 5 || i == 7 || i == 9)
+        {
+            *out++ = '-';
+        }
+    }
+#endif
 }
 
 void LLUUID::toCompressedString(std::string& out) const
@@ -194,18 +236,6 @@ void LLUUID::toCompressedString(char *out) const
 {
 	memcpy(out, mData, UUID_BYTES);		/* Flawfinder: ignore */
 	out[UUID_BYTES] = '\0';
-}
-
-std::string LLUUID::getString() const
-{
-	return asString();
-}
-
-std::string LLUUID::asString() const
-{
-	std::string str;
-	toString(str);
-	return str;
 }
 
 BOOL LLUUID::set(const char* in_string, BOOL emit)
@@ -416,8 +446,8 @@ LLUUID LLUUID::combine(const LLUUID &other) const
 
 std::ostream& operator<<(std::ostream& s, const LLUUID &uuid)
 {
-	std::string uuid_str;
-	uuid.toString(uuid_str);
+    char uuid_str[37] = {}; // will be null-terminated
+    uuid.to_chars(uuid_str);
 	s << uuid_str;
 	return s;
 }
