@@ -116,41 +116,6 @@ unsigned int decode( char const * fiveChars ) throw( bad_input_data )
 } 
 */
 
-#define LL_USE_JANKY_RANDOM_NUMBER_GENERATOR 0
-#if LL_USE_JANKY_RANDOM_NUMBER_GENERATOR
-/**
- * @brief a global for
- */
-static U64 sJankyRandomSeed(LLUUID::getRandomSeed());
-
-/**
- * @brief generate a random U32.
- */
-U32 janky_fast_random_bytes()
-{
-	sJankyRandomSeed = U64L(1664525) * sJankyRandomSeed + U64L(1013904223); 
-	return (U32)sJankyRandomSeed;
-}
-
-/**
- * @brief generate a random U32 from [0, val)
- */
-U32 janky_fast_random_byes_range(U32 val)
-{
-	sJankyRandomSeed = U64L(1664525) * sJankyRandomSeed + U64L(1013904223); 
-	return (U32)(sJankyRandomSeed) % val; 
-}
-
-/**
- * @brief generate a random U32 from [0, val)
- */
-U32 janky_fast_random_seeded_bytes(U32 seed, U32 val)
-{
-	seed = U64L(1664525) * (U64)(seed) + U64L(1013904223); 
-	return (U32)(seed) % val; 
-}
-#endif
-
 // Common to all UUID implementations
 void LLUUID::to_chars(char* out) const
 {
@@ -475,11 +440,8 @@ static void get_random_bytes(void *buf, int nbytes)
 	// RAND_MAX. This could be made more efficient by copying all the
 	// bytes.
 	for (i=0; i < nbytes; i++)
-#if LL_USE_JANKY_RANDOM_NUMBER_GENERATOR
-		*cp++ = janky_fast_random_bytes() & 0xFF;
-#else
 		*cp++ = ll_rand() & 0xFF;
-#endif
+
 	return;	
 }
 
@@ -850,9 +812,7 @@ void LLUUID::generate()
 	// Create a UUID.
 	static uuid_time_t time_last = {0,0};
 	static U16 clock_seq = 0;
-#if LL_USE_JANKY_RANDOM_NUMBER_GENERATOR
-	static U32 seed = 0L; // dummy seed.  reset it below
-#endif
+
 	if (!has_init) 
 	{
 		has_init = 1;
@@ -868,15 +828,8 @@ void LLUUID::generate()
 		}
 
 		getCurrentTime(&time_last);
-#if LL_USE_JANKY_RANDOM_NUMBER_GENERATOR
-		seed = time_last.low;
-#endif
 
-#if LL_USE_JANKY_RANDOM_NUMBER_GENERATOR
-		clock_seq = (U16)janky_fast_random_seeded_bytes(seed, 65536);
-#else
 		clock_seq = (U16)ll_rand(65536);
-#endif
 	}
 
 	// get current time
