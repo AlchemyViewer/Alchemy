@@ -141,16 +141,13 @@ public:
 	// Mac+Linux FAST x86 implementation of CPU clock
 	static U32 getCPUClockCount32()
 	{
-		U32 low(0),high(0);
-		__asm__ volatile (".byte 0x0f, 0x31": "=a"(low), "=d"(high) );
-		return (low>>8) | (high<<24);
+        U64 time_stamp = __rdtsc() >> 8U;
+        return static_cast<U32>(time_stamp);
 	}
 
 	static U64 getCPUClockCount64()
 	{
-		U32 low(0),high(0);
-		__asm__ volatile (".byte 0x0f, 0x31": "=a"(low), "=d"(high) );
-		return (U64)low | ( ((U64)high) << 32);
+        return static_cast<U64>(__rdtsc());
 	}
 
 #endif
