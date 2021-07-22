@@ -208,10 +208,143 @@ BOOL LLUUID::set(const char* in_string, BOOL emit)
 	return set(absl::NullSafeStringView(in_string),emit);
 }
 
+BOOL LLUUID::parseInternalScalar(const char* in_string, bool broken_format, bool emit)
+{
+    U8 cur_pos = 0;
+    S32 i;
+    for (i = 0; i < UUID_BYTES; i++)
+    {
+        if ((i == 4) || (i == 6) || (i == 8) || (i == 10))
+        {
+            cur_pos++;
+            if (broken_format && (i==10))
+            {
+                // Missing - in the broken format
+                cur_pos--;
+            }
+        }
+        
+        mData[i] = 0;
+        
+        if ((in_string[cur_pos] >= '0') && (in_string[cur_pos] <= '9'))
+        {
+            mData[i] += (U8)(in_string[cur_pos] - '0');
+        }
+        else if ((in_string[cur_pos] >= 'a') && (in_string[cur_pos] <='f'))
+        {
+            mData[i] += (U8)(10 + in_string[cur_pos] - 'a');
+        }
+        else if ((in_string[cur_pos] >= 'A') && (in_string[cur_pos] <='F'))
+        {
+            mData[i] += (U8)(10 + in_string[cur_pos] - 'A');
+        }
+        else
+        {
+            if(emit)
+            {
+                LL_WARNS() << "Invalid UUID string character" << LL_ENDL;
+            }
+            setNull();
+            return FALSE;
+        }
+        
+        mData[i] = mData[i] << 4;
+        cur_pos++;
+        
+        if ((in_string[cur_pos] >= '0') && (in_string[cur_pos] <= '9'))
+        {
+            mData[i] += (U8)(in_string[cur_pos] - '0');
+        }
+        else if ((in_string[cur_pos] >= 'a') && (in_string[cur_pos] <='f'))
+        {
+            mData[i] += (U8)(10 + in_string[cur_pos] - 'a');
+        }
+        else if ((in_string[cur_pos] >= 'A') && (in_string[cur_pos] <='F'))
+        {
+            mData[i] += (U8)(10 + in_string[cur_pos] - 'A');
+        }
+        else
+        {
+            if(emit)
+            {
+                LL_WARNS() << "Invalid UUID string character" << LL_ENDL;
+            }
+            setNull();
+            return FALSE;
+        }
+        cur_pos++;
+    }
+    return TRUE;
+}
+
+#if defined(__SSE4_2__)
+BOOL LLUUID::parseInternalSIMD(const char* in_string, bool emit)
+{
+    __m128i mm_lower_mask_1, mm_lower_mask_2, mm_upper_mask_1, mm_upper_mask_2;
+    const __m128i mm_lower = _mm_loadu_si128(reinterpret_cast<const __m128i *>(in_string));
+    const __m128i mm_upper = _mm_loadu_si128(reinterpret_cast<const __m128i *>(in_string + UUID_BYTES + 3));
+    
+    mm_lower_mask_1 = _mm_shuffle_epi8(mm_lower, _mm_setr_epi8(0, 2, 4, 6, 9, 11, 14, -1, -1, -1, -1, -1, -1, -1, -1, -1));
+    mm_lower_mask_2 = _mm_shuffle_epi8(mm_lower, _mm_setr_epi8(1, 3, 5, 7, 10, 12, 15, -1, -1, -1, -1, -1, -1, -1, -1, -1));
+    mm_upper_mask_1 = _mm_shuffle_epi8(mm_upper, _mm_setr_epi8(-1, -1, -1, -1, -1, -1, -1, -1, 0, 2, 5, 7, 9, 11, 13, -1));
+    mm_upper_mask_2 = _mm_shuffle_epi8(mm_upper, _mm_setr_epi8(-1, -1, -1, -1, -1, -1, -1, -1, 1, 3, 6, 8, 10, 12, 14, -1));
+    
+    // Since we had hypens between the character we have 36 characters which does not fit in two 16 char loads
+    // therefor we must manually insert them here
+    mm_lower_mask_1 = _mm_insert_epi8(mm_lower_mask_1, in_string[16], 7);
+    mm_lower_mask_2 = _mm_insert_epi8(mm_lower_mask_2, in_string[17], 7);
+    mm_upper_mask_1 = _mm_insert_epi8(mm_upper_mask_1, in_string[34], 15);
+    mm_upper_mask_2 = _mm_insert_epi8(mm_upper_mask_2, in_string[35], 15);
+    
+    // Merge [aaaaaaaa|aaaaaaaa|00000000|00000000] | [00000000|00000000|bbbbbbbb|bbbbbbbb] -> [aaaaaaaa|aaaaaaaa|bbbbbbbb|bbbbbbbb]
+    __m128i mm_mask_merge_1 = _mm_or_si128(mm_lower_mask_1, mm_upper_mask_1);
+    __m128i mm_mask_merge_2 = _mm_or_si128(mm_lower_mask_2, mm_upper_mask_2);
+    
+    // Check if all characters are between 0-9, A-Z or a-z
+    const __m128i mm_allowed_char_range = _mm_setr_epi8('0', '9', 'A', 'Z', 'a', 'z', 0, -1, 0, -1, 0, -1, 0, -1, 0, -1);
+    const int cmp_lower = _mm_cmpistri(mm_allowed_char_range, mm_mask_merge_1, _SIDD_UBYTE_OPS | _SIDD_CMP_RANGES | _SIDD_NEGATIVE_POLARITY);
+    const int cmp_upper = _mm_cmpistri(mm_allowed_char_range, mm_mask_merge_2, _SIDD_UBYTE_OPS | _SIDD_CMP_RANGES | _SIDD_NEGATIVE_POLARITY);
+    if (cmp_lower != UUID_BYTES || cmp_upper != UUID_BYTES)
+    {
+        if(emit)
+        {
+            LL_WARNS() << "Invalid UUID string: " << in_string << LL_ENDL;
+        }
+        setNull();
+        return FALSE;
+    }
+    
+    const __m128i nine = _mm_set1_epi8('9');
+    const __m128i mm_above_nine_mask_1 = _mm_cmpgt_epi8(mm_mask_merge_1, nine);
+    const __m128i mm_above_nine_mask_2 = _mm_cmpgt_epi8(mm_mask_merge_2, nine);
+    
+    __m128i mm_letter_mask_1 = _mm_and_si128(mm_mask_merge_1, mm_above_nine_mask_1);
+    __m128i mm_letter_mask_2 = _mm_and_si128(mm_mask_merge_2, mm_above_nine_mask_2);
+    
+    // Convert all letters to to lower case first
+    const __m128i toLowerCase = _mm_set1_epi8(0x20);
+    mm_letter_mask_1 = _mm_or_si128(mm_letter_mask_1, toLowerCase);
+    mm_letter_mask_2 = _mm_or_si128(mm_letter_mask_2, toLowerCase);
+    
+    // now convert to hex
+    const __m128i toHex = _mm_set1_epi8('a' - 10 - '0');
+    const __m128i fixedUppercase1 = _mm_sub_epi8(mm_letter_mask_1, toHex);
+    const __m128i fixedUppercase2 = _mm_sub_epi8(mm_letter_mask_2, toHex);
+    
+    const __m128i mm_blended_high = _mm_blendv_epi8(mm_mask_merge_1, fixedUppercase1, mm_above_nine_mask_1);
+    const __m128i mm_blended_low = _mm_blendv_epi8(mm_mask_merge_2, fixedUppercase2, mm_above_nine_mask_2);
+    const __m128i zero = _mm_set1_epi8('0');
+    __m128i lo = _mm_sub_epi8(mm_blended_low, zero);
+    __m128i hi = _mm_sub_epi8(mm_blended_high, zero);
+    hi = _mm_slli_epi16(hi, 4);
+    
+    _mm_storeu_si128(reinterpret_cast<__m128i *>(mData), _mm_xor_si128(hi, lo));
+    return TRUE;
+}
+#endif
+
 BOOL LLUUID::set(const std::string_view in_string, BOOL emit)
 {
-	BOOL broken_format = FALSE;
-
 	// empty strings should make NULL uuid
 	if (in_string.empty())
 	{
@@ -219,6 +352,8 @@ BOOL LLUUID::set(const std::string_view in_string, BOOL emit)
 		return TRUE;
 	}
 
+    BOOL broken_format = FALSE;
+    
 	if (in_string.length() != (UUID_STR_LENGTH - 1))		/* Flawfinder: ignore */
 	{
 		// I'm a moron.  First implementation didn't have the right UUID format.
@@ -244,135 +379,123 @@ BOOL LLUUID::set(const std::string_view in_string, BOOL emit)
 		}
 	}
 
-	U8 cur_pos = 0;
-	S32 i;
-	for (i = 0; i < UUID_BYTES; i++)
-	{
-		if ((i == 4) || (i == 6) || (i == 8) || (i == 10))
-		{
-			cur_pos++;
-			if (broken_format && (i==10))
-			{
-				// Missing - in the broken format
-				cur_pos--;
-			}
-		}
-
-		mData[i] = 0;
-
-		if ((in_string[cur_pos] >= '0') && (in_string[cur_pos] <= '9'))
-		{
-			mData[i] += (U8)(in_string[cur_pos] - '0');
-		}
-		else if ((in_string[cur_pos] >= 'a') && (in_string[cur_pos] <='f'))
-		{
-			mData[i] += (U8)(10 + in_string[cur_pos] - 'a');
-		}
-		else if ((in_string[cur_pos] >= 'A') && (in_string[cur_pos] <='F'))
-		{
-			mData[i] += (U8)(10 + in_string[cur_pos] - 'A');
-		}
-		else
-		{
-			if(emit)
-			{							
-				LL_WARNS() << "Invalid UUID string character" << LL_ENDL;
-			}
-			setNull();
-			return FALSE;
-		}
-
-		mData[i] = mData[i] << 4;
-		cur_pos++;
-
-		if ((in_string[cur_pos] >= '0') && (in_string[cur_pos] <= '9'))
-		{
-			mData[i] += (U8)(in_string[cur_pos] - '0');
-		}
-		else if ((in_string[cur_pos] >= 'a') && (in_string[cur_pos] <='f'))
-		{
-			mData[i] += (U8)(10 + in_string[cur_pos] - 'a');
-		}
-		else if ((in_string[cur_pos] >= 'A') && (in_string[cur_pos] <='F'))
-		{
-			mData[i] += (U8)(10 + in_string[cur_pos] - 'A');
-		}
-		else
-		{
-			if(emit)
-			{
-				LL_WARNS() << "Invalid UUID string character" << LL_ENDL;
-			}
-			setNull();
-			return FALSE;
-		}
-		cur_pos++;
-	}
+#if defined(__SSE4_2__)
+    if(broken_format)
+    {
+        return parseInternalScalar(in_string.data(), broken_format, emit);
+    }
+    else
+    {
+        return parseInternalSIMD(in_string.data(), emit);
+    }
+#else
+    return parseInternalScalar(in_string.data(), broken_format, emit);
+#endif
 
 	return TRUE;
 }
 
-BOOL LLUUID::validate(const std::string_view in_string)
+BOOL validate_internal_scalar(const char* str_ptr, bool broken_format)
 {
-	BOOL broken_format = FALSE;
-	if (in_string.length() != (UUID_STR_LENGTH - 1))		/* Flawfinder: ignore */
-	{
-		// I'm a moron.  First implementation didn't have the right UUID format.
-		if (in_string.length() == (UUID_STR_LENGTH - 2))		/* Flawfinder: ignore */
-		{
-			broken_format = TRUE;
-		}
-		else
-		{
-			return FALSE;
-		}
-	}
+    U8 cur_pos = 0;
+    for (U32 i = 0; i < 16; i++)
+    {
+        if ((i == 4) || (i == 6) || (i == 8) || (i == 10))
+        {
+            cur_pos++;
+            if (broken_format && (i==10))
+            {
+                // Missing - in the broken format
+                cur_pos--;
+            }
+        }
+        
+        if (((str_ptr[cur_pos] >= '0') && (str_ptr[cur_pos] <= '9'))
+            || ((str_ptr[cur_pos] >= 'a') && (str_ptr[cur_pos] <='f'))
+            || ((str_ptr[cur_pos] >= 'A') && (str_ptr[cur_pos] <='F')))
+        {
+        }
+        else
+        {
+            return FALSE;
+        }
+        
+        cur_pos++;
+        
+        if (((str_ptr[cur_pos] >= '0') && (str_ptr[cur_pos] <= '9'))
+            || ((str_ptr[cur_pos] >= 'a') && (str_ptr[cur_pos] <='f'))
+            || ((str_ptr[cur_pos] >= 'A') && (str_ptr[cur_pos] <='F')))
+        {
+        }
+        else
+        {
+            return FALSE;
+        }
+        cur_pos++;
+    }
+    return TRUE;
+}
 
-	U8 cur_pos = 0;
-	for (U32 i = 0; i < 16; i++)
-	{
-		if ((i == 4) || (i == 6) || (i == 8) || (i == 10))
-		{
-			cur_pos++;
-			if (broken_format && (i==10))
-			{
-				// Missing - in the broken format
-				cur_pos--;
-			}
-		}
+#if defined(__SSE4_2__)
+BOOL validate_internal_simd(const char* str_ptr)
+{
+    __m128i mm_lower_mask_1, mm_lower_mask_2, mm_upper_mask_1, mm_upper_mask_2;
+    const __m128i mm_lower = _mm_loadu_si128(reinterpret_cast<const __m128i *>(str_ptr));
+    const __m128i mm_upper = _mm_loadu_si128(reinterpret_cast<const __m128i *>(str_ptr + UUID_BYTES + 3));
+    
+    mm_lower_mask_1 = _mm_shuffle_epi8(mm_lower, _mm_setr_epi8(0, 2, 4, 6, 9, 11, 14, -1, -1, -1, -1, -1, -1, -1, -1, -1));
+    mm_lower_mask_2 = _mm_shuffle_epi8(mm_lower, _mm_setr_epi8(1, 3, 5, 7, 10, 12, 15, -1, -1, -1, -1, -1, -1, -1, -1, -1));
+    mm_upper_mask_1 = _mm_shuffle_epi8(mm_upper, _mm_setr_epi8(-1, -1, -1, -1, -1, -1, -1, -1, 0, 2, 5, 7, 9, 11, 13, -1));
+    mm_upper_mask_2 = _mm_shuffle_epi8(mm_upper, _mm_setr_epi8(-1, -1, -1, -1, -1, -1, -1, -1, 1, 3, 6, 8, 10, 12, 14, -1));
+    
+    // Since we had hypens between the character we have 36 characters which does not fit in two 16 char loads
+    // therefor we must manually insert them here
+    mm_lower_mask_1 = _mm_insert_epi8(mm_lower_mask_1, str_ptr[16], 7);
+    mm_lower_mask_2 = _mm_insert_epi8(mm_lower_mask_2, str_ptr[17], 7);
+    mm_upper_mask_1 = _mm_insert_epi8(mm_upper_mask_1, str_ptr[34], 15);
+    mm_upper_mask_2 = _mm_insert_epi8(mm_upper_mask_2, str_ptr[35], 15);
+    
+    // Merge [aaaaaaaa|aaaaaaaa|00000000|00000000] | [00000000|00000000|bbbbbbbb|bbbbbbbb] -> [aaaaaaaa|aaaaaaaa|bbbbbbbb|bbbbbbbb]
+    __m128i mm_mask_merge_1 = _mm_or_si128(mm_lower_mask_1, mm_upper_mask_1);
+    __m128i mm_mask_merge_2 = _mm_or_si128(mm_lower_mask_2, mm_upper_mask_2);
+    
+    // Check if all characters are between 0-9, A-Z or a-z
+    const __m128i mm_allowed_char_range = _mm_setr_epi8('0', '9', 'A', 'Z', 'a', 'z', 0, -1, 0, -1, 0, -1, 0, -1, 0, -1);
+    const int cmp_lower = _mm_cmpistri(mm_allowed_char_range, mm_mask_merge_1, _SIDD_UBYTE_OPS | _SIDD_CMP_RANGES | _SIDD_NEGATIVE_POLARITY);
+    const int cmp_upper = _mm_cmpistri(mm_allowed_char_range, mm_mask_merge_2, _SIDD_UBYTE_OPS | _SIDD_CMP_RANGES | _SIDD_NEGATIVE_POLARITY);
+    if (cmp_lower != UUID_BYTES || cmp_upper != UUID_BYTES)
+    {
+        return FALSE;
+    }
 
-		if ((in_string[cur_pos] >= '0') && (in_string[cur_pos] <= '9'))
-		{
-		}
-		else if ((in_string[cur_pos] >= 'a') && (in_string[cur_pos] <='f'))
-		{
-		}
-		else if ((in_string[cur_pos] >= 'A') && (in_string[cur_pos] <='F'))
-		{
-		}
-		else
-		{
-			return FALSE;
-		}
+    return TRUE;
+}
+#endif
 
-		cur_pos++;
-
-		if ((in_string[cur_pos] >= '0') && (in_string[cur_pos] <= '9'))
-		{
-		}
-		else if ((in_string[cur_pos] >= 'a') && (in_string[cur_pos] <='f'))
-		{
-		}
-		else if ((in_string[cur_pos] >= 'A') && (in_string[cur_pos] <='F'))
-		{
-		}
-		else
-		{
-			return FALSE;
-		}
-		cur_pos++;
-	}
-	return TRUE;
+BOOL LLUUID::validate(std::string_view in_string)
+{
+    if (in_string.empty())
+    {
+        return FALSE;
+    }
+    
+    static constexpr auto HYPEN_UUID = 36;
+    static constexpr auto BROKEN_UUID = 35;
+    
+    size_t in_str_size = in_string.size();
+    if(in_str_size == HYPEN_UUID)
+    {
+#if defined(__SSE4_2__)
+        return validate_internal_simd(in_string.data());
+#else
+        return validate_internal_scalar(in_string.data(), false);
+#endif
+    }
+    else if (in_str_size == BROKEN_UUID)
+    {
+        return validate_internal_scalar(in_string.data(), true);
+    }
+    return FALSE;
 }
 
 const LLUUID& LLUUID::operator^=(const LLUUID& rhs)

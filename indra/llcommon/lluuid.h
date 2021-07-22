@@ -71,6 +71,12 @@ public:
 	static LLUUID generateNewID();	
 	static LLUUID generateNewID(const std::string& stream);	//static version of above for use in initializer expressions such as constructor params, etc. 
 
+private:
+    BOOL    parseInternalScalar(const char* in_string, bool broken_format, bool emit);
+#if defined(__SSE4_2__)
+    BOOL    parseInternalSIMD(const char* in_string, bool emit);
+#endif
+public:
 	BOOL	set(const char *in_string, BOOL emit = TRUE);	// Convert from string, if emit is FALSE, do not emit warnings
 	BOOL	set(const std::string_view in_string, BOOL emit = TRUE);	// Convert from string, if emit is FALSE, do not emit warnings
 	void	setNull();					// Faster than setting to LLUUID::null.
