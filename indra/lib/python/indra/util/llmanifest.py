@@ -29,6 +29,7 @@ $/LicenseInfo$
 """
 
 from collections import namedtuple, defaultdict
+from io import open
 import subprocess
 import errno
 import filecmp
@@ -224,8 +225,8 @@ def main(extra=[]):
     # fix up version
     if isinstance(args.get('versionfile'), str):
         try: # read in the version string
-            vf = open(args['versionfile'], 'r')
-            args['version'] = vf.read().strip().split('.')
+            with open(args['versionfile'], 'r', encoding='utf-8') as vf:
+                args['version'] = vf.read().strip().split('.')
         except:
             print("Unable to read versionfile '%s'" % args['versionfile'])
             raise
@@ -558,11 +559,8 @@ class LLManifest(object, metaclass=LLManifestRegistry):
         # write contents as dst
         dst_path = self.dst_path_of(dst)
         self.cmakedirs(os.path.dirname(dst_path))
-        f = open(dst_path, "wb")
-        try:
+        with open(dst_path, 'wb') as f:
             f.write(contents)
-        finally:
-            f.close()
 
         # Why would we create a file in the destination tree if not to include
         # it in the installer? The default src=None (plus the fact that the
@@ -575,9 +573,9 @@ class LLManifest(object, metaclass=LLManifestRegistry):
         if dst == None:
             dst = src
         # read src
-        f = open(self.src_path_of(src), "r")
-        contents = f.read()
-        f.close()
+        with open(self.src_path_of(src), 'r', encoding='utf-8') as f:
+            contents = f.read()
+
         # apply dict replacements
         for old, new in searchdict.items():
             contents = contents.replace(old, new)
@@ -642,10 +640,9 @@ class LLManifest(object, metaclass=LLManifestRegistry):
             'vers':'_'.join(self.args['version'])}
         print("Creating unpacked file:", unpacked_file_name)
         # could add a gz here but that doubles the time it takes to do this step
-        tf = tarfile.open(self.src_path_of(unpacked_file_name), 'w:')
-        # add the entire installation package, at the very top level
-        tf.add(self.get_dst_prefix(), "")
-        tf.close()
+        with tarfile.open(self.src_path_of(unpacked_file_name), 'w:') as tf:
+            # add the entire installation package, at the very top level
+            tf.add(self.get_dst_prefix(), "")
 
     def cleanup_finish(self):
         """ Delete paths that were specified to have been created by this script"""
@@ -789,13 +786,12 @@ class LLManifest(object, metaclass=LLManifestRegistry):
         relative to the source prefix) into the directory
         specified relative to the destination directory."""
         self.check_file_exists(src_tar)
-        tf = tarfile.open(self.src_path_of(src_tar), 'r')
-        for member in tf.getmembers():
-            tf.extract(member, self.ensure_dst_dir(dst_dir))
-            # TODO get actions working on these dudes, perhaps we should extract to a temporary directory and then process_directory on it?
-            self.file_list.append([src_tar,
-                           self.dst_path_of(os.path.join(dst_dir,member.name))])
-        tf.close()
+        with tarfile.open(self.src_path_of(src_tar), 'r') as tf:
+            for member in tf.getmembers():
+                tf.extract(member, self.ensure_dst_dir(dst_dir))
+                # TODO get actions working on these dudes, perhaps we should extract to a temporary directory and then process_directory on it?
+                self.file_list.append([src_tar,
+                               self.dst_path_of(os.path.join(dst_dir,member.name))])
 
 
     def wildcard_regex(self, src_glob, dst_glob):

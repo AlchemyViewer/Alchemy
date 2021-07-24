@@ -321,9 +321,8 @@ http://wiki.secondlife.com/wiki/Template_verifier.py
         if options.force_verification == False:
             print("Updating sha256 to %s" % hexdigest)
             sha_filename = "%s.sha256" % current_filename
-            sha_file = open(sha_filename, 'w')
-            sha_file.write(hexdigest)
-            sha_file.close()
+            with open(sha_filename, 'w') as sha_file:
+                sha_file.write(hexdigest)
     else:
         explain("*** FAIL ***", compat)
         return 1
