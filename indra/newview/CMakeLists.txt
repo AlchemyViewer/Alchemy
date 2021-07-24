@@ -2002,10 +2002,6 @@ if (WINDOWS)
 
     add_dependencies(${VIEWER_BINARY_NAME} SLPlugin)
 
-    if (NOT USE_BUGSPLAT)
-        add_dependencies(${VIEWER_BINARY_NAME} windows-crash-logger)
-    endif (NOT USE_BUGSPLAT)
-
     # sets the 'working directory' for debugging from visual studio.
     # Condition for version can be moved to requirements once build agents will be updated (see TOOL-3865)
     if (NOT UNATTENDED)
