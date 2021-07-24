@@ -51,8 +51,8 @@ FetchContent_Declare(
   )
 FetchContent_Declare(
   absl
-  GIT_REPOSITORY https://git.alchemyviewer.org/alchemy/mirrors/abseil-cpp.git
-  GIT_TAG        9a7e447c511dae7276ab65fde4d04f6ed52b39c9
+  GIT_REPOSITORY https://git.alchemyviewer.org/alchemy/thirdparty/abseil-cpp.git
+  GIT_TAG        9659ac086e4fa5e1e6a6559ef2a9cca4767f573d
   )
 FetchContent_Declare(
   readerwriterqueue
