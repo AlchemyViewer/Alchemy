@@ -27,7 +27,6 @@ Linden Research, Inc., 945 Battery Street, San Francisco, CA  94111  USA
 $/LicenseInfo$
 """
 
-from __future__ import print_function, division
 from io import open
 import errno
 import json
