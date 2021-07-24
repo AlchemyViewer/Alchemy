@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 """\
 @file viewer_manifest.py
 @author Ryan Williams
@@ -26,6 +26,8 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 Linden Research, Inc., 945 Battery Street, San Francisco, CA  94111  USA
 $/LicenseInfo$
 """
+
+from __future__ import print_function, division
 import errno
 import json
 import os
@@ -114,17 +116,17 @@ class ViewerManifest(LLManifest):
                 if sourceid:
                     settings_install['sourceid'] = settings_template['sourceid'].copy()
                     settings_install['sourceid']['Value'] = sourceid
-                    print "Set sourceid in settings_install.xml to '%s'" % sourceid
+                    print("Set sourceid in settings_install.xml to '%s'" % sourceid)
 
                 if self.args.get('channel_suffix'):
                     settings_install['CmdLineChannel'] = settings_template['CmdLineChannel'].copy()
                     settings_install['CmdLineChannel']['Value'] = self.channel_with_pkg_suffix()
-                    print "Set CmdLineChannel in settings_install.xml to '%s'" % self.channel_with_pkg_suffix()
+                    print("Set CmdLineChannel in settings_install.xml to '%s'" % self.channel_with_pkg_suffix())
 
                 if self.args.get('grid'):
                     settings_install['CmdLineGridChoice'] = settings_template['CmdLineGridChoice'].copy()
                     settings_install['CmdLineGridChoice']['Value'] = self.grid()
-                    print "Set CmdLineGridChoice in settings_install.xml to '%s'" % self.grid()
+                    print("Set CmdLineGridChoice in settings_install.xml to '%s'" % self.grid())
 
                 # put_in_file(src=) need not be an actual pathname; it
                 # only needs to be non-empty
@@ -193,7 +195,7 @@ class ViewerManifest(LLManifest):
             #we likely no longer need the test, since we will throw an exception above, but belt and suspenders and we get the
             #return code for free.
             if not self.path2basename(os.pardir, "build_data.json"):
-                print "No build_data.json file"
+                print("No build_data.json file")
 
     def finish_build_data_dict(self, build_data_dict):
         return build_data_dict
@@ -272,20 +274,20 @@ class ViewerManifest(LLManifest):
         try:
             contrib_file = open(src,'r')
         except IOError:
-            print "Failed to open '%s'" % src
+            print("Failed to open '%s'" % src)
             raise
         lines = contrib_file.readlines()
         contrib_file.close()
 
         # All lines up to and including the first blank line are the file header; skip them
         lines.reverse() # so that pop will pull from first to last line
-        while not re.match("\s*$", lines.pop()) :
+        while not re.match(r"\s*$", lines.pop()) :
             pass # do nothing
 
         # A line that starts with a non-whitespace character is a name; all others describe contributions, so collect the names
         names = []
         for line in lines :
-            if re.match("\S", line) :
+            if re.match(r"\S", line) :
                 names.append(line.rstrip())
         # It's not fair to always put the same people at the head of the list
         random.shuffle(names)
@@ -311,7 +313,7 @@ class ViewerManifest(LLManifest):
         """
         Like ln -sf, but uses os.symlink() instead of running ln. This creates
         a symlink at 'dst' that points to 'src' -- see:
-        https://docs.python.org/2/library/os.html#os.symlink
+        https://docs.python.org/3/library/os.html#os.symlink
 
         If you omit 'dst', this creates a symlink with basename(src) at
         get_dst_prefix() -- in other words: put a symlink to this pathname
@@ -373,11 +375,11 @@ class ViewerManifest(LLManifest):
                         os.remove(dst)
                         os.symlink(src, dst)
                 elif os.path.isdir(dst):
-                    print "Requested symlink (%s) exists but is a directory; replacing" % dst
+                    print("Requested symlink (%s) exists but is a directory; replacing" % dst)
                     shutil.rmtree(dst)
                     os.symlink(src, dst)
                 elif os.path.exists(dst):
-                    print "Requested symlink (%s) exists but is a file; replacing" % dst
+                    print("Requested symlink (%s) exists but is a file; replacing" % dst)
                     os.remove(dst)
                     os.symlink(src, dst)
                 else:
@@ -385,8 +387,8 @@ class ViewerManifest(LLManifest):
                     raise
         except Exception as err:
             # report
-            print "Can't symlink %r -> %r: %s: %s" % \
-                  (dst, src, err.__class__.__name__, err)
+            print("Can't symlink %r -> %r: %s: %s" % \
+                  (dst, src, err.__class__.__name__, err))
             # if caller asked us not to catch, re-raise this exception
             if not catch:
                 raise
@@ -767,19 +769,19 @@ class WindowsManifest(ViewerManifest):
         installer_created=False
         nsis_attempts=3
         nsis_retry_wait=15
-        for attempt in xrange(nsis_attempts):
+        for attempt in range(nsis_attempts):
             try:
                 self.run_command([NSIS_path, '/V2', self.dst_path_of(tempfile)])
             except ManifestError as err:
                 if attempt+1 < nsis_attempts:
-                    print >> sys.stderr, "nsis failed, waiting %d seconds before retrying" % nsis_retry_wait
+                    print("nsis failed, waiting %d seconds before retrying" % nsis_retry_wait, file=sys.stderr)
                     time.sleep(nsis_retry_wait)
                     nsis_retry_wait*=2
             else:
                 # NSIS worked! Done!
                 break
         else:
-            print >> sys.stderr, "Maximum nsis attempts exceeded; giving up"
+            print("Maximum nsis attempts exceeded; giving up", file=sys.stderr)
             raise
 
         self.sign(installer_file)
@@ -791,10 +793,10 @@ class WindowsManifest(ViewerManifest):
         python  = os.environ.get('PYTHON', sys.executable)
         if os.path.exists(sign_py):
             dst_path = self.dst_path_of(exe)
-            print "about to run signing of: ", dst_path
+            print("about to run signing of: ", dst_path)
             self.run_command([python, sign_py, dst_path])
         else:
-            print "Skipping code signing of %s %s: %s not found" % (self.dst_path_of(exe), exe, sign_py)
+            print("Skipping code signing of %s %s: %s not found" % (self.dst_path_of(exe), exe, sign_py))
 
     def escape_slashes(self, path):
         return path.replace('\\', '\\\\\\\\')
@@ -1040,7 +1042,7 @@ class DarwinManifest(ViewerManifest):
         appname = os.path.basename(application)
 
         vol_icon = self.src_path_of(os.path.join(self.icon_path(), 'alchemy.icns'))
-        print "DEBUG: icon_path '%s'" % vol_icon
+        print("DEBUG: icon_path '%s'" % vol_icon)
 
         dmgoptions = {
             'format': 'ULFO',
@@ -1160,7 +1162,7 @@ class LinuxManifest(ViewerManifest):
 
         # Get the icons based on the channel type
         icon_path = self.icon_path()
-        print "DEBUG: icon_path '%s'" % icon_path
+        print("DEBUG: icon_path '%s'" % icon_path)
         with self.prefix(src=icon_path) :
             self.path("alchemy_256.png","alchemy_icon.png")
             with self.prefix(dst="res-sdl") :
@@ -1232,14 +1234,14 @@ class LinuxManifest(ViewerManifest):
                                   '--numeric-owner', '-cjf',
                                  tempname + '.tar.bz2', installer_name])
             else:
-                print "Skipping %s.tar.bz2 for non-Release build (%s)" % \
-                      (installer_name, self.args['buildtype'])
+                print("Skipping %s.tar.bz2 for non-Release build (%s)" % \
+                      (installer_name, self.args['buildtype']))
         finally:
             self.run_command(["mv", tempname, realname])
 
     def strip_binaries(self):
         if self.args['buildtype'].lower() == 'release' and self.is_packaging_viewer():
-            print "* Going strip-crazy on the packaged binaries, since this is a RELEASE build"
+            print("* Going strip-crazy on the packaged binaries, since this is a RELEASE build")
             # makes some small assumptions about our packaged dir structure
             self.run_command(
                 ["find"] +

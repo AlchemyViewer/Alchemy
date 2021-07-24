@@ -1,4 +1,4 @@
-#!runpy.sh
+#!/usr/bin/env python3
 
 """\
 

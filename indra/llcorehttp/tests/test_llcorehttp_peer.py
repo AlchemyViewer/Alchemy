@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 """\
 @file   test_llsdmessage_peer.py
 @author Nat Goodspeed
@@ -34,11 +34,8 @@ import sys
 import time
 import select
 import getopt
-try:
-    from cStringIO import StringIO
-except ImportError:
-    from StringIO import StringIO
-from BaseHTTPServer import HTTPServer, BaseHTTPRequestHandler
+from io import StringIO
+from http.server import HTTPServer, BaseHTTPRequestHandler
 
 from llbase.fastest_elementtree import parse as xml_parse
 from llbase import llsd
@@ -127,8 +124,8 @@ class TestHTTPRequestHandler(BaseHTTPRequestHandler):
         try:
             self.answer(dict(reply="success", status=200,
                              reason="Your GET operation worked"))
-        except self.ignore_exceptions, e:
-            print >> sys.stderr, "Exception during GET (ignoring): %s" % str(e)
+        except self.ignore_exceptions as e:
+            print("Exception during GET (ignoring): %s" % str(e), file=sys.stderr)
 
     def do_POST(self):
         # Read the provided POST data.
@@ -136,8 +133,8 @@ class TestHTTPRequestHandler(BaseHTTPRequestHandler):
         try:
             self.answer(dict(reply="success", status=200,
                              reason=self.read()))
-        except self.ignore_exceptions, e:
-            print >> sys.stderr, "Exception during POST (ignoring): %s" % str(e)
+        except self.ignore_exceptions as e:
+            print("Exception during POST (ignoring): %s" % str(e), file=sys.stderr)
 
     def do_PUT(self):
         # Read the provided PUT data.
@@ -145,8 +142,8 @@ class TestHTTPRequestHandler(BaseHTTPRequestHandler):
         try:
             self.answer(dict(reply="success", status=200,
                              reason=self.read()))
-        except self.ignore_exceptions, e:
-            print >> sys.stderr, "Exception during PUT (ignoring): %s" % str(e)
+        except self.ignore_exceptions as e:
+            print("Exception during PUT (ignoring): %s" % str(e), file=sys.stderr)
 
     def answer(self, data, withdata=True):
         debug("%s.answer(%s): self.path = %r", self.__class__.__name__, data, self.path)
@@ -255,7 +252,7 @@ class TestHTTPRequestHandler(BaseHTTPRequestHandler):
             self.end_headers()
 
     def reflect_headers(self):
-        for name in self.headers.keys():
+        for name in list(self.headers.keys()):
             # print "Header:  %s: %s" % (name, self.headers[name])
             self.send_header("X-Reflect-" + name, self.headers[name])
 
@@ -283,10 +280,10 @@ class Server(HTTPServer):
     # default behavior which *shouldn't* cause the program to return
     # a failure status.
     def handle_error(self, request, client_address):
-        print '-'*40
-        print 'Ignoring exception during processing of request from',
-        print client_address
-        print '-'*40
+        print('-'*40)
+        print('Ignoring exception during processing of request from', end=' ')
+        print(client_address)
+        print('-'*40)
 
 if __name__ == "__main__":
     do_valgrind = False
@@ -307,7 +304,7 @@ if __name__ == "__main__":
         # "Then there's Windows"
         # Instantiate a Server(TestHTTPRequestHandler) on the first free port
         # in the specified port range.
-        httpd, port = freeport(xrange(8000, 8020), make_server)
+        httpd, port = freeport(range(8000, 8020), make_server)
 
     # Pass the selected port number to the subject test program via the
     # environment. We don't want to impose requirements on the test program's
