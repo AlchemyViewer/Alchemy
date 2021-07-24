@@ -149,30 +149,30 @@ class ViewerManifest(LLManifest):
 
             # skins
             with self.prefix(src_dst="skins"):
-                    # include the entire textures directory recursively
-                    with self.prefix(src_dst="*/textures"):
-                            self.path("*/*.jpg")
-                            self.path("*/*.png")
-                            self.path("*.tga")
-                            self.path("*.j2c")
-                            self.path("*.png")
-                            self.path("textures.xml")
-                    self.path("*/xui/*/*.xml")
-                    self.path("*/xui/*/widgets/*.xml")
-                    self.path("*/*.xml")
-                    self.path("*/*.json")
+                # include the entire textures directory recursively
+                with self.prefix(src_dst="*/textures"):
+                    self.path("*/*.jpg")
+                    self.path("*/*.png")
+                    self.path("*.tga")
+                    self.path("*.j2c")
+                    self.path("*.png")
+                    self.path("textures.xml")
+                self.path("*/xui/*/*.xml")
+                self.path("*/xui/*/widgets/*.xml")
+                self.path("*/*.xml")
+                self.path("*/*.json")
 
-                    # Local HTML files (e.g. loading screen)
-                    # The claim is that we never use local html files any
-                    # longer. But rather than commenting out this block, let's
-                    # rename every html subdirectory as html.old. That way, if
-                    # we're wrong, a user actually does have the relevant
-                    # files; s/he just needs to rename every html.old
-                    # directory back to html to recover them.
-                    with self.prefix(src="*/html", dst="*/html.old"):
-                            self.path("*.png")
-                            self.path("*/*/*.html")
-                            self.path("*/*/*.gif")
+                 # Local HTML files (e.g. loading screen)
+                # The claim is that we never use local html files any
+                # longer. But rather than commenting out this block, let's
+                # rename every html subdirectory as html.old. That way, if
+                # we're wrong, a user actually does have the relevant
+                # files; s/he just needs to rename every html.old
+                # directory back to html to recover them.
+                with self.prefix(src="*/html", dst="*/html.old"):
+                    self.path("*.png")
+                    self.path("*/*/*.html")
+                    self.path("*/*/*.gif")
 
 
             #build_data.json.  Standard with exception handling is fine.  If we can't open a new file for writing, we have worse problems
