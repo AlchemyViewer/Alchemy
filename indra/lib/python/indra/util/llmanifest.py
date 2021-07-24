@@ -570,7 +570,7 @@ class LLManifest(object, metaclass=LLManifestRegistry):
         return dst_path
 
     def replace_in(self, src, dst=None, searchdict={}):
-        if dst == None:
+        if dst is None:
             dst = src
         # read src
         with open(self.src_path_of(src), 'r', encoding='utf-8') as f:
@@ -837,9 +837,9 @@ class LLManifest(object, metaclass=LLManifestRegistry):
 
     def path(self, src, dst=None, err_if_missing=True):
         sys.stdout.flush()
-        if src == None:
+        if src is None:
             raise ManifestError("No source file, dst is " + dst)
-        if dst == None:
+        if dst is None:
             dst = src
         dst = os.path.join(self.get_dst_prefix(), dst)
         sys.stdout.write("Processing %s => %s ... " % (src, self._relative_dst_path(dst)))
@@ -891,7 +891,7 @@ class LLManifest(object, metaclass=LLManifestRegistry):
         or a list containing dst (present). Concatenate these
         return values to get a list of all libs that are present.
         """
-        if dst == None:
+        if dst is None:
             dst = src
 
         # This was simple before we started needing to pass
