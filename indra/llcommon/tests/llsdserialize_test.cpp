@@ -1795,7 +1795,7 @@ namespace tut
         set_test_name("verify NamedTempFile");
         python("platform",
                "import sys\n"
-               "print 'Running on', sys.platform\n");
+               "print('Running on %s' % sys.platform)\n");
     }
 
     // helper for test<3>
@@ -1825,14 +1825,14 @@ namespace tut
         const char pydata[] =
             "def verify(iterable):\n"
             "    it = iter(iterable)\n"
-            "    assert it.next() == 17\n"
-            "    assert abs(it.next() - 3.14) < 0.01\n"
-            "    assert it.next() == '''\\\n"
+            "    assert next(it) == 17\n"
+            "    assert abs(next(it) - 3.14) < 0.01\n"
+            "    assert next(it) == '''\\\n"
             "This string\n"
             "has several\n"
             "lines.'''\n"
             "    try:\n"
-            "        it.next()\n"
+            "        next(it)\n"
             "    except StopIteration:\n"
             "        pass\n"
             "    else:\n"
@@ -1852,7 +1852,7 @@ namespace tut
                import_llsd <<
                "def parse_each(iterable):\n"
                "    for item in iterable:\n"
-               "        yield llsd.parse(item)\n" <<
+               "        yield llsd.parse(item.encode(\"utf-8\"))\n" <<
                pydata <<
                // Don't forget raw-string syntax for Windows pathnames.
                "verify(parse_each(open(r'" << file.getName() << "')))\n");
@@ -1884,7 +1884,7 @@ namespace tut
                // N.B. Using 'print' implicitly adds newlines.
                "with open(r'" << file.getName() << "', 'w') as f:\n"
                "    for item in DATA:\n"
-               "        print >>f, llsd.format_notation(item)\n");
+               "        print(llsd.format_notation(item).decode(\"utf-8\"), file=f)\n");
 
         std::ifstream inf(file.getName().c_str());
         LLSD item;
