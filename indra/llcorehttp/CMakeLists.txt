@@ -167,7 +167,7 @@ if (LL_TESTS AND LLCOREHTTP_TESTS)
                           "${llcorehttp_TEST_SOURCE_FILES}"
                           "${test_libs}"
                           "-Dhttp_proxy"
-                          ${Python2_EXECUTABLE}
+                          ${Python3_EXECUTABLE}
                           "${CMAKE_CURRENT_SOURCE_DIR}/tests/test_llcorehttp_peer.py"
                           )
  
