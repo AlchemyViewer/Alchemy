@@ -575,13 +575,13 @@ class LLManifest(object, metaclass=LLManifestRegistry):
         if dst == None:
             dst = src
         # read src
-        f = open(self.src_path_of(src), "rbU")
+        f = open(self.src_path_of(src), "rU")
         contents = f.read()
         f.close()
         # apply dict replacements
-        for old, new in searchdict.iteritems():
+        for old, new in searchdict.items():
             contents = contents.replace(old, new)
-        self.put_in_file(contents, dst)
+        self.put_in_file(contents.encode("utf-8"), dst)
         self.created_paths.append(dst)
 
     def copy_action(self, src, dst):

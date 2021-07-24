@@ -272,7 +272,7 @@ class ViewerManifest(LLManifest):
 
     def extract_names(self,src):
         try:
-            contrib_file = open(src,'r')
+            contrib_file = open(src,'rU')
         except IOError:
             print("Failed to open '%s'" % src)
             raise
@@ -291,7 +291,7 @@ class ViewerManifest(LLManifest):
                 names.append(line.rstrip())
         # It's not fair to always put the same people at the head of the list
         random.shuffle(names)
-        return ', '.join(names)
+        return ', '.join(names).encode("utf-8")
 
     def relsymlinkf(self, src, dst=None, catch=True):
         """
@@ -658,8 +658,7 @@ class WindowsManifest(ViewerManifest):
         result = ""
         dest_files = [pair[1] for pair in self.file_list if pair[0] and os.path.isfile(pair[1])]
         # sort deepest hierarchy first
-        dest_files.sort(lambda a,b: cmp(a.count(os.path.sep),b.count(os.path.sep)) or cmp(a,b))
-        dest_files.reverse()
+        dest_files.sort(key=lambda path: (path.count(os.path.sep), path), reverse=True)
         out_path = None
         for pkg_file in dest_files:
             rel_file = os.path.normpath(pkg_file.replace(self.get_dst_prefix()+os.path.sep,''))
@@ -682,8 +681,7 @@ class WindowsManifest(ViewerManifest):
             for d in deleted_file_dirs:
                 deleted_dirs.extend(path_ancestors(d))
             # sort deepest hierarchy first
-            deleted_dirs.sort(lambda a,b: cmp(a.count(os.path.sep),b.count(os.path.sep)) or cmp(a,b))
-            deleted_dirs.reverse()
+            deleted_dirs.sort(key=lambda path: (path.count(os.path.sep), path), reverse=True)
             prev = None
             for d in deleted_dirs:
                 if d != prev:   # skip duplicates
