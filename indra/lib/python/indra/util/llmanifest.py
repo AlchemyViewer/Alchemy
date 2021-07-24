@@ -575,7 +575,7 @@ class LLManifest(object, metaclass=LLManifestRegistry):
         if dst == None:
             dst = src
         # read src
-        f = open(self.src_path_of(src), "rU")
+        f = open(self.src_path_of(src), "r")
         contents = f.read()
         f.close()
         # apply dict replacements

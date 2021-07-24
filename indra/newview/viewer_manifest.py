@@ -272,7 +272,7 @@ class ViewerManifest(LLManifest):
 
     def extract_names(self,src):
         try:
-            contrib_file = open(src,'rU')
+            contrib_file = open(src,'r')
         except IOError:
             print("Failed to open '%s'" % src)
             raise
