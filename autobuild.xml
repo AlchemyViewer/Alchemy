@@ -686,11 +686,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>97b019dafbdd8220260e7b8df098cf850becbf26c3a2a4ac5d97faed42cb1a04f929ada94088198ac35dc0ff234a1f4b</string>
+              <string>4f1ca413752f71cf82c3bb966839421e7713d5610107675d1a5582a0aee4b03e65065d8cad787482c33548c731fcb6f6</string>
               <key>hash_algorithm</key>
               <string>sha3_384</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/94/packages/generic/freetype-948/2.11.0/freetype-2.11.0-darwin64-948.tar.xz</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/94/packages/generic/freetype-957/2.10.4/freetype-2.10.4-darwin64-957.tar.xz</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
@@ -700,11 +700,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>d8df431b0823a2987313c10054664e895372bf018b19b7e6f5868372b1e76f12e317b8a65f1c380a447286f7738f8af0</string>
+              <string>db6d23a1ffe331707f71f9b2b41fb412079d62342edfb10754e45f7952e17c9dd65fc639d062b80f673fdf093940360d</string>
               <key>hash_algorithm</key>
               <string>sha3_384</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/94/packages/generic/freetype-948/2.11.0/freetype-2.11.0-windows-948.tar.xz</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/94/packages/generic/freetype-957/2.10.4/freetype-2.10.4-windows-957.tar.xz</string>
             </map>
             <key>name</key>
             <string>windows</string>
@@ -714,18 +714,18 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>dcb3fd4b346f57c14ec8943ec8969b269a35a9998eadc7b83b8a6e581cc4662bd2df4b86a0aa7f41f01bafa16236f29f</string>
+              <string>7707cdcc07b2451a7848ecf5462791363018eff294a20eff534e824938ab667d0cc7abdf7fa9ec2a6aa526e41e0b24dc</string>
               <key>hash_algorithm</key>
               <string>sha3_384</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/94/packages/generic/freetype-948/2.11.0/freetype-2.11.0-windows64-948.tar.xz</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/94/packages/generic/freetype-957/2.10.4/freetype-2.10.4-windows64-957.tar.xz</string>
             </map>
             <key>name</key>
             <string>windows64</string>
           </map>
         </map>
         <key>version</key>
-        <string>2.11.0</string>
+        <string>2.10.4</string>
       </map>
       <key>glh_linear</key>
       <map>
