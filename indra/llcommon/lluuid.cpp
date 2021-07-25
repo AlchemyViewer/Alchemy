@@ -116,6 +116,18 @@ unsigned int decode( char const * fiveChars ) throw( bad_input_data )
 } 
 */
 
+char to_char(size_t i)
+{
+    if (i <= 9)
+    {
+        return static_cast<char>('0' + i);
+    }
+    else
+    {
+        return static_cast<char>('a' + (i - 10));
+    }
+}
+
 // Common to all UUID implementations
 void LLUUID::to_chars(char* out) const
 {
@@ -171,23 +183,27 @@ void LLUUID::to_chars(char* out) const
     
     memcpy(out, buffer, UUID_STR_SIZE-1);
 #else
+    alignas(16) char result[UUID_STR_SIZE - 1] = {};  // Temporary aligned output buffer for simd op
+
     for (size_t i = 0, cur_pos = 0; i < UUID_BYTES; ++i)
     {
         const U8 uuid_byte = mData[i];
         const size_t hi = ((uuid_byte) >> 4) & 0x0F;
-        out[cur_pos] = (i <= 9) ? static_cast<char>('0' + hi) : static_cast<char>('a' + (hi-10));
-        ++cur_pos;
+        result[cur_pos] = to_char(hi);
+        cur_pos++;
 
         const size_t lo = (uuid_byte) & 0x0F;
-        out[cur_pos] = (i <= 9) ? static_cast<char>('0' + lo) : static_cast<char>('a' + (lo-10));
-        ++cur_pos;
+        result[cur_pos] = to_char(lo);
+        cur_pos++;
 
         if (i == 3 || i == 5 || i == 7 || i == 9)
         {
-            out[cur_pos] = '-';
-            ++cur_pos;
+            result[cur_pos] = '-';
+            cur_pos++;
         }
     }
+
+    memcpy(out, result, UUID_STR_SIZE - 1);
 #endif
 }
 
