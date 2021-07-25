@@ -171,18 +171,21 @@ void LLUUID::to_chars(char* out) const
     
     memcpy(out, buffer, UUID_STR_SIZE-1);
 #else
-    for (size_t i = 0; i < UUID_BYTES; ++i)
+    for (size_t i = 0, cur_pos = 0; i < UUID_BYTES; ++i)
     {
-        const auto uuid_byte = mData[i];
+        const U8 uuid_byte = mData[i];
         const size_t hi = ((uuid_byte) >> 4) & 0x0F;
-        *out++ = (i <= 9) ? static_cast<char>('0' + hi) : static_cast<char>('a' + (hi-10));;
-        
+        out[cur_pos] = (i <= 9) ? static_cast<char>('0' + hi) : static_cast<char>('a' + (hi-10));
+        ++cur_pos;
+
         const size_t lo = (uuid_byte) & 0x0F;
-        *out++ = (i <= 9) ? static_cast<char>('0' + lo) : static_cast<char>('a' + (lo-10));;
-        
+        out[cur_pos] = (i <= 9) ? static_cast<char>('0' + lo) : static_cast<char>('a' + (lo-10));
+        ++cur_pos;
+
         if (i == 3 || i == 5 || i == 7 || i == 9)
         {
-            *out++ = '-';
+            out[cur_pos] = '-';
+            ++cur_pos;
         }
     }
 #endif
