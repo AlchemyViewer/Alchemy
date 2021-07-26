@@ -98,9 +98,9 @@ class TestHTTPRequestHandler(BaseHTTPRequestHandler):
         while size_remaining:
             chunk_size = min(size_remaining, max_chunk_size)
             chunk = self.rfile.read(chunk_size)
-            L.append(chunk)
+            L.append(chunk.decode('utf-8'))
             size_remaining -= len(chunk)
-        return ''.join(L)
+        return (''.join(L)).encode('utf-8')
         # end of swiped read() logic
 
     def read_xml(self):
@@ -132,7 +132,7 @@ class TestHTTPRequestHandler(BaseHTTPRequestHandler):
         # self.answer(self.read())
         try:
             self.answer(dict(reply="success", status=200,
-                             reason=self.read()))
+                             reason=self.read().decode('utf-8')))
         except self.ignore_exceptions as e:
             print("Exception during POST (ignoring): %s" % str(e), file=sys.stderr)
 
@@ -141,7 +141,7 @@ class TestHTTPRequestHandler(BaseHTTPRequestHandler):
         # self.answer(self.read())
         try:
             self.answer(dict(reply="success", status=200,
-                             reason=self.read()))
+                             reason=self.read().decode('utf-8')))
         except self.ignore_exceptions as e:
             print("Exception during PUT (ignoring): %s" % str(e), file=sys.stderr)
 
@@ -183,7 +183,7 @@ class TestHTTPRequestHandler(BaseHTTPRequestHandler):
             self.send_header("Content-type", "text/plain")
             self.end_headers()
             if body:
-                self.wfile.write(body)
+                self.wfile.write(body.encode('utf-8'))
         elif "/bug2295/" in self.path:
             # Test for https://jira.secondlife.com/browse/BUG-2295
             #
@@ -218,7 +218,7 @@ class TestHTTPRequestHandler(BaseHTTPRequestHandler):
             self.send_header("Content-type", "text/plain")
             self.end_headers()
             if body:
-                self.wfile.write(body)
+                self.wfile.write(body.encode('utf-8'))
         elif "fail" not in self.path:
             data = data.copy()          # we're going to modify
             # Ensure there's a "reply" key in data, even if there wasn't before
@@ -230,7 +230,7 @@ class TestHTTPRequestHandler(BaseHTTPRequestHandler):
                 self.reflect_headers()
             self.send_header("Content-type", "application/llsd+xml")
             self.send_header("Content-Length", str(len(response)))
-            self.send_header("X-LL-Special", "Mememememe");
+            self.send_header("X-LL-Special", "Mememememe")
             self.end_headers()
             if withdata:
                 self.wfile.write(response)
@@ -253,8 +253,8 @@ class TestHTTPRequestHandler(BaseHTTPRequestHandler):
 
     def reflect_headers(self):
         for name in list(self.headers.keys()):
-            # print "Header:  %s: %s" % (name, self.headers[name])
-            self.send_header("X-Reflect-" + name, self.headers[name])
+            # print("Header:  %s: %s" % (name, self.headers[name]))
+            self.send_header("X-Reflect-" + name, str(self.headers[name]))
 
     if not VERBOSE:
         # When VERBOSE is set, skip both these overrides because they exist to
