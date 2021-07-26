@@ -214,7 +214,7 @@ namespace LLMarketplaceImport
         httpOpts->setFollowRedirects(true);
 
         httpHeaders->append(HTTP_OUT_HEADER_ACCEPT, "*/*");
-        httpHeaders->append(HTTP_OUT_HEADER_CONNECTION, "Keep-Alive");
+        httpHeaders->append(HTTP_OUT_HEADER_CONNECTION, "keep-alive");
         httpHeaders->append(HTTP_OUT_HEADER_COOKIE, sMarketplaceCookie);
         httpHeaders->append(HTTP_OUT_HEADER_CONTENT_TYPE, HTTP_CONTENT_XML);
         httpHeaders->append(HTTP_OUT_HEADER_USER_AGENT, LLViewerMedia::getInstance()->getCurrentUserAgent());
@@ -854,8 +854,8 @@ void LLMarketplaceData::getSLMListingsCoro(LLUUID folderId)
     LLCore::HttpRequest::ptr_t httpRequest(new LLCore::HttpRequest);
     LLCore::HttpHeaders::ptr_t httpHeaders(new LLCore::HttpHeaders);
 
-    httpHeaders->append("Accept", "application/json");
-    httpHeaders->append("Content-Type", "application/json");
+    httpHeaders->append(HTTP_OUT_HEADER_ACCEPT, "application/json");
+    httpHeaders->append(HTTP_OUT_HEADER_CONTENT_TYPE, "application/json");
 
     std::string url = getSLMConnectURL("/listings");
 
@@ -916,8 +916,8 @@ void LLMarketplaceData::getSingleListingCoro(S32 listingId, LLUUID folderId)
     LLCore::HttpRequest::ptr_t httpRequest(new LLCore::HttpRequest);
     LLCore::HttpHeaders::ptr_t httpHeaders(new LLCore::HttpHeaders);
 
-    httpHeaders->append("Accept", "application/json");
-    httpHeaders->append("Content-Type", "application/json");
+    httpHeaders->append(HTTP_OUT_HEADER_ACCEPT, "application/json");
+    httpHeaders->append(HTTP_OUT_HEADER_CONTENT_TYPE, "application/json");
 
     std::string url = getSLMConnectURL("/listing/") + llformat("%d", listingId);
 
@@ -984,8 +984,8 @@ void LLMarketplaceData::createSLMListingCoro(LLUUID folderId, LLUUID versionId, 
     LLCore::HttpRequest::ptr_t httpRequest(new LLCore::HttpRequest);
     LLCore::HttpHeaders::ptr_t httpHeaders(new LLCore::HttpHeaders);
 
-    httpHeaders->append("Accept", "application/json");
-    httpHeaders->append("Content-Type", "application/json");
+    httpHeaders->append(HTTP_OUT_HEADER_ACCEPT, "application/json");
+    httpHeaders->append(HTTP_OUT_HEADER_CONTENT_TYPE, "application/json");
 
     LLViewerInventoryCategory* category = gInventory.getCategory(folderId);
     LLSD invInfo;
@@ -1049,8 +1049,8 @@ void LLMarketplaceData::updateSLMListingCoro(LLUUID folderId, S32 listingId, LLU
     LLCore::HttpRequest::ptr_t httpRequest(new LLCore::HttpRequest);
     LLCore::HttpHeaders::ptr_t httpHeaders(new LLCore::HttpHeaders);
 
-    httpHeaders->append("Accept", "application/json");
-    httpHeaders->append("Content-Type", "application/json");
+    httpHeaders->append(HTTP_OUT_HEADER_ACCEPT, "application/json");
+    httpHeaders->append(HTTP_OUT_HEADER_CONTENT_TYPE, "application/json");
     
     LLSD invInfo;
     invInfo["listing_folder_id"] = folderId;
@@ -1128,8 +1128,8 @@ void LLMarketplaceData::associateSLMListingCoro(LLUUID folderId, S32 listingId, 
     LLCore::HttpRequest::ptr_t httpRequest(new LLCore::HttpRequest);
     LLCore::HttpHeaders::ptr_t httpHeaders(new LLCore::HttpHeaders);
 
-    httpHeaders->append("Accept", "application/json");
-    httpHeaders->append("Content-Type", "application/json");
+    httpHeaders->append(HTTP_OUT_HEADER_ACCEPT, "application/json");
+    httpHeaders->append(HTTP_OUT_HEADER_CONTENT_TYPE, "application/json");
 
     LLSD invInfo;
     invInfo["listing_folder_id"] = folderId;
@@ -1206,8 +1206,8 @@ void LLMarketplaceData::deleteSLMListingCoro(S32 listingId)
     LLCore::HttpRequest::ptr_t httpRequest(new LLCore::HttpRequest);
     LLCore::HttpHeaders::ptr_t httpHeaders(new LLCore::HttpHeaders);
 
-    httpHeaders->append("Accept", "application/json");
-    httpHeaders->append("Content-Type", "application/json");
+    httpHeaders->append(HTTP_OUT_HEADER_ACCEPT, "application/json");
+    httpHeaders->append(HTTP_OUT_HEADER_CONTENT_TYPE, "application/json");
 
     std::string url = getSLMConnectURL("/listing/") + llformat("%d", listingId);
     LLUUID folderId = getListingFolder(listingId);

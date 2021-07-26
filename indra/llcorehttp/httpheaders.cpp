@@ -42,12 +42,30 @@ HttpHeaders::clear()
 
 void HttpHeaders::append(const std::string & name, const std::string & value)
 {
+    for (reverse_iterator iter(rbegin()), iend(rend()); iend != iter; ++iter)
+    {
+        if ((*iter).first == name)
+        {
+            iter->second = value;
+            return;
+        }
+    }
+
 	mHeaders.push_back(value_type(name, value));
 }
 
 
 void HttpHeaders::append(const char * name, const char * value)
 {
+    for (reverse_iterator iter(rbegin()), iend(rend()); iend != iter; ++iter)
+    {
+        if ((*iter).first == name)
+        {
+            iter->second = value;
+            return;
+        }
+    }
+
 	mHeaders.push_back(value_type(name, value));
 }
 

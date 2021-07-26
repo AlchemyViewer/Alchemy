@@ -647,10 +647,15 @@ HttpStatus HttpOpRequest::prepareRequest(HttpService * service)
 		break;
 	}
 
+	if (!mReqHeaders || !mReqHeaders->find("Connection"))
+	{
+        mCurlHeaders = curl_slist_append(mCurlHeaders, "Connection: keep-alive");
+	}
 
-    // *TODO: Should this be 'Keep-Alive' ?
-    mCurlHeaders = curl_slist_append(mCurlHeaders, "Connection: keep-alive");
-    mCurlHeaders = curl_slist_append(mCurlHeaders, "Keep-alive: 300");
+	if (!mReqHeaders || !mReqHeaders->find("Keep-Alive"))
+	{
+        mCurlHeaders = curl_slist_append(mCurlHeaders, "Keep-Alive: 300");
+	}
 
 	// Tracing
 	if (mTracing >= HTTP_TRACE_CURL_HEADERS)
