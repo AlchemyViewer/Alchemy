@@ -266,15 +266,14 @@ build:release:windows64:
   script:
     - |
         $BuildData = Get-Content .\build-vc-64\newview\Release\build_data.json | ConvertFrom-Json
-        $BuildChannelVersion = $BuildData."Channel" + ' ' + $BuildData."Version"
-        $UploadDestViewerDir = $BuildChannelVersion.ToLower().Replace(" ", "/")
-        $UploadDestURL = "https://pkg.alchemyviewer.org/repository/viewer/${UploadDestViewerDir}"
+        $PkgName = $BuildData.Channel.Replace(" ", "_")
+        $PkgVer = $BuildData.Version
+        $UploadDestURL = "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${PkgName}/${PkgVer}"
 
         $UploadParams = @{ UseBasicParsing = $true;
          Method = "PUT";
          Headers = @{
-           ContentType = "application/x-executable";
-           Authorization = "Basic $([System.Convert]::ToBase64String([System.Text.Encoding]::ASCII.GetBytes("$env:AUTOBUILD_HTTP_USER`:$env:AUTOBUILD_HTTP_PASS")))"; };
+           "PRIVATE-TOKEN" = "${CI_JOB_TOKEN}"; };
          Verbose = $true; };
 
         Push-Location .\build-linux-64\newview\
