@@ -104,7 +104,7 @@ variables:
     expire_in: 1 week
     paths:
       - build-linux-*/build_data.json
-      - build-linux-*/newview/Alchemy_*.tar.bz2
+      - build-linux-*/newview/Alchemy_*.tar.xz
 
 .win32_build:
   extends: .win_build
@@ -281,7 +281,7 @@ build:release:windows64:
          Verbose = $true; };
 
         Push-Location .\build-linux-64\newview\
-          $FileNameLnx64 = Get-ChildItem -Path . -Name -Include Alchemy_*.tar.bz2
+          $FileNameLnx64 = Get-ChildItem -Path . -Name -Include Alchemy_*.tar.xz
           Invoke-WebRequest @UploadParams -InFile .\$FileNameLnx64 -Uri "${UploadDestURL}/${FileNameLnx64}"
         Pop-Location
 
