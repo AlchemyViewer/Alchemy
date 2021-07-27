@@ -29,13 +29,12 @@ variables:
       - .venv/
     when: 'always'
   before_script:
-    - virtualenv .venv
+    - virtualenv -p C:\Python39\python.exe .venv
     - .\.venv\Scripts\activate.ps1
-    - pip install --upgrade autobuild -i https://pkg.alchemyviewer.org/repository/autobuild/simple --extra-index-url https://pypi.org/simple
+    - pip3 install --upgrade autobuild -i https://ci-job-token:${CI_JOB_TOKEN}@git.alchemyviewer.org/api/v4/projects/54/packages/pypi/simple --extra-index-url https://pypi.org/simple
   script:
-    - |
-        autobuild configure -c ReleaseOS -- -DUSE_FMODSTUDIO=ON -DUSE_NVAPI=ON -DUSE_LTO=ON -DDISABLE_FATAL_WARNINGS=ON -DREVISION_FROM_VCS=FALSE
-        autobuild build -c ReleaseOS --no-configure
+    - autobuild configure -c ReleaseOS -- -DUSE_FMODSTUDIO=ON -DUSE_NVAPI=ON -DUSE_LTO=ON -DDISABLE_FATAL_WARNINGS=ON -DREVISION_FROM_VCS=FALSE
+    - autobuild build -c ReleaseOS --no-configure
   artifacts:
     name: "$env:CI_COMMIT_REF_NAME-$env:CI_COMMIT_SHORT_SHA"
     expire_in: 1 week
@@ -61,13 +60,12 @@ variables:
       - .venv
     when: 'always'
   before_script:
-    - virtualenv .venv -p python2
+    - virtualenv .venv -p python3
     - source .venv/bin/activate
-    - pip install --upgrade autobuild dmgbuild -i https://pkg.alchemyviewer.org/repository/autobuild/simple --extra-index-url https://pypi.org/simple
+    - pip3 install --upgrade autobuild dmgbuild -i https://ci-job-token:${CI_JOB_TOKEN}@git.alchemyviewer.org/api/v4/projects/54/packages/pypi/simple --extra-index-url https://pypi.org/simple
   script:
-    - |
-        autobuild configure -c ReleaseOS -- -DUSE_FMODSTUDIO=ON -DUSE_NVAPI=ON -DUSE_LTO=ON -DDISABLE_FATAL_WARNINGS=ON -DREVISION_FROM_VCS=FALSE
-        autobuild build -c ReleaseOS --no-configure
+    - autobuild configure -c ReleaseOS -- -DUSE_FMODSTUDIO=ON -DUSE_NVAPI=ON -DUSE_LTO=ON -DDISABLE_FATAL_WARNINGS=ON -DREVISION_FROM_VCS=FALSE
+    - autobuild build -c ReleaseOS --no-configure
   artifacts:
     name: "$env:CI_COMMIT_REF_NAME-$env:CI_COMMIT_SHORT_SHA"
     expire_in: 1 week
@@ -92,13 +90,12 @@ variables:
       - .venv
     when: 'always'
   before_script:
-    - virtualenv .venv -p python2
+    - virtualenv .venv -p python3
     - source .venv/bin/activate
-    - pip install --upgrade autobuild -i https://pkg.alchemyviewer.org/repository/autobuild/simple --extra-index-url https://pypi.org/simple
+    - pip3 install --upgrade autobuild -i https://ci-job-token:${CI_JOB_TOKEN}@git.alchemyviewer.org/api/v4/projects/54/packages/pypi/simple --extra-index-url https://pypi.org/simple
   script:
-    - |
-        autobuild configure -c ReleaseOS -- -DUSE_FMODSTUDIO=ON -DUSE_NVAPI=ON -DUSE_LTO=ON -DDISABLE_FATAL_WARNINGS=ON -DREVISION_FROM_VCS=FALSE
-        autobuild build -c ReleaseOS --no-configure
+    - autobuild configure -c ReleaseOS -- -DUSE_FMODSTUDIO=ON -DUSE_NVAPI=ON -DUSE_LTO=ON -DDISABLE_FATAL_WARNINGS=ON -DREVISION_FROM_VCS=FALSE
+    - autobuild build -c ReleaseOS --no-configure
   artifacts:
     name: "$env:CI_COMMIT_REF_NAME-$env:CI_COMMIT_SHORT_SHA"
     expire_in: 1 week
