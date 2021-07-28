@@ -273,7 +273,7 @@ build:release:windows64:
         $UploadParams = @{ UseBasicParsing = $true;
          Method = "PUT";
          Headers = @{
-           "PRIVATE-TOKEN" = "${CI_JOB_TOKEN}"; };
+           "JOB-TOKEN" = "${CI_JOB_TOKEN}"; };
          Verbose = $true; };
 
         Push-Location .\build-linux-64\newview\
