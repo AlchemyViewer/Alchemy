@@ -49,6 +49,7 @@ variables:
   stage: build
   tags:
     - mac
+    - m1
   cache:
     key:
       files:
