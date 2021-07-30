@@ -50,6 +50,7 @@ variables:
   tags:
     - mac
     - m1
+    - bash
   cache:
     key:
       files:
