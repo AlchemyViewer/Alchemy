@@ -1244,7 +1244,7 @@ class LinuxManifest(ViewerManifest):
             self.run_command(
                 ["find"] +
                 [os.path.join(self.get_dst_prefix(), dir) for dir in ('bin', 'lib')] +
-                ['-type', 'f', '!', '-name', '*.py', '!', '-name', '*.pak', '!', '-name', '*.bin',
+                ['-type', 'f', '!', '-name', '*.py', '!', '-name', '*.pak', '!', '-name', '*.bin', '!', '-name', '*.dat',
                  '!', '-name', 'update_install', '-exec', 'strip', '-S', '{}', ';'])
 
 class Linux_i686_Manifest(LinuxManifest):
