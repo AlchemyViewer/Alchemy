@@ -261,12 +261,15 @@ build:release:windows64:
 .upload_template:
   stage: upload
   tags:
-    - autobuild
-    - windows
+    - powershell
+    - m1
+    - mac
   allow_failure: false
+  variables:
+    GIT_STRATEGY: none
   script:
     - |
-        $BuildData = Get-Content .\build-vc-64\newview\Release\build_data.json | ConvertFrom-Json
+        $BuildData = Get-Content ./build-vc-64/newview/Release/build_data.json | ConvertFrom-Json
         $PkgName = $BuildData.Channel.Replace(" ", "_")
         $PkgVer = $BuildData.Version
         $UploadDestURL = "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${PkgName}/${PkgVer}"
@@ -277,19 +280,19 @@ build:release:windows64:
            "JOB-TOKEN" = "${CI_JOB_TOKEN}"; };
          Verbose = $true; };
 
-        Push-Location .\build-linux-64\newview\
+        Push-Location ./build-linux-64/newview/
           $FileNameLnx64 = Get-ChildItem -Path . -Name -Include Alchemy_*.tar.xz
-          Invoke-WebRequest @UploadParams -InFile .\$FileNameLnx64 -Uri "${UploadDestURL}/${FileNameLnx64}"
+          Invoke-WebRequest @UploadParams -InFile ./$FileNameLnx64 -Uri "${UploadDestURL}/${FileNameLnx64}"
         Pop-Location
 
-        Push-Location .\build-darwin-64\newview\
+        Push-Location ./build-darwin-64/newview/
           $FileNameMac64 = Get-ChildItem -Path . -Name -Include Alchemy_*.dmg
-          Invoke-WebRequest @UploadParams -InFile .\$FileNameMac64 -Uri "${UploadDestURL}/${FileNameMac64}"
+          Invoke-WebRequest @UploadParams -InFile ./$FileNameMac64 -Uri "${UploadDestURL}/${FileNameMac64}"
         Pop-Location
 
-        Push-Location .\build-vc-64\newview\Release\
+        Push-Location ./build-vc-64/newview/Release/
           $FileNameWin64 = Get-ChildItem -Path . -Name -Include Alchemy_*_Setup.exe
-          Invoke-WebRequest @UploadParams -InFile .\$FileNameWin64 -Uri "${UploadDestURL}/${FileNameWin64}"
+          Invoke-WebRequest @UploadParams -InFile ./$FileNameWin64 -Uri "${UploadDestURL}/${FileNameWin64}"
 
           If ($env:VIEWER_USE_CRASHPAD -eq 'TRUE') 
           {
