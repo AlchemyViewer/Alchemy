@@ -29,13 +29,12 @@ variables:
       - .venv/
     when: 'always'
   before_script:
-    - virtualenv .venv
+    - virtualenv -p C:\Python39\python.exe .venv
     - .\.venv\Scripts\activate.ps1
-    - pip install --upgrade autobuild -i https://pkg.alchemyviewer.org/repository/autobuild/simple --extra-index-url https://pypi.org/simple
+    - pip3 install --upgrade autobuild -i https://ci-job-token:${CI_JOB_TOKEN}@git.alchemyviewer.org/api/v4/projects/54/packages/pypi/simple --extra-index-url https://pypi.org/simple
   script:
-    - |
-        autobuild configure -c ReleaseOS -- -DUSE_FMODSTUDIO=ON -DUSE_NVAPI=ON -DUSE_LTO=ON -DDISABLE_FATAL_WARNINGS=ON -DREVISION_FROM_VCS=FALSE
-        autobuild build -c ReleaseOS --no-configure
+    - autobuild configure -c ReleaseOS -- -DUSE_FMODSTUDIO=ON -DUSE_NVAPI=ON -DUSE_LTO=ON -DDISABLE_FATAL_WARNINGS=ON -DREVISION_FROM_VCS=FALSE
+    - autobuild build -c ReleaseOS --no-configure
   artifacts:
     name: "$env:CI_COMMIT_REF_NAME-$env:CI_COMMIT_SHORT_SHA"
     expire_in: 1 week
@@ -50,6 +49,7 @@ variables:
   stage: build
   tags:
     - mac
+    - m1
   cache:
     key:
       files:
@@ -61,13 +61,12 @@ variables:
       - .venv
     when: 'always'
   before_script:
-    - virtualenv .venv -p python2
+    - virtualenv .venv -p python3
     - source .venv/bin/activate
-    - pip install --upgrade autobuild dmgbuild -i https://pkg.alchemyviewer.org/repository/autobuild/simple --extra-index-url https://pypi.org/simple
+    - pip3 install --upgrade autobuild dmgbuild -i https://ci-job-token:${CI_JOB_TOKEN}@git.alchemyviewer.org/api/v4/projects/54/packages/pypi/simple --extra-index-url https://pypi.org/simple
   script:
-    - |
-        autobuild configure -c ReleaseOS -- -DUSE_FMODSTUDIO=ON -DUSE_NVAPI=ON -DUSE_LTO=ON -DDISABLE_FATAL_WARNINGS=ON -DREVISION_FROM_VCS=FALSE
-        autobuild build -c ReleaseOS --no-configure
+    - autobuild configure -c ReleaseOS -- -DUSE_FMODSTUDIO=ON -DUSE_NVAPI=ON -DUSE_LTO=ON -DDISABLE_FATAL_WARNINGS=ON -DREVISION_FROM_VCS=FALSE
+    - autobuild build -c ReleaseOS --no-configure
   artifacts:
     name: "$env:CI_COMMIT_REF_NAME-$env:CI_COMMIT_SHORT_SHA"
     expire_in: 1 week
@@ -92,19 +91,18 @@ variables:
       - .venv
     when: 'always'
   before_script:
-    - virtualenv .venv -p python2
+    - virtualenv .venv -p python3
     - source .venv/bin/activate
-    - pip install --upgrade autobuild -i https://pkg.alchemyviewer.org/repository/autobuild/simple --extra-index-url https://pypi.org/simple
+    - pip3 install --upgrade autobuild -i https://ci-job-token:${CI_JOB_TOKEN}@git.alchemyviewer.org/api/v4/projects/54/packages/pypi/simple --extra-index-url https://pypi.org/simple
   script:
-    - |
-        autobuild configure -c ReleaseOS -- -DUSE_FMODSTUDIO=ON -DUSE_NVAPI=ON -DUSE_LTO=ON -DDISABLE_FATAL_WARNINGS=ON -DREVISION_FROM_VCS=FALSE
-        autobuild build -c ReleaseOS --no-configure
+    - autobuild configure -c ReleaseOS -- -DUSE_FMODSTUDIO=ON -DUSE_NVAPI=ON -DUSE_LTO=ON -DDISABLE_FATAL_WARNINGS=ON -DREVISION_FROM_VCS=FALSE
+    - autobuild build -c ReleaseOS --no-configure
   artifacts:
     name: "$env:CI_COMMIT_REF_NAME-$env:CI_COMMIT_SHORT_SHA"
     expire_in: 1 week
     paths:
       - build-linux-*/build_data.json
-      - build-linux-*/newview/Alchemy_*.tar.bz2
+      - build-linux-*/newview/Alchemy_*.tar.xz
 
 .win32_build:
   extends: .win_build
@@ -263,36 +261,38 @@ build:release:windows64:
 .upload_template:
   stage: upload
   tags:
-    - autobuild
-    - windows
+    - powershell
+    - m1
+    - mac
   allow_failure: false
+  variables:
+    GIT_STRATEGY: none
   script:
     - |
-        $BuildData = Get-Content .\build-vc-64\newview\Release\build_data.json | ConvertFrom-Json
-        $BuildChannelVersion = $BuildData."Channel" + ' ' + $BuildData."Version"
-        $UploadDestViewerDir = $BuildChannelVersion.ToLower().Replace(" ", "/")
-        $UploadDestURL = "https://pkg.alchemyviewer.org/repository/viewer/${UploadDestViewerDir}"
+        $BuildData = Get-Content ./build-vc-64/newview/Release/build_data.json | ConvertFrom-Json
+        $PkgName = $BuildData.Channel.Replace(" ", "_")
+        $PkgVer = $BuildData.Version
+        $UploadDestURL = "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${PkgName}/${PkgVer}"
 
         $UploadParams = @{ UseBasicParsing = $true;
          Method = "PUT";
          Headers = @{
-           ContentType = "application/x-executable";
-           Authorization = "Basic $([System.Convert]::ToBase64String([System.Text.Encoding]::ASCII.GetBytes("$env:AUTOBUILD_HTTP_USER`:$env:AUTOBUILD_HTTP_PASS")))"; };
+           "JOB-TOKEN" = "${CI_JOB_TOKEN}"; };
          Verbose = $true; };
 
-        Push-Location .\build-linux-64\newview\
-          $FileNameLnx64 = Get-ChildItem -Path . -Name -Include Alchemy_*.tar.bz2
-          Invoke-WebRequest @UploadParams -InFile .\$FileNameLnx64 -Uri "${UploadDestURL}/${FileNameLnx64}"
+        Push-Location ./build-linux-64/newview/
+          $FileNameLnx64 = Get-ChildItem -Path . -Name -Include Alchemy_*.tar.xz
+          Invoke-WebRequest @UploadParams -InFile ./$FileNameLnx64 -Uri "${UploadDestURL}/${FileNameLnx64}"
         Pop-Location
 
-        Push-Location .\build-darwin-64\newview\
+        Push-Location ./build-darwin-64/newview/
           $FileNameMac64 = Get-ChildItem -Path . -Name -Include Alchemy_*.dmg
-          Invoke-WebRequest @UploadParams -InFile .\$FileNameMac64 -Uri "${UploadDestURL}/${FileNameMac64}"
+          Invoke-WebRequest @UploadParams -InFile ./$FileNameMac64 -Uri "${UploadDestURL}/${FileNameMac64}"
         Pop-Location
 
-        Push-Location .\build-vc-64\newview\Release\
+        Push-Location ./build-vc-64/newview/Release/
           $FileNameWin64 = Get-ChildItem -Path . -Name -Include Alchemy_*_Setup.exe
-          Invoke-WebRequest @UploadParams -InFile .\$FileNameWin64 -Uri "${UploadDestURL}/${FileNameWin64}"
+          Invoke-WebRequest @UploadParams -InFile ./$FileNameWin64 -Uri "${UploadDestURL}/${FileNameWin64}"
 
           If ($env:VIEWER_USE_CRASHPAD -eq 'TRUE') 
           {

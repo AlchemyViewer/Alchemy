@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """\
 @file llmanifest.py
 @author Ryan Williams
@@ -28,7 +29,8 @@ $/LicenseInfo$
 """
 
 from collections import namedtuple, defaultdict
-import commands
+from io import open
+import subprocess
 import errno
 import filecmp
 import fnmatch
@@ -70,9 +72,9 @@ def proper_windows_path(path, current_platform = sys.platform):
     path = path.strip()
     drive_letter = None
     rel = None
-    match = re.match("/cygdrive/([a-z])/(.*)", path)
+    match = re.match(r"/cygdrive/([a-z])/(.*)", path)
     if not match:
-        match = re.match('([a-zA-Z]):\\\(.*)', path)
+        match = re.match(r'([a-zA-Z]):\\\(.*)', path)
     if not match:
         return None         # not an absolute path
     drive_letter = match.group(1)
@@ -83,8 +85,7 @@ def proper_windows_path(path, current_platform = sys.platform):
         return drive_letter.upper() + ':\\' + rel.replace('/', '\\')
 
 def get_default_platform(dummy):
-    return {'linux2':'linux',
-            'linux1':'linux',
+    return {'linux':'linux',
             'cygwin':'windows',
             'win32':'windows',
             'darwin':'darwin'
@@ -162,20 +163,20 @@ BASE_ARGUMENTS=[
 
 def usage(arguments, srctree=""):
     nd = {'name':sys.argv[0]}
-    print """Usage:
+    print("""Usage:
     %(name)s [options] [destdir]
     Options:
-    """ % nd
+    """ % nd)
     for arg in arguments:
         default = arg['default']
         if hasattr(default, '__call__'):
             default = "(computed value) \"" + str(default(srctree)) + '"'
         elif default is not None:
             default = '"' + default + '"'
-        print "\t--%s        Default: %s\n\t%s\n" % (
+        print("\t--%s        Default: %s\n\t%s\n" % (
             arg['name'],
             default,
-            arg['description'] % nd)
+            arg['description'] % nd))
 
 def main(extra=[]):
 ##  print ' '.join((("'%s'" % item) if ' ' in item else item)
@@ -200,10 +201,10 @@ def main(extra=[]):
     for k in 'artwork build dest source'.split():
         args[k] = os.path.normpath(args[k])
 
-    print "Source tree:", args['source']
-    print "Artwork tree:", args['artwork']
-    print "Build tree:", args['build']
-    print "Destination tree:", args['dest']
+    print("Source tree:", args['source'])
+    print("Artwork tree:", args['artwork'])
+    print("Build tree:", args['build'])
+    print("Destination tree:", args['dest'])
 
     # early out for help
     if 'help' in args:
@@ -223,10 +224,10 @@ def main(extra=[]):
     # fix up version
     if isinstance(args.get('versionfile'), str):
         try: # read in the version string
-            vf = open(args['versionfile'], 'r')
-            args['version'] = vf.read().strip().split('.')
+            with open(args['versionfile'], 'r', encoding='utf-8') as vf:
+                args['version'] = vf.read().strip().split('.')
         except:
-            print "Unable to read versionfile '%s'" % args['versionfile']
+            print("Unable to read versionfile '%s'" % args['versionfile'])
             raise
 
     # unspecified, default, and agni are default
@@ -238,7 +239,7 @@ def main(extra=[]):
 
     # debugging
     for opt in args:
-        print "Option:", opt, "=", args[opt]
+        print("Option:", opt, "=", args[opt])
 
     # pass in sourceid as an argument now instead of an environment variable
     args['sourceid'] = os.environ.get("sourceid", "")
@@ -246,18 +247,18 @@ def main(extra=[]):
     # Build base package.
     touch = args.get('touch')
     if touch:
-        print '================ Creating base package'
+        print('================ Creating base package')
     else:
-        print '================ Starting base copy'
+        print('================ Starting base copy')
     wm = LLManifest.for_platform(args['platform'], args.get('arch'))(args)
     wm.do(*args['actions'])
     # Store package file for later if making touched file.
     base_package_file = ""
     if touch:
-        print '================ Created base package ', wm.package_file
+        print('================ Created base package ', wm.package_file)
         base_package_file = "" + wm.package_file
     else:
-        print '================ Finished base copy'
+        print('================ Finished base copy')
 
     # handle multiple packages if set
     # ''.split() produces empty list
@@ -284,39 +285,38 @@ def main(extra=[]):
             args['sourceid']       = os.environ.get(package_id + "_sourceid")
             args['dest'] = base_dest_template.format(package_id)
             if touch:
-                print '================ Creating additional package for "', package_id, '" in ', args['dest']
+                print('================ Creating additional package for "', package_id, '" in ', args['dest'])
             else:
-                print '================ Starting additional copy for "', package_id, '" in ', args['dest']
+                print('================ Starting additional copy for "', package_id, '" in ', args['dest'])
             try:
                 wm = LLManifest.for_platform(args['platform'], args.get('arch'))(args)
                 wm.do(*args['actions'])
             except Exception as err:
                 sys.exit(str(err))
             if touch:
-                print '================ Created additional package ', wm.package_file, ' for ', package_id
+                print('================ Created additional package ', wm.package_file, ' for ', package_id)
                 with open(base_touch_template.format(package_id), 'w') as fp:
                     fp.write('set package_file=%s\n' % wm.package_file)
             else:
-                print '================ Finished additional copy "', package_id, '" in ', args['dest']
+                print('================ Finished additional copy "', package_id, '" in ', args['dest'])
     # Write out the package file in this format, so that it can easily be called
     # and used in a .bat file - yeah, it sucks, but this is the simplest...
     if touch:
         with open(touch, 'w') as fp:
             fp.write('set package_file=%s\n' % base_package_file)
-        print 'touched', touch
+        print('touched', touch)
     return 0
 
 class LLManifestRegistry(type):
     def __init__(cls, name, bases, dct):
         super(LLManifestRegistry, cls).__init__(name, bases, dct)
-        match = re.match("(\w+)Manifest", name)
+        match = re.match(r"(\w+)Manifest", name)
         if match:
            cls.manifests[match.group(1).lower()] = cls
 
 MissingFile = namedtuple("MissingFile", ("pattern", "tried"))
 
-class LLManifest(object):
-    __metaclass__ = LLManifestRegistry
+class LLManifest(object, metaclass=LLManifestRegistry):
     manifests = {}
     def for_platform(self, platform, arch = None):
         if arch:
@@ -408,8 +408,8 @@ class LLManifest(object):
     def display_stacks(self):
         width = 1 + max(len(stack) for stack in self.PrefixManager.stacks)
         for stack in self.PrefixManager.stacks:
-            print "{} {}".format((stack + ':').ljust(width),
-                                 os.path.join(*getattr(self, stack)))
+            print("{} {}".format((stack + ':').ljust(width),
+                                 os.path.join(*getattr(self, stack))))
 
     class PrefixManager(object):
         # stack attributes we manage in this LLManifest (sub)class
@@ -426,7 +426,7 @@ class LLManifest(object):
             self.prevlen = { stack: len(getattr(self.manifest, stack)) - 1
                              for stack in self.stacks }
 
-        def __nonzero__(self):
+        def __bool__(self):
             # If the caller wrote:
             # if self.prefix(...):
             # then a value of this class had better evaluate as 'True'.
@@ -471,7 +471,7 @@ class LLManifest(object):
         build = self.build_prefix.pop()
         dst = self.dst_prefix.pop()
         if descr and not(src == descr or build == descr or dst == descr):
-            raise ValueError, "End prefix '" + descr + "' didn't match '" +src+ "' or '" +dst + "'"
+            raise ValueError("End prefix '" + descr + "' didn't match '" +src+ "' or '" +dst + "'")
 
     def get_src_prefix(self):
         """ Returns the current source prefix."""
@@ -538,7 +538,7 @@ class LLManifest(object):
         Runs an external command.  
         Raises ManifestError exception if the command returns a nonzero status.
         """
-        print "Running command:", command
+        print("Running command:", command)
         sys.stdout.flush()
         try:
             subprocess.check_call(command)
@@ -551,18 +551,15 @@ class LLManifest(object):
           a) verify that you really have created it
           b) schedule it for cleanup"""
         if not os.path.exists(path):
-            raise ManifestError, "Should be something at path " + path
+            raise ManifestError("Should be something at path " + path)
         self.created_paths.append(path)
 
     def put_in_file(self, contents, dst, src=None):
         # write contents as dst
         dst_path = self.dst_path_of(dst)
         self.cmakedirs(os.path.dirname(dst_path))
-        f = open(dst_path, "wb")
-        try:
+        with open(dst_path, 'wb') as f:
             f.write(contents)
-        finally:
-            f.close()
 
         # Why would we create a file in the destination tree if not to include
         # it in the installer? The default src=None (plus the fact that the
@@ -572,16 +569,16 @@ class LLManifest(object):
         return dst_path
 
     def replace_in(self, src, dst=None, searchdict={}):
-        if dst == None:
+        if dst is None:
             dst = src
         # read src
-        f = open(self.src_path_of(src), "rbU")
-        contents = f.read()
-        f.close()
+        with open(self.src_path_of(src), 'r', encoding='utf-8') as f:
+            contents = f.read()
+
         # apply dict replacements
-        for old, new in searchdict.iteritems():
+        for old, new in searchdict.items():
             contents = contents.replace(old, new)
-        self.put_in_file(contents, dst)
+        self.put_in_file(contents.encode("utf-8"), dst)
         self.created_paths.append(dst)
 
     def copy_action(self, src, dst):
@@ -591,7 +588,7 @@ class LLManifest(object):
             self.created_paths.append(dst)
             self.ccopymumble(src, dst)
         else:
-            print "Doesn't exist:", src
+            print("Doesn't exist:", src)
 
     def package_action(self, src, dst):
         pass
@@ -609,8 +606,8 @@ class LLManifest(object):
         # file error until all were resolved. This way permits the developer
         # to resolve them all at once.
         if self.missing:
-            print '*' * 72
-            print "Missing files:"
+            print('*' * 72)
+            print("Missing files:")
             # Instead of just dumping each missing file and all the places we
             # looked for it, group by common sets of places we looked. Use a
             # set to store the 'tried' directories, to avoid mismatches due to
@@ -622,12 +619,12 @@ class LLManifest(object):
             # Now dump all the patterns sought in each group of 'tried'
             # directories.
             for tried, patterns in organize.items():
-                print "  Could not find in:"
+                print("  Could not find in:")
                 for dir in sorted(tried):
-                    print "    %s" % dir
+                    print("    %s" % dir)
                 for pattern in sorted(patterns):
-                    print "      %s" % pattern
-            print '*' * 72
+                    print("      %s" % pattern)
+            print('*' * 72)
             raise MissingError('%s patterns could not be found' % len(self.missing))
 
     def copy_finish(self):
@@ -640,18 +637,17 @@ class LLManifest(object):
         unpacked_file_name = "unpacked_%(plat)s_%(vers)s.tar" % {
             'plat':self.args['platform'],
             'vers':'_'.join(self.args['version'])}
-        print "Creating unpacked file:", unpacked_file_name
+        print("Creating unpacked file:", unpacked_file_name)
         # could add a gz here but that doubles the time it takes to do this step
-        tf = tarfile.open(self.src_path_of(unpacked_file_name), 'w:')
-        # add the entire installation package, at the very top level
-        tf.add(self.get_dst_prefix(), "")
-        tf.close()
+        with tarfile.open(self.src_path_of(unpacked_file_name), 'w:') as tf:
+            # add the entire installation package, at the very top level
+            tf.add(self.get_dst_prefix(), "")
 
     def cleanup_finish(self):
         """ Delete paths that were specified to have been created by this script"""
         for c in self.created_paths:
             # *TODO is this gonna be useful?
-            print "Cleaning up " + c
+            print("Cleaning up " + c)
 
     def process_either(self, src, dst):
         # If it's a real directory, recurse through it --
@@ -700,7 +696,7 @@ class LLManifest(object):
     def remove(self, *paths):
         for path in paths:
             if os.path.exists(path):
-                print "Removing path", path
+                print("Removing path", path)
                 if os.path.isdir(path):
                     shutil.rmtree(path)
                 else:
@@ -762,7 +758,7 @@ class LLManifest(object):
             except (IOError, os.error) as why:
                 errors.append((srcname, dstname, why))
         if errors:
-            raise ManifestError, errors
+            raise ManifestError(errors)
 
 
     def cmakedirs(self, path):
@@ -789,22 +785,21 @@ class LLManifest(object):
         relative to the source prefix) into the directory
         specified relative to the destination directory."""
         self.check_file_exists(src_tar)
-        tf = tarfile.open(self.src_path_of(src_tar), 'r')
-        for member in tf.getmembers():
-            tf.extract(member, self.ensure_dst_dir(dst_dir))
-            # TODO get actions working on these dudes, perhaps we should extract to a temporary directory and then process_directory on it?
-            self.file_list.append([src_tar,
-                           self.dst_path_of(os.path.join(dst_dir,member.name))])
-        tf.close()
+        with tarfile.open(self.src_path_of(src_tar), 'r') as tf:
+            for member in tf.getmembers():
+                tf.extract(member, self.ensure_dst_dir(dst_dir))
+                # TODO get actions working on these dudes, perhaps we should extract to a temporary directory and then process_directory on it?
+                self.file_list.append([src_tar,
+                               self.dst_path_of(os.path.join(dst_dir,member.name))])
 
 
     def wildcard_regex(self, src_glob, dst_glob):
         src_re = re.escape(src_glob)
-        src_re = src_re.replace('\*', '([-a-zA-Z0-9._ ]*)')
+        src_re = src_re.replace(r'\*', r'([-a-zA-Z0-9._ ]*)')
         dst_temp = dst_glob
         i = 1
         while dst_temp.count("*") > 0:
-            dst_temp = dst_temp.replace('*', '\g<' + str(i) + '>', 1)
+            dst_temp = dst_temp.replace(r'*', r'\g<' + str(i) + '>', 1)
             i = i+1
         return re.compile(src_re), dst_temp
 
@@ -841,9 +836,9 @@ class LLManifest(object):
 
     def path(self, src, dst=None, err_if_missing=True):
         sys.stdout.flush()
-        if src == None:
+        if src is None:
             raise ManifestError("No source file, dst is " + dst)
-        if dst == None:
+        if dst is None:
             dst = src
         dst = os.path.join(self.get_dst_prefix(), dst)
         sys.stdout.write("Processing %s => %s ... " % (src, self._relative_dst_path(dst)))
@@ -881,7 +876,7 @@ class LLManifest(object):
             # assigned! Even if it was, though, we can be sure it is 0.
             return 0
 
-        print "%d files" % count
+        print("%d files" % count)
 
         # Let caller check whether we processed as many files as expected. In
         # particular, let caller notice 0.
@@ -895,7 +890,7 @@ class LLManifest(object):
         or a list containing dst (present). Concatenate these
         return values to get a list of all libs that are present.
         """
-        if dst == None:
+        if dst is None:
             dst = src
 
         # This was simple before we started needing to pass
@@ -910,10 +905,10 @@ class LLManifest(object):
             added = [os.path.relpath(d, self.get_dst_prefix())
                      for s, d in self.file_list[oldlen:]]
         except (ManifestError, MissingError) as err:
-            print >> sys.stderr, "Warning: "+err.msg
+            print("Warning: %s" % err.msg, file=sys.stderr)
             added = []
         if not added:
-            print "Skipping %s" % dst
+            print("Skipping %s" % dst)
         return added
 
     def do(self, *actions):

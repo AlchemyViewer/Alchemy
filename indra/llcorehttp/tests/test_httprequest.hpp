@@ -2170,8 +2170,8 @@ void HttpRequestTestObjectType::test<19>()
 
 		// headers
 		headers = HttpHeaders::ptr_t(new HttpHeaders);
-		headers->append("Keep-Alive", "120");
-		headers->append("Accept-encoding", "deflate");
+        headers->append("Keep-Alive", "120");
+		headers->append("Accept-Encoding", "deflate");
 		headers->append("Accept", "text/plain");
 
 		// Issue a GET with modified headers
@@ -2352,10 +2352,10 @@ void HttpRequestTestObjectType::test<20>()
 
 		// headers
 		headers = HttpHeaders::ptr_t(new HttpHeaders());
-		headers->append("keep-Alive", "120");
+        headers->append("Keep-Alive", "120");
 		headers->append("Accept", "text/html");
-		headers->append("content-type", "application/llsd+xml");
-		headers->append("cache-control", "no-store");
+		headers->append("Content-Type", "application/llsd+xml");
+		headers->append("Cache-Control", "no-store");
 		
 		// And a buffer array
 		const char * msg("<xml><llsd><string>It was the best of times, it was the worst of times.</string></llsd></xml>");
@@ -2556,9 +2556,9 @@ void HttpRequestTestObjectType::test<21>()
 
 		// headers
 		headers = HttpHeaders::ptr_t(new HttpHeaders);
-		headers->append("content-type", "text/plain");
-		headers->append("content-type", "text/html");
-		headers->append("content-type", "application/llsd+xml");
+		headers->append("Content-Type", "text/plain");
+		headers->append("Content-Type", "text/html");
+		headers->append("Content-Type", "application/llsd+xml");
 		
 		// And a buffer array
 		const char * msg("<xml><llsd><string>It was the best of times, it was the worst of times.</string></llsd></xml>");

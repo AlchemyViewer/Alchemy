@@ -106,7 +106,9 @@ LLImageDecodeThread::LLImageDecodeThread(bool threaded, U32 pool_size)
 		}
 	}
     else if (pool_size == 1)  // Disable if only 1
+	{
         pool_size = 0;
+	}
 
 	sImageThreads = pool_size;
 	

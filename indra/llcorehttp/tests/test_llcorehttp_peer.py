@@ -1,6 +1,6 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 """\
-@file   test_llsdmessage_peer.py
+@file   test_llcorehttp_peer.py
 @author Nat Goodspeed
 @date   2008-10-09
 @brief  This script asynchronously runs the executable (with args) specified on
@@ -34,11 +34,8 @@ import sys
 import time
 import select
 import getopt
-try:
-    from cStringIO import StringIO
-except ImportError:
-    from StringIO import StringIO
-from BaseHTTPServer import HTTPServer, BaseHTTPRequestHandler
+from io import StringIO
+from http.server import HTTPServer, BaseHTTPRequestHandler
 
 from llbase.fastest_elementtree import parse as xml_parse
 from llbase import llsd
@@ -101,9 +98,9 @@ class TestHTTPRequestHandler(BaseHTTPRequestHandler):
         while size_remaining:
             chunk_size = min(size_remaining, max_chunk_size)
             chunk = self.rfile.read(chunk_size)
-            L.append(chunk)
+            L.append(chunk.decode('utf-8'))
             size_remaining -= len(chunk)
-        return ''.join(L)
+        return (''.join(L)).encode('utf-8')
         # end of swiped read() logic
 
     def read_xml(self):
@@ -127,26 +124,26 @@ class TestHTTPRequestHandler(BaseHTTPRequestHandler):
         try:
             self.answer(dict(reply="success", status=200,
                              reason="Your GET operation worked"))
-        except self.ignore_exceptions, e:
-            print >> sys.stderr, "Exception during GET (ignoring): %s" % str(e)
+        except self.ignore_exceptions as e:
+            print("Exception during GET (ignoring): %s" % str(e), file=sys.stderr)
 
     def do_POST(self):
         # Read the provided POST data.
         # self.answer(self.read())
         try:
             self.answer(dict(reply="success", status=200,
-                             reason=self.read()))
-        except self.ignore_exceptions, e:
-            print >> sys.stderr, "Exception during POST (ignoring): %s" % str(e)
+                             reason=self.read().decode('utf-8')))
+        except self.ignore_exceptions as e:
+            print("Exception during POST (ignoring): %s" % str(e), file=sys.stderr)
 
     def do_PUT(self):
         # Read the provided PUT data.
         # self.answer(self.read())
         try:
             self.answer(dict(reply="success", status=200,
-                             reason=self.read()))
-        except self.ignore_exceptions, e:
-            print >> sys.stderr, "Exception during PUT (ignoring): %s" % str(e)
+                             reason=self.read().decode('utf-8')))
+        except self.ignore_exceptions as e:
+            print("Exception during PUT (ignoring): %s" % str(e), file=sys.stderr)
 
     def answer(self, data, withdata=True):
         debug("%s.answer(%s): self.path = %r", self.__class__.__name__, data, self.path)
@@ -186,7 +183,7 @@ class TestHTTPRequestHandler(BaseHTTPRequestHandler):
             self.send_header("Content-type", "text/plain")
             self.end_headers()
             if body:
-                self.wfile.write(body)
+                self.wfile.write(body.encode('utf-8'))
         elif "/bug2295/" in self.path:
             # Test for https://jira.secondlife.com/browse/BUG-2295
             #
@@ -221,7 +218,7 @@ class TestHTTPRequestHandler(BaseHTTPRequestHandler):
             self.send_header("Content-type", "text/plain")
             self.end_headers()
             if body:
-                self.wfile.write(body)
+                self.wfile.write(body.encode('utf-8'))
         elif "fail" not in self.path:
             data = data.copy()          # we're going to modify
             # Ensure there's a "reply" key in data, even if there wasn't before
@@ -233,7 +230,7 @@ class TestHTTPRequestHandler(BaseHTTPRequestHandler):
                 self.reflect_headers()
             self.send_header("Content-type", "application/llsd+xml")
             self.send_header("Content-Length", str(len(response)))
-            self.send_header("X-LL-Special", "Mememememe");
+            self.send_header("X-LL-Special", "Mememememe")
             self.end_headers()
             if withdata:
                 self.wfile.write(response)
@@ -255,9 +252,9 @@ class TestHTTPRequestHandler(BaseHTTPRequestHandler):
             self.end_headers()
 
     def reflect_headers(self):
-        for name in self.headers.keys():
-            # print "Header:  %s: %s" % (name, self.headers[name])
-            self.send_header("X-Reflect-" + name, self.headers[name])
+        for name in list(self.headers.keys()):
+            # print("Header:  %s: %s" % (name, self.headers[name]))
+            self.send_header("X-Reflect-" + name, str(self.headers[name]))
 
     if not VERBOSE:
         # When VERBOSE is set, skip both these overrides because they exist to
@@ -283,10 +280,10 @@ class Server(HTTPServer):
     # default behavior which *shouldn't* cause the program to return
     # a failure status.
     def handle_error(self, request, client_address):
-        print '-'*40
-        print 'Ignoring exception during processing of request from',
-        print client_address
-        print '-'*40
+        print('-'*40)
+        print('Ignoring exception during processing of request from', end=' ')
+        print(client_address)
+        print('-'*40)
 
 if __name__ == "__main__":
     do_valgrind = False
@@ -307,7 +304,7 @@ if __name__ == "__main__":
         # "Then there's Windows"
         # Instantiate a Server(TestHTTPRequestHandler) on the first free port
         # in the specified port range.
-        httpd, port = freeport(xrange(8000, 8020), make_server)
+        httpd, port = freeport(range(8000, 8020), make_server)
 
     # Pass the selected port number to the subject test program via the
     # environment. We don't want to impose requirements on the test program's
