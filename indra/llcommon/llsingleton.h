@@ -26,7 +26,7 @@
 #define LLSINGLETON_H
 
 #include <boost/noncopyable.hpp>
-#include <boost/unordered_set.hpp>
+#include "absl/container/node_hash_set.h"
 #include <initializer_list>
 #include <list>
 #include <typeinfo>
@@ -53,7 +53,7 @@ private:
     static vec_t dep_sort();
 
     // we directly depend on these other LLSingletons
-    typedef boost::unordered_set<LLSingletonBase*> set_t;
+    typedef absl::node_hash_set<LLSingletonBase*> set_t;
     set_t mDepends;
 
 protected:
@@ -114,7 +114,7 @@ protected:
 
     // delegate logging calls to llsingleton.cpp
 public:
-    typedef std::initializer_list<const std::string> string_params;
+    typedef std::initializer_list<const std::string_view> string_params;
 protected:
     static void logerrs  (const string_params&);
     static void logwarns (const string_params&);
