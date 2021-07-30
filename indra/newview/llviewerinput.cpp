@@ -46,6 +46,11 @@
 #include "llfloatercamera.h"
 #include "llinitparam.h"
 #include "llselectmgr.h"
+// [RLVa:KB] - Checked: 2021-07-29 (RLVa-1.4.4a)
+#include "rlvactions.h"
+#include "rlvhandler.h"
+#include "rlvhelper.h"
+// [/RLVa:KB]
 
 //
 // Constants
@@ -823,13 +828,17 @@ bool toggle_run(EKeystate s)
 bool toggle_sit(EKeystate s)
 {
     if (KEYSTATE_DOWN != s) return true;
-    if (gAgent.isSitting())
+    if (isAgentAvatarValid())
     {
-        gAgent.standUp();
-    }
-    else
-    {
-        gAgent.sitDown();
+        if (gAgentAvatarp->isSitting() && RlvActions::canStand())
+        {
+            gAgent.standUp();
+        }
+        else if(!gAgentAvatarp->isSitting() && !gAgentAvatarp->isEditingAppearance() &&
+                !gAgent.getFlying() && !gRlvHandler.hasBehaviour(RLV_BHVR_SIT))
+        {
+            gAgent.sitDown();
+        }
     }
 	return true;
 }
@@ -1121,7 +1130,7 @@ BOOL LLViewerInput::bindKey(const S32 mode, const KEY key, const MASK mask, cons
 
 	if (!function)
 	{
-		LL_ERRS() << "Can't bind key to function " << function_name << ", no function with this name found" << LL_ENDL;
+        LL_WARNS() << "Can't bind key to function " << function_name << ", no function with this name found" << LL_ENDL;
 		return FALSE;
 	}
 
@@ -1163,7 +1172,7 @@ BOOL LLViewerInput::bindMouse(const S32 mode, const EMouseClickType mouse, const
 
     if (!function)
     {
-        LL_ERRS() << "Can't bind key to function " << function_name << ", no function with this name found" << LL_ENDL;
+        LL_WARNS() << "Can't bind key to function " << function_name << ", no function with this name found" << LL_ENDL;
         return FALSE;
     }
 
