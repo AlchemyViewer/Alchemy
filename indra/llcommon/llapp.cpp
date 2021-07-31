@@ -243,7 +243,11 @@ bool LLApp::parseCommandOptions(int argc, wchar_t** wargv)
 		if(wargv[ii][0] != '-')
 		{
 			LL_INFOS() << "Did not find option identifier while parsing token: "
-				<< wargv[ii] << LL_ENDL;
+#if LL_WINDOWS
+				<< ll_convert_wide_to_string(wargv[ii]) << LL_ENDL;
+#else
+				<< wstring_to_utf8str(wargv[ii]) << LL_ENDL;
+#endif
 			return false;
 		}
 		int offset = 1;

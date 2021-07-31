@@ -154,7 +154,7 @@ namespace LLPredicate
 			return (mRule && value).someSet();
 		}
 
-		bool requires(const Value<ENUM> value) const
+		bool require(const Value<ENUM> value) const
 		{
 			return (mRule && value).someSet() && (!mRule && value).noneSet();
 		}
