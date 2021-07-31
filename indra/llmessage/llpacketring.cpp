@@ -290,7 +290,7 @@ BOOL LLPacketRing::sendPacket(int h_socket, char * send_buffer, S32 buf_size, LL
 			if (!mSendQueue.empty())
 			{
 				// Send a packet off of the queue
-				LLPacketBuffer *packetp = mSendQueue.front();
+				packetp = mSendQueue.front();
 				mSendQueue.pop();
 
 				mOutBufferLength -= packetp->getSize();

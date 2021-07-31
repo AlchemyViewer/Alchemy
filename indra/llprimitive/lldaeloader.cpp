@@ -53,8 +53,6 @@
 #pragma warning (default : 4264)
 #endif
 
-#include <boost/lexical_cast.hpp>
-
 #include "lldaeloader.h"
 #include "llsdserialize.h"
 #include "lljoint.h"

@@ -166,7 +166,6 @@
 #endif
 
 #include "llapr.h"
-#include <boost/lexical_cast.hpp>
 
 #include "llviewerinput.h"
 #include "lllfsthread.h"

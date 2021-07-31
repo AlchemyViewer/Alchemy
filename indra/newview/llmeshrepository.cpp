@@ -73,7 +73,6 @@
 #include "lluploaddialog.h"
 #include "llfloaterreg.h"
 
-#include "boost/lexical_cast.hpp"
 #include <boost/smart_ptr/make_shared.hpp>
 #include <boost/iostreams/device/array.hpp>
 #include <boost/iostreams/stream.hpp>

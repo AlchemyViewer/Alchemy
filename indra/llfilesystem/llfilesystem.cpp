@@ -101,7 +101,7 @@ BOOL LLFileSystem::read(U8* buffer, S32 bytes)
         {
             fseek(mFile, mPosition, SEEK_SET);
             long rsize = fsize - mPosition;
-            size_t bytes_read = fread((void*)buffer, 1, rsize, mFile);
+            bytes_read = fread((void*)buffer, 1, rsize, mFile);
             if (bytes_read == rsize)
             {
                 mBytesRead = bytes_read;

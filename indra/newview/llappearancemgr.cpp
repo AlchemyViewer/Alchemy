@@ -26,7 +26,6 @@
  
 #include "llviewerprecompiledheaders.h"
 
-#include <boost/lexical_cast.hpp>
 #include "llaccordionctrltab.h"
 #include "llagent.h"
 #include "llagentcamera.h"

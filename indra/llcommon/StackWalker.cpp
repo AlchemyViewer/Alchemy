@@ -1341,6 +1341,7 @@ void StackWalker::OnDbgHelpErr(LPCSTR szFuncName, DWORD gle, DWORD64 addr)
   }
 }
 
+#pragma warning(push)
 #pragma warning (disable : 4996)
 
 void StackWalker::OnSymInit(LPCSTR szSearchPath, DWORD symOptions, LPCSTR szUserName)
@@ -1382,6 +1383,7 @@ void StackWalker::OnSymInit(LPCSTR szSearchPath, DWORD symOptions, LPCSTR szUser
   }
 #endif
 }
+#pragma warning(pop)
 
 void StackWalker::OnOutput(LPCSTR buffer)
 {

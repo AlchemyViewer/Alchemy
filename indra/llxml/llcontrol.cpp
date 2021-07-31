@@ -461,7 +461,7 @@ void LLControlGroup::cleanup()
 				if (access_rate >= 2)
 				{
 					msg = llformat("%13d        %7d       %s\n", iter->second, access_rate, iter->first.c_str());
-					size_t data_size = msg.size();
+					data_size = msg.size();
 					if (fwrite(msg.c_str(), 1, data_size, out) != data_size)
 					{
 						LL_WARNS("SettingsProfile") << "Failed to write settings profile" << LL_ENDL;

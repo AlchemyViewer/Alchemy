@@ -140,9 +140,7 @@ LLCoprocedureManager::~LLCoprocedureManager()
 
 void LLCoprocedureManager::initializePool(const std::string &poolName)
 {
-    poolMap_t::iterator it = mPoolMap.find(poolName);
-
-    if (it != mPoolMap.end())
+    if (mPoolMap.find(poolName) != mPoolMap.end())
     {
         // Pools are not supposed to be initialized twice
         // Todo: ideally restrict init to STATE_FIRST

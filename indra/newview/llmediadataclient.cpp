@@ -30,7 +30,6 @@
 #include "llviewercontrol.h"
 
 #include <algorithm>
-#include <boost/lexical_cast.hpp>
 
 #include "llhttpconstants.h"
 #include "llsdutil.h"

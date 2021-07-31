@@ -54,8 +54,6 @@
 #include "llviewerwindow.h"
 #include "lllineeditor.h"
 
-#include <boost/lexical_cast.hpp>
-
 const S32 CLIENT_RECT_VPAD = 4;
 
 const F32 SECONDS_TO_SHOW_FILE_SAVED_MSG = 8.f;
