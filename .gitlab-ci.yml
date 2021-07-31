@@ -35,6 +35,7 @@ variables:
   script:
     - autobuild configure -c ReleaseOS -- -DUSE_FMODSTUDIO=ON -DUSE_NVAPI=ON -DUSE_LTO=ON -DDISABLE_FATAL_WARNINGS=ON -DREVISION_FROM_VCS=FALSE
     - autobuild build -c ReleaseOS --no-configure
+    - autobuild graph -c ReleaseOS --graph-file alchemy-windows${AUTOBUILD_ADDRSIZE}-dependencies.svg
   artifacts:
     name: "$env:CI_COMMIT_REF_NAME-$env:CI_COMMIT_SHORT_SHA"
     expire_in: 1 week
@@ -44,6 +45,7 @@ variables:
       - build-vc-*/newview/Release/*.pdb
       - build-vc-*/newview/Release/*.dll
       - build-vc-*/newview/Release/Alchemy_*_Setup.exe
+      - alchemy-*-dependencies.svg
 
 .mac_build:
   stage: build
@@ -68,12 +70,14 @@ variables:
   script:
     - autobuild configure -c ReleaseOS -- -DUSE_FMODSTUDIO=ON -DUSE_NVAPI=ON -DUSE_LTO=ON -DDISABLE_FATAL_WARNINGS=ON -DREVISION_FROM_VCS=FALSE
     - autobuild build -c ReleaseOS --no-configure
+    - autobuild graph -c ReleaseOS --graph-file alchemy-darwin${AUTOBUILD_ADDRSIZE}-dependencies.svg
   artifacts:
     name: "$env:CI_COMMIT_REF_NAME-$env:CI_COMMIT_SHORT_SHA"
     expire_in: 1 week
     paths:
       - build-darwin-*/build_data.json
       - build-darwin-*/newview/Alchemy_*.dmg
+      - alchemy-*-dependencies.svg
 
 .linux_build:
   stage: build
@@ -98,12 +102,14 @@ variables:
   script:
     - autobuild configure -c ReleaseOS -- -DUSE_FMODSTUDIO=ON -DUSE_NVAPI=ON -DUSE_LTO=ON -DDISABLE_FATAL_WARNINGS=ON -DREVISION_FROM_VCS=FALSE
     - autobuild build -c ReleaseOS --no-configure
+    - autobuild graph -c ReleaseOS --graph-file alchemy-linuxs${AUTOBUILD_ADDRSIZE}-dependencies.svg
   artifacts:
     name: "$env:CI_COMMIT_REF_NAME-$env:CI_COMMIT_SHORT_SHA"
     expire_in: 1 week
     paths:
       - build-linux-*/build_data.json
       - build-linux-*/newview/Alchemy_*.tar.xz
+      - alchemy-*-dependencies.svg
 
 .win32_build:
   extends: .win_build
