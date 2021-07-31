@@ -92,7 +92,7 @@ private:
         // redundant to have to add an argument list to engage result_of, then
         // add the argument list again to complete the signature. At least we
         // only support a nullary CALLABLE.
-        std::packaged_task<typename std::result_of<CALLABLE()>::type()> mTask;
+        std::packaged_task<std::invoke_result_t<CALLABLE>()> mTask;
     };
 };
 
