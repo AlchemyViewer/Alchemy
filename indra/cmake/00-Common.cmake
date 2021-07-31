@@ -160,7 +160,7 @@ if (WINDOWS)
   endif ()
 
   if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
-    set(GLOBAL_CXX_FLAGS "${GLOBAL_CXX_FLAGS} /permissive- /Zc:externConstexpr /Zc:referenceBinding")
+    set(GLOBAL_CXX_FLAGS "${GLOBAL_CXX_FLAGS} /permissive- /Zc:externConstexpr /Zc:referenceBinding /ZH:SHA_256")
   elseif("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
     set(GLOBAL_CXX_FLAGS "${GLOBAL_CXX_FLAGS} /Qvec /Zc:dllexportInlines- /clang:-mprefer-vector-width=128 -fno-strict-aliasing -Wno-ignored-pragma-intrinsic -Wno-unused-local-typedef")
   endif()
