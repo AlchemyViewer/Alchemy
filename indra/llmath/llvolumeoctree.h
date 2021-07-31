@@ -34,7 +34,7 @@
 #include "llvolume.h"
 #include "llvector4a.h"
 
-class LLVolumeTriangle : public LLRefCount
+class LLVolumeTriangle final : public LLRefCount
 {
 public:
 	void* operator new(size_t size)
@@ -75,7 +75,7 @@ public:
 
 };
 
-class LLVolumeOctreeListener : public LLOctreeListener<LLVolumeTriangle>
+class LLVolumeOctreeListener final : public LLOctreeListener<LLVolumeTriangle>
 {
 public:
 	
@@ -134,7 +134,7 @@ public:
 	virtual void visit(const LLOctreeNode<LLVolumeTriangle>* node);
 };
 
-class LLVolumeOctreeValidate : public LLOctreeTraveler<LLVolumeTriangle>
+class LLVolumeOctreeValidate final : public LLOctreeTraveler<LLVolumeTriangle>
 {
 	virtual void visit(const LLOctreeNode<LLVolumeTriangle>* branch);
 };

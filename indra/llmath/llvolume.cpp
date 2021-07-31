@@ -4011,7 +4011,7 @@ void LLVolume::generateSilhouetteVertices(std::vector<LLVector3> &vertices,
 }
 
 S32 LLVolume::lineSegmentIntersect(const LLVector4a& start, const LLVector4a& end, 
-								   S32 face,
+								   S32 face_idx,
 								   LLVector4a* intersection,LLVector2* tex_coord, LLVector4a* normal, LLVector4a* tangent_out)
 {
 	S32 hit_face = -1;
@@ -4019,15 +4019,15 @@ S32 LLVolume::lineSegmentIntersect(const LLVector4a& start, const LLVector4a& en
 	S32 start_face;
 	S32 end_face;
 	
-	if (face == -1) // ALL_SIDES
+	if (face_idx == -1)  // ALL_SIDES
 	{
 		start_face = 0;
 		end_face = getNumVolumeFaces() - 1;
 	}
 	else
 	{
-		start_face = face;
-		end_face = face;
+        start_face = face_idx;
+        end_face   = face_idx;
 	}
 
 	LLVector4a dir;
