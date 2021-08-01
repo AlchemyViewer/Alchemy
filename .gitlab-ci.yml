@@ -102,7 +102,7 @@ variables:
   script:
     - export CC=clang-12
     - export CXX=clang++-12
-    - export LD=ld.lld-12
+    - export LD=lld-12
     - export AR=llvm-ar-12
     - export NM=llvm-nm-12
     - export STRIP=llvm-strip-12
@@ -110,6 +110,7 @@ variables:
     - export OBJDUMP=llvm-objdump-12
     - export OBJSIZE=llvm-size-12
     - export READELF=llvm-readelf-12
+    - export RANLIB=llvm-ranlib-12
     - autobuild configure -c ReleaseOS -- -DUSE_FMODSTUDIO=ON -DUSE_NVAPI=ON -DUSE_LTO=ON -DDISABLE_FATAL_WARNINGS=ON -DREVISION_FROM_VCS=FALSE
     - autobuild build -c ReleaseOS --no-configure
     - autobuild graph -c ReleaseOS --graph-file alchemy-linuxs${AUTOBUILD_ADDRSIZE}-dependencies.svg
