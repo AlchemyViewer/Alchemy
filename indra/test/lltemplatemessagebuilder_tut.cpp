@@ -317,8 +317,8 @@ namespace tut
 	void LLTemplateMessageBuilderTestObject::test<14>()
 		 // Quaternion
 	{
-#if LL_DARWIN
-        skip("This test fails depending on architecture. Need to fix comparison operation, is_approx_equal, to work on more than one platform.");
+#if LL_CLANG
+        skip("This test fails under fast-math in clang");
 #endif
 		LLMessageTemplate messageTemplate = defaultTemplate();
 		messageTemplate.addBlock(defaultBlock(MVT_LLQuaternion, 12));
@@ -788,8 +788,8 @@ namespace tut
 	void LLTemplateMessageBuilderTestObject::test<38>()
 		 // non-zero offset with Quaternion
 	{
-#if LL_DARWIN
-        skip("This test fails depending on architecture. Need to fix comparison operation, is_approx_equal, to work on more than one platform.");
+#if LL_CLANG
+        skip("This test fails under fast-math in clang");
 #endif
 		LLMessageTemplate messageTemplate = defaultTemplate();
 		messageTemplate.addBlock(defaultBlock(MVT_LLQuaternion, 12));
