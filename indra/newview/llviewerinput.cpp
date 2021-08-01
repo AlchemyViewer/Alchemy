@@ -697,11 +697,13 @@ bool run_forward(EKeystate s)
     else if(KEYSTATE_UP == s)
     {
         if (gAgent.mDoubleTapRunMode == LLAgent::DOUBLETAP_FORWARD)
+        {
             gAgent.mDoubleTapRunMode = LLAgent::DOUBLETAP_NONE;
+        }
 //        gAgent.clearRunning();
 //        gAgent.sendWalkRun(false);
 // [RLVa:KB] - Checked: 2011-05-11 (RLVa-1.3.0i) | Added: RLVa-1.3.0i
-            gAgent.clearTempRun();
+        gAgent.clearTempRun();
 // [/RLVa:KB]
     }
     agent_push_forward(s);
@@ -728,11 +730,13 @@ bool run_backward(EKeystate s)
     else if (KEYSTATE_UP == s)
     {
         if (gAgent.mDoubleTapRunMode == LLAgent::DOUBLETAP_BACKWARD)
+        {
             gAgent.mDoubleTapRunMode = LLAgent::DOUBLETAP_NONE;
+        }
 //        gAgent.clearRunning();
 //        gAgent.sendWalkRun(false);
 // [RLVa:KB] - Checked: 2011-05-11 (RLVa-1.3.0i) | Added: RLVa-1.3.0i
-            gAgent.clearTempRun();
+        gAgent.clearTempRun();
 // [/RLVa:KB]
     }
     agent_push_backward(s);
@@ -759,11 +763,13 @@ bool run_left(EKeystate s)
     else if (KEYSTATE_UP == s)
     {
         if (gAgent.mDoubleTapRunMode == LLAgent::DOUBLETAP_SLIDELEFT)
+        {
             gAgent.mDoubleTapRunMode = LLAgent::DOUBLETAP_NONE;
+        }
 //        gAgent.clearRunning();
 //        gAgent.sendWalkRun(false);
 // [RLVa:KB] - Checked: 2011-05-11 (RLVa-1.3.0i) | Added: RLVa-1.3.0i
-            gAgent.clearTempRun();
+        gAgent.clearTempRun();
 // [/RLVa:KB]
     }
     agent_slide_left(s);
@@ -790,11 +796,13 @@ bool run_right(EKeystate s)
     else if (KEYSTATE_UP == s)
     {
         if (gAgent.mDoubleTapRunMode == LLAgent::DOUBLETAP_SLIDERIGHT)
+        {
             gAgent.mDoubleTapRunMode = LLAgent::DOUBLETAP_NONE;
+        }
 //        gAgent.clearRunning();
 //        gAgent.sendWalkRun(false);
 // [RLVa:KB] - Checked: 2011-05-11 (RLVa-1.3.0i) | Added: RLVa-1.3.0i
-            gAgent.clearTempRun();
+        gAgent.clearTempRun();
 // [/RLVa:KB]
     }
     agent_slide_right(s);

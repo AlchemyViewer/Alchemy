@@ -1663,12 +1663,12 @@ void LLFloaterTools::updateMediaSettings()
 	
     // Auto play
     //value_bool = default_media_data.getAutoPlay();
-	// set default to auto play TRUE -- angela  EXT-5172
-	value_bool = true;
+    // set default to auto play TRUE -- angela  EXT-5172
+    value_bool = true;
     struct functor_getter_auto_play : public LLSelectedTEGetFunctor< bool >
     {
-		functor_getter_auto_play(const LLMediaEntry& entry)	: mMediaEntry(entry) {}	
-			
+        functor_getter_auto_play(const LLMediaEntry& entry)	: mMediaEntry(entry) {}	
+
         bool get( LLViewerObject* object, S32 face )
         {
             if ( object )
@@ -1676,11 +1676,11 @@ void LLFloaterTools::updateMediaSettings()
                     if ( object->getTE(face)->getMediaData() )
                         return object->getTE(face)->getMediaData()->getAutoPlay();
             //return mMediaEntry.getAutoPlay(); set default to auto play TRUE -- angela  EXT-5172
-			return true;
+            return true;
         };
-		
-		const LLMediaEntry &mMediaEntry;
-		
+
+        const LLMediaEntry &mMediaEntry;
+
     } func_auto_play(default_media_data);
     identical = selected_objects->getSelectedTEValue( &func_auto_play, value_bool );
     base_key = std::string( LLMediaEntry::AUTO_PLAY_KEY );
@@ -1689,12 +1689,12 @@ void LLFloaterTools::updateMediaSettings()
 	
 	
     // Auto scale
-	// set default to auto scale TRUE -- angela  EXT-5172
+    // set default to auto scale TRUE -- angela  EXT-5172
     //value_bool = default_media_data.getAutoScale();
-	value_bool = true;
+    value_bool = true;
     struct functor_getter_auto_scale : public LLSelectedTEGetFunctor< bool >
     {
-		functor_getter_auto_scale(const LLMediaEntry& entry): mMediaEntry(entry) {}	
+        functor_getter_auto_scale(const LLMediaEntry& entry): mMediaEntry(entry) {}	
 
         bool get( LLViewerObject* object, S32 face )
         {
@@ -1702,12 +1702,12 @@ void LLFloaterTools::updateMediaSettings()
                 if ( object->getTE(face) )
                     if ( object->getTE(face)->getMediaData() )
                         return object->getTE(face)->getMediaData()->getAutoScale();
-           // return mMediaEntry.getAutoScale();  set default to auto scale TRUE -- angela  EXT-5172
-			return true;
-		};
-		
-		const LLMediaEntry &mMediaEntry;
-		
+            // return mMediaEntry.getAutoScale();  set default to auto scale TRUE -- angela  EXT-5172
+            return true;
+        };
+
+        const LLMediaEntry &mMediaEntry;
+
     } func_auto_scale(default_media_data);
     identical = selected_objects->getSelectedTEValue( &func_auto_scale, value_bool );
     base_key = std::string( LLMediaEntry::AUTO_SCALE_KEY );
