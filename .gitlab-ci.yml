@@ -81,7 +81,7 @@ variables:
 
 .linux_build:
   stage: build
-  image: r.alchemyviewer.org/alchemy/infrastructure/ubuntu-build-image:latest
+  image: r.alchemyviewer.org/alchemy/infrastructure/ubuntu-build-image:latest-llvm
   tags:
     - linux
     - docker
@@ -100,7 +100,17 @@ variables:
     - source .venv/bin/activate
     - pip3 install --upgrade autobuild -i https://ci-job-token:${CI_JOB_TOKEN}@git.alchemyviewer.org/api/v4/projects/54/packages/pypi/simple --extra-index-url https://pypi.org/simple
   script:
-    - autobuild configure -c ReleaseOS -- -DUSE_FMODSTUDIO=ON -DUSE_NVAPI=ON -DUSE_LTO=OFF -DDISABLE_FATAL_WARNINGS=ON -DREVISION_FROM_VCS=FALSE
+    - export CC=clang-12
+    - export CXX=clang++-12
+    - export LD=ld.lld-12
+    - export AR=llvm-ar-12
+    - export NM=llvm-nm-12
+    - export STRIP=llvm-strip-12
+    - export OBJCOPY=llvm-objcopy-12
+    - export OBJDUMP=llvm-objdump-12
+    - export OBJSIZE=llvm-size-12
+    - export READELF=llvm-readelf-12
+    - autobuild configure -c ReleaseOS -- -DUSE_FMODSTUDIO=ON -DUSE_NVAPI=ON -DUSE_LTO=ON -DDISABLE_FATAL_WARNINGS=ON -DREVISION_FROM_VCS=FALSE
     - autobuild build -c ReleaseOS --no-configure
     - autobuild graph -c ReleaseOS --graph-file alchemy-linuxs${AUTOBUILD_ADDRSIZE}-dependencies.svg
   artifacts:
