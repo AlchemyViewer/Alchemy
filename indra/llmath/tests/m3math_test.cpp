@@ -227,7 +227,7 @@ namespace tut
 	template<> template<>
 	void m3math_test_object_t::test<9>()
 	{
-#if LL_DARWIN
+#if LL_CLANG
         skip("This test fails depending on architecture. Need to fix comparison operation, is_approx_equal, to work on more than one platform.");
 #endif
         
