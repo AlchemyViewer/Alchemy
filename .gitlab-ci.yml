@@ -111,7 +111,8 @@ variables:
     - export OBJSIZE=llvm-size-12
     - export READELF=llvm-readelf-12
     - export RANLIB=llvm-ranlib-12
-    - autobuild configure -c ReleaseOS -- -DUSE_FMODSTUDIO=ON -DUSE_NVAPI=ON -DUSE_LTO=ON -DDISABLE_FATAL_WARNINGS=ON -DREVISION_FROM_VCS=FALSE
+    - autobuild configure -c ReleaseOS -- -DUSE_FMODSTUDIO=ON -DUSE_NVAPI=ON -DUSE_LTO=ON -DDISABLE_FATAL_WARNINGS=ON -DREVISION_FROM_VCS=FALSE \
+      -DCMAKE_C_COMPILER=/usr/bin/clang-12 -DCMAKE_CXX_COMPILER=clang++-12 -DCMAKE_LINKER=/usr/bin/ld.lld-12
     - autobuild build -c ReleaseOS --no-configure
     - autobuild graph -c ReleaseOS --graph-file alchemy-linuxs${AUTOBUILD_ADDRSIZE}-dependencies.svg
   artifacts:
