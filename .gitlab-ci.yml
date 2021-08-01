@@ -266,8 +266,6 @@ build:release:windows64:
     - m1
     - mac
   allow_failure: false
-  variables:
-    GIT_STRATEGY: none
   script:
     - |
         $BuildData = Get-Content ./build-vc-64/newview/Release/build_data.json | ConvertFrom-Json
