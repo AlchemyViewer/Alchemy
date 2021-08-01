@@ -100,7 +100,7 @@ variables:
     - source .venv/bin/activate
     - pip3 install --upgrade autobuild -i https://ci-job-token:${CI_JOB_TOKEN}@git.alchemyviewer.org/api/v4/projects/54/packages/pypi/simple --extra-index-url https://pypi.org/simple
   script:
-    - autobuild configure -c ReleaseOS -- -DUSE_FMODSTUDIO=ON -DUSE_NVAPI=ON -DUSE_LTO=ON -DDISABLE_FATAL_WARNINGS=ON -DREVISION_FROM_VCS=FALSE
+    - autobuild configure -c ReleaseOS -- -DUSE_FMODSTUDIO=ON -DUSE_NVAPI=ON -DUSE_LTO=OFF -DDISABLE_FATAL_WARNINGS=ON -DREVISION_FROM_VCS=FALSE
     - autobuild build -c ReleaseOS --no-configure
     - autobuild graph -c ReleaseOS --graph-file alchemy-linuxs${AUTOBUILD_ADDRSIZE}-dependencies.svg
   artifacts:
