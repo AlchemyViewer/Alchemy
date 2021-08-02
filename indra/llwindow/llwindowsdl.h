@@ -63,7 +63,7 @@ public:
 	/*virtual*/ BOOL maximize() override;
 	/*virtual*/ void minimize() override;
 	/*virtual*/ void restore() override;
-	/*virtual*/ BOOL getFullscreen() override;
+	BOOL getFullscreen();
 	/*virtual*/ BOOL getPosition(LLCoordScreen *position) override;
 	/*virtual*/ BOOL getSize(LLCoordScreen *size) override;
 	/*virtual*/ BOOL getSize(LLCoordWindow *size) override;
@@ -102,7 +102,6 @@ public:
 	/*virtual*/ void processMiscNativeEvents() override;
 	/*virtual*/ void gatherInput() override;
 	/*virtual*/ void swapBuffers() override;
-	/*virtual*/ void restoreGLContext() override {};
 
 	/*virtual*/ void delayInputProcessing() override { };
 
