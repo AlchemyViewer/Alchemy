@@ -292,7 +292,7 @@ endif (LINUX)
 
 
 if (DARWIN)
-  add_definitions(-DLL_DARWIN=1 -DGL_SILENCE_DEPRECATION)
+  add_definitions(-DLL_DARWIN=1 -DGL_SILENCE_DEPRECATION=1)
   set(CMAKE_CXX_LINK_FLAGS "-Wl,-headerpad_max_install_names,-search_paths_first")
   set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_CXX_LINK_FLAGS}")
   set(DARWIN_extra_cstar_flags "-gdwarf-2")
@@ -302,7 +302,6 @@ if (DARWIN)
   # NOTE: it's critical to have both CXX_FLAGS and C_FLAGS covered.
 
   add_definitions(
-      -D_LIBCPP_ENABLE_CXX17_REMOVED_AUTO_PTR=1
       -DBOOST_CONFIG_SUPPRESS_OUTDATED_MESSAGE=1
       -DBOOST_ALLOW_DEPRECATED_HEADERS=1
       )
