@@ -718,6 +718,10 @@ void LLPipeline::cleanup()
 
 	mInitialized = false;
 
+    mForwardVB = nullptr;
+    
+    mAuxScreenRectVB = NULL;
+    
 	mDeferredVB = NULL;
 
 	mCubeVB = NULL;
@@ -7494,6 +7498,8 @@ void LLPipeline::doResetVertexBuffers(bool forced)
 	LL_RECORD_BLOCK_TIME(FTM_RESET_VB);
 	mResetVertexBuffers = false;
 
+    mForwardVB = nullptr;
+    
 	mAuxScreenRectVB = NULL;
 
 	mDeferredVB = NULL;
@@ -8413,32 +8419,33 @@ void LLPipeline::renderFinalize()
 		}
 // [/RLVa:KB]
 
-        U32 mask = LLVertexBuffer::MAP_VERTEX | LLVertexBuffer::MAP_TEXCOORD0 | LLVertexBuffer::MAP_TEXCOORD1;
-        LLPointer<LLVertexBuffer> buff = new LLVertexBuffer(mask, 0);
-        buff->allocateBuffer(3, 0, TRUE);
+        const U32 mask = LLVertexBuffer::MAP_VERTEX | LLVertexBuffer::MAP_TEXCOORD0 | LLVertexBuffer::MAP_TEXCOORD1;
+        if(mForwardVB.isNull())
+        {
+            mForwardVB = new LLVertexBuffer(mask, 0);
+            mForwardVB->allocateBuffer(3, 0, TRUE);
 
-        LLStrider<LLVector3> v;
-        LLStrider<LLVector2> uv1;
+            LLStrider<LLVector3> v;
+            LLStrider<LLVector2> uv1;
+
+            mForwardVB->getVertexStrider(v);
+            mForwardVB->getTexCoord0Strider(uv1);
+
+            uv1[0] = LLVector2(0, 0);
+            uv1[1] = LLVector2(0, 2);
+            uv1[2] = LLVector2(2, 0);
+
+            v[0] = LLVector3(-1, -1, 0);
+            v[1] = LLVector3(-1, 3, 0);
+            v[2] = LLVector3(3, -1, 0);
+        }
+
         LLStrider<LLVector2> uv2;
-
-        buff->getVertexStrider(v);
-        buff->getTexCoord0Strider(uv1);
-        buff->getTexCoord1Strider(uv2);
-
-        uv1[0] = LLVector2(0, 0);
-        uv1[1] = LLVector2(0, 2);
-        uv1[2] = LLVector2(2, 0);
-
+        mForwardVB->getTexCoord1Strider(uv2);
         uv2[0] = LLVector2(0, 0);
         uv2[1] = LLVector2(0, tc2.mV[1] * 2.f);
         uv2[2] = LLVector2(tc2.mV[0] * 2.f, 0);
-
-        v[0] = LLVector3(-1, -1, 0);
-        v[1] = LLVector3(-1, 3, 0);
-        v[2] = LLVector3(3, -1, 0);
-
-        buff->flush();
-
+        
         LLGLDisable blend(GL_BLEND);
 
         if (LLGLSLShader::sNoFixedFunction)
@@ -8462,8 +8469,8 @@ void LLPipeline::renderFinalize()
 
 		LLGLEnable multisample(RenderFSAASamples > 0 ? GL_MULTISAMPLE : 0);
 
-        buff->setBuffer(mask);
-        buff->drawArrays(LLRender::TRIANGLE_STRIP, 0, 3);
+        mForwardVB->setBuffer(mask);
+        mForwardVB->drawArrays(LLRender::TRIANGLE_STRIP, 0, 3);
 
         if (LLGLSLShader::sNoFixedFunction)
         {

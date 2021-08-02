@@ -631,6 +631,9 @@ public:
     LLCullResult            mReflectedObjects;
     LLCullResult            mRefractedObjects;
 
+    // buffer for forward
+    LLPointer<LLVertexBuffer> mForwardVB;
+    
 	//utility buffer for rendering post effects, gets abused by renderDeferredLighting
 	LLPointer<LLVertexBuffer> mDeferredVB;
 	LLPointer<LLVertexBuffer> mAuxScreenRectVB;
