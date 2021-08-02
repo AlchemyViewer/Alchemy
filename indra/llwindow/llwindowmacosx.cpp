@@ -43,6 +43,7 @@
 #include <CoreGraphics/CGDisplayConfiguration.h>
 
 extern BOOL gDebugWindowProc;
+BOOL gHiDPISupport = TRUE;
 
 const S32	BITS_PER_PIXEL = 32;
 const S32	MAX_NUM_RESOLUTIONS = 32;

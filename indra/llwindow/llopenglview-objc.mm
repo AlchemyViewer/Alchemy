@@ -28,6 +28,8 @@
 #import "llwindowmacosx-objc.h"
 #import "llappdelegate-objc.h"
 
+extern BOOL gHiDPISupport;
+
 #pragma mark local functions
 
 NativeKeyEventData extractKeyDataFromKeyEvent(NSEvent* theEvent)
@@ -247,7 +249,8 @@ attributedStringInfo getSegments(NSAttributedString *str)
         }
         
         //for retina support
-        //[self setWantsBestResolutionOpenGLSurface:YES];
+        BOOL requestHiDPI = gHiDPISupport ? YES : NO;
+        [self setWantsBestResolutionOpenGLSurface:requestHiDPI];
         
         [self setPixelFormat:pixelFormat];
         
