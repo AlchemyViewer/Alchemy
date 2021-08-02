@@ -210,7 +210,8 @@ if (LINUX)
   set(CMAKE_SKIP_BUILD_RPATH TRUE)
 
   set(ALCHEMY_GLOBAL_DEFS "-DLL_LINUX=1 -DAPPID=secondlife -DLL_IGNORE_SIGCHLD -D_REENTRANT -DGDK_DISABLE_DEPRECATED -DGTK_DISABLE_DEPRECATED -DGSEAL_ENABLE -DGTK_DISABLE_SINGLE_INCLUDES")
-  set(ALCHEMY_GLOBAL_CFLAGS "-fvisibility=hidden -fexceptions -fno-math-errno -fno-strict-aliasing -fsigned-char -g -pthread -msse2 -msse4.2 -mfpmath=sse")
+  set(ALCHEMY_GLOBAL_CFLAGS "-fvisibility=hidden -fexceptions -fno-math-errno -fno-strict-aliasing -fsigned-char -g -pthread")
+  set(ALCHEMY_GLOBAL_CFLAGS "${ALCHEMY_GLOBAL_CFLAGS} -mfpmath=sse -msse -msse2 -msse3 -mssse3 -msse4 -msse4.1 -msse4.2 -mcx16 -mpopcnt -mpclmul -maes -mxsave -mxsaveopt")
 
   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${ALCHEMY_GLOBAL_DEFS} ${ALCHEMY_GLOBAL_CFLAGS}")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${ALCHEMY_GLOBAL_DEFS} ${ALCHEMY_GLOBAL_CFLAGS}")
