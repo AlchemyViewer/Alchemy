@@ -8,13 +8,13 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 set(deps_SOURCE_FILES
     CMakeLists.txt
-    ../cmake/cmake_dummy.cpp
     )
 
-set_source_files_properties(${cmake_SOURCE_FILES} ${deps_SOURCE_FILES}
+set_source_files_properties(${deps_SOURCE_FILES}
                             PROPERTIES HEADER_FILE_ONLY TRUE)
 
 add_library(deps
+            ../cmake/cmake_dummy.cpp
             ${deps_SOURCE_FILES}
             )
 
