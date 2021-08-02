@@ -247,7 +247,7 @@ attributedStringInfo getSegments(NSAttributedString *str)
         }
         
         //for retina support
-        [self setWantsBestResolutionOpenGLSurface:YES];
+        //[self setWantsBestResolutionOpenGLSurface:YES];
         
         [self setPixelFormat:pixelFormat];
         
