@@ -2310,11 +2310,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>6b8675df08af9bf7d682d353687510e3ebe34fcdef244e04d4bae0f00c4229d0a07590786a22463f798f5a4d86a97156</string>
+              <string>87b2d8224357b4ca3438c8c436ad058e4405d87e729358904665fa2d09b42058bf0203327bf8b82cf39eb62b4da2a491</string>
               <key>hash_algorithm</key>
               <string>sha3_384</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/147/packages/generic/openjpeg-826/2.4.0/openjpeg-2.4.0-darwin64-826.tar.xz</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/147/packages/generic/openjpeg/2.4.0.1058/openjpeg-2.4.0-darwin64-1058.tar.xz</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
@@ -2324,11 +2324,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>3353c3451062d28b0fd19f5dc4bba8fb19a4a8bfa22de4e8f363f305b8496184e18b700b6bb6518bb822d989f8bf7716</string>
+              <string>08b4869134176cf85bb7a48dc233e7c3483a1ea32e41af8c06edfc246ee6ba710dd9e0761c2d29011940d5db0a3a77ea</string>
               <key>hash_algorithm</key>
               <string>sha3_384</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/147/packages/generic/openjpeg-826/2.4.0/openjpeg-2.4.0-linux64-826.tar.xz</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/147/packages/generic/openjpeg/2.4.0.1058/openjpeg-2.4.0-linux64-1058.tar.xz</string>
             </map>
             <key>name</key>
             <string>linux64</string>
@@ -2338,11 +2338,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>c0cd17f90409f3c7d999d65cd5ca13c999ed993f4a5251ba07c8747fdf60e345a8b188f79169771166bdd0b754f351b1</string>
+              <string>e4935be090fac7c13663eb52137b15c886bccc4c1caa9c2c3a8fe148152c64a349a136018e05c5540c9af31b6dcc305c</string>
               <key>hash_algorithm</key>
               <string>sha3_384</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/147/packages/generic/openjpeg-826/2.4.0/openjpeg-2.4.0-windows-826.tar.xz</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/147/packages/generic/openjpeg/2.4.0.1058/openjpeg-2.4.0-windows-1058.tar.xz</string>
             </map>
             <key>name</key>
             <string>windows</string>
@@ -2352,11 +2352,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>fd9b499a17a9b45fbbc5430383451a8c16cbe665006600df5dec11b335d5ca5b6ab742acfbd40800f6a52bcadf82e79d</string>
+              <string>5f945835b83575b81d0242b3532c9b4e6df8caadad7501bbc2d4a0611375a80d473adc8d69d7843415759b91c7b3a916</string>
               <key>hash_algorithm</key>
               <string>sha3_384</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/147/packages/generic/openjpeg-826/2.4.0/openjpeg-2.4.0-windows64-826.tar.xz</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/147/packages/generic/openjpeg/2.4.0.1058/openjpeg-2.4.0-windows64-1058.tar.xz</string>
             </map>
             <key>name</key>
             <string>windows64</string>
