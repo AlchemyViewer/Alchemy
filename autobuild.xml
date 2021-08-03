@@ -49,6 +49,82 @@
         <key>version</key>
         <string>2.0.14</string>
       </map>
+      <key>abseil-cpp</key>
+      <map>
+        <key>canonical_repo</key>
+        <string>https://git.alchemyviewer.org/alchemy/thirdparty/3p-abseil-cpp</string>
+        <key>copyright</key>
+        <string>Copyright 2018 The Abseil Authors.</string>
+        <key>description</key>
+        <string>Abseil is an open-source collection of C++ code designed to augment the C++ standard library.</string>
+        <key>license</key>
+        <string>Apache 2.0</string>
+        <key>license_file</key>
+        <string>LICENSES/abseil-cpp.txt</string>
+        <key>name</key>
+        <string>abseil-cpp</string>
+        <key>platforms</key>
+        <map>
+          <key>darwin64</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>hash</key>
+              <string>8a39c22df213748c1407f9deef27de6ebf4643c3310281bd619eb936275a8ca1fb6b66359652b6f62a83a8faa7d98b12</string>
+              <key>hash_algorithm</key>
+              <string>sha3_384</string>
+              <key>url</key>
+              <string>https://git.alchemyviewer.org/api/v4/projects/163/packages/generic/abseil-cpp/0.0.0.1044.1044/abseil_cpp-0.0.0.1044-darwin64-1044.tar.xz</string>
+            </map>
+            <key>name</key>
+            <string>darwin64</string>
+          </map>
+          <key>linux64</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>hash</key>
+              <string>a5ac070e08969c6221bb038a38036fb45131bf7fb81c1651691931b46fdf07c0d6041beb328afc8cf71d23463e636f7b</string>
+              <key>hash_algorithm</key>
+              <string>sha3_384</string>
+              <key>url</key>
+              <string>https://git.alchemyviewer.org/api/v4/projects/163/packages/generic/abseil-cpp/0.0.0.1044.1044/abseil_cpp-0.0.0.1044-linux64-1044.tar.xz</string>
+            </map>
+            <key>name</key>
+            <string>linux64</string>
+          </map>
+          <key>windows</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>hash</key>
+              <string>17dbe3aea3b61db570b36b91b0a69c7a508e58121f86829fa6ab16c4c28c3da5b1a84dc5a10dabf795a396faf77b32a0</string>
+              <key>hash_algorithm</key>
+              <string>sha3_384</string>
+              <key>url</key>
+              <string>https://git.alchemyviewer.org/api/v4/projects/163/packages/generic/abseil-cpp/0.0.0.1044.1044/abseil_cpp-0.0.0.1044-windows-1044.tar.xz</string>
+            </map>
+            <key>name</key>
+            <string>windows</string>
+          </map>
+          <key>windows64</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>hash</key>
+              <string>61364464848fa6731f804ba06a490f009ffa3a30758d94a1420d8bc87e8cb112146619ffcb3a22cdb40322576e403779</string>
+              <key>hash_algorithm</key>
+              <string>sha3_384</string>
+              <key>url</key>
+              <string>https://git.alchemyviewer.org/api/v4/projects/163/packages/generic/abseil-cpp/0.0.0.1044.1044/abseil_cpp-0.0.0.1044-windows64-1044.tar.xz</string>
+            </map>
+            <key>name</key>
+            <string>windows64</string>
+          </map>
+        </map>
+        <key>version</key>
+        <string>0.0.0.1044</string>
+      </map>
       <key>apr_suite</key>
       <map>
         <key>copyright</key>

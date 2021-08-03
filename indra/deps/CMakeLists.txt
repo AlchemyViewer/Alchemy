@@ -2,6 +2,7 @@ project(deps)
 
 include(00-Common)
 include(FetchContent)
+include(Abseil)
 
 set(CMAKE_FOLDER "Third Party")
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
@@ -49,43 +50,43 @@ FetchContent_Declare(
   GIT_REPOSITORY https://git.alchemyviewer.org/alchemy/mirrors/modernjson.git
   GIT_TAG        v3.9.1
   )
-FetchContent_Declare(
-  absl
-  GIT_REPOSITORY https://git.alchemyviewer.org/alchemy/thirdparty/abseil-cpp.git
-  GIT_TAG        a198d62533e8de0c33a6311f38a3335f7930b7c7
-  )
+
 FetchContent_Declare(
   readerwriterqueue
   GIT_REPOSITORY    https://github.com/cameron314/readerwriterqueue
   GIT_TAG           v1.0.5
 )
 
-# This is a hack because absl has dumb cmake
-set(OLD_BUILD_TEST ${BUILD_TESTING})
-set(BUILD_TESTING OFF)
-FetchContent_MakeAvailable(absl)
-set(BUILD_TESTING ${OLD_BUILD_TEST})
+if(NOT USE_BINARY_ABSL)
+  FetchContent_Declare(
+    absl
+    GIT_REPOSITORY https://git.alchemyviewer.org/alchemy/thirdparty/abseil-cpp.git
+    GIT_TAG        a198d62533e8de0c33a6311f38a3335f7930b7c7
+    )
 
-# Supress warnings inside abseil under MSVC
-if(WINDOWS)
-  target_compile_options(absl_strings PRIVATE /wd4018)
-  target_compile_options(absl_str_format_internal PRIVATE /wd4018)
-  target_compile_options(absl_flags_usage_internal PRIVATE /wd4018)
-  target_compile_options(absl_random_internal_distribution_test_util PRIVATE /wd4723)
-elseif(LINUX) 
-  target_compile_options(absl_flags PRIVATE -Wno-non-virtual-dtor)
-  target_compile_options(absl_flags_commandlineflag PRIVATE -Wno-non-virtual-dtor)
-  target_compile_options(absl_flags_internal PRIVATE -Wno-non-virtual-dtor)
-  target_compile_options(absl_flags_parse PRIVATE -Wno-non-virtual-dtor)
-  target_compile_options(absl_flags_private_handle_accessor PRIVATE -Wno-non-virtual-dtor)
-  target_compile_options(absl_flags_reflection PRIVATE -Wno-non-virtual-dtor)
-  target_compile_options(absl_flags_usage PRIVATE -Wno-non-virtual-dtor)
-  target_compile_options(absl_flags_usage_internal PRIVATE -Wno-non-virtual-dtor)
+  # This is a hack because absl has dumb cmake
+  set(OLD_BUILD_TEST ${BUILD_TESTING})
+  set(BUILD_TESTING OFF)
+  FetchContent_MakeAvailable(absl)
+  set(BUILD_TESTING ${OLD_BUILD_TEST})
+
+  # Supress warnings inside abseil under MSVC
+  if(WINDOWS)
+    target_compile_options(absl_strings PRIVATE /wd4018)
+    target_compile_options(absl_str_format_internal PRIVATE /wd4018)
+    target_compile_options(absl_flags_usage_internal PRIVATE /wd4018)
+    target_compile_options(absl_random_internal_distribution_test_util PRIVATE /wd4723)
+  elseif(LINUX) 
+    target_compile_options(absl_flags PRIVATE -Wno-non-virtual-dtor)
+    target_compile_options(absl_flags_commandlineflag PRIVATE -Wno-non-virtual-dtor)
+    target_compile_options(absl_flags_internal PRIVATE -Wno-non-virtual-dtor)
+    target_compile_options(absl_flags_parse PRIVATE -Wno-non-virtual-dtor)
+    target_compile_options(absl_flags_private_handle_accessor PRIVATE -Wno-non-virtual-dtor)
+    target_compile_options(absl_flags_reflection PRIVATE -Wno-non-virtual-dtor)
+    target_compile_options(absl_flags_usage PRIVATE -Wno-non-virtual-dtor)
+    target_compile_options(absl_flags_usage_internal PRIVATE -Wno-non-virtual-dtor)
+  endif()
 endif()
-
-# if (BUILD_TESTING)
-#   FetchContent_MakeAvailable(Catch2)
-# endif()
 
 # #Download the rest of the libraries
 FetchContent_MakeAvailable(fmt)

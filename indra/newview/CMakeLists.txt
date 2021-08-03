@@ -54,6 +54,7 @@ include(ViewerManager)
 include(VisualLeakDetector)
 include(ZLIB)
 include(URIPARSER)
+include(Abseil)
 
 if( LLPHYSICSEXTENSIONS_SRC_DIR )
   if (NOT HAVOK_TPV)
