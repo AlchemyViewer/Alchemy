@@ -44,12 +44,6 @@
 @synthesize inputView;
 @synthesize currentInputLanguage;
 
-- (void)dealloc
-{
-    [currentInputLanguage release];
-    [super dealloc];
-}
-
 - (void) applicationWillFinishLaunching:(NSNotification *)notification
 {
     [[NSAppleEventManager sharedAppleEventManager] setEventHandler:self andSelector:@selector(handleGetURLEvent:withReplyEvent:) forEventClass:kInternetEventClass andEventID:kAEGetURL];
@@ -141,7 +135,7 @@
 		return NSTerminateCancel;
 	} else {
 		// pumpMainLoop() returned true: it's done. Okay, done with frameTimer.
-		[frameTimer release];
+		frameTimer = nil;
 		cleanupViewer();
 		return NSTerminateNow;
 	}
@@ -154,7 +148,7 @@
 	{
 		// Once pumpMainLoop() reports that we're done, cancel frameTimer:
 		// stop the repetitive calls.
-		[frameTimer release];
+        frameTimer = nil;
 		[[LLApplication sharedApplication] terminate:self];
 	}
 }

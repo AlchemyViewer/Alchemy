@@ -42,43 +42,22 @@ void LLCocoaPlugin::setupCocoa()
 	
 	if(!inited)
 	{
-		createAutoReleasePool();
-		
-		// The following prevents the Cocoa command line parser from trying to open 'unknown' arguements as documents.
-		// ie. running './secondlife -set Language fr' would cause a pop-up saying can't open document 'fr' 
-		// when init'ing the Cocoa App window.		
-		[[NSUserDefaults standardUserDefaults] setObject:@"NO" forKey:@"NSTreatUnknownArgumentsAsOpen"];
-		
-		//	Needed for Carbon based applications which call into Cocoa
-		NSApplicationLoad();
-
-		//	Must first call [[[NSWindow alloc] init] release] to get the NSWindow machinery set up so that NSCursor can use a window to cache the cursor image
-		[[[NSWindow alloc] init] release];
-		
-        mPluginWindow = [NSApp mainWindow];
-        
-		deleteAutoReleasePool();
+        @autoreleasepool {
+            // The following prevents the Cocoa command line parser from trying to open 'unknown' arguements as documents.
+            // ie. running './secondlife -set Language fr' would cause a pop-up saying can't open document 'fr'
+            // when init'ing the Cocoa App window.
+            [[NSUserDefaults standardUserDefaults] setObject:@"NO" forKey:@"NSTreatUnknownArgumentsAsOpen"];
+            
+            //    Needed for Carbon based applications which call into Cocoa
+            NSApplicationLoad();
+            
+            //    Must first call [[[NSWindow alloc] init] release] to get the NSWindow machinery set up so that NSCursor can use a window to cache the cursor image
+            (void)[[NSWindow alloc] init];
+            
+            mPluginWindow = [NSApp mainWindow];
+        }
 		
 		inited = true;
-	}
-}
-
-static NSAutoreleasePool *sPool = NULL;
-
-void LLCocoaPlugin::createAutoReleasePool()
-{
-	if(!sPool)
-	{
-		sPool = [[NSAutoreleasePool alloc] init];
-	}
-}
-
-void LLCocoaPlugin::deleteAutoReleasePool()
-{
-	if(sPool)
-	{
-		[sPool release];
-		sPool = NULL;
 	}
 }
 

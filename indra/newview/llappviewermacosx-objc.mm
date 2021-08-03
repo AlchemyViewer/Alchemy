@@ -43,7 +43,7 @@ void launchApplication(const std::string* app_name, const std::vector<std::strin
         [app_name_ns appendFormat:@"/%@", [NSString stringWithCString:app_name->c_str()
                                                              encoding:[NSString defaultCStringEncoding]]];
         
-        NSMutableArray *args_ns = [[[NSMutableArray alloc] init] autorelease];
+        NSMutableArray *args_ns = [[NSMutableArray alloc] init];
         
         for (int i=0; i < args->size(); ++i)
         {
@@ -53,9 +53,15 @@ void launchApplication(const std::string* app_name, const std::vector<std::strin
                                 encoding:[NSString defaultCStringEncoding]]];
         }
         
-        NSTask *task = [[[NSTask alloc] init] autorelease];
+        NSTask *task = [[NSTask alloc] init];
         NSBundle *bundle = [NSBundle bundleWithPath:[[NSWorkspace sharedWorkspace] fullPathForApplication:app_name_ns]];
-        [task setLaunchPath:[bundle executablePath]];
+	@try {
+        	[task setLaunchPath:[bundle executablePath]];
+	}
+	@catch (NSException *theException) {
+		NSLog(@"Caught a %@ exception, bailing.", theException);
+		return;
+	}
         [task setArguments:args_ns];
         [task launch];
         

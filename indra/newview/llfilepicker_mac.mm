@@ -46,7 +46,7 @@ std::vector<std::string>* doLoadDialog(const std::vector<std::string>* allowed_t
         
         if (allowed_types && !allowed_types->empty())
         {
-            fileTypes = [[[NSMutableArray alloc] init] autorelease];
+            fileTypes = [[NSMutableArray alloc] init];
             
             for (i=0;i<allowed_types->size();++i)
             {

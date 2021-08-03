@@ -27,6 +27,7 @@
 #import "llopenglview-objc.h"
 #import "llwindowmacosx-objc.h"
 #import "llappdelegate-objc.h"
+#import <Carbon/Carbon.h> // for keycodes
 
 extern BOOL gHiDPISupport;
 
@@ -111,7 +112,7 @@ attributedStringInfo getSegments(NSAttributedString *str)
 - (unsigned long)getVramSize
 {
     CGLRendererInfoObj info = 0;
-	GLint vram_megabytes = 0;
+    GLint vram_megabytes = 0;
     int num_renderers = 0;
     CGLError the_err = CGLQueryRendererInfo (CGDisplayIDToOpenGLDisplayMask(kCGDirectMainDisplay), &info, &num_renderers);
     if(0 == the_err)
@@ -124,7 +125,7 @@ attributedStringInfo getSegments(NSAttributedString *str)
         vram_megabytes = 256;
     }
     
-	return (unsigned long)vram_megabytes; // return value is in megabytes.
+    return (unsigned long)vram_megabytes; // return value is in megabytes.
 }
 
 - (void)viewDidMoveToWindow
@@ -150,7 +151,7 @@ attributedStringInfo getSegments(NSAttributedString *str)
     
     NSRect rect = [[self window] frame];
     NSRect scaled_rect = [self convertRectToBacking:rect];
-    if (NSEqualSizes(rect.size, scaled_rect.size))
+    if (!NSEqualSizes(rect.size, scaled_rect.size))
     {
         callResize(scaled_rect.size.width, scaled_rect.size.height);
     }
@@ -189,7 +190,6 @@ attributedStringInfo getSegments(NSAttributedString *str)
 - (void)dealloc
 {
 	[[NSNotificationCenter defaultCenter] removeObserver:self];
-	[super dealloc];
 }
 
 - (id) init
@@ -232,7 +232,7 @@ attributedStringInfo getSegments(NSAttributedString *str)
             0
         };
         
-        NSOpenGLPixelFormat *pixelFormat = [[[NSOpenGLPixelFormat alloc] initWithAttributes:attrs] autorelease];
+        NSOpenGLPixelFormat *pixelFormat = [[NSOpenGLPixelFormat alloc] initWithAttributes:attrs];
         
         if (pixelFormat == nil)
         {
@@ -240,7 +240,7 @@ attributedStringInfo getSegments(NSAttributedString *str)
             return nil;
         }
         
-        NSOpenGLContext *glContext = [[[NSOpenGLContext alloc] initWithFormat:pixelFormat shareContext:nil] autorelease];
+        NSOpenGLContext *glContext = [[NSOpenGLContext alloc] initWithFormat:pixelFormat shareContext:nil];
         
         if (glContext == nil)
         {
@@ -262,10 +262,8 @@ attributedStringInfo getSegments(NSAttributedString *str)
         
         GLint glVsync = vsync ? 1 : 0;
         [glContext setValues:&glVsync forParameter:NSOpenGLCPSwapInterval];
-
-    }
-
-	return self;
+    } // @autoreleasepool
+    return self;
 }
 
 - (BOOL) rebuildContext
@@ -279,7 +277,7 @@ attributedStringInfo getSegments(NSAttributedString *str)
         NSOpenGLContext *ctx = [self openGLContext];
         
         [ctx clearDrawable];
-        ctx = [[[NSOpenGLContext alloc] initWithFormat:format shareContext:nil] autorelease];
+        ctx = [[NSOpenGLContext alloc] initWithFormat:format shareContext:nil];
         
         if (ctx == nil)
         {
@@ -290,8 +288,7 @@ attributedStringInfo getSegments(NSAttributedString *str)
         [self setOpenGLContext:ctx];
         [ctx setView:self];
         [ctx makeCurrentContext];
-    }
-
+    } // @autoreleasepool
 	return true;
 }
 
@@ -477,13 +474,13 @@ attributedStringInfo getSegments(NSAttributedString *str)
     NSInteger mask = 0;
     switch([theEvent keyCode])
     {        
-        case 56:
+        case kVK_Shift:
             mask = NSEventModifierFlagShift;
             break;
-        case 58:
+        case kVK_Option:
             mask = NSEventModifierFlagOption;
             break;
-        case 59:
+        case kVK_Control:
             mask = NSEventModifierFlagControl;
             break;
         default:
@@ -678,7 +675,7 @@ attributedStringInfo getSegments(NSAttributedString *str)
 		// We may never get this point since unmarkText may be called before insertText ever gets called once we submit our text.
 		// But just in case...
 		
-		for (NSInteger i = 0; i < [aString length]; i++)
+		for (NSInteger i = 0; i < [aString length]; ++i)
 		{
 			handleUnicodeCharacter([aString characterAtIndex:i]);
 		}

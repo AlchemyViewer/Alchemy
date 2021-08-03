@@ -31,9 +31,9 @@
 @end
 
 @interface LLAppDelegate : NSObject <NSApplicationDelegate> {
-	LLNSWindow *window;
-	NSWindow *inputWindow;
-	LLNonInlineTextView *inputView;
+	LLNSWindow __unsafe_unretained *window;
+	NSWindow __unsafe_unretained *inputWindow;
+	LLNonInlineTextView __unsafe_unretained *inputView;
 	NSTimer *frameTimer;
 	NSString *currentInputLanguage;
 }
