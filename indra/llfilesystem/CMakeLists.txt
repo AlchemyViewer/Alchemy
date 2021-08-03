@@ -4,6 +4,7 @@ project(llfilesystem)
 
 include(00-Common)
 include(LLCommon)
+include(Abseil)
 include(UnixInstall)
 
 include_directories(
@@ -71,6 +72,7 @@ set(cache_BOOST_LIBRARIES
 target_link_libraries(llfilesystem
     ${LLCOMMON_LIBRARIES}
     ${cache_BOOST_LIBRARIES}
+    absl::strings
     )
 
 if (WINDOWS)

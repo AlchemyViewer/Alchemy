@@ -7,6 +7,7 @@ include(00-Common)
 # sets variables on which the 3p .cmake files depend.
 include(Linking)
 
+include(Abseil)
 include(Boost)
 include(bugsplat)
 include(BuildPackagesInfo)
@@ -54,7 +55,6 @@ include(ViewerManager)
 include(VisualLeakDetector)
 include(ZLIB)
 include(URIPARSER)
-include(Abseil)
 
 if( LLPHYSICSEXTENSIONS_SRC_DIR )
   if (NOT HAVOK_TPV)
@@ -2153,6 +2153,7 @@ target_link_libraries(${VIEWER_BINARY_NAME}
     ${MINIZIP_LIBRARIES}
     absl::flat_hash_map
     absl::node_hash_map
+    absl::strings
     nlohmann_json::nlohmann_json
     fmt::fmt
     )

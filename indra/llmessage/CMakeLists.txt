@@ -3,6 +3,7 @@
 project(llmessage)
 
 include(00-Common)
+include(Abseil)
 include(CURL)
 include(OpenSSL)
 include(NGHTTP2)
@@ -219,6 +220,9 @@ target_link_libraries(
   ${BOOST_FIBER_LIBRARY}
   ${BOOST_CONTEXT_LIBRARY}
   ${BOOST_SYSTEM_LIBRARY}
+  absl::flat_hash_map
+  absl::node_hash_map
+  absl::strings
   rt
   )
 else (LINUX)
@@ -236,6 +240,9 @@ target_link_libraries(
   ${BOOST_FIBER_LIBRARY}
   ${BOOST_CONTEXT_LIBRARY}
   ${BOOST_SYSTEM_LIBRARY}
+  absl::flat_hash_map
+  absl::node_hash_map
+  absl::strings
   )
 endif(LINUX)
 

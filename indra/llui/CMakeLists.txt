@@ -3,6 +3,7 @@
 project(llui)
 
 include(00-Common)
+include(Abseil)
 include(Hunspell)
 include(LLCommon)
 include(LLImage)
@@ -290,6 +291,9 @@ target_link_libraries(llui
     ${HUNSPELL_LIBRARY}
     ${LLMESSAGE_LIBRARIES}
     ${LLCOMMON_LIBRARIES} # must be after llimage, llwindow, llrender
+    absl::flat_hash_map
+    absl::node_hash_map
+    absl::strings
     )
 
 if(${CMAKE_VERSION} VERSION_GREATER "3.15.0") 

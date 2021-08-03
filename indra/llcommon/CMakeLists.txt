@@ -301,6 +301,7 @@ target_link_libraries(
     absl::node_hash_map
     absl::random_random
     absl::random_bit_gen_ref
+    absl::strings
     nlohmann_json::nlohmann_json
     fmt::fmt
     ${DL_LIBRARY}
