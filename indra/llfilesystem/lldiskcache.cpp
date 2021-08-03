@@ -211,7 +211,7 @@ const std::string LLDiskCache::metaDataToFilepath(const LLUUID& id,
 {
     std::string uuidstr = id.asString();
     const auto& dirdelim = gDirUtilp->getDirDelimiter();
-    return absl::StrCat(sCacheDir, dirdelim, absl::string_view(&uuidstr[0], 1), dirdelim, uuidstr, sCacheFilenameExt);
+    return absl::StrCat(sCacheDir, dirdelim, std::string_view(&uuidstr[0], 1), dirdelim, uuidstr, sCacheFilenameExt);
 }
 
 const std::string LLDiskCache::getCacheInfo()

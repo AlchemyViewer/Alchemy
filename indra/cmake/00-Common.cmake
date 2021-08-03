@@ -142,7 +142,7 @@ if (WINDOWS)
   endif()
 
   set(GLOBAL_CXX_FLAGS 
-      "/GS /W3 /c /Zc:__cplusplus  /Zc:forScope /Zc:rvalueCast /Zc:strictStrings /Zc:ternary /nologo"
+      "/GS /W3 /c /Zc:__cplusplus /Zc:forScope /Zc:rvalueCast /Zc:strictStrings /Zc:ternary /nologo"
       )
 
   if (USE_AVX2)
