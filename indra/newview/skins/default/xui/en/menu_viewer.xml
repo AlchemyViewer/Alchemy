@@ -917,7 +917,8 @@
           <menu_item_separator />
           <menu_item_check
              label="Advanced Menu"
-             name="Show Advanced Menu">
+             name="Show Advanced Menu"
+             shortcut="control|shift|D">>
             <on_check
                function="CheckControl"
                parameter="UseDebugMenus" />
