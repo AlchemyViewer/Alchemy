@@ -35,16 +35,20 @@ variables:
   script:
     - autobuild configure -c ReleaseOS -- -DUSE_FMODSTUDIO=ON -DUSE_NVAPI=ON -DUSE_LTO=ON -DDISABLE_FATAL_WARNINGS=ON -DREVISION_FROM_VCS=FALSE
     - autobuild build -c ReleaseOS --no-configure
-    - autobuild graph -c ReleaseOS --graph-file alchemy-windows${AUTOBUILD_ADDRSIZE}-dependencies.svg
+    - autobuild graph -c ReleaseOS --graph-file alchemy-windows${AUTOBUILD_ADDRSIZE}-dependencies.svg 
+    - |
+        If ($env:USE_SENTRY -eq 'TRUE') 
+        {
+          $AlchemyPdbPath = Resolve-Path build-vc-*/newview/Release/alchemy-bin.pdb
+          sentry-cli difutil bundle-sources $AlchemyPdbPath
+        }
   artifacts:
     name: "$env:CI_COMMIT_REF_NAME-$env:CI_COMMIT_SHORT_SHA"
     expire_in: 1 week
     paths:
-      - build-vc-*/newview/Release/build_data.json
-      - build-vc-*/newview/Release/alchemy-bin.exe
-      - build-vc-*/newview/Release/alchemy-bin.pdb
       - build-vc-*/packages/lib/release/alut*.dll
       - build-vc-*/packages/lib/release/epoxy-*.dll
+      - build-vc-*/packages/lib/release/fmod*.dll
       - build-vc-*/packages/lib/release/glod*.dll
       - build-vc-*/packages/lib/release/libapr*.dll
       - build-vc-*/packages/lib/release/libexpat*.dll
@@ -56,6 +60,10 @@ variables:
       - build-vc-*/packages/lib/release/sentry.dll
       - build-vc-*/packages/lib/release/xmlrpc-epi*.dll
       - build-vc-*/packages/lib/release/*.pdb
+      - build-vc-*/newview/Release/build_data.json
+      - build-vc-*/newview/Release/alchemy-bin.exe
+      - build-vc-*/newview/Release/alchemy-bin.pdb
+      - build-vc-*/newview/Release/alchemy-bin.src.zip
       - build-vc-*/newview/Release/Alchemy_*_Setup.exe
       - alchemy-*-dependencies.svg
 
@@ -348,7 +356,8 @@ build:release:windows64:
 
           If ($env:USE_SENTRY -eq 'TRUE') 
           {
-            sentry-cli upload-dif --include-sources newview/Release/alchemy-bin.*
+            $AlchemyBinPath = Resolve-Path newview/Release/alchemy-bin.*
+            sentry-cli upload-dif $AlchemyBinPath
             sentry-cli upload-dif packages/
           }
         Pop-Location
