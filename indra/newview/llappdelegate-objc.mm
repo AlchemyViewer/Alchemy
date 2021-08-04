@@ -59,7 +59,7 @@
 #if defined(USE_SENTRY)
     [SentrySDK startWithConfigureOptions:^(SentryOptions *options) {
         options.dsn = @SENTRY_DSN;
-        options.debug = YES; // Enabled debug when first installing is always helpful
+        options.debug = NO;
         options.releaseName = @LL_VIEWER_CHANNEL_AND_VERSION;
         options.enableOutOfMemoryTracking = NO;
     }];
