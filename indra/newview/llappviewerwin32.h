@@ -31,7 +31,7 @@
 #include "llappviewer.h"
 #endif
 
-class LLAppViewerWin32 : public LLAppViewer
+class LLAppViewerWin32 final : public LLAppViewer
 {
 public:
 	LLAppViewerWin32(const char* cmd_line);
@@ -44,6 +44,8 @@ public:
     bool cleanup() override;
 
     void reportCrashToBugsplat(void* pExcepInfo) override;
+
+	void setCrashUserMetadata(const LLUUID& user_id, const std::string& avatar_name) override;
 
 protected:
 	void initLoggingAndGetLastDuration() override; // Override to clean stack_trace info.

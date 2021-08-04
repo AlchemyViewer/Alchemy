@@ -5637,8 +5637,13 @@ void LLAppViewer::handleLoginComplete()
 		gDebugInfo["MainloopTimeoutState"] = LLAppViewer::instance()->mMainloopTimeout->getState();
 	}
 	
-	gWindowTitle.append(" - ").append(gAgentAvatarp->getFullname());
-	gViewerWindow->setWindowTitle(gWindowTitle);
+	if (gAgentAvatarp)
+	{
+
+		setCrashUserMetadata(gAgent.getID(), gAgentAvatarp->getFullname());
+		gWindowTitle.append(" - ").append(gAgentAvatarp->getFullname());
+		gViewerWindow->setWindowTitle(gWindowTitle);
+	}
 
 	mOnLoginCompleted();
 

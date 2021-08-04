@@ -253,6 +253,8 @@ public:
     virtual void reportCrashToBugsplat(void* pExcepInfo /*EXCEPTION_POINTERS*/) { }
 #endif
 
+	virtual void setCrashUserMetadata(const LLUUID& user_id, const std::string& avatar_name) {};
+
 public:
 	typedef std::map<std::string, std::string> string_map;
 	string_map mOptionMap;	// Contains all command-line options and arguments in a map

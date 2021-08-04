@@ -719,6 +719,19 @@ void LLAppViewerWin32::reportCrashToBugsplat(void* pExcepInfo)
 #endif // LL_BUGSPLAT
 }
 
+void LLAppViewerWin32::setCrashUserMetadata(const LLUUID& user_id, const std::string& avatar_name)
+{
+#if defined(USE_SENTRY)
+	if (mSentryInitialized)
+	{
+		sentry_value_t user = sentry_value_new_object();
+		sentry_value_set_by_key(user, "id", sentry_value_new_string(user_id.asString().c_str()));
+		sentry_value_set_by_key(user, "username", sentry_value_new_string(avatar_name.c_str()));
+		sentry_set_user(user);
+	}
+#endif
+}
+
 void LLAppViewerWin32::initLoggingAndGetLastDuration()
 {
 	LLAppViewer::initLoggingAndGetLastDuration();
