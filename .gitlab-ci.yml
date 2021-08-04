@@ -26,6 +26,8 @@ variables:
       - .cache/pip
       - .venv/
     when: 'always'
+  variables:
+    USE_SENTRY: "TRUE"
   before_script:
     - virtualenv -p C:\Python39\python.exe .venv
     - .\.venv\Scripts\activate.ps1
@@ -40,8 +42,20 @@ variables:
     paths:
       - build-vc-*/newview/Release/build_data.json
       - build-vc-*/newview/Release/alchemy-bin.exe
-      - build-vc-*/newview/Release/*.pdb
-      - build-vc-*/newview/Release/*.dll
+      - build-vc-*/newview/Release/alchemy-bin.pdb
+      - build-vc-*/packages/lib/release/alut*.dll
+      - build-vc-*/packages/lib/release/epoxy-*.dll
+      - build-vc-*/packages/lib/release/glod*.dll
+      - build-vc-*/packages/lib/release/libapr*.dll
+      - build-vc-*/packages/lib/release/libexpat*.dll
+      - build-vc-*/packages/lib/release/libhunspell*.dll
+      - build-vc-*/packages/lib/release/libogg*.dll
+      - build-vc-*/packages/lib/release/libvorbis*.dll
+      - build-vc-*/packages/lib/release/OpenAL32*.dll
+      - build-vc-*/packages/lib/release/openjp2*.dll
+      - build-vc-*/packages/lib/release/sentry.dll
+      - build-vc-*/packages/lib/release/xmlrpc-epi*.dll
+      - build-vc-*/packages/lib/release/*.pdb
       - build-vc-*/newview/Release/Alchemy_*_Setup.exe
       - alchemy-*-dependencies.svg
 
@@ -326,9 +340,17 @@ build:release:windows64:
           }
         Pop-Location
 
-        Push-Location ./build-vc-64/newview/Release/
-          $FileNameWin64 = Get-ChildItem -Path . -Name -Include Alchemy_*_Setup.exe
-          Invoke-WebRequest @UploadParams -InFile ./$FileNameWin64 -Uri "${UploadDestURL}/${FileNameWin64}"
+        Push-Location ./build-vc-64/
+          Push-Location ./newview/Release/
+            $FileNameWin64 = Get-ChildItem -Path . -Name -Include Alchemy_*_Setup.exe
+            Invoke-WebRequest @UploadParams -InFile ./$FileNameWin64 -Uri "${UploadDestURL}/${FileNameWin64}"
+          Pop-Location
+
+          If ($env:USE_SENTRY -eq 'TRUE') 
+          {
+            sentry-cli upload-dif --include-sources newview/Release/alchemy-bin.*
+            sentry-cli upload-dif packages/
+          }
         Pop-Location
 
         If ($env:USE_SENTRY -eq 'TRUE') 

@@ -5639,7 +5639,6 @@ void LLAppViewer::handleLoginComplete()
 	
 	if (gAgentAvatarp)
 	{
-
 		setCrashUserMetadata(gAgent.getID(), gAgentAvatarp->getFullname());
 		gWindowTitle.append(" - ").append(gAgentAvatarp->getFullname());
 		gViewerWindow->setWindowTitle(gWindowTitle);
