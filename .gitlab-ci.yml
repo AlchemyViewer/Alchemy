@@ -10,8 +10,6 @@ variables:
   AUTOBUILD_BUILD_ID: $CI_PIPELINE_ID
   AUTOBUILD_INSTALLABLE_CACHE: "$CI_PROJECT_DIR/.cache/autobuild"
   PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
-  VIEWER_USE_CRASHPAD: "FALSE"
-  VIEWER_CRASHPAD_URL: $SENTRY_DSN
 
 .win_build:
   stage: build
@@ -63,6 +61,8 @@ variables:
       - .cache/pip
       - .venv
     when: 'always'
+  variables:
+    USE_SENTRY: "TRUE"
   before_script:
     - virtualenv .venv -p python3
     - source .venv/bin/activate
@@ -76,7 +76,21 @@ variables:
     expire_in: 1 week
     paths:
       - build-darwin-*/build_data.json
+      - build-darwin-*/packages/lib/release/libalut*.dylib
+      - build-darwin-*/packages/lib/release/libapr*.dylib
+      - build-darwin-*/packages/lib/release/libepoxy*.dylib
+      - build-darwin-*/packages/lib/release/libGLOD*.dylib
+      - build-darwin-*/packages/lib/release/libhunspell*.dylib
+      - build-darwin-*/packages/lib/release/libndofdev*.dylib
+      - build-darwin-*/packages/lib/release/libogg*.dylib
+      - build-darwin-*/packages/lib/release/libopenal*.dylib
+      - build-darwin-*/packages/lib/release/libvorbis*.dylib
+      - build-darwin-*/packages/lib/release/libxmlrpc*.dylib
+      - build-darwin-*/packages/lib/release/Sentry.framework
+      - build-darwin-*/packages/lib/release/*.dSYM
       - build-darwin-*/newview/Alchemy_*.dmg
+      - build-darwin-*/newview/Release/*.app/Contents/MacOS/*
+      - build-darwin-*/newview/Release/*.dSYM
       - alchemy-*-dependencies.svg
 
 .linux_build:
@@ -100,19 +114,7 @@ variables:
     - source .venv/bin/activate
     - pip3 install --upgrade autobuild -i https://ci-job-token:${CI_JOB_TOKEN}@git.alchemyviewer.org/api/v4/projects/54/packages/pypi/simple --extra-index-url https://pypi.org/simple
   script:
-    - export CC=clang-12
-    - export CXX=clang++-12
-    - export LD=lld-12
-    - export AR=llvm-ar-12
-    - export NM=llvm-nm-12
-    - export STRIP=llvm-strip-12
-    - export OBJCOPY=llvm-objcopy-12
-    - export OBJDUMP=llvm-objdump-12
-    - export OBJSIZE=llvm-size-12
-    - export READELF=llvm-readelf-12
-    - export RANLIB=llvm-ranlib-12
-    - autobuild configure -c ReleaseOS -- -DUSE_FMODSTUDIO=ON -DUSE_NVAPI=ON -DUSE_LTO=ON -DDISABLE_FATAL_WARNINGS=ON -DREVISION_FROM_VCS=FALSE \
-      -DCMAKE_C_COMPILER=/usr/bin/clang-12 -DCMAKE_CXX_COMPILER=clang++-12 -DCMAKE_LINKER=/usr/bin/ld.lld-12
+    - autobuild configure -c ReleaseOS -- -DUSE_FMODSTUDIO=ON -DUSE_NVAPI=ON -DUSE_LTO=ON -DDISABLE_FATAL_WARNINGS=ON -DREVISION_FROM_VCS=FALSE
     - autobuild build -c ReleaseOS --no-configure
     - autobuild graph -c ReleaseOS --graph-file alchemy-linuxs${AUTOBUILD_ADDRSIZE}-dependencies.svg
   artifacts:
@@ -284,9 +286,12 @@ build:release:windows64:
     - m1
     - mac
   allow_failure: false
+  variables:
+    USE_SENTRY: "TRUE"
   script:
     - |
         $BuildData = Get-Content ./build-vc-64/newview/Release/build_data.json | ConvertFrom-Json
+        $BuildChannelVersion = $BuildData."Channel" + ' ' + $BuildData."Version"
         $PkgName = $BuildData.Channel.Replace(" ", "_")
         $PkgVer = $BuildData.Version
         $UploadDestURL = "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${PkgName}/${PkgVer}"
@@ -297,29 +302,37 @@ build:release:windows64:
            "JOB-TOKEN" = "${CI_JOB_TOKEN}"; };
          Verbose = $true; };
 
+        If ($env:USE_SENTRY -eq 'TRUE') 
+        {
+          sentry-cli releases new $BuildChannelVersion
+          sentry-cli releases set-commits --auto $BuildChannelVersion
+        }
+
         Push-Location ./build-linux-64/newview/
           $FileNameLnx64 = Get-ChildItem -Path . -Name -Include Alchemy_*.tar.xz
           Invoke-WebRequest @UploadParams -InFile ./$FileNameLnx64 -Uri "${UploadDestURL}/${FileNameLnx64}"
         Pop-Location
 
-        Push-Location ./build-darwin-64/newview/
-          $FileNameMac64 = Get-ChildItem -Path . -Name -Include Alchemy_*.dmg
-          Invoke-WebRequest @UploadParams -InFile ./$FileNameMac64 -Uri "${UploadDestURL}/${FileNameMac64}"
+        Push-Location ./build-darwin-64/
+          Push-Location ./newview/
+            $FileNameMac64 = Get-ChildItem -Path . -Name -Include Alchemy_*.dmg
+            Invoke-WebRequest @UploadParams -InFile ./$FileNameMac64 -Uri "${UploadDestURL}/${FileNameMac64}"
+          Pop-Location
+
+          If ($env:USE_SENTRY -eq 'TRUE') 
+          {
+            sentry-cli upload-dif --include-sources newview/Release/
+            sentry-cli upload-dif packages/
+          }
         Pop-Location
 
         Push-Location ./build-vc-64/newview/Release/
           $FileNameWin64 = Get-ChildItem -Path . -Name -Include Alchemy_*_Setup.exe
           Invoke-WebRequest @UploadParams -InFile ./$FileNameWin64 -Uri "${UploadDestURL}/${FileNameWin64}"
-
-          If ($env:VIEWER_USE_CRASHPAD -eq 'TRUE') 
-          {
-            sentry-cli upload-dif --include-sources alchemy-bin.exe alchemy-bin.pdb crashpad_handler.exe crashpad_handler.pdb openjpeg.pdb openjpeg.dll fmod.dll libcrypto-1_1.dll libcrypto-1_1.pdb libssl-1_1.dll libssl-1_1.pdb libcrypto-1_1-x64.dll libcrypto-1_1-x64.pdb libssl-1_1-x64.dll libssl-1_1-x64.pdb vcruntime140.dll msvcp140.dll nghttp2.dll glod.dll
-          }
         Pop-Location
-        If ($env:VIEWER_USE_CRASHPAD -eq 'TRUE') 
+
+        If ($env:USE_SENTRY -eq 'TRUE') 
         {
-          sentry-cli releases new $BuildChannelVersion
-          sentry-cli releases set-commits --auto $BuildChannelVersion
           sentry-cli releases finalize $BuildChannelVersion
         }
 
