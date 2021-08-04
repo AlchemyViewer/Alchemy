@@ -1475,12 +1475,6 @@ if (DARWIN)
     llappdelegate-objc.mm
     PROPERTIES
     SKIP_PRECOMPILE_HEADERS TRUE
-    # BugsplatMac is a module, imported with @import. That language feature
-    # demands these -f switches.
-    # Xcode 10.2 requires that Objective-C++ headers declare nullability of
-    # pointer variables. As of 2019-06-26, the BugsplatMac version we're using
-    # does not yet do so in its own header files. This -W flag prevents fatal
-    # warnings.
     COMPILE_FLAGS "-fmodules -fcxx-modules -Wno-nullability-completeness"
     )
 
@@ -1972,7 +1966,7 @@ if (WINDOWS)
         --actions=copy
         --arch=${ARCH}
         --artwork=${ARTWORK_DIR}
-        "--bugsplat=${BUGSPLAT_DB}"
+        "--sentry=${SENTRY_DSN}"
         "--fmodstudio=${USE_FMODSTUDIO}"
         "--openal=${USE_OPENAL}"
         "--kdu=${USE_KDU}"
@@ -2033,7 +2027,7 @@ if (WINDOWS)
           ${CMAKE_CURRENT_SOURCE_DIR}/viewer_manifest.py
           --arch=${ARCH}
           --artwork=${ARTWORK_DIR}
-          "--bugsplat=${BUGSPLAT_DB}"
+          "--sentry=${SENTRY_DSN}"
           "--fmodstudio=${USE_FMODSTUDIO}"
           "--openal=${USE_OPENAL}"
           "--kdu=${USE_KDU}"
@@ -2178,7 +2172,7 @@ if (LINUX)
         ${CMAKE_CURRENT_SOURCE_DIR}/viewer_manifest.py
         --arch=${ARCH}
         --artwork=${ARTWORK_DIR}
-        "--bugsplat=${BUGSPLAT_DB}"
+        "--sentry=${SENTRY_DSN}"
         "--fmodstudio=${USE_FMODSTUDIO}"
         "--openal=${USE_OPENAL}"
         "--kdu=${USE_KDU}"
@@ -2207,7 +2201,7 @@ if (LINUX)
       --actions=copy
       --arch=${ARCH}
       --artwork=${ARTWORK_DIR}
-      "--bugsplat=${BUGSPLAT_DB}"
+      "--sentry=${SENTRY_DSN}"
       "--fmodstudio=${USE_FMODSTUDIO}"
       "--openal=${USE_OPENAL}"
       "--kdu=${USE_KDU}"
@@ -2300,7 +2294,7 @@ if (DARWIN)
       --actions=copy
       --arch=${ARCH}
       --artwork=${ARTWORK_DIR}
-      "--bugsplat=${BUGSPLAT_DB}"
+      "--sentry=${SENTRY_DSN}"
       "--fmodstudio=${USE_FMODSTUDIO}"
       "--openal=${USE_OPENAL}"
       "--kdu=${USE_KDU}"
@@ -2344,7 +2338,7 @@ if (DARWIN)
           ${CMAKE_CURRENT_SOURCE_DIR}/viewer_manifest.py
           --arch=${ARCH}
           --artwork=${ARTWORK_DIR}
-          "--bugsplat=${BUGSPLAT_DB}"
+          "--sentry=${SENTRY_DSN}"
           "--fmodstudio=${USE_FMODSTUDIO}"
           "--openal=${USE_OPENAL}"
           "--kdu=${USE_KDU}"
@@ -2453,15 +2447,6 @@ if (PACKAGE AND (RELEASE_CRASH_REPORTING OR NON_RELEASE_CRASH_REPORTING) AND VIE
       add_dependencies(generate_symbols ${VIEWER_BINARY_NAME})
     endif (WINDOWS)
     if (DARWIN)
-      # Have to run dsymutil first, then pack up the resulting .dSYM directory
-      add_custom_command(OUTPUT "${VIEWER_APP_DSYM}"
-        COMMAND "dsymutil"
-        ARGS
-          ${VIEWER_APP_EXE}
-        COMMENT "Generating ${VIEWER_APP_DSYM}"
-        )
-      add_custom_target(dsym_generate DEPENDS "${VIEWER_APP_DSYM}")
-      add_dependencies(dsym_generate ${VIEWER_BINARY_NAME})
       add_custom_command(OUTPUT "${VIEWER_SYMBOL_FILE}"
         # See above comments about "tar ...j"
         COMMAND "tar"
@@ -2475,7 +2460,7 @@ if (PACKAGE AND (RELEASE_CRASH_REPORTING OR NON_RELEASE_CRASH_REPORTING) AND VIE
         COMMENT "Packing dSYM into ${VIEWER_SYMBOL_FILE}"
         )
       add_custom_target(dsym_tarball DEPENDS "${VIEWER_SYMBOL_FILE}")
-      add_dependencies(dsym_tarball dsym_generate)
+      add_dependencies(dsym_tarball ${VIEWER_BINARY_NAME})
       add_custom_command(OUTPUT "${VIEWER_APP_XCARCHIVE}"
         COMMAND "zip"
         ARGS

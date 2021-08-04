@@ -1,4 +1,7 @@
-set(USE_SENTRY "Use the Sentry crash reporting system" OFF)
+option(USE_SENTRY "Use the Sentry crash reporting system" OFF)
+if (DEFINED ENV{USE_SENTRY})
+  set(USE_SENTRY $ENV{USE_SENTRY} CACHE BOOL "" FORCE)
+endif()
 
 if (USE_SENTRY)
     if (NOT USESYSTEMLIBS)
@@ -15,10 +18,14 @@ if (USE_SENTRY)
         find_package(Sentry REQUIRED)
     endif ()
 
-    if(DEFINED $ENV{SENTRY_DSN})
+    if(DEFINED ENV{SENTRY_DSN})
         set(SENTRY_DSN $ENV{SENTRY_DSN} CACHE STRING "Sentry DSN" FORCE)
     else()
         set(SENTRY_DSN "" CACHE STRING "Sentry DSN")
+    endif()
+
+    if(SENTRY_DSN STREQUAL "")
+        message(FATAL_ERROR "You must set a DSN url with -DSENTRY_DSN= to enable sentry")
     endif()
 
     set(SENTRY_INCLUDE_DIRS ${LIBS_PREBUILT_DIR}/include/sentry)

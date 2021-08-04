@@ -185,9 +185,6 @@ class ViewerManifest(LLManifest):
                             "Update Service":"https://app.alchemyviewer.org/update",
                             }
             # Only store this if it's both present and non-empty
-            bugsplat_db = self.args.get('bugsplat')
-            if bugsplat_db:
-                build_data_dict["BugSplat DB"] = bugsplat_db
             build_data_dict = self.finish_build_data_dict(build_data_dict)
             with open(os.path.join(os.pardir,'build_data.json'), 'w') as build_data_handle:
                 json.dump(build_data_dict,build_data_handle)
@@ -527,8 +524,8 @@ class WindowsManifest(ViewerManifest):
                 self.path("vivoxsdk.dll")
                 self.path("ortp.dll")
 
-            # BugSplat
-            if self.args.get('bugsplat'):
+            # Sentry
+            if self.args.get('sentry'):
                 if(self.address_size == 64):
                     self.path("BsSndRpt64.exe")
                     self.path("BugSplat64.dll")
@@ -835,19 +832,6 @@ class DarwinManifest(ViewerManifest):
         libdir = debpkgdir if self.args['configuration'].lower() == 'debug' else relpkgdir
 
         with self.prefix(src="", dst="Contents"):  # everything goes in Contents
-            bugsplat_db = self.args.get('bugsplat')
-            if bugsplat_db:
-                # Inject BugsplatServerURL into Info.plist if provided.
-                Info_plist = self.dst_path_of("Info.plist")
-                Info = plistlib.readPlist(Info_plist)
-                # https://www.bugsplat.com/docs/platforms/os-x#configuration
-                Info["BugsplatServerURL"] = \
-                    "https://{}.bugsplat.com/".format(bugsplat_db)
-                self.put_in_file(
-                    plistlib.writePlistToString(Info),
-                    os.path.basename(Info_plist),
-                    "Info.plist")
-
             # CEF framework goes inside Contents/Frameworks.
             # Remember where we parked this car.
             with self.prefix(src=libdir, dst="Frameworks"):
@@ -866,8 +850,8 @@ class DarwinManifest(ViewerManifest):
                                 ):
                     self.path(libfile)
 
-                if self.args.get('bugsplat'):
-                    self.path("BugsplatMac.framework")
+                if self.args.get('sentry'):
+                    self.path("Sentry.framework")
 
                 if self.args['openal'] == 'ON' or self.args['openal'] == 'TRUE':
                     for libfile in (
@@ -884,32 +868,6 @@ class DarwinManifest(ViewerManifest):
 
             with self.prefix(dst="MacOS"):
                 executable = self.dst_path_of(self.channel())
-                if self.args.get('bugsplat'):
-                    # According to Apple Technical Note TN2206:
-                    # https://developer.apple.com/library/archive/technotes/tn2206/_index.html#//apple_ref/doc/uid/DTS40007919-CH1-TNTAG207
-                    # "If an app uses @rpath or an absolute path to link to a
-                    # dynamic library outside of the app, the app will be
-                    # rejected by Gatekeeper. ... Neither the codesign nor the
-                    # spctl tool will show the error."
-                    # (Thanks, Apple. Maybe fix spctl to warn?)
-                    # The BugsplatMac framework embeds @rpath, which is
-                    # causing scary Gatekeeper popups at viewer start. Work
-                    # around this by changing the reference baked into our
-                    # viewer. The install_name_tool -change option needs the
-                    # previous value. Instead of guessing -- which might
-                    # silently be defeated by a BugSplat SDK update that
-                    # changes their baked-in @rpath -- ask for the path
-                    # stamped into the framework.
-                    # Let exception, if any, propagate -- if this doesn't
-                    # work, we need the build to noisily fail!
-                    oldpath = subprocess.check_output(
-                        ['objdump', '-macho', '-dylib-id', '-non-verbose',
-                         os.path.join(relpkgdir, "BugsplatMac.framework", "BugsplatMac")]
-                        ).splitlines()[-1]  # take the last line of output
-                    self.run_command(
-                        ['install_name_tool', '-change', oldpath,
-                         '@executable_path/../Frameworks/BugsplatMac.framework/BugsplatMac',
-                         executable])
 
                 # NOTE: the -S argument to strip causes it to keep
                 # enough info for annotated backtraces (i.e. function
@@ -1345,8 +1303,7 @@ if __name__ == "__main__":
            ' '.join((("'%s'" % arg) if ' ' in arg else arg) for arg in sys.argv)))
     # fmodstudio and openal can be used simultaneously and controled by environment
     extra_arguments = [
-        dict(name='bugsplat', description="""BugSplat database to which to post crashes,
-             if BugSplat crash reporting is desired""", default=''),
+        dict(name='sentry', description="""Enable Sentry crash report system""", default=''),
         dict(name='fmodstudio', description="""Indication if fmod studio libraries are needed""", default='OFF'),
         dict(name='openal', description="""Indication if openal libraries are needed""", default='OFF'),
         dict(name='kdu', description="""Indication if kdu libraries are needed""", default='OFF'),
