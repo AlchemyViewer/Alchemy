@@ -93,6 +93,11 @@ variables:
     - autobuild configure -c ReleaseOS -- -DUSE_FMODSTUDIO=ON -DUSE_NVAPI=ON -DUSE_LTO=ON -DDISABLE_FATAL_WARNINGS=ON -DREVISION_FROM_VCS=FALSE
     - autobuild build -c ReleaseOS --no-configure
     - autobuild graph -c ReleaseOS --graph-file alchemy-darwin${AUTOBUILD_ADDRSIZE}-dependencies.svg
+    - | 
+        if [ "$USE_SENTRY" = "TRUE" ] 
+        then 
+          sentry-cli difutil bundle-sources build-darwin-*/newview/Release/*.app.dSYM/Contents/Resources/DWARF/*
+        fi
   artifacts:
     name: "$env:CI_COMMIT_REF_NAME-$env:CI_COMMIT_SHORT_SHA"
     expire_in: 1 week
@@ -101,6 +106,7 @@ variables:
       - build-darwin-*/packages/lib/release/libalut*.dylib
       - build-darwin-*/packages/lib/release/libapr*.dylib
       - build-darwin-*/packages/lib/release/libepoxy*.dylib
+      - build-darwin-*/packages/lib/release/libfmod*.dylib
       - build-darwin-*/packages/lib/release/libGLOD*.dylib
       - build-darwin-*/packages/lib/release/libhunspell*.dylib
       - build-darwin-*/packages/lib/release/libndofdev*.dylib
@@ -113,6 +119,7 @@ variables:
       - build-darwin-*/newview/Alchemy_*.dmg
       - build-darwin-*/newview/Release/*.app/Contents/MacOS/*
       - build-darwin-*/newview/Release/*.dSYM
+      - build-darwin-*/newview/Release/*.src.zip
       - alchemy-*-dependencies.svg
 
 .linux_build:
@@ -343,7 +350,7 @@ build:release:windows64:
 
           If ($env:USE_SENTRY -eq 'TRUE') 
           {
-            sentry-cli upload-dif --include-sources newview/Release/
+            sentry-cli upload-dif newview/Release/
             sentry-cli upload-dif packages/
           }
         Pop-Location
