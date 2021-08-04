@@ -379,7 +379,7 @@ void LLApp::setupErrorHandling(bool second_instance)
 	// This sets a callback to handle w32 signals to the console window.
 	// The viewer shouldn't be affected, sicne its a windowed app.
 	SetConsoleCtrlHandler( (PHANDLER_ROUTINE) ConsoleCtrlHandler, TRUE);
-#endif // LL_SEND_CRASH_REPORTS && ! defined(LL_BUGSPLAT)
+#endif // LL_SEND_CRASH_REPORTS && ! defined(USE_SENTRY)
 #else  // ! LL_WINDOWS
 	//
 	// Start up signal handling.

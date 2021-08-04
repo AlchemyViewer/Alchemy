@@ -8,6 +8,7 @@ if (USE_SENTRY)
         include(Prebuilt)
         use_prebuilt_binary(sentry)
         if (WINDOWS)
+            set(SENTRY_LIBRARIES ${ARCH_PREBUILT_DIRS_RELEASE}/sentry.lib)
         elseif (DARWIN)
             find_library(SENTRY_LIBRARIES Sentry REQUIRED
                 NO_DEFAULT_PATH PATHS "${ARCH_PREBUILT_DIRS_RELEASE}")

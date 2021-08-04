@@ -66,6 +66,7 @@ private:
 
 	std::string mCmdLine;
 	bool mIsConsoleAllocated;
+	bool mSentryInitialized = false;
 };
 
 #endif // LL_LLAPPVIEWERWIN32_H

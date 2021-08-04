@@ -526,14 +526,9 @@ class WindowsManifest(ViewerManifest):
 
             # Sentry
             if self.args.get('sentry'):
-                if(self.address_size == 64):
-                    self.path("BsSndRpt64.exe")
-                    self.path("BugSplat64.dll")
-                    self.path("BugSplatRc64.dll")
-                else:
-                    self.path("BsSndRpt.exe")
-                    self.path("BugSplat.dll")
-                    self.path("BugSplatRc.dll")
+                self.path("sentry.dll")
+                with self.prefix(src=os.path.join(pkgdir, 'bin', 'release')):
+                    self.path("crashpad_handler.exe")
 
         self.path(src="licenses-win32.txt", dst="licenses.txt")
         self.path("featuretable.txt")

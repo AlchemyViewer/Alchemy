@@ -1800,12 +1800,11 @@ endif (SDL_FOUND)
 if (USE_SENTRY)
   set_property(TARGET ${VIEWER_BINARY_NAME}
     PROPERTY COMPILE_DEFINITIONS "${SENTRY_DEFINE}")
-  if (USE_SENTRY)
-    list(APPEND viewer_LIBRARIES
-      ${SENTRY_LIBRARIES}
-      )
-  endif ()
-endif (USE_SENTRY)
+
+  list(APPEND viewer_LIBRARIES
+       ${SENTRY_LIBRARIES}
+       )
+endif ()
 
 # add package files
 file(GLOB EVENT_HOST_SCRIPT_GLOB_LIST

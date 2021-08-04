@@ -2406,14 +2406,42 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>0efba1738965eae8ec392d010e884b3f37d5c1cc803d367c5090909665e087569a39dcc06839dd92d45c7b47ac8afd61</string>
+              <string>049580d94fa2c339dfaf265a578752e60c34983b9afc60c590043e7842287ee28e62ccdf1164e75a0071b89bb34ce1af</string>
               <key>hash_algorithm</key>
               <string>sha3_384</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/164/packages/generic/sentry/1.0.0.1060/sentry-1.0.0-darwin64-1060.tar.xz</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/164/packages/generic/sentry/1.0.0.1063/sentry-1.0.0-darwin64-1063.tar.xz</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
+          </map>
+          <key>windows</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>hash</key>
+              <string>d9b6c40dc8a1ce39d7cbced6e06b66cba181c42c610329e75b1c86ccc7d2072eae882e8c7c8e2331f4487cc6c47823da</string>
+              <key>hash_algorithm</key>
+              <string>sha3_384</string>
+              <key>url</key>
+              <string>https://git.alchemyviewer.org/api/v4/projects/164/packages/generic/sentry/1.0.0.1063/sentry-1.0.0-windows-1063.tar.xz</string>
+            </map>
+            <key>name</key>
+            <string>windows</string>
+          </map>
+          <key>windows64</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>hash</key>
+              <string>954d9a589400a6fec4ded233b592c9c52f54765800af7070a83a3dbb18b60b09103efe15ddaf72916939ff34735bdcaa</string>
+              <key>hash_algorithm</key>
+              <string>sha3_384</string>
+              <key>url</key>
+              <string>https://git.alchemyviewer.org/api/v4/projects/164/packages/generic/sentry/1.0.0.1063/sentry-1.0.0-windows64-1063.tar.xz</string>
+            </map>
+            <key>name</key>
+            <string>windows64</string>
           </map>
         </map>
         <key>version</key>
