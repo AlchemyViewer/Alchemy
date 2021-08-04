@@ -24,7 +24,6 @@ if (NOT CMAKE_BUILD_TYPE)
 endif (NOT CMAKE_BUILD_TYPE)
 
 include(Variables)
-include(bugsplat)
 include(BuildVersion)
 
 set(LEGACY_STDIO_LIBS)

@@ -1,7 +1,7 @@
 # -*- cmake -*-
 include(00-Common)
 include(LLTestCommand)
-include(bugsplat)
+include(Sentry)
 include(Tut)
 
 #*****************************************************************************
@@ -84,10 +84,10 @@ MACRO(LL_ADD_PROJECT_UNIT_TESTS project sources)
       MESSAGE("LL_ADD_PROJECT_UNIT_TESTS ${name}_test_SOURCE_FILES ${${name}_test_SOURCE_FILES}")
     ENDIF(LL_TEST_VERBOSE)
 
-    if (USE_BUGSPLAT)
+    if (USE_SENTRY)
       SET_PROPERTY(SOURCE ${${name}_test_SOURCE_FILES}
-          APPEND PROPERTY COMPILE_DEFINITIONS "${BUGSPLAT_DEFINE}")
-    endif (USE_BUGSPLAT)
+          APPEND PROPERTY COMPILE_DEFINITIONS "${SENTRY_DEFINE}")
+    endif (USE_SENTRY)
 
     # Headers
     GET_OPT_SOURCE_FILE_PROPERTY(${name}_test_additional_HEADER_FILES ${source} LL_TEST_ADDITIONAL_HEADER_FILES)
@@ -232,10 +232,10 @@ FUNCTION(LL_ADD_INTEGRATION_TEST
     SET_TARGET_PROPERTIES(INTEGRATION_TEST_${testname} PROPERTIES COMPILE_FLAGS -I"${TUT_INCLUDE_DIR}")
   endif(USESYSTEMLIBS)
 
-  if (USE_BUGSPLAT)
+  if (USE_SENTRY)
       SET_PROPERTY(SOURCE ${source_files}
-          APPEND PROPERTY COMPILE_DEFINITIONS "${BUGSPLAT_DEFINE}")
-  endif (USE_BUGSPLAT)
+          APPEND PROPERTY COMPILE_DEFINITIONS "${SENTRY_DEFINE}")
+  endif (USE_SENTRY)
 
   # The following was copied to llcorehttp/CMakeLists.txt's texture_load target. 
   # Any changes made here should be replicated there.

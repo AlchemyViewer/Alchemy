@@ -739,14 +739,10 @@ LLAppViewer::LLAppViewer()
 	// from the previous viewer run between this constructor call and the
 	// init() call, which will overwrite the static_debug_info.log file for
 	// THIS run. So setDebugFileNames() early.
-#   ifdef LL_BUGSPLAT
+
 	// MAINT-8917: don't create a dump directory just for the
 	// static_debug_info.log file
 	std::string logdir = gDirUtilp->getExpandedFilename(LL_PATH_LOGS, "");
-#   else // ! LL_BUGSPLAT
-	// write Google Breakpad minidump files to a per-run dump directory to avoid multiple viewer issues.
-	std::string logdir = gDirUtilp->getExpandedFilename(LL_PATH_DUMP, "");
-#   endif // ! LL_BUGSPLAT
 	setDebugFileNames(logdir);
 }
 
@@ -3479,18 +3475,9 @@ void LLAppViewer::writeSystemInfo()
 	gDebugInfo["MainloopThreadID"] = (S32)thread_id;
 #endif
 
-#ifndef LL_BUGSPLAT
-	// "CrashNotHandled" is set here, while things are running well,
-	// in case of a freeze. If there is a freeze, the crash logger will be launched
-	// and can read this value from the debug_info.log.
-	// If the crash is handled by LLAppViewer::handleViewerCrash, ie not a freeze,
-	// then the value of "CrashNotHandled" will be set to true.
-	gDebugInfo["CrashNotHandled"] = LLSD::Boolean(true);
-#else // LL_BUGSPLAT
 	// "CrashNotHandled" is obsolete; it used (not very successsfully)
     // to try to distinguish crashes from freezes - the intent here to to avoid calling it a freeze
 	gDebugInfo["CrashNotHandled"] = LLSD::Boolean(false);
-#endif // ! LL_BUGSPLAT
 
 	// Insert crash host url (url to post crash log to) if configured. This insures
 	// that the crash report will go to the proper location in the case of a

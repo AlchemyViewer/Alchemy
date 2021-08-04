@@ -311,18 +311,22 @@ bool LLAppViewerMacOSX::restoreErrorTrap()
 #define SET_SIG(SIGNAL) sigaction(SIGNAL, &act, &old_act); \
                         if(act.sa_sigaction != old_act.sa_sigaction) ++reset_count;
 	// Synchronous signals
-#   ifndef LL_BUGSPLAT
+#if !defined(USE_SENTRY)
 	SET_SIG(SIGABRT) // let bugsplat catch this
-#   endif        
+#endif
 	SET_SIG(SIGALRM)
+#if !defined(USE_SENTRY)
 	SET_SIG(SIGBUS)
 	SET_SIG(SIGFPE)
-	SET_SIG(SIGHUP) 
+#endif
+	SET_SIG(SIGHUP)
+#if !defined(USE_SENTRY)
 	SET_SIG(SIGILL)
 	SET_SIG(SIGPIPE)
 	SET_SIG(SIGSEGV)
 	SET_SIG(SIGSYS)
-	
+#endif
+    
 	SET_SIG(LL_HEARTBEAT_SIGNAL)
 	SET_SIG(LL_SMACKDOWN_SIGNAL)
 	
@@ -344,8 +348,8 @@ bool LLAppViewerMacOSX::restoreErrorTrap()
 
 void LLAppViewerMacOSX::initCrashReporting(bool reportFreeze)
 {
-#if defined LL_BUGSPLAT
-    LL_DEBUGS("InitOSX", "Bugsplat") << "using BugSplat crash logger" << LL_ENDL;
+#if defined(USE_SENTRY)
+    LL_DEBUGS("InitOSX", "Sentry") << "using Sentry crash logger" << LL_ENDL;
 #else
     LL_DEBUGS("InitOSX") << "No crash logger enabled" << LL_ENDL;    
 #endif // ! LL_BUGSPLAT

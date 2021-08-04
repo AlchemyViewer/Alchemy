@@ -25,16 +25,12 @@
  */
 
 #import "llappdelegate-objc.h"
-#if defined(LL_BUGSPLAT)
-#include <boost/filesystem.hpp>
-#include <vector>
-@import BugsplatMac;
-// derived from BugsplatMac's BugsplatTester/AppDelegate.m
-@interface LLAppDelegate () <BugsplatStartupManagerDelegate>
-@end
+#if defined(USE_SENTRY)
+#import "Sentry.h"
 #endif
 #include "llwindowmacosx-objc.h"
 #include "llappviewermacosx-for-objc.h"
+#include "llviewerbuildconfig.h"
 #include <Carbon/Carbon.h> // Used for Text Input Services ("Safe" API - it's supported)
 
 @implementation LLAppDelegate
@@ -60,18 +56,15 @@
 	// initialized, "played back" into whatever handlers have been set up.
 	constructViewer();
 
-#if defined(LL_BUGSPLAT)
-    infos("bugsplat setup");
-	// Engage BugsplatStartupManager *before* calling initViewer() to handle
-	// any crashes during initialization.
-	// https://www.bugsplat.com/docs/platforms/os-x#initialization
-	[BugsplatStartupManager sharedManager].autoSubmitCrashReport = YES;
-	[BugsplatStartupManager sharedManager].askUserDetails = NO;
-	[BugsplatStartupManager sharedManager].delegate = self;
-	[[BugsplatStartupManager sharedManager] start];
+#if defined(USE_SENTRY)
+    [SentrySDK startWithConfigureOptions:^(SentryOptions *options) {
+        options.dsn = @SENTRY_DSN;
+        options.debug = YES; // Enabled debug when first installing is always helpful
+        options.releaseName = @LL_VIEWER_CHANNEL_AND_VERSION;
+        options.enableOutOfMemoryTracking = NO;
+    }];
 #endif
-    infos("post-bugsplat setup");
-
+    
 	frameTimer = nil;
 
 	[self languageUpdated];

@@ -87,6 +87,8 @@ if(NOT DEFINED VIEWER_SHORT_VERSION) # will be true in indra/, false in indra/ne
         message(STATUS "Ultimate fallback, revision was blank or not set: will use 0")
         set(VIEWER_VERSION_REVISION 0)
     endif("${VIEWER_VERSION_REVISION}" STREQUAL "")
+
+    set(VIEWER_VERSION_AND_CHANNEL "${VIEWER_CHANNEL} ${VIEWER_SHORT_VERSION}.${VIEWER_VERSION_REVISION}")
 endif(NOT DEFINED VIEWER_SHORT_VERSION)
 
 if (NOT DEFINED VIEWER_COMMIT_LONG_SHA)

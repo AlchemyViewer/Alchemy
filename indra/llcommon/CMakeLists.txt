@@ -5,10 +5,10 @@ project(llcommon)
 include(00-Common)
 include(LLCommon)
 include(LLMath)
-include(bugsplat)
 include(Linking)
 include(Abseil)
 include(Boost)
+include(Sentry)
 include(LLSharedLibs)
 include(Copy3rdPartyLibs)
 include(ZLIB)
@@ -269,10 +269,10 @@ endif (DARWIN)
 set_source_files_properties(${llcommon_HEADER_FILES}
                             PROPERTIES HEADER_FILE_ONLY TRUE)
 
-if (USE_BUGSPLAT)
+if (USE_SENTRY)
   set_source_files_properties(${llcommon_SOURCE_FILES}
-    PROPERTIES COMPILE_DEFINITIONS "${BUGSPLAT_DEFINE}")
-endif (USE_BUGSPLAT)
+    PROPERTIES COMPILE_DEFINITIONS "${SENTRY_DEFINE}")
+endif (USE_SENTRY)
 
 list(APPEND llcommon_SOURCE_FILES ${llcommon_HEADER_FILES})
 

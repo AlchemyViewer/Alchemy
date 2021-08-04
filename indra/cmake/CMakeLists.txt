@@ -11,7 +11,6 @@ set(cmake_SOURCE_FILES
     APR.cmake
     Audio.cmake
     Boost.cmake
-    bugsplat.cmake
     BuildVersion.cmake
     CEFPlugin.cmake
     CEFPlugin.cmake
@@ -76,6 +75,7 @@ set(cmake_SOURCE_FILES
     PulseAudio.cmake
     Python.cmake
     SDL2.cmake
+    Sentry.cmake
     TemplateCheck.cmake
     Tut.cmake
     UI.cmake

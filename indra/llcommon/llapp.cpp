@@ -371,9 +371,9 @@ void LLApp::setupErrorHandling(bool second_instance)
 	// Error handling is done by starting up an error handling thread, which just sleeps and
 	// occasionally checks to see if the app is in an error state, and sees if it needs to be run.
 
-#if LL_WINDOWS
+#if defined(LL_WINDOWS)
 
-#if LL_SEND_CRASH_REPORTS && ! defined(LL_BUGSPLAT)
+#if LL_SEND_CRASH_REPORTS && ! defined(USE_SENTRY)
 	EnableCrashingOnCrashes();
 
 	// This sets a callback to handle w32 signals to the console window.
@@ -381,13 +381,6 @@ void LLApp::setupErrorHandling(bool second_instance)
 	SetConsoleCtrlHandler( (PHANDLER_ROUTINE) ConsoleCtrlHandler, TRUE);
 #endif // LL_SEND_CRASH_REPORTS && ! defined(LL_BUGSPLAT)
 #else  // ! LL_WINDOWS
-
-#if defined(LL_BUGSPLAT)
-	// Don't install our own signal handlers -- BugSplat needs to hook them,
-	// or it's completely ineffectual.
-	bool installHandler = false;
-
-#else // ! LL_BUGSPLAT
 	//
 	// Start up signal handling.
 	//
@@ -395,58 +388,11 @@ void LLApp::setupErrorHandling(bool second_instance)
 	// thread, asynchronous signals can be delivered to any thread (in theory)
 	//
 	setup_signals();
-
-	// Add google breakpad exception handler configured for Darwin/Linux.
-#endif // ! LL_BUGSPLAT
-
-#if LL_DARWIN
-
-	bool installHandler = true;
-	// For the special case of Darwin, we do not want to install the handler if
-	// the process is being debugged as the app will exit with value ABRT (6) if
-	// we do.  Unfortunately, the code below which performs that test relies on
-	// the structure kinfo_proc which has been tagged by apple as an unstable
-	// API.  We disable this test for shipping versions to avoid conflicts with
-	// future releases of Darwin.  This test is really only needed for developers
-	// starting the app from a debugger anyway.
-	#ifndef LL_RELEASE_FOR_DOWNLOAD
-    int mib[4];
-	mib[0] = CTL_KERN;
-	mib[1] = KERN_PROC;
-	mib[2] = KERN_PROC_PID;
-	mib[3] = getpid();
-	
-	struct kinfo_proc info;
-	memset(&info, 0, sizeof(info));
-	
-	size_t size = sizeof(info);
-	int result = sysctl(mib, sizeof(mib) / sizeof(*mib), &info, &size, NULL, 0);
-	if((result == 0) || (errno == ENOMEM))
-	{
-		// P_TRACED flag is set, so this process is being debugged; do not install
-		// the handler
-		if(info.kp_proc.p_flag & P_TRACED) installHandler = false;
-	}
-	else
-	{
-		// Failed to discover if the process is being debugged; default to
-		// installing the handler.
-		installHandler = true;
-	}
-	#endif // ! LL_RELEASE_FOR_DOWNLOAD
-
-	if(installHandler)
-	{
-	}
-#elif LL_LINUX
-
-#endif // LL_LINUX
-
 #endif // ! LL_WINDOWS
 
-#ifdef LL_BUGSPLAT
+#if defined(USE_SENTRY)
     // do not start our own error thread
-#else // ! LL_BUGSPLAT
+#else // ! USE_SENTRY
 	startErrorThread();
 #endif
 }
@@ -690,17 +636,21 @@ void setup_signals()
 	act.sa_flags = SA_SIGINFO;
 
 	// Synchronous signals
-#   ifndef LL_BUGSPLAT
+#if !defined(USE_SENTRY)
 	sigaction(SIGABRT, &act, NULL);
-#   endif
+#endif
 	sigaction(SIGALRM, &act, NULL);
+#if !defined(USE_SENTRY)
 	sigaction(SIGBUS, &act, NULL);
 	sigaction(SIGFPE, &act, NULL);
-	sigaction(SIGHUP, &act, NULL); 
+#endif
+	sigaction(SIGHUP, &act, NULL);
+#if !defined(USE_SENTRY)
 	sigaction(SIGILL, &act, NULL);
 	sigaction(SIGPIPE, &act, NULL);
 	sigaction(SIGSEGV, &act, NULL);
 	sigaction(SIGSYS, &act, NULL);
+#endif
 
 	sigaction(LL_HEARTBEAT_SIGNAL, &act, NULL);
 	sigaction(LL_SMACKDOWN_SIGNAL, &act, NULL);
@@ -729,17 +679,21 @@ void clear_signals()
 	act.sa_flags = SA_SIGINFO;
 
 	// Synchronous signals
-#   ifndef LL_BUGSPLAT
+#if !defined(USE_SENTRY)
 	sigaction(SIGABRT, &act, NULL);
-#   endif
+#endif
 	sigaction(SIGALRM, &act, NULL);
+#if !defined(USE_SENTRY)
 	sigaction(SIGBUS, &act, NULL);
 	sigaction(SIGFPE, &act, NULL);
-	sigaction(SIGHUP, &act, NULL); 
+#endif
+	sigaction(SIGHUP, &act, NULL);
+#if !defined(USE_SENTRY)
 	sigaction(SIGILL, &act, NULL);
 	sigaction(SIGPIPE, &act, NULL);
 	sigaction(SIGSEGV, &act, NULL);
 	sigaction(SIGSYS, &act, NULL);
+#endif
 
 	sigaction(LL_HEARTBEAT_SIGNAL, &act, NULL);
 	sigaction(LL_SMACKDOWN_SIGNAL, &act, NULL);

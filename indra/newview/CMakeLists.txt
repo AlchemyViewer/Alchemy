@@ -9,7 +9,6 @@ include(Linking)
 
 include(Abseil)
 include(Boost)
-include(bugsplat)
 include(BuildPackagesInfo)
 include(BuildVersion)
 include(CMakeCopyIfDifferent)
@@ -47,6 +46,7 @@ include(OPENAL)
 include(OpenGL)
 include(OpenSSL)
 include(PNG)
+include(Sentry)
 include(TemplateCheck)
 include(UI)
 include(UnixInstall)
@@ -108,11 +108,11 @@ include_directories(SYSTEM
     ${LLPHYSICSEXTENSIONS_INCLUDE_DIRS}
     )
 
-if (USE_BUGSPLAT)
+if (USE_SENTRY)
   include_directories(AFTER
-    ${BUGSPLAT_INCLUDE_DIR}
+    ${SENTRY_INCLUDE_DIRS}
     )
-endif (USE_BUGSPLAT)
+endif (USE_SENTRY)
 
 set(viewer_SOURCE_FILES
     alcinematicmode.cpp
@@ -1510,12 +1510,6 @@ if (DARWIN)
     ${COREAUDIO_LIBRARY}
     )
 
-  if (USE_BUGSPLAT)
-    list(APPEND viewer_LIBRARIES
-      ${BUGSPLAT_LIBRARIES}
-      )
-  endif (USE_BUGSPLAT)
-
   # Add resource files to the project.
   set(viewer_RESOURCE_FILES
     macview.r
@@ -1809,10 +1803,15 @@ if (SDL_FOUND)
     )
 endif (SDL_FOUND)
 
-if (USE_BUGSPLAT)
+if (USE_SENTRY)
   set_property(TARGET ${VIEWER_BINARY_NAME}
-    PROPERTY COMPILE_DEFINITIONS "${BUGSPLAT_DEFINE}")
-endif (USE_BUGSPLAT)
+    PROPERTY COMPILE_DEFINITIONS "${SENTRY_DEFINE}")
+  if (USE_SENTRY)
+    list(APPEND viewer_LIBRARIES
+      ${SENTRY_LIBRARIES}
+      )
+  endif ()
+endif (USE_SENTRY)
 
 # add package files
 file(GLOB EVENT_HOST_SCRIPT_GLOB_LIST
@@ -2157,12 +2156,6 @@ target_link_libraries(${VIEWER_BINARY_NAME}
     nlohmann_json::nlohmann_json
     fmt::fmt
     )
-
-if (USE_BUGSPLAT)
-  target_link_libraries(${VIEWER_BINARY_NAME}
-    ${BUGSPLAT_LIBRARIES}
-    )
-endif (USE_BUGSPLAT)
 
 set(ARTWORK_DIR ${CMAKE_CURRENT_SOURCE_DIR} CACHE PATH
     "Path to artwork files.")

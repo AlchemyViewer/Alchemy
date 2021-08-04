@@ -3,6 +3,7 @@
 project (lltest)
 
 include(00-Common)
+include(Sentry)
 include(LLCommon)
 include(LLCoreHttp)
 include(LLInventory)
@@ -13,7 +14,7 @@ include(LLXML)
 include(Linking)
 include(Tut)
 include(LLAddBuildTest)
-include(bugsplat)
+
 include_directories(
     ${LLCOMMON_INCLUDE_DIRS}
     ${LLCOREHTTP_INCLUDE_DIRS}
@@ -80,9 +81,9 @@ list(APPEND test_SOURCE_FILES ${test_HEADER_FILES})
 
 add_executable(lltest ${test_SOURCE_FILES})
 
-if (USE_BUGSPLAT)
-  set_target_properties(lltest PROPERTIES COMPILE_DEFINITIONS "${BUGSPLAT_DEFINE}")
-endif (USE_BUGSPLAT)
+if (USE_SENTRY)
+  set_target_properties(lltest PROPERTIES COMPILE_DEFINITIONS "${SENTRY_DEFINE}")
+endif (USE_SENTRY)
 
 target_link_libraries(lltest
     ${LEGACY_STDIO_LIBS}
