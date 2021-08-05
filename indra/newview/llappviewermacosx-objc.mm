@@ -33,6 +33,20 @@
 
 #include "llappviewermacosx-objc.h"
 
+#if defined(USE_SENTRY)
+#import "Sentry.h"
+#endif
+
+void setCrashUserMetadataWrapper(const std::string& userid, const std::string& username)
+{
+#if defined(USE_SENTRY)
+    SentryUser *user = [[SentryUser alloc] init];
+    user.userId = @(userid.c_str());
+    user.username = @(username.c_str());
+    [SentrySDK setUser:user];
+#endif
+}
+
 void launchApplication(const std::string* app_name, const std::vector<std::string>* args)
 {
     @autoreleasepool

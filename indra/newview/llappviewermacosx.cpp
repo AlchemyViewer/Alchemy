@@ -227,6 +227,11 @@ bool LLAppViewerMacOSX::init()
     return success;
 }
 
+void LLAppViewerMacOSX::setCrashUserMetadata(const LLUUID& user_id, const std::string& avatar_name)
+{
+    setCrashUserMetadataWrapper(user_id.asString(), avatar_name);
+}
+
 // MacOSX may add and addition command line arguement for the process serial number.
 // The option takes a form like '-psn_0_12345'. The following method should be able to recognize
 // and either ignore or return a pair of values for the option.
