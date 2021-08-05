@@ -651,8 +651,10 @@ void LLPipeline::cleanup()
 {
 	assertInitialized();
 
-	mGroupQ1.clear() ;
-	mGroupQ2.clear() ;
+	mGroupQ1.clear();
+	mGroupQ2.clear();
+    mGroupSaveQ1.clear();
+    mMeshDirtyGroup.clear();
 
 	for(pool_set_t::iterator iter = mPools.begin();
 		iter != mPools.end(); )
