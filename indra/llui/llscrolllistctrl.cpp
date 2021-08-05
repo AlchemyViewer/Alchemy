@@ -265,10 +265,15 @@ LLScrollListCtrl::LLScrollListCtrl(const LLScrollListCtrl::Params& p)
 		mBorder->reshape(getRect().getWidth(), getRect().getHeight());
 	}
 
-	if (p.sort_column >= 0)
-	{
-		sortByColumnIndex(p.sort_column, p.sort_ascending);
-	}
+	LLTextBox::Params text_p;
+	text_p.name("comment_text");
+	text_p.border_visible(false);
+	text_p.rect(mItemListRect);
+	text_p.follows.flags(FOLLOWS_ALL);
+	// word wrap was added accroding to the EXT-6841
+	text_p.wrap(true);
+	addChild(LLUICtrlFactory::create<LLTextBox>(text_p));
+
 
 	
 	for (LLInitParam::ParamIterator<LLScrollListColumn::Params>::const_iterator row_it = p.contents.columns.begin();
@@ -278,6 +283,11 @@ LLScrollListCtrl::LLScrollListCtrl(const LLScrollListCtrl::Params& p)
 		addColumn(*row_it);
 	}
 
+	if (p.sort_column >= 0)
+	{
+		sortByColumnIndex(p.sort_column, p.sort_ascending);
+	}
+
 	for (LLInitParam::ParamIterator<LLScrollListItem::Params>::const_iterator row_it = p.contents.rows.begin();
 		row_it != p.contents.rows.end();
 		++row_it)
@@ -285,14 +295,6 @@ LLScrollListCtrl::LLScrollListCtrl(const LLScrollListCtrl::Params& p)
 		addRow(*row_it);
 	}
 
-	LLTextBox::Params text_p;
-	text_p.name("comment_text");
-	text_p.border_visible(false);
-	text_p.rect(mItemListRect);
-	text_p.follows.flags(FOLLOWS_ALL);
-	// word wrap was added accroding to the EXT-6841
-	text_p.wrap(true);
-	addChild(LLUICtrlFactory::create<LLTextBox>(text_p));
 }
 
 S32 LLScrollListCtrl::getSearchColumn()
@@ -1637,7 +1639,10 @@ void LLScrollListCtrl::draw()
 
 	updateColumns();
 
-	getChildView("comment_text")->setVisible(mItemList.empty());
+	if (mCommentTextView)
+	{
+		mCommentTextView->setVisible(mItemList.empty());
+	}
 
 	drawItems();
 
