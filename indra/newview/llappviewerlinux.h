@@ -44,11 +44,11 @@ extern "C" {
 
 class LLCommandLineParser;
 
-class LLAppViewerLinux : public LLAppViewer
+class LLAppViewerLinux final : public LLAppViewer
 {
 public:
 	LLAppViewerLinux();
-	virtual ~LLAppViewerLinux();
+	~LLAppViewerLinux() override;
 
 	//
 	// Main application logic
@@ -57,17 +57,19 @@ public:
 	std::string generateSerialNumber();
 	bool setupSLURLHandler();
 
+	void setCrashUserMetadata(const LLUUID& user_id, const std::string& avatar_name) override;
+
 protected:
-	virtual bool beingDebugged();
+	bool beingDebugged() override;
 	
-	virtual bool restoreErrorTrap();
-	virtual void initCrashReporting(bool reportFreeze);
+	bool restoreErrorTrap() override;
+	void initCrashReporting(bool reportFreeze) override;
 
-	virtual void initLoggingAndGetLastDuration();
-	virtual bool initParseCommandLine(LLCommandLineParser& clp);
+	void initLoggingAndGetLastDuration() override;
+	bool initParseCommandLine(LLCommandLineParser& clp) override;
 
-	virtual bool initSLURLHandler();
-	virtual bool sendURLToOtherInstance(const std::string& url);
+	bool initSLURLHandler() override;
+	bool sendURLToOtherInstance(const std::string& url) override;
 private:
 	bool mSentryInitialized;
 };
