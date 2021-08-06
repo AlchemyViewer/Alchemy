@@ -2406,25 +2406,39 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>049580d94fa2c339dfaf265a578752e60c34983b9afc60c590043e7842287ee28e62ccdf1164e75a0071b89bb34ce1af</string>
+              <string>48653eb806b5601f145a5fe4ab8ab4f61de0539fbfb21dbcb8440e4f81a8796e5c7a77063db46da16b7cc35048ab078a</string>
               <key>hash_algorithm</key>
               <string>sha3_384</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/164/packages/generic/sentry/1.0.0.1063/sentry-1.0.0-darwin64-1063.tar.xz</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/164/packages/generic/sentry/1.0.0.1067/sentry-1.0.0-darwin64-1067.tar.xz</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
+          </map>
+          <key>linux64</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>hash</key>
+              <string>0e625d628162109e0c51cf063e02604b48cc5f22196514a8666573b63bf52130ad292e9a45c1edbaa988a64b087fce1f</string>
+              <key>hash_algorithm</key>
+              <string>sha3_384</string>
+              <key>url</key>
+              <string>https://git.alchemyviewer.org/api/v4/projects/164/packages/generic/sentry/1.0.0.1067/sentry-1.0.0-linux64-1067.tar.xz</string>
+            </map>
+            <key>name</key>
+            <string>linux64</string>
           </map>
           <key>windows</key>
           <map>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>d9b6c40dc8a1ce39d7cbced6e06b66cba181c42c610329e75b1c86ccc7d2072eae882e8c7c8e2331f4487cc6c47823da</string>
+              <string>614da9c8e34762a1827f91ac08a411f43da3cf8e3e96e6495f995277eebf55b5eaf3d755ef9666e3fe2c926a6d5de1cd</string>
               <key>hash_algorithm</key>
               <string>sha3_384</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/164/packages/generic/sentry/1.0.0.1063/sentry-1.0.0-windows-1063.tar.xz</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/164/packages/generic/sentry/1.0.0.1067/sentry-1.0.0-windows-1067.tar.xz</string>
             </map>
             <key>name</key>
             <string>windows</string>
@@ -2434,11 +2448,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>954d9a589400a6fec4ded233b592c9c52f54765800af7070a83a3dbb18b60b09103efe15ddaf72916939ff34735bdcaa</string>
+              <string>fc9b04b5d2981d50e3f2b6062e61163244d229c9113f0cbc044db8d2b1e42f44af7e639840aa8505a6f6bac766f7d856</string>
               <key>hash_algorithm</key>
               <string>sha3_384</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/164/packages/generic/sentry/1.0.0.1063/sentry-1.0.0-windows64-1063.tar.xz</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/164/packages/generic/sentry/1.0.0.1067/sentry-1.0.0-windows64-1067.tar.xz</string>
             </map>
             <key>name</key>
             <string>windows64</string>
