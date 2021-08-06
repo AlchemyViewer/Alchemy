@@ -40,6 +40,12 @@
 
 #include <exception>
 
+// Sentry (https://sentry.io) crash reporting tool
+#if defined(USE_SENTRY)
+#include <sentry.h>
+#include "llviewerbuildconfig.h"
+#endif
+
 #if LL_DBUS_ENABLED
 # include "llappviewerlinux_api_dbus.h"
 
@@ -105,6 +111,11 @@ int main( int argc, char **argv )
 	}
 	delete viewer_app_ptr;
 	viewer_app_ptr = NULL;
+
+#if defined(USE_SENTRY)
+	sentry_close();
+#endif
+
 	return 0;
 }
 
@@ -125,16 +136,11 @@ bool LLAppViewerLinux::init()
 	// really early in app startup!
 	if (!g_thread_supported ()) g_thread_init (NULL);
 #endif
-	
-	bool success = LLAppViewer::init();
 
-#if LL_SEND_CRASH_REPORTS
-    if (success)
-    {
-        LLAppViewer* pApp = LLAppViewer::instance();
-        pApp->initCrashReporting();
-    }
-#endif
+    LLAppViewer* pApp = LLAppViewer::instance();
+    pApp->initCrashReporting();
+
+	bool success = LLAppViewer::init();
 
 	return success;
 }
@@ -334,6 +340,24 @@ bool LLAppViewerLinux::sendURLToOtherInstance(const std::string& url)
 
 void LLAppViewerLinux::initCrashReporting(bool reportFreeze)
 {
+#if defined(USE_SENTRY)
+	sentry_options_t* options = sentry_options_new();
+	sentry_options_set_dsn(options, SENTRY_DSN);
+	sentry_options_set_release(options, LL_VIEWER_CHANNEL_AND_VERSION);
+
+	std::string database_path = gDirUtilp->getExpandedFilename(LL_PATH_LOGS, "sentry");
+	sentry_options_set_database_path(options, database_path);
+
+	mSentryInitialized = (sentry_init(options) == 0);
+	if (mSentryInitialized)
+	{
+		LL_INFOS() << "Successfully initialized Sentry" << LL_ENDL;
+	}
+	else
+	{
+		LL_WARNS() << "Failed to initialize Sentry" << LL_ENDL;
+	}
+#endif
 }
 
 bool LLAppViewerLinux::beingDebugged()
@@ -378,13 +402,6 @@ bool LLAppViewerLinux::beingDebugged()
 
 void LLAppViewerLinux::initLoggingAndGetLastDuration()
 {
-	// Remove the last stack trace, if any
-	// This file is no longer created, since the move to Google Breakpad
-	// The code is left here to clean out any old state in the log dir
-	std::string old_stack_file =
-		gDirUtilp->getExpandedFilename(LL_PATH_LOGS,"stack_trace.log");
-	LLFile::remove(old_stack_file);
-
 	LLAppViewer::initLoggingAndGetLastDuration();
 }
 

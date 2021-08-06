@@ -13,7 +13,9 @@ if (USE_SENTRY)
             find_library(SENTRY_LIBRARIES Sentry REQUIRED
                 NO_DEFAULT_PATH PATHS "${ARCH_PREBUILT_DIRS_RELEASE}")
         else ()
-            message(FATAL_ERROR "Sentry is not supported; add -DUSE_SENTRY=OFF")
+            set(SENTRY_LIBRARIES 
+                ${ARCH_PREBUILT_DIRS_RELEASE}/libsentry.a
+                ${ARCH_PREBUILT_DIRS_RELEASE}/libbreakpad_client.a)
         endif ()
     else ()
         find_package(Sentry REQUIRED)
