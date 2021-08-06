@@ -149,10 +149,10 @@ variables:
     - autobuild build -c ReleaseOS --no-configure
     - autobuild graph -c ReleaseOS --graph-file alchemy-linuxs${AUTOBUILD_ADDRSIZE}-dependencies.svg
     - |
-        If ($env:USE_SENTRY -eq 'TRUE') 
-        {
+        if [ "$USE_SENTRY" = "TRUE" ] 
+        then
           sentry-cli difutil bundle-sources build-linux-*/newview/alchemy-bin.debug
-        }
+        fi
   artifacts:
     name: "$env:CI_COMMIT_REF_NAME-$env:CI_COMMIT_SHORT_SHA"
     expire_in: 1 week
