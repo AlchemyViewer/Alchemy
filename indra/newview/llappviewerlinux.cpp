@@ -346,7 +346,7 @@ void LLAppViewerLinux::initCrashReporting(bool reportFreeze)
 	sentry_options_set_release(options, LL_VIEWER_CHANNEL_AND_VERSION);
 
 	std::string database_path = gDirUtilp->getExpandedFilename(LL_PATH_LOGS, "sentry");
-	sentry_options_set_database_path(options, database_path);
+	sentry_options_set_database_path(options, database_path.c_str());
 
 	mSentryInitialized = (sentry_init(options) == 0);
 	if (mSentryInitialized)

@@ -40,5 +40,5 @@ if (USE_SENTRY)
     endif()
 
     set(SENTRY_INCLUDE_DIRS ${LIBS_PREBUILT_DIR}/include/sentry)
-    set(SENTRY_DEFINE "USE_SENTRY")
+    set(SENTRY_DEFINE "USE_SENTRY=1")
 endif ()

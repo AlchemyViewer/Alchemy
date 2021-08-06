@@ -1792,14 +1792,11 @@ add_executable(${VIEWER_BINARY_NAME}
     )
 
 if (SDL_FOUND)
-  set_property(TARGET ${VIEWER_BINARY_NAME}
-    PROPERTY COMPILE_DEFINITIONS LL_SDL=1
-    )
+  target_compile_definitions(${VIEWER_BINARY_NAME} PRIVATE LL_SDL=1)
 endif (SDL_FOUND)
 
 if (USE_SENTRY)
-  set_property(TARGET ${VIEWER_BINARY_NAME}
-    PROPERTY COMPILE_DEFINITIONS "${SENTRY_DEFINE}")
+  target_compile_definitions(${VIEWER_BINARY_NAME} PRIVATE ${SENTRY_DEFINE})
 
   list(APPEND viewer_LIBRARIES
        ${SENTRY_LIBRARIES}
@@ -2164,6 +2161,29 @@ if (LINUX)
     media_plugin_libvlc
     )
 
+  find_program (OBJCOPY NAMES "objcopy" REQUIRED)
+
+  add_custom_command (TARGET ${VIEWER_BINARY_NAME} POST_BUILD
+                      COMMAND ${OBJCOPY}
+                      ARGS
+                        --only-keep-debug --compress-debug-sections=zlib
+                        ${VIEWER_BINARY_NAME} "${VIEWER_BINARY_NAME}.debug"
+                      BYPRODUCTS "${VIEWER_BINARY_NAME}.debug"
+                      COMMENT "Extracting and compressing debug information")
+
+  add_custom_command (TARGET ${VIEWER_BINARY_NAME} POST_BUILD
+                      COMMAND ${OBJCOPY}
+                      ARGS
+                        --strip-all ${VIEWER_BINARY_NAME}
+                      COMMENT "Extracting and compressing debug information")
+
+  add_custom_command (TARGET ${VIEWER_BINARY_NAME} POST_BUILD
+                      COMMAND ${OBJCOPY}
+                      ARGS
+                        --add-gnu-debuglink="${VIEWER_BINARY_NAME}.debug" ${VIEWER_BINARY_NAME}
+                      COMMENT "Extracting and compressing debug information")
+
+  if (PACKAGE)
   add_custom_command(
       OUTPUT ${product}.tar.xz
       COMMAND ${Python3_EXECUTABLE}
@@ -2188,8 +2208,6 @@ if (LINUX)
         ${CMAKE_CURRENT_SOURCE_DIR}/viewer_manifest.py
         ${COPY_INPUT_DEPENDENCIES}
       )
-
-  if (PACKAGE)
   endif (PACKAGE)
 
   add_custom_command(
