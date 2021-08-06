@@ -124,7 +124,7 @@ variables:
 
 .linux_build:
   stage: build
-  image: r.alchemyviewer.org/alchemy/infrastructure/ubuntu-build-image:latest-llvm
+  image: r.alchemyviewer.org/alchemy/infrastructure/ubuntu-build-image:latest
   tags:
     - linux
     - docker
