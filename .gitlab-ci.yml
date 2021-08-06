@@ -138,6 +138,8 @@ variables:
       - .cache/pip
       - .venv
     when: 'always'
+  variables:
+    USE_SENTRY: "TRUE"
   before_script:
     - virtualenv .venv -p python3
     - source .venv/bin/activate
@@ -146,12 +148,20 @@ variables:
     - autobuild configure -c ReleaseOS -- -DUSE_FMODSTUDIO=ON -DUSE_NVAPI=ON -DUSE_LTO=ON -DDISABLE_FATAL_WARNINGS=ON -DREVISION_FROM_VCS=FALSE
     - autobuild build -c ReleaseOS --no-configure
     - autobuild graph -c ReleaseOS --graph-file alchemy-linuxs${AUTOBUILD_ADDRSIZE}-dependencies.svg
+    - |
+        If ($env:USE_SENTRY -eq 'TRUE') 
+        {
+          sentry-cli difutil bundle-sources build-linux-*/newview/alchemy-bin.debug
+        }
   artifacts:
     name: "$env:CI_COMMIT_REF_NAME-$env:CI_COMMIT_SHORT_SHA"
     expire_in: 1 week
     paths:
       - build-linux-*/build_data.json
       - build-linux-*/newview/Alchemy_*.tar.xz
+      - build-linux-*/newview/alchemy-bin
+      - build-linux-*/newview/alchemy-bin.debug
+      - build-linux-*/newview/alchemy-bin.src.zip
       - alchemy-*-dependencies.svg
 
 .win32_build:
@@ -340,6 +350,11 @@ build:release:windows64:
         Push-Location ./build-linux-64/newview/
           $FileNameLnx64 = Get-ChildItem -Path . -Name -Include Alchemy_*.tar.xz
           Invoke-WebRequest @UploadParams -InFile ./$FileNameLnx64 -Uri "${UploadDestURL}/${FileNameLnx64}"
+
+          If ($env:USE_SENTRY -eq 'TRUE') 
+          {
+            sentry-cli upload-dif alchemy-bin alchemy-bin.debug alchemy-bin.src.zip
+          }
         Pop-Location
 
         Push-Location ./build-darwin-64/
