@@ -158,6 +158,19 @@ variables:
     expire_in: 1 week
     paths:
       - build-linux-*/build_data.json
+      - build-linux-*/packages/lib/release/libalut.so*
+      - build-linux-*/packages/lib/release/libapr-1.so*
+      - build-linux-*/packages/lib/release/libaprutil-1.so*
+      - build-linux-*/packages/lib/release/libepoxy.so*
+      - build-linux-*/packages/lib/release/libexpat.so*
+      - build-linux-*/packages/lib/release/libfmod.so*
+      - build-linux-*/packages/lib/release/libGLOD.so*
+      - build-linux-*/packages/lib/release/libjpeg.so*
+      - build-linux-*/packages/lib/release/libogg.so*
+      - build-linux-*/packages/lib/release/libopenal.so*
+      - build-linux-*/packages/lib/release/libopenjp2.so*
+      - build-linux-*/packages/lib/release/libSDL2*.so*
+      - build-linux-*/packages/lib/release/libvorbis*.so*
       - build-linux-*/newview/Alchemy_*.tar.xz
       - build-linux-*/newview/alchemy-bin
       - build-linux-*/newview/alchemy-bin.debug
@@ -347,13 +360,20 @@ build:release:windows64:
           sentry-cli releases set-commits --auto $BuildChannelVersion
         }
 
-        Push-Location ./build-linux-64/newview/
-          $FileNameLnx64 = Get-ChildItem -Path . -Name -Include Alchemy_*.tar.xz
-          Invoke-WebRequest @UploadParams -InFile ./$FileNameLnx64 -Uri "${UploadDestURL}/${FileNameLnx64}"
+        Push-Location ./build-linux-64/
+          Push-Location ./newview/
+            $FileNameLnx64 = Get-ChildItem -Path . -Name -Include Alchemy_*.tar.xz
+            Invoke-WebRequest @UploadParams -InFile ./$FileNameLnx64 -Uri "${UploadDestURL}/${FileNameLnx64}"
+
+            If ($env:USE_SENTRY -eq 'TRUE') 
+            {
+              sentry-cli upload-dif alchemy-bin alchemy-bin.debug alchemy-bin.src.zip
+            }
+          Pop-Location
 
           If ($env:USE_SENTRY -eq 'TRUE') 
           {
-            sentry-cli upload-dif alchemy-bin alchemy-bin.debug alchemy-bin.src.zip
+            sentry-cli upload-dif packages/
           }
         Pop-Location
 
