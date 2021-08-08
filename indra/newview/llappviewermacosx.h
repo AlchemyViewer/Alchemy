@@ -40,7 +40,7 @@ public:
 	//
 	// Main application logic
 	//
-    bool init();			// Override to do application initialization
+    bool init() override;			// Override to do application initialization
 
     void setCrashUserMetadata(const LLUUID& user_id, const std::string& avatar_name) override;
     
@@ -48,7 +48,7 @@ protected:
     bool restoreErrorTrap() override;
     void initCrashReporting(bool reportFreeze) override;
 
-	std::string generateSerialNumber();
+	std::string generateSerialNumber() override;
     bool initParseCommandLine(LLCommandLineParser& clp) override;
 };
 
