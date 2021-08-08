@@ -1025,11 +1025,10 @@ bool _verify_signature(LLPointer<LLCertificate> parent,
 
 std::string _cert_sha256_digest(X509* cert)
 {
-	unsigned char digest_data[BUFFER_READ_SIZE];
+	unsigned char digest_data[SHA256_DIGEST_LENGTH];
 	unsigned int len = sizeof(digest_data);
 	std::stringstream result;
-	const EVP_MD* digest = EVP_sha256();
-	X509_digest(cert, digest, digest_data, &len);
+	X509_digest(cert, EVP_sha256(), digest_data, &len);
 	result << std::hex << std::setprecision(2);
 	for (unsigned int i = 0; i < len; i++)
 	{
