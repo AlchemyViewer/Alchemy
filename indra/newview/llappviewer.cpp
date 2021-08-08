@@ -2120,6 +2120,9 @@ bool LLAppViewer::cleanup()
 	SUBSYSTEM_CLEANUP(LLProxy);
     LLCore::LLHttp::cleanup();
 
+    // Manually cleanup sec handler for openssl 1.1.1+ compat
+    cleanupSecHandler();
+    
 	LLMainLoopRepeater::instance().stop();
 
 	ll_close_fail_log();
