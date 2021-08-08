@@ -10,13 +10,13 @@ if (USESYSTEMLIBS)
 else (USESYSTEMLIBS)
   use_prebuilt_binary(openssl)
   if (WINDOWS)
-    set(SSLEAY_LIBRARY
-        debug ${ARCH_PREBUILT_DIRS_DEBUG}/ssleay32.lib
-        optimized ${ARCH_PREBUILT_DIRS_RELEASE}/ssleay32.lib)
-    set(LIBEAY_LIBRARY
-        debug ${ARCH_PREBUILT_DIRS_DEBUG}/libeay32.lib
-        optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libeay32.lib)
-    set(OPENSSL_LIBRARIES ${SSLEAY_LIBRARY} ${LIBEAY_LIBRARY})
+    set(SSL_LIBRARY
+        debug ${ARCH_PREBUILT_DIRS_DEBUG}/libssl.lib
+        optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libssl.lib)
+    set(CRYPTO_LIBRARY
+        debug ${ARCH_PREBUILT_DIRS_DEBUG}/libcrypto.lib
+        optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libcrypto.lib)
+    set(OPENSSL_LIBRARIES ${SSL_LIBRARY} ${CRYPTO_LIBRARY})
   else (WINDOWS)
     set(OPENSSL_LIBRARIES ssl crypto)
   endif (WINDOWS)
