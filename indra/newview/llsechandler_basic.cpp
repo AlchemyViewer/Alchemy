@@ -56,8 +56,11 @@
 
 static const std::string DEFAULT_CREDENTIAL_STORAGE = "credential";
 
-// 128 bits of salt data...
-#define STORE_SALT_SIZE 16 
+// compat
+#define COMPAT_STORE_SALT_SIZE 16
+
+// 256 bits of salt data...
+#define STORE_SALT_SIZE 32 
 #define BUFFER_READ_SIZE 256
 std::string cert_string_from_asn1_string(ASN1_STRING* value);
 std::string cert_string_from_octet_string(ASN1_OCTET_STRING* value);
@@ -1345,6 +1348,45 @@ LLSecAPIBasicHandler::~LLSecAPIBasicHandler()
 	_writeProtectedData();
 }
 
+// compat_rc4 reads old rc4 encrypted files
+void compat_rc4(llifstream &protected_data_stream, std::string &decrypted_data)
+{
+	U8 salt[COMPAT_STORE_SALT_SIZE];
+	U8 buffer[BUFFER_READ_SIZE];
+	U8 decrypted_buffer[BUFFER_READ_SIZE];
+	int decrypted_length;
+
+    unsigned char unique_id[MAC_ADDRESS_BYTES];
+    LLMachineID::getUniqueID(unique_id, sizeof(unique_id));
+    LLXORCipher cipher(unique_id, sizeof(unique_id));
+
+	// read in the salt and key
+	protected_data_stream.read((char *)salt, COMPAT_STORE_SALT_SIZE);
+	if (protected_data_stream.gcount() < COMPAT_STORE_SALT_SIZE)
+	{
+		throw LLProtectedDataException("Config file too short.");
+	}
+
+	cipher.decrypt(salt, COMPAT_STORE_SALT_SIZE);
+
+	EVP_CIPHER_CTX* ctx = EVP_CIPHER_CTX_new();
+	EVP_DecryptInit_ex(ctx, EVP_rc4(), NULL, salt, NULL);
+
+	while (protected_data_stream.good()) {
+		// read data as a block:
+		protected_data_stream.read((char *)buffer, BUFFER_READ_SIZE);
+
+		EVP_DecryptUpdate(ctx, decrypted_buffer, &decrypted_length,
+			buffer, protected_data_stream.gcount());
+		decrypted_data.append((const char *)decrypted_buffer, decrypted_length);
+	}
+
+	EVP_DecryptFinal_ex(ctx, decrypted_buffer, &decrypted_length);
+	decrypted_data.append((const char *)decrypted_buffer, decrypted_length);
+
+	EVP_CIPHER_CTX_free(ctx);
+}
+
 void LLSecAPIBasicHandler::_readProtectedData()
 {	
 	// attempt to load the file into our map
@@ -1383,28 +1425,41 @@ void LLSecAPIBasicHandler::_readProtectedData()
 		
 
 		// read in the rest of the file.
-        EVP_CIPHER_CTX* ctx = EVP_CIPHER_CTX_new();
-		EVP_DecryptInit(ctx, EVP_rc4(), salt, NULL);
-		// allocate memory:
-		std::string decrypted_data;	
-		
+		EVP_CIPHER_CTX* ctx = EVP_CIPHER_CTX_new();
+		EVP_DecryptInit_ex(ctx, EVP_chacha20(), nullptr, salt, nullptr); // 0 is decrypt
+
+		std::string decrypted_data;
 		while(protected_data_stream.good()) {
 			// read data as a block:
 			protected_data_stream.read((char *)buffer, BUFFER_READ_SIZE);
 			
 			EVP_DecryptUpdate(ctx, decrypted_buffer, &decrypted_length,
 							  buffer, protected_data_stream.gcount());
-			decrypted_data.append((const char *)decrypted_buffer, protected_data_stream.gcount());
+			decrypted_data.append((const char *)decrypted_buffer, decrypted_length);
 		}
 		
-		// RC4 is a stream cipher, so we don't bother to EVP_DecryptFinal, as there is
-		// no block padding.
+		EVP_DecryptFinal_ex(ctx, decrypted_buffer, &decrypted_length);
+		decrypted_data.append((const char *)decrypted_buffer, decrypted_length);
+
 		EVP_CIPHER_CTX_free(ctx);
 		std::istringstream parse_stream(decrypted_data);
 		if (parser->parse(parse_stream, mProtectedDataMap, 
 						  LLSDSerialize::SIZE_UNLIMITED) == LLSDParser::PARSE_FAILURE)
 		{
-			LLTHROW(LLProtectedDataException("Config file cannot be decrypted."));
+			// clear and reset to try compat
+			parser->reset();
+			decrypted_data.clear();
+			protected_data_stream.clear();
+			protected_data_stream.seekg(0, std::ios::beg);
+			compat_rc4(protected_data_stream, decrypted_data);
+
+			std::istringstream compat_parse_stream(decrypted_data);
+			if (parser->parse(compat_parse_stream, mProtectedDataMap,
+				LLSDSerialize::SIZE_UNLIMITED) == LLSDParser::PARSE_FAILURE)
+			{
+				// everything failed abort
+				LLTHROW(LLProtectedDataException("Config file cannot be decrypted."));
+			}
 		}
 	}
 }
@@ -1416,19 +1471,18 @@ void LLSecAPIBasicHandler::_writeProtectedData()
 	U8 buffer[BUFFER_READ_SIZE];
 	U8 encrypted_buffer[BUFFER_READ_SIZE];
 
-	
 	if(mProtectedDataMap.isUndefined())
 	{
 		LLFile::remove(mProtectedDataFilename);
 		return;
 	}
+
 	// create a string with the formatted data.
 	LLSDSerialize::toXML(mProtectedDataMap, formatted_data_ostream);
 	std::istringstream formatted_data_istream(formatted_data_ostream.str());
 	// generate the seed
 	RAND_bytes(salt, STORE_SALT_SIZE);
 
-	
 	// write to a temp file so we don't clobber the initial file if there is
 	// an error.
 	std::string tmp_filename = mProtectedDataFilename + ".tmp";
@@ -1438,14 +1492,15 @@ void LLSecAPIBasicHandler::_writeProtectedData()
 	try
 	{
 		
-        EVP_CIPHER_CTX* ctx = EVP_CIPHER_CTX_new();
-		EVP_EncryptInit(ctx, EVP_rc4(), salt, NULL);
+		EVP_CIPHER_CTX* ctx = EVP_CIPHER_CTX_new();
+		EVP_EncryptInit_ex(ctx, EVP_chacha20(), NULL, salt, NULL); // 1 is encrypt
 		unsigned char unique_id[MAC_ADDRESS_BYTES];
         LLMachineID::getUniqueID(unique_id, sizeof(unique_id));
 		LLXORCipher cipher(unique_id, sizeof(unique_id));
 		cipher.encrypt(salt, STORE_SALT_SIZE);
 		protected_data_stream.write((const char *)salt, STORE_SALT_SIZE);
 
+		int encrypted_length;
 		while (formatted_data_istream.good())
 		{
 			formatted_data_istream.read((char *)buffer, BUFFER_READ_SIZE);
@@ -1453,13 +1508,14 @@ void LLSecAPIBasicHandler::_writeProtectedData()
 			{
 				break;
 			}
-			int encrypted_length;
 			EVP_EncryptUpdate(ctx, encrypted_buffer, &encrypted_length,
 						  buffer, formatted_data_istream.gcount());
 			protected_data_stream.write((const char *)encrypted_buffer, encrypted_length);
 		}
+
+		EVP_EncryptFinal_ex(ctx, encrypted_buffer, &encrypted_length);
+		protected_data_stream.write((const char *)encrypted_buffer, encrypted_length);
 		
-		// no EVP_EncrypteFinal, as this is a stream cipher
 		EVP_CIPHER_CTX_free(ctx);
 
 		protected_data_stream.close();
