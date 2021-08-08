@@ -76,7 +76,6 @@ void initializeSecHandler()
 void cleanupSecHandler()
 {
 	gSecAPIHandler = nullptr;
-    gSecAPICertHandler = nullptr;
 	gHandlerMap.clear();
 }
 
