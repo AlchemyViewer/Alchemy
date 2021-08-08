@@ -42,9 +42,6 @@ LLPointer<LLSecAPIHandler> gSecAPIHandler;
 
 void initializeSecHandler()
 {
-	ERR_load_crypto_strings();
-	OpenSSL_add_all_algorithms();
-
 	gHandlerMap[BASIC_SECHANDLER] = new LLSecAPIBasicHandler();
 	
 	

@@ -53,9 +53,6 @@
 #include "llproxy.h"
 #include "llcleanup.h"
 
-unsigned long ssl_thread_id(void);
-void ssl_locking_callback(int mode, int type, const char * file, int line);
-
 #if 0	// lltut provides main and runner
 
 namespace tut
@@ -80,26 +77,9 @@ int main()
 
 #endif // 0
 
-int ssl_mutex_count(0);
-LLCoreInt::HttpMutex ** ssl_mutex_list = NULL;
-
 void init_curl()
 {
 	curl_global_init(CURL_GLOBAL_ALL);
-
-	ssl_mutex_count = CRYPTO_num_locks();
-	if (ssl_mutex_count > 0)
-	{
-		ssl_mutex_list = new LLCoreInt::HttpMutex * [ssl_mutex_count];
-		
-		for (int i(0); i < ssl_mutex_count; ++i)
-		{
-			ssl_mutex_list[i] = new LLCoreInt::HttpMutex;
-		}
-
-		CRYPTO_set_locking_callback(ssl_locking_callback);
-		CRYPTO_set_id_callback(&ssl_thread_id);
-	}
 
 	LLProxy::getInstance();
 }
@@ -108,37 +88,6 @@ void init_curl()
 void term_curl()
 {
 	SUBSYSTEM_CLEANUP(LLProxy);
-	
-	CRYPTO_set_locking_callback(NULL);
-	for (int i(0); i < ssl_mutex_count; ++i)
-	{
-		delete ssl_mutex_list[i];
-	}
-	delete [] ssl_mutex_list;
-}
-
-
-//static
-unsigned long ssl_thread_id(void)
-{
-    // std::thread::id is very deliberately opaque, but we can hash it
-    return std::hash<LLThread::id_t>()(LLThread::currentID());
-}
-
-
-void ssl_locking_callback(int mode, int type, const char * /* file */, int /* line */)
-{
-	if (type >= 0 && type < ssl_mutex_count)
-	{
-		if (mode & CRYPTO_LOCK)
-		{
-			ssl_mutex_list[type]->lock();
-		}
-		else
-		{
-			ssl_mutex_list[type]->unlock();
-		}
-	}
 }
 
 

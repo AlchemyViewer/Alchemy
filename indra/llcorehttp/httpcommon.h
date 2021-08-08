@@ -62,8 +62,6 @@
 ///
 /// - libcurl initialization including thread-safely callbacks for SSL:
 ///   .  curl_global_init(...)
-///   .  CRYPTO_set_locking_callback(...)
-///   .  CRYPTO_set_id_callback(...)
 /// - HttpRequest::createService() called to instantiate singletons
 ///   and support objects.
 /// - HttpRequest::startThread() to kick off the worker thread and
