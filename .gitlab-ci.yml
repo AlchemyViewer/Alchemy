@@ -177,6 +177,41 @@ variables:
       - build-linux-*/newview/alchemy-bin.src.zip
       - alchemy-*-dependencies.svg
 
+
+coverity_scan:
+  stage: build
+  image: r.alchemyviewer.org/alchemy/infrastructure/ubuntu-build-image:latest-llvm-coverity
+  tags:
+    - linux
+    - docker
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "coverity"'
+  cache:
+    key:
+      files:
+        - autobuild.xml
+      prefix: ${CI_JOB_NAME}
+    paths:
+      - .cache/autobuild
+      - .cache/pip
+      - .venv
+    when: 'always'
+  variables:
+    USE_SENTRY: "TRUE"
+  before_script:
+    - virtualenv .venv -p python3
+    - source .venv/bin/activate
+    - pip3 install --upgrade autobuild -i https://ci-job-token:${CI_JOB_TOKEN}@git.alchemyviewer.org/api/v4/projects/54/packages/pypi/simple --extra-index-url https://pypi.org/simple
+  script:
+    - autobuild configure -c ReleaseOS -- -DUSE_FMODSTUDIO=ON -DUSE_NVAPI=ON -DUSE_LTO=OFF -DDISABLE_FATAL_WARNINGS=ON -DREVISION_FROM_VCS=FALSE
+    - |
+        pushd "build-linux-64"
+          cov-build --dir cov-int ninja
+          tar caf alchemyviewer.xz cov-int
+          curl --header "JOB-TOKEN: $CI_JOB_TOKEN" --upload-file alchemyviewer.xz "${CI_API_V4_URL}/projects/165/packages/generic/my_package/0.0.$CI_PIPELINE_ID/alchemyviewer.xz"
+        popd
+
+
 .win32_build:
   extends: .win_build
   variables:
