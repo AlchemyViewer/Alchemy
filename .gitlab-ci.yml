@@ -197,6 +197,7 @@ coverity_scan:
       - .venv
     when: 'always'
   variables:
+    AUTOBUILD_ADDRSIZE: 64
     USE_SENTRY: "TRUE"
   before_script:
     - virtualenv .venv -p python3
