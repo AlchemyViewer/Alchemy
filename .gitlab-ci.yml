@@ -180,7 +180,7 @@ variables:
 
 coverity_scan:
   stage: build
-  image: r.alchemyviewer.org/alchemy/infrastructure/ubuntu-build-image:latest-llvm-coverity
+  image: r.alchemyviewer.org/alchemy/infrastructure/ubuntu-build-image:latest-llvm
   tags:
     - linux
     - docker
