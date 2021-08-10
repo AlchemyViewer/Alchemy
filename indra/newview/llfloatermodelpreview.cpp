@@ -133,7 +133,7 @@ mAvatarTabIndex(0)
 	sInstance = this;
 	mLastMouseX = 0;
 	mLastMouseY = 0;
-	mStatusLock = new LLMutex();
+	mStatusLock = std::make_unique<LLMutex>();
 	mModelPreview = NULL;
 
 	mLODMode[LLModel::LOD_HIGH] = 0;
@@ -314,8 +314,7 @@ LLFloaterModelPreview::~LLFloaterModelPreview()
 		delete mModelPreview;
 	}
 
-	delete mStatusLock;
-	mStatusLock = NULL;
+    mStatusLock.reset();
 }
 
 void LLFloaterModelPreview::initModelPreview()
@@ -1659,7 +1658,7 @@ void LLFloaterModelPreview::setCtrlLoadFromFile(S32 lod)
 
 void LLFloaterModelPreview::setStatusMessage(const std::string& msg)
 {
-	LLMutexLock lock(mStatusLock);
+	LLMutexLock lock(mStatusLock.get());
 	mStatusMessage = msg;
 }
 

@@ -201,7 +201,7 @@ protected:
 	// 2 - use LoD above
 	S32 mLODMode[4];
 
-	LLMutex* mStatusLock;
+	std::unique_ptr<LLMutex> mStatusLock;
 
 	LLSD mModelPhysicsFee;
 
