@@ -120,7 +120,7 @@ LLFloaterNotificationsTabbed::~LLFloaterNotificationsTabbed()
 }
 
 //---------------------------------------------------------------------------------
-void LLFloaterNotificationsTabbed::removeItemByID(const LLUUID& id, std::string type)
+void LLFloaterNotificationsTabbed::removeItemByID(const LLUUID& id, const std::string& type)
 {
     if(mNotificationsSeparator->removeItemByID(type, id))
     {
@@ -145,7 +145,7 @@ void LLFloaterNotificationsTabbed::removeItemByID(const LLUUID& id, std::string 
 }
 
 //---------------------------------------------------------------------------------
-LLPanel * LLFloaterNotificationsTabbed::findItemByID(const LLUUID& id, std::string type)
+LLPanel * LLFloaterNotificationsTabbed::findItemByID(const LLUUID& id, const std::string& type)
 {
     return mNotificationsSeparator->findItemByID(type, id);
 }
@@ -265,7 +265,7 @@ void LLFloaterNotificationsTabbed::updateNotificationCounters()
 }
 
 //---------------------------------------------------------------------------------
-void LLFloaterNotificationsTabbed::addItem(LLNotificationListItem::Params p)
+void LLFloaterNotificationsTabbed::addItem(const LLNotificationListItem::Params& p)
 {
     // do not add clones
     if (mNotificationsSeparator->findItemByID(p.notification_name, p.notification_id))
@@ -490,7 +490,7 @@ bool LLNotificationSeparator::addItem(std::string& tag, LLNotificationListItem* 
 }
 
 //---------------------------------------------------------------------------------
-bool LLNotificationSeparator::removeItemByID(std::string& tag, const LLUUID& id)
+bool LLNotificationSeparator::removeItemByID(const std::string& tag, const LLUUID& id)
 {
     notification_list_map_t::iterator it = mNotificationListMap.find(tag);
     if (it != mNotificationListMap.end())
@@ -521,7 +521,7 @@ U32 LLNotificationSeparator::size() const
 }
 
 //---------------------------------------------------------------------------------
-LLPanel* LLNotificationSeparator::findItemByID(std::string& tag, const LLUUID& id)
+LLPanel* LLNotificationSeparator::findItemByID(const std::string& tag, const LLUUID& id)
 {
     notification_list_map_t::iterator it = mNotificationListMap.find(tag);
     if (it != mNotificationListMap.end())

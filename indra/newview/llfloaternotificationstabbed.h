@@ -51,8 +51,8 @@ public:
     void initTaggedList(const std::set<std::string>& tags, LLNotificationListView* list);
     void initUnTaggedList(LLNotificationListView* list);
     bool addItem(std::string& tag, LLNotificationListItem* item);
-    LLPanel* findItemByID(std::string& tag, const LLUUID& id);
-    bool removeItemByID(std::string& tag, const LLUUID& id);
+    LLPanel* findItemByID(const std::string& tag, const LLUUID& id);
+    bool removeItemByID(const std::string& tag, const LLUUID& id);
     void getItems(std::vector<LLNotificationListItem*>& items) const;
     U32 size() const;
 private:
@@ -79,8 +79,8 @@ public:
     bool isWindowEmpty();
 
     // Operating with items
-    void removeItemByID(const LLUUID& id, std::string type);
-    LLPanel * findItemByID(const LLUUID& id, std::string type);
+    void removeItemByID(const LLUUID& id, const std::string& type);
+    LLPanel * findItemByID(const LLUUID& id, const std::string& type);
     void updateNotificationCounters();
     void updateNotificationCounter(S32 panelIndex, S32 counterValue, std::string stringName);
 
@@ -142,7 +142,7 @@ private:
     // void initChannel();
     void clearScreenChannels();
     // Operating with items
-    void addItem(LLNotificationListItem::Params p);
+    void addItem(const LLNotificationListItem::Params& p);
     void getAllItemsOnCurrentTab(std::vector<LLPanel*>& items) const;
 
     // Closes all notifications and removes them from the Notification Well
