@@ -628,6 +628,8 @@ LLViewerObject* LLControlAvatar::lineSegmentIntersectRiggedAttachments(const LLV
 	{
 		LLVector4a local_end = end;
 		LLVector4a local_intersection;
+        local_intersection.clear();
+
         if (mRootVolp->lineSegmentIntersect(start, local_end, face, pick_transparent, pick_rigged, face_hit, &local_intersection, tex_coord, normal, tangent))
         {
             local_end = local_intersection;

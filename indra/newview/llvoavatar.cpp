@@ -1876,6 +1876,7 @@ LLViewerObject* LLVOAvatar::lineSegmentIntersectRiggedAttachments(const LLVector
 	{
 		LLVector4a local_end = end;
 		LLVector4a local_intersection;
+        local_intersection.clear();
 
 		for (const auto& attach_pair : mAttachmentPoints)
 		{
