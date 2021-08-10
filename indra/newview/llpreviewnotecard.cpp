@@ -616,13 +616,13 @@ bool LLPreviewNotecard::saveIfNeeded(LLInventoryItem* copyitem, bool sync)
                 LLFileSystem file(asset_id, LLAssetType::AT_NOTECARD, LLFileSystem::WRITE);
 				if(file.open())
 				{
-					LLSaveNotecardInfo* info = new LLSaveNotecardInfo(this, mItemUUID, mObjectUUID,
-																	tid, copyitem);
-
 					S32 size = buffer.length() + 1;
 					if(file.write((U8*)buffer.c_str(), size))
 					{
-						gAssetStorage->storeAssetData(tid, LLAssetType::AT_NOTECARD,
+                        LLSaveNotecardInfo* info = new LLSaveNotecardInfo(this, mItemUUID, mObjectUUID,
+                                                                          tid, copyitem);
+                        
+                        gAssetStorage->storeAssetData(tid, LLAssetType::AT_NOTECARD,
 														&onSaveComplete,
 														(void*)info,
 														FALSE);
