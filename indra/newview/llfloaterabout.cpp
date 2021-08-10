@@ -389,17 +389,17 @@ void LLFloaterAbout::setUpdateListener()
     {
         for(vec::const_iterator iter=file_vec.begin(); iter!=file_vec.end(); ++iter)
         {
-            if ( (iter->rfind(version)))
+            if (iter->rfind(version) != std::string::npos)
             {
-                if ( (iter->rfind(".done") ) )
+                if (iter->rfind(".done") != std::string::npos)
                 {
                     done = true;
                 }
-                else if ( (iter->rfind(".next") ) )
+                else if (iter->rfind(".next") != std::string::npos)
                 {
                     next = true;
                 }
-                else if ( (iter->rfind(".skip") ) )
+                else if (iter->rfind(".skip") != std::string::npos)
                 {
                     skip = true;
                 }
