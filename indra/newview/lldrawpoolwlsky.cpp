@@ -516,9 +516,10 @@ void LLDrawPoolWLSky::renderHeavenlyBodies()
             }
 
             F32 moon_brightness = (float)mCurrentSky->getMoonBrightness();
-
+            LLColor4 moon_color(gSky.mVOSkyp->getMoon().getColor());
+            
             moon_shader->uniform1f(LLShaderMgr::MOON_BRIGHTNESS, moon_brightness);
-            moon_shader->uniform4fv(LLShaderMgr::MOONLIGHT_COLOR, 1, gSky.mVOSkyp->getMoon().getColor().mV);
+            moon_shader->uniform4fv(LLShaderMgr::MOONLIGHT_COLOR, 1, moon_color.mV);
             moon_shader->uniform4fv(LLShaderMgr::DIFFUSE_COLOR, 1, color.mV);
             //moon_shader->uniform1f(LLShaderMgr::BLEND_FACTOR, blend_factor);
             moon_shader->uniform3fv(LLShaderMgr::DEFERRED_MOON_DIR, 1, mCurrentSky->getMoonDirection().mV); // shader: moon_dir
