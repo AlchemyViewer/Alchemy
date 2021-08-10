@@ -53,9 +53,8 @@ public:
 	//
 	// Main application logic
 	//
-	virtual bool init();			// Override to do application initialization
-	std::string generateSerialNumber();
-	bool setupSLURLHandler();
+	bool init() override;			// Override to do application initialization
+	std::string generateSerialNumber() override;
 
 	void setCrashUserMetadata(const LLUUID& user_id, const std::string& avatar_name) override;
 
