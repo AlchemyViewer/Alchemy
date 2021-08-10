@@ -1,0 +1,3 @@
+terminal:
+  image: r.alchemyviewer.org/alchemy/infrastructure/ubuntu-build-image:latest-llvm
+  script: sleep 60
