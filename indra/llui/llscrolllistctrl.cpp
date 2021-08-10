@@ -689,7 +689,7 @@ bool LLScrollListCtrl::updateColumnWidths()
 		{
 			new_width = (S32)ll_round(column->mRelWidth*mItemListRect.getWidth());
 		}
-		else if (column->mDynamicWidth)
+		else if (column->mDynamicWidth && mNumDynamicWidthColumns > 0)
 		{
 			new_width = (mItemListRect.getWidth() - mTotalStaticColumnWidth - mTotalColumnPadding) / mNumDynamicWidthColumns;
 		}
