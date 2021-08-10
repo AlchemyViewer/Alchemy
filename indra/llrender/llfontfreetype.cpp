@@ -112,6 +112,7 @@ const U8* LLFontManager::loadFont(const std::string& filename, long& out_size)
 	if (fread(in_buf, 1, out_size, filep) != out_size)
 	{
 		out_size = 0;
+        delete [] in_buf;
 		return nullptr;
 	}
 	filep.close();
