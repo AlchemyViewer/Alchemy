@@ -178,7 +178,7 @@ void LLAvatarList::setShowIcons(std::string param_name)
 	mShowIcons = gSavedSettings.getBOOL(mIconParamName);
 }
 
-std::string LLAvatarList::getAvatarName(LLAvatarName av_name)
+std::string LLAvatarList::getAvatarName(const LLAvatarName& av_name)
 {
 	return mShowCompleteName? av_name.getCompleteName(false) : av_name.getDisplayName();
 }
