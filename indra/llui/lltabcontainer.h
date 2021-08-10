@@ -261,7 +261,7 @@ private:
 	void commitHoveredButton(S32 x, S32 y);
 
 	// updates tab button images given the tuple, tab position and the corresponding params
-	void update_images(LLTabTuple* tuple, TabParams params, LLTabContainer::TabPosition pos);
+	void update_images(LLTabTuple* tuple, const TabParams& params, LLTabContainer::TabPosition pos);
 	void reshapeTuple(LLTabTuple* tuple);
 
 	// Variables

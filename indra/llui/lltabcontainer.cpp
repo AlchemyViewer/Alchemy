@@ -928,7 +928,7 @@ void LLTabContainer::addTabPanel(LLPanel* panelp)
 }
 
 // function to update images
-void LLTabContainer::update_images(LLTabTuple* tuple, TabParams params, LLTabContainer::TabPosition pos)
+void LLTabContainer::update_images(LLTabTuple* tuple, const TabParams& params, LLTabContainer::TabPosition pos)
 {
 	if (tuple && tuple->mButton)
 	{
