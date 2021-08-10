@@ -52,15 +52,7 @@
 #include <iomanip>
 #include <time.h>
 #include "llmachineid.h"
-#include "llmd5.h"
-#include "lldiriterator.h"
 
-#if LL_WINDOWS
-#include "llwin32headerslean.h"
-#elif LL_DARWIN
-#include <CoreFoundation/CoreFoundation.h>
-#include <IOKit/IOKitLib.h>
-#endif
 
 static const std::string DEFAULT_CREDENTIAL_STORAGE = "credential";
 
@@ -1356,103 +1348,6 @@ LLSecAPIBasicHandler::~LLSecAPIBasicHandler()
 	_writeProtectedData();
 }
 
-// Get system platform key
-std::string genPasswordKey()
-{
-    char serial_md5[MD5HEX_STR_SIZE];        // Flawfinder: ignore
-    serial_md5[0] = 0;
-#if LL_WINDOWS
-    DWORD serial = 0;
-    DWORD flags = 0;
-    BOOL success = GetVolumeInformation(
-                                        L"C:\\",
-                                        NULL,        // volume name buffer
-                                        0,            // volume name buffer size
-                                        &serial,    // volume serial
-                                        NULL,        // max component length
-                                        &flags,        // file system flags
-                                        NULL,        // file system name buffer
-                                        0);            // file system name buffer size
-    if (success)
-    {
-        LLMD5 md5;
-        md5.update( (unsigned char*)&serial, sizeof(DWORD));
-        md5.finalize();
-        md5.hex_digest(serial_md5);
-    }
-    else
-    {
-        LL_WARNS() << "GetVolumeInformation failed" << LL_ENDL;
-    }
-#elif LL_DARWIN
-    // JC: Sample code from http://developer.apple.com/technotes/tn/tn1103.html
-    CFStringRef serialNumber = NULL;
-    io_service_t    platformExpert = IOServiceGetMatchingService(kIOMasterPortDefault,
-                                                                 IOServiceMatching("IOPlatformExpertDevice"));
-    if (platformExpert)
-    {
-        serialNumber = (CFStringRef) IORegistryEntryCreateCFProperty(platformExpert,
-                                                                     CFSTR(kIOPlatformSerialNumberKey),
-                                                                     kCFAllocatorDefault, 0);
-        IOObjectRelease(platformExpert);
-    }
-    
-    if (serialNumber)
-    {
-        char buffer[MAX_STRING];        // Flawfinder: ignore
-        if (CFStringGetCString(serialNumber, buffer, MAX_STRING, kCFStringEncodingASCII))
-        {
-            LLMD5 md5( (unsigned char*)buffer );
-            md5.hex_digest(serial_md5);
-        }
-        CFRelease(serialNumber);
-    }
-#elif LL_LINUX
-    std::string best;
-    std::string uuiddir("/dev/disk/by-uuid/");
-    
-    // trawl /dev/disk/by-uuid looking for a good-looking UUID to grab
-    std::string this_name;
-    
-    LLDirIterator iter(uuiddir, "*");
-    while (iter.next(this_name))
-    {
-        if (this_name.length() > best.length() ||
-            (this_name.length() == best.length() &&
-             this_name > best))
-        {
-            // longest (and secondarily alphabetically last) so far
-            best = this_name;
-        }
-    }
-    
-    {
-        // we don't return the actual serial number, just a hash of it.
-        LLMD5 md5( reinterpret_cast<const unsigned char*>(best.c_str()) );
-        md5.hex_digest(serial_md5);
-    }
-#else
-#error "Unsupported platform"
-#endif
-    std::string out = serial_md5;
-    if(out.empty())
-    {
-        // Fall back to mac address in case of catastrophic failure
-        unsigned char unique_id[MAC_ADDRESS_BYTES];
-        LLMachineID::getUniqueID(unique_id, sizeof(unique_id));
-
-        LLMD5 md5;
-        md5.update(unique_id, sizeof(unique_id));
-        md5.finalize();
-        md5.hex_digest(serial_md5);
-        out = serial_md5;
-    }
-    
-    LL_INFOS() << "PLATFORM KEY: " << out << LL_ENDL;
-    
-    return serial_md5;
-}
-
 // compat_rc4 reads old rc4 encrypted files
 void compat_rc4(llifstream &protected_data_stream, std::string &decrypted_data)
 {
@@ -1504,9 +1399,9 @@ void LLSecAPIBasicHandler::_readProtectedData()
 		U8 buffer[BUFFER_READ_SIZE];
 		U8 decrypted_buffer[BUFFER_READ_SIZE];
 		int decrypted_length;	
-
-        std::string serial = genPasswordKey();
-        LLXORCipher cipher((U8*)serial.data(), serial.size());
+		unsigned char unique_id[MAC_ADDRESS_BYTES];
+        LLMachineID::getUniqueID(unique_id, sizeof(unique_id));
+		LLXORCipher cipher(unique_id, sizeof(unique_id));
 
 		// read in the salt and key
 		protected_data_stream.read((char *)salt, STORE_SALT_SIZE);
@@ -1599,9 +1494,9 @@ void LLSecAPIBasicHandler::_writeProtectedData()
 		
 		EVP_CIPHER_CTX* ctx = EVP_CIPHER_CTX_new();
 		EVP_EncryptInit_ex(ctx, EVP_chacha20(), NULL, salt, NULL); // 1 is encrypt
-    
-        std::string serial = genPasswordKey();
-		LLXORCipher cipher((U8*)serial.data(), serial.size());
+		unsigned char unique_id[MAC_ADDRESS_BYTES];
+        LLMachineID::getUniqueID(unique_id, sizeof(unique_id));
+		LLXORCipher cipher(unique_id, sizeof(unique_id));
 		cipher.encrypt(salt, STORE_SALT_SIZE);
 		protected_data_stream.write((const char *)salt, STORE_SALT_SIZE);
 
