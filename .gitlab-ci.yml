@@ -206,7 +206,7 @@ coverity_scan:
   script:
     - cov-configure --template --comptype clangcc --compiler clang-12
     - cov-configure --template --comptype clangcxx --compiler clang++-12
-    - autobuild configure -c Coverity -- -DLL_TESTS=OFF -DUSE_FMODSTUDIO=ON -DUSE_NVAPI=ON -DUSE_LTO=OFF -DDISABLE_FATAL_WARNINGS=ON -DREVISION_FROM_VCS=FALSE
+    - autobuild configure -c Coverity -- -DLL_TESTS=OFF -DUSE_FMODSTUDIO=ON -DUSE_NVAPI=ON -DUSE_LTO=OFF -DDISABLE_FATAL_WARNINGS=ON -DREVISION_FROM_VCS=FALSE -DUSE_PRECOMPILED_HEADERS=OFF
     - autobuild build -c Coverity --no-configure
     - |
         pushd "build-linux-64"
