@@ -475,7 +475,10 @@ void LLViewerJoystick::initDevice(void * preffered_device /*LPDIRECTINPUTDEVICE8
 #if LIB_NDOF
     mLastDeviceUUID = guid;
 
-    strncpy(mNdofDev->product, name.c_str(), sizeof(mNdofDev->product));
+    size_t dest_size = sizeof(mNdofDev->product);
+    strncpy(mNdofDev->product, name.c_str(), dest_size-1);
+    mNdofDev->product[dest_size] = '\0';
+    
     mNdofDev->manufacturer[0] = '\0';
 
     initDevice(preffered_device);
