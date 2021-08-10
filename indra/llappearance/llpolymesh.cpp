@@ -280,7 +280,7 @@ BOOL LLPolyMeshSharedData::loadMesh( const std::string& fileName )
                 LL_ERRS() << "Filename is Empty!" << LL_ENDL;
                 return FALSE;
         }
-        LLFILE* fp = LLFile::fopen(fileName, "rb");                     /*Flawfinder: ignore*/
+        LLUniqueFile fp = LLFile::fopen(fileName, "rb");                     /*Flawfinder: ignore*/
         if (!fp)
         {
                 LL_ERRS() << "can't open: " << fileName << LL_ENDL;
@@ -604,9 +604,9 @@ BOOL LLPolyMeshSharedData::loadMesh( const std::string& fileName )
                         // look for morph section
                         //-------------------------------------------------------------------------
                         char morphName[64+1];
-                        morphName[sizeof(morphName)-1] = '\0'; // ensure nul-termination
                         while(fread(&morphName, sizeof(char), 64, fp) == 64)
                         {
+                                morphName[sizeof(morphName)-1] = '\0'; // ensure nul-termination
                                 if (!strcmp(morphName, "End Morphs"))
                                 {
                                         // we reached the end of the morphs
@@ -716,7 +716,7 @@ BOOL LLPolyMeshSharedData::loadMesh( const std::string& fileName )
                 allocateJointNames(1);
         }
 
-        fclose( fp );
+    fp.close();
 
         return status;
 }
