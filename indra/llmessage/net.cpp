@@ -454,6 +454,7 @@ S32 start_net(S32& socket_out, int& nPort)
 				{
 					LL_WARNS() << "startNet() : Couldn't find available network port." << LL_ENDL;
 					// Fail gracefully in release.
+                    close(hSocket);
 					return 3;
 				}
 			}
@@ -462,6 +463,7 @@ S32 start_net(S32& socket_out, int& nPort)
 			{
 				LL_WARNS() << llformat ("bind() port: %d failed, Err: %s\n", nPort, strerror(errno)) << LL_ENDL;
 				// Fail gracefully in release.
+                close(hSocket);
 				return 4;
 			}
 		}
