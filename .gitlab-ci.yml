@@ -204,12 +204,12 @@ coverity_scan:
     - source .venv/bin/activate
     - pip3 install --upgrade autobuild -i https://ci-job-token:${CI_JOB_TOKEN}@git.alchemyviewer.org/api/v4/projects/54/packages/pypi/simple --extra-index-url https://pypi.org/simple
   script:
-    - autobuild configure -c ReleaseOS -- -DLL_TESTS=OFF -DUSE_FMODSTUDIO=ON -DUSE_NVAPI=ON -DUSE_LTO=OFF -DDISABLE_FATAL_WARNINGS=ON -DREVISION_FROM_VCS=FALSE
+    - autobuild configure -c Coverity -- -DLL_TESTS=OFF -DUSE_FMODSTUDIO=ON -DUSE_NVAPI=ON -DUSE_LTO=OFF -DDISABLE_FATAL_WARNINGS=ON -DREVISION_FROM_VCS=FALSE
+    - autobuild build -c Coverity --no-configure
     - |
         pushd "build-linux-64"
-          cov-build --dir cov-int ninja
           tar caf alchemyviewer.xz cov-int
-          curl --header "JOB-TOKEN: $CI_JOB_TOKEN" --upload-file alchemyviewer.xz "${CI_API_V4_URL}/projects/165/packages/generic/my_package/0.0.$CI_PIPELINE_ID/alchemyviewer.xz"
+          curl --header "JOB-TOKEN: $CI_JOB_TOKEN" --upload-file alchemyviewer.xz "${CI_API_V4_URL}/projects/165/packages/generic/coverity/0.0.$CI_PIPELINE_ID/alchemyviewer.xz"
         popd
 
 

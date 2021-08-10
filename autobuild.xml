@@ -2912,6 +2912,27 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
         <map>
           <key>configurations</key>
           <map>
+            <key>Coverity</key>
+            <map>
+              <key>configure</key>
+              <map>
+                <key>arguments</key>
+                <array>
+                  <string>../indra</string>
+                </array>
+                <key>command</key>
+                <string>cmake</string>
+                <key>options</key>
+                <array>
+                  <string>-DCMAKE_BUILD_TYPE:STRING=Release</string>
+                  <string>-DADDRESS_SIZE:STRING=$AUTOBUILD_ADDRSIZE</string>
+                  <string>-DROOT_PROJECT_NAME:STRING=Alchemy</string>
+                  <string>-DINSTALL_PROPRIETARY=FALSE</string>
+                </array>
+              </map>
+              <key>name</key>
+              <string>Coverity</string>
+            </map>
             <key>RelWithDebInfo</key>
             <map>
               <key>build</key>
@@ -3004,6 +3025,38 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
           <string>build-darwin-64</string>
           <key>configurations</key>
           <map>
+            <key>Coverity</key>
+            <map>
+              <key>build</key>
+              <map>
+                <key>command</key>
+                <string>cov-build</string>
+                <key>options</key>
+                <array>
+                  <string>--dir</string>
+                  <string>cov-int</string>
+                  <string>make</string>
+                  <string>-j</string>
+                  <string>$AUTOBUILD_CPU_COUNT</string>
+                </array>
+              </map>
+              <key>configure</key>
+              <map>
+                <key>arguments</key>
+                <array>
+                  <string>../indra</string>
+                </array>
+                <key>command</key>
+                <string>cmake</string>
+                <key>options</key>
+                <array>
+                  <string>-G</string>
+                  <string>Unix Makefiles</string>
+                </array>
+              </map>
+              <key>name</key>
+              <string>Coverity</string>
+            </map>
             <key>RelWithDebInfo</key>
             <map>
               <key>build</key>
@@ -3124,6 +3177,32 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
           <string>build-linux-$AUTOBUILD_ADDRSIZE</string>
           <key>configurations</key>
           <map>
+            <key>Coverity</key>
+            <map>
+              <key>build</key>
+              <map>
+                <key>command</key>
+                <string>cov-build</string>
+                <key>options</key>
+                <array>
+                  <string>--dir</string>
+                  <string>cov-int</string>
+                  <string>make</string>
+                  <string>-j</string>
+                  <string>$AUTOBUILD_CPU_COUNT</string>
+                </array>
+              </map>
+              <key>configure</key>
+              <map>
+                <key>options</key>
+                <array>
+                  <string>-G</string>
+                  <string>Unix Makefiles</string>
+                </array>
+              </map>
+              <key>name</key>
+              <string>Coverity</string>
+            </map>
             <key>RelWithDebInfo</key>
             <map>
               <key>build</key>
