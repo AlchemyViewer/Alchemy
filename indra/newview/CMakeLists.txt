@@ -1811,19 +1811,17 @@ list(APPEND EVENT_HOST_SCRIPTS ${EVENT_HOST_SCRIPT_GLOB_LIST})
 set(PACKAGE ON CACHE BOOL
     "Add a package target that builds an installer package.")
 
-if(USE_PRECOMPILED_HEADERS)
+if(USE_PRECOMPILED_HEADERS AND ${CMAKE_VERSION} VERSION_GREATER "3.15.0")
   # precompiled header configuration
   # llviewerprecompiledheaders.cpp generates
   # the .pch file.
   # All sources added to viewer_SOURCE_FILES
   # at this point use it.
-  if(${CMAKE_VERSION} VERSION_GREATER "3.15.0") 
-    target_precompile_headers(${VIEWER_BINARY_NAME}
-      PRIVATE
-      [["llviewerprecompiledheaders.h"]]
-      )
-  endif()
-endif(USE_PRECOMPILED_HEADERS)
+  target_precompile_headers(${VIEWER_BINARY_NAME}
+    PRIVATE
+    [["llviewerprecompiledheaders.h"]]
+    )
+endif()
     
 if (WINDOWS)
     set_target_properties(${VIEWER_BINARY_NAME}

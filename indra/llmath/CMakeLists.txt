@@ -117,14 +117,12 @@ target_link_libraries(llmath
     ${LLCOMMON_LIBRARIES}
     )
 
-if(USE_PRECOMPILED_HEADERS)
-  if(${CMAKE_VERSION} VERSION_GREATER "3.15.0") 
-    target_precompile_headers(llmath
-      PRIVATE
-      [["linden_common.h"]]
-      )
-  endif()
-endif(USE_PRECOMPILED_HEADERS)
+if(USE_PRECOMPILED_HEADERS AND ${CMAKE_VERSION} VERSION_GREATER "3.15.0") 
+  target_precompile_headers(llmath
+    PRIVATE
+    [["linden_common.h"]]
+    )
+endif()
 
 # Add tests
 if (LL_TESTS)

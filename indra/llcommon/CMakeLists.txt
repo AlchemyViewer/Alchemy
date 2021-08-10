@@ -310,7 +310,7 @@ target_link_libraries(
 
 add_dependencies(llcommon stage_third_party_libs)
 
-if(${CMAKE_VERSION} VERSION_GREATER "3.15.0") 
+if(USE_PRECOMPILED_HEADERS AND ${CMAKE_VERSION} VERSION_GREATER "3.15.0") 
   target_precompile_headers(llcommon
     PRIVATE
     linden_common.h

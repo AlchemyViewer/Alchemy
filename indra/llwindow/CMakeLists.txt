@@ -196,7 +196,7 @@ endif (SDL_FOUND)
 
 target_link_libraries (llwindow llcommon ${llwindow_LINK_LIBRARIES})
 
-if(${CMAKE_VERSION} VERSION_GREATER "3.15.0") 
+if(USE_PRECOMPILED_HEADERS AND ${CMAKE_VERSION} VERSION_GREATER "3.15.0") 
   target_precompile_headers(llwindow
     PRIVATE
     [["linden_common.h"]]

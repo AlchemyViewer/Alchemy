@@ -102,7 +102,7 @@ target_link_libraries(
   ${BOOST_SYSTEM_LIBRARY}
   )
 
-if(${CMAKE_VERSION} VERSION_GREATER "3.15.0") 
+if(USE_PRECOMPILED_HEADERS AND ${CMAKE_VERSION} VERSION_GREATER "3.15.0") 
   target_precompile_headers(llcorehttp
   PRIVATE
   [["linden_common.h"]]

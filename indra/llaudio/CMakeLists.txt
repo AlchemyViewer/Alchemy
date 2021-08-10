@@ -95,7 +95,7 @@ target_link_libraries(
     ${OGG_LIBRARIES}
     )
 
-if(${CMAKE_VERSION} VERSION_GREATER "3.15.0") 
+if(USE_PRECOMPILED_HEADERS AND ${CMAKE_VERSION} VERSION_GREATER "3.15.0") 
   target_precompile_headers(llaudio
     PRIVATE
     [["linden_common.h"]]
