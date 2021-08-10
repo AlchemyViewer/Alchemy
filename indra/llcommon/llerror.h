@@ -417,11 +417,12 @@ typedef LLError::NoClassInfo _LL_CLASS_TO_LOG;
 #define LL_NEWLINE '\n'
 
 // Use this only in LL_ERRS or in a place that LL_ERRS may not be used
-#define LLERROR_CRASH         \
-{                             \
-    int* make_me_crash = NULL;\
-    *make_me_crash = 0;       \
-    exit(*make_me_crash);     \
+#define LLERROR_CRASH               \
+{                                   \
+    int* make_me_crash = NULL;      \
+    /* coverity[var_deref_op] */    \
+    *make_me_crash = 0;             \
+    exit(*make_me_crash);           \
 }
 
 #define LL_ENDL                                         \
