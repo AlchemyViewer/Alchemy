@@ -73,6 +73,11 @@ LLFloaterCreateLandmark::LLFloaterCreateLandmark(const LLSD& key)
 LLFloaterCreateLandmark::~LLFloaterCreateLandmark()
 {
 	removeObserver();
+    if(mInventoryObserver)
+    {
+        delete mInventoryObserver;
+        mInventoryObserver = nullptr;
+    }
 }
 
 BOOL LLFloaterCreateLandmark::postBuild()
