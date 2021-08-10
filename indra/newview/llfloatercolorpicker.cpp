@@ -111,12 +111,6 @@ LLFloaterColorPicker::LLFloaterColorPicker (LLColorSwatchCtrl* swatch, BOOL show
 	// create user interface for this picker
 	createUI ();
 
-	if (!mCanApplyImmediately)
-	{
-		mApplyImmediateCheck->setEnabled(FALSE);
-		mApplyImmediateCheck->set(FALSE);
-	}
-
     mContextConeInAlpha = gSavedSettings.getF32("ContextConeInAlpha");
     mContextConeOutAlpha = gSavedSettings.getF32("ContextConeOutAlpha");
     mContextConeFadeTime = gSavedSettings.getF32("ContextConeFadeTime");
@@ -221,6 +215,12 @@ BOOL LLFloaterColorPicker::postBuild()
 	mApplyImmediateCheck->set(gSavedSettings.getBOOL("ApplyColorImmediately"));
 	mApplyImmediateCheck->setCommitCallback(onImmediateCheck, this);
 
+    if (!mCanApplyImmediately)
+    {
+        mApplyImmediateCheck->setEnabled(FALSE);
+        mApplyImmediateCheck->set(FALSE);
+    }
+    
 	childSetCommitCallback("rspin", onTextCommit, (void*)this );
 	childSetCommitCallback("gspin", onTextCommit, (void*)this );
 	childSetCommitCallback("bspin", onTextCommit, (void*)this );
