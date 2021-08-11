@@ -1134,16 +1134,17 @@ F32 gpu_benchmark()
 	for (U32 i = 0; i < count; ++i)
 	{
 		//allocate render targets and textures
-		if (!dest[i].allocate(res, res, GL_RGBA, false, false, LLTexUnit::TT_TEXTURE, true))
+        auto& render_target = dest[i];
+		if (!render_target.allocate(res, res, GL_RGBA, false, false, LLTexUnit::TT_TEXTURE, true))
 		{
 			LL_WARNS("Benchmark") << "Failed to allocate render target." << LL_ENDL;
 			// abandon the benchmark test
 			delete[] pixels;
 			return -1.f;
 		}
-		dest[i].bindTarget();
-		dest[i].clear();
-		dest[i].flush();
+        render_target.bindTarget();
+        render_target.clear();
+        render_target.flush();
 
 		if (!texHolder.bind(i))
 		{
