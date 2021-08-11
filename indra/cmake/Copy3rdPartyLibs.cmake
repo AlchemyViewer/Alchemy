@@ -194,10 +194,6 @@ elseif(LINUX)
         libepoxy.so
         libepoxy.so.0
         libepoxy.so.0.0.0
-        libogg.so
-        libvorbis.so
-        libvorbisenc.so
-        libvorbisfile.so
         libjpeg.so
         libjpeg.so.8
         libjpeg.so.8.2.2

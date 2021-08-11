@@ -837,10 +837,6 @@ class DarwinManifest(ViewerManifest):
                                 'libGLOD.dylib',
                                 'libhunspell-*.dylib',
                                 'libndofdev.dylib',
-                                'libogg.*.dylib',
-                                'libvorbis.*.dylib',
-                                'libvorbisenc.*.dylib',
-                                'libvorbisfile.*.dylib',
                                 'libxmlrpc-epi.*.dylib',
                                 ):
                     self.path(libfile)
@@ -1263,10 +1259,6 @@ class Linux_x86_64_Manifest(LinuxManifest):
             self.path("libepoxy.so")
             self.path("libepoxy.so.0")
             self.path("libepoxy.so.0.0.0")
-            self.path("libogg.so*")
-            self.path("libvorbis.so*")
-            self.path("libvorbisenc.so*")
-            self.path("libvorbisfile.so*")
             self.path("libjpeg.so*")
 
             if self.args['openal'] == 'ON' or self.args['openal'] == 'TRUE':

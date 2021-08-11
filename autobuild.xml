@@ -2076,11 +2076,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>906749c3c608897062b5f15fe640765efc57f16417b430acf5d07087b7855bc6ea5aaa5834e4260f84ce957904b4ed9e</string>
+              <string>be16d985b623c857dbd208542e0cc60b5a8e4a700940bf1e091356553d3707b9261310099e7432dbf411bd8b304ce478</string>
               <key>hash_algorithm</key>
               <string>sha3_384</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/112/packages/generic/ogg_vorbis-652/1.3.4/ogg_vorbis-1.3.4-darwin64-652.tar.xz</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/112/packages/generic/ogg_vorbis/1.3.5.1113/ogg_vorbis-1.3.5-darwin64-1113.tar.xz</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
@@ -2090,11 +2090,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>301cb0a8f1ce82c0bb7b4adddb78cdc9c7eb4dbddac2ccf64a76fab9aea9eb499236a28ccc8563fbca74858fc425d6af</string>
+              <string>facd800fbe9133d9441b12a1a071a58298b36c6120fe2a64dc7f075053c74fa5b0812f985a4d4f84a8a8522e5fed1a4d</string>
               <key>hash_algorithm</key>
               <string>sha3_384</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/112/packages/generic/ogg_vorbis-652/1.3.4/ogg_vorbis-1.3.4-linux64-652.tar.xz</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/112/packages/generic/ogg_vorbis/1.3.5.1113/ogg_vorbis-1.3.5-linux64-1113.tar.xz</string>
             </map>
             <key>name</key>
             <string>linux64</string>
@@ -2104,11 +2104,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>3dc3502a40dd7865d3674fe84720b4919fa1c88920c300a302115e56f20404cf4aefe9204ba68f96cd4a42e38102560b</string>
+              <string>081ddc33eb46dddfca69c606460032d440324ca38a55c91825e266e6e299c2d07d46b796ed947d761600ba5f08c687c2</string>
               <key>hash_algorithm</key>
               <string>sha3_384</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/112/packages/generic/ogg_vorbis-652/1.3.4/ogg_vorbis-1.3.4-windows-652.tar.xz</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/112/packages/generic/ogg_vorbis/1.3.5.1113/ogg_vorbis-1.3.5-windows-1113.tar.xz</string>
             </map>
             <key>name</key>
             <string>windows</string>
@@ -2118,18 +2118,18 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>c042a72824bb14de08931c59280e044c282e751460301f6c5be19ac576dfbb69c85da4813c0cb7106848c9cf86292fe0</string>
+              <string>f180a496e0421daee8eaad85e5a00403d981aefe575145817c5f7528c68534fbe2537e46e93c1579c7e0c856eb50d016</string>
               <key>hash_algorithm</key>
               <string>sha3_384</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/112/packages/generic/ogg_vorbis-652/1.3.4/ogg_vorbis-1.3.4-windows64-652.tar.xz</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/112/packages/generic/ogg_vorbis/1.3.5.1113/ogg_vorbis-1.3.5-windows64-1113.tar.xz</string>
             </map>
             <key>name</key>
             <string>windows64</string>
           </map>
         </map>
         <key>version</key>
-        <string>1.3.4</string>
+        <string>1.3.5</string>
       </map>
       <key>open-libndofdev</key>
       <map>
