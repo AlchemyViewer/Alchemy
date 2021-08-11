@@ -2190,7 +2190,7 @@ void LLToolPie::steerCameraWithMouse(S32 x, S32 y)
 	{
 		old_yaw_angle = F_PI_BY_TWO + asinf(pick_distance_from_rotation_center / camera_distance_from_rotation_center);
 
-		if (mouse_ray * rotation_frame.getLeftAxis() < 0.f)
+		if (old_mouse_ray * rotation_frame.getLeftAxis() < 0.f)
 		{
 			old_yaw_angle *= -1.f;
 		}
