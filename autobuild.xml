@@ -798,11 +798,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>fbc9dbf283606b6511a9e6c70293c12ea3183c4ddb8e1e86533a7ecf9968d95002df708b3dfba380fbc3f4359a873b32</string>
+              <string>5d2f4128465547dbdb9694eeeddef9be4359acce9d5726de6a01cda2d578a420ee54e8910db8254a78f66a3fb7584be9</string>
               <key>hash_algorithm</key>
               <string>sha3_384</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/116/packages/generic/glod-648/1.0.3/glod-1.0.3-darwin64-648.tar.xz</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/116/packages/generic/glod/1.0.3.1119/glod-1.0.3-darwin64-1119.tar.xz</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
@@ -812,11 +812,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>487b26988bc04b6a5d4a5cd75999fad262d1ea3b31d9924e70deaa86e1be8c546aa95ce1fa006cfecd7319035b5c8e3c</string>
+              <string>71cb772acf15353a5b97c20f4f15737f8d46a5c80a3ca11d77209575b8dcde06c76c81072567151f68994f7225f5f47c</string>
               <key>hash_algorithm</key>
               <string>sha3_384</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/116/packages/generic/glod-648/1.0.3/glod-1.0.3-linux64-648.tar.xz</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/116/packages/generic/glod/1.0.3.1119/glod-1.0.3-linux64-1119.tar.xz</string>
             </map>
             <key>name</key>
             <string>linux64</string>
@@ -826,11 +826,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>bee660e23463dbad9586d9c925b625807bea691cd3eb116cce6804c9f720775d54382931216673fb30c079cbb695a2e7</string>
+              <string>cb0e1763a2a10b8b139a454775c6d712f23d8d886988e5668981f353b44f45f6dcae959bceeda757c9983b018a235654</string>
               <key>hash_algorithm</key>
               <string>sha3_384</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/116/packages/generic/glod-648/1.0.3/glod-1.0.3-windows-648.tar.xz</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/116/packages/generic/glod/1.0.3.1119/glod-1.0.3-windows-1119.tar.xz</string>
             </map>
             <key>name</key>
             <string>windows</string>
@@ -840,11 +840,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>72580aa99a62e3c1162cc4e6710a6561e0b4bb609e3c31357e0bced8d94e258adf5038e0c07d60371f9f749047e7d474</string>
+              <string>69ff17873b05cac9647a83dca1d3778474be4dc4982c8eeb1eb2d301c435f0336c1bb457ac64761eb6fdc9d2c260de65</string>
               <key>hash_algorithm</key>
               <string>sha3_384</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/116/packages/generic/glod-648/1.0.3/glod-1.0.3-windows64-648.tar.xz</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/116/packages/generic/glod/1.0.3.1119/glod-1.0.3-windows64-1119.tar.xz</string>
             </map>
             <key>name</key>
             <string>windows64</string>
