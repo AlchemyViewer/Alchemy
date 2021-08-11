@@ -2150,11 +2150,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>389879a217a3d7b3c2e033dc84e2f506b85bd0b260055057b9f8bfb8fa9f59227e1ba4a3d66b331a5779ae9feed010a0</string>
+              <string>3814fd0c22c1a7da1c418b7874f615f26f38578c57d68831dfc9ab84a694b5b8d94528ccc1ddd5e2aa5e99289c283819</string>
               <key>hash_algorithm</key>
               <string>sha3_384</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/99/packages/generic/open-libndofdev-719/0.12.0/open_libndofdev-0.12.0-linux64-719.tar.xz</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/99/packages/generic/open-libndofdev/0.12.0.1118/open_libndofdev-0.12.0-linux64-1118.tar.xz</string>
             </map>
             <key>name</key>
             <string>linux64</string>
