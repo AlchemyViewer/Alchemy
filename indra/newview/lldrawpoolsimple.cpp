@@ -783,7 +783,7 @@ void LLDrawPoolFullbrightAlphaMask::beginPostDeferredPass(S32 pass)
 		{
 			gDeferredFullbrightAlphaMaskWaterProgram.bind();
 			gDeferredFullbrightAlphaMaskWaterProgram.uniform1f(LLShaderMgr::TEXTURE_GAMMA, 2.2f);
-            gDeferredFullbrightAlphaMaskProgram.uniform1i(LLShaderMgr::NO_ATMO, 1);
+            gDeferredFullbrightAlphaMaskWaterProgram.uniform1i(LLShaderMgr::NO_ATMO, 1);
 		}
 		else
 		{
