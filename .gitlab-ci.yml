@@ -110,9 +110,7 @@ variables:
       - build-darwin-*/packages/lib/release/libGLOD*.dylib
       - build-darwin-*/packages/lib/release/libhunspell*.dylib
       - build-darwin-*/packages/lib/release/libndofdev*.dylib
-      - build-darwin-*/packages/lib/release/libogg*.dylib
       - build-darwin-*/packages/lib/release/libopenal*.dylib
-      - build-darwin-*/packages/lib/release/libvorbis*.dylib
       - build-darwin-*/packages/lib/release/libxmlrpc*.dylib
       - build-darwin-*/packages/lib/release/Sentry.framework
       - build-darwin-*/packages/lib/release/*.dSYM
@@ -161,16 +159,14 @@ variables:
       - build-linux-*/packages/lib/release/libalut.so*
       - build-linux-*/packages/lib/release/libapr-1.so*
       - build-linux-*/packages/lib/release/libaprutil-1.so*
-      - build-linux-*/packages/lib/release/libepoxy.so*
-      - build-linux-*/packages/lib/release/libexpat.so*
-      - build-linux-*/packages/lib/release/libfmod.so*
+      - build-linux-*/packages/lib/release/libepoxy*.so*
+      - build-linux-*/packages/lib/release/libexpat*.so*
+      - build-linux-*/packages/lib/release/libfmod*.so*
       - build-linux-*/packages/lib/release/libGLOD.so*
       - build-linux-*/packages/lib/release/libjpeg.so*
-      - build-linux-*/packages/lib/release/libogg.so*
       - build-linux-*/packages/lib/release/libopenal.so*
       - build-linux-*/packages/lib/release/libopenjp2.so*
       - build-linux-*/packages/lib/release/libSDL2*.so*
-      - build-linux-*/packages/lib/release/libvorbis*.so*
       - build-linux-*/newview/Alchemy_*.tar.xz
       - build-linux-*/newview/alchemy-bin
       - build-linux-*/newview/alchemy-bin.debug
