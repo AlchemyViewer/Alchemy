@@ -22,11 +22,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>baef27e1e299e7730ca6995c102da6700d40da8c47b4e7ad52918adb72c295b7d660afcb35a1791aa0013bbc326af023</string>
+              <string>46c42ee79159997f891962def08ea13f459f42b38be8f407eb2c432d34ec2dbbd6372715e74a0c782336f593434b7e80</string>
               <key>hash_algorithm</key>
               <string>sha3_384</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/100/packages/generic/SDL2-718/2.0.14/SDL2-2.0.14-darwin64-718.tar.xz</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/100/packages/generic/SDL2/2.0.16.1116/SDL2-2.0.16-darwin64-1116.tar.xz</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
@@ -36,18 +36,18 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>9946cc673a45404bb4e82b4e4e2d89f490633d8753c9799cc613970b879f9bb174455722f2605c42539b5bfc91965097</string>
+              <string>7ccae4384306b85b397559ae3aecd84503d54d3ceb1b1e9d9e171c64c98f2bb476452f966a806351464b79486a503d73</string>
               <key>hash_algorithm</key>
               <string>sha3_384</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/100/packages/generic/SDL2-718/2.0.14/SDL2-2.0.14-linux64-718.tar.xz</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/100/packages/generic/SDL2/2.0.16.1116/SDL2-2.0.16-linux64-1116.tar.xz</string>
             </map>
             <key>name</key>
             <string>linux64</string>
           </map>
         </map>
         <key>version</key>
-        <string>2.0.14</string>
+        <string>2.0.16</string>
       </map>
       <key>abseil-cpp</key>
       <map>
