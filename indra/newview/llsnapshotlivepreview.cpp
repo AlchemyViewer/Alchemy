@@ -220,7 +220,7 @@ void LLSnapshotLivePreview::updateSnapshot(BOOL new_snapshot, BOOL new_thumbnail
 // Return true if the quality has been changed, false otherwise
 bool LLSnapshotLivePreview::setSnapshotQuality(S32 quality, bool set_by_user)
 {
-	llclamp(quality, 0, 100);
+    quality = llclamp(quality, 0, 100);
 	if (quality != mSnapshotQuality)
 	{
 		mSnapshotQuality = quality;
