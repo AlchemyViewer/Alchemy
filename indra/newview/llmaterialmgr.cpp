@@ -394,11 +394,13 @@ const LLMaterialPtr LLMaterialMgr::setMaterial(const LLUUID& region_id, const LL
 		itMaterial = ret.first;
 	}
 
-	setMaterialCallbacks(material_id, itMaterial->second);
+    LLMaterialPtr material_ptr = itMaterial->second;
+    
+	setMaterialCallbacks(material_id, material_ptr);
 
 	mGetPending.erase(pending_material_t(region_id, material_id));
 
-	return itMaterial->second;
+	return material_ptr;
 }
 
 void LLMaterialMgr::setMaterialCallbacks(const LLMaterialID& material_id, const LLMaterialPtr material_ptr)
