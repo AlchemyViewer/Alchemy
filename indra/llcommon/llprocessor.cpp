@@ -191,7 +191,7 @@ namespace
 		case 0xF: return "Intel Pentium 4";
 		case 0x10: return "Intel Itanium 2 (IA-64)";
 		}
-		return STRINGIZE("Intel <unknown 0x" << std::hex << composed_family << ">");
+		return STRINGIZE("Intel <unknown 0x" << std::hex << composed_family << std::dec << ">");
 	}
 	
 	std::string amd_CPUFamilyName(int composed_family) 
@@ -213,7 +213,7 @@ namespace
 		case 0x18: return "AMD Hygon Dhyana";
 		case 0x19: return "AMD Zen 3";
 		}
-		return STRINGIZE("AMD <unknown 0x" << std::hex << composed_family << ">");
+		return STRINGIZE("AMD <unknown 0x" << std::hex << composed_family << std::dec << ">");
 	}
 
 	std::string compute_CPUFamilyName(const char* cpu_vendor, int family, int ext_family) 

@@ -408,7 +408,7 @@ bool HttpLibcurl::completeRequest(CURLM * multi_handle, CURL * handle, CURLcode 
     else
     {
         LL_WARNS(LOG_CORE) << "Curl multi_handle or handle is NULL on remove! multi:" 
-            << std::hex << multi_handle << " h:" << std::hex << handle << std::dec << LL_ENDL;
+            << std::hex << multi_handle << " h:" << handle << std::dec << LL_ENDL;
     }
 
     op->mCurlHandle = NULL;

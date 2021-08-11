@@ -899,7 +899,7 @@ std::string LLProcess::getStatusString(const std::string& desc, const Status& st
 
 	if (status.mState == KILLED)
 #if LL_WINDOWS
-		return STRINGIZE(desc << " killed with exception " << std::hex << status.mData);
+		return STRINGIZE(desc << " killed with exception " << std::hex << status.mData << std::dec);
 #else
 		return STRINGIZE(desc << " killed by signal " << status.mData
 						 << " (" << apr_signal_description_get(status.mData) << ")");

@@ -50,7 +50,7 @@ std::string HttpStatus::toHex() const
 	std::ostringstream result;
 	result.width(8);
 	result.fill('0');
-	result << std::hex << operator U32();
+	result << std::hex << operator U32() << std::dec;
 	return result.str();
 }
 
