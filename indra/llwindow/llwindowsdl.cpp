@@ -1633,33 +1633,21 @@ BOOL LLWindowSDL::SDLReallyCaptureInput(BOOL capture)
 	bool newGrab = wantGrab;
     if (!mFullscreen) /* only bother if we're windowed anyway */
     {
-        if (mSDL_Display)
-        {
-            /* we dirtily mix raw X11 with SDL so that our pointer
-               isn't (as often) constrained to the limits of the
-               window while grabbed, which feels nicer and
-               hopefully eliminates some reported 'sticky pointer'
-               problems.  We use raw X11 instead of
-               SDL_WM_GrabInput() because the latter constrains
-               the pointer to the window and also steals all
-               *keyboard* input from the window manager, which was
-               frustrating users. */
-            int result;
-            if (wantGrab)
-            {
-                // LL_INFOS() << "X11 POINTER GRABBY" << LL_ENDL;
-                result = SDL_CaptureMouse(SDL_TRUE);
-                if (0 == result)
-                    newGrab = true;
-                else
-                    newGrab = false;
-            }
-            else
-            {
-                newGrab = false;
-                result = SDL_CaptureMouse(SDL_FALSE);
-            }
-        }
+		int result;
+		if (wantGrab)
+		{
+			// LL_INFOS() << "X11 POINTER GRABBY" << LL_ENDL;
+			result = SDL_CaptureMouse(SDL_TRUE);
+			if (0 == result)
+				newGrab = true;
+			else
+				newGrab = false;
+		}
+		else
+		{
+			newGrab = false;
+			result = SDL_CaptureMouse(SDL_FALSE);
+		}
     }
 		// pretend we got what we wanted, when really we don't care.
 	
@@ -2601,23 +2589,6 @@ void LLWindowSDL::spawnWebBrowser(const std::string& escaped_url, bool async)
 
 void *LLWindowSDL::getPlatformWindow()
 {
-#if LL_GTK && LL_LLMOZLIB_ENABLED
-	if (LLWindowSDL::ll_try_gtk_init())
-	{
-		GtkWidget *owin = gtk_window_new(GTK_WINDOW_POPUP);
-		// Why a layout widget?  A MozContainer would be ideal, but
-		// it involves exposing Mozilla headers to mozlib-using apps.
-		// A layout widget with a GtkWindow parent has the desired
-		// properties of being plain GTK, having a window, and being
-		// derived from a GtkContainer.
-		GtkWidget *rtnw = gtk_layout_new(NULL, NULL);
-		gtk_container_add(GTK_CONTAINER(owin), rtnw);
-		gtk_widget_realize(rtnw);
-		GTK_WIDGET_UNSET_FLAGS(GTK_WIDGET(rtnw), GTK_NO_WINDOW);
-		
-		return rtnw;
-	}
-#endif // LL_GTK && LL_LLMOZLIB_ENABLED
 	// Unixoid mozilla really needs GTK.
 	return NULL;
 }
@@ -2627,12 +2598,11 @@ void LLWindowSDL::bringToFront()
 	// This is currently used when we are 'launched' to a specific
 	// map position externally.
 	LL_INFOS() << "bringToFront" << LL_ENDL;
-#if LL_X11
+
 	if (mWindow && !mFullscreen)
 	{
 		SDL_RaiseWindow(mWindow);
 	}
-#endif // LL_X11
 }
 
 void LLWindowSDL::allowLanguageTextInput(LLPreeditor *preeditor, BOOL b)
