@@ -306,9 +306,7 @@ LLWindowSDL::LLWindowSDL(LLWindowCallbacks* callbacks,
 	// Stash an object pointer for OSMessageBox()
 	gWindowImplementation = this;
 
-#if LL_X11
 	mFlashing = FALSE;
-#endif // LL_X11
 
 	mKeyScanCode = 0;
 	mKeyVirtualKey = 0;
@@ -1360,38 +1358,9 @@ void LLWindowSDL::afterDialog()
 }
 
 
-#if LL_X11
-// set/reset the XWMHints flag for 'urgency' that usually makes the icon flash
-void LLWindowSDL::x11_set_urgent(BOOL urgent)
-{
-	if (mSDL_Display && !mFullscreen)
-	{
-		XWMHints *wm_hints;
-		
-		LL_INFOS() << "X11 hint for urgency, " << urgent << LL_ENDL;
-
-		wm_hints = XGetWMHints(mSDL_Display, mSDL_XWindowID);
-		if (!wm_hints)
-			wm_hints = XAllocWMHints();
-
-		if (urgent)
-			wm_hints->flags |= XUrgencyHint;
-		else
-			wm_hints->flags &= ~XUrgencyHint;
-
-		XSetWMHints(mSDL_Display, mSDL_XWindowID, wm_hints);
-		XFree(wm_hints);
-		XSync(mSDL_Display, False);
-	}
-}
-#endif // LL_X11
-
 void LLWindowSDL::flashIcon(F32 seconds)
 {
-#if !LL_X11
-	LL_INFOS() << "Stub LLWindowSDL::flashIcon(" << seconds << ")" << LL_ENDL;
-#else	
-	LL_INFOS() << "X11 LLWindowSDL::flashIcon(" << seconds << ")" << LL_ENDL;
+	LL_INFOS() << "LLWindowSDL::flashIcon(" << seconds << ")" << LL_ENDL;
 	
 	F32 remaining_time = mFlashTimer.getRemainingTimeF32();
 	if (remaining_time < seconds)
@@ -1399,9 +1368,8 @@ void LLWindowSDL::flashIcon(F32 seconds)
 	mFlashTimer.reset();
 	mFlashTimer.setTimerExpirySec(remaining_time);
 
-	x11_set_urgent(TRUE);
+	SDL_FlashWindow(mWindow, SDL_FLASH_UNTIL_FOCUSED);
 	mFlashing = TRUE;
-#endif // LL_X11
 }
 
 
@@ -2066,15 +2034,13 @@ void LLWindowSDL::gatherInput()
 
     updateCursor();
 
-#if LL_X11
     // This is a good time to stop flashing the icon if our mFlashTimer has
     // expired.
     if (mFlashing && mFlashTimer.hasExpired())
     {
-        x11_set_urgent(FALSE);
+        SDL_FlashWindow(mWindow, SDL_FLASH_CANCEL);
         mFlashing = FALSE;
     }
-#endif // LL_X11
 }
 
 static SDL_Cursor *makeSDLCursorFromBMP(const char *filename, int hotx, int hoty)

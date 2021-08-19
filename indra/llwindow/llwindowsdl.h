@@ -207,11 +207,8 @@ protected:
 	friend class LLWindowManager;
 
 private:
-#if LL_X11
-	void x11_set_urgent(BOOL urgent);
 	BOOL mFlashing;
 	LLTimer mFlashTimer;
-#endif //LL_X11
 	
 	U32 mKeyScanCode;
 	U32 mKeyVirtualKey;
