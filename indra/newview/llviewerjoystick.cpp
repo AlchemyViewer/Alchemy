@@ -477,7 +477,7 @@ void LLViewerJoystick::initDevice(void * preffered_device /*LPDIRECTINPUTDEVICE8
 
     size_t dest_size = sizeof(mNdofDev->product);
     strncpy(mNdofDev->product, name.c_str(), dest_size-1);
-    mNdofDev->product[dest_size] = '\0';
+    mNdofDev->product[dest_size-1] = '\0';
     
     mNdofDev->manufacturer[0] = '\0';
 
