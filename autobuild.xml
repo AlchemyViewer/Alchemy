@@ -1040,11 +1040,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>00c5af9a17229fabcd31548596c58ebb054b16275b8779f0be7e2ca4938e13718fb92a181a81ef9411890894f9d076d4</string>
+              <string>92c464e01496191a35c700ee17d42df118d73be78b588c1e2c0de916ae05d5584369d5ea0ef0c102e5a11f9e3edffc3e</string>
               <key>hash_algorithm</key>
               <string>sha3_384</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/101/packages/generic/libepoxy-862/1.5.7/libepoxy-1.5.7-darwin64-862.tar.xz</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/101/packages/generic/libepoxy/1.5.9.1130/libepoxy-1.5.9-darwin64-1130.tar.xz</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
@@ -1054,11 +1054,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>0f798d9cfffc5a9ad10b4e44eda0c94c6d4a426405774e67c6c5ede6d2fbe60ca019c88fc43657474f4ddf22a881f970</string>
+              <string>bb8fb114676d54ec1223bf55ac68a2f5c79a6c7b0daeaa08c7d516a8755f2c91ec29a540553ed60c4b3461a3e44f4473</string>
               <key>hash_algorithm</key>
               <string>sha3_384</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/101/packages/generic/libepoxy-862/1.5.7/libepoxy-1.5.7-linux64-862.tar.xz</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/101/packages/generic/libepoxy/1.5.9.1130/libepoxy-1.5.9-linux64-1130.tar.xz</string>
             </map>
             <key>name</key>
             <string>linux64</string>
@@ -1068,11 +1068,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>b45d06f68086656aa40c7a09ce571c1ecf4115c5c13b0dfe2a9e4645cf557007229c6b5b37042b5fa68faf25749ba769</string>
+              <string>cd6d30e659f33f1f957c9ae97384e4986d29fea62441f73ba5c4e340b04a6e88c6923a2162d1be9e41cd7a6d94f6fe0d</string>
               <key>hash_algorithm</key>
               <string>sha3_384</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/101/packages/generic/libepoxy-862/1.5.7/libepoxy-1.5.7-windows-862.tar.xz</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/101/packages/generic/libepoxy/1.5.9.1130/libepoxy-1.5.9-windows-1130.tar.xz</string>
             </map>
             <key>name</key>
             <string>windows</string>
@@ -1082,18 +1082,18 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>d3ec2ca540b7d068806eee0b898ec9a3d9d5ceec78ca6e15a9dd7d8a443380f8f4375d5e8a55fdb6b1e4227956b7c8b2</string>
+              <string>9bd3a9dc21eb007279bcbaa759ec40680c4149db230700e525e03057a75b52812203f89aa132322913bfe46d7977391b</string>
               <key>hash_algorithm</key>
               <string>sha3_384</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/101/packages/generic/libepoxy-862/1.5.7/libepoxy-1.5.7-windows64-862.tar.xz</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/101/packages/generic/libepoxy/1.5.9.1130/libepoxy-1.5.9-windows64-1130.tar.xz</string>
             </map>
             <key>name</key>
             <string>windows64</string>
           </map>
         </map>
         <key>version</key>
-        <string>1.5.7</string>
+        <string>1.5.9</string>
       </map>
       <key>libhunspell</key>
       <map>
