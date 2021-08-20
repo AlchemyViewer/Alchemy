@@ -736,15 +736,6 @@ BOOL LLWindowSDL::createContext(int x, int y, int width, int height, int bits, B
 		LL_INFOS() << "Swap interval not supported with sdl err: " << SDL_GetError() << LL_ENDL;
 	}
 	
-	// Detect video memory size.
-# if LL_X11
-	gGLManager.mVRAM = x11_detect_VRAM_kb() / 1024;
-	if (gGLManager.mVRAM != 0)
-	{
-		LL_INFOS() << "X11 log-parser detected " << gGLManager.mVRAM << "MB VRAM." << LL_ENDL;
-	}
-# endif // LL_X11
-
     SDL_GL_GetAttribute(SDL_GL_RED_SIZE, &redBits);
     SDL_GL_GetAttribute(SDL_GL_GREEN_SIZE, &greenBits);
     SDL_GL_GetAttribute(SDL_GL_BLUE_SIZE, &blueBits);
@@ -767,10 +758,10 @@ BOOL LLWindowSDL::createContext(int x, int y, int width, int height, int bits, B
     if (colorBits < 32)
     {
         close();
-        setupFailure("Second Life requires True Color (32-bit) to run in a window.\n"
+        setupFailure("Alchemy requires True Color (32-bit) to run in a window.\n"
                      "Please go to Control Panels -> Display -> Settings and\n"
                      "set the screen to 32-bit color.\n"
-                     "Alternately, if you choose to run fullscreen, Second Life\n"
+                     "Alternately, if you choose to run fullscreen, Alchemy\n"
                      "will automatically adjust the screen each time it runs.",
                      "Error", OSMB_OK);
         return FALSE;
@@ -779,7 +770,7 @@ BOOL LLWindowSDL::createContext(int x, int y, int width, int height, int bits, B
     if (alphaBits < 8)
     {
         close();
-        setupFailure("Second Life is unable to run because it can't get an 8 bit alpha\n"
+        setupFailure("Alchemy is unable to run because it can't get an 8 bit alpha\n"
                      "channel.  Usually this is due to video card driver issues.\n"
                      "Please make sure you have the latest video card drivers installed.\n"
                      "Also be sure your monitor is set to True Color (32-bit) in\n"
@@ -810,7 +801,15 @@ BOOL LLWindowSDL::createContext(int x, int y, int width, int height, int bits, B
     {
         LL_WARNS() << "We're not running under any known WM. SDL Err: " << SDL_GetError() << LL_ENDL;
     }
-#endif // LL_X11
+
+	{
+		gGLManager.mVRAM = x11_detect_VRAM_kb() / 1024;
+		if (gGLManager.mVRAM != 0)
+		{
+			LL_INFOS() << "X11 log-parser detected " << gGLManager.mVRAM << "MB VRAM." << LL_ENDL;
+		}
+	}
+# endif // LL_X11
 
     // make sure multisampling is disabled by default
     glDisable(GL_MULTISAMPLE_ARB);
