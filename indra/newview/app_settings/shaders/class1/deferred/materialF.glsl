@@ -341,7 +341,8 @@ void main()
             // overriding the general rule to avoid pollutiong the source with commented code.
             //
             //  If you're reading this in 2021+, feel free to obliterate.
-
+        */
+#if 0
         vec3 npos = -normalize(pos.xyz);
 
         //vec3 ref = dot(pos+lv, norm);
@@ -363,8 +364,7 @@ void main()
             bloom += dot(sp, sp) / 4.0;
             color += sp * spec.rgb;
         }
-        */
-
+#else
         float sa        = dot(refnormpersp, sun_dir.xyz);
         vec3  dumbshiny = sunlit * shadow * (texture2D(lightFunc, vec2(sa, spec.a)).r);
 
@@ -376,6 +376,7 @@ void main()
         glare = max(glare, spec_contrib.b);
 
         color += spec_contrib;
+#endif
     }
 
     color = mix(color.rgb, diffcol.rgb, diffuse.a);

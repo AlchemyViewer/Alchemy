@@ -1,5 +1,5 @@
 /** 
- * @file sunLightF.glsl
+ * @file sunLightV.glsl
  *
  * $LicenseInfo:firstyear=2007&license=viewerlgpl$
  * Second Life Viewer Source Code
@@ -24,7 +24,7 @@
  */
 
 uniform mat4 modelview_projection_matrix;
- 
+
 ATTRIBUTE vec3 position;
 
 VARYING vec2 vary_fragcoord;

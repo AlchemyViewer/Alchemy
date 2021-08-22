@@ -236,21 +236,13 @@ void main()
     color.rgb *= ambient;
 #endif
 
-vec3 post_ambient = color.rgb;
-
 #if !defined(SUNLIGHT_KILL)
     color.rgb += sun_contrib;
 #endif
 
-vec3 post_sunlight = color.rgb;
-
     color.rgb *= diffuse_srgb.rgb;
 
-vec3 post_diffuse = color.rgb;
-
     color.rgb = atmosFragLighting(color.rgb, additive, atten);
-
-vec3 post_atmo = color.rgb;
 
     vec4 light = vec4(0,0,0,0);
     
@@ -273,17 +265,6 @@ vec3 post_atmo = color.rgb;
 #if !defined(LOCAL_LIGHT_KILL)
     color.rgb += light.rgb;
 #endif
-
-//color.rgb = amblit;
-//color.rgb = vec3(ambient);
-//color.rgb = sunlit;
-//color.rgb = vec3(final_da);
-//color.rgb = post_ambient;
-//color.rgb = post_sunlight;
-//color.rgb = sun_contrib;
-//color.rgb = diffuse_srgb.rgb;
-//color.rgb = post_diffuse;
-//color.rgb = post_atmo;
 
 #ifdef WATER_FOG
     color.rgb = linear_to_srgb(color.rgb);
