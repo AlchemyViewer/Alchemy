@@ -476,6 +476,12 @@ void RlvStrings::setCustomString(const std::string& strStringName, const std::st
 
 bool RlvUtil::m_fForceTp = false;
 
+std::string escape_for_regex(const std::string& str)
+{
+	using namespace boost;
+	return regex_replace(str, regex("[.^$|()\\[\\]{}*+?\\\\]"), "\\\\&", match_default|format_sed);
+}
+
 // Checked: 2009-07-04 (RLVa-1.0.0a) | Modified: RLVa-1.0.0a
 void RlvUtil::filterLocation(std::string& strUTF8Text)
 {
@@ -483,13 +489,13 @@ void RlvUtil::filterLocation(std::string& strUTF8Text)
 	const std::string& strHiddenRegion = RlvStrings::getString(RlvStringKeys::Hidden::Region);
 	for (LLViewerRegion* pRegion : LLWorld::getInstance()->getRegionList())
 	{
-		boost::ireplace_all(strUTF8Text, pRegion->getName(), strHiddenRegion);
+		boost::replace_all_regex(strUTF8Text, boost::regex("\\b" + escape_for_regex(pRegion->getName()) + "\\b", boost::regex::icase), strHiddenRegion);
 	}
 
 	// Filter any mention of the parcel name
 	LLViewerParcelMgr* pParcelMgr = LLViewerParcelMgr::getInstance();
 	if (pParcelMgr)
-		boost::ireplace_all(strUTF8Text, pParcelMgr->getAgentParcelName(), RlvStrings::getString(RlvStringKeys::Hidden::Parcel));
+		boost::replace_all_regex(strUTF8Text, boost::regex("\\b" + escape_for_regex(pParcelMgr->getAgentParcelName()) + "\\b", boost::regex::icase), RlvStrings::getString(RlvStringKeys::Hidden::Parcel));
 }
 
 // Checked: 2010-12-08 (RLVa-1.2.2c) | Modified: RLVa-1.2.2c
@@ -503,7 +509,7 @@ void RlvUtil::filterNames(std::string& strUTF8Text, bool fFilterLegacy, bool fCl
 		// NOTE: if we're agressively culling nearby names then ignore exceptions
 		if ( (LLAvatarNameCache::get(idAgents[idxAgent], &avName)) && ((fClearMatches) || (!RlvActions::canShowName(RlvActions::SNC_DEFAULT, idAgents[idxAgent]))) )
 		{
-			const std::string& strDisplayName = avName.getDisplayName();
+			const std::string& strDisplayName = escape_for_regex(avName.getDisplayName());
 			bool fFilterDisplay = (strDisplayName.length() > 2);
 			const std::string& strLegacyName = avName.getLegacyName();
 			fFilterLegacy &= (strLegacyName.length() > 2);
@@ -513,16 +519,16 @@ void RlvUtil::filterNames(std::string& strUTF8Text, bool fFilterLegacy, bool fCl
 			if (boost::icontains(strLegacyName, strDisplayName))
 			{
 				if (fFilterLegacy)
-					boost::ireplace_all(strUTF8Text, strLegacyName, strAnonym);
+					boost::replace_all_regex(strUTF8Text, boost::regex("\\b" + strLegacyName + "\\b", boost::regex::icase), strAnonym);
 				if (fFilterDisplay)
-					boost::ireplace_all(strUTF8Text, strDisplayName, strAnonym);
+					boost::replace_all_regex(strUTF8Text, boost::regex("\\b" + strDisplayName + "\\b", boost::regex::icase), strAnonym);
 			}
 			else
 			{
 				if (fFilterDisplay)
-					boost::ireplace_all(strUTF8Text, strDisplayName, strAnonym);
+					boost::replace_all_regex(strUTF8Text, boost::regex("\\b" + strDisplayName + "\\b", boost::regex::icase), strAnonym);
 				if (fFilterLegacy)
-					boost::ireplace_all(strUTF8Text, strLegacyName, strAnonym);
+					boost::replace_all_regex(strUTF8Text, boost::regex("\\b" + strLegacyName + "\\b", boost::regex::icase), strAnonym);
 			}
 		}
 	}
