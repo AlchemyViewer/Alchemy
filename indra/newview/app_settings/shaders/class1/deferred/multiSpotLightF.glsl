@@ -23,8 +23,6 @@
  * $/LicenseInfo$
  */
 
-
-
 //class 1 -- no shadows
 
 #extension GL_ARB_texture_rectangle : enable
@@ -68,6 +66,7 @@ VARYING vec4 vary_fragcoord;
 uniform vec2 screen_res;
 
 uniform mat4 inv_proj;
+
 vec3 getNormWithEnvIntensity(vec2 screenpos, out float envIntensity);
 
 vec4 texture2DLodSpecular(sampler2D projectionMap, vec2 tc, float lod)
@@ -144,7 +143,6 @@ void main()
 		
 	float envIntensity;
 	vec3 norm = getNormWithEnvIntensity(frag.xy, envIntensity);
-
 	float l_dist = -dot(lv, proj_n);
 	
 	vec4 proj_tc = (proj_mat * vec4(pos.xyz, 1.0));
@@ -159,7 +157,6 @@ void main()
 	float dist_atten = clamp(1.0-(dist-1.0*(1.0-fa))/fa, 0.0, 1.0);
 	dist_atten *= dist_atten;
 	dist_atten *= 2.0;
-	
 
 	if (dist_atten <= 0.0)
 	{
@@ -173,11 +170,10 @@ void main()
 	lv = normalize(lv);
 	float da = dot(norm, lv);
 		
-		
 	vec3 diff_tex = texture2DRect(diffuseRect, frag.xy).rgb;
+	//light shaders output linear and are gamma corrected later in postDeferredGammaCorrectF.glsl
 
 	vec3 dlit = vec3(0, 0, 0);
-	
 	
 	if (proj_tc.z > 0.0 &&
 		proj_tc.x < 1.0 &&
@@ -185,8 +181,8 @@ void main()
 		proj_tc.x > 0.0 &&
 		proj_tc.y > 0.0)
 	{
-		float lit = 0.0;
 		float amb_da = proj_ambiance;
+		float lit = 0.0;
 		
 		if (da > 0.0)
 		{
@@ -194,11 +190,11 @@ void main()
 			float lod = diff * proj_lod;
 			
 			vec4 plcol = texture2DLodDiffuse(projectionMap, proj_tc.xy, lod);
-		
+
 			dlit = color.rgb * plcol.rgb * plcol.a;
 			
 			lit = da * dist_atten;
-			
+
 			col = dlit*lit*diff_tex;
 			amb_da += (da*0.5)*proj_ambiance;
 		}
@@ -210,10 +206,9 @@ void main()
 		amb_da *= dist_atten * noise;
 			
 		amb_da = min(amb_da, 1.0-lit);
-		col += amb_da*color.rgb*diff_tex*amb_plcol.rgb*amb_plcol.a;
+		col += amb_da*color.rgb*diff_tex.rgb*amb_plcol.rgb*amb_plcol.a;
 	}
-	
-	
+
 	vec4 spec = texture2DRect(specularRect, frag.xy);
 	if (spec.a > 0.0)
 	{
@@ -253,10 +248,10 @@ void main()
 			vec3 pfinal = pos + ref * dot(pdelta, proj_n)/ds;
 			
 			vec4 stc = (proj_mat * vec4(pfinal.xyz, 1.0));
-            
+
 			if (stc.z > 0.0)
 			{
-                stc /= stc.w;
+				stc /= stc.w;
 								
 				if (stc.x < 1.0 &&
 					stc.y < 1.0 &&

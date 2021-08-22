@@ -90,6 +90,9 @@ void main()
     float fa = falloff+1.0;
     float dist_atten = clamp(1.0-(dist-1.0*(1.0-fa))/fa, 0.0, 1.0);
     dist_atten *= dist_atten;
+
+    // Tweak falloff slightly to match pre-EEP attenuation
+    // NOTE: this magic number also shows up in a great many other places, search for dist_atten *= to audit
     dist_atten *= 2.0;
     
     float lit = da * dist_atten * noise;
@@ -109,12 +112,12 @@ void main()
         float sa = nh;
         float fres = pow(1 - dot(h, npos), 5) * 0.4+0.5;
         float gtdenom = 2 * nh;
-        float gt = max(0,(min(gtdenom * nv / vh, gtdenom * da / vh)));
+        float gt = max(0,min(gtdenom * nv / vh, gtdenom * da / vh));
 
         if (nh > 0.0)
         {
             float scol = fres*texture2D(lightFunc, vec2(nh, spec.a)).r*gt/(nh*da);
-            col += lit*scol*color.rgb*spec.rgb;
+            col += lit * scol * color.rgb * spec.rgb;
         }
     }
     

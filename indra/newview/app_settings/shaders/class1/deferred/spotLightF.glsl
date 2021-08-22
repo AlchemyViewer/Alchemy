@@ -23,6 +23,8 @@
  * $/LicenseInfo$
  */
 
+//class 1 -- no shadows
+
 #extension GL_ARB_texture_rectangle : enable
 #extension GL_ARB_shader_texture_lod : enable
 
@@ -33,8 +35,6 @@ out vec4 frag_color;
 #else
 #define frag_color gl_FragColor
 #endif
-
-//class 1 -- no shadows
 
 uniform sampler2DRect diffuseRect;
 uniform sampler2DRect specularRect;
@@ -170,8 +170,6 @@ void main()
 	vec3 diff_tex = texture2DRect(diffuseRect, frag.xy).rgb;
 	//light shaders output linear and are gamma corrected later in postDeferredGammaCorrectF.glsl
 
-	vec4 spec = texture2DRect(specularRect, frag.xy);
-
 	float noise = texture2D(noiseMap, frag.xy/128.0).b;
 	vec3 dlit = vec3(0, 0, 0);
 	
@@ -186,14 +184,15 @@ void main()
 		
 		if (da > 0.0)
 		{
-			lit = da * dist_atten * noise;
-
 			float diff = clamp((l_dist-proj_focus)/proj_range, 0.0, 1.0);
 			float lod = diff * proj_lod;
 			
 			vec4 plcol = texture2DLodDiffuse(projectionMap, proj_tc.xy, lod);
+
 			dlit = color.rgb * plcol.rgb * plcol.a;
 			
+			lit = da * dist_atten * noise;
+
 			col = dlit*lit*diff_tex;
 			//amb_da += (da*0.5)*(1.0-shadow)*proj_ambiance;
 		}
@@ -208,9 +207,11 @@ void main()
 		col += amb_da*color.rgb*diff_tex.rgb*amb_plcol.rgb*amb_plcol.a;
 	}
 
+	vec4 spec = texture2DRect(specularRect, frag.xy);
 	if (spec.a > 0.0)
 	{
 		dlit *= min(da*6.0, 1.0) * dist_atten;
+
 		vec3 npos = -normalize(pos);
 
 		//vec3 ref = dot(pos+lv, norm);
@@ -223,15 +224,14 @@ void main()
 
 		float gtdenom = 2 * nh;
 		float gt = max(0, min(gtdenom * nv / vh, gtdenom * da / vh));
-								
+
 		if (nh > 0.0)
 		{
-			
 			float scol = fres*texture2D(lightFunc, vec2(nh, spec.a)).r*gt/(nh*da);
 			col += dlit*scol*spec.rgb;
 			//col += spec.rgb;
 		}
-	}	
+	}
 
 	if (envIntensity > 0.0)
 	{
@@ -263,7 +263,7 @@ void main()
 	}
 #endif
 
-	//col.r = 1.0;
+	//output linear, sum of lights will be gamma corrected later	
 	frag_color.rgb = col;	
 	frag_color.a = 0.0;
 }
