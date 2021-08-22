@@ -195,7 +195,7 @@ void main()
 			lit = da * dist_atten * noise;
 
 			col = dlit*lit*diff_tex;
-			//amb_da += (da*0.5)*(1.0-shadow)*proj_ambiance;
+			amb_da += (da*0.5)*proj_ambiance;
 		}
 		//float diff = clamp((proj_range-proj_focus)/proj_range, 0.0, 1.0);
 		vec4 amb_plcol = texture2DLodAmbient(projectionMap, proj_tc.xy, proj_lod);
