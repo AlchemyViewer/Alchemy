@@ -205,7 +205,7 @@ void main()
 		amb_da *= dist_atten * noise;
 			
 		amb_da = min(amb_da, 1.0-lit);
-		col += amb_da*color.rgb*diff_tex.rgb*amb_plcol.rgb*amb_plcol.a*diff_tex.rgb;
+		col += amb_da*color.rgb*diff_tex.rgb*amb_plcol.rgb*amb_plcol.a;
 	}
 
 	if (spec.a > 0.0)
