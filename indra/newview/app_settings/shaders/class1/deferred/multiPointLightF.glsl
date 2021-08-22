@@ -97,9 +97,12 @@ void main()
                 // NOTE: this magic number also shows up in a great many other places, search for dist_atten *= to audit
                 dist_atten *= 2.0;
 
-                dist_atten *= noise;
+                if (dist_atten <= 0.0)
+                {
+                    continue;
+                }
 
-                float lit = da * dist_atten;
+                float lit = da * dist_atten * noise;
 
                 vec3 col = light_col[i].rgb * lit * diff;
 

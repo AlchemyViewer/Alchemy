@@ -72,6 +72,19 @@ void main()
         discard;
     }
     
+    float fa = falloff+1.0;
+    float dist_atten = clamp(1.0-(dist-1.0*(1.0-fa))/fa, 0.0, 1.0);
+    dist_atten *= dist_atten;
+
+    // Tweak falloff slightly to match pre-EEP attenuation
+    // NOTE: this magic number also shows up in a great many other places, search for dist_atten *= to audit
+    dist_atten *= 2.0;
+    
+    if (dist_atten <= 0.0)
+    {
+        discard;
+    }
+
     vec3 norm = getNorm(frag.xy);
 
     float da = dot(norm, lv);
@@ -87,14 +100,6 @@ void main()
     
     vec3 col = texture2DRect(diffuseRect, frag.xy).rgb;
 
-    float fa = falloff+1.0;
-    float dist_atten = clamp(1.0-(dist-1.0*(1.0-fa))/fa, 0.0, 1.0);
-    dist_atten *= dist_atten;
-
-    // Tweak falloff slightly to match pre-EEP attenuation
-    // NOTE: this magic number also shows up in a great many other places, search for dist_atten *= to audit
-    dist_atten *= 2.0;
-    
     float lit = da * dist_atten * noise;
 
     col = color.rgb*lit*col;
