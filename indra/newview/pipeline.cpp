@@ -2155,6 +2155,8 @@ void LLPipeline::updateMoveNormalAsync(LLDrawable* drawablep)
 
 void LLPipeline::updateMovedList(LLDrawable::drawable_vector_t& moved_list)
 {
+	LLDrawable::drawable_vector_t newList; // removing elements in the middle of a vector is a really bad idea. I'll just create a new one and swap it at the end.
+
 	for (LLDrawable::drawable_vector_t::iterator iter = moved_list.begin();
 		 iter != moved_list.end(); )
 	{
@@ -2183,9 +2185,14 @@ void LLPipeline::updateMovedList(LLDrawable::drawable_vector_t& moved_list)
 					drawablep->getVObj()->dirtySpatialGroup(TRUE);
 				}
 			}
-			iter = moved_list.erase(curiter);
+		}
+		else
+		{
+			newList.push_back( drawablep );
 		}
 	}
+
+	moved_list.swap( newList );
 }
 
 static LLTrace::BlockTimerStatHandle FTM_OCTREE_BALANCE("Balance Octree");
@@ -3053,7 +3060,7 @@ void LLPipeline::rebuildPriorityGroups()
 		group->clearState(LLSpatialGroup::IN_BUILD_Q1);
 	}
 
-	mGroupSaveQ1.swap(mGroupQ1);
+	mGroupSaveQ1 = std::move(mGroupQ1);
 	mGroupQ1.clear();
 	mGroupQ1Locked = false;
 
@@ -3091,7 +3098,7 @@ void LLPipeline::rebuildGroups()
 		{
 			group->rebuildGeom();
 			
-			if (group->getSpatialPartition()->mRenderByGroup)
+			if (group->getSpatialPartition() && group->getSpatialPartition()->mRenderByGroup)
 			{
 				count++;
 			}
@@ -3491,7 +3498,7 @@ void LLPipeline::markRebuild(LLDrawable *drawablep, LLDrawable::EDrawableFlags f
 			mBuildQ2.push_back(drawablep);
 			drawablep->setState(LLDrawable::IN_REBUILD_Q2); // need flag here because it is just a list
 		}
-		if (flag & (LLDrawable::REBUILD_VOLUME | LLDrawable::REBUILD_POSITION))
+		if ((flag & (LLDrawable::REBUILD_VOLUME | LLDrawable::REBUILD_POSITION)) && drawablep->getVObj().notNull())
 		{
 			drawablep->getVObj()->setChanged(LLXform::SILHOUETTE);
 		}

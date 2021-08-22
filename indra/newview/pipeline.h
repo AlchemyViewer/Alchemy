@@ -759,7 +759,7 @@ protected:
 	LLSpatialGroup::sg_vector_t		mMeshDirtyGroup; //groups that need rebuildMesh called
 	U32 mMeshDirtyQueryObject;
 
-	LLDrawable::drawable_list_t		mPartitionQ; //drawables that need to update their spatial partition radius 
+	LLDrawable::drawable_vector_t	mPartitionQ; //drawables that need to update their spatial partition radius 
 
 	bool mGroupQ2Locked;
 	bool mGroupQ1Locked;

@@ -2613,7 +2613,7 @@ void renderPhysicsShape(LLDrawable* drawable, LLVOVolume* volume)
 				}
 			}
 
-			if (phys_volume->mHullPoints)
+			if (phys_volume->mHullPoints && phys_volume->mHullIndices && phys_volume->mNumHullPoints > 0 && phys_volume->mNumHullIndices > 0)
 			{
 				//render hull
 			
@@ -2703,8 +2703,8 @@ void renderPhysicsShape(LLDrawable* drawable, LLVOVolume* volume)
 
 		if (phys_volume->mHullPoints && phys_volume->mHullIndices)
 		{
-			glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 			gGL.diffuseColor4fv(line_color.mV);
+			glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 			LLVertexBuffer::drawElements(LLRender::TRIANGLES, phys_volume->mNumHullPoints, phys_volume->mHullPoints, NULL, phys_volume->mNumHullIndices, phys_volume->mHullIndices);
 
 			gGL.diffuseColor4fv(color.mV);
