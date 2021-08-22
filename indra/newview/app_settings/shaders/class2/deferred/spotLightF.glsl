@@ -143,6 +143,24 @@ void main()
     }
 	dist /= size;
 
+	float fa = falloff+1.0;
+	float dist_atten = clamp(1.0-(dist-1.0*(1.0-fa))/fa, 0.0, 1.0);
+	dist_atten *= dist_atten;
+	dist_atten *= 2.0;
+
+	if (dist_atten <= 0.0)
+	{
+		discard;
+	}
+
+	vec4 proj_tc = (proj_mat * vec4(pos.xyz, 1.0));
+	if (proj_tc.z < 0.0)
+	{
+		discard;
+	}
+	
+	proj_tc.xyz /= proj_tc.w;
+
 	float shadow = 1.0;
 	
 	if (proj_shadow_idx >= 0)
@@ -157,40 +175,23 @@ void main()
 	vec3 norm = getNormWithEnvIntensity(frag.xy, envIntensity);
 	
 	float l_dist = -dot(lv, proj_n);
-	
-	vec4 proj_tc = (proj_mat * vec4(pos.xyz, 1.0));
-	if (proj_tc.z < 0.0)
-	{
-		discard;
-	}
-	
-	proj_tc.xyz /= proj_tc.w;
-	
-	float fa = falloff+1.0;
-	float dist_atten = min(1.0-(dist-1.0*(1.0-fa))/fa, 1.0);
-	dist_atten *= dist_atten;
-	dist_atten *= 2.0;
 
-	if (dist_atten <= 0.0)
-	{
-		discard;
-	}
-	
 	lv = proj_origin-pos.xyz;
 	lv = normalize(lv);
 	float da = dot(norm, lv);
 		
 	vec3 diff_tex = texture2DRect(diffuseRect, frag.xy).rgb;
-	vec4 spec = texture2DRect(specularRect, frag.xy);
+
 	vec3 dlit = vec3(0, 0, 0);
 
-	float noise = texture2D(noiseMap, frag.xy/128.0).b;
 	if (proj_tc.z > 0.0 &&
 		proj_tc.x < 1.0 &&
 		proj_tc.y < 1.0 &&
 		proj_tc.x > 0.0 &&
 		proj_tc.y > 0.0)
 	{
+		float noise = texture2D(noiseMap, frag.xy/128.0).b;
+
 		float amb_da = proj_ambiance;
 		float lit = 0.0;
 		
@@ -220,6 +221,7 @@ void main()
 	    col += amb_da*color.rgb*diff_tex.rgb*amb_plcol.rgb*amb_plcol.a;
 	}
 
+	vec4 spec = texture2DRect(specularRect, frag.xy);
 	if (spec.a > 0.0)
 	{
 		dlit *= min(da*6.0, 1.0) * dist_atten;

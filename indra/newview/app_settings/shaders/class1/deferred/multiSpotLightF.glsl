@@ -140,19 +140,7 @@ void main()
 	{
 		discard;
 	}
-		
-	float envIntensity;
-	vec3 norm = getNormWithEnvIntensity(frag.xy, envIntensity);
-	float l_dist = -dot(lv, proj_n);
-	
-	vec4 proj_tc = (proj_mat * vec4(pos.xyz, 1.0));
-	if (proj_tc.z < 0.0)
-	{
-		discard;
-	}
-	
-	proj_tc.xyz /= proj_tc.w;
-	
+
 	float fa = falloff+1.0;
 	float dist_atten = clamp(1.0-(dist-1.0*(1.0-fa))/fa, 0.0, 1.0);
 	dist_atten *= dist_atten;
@@ -162,9 +150,18 @@ void main()
 	{
 		discard;
 	}
+
+	vec4 proj_tc = (proj_mat * vec4(pos.xyz, 1.0));
+	if (proj_tc.z < 0.0)
+	{
+		discard;
+	}
 	
-	float noise = texture2D(noiseMap, frag.xy/128.0).b;
-	dist_atten *= noise;
+	proj_tc.xyz /= proj_tc.w;
+	
+	float envIntensity;
+	vec3 norm = getNormWithEnvIntensity(frag.xy, envIntensity);
+	float l_dist = -dot(lv, proj_n);
 
 	lv = proj_origin-pos.xyz;
 	lv = normalize(lv);
@@ -181,6 +178,8 @@ void main()
 		proj_tc.x > 0.0 &&
 		proj_tc.y > 0.0)
 	{
+		float noise = texture2D(noiseMap, frag.xy/128.0).b;
+
 		float amb_da = proj_ambiance;
 		float lit = 0.0;
 		
@@ -193,7 +192,7 @@ void main()
 
 			dlit = color.rgb * plcol.rgb * plcol.a;
 			
-			lit = da * dist_atten;
+			lit = da * dist_atten * noise;
 
 			col = dlit*lit*diff_tex;
 			amb_da += (da*0.5)*proj_ambiance;
