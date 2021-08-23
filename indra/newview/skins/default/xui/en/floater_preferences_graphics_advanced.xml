@@ -694,7 +694,7 @@
     layout="topleft"
     name="ReflectionsText"
     text_readonly_color="LabelDisabledColor"
-    top_delta="16"
+    top_delta="18"
     left="440"
     width="128">
        Water Reflections:
@@ -735,6 +735,45 @@
         label="Everything"
         name="4"
         value="4"/>
+  </combo_box>
+
+  <text
+    type="string"
+    length="1"
+    follows="left|top"
+    height="16"
+    layout="topleft"
+    name="ReflectionsQualityText"
+    text_readonly_color="LabelDisabledColor"
+    top_delta="20"
+    left="440"
+    width="128">
+       Water Reflection Quality:
+  </text>
+  <combo_box
+    control_name="RenderWaterRefResolution"
+    height="18"
+    layout="topleft"
+    left_delta="170"
+    top_delta="0"
+    name="ReflectionsQuality"
+    width="150">
+      <combo_box.item
+        label="Low"
+        name="0"
+        value="512"/>
+      <combo_box.item
+        label="Medium"
+        name="1"
+        value="1024"/>
+      <combo_box.item
+        label="High"
+        name="2"
+        value="2048"/>
+      <combo_box.item
+        label="Ultra"
+        name="3"
+        value="4096"/>
   </combo_box>
 
   <check_box

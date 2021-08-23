@@ -1494,6 +1494,8 @@ void LLFloaterPreferenceGraphicsAdvanced::refreshEnabledState()
 {
 	LLComboBox* ctrl_reflections = getChild<LLComboBox>("Reflections");
 	LLTextBox* reflections_text = getChild<LLTextBox>("ReflectionsText");
+	LLComboBox* ctrl_reflections_quality = getChild<LLComboBox>("ReflectionsQuality");
+	LLTextBox* reflections_quality_text = getChild<LLTextBox>("ReflectionsQualityText");
 
 // [RLVa:KB] - Checked: 2013-05-11 (RLVa-1.4.9)
 	if (RlvActions::isRlvEnabled())
@@ -1570,6 +1572,10 @@ void LLFloaterPreferenceGraphicsAdvanced::refreshEnabledState()
                         (ctrl_wind_light->get()) ? TRUE : FALSE;
 
     ctrl_deferred->setEnabled(enabled);
+
+	// Reflection Detail
+	ctrl_reflections_quality->setEnabled(ctrl_deferred->get() && reflections);
+	reflections_quality_text->setEnabled(ctrl_deferred->get() && reflections);
 
 	LLCheckBoxCtrl* ctrl_ssao = getChild<LLCheckBoxCtrl>("UseSSAO");
 	LLCheckBoxCtrl* ctrl_dof = getChild<LLCheckBoxCtrl>("UseDoF");
@@ -1665,6 +1671,8 @@ void LLFloaterPreferenceGraphicsAdvanced::disableUnavailableSettings()
 {	
 	LLComboBox* ctrl_reflections   = getChild<LLComboBox>("Reflections");
 	LLTextBox* reflections_text = getChild<LLTextBox>("ReflectionsText");
+	LLComboBox* ctrl_reflections_quality = getChild<LLComboBox>("ReflectionsQuality");
+	LLTextBox* reflections_quality_text = getChild<LLTextBox>("ReflectionsQualityText");
 	LLCheckBoxCtrl* ctrl_avatar_vp     = getChild<LLCheckBoxCtrl>("AvatarVertexProgram");
 	LLCheckBoxCtrl* ctrl_avatar_cloth  = getChild<LLCheckBoxCtrl>("AvatarCloth");
 	LLCheckBoxCtrl* ctrl_wind_light    = getChild<LLCheckBoxCtrl>("WindLightUseAtmosShaders");
@@ -1716,6 +1724,10 @@ void LLFloaterPreferenceGraphicsAdvanced::disableUnavailableSettings()
 
 		ctrl_deferred->setEnabled(FALSE);
 		ctrl_deferred->setValue(FALSE);
+
+		ctrl_reflections_quality->setEnabled(FALSE);
+		ctrl_reflections_quality->setValue(FALSE);
+		reflections_quality_text->setEnabled(FALSE);
 	}
 	
 	// disabled deferred SSAO
@@ -1739,6 +1751,10 @@ void LLFloaterPreferenceGraphicsAdvanced::disableUnavailableSettings()
 		ctrl_reflections->setEnabled(FALSE);
 		ctrl_reflections->setValue(FALSE);
 		reflections_text->setEnabled(FALSE);
+
+		ctrl_reflections_quality->setEnabled(FALSE);
+		ctrl_reflections_quality->setValue(FALSE);
+		reflections_quality_text->setEnabled(FALSE);
 	}
 	
 	// disabled av
