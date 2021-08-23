@@ -159,9 +159,6 @@ void main()
 	// Note we actually want to use just df1, but multiplying by 0.999999 gets around an nvidia compiler bug
 	color.rgb = mix(fb.rgb, refcol.rgb, df1);
 	color.rgb += spec * specular;
-
-	color.rgb = atmosTransport(color.rgb);
-	color.rgb = scaleSoftClip(color.rgb);
     
 	color.a   = spec * sunAngle2;
     
