@@ -7851,8 +7851,7 @@ void LLPipeline::renderFinalize()
     if (LLPipeline::sRenderDeferred)
     {
 		auto& viewerCamera = LLViewerCamera::instance();
-		bool dof_enabled = !viewerCamera.cameraUnderWater() &&
-                           (RenderDepthOfFieldInEditMode || !LLToolMgr::getInstance()->inBuildMode()) &&
+		bool dof_enabled = (RenderDepthOfFieldInEditMode || !LLToolMgr::getInstance()->inBuildMode()) &&
                            RenderDepthOfField;
 
         bool multisample = RenderFSAASamples > 1 && (mFXAABuffer.isComplete() || (mSMAAEdgeBuffer.isComplete() && mSMAABlendBuffer.isComplete()));
