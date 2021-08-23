@@ -66,7 +66,7 @@ void main()
 	pos.xy = eyeVec.xy + oEyeVec.xy/d*ld;
 	view.xyz = oEyeVec;
 		
-	d = clamp(ld/1536.0-0.5, 0.0, 1.0);	
+	d = clamp(ld/8196.0-0.5, 0.0, 1.0);	
 	d *= d;
 		
 	oPosition = vec4(position, 1.0);
