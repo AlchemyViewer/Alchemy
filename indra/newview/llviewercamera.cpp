@@ -121,18 +121,7 @@ void LLViewerCamera::updateCameraLocation(const LLVector3 &center,
 
 	mLastPointOfInterest = point_of_interest;
 
-	LLViewerRegion * regp = gAgent.getRegion();
-	F32 water_height = (NULL != regp) ? regp->getWaterHeight() : 0.f;
-
 	LLVector3 origin = center;
-	if (origin.mV[2] > water_height)
-	{
-		origin.mV[2] = llmax(origin.mV[2], water_height+0.20f);
-	}
-	else
-	{
-		origin.mV[2] = llmin(origin.mV[2], water_height-0.20f);
-	}
 
 	setOriginAndLookAt(origin, up_direction, point_of_interest);
 
