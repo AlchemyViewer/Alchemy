@@ -1353,6 +1353,11 @@ void LLPipeline::createGLBuffers()
 	if (LLPipeline::sWaterReflections)
 	{ //water reflection texture
 		U32 res = (U32) llmax(gSavedSettings.getS32("RenderWaterRefResolution"), 512);
+		if(!sRenderDeferred)
+		{
+			// Clamp to 512 in forward rendering to avoid breaking reflections
+			res = 512U;
+		}
 		mWaterRef.allocate(res,res,GL_RGBA,TRUE,FALSE);
         mWaterDis.allocate(res,res,GL_RGBA,TRUE,FALSE,LLTexUnit::TT_TEXTURE);
 	}
