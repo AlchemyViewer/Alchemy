@@ -41,6 +41,7 @@
 #include "lldir.h"
 #include "llfindlocale.h"
 
+#include <SDL_misc.h>
 
 #if LL_GTK
 extern "C" {
@@ -2507,39 +2508,6 @@ BOOL LLWindowSDL::dialogColorPicker( F32 *r, F32 *g, F32 *b)
 }
 #endif // LL_GTK
 
-#if LL_LINUX
-// extracted from spawnWebBrowser for clarity and to eliminate
-//  compiler confusion regarding close(int fd) vs. LLWindow::close()
-void exec_cmd(const std::string& cmd, const std::string& arg)
-{
-	char* const argv[] = {(char*)cmd.c_str(), (char*)arg.c_str(), NULL};
-	fflush(NULL);
-	pid_t pid = fork();
-	if (pid == 0)
-	{ // child
-		// disconnect from stdin/stdout/stderr, or child will
-		// keep our output pipe undesirably alive if it outlives us.
-		close(0);
-		close(1);
-		close(2);
-		// end ourself by running the command
-		execv(cmd.c_str(), argv);	/* Flawfinder: ignore */
-		// if execv returns at all, there was a problem.
-		LL_WARNS() << "execv failure when trying to start " << cmd << LL_ENDL;
-		_exit(1); // _exit because we don't want atexit() clean-up!
-	} else {
-		if (pid > 0)
-		{
-			// parent - wait for child to die
-			int childExitStatus;
-			waitpid(pid, &childExitStatus, 0);
-		} else {
-			LL_WARNS() << "fork failure." << LL_ENDL;
-		}
-	}
-}
-#endif
-
 // Open a URL with the user's default web browser.
 // Must begin with protocol identifier.
 void LLWindowSDL::spawnWebBrowser(const std::string& escaped_url, bool async)
@@ -2563,24 +2531,10 @@ void LLWindowSDL::spawnWebBrowser(const std::string& escaped_url, bool async)
 
 	LL_INFOS() << "spawn_web_browser: " << escaped_url << LL_ENDL;
 	
-#if LL_LINUX
-# if LL_X11
-	if (mSDL_Display)
+	if (SDL_OpenURL(escaped_url.c_str()) != 0)
 	{
-		// Just in case - before forking.
-		XSync(mSDL_Display, False);
+		LL_WARNS() << "spawn_web_browser failed with error: " << SDL_GetError() << LL_ENDL;		
 	}
-# endif // LL_X11
-
-	std::string cmd, arg;
-	cmd  = gDirUtilp->getAppRODataDir();
-	cmd += gDirUtilp->getDirDelimiter();
-	cmd += "etc";
-	cmd += gDirUtilp->getDirDelimiter();
-	cmd += "launch_url.sh";
-	arg = escaped_url;
-	exec_cmd(cmd, arg);
-#endif // LL_LINUX
 
 	LL_INFOS() << "spawn_web_browser returning." << LL_ENDL;
 }

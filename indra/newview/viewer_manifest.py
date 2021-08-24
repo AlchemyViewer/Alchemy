@@ -1093,7 +1093,6 @@ class LinuxManifest(ViewerManifest):
                 self.path("handle_secondlifeprotocol.sh")
                 self.path("register_secondlifeprotocol.sh")
                 self.path("refresh_desktop_app_entry.sh")
-                self.path("launch_url.sh")
                 self.path("chrome_sandboxing_permissions_setup.sh")
             self.path("install.sh")
 

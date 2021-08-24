@@ -1,4 +1,4 @@
-Second Life - Linux Beta README
+Alchemy - Linux Beta README
 -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
 This document contains information about the Alchemy Viewer Linux
