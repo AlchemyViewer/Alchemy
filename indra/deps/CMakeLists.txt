@@ -48,7 +48,7 @@ FetchContent_Declare(
 FetchContent_Declare(
   nlohmann_json
   GIT_REPOSITORY https://git.alchemyviewer.org/alchemy/mirrors/modernjson.git
-  GIT_TAG        v3.9.1
+  GIT_TAG        v3.10.1
   )
 
 FetchContent_Declare(
