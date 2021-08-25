@@ -2945,19 +2945,6 @@ void LLAppViewer::initStrings()
 	}
 }
 
-//
-// This function decides whether the client machine meets the minimum requirements to
-// run in a maximized window, per the consensus of davep, boa and nyx on 3/30/2011.
-//
-bool LLAppViewer::meetsRequirementsForMaximizedStart()
-{
-	bool maximizedOk = (LLFeatureManager::getInstance()->getGPUClass() >= GPU_CLASS_2);
-
-	maximizedOk &= (gSysMemory.getPhysicalMemoryKB() >= U32Gigabytes(1));
-
-	return maximizedOk;
-}
-
 bool LLAppViewer::initWindow()
 {
 	LL_INFOS("AppInit") << "Initializing window..." << LL_ENDL;
@@ -3044,21 +3031,6 @@ bool LLAppViewer::initWindow()
 	if(gCrashOnStartup)
 	{
 		LLAppViewer::instance()->forceErrorLLError();
-	}
-
-	//
-	// Determine if the window should start maximized on initial run based
-	// on graphics capability
-	//
-	if (gSavedSettings.getBOOL("FirstLoginThisInstall") && meetsRequirementsForMaximizedStart())
-	{
-		LL_INFOS("AppInit") << "This client met the requirements for a maximized initial screen." << LL_ENDL;
-		gSavedSettings.setBOOL("WindowMaximized", TRUE);
-	}
-
-	if (gSavedSettings.getBOOL("WindowMaximized"))
-	{
-		gViewerWindow->getWindow()->maximize();
 	}
 
 	LLUI::sWindow = gViewerWindow->getWindow();

@@ -228,8 +228,6 @@ protected:
 
 	virtual std::string generateSerialNumber() = 0; // Platforms specific classes generate this.
 
-	virtual bool meetsRequirementsForMaximizedStart(); // Used on first login to decide to launch maximized
-
 private:
 
 	bool doFrame();
