@@ -3487,13 +3487,10 @@ void LLAppViewer::writeSystemInfo()
 	gDebugInfo["FirstRunThisInstall"] = gSavedSettings.getBOOL("FirstRunThisInstall");
     gDebugInfo["StartupState"] = LLStartUp::getStartupStateString();
 
-	if (gViewerWindow && gViewerWindow->getWindow())
+	std::vector<std::string> resolutions = LLWindow::getDisplaysResolutionList();
+	for (auto res_iter : resolutions)
 	{
-		std::vector<std::string> resolutions = gViewerWindow->getWindow()->getDisplaysResolutionList();
-		for (auto res_iter : resolutions)
-		{
-			gDebugInfo["DisplayInfo"].append(res_iter);
-		}
+		gDebugInfo["DisplayInfo"].append(res_iter);
 	}
 
 	writeDebugInfo(); // Save out debug_info.log early, in case of crash.
