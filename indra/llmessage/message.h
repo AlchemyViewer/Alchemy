@@ -726,6 +726,7 @@ public:
 	void	sanityCheck();
 
 	BOOL	has(const char *blockname) const;
+	BOOL	hasFast(const char *blockname) const;
 	S32		getNumberOfBlocksFast(const char *blockname) const;
 	S32		getNumberOfBlocks(const char *blockname) const;
 	S32		getSizeFast(const char *blockname, const char *varname) const;

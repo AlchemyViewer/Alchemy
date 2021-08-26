@@ -3962,6 +3962,11 @@ BOOL	LLMessageSystem::has(const char *blockname) const
 	return getNumberOfBlocks(blockname) > 0;
 }
 
+BOOL	LLMessageSystem::hasFast(const char *blockname) const
+{
+	return getNumberOfBlocksFast(blockname) > 0;
+}
+
 S32	LLMessageSystem::getNumberOfBlocksFast(const char *blockname) const
 {
 	return mMessageReader->getNumberOfBlocks(blockname);
