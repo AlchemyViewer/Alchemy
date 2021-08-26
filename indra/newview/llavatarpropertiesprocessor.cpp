@@ -133,9 +133,9 @@ void LLAvatarPropertiesProcessor::sendAvatarPropertiesRequest(const LLUUID& avat
 
 	msg->newMessageFast(_PREHASH_AvatarPropertiesRequest);
 	msg->nextBlockFast( _PREHASH_AgentData);
-	msg->addUUIDFast(   _PREHASH_AgentID, gAgent.getID() );
+	msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID() );
 	msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
-	msg->addUUIDFast(   _PREHASH_AvatarID, avatar_id);
+	msg->addUUIDFast(_PREHASH_AvatarID, avatar_id);
 	gAgent.sendReliableMessage();
 }
 
@@ -182,20 +182,20 @@ void LLAvatarPropertiesProcessor::sendAvatarPropertiesUpdate(const LLAvatarData*
 
 	LLMessageSystem *msg = gMessageSystem;
 
-	msg->newMessageFast	(_PREHASH_AvatarPropertiesUpdate);
-	msg->nextBlockFast	(_PREHASH_AgentData);
-	msg->addUUIDFast		(_PREHASH_AgentID,		gAgent.getID() );
-	msg->addUUIDFast		(_PREHASH_SessionID,	gAgent.getSessionID() );
-	msg->nextBlockFast	(_PREHASH_PropertiesData);
+	msg->newMessageFast(_PREHASH_AvatarPropertiesUpdate);
+	msg->nextBlockFast(_PREHASH_AgentData);
+	msg->addUUIDFast(_PREHASH_AgentID,		gAgent.getID() );
+	msg->addUUIDFast(_PREHASH_SessionID,	gAgent.getSessionID() );
+	msg->nextBlockFast(_PREHASH_PropertiesData);
 
-	msg->addUUIDFast		(_PREHASH_ImageID,		avatar_props->image_id);
-	msg->addUUIDFast		(_PREHASH_FLImageID,	avatar_props->fl_image_id);
-	msg->addStringFast	(_PREHASH_AboutText,	avatar_props->about_text);
-	msg->addStringFast	(_PREHASH_FLAboutText,	avatar_props->fl_about_text);
+	msg->addUUIDFast(_PREHASH_ImageID,		avatar_props->image_id);
+	msg->addUUIDFast(_PREHASH_FLImageID,	avatar_props->fl_image_id);
+	msg->addStringFast(_PREHASH_AboutText,	avatar_props->about_text);
+	msg->addStringFast(_PREHASH_FLAboutText,	avatar_props->fl_about_text);
 
-	msg->addBOOL(_PREHASH_AllowPublish, avatar_props->allow_publish);
-	msg->addBOOL(_PREHASH_MaturePublish, mature);
-	msg->addString(_PREHASH_ProfileURL, avatar_props->profile_url);
+	msg->addBOOLFast(_PREHASH_AllowPublish, avatar_props->allow_publish);
+	msg->addBOOLFast(_PREHASH_MaturePublish, mature);
+	msg->addStringFast(_PREHASH_ProfileURL, avatar_props->profile_url);
 
 	gAgent.sendReliableMessage();
 }
@@ -279,7 +279,7 @@ void LLAvatarPropertiesProcessor::processAvatarPropertiesReply(LLMessageSystem* 
 	msg->getStringFast(	_PREHASH_PropertiesData,	_PREHASH_AboutText,		avatar_data.about_text);
 	msg->getStringFast(	_PREHASH_PropertiesData,	_PREHASH_FLAboutText,	avatar_data.fl_about_text);
 	msg->getStringFast(	_PREHASH_PropertiesData,	_PREHASH_BornOn,		birth_date);
-	msg->getString(		_PREHASH_PropertiesData,	_PREHASH_ProfileURL,	avatar_data.profile_url);
+	msg->getStringFast( _PREHASH_PropertiesData,	_PREHASH_ProfileURL,	avatar_data.profile_url);
 	msg->getU32Fast(	_PREHASH_PropertiesData,	_PREHASH_Flags,			avatar_data.flags);
 
 
@@ -287,14 +287,14 @@ void LLAvatarPropertiesProcessor::processAvatarPropertiesReply(LLMessageSystem* 
 	avatar_data.caption_index = 0;
 
 	S32 charter_member_size = 0;
-	charter_member_size = msg->getSize(_PREHASH_PropertiesData, _PREHASH_CharterMember);
+	charter_member_size = msg->getSizeFast(_PREHASH_PropertiesData, _PREHASH_CharterMember);
 	if(1 == charter_member_size)
 	{
-		msg->getBinaryData(_PREHASH_PropertiesData, _PREHASH_CharterMember, &avatar_data.caption_index, 1);
+		msg->getBinaryDataFast(_PREHASH_PropertiesData, _PREHASH_CharterMember, &avatar_data.caption_index, 1);
 	}
 	else if(1 < charter_member_size)
 	{
-		msg->getString(_PREHASH_PropertiesData, _PREHASH_CharterMember, avatar_data.caption_text);
+		msg->getStringFast(_PREHASH_PropertiesData, _PREHASH_CharterMember, avatar_data.caption_text);
 	}
 	LLAvatarPropertiesProcessor* self = getInstance();
 	// Request processed, no longer pending
@@ -321,7 +321,7 @@ void LLAvatarPropertiesProcessor::processAvatarInterestsReply(LLMessageSystem* m
     msg->getStringFast( _PREHASH_PropertiesData,    _PREHASH_WantToText,    interests_data.want_to_text );
     msg->getU32Fast(    _PREHASH_PropertiesData,	_PREHASH_SkillsMask,    interests_data.skills_mask );
     msg->getStringFast( _PREHASH_PropertiesData,    _PREHASH_SkillsText,    interests_data.skills_text );
-    msg->getString(     _PREHASH_PropertiesData,    _PREHASH_LanguagesText, interests_data.languages_text );
+    msg->getStringFast(     _PREHASH_PropertiesData,    _PREHASH_LanguagesText, interests_data.languages_text );
     
     LLAvatarPropertiesProcessor* self = getInstance();
     // Request processed, no longer pending
@@ -333,17 +333,17 @@ void LLAvatarPropertiesProcessor::processAvatarClassifiedsReply(LLMessageSystem*
 {
 	LLAvatarClassifieds classifieds;
 
-	msg->getUUID(_PREHASH_AgentData, _PREHASH_AgentID, classifieds.agent_id);
-	msg->getUUID(_PREHASH_AgentData, _PREHASH_TargetID, classifieds.target_id);
+	msg->getUUIDFast(_PREHASH_AgentData, _PREHASH_AgentID, classifieds.agent_id);
+	msg->getUUIDFast(_PREHASH_AgentData, _PREHASH_TargetID, classifieds.target_id);
 
-	S32 block_count = msg->getNumberOfBlocks(_PREHASH_Data);
+	S32 block_count = msg->getNumberOfBlocksFast(_PREHASH_Data);
 
 	for(int n = 0; n < block_count; ++n)
 	{
 		LLAvatarClassifieds::classified_data data;
 
-		msg->getUUID(_PREHASH_Data, _PREHASH_ClassifiedID, data.classified_id, n);
-		msg->getString(_PREHASH_Data, _PREHASH_Name, data.name, n);
+		msg->getUUIDFast(_PREHASH_Data, _PREHASH_ClassifiedID, data.classified_id, n);
+		msg->getStringFast(_PREHASH_Data, _PREHASH_Name, data.name, n);
 
 		classifieds.classifieds_list.push_back(data);
 	}
@@ -358,23 +358,23 @@ void LLAvatarPropertiesProcessor::processClassifiedInfoReply(LLMessageSystem* ms
 {
 	LLAvatarClassifiedInfo c_info;
 
-	msg->getUUID(_PREHASH_AgentData, _PREHASH_AgentID, c_info.agent_id);
+	msg->getUUIDFast(_PREHASH_AgentData, _PREHASH_AgentID, c_info.agent_id);
 
-	msg->getUUID(_PREHASH_Data, _PREHASH_ClassifiedID, c_info.classified_id);
-	msg->getUUID(_PREHASH_Data, _PREHASH_CreatorID, c_info.creator_id);
-	msg->getU32(_PREHASH_Data, _PREHASH_CreationDate, c_info.creation_date);
-	msg->getU32(_PREHASH_Data, _PREHASH_ExpirationDate, c_info.expiration_date);
-	msg->getU32(_PREHASH_Data, _PREHASH_Category, c_info.category);
-	msg->getString(_PREHASH_Data, _PREHASH_Name, c_info.name);
-	msg->getString(_PREHASH_Data, _PREHASH_Desc, c_info.description);
-	msg->getUUID(_PREHASH_Data, _PREHASH_ParcelID, c_info.parcel_id);
-	msg->getU32(_PREHASH_Data, _PREHASH_ParentEstate, c_info.parent_estate);
-	msg->getUUID(_PREHASH_Data, _PREHASH_SnapshotID, c_info.snapshot_id);
-	msg->getString(_PREHASH_Data, _PREHASH_SimName, c_info.sim_name);
-	msg->getVector3d(_PREHASH_Data, _PREHASH_PosGlobal, c_info.pos_global);
-	msg->getString(_PREHASH_Data, _PREHASH_ParcelName, c_info.parcel_name);
-	msg->getU8(_PREHASH_Data, _PREHASH_ClassifiedFlags, c_info.flags);
-	msg->getS32(_PREHASH_Data, _PREHASH_PriceForListing, c_info.price_for_listing);
+	msg->getUUIDFast(_PREHASH_Data, _PREHASH_ClassifiedID, c_info.classified_id);
+	msg->getUUIDFast(_PREHASH_Data, _PREHASH_CreatorID, c_info.creator_id);
+	msg->getU32Fast(_PREHASH_Data, _PREHASH_CreationDate, c_info.creation_date);
+	msg->getU32Fast(_PREHASH_Data, _PREHASH_ExpirationDate, c_info.expiration_date);
+	msg->getU32Fast(_PREHASH_Data, _PREHASH_Category, c_info.category);
+	msg->getStringFast(_PREHASH_Data, _PREHASH_Name, c_info.name);
+	msg->getStringFast(_PREHASH_Data, _PREHASH_Desc, c_info.description);
+	msg->getUUIDFast(_PREHASH_Data, _PREHASH_ParcelID, c_info.parcel_id);
+	msg->getU32Fast(_PREHASH_Data, _PREHASH_ParentEstate, c_info.parent_estate);
+	msg->getUUIDFast(_PREHASH_Data, _PREHASH_SnapshotID, c_info.snapshot_id);
+	msg->getStringFast(_PREHASH_Data, _PREHASH_SimName, c_info.sim_name);
+	msg->getVector3dFast(_PREHASH_Data, _PREHASH_PosGlobal, c_info.pos_global);
+	msg->getStringFast(_PREHASH_Data, _PREHASH_ParcelName, c_info.parcel_name);
+	msg->getU8Fast(_PREHASH_Data, _PREHASH_ClassifiedFlags, c_info.flags);
+	msg->getS32Fast(_PREHASH_Data, _PREHASH_PriceForListing, c_info.price_for_listing);
 
 	LLAvatarPropertiesProcessor* self = getInstance();
 	// Request processed, no longer pending
@@ -387,9 +387,9 @@ void LLAvatarPropertiesProcessor::processAvatarNotesReply(LLMessageSystem* msg, 
 {
 	LLAvatarNotes avatar_notes;
 
-	msg->getUUID(_PREHASH_AgentData, _PREHASH_AgentID, avatar_notes.agent_id);
-	msg->getUUID(_PREHASH_Data, _PREHASH_TargetID, avatar_notes.target_id);
-	msg->getString(_PREHASH_Data, _PREHASH_Notes, avatar_notes.notes);
+	msg->getUUIDFast(_PREHASH_AgentData, _PREHASH_AgentID, avatar_notes.agent_id);
+	msg->getUUIDFast(_PREHASH_Data, _PREHASH_TargetID, avatar_notes.target_id);
+	msg->getStringFast(_PREHASH_Data, _PREHASH_Notes, avatar_notes.notes);
 
 	LLAvatarPropertiesProcessor* self = getInstance();
 	// Request processed, no longer pending
@@ -400,17 +400,17 @@ void LLAvatarPropertiesProcessor::processAvatarNotesReply(LLMessageSystem* msg, 
 void LLAvatarPropertiesProcessor::processAvatarPicksReply(LLMessageSystem* msg, void**)
 {
 	LLAvatarPicks avatar_picks;
-	msg->getUUID(_PREHASH_AgentData, _PREHASH_AgentID, avatar_picks.target_id);
-	msg->getUUID(_PREHASH_AgentData, _PREHASH_TargetID, avatar_picks.target_id);
+	msg->getUUIDFast(_PREHASH_AgentData, _PREHASH_AgentID, avatar_picks.target_id);
+	msg->getUUIDFast(_PREHASH_AgentData, _PREHASH_TargetID, avatar_picks.target_id);
 
-	S32 block_count = msg->getNumberOfBlocks(_PREHASH_Data);
+	S32 block_count = msg->getNumberOfBlocksFast(_PREHASH_Data);
 	for (int block = 0; block < block_count; ++block)
 	{
 		LLUUID pick_id;
 		std::string pick_name;
 
-		msg->getUUID(_PREHASH_Data, _PREHASH_PickID, pick_id, block);
-		msg->getString(_PREHASH_Data, _PREHASH_PickName, pick_name, block);
+		msg->getUUIDFast(_PREHASH_Data, _PREHASH_PickID, pick_id, block);
+		msg->getStringFast(_PREHASH_Data, _PREHASH_PickName, pick_name, block);
 
 		avatar_picks.picks_list.push_back(std::make_pair(pick_id,pick_name));
 	}
@@ -426,24 +426,24 @@ void LLAvatarPropertiesProcessor::processPickInfoReply(LLMessageSystem* msg, voi
 
 	// Extract the agent id and verify the message is for this
 	// client.
-	msg->getUUID(_PREHASH_AgentData, _PREHASH_AgentID, pick_data.agent_id );
-	msg->getUUID(_PREHASH_Data, _PREHASH_PickID, pick_data.pick_id);
-	msg->getUUID(_PREHASH_Data, _PREHASH_CreatorID, pick_data.creator_id);
+	msg->getUUIDFast(_PREHASH_AgentData, _PREHASH_AgentID, pick_data.agent_id );
+	msg->getUUIDFast(_PREHASH_Data, _PREHASH_PickID, pick_data.pick_id);
+	msg->getUUIDFast(_PREHASH_Data, _PREHASH_CreatorID, pick_data.creator_id);
 
 	// ** top_pick should be deleted, not being used anymore - angela
-	msg->getBOOL(_PREHASH_Data, _PREHASH_TopPick, pick_data.top_pick);
-	msg->getUUID(_PREHASH_Data, _PREHASH_ParcelID, pick_data.parcel_id);
-	msg->getString(_PREHASH_Data, _PREHASH_Name, pick_data.name);
-	msg->getString(_PREHASH_Data, _PREHASH_Desc, pick_data.desc);
-	msg->getUUID(_PREHASH_Data, _PREHASH_SnapshotID, pick_data.snapshot_id);
+	msg->getBOOLFast(_PREHASH_Data, _PREHASH_TopPick, pick_data.top_pick);
+	msg->getUUIDFast(_PREHASH_Data, _PREHASH_ParcelID, pick_data.parcel_id);
+	msg->getStringFast(_PREHASH_Data, _PREHASH_Name, pick_data.name);
+	msg->getStringFast(_PREHASH_Data, _PREHASH_Desc, pick_data.desc);
+	msg->getUUIDFast(_PREHASH_Data, _PREHASH_SnapshotID, pick_data.snapshot_id);
 
-	msg->getString(_PREHASH_Data, _PREHASH_User, pick_data.user_name);
-	msg->getString(_PREHASH_Data, _PREHASH_OriginalName, pick_data.original_name);
-	msg->getString(_PREHASH_Data, _PREHASH_SimName, pick_data.sim_name);
-	msg->getVector3d(_PREHASH_Data, _PREHASH_PosGlobal, pick_data.pos_global);
+	msg->getStringFast(_PREHASH_Data, _PREHASH_User, pick_data.user_name);
+	msg->getStringFast(_PREHASH_Data, _PREHASH_OriginalName, pick_data.original_name);
+	msg->getStringFast(_PREHASH_Data, _PREHASH_SimName, pick_data.sim_name);
+	msg->getVector3dFast(_PREHASH_Data, _PREHASH_PosGlobal, pick_data.pos_global);
 
-	msg->getS32(_PREHASH_Data, _PREHASH_SortOrder, pick_data.sort_order);
-	msg->getBOOL(_PREHASH_Data, _PREHASH_Enabled, pick_data.enabled);
+	msg->getS32Fast(_PREHASH_Data, _PREHASH_SortOrder, pick_data.sort_order);
+	msg->getBOOLFast(_PREHASH_Data, _PREHASH_Enabled, pick_data.enabled);
 
 	LLAvatarPropertiesProcessor* self = getInstance();
 	// don't need to remove pending request as we don't track pick info
@@ -461,7 +461,7 @@ void LLAvatarPropertiesProcessor::processAvatarGroupsReply(LLMessageSystem* msg,
 	{
 		LLAvatarGroups::LLGroupData group_data;
 
-		msg->getU64(    _PREHASH_GroupData, _PREHASH_GroupPowers,	group_data.group_powers, i );
+		msg->getU64Fast(    _PREHASH_GroupData, _PREHASH_GroupPowers,	group_data.group_powers, i );
 		msg->getStringFast(_PREHASH_GroupData, _PREHASH_GroupTitle,	group_data.group_title, i );
 		msg->getUUIDFast(  _PREHASH_GroupData, _PREHASH_GroupID,	group_data.group_id, i);
 		msg->getStringFast(_PREHASH_GroupData, _PREHASH_GroupName,	group_data.group_name, i );
@@ -503,12 +503,12 @@ void LLAvatarPropertiesProcessor::sendFriendRights(const LLUUID& avatar_id, S32 
 		// setup message header
 		msg->newMessageFast(_PREHASH_GrantUserRights);
 		msg->nextBlockFast(_PREHASH_AgentData);
-		msg->addUUID(_PREHASH_AgentID, gAgent.getID());
-		msg->addUUID(_PREHASH_SessionID, gAgent.getSessionID());
+		msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID());
+		msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
 
 		msg->nextBlockFast(_PREHASH_Rights);
-		msg->addUUID(_PREHASH_AgentRelated, avatar_id);
-		msg->addS32(_PREHASH_RelatedRights, rights);
+		msg->addUUIDFast(_PREHASH_AgentRelated, avatar_id);
+		msg->addS32Fast(_PREHASH_RelatedRights, rights);
 
 		gAgent.sendReliableMessage();
 	}
@@ -523,12 +523,12 @@ void LLAvatarPropertiesProcessor::sendNotes(const LLUUID& avatar_id, const std::
 		// setup message header
 		msg->newMessageFast(_PREHASH_AvatarNotesUpdate);
 		msg->nextBlockFast(_PREHASH_AgentData);
-		msg->addUUID(_PREHASH_AgentID, gAgent.getID());
-		msg->addUUID(_PREHASH_SessionID, gAgent.getSessionID());
+		msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID());
+		msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
 
 		msg->nextBlockFast(_PREHASH_Data);
-		msg->addUUID(_PREHASH_TargetID, avatar_id);
-		msg->addString(_PREHASH_Notes, notes);
+		msg->addUUIDFast(_PREHASH_TargetID, avatar_id);
+		msg->addStringFast(_PREHASH_Notes, notes);
 
 		gAgent.sendReliableMessage();
 	}
@@ -538,12 +538,12 @@ void LLAvatarPropertiesProcessor::sendNotes(const LLUUID& avatar_id, const std::
 void LLAvatarPropertiesProcessor::sendPickDelete( const LLUUID& pick_id )
 {
 	LLMessageSystem* msg = gMessageSystem; 
-	msg->newMessage(_PREHASH_PickDelete);
-	msg->nextBlock(_PREHASH_AgentData);
-	msg->addUUID(_PREHASH_AgentID, gAgent.getID());
-	msg->addUUID(_PREHASH_SessionID, gAgent.getSessionID());
-	msg->nextBlock(_PREHASH_Data);
-	msg->addUUID(_PREHASH_PickID, pick_id);
+	msg->newMessageFast(_PREHASH_PickDelete);
+	msg->nextBlockFast(_PREHASH_AgentData);
+	msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID());
+	msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
+	msg->nextBlockFast(_PREHASH_Data);
+	msg->addUUIDFast(_PREHASH_PickID, pick_id);
 	gAgent.sendReliableMessage();
 
 	LLAgentPicksInfo::getInstance()->requestNumberOfPicks();
@@ -554,14 +554,14 @@ void LLAvatarPropertiesProcessor::sendClassifiedDelete(const LLUUID& classified_
 {
 	LLMessageSystem* msg = gMessageSystem; 
 
-	msg->newMessage(_PREHASH_ClassifiedDelete);
+	msg->newMessageFast(_PREHASH_ClassifiedDelete);
 
-	msg->nextBlock(_PREHASH_AgentData);
-	msg->addUUID(_PREHASH_AgentID, gAgent.getID());
-	msg->addUUID(_PREHASH_SessionID, gAgent.getSessionID());
+	msg->nextBlockFast(_PREHASH_AgentData);
+	msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID());
+	msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
 
-	msg->nextBlock(_PREHASH_Data);
-	msg->addUUID(_PREHASH_ClassifiedID, classified_id);
+	msg->nextBlockFast(_PREHASH_Data);
+	msg->addUUIDFast(_PREHASH_ClassifiedID, classified_id);
 
 	gAgent.sendReliableMessage();
 }
@@ -575,7 +575,7 @@ void LLAvatarPropertiesProcessor::sendInterestsInfoUpdate(const LLInterestsData*
 
     LLMessageSystem* msg = gMessageSystem;
 
-    msg->newMessage(_PREHASH_AvatarInterestsUpdate);
+    msg->newMessageFast(_PREHASH_AvatarInterestsUpdate);
     msg->nextBlockFast( _PREHASH_AgentData);
     msg->addUUIDFast(	_PREHASH_AgentID,       gAgent.getID() );
     msg->addUUIDFast(   _PREHASH_SessionID,     gAgent.getSessionID() );
@@ -584,7 +584,7 @@ void LLAvatarPropertiesProcessor::sendInterestsInfoUpdate(const LLInterestsData*
     msg->addStringFast(	_PREHASH_WantToText,    interests_data->want_to_text);
     msg->addU32Fast(	_PREHASH_SkillsMask,    interests_data->skills_mask);
     msg->addStringFast(	_PREHASH_SkillsText,    interests_data->skills_text);
-    msg->addString(     _PREHASH_LanguagesText, interests_data->languages_text);
+    msg->addStringFast(     _PREHASH_LanguagesText, interests_data->languages_text);
     
     gAgent.sendReliableMessage();
 }
@@ -595,29 +595,29 @@ void LLAvatarPropertiesProcessor::sendPickInfoUpdate(const LLPickData* new_pick)
 
 	LLMessageSystem* msg = gMessageSystem;
 
-	msg->newMessage(_PREHASH_PickInfoUpdate);
-	msg->nextBlock(_PREHASH_AgentData);
-	msg->addUUID(_PREHASH_AgentID, gAgent.getID());
-	msg->addUUID(_PREHASH_SessionID, gAgent.getSessionID());
+	msg->newMessageFast(_PREHASH_PickInfoUpdate);
+	msg->nextBlockFast(_PREHASH_AgentData);
+	msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID());
+	msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
 
-	msg->nextBlock(_PREHASH_Data);
-	msg->addUUID(_PREHASH_PickID, new_pick->pick_id);
-	msg->addUUID(_PREHASH_CreatorID, new_pick->creator_id);
+	msg->nextBlockFast(_PREHASH_Data);
+	msg->addUUIDFast(_PREHASH_PickID, new_pick->pick_id);
+	msg->addUUIDFast(_PREHASH_CreatorID, new_pick->creator_id);
 
 	//legacy var need to be deleted
-	msg->addBOOL(_PREHASH_TopPick, FALSE);	
+	msg->addBOOLFast(_PREHASH_TopPick, FALSE);	
 
 	// fills in on simulator if null
-	msg->addUUID(_PREHASH_ParcelID, new_pick->parcel_id);
-	msg->addString(_PREHASH_Name, new_pick->name);
-	msg->addString(_PREHASH_Desc, new_pick->desc);
-	msg->addUUID(_PREHASH_SnapshotID, new_pick->snapshot_id);
-	msg->addVector3d(_PREHASH_PosGlobal, new_pick->pos_global);
+	msg->addUUIDFast(_PREHASH_ParcelID, new_pick->parcel_id);
+	msg->addStringFast(_PREHASH_Name, new_pick->name);
+	msg->addStringFast(_PREHASH_Desc, new_pick->desc);
+	msg->addUUIDFast(_PREHASH_SnapshotID, new_pick->snapshot_id);
+	msg->addVector3dFast(_PREHASH_PosGlobal, new_pick->pos_global);
 
 	// Only top picks have a sort order
-	msg->addS32(_PREHASH_SortOrder, 0);
+	msg->addS32Fast(_PREHASH_SortOrder, 0);
 
-	msg->addBOOL(_PREHASH_Enabled, new_pick->enabled);
+	msg->addBOOLFast(_PREHASH_Enabled, new_pick->enabled);
 	gAgent.sendReliableMessage();
 
 	LLAgentPicksInfo::getInstance()->requestNumberOfPicks();
@@ -632,23 +632,23 @@ void LLAvatarPropertiesProcessor::sendClassifiedInfoUpdate(const LLAvatarClassif
 
 	LLMessageSystem* msg = gMessageSystem;
 
-	msg->newMessage(_PREHASH_ClassifiedInfoUpdate);
+	msg->newMessageFast(_PREHASH_ClassifiedInfoUpdate);
 
-	msg->nextBlock(_PREHASH_AgentData);
-	msg->addUUID(_PREHASH_AgentID, gAgent.getID());
-	msg->addUUID(_PREHASH_SessionID, gAgent.getSessionID());
+	msg->nextBlockFast(_PREHASH_AgentData);
+	msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID());
+	msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
 
-	msg->nextBlock(_PREHASH_Data);
-	msg->addUUID(_PREHASH_ClassifiedID, c_data->classified_id);
-	msg->addU32(_PREHASH_Category, c_data->category);
-	msg->addString(_PREHASH_Name, c_data->name);
-	msg->addString(_PREHASH_Desc, c_data->description);
-	msg->addUUID(_PREHASH_ParcelID, c_data->parcel_id);
-	msg->addU32(_PREHASH_ParentEstate, 0);
-	msg->addUUID(_PREHASH_SnapshotID, c_data->snapshot_id);
-	msg->addVector3d(_PREHASH_PosGlobal, c_data->pos_global);
-	msg->addU8(_PREHASH_ClassifiedFlags, c_data->flags);
-	msg->addS32(_PREHASH_PriceForListing, c_data->price_for_listing);
+	msg->nextBlockFast(_PREHASH_Data);
+	msg->addUUIDFast(_PREHASH_ClassifiedID, c_data->classified_id);
+	msg->addU32Fast(_PREHASH_Category, c_data->category);
+	msg->addStringFast(_PREHASH_Name, c_data->name);
+	msg->addStringFast(_PREHASH_Desc, c_data->description);
+	msg->addUUIDFast(_PREHASH_ParcelID, c_data->parcel_id);
+	msg->addU32Fast(_PREHASH_ParentEstate, 0);
+	msg->addUUIDFast(_PREHASH_SnapshotID, c_data->snapshot_id);
+	msg->addVector3dFast(_PREHASH_PosGlobal, c_data->pos_global);
+	msg->addU8Fast(_PREHASH_ClassifiedFlags, c_data->flags);
+	msg->addS32Fast(_PREHASH_PriceForListing, c_data->price_for_listing);
 
 	gAgent.sendReliableMessage();
 }
@@ -667,14 +667,14 @@ void LLAvatarPropertiesProcessor::sendClassifiedInfoRequest(const LLUUID& classi
 {
 	LLMessageSystem* msg = gMessageSystem;
 
-	msg->newMessage(_PREHASH_ClassifiedInfoRequest);
-	msg->nextBlock(_PREHASH_AgentData);
+	msg->newMessageFast(_PREHASH_ClassifiedInfoRequest);
+	msg->nextBlockFast(_PREHASH_AgentData);
 	
-	msg->addUUID(_PREHASH_AgentID, gAgent.getID());
-	msg->addUUID(_PREHASH_SessionID, gAgent.getSessionID());
+	msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID());
+	msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
 
-	msg->nextBlock(_PREHASH_Data);
-	msg->addUUID(_PREHASH_ClassifiedID, classified_id);
+	msg->nextBlockFast(_PREHASH_Data);
+	msg->addUUIDFast(_PREHASH_ClassifiedID, classified_id);
 
 	gAgent.sendReliableMessage();
 }

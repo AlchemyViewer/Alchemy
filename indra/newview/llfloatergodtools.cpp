@@ -236,7 +236,7 @@ void LLFloaterGodTools::processRegionInfo(LLMessageSystem* msg)
 	msg->getF32Fast(_PREHASH_RegionInfo, _PREHASH_BillableFactor, billable_factor);
 	msg->getF32Fast(_PREHASH_RegionInfo, _PREHASH_WaterHeight, water_height);
 
-	if (msg->has(_PREHASH_RegionInfo3))
+	if (msg->hasFast(_PREHASH_RegionInfo3))
 	{
 		msg->getU64Fast(_PREHASH_RegionInfo3, _PREHASH_RegionFlagsExtended, region_flags);
 	}
@@ -328,10 +328,10 @@ void LLFloaterGodTools::sendRegionInfoRequest()
 	mUpdateTimer.reset();
 
 	LLMessageSystem* msg = gMessageSystem;
-	msg->newMessage("RequestRegionInfo");
-	msg->nextBlock("AgentData");
-	msg->addUUID("AgentID", gAgent.getID());
-	msg->addUUID("SessionID", gAgent.getSessionID());
+	msg->newMessageFast(_PREHASH_RequestRegionInfo);
+	msg->nextBlockFast(_PREHASH_AgentData);
+	msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID());
+	msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
 	gAgent.sendReliableMessage();
 }
 
@@ -351,7 +351,7 @@ void LLFloaterGodTools::sendGodUpdateRegionInfo()
 		LLPanelRegionTools *rtool = god_tools->mPanelRegionTools;
 
 		U64 region_flags = computeRegionFlags();
-		msg->newMessage("GodUpdateRegionInfo");
+		msg->newMessageFast(_PREHASH_GodUpdateRegionInfo);
 		msg->nextBlockFast(_PREHASH_AgentData);
 		msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID());
 		msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());

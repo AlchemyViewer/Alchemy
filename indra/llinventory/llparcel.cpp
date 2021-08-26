@@ -485,7 +485,7 @@ void LLParcel::packMessage(LLMessageSystem* msg)
     msg->addStringFast( _PREHASH_Desc,		 getDesc() );
     msg->addStringFast( _PREHASH_MusicURL,	 getMusicURL() );
     msg->addStringFast( _PREHASH_MediaURL,	 getMediaURL() );
-    msg->addU8 ( "MediaAutoScale", getMediaAutoScale () );
+    msg->addU8Fast ( _PREHASH_MediaAutoScale, getMediaAutoScale () );
     msg->addUUIDFast( _PREHASH_MediaID,	 getMediaID() );
     msg->addUUIDFast( _PREHASH_GroupID,	 getGroupID() );
     msg->addS32Fast( _PREHASH_PassPrice, mPassPrice );
@@ -571,7 +571,7 @@ void LLParcel::unpackMessage(LLMessageSystem* msg)
 	setHaveNewParcelLimitData(have_new_parcel_limit_data);
 
     // non-optimized version
-    msg->getU8 ( "ParcelData", "MediaAutoScale", mMediaAutoScale );
+    msg->getU8Fast (_PREHASH_ParcelData, _PREHASH_MediaAutoScale, mMediaAutoScale );
     
     msg->getUUIDFast( _PREHASH_ParcelData,_PREHASH_MediaID, mMediaID );
     msg->getUUIDFast( _PREHASH_ParcelData,_PREHASH_GroupID, mGroupID );

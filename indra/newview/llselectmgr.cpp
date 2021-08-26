@@ -852,7 +852,7 @@ void LLSelectMgr::deselectObjectAndFamily(LLViewerObject* object, BOOL send_to_s
 		objects[i]->setAngularVelocity( 0,0,0 );
 		objects[i]->setVelocity( 0,0,0 );
 
-		if(msg->isSendFull(NULL) || select_count >= MAX_OBJECTS_PER_PACKET)
+		if(msg->isSendFullFast(nullptr) || select_count >= MAX_OBJECTS_PER_PACKET)
 		{
 			msg->sendReliable(regionp->getHost() );
 			select_count = 0;
@@ -2515,21 +2515,21 @@ void LLSelectMgr::sendGodlikeRequest(const std::string& request, const std::stri
 {
 	// If the agent is neither godlike nor an estate owner, the server
 	// will reject the request.
-	std::string message_type;
+	const char* message_type;
 	if (gAgent.isGodlike())
 	{
-		message_type = "GodlikeMessage";
+		message_type = _PREHASH_GodlikeMessage;
 	}
 	else
 	{
-		message_type = "EstateOwnerMessage";
+		message_type = _PREHASH_EstateOwnerMessage;
 	}
 
 	godlike_request_t data(request, param);
 	if(!mSelectedObjects->getRootObjectCount())
 	{
 		LLMessageSystem* msg = gMessageSystem;
-		msg->newMessage(message_type.c_str());
+		msg->newMessageFast(message_type);
 		LLSelectMgr::packGodlikeHead(&data);
 		gAgent.sendReliableMessage();
 	}
@@ -2545,11 +2545,11 @@ void LLSelectMgr::packGodlikeHead(void* user_data)
 	msg->nextBlockFast(_PREHASH_AgentData);
 	msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID());
 	msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
-	msg->addUUID("TransactionID", LLUUID::null);
+	msg->addUUIDFast(_PREHASH_TransactionID, LLUUID::null);
 	godlike_request_t* data = (godlike_request_t*)user_data;
-	msg->nextBlock("MethodData");
-	msg->addString("Method", data->first);
-	msg->addUUID("Invoice", LLUUID::null);
+	msg->nextBlockFast(_PREHASH_MethodData);
+	msg->addStringFast(_PREHASH_Method, data->first);
+	msg->addUUIDFast(_PREHASH_Invoice, LLUUID::null);
 
 	// The parameters used to be restricted to either string or
 	// integer. This mimics that behavior under the new 'string-only'
@@ -2558,8 +2558,8 @@ void LLSelectMgr::packGodlikeHead(void* user_data)
 	// packObjectIDAsParam() method.
 	if(data->second.size() > 0)
 	{
-		msg->nextBlock("ParamList");
-		msg->addString("Parameter", data->second);
+		msg->nextBlockFast(_PREHASH_ParamList);
+		msg->addStringFast(_PREHASH_Parameter, data->second);
 	}
 }
 
@@ -5589,7 +5589,7 @@ void LLSelectMgr::processObjectPropertiesFamily(LLMessageSystem* msg, void** use
 void LLSelectMgr::processForceObjectSelect(LLMessageSystem* msg, void**)
 {
 	BOOL reset_list;
-	msg->getBOOL("Header", "ResetList", reset_list);
+	msg->getBOOLFast(_PREHASH_Header, _PREHASH_ResetList, reset_list);
 
 	if (reset_list)
 	{
@@ -5601,11 +5601,11 @@ void LLSelectMgr::processForceObjectSelect(LLMessageSystem* msg, void**)
 	LLViewerObject* object;
 	std::vector<LLViewerObject*> objects;
 	S32 i;
-	S32 block_count = msg->getNumberOfBlocks("Data");
+	S32 block_count = msg->getNumberOfBlocksFast(_PREHASH_Data);
 
 	for (i = 0; i < block_count; i++)
 	{
-		msg->getS32("Data", "LocalID", local_id, i);
+		msg->getS32Fast(_PREHASH_Data, _PREHASH_LocalID, local_id, i);
 
 		gObjectList.getUUIDFromLocal(full_id, 
 									 local_id, 

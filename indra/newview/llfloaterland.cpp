@@ -1436,8 +1436,8 @@ void send_return_objects_message(S32 parcel_local_id, S32 return_type,
 	msg->addU32Fast(_PREHASH_ReturnType, (U32) return_type);
 
 	// Dummy task id, not used
-	msg->nextBlock("TaskIDs");
-	msg->addUUID("TaskID", LLUUID::null);
+	msg->nextBlockFast(_PREHASH_TaskIDs);
+	msg->addUUIDFast(_PREHASH_TaskID, LLUUID::null);
 
 	// Throw all return ids into the packet.
 	// TODO: Check for too many ids.
@@ -3109,7 +3109,7 @@ void LLPanelLandCovenant::refresh()
 		// Note: LLPanelLandCovenant doesn't change Covenant's content and any
 		// changes made by Estate floater should be requested by Estate floater
 		LLMessageSystem *msg = gMessageSystem;
-		msg->newMessage("EstateCovenantRequest");
+		msg->newMessageFast(_PREHASH_EstateCovenantRequest);
 		msg->nextBlockFast(_PREHASH_AgentData);
 		msg->addUUIDFast(_PREHASH_AgentID,	gAgent.getID());
 		msg->addUUIDFast(_PREHASH_SessionID,gAgent.getSessionID());

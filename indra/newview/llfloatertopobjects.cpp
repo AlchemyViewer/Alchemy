@@ -159,7 +159,7 @@ void LLFloaterTopObjects::handleReply(LLMessageSystem *msg, void** data)
 	msg->getU32Fast(_PREHASH_RequestData, _PREHASH_TotalObjectCount, total_count);
 	msg->getU32Fast(_PREHASH_RequestData, _PREHASH_ReportType, mCurrentMode);
 
-	S32 block_count = msg->getNumberOfBlocks("ReportData");
+	S32 block_count = msg->getNumberOfBlocksFast(_PREHASH_ReportData);
 	for (S32 block = 0; block < block_count; ++block)
 	{
 		U32 task_local_id;

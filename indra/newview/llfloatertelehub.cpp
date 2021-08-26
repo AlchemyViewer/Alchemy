@@ -233,15 +233,15 @@ void LLFloaterTelehub::processTelehubInfo(LLMessageSystem* msg, void**)
 
 void LLFloaterTelehub::unpackTelehubInfo(LLMessageSystem* msg)
 {
-	msg->getUUID("TelehubBlock", "ObjectID", mTelehubObjectID);
-	msg->getString("TelehubBlock", "ObjectName", mTelehubObjectName);
-	msg->getVector3("TelehubBlock", "TelehubPos", mTelehubPos);
-	msg->getQuat("TelehubBlock", "TelehubRot", mTelehubRot);
+	msg->getUUIDFast(_PREHASH_TelehubBlock, _PREHASH_ObjectID, mTelehubObjectID);
+	msg->getStringFast(_PREHASH_TelehubBlock, _PREHASH_ObjectName, mTelehubObjectName);
+	msg->getVector3Fast(_PREHASH_TelehubBlock, _PREHASH_TelehubPos, mTelehubPos);
+	msg->getQuatFast(_PREHASH_TelehubBlock, _PREHASH_TelehubRot, mTelehubRot);
 
-	mNumSpawn = msg->getNumberOfBlocks("SpawnPointBlock");
+	mNumSpawn = msg->getNumberOfBlocksFast(_PREHASH_SpawnPointBlock);
 	for (S32 i = 0; i < mNumSpawn; i++)
 	{
-		msg->getVector3("SpawnPointBlock", "SpawnPointPos", mSpawnPointPos[i], i);
+		msg->getVector3Fast(_PREHASH_SpawnPointBlock, _PREHASH_SpawnPointPos, mSpawnPointPos[i], i);
 	}
 
 	// Update parts of the UI that change only when message received.

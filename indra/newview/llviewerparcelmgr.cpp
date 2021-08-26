@@ -564,7 +564,7 @@ LLParcelSelectionHandle LLViewerParcelMgr::selectLand(const LLVector3d &corner1,
 	msg->addF32Fast(_PREHASH_South, wsb_region.mV[VY] );
 	msg->addF32Fast(_PREHASH_East,  ent_region.mV[VX] );
 	msg->addF32Fast(_PREHASH_North, ent_region.mV[VY] );
-	msg->addBOOL("SnapSelection", snap_selection);
+	msg->addBOOLFast(_PREHASH_SnapSelection, snap_selection);
 	msg->sendReliable( region->getHost() );
 
 	mRequestResult = PARCEL_RESULT_NO_DATA;
@@ -1376,7 +1376,7 @@ void LLViewerParcelMgr::sendParcelPropertiesUpdate(LLParcel* parcel, bool use_ag
 		msg->addS32Fast(_PREHASH_LocalID, parcel->getLocalID() );
 
 		U32 message_flags = 0x01;
-		msg->addU32("Flags", message_flags);
+		msg->addU32Fast(_PREHASH_Flags, message_flags);
 
 		parcel->packMessage(msg);
 
@@ -1491,7 +1491,7 @@ void LLViewerParcelMgr::setHoverParcel(const LLVector3d& pos)
 		msg->addF32Fast(_PREHASH_South, south);
 		msg->addF32Fast(_PREHASH_East, east);
 		msg->addF32Fast(_PREHASH_North, north);
-		msg->addBOOL("SnapSelection", FALSE);
+		msg->addBOOLFast(_PREHASH_SnapSelection, FALSE);
 		msg->sendReliable(region->getHost());
 
 		mHoverRequestResult = PARCEL_RESULT_NO_DATA;
@@ -1628,7 +1628,7 @@ void LLViewerParcelMgr::processParcelProperties(LLMessageSystem *msg, void **use
         return;
     }
 
-    msg->getBOOL("ParcelData", "SnapSelection", snap_selection);
+    msg->getBOOLFast(_PREHASH_ParcelData, _PREHASH_SnapSelection, snap_selection);
     msg->getS32Fast(_PREHASH_ParcelData, _PREHASH_SelfCount, self_count);
     msg->getS32Fast(_PREHASH_ParcelData, _PREHASH_OtherCount, other_count);
     msg->getS32Fast(_PREHASH_ParcelData, _PREHASH_PublicCount, public_count);
@@ -1643,9 +1643,9 @@ void LLViewerParcelMgr::processParcelProperties(LLMessageSystem *msg, void **use
     msg->getVector3Fast(_PREHASH_ParcelData, _PREHASH_AABBMax, aabb_max);
     msg->getS32Fast(_PREHASH_ParcelData, _PREHASH_Area, area);
     //msg->getUUIDFast(	_PREHASH_ParcelData, _PREHASH_BuyerID, buyer_id);
-    msg->getU8("ParcelData", "Status", status);
-    msg->getS32("ParcelData", "SimWideMaxPrims", sw_max_prims);
-    msg->getS32("ParcelData", "SimWideTotalPrims", sw_total_prims);
+    msg->getU8Fast(_PREHASH_ParcelData, _PREHASH_Status, status);
+    msg->getS32Fast(_PREHASH_ParcelData, _PREHASH_SimWideMaxPrims, sw_max_prims);
+    msg->getS32Fast(_PREHASH_ParcelData, _PREHASH_SimWideTotalPrims, sw_total_prims);
     msg->getS32Fast(_PREHASH_ParcelData, _PREHASH_MaxPrims, max_prims);
     msg->getS32Fast(_PREHASH_ParcelData, _PREHASH_TotalPrims, total_prims);
     msg->getS32Fast(_PREHASH_ParcelData, _PREHASH_OwnerPrims, owner_prims);
@@ -1663,18 +1663,18 @@ void LLViewerParcelMgr::processParcelProperties(LLMessageSystem *msg, void **use
         msg->getBOOLFast(_PREHASH_AgeVerificationBlock, _PREHASH_RegionDenyAgeUnverified, region_deny_age_unverified_override);
     }
 
-    if (msg->getNumberOfBlocks(_PREHASH_RegionAllowAccessBlock))
+    if (msg->getNumberOfBlocksFast(_PREHASH_RegionAllowAccessBlock))
     {
         msg->getBOOLFast(_PREHASH_RegionAllowAccessBlock, _PREHASH_RegionAllowAccessOverride, region_allow_access_override);
     }
 
-    if (msg->getNumberOfBlocks(_PREHASH_ParcelEnvironmentBlock))
+    if (msg->getNumberOfBlocksFast(_PREHASH_ParcelEnvironmentBlock))
     {
         msg->getS32Fast(_PREHASH_ParcelEnvironmentBlock, _PREHASH_ParcelEnvironmentVersion, parcel_environment_version);
         msg->getBOOLFast(_PREHASH_ParcelEnvironmentBlock, _PREHASH_RegionAllowEnvironmentOverride, region_allow_environment_override);
     }
 
-	msg->getS32("ParcelData", "OtherCleanTime", other_clean_time );
+	msg->getS32Fast(_PREHASH_ParcelData, _PREHASH_OtherCleanTime, other_clean_time );
 
 	LL_DEBUGS("ParcelMgr") << "Processing parcel " << local_id << " update, target(sequence): " << sequence_id << LL_ENDL;
 
@@ -2070,16 +2070,16 @@ void LLViewerParcelMgr::processParcelAccessListReply(LLMessageSystem *msg, void 
 void LLViewerParcelMgr::processParcelDwellReply(LLMessageSystem* msg, void**)
 {
 	LLUUID agent_id;
-	msg->getUUID("AgentData", "AgentID", agent_id);
+	msg->getUUIDFast(_PREHASH_AgentData, _PREHASH_AgentID, agent_id);
 
 	S32 local_id;
-	msg->getS32("Data", "LocalID", local_id);
+	msg->getS32Fast(_PREHASH_Data, _PREHASH_LocalID, local_id);
 
 	LLUUID parcel_id;
-	msg->getUUID("Data", "ParcelID", parcel_id);
+	msg->getUUIDFast(_PREHASH_Data, _PREHASH_ParcelID, parcel_id);
 
 	F32 dwell;
-	msg->getF32("Data", "Dwell", dwell);
+	msg->getF32Fast(_PREHASH_Data, _PREHASH_Dwell, dwell);
 
 	if (local_id == LLViewerParcelMgr::getInstance()->mCurrentParcel->getLocalID())
 	{
@@ -2148,7 +2148,7 @@ void LLViewerParcelMgr::sendParcelAccessListUpdate(U32 flags, const LLAccessEntr
 			msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID() );
 			msg->nextBlockFast(_PREHASH_Data);
 			msg->addU32Fast(_PREHASH_Flags, flags);
-			msg->addS32(_PREHASH_LocalID,  parcel_local_id);
+			msg->addS32Fast(_PREHASH_LocalID,  parcel_local_id);
 			msg->addUUIDFast(_PREHASH_TransactionID, transactionUUID);
 			msg->addS32Fast(_PREHASH_SequenceID, sequence_id);
 			msg->addS32Fast(_PREHASH_Sections, num_sections);

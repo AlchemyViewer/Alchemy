@@ -759,7 +759,7 @@ void LLXferManager::processFileRequest (LLMessageSystem *mesgsys, void ** /*user
 	S16 type_s16;
 	BOOL b_use_big_packets;
 
-	mesgsys->getBOOL("XferID", "UseBigPackets", b_use_big_packets);
+	mesgsys->getBOOLFast(_PREHASH_XferID, _PREHASH_UseBigPackets, b_use_big_packets);
 	
 	mesgsys->getU64Fast(_PREHASH_XferID, _PREHASH_ID, id);
 	char U64_BUF[MAX_STRING];		/* Flawfinder : ignore */
@@ -770,7 +770,7 @@ void LLXferManager::processFileRequest (LLMessageSystem *mesgsys, void ** /*user
 	
 	{
 		U8 local_path_u8;
-		mesgsys->getU8("XferID", "FilePath", local_path_u8);
+		mesgsys->getU8Fast(_PREHASH_XferID, _PREHASH_FilePath, local_path_u8);
 		local_path = (ELLPath)local_path_u8;
 	}
 
@@ -854,7 +854,7 @@ void LLXferManager::processFileRequest (LLMessageSystem *mesgsys, void ** /*user
 		LL_INFOS("Xfer") << "starting file transfer: " <<  expanded_filename << " to " << mesgsys->getSender() << LL_ENDL;
 
 		BOOL delete_local_on_completion = FALSE;
-		mesgsys->getBOOL("XferID", "DeleteOnCompletion", delete_local_on_completion);
+		mesgsys->getBOOLFast(_PREHASH_XferID, _PREHASH_DeleteOnCompletion, delete_local_on_completion);
 
 		// -1 chunk_size causes it to use the default
 		xferp = (LLXfer *)new LLXfer_File(expanded_filename, delete_local_on_completion, b_use_big_packets ? LL_XFER_LARGE_PAYLOAD : -1);

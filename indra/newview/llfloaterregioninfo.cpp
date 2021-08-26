@@ -439,34 +439,34 @@ void LLFloaterRegionInfo::processRegionInfo(LLMessageSystem* msg)
 	F32 terrain_lower_limit;
 	BOOL use_estate_sun;
 	F32 sun_hour;
-	msg->getString("RegionInfo", "SimName", sim_name);
-	msg->getU8("RegionInfo", "MaxAgents", agent_limit);
-	msg->getS32("RegionInfo2", "HardMaxAgents", hard_agent_limit);
-	msg->getF32("RegionInfo", "ObjectBonusFactor", object_bonus_factor);
-	msg->getU8("RegionInfo", "SimAccess", sim_access);
+	msg->getStringFast(_PREHASH_RegionInfo, _PREHASH_SimName, sim_name);
+	msg->getU8Fast(_PREHASH_RegionInfo, _PREHASH_MaxAgents, agent_limit);
+	msg->getS32Fast(_PREHASH_RegionInfo2, _PREHASH_HardMaxAgents, hard_agent_limit);
+	msg->getF32Fast(_PREHASH_RegionInfo, _PREHASH_ObjectBonusFactor, object_bonus_factor);
+	msg->getU8Fast(_PREHASH_RegionInfo, _PREHASH_SimAccess, sim_access);
 	msg->getF32Fast(_PREHASH_RegionInfo, _PREHASH_WaterHeight, water_height);
 	msg->getF32Fast(_PREHASH_RegionInfo, _PREHASH_TerrainRaiseLimit, terrain_raise_limit);
 	msg->getF32Fast(_PREHASH_RegionInfo, _PREHASH_TerrainLowerLimit, terrain_lower_limit);
-	msg->getBOOL("RegionInfo", "UseEstateSun", use_estate_sun);
+	msg->getBOOLFast(_PREHASH_RegionInfo, _PREHASH_UseEstateSun, use_estate_sun);
 	// actually the "last set" sun hour, not the current sun hour. JC
-	msg->getF32("RegionInfo", "SunHour", sun_hour);
+	msg->getF32Fast(_PREHASH_RegionInfo, _PREHASH_SunHour, sun_hour);
 	// the only reasonable way to decide if we actually have any data is to
 	// check to see if any of these fields have nonzero sizes
-	if (msg->getSize("RegionInfo2", "ProductSKU") > 0 ||
-		msg->getSize("RegionInfo2", "ProductName") > 0)
+	if (msg->getSizeFast(_PREHASH_RegionInfo2, _PREHASH_ProductSKU) > 0 ||
+		msg->getSizeFast(_PREHASH_RegionInfo2, _PREHASH_ProductName) > 0)
 	{
-		msg->getString("RegionInfo2", "ProductName", sim_type);
+		msg->getStringFast(_PREHASH_RegionInfo2, _PREHASH_ProductName, sim_type);
 		LLTrans::findString(sim_type, sim_type); // try localizing sim product name
 	}
 
-	if (msg->has(_PREHASH_RegionInfo3))
+	if (msg->hasFast(_PREHASH_RegionInfo3))
 	{
-		msg->getU64("RegionInfo3", "RegionFlagsExtended", region_flags);
+		msg->getU64Fast(_PREHASH_RegionInfo3, _PREHASH_RegionFlagsExtended, region_flags);
 	}
 	else
 	{
 		U32 flags = 0;
-		msg->getU32("RegionInfo", "RegionFlags", flags);
+		msg->getU32Fast(_PREHASH_RegionInfo, _PREHASH_RegionFlags, flags);
 		region_flags = flags;
 	}
 
@@ -499,7 +499,7 @@ void LLFloaterRegionInfo::processRegionInfo(LLMessageSystem* msg)
  	// detect teen grid for maturity
 
 	U32 parent_estate_id;
-	msg->getU32("RegionInfo", "ParentEstateID", parent_estate_id);
+	msg->getU32Fast(_PREHASH_RegionInfo, _PREHASH_ParentEstateID, parent_estate_id);
 	BOOL teen_grid = (parent_estate_id == 5);  // *TODO add field to estate table and test that
 	panel->getChildView("access_combo")->setEnabled(gAgent.isGodlike() || (region && region->canManageEstate() && !teen_grid));
 	panel->setCtrlsEnabled(allow_modify);

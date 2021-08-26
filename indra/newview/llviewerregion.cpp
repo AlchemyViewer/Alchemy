@@ -2176,7 +2176,7 @@ void LLViewerRegion::updateCoarseLocations(LLMessageSystem* msg)
 	msg->getS16Fast(_PREHASH_Index, _PREHASH_You, agent_index);
 	msg->getS16Fast(_PREHASH_Index, _PREHASH_Prey, target_index);
 
-	BOOL has_agent_data = msg->has(_PREHASH_AgentData);
+	BOOL has_agent_data = msg->hasFast(_PREHASH_AgentData);
 	S32 count = msg->getNumberOfBlocksFast(_PREHASH_Location);
 	for(S32 i = 0; i < count; i++)
 	{
@@ -2775,15 +2775,15 @@ void LLViewerRegion::unpackRegionHandshake()
 	F32 billable_factor;
 	LLUUID cache_id;
 
-	msg->getU8		("RegionInfo", "SimAccess", sim_access);
-	msg->getString	("RegionInfo", "SimName", sim_name);
-	msg->getUUID	("RegionInfo", "SimOwner", sim_owner);
-	msg->getBOOL	("RegionInfo", "IsEstateManager", is_estate_manager);
-	msg->getF32		("RegionInfo", "WaterHeight", water_height);
-	msg->getF32		("RegionInfo", "BillableFactor", billable_factor);
-	msg->getUUID	("RegionInfo", "CacheID", cache_id );
+	msg->getU8Fast		(_PREHASH_RegionInfo, _PREHASH_SimAccess, sim_access);
+	msg->getStringFast	(_PREHASH_RegionInfo, _PREHASH_SimName, sim_name);
+	msg->getUUIDFast	(_PREHASH_RegionInfo, _PREHASH_SimOwner, sim_owner);
+	msg->getBOOLFast	(_PREHASH_RegionInfo, _PREHASH_IsEstateManager, is_estate_manager);
+	msg->getF32Fast		(_PREHASH_RegionInfo, _PREHASH_WaterHeight, water_height);
+	msg->getF32Fast		(_PREHASH_RegionInfo, _PREHASH_BillableFactor, billable_factor);
+	msg->getUUIDFast	(_PREHASH_RegionInfo, _PREHASH_CacheID, cache_id );
 
-	if (msg->has(_PREHASH_RegionInfo4))
+	if (msg->hasFast(_PREHASH_RegionInfo4))
 	{
 		msg->getU64Fast(_PREHASH_RegionInfo4, _PREHASH_RegionFlagsExtended, region_flags);
 		msg->getU64Fast(_PREHASH_RegionInfo4, _PREHASH_RegionProtocols, region_protocols);
@@ -2806,7 +2806,7 @@ void LLViewerRegion::unpackRegionHandshake()
 	setCacheID(cache_id);
 
 	LLUUID region_id;
-	msg->getUUID("RegionInfo2", "RegionID", region_id);
+	msg->getUUIDFast(_PREHASH_RegionInfo2, _PREHASH_RegionID, region_id);
 	setRegionID(region_id);
 	
 	// Retrieve the CR-53 (Homestead/Land SKU) information
@@ -2818,15 +2818,15 @@ void LLViewerRegion::unpackRegionHandshake()
 
 	// the only reasonable way to decide if we actually have any data is to
 	// check to see if any of these fields have positive sizes
-	if (msg->getSize("RegionInfo3", "ColoName") > 0 ||
-	    msg->getSize("RegionInfo3", "ProductSKU") > 0 ||
-	    msg->getSize("RegionInfo3", "ProductName") > 0)
+	if (msg->getSizeFast(_PREHASH_RegionInfo3, _PREHASH_ColoName) > 0 ||
+	    msg->getSizeFast(_PREHASH_RegionInfo3, _PREHASH_ProductSKU) > 0 ||
+	    msg->getSizeFast(_PREHASH_RegionInfo3, _PREHASH_ProductName) > 0)
 	{
-		msg->getS32     ("RegionInfo3", "CPUClassID",  classID);
-		msg->getS32     ("RegionInfo3", "CPURatio",    cpuRatio);
-		msg->getString  ("RegionInfo3", "ColoName",    coloName);
-		msg->getString  ("RegionInfo3", "ProductSKU",  productSKU);
-		msg->getString  ("RegionInfo3", "ProductName", productName);
+		msg->getS32Fast     (_PREHASH_RegionInfo3, _PREHASH_CPUClassID,  classID);
+		msg->getS32Fast     (_PREHASH_RegionInfo3, _PREHASH_CPURatio,    cpuRatio);
+		msg->getStringFast  (_PREHASH_RegionInfo3, _PREHASH_ColoName,    coloName);
+		msg->getStringFast  (_PREHASH_RegionInfo3, _PREHASH_ProductSKU,  productSKU);
+		msg->getStringFast  (_PREHASH_RegionInfo3, _PREHASH_ProductName, productName);
 		
 		mClassID = classID;
 		mCPURatio = cpuRatio;
@@ -2845,54 +2845,54 @@ void LLViewerRegion::unpackRegionHandshake()
 		bool changed = false;
 
 		// Get the 4 textures for land
-		msg->getUUID("RegionInfo", "TerrainDetail0", tmp_id);
+		msg->getUUIDFast(_PREHASH_RegionInfo, _PREHASH_TerrainDetail0, tmp_id);
 		changed |= (tmp_id != compp->getDetailTextureID(0));		
 		compp->setDetailTextureID(0, tmp_id);
 
-		msg->getUUID("RegionInfo", "TerrainDetail1", tmp_id);
+		msg->getUUIDFast(_PREHASH_RegionInfo, _PREHASH_TerrainDetail1, tmp_id);
 		changed |= (tmp_id != compp->getDetailTextureID(1));		
 		compp->setDetailTextureID(1, tmp_id);
 
-		msg->getUUID("RegionInfo", "TerrainDetail2", tmp_id);
+		msg->getUUIDFast(_PREHASH_RegionInfo, _PREHASH_TerrainDetail2, tmp_id);
 		changed |= (tmp_id != compp->getDetailTextureID(2));		
 		compp->setDetailTextureID(2, tmp_id);
 
-		msg->getUUID("RegionInfo", "TerrainDetail3", tmp_id);
+		msg->getUUIDFast(_PREHASH_RegionInfo, _PREHASH_TerrainDetail3, tmp_id);
 		changed |= (tmp_id != compp->getDetailTextureID(3));		
 		compp->setDetailTextureID(3, tmp_id);
 
 		// Get the start altitude and range values for land textures
 		F32 tmp_f32;
-		msg->getF32("RegionInfo", "TerrainStartHeight00", tmp_f32);
+		msg->getF32Fast(_PREHASH_RegionInfo, _PREHASH_TerrainStartHeight00, tmp_f32);
 		changed |= (tmp_f32 != compp->getStartHeight(0));
 		compp->setStartHeight(0, tmp_f32);
 
-		msg->getF32("RegionInfo", "TerrainStartHeight01", tmp_f32);
+		msg->getF32Fast(_PREHASH_RegionInfo, _PREHASH_TerrainStartHeight01, tmp_f32);
 		changed |= (tmp_f32 != compp->getStartHeight(1));
 		compp->setStartHeight(1, tmp_f32);
 
-		msg->getF32("RegionInfo", "TerrainStartHeight10", tmp_f32);
+		msg->getF32Fast(_PREHASH_RegionInfo, _PREHASH_TerrainStartHeight10, tmp_f32);
 		changed |= (tmp_f32 != compp->getStartHeight(2));
 		compp->setStartHeight(2, tmp_f32);
 
-		msg->getF32("RegionInfo", "TerrainStartHeight11", tmp_f32);
+		msg->getF32Fast(_PREHASH_RegionInfo, _PREHASH_TerrainStartHeight11, tmp_f32);
 		changed |= (tmp_f32 != compp->getStartHeight(3));
 		compp->setStartHeight(3, tmp_f32);
 
 
-		msg->getF32("RegionInfo", "TerrainHeightRange00", tmp_f32);
+		msg->getF32Fast(_PREHASH_RegionInfo, _PREHASH_TerrainHeightRange00, tmp_f32);
 		changed |= (tmp_f32 != compp->getHeightRange(0));
 		compp->setHeightRange(0, tmp_f32);
 
-		msg->getF32("RegionInfo", "TerrainHeightRange01", tmp_f32);
+		msg->getF32Fast(_PREHASH_RegionInfo, _PREHASH_TerrainHeightRange01, tmp_f32);
 		changed |= (tmp_f32 != compp->getHeightRange(1));
 		compp->setHeightRange(1, tmp_f32);
 
-		msg->getF32("RegionInfo", "TerrainHeightRange10", tmp_f32);
+		msg->getF32Fast(_PREHASH_RegionInfo, _PREHASH_TerrainHeightRange10, tmp_f32);
 		changed |= (tmp_f32 != compp->getHeightRange(2));
 		compp->setHeightRange(2, tmp_f32);
 
-		msg->getF32("RegionInfo", "TerrainHeightRange11", tmp_f32);
+		msg->getF32Fast(_PREHASH_RegionInfo, _PREHASH_TerrainHeightRange11, tmp_f32);
 		changed |= (tmp_f32 != compp->getHeightRange(3));
 		compp->setHeightRange(3, tmp_f32);
 
@@ -2921,11 +2921,11 @@ void LLViewerRegion::unpackRegionHandshake()
 	// sending data.
 	// TODO: Send all upstream viewer->sim handshake info here.
 	LLHost host = msg->getSender();
-	msg->newMessage("RegionHandshakeReply");
-	msg->nextBlock("AgentData");
-	msg->addUUID("AgentID", gAgent.getID());
-	msg->addUUID("SessionID", gAgent.getSessionID());
-	msg->nextBlock("RegionInfo");
+	msg->newMessageFast(_PREHASH_RegionHandshakeReply);
+	msg->nextBlockFast(_PREHASH_AgentData);
+	msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID());
+	msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
+	msg->nextBlockFast(_PREHASH_RegionInfo);
 
 	U32 flags = 0;
 	flags |= REGION_HANDSHAKE_SUPPORTS_SELF_APPEARANCE;
@@ -2938,7 +2938,7 @@ void LLViewerRegion::unpackRegionHandshake()
 	{
 		flags |= 0x00000002; //set the bit 1 to be 1 to tell sim the cache file is empty, no need to send cache probes.
 	}
-	msg->addU32("Flags", flags );
+	msg->addU32Fast(_PREHASH_Flags, flags );
 	msg->sendReliable(host);
 
 	mRegionTimer.reset(); //reset region timer.

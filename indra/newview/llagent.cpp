@@ -3672,9 +3672,9 @@ void LLAgent::processAgentGroupDataUpdate(LLMessageSystem *msg, void **)
 	{
 		msg->getUUIDFast(_PREHASH_GroupData, _PREHASH_GroupID, group.mID, i);
 		msg->getUUIDFast(_PREHASH_GroupData, _PREHASH_GroupInsigniaID, group.mInsigniaID, i);
-		msg->getU64(_PREHASH_GroupData, "GroupPowers", group.mPowers, i);
-		msg->getBOOL(_PREHASH_GroupData, "AcceptNotices", group.mAcceptNotices, i);
-		msg->getS32(_PREHASH_GroupData, "Contribution", group.mContribution, i);
+		msg->getU64Fast(_PREHASH_GroupData, _PREHASH_GroupPowers, group.mPowers, i);
+		msg->getBOOLFast(_PREHASH_GroupData, _PREHASH_AcceptNotices, group.mAcceptNotices, i);
+		msg->getS32Fast(_PREHASH_GroupData, _PREHASH_Contribution, group.mContribution, i);
 		msg->getStringFast(_PREHASH_GroupData, _PREHASH_GroupName, group.mName, i);
 		
 		if(group.mID.notNull())
@@ -3796,19 +3796,19 @@ void LLAgent::processAgentDataUpdate(LLMessageSystem *msg, void **)
 // static
 void LLAgent::processScriptControlChange(LLMessageSystem *msg, void **)
 {
-	S32 block_count = msg->getNumberOfBlocks("Data");
+	S32 block_count = msg->getNumberOfBlocksFast(_PREHASH_Data);
 	for (S32 block_index = 0; block_index < block_count; block_index++)
 	{
 		BOOL take_controls;
 		U32	controls;
 		BOOL passon;
 		U32 i;
-		msg->getBOOL("Data", "TakeControls", take_controls, block_index);
+		msg->getBOOLFast(_PREHASH_Data, _PREHASH_TakeControls, take_controls, block_index);
 		if (take_controls)
 		{
 			// take controls
-			msg->getU32("Data", "Controls", controls, block_index );
-			msg->getBOOL("Data", "PassToAgent", passon, block_index );
+			msg->getU32Fast(_PREHASH_Data, _PREHASH_Controls, controls, block_index );
+			msg->getBOOLFast(_PREHASH_Data, _PREHASH_PassToAgent, passon, block_index );
 			U32 total_count = 0;
 			for (i = 0; i < TOTAL_CONTROLS; i++)
 			{
@@ -3829,8 +3829,8 @@ void LLAgent::processScriptControlChange(LLMessageSystem *msg, void **)
 		else
 		{
 			// release controls
-			msg->getU32("Data", "Controls", controls, block_index );
-			msg->getBOOL("Data", "PassToAgent", passon, block_index );
+			msg->getU32Fast(_PREHASH_Data, _PREHASH_Controls, controls, block_index );
+			msg->getBOOLFast(_PREHASH_Data, _PREHASH_PassToAgent, passon, block_index );
 			for (i = 0; i < TOTAL_CONTROLS; i++)
 			{
 				if (controls & ( 1 << i))
@@ -3944,10 +3944,10 @@ BOOL LLAgent::isControlGrabbed(S32 control_index) const
 
 void LLAgent::forceReleaseControls()
 {
-	gMessageSystem->newMessage("ForceScriptControlRelease");
-	gMessageSystem->nextBlock("AgentData");
-	gMessageSystem->addUUID("AgentID", getID());
-	gMessageSystem->addUUID("SessionID", getSessionID());
+	gMessageSystem->newMessageFast(_PREHASH_ForceScriptControlRelease);
+	gMessageSystem->nextBlockFast(_PREHASH_AgentData);
+	gMessageSystem->addUUIDFast(_PREHASH_AgentID, getID());
+	gMessageSystem->addUUIDFast(_PREHASH_SessionID, getSessionID());
 	sendReliableMessage();
 }
 

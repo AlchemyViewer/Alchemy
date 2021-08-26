@@ -4262,13 +4262,13 @@ void process_health_message(LLMessageSystem *mesgsys, void **user_data)
 
 void process_sim_stats(LLMessageSystem *msg, void **user_data)
 {	
-	S32 count = msg->getNumberOfBlocks("Stat");
+	S32 count = msg->getNumberOfBlocksFast(_PREHASH_Stat);
 	for (S32 i = 0; i < count; ++i)
 	{
 		U32 stat_id;
 		F32 stat_value;
-		msg->getU32("Stat", "StatID", stat_id, i);
-		msg->getF32("Stat", "StatValue", stat_value, i);
+		msg->getU32Fast(_PREHASH_Stat, _PREHASH_StatID, stat_id, i);
+		msg->getF32Fast(_PREHASH_Stat, _PREHASH_StatValue, stat_value, i);
 		LLStatViewer::SimMeasurementSampler* measurementp = LLStatViewer::SimMeasurementSampler::getInstance((ESimStatID)stat_id);
 		
 		if (measurementp )
@@ -4286,16 +4286,16 @@ void process_sim_stats(LLMessageSystem *msg, void **user_data)
 	//
 	U32 max_tasks_per_region;
 	U64 region_flags;
-	msg->getU32("Region", "ObjectCapacity", max_tasks_per_region);
+	msg->getU32Fast(_PREHASH_Region, _PREHASH_ObjectCapacity, max_tasks_per_region);
 
-	if (msg->has(_PREHASH_RegionInfo))
+	if (msg->hasFast(_PREHASH_RegionInfo))
 	{
-		msg->getU64("RegionInfo", "RegionFlagsExtended", region_flags);
+		msg->getU64Fast(_PREHASH_RegionInfo, _PREHASH_RegionFlagsExtended, region_flags);
 	}
 	else
 	{
 		U32 flags = 0;
-		msg->getU32("Region", "RegionFlags", flags);
+		msg->getU32Fast(_PREHASH_Region, _PREHASH_RegionFlags, flags);
 		region_flags = flags;
 	}
 
@@ -4883,7 +4883,7 @@ void process_money_balance_reply( LLMessageSystem* msg, void** )
 	//LL_DEBUGS("Messaging") << "Pushing back transaction " << tid << LL_ENDL;
 	recent.push_back(tid);
 
-	if (msg->has("TransactionInfo"))
+	if (msg->hasFast(_PREHASH_TransactionInfo))
 	{
 		// ...message has extended info for localization
 		process_money_balance_reply_extended(msg);
@@ -4989,14 +4989,14 @@ static void process_money_balance_reply_extended(LLMessageSystem* msg)
     std::string item_description;
 	BOOL success = FALSE;
 
-    msg->getS32("TransactionInfo", "TransactionType", transaction_type);
-    msg->getUUID("TransactionInfo", "SourceID", source_id);
-	msg->getBOOL("TransactionInfo", "IsSourceGroup", is_source_group);
-    msg->getUUID("TransactionInfo", "DestID", dest_id);
-	msg->getBOOL("TransactionInfo", "IsDestGroup", is_dest_group);
-    msg->getS32("TransactionInfo", "Amount", amount);
-    msg->getString("TransactionInfo", "ItemDescription", item_description);
-	msg->getBOOL("MoneyData", "TransactionSuccess", success);
+    msg->getS32Fast(_PREHASH_TransactionInfo, _PREHASH_TransactionType, transaction_type);
+    msg->getUUIDFast(_PREHASH_TransactionInfo, _PREHASH_SourceID, source_id);
+	msg->getBOOLFast(_PREHASH_TransactionInfo, _PREHASH_IsSourceGroup, is_source_group);
+    msg->getUUIDFast(_PREHASH_TransactionInfo, _PREHASH_DestID, dest_id);
+	msg->getBOOLFast(_PREHASH_TransactionInfo, _PREHASH_IsDestGroup, is_dest_group);
+    msg->getS32Fast(_PREHASH_TransactionInfo, _PREHASH_Amount, amount);
+    msg->getStringFast(_PREHASH_TransactionInfo, _PREHASH_ItemDescription, item_description);
+	msg->getBOOLFast(_PREHASH_MoneyData, _PREHASH_TransactionSuccess, success);
     LL_INFOS("Money") << "MoneyBalanceReply source " << source_id 
 		<< " dest " << dest_id
 		<< " type " << transaction_type
@@ -5573,7 +5573,7 @@ void process_agent_alert_message(LLMessageSystem* msgsystem, void** user_data)
 	if (!attempt_standard_notification(msgsystem))
 	{
 		BOOL modal = FALSE;
-		msgsystem->getBOOL("AlertData", "Modal", modal);
+		msgsystem->getBOOLFast(_PREHASH_AlertData, _PREHASH_Modal, modal);
 		process_alert_core(message, modal);
 	}
 }
@@ -5811,7 +5811,7 @@ void process_frozen_message(LLMessageSystem *msgsystem, void **user_data)
 	gViewerWindow->getWindow()->resetBusyCount();
 	BOOL b_frozen;
 	
-	msgsystem->getBOOL("FrozenData", "Data", b_frozen);
+	msgsystem->getBOOLFast(_PREHASH_FrozenData, _PREHASH_Data, b_frozen);
 
 	// TODO: make being frozen change view
 	if (b_frozen)
@@ -6850,18 +6850,18 @@ void send_places_query(const LLUUID& query_id,
 {
 	LLMessageSystem* msg = gMessageSystem;
 
-	msg->newMessage("PlacesQuery");
-	msg->nextBlock("AgentData");
-	msg->addUUID("AgentID", gAgent.getID());
-	msg->addUUID("SessionID", gAgent.getSessionID());
-	msg->addUUID("QueryID", query_id);
-	msg->nextBlock("TransactionData");
-	msg->addUUID("TransactionID", trans_id);
-	msg->nextBlock("QueryData");
-	msg->addString("QueryText", query_text);
-	msg->addU32("QueryFlags", query_flags);
-	msg->addS8("Category", (S8)category);
-	msg->addString("SimName", sim_name);
+	msg->newMessageFast(_PREHASH_PlacesQuery);
+	msg->nextBlockFast(_PREHASH_AgentData);
+	msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID());
+	msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
+	msg->addUUIDFast(_PREHASH_QueryID, query_id);
+	msg->nextBlockFast(_PREHASH_TransactionData);
+	msg->addUUIDFast(_PREHASH_TransactionID, trans_id);
+	msg->nextBlockFast(_PREHASH_QueryData);
+	msg->addStringFast(_PREHASH_QueryText, query_text);
+	msg->addU32Fast(_PREHASH_QueryFlags, query_flags);
+	msg->addS8Fast(_PREHASH_Category, (S8)category);
+	msg->addStringFast(_PREHASH_SimName, sim_name);
 	gAgent.sendReliableMessage();
 }
 
@@ -6949,15 +6949,15 @@ bool callback_script_dialog(const LLSD& notification, const LLSD& response)
 	if (0 <= button_idx)
 	{
 		LLMessageSystem* msg = gMessageSystem;
-		msg->newMessage("ScriptDialogReply");
-		msg->nextBlock("AgentData");
-		msg->addUUID("AgentID", gAgent.getID());
-		msg->addUUID("SessionID", gAgent.getSessionID());
-		msg->nextBlock("Data");
-		msg->addUUID("ObjectID", notification["payload"]["object_id"].asUUID());
-		msg->addS32("ChatChannel", notification["payload"]["chat_channel"].asInteger());
-		msg->addS32("ButtonIndex", button_idx);
-		msg->addString("ButtonLabel", rtn_text);
+		msg->newMessageFast(_PREHASH_ScriptDialogReply);
+		msg->nextBlockFast(_PREHASH_AgentData);
+		msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID());
+		msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
+		msg->nextBlockFast(_PREHASH_Data);
+		msg->addUUIDFast(_PREHASH_ObjectID, notification["payload"]["object_id"].asUUID());
+		msg->addS32Fast(_PREHASH_ChatChannel, notification["payload"]["chat_channel"].asInteger());
+		msg->addS32Fast(_PREHASH_ButtonIndex, button_idx);
+		msg->addStringFast(_PREHASH_ButtonLabel, rtn_text);
 		msg->sendReliable(LLHost(notification["payload"]["sender"].asString()));
 	}
 
@@ -7116,12 +7116,12 @@ void process_load_url(LLMessageSystem* msg, void**)
 	char message[256];		/* Flawfinder: ignore */
 	char url[256];		/* Flawfinder: ignore */
 
-	msg->getString("Data", "ObjectName", 256, object_name);
-	msg->getUUID(  "Data", "ObjectID", object_id);
-	msg->getUUID(  "Data", "OwnerID", owner_id);
-	msg->getBOOL(  "Data", "OwnerIsGroup", owner_is_group);
-	msg->getString("Data", "Message", 256, message);
-	msg->getString("Data", "URL", 256, url);
+	msg->getStringFast(_PREHASH_Data, _PREHASH_ObjectName, 256, object_name);
+	msg->getUUIDFast(  _PREHASH_Data, _PREHASH_ObjectID, object_id);
+	msg->getUUIDFast(  _PREHASH_Data, _PREHASH_OwnerID, owner_id);
+	msg->getBOOLFast(  _PREHASH_Data, _PREHASH_OwnerIsGroup, owner_is_group);
+	msg->getStringFast(_PREHASH_Data, _PREHASH_Message, 256, message);
+	msg->getStringFast(_PREHASH_Data, _PREHASH_URL, 256, url);
 
 	LLSD payload;
 	payload["object_id"] = object_id;

@@ -521,7 +521,7 @@ void LLPanelGroupNotices::processNotices(LLMessageSystem* msg)
 	U8 asset_type;
 
 	S32 i=0;
-	S32 count = msg->getNumberOfBlocks("Data");
+	S32 count = msg->getNumberOfBlocksFast(_PREHASH_Data);
 
 	mNoticesList->setEnabled(TRUE);
 
@@ -532,7 +532,7 @@ void LLPanelGroupNotices::processNotices(LLMessageSystem* msg)
 
 	for (;i<count;++i)
 	{
-		msg->getUUID("Data","NoticeID",id,i);
+		msg->getUUIDFast(_PREHASH_Data, _PREHASH_NoticeID, id, i);
 		if (1 == count && id.isNull())
 		{
 			// Only one entry, the dummy entry.
@@ -548,11 +548,11 @@ void LLPanelGroupNotices::processNotices(LLMessageSystem* msg)
 		if(pos!=-1)//if items with this ID already in the list - skip it
 			continue;
 			
-		msg->getString("Data","Subject",subj,i);
-		msg->getString("Data","FromName",name,i);
-		msg->getBOOL("Data","HasAttachment",has_attachment,i);
-		msg->getU8("Data","AssetType",asset_type,i);
-		msg->getU32("Data","Timestamp",timestamp,i);
+		msg->getStringFast(_PREHASH_Data, _PREHASH_Subject, subj, i);
+		msg->getStringFast(_PREHASH_Data, _PREHASH_FromName, name, i);
+		msg->getBOOLFast(_PREHASH_Data, _PREHASH_HasAttachment, has_attachment, i);
+		msg->getU8Fast(_PREHASH_Data, _PREHASH_AssetType, asset_type, i);
+		msg->getU32Fast(_PREHASH_Data, _PREHASH_Timestamp, timestamp, i);
 
 		// we only have the legacy name here, convert it to a username
 		name = LLCacheName::buildUsername(name);

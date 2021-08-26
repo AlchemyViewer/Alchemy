@@ -154,15 +154,15 @@ void LLRegionInfoModel::update(LLMessageSystem* msg)
 	msg->getS32Fast(_PREHASH_RegionInfo, _PREHASH_RedirectGridX, mRedirectGridX);
 	msg->getS32Fast(_PREHASH_RegionInfo, _PREHASH_RedirectGridY, mRedirectGridY);
 
-	msg->getBOOL(_PREHASH_RegionInfo, _PREHASH_UseEstateSun, mUseEstateSun);
+	msg->getBOOLFast(_PREHASH_RegionInfo, _PREHASH_UseEstateSun, mUseEstateSun);
 
 	// actually the "last set" sun hour, not the current sun hour. JC
-	msg->getF32(_PREHASH_RegionInfo, _PREHASH_SunHour, mSunHour);
+	msg->getF32Fast(_PREHASH_RegionInfo, _PREHASH_SunHour, mSunHour);
 	LL_DEBUGS("WindlightSync") << "Got region sun hour: " << mSunHour << LL_ENDL;
 
 	msg->getS32Fast(_PREHASH_RegionInfo2, _PREHASH_HardMaxAgents, mHardAgentLimit);
 
-	if (msg->has(_PREHASH_RegionInfo3))
+	if (msg->hasFast(_PREHASH_RegionInfo3))
 	{
 		msg->getU64Fast(_PREHASH_RegionInfo3, _PREHASH_RegionFlagsExtended, mRegionFlags);
 	}
@@ -175,10 +175,10 @@ void LLRegionInfoModel::update(LLMessageSystem* msg)
 
 	// the only reasonable way to decide if we actually have any data is to
 	// check to see if any of these fields have nonzero sizes
-	if (msg->getSize(_PREHASH_RegionInfo2, _PREHASH_ProductSKU) > 0 ||
-		msg->getSize(_PREHASH_RegionInfo2, "ProductName") > 0)
+	if (msg->getSizeFast(_PREHASH_RegionInfo2, _PREHASH_ProductSKU) > 0 ||
+		msg->getSizeFast(_PREHASH_RegionInfo2, _PREHASH_ProductName) > 0)
 	{
-		msg->getString(_PREHASH_RegionInfo2, "ProductName", mSimType);
+		msg->getStringFast(_PREHASH_RegionInfo2, _PREHASH_ProductName, mSimType);
 	}
 
 	// Let interested parties know that region info has been updated.
@@ -201,19 +201,19 @@ void LLRegionInfoModel::sendEstateOwnerMessage(
 	}
 
 	LL_INFOS() << "Sending estate request '" << request << "'" << LL_ENDL;
-	msg->newMessage("EstateOwnerMessage");
+	msg->newMessageFast(_PREHASH_EstateOwnerMessage);
 	msg->nextBlockFast(_PREHASH_AgentData);
 	msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID());
 	msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
 	msg->addUUIDFast(_PREHASH_TransactionID, LLUUID::null); //not used
-	msg->nextBlock("MethodData");
-	msg->addString("Method", request);
-	msg->addUUID("Invoice", invoice);
+	msg->nextBlockFast(_PREHASH_MethodData);
+	msg->addStringFast(_PREHASH_Method, request);
+	msg->addUUIDFast(_PREHASH_Invoice, invoice);
 
 	if (strings.empty())
 	{
-		msg->nextBlock("ParamList");
-		msg->addString("Parameter", NULL);
+		msg->nextBlockFast(_PREHASH_ParamList);
+		msg->addStringFast(_PREHASH_Parameter, NULL);
 	}
 	else
 	{
@@ -222,8 +222,8 @@ void LLRegionInfoModel::sendEstateOwnerMessage(
 		for (unsigned i = 0; it != end; ++it, ++i)
 		{
 			LL_DEBUGS() << "- [" << i << "] " << (*it) << LL_ENDL;
-			msg->nextBlock("ParamList");
-			msg->addString("Parameter", *it);
+			msg->nextBlockFast(_PREHASH_ParamList);
+			msg->addStringFast(_PREHASH_Parameter, *it);
 		}
 	}
 
