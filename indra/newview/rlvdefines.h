@@ -41,7 +41,9 @@ const S32 RLVa_VERSION_PATCH = 1;
 const S32 RLVa_IMPL_ID = 13;
 
 // Uncomment before a final release
-//#define RLV_RELEASE
+#ifdef LL_RELEASE_FOR_DOWNLOAD
+#define RLV_RELEASE
+#endif
 
 // Defining these makes it easier if we ever need to change our tag
 #define RLV_WARNS		LL_WARNS("RLV")
@@ -234,8 +236,8 @@ enum ERlvBehaviour {
 	RLV_BHVR_SETCAM_TEXTURES,		// Replaces all textures with the specified texture (or the default unrezzed one)
 	RLV_BHVR_SETCAM_UNLOCK,			// Forces the camera focus to the user's avatar
 	// Camera (behaviours - deprecated)
-	RLV_BHVR_CAMZOOMMIN,			// Enforces a minimum - vertical - FOV angle of 60° / multiplier
-	RLV_BHVR_CAMZOOMMAX,			// Enforces a maximum - vertical - FOV angle of 60° / multiplier
+	RLV_BHVR_CAMZOOMMIN,			// Enforces a minimum - vertical - FOV angle of 60 degrees / multiplier
+	RLV_BHVR_CAMZOOMMAX,			// Enforces a maximum - vertical - FOV angle of 60 degrees / multiplier
 	// Camera (reply)
 	RLV_BHVR_GETCAM_AVDIST,			// Returns the current minimum distance between the camera and the user's avatar
 	RLV_BHVR_GETCAM_AVDISTMIN,		// Returns the active (if any) minimum distance between the camera and the user's avatar
