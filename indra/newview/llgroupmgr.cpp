@@ -1610,12 +1610,12 @@ void LLGroupMgr::sendGroupPropertiesRequest(const LLUUID& group_id)
     LLGroupMgr::getInstance()->addPendingPropertyRequest(group_id);
 
 	LLMessageSystem* msg = gMessageSystem;
-	msg->newMessage("GroupProfileRequest");
-	msg->nextBlock("AgentData");
-	msg->addUUID("AgentID",gAgent.getID());
-	msg->addUUID("SessionID",gAgent.getSessionID());
-	msg->nextBlock("GroupData");
-	msg->addUUID("GroupID",group_id);
+	msg->newMessageFast(_PREHASH_GroupProfileRequest);
+	msg->nextBlockFast(_PREHASH_AgentData);
+	msg->addUUIDFast(_PREHASH_AgentID,gAgent.getID());
+	msg->addUUIDFast(_PREHASH_SessionID,gAgent.getSessionID());
+	msg->nextBlockFast(_PREHASH_GroupData);
+	msg->addUUIDFast(_PREHASH_GroupID,group_id);
 	gAgent.sendReliableMessage();
 }
 
@@ -1629,13 +1629,13 @@ void LLGroupMgr::sendGroupMembersRequest(const LLUUID& group_id)
 		group_datap->mMemberRequestID.generate();
 
 		LLMessageSystem* msg = gMessageSystem;
-		msg->newMessage("GroupMembersRequest");
-		msg->nextBlock("AgentData");
-		msg->addUUID("AgentID",gAgent.getID());
-		msg->addUUID("SessionID",gAgent.getSessionID());
-		msg->nextBlock("GroupData");
-		msg->addUUID("GroupID",group_id);
-		msg->addUUID("RequestID",group_datap->mMemberRequestID);
+		msg->newMessageFast(_PREHASH_GroupMembersRequest);
+		msg->nextBlockFast(_PREHASH_AgentData);
+		msg->addUUIDFast(_PREHASH_AgentID,gAgent.getID());
+		msg->addUUIDFast(_PREHASH_SessionID,gAgent.getSessionID());
+		msg->nextBlockFast(_PREHASH_GroupData);
+		msg->addUUIDFast(_PREHASH_GroupID,group_id);
+		msg->addUUIDFast(_PREHASH_RequestID,group_datap->mMemberRequestID);
 		gAgent.sendReliableMessage();
 	}
 }
@@ -1651,13 +1651,13 @@ void LLGroupMgr::sendGroupRoleDataRequest(const LLUUID& group_id)
 		group_datap->mRoleDataRequestID.generate();
 
 		LLMessageSystem* msg = gMessageSystem;
-		msg->newMessage("GroupRoleDataRequest");
-		msg->nextBlock("AgentData");
-		msg->addUUID("AgentID",gAgent.getID());
-		msg->addUUID("SessionID",gAgent.getSessionID());
-		msg->nextBlock("GroupData");
-		msg->addUUID("GroupID",group_id);
-		msg->addUUID("RequestID",group_datap->mRoleDataRequestID);
+		msg->newMessageFast(_PREHASH_GroupRoleDataRequest);
+		msg->nextBlockFast(_PREHASH_AgentData);
+		msg->addUUIDFast(_PREHASH_AgentID,gAgent.getID());
+		msg->addUUIDFast(_PREHASH_SessionID,gAgent.getSessionID());
+		msg->nextBlockFast(_PREHASH_GroupData);
+		msg->addUUIDFast(_PREHASH_GroupID,group_id);
+		msg->addUUIDFast(_PREHASH_RequestID,group_datap->mRoleDataRequestID);
 		gAgent.sendReliableMessage();
 	}
 }
@@ -1685,13 +1685,13 @@ void LLGroupMgr::sendGroupRoleMembersRequest(const LLUUID& group_id)
 		group_datap->mRoleMembersRequestID.generate();
 
 		LLMessageSystem* msg = gMessageSystem;
-		msg->newMessage("GroupRoleMembersRequest");
-		msg->nextBlock("AgentData");
-		msg->addUUID("AgentID",gAgent.getID());
-		msg->addUUID("SessionID",gAgent.getSessionID());
-		msg->nextBlock("GroupData");
-		msg->addUUID("GroupID",group_id);
-		msg->addUUID("RequestID",group_datap->mRoleMembersRequestID);
+		msg->newMessageFast(_PREHASH_GroupRoleMembersRequest);
+		msg->nextBlockFast(_PREHASH_AgentData);
+		msg->addUUIDFast(_PREHASH_AgentID,gAgent.getID());
+		msg->addUUIDFast(_PREHASH_SessionID,gAgent.getSessionID());
+		msg->nextBlockFast(_PREHASH_GroupData);
+		msg->addUUIDFast(_PREHASH_GroupID,group_id);
+		msg->addUUIDFast(_PREHASH_RequestID,group_datap->mRoleMembersRequestID);
 		gAgent.sendReliableMessage();
 	}
 }
@@ -1705,12 +1705,12 @@ void LLGroupMgr::sendGroupTitlesRequest(const LLUUID& group_id)
 	group_datap->mTitlesRequestID.generate();
 
 	LLMessageSystem* msg = gMessageSystem;
-	msg->newMessage("GroupTitlesRequest");
-	msg->nextBlock("AgentData");
-	msg->addUUID("AgentID",gAgent.getID());
-	msg->addUUID("SessionID",gAgent.getSessionID());
-	msg->addUUID("GroupID",group_id);
-	msg->addUUID("RequestID",group_datap->mTitlesRequestID);
+	msg->newMessageFast(_PREHASH_GroupTitlesRequest);
+	msg->nextBlockFast(_PREHASH_AgentData);
+	msg->addUUIDFast(_PREHASH_AgentID,gAgent.getID());
+	msg->addUUIDFast(_PREHASH_SessionID,gAgent.getSessionID());
+	msg->addUUIDFast(_PREHASH_GroupID,group_id);
+	msg->addUUIDFast(_PREHASH_RequestID,group_datap->mTitlesRequestID);
 
 	gAgent.sendReliableMessage();
 }
@@ -1720,12 +1720,12 @@ void LLGroupMgr::sendGroupTitleUpdate(const LLUUID& group_id, const LLUUID& titl
 	LL_DEBUGS("GrpMgr") << "LLGroupMgr::sendGroupTitleUpdate" << LL_ENDL;
 
 	LLMessageSystem* msg = gMessageSystem;
-	msg->newMessage("GroupTitleUpdate");
-	msg->nextBlock("AgentData");
-	msg->addUUID("AgentID",gAgent.getID());
-	msg->addUUID("SessionID",gAgent.getSessionID());
-	msg->addUUID("GroupID",group_id);
-	msg->addUUID("TitleRoleID",title_role_id);
+	msg->newMessageFast(_PREHASH_GroupTitleUpdate);
+	msg->nextBlockFast(_PREHASH_AgentData);
+	msg->addUUIDFast(_PREHASH_AgentID,gAgent.getID());
+	msg->addUUIDFast(_PREHASH_SessionID,gAgent.getSessionID());
+	msg->addUUIDFast(_PREHASH_GroupID,group_id);
+	msg->addUUIDFast(_PREHASH_TitleRoleID,title_role_id);
 
 	gAgent.sendReliableMessage();
 
@@ -1889,7 +1889,7 @@ void LLGroupMgr::sendGroupMemberInvites(const LLUUID& group_id, std::map<LLUUID,
 		msg->addUUID("InviteeID",(*it).first);
 		msg->addUUID("RoleID",(*it).second);
 
-		if (msg->isSendFull())
+		if (msg->isSendFullFast())
 		{
 			gAgent.sendReliableMessage();
 			start_message = true;
@@ -1927,19 +1927,19 @@ void LLGroupMgr::sendGroupMemberEjects(const LLUUID& group_id,
 			// Add them to the message
 			if (start_message)
 			{
-				msg->newMessage("EjectGroupMemberRequest");
-				msg->nextBlock("AgentData");
-				msg->addUUID("AgentID",gAgent.getID());
-				msg->addUUID("SessionID",gAgent.getSessionID());
-				msg->nextBlock("GroupData");
-				msg->addUUID("GroupID",group_id);
+				msg->newMessageFast(_PREHASH_EjectGroupMemberRequest);
+				msg->nextBlockFast(_PREHASH_AgentData);
+				msg->addUUIDFast(_PREHASH_AgentID,gAgent.getID());
+				msg->addUUIDFast(_PREHASH_SessionID,gAgent.getSessionID());
+				msg->nextBlockFast(_PREHASH_GroupData);
+				msg->addUUIDFast(_PREHASH_GroupID,group_id);
 				start_message = false;
 			}
 			
-			msg->nextBlock("EjectData");
-			msg->addUUID("EjecteeID",ejected_member_id);
+			msg->nextBlockFast(_PREHASH_EjectData);
+			msg->addUUIDFast(_PREHASH_EjecteeID,ejected_member_id);
 
-			if (msg->isSendFull())
+			if (msg->isSendFullFast())
 			{
 				gAgent.sendReliableMessage();
 				start_message = true;

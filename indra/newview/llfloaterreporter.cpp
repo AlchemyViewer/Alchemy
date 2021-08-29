@@ -826,17 +826,17 @@ void LLFloaterReporter::sendReportViaLegacy(const LLSD & report)
 	
 	msg->nextBlockFast(_PREHASH_ReportData);
 	msg->addU8Fast(_PREHASH_ReportType, report["report-type"].asInteger());
-	msg->addU8(_PREHASH_Category, report["category"].asInteger());
+	msg->addU8Fast(_PREHASH_Category, report["category"].asInteger());
 	msg->addVector3Fast(_PREHASH_Position, 	LLVector3(report["position"]));
 	msg->addU8Fast(_PREHASH_CheckFlags, report["check-flags"].asInteger());
 	msg->addUUIDFast(_PREHASH_ScreenshotID, report["screenshot-id"].asUUID());
 	msg->addUUIDFast(_PREHASH_ObjectID, report["object-id"].asUUID());
-	msg->addUUID("AbuserID", report["abuser-id"].asUUID());
-	msg->addString("AbuseRegionName", report["abuse-region-name"].asString());
-	msg->addUUID("AbuseRegionID", report["abuse-region-id"].asUUID());
+	msg->addUUIDFast(_PREHASH_AbuserID, report["abuser-id"].asUUID());
+	msg->addStringFast(_PREHASH_AbuseRegionName, report["abuse-region-name"].asString());
+	msg->addUUIDFast(_PREHASH_AbuseRegionID, report["abuse-region-id"].asUUID());
 
 	msg->addStringFast(_PREHASH_Summary, report["summary"].asString());
-	msg->addString("VersionString", report["version-string"]);
+	msg->addStringFast(_PREHASH_VersionString, report["version-string"]);
 	msg->addStringFast(_PREHASH_Details, report["details"] );
 	
 	msg->sendReliable(regionp->getHost());

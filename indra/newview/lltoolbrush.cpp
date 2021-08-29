@@ -185,8 +185,8 @@ void LLToolBrushLand::modifyLandAtPointGlobal(const LLVector3d &pos_global,
 		msg->addF32Fast(_PREHASH_South, y_pos );
 		msg->addF32Fast(_PREHASH_East, x_pos );
 		msg->addF32Fast(_PREHASH_North, y_pos );
-		msg->nextBlock("ModifyBlockExtended");
-		msg->addF32("BrushSize", mBrushSize);
+		msg->nextBlockFast(_PREHASH_ModifyBlockExtended);
+		msg->addF32Fast(_PREHASH_BrushSize, mBrushSize);
 		msg->sendMessage(regionp->getHost());
 	}
 }
@@ -340,8 +340,8 @@ void LLToolBrushLand::modifyLandInSelectionGlobal()
 			msg->addF32Fast(_PREHASH_North, max_region.mV[VY] );
 		}
 		
-		msg->nextBlock("ModifyBlockExtended");
-		msg->addF32("BrushSize", mBrushSize);
+		msg->nextBlockFast(_PREHASH_ModifyBlockExtended);
+		msg->addF32Fast(_PREHASH_BrushSize, mBrushSize);
 
 		msg->sendMessage(regionp->getHost());
 	}

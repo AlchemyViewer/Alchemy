@@ -240,7 +240,7 @@ void LLWorldMapMessage::processMapItemReply(LLMessageSystem* msg, void**)
 	U32 type;
 	msg->getU32Fast(_PREHASH_RequestData, _PREHASH_ItemType, type);
 
-	S32 num_blocks = msg->getNumberOfBlocks("Data");
+	S32 num_blocks = msg->getNumberOfBlocksFast(_PREHASH_Data);
 
 	auto& world_map = LLWorldMap::instance();
 

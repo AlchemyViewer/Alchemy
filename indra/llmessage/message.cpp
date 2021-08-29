@@ -1767,7 +1767,7 @@ void	process_start_ping_check(LLMessageSystem *msgsystem, void** /*user_data*/)
 	// Send off the response
 	msgsystem->newMessageFast(_PREHASH_CompletePingCheck);
 	msgsystem->nextBlockFast(_PREHASH_PingID);
-	msgsystem->addU8(_PREHASH_PingID, ping_id);
+	msgsystem->addU8Fast(_PREHASH_PingID, ping_id);
 	msgsystem->sendMessage(msgsystem->getSender());
 }
 
@@ -2001,17 +2001,17 @@ void LLMessageSystem::processUseCircuitCode(LLMessageSystem* msg,
 void LLMessageSystem::processError(LLMessageSystem* msg, void**)
 {
 	S32 error_code = 0;
-	msg->getS32("Data", "Code", error_code);
+	msg->getS32Fast(_PREHASH_Data, _PREHASH_Code, error_code);
 	std::string error_token;
-	msg->getString("Data", "Token", error_token);
+	msg->getStringFast(_PREHASH_Data, _PREHASH_Token, error_token);
 
 	LLUUID error_id;
-	msg->getUUID("Data", "ID", error_id);
+	msg->getUUIDFast(_PREHASH_Data, _PREHASH_ID, error_id);
 	std::string error_system;
-	msg->getString("Data", "System", error_system);
+	msg->getStringFast(_PREHASH_Data, _PREHASH_System, error_system);
 
 	std::string error_message;
-	msg->getString("Data", "Message", error_message);
+	msg->getStringFast(_PREHASH_Data, _PREHASH_Message, error_message);
 
 	LL_WARNS("Messaging") << "Message error from " << msg->getSender() << " - "
 		<< error_code << " " << error_token << " " << error_id << " \""
@@ -2539,13 +2539,12 @@ bool start_messaging_system(
 	gMessageSystem->setHandlerFuncFast(_PREHASH_DenyTrustedCircuit,
 				       process_deny_trusted_circuit,
 				       NULL);
-	gMessageSystem->setHandlerFunc("Error", LLMessageSystem::processError);
+	gMessageSystem->setHandlerFuncFast(_PREHASH_Error, LLMessageSystem::processError);
 
 	// We can hand this to the null_message_callback since it is a
 	// trusted message, so it will automatically be denied if it isn't
 	// trusted and ignored if it is -- exactly what we want.
-	gMessageSystem->setHandlerFunc(
-		"RequestTrustedCircuit",
+	gMessageSystem->setHandlerFuncFast(_PREHASH_RequestTrustedCircuit,
 		null_message_callback,
 		NULL);
 

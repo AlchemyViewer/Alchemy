@@ -691,11 +691,11 @@ LLUUID LLInventoryModel::createNewCategory(const LLUUID& parent_id,
 	// Create the category on the server. We do this to prevent people
 	// from munging their protected folders.
 	LLMessageSystem* msg = gMessageSystem;
-	msg->newMessage("CreateInventoryFolder");
-	msg->nextBlock("AgentData");
-	msg->addUUID("AgentID", gAgent.getID());
-	msg->addUUID(_PREHASH_SessionID, gAgent.getSessionID());
-	msg->nextBlock("FolderData");
+	msg->newMessageFast(_PREHASH_CreateInventoryFolder);
+	msg->nextBlockFast(_PREHASH_AgentData);
+	msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID());
+	msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
+	msg->nextBlockFast(_PREHASH_FolderData);
 	cat->packMessage(msg);
 	gAgent.sendReliableMessage();
 
@@ -2645,8 +2645,8 @@ void LLInventoryModel::buildParentChildMap()
 			msg->nextBlockFast(_PREHASH_InventoryData);
 			msg->addUUIDFast(_PREHASH_ItemID, (*it));
 			msg->addUUIDFast(_PREHASH_FolderID, lnf);
-			msg->addString("NewName", NULL);
-			if(msg->isSendFull(NULL))
+			msg->addStringFast(_PREHASH_NewName, NULL);
+			if(msg->isSendFullFast(nullptr))
 			{
 				start_new_message = TRUE;
 				gAgent.sendReliableMessage();
@@ -3507,7 +3507,7 @@ void LLInventoryModel::processMoveInventoryItem(LLMessageSystem* msg, void**)
 		{
 			LLPointer<LLViewerInventoryItem> new_item = new LLViewerInventoryItem(item);
 			msg->getUUIDFast(_PREHASH_InventoryData, _PREHASH_FolderID, folder_id, i);
-			msg->getString("InventoryData", "NewName", new_name, i);
+			msg->getStringFast(_PREHASH_InventoryData, _PREHASH_NewName, new_name, i);
 
 			LL_DEBUGS() << "moving item " << item_id << " to folder "
 					 << folder_id << LL_ENDL;

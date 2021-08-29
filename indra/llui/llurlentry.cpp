@@ -1036,12 +1036,12 @@ void LLUrlEntryParcel::sendParcelInfoRequest(const LLUUID& parcel_id)
 	if (sRegionHost.isInvalid() || sDisconnected) return;
 
 	LLMessageSystem *msg = gMessageSystem;
-	msg->newMessage("ParcelInfoRequest");
+	msg->newMessageFast(_PREHASH_ParcelInfoRequest);
 	msg->nextBlockFast(_PREHASH_AgentData);
 	msg->addUUIDFast(_PREHASH_AgentID, sAgentID );
-	msg->addUUID("SessionID", sSessionID);
-	msg->nextBlock("Data");
-	msg->addUUID("ParcelID", parcel_id);
+	msg->addUUIDFast(_PREHASH_SessionID, sSessionID);
+	msg->nextBlockFast(_PREHASH_Data);
+	msg->addUUIDFast(_PREHASH_ParcelID, parcel_id);
 	msg->sendReliable(sRegionHost);
 }
 

@@ -296,12 +296,12 @@ void LLAvatarTracker::terminateBuddy(const LLUUID& id)
 	if(!buddy) return;
 	mBuddyInfo.erase(id);
 	LLMessageSystem* msg = gMessageSystem;
-	msg->newMessage("TerminateFriendship");
-	msg->nextBlock("AgentData");
-	msg->addUUID("AgentID", gAgent.getID());
-	msg->addUUID("SessionID", gAgent.getSessionID());
-	msg->nextBlock("ExBlock");
-	msg->addUUID("OtherID", id);
+	msg->newMessageFast(_PREHASH_TerminateFriendship);
+	msg->nextBlockFast(_PREHASH_AgentData);
+	msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID());
+	msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
+	msg->nextBlockFast(_PREHASH_ExBlock);
+	msg->addUUIDFast(_PREHASH_OtherID, id);
 	gAgent.sendReliableMessage();
 	 
 	addChangedMask(LLFriendObserver::REMOVE, id);
@@ -781,7 +781,7 @@ void LLAvatarTracker::formFriendship(const LLUUID& id)
 void LLAvatarTracker::processTerminateFriendship(LLMessageSystem* msg, void**)
 {
 	LLUUID id;
-	msg->getUUID("ExBlock", "OtherID", id);
+	msg->getUUIDFast(_PREHASH_ExBlock, _PREHASH_OtherID, id);
 	if(id.notNull())
 	{
 		LLAvatarTracker& at = LLAvatarTracker::instance();

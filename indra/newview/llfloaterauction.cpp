@@ -418,7 +418,7 @@ void LLFloaterAuction::clearParcelAccessList(LLParcel* parcel, LLViewerRegion* r
 	msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID() );
 	msg->nextBlockFast(_PREHASH_Data);
 	msg->addU32Fast(_PREHASH_Flags, list);
-	msg->addS32(_PREHASH_LocalID, parcel->getLocalID() );
+	msg->addS32Fast(_PREHASH_LocalID, parcel->getLocalID() );
 	msg->addUUIDFast(_PREHASH_TransactionID, transactionUUID);
 	msg->addS32Fast(_PREHASH_SequenceID, 1);			// sequence_id
 	msg->addS32Fast(_PREHASH_Sections, 0);				// num_sections

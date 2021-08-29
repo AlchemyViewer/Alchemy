@@ -650,13 +650,13 @@ bool ALAvatarActions::handleParcelFreeze(const LLSD& notification, const LLSD& r
 			const auto& id = it->asUUID();
 			LLMessageSystem* msg = gMessageSystem;
 
-			msg->newMessage("FreezeUser");
-			msg->nextBlock("AgentData");
-			msg->addUUID("AgentID", gAgent.getID());
-			msg->addUUID("SessionID", gAgent.getSessionID());
-			msg->nextBlock("Data");
-			msg->addUUID("TargetID", id);
-			msg->addU32("Flags", flags);
+			msg->newMessageFast(_PREHASH_FreezeUser);
+			msg->nextBlockFast(_PREHASH_AgentData);
+			msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID());
+			msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
+			msg->nextBlockFast(_PREHASH_Data);
+			msg->addUUIDFast(_PREHASH_TargetID, id);
+			msg->addU32Fast(_PREHASH_Flags, flags);
 			gAgent.sendReliableMessage();
 		}
 	}
@@ -679,13 +679,13 @@ bool ALAvatarActions::handleParcelEject(const LLSD& notification, const LLSD& re
 		const auto& id = it->asUUID();
 		U32 flags = (1 == option && ban_enabled) ? 0x1 : 0x0;
 		LLMessageSystem* msg = gMessageSystem;
-		msg->newMessage("EjectUser");
-		msg->nextBlock("AgentData");
-		msg->addUUID("AgentID", gAgent.getID());
-		msg->addUUID("SessionID", gAgent.getSessionID());
-		msg->nextBlock("Data");
-		msg->addUUID("TargetID", id);
-		msg->addU32("Flags", flags);
+		msg->newMessageFast(_PREHASH_EjectUser);
+		msg->nextBlockFast(_PREHASH_AgentData);
+		msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID());
+		msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
+		msg->nextBlockFast(_PREHASH_Data);
+		msg->addUUIDFast(_PREHASH_TargetID, id);
+		msg->addU32Fast(_PREHASH_Flags, flags);
 		gAgent.sendReliableMessage();
 	}
 	return false;

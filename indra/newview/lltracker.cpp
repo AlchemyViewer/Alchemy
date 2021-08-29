@@ -776,13 +776,13 @@ void LLTracker::setLandmarkVisited()
 			flags |= LLInventoryItemFlags::II_FLAGS_LANDMARK_VISITED;
 			item->setFlags(flags);
 			LLMessageSystem* msg = gMessageSystem;
-			msg->newMessage("ChangeInventoryItemFlags");
-			msg->nextBlock("AgentData");
-			msg->addUUID("AgentID", gAgent.getID());
-			msg->addUUID("SessionID", gAgent.getSessionID());
-			msg->nextBlock("InventoryData");
-			msg->addUUID("ItemID", mTrackedLandmarkItemID);
-			msg->addU32("Flags", flags);
+			msg->newMessageFast(_PREHASH_ChangeInventoryItemFlags);
+			msg->nextBlockFast(_PREHASH_AgentData);
+			msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID());
+			msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
+			msg->nextBlockFast(_PREHASH_InventoryData);
+			msg->addUUIDFast(_PREHASH_ItemID, mTrackedLandmarkItemID);
+			msg->addU32Fast(_PREHASH_Flags, flags);
 			gAgent.sendReliableMessage();
 
 			LLInventoryModel::LLCategoryUpdate up(item->getParentUUID(), 0);

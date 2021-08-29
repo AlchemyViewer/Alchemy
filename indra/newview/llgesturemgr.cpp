@@ -210,18 +210,18 @@ void LLGestureMgr::activateGestures(LLViewerInventoryItem::item_array_t& items)
 
 		if (start_message)
 		{
-			msg->newMessage("ActivateGestures");
-			msg->nextBlock("AgentData");
-			msg->addUUID("AgentID", gAgent.getID());
-			msg->addUUID("SessionID", gAgent.getSessionID());
-			msg->addU32("Flags", 0x0);
+			msg->newMessageFast(_PREHASH_ActivateGestures);
+			msg->nextBlockFast(_PREHASH_AgentData);
+			msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID());
+			msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
+			msg->addU32Fast(_PREHASH_Flags, 0x0);
 			start_message = FALSE;
 		}
 		
-		msg->nextBlock("Data");
-		msg->addUUID("ItemID", item->getUUID());
-		msg->addUUID("AssetID", item->getAssetUUID());
-		msg->addU32("GestureFlags", 0x0);
+		msg->nextBlockFast(_PREHASH_Data);
+		msg->addUUIDFast(_PREHASH_ItemID, item->getUUID());
+		msg->addUUIDFast(_PREHASH_AssetID, item->getAssetUUID());
+		msg->addU32Fast(_PREHASH_GestureFlags, 0x0);
 
 		if (msg->getCurrentSendTotal() > MTUBYTES)
 		{
@@ -332,15 +332,15 @@ void LLGestureMgr::deactivateGesture(const LLUUID& item_id)
 
 	// Inform the database of this change
 	LLMessageSystem* msg = gMessageSystem;
-	msg->newMessage("DeactivateGestures");
-	msg->nextBlock("AgentData");
-	msg->addUUID("AgentID", gAgent.getID());
-	msg->addUUID("SessionID", gAgent.getSessionID());
-	msg->addU32("Flags", 0x0);
+	msg->newMessageFast(_PREHASH_DeactivateGestures);
+	msg->nextBlockFast(_PREHASH_AgentData);
+	msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID());
+	msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
+	msg->addU32Fast(_PREHASH_Flags, 0x0);
 	
-	msg->nextBlock("Data");
-	msg->addUUID("ItemID", item_id);
-	msg->addU32("GestureFlags", 0x0);
+	msg->nextBlockFast(_PREHASH_Data);
+	msg->addUUIDFast(_PREHASH_ItemID, item_id);
+	msg->addU32Fast(_PREHASH_GestureFlags, 0x0);
 
 	gAgent.sendReliableMessage();
 
@@ -399,17 +399,17 @@ void LLGestureMgr::deactivateSimilarGestures(LLMultiGesture* in, const LLUUID& i
 	{
 		if (start_message)
 		{
-			msg->newMessage("DeactivateGestures");
-			msg->nextBlock("AgentData");
-			msg->addUUID("AgentID", gAgent.getID());
-			msg->addUUID("SessionID", gAgent.getSessionID());
-			msg->addU32("Flags", 0x0);
+			msg->newMessageFast(_PREHASH_DeactivateGestures);
+			msg->nextBlockFast(_PREHASH_AgentData);
+			msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID());
+			msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
+			msg->addU32Fast(_PREHASH_Flags, 0x0);
 			start_message = FALSE;
 		}
 	
-		msg->nextBlock("Data");
-		msg->addUUID("ItemID", *vit);
-		msg->addU32("GestureFlags", 0x0);
+		msg->nextBlockFast(_PREHASH_Data);
+		msg->addUUIDFast(_PREHASH_ItemID, *vit);
+		msg->addU32Fast(_PREHASH_GestureFlags, 0x0);
 
 		if (msg->getCurrentSendTotal() > MTUBYTES)
 		{
@@ -1124,16 +1124,16 @@ void LLGestureMgr::onLoadComplete(const LLUUID& asset_uuid,
 					{
 						// Inform the database of this change
 						LLMessageSystem* msg = gMessageSystem;
-						msg->newMessage("ActivateGestures");
-						msg->nextBlock("AgentData");
-						msg->addUUID("AgentID", gAgent.getID());
-						msg->addUUID("SessionID", gAgent.getSessionID());
-						msg->addU32("Flags", 0x0);
+						msg->newMessageFast(_PREHASH_ActivateGestures);
+						msg->nextBlockFast(_PREHASH_AgentData);
+						msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID());
+						msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
+						msg->addU32Fast(_PREHASH_Flags, 0x0);
 
-						msg->nextBlock("Data");
-						msg->addUUID("ItemID", item_id);
-						msg->addUUID("AssetID", asset_uuid);
-						msg->addU32("GestureFlags", 0x0);
+						msg->nextBlockFast(_PREHASH_Data);
+						msg->addUUIDFast(_PREHASH_ItemID, item_id);
+						msg->addUUIDFast(_PREHASH_AssetID, asset_uuid);
+						msg->addU32Fast(_PREHASH_GestureFlags, 0x0);
 
 						gAgent.sendReliableMessage();
 					}

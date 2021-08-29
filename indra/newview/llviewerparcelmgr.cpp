@@ -970,7 +970,7 @@ void LLViewerParcelMgr::sendParcelAccessListRequest(U32 flags)
 	msg->nextBlockFast(_PREHASH_Data);
 	msg->addS32Fast(_PREHASH_SequenceID, 0);
 	msg->addU32Fast(_PREHASH_Flags, flags);
-	msg->addS32("LocalID", mCurrentParcel->getLocalID() );
+	msg->addS32Fast(_PREHASH_LocalID, mCurrentParcel->getLocalID() );
 	msg->sendReliable( region->getHost() );
 }
 
@@ -988,13 +988,13 @@ void LLViewerParcelMgr::sendParcelDwellRequest()
 	LLMessageSystem *msg = gMessageSystem;
 
 	// Only the headers differ
-	msg->newMessage("ParcelDwellRequest");
-	msg->nextBlock("AgentData");
-	msg->addUUID("AgentID", gAgent.getID() );
-	msg->addUUID("SessionID", gAgent.getSessionID());
-	msg->nextBlock("Data");
-	msg->addS32("LocalID", mCurrentParcel->getLocalID());
-	msg->addUUID("ParcelID", LLUUID::null);	// filled in on simulator
+	msg->newMessageFast(_PREHASH_ParcelDwellRequest);
+	msg->nextBlockFast(_PREHASH_AgentData);
+	msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID() );
+	msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
+	msg->nextBlockFast(_PREHASH_Data);
+	msg->addS32Fast(_PREHASH_LocalID, mCurrentParcel->getLocalID());
+	msg->addUUIDFast(_PREHASH_ParcelID, LLUUID::null);	// filled in on simulator
 	msg->sendReliable( region->getHost() );
 }
 

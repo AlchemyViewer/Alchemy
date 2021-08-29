@@ -474,12 +474,12 @@ void LLPanelGroupNotices::onClickRefreshNotices(void* data)
 	self->clearNoticeList();
 
 	LLMessageSystem* msg = gMessageSystem;
-	msg->newMessage("GroupNoticesListRequest");
-	msg->nextBlock("AgentData");
-	msg->addUUID("AgentID",gAgent.getID());
-	msg->addUUID("SessionID",gAgent.getSessionID());
-	msg->nextBlock("Data");
-	msg->addUUID("GroupID",self->mGroupID);
+	msg->newMessageFast(_PREHASH_GroupNoticesListRequest);
+	msg->nextBlockFast(_PREHASH_AgentData);
+	msg->addUUIDFast(_PREHASH_AgentID,gAgent.getID());
+	msg->addUUIDFast(_PREHASH_SessionID,gAgent.getSessionID());
+	msg->nextBlockFast(_PREHASH_Data);
+	msg->addUUIDFast(_PREHASH_GroupID,self->mGroupID);
 	gAgent.sendReliableMessage();
 }
 
@@ -490,7 +490,7 @@ std::map<LLUUID,LLPanelGroupNotices*> LLPanelGroupNotices::sInstances;
 void LLPanelGroupNotices::processGroupNoticesListReply(LLMessageSystem* msg, void** data)
 {
 	LLUUID group_id;
-	msg->getUUID("AgentData", "GroupID", group_id);
+	msg->getUUIDFast(_PREHASH_AgentData, _PREHASH_GroupID, group_id);
 
 	std::map<LLUUID,LLPanelGroupNotices*>::iterator it = sInstances.find(group_id);
 	if (it == sInstances.end())
@@ -604,12 +604,12 @@ void LLPanelGroupNotices::onSelectNotice(LLUICtrl* ctrl, void* data)
 	if (!item) return;
 	
 	LLMessageSystem* msg = gMessageSystem;
-	msg->newMessage("GroupNoticeRequest");
-	msg->nextBlock("AgentData");
-	msg->addUUID("AgentID",gAgent.getID());
-	msg->addUUID("SessionID",gAgent.getSessionID());
-	msg->nextBlock("Data");
-	msg->addUUID("GroupNoticeID",item->getUUID());
+	msg->newMessageFast(_PREHASH_GroupNoticeRequest);
+	msg->nextBlockFast(_PREHASH_AgentData);
+	msg->addUUIDFast(_PREHASH_AgentID,gAgent.getID());
+	msg->addUUIDFast(_PREHASH_SessionID,gAgent.getSessionID());
+	msg->nextBlockFast(_PREHASH_Data);
+	msg->addUUIDFast(_PREHASH_GroupNoticeID,item->getUUID());
 	gAgent.sendReliableMessage();
 
 	LL_DEBUGS() << "Item " << item->getUUID() << " selected." << LL_ENDL;

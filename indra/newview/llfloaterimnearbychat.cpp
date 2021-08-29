@@ -941,21 +941,21 @@ void send_chat_from_viewer(std::string utf8_out_text, EChatType type, S32 channe
         msg->nextBlockFast(_PREHASH_ChatData);
         msg->addStringFast(_PREHASH_Message, utf8_out_text);
         msg->addU8Fast(_PREHASH_Type, type);
-        msg->addS32("Channel", channel);
+        msg->addS32Fast(_PREHASH_Channel, channel);
 
     }
     else
     {
         // Hack: ChatFromViewer doesn't allow negative channels
-        msg->newMessage("ScriptDialogReply");
-        msg->nextBlock("AgentData");
-        msg->addUUID("AgentID", gAgentID);
-        msg->addUUID("SessionID", gAgentSessionID);
-        msg->nextBlock("Data");
-        msg->addUUID("ObjectID", gAgentID);
-        msg->addS32("ChatChannel", channel);
-        msg->addS32("ButtonIndex", 0);
-        msg->addString("ButtonLabel", utf8_out_text);
+        msg->newMessageFast(_PREHASH_ScriptDialogReply);
+        msg->nextBlockFast(_PREHASH_AgentData);
+        msg->addUUIDFast(_PREHASH_AgentID, gAgentID);
+        msg->addUUIDFast(_PREHASH_SessionID, gAgentSessionID);
+        msg->nextBlockFast(_PREHASH_Data);
+        msg->addUUIDFast(_PREHASH_ObjectID, gAgentID);
+        msg->addS32Fast(_PREHASH_ChatChannel, channel);
+        msg->addS32Fast(_PREHASH_ButtonIndex, 0);
+        msg->addStringFast(_PREHASH_ButtonLabel, utf8_out_text);
     }
 
     gAgent.sendReliableMessage();

@@ -86,21 +86,21 @@ void LLRemoteParcelInfoProcessor::processParcelInfoReply(LLMessageSystem* msg, v
 {
 	LLParcelData parcel_data;
 
-	msg->getUUID	("Data", "ParcelID", parcel_data.parcel_id);
-	msg->getUUID	("Data", "OwnerID", parcel_data.owner_id);
-	msg->getString	("Data", "Name", parcel_data.name);
-	msg->getString	("Data", "Desc", parcel_data.desc);
-	msg->getS32		("Data", "ActualArea", parcel_data.actual_area);
-	msg->getS32		("Data", "BillableArea", parcel_data.billable_area);
-	msg->getU8		("Data", "Flags", parcel_data.flags);
-	msg->getF32		("Data", "GlobalX", parcel_data.global_x);
-	msg->getF32		("Data", "GlobalY", parcel_data.global_y);
-	msg->getF32		("Data", "GlobalZ", parcel_data.global_z);
-	msg->getString	("Data", "SimName", parcel_data.sim_name);
-	msg->getUUID	("Data", "SnapshotID", parcel_data.snapshot_id);
-	msg->getF32		("Data", "Dwell", parcel_data.dwell);
-	msg->getS32		("Data", "SalePrice", parcel_data.sale_price);
-	msg->getS32		("Data", "AuctionID", parcel_data.auction_id);
+	msg->getUUIDFast	(_PREHASH_Data, _PREHASH_ParcelID, parcel_data.parcel_id);
+	msg->getUUIDFast	(_PREHASH_Data, _PREHASH_OwnerID, parcel_data.owner_id);
+	msg->getStringFast	(_PREHASH_Data, _PREHASH_Name, parcel_data.name);
+	msg->getStringFast	(_PREHASH_Data, _PREHASH_Desc, parcel_data.desc);
+	msg->getS32Fast		(_PREHASH_Data, _PREHASH_ActualArea, parcel_data.actual_area);
+	msg->getS32Fast		(_PREHASH_Data, _PREHASH_BillableArea, parcel_data.billable_area);
+	msg->getU8Fast		(_PREHASH_Data, _PREHASH_Flags, parcel_data.flags);
+	msg->getF32Fast		(_PREHASH_Data, _PREHASH_GlobalX, parcel_data.global_x);
+	msg->getF32Fast		(_PREHASH_Data, _PREHASH_GlobalY, parcel_data.global_y);
+	msg->getF32Fast		(_PREHASH_Data, _PREHASH_GlobalZ, parcel_data.global_z);
+	msg->getStringFast	(_PREHASH_Data, _PREHASH_SimName, parcel_data.sim_name);
+	msg->getUUIDFast	(_PREHASH_Data, _PREHASH_SnapshotID, parcel_data.snapshot_id);
+	msg->getF32Fast		(_PREHASH_Data, _PREHASH_Dwell, parcel_data.dwell);
+	msg->getS32Fast		(_PREHASH_Data, _PREHASH_SalePrice, parcel_data.sale_price);
+	msg->getS32Fast		(_PREHASH_Data, _PREHASH_AuctionID, parcel_data.auction_id);
 
 	LLRemoteParcelInfoProcessor::observer_multimap_t & observers = LLRemoteParcelInfoProcessor::getInstance()->mObservers;
 
@@ -153,12 +153,12 @@ void LLRemoteParcelInfoProcessor::sendParcelInfoRequest(const LLUUID& parcel_id)
 {
 	LLMessageSystem *msg = gMessageSystem;
 
-	msg->newMessage("ParcelInfoRequest");
+	msg->newMessageFast(_PREHASH_ParcelInfoRequest);
 	msg->nextBlockFast(_PREHASH_AgentData);
 	msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID() );
-	msg->addUUID("SessionID", gAgent.getSessionID());
-	msg->nextBlock("Data");
-	msg->addUUID("ParcelID", parcel_id);
+	msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
+	msg->nextBlockFast(_PREHASH_Data);
+	msg->addUUIDFast(_PREHASH_ParcelID, parcel_id);
 	gAgent.sendReliableMessage();
 }
 

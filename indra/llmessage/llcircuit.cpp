@@ -951,7 +951,7 @@ BOOL LLCircuitData::updateWatchDogTimers(LLMessageSystem *msgsys)
 	// Send off the another ping.
 	pingTimerStart();
 	msgsys->newMessageFast(_PREHASH_StartPingCheck);
-	msgsys->nextBlock(_PREHASH_PingID);
+	msgsys->nextBlockFast(_PREHASH_PingID);
 	msgsys->addU8Fast(_PREHASH_PingID, nextPingID());
 	msgsys->addU32Fast(_PREHASH_OldestUnacked, packet_id);
 	msgsys->sendMessage(mHost);

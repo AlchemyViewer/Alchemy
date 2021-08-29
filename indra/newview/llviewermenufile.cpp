@@ -849,7 +849,7 @@ void upload_done_callback(
 					msg->nextBlockFast(_PREHASH_MoneyData);
 					msg->addUUIDFast(_PREHASH_SourceID, gAgent.getID());
 					msg->addUUIDFast(_PREHASH_DestID, LLUUID::null);
-					msg->addU8("Flags", 0);
+					msg->addU8Fast(_PREHASH_Flags, 0);
 					// we tell the sim how much we were expecting to pay so it
 					// can respond to any discrepancy
 					msg->addS32Fast(_PREHASH_Amount, expected_upload_cost);

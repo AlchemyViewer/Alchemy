@@ -567,7 +567,7 @@ void LLFloaterBuyLandUI::updateCovenantInfo()
 	
 	// send EstateCovenantInfo message
 	LLMessageSystem *msg = gMessageSystem;
-	msg->newMessage("EstateCovenantRequest");
+	msg->newMessageFast(_PREHASH_EstateCovenantRequest);
 	msg->nextBlockFast(_PREHASH_AgentData);
 	msg->addUUIDFast(_PREHASH_AgentID,	gAgent.getID());
 	msg->addUUIDFast(_PREHASH_SessionID,gAgent.getSessionID());

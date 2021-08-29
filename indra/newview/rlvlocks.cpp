@@ -494,7 +494,7 @@ void RlvAttachmentLockWatchdog::detach(const LLViewerObject* pAttachObj)
 {
 	if (pAttachObj)
 	{
-		gMessageSystem->newMessage("ObjectDetach");
+		gMessageSystem->newMessageFast(_PREHASH_ObjectDetach);
 		gMessageSystem->nextBlockFast(_PREHASH_AgentData);
 		gMessageSystem->addUUIDFast(_PREHASH_AgentID, gAgent.getID() );
 		gMessageSystem->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
@@ -524,7 +524,7 @@ void RlvAttachmentLockWatchdog::detach(S32 idxAttachPt, const uuid_vec_t& idsAtt
 
 	if (!attachObjs.empty())
 	{
-		gMessageSystem->newMessage("ObjectDetach");
+		gMessageSystem->newMessageFast(_PREHASH_ObjectDetach);
 		gMessageSystem->nextBlockFast(_PREHASH_AgentData);
 		gMessageSystem->addUUIDFast(_PREHASH_AgentID, gAgent.getID());
 		gMessageSystem->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());

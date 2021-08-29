@@ -719,13 +719,13 @@ void LLToolGrabBase::handleHoverActive(S32 x, S32 y, MASK mask)
 				msg->addVector3Fast(_PREHASH_GrabOffsetInitial, mGrabOffsetFromCenterInitial );
 				msg->addVector3Fast(_PREHASH_GrabPosition, grab_pos_region );
 				msg->addU32Fast(_PREHASH_TimeSinceLast, dt_milliseconds );
-				msg->nextBlock("SurfaceInfo");
-				msg->addVector3("UVCoord", LLVector3(mGrabPick.mUVCoords));
-				msg->addVector3("STCoord", LLVector3(mGrabPick.mSTCoords));
+				msg->nextBlockFast(_PREHASH_SurfaceInfo);
+				msg->addVector3Fast(_PREHASH_UVCoord, LLVector3(mGrabPick.mUVCoords));
+				msg->addVector3Fast(_PREHASH_STCoord, LLVector3(mGrabPick.mSTCoords));
 				msg->addS32Fast(_PREHASH_FaceIndex, mGrabPick.mObjectFace);
-				msg->addVector3("Position", mGrabPick.mIntersection);
-				msg->addVector3("Normal", mGrabPick.mNormal);
-				msg->addVector3("Binormal", mGrabPick.mBinormal);
+				msg->addVector3Fast(_PREHASH_Position, mGrabPick.mIntersection);
+				msg->addVector3Fast(_PREHASH_Normal, mGrabPick.mNormal);
+				msg->addVector3Fast(_PREHASH_Binormal, mGrabPick.mBinormal);
 
 				msg->sendMessage( objectp->getRegion()->getHost() );
 			}
@@ -890,13 +890,13 @@ void LLToolGrabBase::handleHoverNonPhysical(S32 x, S32 y, MASK mask)
 		msg->addVector3Fast(_PREHASH_GrabOffsetInitial, mGrabOffsetFromCenterInitial );
 		msg->addVector3Fast(_PREHASH_GrabPosition, grab_pos_region );
 		msg->addU32Fast(_PREHASH_TimeSinceLast, dt_milliseconds );
-		msg->nextBlock("SurfaceInfo");
-		msg->addVector3("UVCoord", LLVector3(pick.mUVCoords));
-		msg->addVector3("STCoord", LLVector3(pick.mSTCoords));
+		msg->nextBlockFast(_PREHASH_SurfaceInfo);
+		msg->addVector3Fast(_PREHASH_UVCoord, LLVector3(pick.mUVCoords));
+		msg->addVector3Fast(_PREHASH_STCoord, LLVector3(pick.mSTCoords));
 		msg->addS32Fast(_PREHASH_FaceIndex, pick.mObjectFace);
-		msg->addVector3("Position", pick.mIntersection);
-		msg->addVector3("Normal", pick.mNormal);
-		msg->addVector3("Binormal", pick.mBinormal);
+		msg->addVector3Fast(_PREHASH_Position, pick.mIntersection);
+		msg->addVector3Fast(_PREHASH_Normal, pick.mNormal);
+		msg->addVector3Fast(_PREHASH_Binormal, pick.mBinormal);
 
 		msg->sendMessage( objectp->getRegion()->getHost() );
 
@@ -1172,13 +1172,13 @@ void send_ObjectGrab_message(LLViewerObject* object, const LLPickInfo & pick, co
 	msg->nextBlockFast( _PREHASH_ObjectData);
 	msg->addU32Fast(    _PREHASH_LocalID, object->mLocalID);
 	msg->addVector3Fast(_PREHASH_GrabOffset, grab_offset);
-	msg->nextBlock("SurfaceInfo");
-	msg->addVector3("UVCoord", LLVector3(pick.mUVCoords));
-	msg->addVector3("STCoord", LLVector3(pick.mSTCoords));
+	msg->nextBlockFast(_PREHASH_SurfaceInfo);
+	msg->addVector3Fast(_PREHASH_UVCoord, LLVector3(pick.mUVCoords));
+	msg->addVector3Fast(_PREHASH_STCoord, LLVector3(pick.mSTCoords));
 	msg->addS32Fast(_PREHASH_FaceIndex, pick.mObjectFace);
-	msg->addVector3("Position", pick.mIntersection);
-	msg->addVector3("Normal", pick.mNormal);
-	msg->addVector3("Binormal", pick.mBinormal);
+	msg->addVector3Fast(_PREHASH_Position, pick.mIntersection);
+	msg->addVector3Fast(_PREHASH_Normal, pick.mNormal);
+	msg->addVector3Fast(_PREHASH_Binormal, pick.mBinormal);
 	msg->sendMessage( object->getRegion()->getHost());
 
 	/*  Diagnostic code
@@ -1208,13 +1208,13 @@ void send_ObjectDeGrab_message(LLViewerObject* object, const LLPickInfo & pick)
 	msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
 	msg->nextBlockFast(_PREHASH_ObjectData);
 	msg->addU32Fast(_PREHASH_LocalID, object->mLocalID);
-	msg->nextBlock("SurfaceInfo");
-	msg->addVector3("UVCoord", LLVector3(pick.mUVCoords));
-	msg->addVector3("STCoord", LLVector3(pick.mSTCoords));
+	msg->nextBlockFast(_PREHASH_SurfaceInfo);
+	msg->addVector3Fast(_PREHASH_UVCoord, LLVector3(pick.mUVCoords));
+	msg->addVector3Fast(_PREHASH_STCoord, LLVector3(pick.mSTCoords));
 	msg->addS32Fast(_PREHASH_FaceIndex, pick.mObjectFace);
-	msg->addVector3("Position", pick.mIntersection);
-	msg->addVector3("Normal", pick.mNormal);
-	msg->addVector3("Binormal", pick.mBinormal);
+	msg->addVector3Fast(_PREHASH_Position, pick.mIntersection);
+	msg->addVector3Fast(_PREHASH_Normal, pick.mNormal);
+	msg->addVector3Fast(_PREHASH_Binormal, pick.mBinormal);
 	msg->sendMessage(object->getRegion()->getHost());
 }
 

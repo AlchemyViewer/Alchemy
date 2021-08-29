@@ -348,7 +348,7 @@ void LLPanelPlaceProfile::displaySelectedParcelInfo(LLParcel* parcel,
 		// Note: LLPanelPlaceProfile doesn't change Covenant's content and any
 		// changes made by Estate floater should be requested by Estate floater
 		LLMessageSystem *msg = gMessageSystem;
-		msg->newMessage("EstateCovenantRequest");
+		msg->newMessageFast(_PREHASH_EstateCovenantRequest);
 		msg->nextBlockFast(_PREHASH_AgentData);
 		msg->addUUIDFast(_PREHASH_AgentID,	gAgent.getID());
 		msg->addUUIDFast(_PREHASH_SessionID,gAgent.getSessionID());

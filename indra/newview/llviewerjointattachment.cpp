@@ -200,7 +200,7 @@ BOOL LLViewerJointAttachment::addObject(LLViewerObject* object)
 		pAttachObj->markDead();
 		if (pAttachObj->permYouOwner())
 		{
-			gMessageSystem->newMessage("ObjectDetach");
+			gMessageSystem->newMessageFast(_PREHASH_ObjectDetach);
 			gMessageSystem->nextBlockFast(_PREHASH_AgentData);
 			gMessageSystem->addUUIDFast(_PREHASH_AgentID, gAgent.getID());
 			gMessageSystem->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());

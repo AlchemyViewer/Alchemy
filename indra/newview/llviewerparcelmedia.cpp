@@ -50,8 +50,8 @@ LLViewerParcelMedia::LLViewerParcelMedia():
 mMediaParcelLocalID(0)
 {
 	LLMessageSystem* msg = gMessageSystem;
-	msg->setHandlerFunc("ParcelMediaCommandMessage", parcelMediaCommandMessageHandler );
-	msg->setHandlerFunc("ParcelMediaUpdate", parcelMediaUpdateHandler );
+	msg->setHandlerFuncFast(_PREHASH_ParcelMediaCommandMessage, parcelMediaCommandMessageHandler );
+	msg->setHandlerFuncFast(_PREHASH_ParcelMediaUpdate, parcelMediaUpdateHandler );
 
     // LLViewerParcelMediaAutoPlay will regularly check and autoplay media,
     // might be good idea to just integrate it into LLViewerParcelMedia
@@ -331,9 +331,9 @@ void LLViewerParcelMedia::processParcelMediaCommandMessage( LLMessageSystem *msg
 	U32 flags;
 	U32 command;
 	F32 time;
-	msg->getU32( "CommandBlock", "Flags", flags );
-	msg->getU32( "CommandBlock", "Command", command);
-	msg->getF32( "CommandBlock", "Time", time );
+	msg->getU32Fast(_PREHASH_CommandBlock, _PREHASH_Flags, flags );
+	msg->getU32Fast(_PREHASH_CommandBlock, _PREHASH_Command, command);
+	msg->getF32Fast(_PREHASH_CommandBlock, _PREHASH_Time, time );
 
 	if (flags &( (1<<PARCEL_MEDIA_COMMAND_STOP)
 				| (1<<PARCEL_MEDIA_COMMAND_PAUSE)
@@ -403,11 +403,11 @@ void LLViewerParcelMedia::processParcelMediaUpdate( LLMessageSystem *msg)
 	U8 media_auto_scale = FALSE;
 	U8 media_loop = FALSE;
 
-	msg->getUUID( "DataBlock", "MediaID", media_id );
+	msg->getUUIDFast(_PREHASH_DataBlock, _PREHASH_MediaID, media_id );
 	char media_url_buffer[257];
-	msg->getString( "DataBlock", "MediaURL", 255, media_url_buffer );
+	msg->getStringFast(_PREHASH_DataBlock, _PREHASH_MediaURL, 255, media_url_buffer );
 	media_url = media_url_buffer;
-	msg->getU8("DataBlock", "MediaAutoScale", media_auto_scale);
+	msg->getU8Fast(_PREHASH_DataBlock, _PREHASH_MediaAutoScale, media_auto_scale);
 
 	if (msg->has("DataBlockExtended")) // do we have the extended data?
 	{

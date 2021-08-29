@@ -507,13 +507,13 @@ void LLFloaterAvatarPicker::find()
 		else
 		{
 			LLMessageSystem* msg = gMessageSystem;
-			msg->newMessage("AvatarPickerRequest");
-			msg->nextBlock("AgentData");
-			msg->addUUID("AgentID", gAgent.getID());
-			msg->addUUID("SessionID", gAgent.getSessionID());
-			msg->addUUID("QueryID", mQueryID);	// not used right now
-			msg->nextBlock("Data");
-			msg->addString("Name", text);
+			msg->newMessageFast(_PREHASH_AvatarPickerRequest);
+			msg->nextBlockFast(_PREHASH_AgentData);
+			msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID());
+			msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
+			msg->addUUIDFast(_PREHASH_QueryID, mQueryID);	// not used right now
+			msg->nextBlockFast(_PREHASH_Data);
+			msg->addStringFast(_PREHASH_Name, text);
 			gAgent.sendReliableMessage();
 		}
 	}

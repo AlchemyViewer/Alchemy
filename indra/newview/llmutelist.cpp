@@ -367,8 +367,8 @@ void LLMuteList::updateAdd(const LLMute& mute)
 	msg->nextBlockFast(_PREHASH_MuteData);
 	msg->addUUIDFast(_PREHASH_MuteID, mute.mID);
 	msg->addStringFast(_PREHASH_MuteName, mute.mName);
-	msg->addS32("MuteType", mute.mType);
-	msg->addU32("MuteFlags", mute.mFlags);
+	msg->addS32Fast(_PREHASH_MuteType, mute.mType);
+	msg->addU32Fast(_PREHASH_MuteFlags, mute.mFlags);
 	gAgent.sendReliableMessage();
 
     if (!mIsLoaded)
@@ -468,7 +468,7 @@ void LLMuteList::updateRemove(const LLMute& mute)
 	msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
 	msg->nextBlockFast(_PREHASH_MuteData);
 	msg->addUUIDFast(_PREHASH_MuteID, mute.mID);
-	msg->addString("MuteName", mute.mName);
+	msg->addStringFast(_PREHASH_MuteName, mute.mName);
 	gAgent.sendReliableMessage();
 }
 

@@ -4830,11 +4830,11 @@ void LLViewerObject::sendTEUpdate() const
 	msg->addU32Fast(_PREHASH_ObjectLocalID, mLocalID );
 	if (mMedia)
 	{
-		msg->addString("MediaURL", mMedia->mMediaURL);
+		msg->addStringFast(_PREHASH_MediaURL, mMedia->mMediaURL);
 	}
 	else
 	{
-		msg->addString("MediaURL", NULL);
+		msg->addStringFast(_PREHASH_MediaURL, NULL);
 	}
 
 	// TODO send media type
@@ -6555,28 +6555,28 @@ void LLViewerObject::updateFlags(BOOL physics_changed)
 {
 	LLViewerRegion* regionp = getRegion();
 	if(!regionp) return;
-	gMessageSystem->newMessage("ObjectFlagUpdate");
+	gMessageSystem->newMessageFast(_PREHASH_ObjectFlagUpdate);
 	gMessageSystem->nextBlockFast(_PREHASH_AgentData);
 	gMessageSystem->addUUIDFast(_PREHASH_AgentID, gAgent.getID() );
 	gMessageSystem->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
 	gMessageSystem->addU32Fast(_PREHASH_ObjectLocalID, getLocalID() );
 	gMessageSystem->addBOOLFast(_PREHASH_UsePhysics, flagUsePhysics() );
-	gMessageSystem->addBOOL("IsTemporary", flagTemporaryOnRez() );
-	gMessageSystem->addBOOL("IsPhantom", flagPhantom() );
+	gMessageSystem->addBOOLFast(_PREHASH_IsTemporary, flagTemporaryOnRez() );
+	gMessageSystem->addBOOLFast(_PREHASH_IsPhantom, flagPhantom() );
 
 	// stinson 02/28/2012 : This CastsShadows BOOL is no longer used in either the viewer or the simulator
 	// The simulator code does not even unpack this value when the message is received.
 	// This could be potentially hijacked in the future for another use should the urgent need arise.
-	gMessageSystem->addBOOL("CastsShadows", FALSE );
+	gMessageSystem->addBOOLFast(_PREHASH_CastsShadows, FALSE );
 
 	if (physics_changed)
 	{
-		gMessageSystem->nextBlock("ExtraPhysics");
-		gMessageSystem->addU8("PhysicsShapeType", getPhysicsShapeType() );
-		gMessageSystem->addF32("Density", getPhysicsDensity() );
-		gMessageSystem->addF32("Friction", getPhysicsFriction() );
-		gMessageSystem->addF32("Restitution", getPhysicsRestitution() );
-		gMessageSystem->addF32("GravityMultiplier", getPhysicsGravity() );
+		gMessageSystem->nextBlockFast(_PREHASH_ExtraPhysics);
+		gMessageSystem->addU8Fast(_PREHASH_PhysicsShapeType, getPhysicsShapeType() );
+		gMessageSystem->addF32Fast(_PREHASH_Density, getPhysicsDensity() );
+		gMessageSystem->addF32Fast(_PREHASH_Friction, getPhysicsFriction() );
+		gMessageSystem->addF32Fast(_PREHASH_Restitution, getPhysicsRestitution() );
+		gMessageSystem->addF32Fast(_PREHASH_GravityMultiplier, getPhysicsGravity() );
 	}
 	gMessageSystem->sendReliable( regionp->getHost() );
 }

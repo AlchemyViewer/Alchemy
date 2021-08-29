@@ -2584,8 +2584,8 @@ void LLSelectMgr::logDetachRequest(LLSelectNode* node, void *)
 void LLSelectMgr::packObjectIDAsParam(LLSelectNode* node, void *)
 {
 	std::string buf = llformat("%u", node->getObject()->getLocalID());
-	gMessageSystem->nextBlock("ParamList");
-	gMessageSystem->addString("Parameter", buf);
+	gMessageSystem->nextBlockFast(_PREHASH_ParamList);
+	gMessageSystem->addStringFast(_PREHASH_Parameter, buf);
 }
 
 //-----------------------------------------------------------------------------
@@ -5015,14 +5015,14 @@ void LLSelectMgr::packObjectClickAction(LLSelectNode* node, void *user_data)
 {
 	gMessageSystem->nextBlockFast(_PREHASH_ObjectData);
 	gMessageSystem->addU32Fast(_PREHASH_ObjectLocalID, node->getObject()->getLocalID() );
-	gMessageSystem->addU8("ClickAction", node->getObject()->getClickAction());
+	gMessageSystem->addU8Fast(_PREHASH_ClickAction, node->getObject()->getClickAction());
 }
 
 void LLSelectMgr::packObjectIncludeInSearch(LLSelectNode* node, void *user_data)
 {
 	gMessageSystem->nextBlockFast(_PREHASH_ObjectData);
 	gMessageSystem->addU32Fast(_PREHASH_ObjectLocalID, node->getObject()->getLocalID() );
-	gMessageSystem->addBOOL("IncludeInSearch", node->getObject()->getIncludeInSearch());
+	gMessageSystem->addBOOLFast(_PREHASH_IncludeInSearch, node->getObject()->getIncludeInSearch());
 }
 
 // static
@@ -5244,7 +5244,7 @@ void LLSelectMgr::sendListToRegions(LLObjectSelectionHandle selected_handle,
 
 		// if to same simulator and message not too big
 		if ((current_region == last_region)
-			&& (! gMessageSystem->isSendFull(NULL))
+			&& (! gMessageSystem->isSendFullFast(nullptr))
 			&& (objects_in_this_packet < MAX_OBJECTS_PER_PACKET))
 		{
 			if (link_operation && linkset_root == NULL)
@@ -8015,7 +8015,7 @@ void LLSelectMgr::sendSelectionMove()
 	}
 
 	// prepare first bulk message
-	gMessageSystem->newMessage("MultipleObjectUpdate");
+	gMessageSystem->newMessageFast(_PREHASH_MultipleObjectUpdate);
 	packAgentAndSessionID(&update_type);
 
 	LLViewerObject *obj = NULL;
@@ -8029,13 +8029,13 @@ void LLSelectMgr::sendSelectionMove()
 
 		// if not simulator or message too big
 		if (curr_region != last_region
-			|| gMessageSystem->isSendFull(NULL)
+			|| gMessageSystem->isSendFullFast(nullptr)
 			|| objects_in_this_packet >= MAX_OBJECTS_PER_PACKET)
 		{
 			// send sim the current message and start new one
 			gMessageSystem->sendReliable(last_region->getHost());
 			objects_in_this_packet = 0;
-			gMessageSystem->newMessage("MultipleObjectUpdate");
+			gMessageSystem->newMessageFast(_PREHASH_MultipleObjectUpdate);
 			packAgentAndSessionID(&update_type);
 		}
 

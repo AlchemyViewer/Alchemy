@@ -189,24 +189,24 @@ void LLEstateInfoModel::commitEstateInfoDataserver()
 	LL_DEBUGS() << getInfoDump() << LL_ENDL;
 
 	LLMessageSystem* msg = gMessageSystem;
-	msg->newMessage("EstateOwnerMessage");
+	msg->newMessageFast(_PREHASH_EstateOwnerMessage);
 	msg->nextBlockFast(_PREHASH_AgentData);
 	msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID());
 	msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
 	msg->addUUIDFast(_PREHASH_TransactionID, LLUUID::null); //not used
 
-	msg->nextBlock("MethodData");
-	msg->addString("Method", "estatechangeinfo");
-	msg->addUUID("Invoice", LLFloaterRegionInfo::getLastInvoice());
+	msg->nextBlockFast(_PREHASH_MethodData);
+	msg->addStringFast(_PREHASH_Method, "estatechangeinfo");
+	msg->addUUIDFast(_PREHASH_Invoice, LLFloaterRegionInfo::getLastInvoice());
 
-	msg->nextBlock("ParamList");
-	msg->addString("Parameter", getName());
+	msg->nextBlockFast(_PREHASH_ParamList);
+	msg->addStringFast(_PREHASH_Parameter, getName());
 
-	msg->nextBlock("ParamList");
-	msg->addString("Parameter", llformat("%u", getFlags()));
+	msg->nextBlockFast(_PREHASH_ParamList);
+	msg->addStringFast(_PREHASH_Parameter, llformat("%u", getFlags()));
 
-	msg->nextBlock("ParamList");
-	msg->addString("Parameter", llformat("%d", (S32) (getSunHour() * 1024.0f)));
+	msg->nextBlockFast(_PREHASH_ParamList);
+	msg->addStringFast(_PREHASH_Parameter, llformat("%d", (S32) (getSunHour() * 1024.0f)));
 
 	gAgent.sendMessage();
 }

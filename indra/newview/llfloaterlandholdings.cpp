@@ -151,7 +151,7 @@ void LLFloaterLandHoldings::refresh()
 void LLFloaterLandHoldings::processPlacesReply(LLMessageSystem* msg, void**)
 {
 	LLFloaterLandHoldings* self = LLFloaterReg::findTypedInstance<LLFloaterLandHoldings>("land_holdings");
-	S32 count = msg->getNumberOfBlocks("QueryData");
+	S32 count = msg->getNumberOfBlocksFast(_PREHASH_QueryData);
 	std::string land_sku;
 	sHasLindenHome = false;
 	if (!self)

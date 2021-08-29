@@ -839,7 +839,7 @@ BOOL LLPanelGroupLandMoney::isVisibleByAgent(LLAgent* agentp)
 void LLPanelGroupLandMoney::processPlacesReply(LLMessageSystem* msg, void**)
 {
 	LLUUID group_id;
-	msg->getUUID("AgentData", "QueryID", group_id);
+	msg->getUUIDFast(_PREHASH_AgentData, _PREHASH_QueryID, group_id);
 
 	group_id_map_t::iterator found_it = sGroupIDs.find(group_id);
 	if(found_it == sGroupIDs.end())

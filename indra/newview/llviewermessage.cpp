@@ -436,9 +436,9 @@ void process_logout_reply(LLMessageSystem* msg, void**)
 	LL_DEBUGS("Messaging") << "process_logout_reply" << LL_ENDL;
 
 	LLUUID agent_id;
-	msg->getUUID("AgentData", "AgentID", agent_id);
+	msg->getUUIDFast(_PREHASH_AgentData, _PREHASH_AgentID, agent_id);
 	LLUUID session_id;
-	msg->getUUID("AgentData", "SessionID", session_id);
+	msg->getUUIDFast(_PREHASH_AgentData, _PREHASH_SessionID, session_id);
 	if((agent_id != gAgent.getID()) || (session_id != gAgent.getSessionID()))
 	{
 		LL_WARNS("Messaging") << "Bogus Logout Reply" << LL_ENDL;
@@ -2349,7 +2349,7 @@ void process_improved_im(LLMessageSystem *msg, void **user_data)
     msg->getU8Fast(_PREHASH_MessageBlock, _PREHASH_Dialog, d);
     msg->getUUIDFast(_PREHASH_MessageBlock, _PREHASH_ID, session_id);
     msg->getU32Fast(_PREHASH_MessageBlock, _PREHASH_Timestamp, timestamp);
-    //msg->getData("MessageBlock", "Count",		&count);
+    //msg->getDataFast(_PREHASH_MessageBlock, _PREHASH_Count,		&count);
     msg->getStringFast(_PREHASH_MessageBlock, _PREHASH_FromAgentName, agentName);
     msg->getStringFast(_PREHASH_MessageBlock, _PREHASH_Message, message);
     msg->getU32Fast(_PREHASH_MessageBlock, _PREHASH_ParentEstateID, parent_estate_id);
@@ -2535,18 +2535,18 @@ void process_chat_from_simulator(LLMessageSystem *msg, void **user_data)
 	LLUUID		owner_id;
 	LLViewerObject*	chatter;
 
-	msg->getString("ChatData", "FromName", from_name);
+	msg->getStringFast(_PREHASH_ChatData, _PREHASH_FromName, from_name);
 	
-	msg->getUUID("ChatData", "SourceID", from_id);
+	msg->getUUIDFast(_PREHASH_ChatData, _PREHASH_SourceID, from_id);
 	chat.mFromID = from_id;
 	
 	// Object owner for objects
-	msg->getUUID("ChatData", "OwnerID", owner_id);
+	msg->getUUIDFast(_PREHASH_ChatData, _PREHASH_OwnerID, owner_id);
 
 	msg->getU8Fast(_PREHASH_ChatData, _PREHASH_SourceType, source_temp);
 	chat.mSourceType = (EChatSourceType)source_temp;
 
-	msg->getU8("ChatData", "ChatType", type_temp);
+	msg->getU8Fast(_PREHASH_ChatData, _PREHASH_ChatType, type_temp);
 	chat.mChatType = (EChatType)type_temp;
 
 	msg->getU8Fast(_PREHASH_ChatData, _PREHASH_Audible, audible_temp);
@@ -2966,7 +2966,7 @@ void process_teleport_start(LLMessageSystem *msg, void**)
 	// on teleport, don't tell them about destination guide anymore
 	LLFirstUse::notUsingDestinationGuide(false);
 	U32 teleport_flags = 0x0;
-	msg->getU32("Info", "TeleportFlags", teleport_flags);
+	msg->getU32Fast(_PREHASH_Info, _PREHASH_TeleportFlags, teleport_flags);
 
 	if (gAgent.getTeleportState() == LLAgent::TELEPORT_MOVING)
 	{
@@ -3015,7 +3015,7 @@ boost::signals2::connection LLViewerMessage::setTeleportStartedCallback(teleport
 void process_teleport_progress(LLMessageSystem* msg, void**)
 {
 	LLUUID agent_id;
-	msg->getUUID("AgentData", "AgentID", agent_id);
+	msg->getUUIDFast(_PREHASH_AgentData, _PREHASH_AgentID, agent_id);
 	if((gAgent.getID() != agent_id)
 	   || (gAgent.getTeleportState() == LLAgent::TELEPORT_NONE))
 	{
@@ -3023,7 +3023,7 @@ void process_teleport_progress(LLMessageSystem* msg, void**)
 		return;
 	}
 	U32 teleport_flags = 0x0;
-	msg->getU32("Info", "TeleportFlags", teleport_flags);
+	msg->getU32Fast(_PREHASH_Info, _PREHASH_TeleportFlags, teleport_flags);
 //	if (teleport_flags & TELEPORT_FLAGS_DISABLE_CANCEL)
 // [RLVa:KB] - Checked: 2010-04-07 (RLVa-1.2.0d) | Added: RLVa-0.2.0b
 	if ( (teleport_flags & TELEPORT_FLAGS_DISABLE_CANCEL) || (!gRlvHandler.getCanCancelTp()) )
@@ -3036,7 +3036,7 @@ void process_teleport_progress(LLMessageSystem* msg, void**)
 		gViewerWindow->setProgressCancelButtonVisible(TRUE, LLTrans::getString("Cancel"));
 	}
 	std::string buffer;
-	msg->getString("Info", "Message", buffer);
+	msg->getStringFast(_PREHASH_Info, _PREHASH_Message, buffer);
 	LL_DEBUGS("Messaging") << "teleport progress: " << buffer << " flags: " << teleport_flags << LL_ENDL;
 
 	//Sorta hacky...default to using simulator raw messages
@@ -3341,7 +3341,7 @@ void process_agent_movement_complete(LLMessageSystem* msg, void**)
 	msg->getU64Fast(_PREHASH_Data, _PREHASH_RegionHandle, region_handle);
 	
 	std::string version_channel;
-	msg->getString("SimData", "ChannelVersion", version_channel);
+	msg->getStringFast(_PREHASH_SimData, _PREHASH_ChannelVersion, version_channel);
 
 	if (!isAgentAvatarValid())
 	{
@@ -4619,11 +4619,11 @@ void process_set_follow_cam_properties(LLMessageSystem *mesgsys, void **user_dat
 		objectp->setFlagsWithoutUpdate(FLAGS_CAMERA_SOURCE, TRUE);
 	}
 
-	S32 num_objects = mesgsys->getNumberOfBlocks("CameraProperty");
+	S32 num_objects = mesgsys->getNumberOfBlocksFast(_PREHASH_CameraProperty);
 	for (S32 block_index = 0; block_index < num_objects; block_index++)
 	{
-		mesgsys->getS32("CameraProperty", "Type", type, block_index);
-		mesgsys->getF32("CameraProperty", "Value", value, block_index);
+		mesgsys->getS32Fast(_PREHASH_CameraProperty, _PREHASH_Type, type, block_index);
+		mesgsys->getF32Fast(_PREHASH_CameraProperty, _PREHASH_Value, value, block_index);
 		switch(type)
 		{
 		case FOLLOWCAM_PITCH:
@@ -4842,10 +4842,10 @@ void process_money_balance_reply( LLMessageSystem* msg, void** )
 	std::string desc;
 	LLUUID tid;
 
-	msg->getUUID("MoneyData", "TransactionID", tid);
-	msg->getS32("MoneyData", "MoneyBalance", balance);
-	msg->getS32("MoneyData", "SquareMetersCredit", credit);
-	msg->getS32("MoneyData", "SquareMetersCommitted", committed);
+	msg->getUUIDFast(_PREHASH_MoneyData, _PREHASH_TransactionID, tid);
+	msg->getS32Fast(_PREHASH_MoneyData, _PREHASH_MoneyBalance, balance);
+	msg->getS32Fast(_PREHASH_MoneyData, _PREHASH_SquareMetersCredit, credit);
+	msg->getS32Fast(_PREHASH_MoneyData, _PREHASH_SquareMetersCommitted, committed);
 	msg->getStringFast(_PREHASH_MoneyData, _PREHASH_Description, desc);
 	LL_INFOS("Messaging") << "L$, credit, committed: " << balance << " " << credit << " "
 			<< committed << LL_ENDL;
@@ -5764,7 +5764,7 @@ void process_mean_collision_alert_message(LLMessageSystem *msgsystem, void **use
 	EMeanCollisionType	   type;
 	F32    mag;
 
-	S32 i, num = msgsystem->getNumberOfBlocks(_PREHASH_MeanCollision);
+	S32 i, num = msgsystem->getNumberOfBlocksFast(_PREHASH_MeanCollision);
 
 	for (i = 0; i < num; i++)
 	{
@@ -6107,7 +6107,7 @@ void process_script_question(LLMessageSystem *msg, void **user_data)
 	msg->getStringFast(_PREHASH_Data, _PREHASH_ObjectOwner, owner_name);
 	msg->getS32Fast(_PREHASH_Data, _PREHASH_Questions, questions );
 
-	if(msg->has(_PREHASH_Experience))
+	if(msg->hasFast(_PREHASH_Experience))
 	{
 		msg->getUUIDFast(_PREHASH_Experience, _PREHASH_ExperienceID, experienceid);
 	}
@@ -6881,7 +6881,7 @@ void process_user_info_reply(LLMessageSystem* msg, void**)
 	std::string email;
 	msg->getStringFast(_PREHASH_UserData, _PREHASH_EMail, email);
 	std::string dir_visibility;
-	msg->getString( "UserData", "DirectoryVisibility", dir_visibility);
+	msg->getStringFast(_PREHASH_UserData, _PREHASH_DirectoryVisibility, dir_visibility);
 
     // For Message based user info information the is_verified is assumed to be false.
 	LLFloaterPreference::updateUserInfo(dir_visibility, im_via_email, false);   
@@ -6972,13 +6972,13 @@ void process_script_dialog(LLMessageSystem* msg, void**)
 	LLSD payload;
 
 	LLUUID object_id;
-	msg->getUUID("Data", "ObjectID", object_id);
+	msg->getUUIDFast(_PREHASH_Data, _PREHASH_ObjectID, object_id);
 
 //	For compability with OS grids first check for presence of extended packet before fetching data.
     LLUUID owner_id;
-	if (gMessageSystem->getNumberOfBlocks("OwnerData") > 0)
+	if (gMessageSystem->getNumberOfBlocksFast(_PREHASH_OwnerData) > 0)
 	{
-    msg->getUUID("OwnerData", "OwnerID", owner_id);
+		msg->getUUIDFast(_PREHASH_OwnerData, _PREHASH_OwnerID, owner_id);
 	}
 
 	if (LLMuteList::getInstance()->isMuted(object_id) || LLMuteList::getInstance()->isMuted(owner_id))
@@ -6992,15 +6992,15 @@ void process_script_dialog(LLMessageSystem* msg, void**)
 	std::string object_name;
 
 	S32 chat_channel;
-	msg->getString("Data", "FirstName", first_name);
-	msg->getString("Data", "LastName", last_name);
-	msg->getString("Data", "ObjectName", object_name);
-	msg->getString("Data", "Message", message);
-	msg->getS32("Data", "ChatChannel", chat_channel);
+	msg->getStringFast(_PREHASH_Data, _PREHASH_FirstName, first_name);
+	msg->getStringFast(_PREHASH_Data, _PREHASH_LastName, last_name);
+	msg->getStringFast(_PREHASH_Data, _PREHASH_ObjectName, object_name);
+	msg->getStringFast(_PREHASH_Data, _PREHASH_Message, message);
+	msg->getS32Fast(_PREHASH_Data, _PREHASH_ChatChannel, chat_channel);
 
 		// unused for now
 	LLUUID image_id;
-	msg->getUUID("Data", "ImageID", image_id);
+	msg->getUUIDFast(_PREHASH_Data, _PREHASH_ImageID, image_id);
 
 	payload["sender"] = msg->getSender().getIPandPort();
 	payload["object_id"] = object_id;
@@ -7008,7 +7008,7 @@ void process_script_dialog(LLMessageSystem* msg, void**)
 	payload["object_name"] = object_name;
 
 	// build up custom form
-	S32 button_count = msg->getNumberOfBlocks("Buttons");
+	S32 button_count = msg->getNumberOfBlocksFast(_PREHASH_Buttons);
 	if (button_count > SCRIPT_DIALOG_MAX_BUTTONS)
 	{
 		LL_WARNS() << "Too many script dialog buttons - omitting some" << LL_ENDL;
@@ -7019,7 +7019,7 @@ void process_script_dialog(LLMessageSystem* msg, void**)
 	for (i = 0; i < button_count; i++)
 	{
 		std::string tdesc;
-		msg->getString("Buttons", "ButtonLabel", tdesc, i);
+		msg->getStringFast(_PREHASH_Buttons, _PREHASH_ButtonLabel, tdesc, i);
 		form.addElement("button", std::string(tdesc));
 	}
 
@@ -7168,7 +7168,7 @@ void callback_download_complete(void** data, S32 result, LLExtStat ext_status)
 void process_initiate_download(LLMessageSystem* msg, void**)
 {
 	LLUUID agent_id;
-	msg->getUUID("AgentData", "AgentID", agent_id);
+	msg->getUUIDFast(_PREHASH_AgentData, _PREHASH_AgentID, agent_id);
 	if (agent_id != gAgent.getID())
 	{
 		LL_WARNS("Messaging") << "Initiate download for wrong agent" << LL_ENDL;
@@ -7177,8 +7177,8 @@ void process_initiate_download(LLMessageSystem* msg, void**)
 
 	std::string sim_filename;
 	std::string viewer_filename;
-	msg->getString("FileData", "SimFilename", sim_filename);
-	msg->getString("FileData", "ViewerFilename", viewer_filename);
+	msg->getStringFast(_PREHASH_FileData, _PREHASH_SimFilename, sim_filename);
+	msg->getStringFast(_PREHASH_FileData, _PREHASH_ViewerFilename, viewer_filename);
 
 	if (!gXferManager->validateFileForRequest(viewer_filename))
 	{
@@ -7204,10 +7204,10 @@ void process_script_teleport_request(LLMessageSystem* msg, void**)
 	LLVector3 pos;
 	LLVector3 look_at;
 
-	msg->getString("Data", "ObjectName", object_name);
-	msg->getString("Data", "SimName", sim_name);
-	msg->getVector3("Data", "SimPosition", pos);
-	msg->getVector3("Data", "LookAt", look_at);
+	msg->getStringFast(_PREHASH_Data, _PREHASH_ObjectName, object_name);
+	msg->getStringFast(_PREHASH_Data, _PREHASH_SimName, sim_name);
+	msg->getVector3Fast(_PREHASH_Data, _PREHASH_SimPosition, pos);
+	msg->getVector3Fast(_PREHASH_Data, _PREHASH_LookAt, look_at);
 
 	LLFloaterWorldMap* instance = LLFloaterWorldMap::getInstance();
 	if(instance)
@@ -7232,10 +7232,10 @@ void process_covenant_reply(LLMessageSystem* msg, void**)
 	LLUUID covenant_id, estate_owner_id;
 	std::string estate_name;
 	U32 covenant_timestamp;
-	msg->getUUID("Data", "CovenantID", covenant_id);
-	msg->getU32("Data", "CovenantTimestamp", covenant_timestamp);
-	msg->getString("Data", "EstateName", estate_name);
-	msg->getUUID("Data", "EstateOwnerID", estate_owner_id);
+	msg->getUUIDFast(_PREHASH_Data, _PREHASH_CovenantID, covenant_id);
+	msg->getU32Fast(_PREHASH_Data, _PREHASH_CovenantTimestamp, covenant_timestamp);
+	msg->getStringFast(_PREHASH_Data, _PREHASH_EstateName, estate_name);
+	msg->getUUIDFast(_PREHASH_Data, _PREHASH_EstateOwnerID, estate_owner_id);
 
 	LLPanelEstateCovenant::updateEstateName(estate_name);
 	LLPanelLandCovenant::updateEstateName(estate_name);

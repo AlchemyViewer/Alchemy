@@ -488,13 +488,13 @@ void LLViewerInventoryItem::fetchFromServer(void) const
 		else
 		{
 			LLMessageSystem* msg = gMessageSystem;
-			msg->newMessage("FetchInventory");
-			msg->nextBlock("AgentData");
-			msg->addUUID("AgentID", gAgent.getID());
-			msg->addUUID("SessionID", gAgent.getSessionID());
-			msg->nextBlock("InventoryData");
-			msg->addUUID("OwnerID", mPermissions.getOwner());
-			msg->addUUID("ItemID", mUUID);
+			msg->newMessageFast(_PREHASH_FetchInventory);
+			msg->nextBlockFast(_PREHASH_AgentData);
+			msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID());
+			msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
+			msg->nextBlockFast(_PREHASH_InventoryData);
+			msg->addUUIDFast(_PREHASH_OwnerID, mPermissions.getOwner());
+			msg->addUUIDFast(_PREHASH_ItemID, mUUID);
 			gAgent.sendReliableMessage();
 		}
 	}
@@ -565,7 +565,7 @@ void LLViewerInventoryItem::updateParentOnServer(BOOL restamp) const
 	msg->nextBlockFast(_PREHASH_InventoryData);
 	msg->addUUIDFast(_PREHASH_ItemID, mUUID);
 	msg->addUUIDFast(_PREHASH_FolderID, mParentUUID);
-	msg->addString("NewName", NULL);
+	msg->addStringFast(_PREHASH_NewName, NULL);
 	gAgent.sendReliableMessage();
 }
 
@@ -640,7 +640,7 @@ void LLViewerInventoryCategory::updateParentOnServer(BOOL restamp) const
 	msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID());
 	msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
 
-	msg->addBOOL("Stamp", restamp);
+	msg->addBOOLFast(_PREHASH_Stamp, restamp);
 	msg->nextBlockFast(_PREHASH_InventoryData);
 	msg->addUUIDFast(_PREHASH_FolderID, mUUID);
 	msg->addUUIDFast(_PREHASH_ParentID, mParentUUID);
@@ -1056,10 +1056,10 @@ void create_inventory_item(const LLUUID& agent_id, const LLUUID& session_id,
 
 	LLMessageSystem* msg = gMessageSystem;
 	msg->newMessageFast(_PREHASH_CreateInventoryItem);
-	msg->nextBlock(_PREHASH_AgentData);
+	msg->nextBlockFast(_PREHASH_AgentData);
 	msg->addUUIDFast(_PREHASH_AgentID, agent_id);
 	msg->addUUIDFast(_PREHASH_SessionID, session_id);
-	msg->nextBlock(_PREHASH_InventoryBlock);
+	msg->nextBlockFast(_PREHASH_InventoryBlock);
 	msg->addU32Fast(_PREHASH_CallbackID, gInventoryCallbacks.registerCB(cb));
 	msg->addUUIDFast(_PREHASH_FolderID, parent);
 	msg->addUUIDFast(_PREHASH_TransactionID, transaction_id);
@@ -1533,12 +1533,12 @@ void purge_descendents_of(const LLUUID& id, LLPointer<LLInventoryCallback> cb)
 
 			// send it upstream
 			LLMessageSystem* msg = gMessageSystem;
-			msg->newMessage("PurgeInventoryDescendents");
-			msg->nextBlock("AgentData");
-			msg->addUUID("AgentID", gAgent.getID());
-			msg->addUUID("SessionID", gAgent.getSessionID());
-			msg->nextBlock("InventoryData");
-			msg->addUUID("FolderID", id);
+			msg->newMessageFast(_PREHASH_PurgeInventoryDescendents);
+			msg->nextBlockFast(_PREHASH_AgentData);
+			msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID());
+			msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
+			msg->nextBlockFast(_PREHASH_InventoryData);
+			msg->addUUIDFast(_PREHASH_FolderID, id);
 			gAgent.sendReliableMessage();
 
 			// Update model immediately because there is no callback mechanism.
