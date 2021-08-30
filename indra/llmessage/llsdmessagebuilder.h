@@ -36,14 +36,14 @@
 class LLMessageTemplate;
 class LLMsgData;
 
-class LLSDMessageBuilder : public LLMessageBuilder
+class LLSDMessageBuilder final : public LLMessageBuilder
 {
 public:
 
 	//CLASS_LOG_TYPE(LLSDMessageBuilder);
 	
 	LLSDMessageBuilder();
-	virtual ~LLSDMessageBuilder();
+	virtual ~LLSDMessageBuilder() = default;
 
 	virtual void newMessage(const char* name);
 

@@ -49,12 +49,6 @@ LLSDMessageBuilder::LLSDMessageBuilder() :
 {
 }
 
-//virtual
-LLSDMessageBuilder::~LLSDMessageBuilder()
-{
-}
-
-
 // virtual
 void LLSDMessageBuilder::newMessage(const char* name)
 {

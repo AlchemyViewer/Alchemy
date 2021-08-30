@@ -68,28 +68,25 @@ void LLTemplateMessageBuilder::newMessage(const char *name)
 	mCurrentSMessageData = NULL;
 
 	char* namep = (char*)name; 
-	if (mMessageTemplates.count(namep) > 0)
+	auto it = mMessageTemplates.find(namep);
+	if (it != mMessageTemplates.end())
 	{
-		mCurrentSMessageTemplate = mMessageTemplates.find(name)->second;
+		mCurrentSMessageTemplate = it->second;
 		mCurrentSMessageData = new LLMsgData(namep);
 		mCurrentSMessageName = namep;
 		mCurrentSDataBlock = NULL;
 		mCurrentSBlockName = NULL;
 
 		// add at one of each block
-		const LLMessageTemplate* msg_template = mMessageTemplates.find(name)->second;
+		const LLMessageTemplate* msg_template = it->second;
 
 		if (msg_template->getDeprecation() != MD_NOTDEPRECATED)
 		{
 			LL_WARNS() << "Sending deprecated message " << namep << LL_ENDL;
 		}
 		
-		LLMessageTemplate::message_block_map_t::const_iterator iter;
-		for(iter = msg_template->mMemberBlocks.begin();
-			iter != msg_template->mMemberBlocks.end();
-			++iter)
+		for(LLMessageBlock* ci : msg_template->mMemberBlocks)
 		{
-			LLMessageBlock* ci = *iter;
 			LLMsgBlkData* tblockp = new LLMsgBlkData(ci->mName, 0);
 			mCurrentSMessageData->addBlock(tblockp);
 		}
@@ -148,11 +145,9 @@ void LLTemplateMessageBuilder::nextBlock(const char* blockname)
 		mCurrentSBlockName = bnamep;
 
 		// add placeholders for each of the variables
-		for (LLMessageBlock::message_variable_map_t::const_iterator iter = template_data->mMemberVariables.begin();
-			 iter != template_data->mMemberVariables.end(); iter++)
+		for (const LLMessageVariable* ci : template_data->mMemberVariables)
 		{
-			LLMessageVariable& ci = **iter;
-			mCurrentSDataBlock->addVariable(ci.getName(), ci.getType());
+			mCurrentSDataBlock->addVariable(ci->getName(), ci->getType());
 		}
 		return;
 	}

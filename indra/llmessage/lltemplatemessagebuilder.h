@@ -37,7 +37,7 @@ class LLMessageTemplate;
 class LLMsgBlkData;
 class LLMessageTemplate;
 
-class LLTemplateMessageBuilder : public LLMessageBuilder
+class LLTemplateMessageBuilder final : public LLMessageBuilder
 {
 public:
 	
