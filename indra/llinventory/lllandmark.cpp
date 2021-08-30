@@ -207,7 +207,7 @@ LLLandmark* LLLandmark::constructFromString(const char *buffer, const S32 buffer
 // static
 void LLLandmark::registerCallbacks(LLMessageSystem* msg)
 {
-	msg->setHandlerFunc("RegionIDAndHandleReply", &processRegionIDAndHandle);
+	msg->setHandlerFuncFast(_PREHASH_RegionIDAndHandleReply, &processRegionIDAndHandle);
 }
 
 // static

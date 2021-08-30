@@ -861,16 +861,16 @@ bool LLPanelGridTools::flushMapVisibilityCachesConfirm(const LLSD& notification,
 	// HACK: Send this as an EstateOwnerRequest so it gets routed
 	// correctly by the spaceserver. JC
 	LLMessageSystem* msg = gMessageSystem;
-	msg->newMessage("EstateOwnerMessage");
+	msg->newMessageFast(_PREHASH_EstateOwnerMessage);
 	msg->nextBlockFast(_PREHASH_AgentData);
 	msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID());
 	msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
 	msg->addUUIDFast(_PREHASH_TransactionID, LLUUID::null); //not used
-	msg->nextBlock("MethodData");
-	msg->addString("Method", "refreshmapvisibility");
-	msg->addUUID("Invoice", LLUUID::null);
-	msg->nextBlock("ParamList");
-	msg->addString("Parameter", gAgent.getID().asString());
+	msg->nextBlockFast(_PREHASH_MethodData);
+	msg->addStringFast(_PREHASH_Method, "refreshmapvisibility");
+	msg->addUUIDFast(_PREHASH_Invoice, LLUUID::null);
+	msg->nextBlockFast(_PREHASH_ParamList);
+	msg->addStringFast(_PREHASH_Parameter, gAgent.getID().asString());
 	gAgent.sendReliableMessage();
 	return false;
 }
@@ -1254,16 +1254,16 @@ void LLPanelRequestTools::sendRequest(const std::string& request,
 	LL_INFOS() << "Sending request '" << request << "', '"
 			<< parameter << "' to " << host << LL_ENDL;
 	LLMessageSystem* msg = gMessageSystem;
-	msg->newMessage("GodlikeMessage");
+	msg->newMessageFast(_PREHASH_GodlikeMessage);
 	msg->nextBlockFast(_PREHASH_AgentData);
 	msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID());
 	msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
 	msg->addUUIDFast(_PREHASH_TransactionID, LLUUID::null); //not used
-	msg->nextBlock("MethodData");
-	msg->addString("Method", request);
-	msg->addUUID("Invoice", LLUUID::null);
-	msg->nextBlock("ParamList");
-	msg->addString("Parameter", parameter);
+	msg->nextBlockFast(_PREHASH_MethodData);
+	msg->addStringFast(_PREHASH_Method, request);
+	msg->addUUIDFast(_PREHASH_Invoice, LLUUID::null);
+	msg->nextBlockFast(_PREHASH_ParamList);
+	msg->addStringFast(_PREHASH_Parameter, parameter);
 	msg->sendReliable(host);
 }
 

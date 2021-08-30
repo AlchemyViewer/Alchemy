@@ -2472,13 +2472,13 @@ void register_viewer_callbacks(LLMessageSystem* msg)
 	msg->setHandlerFuncFast(_PREHASH_ImageData,				LLViewerTextureList::receiveImageHeader );
 	msg->setHandlerFuncFast(_PREHASH_ImagePacket,				LLViewerTextureList::receiveImagePacket );
 	msg->setHandlerFuncFast(_PREHASH_ObjectUpdate,				process_object_update );
-	msg->setHandlerFunc("ObjectUpdateCompressed",				process_compressed_object_update );
-	msg->setHandlerFunc("ObjectUpdateCached",					process_cached_object_update );
+	msg->setHandlerFuncFast(_PREHASH_ObjectUpdateCompressed,				process_compressed_object_update );
+	msg->setHandlerFuncFast(_PREHASH_ObjectUpdateCached,					process_cached_object_update );
 	msg->setHandlerFuncFast(_PREHASH_ImprovedTerseObjectUpdate, process_terse_object_update_improved );
-	msg->setHandlerFunc("SimStats",				process_sim_stats);
+	msg->setHandlerFuncFast(_PREHASH_SimStats,				process_sim_stats);
 	msg->setHandlerFuncFast(_PREHASH_HealthMessage,			process_health_message );
 	msg->setHandlerFuncFast(_PREHASH_EconomyData,				process_economy_data);
-	msg->setHandlerFunc("RegionInfo", LLViewerRegion::processRegionInfo);
+	msg->setHandlerFuncFast(_PREHASH_RegionInfo, LLViewerRegion::processRegionInfo);
 
 	msg->setHandlerFuncFast(_PREHASH_ChatFromSimulator,		process_chat_from_simulator);
 	msg->setHandlerFuncFast(_PREHASH_KillObject,				process_kill_object,	NULL);
@@ -2487,13 +2487,13 @@ void register_viewer_callbacks(LLMessageSystem* msg)
 	msg->setHandlerFuncFast(_PREHASH_DisableSimulator,			process_disable_simulator);
 	msg->setHandlerFuncFast(_PREHASH_KickUser,					process_kick_user,		NULL);
 
-	msg->setHandlerFunc("CrossedRegion", process_crossed_region);
+	msg->setHandlerFuncFast(_PREHASH_CrossedRegion, process_crossed_region);
 	msg->setHandlerFuncFast(_PREHASH_TeleportFinish, process_teleport_finish);
 
 	msg->setHandlerFuncFast(_PREHASH_AlertMessage,             process_alert_message);
-	msg->setHandlerFunc("AgentAlertMessage", process_agent_alert_message);
+	msg->setHandlerFuncFast(_PREHASH_AgentAlertMessage, process_agent_alert_message);
 	msg->setHandlerFuncFast(_PREHASH_MeanCollisionAlert,             process_mean_collision_alert_message,  NULL);
-	msg->setHandlerFunc("ViewerFrozenMessage",             process_frozen_message);
+	msg->setHandlerFuncFast(_PREHASH_ViewerFrozenMessage,             process_frozen_message);
 
 	msg->setHandlerFuncFast(_PREHASH_NameValuePair,			process_name_value);
 	msg->setHandlerFuncFast(_PREHASH_RemoveNameValuePair,	process_remove_name_value);
@@ -2502,14 +2502,14 @@ void register_viewer_callbacks(LLMessageSystem* msg)
 	msg->setHandlerFuncFast(_PREHASH_AvatarAppearance,		process_avatar_appearance);
 	msg->setHandlerFuncFast(_PREHASH_CameraConstraint,		process_camera_constraint);
 	msg->setHandlerFuncFast(_PREHASH_AvatarSitResponse,		process_avatar_sit_response);
-	msg->setHandlerFunc("SetFollowCamProperties",			process_set_follow_cam_properties);
-	msg->setHandlerFunc("ClearFollowCamProperties",			process_clear_follow_cam_properties);
+	msg->setHandlerFuncFast(_PREHASH_SetFollowCamProperties,			process_set_follow_cam_properties);
+	msg->setHandlerFuncFast(_PREHASH_ClearFollowCamProperties,			process_clear_follow_cam_properties);
 
 	msg->setHandlerFuncFast(_PREHASH_ImprovedInstantMessage,	process_improved_im);
 	msg->setHandlerFuncFast(_PREHASH_ScriptQuestion,			process_script_question);
 	msg->setHandlerFuncFast(_PREHASH_ObjectProperties,			LLSelectMgr::processObjectProperties, NULL);
 	msg->setHandlerFuncFast(_PREHASH_ObjectPropertiesFamily,	LLSelectMgr::processObjectPropertiesFamily, NULL);
-	msg->setHandlerFunc("ForceObjectSelect", LLSelectMgr::processForceObjectSelect);
+	msg->setHandlerFuncFast(_PREHASH_ForceObjectSelect, LLSelectMgr::processForceObjectSelect);
 
 	msg->setHandlerFuncFast(_PREHASH_MoneyBalanceReply,		process_money_balance_reply,	NULL);
 	msg->setHandlerFuncFast(_PREHASH_CoarseLocationUpdate,		LLWorld::processCoarseUpdate, NULL);
@@ -2520,7 +2520,7 @@ void register_viewer_callbacks(LLMessageSystem* msg)
 
 	msg->setHandlerFuncFast(_PREHASH_DeRezAck, process_derez_ack);
 
-	msg->setHandlerFunc("LogoutReply", process_logout_reply);
+	msg->setHandlerFuncFast(_PREHASH_LogoutReply, process_logout_reply);
 
 	//msg->setHandlerFuncFast(_PREHASH_AddModifyAbility,
 	//					&LLAgent::processAddModifyAbility);
@@ -2530,32 +2530,32 @@ void register_viewer_callbacks(LLMessageSystem* msg)
 						&LLAgent::processAgentDataUpdate);
 	msg->setHandlerFuncFast(_PREHASH_AgentGroupDataUpdate,
 						&LLAgent::processAgentGroupDataUpdate);
-	msg->setHandlerFunc("AgentDropGroup",
+	msg->setHandlerFuncFast(_PREHASH_AgentDropGroup,
 						&LLAgent::processAgentDropGroup);
 	// land ownership messages
 	msg->setHandlerFuncFast(_PREHASH_ParcelOverlay,
 						LLViewerParcelMgr::processParcelOverlay);
 	msg->setHandlerFuncFast(_PREHASH_ParcelProperties,
 						LLViewerParcelMgr::processParcelProperties);
-	msg->setHandlerFunc("ParcelAccessListReply",
+	msg->setHandlerFuncFast(_PREHASH_ParcelAccessListReply,
 		LLViewerParcelMgr::processParcelAccessListReply);
-	msg->setHandlerFunc("ParcelDwellReply",
+	msg->setHandlerFuncFast(_PREHASH_ParcelDwellReply,
 		LLViewerParcelMgr::processParcelDwellReply);
 
-	msg->setHandlerFunc("AvatarPropertiesReply",
+	msg->setHandlerFuncFast(_PREHASH_AvatarPropertiesReply,
 						&LLAvatarPropertiesProcessor::processAvatarPropertiesReply);
-	msg->setHandlerFunc("AvatarInterestsReply",
+	msg->setHandlerFuncFast(_PREHASH_AvatarInterestsReply,
 						&LLAvatarPropertiesProcessor::processAvatarInterestsReply);
-	msg->setHandlerFunc("AvatarGroupsReply",
+	msg->setHandlerFuncFast(_PREHASH_AvatarGroupsReply,
 						&LLAvatarPropertiesProcessor::processAvatarGroupsReply);
 	// ratings deprecated
 	//msg->setHandlerFuncFast(_PREHASH_AvatarStatisticsReply,
 	//					LLPanelAvatar::processAvatarStatisticsReply);
-	msg->setHandlerFunc("AvatarNotesReply",
+	msg->setHandlerFuncFast(_PREHASH_AvatarNotesReply,
 						&LLAvatarPropertiesProcessor::processAvatarNotesReply);
-	msg->setHandlerFunc("AvatarPicksReply",
+	msg->setHandlerFuncFast(_PREHASH_AvatarPicksReply,
 						&LLAvatarPropertiesProcessor::processAvatarPicksReply);
- 	msg->setHandlerFunc("AvatarClassifiedReply",
+ 	msg->setHandlerFuncFast(_PREHASH_AvatarClassifiedReply,
  						&LLAvatarPropertiesProcessor::processAvatarClassifiedsReply);
 
 	msg->setHandlerFuncFast(_PREHASH_CreateGroupReply,
@@ -2573,7 +2573,7 @@ void register_viewer_callbacks(LLMessageSystem* msg)
 	// msg->setHandlerFuncFast(_PREHASH_ReputationIndividualReply,
 	//					LLFloaterRate::processReputationIndividualReply);
 
-	msg->setHandlerFunc("ScriptControlChange",
+	msg->setHandlerFuncFast(_PREHASH_ScriptControlChange,
 						LLAgent::processScriptControlChange );
 
 	msg->setHandlerFuncFast(_PREHASH_ViewerEffect, LLHUDManager::processViewerEffect);
@@ -2590,52 +2590,52 @@ void register_viewer_callbacks(LLMessageSystem* msg)
 	msg->setHandlerFuncFast(_PREHASH_UserInfoReply,
 		process_user_info_reply);
 
-	msg->setHandlerFunc("RegionHandshake", process_region_handshake, NULL);
+	msg->setHandlerFuncFast(_PREHASH_RegionHandshake, process_region_handshake, NULL);
 
-	msg->setHandlerFunc("TeleportStart", process_teleport_start );
-	msg->setHandlerFunc("TeleportProgress", process_teleport_progress);
-	msg->setHandlerFunc("TeleportFailed", process_teleport_failed, NULL);
-	msg->setHandlerFunc("TeleportLocal", process_teleport_local, NULL);
+	msg->setHandlerFuncFast(_PREHASH_TeleportStart, process_teleport_start );
+	msg->setHandlerFuncFast(_PREHASH_TeleportProgress, process_teleport_progress);
+	msg->setHandlerFuncFast(_PREHASH_TeleportFailed, process_teleport_failed, NULL);
+	msg->setHandlerFuncFast(_PREHASH_TeleportLocal, process_teleport_local, NULL);
 
-	msg->setHandlerFunc("ImageNotInDatabase", LLViewerTextureList::processImageNotInDatabase, NULL);
+	msg->setHandlerFuncFast(_PREHASH_ImageNotInDatabase, LLViewerTextureList::processImageNotInDatabase, NULL);
 
 	msg->setHandlerFuncFast(_PREHASH_GroupMembersReply,
 						LLGroupMgr::processGroupMembersReply);
-	msg->setHandlerFunc("GroupRoleDataReply",
+	msg->setHandlerFuncFast(_PREHASH_GroupRoleDataReply,
 						LLGroupMgr::processGroupRoleDataReply);
-	msg->setHandlerFunc("GroupRoleMembersReply",
+	msg->setHandlerFuncFast(_PREHASH_GroupRoleMembersReply,
 						LLGroupMgr::processGroupRoleMembersReply);
-	msg->setHandlerFunc("GroupTitlesReply",
+	msg->setHandlerFuncFast(_PREHASH_GroupTitlesReply,
 						LLGroupMgr::processGroupTitlesReply);
 	// Special handler as this message is sometimes used for group land.
-	msg->setHandlerFunc("PlacesReply", process_places_reply);
-	msg->setHandlerFunc("GroupNoticesListReply", LLPanelGroupNotices::processGroupNoticesListReply);
+	msg->setHandlerFuncFast(_PREHASH_PlacesReply, process_places_reply);
+	msg->setHandlerFuncFast(_PREHASH_GroupNoticesListReply, LLPanelGroupNotices::processGroupNoticesListReply);
 
-	msg->setHandlerFunc("AvatarPickerReply", LLFloaterAvatarPicker::processAvatarPickerReply);
+	msg->setHandlerFuncFast(_PREHASH_AvatarPickerReply, LLFloaterAvatarPicker::processAvatarPickerReply);
 
-	msg->setHandlerFunc("MapBlockReply", LLWorldMapMessage::processMapBlockReply);
-	msg->setHandlerFunc("MapItemReply", LLWorldMapMessage::processMapItemReply);
-	msg->setHandlerFunc("EventInfoReply", LLEventNotifier::processEventInfoReply);
+	msg->setHandlerFuncFast(_PREHASH_MapBlockReply, LLWorldMapMessage::processMapBlockReply);
+	msg->setHandlerFuncFast(_PREHASH_MapItemReply, LLWorldMapMessage::processMapItemReply);
+	msg->setHandlerFuncFast(_PREHASH_EventInfoReply, LLEventNotifier::processEventInfoReply);
 	
-	msg->setHandlerFunc("PickInfoReply", &LLAvatarPropertiesProcessor::processPickInfoReply);
-	msg->setHandlerFunc("ClassifiedInfoReply", LLAvatarPropertiesProcessor::processClassifiedInfoReply);
-	msg->setHandlerFunc("ParcelInfoReply", LLRemoteParcelInfoProcessor::processParcelInfoReply);
-	msg->setHandlerFunc("ScriptDialog", process_script_dialog);
-	msg->setHandlerFunc("LoadURL", process_load_url);
-	msg->setHandlerFunc("ScriptTeleportRequest", process_script_teleport_request);
-	msg->setHandlerFunc("EstateCovenantReply", process_covenant_reply);
+	msg->setHandlerFuncFast(_PREHASH_PickInfoReply, &LLAvatarPropertiesProcessor::processPickInfoReply);
+	msg->setHandlerFuncFast(_PREHASH_ClassifiedInfoReply, LLAvatarPropertiesProcessor::processClassifiedInfoReply);
+	msg->setHandlerFuncFast(_PREHASH_ParcelInfoReply, LLRemoteParcelInfoProcessor::processParcelInfoReply);
+	msg->setHandlerFuncFast(_PREHASH_ScriptDialog, process_script_dialog);
+	msg->setHandlerFuncFast(_PREHASH_LoadURL, process_load_url);
+	msg->setHandlerFuncFast(_PREHASH_ScriptTeleportRequest, process_script_teleport_request);
+	msg->setHandlerFuncFast(_PREHASH_EstateCovenantReply, process_covenant_reply);
 
 	// calling cards
-	msg->setHandlerFunc("OfferCallingCard", process_offer_callingcard);
-	msg->setHandlerFunc("AcceptCallingCard", process_accept_callingcard);
-	msg->setHandlerFunc("DeclineCallingCard", process_decline_callingcard);
+	msg->setHandlerFuncFast(_PREHASH_OfferCallingCard, process_offer_callingcard);
+	msg->setHandlerFuncFast(_PREHASH_AcceptCallingCard, process_accept_callingcard);
+	msg->setHandlerFuncFast(_PREHASH_DeclineCallingCard, process_decline_callingcard);
 
-	msg->setHandlerFunc("ParcelObjectOwnersReply", LLPanelLandObjects::processParcelObjectOwnersReply);
+	msg->setHandlerFuncFast(_PREHASH_ParcelObjectOwnersReply, LLPanelLandObjects::processParcelObjectOwnersReply);
 
-	msg->setHandlerFunc("InitiateDownload", process_initiate_download);
-	msg->setHandlerFunc("LandStatReply", LLFloaterTopObjects::handle_land_reply);
-    msg->setHandlerFunc("GenericMessage", process_generic_message);
-    msg->setHandlerFunc("LargeGenericMessage", process_large_generic_message);
+	msg->setHandlerFuncFast(_PREHASH_InitiateDownload, process_initiate_download);
+	msg->setHandlerFuncFast(_PREHASH_LandStatReply, LLFloaterTopObjects::handle_land_reply);
+    msg->setHandlerFuncFast(_PREHASH_GenericMessage, process_generic_message);
+    msg->setHandlerFuncFast(_PREHASH_LargeGenericMessage, process_large_generic_message);
 
 	msg->setHandlerFuncFast(_PREHASH_FeatureDisabled, process_feature_disabled_message);
 }

@@ -2555,9 +2555,9 @@ void LLViewerParcelMgr::buyPass()
 
 	LLMessageSystem* msg = gMessageSystem;
 	msg->newMessageFast(_PREHASH_ParcelBuyPass);
-	msg->nextBlock("AgentData");
-	msg->addUUID("AgentID", gAgent.getID());
-	msg->addUUID("SessionID", gAgent.getSessionID());
+	msg->nextBlockFast(_PREHASH_AgentData);
+	msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID());
+	msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
 	msg->nextBlockFast(_PREHASH_ParcelData);
 	msg->addS32Fast(_PREHASH_LocalID, parcel->getLocalID() );
 	msg->sendReliable( region->getHost() );

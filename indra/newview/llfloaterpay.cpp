@@ -350,7 +350,7 @@ void LLFloaterPay::processPayPriceReply(LLMessageSystem* msg, void **userdata)
 
 		self->reshape( self->getRect().getWidth() + padding_required, self->getRect().getHeight(), FALSE );
 	}
-	msg->setHandlerFunc("PayPriceReply",NULL,NULL);
+	msg->setHandlerFuncFast(_PREHASH_PayPriceReply,NULL,NULL);
 }
 
 // static

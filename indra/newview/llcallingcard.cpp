@@ -577,8 +577,8 @@ void LLAvatarTracker::registerCallbacks(LLMessageSystem* msg)
 						processOfflineNotification);
 	//msg->setHandlerFuncFast(_PREHASH_GrantedProxies,
 	//					processGrantedProxies);
-	msg->setHandlerFunc("TerminateFriendship", processTerminateFriendship);
-	msg->setHandlerFunc(_PREHASH_ChangeUserRights, processChangeUserRights);
+	msg->setHandlerFuncFast(_PREHASH_TerminateFriendship, processTerminateFriendship);
+	msg->setHandlerFuncFast(_PREHASH_ChangeUserRights, processChangeUserRights);
 }
 
 // static

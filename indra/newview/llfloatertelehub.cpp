@@ -55,7 +55,7 @@ LLFloaterTelehub::LLFloaterTelehub(const LLSD& key)
 
 BOOL LLFloaterTelehub::postBuild()
 {
-	gMessageSystem->setHandlerFunc("TelehubInfo", processTelehubInfo);
+	gMessageSystem->setHandlerFuncFast(_PREHASH_TelehubInfo, processTelehubInfo);
 
 	getChild<LLUICtrl>("connect_btn")->setCommitCallback(boost::bind(&LLFloaterTelehub::onClickConnect, this));
 	getChild<LLUICtrl>("disconnect_btn")->setCommitCallback(boost::bind(&LLFloaterTelehub::onClickDisconnect, this));
@@ -85,7 +85,7 @@ void LLFloaterTelehub::onOpen(const LLSD& key)
 LLFloaterTelehub::~LLFloaterTelehub()
 {
 	// no longer interested in this message
-	gMessageSystem->setHandlerFunc("TelehubInfo", NULL);
+	gMessageSystem->setHandlerFuncFast(_PREHASH_TelehubInfo, NULL);
 }
 
 void LLFloaterTelehub::draw()
@@ -196,27 +196,27 @@ void LLFloaterTelehub::onClickRemoveSpawnPoint()
 	// Could be god or estate owner.  If neither, server will reject message.
 	if (gAgent.isGodlike())
 	{
-		msg->newMessage("GodlikeMessage");
+		msg->newMessageFast(_PREHASH_GodlikeMessage);
 	}
 	else
 	{
-		msg->newMessage("EstateOwnerMessage");
+		msg->newMessageFast(_PREHASH_EstateOwnerMessage);
 	}
-	msg->nextBlock("AgentData");
-	msg->addUUID("AgentID", gAgent.getID());
-	msg->addUUID("SessionID", gAgent.getSessionID());
+	msg->nextBlockFast(_PREHASH_AgentData);
+	msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID());
+	msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
 	msg->addUUIDFast(_PREHASH_TransactionID, LLUUID::null); //not used
-	msg->nextBlock("MethodData");
-	msg->addString("Method", "telehub");
-	msg->addUUID("Invoice", LLUUID::null);
+	msg->nextBlockFast(_PREHASH_MethodData);
+	msg->addStringFast(_PREHASH_Method, "telehub");
+	msg->addUUIDFast(_PREHASH_Invoice, LLUUID::null);
 
-	msg->nextBlock("ParamList");
-	msg->addString("Parameter", "spawnpoint remove");
+	msg->nextBlockFast(_PREHASH_ParamList);
+	msg->addStringFast(_PREHASH_Parameter, "spawnpoint remove");
 
 	std::string buffer;
 	buffer = llformat("%d", spawn_index);
-	msg->nextBlock("ParamList");
-	msg->addString("Parameter", buffer);
+	msg->nextBlockFast(_PREHASH_ParamList);
+	msg->addStringFast(_PREHASH_Parameter, buffer);
 
 	gAgent.sendReliableMessage();
 }

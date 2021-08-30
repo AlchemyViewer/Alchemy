@@ -2997,7 +2997,7 @@ void LLInventoryModel::registerCallbacks(LLMessageSystem* msg)
 	msg->setHandlerFuncFast(_PREHASH_BulkUpdateInventory,
 							processBulkUpdateInventory,
 							NULL);
-	msg->setHandlerFunc("MoveInventoryItem", processMoveInventoryItem);
+	msg->setHandlerFuncFast(_PREHASH_MoveInventoryItem, processMoveInventoryItem);
 }
 
 

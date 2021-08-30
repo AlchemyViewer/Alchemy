@@ -1756,20 +1756,20 @@ void LLGroupMgr::sendCreateGroupRequest(const std::string& name,
 										BOOL mature_publish)
 {
 	LLMessageSystem* msg = gMessageSystem;
-	msg->newMessage("CreateGroupRequest");
-	msg->nextBlock("AgentData");
-	msg->addUUID("AgentID",gAgent.getID());
-	msg->addUUID("SessionID",gAgent.getSessionID());
+	msg->newMessageFast(_PREHASH_CreateGroupRequest);
+	msg->nextBlockFast(_PREHASH_AgentData);
+	msg->addUUIDFast(_PREHASH_AgentID,gAgent.getID());
+	msg->addUUIDFast(_PREHASH_SessionID,gAgent.getSessionID());
 
-	msg->nextBlock("GroupData");
-	msg->addString("Name",name);
-	msg->addString("Charter",charter);
-	msg->addBOOL("ShowInList",show_in_list);
-	msg->addUUID("InsigniaID",insignia);
-	msg->addS32("MembershipFee",membership_fee);
-	msg->addBOOL("OpenEnrollment",open_enrollment);
-	msg->addBOOL("AllowPublish",allow_publish);
-	msg->addBOOL("MaturePublish",mature_publish);
+	msg->nextBlockFast(_PREHASH_GroupData);
+	msg->addStringFast(_PREHASH_Name,name);
+	msg->addStringFast(_PREHASH_Charter,charter);
+	msg->addBOOLFast(_PREHASH_ShowInList,show_in_list);
+	msg->addUUIDFast(_PREHASH_InsigniaID,insignia);
+	msg->addS32Fast(_PREHASH_MembershipFee,membership_fee);
+	msg->addBOOLFast(_PREHASH_OpenEnrollment,open_enrollment);
+	msg->addBOOLFast(_PREHASH_AllowPublish,allow_publish);
+	msg->addBOOLFast(_PREHASH_MaturePublish,mature_publish);
 
 	gAgent.sendReliableMessage();
 }
@@ -1876,18 +1876,18 @@ void LLGroupMgr::sendGroupMemberInvites(const LLUUID& group_id, std::map<LLUUID,
 	{
 		if (start_message)
 		{
-			msg->newMessage("InviteGroupRequest");
-			msg->nextBlock("AgentData");
-			msg->addUUID("AgentID",gAgent.getID());
-			msg->addUUID("SessionID",gAgent.getSessionID());
-			msg->nextBlock("GroupData");
-			msg->addUUID("GroupID",group_id);
+			msg->newMessageFast(_PREHASH_InviteGroupRequest);
+			msg->nextBlockFast(_PREHASH_AgentData);
+			msg->addUUIDFast(_PREHASH_AgentID,gAgent.getID());
+			msg->addUUIDFast(_PREHASH_SessionID,gAgent.getSessionID());
+			msg->nextBlockFast(_PREHASH_GroupData);
+			msg->addUUIDFast(_PREHASH_GroupID,group_id);
 			start_message = false;
 		}
 
-		msg->nextBlock("InviteData");
-		msg->addUUID("InviteeID",(*it).first);
-		msg->addUUID("RoleID",(*it).second);
+		msg->nextBlockFast(_PREHASH_InviteData);
+		msg->addUUIDFast(_PREHASH_InviteeID,(*it).first);
+		msg->addUUIDFast(_PREHASH_RoleID,(*it).second);
 
 		if (msg->isSendFullFast())
 		{

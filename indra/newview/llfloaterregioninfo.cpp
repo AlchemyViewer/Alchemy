@@ -289,8 +289,7 @@ BOOL LLFloaterRegionInfo::postBuild()
 		mTab->addTabPanel(panel);
 	}
 	
-	gMessageSystem->setHandlerFunc(
-		"EstateOwnerMessage", 
+	gMessageSystem->setHandlerFuncFast(_PREHASH_EstateOwnerMessage, 
 		&processEstateOwnerRequest);
 
 	// Request region info when agent region changes.
@@ -357,10 +356,10 @@ void LLFloaterRegionInfo::requestRegionInfo()
 	// so non-owners/non-gods can see the values. 
 	// Therefore can't use an EstateOwnerMessage JC
 	LLMessageSystem* msg = gMessageSystem;
-	msg->newMessage("RequestRegionInfo");
-	msg->nextBlock("AgentData");
-	msg->addUUID("AgentID", gAgent.getID());
-	msg->addUUID("SessionID", gAgent.getSessionID());
+	msg->newMessageFast(_PREHASH_RequestRegionInfo);
+	msg->nextBlockFast(_PREHASH_AgentData);
+	msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID());
+	msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
 	gAgent.sendReliableMessage();
 }
 
@@ -751,18 +750,18 @@ void LLPanelRegionInfo::sendEstateOwnerMessage(
 	const strings_t& strings)
 {
 	LL_INFOS() << "Sending estate request '" << request << "'" << LL_ENDL;
-	msg->newMessage("EstateOwnerMessage");
+	msg->newMessageFast(_PREHASH_EstateOwnerMessage);
 	msg->nextBlockFast(_PREHASH_AgentData);
 	msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID());
 	msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
 	msg->addUUIDFast(_PREHASH_TransactionID, LLUUID::null); //not used
-	msg->nextBlock("MethodData");
-	msg->addString("Method", request);
-	msg->addUUID("Invoice", invoice);
+	msg->nextBlockFast(_PREHASH_MethodData);
+	msg->addStringFast(_PREHASH_Method, request);
+	msg->addUUIDFast(_PREHASH_Invoice, invoice);
 	if(strings.empty())
 	{
-		msg->nextBlock("ParamList");
-		msg->addString("Parameter", NULL);
+		msg->nextBlockFast(_PREHASH_ParamList);
+		msg->addStringFast(_PREHASH_Parameter, NULL);
 	}
 	else
 	{
@@ -770,8 +769,8 @@ void LLPanelRegionInfo::sendEstateOwnerMessage(
 		strings_t::const_iterator end = strings.end();
 		for(; it != end; ++it)
 		{
-			msg->nextBlock("ParamList");
-			msg->addString("Parameter", *it);
+			msg->nextBlockFast(_PREHASH_ParamList);
+			msg->addStringFast(_PREHASH_Parameter, *it);
 		}
 	}
 	msg->sendReliable(mHost);
@@ -2093,7 +2092,7 @@ bool LLPanelEstateCovenant::refreshFromRegion(LLViewerRegion* region)
 	// let the parent class handle the general data collection. 
 	bool rv = LLPanelRegionInfo::refreshFromRegion(region);
 	LLMessageSystem *msg = gMessageSystem;
-	msg->newMessage("EstateCovenantRequest");
+	msg->newMessageFast(_PREHASH_EstateCovenantRequest);
 	msg->nextBlockFast(_PREHASH_AgentData);
 	msg->addUUIDFast(_PREHASH_AgentID,	gAgent.getID());
 	msg->addUUIDFast(_PREHASH_SessionID,gAgent.getSessionID());
@@ -2308,18 +2307,18 @@ void LLPanelEstateCovenant::sendChangeCovenantID(const LLUUID &asset_id)
         setCovenantID(asset_id);
 
 		LLMessageSystem* msg = gMessageSystem;
-		msg->newMessage("EstateOwnerMessage");
+		msg->newMessageFast(_PREHASH_EstateOwnerMessage);
 		msg->nextBlockFast(_PREHASH_AgentData);
 		msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID());
 		msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
 		msg->addUUIDFast(_PREHASH_TransactionID, LLUUID::null); //not used
 
-		msg->nextBlock("MethodData");
-		msg->addString("Method", "estatechangecovenantid");
-		msg->addUUID("Invoice", LLFloaterRegionInfo::getLastInvoice());
+		msg->nextBlockFast(_PREHASH_MethodData);
+		msg->addStringFast(_PREHASH_Method, "estatechangecovenantid");
+		msg->addUUIDFast(_PREHASH_Invoice, LLFloaterRegionInfo::getLastInvoice());
 
-		msg->nextBlock("ParamList");
-		msg->addString("Parameter", getCovenantID().asString());
+		msg->nextBlockFast(_PREHASH_ParamList);
+		msg->addStringFast(_PREHASH_Parameter, getCovenantID().asString());
 		gAgent.sendReliableMessage();
 	}
 }
@@ -3473,28 +3472,28 @@ bool LLPanelEstateAccess::accessCoreConfirm(const LLSD& notification, const LLSD
 void LLPanelEstateAccess::sendEstateAccessDelta(U32 flags, const LLUUID& agent_or_group_id)
 {
 	LLMessageSystem* msg = gMessageSystem;
-	msg->newMessage("EstateOwnerMessage");
+	msg->newMessageFast(_PREHASH_EstateOwnerMessage);
 	msg->nextBlockFast(_PREHASH_AgentData);
 	msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID());
 	msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
 	msg->addUUIDFast(_PREHASH_TransactionID, LLUUID::null); //not used
 
-	msg->nextBlock("MethodData");
-	msg->addString("Method", "estateaccessdelta");
-	msg->addUUID("Invoice", LLFloaterRegionInfo::getLastInvoice());
+	msg->nextBlockFast(_PREHASH_MethodData);
+	msg->addStringFast(_PREHASH_Method, "estateaccessdelta");
+	msg->addUUIDFast(_PREHASH_Invoice, LLFloaterRegionInfo::getLastInvoice());
 
 	std::string buf;
 	gAgent.getID().toString(buf);
-	msg->nextBlock("ParamList");
-	msg->addString("Parameter", buf);
+	msg->nextBlockFast(_PREHASH_ParamList);
+	msg->addStringFast(_PREHASH_Parameter, buf);
 
 	buf = llformat("%u", flags);
-	msg->nextBlock("ParamList");
-	msg->addString("Parameter", buf);
+	msg->nextBlockFast(_PREHASH_ParamList);
+	msg->addStringFast(_PREHASH_Parameter, buf);
 
 	agent_or_group_id.toString(buf);
-	msg->nextBlock("ParamList");
-	msg->addString("Parameter", buf);
+	msg->nextBlockFast(_PREHASH_ParamList);
+	msg->addStringFast(_PREHASH_Parameter, buf);
 
 	gAgent.sendReliableMessage();
 }

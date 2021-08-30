@@ -2152,18 +2152,18 @@ S32 LLMessageSystem::sendError(
 	const std::string& message,
 	const LLSD& data)
 {
-	newMessage("Error");
+	newMessageFast(_PREHASH_Error);
 	nextBlockFast(_PREHASH_AgentData);
 	addUUIDFast(_PREHASH_AgentID, agent_id);
 	nextBlockFast(_PREHASH_Data);
-	addS32("Code", code);
-	addString("Token", token);
-	addUUID("ID", id);
-	addString("System", system);
+	addS32Fast(_PREHASH_Code, code);
+	addStringFast(_PREHASH_Token, token);
+	addUUIDFast(_PREHASH_ID, id);
+	addStringFast(_PREHASH_System, system);
 	std::string temp;
 	temp = message;
 	if(temp.size() > (size_t)MTUBYTES) temp.resize((size_t)MTUBYTES);
-	addString("Message", message);
+	addStringFast(_PREHASH_Message, message);
 	LLPointer<LLSDBinaryFormatter> formatter = new LLSDBinaryFormatter;
 	std::ostringstream ostr;
 	formatter->format(data, ostr);
@@ -2181,13 +2181,13 @@ S32 LLMessageSystem::sendError(
 	}
 	if(pack_data)
 	{
-		addBinaryData("Data", (void*)temp.c_str(), temp.size());
+		addBinaryDataFast(_PREHASH_Data, (void*)temp.c_str(), temp.size());
 	}
 	else
 	{
 		LL_WARNS("Messaging") << "Data and message were too large -- data removed."
 			<< LL_ENDL;
-		addBinaryData("Data", NULL, 0);
+		addBinaryDataFast(_PREHASH_Data, NULL, 0);
 	}
 	return sendReliable(host);
 }
@@ -3341,7 +3341,7 @@ void LLMessageSystem::establishBidirectionalTrust(const LLHost &host, S64 frame_
 
 	// Send a request, a deny, and give the host 2 seconds to complete
 	// the trust handshake.
-	newMessage("RequestTrustedCircuit");
+	newMessageFast(_PREHASH_RequestTrustedCircuit);
 	sendMessage(host);
 	reallySendDenyTrustedCircuit(host);
 	setHandlerFuncFast(_PREHASH_StartPingCheck, process_start_ping_check, NULL);
