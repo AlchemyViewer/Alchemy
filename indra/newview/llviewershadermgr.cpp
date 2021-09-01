@@ -1301,7 +1301,7 @@ BOOL LLViewerShaderMgr::loadShadersDeferred()
 		gDeferredCoFProgram.unload();		
 		gDeferredDoFCombineProgram.unload();
 		gDeferredPostGammaCorrectProgram.unload();
-        for (auto i = 0; i < 3; ++i)
+        for (auto i = 0; i < 4; ++i)
         {
             gFXAAProgram[i].unload();
 			gPostSMAAEdgeDetect[i].unload();
@@ -2879,7 +2879,7 @@ BOOL LLViewerShaderMgr::loadShadersDeferred()
 
 	if (success)
 	{
-		gDeferredDoFCombineProgram.mName = "Deferred DoFCombine Shader";
+		gDeferredDoFCombineProgram.mName = "Deferred DoF Combine Shader";
 		gDeferredDoFCombineProgram.mFeatures.isDeferred = true;
 		gDeferredDoFCombineProgram.mShaderFiles.clear();
 		gDeferredDoFCombineProgram.mShaderFiles.push_back(make_pair("deferred/postDeferredNoTCV.glsl", GL_VERTEX_SHADER));
