@@ -266,6 +266,17 @@
       <key>Value</key>
       <integer>0</integer>
     </map>
+    <key>AlchemyForceFly</key>
+    <map>
+      <key>Comment</key>
+      <string>Always allow flight</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <integer>0</integer>
+    </map>
     <key>AlchemyHudTextFadeDistance</key>
     <map>
       <key>Comment</key>

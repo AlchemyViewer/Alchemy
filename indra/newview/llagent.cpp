@@ -787,6 +787,9 @@ BOOL LLAgent::canFly()
 // [/RLVa:KB]
 	if (isGodlike()) return TRUE;
 
+	static LLCachedControl<bool> alchemy_force_fly(gSavedSettings, "AlchemyForceFly", false);
+	if (alchemy_force_fly) return TRUE;
+
 	LLViewerRegion* regionp = getRegion();
 	if (regionp && regionp->getBlockFly()) return FALSE;
 	
