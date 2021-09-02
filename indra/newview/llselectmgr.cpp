@@ -6013,7 +6013,6 @@ void LLSelectMgr::renderSilhouettes(BOOL for_hud)
 		}
 
 		LLUUID focus_item_id = LLViewerMediaFocus::getInstance()->getFocusedObjectID();
-		for (S32 pass = 0; pass < 2; pass++)
 		{
 			for (LLSelectNode* node : mSelectedObjects->begin_end())
 			{                
