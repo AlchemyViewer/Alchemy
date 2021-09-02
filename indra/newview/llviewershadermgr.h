@@ -30,6 +30,8 @@
 #include "llshadermgr.h"
 #include "llmaterial.h"
 
+#include "alrenderutils.h"
+
 #define LL_DEFERRED_MULTI_LIGHT_COUNT 16
 
 class LLViewerShaderMgr: public LLShaderMgr
@@ -262,6 +264,8 @@ extern LLGLSLShader			gPostNightVisionProgram;
 extern LLGLSLShader         gPostSRGBToLinearProgram;
 extern LLGLSLShader         gPostLinearToSRGBProgram;
 extern LLGLSLShader         gPostCASProgram;
+extern LLGLSLShader			gPostTonemapProgram[AL_TONEMAP_COUNT];
+
 extern LLGLSLShader         gPostSMAAEdgeDetect[4];
 extern LLGLSLShader         gPostSMAABlendWeights[4];
 extern LLGLSLShader         gPostSMAANeighborhoodBlend[4];

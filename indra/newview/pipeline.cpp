@@ -465,6 +465,8 @@ void LLPipeline::init()
 {
 	refreshCachedSettings();
 
+	mALRenderUtil = std::make_unique<ALRenderUtil>();
+
 	gOctreeMaxCapacity = gSavedSettings.getU32("OctreeMaxNodeCapacity");
 	gOctreeMinSize = gSavedSettings.getF32("OctreeMinimumNodeSize");
 	sDynamicLOD = gSavedSettings.getBOOL("RenderDynamicLOD");
@@ -551,6 +553,9 @@ void LLPipeline::init()
 
 	mDeferredVB = new LLVertexBuffer(DEFERRED_VB_MASK, 0);
 	mDeferredVB->allocateBuffer(8, 0, true);
+
+	mALRenderUtil->restoreVertexBuffers();
+
 	setLightingDetail(-1);
 	
 	//
@@ -727,6 +732,8 @@ void LLPipeline::cleanup()
 	mDeferredVB = NULL;
 
 	mCubeVB = NULL;
+
+	mALRenderUtil.reset();
 }
 
 //============================================================================
@@ -7527,6 +7534,8 @@ void LLPipeline::doResetVertexBuffers(bool forced)
 
 	mCubeVB = NULL;
 
+	mALRenderUtil->resetVertexBuffers();
+
 	for (LLViewerRegion* region : LLWorld::getInstance()->getRegionList())
 	{
 		for (U32 i = 0; i < LLViewerRegion::NUM_PARTITIONS; i++)
@@ -7594,7 +7603,7 @@ void LLPipeline::doResetVertexBuffers(bool forced)
 	mDeferredVB = new LLVertexBuffer(DEFERRED_VB_MASK, 0);
 	mDeferredVB->allocateBuffer(8, 0, true);
 
-
+	mALRenderUtil->restoreVertexBuffers();
 }
 
 void LLPipeline::renderObjects(U32 type, U32 mask, bool texture, bool batch_texture)
@@ -9367,54 +9376,10 @@ void LLPipeline::renderDeferredLighting(LLRenderTarget *screen_target)
 
 	 screen_target->flush();
 
-    // gamma correct lighting
-    gGL.matrixMode(LLRender::MM_PROJECTION);
-    gGL.pushMatrix();
-    gGL.loadIdentity();
-    gGL.matrixMode(LLRender::MM_MODELVIEW);
-    gGL.pushMatrix();
-    gGL.loadIdentity();
-
-    {
-        LLGLDepthTest depth(GL_FALSE, GL_FALSE);
-
-        LLVector2 tc1(0, 0);
-        LLVector2 tc2((F32) screen_target->getWidth() * 2, (F32) screen_target->getHeight() * 2);
-
-        screen_target->bindTarget();
-        // Apply gamma correction to the frame here.
-        gDeferredPostGammaCorrectProgram.bind();
-
-		S32 channel = gDeferredPostGammaCorrectProgram.enableTexture(LLShaderMgr::DEFERRED_DIFFUSE, screen_target->getUsage());
-        if (channel > -1)
-        {
-            screen_target->bindTexture(0, channel, LLTexUnit::TFO_POINT);
-        }
-
-        gDeferredPostGammaCorrectProgram.uniform2f(LLShaderMgr::DEFERRED_SCREEN_RES, screen_target->getWidth(), screen_target->getHeight());
-
-		
-        gGL.begin(LLRender::TRIANGLE_STRIP);
-        gGL.texCoord2f(tc1.mV[0], tc1.mV[1]);
-        gGL.vertex2f(-1, -1);
-
-        gGL.texCoord2f(tc1.mV[0], tc2.mV[1]);
-        gGL.vertex2f(-1, 3);
-
-        gGL.texCoord2f(tc2.mV[0], tc1.mV[1]);
-        gGL.vertex2f(3, -1);
-
-        gGL.end();
-
-        gGL.getTexUnit(channel)->unbind(screen_target->getUsage());
-        gDeferredPostGammaCorrectProgram.unbind();
-        screen_target->flush();
-    }
-
-    gGL.matrixMode(LLRender::MM_PROJECTION);
-    gGL.popMatrix();
-    gGL.matrixMode(LLRender::MM_MODELVIEW);
-    gGL.popMatrix();
+	// Tonemapping & Gamma Correction
+	{
+		 mALRenderUtil->renderTonemap(screen_target, screen_target);
+	}
 
     screen_target->bindTarget();
 

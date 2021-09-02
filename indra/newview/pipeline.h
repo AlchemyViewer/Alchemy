@@ -39,6 +39,8 @@
 #include "lldrawable.h"
 #include "llrendertarget.h"
 
+#include "alrenderutils.h"
+
 #include <stack>
 
 class LLViewerTexture;
@@ -609,6 +611,8 @@ public:
 // [/RLVa:KB]
 
 	static LLTrace::EventStatHandle<S64> sStatBatchSize;
+
+	std::unique_ptr<ALRenderUtil> mALRenderUtil;
 
 	//screen texture
 	U32 					mScreenWidth;

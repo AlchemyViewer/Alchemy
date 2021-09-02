@@ -129,6 +129,7 @@ set(viewer_SOURCE_FILES
     alpanelmusicticker.cpp
     alpanelquicksettings.cpp
     alpanelquicksettingspulldown.cpp
+    alrenderutils.cpp
     altoolalign.cpp
     alunzip.cpp
     alviewermenu.cpp
@@ -800,6 +801,7 @@ set(viewer_HEADER_FILES
     alpanelmusicticker.h
     alpanelquicksettings.h
     alpanelquicksettingspulldown.h
+    alrenderutils.h
     altoolalign.h
     alunzip.h
     alviewermenu.h

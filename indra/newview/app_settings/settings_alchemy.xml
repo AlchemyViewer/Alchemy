@@ -684,6 +684,28 @@
       <key>Value</key>
       <real>0.275</real>
     </map>
+    <key>RenderToneMapType</key>
+    <map>
+      <key>Comment</key>
+      <string>Tonemapping type 0 - None, 1 - Linear, 2 - Reinhard, 3 - Reinhard2, 4 - Filmic, 5 - Unreal, 6 - ACES, 7 - Uchimura, 8 - Lottes</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>U32</string>
+      <key>Value</key>
+      <integer>0</integer>
+    </map>
+    <key>RenderToneMapExposure</key>
+    <map>
+      <key>Comment</key>
+      <string>Tonemapping exposure multiplier</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>F32</string>
+      <key>Value</key>
+      <real>1.0</real>
+    </map>
     <key>ResetUserColorsOnLogout</key>
     <map>
       <key>Comment</key>
