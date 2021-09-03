@@ -153,10 +153,10 @@ void LLFloaterSettingsDebug::onCommitSettings()
 		controlp->set(vectord.getValue());
 		break;
 	  case TYPE_VEC4:
-		vector4.mV[VX] = getChild<LLUICtrl>("val_spinner_1")->getValue().asReal();
-		vector4.mV[VY] = getChild<LLUICtrl>("val_spinner_2")->getValue().asReal();
-		vector4.mV[VZ] = getChild<LLUICtrl>("val_spinner_3")->getValue().asReal();
-		vector4.mV[VW] = getChild<LLUICtrl>("val_spinner_3")->getValue().asReal();
+		vector4.mV[VX] = (F32)getChild<LLUICtrl>("val_spinner_1")->getValue().asReal();
+		vector4.mV[VY] = (F32)getChild<LLUICtrl>("val_spinner_2")->getValue().asReal();
+		vector4.mV[VZ] = (F32)getChild<LLUICtrl>("val_spinner_3")->getValue().asReal();
+		vector4.mV[VW] = (F32)getChild<LLUICtrl>("val_spinner_4")->getValue().asReal();
 		controlp->set(vector4.getValue());
 		break;
 	  case TYPE_QUAT:
