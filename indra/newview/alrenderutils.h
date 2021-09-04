@@ -28,7 +28,7 @@
 
 #include "llpointer.h"
 
-#define AL_TONEMAP_COUNT 9
+#define AL_TONEMAP_COUNT 10
 
 class LLRenderTarget;
 class LLVertexBuffer;
@@ -36,12 +36,15 @@ class LLVertexBuffer;
 class ALRenderUtil
 {
 public:
-	ALRenderUtil() = default;
+	ALRenderUtil();
 	~ALRenderUtil() = default;
 
 	void restoreVertexBuffers();
 	void resetVertexBuffers();
 
+	void refreshState();
+
+	// Deferred Only Functions
 	enum ALTonemap : uint32_t
 	{
 		NONE = 0,
@@ -53,11 +56,27 @@ public:
 		ACES,
 		UCHIMURA,
 		LOTTES,
+		UNCHARTED,
 		TONEMAP_COUNT
 	};
+	bool setupTonemap();
 	void renderTonemap(LLRenderTarget* src, LLRenderTarget* dst);
-
+	// End Deferred Only
 
 private:
+	// Parameters
+	F32 mTonemapExposure = 1.f;
+
+	// State
+	U32 mTonemapType = ALTonemap::NONE;
+	LLVector3 mToneLottesParamA;
+	LLVector3 mToneLottesParamB;
+	LLVector3 mToneUchimuraParamA;
+	LLVector3 mToneUchimuraParamB;
+	LLVector3 mToneUnchartedParamA;
+	LLVector3 mToneUnchartedParamB;
+	LLVector3 mToneUnchartedParamC;
+
+	// Vertex Buffers
 	LLPointer<LLVertexBuffer> mRenderBuffer;
 };

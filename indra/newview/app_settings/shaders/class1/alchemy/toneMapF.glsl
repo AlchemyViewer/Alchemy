@@ -56,14 +56,16 @@ vec3 filmic(vec3 color)
 	return color;
 }
 
-vec3 unreal(vec3 x) {
+vec3 unreal(vec3 x)
+{
     // Unreal 3, Documentation: "Color Grading"
     // Adapted to be close to Tonemap_ACES, with similar range
     // Gamma 2.2 correction is baked in, don't use with sRGB conversion!
     return x / (x + 0.155) * 1.019;
 }
 
-vec3 aces(vec3 x) {
+vec3 aces(vec3 x) 
+{
     // Narkowicz 2015, "ACES Filmic Tone Mapping Curve"
     const float a = 2.51;
     const float b = 0.03;
@@ -73,7 +75,9 @@ vec3 aces(vec3 x) {
     return (x * (a * x + b)) / (x * (c * x + d) + e);
 }
 
-vec3 uchimura(vec3 x, float P, float a, float m, float l, float c, float b) {
+#if TONEMAP_METHOD == 7 // Uchimura
+vec3 uchimura(vec3 x, float P, float a, float m, float l, float c, float b) 
+{
   float l0 = ((P - m) * l) / a;
   float L0 = m - m / a;
   float L1 = m + (1.0 - m) / a;
@@ -93,34 +97,70 @@ vec3 uchimura(vec3 x, float P, float a, float m, float l, float c, float b) {
   return T * w0 + L * w1 + S * w2;
 }
 
-vec3 uchimura(vec3 x) {
-  const float P = 1.0;  // max display brightness
-  const float a = 1.0;  // contrast
-  const float m = 0.22; // linear section start
-  const float l = 0.4;  // linear section length
-  const float c = 1.33; // black
-  const float b = 0.0;  // pedestal
+uniform vec3 tone_uchimura_a = vec3(1.0, 1.0, 0.22);
+uniform vec3 tone_uchimura_b = vec3(0.4, 1.33, 0.0);
+vec3 uchimura(vec3 x)
+{
+    float P = tone_uchimura_a.x; // max display brightness
+    float a = tone_uchimura_a.y; // contrast
+    float m = tone_uchimura_a.z; // linear section start
+    float l = tone_uchimura_b.x; // linear section length
+    float c = tone_uchimura_b.y; // black
+    float b = tone_uchimura_b.z; // pedestal
 
-  return uchimura(x, P, a, m, l, c, b);
+    return uchimura(x, P, a, m, l, c, b);
 }
+#endif
 
+#if TONEMAP_METHOD == 8
 // Lottes 2016, "Advanced Techniques and Optimization of HDR Color Pipelines"
-vec3 lottes(vec3 x) {
-  const vec3 a = vec3(1.6);
-  const vec3 d = vec3(0.977);
-  const vec3 hdrMax = vec3(8.0);
-  const vec3 midIn = vec3(0.18);
-  const vec3 midOut = vec3(0.267);
+uniform vec3 tone_lottes_a = vec3(1.6, 0.977, 8.0);
+uniform vec3 tone_lottes_b = vec3(0.18, 0.267, 0.0);
+vec3 lottes(vec3 x) 
+{
+  vec3 a = vec3(tone_lottes_a.x);
+  vec3 d = vec3(tone_lottes_a.y);
+  vec3 hdrMax = vec3(tone_lottes_a.z);
+  vec3 midIn = vec3(tone_lottes_b.x);
+  vec3 midOut = vec3(tone_lottes_b.y);
 
-  const vec3 b =
+  vec3 b =
       (-pow(midIn, a) + pow(hdrMax, a) * midOut) /
       ((pow(hdrMax, a * d) - pow(midIn, a * d)) * midOut);
-  const vec3 c =
+  vec3 c =
       (pow(hdrMax, a * d) * pow(midIn, a) - pow(hdrMax, a) * pow(midIn, a * d) * midOut) /
       ((pow(hdrMax, a * d) - pow(midIn, a * d)) * midOut);
 
   return pow(x, a) / (pow(x, a * d) * b + c);
 }
+#endif
+
+#if TONEMAP_METHOD == 9
+// Hable, http://filmicworlds.com/blog/filmic-tonemapping-operators/
+uniform vec3 tone_uncharted_a = vec3(0.15, 0.50, 0.10); // A, B, C
+uniform vec3 tone_uncharted_b = vec3(0.20, 0.02, 0.30); // D, E, F
+uniform vec3 tone_uncharted_c = vec3(11.2, 2.0, 0.0); // W, ExposureBias, Unused
+vec3 Uncharted2Tonemap(vec3 x)
+{
+    float A = tone_uncharted_a.x;
+    float B = tone_uncharted_a.y;
+    float C = tone_uncharted_a.z;
+    float D = tone_uncharted_b.x;
+    float E = tone_uncharted_b.y;
+    float F = tone_uncharted_b.z;
+
+    return ((x*(A*x+C*B)+D*E)/(x*(A*x+B)+D*F))-E/F;
+}
+
+vec3 uncharted2(vec3 col) 
+{
+    float ExposureBias = tone_uncharted_c.y;
+    vec3 curr = Uncharted2Tonemap(ExposureBias*col);
+
+    vec3 whiteScale = vec3(1.0f)/Uncharted2Tonemap(vec3(tone_uncharted_c.x));
+    return curr*whiteScale;
+}
+#endif
 
 void main()
 {
@@ -154,6 +194,9 @@ void main()
 #elif TONEMAP_METHOD == 8 // Lottes 2016
     #define NEEDS_GAMMA_CORRECT 1
     diff.rgb = lottes(diff.rgb);
+#elif TONEMAP_METHOD == 9 // Uncharted
+    #define NEEDS_GAMMA_CORRECT 1
+    diff.rgb = uncharted2(diff.rgb);
 #else
     #define NEEDS_GAMMA_CORRECT 1
 #endif

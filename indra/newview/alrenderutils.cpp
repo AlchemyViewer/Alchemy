@@ -32,11 +32,34 @@
 #include "llvertexbuffer.h"
 
 #include "alcontrolcache.h"
+#include "llviewercontrol.h"
 #include "llviewershadermgr.h"
+#include "pipeline.h"
 
 const U32 ALRENDER_BUFFER_MASK = LLVertexBuffer::MAP_VERTEX | LLVertexBuffer::MAP_TEXCOORD0 | LLVertexBuffer::MAP_TEXCOORD1;
 
 static LLStaticHashedString al_exposure("exposure");
+static LLStaticHashedString tone_uchimura_a("tone_uchimura_a");
+static LLStaticHashedString tone_uchimura_b("tone_uchimura_b");
+static LLStaticHashedString tone_lottes_a("tone_lottes_a");
+static LLStaticHashedString tone_lottes_b("tone_lottes_b");
+static LLStaticHashedString tone_uncharted_a("tone_uncharted_a");
+static LLStaticHashedString tone_uncharted_b("tone_uncharted_b");
+static LLStaticHashedString tone_uncharted_c("tone_uncharted_c");
+
+ALRenderUtil::ALRenderUtil()
+{
+	// Connect settings
+	gSavedSettings.getControl("RenderToneMapType")->getSignal()->connect(boost::bind(&ALRenderUtil::setupTonemap, this));
+	gSavedSettings.getControl("RenderToneMapExposure")->getSignal()->connect(boost::bind(&ALRenderUtil::setupTonemap, this));
+	gSavedSettings.getControl("RenderToneMapLottesA")->getSignal()->connect(boost::bind(&ALRenderUtil::setupTonemap, this));
+	gSavedSettings.getControl("RenderToneMapLottesB")->getSignal()->connect(boost::bind(&ALRenderUtil::setupTonemap, this));
+	gSavedSettings.getControl("RenderToneMapUchimuraA")->getSignal()->connect(boost::bind(&ALRenderUtil::setupTonemap, this));
+	gSavedSettings.getControl("RenderToneMapUchimuraB")->getSignal()->connect(boost::bind(&ALRenderUtil::setupTonemap, this));
+
+	// Shader setup
+	refreshState();
+}
 
 void ALRenderUtil::restoreVertexBuffers()
 {
@@ -62,6 +85,39 @@ void ALRenderUtil::resetVertexBuffers()
 	mRenderBuffer = nullptr;
 }
 
+void ALRenderUtil::refreshState()
+{
+	setupTonemap();
+}
+
+bool ALRenderUtil::setupTonemap()
+{
+	if (LLPipeline::sRenderDeferred)
+	{
+		mTonemapType = gSavedSettings.getU32("RenderToneMapType");
+		if (mTonemapType >= TONEMAP_COUNT)
+		{
+			mTonemapType = ALTonemap::NONE;
+		}
+
+		mTonemapExposure = llclamp(gSavedSettings.getF32("RenderToneMapExposure"), 0.1f, 16.f);
+
+		mToneLottesParamA = gSavedSettings.getVector3("RenderToneMapLottesA");
+		mToneLottesParamB = gSavedSettings.getVector3("RenderToneMapLottesB");
+		mToneUchimuraParamA = gSavedSettings.getVector3("RenderToneMapUchimuraA");
+		mToneUchimuraParamB = gSavedSettings.getVector3("RenderToneMapUchimuraB");
+		mToneUnchartedParamA = gSavedSettings.getVector3("RenderToneMapUnchartedA");
+		mToneUnchartedParamB = gSavedSettings.getVector3("RenderToneMapUnchartedB");
+		mToneUnchartedParamC = gSavedSettings.getVector3("RenderToneMapUnchartedC");
+	}
+	else
+	{
+		mTonemapType = ALTonemap::NONE;
+		mTonemapExposure = 1.f;
+	}
+	return true;
+}
+
 void ALRenderUtil::renderTonemap(LLRenderTarget* src, LLRenderTarget* dst)
 {
 	gGL.matrixMode(LLRender::MM_PROJECTION);
@@ -74,58 +130,49 @@ void ALRenderUtil::renderTonemap(LLRenderTarget* src, LLRenderTarget* dst)
 	LLGLDepthTest depth(GL_FALSE, GL_FALSE);
 
 	dst->bindTarget();
-	LLGLSLShader* shader;
 
-	switch (ALControlCache::RenderToneMapType)
-	{
-	default:
-	case ALTonemap::NONE:
-		shader = &gPostTonemapProgram[NONE];
-		break;
-	case ALTonemap::LINEAR:
-		shader = &gPostTonemapProgram[LINEAR];
-		break;
-	case ALTonemap::REINHARD:
-		shader = &gPostTonemapProgram[REINHARD];
-		break;
-	case ALTonemap::REINHARD2:
-		shader = &gPostTonemapProgram[REINHARD2];
-		break;
-	case ALTonemap::FILMIC:
-		shader = &gPostTonemapProgram[FILMIC];
-		break;
-	case ALTonemap::UNREAL:
-		shader = &gPostTonemapProgram[UNREAL];
-		break;
-	case ALTonemap::ACES:
-		shader = &gPostTonemapProgram[ACES];
-		break;
-	case ALTonemap::UCHIMURA:
-		shader = &gPostTonemapProgram[UCHIMURA];
-		break;
-	case ALTonemap::LOTTES:
-		shader = &gPostTonemapProgram[LOTTES];
-		break;
-	}
+	LLGLSLShader* tone_shader = &gDeferredPostTonemapProgram[mTonemapType];
 
-	shader->bind();
+	tone_shader->bind();
 
-	S32 channel = shader->enableTexture(LLShaderMgr::DEFERRED_DIFFUSE, src->getUsage());
+	S32 channel = tone_shader->enableTexture(LLShaderMgr::DEFERRED_DIFFUSE, src->getUsage());
 	if (channel > -1)
 	{
 		src->bindTexture(0, channel, LLTexUnit::TFO_POINT);
 	}
-	shader->uniform2f(LLShaderMgr::DEFERRED_SCREEN_RES, dst->getWidth(), dst->getHeight());
+	tone_shader->uniform2f(LLShaderMgr::DEFERRED_SCREEN_RES, dst->getWidth(), dst->getHeight());
+	tone_shader->uniform1f(al_exposure, mTonemapExposure);
 
-
-	F32 exposure = llclamp(ALControlCache::RenderToneMapExposure, 0.1f, 8.f);
-	shader->uniform1f(al_exposure, exposure);
+	switch (mTonemapType)
+	{
+	default:
+		break;
+	case ALTonemap::UCHIMURA:
+	{
+		tone_shader->uniform3fv(tone_uchimura_a, 1, mToneUchimuraParamA.mV);
+		tone_shader->uniform3fv(tone_uchimura_b, 1, mToneUchimuraParamB.mV);
+		break;
+	}
+	case ALTonemap::LOTTES:
+	{
+		tone_shader->uniform3fv(tone_lottes_a, 1, mToneLottesParamA.mV);
+		tone_shader->uniform3fv(tone_lottes_b, 1, mToneLottesParamB.mV);
+		break;
+	}
+	case ALTonemap::UNCHARTED:
+	{
+		tone_shader->uniform3fv(tone_uncharted_a, 1, mToneUnchartedParamA.mV);
+		tone_shader->uniform3fv(tone_uncharted_b, 1, mToneUnchartedParamB.mV);
+		tone_shader->uniform3fv(tone_uncharted_c, 1, mToneUnchartedParamC.mV);
+		break;
+	}
+	}
 
 	mRenderBuffer->setBuffer(LLVertexBuffer::MAP_VERTEX);
 	mRenderBuffer->drawArrays(LLRender::TRIANGLES, 0, 3);
 	stop_glerror();
 
-	shader->unbind();
+	tone_shader->unbind();
 	dst->flush();
 
 	gGL.matrixMode(LLRender::MM_PROJECTION);

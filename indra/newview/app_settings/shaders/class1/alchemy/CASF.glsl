@@ -34,7 +34,7 @@ out vec4 frag_color;
 #define frag_color gl_FragColor
 #endif
 
-VARYING vec2 vary_texcoord0;
+VARYING vec2 vary_fragcoord;
 
 uniform sampler2D tex0;
 
@@ -65,18 +65,18 @@ void main()
     //  a b c
     //  d(e)f
     //  g h i
-    vec4 inputColor = texture2DLod(tex0, vary_texcoord0, 0.0f);
+    vec4 inputColor = texture2DLod(tex0, vary_fragcoord, 0.0f);
     float alpha = inputColor.a;
 
-    vec3 a = texture2DLodOffset(tex0, vary_texcoord0, 0.0f, ivec2(-1,-1)).rgb;
-    vec3 b = texture2DLodOffset(tex0, vary_texcoord0, 0.0f, ivec2( 0,-1)).rgb;
-    vec3 c = texture2DLodOffset(tex0, vary_texcoord0, 0.0f, ivec2( 1,-1)).rgb;
-    vec3 d = texture2DLodOffset(tex0, vary_texcoord0, 0.0f, ivec2(-1, 0)).rgb;
+    vec3 a = texture2DLodOffset(tex0, vary_fragcoord, 0.0f, ivec2(-1,-1)).rgb;
+    vec3 b = texture2DLodOffset(tex0, vary_fragcoord, 0.0f, ivec2( 0,-1)).rgb;
+    vec3 c = texture2DLodOffset(tex0, vary_fragcoord, 0.0f, ivec2( 1,-1)).rgb;
+    vec3 d = texture2DLodOffset(tex0, vary_fragcoord, 0.0f, ivec2(-1, 0)).rgb;
     vec3 e = inputColor.rgb;
-    vec3 f = texture2DLodOffset(tex0, vary_texcoord0, 0.0f, ivec2( 1, 0)).rgb;
-    vec3 g = texture2DLodOffset(tex0, vary_texcoord0, 0.0f, ivec2(-1, 1)).rgb;
-    vec3 h = texture2DLodOffset(tex0, vary_texcoord0, 0.0f, ivec2( 0, 1)).rgb;
-    vec3 i = texture2DLodOffset(tex0, vary_texcoord0, 0.0f, ivec2( 1, 1)).rgb;
+    vec3 f = texture2DLodOffset(tex0, vary_fragcoord, 0.0f, ivec2( 1, 0)).rgb;
+    vec3 g = texture2DLodOffset(tex0, vary_fragcoord, 0.0f, ivec2(-1, 1)).rgb;
+    vec3 h = texture2DLodOffset(tex0, vary_fragcoord, 0.0f, ivec2( 0, 1)).rgb;
+    vec3 i = texture2DLodOffset(tex0, vary_fragcoord, 0.0f, ivec2( 1, 1)).rgb;
 
     // Soft min and max.
     //  a b c             b

@@ -261,10 +261,6 @@ extern LLGLSLShader			gWLMoonProgram;
 // Post Process Shaders
 extern LLGLSLShader			gPostColorFilterProgram;
 extern LLGLSLShader			gPostNightVisionProgram;
-extern LLGLSLShader         gPostSRGBToLinearProgram;
-extern LLGLSLShader         gPostLinearToSRGBProgram;
-extern LLGLSLShader         gPostCASProgram;
-extern LLGLSLShader			gPostTonemapProgram[AL_TONEMAP_COUNT];
 
 extern LLGLSLShader         gPostSMAAEdgeDetect[4];
 extern LLGLSLShader         gPostSMAABlendWeights[4];
@@ -334,6 +330,8 @@ extern LLGLSLShader			gDeferredFullbrightShinyProgram;
 extern LLGLSLShader			gDeferredSkinnedFullbrightShinyProgram;
 extern LLGLSLShader			gDeferredSkinnedFullbrightProgram;
 extern LLGLSLShader			gNormalMapGenProgram;
+extern LLGLSLShader         gDeferredPostCASProgram;
+extern LLGLSLShader			gDeferredPostTonemapProgram[AL_TONEMAP_COUNT];
 // [RLVa:KB] - @setsphere
 extern LLGLSLShader			gRlvSphereProgram;
 // [/RLVa:KB]

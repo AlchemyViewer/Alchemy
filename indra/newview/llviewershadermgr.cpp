@@ -176,10 +176,6 @@ LLGLSLShader			gGlowProgram;
 LLGLSLShader			gGlowExtractProgram;
 LLGLSLShader			gPostColorFilterProgram;
 LLGLSLShader			gPostNightVisionProgram;
-LLGLSLShader		    gPostSRGBToLinearProgram;
-LLGLSLShader			gPostLinearToSRGBProgram;
-LLGLSLShader            gPostCASProgram;
-LLGLSLShader			gPostTonemapProgram[AL_TONEMAP_COUNT];
 LLGLSLShader            gPostSMAAEdgeDetect[4];
 LLGLSLShader            gPostSMAABlendWeights[4];
 LLGLSLShader            gPostSMAANeighborhoodBlend[4];
@@ -248,6 +244,8 @@ LLGLSLShader			gDeferredFullbrightShinyProgram;
 LLGLSLShader			gDeferredSkinnedFullbrightShinyProgram;
 LLGLSLShader			gDeferredSkinnedFullbrightProgram;
 LLGLSLShader			gNormalMapGenProgram;
+LLGLSLShader            gDeferredPostCASProgram;
+LLGLSLShader			gDeferredPostTonemapProgram[AL_TONEMAP_COUNT];
 // [RLVa:KB] - @setsphere
 LLGLSLShader			gRlvSphereProgram;
 // [/RLVa:KB]
@@ -822,13 +820,6 @@ void LLViewerShaderMgr::unloadShaders()
 
 	gPostColorFilterProgram.unload();
 	gPostNightVisionProgram.unload();
-    gPostSRGBToLinearProgram.unload();
-    gPostLinearToSRGBProgram.unload();
-    gPostCASProgram.unload();
-	for (U32 i = 0; i < AL_TONEMAP_COUNT; ++i)
-	{
-		gPostTonemapProgram[i].unload();
-	}
 
 	gDeferredDiffuseProgram.unload();
 	gDeferredDiffuseAlphaMaskProgram.unload();
@@ -839,6 +830,12 @@ void LLViewerShaderMgr::unloadShaders()
 	gDeferredSkinnedBumpProgram.unload();
 	gDeferredSkinnedAlphaProgram.unload();
 	gDeferredSkinnedAlphaWaterProgram.unload();
+
+	gDeferredPostCASProgram.unload();
+	for (U32 i = 0; i < AL_TONEMAP_COUNT; ++i)
+	{
+		gDeferredPostTonemapProgram[i].unload();
+	}
 
 	mShaderLevel[SHADER_LIGHTING] = 0;
 	mShaderLevel[SHADER_OBJECT] = 0;
@@ -1174,13 +1171,6 @@ BOOL LLViewerShaderMgr::loadShadersEffects()
 		gGlowExtractProgram.unload();
 		gPostColorFilterProgram.unload();	
 		gPostNightVisionProgram.unload();
-        gPostSRGBToLinearProgram.unload();
-        gPostLinearToSRGBProgram.unload();
-        gPostCASProgram.unload();
-		for (U32 i = 0; i < AL_TONEMAP_COUNT; ++i)
-		{
-			gPostTonemapProgram[i].unload();
-		}
 		return TRUE;
 	}
 
@@ -1209,57 +1199,6 @@ BOOL LLViewerShaderMgr::loadShadersEffects()
 		if (!success)
 		{
 			LLPipeline::sRenderGlow = FALSE;
-		}
-	}
-
-	if (success)
-    {
-        gPostLinearToSRGBProgram.mName = "Linear To SRGB Shader";
-        gPostLinearToSRGBProgram.mFeatures.hasSrgb = true;
-        gPostLinearToSRGBProgram.mShaderFiles.clear();
-        gPostLinearToSRGBProgram.mShaderFiles.push_back(make_pair("effects/postNoTCV.glsl", GL_VERTEX_SHADER));
-        gPostLinearToSRGBProgram.mShaderFiles.push_back(make_pair("effects/linearToSRGBF.glsl", GL_FRAGMENT_SHADER));
-        gPostLinearToSRGBProgram.mShaderLevel = mShaderLevel[SHADER_EFFECT];
-        success = gPostLinearToSRGBProgram.createShader(NULL, NULL);
-    }
-
-	if (success)
-    {
-        gPostSRGBToLinearProgram.mName = "SRGB To Linear Shader";
-        gPostSRGBToLinearProgram.mFeatures.hasSrgb = true;
-        gPostSRGBToLinearProgram.mShaderFiles.clear();
-        gPostSRGBToLinearProgram.mShaderFiles.push_back(make_pair("effects/postNoTCV.glsl", GL_VERTEX_SHADER));
-        gPostSRGBToLinearProgram.mShaderFiles.push_back(make_pair("effects/SRGBToLinearF.glsl", GL_FRAGMENT_SHADER));
-        gPostSRGBToLinearProgram.mShaderLevel = mShaderLevel[SHADER_EFFECT];
-        success = gPostSRGBToLinearProgram.createShader(NULL, NULL);
-    }
-
-	if (success)
-    {
-        gPostCASProgram.mName = "Contrast Adaptive Sharpen Shader";
-        gPostCASProgram.mFeatures.hasSrgb = true;
-        gPostCASProgram.mShaderFiles.clear();
-        gPostCASProgram.mShaderFiles.push_back(make_pair("effects/postNoTCV.glsl", GL_VERTEX_SHADER));
-        gPostCASProgram.mShaderFiles.push_back(make_pair("effects/CASF.glsl", GL_FRAGMENT_SHADER));
-        gPostCASProgram.mShaderLevel = mShaderLevel[SHADER_EFFECT];
-        success = gPostCASProgram.createShader(NULL, NULL);
-    }
-
-	for (U32 i = 0; i < AL_TONEMAP_COUNT; ++i)
-	{
-		if (success)
-		{
-			gPostTonemapProgram[i].mName = "Tonemapping Shader " + std::to_string(i);
-			gPostTonemapProgram[i].mFeatures.hasSrgb = true;
-			gPostTonemapProgram[i].mShaderFiles.clear();
-			gPostTonemapProgram[i].mShaderFiles.push_back(make_pair("alchemy/postNoTCV.glsl", GL_VERTEX_SHADER));
-			gPostTonemapProgram[i].mShaderFiles.push_back(make_pair("alchemy/toneMapF.glsl", GL_FRAGMENT_SHADER));
-			gPostTonemapProgram[i].mShaderLevel = mShaderLevel[SHADER_EFFECT];
-
-			gPostTonemapProgram[i].clearPermutations();
-			gPostTonemapProgram[i].addPermutation("TONEMAP_METHOD", std::to_string(i));
-
-			success = gPostTonemapProgram[i].createShader(NULL, NULL);
 		}
 	}
 
@@ -1355,6 +1294,12 @@ BOOL LLViewerShaderMgr::loadShadersDeferred()
 		{
 			gDeferredMaterialProgram[i].unload();
 			gDeferredMaterialWaterProgram[i].unload();
+		}
+
+		gDeferredPostCASProgram.unload();
+		for (U32 i = 0; i < AL_TONEMAP_COUNT; ++i)
+		{
+			gDeferredPostTonemapProgram[i].unload();
 		}
 		return TRUE;
 	}
@@ -3023,6 +2968,35 @@ BOOL LLViewerShaderMgr::loadShadersDeferred()
 		gNormalMapGenProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
 		gNormalMapGenProgram.mShaderGroup = LLGLSLShader::SG_SKY;
 		success = gNormalMapGenProgram.createShader(NULL, NULL);
+	}
+
+	if (success)
+	{
+		gDeferredPostCASProgram.mName = "Contrast Adaptive Sharpen Shader";
+		gDeferredPostCASProgram.mFeatures.hasSrgb = true;
+		gDeferredPostCASProgram.mShaderFiles.clear();
+		gDeferredPostCASProgram.mShaderFiles.push_back(make_pair("alchemy/postNoTCV.glsl", GL_VERTEX_SHADER));
+		gDeferredPostCASProgram.mShaderFiles.push_back(make_pair("alchemy/CASF.glsl", GL_FRAGMENT_SHADER));
+		gDeferredPostCASProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
+		success = gDeferredPostCASProgram.createShader(NULL, NULL);
+	}
+
+	for (U32 i = 0; i < AL_TONEMAP_COUNT; ++i)
+	{
+		if (success)
+		{
+			gDeferredPostTonemapProgram[i].mName = "Tonemapping Shader " + std::to_string(i);
+			gDeferredPostTonemapProgram[i].mFeatures.hasSrgb = true;
+			gDeferredPostTonemapProgram[i].mShaderFiles.clear();
+			gDeferredPostTonemapProgram[i].mShaderFiles.push_back(make_pair("alchemy/postNoTCV.glsl", GL_VERTEX_SHADER));
+			gDeferredPostTonemapProgram[i].mShaderFiles.push_back(make_pair("alchemy/toneMapF.glsl", GL_FRAGMENT_SHADER));
+			gDeferredPostTonemapProgram[i].mShaderLevel = mShaderLevel[SHADER_DEFERRED];
+
+			gDeferredPostTonemapProgram[i].clearPermutations();
+			gDeferredPostTonemapProgram[i].addPermutation("TONEMAP_METHOD", std::to_string(i));
+
+			success = gDeferredPostTonemapProgram[i].createShader(NULL, NULL);
+		}
 	}
 
 	return success;

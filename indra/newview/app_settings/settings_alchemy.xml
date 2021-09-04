@@ -695,17 +695,6 @@
       <key>Value</key>
       <real>0.275</real>
     </map>
-    <key>RenderToneMapType</key>
-    <map>
-      <key>Comment</key>
-      <string>Tonemapping type 0 - None, 1 - Linear, 2 - Reinhard, 3 - Reinhard2, 4 - Filmic, 5 - Unreal, 6 - ACES, 7 - Uchimura, 8 - Lottes</string>
-      <key>Persist</key>
-      <integer>1</integer>
-      <key>Type</key>
-      <string>U32</string>
-      <key>Value</key>
-      <integer>0</integer>
-    </map>
     <key>RenderToneMapExposure</key>
     <map>
       <key>Comment</key>
@@ -716,6 +705,122 @@
       <string>F32</string>
       <key>Value</key>
       <real>1.0</real>
+    </map>
+    <key>RenderToneMapLottesA</key>
+    <map>
+      <key>Comment</key>
+      <string>x (a), y (d), z (hdrMax)</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Vector3</string>
+      <key>Value</key>
+      <array>
+        <real>1.6</real>
+        <real>0.977</real>
+        <real>8.0</real>
+      </array>
+    </map>
+    <key>RenderToneMapLottesB</key>
+    <map>
+      <key>Comment</key>
+      <string>x (midIn), y (black), z (UNUSED)</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Vector3</string>
+      <key>Value</key>
+      <array>
+        <real>0.18</real>
+        <real>0.267</real>
+        <real>0.0</real>
+      </array>
+    </map>
+    <key>RenderToneMapType</key>
+    <map>
+      <key>Comment</key>
+      <string>Tonemapping type 0 - None, 1 - Linear, 2 - Reinhard, 3 - Reinhard2, 4 - Filmic, 5 - Unreal, 6 - ACES, 7 - Uchimura, 8 - Lottes, 9 - Uncharted</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>U32</string>
+      <key>Value</key>
+      <integer>0</integer>
+    </map>
+    <key>RenderToneMapUchimuraA</key>
+    <map>
+      <key>Comment</key>
+      <string>x (max display brightness), y (contrast), z (linear section start)</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Vector3</string>
+      <key>Value</key>
+      <array>
+        <real>1.0</real>
+        <real>1.0</real>
+        <real>0.22</real>
+      </array>
+    </map>
+    <key>RenderToneMapUchimuraB</key>
+    <map>
+      <key>Comment</key>
+      <string>x (linear section length), y (black), z (pedestal)</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Vector3</string>
+      <key>Value</key>
+      <array>
+        <real>0.4</real>
+        <real>1.33</real>
+        <real>0.0</real>
+      </array>
+    </map>
+    <key>RenderToneMapUnchartedA</key>
+    <map>
+      <key>Comment</key>
+      <string>A, B, C</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Vector3</string>
+      <key>Value</key>
+      <array>
+        <real>0.15</real>
+        <real>0.50</real>
+        <real>0.10</real>
+      </array>
+    </map>
+    <key>RenderToneMapUnchartedB</key>
+    <map>
+      <key>Comment</key>
+      <string>D, E, F</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Vector3</string>
+      <key>Value</key>
+      <array>
+        <real>0.20</real>
+        <real>0.02</real>
+        <real>0.20</real>
+      </array>
+    </map>
+    <key>RenderToneMapUnchartedC</key>
+    <map>
+      <key>Comment</key>
+      <string>W, ExposureBias, UNUSED</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Vector3</string>
+      <key>Value</key>
+      <array>
+        <real>11.2</real>
+        <real>2.0</real>
+        <real>0.0</real>
+      </array>
     </map>
     <key>ResetUserColorsOnLogout</key>
     <map>

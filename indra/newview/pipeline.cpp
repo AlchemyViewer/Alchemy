@@ -465,6 +465,7 @@ void LLPipeline::init()
 {
 	refreshCachedSettings();
 
+	// Initialize Alchemy render stack
 	mALRenderUtil = std::make_unique<ALRenderUtil>();
 
 	gOctreeMaxCapacity = gSavedSettings.getU32("OctreeMaxNodeCapacity");
@@ -1153,6 +1154,11 @@ void LLPipeline::updateRenderDeferred()
 		LLPipeline::sUseDepthTexture = true;
 	}
 // [/RLVa:KB]
+
+	if (gPipeline.mALRenderUtil)
+	{
+		gPipeline.mALRenderUtil->refreshState();
+	}
 }
 
 // static
@@ -8408,7 +8414,7 @@ void LLPipeline::renderFinalize()
 				LLRenderTarget* previous_target = bound_target;
 
 				// Bind setup:
-                bound_shader = &gPostCASProgram;
+                bound_shader = &gDeferredPostCASProgram;
 
 				// Draw
                 previous_target->bindTexture(0, 0, LLTexUnit::TFO_POINT);
