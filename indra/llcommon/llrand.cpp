@@ -29,13 +29,22 @@
 #include "llrand.h"
 #include "lluuid.h"
 
-#include <absl/random/bit_gen_ref.h>
-#include <absl/random/random.h>
+#include <boost/random/lagged_fibonacci.hpp>
 
-static absl::BitGenRef tls_bit_gen()
+static boost::lagged_fibonacci2281 gRandomGenerator(LLUUID::getRandomSeed());
+inline F64 ll_internal_random_double()
 {
-	thread_local static absl::BitGen tlsBitGen;
-	return tlsBitGen;
+	F64 rv = gRandomGenerator();
+	if(!((rv >= 0.0) && (rv < 1.0))) return fmod(rv, 1.0);
+	return rv;
+}
+
+inline F32 ll_internal_random_float()
+{
+	// The clamping rules are described above.
+	F32 rv = (F32)gRandomGenerator();
+	if(!((rv >= 0.0f) && (rv < 1.0f))) return fmod(rv, 1.f);
+	return rv;
 }
 
 S32 ll_rand()
@@ -45,25 +54,47 @@ S32 ll_rand()
 
 S32 ll_rand(S32 val)
 {
-	return absl::Uniform<S32>(absl::IntervalClosedOpen, tls_bit_gen(), 0, val);
+	S32 rv = (S32)(ll_internal_random_double() * val);
+	if(rv == val) return 0;
+	return rv;
 }
 
 F32 ll_frand()
 {
-	return absl::Uniform<float>(absl::IntervalClosedOpen, tls_bit_gen(), 0.f, 1.f);
+	return ll_internal_random_float();
 }
 
 F32 ll_frand(F32 val)
 {
-	return absl::Uniform<float>(absl::IntervalClosedOpen, tls_bit_gen(), 0.f, val);
+	// The clamping rules are described above.
+	F32 rv = ll_internal_random_float() * val;
+	if(val > 0)
+	{
+		if(rv >= val) return 0.0f;
+	}
+	else
+	{
+		if(rv <= val) return 0.0f;
+	}
+	return rv;
 }
 
 F64 ll_drand()
 {
-	return absl::Uniform<double>(absl::IntervalClosedOpen, tls_bit_gen(), 0.0, 1.0);
+	return ll_internal_random_double();
 }
 
 F64 ll_drand(F64 val)
 {
-	return absl::Uniform<double>(absl::IntervalClosedOpen, tls_bit_gen(), 0.0, val);
+	// The clamping rules are described above.
+	F64 rv = ll_internal_random_double() * val;
+	if(val > 0)
+	{
+		if(rv >= val) return 0.0;
+	}
+	else
+	{
+		if(rv <= val) return 0.0;
+	}
+	return rv;
 }
