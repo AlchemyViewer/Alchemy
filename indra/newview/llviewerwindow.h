@@ -136,7 +136,7 @@ private:
 
 };
 
-static const U32 MAX_SNAPSHOT_IMAGE_SIZE = 7680; // max snapshot image size 7680 * 7680 UHDTV2
+static const U32 MAX_SNAPSHOT_IMAGE_SIZE = 15360; // Anything bigger would require TBs of (video) RAM and 64bit code
 
 class LLViewerWindow final : public LLWindowCallbacks
 {

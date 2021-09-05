@@ -645,18 +645,19 @@ LLViewerTexture* LLSnapshotLivePreview::getBigThumbnailImage()
 //static 
 BOOL LLSnapshotLivePreview::onIdle( void* snapshot_preview )
 {
+	BOOL success = FALSE;
 	LLSnapshotLivePreview* previewp = (LLSnapshotLivePreview*)snapshot_preview;
 	if (previewp->getWidth() == 0 || previewp->getHeight() == 0)
 	{
 		LL_WARNS("Snapshot") << "Incorrect dimensions: " << previewp->getWidth() << "x" << previewp->getHeight() << LL_ENDL;
-		return FALSE;
+		return success;
 	}
 
 	if (previewp->mSnapshotDelayTimer.getStarted()) // Wait for a snapshot delay timer
 	{
 		if (!previewp->mSnapshotDelayTimer.hasExpired())
 		{
-			return FALSE;
+			return success;
 		}
 		previewp->mSnapshotDelayTimer.stop();
 	}
@@ -664,7 +665,7 @@ BOOL LLSnapshotLivePreview::onIdle( void* snapshot_preview )
 	if (LLToolCamera::getInstance()->hasMouseCapture()) // Hide full-screen preview while camming, either don't take snapshots while ALT-zoom active
 	{
 		previewp->setVisible(FALSE);
-		return FALSE;
+		return success;
 	}
 
 	// If we're in freeze-frame and/or auto update mode and camera has moved, update snapshot.
@@ -689,9 +690,12 @@ BOOL LLSnapshotLivePreview::onIdle( void* snapshot_preview )
 
 	if (previewp->getSnapshotUpToDate() && previewp->getThumbnailUpToDate())
 	{
-		return FALSE;
+		return success;
 	}
 
+	auto last_image = previewp->mFormattedImage;
+	auto last_preview = previewp->mPreviewImage;
+	auto last_preview_encoded = previewp->mPreviewImageEncoded;
 	// time to produce a snapshot
 	if(!previewp->getSnapshotUpToDate())
     {
@@ -710,7 +714,7 @@ BOOL LLSnapshotLivePreview::onIdle( void* snapshot_preview )
         previewp->setImageScaled(FALSE);
 
         // grab the raw image
-        if (gViewerWindow->rawSnapshot(
+		success = gViewerWindow->rawSnapshot(
                 previewp->mPreviewImage,
                 previewp->getWidth(),
                 previewp->getHeight(),
@@ -720,7 +724,8 @@ BOOL LLSnapshotLivePreview::onIdle( void* snapshot_preview )
                 gSavedSettings.getBOOL("RenderHUDInSnapshot"),
                 FALSE,
                 previewp->mSnapshotBufferType,
-                previewp->getMaxImageSize()))
+                previewp->getMaxImageSize());
+        if (success)
         {
             // Invalidate/delete any existing encoded image
             previewp->mPreviewImageEncoded = NULL;
@@ -740,26 +745,39 @@ BOOL LLSnapshotLivePreview::onIdle( void* snapshot_preview )
         
             // We need to update the thumbnail though
             previewp->setThumbnailImageSize();
-            previewp->generateThumbnailImage(TRUE) ;
+
+       		previewp->generateThumbnailImage(TRUE) ;
+			previewp->getWindow()->decBusyCount();
+        	previewp->setVisible(gSavedSettings.getBOOL("UseFreezeFrame") && previewp->mAllowFullScreenPreview); // only show fullscreen preview when in freeze frame mode
+	        previewp->mSnapshotActive = FALSE;
+        	LL_DEBUGS("Snapshot") << "done creating snapshot" << LL_ENDL;
         }
-        previewp->getWindow()->decBusyCount();
-        previewp->setVisible(gSavedSettings.getBOOL("UseFreezeFrame") && previewp->mAllowFullScreenPreview); // only show fullscreen preview when in freeze frame mode
-        previewp->mSnapshotActive = FALSE;
-        LL_DEBUGS("Snapshot") << "done creating snapshot" << LL_ENDL;
+		else
+		{
+			LL_WARNS() << "Failed creating snapshot" << LL_ENDL;
+			previewp->mSnapshotDelayTimer.stop();
+
+        	// previewp->setVisible(gSavedSettings.getBOOL("UseFreezeFrame") && previewp->mAllowFullScreenPreview); // only show fullscreen preview when in freeze frame mode
+			// Restore the old data
+            previewp->mSnapshotActive = FALSE;
+			previewp->mThumbnailUpdateLock = FALSE;
+			previewp->mSnapshotUpToDate = TRUE;
+			previewp->mThumbnailUpToDate = TRUE;
+            previewp->mFormattedImage = last_image;
+			previewp->mPreviewImageEncoded = last_preview;
+			previewp->mPreviewImageEncoded = last_preview_encoded;
+			previewp->generateThumbnailImage(FALSE);
+            previewp->getWindow()->decBusyCount();
+			gPipeline.doResetVertexBuffers(true);
+		}
     }
-    
-    if (!previewp->getThumbnailUpToDate())
-	{
-		previewp->generateThumbnailImage() ;
-	}
-    
     // Tell the floater container that the snapshot is updated now
     if (previewp->mViewContainer)
     {
         previewp->mViewContainer->notify(LLSD().with("snapshot-updated", true));
     }
 
-	return TRUE;
+	return success;
 }
 
 void LLSnapshotLivePreview::prepareFreezeFrame()
