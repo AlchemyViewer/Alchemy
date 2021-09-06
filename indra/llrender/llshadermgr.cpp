@@ -1413,6 +1413,10 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("sun_up_factor");
     mReservedUniforms.push_back("moonlight_color");
 
+	// Alchemy
+	mReservedUniforms.push_back("colorgrade_lut");
+	mReservedUniforms.push_back("colorgrade_lut_size");
+
 	llassert(mReservedUniforms.size() == END_RESERVED_UNIFORMS);
 
 	std::set<std::string> dupe_check;

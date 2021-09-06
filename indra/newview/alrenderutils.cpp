@@ -28,6 +28,9 @@
 
 #include "alrenderutils.h"
 
+#include "llimagepng.h"
+#include "llimagetga.h"
+#include "llimagewebp.h"
 #include "llrendertarget.h"
 #include "llvertexbuffer.h"
 
@@ -50,6 +53,7 @@ static LLStaticHashedString tone_uncharted_c("tone_uncharted_c");
 ALRenderUtil::ALRenderUtil()
 {
 	// Connect settings
+	gSavedSettings.getControl("RenderColorGradeLUT")->getSignal()->connect(boost::bind(&ALRenderUtil::setupColorGrade, this));
 	gSavedSettings.getControl("RenderToneMapType")->getSignal()->connect(boost::bind(&ALRenderUtil::setupTonemap, this));
 	gSavedSettings.getControl("RenderToneMapExposure")->getSignal()->connect(boost::bind(&ALRenderUtil::setupTonemap, this));
 	gSavedSettings.getControl("RenderToneMapLottesA")->getSignal()->connect(boost::bind(&ALRenderUtil::setupTonemap, this));
@@ -85,9 +89,19 @@ void ALRenderUtil::resetVertexBuffers()
 	mRenderBuffer = nullptr;
 }
 
+void ALRenderUtil::releaseGLBuffers()
+{
+	if (mCGLut)
+	{
+		LLImageGL::deleteTextures(1, &mCGLut);
+		mCGLut = 0;
+	}
+}
+
 void ALRenderUtil::refreshState()
 {
 	setupTonemap();
+	setupColorGrade();
 }
 
 bool ALRenderUtil::setupTonemap()
@@ -131,7 +145,7 @@ void ALRenderUtil::renderTonemap(LLRenderTarget* src, LLRenderTarget* dst)
 
 	dst->bindTarget();
 
-	LLGLSLShader* tone_shader = &gDeferredPostTonemapProgram[mTonemapType];
+	LLGLSLShader* tone_shader = (mCGLut != 0 ) ? &gDeferredPostColorGradeLUTProgram[mTonemapType] : &gDeferredPostTonemapProgram[mTonemapType];
 
 	tone_shader->bind();
 
@@ -168,6 +182,19 @@ void ALRenderUtil::renderTonemap(LLRenderTarget* src, LLRenderTarget* dst)
 	}
 	}
 
+	if (mCGLut != 0)
+	{
+		S32 channel = tone_shader->enableTexture(LLShaderMgr::COLORGRADE_LUT, LLTexUnit::TT_TEXTURE);
+		if (channel > -1)
+		{
+			gGL.getTexUnit(channel)->bindManual(LLTexUnit::TT_TEXTURE, mCGLut);
+			gGL.getTexUnit(channel)->setTextureFilteringOption(LLTexUnit::TFO_BILINEAR);
+			gGL.getTexUnit(channel)->setTextureAddressMode(LLTexUnit::TAM_CLAMP);
+		}
+
+		tone_shader->uniform4fv(LLShaderMgr::COLORGRADE_LUT_SIZE, 1, mCGLutSize.mV);
+	}
+
 	mRenderBuffer->setBuffer(LLVertexBuffer::MAP_VERTEX);
 	mRenderBuffer->drawArrays(LLRender::TRIANGLES, 0, 3);
 	stop_glerror();
@@ -179,4 +206,121 @@ void ALRenderUtil::renderTonemap(LLRenderTarget* src, LLRenderTarget* dst)
 	gGL.popMatrix();
 	gGL.matrixMode(LLRender::MM_MODELVIEW);
 	gGL.popMatrix();
+}
+
+bool ALRenderUtil::setupColorGrade()
+{
+	if (mCGLut)
+	{
+		LLImageGL::deleteTextures(1, &mCGLut);
+		mCGLut = 0;
+	}
+
+	std::string lut_name = gSavedSettings.getString("RenderColorGradeLUT");
+	if (!lut_name.empty())
+	{
+		enum class ELutExt
+		{
+			EXT_IMG_TGA = 0,
+			EXT_IMG_PNG,
+			EXT_IMG_WEBP,
+			EXT_NONE
+		};
+		std::string lut_path = gDirUtilp->getExpandedFilename(LL_PATH_APP_SETTINGS, "colorlut", lut_name);
+		if (!lut_path.empty())
+		{
+			std::string temp_exten = gDirUtilp->getExtension(lut_path);
+
+			ELutExt extension = ELutExt::EXT_NONE;
+			if (temp_exten == "tga")
+			{
+				extension = ELutExt::EXT_IMG_TGA;
+			}
+			else if (temp_exten == "png")
+			{
+				extension = ELutExt::EXT_IMG_PNG;
+			}
+			else if (temp_exten == "webp")
+			{
+				extension = ELutExt::EXT_IMG_WEBP;
+			}
+
+			LLPointer<LLImageRaw> raw_image = new LLImageRaw;
+			bool decode_success = false;
+
+			switch (extension)
+			{
+			default:
+				break;
+			case ELutExt::EXT_IMG_TGA:
+			{
+				LLPointer<LLImageTGA> tga_image = new LLImageTGA;
+				if (tga_image->load(lut_path) && tga_image->decode(raw_image, 0.0f))
+				{
+					decode_success = true;
+				}
+				break;
+			}
+			case ELutExt::EXT_IMG_PNG:
+			{
+				LLPointer<LLImagePNG> png_image = new LLImagePNG;
+				if (png_image->load(lut_path) && png_image->decode(raw_image, 0.0f))
+				{
+					decode_success = true;
+				}
+				break;
+			}
+			case ELutExt::EXT_IMG_WEBP:
+			{
+				LLPointer<LLImageWebP> webp_image = new LLImageWebP;
+				if (webp_image->load(lut_path) && webp_image->decode(raw_image, 0.0f))
+				{
+					decode_success = true;
+				}
+				break;
+			}
+			}
+
+			if(decode_success)
+			{
+				U32 primary_format = 0;
+				U32 int_format = 0;
+				switch (raw_image->getComponents())
+				{
+				case 3:
+				{
+					primary_format = GL_RGB;
+					int_format = GL_RGB8;
+					break;
+				}
+				case 4:
+				{
+					primary_format = GL_RGBA;
+					int_format = GL_RGBA8;
+					break;
+				}
+				default:
+					return true;
+				};
+
+				S32 image_height = raw_image->getHeight();
+				S32 image_width = raw_image->getWidth();
+				if ((image_height > 0 && image_height <= 64)	   // within dimension limit
+				&& !(image_height & (image_height - 1))			   // height is power of 2
+				&& ((image_height * image_height) == image_width)) // width is height * height
+				{
+					mCGLutSize = LLVector4(1.f / image_width, 1.f / image_height, (F32)image_width, (F32)image_height);
+
+					LLImageGL::generateTextures(1, &mCGLut);
+					gGL.getTexUnit(0)->bindManual(LLTexUnit::TT_TEXTURE, mCGLut);
+					LLImageGL::setManualImage(LLTexUnit::getInternalType(LLTexUnit::TT_TEXTURE), 0, int_format, image_width,
+						image_height, primary_format, GL_UNSIGNED_BYTE, raw_image->getData(), false);
+					stop_glerror();
+					gGL.getTexUnit(0)->setTextureFilteringOption(LLTexUnit::TFO_BILINEAR);
+					gGL.getTexUnit(0)->setTextureAddressMode(LLTexUnit::TAM_CLAMP);
+				}
+			}
+		}
+	}
+	return true;
 }

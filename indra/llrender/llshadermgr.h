@@ -257,6 +257,8 @@ public:
         WATER_EDGE_FACTOR,                  //  "water_edge"
         SUN_UP_FACTOR,                      //  "sun_up_factor"
         MOONLIGHT_COLOR,                    //  "moonlight_color"
+        COLORGRADE_LUT,                     //  "colorgrade_lut"
+        COLORGRADE_LUT_SIZE,                //  "colorgrade_lut_size"
         END_RESERVED_UNIFORMS
     } eGLSLReservedUniforms;
     // clang-format on

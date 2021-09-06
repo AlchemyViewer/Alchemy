@@ -1294,6 +1294,8 @@ void LLPipeline::releaseGLBuffers()
         mSampleMap = 0;
     }
 
+	mALRenderUtil->releaseGLBuffers();
+
 	releaseLUTBuffers();
 
 	mWaterRef.release();

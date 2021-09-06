@@ -246,6 +246,7 @@ LLGLSLShader			gDeferredSkinnedFullbrightProgram;
 LLGLSLShader			gNormalMapGenProgram;
 LLGLSLShader            gDeferredPostCASProgram;
 LLGLSLShader			gDeferredPostTonemapProgram[AL_TONEMAP_COUNT];
+LLGLSLShader			gDeferredPostColorGradeLUTProgram[AL_TONEMAP_COUNT];
 // [RLVa:KB] - @setsphere
 LLGLSLShader			gRlvSphereProgram;
 // [/RLVa:KB]
@@ -835,6 +836,7 @@ void LLViewerShaderMgr::unloadShaders()
 	for (U32 i = 0; i < AL_TONEMAP_COUNT; ++i)
 	{
 		gDeferredPostTonemapProgram[i].unload();
+		gDeferredPostColorGradeLUTProgram[i].unload();
 	}
 
 	mShaderLevel[SHADER_LIGHTING] = 0;
@@ -1300,6 +1302,7 @@ BOOL LLViewerShaderMgr::loadShadersDeferred()
 		for (U32 i = 0; i < AL_TONEMAP_COUNT; ++i)
 		{
 			gDeferredPostTonemapProgram[i].unload();
+			gDeferredPostColorGradeLUTProgram[i].unload();
 		}
 		return TRUE;
 	}
@@ -2996,6 +2999,22 @@ BOOL LLViewerShaderMgr::loadShadersDeferred()
 			gDeferredPostTonemapProgram[i].addPermutation("TONEMAP_METHOD", std::to_string(i));
 
 			success = gDeferredPostTonemapProgram[i].createShader(NULL, NULL);
+		}
+
+		if (success)
+		{
+			gDeferredPostColorGradeLUTProgram[i].mName = "Color Grading Shader " + std::to_string(i);
+			gDeferredPostColorGradeLUTProgram[i].mFeatures.hasSrgb = true;
+			gDeferredPostColorGradeLUTProgram[i].mShaderFiles.clear();
+			gDeferredPostColorGradeLUTProgram[i].mShaderFiles.push_back(make_pair("alchemy/postNoTCV.glsl", GL_VERTEX_SHADER));
+			gDeferredPostColorGradeLUTProgram[i].mShaderFiles.push_back(make_pair("alchemy/toneMapF.glsl", GL_FRAGMENT_SHADER));
+			gDeferredPostColorGradeLUTProgram[i].mShaderLevel = mShaderLevel[SHADER_DEFERRED];
+
+			gDeferredPostColorGradeLUTProgram[i].clearPermutations();
+			gDeferredPostColorGradeLUTProgram[i].addPermutation("COLOR_GRADE_LUT", std::to_string(1));
+			gDeferredPostColorGradeLUTProgram[i].addPermutation("TONEMAP_METHOD", std::to_string(i));
+
+			success = gDeferredPostColorGradeLUTProgram[i].createShader(NULL, NULL);
 		}
 	}
 

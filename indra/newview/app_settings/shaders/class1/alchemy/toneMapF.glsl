@@ -37,6 +37,11 @@ uniform sampler2DRect diffuseRect;
 uniform vec2 screen_res;
 uniform float exposure;
 
+#if COLOR_GRADE_LUT
+uniform sampler2D colorgrade_lut;
+uniform vec4 colorgrade_lut_size;
+#endif
+
 vec3 linear_to_srgb(vec3 cl);
 
 vec3 reinhard(vec3 x)
@@ -204,6 +209,30 @@ void main()
 #if NEEDS_GAMMA_CORRECT
     diff.rgb = linear_to_srgb(diff.rgb);
 #endif
+
+#if COLOR_GRADE_LUT
+    // Invert coord for compat with DX-style LUT
+    diff.y	= 1.0 - diff.y;
+
+	// Convert to texel coords
+	vec3 lutRange = diff.rgb * ( colorgrade_lut_size.w - 1);
+
+    // Calculate coords in texel space
+	vec2 lutX = vec2(floor(lutRange.z)*colorgrade_lut_size.w+lutRange.x, lutRange.y);
+	vec2 lutY = vec2(ceil(lutRange.z)*colorgrade_lut_size.w+lutRange.x, lutRange.y);
+
+	// texel to ndc
+	lutX = (lutX+0.5)*colorgrade_lut_size.xy;
+	lutY = (lutY+0.5)*colorgrade_lut_size.xy;
+
+	// LUT interpolation
+	diff.rgb = mix(
+        texture2D(colorgrade_lut, lutX).rgb, 
+        texture2D(colorgrade_lut, lutY).rgb, 
+        fract(lutRange.z)
+	);
+#endif
+
     frag_color = diff;
 }
 

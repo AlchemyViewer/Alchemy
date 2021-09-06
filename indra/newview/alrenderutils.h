@@ -42,6 +42,8 @@ public:
 	void restoreVertexBuffers();
 	void resetVertexBuffers();
 
+	void releaseGLBuffers();
+
 	void refreshState();
 
 	// Deferred Only Functions
@@ -63,6 +65,8 @@ public:
 	void renderTonemap(LLRenderTarget* src, LLRenderTarget* dst);
 	// End Deferred Only
 
+	bool setupColorGrade();
+
 private:
 	// Parameters
 	F32 mTonemapExposure = 1.f;
@@ -76,6 +80,10 @@ private:
 	LLVector3 mToneUnchartedParamA;
 	LLVector3 mToneUnchartedParamB;
 	LLVector3 mToneUnchartedParamC;
+
+	// Texture Data
+	U32 mCGLut;
+	LLVector4 mCGLutSize;
 
 	// Vertex Buffers
 	LLPointer<LLVertexBuffer> mRenderBuffer;
