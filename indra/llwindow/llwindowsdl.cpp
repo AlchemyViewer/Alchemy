@@ -1878,8 +1878,8 @@ void LLWindowSDL::gatherInput()
             mKeyModifiers = (SDL_Keymod) event.key.keysym.mod;
 
             gKeyboard->handleKeyDown(mKeyVirtualKey, mKeyModifiers);
-            if (mKeyVirtualKey == SDLK_RETURN)
-                handleUnicodeUTF16(mKeyVirtualKey, gKeyboard->currentMask(FALSE));
+            if (mKeyVirtualKey == SDLK_RETURN || mKeyVirtualKey == SDLK_KP_ENTER)
+                handleUnicodeUTF16(SDLK_RETURN, gKeyboard->currentMask(FALSE));
             // part of the fix for SL-13243
             if (SDLCheckGrabbyKeys(event.key.keysym.sym, TRUE) != 0)
                 SDLReallyCaptureInput(TRUE);
