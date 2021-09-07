@@ -97,6 +97,7 @@ public:
 
 		FT_ANIM_OVERRIDES,
 		FT_TOXIC,
+		FT_RLV,
 
 		FT_COUNT,
 
