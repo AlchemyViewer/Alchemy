@@ -73,11 +73,6 @@ bool ll::prefs::PanelData::hightlightAndHide( LLWString const &aFilter )
 	for (tPanelDataList::iterator itr = mChildPanel.begin(); itr != mChildPanel.end(); ++itr)
 		(*itr)->setNotHighlighted();
 
-	if (aFilter.empty())
-	{
-		return true;
-	}
-
 	bool bVisible(false);
 	for( tSearchableItemList::iterator itr = mChildren.begin(); itr  != mChildren.end(); ++itr )
 		bVisible |= (*itr)->hightlightAndHide( aFilter );
