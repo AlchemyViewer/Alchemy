@@ -60,7 +60,7 @@ void main()
     outColor.a = 0.0; // yes, downstream atmospherics 
     
     frag_data[0] = outColor;
-    frag_data[1] = vec4(0.0,0.0,0.0,-1.0);
+    frag_data[1] = vec4(0.0,0.0,0.0,0.0);
     vec3 nvn = normalize(vary_normal);
     frag_data[2] = vec4(encode_normal(nvn.xyz), 0.0, 0.0);
 }
