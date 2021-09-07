@@ -3517,6 +3517,8 @@ LLFolderType::EType LLFolderBridge::getPreferredType() const
 		else if (cat_name == "#Firestorm" || cat_name == "#Phoenix"
 				 || cat_name == "#DV3" || cat_name == "#Kokua")
 			preferred_type = LLFolderType::FT_TOXIC;
+		else if (cat_name == RLV_ROOT_FOLDER)
+			preferred_type = LLFolderType::FT_RLV;
 		else
 			preferred_type = cat->getPreferredType();
 	}
