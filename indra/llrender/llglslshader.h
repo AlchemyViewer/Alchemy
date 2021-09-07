@@ -146,7 +146,6 @@ public:
 	void setMinimumAlpha(F32 minimum);
 
 	void vertexAttrib4f(U32 index, GLfloat x, GLfloat y, GLfloat z, GLfloat w);
-	void vertexAttrib4fv(U32 index, GLfloat* v);
 	
 	//GLint getUniformLocation(const std::string& uniform);
 	GLint getUniformLocation(const LLStaticHashedString& uniform);	
@@ -163,7 +162,7 @@ public:
 	void addPermutation(std::string name, std::string value);
     void removePermutations(std::map<std::string, std::string>& map)
     {
-        for (auto entry : map)
+		for (const auto& entry : map)
         {
             mDefines.erase(entry.first);
         }

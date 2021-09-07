@@ -436,6 +436,7 @@ BOOL LLGLSLShader::createShader(std::vector<LLStaticHashedString> * attributes,
     // Attach existing objects
     if (!LLShaderMgr::instance()->attachShaderFeatures(this))
     {
+        unloadInternal();
         return FALSE;
     }
 
@@ -456,6 +457,8 @@ BOOL LLGLSLShader::createShader(std::vector<LLStaticHashedString> * attributes,
     }
     if( !success )
     {
+        unloadInternal();
+
         LL_SHADER_LOADING_WARNS() << "Failed to link shader: " << mName << LL_ENDL;
 
         // Try again using a lower shader level;
@@ -1511,13 +1514,6 @@ void LLGLSLShader::vertexAttrib4f(U32 index, GLfloat x, GLfloat y, GLfloat z, GL
     }
 }
 
-void LLGLSLShader::vertexAttrib4fv(U32 index, GLfloat* v)
-{
-    if (mAttribute[index] > 0)
-    {
-        glVertexAttrib4fv(mAttribute[index], v);
-    }
-}
 
 void LLGLSLShader::setMinimumAlpha(F32 minimum)
 {
