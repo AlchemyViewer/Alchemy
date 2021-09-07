@@ -120,6 +120,7 @@ void main()
 
     if (spec.a > 0.0)  // specular reflection
     {
+        spec.rgb = linear_to_srgb(spec.rgb);
 #if 0 //EEP
             vec3 npos = -normalize(pos.xyz);
 
