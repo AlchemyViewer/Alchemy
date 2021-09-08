@@ -1014,16 +1014,9 @@ void LLFloaterPreference::onOpen(const LLSD& key)
 
 	bool started = (LLStartUp::getStartupState() == STATE_STARTED);
 
-	LLButton* load_btn = findChild<LLButton>("PrefLoadButton");
-	LLButton* save_btn = findChild<LLButton>("PrefSaveButton");
-	LLButton* delete_btn = findChild<LLButton>("PrefDeleteButton");
 	LLButton* exceptions_btn = findChild<LLButton>("RenderExceptionsButton");
-
-	if (load_btn && save_btn && delete_btn && exceptions_btn)
+	if (exceptions_btn)
 	{
-		load_btn->setEnabled(started);
-		save_btn->setEnabled(started);
-		delete_btn->setEnabled(started);
 		exceptions_btn->setEnabled(started);
 	}
 

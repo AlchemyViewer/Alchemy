@@ -63,10 +63,6 @@ void LLPresetsManager::triggerChangeSignal()
 
 void LLPresetsManager::createMissingDefault(const std::string& subdirectory)
 {
-	if(gDirUtilp->getLindenUserDir().empty())
-	{
-		return;
-	}
 
 	if (PRESETS_CAMERA == subdirectory)
 	{
@@ -74,7 +70,7 @@ void LLPresetsManager::createMissingDefault(const std::string& subdirectory)
 		return;
 	}
 
-	std::string default_file = gDirUtilp->getExpandedFilename(LL_PATH_PER_SL_ACCOUNT, PRESETS_DIR,
+	std::string default_file = gDirUtilp->getExpandedFilename(LL_PATH_USER_SETTINGS, PRESETS_DIR,
 		subdirectory, PRESETS_DEFAULT + ".xml");
 	if (!gDirUtilp->fileExists(default_file))
 	{
@@ -130,15 +126,15 @@ void LLPresetsManager::startWatching(const std::string& subdirectory)
 
 std::string LLPresetsManager::getPresetsDir(const std::string& subdirectory)
 {
-	std::string presets_path = gDirUtilp->getExpandedFilename(LL_PATH_PER_SL_ACCOUNT, PRESETS_DIR);
+	std::string presets_path = gDirUtilp->getExpandedFilename(LL_PATH_USER_SETTINGS, PRESETS_DIR);
 
 	LLFile::mkdir(presets_path);
 
-	std::string dest_path = gDirUtilp->getExpandedFilename(LL_PATH_PER_SL_ACCOUNT, PRESETS_DIR, subdirectory);
-	if (!gDirUtilp->fileExists(dest_path))
-		LLFile::mkdir(dest_path);
+	presets_path = gDirUtilp->add(presets_path, subdirectory);
+	if (!gDirUtilp->fileExists(presets_path))
+		LLFile::mkdir(presets_path);
 
-	return dest_path;
+	return presets_path;
 }
 
 void LLPresetsManager::loadPresetNamesFromDir(const std::string& subdirectory, preset_name_list_t& presets, EDefaultOptions default_option)
@@ -559,7 +555,7 @@ void LLPresetsManager::resetCameraPreset(std::string preset_name)
 
 bool LLPresetsManager::createDefaultCameraPreset(std::string preset_name, bool force_reset)
 {
-	std::string preset_file = gDirUtilp->getExpandedFilename(LL_PATH_PER_SL_ACCOUNT, PRESETS_DIR,
+	std::string preset_file = gDirUtilp->getExpandedFilename(LL_PATH_USER_SETTINGS, PRESETS_DIR,
 		PRESETS_CAMERA, LLURI::escape(preset_name) + ".xml");
 	if (!gDirUtilp->fileExists(preset_file) || force_reset)
 	{
