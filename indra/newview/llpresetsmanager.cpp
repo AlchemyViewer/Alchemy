@@ -106,7 +106,7 @@ void LLPresetsManager::startWatching(const std::string& subdirectory)
 	if (PRESETS_CAMERA == subdirectory)
 	{
 		std::vector<std::string> name_list;
-		getControlNames(name_list);
+		getCameraControlNames(name_list);
 
 		for (std::vector<std::string>::iterator it = name_list.begin(); it != name_list.end(); ++it)
 		{
@@ -248,7 +248,7 @@ void LLPresetsManager::settingChanged()
 	}
 }
 
-void LLPresetsManager::getControlNames(std::vector<std::string>& names)
+void LLPresetsManager::getCameraControlNames(std::vector<std::string>& names)
 {
 	const std::vector<std::string> camera_controls = boost::assign::list_of
 		// From panel_preferences_move.xml
@@ -308,7 +308,7 @@ bool LLPresetsManager::savePreset(const std::string& subdirectory, std::string n
 	else if (IS_CAMERA)
 	{
 		name_list.clear();
-		getControlNames(name_list);
+		getCameraControlNames(name_list);
 		name_list.push_back("PresetCameraActive");
 	}
 	else

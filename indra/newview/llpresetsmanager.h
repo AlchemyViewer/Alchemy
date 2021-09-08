@@ -97,7 +97,7 @@ public:
   private:
 	LOG_CLASS(LLPresetsManager);
 
-	void getControlNames(std::vector<std::string>& names);
+	void getCameraControlNames(std::vector<std::string>& names);
 	static void settingChanged();
 
 	boost::signals2::connection	mCameraChangedSignal;
