@@ -87,6 +87,9 @@ class ViewerManifest(LLManifest):
 
                 # ... and the entire image filters directory
                 self.path("filters")
+
+                # ... and the entire color lut texture directory
+                self.path("colorlut")
             
                 # ... and the included spell checking dictionaries
                 pkgdir = os.path.join(self.args['build'], os.pardir, 'packages')
