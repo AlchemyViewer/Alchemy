@@ -619,6 +619,7 @@ public:
 	U32 					mScreenHeight;
 	
 	LLRenderTarget			mScreen;
+	LLRenderTarget			mHDRScreen;
 	LLRenderTarget			mUIScreen;
 	LLRenderTarget			mDeferredScreen;
 	LLRenderTarget			mFXAABuffer;

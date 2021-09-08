@@ -144,6 +144,8 @@ void ALRenderUtil::renderTonemap(LLRenderTarget* src, LLRenderTarget* dst)
 	LLGLDepthTest depth(GL_FALSE, GL_FALSE);
 
 	dst->bindTarget();
+	glClearColor(0, 0, 0, 0);
+	dst->clear(GL_COLOR_BUFFER_BIT);
 
 	LLGLSLShader* tone_shader = (mCGLut != 0 ) ? &gDeferredPostColorGradeLUTProgram[mTonemapType] : &gDeferredPostTonemapProgram[mTonemapType];
 

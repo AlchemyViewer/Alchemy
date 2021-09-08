@@ -161,7 +161,6 @@ void LLDrawPoolAlpha::endPostDeferredPass(S32 pass)
 	if (pass == 1 && !LLPipeline::sImpostorRender)
 	{
 		gPipeline.mDeferredDepth.flush();
-		gPipeline.mScreen.bindTarget();
 		gObjectFullbrightAlphaMaskProgram.unbind();
 	}
 

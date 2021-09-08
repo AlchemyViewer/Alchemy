@@ -961,18 +961,8 @@ bool LLPipeline::allocateScreenBuffer(U32 resX, U32 resY, U32 samples)
 		if (!mOcclusionDepth.allocate(resX/occlusion_divisor, resY/occlusion_divisor, 0, TRUE, FALSE, LLTexUnit::TT_RECT_TEXTURE, FALSE, samples)) return false;
 		if (!addDeferredAttachments(mDeferredScreen)) return false;
 	
-		GLuint screenFormat = GL_RGBA16;
-		if (gGLManager.mGLVersion < 4.f && gGLManager.mIsATI)
-		{
-			screenFormat = GL_RGBA12;
-		}
-
-		if (gGLManager.mGLVersion < 4.f && gGLManager.mIsNVIDIA)
-		{
-			screenFormat = GL_RGBA16F;
-		}
-
-		if (!mScreen.allocate(resX, resY, screenFormat, FALSE, FALSE, LLTexUnit::TT_RECT_TEXTURE, FALSE, samples)) return false;
+		if (!mHDRScreen.allocate(resX, resY, GL_RGBA16F, FALSE, FALSE, LLTexUnit::TT_RECT_TEXTURE, FALSE, samples, GL_RGBA, GL_FLOAT)) return false;
+		if (!mScreen.allocate(resX, resY, GL_RGBA8, FALSE, FALSE, LLTexUnit::TT_RECT_TEXTURE, FALSE, samples)) return false;
 		if (samples > 0)
 		{
 			if (!mFXAABuffer.allocate(resX, resY, GL_SRGB8_ALPHA8, FALSE, FALSE, LLTexUnit::TT_TEXTURE, FALSE, samples)) return false;
@@ -1019,6 +1009,7 @@ bool LLPipeline::allocateScreenBuffer(U32 resX, U32 resY, U32 samples)
         mSMAABlendBuffer.release();
         mSMAAEdgeBuffer.release();
         mScratchBuffer.release();
+		mHDRScreen.release();
 		mScreen.release();
 		mDeferredScreen.release(); //make sure to release any render targets that share a depth buffer with mDeferredScreen first
 // [RLVa:KB] - @setsphere
@@ -1044,6 +1035,7 @@ bool LLPipeline::allocateScreenBuffer(U32 resX, U32 resY, U32 samples)
 	if (LLPipeline::sRenderDeferred)
 	{ //share depth buffer between deferred targets
 		mDeferredScreen.shareDepthBuffer(mScreen);
+		mDeferredScreen.shareDepthBuffer(mHDRScreen);
 	}
 
 	gGL.getTexUnit(0)->disable();
@@ -1333,6 +1325,7 @@ void LLPipeline::releaseScreenBuffers()
 {
 	mUIScreen.release();
 	mScreen.release();
+	mHDRScreen.release();
 	mFXAABuffer.release();
     mSMAABlendBuffer.release();
     mSMAAEdgeBuffer.release();
@@ -9019,10 +9012,10 @@ void LLPipeline::renderDeferredLighting(LLRenderTarget *screen_target)
         gGL.popMatrix();
         stop_glerror();
 
-        screen_target->bindTarget();
+		mHDRScreen.bindTarget();
         // clear color buffer here - zeroing alpha (glow) is important or it will accumulate against sky
         glClearColor(0, 0, 0, 0);
-        screen_target->clear(GL_COLOR_BUFFER_BIT);
+		mHDRScreen.clear(GL_COLOR_BUFFER_BIT);
 
         if (RenderDeferredAtmospheric)
         {  // apply sunlight contribution
@@ -9345,9 +9338,9 @@ void LLPipeline::renderDeferredLighting(LLRenderTarget *screen_target)
         gGL.setColorMask(true, true);
     }
 
-    screen_target->flush();
+	mHDRScreen.flush();
 
-	screen_target->bindTarget();
+	mHDRScreen.bindTarget();
 
     {  // render non-deferred geometry (alpha, fullbright, glow)
         LLGLDisable blend(GL_BLEND);
@@ -9382,11 +9375,12 @@ void LLPipeline::renderDeferredLighting(LLRenderTarget *screen_target)
         popRenderTypeMask();
     }
 
-	 screen_target->flush();
+	mHDRScreen.flush();
 
 	// Tonemapping & Gamma Correction
 	{
-		 mALRenderUtil->renderTonemap(screen_target, screen_target);
+		gGL.setColorMask(true, true);
+		mALRenderUtil->renderTonemap(&mHDRScreen, screen_target);
 	}
 
     screen_target->bindTarget();
