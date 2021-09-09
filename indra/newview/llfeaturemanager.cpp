@@ -727,14 +727,6 @@ void LLFeatureManager::applyBaseMasks()
 		maskFeatures("VRAMGT512");
 	}
 
-#if LL_DARWIN
-	const LLOSInfo& osInfo = LLOSInfo::instance();
-	if (osInfo.mMajorVer == 10 && osInfo.mMinorVer < 7)
-	{
-		maskFeatures("OSX_10_6_8");
-	}
-#endif
-
 	// now mask by gpu string
 	// Replaces ' ' with '_' in mGPUString to deal with inability for parser to handle spaces
 	std::string gpustr = mGPUString;

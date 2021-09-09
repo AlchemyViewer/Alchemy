@@ -631,7 +631,3 @@ list NVIDIA_GeForce_Go_7300
 Disregard128DefaultDrawDistance	1	0
 list NVIDIA_GeForce_Go_7400
 Disregard128DefaultDrawDistance	1	0
-
-list OSX_10_6_8
-RenderDeferred 0 0
-
