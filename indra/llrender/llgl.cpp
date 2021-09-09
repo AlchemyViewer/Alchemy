@@ -206,7 +206,9 @@ LLGLManager::LLGLManager() :
 	mGLSLVersionMinor(0),		
 	mVRAM(0),
 	mGLMaxVertexRange(0),
-	mGLMaxIndexRange(0)
+	mGLMaxIndexRange(0),
+	mGLMaxTextureSize(0),
+	mGLMaxAnisotropy(1.f)
 {
 }
 
@@ -521,6 +523,16 @@ bool LLGLManager::initGL()
 	}
 
 	stop_glerror();
+
+    if (mHasAnisotropic)
+    {
+        glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT, &mGLMaxAnisotropy);
+
+        LL_INFOS() << "GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT = " << mGLMaxAnisotropy << LL_ENDL;
+        mGLMaxAnisotropy = llmax(1.f, mGLMaxAnisotropy);
+    }
+    
+    stop_glerror();
 
 	if (mHasDebugOutput && gDebugGL)
 	{ //setup debug output callback

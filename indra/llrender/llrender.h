@@ -476,6 +476,7 @@ public:
 public:
 	static U32 sUICalls;
 	static U32 sUIVerts;
+	static F32 sAnisotropicFilteringLevel;
 	static bool sGLCoreProfile;
 	static bool sNsightDebugSupport;
 	static LLVector2 sUIGLScaleFactor;
@@ -514,7 +515,6 @@ private:
 	eBlendFactor mCurrBlendAlphaSFactor;
 	eBlendFactor mCurrBlendAlphaDFactor;
 
-	F32				mMaxAnisotropy;
     U32             mDummyVAO;
 
 	std::vector<LLVector4a, boost::alignment::aligned_allocator<LLVector4a, 64> > mUIOffset;

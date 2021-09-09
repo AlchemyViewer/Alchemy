@@ -167,6 +167,7 @@ public:
 	S32 mGLMaxVertexRange;
 	S32 mGLMaxIndexRange;
 	S32 mGLMaxTextureSize;
+	F32 mGLMaxAnisotropy;
 	
 	void getPixelFormat(); // Get the best pixel format
 

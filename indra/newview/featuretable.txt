@@ -27,7 +27,7 @@ version 33
 // NOTE: All settings are set to the MIN of applied values, including 'all'!
 //
 list all
-RenderAnisotropic			1	1
+RenderAnisotropicLevel			1	16
 RenderAvatarCloth			1	1
 RenderAvatarLODFactor		1	1.0
 RenderAvatarPhysicsLODFactor 1	1.0
@@ -65,7 +65,6 @@ RenderCompressTextures		1	1
 RenderShaderLightingMaxLevel	1	3
 RenderDeferred				1	1
 RenderDeferredSSAO			1	1
-RenderUseAdvancedAtmospherics 1 0
 RenderShadowDetail			1	2
 RenderUseStreamVBO			1	1
 RenderFSAASamples			1	16
@@ -75,7 +74,7 @@ RenderMaxTextureIndex		1	16
 // Low Graphics Settings (fixed function)
 //
 list LowFixedFunction
-RenderAnisotropic			1	0
+RenderAnisotropicLevel			1	0
 RenderAvatarCloth			1	0
 RenderAvatarLODFactor		1	0
 RenderAvatarPhysicsLODFactor 1	0
@@ -97,7 +96,6 @@ RenderVolumeLODFactor		1	1.125
 WindLightUseAtmosShaders	1	0
 RenderDeferred				1	0
 RenderDeferredSSAO			1	0
-RenderUseAdvancedAtmospherics 1 0
 RenderShadowDetail			1	0
 WLSkyDetail					1	48
 RenderFSAASamples			1	0
@@ -106,7 +104,7 @@ RenderFSAASamples			1	0
 // Low Graphics Settings
 //
 list Low
-RenderAnisotropic			1	0
+RenderAnisotropicLevel			1	0
 RenderAvatarCloth			1	0
 RenderAvatarLODFactor		1	0
 RenderAvatarPhysicsLODFactor 1	0
@@ -128,7 +126,6 @@ RenderVolumeLODFactor		1	1.125
 WindLightUseAtmosShaders	1	0
 RenderDeferred				1	0
 RenderDeferredSSAO			1	0
-RenderUseAdvancedAtmospherics 1 0
 RenderShadowDetail			1	0
 WLSkyDetail					1	48
 RenderFSAASamples			1	0
@@ -137,7 +134,7 @@ RenderFSAASamples			1	0
 // Medium Low Graphics Settings
 //
 list LowMid
-RenderAnisotropic			1	0
+RenderAnisotropicLevel			1	2
 RenderAvatarCloth			1	0
 RenderAvatarLODFactor		1	0.5
 RenderAvatarMaxComplexity   1	100000
@@ -158,7 +155,6 @@ RenderVolumeLODFactor		1	1.125
 WindLightUseAtmosShaders	1	0
 RenderDeferred				1	0
 RenderDeferredSSAO			1	0
-RenderUseAdvancedAtmospherics 1 0
 RenderShadowDetail			1	0
 WLSkyDetail					1	48
 RenderFSAASamples			1	0
@@ -167,7 +163,7 @@ RenderFSAASamples			1	0
 // Medium Graphics Settings (standard)
 //
 list Mid
-RenderAnisotropic			1	1
+RenderAnisotropicLevel			1	2
 RenderAvatarCloth			1	0
 RenderAvatarLODFactor		1	1.0
 RenderAvatarMaxComplexity   1	200000
@@ -188,7 +184,6 @@ RenderVolumeLODFactor		1	1.125
 WindLightUseAtmosShaders	1	1
 RenderDeferred				1	0
 RenderDeferredSSAO			1	0
-RenderUseAdvancedAtmospherics 1 0
 RenderShadowDetail			1	0
 WLSkyDetail					1	48
 RenderFSAASamples			1	2
@@ -197,7 +192,7 @@ RenderFSAASamples			1	2
 // Medium High Graphics Settings (deferred enabled)
 //
 list MidHigh
-RenderAnisotropic			1	1
+RenderAnisotropicLevel			1	4
 RenderAvatarCloth			1	0
 RenderAvatarLODFactor		1	1.0
 RenderAvatarMaxComplexity   1	250000
@@ -218,7 +213,6 @@ RenderVolumeLODFactor		1	1.125
 WindLightUseAtmosShaders	1	1
 RenderDeferred				1	1
 RenderDeferredSSAO			1	0
-RenderUseAdvancedAtmospherics 1 0
 RenderShadowDetail			1	0
 WLSkyDetail					1	48
 RenderFSAASamples			1	8
@@ -227,7 +221,7 @@ RenderFSAASamples			1	8
 // High Graphics Settings (deferred + SSAO)
 //
 list High
-RenderAnisotropic			1	1
+RenderAnisotropicLevel			1	8
 RenderAvatarCloth			1	0
 RenderAvatarLODFactor		1	1.0
 RenderAvatarMaxComplexity   1	300000
@@ -248,7 +242,6 @@ RenderVolumeLODFactor		1	1.125
 WindLightUseAtmosShaders	1	1
 RenderDeferred				1	1
 RenderDeferredSSAO			1	1
-RenderUseAdvancedAtmospherics 1 0
 RenderShadowDetail			1	0
 WLSkyDetail					1	48
 RenderFSAASamples			1	8
@@ -257,7 +250,7 @@ RenderFSAASamples			1	8
 // High Ultra Graphics Settings (deferred + SSAO + shadows)
 //
 list HighUltra
-RenderAnisotropic			1	1
+RenderAnisotropicLevel			1	8
 RenderAvatarCloth			1	0
 RenderAvatarLODFactor		1	1.0
 RenderAvatarMaxComplexity   1	350000
@@ -278,7 +271,6 @@ RenderVolumeLODFactor		1	1.125
 WindLightUseAtmosShaders	1	1
 RenderDeferred				1	1
 RenderDeferredSSAO			1	1
-RenderUseAdvancedAtmospherics 1 0
 RenderShadowDetail			1	2
 WLSkyDetail					1	48
 RenderFSAASamples			1	16
@@ -287,7 +279,7 @@ RenderFSAASamples			1	16
 // Ultra graphics (REALLY PURTY!)
 //
 list Ultra
-RenderAnisotropic			1	1
+RenderAnisotropicLevel			1	16
 RenderAvatarCloth			1	1
 RenderAvatarLODFactor		1	1.0
 RenderAvatarPhysicsLODFactor 1	1.0
@@ -308,7 +300,6 @@ WindLightUseAtmosShaders	1	1
 WLSkyDetail					1	128
 RenderDeferred				1	1
 RenderDeferredSSAO			1	1
-RenderUseAdvancedAtmospherics 1 0
 RenderShadowDetail			1	2
 RenderFSAASamples			1	16
 
@@ -320,7 +311,6 @@ RenderVBOEnable				1	0
 RenderShadowDetail			1	0
 RenderDeferred				1	0
 RenderDeferredSSAO			1	0
-RenderUseAdvancedAtmospherics 1 0
 
 //
 // Class 0 Hardware (just old)
@@ -375,7 +365,6 @@ WindLightUseAtmosShaders	0	0
 RenderDeferred				0	0
 RenderDeferredSSAO			0	0
 RenderShadowDetail			0	0
-RenderUseAdvancedAtmospherics 0 0
 
 //
 // No Vertex Shaders available
@@ -388,7 +377,6 @@ WindLightUseAtmosShaders	0	0
 RenderDeferred				0	0
 RenderDeferredSSAO			0	0
 RenderShadowDetail			0	0
-RenderUseAdvancedAtmospherics 0 0
 
 //
 // GL_ARB_map_buffer_range exists
@@ -396,12 +384,17 @@ RenderUseAdvancedAtmospherics 0 0
 list MapBufferRange
 RenderVBOMappingDisable		1	1
 
+//
+// AF Missing or AF < 2
+//
+list AnisotropicMissing
+RenderAnisotropicLevel		0	0
 
 //
 // "Default" setups for safe, low, medium, high
 //
 list safe
-RenderAnisotropic			1	0
+RenderAnisotropicLevel			1	0
 RenderAvatarCloth			0	0
 RenderAvatarVP				0	0
 RenderAvatarMaxNonImpostors 1	16
@@ -442,12 +435,12 @@ RenderDeferred				0	0
 RenderMaxTextureIndex		1	1
 
 list Intel
-RenderAnisotropic			1	0
+RenderAnisotropicLevel			1	0
 RenderVBOEnable				1	0
 RenderFSAASamples			1	0
 
 list GeForce2
-RenderAnisotropic			1	0
+RenderAnisotropicLevel			1	0
 RenderMaxPartCount			1	2048
 RenderTerrainDetail			1	0
 RenderVBOEnable				1	1

@@ -251,11 +251,23 @@ static bool handleLUTBufferChanged(const LLSD& newvalue)
 	return true;
 }
 
-static bool handleAnisotropicChanged(const LLSD& newvalue)
+static bool handleAnisotropicFilteringChanged(LLControlVariable* ctrl, const LLSD& newval)
 {
-	LLImageGL::sGlobalUseAnisotropic = newvalue.asBoolean();
+	F32 val = newval.asReal();
+	if (val > gGLManager.mGLMaxAnisotropy)
+	{
+		val = llclamp(val, 0.f, gGLManager.mGLMaxAnisotropy);
+		ctrl->setValue(val);
+	}
+	LLRender::sAnisotropicFilteringLevel = val;
 	LLImageGL::dirtyTexOptions();
 	return true;
+}
+
+static bool validateAnisotropicFiltering(const LLSD& val)
+{
+	F32 filter_level = val.asInteger();
+	return filter_level == 0 || filter_level == 2 || filter_level == 4 || filter_level == 8 || filter_level == 16;
 }
 
 static bool handleVolumeLODChanged(const LLSD& newvalue)
@@ -668,7 +680,6 @@ void settings_setup_listeners()
 	gSavedSettings.getControl("RenderSpecularResX")->getSignal()->connect(boost::bind(&handleLUTBufferChanged, _2));
 	gSavedSettings.getControl("RenderSpecularResY")->getSignal()->connect(boost::bind(&handleLUTBufferChanged, _2));
 	gSavedSettings.getControl("RenderSpecularExponent")->getSignal()->connect(boost::bind(&handleLUTBufferChanged, _2));
-	gSavedSettings.getControl("RenderAnisotropic")->getSignal()->connect(boost::bind(&handleAnisotropicChanged, _2));
 	gSavedSettings.getControl("RenderShadowResolutionScale")->getSignal()->connect(boost::bind(&handleShadowsResized, _2));
 	gSavedSettings.getControl("RenderGlow")->getSignal()->connect(boost::bind(&handleReleaseGLBufferChanged, _2));
 	gSavedSettings.getControl("RenderGlow")->getSignal()->connect(boost::bind(&handleSetShaderChanged, _2));
@@ -814,6 +825,8 @@ void settings_setup_listeners()
 // [/RLVa:KB]
 	gSavedSettings.getControl("AlchemyHudTextFadeDistance")->getSignal()->connect(boost::bind(&LLHUDText::onFadeSettingsChanged));
 	gSavedSettings.getControl("AlchemyHudTextFadeRange")->getSignal()->connect(boost::bind(&LLHUDText::onFadeSettingsChanged));
+	gSavedSettings.getControl("RenderAnisotropicLevel")->getSignal()->connect(boost::bind(&handleAnisotropicFilteringChanged, _1, _2));
+	gSavedSettings.getControl("RenderAnisotropicLevel")->getValidateSignal()->connect(boost::bind(&validateAnisotropicFiltering, _2));
 }
 
 #if TEST_CACHED_CONTROL

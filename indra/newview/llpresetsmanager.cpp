@@ -311,7 +311,7 @@ void LLPresetsManager::getGraphicsControlNames(std::vector<std::string>& names)
 		"AlchemyRenderCAS",
 		"AlchemyRenderCASSharpness",
 		"AlwaysRenderFriends",
-		"RenderAnisotropic",
+		"RenderAnisotropicLevel",
 		"RenderAvatarCloth",
 		"RenderAvatarLODFactor",
 		"RenderAvatarMaxComplexity",

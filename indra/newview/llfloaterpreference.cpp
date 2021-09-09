@@ -1612,6 +1612,20 @@ void LLFloaterPreferenceGraphicsAdvanced::refreshEnabledState()
 	getChildView("fog")->setEnabled(!gPipeline.canUseWindLightShaders());
 	getChildView("antialiasing restart")->setVisible(!LLFeatureManager::getInstance()->isFeatureAvailable("RenderDeferred"));
 
+	LLComboBox* af_combo = getChild<LLComboBox>("anisotropic_filter");
+	if (2.f > gGLManager.mGLMaxAnisotropy) {
+		af_combo->remove("2x");
+	}
+	if (4.f > gGLManager.mGLMaxAnisotropy) {
+		af_combo->remove("4x");
+	}
+	if (8.f > gGLManager.mGLMaxAnisotropy) {
+		af_combo->remove("8x");
+	}
+	if (16.f > gGLManager.mGLMaxAnisotropy) {
+		af_combo->remove("16x");
+	}
+
 	// now turn off any features that are unavailable
 	disableUnavailableSettings();
 }
@@ -1674,6 +1688,7 @@ void LLFloaterPreferenceGraphicsAdvanced::disableUnavailableSettings()
 	LLCheckBoxCtrl* ctrl_dof = getChild<LLCheckBoxCtrl>("UseDoF");
 	LLSliderCtrl* sky = getChild<LLSliderCtrl>("SkyMeshDetail");
 	LLTextBox* sky_text = getChild<LLTextBox>("SkyMeshDetailText");
+	LLComboBox* ctrl_anisotropic = getChild<LLComboBox>("anisotropic_filter");
 
 	// disabled windlight
 	if (!LLFeatureManager::getInstance()->isFeatureAvailable("WindLightUseAtmosShaders"))
@@ -1777,6 +1792,11 @@ void LLFloaterPreferenceGraphicsAdvanced::disableUnavailableSettings()
 	{
 		ctrl_avatar_cloth->setEnabled(FALSE);
 		ctrl_avatar_cloth->setValue(FALSE);
+	}
+
+	if (!LLFeatureManager::instance().isFeatureAvailable("RenderAnisotropicLevel"))
+	{
+		ctrl_anisotropic->setEnabled(FALSE);
 	}
 }
 
