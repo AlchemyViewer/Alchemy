@@ -99,12 +99,15 @@ public:
 
 	void getGraphicsControlNames(std::vector<std::string>& names);
 	void getCameraControlNames(std::vector<std::string>& names);
-	static void settingChanged();
+	void graphicsSettingChanged();
+	void cameraSettingChanged();
 
-	boost::signals2::connection	mCameraChangedSignal;
+	std::vector<boost::signals2::connection> mGraphicsChangedSignals;
+	std::vector<boost::signals2::connection> mCameraChangedSignals;
 
-	static bool	mCameraDirty;
-	static bool mIgnoreChangedSignal;
+	bool mIgnoreChangedSignal = false;
+
+	static bool	sCameraDirty;
 };
 
 #endif // LL_PRESETSMANAGER_H

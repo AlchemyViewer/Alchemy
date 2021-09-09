@@ -44,14 +44,25 @@
 
 LLPresetsManager::LLPresetsManager()
 {
-	// Start watching camera controls as soon as the preset
-	// manager gets initialized
+	// Connect preset signals
+	startWatching(PRESETS_GRAPHIC);
 	startWatching(PRESETS_CAMERA);
 }
 
 LLPresetsManager::~LLPresetsManager()
 {
-	mCameraChangedSignal.disconnect();
+	for (auto& signal : mGraphicsChangedSignals)
+	{
+		signal.disconnect();
+	}
+	mGraphicsChangedSignals.clear();
+
+
+	for (auto& signal : mCameraChangedSignals)
+	{
+		signal.disconnect();
+	}
+	mCameraChangedSignals.clear();
 }
 
 void LLPresetsManager::triggerChangeCameraSignal()
@@ -120,7 +131,43 @@ void LLPresetsManager::startWatching(const std::string& subdirectory)
 				}
 				else
 				{
-					mCameraChangedSignal = cntrl_ptr->getCommitSignal()->connect(boost::bind(&settingChanged));
+					mCameraChangedSignals.push_back(cntrl_ptr->getCommitSignal()->connect(boost::bind(&LLPresetsManager::cameraSettingChanged, this)));
+				}
+			}
+		}
+	}
+	else if (PRESETS_GRAPHIC == subdirectory)
+	{
+		std::vector<std::string> name_list;
+		getGraphicsControlNames(name_list);
+
+		for (std::vector<std::string>::iterator it = name_list.begin(); it != name_list.end(); ++it)
+		{
+			std::string ctrl_name = *it;
+			if (gSavedSettings.controlExists(ctrl_name))
+			{
+				LLPointer<LLControlVariable> cntrl_ptr = gSavedSettings.getControl(ctrl_name);
+				if (cntrl_ptr.isNull())
+				{
+					LL_WARNS("Init") << "Unable to set signal on global setting '" << ctrl_name
+						<< "'" << LL_ENDL;
+				}
+				else
+				{
+					mGraphicsChangedSignals.push_back(cntrl_ptr->getCommitSignal()->connect(boost::bind(&LLPresetsManager::graphicsSettingChanged, this)));
+				}
+			}
+			else if (gSavedPerAccountSettings.controlExists(ctrl_name))
+			{
+				LLPointer<LLControlVariable> cntrl_ptr = gSavedPerAccountSettings.getControl(ctrl_name);
+				if (cntrl_ptr.isNull())
+				{
+					LL_WARNS("Init") << "Unable to set signal on global setting '" << ctrl_name
+						<< "'" << LL_ENDL;
+				}
+				else
+				{
+					mGraphicsChangedSignals.push_back(cntrl_ptr->getCommitSignal()->connect(boost::bind(&LLPresetsManager::graphicsSettingChanged, this)));
 				}
 			}
 		}
@@ -219,26 +266,36 @@ void LLPresetsManager::loadPresetNamesFromDir(const std::string& subdirectory, p
 	presets = mPresetNames;
 }
 
-bool LLPresetsManager::mCameraDirty = false;
-bool LLPresetsManager::mIgnoreChangedSignal = false;
+bool LLPresetsManager::sCameraDirty = false;
 
 void LLPresetsManager::setCameraDirty(bool dirty)
 {
-	mCameraDirty = dirty;
+	sCameraDirty = dirty;
 }
 
 bool LLPresetsManager::isCameraDirty()
 {
-	return mCameraDirty;
+	return sCameraDirty;
 }
 
-void LLPresetsManager::settingChanged()
+void LLPresetsManager::graphicsSettingChanged()
+{
+	static LLCachedControl<std::string> graphic_preset_active(gSavedSettings, "PresetGraphicActive", "");
+	if (!graphic_preset_active().empty() && !mIgnoreChangedSignal)
+	{
+		gSavedSettings.setString("PresetGraphicActive", "");
+
+		// Hack call because this is a static routine
+		LLPresetsManager::getInstance()->triggerChangeSignal();
+	}
+}
+
+void LLPresetsManager::cameraSettingChanged()
 {
 	setCameraDirty(true);
 
 	static LLCachedControl<std::string> preset_camera_active(gSavedSettings, "PresetCameraActive", "");
-	std::string preset_name = preset_camera_active;
-	if (!preset_name.empty() && !mIgnoreChangedSignal)
+	if (!preset_camera_active().empty() && !mIgnoreChangedSignal)
 	{
 		gSavedSettings.setString("PresetCameraActive", "");
 
@@ -360,8 +417,10 @@ bool LLPresetsManager::savePreset(const std::string& subdirectory, std::string n
 		paramsData = LLFeatureManager::getInstance()->getRecommendedSettingsMap();
 		if (gSavedSettings.getU32("RenderAvatarMaxComplexity") == 0)
 		{
+			mIgnoreChangedSignal = true;
 			// use the recommended setting as an initial one (MAINT-6435)
 			gSavedSettings.setU32("RenderAvatarMaxComplexity", paramsData["RenderAvatarMaxComplexity"]["Value"].asInteger());
+			mIgnoreChangedSignal = false;
 		}
 
 		// Add dynamic controls to default preset 

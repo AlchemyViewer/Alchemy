@@ -1100,8 +1100,6 @@ void LLFloaterPreference::setHardwareDefaults()
 	LLAvatarComplexityControls::setIndirectControls(); 
 
 	refreshEnabledGraphics();
-	gSavedSettings.setString("PresetGraphicActive", "");
-	LLPresetsManager::getInstance()->triggerChangeSignal();
 
 	LLTabContainer* tabcontainer = getChild<LLTabContainer>("pref core");
 	child_list_t::const_iterator iter = tabcontainer->getChildList()->begin();
@@ -2894,11 +2892,7 @@ void LLPanelPreferenceGraphics::setPresetText()
 
     if (hasDirtyChilds() && !preset_graphic_active.empty())
 	{
-		gSavedSettings.setString("PresetGraphicActive", "");
 		preset_graphic_active.clear();
-		// This doesn't seem to cause an infinite recursion.  This trigger is needed to cause the pulldown
-		// panel to update.
-		LLPresetsManager::getInstance()->triggerChangeSignal();
 	}
 
 	if (!preset_graphic_active.empty())
