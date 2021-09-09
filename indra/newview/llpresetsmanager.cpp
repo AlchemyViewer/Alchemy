@@ -308,6 +308,8 @@ void LLPresetsManager::getGraphicsControlNames(std::vector<std::string>& names)
 {
 	const std::vector<std::string> camera_controls = {
 		// From panel_preferences_graphics.xml
+		"AlchemyRenderCAS",
+		"AlchemyRenderCASSharpness",
 		"AlwaysRenderFriends",
 		"RenderAnisotropic",
 		"RenderAvatarCloth",
@@ -316,6 +318,7 @@ void LLPresetsManager::getGraphicsControlNames(std::vector<std::string>& names)
 		"RenderAvatarMaxNonImpostors",
 		"RenderAvatarPhysicsLODFactor",
 		"RenderAvatarVP",
+		"RenderColorGradeLUT",
 		"RenderCompressTextures",
 		"RenderDeferred",
 		"RenderDeferredSSAO",
@@ -334,6 +337,8 @@ void LLPresetsManager::getGraphicsControlNames(std::vector<std::string>& names)
 		"RenderShadowDetail",
 		"RenderTerrainDetail",
 		"RenderTerrainLODFactor",
+		"RenderToneMapExposure",
+		"RenderToneMapType",
 		"RenderTransparentWater",
 		"RenderTreeLODFactor",
 		"RenderVBOEnable",
