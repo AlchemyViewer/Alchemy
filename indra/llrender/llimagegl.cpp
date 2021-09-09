@@ -1254,6 +1254,8 @@ void LLImageGL::setManualImage(U32 target, S32 miplevel, S32 intformat, S32 widt
 					pix[3] = ((U8*)pixels)[i];
 				}
 
+				pixels = &scratch[0];
+
 				pixformat = GL_RGBA;
 				intformat = GL_RGBA8;
 			}
