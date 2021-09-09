@@ -133,10 +133,6 @@ void LLCameraPresetFlatItem::onDeleteBtnClick()
         args["NAME"] = mPresetName;
         LLNotificationsUtil::add("PresetNotDeleted", args);
     }
-	else if (gSavedSettings.getString("PresetCameraActive") == mPresetName)
-    {
-        gSavedSettings.setString("PresetCameraActive", "");
-    }
 }
 
 void LLCameraPresetFlatItem::onResetBtnClick()

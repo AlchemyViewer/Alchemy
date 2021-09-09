@@ -44,6 +44,9 @@
 
 LLPresetsManager::LLPresetsManager()
 {
+	// Start watching camera controls as soon as the preset
+	// manager gets initialized
+	startWatching(PRESETS_CAMERA);
 }
 
 LLPresetsManager::~LLPresetsManager()
@@ -288,17 +291,17 @@ void LLPresetsManager::getGraphicsControlNames(std::vector<std::string>& names)
 
 void LLPresetsManager::getCameraControlNames(std::vector<std::string>& names)
 {
-	const std::vector<std::string> camera_controls = boost::assign::list_of
+	const std::vector<std::string> camera_controls = {
 		// From panel_preferences_move.xml
-		("CameraAngle")
-		("CameraOffsetScale")
+		"CameraAngle",
+		"CameraOffsetScale",
 		// From llagentcamera.cpp
-		("CameraOffsetBuild")
-		("TrackFocusObject")
-		("CameraOffsetRearView")
-		("FocusOffsetRearView")
-		("AvatarSitRotation")
-        ;
+		"CameraOffsetBuild",
+		"TrackFocusObject",
+		"CameraOffsetRearView",
+		"FocusOffsetRearView",
+		"AvatarSitRotation",
+	};
     names = camera_controls;
 }
 
@@ -328,11 +331,12 @@ bool LLPresetsManager::savePreset(const std::string& subdirectory, std::string n
 
 	if (IS_GRAPHIC)
 	{
+		name_list.clear();
+		getGraphicsControlNames(name_list);
+
 		if (!createDefault)
 		{
 			gSavedSettings.setString("PresetGraphicActive", name);
-			name_list.clear();
-			getGraphicsControlNames(name_list);
 			name_list.push_back("PresetGraphicActive");
 		}
 	}
@@ -358,6 +362,25 @@ bool LLPresetsManager::savePreset(const std::string& subdirectory, std::string n
 		{
 			// use the recommended setting as an initial one (MAINT-6435)
 			gSavedSettings.setU32("RenderAvatarMaxComplexity", paramsData["RenderAvatarMaxComplexity"]["Value"].asInteger());
+		}
+
+		// Add dynamic controls to default preset 
+		for (std::vector<std::string>::iterator it = name_list.begin(); it != name_list.end(); ++it)
+		{
+			std::string ctrl_name = *it;
+
+			LLControlVariable* ctrl = gSavedSettings.getControl(ctrl_name).get();
+			if (ctrl)
+			{
+				std::string comment = ctrl->getComment();
+				std::string type = LLControlGroup::typeEnumToString(ctrl->type());
+				LLSD value = ctrl->getValue();
+
+				paramsData[ctrl_name]["Comment"] = comment;
+				paramsData[ctrl_name]["Persist"] = 1;
+				paramsData[ctrl_name]["Type"] = type;
+				paramsData[ctrl_name]["Value"] = value;
+			}
 		}
 	}
 	else
