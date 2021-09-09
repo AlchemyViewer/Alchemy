@@ -1146,11 +1146,6 @@ void LLPipeline::updateRenderDeferred()
 		LLPipeline::sUseDepthTexture = true;
 	}
 // [/RLVa:KB]
-
-	if (gPipeline.mALRenderUtil)
-	{
-		gPipeline.mALRenderUtil->refreshState();
-	}
 }
 
 // static
@@ -1395,6 +1390,8 @@ void LLPipeline::createGLBuffers()
     }
 
     allocateScreenBuffer(resX, resY);
+
+	mALRenderUtil->refreshState();
 
     if (sRenderDeferred)
     {
