@@ -741,7 +741,7 @@ BOOL LLImageGL::setImage(const U8* data_in, BOOL data_hasmips)
 						stop_glerror();
 					}
 						
-					LLImageGL::setManualImage(mTarget, gl_level, mFormatInternal, w, h, mFormatPrimary, GL_UNSIGNED_BYTE, (GLvoid*)data_in, mAllowCompression);
+					LLImageGL::setManualImage(mTarget, gl_level, mFormatInternal, w, h, mFormatPrimary, mFormatType, (GLvoid*)data_in, mAllowCompression);
 					if (gl_level == 0)
 					{
 						analyzeAlpha(data_in, w, h);
