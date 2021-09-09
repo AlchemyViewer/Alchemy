@@ -266,18 +266,6 @@ void LLPresetsManager::loadPresetNamesFromDir(const std::string& subdirectory, p
 	presets = mPresetNames;
 }
 
-bool LLPresetsManager::sCameraDirty = false;
-
-void LLPresetsManager::setCameraDirty(bool dirty)
-{
-	sCameraDirty = dirty;
-}
-
-bool LLPresetsManager::isCameraDirty()
-{
-	return sCameraDirty;
-}
-
 void LLPresetsManager::graphicsSettingChanged()
 {
 	static LLCachedControl<std::string> graphic_preset_active(gSavedSettings, "PresetGraphicActive", "");
@@ -285,22 +273,18 @@ void LLPresetsManager::graphicsSettingChanged()
 	{
 		gSavedSettings.setString("PresetGraphicActive", "");
 
-		// Hack call because this is a static routine
-		LLPresetsManager::getInstance()->triggerChangeSignal();
+		triggerChangeSignal();
 	}
 }
 
 void LLPresetsManager::cameraSettingChanged()
 {
-	setCameraDirty(true);
-
 	static LLCachedControl<std::string> preset_camera_active(gSavedSettings, "PresetCameraActive", "");
 	if (!preset_camera_active().empty() && !mIgnoreChangedSignal)
 	{
 		gSavedSettings.setString("PresetCameraActive", "");
 
-		// Hack call because this is a static routine
-		LLPresetsManager::getInstance()->triggerChangeCameraSignal();
+		triggerChangeCameraSignal();
 	}
 }
 
@@ -521,7 +505,6 @@ bool LLPresetsManager::savePreset(const std::string& subdirectory, std::string n
 			if (IS_CAMERA)
 			{
 				gSavedSettings.setString("PresetCameraActive", name);
-				setCameraDirty(false);
 				// signal interested parties
 				triggerChangeCameraSignal();
 			}

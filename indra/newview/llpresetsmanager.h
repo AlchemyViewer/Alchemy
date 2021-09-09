@@ -73,8 +73,6 @@ public:
 	bool savePreset(const std::string& subdirectory, std::string name, bool createDefault = false);
 	void loadPreset(const std::string& subdirectory, std::string name);
 	bool deletePreset(const std::string& subdirectory, std::string name);
-	bool isCameraDirty();
-	static void setCameraDirty(bool dirty);
 
 	void createCameraDefaultPresets();
 
@@ -83,12 +81,16 @@ public:
 	void resetCameraPreset(std::string preset_name);
 	bool createDefaultCameraPreset(std::string preset_name, bool force_reset = false);
 
+	void setIgnoreChangeSignal(bool val)
+	{
+		mIgnoreChangedSignal = val;
+	}
+
 	// Emitted when a preset gets loaded, deleted, or saved.
 	boost::signals2::connection setPresetListChangeCameraCallback(const preset_list_signal_t::slot_type& cb);
 	boost::signals2::connection setPresetListChangeCallback(const preset_list_signal_t::slot_type& cb);
 
 	// Emitted when a preset gets loaded or saved.
-
 	preset_name_list_t mPresetNames;
 
 	preset_list_signal_t mPresetListChangeCameraSignal;
@@ -106,8 +108,6 @@ public:
 	std::vector<boost::signals2::connection> mCameraChangedSignals;
 
 	bool mIgnoreChangedSignal = false;
-
-	static bool	sCameraDirty;
 };
 
 #endif // LL_PRESETSMANAGER_H
