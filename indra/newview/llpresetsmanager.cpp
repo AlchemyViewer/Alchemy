@@ -244,6 +244,48 @@ void LLPresetsManager::settingChanged()
 	}
 }
 
+void LLPresetsManager::getGraphicsControlNames(std::vector<std::string>& names)
+{
+	const std::vector<std::string> camera_controls = {
+		// From panel_preferences_graphics.xml
+		"AlwaysRenderFriends",
+		"RenderAnisotropic",
+		"RenderAvatarCloth",
+		"RenderAvatarLODFactor",
+		"RenderAvatarMaxComplexity",
+		"RenderAvatarMaxNonImpostors",
+		"RenderAvatarPhysicsLODFactor",
+		"RenderAvatarVP",
+		"RenderCompressTextures",
+		"RenderDeferred",
+		"RenderDeferredSSAO",
+		"RenderDepthOfField",
+		"RenderFSAASamples",
+		"RenderFarClip",
+		"RenderFlexTimeFactor",
+		"RenderFogRatio",
+		"RenderGamma",
+		"RenderGlowResolutionPow",
+		"RenderLocalLights",
+		"RenderMaxPartCount",
+		"RenderObjectBump",
+		"RenderQualityPerformance",
+		"RenderReflectionDetail",
+		"RenderShadowDetail",
+		"RenderTerrainDetail",
+		"RenderTerrainLODFactor",
+		"RenderTransparentWater",
+		"RenderTreeLODFactor",
+		"RenderVBOEnable",
+		"RenderVolumeLODFactor",
+		"RenderWaterRefResolution",
+		"TextureMemory",
+		"WLSkyDetail",
+		"WindLightUseAtmosShaders"
+	};
+	names = camera_controls;
+}
+
 void LLPresetsManager::getCameraControlNames(std::vector<std::string>& names)
 {
 	const std::vector<std::string> camera_controls = boost::assign::list_of
@@ -286,17 +328,12 @@ bool LLPresetsManager::savePreset(const std::string& subdirectory, std::string n
 
 	if (IS_GRAPHIC)
 	{
-		LLFloaterPreference* instance = LLFloaterReg::findTypedInstance<LLFloaterPreference>("preferences");
-		if (instance && !createDefault)
+		if (!createDefault)
 		{
 			gSavedSettings.setString("PresetGraphicActive", name);
-			instance->getControlNames(name_list);
-			LL_DEBUGS() << "saving preset '" << name << "'; " << name_list.size() << " names" << LL_ENDL;
+			name_list.clear();
+			getGraphicsControlNames(name_list);
 			name_list.push_back("PresetGraphicActive");
-		}
-		else
-        {
-			LL_WARNS("Presets") << "preferences floater instance not found" << LL_ENDL;
 		}
 	}
 	else if (IS_CAMERA)

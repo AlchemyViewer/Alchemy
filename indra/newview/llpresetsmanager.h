@@ -97,6 +97,7 @@ public:
   private:
 	LOG_CLASS(LLPresetsManager);
 
+	void getGraphicsControlNames(std::vector<std::string>& names);
 	void getCameraControlNames(std::vector<std::string>& names);
 	static void settingChanged();
 
