@@ -299,7 +299,6 @@ static LLStaticHashedString sDistFactor("dist_factor");
 static LLStaticHashedString sKern("kern");
 static LLStaticHashedString sKernScale("kern_scale");
 static LLStaticHashedString sSmaaRTMetrics("SMAA_RT_METRICS");
-static LLStaticHashedString sSharpness("sharpness");
 
 //----------------------------------------
 std::string gPoolNames[] = 
@@ -8196,7 +8195,8 @@ void LLPipeline::renderFinalize()
             }
 
             static LLCachedControl<bool> use_smaa(gSavedSettings, "AlchemyRenderSMAA", true);
-            static LLCachedControl<bool> enable_cas(gSavedSettings, "AlchemyRenderCAS", true);
+
+			bool sharpen_enabled = mALRenderUtil->getSharpenMethod() != ALRenderUtil::ALSharpen::SHARPEN_NONE;
 			if (use_smaa && gGLManager.mGLVersion >= 3.1)
             {
                 mFXAABuffer.copyContents(*pRenderBuffer, 0, 0, mFXAABuffer.getWidth(), mFXAABuffer.getHeight(), 0, 0,
@@ -8301,13 +8301,13 @@ void LLPipeline::renderFinalize()
 
                     bound_shader->bind();
                     bound_shader->uniform4fv(sSmaaRTMetrics, 1, rt_metrics);
-                    if (enable_cas)
+                    if (sharpen_enabled)
                     {
                         bound_target->bindTarget();
                         bound_target->clear(GL_COLOR_BUFFER_BIT);
 					}
                     drawFullScreenRect();
-                    if (enable_cas)
+                    if (sharpen_enabled)
                     {
                         bound_target->flush();
                     }
@@ -8379,13 +8379,13 @@ void LLPipeline::renderFinalize()
                                         2.f / width * scale_x,
                                   2.f / height * scale_y);
 
-				if (enable_cas)
+				if (sharpen_enabled)
                 {
                     bound_target->bindTarget();
                     bound_target->clear(GL_COLOR_BUFFER_BIT);
                 }
 				drawFullScreenRect();
-                if (enable_cas)
+                if (sharpen_enabled)
                 {
                     bound_target->flush();
                 }
@@ -8397,26 +8397,8 @@ void LLPipeline::renderFinalize()
                 gGL.getTexUnit(channel)->disable();
             }
 
-            if (enable_cas)
             {
-                static LLCachedControl<F32> sharpness_cc(gSavedSettings, "AlchemyRenderCASSharpness", 0.8f);
-
-				LLGLDisable srgb(GL_FRAMEBUFFER_SRGB);
-
-				LLRenderTarget* previous_target = bound_target;
-
-				// Bind setup:
-                bound_shader = &gDeferredPostCASProgram;
-
-				// Draw
-                previous_target->bindTexture(0, 0, LLTexUnit::TFO_POINT);
-                gGL.getTexUnit(0)->setTextureColorSpace(LLTexUnit::TCS_LINEAR);
-
-                bound_shader->bind();
-                bound_shader->uniform1f(sSharpness, sharpness_cc);
-                drawFullScreenRect();
-                bound_shader->unbind();
-                gGL.getTexUnit(0)->disable();
+				mALRenderUtil->renderSharpen(bound_target, nullptr);
             }
 
             gGLViewport[0] = gViewerWindow->getWorldViewRectRaw().mLeft;

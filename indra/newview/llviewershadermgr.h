@@ -331,6 +331,7 @@ extern LLGLSLShader			gDeferredSkinnedFullbrightShinyProgram;
 extern LLGLSLShader			gDeferredSkinnedFullbrightProgram;
 extern LLGLSLShader			gNormalMapGenProgram;
 extern LLGLSLShader         gDeferredPostCASProgram;
+extern LLGLSLShader			gDeferredPostDLSProgram;
 extern LLGLSLShader			gDeferredPostTonemapProgram[AL_TONEMAP_COUNT];
 extern LLGLSLShader			gDeferredPostColorGradeLUTProgram[AL_TONEMAP_COUNT];
 // [RLVa:KB] - @setsphere

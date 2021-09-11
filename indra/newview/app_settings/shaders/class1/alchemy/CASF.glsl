@@ -2,7 +2,7 @@
  * @file CASF.glsl
  *
  * $LicenseInfo:firstyear=2021&license=viewerlgpl$
- * Second Life Viewer Source Code
+ * Alchemy Viewer Source Code
  * Copyright (C) 2021, Rye Mutt<rye@alchemyviewer.org>
  * 
  * This library is free software; you can redistribute it and/or
@@ -19,7 +19,6 @@
  * License along with this library; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  * 
- * Linden Research, Inc., 945 Battery Street, San Francisco, CA  94111  USA
  * $/LicenseInfo$
  */
 
@@ -38,7 +37,7 @@ VARYING vec2 vary_fragcoord;
 
 uniform sampler2D tex0;
 
-uniform float sharpness;
+uniform vec3 sharpen_params = vec3(1.0, 0.5, 0.0);
 
 vec3 linear_to_srgb(vec3 cl);
 
@@ -98,7 +97,8 @@ void main()
 
     // Shaping amount of sharpening.
     ampRGB = inversesqrt(ampRGB);
-    float peak = 8.0 - 3.0 * sharpness;
+
+    float peak = 8.0 - 3.0 * sharpen_params.y;
     vec3 wRGB = -vec3(1)/(ampRGB * peak);
     vec3 rcpWeightRGB = vec3(1)/(1.0 + 4.0 * wRGB);
 
@@ -107,7 +107,8 @@ void main()
     //                          0 w 0  
 
     vec3 window = (b + d) + (f + h);
-    vec3 outColor = clamp((window * wRGB + e) * rcpWeightRGB,0,1);
+    vec3 outColor = clamp((window * wRGB + e) * rcpWeightRGB, 0, 1);
+    outColor = mix(e, outColor, sharpen_params.x);
 
     frag_color = vec4(linear_to_srgb(outColor),alpha);
 }

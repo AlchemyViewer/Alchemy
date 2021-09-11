@@ -62,10 +62,22 @@ public:
 		TONEMAP_COUNT
 	};
 	bool setupTonemap();
+	bool setupColorGrade();
 	void renderTonemap(LLRenderTarget* src, LLRenderTarget* dst);
+
+	enum ALSharpen : uint32_t
+	{
+		SHARPEN_NONE = 0,
+		SHARPEN_CAS,
+		SHARPEN_DLS,
+		SHARPEN_COUNT
+	};
+
+	bool setupSharpen();
+	void renderSharpen(LLRenderTarget* src, LLRenderTarget* dst);
 	// End Deferred Only
 
-	bool setupColorGrade();
+	U32 getSharpenMethod() { return mSharpenMethod; };
 
 private:
 	// Parameters
@@ -80,6 +92,8 @@ private:
 	LLVector3 mToneUnchartedParamA;
 	LLVector3 mToneUnchartedParamB;
 	LLVector3 mToneUnchartedParamC;
+
+	U32 mSharpenMethod = ALSharpen::SHARPEN_NONE;
 
 	// Texture Data
 	U32 mCGLut;

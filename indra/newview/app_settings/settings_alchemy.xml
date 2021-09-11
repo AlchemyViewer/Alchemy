@@ -596,28 +596,6 @@
       <key>Value</key>
       <integer>0</integer>
     </map>
-    <key>AlchemyRenderCAS</key>
-    <map>
-      <key>Comment</key>
-      <string>Enable Contrast Adaptive Sharpening in Deferred(AA Required)</string>
-      <key>Persist</key>
-      <integer>1</integer>
-      <key>Type</key>
-      <string>Boolean</string>
-      <key>Value</key>
-      <integer>1</integer>
-    </map>
-    <key>AlchemyRenderCASSharpness</key>
-    <map>
-      <key>Comment</key>
-      <string>0-1 Maximum Sharpening for CAS</string>
-      <key>Persist</key>
-      <integer>1</integer>
-      <key>Type</key>
-      <string>F32</string>
-      <key>Value</key>
-      <real>0.8</real>
-    </map>
     <key>AlchemyRenderSMAA</key>
     <map>
       <key>Comment</key>
@@ -705,6 +683,47 @@
       <string>String</string>
       <key>Value</key>
       <string></string>
+    </map>
+    <key>RenderSharpenMethod</key>
+    <map>
+      <key>Comment</key>
+      <string>Sharpening Method - 0 (None), 1 (Contrast Adaptive Sharpening), 2 (DLS)</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>U32</string>
+      <key>Value</key>
+      <integer>1</integer>
+    </map>
+    <key>RenderSharpenCASParams</key>
+    <map>
+      <key>Comment</key>
+      <string>x (Sharpness 0-1), y (Contrast 0-1) z (UNUSED)</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Vector3</string>
+      <key>Value</key>
+      <array>
+        <real>1.0</real>
+        <real>0.6</real>
+        <real>0.0</real>
+      </array>
+    </map>
+    <key>RenderSharpenDLSParams</key>
+    <map>
+      <key>Comment</key>
+      <string>x (Sharpness 0-1), y (Denoise 0-1) z (UNUSED)</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Vector3</string>
+      <key>Value</key>
+      <array>
+        <real>0.6</real>
+        <real>0.17</real>
+        <real>0.0</real>
+      </array>
     </map>
     <key>RenderToneMapExposure</key>
     <map>

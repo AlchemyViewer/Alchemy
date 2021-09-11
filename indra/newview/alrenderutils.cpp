@@ -49,6 +49,7 @@ static LLStaticHashedString tone_lottes_b("tone_lottes_b");
 static LLStaticHashedString tone_uncharted_a("tone_uncharted_a");
 static LLStaticHashedString tone_uncharted_b("tone_uncharted_b");
 static LLStaticHashedString tone_uncharted_c("tone_uncharted_c");
+static LLStaticHashedString sharpen_params("sharpen_params");
 
 ALRenderUtil::ALRenderUtil()
 {
@@ -60,6 +61,9 @@ ALRenderUtil::ALRenderUtil()
 	gSavedSettings.getControl("RenderToneMapLottesB")->getSignal()->connect(boost::bind(&ALRenderUtil::setupTonemap, this));
 	gSavedSettings.getControl("RenderToneMapUchimuraA")->getSignal()->connect(boost::bind(&ALRenderUtil::setupTonemap, this));
 	gSavedSettings.getControl("RenderToneMapUchimuraB")->getSignal()->connect(boost::bind(&ALRenderUtil::setupTonemap, this));
+	gSavedSettings.getControl("RenderSharpenMethod")->getSignal()->connect(boost::bind(&ALRenderUtil::setupSharpen, this));
+	gSavedSettings.getControl("RenderSharpenCASParams")->getSignal()->connect(boost::bind(&ALRenderUtil::setupSharpen, this));
+	gSavedSettings.getControl("RenderSharpenDLSParams")->getSignal()->connect(boost::bind(&ALRenderUtil::setupSharpen, this));
 }
 
 void ALRenderUtil::restoreVertexBuffers()
@@ -99,6 +103,7 @@ void ALRenderUtil::refreshState()
 {
 	setupTonemap();
 	setupColorGrade();
+	setupSharpen();
 }
 
 bool ALRenderUtil::setupTonemap()
@@ -325,4 +330,97 @@ void ALRenderUtil::renderTonemap(LLRenderTarget* src, LLRenderTarget* dst)
 	gGL.popMatrix();
 	gGL.matrixMode(LLRender::MM_MODELVIEW);
 	gGL.popMatrix();
+}
+
+bool ALRenderUtil::setupSharpen()
+{
+	if (LLPipeline::sRenderDeferred)
+	{
+		mSharpenMethod = gSavedSettings.getU32("RenderSharpenMethod");
+		if (mSharpenMethod >= SHARPEN_COUNT)
+		{
+			mSharpenMethod = ALSharpen::SHARPEN_NONE;
+		}
+
+		LLGLSLShader* sharpen_shader = nullptr;
+		switch (mSharpenMethod)
+		{
+		case ALSharpen::SHARPEN_CAS:
+		{
+			sharpen_shader = &gDeferredPostCASProgram;
+			sharpen_shader->bind();
+			LLVector3 params = gSavedSettings.getVector3("RenderSharpenCASParams");
+			params.clamp(LLVector3::zero, LLVector3::all_one);
+			sharpen_shader->uniform3fv(sharpen_params, 1, params.mV);
+			sharpen_shader->unbind();
+			break;
+		}
+		case ALSharpen::SHARPEN_DLS:
+		{
+			sharpen_shader = &gDeferredPostDLSProgram;
+			sharpen_shader->bind();
+			LLVector3 params = gSavedSettings.getVector3("RenderSharpenDLSParams");
+			params.clamp(LLVector3::zero, LLVector3::all_one);
+			sharpen_shader->uniform3fv(sharpen_params, 1, params.mV);
+			sharpen_shader->unbind();
+			break;
+		}
+		default:
+		case ALSharpen::SHARPEN_NONE:
+			break;
+		}
+	}
+	else
+	{
+		mSharpenMethod = ALSharpen::SHARPEN_NONE;
+	}
+	return true;
+}
+
+void ALRenderUtil::renderSharpen(LLRenderTarget* src, LLRenderTarget* dst)
+{
+	if (mSharpenMethod == ALSharpen::SHARPEN_NONE)
+	{
+		return;
+	}
+
+	LLGLSLShader* sharpen_shader = nullptr;
+	switch (mSharpenMethod)
+	{
+	case ALSharpen::SHARPEN_CAS:
+		sharpen_shader = &gDeferredPostCASProgram;
+		break;
+	case ALSharpen::SHARPEN_DLS:
+		sharpen_shader = &gDeferredPostDLSProgram;
+		break;
+	default:
+	case ALSharpen::SHARPEN_NONE:
+		break;
+	}
+
+	LLGLDepthTest depth(GL_FALSE, GL_FALSE);
+	LLGLDisable srgb(GL_FRAMEBUFFER_SRGB);
+
+	// Bind setup:
+	if (dst)
+	{
+		dst->bindTarget();
+	}
+
+	sharpen_shader->bind();
+
+	// Draw
+	src->bindTexture(0, 0, LLTexUnit::TFO_POINT);
+	gGL.getTexUnit(0)->setTextureColorSpace(LLTexUnit::TCS_LINEAR);
+
+	mRenderBuffer->setBuffer(LLVertexBuffer::MAP_VERTEX);
+	mRenderBuffer->drawArrays(LLRender::TRIANGLES, 0, 3);
+
+	if (dst)
+	{
+		dst->flush();
+	}
+
+	sharpen_shader->unbind();
+	gGL.getTexUnit(0)->disable();
 }

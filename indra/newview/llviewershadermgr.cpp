@@ -245,6 +245,7 @@ LLGLSLShader			gDeferredSkinnedFullbrightShinyProgram;
 LLGLSLShader			gDeferredSkinnedFullbrightProgram;
 LLGLSLShader			gNormalMapGenProgram;
 LLGLSLShader            gDeferredPostCASProgram;
+LLGLSLShader			gDeferredPostDLSProgram;
 LLGLSLShader			gDeferredPostTonemapProgram[AL_TONEMAP_COUNT];
 LLGLSLShader			gDeferredPostColorGradeLUTProgram[AL_TONEMAP_COUNT];
 // [RLVa:KB] - @setsphere
@@ -833,6 +834,7 @@ void LLViewerShaderMgr::unloadShaders()
 	gDeferredSkinnedAlphaWaterProgram.unload();
 
 	gDeferredPostCASProgram.unload();
+	gDeferredPostDLSProgram.unload();
 	for (U32 i = 0; i < AL_TONEMAP_COUNT; ++i)
 	{
 		gDeferredPostTonemapProgram[i].unload();
@@ -1299,6 +1301,7 @@ BOOL LLViewerShaderMgr::loadShadersDeferred()
 		}
 
 		gDeferredPostCASProgram.unload();
+		gDeferredPostDLSProgram.unload();
 		for (U32 i = 0; i < AL_TONEMAP_COUNT; ++i)
 		{
 			gDeferredPostTonemapProgram[i].unload();
@@ -2982,6 +2985,17 @@ BOOL LLViewerShaderMgr::loadShadersDeferred()
 		gDeferredPostCASProgram.mShaderFiles.push_back(make_pair("alchemy/CASF.glsl", GL_FRAGMENT_SHADER));
 		gDeferredPostCASProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
 		success = gDeferredPostCASProgram.createShader(NULL, NULL);
+	}
+
+	if (success)
+	{
+		gDeferredPostDLSProgram.mName = "DLS Shader";
+		gDeferredPostDLSProgram.mFeatures.hasSrgb = true;
+		gDeferredPostDLSProgram.mShaderFiles.clear();
+		gDeferredPostDLSProgram.mShaderFiles.push_back(make_pair("alchemy/postNoTCV.glsl", GL_VERTEX_SHADER));
+		gDeferredPostDLSProgram.mShaderFiles.push_back(make_pair("alchemy/DLSF.glsl", GL_FRAGMENT_SHADER));
+		gDeferredPostDLSProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
+		success = gDeferredPostDLSProgram.createShader(NULL, NULL);
 	}
 
 	for (U32 i = 0; i < AL_TONEMAP_COUNT; ++i)
