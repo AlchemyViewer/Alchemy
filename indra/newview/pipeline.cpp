@@ -8942,9 +8942,9 @@ void LLPipeline::renderDeferredLighting(LLRenderTarget *screen_target)
         {  // soften direct lighting lightmap
             LL_RECORD_BLOCK_TIME(FTM_SOFTEN_SHADOW);
             // blur lightmap
-            screen_target->bindTarget();
+			mHDRScreen.bindTarget();
             glClearColor(1, 1, 1, 1);
-            screen_target->clear(GL_COLOR_BUFFER_BIT);
+			mHDRScreen.clear(GL_COLOR_BUFFER_BIT);
             glClearColor(0, 0, 0, 0);
 
             bindDeferredShader(gDeferredBlurLightProgram);
@@ -8980,10 +8980,10 @@ void LLPipeline::renderDeferredLighting(LLRenderTarget *screen_target)
                 stop_glerror();
             }
 
-            screen_target->flush();
+			mHDRScreen.flush();
             unbindDeferredShader(gDeferredBlurLightProgram);
 
-            bindDeferredShader(gDeferredBlurLightProgram, screen_target);
+            bindDeferredShader(gDeferredBlurLightProgram, &mHDRScreen);
 
             mDeferredVB->setBuffer(LLVertexBuffer::MAP_VERTEX);
             deferred_light_target->bindTarget();
