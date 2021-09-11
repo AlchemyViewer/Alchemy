@@ -108,7 +108,7 @@ bool ALRenderUtil::setupTonemap()
 		mTonemapType = gSavedSettings.getU32("RenderToneMapType");
 		if (mTonemapType >= TONEMAP_COUNT)
 		{
-			mTonemapType = ALTonemap::NONE;
+			mTonemapType = ALTonemap::TONEMAP_NONE;
 		}
 
 		mTonemapExposure = llclamp(gSavedSettings.getF32("RenderToneMapExposure"), 0.1f, 16.f);
@@ -123,88 +123,10 @@ bool ALRenderUtil::setupTonemap()
 	}
 	else
 	{
-		mTonemapType = ALTonemap::NONE;
+		mTonemapType = ALTonemap::TONEMAP_NONE;
 		mTonemapExposure = 1.f;
 	}
 	return true;
-}
-
-void ALRenderUtil::renderTonemap(LLRenderTarget* src, LLRenderTarget* dst)
-{
-	gGL.matrixMode(LLRender::MM_PROJECTION);
-	gGL.pushMatrix();
-	gGL.loadIdentity();
-	gGL.matrixMode(LLRender::MM_MODELVIEW);
-	gGL.pushMatrix();
-	gGL.loadIdentity();
-
-	LLGLDepthTest depth(GL_FALSE, GL_FALSE);
-
-	dst->bindTarget();
-	glClearColor(0, 0, 0, 0);
-	dst->clear(GL_COLOR_BUFFER_BIT);
-
-	LLGLSLShader* tone_shader = (mCGLut != 0 ) ? &gDeferredPostColorGradeLUTProgram[mTonemapType] : &gDeferredPostTonemapProgram[mTonemapType];
-
-	tone_shader->bind();
-
-	S32 channel = tone_shader->enableTexture(LLShaderMgr::DEFERRED_DIFFUSE, src->getUsage());
-	if (channel > -1)
-	{
-		src->bindTexture(0, channel, LLTexUnit::TFO_POINT);
-	}
-	tone_shader->uniform2f(LLShaderMgr::DEFERRED_SCREEN_RES, dst->getWidth(), dst->getHeight());
-	tone_shader->uniform1f(al_exposure, mTonemapExposure);
-
-	switch (mTonemapType)
-	{
-	default:
-		break;
-	case ALTonemap::UCHIMURA:
-	{
-		tone_shader->uniform3fv(tone_uchimura_a, 1, mToneUchimuraParamA.mV);
-		tone_shader->uniform3fv(tone_uchimura_b, 1, mToneUchimuraParamB.mV);
-		break;
-	}
-	case ALTonemap::LOTTES:
-	{
-		tone_shader->uniform3fv(tone_lottes_a, 1, mToneLottesParamA.mV);
-		tone_shader->uniform3fv(tone_lottes_b, 1, mToneLottesParamB.mV);
-		break;
-	}
-	case ALTonemap::UNCHARTED:
-	{
-		tone_shader->uniform3fv(tone_uncharted_a, 1, mToneUnchartedParamA.mV);
-		tone_shader->uniform3fv(tone_uncharted_b, 1, mToneUnchartedParamB.mV);
-		tone_shader->uniform3fv(tone_uncharted_c, 1, mToneUnchartedParamC.mV);
-		break;
-	}
-	}
-
-	if (mCGLut != 0)
-	{
-		S32 channel = tone_shader->enableTexture(LLShaderMgr::COLORGRADE_LUT, LLTexUnit::TT_TEXTURE);
-		if (channel > -1)
-		{
-			gGL.getTexUnit(channel)->bindManual(LLTexUnit::TT_TEXTURE, mCGLut);
-			gGL.getTexUnit(channel)->setTextureFilteringOption(LLTexUnit::TFO_BILINEAR);
-			gGL.getTexUnit(channel)->setTextureAddressMode(LLTexUnit::TAM_CLAMP);
-		}
-
-		tone_shader->uniform4fv(LLShaderMgr::COLORGRADE_LUT_SIZE, 1, mCGLutSize.mV);
-	}
-
-	mRenderBuffer->setBuffer(LLVertexBuffer::MAP_VERTEX);
-	mRenderBuffer->drawArrays(LLRender::TRIANGLES, 0, 3);
-	stop_glerror();
-
-	tone_shader->unbind();
-	dst->flush();
-
-	gGL.matrixMode(LLRender::MM_PROJECTION);
-	gGL.popMatrix();
-	gGL.matrixMode(LLRender::MM_MODELVIEW);
-	gGL.popMatrix();
 }
 
 bool ALRenderUtil::setupColorGrade()
@@ -325,4 +247,82 @@ bool ALRenderUtil::setupColorGrade()
 		}
 	}
 	return true;
+}
+
+void ALRenderUtil::renderTonemap(LLRenderTarget* src, LLRenderTarget* dst)
+{
+	gGL.matrixMode(LLRender::MM_PROJECTION);
+	gGL.pushMatrix();
+	gGL.loadIdentity();
+	gGL.matrixMode(LLRender::MM_MODELVIEW);
+	gGL.pushMatrix();
+	gGL.loadIdentity();
+
+	LLGLDepthTest depth(GL_FALSE, GL_FALSE);
+
+	dst->bindTarget();
+	glClearColor(0, 0, 0, 0);
+	dst->clear(GL_COLOR_BUFFER_BIT);
+
+	LLGLSLShader* tone_shader = (mCGLut != 0 ) ? &gDeferredPostColorGradeLUTProgram[mTonemapType] : &gDeferredPostTonemapProgram[mTonemapType];
+
+	tone_shader->bind();
+
+	S32 channel = tone_shader->enableTexture(LLShaderMgr::DEFERRED_DIFFUSE, src->getUsage());
+	if (channel > -1)
+	{
+		src->bindTexture(0, channel, LLTexUnit::TFO_POINT);
+	}
+	tone_shader->uniform2f(LLShaderMgr::DEFERRED_SCREEN_RES, dst->getWidth(), dst->getHeight());
+	tone_shader->uniform1f(al_exposure, mTonemapExposure);
+
+	switch (mTonemapType)
+	{
+	default:
+		break;
+	case ALTonemap::TONEMAP_UCHIMURA:
+	{
+		tone_shader->uniform3fv(tone_uchimura_a, 1, mToneUchimuraParamA.mV);
+		tone_shader->uniform3fv(tone_uchimura_b, 1, mToneUchimuraParamB.mV);
+		break;
+	}
+	case ALTonemap::TONEMAP_LOTTES:
+	{
+		tone_shader->uniform3fv(tone_lottes_a, 1, mToneLottesParamA.mV);
+		tone_shader->uniform3fv(tone_lottes_b, 1, mToneLottesParamB.mV);
+		break;
+	}
+	case ALTonemap::TONEMAP_UNCHARTED:
+	{
+		tone_shader->uniform3fv(tone_uncharted_a, 1, mToneUnchartedParamA.mV);
+		tone_shader->uniform3fv(tone_uncharted_b, 1, mToneUnchartedParamB.mV);
+		tone_shader->uniform3fv(tone_uncharted_c, 1, mToneUnchartedParamC.mV);
+		break;
+	}
+	}
+
+	if (mCGLut != 0)
+	{
+		S32 channel = tone_shader->enableTexture(LLShaderMgr::COLORGRADE_LUT, LLTexUnit::TT_TEXTURE);
+		if (channel > -1)
+		{
+			gGL.getTexUnit(channel)->bindManual(LLTexUnit::TT_TEXTURE, mCGLut);
+			gGL.getTexUnit(channel)->setTextureFilteringOption(LLTexUnit::TFO_BILINEAR);
+			gGL.getTexUnit(channel)->setTextureAddressMode(LLTexUnit::TAM_CLAMP);
+		}
+
+		tone_shader->uniform4fv(LLShaderMgr::COLORGRADE_LUT_SIZE, 1, mCGLutSize.mV);
+	}
+
+	mRenderBuffer->setBuffer(LLVertexBuffer::MAP_VERTEX);
+	mRenderBuffer->drawArrays(LLRender::TRIANGLES, 0, 3);
+	stop_glerror();
+
+	tone_shader->unbind();
+	dst->flush();
+
+	gGL.matrixMode(LLRender::MM_PROJECTION);
+	gGL.popMatrix();
+	gGL.matrixMode(LLRender::MM_MODELVIEW);
+	gGL.popMatrix();
 }
