@@ -84,18 +84,17 @@ void main()
     //  g h i             h
     // These are 2.0x bigger (factored out the extra multiply).
 
-    vec3 mnRGB  = min(min(min(d,e),min(f,b)),h);
-    vec3 mnRGB2 = min(min(min(mnRGB,a),min(g,c)),i);
+    vec3 mnRGB = min(min(min(d, e), min(f, b)), h);
+    vec3 mnRGB2 = min(mnRGB, min(min(a, c), min(g, i)));
     mnRGB += mnRGB2;
 
-    vec3 mxRGB  = max(max(max(d,e),max(f,b)),h);
-    vec3 mxRGB2 = max(max(max(mxRGB,a),max(g,c)),i);
+    vec3 mxRGB = max(max(max(d, e), max(f, b)), h);
+    vec3 mxRGB2 = max(mxRGB, max(max(a, c), max(g, i)));
     mxRGB += mxRGB2;
 
     // Smooth minimum distance to signal limit divided by smooth max.
-
-    vec3 rcpMxRGB = vec3(1)/mxRGB;
-    vec3 ampRGB = clamp((min(mnRGB,2.0-mxRGB) * rcpMxRGB),0,1);
+    vec3 rcpMxRGB = vec3(1) / mxRGB;
+    vec3 ampRGB = clamp((min(mnRGB, 2.0-mxRGB) * rcpMxRGB), 0, 1);
 
     // Shaping amount of sharpening.
     ampRGB = inversesqrt(ampRGB);
