@@ -31,7 +31,6 @@ include_directories(SYSTEM
     )
 
 set(llrender_SOURCE_FILES
-    llatmosphere.cpp
     llcubemap.cpp
     llfontbitmapcache.cpp
     llfontfreetype.cpp
@@ -57,7 +56,6 @@ set(llrender_SOURCE_FILES
 set(llrender_HEADER_FILES
     CMakeLists.txt
 
-    llatmosphere.h
     llcubemap.h
     llfontgl.h
     llfontfreetype.h
