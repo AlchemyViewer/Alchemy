@@ -278,7 +278,7 @@ void ALRenderUtil::renderTonemap(LLRenderTarget* src, LLRenderTarget* dst)
 	{
 		src->bindTexture(0, channel, LLTexUnit::TFO_POINT);
 	}
-	tone_shader->uniform2f(LLShaderMgr::DEFERRED_SCREEN_RES, dst->getWidth(), dst->getHeight());
+	tone_shader->uniform2f(LLShaderMgr::DEFERRED_SCREEN_RES, src->getWidth(), src->getHeight());
 	tone_shader->uniform1f(al_exposure, mTonemapExposure);
 
 	switch (mTonemapType)
@@ -410,8 +410,7 @@ void ALRenderUtil::renderSharpen(LLRenderTarget* src, LLRenderTarget* dst)
 	sharpen_shader->bind();
 
 	// Draw
-	src->bindTexture(0, 0, LLTexUnit::TFO_POINT);
-	gGL.getTexUnit(0)->setTextureColorSpace(LLTexUnit::TCS_LINEAR);
+	src->bindTexture(0, 0, LLTexUnit::TFO_POINT, LLTexUnit::TCS_LINEAR);
 
 	mRenderBuffer->setBuffer(LLVertexBuffer::MAP_VERTEX);
 	mRenderBuffer->drawArrays(LLRender::TRIANGLES, 0, 3);
