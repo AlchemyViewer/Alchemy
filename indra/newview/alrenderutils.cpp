@@ -228,13 +228,16 @@ bool ALRenderUtil::setupColorGrade()
 						break;
 					}
 					default:
+					{
+						LL_WARNS() << "Color LUT has invalid number of color components: " << raw_image->getComponents() << LL_ENDL;
 						return true;
+					}
 					};
 
 					S32 image_height = raw_image->getHeight();
 					S32 image_width = raw_image->getWidth();
-					if ((image_height > 0 && image_height <= 64)	   // within dimension limit
-						&& !(image_height & (image_height - 1))			   // height is power of 2
+					if ((image_height > 0 && image_height <= 64)		   // within dimension limit
+						&& ((image_height & (image_height - 1)) == 0)	   // height is power of 2
 						&& ((image_height * image_height) == image_width)) // width is height * height
 					{
 						mCGLutSize = LLVector4(1.f / image_width, 1.f / image_height, (F32)image_width, (F32)image_height);
@@ -247,6 +250,14 @@ bool ALRenderUtil::setupColorGrade()
 						gGL.getTexUnit(0)->setTextureFilteringOption(LLTexUnit::TFO_BILINEAR);
 						gGL.getTexUnit(0)->setTextureAddressMode(LLTexUnit::TAM_CLAMP);
 					}
+					else
+					{
+						LL_WARNS() << "Color LUT is invalid width or height: " << image_height << " x " << image_width << LL_ENDL;
+					}
+				}
+				else
+				{
+					LL_WARNS() << "Failed to decode color grading LUT with extension: " << temp_exten << LL_ENDL;
 				}
 			}
 		}
