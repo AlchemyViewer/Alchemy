@@ -229,8 +229,9 @@ void main()
 		if (nh > 0.0)
 		{
 			float scol = fres*texture2D(lightFunc, vec2(nh, spec.a)).r*gt/(nh*da);
-			col += dlit*scol*spec.rgb;
-			//col += spec.rgb;
+			vec3 speccol = dlit*scol*spec.rgb;
+			speccol = max(speccol, vec3(0));
+			col += speccol;
 		}
 	}
 

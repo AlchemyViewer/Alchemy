@@ -225,6 +225,7 @@ void main()
 	if (spec.a > 0.0)
 	{
 		dlit *= min(da*6.0, 1.0) * dist_atten;
+
 		vec3 npos = -normalize(pos);
 
 		//vec3 ref = dot(pos+lv, norm);
@@ -242,7 +243,7 @@ void main()
 		{
 			float scol = fres*texture2D(lightFunc, vec2(nh, spec.a)).r*gt/(nh*da);
 			vec3 speccol = dlit*scol*spec.rgb*shadow;
-            speccol = clamp(speccol, vec3(0), vec3(1));
+			speccol = max(speccol, vec3(0));
 			col += speccol;
 		}
 	}	

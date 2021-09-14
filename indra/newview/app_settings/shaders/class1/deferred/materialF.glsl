@@ -158,7 +158,7 @@ vec3 calcPointLightOrSpotLight(vec3 light_col, vec3 npos, vec3 diffuse, vec4 spe
             {
                 float scol = fres*texture2D(lightFunc, vec2(nh, spec.a)).r*gt / (nh*da);
                 vec3 speccol = lit*scol*light_col.rgb*spec.rgb;
-                speccol = clamp(speccol, vec3(0), vec3(1));
+                speccol = max(speccol, vec3(0));
                 col += speccol;
 
                 float cur_glare = max(speccol.r, speccol.g);

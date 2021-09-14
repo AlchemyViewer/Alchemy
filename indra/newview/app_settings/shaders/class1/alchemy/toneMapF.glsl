@@ -46,7 +46,7 @@ vec3 linear_to_srgb(vec3 cl);
 
 vec3 reinhard(vec3 x)
 {
-	return x/(1+x);
+    return x/(1+x);
 }
 
 vec3 reinhard2(vec3 x) {
@@ -56,9 +56,9 @@ vec3 reinhard2(vec3 x) {
 
 vec3 filmic(vec3 color)
 {
-	color = max(vec3(0.), color - vec3(0.004));
-	color = (color * (6.2 * color + .5)) / (color * (6.2 * color + 1.7) + 0.06);
-	return color;
+    color = max(vec3(0.), color - vec3(0.004));
+    color = (color * (6.2 * color + .5)) / (color * (6.2 * color + 1.7) + 0.06);
+    return color;
 }
 
 vec3 unreal(vec3 x)
@@ -178,8 +178,9 @@ void main()
 
 #if TONEMAP_METHOD == 0 // None, Gamma Correct Only
     #define NEEDS_GAMMA_CORRECT 1
-#elif TONEMAP_METHOD == 1 // Linear 
+#elif TONEMAP_METHOD == 1 // Linear
     #define NEEDS_GAMMA_CORRECT 1
+    diff.rgb = clamp(diff.rgb, 0, 1);
 #elif TONEMAP_METHOD == 2 // Reinhard method
     #define NEEDS_GAMMA_CORRECT 1
     diff.rgb = reinhard(diff.rgb);
@@ -212,25 +213,25 @@ void main()
 
 #if COLOR_GRADE_LUT
     // Invert coord for compat with DX-style LUT
-    diff.y	= 1.0 - diff.y;
+    diff.y = 1.0 - diff.y;
 
-	// Convert to texel coords
-	vec3 lutRange = diff.rgb * ( colorgrade_lut_size.w - 1);
+    // Convert to texel coords
+    vec3 lutRange = diff.rgb * ( colorgrade_lut_size.w - 1);
 
     // Calculate coords in texel space
-	vec2 lutX = vec2(floor(lutRange.z)*colorgrade_lut_size.w+lutRange.x, lutRange.y);
-	vec2 lutY = vec2(ceil(lutRange.z)*colorgrade_lut_size.w+lutRange.x, lutRange.y);
+    vec2 lutX = vec2(floor(lutRange.z)*colorgrade_lut_size.w+lutRange.x, lutRange.y);
+    vec2 lutY = vec2(ceil(lutRange.z)*colorgrade_lut_size.w+lutRange.x, lutRange.y);
 
-	// texel to ndc
-	lutX = (lutX+0.5)*colorgrade_lut_size.xy;
-	lutY = (lutY+0.5)*colorgrade_lut_size.xy;
+    // texel to ndc
+    lutX = (lutX+0.5)*colorgrade_lut_size.xy;
+    lutY = (lutY+0.5)*colorgrade_lut_size.xy;
 
-	// LUT interpolation
-	diff.rgb = mix(
+    // LUT interpolation
+    diff.rgb = mix(
         texture2D(colorgrade_lut, lutX).rgb, 
         texture2D(colorgrade_lut, lutY).rgb, 
         fract(lutRange.z)
-	);
+    );
 #endif
 
     frag_color = diff;

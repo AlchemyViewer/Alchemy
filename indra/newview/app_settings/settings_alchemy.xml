@@ -769,13 +769,13 @@
     <key>RenderToneMapType</key>
     <map>
       <key>Comment</key>
-      <string>Tonemapping type 0 - None, 1 - Linear, 2 - Reinhard, 3 - Reinhard2, 4 - Filmic, 5 - Unreal, 6 - ACES, 7 - Uchimura, 8 - Lottes, 9 - Uncharted</string>
+      <string>Tonemapping type 0 - HDR Debug, 1 - Linear, 2 - Reinhard, 3 - Reinhard2, 4 - Filmic, 5 - Unreal, 6 - ACES, 7 - Uchimura, 8 - Lottes, 9 - Uncharted</string>
       <key>Persist</key>
       <integer>1</integer>
       <key>Type</key>
       <string>U32</string>
       <key>Value</key>
-      <integer>0</integer>
+      <integer>7</integer>
     </map>
     <key>RenderToneMapUchimuraA</key>
     <map>
@@ -803,7 +803,7 @@
       <key>Value</key>
       <array>
         <real>0.4</real>
-        <real>1.33</real>
+        <real>1.13</real>
         <real>0.0</real>
       </array>
     </map>
