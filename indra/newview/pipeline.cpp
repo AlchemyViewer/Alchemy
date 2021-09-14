@@ -552,7 +552,13 @@ void LLPipeline::init()
 	}
 
 	mDeferredVB = new LLVertexBuffer(DEFERRED_VB_MASK, 0);
-	mDeferredVB->allocateBuffer(8, 0, true);
+	mDeferredVB->allocateBuffer(3, 0, true);
+	LLStrider<LLVector3> vert;
+	mDeferredVB->getVertexStrider(vert);
+	vert[0].set(-1.f, -1.f, 0.f);
+	vert[1].set( 3.f, -1.f, 0.f);
+	vert[2].set(-1.f,  3.f, 0.f);
+	mDeferredVB->flush();
 
 	mALRenderUtil->restoreVertexBuffers();
 
@@ -2802,14 +2808,6 @@ void LLPipeline::downsampleDepthBuffer(LLRenderTarget& source, LLRenderTarget& d
 	dest.bindTarget();
 	dest.clear(GL_DEPTH_BUFFER_BIT);
 
-	LLStrider<LLVector3> vert; 
-	mDeferredVB->getVertexStrider(vert);
-	LLStrider<LLVector2> tc0;
-		
-	vert[0].set(-1,1,0);
-	vert[1].set(-1,-3,0);
-	vert[2].set(3,1,0);
-	
 	if (source.getUsage() == LLTexUnit::TT_RECT_TEXTURE)
 	{
 		shader = &gDownsampleDepthRectProgram;
@@ -7598,7 +7596,13 @@ void LLPipeline::doResetVertexBuffers(bool forced)
 	}
 
 	mDeferredVB = new LLVertexBuffer(DEFERRED_VB_MASK, 0);
-	mDeferredVB->allocateBuffer(8, 0, true);
+	mDeferredVB->allocateBuffer(3, 0, true);
+	LLStrider<LLVector3> vert;
+	mDeferredVB->getVertexStrider(vert);
+	vert[0].set(-1.f, -1.f, 0.f);
+	vert[1].set( 3.f, -1.f, 0.f);
+	vert[2].set(-1.f,  3.f, 0.f);
+	mDeferredVB->flush();
 
 	mALRenderUtil->restoreVertexBuffers();
 }
@@ -8243,7 +8247,8 @@ void LLPipeline::renderFinalize()
                         glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
                         glStencilMask(0xFF);
                     }
-                    drawFullScreenRect();
+					mDeferredVB->setBuffer(LLVertexBuffer::MAP_VERTEX);
+					mDeferredVB->drawArrays(LLRender::TRIANGLES, 0, 3);
                     bound_target->flush();
                     bound_shader->unbind();
                     gGL.getTexUnit(0)->disable();
@@ -8273,7 +8278,8 @@ void LLPipeline::renderFinalize()
                         glStencilFunc(GL_EQUAL, 1, 0xFF);
                         glStencilMask(0x00);
                     }
-                    drawFullScreenRect();
+					mDeferredVB->setBuffer(LLVertexBuffer::MAP_VERTEX);
+					mDeferredVB->drawArrays(LLRender::TRIANGLES, 0, 3);
                     if (use_stencil)
                     {
                         glStencilFunc(GL_ALWAYS, 0, 0xFF);
@@ -8306,7 +8312,8 @@ void LLPipeline::renderFinalize()
                         bound_target->bindTarget();
                         bound_target->clear(GL_COLOR_BUFFER_BIT);
 					}
-                    drawFullScreenRect();
+					mDeferredVB->setBuffer(LLVertexBuffer::MAP_VERTEX);
+					mDeferredVB->drawArrays(LLRender::TRIANGLES, 0, 3);
                     if (sharpen_enabled)
                     {
                         bound_target->flush();
@@ -8350,7 +8357,8 @@ void LLPipeline::renderFinalize()
                 }
                 // [RLVa:KB]
 
-                drawFullScreenRect();
+				mDeferredVB->setBuffer(LLVertexBuffer::MAP_VERTEX);
+				mDeferredVB->drawArrays(LLRender::TRIANGLES, 0, 3);
 				bound_target->flush();
                 // [RLVa:KB] - @setsphere
                 bound_shader->disableTexture(LLShaderMgr::DEFERRED_DIFFUSE, pRenderBuffer->getUsage());
@@ -8384,7 +8392,8 @@ void LLPipeline::renderFinalize()
                     bound_target->bindTarget();
                     bound_target->clear(GL_COLOR_BUFFER_BIT);
                 }
-				drawFullScreenRect();
+				mDeferredVB->setBuffer(LLVertexBuffer::MAP_VERTEX);
+				mDeferredVB->drawArrays(LLRender::TRIANGLES, 0, 3);
                 if (sharpen_enabled)
                 {
                     bound_target->flush();
@@ -8841,13 +8850,6 @@ void LLPipeline::renderDeferredLighting(LLRenderTarget *screen_target)
 
         glh::matrix4f mat = copy_matrix(gGLModelView);
 
-        LLStrider<LLVector3> vert;
-        mDeferredVB->getVertexStrider(vert);
-
-        vert[0].set(-1, 1, 0);
-        vert[1].set(-1, -3, 0);
-        vert[2].set(3, 1, 0);
-
         setupHWLights(NULL);  // to set mSun/MoonDir;
 
         glh::vec4f tc(mSunDir.mV);
@@ -9192,12 +9194,6 @@ void LLPipeline::renderDeferredLighting(LLRenderTarget *screen_target)
                 gDeferredSpotLightProgram.disableTexture(LLShaderMgr::DEFERRED_PROJECTION);
                 unbindDeferredShader(gDeferredSpotLightProgram);
             }
-
-            // reset mDeferredVB to fullscreen triangle
-            mDeferredVB->getVertexStrider(vert);
-            vert[0].set(-1, 1, 0);
-            vert[1].set(-1, -3, 0);
-            vert[2].set(3, 1, 0);
 
             {
                 LLGLDepthTest depth(GL_FALSE);
