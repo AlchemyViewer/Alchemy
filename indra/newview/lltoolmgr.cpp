@@ -230,7 +230,7 @@ LLTool* LLToolMgr::getCurrentTool()
 				&&	prev_tool == LLToolCamera::getInstance()
 				&&	cur_tool == LLToolPie::getInstance() )
 			{
-				LLFloaterInspect * inspect_instance = LLFloaterReg::getTypedInstance<LLFloaterInspect>("inspect");
+				LLFloaterInspect * inspect_instance = LLFloaterReg::findTypedInstance<LLFloaterInspect>("inspect");
 				if(inspect_instance && inspect_instance->getVisible())
 				{
 					setTransientTool(LLToolCompInspect::getInstance());
