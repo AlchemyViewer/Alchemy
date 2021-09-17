@@ -61,6 +61,9 @@ ALRenderUtil::ALRenderUtil()
 	gSavedSettings.getControl("RenderToneMapLottesB")->getSignal()->connect(boost::bind(&ALRenderUtil::setupTonemap, this));
 	gSavedSettings.getControl("RenderToneMapUchimuraA")->getSignal()->connect(boost::bind(&ALRenderUtil::setupTonemap, this));
 	gSavedSettings.getControl("RenderToneMapUchimuraB")->getSignal()->connect(boost::bind(&ALRenderUtil::setupTonemap, this));
+	gSavedSettings.getControl("RenderToneMapUnchartedA")->getSignal()->connect(boost::bind(&ALRenderUtil::setupTonemap, this));
+	gSavedSettings.getControl("RenderToneMapUnchartedB")->getSignal()->connect(boost::bind(&ALRenderUtil::setupTonemap, this));
+	gSavedSettings.getControl("RenderToneMapUnchartedC")->getSignal()->connect(boost::bind(&ALRenderUtil::setupTonemap, this));
 	gSavedSettings.getControl("RenderSharpenMethod")->getSignal()->connect(boost::bind(&ALRenderUtil::setupSharpen, this));
 	gSavedSettings.getControl("RenderSharpenCASParams")->getSignal()->connect(boost::bind(&ALRenderUtil::setupSharpen, this));
 	gSavedSettings.getControl("RenderSharpenDLSParams")->getSignal()->connect(boost::bind(&ALRenderUtil::setupSharpen, this));
