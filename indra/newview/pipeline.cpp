@@ -8631,8 +8631,6 @@ void LLPipeline::bindDeferredShader(LLGLSLShader& shader, LLRenderTarget* light_
 
 	stop_glerror();
 
-	auto& viewerCamera = LLViewerCamera::instance();
-
 	if (shader.mFeatures.hasShadows)
 	{
 		for (U32 i = 0; i < 4; i++)
@@ -8681,8 +8679,6 @@ void LLPipeline::bindDeferredShader(LLGLSLShader& shader, LLRenderTarget* light_
 
 		stop_glerror();
 
-
-		if (shader.getUniformLocation(LLShaderMgr::DEFERRED_SHADOW_MATRIX) > -1)
 		{
 			F32 mat[16 * 6];
 			memcpy(mat, mSunShadowMatrix[0].m, sizeof(F32) * 16);
@@ -8702,7 +8698,7 @@ void LLPipeline::bindDeferredShader(LLGLSLShader& shader, LLRenderTarget* light_
 		shader.uniform2f(LLShaderMgr::DEFERRED_PROJ_SHADOW_RES, mShadow[4].getWidth(), mShadow[4].getHeight());
 
 		//F32 shadow_offset_error = 1.f + RenderShadowOffsetError * fabsf(LLViewerCamera::getInstance()->getOrigin().mV[2]);
-		F32 shadow_bias_error = RenderShadowBiasError * fabsf(viewerCamera.getOrigin().mV[2]) / 3000.f;
+		F32 shadow_bias_error = RenderShadowBiasError * fabsf(LLViewerCamera::instance().getOrigin().mV[2]) / 3000.f;
 		F32 shadow_bias = RenderShadowBias + shadow_bias_error;
 
 		shader.uniform1f(LLShaderMgr::DEFERRED_SHADOW_OFFSET, RenderShadowOffset); //*shadow_offset_error);
@@ -8742,7 +8738,11 @@ void LLPipeline::bindDeferredShader(LLGLSLShader& shader, LLRenderTarget* light_
 	}
 
     shader.uniform2f(LLShaderMgr::DEFERRED_SCREEN_RES, deferred_target->getWidth(), deferred_target->getHeight());
-	shader.uniform1f(LLShaderMgr::DEFERRED_NEAR_CLIP, viewerCamera.getNear()*2.f);
+
+	if (shader.getUniformLocation(LLShaderMgr::DEFERRED_NEAR_CLIP) > -1)
+	{
+		shader.uniform1f(LLShaderMgr::DEFERRED_NEAR_CLIP, LLViewerCamera::instance().getNear() * 2.f);
+	}
 
 	shader.uniform3fv(LLShaderMgr::DEFERRED_SUN_DIR, 1, mTransformedSunDir.mV);
     shader.uniform3fv(LLShaderMgr::DEFERRED_MOON_DIR, 1, mTransformedMoonDir.mV);

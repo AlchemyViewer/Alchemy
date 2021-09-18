@@ -49,7 +49,6 @@ uniform float proj_focus; //distance from plane to begin blurring
 uniform float proj_lod;  //(number of mips in proj map)
 uniform float proj_range; //range between near clip and far clip plane of projection
 uniform float proj_ambiance;
-uniform float near_clip;
 uniform float far_clip;
 
 uniform vec3 proj_origin; //origin of projection to be used for angular attenuation
