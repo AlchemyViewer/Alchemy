@@ -28,9 +28,6 @@ uniform mat4 modelview_projection_matrix;
 
 ATTRIBUTE vec3 position;
 
-
-void calcAtmospherics(vec3 inPositionEye);
-
 uniform vec2 waveDir1;
 uniform vec2 waveDir2;
 uniform float time;
@@ -85,8 +82,6 @@ void main()
 	pos.w = 1.0;
 	pos = modelview_matrix*pos;
 	
-	calcAtmospherics(pos.xyz);
-		
 	//pass wave parameters to pixel shader
 	vec2 bigWave =  (v.xy) * vec2(0.04,0.04)  + waveDir1 * time * 0.055;
 	//get two normal map (detail map) texture coordinates

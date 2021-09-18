@@ -49,8 +49,6 @@ vec3 fullbrightShinyAtmosTransport(vec3 light);
 vec3 fullbrightAtmosTransportFrag(vec3 light, vec3 additive, vec3 atten);
 vec3 fullbrightScaleSoftClip(vec3 light);
 
-void calcAtmosphericVars(vec3 inPositionEye, vec3 light_dir, float ambFactor, out vec3 sunlit, out vec3 amblit, out vec3 additive, out vec3 atten, bool use_ao);
-
 vec3 linear_to_srgb(vec3 c);
 vec3 srgb_to_linear(vec3 c);
 
@@ -70,21 +68,14 @@ void main()
 	// SL-9632 HUDs are affected by Atmosphere
 	if (no_atmo == 0)
 	{
-	vec3 sunlit;
-	vec3 amblit;
-	vec3 additive;
-	vec3 atten;
 		vec3 pos = vary_position.xyz/vary_position.w;
-
-	calcAtmosphericVars(pos.xyz, vec3(0), 1.0, sunlit, amblit, additive, atten, false);
 	
-	vec3 envColor = textureCube(environmentMap, vary_texcoord1.xyz).rgb;	
-	float env_intensity = vertex_color.a;
+		vec3 envColor = textureCube(environmentMap, vary_texcoord1.xyz).rgb;	
+		float env_intensity = vertex_color.a;
 
-	//color.rgb = srgb_to_linear(color.rgb);
 		color.rgb = mix(color.rgb, envColor.rgb, env_intensity);
-	color.rgb = fullbrightShinyAtmosTransport(color.rgb);
-	color.rgb = fullbrightScaleSoftClip(color.rgb);
+		color.rgb = fullbrightShinyAtmosTransport(color.rgb);
+		color.rgb = fullbrightScaleSoftClip(color.rgb);
 	}
 
 /*
