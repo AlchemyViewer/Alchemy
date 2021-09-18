@@ -32,10 +32,6 @@ uniform mat4 modelview_projection_matrix;
 
 void calcAtmospherics(vec3 inPositionEye);
 
-uniform vec4 origin;
-
-
-
 ATTRIBUTE vec3 position;
 void passTextureIndex();
 ATTRIBUTE vec3 normal;

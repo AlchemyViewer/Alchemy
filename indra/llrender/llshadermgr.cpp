@@ -1266,7 +1266,6 @@ void LLShaderMgr::initAttribsAndUniforms()
 	mReservedUniforms.push_back("ssao_radius");
 	mReservedUniforms.push_back("ssao_max_radius");
 	mReservedUniforms.push_back("ssao_factor");
-	mReservedUniforms.push_back("ssao_factor_inv");
 	mReservedUniforms.push_back("ssao_effect");
 	mReservedUniforms.push_back("screen_res");
 	mReservedUniforms.push_back("near_clip");
@@ -1364,10 +1363,6 @@ void LLShaderMgr::initAttribsAndUniforms()
 	mReservedUniforms.push_back("detail_3");
 	mReservedUniforms.push_back("alpha_ramp");
 
-	mReservedUniforms.push_back("origin");
-
-    mReservedUniforms.push_back("fog_color");
-
     mReservedUniforms.push_back("blend_factor");
     mReservedUniforms.push_back("no_atmo");
     mReservedUniforms.push_back("moisture_level");
@@ -1377,10 +1372,6 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("halo_map");
     mReservedUniforms.push_back("moon_brightness");
     mReservedUniforms.push_back("cloud_variance");
-
-    mReservedUniforms.push_back("sh_input_r");
-    mReservedUniforms.push_back("sh_input_g");
-    mReservedUniforms.push_back("sh_input_b");
 
     mReservedUniforms.push_back("sun_moon_glow_factor");
     mReservedUniforms.push_back("water_edge");

@@ -43,8 +43,6 @@ vec4 calcLighting(vec3 pos, vec3 norm, vec4 color);
 
 void calcAtmospherics(vec3 inPositionEye);
 
-uniform vec4 origin;
-
 void main()
 {
 	//transform vertex

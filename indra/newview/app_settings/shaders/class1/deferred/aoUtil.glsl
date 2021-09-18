@@ -30,7 +30,6 @@ uniform sampler2DRect   depthMap;
 uniform float ssao_radius;
 uniform float ssao_max_radius;
 uniform float ssao_factor;
-uniform float ssao_factor_inv;
 
 uniform mat4 inv_proj;
 uniform vec2 screen_res;

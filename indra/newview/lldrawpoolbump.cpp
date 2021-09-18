@@ -384,14 +384,6 @@ void LLDrawPoolBump::bindCubeMap(LLGLSLShader* shader, S32 shader_level, S32& di
 	{
 		if (!invisible && shader )
 		{
-			LLMatrix4 mat;
-			mat.initRows(LLVector4(gGLModelView+0),
-						 LLVector4(gGLModelView+4),
-						 LLVector4(gGLModelView+8),
-						 LLVector4(gGLModelView+12));
-			LLVector3 vec = LLVector3(gShinyOrigin) * mat;
-			LLVector4 vec4(vec, gShinyOrigin.mV[3]);
-			shader->uniform4fv(LLViewerShaderMgr::SHINY_ORIGIN, 1, vec4.mV);			
 			if (shader_level > 1)
 			{
 				cube_map->setMatrix(1);
@@ -539,11 +531,6 @@ void LLDrawPoolBump::beginFullbrightShiny()
 	LLCubeMap* cube_map = gSky.mVOSkyp ? gSky.mVOSkyp->getCubeMap() : NULL;
 	if( cube_map )
 	{
-		LLMatrix4 mat;
-		mat.initRows(LLVector4(gGLModelView+0),
-					 LLVector4(gGLModelView+4),
-					 LLVector4(gGLModelView+8),
-					 LLVector4(gGLModelView+12));
 		shader->bind();
         if (LLPipeline::sRenderingHUDs)
         {
@@ -553,10 +540,6 @@ void LLDrawPoolBump::beginFullbrightShiny()
         {
             shader->uniform1i(LLShaderMgr::NO_ATMO, 0);
         }
-
-		LLVector3 vec = LLVector3(gShinyOrigin) * mat;
-		LLVector4 vec4(vec, gShinyOrigin.mV[3]);
-		shader->uniform4fv(LLViewerShaderMgr::SHINY_ORIGIN, 1, vec4.mV);			
 
 		cube_map->setMatrix(1);
 		// Make sure that texture coord generation happens for tex unit 1, as that's the one we use for 

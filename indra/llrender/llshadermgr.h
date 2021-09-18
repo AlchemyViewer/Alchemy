@@ -121,8 +121,7 @@ public:
         DEFERRED_SSAO_RADIUS,               //  "ssao_radius"
         DEFERRED_SSAO_MAX_RADIUS,           //  "ssao_max_radius"
         DEFERRED_SSAO_FACTOR,               //  "ssao_factor"
-        DEFERRED_SSAO_FACTOR_INV,           //  "ssao_factor_inv"
-		DEFERRED_SSAO_EFFECT,
+		DEFERRED_SSAO_EFFECT,               //  "ssao_effect"
         DEFERRED_SCREEN_RES,                //  "screen_res"
         DEFERRED_NEAR_CLIP,                 //  "near_clip"
         DEFERRED_SHADOW_OFFSET,             //  "shadow_offset"
@@ -213,10 +212,6 @@ public:
         TERRAIN_DETAIL3,                    //  "detail_3"
         TERRAIN_ALPHARAMP,                  //  "alpha_ramp"
 
-        SHINY_ORIGIN,                       //  "origin"
-
-        FOG_COLOR,                          //  "fog_color"
-
         BLEND_FACTOR,                       //  "blend_factor"
 
         NO_ATMO,                            //  "no_atmo"
@@ -227,12 +222,7 @@ public:
         HALO_MAP,                           //  "halo_map"
 
         MOON_BRIGHTNESS,                    //  "moon_brightness"
-
         CLOUD_VARIANCE,                     //  "cloud_variance"
-
-        SH_INPUT_L1R,                       //  "sh_input_r"
-        SH_INPUT_L1G,                       //  "sh_input_g"
-        SH_INPUT_L1B,                       //  "sh_input_b"
 
         SUN_MOON_GLOW_FACTOR,               //  "sun_moon_glow_factor"
         WATER_EDGE_FACTOR,                  //  "water_edge"

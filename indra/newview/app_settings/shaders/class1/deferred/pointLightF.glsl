@@ -38,8 +38,6 @@ uniform sampler2DRect specularRect;
 uniform sampler2D noiseMap;
 uniform sampler2D lightFunc;
 
-uniform vec3 env_mat[3];
-
 uniform vec3 color;
 uniform float falloff;
 uniform float size;
@@ -50,7 +48,6 @@ VARYING vec3 trans_center;
 uniform vec2 screen_res;
 
 uniform mat4 inv_proj;
-uniform vec4 viewport;
 
 vec3 getNorm(vec2 pos_screen);
 vec4 getPosition(vec2 pos_screen);
