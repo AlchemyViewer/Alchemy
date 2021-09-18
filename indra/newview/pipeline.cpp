@@ -8642,66 +8642,73 @@ void LLPipeline::bindDeferredShader(LLGLSLShader& shader, LLRenderTarget* light_
 
 	stop_glerror();
 
-	for (U32 i = 0; i < 4; i++)
+	if (shader.mFeatures.hasShadows)
 	{
-        LLRenderTarget* shadow_target = getShadowTarget(i);
-        if (shadow_target)
-        {
-		channel = shader.enableTexture(LLShaderMgr::DEFERRED_SHADOW0+i, LLTexUnit::TT_TEXTURE);
-		stop_glerror();
-		if (channel > -1)
+		for (U32 i = 0; i < 4; i++)
 		{
-			stop_glerror();
-                gGL.getTexUnit(channel)->bind(getShadowTarget(i), TRUE);
-                gGL.getTexUnit(channel)->setTextureFilteringOption(LLTexUnit::TFO_BILINEAR);
-			gGL.getTexUnit(channel)->setTextureAddressMode(LLTexUnit::TAM_CLAMP);
-			stop_glerror();
-			
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_R_TO_TEXTURE);
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_FUNC, GL_LEQUAL);
-			stop_glerror();
-		}
-	}
-    }
-
-	for (U32 i = 4; i < 6; i++)
-	{
-		channel = shader.enableTexture(LLShaderMgr::DEFERRED_SHADOW0+i);
-		stop_glerror();
-		if (channel > -1)
-		{
-			stop_glerror();
 			LLRenderTarget* shadow_target = getShadowTarget(i);
 			if (shadow_target)
 			{
-				gGL.getTexUnit(channel)->bind(shadow_target, TRUE);
-				gGL.getTexUnit(channel)->setTextureFilteringOption(LLTexUnit::TFO_BILINEAR);
-			gGL.getTexUnit(channel)->setTextureAddressMode(LLTexUnit::TAM_CLAMP);
-			stop_glerror();
-			
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_R_TO_TEXTURE);
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_FUNC, GL_LEQUAL);
-			stop_glerror();
+				channel = shader.enableTexture(LLShaderMgr::DEFERRED_SHADOW0 + i, LLTexUnit::TT_TEXTURE);
+				stop_glerror();
+				if (channel > -1)
+				{
+					stop_glerror();
+					gGL.getTexUnit(channel)->bind(getShadowTarget(i), TRUE);
+					gGL.getTexUnit(channel)->setTextureFilteringOption(LLTexUnit::TFO_BILINEAR);
+					gGL.getTexUnit(channel)->setTextureAddressMode(LLTexUnit::TAM_CLAMP);
+					stop_glerror();
+
+					glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_R_TO_TEXTURE);
+					glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_FUNC, GL_LEQUAL);
+					stop_glerror();
+				}
+			}
 		}
-	}
-	}
 
-	stop_glerror();
+		for (U32 i = 4; i < 6; i++)
+		{
+			channel = shader.enableTexture(LLShaderMgr::DEFERRED_SHADOW0 + i);
+			stop_glerror();
+			if (channel > -1)
+			{
+				stop_glerror();
+				LLRenderTarget* shadow_target = getShadowTarget(i);
+				if (shadow_target)
+				{
+					gGL.getTexUnit(channel)->bind(shadow_target, TRUE);
+					gGL.getTexUnit(channel)->setTextureFilteringOption(LLTexUnit::TFO_BILINEAR);
+					gGL.getTexUnit(channel)->setTextureAddressMode(LLTexUnit::TAM_CLAMP);
+					stop_glerror();
 
-
-	if(shader.getUniformLocation(LLShaderMgr::DEFERRED_SHADOW_MATRIX) > -1)
-	{
-		F32 mat[16*6];
-		memcpy(mat,		 mSunShadowMatrix[0].m, sizeof(F32) * 16);
-		memcpy(mat + 16, mSunShadowMatrix[1].m, sizeof(F32) * 16);
-		memcpy(mat + 32, mSunShadowMatrix[2].m, sizeof(F32) * 16);
-		memcpy(mat + 48, mSunShadowMatrix[3].m, sizeof(F32) * 16);
-		memcpy(mat + 64, mSunShadowMatrix[4].m, sizeof(F32) * 16);
-		memcpy(mat + 80, mSunShadowMatrix[5].m, sizeof(F32) * 16);
-
-		shader.uniformMatrix4fv(LLShaderMgr::DEFERRED_SHADOW_MATRIX, 6, FALSE, mat);
+					glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_R_TO_TEXTURE);
+					glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_FUNC, GL_LEQUAL);
+					stop_glerror();
+				}
+			}
+		}
 
 		stop_glerror();
+
+
+		if (shader.getUniformLocation(LLShaderMgr::DEFERRED_SHADOW_MATRIX) > -1)
+		{
+			F32 mat[16 * 6];
+			memcpy(mat, mSunShadowMatrix[0].m, sizeof(F32) * 16);
+			memcpy(mat + 16, mSunShadowMatrix[1].m, sizeof(F32) * 16);
+			memcpy(mat + 32, mSunShadowMatrix[2].m, sizeof(F32) * 16);
+			memcpy(mat + 48, mSunShadowMatrix[3].m, sizeof(F32) * 16);
+			memcpy(mat + 64, mSunShadowMatrix[4].m, sizeof(F32) * 16);
+			memcpy(mat + 80, mSunShadowMatrix[5].m, sizeof(F32) * 16);
+
+			shader.uniformMatrix4fv(LLShaderMgr::DEFERRED_SHADOW_MATRIX, 6, FALSE, mat);
+
+			stop_glerror();
+		}
+
+		shader.uniform4fv(LLShaderMgr::DEFERRED_SHADOW_CLIP, 1, mSunClipPlanes.mV);
+		shader.uniform2f(LLShaderMgr::DEFERRED_SHADOW_RES, mShadow[0].getWidth(), mShadow[0].getHeight());
+		shader.uniform2f(LLShaderMgr::DEFERRED_PROJ_SHADOW_RES, mShadow[4].getWidth(), mShadow[4].getHeight());
 	}
 
 	channel = shader.enableTexture(LLShaderMgr::ENVIRONMENT_MAP, LLTexUnit::TT_CUBE_MAP);
@@ -8722,7 +8729,6 @@ void LLPipeline::bindDeferredShader(LLGLSLShader& shader, LLRenderTarget* light_
 		}
 	}
 
-	shader.uniform4fv(LLShaderMgr::DEFERRED_SHADOW_CLIP, 1, mSunClipPlanes.mV);
 	shader.uniform1f(LLShaderMgr::DEFERRED_SUN_WASH, RenderDeferredSunWash);
 	shader.uniform1f(LLShaderMgr::DEFERRED_SHADOW_NOISE, RenderShadowNoise);
 	shader.uniform1f(LLShaderMgr::DEFERRED_BLUR_SIZE, RenderShadowBlurSize);
@@ -8751,8 +8757,7 @@ void LLPipeline::bindDeferredShader(LLGLSLShader& shader, LLRenderTarget* light_
 
 	shader.uniform3fv(LLShaderMgr::DEFERRED_SUN_DIR, 1, mTransformedSunDir.mV);
     shader.uniform3fv(LLShaderMgr::DEFERRED_MOON_DIR, 1, mTransformedMoonDir.mV);
-	shader.uniform2f(LLShaderMgr::DEFERRED_SHADOW_RES, mShadow[0].getWidth(), mShadow[0].getHeight());
-	shader.uniform2f(LLShaderMgr::DEFERRED_PROJ_SHADOW_RES, mShadow[4].getWidth(), mShadow[4].getHeight());
+
 	
 	if (shader.getUniformLocation(LLShaderMgr::DEFERRED_NORM_MATRIX) >= 0)
 	{
@@ -9422,28 +9427,30 @@ void LLPipeline::setupSpotLight(LLGLSLShader& shader, LLDrawable* drawablep)
 	shader.uniform3fv(LLShaderMgr::PROJECTOR_ORIGIN, 1, screen_origin.v);
 	shader.uniform1f(LLShaderMgr::PROJECTOR_RANGE, proj_range);
 	shader.uniform1f(LLShaderMgr::PROJECTOR_AMBIANCE, params.mV[2]);
-	S32 s_idx = -1;
 
-	for (U32 i = 0; i < 2; i++)
+	if (shader.mFeatures.hasShadows)
 	{
-		if (mShadowSpotLight[i] == drawablep)
+		S32 s_idx = -1;
+
+		for (U32 i = 0; i < 2; i++)
 		{
-			s_idx = i;
+			if (mShadowSpotLight[i] == drawablep)
+			{
+				s_idx = i;
+			}
 		}
-	}
 
-	shader.uniform1i(LLShaderMgr::PROJECTOR_SHADOW_INDEX, s_idx);
+		shader.uniform1i(LLShaderMgr::PROJECTOR_SHADOW_INDEX, s_idx);
 
-	if (s_idx >= 0)
-	{
-		shader.uniform1f(LLShaderMgr::PROJECTOR_SHADOW_FADE, 1.f-mSpotLightFade[s_idx]);
-	}
-	else
-	{
-		shader.uniform1f(LLShaderMgr::PROJECTOR_SHADOW_FADE, 1.f);
-	}
+		if (s_idx >= 0)
+		{
+			shader.uniform1f(LLShaderMgr::PROJECTOR_SHADOW_FADE, 1.f - mSpotLightFade[s_idx]);
+		}
+		else
+		{
+			shader.uniform1f(LLShaderMgr::PROJECTOR_SHADOW_FADE, 1.f);
+		}
 
-	{
 		LLDrawable* potential = drawablep;
 		//determine if this is a good light for casting shadows
 		F32 m_pri = volume->getSpotLightPriority();
@@ -9507,19 +9514,22 @@ void LLPipeline::unbindDeferredShader(LLGLSLShader &shader)
 	shader.disableTexture(LLShaderMgr::DIFFUSE_MAP);
 	shader.disableTexture(LLShaderMgr::DEFERRED_BLOOM);
 
-	for (U32 i = 0; i < 4; i++)
+	if (shader.mFeatures.hasShadows)
 	{
-		if (shader.disableTexture(LLShaderMgr::DEFERRED_SHADOW0+i) > -1)
+		for (U32 i = 0; i < 4; i++)
 		{
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_NONE);
+			if (shader.disableTexture(LLShaderMgr::DEFERRED_SHADOW0 + i) > -1)
+			{
+				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_NONE);
+			}
 		}
-	}
 
-	for (U32 i = 4; i < 6; i++)
-	{
-		if (shader.disableTexture(LLShaderMgr::DEFERRED_SHADOW0+i) > -1)
+		for (U32 i = 4; i < 6; i++)
 		{
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_NONE);
+			if (shader.disableTexture(LLShaderMgr::DEFERRED_SHADOW0 + i) > -1)
+			{
+				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_NONE);
+			}
 		}
 	}
 
