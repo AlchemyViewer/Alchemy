@@ -42,7 +42,6 @@ uniform float sunAngle;
 uniform float sunAngle2;
 uniform vec3 lightDir;
 uniform vec3 specular;
-uniform float lightExp;
 uniform float refScale;
 uniform float kd;
 uniform vec2 screenRes;

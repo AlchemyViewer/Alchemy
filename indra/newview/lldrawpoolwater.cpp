@@ -565,7 +565,6 @@ void LLDrawPoolWater::shade2(bool edge, LLGLSLShader* shader, const LLColor3& li
 	shader->uniform1f(LLShaderMgr::WATER_TIME, sTime);
 	shader->uniform3fv(LLShaderMgr::WATER_EYEVEC, 1, viewerCamera.getOrigin().mV);
 	shader->uniform3fv(LLShaderMgr::WATER_SPECULAR, 1, light_diffuse.mV);
-	shader->uniform1f(LLShaderMgr::WATER_SPECULAR_EXP, light_exp);
     if (environment.isCloudScrollPaused())
     {
         shader->uniform2fv(LLShaderMgr::WATER_WAVE_DIR1, 1, LLVector2::zero.mV);

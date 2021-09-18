@@ -190,7 +190,6 @@ public:
         WATER_WAVE_DIR2,                    //  "waveDir2"
         WATER_LIGHT_DIR,                    //  "lightDir"
         WATER_SPECULAR,                     //  "specular"
-        WATER_SPECULAR_EXP,                 //  "lightExp"
         WATER_FOGCOLOR,                     //  "waterFogColor"
         WATER_FOGDENSITY,                   //  "waterFogDensity"
         WATER_FOGKS,                        //  "waterFogKS"
