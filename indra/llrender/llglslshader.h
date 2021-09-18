@@ -55,7 +55,6 @@ public:
 	bool hasSrgb;
     bool encodesNormal;
     bool isDeferred;
-    bool hasIndirect;
 	S32 mIndexedTextureChannels;
 	bool disableTextureIndex;
 	bool hasAlphaMask;

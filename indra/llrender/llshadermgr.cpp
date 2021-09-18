@@ -221,14 +221,6 @@ BOOL LLShaderMgr::attachShaderFeatures(LLGLSLShader * shader)
 		}
 	}
 
-    if (features->hasIndirect)
-	{
-        if (!shader->attachFragmentObject("deferred/indirect.glsl"))
-		{
-			return FALSE;
-		}
-	}
-
 	if (features->hasGamma)
 	{
         if (!shader->attachFragmentObject("windlight/gammaF.glsl"))
