@@ -53,7 +53,6 @@ uniform float near_clip;
 uniform float far_clip;
 
 uniform vec3 proj_origin; //origin of projection to be used for angular attenuation
-uniform float sun_wash;
 
 uniform vec3 center;
 uniform vec3 color;

@@ -39,7 +39,6 @@ uniform sampler2D     noiseMap;
 uniform sampler2D     lightFunc;
 
 uniform vec3  env_mat[3];
-uniform float sun_wash;
 uniform int   light_count;
 uniform vec4  light[LIGHT_COUNT];
 uniform vec4  light_col[LIGHT_COUNT];

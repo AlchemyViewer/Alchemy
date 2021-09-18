@@ -38,7 +38,6 @@ uniform sampler2D	noiseMap;
 
 uniform vec2 kern[32];
 uniform float dist_factor;
-uniform float blur_size;
 uniform vec2 delta;
 uniform int kern_length;
 uniform float kern_scale;

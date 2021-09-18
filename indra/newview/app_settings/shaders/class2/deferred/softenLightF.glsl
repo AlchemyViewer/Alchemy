@@ -42,9 +42,6 @@ uniform sampler2DRect depthMap;
 uniform samplerCube   environmentMap;
 uniform sampler2D     lightFunc;
 
-uniform float blur_size;
-uniform float blur_fidelity;
-
 // Inputs
 uniform mat3 env_mat;
 
