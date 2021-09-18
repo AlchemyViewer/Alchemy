@@ -43,7 +43,6 @@ public:
         PROJECTION_MATRIX,                  //  "projection_matrix"
         INVERSE_PROJECTION_MATRIX,          //  "inv_proj"
         MODELVIEW_PROJECTION_MATRIX,        //  "modelview_projection_matrix"
-        INVERSE_MODELVIEW_MATRIX,           //  "inv_modelview"
         NORMAL_MATRIX,                      //  "normal_matrix"
         TEXTURE_MATRIX0,                    //  "texture_matrix0"
         TEXTURE_MATRIX1,                    //  "texture_matrix1"
@@ -62,7 +61,6 @@ public:
         MULTI_LIGHT_COL,                    //  "light_col"
         MULTI_LIGHT_FAR_Z,                  //  "far_z"
         PROJECTOR_MATRIX,                   //  "proj_mat"
-        PROJECTOR_NEAR,                     //  "proj_near"
         PROJECTOR_P,                        //  "proj_p"
         PROJECTOR_N,                        //  "proj_n"
         PROJECTOR_ORIGIN,                   //  "proj_origin"
@@ -72,7 +70,6 @@ public:
         PROJECTOR_SHADOW_FADE,              //  "shadow_fade"
         PROJECTOR_FOCUS,                    //  "proj_focus"
         PROJECTOR_LOD,                      //  "proj_lod"
-        PROJECTOR_AMBIENT_LOD,              //  "proj_ambient_lod"
         DIFFUSE_COLOR,                      //  "color"
         DIFFUSE_MAP,                        //  "diffuseMap"
         ALTERNATE_DIFFUSE_MAP,              //  "altDiffuseMap"
@@ -139,8 +136,6 @@ public:
         DEFERRED_MOON_DIR,                  //  "moon_dir"
         DEFERRED_SHADOW_RES,                //  "shadow_res"
         DEFERRED_PROJ_SHADOW_RES,           //  "proj_shadow_res"
-        DEFERRED_DEPTH_CUTOFF,              //  "depth_cutoff"
-        DEFERRED_NORM_CUTOFF,               //  "norm_cutoff"
         DEFERRED_SHADOW_TARGET_WIDTH,       //  "shadow_target_width"
 
         FXAA_TC_SCALE,                      //  "tc_scale"
@@ -182,7 +177,6 @@ public:
         AVATAR_TRANSLATION,                 //  "translationPalette"
 
         WATER_SCREENTEX,                    //  "screenTex"
-        WATER_SCREENDEPTH,                  //  "screenDepth"
         WATER_REFTEX,                       //  "refTex"
         WATER_EYEVEC,                       //  "eyeVec"
         WATER_TIME,                         //  "time"
@@ -201,8 +195,6 @@ public:
         WATER_FRESNEL_OFFSET,               //  "fresnelOffset"
         WATER_BLUR_MULTIPLIER,              //  "blurMultiplier"
         WATER_SUN_ANGLE,                    //  "sunAngle"
-        WATER_SCALED_ANGLE,                 //  "scaledAngle"
-        WATER_SUN_ANGLE2,                   //  "sunAngle2"
 
         WL_CAMPOSLOCAL,                     //  "camPosLocal"
 // [RLVa:KB] - @setsphere
@@ -226,15 +218,8 @@ public:
 
         SHINY_ORIGIN,                       //  "origin"
 
-        INSCATTER_RT,                       //  "inscatter"
-        SUN_SIZE,                           //  "sun_size"
         FOG_COLOR,                          //  "fog_color"
 
-        // precomputed textures
-        TRANSMITTANCE_TEX,                  //  "transmittance_texture"
-        SCATTER_TEX,                        //  "scattering_texture"
-        SINGLE_MIE_SCATTER_TEX,             //  "single_mie_scattering_texture"
-        ILLUMINANCE_TEX,                    //  "irradiance_texture"
         BLEND_FACTOR,                       //  "blend_factor"
 
         NO_ATMO,                            //  "no_atmo"

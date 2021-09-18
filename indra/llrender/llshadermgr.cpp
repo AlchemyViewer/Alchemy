@@ -1169,7 +1169,6 @@ void LLShaderMgr::initAttribsAndUniforms()
 	mReservedUniforms.push_back("projection_matrix");
 	mReservedUniforms.push_back("inv_proj");
 	mReservedUniforms.push_back("modelview_projection_matrix");
-    mReservedUniforms.push_back("inv_modelview");
 	mReservedUniforms.push_back("normal_matrix");
 	mReservedUniforms.push_back("texture_matrix0");
 	mReservedUniforms.push_back("texture_matrix1");
@@ -1195,7 +1194,6 @@ void LLShaderMgr::initAttribsAndUniforms()
 
     //NOTE: MUST match order in eGLSLReservedUniforms
 	mReservedUniforms.push_back("proj_mat");
-	mReservedUniforms.push_back("proj_near");
 	mReservedUniforms.push_back("proj_p");
 	mReservedUniforms.push_back("proj_n");
 	mReservedUniforms.push_back("proj_origin");
@@ -1205,9 +1203,8 @@ void LLShaderMgr::initAttribsAndUniforms()
 	mReservedUniforms.push_back("shadow_fade");
 	mReservedUniforms.push_back("proj_focus");
 	mReservedUniforms.push_back("proj_lod");
-	mReservedUniforms.push_back("proj_ambient_lod");
 
-	llassert(mReservedUniforms.size() == LLShaderMgr::PROJECTOR_AMBIENT_LOD+1);
+	llassert(mReservedUniforms.size() == LLShaderMgr::PROJECTOR_LOD+1);
 
 	mReservedUniforms.push_back("color");
 		
@@ -1284,8 +1281,6 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("moon_dir");
 	mReservedUniforms.push_back("shadow_res");
 	mReservedUniforms.push_back("proj_shadow_res");
-	mReservedUniforms.push_back("depth_cutoff");
-	mReservedUniforms.push_back("norm_cutoff");
 	mReservedUniforms.push_back("shadow_target_width");
 	
 	llassert(mReservedUniforms.size() == LLShaderMgr::DEFERRED_SHADOW_TARGET_WIDTH+1);
@@ -1333,7 +1328,6 @@ void LLShaderMgr::initAttribsAndUniforms()
 	mReservedUniforms.push_back("translationPalette");
 	
 	mReservedUniforms.push_back("screenTex");
-	mReservedUniforms.push_back("screenDepth");
 	mReservedUniforms.push_back("refTex");
 	mReservedUniforms.push_back("eyeVec");
 	mReservedUniforms.push_back("time");
@@ -1352,8 +1346,6 @@ void LLShaderMgr::initAttribsAndUniforms()
 	mReservedUniforms.push_back("fresnelOffset");
 	mReservedUniforms.push_back("blurMultiplier");
 	mReservedUniforms.push_back("sunAngle");
-	mReservedUniforms.push_back("scaledAngle");
-	mReservedUniforms.push_back("sunAngle2");
 	
 	mReservedUniforms.push_back("camPosLocal");
 // [RLVa:KB] - @setsphere
@@ -1377,14 +1369,8 @@ void LLShaderMgr::initAttribsAndUniforms()
 
 	mReservedUniforms.push_back("origin");
 
-    mReservedUniforms.push_back("inscatter");
-    mReservedUniforms.push_back("sun_size");
     mReservedUniforms.push_back("fog_color");
 
-    mReservedUniforms.push_back("transmittance_texture");
-    mReservedUniforms.push_back("scattering_texture");
-    mReservedUniforms.push_back("single_mie_scattering_texture");
-    mReservedUniforms.push_back("irradiance_texture");
     mReservedUniforms.push_back("blend_factor");
     mReservedUniforms.push_back("no_atmo");
     mReservedUniforms.push_back("moisture_level");

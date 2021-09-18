@@ -35,7 +35,6 @@ uniform sampler2D diffuseMap;
 uniform sampler2D bumpMap;   
 uniform sampler2D screenTex;
 uniform sampler2D refTex;
-uniform sampler2D screenDepth;
 
 uniform vec4 fogCol;
 uniform vec3 lightDir;

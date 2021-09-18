@@ -583,12 +583,9 @@ void LLDrawPoolWater::shade2(bool edge, LLGLSLShader* shader, const LLColor3& li
     shader->uniform1f(LLShaderMgr::WATER_BLUR_MULTIPLIER, pwater->getBlurMultiplier());
 
 	F32 sunAngle = llmax(0.f, light_dir.mV[1]);
-	F32 scaledAngle = 1.f - sunAngle;
 
     shader->uniform1i(LLShaderMgr::SUN_UP_FACTOR, environment.getIsSunUp() ? 1 : 0);
-	shader->uniform1f(LLShaderMgr::WATER_SUN_ANGLE, sunAngle);
-	shader->uniform1f(LLShaderMgr::WATER_SCALED_ANGLE, scaledAngle);
-	shader->uniform1f(LLShaderMgr::WATER_SUN_ANGLE2, 0.1f + 0.2f*sunAngle);
+	shader->uniform1f(LLShaderMgr::WATER_SUN_ANGLE, 0.1f + 0.2f * sunAngle);
 
     LLVector4 rotated_light_direction = environment.getRotatedLightNorm();
     shader->uniform4fv(LLViewerShaderMgr::LIGHTNORM, 1, rotated_light_direction.mV);
@@ -646,7 +643,6 @@ void LLDrawPoolWater::shade2(bool edge, LLGLSLShader* shader, const LLColor3& li
 	shader->disableTexture(LLShaderMgr::BUMP_MAP);
 	shader->disableTexture(LLShaderMgr::DIFFUSE_MAP);
 	shader->disableTexture(LLShaderMgr::WATER_REFTEX);
-	shader->disableTexture(LLShaderMgr::WATER_SCREENDEPTH);
 
 	shader->unbind();
 }

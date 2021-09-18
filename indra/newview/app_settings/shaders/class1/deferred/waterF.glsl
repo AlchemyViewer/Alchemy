@@ -42,7 +42,6 @@ uniform float blend_factor;
 uniform sampler2D screenTex;
 uniform sampler2D refTex;
 uniform float sunAngle;
-uniform float sunAngle2;
 uniform vec3 lightDir;
 uniform vec3 specular;
 uniform float refScale;
@@ -159,7 +158,7 @@ void main()
 	color.rgb = mix(fb.rgb, refcol.rgb, df1);
 	color.rgb += spec * specular;
     
-	color.a   = spec * sunAngle2;
+	color.a   = spec * sunAngle;
     
 	vec3 screenspacewavef = normalize((norm_mat*vec4(wavef, 1.0)).xyz);
 

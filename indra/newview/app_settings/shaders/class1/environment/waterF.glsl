@@ -39,7 +39,6 @@ uniform sampler2D screenTex;
 uniform sampler2D refTex;
 
 uniform float sunAngle;
-uniform float sunAngle2;
 uniform vec3 lightDir;
 uniform vec3 specular;
 uniform float refScale;
@@ -155,7 +154,7 @@ void main()
 	
 	color.rgb = atmosTransport(color.rgb);
 	color.rgb = scaleSoftClip(color.rgb);
-	color.a = spec * sunAngle2;
+	color.a = spec * sunAngle;
 	
 	frag_color = color;
 

@@ -42,13 +42,11 @@ uniform sampler2D projectionMap;
 uniform sampler2D lightFunc;
 
 uniform mat4 proj_mat; //screen space to light space
-uniform float proj_near; //near clip for projection
 uniform vec3 proj_p; //plane projection is emitting from (in screen space)
 uniform vec3 proj_n;
 uniform float proj_focus; //distance from plane to begin blurring
 uniform float proj_lod;  //(number of mips in proj map)
 uniform float proj_range; //range between near clip and far clip plane of projection
-uniform float proj_ambient_lod;
 uniform float proj_ambiance;
 uniform float near_clip;
 uniform float far_clip;
