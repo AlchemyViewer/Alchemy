@@ -426,20 +426,6 @@ BOOL LLFloaterIMNearbyChat::handleKeyHere( KEY key, MASK mask )
 		sendChat(CHAT_TYPE_SHOUT);
 		handled = TRUE;
 	}
-	else if (KEY_RETURN == key && mask == MASK_SHIFT)
-	{
-		// newline
-		if (mInputEditor)
-		{
-			// but don't allow multiple new lines
-			LLWString raw_text = mInputEditor->getWText();
-			if (raw_text[raw_text.length() - 1] != '\n')
-			{
-				mInputEditor->handleNewLine();
-			}
-		}
-		handled = TRUE;
-	}
 
 	if((mask == MASK_ALT) && isTornOff())
 	{

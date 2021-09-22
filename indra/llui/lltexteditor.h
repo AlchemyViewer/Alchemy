@@ -213,7 +213,6 @@ public:
 	bool			getShowContextMenu() const { return mShowContextMenu; }
 
 	void			setPassDelete(BOOL b) { mPassDelete = b; }
-	void			handleNewLine() { addLineBreakChar(FALSE); }
 
 protected:
 	void			showContextMenu(S32 x, S32 y);
