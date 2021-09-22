@@ -1255,7 +1255,6 @@ void LLTextEditor::addLineBreakChar(BOOL group_together)
 	setCursorPos(mCursorPos + pos);
 }
 
-
 BOOL LLTextEditor::handleSelectionKey(const KEY key, const MASK mask)
 {
 	BOOL handled = FALSE;

@@ -414,7 +414,13 @@ BOOL LLFloaterIMNearbyChat::handleKeyHere( KEY key, MASK mask )
 {
 	BOOL handled = FALSE;
 
-	if( KEY_RETURN == key && mask == MASK_CONTROL)
+	if (KEY_RETURN == key && mask == (MASK_CONTROL|MASK_SHIFT))
+	{
+		// whisper
+		sendChat(CHAT_TYPE_WHISPER);
+		handled = TRUE;
+	}
+	else if( KEY_RETURN == key && mask == MASK_CONTROL)
 	{
 		// shout
 		sendChat(CHAT_TYPE_SHOUT);
@@ -422,11 +428,18 @@ BOOL LLFloaterIMNearbyChat::handleKeyHere( KEY key, MASK mask )
 	}
 	else if (KEY_RETURN == key && mask == MASK_SHIFT)
 	{
-		// whisper
-		sendChat(CHAT_TYPE_WHISPER);
+		// newline
+		if (mInputEditor)
+		{
+			// but don't allow multiple new lines
+			LLWString raw_text = mInputEditor->getWText();
+			if (raw_text[raw_text.length() - 1] != '\n')
+			{
+				mInputEditor->handleNewLine();
+			}
+		}
 		handled = TRUE;
 	}
-
 
 	if((mask == MASK_ALT) && isTornOff())
 	{
