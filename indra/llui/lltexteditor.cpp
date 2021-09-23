@@ -1255,7 +1255,6 @@ void LLTextEditor::addLineBreakChar(BOOL group_together)
 	setCursorPos(mCursorPos + pos);
 }
 
-
 BOOL LLTextEditor::handleSelectionKey(const KEY key, const MASK mask)
 {
 	BOOL handled = FALSE;
@@ -1783,6 +1782,18 @@ BOOL LLTextEditor::handleSpecialKey(const KEY key, const MASK mask)
 			if (mAutoIndent)
 			{
 				autoIndent();
+			}
+		}
+		else if (mask == MASK_SHIFT)
+		{
+			if( mCursorPos > 0 )
+			{
+				const LLWString& text = getWText();
+				if( '\n' != text[ mCursorPos - 1 ] )
+				{
+					addLineBreakChar();
+					handled = TRUE;
+				}
 			}
 		}
 		else
