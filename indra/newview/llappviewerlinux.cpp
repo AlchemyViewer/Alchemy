@@ -40,6 +40,8 @@
 
 #include <exception>
 
+#include "algamemode.h"
+
 // Sentry (https://sentry.io) crash reporting tool
 #if defined(USE_SENTRY)
 #include <sentry.h>
@@ -116,6 +118,8 @@ int main( int argc, char **argv )
 	sentry_close();
 #endif
 
+	ALGameMode::instance().shutdown();
+
 	return 0;
 }
 
@@ -141,6 +145,8 @@ bool LLAppViewerLinux::init()
     pApp->initCrashReporting();
 
 	bool success = LLAppViewer::init();
+
+	ALGameMode::instance().init();
 
 	return success;
 }

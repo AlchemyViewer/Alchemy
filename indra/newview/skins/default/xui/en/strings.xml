@@ -4366,5 +4366,6 @@ and report the problem.
   <string name="NotifyIncomingMessage">Incoming message from [NAME]...</string>
   <string name="AvatarTyping">Typing</string>
   <string name="UnknownAvatar">Unknown Avatar</string>
+  <string name="NotAvailableOnPlatform">Not availalbe on this platform</string>
   
 </strings>

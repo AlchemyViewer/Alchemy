@@ -248,6 +248,16 @@
    top_pad="10"
    width="237"/>
   <check_box
+   control_name="AlchemyGameModeEnable"
+   follows="top|left"
+   height="15"
+   label="Enable Game Mode"
+   layout="topleft"
+   left="10"
+   name="enable_game_mode_check"
+   top_pad="5"
+   width="237"/>
+  <check_box
    control_name="ForceShowGrid"
    follows="top|left"
    height="15"

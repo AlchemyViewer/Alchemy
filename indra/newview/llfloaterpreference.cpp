@@ -2637,6 +2637,14 @@ BOOL LLPanelPreference::postBuild()
 		gSavedSettings.getControl("ThrottleBandwidthKBPS")->getSignal()->connect(boost::bind(&LLPanelPreference::Updater::update, mBandWidthUpdater, _2));
 	}
 
+#ifndef LL_LINUX
+	if (hasChild("enable_game_mode_check", TRUE))
+	{
+		getChild<LLCheckBoxCtrl>("enable_game_mode_check")->setEnabled(FALSE);
+		getChild<LLCheckBoxCtrl>("enable_game_mode_check")->setToolTip(LLTrans::getString("NotAvailableOnPlatform"));
+	}
+#endif
+
 #ifdef EXTERNAL_TOS
 	LLRadioGroup* ext_browser_settings = getChild<LLRadioGroup>("preferred_browser_behavior");
 	if (ext_browser_settings)

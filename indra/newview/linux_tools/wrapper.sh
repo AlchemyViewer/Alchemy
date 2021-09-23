@@ -12,6 +12,10 @@
 ## - Avoids using the FMOD Studio or FMOD Ex ALSA audio driver.
 #export LL_BAD_FMOD_ALSA=x
 
+# Completely prevent gamemode from enabling even if set to true in the settings
+# This can be useful if you run Alchemy on a battery-operated device (i.e. laptop)
+# export DISABLE_GAMEMODE=1
+
 ## - Avoids the optional OpenGL extensions which have proven most problematic
 ##   on some hardware.  Disabling this option may cause BETTER PERFORMANCE but
 ##   may also cause CRASHES and hangs on some unstable combinations of drivers
