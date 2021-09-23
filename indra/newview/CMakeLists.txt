@@ -1531,6 +1531,8 @@ endif (DARWIN)
 if (LINUX)
     LIST(APPEND viewer_SOURCE_FILES llappviewerlinux.cpp)
     LIST(APPEND viewer_SOURCE_FILES llappviewerlinux_api_dbus.cpp)
+	LIST(APPEND viewer_SOURCE_FILES algamemode.cpp)
+	LIST(APPEND viewer_HEADER_FILES algamemode.h)
     SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,--as-needed")
 
     set(viewer_LIBRARIES
