@@ -106,6 +106,7 @@ private:
 	bool mCanPaste;
 	bool mCanDelete;
 	bool mCanSelectAll;
+	std::string mUserDataPath;
     std::string mRootCachePath;
 	std::string mCachePath;
 	std::string mContextCachePath;
@@ -580,6 +581,8 @@ void MediaPluginCEF::receiveMessage(const char* message_string)
 				// and set it to white
 				settings.background_color = 0xffffffff;	// white 
 
+				settings.user_data_path = mUserDataPath;
+
 				settings.cache_enabled = true;
 				settings.root_cache_path = mRootCachePath;
 				settings.cache_path = mCachePath;
@@ -671,16 +674,18 @@ void MediaPluginCEF::receiveMessage(const char* message_string)
 				std::string user_data_path_cache = message_in.getValue("cache_path");
 				std::string subfolder = message_in.getValue("username");
 
+				std::string delim;
+#if LL_WINDOWS
+				// media plugin doesn't have access to gDirUtilp
+				delim = "\\";
+#else
+				delim = "/";
+#endif
+
 				mRootCachePath = user_data_path_cache + "cef_cache";
                 if (!subfolder.empty())
                 {
-                    std::string delim;
-#if LL_WINDOWS
-                    // media plugin doesn't have access to gDirUtilp
-                    delim = "\\";
-#else
-                    delim = "/";
-#endif
+
                     mCachePath = mRootCachePath + delim + subfolder;
                 }
                 else
@@ -688,6 +693,14 @@ void MediaPluginCEF::receiveMessage(const char* message_string)
                     mCachePath = mRootCachePath;
                 }
                 mContextCachePath = ""; // disabled by ""
+
+				mUserDataPath = user_data_path_cache + "cef_data";
+				if (!subfolder.empty())
+				{
+
+					mUserDataPath += delim + subfolder;
+				}
+
 				mCefLogFile = message_in.getValue("cef_log_file");
 				mCefLogVerbose = message_in.getValueBoolean("cef_verbose_log");
 			}
