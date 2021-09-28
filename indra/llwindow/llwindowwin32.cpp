@@ -856,7 +856,7 @@ LLWindowWin32::LLWindowWin32(LLWindowCallbacks* callbacks,
 	LLCoordScreen windowPos(x,y);
 	LLCoordScreen windowSize(window_rect.right - window_rect.left,
 							 window_rect.bottom - window_rect.top);
-	if (!switchContext(mFullscreen, windowSize, TRUE, &windowPos))
+	if (!switchContext(mFullscreen, windowSize, disable_vsync, &windowPos))
 	{
 		return;
 	}
