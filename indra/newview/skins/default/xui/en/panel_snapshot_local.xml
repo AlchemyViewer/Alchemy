@@ -127,14 +127,6 @@
          name="10240x4320"
          value="[i10240,i4320]" />
         <combo_box.item
-         label="Max size (1:1)"
-         name="15360x15360"
-         value="[i15360,i15360]" />
-        <combo_box.item
-         label="Max size (16:9)"
-         name="15360x8640"
-         value="[i15360,i8640]" />
-        <combo_box.item
          label="Custom"
          name="Custom"
          value="[i-1,i-1]" />

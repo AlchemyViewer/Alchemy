@@ -136,7 +136,7 @@ private:
 
 };
 
-static const U32 MAX_SNAPSHOT_IMAGE_SIZE = 15360; // Anything bigger would require TBs of (video) RAM and 64bit code
+static const U32 MAX_SNAPSHOT_IMAGE_SIZE = 10240; // max snapshot image size
 
 class LLViewerWindow final : public LLWindowCallbacks
 {
