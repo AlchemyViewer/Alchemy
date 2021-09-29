@@ -276,7 +276,8 @@ void LLSnapshotLivePreview::drawPreviewRect(S32 offset_x, S32 offset_y)
 //called when the frame is frozen.
 void LLSnapshotLivePreview::draw()
 {
-	if (getCurrentImage() &&
+	LLViewerTexture* currentImage = getCurrentImage();
+	if (currentImage &&
 		mPreviewImageEncoded.notNull() &&
 		getSnapshotUpToDate())
 	{
@@ -289,10 +290,10 @@ void LLSnapshotLivePreview::draw()
 
 		LLColor4 image_color(1.f, 1.f, 1.f, 1.f);
 		gGL.color4fv(image_color.mV);
-		gGL.getTexUnit(0)->bind(getCurrentImage());
+		gGL.getTexUnit(0)->bind(currentImage);
 		// calculate UV scale
-		F32 uv_width = isImageScaled() ? 1.f : llmin((F32)getWidth() / (F32)getCurrentImage()->getWidth(), 1.f);
-		F32 uv_height = isImageScaled() ? 1.f : llmin((F32)getHeight() / (F32)getCurrentImage()->getHeight(), 1.f);
+		F32 uv_width = isImageScaled() ? 1.f : llmin((F32)getWidth() / (F32)currentImage->getWidth(), 1.f);
+		F32 uv_height = isImageScaled() ? 1.f : llmin((F32)getHeight() / (F32)currentImage->getHeight(), 1.f);
 		gGL.pushMatrix();
 		{	
 			gGL.translatef((F32)rect.mLeft, (F32)rect.mBottom + TOP_PANEL_HEIGHT, 0.f);
