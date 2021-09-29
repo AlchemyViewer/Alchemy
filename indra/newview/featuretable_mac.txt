@@ -1,4 +1,4 @@
-version 37
+version 38
 // The version number above should be incremented IF AND ONLY IF some
 // change has been made that is sufficiently important to justify
 // resetting the graphics preferences of all users to the recommended
@@ -247,7 +247,7 @@ WLSkyDetail					1	48
 RenderFSAASamples			1	2
 
 //
-// High Ultra Graphics Settings (deferred + SSAO + shadows)
+// High Ultra Graphics Settings (deferred + SSAO)
 //
 list HighUltra
 RenderAnisotropicLevel			1	4
@@ -271,7 +271,7 @@ RenderVolumeLODFactor		1	1.125
 WindLightUseAtmosShaders	1	1
 RenderDeferred				1	1
 RenderDeferredSSAO			1	1
-RenderShadowDetail			1	2
+RenderShadowDetail			1	0
 WLSkyDetail					1	48
 RenderFSAASamples			1	2
 
