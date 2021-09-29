@@ -4373,6 +4373,11 @@ void LLAppViewer::purgeCache()
 		// cef does not support clear_cache and clear_cookies, so clear what we can manually.
 		gDirUtilp->deleteDirAndContents(browser_cache);
 	}
+	std::string browser_data = gDirUtilp->getExpandedFilename(LL_PATH_CACHE, "cef_data");
+	if (LLFile::isdir(browser_data))
+	{
+		gDirUtilp->deleteDirAndContents(browser_data);
+	}
 	gDirUtilp->deleteFilesInDir(gDirUtilp->getExpandedFilename(LL_PATH_CACHE, ""), "*");
 }
 
