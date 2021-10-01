@@ -2134,7 +2134,6 @@ BOOL LLViewerShaderMgr::loadShadersDeferred()
 	{
 		gDeferredFullbrightProgram.mName = "Deferred Fullbright Shader";
 		gDeferredFullbrightProgram.mFeatures.calculatesAtmospherics = true;
-		gDeferredFullbrightProgram.mFeatures.hasAtmospherics = true;
 		gDeferredFullbrightProgram.mFeatures.hasGamma = true;
 		gDeferredFullbrightProgram.mFeatures.hasTransport = true;
 		gDeferredFullbrightProgram.mFeatures.hasSrgb = true;		
