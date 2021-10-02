@@ -880,8 +880,13 @@ bool LLVivoxVoiceClient::startAndLaunchDaemon()
             params.args.add(".log");
 
             // rotate any existing log
-            std::string new_log = gDirUtilp->getExpandedFilename(LL_PATH_LOGS, "SLVoice.log");
+
             std::string old_log = gDirUtilp->getExpandedFilename(LL_PATH_LOGS, "SLVoice.old");
+			if (gDirUtilp->fileExists(old_log))
+			{
+				LLFile::remove(old_log);
+			}
+			std::string new_log = gDirUtilp->getExpandedFilename(LL_PATH_LOGS, "SLVoice.log");
             if (gDirUtilp->fileExists(new_log))
             {
                 LLFile::rename(new_log, old_log);
