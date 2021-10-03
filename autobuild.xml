@@ -606,11 +606,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>a8579ee6f494af246a4cd58168d8bd6311d55b6f823e86bfb8800bb912c59a55643b168721d78e87800dc3c2768c5ed3</string>
+              <string>e082b5423cca66ceadbc2e5d372b495210a61d80763981994f85fdafb2edace179cbff5cdb6306cbdec81d1b278bcb832896b87033250cc081c1ea15b3497201</string>
               <key>hash_algorithm</key>
-              <string>sha3_384</string>
+              <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/49/packages/generic/fmodstudio/2.02.03.1146/fmodstudio-2.02.03-darwin64-1146.tar.xz</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/49/packages/generic/fmodstudio/2.02.03.1163/fmodstudio-2.02.03-darwin64-1163.tar.zst</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
@@ -620,39 +620,25 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>191a6cd4f0f9c9421d9d8174f00ce7fd6879108f11e8179e8124cc1aeffaf61cfd8a6102e063fc3efea85c33d4adcdd8</string>
+              <string>f0459842efccae4269faa302cf4f6d90bf196a722f694756ea89b3b9a529b33b5dbb9a8b8fe0131fd6c85e480ac28feb89f7ed96403d63393f9de04cc966c75b</string>
               <key>hash_algorithm</key>
-              <string>sha3_384</string>
+              <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/49/packages/generic/fmodstudio/2.02.03.1146/fmodstudio-2.02.03-linux64-1146.tar.xz</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/49/packages/generic/fmodstudio/2.02.03.1163/fmodstudio-2.02.03-linux64-1163.tar.zst</string>
             </map>
             <key>name</key>
             <string>linux64</string>
-          </map>
-          <key>windows</key>
-          <map>
-            <key>archive</key>
-            <map>
-              <key>hash</key>
-              <string>86f54be057ebb1ab33a03f7525aaf4253bf62d62f47d28cb6246d40230e0d1bcad25f6439173a8297ec0295943932d96</string>
-              <key>hash_algorithm</key>
-              <string>sha3_384</string>
-              <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/49/packages/generic/fmodstudio/2.02.03.1146/fmodstudio-2.02.03-windows-1146.tar.xz</string>
-            </map>
-            <key>name</key>
-            <string>windows</string>
           </map>
           <key>windows64</key>
           <map>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>5f8ad45d5f4eac62b029f2d5a9a67219733ec853d61cd32850e02ce26f95573e3fa800c69a32a19261d0459956edd1f9</string>
+              <string>64f27ccb33f48bbb1345eb742d045f2a02c4ca461c9f5a73e689113e2da7bedad1210ccdbfa1db92f8f708eebf61d41235a297327c8d148cdb9b1c380ad315fa</string>
               <key>hash_algorithm</key>
-              <string>sha3_384</string>
+              <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/49/packages/generic/fmodstudio/2.02.03.1146/fmodstudio-2.02.03-windows64-1146.tar.xz</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/49/packages/generic/fmodstudio/2.02.03.1163/fmodstudio-2.02.03-windows64-1163.tar.zst</string>
             </map>
             <key>name</key>
             <string>windows64</string>
