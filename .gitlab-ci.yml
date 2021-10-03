@@ -167,7 +167,7 @@ variables:
       - build-linux-*/packages/lib/release/libopenal.so*
       - build-linux-*/packages/lib/release/libopenjp2.so*
       - build-linux-*/packages/lib/release/libSDL2*.so*
-      - build-linux-*/newview/Alchemy_*.tar.xz
+      - build-linux-*/newview/Alchemy_*.tar.*
       - build-linux-*/newview/alchemy-bin
       - build-linux-*/newview/alchemy-bin.debug
       - build-linux-*/newview/alchemy-bin.src.zip
@@ -396,7 +396,7 @@ build:release:windows64:
 
         Push-Location ./build-linux-64/
           Push-Location ./newview/
-            $FileNameLnx64 = Get-ChildItem -Path . -Name -Include Alchemy_*.tar.xz
+            $FileNameLnx64 = Get-ChildItem -Path . -Name -Include Alchemy_*.tar.*
             Invoke-WebRequest @UploadParams -InFile ./$FileNameLnx64 -Uri "${UploadDestURL}/${FileNameLnx64}"
 
             If ($env:USE_SENTRY -eq 'TRUE') 

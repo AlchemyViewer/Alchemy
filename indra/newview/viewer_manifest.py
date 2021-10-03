@@ -1167,7 +1167,7 @@ class LinuxManifest(ViewerManifest):
             self.run_command(['find', self.get_dst_prefix(),
                               '-type', 'f', '-perm', old,
                               '-exec', 'chmod', new, '{}', ';'])
-        self.package_file = installer_name + '.tar.xz'
+        self.package_file = installer_name + '.tar.bz2'
 
         # temporarily move directory tree so that it has the right
         # name in the tarfile
@@ -1180,10 +1180,10 @@ class LinuxManifest(ViewerManifest):
                 # --numeric-owner hides the username of the builder for
                 # security etc.
                 self.run_command(['tar', '-C', self.get_build_prefix(),
-                                  '--numeric-owner', '-cJf',
-                                 tempname + '.tar.xz', installer_name])
+                                  '--numeric-owner', '-cjf',
+                                 tempname + '.tar.bz2', installer_name])
             else:
-                print("Skipping %s.tar.xz for non-Release build (%s)" % \
+                print("Skipping %s.tar.bz2 for non-Release build (%s)" % \
                       (installer_name, self.args['buildtype']))
         finally:
             self.run_command(["mv", tempname, realname])
