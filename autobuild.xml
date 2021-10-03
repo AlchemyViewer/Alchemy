@@ -1180,39 +1180,25 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>8922b3c06c9bccf5bb6e2cb47fb95f39f022a41ebce10d0de039bf2a28fbe916a11461f4c8c30aa3d5ce86d760933741</string>
+              <string>ef470a983c59c1317bae7cdc4c9a36a239b811798a7367184aa8dec2a7464c0d1c93153e78d1af3b6faa319c705626002c2baacdc7bd8b919e9aae6e37648e32</string>
               <key>hash_algorithm</key>
-              <string>sha3_384</string>
+              <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/117/packages/generic/libndofdev-645/0.1.0/libndofdev-0.1.0-darwin64-645.tar.xz</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/117/packages/generic/libndofdev/0.1.0.1178/libndofdev-0.1.0-darwin64-1178.tar.zst</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
-          </map>
-          <key>windows</key>
-          <map>
-            <key>archive</key>
-            <map>
-              <key>hash</key>
-              <string>d3d2b703280d166b358194395cc7d1c56c3877caec30fa7fbf7f97cc68aa1b249c75fbdaefc420c3b32bb8ec6a547cf3</string>
-              <key>hash_algorithm</key>
-              <string>sha3_384</string>
-              <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/117/packages/generic/libndofdev-645/0.1.0/libndofdev-0.1.0-windows-645.tar.xz</string>
-            </map>
-            <key>name</key>
-            <string>windows</string>
           </map>
           <key>windows64</key>
           <map>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>b947e7482408e17e89c81c4af06521286ba1b7a5d49b42e428bd3fb26126e4a4379bc0a29dc41259e87aacefb12c0515</string>
+              <string>067140626d083a4fb7bdbc5742d00800c125b5eea151d38c0ccbede6696a9c4a88a20f3339496a3f272f226ed82a6c4da8fbb88aea16b30825e4efd7f7762f1e</string>
               <key>hash_algorithm</key>
-              <string>sha3_384</string>
+              <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/117/packages/generic/libndofdev-645/0.1.0/libndofdev-0.1.0-windows64-645.tar.xz</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/117/packages/generic/libndofdev/0.1.0.1178/libndofdev-0.1.0-windows64-1178.tar.zst</string>
             </map>
             <key>name</key>
             <string>windows64</string>
