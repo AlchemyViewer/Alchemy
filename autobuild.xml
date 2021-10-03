@@ -500,11 +500,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>7e9a98b44e19b2b2f7f5338f66d92a7b18e710ce5a984400156062938f1c54de63f815ad08e22838e93a8ed33774fd8c</string>
+              <string>05343b8d688c479aae004a5a98b208234a83035ed663f82ef265dc950a0a7a11f1eb92333743505a86f9aad363e1a33d5e3dab7a672b13e2783f0b373414929c</string>
               <key>hash_algorithm</key>
-              <string>sha3_384</string>
+              <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/103/packages/generic/dullahan/0.0.0.1144/dullahan-1.12.2_94.4.1_g4b61a8c_chromium-94.0.4606.54-darwin64-1144.tar.xz</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/103/packages/generic/dullahan/0.0.0.1160/dullahan-1.12.2_94.4.5_g0fd0d6f_chromium-94.0.4606.71-darwin64-1160.tar.zst</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
@@ -514,46 +514,32 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>95ab295e2c0243551a3db1b2c9c916147832db9b93627b92e2d162c94a0c001943f5a8480e311284be9770fa87decc25</string>
+              <string>7ef30decd6177c4b5e76e5925c87e4a44d77dc51a0d6e60c51798097265cd66ee67ced672a1cf0e79e97dbb2c1a1a901fdf7526cf9d26885c8d42721dda4f558</string>
               <key>hash_algorithm</key>
-              <string>sha3_384</string>
+              <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/103/packages/generic/dullahan/0.0.0.1144/dullahan-1.12.2_94.4.1_g4b61a8c_chromium-94.0.4606.54-linux64-1144.tar.xz</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/103/packages/generic/dullahan/0.0.0.1160/dullahan-1.12.2_94.4.5_g0fd0d6f_chromium-94.0.4606.71-linux64-1160.tar.zst</string>
             </map>
             <key>name</key>
             <string>linux64</string>
-          </map>
-          <key>windows</key>
-          <map>
-            <key>archive</key>
-            <map>
-              <key>hash</key>
-              <string>5a0a13703381052c75eeec82b203b48d</string>
-              <key>hash_algorithm</key>
-              <string>md5</string>
-              <key>url</key>
-              <string>https://pkg.alchemyviewer.org/repository/autobuild-external/dullahan/windows/dullahan-1.7.0.202010052042_81.3.10_gb223419_chromium-81.0.4044.138-windows-477.tar.bz2</string>
-            </map>
-            <key>name</key>
-            <string>windows</string>
           </map>
           <key>windows64</key>
           <map>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>ad3b63bb4098bef97dda2c57e9490cfe09d1273830c37acd1644285fa67f4f1b4612b817d96ce4d708414187c3c9cb98</string>
+              <string>1c0ad59c026cc2f255d22248207d5bcaee7c5df83404a38a2886ae7cd23e20b1bc14b0b37760e31433ce3b6393656804b9ee2858f1a9dd3023ffcebed9220a4a</string>
               <key>hash_algorithm</key>
-              <string>sha3_384</string>
+              <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/103/packages/generic/dullahan/0.0.0.1144/dullahan-1.12.2_94.4.1_g4b61a8c_chromium-94.0.4606.54-windows64-1144.tar.xz</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/103/packages/generic/dullahan/0.0.0.1160/dullahan-1.12.2_94.4.5_g0fd0d6f_chromium-94.0.4606.71-windows64-1160.tar.zst</string>
             </map>
             <key>name</key>
             <string>windows64</string>
           </map>
         </map>
         <key>version</key>
-        <string>1.12.2_94.4.1_g4b61a8c_chromium-94.0.4606.54</string>
+        <string>1.12.2_94.4.5_g0fd0d6f_chromium-94.0.4606.71</string>
       </map>
       <key>expat</key>
       <map>

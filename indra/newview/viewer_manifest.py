@@ -565,9 +565,12 @@ class WindowsManifest(ViewerManifest):
                     self.path("libcef.dll")
                     self.path("libEGL.dll")
                     self.path("libGLESv2.dll")
+                    self.path("vk_swiftshader.dll")
+                    self.path("vulkan-1.dll")
                     self.path("dullahan_host.exe")
                     self.path("snapshot_blob.bin")
                     self.path("v8_context_snapshot.bin")
+                    self.path("vk_swiftshader_icd.json")
 
                 # CEF software renderer files
                 with self.prefix(src=os.path.join(pkgdir, 'bin', config, 'swiftshader'), dst='swiftshader'):
@@ -1131,11 +1134,14 @@ class LinuxManifest(ViewerManifest):
             self.path("dullahan_host")
             self.path("snapshot_blob.bin")
             self.path("v8_context_snapshot.bin")
+            self.path("vk_swiftshader_icd.json")
 
         with self.prefix(src=os.path.join(pkgdir, 'lib', 'release'), dst=os.path.join('bin', 'llplugin')):
             self.path("libcef.so")
             self.path("libEGL.so")
             self.path("libGLESv2.so")
+            self.path("libvk_swiftshader.so")
+            self.path("libvulkan.so.1")
 
         with self.prefix(src=os.path.join(pkgdir, 'resources'), dst=os.path.join('bin', 'llplugin')):
             self.path("chrome_100_percent.pak")
