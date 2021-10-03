@@ -1885,37 +1885,23 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
         <string>nvapi</string>
         <key>platforms</key>
         <map>
-          <key>windows</key>
-          <map>
-            <key>archive</key>
-            <map>
-              <key>hash</key>
-              <string>c7636e34bbdb9b684fca293aff5f1583e851f206c587f72d3cf65468f329c950b2d0513645be04ae5420d91d3679901b</string>
-              <key>hash_algorithm</key>
-              <string>sha3_384</string>
-              <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/114/packages/generic/nvapi-528/450.0.0/nvapi-450.0.0-windows-528.tar.xz</string>
-            </map>
-            <key>name</key>
-            <string>windows</string>
-          </map>
           <key>windows64</key>
           <map>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>e49772a4090d31268a36699127371f38ca5b492fbf19bcea8844f93c721b508ed8e209077343433b8f1e212e6094c7b8</string>
+              <string>b098bab37d4f4967bec96b5eb2867262965a1ccaa48f595600fea9f98a7f5d8a01ae85272db51cc368528973793c2f006c822d130d78e65592072ff598afc9d7</string>
               <key>hash_algorithm</key>
-              <string>sha3_384</string>
+              <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/114/packages/generic/nvapi-528/450.0.0/nvapi-450.0.0-windows64-528.tar.xz</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/114/packages/generic/nvapi/470.0.0.1182/nvapi-470.0.0-windows64-1182.tar.zst</string>
             </map>
             <key>name</key>
             <string>windows64</string>
           </map>
         </map>
         <key>version</key>
-        <string>450.0.0</string>
+        <string>470.0.0</string>
       </map>
       <key>ogg_vorbis</key>
       <map>
