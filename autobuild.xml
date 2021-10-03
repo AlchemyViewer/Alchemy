@@ -726,11 +726,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>c8a92a009158be0d8e4c86687ec014717c26fa662453c651de6275cf5ac118a89756e22dc6fd37cabadc9264e861450a</string>
+              <string>3bf5067722ac60db75c600e8a4e15c7be1147329847eb373971f1a90be76cbf71499ed14c5b91e175a221bd6b02d4ec9fc172930e34666cb2ffd24efedba87f9</string>
               <key>hash_algorithm</key>
-              <string>sha3_384</string>
+              <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/139/packages/generic/glh_linear-544/0.0.1/glh_linear-0.0.1-common-544.tar.xz</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/139/packages/generic/glh_linear/0.0.1.1174/glh_linear-0.0.1-common-1174.tar.zst</string>
             </map>
             <key>name</key>
             <string>common</string>
@@ -2438,11 +2438,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>4b455ab3d1b300dd908686c450738aa32783267d57caca8bd949eb71db9bef60c39c0c0a63810479327c1d47815f1ab6</string>
+              <string>780b87d04e600cace6e76f1cc9b1a0f81ad2b5216bbbccb8e1e8aab287efdab0b6556b5f9f15240370c2025e7ca95689727c4741efd8837e9b5f9c2390ffb783</string>
               <key>hash_algorithm</key>
-              <string>sha3_384</string>
+              <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/138/packages/generic/tut-543/2008.11.30/tut-2008.11.30-common-543.tar.xz</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/138/packages/generic/tut/2008.11.30.1175/tut-2008.11.30-common-1175.tar.zst</string>
             </map>
             <key>name</key>
             <string>common</string>
