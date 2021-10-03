@@ -454,11 +454,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>d18e689d24311de59ade2f66df6d01c7ab32aebdd7423b94b149dcf1ca8e085a2028e599ddc5b9ab43a7437b4f314c2e</string>
+              <string>1923960e355d3d461e3b34644003c8fd4f0462636ffad63c0b80a670b13c5ff83e187244d83ea90da97dedcef92d3bea1df5d57299a8dad920af30720308ec9b</string>
               <key>hash_algorithm</key>
-              <string>sha3_384</string>
+              <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/124/packages/generic/dictionaries-541/1.0.0/dictionaries-1.0.0-common-541.tar.xz</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/124/packages/generic/dictionaries/1.0.0.1181/dictionaries-1.0.0-common-1181.tar.zst</string>
             </map>
             <key>name</key>
             <string>common</string>
