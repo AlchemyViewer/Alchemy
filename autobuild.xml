@@ -1577,18 +1577,18 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>8dabe7a2af3014287aa995e81a4780a877ed2b4e0fae29bad0e36753dc6322fdb2eea915867331f0b1ae455e4d9f9678</string>
+              <string>1588889ab7b2e1e1e58da7e078d904f9e78930e5fe9f1b61edfc99dd2cfa2f29603952440d4c93d432a195a14a78e0418492aa5a22fa0b40cf3dff9cd67870ae</string>
               <key>hash_algorithm</key>
-              <string>sha3_384</string>
+              <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/125/packages/generic/llca-771/2021.0407.0513/llca-2021.0407.0513-common-771.tar.xz</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/125/packages/generic/llca/2021.1003.1007.1158/llca-2021.1003.1007-common-1158.tar.zst</string>
             </map>
             <key>name</key>
             <string>common</string>
           </map>
         </map>
         <key>version</key>
-        <string>2021.0407.0513</string>
+        <string>2021.1003.1007</string>
       </map>
       <key>llphysicsextensions_source</key>
       <map>
