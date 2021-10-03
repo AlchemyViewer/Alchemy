@@ -1986,11 +1986,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>3104982c686828a293d75448845f325b7c0cf94f4e52d977e72a15ef4710e20e76f6df6bb9666286adcd8006e036e46a</string>
+              <string>ab207e5f8f4c10fd424c15bc694f577b76a467f715f0060e049e59afa7871b6aae322a653babcd89d90c0885a2c3d2a6bb0f5b8d90db9d0b30090ccf6c01de62</string>
               <key>hash_algorithm</key>
-              <string>sha3_384</string>
+              <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/141/packages/generic/openal-863/1.21.1/openal-1.21.1-darwin64-863.tar.xz</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/141/packages/generic/openal/1.21.1.1180/openal-1.21.1-darwin64-1180.tar.zst</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
@@ -2000,39 +2000,25 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>1084c64eee90fbfa5ceb435c21951354788746ac8f6a6970f156cf4fe3406c71a3217c5f1193f0134fd9b43e1dd232e8</string>
+              <string>3ba32babd96b42d09dec6a7bfe7c5cf4bfe3140343a3f24f6982c9b99c2dbdd8842b1e0ec6a463321dcc2b6f6da35dcaccfb62f45d83f485aa631089c09189b3</string>
               <key>hash_algorithm</key>
-              <string>sha3_384</string>
+              <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/141/packages/generic/openal-863/1.21.1/openal-1.21.1-linux64-863.tar.xz</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/141/packages/generic/openal/1.21.1.1180/openal-1.21.1-linux64-1180.tar.zst</string>
             </map>
             <key>name</key>
             <string>linux64</string>
-          </map>
-          <key>windows</key>
-          <map>
-            <key>archive</key>
-            <map>
-              <key>hash</key>
-              <string>062d0377fda0d686c71066460916bd50e8f4fc1784019705e2c8ebef6713477b6c082b0b7379d3292571cea9b32f24d1</string>
-              <key>hash_algorithm</key>
-              <string>sha3_384</string>
-              <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/141/packages/generic/openal-863/1.21.1/openal-1.21.1-windows-863.tar.xz</string>
-            </map>
-            <key>name</key>
-            <string>windows</string>
           </map>
           <key>windows64</key>
           <map>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>44ef5da43ca9ed2338171f6ddcc87eca7f564755805dcf109c6b1c28ebbefc742dce82a2ee0ad6ed3923ad5aa15727b3</string>
+              <string>18fc73de10a6f3194205ebfed47b630a5dd3956e0c3a07efc6bc604bba3b88d801fe5d86964a2e5ebe1fa3032dd172b1c79c7f5c57783dcd7e4a42d81cc37bbb</string>
               <key>hash_algorithm</key>
-              <string>sha3_384</string>
+              <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/141/packages/generic/openal-863/1.21.1/openal-1.21.1-windows64-863.tar.xz</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/141/packages/generic/openal/1.21.1.1180/openal-1.21.1-windows64-1180.tar.zst</string>
             </map>
             <key>name</key>
             <string>windows64</string>
