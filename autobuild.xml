@@ -1044,11 +1044,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>4450df2596f2b8248773d2c11080c8137b135bd5e17af4d4d9086d12e77af2affc88cfdb60ded02bd0355737b6287dd6</string>
+              <string>a8601e206e2ba160b219916189fc73c113920f4fe5d4a7b549fd73c38f2836c817221fed36c88d79e661f9b5c0b6c876a941d88cb7e43c286d7cad8258e543a3</string>
               <key>hash_algorithm</key>
-              <string>sha3_384</string>
+              <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/107/packages/generic/libhunspell-654/1.7.0/libhunspell-1.7.0-darwin64-654.tar.xz</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/107/packages/generic/libhunspell/1.7.0.1179/libhunspell-1.7.0-darwin64-1179.tar.zst</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
@@ -1058,39 +1058,25 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>b19405654764890352ceb796f40ca56085c7e711e35cd1fb4fb3606d972de0c457698425c33cc36434c2e4a5a30d7ec5</string>
+              <string>3915f5f3f1f86f236c52925dc14086953403fc68a905264ef01892ad5f4001fd7aea4578d5f93894fb22988dc259d248ea6907e0c06b7e003c695f20b6a8c5fd</string>
               <key>hash_algorithm</key>
-              <string>sha3_384</string>
+              <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/107/packages/generic/libhunspell-654/1.7.0/libhunspell-1.7.0-linux64-654.tar.xz</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/107/packages/generic/libhunspell/1.7.0.1179/libhunspell-1.7.0-linux64-1179.tar.zst</string>
             </map>
             <key>name</key>
             <string>linux64</string>
-          </map>
-          <key>windows</key>
-          <map>
-            <key>archive</key>
-            <map>
-              <key>hash</key>
-              <string>4b8b2f04113e39c762b582710fbc65f69e3e37bc5f868868198aea16e75af0b8cb8daa8e26cbe6bd337786bade67355d</string>
-              <key>hash_algorithm</key>
-              <string>sha3_384</string>
-              <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/107/packages/generic/libhunspell-654/1.7.0/libhunspell-1.7.0-windows-654.tar.xz</string>
-            </map>
-            <key>name</key>
-            <string>windows</string>
           </map>
           <key>windows64</key>
           <map>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>0928658489a5010e983ec926ae77ef8a8bee9086b68d8dfc8350cbb5a4202042d8f71abae914c9c9ade8ce1c31225d1c</string>
+              <string>6e8113a7e4de693187856bb9945312867a9288ac8883d98b07e3f82f02fd5bfd3205211db38f845416b22f93521052a18fb51ecfc0f9f56272bb7fa1e890e833</string>
               <key>hash_algorithm</key>
-              <string>sha3_384</string>
+              <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/107/packages/generic/libhunspell-654/1.7.0/libhunspell-1.7.0-windows64-654.tar.xz</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/107/packages/generic/libhunspell/1.7.0.1179/libhunspell-1.7.0-windows64-1179.tar.zst</string>
             </map>
             <key>name</key>
             <string>windows64</string>
