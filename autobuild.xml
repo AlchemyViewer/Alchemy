@@ -2242,9 +2242,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>321a8542e7b693fbe8e44ebface06087</string>
+              <string>ee960277ce5a3982aa04abbae482ce0b949a4a6d22a719f4d78fda77599cdca001b9cbaf28f00d013b4cd16eff76310cf1c7829b4e6bd5a16b4906daccdbbc88</string>
+              <key>hash_algorithm</key>
+              <string>blake2b</string>
               <key>url</key>
-              <string>http://automated-builds-secondlife-com.s3.amazonaws.com/ct2/55966/524403/slvoice-4.10.0000.32327.5fc3fe7c.539691-darwin64-539691.tar.bz2</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/168/packages/generic/slvoice/4.10.0000.32327.5fc3fe7c.558436.1202/slvoice-4.10.0000.32327.5fc3fe7c.558436-darwin64-1202.tar.zst</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
@@ -2254,44 +2256,32 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>df43d3df49296bfe93996ec537b9eddf</string>
+              <string>2e2f8a3793cfd4ab441d4cfb6ec2af1c6a0e929076a56f18d6c741b15c2850aaf5ab790291b931a315a6289753de767c802df34c6f8e7ba21e6f549cf8347691</string>
               <key>hash_algorithm</key>
-              <string>md5</string>
+              <string>blake2b</string>
               <key>url</key>
-              <string>https://depot.alchemyviewer.org/pub/linux64/lib/slvoice-4.6.0009.20030-linux64-201501031918.tar.bz2</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/168/packages/generic/slvoice/4.10.0000.32327.5fc3fe7c.558436.1202/slvoice-4.10.0000.32327.5fc3fe7c.558436-linux64-1202.tar.zst</string>
             </map>
             <key>name</key>
             <string>linux64</string>
-          </map>
-          <key>windows</key>
-          <map>
-            <key>archive</key>
-            <map>
-              <key>hash</key>
-              <string>017c4784aea9dffbebfb782cbfeed020</string>
-              <key>hash_algorithm</key>
-              <string>md5</string>
-              <key>url</key>
-              <string>https://pkg.alchemyviewer.org/repository/autobuild-external/slvoice/windows/slvoice-4.10.0000.32327.5fc3fe7c.539691-windows-539691.tar.bz2</string>
-            </map>
-            <key>name</key>
-            <string>windows</string>
           </map>
           <key>windows64</key>
           <map>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>81df970eb0c97d415d7bd12049c82042</string>
+              <string>b756951b908b487fb616c6e420d3bfb8d8729613572263ef57fcc17c6d865c1177750b5a3e11f12757004dbb3fd76a4b2082e93bc05b740af394250d5cd050ac</string>
+              <key>hash_algorithm</key>
+              <string>blake2b</string>
               <key>url</key>
-              <string>http://automated-builds-secondlife-com.s3.amazonaws.com/ct2/55967/524409/slvoice-4.10.0000.32327.5fc3fe7c.539691-windows64-539691.tar.bz2</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/168/packages/generic/slvoice/4.10.0000.32327.5fc3fe7c.558436.1202/slvoice-4.10.0000.32327.5fc3fe7c.558436-windows64-1202.tar.zst</string>
             </map>
             <key>name</key>
             <string>windows64</string>
           </map>
         </map>
         <key>version</key>
-        <string>4.10.0000.32327.5fc3fe7c.539691</string>
+        <string>4.10.0000.32327.5fc3fe7c.558436</string>
       </map>
       <key>tut</key>
       <map>

@@ -1235,7 +1235,7 @@ class Linux_i686_Manifest(LinuxManifest):
                 self.path("libfmod.so*")
 
         # Vivox runtimes
-        with self.prefix(src=relpkgdir, dst="bin"):
+        with self.prefix(src=os.path.join(pkgdir, 'bin', 'release'), dst="bin"):
             self.path("SLVoice")
         with self.prefix(src=relpkgdir, dst="lib"):
             self.path("libortp.so")
