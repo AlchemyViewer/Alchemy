@@ -66,6 +66,7 @@ if (WINDOWS)
 elseif (LINUX)
   set_target_properties(SLPlugin 
     PROPERTIES
+    LINK_FLAGS "-Wl,--disable-new-dtags"
     SKIP_BUILD_RPATH FALSE
     BUILD_WITH_INSTALL_RPATH TRUE
     INSTALL_RPATH "$ORIGIN/../lib;$ORIGIN/llplugin")
