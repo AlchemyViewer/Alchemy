@@ -38,7 +38,7 @@ FetchContent_Declare(
 # FetchContent_Declare(
 #   Catch2
 #   GIT_REPOSITORY https://github.com/catchorg/Catch2.git
-#   GIT_TAG        v2.11.0
+#   GIT_TAG        v2.13.7
 #   )
 FetchContent_Declare(
   fmt
@@ -48,7 +48,7 @@ FetchContent_Declare(
 FetchContent_Declare(
   nlohmann_json
   GIT_REPOSITORY https://git.alchemyviewer.org/alchemy/mirrors/modernjson.git
-  GIT_TAG        v3.10.1
+  GIT_TAG        v3.10.2
   )
 
 FetchContent_Declare(
