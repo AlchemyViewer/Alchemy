@@ -213,21 +213,23 @@ void notify_of_message(const LLSD& msg, bool is_dnd_msg)
 		}
 		else
 		{
-    	user_preferences = gSavedSettings.getString("NotificationNearbyChatOptions");
+			user_preferences = gSavedSettings.getString("NotificationNearbyChatOptions");
 			if (!gAgent.isDoNotDisturb() && (gSavedSettings.getBOOL("PlaySoundNearbyChatIM") == TRUE))
 			{
 				make_ui_sound("UISndNewIncomingIMSession");
-    }
+			}
 		}
 	}
     else if(session->isP2PSessionType())
     {
-        if (LLAvatarTracker::instance().isBuddy(participant_id))
+        if (const LLRelationship* buddy_info = LLAvatarTracker::instance().getBuddyInfo(participant_id))
         {
-        	user_preferences = gSavedSettings.getString("NotificationFriendIMOptions");
-			if (!gAgent.isDoNotDisturb() && (gSavedSettings.getBOOL("PlaySoundFriendIM") == TRUE))
-			{
-				make_ui_sound("UISndNewIncomingIMSession");
+			if (buddy_info->isOnline()) {
+				user_preferences = gSavedSettings.getString("NotificationFriendIMOptions");
+				if (!gAgent.isDoNotDisturb() && (gSavedSettings.getBOOL("PlaySoundFriendIM") == TRUE))
+				{
+					make_ui_sound("UISndNewIncomingIMSession");
+				}
 			}
         }
         else
@@ -236,8 +238,8 @@ void notify_of_message(const LLSD& msg, bool is_dnd_msg)
 			if (!gAgent.isDoNotDisturb() && (gSavedSettings.getBOOL("PlaySoundNonFriendIM") == TRUE))
 			{
 				make_ui_sound("UISndNewIncomingIMSession");
-        }
-    }
+			}
+		}
 	}
     else if(session->isAdHocSessionType())
     {
@@ -245,7 +247,7 @@ void notify_of_message(const LLSD& msg, bool is_dnd_msg)
 		if (!gAgent.isDoNotDisturb() && (gSavedSettings.getBOOL("PlaySoundConferenceIM") == TRUE))
 		{
 			make_ui_sound("UISndNewIncomingIMSession");
-    }
+		}
 	}
     else if(session->isGroupSessionType())
     {
