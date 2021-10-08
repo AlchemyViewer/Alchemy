@@ -79,7 +79,6 @@
 // Sentry (https://sentry.io) crash reporting tool
 #if defined(USE_SENTRY)
 #include <sentry.h>
-#include "llviewerbuildconfig.h"
 #endif
 
 namespace
@@ -144,7 +143,10 @@ bool create_app_mutex()
 }
 
 #if USE_NVAPI
-#define NVAPI_APPNAME L"Second Life"
+
+#define ALWSTR_SIZE(inwstr) ((inwstr.size() + 1) * sizeof(wchar_t))
+
+static std::wstring NVAPI_APPNAME = TEXT("Alchemy Viewer");
 
 /*
 	This function is used to print to the command line a text message
@@ -154,7 +156,7 @@ void nvapi_error(NvAPI_Status status)
 {
 	NvAPI_ShortString szDesc = { 0 };
 	NvAPI_GetErrorMessage(status, szDesc);
-	LL_WARNS() << szDesc << LL_ENDL;
+	LL_WARNS() << "nvapi error: " << szDesc << LL_ENDL;
 
 	//should always trigger when asserts are enabled
 	//llassert(status == NVAPI_OK);
@@ -170,22 +172,118 @@ void ll_nvapi_init(NvDRSSessionHandle hSession)
 		return;
 	}
 
-	NvAPI_UnicodeString wsz = { 0 };
-	memcpy_s(wsz, sizeof(wsz), NVAPI_APPNAME, sizeof(NVAPI_APPNAME));
-	status = NvAPI_DRS_SetCurrentGlobalProfile(hSession, wsz);
-	if (status != NVAPI_OK)
+	NvAPI_UnicodeString profile_name = {};
+	memcpy_s(profile_name, sizeof(profile_name), NVAPI_APPNAME.c_str(), ALWSTR_SIZE(NVAPI_APPNAME));
+
+	NvDRSProfileHandle hProfile = 0;
+	// Check if we already have a Alchmey Viewer profile
+	status = NvAPI_DRS_FindProfileByName(hSession, profile_name, &hProfile);
+	if (status != NVAPI_OK && status != NVAPI_PROFILE_NOT_FOUND)
 	{
 		nvapi_error(status);
 		return;
 	}
+	else if (status == NVAPI_PROFILE_NOT_FOUND)
+	{
+		// Don't have a Alchemy Viewer profile yet - create one
+		LL_INFOS() << "Creating Alchemy Viewer profile for NVIDIA driver" << LL_ENDL;
 
-	// (3) Obtain the current profile. 
-	NvDRSProfileHandle hProfile = 0;
-	status = NvAPI_DRS_GetCurrentGlobalProfile(hSession, &hProfile);
-	if (status != NVAPI_OK) 
+		NVDRS_PROFILE profileInfo;
+		profileInfo.version = NVDRS_PROFILE_VER;
+		profileInfo.isPredefined = 0;
+		memcpy_s(profileInfo.profileName, sizeof(profileInfo.profileName), NVAPI_APPNAME.c_str(), ALWSTR_SIZE(NVAPI_APPNAME));
+
+		status = NvAPI_DRS_CreateProfile(hSession, &profileInfo, &hProfile);
+		if (status != NVAPI_OK)
+		{
+			nvapi_error(status);
+			return;
+		}
+
+		// set the preferred power management mode
+		{
+			NVDRS_SETTING drsSetting = {};
+			drsSetting.version = NVDRS_SETTING_VER;
+			drsSetting.settingId = PREFERRED_PSTATE_ID;
+			drsSetting.settingType = NVDRS_DWORD_TYPE;
+			drsSetting.u32CurrentValue = PREFERRED_PSTATE_PREFER_MAX;
+			status = NvAPI_DRS_SetSetting(hSession, hProfile, &drsSetting);
+			if (status != NVAPI_OK)
+			{
+				nvapi_error(status);
+				return;
+			}
+			LL_INFOS() << "Set preferred power management mode" << LL_ENDL;
+		}
+
+		// set the preferred opengl threading state
+		{
+			NVDRS_SETTING drsSetting = {};
+			drsSetting.version = NVDRS_SETTING_VER;
+			drsSetting.settingId = OGL_THREAD_CONTROL_ID;
+			drsSetting.settingType = NVDRS_DWORD_TYPE;
+			drsSetting.u32CurrentValue = OGL_THREAD_CONTROL_ENABLE;
+			status = NvAPI_DRS_SetSetting(hSession, hProfile, &drsSetting);
+			if (status != NVAPI_OK)
+			{
+				nvapi_error(status);
+				return;
+			}
+			LL_INFOS() << "Set preferred GL Threading mode" << LL_ENDL;
+		}
+
+		// apply our changes to the system
+		status = NvAPI_DRS_SaveSettings(hSession);
+		if (status != NVAPI_OK)
+		{
+			nvapi_error(status);
+			return;
+		}
+	}
+
+	// Check if current exe is part of the profile
+	std::string exe_name = gDirUtilp->getExecutableFilename();
+	NVDRS_APPLICATION profile_application = {};
+	profile_application.version = NVDRS_APPLICATION_VER;
+
+	std::wstring w_exe_name = ll_convert_string_to_wide(exe_name);
+	size_t w_exe_bytes = ALWSTR_SIZE(w_exe_name);
+	NvAPI_UnicodeString profile_app_name = {};
+	memcpy_s(profile_app_name, sizeof(profile_app_name), w_exe_name.c_str(), w_exe_bytes);
+
+	status = NvAPI_DRS_GetApplicationInfo(hSession, hProfile, profile_app_name, &profile_application);
+	if (status != NVAPI_OK && status != NVAPI_EXECUTABLE_NOT_FOUND)
 	{
 		nvapi_error(status);
 		return;
+	}
+	else if (status == NVAPI_EXECUTABLE_NOT_FOUND)
+	{
+		LL_INFOS() << "Creating application for " << exe_name << " for NVIDIA driver" << LL_ENDL;
+
+		// Add this exe to the profile
+		NVDRS_APPLICATION application = {};
+		application.version = NVDRS_APPLICATION_VER;
+		application.isPredefined = 0;
+		memcpy_s(application.appName, sizeof(application.appName), w_exe_name.c_str(), w_exe_bytes);
+		memcpy_s(application.launcher, sizeof(application.launcher), w_exe_name.c_str(), w_exe_bytes);
+
+		memcpy_s(application.userFriendlyName, sizeof(application.userFriendlyName), TEXT(LL_VIEWER_CHANNEL), sizeof(TEXT(LL_VIEWER_CHANNEL)));
+
+		status = NvAPI_DRS_CreateApplication(hSession, hProfile, &application);
+		if (status != NVAPI_OK)
+		{
+			nvapi_error(status);
+			return;
+		}
+
+		// apply our changes to the system
+		status = NvAPI_DRS_SaveSettings(hSession);
+		if (status != NVAPI_OK) 
+		{
+			nvapi_error(status);
+			return;
+		}
 	}
 
 	// load settings for querying 
@@ -196,34 +294,9 @@ void ll_nvapi_init(NvDRSSessionHandle hSession)
 		return;
 	}
 
-	//get the preferred power management mode for Second Life
-	NVDRS_SETTING drsSetting = {0};
-	drsSetting.version = NVDRS_SETTING_VER;
-	status = NvAPI_DRS_GetSetting(hSession, hProfile, PREFERRED_PSTATE_ID, &drsSetting);
-	if (status == NVAPI_SETTING_NOT_FOUND)
-	{ //only override if the user hasn't specifically set this setting
-		// (4) Specify that we want the VSYNC disabled setting
-		// first we fill the NVDRS_SETTING struct, then we call the function
-		drsSetting.version = NVDRS_SETTING_VER;
-		drsSetting.settingId = PREFERRED_PSTATE_ID;
-		drsSetting.settingType = NVDRS_DWORD_TYPE;
-		drsSetting.u32CurrentValue = PREFERRED_PSTATE_PREFER_MAX;
-		status = NvAPI_DRS_SetSetting(hSession, hProfile, &drsSetting);
-		if (status != NVAPI_OK) 
-		{
-			nvapi_error(status);
-			return;
-		}
-
-        // (5) Now we apply (or save) our changes to the system
-        status = NvAPI_DRS_SaveSettings(hSession);
-        if (status != NVAPI_OK) 
-        {
-            nvapi_error(status);
-            return;
-        }
-	}
-	else if (status != NVAPI_OK)
+	// apply our changes to the system
+	status = NvAPI_DRS_SaveSettings(hSession);
+	if (status != NVAPI_OK)
 	{
 		nvapi_error(status);
 		return;
@@ -292,24 +365,22 @@ int APIENTRY WINMAIN(HINSTANCE hInstance,
 	}
 
 #if USE_NVAPI
-	NvAPI_Status status;
-    
 	// Initialize NVAPI
-	status = NvAPI_Initialize();
-	NvDRSSessionHandle hSession = 0;
+	NvAPI_Status nvStatus = NvAPI_Initialize();
+	NvDRSSessionHandle nvhSession = 0;
 
-    if (status == NVAPI_OK) 
+    if (nvStatus == NVAPI_OK)
 	{
 		// Create the session handle to access driver settings
-		status = NvAPI_DRS_CreateSession(&hSession);
-		if (status != NVAPI_OK) 
+		nvStatus = NvAPI_DRS_CreateSession(&nvhSession);
+		if (nvStatus != NVAPI_OK)
 		{
-			nvapi_error(status);
+			nvapi_error(nvStatus);
 		}
 		else
 		{
 			//override driver setting as needed
-			ll_nvapi_init(hSession);
+			ll_nvapi_init(nvhSession);
 		}
 	}
 #endif
@@ -372,11 +443,21 @@ int APIENTRY WINMAIN(HINSTANCE hInstance,
 
 #if USE_NVAPI
 	// (NVAPI) (6) We clean up. This is analogous to doing a free()
-	if (hSession)
+	if (nvhSession)
 	{
-		NvAPI_DRS_DestroySession(hSession);
-		hSession = 0;
+		NvAPI_DRS_DestroySession(nvhSession);
+		nvhSession = 0;
 	}
+
+	if (nvStatus == NVAPI_OK)
+	{
+		nvStatus = NvAPI_Unload();
+		if (nvStatus != NVAPI_OK)
+		{
+			nvapi_error(nvStatus);
+		}
+	}
+
 #endif
 
 #if defined(USE_SENTRY)
