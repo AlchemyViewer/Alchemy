@@ -28,7 +28,7 @@
 
 #include "llimageworker.h"
 #include "llimagedxt.h"
-#include <readerwriterqueue.h>
+#include <readerwritercircularbuffer.h>
 
 std::atomic< U32 > sImageThreads = 0;
 
@@ -70,7 +70,7 @@ public:
 	}
 
 private:
-    moodycamel::ReaderWriterQueue<LLImageDecodeThread::ImageRequest*> mRequestQueue;
+    moodycamel::BlockingReaderWriterCircularBuffer<LLImageDecodeThread::ImageRequest*> mRequestQueue;
 };
 
 //----------------------------------------------------------------------------
@@ -87,16 +87,16 @@ LLImageDecodeThread::LLImageDecodeThread(bool threaded, U32 pool_size)
 	{
         pool_size = std::thread::hardware_concurrency();
         if (pool_size == 0)
-            pool_size = 4U;  // Use a sane default: 2 cores
+            pool_size = 2U;  // Use a sane default: 2 cores
         if (pool_size >= 8U)
 		{
 			// Using number of (virtual) cores minus 3 for:
 			// - main image worker
 			// - viewer main loop thread
 			// - mesh repo thread
-			// further bound to a maximum of 16 threads (more than that is totally useless, even
+			// further bound to a maximum of 12 threads (more than that is totally useless, even
 			// when flying over main land with 512m draw distance).
-            pool_size = llmin(pool_size - 3U, 16U);
+            pool_size = llclamp(pool_size - 4U, 0U, 12U);
 		}
         else if (pool_size > 2U)
 		{

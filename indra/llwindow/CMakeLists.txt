@@ -194,7 +194,7 @@ if (SDL_FOUND)
     )
 endif (SDL_FOUND)
 
-target_link_libraries (llwindow llcommon ${llwindow_LINK_LIBRARIES})
+target_link_libraries (llwindow llcommon ${llwindow_LINK_LIBRARIES} readerwriterqueue)
 
 if(USE_PRECOMPILED_HEADERS AND ${CMAKE_VERSION} VERSION_GREATER "3.15.0") 
   target_precompile_headers(llwindow
