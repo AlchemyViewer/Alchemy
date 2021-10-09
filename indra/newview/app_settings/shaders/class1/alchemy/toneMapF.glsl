@@ -1,24 +1,24 @@
-/** 
+/**
  * @file toneMapF.glsl
  *
  * $LicenseInfo:firstyear=2021&license=viewerlgpl$
  * Alchemy Viewer Source Code
  * Copyright (C) 2021, Rye Mutt<rye@alchemyviewer.org>
- * 
+ *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation;
  * version 2.1 of the License only.
- * 
+ *
  * This library is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * Lesser General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU Lesser General Public
  * License along with this library; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
- * 
+ *
  * $/LicenseInfo$
  */
 
@@ -37,7 +37,7 @@ uniform sampler2DRect diffuseRect;
 uniform vec2 screen_res;
 uniform float exposure;
 
-#if COLOR_GRADE_LUT
+#if COLOR_GRADE_LUT != 0
 uniform sampler2D colorgrade_lut;
 uniform vec4 colorgrade_lut_size;
 #endif
@@ -69,7 +69,7 @@ vec3 unreal(vec3 x)
     return x / (x + 0.155) * 1.019;
 }
 
-vec3 aces(vec3 x) 
+vec3 aces(vec3 x)
 {
     // Narkowicz 2015, "ACES Filmic Tone Mapping Curve"
     const float a = 2.51;
@@ -81,25 +81,25 @@ vec3 aces(vec3 x)
 }
 
 #if TONEMAP_METHOD == 7 // Uchimura
-vec3 uchimura(vec3 x, float P, float a, float m, float l, float c, float b) 
+vec3 uchimura(vec3 x, float P, float a, float m, float l, float c, float b)
 {
-  float l0 = ((P - m) * l) / a;
-  float L0 = m - m / a;
-  float L1 = m + (1.0 - m) / a;
-  float S0 = m + l0;
-  float S1 = m + a * l0;
-  float C2 = (a * P) / (P - S1);
-  float CP = -C2 / P;
-
-  vec3 w0 = vec3(1.0 - smoothstep(0.0, m, x));
-  vec3 w2 = vec3(step(m + l0, x));
-  vec3 w1 = vec3(1.0 - w0 - w2);
-
-  vec3 T = vec3(m * pow(x / m, vec3(c)) + b);
-  vec3 S = vec3(P - (P - S1) * exp(CP * (x - S0)));
-  vec3 L = vec3(m + a * (x - m));
-
-  return T * w0 + L * w1 + S * w2;
+    float l0 = ((P - m) * l) / a;
+    float L0 = m - m / a;
+    float L1 = m + (1.0 - m) / a;
+    float S0 = m + l0;
+    float S1 = m + a * l0;
+    float C2 = (a * P) / (P - S1);
+    float CP = -C2 / P;
+    
+    vec3 w0 = vec3(1.0 - smoothstep(0.0, m, x));
+    vec3 w2 = vec3(step(m + l0, x));
+    vec3 w1 = vec3(1.0 - w0 - w2);
+    
+    vec3 T = vec3(m * pow(x / m, vec3(c)) + b);
+    vec3 S = vec3(P - (P - S1) * exp(CP * (x - S0)));
+    vec3 L = vec3(m + a * (x - m));
+    
+    return T * w0 + L * w1 + S * w2;
 }
 
 uniform vec3 tone_uchimura_a = vec3(1.0, 1.0, 0.22);
@@ -112,7 +112,7 @@ vec3 uchimura(vec3 x)
     float l = tone_uchimura_b.x; // linear section length
     float c = tone_uchimura_b.y; // black
     float b = tone_uchimura_b.z; // pedestal
-
+    
     return uchimura(x, P, a, m, l, c, b);
 }
 #endif
@@ -121,22 +121,22 @@ vec3 uchimura(vec3 x)
 // Lottes 2016, "Advanced Techniques and Optimization of HDR Color Pipelines"
 uniform vec3 tone_lottes_a = vec3(1.6, 0.977, 8.0);
 uniform vec3 tone_lottes_b = vec3(0.18, 0.267, 0.0);
-vec3 lottes(vec3 x) 
+vec3 lottes(vec3 x)
 {
-  vec3 a = vec3(tone_lottes_a.x);
-  vec3 d = vec3(tone_lottes_a.y);
-  vec3 hdrMax = vec3(tone_lottes_a.z);
-  vec3 midIn = vec3(tone_lottes_b.x);
-  vec3 midOut = vec3(tone_lottes_b.y);
-
-  vec3 b =
-      (-pow(midIn, a) + pow(hdrMax, a) * midOut) /
-      ((pow(hdrMax, a * d) - pow(midIn, a * d)) * midOut);
-  vec3 c =
-      (pow(hdrMax, a * d) * pow(midIn, a) - pow(hdrMax, a) * pow(midIn, a * d) * midOut) /
-      ((pow(hdrMax, a * d) - pow(midIn, a * d)) * midOut);
-
-  return pow(x, a) / (pow(x, a * d) * b + c);
+    vec3 a = vec3(tone_lottes_a.x);
+    vec3 d = vec3(tone_lottes_a.y);
+    vec3 hdrMax = vec3(tone_lottes_a.z);
+    vec3 midIn = vec3(tone_lottes_b.x);
+    vec3 midOut = vec3(tone_lottes_b.y);
+    
+    vec3 b =
+    (-pow(midIn, a) + pow(hdrMax, a) * midOut) /
+    ((pow(hdrMax, a * d) - pow(midIn, a * d)) * midOut);
+    vec3 c =
+    (pow(hdrMax, a * d) * pow(midIn, a) - pow(hdrMax, a) * pow(midIn, a * d) * midOut) /
+    ((pow(hdrMax, a * d) - pow(midIn, a * d)) * midOut);
+    
+    return pow(x, a) / (pow(x, a * d) * b + c);
 }
 #endif
 
@@ -153,15 +153,15 @@ vec3 Uncharted2Tonemap(vec3 x)
     float D = tone_uncharted_b.x;
     float E = tone_uncharted_b.y;
     float F = tone_uncharted_b.z;
-
+    
     return ((x*(A*x+C*B)+D*E)/(x*(A*x+B)+D*F))-E/F;
 }
 
-vec3 uncharted2(vec3 col) 
+vec3 uncharted2(vec3 col)
 {
     float ExposureBias = tone_uncharted_c.y;
     vec3 curr = Uncharted2Tonemap(ExposureBias*col);
-
+    
     vec3 whiteScale = vec3(1.0f)/Uncharted2Tonemap(vec3(tone_uncharted_c.x));
     return curr*whiteScale;
 }
@@ -170,70 +170,72 @@ vec3 uncharted2(vec3 col)
 void main()
 {
     vec4 diff = texture2DRect(diffuseRect, vary_fragcoord);
-
-#if TONEMAP_METHOD != 0
+    
+    #if TONEMAP_METHOD != 0
     // Exposure adjustment
-    diff.rgb *= exposure; 
-#endif
-
-#if TONEMAP_METHOD == 0 // None, Gamma Correct Only
+    diff.rgb *= exposure;
+    #endif
+    
+    #if TONEMAP_METHOD == 0 // None, Gamma Correct Only
     #define NEEDS_GAMMA_CORRECT 1
-#elif TONEMAP_METHOD == 1 // Linear
+    #elif TONEMAP_METHOD == 1 // Linear
     #define NEEDS_GAMMA_CORRECT 1
     diff.rgb = clamp(diff.rgb, 0, 1);
-#elif TONEMAP_METHOD == 2 // Reinhard method
+    #elif TONEMAP_METHOD == 2 // Reinhard method
     #define NEEDS_GAMMA_CORRECT 1
     diff.rgb = reinhard(diff.rgb);
-#elif TONEMAP_METHOD == 3 // Reinhard2 method
+    #elif TONEMAP_METHOD == 3 // Reinhard2 method
     #define NEEDS_GAMMA_CORRECT 1
     diff.rgb = reinhard2(diff.rgb);
-#elif TONEMAP_METHOD == 4 // Filmic method
+    #elif TONEMAP_METHOD == 4 // Filmic method
+    #define NEEDS_GAMMA_CORRECT 0
     diff.rgb = filmic(diff.rgb);
-#elif TONEMAP_METHOD == 5 // Unreal method
+    #elif TONEMAP_METHOD == 5 // Unreal method
+    #define NEEDS_GAMMA_CORRECT 0
     diff.rgb = unreal(diff.rgb);
-#elif TONEMAP_METHOD == 6 // Aces method
+    #elif TONEMAP_METHOD == 6 // Aces method
     #define NEEDS_GAMMA_CORRECT 1
     diff.rgb = aces(diff.rgb);
-#elif TONEMAP_METHOD == 7 // Uchimura's Gran Turismo method
+    #elif TONEMAP_METHOD == 7 // Uchimura's Gran Turismo method
     #define NEEDS_GAMMA_CORRECT 1
     diff.rgb = uchimura(diff.rgb);
-#elif TONEMAP_METHOD == 8 // Lottes 2016
+    #elif TONEMAP_METHOD == 8 // Lottes 2016
     #define NEEDS_GAMMA_CORRECT 1
     diff.rgb = lottes(diff.rgb);
-#elif TONEMAP_METHOD == 9 // Uncharted
+    #elif TONEMAP_METHOD == 9 // Uncharted
     #define NEEDS_GAMMA_CORRECT 1
     diff.rgb = uncharted2(diff.rgb);
-#else
+    #else
     #define NEEDS_GAMMA_CORRECT 1
-#endif
-
-#if NEEDS_GAMMA_CORRECT
+    #endif
+    
+    #if NEEDS_GAMMA_CORRECT != 0
     diff.rgb = linear_to_srgb(diff.rgb);
-#endif
-
-#if COLOR_GRADE_LUT
+    #endif
+    
+    #if COLOR_GRADE_LUT != 0
     // Invert coord for compat with DX-style LUT
     diff.y = 1.0 - diff.y;
-
+    
     // Convert to texel coords
     vec3 lutRange = diff.rgb * ( colorgrade_lut_size.w - 1);
-
+    
     // Calculate coords in texel space
     vec2 lutX = vec2(floor(lutRange.z)*colorgrade_lut_size.w+lutRange.x, lutRange.y);
     vec2 lutY = vec2(ceil(lutRange.z)*colorgrade_lut_size.w+lutRange.x, lutRange.y);
-
+    
     // texel to ndc
     lutX = (lutX+0.5)*colorgrade_lut_size.xy;
     lutY = (lutY+0.5)*colorgrade_lut_size.xy;
-
+    
     // LUT interpolation
     diff.rgb = mix(
-        texture2D(colorgrade_lut, lutX).rgb, 
-        texture2D(colorgrade_lut, lutY).rgb, 
-        fract(lutRange.z)
+    texture2D(colorgrade_lut, lutX).rgb,
+    texture2D(colorgrade_lut, lutY).rgb,
+    fract(lutRange.z)
     );
-#endif
-
+    #endif
+    
     frag_color = diff;
 }
 

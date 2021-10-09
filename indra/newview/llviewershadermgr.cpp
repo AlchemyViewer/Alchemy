@@ -3009,6 +3009,7 @@ BOOL LLViewerShaderMgr::loadShadersDeferred()
 			gDeferredPostTonemapProgram[i].mShaderLevel = mShaderLevel[SHADER_DEFERRED];
 
 			gDeferredPostTonemapProgram[i].clearPermutations();
+            gDeferredPostTonemapProgram[i].addPermutation("COLOR_GRADE_LUT", std::to_string(0));
 			gDeferredPostTonemapProgram[i].addPermutation("TONEMAP_METHOD", std::to_string(i));
 
 			success = gDeferredPostTonemapProgram[i].createShader(NULL, NULL);
