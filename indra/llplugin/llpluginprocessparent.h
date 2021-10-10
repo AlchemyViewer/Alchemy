@@ -210,7 +210,7 @@ private:
     bool pollTick();
 
 	LLMutex mIncomingQueueMutex;
-	std::queue<LLPluginMessage> mIncomingQueue;
+	std::deque<LLPluginMessage> mIncomingQueue;
 };
 
 #endif // LL_LLPLUGINPROCESSPARENT_H

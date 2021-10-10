@@ -315,19 +315,24 @@ void LLPluginProcessParent::idle(void)
 	do
 	{
 		// process queued messages
-		mIncomingQueueMutex.lock();
-		while(!mIncomingQueue.empty())
+		if (!mIncomingQueue.empty())
 		{
-			LLPluginMessage message = mIncomingQueue.front();
-			mIncomingQueue.pop();
-			mIncomingQueueMutex.unlock();
-				
-			receiveMessage(message);
-			
-			mIncomingQueueMutex.lock();
-		}
+			LLMutexTrylock locked_mtx(&mIncomingQueueMutex);
+			if (locked_mtx.isLocked())
+			{
+				if (!mIncomingQueue.empty())
+				{
+					std::deque<LLPluginMessage> local_queue;
+					local_queue.swap(mIncomingQueue);
 
-		mIncomingQueueMutex.unlock();
+					for(const auto& message : local_queue)
+					{
+						receiveMessage(message);
+					}
+				}
+			}
+
+		}
 		
 		// Give time to network processing
 		if(mMessagePipe)
@@ -870,10 +875,9 @@ void LLPluginProcessParent::poll(F64 timeout)
 
                 if (that)
                 {
-                    that->mIncomingQueueMutex.lock();
+					LLMutexLock incoming_lock(&that->mIncomingQueueMutex);
                     that->servicePoll();
-                    that->mIncomingQueueMutex.unlock();
-                }
+                 }
 
 			}
 		}
@@ -978,7 +982,7 @@ void LLPluginProcessParent::receiveMessageEarly(const LLPluginMessage &message)
 	if(!handled)
 	{
 		// any message that wasn't handled early needs to be queued.
-		mIncomingQueue.push(message);
+		mIncomingQueue.push_back(message);
 	}
 }
 
