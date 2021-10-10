@@ -47,7 +47,6 @@ void LLCommon::initClass()
 		sAprInitialized = TRUE;
 	}
 	LLTimer::initClass();
-	LLThreadSafeRefCount::initThreadSafeRefCount();
 	assert_main_thread();		// Make sure we record the main thread
 	if (!sMasterThreadRecorder)
 	{
@@ -62,7 +61,6 @@ void LLCommon::cleanupClass()
 	delete sMasterThreadRecorder;
 	sMasterThreadRecorder = NULL;
 	LLTrace::set_master_thread_recorder(NULL);
-	LLThreadSafeRefCount::cleanupThreadSafeRefCount();
 	SUBSYSTEM_CLEANUP_DBG(LLTimer);
 	if (sAprInitialized)
 	{
