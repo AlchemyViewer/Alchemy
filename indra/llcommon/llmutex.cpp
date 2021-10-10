@@ -31,12 +31,6 @@
 
 //============================================================================
 
-LLMutex::LLMutex() :
- mCount(0)
-{
-}
-
-
 void LLMutex::lock()
 {
 	if(isSelfLocked())
@@ -55,7 +49,7 @@ void LLMutex::lock()
 	mIsLocked[id] = TRUE;
 #endif
 
-	mLockingThread = LLThread::currentID();
+	mLockingThread = absl::Hash<std::thread::id>{}(LLThread::currentID());
 }
 
 void LLMutex::unlock()
@@ -74,7 +68,7 @@ void LLMutex::unlock()
 	mIsLocked[id] = FALSE;
 #endif
 
-	mLockingThread = LLThread::id_t();
+	mLockingThread = 0;
 	mMutex.Unlock();
 }
 
@@ -93,12 +87,7 @@ bool LLMutex::isLocked()
 
 bool LLMutex::isSelfLocked()
 {
-	return mLockingThread == LLThread::currentID();
-}
-
-LLThread::id_t LLMutex::lockingThread() const
-{
-	return mLockingThread;
+	return mLockingThread == absl::Hash<std::thread::id>{}(LLThread::currentID());
 }
 
 bool LLMutex::trylock()
@@ -122,7 +111,7 @@ bool LLMutex::trylock()
 	mIsLocked[id] = TRUE;
 #endif
 
-	mLockingThread = LLThread::currentID();
+	mLockingThread = absl::Hash<std::thread::id>{}(LLThread::currentID());
 	return true;
 }
 

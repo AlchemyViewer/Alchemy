@@ -45,19 +45,32 @@
 class LL_COMMON_API LLMutex
 {
 public:
-	LLMutex();
+	enum InitKey
+	{
+		E_CONST_INIT = 0
+	};
+
+
+	LLMutex() :
+		mMutex()
+	{
+	}
 	
+	explicit constexpr LLMutex(InitKey) :
+		mMutex(absl::kConstInit)
+	{
+	}
+
 	void lock();		// blocks
 	bool trylock();		// non-blocking, returns true if lock held.
 	void unlock();		// undefined behavior when called on mutex not being held
 	bool isLocked(); 	// non-blocking, but does do a lock/unlock so not free
 	bool isSelfLocked(); //return true if locked in a same thread
-	LLThread::id_t lockingThread() const; //get ID of locking thread
 
 protected:
 	absl::Mutex			mMutex;
-	mutable U32			mCount;
-	mutable LLThread::id_t	mLockingThread;
+	mutable size_t		mLockingThread = 0;
+	mutable U32			mCount = 0;
 	
 #if MUTEX_DEBUG
 	std::map<LLThread::id_t, BOOL> mIsLocked;
