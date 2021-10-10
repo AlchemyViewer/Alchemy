@@ -1228,9 +1228,6 @@ void RlvObject::setModifierValue(ERlvLocalBhvrModifier eBhvrModifier, const RlvB
 // RlvForceWear
 //
 
-RlvForceWear::RlvForceWear()
-{
-}
 
 // Checked: 2010-04-05 (RLVa-1.2.0d) | Modified: RLVa-1.2.0d
 bool RlvForceWear::isWearingItem(const LLInventoryItem* pItem)
