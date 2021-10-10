@@ -224,7 +224,7 @@ S32 LLMachineID::init()
                 pclsObj = NULL;
                 continue;
             }
-            LL_INFOS("AppInit") << " Serial Number : " << vtProp.bstrVal << LL_ENDL;
+            LL_INFOS("AppInit") << " Serial Number : " << ll_convert_wide_to_string(vtProp.bstrVal) << LL_ENDL;
 
             // use characters in the returned Serial Number to create a byte array of size len
             BSTR serialNumber ( vtProp.bstrVal);
