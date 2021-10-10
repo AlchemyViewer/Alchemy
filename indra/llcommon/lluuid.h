@@ -255,7 +255,7 @@ public:
 	static BOOL validate(const std::string_view in_string); // Validate that the UUID string is legal.
 
 	static const LLUUID null;
-	static LLMutex * mMutex;
+	static LLMutex sMutex;
 
 	static U32 getRandomSeed();
 	static S32 getNodeID(unsigned char * node_id);

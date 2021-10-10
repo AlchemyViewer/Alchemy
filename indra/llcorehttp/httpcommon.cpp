@@ -311,14 +311,9 @@ CURL *getCurlTemplateHandle()
     
 LLMutex *getCurlMutex()
 {
-    static LLMutex* sHandleMutexp = NULL;
+	static LLMutex sHandleMutexp(LLMutex::E_CONST_INIT);
 
-    if (!sHandleMutexp)
-    {
-        sHandleMutexp = new LLMutex();
-    }
-
-    return sHandleMutexp;
+    return &sHandleMutexp;
 }
 
 void deallocateEasyCurl(CURL *curlp)

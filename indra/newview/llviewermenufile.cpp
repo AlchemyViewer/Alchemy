@@ -118,7 +118,7 @@ class LLMeshUploadVisible : public view_listener_t
 	}
 };
 
-LLMutex* LLFilePickerThread::sMutex = NULL;
+LLMutex LLFilePickerThread::sMutex(LLMutex::E_CONST_INIT);
 std::queue<LLFilePickerThread*> LLFilePickerThread::sDeadQ;
 
 void LLFilePickerThread::getFile()
@@ -164,7 +164,7 @@ void LLFilePickerThread::run()
 	}
 
 	{
-		LLMutexLock lock(sMutex);
+		LLMutexLock lock(&sMutex);
 		sDeadQ.push(this);
 	}
 
@@ -173,16 +173,12 @@ void LLFilePickerThread::run()
 //static
 void LLFilePickerThread::initClass()
 {
-	sMutex = new LLMutex();
 }
 
 //static
 void LLFilePickerThread::cleanupClass()
 {
 	clearDead();
-	
-	delete sMutex;
-	sMutex = NULL;
 }
 
 //static
@@ -190,7 +186,7 @@ void LLFilePickerThread::clearDead()
 {
 	if (!sDeadQ.empty())
 	{
-		LLMutexLock lock(sMutex);
+		LLMutexLock lock(&sMutex);
 		while (!sDeadQ.empty())
 		{
 			LLFilePickerThread* thread = sDeadQ.front();

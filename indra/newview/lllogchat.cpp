@@ -210,14 +210,10 @@ LLLogChatTimeScanner::LLLogChatTimeScanner()
 LLLogChat::LLLogChat()
 : mSaveHistorySignal(NULL) // only needed in preferences
 {
-    mHistoryThreadsMutex = new LLMutex();
 }
 
 LLLogChat::~LLLogChat()
 {
-    delete mHistoryThreadsMutex;
-    mHistoryThreadsMutex = NULL;
-
     if (mSaveHistorySignal)
     {
         mSaveHistorySignal->disconnect_all_slots();
@@ -548,7 +544,7 @@ void LLLogChat::cleanupHistoryThreads()
 
 LLMutex* LLLogChat::historyThreadsMutex()
 {
-	return mHistoryThreadsMutex;
+	return &mHistoryThreadsMutex;
 }
 
 void LLLogChat::triggerHistorySignal()

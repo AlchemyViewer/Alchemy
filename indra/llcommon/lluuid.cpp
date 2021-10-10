@@ -49,9 +49,7 @@ const LLUUID LLUUID::null;
 const LLTransactionID LLTransactionID::tnull;
 
 // static 
-LLMutex * LLUUID::mMutex = NULL;
-
-
+LLMutex LLUUID::sMutex(LLMutex::E_CONST_INIT);
 
 /*
 
@@ -907,7 +905,6 @@ void LLUUID::getCurrentTime(uuid_time_t *timestamp)
       getSystemTime(&time_last);
       uuids_this_tick = uuids_per_tick;
       init = TRUE;
-      mMutex = new LLMutex();
    }
 
    uuid_time_t time_now = {0,0};
@@ -981,7 +978,7 @@ void LLUUID::generate()
 	// if clock hasn't changed or went backward, change clockseq
 	if (cmpTime(&timestamp, &time_last) != 1) 
 	{
-		LLMutexLock	lock(mMutex);
+		LLMutexLock	lock(&sMutex);
 		clock_seq = (clock_seq + 1) & 0x3FFF;
 		if (clock_seq == 0) 
 			clock_seq++;

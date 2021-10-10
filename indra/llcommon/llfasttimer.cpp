@@ -70,7 +70,7 @@ U64         BlockTimer::sClockResolution = 1000000000; // Nanosecond resolution
 U64         BlockTimer::sClockResolution = 1000000; // Microsecond resolution
 #endif
 
-static LLMutex*			sLogLock = NULL;
+static LLMutex			sLogLock(LLMutex::E_CONST_INIT);
 static std::queue<LLSD> sLogQueue;
 
 block_timer_tree_df_iterator_t begin_block_timer_tree_df(BlockTimerStatHandle& id) 
@@ -139,16 +139,10 @@ BlockTimerStatHandle& BlockTimer::getRootTimeBlock()
 
 void BlockTimer::pushLog(LLSD log)
 {
-	LLMutexLock lock(sLogLock);
+	LLMutexLock lock(&sLogLock);
 
 	sLogQueue.push(log);
 }
-
-void BlockTimer::setLogLock(LLMutex* lock)
-{
-	sLogLock = lock;
-}
-
 
 //static
 #if (LL_DARWIN || LL_LINUX) && !(defined(__i386__) || defined(__amd64__))
@@ -379,7 +373,7 @@ void BlockTimer::logStats()
 		sd["Total"]["Calls"] = (LLSD::Integer) 1;
 
 		{		
-			LLMutexLock lock(sLogLock);
+			LLMutexLock lock(&sLogLock);
 			sLogQueue.push(sd);
 		}
 	}
@@ -423,11 +417,11 @@ void BlockTimer::dumpCurTimes()
 //static
 void BlockTimer::writeLog(std::ostream& os)
 {
+	LLMutexLock lock(&sLogLock);
 	while (!sLogQueue.empty())
 	{
 		LLSD& sd = sLogQueue.front();
 		LLSDSerialize::toXML(sd, os);
-		LLMutexLock lock(sLogLock);
 		sLogQueue.pop();
 	}
 }

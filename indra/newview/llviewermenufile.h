@@ -76,7 +76,7 @@ class LLFilePickerThread : public LLThread
 public:
 
 	static std::queue<LLFilePickerThread*> sDeadQ;
-	static LLMutex* sMutex;
+	static LLMutex sMutex;
 
 	static void initClass();
 	static void cleanupClass();

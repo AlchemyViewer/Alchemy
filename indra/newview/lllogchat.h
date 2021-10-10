@@ -142,7 +142,7 @@ private:
 	save_history_signal_t * mSaveHistorySignal;
 	std::map<LLUUID,LLLoadHistoryThread *> mLoadHistoryThreads;
 	std::map<LLUUID,LLDeleteHistoryThread *> mDeleteHistoryThreads;
-	LLMutex* mHistoryThreadsMutex;
+	LLMutex mHistoryThreadsMutex;
 };
 
 /**
