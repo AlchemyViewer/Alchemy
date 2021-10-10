@@ -731,16 +731,9 @@ inline void RlvBehaviourInfo::toggleBehaviourFlag(EBehaviourFlags eBhvrFlag, boo
 inline std::string RlvCommand::asString() const
 {
     // NOTE: @clear=<param> should be represented as clear:<param>
-    std::string bhvr = getBehaviour();
-    if (m_eParamType != RLV_TYPE_CLEAR && !m_strOption.empty())
-    {
-        absl::StrAppend(&bhvr, ":", m_strOption);
-    }
-    else if (!m_strParam.empty())
-    {
-        absl::StrAppend(&bhvr, ":", m_strParam);
-    }
-    return bhvr;
+	return (m_eParamType != RLV_TYPE_CLEAR)
+		? (!m_strOption.empty()) ? (std::string(getBehaviour())).append(":").append(m_strOption) : (std::string(getBehaviour()))
+	    : (!m_strParam.empty())  ? (std::string(getBehaviour())).append(":").append(m_strParam)  : (std::string(getBehaviour()));
 }
 
 inline bool RlvCommand::operator ==(const RlvCommand& rhs) const
