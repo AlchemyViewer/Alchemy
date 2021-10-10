@@ -378,6 +378,12 @@ void LLPluginProcessParent::idle(void)
 				apr_sockaddr_t* addr = NULL;
 				mListenSocket = LLSocket::create(gAPRPoolp, LLSocket::STREAM_TCP);
 				mBoundPort = 0;
+				if (!mListenSocket)
+				{
+					killSockets();
+					errorState();
+					break;
+				}
 				
 				// This code is based on parts of LLSocket::create() in lliosocket.cpp.
 				
