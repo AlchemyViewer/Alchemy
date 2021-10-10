@@ -468,8 +468,8 @@ void LLPluginProcessParent::idle(void)
 				
 				// If we got here, we're listening.
 				setState(STATE_LISTENING);
+				break;
 			}
-			break;
 			
 			case STATE_LISTENING:
 			    {
@@ -512,28 +512,28 @@ void LLPluginProcessParent::idle(void)
 					    mHeartbeat.setTimerExpirySec(mPluginLaunchTimeout);
 					    setState(STATE_LAUNCHED);
 				    }
+				break;
 			    }
-			    break;
 
 			case STATE_LAUNCHED:
+			{
 				// waiting for the plugin to connect
 				if(pluginLockedUpOrQuit())
 				{
 					errorState();
 				}
-				else
+				// Check for the incoming connection.
+				else if (accept())
 				{
-					// Check for the incoming connection.
-					if(accept())
-					{
-						// Stop listening on the server port
-						mListenSocket.reset();
-						setState(STATE_CONNECTED);
-					}
+					// Stop listening on the server port
+					mListenSocket.reset();
+					setState(STATE_CONNECTED);
 				}
 			    break;
+			}
 			
 			case STATE_CONNECTED:
+			{
 				// waiting for hello message from the plugin
 
 				if(pluginLockedUpOrQuit())
@@ -541,8 +541,10 @@ void LLPluginProcessParent::idle(void)
 					errorState();
 				}
 			    break;
+			}
 
 			case STATE_HELLO:
+			{
 				LL_DEBUGS("Plugin") << "received hello message" << LL_ENDL;
 				
 				// Send the message to load the plugin
@@ -555,32 +557,40 @@ void LLPluginProcessParent::idle(void)
 
 				setState(STATE_LOADING);
 			    break;
+			}
 			
 			case STATE_LOADING:
+			{
 				// The load_plugin_response message will kick us from here into STATE_RUNNING
 				if(pluginLockedUpOrQuit())
 				{
 					errorState();
 				}
 			    break;
+			}
 			
 			case STATE_RUNNING:
+			{
 				if(pluginLockedUpOrQuit())
 				{
 					errorState();
 				}
 			    break;
+			}
 			
             case STATE_GOODBYE:
-                {
+            {
+				{
                     LLPluginMessage message(LLPLUGIN_MESSAGE_CLASS_INTERNAL, "shutdown_plugin");
                     sendMessage(message);
                 }
                 setState(STATE_EXITING);
                 break;
+			}
 
 			case STATE_EXITING:
-				if (! LLProcess::isRunning(mProcess))
+			{
+				if (!LLProcess::isRunning(mProcess))
 				{
 					setState(STATE_CLEANUP);
 				}
@@ -590,36 +600,44 @@ void LLPluginProcessParent::idle(void)
 					errorState();
 				}
     			break;
+			}
 
 			case STATE_LAUNCH_FAILURE:
+			{
 				if(mOwner != NULL)
 				{
 					mOwner->pluginLaunchFailed();
 				}
 				setState(STATE_CLEANUP);
     			break;
+			}
 
 			case STATE_ERROR:
+			{
 				if(mOwner != NULL)
 				{
 					mOwner->pluginDied();
 				}
 				setState(STATE_CLEANUP);
 			    break;
+			}
 			
 			case STATE_CLEANUP:
+			{
 				LLProcess::kill(mProcess);
 				killSockets();
 				setState(STATE_DONE);
                 dirtyPollSet();
 			    break;
+			}
 			
 			case STATE_DONE:
 				// just sit here.
     			break;
 		}
-	
-	} while (idle_again);
+
+	} 
+	while (idle_again);
 }
 
 bool LLPluginProcessParent::isLoading(void)
@@ -760,11 +778,9 @@ void LLPluginProcessParent::updatePollset()
 		sPollSet = NULL;
 	}
 	
-    mapInstances_t::iterator iter;
-	int count = 0;
-	
 	// Count the number of instances that want to be in the pollset
-	for(iter = sInstances.begin(); iter != sInstances.end(); iter++)
+	S32 count = 0;
+	for(auto iter = sInstances.begin(); iter != sInstances.end(); iter++)
 	{
 		(*iter).second->mPolledInput = false;
         if ((*iter).second->wantsPolling())
@@ -793,9 +809,9 @@ void LLPluginProcessParent::updatePollset()
 				LL_DEBUGS("PluginPoll") << "created pollset " << sPollSet << LL_ENDL;
 				
 				// Pollset was created, add all instances to it.
-				for(iter = sInstances.begin(); iter != sInstances.end(); iter++)
+				for(auto iter = sInstances.begin(); iter != sInstances.end(); iter++)
 				{
-                    if ((*iter).second->wantsPolling())
+                    if (iter->second->wantsPolling())
 					{
 						status = apr_pollset_add(sPollSet, &((*iter).second->mPollFD));
 						if(status == APR_SUCCESS)
