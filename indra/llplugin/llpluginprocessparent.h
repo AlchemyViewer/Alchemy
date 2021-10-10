@@ -125,7 +125,7 @@ public:
 
 	F64 getCPUUsage() { return mCPUUsage; };
 	
-	static void poll(F64 timeout);
+	static bool poll(F64 timeout);
 	static bool canPollThreadRun() { return (sPollSet || sPollsetNeedsRebuild || sUseReadThread); };
 	static void setUseReadThread(bool use_read_thread);
 	static bool getUseReadThread() { return sUseReadThread; };

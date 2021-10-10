@@ -63,8 +63,9 @@ protected:
 	{
 		while(!isQuitting() && LLPluginProcessParent::getUseReadThread())
 		{
-			LLPluginProcessParent::poll(0.1f);
+			bool active = LLPluginProcessParent::poll(0.1f);
 			checkPause();
+			ms_sleep(active ? 1 : 10); // Do not eat-up a full CPU core !!!
 		}
 		
 		// Final poll to clean up the pollset, etc.
@@ -133,7 +134,7 @@ LLPluginProcessParent::ptr_t LLPluginProcessParent::create(LLPluginProcessParent
     // Don't add to the global list until fully constructed.
     {
         LLMutexLock lock(&sInstancesMutex);
-        sInstances.insert(mapInstances_t::value_type(that.get(), that));
+        sInstances.emplace(that.get(), that);
     }
 
     return that;
@@ -864,8 +865,18 @@ void LLPluginProcessParent::setUseReadThread(bool use_read_thread)
 	}
 }
 
-void LLPluginProcessParent::poll(F64 timeout)
+bool LLPluginProcessParent::poll(F64 timeout)
 {
+	{	
+		LLMutexLock mtxLock(&sInstancesMutex);
+		if (sInstances.empty())
+		{
+			return false;
+		}
+	}
+
+	bool active = false;
+
 	if(sPollsetNeedsRebuild || !sUseReadThread)
 	{
 		sPollsetNeedsRebuild = false;
@@ -902,6 +913,7 @@ void LLPluginProcessParent::poll(F64 timeout)
                  }
 
 			}
+			active = true;	// Plugin is active
 		}
 		else if(APR_STATUS_IS_TIMEUP(status))
 		{
@@ -931,6 +943,7 @@ void LLPluginProcessParent::poll(F64 timeout)
 				++itClean;
 		}
 	}
+	return active;
 }
 
 void LLPluginProcessParent::servicePoll()
