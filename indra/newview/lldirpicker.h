@@ -99,7 +99,7 @@ public:
 	~LLDirPicker();
 };
 
-class LLDirPickerThread : public LLThread
+class LLDirPickerThread final : public LLThread
 {
 public:
 

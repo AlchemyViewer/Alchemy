@@ -103,7 +103,7 @@ public:
 	}
 };
 
-class LLPhysicsDecomp : public LLThread
+class LLPhysicsDecomp final : public LLThread
 {
 public:
 
@@ -195,7 +195,7 @@ private:
     LLFrameTimer mTimer;
 };
 
-class LLMeshRepoThread : public LLThread
+class LLMeshRepoThread final : public LLThread
 {
 public:
 
@@ -409,7 +409,7 @@ private:
 // trivially serve as the HttpHandler object for request completion
 // notifications.
 
-class LLMeshUploadThread : public LLThread, public LLCore::HttpHandler 
+class LLMeshUploadThread final : public LLThread, public LLCore::HttpHandler
 {
 private:
 	S32 mMeshUploadTimeOut ; //maximum time in seconds to execute an uploading request.

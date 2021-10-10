@@ -34,7 +34,7 @@
  class PoolWorkerThread;
 class LLImageFormatted;
 
-class LLImageDecodeThread : public LLQueuedThread
+class LLImageDecodeThread final : public LLQueuedThread
 {
 public:
 	class Responder : public LLThreadSafeRefCount
@@ -45,7 +45,7 @@ public:
 		virtual void completed(bool success, LLImageRaw* raw, LLImageRaw* aux) = 0;
 	};
 
-	class ImageRequest : public LLQueuedThread::QueuedRequest
+	class ImageRequest final : public LLQueuedThread::QueuedRequest
 	{
 	protected:
 		virtual ~ImageRequest(); // use deleteRequest()

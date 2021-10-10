@@ -54,7 +54,7 @@ public:
 	virtual void pluginDied() {};
 };
 
-class LLPluginProcessParent : public LLPluginMessagePipeOwner
+class LLPluginProcessParent final : public LLPluginMessagePipeOwner
 {
 	LOG_CLASS(LLPluginProcessParent);
 

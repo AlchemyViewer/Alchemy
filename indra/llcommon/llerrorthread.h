@@ -29,7 +29,7 @@
 
 #include "llthread.h"
 
-class LL_COMMON_API LLErrorThread : public LLThread
+class LL_COMMON_API LLErrorThread final : public LLThread
 {
 public:
 	LLErrorThread();

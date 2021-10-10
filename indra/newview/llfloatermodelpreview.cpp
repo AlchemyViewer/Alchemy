@@ -83,7 +83,7 @@ const S32 SMOOTH_VALUES_NUMBER = 10;
 const S32 PREVIEW_RENDER_SIZE = 1024;
 const F32 PREVIEW_CAMERA_DISTANCE = 16.f;
 
-class LLMeshFilePicker : public LLFilePickerThread
+class LLMeshFilePicker final : public LLFilePickerThread
 {
 public:
     LLMeshFilePicker(LLModelPreview* mp, S32 lod);

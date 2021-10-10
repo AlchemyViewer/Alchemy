@@ -39,7 +39,7 @@
 // Threaded Local File System
 //============================================================================
 
-class LLLFSThread : public LLQueuedThread
+class LLLFSThread final : public LLQueuedThread
 {
 	//------------------------------------------------------------------------
 public:
@@ -61,7 +61,7 @@ public:
 		virtual void completed(S32 bytes) = 0;
 	};
 
-	class Request : public QueuedRequest
+	class Request final : public QueuedRequest
 	{
 	protected:
 		virtual ~Request(); // use deleteRequest()

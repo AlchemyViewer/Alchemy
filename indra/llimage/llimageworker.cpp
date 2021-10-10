@@ -32,7 +32,7 @@
 
 std::atomic< U32 > sImageThreads = 0;
 
-class PoolWorkerThread : public LLThread
+class PoolWorkerThread final : public LLThread
 {
 public:
 	PoolWorkerThread(std::string name) : LLThread(name), mRequestQueue(30)

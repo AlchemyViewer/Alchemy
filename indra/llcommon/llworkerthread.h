@@ -50,7 +50,7 @@ class LL_COMMON_API LLWorkerThread : public LLQueuedThread
 {
 	friend class LLWorkerClass;
 public:
-	class WorkRequest : public LLQueuedThread::QueuedRequest
+	class WorkRequest final : public LLQueuedThread::QueuedRequest
 	{
 	protected:
 		virtual ~WorkRequest() = default; // use deleteRequest()

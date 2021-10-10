@@ -119,7 +119,7 @@ void ll_debug_poll_fd(const char* msg, const apr_pollfd_t* poll)
 /**
  * @class
  */
-class LLChainSleeper : public LLRunnable
+class LLChainSleeper final : public LLRunnable
 {
 public:
 	static LLRunner::run_ptr_t build(LLPumpIO* pump, S32 key)
@@ -127,7 +127,7 @@ public:
 		return LLRunner::run_ptr_t(new LLChainSleeper(pump, key));
 	}
 	
-	virtual void run(LLRunner* runner, S64 handle)
+	void run(LLRunner* runner, S64 handle) override
 	{
 		mPump->clearLock(mKey);
 	}

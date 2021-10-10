@@ -38,7 +38,7 @@ class LLImageFormatted;
 class LLTextureCacheWorker;
 class LLImageRaw;
 
-class LLTextureCache : public LLWorkerThread
+class LLTextureCache final : public LLWorkerThread
 {
 	friend class LLTextureCacheWorker;
 	friend class LLTextureCacheRemoteWorker;

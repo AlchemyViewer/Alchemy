@@ -628,7 +628,7 @@ static void settings_modify()
 	gDebugPipeline = gSavedSettings.getBOOL("RenderDebugPipeline");
 }
 
-class LLFastTimerLogThread : public LLThread
+class LLFastTimerLogThread final : public LLThread
 {
 public:
 	std::string mFile;
@@ -5496,7 +5496,7 @@ void LLAppViewer::forceErrorCoroutineCrash()
 
 void LLAppViewer::forceErrorThreadCrash()
 {
-    class LLCrashTestThread : public LLThread
+    class LLCrashTestThread final : public LLThread
     {
     public:
 

@@ -46,7 +46,7 @@ private:
 	LLCondition mRunCondition;
 };
 
-class LLLoadHistoryThread : public LLActionThread
+class LLLoadHistoryThread final : public LLActionThread
 {
 private:
 	const std::string& mFileName;
@@ -57,8 +57,8 @@ public:
 	LLLoadHistoryThread(const std::string& file_name, std::list<LLSD>* messages, const LLSD& load_params);
 	~LLLoadHistoryThread();
 	//void setHistoryParams(const std::string& file_name, const LLSD& load_params);
-	virtual void loadHistory(const std::string& file_name, std::list<LLSD>* messages, const LLSD& load_params);
-    virtual void run();
+	void loadHistory(const std::string& file_name, std::list<LLSD>* messages, const LLSD& load_params);
+    void run() override;
 
 	typedef boost::signals2::signal<void (std::list<LLSD>* messages,const std::string& file_name)> load_end_signal_t;
 	load_end_signal_t * mLoadEndSignal;
@@ -66,7 +66,7 @@ public:
 	void removeLoadEndSignal(const load_end_signal_t::slot_type& cb);
 };
 
-class LLDeleteHistoryThread : public LLActionThread
+class LLDeleteHistoryThread final : public LLActionThread
 {
 private:
 	std::list<LLSD>* mMessages;
@@ -75,7 +75,7 @@ public:
 	LLDeleteHistoryThread(std::list<LLSD>* messages, LLLoadHistoryThread* loadThread);
 	~LLDeleteHistoryThread();
 
-	virtual void run();
+	void run() override;
 	static void deleteHistory();
 };
 

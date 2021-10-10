@@ -78,7 +78,7 @@
 #include <boost/bind.hpp>	// for SkinFolder listener
 #include <boost/signals2.hpp>
 
-class LLMediaFilePicker : public LLFilePickerThread // deletes itself when done
+class LLMediaFilePicker final : public LLFilePickerThread // deletes itself when done
 {
 public:
     LLMediaFilePicker(LLPluginClassMedia* plugin, LLFilePicker::ELoadFilter filter, bool get_multiple)

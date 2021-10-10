@@ -102,13 +102,13 @@ public:
 
 	void getFile();
 
-	virtual void run();
+	void run() override final;
 
 	virtual void notify(const std::vector<std::string>& filenames) = 0;
 };
 
 
-class LLFilePickerReplyThread : public LLFilePickerThread
+class LLFilePickerReplyThread final : public LLFilePickerThread
 {
 public:
 

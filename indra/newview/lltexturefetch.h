@@ -53,7 +53,7 @@ class LLTextureCache;
 
 // Interface class
 
-class LLTextureFetch : public LLWorkerThread
+class LLTextureFetch final : public LLWorkerThread
 {
 	friend class LLTextureFetchWorker;
 	

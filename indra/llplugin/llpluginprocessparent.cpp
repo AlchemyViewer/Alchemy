@@ -50,7 +50,7 @@ LLPluginProcessParent::mapInstances_t LLPluginProcessParent::sInstances;
 LLThread *LLPluginProcessParent::sReadThread = NULL;
 
 
-class LLPluginProcessParentPollThread: public LLThread
+class LLPluginProcessParentPollThread final : public LLThread
 {
 public:
 	LLPluginProcessParentPollThread() :
