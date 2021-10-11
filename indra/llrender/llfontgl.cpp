@@ -1115,10 +1115,6 @@ std::string LLFontGL::getFontPathSystem()
 			sSystemFontPath = "/WINDOWS/FONTS/";
 		}
 	}
-#elif LL_LINUX
-
-	sSystemFontPath = "/usr/share/fonts/";
-
 #endif
 
 	if (sSystemFontPath.empty())
