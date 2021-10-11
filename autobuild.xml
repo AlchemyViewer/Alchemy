@@ -598,18 +598,18 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>439196ad7d55786d3fea808c3afc147e54afdf3255de3d0d2a10b109e720e4fbbeb66065e1009a8d6a74df8e24265794655b633ded2c603fa221469b38f0c8f3</string>
+              <string>ba6f350cc13df0f1f8eb9c0033d587abdd8d3942fcd972441d4e42554d54c72ca472cb49a9c004463e94e471f3510abbec1ecfb3f1332ba4a442130c576fae76</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/169/packages/generic/fonts/8ae51f5.1222/fonts-8ae51f5-common-1222.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/169/packages/generic/fonts/187d5d3.1224/fonts-187d5d3-common-1224.tar.zst</string>
             </map>
             <key>name</key>
             <string>common</string>
           </map>
         </map>
         <key>version</key>
-        <string>8ae51f5</string>
+        <string>187d5d3</string>
       </map>
       <key>freetype</key>
       <map>

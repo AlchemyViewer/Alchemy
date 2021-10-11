@@ -3,6 +3,13 @@
 
   <font name="default" comment="default font files (global fallbacks)">
     <file>DejaVuSans.ttf</file>
+    <file>NotoSans-Regular.ttf</file>
+    <file>NotoSansSymbols-Regular.ttf</file>
+    <file>NotoSansSymbols2-Regular.ttf</file>
+    <file>NotoSansMath-Regular.ttf</file>
+    <file>NotoNaskhArabicUI-Regular.ttf</file>
+    <file>NotoLoopedThaiUI-Regular.ttf</file>
+    <file>NotoSansCJK-Regular.ttc</file>
     <os name="Windows">
       <file>meiryo.TTC</file>
       <file>MSGOTHIC.TTC</file>
@@ -34,6 +41,11 @@
   <font name="SansSerifBold"
 	comment="Name of bold sans-serif font">
     <file>DejaVuSans-Bold.ttf</file>
+    <file>NotoSans-Bold.ttf</file>
+    <file>NotoSansSymbols-Bold.ttf</file>
+    <file>NotoNaskhArabicUI-Bold.ttf</file>
+    <file>NotoLoopedThaiUI-Bold.ttf</file>
+    <file>NotoSansCJK-Bold.ttc</file>
     <os name="Windows">
       <file>arialbd.ttf</file>
       </os>
@@ -44,6 +56,13 @@
 
   <font name="SansSerif" comment="Name of san-serif font (Truetype file name)">
     <file>DejaVuSans.ttf</file>
+    <file>NotoSans-Regular.ttf</file>
+    <file>NotoSansSymbols-Regular.ttf</file>
+    <file>NotoSansSymbols2-Regular.ttf</file>
+    <file>NotoSansMath-Regular.ttf</file>
+    <file>NotoNaskhArabicUI-Regular.ttf</file>
+    <file>NotoLoopedThaiUI-Regular.ttf</file>
+    <file>NotoSansCJK-Regular.ttc</file>
     <os name="Windows">
       <file>arial.ttf</file>
       </os>
@@ -56,23 +75,31 @@
 	comment="Name of bold sans-serif font"
 	font_style="BOLD">
     <file>DejaVuSans-Bold.ttf</file>
+    <file>NotoSans-Bold.ttf</file>
+    <file>NotoSansSymbols-Bold.ttf</file>
+    <file>NotoNaskhArabicUI-Bold.ttf</file>
+    <file>NotoNaskhArabicUI-Regular.ttf</file>
+    <file>NotoSansCJK-Bold.ttc</file>
   </font>
 
   <font name="SansSerif"
 	comment="Name of italic sans-serif font"
 	font_style="ITALIC">
     <file>DejaVuSans-Oblique.ttf</file>
+    <file>NotoSans-Italic.ttf</file>
   </font>
 
   <font name="SansSerif"
 	comment="Name of bold italic sans-serif font"
 	font_style="BOLD|ITALIC">
     <file>DejaVuSans-BoldOblique.ttf</file>
+    <file>NotoSans-BoldItalic.ttf</file>
   </font>
 
   <font name="Monospace"
 	comment="Name of monospace font">
     <file>DejaVuSansMono.ttf</file>
+    <file>NotoSansMono-Regular.ttf</file>
   </font>
 
   <font name="DejaVu"
