@@ -577,6 +577,40 @@
         <key>version</key>
         <string>2.02.03</string>
       </map>
+      <key>fonts</key>
+      <map>
+        <key>canonical_repo</key>
+        <string>https://git.alchemyviewer.org/alchemy/thirdparty/3p-fonts</string>
+        <key>copyright</key>
+        <string>Various Licenses</string>
+        <key>description</key>
+        <string>A collection of fonts used by the viewer</string>
+        <key>license</key>
+        <string>various</string>
+        <key>license_file</key>
+        <string>LICENSES/fonts.txt</string>
+        <key>name</key>
+        <string>fonts</string>
+        <key>platforms</key>
+        <map>
+          <key>common</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>hash</key>
+              <string>439196ad7d55786d3fea808c3afc147e54afdf3255de3d0d2a10b109e720e4fbbeb66065e1009a8d6a74df8e24265794655b633ded2c603fa221469b38f0c8f3</string>
+              <key>hash_algorithm</key>
+              <string>blake2b</string>
+              <key>url</key>
+              <string>https://git.alchemyviewer.org/api/v4/projects/169/packages/generic/fonts/8ae51f5.1222/fonts-8ae51f5-common-1222.tar.zst</string>
+            </map>
+            <key>name</key>
+            <string>common</string>
+          </map>
+        </map>
+        <key>version</key>
+        <string>8ae51f5</string>
+      </map>
       <key>freetype</key>
       <map>
         <key>copyright</key>

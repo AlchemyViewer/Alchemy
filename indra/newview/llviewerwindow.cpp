@@ -5738,10 +5738,17 @@ void LLViewerWindow::initFonts(F32 zoom_factor)
 
 	LLFontManager::initClass();
 
+	std::string font_dir;
+#if LL_WINDOWS
+	font_dir = gDirUtilp->getExecutableDir();
+#else
+	font_dir = gDirUtilp->getAppRODataDir();
+#endif
+
 	LLFontGL::initClass( gSavedSettings.getF32("FontScreenDPI"),
 								mDisplayScale.mV[VX] * zoom_factor,
 								mDisplayScale.mV[VY] * zoom_factor,
-								gDirUtilp->getAppRODataDir());
+								font_dir);
 	// Force font reloads, which can be very slow
 	LLFontGL::loadDefaultFonts();
 }
