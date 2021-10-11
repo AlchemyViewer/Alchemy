@@ -69,13 +69,6 @@ if (ENABLE_MEDIA_PLUGINS)
 add_subdirectory(${LIBS_OPEN_PREFIX}media_plugins)
 endif (ENABLE_MEDIA_PLUGINS)
 
-if (LINUX)
-  if (INSTALL_PROPRIETARY)
-      include(LLAppearanceUtility)
-      add_subdirectory(${LLAPPEARANCEUTILITY_SRC_DIR} ${LLAPPEARANCEUTILITY_BIN_DIR})
-  endif (INSTALL_PROPRIETARY)
-endif (LINUX)
-
 # sets the 'startup project' for debugging from visual studio.
 set_property(
     DIRECTORY ${VIEWER_PREFIX}
