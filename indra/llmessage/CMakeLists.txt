@@ -54,7 +54,6 @@ set(llmessage_SOURCE_FILES
     lliopipe.cpp
     lliosocket.cpp
     llioutil.cpp
-    llmail.cpp
     llmessagebuilder.cpp
     llmessageconfig.cpp
     llmessagereader.cpp
@@ -141,7 +140,6 @@ set(llmessage_HEADER_FILES
     lliosocket.h
     llioutil.h
     llloginflags.h
-    llmail.h
     llmessagebuilder.h
     llmessageconfig.h
     llmessagereader.h
