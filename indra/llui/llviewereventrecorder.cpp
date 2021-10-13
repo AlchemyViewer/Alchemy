@@ -258,8 +258,8 @@ void LLViewerEventRecorder::logKeyUnicodeEvent(llwchar uni_char) {
   // TODO need to consider mask keys too? Doesn't seem possible - at least not easily at this point
 
   event.insert("event",LLSD("keyDown")); 
-
-  LL_DEBUGS()  << "[VITA] unicode key: " << uni_char   << LL_ENDL;
+ 
+  LL_DEBUGS()  << "[VITA] unicode key: " << wstring_to_utf8str(LLWString(1, uni_char)) << LL_ENDL;
   LL_DEBUGS()  << "[VITA] dumpxml " << LLSDXMLStreamer(event) << "\n" << LL_ENDL;
 
 
