@@ -32,7 +32,7 @@ float LLTweenableValueLerp<float>::get()
 	{
 		float curFactor = (LLTimer::getElapsedSeconds() - m_StartTime) / m_Duration;
 		if (curFactor < 1.0)
-			return lerp(m_StartValue, m_EndValue, curFactor);
+			return ll_lerp(m_StartValue, m_EndValue, curFactor);
 		m_CurValue = m_EndValue;
 	}
 	return m_CurValue.get();

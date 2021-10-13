@@ -475,19 +475,19 @@ void LLSettingsSky::blend(const LLSettingsBase::ptr_t &end, F64 blendf)
             // If there is no cloud texture in destination, reduce coverage to imitate disappearance
             // See LLDrawPoolWLSky::renderSkyClouds... we don't blend present texture with null
             // Note: Probably can be done by shader
-            cloud_shadow = lerp(mSettings[SETTING_CLOUD_SHADOW].asReal(), (F64)0.f, blendf);
+            cloud_shadow = ll_lerp(mSettings[SETTING_CLOUD_SHADOW].asReal(), (F64)0.f, blendf);
             cloud_noise_id_next = cloud_noise_id;
         }
         else if (cloud_noise_id.isNull() && !cloud_noise_id_next.isNull())
         {
             // Source has no cloud texture, reduce initial coverage to imitate appearance
             // use same texture as destination
-            cloud_shadow = lerp((F64)0.f, other->mSettings[SETTING_CLOUD_SHADOW].asReal(), blendf);
+            cloud_shadow = ll_lerp((F64)0.f, other->mSettings[SETTING_CLOUD_SHADOW].asReal(), blendf);
             setCloudNoiseTextureId(cloud_noise_id_next);
         }
         else
         {
-            cloud_shadow = lerp(mSettings[SETTING_CLOUD_SHADOW].asReal(), other->mSettings[SETTING_CLOUD_SHADOW].asReal(), blendf);
+            cloud_shadow = ll_lerp(mSettings[SETTING_CLOUD_SHADOW].asReal(), other->mSettings[SETTING_CLOUD_SHADOW].asReal(), blendf);
         }
 
         LLSD blenddata = interpolateSDMap(mSettings, other->mSettings, other->getParameterMap(), blendf);

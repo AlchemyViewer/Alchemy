@@ -308,8 +308,8 @@ void LLWorldMapView::draw()
 	mVisibleRegions.clear();
 
 	// animate pan if necessary
-	sPanX = lerp(sPanX, sTargetPanX, LLSmoothInterpolation::getInterpolant(0.1f));
-	sPanY = lerp(sPanY, sTargetPanY, LLSmoothInterpolation::getInterpolant(0.1f));
+	sPanX = ll_lerp(sPanX, sTargetPanX, LLSmoothInterpolation::getInterpolant(0.1f));
+	sPanY = ll_lerp(sPanY, sTargetPanY, LLSmoothInterpolation::getInterpolant(0.1f));
 
 	const S32 width = getRect().getWidth();
 	const S32 height = getRect().getHeight();

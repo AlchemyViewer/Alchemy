@@ -887,7 +887,7 @@ void LLToolCompGun::draw()
 				LLViewerCamera::getInstance()->setDefaultFOV(mTargetFOV);
 				mTimerFOV.stop();
 			}
-			else LLViewerCamera::getInstance()->setDefaultFOV(lerp(mStartFOV, mTargetFOV, timer * ml_zoom_time));
+			else LLViewerCamera::getInstance()->setDefaultFOV(ll_lerp(mStartFOV, mTargetFOV, timer * ml_zoom_time));
 		}
 		else mTimerFOV.stop();
 	}

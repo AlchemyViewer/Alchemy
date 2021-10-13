@@ -279,11 +279,11 @@ LLSD LLSettingsBase::interpolateSDValue(const std::string& key_name, const LLSD 
     {
         case LLSD::TypeInteger:
             // lerp between the two values rounding the result to the nearest integer. 
-            new_value = LLSD::Integer(llroundf(lerp(value.asReal(), other_value.asReal(), mix)));
+            new_value = LLSD::Integer(llroundf(ll_lerp(value.asReal(), other_value.asReal(), mix)));
             break;
         case LLSD::TypeReal:
             // lerp between the two values.
-            new_value = LLSD::Real(lerp(value.asReal(), other_value.asReal(), mix));
+            new_value = LLSD::Real(ll_lerp(value.asReal(), other_value.asReal(), mix));
             break;
         case LLSD::TypeMap:
             // deep copy.
@@ -309,7 +309,7 @@ LLSD LLSettingsBase::interpolateSDValue(const std::string& key_name, const LLSD 
                 for (size_t i = 0; i < len; ++i)
                 {
 
-                    new_array[i] = lerp(value[i].asReal(), other_value[i].asReal(), mix);
+                    new_array[i] = ll_lerp(value[i].asReal(), other_value[i].asReal(), mix);
                 }
             }
 

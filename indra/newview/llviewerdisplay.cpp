@@ -1121,7 +1121,7 @@ void render_hud_attachments()
 // [/RLVa:KB]
 
 	// smoothly interpolate current zoom level
-	gAgentCamera.mHUDCurZoom = lerp(gAgentCamera.mHUDCurZoom, gAgentCamera.getAgentHUDTargetZoom(), LLSmoothInterpolation::getInterpolant(0.03f));
+	gAgentCamera.mHUDCurZoom = ll_lerp(gAgentCamera.mHUDCurZoom, gAgentCamera.getAgentHUDTargetZoom(), LLSmoothInterpolation::getInterpolant(0.03f));
 
 	if (!ALCinematicMode::isEnabled() && LLPipeline::sShowHUDAttachments && !gDisconnected && setup_hud_matrices())
 	{
