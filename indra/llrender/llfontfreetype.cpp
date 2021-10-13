@@ -419,7 +419,7 @@ LLFontGlyphInfo* LLFontFreetype::addGlyph(llwchar wch) const
 		return FALSE;
 
 	llassert(!mIsFallback);
-	//LL_DEBUGS() << "Adding new glyph for " << wch << " to font" << LL_ENDL;
+	//LL_DEBUGS() << "Adding new glyph for " << wstring_to_utf8str(LLWString(1, wch)) << " to font " << mName << LL_ENDL;
 
 	FT_UInt glyph_index;
 

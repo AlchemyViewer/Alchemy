@@ -492,7 +492,7 @@ S32 LLEmbeddedItems::getIndexFromEmbeddedChar(llwchar wch)
 	}
 	else
 	{
-		LL_WARNS() << "Embedded char " << wch << " not found, using 0" << LL_ENDL;
+		LL_WARNS() << "Embedded char " << wstring_to_utf8str(LLWString(1, wch)) << " not found, using 0" << LL_ENDL;
 		return 0;
 	}
 }
