@@ -1536,6 +1536,11 @@ void LLSecAPIBasicHandler::_writeProtectedData()
 		// it may be, however.
 		LLFile::remove(tmp_filename);
 
+        if (ctx)
+        {
+            EVP_CIPHER_CTX_free(ctx);
+        }
+
 		// EXP-1825 crash in LLSecAPIBasicHandler::_writeProtectedData()
 		// Decided throwing an exception here was overkill until we figure out why this happens
 		//LLTHROW(LLProtectedDataException("Error writing Protected Data Store"));

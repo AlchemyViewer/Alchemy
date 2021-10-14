@@ -53,6 +53,11 @@ U32 LLBlowfishCipher::encrypt(const U8* src, U32 src_len, U8* dst, U32 dst_len)
 
 	// OpenSSL uses "cipher contexts" to hold encryption parameters.
     EVP_CIPHER_CTX* context = EVP_CIPHER_CTX_new();
+    if (!context)
+    {
+        LL_WARNS() << "LLBlowfishCipher::encrypt EVP_CIPHER_CTX initiation failure" << LL_ENDL;
+        return 0;
+    }
 
 	// We want a blowfish cyclic block chain cipher, but need to set 
 	// the key length before we pass in a key, so call EncryptInit 

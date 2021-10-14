@@ -1981,7 +1981,7 @@ bool LLAppViewer::cleanup()
 	if (LLConversationLog::instanceExists())
 	{
 		LLConversationLog::instance().cache();
-	}
+    }
 
 	if (mPurgeCacheOnExit)
 	{
@@ -2118,7 +2118,7 @@ bool LLAppViewer::cleanup()
     LLCore::LLHttp::cleanup();
 
     // Manually cleanup sec handler for openssl 1.1.1+ compat
-    cleanupSecHandler();
+    clearSecHandler();
     
 	LLMainLoopRepeater::instance().stop();
 

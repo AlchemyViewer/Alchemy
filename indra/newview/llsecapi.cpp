@@ -73,10 +73,10 @@ void initializeSecHandler()
 
 }
 
-void cleanupSecHandler()
+void clearSecHandler()
 {
-	gSecAPIHandler = nullptr;
-	gHandlerMap.clear();
+    gSecAPIHandler = nullptr;
+    gHandlerMap.clear();
 }
 
 // start using a given security api handler.  If the string is empty
