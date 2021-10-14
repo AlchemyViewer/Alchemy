@@ -1497,10 +1497,11 @@ void LLSecAPIBasicHandler::_writeProtectedData()
 	
 	llofstream protected_data_stream(tmp_filename.c_str(), 
                                      std::ios_base::binary);
+	EVP_CIPHER_CTX* ctx = nullptr;
 	try
 	{
 		
-		EVP_CIPHER_CTX* ctx = EVP_CIPHER_CTX_new();
+		ctx = EVP_CIPHER_CTX_new();
 		EVP_EncryptInit_ex(ctx, EVP_chacha20(), NULL, salt, NULL); // 1 is encrypt
 		unsigned char unique_id[MAC_ADDRESS_BYTES];
         LLMachineID::getUniqueID(unique_id, sizeof(unique_id));
