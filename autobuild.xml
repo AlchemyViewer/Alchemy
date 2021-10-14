@@ -1288,45 +1288,23 @@
         <string>llphysicsextensions_stub</string>
         <key>platforms</key>
         <map>
-          <key>darwin64</key>
+          <key>common</key>
           <map>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>f290b000b31f9e36f2489946cbc99f5e</string>
+              <string>4e1597ec20042c578afb5b0807919beb0865df46f044b83d886bf2c05460113eaac2a46c5acef8eac623a2846b2f334172aa7a801e0dde6744209bc719006bee</string>
+              <key>hash_algorithm</key>
+              <string>blake2b</string>
               <key>url</key>
-              <string>http://automated-builds-secondlife-com.s3.amazonaws.com/ct2/59995/563653/llphysicsextensions_stub-1.0.542456-darwin64-542456.tar.bz2</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/170/packages/generic/llphysicsextensions_stub/1.0.1229/llphysicsextensions_stub-1.0-common-1229.tar.zst</string>
             </map>
             <key>name</key>
-            <string>darwin64</string>
-          </map>
-          <key>linux64</key>
-          <map>
-            <key>archive</key>
-            <map>
-              <key>hash</key>
-              <string>711f4ec769e4b5f59ba25ee43c11bcbc</string>
-              <key>url</key>
-              <string>http://automated-builds-secondlife-com.s3.amazonaws.com/ct2/4724/14846/llphysicsextensions_stub-1.0.504712-linux64-504712.tar.bz2</string>
-            </map>
-            <key>name</key>
-            <string>linux64</string>
-          </map>
-          <key>windows</key>
-          <map>
-            <key>archive</key>
-            <map>
-              <key>hash</key>
-              <string>2e5f1f7046a49d8b0bc295aa878116bc</string>
-              <key>url</key>
-              <string>http://automated-builds-secondlife-com.s3.amazonaws.com/ct2/60043/564063/llphysicsextensions_stub-1.0.542456-windows-542456.tar.bz2</string>
-            </map>
-            <key>name</key>
-            <string>windows</string>
+            <string>common</string>
           </map>
         </map>
         <key>version</key>
-        <string>1.0.542456</string>
+        <string>1.0</string>
       </map>
       <key>minizip-ng</key>
       <map>
