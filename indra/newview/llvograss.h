@@ -94,6 +94,7 @@ public:
 		
 		F32		mBladeSizeX;
 		F32		mBladeSizeY;
+		std::string	mName;
 	};
 
 	typedef std::map<U32, GrassSpeciesData*> SpeciesMap;
@@ -120,6 +121,7 @@ private:
 	F32 mLastHeight;		// For cheap update hack
 	S32 mNumBlades;
 
+public:
 	static SpeciesMap sSpeciesTable;
 };
 #endif // LL_VO_GRASS_

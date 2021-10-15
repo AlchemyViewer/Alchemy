@@ -662,6 +662,28 @@
       <key>Value</key>
       <integer>900</integer>
     </map>
+    <key>LastSelectedGrass</key>
+    <map>
+      <key>Comment</key>
+      <string>The last selected grass option from the build tools</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>String</string>
+      <key>Value</key>
+      <string />
+    </map>
+    <key>LastSelectedTree</key>
+    <map>
+      <key>Comment</key>
+      <string>The last selected tree option from the build tools</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>String</string>
+      <key>Value</key>
+      <string />
+    </map>
     <key>RenderAutoMaskAlphaUseRMSE</key>
     <map>
       <key>Comment</key>

@@ -134,6 +134,7 @@ void LLVOTree::initClass()
 			F32 F32_val;
 			LLUUID id;
 			S32 S32_val;
+			std::string name;
 
 			BOOL success = TRUE;
 
@@ -237,15 +238,15 @@ void LLVOTree::initClass()
 			success &= tree_def->getFastAttributeF32(repeat_z_string, F32_val);
 			newTree->mRepeatTrunkZ = F32_val;
 
+			static LLStdStringHandle name_string = LLXmlTree::addAttributeString("name");
+			tree_def->getFastAttributeString(name_string, name);
+			newTree->mName = name;
 			sSpeciesTable[species] = newTree;
 
 			if (species >= sMaxTreeSpecies) sMaxTreeSpecies = species + 1;
 
 			if (!success)
 			{
-				std::string name;
-				static LLStdStringHandle name_string = LLXmlTree::addAttributeString("name");
-				tree_def->getFastAttributeString(name_string, name);
 				LL_WARNS() << "Incomplete definition of tree " << name << LL_ENDL;
 			}
 		}
@@ -318,7 +319,7 @@ U32 LLVOTree::processUpdateMessage(LLMessageSystem *mesgsys,
 	//
 	//  Load Species-Specific data 
 	//
-	auto species_data = sSpeciesTable[mSpecies];
+	const auto& species_data = sSpeciesTable[mSpecies];
 
 	static const S32 MAX_TREE_TEXTURE_VIRTURE_SIZE_RESET_INTERVAL = 32 ; //frames.
 	mTreeImagep = LLViewerTextureManager::getFetchedTexture(species_data->mTextureID, FTT_DEFAULT, TRUE, LLGLTexture::BOOST_NONE, LLViewerTexture::LOD_TEXTURE);
@@ -736,7 +737,7 @@ BOOL LLVOTree::updateGeometry(LLDrawable *drawable)
 		// Generate the vertices
 		// Generate the indices
 
-		auto species_data = sSpeciesTable[mSpecies];
+		const auto& species_data = sSpeciesTable[mSpecies];
 
 		for (lod = 0; lod < sMAX_NUM_TREE_LOD_LEVELS; lod++)
 		{

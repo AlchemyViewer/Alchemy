@@ -67,10 +67,34 @@
 #include "llwindow.h"			// incBusyCount()
 #include "material_codes.h"
 
+#include "llparcel.h"
+#include "llviewerparcelmgr.h"
+#include "roles_constants.h"
+
 const LLVector3 DEFAULT_OBJECT_SCALE(0.5f, 0.5f, 0.5f);
 
 //static 
 LLPCode	LLToolPlacer::sObjectType = LL_PCODE_CUBE;
+
+template<class P>
+U32 get_selected_plant(const std::map<U32, P*>& list, const std::string& type, S32 max) // MC
+{
+	if (!type.empty() && !list.empty())
+	{
+		std::string last_selected = gSavedSettings.getString("LastSelected"+type);
+		if (!last_selected.empty())
+		{
+			for (size_t i = 0; i < list.size(); ++i)
+			{
+				if (list.at(i) && list.at(i)->mName == last_selected)
+				{
+					return (U32)i;
+				}
+			}
+		}
+	}
+	return rand() % max;
+}
 
 LLToolPlacer::LLToolPlacer()
 :	LLTool( "Create" )
@@ -213,13 +237,13 @@ BOOL LLToolPlacer::addObject( LLPCode pcode, S32 x, S32 y, U8 use_physics )
 	case LL_PCODE_LEGACY_GRASS:
 		//  Randomize size of grass patch 
 		scale.setVec(10.f + ll_frand(20.f), 10.f + ll_frand(20.f),  1.f + ll_frand(2.f));
-		state = ll_rand() % LLVOGrass::sMaxGrassSpecies;
+		state = get_selected_plant(LLVOGrass::sSpeciesTable, "Grass", LLVOGrass::sMaxGrassSpecies);
 		break;
 
 
 	case LL_PCODE_LEGACY_TREE:
 	case LL_PCODE_TREE_NEW:
-		state = ll_rand() % LLVOTree::sMaxTreeSpecies;
+		state = get_selected_plant(LLVOTree::sSpeciesTable, "Tree", LLVOTree::sMaxTreeSpecies);
 		break;
 
 	case LL_PCODE_SPHERE:
