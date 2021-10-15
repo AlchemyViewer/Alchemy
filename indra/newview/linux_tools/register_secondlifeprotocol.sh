@@ -6,14 +6,12 @@
 
 HANDLER="$1"
 
-RUN_PATH=`dirname "$0" || echo .`
+RUN_PATH=$(dirname "$0" || echo .)
 cd "${RUN_PATH}/.."
 
 if [ -z "$HANDLER" ]; then
-    HANDLER="$RUN_PATH/etc/handle_secondlifeprotocol.sh"
-    #curdir=`pwd`
-    #echo $curdir
-    #HANDLER="$curdir/etc/handle_secondlifeprotocol.sh"
+    #HANDLER="$RUN_PATH/etc/handle_secondlifeprotocol.sh"
+    HANDLER="$(pwd)/etc/handle_secondlifeprotocol.sh"
 fi
 
 # Register handler for GNOME-aware apps
@@ -26,8 +24,8 @@ fi
 
 # Register handler for KDE-aware apps
 for LLKDECONFIG in kde-config kde4-config; do
-    if [ `which $LLKDECONFIG` ]; then
-        LLKDEPROTODIR=`$LLKDECONFIG --path services | cut -d ':' -f 1`
+    if [ $(which $LLKDECONFIG) ]; then
+        LLKDEPROTODIR=$($LLKDECONFIG --path services | cut -d ':' -f 1)
         if [ -d "$LLKDEPROTODIR" ]; then
             LLKDEPROTOFILE=${LLKDEPROTODIR}/secondlife.protocol
             cat > ${LLKDEPROTOFILE} <<EOF || echo Warning: Did not register secondlife:// handler with KDE: Could not write ${LLKDEPROTOFILE} 
@@ -51,13 +49,11 @@ done
 
 #Check if xdg-mime is present, if so, use it to register new protocol.
 if command -v xdg-mime query default x-scheme-handler/secondlife > /dev/null 2>&1; then
-	#zenity --info --text="xdg-mime present\!" --title="register_secondlife_protocol"
-	urlhandler=`xdg-mime query default x-scheme-handler/secondlife`
+	urlhandler=$(xdg-mime query default x-scheme-handler/secondlife)
 	localappdir="$HOME/.local/share/applications"
 	newhandler="handle_secondlifeprotocol.desktop"
 	cat >"$localappdir/$newhandler" <<EOFnew || echo Warning: Did not register secondlife:// handler with xdg-mime: Could not write $newhandler
 [Desktop Entry]
-Encoding=UTF-8
 Version=1.5
 Name="Second Life URL handler"
 Comment="secondlife:// URL handler"
@@ -82,7 +78,7 @@ EOFnew
 	xdg-mime default $newhandler x-scheme-handler/secondlife
 	if command -v update-desktop-database > /dev/null 2>&1; then
 		update-desktop-database $localappdir
-		echo -e "Registered secondlife:// protocol with xdg-mime\nNew default: `xdg-mime query default x-scheme-handler/secondlife`"
+		echo -e "Registered secondlife:// protocol with xdg-mime\nNew default: $(xdg-mime query default x-scheme-handler/secondlife)"
 	else
 		echo Warning: Cannot update desktop database, command missing - installation may be incomplete.
 	fi
