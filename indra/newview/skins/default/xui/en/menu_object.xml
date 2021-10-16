@@ -30,16 +30,103 @@
     <menu_item_call.on_enable
         function="EnableEdit"/>
   </menu_item_call>
-    <menu_item_call
-     label="Edit Particles"
-     name="Menu Object Edit Particles">
-      <menu_item_call.on_click
-       function="Object.EditParticles" />
-      <menu_item_call.on_enable
-       function="Object.EnableEditParticles" />
-      <menu_item_call.on_visible
-       function="Object.EnableEditParticles" />
-    </menu_item_call>
+  <context_menu
+    label="Tools"
+    name="Tools">
+	  <menu_item_call
+		  label="Recompile Scripts (Mono)"
+		  name="Mono">
+		  <menu_item_call.on_click
+			  function="Tools.SelectedScriptAction"
+			  parameter="compile mono" />
+		  <menu_item_call.on_enable
+			  function="EditableSelectedMono" />
+	  </menu_item_call>
+	  <menu_item_call
+		  label="Recompile Scripts (LSL)"
+		  name="LSL">
+		  <menu_item_call.on_click
+			  function="Tools.SelectedScriptAction"
+			  parameter="compile lsl" />
+		  <menu_item_call.on_enable
+			  function="EditableSelected" />
+	  </menu_item_call>
+	  <menu_item_call
+		  label="Reset Scripts"
+		  name="Reset Scripts">
+		  <menu_item_call.on_click
+			  function="Tools.SelectedScriptAction"
+			  parameter="reset" />
+		  <menu_item_call.on_enable
+			  function="EditableSelected" />
+	  </menu_item_call>
+	  <menu_item_call
+		  label="Set Scripts to Running"
+		  name="Set Scripts to Running">
+		  <menu_item_call.on_click
+			  function="Tools.SelectedScriptAction"
+			  parameter="start" />
+		  <menu_item_call.on_enable
+			  function="EditableSelected" />
+	  </menu_item_call>
+	  <menu_item_call
+		  label="Set Scripts to Not Running"
+		  name="Set Scripts to Not Running">
+		  <menu_item_call.on_click
+			  function="Tools.SelectedScriptAction"
+			  parameter="stop" />
+		  <menu_item_call.on_enable
+			  function="EditableSelected" />
+	  </menu_item_call>
+	  <menu_item_call
+		  label="Delete Scripts"
+		  name="Delete Scripts">
+		  <menu_item_call.on_click
+			  function="Tools.SelectedScriptAction"
+			  parameter="delete" />
+		  <menu_item_call.on_enable
+			  function="EditableSelected" />
+	  </menu_item_call>
+	  <menu_item_separator layout="topleft" />
+	  <menu_item_call
+	   label="Edit Particles"
+	   name="Menu Object Edit Particles">
+		  <menu_item_call.on_click
+		   function="Object.EditParticles" />
+		  <menu_item_call.on_enable
+		   function="Object.EnableEditParticles" />
+	  </menu_item_call>
+	  <menu_item_call
+		  label="Explode"
+		  name="Explode">
+		  <menu_item_call.on_click
+			  function="Object.AlchemyExplode" />
+		  <menu_item_call.on_enable
+			  function="Alchemy.PowerfulWizard" />
+		  <menu_item_call.on_visible
+			  function="Alchemy.PowerfulWizard" />
+	  </menu_item_call>
+	  <menu_item_call
+		  label="Destroy"
+		  name="Destroy">
+		  <menu_item_call.on_click
+			  function="Object.AlchemyDestroy" />
+		  <menu_item_call.on_enable
+			  function="Alchemy.PowerfulWizard" />
+		  <menu_item_call.on_visible
+			  function="Alchemy.PowerfulWizard" />
+	  </menu_item_call>
+	  <menu_item_call
+		  label="Force Delete"
+		  name="Force Delete">
+		  <menu_item_call.on_click
+			  function="Object.AlchemyForceDelete" />
+		  <menu_item_call.on_enable
+			  function="Alchemy.PowerfulWizard" />
+		  <menu_item_call.on_visible
+			  function="Alchemy.PowerfulWizard" />
+	  </menu_item_call>
+  </context_menu>
   <menu_item_call
       enabled="false"
       label="Open"

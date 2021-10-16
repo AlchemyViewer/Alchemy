@@ -34,6 +34,7 @@
 #include "llnotifications.h"
 #include "llnotificationsutil.h"
 #include "llselectmgr.h"
+#include "llviewercontrol.h"
 #include "llviewermenu.h"
 #include "llviewerobject.h"
 #include "llviewerobjectlist.h"
@@ -195,43 +196,119 @@ namespace
 			}
 		}
 	}
-}
 
-
-void confirm_cinematic_mode(const LLSD& notification, const LLSD& response)
-{
-	S32 option = LLNotificationsUtil::getSelectedOption(notification, response);
-	if (option == 0) // OK
+	void confirm_cinematic_mode(const LLSD& notification, const LLSD& response)
 	{
-		ALCinematicMode::toggle();
+		S32 option = LLNotificationsUtil::getSelectedOption(notification, response);
+		if (option == 0) // OK
+		{
+			ALCinematicMode::toggle();
+		}
+	}
+
+	bool toggle_cinematic_mode()
+	{
+		LLNotification::Params params("CinematicConfirmHideUI");
+		params.functor.function(boost::bind(&confirm_cinematic_mode, _1, _2));
+		LLSD substitutions;
+		substitutions["SHORTCUT"] = "Alt+Shift+C";
+		params.substitutions = substitutions;
+		if (!ALCinematicMode::isEnabled())
+		{
+			// hiding, so show notification
+			LLNotifications::instance().add(params);
+		}
+		else
+		{
+			LLNotifications::instance().forceResponse(params, 0);
+		}
+		return true;
+	}
+
+	bool is_powerful_wizard()
+	{
+		LLViewerObject* objpos = LLSelectMgr::getInstance()->getSelection()->getFirstRootObject();
+		if (objpos)
+		{
+			if (objpos->permYouOwner() && gSavedSettings.getBOOL("AlchemyPowerfulWizard"))
+				return true;
+		}
+		return false;
+	}
+
+
+	void object_explode()
+	{
+		LLViewerObject* objpos = LLSelectMgr::getInstance()->getSelection()->getFirstRootObject();
+		if (objpos)
+		{
+			if (!objpos->permYouOwner())
+			{
+				LLNotificationsUtil::add("AlchemyUnpoweredWizard", LLSD());
+				return;
+			}
+
+			LLNotificationsUtil::add("AlchemyExplosions", LLSD());
+
+			/*
+				NOTE: oh god how did this get here
+			*/
+			LLSelectMgr::getInstance()->selectionUpdateTemporary(1);//set temp to TRUE
+			LLSelectMgr::getInstance()->selectionUpdatePhysics(1);
+			LLSelectMgr::getInstance()->sendDelink();
+			LLSelectMgr::getInstance()->deselectAll();
+		}
+	}
+
+	void object_destroy()
+	{
+		LLViewerObject* objpos = LLSelectMgr::getInstance()->getSelection()->getFirstRootObject();
+		if (objpos)
+		{
+			if (!objpos->permYouOwner())
+			{
+				LLNotificationsUtil::add("AlchemyUnpoweredWizard", LLSD());
+				return;
+			}
+
+			LLNotificationsUtil::add("AlchemyDestroyObject", LLSD());
+
+			/*
+				NOTE: Temporary objects, when thrown off world/put off world,
+				do not report back to the viewer, nor go to lost and found.
+
+				So we do selectionUpdateTemporary(1)
+			*/
+			LLSelectMgr::getInstance()->selectionUpdateTemporary(1);//set temp to TRUE
+			LLVector3 pos = objpos->getPosition();//get the x and the y
+			pos.mV[VZ] = FLT_MAX;//create the z
+			objpos->setPositionParent(pos);//set the x y z
+			LLSelectMgr::getInstance()->sendMultipleUpdate(UPD_POSITION);//send the data
+		}
+	}
+
+	void object_force_delete()
+	{
+		LLViewerObject* objpos = LLSelectMgr::getInstance()->getSelection()->getFirstRootObject();
+		if (objpos)
+		{
+			if (!objpos->permYouOwner())
+			{
+				LLNotificationsUtil::add("AlchemyUnpoweredWizard", LLSD());
+				return;
+			}
+			LLSelectMgr::getInstance()->selectForceDelete();
+
+		}
 	}
 }
-
-bool toggle_cinematic_mode()
-{
-	LLNotification::Params params("CinematicConfirmHideUI");
-	params.functor.function(boost::bind(&confirm_cinematic_mode, _1, _2));
-	LLSD substitutions;
-	substitutions["SHORTCUT"] = "Alt+Shift+C";
-	params.substitutions = substitutions;
-	if (!ALCinematicMode::isEnabled())
-	{
-		// hiding, so show notification
-		LLNotifications::instance().add(params);
-	}
-	else
-	{
-		LLNotifications::instance().forceResponse(params, 0);
-	}
-	return true;
-}
-
 
 ////////////////////////////////////////////////////////
 
 void ALViewerMenu::initialize_menus()
 {
 	LLUICtrl::EnableCallbackRegistry::Registrar& enable = LLUICtrl::EnableCallbackRegistry::currentRegistrar();
+	enable.add("Alchemy.PowerfulWizard", [](LLUICtrl* ctrl, const LLSD& param) { return is_powerful_wizard(); });
 	enable.add("Avatar.EnableManageEstate", [](LLUICtrl* ctrl, const LLSD& param) { return can_manage_avatar_estate(); });
 	enable.add("Avatar.EnableTeleportTo", [](LLUICtrl* ctrl, const LLSD& param) { return can_teleport_to(); });
 	enable.add("Object.EnableEditParticles", [](LLUICtrl* ctrl, const LLSD& param) { return enable_edit_particle_source(); });
@@ -243,6 +320,9 @@ void ALViewerMenu::initialize_menus()
 
 	commit.add("Object.CopyID", [](LLUICtrl* ctrl, const LLSD& param) { object_copy_key(); });
 	commit.add("Object.EditParticles",	[](LLUICtrl* ctrl, const LLSD& param) { edit_particle_source(); });
+	commit.add("Object.AlchemyExplode", [](LLUICtrl* ctrl, const LLSD& param) { object_explode(); });
+	commit.add("Object.AlchemyDestroy", [](LLUICtrl* ctrl, const LLSD& param) { object_destroy(); });
+	commit.add("Object.AlchemyForceDelete", [](LLUICtrl* ctrl, const LLSD& param) { object_force_delete(); });
 
 	commit.add("Tools.UndeformSelf", [](LLUICtrl* ctrl, const LLSD& param) { avatar_undeform_self(); });
 

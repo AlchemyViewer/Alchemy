@@ -12338,5 +12338,32 @@ Always Run disabled.
     notext="Cancel"
     ignoretext="Confirm before enabling Cinematic Mode"/>
   </notification>
-  
+
+ <notification
+  icon="notifytip.tga"
+  name="AlchemyUnpoweredWizard"
+  persist="true"
+  log_to_chat="true"
+  type="notifytip">
+	 I’m sorry Dave, I’m afraid I can’t do that
+ </notification>
+	
+ <notification
+  icon="notifytip.tga"
+  name="AlchemyExplosions"
+  persist="true"
+  log_to_chat="true"
+  type="notifytip">
+	 Explosions!~
+ </notification>
+
+ <notification
+  icon="notifytip.tga"
+  name="AlchemyDestroyObject"
+  persist="true"
+  log_to_chat="true"
+  type="notifytip">
+	 Irrevocably destroying object. Hope you didn't need that.
+ </notification>
+
 </notifications>
