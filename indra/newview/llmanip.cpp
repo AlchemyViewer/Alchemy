@@ -359,9 +359,11 @@ LLVector3 LLManip::getSavedPivotPoint() const
 
 LLVector3 LLManip::getPivotPoint()
 {
-	if (mObjectSelection->getFirstObject() && mObjectSelection->getObjectCount() == 1 && mObjectSelection->getSelectType() != SELECT_TYPE_HUD)
+	static LLCachedControl<bool> editRootAxis(gSavedSettings, "AlchemyEditRootAxis", false);
+	LLViewerObject* vobjp = mObjectSelection->getFirstRootObject(TRUE);
+	if (vobjp && (mObjectSelection->getObjectCount() == 1 || editRootAxis) && mObjectSelection->getSelectType() != SELECT_TYPE_HUD)
 	{
-		return mObjectSelection->getFirstObject()->getPivotPositionAgent();
+		return vobjp->getPivotPositionAgent();
 	}
 	return LLSelectMgr::getInstance()->getBBoxOfSelection().getCenterAgent();
 }

@@ -79,6 +79,8 @@ public:
 	virtual BOOL	handleMouseDown( S32 x, S32 y, MASK mask );
 	virtual BOOL	handleMouseUp( S32 x, S32 y, MASK mask );
 	virtual BOOL	handleHover( S32 x, S32 y, MASK mask );
+	virtual BOOL	handleMiddleMouseDown( S32 x, S32 y, MASK mask );
+	virtual BOOL	handleMiddleMouseUp( S32 x, S32 y, MASK mask );
 	virtual void	render();
 	virtual void	handleSelect();
 
@@ -174,6 +176,8 @@ private:
 	S32				mFirstClickX;
 	S32				mFirstClickY;
 	bool			mIsFirstClick;
+	
+	static BOOL		sInvertUniform;
 };
 
 #endif  // LL_MANIPSCALE_H

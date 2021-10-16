@@ -459,6 +459,73 @@ void LLFloaterTools::refresh()
 
 	// Refresh object and prim count labels
 	LLLocale locale(LLLocale::USER_LOCALE);
+	
+	std::string desc_string;
+	std::string num_string;
+	bool enable_link_count = true;
+
+	LLObjectSelectionHandle selected_objects = LLSelectMgr::getInstance()->getSelection();
+	S32 prim_count = selected_objects->getObjectCount();
+	if (prim_count == 1 && LLToolMgr::getInstance()->getCurrentTool() == LLToolFace::getInstance())
+	{
+		desc_string = getString("selected_faces");
+		
+		LLViewerObject* objectp = mObjectSelection->getFirstRootObject();
+		LLSelectNode* nodep = mObjectSelection->getFirstRootNode();
+		if(!objectp || !nodep)
+		{
+			objectp = selected_objects->getFirstObject();
+			nodep = selected_objects->getFirstNode();
+		}
+
+		if (objectp && objectp->getNumTEs() == selected_objects->getTECount())
+			num_string = "ALL_SIDES";
+		else if (objectp && nodep)
+		{
+			for (S32 i = 0; i < objectp->getNumTEs(); i++)
+			{
+				if (nodep->isTESelected(i))
+				{
+					if (!num_string.empty())
+						num_string.append(", ");
+					num_string.append(llformat("%d", i));
+				}
+			}
+		}
+	}
+	else if (prim_count == 1 && gSavedSettings.getBOOL("EditLinkedParts"))
+	{
+		desc_string = getString("link_number");
+		LLViewerObject* objectp = selected_objects->getFirstObject();
+		if (objectp && objectp->getRootEdit())
+		{
+			const LLViewerObject::const_child_list_t& children = objectp->getRootEdit()->getChildren();
+			if (children.empty())
+				num_string = "0"; //a childless prim is always link zero, and unhappy
+			else if (objectp->getRootEdit()->isSelected())
+				num_string = "1"; //root prim is always link one
+			else
+			{
+				S32 index = 1;
+				for (LLViewerObject* selected_child : children)
+				{
+					index++;
+					if (selected_child->isSelected())
+					{
+						LLResMgr::getInstance()->getIntegerString(num_string, index);
+						break;
+					}
+				}
+			}
+		}
+	}
+	else
+	{
+		enable_link_count = false;
+	}
+	getChild<LLUICtrl>("link_num_obj_count")->setTextArg("[DESC]", desc_string);
+	getChild<LLUICtrl>("link_num_obj_count")->setTextArg("[NUM]", num_string);
+
 #if 0
 	if (!gMeshRepo.meshRezEnabled())
 	{		
@@ -475,23 +542,20 @@ void LLFloaterTools::refresh()
 			std::string prim_cost_string;
 			S32 render_cost = LLSelectMgr::getInstance()->getSelection()->getSelectedObjectRenderCost();
 			LLResMgr::getInstance()->getIntegerString(prim_cost_string, render_cost);
-			getChild<LLUICtrl>("RenderingCost")->setTextArg("[COUNT]", prim_cost_string);
 		}
 		
 		// disable the object and prim counts if nothing selected
 		bool have_selection = ! LLSelectMgr::getInstance()->getSelection()->isEmpty();
-		getChildView("obj_count")->setEnabled(have_selection);
-		getChildView("prim_count")->setEnabled(have_selection);
-		getChildView("RenderingCost")->setEnabled(have_selection && sShowObjectCost);
+		getChildView("link_num_obj_count")->setEnabled(have_selection);
 	}
 	else
 #endif
 	{
-		F32 link_cost  = LLSelectMgr::getInstance()->getSelection()->getSelectedLinksetCost();
-		S32 link_count = LLSelectMgr::getInstance()->getSelection()->getRootObjectCount();
+		F32 link_cost  = selected_objects->getSelectedLinksetCost();
+		S32 link_count = selected_objects->getRootObjectCount();
 
 		LLCrossParcelFunctor func;
-		if (LLSelectMgr::getInstance()->getSelection()->applyToRootObjects(&func, true))
+		if (selected_objects->applyToRootObjects(&func, true))
 		{
 			// Selection crosses parcel bounds.
 			// We don't display remaining land capacity in this case.
@@ -531,6 +595,9 @@ void LLFloaterTools::refresh()
 		getChild<LLTextBox>("selection_count")->setText(selection_info.str());
 	}
 
+	// disable the object and prim counts if nothing selected
+	bool have_selection = !selected_objects->isEmpty();
+	getChildView("link_num_obj_count")->setEnabled(have_selection && enable_link_count);
 
 	// Refresh child tabs
 	mPanelPermissions->refresh();
