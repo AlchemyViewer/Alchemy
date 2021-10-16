@@ -290,7 +290,10 @@ LLManipTranslate::~LLManipTranslate()
 void LLManipTranslate::handleSelect()
 {
 	LLSelectMgr::getInstance()->saveSelectedObjectTransform(SELECT_ACTION_TYPE_PICK);
-	gFloaterTools->setStatusText("move");
+    if (gFloaterTools)
+    {
+        gFloaterTools->setStatusText("move");
+    }
 	LLManip::handleSelect();
 }
 
@@ -1741,11 +1744,6 @@ void LLManipTranslate::highlightIntersection(LLVector3 normal,
 	
 	F32 sz = mGridSizeMeters;
 	F32 tiles = sz;
-
-	if (shader)
-	{
-		shader->bind();
-	}
 
 	if (shader)
 	{
