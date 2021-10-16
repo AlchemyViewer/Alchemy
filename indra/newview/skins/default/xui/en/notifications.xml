@@ -2492,6 +2492,26 @@ Select objects with scripts that you have permission to modify.
 
   <notification
    icon="alertmodal.tga"
+   name="CannotDeleteSelectObjectsNoScripts"
+   type="alertmodal">
+Not able to perform &apos;delete&apos;.
+
+Select objects with scripts.
+  <tag>fail</tag>
+  </notification>
+	
+  <notification
+   icon="alertmodal.tga"
+   name="CannotResetSelectObjectsNoPermission"
+   type="alertmodal">
+Not able to perform &apos;delete&apos;.
+
+Select objects with scripts that you have permission to modify.
+  <tag>fail</tag>
+  </notification>
+  
+  <notification
+   icon="alertmodal.tga"
    name="CannotOpenScriptObjectNoMod"
    type="alertmodal">
     Unable to open script in object without modify permissions.
