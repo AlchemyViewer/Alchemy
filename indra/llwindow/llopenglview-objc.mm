@@ -212,7 +212,7 @@ attributedStringInfo getSegments(NSAttributedString *str)
 	self = [super initWithFrame:frame];
 	if (!self) { return self; }	// Despite what this may look like, returning nil self is a-ok.
     @autoreleasepool {
-        [self registerForDraggedTypes:[NSArray arrayWithObject:NSURLPboardType]];
+        [self registerForDraggedTypes:[NSArray arrayWithObject:NSPasteboardTypeURL]];
         
         // Initialize with a default "safe" pixel format that will work with versions dating back to OS X 10.6.
         // Any specialized pixel formats, i.e. a core profile pixel format, should be initialized through rebuildContextWithFormat.
@@ -261,7 +261,7 @@ attributedStringInfo getSegments(NSAttributedString *str)
         [glContext makeCurrentContext];
         
         GLint glVsync = vsync ? 1 : 0;
-        [glContext setValues:&glVsync forParameter:NSOpenGLCPSwapInterval];
+        [glContext setValues:&glVsync forParameter:NSOpenGLContextParameterSwapInterval];
     } // @autoreleasepool
     return self;
 }
@@ -513,7 +513,7 @@ attributedStringInfo getSegments(NSAttributedString *str)
 	
 	pboard = [sender draggingPasteboard];
 	
-	if ([[pboard types] containsObject:NSURLPboardType])
+    if ([[pboard types] containsObject:NSPasteboardTypeURL])
 	{
 		if (sourceDragMask & NSDragOperationLink) {
 			NSURL *fileUrl = [[pboard readObjectsForClasses:[NSArray arrayWithObject:[NSURL class]] options:[NSDictionary dictionary]] objectAtIndex:0];

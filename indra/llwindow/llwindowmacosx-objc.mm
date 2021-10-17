@@ -206,7 +206,7 @@ OSErr setImageCursor(CursorRef ref)
 NSWindowRef createNSWindow(int x, int y, int width, int height)
 {
 	LLNSWindow *window = [[LLNSWindow alloc]initWithContentRect:NSMakeRect(x, y, width, height)
-                                                      styleMask:NSWindowStyleMaskTitled | NSWindowStyleMaskResizable | NSWindowStyleMaskClosable | NSWindowStyleMaskMiniaturizable | NSWindowStyleMaskTexturedBackground backing:NSBackingStoreBuffered defer:NO];
+                                                      styleMask:NSWindowStyleMaskTitled | NSWindowStyleMaskResizable | NSWindowStyleMaskClosable | NSWindowStyleMaskMiniaturizable backing:NSBackingStoreBuffered defer:NO];
 	[window makeKeyAndOrderFront:nil];
 	[window setAcceptsMouseMovedEvents:TRUE];
 	return (NSWindowRef)CFBridgingRetain(window);
