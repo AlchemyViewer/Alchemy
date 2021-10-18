@@ -64,6 +64,7 @@ namespace
     const S32 NUM_TILES_X = 8;
     const S32 NUM_TILES_Y = 4;
     const S32 NUM_TILES = NUM_TILES_X * NUM_TILES_Y;
+	const S32 UPDATE_TILES = NUM_TILES / 8; // SL-16127: Amortize updating face; see sTileResX
     const S32 NUM_CUBEMAP_FACES = 6;
 
 // Heavenly body constants
@@ -412,6 +413,7 @@ LLVOSky::LLVOSky(const LLUUID &id, const LLPCode pcode, LLViewerRegion *regionp)
 	mForceUpdate(FALSE),
     mNeedUpdate(TRUE),
     mCubeMapUpdateStage(-1),
+	mCubeMapUpdateTile(0),
 	mWorldScale(1.f),
 	mBumpSunDir(0.f, 0.f, 1.f)
 {
@@ -492,7 +494,7 @@ void LLVOSky::init()
 		for (S32 tile = 0; tile < NUM_TILES; ++tile)
 		{
 			initSkyTextureDirs(side, tile);
-            createSkyTexture(m_atmosphericsVars, side, tile);
+            createSkyTexture(psky, m_atmosphericsVars, side, tile);
 		}
         mSkyTex[side].create();
         mShinyTex[side].create();
@@ -640,10 +642,8 @@ void LLVOSky::initSkyTextureDirs(const S32 side, const S32 tile)
 	}
 }
 
-void LLVOSky::createSkyTexture(AtmosphericsVars& vars, const S32 side, const S32 tile)
+void LLVOSky::createSkyTexture(const LLSettingsSky::ptr_t psky, AtmosphericsVars& vars, const S32 side, const S32 tile)
 {
-	const LLSettingsSky::ptr_t& psky = LLEnvironment::instance().getCurrentSky();
-
 	S32 tile_x = tile % NUM_TILES_X;
 	S32 tile_y = tile / NUM_TILES_X;
 
@@ -684,18 +684,13 @@ void LLVOSky::forceSkyUpdate()
     m_lastAtmosphericsVars = AtmosphericsVars();
 
     mCubeMapUpdateStage = -1;
+	mCubeMapUpdateTile = 0;
 }
 
 bool LLVOSky::updateSky()
 {
 	if (mDead || !(gPipeline.hasRenderType(LLPipeline::RENDER_TYPE_SKY)))
 	{
-		return TRUE;
-	}
-
-	if (mDead)
-	{
-		// It's dead.  Don't update it.
 		return TRUE;
 	}
 
@@ -738,6 +733,7 @@ bool LLVOSky::updateSky()
             // start updating cube map sides
             updateFog(LLViewerCamera::getInstance()->getFar());
             mCubeMapUpdateStage = 0;
+			mCubeMapUpdateTile = 0;
             mForceUpdate = FALSE;
 		}
 	}
@@ -802,21 +798,26 @@ bool LLVOSky::updateSky()
         mCubeMapUpdateStage = -1;
     }
     // run 0 to 5 faces, each face in own frame
-    else if (mCubeMapUpdateStage >= 0 && mCubeMapUpdateStage < NUM_CUBEMAP_FACES)
+	else if (mCubeMapUpdateStage >= 0 && mCubeMapUpdateStage < NUM_CUBEMAP_FACES)
+	{
+		LL_RECORD_BLOCK_TIME(FTM_VOSKY_CREATETEXTURES);
+		const LLSettingsSky::ptr_t& psky = LLEnvironment::instance().getCurrentSky();
+
+		const S32 side = mCubeMapUpdateStage;
+		const S32 start_tile = mCubeMapUpdateTile;
+		// CPU hungry part, createSkyTexture() is math heavy
+		// Prior to EEP it was mostly per tile, but since EPP it is per face.
+		// This still can be optimized further
+		// (i.e. potentially can be made per tile again, can be moved to thread
+		// instead of executing per face, or may be can be moved to shaders)
+		for (S32 tile = 0; tile < UPDATE_TILES; tile++)
 		{
-        LL_RECORD_BLOCK_TIME(FTM_VOSKY_CREATETEXTURES);
-        S32 side = mCubeMapUpdateStage;
-        // CPU hungry part, createSkyTexture() is math heavy
-        // Prior to EEP it was mostly per tile, but since EPP it is per face.
-        // This still can be optimized further
-        // (i.e. potentially can be made per tile again, can be moved to thread
-        // instead of executing per face, or may be can be moved to shaders)
-        for (S32 tile = 0; tile < NUM_TILES; tile++)
-        {
-            createSkyTexture(m_atmosphericsVars, side, tile);
-        }
-        mCubeMapUpdateStage++;
-    }
+			createSkyTexture(psky, m_atmosphericsVars, side, start_tile + tile);
+		}
+		mCubeMapUpdateTile += UPDATE_TILES;
+		if (mCubeMapUpdateTile >= NUM_TILES)
+			mCubeMapUpdateStage++;
+	}
 
 	return TRUE;
 }
