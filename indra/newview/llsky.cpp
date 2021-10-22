@@ -270,7 +270,9 @@ void LLSky::updateFog(const F32 distance)
 {
 	if (mVOSkyp)
 	{
-		mVOSkyp->updateFog(distance);
+		LLEnvironment& environment = LLEnvironment::instance();
+		const LLSettingsSky::ptr_t& psky = environment.getCurrentSky();
+		mVOSkyp->updateFog(&environment, psky, distance);
 	}
 }
 

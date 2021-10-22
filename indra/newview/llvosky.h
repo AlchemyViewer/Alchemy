@@ -43,6 +43,7 @@ const F32 HEAVENLY_BODY_DIST	= HORIZON_DIST - 20.f;
 const F32 HEAVENLY_BODY_FACTOR	= 0.1f;
 const F32 HEAVENLY_BODY_SCALE	= HEAVENLY_BODY_DIST * HEAVENLY_BODY_FACTOR;
 
+class LLEnvironment;
 class LLFace;
 class LLHaze;
 
@@ -219,7 +220,8 @@ public:
 	void cleanupGL();
 	void restoreGL();
 
-    void calc();
+	void cacheEnvironment(const LLSettingsSky::ptr_t& psky, AtmosphericsVars& atmosphericsVars);
+    void calc(const LLSettingsSky::ptr_t& psky);
 
 	/*virtual*/ void idleUpdate(LLAgent &agent, const F64 &time);
 	bool updateSky();
@@ -245,7 +247,7 @@ public:
 	
 	F32 getWorldScale() const							{ return mWorldScale; }
 	void setWorldScale(const F32 s)						{ mWorldScale = s; }
-	void updateFog(const F32 distance);
+	void updateFog(LLEnvironment* environment, const LLSettingsSky::ptr_t& psky, const F32 distance);
 
     void setFogRatio(const F32 fog_ratio)               { m_legacyAtmospherics.setFogRatio(fog_ratio); }
     F32  getFogRatio() const                            { return m_legacyAtmospherics.getFogRatio(); }
@@ -299,10 +301,10 @@ public:
 protected:
 	~LLVOSky();
 
-	void updateDirections(void);
+	void updateDirections(const LLSettingsSky::ptr_t& psky);
 
 	void initSkyTextureDirs(const S32 side, const S32 tile);
-	void createSkyTexture(AtmosphericsVars& vars, const S32 side, const S32 tile);
+	void createSkyTexture(const LLSettingsSky::ptr_t& psky, AtmosphericsVars& vars, const S32 side, const S32 tile);
 
 	LLPointer<LLViewerFetchedTexture> mSunTexturep[2];
 	LLPointer<LLViewerFetchedTexture> mMoonTexturep[2];
