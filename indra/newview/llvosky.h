@@ -302,7 +302,7 @@ protected:
 	void updateDirections(void);
 
 	void initSkyTextureDirs(const S32 side, const S32 tile);
-	void createSkyTexture(const LLSettingsSky::ptr_t psky, AtmosphericsVars& vars, const S32 side, const S32 tile);
+	void createSkyTexture(AtmosphericsVars& vars, const S32 side, const S32 tile);
 
 	LLPointer<LLViewerFetchedTexture> mSunTexturep[2];
 	LLPointer<LLViewerFetchedTexture> mMoonTexturep[2];
@@ -340,7 +340,6 @@ protected:
 	bool				mForceUpdate;	
     bool				mNeedUpdate;				// flag to force update of cubemap
 	S32					mCubeMapUpdateStage;		// state of cubemap uodate: -1 idle; 0-5 per-face updates; 6 finalizing
-	S32					mCubeMapUpdateTile;			// Do partial work to amortize cost of updating; SL-16127
 
 	F32					mAmbientScale;
 	LLColor3			mNightColorShift;
