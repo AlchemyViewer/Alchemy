@@ -246,6 +246,8 @@ BOOL	LLFloaterTools::postBuild()
 	mTitleMedia			= getChild<LLMediaCtrl>("title_media");
 	mBtnLink			= getChild<LLButton>("link_btn");
 	mBtnUnlink			= getChild<LLButton>("unlink_btn");
+	mBtnPrevPart		= getChild<LLButton>("prev_part_btn");
+	mBtnNextPart		= getChild<LLButton>("next_part_btn");
 	
 	mCheckSelectIndividual	= getChild<LLCheckBoxCtrl>("checkbox edit linked parts");	
 	getChild<LLUICtrl>("checkbox edit linked parts")->setValue((BOOL)gSavedSettings.getBOOL("EditLinkedParts"));
@@ -256,6 +258,8 @@ BOOL	LLFloaterTools::postBuild()
 	mCheckStretchTexture	= getChild<LLCheckBoxCtrl>("checkbox stretch textures");
 	getChild<LLUICtrl>("checkbox stretch textures")->setValue((BOOL)gSavedSettings.getBOOL("ScaleStretchTextures"));
 	mComboGridMode			= getChild<LLComboBox>("combobox grid mode");
+
+	mCheckActualRoot = getChild<LLCheckBoxCtrl>("checkbox actual root");
 
 	//
 	// Create Buttons
@@ -338,6 +342,7 @@ LLFloaterTools::LLFloaterTools(const LLSD& key)
 	mCheckStretchUniform(NULL),
 	mCheckStretchTexture(NULL),
 	mCheckStretchUniformLabel(NULL),
+	mCheckActualRoot(NULL),
 
 	mBtnRotateLeft(NULL),
 	mBtnRotateReset(NULL),
@@ -346,6 +351,8 @@ LLFloaterTools::LLFloaterTools(const LLSD& key)
 	mBtnLink(NULL),
 	mBtnUnlink(NULL),
 
+	mBtnPrevPart(NULL),
+	mBtnNextPart(NULL),
 	mBtnDelete(NULL),
 	mBtnDuplicate(NULL),
 	mBtnDuplicateInPlace(NULL),
@@ -752,6 +759,14 @@ void LLFloaterTools::updatePopup(LLCoordGL center, MASK mask)
 	mBtnLink->setEnabled(LLSelectMgr::instance().enableLinkObjects());
 	mBtnUnlink->setEnabled(LLSelectMgr::instance().enableUnlinkObjects());
 
+	mBtnPrevPart->setVisible(edit_visible);
+	mBtnNextPart->setVisible(edit_visible);
+
+	bool select_btn_enabled = (!LLSelectMgr::getInstance()->getSelection()->isEmpty()
+								&& (ALControlCache::EditLinkedParts || LLToolFace::getInstance() == LLToolMgr::getInstance()->getCurrentTool()));
+	mBtnPrevPart->setEnabled(select_btn_enabled);
+	mBtnNextPart->setEnabled(select_btn_enabled);
+
 	if (mCheckSelectIndividual)
 	{
 		mCheckSelectIndividual->setVisible(edit_visible);
@@ -813,6 +828,7 @@ void LLFloaterTools::updatePopup(LLCoordGL center, MASK mask)
 	if (mCheckStretchUniform) mCheckStretchUniform->setVisible( edit_visible );
 	if (mCheckStretchTexture) mCheckStretchTexture->setVisible( edit_visible );
 	if (mCheckStretchUniformLabel) mCheckStretchUniformLabel->setVisible( edit_visible );
+	if (mCheckActualRoot) mCheckActualRoot->setVisible( edit_visible );
 
 	// Create buttons
 	BOOL create_visible = (tool == LLToolCompCreate::getInstance());
