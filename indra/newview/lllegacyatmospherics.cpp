@@ -458,9 +458,9 @@ void LLAtmospherics::updateFog(const F32 distance, const LLVector3& tosun_in)
     vars.total_density = psky->getTotalDensity();
     vars.gamma = psky->getGamma();
 
-	res_color[0] = calcSkyColorInDir(vars, tosun);
-	res_color[1] = calcSkyColorInDir(vars, perp_tosun);
-	res_color[2] = calcSkyColorInDir(vars, tosun_45);
+	res_color[0] = calcSkyColorInDir(psky, vars, tosun);
+	res_color[1] = calcSkyColorInDir(psky, vars, perp_tosun);
+	res_color[2] = calcSkyColorInDir(psky, vars, tosun_45);
 
 	sky_fog_color = color_norm(res_color[0] + res_color[1] + res_color[2]);
 

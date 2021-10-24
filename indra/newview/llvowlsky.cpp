@@ -211,6 +211,8 @@ BOOL LLVOWLSky::updateGeometry(LLDrawable * drawable)
 		LLTimer timer;
 		timer.start();
 
+		const F32 DOME_RADIUS = LLEnvironment::instance().getCurrentSky()->getDomeRadius();
+
 		for (U32 i = 0; i < strips_segments ;++i)
 		{
 			LLVertexBuffer * segment = new LLVertexBuffer(LLDrawPoolWLSky::SKY_VERTEX_DATA_MASK, GL_STATIC_DRAW);
@@ -255,7 +257,7 @@ BOOL LLVOWLSky::updateGeometry(LLDrawable * drawable)
             U32 index_count  = 0;
 
 			// fill it
-			buildStripsBuffer(begin_stack, end_stack, vertex_count, index_count, vertices, texCoords, indices);
+			buildStripsBuffer(begin_stack, end_stack, vertex_count, index_count, vertices, texCoords, indices, DOME_RADIUS);
 
 			// and unlock the buffer
 			segment->flush();
@@ -368,10 +370,9 @@ void LLVOWLSky::buildStripsBuffer(U32 begin_stack,
                                   U32& index_count,
 								  LLStrider<LLVector3> & vertices,
 								  LLStrider<LLVector2> & texCoords,
-								  LLStrider<U16> & indices)
+								  LLStrider<U16> & indices,
+								  const F32 RADIUS)
 {
-    const F32 RADIUS = LLEnvironment::instance().getCurrentSky()->getDomeRadius();
-
 	U32 i, j, num_slices, num_stacks;
 	F32 phi0, theta, x0, y0, z0;
 

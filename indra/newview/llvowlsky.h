@@ -70,7 +70,8 @@ private:
                                   U32& index_count,
 								  LLStrider<LLVector3> & vertices,
 								  LLStrider<LLVector2> & texCoords,
-								  LLStrider<U16> & indices);
+								  LLStrider<U16> & indices,
+								  const F32 RADIUS);
 
 	// helper function for updating the stars colors.
 	void updateStarColors();
