@@ -250,7 +250,6 @@
 // Include for security api initialization
 #include "llsecapi.h"
 #include "llmachineid.h"
-#include "llmainlooprepeater.h"
 #include "llcleanup.h"
 
 #include "llcoproceduremanager.h"
@@ -977,9 +976,6 @@ bool LLAppViewer::init()
 		return 0;
 	}
 	LL_INFOS("InitInfo") << "Cache initialization is done." << LL_ENDL ;
-
-	// Initialize the repeater service.
-	LLMainLoopRepeater::instance().start();
 
 	//
 	// Initialize the window
@@ -2119,8 +2115,6 @@ bool LLAppViewer::cleanup()
 
     // Manually cleanup sec handler for openssl 1.1.1+ compat
     clearSecHandler();
-    
-	LLMainLoopRepeater::instance().stop();
 
 	ll_close_fail_log();
 
