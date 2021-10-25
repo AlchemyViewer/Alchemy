@@ -56,7 +56,7 @@ public:
 
 private:
 	// a tiny helper function for controlling the sky dome tesselation.
-	static F32 calcPhi(U32 i);
+	static F32 calcPhi(U32 i, const U32 num_stacks);
 
 	// helper function for initializing the stars.
 	void initStars();
@@ -71,7 +71,9 @@ private:
 								  LLStrider<LLVector3> & vertices,
 								  LLStrider<LLVector2> & texCoords,
 								  LLStrider<U16> & indices,
-								  const F32 RADIUS);
+								  const U32 num_slices,
+								  const U32 num_stacks,
+								  const F32 radius);
 
 	// helper function for updating the stars colors.
 	void updateStarColors();
