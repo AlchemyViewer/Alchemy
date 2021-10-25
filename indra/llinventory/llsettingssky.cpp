@@ -1182,6 +1182,12 @@ LLColor3 LLSettingsSky::getTotalDensity() const
     return total_density;
 }
 
+LLColor3 LLSettingsSky::getTotalDensityFast(const LLColor3& blue_density, F32 haze_density) const
+{
+    LLColor3 total_density = blue_density + smear(haze_density);
+    return total_density;
+}
+
 // Sunlight attenuation effect (hue and brightness) due to atmosphere
 // this is used later for sunlight modulation at various altitudes
 LLColor3 LLSettingsSky::getLightAttenuation(F32 distance) const
@@ -1194,10 +1200,25 @@ LLColor3 LLSettingsSky::getLightAttenuation(F32 distance) const
     return light_atten;
 }
 
+LLColor3 LLSettingsSky::getLightAttenuationFast(F32 density_multiplier, const LLColor3& blue_density, F32 haze_density, F32 distance) const
+{
+    // Approximate line integral over requested distance
+    LLColor3    light_atten = (blue_density * 1.0 + smear(haze_density * 0.25f)) * density_multiplier * distance;
+    return light_atten;
+}
+
 LLColor3 LLSettingsSky::getLightTransmittance(F32 distance) const
 {
     LLColor3 total_density      = getTotalDensity();
     F32      density_multiplier = getDensityMultiplier();
+    // Transparency (-> density) from Beer's law
+    LLColor3 transmittance = componentExp(total_density * -(density_multiplier * distance));
+    return transmittance;
+}
+
+// SL-16127: getTotalDensity() and getDensityMultiplier() call LLSettingsSky::getColor() and LLSettingsSky::getFloat() respectively which are S-L-O-W
+LLColor3 LLSettingsSky::getLightTransmittanceFast(const LLColor3& total_density, const F32 density_multiplier, const F32 distance) const
+{
     // Transparency (-> density) from Beer's law
     LLColor3 transmittance = componentExp(total_density * -(density_multiplier * distance));
     return transmittance;

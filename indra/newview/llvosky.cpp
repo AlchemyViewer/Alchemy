@@ -509,9 +509,9 @@ void LLVOSky::cacheEnvironment(const LLSettingsSky::ptr_t& psky, AtmosphericsVar
 	m_atmosphericsVars.cloud_shadow = psky->getCloudShadow();
 	m_atmosphericsVars.dome_radius = psky->getDomeRadius();
 	m_atmosphericsVars.dome_offset = psky->getDomeOffset();
-	m_atmosphericsVars.light_atten = psky->getLightAttenuation(m_atmosphericsVars.max_y);
-	m_atmosphericsVars.light_transmittance = psky->getLightTransmittance(m_atmosphericsVars.max_y);
-	m_atmosphericsVars.total_density = psky->getTotalDensity();
+	m_atmosphericsVars.total_density = psky->getTotalDensityFast(m_atmosphericsVars.blue_density, m_atmosphericsVars.haze_density);
+	m_atmosphericsVars.light_atten = psky->getLightAttenuationFast(m_atmosphericsVars.density_multiplier, m_atmosphericsVars.blue_density, m_atmosphericsVars.haze_density, m_atmosphericsVars.max_y);
+	m_atmosphericsVars.light_transmittance = psky->getLightTransmittanceFast(m_atmosphericsVars.total_density, m_atmosphericsVars.density_multiplier, m_atmosphericsVars.max_y);
 	m_atmosphericsVars.gamma = psky->getGamma();
 }
 

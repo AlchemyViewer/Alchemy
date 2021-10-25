@@ -214,6 +214,8 @@ LLColor4 LLAtmospherics::calcSkyColorInDir(const LLSettingsSky::ptr_t &psky, Atm
 	F32 sky_saturation = 0.25f;
 	F32 land_saturation = 0.1f;
 
+	bool low_end = !gPipeline.canUseWindLightShaders();
+
 	if (isShiny && dir.mV[VZ] < -0.02f)
 	{
 		LLColor4 col;
@@ -227,7 +229,7 @@ LLColor4 LLAtmospherics::calcSkyColorInDir(const LLSettingsSky::ptr_t &psky, Atm
 		}
 		F32 greyscale_sat = brightness * (1.0f - land_saturation);
 		desat_fog = desat_fog * land_saturation + smear(greyscale_sat);
-		if (!gPipeline.canUseWindLightShaders())
+		if (low_end)
 		{
 			col = LLColor4(desat_fog, 0.f);
 		}
@@ -258,7 +260,6 @@ LLColor4 LLAtmospherics::calcSkyColorInDir(const LLSettingsSky::ptr_t &psky, Atm
 		return LLColor4(sky_color, 0.0f);
 	}
 
-	bool low_end = !gPipeline.canUseWindLightShaders();
 	LLColor3 sky_color = low_end ? vars.hazeColor * 2.0f : psky->gammaCorrect(vars.hazeColor * 2.0f);
 
 	return LLColor4(sky_color, 0.0f);
@@ -313,8 +314,7 @@ void LLAtmospherics::calcSkyColorWLVert(const LLSettingsSky::ptr_t &psky, LLVect
 	// Sunlight attenuation effect (hue and brightness) due to atmosphere
 	// this is used later for sunlight modulation at various altitudes
 	LLColor3 light_atten = vars.light_atten;
-    LLColor3 light_transmittance = psky->getLightTransmittance(Plen);
-    (void)light_transmittance; // silence Clang warn-error
+    LLColor3 light_transmittance = psky->getLightTransmittanceFast(vars.total_density, vars.density_multiplier, Plen);
 
 	// Calculate relative weights
 	LLColor3 temp2(0.f, 0.f, 0.f);
@@ -453,9 +453,9 @@ void LLAtmospherics::updateFog(const F32 distance, const LLVector3& tosun_in)
     vars.cloud_shadow = psky->getCloudShadow();
     vars.dome_radius = psky->getDomeRadius();
     vars.dome_offset = psky->getDomeOffset();
-    vars.light_atten = psky->getLightAttenuation(vars.max_y);
-    vars.light_transmittance = psky->getLightTransmittance(vars.max_y);
-    vars.total_density = psky->getTotalDensity();
+	vars.total_density = psky->getTotalDensityFast(vars.blue_density, vars.haze_density);
+	vars.light_atten = psky->getLightAttenuationFast(vars.density_multiplier, vars.blue_density, vars.haze_density, vars.max_y);
+	vars.light_transmittance = psky->getLightTransmittanceFast(vars.total_density, vars.density_multiplier, vars.max_y);
     vars.gamma = psky->getGamma();
 
 	res_color[0] = calcSkyColorInDir(psky, vars, tosun);

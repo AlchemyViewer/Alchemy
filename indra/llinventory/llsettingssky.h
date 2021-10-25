@@ -251,8 +251,11 @@ public:
     static LLSD translateLegacyHazeSettings(const LLSD& legacy);
 
     LLColor3 getLightAttenuation(F32 distance) const;
+    LLColor3 getLightAttenuationFast(F32 density_multiplier, const LLColor3& blue_density, F32 haze_density, F32 distance) const;
     LLColor3 getLightTransmittance(F32 distance) const;
+    LLColor3 getLightTransmittanceFast(const LLColor3& total_density, const F32 density_multiplier, const F32 distance) const;
     LLColor3 getTotalDensity() const;
+    LLColor3 getTotalDensityFast(const LLColor3& blue_density, F32 haze_density) const;
     LLColor3 gammaCorrect(const LLColor3& in) const;
 
     LLColor3 getBlueDensity() const;
