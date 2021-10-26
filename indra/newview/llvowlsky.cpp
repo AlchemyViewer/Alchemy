@@ -36,8 +36,8 @@
 #include "llenvironment.h"
 #include "llsettingssky.h"
 
-static const U32 MIN_SKY_DETAIL = 8;
-static const U32 MAX_SKY_DETAIL = 180;
+constexpr U32 MIN_SKY_DETAIL = 8;
+constexpr U32 MAX_SKY_DETAIL = 180;
 
 inline U32 LLVOWLSky::getNumStacks(void)
 {

@@ -38,10 +38,16 @@
 #include "llsettingssky.h"
 #include "lllegacyatmospherics.h"
 
-const F32 SKY_BOX_MULT			= 16.0f;
-const F32 HEAVENLY_BODY_DIST	= HORIZON_DIST - 20.f;
-const F32 HEAVENLY_BODY_FACTOR	= 0.1f;
-const F32 HEAVENLY_BODY_SCALE	= HEAVENLY_BODY_DIST * HEAVENLY_BODY_FACTOR;
+namespace
+{
+	constexpr F32 SKY_BOX_MULT = 16.0f;
+	constexpr F32 HEAVENLY_BODY_DIST = HORIZON_DIST - 20.f;
+	constexpr F32 HEAVENLY_BODY_FACTOR = 0.1f;
+	constexpr F32 HEAVENLY_BODY_SCALE = HEAVENLY_BODY_DIST * HEAVENLY_BODY_FACTOR;
+
+	constexpr S32 SKYTEX_COMPONENTS = 4;
+	constexpr S32 SKYTEX_RES = 64;
+}
 
 class LLEnvironment;
 class LLFace;
@@ -51,8 +57,6 @@ class LLSkyTex
 {
 	friend class LLVOSky;
 private:
-	static S32		sResolution;
-	static S32		sComponents;
 	LLPointer<LLViewerTexture> mTexture[2];
 	LLPointer<LLImageRaw> mImageRaw[2];
 	LLColor4		*mSkyData;
@@ -83,25 +87,25 @@ protected:
 
 	void setDir(const LLVector3 &dir, const S32 i, const S32 j)
 	{
-		S32 offset = i * sResolution + j;
+		S32 offset = i * SKYTEX_RES + j;
 		mSkyDirs[offset] = dir;
 	}
 
 	const LLVector3 &getDir(const S32 i, const S32 j) const
 	{
-		S32 offset = i * sResolution + j;
+		S32 offset = i * SKYTEX_RES + j;
 		return mSkyDirs[offset];
 	}
 
 	void setPixel(const LLColor4 &col, const S32 i, const S32 j)
 	{
-		S32 offset = i * sResolution + j;
+		S32 offset = i * SKYTEX_RES + j;
 		mSkyData[offset] = col;
 	}
 
 	void setPixel(const LLColor4U &col, const S32 i, const S32 j)
 	{
-		S32 offset = (i * sResolution + j) * sComponents;
+		S32 offset = (i * SKYTEX_RES + j) * SKYTEX_COMPONENTS;
 		U32* pix = (U32*) &(mImageRaw[sCurrent]->getData()[offset]);
 		*pix = col.asRGBA();
 	}
@@ -109,7 +113,7 @@ protected:
 	LLColor4U getPixel(const S32 i, const S32 j)
 	{
 		LLColor4U col;
-		S32 offset = (i * sResolution + j) * sComponents;
+		S32 offset = (i * SKYTEX_RES + j) * SKYTEX_COMPONENTS;
 		U32* pix = (U32*) &(mImageRaw[sCurrent]->getData()[offset]);
 		col.fromRGBA( *pix );
 		return col;
@@ -316,9 +320,6 @@ protected:
     F32 mSunScale  = 1.0f;
     F32 mMoonScale = 1.0f;
 
-	static S32			sResolution;
-	static S32			sTileResX;
-	static S32			sTileResY;
 	LLSkyTex			mSkyTex[6];
 	LLSkyTex			mShinyTex[6];
 	LLHeavenBody		mSun;

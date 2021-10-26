@@ -43,16 +43,16 @@
 // Will clean these up at some point...
 //
 
-const F32 HORIZON_DIST          = 1024.0f;
-const F32 ATM_EXP_FALLOFF       = 0.000126f;
-const F32 ATM_SEA_LEVEL_NDENS   = 2.55e25f;
-const F32 ATM_HEIGHT            = 100000.f;
+constexpr F32 HORIZON_DIST          = 1024.0f;
+constexpr F32 ATM_EXP_FALLOFF       = 0.000126f;
+constexpr F32 ATM_SEA_LEVEL_NDENS   = 2.55e25f;
+constexpr F32 ATM_HEIGHT            = 100000.f;
 
 // constants used in calculation of scattering coeff of clear air
-const F32 sigma     = 0.035f;
-const F32 fsigma    = (6.f + 3.f * sigma) / (6.f-7.f*sigma);
-const F64 Ndens     = 2.55e25;
-const F64 Ndens2    = Ndens*Ndens;
+constexpr F32 sigma     = 0.035f;
+constexpr F32 fsigma    = (6.f + 3.f * sigma) / (6.f-7.f*sigma);
+constexpr F64 Ndens     = 2.55e25;
+constexpr F64 Ndens2    = Ndens*Ndens;
 
 class LLFace;
 class LLHaze;

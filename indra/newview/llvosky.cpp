@@ -61,41 +61,38 @@
 
 namespace
 {
-    const S32 NUM_TILES_X = 8;
-    const S32 NUM_TILES_Y = 4;
-    const S32 NUM_TILES = NUM_TILES_X * NUM_TILES_Y;
-	const S32 NUM_CUBEMAP_FACES = 6; // See sResolution for face dimensions
-	const S32 TOTAL_TILES = NUM_CUBEMAP_FACES * NUM_TILES;
-	const S32 MAX_TILES = TOTAL_TILES + 1;
+	constexpr S32 NUM_TILES_X = 8;
+	constexpr S32 NUM_TILES_Y = 4;
+	constexpr S32 NUM_TILES = NUM_TILES_X * NUM_TILES_Y;
+	constexpr S32 NUM_CUBEMAP_FACES = 6; // See sResolution for face dimensions
+	constexpr S32 TOTAL_TILES = NUM_CUBEMAP_FACES * NUM_TILES;
+	constexpr S32 MAX_TILES = TOTAL_TILES + 1;
 
 // Heavenly body constants
-    const F32 SUN_DISK_RADIUS	= 0.5f;
-    const F32 MOON_DISK_RADIUS	= SUN_DISK_RADIUS * 0.9f;
-    const F32 SUN_INTENSITY = 1e5;
+	constexpr F32 SUN_DISK_RADIUS	= 0.5f;
+	constexpr F32 MOON_DISK_RADIUS	= SUN_DISK_RADIUS * 0.9f;
+	constexpr F32 SUN_INTENSITY = 1e5;
 
 // Texture coordinates:
-    const LLVector2 TEX00 = LLVector2(0.f, 0.f);
-    const LLVector2 TEX01 = LLVector2(0.f, 1.f);
-    const LLVector2 TEX10 = LLVector2(1.f, 0.f);
-    const LLVector2 TEX11 = LLVector2(1.f, 1.f);
+    constexpr LLVector2 TEX00 = LLVector2(0.f, 0.f);
+	constexpr LLVector2 TEX01 = LLVector2(0.f, 1.f);
+	constexpr LLVector2 TEX10 = LLVector2(1.f, 0.f);
+	constexpr LLVector2 TEX11 = LLVector2(1.f, 1.f);
 
     LLTrace::BlockTimerStatHandle FTM_VOSKY_UPDATETIMER("VOSky Update Timer Tick");
     LLTrace::BlockTimerStatHandle FTM_VOSKY_CALC("VOSky Update Calculations");
     LLTrace::BlockTimerStatHandle FTM_VOSKY_CREATETEXTURES("VOSky Update Textures");
     LLTrace::BlockTimerStatHandle FTM_VOSKY_UPDATEFORCED("VOSky Update Forced");
 
-    F32Seconds UPDATE_EXPRY(0.25f);
+	constexpr F32Seconds UPDATE_EXPRY(0.25f);
 
-    const F32 UPDATE_MIN_DELTA_THRESHOLD = 0.0005f;
+	constexpr F32 UPDATE_MIN_DELTA_THRESHOLD = 0.0005f;
 }
 /***************************************
 		SkyTex
 ***************************************/
 
-S32 LLSkyTex::sComponents = 4;
-S32 LLSkyTex::sResolution = 64;
 S32 LLSkyTex::sCurrent = 0;
-
 
 LLSkyTex::LLSkyTex() :
 	mSkyData(NULL),
@@ -107,14 +104,14 @@ LLSkyTex::LLSkyTex() :
 void LLSkyTex::init(bool isShiny)
 {
     mIsShiny = isShiny;
-	mSkyData = new LLColor4[sResolution * sResolution];
-	mSkyDirs = new LLVector3[sResolution * sResolution];
+	mSkyData = new LLColor4[SKYTEX_RES * SKYTEX_RES];
+	mSkyDirs = new LLVector3[SKYTEX_RES * SKYTEX_RES];
 
 	for (S32 i = 0; i < 2; ++i)
 	{
 		mTexture[i] = LLViewerTextureManager::getLocalTexture(FALSE);
 		mTexture[i]->setAddressMode(LLTexUnit::TAM_CLAMP);
-		mImageRaw[i] = new LLImageRaw(sResolution, sResolution, sComponents);
+		mImageRaw[i] = new LLImageRaw(SKYTEX_RES, SKYTEX_RES, SKYTEX_COMPONENTS);
 		
 		initEmpty(i);
 	}
@@ -146,7 +143,7 @@ LLSkyTex::~LLSkyTex()
 
 S32 LLSkyTex::getResolution()
 {
-    return sResolution;
+    return SKYTEX_RES;
 }
 
 S32 LLSkyTex::getCurrent()
@@ -174,12 +171,12 @@ S32 LLSkyTex::getWhich(const BOOL curr)
 void LLSkyTex::initEmpty(const S32 tex)
 {
 	U8* data = mImageRaw[tex]->getData();
-	for (S32 i = 0; i < sResolution; ++i)
+	for (S32 i = 0; i < SKYTEX_RES; ++i)
 	{
-		for (S32 j = 0; j < sResolution; ++j)
+		for (S32 j = 0; j < SKYTEX_RES; ++j)
 		{
-			const S32 basic_offset = (i * sResolution + j);
-			S32 offset = basic_offset * sComponents;
+			const S32 basic_offset = (i * SKYTEX_RES + j);
+			S32 offset = basic_offset * SKYTEX_COMPONENTS;
 			data[offset] = 0;
 			data[offset+1] = 0;
 			data[offset+2] = 0;
@@ -195,12 +192,12 @@ void LLSkyTex::initEmpty(const S32 tex)
 void LLSkyTex::create()
 {
 	U8* data = mImageRaw[sCurrent]->getData();
-	for (S32 i = 0; i < sResolution; ++i)
+	for (S32 i = 0; i < SKYTEX_RES; ++i)
 	{
-		for (S32 j = 0; j < sResolution; ++j)
+		for (S32 j = 0; j < SKYTEX_RES; ++j)
 		{
-			const S32 basic_offset = (i * sResolution + j);
-			S32 offset = basic_offset * sComponents;
+			const S32 basic_offset = (i * SKYTEX_RES + j);
+			S32 offset = basic_offset * SKYTEX_COMPONENTS;
 			U32* pix = (U32*)(data + offset);
 			LLColor4U temp = LLColor4U(mSkyData[basic_offset]);
 			*pix = temp.asRGBA();
@@ -397,10 +394,12 @@ const LLVector3* LLHeavenBody::corners() const
 		Sky
 ***************************************/
 
-
-S32 LLVOSky::sResolution = LLSkyTex::getResolution();
-S32 LLVOSky::sTileResX = sResolution/NUM_TILES_X;
-S32 LLVOSky::sTileResY = sResolution/NUM_TILES_Y;
+namespace
+{
+	constexpr S32 VOSKY_RES = SKYTEX_RES;
+	constexpr S32 VOSKY_TILE_RES_X = VOSKY_RES / NUM_TILES_X;
+	constexpr S32 VOSKY_TILE_RES_Y = VOSKY_RES / NUM_TILES_Y;
+}
 
 LLVOSky::LLVOSky(const LLUUID &id, const LLPCode pcode, LLViewerRegion *regionp)
 :	LLStaticViewerObject(id, pcode, regionp, TRUE),
@@ -600,8 +599,8 @@ void LLVOSky::initSkyTextureDirs(const S32 side, const S32 tile)
 	S32 tile_x = tile % NUM_TILES_X;
 	S32 tile_y = tile / NUM_TILES_X;
 
-	S32 tile_x_pos = tile_x * sTileResX;
-	S32 tile_y_pos = tile_y * sTileResY;
+	S32 tile_x_pos = tile_x * VOSKY_TILE_RES_X;
+	S32 tile_y_pos = tile_y * VOSKY_TILE_RES_Y;
 
 	F32 coeff[3] = {0, 0, 0};
 	const S32 curr_coef = side >> 1; // 0/1 = Z axis, 2/3 = Y, 4/5 = X
@@ -611,11 +610,11 @@ void LLVOSky::initSkyTextureDirs(const S32 side, const S32 tile)
 
 	coeff[curr_coef] = (F32)side_dir;
 
-	F32 inv_res = 1.f/sResolution;
+	F32 inv_res = 1.f/ VOSKY_RES;
 	S32 x, y;
-	for (y = tile_y_pos; y < (tile_y_pos + sTileResY); ++y)
+	for (y = tile_y_pos; y < (tile_y_pos + VOSKY_TILE_RES_Y); ++y)
 	{
-		for (x = tile_x_pos; x < (tile_x_pos + sTileResX); ++x)
+		for (x = tile_x_pos; x < (tile_x_pos + VOSKY_TILE_RES_X); ++x)
 		{
 			coeff[x_coef] = F32((x<<1) + 1) * inv_res - 1.f;
 			coeff[y_coef] = F32((y<<1) + 1) * inv_res - 1.f;
@@ -632,13 +631,13 @@ void LLVOSky::createSkyTexture(const LLSettingsSky::ptr_t& psky, AtmosphericsVar
 	S32 tile_x = tile % NUM_TILES_X;
 	S32 tile_y = tile / NUM_TILES_X;
 
-	S32 tile_x_pos = tile_x * sTileResX;
-	S32 tile_y_pos = tile_y * sTileResY;
+	S32 tile_x_pos = tile_x * VOSKY_TILE_RES_X;
+	S32 tile_y_pos = tile_y * VOSKY_TILE_RES_Y;
 
 	S32 x, y;
-	for (y = tile_y_pos; y < (tile_y_pos + sTileResY); ++y)
+	for (y = tile_y_pos; y < (tile_y_pos + VOSKY_TILE_RES_Y); ++y)
 	{
-		for (x = tile_x_pos; x < (tile_x_pos + sTileResX); ++x)
+		for (x = tile_x_pos; x < (tile_x_pos + VOSKY_TILE_RES_X); ++x)
 		{
 			mSkyTex[side].setPixel(m_legacyAtmospherics.calcSkyColorInDir(psky, vars, mSkyTex[side].getDir(x, y), false), x, y);
 			mShinyTex[side].setPixel(m_legacyAtmospherics.calcSkyColorInDir(psky, vars, mShinyTex[side].getDir(x, y), true), x, y);
