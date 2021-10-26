@@ -1019,26 +1019,45 @@ LLColor3 LLSettingsSky::getLightDiffuse() const
 
 LLColor3 LLSettingsSky::getColor(const std::string& key, const LLColor3& default_value) const
 {
-    if (mSettings.has(SETTING_LEGACY_HAZE) && mSettings[SETTING_LEGACY_HAZE].has(key))
+    const auto& settings_map = mSettings.map();
+    auto legacy_it = settings_map.find(SETTING_LEGACY_HAZE);
+    if (legacy_it != settings_map.end())
     {
-        return LLColor3(mSettings[SETTING_LEGACY_HAZE][key]);
+        const auto& legacy_map = legacy_it->second.map();
+        auto legacy_settings_it = legacy_map.find(key);
+        if (legacy_settings_it != legacy_map.end())
+        {
+            return LLColor3(legacy_settings_it->second);
+        }
     }
-    if (mSettings.has(key))
+
+    auto settings_it = settings_map.find(key);
+    if (settings_it != settings_map.end())
     {
-        return LLColor3(mSettings[key]);
+        return LLColor3(settings_it->second);
     }
     return default_value;
+
 }
 
 F32 LLSettingsSky::getFloat(const std::string& key, F32 default_value) const
 {
-    if (mSettings.has(SETTING_LEGACY_HAZE) && mSettings[SETTING_LEGACY_HAZE].has(key))
+    const auto& settings_map = mSettings.map();
+    auto legacy_it = settings_map.find(SETTING_LEGACY_HAZE);
+    if (legacy_it != settings_map.end())
     {
-        return mSettings[SETTING_LEGACY_HAZE][key].asReal();
+        const auto& legacy_map = legacy_it->second.map();
+        auto legacy_settings_it = legacy_map.find(key);
+        if (legacy_settings_it != legacy_map.end())
+        {
+            return legacy_settings_it->second.asReal();
+        }
     }
-    if (mSettings.has(key))
+
+    auto settings_it = settings_map.find(key);
+    if (settings_it != settings_map.end())
     {
-        return mSettings[key].asReal();
+        return settings_it->second.asReal();
     }
     return default_value;
 }

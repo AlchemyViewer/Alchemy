@@ -1618,22 +1618,35 @@ void LLEnvironment::updateGLVariablesForSettings(LLGLSLShader *shader, const LLS
 
     //_WARNS("RIDER") << "----------------------------------------------------------------" << LL_ENDL;
     const LLSettingsBase::parammapping_t& params = psetting->getParameterMap();
+    const auto& settings_map = psetting->mSettings.map();
     for (const auto &it: params)
     {
         LLSD value;
         // legacy first since it contains ambient color and we prioritize value from legacy, see getAmbientColor()
-        if (psetting->mSettings.has(LLSettingsSky::SETTING_LEGACY_HAZE) && psetting->mSettings[LLSettingsSky::SETTING_LEGACY_HAZE].has(it.first))
+        auto legacy_haze_it = settings_map.find(LLSettingsSky::SETTING_LEGACY_HAZE);
+        if (legacy_haze_it != settings_map.end())
         {
-            value = psetting->mSettings[LLSettingsSky::SETTING_LEGACY_HAZE][it.first];
+            const auto& legacy_map = legacy_haze_it->second.map();
+            auto legacy_setting_it = legacy_map.find(it.first);
+            if (legacy_setting_it != legacy_map.end())
+            {
+                value = legacy_setting_it->second;
+            }
         }
-        else if (psetting->mSettings.has(it.first))
+        
+
+        if(value.isUndefined())
         {
-            value = psetting->mSettings[it.first];
-        }
-        else
-        {
-            // We need to reset shaders, use defaults
-            value = it.second.getDefaultValue();
+            auto setting_it = settings_map.find(it.first);
+            if (setting_it != settings_map.end())
+            {
+                value = setting_it->second;
+            }
+            else
+            {
+                // We need to reset shaders, use defaults
+                value = it.second.getDefaultValue();
+            }
         }
 
         LLSD::Type setting_type = value.type();
