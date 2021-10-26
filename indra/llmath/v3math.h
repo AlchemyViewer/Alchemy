@@ -56,8 +56,8 @@ class LLVector3
 		static const LLVector3 z_axis_neg;
 		static const LLVector3 all_one;
 
-		inline LLVector3();							// Initializes LLVector3 to (0, 0, 0)
-		inline LLVector3(const F32 x, const F32 y, const F32 z);			// Initializes LLVector3 to (x. y, z)
+		inline constexpr LLVector3();							// Initializes LLVector3 to (0, 0, 0)
+		inline constexpr LLVector3(const F32 x, const F32 y, const F32 z);			// Initializes LLVector3 to (x. y, z)
 		inline explicit LLVector3(const F32 *vec);				// Initializes LLVector3 to (vec[0]. vec[1], vec[2])
 		explicit LLVector3(const LLVector2 &vec);				// Initializes LLVector3 to (vec[0]. vec[1], 0)
 		explicit LLVector3(const LLVector3d &vec);				// Initializes LLVector3 to (vec[0]. vec[1], vec[2])
@@ -169,14 +169,14 @@ LLVector3 lerp(const LLVector3 &a, const LLVector3 &b, F32 u); // Returns a vect
 LLVector3 point_to_box_offset(LLVector3& pos, const LLVector3* box); // Displacement from query point to nearest point on bounding box.
 bool box_valid_and_non_zero(const LLVector3* box);
 
-inline LLVector3::LLVector3(void)
+inline constexpr LLVector3::LLVector3(void)
 {
 	mV[0] = 0.f;
 	mV[1] = 0.f;
 	mV[2] = 0.f;
 }
 
-inline LLVector3::LLVector3(const F32 x, const F32 y, const F32 z)
+inline constexpr LLVector3::LLVector3(const F32 x, const F32 y, const F32 z)
 {
 	mV[VX] = x;
 	mV[VY] = y;
