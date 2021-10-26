@@ -83,7 +83,7 @@ struct LLUnit
 	typedef void is_unit_t;
 
 	// value initialization
-	LL_FORCE_INLINE explicit LLUnit(storage_t value = storage_t())
+	LL_FORCE_INLINE explicit constexpr LLUnit(storage_t value = storage_t())
 	:	mValue(value)
 	{}
 
@@ -255,7 +255,7 @@ struct LLUnitImplicit : public LLUnit<STORAGE_TYPE, UNITS>
 	typedef typename LLUnit<STORAGE_TYPE, UNITS>::storage_t storage_t;
 	typedef LLUnit<STORAGE_TYPE, UNITS> base_t;
 
-	LL_FORCE_INLINE LLUnitImplicit(storage_t value = storage_t())
+	LL_FORCE_INLINE constexpr LLUnitImplicit(storage_t value = storage_t())
 	:	base_t(value)
 	{}
 
