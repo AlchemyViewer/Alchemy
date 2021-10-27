@@ -251,11 +251,8 @@ BOOL LLVOWLSky::updateGeometry(LLDrawable * drawable)
 				LL_ERRS() << "Failed updating WindLight sky geometry." << LL_ENDL;
 			}
 
-            U32 vertex_count = 0;
-            U32 index_count  = 0;
-
 			// fill it
-			buildStripsBuffer(begin_stack, end_stack, vertex_count, index_count, vertices, texCoords, indices, verts_per_stack, total_stacks, dome_radius);
+			buildStripsBuffer(begin_stack, end_stack, vertices, texCoords, indices, verts_per_stack, total_stacks, dome_radius);
 
 			// and unlock the buffer
 			segment->flush();
@@ -362,8 +359,6 @@ void LLVOWLSky::initStars()
 
 void LLVOWLSky::buildStripsBuffer(U32 begin_stack,
                                   U32 end_stack,
-                                  U32& vertex_count,
-                                  U32& index_count,
 								  LLStrider<LLVector3> & vertices,
 								  LLStrider<LLVector2> & texCoords,
 								  LLStrider<U16> & indices,
@@ -373,10 +368,6 @@ void LLVOWLSky::buildStripsBuffer(U32 begin_stack,
 {
 	U32 i, j;
 	F32 phi0, theta, x0, y0, z0;
-
-	// paranoia checking for SL-55986/SL-55833
-	U32 count_verts = 0;
-	U32 count_indices = 0;
 
 	llassert(end_stack <= num_stacks);
 
@@ -416,8 +407,6 @@ void LLVOWLSky::buildStripsBuffer(U32 begin_stack,
 			}
 #endif
 
-			++count_verts;
-
 			// generate planar uv coordinates
 			// note: x and z are transposed in order for things to animate
 			// correctly in the global coordinate system where +x is east and
@@ -428,20 +417,16 @@ void LLVOWLSky::buildStripsBuffer(U32 begin_stack,
 
 	//build triangle strip...
 	*indices++ = 0 ;
-	count_indices++ ;
 	S32 k = 0 ;
 	for(i = 1; i <= end_stack - begin_stack; ++i) 
 	{
 		*indices++ = i * num_slices + k ;
-		count_indices++ ;
 
 		k = (k+1) % num_slices ;
 		for(j = 0; j < num_slices ; ++j) 
 		{
 			*indices++ = (i-1) * num_slices + k ;
 			*indices++ = i * num_slices + k ;
-
-			count_indices += 2 ;
 
 			k = (k+1) % num_slices ;
 		}
@@ -452,11 +437,7 @@ void LLVOWLSky::buildStripsBuffer(U32 begin_stack,
 		}
 
 		*indices++ = i * num_slices + k ;
-		count_indices++ ;
 	}
-
-    vertex_count = count_verts;
-    index_count = count_indices;
 }
 
 void LLVOWLSky::updateStarColors()
