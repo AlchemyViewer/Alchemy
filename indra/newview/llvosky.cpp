@@ -74,10 +74,10 @@ namespace
 	constexpr F32 SUN_INTENSITY = 1e5;
 
 // Texture coordinates:
-    constexpr LLVector2 TEX00 = LLVector2(0.f, 0.f);
-	constexpr LLVector2 TEX01 = LLVector2(0.f, 1.f);
-	constexpr LLVector2 TEX10 = LLVector2(1.f, 0.f);
-	constexpr LLVector2 TEX11 = LLVector2(1.f, 1.f);
+    const LLVector2 TEX00 = LLVector2(0.f, 0.f);
+	const LLVector2 TEX01 = LLVector2(0.f, 1.f);
+	const LLVector2 TEX10 = LLVector2(1.f, 0.f);
+	const LLVector2 TEX11 = LLVector2(1.f, 1.f);
 
     LLTrace::BlockTimerStatHandle FTM_VOSKY_UPDATETIMER("VOSky Update Timer Tick");
     LLTrace::BlockTimerStatHandle FTM_VOSKY_CALC("VOSky Update Calculations");

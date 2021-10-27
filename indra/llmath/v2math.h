@@ -45,27 +45,27 @@ class LLVector2
 
 		static LLVector2 zero;
 
-		inline constexpr LLVector2();							  // Initializes LLVector2 to (0, 0)
-		inline constexpr LLVector2(F32 x, F32 y);			      // Initializes LLVector2 to (x. y)
-		inline constexpr LLVector2(const F32 *vec);				  // Initializes LLVector2 to (vec[0]. vec[1])
-        explicit inline constexpr LLVector2(const LLVector3 &vec); // Initializes LLVector2 to (vec[0]. vec[1])
-        explicit inline LLVector2(const LLSD &sd);
+		LLVector2();							  // Initializes LLVector2 to (0, 0)
+		LLVector2(F32 x, F32 y);			      // Initializes LLVector2 to (x. y)
+		LLVector2(const F32 *vec);				  // Initializes LLVector2 to (vec[0]. vec[1])
+        explicit LLVector2(const LLVector3 &vec); // Initializes LLVector2 to (vec[0]. vec[1])
+        explicit LLVector2(const LLSD &sd);
 		
 		// Clears LLVector2 to (0, 0).  DEPRECATED - prefer zeroVec.
-		constexpr void	clear();
-		constexpr void	setZero();
-		constexpr void	clearVec();	// deprecated
-		constexpr void	zeroVec();	// deprecated
+		void	clear();
+		void	setZero();
+		void	clearVec();	// deprecated
+		void	zeroVec();	// deprecated
 
-		constexpr void	set(F32 x, F32 y);	        // Sets LLVector2 to (x, y)
-		constexpr void	set(const LLVector2 &vec);	// Sets LLVector2 to vec
+		void	set(F32 x, F32 y);	        // Sets LLVector2 to (x, y)
+		void	set(const LLVector2 &vec);	// Sets LLVector2 to vec
 		void	set(const F32 *vec);			// Sets LLVector2 to vec
 
 		LLSD	getValue() const;
 		void	setValue(const LLSD& sd);
 
-		constexpr void	setVec(F32 x, F32 y);	        // deprecated
-		constexpr void	setVec(const LLVector2 &vec);	// deprecated
+		void	setVec(F32 x, F32 y);	        // deprecated
+		void	setVec(const LLVector2 &vec);	// deprecated
 		void	setVec(const F32 *vec);			// deprecated
 
 		inline bool isFinite() const; // checks to see if all values of LLVector2 are finite
@@ -78,34 +78,34 @@ class LLVector2
 		F32		magVecSquared() const;		// deprecated
 		F32		normVec();					// deprecated
 
-		constexpr BOOL	abs();						// sets all values to absolute value of original value (first octant), returns TRUE if changed
+		BOOL		abs();						// sets all values to absolute value of original value (first octant), returns TRUE if changed
 
-		constexpr const LLVector2&	scaleVec(const LLVector2& vec);				// scales per component by vec
+		const LLVector2&	scaleVec(const LLVector2& vec);				// scales per component by vec
 
-		constexpr BOOL isNull();			// Returns TRUE if vector has a _very_small_ length
-		constexpr BOOL isExactlyZero() const		{ return !mV[VX] && !mV[VY]; }
+		BOOL isNull();			// Returns TRUE if vector has a _very_small_ length
+		BOOL isExactlyZero() const		{ return !mV[VX] && !mV[VY]; }
 
-		constexpr F32 operator[](int idx) const { return mV[idx]; }
-		constexpr F32 &operator[](int idx) { return mV[idx]; }
+		F32 operator[](int idx) const { return mV[idx]; }
+		F32 &operator[](int idx) { return mV[idx]; }
 	
-		friend constexpr bool operator<(const LLVector2 &a, const LLVector2 &b);	// For sorting. x is "more significant" than y
-		friend constexpr LLVector2 operator+(const LLVector2 &a, const LLVector2 &b);	// Return vector a + b
-		friend constexpr LLVector2 operator-(const LLVector2 &a, const LLVector2 &b);	// Return vector a minus b
-		friend constexpr F32 operator*(const LLVector2 &a, const LLVector2 &b);		// Return a dot b
-		friend constexpr LLVector2 operator%(const LLVector2 &a, const LLVector2 &b);	// Return a cross b
-		friend constexpr LLVector2 operator/(const LLVector2 &a, F32 k);				// Return a divided by scaler k
-		friend constexpr LLVector2 operator*(const LLVector2 &a, F32 k);				// Return a times scaler k
-		friend constexpr LLVector2 operator*(F32 k, const LLVector2 &a);				// Return a times scaler k
-		friend constexpr bool operator==(const LLVector2 &a, const LLVector2 &b);		// Return a == b
-		friend constexpr bool operator!=(const LLVector2 &a, const LLVector2 &b);		// Return a != b
+		friend bool operator<(const LLVector2 &a, const LLVector2 &b);	// For sorting. x is "more significant" than y
+		friend LLVector2 operator+(const LLVector2 &a, const LLVector2 &b);	// Return vector a + b
+		friend LLVector2 operator-(const LLVector2 &a, const LLVector2 &b);	// Return vector a minus b
+		friend F32 operator*(const LLVector2 &a, const LLVector2 &b);		// Return a dot b
+		friend LLVector2 operator%(const LLVector2 &a, const LLVector2 &b);	// Return a cross b
+		friend LLVector2 operator/(const LLVector2 &a, F32 k);				// Return a divided by scaler k
+		friend LLVector2 operator*(const LLVector2 &a, F32 k);				// Return a times scaler k
+		friend LLVector2 operator*(F32 k, const LLVector2 &a);				// Return a times scaler k
+		friend bool operator==(const LLVector2 &a, const LLVector2 &b);		// Return a == b
+		friend bool operator!=(const LLVector2 &a, const LLVector2 &b);		// Return a != b
 
-		friend constexpr const LLVector2& operator+=(LLVector2 &a, const LLVector2 &b);	// Return vector a + b
-		friend constexpr const LLVector2& operator-=(LLVector2 &a, const LLVector2 &b);	// Return vector a minus b
-		friend constexpr const LLVector2& operator%=(LLVector2 &a, const LLVector2 &b);	// Return a cross b
-		friend constexpr const LLVector2& operator*=(LLVector2 &a, F32 k);				// Return a times scaler k
-		friend constexpr const LLVector2& operator/=(LLVector2 &a, F32 k);				// Return a divided by scaler k
+		friend const LLVector2& operator+=(LLVector2 &a, const LLVector2 &b);	// Return vector a + b
+		friend const LLVector2& operator-=(LLVector2 &a, const LLVector2 &b);	// Return vector a minus b
+		friend const LLVector2& operator%=(LLVector2 &a, const LLVector2 &b);	// Return a cross b
+		friend const LLVector2& operator*=(LLVector2 &a, F32 k);				// Return a times scaler k
+		friend const LLVector2& operator/=(LLVector2 &a, F32 k);				// Return a divided by scaler k
 
-		friend constexpr LLVector2 operator-(const LLVector2 &a);					// Return vector -a
+		friend LLVector2 operator-(const LLVector2 &a);					// Return vector -a
 
 		friend std::ostream&	 operator<<(std::ostream& s, const LLVector2 &a);		// Stream a
 };
@@ -124,25 +124,25 @@ LLVector2 lerp(const LLVector2 &a, const LLVector2 &b, F32 u); // Returns a vect
 
 // Constructors
 
-inline constexpr LLVector2::LLVector2(void)
+inline LLVector2::LLVector2(void)
 {
 	mV[VX] = 0.f;
 	mV[VY] = 0.f;
 }
 
-inline constexpr LLVector2::LLVector2(F32 x, F32 y)
+inline LLVector2::LLVector2(F32 x, F32 y)
 {
 	mV[VX] = x;
 	mV[VY] = y;
 }
 
-inline constexpr LLVector2::LLVector2(const F32 *vec)
+inline LLVector2::LLVector2(const F32 *vec)
 {
 	mV[VX] = vec[VX];
 	mV[VY] = vec[VY];
 }
 
-inline constexpr LLVector2::LLVector2(const LLVector3 &vec)
+inline LLVector2::LLVector2(const LLVector3 &vec)
 {
 	mV[VX] = vec.mV[VX];
 	mV[VY] = vec.mV[VY];
@@ -155,39 +155,39 @@ inline LLVector2::LLVector2(const LLSD &sd)
 
 // Clear and Assignment Functions
 
-inline constexpr void LLVector2::clear(void)
+inline void	LLVector2::clear(void)
 {
 	mV[VX] = 0.f;
 	mV[VY] = 0.f;
 }
 
-inline constexpr void LLVector2::setZero(void)
-{
-	mV[VX] = 0.f;
-	mV[VY] = 0.f;
-}
-
-// deprecated
-inline constexpr void LLVector2::clearVec(void)
+inline void	LLVector2::setZero(void)
 {
 	mV[VX] = 0.f;
 	mV[VY] = 0.f;
 }
 
 // deprecated
-inline constexpr void LLVector2::zeroVec(void)
+inline void	LLVector2::clearVec(void)
 {
 	mV[VX] = 0.f;
 	mV[VY] = 0.f;
 }
 
-inline constexpr void LLVector2::set(F32 x, F32 y)
+// deprecated
+inline void	LLVector2::zeroVec(void)
+{
+	mV[VX] = 0.f;
+	mV[VY] = 0.f;
+}
+
+inline void	LLVector2::set(F32 x, F32 y)
 {
 	mV[VX] = x;
 	mV[VY] = y;
 }
 
-inline constexpr void	LLVector2::set(const LLVector2 &vec)
+inline void	LLVector2::set(const LLVector2 &vec)
 {
 	mV[VX] = vec.mV[VX];
 	mV[VY] = vec.mV[VY];
@@ -201,14 +201,14 @@ inline void	LLVector2::set(const F32 *vec)
 
 
 // deprecated
-inline constexpr void	LLVector2::setVec(F32 x, F32 y)
+inline void	LLVector2::setVec(F32 x, F32 y)
 {
 	mV[VX] = x;
 	mV[VY] = y;
 }
 
 // deprecated
-inline constexpr void	LLVector2::setVec(const LLVector2 &vec)
+inline void	LLVector2::setVec(const LLVector2 &vec)
 {
 	mV[VX] = vec.mV[VX];
 	mV[VY] = vec.mV[VY];
@@ -293,7 +293,7 @@ inline F32		LLVector2::normVec(void)
 	return (mag);
 }
 
-inline constexpr const LLVector2& LLVector2::scaleVec(const LLVector2& vec)
+inline const LLVector2&	LLVector2::scaleVec(const LLVector2& vec)
 {
 	mV[VX] *= vec.mV[VX];
 	mV[VY] *= vec.mV[VY];
@@ -301,19 +301,7 @@ inline constexpr const LLVector2& LLVector2::scaleVec(const LLVector2& vec)
 	return *this;
 }
 
-// Sets all values to absolute value of their original values
-// Returns TRUE if data changed
-inline constexpr BOOL LLVector2::abs()
-{
-	BOOL ret = FALSE;
-
-	if (mV[0] < 0.f) { mV[0] = -mV[0]; ret = TRUE; }
-	if (mV[1] < 0.f) { mV[1] = -mV[1]; ret = TRUE; }
-
-	return ret;
-}
-
-inline constexpr BOOL LLVector2::isNull()
+inline BOOL	LLVector2::isNull()
 {
 	if ( F_APPROXIMATELY_ZERO > mV[VX]*mV[VX] + mV[VY]*mV[VY] )
 	{
@@ -326,7 +314,7 @@ inline constexpr BOOL LLVector2::isNull()
 // LLVector2 Operators
 
 // For sorting. By convention, x is "more significant" than y.
-inline constexpr bool operator<(const LLVector2 &a, const LLVector2 &b)
+inline bool operator<(const LLVector2 &a, const LLVector2 &b)	
 {
 	if( a.mV[VX] == b.mV[VX] )
 	{
@@ -339,85 +327,85 @@ inline constexpr bool operator<(const LLVector2 &a, const LLVector2 &b)
 }
 
 
-inline constexpr LLVector2 operator+(const LLVector2 &a, const LLVector2 &b)
+inline LLVector2 operator+(const LLVector2 &a, const LLVector2 &b)
 {
 	LLVector2 c(a);
 	return c += b;
 }
 
-inline constexpr LLVector2 operator-(const LLVector2 &a, const LLVector2 &b)
+inline LLVector2 operator-(const LLVector2 &a, const LLVector2 &b)
 {
 	LLVector2 c(a);
 	return c -= b;
 }
 
-inline constexpr F32  operator*(const LLVector2 &a, const LLVector2 &b)
+inline F32  operator*(const LLVector2 &a, const LLVector2 &b)
 {
 	return (a.mV[0]*b.mV[0] + a.mV[1]*b.mV[1]);
 }
 
-inline constexpr LLVector2 operator%(const LLVector2 &a, const LLVector2 &b)
+inline LLVector2 operator%(const LLVector2 &a, const LLVector2 &b)
 {
 	return LLVector2(a.mV[0]*b.mV[1] - b.mV[0]*a.mV[1], a.mV[1]*b.mV[0] - b.mV[1]*a.mV[0]);
 }
 
-inline constexpr LLVector2 operator/(const LLVector2 &a, F32 k)
+inline LLVector2 operator/(const LLVector2 &a, F32 k)
 {
 	F32 t = 1.f / k;
 	return LLVector2( a.mV[0] * t, a.mV[1] * t );
 }
 
-inline constexpr LLVector2 operator*(const LLVector2 &a, F32 k)
+inline LLVector2 operator*(const LLVector2 &a, F32 k)
 {
 	return LLVector2( a.mV[0] * k, a.mV[1] * k );
 }
 
-inline constexpr LLVector2 operator*(F32 k, const LLVector2 &a)
+inline LLVector2 operator*(F32 k, const LLVector2 &a)
 {
 	return LLVector2( a.mV[0] * k, a.mV[1] * k );
 }
 
-inline constexpr bool operator==(const LLVector2 &a, const LLVector2 &b)
+inline bool operator==(const LLVector2 &a, const LLVector2 &b)
 {
 	return (  (a.mV[0] == b.mV[0])
 			&&(a.mV[1] == b.mV[1]));
 }
 
-inline constexpr bool operator!=(const LLVector2 &a, const LLVector2 &b)
+inline bool operator!=(const LLVector2 &a, const LLVector2 &b)
 {
 	return (  (a.mV[0] != b.mV[0])
 			||(a.mV[1] != b.mV[1]));
 }
 
-inline constexpr const LLVector2& operator+=(LLVector2 &a, const LLVector2 &b)
+inline const LLVector2& operator+=(LLVector2 &a, const LLVector2 &b)
 {
 	a.mV[0] += b.mV[0];
 	a.mV[1] += b.mV[1];
 	return a;
 }
 
-inline constexpr const LLVector2& operator-=(LLVector2 &a, const LLVector2 &b)
+inline const LLVector2& operator-=(LLVector2 &a, const LLVector2 &b)
 {
 	a.mV[0] -= b.mV[0];
 	a.mV[1] -= b.mV[1];
 	return a;
 }
 
-inline constexpr const LLVector2& operator%=(LLVector2 &a, const LLVector2 &b)
+inline const LLVector2& operator%=(LLVector2 &a, const LLVector2 &b)
 {
 	LLVector2 ret(a.mV[0]*b.mV[1] - b.mV[0]*a.mV[1], a.mV[1]*b.mV[0] - b.mV[1]*a.mV[0]);
 	a = ret;
 	return a;
 }
 
-inline constexpr const LLVector2& operator*=(LLVector2 &a, F32 k)
+inline const LLVector2& operator*=(LLVector2 &a, F32 k)
 {
 	a.mV[0] *= k;
 	a.mV[1] *= k;
 	return a;
 }
 
-inline constexpr const LLVector2& operator/=(LLVector2 &a, F32 k)
+inline const LLVector2& operator/=(LLVector2 &a, F32 k)
 {
 	F32 t = 1.f / k;
 	a.mV[0] *= t;
@@ -425,7 +413,7 @@ inline constexpr const LLVector2& operator/=(LLVector2 &a, F32 k)
 	return a;
 }
 
-inline constexpr LLVector2 operator-(const LLVector2 &a)
+inline LLVector2 operator-(const LLVector2 &a)
 {
 	return LLVector2( -a.mV[0], -a.mV[1] );
 }

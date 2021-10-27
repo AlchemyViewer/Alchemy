@@ -41,7 +41,17 @@ LLVector2 LLVector2::zero(0,0);
 
 // Non-member functions
 
+// Sets all values to absolute value of their original values
+// Returns TRUE if data changed
+BOOL LLVector2::abs()
+{
+	BOOL ret = FALSE;
 
+	if (mV[0] < 0.f) { mV[0] = -mV[0]; ret = TRUE; }
+	if (mV[1] < 0.f) { mV[1] = -mV[1]; ret = TRUE; }
+	
+	return ret;
+}
 
 
 F32 angle_between(const LLVector2& a, const LLVector2& b)

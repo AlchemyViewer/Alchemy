@@ -47,16 +47,16 @@ class LLVector4
 
 		const static LLVector4 zero;
 
-		constexpr LLVector4();						// Initializes LLVector4 to (0, 0, 0, 1)
+		LLVector4();						// Initializes LLVector4 to (0, 0, 0, 1)
 		explicit LLVector4(const F32 *vec);			// Initializes LLVector4 to (vec[0]. vec[1], vec[2], vec[3])
 		explicit LLVector4(const F64 *vec);			// Initialized LLVector4 to ((F32) vec[0], (F32) vec[1], (F32) vec[3], (F32) vec[4]);
-        explicit constexpr LLVector4(const LLVector2 &vec);
-        explicit constexpr LLVector4(const LLVector2 &vec, F32 z, F32 w);
-		explicit constexpr LLVector4(const LLVector3 &vec);			// Initializes LLVector4 to (vec, 1)
-		explicit constexpr LLVector4(const LLVector3 &vec, F32 w);	// Initializes LLVector4 to (vec, w)
+        explicit LLVector4(const LLVector2 &vec);
+        explicit LLVector4(const LLVector2 &vec, F32 z, F32 w);
+		explicit LLVector4(const LLVector3 &vec);			// Initializes LLVector4 to (vec, 1)
+		explicit LLVector4(const LLVector3 &vec, F32 w);	// Initializes LLVector4 to (vec, w)
         explicit LLVector4(const LLSD &sd);
-		constexpr LLVector4(F32 x, F32 y, F32 z);		// Initializes LLVector4 to (x. y, z, 1)
-		constexpr LLVector4(F32 x, F32 y, F32 z, F32 w);
+		LLVector4(F32 x, F32 y, F32 z);		// Initializes LLVector4 to (x. y, z, 1)
+		LLVector4(F32 x, F32 y, F32 z, F32 w);
 
 		LLSD getValue() const
 		{
@@ -156,7 +156,7 @@ LLVector4 lerp(const LLVector4 &a, const LLVector4 &b, F32 u); // Returns a vect
 
 // Constructors
 
-inline constexpr LLVector4::LLVector4(void)
+inline LLVector4::LLVector4(void)
 {
 	mV[VX] = 0.f;
 	mV[VY] = 0.f;
@@ -164,7 +164,7 @@ inline constexpr LLVector4::LLVector4(void)
 	mV[VW] = 1.f;
 }
 
-inline constexpr LLVector4::LLVector4(F32 x, F32 y, F32 z)
+inline LLVector4::LLVector4(F32 x, F32 y, F32 z)
 {
 	mV[VX] = x;
 	mV[VY] = y;
@@ -172,7 +172,7 @@ inline constexpr LLVector4::LLVector4(F32 x, F32 y, F32 z)
 	mV[VW] = 1.f;
 }
 
-inline constexpr LLVector4::LLVector4(F32 x, F32 y, F32 z, F32 w)
+inline LLVector4::LLVector4(F32 x, F32 y, F32 z, F32 w)
 {
 	mV[VX] = x;
 	mV[VY] = y;
@@ -196,7 +196,7 @@ inline LLVector4::LLVector4(const F64 *vec)
 	mV[VW] = (F32) vec[VW];
 }
 
-inline constexpr LLVector4::LLVector4(const LLVector2 &vec)
+inline LLVector4::LLVector4(const LLVector2 &vec)
 {
     mV[VX] = vec[VX];
     mV[VY] = vec[VY];
@@ -204,7 +204,7 @@ inline constexpr LLVector4::LLVector4(const LLVector2 &vec)
     mV[VW] = 0.f;
 }
 
-inline constexpr LLVector4::LLVector4(const LLVector2 &vec, F32 z, F32 w)
+inline LLVector4::LLVector4(const LLVector2 &vec, F32 z, F32 w)
 {
     mV[VX] = vec[VX];
     mV[VY] = vec[VY];
@@ -212,7 +212,7 @@ inline constexpr LLVector4::LLVector4(const LLVector2 &vec, F32 z, F32 w)
     mV[VW] = w;
 }
 
-inline constexpr LLVector4::LLVector4(const LLVector3 &vec)
+inline LLVector4::LLVector4(const LLVector3 &vec)
 {
 	mV[VX] = vec.mV[VX];
 	mV[VY] = vec.mV[VY];
@@ -220,7 +220,7 @@ inline constexpr LLVector4::LLVector4(const LLVector3 &vec)
 	mV[VW] = 1.f;
 }
 
-inline constexpr LLVector4::LLVector4(const LLVector3 &vec, F32 w)
+inline LLVector4::LLVector4(const LLVector3 &vec, F32 w)
 {
 	mV[VX] = vec.mV[VX];
 	mV[VY] = vec.mV[VY];
