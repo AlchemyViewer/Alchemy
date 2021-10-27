@@ -213,7 +213,7 @@ void LLGroupList::refresh()
         // but only if some real groups exists. EXT-4838
         if (!have_filter && count > 0 && mShowNone)
         {
-            std::string loc_none = LLTrans::getString("GroupsNone");
+            static const std::string loc_none = LLTrans::getString("GroupsNone");
             addNewItem(LLUUID::null, loc_none, LLUUID::null, ADD_TOP);
         }
 

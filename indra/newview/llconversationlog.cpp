@@ -112,16 +112,11 @@ void LLConversation::onIMFloaterShown(const LLUUID& session_id)
 // static
 const std::string LLConversation::createTimestamp(const U64Seconds& utc_time)
 {
-	std::string timeStr;
+	static const std::string time_fmt_str = fmt::format(FMT_STRING("[{:s}]/[{:s}]/[{:s}] [{:s}]:[{:s}]"), LLTrans::getString("TimeMonth"), LLTrans::getString("TimeDay"), LLTrans::getString("TimeYear"), LLTrans::getString("TimeHour"), LLTrans::getString("TimeMin"));
+
+	std::string timeStr = time_fmt_str;
 	LLSD substitution;
 	substitution["datetime"] = (S32)utc_time.value();
-
-	timeStr = "["+LLTrans::getString ("TimeMonth")+"]/["
-				 +LLTrans::getString ("TimeDay")+"]/["
-				 +LLTrans::getString ("TimeYear")+"] ["
-				 +LLTrans::getString ("TimeHour")+"]:["
-				 +LLTrans::getString ("TimeMin")+"]";
-
 
 	LLStringUtil::format (timeStr, substitution);
 	return timeStr;

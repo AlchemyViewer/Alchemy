@@ -6557,9 +6557,12 @@ void LLVivoxVoiceClient::expireVoiceFonts()
 		}
 	}
 
+	static const std::string voice_morphing_url = LLTrans::getString("voice_morphing_url");
+	static const std::string premium_voice_morphing_url = LLTrans::getString("premium_voice_morphing_url");
+
 	LLSD args;
-	args["URL"] = LLTrans::getString("voice_morphing_url");
-	args["PREMIUM_URL"] = LLTrans::getString("premium_voice_morphing_url");
+	args["URL"] = voice_morphing_url;
+	args["PREMIUM_URL"] = premium_voice_morphing_url;
 
 	// Give a notification if any voice fonts have expired.
 	if (have_expired)

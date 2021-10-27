@@ -364,18 +364,26 @@ bool idle_startup()
 
 	LLMortician::updateClass();
 
-	const std::string delims (" ");
-	std::string system;
-	std::string::size_type begIdx, endIdx;
-	std::string osString = LLOSInfo::instance().getOSStringSimple();
+	{
+		static std::string locale_str;
 
-	begIdx = osString.find_first_not_of (delims);
-	endIdx = osString.find_first_of (delims, begIdx);
-	system = osString.substr (begIdx, endIdx - begIdx);
-	system += "Locale";
+		if (locale_str.empty())
+		{
+			const std::string delims(" ");
+			std::string system;
+			std::string::size_type begIdx, endIdx;
+			const std::string& osString = LLOSInfo::instance().getOSStringSimple();
 
-	LLStringUtil::setLocale (LLTrans::getString(system));
+			begIdx = osString.find_first_not_of(delims);
+			endIdx = osString.find_first_of(delims, begIdx);
+			system = osString.substr(begIdx, endIdx - begIdx);
+			system += "Locale";
 
+			locale_str = LLTrans::getString(system);
+		}
+
+		LLStringUtil::setLocale(locale_str);
+	}
 	//note: Removing this line will cause incorrect button size in the login screen. -- bao.
 	gTextureList.updateImages(0.01f) ;
 
@@ -1096,7 +1104,6 @@ bool idle_startup()
 	{
 		// Generic failure message
 		std::ostringstream emsg;
-		emsg << LLTrans::getString("LoginFailed") << "\n";
 		if(LLLoginInstance::getInstance()->authFailure())
 		{
 			LL_INFOS("LLStartup") << "Login failed, LLLoginInstance::getResponse(): "
@@ -1127,7 +1134,7 @@ bool idle_startup()
 				message = message_response;
 			}
 
-			emsg << message;
+			emsg << LLTrans::getString("LoginFailed") << "\n" << message;
 
 
 			if(reason_response == "key")
@@ -1242,6 +1249,8 @@ bool idle_startup()
 			}
 			else
 			{
+				emsg << LLTrans::getString("LoginFailed") << "\n";
+
 				LLSD args;
 				args["ERROR_MESSAGE"] = emsg.str();
 				LL_INFOS("LLStartup") << "Notification: " << args << LL_ENDL;

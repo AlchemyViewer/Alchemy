@@ -1250,15 +1250,16 @@ BOOL LLToolPie::handleTooltipObject( LLViewerObject* hover_object, std::string l
 			bool for_sale = for_sale_selection(nodep);
 			if(for_sale)
 			{
-				LLStringUtil::format_map_t args;
+				static LLUIString tooltip_price = LLTrans::getString("TooltipPrice");
 				S32 price = nodep->mSaleInfo.getSalePrice();
-				args["[AMOUNT]"] = LLResMgr::getInstance()->getMonetaryString(price);
-				tooltip_msg.append(LLTrans::getString("TooltipPrice", args) );
+				tooltip_price.setArg("[AMOUNT]", LLResMgr::getInstance()->getMonetaryString(price));
+				tooltip_msg.append(tooltip_price.getString());
 			}
 
 			if (nodep->mName.empty())
 			{
-				tooltip_msg.append(LLTrans::getString("TooltipNoName"));
+				static const std::string tooltip_noname = LLTrans::getString("TooltipNoName");
+				tooltip_msg.append(tooltip_noname);
 			}
 			else
 			{

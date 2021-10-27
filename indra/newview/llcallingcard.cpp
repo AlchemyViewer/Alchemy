@@ -735,9 +735,12 @@ static void on_avatar_name_cache_notify(const LLUUID& agent_id,
 {
 	// Popup a notify box with online status of this agent
 	// Use display name only because this user is your friend
+	static const std::string online_status = LLTrans::getString("OnlineStatus");
+	static const std::string offline_status = LLTrans::getString("OfflineStatus");
+
 	LLSD args;
 	args["NAME"] = av_name.getDisplayName();
-	args["STATUS"] = online ? LLTrans::getString("OnlineStatus") : LLTrans::getString("OfflineStatus");
+	args["STATUS"] = online ? online_status : offline_status;
 
 	LLNotificationPtr notification;
 	if (online)

@@ -302,12 +302,13 @@ std::string LLLogChat::timestamp(bool withdate)
 	std::string timeStr;
 	if (withdate)
 	{
-        timeStr = absl::StrCat("[", LLTrans::getString("TimeYear"), "]/[", LLTrans::getString("TimeMonth"), "]/[", LLTrans::getString("TimeDay"),
-                         "] [", LLTrans::getString("TimeHour"), "]:[", LLTrans::getString("TimeMin"), "]");
+		static const std::string timestamp_long_fmt = fmt::format(FMT_STRING("[{}]/[{}]/[{}] [{}]:[{}]"), LLTrans::getString("TimeYear"), LLTrans::getString("TimeMonth"), LLTrans::getString("TimeDay"), LLTrans::getString("TimeHour"), LLTrans::getString("TimeMin"));
+        timeStr = timestamp_long_fmt;
 	}
 	else
 	{
-        timeStr = absl::StrCat("[", LLTrans::getString("TimeHour"), "]:[", LLTrans::getString("TimeMin"), "]");
+		static const std::string timestamp_short_fmt = fmt::format(FMT_STRING("[{}]:[{}]"), LLTrans::getString("TimeHour"), LLTrans::getString("TimeMin"));
+        timeStr = timestamp_short_fmt;
 	}
 
 	LLSD substitution;

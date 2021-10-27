@@ -3301,36 +3301,37 @@ void LLVOAvatar::idleUpdateNameTagText(BOOL new_name)
 
 		if (is_away || is_muted || is_do_not_disturb || is_appearance || (is_typing && !use_chat_bubble))
 		{
+			static const std::string avatar_away_str = LLTrans::getString("AvatarAway");
+			static const std::string avatar_dnd_str = LLTrans::getString("AvatarDoNotDisturb");
+			static const std::string avatar_muted_str = LLTrans::getString("AvatarMuted");
+			static const std::string avatar_edit_appr_str = LLTrans::getString("AvatarEditingAppearance");
+			static const std::string avatar_loading_data_str = LLTrans::getString("LoadingData");
+			static const std::string avatar_typing_str = LLTrans::getString("AvatarTyping");
+
 			std::string line;
 			if (is_away)
 			{
-				line += LLTrans::getString("AvatarAway");
-				line += ", ";
+				absl::StrAppend(&line, avatar_away_str, ", ");
 			}
 			if (is_do_not_disturb)
 			{
-				line += LLTrans::getString("AvatarDoNotDisturb");
-				line += ", ";
+				absl::StrAppend(&line, avatar_dnd_str, ", ");
 			}
 			if (is_muted)
 			{
-				line += LLTrans::getString("AvatarMuted");
-				line += ", ";
+				absl::StrAppend(&line, avatar_muted_str, ", ");
 			}
 			if (is_appearance)
 			{
-				line += LLTrans::getString("AvatarEditingAppearance");
-				line += ", ";
+				absl::StrAppend(&line, avatar_edit_appr_str, ", ");
 			}
 			if (is_cloud)
 			{
-				line += LLTrans::getString("LoadingData");
-				line += ", ";
+				absl::StrAppend(&line, avatar_loading_data_str, ", ");
 			}
 			if (is_typing)
 			{
-				line += LLTrans::getString("AvatarTyping");
-				line += ", ";
+				absl::StrAppend(&line, avatar_typing_str, ", ");
 			}
 			// trim last ", "
 			line.resize( line.length() - 2 );

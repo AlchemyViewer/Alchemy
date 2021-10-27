@@ -284,11 +284,10 @@ void LLAvatarList::refresh()
 
 	// Handle added items.
 	unsigned nadded = 0;
-	const std::string waiting_str = LLTrans::getString("AvatarNameWaiting");
+	static const std::string waiting_str = LLTrans::getString("AvatarNameWaiting");
 
-	for (uuid_vec_t::const_iterator it=added.begin(); it != added.end(); it++)
+	for (const LLUUID& buddy_id : added)
 	{
-		const LLUUID& buddy_id = *it;
 		LLAvatarName av_name;
 		have_names &= LLAvatarNameCache::get(buddy_id, &av_name);
 
@@ -323,9 +322,9 @@ void LLAvatarList::refresh()
 	}
 
 	// Handle removed items.
-	for (uuid_vec_t::const_iterator it=removed.begin(); it != removed.end(); it++)
+	for (const LLUUID& rem_id : removed)
 	{
-		removeItemByUUID(*it);
+		removeItemByUUID(rem_id);
 		modified = true;
 	}
 
