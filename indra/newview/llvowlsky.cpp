@@ -207,12 +207,7 @@ BOOL LLVOWLSky::updateGeometry(LLDrawable * drawable)
 		// round up to a whole number of segments
 		const U32 strips_segments = (total_stacks+stacks_per_seg-1) / stacks_per_seg;
 
-		LL_INFOS() << "WL Skydome strips in " << strips_segments << " batches." << LL_ENDL;
-
 		mStripsVerts.resize(strips_segments, NULL);
-
-		LLTimer timer;
-		timer.start();
 
 		const F32 dome_radius = LLEnvironment::instance().getCurrentSky()->getDomeRadius();
 
@@ -265,8 +260,6 @@ BOOL LLVOWLSky::updateGeometry(LLDrawable * drawable)
 			// and unlock the buffer
 			segment->flush();
 		}
-	
-		LL_INFOS() << "completed in " << llformat("%.2f", timer.getElapsedTimeF32().value()) << "seconds" << LL_ENDL;
 	}
 
 	updateStarColors();

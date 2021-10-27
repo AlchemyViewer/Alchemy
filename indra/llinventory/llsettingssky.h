@@ -256,7 +256,7 @@ public:
     LLColor3 getLightTransmittanceFast(const LLColor3& total_density, const F32 density_multiplier, const F32 distance) const;
     LLColor3 getTotalDensity() const;
     LLColor3 getTotalDensityFast(const LLColor3& blue_density, F32 haze_density) const;
-    LLColor3 gammaCorrect(const LLColor3& in) const;
+    LLColor3 gammaCorrect(const LLColor3& in, F32 gamma) const;
 
     LLColor3 getBlueDensity() const;
     LLColor3 getBlueHorizon() const;
