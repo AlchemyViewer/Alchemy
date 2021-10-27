@@ -1325,8 +1325,8 @@ void LLChatHistory::appendMessage(const LLChat& chat, const LLSD &args, const LL
 
 	// Delimiter after a name in header copy/past and in plain text mode
 	std::string delimiter = ": ";
-	std::string shout = LLTrans::getString("shout");
-	std::string whisper = LLTrans::getString("whisper");
+	static const std::string shout = LLTrans::getString("shout");
+	static const std::string whisper = LLTrans::getString("whisper");
 	if (chat.mChatType == CHAT_TYPE_SHOUT || 
 		chat.mChatType == CHAT_TYPE_WHISPER ||
 		chat.mText.compare(0, shout.length(), shout) == 0 ||
