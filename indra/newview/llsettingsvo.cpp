@@ -710,15 +710,13 @@ void LLSettingsVOSky::applySpecial(void *ptarget, bool force)
         vect_c_p_d1 += cloud_scroll;
         shader->uniform4fv(LLShaderMgr::CLOUD_POS_DENSITY1, 1, vect_c_p_d1.mV);
 
-        const LLSettingsSky::ptr_t& psky = env.getCurrentSky();
-
-        LLColor4 sunDiffuse  = psky->getSunlightColor();
-        LLColor4 moonDiffuse = psky->getMoonlightColor();
+        LLColor4 sunDiffuse  = getSunlightColor();
+        LLColor4 moonDiffuse = getMoonlightColor();
 
         shader->uniform4fv(LLShaderMgr::SUNLIGHT_COLOR, 1, sunDiffuse.mV);
         shader->uniform4fv(LLShaderMgr::MOONLIGHT_COLOR, 1, moonDiffuse.mV);
 
-        LLColor4 cloud_color(psky->getCloudColor(), 1.0);
+        LLColor4 cloud_color(getCloudColor(), 1.0);
         shader->uniform4fv(LLShaderMgr::CLOUD_COLOR, 1, cloud_color.mV);
     }
 
@@ -927,8 +925,6 @@ void LLSettingsVOWater::applySpecial(void *ptarget, bool force)
     if (force || (shader->mShaderGroup == LLGLSLShader::SG_WATER))
 	{
         auto& env = LLEnvironment::instance();
-        const LLSettingsWater::ptr_t& pwater = env.getCurrentWater();
-
         F32 water_height = env.getWaterHeight();
 
         //transform water plane to eye space
@@ -959,13 +955,13 @@ void LLSettingsVOWater::applySpecial(void *ptarget, bool force)
         F32 eyedepth = LLViewerCamera::getInstance()->getOrigin().mV[2] - water_height;
         bool underwater = (eyedepth <= 0.0f);
 
-        F32 waterFogDensity = pwater->getModifiedWaterFogDensity(underwater);
+        F32 waterFogDensity = getModifiedWaterFogDensity(underwater);
         shader->uniform1f(LLShaderMgr::WATER_FOGDENSITY, waterFogDensity);
 
-        LLColor4 fog_color(pwater->getWaterFogColor(), 0.0f);
+        LLColor4 fog_color(getWaterFogColor(), 0.0f);
         shader->uniform4fv(LLShaderMgr::WATER_FOGCOLOR, 1, fog_color.mV);
 
-        F32 blend_factor = pwater->getBlendFactor();
+        F32 blend_factor = getBlendFactor();
         shader->uniform1f(LLShaderMgr::BLEND_FACTOR, blend_factor);
 
         // update to normal lightnorm, water shader itself will use rotated lightnorm as necessary
