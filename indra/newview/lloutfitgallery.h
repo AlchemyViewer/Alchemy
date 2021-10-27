@@ -278,9 +278,10 @@ private:
     LLPointer<LLViewerFetchedTexture> mTexturep;
     LLUUID mUUID;
     LLUUID mImageAssetId;
-    LLTextBox* mOutfitNameText;
-    LLTextBox* mOutfitWornText;
-    LLPanel* mTextBgPanel;
+    LLTextBox*  mOutfitNameText;
+    LLTextBox*  mOutfitWornText;
+    LLPanel*    mTextBgPanel;
+    LLIconCtrl* mPreviewIcon = nullptr;
     bool     mSelected;
     bool     mWorn;
     bool     mDefaultImage;

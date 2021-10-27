@@ -107,6 +107,10 @@ protected:
 private:
 	LLPanel*					mListCommands;
 	LLMenuGL*					mMenuAdd;
+	LLButton*					mSaveBtn = nullptr;
+	LLButton*					mListCommandWearBtn = nullptr;
+	LLButton*					mMyOutfitTrashBtn = nullptr;
+	LLButton*					mGalleryTrashBtn = nullptr;
 	// List Commands                                                                //
 	//////////////////////////////////////////////////////////////////////////////////
 

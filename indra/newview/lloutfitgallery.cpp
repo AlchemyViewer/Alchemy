@@ -686,6 +686,7 @@ LLOutfitGalleryItem::~LLOutfitGalleryItem()
 
 BOOL LLOutfitGalleryItem::postBuild()
 {
+    mPreviewIcon = getChild<LLIconCtrl>("preview_outfit");
     setDefaultImage();
 
     mOutfitNameText = getChild<LLTextBox>("outfit_name");
@@ -704,7 +705,7 @@ void LLOutfitGalleryItem::draw()
     static LLUIColor selected_color = LLUIColorTable::instance().getColor("OutfitGalleryItemSelected", LLColor4::white);
     static LLUIColor unselected_color = LLUIColorTable::instance().getColor("OutfitGalleryItemUnselected", LLColor4::white);
     const LLColor4& border_color = mSelected ? selected_color : unselected_color;
-    LLRect border = getChildView("preview_outfit")->getRect();
+    LLRect border = mPreviewIcon->getRect();
     border.mRight = border.mRight + 1;
     gl_rect_2d(border, border_color, FALSE);
 
@@ -802,7 +803,7 @@ bool LLOutfitGalleryItem::setImageAssetId(LLUUID image_asset_id)
     {
         mImageAssetId = image_asset_id;
         mTexturep = texture;
-        getChildView("preview_outfit")->setVisible(FALSE);
+        mPreviewIcon->setVisible(FALSE);
         mDefaultImage = false;
         mImageUpdatePending = (texture->getDiscardLevel() == -1);
         return true;
@@ -819,7 +820,7 @@ void LLOutfitGalleryItem::setDefaultImage()
 {
     mTexturep = NULL;
     mImageAssetId.setNull();
-    getChildView("preview_outfit")->setVisible(TRUE);
+    mPreviewIcon->setVisible(TRUE);
     mDefaultImage = true;
     mImageUpdatePending = false;
 }

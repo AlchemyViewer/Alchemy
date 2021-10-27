@@ -93,7 +93,10 @@ BOOL LLPanelOutfitsInventory::postBuild()
 		LLInventoryModelBackgroundFetch::instance().start(outfits_cat);
 	}
 
-	getChild<LLButton>(SAVE_BTN)->setCommitCallback(boost::bind(&LLPanelOutfitsInventory::saveOutfit, this, false));
+
+	mSaveBtn = getChild<LLButton>(SAVE_BTN);
+
+	mSaveBtn->setCommitCallback(boost::bind(&LLPanelOutfitsInventory::saveOutfit, this, false));
 	getChild<LLButton>(SAVE_AS_BTN)->setCommitCallback(boost::bind(&LLPanelOutfitsInventory::saveOutfit, this, true));
 
 	return TRUE;
@@ -261,9 +264,14 @@ void LLPanelOutfitsInventory::openApearanceTab(const std::string& tab_name)
 void LLPanelOutfitsInventory::initListCommandsHandlers()
 {
 	mListCommands = getChild<LLPanel>("bottom_panel");
-	mListCommands->childSetAction("wear_btn", boost::bind(&LLPanelOutfitsInventory::onWearButtonClick, this));
-	mMyOutfitsPanel->childSetAction("trash_btn", boost::bind(&LLPanelOutfitsInventory::onTrashButtonClick, this));
-	mOutfitGalleryPanel->childSetAction("trash_btn", boost::bind(&LLPanelOutfitsInventory::onTrashButtonClick, this));
+	mListCommandWearBtn = mListCommands->getChild<LLButton>("wear_btn");
+	mListCommandWearBtn->setClickedCallback(boost::bind(&LLPanelOutfitsInventory::onWearButtonClick, this));
+
+	mMyOutfitTrashBtn = mMyOutfitsPanel->getChild<LLButton>("trash_btn");
+	mMyOutfitTrashBtn->setClickedCallback(boost::bind(&LLPanelOutfitsInventory::onTrashButtonClick, this));
+	
+	mGalleryTrashBtn = mOutfitGalleryPanel->getChild<LLButton>("trash_btn");
+	mMyOutfitTrashBtn->setClickedCallback(boost::bind(&LLPanelOutfitsInventory::onTrashButtonClick, this));
 }
 
 void LLPanelOutfitsInventory::updateListCommands()
@@ -273,13 +281,14 @@ void LLPanelOutfitsInventory::updateListCommands()
 	bool wear_visible = !isCOFPanelActive();
 	bool make_outfit_enabled = isActionEnabled("save_outfit");
 
-	LLButton* wear_btn = mListCommands->getChild<LLButton>("wear_btn");
-	mMyOutfitsPanel->childSetEnabled("trash_btn", trash_enabled);
-	mOutfitGalleryPanel->childSetEnabled("trash_btn", trash_enabled);
-	wear_btn->setEnabled(wear_enabled);
-	wear_btn->setVisible(wear_visible);
-	getChild<LLButton>(SAVE_BTN)->setEnabled(make_outfit_enabled);
-	wear_btn->setToolTip(getString((!isOutfitsGalleryPanelActive() && mMyOutfitsPanel->hasItemSelected()) ? "wear_items_tooltip" : "wear_outfit_tooltip"));
+	mMyOutfitTrashBtn->setEnabled(trash_enabled);
+	mGalleryTrashBtn->setEnabled(trash_enabled);
+
+	mListCommandWearBtn->setEnabled(wear_enabled);
+	mListCommandWearBtn->setVisible(wear_visible);
+	mListCommandWearBtn->setToolTip(getString((!isOutfitsGalleryPanelActive() && mMyOutfitsPanel->hasItemSelected()) ? "wear_items_tooltip" : "wear_outfit_tooltip"));
+
+	mSaveBtn->setEnabled(make_outfit_enabled);
 }
 
 void LLPanelOutfitsInventory::onTrashButtonClick()
