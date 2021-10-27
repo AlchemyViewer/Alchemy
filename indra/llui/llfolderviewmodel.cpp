@@ -38,7 +38,8 @@ std::string LLFolderViewModelCommon::getStatusText()
 {
 	if (!contentsReady() || mFolderView->getViewModelItem()->getLastFilterGeneration() < getFilter().getCurrentGeneration())
 	{
-		return LLTrans::getString("Searching");
+		static const std::string SEARCHING_STR = LLTrans::getString("Searching");
+		return SEARCHING_STR;
 	}
 	else
 	{

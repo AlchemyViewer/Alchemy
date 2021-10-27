@@ -1245,148 +1245,164 @@ const std::string& LLInventoryFilter::getFilterText()
 
 	mFilterText.clear();
 
+
+	static const std::string ANIMATIONS_STR = LLTrans::getString("Animations");
+	static const std::string CALLINGCARD_STR = LLTrans::getString("Calling Cards");
+	static const std::string CLOTHING_STR = LLTrans::getString("Clothing");
+	static const std::string GESTURES_STR = LLTrans::getString("Gestures");
+	static const std::string LANDMARKS_STR = LLTrans::getString("Landmarks");
+	static const std::string NOTECARDS_STR = LLTrans::getString("Notecards");
+	static const std::string OBJECTS_STR = LLTrans::getString("Objects");
+	static const std::string SCRIPTS_STR = LLTrans::getString("Scripts");
+	static const std::string SOUNDS_STR = LLTrans::getString("Sounds");
+	static const std::string TEXTURES_STR = LLTrans::getString("Textures");
+	static const std::string SNAPSHOTS_STR = LLTrans::getString("Snapshots");
+	static const std::string SETTINGS_STR = LLTrans::getString("Settings");
+	static const std::string NO_FILTER_STR = LLTrans::getString("No Filters");
+	static const std::string SINCE_LOGOFF_STR = LLTrans::getString("Since Logoff");
+
 	if (isFilterObjectTypesWith(LLInventoryType::IT_ANIMATION))
 	{
-		filtered_types += LLTrans::getString("Animations");
+		filtered_types += ANIMATIONS_STR;
 		filtered_by_type = TRUE;
 		num_filter_types++;
 	}
 	else
 	{
-		not_filtered_types += LLTrans::getString("Animations");
+		not_filtered_types += ANIMATIONS_STR;
 
 		filtered_by_all_types = FALSE;
 	}
 
 	if (isFilterObjectTypesWith(LLInventoryType::IT_CALLINGCARD))
 	{
-		filtered_types += LLTrans::getString("Calling Cards");
+		filtered_types += CALLINGCARD_STR;
 		filtered_by_type = TRUE;
 		num_filter_types++;
 	}
 	else
 	{
-		not_filtered_types += LLTrans::getString("Calling Cards");
+		not_filtered_types += CALLINGCARD_STR;
 		filtered_by_all_types = FALSE;
 	}
 
 	if (isFilterObjectTypesWith(LLInventoryType::IT_WEARABLE))
 	{
-		filtered_types +=  LLTrans::getString("Clothing");
+		filtered_types += CLOTHING_STR;
 		filtered_by_type = TRUE;
 		num_filter_types++;
 	}
 	else
 	{
-		not_filtered_types +=  LLTrans::getString("Clothing");
+		not_filtered_types += CLOTHING_STR;
 		filtered_by_all_types = FALSE;
 	}
 
 	if (isFilterObjectTypesWith(LLInventoryType::IT_GESTURE))
 	{
-		filtered_types +=  LLTrans::getString("Gestures");
+		filtered_types += GESTURES_STR;
 		filtered_by_type = TRUE;
 		num_filter_types++;
 	}
 	else
 	{
-		not_filtered_types +=  LLTrans::getString("Gestures");
+		not_filtered_types += GESTURES_STR;
 		filtered_by_all_types = FALSE;
 	}
 
 	if (isFilterObjectTypesWith(LLInventoryType::IT_LANDMARK))
 	{
-		filtered_types +=  LLTrans::getString("Landmarks");
+		filtered_types += LANDMARKS_STR;
 		filtered_by_type = TRUE;
 		num_filter_types++;
 	}
 	else
 	{
-		not_filtered_types +=  LLTrans::getString("Landmarks");
+		not_filtered_types += LANDMARKS_STR;
 		filtered_by_all_types = FALSE;
 	}
 
 	if (isFilterObjectTypesWith(LLInventoryType::IT_NOTECARD))
 	{
-		filtered_types +=  LLTrans::getString("Notecards");
+		filtered_types += NOTECARDS_STR;
 		filtered_by_type = TRUE;
 		num_filter_types++;
 	}
 	else
 	{
-		not_filtered_types +=  LLTrans::getString("Notecards");
+		not_filtered_types += NOTECARDS_STR;
 		filtered_by_all_types = FALSE;
 	}
 
 	if (isFilterObjectTypesWith(LLInventoryType::IT_OBJECT) && isFilterObjectTypesWith(LLInventoryType::IT_ATTACHMENT))
 	{
-		filtered_types +=  LLTrans::getString("Objects");
+		filtered_types += OBJECTS_STR;
 		filtered_by_type = TRUE;
 		num_filter_types++;
 	}
 	else
 	{
-		not_filtered_types +=  LLTrans::getString("Objects");
+		not_filtered_types += OBJECTS_STR;
 		filtered_by_all_types = FALSE;
 	}
 
 	if (isFilterObjectTypesWith(LLInventoryType::IT_LSL))
 	{
-		filtered_types +=  LLTrans::getString("Scripts");
+		filtered_types += SCRIPTS_STR;
 		filtered_by_type = TRUE;
 		num_filter_types++;
 	}
 	else
 	{
-		not_filtered_types +=  LLTrans::getString("Scripts");
+		not_filtered_types += SCRIPTS_STR;
 		filtered_by_all_types = FALSE;
 	}
 
 	if (isFilterObjectTypesWith(LLInventoryType::IT_SOUND))
 	{
-		filtered_types +=  LLTrans::getString("Sounds");
+		filtered_types += SOUNDS_STR;
 		filtered_by_type = TRUE;
 		num_filter_types++;
 	}
 	else
 	{
-		not_filtered_types +=  LLTrans::getString("Sounds");
+		not_filtered_types += SOUNDS_STR;
 		filtered_by_all_types = FALSE;
 	}
 
 	if (isFilterObjectTypesWith(LLInventoryType::IT_TEXTURE))
 	{
-		filtered_types +=  LLTrans::getString("Textures");
+		filtered_types += TEXTURES_STR;
 		filtered_by_type = TRUE;
 		num_filter_types++;
 	}
 	else
 	{
-		not_filtered_types +=  LLTrans::getString("Textures");
+		not_filtered_types += TEXTURES_STR;
 		filtered_by_all_types = FALSE;
 	}
 
 	if (isFilterObjectTypesWith(LLInventoryType::IT_SNAPSHOT))
 	{
-		filtered_types +=  LLTrans::getString("Snapshots");
+		filtered_types += SNAPSHOTS_STR;
 		filtered_by_type = TRUE;
 		num_filter_types++;
 	}
 	else
 	{
-		not_filtered_types +=  LLTrans::getString("Snapshots");
+		not_filtered_types += SNAPSHOTS_STR;
 		filtered_by_all_types = FALSE;
 	}
 
 	if (isFilterObjectTypesWith(LLInventoryType::IT_SETTINGS))
 	{
-		filtered_types +=  LLTrans::getString("Settings");
+		filtered_types += SETTINGS_STR;
 		filtered_by_type = TRUE;
 		num_filter_types++;
 	}
 	else
 	{
-		not_filtered_types +=  LLTrans::getString("Settings");
+		not_filtered_types += SETTINGS_STR;
 		filtered_by_all_types = FALSE;
 	}
 
@@ -1401,7 +1417,7 @@ const std::string& LLInventoryFilter::getFilterText()
 		}
 		else
 		{
-			mFilterText += LLTrans::getString("No Filters");
+			mFilterText += NO_FILTER_STR;
 			mFilterText += not_filtered_types;
 		}
 		// remove the ',' at the end
@@ -1410,7 +1426,7 @@ const std::string& LLInventoryFilter::getFilterText()
 
 	if (isSinceLogoff())
 	{
-		mFilterText += LLTrans::getString("Since Logoff");
+		mFilterText += SINCE_LOGOFF_STR;
 	}
 	return mFilterText;
 }
@@ -1573,26 +1589,24 @@ S32 LLInventoryFilter::getFirstRequiredGeneration() const
 
 void LLInventoryFilter::setEmptyLookupMessage(const std::string& message)
 {
-	mEmptyLookupMessage = message;
+	mEmptyLookupMessage = LLTrans::getString(message);
 }
 
 void LLInventoryFilter::setDefaultEmptyLookupMessage(const std::string& message)
 {
-	mDefaultEmptyLookupMessage = message;
+	mDefaultEmptyLookupMessage = LLTrans::getString(message);
 }
 
 std::string LLInventoryFilter::getEmptyLookupMessage() const
 {
 	if (isDefault() && !mDefaultEmptyLookupMessage.empty())
 	{
-		return LLTrans::getString(mDefaultEmptyLookupMessage);
+		return mDefaultEmptyLookupMessage;
 	}
 	else
 	{
-		LLStringUtil::format_map_t args;
-		args["[SEARCH_TERM]"] = LLURI::escape(getFilterSubStringOrig());
-
-		return LLTrans::getString(mEmptyLookupMessage, args);
+		mEmptyLookupMessage.setArg("[SEARCH_TERM]", LLURI::escape(getFilterSubStringOrig()));
+		return mEmptyLookupMessage.getString();
 	}
 
 }

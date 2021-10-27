@@ -2227,7 +2227,8 @@ std::string LLFolderBridge::getLabelSuffix() const
     
     if (mIsLoading && mTimeSinceRequestStart.getElapsedTimeF32() >= folder_loading_message_delay())
     {
-        return llformat(" ( %s ) ", LLTrans::getString("LoadingData").c_str());
+		static const std::string LOADING_DATA_STR = LLTrans::getString("LoadingData");
+		return fmt::format(FMT_STRING(" ( {:s} ) "), LOADING_DATA_STR);
     }
     std::string suffix = "";
     if(mShowDescendantsCount)
@@ -2238,11 +2239,9 @@ std::string LLFolderBridge::getLabelSuffix() const
         S32 count = item_array.size();
         if(count > 0)
         {
-            std::ostringstream oss;
-            oss << count;
-            LLStringUtil::format_map_t args;
-            args["[ITEMS_COUNT]"] = oss.str();
-            suffix = " " + LLTrans::getString("InventoryItemsCount", args);
+			static LLUIString ITEM_COUNT_STR = LLTrans::getString("InventoryItemsCount");
+			ITEM_COUNT_STR.setArg("[ITEMS_COUNT]", fmt::to_string(count));
+			suffix = absl::StrCat(" ", ITEM_COUNT_STR.getString());
         }
     }
 
@@ -6183,9 +6182,9 @@ std::string LLGestureBridge::getLabelSuffix() const
 {
 	if( LLGestureMgr::instance().isGestureActive(mUUID) )
 	{
-		LLStringUtil::format_map_t args;
-		args["[GESLABEL]"] =  LLItemBridge::getLabelSuffix();
-		return  LLTrans::getString("ActiveGesture", args);
+		static LLUIString active_gesture_str = LLTrans::getString("ActiveGesture");
+		active_gesture_str.setArg("[GESLABEL]", LLItemBridge::getLabelSuffix());
+		return  active_gesture_str.getString();
 	}
 	else
 	{
@@ -6849,7 +6848,8 @@ std::string LLWearableBridge::getLabelSuffix() const
 	if (get_is_item_worn(mUUID))
 	{
 		// e.g. "(worn)" 
-		return LLItemBridge::getLabelSuffix() + LLTrans::getString("worn");
+		static const std::string WORN_STR = LLTrans::getString("worn");
+		return LLItemBridge::getLabelSuffix() + WORN_STR;
 	}
 	else
 	{
