@@ -197,14 +197,15 @@ void LLDrawPoolWLSky::renderSkyHaze() const
             sky_shader->bindTexture(LLShaderMgr::RAINBOW_MAP, rainbow_tex);
             sky_shader->bindTexture(LLShaderMgr::HALO_MAP, halo_tex);
 
-            ((LLSettingsVOSky*)mCurrentSky.get())->updateShader(sky_shader);
+            LLSettingsVOSky* voskysetp = ((LLSettingsVOSky*)mCurrentSky.get());
+            voskysetp->updateShader(sky_shader);
 
-            F32 moisture_level = (float)mCurrentSky->getSkyMoistureLevel();
-            F32 droplet_radius = (float)mCurrentSky->getSkyDropletRadius();
-            F32 ice_level = (float)mCurrentSky->getSkyIceLevel();
+            F32 moisture_level = (float)voskysetp->getSkyMoistureLevelFast();
+            F32 droplet_radius = (float)voskysetp->getSkyDropletRadiusFast();
+            F32 ice_level = (float)voskysetp->getSkyIceLevelFast();
 
             // hobble halos and rainbows when there's no light source to generate them
-            if (!mCurrentSky->getIsSunUp() && !mCurrentSky->getIsMoonUp())
+            if (!voskysetp->getIsSunUp() && !voskysetp->getIsMoonUp())
             {
                 moisture_level = 0.0f;
                 ice_level = 0.0f;
@@ -214,10 +215,11 @@ void LLDrawPoolWLSky::renderSkyHaze() const
             sky_shader->uniform1f(LLShaderMgr::DROPLET_RADIUS, droplet_radius);
             sky_shader->uniform1f(LLShaderMgr::ICE_LEVEL, ice_level);
         }
-
-        sky_shader->uniform1f(LLShaderMgr::SUN_MOON_GLOW_FACTOR, mCurrentSky->getSunMoonGlowFactor());
-
-        sky_shader->uniform1i(LLShaderMgr::SUN_UP_FACTOR, mCurrentSky->getIsSunUp() ? 1 : 0);
+        else
+        {
+            sky_shader->uniform1f(LLShaderMgr::SUN_MOON_GLOW_FACTOR, mCurrentSky->getSunMoonGlowFactor());
+            sky_shader->uniform1i(LLShaderMgr::SUN_UP_FACTOR, mCurrentSky->getIsSunUp() ? 1 : 0);
+        }
 
         /// Render the skydome
         renderDome(sky_shader);
@@ -238,8 +240,7 @@ void LLDrawPoolWLSky::renderStars() const
 	// *NOTE: we divide by two here and GL_ALPHA_SCALE by two below to avoid
 	// clamping and allow the star_alpha param to brighten the stars.
 	LLColor4 star_alpha(LLColor4::black);
-
-    star_alpha.mV[3] = mCurrentSky->getStarBrightness() / 512.f;
+    star_alpha.mV[3] = ((LLSettingsVOSky*)mCurrentSky.get())->getStarBrightness() / 512.f;
     
 	// If star brightness is not set, exit
 	if( star_alpha.mV[3] < 0.001 )
@@ -306,7 +307,9 @@ void LLDrawPoolWLSky::renderStarsDeferred() const
 
 	gGL.setSceneBlendType(LLRender::BT_ADD_WITH_ALPHA);
 
-    F32 star_alpha = mCurrentSky->getStarBrightness() / 500.0f;
+    LLSettingsVOSky* voskysetp = ((LLSettingsVOSky*)mCurrentSky.get());
+
+    F32 star_alpha = voskysetp->getStarBrightnessFast() / 500.0f;
 
 	// If start_brightness is not set, exit
 	if(star_alpha < 0.001f)
@@ -320,7 +323,7 @@ void LLDrawPoolWLSky::renderStarsDeferred() const
     LLViewerTexture* tex_a = gSky.mVOSkyp->getBloomTex();
     LLViewerTexture* tex_b = gSky.mVOSkyp->getBloomTexNext();
 
-    F32 blend_factor = mCurrentSky->getBlendFactor();
+    F32 blend_factor = voskysetp->getBlendFactor();
 	
     if (tex_a && (!tex_b || (tex_a == tex_b)))
     {
@@ -380,8 +383,10 @@ void LLDrawPoolWLSky::renderSkyClouds() const
         gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
         gGL.getTexUnit(1)->unbind(LLTexUnit::TT_TEXTURE);
 
-        F32 cloud_variance = mCurrentSky ? mCurrentSky->getCloudVariance() : 0.0f;
-        F32 blend_factor   = mCurrentSky ? mCurrentSky->getBlendFactor() : 0.0f;
+        LLSettingsVOSky* voskysetp = ((LLSettingsVOSky*)mCurrentSky.get());
+
+        F32 cloud_variance = voskysetp->getCloudVarianceFast();
+        F32 blend_factor = voskysetp->getBlendFactor();
 
         // if we even have sun disc textures to work with...
         if (cloud_noise || cloud_noise_next)
@@ -406,9 +411,8 @@ void LLDrawPoolWLSky::renderSkyClouds() const
 
         cloud_shader->uniform1f(LLShaderMgr::BLEND_FACTOR, blend_factor);
         cloud_shader->uniform1f(LLShaderMgr::CLOUD_VARIANCE, cloud_variance);
-        cloud_shader->uniform1f(LLShaderMgr::SUN_MOON_GLOW_FACTOR, mCurrentSky->getSunMoonGlowFactor());
 
-        ((LLSettingsVOSky*)mCurrentSky.get())->updateShader(cloud_shader);
+        voskysetp->updateShader(cloud_shader);
 
 		/// Render the skydome
         renderDome(cloud_shader);
@@ -514,14 +518,16 @@ void LLDrawPoolWLSky::renderHeavenlyBodies()
                 //moon_shader->bindTexture(LLShaderMgr::ALTERNATE_DIFFUSE_MAP, tex_b, LLTexUnit::TT_TEXTURE);
             }
 
-            F32 moon_brightness = (float)mCurrentSky->getMoonBrightness();
+            LLSettingsVOSky* voskysetp = ((LLSettingsVOSky*)mCurrentSky.get());
+
+            F32 moon_brightness = (float)voskysetp->getMoonBrightnessFast();
             LLColor4 moon_color(gSky.mVOSkyp->getMoon().getColor());
             
             moon_shader->uniform1f(LLShaderMgr::MOON_BRIGHTNESS, moon_brightness);
             moon_shader->uniform4fv(LLShaderMgr::MOONLIGHT_COLOR, 1, moon_color.mV);
             moon_shader->uniform4fv(LLShaderMgr::DIFFUSE_COLOR, 1, color.mV);
             //moon_shader->uniform1f(LLShaderMgr::BLEND_FACTOR, blend_factor);
-            moon_shader->uniform3fv(LLShaderMgr::DEFERRED_MOON_DIR, 1, mCurrentSky->getMoonDirection().mV); // shader: moon_dir
+            moon_shader->uniform3fv(LLShaderMgr::DEFERRED_MOON_DIR, 1, voskysetp->getMoonDirection().mV); // shader: moon_dir
 
             face->renderIndexed();
 

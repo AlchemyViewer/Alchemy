@@ -103,6 +103,13 @@ public:
 
     void updateShader(LLGLSLShader* shader) { applySpecial(shader, true); }
 
+    F32 getSkyMoistureLevelFast() const { return mSkyMoistureCached; }
+    F32 getSkyDropletRadiusFast() const { return mSkyDropletRadius; }
+    F32 getSkyIceLevelFast() const { return mSkyIceLevel; }
+    F32 getCloudVarianceFast() const { return mCloudVarianceCached;; }
+    F32 getMoonBrightnessFast() const { return mMoonBrightnessCached; }
+    F32 getStarBrightnessFast() const { return mStarBrightnessCached; }
+
 protected:
     LLSettingsVOSky();
 
@@ -115,8 +122,21 @@ protected:
 
     const parammapping_t& getParameterMap() const final;
 
-    bool m_isAdvanced = false;
+    LLVector4 mCloudPosDensityCached;
+    LLColor4 mSunDiffuseCached;
+    LLColor4 mMoonDiffuseCached;
+    LLColor4 mCloudColorCached;
+    F32 mDensityMultiplierCached;
+    F32 mDistanceMultiplierCached;
+    F32 mGammaCached = 1.f;
+    F32 mCloudVarianceCached;
+    F32 mMoonBrightnessCached;
+    F32 mStarBrightnessCached;
+    F32 mSkyMoistureCached;
+    F32 mSkyDropletRadius;
+    F32 mSkyIceLevel;
     F32 mSceneLightStrength = 3.0f;
+    bool m_isAdvanced = false;
 };
 
 //=========================================================================

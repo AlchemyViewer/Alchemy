@@ -678,27 +678,43 @@ void LLSettingsVOSky::updateSettings()
 
     gSky.setSunScale(getSunScale());
     gSky.setMoonScale(getMoonScale());
+
+    //Cache settings for fast access during render
+    // Legacy? SETTING_CLOUD_SCROLL_RATE("cloud_scroll_rate")
+    mCloudPosDensityCached = LLVector4(mSettings[SETTING_CLOUD_POS_DENSITY1]);
+
+    mDensityMultiplierCached = getDensityMultiplier();
+    mDistanceMultiplierCached = getDistanceMultiplier();
+    mGammaCached = getGamma();
+    mCloudVarianceCached = getCloudVariance();
+    mMoonBrightnessCached = getMoonBrightness();
+    mStarBrightnessCached = getStarBrightness();
+
+    mSkyMoistureCached = getSkyMoistureLevel();
+    mSkyDropletRadius = getSkyDropletRadius();
+    mSkyIceLevel = getSkyIceLevel();
+
+    mSunDiffuseCached = getSunlightColor();
+    mMoonDiffuseCached = getMoonlightColor();
+    mCloudColorCached = LLColor4(getCloudColor(), 1.0);
 }
 
 void LLSettingsVOSky::applySpecial(void *ptarget, bool force)
 {
     LLGLSLShader *shader = (LLGLSLShader *) ptarget;
 
-    auto& env = LLEnvironment::instance();
-
-    LLVector4 light_direction = env.getClampedLightNorm();
-
     if (shader->mShaderGroup == LLGLSLShader::SG_DEFAULT)
     {
-        shader->uniform4fv(LLViewerShaderMgr::LIGHTNORM, 1, light_direction.mV);
+        shader->uniform4fv(LLViewerShaderMgr::LIGHTNORM, 1, LLEnvironment::instance().getClampedLightNorm().mV);
         shader->uniform3fv(LLShaderMgr::WL_CAMPOSLOCAL, 1, LLViewerCamera::getInstance()->getOrigin().mV);
     }
     else if (shader->mShaderGroup == LLGLSLShader::SG_SKY)
     {
-        shader->uniform4fv(LLViewerShaderMgr::LIGHTNORM, 1, light_direction.mV);
+        auto& env = LLEnvironment::instance();
 
-        // Legacy? SETTING_CLOUD_SCROLL_RATE("cloud_scroll_rate")
-        LLVector4 vect_c_p_d1(mSettings[SETTING_CLOUD_POS_DENSITY1]);
+        shader->uniform4fv(LLViewerShaderMgr::LIGHTNORM, 1, env.getClampedLightNorm().mV);
+
+        LLVector4 vect_c_p_d1(mCloudPosDensityCached);
         LLVector4 cloud_scroll(env.getCloudScrollDelta());
 
         // SL-13084 EEP added support for custom cloud textures -- flip them horizontally to match the preview of Clouds > Cloud Scroll
@@ -710,27 +726,21 @@ void LLSettingsVOSky::applySpecial(void *ptarget, bool force)
         vect_c_p_d1 += cloud_scroll;
         shader->uniform4fv(LLShaderMgr::CLOUD_POS_DENSITY1, 1, vect_c_p_d1.mV);
 
-        LLColor4 sunDiffuse  = getSunlightColor();
-        LLColor4 moonDiffuse = getMoonlightColor();
-
-        shader->uniform4fv(LLShaderMgr::SUNLIGHT_COLOR, 1, sunDiffuse.mV);
-        shader->uniform4fv(LLShaderMgr::MOONLIGHT_COLOR, 1, moonDiffuse.mV);
-
-        LLColor4 cloud_color(getCloudColor(), 1.0);
-        shader->uniform4fv(LLShaderMgr::CLOUD_COLOR, 1, cloud_color.mV);
+        shader->uniform4fv(LLShaderMgr::SUNLIGHT_COLOR, 1, mSunDiffuseCached.mV);
+        shader->uniform4fv(LLShaderMgr::MOONLIGHT_COLOR, 1, mMoonDiffuseCached.mV);
+        shader->uniform4fv(LLShaderMgr::CLOUD_COLOR, 1, mCloudColorCached.mV);
     }
 
     shader->uniform1f(LLShaderMgr::SCENE_LIGHT_STRENGTH, mSceneLightStrength);
 
-    LLColor4 ambient(getTotalAmbient());
-    shader->uniform4fv(LLShaderMgr::AMBIENT, 1, ambient.mV);
+    shader->uniform4fv(LLShaderMgr::AMBIENT, 1, getTotalAmbient().mV);
 
     shader->uniform1i(LLShaderMgr::SUN_UP_FACTOR, getIsSunUp() ? 1 : 0);
     shader->uniform1f(LLShaderMgr::SUN_MOON_GLOW_FACTOR, getSunMoonGlowFactor());
-    shader->uniform1f(LLShaderMgr::DENSITY_MULTIPLIER, getDensityMultiplier());
-    shader->uniform1f(LLShaderMgr::DISTANCE_MULTIPLIER, getDistanceMultiplier());
+    shader->uniform1f(LLShaderMgr::DENSITY_MULTIPLIER, mDensityMultiplierCached);
+    shader->uniform1f(LLShaderMgr::DISTANCE_MULTIPLIER, mDistanceMultiplierCached);
 
-    shader->uniform1f(LLShaderMgr::GAMMA, getGamma());
+    shader->uniform1f(LLShaderMgr::GAMMA, mGammaCached);
 }
 
 const LLSettingsSky::parammapping_t& LLSettingsVOSky::getParameterMap() const
