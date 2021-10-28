@@ -934,29 +934,29 @@ void LLSettingsVOWater::applySpecial(void *ptarget, bool force)
 
     if (force || (shader->mShaderGroup == LLGLSLShader::SG_WATER))
 	{
-        auto& env = LLEnvironment::instance();
-        F32 water_height = env.getWaterHeight();
+        F32 water_height = gAgent.getRegion() ? gAgent.getRegion()->getWaterHeight() : DEFAULT_WATER_HEIGHT;
 
         //transform water plane to eye space
-        glh::vec3f norm(0.f, 0.f, 1.f);
-        glh::vec3f p(0.f, 0.f, water_height + 0.1f);
+        LLVector4a enorm(0.f, 0.f, 1.f);
+        LLVector4a ep(0.f, 0.f, water_height + 0.1f);
 
-        F32 modelView[16];
-        memcpy(modelView, gGLModelView, sizeof(F32) * 16);
+        LLMatrix4a mat;
+        mat.loadu(gGLModelView);
+        LLMatrix4a invtrans = mat;
+        invtrans.invert();
+        invtrans.transpose();
 
-        glh::matrix4f mat(modelView);
-        glh::matrix4f invtrans = mat.inverse().transpose();
-        glh::vec3f enorm;
-        glh::vec3f ep;
-        invtrans.mult_matrix_vec(norm, enorm);
-        enorm.normalize();
-        mat.mult_matrix_vec(p, ep);
+        invtrans.perspectiveTransform(enorm, enorm);
+        enorm.normalize3fast();
+        mat.affineTransform(ep, ep);
 
-        LLVector4 waterPlane(enorm.v[0], enorm.v[1], enorm.v[2], -ep.dot(enorm));
+        ep.setAllDot3(ep, enorm);
+        ep.negate();
+        enorm.copyComponent<3>(ep);
 
-        shader->uniform4fv(LLShaderMgr::WATER_WATERPLANE, 1, waterPlane.mV);
+        shader->uniform4fv(LLShaderMgr::WATER_WATERPLANE, 1, enorm.getF32ptr());
 
-        LLVector4 light_direction = env.getClampedLightNorm();
+        LLVector4 light_direction = LLEnvironment::instance().getClampedLightNorm();
 
         F32 waterFogKS = 1.f / llmax(light_direction.mV[2], WATER_FOG_LIGHT_CLAMP);
 
@@ -965,11 +965,10 @@ void LLSettingsVOWater::applySpecial(void *ptarget, bool force)
         F32 eyedepth = LLViewerCamera::getInstance()->getOrigin().mV[2] - water_height;
         bool underwater = (eyedepth <= 0.0f);
 
-        F32 waterFogDensity = getModifiedWaterFogDensity(underwater);
+        F32 waterFogDensity = getModifiedWaterFogDensityFast(mCachedWaterFogDensity, mCachedFogMod, underwater);
         shader->uniform1f(LLShaderMgr::WATER_FOGDENSITY, waterFogDensity);
 
-        LLColor4 fog_color(getWaterFogColor(), 0.0f);
-        shader->uniform4fv(LLShaderMgr::WATER_FOGCOLOR, 1, fog_color.mV);
+        shader->uniform4fv(LLShaderMgr::WATER_FOGCOLOR, 1, mCachedWaterFogColor.mV);
 
         F32 blend_factor = getBlendFactor();
         shader->uniform1f(LLShaderMgr::BLEND_FACTOR, blend_factor);
@@ -991,6 +990,10 @@ void LLSettingsVOWater::updateSettings()
         pwaterpool->setOpaqueTexture(GetDefaultOpaqueTextureAssetId());
         pwaterpool->setNormalMaps(getNormalMapID(), getNextNormalMapID());
     }
+
+    mCachedWaterFogDensity= getWaterFogDensity();
+    mCachedFogMod = getFogMod();
+    mCachedWaterFogColor = LLColor4(getWaterFogColor(), 0.0f);
 }
 
 const LLSettingsWater::parammapping_t& LLSettingsVOWater::getParameterMap() const

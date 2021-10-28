@@ -96,6 +96,7 @@ public:
     }
 
     F32 getModifiedWaterFogDensity(bool underwater) const;
+    F32 getModifiedWaterFogDensityFast(F32 fog_density, F32 underwater_fog_mod, bool underwater) const;
 
     void setWaterFogDensity(F32 val)
     {

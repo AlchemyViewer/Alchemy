@@ -295,8 +295,13 @@ F32 LLSettingsWater::getModifiedWaterFogDensity(bool underwater) const
 {
     F32 fog_density = getWaterFogDensity();
     F32 underwater_fog_mod = getFogMod();
+    return getModifiedWaterFogDensityFast(fog_density, underwater_fog_mod, underwater);
+}
+
+F32 LLSettingsWater::getModifiedWaterFogDensityFast(F32 fog_density, F32 underwater_fog_mod, bool underwater) const
+{
     if (underwater && underwater_fog_mod > 0.0f)
-    {        
+    {
         underwater_fog_mod = llclamp(underwater_fog_mod, 0.0f, 10.0f);
         fog_density = pow(fog_density, underwater_fog_mod);
     }

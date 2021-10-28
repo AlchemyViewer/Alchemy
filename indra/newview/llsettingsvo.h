@@ -167,8 +167,11 @@ protected:
 
 
 private:
-    static const F32 WATER_FOG_LIGHT_CLAMP;
+    LLColor4 mCachedWaterFogColor;
+    F32 mCachedWaterFogDensity;
+    F32 mCachedFogMod;
 
+    static const F32 WATER_FOG_LIGHT_CLAMP;
 };
 
 //=========================================================================
