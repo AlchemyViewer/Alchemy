@@ -4,33 +4,46 @@
 # URLs of the form secondlife://...
 #
 
-HANDLER="$1"
+desired_handler="$1"
 
-RUN_PATH=$(dirname "$0" || echo .)
-cd "${RUN_PATH}/.."
+print() {
+	log_prefix="RegisterSLProtocol:"
+	echo -e "${log_prefix} $*"
+}
+run_path=$(dirname "$0" || echo .)
+cd "${run_path}/.." || exit
 
-if [ -z "$HANDLER" ]; then
-    #HANDLER="$RUN_PATH/etc/handle_secondlifeprotocol.sh"
-    HANDLER="$(pwd)/etc/handle_secondlifeprotocol.sh"
+if [ -z "${desired_handler}" ]; then
+    #desired_handler="$run_path/etc/handle_secondlifeprotocol.sh"
+    desired_handler="$(pwd)/etc/handle_secondlifeprotocol.sh"
 fi
 
-# Register handler for GNOME-aware apps
-LLGCONFTOOL=gconftool-2
-if which ${LLGCONFTOOL} >/dev/null; then
-    (${LLGCONFTOOL} -s -t string /desktop/gnome/url-handlers/secondlife/command "${HANDLER} \"%s\"" && ${LLGCONFTOOL} -s -t bool /desktop/gnome/url-handlers/secondlife/enabled true) || echo Warning: Did not register secondlife:// handler with GNOME: ${LLGCONFTOOL} failed.
-else
-    echo Warning: Did not register secondlife:// handler with GNOME: ${LLGCONFTOOL} not found.
+print "Requested Handler: ${desired_handler}"
+
+# Register handler for gconf-aware apps
+# TODO: use dconf or another modern alternative
+gconftool=$(command -v "${LLGCONFTOOL:=gconftool-2}")
+if [[ -z "${gconftool}" ]]; then
+	print "gconf not found, skipped. (This is good)"
+	else
+	if "${gconftool}" -s -t string /desktop/gnome/url-handlers/secondlife/command "${desired_handler} \"%s\"" \
+			&& ${gconftool} -s -t bool /desktop/gnome/url-handlers/secondlife/enabled true; then
+				print "Registered secondlife:// handler with (deprecated) gconf."
+			else
+				print "Failed to register secondlife:// handler with (deprecated) gconf."
+			fi
 fi
 
 # Register handler for KDE-aware apps
-for LLKDECONFIG in kde-config kde4-config; do
-    if [ $(which $LLKDECONFIG) ]; then
-        LLKDEPROTODIR=$($LLKDECONFIG --path services | cut -d ':' -f 1)
-        if [ -d "$LLKDEPROTODIR" ]; then
-            LLKDEPROTOFILE=${LLKDEPROTODIR}/secondlife.protocol
-            cat > ${LLKDEPROTOFILE} <<EOF || echo Warning: Did not register secondlife:// handler with KDE: Could not write ${LLKDEPROTOFILE} 
+for kdeconfig in ${LLKDECONFIG} kf5-config kde4-config kde-config; do
+    if command -v "${kdeconfig}" >/dev/null 2>&1; then
+        kde_protocols_folder=$("${kdeconfig}" --path services | cut -d ':' -f 1)
+				mkdir -p "${kde_protocols_folder}"
+        if [ -d "${kde_protocols_folder}" ]; then
+            kde_proto_file=${kde_protocols_folder}/secondlife.protocol
+						kde_handler_string="
 [Protocol]
-exec=${HANDLER} '%u'
+exec=${desired_handler} %u
 protocol=secondlife
 input=none
 output=none
@@ -39,49 +52,67 @@ listing=
 reading=false
 writing=false
 makedir=false
-deleting=false
-EOF
+deleting=false"
+            if echo "${kde_handler_string}" > "${kde_proto_file}"; then
+						print "Registered secondlife:// handler with KDE"
+							success=1
+						else
+							print 'Warning: Did not register secondlife:// handler with KDE: Could not write '"${kde_proto_file}"
+						fi
         else
-            echo Warning: Did not register secondlife:// handler with KDE: Directory $LLKDEPROTODIR does not exist.
+            print 'Warning: Did not register secondlife:// handler with KDE: Directory '"${kde_protocols_folder}"' does not exist.'
         fi
-    fi
+    # else
+			# print "Warning: KDE-Config binary '${kdeconfig}' not found"
+		fi
 done
-
-#Check if xdg-mime is present, if so, use it to register new protocol.
+if [[ -z "${success}" ]]; then
+	print "Warning: secondlife:// protocol not registered with KDE: could not find any configuration utility. You can still register the application manually by editing ${HOME}/.local/share/mimeapps.list"
+fi
+# if [[ -n "${FALLBACK}" ]]; then
+	#Check if xdg-mime is present, if so, use it to register new protocol.
 if command -v xdg-mime query default x-scheme-handler/secondlife > /dev/null 2>&1; then
 	urlhandler=$(xdg-mime query default x-scheme-handler/secondlife)
 	localappdir="$HOME/.local/share/applications"
 	newhandler="handle_secondlifeprotocol.desktop"
-	cat >"$localappdir/$newhandler" <<EOFnew || echo Warning: Did not register secondlife:// handler with xdg-mime: Could not write $newhandler
+	handlerpath="$localappdir/$newhandler"
+	print "New handler file: ${handlerpath}"
+	cat >"${handlerpath}" <<EOFnew || print Warning: Did not register secondlife:// handler with xdg-mime: Could not write $newhandler
 [Desktop Entry]
 Version=1.5
 Name="Second Life URL handler"
 Comment="secondlife:// URL handler"
 Type=Application
-Exec=$HANDLER %u
+Exec=$desired_handler %u
 Terminal=false
 StartupNotify=false
 NoDisplay=true
 MimeType=x-scheme-handler/secondlife
 EOFnew
 
-	if [ -z $urlhandler ]; then
-		echo No SLURL handler currently registered, creating new...
+# TODO: use absolute path for the desktop file
+# TODO: Ensure that multiple channels behave properly due to different desktop file names in /usr/share/applications/
+# TODO: Better detection of what the handler actually is, as other viewer projects may use the same filename
+	if [ -z "$urlhandler" ]; then
+		print No SLURL handler currently registered, creating new...
 	else
-		echo Current SLURL Handler: $urlhandler - Setting new default...
 		#xdg-mime uninstall $localappdir/$urlhandler
 		#Clean up handlers from other viewers
 		if [ "$urlhandler" != "$newhandler" ]; then
-			mv $localappdir/$urlhandler $localappdir/$urlhandler.bak
+			print "Current SLURL Handler: ${urlhandler} - Setting ${newhandler} as the new default..."
+			mv "$localappdir"/"$urlhandler" "$localappdir"/"$urlhandler".bak
+		else
+			print "SLURL Handler has not changed, leaving as-is."
 		fi
 	fi
 	xdg-mime default $newhandler x-scheme-handler/secondlife
 	if command -v update-desktop-database > /dev/null 2>&1; then
-		update-desktop-database $localappdir
-		echo -e "Registered secondlife:// protocol with xdg-mime\nNew default: $(xdg-mime query default x-scheme-handler/secondlife)"
+		update-desktop-database "$localappdir"
+		print "Registered secondlife:// protocol with xdg-mime. New default: $(xdg-mime query default x-scheme-handler/secondlife)"
 	else
-		echo Warning: Cannot update desktop database, command missing - installation may be incomplete.
+		print "Warning: Cannot update desktop database, command missing - installation may be incomplete."
 	fi
 else
-	echo Warning: Did not register secondlife:// handler with xdg-mime: Package not found.
+	print "Warning: Did not register secondlife:// handler with xdg-mime: Package not found."
 fi
+# fi
