@@ -99,9 +99,14 @@ U64 get_clock_count()
 
 F64 calc_clock_frequency()
 {
-	__int64 freq;
-	QueryPerformanceFrequency((LARGE_INTEGER *) &freq);
-	return (F64)freq;
+	static F64 clock_freq = 0.0;
+	if (clock_freq == 0.0)
+	{
+		__int64 freq;
+		QueryPerformanceFrequency((LARGE_INTEGER*)&freq);
+		clock_freq = (F64)freq;
+	}
+	return clock_freq;
 }
 #endif // LL_WINDOWS
 
