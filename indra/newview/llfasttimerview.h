@@ -33,6 +33,9 @@
 #include "lltracerecording.h"
 #include <deque>
 
+class LLComboBox;
+class LLLayoutPanel;
+class LLPanel;
 class LLScrollbar;
 
 class LLFastTimerView final : public LLFloater
@@ -40,7 +43,7 @@ class LLFastTimerView final : public LLFloater
 public:
 	LLFastTimerView(const LLSD&);
 	~LLFastTimerView();
-	BOOL postBuild();
+	BOOL postBuild() override;
 
 	static BOOL sAnalyzePerformance;
 
@@ -55,16 +58,16 @@ private:
 
 public:
 
-	virtual BOOL handleMouseDown(S32 x, S32 y, MASK mask);
-	virtual BOOL handleDoubleClick(S32 x, S32 y, MASK mask);
-	virtual BOOL handleRightMouseDown(S32 x, S32 y, MASK mask);
-	virtual BOOL handleMouseUp(S32 x, S32 y, MASK mask);
-	virtual BOOL handleHover(S32 x, S32 y, MASK mask);
-	virtual BOOL handleToolTip(S32 x, S32 y, MASK mask);
-	virtual BOOL handleScrollWheel(S32 x, S32 y, S32 clicks);
-	virtual void draw();
-	virtual void onOpen(const LLSD& key);
-	virtual void onClose(bool app_quitting);
+	BOOL handleMouseDown(S32 x, S32 y, MASK mask) override;
+	BOOL handleDoubleClick(S32 x, S32 y, MASK mask) override;
+	BOOL handleRightMouseDown(S32 x, S32 y, MASK mask) override;
+	BOOL handleMouseUp(S32 x, S32 y, MASK mask) override;
+	BOOL handleHover(S32 x, S32 y, MASK mask) override;
+	BOOL handleToolTip(S32 x, S32 y, MASK mask) override;
+	BOOL handleScrollWheel(S32 x, S32 y, S32 clicks) override;
+	void draw() override;
+	void onOpen(const LLSD& key) override;
+	void onClose(bool app_quitting) override;
 	LLTrace::BlockTimerStatHandle* getLegendID(S32 y);
 
 private:	
@@ -95,7 +98,7 @@ private:
 							mChildrenEnd,
 							mSelfStart,
 							mSelfEnd;
-		LLTrace::BlockTimerStatHandle* mTimeBlock;
+		LLTrace::BlockTimerStatHandle* mTimeBlock = nullptr;
 		bool				mVisible,
 							mFirstChild,
 							mLastChild;
@@ -108,7 +111,7 @@ private:
 		TimerBarRow() 
 		:	mBottom(0),
 			mTop(0),
-			mBars(NULL)
+			mBars(nullptr)
 		{}
 		~TimerBarRow();
 		S32			mBottom,
@@ -145,8 +148,21 @@ private:
 									mLegendRect;
 	LLFrameTimer					mHighlightTimer;
 	LLTrace::PeriodicRecording		mRecording;
-
+	
+	// Widgets
+	LLComboBox*						mMetricCombo;
+	LLComboBox*						mTimeScaleCombo;
 	LLScrollbar* 					mScrollBar;
+	LLLayoutPanel*					mBarsPanel;
+	LLLayoutPanel*					mLinesPanel;
+
+	LLPanel*						mLegendPanel;
+	
+	LLButton*						mBtnPause;
+
+	// UI Resources
+	LLUIImagePtr					mBarImage;
+	LLFontGL*						mFontMonospace;
 };
 
 #endif
