@@ -53,22 +53,22 @@ protected:
 	class LLHUDTextSegment
 	{
 	public:
-		LLHUDTextSegment(const LLWString& text, const LLFontGL::StyleFlags style, const LLColor4& color, const LLFontGL* font)
+		LLHUDTextSegment(LLWString text, const LLFontGL::StyleFlags style, const LLColor4& color, const LLFontGL* font)
 		:	mColor(color),
 			mStyle(style),
-			mText(text),
-			mFont(font)
+			mFont(font),
+			mText(std::move(text))
 		{}
 		F32 getWidth(const LLFontGL* font);
 		const LLWString& getText() const { return mText; }
-		void clearFontWidthMap() { mFontWidthMap.clear(); }
+		void clearFontWidthMap() { mFontWidthMap[0].first = nullptr; mFontWidthMap[1].first = nullptr; }
 		
 		LLColor4				mColor;
 		LLFontGL::StyleFlags	mStyle;
 		const LLFontGL*			mFont;
 	private:
 		LLWString				mText;
-		std::map<const LLFontGL*, F32> mFontWidthMap;
+		std::pair<const LLFontGL*, F32> mFontWidthMap[2];
 	};
 
 public:
@@ -91,7 +91,7 @@ public:
 	void clearString();
 
 	// Add text a line at a time, allowing custom formatting
-	void addLine(const std::string &text_utf8, const LLColor4& color, const LLFontGL::StyleFlags style = LLFontGL::NORMAL, const LLFontGL* font = NULL);
+	void addLine(const std::string &text_utf8, const LLColor4& color, const LLFontGL::StyleFlags style = LLFontGL::NORMAL, const LLFontGL* font = nullptr);
 
 	// Sets the default font for lines with no font specified
 	void setFont(const LLFontGL* font);
@@ -105,14 +105,14 @@ public:
 	void setMaxLines(S32 max_lines) { mMaxLines = max_lines; }
 	void setFadeDistance(F32 fade_distance, F32 fade_range) { mFadeDistance = fade_distance; mFadeRange = fade_range; }
 	void updateVisibility();
-	LLVector2 updateScreenPos(LLVector2 &offset_target);
+	LLVector2 updateScreenPos(const LLVector2 &offset_target);
 	void updateSize();
 	void setMass(F32 mass) { mMass = llmax(0.1f, mass); }
 	void setTextAlignment(ETextAlignment alignment) { mTextAlignment = alignment; }
 	void setVertAlignment(EVertAlignment alignment) { mVertAlignment = alignment; }
-	/*virtual*/ void markDead();
+	/*virtual*/ void markDead() override;
 	friend class LLHUDObject;
-	/*virtual*/ F32 getDistance() const { return mLastDistance; }
+	/*virtual*/ F32 getDistance() const override { return mLastDistance; }
 	BOOL getVisible() { return mVisible; }
 	BOOL getHidden() const { return mHidden; }
 	void setHidden( BOOL hide ) { mHidden = hide; }
@@ -135,7 +135,7 @@ public:
 protected:
 	LLHUDText(const U8 type);
 
-	/*virtual*/ void render();
+	/*virtual*/ void render() override;
 	void renderText();
 	static void updateAll();
 	S32 getMaxLines();

@@ -104,7 +104,7 @@ LLHUDText::~LLHUDText()
 
 void LLHUDText::render()
 {
-	if (!mOnHUDAttachment && sDisplayText)
+	if (!mOnHUDAttachment && sDisplayText && mVisible && !mHidden)
 	{
 		LLGLDepthTest gls_depth(GL_TRUE, GL_FALSE);
 		LLGLDisable gls_stencil(GL_STENCIL_TEST);
@@ -142,21 +142,6 @@ void LLHUDText::renderText()
 	shadow_color.mV[3] = text_color.mV[3];
 
 	mOffsetY = lltrunc(mHeight * ((mVertAlignment == ALIGN_VERT_CENTER) ? 0.5f : 1.f));
-
-	const S32 border_height = 16;
-	const S32 border_width = 16;
-
-	// *TODO move this into helper function
-	F32 border_scale = 1.f;
-
-	if (border_height * 2 > mHeight)
-	{
-		border_scale = (F32)mHeight / ((F32)border_height * 2.f);
-	}
-	if (border_width * 2 > mWidth)
-	{
-		border_scale = llmin(border_scale, (F32)mWidth / ((F32)border_width * 2.f));
-	}
 
 	// scale screen size of borders down
 	//RN: for now, text on hud objects is never occluded
@@ -215,7 +200,7 @@ void LLHUDText::renderText()
 			y_offset -= fontp->getLineHeight() - 1; // correction factor to match legacy font metrics
 
 			U8 style = segment_iter->mStyle;
-			LLFontGL::ShadowType shadow = LLFontGL::DROP_SHADOW;
+			LLFontGL::ShadowType shadow = LLFontGL::NO_SHADOW;
 	
 			F32 x_offset;
 			if (mTextAlignment== ALIGN_TEXT_CENTER)
@@ -470,16 +455,16 @@ void LLHUDText::updateVisibility()
 	}
 
 	mVisible = TRUE;
-	sVisibleTextObjects.push_back(LLPointer<LLHUDText> (this));
+	sVisibleTextObjects.emplace_back(this);
 }
 
-LLVector2 LLHUDText::updateScreenPos(LLVector2 &offset)
+LLVector2 LLHUDText::updateScreenPos(const LLVector2 &offset)
 {
 	LLCoordGL screen_pos;
 	LLVector2 screen_pos_vec;
-	LLVector3 x_pixel_vec;
-	LLVector3 y_pixel_vec;
-	LLViewerCamera::getInstance()->getPixelVectors(mPositionAgent, y_pixel_vec, x_pixel_vec);
+//	LLVector3 x_pixel_vec;
+//	LLVector3 y_pixel_vec;
+//	LLViewerCamera::getInstance()->getPixelVectors(mPositionAgent, y_pixel_vec, x_pixel_vec);
 //	LLVector3 world_pos = mPositionAgent + (offset.mV[VX] * x_pixel_vec) + (offset.mV[VY] * y_pixel_vec);
 //	if (!LLViewerCamera::getInstance()->projectPosAgentToScreen(world_pos, screen_pos, FALSE) && mVisibleOffScreen)
 //	{
@@ -664,17 +649,18 @@ void LLHUDText::reshape()
 
 F32 LLHUDText::LLHUDTextSegment::getWidth(const LLFontGL* font)
 {
-	std::map<const LLFontGL*, F32>::iterator iter = mFontWidthMap.find(font);
-	if (iter != mFontWidthMap.end())
+	// Singu note: Reworked hotspot. Less indirection
+	if (mFontWidthMap[0].first == font)
 	{
-		return iter->second;
+		return mFontWidthMap[0].second;
 	}
-	else
+	else if (mFontWidthMap[1].first == font)
 	{
-		F32 width = font->getWidthF32(mText.c_str());
-		mFontWidthMap[font] = width;
-		return width;
+		return mFontWidthMap[1].second;
 	}
+	F32 width = font->getWidthF32(mText.c_str());
+	mFontWidthMap[mFontWidthMap[0].first != nullptr] = std::make_pair(font, width);
+	return width;
 }
 
 // [RLVa:KB] - Checked: RLVa-2.0.3
