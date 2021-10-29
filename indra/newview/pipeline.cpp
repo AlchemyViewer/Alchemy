@@ -6109,7 +6109,7 @@ void LLPipeline::setupAvatarLights(bool for_edit)
 {
 	assertInitialized();
 
-    LLEnvironment& environment = LLEnvironment::instance();
+    LLEnvironment& environment = LLEnvironment::instanceFast();
     bool sun_up = environment.getIsSunUp();
 
 
@@ -6398,7 +6398,7 @@ void LLPipeline::setupHWLights(LLDrawPool* pool)
 {
 	assertInitialized();
 	
-    LLEnvironment& environment = LLEnvironment::instance();
+    LLEnvironment& environment = LLEnvironment::instanceFast();
 	const LLSettingsSky::ptr_t& psky = environment.getCurrentSky();
 
 	if (!LLGLSLShader::sNoFixedFunction)
@@ -8759,8 +8759,7 @@ void LLPipeline::bindDeferredShader(LLGLSLShader& shader, LLRenderTarget* light_
     shader.uniform4fv(LLShaderMgr::SUNLIGHT_COLOR, 1, mSunDiffuse.mV);
     shader.uniform4fv(LLShaderMgr::MOONLIGHT_COLOR, 1, mMoonDiffuse.mV);
 
-    LLEnvironment& environment = LLEnvironment::instance();
-	const LLSettingsSky::ptr_t& sky = environment.getCurrentSky();
+	const LLSettingsSky::ptr_t& sky = LLEnvironment::getInstanceFast()->getCurrentSky();
 
     static_cast<LLSettingsVOSky*>(sky.get())->updateShader(&shader);
 }
@@ -8977,7 +8976,7 @@ void LLPipeline::renderDeferredLighting(LLRenderTarget *screen_target)
                 gGL.getTexUnit(channel)->setTextureColorSpace(LLTexUnit::TCS_SRGB);
             }
 
-            LLEnvironment &environment = LLEnvironment::instance();
+            LLEnvironment &environment = LLEnvironment::instanceFast();
             soften_shader.uniform1i(LLShaderMgr::SUN_UP_FACTOR, environment.getIsSunUp() ? 1 : 0);
             soften_shader.uniform4fv(LLShaderMgr::LIGHTNORM, 1, environment.getClampedLightNorm().mV);
 
@@ -9756,7 +9755,7 @@ void LLPipeline::generateWaterReflection(LLCamera& camera_in)
             {
                 LLPipeline::sDistortionRender = true;
 
-                LLColor3 col = LLEnvironment::instance().getCurrentWater()->getWaterFogColor();
+                LLColor3 col = LLEnvironment::getInstanceFast()->getCurrentWater()->getWaterFogColor();
                 glClearColor(col.mV[0], col.mV[1], col.mV[2], 0.f);
 
                 LLViewerCamera::sCurCameraID = LLViewerCamera::CAMERA_WATER1;
@@ -9979,7 +9978,7 @@ void LLPipeline::renderShadow(glh::matrix4f& view, glh::matrix4f& proj, LLCamera
 	
 	stop_glerror();
 	
-    LLEnvironment& environment = LLEnvironment::instance();
+	LLEnvironment& environment = LLEnvironment::instanceFast();
 
 	LLVertexBuffer::unbind();
 
@@ -10442,7 +10441,7 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
 
 	gGL.setColorMask(false, false);
 
-    LLEnvironment& environment = LLEnvironment::instance();
+    LLEnvironment& environment = LLEnvironment::instanceFast();
 
 	//get sun view matrix
 	

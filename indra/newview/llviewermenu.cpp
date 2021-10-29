@@ -9094,10 +9094,10 @@ class LLWorldEnableEnvSettings : public view_listener_t
 
         if (event_name == "pause_clouds")
 		{
-            return LLEnvironment::instance().isCloudScrollPaused();
+            return LLEnvironment::instanceFast().isCloudScrollPaused();
 		}
 
-        LLSettingsSky::ptr_t sky = LLEnvironment::instance().getEnvironmentFixedSky(LLEnvironment::ENV_LOCAL);
+        LLSettingsSky::ptr_t sky = LLEnvironment::instanceFast().getEnvironmentFixedSky(LLEnvironment::ENV_LOCAL);
 
 		if (!sky)
 		{

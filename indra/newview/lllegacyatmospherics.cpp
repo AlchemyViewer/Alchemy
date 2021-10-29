@@ -204,7 +204,7 @@ void LLAtmospherics::init()
 
 LLColor4 LLAtmospherics::calcSkyColorInDir(AtmosphericsVars& vars, const LLVector3 &dir, bool isShiny)
 {
-	const LLSettingsSky::ptr_t& psky = LLEnvironment::instance().getCurrentSky();
+	const LLSettingsSky::ptr_t& psky = LLEnvironment::instanceFast().getCurrentSky();
     return calcSkyColorInDir(psky, vars, dir, isShiny);
 }
 
@@ -434,7 +434,7 @@ void LLAtmospherics::updateFog(const F32 distance, const LLVector3& tosun_in)
 	// Sky colors, just slightly above the horizon in the direction of the sun, perpendicular to the sun, and at a 45 degree angle to the sun.
     AtmosphericsVars vars;
 
-	LLEnvironment& env = LLEnvironment::instance();
+	LLEnvironment& env = LLEnvironment::instanceFast();
 
 	const LLSettingsSky::ptr_t& psky = env.getCurrentSky();
 

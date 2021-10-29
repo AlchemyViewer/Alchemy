@@ -705,12 +705,12 @@ void LLSettingsVOSky::applySpecial(void *ptarget, bool force)
 
     if (shader->mShaderGroup == LLGLSLShader::SG_DEFAULT)
     {
-        shader->uniform4fv(LLViewerShaderMgr::LIGHTNORM, 1, LLEnvironment::instance().getClampedLightNorm().mV);
-        shader->uniform3fv(LLShaderMgr::WL_CAMPOSLOCAL, 1, LLViewerCamera::getInstance()->getOrigin().mV);
+        shader->uniform4fv(LLViewerShaderMgr::LIGHTNORM, 1, LLEnvironment::getInstanceFast()->getClampedLightNorm().mV);
+        shader->uniform3fv(LLShaderMgr::WL_CAMPOSLOCAL, 1, LLViewerCamera::getInstanceFast()->getOrigin().mV);
     }
     else if (shader->mShaderGroup == LLGLSLShader::SG_SKY)
     {
-        auto& env = LLEnvironment::instance();
+        auto& env = LLEnvironment::instanceFast();
 
         shader->uniform4fv(LLViewerShaderMgr::LIGHTNORM, 1, env.getClampedLightNorm().mV);
 
@@ -956,13 +956,13 @@ void LLSettingsVOWater::applySpecial(void *ptarget, bool force)
 
         shader->uniform4fv(LLShaderMgr::WATER_WATERPLANE, 1, enorm.getF32ptr());
 
-        LLVector4 light_direction = LLEnvironment::instance().getClampedLightNorm();
+        LLVector4 light_direction = LLEnvironment::getInstanceFast()->getClampedLightNorm();
 
         F32 waterFogKS = 1.f / llmax(light_direction.mV[2], WATER_FOG_LIGHT_CLAMP);
 
         shader->uniform1f(LLShaderMgr::WATER_FOGKS, waterFogKS);
 
-        F32 eyedepth = LLViewerCamera::getInstance()->getOrigin().mV[2] - water_height;
+        F32 eyedepth = LLViewerCamera::getInstanceFast()->getOrigin().mV[2] - water_height;
         bool underwater = (eyedepth <= 0.0f);
 
         F32 waterFogDensity = getModifiedWaterFogDensityFast(mCachedWaterFogDensity, mCachedFogMod, underwater);

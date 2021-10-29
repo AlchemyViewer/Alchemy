@@ -209,7 +209,7 @@ BOOL LLVOWLSky::updateGeometry(LLDrawable * drawable)
 
 		mStripsVerts.resize(strips_segments, NULL);
 
-		const F32 dome_radius = LLEnvironment::instance().getCurrentSky()->getDomeRadius();
+		const F32 dome_radius = LLEnvironment::getInstanceFast()->getCurrentSky()->getDomeRadius();
 
 		for (U32 i = 0; i < strips_segments ;++i)
 		{
@@ -321,7 +321,7 @@ void LLVOWLSky::drawDome(void)
 
 void LLVOWLSky::initStars()
 {
-    const F32 DISTANCE_TO_STARS = LLEnvironment::instance().getCurrentSky()->getDomeRadius();
+    const F32 DISTANCE_TO_STARS = LLEnvironment::instanceFast().getCurrentSky()->getDomeRadius();
 
 	// Initialize star map
 	mStarVertices.resize(getStarsNumVerts());

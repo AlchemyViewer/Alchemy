@@ -686,7 +686,7 @@ void display(BOOL rebuild, F32 zoom_factor, int subfield, BOOL for_snapshot)
 		{
 			LL_RECORD_BLOCK_TIME(FTM_EEP_UPDATE);
             // update all the sky/atmospheric/water settings
-            LLEnvironment::instance().update(&vwrCamera);
+            LLEnvironment::getInstanceFast()->update(&vwrCamera);
 		}
 
 		// *TODO: merge these two methods
@@ -972,7 +972,7 @@ void display(BOOL rebuild, F32 zoom_factor, int subfield, BOOL for_snapshot)
             gPipeline.mScreen.bindTarget();
             if (LLPipeline::sUnderWaterRender && !gPipeline.canUseWindLightShaders())
             {
-                const LLColor3 col = LLEnvironment::instance().getCurrentWater()->getWaterFogColor();
+                const LLColor3 col = LLEnvironment::getInstanceFast()->getCurrentWater()->getWaterFogColor();
                 glClearColor(col.mV[0], col.mV[1], col.mV[2], 0.f);
             }
             gPipeline.mScreen.clear();
