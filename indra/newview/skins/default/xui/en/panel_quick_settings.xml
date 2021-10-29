@@ -131,7 +131,7 @@
    left="93"
    right="-68"
    name="max_avatar_slider_bar"
-   control_name="RenderAvatarMaxVisible"/>
+   control_name="RenderAvatarMaxNonImpostors"/>
   <spinner
    top_pad="-21"
    height="20"
@@ -145,7 +145,7 @@
    width="55"
    increment="1"
    name="max_avatar_spinner"
-   control_name="RenderAvatarMaxVisible" />
+   control_name="RenderAvatarMaxNonImpostors" />
   <text
    follows="left|top"
    height="15"
