@@ -1338,7 +1338,7 @@ BOOL LLVOAvatarSelf::detachAttachmentIntoInventory(const LLUUID &item_id)
 		LLViewerObject *found_obj = gObjectList.findObject(item_id);
 		if (found_obj)
 		{
-			LLSelectMgr::getInstance()->remove(found_obj);
+			LLSelectMgr::getInstanceFast()->remove(found_obj);
 		}
 
 		// Error checking in case this object was attached to an invalid point
@@ -2851,16 +2851,16 @@ void LLVOAvatarSelf::setHoverOffset(const LLVector3& hover_offset, bool send_upd
 //------------------------------------------------------------------------
 BOOL LLVOAvatarSelf::needsRenderBeam()
 {
-	LLTool *tool = LLToolMgr::getInstance()->getCurrentTool();
+	LLTool *tool = LLToolMgr::getInstanceFast()->getCurrentTool();
 
-	BOOL is_touching_or_grabbing = (tool == LLToolGrab::getInstance() && LLToolGrab::getInstance()->isEditing());
-	if (LLToolGrab::getInstance()->getEditingObject() && 
-		LLToolGrab::getInstance()->getEditingObject()->isAttachment())
+	BOOL is_touching_or_grabbing = (tool == LLToolGrab::getInstanceFast() && LLToolGrab::getInstanceFast()->isEditing());
+	if (LLToolGrab::getInstanceFast()->getEditingObject() &&
+		LLToolGrab::getInstanceFast()->getEditingObject()->isAttachment())
 	{
 		// don't render selection beam on hud objects
 		is_touching_or_grabbing = FALSE;
 	}
-	return is_touching_or_grabbing || (getAttachmentState() & AGENT_STATE_EDITING && LLSelectMgr::getInstance()->shouldShowSelection());
+	return is_touching_or_grabbing || (getAttachmentState() & AGENT_STATE_EDITING && LLSelectMgr::getInstanceFast()->shouldShowSelection());
 }
 
 // static

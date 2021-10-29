@@ -455,7 +455,7 @@ U32 LLVOVolume::processUpdateMessage(LLMessageSystem *mesgsys,
 
 				if(LLVOCache::instanceExists() && getRegion())
 				{
-					LLVOCache::getInstance()->removeEntry(getRegion()->getHandle()) ;
+					LLVOCache::getInstanceFast()->removeEntry(getRegion()->getHandle()) ;
 				}
 				
 				LL_WARNS() << "Bogus TE data in " << getID() << LL_ENDL;
@@ -2336,7 +2336,7 @@ S32 LLVOVolume::setTEMaterialID(const U8 te, const LLMaterialID& pMaterialID)
 #endif
 	if (res)
 	{
-		LLMaterialMgr::instance().getTE(getRegion()->getRegionID(), pMaterialID, te, boost::bind(&LLVOVolume::setTEMaterialParamsCallbackTE, getID(), _1, _2, _3));
+		LLMaterialMgr::instanceFast().getTE(getRegion()->getRegionID(), pMaterialID, te, boost::bind(&LLVOVolume::setTEMaterialParamsCallbackTE, getID(), _1, _2, _3));
 
 		setChanged(ALL_CHANGED);
 		if (!mDrawable.isNull())
@@ -5211,7 +5211,7 @@ void LLVolumeGeometryManager::registerFace(LLSpatialGroup* group, LLFace* facep,
 // [RLVa:KB] - Checked: 2010-11-29 (RLVa-1.3.0c) | Modified: RLVa-1.3.0c
 	const LLViewerObject* pObj = facep->getViewerObject();
 	bool selected = pObj->isSelected();
-	if ( (pObj->isSelected() && LLSelectMgr::getInstance()->mHideSelectedObjects) &&
+	if ( (pObj->isSelected() && LLSelectMgr::getInstanceFast()->mHideSelectedObjects) &&
 		 ( (!RlvActions::isRlvEnabled()) ||
 		   ( ((!pObj->isHUDAttachment()) || (!gRlvAttachmentLocks.isLockedAttachment(pObj->getRootEdit()))) &&
 		     (RlvActions::canEdit(pObj)) ) ) )

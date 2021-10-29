@@ -736,7 +736,7 @@ void LLViewerRegion::loadObjectCache()
 
 	if(LLVOCache::instanceExists())
 	{
-		LLVOCache::getInstance()->readFromCache(mHandle, mImpl->mCacheID, mImpl->mCacheMap) ;
+		LLVOCache::getInstanceFast()->readFromCache(mHandle, mImpl->mCacheID, mImpl->mCacheMap) ;
 		if (mImpl->mCacheMap.empty())
 		{
 			mCacheDirty = TRUE;
@@ -762,7 +762,7 @@ void LLViewerRegion::saveObjectCache()
 		const F32 start_time_threshold = 600.0f; //seconds
 		bool removal_enabled = sVOCacheCullingEnabled && (mRegionTimer.getElapsedTimeF32() > start_time_threshold); //allow to remove invalid objects from object cache file.
 		
-		LLVOCache::getInstance()->writeToCache(mHandle, mImpl->mCacheID, mImpl->mCacheMap, mCacheDirty, removal_enabled) ;
+		LLVOCache::getInstanceFast()->writeToCache(mHandle, mImpl->mCacheID, mImpl->mCacheMap, mCacheDirty, removal_enabled) ;
 		mCacheDirty = FALSE;
 	}
 

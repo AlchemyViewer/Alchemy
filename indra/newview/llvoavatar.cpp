@@ -2593,8 +2593,8 @@ void LLVOAvatar::idleUpdate(LLAgent &agent, const F64 &time)
 	BOOL detailed_update = updateCharacter(agent);
 
 	static LLUICachedControl<bool> visualizers_in_calls("ShowVoiceVisualizersInCalls", false);
-	bool voice_enabled = (visualizers_in_calls || LLVoiceClient::getInstance()->inProximalChannel()) &&
-						 LLVoiceClient::getInstance()->getVoiceEnabled(mID);
+	bool voice_enabled = (visualizers_in_calls || LLVoiceClient::getInstanceFast()->inProximalChannel()) &&
+						 LLVoiceClient::getInstanceFast()->getVoiceEnabled(mID);
 
 	idleUpdateVoiceVisualizer( voice_enabled );
 	idleUpdateMisc( detailed_update );
@@ -2700,7 +2700,7 @@ void LLVOAvatar::idleUpdateVoiceVisualizer(bool voice_enabled)
 		// Notice the calls to "gAwayTimer.reset()". This resets the timer that determines how long the avatar has been
 		// "away", so that the avatar doesn't lapse into away-mode (and slump over) while the user is still talking. 
 		//-----------------------------------------------------------------------------------------------------------------
-		if (LLVoiceClient::getInstance()->getIsSpeaking( mID ))
+		if (LLVoiceClient::getInstanceFast()->getIsSpeaking( mID ))
 		{		
 			if (!mVoiceVisualizer->getCurrentlySpeaking())
 			{
@@ -2709,7 +2709,7 @@ void LLVOAvatar::idleUpdateVoiceVisualizer(bool voice_enabled)
 				//printf( "gAwayTimer.reset();\n" );
 			}
 			
-			mVoiceVisualizer->setSpeakingAmplitude( LLVoiceClient::getInstance()->getCurrentPower( mID ) );
+			mVoiceVisualizer->setSpeakingAmplitude( LLVoiceClient::getInstanceFast()->getCurrentPower( mID ) );
 			
 			if( isSelf() )
 			{
@@ -2772,7 +2772,7 @@ void LLVOAvatar::idleUpdateMisc(bool detailed_update)
 	if (detailed_update)
 	{
 		LL_RECORD_BLOCK_TIME(FTM_ATTACHMENT_UPDATE);
-		auto& selectMgr = LLSelectMgr::instance();
+		auto& selectMgr = LLSelectMgr::instanceFast();
 		for (const auto& attach_point_pair : mAttachmentPoints)
 		{
 			LLViewerJointAttachment* attachment = attach_point_pair.second;
@@ -2953,7 +2953,7 @@ F32 LLVOAvatar::calcMorphAmount()
 void LLVOAvatar::idleUpdateLipSync(bool voice_enabled)
 {
 	// Use the Lipsync_Ooh and Lipsync_Aah morphs for lip sync
-	auto& voiceClient = LLVoiceClient::instance();
+	auto& voiceClient = LLVoiceClient::instanceFast();
     if ( voice_enabled
         && mLastRezzedStatus > 0 // no point updating lip-sync for clouds
         && (voiceClient.lipSyncEnabled())
@@ -2999,9 +2999,9 @@ void LLVOAvatar::idleUpdateLoadingEffect()
 				if (isSelf())
 				{
 					LL_INFOS("Avatar") << avString() << "self isFullyLoaded, mFirstFullyVisible" << LL_ENDL;
-					LLAppearanceMgr::instance().onFirstFullyVisible();
+					LLAppearanceMgr::instanceFast().onFirstFullyVisible();
 
-					ALAOEngine::instance().onLoginComplete();
+					ALAOEngine::instanceFast().onLoginComplete();
 				}
 				else
 				{
@@ -3650,7 +3650,7 @@ void LLVOAvatar::idleUpdateBelowWater()
 	BOOL was_below_water = mBelowWater;
 	mBelowWater = avatar_height < water_height;
 	if (isSelf() && mBelowWater != was_below_water)
-        ALAOEngine::instance().checkBelowWater(mBelowWater);
+        ALAOEngine::instanceFast().checkBelowWater(mBelowWater);
 }
 
 void LLVOAvatar::slamPosition()
@@ -3719,7 +3719,7 @@ bool LLVOAvatar::isInMuteList() const
 	}
 	else
 	{
-		muted = LLMuteList::getInstance()->isMuted(getID());
+		muted = LLMuteList::getInstanceFast()->isMuted(getID());
 
 		const F64 SECONDS_BETWEEN_MUTE_UPDATES = 1;
 		mCachedMuteListUpdateTime = now + SECONDS_BETWEEN_MUTE_UPDATES;
@@ -3787,7 +3787,7 @@ void LLVOAvatar::updateAppearanceMessageDebugText()
 										  1, central_bake_version);
 		std::string origin_string = bakedTextureOriginInfo();
 		debug_line += " [" + origin_string + "]";
-		S32 curr_cof_version = LLAppearanceMgr::instance().getCOFVersion();
+		S32 curr_cof_version = LLAppearanceMgr::instanceFast().getCOFVersion();
 		S32 last_request_cof_version = mLastUpdateRequestCOFVersion;
 		S32 last_received_cof_version = mLastUpdateReceivedCOFVersion;
 		if (isSelf())
@@ -4111,8 +4111,8 @@ void LLVOAvatar::updateFootstepSounds()
 
 			LLVector3d foot_pos_global = gAgent.getPosGlobalFromAgent(foot_pos_agent);
 
-			if (LLViewerParcelMgr::getInstance()->canHearSound(foot_pos_global)
-				&& !LLMuteList::getInstance()->isMuted(getID(), LLMute::flagObjectSounds))
+			if (LLViewerParcelMgr::getInstanceFast()->canHearSound(foot_pos_global)
+				&& !LLMuteList::getInstanceFast()->isMuted(getID(), LLMute::flagObjectSounds))
 			{
 				gAudiop->triggerSound(step_sound_id, getID(), STEP_VOLUME, LLAudioEngine::AUDIO_TYPE_AMBIENT, foot_pos_global);
 			}
@@ -4435,7 +4435,7 @@ void LLVOAvatar::updateRootPositionAndRotation(LLAgent& agent, F32 speed, bool w
         LLVector3 normal;
 		resolveHeightGlobal(root_pos, ground_under_pelvis, normal);
 		F32 foot_to_ground = (F32) (root_pos.mdV[VZ] - mPelvisToFoot - ground_under_pelvis.mdV[VZ]);				
-		BOOL in_air = ((!LLWorld::getInstance()->getRegionFromPosGlobal(ground_under_pelvis)) || 
+		BOOL in_air = ((!LLWorld::getInstanceFast()->getRegionFromPosGlobal(ground_under_pelvis)) ||
 						foot_to_ground > FOOT_GROUND_COLLISION_TOLERANCE);
 
 		if (in_air && !mInAir)
@@ -5806,7 +5806,7 @@ const std::string LLVOAvatar::getImageURL(const U8 te, const LLUUID &uuid)
 {
 	llassert(isIndexBakedTexture(ETextureIndex(te)));
 	std::string url = "";
-	const std::string& appearance_service_url = LLAppearanceMgr::instance().getAppearanceServiceURL();
+	const std::string& appearance_service_url = LLAppearanceMgr::instanceFast().getAppearanceServiceURL();
 	if (appearance_service_url.empty())
 	{
 		// Probably a server-side issue if we get here:
@@ -5840,7 +5840,7 @@ void LLVOAvatar::resolveHeightAgent(const LLVector3 &in_pos_agent, LLVector3 &ou
 void LLVOAvatar::resolveRayCollisionAgent(const LLVector3d start_pt, const LLVector3d end_pt, LLVector3d &out_pos, LLVector3 &out_norm)
 {
 	LLViewerObject *obj;
-	LLWorld::getInstance()->resolveStepHeightGlobal(this, start_pt, end_pt, out_pos, out_norm, &obj);
+	LLWorld::getInstanceFast()->resolveStepHeightGlobal(this, start_pt, end_pt, out_pos, out_norm, &obj);
 }
 
 void LLVOAvatar::resolveHeightGlobal(const LLVector3d &inPos, LLVector3d &outPos, LLVector3 &outNorm)
@@ -5849,7 +5849,7 @@ void LLVOAvatar::resolveHeightGlobal(const LLVector3d &inPos, LLVector3d &outPos
 	LLVector3d p0 = inPos + zVec;
 	LLVector3d p1 = inPos - zVec;
 	LLViewerObject *obj;
-	LLWorld::getInstance()->resolveStepHeightGlobal(this, p0, p1, outPos, outNorm, &obj);
+	LLWorld::getInstanceFast()->resolveStepHeightGlobal(this, p0, p1, outPos, outNorm, &obj);
 	if (!obj)
 	{
 		mStepOnLand = TRUE;
@@ -6013,8 +6013,8 @@ BOOL LLVOAvatar::processSingleAnimationStateChange( const LLUUID& anim_id, BOOL 
 			if (gAudiop)
 			{
 				LLVector3d char_pos_global = gAgent.getPosGlobalFromAgent(getCharacterPosition());
-				if (LLViewerParcelMgr::getInstance()->canHearSound(char_pos_global)
-				    && !LLMuteList::getInstance()->isMuted(getID(), LLMute::flagObjectSounds))
+				if (LLViewerParcelMgr::getInstanceFast()->canHearSound(char_pos_global)
+				    && !LLMuteList::getInstanceFast()->isMuted(getID(), LLMute::flagObjectSounds))
 				{
 					// RN: uncomment this to play on typing sound at fixed volume once sound engine is fixed
 					// to support both spatialized and non-spatialized instances of the same sound
@@ -6156,7 +6156,7 @@ BOOL LLVOAvatar::startMotion(const LLUUID& id, F32 time_offset)
 	LLUUID remap_id;
 	if(isSelf())
 	{
-        remap_id = ALAOEngine::getInstance()->override(id, true);
+        remap_id = ALAOEngine::getInstanceFast()->override(id, true);
 		if(remap_id.isNull())
 		{
 			remap_id = remapMotionID(id);
@@ -6203,7 +6203,7 @@ BOOL LLVOAvatar::stopMotion(const LLUUID& id, BOOL stop_immediate)
 	LLUUID remap_id;
 	if(isSelf())
 	{
-        remap_id = ALAOEngine::getInstance()->override(id, false);
+        remap_id = ALAOEngine::getInstanceFast()->override(id, false);
 		if (remap_id.isNull())
 		{
 			remap_id = remapMotionID(id);
@@ -6945,7 +6945,7 @@ void LLVOAvatar::getGround(const LLVector3 &in_pos_agent, LLVector3 &out_pos_age
 	p1_global = gAgent.getPosGlobalFromAgent(in_pos_agent) - z_vec;
 	LLViewerObject *obj;
 	LLVector3d out_pos_global;
-	LLWorld::getInstance()->resolveStepHeightGlobal(this, p0_global, p1_global, out_pos_global, outNorm, &obj);
+	LLWorld::getInstanceFast()->resolveStepHeightGlobal(this, p0_global, p1_global, out_pos_global, outNorm, &obj);
 	out_pos_agent = gAgent.getPosAgentFromGlobal(out_pos_global);
 }
 
@@ -7465,8 +7465,8 @@ const LLViewerJointAttachment *LLVOAvatar::attachObject(LLViewerObject *viewer_o
 
 	if (viewer_object->isSelected())
 	{
-		LLSelectMgr::getInstance()->updateSelectionCenter();
-		LLSelectMgr::getInstance()->updatePointAt();
+		LLSelectMgr::getInstanceFast()->updateSelectionCenter();
+		LLSelectMgr::getInstanceFast()->updatePointAt();
 	}
 
 	viewer_object->refreshBakeTexture();
@@ -7730,9 +7730,9 @@ void LLVOAvatar::sitOnObject(LLViewerObject *sit_object)
 			gAgentCamera.changeCameraToMouselook();
 		}
 
-        if (gAgentCamera.getFocusOnAvatar() && LLToolMgr::getInstance()->inEdit())
+        if (gAgentCamera.getFocusOnAvatar() && LLToolMgr::getInstanceFast()->inEdit())
         {
-            LLSelectNode* node = LLSelectMgr::getInstance()->getSelection()->getFirstRootNode();
+            LLSelectNode* node = LLSelectMgr::getInstanceFast()->getSelection()->getFirstRootNode();
             if (node && node->mValid)
             {
                 LLViewerObject* root_object = node->getObject();
@@ -7786,13 +7786,15 @@ void LLVOAvatar::getOffObject()
 	if (sit_object)
 	{
 		stopMotionFromSource(sit_object->getID());
-		LLFollowCamMgr::getInstance()->setCameraActive(sit_object->getID(), FALSE);
+
+		auto& followcam_mgr = LLFollowCamMgr::instanceFast();
+		followcam_mgr.setCameraActive(sit_object->getID(), FALSE);
 
 		LLViewerObject::const_child_list_t& child_list = sit_object->getChildren();
 		for (LLViewerObject* child_objectp : child_list)
 		{
 			stopMotionFromSource(child_objectp->getID());
-			LLFollowCamMgr::getInstance()->setCameraActive(child_objectp->getID(), FALSE);
+			followcam_mgr.setCameraActive(child_objectp->getID(), FALSE);
 		}
 	}
 
@@ -8201,7 +8203,7 @@ void LLVOAvatar::logMetricsTimerRecord(const std::string& phase_name, F32 elapse
 	record["elapsed"] = elapsed;
 	record["completed"] = completed;
 	U32 grid_x(0), grid_y(0);
-	if (!isDead() && getRegion() && LLWorld::instance().isRegionListed(getRegion()))
+	if (!isDead() && getRegion() && LLWorld::instanceFast().isRegionListed(getRegion()))
 	{
 		record["central_bake_version"] = LLSD::Integer(getRegion()->getCentralBakeVersion());
 		grid_from_region_handle(getRegion()->getHandle(), &grid_x, &grid_y);

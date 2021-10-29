@@ -5425,7 +5425,7 @@ void LLSelectMgr::processObjectProperties(LLMessageSystem* msg, void** user_data
 				return (node->getObject() && node->getObject()->mID == mID);
 			}
 		} func(id);
-		LLSelectNode* node = LLSelectMgr::getInstance()->getSelection()->getFirstNode(&func);
+		LLSelectNode* node = LLSelectMgr::getInstanceFast()->getSelection()->getFirstNode(&func);
 
 		if (!node)
 		{
@@ -5567,7 +5567,7 @@ void LLSelectMgr::processObjectPropertiesFamily(LLMessageSystem* msg, void** use
 			return (node->getObject() && node->getObject()->mID == mID);
 		}
 	} func(id);
-	LLSelectNode* node = LLSelectMgr::getInstance()->mHoverObjects->getFirstNode(&func);
+	LLSelectNode* node = LLSelectMgr::getInstanceFast()->mHoverObjects->getFirstNode(&func);
 
 	if (node)
 	{

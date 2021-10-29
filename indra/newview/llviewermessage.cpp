@@ -476,7 +476,7 @@ void process_logout_reply(LLMessageSystem* msg, void**)
 
 void process_layer_data(LLMessageSystem *mesgsys, void **user_data)
 {
-	LLViewerRegion *regionp = LLWorld::getInstance()->getRegion(mesgsys->getSender());
+	LLViewerRegion *regionp = LLWorld::getInstanceFast()->getRegion(mesgsys->getSender());
 
 	LL_DEBUGS_ONCE("SceneLoadTiming") << "Received layer data" << LL_ENDL;
 
@@ -4454,7 +4454,7 @@ void process_object_animation(LLMessageSystem *mesgsys, void **user_data)
                                     << uuid << " animation id " << animation_id << LL_ENDL;
 #endif
     }
-    LLObjectSignaledAnimationMap::instance().getMap()[uuid] = signaled_anims;
+    LLObjectSignaledAnimationMap::instanceFast().getMap()[uuid] = signaled_anims;
     
     LLViewerObject *objp = gObjectList.findObject(uuid);
     if (!objp)

@@ -260,7 +260,7 @@ void LLNetMap::draw()
 			gGL.rotatef( rotation * RAD_TO_DEG, 0.f, 0.f, 1.f);
 		}
 
-		auto& worldInst = LLWorld::instance();
+		auto& worldInst = LLWorld::instanceFast();
 
 		// figure out where agent is
 		S32 region_width = ll_round(worldInst.getRegionWidthInMeters());

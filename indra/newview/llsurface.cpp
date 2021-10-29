@@ -172,7 +172,7 @@ void LLSurface::create(const S32 grids_per_edge,
 
 	mOriginGlobal.setVec(origin_global);
 
-	mPVArray.create(mGridsPerEdge, mGridsPerPatchEdge, LLWorld::getInstance()->getRegionScale());
+	mPVArray.create(mGridsPerEdge, mGridsPerPatchEdge, LLWorld::getInstanceFast()->getRegionScale());
 
 	S32 number_of_grids = mGridsPerEdge * mGridsPerEdge;
 
@@ -1188,7 +1188,7 @@ void LLSurface::setWaterHeight(F32 height)
 		mWaterObjp->setPositionRegion(water_pos_region);
 		if (changed)
 		{
-			LLWorld::getInstance()->updateWaterObjects();
+			LLWorld::getInstanceFast()->updateWaterObjects();
 		}
 	}
 	else

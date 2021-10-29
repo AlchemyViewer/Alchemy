@@ -191,7 +191,7 @@ void LLToolGun::draw()
 		myRotation.set(-myRotation.mQ[VX], -myRotation.mQ[VY], -myRotation.mQ[VZ], myRotation.mQ[VW]);
 
 		LLWorld::pos_map_t positions;
-		LLWorld::getInstance()->getAvatars(&positions, gAgent.getPositionGlobal(), iff_range);
+		LLWorld::getInstanceFast()->getAvatars(&positions, gAgent.getPositionGlobal(), iff_range);
 		for (const auto& position : positions)
 		{
 			const auto& id = position.first;

@@ -567,7 +567,7 @@ void LLControlAvatar::updateAnimations()
     getAnimatedVolumes(volumes);
     
     // Rebuild mSignaledAnimations from the associated volumes.
-    auto& signaled_anim_map = LLObjectSignaledAnimationMap::instance().getMap();
+    auto& signaled_anim_map = LLObjectSignaledAnimationMap::instanceFast().getMap();
 
 	std::map<LLUUID, S32> anims;
     for (LLVOVolume* volp : volumes)

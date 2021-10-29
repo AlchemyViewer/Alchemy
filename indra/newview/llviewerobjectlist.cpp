@@ -287,11 +287,11 @@ void LLViewerObjectList::processUpdateCore(LLViewerObject* objectp,
 		&& update_type != OUT_TERSE_IMPROVED 
 		&& objectp->mCreateSelected)
 	{
-		if ( LLToolMgr::getInstance()->getCurrentTool() != LLToolPie::getInstance() )
+		if ( LLToolMgr::getInstanceFast()->getCurrentTool() != LLToolPie::getInstanceFast() )
 		{
 			// LL_INFOS() << "DEBUG selecting " << objectp->mID << " " 
 			// << objectp->mLocalID << LL_ENDL;
-			LLSelectMgr::getInstance()->selectObjectAndFamily(objectp);
+			LLSelectMgr::getInstanceFast()->selectObjectAndFamily(objectp);
 			dialog_refresh_all();
 		}
 
@@ -316,7 +316,7 @@ LLViewerObject* LLViewerObjectList::processObjectUpdateFromCache(LLVOCacheEntry*
 	U32			    local_id;
 	LLPCode		    pcode = 0;
 	LLUUID		    fullid;
-	LLViewerStatsRecorder& recorder = LLViewerStatsRecorder::instance();
+	LLViewerStatsRecorder& recorder = LLViewerStatsRecorder::instanceFast();
 
 	// Cache Hit.
 	record(LLStatViewer::OBJECT_CACHE_HIT_RATE, LLUnits::Ratio::fromValue(1));
@@ -457,7 +457,7 @@ void LLViewerObjectList::processObjectUpdate(LLMessageSystem *mesgsys,
 	U64 region_handle;
 	mesgsys->getU64Fast(_PREHASH_RegionData, _PREHASH_RegionHandle, region_handle);
 	
-	LLViewerRegion *regionp = LLWorld::getInstance()->getRegionFromHandle(region_handle);
+	LLViewerRegion *regionp = LLWorld::getInstanceFast()->getRegionFromHandle(region_handle);
 
 	if (!regionp)
 	{
@@ -467,7 +467,7 @@ void LLViewerObjectList::processObjectUpdate(LLMessageSystem *mesgsys,
 
 	U8 compressed_dpbuffer[2048];
 	LLDataPackerBinaryBuffer compressed_dp(compressed_dpbuffer, 2048);
-	LLViewerStatsRecorder& recorder = LLViewerStatsRecorder::instance();
+	LLViewerStatsRecorder& recorder = LLViewerStatsRecorder::instanceFast();
 
 	for (i = 0; i < num_objects; i++)
 	{
@@ -733,14 +733,14 @@ void LLViewerObjectList::processCachedObjectUpdate(LLMessageSystem *mesgsys,
 
 	U64 region_handle;
 	mesgsys->getU64Fast(_PREHASH_RegionData, _PREHASH_RegionHandle, region_handle);	
-	LLViewerRegion *regionp = LLWorld::getInstance()->getRegionFromHandle(region_handle);
+	LLViewerRegion *regionp = LLWorld::getInstanceFast()->getRegionFromHandle(region_handle);
 	if (!regionp)
 	{
 		LL_WARNS() << "Object update from unknown region! " << region_handle << LL_ENDL;
 		return;
 	}
 
-	LLViewerStatsRecorder& recorder = LLViewerStatsRecorder::instance();
+	LLViewerStatsRecorder& recorder = LLViewerStatsRecorder::instanceFast();
 
 	for (S32 i = 0; i < num_objects; i++)
 	{
@@ -830,7 +830,9 @@ void LLViewerObjectList::updateApparentAngles(LLAgent &agent)
 	// Slam priorities for textures that we care about (hovered, selected, and focused)
 	// Hovered
 	// Assumes only one level deep of parenting
-	LLSelectNode* nodep = LLSelectMgr::instance().getHoverNode();
+	auto& select_mgr = LLSelectMgr::instanceFast();
+
+	LLSelectNode* nodep = select_mgr.getHoverNode();
 	if (nodep)
 	{
 		objectp = nodep->getObject();
@@ -856,7 +858,7 @@ void LLViewerObjectList::updateApparentAngles(LLAgent &agent)
 			return true;
 		}
 	} func;
-	LLSelectMgr::getInstance()->getSelection()->applyToRootObjects(&func);
+	select_mgr.getSelection()->applyToRootObjects(&func);
 
 	// Iterate through some of the objects and lazy update their texture priorities
 	for (i = mCurLazyUpdateIndex; i < max_value; i++)
@@ -1011,8 +1013,6 @@ void LLViewerObjectList::update(LLAgent &agent)
 		}
 	}
 
-
-
 	fetchObjectCosts();
 	fetchPhysicsFlags();
 
@@ -1023,7 +1023,7 @@ void LLViewerObjectList::update(LLAgent &agent)
 	// don't factor frames that were paused into the stats
 	if (! mWasPaused)
 	{
-		LLViewerStats::getInstance()->updateFrameStats(time_diff);
+		LLViewerStats::getInstanceFast()->updateFrameStats(time_diff);
 	}
 
 	/*
@@ -1727,7 +1727,7 @@ void LLViewerObjectList::shiftObjects(const LLVector3 &offset)
 
 	{
 		LL_RECORD_BLOCK_TIME(FTM_REGION_SHIFT);
-	LLWorld::getInstance()->shiftRegions(offset);
+	LLWorld::getInstanceFast()->shiftRegions(offset);
 }
 }
 
@@ -1905,7 +1905,7 @@ void LLViewerObjectList::generatePickList(LLCamera &camera)
 
 		std::vector<LLDrawable*> pick_drawables;
 
-		for (LLViewerRegion* region : LLWorld::getInstance()->getRegionList())
+		for (LLViewerRegion* region : LLWorld::getInstanceFast()->getRegionList())
 		{
 			for (U32 i = 0; i < LLViewerRegion::NUM_PARTITIONS; i++)
 			{
@@ -2324,12 +2324,12 @@ void LLViewerObjectList::findOrphans(LLViewerObject* objectp, U32 ip, U32 port)
 
 	if (orphans_found && objectp->isSelected())
 	{
-		LLSelectNode* nodep = LLSelectMgr::getInstance()->getSelection()->findNode(objectp);
+		LLSelectNode* nodep = LLSelectMgr::getInstanceFast()->getSelection()->findNode(objectp);
 		if (nodep && !nodep->mIndividualSelection)
 		{
 			// rebuild selection with orphans
-			LLSelectMgr::getInstance()->deselectObjectAndFamily(objectp);
-			LLSelectMgr::getInstance()->selectObjectAndFamily(objectp);
+			LLSelectMgr::getInstanceFast()->deselectObjectAndFamily(objectp);
+			LLSelectMgr::getInstanceFast()->selectObjectAndFamily(objectp);
 		}
 	}
 }

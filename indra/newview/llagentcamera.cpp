@@ -2036,7 +2036,7 @@ LLVector3d LLAgentCamera::calcCameraPositionTargetGlobal(BOOL *hit_limit)
 		camera_position_global = focusPosGlobal + mCameraFocusOffset;
 	}
 
-	auto& worldInst = LLWorld::instance();
+	auto& worldInst = LLWorld::instanceFast();
 
 	if (!ALControlCache::DisableCameraConstraints && !gAgent.isGodlike())
 	{
