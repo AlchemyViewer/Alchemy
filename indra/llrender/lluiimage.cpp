@@ -138,7 +138,7 @@ namespace LLInitParam
 			return;
 		}
 
-		LLUIImage* imagep =  LLRender2D::getInstance()->getUIImage(name());
+		LLUIImage* imagep =  LLRender2D::getInstanceFast()->getUIImage(name());
 		if (imagep)
 		{
 			updateValue(imagep);
