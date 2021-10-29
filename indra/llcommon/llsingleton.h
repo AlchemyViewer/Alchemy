@@ -301,6 +301,10 @@ private:
     };
     typedef llthread::LockStaticLL<SingletonData> LockStatic;
 
+protected:
+    inline static DERIVED_TYPE* sUnsafeInstance = nullptr;
+private:
+
     // Allow LLParamSingleton subclass -- but NOT DERIVED_TYPE itself -- to
     // access our private members.
     friend class LLParamSingleton<DERIVED_TYPE>;
@@ -347,6 +351,9 @@ private:
             // breaking cyclic dependencies
             lk->mInstance->initSingleton();
             lk->mInitState = INITIALIZED;
+
+            // Cache for fast unsafe access
+            sUnsafeInstance = lk->mInstance;
 
             // pop this off stack of initializing singletons
             pop_initializing(lk->mInstance);
@@ -416,6 +423,8 @@ protected:
         // deleteSingleton() to defend against manual deletion. When we moved
         // cleanup to deleteSingleton(), we hit crashes due to dangling
         // pointers in the MasterList.
+        sUnsafeInstance = nullptr;
+
         LockStatic lk;
         lk->mInstance  = nullptr;
         lk->mInitState = DELETED;
@@ -577,11 +586,28 @@ public:
         return instance;
     }
 
+    // Thread unsafe access
+    inline static DERIVED_TYPE* getInstanceFast()
+    {
+        if (!sUnsafeInstance)
+        {
+            // Dummy call to force populate
+            getInstance();
+        }
+        return sUnsafeInstance;
+    }
+
     // Reference version of getInstance()
     // Preferred over getInstance() as it disallows checking for nullptr
     static DERIVED_TYPE& instance()
     {
         return *getInstance();
+    }
+
+    // Thread unsafe access
+    inline static DERIVED_TYPE& instanceFast()
+    {
+        return *getInstanceFast();
     }
 
     // Has this singleton been created yet?
@@ -737,12 +763,27 @@ public:
         return nullptr;
     }
 
+    static DERIVED_TYPE* getInstanceFast()
+    {
+        if (!super::sUnsafeInstance)
+        {
+            // Dummy call to force populate
+            getInstance();
+        }
+        return super::sUnsafeInstance;
+    }
+
     // instance() is replicated here so it calls
     // LLParamSingleton::getInstance() rather than LLSingleton::getInstance()
     // -- avoid making getInstance() virtual
     static DERIVED_TYPE& instance()
     {
         return *getInstance();
+    }
+
+    static DERIVED_TYPE& instanceFast()
+    {
+        return *getInstanceFast();
     }
 };
 
