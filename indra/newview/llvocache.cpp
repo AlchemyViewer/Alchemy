@@ -426,7 +426,7 @@ F32 LLVOCacheEntry::getSquaredPixelThreshold(bool is_front)
 	}
 
 	//object projected area threshold
-	F32 pixel_meter_ratio = LLViewerCamera::getInstance()->getPixelMeterRatio();
+	F32 pixel_meter_ratio = LLViewerCamera::getInstanceFast()->getPixelMeterRatio();
 	F32 projection_threshold = pixel_meter_ratio > 0.f ? threshold / pixel_meter_ratio : 0.f;
 	projection_threshold *= projection_threshold;
 

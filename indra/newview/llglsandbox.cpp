@@ -103,8 +103,10 @@ void LLToolSelectRect::handleRectangleSelection(S32 x, S32 y, MASK mask)
 	top = ll_round((F32) top * LLUI::getScaleFactor().mV[VY]);
 	bottom = ll_round((F32) bottom * LLUI::getScaleFactor().mV[VY]);
 
-	F32 old_far_plane = LLViewerCamera::getInstance()->getFar();
-	F32 old_near_plane = LLViewerCamera::getInstance()->getNear();
+	LLViewerCamera* viewer_cam = LLViewerCamera::getInstanceFast();
+
+	F32 old_far_plane = viewer_cam->getFar();
+	F32 old_near_plane = viewer_cam->getNear();
 
 	S32 width = right - left + 1;
 	S32 height = top - bottom + 1;
@@ -142,15 +144,15 @@ void LLToolSelectRect::handleRectangleSelection(S32 x, S32 y, MASK mask)
 	{
 		// ...select distance from control
 		LLVector3 relative_av_pos = av_pos;
-		relative_av_pos -= LLViewerCamera::getInstance()->getOrigin();
+		relative_av_pos -= viewer_cam->getOrigin();
 
-		F32 new_far = relative_av_pos * LLViewerCamera::getInstance()->getAtAxis() + ALControlCache::MaxSelectDistance;
-		F32 new_near = relative_av_pos * LLViewerCamera::getInstance()->getAtAxis() - ALControlCache::MaxSelectDistance;
+		F32 new_far = relative_av_pos * viewer_cam->getAtAxis() + ALControlCache::MaxSelectDistance;
+		F32 new_near = relative_av_pos * viewer_cam->getAtAxis() - ALControlCache::MaxSelectDistance;
 
 		new_near = llmax(new_near, 0.1f);
 
-		LLViewerCamera::getInstance()->setFar(new_far);
-		LLViewerCamera::getInstance()->setNear(new_near);
+		viewer_cam->setFar(new_far);
+		viewer_cam->setNear(new_near);
 	}
 // [RLVa:KB] - Checked: 2010-04-11 (RLVa-1.2.0e) | Modified: RLVa-1.0.0g
 	if (gRlvHandler.hasBehaviour(RLV_BHVR_FARTOUCH))
@@ -160,22 +162,22 @@ void LLToolSelectRect::handleRectangleSelection(S32 x, S32 y, MASK mask)
 		// We'll allow drag selection under fartouch, but only within the fartouch range
 		// (just copy/paste the code above us to make that work, thank you Lindens!)
 		LLVector3 relative_av_pos = av_pos;
-		relative_av_pos -= LLViewerCamera::getInstance()->getOrigin();
+		relative_av_pos -= viewer_cam->getOrigin();
 
-		F32 new_far = relative_av_pos * LLViewerCamera::getInstance()->getAtAxis() + s_nFartouchDist;
-		F32 new_near = relative_av_pos * LLViewerCamera::getInstance()->getAtAxis() - s_nFartouchDist;
+		F32 new_far = relative_av_pos * viewer_cam->getAtAxis() + s_nFartouchDist;
+		F32 new_near = relative_av_pos * viewer_cam->getAtAxis() - s_nFartouchDist;
 
 		new_near = llmax(new_near, 0.1f);
 
-		LLViewerCamera::getInstance()->setFar(new_far);
-		LLViewerCamera::getInstance()->setNear(new_near);
+		viewer_cam->setFar(new_far);
+		viewer_cam->setNear(new_near);
 
 		// Usurp these two
 		limit_select_distance = TRUE;
 		select_dist_squared = s_nFartouchDist * s_nFartouchDist;
 	}
 // [/RLVa:KB]
-	LLViewerCamera::getInstance()->setPerspective(FOR_SELECTION, 
+	viewer_cam->setPerspective(FOR_SELECTION,
 							center_x-width/2, center_y-height/2, width, height, 
 							limit_select_distance);
 
@@ -190,17 +192,17 @@ void LLToolSelectRect::handleRectangleSelection(S32 x, S32 y, MASK mask)
 				{
 					return true;
 				}
-				S32 result = LLViewerCamera::getInstance()->sphereInFrustum(drawable->getPositionAgent(), drawable->getRadius());
+				S32 result = LLViewerCamera::getInstanceFast()->sphereInFrustum(drawable->getPositionAgent(), drawable->getRadius());
 				switch (result)
 				{
 				  case 0:
-					LLSelectMgr::getInstance()->unhighlightObjectOnly(vobjp);
+					LLSelectMgr::getInstanceFast()->unhighlightObjectOnly(vobjp);
 					break;
 				  case 1:
 					// check vertices
-					if (!LLViewerCamera::getInstance()->areVertsVisible(vobjp, LLSelectMgr::sRectSelectInclusive))
+					if (!LLViewerCamera::getInstanceFast()->areVertsVisible(vobjp, LLSelectMgr::sRectSelectInclusive))
 					{
-						LLSelectMgr::getInstance()->unhighlightObjectOnly(vobjp);
+						LLSelectMgr::getInstanceFast()->unhighlightObjectOnly(vobjp);
 					}
 					break;
 				  default:
@@ -209,21 +211,21 @@ void LLToolSelectRect::handleRectangleSelection(S32 x, S32 y, MASK mask)
 				return true;
 			}
 		} func;
-		LLSelectMgr::getInstance()->getHighlightedObjects()->applyToObjects(&func);
+		LLSelectMgr::getInstanceFast()->getHighlightedObjects()->applyToObjects(&func);
 	}
 
 	if (grow_selection)
 	{
 		std::vector<LLDrawable*> potentials;
 				
-		for (LLViewerRegion* region : LLWorld::getInstance()->getRegionList())
+		for (LLViewerRegion* region : LLWorld::getInstanceFast()->getRegionList())
 		{
 			for (U32 i = 0; i < LLViewerRegion::NUM_PARTITIONS; i++)
 			{
 				LLSpatialPartition* part = region->getSpatialPartition(i);
 				if (part)
 				{	
-					part->cull(*LLViewerCamera::getInstance(), &potentials, TRUE);
+					part->cull(*viewer_cam, &potentials, TRUE);
 				}
 			}
 		}
@@ -254,20 +256,20 @@ void LLToolSelectRect::handleRectangleSelection(S32 x, S32 y, MASK mask)
 			}
 // [/RLVa:KB]
 
-			S32 result = LLViewerCamera::getInstance()->sphereInFrustum(drawable->getPositionAgent(), drawable->getRadius());
+			S32 result = viewer_cam->sphereInFrustum(drawable->getPositionAgent(), drawable->getRadius());
 			if (result)
 			{
 				switch (result)
 				{
 				case 1:
 					// check vertices
-					if (LLViewerCamera::getInstance()->areVertsVisible(vobjp, LLSelectMgr::sRectSelectInclusive))
+					if (viewer_cam->areVertsVisible(vobjp, LLSelectMgr::sRectSelectInclusive))
 					{
-						LLSelectMgr::getInstance()->highlightObjectOnly(vobjp);
+						LLSelectMgr::getInstanceFast()->highlightObjectOnly(vobjp);
 					}
 					break;
 				case 2:
-					LLSelectMgr::getInstance()->highlightObjectOnly(vobjp);
+					LLSelectMgr::getInstanceFast()->highlightObjectOnly(vobjp);
 					break;
 				default:
 					break;
@@ -282,8 +284,8 @@ void LLToolSelectRect::handleRectangleSelection(S32 x, S32 y, MASK mask)
 	gGL.matrixMode(LLRender::MM_MODELVIEW);
 
 	// restore camera
-	LLViewerCamera::getInstance()->setFar(old_far_plane);
-	LLViewerCamera::getInstance()->setNear(old_near_plane);
+	LLViewerCamera::getInstanceFast()->setFar(old_far_plane);
+	LLViewerCamera::getInstanceFast()->setNear(old_near_plane);
 	gViewerWindow->setup3DRender();
 }
 

@@ -99,7 +99,7 @@ void LLHUDIcon::renderIcon(BOOL for_select)
 
 	// put icon above object, and in front
 	// RN: don't use drawable radius, it's fricking HUGE
-	LLViewerCamera* camera = LLViewerCamera::getInstance();
+	LLViewerCamera* camera = LLViewerCamera::getInstanceFast();
 	LLVector3 icon_relative_pos = (camera->getUpAxis() * ~mSourceObject->getRenderRotation());
 	icon_relative_pos.abs();
 
@@ -109,7 +109,7 @@ void LLHUDIcon::renderIcon(BOOL for_select)
 	F32 up_distance = 0.5f * distance_scale;
 	LLVector3 icon_position = obj_position + (up_distance * camera->getUpAxis()) * 1.2f;
 
-	LLVector3 icon_to_cam = LLViewerCamera::getInstance()->getOrigin() - icon_position;
+	LLVector3 icon_to_cam = camera->getOrigin() - icon_position;
 	icon_to_cam.normVec();
 
 	icon_position += icon_to_cam * mSourceObject->mDrawable->getRadius() * 1.1f;
@@ -218,7 +218,7 @@ BOOL LLHUDIcon::lineSegmentIntersect(const LLVector4a& start, const LLVector4a& 
 
 	// put icon above object, and in front
 	// RN: don't use drawable radius, it's fricking HUGE
-	LLViewerCamera* camera = LLViewerCamera::getInstance();
+	LLViewerCamera* camera = LLViewerCamera::getInstanceFast();
 	LLVector3 icon_relative_pos = (camera->getUpAxis() * ~mSourceObject->getRenderRotation());
 	icon_relative_pos.abs();
 
@@ -228,7 +228,7 @@ BOOL LLHUDIcon::lineSegmentIntersect(const LLVector4a& start, const LLVector4a& 
 	F32 up_distance = 0.5f * distance_scale;
 	LLVector3 icon_position = obj_position + (up_distance * camera->getUpAxis()) * 1.2f;
 
-	LLVector3 icon_to_cam = LLViewerCamera::getInstance()->getOrigin() - icon_position;
+	LLVector3 icon_to_cam = camera->getOrigin() - icon_position;
 	icon_to_cam.normVec();
 
 	icon_position += icon_to_cam * mSourceObject->mDrawable->getRadius() * 1.1f;

@@ -3854,7 +3854,7 @@ bool LLSpatialPartition::isHUDPartition()
 
 BOOL LLSpatialPartition::isVisible(const LLVector3& v)
 {
-	if (!LLViewerCamera::getInstance()->sphereInFrustum(v, 4.0f))
+	if (!LLViewerCamera::getInstanceFast()->sphereInFrustum(v, 4.0f))
 	{
 		return FALSE;
 	}

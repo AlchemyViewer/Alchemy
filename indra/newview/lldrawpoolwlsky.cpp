@@ -94,9 +94,9 @@ void LLDrawPoolWLSky::beginRenderPass( S32 pass )
 				&gObjectFullbrightNoColorWaterProgram :
 				&gCustomAlphaProgram;
 
-    auto& environment = LLEnvironment::instance();
+    auto& environment = LLEnvironment::instanceFast();
     mCamHeightLocal = environment.getCamHeight();
-    mCameraOrigin = LLViewerCamera::getInstance()->getOrigin();
+    mCameraOrigin = LLViewerCamera::getInstanceFast()->getOrigin();
     mCurrentSky = environment.getCurrentSky();
 }
 
@@ -130,9 +130,9 @@ void LLDrawPoolWLSky::beginDeferredPass(S32 pass)
 				&gObjectFullbrightNoColorWaterProgram :
 				&gDeferredStarProgram;
 
-    auto& environment = LLEnvironment::instance();
+    auto& environment = LLEnvironment::instanceFast();
     mCamHeightLocal = environment.getCamHeight();
-    mCameraOrigin = LLViewerCamera::getInstance()->getOrigin();
+    mCameraOrigin = LLViewerCamera::getInstanceFast()->getOrigin();
     mCurrentSky = environment.getCurrentSky();
 }
 

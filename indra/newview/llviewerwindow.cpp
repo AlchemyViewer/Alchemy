@@ -4160,7 +4160,7 @@ void LLViewerWindow::renderSelections( BOOL for_gl_pick, BOOL pick_parcel_walls,
 			gGL.pushMatrix();
 			gGL.loadIdentity();
 			F32 depth = llmax(1.f, hud_bbox.getExtentLocal().mV[VX] * 1.1f);
-			gGL.ortho(-0.5f * LLViewerCamera::getInstance()->getAspect(), 0.5f * LLViewerCamera::getInstance()->getAspect(), -0.5f, 0.5f, 0.f, depth);
+			gGL.ortho(-0.5f * LLViewerCamera::getInstanceFast()->getAspect(), 0.5f * LLViewerCamera::getInstanceFast()->getAspect(), -0.5f, 0.5f, 0.f, depth);
 			
 			gGL.matrixMode(LLRender::MM_MODELVIEW);
 			gGL.pushMatrix();
@@ -4425,7 +4425,7 @@ LLHUDIcon* LLViewerWindow::cursorIntersectIcon(S32 mouse_x, S32 mouse_y, F32 dep
 	// world coordinates of mouse
 	// VECTORIZE THIS
 	LLVector3 mouse_direction_global = mouseDirectionGlobal(x,y);
-	LLVector3 mouse_point_global = LLViewerCamera::getInstance()->getOrigin();
+	LLVector3 mouse_point_global = LLViewerCamera::getInstanceFast()->getOrigin();
 	LLVector3 mouse_world_start = mouse_point_global;
 	LLVector3 mouse_world_end   = mouse_point_global + mouse_direction_global * depth;
 
@@ -4465,11 +4465,11 @@ LLViewerObject* LLViewerWindow::cursorIntersect(S32 mouse_x, S32 mouse_y, F32 de
 	
 	// world coordinates of mouse
 	LLVector3 mouse_direction_global = mouseDirectionGlobal(x,y);
-	LLVector3 mouse_point_global = LLViewerCamera::getInstance()->getOrigin();
+	LLVector3 mouse_point_global = LLViewerCamera::getInstanceFast()->getOrigin();
 	
 	//get near clip plane
-	LLVector3 n = LLViewerCamera::getInstance()->getAtAxis();
-	LLVector3 p = mouse_point_global + n * LLViewerCamera::getInstance()->getNear();
+	LLVector3 n = LLViewerCamera::getInstanceFast()->getAtAxis();
+	LLVector3 p = mouse_point_global + n * LLViewerCamera::getInstanceFast()->getNear();
 
 	//project mouse point onto plane
 	LLVector3 pos;
@@ -4573,7 +4573,7 @@ LLViewerObject* LLViewerWindow::cursorIntersect(S32 mouse_x, S32 mouse_y, F32 de
 // indicating direction of point on screen x,y
 LLVector3 LLViewerWindow::mouseDirectionGlobal(const S32 x, const S32 y) const
 {
-	auto& viewerCamera = LLViewerCamera::instance();
+	auto& viewerCamera = LLViewerCamera::instanceFast();
 
 	// find vertical field of view
 	F32			fov = viewerCamera.getView();
@@ -4619,7 +4619,7 @@ LLVector3 LLViewerWindow::mousePointHUD(const S32 x, const S32 y) const
 // indicating direction of point on screen x,y
 LLVector3 LLViewerWindow::mouseDirectionCamera(const S32 x, const S32 y) const
 {
-	auto& viewerCamera = LLViewerCamera::instance();
+	auto& viewerCamera = LLViewerCamera::instanceFast();
 
 	// find vertical field of view
 	F32			fov_height = viewerCamera.getView();
@@ -5100,7 +5100,7 @@ BOOL LLViewerWindow::rawSnapshot(LLImageRaw *raw, S32 image_width, S32 image_hei
 
 	LLRenderTarget scratch_space;
 
-	auto& viewerCamera = LLViewerCamera::instance();
+	auto& viewerCamera = LLViewerCamera::instanceFast();
 
 	F32 scale_factor = 1.0f ;
 	if (!keep_window_aspect || (image_width > window_width) || (image_height > window_height))
@@ -5191,7 +5191,7 @@ BOOL LLViewerWindow::rawSnapshot(LLImageRaw *raw, S32 image_width, S32 image_hei
 	F32 depth_conversion_factor_1 = (viewerCamera.getFar() + viewerCamera.getNear()) / (2.f * viewerCamera.getFar() * viewerCamera.getNear());
 	F32 depth_conversion_factor_2 = (viewerCamera.getFar() - viewerCamera.getNear()) / (2.f * viewerCamera.getFar() * viewerCamera.getNear());
 
-	gObjectList.generatePickList(*LLViewerCamera::getInstance());
+	gObjectList.generatePickList(LLViewerCamera::instanceFast());
 
 	// Subimages are in fact partial rendering of the final view. This happens when the final view is bigger than the screen.
 	// In most common cases, scale_factor is 1 and there's no more than 1 iteration on x and y
@@ -5512,7 +5512,7 @@ void LLViewerWindow::setup2DViewport(S32 x_offset, S32 y_offset)
 void LLViewerWindow::setup3DRender()
 {
 	// setup perspective camera
-	LLViewerCamera::getInstance()->setPerspective(NOT_FOR_SELECTION, mWorldViewRectRaw.mLeft, mWorldViewRectRaw.mBottom,  mWorldViewRectRaw.getWidth(), mWorldViewRectRaw.getHeight(), FALSE, LLViewerCamera::getInstance()->getNear(), MAX_FAR_CLIP*2.f);
+	LLViewerCamera::getInstanceFast()->setPerspective(NOT_FOR_SELECTION, mWorldViewRectRaw.mLeft, mWorldViewRectRaw.mBottom,  mWorldViewRectRaw.getWidth(), mWorldViewRectRaw.getHeight(), FALSE, LLViewerCamera::getInstanceFast()->getNear(), MAX_FAR_CLIP*2.f);
 	setup3DViewport();
 }
 

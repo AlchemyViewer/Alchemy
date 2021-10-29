@@ -656,10 +656,10 @@ void LLFace::renderOneWireframe(const LLColor4 &color, F32 fogCfx, bool wirefram
 			{
 				LLGLEnable fog(GL_FOG);
 				glFogi(GL_FOG_MODE, GL_LINEAR);
-				float d = (LLViewerCamera::getInstance()->getPointOfInterest() - LLViewerCamera::getInstance()->getOrigin()).magVec();
+				float d = (LLViewerCamera::getInstanceFast()->getPointOfInterest() - LLViewerCamera::getInstanceFast()->getOrigin()).magVec();
 				LLColor4 fogCol = color * fogCfx;
 				glFogf(GL_FOG_START, d);
-				glFogf(GL_FOG_END, d * (1 + (LLViewerCamera::getInstance()->getView() / LLViewerCamera::getInstance()->getDefaultFOV())));
+				glFogf(GL_FOG_END, d * (1 + (LLViewerCamera::getInstanceFast()->getView() / LLViewerCamera::getInstanceFast()->getDefaultFOV())));
 				glFogfv(GL_FOG_COLOR, fogCol.mV);
 			}
             gGL.setAlphaRejectSettings(LLRender::CF_DEFAULT);
@@ -2212,7 +2212,7 @@ BOOL LLFace::calcPixelArea(F32& cos_angle_to_view_dir, F32& radius)
 	size.setSub(mExtents[1], mExtents[0]);
 	size.mul(0.5f);
 
-	LLViewerCamera* camera = LLViewerCamera::getInstance();
+	LLViewerCamera* camera = LLViewerCamera::getInstanceFast();
 
 	F32 size_squared = size.dot3(size).getF32();
 	LLVector4a lookAt;
@@ -2317,7 +2317,7 @@ F32 LLFace::calcImportanceToCamera(F32 cos_angle_to_view_dir, F32 dist)
 {
 	F32 importance = 0.f ;
 	
-	LLViewerCamera& camera = LLViewerCamera::instance();
+	LLViewerCamera& camera = LLViewerCamera::instanceFast();
 
 	if(cos_angle_to_view_dir > camera.getCosHalfFov() &&
 		dist < FACE_IMPORTANCE_TO_CAMERA_OVER_DISTANCE[FACE_IMPORTANCE_LEVEL - 1][0]) 

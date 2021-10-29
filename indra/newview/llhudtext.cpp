@@ -156,7 +156,7 @@ void LLHUDText::renderText()
 	}
 	else
 	{
-		LLViewerCamera::getInstance()->getPixelVectors(mPositionAgent, y_pixel_vec, x_pixel_vec);
+		LLViewerCamera::getInstanceFast()->getPixelVectors(mPositionAgent, y_pixel_vec, x_pixel_vec);
 	}
 
 	LLVector3 width_vec = mWidth * x_pixel_vec;
@@ -380,7 +380,7 @@ void LLHUDText::updateVisibility()
 	}
 
 	// push text towards camera by radius of object, but not past camera
-	auto& viewerCamera = LLViewerCamera::instance();
+	auto& viewerCamera = LLViewerCamera::instanceFast();
 	LLVector3 vec_from_camera = mPositionAgent - viewerCamera.getOrigin();
 	LLVector3 dir_from_camera = vec_from_camera;
 	dir_from_camera.normVec();
@@ -464,7 +464,7 @@ LLVector2 LLHUDText::updateScreenPos(const LLVector2 &offset)
 	LLVector2 screen_pos_vec;
 //	LLVector3 x_pixel_vec;
 //	LLVector3 y_pixel_vec;
-//	LLViewerCamera::getInstance()->getPixelVectors(mPositionAgent, y_pixel_vec, x_pixel_vec);
+//	LLViewerCamera::getInstanceFast()->getPixelVectors(mPositionAgent, y_pixel_vec, x_pixel_vec);
 //	LLVector3 world_pos = mPositionAgent + (offset.mV[VX] * x_pixel_vec) + (offset.mV[VY] * y_pixel_vec);
 //	if (!LLViewerCamera::getInstance()->projectPosAgentToScreen(world_pos, screen_pos, FALSE) && mVisibleOffScreen)
 //	{

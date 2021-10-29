@@ -238,12 +238,12 @@ void LLAgentPilot::addAction(enum EActionType action_type)
 	action.mType = action_type;
 	action.mTarget = gAgent.getPositionGlobal();
 	action.mTime = mTimer.getElapsedTimeF32();
-	LLViewerCamera *cam = LLViewerCamera::getInstance();
-	action.mCameraView = cam->getView();
-	action.mCameraOrigin = cam->getOrigin();
-	action.mCameraXAxis = cam->getXAxis();
-	action.mCameraYAxis = cam->getYAxis();
-	action.mCameraZAxis = cam->getZAxis();
+	LLViewerCamera& cam = LLViewerCamera::instance();
+	action.mCameraView = cam.getView();
+	action.mCameraOrigin = cam.getOrigin();
+	action.mCameraXAxis = cam.getXAxis();
+	action.mCameraYAxis = cam.getYAxis();
+	action.mCameraZAxis = cam.getZAxis();
 	mLastRecordTime = (F32)action.mTime;
 	mActions.push_back(action);
 }
@@ -320,11 +320,12 @@ void LLAgentPilot::moveCamera()
 		LLQuaternion quat = nlerp(t, start_quat, end_quat);
 		LLMatrix3 mat(quat);
 	
-		LLViewerCamera::getInstance()->setView(view);
-		LLViewerCamera::getInstance()->setOrigin(origin);
-		LLViewerCamera::getInstance()->mXAxis = LLVector3(mat.mMatrix[0]);
-		LLViewerCamera::getInstance()->mYAxis = LLVector3(mat.mMatrix[1]);
-		LLViewerCamera::getInstance()->mZAxis = LLVector3(mat.mMatrix[2]);
+		LLViewerCamera& cam = LLViewerCamera::instance();
+		cam.setView(view);
+		cam.setOrigin(origin);
+		cam.mXAxis = LLVector3(mat.mMatrix[0]);
+		cam.mYAxis = LLVector3(mat.mMatrix[1]);
+		cam.mZAxis = LLVector3(mat.mMatrix[2]);
 	}
 }
 

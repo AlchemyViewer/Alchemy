@@ -1494,7 +1494,7 @@ void LLVOAvatar::calculateSpatialExtents(LLVector4a& newMin, LLVector4a& newMax)
     size.setSub(newMax,newMin);
     size.mul(0.5f);
     
-    mPixelArea = LLPipeline::calcPixelArea(center, size, *LLViewerCamera::getInstance());
+    mPixelArea = LLPipeline::calcPixelArea(center, size, LLViewerCamera::instanceFast());
 }
 
 void render_sphere_and_line(const LLVector3& begin_pos, const LLVector3& end_pos, F32 sphere_scale, const LLVector3& occ_color, const LLVector3& visible_color)
@@ -3549,7 +3549,7 @@ void LLVOAvatar::invalidateNameTags()
 // Compute name tag position during idle update
 void LLVOAvatar::idleUpdateNameTagPosition(const LLVector3& root_pos_last)
 {
-	auto& viewerCamera = LLViewerCamera::instance();
+	auto& viewerCamera = LLViewerCamera::instanceFast();
 	LLQuaternion root_rot = mRoot->getWorldRotation();
 	LLQuaternion inv_root_rot = ~root_rot;
 	LLVector3 pixel_right_vec;
@@ -4232,11 +4232,11 @@ void LLVOAvatar::updateOrientation(LLAgent& agent, F32 speed, F32 delta_time)
 				// make sure fwdDir stays in same general direction as primdir
 				if (gAgent.getFlying())
 				{
-					fwdDir = LLViewerCamera::getInstance()->getAtAxis();
+					fwdDir = LLViewerCamera::getInstanceFast()->getAtAxis();
 				}
 				else
 				{
-					LLVector3 at_axis = LLViewerCamera::getInstance()->getAtAxis();
+					LLVector3 at_axis = LLViewerCamera::getInstanceFast()->getAtAxis();
 					LLVector3 up_vector = gAgent.getReferenceUpVector();
 					at_axis -= up_vector * (at_axis * up_vector);
 					at_axis.normalize();
@@ -4739,7 +4739,7 @@ void LLVOAvatar::updateHeadOffset()
 	// since we only care about Z, just grab one of the eyes
 	LLVector3 midEyePt = mEyeLeftp->getWorldPosition();
 	midEyePt -= mDrawable.notNull() ? mDrawable->getWorldPosition() : mRoot->getWorldPosition();
-	midEyePt.mV[VZ] = llmax(-mPelvisToFoot + LLViewerCamera::getInstance()->getNear(), midEyePt.mV[VZ]);
+	midEyePt.mV[VZ] = llmax(-mPelvisToFoot + LLViewerCamera::getInstanceFast()->getNear(), midEyePt.mV[VZ]);
 
 	if (mDrawable.notNull())
 	{
@@ -5324,7 +5324,7 @@ U32 LLVOAvatar::renderImpostor(LLColor4U color, S32 diffuse_channel)
 		return 0;
 	}
 
-	auto& camera = LLViewerCamera::instance();
+	auto& camera = LLViewerCamera::instanceFast();
 
 	LLVector3 pos(getRenderPosition()+mImpostorOffset);
 	LLVector3 at = (pos - camera.getOrigin());
@@ -7164,7 +7164,7 @@ void LLVOAvatar::setPixelAreaAndAngle(LLAgent &agent)
 	size.setSub(ext[1], ext[0]);
 	size.mul(0.5f);
 
-	mImpostorPixelArea = LLPipeline::calcPixelArea(center, size, *LLViewerCamera::getInstance());
+	mImpostorPixelArea = LLPipeline::calcPixelArea(center, size, LLViewerCamera::instanceFast());
 
 	F32 range = mDrawable->mDistanceWRTCamera;
 
@@ -10493,7 +10493,7 @@ void LLVOAvatar::getImpostorValues(LLVector4a* extents, LLVector3& angle, F32& d
 	extents[0] = ext[0];
 	extents[1] = ext[1];
 
-	auto& vwrCamera = LLViewerCamera::instance();
+	auto& vwrCamera = LLViewerCamera::instanceFast();
 
 	LLVector3 at = vwrCamera.getOrigin()-(getRenderPosition()+mImpostorOffset);
 	distance = at.normalize();

@@ -178,7 +178,7 @@ void LLDrawPoolTree::beginShadowPass(S32 pass)
 	glPolygonOffset(gSavedSettings.getF32("RenderDeferredTreeShadowOffset"),
 					gSavedSettings.getF32("RenderDeferredTreeShadowBias"));
 
-    LLEnvironment& environment = LLEnvironment::instance();
+	LLEnvironment& environment = LLEnvironment::instanceFast();
 
 	gDeferredTreeShadowProgram.bind();
     gDeferredTreeShadowProgram.uniform1i(LLShaderMgr::SUN_UP_FACTOR, environment.getIsSunUp() ? 1 : 0);

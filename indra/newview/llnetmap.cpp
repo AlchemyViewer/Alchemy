@@ -229,7 +229,7 @@ void LLNetMap::draw()
 	gGL.scalef(scale.mV[0], scale.mV[1], scale.mV[2]);
 	gGL.translatef(offset.mV[0], offset.mV[1], offset.mV[2]);
 
-	auto& viewer_camera = LLViewerCamera::instance();
+	auto& viewer_camera = LLViewerCamera::instanceFast();
 	
 	{
 		LLLocalClipRect clip(getLocalRect());
@@ -692,7 +692,7 @@ LLVector3 LLNetMap::globalPosToView(const LLVector3d& global_pos)
 	static LLUICachedControl<bool> rotate_map("MiniMapRotate", true);
 	if( rotate_map )
 	{
-		F32 radians = atan2( LLViewerCamera::getInstance()->getAtAxis().mV[VX], LLViewerCamera::getInstance()->getAtAxis().mV[VY] );
+		F32 radians = atan2( LLViewerCamera::getInstanceFast()->getAtAxis().mV[VX], LLViewerCamera::getInstanceFast()->getAtAxis().mV[VY] );
 		LLQuaternion rot(radians, LLVector3(0.f, 0.f, 1.f));
 		pos_local.rotVec( rot );
 	}
@@ -736,7 +736,7 @@ LLVector3d LLNetMap::viewPosToGlobal( S32 x, S32 y )
 
 	LLVector3 pos_local( (F32)x, (F32)y, 0 );
 
-	F32 radians = - atan2( LLViewerCamera::getInstance()->getAtAxis().mV[VX], LLViewerCamera::getInstance()->getAtAxis().mV[VY] );
+	F32 radians = - atan2( LLViewerCamera::getInstanceFast()->getAtAxis().mV[VX], LLViewerCamera::getInstanceFast()->getAtAxis().mV[VY] );
 
 	static LLUICachedControl<bool> rotate_map("MiniMapRotate", true);
 	if( rotate_map )

@@ -760,7 +760,7 @@ void LLVOVolume::updateTextureVirtualSize(bool forced)
 
 	const S32 num_faces = mDrawable->getNumFaces();
 	F32 min_vsize=999999999.f, max_vsize=0.f;
-	LLViewerCamera* camera = LLViewerCamera::getInstance();
+	LLViewerCamera* camera = LLViewerCamera::getInstanceFast();
 	for (S32 i = 0; i < num_faces; i++)
 	{
 		LLFace* face = mDrawable->getFace(i);
@@ -981,7 +981,7 @@ LLDrawable *LLVOVolume::createDrawable(LLPipeline *pipeline)
 	
 	updateRadius();
 	bool force_update = true; // avoid non-alpha mDistance update being optimized away
-	mDrawable->updateDistance(*LLViewerCamera::getInstance(), force_update);
+	mDrawable->updateDistance(LLViewerCamera::instanceFast(), force_update);
 
 	return mDrawable;
 }
@@ -1461,7 +1461,7 @@ BOOL LLVOVolume::calcLOD()
 	static LLCachedControl<bool> ignore_fov_zoom(gSavedSettings,"IgnoreFOVZoomForLODs");
 	if(!ignore_fov_zoom)
 	{
-		lod_factor *= DEFAULT_FIELD_OF_VIEW / LLViewerCamera::getInstance()->getDefaultFOV();
+		lod_factor *= DEFAULT_FIELD_OF_VIEW / LLViewerCamera::getInstanceFast()->getDefaultFOV();
 	}
 
     mLODAdjustedDistance = distance;
@@ -3377,7 +3377,7 @@ F32 LLVOVolume::getSpotLightPriority() const
 
 void LLVOVolume::updateSpotLightPriority()
 {
-	auto& viewerCamera = LLViewerCamera::instance();
+	auto& viewerCamera = LLViewerCamera::instanceFast();
 
     F32 r = getLightRadius();
 	LLVector3 pos = mDrawable->getPositionAgent();

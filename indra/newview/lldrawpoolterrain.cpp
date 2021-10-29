@@ -237,7 +237,7 @@ void LLDrawPoolTerrain::beginShadowPass(S32 pass)
 	gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
 	gDeferredShadowProgram.bind();
 
-    LLEnvironment& environment = LLEnvironment::instance();
+    LLEnvironment& environment = LLEnvironment::instanceFast();
     gDeferredShadowProgram.uniform1i(LLShaderMgr::SUN_UP_FACTOR, environment.getIsSunUp() ? 1 : 0);
 }
 
@@ -329,7 +329,7 @@ void LLDrawPoolTerrain::renderFullShader()
 	shader->uniform4fv(LLShaderMgr::OBJECT_PLANE_S, 1, tp0.mV);
 	shader->uniform4fv(LLShaderMgr::OBJECT_PLANE_T, 1, tp1.mV);
 
-	const LLSettingsWater::ptr_t& pwater = LLEnvironment::instance().getCurrentWater();
+	const LLSettingsWater::ptr_t& pwater = LLEnvironment::getInstanceFast()->getCurrentWater();
 
     ((LLSettingsVOWater*)pwater.get())->updateShader(shader);
 

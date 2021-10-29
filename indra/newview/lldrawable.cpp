@@ -88,7 +88,7 @@ std::vector<LLPointer<LLDrawable> > LLDrawable::sDeadList;
 void LLDrawable::incrementVisible() 
 {
 	LLViewerOctreeEntryData::incrementVisible();
-	sCurPixelAngle = (F32) gViewerWindow->getWindowHeightRaw()/LLViewerCamera::getInstance()->getView();
+	sCurPixelAngle = (F32) gViewerWindow->getWindowHeightRaw()/LLViewerCamera::getInstanceFast()->getView();
 }
 
 LLDrawable::LLDrawable(LLViewerObject *vobj, bool new_entry)
@@ -911,7 +911,7 @@ void LLDrawable::updateDistance(LLCamera& camera, bool force_update)
             if (avatarp)
             {
                 const LLVector3* av_box = avatarp->getLastAnimExtents();
-                LLVector3 cam_pos_from_agent = LLViewerCamera::getInstance()->getOrigin();
+                LLVector3 cam_pos_from_agent = LLViewerCamera::getInstanceFast()->getOrigin();
                 LLVector3 cam_to_box_offset = point_to_box_offset(cam_pos_from_agent, av_box);
                 mDistanceWRTCamera = llmax(0.01f, ll_round(cam_to_box_offset.magVec(), 0.01f));
 #ifdef SHOW_DEBUG

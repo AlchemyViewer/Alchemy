@@ -203,7 +203,7 @@ void display_update_camera()
 	{
 		final_far *= 0.5f;
 	}
-	LLViewerCamera::getInstance()->setFar(final_far);
+	LLViewerCamera::getInstanceFast()->setFar(final_far);
 	gViewerWindow->setup3DRender();
 	
 	// Update land visibility too
@@ -609,7 +609,7 @@ void display(BOOL rebuild, F32 zoom_factor, int subfield, BOOL for_snapshot)
 	//
 
 	LLAppViewer::instance()->pingMainloopTimeout(STR_DISPLAY_CAMERA);
-	auto& vwrCamera = LLViewerCamera::instance();
+	auto& vwrCamera = LLViewerCamera::instanceFast();
 	vwrCamera.setZoomParameters(zoom_factor, subfield);
 	vwrCamera.setNear(MIN_NEAR_PLANE);
 
@@ -1126,7 +1126,7 @@ void render_hud_attachments()
 	if (!ALCinematicMode::isEnabled() && LLPipeline::sShowHUDAttachments && !gDisconnected && setup_hud_matrices())
 	{
 		LLPipeline::sRenderingHUDs = TRUE;
-		LLCamera hud_cam = *LLViewerCamera::getInstance();
+		LLCamera hud_cam = LLViewerCamera::instanceFast();
 		hud_cam.setOrigin(-1.f,0,0);
 		hud_cam.setAxes(LLVector3(1,0,0), LLVector3(0,1,0), LLVector3(0,0,1));
 		LLViewerCamera::updateFrustumPlanes(hud_cam, TRUE);
@@ -1218,7 +1218,7 @@ LLRect get_whole_screen_region()
 	LLRect whole_screen = gViewerWindow->getWorldViewRectScaled();
 	
 	// apply camera zoom transform (for high res screenshots)
-	auto& vwrCamera = LLViewerCamera::instance();
+	auto& vwrCamera = LLViewerCamera::instanceFast();
 	F32 zoom_factor = vwrCamera.getZoomFactor();
 	S16 sub_region = vwrCamera.getZoomSubRegion();
 	if (zoom_factor > 1.f)
@@ -1238,7 +1238,7 @@ bool get_hud_matrices(const LLRect& screen_region, glh::matrix4f &proj, glh::mat
 {
 	if (isAgentAvatarValid() && gAgentAvatarp->hasHUDAttachment())
 	{
-		auto& vwrCamera = LLViewerCamera::instance();
+		auto& vwrCamera = LLViewerCamera::instanceFast();
 		F32 zoom_level = gAgentCamera.mHUDCurZoom;
 		LLBBox hud_bbox = gAgentAvatarp->getHUDBBox();
 		
@@ -1516,7 +1516,7 @@ void render_ui_2d()
 	//  Menu overlays, HUD, etc
 	gViewerWindow->setup2DRender();
 
-	auto& vwrCamera = LLViewerCamera::instance();
+	auto& vwrCamera = LLViewerCamera::instanceFast();
 	F32 zoom_factor = vwrCamera.getZoomFactor();
 	S16 sub_region = vwrCamera.getZoomSubRegion();
 

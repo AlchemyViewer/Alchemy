@@ -505,7 +505,7 @@ void LLTracker::drawBeacon(LLVector3 pos_agent, std::string direction, LLColor4 
 
 		gGL.color4fv(fogged_color.mV);
 		
-		LLVector3 x_axis = LLViewerCamera::getInstance()->getLeftAxis();
+		LLVector3 x_axis = LLViewerCamera::getInstanceFast()->getLeftAxis();
 		F32 t = gRenderStartTime.getElapsedTimeF32();
 		
 		for (U32 i = 0; i < BEACON_VERTS; i++)
@@ -563,14 +563,14 @@ void LLTracker::renderBeacon(LLVector3d pos_global,
 
 	F32 dist = (F32)to_vec.magVec();
 	F32 color_frac = 1.f;
-	if (dist > 0.99f * LLViewerCamera::getInstance()->getFar())
+	if (dist > 0.99f * LLViewerCamera::getInstanceFast()->getFar())
 	{
 		color_frac = 0.4f;
 	//	pos_global = gAgentCamera.getCameraPositionGlobal() + 0.99f*(LLViewerCamera::getInstance()->getFar()/dist)*to_vec;
 		}
 	else
 	{
-		color_frac = 1.f - 0.6f*(dist/LLViewerCamera::getInstance()->getFar());
+		color_frac = 1.f - 0.6f*(dist/LLViewerCamera::getInstanceFast()->getFar());
 	}
 
 	LLColor4 fogged_color = color_frac * color + (1 - color_frac)*gSky.getSkyFogColor();
@@ -684,9 +684,9 @@ void LLTracker::drawMarker(const LLVector3d& pos_global, const LLColor4& color, 
 	S32 y = 0;
 	const BOOL CLAMP = TRUE;
 
-	bool on_screen = LLViewerCamera::getInstance()->projectPosAgentToScreen(pos_local, screen, CLAMP);
+	bool on_screen = LLViewerCamera::getInstanceFast()->projectPosAgentToScreen(pos_local, screen, CLAMP);
 	if (on_screen && is_iff) return;
-	if (on_screen || LLViewerCamera::getInstance()->projectPosAgentToScreenEdge(pos_local, screen) )
+	if (on_screen || LLViewerCamera::getInstanceFast()->projectPosAgentToScreenEdge(pos_local, screen) )
 	{
 		gHUDView->screenPointToLocal(screen.mX, screen.mY, &x, &y);
 

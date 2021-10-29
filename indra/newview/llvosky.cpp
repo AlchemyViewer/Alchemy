@@ -1047,7 +1047,7 @@ BOOL LLVOSky::updateGeometry(LLDrawable *drawable)
 		}
 	}
 
-	const LLVector3 &look_at = LLViewerCamera::getInstance()->getAtAxis();
+	const LLVector3 &look_at = LLViewerCamera::getInstanceFast()->getAtAxis();
 	LLVector3 right = look_at % LLVector3::z_axis;
 	LLVector3 up = right % look_at;
 	right.normalize();
@@ -1223,7 +1223,7 @@ F32 dtClip(const LLVector3& v0, const LLVector3& v1, F32 far_clip2)
 void LLVOSky::updateReflectionGeometry(LLDrawable *drawable, F32 H,
 										 const LLHeavenBody& HB)
 {
-	const LLVector3 &look_at = LLViewerCamera::getInstance()->getAtAxis();
+	const LLVector3 &look_at = LLViewerCamera::getInstanceFast()->getAtAxis();
 	// const F32 water_height = gAgent.getRegion()->getWaterHeight() + 0.001f;
 	// LLWorld::getInstance()->getWaterHeight() + 0.001f;
 

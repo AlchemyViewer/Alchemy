@@ -64,7 +64,7 @@ void LLHUDEffectBlob::render()
 
 	LLVector3 pixel_up, pixel_right;
 
-	LLViewerCamera::instance().getPixelVectors(pos_agent, pixel_up, pixel_right);
+	LLViewerCamera::instanceFast().getPixelVectors(pos_agent, pixel_up, pixel_right);
 
 	LLGLSPipelineAlpha gls_pipeline_alpha;
 	gGL.getTexUnit(0)->bind(mImage->getImage());

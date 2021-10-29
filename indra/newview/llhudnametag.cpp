@@ -147,7 +147,7 @@ BOOL LLHUDNameTag::lineSegmentIntersect(const LLVector4a& start, const LLVector4
 
 	LLVector3 position = mPositionAgent;
 
-	auto& viewerCamera = LLViewerCamera::instance();
+	auto& viewerCamera = LLViewerCamera::instanceFast();
 
 	if (mSourceObject)
 	{ //get intersection of eye through mPositionAgent to plane of source object
@@ -291,7 +291,7 @@ void LLHUDNameTag::renderText(BOOL for_select)
 	LLVector3 x_pixel_vec;
 	LLVector3 y_pixel_vec;
 	
-	LLViewerCamera::getInstance()->getPixelVectors(mPositionAgent, y_pixel_vec, x_pixel_vec);
+	LLViewerCamera::getInstanceFast()->getPixelVectors(mPositionAgent, y_pixel_vec, x_pixel_vec);
 
 	LLVector3 width_vec = mWidth * x_pixel_vec;
 	LLVector3 height_vec = mHeight * y_pixel_vec;
@@ -299,7 +299,7 @@ void LLHUDNameTag::renderText(BOOL for_select)
 	mRadius = (width_vec + height_vec).magVec() * 0.5f;
 
 	LLCoordGL screen_pos;
-	LLViewerCamera::getInstance()->projectPosAgentToScreen(mPositionAgent, screen_pos, FALSE);
+	LLViewerCamera::getInstanceFast()->projectPosAgentToScreen(mPositionAgent, screen_pos, FALSE);
 
 	LLVector2 screen_offset = updateScreenPos(mPositionOffset);
 
@@ -585,7 +585,7 @@ void LLHUDNameTag::updateVisibility()
 		return;
 	}
 
-	auto& viewerCamera = LLViewerCamera::instance();
+	auto& viewerCamera = LLViewerCamera::instanceFast();
 
 	// push text towards camera by radius of object, but not past camera
 	LLVector3 vec_from_camera = mPositionAgent - viewerCamera.getOrigin();
@@ -648,7 +648,7 @@ LLVector2 LLHUDNameTag::updateScreenPos(LLVector2 &offset)
 	LLVector2 screen_pos_vec;
 	LLVector3 x_pixel_vec;
 	LLVector3 y_pixel_vec;
-	auto& viewerCamera = LLViewerCamera::instance();
+	auto& viewerCamera = LLViewerCamera::instanceFast();
 
 	viewerCamera.getPixelVectors(mPositionAgent, y_pixel_vec, x_pixel_vec);
 	LLVector3 world_pos = mPositionAgent + (offset.mV[VX] * x_pixel_vec) + (offset.mV[VY] * y_pixel_vec);

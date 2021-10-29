@@ -603,7 +603,7 @@ LLVector3 LLWorld::resolveLandNormalGlobal(const LLVector3d &pos_global)
 
 void LLWorld::updateVisibilities()
 {
-	auto& viewerCamera = LLViewerCamera::instance();
+	auto& viewerCamera = LLViewerCamera::instanceFast();
 
 	F32 cur_far_clip = viewerCamera.getFar();
 
@@ -669,7 +669,7 @@ void LLWorld::updateRegions(F32 max_update_time)
 	LLTimer update_timer;
 	mNumOfActiveCachedObjects = 0;
 	
-	if(LLViewerCamera::getInstance()->isChanged())
+	if(LLViewerCamera::getInstanceFast()->isChanged())
 	{
 		LLViewerRegion::sLastCameraUpdated = LLViewerOctreeEntryData::getCurrentFrame() + 1;
 	}
@@ -934,7 +934,7 @@ void LLWorld::updateWaterObjects()
 	S32 rwidth = 256;
 
 	// We only want to fill in water for stuff that's near us, say, within 256 or 512m
-	S32 range = LLViewerCamera::getInstance()->getFar() > 256.f ? 512 : 256;
+	S32 range = LLViewerCamera::getInstanceFast()->getFar() > 256.f ? 512 : 256;
 
 	LLViewerRegion* regionp = gAgent.getRegion();
 	from_region_handle(regionp->getHandle(), &region_x, &region_y);

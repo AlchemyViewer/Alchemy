@@ -979,8 +979,8 @@ void LLAgent::setRegion(LLViewerRegion *regionp)
 
 			setPositionAgent(getPositionAgent() - delta);
 
-			LLVector3 camera_position_agent = LLViewerCamera::getInstance()->getOrigin();
-			LLViewerCamera::getInstance()->setOrigin(camera_position_agent - delta);
+			LLVector3 camera_position_agent = LLViewerCamera::getInstanceFast()->getOrigin();
+			LLViewerCamera::getInstanceFast()->setOrigin(camera_position_agent - delta);
 
 			// Update all of the regions.
 			LLWorld::getInstance()->updateAgentOffset(agent_offset_global);
@@ -1017,8 +1017,8 @@ void LLAgent::setRegion(LLViewerRegion *regionp)
 			delta.setVec(regionp->getOriginGlobal());
 
 			setPositionAgent(getPositionAgent() - delta);
-			LLVector3 camera_position_agent = LLViewerCamera::getInstance()->getOrigin();
-			LLViewerCamera::getInstance()->setOrigin(camera_position_agent - delta);
+			LLVector3 camera_position_agent = LLViewerCamera::getInstanceFast()->getOrigin();
+			LLViewerCamera::getInstanceFast()->setOrigin(camera_position_agent - delta);
 
 			// Update all of the regions.
 			LLWorld::getInstance()->updateAgentOffset(mAgentOriginGlobal);
@@ -2439,7 +2439,7 @@ void LLAgent::endAnimationUpdateUI()
 			}
 			if (gAgentAvatarp->getParent())
 			{
-				LLVector3 at_axis = LLViewerCamera::getInstance()->getAtAxis();
+				LLVector3 at_axis = LLViewerCamera::getInstanceFast()->getAtAxis();
 				LLViewerObject* root_object = (LLViewerObject*)gAgentAvatarp->getRoot();
 				if (root_object->flagCameraDecoupled())
 				{
@@ -3216,7 +3216,7 @@ LLQuaternion LLAgent::getHeadRotation()
 	}
 
 	// We must be in mouselook
-	LLVector3 look_dir( LLViewerCamera::getInstance()->getAtAxis() );
+	LLVector3 look_dir( LLViewerCamera::getInstanceFast()->getAtAxis() );
 	LLVector3 up = look_dir % mFrameAgent.getLeftAxis();
 	LLVector3 left = up % look_dir;
 

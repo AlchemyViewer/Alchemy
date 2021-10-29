@@ -204,12 +204,12 @@ void LLAgentCamera::init()
 
 	mDrawDistance = gSavedSettings.getF32("RenderFarClip");
 
-	LLViewerCamera::getInstance()->setView(DEFAULT_FIELD_OF_VIEW);
+	LLViewerCamera::getInstanceFast()->setView(DEFAULT_FIELD_OF_VIEW);
 	// Leave at 0.1 meters until we have real near clip management
-	LLViewerCamera::getInstance()->setNear(0.1f);
-	LLViewerCamera::getInstance()->setFar(mDrawDistance);			// if you want to change camera settings, do so in camera.h
-	LLViewerCamera::getInstance()->setAspect( gViewerWindow->getWorldViewAspectRatio() );		// default, overridden in LLViewerWindow::reshape
-	LLViewerCamera::getInstance()->setViewHeightInPixels(768);			// default, overridden in LLViewerWindow::reshape
+	LLViewerCamera::getInstanceFast()->setNear(0.1f);
+	LLViewerCamera::getInstanceFast()->setFar(mDrawDistance);			// if you want to change camera settings, do so in camera.h
+	LLViewerCamera::getInstanceFast()->setAspect( gViewerWindow->getWorldViewAspectRatio() );		// default, overridden in LLViewerWindow::reshape
+	LLViewerCamera::getInstanceFast()->setViewHeightInPixels(768);			// default, overridden in LLViewerWindow::reshape
 
 	mCameraFocusOffsetTarget = LLVector4(gSavedSettings.getVector3("CameraOffsetBuild"));
 	
@@ -438,7 +438,7 @@ LLVector3 LLAgentCamera::calcFocusOffset(LLViewerObject *object, LLVector3 origi
 	// make sure they object extents are non-zero
 	object_extents.clamp(0.001f, F32_MAX);
 
-	auto& viewerCamera = LLViewerCamera::instance();
+	auto& viewerCamera = LLViewerCamera::instanceFast();
 	const auto& viewer_camera_origin = viewerCamera.getOrigin();
 
 	// obj_to_cam_ray is unit vector pointing from object center to camera, in the coordinate frame of the object
@@ -751,7 +751,7 @@ BOOL LLAgentCamera::calcCameraMinDistance(F32 &obj_min_distance)
 	// clamp obj distance to diagonal of 10 by 10 cube
 	obj_min_distance = llmin(obj_min_distance, 10.f * F_SQRT3);
 
-	obj_min_distance += LLViewerCamera::getInstance()->getNear() + (soft_limit ? 0.1f : 0.2f);
+	obj_min_distance += LLViewerCamera::getInstanceFast()->getNear() + (soft_limit ? 0.1f : 0.2f);
 	
 	return TRUE;
 }
@@ -904,7 +904,7 @@ void LLAgentCamera::cameraOrbitOver(const F32 angle)
 		F32 angle_from_up = acos( camera_offset_unit * gAgent.getReferenceUpVector() );
 
 		LLVector3d left_axis;
-		left_axis.setVec(LLViewerCamera::getInstance()->getLeftAxis());
+		left_axis.setVec(LLViewerCamera::getInstanceFast()->getLeftAxis());
 		F32 new_angle = llclamp(angle_from_up - angle, 1.f * DEG_TO_RAD, 179.f * DEG_TO_RAD);
 		mOrbitOverAngle += angle_from_up - new_angle;
 		mCameraFocusOffsetTarget.rotVec(angle_from_up - new_angle, left_axis);
@@ -919,7 +919,7 @@ void LLAgentCamera::resetCameraOrbit()
 	camera_offset_unit.normalize();
 
 	LLVector3d left_axis;
-	left_axis.setVec(LLViewerCamera::getInstance()->getLeftAxis());
+	left_axis.setVec(LLViewerCamera::getInstanceFast()->getLeftAxis());
 	mCameraFocusOffsetTarget.rotVec(-mOrbitOverAngle, left_axis);
 	
 	mCameraFocusOffsetTarget.rotVec(-mOrbitAroundRadians, 0.f, 0.f, 1.f);
@@ -1092,7 +1092,7 @@ void LLAgentCamera::cameraOrbitIn(const F32 meters)
 void LLAgentCamera::cameraPanIn(F32 meters)
 {
 	LLVector3d at_axis;
-	at_axis.setVec(LLViewerCamera::getInstance()->getAtAxis());
+	at_axis.setVec(LLViewerCamera::getInstanceFast()->getAtAxis());
 
 	mPanFocusDiff += meters * at_axis;
 
@@ -1110,7 +1110,7 @@ void LLAgentCamera::cameraPanIn(F32 meters)
 void LLAgentCamera::cameraPanLeft(F32 meters)
 {
 	LLVector3d left_axis;
-	left_axis.setVec(LLViewerCamera::getInstance()->getLeftAxis());
+	left_axis.setVec(LLViewerCamera::getInstanceFast()->getLeftAxis());
 
 	mPanFocusDiff += meters * left_axis;
 
@@ -1132,7 +1132,7 @@ void LLAgentCamera::cameraPanLeft(F32 meters)
 void LLAgentCamera::cameraPanUp(F32 meters)
 {
 	LLVector3d up_axis;
-	up_axis.setVec(LLViewerCamera::getInstance()->getUpAxis());
+	up_axis.setVec(LLViewerCamera::getInstanceFast()->getUpAxis());
 
 	mPanFocusDiff += meters * up_axis;
 
@@ -1210,7 +1210,7 @@ void LLAgentCamera::updateLookAt(const S32 mouse_x, const S32 mouse_y)
 		// Move head based on cursor position
 		ELookAtType lookAtType = LOOKAT_TARGET_NONE;
 		LLVector3 headLookAxis;
-		LLCoordFrame frameCamera = *((LLCoordFrame*)LLViewerCamera::getInstance());
+		LLCoordFrame frameCamera = *((LLCoordFrame*)LLViewerCamera::getInstanceFast());
 
 		if (cameraMouselook())
 		{
@@ -1305,6 +1305,8 @@ void LLAgentCamera::updateCamera()
 											   gAgentCamera.getPanDownKey() > 0.f);		// bottom
 	}
 
+	auto& vwr_camera = LLViewerCamera::instanceFast();
+
 	// Handle camera movement based on keyboard.
 	const F32 ORBIT_OVER_RATE = 90.f * DEG_TO_RAD;			// radians per second
 	const F32 ORBIT_AROUND_RATE = 90.f * DEG_TO_RAD;		// radians per second
@@ -1326,7 +1328,7 @@ void LLAgentCamera::updateCamera()
 	{
 		F32 input_rate = gAgentCamera.getOrbitInKey() - gAgentCamera.getOrbitOutKey();
 		
-		LLVector3d to_focus = gAgent.getPosGlobalFromAgent(LLViewerCamera::getInstance()->getOrigin()) - calcFocusPositionTargetGlobal();
+		LLVector3d to_focus = gAgent.getPosGlobalFromAgent(vwr_camera.getOrigin()) - calcFocusPositionTargetGlobal();
 		F32 distance_to_focus = (F32)to_focus.magVec();
 		// Move at distance (in meters) meters per second
 		cameraOrbitIn( input_rate * distance_to_focus / gFPSClamped );
@@ -1513,12 +1515,11 @@ void LLAgentCamera::updateCamera()
 	mCameraPositionAgent = gAgent.getPosAgentFromGlobal(camera_pos_global);
 
 	// Move the camera
-
-	LLViewerCamera::getInstance()->updateCameraLocation(mCameraPositionAgent, mCameraUpVector, focus_agent);
+	vwr_camera.updateCameraLocation(mCameraPositionAgent, mCameraUpVector, focus_agent);
 	//LLViewerCamera::getInstance()->updateCameraLocation(mCameraPositionAgent, camera_skyward, focus_agent);
 	
 	// Change FOV
-	LLViewerCamera::getInstance()->setView(LLViewerCamera::getInstance()->getDefaultFOV() / (1.f + mCameraCurrentFOVZoomFactor));
+	vwr_camera.setView(vwr_camera.getDefaultFOV() / (1.f + mCameraCurrentFOVZoomFactor));
 
 	// follow camera when in customize mode
 	if (cameraCustomizeAvatar())	
@@ -1583,11 +1584,8 @@ void LLAgentCamera::updateCamera()
 					
 				}
 			}
-			auto camera_instance = LLViewerCamera::getInstance();
-			if(camera_instance)
-			{
-				camera_instance->updateCameraLocation(head_pos, mCameraUpVector, gAgentAvatarp->mHeadp->getWorldPosition() + LLVector3(1.0, 0.0, 0.0) * agent_rot);
-			}
+
+			vwr_camera.updateCameraLocation(head_pos, mCameraUpVector, gAgentAvatarp->mHeadp->getWorldPosition() + LLVector3(1.0, 0.0, 0.0) * agent_rot);
 		}
 		else
 		{
@@ -1776,7 +1774,7 @@ void LLAgentCamera::setupSitCamera()
 //-----------------------------------------------------------------------------
 const LLVector3 &LLAgentCamera::getCameraPositionAgent() const
 {
-	return LLViewerCamera::getInstance()->getOrigin();
+	return LLViewerCamera::getInstanceFast()->getOrigin();
 }
 
 //-----------------------------------------------------------------------------
@@ -1784,7 +1782,7 @@ const LLVector3 &LLAgentCamera::getCameraPositionAgent() const
 //-----------------------------------------------------------------------------
 LLVector3d LLAgentCamera::getCameraPositionGlobal() const
 {
-	return gAgent.getPosGlobalFromAgent(LLViewerCamera::getInstance()->getOrigin());
+	return gAgent.getPosGlobalFromAgent(LLViewerCamera::getInstanceFast()->getOrigin());
 }
 
 //-----------------------------------------------------------------------------
@@ -2179,7 +2177,7 @@ bool LLAgentCamera::clampCameraPosition(LLVector3d& posCamGlobal, const LLVector
 
 LLVector3 LLAgentCamera::getCurrentCameraOffset()
 {
-	return (LLViewerCamera::getInstance()->getOrigin() - getAvatarRootPosition() - mThirdPersonHeadOffset) * ~getCurrentAvatarRotation();
+	return (LLViewerCamera::getInstanceFast()->getOrigin() - getAvatarRootPosition() - mThirdPersonHeadOffset) * ~getCurrentAvatarRotation();
 }
 
 LLVector3d LLAgentCamera::getCurrentFocusOffset()
@@ -2440,7 +2438,7 @@ void LLAgentCamera::changeCameraToFollow(BOOL animate)
 		ALAOEngine::getInstance()->inMouselook(false);
 
 		// bang-in the current focus, position, and up vector of the follow cam
-		mFollowCam.reset(mCameraPositionAgent, LLViewerCamera::getInstance()->getPointOfInterest(), LLVector3::z_axis);
+		mFollowCam.reset(mCameraPositionAgent, LLViewerCamera::getInstanceFast()->getPointOfInterest(), LLVector3::z_axis);
 		
 		if (gBasicToolset)
 		{
@@ -2933,7 +2931,7 @@ void LLAgentCamera::setFocusOnAvatar(BOOL focus_on_avatar, BOOL animate, BOOL re
                 LLVector3 vect = getCameraOffsetInitial();
                 F32 rotxy = F32(atan2(vect.mV[VY], vect.mV[VX]));
 
-                LLCoordFrame frameCamera = *((LLCoordFrame*)LLViewerCamera::getInstance());
+                LLCoordFrame frameCamera = *((LLCoordFrame*)LLViewerCamera::getInstanceFast());
                 // front view angle rotxy is zero, rear view rotxy angle is 180, compensate
                 frameCamera.yaw((180 * DEG_TO_RAD) - rotxy);
                 at_axis = frameCamera.getAtAxis();

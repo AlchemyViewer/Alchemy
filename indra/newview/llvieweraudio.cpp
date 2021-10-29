@@ -422,7 +422,7 @@ void audio_update_volume(bool force_update)
 
 		static const LLCachedControl<F32> rolloff_volume(gSavedSettings, "AudioLevelRolloff");
 		static const LLCachedControl<F32> underwater_rolloff_volume(gSavedSettings, "AudioLevelUnderwaterRolloff");
-		if(!LLViewerCamera::getInstance()->cameraUnderWater())
+		if(!LLViewerCamera::getInstanceFast()->cameraUnderWater())
 			gAudiop->setRolloffFactor(rolloff_volume);
 		else
 			gAudiop->setRolloffFactor(underwater_rolloff_volume);
@@ -508,8 +508,8 @@ void audio_update_listener()
 							 // LLViewerCamera::getInstance()VelocitySmoothed, 
 							 // LLVector3::zero,	
 							 gAgent.getVelocity(),    // !!! *TODO: need to replace this with smoothed velocity!
-							 LLViewerCamera::getInstance()->getUpAxis(),
-							 LLViewerCamera::getInstance()->getAtAxis());
+							 LLViewerCamera::getInstanceFast()->getUpAxis(),
+							 LLViewerCamera::getInstanceFast()->getAtAxis());
 	}
 }
 

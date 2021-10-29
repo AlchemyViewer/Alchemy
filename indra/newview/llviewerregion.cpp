@@ -1295,7 +1295,7 @@ void LLViewerRegion::updateVisibleEntries(F32 max_time)
 	}
 
 	const F32 LARGE_SCENE_CONTRIBUTION = 1000.f; //a large number to force to load the object.
-	const LLVector3 camera_origin = LLViewerCamera::getInstance()->getOrigin();
+	const LLVector3 camera_origin = LLViewerCamera::getInstanceFast()->getOrigin();
 	const U32 cur_frame = LLViewerOctreeEntryData::getCurrentFrame();
 	bool needs_update = ((cur_frame - mImpl->mLastCameraUpdate) > 5) && ((camera_origin - mImpl->mLastCameraOrigin).lengthSquared() > 10.f);	
 	U32 last_update = mImpl->mLastCameraUpdate;
@@ -1607,9 +1607,9 @@ void LLViewerRegion::killInvisibleObjects(F32 max_time)
 
 	LLTimer update_timer;
 	LLVector4a camera_origin;
-	camera_origin.load3(LLViewerCamera::getInstance()->getOrigin().mV);
+	camera_origin.load3(LLViewerCamera::getInstanceFast()->getOrigin().mV);
 	LLVector4a local_origin;
-	local_origin.load3((LLViewerCamera::getInstance()->getOrigin() - getOriginAgent()).mV);
+	local_origin.load3((LLViewerCamera::getInstanceFast()->getOrigin() - getOriginAgent()).mV);
 	F32 back_threshold = LLVOCacheEntry::sRearFarRadius;
 	
 	size_t max_update = 64; 

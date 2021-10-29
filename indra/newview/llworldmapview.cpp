@@ -900,7 +900,7 @@ void LLWorldMapView::drawAgents()
 
 void LLWorldMapView::drawFrustum()
 {
-	auto& viewerCamera = LLViewerCamera::instance();
+	auto& viewerCamera = LLViewerCamera::instanceFast();
 
 	// Draw frustum
 	F32 meters_to_pixels = sMapScale/ REGION_WIDTH_METERS;
@@ -928,8 +928,8 @@ void LLWorldMapView::drawFrustum()
 		gGL.begin( LLRender::TRIANGLES  );
 		{
 			// get camera look at and left axes
-			LLVector3 at_axis = LLViewerCamera::instance().getAtAxis();
-			LLVector3 left_axis = LLViewerCamera::instance().getLeftAxis();
+			LLVector3 at_axis = viewerCamera.getAtAxis();
+			LLVector3 left_axis = viewerCamera.getLeftAxis();
 
 			// grab components along XY plane
 			LLVector2 cam_lookat(at_axis.mV[VX], at_axis.mV[VY]);

@@ -418,7 +418,7 @@ void LLVOTree::render(LLAgent &agent)
 
 void LLVOTree::setPixelAreaAndAngle(LLAgent &agent)
 {
-	auto& viewerCamera = LLViewerCamera::instance();
+	auto& viewerCamera = LLViewerCamera::instanceFast();
 
 	LLVector3 center = getPositionAgent();//center of tree.
 	LLVector3 viewer_pos_agent = gAgentCamera.getCameraPositionAgent();

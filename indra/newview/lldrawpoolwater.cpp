@@ -110,7 +110,7 @@ void LLDrawPoolWater::prerender()
 
 S32 LLDrawPoolWater::getNumPasses()
 {
-	if (LLViewerCamera::getInstance()->getOrigin().mV[2] < 1024.f)
+	if (LLViewerCamera::getInstanceFast()->getOrigin().mV[2] < 1024.f)
 	{
 		return 1;
 	}
@@ -202,11 +202,11 @@ void LLDrawPoolWater::render(S32 pass)
 	gGL.getTexUnit(2)->enable(LLTexUnit::TT_TEXTURE);
 	gGL.getTexUnit(2)->bind(mWaterImagep[1]) ;
 
-	LLVector3 camera_up = LLViewerCamera::getInstance()->getUpAxis();
+	LLVector3 camera_up = LLViewerCamera::getInstanceFast()->getUpAxis();
 	F32 up_dot = camera_up * LLVector3::z_axis;
 
 	LLColor4 water_color;
-	if (LLViewerCamera::getInstance()->cameraUnderWater())
+	if (LLViewerCamera::getInstanceFast()->cameraUnderWater())
 	{
 		water_color.setVec(1.f, 1.f, 1.f, 0.4f);
 	}
@@ -279,7 +279,7 @@ void LLDrawPoolWater::render(S32 pass)
 
 		gGL.matrixMode(LLRender::MM_TEXTURE);
 		gGL.loadIdentity();
-		LLMatrix4 camera_mat = LLViewerCamera::getInstance()->getModelview();
+		LLMatrix4 camera_mat = LLViewerCamera::getInstanceFast()->getModelview();
 		LLMatrix4 camera_rot(camera_mat.getMat3());
 		camera_rot.invert();
 
@@ -463,8 +463,8 @@ void LLDrawPoolWater::renderReflection(LLFace* face)
 
 void LLDrawPoolWater::shade2(bool edge, LLGLSLShader* shader, const LLColor3& light_diffuse, const LLVector3& light_dir, F32 light_exp)
 {
-	LLEnvironment& environment = LLEnvironment::instance();
-	LLViewerCamera& viewerCamera = LLViewerCamera::instance();
+	LLEnvironment& environment = LLEnvironment::instanceFast();
+	LLViewerCamera& viewerCamera = LLViewerCamera::instanceFast();
 
 	F32  water_height  = environment.getWaterHeight();
     F32  camera_height = viewerCamera.getOrigin().mV[2];
@@ -667,7 +667,7 @@ void LLDrawPoolWater::shade()
 	F32 light_exp = 0.0f;
 	LLVector3 light_dir;
 
-    LLEnvironment& environment = LLEnvironment::instance();
+    LLEnvironment& environment = LLEnvironment::instanceFast();
 	const LLSettingsSky::ptr_t& psky   = environment.getCurrentSky();
 
     light_dir = environment.getLightDirection();
@@ -703,7 +703,7 @@ void LLDrawPoolWater::shade()
 
 	LLGLSLShader* shader = nullptr;
 
-	F32 eyedepth = LLViewerCamera::getInstance()->getOrigin().mV[2] - environment.getWaterHeight();
+	F32 eyedepth = LLViewerCamera::getInstanceFast()->getOrigin().mV[2] - environment.getWaterHeight();
 	
 	if (eyedepth < 0.f && LLPipeline::sWaterReflections)
 	{

@@ -5766,7 +5766,7 @@ void LLSelectMgr::updateSilhouettes()
 		num_sils_genned	= 0;
 
 		// render silhouettes for highlighted objects
-		const auto& viewer_cam_origin = LLViewerCamera::instance().getOrigin();
+		const auto& viewer_cam_origin = LLViewerCamera::instanceFast().getOrigin();
 		//BOOL subtracting_from_selection = (gKeyboard->currentMask(TRUE) == MASK_CONTROL);
 		for (S32 pass = 0; pass < 2; pass++)
 		{
@@ -5841,7 +5841,7 @@ void LLSelectMgr::updateSelectionSilhouette(LLObjectSelectionHandle object_handl
 
 		//mSilhouetteImagep->bindTexture();
 		//glAlphaFunc(GL_GREATER, sHighlightAlphaTest);
-		const auto& viewer_cam_origin = LLViewerCamera::instance().getOrigin();
+		const auto& viewer_cam_origin = LLViewerCamera::instanceFast().getOrigin();
 		for (S32 pass = 0; pass < 2; pass++)
 		{
 			for (LLSelectNode* node : object_handle->begin_end())
@@ -5904,7 +5904,7 @@ void LLSelectMgr::renderSilhouettes(BOOL for_hud)
 		gGL.pushMatrix();
 		gGL.loadIdentity();
 		F32 depth = llmax(1.f, hud_bbox.getExtentLocal().mV[VX] * 1.1f);
-		auto& viewerCamera = LLViewerCamera::instance();
+		auto& viewerCamera = LLViewerCamera::instanceFast();
 		gGL.ortho(-0.5f * viewerCamera.getAspect(), 0.5f * viewerCamera.getAspect(), -0.5f, 0.5f, 0.f, depth);
 
 		gGL.matrixMode(LLRender::MM_MODELVIEW);
@@ -6504,7 +6504,7 @@ void LLSelectNode::renderOneSilhouette(const LLColor4 &color)
 	LLVolume *volume = objectp->getVolume();
 	if (volume)
 	{
-		auto& viewerCamera = LLViewerCamera::instance();
+		auto& viewerCamera = LLViewerCamera::instanceFast();
 
 		F32 silhouette_thickness;
 		if (isAgentAvatarValid() && is_hud_object)
@@ -7883,12 +7883,14 @@ bool LLSelectMgr::selectionMove(const LLVector3& displ,
 		// calculate the distance of the object closest to the camera origin
 		F32 min_dist_squared = F32_MAX; // value will be overridden in the loop
 		
+		const auto& origin = LLViewerCamera::getInstanceFast()->getOrigin();
+
 		LLVector3 obj_pos;
 		for (LLSelectNode* nodep : selection->root_begin_end())
 		{
 			obj_pos = nodep->getObject()->getPositionEdit();
 			
-			F32 obj_dist_squared = dist_vec_squared(obj_pos, LLViewerCamera::getInstance()->getOrigin());
+			F32 obj_dist_squared = dist_vec_squared(obj_pos, origin);
 			if (obj_dist_squared < min_dist_squared)
 			{
 				min_dist_squared = obj_dist_squared;

@@ -145,7 +145,7 @@ void LLViewerDynamicTexture::preRender(BOOL clear_depth)
 
 	gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
 	// Set up camera
-	LLViewerCamera* camera = LLViewerCamera::getInstance();
+	LLViewerCamera* camera = LLViewerCamera::getInstanceFast();
 	mCamera.setOrigin(*camera);
 	mCamera.setAxes(*camera);
 	mCamera.setAspect(camera->getAspect());
@@ -188,7 +188,7 @@ void LLViewerDynamicTexture::postRender(BOOL success)
 	gViewerWindow->setup2DViewport();
 
 	// restore camera
-	LLViewerCamera* camera = LLViewerCamera::getInstance();
+	LLViewerCamera* camera = LLViewerCamera::getInstanceFast();
 	camera->setOrigin(mCamera);
 	camera->setAxes(mCamera);
 	camera->setAspect(mCamera.getAspect());

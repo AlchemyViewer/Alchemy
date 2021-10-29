@@ -3425,7 +3425,7 @@ void process_agent_movement_complete(LLMessageSystem* msg, void**)
 			look_at_point = agent_pos + look_at_point.rotVec(gAgent.getQuat());
 
 			static LLVector3 up_direction(0.0f, 0.0f, 1.0f);
-			LLViewerCamera::getInstance()->lookAt(agent_pos, look_at_point, up_direction);
+			LLViewerCamera::getInstanceFast()->lookAt(agent_pos, look_at_point, up_direction);
 		}
 	}
 
@@ -3608,7 +3608,7 @@ void send_agent_update(BOOL force_send, BOOL send_reliable)
 	U8		flag_change = 0;
 
 	cam_center_chg = last_camera_pos_agent - camera_pos_agent;
-	cam_rot_chg = last_camera_at - LLViewerCamera::getInstance()->getAtAxis();
+	cam_rot_chg = last_camera_at - LLViewerCamera::getInstanceFast()->getAtAxis();
 
 	// If a modifier key is held down, turn off
 	// LBUTTON and ML_LBUTTON so that using the camera (alt-key) doesn't
@@ -3746,9 +3746,9 @@ void send_agent_update(BOOL force_send, BOOL send_reliable)
 //		}
 		
 		msg->addVector3Fast(_PREHASH_CameraCenter, camera_pos_agent);
-		msg->addVector3Fast(_PREHASH_CameraAtAxis, LLViewerCamera::getInstance()->getAtAxis());
-		msg->addVector3Fast(_PREHASH_CameraLeftAxis, LLViewerCamera::getInstance()->getLeftAxis());
-		msg->addVector3Fast(_PREHASH_CameraUpAxis, LLViewerCamera::getInstance()->getUpAxis());
+		msg->addVector3Fast(_PREHASH_CameraAtAxis, LLViewerCamera::getInstanceFast()->getAtAxis());
+		msg->addVector3Fast(_PREHASH_CameraLeftAxis, LLViewerCamera::getInstanceFast()->getLeftAxis());
+		msg->addVector3Fast(_PREHASH_CameraUpAxis, LLViewerCamera::getInstanceFast()->getUpAxis());
 		msg->addF32Fast(_PREHASH_Far, gAgentCamera.mDrawDistance);
 		
 		msg->addU32Fast(_PREHASH_ControlFlags, control_flags);
@@ -3783,9 +3783,9 @@ void send_agent_update(BOOL force_send, BOOL send_reliable)
 		last_head_rot = head_rotation;
 		last_render_state = render_state;
 		last_camera_pos_agent = camera_pos_agent;
-		last_camera_at = LLViewerCamera::getInstance()->getAtAxis();
-		last_camera_left = LLViewerCamera::getInstance()->getLeftAxis();
-		last_camera_up = LLViewerCamera::getInstance()->getUpAxis();
+		last_camera_at = LLViewerCamera::getInstanceFast()->getAtAxis();
+		last_camera_left = LLViewerCamera::getInstanceFast()->getLeftAxis();
+		last_camera_up = LLViewerCamera::getInstanceFast()->getUpAxis();
 		last_control_flags = control_flags;
 		last_flags = flags;
 	}

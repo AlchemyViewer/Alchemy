@@ -316,7 +316,7 @@ void LLVOGrass::setPixelAreaAndAngle(LLAgent &agent)
 	mAppAngle = (F32) atan2( max_scale, range) * RAD_TO_DEG;
 
 	// Compute pixels per meter at the given range
-	auto& viewerCamera = LLViewerCamera::instance();
+	auto& viewerCamera = LLViewerCamera::instanceFast();
 	F32 pixels_per_meter = viewerCamera.getViewHeightInPixels() / (tan(viewerCamera.getView()) * range);
 
 	// Assume grass texture is a 5 meter by 5 meter sprite at the grass object's center
@@ -457,7 +457,7 @@ void LLVOGrass::plantBlades()
 		face->mCenterLocal = mPosition + mRegionp->getOriginAgent();
 	}
 
-	auto& viewerCamera = LLViewerCamera::instance();
+	auto& viewerCamera = LLViewerCamera::instanceFast();
 	mDepth = (face->mCenterLocal - viewerCamera.getOrigin())* viewerCamera.getAtAxis();
 	mDrawable->setPosition(face->mCenterLocal);
 	mDrawable->movePartition();
@@ -612,7 +612,7 @@ void LLGrassPartition::addGeometryCount(LLSpatialGroup* group, U32& vertex_count
 
 	mFaceList.clear();
 
-	LLViewerCamera* camera = LLViewerCamera::getInstance();
+	LLViewerCamera* camera = LLViewerCamera::getInstanceFast();
 	for (LLSpatialGroup::element_iter i = group->getDataBegin(), i_end = group->getDataEnd(); i != i_end; ++i)
 	{
 		LLDrawable* drawablep = (LLDrawable*)(*i)->getDrawable();

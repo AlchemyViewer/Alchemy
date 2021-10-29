@@ -6117,7 +6117,7 @@ void LLPipeline::setupAvatarLights(bool for_edit)
 	{
 		LLColor4 diffuse(1.f, 1.f, 1.f, 0.f);
 		LLVector4 light_pos_cam(-8.f, 0.25f, 10.f, 0.f);  // w==0 => directional light
-		LLMatrix4 camera_mat = LLViewerCamera::getInstance()->getModelview();
+		LLMatrix4 camera_mat = LLViewerCamera::getInstanceFast()->getModelview();
 		LLMatrix4 camera_rot(camera_mat.getMat3());
 		camera_rot.invert();
 		LLVector4 light_pos = light_pos_cam * camera_rot;
@@ -7862,7 +7862,7 @@ void LLPipeline::renderFinalize()
 // [/RLVa:KB]
     if (LLPipeline::sRenderDeferred)
     {
-		auto& viewerCamera = LLViewerCamera::instance();
+		auto& viewerCamera = LLViewerCamera::instanceFast();
 		bool dof_enabled = (RenderDepthOfFieldInEditMode || !LLToolMgr::getInstance()->inBuildMode()) &&
                            RenderDepthOfField;
 
@@ -8698,7 +8698,7 @@ void LLPipeline::bindDeferredShader(LLGLSLShader& shader, LLRenderTarget* light_
 		shader.uniform2f(LLShaderMgr::DEFERRED_PROJ_SHADOW_RES, mShadow[4].getWidth(), mShadow[4].getHeight());
 
 		//F32 shadow_offset_error = 1.f + RenderShadowOffsetError * fabsf(LLViewerCamera::getInstance()->getOrigin().mV[2]);
-		F32 shadow_bias_error = RenderShadowBiasError * fabsf(LLViewerCamera::instance().getOrigin().mV[2]) / 3000.f;
+		F32 shadow_bias_error = RenderShadowBiasError * fabsf(LLViewerCamera::getInstanceFast()->getOrigin().mV[2]) / 3000.f;
 		F32 shadow_bias = RenderShadowBias + shadow_bias_error;
 
 		shader.uniform1f(LLShaderMgr::DEFERRED_SHADOW_OFFSET, RenderShadowOffset); //*shadow_offset_error);
@@ -8741,7 +8741,7 @@ void LLPipeline::bindDeferredShader(LLGLSLShader& shader, LLRenderTarget* light_
 
 	if (shader.getUniformLocation(LLShaderMgr::DEFERRED_NEAR_CLIP) > -1)
 	{
-		shader.uniform1f(LLShaderMgr::DEFERRED_NEAR_CLIP, LLViewerCamera::instance().getNear() * 2.f);
+		shader.uniform1f(LLShaderMgr::DEFERRED_NEAR_CLIP, LLViewerCamera::getInstanceFast()->getNear() * 2.f);
 	}
 
 	shader.uniform3fv(LLShaderMgr::DEFERRED_SUN_DIR, 1, mTransformedSunDir.mV);
@@ -8803,7 +8803,7 @@ void LLPipeline::renderDeferredLighting(LLRenderTarget *screen_target)
     LLRenderTarget *deferred_depth_target = &mDeferredDepth;
     LLRenderTarget *deferred_light_target = &mDeferredLight;
 
-	LLViewerCamera& camera = LLViewerCamera::instance();
+	LLViewerCamera& camera = LLViewerCamera::instanceFast();
 
     {
         LL_RECORD_BLOCK_TIME(FTM_RENDER_DEFERRED);
@@ -9558,7 +9558,7 @@ void LLPipeline::generateWaterReflection(LLCamera& camera_in)
         LLCamera camera = camera_in;
         camera.setFar(camera_in.getFar() * 0.75f);
 
-        bool camera_is_underwater = LLViewerCamera::getInstance()->cameraUnderWater();
+        bool camera_is_underwater = LLViewerCamera::getInstanceFast()->cameraUnderWater();
 
         LLPipeline::sReflectionRender = true;
 
@@ -11240,7 +11240,7 @@ void LLPipeline::generateImpostor(LLVOAvatar* avatar)
 	sShadowRender = true;
 	sImpostorRender = true;
 
-	LLViewerCamera& viewer_camera = LLViewerCamera::instance();
+	LLViewerCamera& viewer_camera = LLViewerCamera::instanceFast();
 
 	{
 		LL_RECORD_BLOCK_TIME(FTM_IMPOSTOR_MARK_VISIBLE);

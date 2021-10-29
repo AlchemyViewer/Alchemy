@@ -281,7 +281,7 @@ void LLViewerPartGroup::updateParticles(const F32 lastdt)
 
 	LLViewerPartSim::checkParticleCount(mParticles.size());
 
-	LLViewerCamera* camera = LLViewerCamera::getInstance();
+	LLViewerCamera* camera = LLViewerCamera::getInstanceFast();
 	LLViewerRegion *regionp = getRegion();
 	S32 end = (S32) mParticles.size();
 	for (S32 i = 0 ; i < (S32)mParticles.size();)
@@ -580,7 +580,7 @@ LLViewerPartGroup *LLViewerPartSim::put(LLViewerPart* part)
 	}
 	else
 	{	
-		LLViewerCamera* camera = LLViewerCamera::getInstance();
+		LLViewerCamera* camera = LLViewerCamera::getInstanceFast();
 		F32 desired_size = calc_desired_size(camera, part->mPosAgent, part->mScale);
 
 		S32 count = (S32) mViewerPartGroups.size();

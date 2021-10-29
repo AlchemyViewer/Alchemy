@@ -215,7 +215,7 @@ void LLViewerPartSourceScript::update(const F32 dt)
 		first_run = TRUE;
 	}
 
-	LLViewerCamera& vwrCamera = LLViewerCamera::instance();
+	LLViewerCamera& vwrCamera = LLViewerCamera::instanceFast();
 
 	F32 max_time = llmax(1.f, 10.f*mPartSysData.mBurstRate);
 	dt_update = llmin(max_time, dt_update);
