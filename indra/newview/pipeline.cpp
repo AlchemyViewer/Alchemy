@@ -1140,7 +1140,7 @@ void LLPipeline::updateRenderDeferred()
                       LLPipeline::sRenderTransparentWater &&
                       RenderAvatarVP &&
                       WindLightUseAtmosShaders &&
-                      (bool) LLFeatureManager::getInstance()->isFeatureAvailable("RenderDeferred");
+                      (bool) LLFeatureManager::getInstanceFast()->isFeatureAvailable("RenderDeferred");
 // [RLVa:KB] - @setsphere
 	if (!sRenderDeferred && RlvActions::hasBehaviour(RLV_BHVR_SETSPHERE) && WindLightUseAtmosShaders)
 	{
@@ -1163,7 +1163,7 @@ void LLPipeline::refreshCachedSettings()
 	LLPipeline::sUseOcclusion = 
 			(!gUseWireframe
 			&& LLGLSLShader::sNoFixedFunction
-			&& LLFeatureManager::getInstance()->isFeatureAvailable("UseOcclusion") 
+			&& LLFeatureManager::getInstanceFast()->isFeatureAvailable("UseOcclusion")
 			&& gSavedSettings.getBOOL("UseOcclusion") 
 			&& gGLManager.mHasOcclusionQuery) ? 2 : 0;
 	
@@ -1571,7 +1571,7 @@ void LLPipeline::restoreGL()
 		LLViewerShaderMgr::instance()->setShaders();
 	}
 
-	for (LLViewerRegion* region : LLWorld::getInstance()->getRegionList())
+	for (LLViewerRegion* region : LLWorld::getInstanceFast()->getRegionList())
 	{
 		for (U32 i = 0; i < LLViewerRegion::NUM_PARTITIONS; i++)
 		{
@@ -1722,7 +1722,7 @@ void LLPipeline::dirtyPoolObjectTextures(const std::set<LLViewerFetchedTexture*>
 	}
 	
 	LLOctreeDirtyTexture dirty(textures);
-	for (LLViewerRegion* region : LLWorld::getInstance()->getRegionList())
+	for (LLViewerRegion* region : LLWorld::getInstanceFast()->getRegionList())
 	{
 		for (U32 i = 0; i < LLViewerRegion::NUM_PARTITIONS; i++)
 		{
@@ -2245,7 +2245,7 @@ void LLPipeline::updateMove()
 	{
  		LL_RECORD_BLOCK_TIME(FTM_OCTREE_BALANCE);
 
-		for (LLViewerRegion* region : LLWorld::getInstance()->getRegionList())
+		for (LLViewerRegion* region : LLWorld::getInstanceFast()->getRegionList())
 		{
 			for (U32 i = 0; i < LLViewerRegion::NUM_PARTITIONS; i++)
 			{
@@ -2506,7 +2506,7 @@ void LLPipeline::checkReferences(LLSpatialGroup* group)
 
 bool LLPipeline::visibleObjectsInFrustum(LLCamera& camera)
 {
-	for (LLViewerRegion* region : LLWorld::getInstance()->getRegionList())
+	for (LLViewerRegion* region : LLWorld::getInstanceFast()->getRegionList())
 	{
 		for (U32 i = 0; i < LLViewerRegion::NUM_PARTITIONS; i++)
 		{
@@ -2539,7 +2539,7 @@ bool LLPipeline::getVisibleExtents(LLCamera& camera, LLVector3& min, LLVector3& 
 
 	bool res = true;
 
-	for (LLViewerRegion* region : LLWorld::getInstance()->getRegionList())
+	for (LLViewerRegion* region : LLWorld::getInstanceFast()->getRegionList())
 	{
 		for (U32 i = 0; i < LLViewerRegion::NUM_PARTITIONS; i++)
 		{
@@ -2568,7 +2568,7 @@ void LLPipeline::updateCull(LLCamera& camera, LLCullResult& result, S32 water_cl
 {
 	static LLCachedControl<bool> use_occlusion(gSavedSettings,"UseOcclusion");
 	static bool can_use_occlusion = LLGLSLShader::sNoFixedFunction
-									&& LLFeatureManager::getInstance()->isFeatureAvailable("UseOcclusion") 
+									&& LLFeatureManager::getInstanceFast()->isFeatureAvailable("UseOcclusion")
 									&& gGLManager.mHasOcclusionQuery;
 
 	LL_RECORD_BLOCK_TIME(FTM_CULL);
@@ -2632,7 +2632,7 @@ void LLPipeline::updateCull(LLCamera& camera, LLCullResult& result, S32 water_cl
         camera.disableUserClipPlane();
     }
 
-	for (LLViewerRegion* region : LLWorld::getInstance()->getRegionList())
+	for (LLViewerRegion* region : LLWorld::getInstanceFast()->getRegionList())
 	{
 		for (U32 i = 0; i < LLViewerRegion::NUM_PARTITIONS; i++)
 		{
@@ -2695,7 +2695,7 @@ void LLPipeline::updateCull(LLCamera& camera, LLCullResult& result, S32 water_cl
 
     if (render_water)
     {
-        LLWorld::getInstance()->precullWaterObjects(camera, sCull, render_water);
+        LLWorld::getInstanceFast()->precullWaterObjects(camera, sCull, render_water);
     }
 	
 	gGL.matrixMode(LLRender::MM_PROJECTION);
@@ -2898,7 +2898,7 @@ void LLPipeline::doOcclusion(LLCamera& camera)
 		}
 	
 		//apply occlusion culling to object cache tree
-		for (LLViewerRegion* region : LLWorld::getInstance()->getRegionList())
+		for (LLViewerRegion* region : LLWorld::getInstanceFast()->getRegionList())
 		{
 			LLVOCachePartition* vo_part = region->getVOCachePartition();
 			if(vo_part)
@@ -3357,7 +3357,7 @@ void LLPipeline::shiftObjects(const LLVector3 &offset)
 	
 	{
 		LL_RECORD_BLOCK_TIME(FTM_SHIFT_OCTREE);
-		for (LLViewerRegion* region : LLWorld::getInstance()->getRegionList())
+		for (LLViewerRegion* region : LLWorld::getInstanceFast()->getRegionList())
 		{
 			for (U32 i = 0; i < LLViewerRegion::NUM_PARTITIONS; i++)
 			{
@@ -3561,7 +3561,7 @@ void LLPipeline::stateSort(LLCamera& camera, LLCullResult &result)
 	if (LLViewerCamera::sCurCameraID == LLViewerCamera::CAMERA_WORLD)
 	{
 		LLSpatialGroup* last_group = NULL;
-		BOOL fov_changed = LLViewerCamera::getInstance()->isDefaultFOVChanged();
+		BOOL fov_changed = LLViewerCamera::getInstanceFast()->isDefaultFOVChanged();
 		for (LLCullResult::bridge_iterator i = sCull->beginVisibleBridge(), i_end = sCull->endVisibleBridge(); i != i_end; ++i)
 		{
 			LLCullResult::bridge_iterator cur_iter = i;
@@ -3674,7 +3674,7 @@ void LLPipeline::stateSort(LLDrawable* drawablep, LLCamera& camera)
         return;
     }
 
-	if (LLSelectMgr::getInstance()->mHideSelectedObjects)
+	if (LLSelectMgr::getInstanceFast()->mHideSelectedObjects)
 	{
 //		if (drawablep->getVObj().notNull() &&
 //			drawablep->getVObj()->isSelected())
@@ -4141,7 +4141,7 @@ void LLPipeline::postSort(LLCamera& camera)
 		mSelectedFaces.clear();
 
 		// Draw face highlights for selected faces.
-		if (LLSelectMgr::getInstance()->getTEMode())
+		if (LLSelectMgr::getInstanceFast()->getTEMode())
 		{
 			LLPipeline::setRenderHighlightTextureChannel(gFloaterTools->getPanelFace()->getTextureChannelToEdit());
 
@@ -4160,7 +4160,7 @@ void LLPipeline::postSort(LLCamera& camera)
 					return true;
 				}
 			} func;
-			LLSelectMgr::getInstance()->getSelection()->applyToTEs(&func);
+			LLSelectMgr::getInstanceFast()->getSelection()->applyToTEs(&func);
 		}
 	}
 
@@ -4199,9 +4199,9 @@ void render_hud_elements()
 		LLTracker::render3D();
 		
 		// Show the property lines
-		LLWorld::getInstance()->renderPropertyLines();
-		LLViewerParcelMgr::getInstance()->render();
-		LLViewerParcelMgr::getInstance()->renderParcelCollision();
+		LLWorld::getInstanceFast()->renderPropertyLines();
+		LLViewerParcelMgr::getInstanceFast()->render();
+		LLViewerParcelMgr::getInstanceFast()->renderParcelCollision();
 	
 		// Render name tags.
 		LLHUDObject::renderAll();
@@ -4209,7 +4209,7 @@ void render_hud_elements()
 	else if (gForceRenderLandFence)
 	{
 		// This is only set when not rendering the UI, for parcel snapshots
-		LLViewerParcelMgr::getInstance()->render();
+		LLViewerParcelMgr::getInstanceFast()->render();
 	}
 	else if (gPipeline.hasRenderType(LLPipeline::RENDER_TYPE_HUD))
 	{
@@ -5012,7 +5012,7 @@ void LLPipeline::renderPhysicsDisplay()
 		gDebugProgram.bind();
 	}
 
-	for (LLViewerRegion* region : LLWorld::getInstance()->getRegionList())
+	for (LLViewerRegion* region : LLWorld::getInstanceFast()->getRegionList())
 	{
 		for (U32 i = 0; i < LLViewerRegion::NUM_PARTITIONS; i++)
 		{
@@ -5418,7 +5418,7 @@ void LLPipeline::renderDebug()
 
 
 	// Debug stuff.
-	for (LLViewerRegion* region : LLWorld::getInstance()->getRegionList())
+	for (LLViewerRegion* region : LLWorld::getInstanceFast()->getRegionList())
 	{
 		for (U32 i = 0; i < LLViewerRegion::NUM_PARTITIONS; i++)
 		{
@@ -7240,7 +7240,7 @@ LLVOPartGroup* LLPipeline::lineSegmentIntersectParticle(const LLVector4a& start,
 
 	LLDrawable* drawable = NULL;
 
-	for (LLViewerRegion* region : LLWorld::getInstance()->getRegionList())
+	for (LLViewerRegion* region : LLWorld::getInstanceFast()->getRegionList())
 	{
 		LLSpatialPartition* part = region->getSpatialPartition(LLViewerRegion::PARTITION_PARTICLE);
 		if (part && hasRenderType(part->mDrawableType))
@@ -7289,7 +7289,7 @@ LLViewerObject* LLPipeline::lineSegmentIntersectInWorld(const LLVector4a& start,
 
 	sPickAvatar = false; //! LLToolMgr::getInstance()->inBuildMode();
 	
-	for (LLViewerRegion* region : LLWorld::getInstance()->getRegionList())
+	for (LLViewerRegion* region : LLWorld::getInstanceFast()->getRegionList())
 	{
 		for (U32 j = 0; j < LLViewerRegion::NUM_PARTITIONS; j++)
 		{
@@ -7352,7 +7352,7 @@ LLViewerObject* LLPipeline::lineSegmentIntersectInWorld(const LLVector4a& start,
 
 		//check against avatars
 		sPickAvatar = true;
-		for (LLViewerRegion* region : LLWorld::getInstance()->getRegionList())
+		for (LLViewerRegion* region : LLWorld::getInstanceFast()->getRegionList())
 		{
 			LLSpatialPartition* part = region->getSpatialPartition(LLViewerRegion::PARTITION_AVATAR);
 			if (part && hasRenderType(part->mDrawableType))
@@ -7430,7 +7430,7 @@ LLViewerObject* LLPipeline::lineSegmentIntersectInHUD(const LLVector4a& start, c
 {
 	LLDrawable* drawable = NULL;
 
-	for (LLViewerRegion* region : LLWorld::getInstance()->getRegionList())
+	for (LLViewerRegion* region : LLWorld::getInstanceFast()->getRegionList())
 	{
 		bool toggle = false;
 		if (!hasRenderType(LLPipeline::RENDER_TYPE_HUD))
@@ -7528,7 +7528,7 @@ void LLPipeline::doResetVertexBuffers(bool forced)
 
 	mALRenderUtil->resetVertexBuffers();
 
-	for (LLViewerRegion* region : LLWorld::getInstance()->getRegionList())
+	for (LLViewerRegion* region : LLWorld::getInstanceFast()->getRegionList())
 	{
 		for (U32 i = 0; i < LLViewerRegion::NUM_PARTITIONS; i++)
 		{
@@ -7543,7 +7543,7 @@ void LLPipeline::doResetVertexBuffers(bool forced)
 	{
 		LLSpatialPartition::sTeleportRequested = FALSE;
 
-		LLWorld::getInstance()->clearAllVisibleObjects();
+		LLWorld::getInstanceFast()->clearAllVisibleObjects();
 		clearRebuildDrawables();
 	}
 
@@ -7863,7 +7863,7 @@ void LLPipeline::renderFinalize()
     if (LLPipeline::sRenderDeferred)
     {
 		auto& viewerCamera = LLViewerCamera::instanceFast();
-		bool dof_enabled = (RenderDepthOfFieldInEditMode || !LLToolMgr::getInstance()->inBuildMode()) &&
+		bool dof_enabled = (RenderDepthOfFieldInEditMode || !LLToolMgr::getInstanceFast()->inBuildMode()) &&
                            RenderDepthOfField;
 
         bool multisample = RenderFSAASamples > 1 && (mFXAABuffer.isComplete() || (mSMAAEdgeBuffer.isComplete() && mSMAABlendBuffer.isComplete()));
@@ -7888,10 +7888,10 @@ void LLPipeline::renderFinalize()
 
             LLVector3 focus_point;
 
-            LLViewerObject *obj = LLViewerMediaFocus::getInstance()->getFocusedObject();
+            LLViewerObject *obj = LLViewerMediaFocus::getInstanceFast()->getFocusedObject();
             if (obj && obj->mDrawable && obj->isSelected())
             { // focus on selected media object
-                S32 face_idx = LLViewerMediaFocus::getInstance()->getFocusedFace();
+                S32 face_idx = LLViewerMediaFocus::getInstanceFast()->getFocusedFace();
                 if (obj && obj->mDrawable)
                 {
                     LLFace *face = obj->mDrawable->getFace(face_idx);
@@ -7904,7 +7904,7 @@ void LLPipeline::renderFinalize()
 
             if (focus_point.isExactlyZero())
             {
-                if (LLViewerJoystick::getInstance()->getOverrideCamera())
+                if (LLViewerJoystick::getInstanceFast()->getOverrideCamera())
                 { // focus on point under cursor
                     focus_point.set(gDebugRaycastIntersection.getF32ptr());
                 }
@@ -9796,7 +9796,7 @@ void LLPipeline::generateWaterReflection(LLCamera& camera_in)
                     gUIProgram.bind();
                 }
 
-                LLWorld::getInstance()->renderPropertyLines();
+                LLWorld::getInstanceFast()->renderPropertyLines();
 
                 if (LLGLSLShader::sNoFixedFunction)
                 {

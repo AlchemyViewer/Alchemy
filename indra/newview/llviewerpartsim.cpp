@@ -139,7 +139,7 @@ LLViewerPartGroup::LLViewerPartGroup(const LLVector3 &center_agent, const F32 bo
 	mVOPartGroupp = NULL;
 	mUniformParticles = TRUE;
 
-	mRegionp = LLWorld::getInstance()->getRegionFromPosAgent(center_agent);
+	mRegionp = LLWorld::getInstanceFast()->getRegionFromPosAgent(center_agent);
 	llassert_always(center_agent.isFinite());
 	
 	if (!mRegionp)
@@ -408,7 +408,7 @@ void LLViewerPartGroup::updateParticles(const F32 lastdt)
 			if (!posInGroup(part->mPosAgent, desired_size))
 			{
 				// Transfer particles between groups
-				LLViewerPartSim::getInstance()->put(part) ;
+				LLViewerPartSim::getInstanceFast()->put(part) ;
 				vector_replace_with_last(mParticles, mParticles.begin() + i);
 			}
 			else

@@ -742,7 +742,7 @@ void LLWorld::clearAllVisibleObjects()
 
 void LLWorld::updateParticles()
 {
-	LLViewerPartSim::getInstance()->updateSimulation();
+	LLViewerPartSim::getInstanceFast()->updateSimulation();
 }
 
 void LLWorld::renderPropertyLines()
@@ -822,7 +822,7 @@ void LLWorld::printPacketsLost()
 
 void LLWorld::processCoarseUpdate(LLMessageSystem* msg, void** user_data)
 {
-	LLViewerRegion* region = LLWorld::getInstance()->getRegion(msg->getSender());
+	LLViewerRegion* region = LLWorld::getInstanceFast()->getRegion(msg->getSender());
 	if( region )
 	{
 		region->updateCoarseLocations(msg);
@@ -1059,7 +1059,7 @@ void LLWorld::shiftRegions(const LLVector3& offset)
 		region->updateRenderMatrix();
 	}
 
-	LLViewerPartSim::getInstance()->shift(offset);
+	LLViewerPartSim::getInstanceFast()->shift(offset);
 }
 
 LLViewerTexture* LLWorld::getDefaultWaterTexture()
@@ -1137,7 +1137,7 @@ void process_enable_simulator(LLMessageSystem *msg, void **user_data)
 
 	// Viewer trusts the simulator.
 	msg->enableCircuit(sim, TRUE);
-	LLWorld::getInstance()->addRegion(handle, sim);
+	LLWorld::getInstanceFast()->addRegion(handle, sim);
 
 	// give the simulator a message it can use to get ip and port
 	LL_INFOS() << "simulator_enable() Enabling " << sim << " with code " << msg->getOurCircuitCode() << LL_ENDL;

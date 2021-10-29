@@ -108,7 +108,7 @@ LLDrawable *LLVOWater::createDrawable(LLPipeline *pipeline)
 	}
 	else
 	{
-		mDrawable->setNumFaces(1, pool, LLWorld::getInstance()->getDefaultWaterTexture());
+		mDrawable->setNumFaces(1, pool, LLWorld::getInstanceFast()->getDefaultWaterTexture());
 	}
 
 	return mDrawable;

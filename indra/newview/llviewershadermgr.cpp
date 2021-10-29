@@ -1042,7 +1042,7 @@ BOOL LLViewerShaderMgr::loadShadersEnvironment()
 		return FALSE;
 	}
 	
-	LLWorld::getInstance()->updateWaterObjects();
+	LLWorld::getInstanceFast()->updateWaterObjects();
 	
 	return TRUE;
 }
@@ -1159,7 +1159,7 @@ BOOL LLViewerShaderMgr::loadShadersWater()
 		return loadShadersWater();
 	}
 	
-	LLWorld::getInstance()->updateWaterObjects();
+	LLWorld::getInstanceFast()->updateWaterObjects();
 
 	return TRUE;
 }

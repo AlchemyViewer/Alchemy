@@ -981,7 +981,7 @@ void LLVOAvatarSelf::idleUpdateTractorBeam()
 	else if (!mBeam || mBeam->isDead())
 	{
 		// VEFFECT: Tractor Beam
-		mBeam = (LLHUDEffectSpiral *)LLHUDManager::getInstance()->createViewerEffect(LLHUDObject::LL_HUD_EFFECT_BEAM);
+		mBeam = (LLHUDEffectSpiral *)LLHUDManager::getInstanceFast()->createViewerEffect(LLHUDObject::LL_HUD_EFFECT_BEAM);
 		mBeam->setColor(LLColor4U(gAgent.getEffectColor()));
 		mBeam->setSourceObject(this);
 		mBeamTimer.reset();
@@ -989,7 +989,7 @@ void LLVOAvatarSelf::idleUpdateTractorBeam()
 
 	if (!mBeam.isNull())
 	{
-		LLObjectSelectionHandle selection = LLSelectMgr::getInstance()->getSelection();
+		LLObjectSelectionHandle selection = LLSelectMgr::getInstanceFast()->getSelection();
 
 		if (gAgentCamera.mPointAt.notNull())
 		{
@@ -1006,7 +1006,7 @@ void LLVOAvatarSelf::idleUpdateTractorBeam()
 		else
 		{
 			mBeam->setTargetObject(NULL);
-			LLTool *tool = LLToolMgr::getInstance()->getCurrentTool();
+			LLTool *tool = LLToolMgr::getInstanceFast()->getCurrentTool();
 			if (tool->isEditing())
 			{
 				if (tool->getEditingObject())
@@ -1285,7 +1285,7 @@ BOOL LLVOAvatarSelf::detachObject(LLViewerObject *viewer_object)
 		// the simulator should automatically handle permission revocation
 		
 		stopMotionFromSource(attachment_id);
-		LLFollowCamMgr::getInstance()->setCameraActive(viewer_object->getID(), FALSE);
+		LLFollowCamMgr::getInstanceFast()->setCameraActive(viewer_object->getID(), FALSE);
 		
 		LLViewerObject::const_child_list_t& child_list = viewer_object->getChildren();
 		for (LLViewerObject* child_objectp : child_list)
@@ -1294,7 +1294,7 @@ BOOL LLVOAvatarSelf::detachObject(LLViewerObject *viewer_object)
 			// permissions revocation
 			
 			stopMotionFromSource(child_objectp->getID());
-			LLFollowCamMgr::getInstance()->setCameraActive(child_objectp->getID(), FALSE);
+			LLFollowCamMgr::getInstanceFast()->setCameraActive(child_objectp->getID(), FALSE);
 		}
 		
 		// Make sure the inventory is in sync with the avatar.
