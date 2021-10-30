@@ -1,0 +1,153 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<panel
+ border="true"
+ follows="left|top|right|bottom"
+ height="435"
+ label="Move"
+ layout="topleft"
+ left="102"
+ name="move_panel"
+ top="1"
+ width="517">
+  <text
+   follows="left|top"
+   type="string"
+   length="1"
+   height="10"
+   layout="topleft"
+   left="78"
+   name="mouse_lbl"
+   width="270"
+   top_pad="15">
+    Mouse:
+  </text>
+  <check_box
+   control_name="FirstPersonAvatarVisible"
+   follows="left|top"
+   height="20"
+   label="Show me in Mouselook"
+   layout="topleft"
+   left_delta="5"
+   name="first_person_avatar_visible"
+   top_pad="5"
+   width="256" />
+  <check_box
+   control_name="AlchemyRealisticMouselook"
+   follows="left|top"
+   height="16"
+   label="Realistic mouselook"
+   layout="topleft"
+   left_delta="0"
+   name="AlchemyRealisticMouselook"
+   tool_tip="Make the camera follow avatar body movements and animations while in mouselook"
+   top_pad="5"
+   width="256" />
+  <check_box
+   control_name="AlchemyDisableMouseSteering"
+   follows="left|top"
+   height="20"
+   label="Disable mouse steering"
+   layout="topleft"
+   left_delta="0"
+   name="disable_mouse_steering"
+   tool_tip="Mouse steering resets your camera and avatar position to face away from the camera when you click your avatar."
+   top_pad="0"
+   width="256" />
+  <text
+   type="string"
+   length="1"
+   follows="left|top"
+   height="15"
+   layout="topleft"
+   left_delta="3"
+   name=" Mouse Sensitivity"
+   top_pad="10"
+   width="160"
+   wrap="true">
+    Mouselook mouse sensitivity:
+  </text>
+  <slider
+   control_name="MouseSensitivity"
+   follows="left|top"
+   height="15"
+   initial_value="2"
+   layout="topleft"
+   show_text="false"
+   left_pad="0"
+   max_val="15"
+   name="mouse_sensitivity"
+   top_delta="-1"
+   width="115" />
+  <check_box
+   control_name="InvertMouse"
+   height="16"
+   label="Invert"
+   layout="topleft"
+   left_pad="2"
+   name="invert_mouse"
+   top_delta="0"
+   width="128" />
+  <text
+   type="string"
+   length="1"
+   follows="left|top"
+   height="15"
+   layout="topleft"
+   left="75"
+   name="Combat Features"
+   top_pad="10"
+   width="160"
+   wrap="true">
+    Combat Features:
+  </text>
+  <check_box
+   control_name="AlchemyMouselookIFF"
+   follows="left|top"
+   height="20"
+   label="Show User In Crosshairs"
+   layout="topleft"
+   left_delta="5"
+   name="alchemy_mlook_iff"
+   tool_tip="Shows user's name and distance in mouselook's crosshairs."
+   top_pad="0"
+   width="256" />
+  <check_box
+   control_name="AlchemyMouselookIFFMarkers"
+   follows="left|top"
+   height="20"
+   label="Show arrows for offscreen users"
+   layout="topleft"
+   left_delta="0"
+   name="alchemy_mlook_iff_markers"
+   tool_tip="Shows arrows on the sides of the screen for users not currently visible."
+   top_pad="0"
+   width="256" />
+  <slider
+   control_name="AlchemyMouselookIFFRange"
+   follows="left|top"
+   height="15"
+   layout="topleft"
+   show_text="false"
+   left_pad="-70"
+   max_val="512"
+   min_val="16"
+   increment="16"
+   name="iff_range_slider"
+   top_delta="3"
+   width="115" />
+  <spinner
+   top_pad="-18"
+   height="20"
+   label=""
+   label_width="0"
+   left="385"
+   decimal_digits="0"
+   follows="top|right"
+   layout="topleft"
+   max_val="512"
+   min_val="16"
+   width="50"
+   increment="16"
+   name="iff_range_spinner"
+   control_name="AlchemyMouselookIFFRange"/>
+</panel>
