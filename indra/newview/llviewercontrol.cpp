@@ -148,7 +148,7 @@ static bool handleAvatarHoverOffsetChanged(const LLSD& newvalue)
 static bool handleSetShaderChanged(const LLSD& newvalue)
 {
 // [RLVa:KB] - @setenv and @setsphere
-	if ( (RlvActions::isRlvEnabled()) && (!RlvActions::canChangeEnvironment() || (LLVfxManager::instance().hasEffect(EVisualEffect::RlvSphere))) &&
+	if ( (RlvActions::isRlvEnabled()) && (!RlvActions::canChangeEnvironment() || (LLVfxManager::instanceFast().hasEffect(EVisualEffect::RlvSphere))) &&
 		 (LLFeatureManager::getInstance()->isFeatureAvailable("WindLightUseAtmosShaders"))&& (!gSavedSettings.getBOOL("WindLightUseAtmosShaders")) )
 	{
 		gSavedSettings.setBOOL("WindLightUseAtmosShaders", TRUE);

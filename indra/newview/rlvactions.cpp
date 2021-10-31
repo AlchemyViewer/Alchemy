@@ -403,7 +403,7 @@ bool RlvActions::canChangeEnvironment(const LLUUID& idRlvObject)
 
 bool RlvActions::hasPostProcess()
 {
-	return LLVfxManager::instance().hasEffect(EVisualEffect::RlvSphere);
+	return LLVfxManager::instanceFast().hasEffect(EVisualEffect::RlvSphere);
 }
 
 // ============================================================================

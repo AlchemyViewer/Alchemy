@@ -6098,7 +6098,7 @@ void LLPickInfo::fetchResults()
 	if ( (RlvActions::hasBehaviour(RLV_BHVR_SETOVERLAY)) && (hit_object) && (!hit_object->isHUDAttachment()) )
 	{
 		std::list<RlvOverlayEffect*> effects;
-		LLVfxManager::instance().getEffects<RlvOverlayEffect>(effects);
+		LLVfxManager::instanceFast().getEffects<RlvOverlayEffect>(effects);
 		for (const RlvOverlayEffect* pEffect : effects)
 		{
 			if (pEffect->getEnabled() && pEffect->hitTest(mMousePt))

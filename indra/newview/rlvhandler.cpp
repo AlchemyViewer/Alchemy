@@ -2081,17 +2081,17 @@ ERlvCmdRet RlvBehaviourHandler<RLV_BHVR_SETOVERLAY>::onCommand(const RlvCommand&
 	{
 		if (gRlvHandler.hasBehaviour(rlvCmd.getObjectID(), rlvCmd.getBehaviourType()))
 		{
-			LLVfxManager::instance().addEffect(new RlvOverlayEffect(gRlvHandler.getCurrentObject()));
+			LLVfxManager::instanceFast().addEffect(new RlvOverlayEffect(gRlvHandler.getCurrentObject()));
 		}
 		else
 		{
-			LLVfxManager::instance().removeEffect<RlvOverlayEffect>(gRlvHandler.getCurrentObject());
+			LLVfxManager::instanceFast().removeEffect<RlvOverlayEffect>(gRlvHandler.getCurrentObject());
 		}
 	}
 
 	// Refresh overlay effects according to object hierarchy
 	std::list<RlvOverlayEffect*> effects;
-	if (LLVfxManager::instance().getEffects<RlvOverlayEffect>(effects))
+	if (LLVfxManager::instanceFast().getEffects<RlvOverlayEffect>(effects))
 	{
 		auto itActiveEffect = std::find_if(effects.begin(), effects.end(), [](const LLVisualEffect* pEffect) { return pEffect->getEnabled(); });
 		if (effects.end() == itActiveEffect)
@@ -2105,7 +2105,7 @@ ERlvCmdRet RlvBehaviourHandler<RLV_BHVR_SETOVERLAY>::onCommand(const RlvCommand&
 		{
 			bool isActive = (idActiveRootObj.isNull() && pEffect == effects.front()) || (Rlv::getObjectRootId(pEffect->getId()) == idActiveRootObj);
 			int nPriority = (isActive) ? 256 - Rlv::getObjectLinkNumber(pEffect->getId()) : pEffect->getPriority();
-			LLVfxManager::instance().updateEffect(pEffect, isActive, nPriority);
+			LLVfxManager::instanceFast().updateEffect(pEffect, isActive, nPriority);
 			pEffect->setBlockTouch(gRlvHandler.hasBehaviour(pEffect->getId(), RLV_BHVR_SETOVERLAY_TOUCH));
 		}
 	}
@@ -2117,7 +2117,7 @@ ERlvCmdRet RlvBehaviourHandler<RLV_BHVR_SETOVERLAY>::onCommand(const RlvCommand&
 template<> template<>
 ERlvCmdRet RlvBehaviourHandler<RLV_BHVR_SETOVERLAY_TOUCH>::onCommand(const RlvCommand& rlvCmd, bool& fRefCount)
 {
-	if (RlvOverlayEffect* pOverlayEffect = LLVfxManager::instance().getEffect<RlvOverlayEffect>(rlvCmd.getObjectID()))
+	if (RlvOverlayEffect* pOverlayEffect = LLVfxManager::instanceFast().getEffect<RlvOverlayEffect>(rlvCmd.getObjectID()))
 	{
 		pOverlayEffect->setBlockTouch( RLV_TYPE_ADD == rlvCmd.getParamType() );
 	}
@@ -2138,7 +2138,7 @@ ERlvCmdRet RlvBehaviourHandler<RLV_BHVR_SETSPHERE>::onCommand(const RlvCommand& 
 	{
 		if (gRlvHandler.hasBehaviour(rlvCmd.getObjectID(), rlvCmd.getBehaviourType()))
 		{
-			LLVfxManager::instance().addEffect(new RlvSphereEffect(rlvCmd.getObjectID()));
+			LLVfxManager::instanceFast().addEffect(new RlvSphereEffect(rlvCmd.getObjectID()));
 
 			Rlv::forceAtmosphericShadersIfAvailable();
 
@@ -2163,7 +2163,7 @@ ERlvCmdRet RlvBehaviourHandler<RLV_BHVR_SETSPHERE>::onCommand(const RlvCommand& 
 		}
 		else
 		{
-			LLVfxManager::instance().removeEffect<RlvSphereEffect>(gRlvHandler.getCurrentObject());
+			LLVfxManager::instanceFast().removeEffect<RlvSphereEffect>(gRlvHandler.getCurrentObject());
 		}
 	}
 	return eRet;
@@ -3109,7 +3109,7 @@ ERlvCmdRet RlvForceHandler<RLV_BHVR_SETOVERLAY_TWEEN>::onCommand(const RlvComman
 	if (!pRlvObj)
 		return RLV_RET_FAILED_NOBEHAVIOUR;
 
-	RlvOverlayEffect* pOverlayEffect = LLVfxManager::instance().getEffect<RlvOverlayEffect>(rlvCmd.getObjectID());
+	RlvOverlayEffect* pOverlayEffect = LLVfxManager::instanceFast().getEffect<RlvOverlayEffect>(rlvCmd.getObjectID());
 	if (!pOverlayEffect)
 		return RLV_RET_FAILED_LOCK;
 

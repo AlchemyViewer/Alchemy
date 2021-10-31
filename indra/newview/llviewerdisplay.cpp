@@ -1335,7 +1335,7 @@ void render_ui(F32 zoom_factor, int subfield)
 // [RLVa:KB] - Checked: RLVa-2.2 (@setoverlay)
     if (RlvActions::hasBehaviour(RLV_BHVR_SETOVERLAY))
     {
-        LLVfxManager::instance().runEffect(EVisualEffect::RlvOverlay);
+        LLVfxManager::instanceFast().runEffect(EVisualEffect::RlvOverlay);
     }
 // [/RLVa:KB]
 	render_hud_attachments();
