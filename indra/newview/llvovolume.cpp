@@ -86,6 +86,7 @@
 #include "llcallstack.h"
 #include "llsculptidsize.h"
 #include "llavatarappearancedefines.h"
+#include "lltoolmgr.h"
 // [RLVa:KB] - Checked: RLVa-2.0.0
 #include "rlvactions.h"
 #include "rlvlocks.h"
@@ -4668,14 +4669,14 @@ BOOL LLVOVolume::lineSegmentIntersect(const LLVector4a& start, const LLVector4a&
 
 	if (mDrawable->isState(LLDrawable::RIGGED))
 	{
-		if ((pick_rigged) || (getAvatar() && (getAvatar()->isSelf()) && (LLFloater::isVisible(gFloaterTools))))
+		if (pick_rigged || LLToolMgr::getInstanceFast()->inBuildMode())
 		{
 			updateRiggedVolume(true);
 			volume = mRiggedVolume;
 			transform = false;
 		}
 		else
-		{ //cannot pick rigged attachments on other avatars or when not in build mode
+		{ //cannot pick rigged attachments when not in build mode
 			return FALSE;
 		}
 	}
