@@ -403,10 +403,10 @@ BOOL LLToolPie::handleLeftClickPick()
 					gAgentCamera.setFocusOnAvatar(FALSE, ANIMATE);
 					
 					LLBBox bbox = object->getBoundingBoxAgent() ;
-					F32 angle_of_view = llmax(0.1f, LLViewerCamera::getInstance()->getAspect() > 1.f ? LLViewerCamera::getInstance()->getView() * LLViewerCamera::getInstance()->getAspect() : LLViewerCamera::getInstance()->getView());
+					F32 angle_of_view = llmax(0.1f, LLViewerCamera::getInstanceFast()->getAspect() > 1.f ? LLViewerCamera::getInstanceFast()->getView() * LLViewerCamera::getInstanceFast()->getAspect() : LLViewerCamera::getInstanceFast()->getView());
 					F32 distance = bbox.getExtentLocal().magVec() * PADDING_FACTOR / atan(angle_of_view);
 				
-					LLVector3 obj_to_cam = LLViewerCamera::getInstance()->getOrigin() - bbox.getCenterAgent();
+					LLVector3 obj_to_cam = LLViewerCamera::getInstanceFast()->getOrigin() - bbox.getCenterAgent();
 					obj_to_cam.normVec();
 					
 					LLVector3d object_center_global = gAgent.getPosGlobalFromAgent(bbox.getCenterAgent());
@@ -664,7 +664,7 @@ bool LLToolPie::walkToClickedLocation()
     {
         const F64 SELF_CLICK_WALK_DISTANCE = 3.0;
         // pretend we picked some point a bit in front of avatar
-        mPick.mPosGlobal = gAgent.getPositionGlobal() + LLVector3d(LLViewerCamera::instance().getAtAxis()) * SELF_CLICK_WALK_DISTANCE;
+        mPick.mPosGlobal = gAgent.getPositionGlobal() + LLVector3d(LLViewerCamera::instanceFast().getAtAxis()) * SELF_CLICK_WALK_DISTANCE;
     }
 
     if ((mPick.mPickType == LLPickInfo::PICK_LAND && !mPick.mPosGlobal.isExactlyZero()) ||
@@ -2106,20 +2106,20 @@ void LLToolPie::startCameraSteering()
 		if (avatar_object && ((LLVOAvatar*)avatar_object)->isSelf())
 		{
 			// ...project pick point a few meters in front of avatar
-			mSteerPick.mPosGlobal = gAgent.getPositionGlobal() + LLVector3d(LLViewerCamera::instance().getAtAxis()) * 3.0;
+			mSteerPick.mPosGlobal = gAgent.getPositionGlobal() + LLVector3d(LLViewerCamera::instanceFast().getAtAxis()) * 3.0;
 		}
 
 		if (!mSteerPick.isValid())
 		{
 			mSteerPick.mPosGlobal = gAgent.getPosGlobalFromAgent(
-				LLViewerCamera::instance().getOrigin() + gViewerWindow->mouseDirectionGlobal(mSteerPick.mMousePt.mX, mSteerPick.mMousePt.mY) * 100.f);
+				LLViewerCamera::instanceFast().getOrigin() + gViewerWindow->mouseDirectionGlobal(mSteerPick.mMousePt.mX, mSteerPick.mMousePt.mY) * 100.f);
 		}
 
 		setMouseCapture(TRUE);
 		
 		mMouseSteerX = mMouseDownX;
 		mMouseSteerY = mMouseDownY;
-		const LLVector3 camera_to_rotation_center	= gAgent.getFrameAgent().getOrigin() - LLViewerCamera::instance().getOrigin();
+		const LLVector3 camera_to_rotation_center	= gAgent.getFrameAgent().getOrigin() - LLViewerCamera::instanceFast().getOrigin();
 		const LLVector3 rotation_center_to_pick		= gAgent.getPosAgentFromGlobal(mSteerPick.mPosGlobal) - gAgent.getFrameAgent().getOrigin();
 
 		mClockwise = camera_to_rotation_center * rotation_center_to_pick < 0.f;
@@ -2134,7 +2134,7 @@ void LLToolPie::startCameraSteering()
 
 void LLToolPie::steerCameraWithMouse(S32 x, S32 y)
 {
-	const LLViewerCamera& camera = LLViewerCamera::instance();
+	const LLViewerCamera& camera = LLViewerCamera::instanceFast();
 	const LLCoordFrame& rotation_frame = gAgent.getFrameAgent();
 	const LLVector3 pick_pos = gAgent.getPosAgentFromGlobal(mSteerPick.mPosGlobal);
 	const LLVector3 pick_rotation_center = rotation_frame.getOrigin() + parallel_component(pick_pos - rotation_frame.getOrigin(), rotation_frame.getUpAxis());
@@ -2142,7 +2142,7 @@ void LLToolPie::steerCameraWithMouse(S32 x, S32 y)
 	const F32 min_rotation_radius = MIN_ROTATION_RADIUS_FRACTION * dist_vec(pick_rotation_center, camera.getOrigin());;
 	const F32 pick_distance_from_rotation_center = llclamp(dist_vec(pick_pos, pick_rotation_center), min_rotation_radius, F32_MAX);
 	const LLVector3 camera_to_rotation_center = pick_rotation_center - camera.getOrigin();
-	const LLVector3 adjusted_camera_pos = LLViewerCamera::instance().getOrigin() + projected_vec(camera_to_rotation_center, rotation_frame.getUpAxis());
+	const LLVector3 adjusted_camera_pos = camera.getOrigin() + projected_vec(camera_to_rotation_center, rotation_frame.getUpAxis());
 	const F32 camera_distance_from_rotation_center = dist_vec(adjusted_camera_pos, pick_rotation_center);
 
 	LLVector3 mouse_ray = orthogonal_component(gViewerWindow->mouseDirectionGlobal(x, y), rotation_frame.getUpAxis());

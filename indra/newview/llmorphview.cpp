@@ -81,8 +81,8 @@ void	LLMorphView::initialize()
 	gAgentAvatarp->mSpecialRenderMode = 3;
 	
 	// set up camera for close look at avatar
-	mOldCameraNearClip = LLViewerCamera::getInstance()->getNear();
-	LLViewerCamera::getInstance()->setNear(MORPH_NEAR_CLIP);	
+	mOldCameraNearClip = LLViewerCamera::getInstanceFast()->getNear();
+	LLViewerCamera::getInstanceFast()->setNear(MORPH_NEAR_CLIP);
 }
 
 //-----------------------------------------------------------------------------
@@ -95,7 +95,7 @@ void	LLMorphView::shutdown()
 		gAgentAvatarp->startMotion( ANIM_AGENT_BODY_NOISE );
 		gAgentAvatarp->mSpecialRenderMode = 0;
 		// reset camera
-		LLViewerCamera::getInstance()->setNear(mOldCameraNearClip);
+		LLViewerCamera::getInstanceFast()->setNear(mOldCameraNearClip);
 	}
 }
 

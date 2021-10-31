@@ -114,7 +114,7 @@ BOOL LLToolGun::handleHover(S32 x, S32 y, MASK mask)
 		if (dx != 0 || dy != 0)
 		{
 			// ...actually moved off center
-			const F32 fov = LLViewerCamera::getInstance()->getView() / DEFAULT_FIELD_OF_VIEW;
+			const F32 fov = LLViewerCamera::getInstanceFast()->getView() / DEFAULT_FIELD_OF_VIEW;
 			static LLCachedControl<bool> invert_mouse(gSavedSettings, "InvertMouse");
 			if (invert_mouse)
 			{
@@ -130,7 +130,7 @@ BOOL LLToolGun::handleHover(S32 x, S32 y, MASK mask)
 			static LLCachedControl<bool> mouse_sun(gSavedSettings, "MouseSun");
 			if (mouse_sun)
 			{
-                const LLVector3& sunpos = LLViewerCamera::getInstance()->getAtAxis();
+                const LLVector3& sunpos = LLViewerCamera::getInstanceFast()->getAtAxis();
 				gSky.setSunDirectionCFR(sunpos);
 				gSavedSettings.setVector3("SkySunDefaultPosition", sunpos);
 			}
@@ -138,7 +138,7 @@ BOOL LLToolGun::handleHover(S32 x, S32 y, MASK mask)
 			static LLCachedControl<bool> mouse_moon(gSavedSettings, "MouseMoon");
             if (mouse_moon)
 			{
-				const LLVector3& moonpos = LLViewerCamera::getInstance()->getAtAxis();
+				const LLVector3& moonpos = LLViewerCamera::getInstanceFast()->getAtAxis();
 				gSky.setMoonDirectionCFR(moonpos);
 				gSavedSettings.setVector3("SkyMoonDefaultPosition", moonpos);
 			}
@@ -187,7 +187,7 @@ void LLToolGun::draw()
 		bool target_rendered = false;
 
 		LLVector3d myPosition = gAgentCamera.getCameraPositionGlobal();
-		LLQuaternion myRotation = LLViewerCamera::getInstance()->getQuaternion();
+		LLQuaternion myRotation = LLViewerCamera::getInstanceFast()->getQuaternion();
 		myRotation.set(-myRotation.mQ[VX], -myRotation.mQ[VY], -myRotation.mQ[VZ], myRotation.mQ[VW]);
 
 		LLWorld::pos_map_t positions;

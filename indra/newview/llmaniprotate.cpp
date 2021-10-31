@@ -1149,7 +1149,7 @@ void LLManipRotate::renderSnapGuides()
 		{
 			LLVector3 selection_center_start = LLSelectMgr::getInstance()->getSavedBBoxOfSelection().getCenterAgent();
 
-			LLVector3 offset_dir = LLViewerCamera::getInstance()->getUpAxis();
+			LLVector3 offset_dir = LLViewerCamera::getInstanceFast()->getUpAxis();
 
 			F32 line_alpha = ALControlCache::GridOpacity;
 
@@ -1193,7 +1193,7 @@ BOOL LLManipRotate::updateVisiblity()
 		mCenterToCamNorm = mCenterToCam;
 		mCenterToCamMag = mCenterToCamNorm.normVec();
 
-		mRadiusMeters = RADIUS_PIXELS / (F32) LLViewerCamera::getInstance()->getViewHeightInPixels();
+		mRadiusMeters = RADIUS_PIXELS / (F32) LLViewerCamera::getInstanceFast()->getViewHeightInPixels();
 		mRadiusMeters /= gAgentCamera.mHUDCurZoom;
 		mRadiusMeters *= ui_scale_factor;
 
@@ -1209,13 +1209,13 @@ BOOL LLManipRotate::updateVisiblity()
 	}
 	else
 	{
-		visible = LLViewerCamera::getInstance()->projectPosAgentToScreen(center, mCenterScreen );
+		visible = LLViewerCamera::getInstanceFast()->projectPosAgentToScreen(center, mCenterScreen );
 		if( visible )
 		{
 			mCenterToCam = gAgentCamera.getCameraPositionAgent() - center;
 			mCenterToCamNorm = mCenterToCam;
 			mCenterToCamMag = mCenterToCamNorm.normVec();
-			LLVector3 cameraAtAxis = LLViewerCamera::getInstance()->getAtAxis();
+			LLVector3 cameraAtAxis = LLViewerCamera::getInstanceFast()->getAtAxis();
 			cameraAtAxis.normVec();
 
 			F32 z_dist = -1.f * (mCenterToCam * cameraAtAxis);
@@ -1232,8 +1232,8 @@ BOOL LLManipRotate::updateVisiblity()
 			
 			if (mCenterToCamMag > 0.001f)
 			{
-				F32 fraction_of_fov = RADIUS_PIXELS / (F32) LLViewerCamera::getInstance()->getViewHeightInPixels();
-				F32 apparent_angle = fraction_of_fov * LLViewerCamera::getInstance()->getView();  // radians
+				F32 fraction_of_fov = RADIUS_PIXELS / (F32) LLViewerCamera::getInstanceFast()->getViewHeightInPixels();
+				F32 apparent_angle = fraction_of_fov * LLViewerCamera::getInstanceFast()->getView();  // radians
 				mRadiusMeters = z_dist * tan(apparent_angle);
 				mRadiusMeters *= ui_scale_factor;
 
@@ -1740,7 +1740,7 @@ void LLManipRotate::mouseToRay( S32 x, S32 y, LLVector3* ray_pt, LLVector3* ray_
 	else
 	{
 		*ray_pt = gAgentCamera.getCameraPositionAgent();
-		LLViewerCamera::getInstance()->projectScreenToPosAgent(x, y, ray_dir);
+		LLViewerCamera::getInstanceFast()->projectScreenToPosAgent(x, y, ray_dir);
 		*ray_dir -= *ray_pt;
 		ray_dir->normVec();
 	}

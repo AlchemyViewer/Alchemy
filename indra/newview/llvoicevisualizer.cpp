@@ -361,7 +361,7 @@ void LLVoiceVisualizer::render()
 		//-------------------------------------------------------------
 		// create coordinates of the geometry for the dot
 		//-------------------------------------------------------------
-		LLViewerCamera* camera = LLViewerCamera::getInstance();
+		LLViewerCamera* camera = LLViewerCamera::getInstanceFast();
 		LLVector3 l	= camera->getLeftAxis() * DOT_SIZE;
 		LLVector3 u	= camera->getUpAxis()   * DOT_SIZE;
 

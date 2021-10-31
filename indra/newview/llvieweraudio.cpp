@@ -345,8 +345,8 @@ void init_audio()
 					
 	gAudiop->setListener(lpos_global_f,
 						  LLVector3::zero,	// LLViewerCamera::getInstance()->getVelocity(),    // !!! BUG need to replace this with smoothed velocity!
-						  LLViewerCamera::getInstance()->getUpAxis(),
-						  LLViewerCamera::getInstance()->getAtAxis());
+						  LLViewerCamera::getInstanceFast()->getUpAxis(),
+						  LLViewerCamera::getInstanceFast()->getAtAxis());
 
 // load up our initial set of sounds we'll want so they're in memory and ready to be played
 

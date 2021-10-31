@@ -118,7 +118,7 @@ void LLManip::getManipNormal(LLViewerObject* object, EManipPart manip, LLVector3
 		LLVector3 arrow_axis;
 		getManipAxis(object, manip, arrow_axis);
 
-		LLVector3 cross = arrow_axis % LLViewerCamera::getInstance()->getAtAxis();
+		LLVector3 cross = arrow_axis % LLViewerCamera::getInstanceFast()->getAtAxis();
 		normal = cross % arrow_axis;
 		normal.normVec();
 	}
@@ -186,12 +186,12 @@ F32 LLManip::getSubdivisionLevel(const LLVector3 &reference_point, const LLVecto
 	}
 	else
 	{
-		cam_to_reference = reference_point - LLViewerCamera::getInstance()->getOrigin();
+		cam_to_reference = reference_point - LLViewerCamera::getInstanceFast()->getOrigin();
 	}
 	F32 current_range = cam_to_reference.normVec();
 
 	F32 projected_translation_axis_length = (translate_axis % cam_to_reference).magVec();
-	F32 subdivisions = llmax(projected_translation_axis_length * grid_scale / (current_range / LLViewerCamera::getInstance()->getPixelMeterRatio() * min_pixel_spacing), 0.f);
+	F32 subdivisions = llmax(projected_translation_axis_length * grid_scale / (current_range / LLViewerCamera::getInstanceFast()->getPixelMeterRatio() * min_pixel_spacing), 0.f);
 	// figure out nearest power of 2 that subdivides grid_scale with result > min_pixel_spacing
 	subdivisions = llclamp((F32)pow(2.f, llfloor(log(subdivisions) / log(2.f))), min_subdivisions, max_subdivisions);
 
@@ -272,7 +272,7 @@ BOOL LLManip::getMousePointOnPlaneGlobal(LLVector3d& point, S32 x, S32 y, LLVect
 	if (mObjectSelection->getSelectType() == SELECT_TYPE_HUD)
 	{
 		BOOL result = FALSE;
-		F32 mouse_x = ((F32)x / gViewerWindow->getWorldViewWidthScaled() - 0.5f) * LLViewerCamera::getInstance()->getAspect() / gAgentCamera.mHUDCurZoom;
+		F32 mouse_x = ((F32)x / gViewerWindow->getWorldViewWidthScaled() - 0.5f) * LLViewerCamera::getInstanceFast()->getAspect() / gAgentCamera.mHUDCurZoom;
 		F32 mouse_y = ((F32)y / gViewerWindow->getWorldViewHeightScaled() - 0.5f) / gAgentCamera.mHUDCurZoom;
 
 		LLVector3 origin_agent = gAgent.getPosAgentFromGlobal(origin);
@@ -311,7 +311,7 @@ BOOL LLManip::nearestPointOnLineFromMouse( S32 x, S32 y, const LLVector3& b1, co
 
 	if (mObjectSelection->getSelectType() == SELECT_TYPE_HUD)
 	{
-		F32 mouse_x = (((F32)x / gViewerWindow->getWindowWidthScaled()) - 0.5f) * LLViewerCamera::getInstance()->getAspect() / gAgentCamera.mHUDCurZoom;
+		F32 mouse_x = (((F32)x / gViewerWindow->getWindowWidthScaled()) - 0.5f) * LLViewerCamera::getInstanceFast()->getAspect() / gAgentCamera.mHUDCurZoom;
 		F32 mouse_y = (((F32)y / gViewerWindow->getWindowHeightScaled()) - 0.5f) / gAgentCamera.mHUDCurZoom;
 		a1 = LLVector3(llmin(b1.mV[VX] - 0.1f, b2.mV[VX] - 0.1f, 0.f), -mouse_x, mouse_y);
 		a2 = a1 + LLVector3(1.f, 0.f, 0.f);

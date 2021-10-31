@@ -190,7 +190,7 @@ void LLFloaterMap::draw()
 	if( rotate_map )
 	{
 		// rotate subsequent draws to agent rotation
-		rotation = atan2( LLViewerCamera::getInstance()->getAtAxis().mV[VX], LLViewerCamera::getInstance()->getAtAxis().mV[VY] );
+		rotation = atan2( LLViewerCamera::getInstanceFast()->getAtAxis().mV[VX], LLViewerCamera::getInstanceFast()->getAtAxis().mV[VY] );
 	}
 
 	setDirectionPos( mTextBoxEast,  rotation );

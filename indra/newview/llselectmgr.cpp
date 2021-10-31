@@ -7905,16 +7905,16 @@ bool LLSelectMgr::selectionMove(const LLVector3& displ,
 							displ.mV[2] * min_dist);
 
 		// equates to: Displ_global = Displ * M_cam_axes_in_global_frame
-		displ_global = LLViewerCamera::getInstance()->rotateToAbsolute(displ_global);
+		displ_global = LLViewerCamera::getInstanceFast()->rotateToAbsolute(displ_global);
 	}
 
 	LLQuaternion new_rot;
 	if (update_rotation)
 	{
 		// let's calculate the rotation around each camera axes 
-		LLQuaternion qx(roll, LLViewerCamera::getInstance()->getAtAxis());
-		LLQuaternion qy(pitch, LLViewerCamera::getInstance()->getLeftAxis());
-		LLQuaternion qz(yaw, LLViewerCamera::getInstance()->getUpAxis());
+		LLQuaternion qx(roll, LLViewerCamera::getInstanceFast()->getAtAxis());
+		LLQuaternion qy(pitch, LLViewerCamera::getInstanceFast()->getLeftAxis());
+		LLQuaternion qz(yaw, LLViewerCamera::getInstanceFast()->getUpAxis());
 		new_rot.setQuat(qx * qy * qz);
 	}
 	

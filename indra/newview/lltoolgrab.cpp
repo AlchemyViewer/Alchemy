@@ -578,7 +578,7 @@ void LLToolGrabBase::handleHoverActive(S32 x, S32 y, MASK mask)
 			LLQuaternion rotation_around_vertical( dx*RADIANS_PER_PIXEL_X, up );
 
 			// y motion maps to rotation around left axis
-			const LLVector3 &agent_left = LLViewerCamera::getInstance()->getLeftAxis();
+			const LLVector3 &agent_left = LLViewerCamera::getInstanceFast()->getLeftAxis();
 			LLQuaternion rotation_around_left( dy*RADIANS_PER_PIXEL_Y, agent_left );
 
 			// compose with current rotation
@@ -603,14 +603,14 @@ void LLToolGrabBase::handleHoverActive(S32 x, S32 y, MASK mask)
 			//------------------------------------------------------
 
 			LLVector3d x_part;
-			x_part.setVec(LLViewerCamera::getInstance()->getLeftAxis());
+			x_part.setVec(LLViewerCamera::getInstanceFast()->getLeftAxis());
 			x_part.mdV[VZ] = 0.0;
 			x_part.normVec();
 
 			LLVector3d y_part;
 			if( mVerticalDragging )
 			{
-				y_part.setVec(LLViewerCamera::getInstance()->getUpAxis());
+				y_part.setVec(LLViewerCamera::getInstanceFast()->getUpAxis());
 				// y_part.setVec(0.f, 0.f, 1.f);
 			}
 			else
@@ -673,7 +673,7 @@ void LLToolGrabBase::handleHoverActive(S32 x, S32 y, MASK mask)
 			LLVector3 grab_pos_agent = gAgent.getPosAgentFromGlobal( grab_point_global );
 
 			LLCoordGL grab_center_gl( gViewerWindow->getWorldViewWidthScaled() / 2, gViewerWindow->getWorldViewHeightScaled() / 2);
-			LLViewerCamera::getInstance()->projectPosAgentToScreen(grab_pos_agent, grab_center_gl);
+			LLViewerCamera::getInstanceFast()->projectPosAgentToScreen(grab_pos_agent, grab_center_gl);
 
 			const S32 ROTATE_H_MARGIN = gViewerWindow->getWorldViewWidthScaled() / 20;
 			const F32 ROTATE_ANGLE_PER_SECOND = 30.f * DEG_TO_RAD;
@@ -832,14 +832,14 @@ void LLToolGrabBase::handleHoverNonPhysical(S32 x, S32 y, MASK mask)
 			//------------------------------------------------------
 
 			LLVector3d x_part;
-			x_part.setVec(LLViewerCamera::getInstance()->getLeftAxis());
+			x_part.setVec(LLViewerCamera::getInstanceFast()->getLeftAxis());
 			x_part.mdV[VZ] = 0.0;
 			x_part.normVec();
 
 			LLVector3d y_part;
 			if( mVerticalDragging )
 			{
-				y_part.setVec(LLViewerCamera::getInstance()->getUpAxis());
+				y_part.setVec(LLViewerCamera::getInstanceFast()->getUpAxis());
 				// y_part.setVec(0.f, 0.f, 1.f);
 			}
 			else
@@ -1047,7 +1047,7 @@ void LLToolGrabBase::onMouseCaptureLost()
 			LLVector3 grab_point_agent = objectp->getRenderPosition();
 
 			LLCoordGL gl_point;
-			if (LLViewerCamera::getInstance()->projectPosAgentToScreen(grab_point_agent, gl_point))
+			if (LLViewerCamera::getInstanceFast()->projectPosAgentToScreen(grab_point_agent, gl_point))
 			{
 				LLUI::setMousePositionScreen(gl_point.mX, gl_point.mY);
 			}

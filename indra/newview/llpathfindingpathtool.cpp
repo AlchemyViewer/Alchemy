@@ -320,7 +320,7 @@ bool LLPathfindingPathTool::isCameraModKeys(MASK pMask) const
 void LLPathfindingPathTool::getRayPoints(S32 pX, S32 pY, LLVector3 &pRayStart, LLVector3 &pRayEnd) const
 {
 	LLVector3 dv = gViewerWindow->mouseDirectionGlobal(pX, pY);
-	LLVector3 mousePos = LLViewerCamera::getInstance()->getOrigin();
+	LLVector3 mousePos = LLViewerCamera::getInstanceFast()->getOrigin();
 	pRayStart = mousePos;
 	pRayEnd = mousePos + dv * 150;
 }

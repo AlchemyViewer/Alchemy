@@ -110,7 +110,7 @@ BOOL ALToolAlign::findSelectedManipulator(S32 x, S32 y)
 	mHighlightedAxis = -1;
 	mHighlightedDirection = 0;
 
-	LLViewerCamera* camera = LLViewerCamera::getInstance();
+	LLViewerCamera* camera = LLViewerCamera::getInstanceFast();
 
 	LLMatrix4 transform;
 	if (LLSelectMgr::getInstance()->getSelection()->getSelectType() == SELECT_TYPE_HUD)

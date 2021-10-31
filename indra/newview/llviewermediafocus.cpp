@@ -222,7 +222,7 @@ LLVector3d LLViewerMediaFocus::setCameraZoom(LLViewerObject* object, LLVector3 n
 
 		// We need the aspect ratio, and the 3 components of the bbox as height, width, and depth.
 		F32 aspect_ratio = getBBoxAspectRatio(bbox, normal, &height, &width, &depth);
-		F32 camera_aspect = LLViewerCamera::getInstance()->getAspect();
+		F32 camera_aspect = LLViewerCamera::getInstanceFast()->getAspect();
 		
 		LL_DEBUGS() << "normal = " << normal << ", aspect_ratio = " << aspect_ratio << ", camera_aspect = " << camera_aspect << LL_ENDL;
 
@@ -239,14 +239,14 @@ LLVector3d LLViewerMediaFocus::setCameraZoom(LLViewerObject* object, LLVector3 n
 		// We will add half the depth of the bounding box, as the distance projection uses the center point of the bbox.
 		if(camera_aspect < 1.0f || invert)
 		{
-			angle_of_view = llmax(0.1f, LLViewerCamera::getInstance()->getView() * LLViewerCamera::getInstance()->getAspect());
+			angle_of_view = llmax(0.1f, LLViewerCamera::getInstanceFast()->getView() * LLViewerCamera::getInstanceFast()->getAspect());
 			distance = width * 0.5 * padding_factor / tan(angle_of_view * 0.5f );
 
 			LL_DEBUGS() << "using width (" << width << "), angle_of_view = " << angle_of_view << ", distance = " << distance << LL_ENDL;
 		}
 		else
 		{
-			angle_of_view = llmax(0.1f, LLViewerCamera::getInstance()->getView());
+			angle_of_view = llmax(0.1f, LLViewerCamera::getInstanceFast()->getView());
 			distance = height * 0.5 * padding_factor / tan(angle_of_view * 0.5f );
 
 			LL_DEBUGS() << "using height (" << height << "), angle_of_view = " << angle_of_view << ", distance = " << distance << LL_ENDL;
@@ -575,7 +575,7 @@ void LLViewerMediaFocus::focusZoomOnMedia(LLUUID media_id)
 			{
 				// If that didn't work, use the inverse of the camera "look at" axis, which should keep the camera pointed in the same direction.
 //				LL_INFOS() << "approximate face normal invalid, using camera direction." << LL_ENDL;
-				normal = LLViewerCamera::getInstance()->getAtAxis();
+				normal = LLViewerCamera::getInstanceFast()->getAtAxis();
 				normal *= (F32)-1.0f;
 			}
 			

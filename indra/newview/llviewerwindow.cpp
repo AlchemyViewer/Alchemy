@@ -2540,8 +2540,8 @@ void LLViewerWindow::reshape(S32 width, S32 height)
 
 		if (height > 0)
 		{ 
-			LLViewerCamera::getInstance()->setViewHeightInPixels( mWorldViewRectRaw.getHeight() );
-			LLViewerCamera::getInstance()->setAspect( getWorldViewAspectRatio() );
+			LLViewerCamera::getInstanceFast()->setViewHeightInPixels( mWorldViewRectRaw.getHeight() );
+			LLViewerCamera::getInstanceFast()->setAspect( getWorldViewAspectRatio() );
 		}
 
 		calcDisplayScale();
@@ -2743,8 +2743,8 @@ void LLViewerWindow::draw()
 
 		LLVector2 old_scale_factor = LLUI::getScaleFactor();
 		// apply camera zoom transform (for high res screenshots)
-		F32 zoom_factor = LLViewerCamera::getInstance()->getZoomFactor();
-		S16 sub_region = LLViewerCamera::getInstance()->getZoomSubRegion();
+		F32 zoom_factor = LLViewerCamera::getInstanceFast()->getZoomFactor();
+		S16 sub_region = LLViewerCamera::getInstanceFast()->getZoomSubRegion();
 		if (zoom_factor > 1.f)
 		{
 			//decompose subregion number to x and y values

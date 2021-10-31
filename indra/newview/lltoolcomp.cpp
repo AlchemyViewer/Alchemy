@@ -692,7 +692,7 @@ LLToolCompGun::LLToolCompGun()
 	mDefault = mGun;
 
 	mTimerFOV.stop();
-	mStartFOV = mOriginalFOV = mTargetFOV = LLViewerCamera::getInstance()->getAndSaveDefaultFOV();
+	mStartFOV = mOriginalFOV = mTargetFOV = LLViewerCamera::getInstanceFast()->getAndSaveDefaultFOV();
 }
 
 
@@ -787,11 +787,11 @@ BOOL LLToolCompGun::handleRightMouseDown(S32 x, S32 y, MASK mask)
 
 		if (!mTimerFOV.getStarted())
 		{
-			mStartFOV = LLViewerCamera::getInstance()->getAndSaveDefaultFOV();
+			mStartFOV = LLViewerCamera::getInstanceFast()->getAndSaveDefaultFOV();
 			mOriginalFOV = mStartFOV;
 		}
 		else
-			mStartFOV = LLViewerCamera::getInstance()->getDefaultFOV();
+			mStartFOV = LLViewerCamera::getInstanceFast()->getDefaultFOV();
 
 		mTargetFOV = gSavedPerAccountSettings.getF32("AlchemyMouselookAlternativeFOV");
 		mTimerFOV.start();
@@ -807,7 +807,7 @@ BOOL LLToolCompGun::handleRightMouseUp(S32 x, S32 y, MASK mask)
 {
 	mRightMouseDown = false;
 
-	mStartFOV = LLViewerCamera::getInstance()->getDefaultFOV();
+	mStartFOV = LLViewerCamera::getInstanceFast()->getDefaultFOV();
 	mTargetFOV = mOriginalFOV;
 	mTimerFOV.start();
 
@@ -842,7 +842,7 @@ void	LLToolCompGun::handleDeselect()
 	LLToolComposite::handleDeselect();
 	if (mRightMouseDown || mTimerFOV.getStarted())
 	{
-		LLViewerCamera::getInstance()->loadDefaultFOV();
+		LLViewerCamera::getInstanceFast()->loadDefaultFOV();
 		mRightMouseDown = false;
 		mTimerFOV.stop();
 	}
@@ -854,7 +854,7 @@ BOOL LLToolCompGun::handleScrollWheel(S32 x, S32 y, S32 clicks)
 {
 	if(mRightMouseDown)
 	{
-		mStartFOV = LLViewerCamera::getInstance()->getDefaultFOV();
+		mStartFOV = LLViewerCamera::getInstanceFast()->getDefaultFOV();
 
 		gSavedPerAccountSettings.setF32(
 			"AlchemyMouselookAlternativeFOV",
@@ -876,7 +876,7 @@ void LLToolCompGun::draw()
 {
 	if(mTimerFOV.getStarted())
 	{
-		if(!LLViewerCamera::getInstance()->mSavedFOVLoaded && mStartFOV != mTargetFOV)
+		if(!LLViewerCamera::getInstanceFast()->mSavedFOVLoaded && mStartFOV != mTargetFOV)
 		{
 			F32 timer = mTimerFOV.getElapsedTimeF32();
 
@@ -884,10 +884,10 @@ void LLToolCompGun::draw()
 			static LLCachedControl<F32> ml_zoom_time(gSavedSettings, "AlchemyMouseLookZoomTime", 6.66f);
 			if(timer > ml_zoom_timeout)
 			{
-				LLViewerCamera::getInstance()->setDefaultFOV(mTargetFOV);
+				LLViewerCamera::getInstanceFast()->setDefaultFOV(mTargetFOV);
 				mTimerFOV.stop();
 			}
-			else LLViewerCamera::getInstance()->setDefaultFOV(ll_lerp(mStartFOV, mTargetFOV, timer * ml_zoom_time));
+			else LLViewerCamera::getInstanceFast()->setDefaultFOV(ll_lerp(mStartFOV, mTargetFOV, timer * ml_zoom_time));
 		}
 		else mTimerFOV.stop();
 	}

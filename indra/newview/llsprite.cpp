@@ -75,7 +75,7 @@ LLSprite::~LLSprite()
 
 void LLSprite::updateFace(LLFace &face)
 {
-	LLViewerCamera &camera = *LLViewerCamera::getInstance();
+	LLViewerCamera &camera = *LLViewerCamera::getInstanceFast();
 
 	// First, figure out how many vertices/indices we need.
 	U32 num_vertices, num_indices;

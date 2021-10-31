@@ -684,16 +684,16 @@ BOOL LLImagePreviewAvatar::render()
 		LLQuaternion(mCameraYaw, LLVector3::z_axis);
 
 	LLQuaternion av_rot = avatarp->mPelvisp->getWorldRotation() * camera_rot;
-	LLViewerCamera::getInstance()->setOriginAndLookAt(
+	LLViewerCamera::getInstanceFast()->setOriginAndLookAt(
 		target_pos + ((LLVector3(mCameraDistance, 0.f, 0.f) + mCameraOffset) * av_rot),		// camera
 		LLVector3::z_axis,																	// up
 		target_pos + (mCameraOffset  * av_rot) );											// point of interest
 
 	stop_glerror();
 
-	LLViewerCamera::getInstance()->setAspect((F32)mFullWidth / mFullHeight);
-	LLViewerCamera::getInstance()->setView(LLViewerCamera::getInstance()->getDefaultFOV() / mCameraZoom);
-	LLViewerCamera::getInstance()->setPerspective(FALSE, mOrigin.mX, mOrigin.mY, mFullWidth, mFullHeight, FALSE);
+	LLViewerCamera::getInstanceFast()->setAspect((F32)mFullWidth / mFullHeight);
+	LLViewerCamera::getInstanceFast()->setView(LLViewerCamera::getInstanceFast()->getDefaultFOV() / mCameraZoom);
+	LLViewerCamera::getInstanceFast()->setPerspective(FALSE, mOrigin.mX, mOrigin.mY, mFullWidth, mFullHeight, FALSE);
 
 	LLVertexBuffer::unbind();
 	avatarp->updateLOD();
@@ -887,16 +887,16 @@ BOOL LLImagePreviewSculpted::render()
 		LLQuaternion(mCameraYaw, LLVector3::z_axis);
 
 	LLQuaternion av_rot = camera_rot;
-	LLViewerCamera::getInstance()->setOriginAndLookAt(
+	LLViewerCamera::getInstanceFast()->setOriginAndLookAt(
 		target_pos + ((LLVector3(mCameraDistance, 0.f, 0.f) + mCameraOffset) * av_rot),		// camera
 		LLVector3::z_axis,																	// up
 		target_pos + (mCameraOffset  * av_rot) );											// point of interest
 
 	stop_glerror();
 
-	LLViewerCamera::getInstance()->setAspect((F32) mFullWidth / mFullHeight);
-	LLViewerCamera::getInstance()->setView(LLViewerCamera::getInstance()->getDefaultFOV() / mCameraZoom);
-	LLViewerCamera::getInstance()->setPerspective(FALSE, mOrigin.mX, mOrigin.mY, mFullWidth, mFullHeight, FALSE);
+	LLViewerCamera::getInstanceFast()->setAspect((F32) mFullWidth / mFullHeight);
+	LLViewerCamera::getInstanceFast()->setView(LLViewerCamera::getInstanceFast()->getDefaultFOV() / mCameraZoom);
+	LLViewerCamera::getInstanceFast()->setPerspective(FALSE, mOrigin.mX, mOrigin.mY, mFullWidth, mFullHeight, FALSE);
 
 	const LLVolumeFace &vf = mVolume->getVolumeFace(0);
 	U32 num_indices = vf.mNumIndices;

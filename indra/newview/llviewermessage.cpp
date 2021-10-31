@@ -3392,7 +3392,7 @@ void process_agent_movement_complete(LLMessageSystem* msg, void**)
 		{
 			// *NOTE: the LookAt data we get from the sim here doesn't
 			// seem to be useful, so get it from the camera instead
-			look_at = LLViewerCamera::getInstance()->getAtAxis();
+			look_at = LLViewerCamera::getInstanceFast()->getAtAxis();
 		}
 		// Force the camera back onto the agent, don't animate.
 		gAgentCamera.setFocusOnAvatar(TRUE, FALSE);

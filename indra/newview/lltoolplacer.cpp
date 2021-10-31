@@ -175,8 +175,8 @@ BOOL LLToolPlacer::raycastForNewObjPos( S32 x, S32 y, LLViewerObject** hit_obj, 
 
 	*region = regionp;
 	*ray_start_region =	regionp->getPosRegionFromGlobal( ray_start_global );
-	F32 near_clip = LLViewerCamera::getInstance()->getNear() + 0.01f;  // Include an epsilon to avoid rounding issues.
-	*ray_start_region += LLViewerCamera::getInstance()->getAtAxis() * near_clip;
+	F32 near_clip = LLViewerCamera::getInstanceFast()->getNear() + 0.01f;  // Include an epsilon to avoid rounding issues.
+	*ray_start_region += LLViewerCamera::getInstanceFast()->getAtAxis() * near_clip;
 
 	if( bypass_sim_raycast )
 	{
