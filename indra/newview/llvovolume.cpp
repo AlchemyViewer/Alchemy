@@ -6665,6 +6665,13 @@ U32 LLVolumeGeometryManager::genDrawInfo(LLSpatialGroup* group, U32 mask, LLFace
 			}
 
 			const LLTextureEntry* te = facep->getTextureEntry();
+
+			if (!LLDrawPoolAlpha::sShowDebugAlpha && te->getColor().mV[3] <= 0.001f)
+			{
+				++face_iter;
+				continue;
+			}
+
 			tex = facep->getTexture();
 
 			BOOL is_alpha = (facep->getPoolType() == LLDrawPool::POOL_ALPHA) ? TRUE : FALSE;

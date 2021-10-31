@@ -2022,7 +2022,7 @@ void LLDrawPoolAvatar::renderRigged(LLVOAvatar* avatar, U32 type, bool glow)
 		const LLTextureEntry* tex_entry = face->getTextureEntry();
 
 		// Don't render invisible faces even when they are in a linkset.
-		if (tex_entry && tex_entry->getColor().mV[VW] == 0.0f)
+		if (tex_entry && tex_entry->getColor().mV[VW] <= 0.001f)
 		{
 			continue;
 		}

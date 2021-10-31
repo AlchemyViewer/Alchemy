@@ -3029,7 +3029,7 @@ BOOL LLViewerWindow::handleKey(KEY key, MASK mask)
 	}
 
 	LLFloater* focused_floaterp = gFloaterView->getFocusedFloater();
-	std::string focusedFloaterName = (focused_floaterp ? focused_floaterp->getInstanceName() : "");
+	const std::string& focusedFloaterName = (focused_floaterp ? focused_floaterp->getInstanceName() : LLStringUtil::null);
 
 	if( keyboard_focus )
 	{
