@@ -305,7 +305,7 @@ public:
 	void setHighlightObject(LLDrawable* obj) { mHighlightObject = obj; }
 
 
-	void renderShadow(glh::matrix4f& view, glh::matrix4f& proj, LLCamera& camera, LLCullResult& result, bool use_shader, bool use_occlusion, U32 target_width);
+	void renderShadow(const LLMatrix4a& view, const LLMatrix4a& proj, LLCamera& camera, LLCullResult& result, bool use_shader, bool use_occlusion, U32 target_width);
 	void renderHighlights();
 	void renderDebug();
 	void renderPhysicsDisplay();
@@ -653,9 +653,9 @@ public:
 	LLVector3				mShadowFrustOrigin[4];
 	LLCamera				mShadowCamera[8];
 	LLVector3				mShadowExtents[4][2];
-	glh::matrix4f			mSunShadowMatrix[6];
-	glh::matrix4f			mShadowModelview[6];
-	glh::matrix4f			mShadowProjection[6];
+	LLMatrix4a				mSunShadowMatrix[6];
+	LLMatrix4a				mShadowModelview[6];
+	LLMatrix4a				mShadowProjection[6];
     glh::matrix4f           mReflectionModelView;
 
 	LLPointer<LLDrawable>	mShadowSpotLight[2];
@@ -663,7 +663,6 @@ public:
 	LLPointer<LLDrawable>	mTargetShadowSpotLight[2];
 
 	LLVector4				mSunClipPlanes;
-	LLVector4				mSunOrthoClipPlanes;
 	LLVector2				mScreenScale;
 
 	//water reflection texture
