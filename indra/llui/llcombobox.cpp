@@ -794,7 +794,7 @@ BOOL LLComboBox::handleToolTip(S32 x, S32 y, MASK mask)
 	
 	if( !tool_tip.empty() )
 	{
-		LLToolTipMgr::instance().show(LLToolTip::Params()
+		LLToolTipMgr::instanceFast().show(LLToolTip::Params()
 			.message(tool_tip)
 			.sticky_rect(calcScreenRect()));
 	}

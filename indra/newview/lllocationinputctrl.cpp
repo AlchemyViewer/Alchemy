@@ -493,7 +493,7 @@ BOOL LLLocationInputCtrl::handleToolTip(S32 x, S32 y, MASK mask)
 				LLSD value = item->getValue();
 				if (value.has("tooltip"))
 				{
-					LLToolTipMgr::instance().show(value["tooltip"]);
+					LLToolTipMgr::instanceFast().show(value["tooltip"]);
 				}
 			}
 		}

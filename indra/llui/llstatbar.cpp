@@ -212,16 +212,16 @@ BOOL LLStatBar::handleHover(S32 x, S32 y, MASK mask)
 	switch(mStatType)
 	{
 	case STAT_COUNT:
-		LLToolTipMgr::instance().show(LLToolTip::Params().message(mStat.countStatp->getDescription()).sticky_rect(calcScreenRect()));
+		LLToolTipMgr::instanceFast().show(LLToolTip::Params().message(mStat.countStatp->getDescription()).sticky_rect(calcScreenRect()));
 		break;
 	case STAT_EVENT:
-		LLToolTipMgr::instance().show(LLToolTip::Params().message(mStat.eventStatp->getDescription()).sticky_rect(calcScreenRect()));
+		LLToolTipMgr::instanceFast().show(LLToolTip::Params().message(mStat.eventStatp->getDescription()).sticky_rect(calcScreenRect()));
 		break;
 	case STAT_SAMPLE:
-		LLToolTipMgr::instance().show(LLToolTip::Params().message(mStat.sampleStatp->getDescription()).sticky_rect(calcScreenRect()));
+		LLToolTipMgr::instanceFast().show(LLToolTip::Params().message(mStat.sampleStatp->getDescription()).sticky_rect(calcScreenRect()));
 		break;
 	case STAT_MEM:
-		LLToolTipMgr::instance().show(LLToolTip::Params().message(mStat.memStatp->getDescription()).sticky_rect(calcScreenRect()));
+		LLToolTipMgr::instanceFast().show(LLToolTip::Params().message(mStat.memStatp->getDescription()).sticky_rect(calcScreenRect()));
 		break;
 	default:
 		break;

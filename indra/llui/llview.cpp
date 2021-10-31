@@ -905,14 +905,14 @@ BOOL LLView::handleToolTip(S32 x, S32 y, MASK mask)
         static LLUICachedControl<bool> allow_ui_tooltips("BasicUITooltips", true);
 		// allow "scrubbing" over ui by showing next tooltip immediately
 		// if previous one was still visible
-		F32 timeout = LLToolTipMgr::instance().toolTipVisible() 
+		F32 timeout = LLToolTipMgr::instanceFast().toolTipVisible() 
 		              ? tooltip_fast_delay
 		              : tooltip_delay;
 
 		// Even if we don't show tooltips, consume the event, nothing below should show tooltip
 		if (allow_ui_tooltips)
 		{
-			LLToolTipMgr::instance().show(LLToolTip::Params()
+			LLToolTipMgr::instanceFast().show(LLToolTip::Params()
 			                              .message(tooltip)
 			                              .sticky_rect(calcScreenRect())
 			                              .delay_time(timeout));

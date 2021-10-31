@@ -174,7 +174,7 @@ public:
 			params.max_width = 1000;			
 			params.sticky_rect = calcScreenRect(); 
 
-			LLToolTipMgr::instance().show(params);
+			LLToolTipMgr::instanceFast().show(params);
 		}
 		return TRUE;
 	}
@@ -232,7 +232,7 @@ public:
 			LLToolTip::Params params;
 			params.message = llformat("%s\n%s (%d, %d)", getLabel().c_str(), region_name.c_str(), mLandmarkInfoGetter.getPosX(), mLandmarkInfoGetter.getPosY());
 			params.sticky_rect = calcScreenRect();
-			LLToolTipMgr::instance().show(params);
+			LLToolTipMgr::instanceFast().show(params);
 		}
 		return TRUE;
 	}

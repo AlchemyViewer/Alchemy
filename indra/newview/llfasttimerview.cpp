@@ -302,7 +302,7 @@ BOOL LLFastTimerView::handleHover(S32 x, S32 y, MASK mask)
 				// could be that existing tooltip is for a parent and is thus
 				// covering region for this new timer, go ahead and unblock 
 				// so we can create a new tooltip
-				LLToolTipMgr::instance().unblockToolTips();
+				LLToolTipMgr::instanceFast().unblockToolTips();
 				mHoverTimer = mHoverID;
 				mToolTipRect.set(mBarRect.mLeft + (hover_bar->mSelfStart / mTotalTimeDisplay) * mBarRect.getWidth(),
 								row.mTop,
@@ -351,7 +351,7 @@ BOOL LLFastTimerView::handleToolTip(S32 x, S32 y, MASK mask)
 
 			std::string tooltip = get_tooltip(*mHoverTimer, mHoverBarIndex > 0 ? mScrollIndex + mHoverBarIndex : 0, mRecording);
 
-			LLToolTipMgr::instance().show(LLToolTip::Params()
+			LLToolTipMgr::instanceFast().show(LLToolTip::Params()
 				.message(tooltip)
 				.sticky_rect(screen_rect)
 				.delay_time(0.f));
@@ -367,7 +367,7 @@ BOOL LLFastTimerView::handleToolTip(S32 x, S32 y, MASK mask)
 			BlockTimerStatHandle* idp = getLegendID(y);
 			if (idp)
 			{
-				LLToolTipMgr::instance().show(get_tooltip(*idp, 0, mRecording));
+				LLToolTipMgr::instanceFast().show(get_tooltip(*idp, 0, mRecording));
 
 				return TRUE;
 			}

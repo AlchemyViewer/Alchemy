@@ -65,7 +65,7 @@ LLToolTipView::LLToolTipView(const LLToolTipView::Params& p)
 
 void LLToolTipView::draw()
 {
-	LLToolTipMgr::instance().updateToolTipVisibility();
+	LLToolTipMgr::instanceFast().updateToolTipVisibility();
 
 	// do the usual thing
 	LLView::draw();
@@ -76,7 +76,7 @@ BOOL LLToolTipView::handleHover(S32 x, S32 y, MASK mask)
 	static S32 last_x = x;
 	static S32 last_y = y;
 
-	LLToolTipMgr& tooltip_mgr = LLToolTipMgr::instance();
+	LLToolTipMgr& tooltip_mgr = LLToolTipMgr::instanceFast();
 
 	if (x != last_x && y != last_y && !tooltip_mgr.getMouseNearRect().pointInRect(x, y))
 	{
@@ -91,7 +91,7 @@ BOOL LLToolTipView::handleHover(S32 x, S32 y, MASK mask)
 
 BOOL LLToolTipView::handleMouseDown(S32 x, S32 y, MASK mask)
 {
-	LLToolTipMgr::instance().blockToolTips();
+	LLToolTipMgr::instanceFast().blockToolTips();
 
 	if (LLView::handleMouseDown(x, y, mask))
 	{
@@ -106,26 +106,26 @@ BOOL LLToolTipView::handleMouseDown(S32 x, S32 y, MASK mask)
 
 BOOL LLToolTipView::handleMiddleMouseDown(S32 x, S32 y, MASK mask)
 {
-	LLToolTipMgr::instance().blockToolTips();
+	LLToolTipMgr::instanceFast().blockToolTips();
 	return LLView::handleMiddleMouseDown(x, y, mask);
 }
 
 BOOL LLToolTipView::handleRightMouseDown(S32 x, S32 y, MASK mask)
 {
-	LLToolTipMgr::instance().blockToolTips();
+	LLToolTipMgr::instanceFast().blockToolTips();
 	return LLView::handleRightMouseDown(x, y, mask);
 }
 
 
 BOOL LLToolTipView::handleScrollWheel( S32 x, S32 y, S32 clicks )
 {
-	LLToolTipMgr::instance().blockToolTips();
+	LLToolTipMgr::instanceFast().blockToolTips();
 	return FALSE;
 }
 
 void LLToolTipView::drawStickyRect()
 {
-	gl_rect_2d(LLToolTipMgr::instance().getMouseNearRect(), LLColor4::white, false);
+	gl_rect_2d(LLToolTipMgr::instanceFast().getMouseNearRect(), LLColor4::white, false);
 }
 
 // defaults for floater param block pulled from widgets/floater.xml

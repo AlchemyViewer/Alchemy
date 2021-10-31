@@ -1546,7 +1546,7 @@ void LLViewerWindow::handleMouseLeave(LLWindow *window)
 	// Note: we won't get this if we have captured the mouse.
 	llassert( gFocusMgr.getMouseCapture() == NULL );
 	mMouseInWindow = FALSE;
-	LLToolTipMgr::instance().blockToolTips();
+	LLToolTipMgr::instanceFast().blockToolTips();
 }
 
 BOOL LLViewerWindow::handleCloseRequest(LLWindow *window)
@@ -2160,7 +2160,7 @@ void LLViewerWindow::initBase()
 	// Get a pointer to the toolbar view holder
 	LLPanel* panel_holder = main_view->getChild<LLPanel>("toolbar_view_holder");
 	// Load the toolbar view from file 
-	gToolBarView = LLUICtrlFactory::getInstance()->createFromFile<LLToolBarView>("panel_toolbar_view.xml", panel_holder, LLDefaultChildRegistry::instance());
+	gToolBarView = LLUICtrlFactory::getInstance()->createFromFile<LLToolBarView>("panel_toolbar_view.xml", panel_holder, LLDefaultChildRegistry::instanceFast());
 	if (!gToolBarView)
 	{
 		LL_ERRS() << "Failed to initialize viewer: Viewer couldn't process file panel_toolbar_view.xml, "
@@ -2824,7 +2824,9 @@ BOOL LLViewerWindow::handleKeyUp(KEY key, MASK mask)
     if (LLSetKeyBindDialog::recordKey(key, mask, FALSE))
     {
         LL_DEBUGS() << "KeyUp handled by LLSetKeyBindDialog" << LL_ENDL;
+#if AL_VIEWER_EVENT_RECORDER
         LLViewerEventRecorder::instance().logKeyEvent(key, mask);
+#endif
         return TRUE;
     }
 
@@ -2871,14 +2873,16 @@ BOOL LLViewerWindow::handleKeyUp(KEY key, MASK mask)
 BOOL LLViewerWindow::handleKey(KEY key, MASK mask)
 {
 	// hide tooltips on keypress
-	LLToolTipMgr::instance().blockToolTips();
+	LLToolTipMgr::instanceFast().blockToolTips();
 
     // Menus get handled on key down instead of key up
     // so keybindings have to be recorded before that
     if (LLSetKeyBindDialog::recordKey(key, mask, TRUE))
     {
+#if AL_VIEWER_EVENT_RECORDER
         LL_DEBUGS() << "Key handled by LLSetKeyBindDialog" << LL_ENDL;
-        LLViewerEventRecorder::instance().logKeyEvent(key,mask);
+        LLViewerEventRecorder::instanceFast().logKeyEvent(key,mask);
+#endif
         return TRUE;
     }
 
@@ -2949,7 +2953,7 @@ BOOL LLViewerWindow::handleKey(KEY key, MASK mask)
 	{
 		LL_DEBUGS() << "LLviewerWindow::handleKey handle nav keys for nav" << LL_ENDL;
 #if AL_VIEWER_EVENT_RECORDER
-		LLViewerEventRecorder::instance().logKeyEvent(key,mask);
+		LLViewerEventRecorder::instanceFast().logKeyEvent(key,mask);
 #endif
 		return TRUE;
 	}
@@ -2965,7 +2969,7 @@ BOOL LLViewerWindow::handleKey(KEY key, MASK mask)
 			&& keyboard_focus->handleKey(key,mask,FALSE))
 		{
 #if AL_VIEWER_EVENT_RECORDER
-			LLViewerEventRecorder::instance().logKeyEvent(key,mask);
+			LLViewerEventRecorder::instanceFast().logKeyEvent(key,mask);
 #endif
 			return TRUE;
 		}
@@ -2976,7 +2980,7 @@ BOOL LLViewerWindow::handleKey(KEY key, MASK mask)
 			&& gMenuBarView->handleAcceleratorKey(key, mask))
 		{
 #if AL_VIEWER_EVENT_RECORDER
-			LLViewerEventRecorder::instance().logKeyEvent(key, mask);
+			LLViewerEventRecorder::instanceFast().logKeyEvent(key, mask);
 #endif
 			return TRUE;
 		}
@@ -2984,7 +2988,7 @@ BOOL LLViewerWindow::handleKey(KEY key, MASK mask)
 		if (gLoginMenuBarView && gLoginMenuBarView->handleAcceleratorKey(key, mask))
 		{
 #if AL_VIEWER_EVENT_RECORDER
-			LLViewerEventRecorder::instance().logKeyEvent(key,mask);
+			LLViewerEventRecorder::instanceFast().logKeyEvent(key,mask);
 #endif
 			return TRUE;
 		}
@@ -3011,7 +3015,7 @@ BOOL LLViewerWindow::handleKey(KEY key, MASK mask)
 			mRootView->focusNextRoot();
 		}
 #if AL_VIEWER_EVENT_RECORDER
-		LLViewerEventRecorder::instance().logKeyEvent(key,mask);
+		LLViewerEventRecorder::instanceFast().logKeyEvent(key,mask);
 #endif
 		return TRUE;
 	}
@@ -3019,7 +3023,7 @@ BOOL LLViewerWindow::handleKey(KEY key, MASK mask)
 	if (gEditMenu && gEditMenu->handleAcceleratorKey(key, mask))
 	{
 #if AL_VIEWER_EVENT_RECORDER
-		LLViewerEventRecorder::instance().logKeyEvent(key,mask);
+		LLViewerEventRecorder::instanceFast().logKeyEvent(key,mask);
 #endif
 		return TRUE;
 	}
@@ -3804,7 +3808,7 @@ void LLViewerWindow::updateUI()
 				params.sticky_rect = screen_sticky_rect;
 				params.max_width = 400;
 
-				LLToolTipMgr::instance().show(params);
+				LLToolTipMgr::instanceFast().show(params);
 			}
 			// if there is a mouse captor, nothing else gets a tooltip
 			else if (mouse_captor)

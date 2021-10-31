@@ -3620,13 +3620,13 @@ BOOL LLNormalTextSegment::handleToolTip(S32 x, S32 y, MASK mask)
 	if (mToken && !mToken->getToolTip().empty())
 	{
 		const LLWString& wmsg = mToken->getToolTip();
-		LLToolTipMgr::instance().show(wstring_to_utf8str(wmsg));
+		LLToolTipMgr::instanceFast().show(wstring_to_utf8str(wmsg));
 		return TRUE;
 	}
 	// or do we have an explicitly set tooltip (e.g., for Urls)
 	if (!mTooltip.empty())
 	{
-		LLToolTipMgr::instance().show(mTooltip);
+		LLToolTipMgr::instanceFast().show(mTooltip);
 		return TRUE;
 	}
 
@@ -3973,7 +3973,7 @@ BOOL LLImageTextSegment::handleToolTip(S32 x, S32 y, MASK mask)
 {
 	if (!mTooltip.empty())
 	{
-		LLToolTipMgr::instance().show(mTooltip);
+		LLToolTipMgr::instanceFast().show(mTooltip);
 		return TRUE;
 	}
 
