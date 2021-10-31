@@ -816,7 +816,7 @@ BOOL LLUICtrl::focusFirstItem(BOOL prefer_text_fields, BOOL focus_flash)
 	if(prefer_text_fields)
 	{
 		LLViewQuery query = getTabOrderQuery();
-		query.addPreFilter(LLUICtrl::LLTextInputFilter::getInstance());
+		query.addPreFilter(LLUICtrl::LLTextInputFilter::getInstanceFast());
 		child_list_t result = query(this);
 		if(result.size() > 0)
 		{
@@ -860,7 +860,7 @@ BOOL LLUICtrl::focusNextItem(BOOL text_fields_only)
 	static LLUICachedControl<bool> tab_to_text_fields_only ("TabToTextFieldsOnly", false);
 	if(text_fields_only || tab_to_text_fields_only)
 	{
-		query.addPreFilter(LLUICtrl::LLTextInputFilter::getInstance());
+		query.addPreFilter(LLUICtrl::LLTextInputFilter::getInstanceFast());
 	}
 	child_list_t result = query(this);
 	return focusNext(result);
@@ -873,7 +873,7 @@ BOOL LLUICtrl::focusPrevItem(BOOL text_fields_only)
 	static LLUICachedControl<bool> tab_to_text_fields_only ("TabToTextFieldsOnly", false);
 	if(text_fields_only || tab_to_text_fields_only)
 	{
-		query.addPreFilter(LLUICtrl::LLTextInputFilter::getInstance());
+		query.addPreFilter(LLUICtrl::LLTextInputFilter::getInstanceFast());
 	}
 	child_list_t result = query(this);
 	return focusPrev(result);

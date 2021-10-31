@@ -398,7 +398,7 @@ LLView* LLPanel::fromXML(LLXMLNodePtr node, LLView* parent, LLXMLNodePtr output_
 		
 		if(!class_attr.empty())
 		{
-			panelp = LLRegisterPanelClass::instance().createPanelClass(class_attr);
+			panelp = LLRegisterPanelClass::instanceFast().createPanelClass(class_attr);
 			if (!panelp)
 			{
 				LL_WARNS() << "Panel class \"" << class_attr << "\" not registered." << LL_ENDL;
@@ -518,6 +518,8 @@ BOOL LLPanel::initPanelXML(LLXMLNodePtr node, LLView *parent, LLXMLNodePtr outpu
 			setXMLFilename(xml_filename);
 		}
 
+		auto& uictrl_factory = LLUICtrlFactory::instanceFast();
+
 		LLXUIParser parser;
 
 		if (!xml_filename.empty())
@@ -526,7 +528,7 @@ BOOL LLPanel::initPanelXML(LLXMLNodePtr node, LLView *parent, LLXMLNodePtr outpu
 			{
 				//if we are exporting, we want to export the current xml
 				//not the referenced xml
-				parser.readXUI(node, params, LLUICtrlFactory::getInstance()->getCurFileName());
+				parser.readXUI(node, params, uictrl_factory.getCurFileName());
 				Params output_params(params);
 				setupParamsForExport(output_params, parent);
 				output_node->setName(node->getName()->mString);
@@ -534,7 +536,7 @@ BOOL LLPanel::initPanelXML(LLXMLNodePtr node, LLView *parent, LLXMLNodePtr outpu
 				return TRUE;
 			}
 		
-			LLUICtrlFactory::instance().pushFileName(xml_filename);
+			uictrl_factory.pushFileName(xml_filename);
 
 			LL_RECORD_BLOCK_TIME(FTM_EXTERNAL_PANEL_LOAD);
 			if (!LLUICtrlFactory::getLayeredXMLNode(xml_filename, referenced_xml))
@@ -544,17 +546,17 @@ BOOL LLPanel::initPanelXML(LLXMLNodePtr node, LLView *parent, LLXMLNodePtr outpu
 				return FALSE;
 			}
 
-			parser.readXUI(referenced_xml, params, LLUICtrlFactory::getInstance()->getCurFileName());
+			parser.readXUI(referenced_xml, params, uictrl_factory.getCurFileName());
 
 			// add children using dimensions from referenced xml for consistent layout
 			setShape(params.rect);
-			LLUICtrlFactory::createChildren(this, referenced_xml, child_registry_t::instance());
+			LLUICtrlFactory::createChildren(this, referenced_xml, child_registry_t::instanceFast());
 
-			LLUICtrlFactory::instance().popFileName();
+			uictrl_factory.popFileName();
 		}
 
 		// ask LLUICtrlFactory for filename, since xml_filename might be empty
-		parser.readXUI(node, params, LLUICtrlFactory::getInstance()->getCurFileName());
+		parser.readXUI(node, params, uictrl_factory.getCurFileName());
 
 		if (output_node)
 		{
@@ -572,7 +574,7 @@ BOOL LLPanel::initPanelXML(LLXMLNodePtr node, LLView *parent, LLXMLNodePtr outpu
 		}
 
 		// add children
-		LLUICtrlFactory::createChildren(this, node, child_registry_t::instance(), output_node);
+		LLUICtrlFactory::createChildren(this, node, child_registry_t::instanceFast(), output_node);
 
 		// Connect to parent after children are built, because tab containers
 		// do a reshape() on their child panels, which requires that the children
@@ -824,7 +826,7 @@ BOOL LLPanel::buildFromFile(const std::string& filename, const LLPanel::Params& 
 
 	LL_DEBUGS() << "Building panel " << filename << LL_ENDL;
 
-	LLUICtrlFactory::instance().pushFileName(filename);
+	LLUICtrlFactory::instanceFast().pushFileName(filename);
 	{
 		if (!getFactoryMap().empty())
 		{
@@ -847,7 +849,7 @@ BOOL LLPanel::buildFromFile(const std::string& filename, const LLPanel::Params& 
 			sFactoryStack.pop_back();
 		}
 	}
-	LLUICtrlFactory::instance().popFileName();
+	LLUICtrlFactory::instanceFast().popFileName();
 	return didPost;
 }
 

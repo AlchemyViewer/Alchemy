@@ -1985,11 +1985,11 @@ const LLViewQuery & LLView::getTabOrderQuery()
 {
 	static LLViewQuery query;
 	if(query.getPreFilters().size() == 0) {
-		query.addPreFilter(LLVisibleFilter::getInstance());
-		query.addPreFilter(LLEnabledFilter::getInstance());
-		query.addPreFilter(LLTabStopFilter::getInstance());
-		query.addPostFilter(LLLeavesFilter::getInstance());
-		query.setSorter(SortByTabOrder::getInstance());
+		query.addPreFilter(LLVisibleFilter::getInstanceFast());
+		query.addPreFilter(LLEnabledFilter::getInstanceFast());
+		query.addPreFilter(LLTabStopFilter::getInstanceFast());
+		query.addPostFilter(LLLeavesFilter::getInstanceFast());
+		query.setSorter(SortByTabOrder::getInstanceFast());
 	}
 	return query;
 }
@@ -2009,10 +2009,10 @@ const LLViewQuery & LLView::getFocusRootsQuery()
 {
 	static LLViewQuery query;
 	if(query.getPreFilters().size() == 0) {
-		query.addPreFilter(LLVisibleFilter::getInstance());
-		query.addPreFilter(LLEnabledFilter::getInstance());
-		query.addPreFilter(LLFocusRootsFilter::getInstance());
-		query.addPostFilter(LLRootsFilter::getInstance());
+		query.addPreFilter(LLVisibleFilter::getInstanceFast());
+		query.addPreFilter(LLEnabledFilter::getInstanceFast());
+		query.addPreFilter(LLFocusRootsFilter::getInstanceFast());
+		query.addPostFilter(LLRootsFilter::getInstanceFast());
 	}
 	return query;
 }

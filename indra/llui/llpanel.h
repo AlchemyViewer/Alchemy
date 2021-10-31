@@ -310,7 +310,7 @@ public:
 template<typename T>
 	LLPanelInjector<T>::LLPanelInjector(const std::string& tag) 
 {
-	LLRegisterPanelClass::instance().addPanelClass(tag,&LLRegisterPanelClass::defaultPanelClassBuilder<T>);
+	LLRegisterPanelClass::instanceFast().addPanelClass(tag,&LLRegisterPanelClass::defaultPanelClassBuilder<T>);
 }
 
 

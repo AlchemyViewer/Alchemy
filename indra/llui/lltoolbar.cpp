@@ -176,7 +176,7 @@ void LLToolBar::createContextMenu()
 		
 		// Create the context menu
 		llassert(LLMenuGL::sMenuContainer != NULL);
-		LLContextMenu* menu = LLUICtrlFactory::instance().createFromFile<LLContextMenu>("menu_toolbars.xml", LLMenuGL::sMenuContainer, LLMenuHolderGL::child_registry_t::instance());
+		LLContextMenu* menu = LLUICtrlFactory::instanceFast().createFromFile<LLContextMenu>("menu_toolbars.xml", LLMenuGL::sMenuContainer, LLMenuHolderGL::child_registry_t::instanceFast());
 
 		if (menu)
 		{

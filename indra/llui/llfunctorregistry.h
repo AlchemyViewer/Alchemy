@@ -132,7 +132,7 @@ class LLFunctorRegistration
 public:
 	LLFunctorRegistration(const std::string& name, FUNCTOR_TYPE functor) 
 	{
-		LLFunctorRegistry<FUNCTOR_TYPE>::instance().registerFunctor(name, functor);
+		LLFunctorRegistry<FUNCTOR_TYPE>::instanceFast().registerFunctor(name, functor);
 	}
 };
 

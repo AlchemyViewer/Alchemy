@@ -602,8 +602,8 @@ void LLXUIXSDWriter::writeXSD(const std::string& type_name, const std::string& p
 	LLXSDWriter::writeXSD(type_name, root_nodep, block, "http://www.lindenlab.com/xui");
 
 	// add includes for all possible children
-	const std::type_info* type = *LLWidgetTypeRegistry::instance().getValue(type_name);
-	const widget_registry_t* widget_registryp = LLChildRegistryRegistry::instance().getValue(type);
+	const std::type_info* type = *LLWidgetTypeRegistry::instanceFast().getValue(type_name);
+	const widget_registry_t* widget_registryp = LLChildRegistryRegistry::instanceFast().getValue(type);
 
 	// add choices for valid children
 	if (widget_registryp)

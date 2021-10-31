@@ -3298,6 +3298,8 @@ bool LLFloater::initFloaterXML(LLXMLNodePtr node, LLView *parent, const std::str
 
 	if (!xml_filename.empty())
 	{
+		auto& uifactory_inst = LLUICtrlFactory::instanceFast();
+		
 		LLXMLNodePtr referenced_xml;
 
 		if (output_node)
@@ -3305,14 +3307,16 @@ bool LLFloater::initFloaterXML(LLXMLNodePtr node, LLView *parent, const std::str
 			//if we are exporting, we want to export the current xml
 			//not the referenced xml
 			Params output_params;
-			parser.readXUI(node, output_params, LLUICtrlFactory::getInstance()->getCurFileName());
+			parser.readXUI(node, output_params, uifactory_inst.getCurFileName());
 			setupParamsForExport(output_params, parent);
 			output_node->setName(node->getName()->mString);
 			parser.writeXUI(output_node, output_params, LLInitParam::default_parse_rules(), &default_params);
 			return TRUE;
 		}
 
-		LLUICtrlFactory::instance().pushFileName(xml_filename);
+
+
+		uifactory_inst.pushFileName(xml_filename);
 
 		LL_RECORD_BLOCK_TIME(FTM_EXTERNAL_FLOATER_LOAD);
 		if (!LLUICtrlFactory::getLayeredXMLNode(xml_filename, referenced_xml))
@@ -3323,14 +3327,14 @@ bool LLFloater::initFloaterXML(LLXMLNodePtr node, LLView *parent, const std::str
 		}
 
 		Params referenced_params;
-		parser.readXUI(referenced_xml, referenced_params, LLUICtrlFactory::getInstance()->getCurFileName());
+		parser.readXUI(referenced_xml, referenced_params, uifactory_inst.getCurFileName());
 		params.fillFrom(referenced_params);
 
 		// add children using dimensions from referenced xml for consistent layout
 		setShape(params.rect);
-		LLUICtrlFactory::createChildren(this, referenced_xml, child_registry_t::instance());
+		LLUICtrlFactory::createChildren(this, referenced_xml, child_registry_t::instanceFast());
 
-		LLUICtrlFactory::instance().popFileName();
+		uifactory_inst.popFileName();
 	}
 
 
@@ -3365,7 +3369,7 @@ bool LLFloater::initFloaterXML(LLXMLNodePtr node, LLView *parent, const std::str
 		LLFloater::setFloaterHost((LLMultiFloater*) this);
 	}
 
-	LLUICtrlFactory::createChildren(this, node, child_registry_t::instance(), output_node);
+	LLUICtrlFactory::createChildren(this, node, child_registry_t::instanceFast(), output_node);
 
 	if (node->hasName("multi_floater"))
 	{
@@ -3462,7 +3466,7 @@ bool LLFloater::buildFromFile(const std::string& filename)
 	bool res = true;
 	
 	LL_DEBUGS() << "Building floater " << filename << LL_ENDL;
-    auto& uictrl_factory = LLUICtrlFactory::instance();
+    auto& uictrl_factory = LLUICtrlFactory::instanceFast();
     uictrl_factory.pushFileName(filename);
 	{
 		if (!getFactoryMap().empty())
