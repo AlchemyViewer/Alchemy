@@ -48,8 +48,8 @@ public:
 		
 		Params() 
 		:	label("label"),	
-			drag_highlight_color("drag_highlight_color", LLUIColorTable::instance().getColor("DefaultHighlightLight")),
-			drag_shadow_color("drag_shadow_color", LLUIColorTable::instance().getColor("DefaultShadowDark"))
+			drag_highlight_color("drag_highlight_color", LLUIColorTable::instanceFast().getColor("DefaultHighlightLight")),
+			drag_shadow_color("drag_shadow_color", LLUIColorTable::instanceFast().getColor("DefaultShadowDark"))
 		{
 			changeDefault(mouse_opaque, true);
 			changeDefault(follows.flags, FOLLOWS_ALL);

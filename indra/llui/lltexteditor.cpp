@@ -1495,7 +1495,7 @@ void LLTextEditor::copy()
 
 BOOL LLTextEditor::canPaste() const
 {
-	return !mReadOnly && LLClipboard::instance().isTextAvailable();
+	return !mReadOnly && LLClipboard::instanceFast().isTextAvailable();
 }
 
 // paste from clipboard
@@ -1632,7 +1632,7 @@ void LLTextEditor::copyPrimary()
 
 BOOL LLTextEditor::canPastePrimary() const
 {
-	return !mReadOnly && LLClipboard::instance().isTextAvailable(true);
+	return !mReadOnly && LLClipboard::instanceFast().isTextAvailable(true);
 }
 
 void LLTextEditor::updatePrimary()
@@ -2219,7 +2219,7 @@ void LLTextEditor::showContextMenu(S32 x, S32 y)
 		std::string misspelled_word = getMisspelledWord(mCursorPos);
 		if ((is_misspelled = !misspelled_word.empty()) == true)
 		{
-			LLSpellChecker::instance().getSuggestions(misspelled_word, mSuggestionList);
+			LLSpellChecker::instanceFast().getSuggestions(misspelled_word, mSuggestionList);
 		}
 	}
 
@@ -2605,6 +2605,7 @@ void LLTextEditor::updateLinkSegments()
 	const LLWString& wtext = getWText();
 
 	// update any segments that contain a link
+	auto& url_registry = LLUrlRegistry::instanceFast();
 	for (segment_set_t::iterator it = mSegments.begin(); it != mSegments.end(); ++it)
 	{
 		LLTextSegment *segment = *it;
@@ -2622,7 +2623,7 @@ void LLTextEditor::updateLinkSegments()
 				std::string link_check = wstring_to_utf8str(url_label) + wstring_to_utf8str(next_url_label);
 				LLUrlMatch match;
 
-				if ( LLUrlRegistry::instance().findUrl(link_check, match))
+				if (url_registry.findUrl(link_check, match))
 				{
 					if(match.getQuery() == wstring_to_utf8str(next_url_label))
 					{
@@ -2634,7 +2635,7 @@ void LLTextEditor::updateLinkSegments()
 			// if the link's label (what the user can edit) is a valid Url,
 			// then update the link's HREF to be the same as the label text.
 			// This lets users edit Urls in-place.
-			if (acceptsTextInput() && LLUrlRegistry::instance().hasUrl(url_label))
+			if (acceptsTextInput() && url_registry.hasUrl(url_label))
 			{
 				std::string new_url = wstring_to_utf8str(url_label);
 				LLStringUtil::trim(new_url);

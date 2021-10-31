@@ -567,11 +567,11 @@ void LLLayoutStack::createResizeBar(LLLayoutPanel* panelp)
 				resize_bar_bg_panel_p.follows.flags = FOLLOWS_ALL;
 				resize_bar_bg_panel_p.tab_stop = false;
 				resize_bar_bg_panel_p.background_visible = true;
-				resize_bar_bg_panel_p.bg_alpha_color = LLUIColorTable::instance().getColor("ResizebarBody");
+				resize_bar_bg_panel_p.bg_alpha_color = LLUIColorTable::instanceFast().getColor("ResizebarBody");
 				resize_bar_bg_panel_p.has_border = true;
 				resize_bar_bg_panel_p.border.border_thickness = 1;
-				resize_bar_bg_panel_p.border.highlight_light_color = LLUIColorTable::instance().getColor("ResizebarBorderLight");
-				resize_bar_bg_panel_p.border.shadow_dark_color = LLUIColorTable::instance().getColor("ResizebarBorderDark");
+				resize_bar_bg_panel_p.border.highlight_light_color = LLUIColorTable::instanceFast().getColor("ResizebarBorderLight");
+				resize_bar_bg_panel_p.border.shadow_dark_color = LLUIColorTable::instanceFast().getColor("ResizebarBorderDark");
 
 				LLPanel* resize_bar_bg_panel = LLUICtrlFactory::create<LLPanel>(resize_bar_bg_panel_p);
 

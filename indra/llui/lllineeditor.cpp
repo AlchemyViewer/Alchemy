@@ -1239,7 +1239,7 @@ void LLLineEditor::copy()
 
 BOOL LLLineEditor::canPaste() const
 {
-	return !mReadOnly && LLClipboard::instance().isTextAvailable(); 
+	return !mReadOnly && LLClipboard::instanceFast().isTextAvailable();
 }
 
 void LLLineEditor::paste()
@@ -1362,7 +1362,7 @@ void LLLineEditor::copyPrimary()
 
 BOOL LLLineEditor::canPastePrimary() const
 {
-	return !mReadOnly && LLClipboard::instance().isTextAvailable(true); 
+	return !mReadOnly && LLClipboard::instanceFast().isTextAvailable(true);
 }
 
 void LLLineEditor::updatePrimary()
@@ -1989,7 +1989,7 @@ void LLLineEditor::draw()
 
 				// Don't process words shorter than 3 characters
 				std::string word = wstring_to_utf8str(text.substr(word_start, word_end - word_start));
-				if ( (word.length() >= 3) && (!LLSpellChecker::instance().checkSpelling(word)) )
+				if ( (word.length() >= 3) && (!LLSpellChecker::instanceFast().checkSpelling(word)) )
 				{
 					mMisspellRanges.push_back(std::pair<U32, U32>(start + word_start, start + word_end));
 				}
@@ -2302,7 +2302,7 @@ BOOL LLLineEditor::postvalidateFloat(const std::string &str)
 		}
 
 		// May be a comma or period, depending on the locale
-		llwchar decimal_point = (llwchar)LLResMgr::getInstance()->getDecimalPoint();
+		llwchar decimal_point = (llwchar)LLResMgr::getInstanceFast()->getDecimalPoint();
 
 		for( ; i < len; i++ )
 		{

@@ -62,7 +62,7 @@ namespace LLTextValidate
 		if( 0 < len )
 		{
 			// May be a comma or period, depending on the locale
-			llwchar decimal_point = (llwchar)LLResMgr::getInstance()->getDecimalPoint();
+			llwchar decimal_point = (llwchar)LLResMgr::getInstanceFast()->getDecimalPoint();
 
 			S32 i = 0;
 

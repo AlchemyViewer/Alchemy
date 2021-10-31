@@ -213,7 +213,7 @@ LLColor4 LLKeywords::getColorGroup(std::string_view key_in)
 		LL_WARNS("SyntaxLSL") << "Color key '" << key_in << "' not recognized." << LL_ENDL;
 	}
 
-	return LLUIColorTable::instance().getColor(color_group);
+	return LLUIColorTable::instanceFast().getColor(color_group);
 }
 
 void LLKeywords::initialize(LLSD SyntaxXML)
@@ -232,9 +232,9 @@ void LLKeywords::processTokens()
 	// Add 'standard' stuff: Quotes, Comments, Strings, Labels, etc. before processing the LLSD
 	std::string delimiter;
 	addToken(LLKeywordToken::TT_LABEL, "@", getColorGroup("misc-flow-label"), "Label\nTarget for jump statement", delimiter );
-	addToken(LLKeywordToken::TT_ONE_SIDED_DELIMITER, "//", LLUIColorTable::instance().getColor("SyntaxLslComment"), "Comment (single-line)\nNon-functional commentary or disabled code", delimiter );
-	addToken(LLKeywordToken::TT_TWO_SIDED_DELIMITER, "/*", LLUIColorTable::instance().getColor("SyntaxLslComment"), "Comment (multi-line)\nNon-functional commentary or disabled code", "*/" );
-	addToken(LLKeywordToken::TT_DOUBLE_QUOTATION_MARKS, "\"", LLUIColorTable::instance().getColor("SyntaxLslStringLiteral"), "String literal", "\"" );
+	addToken(LLKeywordToken::TT_ONE_SIDED_DELIMITER, "//", LLUIColorTable::instanceFast().getColor("SyntaxLslComment"), "Comment (single-line)\nNon-functional commentary or disabled code", delimiter );
+	addToken(LLKeywordToken::TT_TWO_SIDED_DELIMITER, "/*", LLUIColorTable::instanceFast().getColor("SyntaxLslComment"), "Comment (multi-line)\nNon-functional commentary or disabled code", "*/" );
+	addToken(LLKeywordToken::TT_DOUBLE_QUOTATION_MARKS, "\"", LLUIColorTable::instanceFast().getColor("SyntaxLslStringLiteral"), "String literal", "\"" );
 
 	for (const auto& llsd_pair : mSyntax.map())
 	{

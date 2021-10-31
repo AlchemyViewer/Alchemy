@@ -914,7 +914,7 @@ BOOL LLFolderView::canCopy() const
 void LLFolderView::copy()
 {
 	// *NOTE: total hack to clear the inventory clipboard
-	LLClipboard::instance().reset();
+	LLClipboard::instanceFast().reset();
 	S32 count = mSelectedItems.size();
 	if(getVisible() && getEnabled() && (count > 0))
 	{
@@ -955,7 +955,7 @@ BOOL LLFolderView::canCut() const
 void LLFolderView::cut()
 {
 	// clear the inventory clipboard
-	LLClipboard::instance().reset();
+	LLClipboard::instanceFast().reset();
 	if(getVisible() && getEnabled() && (mSelectedItems.size() > 0))
 	{
 		// Find out which item will be selected once the selection will be cut
@@ -1458,7 +1458,7 @@ BOOL LLFolderView::handleRightMouseDown( S32 x, S32 y, MASK mask )
 		{
 			menu = LLUICtrlFactory::getDefaultWidget<LLMenuGL>("inventory_menu");
 		}
-	menu->setBackgroundColor(LLUIColorTable::instance().getColor("MenuPopupBgColor"));
+	menu->setBackgroundColor(LLUIColorTable::instanceFast().getColor("MenuPopupBgColor"));
 		mPopupMenuHandle = menu->getHandle();
 		if (mEnableRegistrar)
 		{

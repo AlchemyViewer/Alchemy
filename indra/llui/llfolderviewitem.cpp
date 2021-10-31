@@ -746,7 +746,7 @@ void LLFolderViewItem::drawOpenFolderArrow(const Params& default_params, const L
 
 /*virtual*/ bool LLFolderViewItem::isFadeItem()
 {
-    LLClipboard& clipboard = LLClipboard::instance();
+    LLClipboard& clipboard = LLClipboard::instanceFast();
     if (mCutGeneration != clipboard.getGeneration())
     {
         mCutGeneration = clipboard.getGeneration();

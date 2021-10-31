@@ -282,7 +282,7 @@ LLUrlEntryHTTPLabel::LLUrlEntryHTTPLabel()
 std::string LLUrlEntryHTTPLabel::getLabel(const std::string &url, const LLUrlLabelCallback &cb)
 {
 	std::string label = getLabelFromWikiLink(url);
-	return (!LLUrlRegistry::instance().hasUrl(label)) ? label : getUrl(url);
+	return (!LLUrlRegistry::instanceFast().hasUrl(label)) ? label : getUrl(url);
 }
 
 std::string LLUrlEntryHTTPLabel::getTooltip(const std::string &string) const
@@ -1294,7 +1294,7 @@ LLUrlEntrySLLabel::LLUrlEntrySLLabel()
 std::string LLUrlEntrySLLabel::getLabel(const std::string &url, const LLUrlLabelCallback &cb)
 {
 	std::string label = getLabelFromWikiLink(url);
-	return (!LLUrlRegistry::instance().hasUrl(label)) ? label : getUrl(url);
+	return (!LLUrlRegistry::instanceFast().hasUrl(label)) ? label : getUrl(url);
 }
 
 std::string LLUrlEntrySLLabel::getUrl(const std::string &string) const
@@ -1307,7 +1307,7 @@ std::string LLUrlEntrySLLabel::getTooltip(const std::string &string) const
 	// return a tooltip corresponding to the URL type instead of the generic one (EXT-4574)
 	std::string url = getUrl(string);
 	LLUrlMatch match;
-	if (LLUrlRegistry::instance().findUrl(url, match))
+	if (LLUrlRegistry::instanceFast().findUrl(url, match))
 	{
 		return match.getTooltip();
 	}
@@ -1320,7 +1320,7 @@ bool LLUrlEntrySLLabel::underlineOnHoverOnly(const std::string &string) const
 {
 	std::string url = getUrl(string);
 	LLUrlMatch match;
-	if (LLUrlRegistry::instance().findUrl(url, match))
+	if (LLUrlRegistry::instanceFast().findUrl(url, match))
 	{
 		return match.underlineOnHoverOnly();
 	}
