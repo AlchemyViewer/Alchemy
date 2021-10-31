@@ -131,7 +131,7 @@ bool handleIgnoredNotification(const LLSD& payload)
 			response = pNotif->getResponseTemplate(LLNotification::WITH_DEFAULT_BUTTON);
 			break;
 		case LLNotificationForm::IGNORE_WITH_LAST_RESPONSE:
-			response = LLUI::getInstance()->mSettingGroups["ignores"]->getLLSD("Default" + pNotif->getName());
+			response = LLUI::getInstanceFast()->mSettingGroups["ignores"]->getLLSD("Default" + pNotif->getName());
 			break;
 		case LLNotificationForm::IGNORE_SHOW_AGAIN:
 			break;
@@ -199,7 +199,7 @@ LLNotificationForm::LLNotificationForm(const std::string& name, const LLNotifica
 		// For all cases but IGNORE_CHECKBOX_ONLY this is name for use in preferences
 		mIgnoreMsg = p.ignore.text;
 
-		LLUI *ui_inst = LLUI::getInstance();
+		LLUI *ui_inst = LLUI::getInstanceFast();
 		if (p.ignore.checkbox_only)
 		{
 			mIgnore = IGNORE_CHECKBOX_ONLY;
@@ -425,7 +425,7 @@ LLNotificationTemplate::LLNotificationTemplate(const LLNotificationTemplate::Par
     mSoundName("")
 {
 	if (p.sound.isProvided()
-		&& LLUI::getInstance()->mSettingGroups["config"]->controlExists(p.sound.getValue()))
+		&& LLUI::getInstanceFast()->mSettingGroups["config"]->controlExists(p.sound.getValue()))
 	{
 		mSoundName = p.sound;
 	}
@@ -691,7 +691,7 @@ void LLNotification::respond(const LLSD& response)
 		mForm->setIgnored(mIgnored);
 		if (mIgnored && mForm->getIgnoreType() == LLNotificationForm::IGNORE_WITH_LAST_RESPONSE)
 		{
-			LLUI::getInstance()->mSettingGroups["ignores"]->setLLSD(absl::StrCat("Default", getName()), response);
+			LLUI::getInstanceFast()->mSettingGroups["ignores"]->setLLSD(absl::StrCat("Default", getName()), response);
 		}
 	}
 

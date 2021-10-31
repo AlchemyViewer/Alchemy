@@ -598,7 +598,7 @@ std::string LLFloater::getControlName(const std::string& name, const LLSD& key)
 LLControlGroup*	LLFloater::getControlGroup()
 {
 	// Floater size, position, visibility, etc are saved in per-account settings.
-	return LLUI::getInstance()->mSettingGroups["account"];
+	return LLUI::getInstanceFast()->mSettingGroups["account"];
 }
 
 void LLFloater::setVisible( BOOL visible )
@@ -611,7 +611,7 @@ void LLFloater::setVisible( BOOL visible )
 
 	if( !visible )
 	{
-		LLUI::getInstance()->removePopup(this);
+		LLUI::getInstanceFast()->removePopup(this);
 
 		if( gFocusMgr.childHasMouseCapture( this ) )
 		{
@@ -847,7 +847,7 @@ void LLFloater::reshape(S32 width, S32 height, BOOL called_from_parent)
 
 void LLFloater::releaseFocus()
 {
-	LLUI::getInstance()->removePopup(this);
+	LLUI::getInstanceFast()->removePopup(this);
 
 	setFocus(FALSE);
 
@@ -1819,13 +1819,13 @@ void LLFloater::onClickDock(LLFloater* self)
 // static
 void LLFloater::onClickHelp( LLFloater* self )
 {
-	if (self && LLUI::getInstance()->mHelpImpl)
+	if (self && LLUI::getInstanceFast()->mHelpImpl)
 	{
 		// find the current help context for this floater
 		std::string help_topic;
 		if (self->findHelpTopic(help_topic))
 		{
-			LLUI::getInstance()->mHelpImpl->showTopic(help_topic);
+			LLUI::getInstanceFast()->mHelpImpl->showTopic(help_topic);
 		}
 	}
 }
@@ -3031,7 +3031,7 @@ void LLFloaterView::syncFloaterTabOrder()
 	if (modal_dialog)
 	{
 		// If we have a visible modal dialog, make sure that it has focus
-		LLUI::getInstance()->addPopup(modal_dialog);
+		LLUI::getInstanceFast()->addPopup(modal_dialog);
 		
 		if( !gFocusMgr.childHasKeyboardFocus( modal_dialog ) )
 		{

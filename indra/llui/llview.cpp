@@ -2281,9 +2281,9 @@ LLControlVariable *LLView::findControl(std::string_view name)
 		std::string control_group_key(name.substr(0, key_pos));
 		LLControlVariable* control;
 		// check if it's in the control group that name indicated
-		if(LLUI::getInstance()->mSettingGroups[control_group_key])
+		if(LLUI::getInstanceFast()->mSettingGroups[control_group_key])
 		{
-			control = LLUI::getInstance()->mSettingGroups[control_group_key]->getControl(name);
+			control = LLUI::getInstanceFast()->mSettingGroups[control_group_key]->getControl(name);
 			if (control)
 			{
 				return control;
@@ -2291,7 +2291,7 @@ LLControlVariable *LLView::findControl(std::string_view name)
 		}
 	}
 	
-	LLControlGroup& control_group = LLUI::getInstance()->getControlControlGroup(name);
+	LLControlGroup& control_group = LLUI::getInstanceFast()->getControlControlGroup(name);
 	return control_group.getControl(name);	
 }
 

@@ -105,7 +105,7 @@ void LLModalDialog::onOpen(const LLSD& key)
 	
 		// This is a modal dialog.  It sucks up all mouse and keyboard operations.
 		gFocusMgr.setMouseCapture( this );
-		LLUI::getInstance()->addPopup(this);
+		LLUI::getInstanceFast()->addPopup(this);
 		setFocus(TRUE);
 
 		sModalStack.push_front( this );
@@ -147,7 +147,7 @@ void LLModalDialog::setVisible( BOOL visible )
 			gFocusMgr.setMouseCapture( this );
 
 			// The dialog view is a root view
-			LLUI::getInstance()->addPopup(this);
+			LLUI::getInstanceFast()->addPopup(this);
 			setFocus( TRUE );
 		}
 		else
@@ -318,7 +318,7 @@ void LLModalDialog::onAppFocusGained()
 		// This is a modal dialog.  It sucks up all mouse and keyboard operations.
 		gFocusMgr.setMouseCapture( instance );
 		instance->setFocus(TRUE);
-		LLUI::getInstance()->addPopup(instance);
+		LLUI::getInstanceFast()->addPopup(instance);
 
 		instance->centerOnScreen();
 	}

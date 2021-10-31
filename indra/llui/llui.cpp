@@ -96,7 +96,7 @@ LLFrameTimer LLUI::sMouseIdleTimer(LLFrameTimer::kConstInit);
 LLUUID find_ui_sound(std::string_view name)
 {
 	LLUUID uuid = LLUUID(NULL);
-	LLUI& ui_inst = LLUI::instance();
+	LLUI& ui_inst = LLUI::instanceFast();
 	if (!ui_inst.mSettingGroups["config"]->controlExists(name))
 	{
 		LL_WARNS() << "tried to make UI sound for unknown sound name: " << name << LL_ENDL;	
@@ -140,7 +140,7 @@ void make_ui_sound(const char* namep)
 	LLUUID soundUUID = find_ui_sound(absl::NullSafeStringView(namep));
 	if(soundUUID.notNull())
 	{
-		LLUI::getInstance()->mAudioCallback(soundUUID);
+		LLUI::getInstanceFast()->mAudioCallback(soundUUID);
 	}
 }
 
@@ -149,7 +149,7 @@ void make_ui_sound_deferred(const char* namep)
 	LLUUID soundUUID = find_ui_sound(absl::NullSafeStringView(namep));
 	if(soundUUID.notNull())
 	{
-		LLUI::getInstance()->mDeferredAudioCallback(soundUUID);
+		LLUI::getInstanceFast()->mDeferredAudioCallback(soundUUID);
 	}
 }
 
@@ -287,7 +287,7 @@ std::string LLUI::getUILanguage()
 std::string LLUI::getLanguage()
 {
     // Note: lldateutil_test redefines this function
-    return LLUI::getInstance()->getUILanguage();
+    return LLUI::getInstanceFast()->getUILanguage();
 }
 
 struct SubDir : public LLInitParam::Block<SubDir>

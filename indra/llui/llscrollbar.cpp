@@ -84,7 +84,7 @@ LLScrollbar::LLScrollbar(const Params & p)
 		mThumbImageH(p.thumb_image_horizontal),
 		mTrackImageV(p.track_image_vertical),
 		mTrackImageH(p.track_image_horizontal),
-		mThickness(p.thickness.isProvided() ? p.thickness : LLUI::getInstance()->mSettingGroups["config"]->getS32("UIScrollbarSize")),
+		mThickness(p.thickness.isProvided() ? p.thickness : LLUI::getInstanceFast()->mSettingGroups["config"]->getS32("UIScrollbarSize")),
 		mBGVisible(p.bg_visible),
 		mBGColor(p.bg_color)
 {
@@ -659,5 +659,5 @@ void LLScrollbar::onLineDownBtnPressed( const LLSD& data )
 
 void LLScrollbar::setThickness(S32 thickness)
 {
-	mThickness = thickness < 0 ? LLUI::getInstance()->mSettingGroups["config"]->getS32("UIScrollbarSize") : thickness;
+	mThickness = thickness < 0 ? LLUI::getInstanceFast()->mSettingGroups["config"]->getS32("UIScrollbarSize") : thickness;
 }

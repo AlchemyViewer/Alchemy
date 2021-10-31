@@ -740,7 +740,7 @@ void LLFolderView::closeRenamer( void )
 	if (mRenamer && mRenamer->getVisible())
 	{
 		// Triggers onRenamerLost() that actually closes the renamer.
-		LLUI::getInstance()->removePopup(mRenamer);
+		LLUI::getInstanceFast()->removePopup(mRenamer);
 	}
 }
 
@@ -1070,7 +1070,7 @@ void LLFolderView::startRenamingSelectedItem( void )
 		// set focus will fail unless item is visible
 		mRenamer->setFocus( TRUE );
 		mRenamer->setTopLostCallback(boost::bind(&LLFolderView::onRenamerLost, this));
-		LLUI::getInstance()->addPopup(mRenamer);
+		LLUI::getInstanceFast()->addPopup(mRenamer);
 	}
 }
 

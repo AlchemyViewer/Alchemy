@@ -676,7 +676,7 @@ void LLComboBox::showList()
 	mButton->setToggleState(TRUE);
 	mList->setVisible(TRUE);
 	
-	LLUI::getInstance()->addPopup(this);
+	LLUI::getInstanceFast()->addPopup(this);
 
 	setUseBoundingRect(TRUE);
 //	updateBoundingRect();
@@ -702,7 +702,7 @@ void LLComboBox::hideList()
 		mList->mouseOverHighlightNthItem(-1);
 
 		setUseBoundingRect(FALSE);
-		LLUI::getInstance()->removePopup(this);
+		LLUI::getInstanceFast()->removePopup(this);
 //		updateBoundingRect();
 	}
 }

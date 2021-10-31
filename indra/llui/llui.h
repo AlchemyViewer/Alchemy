@@ -361,7 +361,7 @@ public:
 	LLUICachedControl(const std::string& name,
 					  const T& default_value,
 					  const std::string& comment = "Declared In Code")
-	:	LLCachedControl<T>(LLUI::getInstance()->getControlControlGroup(name), name, default_value, comment)
+	:	LLCachedControl<T>(LLUI::getInstanceFast()->getControlControlGroup(name), name, default_value, comment)
 	{}
 };
 

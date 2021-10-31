@@ -45,7 +45,7 @@ LLViewerEventRecorder::LLViewerEventRecorder() {
 
 
 bool LLViewerEventRecorder::displayViewerEventRecorderMenuItems() {
-  return LLUI::getInstance()->mSettingGroups["config"]->getBOOL("ShowEventRecorderMenuItems");
+  return LLUI::getInstanceFast()->mSettingGroups["config"]->getBOOL("ShowEventRecorderMenuItems");
 }
 
 
@@ -218,7 +218,7 @@ void LLViewerEventRecorder::playbackRecording() {
   LLSD LeapCommand;
 
   // ivita sets this on startup, it also sends commands to the viewer to make start, stop, and playback menu items visible in viewer
-  LeapCommand =LLUI::getInstance()->mSettingGroups["config"]->getLLSD("LeapPlaybackEventsCommand");
+  LeapCommand =LLUI::getInstanceFast()->mSettingGroups["config"]->getLLSD("LeapPlaybackEventsCommand");
   
   LL_DEBUGS() << "[VITA] launching playback - leap command is: " << LLSDXMLStreamer(LeapCommand) << LL_ENDL;
   LLLeap::create("", LeapCommand, false); // exception=false

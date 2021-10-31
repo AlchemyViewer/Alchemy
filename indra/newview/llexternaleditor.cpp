@@ -183,9 +183,9 @@ std::string LLExternalEditor::findCommand(
 		cmd = override;
 		LL_INFOS() << "Using override" << LL_ENDL;
 	}
-	else if (!LLUI::getInstance()->mSettingGroups["config"]->getString(sSetting).empty())
+	else if (!LLUI::getInstanceFast()->mSettingGroups["config"]->getString(sSetting).empty())
 	{
-		cmd = LLUI::getInstance()->mSettingGroups["config"]->getString(sSetting);
+		cmd = LLUI::getInstanceFast()->mSettingGroups["config"]->getString(sSetting);
 		LL_INFOS() << "Using setting" << LL_ENDL;
 	}
 	else                    // otherwise use the path specified by the environment variable

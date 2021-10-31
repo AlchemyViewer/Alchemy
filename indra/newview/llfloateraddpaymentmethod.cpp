@@ -75,7 +75,7 @@ void LLFloaterAddPaymentMethod::onCloseBtn()
 
 void LLFloaterAddPaymentMethod::centerOnScreen()
 {
-	LLVector2 window_size = LLUI::getInstance()->getWindowSize();
+	LLVector2 window_size = LLUI::getWindowSize();
 	centerWithin(LLRect(0, 0, ll_round(window_size.mV[VX]), ll_round(window_size.mV[VY])));
 }
 
