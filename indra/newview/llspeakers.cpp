@@ -1004,7 +1004,7 @@ void LLLocalSpeakerMgr::updateSpeakerList()
 	// pick up non-voice speakers in chat range
 	uuid_vec_t avatar_ids;
 	std::vector<LLVector3d> positions;
-	LLWorld::getInstance()->getAvatars(&avatar_ids, &positions, gAgent.getPositionGlobal(), CHAT_NORMAL_RADIUS);
+	LLWorld::getInstanceFast()->getAvatars(&avatar_ids, &positions, gAgent.getPositionGlobal(), CHAT_NORMAL_RADIUS);
 	for(U32 i=0; i<avatar_ids.size(); i++)
 	{
 		setSpeaker(avatar_ids[i]);

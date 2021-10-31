@@ -688,7 +688,7 @@ void LLManipRotate::drag( S32 x, S32 y )
 			if (object->isRootEdit() && !object->isAttachment())
 			{
 				LLVector3d new_pos_global = gAgent.getPosGlobalFromAgent(new_position);
-				new_pos_global = LLWorld::getInstance()->clipToVisibleRegions(selectNode->mSavedPositionGlobal, new_pos_global);
+				new_pos_global = LLWorld::getInstanceFast()->clipToVisibleRegions(selectNode->mSavedPositionGlobal, new_pos_global);
 				new_position = gAgent.getPosAgentFromGlobal(new_pos_global);
 			}
 

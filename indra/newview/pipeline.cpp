@@ -5621,8 +5621,8 @@ void LLPipeline::renderDebug()
 
 			/*gGL.flush();
 			gGL.setLineWidth(16-i*2);
-			for (LLWorld::region_list_t::const_iterator iter = LLWorld::getInstance()->getRegionList().begin(); 
-					iter != LLWorld::getInstance()->getRegionList().end(); ++iter)
+			for (LLWorld::region_list_t::const_iterator iter = LLWorld::getInstanceFast()->getRegionList().begin(); 
+					iter != LLWorld::getInstanceFast()->getRegionList().end(); ++iter)
 			{
 				LLViewerRegion* region = *iter;
 				for (U32 j = 0; j < LLViewerRegion::NUM_PARTITIONS; j++)

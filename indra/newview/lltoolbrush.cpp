@@ -588,29 +588,31 @@ void LLToolBrushLand::renderOverlay(LLSurface& land, const LLVector3& pos_region
 void LLToolBrushLand::determineAffectedRegions(region_list_t& regions,
 											   const LLVector3d& spot ) const
 {
+	auto& world_inst = LLWorld::instanceFast();
+
 	LLVector3d corner(spot);
 	corner.mdV[VX] -= (mBrushSize / 2);
 	corner.mdV[VY] -= (mBrushSize / 2);
 	LLViewerRegion* region = NULL;
-	region = LLWorld::getInstance()->getRegionFromPosGlobal(corner);
+	region = world_inst.getRegionFromPosGlobal(corner);
 	if(region && regions.find(region) == regions.end())
 	{
 		regions.insert(region);
 	}
 	corner.mdV[VY] += mBrushSize;
-	region = LLWorld::getInstance()->getRegionFromPosGlobal(corner);
+	region = world_inst.getRegionFromPosGlobal(corner);
 	if(region && regions.find(region) == regions.end())
 	{
 		regions.insert(region);
 	}
 	corner.mdV[VX] += mBrushSize;
-	region = LLWorld::getInstance()->getRegionFromPosGlobal(corner);
+	region = world_inst.getRegionFromPosGlobal(corner);
 	if(region && regions.find(region) == regions.end())
 	{
 		regions.insert(region);
 	}
 	corner.mdV[VY] -= mBrushSize;
-	region = LLWorld::getInstance()->getRegionFromPosGlobal(corner);
+	region = world_inst.getRegionFromPosGlobal(corner);
 	if(region && regions.find(region) == regions.end())
 	{
 		regions.insert(region);

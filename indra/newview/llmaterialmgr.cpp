@@ -624,7 +624,7 @@ void LLMaterialMgr::CapsRecvForRegion(const LLUUID& regionId, LLUUID regionTest,
 
 void LLMaterialMgr::processGetQueue()
 {
-	auto& worldInst = LLWorld::instance();
+	auto& worldInst = LLWorld::instanceFast();
     get_queue_t::iterator loopRegionQueue = mGetQueue.begin();
     while (mGetQueue.end() != loopRegionQueue)
     {
@@ -839,7 +839,7 @@ void LLMaterialMgr::processGetAllQueue()
 
 void LLMaterialMgr::processGetAllQueueCoro(LLUUID regionId)
 {
-	auto& worldInst = LLWorld::instance();
+	auto& worldInst = LLWorld::instanceFast();
     LLViewerRegion* regionp = worldInst.getRegionFromID(regionId);
     if (regionp == NULL)
     {

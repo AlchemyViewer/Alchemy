@@ -148,7 +148,7 @@ void LLTracker::drawHUDArrow()
 				0.9f * instance()->mTrackedPositionGlobal.mdV[VZ]
 				+ 0.1f * (LLWorld::getInstance()->resolveLandHeightGlobal(getTrackedPositionGlobal()) + 1.5f);
 #endif
-		instance()->mTrackedPositionGlobal.mdV[VZ] = llclamp((F32)instance()->mTrackedPositionGlobal.mdV[VZ], LLWorld::getInstance()->resolveLandHeightGlobal(getTrackedPositionGlobal()) + 1.5f, (F32)instance()->getTrackedPositionGlobal().mdV[VZ]);
+		instance()->mTrackedPositionGlobal.mdV[VZ] = llclamp((F32)instance()->mTrackedPositionGlobal.mdV[VZ], LLWorld::getInstanceFast()->resolveLandHeightGlobal(getTrackedPositionGlobal()) + 1.5f, (F32)instance()->getTrackedPositionGlobal().mdV[VZ]);
 		instance()->drawMarker( getTrackedPositionGlobal(), map_track_color );
 		break;
 

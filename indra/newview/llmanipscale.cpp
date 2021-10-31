@@ -963,6 +963,7 @@ void LLManipScale::dragCorner( S32 x, S32 y )
 	LLVector3d drag_global = uniform ? mDragStartCenterGlobal : mDragFarHitGlobal;
 
 	// do the root objects i.e. (TRUE == cur->isRootEdit())
+	LLWorld* world_inst = LLWorld::getInstanceFast();
 	for (LLObjectSelection::iterator iter = mObjectSelection->begin();
 		 iter != mObjectSelection->end(); iter++)
 	{
@@ -981,7 +982,7 @@ void LLManipScale::dragCorner( S32 x, S32 y )
 			LLVector3d new_pos_global = drag_global + (selectNode->mSavedPositionGlobal - drag_global) * scale_factor;
 			if (!cur->isAttachment())
 			{
-				new_pos_global = LLWorld::getInstance()->clipToVisibleRegions(selectNode->mSavedPositionGlobal, new_pos_global);
+				new_pos_global = world_inst->clipToVisibleRegions(selectNode->mSavedPositionGlobal, new_pos_global);
 			}
 			cur->setPositionAbsoluteGlobal( new_pos_global );
 			rebuild(cur);
@@ -1264,7 +1265,7 @@ void LLManipScale::stretchFace( const LLVector3& drag_start_agent, const LLVecto
 
 				if (cur->isRootEdit() && !cur->isAttachment())
 				{
-					LLVector3d new_pos_global = LLWorld::getInstance()->clipToVisibleRegions(selectNode->mSavedPositionGlobal, selectNode->mSavedPositionGlobal + delta_pos_global);
+					LLVector3d new_pos_global = LLWorld::getInstanceFast()->clipToVisibleRegions(selectNode->mSavedPositionGlobal, selectNode->mSavedPositionGlobal + delta_pos_global);
 					cur->setPositionGlobal( new_pos_global );
 				}
 				else
@@ -1318,7 +1319,7 @@ void LLManipScale::renderGuidelinesPart( const LLBBox& bbox )
 
 	guideline_end -= guideline_start;
 	guideline_end.normalize();
-	guideline_end *= LLWorld::getInstance()->getRegionWidthInMeters();
+	guideline_end *= LLWorld::getInstanceFast()->getRegionWidthInMeters();
 	guideline_end += guideline_start;
 
 	{

@@ -190,7 +190,7 @@ bool ALAvatarActions::canTeleportTo(const LLUUID& avatar_id)
 		return false;
 
 	LLWorld::pos_map_t positions;
-	LLWorld::getInstance()->getAvatars(&positions);
+	LLWorld::getInstanceFast()->getAvatars(&positions);
 	auto iter = positions.find(avatar_id);
 	if (iter != positions.cend())
 	{
@@ -211,7 +211,7 @@ void ALAvatarActions::teleportTo(const LLUUID& avatar_id)
 		return;
 
 	LLWorld::pos_map_t positions;
-	LLWorld::getInstance()->getAvatars(&positions);
+	LLWorld::getInstanceFast()->getAvatars(&positions);
 	auto iter = positions.find(avatar_id);
 	if (iter != positions.cend())
 	{
@@ -256,7 +256,7 @@ bool ALAvatarActions::canFreezeEject(const uuid_vec_t& ids)
 		return true;
 
 	LLWorld::region_gpos_map_t idRegions;
-	LLWorld::getInstance()->getAvatars(&idRegions);
+	LLWorld::getInstanceFast()->getAvatars(&idRegions);
 
 	auto ret = false;
 
@@ -351,7 +351,7 @@ void ALAvatarActions::parcelEject(const uuid_vec_t& ids)
 		return;
 
 	LLWorld::pos_map_t avatar_positions;
-	LLWorld::getInstance()->getAvatars(&avatar_positions);
+	LLWorld::getInstanceFast()->getAvatars(&avatar_positions);
 
 	LLSD payload;
 	payload["avatar_ids"] = LLSD::emptyArray();
@@ -429,7 +429,7 @@ bool ALAvatarActions::canManageAvatarsEstate(const uuid_vec_t& ids)
 		return true;
 
 	LLWorld::region_gpos_map_t idRegions;
-	LLWorld::getInstance()->getAvatars(&idRegions);
+	LLWorld::getInstanceFast()->getAvatars(&idRegions);
 
 	auto ret = false;
 
@@ -699,7 +699,7 @@ bool ALAvatarActions::handleEstateTeleportHome(const LLSD& notification, const L
 	if (option == 0)
 	{
 		LLWorld::region_gpos_map_t idRegions;
-		LLWorld::getInstance()->getAvatars(&idRegions);
+		LLWorld::getInstanceFast()->getAvatars(&idRegions);
 		const auto& avatar_ids = notification["payload"]["avatar_ids"];
 		for (LLSD::array_const_iterator it = avatar_ids.beginArray(), it_end = avatar_ids.endArray(); it != it_end; ++it)
 		{
@@ -741,7 +741,7 @@ bool ALAvatarActions::handleEstateKick(const LLSD& notification, const LLSD& res
 	if (option == 0)
 	{
 		LLWorld::region_gpos_map_t idRegions;
-		LLWorld::getInstance()->getAvatars(&idRegions);
+		LLWorld::getInstanceFast()->getAvatars(&idRegions);
 		const auto& avatar_ids = notification["payload"]["avatar_ids"];
 		for (LLSD::array_const_iterator it = avatar_ids.beginArray(), it_end = avatar_ids.endArray(); it != it_end; ++it)
 		{

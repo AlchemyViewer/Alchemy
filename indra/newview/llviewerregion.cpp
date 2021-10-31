@@ -258,7 +258,7 @@ void LLViewerRegionImpl::requestBaseCapabilitiesCoro(U64 regionHandle)
     // This loop is used for retrying a capabilities request.
     do
     {
-        regionp = LLWorld::getInstance()->getRegionFromHandle(regionHandle);
+        regionp = LLWorld::getInstanceFast()->getRegionFromHandle(regionHandle);
         if (!regionp) //region was removed
         {
             LL_WARNS("AppInit", "Capabilities") << "Attempting to get capabilities for region that no longer exists!" << LL_ENDL;
@@ -313,7 +313,7 @@ void LLViewerRegionImpl::requestBaseCapabilitiesCoro(U64 regionHandle)
             return;
         }
 
-        regionp = LLWorld::getInstance()->getRegionFromHandle(regionHandle);
+        regionp = LLWorld::getInstanceFast()->getRegionFromHandle(regionHandle);
         if (!regionp) //region was removed
         {
             LL_WARNS("AppInit", "Capabilities") << "Received capabilities for region that no longer exists!" << LL_ENDL;
@@ -394,7 +394,7 @@ void LLViewerRegionImpl::requestBaseCapabilitiesCompleteCoro(U64 regionHandle)
     // This loop is used for retrying a capabilities request.
     do
     {
-        regionp = LLWorld::getInstance()->getRegionFromHandle(regionHandle);
+        regionp = LLWorld::getInstanceFast()->getRegionFromHandle(regionHandle);
         if (!regionp) //region was removed
         {
             LL_WARNS("AppInit", "Capabilities") << "Attempting to get capabilities for region that no longer exists!" << LL_ENDL;
@@ -432,7 +432,7 @@ void LLViewerRegionImpl::requestBaseCapabilitiesCompleteCoro(U64 regionHandle)
             break;
         }
 
-        regionp = LLWorld::getInstance()->getRegionFromHandle(regionHandle);
+        regionp = LLWorld::getInstanceFast()->getRegionFromHandle(regionHandle);
         if (!regionp) //region was removed
         {
             LL_WARNS("AppInit", "Capabilities") << "Received capabilities for region that no longer exists!" << LL_ENDL;
@@ -516,7 +516,7 @@ void LLViewerRegionImpl::requestSimulatorFeatureCoro(std::string url, U64 region
             break;
         }
 
-        regionp = LLWorld::getInstance()->getRegionFromHandle(regionHandle);
+        regionp = LLWorld::getInstanceFast()->getRegionFromHandle(regionHandle);
         if (!regionp) //region was removed
         {
             LL_WARNS("AppInit", "SimulatorFeatures") << "Attempting to request Sim Feature for region that no longer exists!" << LL_ENDL;
@@ -542,7 +542,7 @@ void LLViewerRegionImpl::requestSimulatorFeatureCoro(std::string url, U64 region
         // remove the http_result from the llsd
         result.erase("http_result");
 
-        regionp = LLWorld::getInstance()->getRegionFromHandle(regionHandle);
+        regionp = LLWorld::getInstanceFast()->getRegionFromHandle(regionHandle);
         if (!regionp) //region was removed
         {
             LL_WARNS("AppInit", "SimulatorFeatures") << "Attempting to set Sim Feature for region that no longer exists!" << LL_ENDL;
@@ -1828,7 +1828,7 @@ F32 LLViewerRegion::getCompositionXY(const S32 x, const S32 y) const
 		if (y >= 256)
 		{
 			LLVector3d center = getCenterGlobal() + LLVector3d(256.f, 256.f, 0.f);
-			LLViewerRegion *regionp = LLWorld::getInstance()->getRegionFromPosGlobal(center);
+			LLViewerRegion *regionp = LLWorld::getInstanceFast()->getRegionFromPosGlobal(center);
 			if (regionp)
 			{
 				// OK, we need to do some hackery here - different simulators no longer use
@@ -1855,7 +1855,7 @@ F32 LLViewerRegion::getCompositionXY(const S32 x, const S32 y) const
 		else
 		{
 			LLVector3d center = getCenterGlobal() + LLVector3d(256.f, 0, 0.f);
-			LLViewerRegion *regionp = LLWorld::getInstance()->getRegionFromPosGlobal(center);
+			LLViewerRegion *regionp = LLWorld::getInstanceFast()->getRegionFromPosGlobal(center);
 			if (regionp)
 			{
 				// OK, we need to do some hackery here - different simulators no longer use
@@ -1883,7 +1883,7 @@ F32 LLViewerRegion::getCompositionXY(const S32 x, const S32 y) const
 	else if (y >= 256)
 	{
 		LLVector3d center = getCenterGlobal() + LLVector3d(0.f, 256.f, 0.f);
-		LLViewerRegion *regionp = LLWorld::getInstance()->getRegionFromPosGlobal(center);
+		LLViewerRegion *regionp = LLWorld::getInstanceFast()->getRegionFromPosGlobal(center);
 		if (regionp)
 		{
 			// OK, we need to do some hackery here - different simulators no longer use
@@ -2084,7 +2084,7 @@ public:
 		const LLSD& input) const
 	{
 		LLHost host(input["sender"].asString());
-		LLViewerRegion* region = LLWorld::getInstance()->getRegion(host);
+		LLViewerRegion* region = LLWorld::getInstanceFast()->getRegion(host);
 		if( !region )
 		{
 			return;

@@ -728,7 +728,8 @@ BOOL LLManipTranslate::handleHover(S32 x, S32 y, MASK mask)
 				LLVector3d new_position_global = selectNode->mSavedPositionGlobal + clamped_relative_move;
 
 				// Don't let object centers go too far underground
-				F64 min_height = LLWorld::getInstance()->getMinAllowedZ(object, object->getPositionGlobal());
+				LLWorld* world_inst = LLWorld::getInstanceFast();
+				F64 min_height = world_inst->getMinAllowedZ(object, object->getPositionGlobal());
 				if (new_position_global.mdV[VZ] < min_height)
 				{
 					new_position_global.mdV[VZ] = min_height;
@@ -743,12 +744,12 @@ BOOL LLManipTranslate::handleHover(S32 x, S32 y, MASK mask)
 				// Grass is always drawn on the ground, so clamp its position to the ground
 				if (object->getPCode() == LL_PCODE_LEGACY_GRASS)
 				{
-					new_position_global.mdV[VZ] = LLWorld::getInstance()->resolveLandHeightGlobal(new_position_global) + 1.f;
+					new_position_global.mdV[VZ] = world_inst->resolveLandHeightGlobal(new_position_global) + 1.f;
 				}
 				
 				if (object->isRootEdit())
 				{
-					new_position_global = LLWorld::getInstance()->clipToVisibleRegions(object->getPositionGlobal(), new_position_global);
+					new_position_global = world_inst->clipToVisibleRegions(object->getPositionGlobal(), new_position_global);
 				}
 
 				// PR: Only update if changed
@@ -809,7 +810,7 @@ void LLManipTranslate::highlightManipulators(S32 x, S32 y)
 	LLVector3 grid_scale;
 	LLQuaternion grid_rotation;
 
-	LLSelectMgr::getInstance()->getGrid(grid_origin, grid_rotation, grid_scale);
+	LLSelectMgr::getInstanceFast()->getGrid(grid_origin, grid_rotation, grid_scale);
 
 	LLVector3 relative_camera_dir;
 

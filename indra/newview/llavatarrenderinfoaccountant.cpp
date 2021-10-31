@@ -82,7 +82,7 @@ void LLAvatarRenderInfoAccountant::avatarRenderInfoGetCoro(std::string url, U64 
 
     LLSD result = httpAdapter->getAndSuspend(httpRequest, url);
 
-    LLViewerRegion * regionp = LLWorld::getInstance()->getRegionFromHandle(regionHandle);
+    LLViewerRegion * regionp = LLWorld::getInstanceFast()->getRegionFromHandle(regionHandle);
     if (!regionp)
     {
         LL_WARNS("AvatarRenderInfoAccountant") << "Avatar render weight info received but region not found for " 
@@ -183,7 +183,7 @@ void LLAvatarRenderInfoAccountant::avatarRenderInfoReportCoro(std::string url, U
         httpAdapter(new LLCoreHttpUtil::HttpCoroutineAdapter("AvatarRenderInfoAccountant", httpPolicy));
     LLCore::HttpRequest::ptr_t httpRequest(new LLCore::HttpRequest);
 
-    LLViewerRegion * regionp = LLWorld::getInstance()->getRegionFromHandle(regionHandle);
+    LLViewerRegion * regionp = LLWorld::getInstanceFast()->getRegionFromHandle(regionHandle);
     if (!regionp)
     {
         LL_WARNS("AvatarRenderInfoAccountant") << "Avatar render weight calculation but region not found for "
@@ -241,7 +241,7 @@ void LLAvatarRenderInfoAccountant::avatarRenderInfoReportCoro(std::string url, U
     regionp = NULL;
     LLSD result = httpAdapter->postAndSuspend(httpRequest, url, report);
 
-    regionp = LLWorld::getInstance()->getRegionFromHandle(regionHandle);
+    regionp = LLWorld::getInstanceFast()->getRegionFromHandle(regionHandle);
     if (!regionp)
     {
         LL_INFOS("AvatarRenderInfoAccountant") << "Avatar render weight POST result received but region not found for "
@@ -335,7 +335,7 @@ void LLAvatarRenderInfoAccountant::idle()
 									  << LL_ENDL;
 
 		// Check all regions
-		for (LLViewerRegion* regionp : LLWorld::getInstance()->getRegionList())
+		for (LLViewerRegion* regionp : LLWorld::getInstanceFast()->getRegionList())
 		{
 			if (   regionp
 				&& regionp->isAlive()
@@ -368,7 +368,7 @@ void LLAvatarRenderInfoAccountant::scanNewRegion(const LLUUID& region_id)
 	// Reset the global timer so it will scan regions on the next call to ::idle
 	LLAvatarRenderInfoAccountant::getInstance()->resetRenderInfoScanTimer();
 	
-	LLViewerRegion* regionp = LLWorld::instance().getRegionFromID(region_id);
+	LLViewerRegion* regionp = LLWorld::instanceFast().getRegionFromID(region_id);
 	if (regionp)
 	{	// Reset the region's timers so we will:
 		//  * request render info from it immediately

@@ -113,7 +113,7 @@ BOOL ALToolAlign::findSelectedManipulator(S32 x, S32 y)
 	LLViewerCamera* camera = LLViewerCamera::getInstanceFast();
 
 	LLMatrix4 transform;
-	if (LLSelectMgr::getInstance()->getSelection()->getSelectType() == SELECT_TYPE_HUD)
+	if (LLSelectMgr::getInstanceFast()->getSelection()->getSelectType() == SELECT_TYPE_HUD)
 	{
 		LLVector4 translation(mBBox.getCenterAgent());
 		transform.initRotTrans(mBBox.getRotation(), translation);

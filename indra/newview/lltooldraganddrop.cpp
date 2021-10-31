@@ -1240,7 +1240,7 @@ void LLToolDragAndDrop::dropObject(LLViewerObject* raycast_target,
 				   BOOL from_task_inventory,
 				   BOOL remove_from_inventory)
 {
-	LLViewerRegion* regionp = LLWorld::getInstance()->getRegionFromPosGlobal(mLastHitPos);
+	LLViewerRegion* regionp = LLWorld::getInstanceFast()->getRegionFromPosGlobal(mLastHitPos);
 	if (!regionp)
 	{
 		LL_WARNS() << "Couldn't find region to rez object" << LL_ENDL;

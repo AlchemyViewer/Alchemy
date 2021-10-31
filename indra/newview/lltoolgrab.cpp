@@ -652,7 +652,7 @@ void LLToolGrabBase::handleHoverActive(S32 x, S32 y, MASK mask)
 			*/
 
 			// Don't let object centers go underground.
-			F32 land_height = LLWorld::getInstance()->resolveLandHeightGlobal(grab_point_global);
+			F32 land_height = LLWorld::getInstanceFast()->resolveLandHeightGlobal(grab_point_global);
 
 			if (grab_point_global.mdV[VZ] < land_height)
 			{
@@ -665,7 +665,7 @@ void LLToolGrabBase::handleHoverActive(S32 x, S32 y, MASK mask)
 				grab_point_global.mdV[VZ] = MAX_OBJECT_Z;
 			}
 
-			grab_point_global = LLWorld::getInstance()->clipToVisibleRegions(mDragStartPointGlobal, grab_point_global);
+			grab_point_global = LLWorld::getInstanceFast()->clipToVisibleRegions(mDragStartPointGlobal, grab_point_global);
 			// propagate constrained grab point back to grab offset
 			mGrabHiddenOffsetFromCamera = grab_point_global - gAgentCamera.getCameraPositionGlobal();
 

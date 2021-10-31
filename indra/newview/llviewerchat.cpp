@@ -262,7 +262,7 @@ std::string LLViewerChat::getObjectImSLURL(const LLChat& chat, const LLSD& args)
 	std::string slurl = args["slurl"].asString();
 	if (slurl.empty())
 	{
-		LLViewerRegion *region = LLWorld::getInstance()->getRegionFromPosAgent(chat.mPosAgent);
+		LLViewerRegion *region = LLWorld::getInstanceFast()->getRegionFromPosAgent(chat.mPosAgent);
 		if(region)
 		{
 			LLSLURL region_slurl(region->getName(), chat.mPosAgent);

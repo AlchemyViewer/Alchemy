@@ -158,7 +158,7 @@ void LLNetMap::setScale( F32 scale )
 		F32 height = (F32)(getRect().getHeight());
 		F32 diameter = sqrt(width * width + height * height);
 		F32 region_widths = diameter / mScale;
-		F32 meters = region_widths * LLWorld::getInstance()->getRegionWidthInMeters();
+		F32 meters = region_widths * LLWorld::getInstanceFast()->getRegionWidthInMeters();
 		F32 num_pixels = (F32)mObjectImagep->getWidth();
 		mObjectMapTPM = num_pixels / meters;
 		mObjectMapPixels = diameter;
@@ -745,7 +745,7 @@ LLVector3d LLNetMap::viewPosToGlobal( S32 x, S32 y )
 		pos_local.rotVec( rot );
 	}
 
-	pos_local *= ( LLWorld::getInstance()->getRegionWidthInMeters() / mScale );
+	pos_local *= ( LLWorld::getInstanceFast()->getRegionWidthInMeters() / mScale );
 	
 	LLVector3d pos_global;
 	pos_global.setVec( pos_local );
@@ -800,7 +800,7 @@ BOOL LLNetMap::handleToolTip( S32 x, S32 y, MASK mask )
 
 	LLRect sticky_rect;
 	std::string region_name;
-	LLViewerRegion*	region = LLWorld::getInstance()->getRegionFromPosGlobal( viewPosToGlobal( x, y ) );
+	LLViewerRegion*	region = LLWorld::getInstanceFast()->getRegionFromPosGlobal( viewPosToGlobal( x, y ) );
 	if(region)
 	{
 		// set sticky_rect

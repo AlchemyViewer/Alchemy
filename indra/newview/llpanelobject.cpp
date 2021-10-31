@@ -1837,15 +1837,17 @@ void LLPanelObject::sendPosition(BOOL btn_down)
 	}
 	else
 	{
+		LLWorld* world_inst = LLWorld::getInstanceFast();
+
 		// Clamp the Z height
 		const F32 height = newpos.mV[VZ];
 		LLVector3d height_check_pos = mObject->getPositionGlobal();
-		if (LLWorld::getInstance()->positionRegionValidGlobal(regionp->getPosGlobalFromRegion(newpos)))
+		if (world_inst->positionRegionValidGlobal(regionp->getPosGlobalFromRegion(newpos)))
 		{
 			height_check_pos = regionp->getPosGlobalFromRegion(newpos);
 		}
-		const F32 min_height = LLWorld::getInstance()->getMinAllowedZ(mObject, height_check_pos);
-		const F32 max_height = LLWorld::getInstance()->getRegionMaxHeight();
+		const F32 min_height = world_inst->getMinAllowedZ(mObject, height_check_pos);
+		const F32 max_height = world_inst->getRegionMaxHeight();
 
 		if ( height < min_height)
 		{
@@ -1861,7 +1863,7 @@ void LLPanelObject::sendPosition(BOOL btn_down)
 		// Grass is always drawn on the ground, so clamp its position to the ground
 		if (mObject->getPCode() == LL_PCODE_LEGACY_GRASS)
 		{
-			mCtrlPosZ->set(LLWorld::getInstance()->resolveLandHeightAgent(newpos) + 1.f);
+			mCtrlPosZ->set(world_inst->resolveLandHeightAgent(newpos) + 1.f);
 		}
 
 		// Make sure new position is in a valid region, so the object
@@ -1902,7 +1904,7 @@ void LLPanelObject::sendPosition(BOOL btn_down)
 
 		LLSelectMgr::getInstance()->updateSelectionCenter();
 	}
-	else if ( LLWorld::getInstance()->positionRegionValidGlobal(new_pos_global) )
+	else if ( LLWorld::getInstanceFast()->positionRegionValidGlobal(new_pos_global) )
 	{
 		// send only if the position is changed, that is, the delta vector is not zero
 		LLVector3d old_pos_global = mObject->getPositionGlobal();

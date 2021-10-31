@@ -983,7 +983,7 @@ void LLAgent::setRegion(LLViewerRegion *regionp)
 			LLViewerCamera::getInstanceFast()->setOrigin(camera_position_agent - delta);
 
 			// Update all of the regions.
-			LLWorld::getInstance()->updateAgentOffset(agent_offset_global);
+			LLWorld::getInstanceFast()->updateAgentOffset(agent_offset_global);
 
 			// Hack to keep sky in the agent's region, otherwise it may get deleted - DJS 08/02/02
 			// *TODO: possibly refactor into gSky->setAgentRegion(regionp)? -Brad
@@ -1021,7 +1021,7 @@ void LLAgent::setRegion(LLViewerRegion *regionp)
 			LLViewerCamera::getInstanceFast()->setOrigin(camera_position_agent - delta);
 
 			// Update all of the regions.
-			LLWorld::getInstance()->updateAgentOffset(mAgentOriginGlobal);
+			LLWorld::getInstanceFast()->updateAgentOffset(mAgentOriginGlobal);
 
             if (regionp->capabilitiesReceived())
             {
@@ -1047,7 +1047,7 @@ void LLAgent::setRegion(LLViewerRegion *regionp)
 
 	// Must shift hole-covering water object locations because local
 	// coordinate frame changed.
-	LLWorld::getInstance()->updateWaterObjects();
+	LLWorld::getInstanceFast()->updateWaterObjects();
 
 	// keep a list of regions we've been too
 	// this is just an interesting stat, logged at the dataserver
@@ -1665,7 +1665,7 @@ void LLAgent::startAutoPilotGlobal(
 	LLVector3d intersection;
 	LLVector3 normal;
 	LLViewerObject *hit_obj;
-	F32 heightDelta = LLWorld::getInstance()->resolveStepHeightGlobal(NULL, target_global, trace_target, intersection, normal, &hit_obj);
+	F32 heightDelta = LLWorld::getInstanceFast()->resolveStepHeightGlobal(NULL, target_global, trace_target, intersection, normal, &hit_obj);
 
 	if (stop_distance > 0.f)
 	{
@@ -1742,7 +1742,7 @@ void LLAgent::setAutoPilotTargetGlobal(const LLVector3d &target_global)
 		LLVector3 groundNorm;
 		LLViewerObject *obj;
 
-		LLWorld::getInstance()->resolveStepHeightGlobal(NULL, target_global, traceEndPt, targetOnGround, groundNorm, &obj);
+		LLWorld::getInstanceFast()->resolveStepHeightGlobal(NULL, target_global, traceEndPt, targetOnGround, groundNorm, &obj);
 		// Note: this might malfunction for sitting agent, since pelvis stays same, but agent's position becomes lower
 		// But for autopilot to work we assume that agent is standing and ready to go.
 		F64 target_height = llmax((F64)gAgentAvatarp->getPelvisToFoot(), target_global.mdV[VZ] - targetOnGround.mdV[VZ]);
@@ -2557,7 +2557,7 @@ void LLAgent::setStartPosition( U32 location_id )
     // this simulator.  Clamp it to the region the agent is
     // in, a little bit in on each side.
     const F32 INSET = 0.5f; //meters
-    const F32 REGION_WIDTH = LLWorld::getInstance()->getRegionWidthInMeters();
+    const F32 REGION_WIDTH = LLWorld::getInstanceFast()->getRegionWidthInMeters();
 
     LLVector3 agent_pos = getPositionAgent();
 
@@ -2573,7 +2573,7 @@ void LLAgent::setStartPosition( U32 location_id )
     // Don't let them go below ground, or too high.
     agent_pos.mV[VZ] = llclamp( agent_pos.mV[VZ],
                                 mRegionp->getLandHeightRegion( agent_pos ),
-                                LLWorld::getInstance()->getRegionMaxHeight() );
+                                LLWorld::getInstanceFast()->getRegionMaxHeight() );
     // Send the CapReq
     LLSD request;
     LLSD body;
@@ -2717,7 +2717,7 @@ bool LLAgent::canAccessAdult() const
 
 bool LLAgent::canAccessMaturityInRegion( U64 region_handle ) const
 {
-	LLViewerRegion *regionp = LLWorld::getInstance()->getRegionFromHandle( region_handle );
+	LLViewerRegion *regionp = LLWorld::getInstanceFast()->getRegionFromHandle( region_handle );
 	if( regionp )
 	{
 		switch( regionp->getSimAccess() )

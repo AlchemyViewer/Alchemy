@@ -2230,7 +2230,7 @@ F32 LLAgentCamera::getCameraMaxZoomDistance(bool allow_disabled_constraints/* = 
                ? INT_MAX
                : llmin(MAX_CAMERA_DISTANCE_FROM_OBJECT,
                        mDrawDistance - 1,  // convenience, don't hit draw limit when focusing on something
-                       LLWorld::getInstance()->getRegionWidthInMeters() - CAMERA_FUDGE_FROM_OBJECT);
+                       LLWorld::getInstanceFast()->getRegionWidthInMeters() - CAMERA_FUDGE_FROM_OBJECT);
 }
 
 LLVector3 LLAgentCamera::getAvatarRootPosition()

@@ -2702,7 +2702,7 @@ void process_chat_from_simulator(LLMessageSystem *msg, void **user_data)
 				if ( (!RlvActions::canShowName(RlvActions::SNC_DEFAULT, owner_id)) && (!is_owned_by_me) )
 					sdQuery["rlv_shownames"] = true;
 
-				const LLViewerRegion* pRegion = LLWorld::getInstance()->getRegionFromPosAgent(chat.mPosAgent);
+				const LLViewerRegion* pRegion = LLWorld::getInstanceFast()->getRegionFromPosAgent(chat.mPosAgent);
 				if (pRegion)
 					sdQuery["slurl"] = LLSLURL(pRegion->getName(), chat.mPosAgent).getLocationString();
 
@@ -3237,7 +3237,7 @@ void process_teleport_finish(LLMessageSystem* msg, void**)
 
 	// Viewer trusts the simulator.
 	gMessageSystem->enableCircuit(sim_host, TRUE);
-	LLViewerRegion* regionp =  LLWorld::getInstance()->addRegion(region_handle, sim_host);
+	LLViewerRegion* regionp =  LLWorld::getInstanceFast()->addRegion(region_handle, sim_host);
 
 /*
 	// send camera update to new region
@@ -3352,7 +3352,7 @@ void process_agent_movement_complete(LLMessageSystem* msg, void**)
 
 	F32 x, y;
 	from_region_handle(region_handle, &x, &y);
-	LLViewerRegion* regionp = LLWorld::getInstance()->getRegionFromHandle(region_handle);
+	LLViewerRegion* regionp = LLWorld::getInstanceFast()->getRegionFromHandle(region_handle);
 	if (!regionp)
 	{
 		if (gAgent.getRegion())
@@ -3529,7 +3529,7 @@ void process_crossed_region(LLMessageSystem* msg, void**)
 
 	send_complete_agent_movement(sim_host);
 
-	LLViewerRegion* regionp = LLWorld::getInstance()->addRegion(region_handle, sim_host);
+	LLViewerRegion* regionp = LLWorld::getInstanceFast()->addRegion(region_handle, sim_host);
 
 	LL_DEBUGS("CrossingCaps") << "Calling setSeedCapability from process_crossed_region(). Seed cap == "
 			<< seedCap << LL_ENDL;
@@ -3992,7 +3992,7 @@ void process_kill_object(LLMessageSystem *mesgsys, void **user_data)
 	LLViewerRegion* regionp = NULL;
 	{
 		LLHost host(ip, port);
-		regionp = LLWorld::getInstance()->getRegion(host);
+		regionp = LLWorld::getInstanceFast()->getRegion(host);
 	}
 
 	bool delete_object = LLViewerRegion::sVOCacheCullingEnabled;
@@ -4075,7 +4075,7 @@ void process_time_synch(LLMessageSystem *mesgsys, void **user_data)
 	mesgsys->getVector3Fast(_PREHASH_TimeInfo, _PREHASH_SunDirection, sun_direction);
 	mesgsys->getVector3Fast(_PREHASH_TimeInfo, _PREHASH_SunAngVelocity, sun_ang_velocity);
 
-	LLWorld::getInstance()->setSpaceTimeUSec(space_time_usec);
+	LLWorld::getInstanceFast()->setSpaceTimeUSec(space_time_usec);
 
 	LL_DEBUGS("WindlightSync") << "Sun phase: " << phase << " rad = " << fmodf(phase / F_TWO_PI + 0.25, 1.f) * 24.f << " h" << LL_ENDL;
 
@@ -4825,7 +4825,7 @@ void process_time_dilation(LLMessageSystem *msg, void **user_data)
 	// get the pointer to the right region
 	U32 ip = msg->getSenderIP();
 	U32 port = msg->getSenderPort();
-	LLViewerRegion *regionp = LLWorld::getInstance()->getRegion(ip, port);
+	LLViewerRegion *regionp = LLWorld::getInstanceFast()->getRegion(ip, port);
 	if (regionp)
 	{
 		regionp->setTimeDilation(time_dilation);

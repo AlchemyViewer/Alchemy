@@ -396,8 +396,8 @@ void update_statistics()
 	}
 	
 	sample(LLStatViewer::VISIBLE_AVATARS, LLVOAvatar::sNumVisibleAvatars);
-	LLWorld::getInstance()->updateNetStats();
-	LLWorld::getInstance()->requestCacheMisses();
+	LLWorld::getInstanceFast()->updateNetStats();
+	LLWorld::getInstanceFast()->requestCacheMisses();
 	
 	// Reset all of these values.
 	gVLManager.resetBitCounts();

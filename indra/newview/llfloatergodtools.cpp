@@ -251,7 +251,7 @@ void LLFloaterGodTools::processRegionInfo(LLMessageSystem* msg)
 	{
 		// Update is for a different region than the one we're in.
 		// Just check for a waterheight change.
-		LLWorld::getInstance()->waterHeightRegionInfo(sim_name, water_height);
+		LLWorld::getInstanceFast()->waterHeightRegionInfo(sim_name, water_height);
 		return;
 	}
 
@@ -792,7 +792,7 @@ void LLPanelRegionTools::onSelectRegion()
 {
 	LL_INFOS() << "LLPanelRegionTools::onSelectRegion" << LL_ENDL;
 
-	LLViewerRegion *regionp = LLWorld::getInstance()->getRegionFromPosGlobal(gAgent.getPositionGlobal());
+	LLViewerRegion *regionp = LLWorld::getInstanceFast()->getRegionFromPosGlobal(gAgent.getPositionGlobal());
 	if (!regionp)
 	{
 		return;
@@ -1227,7 +1227,7 @@ void LLPanelRequestTools::refresh()
 	list->selectItemRange(2,last_item);
 	list->operateOnSelection(LLCtrlListInterface::OP_DELETE);
 	}
-	for (LLViewerRegion* regionp : LLWorld::getInstance()->getRegionList())
+	for (LLViewerRegion* regionp : LLWorld::getInstanceFast()->getRegionList())
 	{
 		std::string name = regionp->getName();
 		if (!name.empty())
@@ -1284,7 +1284,7 @@ void LLPanelRequestTools::onClickRequest()
 	else
 	{
 		// find region by name
-		for (LLViewerRegion* regionp : LLWorld::getInstance()->getRegionList())
+		for (LLViewerRegion* regionp : LLWorld::getInstanceFast()->getRegionList())
 		{
 			if(dest == regionp->getName())
 			{

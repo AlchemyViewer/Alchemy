@@ -1174,7 +1174,7 @@ public:
 
 		LLHost sim(input["body"]["sim-ip-and-port"].asString());
 	
-		LLViewerRegion* regionp = LLWorld::getInstance()->getRegion(sim);
+		LLViewerRegion* regionp = LLWorld::getInstanceFast()->getRegion(sim);
 		if (!regionp)
 		{
 			LL_WARNS() << "Got EstablishAgentCommunication for unknown region "
@@ -1199,7 +1199,7 @@ void process_disable_simulator(LLMessageSystem *mesgsys, void **user_data)
     LLHost host = mesgsys->getSender();
 
 	//LL_INFOS() << "Disabling simulator with message from " << host << LL_ENDL;
-	LLWorld::getInstance()->removeRegion(host);
+	LLWorld::getInstanceFast()->removeRegion(host);
 
 	mesgsys->disableCircuit(host);
 }
@@ -1208,7 +1208,7 @@ void process_disable_simulator(LLMessageSystem *mesgsys, void **user_data)
 void process_region_handshake(LLMessageSystem* msg, void** user_data)
 {
 	LLHost host = msg->getSender();
-	LLViewerRegion* regionp = LLWorld::getInstance()->getRegion(host);
+	LLViewerRegion* regionp = LLWorld::getInstanceFast()->getRegion(host);
 	if (!regionp)
 	{
 		LL_WARNS() << "Got region handshake for unknown region "
@@ -1242,7 +1242,7 @@ void send_agent_pause()
 	gAgentPauseSerialNum++;
 	gMessageSystem->addU32Fast(_PREHASH_SerialNum, gAgentPauseSerialNum);
 
-	for (LLViewerRegion* regionp : LLWorld::getInstance()->getRegionList())
+	for (LLViewerRegion* regionp : LLWorld::getInstanceFast()->getRegionList())
 	{
 		gMessageSystem->sendReliable(regionp->getHost());
 	}
@@ -1271,7 +1271,7 @@ void send_agent_resume()
 	gMessageSystem->addU32Fast(_PREHASH_SerialNum, gAgentPauseSerialNum);
 	
 
-	for (LLViewerRegion* regionp : LLWorld::getInstance()->getRegionList())
+	for (LLViewerRegion* regionp : LLWorld::getInstanceFast()->getRegionList())
 	{
 		gMessageSystem->sendReliable(regionp->getHost());
 	}

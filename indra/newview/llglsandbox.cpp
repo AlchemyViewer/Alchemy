@@ -297,7 +297,7 @@ void LLWind::renderVectors()
 	S32 i,j;
 	F32 x,y;
 
-	F32 region_width_meters = LLWorld::getInstance()->getRegionWidthInMeters();
+	F32 region_width_meters = LLWorld::getInstanceFast()->getRegionWidthInMeters();
 
 	gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
 	gGL.pushMatrix();
@@ -352,7 +352,7 @@ void LLViewerParcelMgr::renderRect(const LLVector3d &west_south_bottom_global,
 	// resolves correctly so we can get a height value.
 	const F32 FUDGE = 0.01f;
 
-	auto& worldInst = LLWorld::instance();
+	auto& worldInst = LLWorld::instanceFast();
 
 	F32 sw_bottom = worldInst.resolveLandHeightAgent( LLVector3( west, south, 0.f ) );
 	F32 se_bottom = worldInst.resolveLandHeightAgent( LLVector3( east-FUDGE, south, 0.f ) );

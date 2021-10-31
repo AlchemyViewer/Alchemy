@@ -117,7 +117,7 @@ static bool handleRenderFarClipChanged(const LLSD& newvalue)
 {
 	F32 draw_distance = (F32) newvalue.asReal();
 	gAgentCamera.mDrawDistance = draw_distance;
-	LLWorld::getInstance()->setLandFarClip(draw_distance);
+	LLWorld::getInstanceFast()->setLandFarClip(draw_distance);
 	return true;
 }
 
@@ -214,7 +214,7 @@ bool handleRenderTransparentWaterChanged(const LLSD& newvalue)
 		gPipeline.resetVertexBuffers();
 		LLViewerShaderMgr::instance()->setShaders();
 	}
-	LLWorld::getInstance()->updateWaterObjects();
+	LLWorld::getInstanceFast()->updateWaterObjects();
 	return true;
 }
 

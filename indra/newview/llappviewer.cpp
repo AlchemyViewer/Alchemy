@@ -4673,7 +4673,7 @@ void LLAppViewer::idle()
 		gGLActive = FALSE;
 	}
 
-	auto& worldInst = LLWorld::instance();
+	auto& worldInst = LLWorld::instanceFast();
 
     F32 yaw = 0.f;				// radians
 

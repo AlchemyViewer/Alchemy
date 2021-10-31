@@ -487,7 +487,7 @@ void RlvUtil::filterLocation(std::string& strUTF8Text)
 {
 	// Filter any mention of the surrounding region names
 	const std::string& strHiddenRegion = RlvStrings::getString(RlvStringKeys::Hidden::Region);
-	for (LLViewerRegion* pRegion : LLWorld::getInstance()->getRegionList())
+	for (LLViewerRegion* pRegion : LLWorld::getInstanceFast()->getRegionList())
 	{
 		boost::replace_all_regex(strUTF8Text, boost::regex("\\b" + escape_for_regex(pRegion->getName()) + "\\b", boost::regex::icase), strHiddenRegion);
 	}
@@ -502,7 +502,7 @@ void RlvUtil::filterLocation(std::string& strUTF8Text)
 void RlvUtil::filterNames(std::string& strUTF8Text, bool fFilterLegacy, bool fClearMatches)
 {
 	uuid_vec_t idAgents;
-	LLWorld::getInstance()->getAvatars(&idAgents, NULL);
+	LLWorld::getInstanceFast()->getAvatars(&idAgents, NULL);
 	for (int idxAgent = 0, cntAgent = idAgents.size(); idxAgent < cntAgent; idxAgent++)
 	{
 		LLAvatarName avName;
@@ -572,7 +572,7 @@ bool RlvUtil::isNearbyAgent(const LLUUID& idAgent)
 	if ( (idAgent.notNull()) && (gAgent.getID() != idAgent) )
 	{
 		std::vector<LLUUID> idAgents;
-		LLWorld::getInstance()->getAvatars(&idAgents, NULL);
+		LLWorld::getInstanceFast()->getAvatars(&idAgents, NULL);
 
 		for (int idxAgent = 0, cntAgent = idAgents.size(); idxAgent < cntAgent; idxAgent++)
 			if (idAgents[idxAgent] == idAgent)
@@ -584,7 +584,7 @@ bool RlvUtil::isNearbyAgent(const LLUUID& idAgent)
 // Checked: 2010-04-05 (RLVa-1.2.0d) | Modified: RLVa-1.2.0d
 bool RlvUtil::isNearbyRegion(const std::string& strRegion)
 {
-	for (LLViewerRegion* pRegion : LLWorld::getInstance()->getRegionList())
+	for (LLViewerRegion* pRegion : LLWorld::getInstanceFast()->getRegionList())
 		if (pRegion->getName() == strRegion)
 			return true;
 	return false;

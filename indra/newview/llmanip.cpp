@@ -395,7 +395,7 @@ void LLManip::renderGuidelines(BOOL draw_x, BOOL draw_y, BOOL draw_z)
 		grid_rot.getAngleAxis(&angle_radians, &x, &y, &z);
 		gGL.rotatef(angle_radians * RAD_TO_DEG, x, y, z);
 
-		F32 region_size = LLWorld::getInstance()->getRegionWidthInMeters();
+		F32 region_size = LLWorld::getInstanceFast()->getRegionWidthInMeters();
 
 		const F32 LINE_ALPHA = 0.33f;
 

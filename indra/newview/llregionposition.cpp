@@ -80,7 +80,7 @@ LLVector3d LLRegionPosition::getPositionGlobal() const
 
 void LLRegionPosition::setPositionGlobal(const LLVector3d& position_global )
 {
-	mRegionp = LLWorld::getInstance()->getRegionFromPosGlobal(position_global);
+	mRegionp = LLWorld::getInstanceFast()->getRegionFromPosGlobal(position_global);
 	if (mRegionp)
 	{
 		mPositionRegion = mRegionp->getPosRegionFromGlobal(position_global);

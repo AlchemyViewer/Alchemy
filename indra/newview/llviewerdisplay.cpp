@@ -207,7 +207,7 @@ void display_update_camera()
 	gViewerWindow->setup3DRender();
 	
 	// Update land visibility too
-	LLWorld::getInstance()->setLandFarClip(final_far);
+	LLWorld::getInstanceFast()->setLandFarClip(final_far);
 }
 
 // Write some stats to LL_INFOS()

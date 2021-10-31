@@ -162,7 +162,7 @@ BOOL LLToolPlacer::raycastForNewObjPos( S32 x, S32 y, LLViewerObject** hit_obj, 
 // [/RLVa:KB]
 
 	// Find the sim where the surface lives.
-	LLViewerRegion *regionp = LLWorld::getInstance()->getRegionFromPosGlobal(surface_pos_global);
+	LLViewerRegion *regionp = LLWorld::getInstanceFast()->getRegionFromPosGlobal(surface_pos_global);
 	if (!regionp)
 	{
 		LL_WARNS() << "Trying to add object outside of all known regions!" << LL_ENDL;

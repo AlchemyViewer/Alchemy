@@ -467,7 +467,7 @@ void LLViewerAssetStorage::queueRequestHttp(
 
 void LLViewerAssetStorage::capsRecvForRegion(const LLUUID& region_id, std::string pumpname)
 {
-    LLViewerRegion *regionp = LLWorld::instance().getRegionFromID(region_id);
+    LLViewerRegion *regionp = LLWorld::instanceFast().getRegionFromID(region_id);
     if (!regionp)
     {
         LL_WARNS("ViewerAsset") << "region not found for region_id " << region_id << LL_ENDL;
