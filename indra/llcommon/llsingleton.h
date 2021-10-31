@@ -592,7 +592,7 @@ public:
         if (!sUnsafeInstance)
         {
             // Dummy call to force populate
-            getInstance();
+            return getInstance();
         }
         return sUnsafeInstance;
     }
@@ -768,7 +768,7 @@ public:
         if (!super::sUnsafeInstance)
         {
             // Dummy call to force populate
-            getInstance();
+            return getInstance();
         }
         return super::sUnsafeInstance;
     }
