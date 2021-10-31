@@ -398,8 +398,6 @@ LLPipeline::LLPipeline() :
 	mMatrixOpCount(0),
 	mTextureMatrixOps(0),
 	mNumVisibleNodes(0),
-	mNumVisibleFaces(0),
-
 	mInitialized(false),
 	mVertexShadersEnabled(false),
 	mVertexShadersLoaded(0),
@@ -2096,8 +2094,6 @@ void LLPipeline::resetFrameStats()
 {
 	assertInitialized();
 
-	mNumVisibleFaces = 0;
-
 	if (mOldRenderDebugMask != mRenderDebugMask)
 	{
 		gObjectList.clearDebugText();
@@ -3750,8 +3746,6 @@ void LLPipeline::stateSort(LLDrawable* drawablep, LLCamera& camera)
 			}
 		}
 	}
-	
-	mNumVisibleFaces += drawablep->getNumFaces();
 }
 
 

@@ -2478,7 +2478,7 @@ void set_current_modelview(const glh::matrix4f& mat)
 	copy_matrix(mat, gGLModelView);
 }
 
-void set_current_projection(glh::matrix4f& mat)
+void set_current_projection(const glh::matrix4f& mat)
 {
 	copy_matrix(mat, gGLProjection);
 }

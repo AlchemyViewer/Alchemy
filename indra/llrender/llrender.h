@@ -545,7 +545,7 @@ glh::matrix4f get_last_projection();
 
 void copy_matrix(const glh::matrix4f& src, F32* dst);
 void set_current_modelview(const glh::matrix4f& mat);
-void set_current_projection(glh::matrix4f& mat);
+void set_current_projection(const glh::matrix4f& mat);
 
 glh::matrix4f gl_ortho(GLfloat left, GLfloat right, GLfloat bottom, GLfloat top, GLfloat znear, GLfloat zfar);
 glh::matrix4f gl_perspective(GLfloat fovy, GLfloat aspect, GLfloat zNear, GLfloat zFar);
