@@ -399,7 +399,7 @@ protected:
  * an inventory category specified by UUID and displays them
  * as a flat list.
  */
-class LLWearableItemsList : public LLInventoryItemsList
+class LLWearableItemsList final : public LLInventoryItemsList
 {
 public:
 	/**

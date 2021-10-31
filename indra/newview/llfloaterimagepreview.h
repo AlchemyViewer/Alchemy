@@ -40,7 +40,7 @@ class LLTextBox;
 class LLVertexBuffer;
 class LLVolume;
 
-class LLImagePreviewSculpted : public LLViewerDynamicTexture
+class LLImagePreviewSculpted final : public LLViewerDynamicTexture
 {
 protected:
 	virtual ~LLImagePreviewSculpted();
@@ -73,7 +73,7 @@ protected:
 };
 
 
-class LLImagePreviewAvatar : public LLViewerDynamicTexture
+class LLImagePreviewAvatar final : public LLViewerDynamicTexture
 {
 protected:
 	virtual ~LLImagePreviewAvatar();

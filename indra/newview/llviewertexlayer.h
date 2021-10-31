@@ -40,7 +40,7 @@ class LLViewerTexLayerSetBuffer;
 // An ordered set of texture layers that gets composited into a single texture.
 // Only exists for llavatarappearanceself.
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-class LLViewerTexLayerSet : public LLTexLayerSet
+class LLViewerTexLayerSet final : public LLTexLayerSet
 {
 public:
 	LLViewerTexLayerSet(LLAvatarAppearance* const appearance);
@@ -69,7 +69,7 @@ private:
 //
 // The composite image that a LLViewerTexLayerSet writes to.  Each LLViewerTexLayerSet has one.
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-class LLViewerTexLayerSetBuffer : public LLTexLayerSetBuffer, public LLViewerDynamicTexture
+class LLViewerTexLayerSetBuffer final : public LLTexLayerSetBuffer, public LLViewerDynamicTexture
 {
 	LOG_CLASS(LLViewerTexLayerSetBuffer);
 

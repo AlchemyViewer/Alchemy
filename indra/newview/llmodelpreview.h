@@ -111,7 +111,7 @@ static const std::string lod_label_name[NUM_LOD + 1] =
     "I went off the end of the lod_label_name array.  Me so smart."
 };
 
-class LLModelPreview : public LLViewerDynamicTexture, public LLMutex
+class LLModelPreview final : public LLViewerDynamicTexture, public LLMutex
 {
     LOG_CLASS(LLModelPreview);
 

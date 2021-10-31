@@ -46,7 +46,7 @@ class LLJoint;
 //-----------------------------------------------------------------------------
 // LLVisualParamHint
 //-----------------------------------------------------------------------------
-class LLVisualParamHint : public LLViewerDynamicTexture
+class LLVisualParamHint final : public LLViewerDynamicTexture
 {
 protected:
 	virtual ~LLVisualParamHint();
@@ -101,7 +101,7 @@ protected:
 };
 
 // this class resets avatar data at the end of an update cycle
-class LLVisualParamReset : public LLViewerDynamicTexture
+class LLVisualParamReset final : public LLViewerDynamicTexture
 {
 protected:
 	/*virtual */ ~LLVisualParamReset(){}

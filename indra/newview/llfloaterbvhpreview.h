@@ -37,7 +37,7 @@
 class LLVOAvatar;
 class LLViewerJointMesh;
 
-class LLPreviewAnimation : public LLViewerDynamicTexture
+class LLPreviewAnimation final : public LLViewerDynamicTexture
 {
 protected:
 	virtual ~LLPreviewAnimation();
