@@ -7,6 +7,12 @@
 
 namespace ALGLMath
 {
+	inline static const LLMatrix4a TRANS_MAT = LLMatrix4a(
+		LLVector4a(.5f, 0, 0, 0),
+		LLVector4a(0, .5f, 0, 0),
+		LLVector4a(0, 0, .5f, 0),
+		LLVector4a(.5f, .5f, .5f, 1.f));
+
 	inline LLMatrix4a genRot(const float a, const LLVector4a& axis)
 	{
 		F32 r = a * DEG_TO_RAD;
@@ -43,6 +49,77 @@ namespace ALGLMath
 	}
 
 	inline LLMatrix4a genRot(const float a, const float x, const float y, const float z) { return genRot(a, LLVector4a(x, y, z)); }
+
+	inline LLMatrix4a genOrtho(const GLfloat& left, const GLfloat& right, const GLfloat& bottom, const GLfloat& top, const GLfloat& zNear, const GLfloat& zFar)
+	{
+		LLMatrix4a ortho_mat;
+		ortho_mat.setRow<0>(LLVector4a(2.f / (right - left), 0, 0));
+		ortho_mat.setRow<1>(LLVector4a(0, 2.f / (top - bottom), 0));
+		ortho_mat.setRow<2>(LLVector4a(0, 0, -2.f / (zFar - zNear)));
+		ortho_mat.setRow<3>(LLVector4a(-(right + left) / (right - left), -(top + bottom) / (top - bottom), -(zFar + zNear) / (zFar - zNear), 1));
+
+		return ortho_mat;
+	}
+
+	inline LLMatrix4a genPersp(const GLfloat& fovy, const GLfloat& aspect, const GLfloat& zNear, const GLfloat& zFar)
+	{
+		GLfloat f = 1.f / tanf(DEG_TO_RAD * fovy / 2.f);
+
+		LLMatrix4a persp_mat;
+		persp_mat.setRow<0>(LLVector4a(f / aspect, 0, 0));
+		persp_mat.setRow<1>(LLVector4a(0, f, 0));
+		persp_mat.setRow<2>(LLVector4a(0, 0, (zFar + zNear) / (zNear - zFar), -1.f));
+		persp_mat.setRow<3>(LLVector4a(0, 0, (2.f * zFar * zNear) / (zNear - zFar), 0));
+
+		return persp_mat;
+	}
+
+	inline LLMatrix4a genLook(const LLVector3& pos_in, const LLVector3& dir_in, const LLVector3& up_in)
+	{
+		const LLVector4a pos(pos_in.mV[VX], pos_in.mV[VY], pos_in.mV[VZ], 1.f);
+		LLVector4a dir(dir_in.mV[VX], dir_in.mV[VY], dir_in.mV[VZ]);
+		const LLVector4a up(up_in.mV[VX], up_in.mV[VY], up_in.mV[VZ]);
+
+		LLVector4a left_norm;
+		left_norm.setCross3(dir, up);
+		left_norm.normalize3fast();
+		LLVector4a up_norm;
+		up_norm.setCross3(left_norm, dir);
+		up_norm.normalize3fast();
+		LLVector4a& dir_norm = dir;
+		dir.normalize3fast();
+
+		LLVector4a left_dot;
+		left_dot.setAllDot3(left_norm, pos);
+		left_dot.negate();
+		LLVector4a up_dot;
+		up_dot.setAllDot3(up_norm, pos);
+		up_dot.negate();
+		LLVector4a dir_dot;
+		dir_dot.setAllDot3(dir_norm, pos);
+
+		dir_norm.negate();
+
+		LLMatrix4a lookat_mat;
+		lookat_mat.setRow<0>(left_norm);
+		lookat_mat.setRow<1>(up_norm);
+		lookat_mat.setRow<2>(dir_norm);
+		lookat_mat.setRow<3>(LLVector4a(0, 0, 0, 1));
+
+		lookat_mat.getRow<0>().copyComponent<3>(left_dot);
+		lookat_mat.getRow<1>().copyComponent<3>(up_dot);
+		lookat_mat.getRow<2>().copyComponent<3>(dir_dot);
+
+		lookat_mat.transpose();
+
+		return lookat_mat;
+	}
+
+	inline const LLMatrix4a& genNDCtoWC()
+	{
+		return TRANS_MAT;
+	}
+
 
 	inline bool projectf(const LLVector3& object, const LLMatrix4a& modelview, const LLMatrix4a& projection, const LLRect& viewport, LLVector3& windowCoordinate)
 	{
