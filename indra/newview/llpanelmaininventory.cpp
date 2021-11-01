@@ -732,7 +732,7 @@ void LLPanelMainInventory::updateItemcountText()
 		mItemCount = gInventory.getItemCount();
 		mItemCountString = "";
 		LLLocale locale(LLLocale::USER_LOCALE);
-		LLResMgr::getInstance()->getIntegerString(mItemCountString, mItemCount);
+		LLResMgr::getIntegerString(mItemCountString, mItemCount);
 	}
 
 	if(mCategoryCount != gInventory.getCategoryCount())
@@ -740,7 +740,7 @@ void LLPanelMainInventory::updateItemcountText()
 		mCategoryCount = gInventory.getCategoryCount();
 		mCategoryCountString = "";
 		LLLocale locale(LLLocale::USER_LOCALE);
-		LLResMgr::getInstance()->getIntegerString(mCategoryCountString, mCategoryCount);
+		LLResMgr::getIntegerString(mCategoryCountString, mCategoryCount);
 	}
 
 	LLStringUtil::format_map_t string_args;

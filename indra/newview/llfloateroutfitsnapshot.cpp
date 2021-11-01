@@ -104,7 +104,7 @@ void LLFloaterOutfitSnapshot::Impl::updateControls(LLFloaterSnapshotBase* floate
     std::string bytes_string;
     if (got_snap)
     {
-        LLResMgr::getInstance()->getIntegerString(bytes_string, (previewp->getDataSize()) >> 10);
+        LLResMgr::getIntegerString(bytes_string, (previewp->getDataSize()) >> 10);
     }
 
     // Update displayed image resolution.

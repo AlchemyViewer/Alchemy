@@ -47,7 +47,7 @@ void LLResMgr::setLocale( LLLOCALE_ID locale_id )
 	mLocale = locale_id;
 }
 
-char LLResMgr::getDecimalPoint() const					
+char LLResMgr::getDecimalPoint()					
 { 
 	char decimal = localeconv()->decimal_point[0]; 
 
@@ -62,7 +62,7 @@ char LLResMgr::getDecimalPoint() const
 	return decimal;
 }
 
-char LLResMgr::getThousandsSeparator() const			
+char LLResMgr::getThousandsSeparator()			
 {
 	char separator = localeconv()->thousands_sep[0]; 
 
@@ -77,7 +77,7 @@ char LLResMgr::getThousandsSeparator() const
 	return separator;
 }
 
-char LLResMgr::getMonetaryDecimalPoint() const
+char LLResMgr::getMonetaryDecimalPoint()
 {
 	char decimal = localeconv()->mon_decimal_point[0]; 
 
@@ -92,7 +92,7 @@ char LLResMgr::getMonetaryDecimalPoint() const
 	return decimal;
 }
 
-char LLResMgr::getMonetaryThousandsSeparator() const	
+char LLResMgr::getMonetaryThousandsSeparator()	
 {
 	char separator = localeconv()->mon_thousands_sep[0]; 
 
@@ -109,36 +109,13 @@ char LLResMgr::getMonetaryThousandsSeparator() const
 
 
 // Sets output to a string of integers with monetary separators inserted according to the locale.
-std::string LLResMgr::getMonetaryString( S32 input ) const
+std::string LLResMgr::getMonetaryString( S32 input )
 {
 	std::string output;
 
 	LLLocale locale(LLLocale::USER_LOCALE);
 	struct lconv *conv = localeconv();
 	
-#if LL_DARWIN
-	// On the Mac, locale support is broken before 10.4, which causes things to go all pear-shaped.
-	// Fake up a conv structure with some reasonable values for the fields this function uses.
-	struct lconv fakeconv;
-	char fake_neg[2] = "-";
-	char fake_mon_group[4] = "\x03\x03\x00"; // commas every 3 digits
-	if(conv->negative_sign[0] == 0)	// Real locales all seem to have something here...
-	{
-		fakeconv = *conv;	// start with what's there.
-		switch(mLocale)
-		{
-			default:  			// Unknown -- use the US defaults.
-			case LLLOCALE_USA: 
-			case LLLOCALE_UK:	// UK ends up being the same as US for the items used here.
-				fakeconv.negative_sign = fake_neg;
-				fakeconv.mon_grouping = fake_mon_group;
-				fakeconv.n_sign_posn = 1; // negative sign before the string
-			break;
-		}
-		conv = &fakeconv;
-	}
-#endif
-
 	char* negative_sign = conv->negative_sign;
 	char separator = getMonetaryThousandsSeparator();
 	char* grouping = conv->mon_grouping;
@@ -244,7 +221,7 @@ std::string LLResMgr::getMonetaryString( S32 input ) const
 	return output;
 }
 
-void LLResMgr::getIntegerString( std::string& output, S32 input ) const
+void LLResMgr::getIntegerString( std::string& output, S32 input )
 {
 	// handle special case of input value being zero
 	if (input == 0)

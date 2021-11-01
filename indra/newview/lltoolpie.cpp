@@ -1132,7 +1132,7 @@ BOOL LLToolPie::handleTooltipLand(std::string line, std::string tooltip_msg)
 	{
 		LLStringUtil::format_map_t args;
 		S32 price = hover_parcel->getSalePrice();
-		args["[AMOUNT]"] = LLResMgr::getInstance()->getMonetaryString(price);
+		args["[AMOUNT]"] = LLResMgr::getMonetaryString(price);
 		line = LLTrans::getString("TooltipForSaleL$", args);
 		tooltip_msg.append(line);
 		tooltip_msg.push_back('\n');
@@ -1252,7 +1252,7 @@ BOOL LLToolPie::handleTooltipObject( LLViewerObject* hover_object, std::string l
 			{
 				static LLUIString tooltip_price = LLTrans::getString("TooltipPrice");
 				S32 price = nodep->mSaleInfo.getSalePrice();
-				tooltip_price.setArg("[AMOUNT]", LLResMgr::getInstance()->getMonetaryString(price));
+				tooltip_price.setArg("[AMOUNT]", LLResMgr::getMonetaryString(price));
 				tooltip_msg.append(tooltip_price.getString());
 			}
 

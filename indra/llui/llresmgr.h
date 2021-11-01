@@ -48,13 +48,13 @@ public:
 	void				setLocale( LLLOCALE_ID locale_id );
 	LLLOCALE_ID			getLocale() const						{ return mLocale; }
 
-	char				getDecimalPoint() const;
-	char				getThousandsSeparator() const;
+	static char			getDecimalPoint();
+	static char			getThousandsSeparator();
 
-	char				getMonetaryDecimalPoint() const;	
-	char				getMonetaryThousandsSeparator() const;
-	std::string			getMonetaryString( S32 input ) const;
-	void				getIntegerString( std::string& output, S32 input ) const;
+	static char			getMonetaryDecimalPoint();
+	static char			getMonetaryThousandsSeparator();
+	static std::string  getMonetaryString( S32 input );
+	static void			getIntegerString( std::string& output, S32 input );
 
 
 private:

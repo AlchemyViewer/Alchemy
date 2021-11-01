@@ -576,7 +576,7 @@ void LLManip::renderTickValue(const LLVector3& pos, F32 value, const std::string
 
 		if (fractional_portion != 0)
 		{
-			fraction_string = llformat("%c%02d%s", LLResMgr::getInstance()->getDecimalPoint(), fractional_portion, suffix.c_str());
+			fraction_string = llformat("%c%02d%s", LLResMgr::getDecimalPoint(), fractional_portion, suffix.c_str());
 
 			hud_render_utf8text(val_string, render_pos, *big_fontp, LLFontGL::NORMAL, LLFontGL::DROP_SHADOW, -1.f * big_fontp->getWidthF32(val_string), 3.f, color, hud_selection);
 			hud_render_utf8text(fraction_string, render_pos, *small_fontp, LLFontGL::NORMAL, LLFontGL::DROP_SHADOW, 1.f, 3.f, color, hud_selection);

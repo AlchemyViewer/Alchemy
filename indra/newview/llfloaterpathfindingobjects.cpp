@@ -756,10 +756,10 @@ void LLFloaterPathfindingObjects::updateMessagingStatus()
 
 			LLLocale locale(LLStringUtil::getLocale());
 			std::string numItemsString;
-			LLResMgr::getInstance()->getIntegerString(numItemsString, numItems);
+			LLResMgr::getIntegerString(numItemsString, numItems);
 
 			std::string numSelectedItemsString;
-			LLResMgr::getInstance()->getIntegerString(numSelectedItemsString, numSelectedItems);
+			LLResMgr::getIntegerString(numSelectedItemsString, numSelectedItems);
 
 			LLStringUtil::format_map_t string_args;
 			string_args["[NUM_SELECTED]"] = numSelectedItemsString;

@@ -278,7 +278,7 @@ void LLFloaterPay::processPayPriceReply(LLMessageSystem* msg, void **userdata)
 			if (pay_button > 0)
 			{
 				std::string button_str = "L$";
-				button_str += LLResMgr::getInstance()->getMonetaryString( pay_button );
+				button_str += LLResMgr::getMonetaryString( pay_button );
 
 				self->mQuickPayButton[i]->setLabelSelected(button_str);
 				self->mQuickPayButton[i]->setLabelUnselected(button_str);
@@ -298,7 +298,7 @@ void LLFloaterPay::processPayPriceReply(LLMessageSystem* msg, void **userdata)
 
 		// build a string containing the maximum value and calc nerw button width from it.
 		std::string balance_str = "L$";
-		balance_str += LLResMgr::getInstance()->getMonetaryString( max_pay_amount );
+		balance_str += LLResMgr::getMonetaryString( max_pay_amount );
 		const LLFontGL* font = LLFontGL::getFontSansSerif();
 		S32 new_button_width = font->getWidth( std::string(balance_str));
 		new_button_width += ( 12 + 12 );	// padding

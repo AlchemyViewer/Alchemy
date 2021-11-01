@@ -4894,11 +4894,11 @@ void LLViewerWindow::saveImageLocal(LLImageFormatted *image, const snapshot_save
 		args["PATH"] = lastSnapshotDir;
 
 		std::string needM_bytes_string;
-		LLResMgr::getInstance()->getIntegerString(needM_bytes_string, (image->getDataSize()) >> 10);
+		LLResMgr::getIntegerString(needM_bytes_string, (image->getDataSize()) >> 10);
 		args["NEED_MEMORY"] = needM_bytes_string;
 
 		std::string freeM_bytes_string;
-		LLResMgr::getInstance()->getIntegerString(freeM_bytes_string, (b_space.free) >> 10);
+		LLResMgr::getIntegerString(freeM_bytes_string, (b_space.free) >> 10);
 		args["FREE_MEMORY"] = freeM_bytes_string;
 
 		LLNotificationsUtil::add("SnapshotToComputerFailed", args);

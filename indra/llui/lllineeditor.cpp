@@ -2302,7 +2302,7 @@ BOOL LLLineEditor::postvalidateFloat(const std::string &str)
 		}
 
 		// May be a comma or period, depending on the locale
-		llwchar decimal_point = (llwchar)LLResMgr::getInstanceFast()->getDecimalPoint();
+		llwchar decimal_point = (llwchar)LLResMgr::getDecimalPoint();
 
 		for( ; i < len; i++ )
 		{

@@ -207,7 +207,7 @@ void LLFloaterMemLeak::draw()
 	if(sTotalLeaked > 0)
 	{
 		std::string bytes_string;
-		LLResMgr::getInstance()->getIntegerString(bytes_string, sTotalLeaked >> 10 );
+		LLResMgr::getIntegerString(bytes_string, sTotalLeaked >> 10 );
 		getChild<LLUICtrl>("total_leaked_label")->setTextArg("[SIZE]", bytes_string);
 	}
 	else

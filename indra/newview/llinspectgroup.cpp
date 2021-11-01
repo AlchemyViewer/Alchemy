@@ -240,7 +240,7 @@ void LLInspectGroup::processGroupData()
 			else
 			{
 				std::string amount =
-					LLResMgr::getInstance()->getMonetaryString(
+					LLResMgr::getMonetaryString(
 						data->mMembershipFee);
 				LLStringUtil::format_map_t args;
 				args["[AMOUNT]"] = amount;

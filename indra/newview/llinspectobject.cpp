@@ -550,7 +550,7 @@ void LLInspectObject::updatePrice(LLSelectNode* nodep)
 	else if (for_sale)
 	{
 		LLStringUtil::format_map_t args;
-		args["[AMOUNT]"] = LLResMgr::getInstance()->getMonetaryString(price);
+		args["[AMOUNT]"] = LLResMgr::getMonetaryString(price);
 		line = getString("Price", args);
 		show_price_icon = true;
 	}

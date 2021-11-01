@@ -519,7 +519,7 @@ void LLFloaterTools::refresh()
 					index++;
 					if (selected_child->isSelected())
 					{
-						LLResMgr::getInstance()->getIntegerString(num_string, index);
+						LLResMgr::getIntegerString(num_string, index);
 						break;
 					}
 				}
@@ -537,10 +537,10 @@ void LLFloaterTools::refresh()
 	if (!gMeshRepo.meshRezEnabled())
 	{		
 		std::string obj_count_string;
-		LLResMgr::getInstance()->getIntegerString(obj_count_string, LLSelectMgr::getInstance()->getSelection()->getRootObjectCount());
+		LLResMgr::getIntegerString(obj_count_string, LLSelectMgr::getInstance()->getSelection()->getRootObjectCount());
 		getChild<LLUICtrl>("selection_count")->setTextArg("[OBJ_COUNT]", obj_count_string);
 		std::string prim_count_string;
-		LLResMgr::getInstance()->getIntegerString(prim_count_string, LLSelectMgr::getInstance()->getSelection()->getObjectCount());
+		LLResMgr::getIntegerString(prim_count_string, LLSelectMgr::getInstance()->getSelection()->getObjectCount());
 		getChild<LLUICtrl>("selection_count")->setTextArg("[PRIM_COUNT]", prim_count_string);
 
 		// calculate selection rendering cost
@@ -548,7 +548,7 @@ void LLFloaterTools::refresh()
 		{
 			std::string prim_cost_string;
 			S32 render_cost = LLSelectMgr::getInstance()->getSelection()->getSelectedObjectRenderCost();
-			LLResMgr::getInstance()->getIntegerString(prim_cost_string, render_cost);
+			LLResMgr::getIntegerString(prim_cost_string, render_cost);
 		}
 		
 		// disable the object and prim counts if nothing selected

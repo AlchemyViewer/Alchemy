@@ -831,7 +831,7 @@ void LLPanelLandGeneral::refresh()
 			}
 
 			S32 price = parcel->getSalePrice();
-			mSaleInfoForSale1->setTextArg("[PRICE]", LLResMgr::getInstance()->getMonetaryString(price));
+			mSaleInfoForSale1->setTextArg("[PRICE]", LLResMgr::getMonetaryString(price));
 			mSaleInfoForSale1->setTextArg("[PRICE_PER_SQM]", llformat("%.1f", cost_per_sqm));
 			if (can_be_sold)
 			{
