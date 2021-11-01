@@ -8266,7 +8266,7 @@ void LLVOAvatar::updateRuthTimer(bool loading)
 				<< "( Head : " << isTextureDefined(TEX_HEAD_BAKED) << " )."
 				<< LL_ENDL;
 		
-		LLAvatarPropertiesProcessor::getInstance()->sendAvatarTexturesRequest(getID());
+		LLAvatarPropertiesProcessor::getInstanceFast()->sendAvatarTexturesRequest(getID());
 		mRuthTimer.reset();
 	}
 }
@@ -9461,7 +9461,7 @@ void LLVOAvatar::applyParsedAppearanceMessage(LLAppearanceMessageContents& conte
 		{
 			// re-request appearance, hoping that it comes back with a shape next time
 			LL_INFOS() << "Re-requesting AvatarAppearance for object: "  << getID() << LL_ENDL;
-			LLAvatarPropertiesProcessor::getInstance()->sendAvatarTexturesRequest(getID());
+			LLAvatarPropertiesProcessor::getInstanceFast()->sendAvatarTexturesRequest(getID());
 			mRuthTimer.reset();
 		}
 		else

@@ -90,7 +90,7 @@ public:
             return true;
         }
 
-        if (!LLUI::getInstance()->mSettingGroups["config"]->getBOOL("EnableClassifieds"))
+        if (!LLUI::getInstanceFast()->mSettingGroups["config"]->getBOOL("EnableClassifieds"))
         {
             LLNotificationsUtil::add("NoClassifieds", LLSD(), LLSD(), std::string("SwitchToStandardSkinAndQuit"));
             return true;
@@ -123,8 +123,8 @@ public:
         {
             mRequestVerb = verb;
             mClassifiedIds.insert(classified_id);
-            LLAvatarPropertiesProcessor::getInstance()->addObserver(LLUUID(), this);
-            LLAvatarPropertiesProcessor::getInstance()->sendClassifiedInfoRequest(classified_id);
+            LLAvatarPropertiesProcessor::getInstanceFast()->addObserver(LLUUID(), this);
+            LLAvatarPropertiesProcessor::getInstanceFast()->sendClassifiedInfoRequest(classified_id);
             return true;
         }
         else if (verb == "edit")
@@ -180,7 +180,7 @@ public:
 
         // remove our observer now that we're done
         mClassifiedIds.erase(c_info->classified_id);
-        LLAvatarPropertiesProcessor::getInstance()->removeObserver(LLUUID(), this);
+        LLAvatarPropertiesProcessor::getInstanceFast()->removeObserver(LLUUID(), this);
     }
 };
 LLClassifiedHandler gClassifiedHandler;
@@ -320,7 +320,7 @@ void LLPanelProfileClassifieds::callbackDeleteClassified(const LLSD& notificatio
 
         if (classified_id.notNull())
         {
-            LLAvatarPropertiesProcessor::getInstance()->sendClassifiedDelete(classified_id);
+            LLAvatarPropertiesProcessor::getInstanceFast()->sendClassifiedDelete(classified_id);
         }
 
         updateButtons();
@@ -421,7 +421,7 @@ void LLPanelProfileClassifieds::updateData()
         mNoItemsLabel->setValue(LLTrans::getString("PicksClassifiedsLoadingText"));
         mNoItemsLabel->setVisible(TRUE);
 
-        LLAvatarPropertiesProcessor::getInstance()->sendAvatarClassifiedsRequest(avatar_id);
+        LLAvatarPropertiesProcessor::getInstanceFast()->sendAvatarClassifiedsRequest(avatar_id);
     }
 }
 
@@ -615,7 +615,7 @@ void LLPanelProfileClassified::onOpen(const LLSD& key)
 
         LLUUID snapshot_id = LLUUID::null;
         std::string desc;
-        LLParcel* parcel = LLViewerParcelMgr::getInstance()->getAgentParcel();
+        LLParcel* parcel = LLViewerParcelMgr::getInstanceFast()->getAgentParcel();
         if(parcel)
         {
             desc = parcel->getDesc();
@@ -660,7 +660,7 @@ void LLPanelProfileClassified::onOpen(const LLSD& key)
 
         LL_INFOS() << "Opening classified [" << getClassifiedName() << "] (" << getClassifiedId() << ")" << LL_ENDL;
 
-        LLAvatarPropertiesProcessor::getInstance()->sendClassifiedInfoRequest(getClassifiedId());
+        LLAvatarPropertiesProcessor::getInstanceFast()->sendClassifiedInfoRequest(getClassifiedId());
 
         gGenericDispatcher.addHandler("classifiedclickthrough", &sClassifiedClickThrough);
 
@@ -847,7 +847,7 @@ void LLPanelProfileClassified::onCancelClick()
     else
     {
         // Reload data to undo changes to forms
-        LLAvatarPropertiesProcessor::getInstance()->sendClassifiedInfoRequest(getClassifiedId());
+        LLAvatarPropertiesProcessor::getInstanceFast()->sendClassifiedInfoRequest(getClassifiedId());
     }
 
     setInfoLoaded(false);
@@ -1229,7 +1229,7 @@ void LLPanelProfileClassified::sendUpdate()
     c_data.flags = getFlags();
     c_data.price_for_listing = getPriceForListing();
 
-    LLAvatarPropertiesProcessor::getInstance()->sendClassifiedInfoUpdate(&c_data);
+    LLAvatarPropertiesProcessor::getInstanceFast()->sendClassifiedInfoUpdate(&c_data);
 
     if(isNew())
     {
@@ -1269,7 +1269,7 @@ std::string LLPanelProfileClassified::makeClassifiedName()
 {
     std::string name;
 
-    LLParcel* parcel = LLViewerParcelMgr::getInstance()->getAgentParcel();
+    LLParcel* parcel = LLViewerParcelMgr::getInstanceFast()->getAgentParcel();
     if(parcel)
     {
         name = parcel->getName();

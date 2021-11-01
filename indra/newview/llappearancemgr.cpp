@@ -4066,7 +4066,7 @@ void LLAppearanceMgr::serverAppearanceUpdateCoro(LLCoreHttpUtil::HttpCoroutineAd
                 // through the UDP and be handled in LLVOAvatar::processAvatarAppearance
                 // this should ensure that we receive a new canonical COF from the sim
                 // host. Hopefully it will return before the timeout.
-                LLAvatarPropertiesProcessor::getInstance()->sendAvatarTexturesRequest(gAgent.getID());
+                LLAvatarPropertiesProcessor::getInstanceFast()->sendAvatarTexturesRequest(gAgent.getID());
 
                 bRetry = true;
                 // Wait for a 1/2 second before trying again.  Just to keep from asking too quickly.

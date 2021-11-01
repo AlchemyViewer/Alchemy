@@ -96,11 +96,11 @@ LLPanelPickInfo::LLPanelPickInfo()
 
 LLPanelPickInfo::~LLPanelPickInfo()
 {
-	LLAvatarPropertiesProcessor::getInstance()->removeObserver(getAvatarId(), this);
+	LLAvatarPropertiesProcessor::getInstanceFast()->removeObserver(getAvatarId(), this);
 
 	if (mParcelId.notNull())
 	{
-		LLRemoteParcelInfoProcessor::getInstance()->removeObserver(mParcelId, this);
+		LLRemoteParcelInfoProcessor::getInstanceFast()->removeObserver(mParcelId, this);
 	}
 }
 
@@ -114,7 +114,7 @@ void LLPanelPickInfo::onOpen(const LLSD& key)
 
 	if(getAvatarId().notNull())
 	{
-		LLAvatarPropertiesProcessor::getInstance()->removeObserver(
+		LLAvatarPropertiesProcessor::getInstanceFast()->removeObserver(
 			getAvatarId(), this);
 	}
 
@@ -128,9 +128,9 @@ void LLPanelPickInfo::onOpen(const LLSD& key)
 	setPickDesc(key["pick_desc"]);
 	setSnapshotId(key["snapshot_id"]);
 
-	LLAvatarPropertiesProcessor::getInstance()->addObserver(
+	LLAvatarPropertiesProcessor::getInstanceFast()->addObserver(
 		getAvatarId(), this);
-	LLAvatarPropertiesProcessor::getInstance()->sendPickInfoRequest(
+	LLAvatarPropertiesProcessor::getInstanceFast()->sendPickInfoRequest(
 		getAvatarId(), getPickId());
 }
 
@@ -333,7 +333,7 @@ void LLPanelPickInfo::onClickTeleport()
 
 void LLPanelPickInfo::onClickBack()
 {
-	LLAvatarPropertiesProcessor::getInstance()->removeObserver(getAvatarId(), this);
+	LLAvatarPropertiesProcessor::getInstanceFast()->removeObserver(getAvatarId(), this);
 }
 
 //////////////////////////////////////////////////////////////////////////

@@ -38,18 +38,18 @@ class LLAgentPicksInfo::LLAgentPicksObserver : public LLAvatarPropertiesObserver
 public:
 	LLAgentPicksObserver()
 	{
-		LLAvatarPropertiesProcessor::getInstance()->addObserver(gAgent.getID(), this);
+		LLAvatarPropertiesProcessor::getInstanceFast()->addObserver(gAgent.getID(), this);
 	}
 
 	~LLAgentPicksObserver()
 	{
 		if (LLAvatarPropertiesProcessor::instanceExists())
-			LLAvatarPropertiesProcessor::getInstance()->removeObserver(gAgent.getID(), this);
+			LLAvatarPropertiesProcessor::getInstanceFast()->removeObserver(gAgent.getID(), this);
 	}
 
 	void sendAgentPicksRequest()
 	{
-		LLAvatarPropertiesProcessor::getInstance()->sendAvatarPicksRequest(gAgent.getID());
+		LLAvatarPropertiesProcessor::getInstanceFast()->sendAvatarPicksRequest(gAgent.getID());
 	}
 
 	typedef boost::function<void(LLAvatarPicks*)> server_respond_callback_t;

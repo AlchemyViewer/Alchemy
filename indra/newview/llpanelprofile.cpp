@@ -151,7 +151,7 @@ public:
 
 		if (verb == "pay")
 		{
-			if (!LLUI::getInstance()->mSettingGroups["config"]->getBOOL("EnableAvatarPay"))
+			if (!LLUI::getInstanceFast()->mSettingGroups["config"]->getBOOL("EnableAvatarPay"))
 			{
 				LLNotificationsUtil::add("NoAvatarPay", LLSD(), LLSD(), std::string("SwitchToStandardSkinAndQuit"));
 				return true;
@@ -304,7 +304,7 @@ BOOL LLPanelProfileSecondLife::postBuild()
     mGroupList->setDoubleClickCallback(boost::bind(&LLPanelProfileSecondLife::openGroupProfile, this));
     mGroupList->setReturnCallback(boost::bind(&LLPanelProfileSecondLife::openGroupProfile, this));
 
-    LLVoiceClient::getInstance()->addObserver((LLVoiceClientStatusObserver*)this);
+    LLVoiceClient::getInstanceFast()->addObserver((LLVoiceClientStatusObserver*)this);
     mCopyMenuButton->setMenu("menu_name_field.xml", LLMenuButton::MP_BOTTOM_RIGHT);
 
     mRlvBehaviorConn = gRlvHandler.setBehaviourToggleCallback([this](ERlvBehaviour eBhvr, ERlvParamType eParam) { if (eBhvr == RLV_BHVR_SHOWWORLDMAP) updateButtons(); });
@@ -319,7 +319,7 @@ void LLPanelProfileSecondLife::onOpen(const LLSD& key)
     resetData();
 
     LLUUID avatar_id = getAvatarId();
-    LLAvatarPropertiesProcessor::getInstance()->addObserver(avatar_id, this);
+    LLAvatarPropertiesProcessor::getInstanceFast()->addObserver(avatar_id, this);
 
     BOOL own_profile = getSelfProfile();
 
@@ -376,7 +376,7 @@ void LLPanelProfileSecondLife::apply(LLAvatarData* data)
         data->about_text = mDescriptionEdit->getValue().asString();
         data->allow_publish = mShowInSearchCheckbox->getValue();
 
-        LLAvatarPropertiesProcessor::getInstance()->sendAvatarPropertiesUpdate(data);
+        LLAvatarPropertiesProcessor::getInstanceFast()->sendAvatarPropertiesUpdate(data);
     }
 }
 
@@ -386,7 +386,7 @@ void LLPanelProfileSecondLife::updateData()
     if (!getIsLoading() && avatar_id.notNull() && !(getSelfProfile() && !getEmbedded()))
     {
         setIsLoading();
-        LLAvatarPropertiesProcessor::getInstance()->sendAvatarGroupsRequest(avatar_id);
+        LLAvatarPropertiesProcessor::getInstanceFast()->sendAvatarGroupsRequest(avatar_id);
     }
 }
 
@@ -495,7 +495,7 @@ void LLPanelProfileSecondLife::fillCommonData(const LLAvatarData* avatar_data)
 {
     // Refresh avatar id in cache with new info to prevent re-requests
     // and to make sure icons in text will be up to date
-    LLAvatarIconIDCache::getInstance()->add(avatar_data->avatar_id, avatar_data->image_id);
+    LLAvatarIconIDCache::getInstanceFast()->add(avatar_data->avatar_id, avatar_data->image_id);
 
     LLStringUtil::format_map_t args;
     {
@@ -715,8 +715,8 @@ void LLPanelProfileSecondLife::processOnlineStatus(bool online)
 
     mStatusText->setValue(status);
     mStatusText->setColor(online ?
-    LLUIColorTable::instance().getColor("StatusUserOnline") :
-    LLUIColorTable::instance().getColor("StatusUserOffline"));
+    LLUIColorTable::instanceFast().getColor("StatusUserOnline") :
+    LLUIColorTable::instanceFast().getColor("StatusUserOffline"));
 }
 
 void LLPanelProfileSecondLife::updateButtons()
@@ -1101,7 +1101,7 @@ void LLPanelProfileInterests::apply()
         interests_data.skills_text = mSkillsEditor->getText();
         interests_data.languages_text = mLanguagesEditor->getText();
 
-        LLAvatarPropertiesProcessor::getInstance()->sendInterestsInfoUpdate(&interests_data);
+        LLAvatarPropertiesProcessor::getInstanceFast()->sendInterestsInfoUpdate(&interests_data);
     }
 
 }
@@ -1243,7 +1243,7 @@ void LLPanelProfileNotes::updateData()
     if (!getIsLoading() && avatar_id.notNull())
     {
         setIsLoading();
-        LLAvatarPropertiesProcessor::getInstance()->sendAvatarNotesRequest(avatar_id);
+        LLAvatarPropertiesProcessor::getInstanceFast()->sendAvatarNotesRequest(avatar_id);
     }
 }
 
@@ -1304,7 +1304,7 @@ void LLPanelProfileNotes::onCommitNotes()
     if (getIsLoaded())
     {
         std::string notes = mNotesEditor->getValue().asString();
-        LLAvatarPropertiesProcessor::getInstance()->sendNotes(getAvatarId(),notes);
+        LLAvatarPropertiesProcessor::getInstanceFast()->sendNotes(getAvatarId(),notes);
     }
 }
 
@@ -1375,7 +1375,7 @@ void LLPanelProfileNotes::applyRights()
         rights |= LLRelationship::GRANT_MODIFY_OBJECTS;
     }
 
-    LLAvatarPropertiesProcessor::getInstance()->sendFriendRights(getAvatarId(), rights);
+    LLAvatarPropertiesProcessor::getInstanceFast()->sendFriendRights(getAvatarId(), rights);
 }
 
 void LLPanelProfileNotes::updateWarning()
@@ -1420,7 +1420,7 @@ void LLPanelProfileNotes::processProperties(void* data, EAvatarProcessorType typ
                 mCharacterLimitWarning->setVisible(FALSE);
             }
 
-            LLAvatarPropertiesProcessor::getInstance()->removeObserver(getAvatarId(),this);
+            LLAvatarPropertiesProcessor::getInstanceFast()->removeObserver(getAvatarId(),this);
         }
     }
 }
@@ -1583,7 +1583,7 @@ void LLPanelProfile::updateData()
     if (!getIsLoading() && avatar_id.notNull())
     {
         setIsLoading();
-        LLAvatarPropertiesProcessor::getInstance()->sendAvatarPropertiesRequest(avatar_id);
+        LLAvatarPropertiesProcessor::getInstanceFast()->sendAvatarPropertiesRequest(avatar_id);
     }
 }
 

@@ -156,7 +156,7 @@ void LLPanelClassifiedInfo::onOpen(const LLSD& key)
 
 	if(getAvatarId().notNull())
 	{
-		LLAvatarPropertiesProcessor::getInstance()->removeObserver(getAvatarId(), this);
+		LLAvatarPropertiesProcessor::getInstanceFast()->removeObserver(getAvatarId(), this);
 	}
 
 	setAvatarId(avatar_id);
@@ -173,8 +173,8 @@ void LLPanelClassifiedInfo::onOpen(const LLSD& key)
 
 	LL_INFOS() << "Opening classified [" << getClassifiedName() << "] (" << getClassifiedId() << ")" << LL_ENDL;
 
-	LLAvatarPropertiesProcessor::getInstance()->addObserver(getAvatarId(), this);
-	LLAvatarPropertiesProcessor::getInstance()->sendClassifiedInfoRequest(getClassifiedId());
+	LLAvatarPropertiesProcessor::getInstanceFast()->addObserver(getAvatarId(), this);
+	LLAvatarPropertiesProcessor::getInstanceFast()->sendClassifiedInfoRequest(getClassifiedId());
 	gGenericDispatcher.addHandler("classifiedclickthrough", &sClassifiedClickThrough);
 
 	if (gAgent.getRegion())
@@ -256,7 +256,7 @@ void LLPanelClassifiedInfo::processProperties(void* data, EAvatarProcessorType t
 
 			setInfoLoaded(true);
 
-			LLAvatarPropertiesProcessor::getInstance()->removeObserver(getAvatarId(), this);
+			LLAvatarPropertiesProcessor::getInstanceFast()->removeObserver(getAvatarId(), this);
 		}
 	}
 }

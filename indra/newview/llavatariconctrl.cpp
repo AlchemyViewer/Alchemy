@@ -204,7 +204,7 @@ LLAvatarIconCtrl::~LLAvatarIconCtrl()
 {
 	if (mAvatarId.notNull())
 	{
-		LLAvatarPropertiesProcessor::getInstance()->removeObserver(mAvatarId, this);
+		LLAvatarPropertiesProcessor::getInstanceFast()->removeObserver(mAvatarId, this);
 		// Name callbacks will be automatically disconnected since LLUICtrl is trackable
 	}
 
@@ -220,7 +220,7 @@ void LLAvatarIconCtrl::setValue(const LLSD& value)
 	if (value.isUUID())
 	{
 		LLAvatarPropertiesProcessor* app =
-			LLAvatarPropertiesProcessor::getInstance();
+			LLAvatarPropertiesProcessor::getInstanceFast();
 		if (mAvatarId.notNull())
 		{
 			app->removeObserver(mAvatarId, this);
