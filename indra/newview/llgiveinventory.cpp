@@ -474,7 +474,7 @@ bool LLGiveInventory::commitGiveInventoryItem(const LLUUID& to_agent,
 	if ( (!RlvActions::isRlvEnabled()) ||
 	     (RlvActions::canShowName(RlvActions::SNC_DEFAULT, to_agent)) || (im_session_id.notNull()) || (!RlvUtil::isNearbyAgent(to_agent)) || (RlvUIEnabler::hasOpenProfile(to_agent)) )
 	{
-		LLRecentPeople::instance().add(to_agent);
+		LLRecentPeople::instanceFast().add(to_agent);
 	}
 	return true;
 // [/RLVa:KB]
@@ -564,7 +564,7 @@ bool LLGiveInventory::commitGiveInventoryCategory(const LLUUID& to_agent,
 	if ( (!RlvActions::isRlvEnabled()) ||
 	     (RlvActions::canShowName(RlvActions::SNC_DEFAULT, to_agent)) || (im_session_id.notNull()) || (!RlvUtil::isNearbyAgent(to_agent)) || (RlvUIEnabler::hasOpenProfile(to_agent)) )
 	{
-		LLRecentPeople::instance().add(to_agent);
+		LLRecentPeople::instanceFast().add(to_agent);
 	}
 // [/RLVa:KB]
 

@@ -1207,7 +1207,7 @@ BOOL LLToolPie::handleTooltipObject( LLViewerObject* hover_object, std::string l
 // [/RLVa:KB]
 				static const LLCachedControl<F32> av_inspector_tooltip_delay(gSavedSettings, "AvatarInspectorTooltipDelay");
 				LLInspector::Params p;
-				p.fillFrom(LLUICtrlFactory::instance().getDefaultParams<LLInspector>());
+				p.fillFrom(LLUICtrlFactory::getDefaultParams<LLInspector>());
 				p.message(final_name);
 				p.image.name("Inspector_I");
 				p.click_callback(boost::bind(showAvatarInspector, hover_object->getID()));
@@ -1331,7 +1331,7 @@ BOOL LLToolPie::handleTooltipObject( LLViewerObject* hover_object, std::string l
 				{
 // [/RLVa:KB]
 					LLInspector::Params p;
-					p.fillFrom(LLUICtrlFactory::instance().getDefaultParams<LLInspector>());
+					p.fillFrom(LLUICtrlFactory::getDefaultParams<LLInspector>());
 					p.message(tooltip_msg);
 					p.image.name("Inspector_I");
 					p.click_callback(boost::bind(showObjectInspector, hover_object->getID(), mHoverPick.mObjectFace));

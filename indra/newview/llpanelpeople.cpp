@@ -100,7 +100,7 @@ public:
 protected:
 	virtual bool doCompare(const LLAvatarListItem* avatar_item1, const LLAvatarListItem* avatar_item2) const
 	{
-		LLRecentPeople& people = LLRecentPeople::instance();
+		LLRecentPeople& people = LLRecentPeople::instanceFast();
 		const LLDate& date1 = people.getDate(avatar_item1->getAvatarId());
 		const LLDate& date2 = people.getDate(avatar_item2->getAvatarId());
 
@@ -223,8 +223,8 @@ protected:
 	virtual bool doCompare(const LLAvatarListItem* item1, const LLAvatarListItem* item2) const
 	{
 
-		F32 arr_time1 = LLRecentPeople::instance().getArrivalTimeByID(item1->getAvatarId());
-		F32 arr_time2 = LLRecentPeople::instance().getArrivalTimeByID(item2->getAvatarId());
+		F32 arr_time1 = LLRecentPeople::instanceFast().getArrivalTimeByID(item1->getAvatarId());
+		F32 arr_time2 = LLRecentPeople::instanceFast().getArrivalTimeByID(item2->getAvatarId());
 
 		if (arr_time1 == arr_time2)
 		{
@@ -528,7 +528,7 @@ public:
 	LLRecentListUpdater(callback_t cb)
 	:	LLAvatarListUpdater(cb, 0)
 	{
-		LLRecentPeople::instance().setChangedCallback(boost::bind(&LLRecentListUpdater::update, this));
+		LLRecentPeople::instanceFast().setChangedCallback(boost::bind(&LLRecentListUpdater::update, this));
 	}
 };
 
@@ -854,7 +854,7 @@ void LLPanelPeople::updateRecentList()
 	if (!mRecentList)
 		return;
 
-	LLRecentPeople::instance().get(mRecentList->getIDs());
+	LLRecentPeople::instanceFast().get(mRecentList->getIDs());
 	mRecentList->setDirty();
 }
 
@@ -1623,7 +1623,7 @@ bool LLPanelPeople::updateNearbyArrivalTime()
 	std::vector<LLVector3d> positions;
 	std::vector<LLUUID> uuids;
 	LLWorld::getInstanceFast()->getAvatars(&uuids, &positions, gAgent.getPositionGlobal(), ALControlCache::NearMeRange);
-	LLRecentPeople::instance().updateAvatarsArrivalTime(uuids);
+	LLRecentPeople::instanceFast().updateAvatarsArrivalTime(uuids);
 	return LLApp::isExiting();
 }
 

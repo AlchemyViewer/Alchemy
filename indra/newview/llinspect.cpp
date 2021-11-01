@@ -110,7 +110,7 @@ BOOL LLInspect::handleToolTip(S32 x, S32 y, MASK mask)
 	{
 		//build LLInspector params to get correct tooltip setting, etc. background image
 		LLInspector::Params params;
-		params.fillFrom(LLUICtrlFactory::instanceFast().getDefaultParams<LLInspector>());
+		params.fillFrom(LLUICtrlFactory::getDefaultParams<LLInspector>());
 		params.message = child_handler->getToolTip();
 		//set up delay if there is no visible tooltip at this moment
 		static LLUICachedControl<F32> tool_tip_delay("ToolTipDelay", 0.69999f);

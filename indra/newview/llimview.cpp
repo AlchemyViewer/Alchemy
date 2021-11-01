@@ -1217,7 +1217,7 @@ bool LLIMModel::addMessage(const LLUUID& session_id, const std::string& from, co
 	//other places may be called from message history.
 	if( !from_id.isNull() &&
 		( session->isP2PSessionType() || session->isAdHocSessionType() ) )
-		LLRecentPeople::instance().add(from_id);
+		LLRecentPeople::instanceFast().add(from_id);
 
 	// notify listeners
 	LLSD arg;
@@ -1508,7 +1508,7 @@ void LLIMModel::sendMessage(const std::string& utf8_text,
 	{
 		if( session == 0)//??? shouldn't really happen
 		{
-			LLRecentPeople::instance().add(other_participant_id);
+			LLRecentPeople::instanceFast().add(other_participant_id);
 			return;
 		}
 		// IM_SESSION_INVITE means that this is an Ad-hoc incoming chat
@@ -1528,7 +1528,7 @@ void LLIMModel::sendMessage(const std::string& utf8_text,
 			// Add the recepient of the session.
 			if (!session->mInitialTargetIDs.empty())
 			{
-				LLRecentPeople::instance().add(*(session->mInitialTargetIDs.begin()));
+				LLRecentPeople::instanceFast().add(*(session->mInitialTargetIDs.begin()));
 			}
 		}
 	}
@@ -1545,7 +1545,7 @@ void LLIMModel::addSpeakersToRecent(const LLUUID& im_session_id)
 	for(LLSpeakerMgr::speaker_list_t::iterator it = speaker_list.begin(); it != speaker_list.end(); it++)
 	{
 		const LLPointer<LLSpeaker>& speakerp = *it;
-		LLRecentPeople::instance().add(speakerp->mID);
+		LLRecentPeople::instanceFast().add(speakerp->mID);
 	}
 }
 
@@ -3247,7 +3247,7 @@ void LLIMMgr::inviteToSession(
 		// the call, the caller should be added to the recent list
 		// anyway. STORM-507.
 		if(type == IM_SESSION_P2P_INVITE)
-			LLRecentPeople::instance().add(caller_id);
+			LLRecentPeople::instanceFast().add(caller_id);
 		
 		mPendingInvitations[session_id.asString()] = LLSD();
 	}

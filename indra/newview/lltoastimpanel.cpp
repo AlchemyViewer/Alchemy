@@ -247,7 +247,7 @@ void LLToastIMPanel::spawnGroupIconToolTip()
 	}
 
 	LLInspector::Params params;
-	params.fillFrom(LLUICtrlFactory::instance().getDefaultParams<LLInspector>());
+	params.fillFrom(LLUICtrlFactory::getDefaultParams<LLInspector>());
 	params.click_callback(boost::bind(&LLFloaterReg::showInstance, "inspect_group", LLSD().with("group_id", mSessionID), FALSE));
 	params.delay_time(0.100f);
 	params.image(LLUI::getUIImage("Info_Small"));

@@ -195,7 +195,7 @@ void accept_friendship_coro(std::string url, LLSD notification)
         {
             LL_DEBUGS("Friendship") << "Adding friend to list" << httpResults << LL_ENDL;
             // add friend to recent people list
-            LLRecentPeople::instance().add(payload["from_id"]);
+            LLRecentPeople::instanceFast().add(payload["from_id"]);
 
             LLNotificationsUtil::add("FriendshipAcceptedByMe",
                 notification["substitutions"], payload);
@@ -293,7 +293,7 @@ bool friendship_offer_callback(const LLSD& notification, const LLSD& response)
                 msg->sendReliable(LLHost(payload["sender"].asString()));
 
                 // add friend to recent people list
-                LLRecentPeople::instance().add(payload["from_id"]);
+                LLRecentPeople::instanceFast().add(payload["from_id"]);
                 LLNotificationsUtil::add("FriendshipAcceptedByMe",
                     notification["substitutions"], payload);
             }
@@ -1701,7 +1701,7 @@ void LLOfferInfo::sendReceiveResponse(bool accept, const LLUUID &destination_fol
 		bool fRlvCanShowName = (!RlvActions::isRlvEnabled()) ||
 			(RlvActions::canShowName(RlvActions::SNC_DEFAULT, mFromID)) || (!RlvUtil::isNearbyAgent(mFromID)) || (RlvUIEnabler::hasOpenIM(mFromID)) || (RlvUIEnabler::hasOpenProfile(mFromID));
 		if (fRlvCanShowName)
-			LLRecentPeople::instance().add(mFromID);
+			LLRecentPeople::instanceFast().add(mFromID);
 // [/RLVa:KB]
 	}
 
@@ -6668,7 +6668,7 @@ void send_lures(const LLSD& notification, const LLSD& response)
 			// Add the recepient to the recent people list.
 // [RLVa:KB] - Checked: RLVa-2.0.1
 			if (fRlvCanShowName)
-				LLRecentPeople::instance().add(target_id);
+				LLRecentPeople::instanceFast().add(target_id);
 // [/RLVa:KB]
 //			LLRecentPeople::instance().add(target_id);
 		}

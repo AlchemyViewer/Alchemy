@@ -302,9 +302,9 @@ void LLAvatarList::refresh()
 			{
 				// *NOTE: If you change the UI to show a different string,
 				// be sure to change the filter code below.
-				if (LLRecentPeople::instance().isAvalineCaller(buddy_id))
+				if (LLRecentPeople::instanceFast().isAvalineCaller(buddy_id))
 				{
-					const LLSD& call_data = LLRecentPeople::instance().getData(buddy_id);
+					const LLSD& call_data = LLRecentPeople::instanceFast().getData(buddy_id);
 					addAvalineItem(buddy_id, call_data["session_id"].asUUID(), call_data["call_number"].asString());
 				}
 				else
@@ -488,7 +488,7 @@ BOOL LLAvatarList::handleMouseDown(S32 x, S32 y, MASK mask)
 	S32 screen_x;
 	S32 screen_y;
 	localPointToScreen(x, y, &screen_x, &screen_y);
-	LLToolDragAndDrop::getInstance()->setDragStart(screen_x, screen_y);
+	LLToolDragAndDrop::getInstanceFast()->setDragStart(screen_x, screen_y);
 
 	return LLFlatListViewEx::handleMouseDown(x, y, mask);
 }
@@ -512,7 +512,7 @@ BOOL LLAvatarList::handleHover(S32 x, S32 y, MASK mask)
 		S32 screen_y;
 		localPointToScreen(x, y, &screen_x, &screen_y);
 
-		if(LLToolDragAndDrop::getInstance()->isOverThreshold(screen_x, screen_y))
+		if(LLToolDragAndDrop::getInstanceFast()->isOverThreshold(screen_x, screen_y))
 		{
 			// First, create the global drag and drop object
 			std::vector<EDragAndDropType> types;
@@ -520,7 +520,7 @@ BOOL LLAvatarList::handleHover(S32 x, S32 y, MASK mask)
 			getSelectedUUIDs(cargo_ids);
 			types.resize(cargo_ids.size(), DAD_PERSON);
 			LLToolDragAndDrop::ESource src = LLToolDragAndDrop::SOURCE_PEOPLE;
-			LLToolDragAndDrop::getInstance()->beginMultiDrag(types, cargo_ids, src);
+			LLToolDragAndDrop::getInstanceFast()->beginMultiDrag(types, cargo_ids, src);
 		}
 	}
 
@@ -586,7 +586,7 @@ void LLAvatarList::updateLastInteractionTimes()
 	{
 		// *TODO: error handling
 		LLAvatarListItem* item = static_cast<LLAvatarListItem*>(*it);
-		S32 secs_since = now - (S32) LLRecentPeople::instance().getDate(item->getAvatarId()).secondsSinceEpoch();
+		S32 secs_since = now - (S32) LLRecentPeople::instanceFast().getDate(item->getAvatarId()).secondsSinceEpoch();
 		if (secs_since >= 0)
 			item->setLastInteractionTime(secs_since);
 	}

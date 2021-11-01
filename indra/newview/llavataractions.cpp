@@ -120,7 +120,7 @@ void LLAvatarActions::requestFriendshipDialog(const LLUUID& id, const std::strin
     	LLNotificationsUtil::add("AddFriendWithMessage", args, payload, &callbackAddFriendWithMessage);
 
 	// add friend to recent people list
-	LLRecentPeople::instance().add(id);
+	LLRecentPeople::instanceFast().add(id);
 }
 
 static void on_avatar_name_friendship(const LLUUID& id, const LLAvatarName av_name)

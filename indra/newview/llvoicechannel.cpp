@@ -451,7 +451,7 @@ void LLVoiceChannelGroup::activate()
 					it!=session->mInitialTargetIDs.end();++it)
 				{
 					const LLUUID id = *it;
-					LLRecentPeople::instance().add(id);
+					LLRecentPeople::instanceFast().add(id);
 				}
 			}
 			// If this ad-hoc is incoming then trying to get ids of people from mInitialTargetIDs
@@ -961,10 +961,10 @@ void LLVoiceChannelP2P::addToTheRecentPeopleList()
 		call_data["call_number"]	= call_number;
 		call_data["date"]			= LLDate::now();
 		
-		LLRecentPeople::instance().add(mOtherUserID, call_data);
+		LLRecentPeople::instanceFast().add(mOtherUserID, call_data);
 	}
 	else
 	{
-		LLRecentPeople::instance().add(mOtherUserID);
+		LLRecentPeople::instanceFast().add(mOtherUserID);
 	}
 }

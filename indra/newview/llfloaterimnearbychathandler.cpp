@@ -585,7 +585,7 @@ void LLFloaterIMNearbyChatHandler::processChat(const LLChat& chat_msg,
  		// Add sender to the recent people list.
 // [RLVa:KB] - Checked: RLVa-2.0.0
 		if ( (!RlvActions::isRlvEnabled()) || (RlvActions::canShowName(RlvActions::SNC_DEFAULT, chat_msg.mFromID)) )
-	 		LLRecentPeople::instance().add(chat_msg.mFromID);
+	 		LLRecentPeople::instanceFast().add(chat_msg.mFromID);
 // [/RLVa:KB]
 // 		LLRecentPeople::instance().add(chat_msg.mFromID);
 	}
