@@ -1281,7 +1281,7 @@ BOOL LLToolPie::handleTooltipObject( LLViewerObject* hover_object, std::string l
 				const LLMediaEntry* mep = has_media ? tep->getMediaData() : NULL;
 				if (mep)
 				{
-					viewer_media_t media_impl = LLViewerMedia::getInstance()->getMediaImplFromTextureID(mep->getMediaID());
+					viewer_media_t media_impl = LLViewerMedia::getInstanceFast()->getMediaImplFromTextureID(mep->getMediaID());
 					LLPluginClassMedia* media_plugin = NULL;
 					
 					if (media_impl.notNull() && (media_impl->hasMedia()))
@@ -1481,7 +1481,7 @@ void LLToolPie::playCurrentMedia(const LLPickInfo& info)
 
 	LLPluginClassMedia* media_plugin = NULL;
 	
-	viewer_media_t media_impl = LLViewerMedia::getInstance()->getMediaImplFromTextureID(mep->getMediaID());
+	viewer_media_t media_impl = LLViewerMedia::getInstanceFast()->getMediaImplFromTextureID(mep->getMediaID());
 		
 	if(media_impl.notNull() && media_impl->hasMedia())
 	{
@@ -1533,7 +1533,7 @@ void LLToolPie::VisitHomePage(const LLPickInfo& info)
 	
 	LLPluginClassMedia* media_plugin = NULL;
 	
-	viewer_media_t media_impl = LLViewerMedia::getInstance()->getMediaImplFromTextureID(mep->getMediaID());
+	viewer_media_t media_impl = LLViewerMedia::getInstanceFast()->getMediaImplFromTextureID(mep->getMediaID());
 	
 	if(media_impl.notNull() && media_impl->hasMedia())
 	{
@@ -1676,7 +1676,7 @@ bool LLToolPie::handleMediaClick(const LLPickInfo& pick)
     if (!mep)
         return false;
 
-    viewer_media_t media_impl = LLViewerMedia::getInstance()->getMediaImplFromTextureID(mep->getMediaID());
+    viewer_media_t media_impl = LLViewerMedia::getInstanceFast()->getMediaImplFromTextureID(mep->getMediaID());
 
     if (gSavedSettings.getBOOL("MediaOnAPrimUI"))
     {
@@ -1730,7 +1730,7 @@ bool LLToolPie::handleMediaDblClick(const LLPickInfo& pick)
     if (!mep)
         return false;
 
-    viewer_media_t media_impl = LLViewerMedia::getInstance()->getMediaImplFromTextureID(mep->getMediaID());
+    viewer_media_t media_impl = LLViewerMedia::getInstanceFast()->getMediaImplFromTextureID(mep->getMediaID());
 
     if (gSavedSettings.getBOOL("MediaOnAPrimUI"))
     {
@@ -1785,7 +1785,7 @@ bool LLToolPie::handleMediaHover(const LLPickInfo& pick)
 	if (mep
 		&& gSavedSettings.getBOOL("MediaOnAPrimUI"))
 	{		
-		viewer_media_t media_impl = LLViewerMedia::getInstance()->getMediaImplFromTextureID(mep->getMediaID());
+		viewer_media_t media_impl = LLViewerMedia::getInstanceFast()->getMediaImplFromTextureID(mep->getMediaID());
 		
 		if(media_impl.notNull())
 		{
@@ -1823,7 +1823,7 @@ bool LLToolPie::handleMediaMouseUp()
 	if(mMediaMouseCaptureID.notNull())
 	{
 		// Face media needs to know the mouse went up.
-		viewer_media_t media_impl = LLViewerMedia::getInstance()->getMediaImplFromTextureID(mMediaMouseCaptureID);
+		viewer_media_t media_impl = LLViewerMedia::getInstanceFast()->getMediaImplFromTextureID(mMediaMouseCaptureID);
 		if(media_impl)
 		{
 			// This will send a mouseUp event to the plugin using the last known mouse coordinate (from a mouseDown or mouseMove), which is what we want.
@@ -1852,7 +1852,7 @@ static void handle_click_action_open_media(LLPointer<LLViewerObject> objectp)
 	if( face < 0 || face >= objectp->getNumTEs() ) return;
 		
 	// is media playing on this face?
-	if (LLViewerMedia::getInstance()->getMediaImplFromTextureID(objectp->getTE(face)->getID()) != NULL)
+	if (LLViewerMedia::getInstanceFast()->getMediaImplFromTextureID(objectp->getTE(face)->getID()) != NULL)
 	{
 		handle_click_action_play();
 		return;

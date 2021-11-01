@@ -271,7 +271,7 @@ void LLPanelPrimMediaControls::focusOnTarget()
 
 LLViewerMediaImpl* LLPanelPrimMediaControls::getTargetMediaImpl()
 {
-	return LLViewerMedia::getInstance()->getMediaImplFromTextureID(mTargetImplID);
+	return LLViewerMedia::getInstanceFast()->getMediaImplFromTextureID(mTargetImplID);
 }
 
 LLViewerObject* LLPanelPrimMediaControls::getTargetObject()

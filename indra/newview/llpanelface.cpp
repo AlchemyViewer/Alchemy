@@ -913,7 +913,7 @@ void LLPanelFace::updateUI(bool force_set_values /*false*/)
                break;
 				}
 
-			if(LLViewerMedia::getInstance()->textureHasMedia(id))
+			if(LLViewerMedia::getInstanceFast()->textureHasMedia(id))
 			{
 				getChildView("button align")->setEnabled(editable);
 			}
@@ -2341,13 +2341,13 @@ struct LLPanelFaceSetMediaFunctor : public LLSelectedTEFunctor
 		const LLMediaEntry* mep = tep->hasMedia() ? tep->getMediaData() : NULL;
 		if ( mep )
 		{
-			pMediaImpl = LLViewerMedia::getInstance()->getMediaImplFromTextureID(mep->getMediaID());
+			pMediaImpl = LLViewerMedia::getInstanceFast()->getMediaImplFromTextureID(mep->getMediaID());
 		}
 		
 		if ( pMediaImpl.isNull())
 		{
 			// If we didn't find face media for this face, check whether this face is showing parcel media.
-			pMediaImpl = LLViewerMedia::getInstance()->getMediaImplFromTextureID(tep->getID());
+			pMediaImpl = LLViewerMedia::getInstanceFast()->getMediaImplFromTextureID(tep->getID());
 		}
 		
 		if ( pMediaImpl.notNull())
@@ -2515,7 +2515,7 @@ void LLPanelFace::LLSelectedTE::getTexId(LLUUID& id, bool& identical)
 				id = image->getID();
 			}
 
-			if (!id.isNull() && LLViewerMedia::getInstance()->textureHasMedia(id))
+			if (!id.isNull() && LLViewerMedia::getInstanceFast()->textureHasMedia(id))
 			{
 				if (te)
 				{

@@ -3495,7 +3495,7 @@ void LLViewerMediaTexture::setMediaImpl()
 {
 	if(!mMediaImplp)
 	{
-		mMediaImplp = LLViewerMedia::getInstance()->getMediaImplFromTextureID(mID);
+		mMediaImplp = LLViewerMedia::getInstanceFast()->getMediaImplFromTextureID(mID);
 	}
 }
 

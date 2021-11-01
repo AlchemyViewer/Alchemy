@@ -538,7 +538,7 @@ bool LLViewerMediaFocus::isHoveringOverFace(LLPointer<LLViewerObject> objectp, S
 
 LLViewerMediaImpl* LLViewerMediaFocus::getFocusedMediaImpl()
 {
-	return LLViewerMedia::getInstance()->getMediaImplFromTextureID(mFocusedImplID);
+	return LLViewerMedia::getInstanceFast()->getMediaImplFromTextureID(mFocusedImplID);
 }
 
 LLViewerObject* LLViewerMediaFocus::getFocusedObject()
@@ -548,7 +548,7 @@ LLViewerObject* LLViewerMediaFocus::getFocusedObject()
 
 LLViewerMediaImpl* LLViewerMediaFocus::getHoverMediaImpl()
 {
-	return LLViewerMedia::getInstance()->getMediaImplFromTextureID(mHoverImplID);
+	return LLViewerMedia::getInstanceFast()->getMediaImplFromTextureID(mHoverImplID);
 }
 
 LLViewerObject* LLViewerMediaFocus::getHoverObject()
@@ -558,7 +558,7 @@ LLViewerObject* LLViewerMediaFocus::getHoverObject()
 
 void LLViewerMediaFocus::focusZoomOnMedia(LLUUID media_id)
 {
-	LLViewerMediaImpl* impl = LLViewerMedia::getInstance()->getMediaImplFromTextureID(media_id);
+	LLViewerMediaImpl* impl = LLViewerMedia::getInstanceFast()->getMediaImplFromTextureID(media_id);
 	
 	if(impl)
 	{	

@@ -219,7 +219,7 @@ static void remove_media_impl(LLViewerMediaImpl* media)
 
 class LLViewerMediaMuteListObserver : public LLMuteListObserver
 {
-	/* virtual */ void onChange()  { LLViewerMedia::getInstance()->muteListChanged();}
+	/* virtual */ void onChange()  { LLViewerMedia::getInstanceFast()->muteListChanged();}
 };
 
 static LLViewerMediaMuteListObserver sViewerMediaMuteListObserver;
@@ -643,7 +643,7 @@ static LLTrace::BlockTimerStatHandle FTM_MEDIA_MISC("Misc");
 //////////////////////////////////////////////////////////////////////////////////////////
 void LLViewerMedia::onIdle(void *dummy_arg)
 {
-    LLViewerMedia::getInstance()->updateMedia(dummy_arg);
+    LLViewerMedia::getInstanceFast()->updateMedia(dummy_arg);
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////
@@ -1700,7 +1700,7 @@ LLPluginClassMedia* LLViewerMediaImpl::newSourceFromMediaType(std::string media_
 	if ((plugin_basename == "media_plugin_cef") &&
         !gSavedSettings.getBOOL("PluginAttachDebuggerToPlugins") && !clean_browser)
 	{
-		media_source = LLViewerMedia::getInstance()->getSpareBrowserMediaSource();
+		media_source = LLViewerMedia::getInstanceFast()->getSpareBrowserMediaSource();
 		if(media_source)
 		{
 			media_source->setOwner(owner);
@@ -1767,7 +1767,7 @@ LLPluginClassMedia* LLViewerMediaImpl::newSourceFromMediaType(std::string media_
 			media_source->enableMediaPluginDebugging( media_plugin_debugging_enabled  || clean_browser);
 
 			// need to set agent string here before instance created
-			media_source->setBrowserUserAgent(LLViewerMedia::getInstance()->getCurrentUserAgent());
+			media_source->setBrowserUserAgent(LLViewerMedia::getInstanceFast()->getCurrentUserAgent());
 
 			media_source->setTarget(target);
 
@@ -1838,7 +1838,7 @@ bool LLViewerMediaImpl::initializePlugin(const std::string& media_type)
 		media_source->setDisableTimeout(gSavedSettings.getBOOL("DebugPluginDisableTimeout"));
 		media_source->setLoop(mMediaLoop);
 		media_source->setAutoScale(mMediaAutoScale);
-		media_source->setBrowserUserAgent(LLViewerMedia::getInstance()->getCurrentUserAgent());
+		media_source->setBrowserUserAgent(LLViewerMedia::getInstanceFast()->getCurrentUserAgent());
 		media_source->focus(mHasFocus);
 		media_source->setBackgroundColor(mBackgroundColor);
 
@@ -2071,7 +2071,7 @@ void LLViewerMediaImpl::updateVolume()
 	if(mMediaSource)
 	{
 		// always scale the volume by the global media volume
-		F32 volume = mRequestedVolume * LLViewerMedia::getInstance()->getVolume();
+		F32 volume = mRequestedVolume * LLViewerMedia::getInstanceFast()->getVolume();
 
 		if (mProximityCamera > 0)
 		{

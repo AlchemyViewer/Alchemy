@@ -735,7 +735,7 @@ bool LLMediaCtrl::ensureMediaSourceExists()
 	if(mMediaSource.isNull())
 	{
 		// If we don't already have a media source, try to create one.
-		mMediaSource = LLViewerMedia::getInstance()->newMediaImpl(mMediaTextureID, mTextureWidth, mTextureHeight);
+		mMediaSource = LLViewerMedia::getInstanceFast()->newMediaImpl(mMediaTextureID, mTextureWidth, mTextureHeight);
 		if ( mMediaSource )
 		{
 			mMediaSource->setUsedInUI(true);

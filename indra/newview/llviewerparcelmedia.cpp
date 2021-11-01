@@ -193,7 +193,7 @@ void LLViewerParcelMedia::play(LLParcel* parcel)
 			LL_DEBUGS("Media") << "new media impl with mime type " << mime_type << ", url " << media_url << LL_ENDL;
 
 			// There is no media impl, make a new one
-			mMediaImpl = LLViewerMedia::getInstance()->newMediaImpl(
+			mMediaImpl = LLViewerMedia::getInstanceFast()->newMediaImpl(
 				placeholder_texture_id,
 				media_width, 
 				media_height, 

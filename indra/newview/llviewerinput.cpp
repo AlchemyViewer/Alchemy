@@ -271,7 +271,7 @@ bool agent_turn_left(EKeystate s)
 
 	if(gAgent.isMovementLocked()) return false;
 
-	if (LLToolCamera::getInstance()->mouseSteerMode())
+	if (LLToolCamera::getInstanceFast()->mouseSteerMode())
 	{
 		agent_slide_left(s);
 	}
@@ -302,7 +302,7 @@ bool agent_turn_right( EKeystate s )
 
 	if(gAgent.isMovementLocked()) return false;
 
-	if (LLToolCamera::getInstance()->mouseSteerMode())
+	if (LLToolCamera::getInstanceFast()->mouseSteerMode())
 	{
 		agent_slide_right(s);
 	}
@@ -855,29 +855,29 @@ bool toggle_sit(EKeystate s)
 bool toggle_pause_media(EKeystate s) // analogue of play/pause button in top bar
 {
     if (KEYSTATE_DOWN != s) return true;
-    bool pause = LLViewerMedia::getInstance()->isAnyMediaPlaying();
-    LLViewerMedia::getInstance()->setAllMediaPaused(pause);
+    bool pause = LLViewerMedia::getInstanceFast()->isAnyMediaPlaying();
+    LLViewerMedia::getInstanceFast()->setAllMediaPaused(pause);
     return true;
 }
 
 bool toggle_enable_media(EKeystate s)
 {
     if (KEYSTATE_DOWN != s) return true;
-    bool pause = LLViewerMedia::getInstance()->isAnyMediaPlaying() || LLViewerMedia::getInstance()->isAnyMediaShowing();
-    LLViewerMedia::getInstance()->setAllMediaEnabled(!pause);
+    bool pause = LLViewerMedia::getInstanceFast()->isAnyMediaPlaying() || LLViewerMedia::getInstanceFast()->isAnyMediaShowing();
+    LLViewerMedia::getInstanceFast()->setAllMediaEnabled(!pause);
     return true;
 }
 
 bool walk_to(EKeystate s)
 {
     if (KEYSTATE_DOWN != s) return true;
-    return LLToolPie::getInstance()->walkToClickedLocation();
+    return LLToolPie::getInstanceFast()->walkToClickedLocation();
 }
 
 bool teleport_to(EKeystate s)
 {
     if (KEYSTATE_DOWN != s) return true;
-    return LLToolPie::getInstance()->teleportToClickedLocation();
+    return LLToolPie::getInstanceFast()->teleportToClickedLocation();
 }
 
 bool toggle_voice(EKeystate s)

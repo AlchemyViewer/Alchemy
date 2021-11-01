@@ -236,7 +236,7 @@ void LLInspectObject::onOpen(const LLSD& data)
 		if(!mMediaEntry)
 			return;
 		
-		mMediaImpl = LLViewerMedia::getInstance()->getMediaImplFromTextureID(mMediaEntry->getMediaID());
+		mMediaImpl = LLViewerMedia::getInstanceFast()->getMediaImplFromTextureID(mMediaEntry->getMediaID());
 	}
 }
 
@@ -295,7 +295,7 @@ void LLInspectObject::update()
 	if(!mMediaEntry)
 		return;
 	
-	mMediaImpl = LLViewerMedia::getInstance()->getMediaImplFromTextureID(mMediaEntry->getMediaID());
+	mMediaImpl = LLViewerMedia::getInstanceFast()->getMediaImplFromTextureID(mMediaEntry->getMediaID());
 	
 	updateMediaCurrentURL();
 	updateSecureBrowsing();
