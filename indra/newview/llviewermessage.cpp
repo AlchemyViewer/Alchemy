@@ -4119,7 +4119,7 @@ void process_sound_trigger(LLMessageSystem *msg, void **)
 
 	// Don't play a trigger sound if you can't hear it due
 	// to parcel "local audio only" settings.
-	if (!LLViewerParcelMgr::getInstance()->canHearSound(pos_global)) return;
+	if (!LLViewerParcelMgr::getInstanceFast()->canHearSound(pos_global)) return;
 
 	// Don't play sounds triggered by someone you muted.
 	if (LLMuteList::getInstance()->isMuted(owner_id, LLMute::flagObjectSounds)) return;

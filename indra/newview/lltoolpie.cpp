@@ -241,12 +241,12 @@ BOOL LLToolPie::handleLeftClickPick()
 	MASK mask = mPick.mKeyMask;
 	if (mPick.mPickType == LLPickInfo::PICK_PARCEL_WALL)
 	{
-		LLParcel* parcel = LLViewerParcelMgr::getInstance()->getCollisionParcel();
+		LLParcel* parcel = LLViewerParcelMgr::getInstanceFast()->getCollisionParcel();
 		if (parcel)
 		{
-			LLViewerParcelMgr::getInstance()->selectCollisionParcel();
+			LLViewerParcelMgr::getInstanceFast()->selectCollisionParcel();
 			if (parcel->getParcelFlag(PF_USE_PASS_LIST) 
-				&& !LLViewerParcelMgr::getInstance()->isCollisionBanned())
+				&& !LLViewerParcelMgr::getInstanceFast()->isCollisionBanned())
 			{
 				// if selling passes, just buy one
 				void* deselect_when_done = (void*)TRUE;
@@ -269,7 +269,7 @@ BOOL LLToolPie::handleLeftClickPick()
 
 	if (mPick.mPickType != LLPickInfo::PICK_LAND)
 	{
-		LLViewerParcelMgr::getInstance()->deselectLand();
+		LLViewerParcelMgr::getInstanceFast()->deselectLand();
 	}
 	
 	if (object)
@@ -993,12 +993,12 @@ BOOL LLToolPie::handleTooltipLand(std::string line, std::string tooltip_msg)
 	static const LLCachedControl<bool> show_land_hover_tips(gSavedSettings, "ShowLandHoverTip");
 	if (!show_land_hover_tips) return TRUE;
 
-	LLViewerParcelMgr::getInstance()->setHoverParcel( mHoverPick.mPosGlobal );
+	LLViewerParcelMgr::getInstanceFast()->setHoverParcel( mHoverPick.mPosGlobal );
 
 	// Didn't hit an object, but since we have a land point we
 	// must be hovering over land.
 	
-	LLParcel* hover_parcel = LLViewerParcelMgr::getInstance()->getHoverParcel();
+	LLParcel* hover_parcel = LLViewerParcelMgr::getInstanceFast()->getHoverParcel();
 	LLUUID owner;
 	
 	if ( hover_parcel )
@@ -1454,7 +1454,7 @@ void LLToolPie::showObjectInspector(const LLUUID& object_id, const S32& object_f
 void LLToolPie::playCurrentMedia(const LLPickInfo& info)
 {
 	//FIXME: how do we handle object in different parcel than us?
-	LLParcel* parcel = LLViewerParcelMgr::getInstance()->getAgentParcel();
+	LLParcel* parcel = LLViewerParcelMgr::getInstanceFast()->getAgentParcel();
 	if (!parcel) return;
 	
 	LLPointer<LLViewerObject> objectp = info.getObject();
@@ -1630,7 +1630,7 @@ void LLToolPie::render()
 
 static void handle_click_action_play()
 {
-	LLParcel* parcel = LLViewerParcelMgr::getInstance()->getAgentParcel();
+	LLParcel* parcel = LLViewerParcelMgr::getInstanceFast()->getAgentParcel();
 	if (!parcel) return;
 
 	LLViewerMediaImpl::EMediaStatus status = LLViewerParcelMedia::getInstance()->getStatus();
@@ -1653,7 +1653,7 @@ static void handle_click_action_play()
 bool LLToolPie::handleMediaClick(const LLPickInfo& pick)
 {
     //FIXME: how do we handle object in different parcel than us?
-    LLParcel* parcel = LLViewerParcelMgr::getInstance()->getAgentParcel();
+    LLParcel* parcel = LLViewerParcelMgr::getInstanceFast()->getAgentParcel();
     LLPointer<LLViewerObject> objectp = pick.getObject();
 
 
@@ -1707,7 +1707,7 @@ bool LLToolPie::handleMediaClick(const LLPickInfo& pick)
 bool LLToolPie::handleMediaDblClick(const LLPickInfo& pick)
 {
     //FIXME: how do we handle object in different parcel than us?
-    LLParcel* parcel = LLViewerParcelMgr::getInstance()->getAgentParcel();
+    LLParcel* parcel = LLViewerParcelMgr::getInstanceFast()->getAgentParcel();
     LLPointer<LLViewerObject> objectp = pick.getObject();
 
 
@@ -1761,7 +1761,7 @@ bool LLToolPie::handleMediaDblClick(const LLPickInfo& pick)
 bool LLToolPie::handleMediaHover(const LLPickInfo& pick)
 {
 	//FIXME: how do we handle object in different parcel than us?
-	LLParcel* parcel = LLViewerParcelMgr::getInstance()->getAgentParcel();
+	LLParcel* parcel = LLViewerParcelMgr::getInstanceFast()->getAgentParcel();
 	if (!parcel) return false;
 
 	LLPointer<LLViewerObject> objectp = pick.getObject();
@@ -1841,7 +1841,7 @@ bool LLToolPie::handleMediaMouseUp()
 static void handle_click_action_open_media(LLPointer<LLViewerObject> objectp)
 {
 	//FIXME: how do we handle object in different parcel than us?
-	LLParcel* parcel = LLViewerParcelMgr::getInstance()->getAgentParcel();
+	LLParcel* parcel = LLViewerParcelMgr::getInstanceFast()->getAgentParcel();
 	if (!parcel) return;
 
 	// did we hit an object?
@@ -1872,7 +1872,7 @@ static ECursorType cursor_from_parcel_media(U8 click_action)
 	
 	//FIXME: how do we handle object in different parcel than us?
 	ECursorType open_cursor = UI_CURSOR_ARROW;
-	LLParcel* parcel = LLViewerParcelMgr::getInstance()->getAgentParcel();
+	LLParcel* parcel = LLViewerParcelMgr::getInstanceFast()->getAgentParcel();
 	if (!parcel) return open_cursor;
 
 	open_cursor = UI_CURSOR_TOOLMEDIAOPEN;
@@ -1897,7 +1897,7 @@ BOOL LLToolPie::handleRightClickPick()
 
 	if (mPick.mPickType != LLPickInfo::PICK_LAND)
 	{
-		LLViewerParcelMgr::getInstance()->deselectLand();
+		LLViewerParcelMgr::getInstanceFast()->deselectLand();
 	}
 
 	// didn't click in any UI object, so must have clicked in the world
@@ -1909,7 +1909,7 @@ BOOL LLToolPie::handleRightClickPick()
 	// Spawn pie menu
 	if (mPick.mPickType == LLPickInfo::PICK_LAND)
 	{
-		LLParcelSelectionHandle selection = LLViewerParcelMgr::getInstance()->selectParcelAt( mPick.mPosGlobal );
+		LLParcelSelectionHandle selection = LLViewerParcelMgr::getInstanceFast()->selectParcelAt( mPick.mPosGlobal );
 		gMenuHolder->setParcelSelection(selection);
 		gMenuLand->show(x, y);
 

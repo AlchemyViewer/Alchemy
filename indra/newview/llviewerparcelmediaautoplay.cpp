@@ -77,7 +77,7 @@ BOOL LLViewerParcelMediaAutoPlay::tick()
 		this_region_id = this_region->getRegionID();
 	}
 
-	this_parcel = LLViewerParcelMgr::getInstance()->getAgentParcel();
+	this_parcel = LLViewerParcelMgr::getInstanceFast()->getAgentParcel();
 
 	if (this_parcel)
 	{
@@ -164,7 +164,7 @@ void LLViewerParcelMediaAutoPlay::onStartMediaResponse(const LLUUID &region_id, 
 {
     if (play)
     {
-        LLParcel *parcel = LLViewerParcelMgr::getInstance()->getAgentParcel();
+        LLParcel *parcel = LLViewerParcelMgr::getInstanceFast()->getAgentParcel();
 
         // make sure we are still there
         if (parcel->getLocalID() == parcel_id && gAgent.getRegion()->getRegionID() == region_id)

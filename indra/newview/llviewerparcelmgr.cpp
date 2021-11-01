@@ -688,7 +688,7 @@ LLParcel * LLViewerParcelMgr::getAgentOrSelectedParcel() const
     }
 
     if (!parcel)
-        parcel = LLViewerParcelMgr::instance().getAgentParcel();
+        parcel = getAgentParcel();
 
     return parcel;
 }
@@ -820,12 +820,12 @@ BOOL LLViewerParcelMgr::canHearSound(const LLVector3d &pos_global) const
 	}
 	else
 	{
-		if (LLViewerParcelMgr::getInstance()->getAgentParcel()->getSoundLocal())
+		if (getAgentParcel()->getSoundLocal())
 		{
 			// Not in same parcel, and agent parcel only has local sound
 			return FALSE;
 		}
-		else if (LLViewerParcelMgr::getInstance()->isSoundLocal(pos_global))
+		else if (isSoundLocal(pos_global))
 		{
 			// Not in same parcel, and target parcel only has local sound
 			return FALSE;
@@ -1577,7 +1577,7 @@ void LLViewerParcelMgr::processParcelProperties(LLMessageSystem *msg, void **use
 
     S32		other_clean_time = 0;
 
-    LLViewerParcelMgr& parcel_mgr = LLViewerParcelMgr::instance();
+    LLViewerParcelMgr& parcel_mgr = LLViewerParcelMgr::instanceFast();
     LLViewerRegion* msg_region = LLWorld::getInstanceFast()->getRegion(msg->getSender());
     if(msg_region)
         parcel_mgr.mParcelsPerEdge = S32(msg_region->getWidth() / PARCEL_GRID_STEP_METERS);
@@ -1739,19 +1739,17 @@ void LLViewerParcelMgr::processParcelProperties(LLMessageSystem *msg, void **use
 			delete[] bitmap;
 
 			// Let interesting parties know about agent parcel change.
-			LLViewerParcelMgr* instance = LLViewerParcelMgr::getInstance();
-
-			if (instance->mTeleportInProgress)
+			if (parcel_mgr.mTeleportInProgress)
 			{
-				instance->mTeleportInProgress = FALSE;
-				if(instance->mTeleportInProgressPosition.isNull())
+				parcel_mgr.mTeleportInProgress = FALSE;
+				if(parcel_mgr.mTeleportInProgressPosition.isNull())
 				{
 					//initial update
-					instance->mTeleportFinishedSignal(gAgent.getPositionGlobal(), false);
+					parcel_mgr.mTeleportFinishedSignal(gAgent.getPositionGlobal(), false);
 				}
 				else
 				{
-					instance->mTeleportFinishedSignal(instance->mTeleportInProgressPosition, false);
+					parcel_mgr.mTeleportFinishedSignal(parcel_mgr.mTeleportInProgressPosition, false);
 				}
 			}
             parcel->setParcelEnvironmentVersion(parcel_environment_version);
@@ -1759,7 +1757,7 @@ void LLViewerParcelMgr::processParcelProperties(LLMessageSystem *msg, void **use
 
             // Notify anything that wants to know when the agent changes parcels
             gAgent.changeParcels();
-            instance->mTeleportInProgress = FALSE;
+			parcel_mgr.mTeleportInProgress = FALSE;
         }
         else if (agent_parcel_update)
         {
@@ -2031,7 +2029,7 @@ void LLViewerParcelMgr::processParcelAccessListReply(LLMessageSystem *msg, void 
 	msg->getU32Fast( _PREHASH_Data, _PREHASH_Flags, message_flags);
 	msg->getS32Fast( _PREHASH_Data, _PREHASH_LocalID, parcel_id);
 
-	LLParcel* parcel = LLViewerParcelMgr::getInstance()->mCurrentParcel;
+	LLParcel* parcel = LLViewerParcelMgr::getInstanceFast()->mCurrentParcel;
 	if (!parcel) return;
 
 	if (parcel_id != parcel->getLocalID())
@@ -2062,7 +2060,7 @@ void LLViewerParcelMgr::processParcelAccessListReply(LLMessageSystem *msg, void 
 		parcel->unpackAccessEntries(msg, &(parcel->mRenterList) );
 	}*/
 
-	LLViewerParcelMgr::getInstance()->notifyObservers();
+	LLViewerParcelMgr::getInstanceFast()->notifyObservers();
 }
 
 
@@ -2081,10 +2079,11 @@ void LLViewerParcelMgr::processParcelDwellReply(LLMessageSystem* msg, void**)
 	F32 dwell;
 	msg->getF32Fast(_PREHASH_Data, _PREHASH_Dwell, dwell);
 
-	if (local_id == LLViewerParcelMgr::getInstance()->mCurrentParcel->getLocalID())
+	auto& parcel_mgr = LLViewerParcelMgr::instanceFast();
+	if (local_id == parcel_mgr.mCurrentParcel->getLocalID())
 	{
-		LLViewerParcelMgr::getInstance()->mSelectedDwell = dwell;
-		LLViewerParcelMgr::getInstance()->notifyObservers();
+		parcel_mgr.mSelectedDwell = dwell;
+		parcel_mgr.notifyObservers();
 	}
 }
 
@@ -2209,13 +2208,13 @@ bool LLViewerParcelMgr::deedAlertCB(const LLSD& notification, const LLSD& respon
 	S32 option = LLNotificationsUtil::getSelectedOption(notification, response);
 	if (option == 0)
 	{
-		LLParcel* parcel = LLViewerParcelMgr::getInstance()->getParcelSelection()->getParcel();
+		LLParcel* parcel = LLViewerParcelMgr::getInstanceFast()->getParcelSelection()->getParcel();
 		LLUUID group_id;
 		if(parcel)
 		{
 			group_id = parcel->getGroupID();
 		}
-		LLViewerParcelMgr::getInstance()->sendParcelDeed(group_id);
+		LLViewerParcelMgr::getInstanceFast()->sendParcelDeed(group_id);
 	}
 	return false;
 }
@@ -2516,8 +2515,8 @@ void LLViewerParcelMgr::startDeedLandToGroup()
 }
 void LLViewerParcelMgr::reclaimParcel()
 {
-	LLParcel* parcel = LLViewerParcelMgr::getInstance()->getParcelSelection()->getParcel();
-	LLViewerRegion* regionp = LLViewerParcelMgr::getInstance()->getSelectionRegion();
+	LLParcel* parcel = LLViewerParcelMgr::getInstanceFast()->getParcelSelection()->getParcel();
+	LLViewerRegion* regionp = LLViewerParcelMgr::getInstanceFast()->getSelectionRegion();
 	if(parcel && parcel->getOwnerID().notNull()
 	   && (parcel->getOwnerID() != gAgent.getID())
 	   && regionp && (regionp->getOwner() == gAgent.getID()))
@@ -2540,7 +2539,7 @@ bool LLViewerParcelMgr::releaseAlertCB(const LLSD& notification, const LLSD& res
 	if (option == 0)
 	{
 		// Send the release message, not a force
-		LLViewerParcelMgr::getInstance()->sendParcelRelease();
+		LLViewerParcelMgr::getInstanceFast()->sendParcelRelease();
 	}
 	return false;
 }
@@ -2688,7 +2687,7 @@ boost::signals2::connection LLViewerParcelMgr::setTeleportDoneCallback(teleport_
 void LLViewerParcelMgr::onTeleportFinished(bool local, const LLVector3d& new_pos)
 {
 	// Treat only teleports within the same parcel as local (EXT-3139).
-	if (local && LLViewerParcelMgr::getInstance()->inAgentParcel(new_pos))
+	if (local && inAgentParcel(new_pos))
 	{
 		// Local teleport. We already have the agent parcel data.
 		// Emit the signal immediately.

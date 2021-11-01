@@ -845,7 +845,7 @@ BOOL LLNetMap::handleToolTipAgent(const LLUUID& avatar_id)
 		|| existing_inspector->getKey()["avatar_id"].asUUID() != avatar_id)
 	{
 		LLInspector::Params p;
-		p.fillFrom(LLUICtrlFactory::instance().getDefaultParams<LLInspector>());
+		p.fillFrom(LLUICtrlFactory::getDefaultParams<LLInspector>());
 		p.message(av_name.getCompleteName());
 		p.image.name("Inspector_I");
 		p.click_callback(boost::bind(showAvatarInspector, avatar_id));
@@ -1009,7 +1009,7 @@ void LLNetMap::renderPropertyLinesForRegion(const LLViewerRegion* region, const 
 	const S32 GRIDS_PER_EDGE = real_width / GRID_STEP;
 
 	const U8* ownership = region->getParcelOverlay()->getOwnership();
-	const U8* collision = (region->getHandle() == LLViewerParcelMgr::instance().getCollisionRegionHandle()) ? LLViewerParcelMgr::instance().getCollisionBitmap() : NULL;
+	const U8* collision = (region->getHandle() == LLViewerParcelMgr::instanceFast().getCollisionRegionHandle()) ? LLViewerParcelMgr::instanceFast().getCollisionBitmap() : NULL;
 	for (S32 idxRow = 0; idxRow < GRIDS_PER_EDGE; idxRow++)
 	{
 		for (S32 idxCol = 0; idxCol < GRIDS_PER_EDGE; idxCol++)

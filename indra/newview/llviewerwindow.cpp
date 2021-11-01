@@ -3857,7 +3857,7 @@ void LLViewerWindow::updateUI()
 	// cleanup unused selections when no modal dialogs are open
 	if (LLModalDialog::activeCount() == 0)
 	{
-		LLViewerParcelMgr::getInstance()->deselectUnused();
+		LLViewerParcelMgr::getInstanceFast()->deselectUnused();
 	}
 
 	if (LLModalDialog::activeCount() == 0)
@@ -4144,7 +4144,7 @@ void LLViewerWindow::renderSelections( BOOL for_gl_pick, BOOL pick_parcel_walls,
 	{
 		if (pick_parcel_walls)
 		{
-			LLViewerParcelMgr::getInstance()->renderParcelCollision();
+			LLViewerParcelMgr::getInstanceFast()->renderParcelCollision();
 		}
 	}
 	else if (( for_hud && selection->getSelectType() == SELECT_TYPE_HUD) ||
@@ -5397,7 +5397,7 @@ void LLViewerWindow::drawMouselookInstructions()
 		LLColor4(0.5f, 0.5f, 1.0f, 0.5f),
 		LLFontGL::HCENTER, LLFontGL::TOP,
 		LLFontGL::BOLD, LLFontGL::DROP_SHADOW);
-	LLViewerParcelMgr* vpm = LLViewerParcelMgr::getInstance();
+	LLViewerParcelMgr* vpm = LLViewerParcelMgr::getInstanceFast();
 	const bool allow_damage = vpm->allowAgentDamage(gAgent.getRegion(), vpm->getAgentParcel());
 	if (allow_damage)
 	{

@@ -281,7 +281,7 @@ void LLPanelTopInfoBar::updateParcelInfoText()
 
 void LLPanelTopInfoBar::updateParcelIcons()
 {
-	LLViewerParcelMgr* vpm = LLViewerParcelMgr::getInstance();
+	LLViewerParcelMgr* vpm = LLViewerParcelMgr::getInstanceFast();
 
 	LLViewerRegion* agent_region = gAgent.getRegion();
 	LLParcel* agent_parcel = vpm->getAgentParcel();

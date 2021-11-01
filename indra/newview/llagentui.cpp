@@ -72,7 +72,7 @@ BOOL LLAgentUI::checkAgentDistance(const LLVector3& pole, F32 radius)
 BOOL LLAgentUI::buildLocationString(std::string& str, ELocationFormat fmt,const LLVector3& agent_pos_region)
 {
 	LLViewerRegion* region = gAgent.getRegion();
-	LLViewerParcelMgr& parcelMGr = LLViewerParcelMgr::instance();
+	LLViewerParcelMgr& parcelMGr = LLViewerParcelMgr::instanceFast();
 	LLParcel* parcel = parcelMGr.getAgentParcel();
 
 	if (!region || !parcel) return FALSE;

@@ -142,14 +142,14 @@ void LLAudioSourceVO::updateMute()
 
 	F32 cutoff = mObjectp->getSoundCutOffRadius();
 	if ((cutoff > 0.1f && !isInCutOffRadius(pos_global, cutoff)) // consider cutoff below 0.1m as off
-		|| !LLViewerParcelMgr::getInstance()->canHearSound(pos_global))
+		|| !LLViewerParcelMgr::getInstanceFast()->canHearSound(pos_global))
 	{
 		mute = true;
 	}
 
 	if (!mute)
 	{
-		auto& mute_list = LLMuteList::instance();
+		auto& mute_list = LLMuteList::instanceFast();
 		if (mute_list.isMuted(mObjectp->getID()))
 		{
 			mute = true;

@@ -266,7 +266,7 @@ bool LLToolMgr::inEdit()
 bool LLToolMgr::canEdit()
 {
 // [RLVa:KB] - Patch: RLVa-2.1.0
-	return LLViewerParcelMgr::getInstance()->allowAgentBuild() && RlvActions::canBuild();
+	return LLViewerParcelMgr::getInstanceFast()->allowAgentBuild() && RlvActions::canBuild();
 // [/RLVa:KB]
 //	return LLViewerParcelMgr::getInstance()->allowAgentBuild();
 }

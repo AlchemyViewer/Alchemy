@@ -318,7 +318,7 @@ bool LLAgent::isActionAllowed(const LLSD& sdname)
             if (channel->getSessionName().empty() && channel->getSessionID().isNull())
             {
                 // default channel
-                allow_agent_voice = LLViewerParcelMgr::getInstance()->allowAgentVoice();
+                allow_agent_voice = LLViewerParcelMgr::getInstanceFast()->allowAgentVoice();
             }
             else
             {
@@ -793,7 +793,7 @@ BOOL LLAgent::canFly()
 	LLViewerRegion* regionp = getRegion();
 	if (regionp && regionp->getBlockFly()) return FALSE;
 	
-	LLParcel* parcel = LLViewerParcelMgr::getInstance()->getAgentParcel();
+	LLParcel* parcel = LLViewerParcelMgr::getInstanceFast()->getAgentParcel();
 	if (!parcel) return FALSE;
 
 	// Allow owners to fly on their own land.
@@ -4257,7 +4257,7 @@ void LLAgent::handleTeleportFailed()
 void LLAgent::addTPNearbyChatSeparator()
 {
     LLViewerRegion* agent_region = gAgent.getRegion();
-    LLParcel* agent_parcel = LLViewerParcelMgr::getInstance()->getAgentParcel();
+    LLParcel* agent_parcel = LLViewerParcelMgr::getInstanceFast()->getAgentParcel();
     if (!agent_region || !agent_parcel)
     {
         return;
@@ -4635,7 +4635,7 @@ void LLAgent::setTeleportState(ETeleportState state)
 		//LLViewerStats::getInstance()->mAgentPositionSnaps.mCountOfNextUpdatesToIgnore = 2;
 
 		// Let the interested parties know we've teleported.
-		LLViewerParcelMgr::getInstance()->onTeleportFinished(false, getPositionGlobal());
+		LLViewerParcelMgr::getInstanceFast()->onTeleportFinished(false, getPositionGlobal());
 			break;
 
 		default:
@@ -5305,7 +5305,7 @@ LLUUID LLAgent::getGroupForRezzing()
 {
 	if (gSavedSettings.getBOOL("AlchemyRezUnderLandGroup"))
 	{
-		LLParcel* land_parcel = LLViewerParcelMgr::getInstance()->getAgentParcel();
+		LLParcel* land_parcel = LLViewerParcelMgr::getInstanceFast()->getAgentParcel();
 		// Is the agent in the land group
 		if (gAgent.isInGroup(land_parcel->getGroupID()))
 			return land_parcel->getGroupID();

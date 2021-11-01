@@ -67,7 +67,7 @@ LLViewerMediaFocus::~LLViewerMediaFocus()
 
 void LLViewerMediaFocus::setFocusFace(LLPointer<LLViewerObject> objectp, S32 face, viewer_media_t media_impl, LLVector3 pick_normal)
 {	
-	LLParcel *parcel = LLViewerParcelMgr::getInstance()->getAgentParcel();
+	LLParcel *parcel = LLViewerParcelMgr::getInstanceFast()->getAgentParcel();
 	
 	LLViewerMediaImpl *old_media_impl = getFocusedMediaImpl();
 	if(old_media_impl)

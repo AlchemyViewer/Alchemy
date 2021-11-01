@@ -4651,7 +4651,7 @@ LLVivoxVoiceClient::participantStatePtr_t LLVivoxVoiceClient::findParticipantByI
 bool LLVivoxVoiceClient::checkParcelChanged(bool update)
 {
 	LLViewerRegion *region = gAgent.getRegion();
-	LLParcel *parcel = LLViewerParcelMgr::getInstance()->getAgentParcel();
+	LLParcel *parcel = LLViewerParcelMgr::getInstanceFast()->getAgentParcel();
 	
 	if(region && parcel)
 	{

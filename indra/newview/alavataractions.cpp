@@ -273,12 +273,12 @@ bool ALAvatarActions::canFreezeEject(const uuid_vec_t& ids)
 			{
 				// Estate owners / managers can freeze
 				// Parcel owners can also freeze
-				LLParcelSelectionHandle selection = LLViewerParcelMgr::getInstance()->selectParcelAt(pos_global);
+				LLParcelSelectionHandle selection = LLViewerParcelMgr::getInstanceFast()->selectParcelAt(pos_global);
 				const LLParcel* parcel = selection->getParcel();
 				auto local_pos = region->getPosRegionFromGlobal(pos_global);
 
 				if ((region->getOwner() == gAgent.getID() || region->isEstateManager() || region->isOwnedSelf(local_pos))
-					|| (region->isOwnedGroup(local_pos) && parcel && LLViewerParcelMgr::getInstance()->isParcelOwnedByAgent(parcel, GP_LAND_ADMIN)))
+					|| (region->isOwnedGroup(local_pos) && parcel && LLViewerParcelMgr::getInstanceFast()->isParcelOwnedByAgent(parcel, GP_LAND_ADMIN)))
 				{
 					ret = true;
 				}
@@ -370,10 +370,10 @@ void ALAvatarActions::parcelEject(const uuid_vec_t& ids)
 				if (pos_it != avatar_positions.cend())
 				{
 					const auto& pos = pos_it->second;
-					LLParcel* parcel = LLViewerParcelMgr::getInstance()->selectParcelAt(pos)->getParcel();
+					LLParcel* parcel = LLViewerParcelMgr::getInstanceFast()->selectParcelAt(pos)->getParcel();
 					if (parcel)
 					{
-						ban_enabled = LLViewerParcelMgr::getInstance()->isParcelOwnedByAgent(parcel, GP_LAND_MANAGE_BANNED);
+						ban_enabled = LLViewerParcelMgr::getInstanceFast()->isParcelOwnedByAgent(parcel, GP_LAND_MANAGE_BANNED);
 						if (!ban_enabled)
 						{
 							ban_killed = true;

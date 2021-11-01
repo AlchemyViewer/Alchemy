@@ -493,7 +493,7 @@ void RlvUtil::filterLocation(std::string& strUTF8Text)
 	}
 
 	// Filter any mention of the parcel name
-	LLViewerParcelMgr* pParcelMgr = LLViewerParcelMgr::getInstance();
+	LLViewerParcelMgr* pParcelMgr = LLViewerParcelMgr::getInstanceFast();
 	if (pParcelMgr)
 		boost::replace_all_regex(strUTF8Text, boost::regex("\\b" + escape_for_regex(pParcelMgr->getAgentParcelName()) + "\\b", boost::regex::icase), RlvStrings::getString(RlvStringKeys::Hidden::Parcel));
 }

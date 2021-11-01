@@ -923,7 +923,7 @@ const LLSettingsWater::ptr_t& LLEnvironment::getCurrentWater() const
 
 bool LLEnvironment::canAgentUpdateParcelEnvironment() const
 {
-    LLParcel *parcel(LLViewerParcelMgr::instance().getAgentOrSelectedParcel());
+    LLParcel *parcel(LLViewerParcelMgr::instanceFast().getAgentOrSelectedParcel());
 
     return canAgentUpdateParcelEnvironment(parcel);
 }
@@ -989,7 +989,7 @@ void LLEnvironment::onRegionChange()
 void LLEnvironment::onParcelChange()
 {
     S32 parcel_id(INVALID_PARCEL_ID);
-    LLParcel* parcel = LLViewerParcelMgr::instance().getAgentParcel();
+    LLParcel* parcel = LLViewerParcelMgr::instanceFast().getAgentParcel();
 
     if (parcel)
     {
@@ -3340,7 +3340,7 @@ namespace
         }
 
         {
-            LLParcel* parcel = LLViewerParcelMgr::instance().getAgentParcel();
+            LLParcel* parcel = LLViewerParcelMgr::instanceFast().getAgentParcel();
             if (!parcel)
                 return;
 
@@ -3459,7 +3459,7 @@ namespace
     void DayInjection::onParcelChange()
     {
         S32 parcel_id(INVALID_PARCEL_ID);
-        LLParcel* parcel = LLViewerParcelMgr::instance().getAgentParcel();
+        LLParcel* parcel = LLViewerParcelMgr::instanceFast().getAgentParcel();
 
         if (!parcel)
             return;

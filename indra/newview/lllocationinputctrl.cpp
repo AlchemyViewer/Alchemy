@@ -841,7 +841,7 @@ void LLLocationInputCtrl::refreshParcelIcons()
 	// Our "cursor" moving right to left
 	S32 x = mAddLandmarkBtn->getRect().mLeft;
 
-	LLViewerParcelMgr* vpm = LLViewerParcelMgr::getInstance();
+	LLViewerParcelMgr* vpm = LLViewerParcelMgr::getInstanceFast();
 
 	LLViewerRegion* agent_region = gAgent.getRegion();
 	LLParcel* agent_parcel = vpm->getAgentParcel();

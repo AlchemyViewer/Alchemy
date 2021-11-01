@@ -1022,7 +1022,7 @@ void LLViewerMedia::setAllMediaPaused(bool val)
         }
     }
 
-    LLParcel *agent_parcel = LLViewerParcelMgr::getInstance()->getAgentParcel();
+    LLParcel *agent_parcel = LLViewerParcelMgr::getInstanceFast()->getAgentParcel();
 
     // Also do Parcel Media and Parcel Audio
     if (!val)
@@ -1496,7 +1496,7 @@ bool LLViewerMedia::hasParcelAudio()
 //////////////////////////////////////////////////////////////////////////////////////////
 std::string LLViewerMedia::getParcelAudioURL()
 {
-	return LLViewerParcelMgr::getInstance()->getAgentParcel()->getMusicURL();
+	return LLViewerParcelMgr::getInstanceFast()->getAgentParcel()->getMusicURL();
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////
@@ -3996,5 +3996,5 @@ LLNotificationPtr LLViewerMediaImpl::getCurrentNotification() const
 // static
 bool LLViewerMediaImpl::isObjectInAgentParcel(LLVOVolume *obj)
 {
-	return (LLViewerParcelMgr::getInstance()->inAgentParcel(obj->getPositionGlobal()));
+	return (LLViewerParcelMgr::getInstanceFast()->inAgentParcel(obj->getPositionGlobal()));
 }
