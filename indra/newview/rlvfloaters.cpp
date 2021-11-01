@@ -379,7 +379,7 @@ void RlvFloaterBehaviours::refreshAll()
 	//
 	for (int idxModifier = 0; idxModifier < RLV_MODIFIER_COUNT; idxModifier++)
 	{
-		const RlvBehaviourModifier* pBhvrModifier = RlvBehaviourDictionary::instance().m_BehaviourModifiers[idxModifier];
+		const RlvBehaviourModifier* pBhvrModifier = RlvBehaviourDictionary::instanceFast().m_BehaviourModifiers[idxModifier];
 		if (pBhvrModifier)
 		{
 			sdModifierRow["enabled"] = (pBhvrModifier->hasValue());
@@ -761,7 +761,7 @@ BOOL RlvFloaterConsole::postBuild()
 
 void RlvFloaterConsole::onClose(bool fQuitting)
 {
-	RlvBehaviourDictionary::instance().clearModifiers(gAgent.getID());
+	RlvBehaviourDictionary::instanceFast().clearModifiers(gAgent.getID());
 	gRlvHandler.processCommand(gAgent.getID(), "clear", true);
 }
 

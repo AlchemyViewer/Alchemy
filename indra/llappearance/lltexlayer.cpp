@@ -548,7 +548,7 @@ void LLTexLayerSet::renderAlphaMaskTextures(S32 x, S32 y, S32 width, S32 height,
 	{
 		gGL.flush();
 		{
-			LLGLTexture* tex = LLTexLayerStaticImageList::getInstance()->getTexture(info->mStaticAlphaFileName, TRUE);
+			LLGLTexture* tex = LLTexLayerStaticImageList::getInstanceFast()->getTexture(info->mStaticAlphaFileName, TRUE);
 			if( tex )
 			{
 				LLGLSUIDefault gls_ui;
@@ -1248,7 +1248,7 @@ BOOL LLTexLayer::render(S32 x, S32 y, S32 width, S32 height, LLRenderTarget* bou
 	if( !getInfo()->mStaticImageFileName.empty() )
 	{
 		{
-			LLGLTexture* tex = LLTexLayerStaticImageList::getInstance()->getTexture(getInfo()->mStaticImageFileName, getInfo()->mStaticImageIsMask);
+			LLGLTexture* tex = LLTexLayerStaticImageList::getInstanceFast()->getTexture(getInfo()->mStaticImageFileName, getInfo()->mStaticImageIsMask);
 			if( tex )
 			{
 				gGL.getTexUnit(0)->bind(tex, TRUE);
@@ -1371,7 +1371,7 @@ BOOL LLTexLayer::blendAlphaTexture(S32 x, S32 y, S32 width, S32 height)
 
 	if( !getInfo()->mStaticImageFileName.empty() )
 	{
-		LLGLTexture* tex = LLTexLayerStaticImageList::getInstance()->getTexture( getInfo()->mStaticImageFileName, getInfo()->mStaticImageIsMask );
+		LLGLTexture* tex = LLTexLayerStaticImageList::getInstanceFast()->getTexture( getInfo()->mStaticImageFileName, getInfo()->mStaticImageIsMask );
 		if( tex )
 		{
 			LLGLSNoAlphaTest gls_no_alpha_test;
@@ -1500,7 +1500,7 @@ void LLTexLayer::renderMorphMasks(S32 x, S32 y, S32 width, S32 height, const LLC
 
 	if( !getInfo()->mStaticImageFileName.empty() && getInfo()->mStaticImageIsMask )
 	{
-		LLGLTexture* tex = LLTexLayerStaticImageList::getInstance()->getTexture(getInfo()->mStaticImageFileName, getInfo()->mStaticImageIsMask);
+		LLGLTexture* tex = LLTexLayerStaticImageList::getInstanceFast()->getTexture(getInfo()->mStaticImageFileName, getInfo()->mStaticImageIsMask);
 		if( tex )
 		{
 			if(	(tex->getComponents() == 4) || (tex->getComponents() == 1) )
@@ -1648,7 +1648,7 @@ LLUUID LLTexLayer::getUUID() const
 	}
 	if( !getInfo()->mStaticImageFileName.empty() )
 	{
-			LLGLTexture* tex = LLTexLayerStaticImageList::getInstance()->getTexture(getInfo()->mStaticImageFileName, getInfo()->mStaticImageIsMask);
+			LLGLTexture* tex = LLTexLayerStaticImageList::getInstanceFast()->getTexture(getInfo()->mStaticImageFileName, getInfo()->mStaticImageIsMask);
 			if( tex )
 			{
 				uuid = tex->getID();

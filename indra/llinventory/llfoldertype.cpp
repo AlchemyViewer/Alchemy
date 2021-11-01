@@ -113,13 +113,13 @@ LLFolderDictionary::LLFolderDictionary()
 // static
 LLFolderType::EType LLFolderType::lookup(const std::string_view name)
 {
-	return LLFolderDictionary::getInstance()->lookup(name);
+	return LLFolderDictionary::getInstanceFast()->lookup(name);
 }
 
 // static
 const std::string &LLFolderType::lookup(LLFolderType::EType folder_type)
 {
-	const FolderEntry *entry = LLFolderDictionary::getInstance()->lookup(folder_type);
+	const FolderEntry *entry = LLFolderDictionary::getInstanceFast()->lookup(folder_type);
 	if (entry)
 	{
 		return entry->mName;
@@ -135,7 +135,7 @@ const std::string &LLFolderType::lookup(LLFolderType::EType folder_type)
 // you can't change certain properties such as their type.
 bool LLFolderType::lookupIsProtectedType(EType folder_type)
 {
-	const LLFolderDictionary *dict = LLFolderDictionary::getInstance();
+	const LLFolderDictionary *dict = LLFolderDictionary::getInstanceFast();
 	const FolderEntry *entry = dict->lookup(folder_type);
 	if (entry)
 	{

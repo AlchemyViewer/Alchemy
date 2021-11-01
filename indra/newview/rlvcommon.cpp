@@ -760,7 +760,7 @@ bool rlvMenuEnableIfNot(const LLSD& sdParam)
 	bool fEnable = true;
 	if (rlv_handler_t::isEnabled())
 	{
-		ERlvBehaviour eBhvr = RlvBehaviourDictionary::instance().getBehaviourFromString(sdParam.asString(), RLV_TYPE_ADDREM);
+		ERlvBehaviour eBhvr = RlvBehaviourDictionary::instanceFast().getBehaviourFromString(sdParam.asString(), RLV_TYPE_ADDREM);
 		fEnable = (eBhvr != RLV_BHVR_UNKNOWN) ? !gRlvHandler.hasBehaviour(eBhvr) : true;
 	}
 	return fEnable;

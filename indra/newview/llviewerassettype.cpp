@@ -92,7 +92,7 @@ LLViewerAssetDictionary::LLViewerAssetDictionary()
 
 EDragAndDropType LLViewerAssetType::lookupDragAndDropType(EType asset_type)
 {
-	const LLViewerAssetDictionary *dict = LLViewerAssetDictionary::getInstance();
+	const LLViewerAssetDictionary *dict = LLViewerAssetDictionary::getInstanceFast();
 	const ViewerAssetEntry *entry = dict->lookup(asset_type);
 	if (entry)
 		return entry->mDadType;

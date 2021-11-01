@@ -122,7 +122,7 @@ void LLWearableType::initSingleton()
 // static
 LLWearableType::EType LLWearableType::typeNameToType(const std::string& type_name)
 {
-	const LLWearableDictionary *dict = LLWearableDictionary::getInstance();
+	const LLWearableDictionary *dict = LLWearableDictionary::getInstanceFast();
 	const LLWearableType::EType wearable = dict->lookup(type_name);
 	return wearable;
 }
@@ -130,7 +130,7 @@ LLWearableType::EType LLWearableType::typeNameToType(const std::string& type_nam
 // static 
 const std::string& LLWearableType::getTypeName(LLWearableType::EType type)
 { 
-	const LLWearableDictionary *dict = LLWearableDictionary::getInstance();
+	const LLWearableDictionary *dict = LLWearableDictionary::getInstanceFast();
 	const WearableEntry *entry = dict->lookup(type);
 	if (!entry) return getTypeName(WT_INVALID);
 	return entry->mName;
@@ -139,7 +139,7 @@ const std::string& LLWearableType::getTypeName(LLWearableType::EType type)
 //static 
 const std::string& LLWearableType::getTypeDefaultNewName(LLWearableType::EType type)
 { 
-	const LLWearableDictionary *dict = LLWearableDictionary::getInstance();
+	const LLWearableDictionary *dict = LLWearableDictionary::getInstanceFast();
 	const WearableEntry *entry = dict->lookup(type);
 	if (!entry) return getTypeDefaultNewName(WT_INVALID);
 	return entry->mDefaultNewName;
@@ -148,7 +148,7 @@ const std::string& LLWearableType::getTypeDefaultNewName(LLWearableType::EType t
 // static 
 const std::string& LLWearableType::getTypeLabel(LLWearableType::EType type)
 { 
-	const LLWearableDictionary *dict = LLWearableDictionary::getInstance();
+	const LLWearableDictionary *dict = LLWearableDictionary::getInstanceFast();
 	const WearableEntry *entry = dict->lookup(type);
 	if (!entry) return getTypeLabel(WT_INVALID);
 	return entry->mLabel;
@@ -157,7 +157,7 @@ const std::string& LLWearableType::getTypeLabel(LLWearableType::EType type)
 // static 
 LLAssetType::EType LLWearableType::getAssetType(LLWearableType::EType type)
 {
-	const LLWearableDictionary *dict = LLWearableDictionary::getInstance();
+	const LLWearableDictionary *dict = LLWearableDictionary::getInstanceFast();
 	const WearableEntry *entry = dict->lookup(type);
 	if (!entry) return getAssetType(WT_INVALID);
 	return entry->mAssetType;
@@ -166,7 +166,7 @@ LLAssetType::EType LLWearableType::getAssetType(LLWearableType::EType type)
 // static 
 LLInventoryType::EIconName LLWearableType::getIconName(LLWearableType::EType type)
 {
-	const LLWearableDictionary *dict = LLWearableDictionary::getInstance();
+	const LLWearableDictionary *dict = LLWearableDictionary::getInstanceFast();
 	const WearableEntry *entry = dict->lookup(type);
 	if (!entry) return getIconName(WT_INVALID);
 	return entry->mIconName;
@@ -175,7 +175,7 @@ LLInventoryType::EIconName LLWearableType::getIconName(LLWearableType::EType typ
 // static 
 BOOL LLWearableType::getDisableCameraSwitch(LLWearableType::EType type)
 {
-	const LLWearableDictionary *dict = LLWearableDictionary::getInstance();
+	const LLWearableDictionary *dict = LLWearableDictionary::getInstanceFast();
 	const WearableEntry *entry = dict->lookup(type);
 	if (!entry) return FALSE;
 	return entry->mDisableCameraSwitch;
@@ -184,7 +184,7 @@ BOOL LLWearableType::getDisableCameraSwitch(LLWearableType::EType type)
 // static
 BOOL LLWearableType::getAllowMultiwear(LLWearableType::EType type)
 {
-	const LLWearableDictionary *dict = LLWearableDictionary::getInstance();
+	const LLWearableDictionary *dict = LLWearableDictionary::getInstanceFast();
 	const WearableEntry *entry = dict->lookup(type);
 	if (!entry) return FALSE;
 	return entry->mAllowMultiwear;

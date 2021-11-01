@@ -51,7 +51,7 @@ bool RlvActions::canChangeToMouselook()
 	// User can switch to mouselook if:
 	//   - not specifically prevented from going into mouselook (NOTE: if an object has exclusive camera control only that object can prevent mouselook)
 	//   - there is no minimum camera distance defined (or it's higher than > 0m)
-	const RlvBehaviourModifier* pCamDistMinModifier = RlvBehaviourDictionary::instance().getModifier(RLV_MODIFIER_SETCAM_AVDISTMIN);
+	const RlvBehaviourModifier* pCamDistMinModifier = RlvBehaviourDictionary::instanceFast().getModifier(RLV_MODIFIER_SETCAM_AVDISTMIN);
 	return
 		( (!gRlvHandler.hasBehaviour(RLV_BHVR_SETCAM)) ? !gRlvHandler.hasBehaviour(RLV_BHVR_SETCAM_MOUSELOOK) : !gRlvHandler.hasBehaviour(pCamDistMinModifier->getPrimaryObject(), RLV_BHVR_SETCAM_MOUSELOOK) ) &&
 		( (!pCamDistMinModifier->hasValue()) || (pCamDistMinModifier->getValue<float>() == 0.f) );
@@ -158,7 +158,7 @@ static bool rlvCheckAvatarIMDistance(const LLUUID& idAvatar, ERlvBehaviourModifi
 	// min  <= max  <= dist | block     | allow       | block       |           F    |  ^ (see above) |    F
 	// off-region           | block     | allow       | block       |           F    |  ^ (see above) |    F
 
-	const RlvBehaviourModifier *pBhvrModDistMin = RlvBehaviourDictionary::instance().getModifier(eModDistMin), *pBhvrModDistMax = RlvBehaviourDictionary::instance().getModifier(eModDistMax);
+	const RlvBehaviourModifier *pBhvrModDistMin = RlvBehaviourDictionary::instanceFast().getModifier(eModDistMin), *pBhvrModDistMax = RlvBehaviourDictionary::instanceFast().getModifier(eModDistMax);
 	if (pBhvrModDistMin->hasValue())
 	{
 		LLVector3d posAgent; bool fHasMax = pBhvrModDistMax->hasValue();
@@ -257,7 +257,7 @@ bool RlvActions::canShowNameTag(const LLVOAvatar* pAvatar)
 	if ( (!gRlvHandler.hasBehaviour(RLV_BHVR_SHOWNAMETAGS)) || (gRlvHandler.isException(RLV_BHVR_SHOWNAMETAGS, pAvatar->getID())) || (gAgentID == pAvatar->getID()) )
 		return true;
 
-	const F32 nShowNameTagsDist = RlvBehaviourDictionary::instance().getModifier(RLV_MODIFIER_SHOWNAMETAGSDIST)->getValue<F32>();
+	const F32 nShowNameTagsDist = RlvBehaviourDictionary::instanceFast().getModifier(RLV_MODIFIER_SHOWNAMETAGSDIST)->getValue<F32>();
 	return (nShowNameTagsDist != 0.f) && (dist_vec_squared(pAvatar->getPositionGlobal(), gAgent.getPositionGlobal()) < nShowNameTagsDist * nShowNameTagsDist);
 }
 
@@ -365,13 +365,13 @@ bool RlvActions::canTeleportToLocal(const LLVector3d& posGlobal)
 	if ( (fCanTeleport) && (gRlvHandler.hasBehaviourExcept(RLV_BHVR_SITTP, idRlvObjExcept)) )
 	{
 		const F32 nDistSq = (posGlobal - gAgent.getPositionGlobal()).lengthSquared();
-		const F32 nSitTpDist = RlvBehaviourDictionary::instance().getModifier(RLV_MODIFIER_SITTPDIST)->getValue<F32>();
+		const F32 nSitTpDist = RlvBehaviourDictionary::instanceFast().getModifier(RLV_MODIFIER_SITTPDIST)->getValue<F32>();
 		fCanTeleport = nDistSq < nSitTpDist * nSitTpDist;
 	}
 	if ( (fCanTeleport) && (gRlvHandler.hasBehaviourExcept(RLV_BHVR_TPLOCAL, idRlvObjExcept)) )
 	{
 		const F32 nDistSq = (LLVector2(posGlobal.mdV[0], posGlobal.mdV[1]) - LLVector2(gAgent.getPositionGlobal().mdV[0], gAgent.getPositionGlobal().mdV[1])).lengthSquared();
-		const F32 nTpLocalDist = llmin(RlvBehaviourDictionary::instance().getModifier(RLV_MODIFIER_TPLOCALDIST)->getValue<float>(), RLV_MODIFIER_TPLOCAL_DEFAULT);
+		const F32 nTpLocalDist = llmin(RlvBehaviourDictionary::instanceFast().getModifier(RLV_MODIFIER_TPLOCALDIST)->getValue<float>(), RLV_MODIFIER_TPLOCAL_DEFAULT);
 		fCanTeleport = nDistSq < nTpLocalDist * nTpLocalDist;
 	}
 	return fCanTeleport;
@@ -697,7 +697,7 @@ bool RlvActions::canViewWireframe()
 template<>
 const float& RlvActions::getModifierValue<float>(ERlvBehaviourModifier eBhvrMod)
 {
-	return RlvBehaviourDictionary::instance().getModifier(eBhvrMod)->getValue<float>();
+	return RlvBehaviourDictionary::instanceFast().getModifier(eBhvrMod)->getValue<float>();
 }
 
 // Checked: 2013-05-10 (RLVa-1.4.9)

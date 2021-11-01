@@ -189,7 +189,7 @@ const std::string& LLInventoryIcon::getIconName(LLAssetType::EType asset_type,
 
 const std::string& LLInventoryIcon::getIconName(LLInventoryType::EIconName idx)
 {
-	const IconEntry *entry = LLIconDictionary::instance().lookup(idx);
+	const IconEntry *entry = LLIconDictionary::instanceFast().lookup(idx);
 	return entry->mName;
 }
 

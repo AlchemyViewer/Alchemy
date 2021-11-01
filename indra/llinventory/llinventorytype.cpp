@@ -160,7 +160,7 @@ DEFAULT_ASSET_FOR_INV_TYPE[LLAssetType::AT_COUNT] =
 // static
 const std::string &LLInventoryType::lookup(EType type)
 {
-	const InventoryEntry *entry = LLInventoryDictionary::getInstance()->lookup(type);
+	const InventoryEntry *entry = LLInventoryDictionary::getInstanceFast()->lookup(type);
 	if (!entry) return empty_string;
 	return entry->mName;
 }
@@ -168,7 +168,7 @@ const std::string &LLInventoryType::lookup(EType type)
 // static
 LLInventoryType::EType LLInventoryType::lookup(const std::string_view name)
 {
-	return LLInventoryDictionary::getInstance()->lookup(name);
+	return LLInventoryDictionary::getInstanceFast()->lookup(name);
 }
 
 // XUI:translate
@@ -176,7 +176,7 @@ LLInventoryType::EType LLInventoryType::lookup(const std::string_view name)
 // static
 const std::string &LLInventoryType::lookupHumanReadable(EType type)
 {
-	const InventoryEntry *entry = LLInventoryDictionary::getInstance()->lookup(type);
+	const InventoryEntry *entry = LLInventoryDictionary::getInstanceFast()->lookup(type);
 	if (!entry) return empty_string;
 	return entry->mHumanName;
 }
@@ -223,7 +223,7 @@ bool inventory_and_asset_types_match(LLInventoryType::EType inventory_type,
 	if (LLAssetType::lookupIsLinkType(asset_type))
 		return true;
 
-	const InventoryEntry *entry = LLInventoryDictionary::getInstance()->lookup(inventory_type);
+	const InventoryEntry *entry = LLInventoryDictionary::getInstanceFast()->lookup(inventory_type);
 	if (!entry) return false;
 
 	for (InventoryEntry::asset_vec_t::const_iterator iter = entry->mAssetTypes.begin();

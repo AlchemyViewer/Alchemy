@@ -304,7 +304,7 @@ bool RlvHandler::isException(ERlvBehaviour eBhvr, const RlvExceptionOption& varO
 
 bool RlvHandler::isPermissive(ERlvBehaviour eBhvr) const
 {
-	return (RlvBehaviourDictionary::instance().getHasStrict(eBhvr))
+	return (RlvBehaviourDictionary::instanceFast().getHasStrict(eBhvr))
 		? !((hasBehaviour(RLV_BHVR_PERMISSIVE)) || (isException(RLV_BHVR_PERMISSIVE, eBhvr, ERlvExceptionCheck::Permissive)))
 		: true;
 }
@@ -536,7 +536,7 @@ ERlvCmdRet RlvHandler::processCommand(std::reference_wrapper<const RlvCommand> r
 					if (0 == itObj->second.m_Commands.size())
 					{
 						RLV_DEBUGS << "\t- command list empty => removing " << idCurObj << RLV_ENDL;
-						RlvBehaviourDictionary::instance().clearModifiers(idCurObj);
+						RlvBehaviourDictionary::instanceFast().clearModifiers(idCurObj);
 						m_Objects.erase(itObj);
 					}
 				}
@@ -1802,7 +1802,7 @@ template<>
 ERlvCmdRet RlvBehaviourGenericHandler<RLV_OPTION_MODIFIER>::onCommand(const RlvCommand& rlvCmd, bool& fRefCount)
 {
 	// There should be an option and it should specify a valid modifier (RlvBehaviourModifier performs the appropriate type checks)
-	RlvBehaviourModifier* pBhvrModifier = RlvBehaviourDictionary::instance().getModifierFromBehaviour(rlvCmd.getBehaviourType());
+	RlvBehaviourModifier* pBhvrModifier = RlvBehaviourDictionary::instanceFast().getModifierFromBehaviour(rlvCmd.getBehaviourType());
 	RlvBehaviourModifierValue modValue;
 	if ( (!rlvCmd.hasOption()) || (!pBhvrModifier) || (!pBhvrModifier->convertOptionValue(rlvCmd.getOption(), pBhvrModifier->getType(), modValue)) )
 		return RLV_RET_FAILED_OPTION;
@@ -1841,7 +1841,7 @@ ERlvCmdRet RlvBehaviourGenericHandler<RLV_OPTION_NONE_OR_MODIFIER>::onCommand(co
 	}
 
 	// @bhvr=n : add the default option on an empty modifier if needed
-	RlvBehaviourModifier* pBhvrModifier = RlvBehaviourDictionary::instance().getModifierFromBehaviour(rlvCmd.getBehaviourType());
+	RlvBehaviourModifier* pBhvrModifier = RlvBehaviourDictionary::instanceFast().getModifierFromBehaviour(rlvCmd.getBehaviourType());
 	if ( (pBhvrModifier) && (pBhvrModifier->getAddDefault()) )
 	{
 		// HACK-RLVa: reference counting doesn't happen until control returns to our caller but the modifier callbacks will happen now so we need to adjust the reference counts here
@@ -2225,7 +2225,7 @@ ERlvCmdRet RlvBehaviourRecvSendStartIMHandler::onCommand(const RlvCommand& rlvCm
 				return RLV_RET_FAILED_OPTION;
 		}
 
-		RlvBehaviourModifier *pBhvrModDistMin = RlvBehaviourDictionary::instance().getModifier(eModDistMin), *pBhvrModDistMax = RlvBehaviourDictionary::instance().getModifier(eModDistMax);
+		RlvBehaviourModifier *pBhvrModDistMin = RlvBehaviourDictionary::instanceFast().getModifier(eModDistMin), *pBhvrModDistMax = RlvBehaviourDictionary::instanceFast().getModifier(eModDistMax);
 		if (RLV_TYPE_ADD == rlvCmd.getParamType())
 		{
 			pBhvrModDistMin->addValue(nDistMin * nDistMin, rlvCmd.getObjectID(), rlvCmd.getBehaviourType());
@@ -2270,9 +2270,9 @@ void RlvBehaviourCamEyeFocusOffsetHandler::onCommandToggle(ERlvBehaviour eBhvr, 
 	}
 	else
 	{
-		const RlvBehaviourModifier* pBhvrEyeOffsetModifier = RlvBehaviourDictionary::instance().getModifier(RLV_MODIFIER_SETCAM_EYEOFFSET);
-		const RlvBehaviourModifier* pBhvrEyeOffsetScaleModifier = RlvBehaviourDictionary::instance().getModifier(RLV_MODIFIER_SETCAM_EYEOFFSETSCALE);
-		const RlvBehaviourModifier* pBhvrFocusOffsetModifier = RlvBehaviourDictionary::instance().getModifier(RLV_MODIFIER_SETCAM_FOCUSOFFSET);
+		const RlvBehaviourModifier* pBhvrEyeOffsetModifier = RlvBehaviourDictionary::instanceFast().getModifier(RLV_MODIFIER_SETCAM_EYEOFFSET);
+		const RlvBehaviourModifier* pBhvrEyeOffsetScaleModifier = RlvBehaviourDictionary::instanceFast().getModifier(RLV_MODIFIER_SETCAM_EYEOFFSETSCALE);
+		const RlvBehaviourModifier* pBhvrFocusOffsetModifier = RlvBehaviourDictionary::instanceFast().getModifier(RLV_MODIFIER_SETCAM_FOCUSOFFSET);
 		if ( (!pBhvrEyeOffsetModifier->hasValue()) && (!pBhvrEyeOffsetScaleModifier->hasValue()) && (!pBhvrFocusOffsetModifier->hasValue()) )
 		{
 			gRlvHandler.setCameraOverride(false);
@@ -2284,7 +2284,7 @@ void RlvBehaviourCamEyeFocusOffsetHandler::onCommandToggle(ERlvBehaviour eBhvr, 
 template<>
 void RlvBehaviourModifierHandler<RLV_MODIFIER_SETCAM_EYEOFFSET>::onValueChange() const
 {
-	if (RlvBehaviourModifier* pBhvrModifier = RlvBehaviourDictionary::instance().getModifier(RLV_MODIFIER_SETCAM_EYEOFFSET))
+	if (RlvBehaviourModifier* pBhvrModifier = RlvBehaviourDictionary::instanceFast().getModifier(RLV_MODIFIER_SETCAM_EYEOFFSET))
 	{
 		LLControlVariable* pControl = gSavedSettings.getControl("CameraOffsetRLVaView");
 		if (pBhvrModifier->hasValue())
@@ -2298,7 +2298,7 @@ void RlvBehaviourModifierHandler<RLV_MODIFIER_SETCAM_EYEOFFSET>::onValueChange()
 template<>
 void RlvBehaviourModifierHandler<RLV_MODIFIER_SETCAM_EYEOFFSETSCALE>::onValueChange() const
 {
-	if (RlvBehaviourModifier* pBhvrModifier = RlvBehaviourDictionary::instance().getModifier(RLV_MODIFIER_SETCAM_EYEOFFSETSCALE))
+	if (RlvBehaviourModifier* pBhvrModifier = RlvBehaviourDictionary::instanceFast().getModifier(RLV_MODIFIER_SETCAM_EYEOFFSETSCALE))
 	{
 		LLControlVariable* pControl = gSavedSettings.getControl("CameraOffsetScaleRLVa");
 		if (pBhvrModifier->hasValue())
@@ -2312,7 +2312,7 @@ void RlvBehaviourModifierHandler<RLV_MODIFIER_SETCAM_EYEOFFSETSCALE>::onValueCha
 template<>
 void RlvBehaviourModifierHandler<RLV_MODIFIER_SETCAM_FOCUSOFFSET>::onValueChange() const
 {
-	if (RlvBehaviourModifier* pBhvrModifier = RlvBehaviourDictionary::instance().getModifier(RLV_MODIFIER_SETCAM_FOCUSOFFSET))
+	if (RlvBehaviourModifier* pBhvrModifier = RlvBehaviourDictionary::instanceFast().getModifier(RLV_MODIFIER_SETCAM_FOCUSOFFSET))
 	{
 		LLControlVariable* pControl = gSavedSettings.getControl("FocusOffsetRLVaView");
 		if (pBhvrModifier->hasValue())
@@ -2380,7 +2380,7 @@ void RlvBehaviourToggleHandler<RLV_BHVR_SETCAM_MOUSELOOK>::onCommandToggle(ERlvB
 template<>
 void RlvBehaviourModifierHandler<RLV_MODIFIER_SETCAM_TEXTURE>::onValueChange() const
 {
-	if (RlvBehaviourModifier* pBhvrModifier = RlvBehaviourDictionary::instance().getModifier(RLV_MODIFIER_SETCAM_TEXTURE))
+	if (RlvBehaviourModifier* pBhvrModifier = RlvBehaviourDictionary::instanceFast().getModifier(RLV_MODIFIER_SETCAM_TEXTURE))
 	{
 		if (pBhvrModifier->hasValue())
 		{
@@ -2436,16 +2436,16 @@ void RlvBehaviourToggleHandler<RLV_BHVR_SETCAM>::onCommandToggle(ERlvBehaviour e
 		RlvBehaviourToggleHandler<RLV_BHVR_SETCAM_UNLOCK>::onCommandToggle(RLV_BHVR_SETCAM_UNLOCK, !fHasCamUnlock);
 
 	gRlvHandler.setCameraOverride(fHasBhvr);
-	RlvBehaviourDictionary::instance().getModifier(RLV_MODIFIER_SETCAM_AVDISTMIN)->setPrimaryObject(idRlvObject);
-	RlvBehaviourDictionary::instance().getModifier(RLV_MODIFIER_SETCAM_AVDISTMAX)->setPrimaryObject(idRlvObject);
-	RlvBehaviourDictionary::instance().getModifier(RLV_MODIFIER_SETCAM_ORIGINDISTMIN)->setPrimaryObject(idRlvObject);
-	RlvBehaviourDictionary::instance().getModifier(RLV_MODIFIER_SETCAM_ORIGINDISTMAX)->setPrimaryObject(idRlvObject);
-	RlvBehaviourDictionary::instance().getModifier(RLV_MODIFIER_SETCAM_EYEOFFSET)->setPrimaryObject(idRlvObject);
-	RlvBehaviourDictionary::instance().getModifier(RLV_MODIFIER_SETCAM_EYEOFFSETSCALE)->setPrimaryObject(idRlvObject);
-	RlvBehaviourDictionary::instance().getModifier(RLV_MODIFIER_SETCAM_FOCUSOFFSET)->setPrimaryObject(idRlvObject);
-	RlvBehaviourDictionary::instance().getModifier(RLV_MODIFIER_SETCAM_FOVMIN)->setPrimaryObject(idRlvObject);
-	RlvBehaviourDictionary::instance().getModifier(RLV_MODIFIER_SETCAM_FOVMAX)->setPrimaryObject(idRlvObject);
-	RlvBehaviourDictionary::instance().getModifier(RLV_MODIFIER_SETCAM_TEXTURE)->setPrimaryObject(idRlvObject);
+	RlvBehaviourDictionary::instanceFast().getModifier(RLV_MODIFIER_SETCAM_AVDISTMIN)->setPrimaryObject(idRlvObject);
+	RlvBehaviourDictionary::instanceFast().getModifier(RLV_MODIFIER_SETCAM_AVDISTMAX)->setPrimaryObject(idRlvObject);
+	RlvBehaviourDictionary::instanceFast().getModifier(RLV_MODIFIER_SETCAM_ORIGINDISTMIN)->setPrimaryObject(idRlvObject);
+	RlvBehaviourDictionary::instanceFast().getModifier(RLV_MODIFIER_SETCAM_ORIGINDISTMAX)->setPrimaryObject(idRlvObject);
+	RlvBehaviourDictionary::instanceFast().getModifier(RLV_MODIFIER_SETCAM_EYEOFFSET)->setPrimaryObject(idRlvObject);
+	RlvBehaviourDictionary::instanceFast().getModifier(RLV_MODIFIER_SETCAM_EYEOFFSETSCALE)->setPrimaryObject(idRlvObject);
+	RlvBehaviourDictionary::instanceFast().getModifier(RLV_MODIFIER_SETCAM_FOCUSOFFSET)->setPrimaryObject(idRlvObject);
+	RlvBehaviourDictionary::instanceFast().getModifier(RLV_MODIFIER_SETCAM_FOVMIN)->setPrimaryObject(idRlvObject);
+	RlvBehaviourDictionary::instanceFast().getModifier(RLV_MODIFIER_SETCAM_FOVMAX)->setPrimaryObject(idRlvObject);
+	RlvBehaviourDictionary::instanceFast().getModifier(RLV_MODIFIER_SETCAM_TEXTURE)->setPrimaryObject(idRlvObject);
 }
 
 // Handles: @setdebug=n|y toggles
@@ -2745,7 +2745,7 @@ ERlvCmdRet RlvForceGenericHandler<RLV_OPTION_MODIFIER>::onCommand(const RlvComma
 		return RLV_RET_FAILED_NOBEHAVIOUR;
 
 	// There should be an option and it should specify a valid modifier (RlvBehaviourModifier performs the appropriate type checks)
-	RlvBehaviourModifier* pBhvrModifier = RlvBehaviourDictionary::instance().getModifierFromBehaviour(rlvCmd.getBehaviourType());
+	RlvBehaviourModifier* pBhvrModifier = RlvBehaviourDictionary::instanceFast().getModifierFromBehaviour(rlvCmd.getBehaviourType());
 	RlvBehaviourModifierValue modValue;
 	if ( (!rlvCmd.hasOption()) || (!pBhvrModifier) || (!pBhvrModifier->convertOptionValue(rlvCmd.getOption(), pBhvrModifier->getType(), modValue)) )
 		return RLV_RET_FAILED_OPTION;
@@ -3628,8 +3628,8 @@ ERlvCmdRet RlvReplyCamMinMaxModifierHandler::onCommand(const RlvCommand& rlvCmd,
 {
 	if ( (rlvCmd.hasOption()) || (!boost::starts_with(rlvCmd.getBehaviour(), "getcam_")) )
 		return RLV_RET_FAILED_OPTION;
-	ERlvBehaviour eBhvr = RlvBehaviourDictionary::instance().getBehaviourFromString("setcam_" + rlvCmd.getBehaviour().substr(7), RLV_TYPE_ADDREM);
-	if (RlvBehaviourModifier* pBhvrModifier = RlvBehaviourDictionary::instance().getModifierFromBehaviour(eBhvr))
+	ERlvBehaviour eBhvr = RlvBehaviourDictionary::instanceFast().getBehaviourFromString("setcam_" + rlvCmd.getBehaviour().substr(7), RLV_TYPE_ADDREM);
+	if (RlvBehaviourModifier* pBhvrModifier = RlvBehaviourDictionary::instanceFast().getModifierFromBehaviour(eBhvr))
 		strReply = (pBhvrModifier->hasValue()) ? llformat("%.3f", pBhvrModifier->getValue<float>()) : LLStringUtil::null;
 	return RLV_RET_SUCCESS;
 }
@@ -3643,7 +3643,7 @@ ERlvCmdRet RlvBehaviourCamZoomMinMaxHandler::onCommand(const RlvCommand& rlvCmd,
 	if ( (rlvCmd.hasOption()) && (!RlvCommandOptionHelper::parseOption(rlvCmd.getOption(), nMult)) )
 		return RLV_RET_FAILED_OPTION;
 
-	RlvBehaviourModifier* pBhvrModifier = RlvBehaviourDictionary::instance().getModifier( (RLV_BHVR_CAMZOOMMIN == rlvCmd.getBehaviourType()) ? RLV_MODIFIER_SETCAM_FOVMIN : RLV_MODIFIER_SETCAM_FOVMAX);
+	RlvBehaviourModifier* pBhvrModifier = RlvBehaviourDictionary::instanceFast().getModifier( (RLV_BHVR_CAMZOOMMIN == rlvCmd.getBehaviourType()) ? RLV_MODIFIER_SETCAM_FOVMIN : RLV_MODIFIER_SETCAM_FOVMAX);
 	if (pBhvrModifier)
 	{
 		if (RLV_TYPE_ADD == rlvCmd.getParamType())
@@ -3678,7 +3678,7 @@ ERlvCmdRet RlvReplyHandler<RLV_BHVR_GETCAM_TEXTURES>::onCommand(const RlvCommand
 {
 	if (rlvCmd.hasOption())
 		return RLV_RET_FAILED_OPTION;
-	if (RlvBehaviourModifier* pBhvrModifier = RlvBehaviourDictionary::instance().getModifier(RLV_MODIFIER_SETCAM_TEXTURE))
+	if (RlvBehaviourModifier* pBhvrModifier = RlvBehaviourDictionary::instanceFast().getModifier(RLV_MODIFIER_SETCAM_TEXTURE))
 		strReply = (pBhvrModifier->hasValue()) ? pBhvrModifier->getValue<LLUUID>().asString() : LLStringUtil::null;
 	return RLV_RET_SUCCESS;
 }
@@ -3707,7 +3707,7 @@ ERlvCmdRet RlvReplyHandler<RLV_BHVR_GETCOMMAND>::onCommand(const RlvCommand& rlv
 	}
 
 	std::list<std::string> cmdList;
-	if (RlvBehaviourDictionary::instance().getCommands((optionList.size() >= 1) ? optionList[0] : LLStringUtil::null, eType, cmdList))
+	if (RlvBehaviourDictionary::instanceFast().getCommands((optionList.size() >= 1) ? optionList[0] : LLStringUtil::null, eType, cmdList))
 		strReply = boost::algorithm::join(cmdList, (optionList.size() >= 3) ? optionList[2] : std::string(RLV_OPTION_SEPARATOR) );
 	return RLV_RET_SUCCESS;
 }

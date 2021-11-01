@@ -295,7 +295,7 @@ BOOL LLTexLayerParamAlpha::render(S32 x, S32 y, S32 width, S32 height)
 		if (mStaticImageTGA.isNull())
 		{
 			// Don't load the image file until we actually need it the first time.  Like now.
-			mStaticImageTGA = LLTexLayerStaticImageList::getInstance()->getImageTGA(info->mStaticImageFileName);  
+			mStaticImageTGA = LLTexLayerStaticImageList::getInstanceFast()->getImageTGA(info->mStaticImageFileName);
 			// We now have something in one of our caches
 			LLTexLayerSet::sHasCaches |= mStaticImageTGA.notNull() ? TRUE : FALSE;
 

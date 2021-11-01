@@ -505,7 +505,7 @@ BOOL LLViewerInventoryItem::unpackMessage(const LLSD& item)
 {
 	BOOL rv = LLInventoryItem::fromLLSD(item);
 
-	LLLocalizedInventoryItemsDictionary::getInstance()->localizeInventoryObjectName(mName);
+	LLLocalizedInventoryItemsDictionary::getInstanceFast()->localizeInventoryObjectName(mName);
 
 	mIsComplete = TRUE;
 	return rv;
@@ -516,7 +516,7 @@ BOOL LLViewerInventoryItem::unpackMessage(LLMessageSystem* msg, const char* bloc
 {
 	BOOL rv = LLInventoryItem::unpackMessage(msg, block, block_num);
 
-	LLLocalizedInventoryItemsDictionary::getInstance()->localizeInventoryObjectName(mName);
+	LLLocalizedInventoryItemsDictionary::getInstanceFast()->localizeInventoryObjectName(mName);
 
 	mIsComplete = TRUE;
 	return rv;
@@ -841,7 +841,7 @@ void LLViewerInventoryCategory::changeType(LLFolderType::EType new_folder_type)
 
 void LLViewerInventoryCategory::localizeName()
 {
-	LLLocalizedInventoryItemsDictionary::getInstance()->localizeInventoryObjectName(mName);
+	LLLocalizedInventoryItemsDictionary::getInstanceFast()->localizeInventoryObjectName(mName);
 }
 
 // virtual
@@ -1044,7 +1044,7 @@ void create_inventory_item(const LLUUID& agent_id, const LLUUID& session_id,
 	std::string server_name = name;
 
 	{
-		for (const auto& pair : LLLocalizedInventoryItemsDictionary::getInstance()->mInventoryItemsDict)
+		for (const auto& pair : LLLocalizedInventoryItemsDictionary::getInstanceFast()->mInventoryItemsDict)
 		{
 			const std::string& localized_name = pair.second;
 			if(localized_name == name)
@@ -2083,12 +2083,12 @@ BOOL LLViewerInventoryItem::extractSortFieldAndDisplayName(const std::string& na
 // [SL:KB] - Patch: Build-ScriptRecover | Checked: 2013-03-10 (Catznip-3.4)
 bool LLViewerInventoryItem::lookupLocalizedName(std::string& name)
 {
-	return LLLocalizedInventoryItemsDictionary::instance().localizeInventoryObjectName(name);
+	return LLLocalizedInventoryItemsDictionary::instanceFast().localizeInventoryObjectName(name);
 }
 
 bool LLViewerInventoryItem::lookupSystemName(std::string& name)
 {
-	return LLLocalizedInventoryItemsDictionary::instance().revertInventoryObjectName(name);
+	return LLLocalizedInventoryItemsDictionary::instanceFast().revertInventoryObjectName(name);
 }
 // [/SL:KB]
 

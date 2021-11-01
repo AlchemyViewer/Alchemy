@@ -739,7 +739,7 @@ RlvCommand::RlvCommand(const LLUUID& idObj, const std::string& strCommand)
 		return;
 	}
 
-	m_pBhvrInfo = RlvBehaviourDictionary::instance().getBehaviourInfo(m_strBehaviour, m_eParamType, &m_fStrict, &m_eBhvrModifier);
+	m_pBhvrInfo = RlvBehaviourDictionary::instanceFast().getBehaviourInfo(m_strBehaviour, m_eParamType, &m_fStrict, &m_eBhvrModifier);
 }
 
 RlvCommand::RlvCommand(const RlvCommand& rlvCmd, ERlvParamType eParamType)
@@ -1201,7 +1201,7 @@ std::string RlvObject::getStatusString(const std::string& strFilter, const std::
 
 void RlvObject::clearModifiers(ERlvBehaviour eBhvr)
 {
-	if (const RlvBehaviourInfo* pBhvrInfo = RlvBehaviourDictionary::instance().getBehaviourInfo(eBhvr, RLV_TYPE_ADDREM))
+	if (const RlvBehaviourInfo* pBhvrInfo = RlvBehaviourDictionary::instanceFast().getBehaviourInfo(eBhvr, RLV_TYPE_ADDREM))
 	{
 		for (const auto& modifierEntry : pBhvrInfo->getModifiers())
 		{

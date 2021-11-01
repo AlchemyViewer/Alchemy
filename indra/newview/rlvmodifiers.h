@@ -85,7 +85,7 @@ public:
 	RlvBehaviourModifierCache(ERlvBehaviourModifier eModifier)
 		: LLInstanceTracker<RlvBehaviourModifierCache<T>, ERlvBehaviourModifier>(eModifier)
 	{
-		if (RlvBehaviourModifier* pBhvrModifier = RlvBehaviourDictionary::instance().getModifier(eModifier))
+		if (RlvBehaviourModifier* pBhvrModifier = RlvBehaviourDictionary::instanceFast().getModifier(eModifier))
 		{
 			mConnection = pBhvrModifier->getSignal().connect(boost::bind(&RlvBehaviourModifierCache<T>::handleValueChange, this, _1));
 			mCachedValue = pBhvrModifier->getValue<T>();
