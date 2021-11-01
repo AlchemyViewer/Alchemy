@@ -240,7 +240,7 @@ void  LLPanelCameraZoom::onSliderValueChanged()
 
 void activate_camera_tool()
 {
-	LLToolMgr::getInstance()->setTransientTool(LLToolCamera::getInstance());
+	LLToolMgr::getInstanceFast()->setTransientTool(LLToolCamera::getInstanceFast());
 };
 
 //
@@ -417,8 +417,8 @@ ECameraControlMode LLFloaterCamera::determineMode()
 		return CAMERA_CTRL_MODE_PAN;
 	}
 
-	LLTool* curr_tool = LLToolMgr::getInstance()->getCurrentTool();
-	if (curr_tool == LLToolCamera::getInstance())
+	LLTool* curr_tool = LLToolMgr::getInstanceFast()->getCurrentTool();
+	if (curr_tool == LLToolCamera::getInstanceFast())
 	{
 		return CAMERA_CTRL_MODE_FREE_CAMERA;
 	} 
@@ -434,9 +434,9 @@ ECameraControlMode LLFloaterCamera::determineMode()
 
 void clear_camera_tool()
 {
-	LLToolMgr* tool_mgr = LLToolMgr::getInstance();
+	LLToolMgr* tool_mgr = LLToolMgr::getInstanceFast();
 	if (tool_mgr->usingTransientTool() && 
-		tool_mgr->getCurrentTool() == LLToolCamera::getInstance())
+		tool_mgr->getCurrentTool() == LLToolCamera::getInstanceFast())
 	{
 		tool_mgr->clearTransientTool();
 	}

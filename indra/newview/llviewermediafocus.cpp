@@ -408,7 +408,7 @@ void LLViewerMediaFocus::update()
 				clearFocus();
 			}
 		}
-		else if(LLToolMgr::getInstance()->inBuildMode())
+		else if(LLToolMgr::getInstanceFast()->inBuildMode())
 		{
 			// Build tools are selected -- clear focus.
 			clearFocus();

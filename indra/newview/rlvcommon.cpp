@@ -748,7 +748,7 @@ bool rlvMenuCanShowName()
 	bool fEnable = true;
 	if (rlv_handler_t::isEnabled())
 	{
-		const LLVOAvatar* pAvatar = find_avatar_from_object(LLSelectMgr::getInstance()->getSelection()->getPrimaryObject());
+		const LLVOAvatar* pAvatar = find_avatar_from_object(LLSelectMgr::getInstanceFast()->getSelection()->getPrimaryObject());
 		fEnable = (pAvatar) && (RlvActions::canShowName(RlvActions::SNC_DEFAULT, pAvatar->getID()));
 	}
 	return fEnable;
@@ -788,7 +788,7 @@ bool rlvCanDeleteOrReturn()
 		{
 			/*virtual*/ bool apply(LLViewerObject* pObj) { return rlvCanDeleteOrReturn(pObj); }
 		} f;
-		LLObjectSelectionHandle hSel = LLSelectMgr::getInstance()->getSelection();
+		LLObjectSelectionHandle hSel = LLSelectMgr::getInstanceFast()->getSelection();
 		return (hSel.notNull()) && (0 != hSel->getRootObjectCount()) && (hSel->applyToRootObjects(&f, false));
 	}
 	return true;

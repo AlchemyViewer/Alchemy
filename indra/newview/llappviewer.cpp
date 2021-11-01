@@ -4964,7 +4964,7 @@ void LLAppViewer::idle()
 	}
 	else
 	{
-		if (LLToolMgr::getInstance()->inBuildMode())
+		if (LLToolMgr::getInstanceFast()->inBuildMode())
 		{
 			LLViewerJoystick::getInstance()->moveObjects();
 		}

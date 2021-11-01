@@ -1099,12 +1099,12 @@ LLViewerWindow::Params::Params()
 
 void LLViewerWindow::handlePieMenu(S32 x, S32 y, MASK mask)
 {
-    if (CAMERA_MODE_CUSTOMIZE_AVATAR != gAgentCamera.getCameraMode() && LLToolMgr::getInstance()->getCurrentTool() != LLToolPie::getInstance() && gAgent.isInitialized())
+    if (CAMERA_MODE_CUSTOMIZE_AVATAR != gAgentCamera.getCameraMode() && LLToolMgr::getInstanceFast()->getCurrentTool() != LLToolPie::getInstanceFast() && gAgent.isInitialized())
     {
         // If the current tool didn't process the click, we should show
         // the pie menu.  This can be done by passing the event to the pie
         // menu tool.
-        LLToolPie::getInstance()->handleRightMouseDown(x, y, mask);
+        LLToolPie::getInstanceFast()->handleRightMouseDown(x, y, mask);
     }
 }
 
@@ -1181,7 +1181,7 @@ BOOL LLViewerWindow::handleAnyMouseClick(LLWindow *window, LLCoordGL pos, MASK m
 		LLUI::resetMouseIdleTimer();
 
 		// Don't let the user move the mouse out of the window until mouse up.
-		if( LLToolMgr::getInstance()->getCurrentTool()->clipMouseWhenDown() )
+		if( LLToolMgr::getInstanceFast()->getCurrentTool()->clipMouseWhenDown() )
 		{
 			mWindow->setMouseClipping(down);
 		}
@@ -1259,7 +1259,7 @@ BOOL LLViewerWindow::handleAnyMouseClick(LLWindow *window, LLCoordGL pos, MASK m
 	}
 
 	// Do not allow tool manager to handle mouseclicks if we have disconnected	
-	if(!gDisconnected && LLToolMgr::getInstance()->getCurrentTool()->handleAnyMouseClick( x, y, mask, clicktype, down ) )
+	if(!gDisconnected && LLToolMgr::getInstanceFast()->getCurrentTool()->handleAnyMouseClick( x, y, mask, clicktype, down ) )
 	{
 #if AL_VIEWER_EVENT_RECORDER
 		if (LLViewerEventRecorder::getLoggingStatus())
@@ -1431,7 +1431,7 @@ LLWindowCallbacks::DragNDropResult LLViewerWindow::handleDragNDrop( LLWindow *wi
 										
 									}
 								}
-								LLSelectMgr::getInstance()->unhighlightObjectOnly(mDragHoveredObject);
+								LLSelectMgr::getInstanceFast()->unhighlightObjectOnly(mDragHoveredObject);
 								mDragHoveredObject = NULL;
 							
 							}
@@ -1443,9 +1443,9 @@ LLWindowCallbacks::DragNDropResult LLViewerWindow::handleDragNDrop( LLWindow *wi
 									if ( obj != mDragHoveredObject)
 									{
 										// Highlight the dragged object
-										LLSelectMgr::getInstance()->unhighlightObjectOnly(mDragHoveredObject);
+										LLSelectMgr::getInstanceFast()->unhighlightObjectOnly(mDragHoveredObject);
 										mDragHoveredObject = obj;
-										LLSelectMgr::getInstance()->highlightObjectOnly(mDragHoveredObject);
+										LLSelectMgr::getInstanceFast()->highlightObjectOnly(mDragHoveredObject);
 									}
 									result = (! te->hasMedia()) ? LLWindowCallbacks::DND_COPY : LLWindowCallbacks::DND_LINK;
 
@@ -1577,7 +1577,7 @@ void LLViewerWindow::handleFocus(LLWindow *window)
 	LLModalDialog::onAppFocusGained();
 
 	gAgent.onAppFocusGained();
-	LLToolMgr::getInstance()->onAppFocusGained();
+	LLToolMgr::getInstanceFast()->onAppFocusGained();
 
 	// See if we're coming in with modifier keys held down
 	if (gKeyboard)
@@ -1595,7 +1595,7 @@ void LLViewerWindow::handleFocusLost(LLWindow *window)
 {
 	gFocusMgr.setAppHasFocus(FALSE);
 	//LLModalDialog::onAppFocusLost();
-	LLToolMgr::getInstance()->onAppFocusLost();
+	LLToolMgr::getInstanceFast()->onAppFocusLost();
 	gFocusMgr.setMouseCapture( NULL );
 
 	if (gMenuBarView)
@@ -1646,8 +1646,8 @@ BOOL LLViewerWindow::handleTranslatedKeyDown(KEY key,  MASK mask, BOOL repeated)
 BOOL LLViewerWindow::handleTranslatedKeyUp(KEY key,  MASK mask)
 {
 	// Let the inspect tool code check for ALT key to set LLToolSelectRect active instead LLToolCamera
-	LLToolCompInspect * tool_inspectp = LLToolCompInspect::getInstance();
-	if (LLToolMgr::getInstance()->getCurrentTool() == tool_inspectp)
+	LLToolCompInspect * tool_inspectp = LLToolCompInspect::getInstanceFast();
+	if (LLToolMgr::getInstanceFast()->getCurrentTool() == tool_inspectp)
 	{
 		tool_inspectp->keyUp(key, mask);
 	}
@@ -2759,7 +2759,7 @@ void LLViewerWindow::draw()
 		}
 
 		// Draw tool specific overlay on world
-		LLToolMgr::getInstance()->getCurrentTool()->draw();
+		LLToolMgr::getInstanceFast()->getCurrentTool()->draw();
 
 		if( gAgentCamera.cameraMouselook() || LLFloaterCamera::inFreeCameraMode() )
 		{
@@ -3075,7 +3075,7 @@ BOOL LLViewerWindow::handleKey(KEY key, MASK mask)
 		}
 	}
 
-	if( LLToolMgr::getInstance()->getCurrentTool()->handleKey(key, mask) )
+	if( LLToolMgr::getInstanceFast()->getCurrentTool()->handleKey(key, mask) )
 	{
 		LL_DEBUGS() << "LLviewerWindow::handleKey toolbar handling?" << LL_ENDL;
 #if AL_VIEWER_EVENT_RECORDER
@@ -3740,7 +3740,7 @@ void LLViewerWindow::updateUI()
 		
 			if (!handled)
 			{
-				LLTool *tool = LLToolMgr::getInstance()->getCurrentTool();
+				LLTool *tool = LLToolMgr::getInstanceFast()->getCurrentTool();
 
 				if(mMouseInWindow && tool)
 				{
@@ -3831,7 +3831,7 @@ void LLViewerWindow::updateUI()
 					tool_tip_handled = mRootView->handleToolTip(local_x, local_y, mask );
 				}
 
-				LLTool* current_tool = LLToolMgr::getInstance()->getCurrentTool();
+				LLTool* current_tool = LLToolMgr::getInstanceFast()->getCurrentTool();
 				if (!tool_tip_handled && current_tool)
 				{
 					current_tool->screenPointToLocal(x, y, &local_x, &local_y);
@@ -3842,7 +3842,7 @@ void LLViewerWindow::updateUI()
 	}
 	else
 	{	// just have tools handle hover when UI is turned off
-		LLTool *tool = LLToolMgr::getInstance()->getCurrentTool();
+		LLTool *tool = LLToolMgr::getInstanceFast()->getCurrentTool();
 
 		if(mMouseInWindow && tool)
 		{
@@ -3862,36 +3862,36 @@ void LLViewerWindow::updateUI()
 
 	if (LLModalDialog::activeCount() == 0)
 	{
-		LLSelectMgr::getInstance()->deselectUnused();
+		LLSelectMgr::getInstanceFast()->deselectUnused();
 	}
 }
 
 
 void LLViewerWindow::updateLayout()
 {
-	LLTool* tool = LLToolMgr::getInstance()->getCurrentTool();
+	LLTool* tool = LLToolMgr::getInstanceFast()->getCurrentTool();
 	if (gFloaterTools != NULL
 		&& tool != NULL
 		&& tool != gToolNull  
-		&& tool != LLToolCompInspect::getInstance() 
-		&& tool != LLToolDragAndDrop::getInstance() 
+		&& tool != LLToolCompInspect::getInstanceFast()
+		&& tool != LLToolDragAndDrop::getInstanceFast()
 		&& !LLPipeline::FreezeTime)
 	{ 
 		// Suppress the toolbox view if our source tool was the pie tool,
 		// and we've overridden to something else.
 		bool suppress_toolbox = 
-			(LLToolMgr::getInstance()->getBaseTool() == LLToolPie::getInstance()) &&
-			(LLToolMgr::getInstance()->getCurrentTool() != LLToolPie::getInstance());
+			(LLToolMgr::getInstanceFast()->getBaseTool() == LLToolPie::getInstanceFast()) &&
+			(LLToolMgr::getInstanceFast()->getCurrentTool() != LLToolPie::getInstanceFast());
 
 		LLMouseHandler *captor = gFocusMgr.getMouseCapture();
 		// With the null, inspect, or drag and drop tool, don't muck
 		// with visibility.
 
 		if (gFloaterTools->isMinimized()
-			||	(tool != LLToolPie::getInstance()						// not default tool
-				&& tool != LLToolCompGun::getInstance()					// not coming out of mouselook
+			||	(tool != LLToolPie::getInstanceFast()						// not default tool
+				&& tool != LLToolCompGun::getInstanceFast()					// not coming out of mouselook
 				&& !suppress_toolbox									// not override in third person
-				&& LLToolMgr::getInstance()->getCurrentToolset()->isShowFloaterTools()
+				&& LLToolMgr::getInstanceFast()->getCurrentToolset()->isShowFloaterTools()
 				&& (!captor || dynamic_cast<LLView*>(captor) != NULL)))						// not dragging
 		{
 			// Force floater tools to be visible (unless minimized)
@@ -4022,9 +4022,9 @@ void LLViewerWindow::updateKeyboardFocus()
 	}
 
 	// last ditch force of edit menu to selection manager
-	if (LLEditMenuHandler::gEditMenuHandler == NULL && LLSelectMgr::getInstance()->getSelection()->getObjectCount())
+	if (LLEditMenuHandler::gEditMenuHandler == NULL && LLSelectMgr::getInstanceFast()->getSelection()->getObjectCount())
 	{
-		LLEditMenuHandler::gEditMenuHandler = LLSelectMgr::getInstance();
+		LLEditMenuHandler::gEditMenuHandler = LLSelectMgr::getInstanceFast();
 	}
 
 	if (gFloaterView->getCycleMode())
@@ -4080,8 +4080,8 @@ void LLViewerWindow::updateWorldViewRect(bool use_full_window)
 	{
 		mWorldViewRectRaw = new_world_rect;
 		gResizeScreenTexture = TRUE;
-		LLViewerCamera::getInstance()->setViewHeightInPixels( mWorldViewRectRaw.getHeight() );
-		LLViewerCamera::getInstance()->setAspect( getWorldViewAspectRatio() );
+		LLViewerCamera::getInstanceFast()->setViewHeightInPixels( mWorldViewRectRaw.getHeight() );
+		LLViewerCamera::getInstanceFast()->setAspect( getWorldViewAspectRatio() );
 
 		LLRect old_world_rect_scaled = mWorldViewRectScaled;
 		mWorldViewRectScaled = calcScaledRect(mWorldViewRectRaw, mDisplayScale);
@@ -4131,12 +4131,12 @@ void LLViewerWindow::saveLastMouse(const LLCoordGL &point)
 //  render_hud_elements:	FALSE, FALSE, FALSE
 void LLViewerWindow::renderSelections( BOOL for_gl_pick, BOOL pick_parcel_walls, BOOL for_hud )
 {
-	LLObjectSelectionHandle selection = LLSelectMgr::getInstance()->getSelection();
+	LLObjectSelectionHandle selection = LLSelectMgr::getInstanceFast()->getSelection();
 
 	if (!for_hud && !for_gl_pick)
 	{
 		// Call this once and only once
-		LLSelectMgr::getInstance()->updateSilhouettes();
+		LLSelectMgr::getInstanceFast()->updateSilhouettes();
 	}
 	
 	// Draw fence around land selections
@@ -4150,12 +4150,12 @@ void LLViewerWindow::renderSelections( BOOL for_gl_pick, BOOL pick_parcel_walls,
 	else if (( for_hud && selection->getSelectType() == SELECT_TYPE_HUD) ||
 			 (!for_hud && selection->getSelectType() != SELECT_TYPE_HUD))
 	{		
-		LLSelectMgr::getInstance()->renderSilhouettes(for_hud);
+		LLSelectMgr::getInstanceFast()->renderSilhouettes(for_hud);
 		
 		stop_glerror();
 
 		// setup HUD render
-		if (selection->getSelectType() == SELECT_TYPE_HUD && LLSelectMgr::getInstance()->getSelection()->getObjectCount())
+		if (selection->getSelectType() == SELECT_TYPE_HUD && LLSelectMgr::getInstanceFast()->getSelection()->getObjectCount())
 		{
 			LLBBox hud_bbox = gAgentAvatarp->getHUDBBox();
 
@@ -4174,7 +4174,7 @@ void LLViewerWindow::renderSelections( BOOL for_gl_pick, BOOL pick_parcel_walls,
 		}
 
 		// Render light for editing
-		if (LLSelectMgr::sRenderLightRadius && LLToolMgr::getInstance()->inEdit())
+		if (LLSelectMgr::sRenderLightRadius && LLToolMgr::getInstanceFast()->inEdit())
 		{
 			gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
 			LLGLEnable gls_blend(GL_BLEND);
@@ -4220,7 +4220,7 @@ void LLViewerWindow::renderSelections( BOOL for_gl_pick, BOOL pick_parcel_walls,
 					return true;
 				}
 			} func;
-			LLSelectMgr::getInstance()->getSelection()->applyToObjects(&func);
+			LLSelectMgr::getInstanceFast()->getSelection()->applyToObjects(&func);
 			
 			gGL.popMatrix();
 		}				
@@ -4229,7 +4229,7 @@ void LLViewerWindow::renderSelections( BOOL for_gl_pick, BOOL pick_parcel_walls,
 		// not be recalculated at this time.  If they are, then group rotations will break.
 
 		// Draw arrows at average center of all selected objects
-		LLTool* tool = LLToolMgr::getInstance()->getCurrentTool();
+		LLTool* tool = LLToolMgr::getInstanceFast()->getCurrentTool();
 		if (tool)
 		{
 			if(tool->isAlwaysRendered())
@@ -4238,7 +4238,7 @@ void LLViewerWindow::renderSelections( BOOL for_gl_pick, BOOL pick_parcel_walls,
 			}
 			else
 			{
-				if( !LLSelectMgr::getInstance()->getSelection()->isEmpty() )
+				if( !LLSelectMgr::getInstanceFast()->getSelection()->isEmpty() )
 				{
 					bool all_selected_objects_move;
 					bool all_selected_objects_modify;
@@ -4246,21 +4246,21 @@ void LLViewerWindow::renderSelections( BOOL for_gl_pick, BOOL pick_parcel_walls,
 					// we might be better off with some kind of memory for selection and/or states, consider
 					// optimizing, perhaps even some kind of selection generation at level of LLSelectMgr to
 					// make whole viewer benefit.
-					LLSelectMgr::getInstance()->selectGetEditMoveLinksetPermissions(all_selected_objects_move, all_selected_objects_modify);
+					LLSelectMgr::getInstanceFast()->selectGetEditMoveLinksetPermissions(all_selected_objects_move, all_selected_objects_modify);
 
 					BOOL draw_handles = TRUE;
 
-					if (tool == LLToolCompTranslate::getInstance() && !all_selected_objects_move && !LLSelectMgr::getInstance()->isMovableAvatarSelected())
+					if (tool == LLToolCompTranslate::getInstanceFast() && !all_selected_objects_move && !LLSelectMgr::getInstanceFast()->isMovableAvatarSelected())
 					{
 						draw_handles = FALSE;
 					}
 
-					if (tool == LLToolCompRotate::getInstance() && !all_selected_objects_move && !LLSelectMgr::getInstance()->isMovableAvatarSelected())
+					if (tool == LLToolCompRotate::getInstanceFast() && !all_selected_objects_move && !LLSelectMgr::getInstanceFast()->isMovableAvatarSelected())
 					{
 						draw_handles = FALSE;
 					}
 
-					if ( !all_selected_objects_modify && tool == LLToolCompScale::getInstance() )
+					if ( !all_selected_objects_modify && tool == LLToolCompScale::getInstanceFast() )
 					{
 						draw_handles = FALSE;
 					}
@@ -4537,7 +4537,7 @@ LLViewerObject* LLViewerWindow::cursorIntersect(S32 mouse_x, S32 mouse_y, F32 de
 
 // [RLVa:KB] - Checked: 2010-03-31 (RLVa-1.2.0c) | Modified: RLVa-1.2.0c
 		if ( (rlv_handler_t::isEnabled()) && (found) &&
-			 (LLToolCamera::getInstance()->hasMouseCapture()) && (gKeyboard->currentMask(TRUE) & MASK_ALT) )
+			 (LLToolCamera::getInstanceFast()->hasMouseCapture()) && (gKeyboard->currentMask(TRUE) & MASK_ALT) )
 		{
 			found = NULL;
 		}
@@ -4559,10 +4559,10 @@ LLViewerObject* LLViewerWindow::cursorIntersect(S32 mouse_x, S32 mouse_y, F32 de
 			//   - the drag-and-drop tool is active (allows inventory offers)
 			//   - the camera tool is active
 			//   - the pie tool is active *and* we picked our own avie (allows "mouse steering" and the self pie menu)
-			LLTool* pCurTool = LLToolMgr::getInstance()->getCurrentTool();
-			if ( (LLToolDragAndDrop::getInstance() != pCurTool) && 
-			     (!LLToolCamera::getInstance()->hasMouseCapture()) &&
-			     ((LLToolPie::getInstance() != pCurTool) || (gAgent.getID() != found->getID())) )
+			LLTool* pCurTool = LLToolMgr::getInstanceFast()->getCurrentTool();
+			if ( (LLToolDragAndDrop::getInstanceFast() != pCurTool) &&
+			     (!LLToolCamera::getInstanceFast()->hasMouseCapture()) &&
+			     ((LLToolPie::getInstanceFast() != pCurTool) || (gAgent.getID() != found->getID())) )
 			{
 				found = NULL;
 			}
@@ -4709,7 +4709,7 @@ BOOL LLViewerWindow::mousePointOnLandGlobal(const S32 x, const S32 y, LLVector3d
 		mouse_direction_global_d.setVec(mouse_direction_global * mouse_dir_scale);
 		probe_point_global = camera_pos_global + mouse_direction_global_d;
 
-		regionp = LLWorld::getInstance()->resolveRegionGlobal(probe_point_region, probe_point_global);
+		regionp = LLWorld::getInstanceFast()->resolveRegionGlobal(probe_point_region, probe_point_global);
 
 		if (!regionp)
 		{
@@ -4756,7 +4756,7 @@ BOOL LLViewerWindow::mousePointOnLandGlobal(const S32 x, const S32 y, LLVector3d
 			mouse_direction_global_d.setVec(mouse_direction_global * mouse_dir_scale);
 			probe_point_global = camera_pos_global + mouse_direction_global_d;
 
-			regionp = LLWorld::getInstance()->resolveRegionGlobal(probe_point_region, probe_point_global);
+			regionp = LLWorld::getInstanceFast()->resolveRegionGlobal(probe_point_region, probe_point_global);
 
 			if (!regionp)
 			{

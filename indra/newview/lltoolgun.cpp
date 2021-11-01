@@ -91,9 +91,9 @@ void LLToolGun::handleDeselect()
 BOOL LLToolGun::handleMouseDown(S32 x, S32 y, MASK mask)
 {
 	gGrabTransientTool = this;
-	LLToolMgr::getInstance()->getCurrentToolset()->selectTool( LLToolGrab::getInstance() );
+	LLToolMgr::getInstanceFast()->getCurrentToolset()->selectTool( LLToolGrab::getInstanceFast() );
 
-	return LLToolGrab::getInstance()->handleMouseDown(x, y, mask);
+	return LLToolGrab::getInstanceFast()->handleMouseDown(x, y, mask);
 }
 
 BOOL LLToolGun::handleHover(S32 x, S32 y, MASK mask) 

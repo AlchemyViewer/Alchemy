@@ -2874,7 +2874,7 @@ bool LLVOVolume::hasMediaPermission(const LLMediaEntry* media_entry, MediaPermTy
     // Group permissions
     else if (0 != (media_perms & LLMediaEntry::PERM_GROUP))
     {
-		LLPermissions* obj_perm = LLSelectMgr::getInstance()->findObjectPermissions(this);
+		LLPermissions* obj_perm = LLSelectMgr::getInstanceFast()->findObjectPermissions(this);
 		if (obj_perm && gAgent.isInGroup(obj_perm->getGroup()))
 		{
 			return true;
@@ -3121,7 +3121,7 @@ F64 LLVOVolume::getTotalMediaInterest() const
 	// If this object is selected, this object has "high" interest, but since 
 	// there can be more than one, we still add in calculated impl interest
 	// XXX Sadly, 'contains()' doesn't take a const :(
-	if (LLSelectMgr::getInstance()->getSelection()->contains(const_cast<LLVOVolume*>(this)))
+	if (LLSelectMgr::getInstanceFast()->getSelection()->contains(const_cast<LLVOVolume*>(this)))
 		interest = F64_MAX / 2.0;
 	
 	int i = 0;

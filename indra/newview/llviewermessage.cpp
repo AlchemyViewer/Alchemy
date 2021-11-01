@@ -4050,7 +4050,7 @@ void process_kill_object(LLMessageSystem *mesgsys, void **user_data)
 		// We should remove the object from selection after it is marked dead by gObjectList to make LLToolGrab,
         // which is using the object, release the mouse capture correctly when the object dies.
         // See LLToolGrab::handleHoverActive() and LLToolGrab::handleHoverNonPhysical().
-		LLSelectMgr::getInstance()->removeObjectFromSelections(id);
+		LLSelectMgr::getInstanceFast()->removeObjectFromSelections(id);
 	}
 }
 

@@ -527,7 +527,7 @@ bool LLViewerMedia::isInterestingEnough(const LLVOVolume *object, const F64 &obj
 	}
 	// Selected?  Then it is interesting!
 	// XXX Sadly, 'contains()' doesn't take a const :(
-	else if (LLSelectMgr::getInstance()->getSelection()->contains(const_cast<LLVOVolume*>(object)))
+	else if (LLSelectMgr::getInstanceFast()->getSelection()->contains(const_cast<LLVOVolume*>(object)))
 	{
 		result = true;
 	}
@@ -3650,7 +3650,7 @@ void LLViewerMediaImpl::calculateInterest()
 				// We won't have full permissions data for all objects.  Attempt to mute objects when we can tell their owners are muted.
 				if (LLSelectMgr::instanceExists())
 				{
-					LLPermissions* obj_perm = LLSelectMgr::getInstance()->findObjectPermissions(obj);
+					LLPermissions* obj_perm = LLSelectMgr::getInstanceFast()->findObjectPermissions(obj);
 					if(obj_perm)
 					{
 						if(LLMuteList::getInstance() &&

@@ -298,7 +298,7 @@ bool handleSlowMotionAnimation(const LLSD& newvalue)
 
 void LLAgent::setCanEditParcel() // called via mParcelChangedSignal
 {
-	bool can_edit = LLToolMgr::getInstance()->canEdit();
+	bool can_edit = LLToolMgr::getInstanceFast()->canEdit();
 	gAgent.mCanEditParcel = can_edit;
 }
 
@@ -2200,8 +2200,8 @@ U8 LLAgent::getRenderState()
 		stopTyping();
 	}
 	
-	if ((!LLSelectMgr::getInstance()->getSelection()->isEmpty() && LLSelectMgr::getInstance()->shouldShowSelection())
-		|| LLToolMgr::getInstance()->getCurrentTool()->isEditing() )
+	if ((!LLSelectMgr::getInstanceFast()->getSelection()->isEmpty() && LLSelectMgr::getInstanceFast()->shouldShowSelection())
+		|| LLToolMgr::getInstanceFast()->getCurrentTool()->isEditing() )
 	{
 		setRenderState(AGENT_STATE_EDITING);
 	}
@@ -2255,7 +2255,7 @@ void LLAgent::endAnimationUpdateUI()
 
 		LLPanelStandStopFlying::getInstance()->setVisible(TRUE);
 
-		LLToolMgr::getInstance()->setCurrentToolset(gBasicToolset);
+		LLToolMgr::getInstanceFast()->setCurrentToolset(gBasicToolset);
 
 		LLFloaterCamera::onLeavingMouseLook();
 

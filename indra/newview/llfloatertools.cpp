@@ -446,7 +446,7 @@ void LLFloaterTools::refresh()
 	const S32 INFO_WIDTH = getRect().getWidth();
 	const S32 INFO_HEIGHT = 384;
 	LLRect object_info_rect(0, 0, INFO_WIDTH, -INFO_HEIGHT);
-	BOOL all_volume = LLSelectMgr::getInstance()->selectionAllPCode( LL_PCODE_VOLUME );
+	BOOL all_volume = LLSelectMgr::getInstanceFast()->selectionAllPCode( LL_PCODE_VOLUME );
 
 	S32 idx_features = mTab->getPanelIndexByTitle(PANEL_NAMES[PANEL_FEATURES]);
 	S32 idx_face = mTab->getPanelIndexByTitle(PANEL_NAMES[PANEL_FACE]);
@@ -471,9 +471,9 @@ void LLFloaterTools::refresh()
 	std::string num_string;
 	bool enable_link_count = true;
 
-	LLObjectSelectionHandle selected_objects = LLSelectMgr::getInstance()->getSelection();
+	LLObjectSelectionHandle selected_objects = LLSelectMgr::getInstanceFast()->getSelection();
 	S32 prim_count = selected_objects->getObjectCount();
-	if (prim_count == 1 && LLToolMgr::getInstance()->getCurrentTool() == LLToolFace::getInstance())
+	if (prim_count == 1 && LLToolMgr::getInstanceFast()->getCurrentTool() == LLToolFace::getInstanceFast())
 	{
 		desc_string = getString("selected_faces");
 		

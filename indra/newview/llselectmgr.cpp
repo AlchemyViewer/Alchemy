@@ -580,7 +580,7 @@ BOOL LLSelectMgr::removeObjectFromSelections(const LLUUID &id)
 	BOOL object_found = FALSE;
 	LLTool *tool = NULL;
 
-	tool = LLToolMgr::getInstance()->getCurrentTool();
+	tool = LLToolMgr::getInstanceFast()->getCurrentTool();
 
 	// It's possible that the tool is editing an object that is not selected
 	LLViewerObject* tool_editing_object = tool->getEditingObject();
@@ -4410,7 +4410,7 @@ void LLSelectMgr::deselectAllIfTooFar()
 // [RLVa:KB] - Checked: 2010-04-11 (RLVa-1.2.0e) | Modified: RLVa-0.2.0f
 	static RlvCachedBehaviourModifier<float> s_nFartouchDist(RLV_MODIFIER_FARTOUCHDIST);
 
-	BOOL fRlvFartouch = gRlvHandler.hasBehaviour(RLV_BHVR_FARTOUCH) && LLToolMgr::instance().inEdit();
+	BOOL fRlvFartouch = gRlvHandler.hasBehaviour(RLV_BHVR_FARTOUCH) && LLToolMgr::instanceFast().inEdit();
 	if ( (ALControlCache::LimitSelectDistance || (fRlvFartouch) )
 // [/RLVa:KB]
 		&& (!mSelectedObjects->getPrimaryObject() || !mSelectedObjects->getPrimaryObject()->isAvatar())
@@ -4538,7 +4538,7 @@ void LLSelectMgr::sendAttach(LLObjectSelectionHandle selection_handle, U8 attach
 		return;
 	}
 
-	BOOL build_mode = LLToolMgr::getInstance()->inEdit();
+	BOOL build_mode = LLToolMgr::getInstanceFast()->inEdit();
 	// Special case: Attach to default location for this object.
 	if (0 == attachment_point ||
 		get_if_there(gAgentAvatarp->mAttachmentPoints, (S32)attachment_point, (LLViewerJointAttachment*)NULL))
@@ -6633,7 +6633,7 @@ void dialog_refresh_all()
 	// make cleaning up the functions below easier.  Also, sometimes entities
 	// outside the selection manager change properties of selected objects
 	// and call into this function.  Yuck.
-	LLSelectMgr::getInstance()->mUpdateSignal();
+	LLSelectMgr::getInstanceFast()->mUpdateSignal();
 
 	// *TODO: Eliminate all calls into outside classes below, make those
 	// objects register with the update signal.
@@ -6674,7 +6674,7 @@ S32 get_family_count(LLViewerObject *parent)
 		return 1;
 	}
 	S32 count = 1;	// for this object
-	LLViewerObject::const_child_list_t& child_list = parent->getChildren();
+	const LLViewerObject::const_child_list_t& child_list = parent->getChildren();
 	for (LLViewerObject* child : child_list)
 	{
 		if (!child)
@@ -6687,7 +6687,7 @@ S32 get_family_count(LLViewerObject *parent)
 		}
 		else
 		{
-			if (LLSelectMgr::getInstance()->canSelectObject(child))
+			if (LLSelectMgr::getInstanceFast()->canSelectObject(child))
 			{
 				count += get_family_count( child );
 			}
@@ -6767,7 +6767,7 @@ void LLSelectMgr::updateSelectionCenter()
 	
 	if ( !(gAgentID == LLUUID::null)) 
 	{
-		LLTool		*tool = LLToolMgr::getInstance()->getCurrentTool();
+		LLTool		*tool = LLToolMgr::getInstanceFast()->getCurrentTool();
 		if (mShowSelection)
 		{
 			LLVector3d select_center_global;
@@ -7024,9 +7024,9 @@ void LLSelectMgr::validateSelection()
 	{
 		virtual bool apply(LLViewerObject* object)
 		{
-			if (!LLSelectMgr::getInstance()->canSelectObject(object))
+			if (!instanceFast().canSelectObject(object))
 			{
-				LLSelectMgr::getInstance()->deselectObjectOnly(object);
+				instanceFast().deselectObjectOnly(object);
 			}
 			return true;
 		}

@@ -2016,7 +2016,7 @@ void LLPanelObject::draw()
 	static const LLColor4	blue(	0.f,	0.5f,	1.0f,	1);
 
 	// Tune the colors of the labels
-	LLTool* tool = LLToolMgr::getInstance()->getCurrentTool();
+	LLTool* tool = LLToolMgr::getInstanceFast()->getCurrentTool();
 
 	if (tool == LLToolCompTranslate::getInstance())
 	{

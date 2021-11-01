@@ -206,7 +206,7 @@ void LLToolCamera::pickCallback(const LLPickInfo& pick_info)
 	}
 	//RN: check to see if this is mouse-driving as opposed to ALT-zoom or Focus tool
 	else if (pick_info.mKeyMask & MASK_ALT || 
-			(LLToolMgr::getInstance()->getCurrentTool()->getName() == "Camera")) 
+			(LLToolMgr::getInstanceFast()->getCurrentTool()->getName() == "Camera"))
 	{
 		LLViewerObject* hit_obj = pick_info.getObject();
 		if (hit_obj)
@@ -225,7 +225,7 @@ void LLToolCamera::pickCallback(const LLPickInfo& pick_info)
 			gAgentCamera.setFocusGlobal(pick_info);
 		}
 
-		BOOL zoom_tool = gCameraBtnZoom && (LLToolMgr::getInstance()->getBaseTool() == LLToolCamera::getInstance());
+		BOOL zoom_tool = gCameraBtnZoom && (LLToolMgr::getInstanceFast()->getBaseTool() == LLToolCamera::getInstanceFast());
 		if (!(pick_info.mKeyMask & MASK_ALT) &&
 			!LLFloaterCamera::inFreeCameraMode() &&
 			!zoom_tool &&
@@ -235,12 +235,12 @@ void LLToolCamera::pickCallback(const LLPickInfo& pick_info)
 			(hit_obj == gAgentAvatarp || 
 			 (hit_obj && hit_obj->isAttachment() && LLVOAvatar::findAvatarFromAttachment(hit_obj)->isSelf())))
 		{
-			LLToolCamera::getInstance()->mMouseSteering = TRUE;
+			LLToolCamera::getInstanceFast()->mMouseSteering = TRUE;
 		}
 
 	}
 
-	LLToolCamera::getInstance()->mValidClickPoint = TRUE;
+	LLToolCamera::getInstanceFast()->mValidClickPoint = TRUE;
 
 	if( CAMERA_MODE_CUSTOMIZE_AVATAR == gAgentCamera.getCameraMode() )
 	{
@@ -268,7 +268,7 @@ void LLToolCamera::releaseMouse()
 	//for the situation when left click was performed on the Agent
 	if (!LLFloaterCamera::inFreeCameraMode())
 	{
-		LLToolMgr::getInstance()->clearTransientTool();
+		LLToolMgr::getInstanceFast()->clearTransientTool();
 	}
 
 	mMouseSteering = FALSE;

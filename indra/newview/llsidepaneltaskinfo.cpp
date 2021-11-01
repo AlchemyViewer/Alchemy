@@ -1248,7 +1248,7 @@ void LLSidepanelTaskInfo::updateVerbs()
 	//mEditBtn->setEnabled(obj && obj->permModify());
 	*/
 
-	LLSafeHandle<LLObjectSelection> object_selection = LLSelectMgr::getInstance()->getSelection();
+	LLSafeHandle<LLObjectSelection> object_selection = LLSelectMgr::getInstanceFast()->getSelection();
 	const BOOL any_selected = (object_selection->getNumNodes() > 0);
 
 	mOpenBtn->setVisible(true);
