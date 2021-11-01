@@ -3634,27 +3634,30 @@ void LLViewerMediaImpl::calculateInterest()
 		// Check all objects this instance is associated with, and those objects' owners, against the mute list
 		mIsMuted = false;
 
+		bool mutelist_exists = LLMuteList::instanceExists();
+		bool selectmgr_exists = LLSelectMgr::instanceExists();
+
 		std::list< LLVOVolume* >::iterator iter = mObjectList.begin() ;
 		for(; iter != mObjectList.end() ; ++iter)
 		{
 			LLVOVolume *obj = *iter;
 			llassert(obj);
 			if (!obj) continue;
-			if(LLMuteList::instanceExists() &&
-			   LLMuteList::getInstance()->isMuted(obj->getID()))
+			if(mutelist_exists &&
+			   LLMuteList::getInstanceFast()->isMuted(obj->getID()))
 			{
 				mIsMuted = true;
 			}
 			else
 			{
 				// We won't have full permissions data for all objects.  Attempt to mute objects when we can tell their owners are muted.
-				if (LLSelectMgr::instanceExists())
+				if (selectmgr_exists)
 				{
 					LLPermissions* obj_perm = LLSelectMgr::getInstanceFast()->findObjectPermissions(obj);
 					if(obj_perm)
 					{
-						if(LLMuteList::getInstance() &&
-						   LLMuteList::getInstance()->isMuted(obj_perm->getOwner()))
+						if(mutelist_exists &&
+						   LLMuteList::getInstanceFast()->isMuted(obj_perm->getOwner()))
 							mIsMuted = true;
 					}
 				}

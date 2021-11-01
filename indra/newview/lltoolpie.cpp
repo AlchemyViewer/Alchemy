@@ -1950,7 +1950,7 @@ BOOL LLToolPie::handleRightClickPick()
 			LLVOAvatar* avatar = (LLVOAvatar*)object;
 			std::string name = avatar->getFullname();
 			std::string mute_msg;
-			if (LLMuteList::getInstance()->isMuted(avatar->getID(), avatar->getFullname()))
+			if (LLMuteList::getInstanceFast()->isMuted(avatar->getID(), avatar->getFullname()))
 			{
 				mute_msg = LLTrans::getString("UnmuteAvatar");
 			}
@@ -1961,7 +1961,7 @@ BOOL LLToolPie::handleRightClickPick()
 
 // [RLVa:KB] - Checked: 2010-04-11 (RLVa-1.2.0e) | Modified: RLVa-1.1.0l
 			// Don't show the context menu on empty selection when fartouch restricted [see LLToolSelect::handleObjectSelection()]
-			if ( (!rlv_handler_t::isEnabled()) || (!LLSelectMgr::getInstance()->getSelection()->isEmpty()) ||
+			if ( (!rlv_handler_t::isEnabled()) || (!LLSelectMgr::getInstanceFast()->getSelection()->isEmpty()) ||
 				 (!gRlvHandler.hasBehaviour(RLV_BHVR_FARTOUCH)) )
 			{
 // [/RLVa:KB]
@@ -1991,7 +1991,7 @@ BOOL LLToolPie::handleRightClickPick()
 		{
 			// BUG: What about chatting child objects?
 			std::string name;
-			LLSelectNode* node = LLSelectMgr::getInstance()->getSelection()->getFirstRootNode();
+			LLSelectNode* node = LLSelectMgr::getInstanceFast()->getSelection()->getFirstRootNode();
 			if (node)
 			{
 				name = node->mName;
@@ -2000,7 +2000,7 @@ BOOL LLToolPie::handleRightClickPick()
 // [RLVa:KB] - Checked: 2010-04-11 (RLVa-1.2.el) | Modified: RLVa-1.1.0l
 			// Don't show the pie menu on empty selection when fartouch/interaction restricted
 			// (not entirely accurate in case of Tools / Select Only XXX [see LLToolSelect::handleObjectSelection()]
-			if ( (!rlv_handler_t::isEnabled()) || (!LLSelectMgr::getInstance()->getSelection()->isEmpty()) ||
+			if ( (!rlv_handler_t::isEnabled()) || (!LLSelectMgr::getInstanceFast()->getSelection()->isEmpty()) ||
 				 (!gRlvHandler.hasBehaviour(RLV_BHVR_FARTOUCH)) )
 			{
 // [/RLVa:KB]

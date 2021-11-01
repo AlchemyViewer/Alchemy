@@ -184,8 +184,8 @@ void inventory_offer_handler(LLOfferInfo* info)
     // If muted, don't even go through the messaging stuff.  Just curtail the offer here.
     // Passing in a null UUID handles the case of where you have muted one of your own objects by_name.
     // The solution for STORM-1297 seems to handle the cases where the object is owned by someone else.
-    if (LLMuteList::getInstance()->isMuted(info->mFromID, info->mFromName) ||
-        LLMuteList::getInstance()->isMuted(LLUUID::null, info->mFromName))
+    if (LLMuteList::getInstanceFast()->isMuted(info->mFromID, info->mFromName) ||
+        LLMuteList::getInstanceFast()->isMuted(LLUUID::null, info->mFromName))
     {
         info->forceResponse(IOR_MUTE);
         return;
@@ -494,14 +494,14 @@ void LLIMProcessing::processNewMessage(LLUUID from_id,
     name = clean_name_from_im(name, dialog);
 
     BOOL is_do_not_disturb = gAgent.isDoNotDisturb();
-    BOOL is_muted = LLMuteList::getInstance()->isMuted(from_id, name, LLMute::flagTextChat)
+    BOOL is_muted = LLMuteList::getInstanceFast()->isMuted(from_id, name, LLMute::flagTextChat)
         // object IMs contain sender object id in session_id (STORM-1209)
-        || (dialog == IM_FROM_TASK && LLMuteList::getInstance()->isMuted(session_id));
+        || (dialog == IM_FROM_TASK && LLMuteList::getInstanceFast()->isMuted(session_id));
     BOOL is_owned_by_me = FALSE;
     BOOL is_friend = (LLAvatarTracker::instance().getBuddyInfo(from_id) == NULL) ? false : true;
     BOOL accept_im_from_only_friend = gSavedPerAccountSettings.getBOOL("VoiceCallsFriendsOnly");
     BOOL is_linden = chat.mSourceType != CHAT_SOURCE_OBJECT &&
-        LLMuteList::getInstance()->isLinden(name);
+        LLMuteList::isLinden(name);
 
     chat.mMuted = is_muted;
     chat.mFromID = from_id;
@@ -636,7 +636,7 @@ void LLIMProcessing::processNewMessage(LLUUID from_id,
 
 // [RLVa:KB] - Checked: 2010-11-30 (RLVa-1.3.0)
 				// Don't block offline IMs, or IMs from Lindens
-				if ( (rlv_handler_t::isEnabled()) && (offline != IM_OFFLINE) && (!RlvActions::canReceiveIM(from_id)) && (!LLMuteList::getInstance()->isLinden(original_name) ))
+				if ( (rlv_handler_t::isEnabled()) && (offline != IM_OFFLINE) && (!RlvActions::canReceiveIM(from_id)) && (!LLMuteList::isLinden(original_name) ))
 				{
 					if (!mute_im)
 						RlvUtil::sendBusyMessage(from_id, RlvStrings::getString(RlvStringKeys::Blocked::RecvImRemote), session_id);
@@ -804,7 +804,7 @@ void LLIMProcessing::processNewMessage(LLUUID from_id,
                 }
             }
 
-            if (agent_id.notNull() && LLMuteList::getInstance()->isMuted(agent_id))
+            if (agent_id.notNull() && LLMuteList::getInstanceFast()->isMuted(agent_id))
             {
                 break;
             }
@@ -886,7 +886,7 @@ void LLIMProcessing::processNewMessage(LLUUID from_id,
                 // group is not blocked, but we still need to check agent that sent the invitation
                 // and we have no agent's id
                 // Note: server sends username "first.last".
-                is_muted |= LLMuteList::getInstance()->isMuted(name);
+                is_muted |= LLMuteList::getInstanceFast()->isMuted(name);
             }
             if (is_do_not_disturb || is_muted)
             {
@@ -1675,7 +1675,7 @@ void LLIMProcessing::requestOfflineMessages()
     if (!requested
         && gMessageSystem
         && !gDisconnected
-        && LLMuteList::getInstance()->isLoaded()
+        && LLMuteList::getInstanceFast()->isLoaded()
         && isAgentAvatarValid()
         && gAgent.getRegion()
         && gAgent.getRegion()->capabilitiesReceived())

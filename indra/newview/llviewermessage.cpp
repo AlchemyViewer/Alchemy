@@ -1586,7 +1586,7 @@ void inventory_offer_mute_callback(const LLUUID& blocked_id,
 	LLMute::EType mute_type = is_group ? LLMute::GROUP : LLMute::AGENT;
 
 	LLMute mute(blocked_id, full_name, mute_type);
-	if (LLMuteList::getInstance()->add(mute))
+	if (LLMuteList::getInstanceFast()->add(mute))
 	{
 		LLPanelBlockedList::showPanelAndSelect(blocked_id);
 	}
@@ -1921,7 +1921,7 @@ bool LLOfferInfo::inventory_offer_callback(const LLSD& notification, const LLSD&
 				log_message = LLTrans::getString("InvOfferDecline", log_message_args);
 			}
 			chat.mText = log_message;
-			if( LLMuteList::getInstance()->isMuted(mFromID ) && ! LLMuteList::getInstance()->isLinden(mFromName) )  // muting for SL-42269
+			if( LLMuteList::getInstanceFast()->isMuted(mFromID ) && ! LLMuteList::isLinden(mFromName) )  // muting for SL-42269
 			{
 				chat.mMuted = TRUE;
 				accept_to_trash = false; // will send decline message
@@ -2130,7 +2130,7 @@ bool LLOfferInfo::inventory_task_offer_callback(const LLSD& notification, const 
 		default:
 			// close button probably (or any of the fall-throughs from above)
 			destination = gInventory.findCategoryUUIDForType(LLFolderType::FT_TRASH);
-			if (accept && LLMuteList::getInstance()->isMuted(mFromID, mFromName))
+			if (accept && LLMuteList::getInstanceFast()->isMuted(mFromID, mFromName))
 			{
 				// Note: muted offers are usually declined automatically,
 				// but user can mute object after receiving message
@@ -2472,7 +2472,7 @@ void process_offer_callingcard(LLMessageSystem* msg, void**)
 	if(!source_name.empty())
 	{
 		if (gAgent.isDoNotDisturb() 
-			|| LLMuteList::getInstance()->isMuted(source_id, source_name, LLMute::flagTextChat))
+			|| LLMuteList::getInstanceFast()->isMuted(source_id, source_name, LLMute::flagTextChat))
 		{
 			// automatically decline offer
 			LLNotifications::instance().forceResponse(LLNotification::Params("OfferCallingCard").payload(payload), 1);
@@ -2585,13 +2585,13 @@ void process_chat_from_simulator(LLMessageSystem *msg, void **user_data)
 
 	BOOL is_muted = FALSE;
 	BOOL is_linden = FALSE;
-	is_muted = LLMuteList::getInstance()->isMuted(
+	is_muted = LLMuteList::getInstanceFast()->isMuted(
 		from_id,
 		from_name,
 		LLMute::flagTextChat) 
-		|| LLMuteList::getInstance()->isMuted(owner_id, LLMute::flagTextChat);
+		|| LLMuteList::getInstanceFast()->isMuted(owner_id, LLMute::flagTextChat);
 	is_linden = chat.mSourceType != CHAT_SOURCE_OBJECT &&
-		LLMuteList::getInstance()->isLinden(from_name);
+		LLMuteList::isLinden(from_name);
 
 	if (is_muted && (chat.mSourceType == CHAT_SOURCE_OBJECT))
 	{
@@ -3820,9 +3820,9 @@ static std::map<LLUUID, PostponedSoundData> postponed_sounds;
 
 void set_attached_sound(LLViewerObject *objectp, const LLUUID &object_id, const LLUUID &sound_id, const LLUUID& owner_id, const F32 gain, const U8 flags)
 {
-    if (LLMuteList::getInstance()->isMuted(object_id)) return;
+    if (LLMuteList::getInstanceFast()->isMuted(object_id)) return;
 
-    if (LLMuteList::getInstance()->isMuted(owner_id, LLMute::flagObjectSounds)) return;
+    if (LLMuteList::getInstanceFast()->isMuted(owner_id, LLMute::flagObjectSounds)) return;
 
     // Don't play sounds from a region with maturity above current agent maturity
     LLVector3d pos = objectp->getPositionGlobal();
@@ -4122,14 +4122,14 @@ void process_sound_trigger(LLMessageSystem *msg, void **)
 	if (!LLViewerParcelMgr::getInstanceFast()->canHearSound(pos_global)) return;
 
 	// Don't play sounds triggered by someone you muted.
-	if (LLMuteList::getInstance()->isMuted(owner_id, LLMute::flagObjectSounds)) return;
+	if (LLMuteList::getInstanceFast()->isMuted(owner_id, LLMute::flagObjectSounds)) return;
 	
 	// Don't play sounds from an object you muted
-	if (LLMuteList::getInstance()->isMuted(object_id)) return;
+	if (LLMuteList::getInstanceFast()->isMuted(object_id)) return;
 
 	// Don't play sounds from an object whose parent you muted
 	if (parent_id.notNull()
-		&& LLMuteList::getInstance()->isMuted(parent_id))
+		&& LLMuteList::getInstanceFast()->isMuted(parent_id))
 	{
 		return;
 	}
@@ -4170,8 +4170,8 @@ void process_preload_sound(LLMessageSystem *msg, void **user_data)
 	LLViewerObject *objectp = gObjectList.findObject(object_id);
 	if (!objectp) return;
 
-	if (LLMuteList::getInstance()->isMuted(object_id)) return;
-	if (LLMuteList::getInstance()->isMuted(owner_id, LLMute::flagObjectSounds)) return;
+	if (LLMuteList::getInstanceFast()->isMuted(object_id)) return;
+	if (LLMuteList::getInstanceFast()->isMuted(owner_id, LLMute::flagObjectSounds)) return;
 	
 	LLAudioSource *sourcep = objectp->getAudioSource(owner_id);
 	if (!sourcep) return;
@@ -5102,7 +5102,7 @@ static void process_money_balance_reply_extended(LLMessageSystem* msg)
 		is_name_group = is_source_group;
 		name_id = source_id;
 
-		if (!reason.empty() && !LLMuteList::getInstance()->isMuted(source_id))
+		if (!reason.empty() && !LLMuteList::getInstanceFast()->isMuted(source_id))
 		{
 			message = LLTrans::getString("paid_you_ldollars" + gift_suffix, args);
 		}
@@ -6043,7 +6043,7 @@ bool script_question_cb(const LLSD& notification, const LLSD& response)
 
 void script_question_mute(const LLUUID& task_id, const std::string& object_name)
 {
-	LLMuteList::getInstance()->add(LLMute(task_id, object_name, LLMute::OBJECT));
+	LLMuteList::getInstanceFast()->add(LLMute(task_id, object_name, LLMute::OBJECT));
 
     // purge the message queue of any previously queued requests from the same source. DEV-4879
     class OfferMatcher : public LLNotificationsUI::LLScreenChannel::Matcher
@@ -6126,7 +6126,7 @@ void process_script_question(LLMessageSystem *msg, void **user_data)
 	}
 	
 	// don't display permission requests if this object is muted
-	if (LLMuteList::getInstance()->isMuted(taskid)) return;
+	if (LLMuteList::getInstanceFast()->isMuted(taskid)) return;
 	
 	// throttle excessive requests from any specific user's scripts
 	typedef LLKeyThrottle<std::string> LLStringThrottle;
@@ -6769,7 +6769,7 @@ bool teleport_request_callback(const LLSD& notification, const LLSD& response)
 	LLAvatarName av_name;
 	LLAvatarNameCache::get(from_id, &av_name);
 
-	if(LLMuteList::getInstance()->isMuted(from_id) && !LLMuteList::getInstance()->isLinden(av_name.getUserName()))
+	if(LLMuteList::getInstanceFast()->isMuted(from_id) && !LLMuteList::isLinden(av_name.getUserName()))
 	{
 		return false;
 	}
@@ -6924,7 +6924,7 @@ bool callback_script_dialog(const LLSD& notification, const LLSD& response)
 		std::string object_name = notification["payload"]["object_name"].asString();
 		LLUUID object_id = notification["payload"]["object_id"].asUUID();
 		LLMute mute(object_id, object_name, LLMute::OBJECT);
-		if (LLMuteList::getInstance()->add(mute))
+		if (LLMuteList::getInstanceFast()->add(mute))
 		{
 			// This call opens the sidebar, displays the block list, and highlights the newly blocked
 			// object in the list so the user can see that their block click has taken effect.
@@ -6981,7 +6981,7 @@ void process_script_dialog(LLMessageSystem* msg, void**)
 		msg->getUUIDFast(_PREHASH_OwnerData, _PREHASH_OwnerID, owner_id);
 	}
 
-	if (LLMuteList::getInstance()->isMuted(object_id) || LLMuteList::getInstance()->isMuted(owner_id))
+	if (LLMuteList::getInstanceFast()->isMuted(object_id) || LLMuteList::getInstanceFast()->isMuted(owner_id))
 	{
 		return;
 	}
@@ -7082,7 +7082,7 @@ void callback_load_url_name(const LLUUID& id, const std::string& full_name, bool
 			}
 
 			// For legacy name-only mutes.
-			if (LLMuteList::getInstance()->isMuted(LLUUID::null, owner_name))
+			if (LLMuteList::getInstanceFast()->isMuted(LLUUID::null, owner_name))
 			{
 				continue;
 			}
@@ -7134,8 +7134,8 @@ void process_load_url(LLMessageSystem* msg, void**)
 	// URL is safety checked in load_url above
 
 	// Check if object or owner is muted
-	if (LLMuteList::getInstance()->isMuted(object_id, object_name) ||
-	    LLMuteList::getInstance()->isMuted(owner_id))
+	if (LLMuteList::getInstanceFast()->isMuted(object_id, object_name) ||
+	    LLMuteList::getInstanceFast()->isMuted(owner_id))
 	{
 		LL_INFOS("Messaging")<<"Ignoring load_url from muted object/owner."<<LL_ENDL;
 		return;

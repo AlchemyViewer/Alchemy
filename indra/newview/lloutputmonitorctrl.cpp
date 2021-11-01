@@ -306,7 +306,7 @@ void LLOutputMonitorCtrl::setSpeakerId(const LLUUID& speaker_id, const LLUUID& s
 		else
 		{
 			// check only blocking on voice. EXT-3542
-			mIsMuted = LLMuteList::getInstance()->isMuted(mSpeakerId, LLMute::flagVoiceChat);
+			mIsMuted = LLMuteList::getInstanceFast()->isMuted(mSpeakerId, LLMute::flagVoiceChat);
 			LLMuteList::getInstance()->addObserver(this);
 		}
 	}

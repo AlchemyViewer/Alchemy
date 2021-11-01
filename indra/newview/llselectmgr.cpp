@@ -5554,7 +5554,7 @@ void LLSelectMgr::processObjectPropertiesFamily(LLMessageSystem* msg, void** use
 	else if (request_flags & OBJECT_PAY_REQUEST)
 	{
 		// check if the owner of the paid object is muted
-		LLMuteList::getInstance()->autoRemove(owner_id, LLMuteList::AR_MONEY);
+		LLMuteList::getInstanceFast()->autoRemove(owner_id, LLMuteList::AR_MONEY);
 	}
 
 	// Now look through all of the hovered nodes

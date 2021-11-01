@@ -314,7 +314,7 @@ void notify_of_message(const LLSD& msg, bool is_dnd_msg)
 				 	 	 	 	 	 	|| NOT_ON_TOP == conversations_floater_status))
 		|| is_dnd_msg)
     {
-    	if(!LLMuteList::getInstance()->isMuted(participant_id))
+    	if(!LLMuteList::getInstanceFast()->isMuted(participant_id))
     	{
 			if(gAgent.isDoNotDisturb())
 			{
@@ -343,7 +343,7 @@ void notify_of_message(const LLSD& msg, bool is_dnd_msg)
 		&& !is_session_focused
 		&& !is_dnd_msg) //prevent flashing FUI button because the conversation floater will have already opened
 	{
-		if(!LLMuteList::getInstance()->isMuted(participant_id))
+		if(!LLMuteList::getInstanceFast()->isMuted(participant_id))
     {
 			if(!gAgent.isDoNotDisturb())
     	{
@@ -1457,7 +1457,7 @@ void LLIMModel::sendMessage(const std::string& utf8_text,
 	}
 
 	// If there is a mute list and this is not a group chat...
-	if ( LLMuteList::getInstance() && !is_group_chat)
+	if ( LLMuteList::instanceExists() && !is_group_chat)
 	{
 		// ... the target should not be in our mute list for some message types.
 		// Auto-remove them if present.
@@ -1473,7 +1473,7 @@ void LLIMModel::sendMessage(const std::string& utf8_text,
 		case IM_LURE_USER:
 		case IM_GODLIKE_LURE_USER:
 		case IM_FRIENDSHIP_OFFERED:
-			LLMuteList::getInstance()->autoRemove(other_participant_id, LLMuteList::AR_IM);
+			LLMuteList::getInstanceFast()->autoRemove(other_participant_id, LLMuteList::AR_IM);
 			break;
 		default: ; // do nothing
 		}
@@ -2737,7 +2737,7 @@ void LLIMMgr::addMessage(
 //		name_is_setted = true;
 	}
 //	bool skip_message = false;
-//	bool from_linden = LLMuteList::getInstance()->isLinden(from);
+//	bool from_linden = LLMuteList::isLinden(from);
 //	if (gSavedSettings.getBOOL("VoiceCallsFriendsOnly") && !from_linden)
 //	{
 //		// Evaluate if we need to skip this message when that setting is true (default is false)
@@ -2819,7 +2819,7 @@ void LLIMMgr::addMessage(
 
 //	if (!LLMuteList::getInstance()->isMuted(other_participant_id, LLMute::flagTextChat) && !skip_message)
 // [SL:KB] - Patch: Chat-Misc | Checked: 2014-05-01 (Catznip-3.6)
-	if (!LLMuteList::getInstance()->isMuted(other_participant_id, LLMute::flagTextChat))
+	if (!LLMuteList::getInstanceFast()->isMuted(other_participant_id, LLMute::flagTextChat))
 // [/SL:KB]
 	{
 		LLIMModel::instance().addMessage(new_session_id, from, other_participant_id, msg);
@@ -3110,7 +3110,7 @@ void LLIMMgr::inviteToSession(
 	std::string question_type = "VoiceInviteQuestionDefault";
 
 	BOOL voice_invite = FALSE;
-	bool is_linden = LLMuteList::getInstance()->isLinden(caller_name);
+	bool is_linden = LLMuteList::isLinden(caller_name);
 // [SL:KB] - Patch: Chat-GroupOptions | Checked: Catznip-5.2
 	bool is_adhoc = false;
 // [/SL:KB]
@@ -3162,14 +3162,14 @@ void LLIMMgr::inviteToSession(
 	//ignore invites from muted residents
 	if (!is_linden)
 	{
-		if (LLMuteList::getInstance()->isMuted(caller_id, LLMute::flagVoiceChat)
+		if (LLMuteList::getInstanceFast()->isMuted(caller_id, LLMute::flagVoiceChat)
 			&& voice_invite && "VoiceInviteQuestionDefault" == question_type)
 		{
 			LL_INFOS("IMVIEW") << "Rejecting voice call from initiating muted resident " << caller_name << LL_ENDL;
 			LLIncomingCallDialog::processCallResponse(1, payload);
 			return;
 		}
-		else if (LLMuteList::getInstance()->isMuted(caller_id, LLMute::flagAll & ~LLMute::flagVoiceChat) && !voice_invite)
+		else if (LLMuteList::getInstanceFast()->isMuted(caller_id, LLMute::flagAll & ~LLMute::flagVoiceChat) && !voice_invite)
 		{
 			LL_INFOS("IMVIEW") << "Rejecting session invite from initiating muted resident " << caller_name << LL_ENDL;
 			return;
@@ -3577,7 +3577,7 @@ void LLIMMgr::noteMutedUsers(const LLUUID& session_id,
 								  const std::vector<LLUUID>& ids)
 {
 	// Don't do this if we don't have a mute list.
-	LLMuteList *ml = LLMuteList::getInstance();
+	LLMuteList *ml = LLMuteList::getInstanceFast();
 	if( !ml )
 	{
 		return;
@@ -3800,7 +3800,7 @@ public:
 
 			BOOL is_do_not_disturb = gAgent.isDoNotDisturb();
  // [SL:KB] - Patch: Chat-GroupOptions | Checked: 2012-06-21 (Catznip-3.3)
-			BOOL is_muted = LLMuteList::getInstance()->isMuted(from_id, LLMute::flagTextChat);
+			BOOL is_muted = LLMuteList::getInstanceFast()->isMuted(from_id, LLMute::flagTextChat);
 			BOOL is_group = gAgent.isInGroup(session_id);
 
 			// Just return if the user is currently marked DnD or if the group session was started by someone on the mute list (we'll get another invitation later)
@@ -3897,7 +3897,7 @@ public:
 				ll_vector3_from_sd(message_params["position"]),
 				true);
 
-			if (LLMuteList::getInstance()->isMuted(from_id, name, LLMute::flagTextChat))
+			if (LLMuteList::getInstanceFast()->isMuted(from_id, name, LLMute::flagTextChat))
 			{
 				return;
 			}

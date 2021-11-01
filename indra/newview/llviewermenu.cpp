@@ -3173,7 +3173,8 @@ BOOL enable_has_attachments(void*)
 
 bool enable_object_mute()
 {
-	LLViewerObject* object = LLSelectMgr::getInstance()->getSelection()->getPrimaryObject();
+	LLObjectSelectionHandle selection = LLSelectMgr::getInstanceFast()->getSelection();
+	LLViewerObject* object = selection->getPrimaryObject();
 	if (!object) return false;
 
 	LLVOAvatar* avatar = find_avatar_from_object(object); 
@@ -3192,14 +3193,15 @@ bool enable_object_mute()
 	else
 	{
 		// Just a regular object
-		return LLSelectMgr::getInstance()->getSelection()->contains( object, SELECT_ALL_TES ) &&
-			   !LLMuteList::getInstance()->isMuted(object->getID());
+		return selection->contains( object, SELECT_ALL_TES ) &&
+			   !LLMuteList::getInstanceFast()->isMuted(object->getID());
 	}
 }
 
 bool enable_object_unmute()
 {
-	LLViewerObject* object = LLSelectMgr::getInstance()->getSelection()->getPrimaryObject();
+	LLObjectSelectionHandle selection = LLSelectMgr::getInstanceFast()->getSelection();
+	LLViewerObject* object = selection->getPrimaryObject();
 	if (!object) return false;
 
 	LLVOAvatar* avatar = find_avatar_from_object(object); 
@@ -3215,8 +3217,8 @@ bool enable_object_unmute()
 	else
 	{
 		// Just a regular object
-		return LLSelectMgr::getInstance()->getSelection()->contains( object, SELECT_ALL_TES ) &&
-			   LLMuteList::getInstance()->isMuted(object->getID());;
+		return selection->contains( object, SELECT_ALL_TES ) &&
+			   LLMuteList::getInstanceFast()->isMuted(object->getID());;
 	}
 }
 
@@ -3293,7 +3295,7 @@ class LLObjectMute : public view_listener_t
 {
 	bool handleEvent(const LLSD& userdata)
 	{
-		LLViewerObject* object = LLSelectMgr::getInstance()->getSelection()->getPrimaryObject();
+		LLViewerObject* object = LLSelectMgr::getInstanceFast()->getSelection()->getPrimaryObject();
 		if (!object) return true;
 		
 		LLUUID id;
@@ -3326,7 +3328,7 @@ class LLObjectMute : public view_listener_t
 			// it's an object
 			id = object->getID();
 
-			LLSelectNode* node = LLSelectMgr::getInstance()->getSelection()->getFirstRootNode();
+			LLSelectNode* node = LLSelectMgr::getInstanceFast()->getSelection()->getFirstRootNode();
 			if (node)
 			{
 				name = node->mName;
@@ -3336,13 +3338,13 @@ class LLObjectMute : public view_listener_t
 		}
 		
 		LLMute mute(id, name, type);
-		if (LLMuteList::getInstance()->isMuted(mute.mID))
+		if (LLMuteList::getInstanceFast()->isMuted(mute.mID))
 		{
-			LLMuteList::getInstance()->remove(mute);
+			LLMuteList::getInstanceFast()->remove(mute);
 		}
 		else
 		{
-			LLMuteList::getInstance()->add(mute);
+			LLMuteList::getInstanceFast()->add(mute);
 			LLPanelBlockedList::showPanelAndSelect(mute.mID);
 		}
 		
@@ -6888,7 +6890,7 @@ class LLMuteParticle : public view_listener_t
 {
 	bool handleEvent(const LLSD& userdata)
 	{
-		LLUUID id = LLToolPie::getInstance()->getPick().mParticleOwnerID;
+		LLUUID id = LLToolPie::getInstanceFast()->getPick().mParticleOwnerID;
 		
 		if (id.notNull())
 		{
@@ -6896,13 +6898,13 @@ class LLMuteParticle : public view_listener_t
 			LLAvatarNameCache::get(id, &av_name);
 
 			LLMute mute(id, av_name.getUserName(), LLMute::AGENT);
-			if (LLMuteList::getInstance()->isMuted(mute.mID))
+			if (LLMuteList::getInstanceFast()->isMuted(mute.mID))
 			{
-				LLMuteList::getInstance()->remove(mute);
+				LLMuteList::getInstanceFast()->remove(mute);
 			}
 			else
 			{
-				LLMuteList::getInstance()->add(mute);
+				LLMuteList::getInstanceFast()->add(mute);
 				LLPanelBlockedList::showPanelAndSelect(mute.mID);
 			}
 		}

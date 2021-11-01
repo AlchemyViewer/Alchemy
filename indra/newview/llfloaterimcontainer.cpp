@@ -1639,11 +1639,11 @@ bool LLFloaterIMContainer::checkContextMenuItem(const std::string& item, uuid_ve
     {
 		if ("is_blocked" == item)
 		{
-			return LLMuteList::getInstance()->isMuted(uuids.front(), LLMute::flagVoiceChat);
+			return LLMuteList::getInstanceFast()->isMuted(uuids.front(), LLMute::flagVoiceChat);
 		}
 		else if (item == "is_muted")
 		{
-		    return LLMuteList::getInstance()->isMuted(uuids.front(), LLMute::flagTextChat);
+		    return LLMuteList::getInstanceFast()->isMuted(uuids.front(), LLMute::flagTextChat);
 	    }
 		else if ("is_allowed_text_chat" == item)
 		{

@@ -4307,8 +4307,8 @@ void LLVivoxVoiceClient::messageEvent(
 		if(session)
 		{
 			bool is_do_not_disturb = gAgent.isDoNotDisturb();
-			bool is_muted = LLMuteList::getInstance()->isMuted(session->mCallerID, session->mName, LLMute::flagTextChat);
-			bool is_linden = LLMuteList::getInstance()->isLinden(session->mName);
+			bool is_muted = LLMuteList::getInstanceFast()->isMuted(session->mCallerID, session->mName, LLMute::flagTextChat);
+			bool is_linden = LLMuteList::isLinden(session->mName);
 			LLChat chat;
 
 			chat.mMuted = is_muted && !is_linden;
@@ -4495,7 +4495,7 @@ bool LLVivoxVoiceClient::participantState::updateMuteState()
 {
 	bool result = false;
 
-	bool isMuted = LLMuteList::getInstance()->isMuted(mAvatarID, LLMute::flagVoiceChat);
+	bool isMuted = LLMuteList::getInstanceFast()->isMuted(mAvatarID, LLMute::flagVoiceChat);
 	if(mOnMuteList != isMuted)
 	{
 	    mOnMuteList = isMuted;

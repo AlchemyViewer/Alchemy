@@ -80,7 +80,7 @@ LLBlockList::~LLBlockList()
 
 void LLBlockList::createList()
 {
-	std::vector<LLMute> mutes = LLMuteList::instance().getMutes();
+	std::vector<LLMute> mutes = LLMuteList::instanceFast().getMutes();
 	std::vector<LLMute>::const_iterator mute_it = mutes.begin();
 
 	for (; mute_it != mutes.end(); ++mute_it)

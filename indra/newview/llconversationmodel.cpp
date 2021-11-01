@@ -650,7 +650,7 @@ void LLConversationItemParticipant::setDisplayModeratorRole(bool displayRole)
 
 bool LLConversationItemParticipant::isVoiceMuted()
 {
-	return mIsModeratorMuted || LLMuteList::getInstance()->isMuted(mUUID, LLMute::flagVoiceChat);
+	return mIsModeratorMuted || LLMuteList::getInstanceFast()->isMuted(mUUID, LLMute::flagVoiceChat);
 }
 
 //

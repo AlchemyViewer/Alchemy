@@ -1165,14 +1165,14 @@ bool LLAvatarActions::toggleBlock(const LLUUID& id)
 
 	LLMute mute(id, av_name.getUserName(), LLMute::AGENT);
 
-	if (LLMuteList::getInstance()->isMuted(mute.mID, mute.mName))
+	if (LLMuteList::getInstanceFast()->isMuted(mute.mID, mute.mName))
 	{
-		LLMuteList::getInstance()->remove(mute);
+		LLMuteList::getInstanceFast()->remove(mute);
 		return false;
 	}
 	else
 	{
-		LLMuteList::getInstance()->add(mute);
+		LLMuteList::getInstanceFast()->add(mute);
 		return true;
 	}
 }
@@ -1183,7 +1183,7 @@ void LLAvatarActions::toggleMute(const LLUUID& id, U32 flags)
 	LLAvatarName av_name;
 	LLAvatarNameCache::get(id, &av_name);
 
-	LLMuteList* mute_list = LLMuteList::getInstance();
+	LLMuteList* mute_list = LLMuteList::getInstanceFast();
 	bool is_muted = mute_list->isMuted(id, flags);
 
 	LLMute mute(id, av_name.getUserName(), LLMute::AGENT);
@@ -1510,13 +1510,13 @@ bool LLAvatarActions::isBlocked(const LLUUID& id)
 {
 	LLAvatarName av_name;
 	LLAvatarNameCache::get(id, &av_name);
-	return LLMuteList::getInstance()->isMuted(id, av_name.getUserName());
+	return LLMuteList::getInstanceFast()->isMuted(id, av_name.getUserName());
 }
 
 // static
 bool LLAvatarActions::isVoiceMuted(const LLUUID& id)
 {
-	return LLMuteList::getInstance()->isMuted(id, LLMute::flagVoiceChat);
+	return LLMuteList::getInstanceFast()->isMuted(id, LLMute::flagVoiceChat);
 }
 
 // static
