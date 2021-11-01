@@ -354,7 +354,7 @@ Learn about [https://community.secondlife.com/knowledgebase/joining-and-particip
                          multi_select="true"
                          name="avatars_online"
                          keep_one_selected="false"
-                         show_permissions_granted="true"
+                         show_permissions_granted="hover"
                          top="0"
                          width="307" />
                 </accordion_tab>
@@ -372,7 +372,7 @@ Learn about [https://community.secondlife.com/knowledgebase/joining-and-particip
                          multi_select="true"
                          name="avatars_all"
                          keep_one_selected="false"
-                         show_permissions_granted="true"
+                         show_permissions_granted="hover"
                          top="0"
                          width="307" />
                 </accordion_tab>           
