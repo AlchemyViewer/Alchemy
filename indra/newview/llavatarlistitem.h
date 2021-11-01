@@ -40,6 +40,13 @@ class LLAvatarIconCtrl;
 class LLOutputMonitorCtrl;
 class LLAvatarName;
 class LLIconCtrl;
+typedef enum
+{
+	SP_NEVER = 0,			// Never show permission icons
+	SP_HOVER = 1,			// Only show permission icons on hover
+	SP_NONDEFAULT = 2,		// Show permissions different from default
+	SP_COUNT
+} EShowPermissionType;
 
 class LLAvatarListItem : public LLPanel, public LLFriendObserver
 {
@@ -104,7 +111,10 @@ public:
 	void setShowProfileBtn(bool show);
 	void setShowInfoBtn(bool show);
 	void showSpeakingIndicator(bool show);
-	void setShowPermissions(bool show) { mShowPermissions = show; };
+// [SL:KB] - Patch: UI-PeopleFriendPermissions | Checked: 2013-06-03 (Catznip-3.4)
+	void setShowPermissions(EShowPermissionType spType);
+// [/SL:KB]
+//	void setShowPermissions(bool show) { mShowPermissions = show; };
 	void showDistance(bool show);
 	void showLastInteractionTime(bool show);
 	void setAvatarIconVisible(bool visible);
@@ -119,6 +129,10 @@ public:
 
 	void onInfoBtnClick();
 	void onProfileBtnClick();
+// [SL:KB] - Patch: UI-PeopleFriendPermissions | Checked: 2010-11-04 (Catznip-2.3)
+	void onPermissionBtnToggle(S32 toggleRight);
+	void onModifyRightsConfirmationCallback(const LLSD& notification, const LLSD& response, bool fGrant);
+// [/SL:KB]
 
 	/*virtual*/ BOOL handleDoubleClick(S32 x, S32 y, MASK mask) final override;
 
@@ -131,18 +145,15 @@ protected:
 	LLAvatarIconCtrl* mAvatarIcon = nullptr;
 
 	/// Indicator for permission to see me online.
-	LLIconCtrl* mIconPermissionOnline = nullptr;
+	LLButton* mIconPermissionOnline = nullptr;
 	/// Indicator for permission to see my position on the map.
-	LLIconCtrl* mIconPermissionMap = nullptr;
+	LLButton* mIconPermissionMap = nullptr;
 	/// Indicator for permission to edit my objects.
-	LLIconCtrl* mIconPermissionEditMine = nullptr;
+	LLButton* mIconPermissionEditMine = nullptr;
 	/// Indicator for permission to edit their objects.
 	LLIconCtrl* mIconPermissionEditTheirs = nullptr;
-	
 	/// Indicator for permission to show their position on the map.
 	LLIconCtrl* mIconPermissionMapTheirs = nullptr;
-	/// Indicator for permission to see their online status.
-	LLIconCtrl* mIconPermissionOnlineTheirs = nullptr;
 
 	LLIconCtrl* mIconHovered = nullptr;
 
@@ -203,7 +214,10 @@ private:
 	 *
 	 * Need to call updateChildren() afterwards to sort out their layout.
 	 */
-	bool showPermissions(bool visible);
+//	bool showPermissions(bool visible);
+// [SL:KB] - Patch: UI-PeopleFriendPermissions | Checked: 2010-10-26 (Catznip-2.3)
+	bool refreshPermissions();
+// [/SL:KB]
 
 	/**
 	 * Gets child view specified by index.
@@ -233,7 +247,10 @@ private:
 // [/RLVa:KB]
 
 	/// indicates whether to show icons representing permissions granted
-	bool mShowPermissions;
+// [SL:KB] - Patch: UI-PeopleFriendPermissions | Checked: 2013-06-03 (Catznip-3.4)
+	EShowPermissionType mShowPermissions;
+// [/SL:KB]
+//	bool mShowPermissions;
 
 	/// true when the mouse pointer is hovering over this item
 	bool mHovered;

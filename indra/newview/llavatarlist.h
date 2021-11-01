@@ -47,6 +47,11 @@ class LLAvatarList final : public LLFlatListViewEx
 {
 	LOG_CLASS(LLAvatarList);
 public:
+	struct ShowPermissionTypeNames : public LLInitParam::TypeValuesHelper<EShowPermissionType, ShowPermissionTypeNames>
+	{
+		static void declareValues();
+	};
+
 	struct Params : public LLInitParam::Block<Params, LLFlatListViewEx::Params>
 	{
 		Optional<bool>	ignore_online_status, // show all items as online
@@ -54,8 +59,8 @@ public:
 						show_distance,	// *HACK: my sinuses hurt and i want pizza.
 						show_info_btn,
 						show_profile_btn,
-						show_speaking_indicator,
-						show_permissions_granted;
+						show_speaking_indicator;
+		Optional<EShowPermissionType, ShowPermissionTypeNames> show_permissions_granted;
 		Params();
 	};
 
@@ -79,7 +84,10 @@ public:
 
 	void toggleIcons();
 	void setSpeakingIndicatorsVisible(bool visible);
-	void showPermissions(bool visible);
+// [SL:KB] - Patch: UI-PeopleFriendPermissions | Checked: 2013-06-03 (Catznip-3.4)
+	void showPermissions(EShowPermissionType spType);
+// [/SL:KB]
+//	void showPermissions(bool visible);
 	void sortByName();
 	void setShowIcons(std::string param_name);
 	bool getIconsVisible() const { return mShowIcons; }
@@ -137,7 +145,10 @@ private:
 	bool mShowInfoBtn;
 	bool mShowProfileBtn;
 	bool mShowSpeakingIndicator;
-	bool mShowPermissions;
+// [SL:KB] - Patch: UI-PeopleFriendPermissions | Checked: 2013-06-03 (Catznip-3.4)
+	EShowPermissionType mShowPermissions;
+// [/SL:KB]
+//	bool mShowPermissions;
 	bool mShowCompleteName;
 // [RLVa:KB] - RLVa-1.2.0
 	bool mRlvCheckShowNames;

@@ -39,7 +39,9 @@
 #include "llagent.h"
 #include "llavatarnamecache.h"
 #include "llavatariconctrl.h"
+#include "llnotificationsutil.h"
 #include "lloutputmonitorctrl.h"
+#include "llslurl.h"
 #include "lltooldraganddrop.h"
 // [RLVa:KB] - Checked: RLVa-2.0.1
 #include "rlvactions.h"
@@ -73,7 +75,8 @@ LLAvatarListItem::LLAvatarListItem(bool not_from_ui_factory/* = true*/)
 // [RLVa:KB] - Checked: RLVa-1.2.0
 	mRlvCheckShowNames(false),
 // [/RLVa:KB]
-	mShowPermissions(false),
+	mShowPermissions(SP_NEVER),
+//	mShowPermissions(false),
 	mShowCompleteName(false),
 	mHovered(false),
 	mAvatarNameCacheConnection(),
@@ -107,17 +110,20 @@ BOOL  LLAvatarListItem::postBuild()
 	mDistance = getChild<LLTextBox>("distance");
 	mLastInteractionTime = getChild<LLTextBox>("last_interaction");
 
-	mIconPermissionOnline = getChild<LLIconCtrl>("permission_online_icon");
-	mIconPermissionMap = getChild<LLIconCtrl>("permission_map_icon");
-	mIconPermissionEditMine = getChild<LLIconCtrl>("permission_edit_mine_icon");
+	mIconPermissionOnline = getChild<LLButton>("permission_online_icon");
+	mIconPermissionMap = getChild<LLButton>("permission_map_icon");
+	mIconPermissionEditMine = getChild<LLButton>("permission_edit_mine_icon");
+
+	mIconPermissionOnline->setClickedCallback(boost::bind(&LLAvatarListItem::onPermissionBtnToggle, this, (S32)LLRelationship::GRANT_ONLINE_STATUS));
+	mIconPermissionMap->setClickedCallback(boost::bind(&LLAvatarListItem::onPermissionBtnToggle, this, (S32)LLRelationship::GRANT_MAP_LOCATION));
+	mIconPermissionEditMine->setClickedCallback(boost::bind(&LLAvatarListItem::onPermissionBtnToggle, this, (S32)LLRelationship::GRANT_MODIFY_OBJECTS));
+
 	mIconPermissionEditTheirs = getChild<LLIconCtrl>("permission_edit_theirs_icon");
 	mIconPermissionMapTheirs = getChild<LLIconCtrl>("permission_map_theirs_icon");
-	mIconPermissionOnlineTheirs = getChild<LLIconCtrl>("permission_online_theirs_icon");
 	mIconPermissionOnline->setVisible(false);
 	mIconPermissionMap->setVisible(false);
 	mIconPermissionEditMine->setVisible(false);
 	mIconPermissionEditTheirs->setVisible(false);
-	mIconPermissionOnlineTheirs->setVisible(false);
 	mIconPermissionMapTheirs->setVisible(false);
 
 	mIconHovered = getChild<LLIconCtrl>("hovered_icon");
@@ -145,6 +151,11 @@ BOOL  LLAvatarListItem::postBuild()
 		sStaticInitialized = true;
 	}
 
+	mIconPermissionOnline->setEnabled(SP_NEVER != mShowPermissions);
+	mIconPermissionMap->setEnabled(SP_NEVER != mShowPermissions);
+	mIconPermissionEditMine->setEnabled(SP_NEVER != mShowPermissions);
+	mIconPermissionEditTheirs->setEnabled(SP_NEVER != mShowPermissions);
+	mIconPermissionMapTheirs->setEnabled(SP_NEVER != mShowPermissions);
 	return TRUE;
 }
 
@@ -195,7 +206,10 @@ void LLAvatarListItem::onMouseEnter(S32 x, S32 y, MASK mask)
 	mHovered = true;
 	LLPanel::onMouseEnter(x, y, mask);
 
-	showPermissions(mShowPermissions);
+//	showPermissions(mShowPermissions);
+// [SL:KB] - Patch: UI-PeopleFriendPermissions | Checked: 2010-10-26 (Catznip-2.3)
+	refreshPermissions();
+// [/SL:KB]
 	updateChildren();
 }
 
@@ -208,7 +222,10 @@ void LLAvatarListItem::onMouseLeave(S32 x, S32 y, MASK mask)
 	mHovered = false;
 	LLPanel::onMouseLeave(x, y, mask);
 
-	showPermissions(false);
+//	showPermissions(false);
+// [SL:KB] - Patch: UI-PeopleFriendPermissions | Checked: 2010-10-26 (Catznip-2.3)
+	refreshPermissions();
+// [/SL:KB]
 	updateChildren();
 }
 
@@ -220,7 +237,10 @@ void LLAvatarListItem::changed(U32 mask)
 
 	if (mask & LLFriendObserver::POWERS)
 	{
-		showPermissions(mShowPermissions && mHovered);
+//		showPermissions(mShowPermissions && mHovered);
+// [SL:KB] - Patch: UI-PeopleFriendPermissions | Checked: 2010-10-26 (Catznip-2.3)
+		refreshPermissions();
+// [/SL:KB]
 		updateChildren();
 	}
 }
@@ -310,6 +330,25 @@ void LLAvatarListItem::setAvatarId(const LLUUID& id, const LLUUID& session_id, b
 	}
 }
 
+// [SL:KB] - Patch: UI-PeopleFriendPermissions | Checked: 2010-10-24 (Catznip-2.3)
+void LLAvatarListItem::setShowPermissions(EShowPermissionType spType)
+{
+	mShowPermissions = spType;
+
+// [SL:KB] - Patch: UI-SidepanelPeople | Checked: 2011-05-13 (Catznip-2.6)
+	// Reenable the controls for updateChildren()
+	mIconPermissionOnline->setEnabled(SP_NEVER != mShowPermissions);
+	mIconPermissionMap->setEnabled(SP_NEVER != mShowPermissions);
+	mIconPermissionEditMine->setEnabled(SP_NEVER != mShowPermissions);
+	mIconPermissionEditTheirs->setEnabled(SP_NEVER != mShowPermissions);
+	mIconPermissionMapTheirs->setEnabled(SP_NEVER != mShowPermissions);
+// [/SL:KB]
+	
+	refreshPermissions();
+	updateChildren();
+}
+// [/SL:KB]
+
 void LLAvatarListItem::showDistance(bool show)
 {
 	mDistance->setVisible(show);
@@ -378,6 +417,81 @@ void LLAvatarListItem::onProfileBtnClick()
 {
 	LLAvatarActions::showProfile(mAvatarId);
 }
+
+// [SL:KB] - Patch: UI-PeopleFriendPermissions | Checked: 2010-11-04 (Catznip-2.3)
+void LLAvatarListItem::onPermissionBtnToggle(S32 toggleRight)
+{
+	LLRelationship* pRelationship = const_cast<LLRelationship*>(LLAvatarTracker::instance().getBuddyInfo(mAvatarId));
+	if (!pRelationship)
+		return;
+
+	if (LLRelationship::GRANT_MODIFY_OBJECTS != toggleRight)
+	{
+		S32 rights = pRelationship->getRightsGrantedTo();
+		if ( (rights & toggleRight) == toggleRight)
+		{
+			rights &= ~toggleRight;
+			// Revoke the permission locally until we hear back from the region
+			pRelationship->revokeRights(toggleRight, LLRelationship::GRANT_NONE);
+		}
+		else
+		{
+			rights |= toggleRight;
+			// Grant the permission locally until we hear back from the region
+			pRelationship->grantRights(toggleRight, LLRelationship::GRANT_NONE);
+		}
+
+		LLAvatarPropertiesProcessor::getInstance()->sendFriendRights(mAvatarId, rights);
+		refreshPermissions();
+		updateChildren();
+	}
+	else
+	{
+		LLSD args;
+		args["NAME"] = LLSLURL("agent", mAvatarId, "fullname").getSLURLString();
+
+		if (!pRelationship->isRightGrantedTo(LLRelationship::GRANT_MODIFY_OBJECTS))
+		{
+			LLNotificationsUtil::add("GrantModifyRights", args, LLSD(), 
+				boost::bind(&LLAvatarListItem::onModifyRightsConfirmationCallback, this, _1, _2, true));
+		}
+		else
+		{
+			LLNotificationsUtil::add("RevokeModifyRights", args, LLSD(),
+				boost::bind(&LLAvatarListItem::onModifyRightsConfirmationCallback, this, _1, _2, false));
+		}
+	}
+}
+
+void LLAvatarListItem::onModifyRightsConfirmationCallback(const LLSD& notification, const LLSD& response, bool fGrant)
+{
+	S32 option = LLNotificationsUtil::getSelectedOption(notification, response);
+	if (option == 0)
+	{
+		LLRelationship* pRelationship = const_cast<LLRelationship*>(LLAvatarTracker::instance().getBuddyInfo(mAvatarId));
+		if (!pRelationship)
+			return;
+
+		S32 rights = pRelationship->getRightsGrantedTo();
+		if (!fGrant)
+		{
+			rights &= ~LLRelationship::GRANT_MODIFY_OBJECTS;
+			// Revoke the permission locally until we hear back from the region
+			pRelationship->revokeRights(LLRelationship::GRANT_MODIFY_OBJECTS, LLRelationship::GRANT_NONE);
+		}
+		else
+		{
+			rights |= LLRelationship::GRANT_MODIFY_OBJECTS;
+			// Grant the permission locally until we hear back from the region
+			pRelationship->grantRights(LLRelationship::GRANT_MODIFY_OBJECTS, LLRelationship::GRANT_NONE);
+		}
+
+		LLAvatarPropertiesProcessor::getInstance()->sendFriendRights(mAvatarId, rights);
+		refreshPermissions();
+		updateChildren();
+	}
+}
+// [/SL:KB]
 
 BOOL LLAvatarListItem::handleDoubleClick(S32 x, S32 y, MASK mask)
 {
@@ -573,12 +687,11 @@ void LLAvatarListItem::initChildrenWidths(LLAvatarListItem* avatar_item)
 	S32 permission_edit_theirs_width = avatar_item->mIconPermissionEditMine->getRect().mLeft - avatar_item->mIconPermissionEditTheirs->getRect().mLeft;
 
 	S32 permission_map_theirs_width = avatar_item->mIconPermissionEditTheirs->getRect().mLeft - avatar_item->mIconPermissionMapTheirs->getRect().mLeft;
-	S32 permission_online_theirs_width = avatar_item->mIconPermissionMapTheirs->getRect().mLeft - avatar_item->mIconPermissionOnlineTheirs->getRect().mLeft;
 
 	// last interaction time textbox width + padding
-	S32 last_interaction_time_width = avatar_item->mIconPermissionOnlineTheirs->getRect().mLeft - avatar_item->mLastInteractionTime->getRect().mLeft;
+	S32 last_interaction_time_width = avatar_item->mIconPermissionMapTheirs->getRect().mLeft - avatar_item->mLastInteractionTime->getRect().mLeft;
 	
-	S32 distance_width = avatar_item->mIconPermissionOnlineTheirs->getRect().mLeft - avatar_item->mDistance->getRect().mLeft;
+	S32 distance_width = avatar_item->mIconPermissionMapTheirs->getRect().mLeft - avatar_item->mDistance->getRect().mLeft;
 
 	// avatar icon width + padding
 	S32 icon_width = avatar_item->mAvatarName->getRect().mLeft - avatar_item->mAvatarIcon->getRect().mLeft;
@@ -590,7 +703,6 @@ void LLAvatarListItem::initChildrenWidths(LLAvatarListItem* avatar_item)
 	sChildrenWidths[--index] = 0; // for avatar name we don't need its width, it will be calculated as "left available space"
 	sChildrenWidths[--index] = distance_width;
 	sChildrenWidths[--index] = last_interaction_time_width;
-	sChildrenWidths[--index] = permission_online_theirs_width;
 	sChildrenWidths[--index] = permission_map_theirs_width;
 	sChildrenWidths[--index] = permission_edit_theirs_width;
 	sChildrenWidths[--index] = permission_edit_mine_width;
@@ -678,16 +790,36 @@ void LLAvatarListItem::updateChildren()
 	LL_DEBUGS("AvatarItemReshape") << "name rect after: " << name_view_rect << LL_ENDL;
 }
 
-bool LLAvatarListItem::showPermissions(bool visible)
+//bool LLAvatarListItem::showPermissions(bool visible)
+// [SL:KB] - Patch: UI-PeopleFriendPermissions | Checked: 2010-10-26 (Catznip-2.3)
+bool LLAvatarListItem::refreshPermissions()
+// [/SL:KB]
 {
+	static const std::string strUngrantedOverlay = "Permission_Ungranted";
+
 	const LLRelationship* relation = LLAvatarTracker::instance().getBuddyInfo(getAvatarId());
-	if(relation && visible)
+//	if(relation && visible)
+// [SL:KB] - Patch: UI-PeopleFriendPermissions | Checked: 2010-10-26 (Catznip-2.3)
+	if( (relation) && (((SP_HOVER == mShowPermissions) && (mHovered)) || (SP_NONDEFAULT == mShowPermissions)) )
+// [/SL:KB]
 	{
-		mIconPermissionOnline->setVisible(relation->isRightGrantedTo(LLRelationship::GRANT_ONLINE_STATUS));
-		mIconPermissionMap->setVisible(relation->isRightGrantedTo(LLRelationship::GRANT_MAP_LOCATION));
-		mIconPermissionEditMine->setVisible(relation->isRightGrantedTo(LLRelationship::GRANT_MODIFY_OBJECTS));
+// [SL:KB] - Patch: UI-PeopleFriendPermissions | Checked: 2010-10-26 (Catznip-2.3)
+		bool fGrantedOnline = relation->isRightGrantedTo(LLRelationship::GRANT_ONLINE_STATUS);
+		mIconPermissionOnline->setVisible( (!fGrantedOnline) || (mHovered) );
+		mIconPermissionOnline->setImageOverlay( (fGrantedOnline) ? "" : strUngrantedOverlay);
+
+		bool fGrantedMap = relation->isRightGrantedTo(LLRelationship::GRANT_MAP_LOCATION);
+		mIconPermissionMap->setVisible( (fGrantedMap) || (mHovered) );
+		mIconPermissionMap->setImageOverlay( (fGrantedMap) ? "" : strUngrantedOverlay);
+
+		bool fGrantedEditMine = relation->isRightGrantedTo(LLRelationship::GRANT_MODIFY_OBJECTS);
+		mIconPermissionEditMine->setVisible( (fGrantedEditMine) || (mHovered) );
+		mIconPermissionEditMine->setImageOverlay( (fGrantedEditMine) ? "" : strUngrantedOverlay);
+// [/SL:KB]
+//		mIconPermissionOnline->setVisible(relation->isRightGrantedTo(LLRelationship::GRANT_ONLINE_STATUS));
+//		mIconPermissionMap->setVisible(relation->isRightGrantedTo(LLRelationship::GRANT_MAP_LOCATION));
+//		mIconPermissionEditMine->setVisible(relation->isRightGrantedTo(LLRelationship::GRANT_MODIFY_OBJECTS));
 		mIconPermissionEditTheirs->setVisible(relation->isRightGrantedFrom(LLRelationship::GRANT_MODIFY_OBJECTS));
-		mIconPermissionOnlineTheirs->setVisible(relation->isRightGrantedFrom(LLRelationship::GRANT_ONLINE_STATUS));
 		mIconPermissionMapTheirs->setVisible(relation->isRightGrantedFrom(LLRelationship::GRANT_MAP_LOCATION));
 	}
 	else
@@ -696,7 +828,6 @@ bool LLAvatarListItem::showPermissions(bool visible)
 		mIconPermissionMap->setVisible(false);
 		mIconPermissionEditMine->setVisible(false);
 		mIconPermissionEditTheirs->setVisible(false);
-		mIconPermissionOnlineTheirs->setVisible(false);
 		mIconPermissionMapTheirs->setVisible(false);
 	}
 
@@ -738,9 +869,6 @@ LLView* LLAvatarListItem::getItemChildView(EAvatarListItemChildIndex child_view_
 		break;
 	case ALIC_PERMISSION_MAP_THEIRS:
 		child_view = mIconPermissionMapTheirs;
-		break;
-	case ALIC_PERMISSION_ONLINE_THEIRS:
-		child_view = mIconPermissionOnlineTheirs;
 		break;
 	case ALIC_INFO_BUTTON:
 		child_view = mInfoBtn;

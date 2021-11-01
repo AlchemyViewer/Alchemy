@@ -633,15 +633,19 @@ BOOL LLPanelPeople::postBuild()
 	friends_tab->setVisibleCallback(boost::bind(&Updater::setActive, mFriendListUpdater, _2));
     friends_tab->setVisibleCallback(boost::bind(&LLPanelPeople::removePicker, this));
 
+	EShowPermissionType spType = (EShowPermissionType)gSavedSettings.getU32("FriendsListShowPermissions");
+	if (spType >= SP_COUNT)
+		spType = SP_NEVER;
+
 	mOnlineFriendList = friends_tab->getChild<LLAvatarList>("avatars_online");
 	mAllFriendList = friends_tab->getChild<LLAvatarList>("avatars_all");
 	mOnlineFriendList->setNoItemsCommentText(getString("no_friends_online"));
 	mOnlineFriendList->setShowIcons("FriendsListShowIcons");
-	mOnlineFriendList->showPermissions(gSavedSettings.getBOOL("FriendsListShowPermissions"));
+	mOnlineFriendList->showPermissions(spType);
 	mOnlineFriendList->setShowCompleteName(!gSavedSettings.getBOOL("FriendsListHideUsernames"));
 	mAllFriendList->setNoItemsCommentText(getString("no_friends"));
 	mAllFriendList->setShowIcons("FriendsListShowIcons");
-	mAllFriendList->showPermissions(gSavedSettings.getBOOL("FriendsListShowPermissions"));
+	mAllFriendList->showPermissions(spType);
 	mAllFriendList->setShowCompleteName(!gSavedSettings.getBOOL("FriendsListHideUsernames"));
 
 	LLPanel* nearby_tab = getChild<LLPanel>(NEARBY_TAB_NAME);
@@ -1344,14 +1348,21 @@ void LLPanelPeople::onFriendsViewSortMenuItemClicked(const LLSD& userdata)
 		mAllFriendList->toggleIcons();
 		mOnlineFriendList->toggleIcons();
 	}
-	else if (chosen_item == "view_permissions")
+	else if ( ("view_permissions_never" == chosen_item) || 
+	          ("view_permissions_hover" == chosen_item) ||
+	          ("view_permissions_nondefault" == chosen_item) )
 	{
-		bool show_permissions = !gSavedSettings.getBOOL("FriendsListShowPermissions");
-		gSavedSettings.setBOOL("FriendsListShowPermissions", show_permissions);
-
-		mAllFriendList->showPermissions(show_permissions);
-		mOnlineFriendList->showPermissions(show_permissions);
+		EShowPermissionType spType = SP_NEVER;
+		if ("view_permissions_hover" == chosen_item)
+			spType = SP_HOVER;
+		else if ("view_permissions_nondefault" == chosen_item)
+			spType = SP_NONDEFAULT;
+		gSavedSettings.setU32("FriendsListShowPermissions", (U32)spType);
+		
+		mAllFriendList->showPermissions(spType);
+		mOnlineFriendList->showPermissions(spType);
 	}
+
 	else if (chosen_item == "view_usernames")
 	{
 		bool hide_usernames = !gSavedSettings.getBOOL("FriendsListHideUsernames");
@@ -1452,6 +1463,14 @@ bool LLPanelPeople::onFriendsViewSortMenuItemCheck(const LLSD& userdata)
 		return sort_order == E_SORT_BY_NAME;
 	if (item == "sort_status")
 		return sort_order == E_SORT_BY_STATUS;
+
+	EShowPermissionType spType = (EShowPermissionType)gSavedSettings.getU32("FriendsListShowPermissions");
+	if ("view_permissions_never" == item)
+		return SP_NEVER == spType;
+	if ("view_permissions_hover" == item)
+		return SP_HOVER == spType;
+	if ("view_permissions_nondefault" == item)
+		return SP_NONDEFAULT == spType;
 
 	return false;
 }
