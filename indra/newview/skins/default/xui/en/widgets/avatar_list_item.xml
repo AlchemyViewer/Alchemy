@@ -35,7 +35,7 @@
   <online_style
    font="SansSerifSmall"
    font.style="NORMAL"
-   color="White"/>
+   color="AvatarListItemOnlineColor"/>
 
   <!-- styles for OFFLINE avatar item -->
   <offline_style

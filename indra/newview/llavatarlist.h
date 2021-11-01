@@ -43,7 +43,7 @@ class LLListContextMenu;
  * @see setDirty()
  * @see setNameFilter()
  */
-class LLAvatarList : public LLFlatListViewEx
+class LLAvatarList final : public LLFlatListViewEx
 {
 	LOG_CLASS(LLAvatarList);
 public:
@@ -51,6 +51,7 @@ public:
 	{
 		Optional<bool>	ignore_online_status, // show all items as online
 						show_last_interaction_time, // show most recent interaction time. *HACK: move this to a derived class
+						show_distance,	// *HACK: my sinuses hurt and i want pizza.
 						show_info_btn,
 						show_profile_btn,
 						show_speaking_indicator,
@@ -61,11 +62,11 @@ public:
 	LLAvatarList(const Params&);
 	virtual	~LLAvatarList();
 
-	virtual void draw(); // from LLView
+	void draw() override; // from LLView
 
-	virtual void clear();
+	void clear() override;
 
-	virtual void setVisible(BOOL visible);
+	void setVisible(BOOL visible) override;
 
 	void setNameFilter(const std::string& filter);
 	void setDirty(bool val = true, bool force_refresh = false);
@@ -74,7 +75,7 @@ public:
 
 	void setContextMenu(LLListContextMenu* menu) { mContextMenu = menu; }
 	void setSessionID(const LLUUID& session_id) { mSessionID = session_id; }
-	const LLUUID& getSessionID() { return mSessionID; }
+	const LLUUID& getSessionID() const { return mSessionID; }
 
 	void toggleIcons();
 	void setSpeakingIndicatorsVisible(bool visible);
@@ -82,12 +83,12 @@ public:
 	void sortByName();
 	void setShowIcons(std::string param_name);
 	bool getIconsVisible() const { return mShowIcons; }
-	const std::string getIconParamName() const{return mIconParamName;}
+	const std::string& getIconParamName() const {return mIconParamName;}
 	std::string getAvatarName(const LLAvatarName& av_name);
-	virtual BOOL handleRightMouseDown(S32 x, S32 y, MASK mask);
-	/*virtual*/ BOOL handleMouseDown( S32 x, S32 y, MASK mask );
-	/*virtual*/ BOOL handleMouseUp(S32 x, S32 y, MASK mask);
-	/*virtual*/ BOOL handleHover(S32 x, S32 y, MASK mask);
+	BOOL handleRightMouseDown(S32 x, S32 y, MASK mask) override;
+	BOOL handleMouseDown( S32 x, S32 y, MASK mask ) override;
+	BOOL handleMouseUp(S32 x, S32 y, MASK mask) override;
+	BOOL handleHover(S32 x, S32 y, MASK mask) override;
 
 	// Return true if filter has at least one match.
 	bool filterHasMatches();
@@ -118,6 +119,7 @@ protected:
 		uuid_vec_t& vadded,
 		uuid_vec_t& vremoved);
 	void updateLastInteractionTimes();	
+	void updateDistances();
 	void rebuildNames();
 	void onItemDoubleClicked(LLUICtrl* ctrl, S32 x, S32 y, MASK mask);
 //	void updateAvatarNames();
@@ -128,6 +130,7 @@ private:
 
 	bool mIgnoreOnlineStatus;
 	bool mShowLastInteractionTime;
+	bool mShowDistance;
 	bool mDirty;
 	bool mNeedUpdateNames;
 	bool mShowIcons;
@@ -158,10 +161,10 @@ class LLAvatarItemComparator : public LLFlatListView::ItemComparator
 	LOG_CLASS(LLAvatarItemComparator);
 
 public:
-	LLAvatarItemComparator() {};
-	virtual ~LLAvatarItemComparator() {};
+	LLAvatarItemComparator() = default;
+	virtual ~LLAvatarItemComparator() = default;
 
-	virtual bool compare(const LLPanel* item1, const LLPanel* item2) const;
+	bool compare(const LLPanel* item1, const LLPanel* item2) const override;
 
 protected:
 

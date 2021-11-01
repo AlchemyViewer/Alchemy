@@ -79,17 +79,17 @@ public:
 	LLAvatarListItem(bool not_from_ui_factory = true);
 	virtual ~LLAvatarListItem();
 
-	virtual BOOL postBuild();
+	BOOL postBuild() override;
 
 	/**
 	 * Processes notification from speaker indicator to update children when indicator's visibility is changed.
 	 */
     virtual void handleVisibilityChange ( BOOL new_visibility );
-	virtual S32	notifyParent(const LLSD& info);
-	virtual void onMouseLeave(S32 x, S32 y, MASK mask);
-	virtual void onMouseEnter(S32 x, S32 y, MASK mask);
-	virtual void setValue(const LLSD& value);
-	virtual void changed(U32 mask); // from LLFriendObserver
+	S32	notifyParent(const LLSD& info) final override;
+	void onMouseLeave(S32 x, S32 y, MASK mask) final override;
+	void onMouseEnter(S32 x, S32 y, MASK mask) final override;
+	void setValue(const LLSD& value) final override;
+	void changed(U32 mask) final override; // from LLFriendObserver
 
 	void setOnline(bool online);
 	void updateAvatarName(); // re-query the name cache
@@ -99,11 +99,13 @@ public:
 	void setState(EItemState item_style);
 	void setAvatarId(const LLUUID& id, const LLUUID& session_id, bool ignore_status_changes = false, bool is_resident = true);
 	void setLastInteractionTime(U32 secs_since);
+	void setDistance(F32 distance);
 	//Show/hide profile/info btn, translating speaker indicator and avatar name coordinates accordingly
 	void setShowProfileBtn(bool show);
 	void setShowInfoBtn(bool show);
 	void showSpeakingIndicator(bool show);
 	void setShowPermissions(bool show) { mShowPermissions = show; };
+	void showDistance(bool show);
 	void showLastInteractionTime(bool show);
 	void setAvatarIconVisible(bool visible);
 	void setShowCompleteName(bool show) { mShowCompleteName = show;};
@@ -118,24 +120,31 @@ public:
 	void onInfoBtnClick();
 	void onProfileBtnClick();
 
-	/*virtual*/ BOOL handleDoubleClick(S32 x, S32 y, MASK mask);
+	/*virtual*/ BOOL handleDoubleClick(S32 x, S32 y, MASK mask) final override;
 
 protected:
 	/**
 	 * Contains indicator to show voice activity. 
 	 */
-	LLOutputMonitorCtrl* mSpeakingIndicator;
+	LLOutputMonitorCtrl* mSpeakingIndicator = nullptr;
 
-	LLAvatarIconCtrl* mAvatarIcon;
+	LLAvatarIconCtrl* mAvatarIcon = nullptr;
 
 	/// Indicator for permission to see me online.
-	LLIconCtrl* mIconPermissionOnline;
+	LLIconCtrl* mIconPermissionOnline = nullptr;
 	/// Indicator for permission to see my position on the map.
-	LLIconCtrl* mIconPermissionMap;
+	LLIconCtrl* mIconPermissionMap = nullptr;
 	/// Indicator for permission to edit my objects.
-	LLIconCtrl* mIconPermissionEditMine;
+	LLIconCtrl* mIconPermissionEditMine = nullptr;
 	/// Indicator for permission to edit their objects.
-	LLIconCtrl* mIconPermissionEditTheirs;
+	LLIconCtrl* mIconPermissionEditTheirs = nullptr;
+	
+	/// Indicator for permission to show their position on the map.
+	LLIconCtrl* mIconPermissionMapTheirs = nullptr;
+	/// Indicator for permission to see their online status.
+	LLIconCtrl* mIconPermissionOnlineTheirs = nullptr;
+
+	LLIconCtrl* mIconHovered = nullptr;
 
 private:
 
@@ -160,7 +169,10 @@ private:
 		ALIC_PERMISSION_MAP,
 		ALIC_PERMISSION_EDIT_MINE,
 		ALIC_PERMISSION_EDIT_THEIRS,
+		ALIC_PERMISSION_MAP_THEIRS,
+		ALIC_PERMISSION_ONLINE_THEIRS,
 		ALIC_INTERACTION_TIME,
+		ALIC_DISTANCE,
 		ALIC_NAME,
 		ALIC_ICON,
 		ALIC_COUNT,
@@ -201,12 +213,13 @@ private:
 	 */
 	LLView* getItemChildView(EAvatarListItemChildIndex child_index);
 
-	LLTextBox* mAvatarName;
-	LLTextBox* mLastInteractionTime;
+	LLTextBox* mAvatarName = nullptr;
+	LLTextBox* mDistance = nullptr;
+	LLTextBox* mLastInteractionTime = nullptr;
 	LLStyle::Params mAvatarNameStyle;
 	
-	LLButton* mInfoBtn;
-	LLButton* mProfileBtn;
+	LLButton* mInfoBtn = nullptr;
+	LLButton* mProfileBtn = nullptr;
 
 	LLUUID mAvatarId;
 	std::string mHighlihtSubstring; // substring to highlight

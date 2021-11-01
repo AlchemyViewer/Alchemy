@@ -61,10 +61,21 @@
      left_pad="5"
      name="avatar_name"
      parse_urls="false"
-     top="6"
+     top="4"
      use_ellipses="true"
      value="(loading)"
      width="180" />
+    <text
+     follows="right"
+     font="SansSerifSmall"
+     height="15"
+     layout="topleft"
+     left_pad="5"
+     right="-168"
+     name="distance"
+     text_color="LtGray_50"
+     value=""
+     width="60" />
     <text
      follows="right"
      font="SansSerifSmall"
@@ -75,7 +86,29 @@
      name="last_interaction"
      text_color="LtGray_50"
      value="0s"
-     width="35" />
+     width="38" />
+    <icon
+     height="16"
+     follows="right"
+     image_name="Permission_Visible_Them_Online"
+     layout="topleft"
+     left_pad="3"
+     right="-167"
+     name="permission_online_theirs_icon"
+     tool_tip="You can see this friend&apos;s online status"
+     top="4"
+     width="16" />
+    <icon
+     height="16"
+     follows="right"
+     image_name="Permission_Visible_Them_Map"
+     layout="topleft"
+     left_pad="3"
+     right="-148"
+     name="permission_map_theirs_icon"
+     tool_tip="You can locate this friend on the map"
+     top="4"
+     width="16" />
     <icon
      height="16"
      follows="right"

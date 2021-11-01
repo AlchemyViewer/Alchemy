@@ -157,8 +157,6 @@ public:
 			id_it = uuids.begin(),
 			id_end = uuids.end();
 
-		LLAvatarItemDistanceComparator::id_to_pos_map_t pos_map;
-
 		mAvatarsPositions.clear();
 
 		for (;pos_it != pos_end && id_it != id_end; ++pos_it, ++id_it )
@@ -639,11 +637,11 @@ BOOL LLPanelPeople::postBuild()
 	mAllFriendList = friends_tab->getChild<LLAvatarList>("avatars_all");
 	mOnlineFriendList->setNoItemsCommentText(getString("no_friends_online"));
 	mOnlineFriendList->setShowIcons("FriendsListShowIcons");
-	mOnlineFriendList->showPermissions("FriendsListShowPermissions");
+	mOnlineFriendList->showPermissions(gSavedSettings.getBOOL("FriendsListShowPermissions"));
 	mOnlineFriendList->setShowCompleteName(!gSavedSettings.getBOOL("FriendsListHideUsernames"));
 	mAllFriendList->setNoItemsCommentText(getString("no_friends"));
 	mAllFriendList->setShowIcons("FriendsListShowIcons");
-	mAllFriendList->showPermissions("FriendsListShowPermissions");
+	mAllFriendList->showPermissions(gSavedSettings.getBOOL("FriendsListShowPermissions"));
 	mAllFriendList->setShowCompleteName(!gSavedSettings.getBOOL("FriendsListHideUsernames"));
 
 	LLPanel* nearby_tab = getChild<LLPanel>(NEARBY_TAB_NAME);
@@ -657,7 +655,7 @@ BOOL LLPanelPeople::postBuild()
 // [RLVa:KB] - Checked: RLVa-1.2.0
 	mNearbyList->setRlvCheckShowNames(true);
 // [/RLVa:KB]
-	mMiniMap = (LLNetMap*)getChildView("Net Map",true);
+	mMiniMap = getChild<LLNetMap>("Net Map", true);
 	mMiniMap->setToolTipMsg(gSavedSettings.getBOOL("DoubleClickTeleport") ? 
 		getString("AltMiniMapToolTipMsg") :	getString("MiniMapToolTipMsg"));
 
@@ -785,31 +783,23 @@ void LLPanelPeople::updateFriendList()
 	all_friendsp.clear();
 	online_friendsp.clear();
 
-	uuid_vec_t buddies_uuids;
-	LLAvatarTracker::buddy_map_t::const_iterator buddies_iter;
-
-	// Fill the avatar list with friends UUIDs
-	for (buddies_iter = all_buddies.begin(); buddies_iter != all_buddies.end(); ++buddies_iter)
+	if (!all_buddies.empty())
 	{
-		buddies_uuids.push_back(buddies_iter->first);
-	}
+		// Fill the avatar list with friends UUIDs
+		for (const auto& buddy_pair : all_buddies)
+		{
+			const LLUUID& buddy_id = buddy_pair.first;
+			all_friendsp.push_back(buddy_id);
 
-	if (buddies_uuids.size() > 0)
-	{
-		LL_DEBUGS() << "Friends added to the list: " << buddies_uuids.size() << LL_ENDL;
-		all_friendsp = buddies_uuids;
+			if (av_tracker.isBuddyOnline(buddy_id))
+				online_friendsp.push_back(buddy_id);
+		}
+		LL_DEBUGS() << "Friends added to the list: " << all_friendsp.size() << LL_ENDL;
+		LL_DEBUGS() << "Online friends added to the list: " << online_friendsp.size() << LL_ENDL;
 	}
 	else
 	{
 		LL_DEBUGS() << "No friends found" << LL_ENDL;
-	}
-
-	LLAvatarTracker::buddy_map_t::const_iterator buddy_it = all_buddies.begin();
-	for (; buddy_it != all_buddies.end(); ++buddy_it)
-	{
-		LLUUID buddy_id = buddy_it->first;
-		if (av_tracker.isBuddyOnline(buddy_id))
-			online_friendsp.push_back(buddy_id);
 	}
 
 	/*
@@ -1140,7 +1130,6 @@ void LLPanelPeople::onGroupLimitInfo()
 
 void LLPanelPeople::onTabSelected(const LLSD& param)
 {
-	std::string tab_name = getChild<LLPanel>(param.asString())->getName();
 	updateButtons();
 
 	showFriendsAccordionsIfNeeded();

@@ -67,16 +67,6 @@ LLAvatarListItem::Params::Params()
 LLAvatarListItem::LLAvatarListItem(bool not_from_ui_factory/* = true*/)
 	: LLPanel(),
 	LLFriendObserver(),
-	mAvatarIcon(NULL),
-	mAvatarName(NULL),
-	mLastInteractionTime(NULL),
-	mIconPermissionOnline(NULL),
-	mIconPermissionMap(NULL),
-	mIconPermissionEditMine(NULL),
-	mIconPermissionEditTheirs(NULL),
-	mSpeakingIndicator(NULL),
-	mInfoBtn(NULL),
-	mProfileBtn(NULL),
 	mOnlineStatus(E_UNKNOWN),
 	mShowInfoBtn(true),
 	mShowProfileBtn(true),
@@ -114,16 +104,23 @@ BOOL  LLAvatarListItem::postBuild()
 {
 	mAvatarIcon = getChild<LLAvatarIconCtrl>("avatar_icon");
 	mAvatarName = getChild<LLTextBox>("avatar_name");
+	mDistance = getChild<LLTextBox>("distance");
 	mLastInteractionTime = getChild<LLTextBox>("last_interaction");
 
 	mIconPermissionOnline = getChild<LLIconCtrl>("permission_online_icon");
 	mIconPermissionMap = getChild<LLIconCtrl>("permission_map_icon");
 	mIconPermissionEditMine = getChild<LLIconCtrl>("permission_edit_mine_icon");
 	mIconPermissionEditTheirs = getChild<LLIconCtrl>("permission_edit_theirs_icon");
+	mIconPermissionMapTheirs = getChild<LLIconCtrl>("permission_map_theirs_icon");
+	mIconPermissionOnlineTheirs = getChild<LLIconCtrl>("permission_online_theirs_icon");
 	mIconPermissionOnline->setVisible(false);
 	mIconPermissionMap->setVisible(false);
 	mIconPermissionEditMine->setVisible(false);
 	mIconPermissionEditTheirs->setVisible(false);
+	mIconPermissionOnlineTheirs->setVisible(false);
+	mIconPermissionMapTheirs->setVisible(false);
+
+	mIconHovered = getChild<LLIconCtrl>("hovered_icon");
 
 	mSpeakingIndicator = getChild<LLOutputMonitorCtrl>("speaking_indicator");
 	mSpeakingIndicator->setChannelState(LLOutputMonitorCtrl::UNDEFINED_CHANNEL);
@@ -186,7 +183,7 @@ S32 LLAvatarListItem::notifyParent(const LLSD& info)
 
 void LLAvatarListItem::onMouseEnter(S32 x, S32 y, MASK mask)
 {
-	getChildView("hovered_icon")->setVisible( true);
+	mIconHovered->setVisible(true);
 //	mInfoBtn->setVisible(mShowInfoBtn);
 //	mProfileBtn->setVisible(mShowProfileBtn);
 // [RLVa:KB] - Checked: RLVa-1.2.0
@@ -204,7 +201,7 @@ void LLAvatarListItem::onMouseEnter(S32 x, S32 y, MASK mask)
 
 void LLAvatarListItem::onMouseLeave(S32 x, S32 y, MASK mask)
 {
-	getChildView("hovered_icon")->setVisible( false);
+	mIconHovered->setVisible( false);
 	mInfoBtn->setVisible(false);
 	mProfileBtn->setVisible(false);
 
@@ -311,6 +308,20 @@ void LLAvatarListItem::setAvatarId(const LLUUID& id, const LLUUID& session_id, b
 		// Set avatar name.
 		fetchAvatarName();
 	}
+}
+
+void LLAvatarListItem::showDistance(bool show)
+{
+	mDistance->setVisible(show);
+	updateChildren();
+}
+
+void LLAvatarListItem::setDistance(F32 distance)
+{
+	if (distance == 0)
+		mDistance->setValue(LLStringUtil::null);
+	else
+		mDistance->setValue(fmt::format(FMT_STRING("{:0.1f}m"), distance));
 }
 
 void LLAvatarListItem::showLastInteractionTime(bool show)
@@ -434,7 +445,7 @@ void LLAvatarListItem::onAvatarNameCache(const LLAvatarName& av_name)
 {
 	mAvatarNameCacheConnection.disconnect();
 
-	mGreyOutUsername = "";
+	mGreyOutUsername.clear();
 	std::string name_string = mShowCompleteName? av_name.getCompleteName(false) : av_name.getDisplayName();
 	if(av_name.getCompleteName() != av_name.getUserName())
 	{
@@ -561,8 +572,13 @@ void LLAvatarListItem::initChildrenWidths(LLAvatarListItem* avatar_item)
 	// edit their objects permission icon width + padding
 	S32 permission_edit_theirs_width = avatar_item->mIconPermissionEditMine->getRect().mLeft - avatar_item->mIconPermissionEditTheirs->getRect().mLeft;
 
+	S32 permission_map_theirs_width = avatar_item->mIconPermissionEditTheirs->getRect().mLeft - avatar_item->mIconPermissionMapTheirs->getRect().mLeft;
+	S32 permission_online_theirs_width = avatar_item->mIconPermissionMapTheirs->getRect().mLeft - avatar_item->mIconPermissionOnlineTheirs->getRect().mLeft;
+
 	// last interaction time textbox width + padding
-	S32 last_interaction_time_width = avatar_item->mIconPermissionEditTheirs->getRect().mLeft - avatar_item->mLastInteractionTime->getRect().mLeft;
+	S32 last_interaction_time_width = avatar_item->mIconPermissionOnlineTheirs->getRect().mLeft - avatar_item->mLastInteractionTime->getRect().mLeft;
+	
+	S32 distance_width = avatar_item->mIconPermissionOnlineTheirs->getRect().mLeft - avatar_item->mDistance->getRect().mLeft;
 
 	// avatar icon width + padding
 	S32 icon_width = avatar_item->mAvatarName->getRect().mLeft - avatar_item->mAvatarIcon->getRect().mLeft;
@@ -572,7 +588,10 @@ void LLAvatarListItem::initChildrenWidths(LLAvatarListItem* avatar_item)
 	S32 index = ALIC_COUNT;
 	sChildrenWidths[--index] = icon_width;
 	sChildrenWidths[--index] = 0; // for avatar name we don't need its width, it will be calculated as "left available space"
+	sChildrenWidths[--index] = distance_width;
 	sChildrenWidths[--index] = last_interaction_time_width;
+	sChildrenWidths[--index] = permission_online_theirs_width;
+	sChildrenWidths[--index] = permission_map_theirs_width;
 	sChildrenWidths[--index] = permission_edit_theirs_width;
 	sChildrenWidths[--index] = permission_edit_mine_width;
 	sChildrenWidths[--index] = permission_map_width;
@@ -668,6 +687,8 @@ bool LLAvatarListItem::showPermissions(bool visible)
 		mIconPermissionMap->setVisible(relation->isRightGrantedTo(LLRelationship::GRANT_MAP_LOCATION));
 		mIconPermissionEditMine->setVisible(relation->isRightGrantedTo(LLRelationship::GRANT_MODIFY_OBJECTS));
 		mIconPermissionEditTheirs->setVisible(relation->isRightGrantedFrom(LLRelationship::GRANT_MODIFY_OBJECTS));
+		mIconPermissionOnlineTheirs->setVisible(relation->isRightGrantedFrom(LLRelationship::GRANT_ONLINE_STATUS));
+		mIconPermissionMapTheirs->setVisible(relation->isRightGrantedFrom(LLRelationship::GRANT_MAP_LOCATION));
 	}
 	else
 	{
@@ -675,9 +696,11 @@ bool LLAvatarListItem::showPermissions(bool visible)
 		mIconPermissionMap->setVisible(false);
 		mIconPermissionEditMine->setVisible(false);
 		mIconPermissionEditTheirs->setVisible(false);
+		mIconPermissionOnlineTheirs->setVisible(false);
+		mIconPermissionMapTheirs->setVisible(false);
 	}
 
-	return NULL != relation;
+	return nullptr != relation;
 }
 
 LLView* LLAvatarListItem::getItemChildView(EAvatarListItemChildIndex child_view_index)
@@ -691,6 +714,9 @@ LLView* LLAvatarListItem::getItemChildView(EAvatarListItemChildIndex child_view_
 		break;
 	case ALIC_NAME:
 		child_view = mAvatarName;
+		break;
+	case ALIC_DISTANCE:
+		child_view = mDistance;
 		break;
 	case ALIC_INTERACTION_TIME:
 		child_view = mLastInteractionTime;
@@ -709,6 +735,12 @@ LLView* LLAvatarListItem::getItemChildView(EAvatarListItemChildIndex child_view_
 		break;
 	case ALIC_PERMISSION_EDIT_THEIRS:
 		child_view = mIconPermissionEditTheirs;
+		break;
+	case ALIC_PERMISSION_MAP_THEIRS:
+		child_view = mIconPermissionMapTheirs;
+		break;
+	case ALIC_PERMISSION_ONLINE_THEIRS:
+		child_view = mIconPermissionOnlineTheirs;
 		break;
 	case ALIC_INFO_BUTTON:
 		child_view = mInfoBtn;

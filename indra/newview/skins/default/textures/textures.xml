@@ -514,7 +514,9 @@ with the same filename but different name
   <texture name="Person_Star" file_name="icons/Person_Star.png" preload="false" />
 
   <texture name="Permission_Visible_Online" file_name="icons/see_me_online.png" preload="false" />
+  <texture name="Permission_Visible_Them_Online" file_name="icons/see_them_online.png" preload="false" />
   <texture name="Permission_Visible_Map" file_name="icons/see_on_map.png" preload="false" />
+  <texture name="Permission_Visible_Them_Map" file_name="icons/see_them_on_map.png" preload="false" />
   <texture name="Permission_Edit_Objects_Mine" file_name="icons/edit_mine.png" preload="false" />
   <texture name="Permission_Edit_Objects_Theirs" file_name="icons/edit_theirs.png" preload="false" />
 
