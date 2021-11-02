@@ -109,7 +109,7 @@ public:
     F32         getSpecularRotation() const;
     void        setSpecularRotation(F32 rot);
 
-    const LLColor4U getSpecularLightColor() const;
+    const LLColor4U& getSpecularLightColor() const;
     void        setSpecularLightColor(const LLColor4U& color);
     U8          getSpecularLightExponent() const;
     void        setSpecularLightExponent(U8 exponent);

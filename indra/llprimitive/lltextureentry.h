@@ -162,7 +162,7 @@ public:
 	U8	 getMediaTexGen() const { return mMediaFlags; }
     F32  getGlow() const { return mGlow; }
 	const LLMaterialID& getMaterialID() const { return mMaterialID; };
-	const LLMaterialPtr getMaterialParams() const { return mMaterial; };
+	const LLMaterialPtr& getMaterialParams() const { return mMaterial; };
 
     // *NOTE: it is possible for hasMedia() to return true, but getMediaData() to return NULL.
     // CONVERSELY, it is also possible for hasMedia() to return false, but getMediaData()

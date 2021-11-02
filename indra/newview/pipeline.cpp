@@ -6304,9 +6304,9 @@ void LLPipeline::calcNearbyLights(LLCamera& camera)
                     fade -= LIGHT_FADE_TIME;
                 }
             }
-            cur_nearby_lights.insert(Light(drawable, dist, fade));
+            cur_nearby_lights.emplace(drawable, dist, fade);
 		}
-		mNearbyLights = cur_nearby_lights;
+		mNearbyLights = std::move(cur_nearby_lights);
 				
 		// FIND NEW LIGHTS THAT ARE IN RANGE
 		light_set_t new_nearby_lights;

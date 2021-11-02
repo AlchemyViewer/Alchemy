@@ -281,7 +281,7 @@ void LLMaterial::setSpecularRotation(F32 rot)
     mSpecularRotation = rot;
 }
 
-const LLColor4U LLMaterial::getSpecularLightColor() const
+const LLColor4U& LLMaterial::getSpecularLightColor() const
 {
     return mSpecularLightColor;
 }
