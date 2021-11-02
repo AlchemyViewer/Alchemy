@@ -619,7 +619,11 @@ void LLAvatarList::updateDistances()
 	for (auto itemp : items)
 	{
 		LLAvatarListItem* item = static_cast<LLAvatarListItem*>(itemp);
-		if (item->getAvatarId() == gAgentID) continue;
+		if (item->getAvatarId() == gAgentID)
+		{
+			item->setTextField(LLStringUtil::null);
+			continue;
+		}
 		
 		LLWorld::pos_map_t::iterator iter = positions.find(item->getAvatarId());
 		if (iter != positions.end())
