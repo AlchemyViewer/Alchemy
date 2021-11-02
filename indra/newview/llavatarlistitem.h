@@ -105,8 +105,9 @@ public:
 	void setHighlight(const std::string& highlight);
 	void setState(EItemState item_style);
 	void setAvatarId(const LLUUID& id, const LLUUID& session_id, bool ignore_status_changes = false, bool is_resident = true);
-	void setLastInteractionTime(U32 secs_since);
-	void setDistance(F32 distance);
+	void setTextField(const std::string& text);
+	void setTextFieldDistance(F32 distance);
+	void setTextFieldSeconds(U32 secs_since);
 	//Show/hide profile/info btn, translating speaker indicator and avatar name coordinates accordingly
 	void setShowProfileBtn(bool show);
 	void setShowInfoBtn(bool show);
@@ -115,8 +116,8 @@ public:
 	void setShowPermissions(EShowPermissionType spType);
 // [/SL:KB]
 //	void setShowPermissions(bool show) { mShowPermissions = show; };
-	void showDistance(bool show);
-	void showLastInteractionTime(bool show);
+
+	void showTextField(bool show);
 	void setAvatarIconVisible(bool visible);
 	void setShowCompleteName(bool show) { mShowCompleteName = show;};
 // [RLVa:KB] - Checked: RLVa-1.2.0
@@ -174,6 +175,7 @@ private:
 	 */
 	typedef enum e_avatar_item_child {
 		ALIC_SPEAKER_INDICATOR,
+		ALIC_TEXT_FIELD,
 		ALIC_PROFILE_BUTTON,
 		ALIC_INFO_BUTTON,
 		ALIC_PERMISSION_ONLINE,
@@ -181,9 +183,6 @@ private:
 		ALIC_PERMISSION_EDIT_MINE,
 		ALIC_PERMISSION_EDIT_THEIRS,
 		ALIC_PERMISSION_MAP_THEIRS,
-		ALIC_PERMISSION_ONLINE_THEIRS,
-		ALIC_INTERACTION_TIME,
-		ALIC_DISTANCE,
 		ALIC_NAME,
 		ALIC_ICON,
 		ALIC_COUNT,
@@ -228,8 +227,7 @@ private:
 	LLView* getItemChildView(EAvatarListItemChildIndex child_index);
 
 	LLTextBox* mAvatarName = nullptr;
-	LLTextBox* mDistance = nullptr;
-	LLTextBox* mLastInteractionTime = nullptr;
+	LLTextBox* mTextField = nullptr;
 	LLStyle::Params mAvatarNameStyle;
 	
 	LLButton* mInfoBtn = nullptr;

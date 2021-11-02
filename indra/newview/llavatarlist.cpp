@@ -273,8 +273,7 @@ void LLAvatarList::addAvalineItem(const LLUUID& item_id, const LLUUID& session_i
 	LLAvalineListItem* item = new LLAvalineListItem(/*hide_number=*/false);
 	item->setAvatarId(item_id, session_id, true, false);
 	item->setName(item_name);
-	item->showLastInteractionTime(mShowLastInteractionTime);
-	item->showDistance(mShowDistance);
+	item->showTextField(mShowLastInteractionTime || mShowDistance);
 	item->showSpeakingIndicator(mShowSpeakingIndicator);
 	item->setOnline(false);
 
@@ -473,8 +472,7 @@ void LLAvatarList::addNewItem(const LLUUID& id, const std::string& name, BOOL is
 	// This sets the name as a side effect
 	item->setAvatarId(id, mSessionID, mIgnoreOnlineStatus);
 	item->setOnline(mIgnoreOnlineStatus ? true : is_online);
-	item->showLastInteractionTime(mShowLastInteractionTime);
-	item->showDistance(mShowDistance);
+	item->showTextField(mShowLastInteractionTime || mShowDistance);
 
 	item->setAvatarIconVisible(mShowIcons);
 	item->setShowInfoBtn(mShowInfoBtn);
@@ -608,7 +606,7 @@ void LLAvatarList::updateLastInteractionTimes()
 		LLAvatarListItem* item = static_cast<LLAvatarListItem*>(*it);
 		S32 secs_since = now - (S32) LLRecentPeople::instanceFast().getDate(item->getAvatarId()).secondsSinceEpoch();
 		if (secs_since >= 0)
-			item->setLastInteractionTime(secs_since);
+			item->setTextFieldSeconds(secs_since);
 	}
 }
 
@@ -628,9 +626,9 @@ void LLAvatarList::updateDistances()
 		
 		LLWorld::pos_map_t::iterator iter = positions.find(item->getAvatarId());
 		if (iter != positions.end())
-			item->setDistance((iter->second - gAgent.getPositionGlobal()).magVec());
+			item->setTextFieldDistance((iter->second - gAgent.getPositionGlobal()).magVec());
 		else
-			item->setDistance(0.f);
+			item->setTextFieldDistance(0.f);
 	}
 }
 
@@ -695,8 +693,7 @@ BOOL LLAvalineListItem::postBuild()
 	if (rv)
 	{
 		setOnline(true);
-		showLastInteractionTime(false);
-		showDistance(false);
+		showTextField(false);
 		setShowProfileBtn(false);
 		setShowInfoBtn(false);
 		mAvatarIcon->setValue("Avaline_Icon");
