@@ -112,10 +112,7 @@ public:
 	void setShowProfileBtn(bool show);
 	void setShowInfoBtn(bool show);
 	void showSpeakingIndicator(bool show);
-// [SL:KB] - Patch: UI-PeopleFriendPermissions | Checked: 2013-06-03 (Catznip-3.4)
 	void setShowPermissions(EShowPermissionType spType);
-// [/SL:KB]
-//	void setShowPermissions(bool show) { mShowPermissions = show; };
 
 	void showTextField(bool show);
 	void setAvatarIconVisible(bool visible);
@@ -130,10 +127,9 @@ public:
 
 	void onInfoBtnClick();
 	void onProfileBtnClick();
-// [SL:KB] - Patch: UI-PeopleFriendPermissions | Checked: 2010-11-04 (Catznip-2.3)
+
 	void onPermissionBtnToggle(S32 toggleRight);
 	void onModifyRightsConfirmationCallback(const LLSD& notification, const LLSD& response, bool fGrant);
-// [/SL:KB]
 
 	/*virtual*/ BOOL handleDoubleClick(S32 x, S32 y, MASK mask) final override;
 
@@ -213,10 +209,7 @@ private:
 	 *
 	 * Need to call updateChildren() afterwards to sort out their layout.
 	 */
-//	bool showPermissions(bool visible);
-// [SL:KB] - Patch: UI-PeopleFriendPermissions | Checked: 2010-10-26 (Catznip-2.3)
 	bool refreshPermissions();
-// [/SL:KB]
 
 	/**
 	 * Gets child view specified by index.
@@ -245,10 +238,7 @@ private:
 // [/RLVa:KB]
 
 	/// indicates whether to show icons representing permissions granted
-// [SL:KB] - Patch: UI-PeopleFriendPermissions | Checked: 2013-06-03 (Catznip-3.4)
 	EShowPermissionType mShowPermissions;
-// [/SL:KB]
-//	bool mShowPermissions;
 
 	/// true when the mouse pointer is hovering over this item
 	bool mHovered;

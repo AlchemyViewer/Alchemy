@@ -84,10 +84,7 @@ public:
 
 	void toggleIcons();
 	void setSpeakingIndicatorsVisible(bool visible);
-// [SL:KB] - Patch: UI-PeopleFriendPermissions | Checked: 2013-06-03 (Catznip-3.4)
 	void showPermissions(EShowPermissionType spType);
-// [/SL:KB]
-//	void showPermissions(bool visible);
 	void sortByName();
 	void setShowIcons(std::string param_name);
 	bool getIconsVisible() const { return mShowIcons; }
@@ -145,10 +142,7 @@ private:
 	bool mShowInfoBtn;
 	bool mShowProfileBtn;
 	bool mShowSpeakingIndicator;
-// [SL:KB] - Patch: UI-PeopleFriendPermissions | Checked: 2013-06-03 (Catznip-3.4)
 	EShowPermissionType mShowPermissions;
-// [/SL:KB]
-//	bool mShowPermissions;
 	bool mShowCompleteName;
 // [RLVa:KB] - RLVa-1.2.0
 	bool mRlvCheckShowNames;

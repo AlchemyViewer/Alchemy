@@ -59,14 +59,12 @@ static const F32 LIT_UPDATE_PERIOD = 2;
 // Used to limit time spent for avatar list update per frame.
 static const unsigned ADD_LIMIT = 50;
 
-// [SL:KB] - Patch: UI-PeopleFriendPermissions | Checked: 2013-06-03 (Catznip-3.4)
 void LLAvatarList::ShowPermissionTypeNames::declareValues()
 {
 	declare("never", SP_NEVER);
 	declare("hover", SP_HOVER);
 	declare("nondefault", SP_NONDEFAULT);
 }
-// [/SL:KB]
 
 bool LLAvatarList::contains(const LLUUID& id)
 {
@@ -103,7 +101,6 @@ void LLAvatarList::setSpeakingIndicatorsVisible(bool visible)
 	}
 }
 
-// [SL:KB] - Patch: UI-PeopleFriendPermissions | Checked: 2013-06-03 (Catznip-3.4)
 void LLAvatarList::showPermissions(EShowPermissionType spType)
 {
 	// Save the value for new items to use.

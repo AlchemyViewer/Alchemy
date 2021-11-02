@@ -207,10 +207,7 @@ void LLAvatarListItem::onMouseEnter(S32 x, S32 y, MASK mask)
 	mHovered = true;
 	LLPanel::onMouseEnter(x, y, mask);
 
-//	showPermissions(mShowPermissions);
-// [SL:KB] - Patch: UI-PeopleFriendPermissions | Checked: 2010-10-26 (Catznip-2.3)
 	refreshPermissions();
-// [/SL:KB]
 	updateChildren();
 }
 
@@ -223,10 +220,7 @@ void LLAvatarListItem::onMouseLeave(S32 x, S32 y, MASK mask)
 	mHovered = false;
 	LLPanel::onMouseLeave(x, y, mask);
 
-//	showPermissions(false);
-// [SL:KB] - Patch: UI-PeopleFriendPermissions | Checked: 2010-10-26 (Catznip-2.3)
 	refreshPermissions();
-// [/SL:KB]
 	updateChildren();
 }
 
@@ -238,10 +232,7 @@ void LLAvatarListItem::changed(U32 mask)
 
 	if (mask & LLFriendObserver::POWERS)
 	{
-//		showPermissions(mShowPermissions && mHovered);
-// [SL:KB] - Patch: UI-PeopleFriendPermissions | Checked: 2010-10-26 (Catznip-2.3)
 		refreshPermissions();
-// [/SL:KB]
 		updateChildren();
 	}
 }
@@ -331,24 +322,20 @@ void LLAvatarListItem::setAvatarId(const LLUUID& id, const LLUUID& session_id, b
 	}
 }
 
-// [SL:KB] - Patch: UI-PeopleFriendPermissions | Checked: 2010-10-24 (Catznip-2.3)
 void LLAvatarListItem::setShowPermissions(EShowPermissionType spType)
 {
 	mShowPermissions = spType;
 
-// [SL:KB] - Patch: UI-SidepanelPeople | Checked: 2011-05-13 (Catznip-2.6)
 	// Reenable the controls for updateChildren()
 	mIconPermissionOnline->setEnabled(SP_NEVER != mShowPermissions);
 	mIconPermissionMap->setEnabled(SP_NEVER != mShowPermissions);
 	mIconPermissionEditMine->setEnabled(SP_NEVER != mShowPermissions);
 	mIconPermissionEditTheirs->setEnabled(SP_NEVER != mShowPermissions);
 	mIconPermissionMapTheirs->setEnabled(SP_NEVER != mShowPermissions);
-// [/SL:KB]
 	
 	refreshPermissions();
 	updateChildren();
 }
-// [/SL:KB]
 
 void LLAvatarListItem::showTextField(bool show)
 {
@@ -418,7 +405,6 @@ void LLAvatarListItem::onProfileBtnClick()
 	LLAvatarActions::showProfile(mAvatarId);
 }
 
-// [SL:KB] - Patch: UI-PeopleFriendPermissions | Checked: 2010-11-04 (Catznip-2.3)
 void LLAvatarListItem::onPermissionBtnToggle(S32 toggleRight)
 {
 	LLRelationship* pRelationship = const_cast<LLRelationship*>(LLAvatarTracker::instance().getBuddyInfo(mAvatarId));
@@ -491,7 +477,6 @@ void LLAvatarListItem::onModifyRightsConfirmationCallback(const LLSD& notificati
 		updateChildren();
 	}
 }
-// [/SL:KB]
 
 BOOL LLAvatarListItem::handleDoubleClick(S32 x, S32 y, MASK mask)
 {
@@ -788,20 +773,14 @@ void LLAvatarListItem::updateChildren()
 	LL_DEBUGS("AvatarItemReshape") << "name rect after: " << name_view_rect << LL_ENDL;
 }
 
-//bool LLAvatarListItem::showPermissions(bool visible)
-// [SL:KB] - Patch: UI-PeopleFriendPermissions | Checked: 2010-10-26 (Catznip-2.3)
 bool LLAvatarListItem::refreshPermissions()
-// [/SL:KB]
 {
 	static const std::string strUngrantedOverlay = "Permission_Ungranted";
 
 	const LLRelationship* relation = LLAvatarTracker::instance().getBuddyInfo(getAvatarId());
-//	if(relation && visible)
-// [SL:KB] - Patch: UI-PeopleFriendPermissions | Checked: 2010-10-26 (Catznip-2.3)
+
 	if( (relation) && (((SP_HOVER == mShowPermissions) && (mHovered)) || (SP_NONDEFAULT == mShowPermissions)) )
-// [/SL:KB]
 	{
-// [SL:KB] - Patch: UI-PeopleFriendPermissions | Checked: 2010-10-26 (Catznip-2.3)
 		bool fGrantedOnline = relation->isRightGrantedTo(LLRelationship::GRANT_ONLINE_STATUS);
 		mIconPermissionOnline->setVisible( (!fGrantedOnline) || (mHovered) );
 		mIconPermissionOnline->setImageOverlay( (fGrantedOnline) ? "" : strUngrantedOverlay);
@@ -813,10 +792,7 @@ bool LLAvatarListItem::refreshPermissions()
 		bool fGrantedEditMine = relation->isRightGrantedTo(LLRelationship::GRANT_MODIFY_OBJECTS);
 		mIconPermissionEditMine->setVisible( (fGrantedEditMine) || (mHovered) );
 		mIconPermissionEditMine->setImageOverlay( (fGrantedEditMine) ? "" : strUngrantedOverlay);
-// [/SL:KB]
-//		mIconPermissionOnline->setVisible(relation->isRightGrantedTo(LLRelationship::GRANT_ONLINE_STATUS));
-//		mIconPermissionMap->setVisible(relation->isRightGrantedTo(LLRelationship::GRANT_MAP_LOCATION));
-//		mIconPermissionEditMine->setVisible(relation->isRightGrantedTo(LLRelationship::GRANT_MODIFY_OBJECTS));
+
 		mIconPermissionEditTheirs->setVisible(relation->isRightGrantedFrom(LLRelationship::GRANT_MODIFY_OBJECTS));
 		mIconPermissionMapTheirs->setVisible(relation->isRightGrantedFrom(LLRelationship::GRANT_MAP_LOCATION));
 	}
@@ -844,7 +820,6 @@ LLView* LLAvatarListItem::getItemChildView(EAvatarListItemChildIndex child_view_
 	case ALIC_NAME:
 		child_view = mAvatarName;
 		break;
-// [SL:KB] - Patch: UI-AvatarListTextField | Checked: 2010-10-24 (Catznip-2.3)
 	case ALIC_TEXT_FIELD:
 		child_view = mTextField;
 		break;
