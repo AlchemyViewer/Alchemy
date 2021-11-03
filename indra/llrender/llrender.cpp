@@ -1275,12 +1275,11 @@ void LLRender::syncMatrices()
 
 	LLGLSLShader* shader = LLGLSLShader::sCurBoundShaderPtr;
 
-	static glh::matrix4f cached_mvp;
-    static glh::matrix4f cached_inv_mdv;
+	static LLMatrix4a cached_mvp;
 	static U32 cached_mvp_mdv_hash = 0xFFFFFFFF;
 	static U32 cached_mvp_proj_hash = 0xFFFFFFFF;
 	
-	static glh::matrix4f cached_normal;
+	static LLMatrix4a cached_normal;
 	static U32 cached_normal_hash = 0xFFFFFFFF;
 
 	if (shader)
@@ -1292,15 +1291,10 @@ void LLRender::syncMatrices()
 		U32 i = MM_MODELVIEW;
 		if (mMatHash[MM_MODELVIEW] != shader->mMatHash[MM_MODELVIEW])
 		{ //update modelview, normal, and MVP
-			glh::matrix4f& mat = mMatrix[MM_MODELVIEW][mMatIdx[MM_MODELVIEW]];
+			LLMatrix4a mat;
+			mat.loadu(mMatrix[MM_MODELVIEW][mMatIdx[MM_MODELVIEW]].m);
 
-            // if MDV has changed, update the cached inverse as well
-            if (cached_mvp_mdv_hash != mMatHash[MM_MODELVIEW])
-            {
-                cached_inv_mdv = mat.inverse();
-            }
-
-			shader->uniformMatrix4fv(name[MM_MODELVIEW], 1, GL_FALSE, mat.m);
+			shader->uniformMatrix4fv(name[MM_MODELVIEW], 1, GL_FALSE, mat.getF32ptr());
 			shader->mMatHash[MM_MODELVIEW] = mMatHash[MM_MODELVIEW];
 
 			//update normal matrix
@@ -1309,20 +1303,20 @@ void LLRender::syncMatrices()
 			{
 				if (cached_normal_hash != mMatHash[i])
 				{
-					cached_normal = cached_inv_mdv.transpose();
+					cached_normal = mat;
+					cached_normal.invert();
+					cached_normal.transpose();
 					cached_normal_hash = mMatHash[i];
 				}
 
-				glh::matrix4f& norm = cached_normal;
+				const LLMatrix4a& norm = cached_normal;
 
-				F32 norm_mat[] = 
-				{
-					norm.m[0], norm.m[1], norm.m[2],
-					norm.m[4], norm.m[5], norm.m[6],
-					norm.m[8], norm.m[9], norm.m[10] 
-				};
+				LLVector3 norms[3];
+				norms[0].set(norm.getRow<0>().getF32ptr());
+				norms[1].set(norm.getRow<1>().getF32ptr());
+				norms[2].set(norm.getRow<2>().getF32ptr());
 
-				shader->uniformMatrix3fv(LLShaderMgr::NORMAL_MATRIX, 1, GL_FALSE, norm_mat);
+				shader->uniformMatrix3fv(LLShaderMgr::NORMAL_MATRIX, 1, GL_FALSE, norms[0].mV);
 			}
 
 			//update MVP matrix
@@ -1330,24 +1324,24 @@ void LLRender::syncMatrices()
 			loc = shader->getUniformLocation(LLShaderMgr::MODELVIEW_PROJECTION_MATRIX);
 			if (loc > -1)
 			{
-				U32 proj = MM_PROJECTION;
-
 				if (cached_mvp_mdv_hash != mMatHash[i] || cached_mvp_proj_hash != mMatHash[MM_PROJECTION])
 				{
-					cached_mvp = mat;
-					cached_mvp.mult_left(mMatrix[proj][mMatIdx[proj]]);
+					LLMatrix4a proj;
+					proj.loadu(mMatrix[MM_PROJECTION][mMatIdx[MM_PROJECTION]].m);
+					cached_mvp.setMul(proj, mat);
 					cached_mvp_mdv_hash = mMatHash[i];
 					cached_mvp_proj_hash = mMatHash[MM_PROJECTION];
 				}
 
-				shader->uniformMatrix4fv(LLShaderMgr::MODELVIEW_PROJECTION_MATRIX, 1, GL_FALSE, cached_mvp.m);
+				shader->uniformMatrix4fv(LLShaderMgr::MODELVIEW_PROJECTION_MATRIX, 1, GL_FALSE, cached_mvp.getF32ptr());
 			}
 		}
 
 		i = MM_PROJECTION;
 		if (mMatHash[MM_PROJECTION] != shader->mMatHash[MM_PROJECTION])
 		{ //update projection matrix, normal, and MVP
-			glh::matrix4f& mat = mMatrix[MM_PROJECTION][mMatIdx[MM_PROJECTION]];
+			LLMatrix4a mat;
+			mat.loadu(mMatrix[MM_PROJECTION][mMatIdx[MM_PROJECTION]].m);
 
             // it would be nice to have this automatically track the state of the proj matrix
             // but certain render paths (deferred lighting) require it to be mismatched *sigh*
@@ -1357,7 +1351,7 @@ void LLRender::syncMatrices()
 	        //    shader->uniformMatrix4fv(LLShaderMgr::INVERSE_PROJECTION_MATRIX, 1, FALSE, inv_proj.m);
             //}
 
-			shader->uniformMatrix4fv(name[MM_PROJECTION], 1, GL_FALSE, mat.m);
+			shader->uniformMatrix4fv(name[MM_PROJECTION], 1, GL_FALSE, mat.getF32ptr());
 			shader->mMatHash[MM_PROJECTION] = mMatHash[MM_PROJECTION];
 
 			if (!mvp_done)
@@ -1368,14 +1362,14 @@ void LLRender::syncMatrices()
 				{
 					if (cached_mvp_mdv_hash != mMatHash[MM_PROJECTION] || cached_mvp_proj_hash != mMatHash[MM_PROJECTION])
 					{
-						U32 mdv = MM_MODELVIEW;
-						cached_mvp = mat;
-						cached_mvp.mult_right(mMatrix[mdv][mMatIdx[mdv]]);
+						LLMatrix4a mdv;
+						mdv.loadu(mMatrix[MM_MODELVIEW][mMatIdx[MM_MODELVIEW]].m);
+						cached_mvp.setMul(mat, mdv);
 						cached_mvp_mdv_hash = mMatHash[MM_MODELVIEW];
 						cached_mvp_proj_hash = mMatHash[MM_PROJECTION];
 					}
 									
-					shader->uniformMatrix4fv(LLShaderMgr::MODELVIEW_PROJECTION_MATRIX, 1, GL_FALSE, cached_mvp.m);
+					shader->uniformMatrix4fv(LLShaderMgr::MODELVIEW_PROJECTION_MATRIX, 1, GL_FALSE, cached_mvp.getF32ptr());
 				}
 			}
 		}
