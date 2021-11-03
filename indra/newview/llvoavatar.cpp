@@ -1781,36 +1781,37 @@ BOOL LLVOAvatar::lineSegmentIntersect(const LLVector4a& start, const LLVector4a&
 		{
 			mCollisionVolumes[i].updateWorldMatrix();
             
-			glh::matrix4f mat((F32*) mCollisionVolumes[i].getXform()->getWorldMatrix().mMatrix);
-			glh::matrix4f inverse = mat.inverse();
-			glh::matrix4f norm_mat = inverse.transpose();
+			LLMatrix4a mat;
+			mat.loadu(mCollisionVolumes[i].getXform()->getWorldMatrix());
+			LLMatrix4a inverse = mat;
+			inverse.invert();
+			LLMatrix4a norm_mat = inverse;
+			norm_mat.transpose();
 
-			glh::vec3f p1(start.getF32ptr());
-			glh::vec3f p2(end.getF32ptr());
-
-			inverse.mult_matrix_vec(p1);
-			inverse.mult_matrix_vec(p2);
+			LLVector4a p1, p2;
+			inverse.affineTransform(start,p1);	//Might need to use perspectiveTransform here.
+			inverse.affineTransform(end,p2);
 
 			LLVector3 position;
 			LLVector3 norm;
 
-			if (linesegment_sphere(LLVector3(p1.v), LLVector3(p2.v), LLVector3(0,0,0), 1.f, position, norm))
+			if (linesegment_sphere(LLVector3(p1.getF32ptr()), LLVector3(p2.getF32ptr()), LLVector3(0,0,0), 1.f, position, norm))
 			{
-				glh::vec3f res_pos(position.mV);
-				mat.mult_matrix_vec(res_pos);
-				
-				norm.normalize();
-				glh::vec3f res_norm(norm.mV);
-				norm_mat.mult_matrix_dir(res_norm);
-
 				if (intersection)
 				{
-					intersection->load3(res_pos.v);
+					LLVector4a res_pos;
+					res_pos.load3(position.mV);
+					mat.affineTransform(res_pos,res_pos);
+					*intersection = res_pos;
 				}
 
 				if (normal)
 				{
-					normal->load3(res_norm.v);
+					LLVector4a res_norm;
+					res_norm.load3(norm.mV);
+					res_norm.normalize3fast();
+					norm_mat.perspectiveTransform(res_norm,res_norm);
+					*normal = res_norm;
 				}
 
 				return TRUE;
@@ -1838,8 +1839,6 @@ BOOL LLVOAvatar::lineSegmentIntersect(const LLVector4a& start, const LLVector4a&
 		}
 	}
 
-	
-	
 	LLVector4a position;
 	if (mNameText.notNull() && mNameText->lineSegmentIntersect(start, end, position))
 	{
