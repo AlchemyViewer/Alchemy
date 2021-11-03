@@ -1985,13 +1985,15 @@ void LLDrawPoolAvatar::renderRigged(LLVOAvatar* avatar, U32 type, bool glow)
 
 	stop_glerror();
 
+	const U32 data_mask_type = LLFace::getRiggedDataMask(type);
+
 	for (LLFace* face : mRiggedFace[type])
 	{
-        S32 offset = face->getIndicesStart();
-		U32 count = face->getIndicesCount();
+		const S32 offset = face->getIndicesStart();
+		const U32 count = face->getIndicesCount();
 
-        U16 start = face->getGeomStart();
-		U16 end = start + face->getGeomCount()-1;			
+		const U16 start = face->getGeomStart();
+		const U16 end = start + face->getGeomCount()-1;
 
 		LLDrawable* drawable = face->getDrawable();
 		if (!drawable)
@@ -1999,17 +2001,8 @@ void LLDrawPoolAvatar::renderRigged(LLVOAvatar* avatar, U32 type, bool glow)
 			continue;
 		}
 
-		LLVOVolume* vobj = drawable->getVOVolume();
-
+		LLVOVolume* vobj = drawable->getVObj()->asVolume();
 		if (!vobj)
-		{
-			continue;
-		}
-
-		LLVolume* volume = vobj->getVolume();
-		S32 te = face->getTEOffset();
-
-		if (!volume || volume->getNumVolumeFaces() <= te || !volume->isMeshAssetLoaded())
 		{
 			continue;
 		}
@@ -2019,13 +2012,10 @@ void LLDrawPoolAvatar::renderRigged(LLVOAvatar* avatar, U32 type, bool glow)
 		{
 			continue;
 		}
-		const LLTextureEntry* tex_entry = face->getTextureEntry();
 
-		// Don't render invisible faces even when they are in a linkset.
-		if (tex_entry && tex_entry->getColor().mV[VW] <= 0.001f)
-		{
-			continue;
-		}
+		U32 data_mask = data_mask_type;
+
+		const LLTextureEntry* tex_entry = face->getTextureEntry();
 
 		//stop_glerror();
 
@@ -2033,8 +2023,6 @@ void LLDrawPoolAvatar::renderRigged(LLVOAvatar* avatar, U32 type, bool glow)
 		//updateRiggedFaceVertexBuffer(avatar, face, skin, volume, vol_face);
 		
 		//stop_glerror();
-
-		U32 data_mask = LLFace::getRiggedDataMask(type);
 
 		LLVertexBuffer* buff = face->getVertexBuffer();
 
@@ -2122,36 +2110,6 @@ void LLDrawPoolAvatar::renderRigged(LLVOAvatar* avatar, U32 type, bool glow)
 		{        
 			if (sShaderLevel > 0)
 			{
-    //            // upload matrix palette to shader
-				//LLMatrix4a mat[LL_MAX_JOINTS_PER_MESH_OBJECT];
-				//U32 count = LLSkinningUtil::getMeshJointCount(skin);
-    //            LLSkinningUtil::initSkinningMatrixPalette(mat, count, skin, avatar);
-
-				//stop_glerror();
-
-				//F32 mp[LL_MAX_JOINTS_PER_MESH_OBJECT*12];
-
-				//for (U32 i = 0; i < count; ++i)
-				//{
-				//	F32* m = (F32*) mat[i].mMatrix[0].getF32ptr();
-
-				//	U32 idx = i*12;
-
-				//	mp[idx+0] = m[0];
-				//	mp[idx+1] = m[1];
-				//	mp[idx+2] = m[2];
-				//	mp[idx+3] = m[12];
-
-				//	mp[idx+4] = m[4];
-				//	mp[idx+5] = m[5];
-				//	mp[idx+6] = m[6];
-				//	mp[idx+7] = m[13];
-
-				//	mp[idx+8] = m[8];
-				//	mp[idx+9] = m[9];
-				//	mp[idx+10] = m[10];
-				//	mp[idx+11] = m[14];
-				//}
 				U32 count = 0;
 				auto mat_pair = vobj->getCachedSkinRenderMatrix(count, avatar, skin);
 				if (!mat_pair.has_value())
@@ -2201,17 +2159,20 @@ void LLDrawPoolAvatar::renderRigged(LLVOAvatar* avatar, U32 type, bool glow)
 				}
 				gGL.getTexUnit(sDiffuseChannel)->bind(face->getTexture(LLRender::DIFFUSE_MAP), false, true);
 
-
-				LLColor4 col = mat->getSpecularLightColor();
-				F32 spec = mat->getSpecularLightExponent()/255.f;
-
-				F32 env = mat->getEnvironmentIntensity()/255.f;
-
+				LLColor4 col;
+				F32 spec;
+				F32 env;
 				if (mat->getSpecularID().isNull())
 				{
 					env = tex_entry->getShiny()*0.25f;
 					col.set(env,env,env,0);
 					spec = env;
+				}
+				else
+				{
+					col = mat->getSpecularLightColor();
+					spec = mat->getSpecularLightExponent() / 255.f;
+					env = mat->getEnvironmentIntensity() / 255.f;
 				}
 		
 				BOOL fullbright = tex_entry->getFullbright();
@@ -2451,7 +2412,20 @@ LLColor3 LLDrawPoolAvatar::getDebugColor() const
 
 void LLDrawPoolAvatar::addRiggedFace(LLFace* facep, U32 type)
 {
-    llassert (facep->isState(LLFace::RIGGED));
+	LLVolume* volume = facep->getViewerObject()->getVolume();
+	if (!volume || volume->getNumVolumeFaces() <= facep->getTEOffset())
+	{
+		return;
+	}
+
+	const LLTextureEntry* tex_entry = facep->getTextureEntry();
+	// Don't render invisible faces even when they are in a linkset.
+	if (tex_entry && tex_entry->getColor().mV[VW] <= 0.001f)
+	{
+		return;
+	}
+	
+	llassert (facep->isState(LLFace::RIGGED));
     llassert(getType() == LLDrawPool::POOL_AVATAR || getType() == LLDrawPool::POOL_CONTROL_AV);
     if (facep->getPool() && facep->getPool() != this)
     {
