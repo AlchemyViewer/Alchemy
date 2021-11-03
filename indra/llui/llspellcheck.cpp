@@ -402,7 +402,7 @@ const std::string LLSpellChecker::getDictionaryUserPath()
 // static
 bool LLSpellChecker::getUseSpellCheck()
 {
-	return (LLSpellChecker::instanceExists()) && (LLSpellChecker::instance().mHunspell);
+	return LLSpellChecker::instanceFast().mHunspell;
 }
 
 bool LLSpellChecker::canRemoveDictionary(const std::string& dict_language)
@@ -411,7 +411,7 @@ bool LLSpellChecker::canRemoveDictionary(const std::string& dict_language)
 	const LLSD dict_info = getDictionaryData(dict_language);
 	return 
 		(dict_info["user_installed"].asBoolean()) && 
-		( (!getUseSpellCheck()) || (!LLSpellChecker::instance().isActiveDictionary(dict_language)) );
+		( (!getUseSpellCheck()) || (!isActiveDictionary(dict_language)) );
 }
 
 void LLSpellChecker::removeDictionary(const std::string& dict_language)
@@ -481,8 +481,8 @@ boost::signals2::connection LLSpellChecker::setSettingsChangeCallback(const sett
 void LLSpellChecker::setUseSpellCheck(const std::string& dict_language)
 {
 	if ( (((dict_language.empty()) && (getUseSpellCheck())) || (!dict_language.empty())) && 
-		 (LLSpellChecker::instance().mDictLanguage != dict_language) )
+		 (LLSpellChecker::instanceFast().mDictLanguage != dict_language) )
 	{
-		LLSpellChecker::instance().initHunspell(dict_language);
+		LLSpellChecker::instanceFast().initHunspell(dict_language);
 	}
 }

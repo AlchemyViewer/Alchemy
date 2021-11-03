@@ -593,7 +593,7 @@ void LLLineEditor::addToDictionary()
 {
 	if (canAddToDictionary())
 	{
-		LLSpellChecker::instance().addToCustomDictionary(getMisspelledWord(mCursorPos));
+		LLSpellChecker::instanceFast().addToCustomDictionary(getMisspelledWord(mCursorPos));
 	}
 }
 
@@ -606,7 +606,7 @@ void LLLineEditor::addToIgnore()
 {
 	if (canAddToIgnore())
 	{
-		LLSpellChecker::instance().addToIgnoreList(getMisspelledWord(mCursorPos));
+		LLSpellChecker::instanceFast().addToIgnoreList(getMisspelledWord(mCursorPos));
 	}
 }
 
@@ -2686,7 +2686,7 @@ void LLLineEditor::showContextMenu(S32 x, S32 y)
 			std::string misspelled_word = getMisspelledWord(mCursorPos);
 			if ((is_misspelled = !misspelled_word.empty()) == true)
 			{
-				LLSpellChecker::instance().getSuggestions(misspelled_word, mSuggestionList);
+				LLSpellChecker::instanceFast().getSuggestions(misspelled_word, mSuggestionList);
 			}
 		}
 

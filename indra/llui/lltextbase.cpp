@@ -1449,7 +1449,7 @@ void LLTextBase::deselect()
 
 bool LLTextBase::getSpellCheck() const
 {
-	return (LLSpellChecker::getUseSpellCheck()) && (!mReadOnly) && (mSpellCheck);
+	return (!mReadOnly) && (mSpellCheck) && (LLSpellChecker::getUseSpellCheck());
 }
 
 const std::string& LLTextBase::getSuggestion(U32 index) const
@@ -1490,7 +1490,7 @@ void LLTextBase::addToDictionary()
 {
 	if (canAddToDictionary())
 	{
-		LLSpellChecker::instance().addToCustomDictionary(getMisspelledWord(mCursorPos));
+		LLSpellChecker::instanceFast().addToCustomDictionary(getMisspelledWord(mCursorPos));
 	}
 }
 
@@ -1503,7 +1503,7 @@ void LLTextBase::addToIgnore()
 {
 	if (canAddToIgnore())
 	{
-		LLSpellChecker::instance().addToIgnoreList(getMisspelledWord(mCursorPos));
+		LLSpellChecker::instanceFast().addToIgnoreList(getMisspelledWord(mCursorPos));
 	}
 }
 
