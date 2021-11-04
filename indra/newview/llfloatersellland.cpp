@@ -446,7 +446,7 @@ static LLNotificationFunctorRegistration tr("TransferObjectsHighlighted", &LLFlo
 // static
 bool LLFloaterSellLandUI::callbackHighlightTransferable(const LLSD& notification, const LLSD& data)
 {
-	LLSelectMgr::getInstance()->unhighlightAll();
+	LLSelectMgr::getInstanceFast()->unhighlightAll();
 	return false;
 }
 

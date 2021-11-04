@@ -57,7 +57,7 @@ BOOL LLFloaterBuildOptions::postBuild()
 // virtual
 void LLFloaterBuildOptions::onOpen(const LLSD& key)
 {
-	mObjectSelection = LLSelectMgr::getInstance()->getEditSelection();
+	mObjectSelection = LLSelectMgr::getInstanceFast()->getEditSelection();
 }
 
 // virtual

@@ -114,13 +114,13 @@ void LLPanelContents::getState(LLViewerObject *objectp )
 	}
 
 	LLUUID group_id;			// used for SL-23488
-	LLSelectMgr::getInstance()->selectGetGroup(group_id);  // sets group_id as a side effect SL-23488
+	LLSelectMgr::getInstanceFast()->selectGetGroup(group_id);  // sets group_id as a side effect SL-23488
 
 	// BUG? Check for all objects being editable?
 	bool editable = gAgent.isGodlike()
 					|| (objectp->permModify() && !objectp->isPermanentEnforced()
 					       && ( objectp->permYouOwner() || ( !group_id.isNull() && gAgent.isInGroup(group_id) )));  // solves SL-23488
-	BOOL all_volume = LLSelectMgr::getInstance()->selectionAllPCode( LL_PCODE_VOLUME );
+	BOOL all_volume = LLSelectMgr::getInstanceFast()->selectionAllPCode( LL_PCODE_VOLUME );
 
 // [RLVa:KB] - Checked: 2010-04-01 (RLVa-1.2.0c) | Modified: RLVa-1.0.5a
 	if ( (rlv_handler_t::isEnabled()) && (editable) )
@@ -133,7 +133,7 @@ void LLPanelContents::getState(LLViewerObject *objectp )
 		if ( (editable) && ((gRlvHandler.hasBehaviour(RLV_BHVR_UNSIT)) || (gRlvHandler.hasBehaviour(RLV_BHVR_SITTP))) )
 		{
 			// Only check the first (non-)root object because nothing else would result in enabling the button (see below)
-			LLViewerObject* pObj = LLSelectMgr::getInstance()->getSelection()->getFirstRootObject(TRUE);
+			LLViewerObject* pObj = LLSelectMgr::getInstanceFast()->getSelection()->getFirstRootObject(TRUE);
 
 			editable = 
 				(pObj) && (isAgentAvatarValid()) && ((!gAgentAvatarp->isSitting()) || (gAgentAvatarp->getRoot() != pObj->getRootEdit()));
@@ -145,8 +145,8 @@ void LLPanelContents::getState(LLViewerObject *objectp )
 	getChildView("button new script")->setEnabled(
 		editable &&
 		all_volume &&
-		((LLSelectMgr::getInstance()->getSelection()->getRootObjectCount() == 1)
-			|| (LLSelectMgr::getInstance()->getSelection()->getObjectCount() == 1)));
+		((LLSelectMgr::getInstanceFast()->getSelection()->getRootObjectCount() == 1)
+			|| (LLSelectMgr::getInstanceFast()->getSelection()->getObjectCount() == 1)));
 
 	getChildView("button permissions")->setEnabled(!objectp->isPermanentEnforced());
 	mPanelInventoryObject->setEnabled(!objectp->isPermanentEnforced());
@@ -155,7 +155,7 @@ void LLPanelContents::getState(LLViewerObject *objectp )
 void LLPanelContents::refresh()
 {
 	const BOOL children_ok = TRUE;
-	LLViewerObject* object = LLSelectMgr::getInstance()->getSelection()->getFirstRootObject(children_ok);
+	LLViewerObject* object = LLSelectMgr::getInstanceFast()->getSelection()->getFirstRootObject(children_ok);
 
 	getState(object);
 	if (mPanelInventoryObject)
@@ -181,7 +181,7 @@ void LLPanelContents::clearContents()
 void LLPanelContents::onClickNewScript(void *userdata)
 {
 	const BOOL children_ok = TRUE;
-	LLViewerObject* object = LLSelectMgr::getInstance()->getSelection()->getFirstRootObject(children_ok);
+	LLViewerObject* object = LLSelectMgr::getInstanceFast()->getSelection()->getFirstRootObject(children_ok);
 	if(object)
 	{
 // [RLVa:KB] - Checked: 2010-03-31 (RLVa-1.2.0c) | Modified: RLVa-1.0.5a

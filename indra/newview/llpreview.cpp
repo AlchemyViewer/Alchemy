@@ -216,11 +216,11 @@ void LLPreview::onCommit()
 					LLViewerObject* obj = gAgentAvatarp->getWornAttachment( item->getUUID() );
 					if( obj )
 					{
-						LLSelectMgr::getInstance()->deselectAll();
-						LLSelectMgr::getInstance()->addAsIndividual( obj, SELECT_ALL_TES, FALSE );
-						LLSelectMgr::getInstance()->selectionSetObjectDescription( getChild<LLUICtrl>("desc")->getValue().asString() );
+						LLSelectMgr::getInstanceFast()->deselectAll();
+						LLSelectMgr::getInstanceFast()->addAsIndividual( obj, SELECT_ALL_TES, FALSE );
+						LLSelectMgr::getInstanceFast()->selectionSetObjectDescription( getChild<LLUICtrl>("desc")->getValue().asString() );
 
-						LLSelectMgr::getInstance()->deselectAll();
+						LLSelectMgr::getInstanceFast()->deselectAll();
 					}
 				}
 			}

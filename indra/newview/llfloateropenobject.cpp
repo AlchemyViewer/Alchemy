@@ -80,7 +80,7 @@ BOOL LLFloaterOpenObject::postBuild()
 
 void LLFloaterOpenObject::onOpen(const LLSD& key)
 {
-	LLObjectSelectionHandle object_selection = LLSelectMgr::getInstance()->getSelection();
+	LLObjectSelectionHandle object_selection = LLSelectMgr::getInstanceFast()->getSelection();
 	if (object_selection->getRootObjectCount() != 1)
 	{
 		LLNotificationsUtil::add("UnableToViewContentsMoreThanOne");
@@ -92,7 +92,7 @@ void LLFloaterOpenObject::onOpen(const LLSD& key)
 		closeFloater();
 		return;
 	}
-	mObjectSelection = LLSelectMgr::getInstance()->getEditSelection();
+	mObjectSelection = LLSelectMgr::getInstanceFast()->getEditSelection();
 	refresh();
 }
 

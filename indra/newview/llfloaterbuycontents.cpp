@@ -87,7 +87,7 @@ LLFloaterBuyContents::~LLFloaterBuyContents()
 // static
 void LLFloaterBuyContents::show(const LLSaleInfo& sale_info)
 {
-	LLObjectSelectionHandle selection = LLSelectMgr::getInstance()->getSelection();
+	LLObjectSelectionHandle selection = LLSelectMgr::getInstanceFast()->getSelection();
 
 	if (selection->getRootObjectCount() != 1)
 	{
@@ -104,13 +104,13 @@ void LLFloaterBuyContents::show(const LLSaleInfo& sale_info)
 		list->deleteAllItems();
 
 // [RLVa:KB] - Checked: RLVa-2.0.0
-	floater->mObjectSelection = LLSelectMgr::getInstance()->getSelection();
+	floater->mObjectSelection = LLSelectMgr::getInstanceFast()->getSelection();
 // [/RLVa:KB]
-//	floater->mObjectSelection = LLSelectMgr::getInstance()->getEditSelection();
+//	floater->mObjectSelection = LLSelectMgr::getInstanceFast()->getEditSelection();
 
 	LLUUID owner_id;
 	std::string owner_name;
-	BOOL owners_identical = LLSelectMgr::getInstance()->selectGetOwner(owner_id, owner_name);
+	BOOL owners_identical = LLSelectMgr::getInstanceFast()->selectGetOwner(owner_id, owner_name);
 	if (!owners_identical)
 	{
 		LLNotificationsUtil::add("BuyContentsOneOwner");
@@ -289,7 +289,7 @@ void LLFloaterBuyContents::onClickBuy()
 	// *NOTE: doesn't work for multiple object buy, which UI does not
 	// currently support sale info is used for verification only, if
 	// it doesn't match region info then sale is canceled.
-	LLSelectMgr::getInstance()->sendBuy(gAgent.getID(), category_id, mSaleInfo);
+	LLSelectMgr::getInstanceFast()->sendBuy(gAgent.getID(), category_id, mSaleInfo);
 
 	// NOTE: do this here instead of on receipt of object, since contents are transfered
 	// via a generic BulkUpdateInventory message with no way of distinguishing it from

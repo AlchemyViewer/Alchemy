@@ -113,7 +113,7 @@ void LLToolComposite::handleSelect()
 {
 	if (!ALControlCache::EditLinkedParts)
 	{
-		LLSelectMgr::getInstance()->promoteSelectionToRoot();
+		LLSelectMgr::getInstanceFast()->promoteSelectionToRoot();
 	}
 	mCur = mDefault; 
 	mCur->handleSelect(); 
@@ -167,14 +167,14 @@ BOOL LLToolCompInspect::handleMouseDown(S32 x, S32 y, MASK mask)
 BOOL LLToolCompInspect::handleMouseUp(S32 x, S32 y, MASK mask)
 {
 	BOOL handled = LLToolComposite::handleMouseUp(x, y, mask);
-	mIsToolCameraActive = getCurrentTool() == LLToolCamera::getInstance();
+	mIsToolCameraActive = getCurrentTool() == LLToolCamera::getInstanceFast();
 	return handled;
 }
 
 void LLToolCompInspect::pickCallback(const LLPickInfo& pick_info)
 {
 	LLViewerObject* hit_obj = pick_info.getObject();
-	LLToolCompInspect * tool_inspectp = LLToolCompInspect::getInstance();
+	LLToolCompInspect * tool_inspectp = LLToolCompInspect::getInstanceFast();
 
 	if (!tool_inspectp->mMouseDown)
 	{
@@ -183,7 +183,7 @@ void LLToolCompInspect::pickCallback(const LLPickInfo& pick_info)
 		return;
 	}
 
-	LLSelectMgr * mgr_selectp = LLSelectMgr::getInstance();
+	LLSelectMgr * mgr_selectp = LLSelectMgr::getInstanceFast();
 	if( hit_obj && mgr_selectp->getSelection()->getObjectCount()) {
 		LLEditMenuHandler::gEditMenuHandler = mgr_selectp;
 	}
@@ -204,7 +204,7 @@ BOOL LLToolCompInspect::handleKey(KEY key, MASK mask)
 
 	if(KEY_ALT == key)
 	{
-		setCurrentTool(LLToolCamera::getInstance());
+		setCurrentTool(LLToolCamera::getInstanceFast());
 		mIsToolCameraActive = TRUE;
 		handled = TRUE;
 	}
@@ -287,7 +287,7 @@ void LLToolCompTranslate::pickCallback(const LLPickInfo& pick_info)
 	{
 		if (LLToolCompTranslate::getInstance()->mManip->getSelection()->getObjectCount())
 		{
-			LLEditMenuHandler::gEditMenuHandler = LLSelectMgr::getInstance();
+			LLEditMenuHandler::gEditMenuHandler = LLSelectMgr::getInstanceFast();
 		}
 
 		BOOL can_move = LLToolCompTranslate::getInstance()->mManip->canAffectSelection();
@@ -412,7 +412,7 @@ void LLToolCompScale::pickCallback(const LLPickInfo& pick_info)
 	{
 		if (LLToolCompScale::getInstance()->mManip->getSelection()->getObjectCount())
 		{
-			LLEditMenuHandler::gEditMenuHandler = LLSelectMgr::getInstance();
+			LLEditMenuHandler::gEditMenuHandler = LLSelectMgr::getInstanceFast();
 		}
 		if(	LLManip::LL_NO_PART != LLToolCompScale::getInstance()->mManip->getHighlightedPart() )
 		{
@@ -611,7 +611,7 @@ void LLToolCompRotate::pickCallback(const LLPickInfo& pick_info)
 	{
 		if (LLToolCompRotate::getInstance()->mManip->getSelection()->getObjectCount())
 		{
-			LLEditMenuHandler::gEditMenuHandler = LLSelectMgr::getInstance();
+			LLEditMenuHandler::gEditMenuHandler = LLSelectMgr::getInstanceFast();
 		}
 		if(	LLManip::LL_NO_PART != LLToolCompRotate::getInstance()->mManip->getHighlightedPart() )
 		{
@@ -715,7 +715,7 @@ BOOL LLToolCompGun::handleHover(S32 x, S32 y, MASK mask)
 	// item selected from context menu.
 	if ( mCur == mNull && !gPopupMenuView->getVisible() )
 	{
-		LLSelectMgr::getInstance()->deselectAll();
+		LLSelectMgr::getInstanceFast()->deselectAll();
 		setCurrentTool( (LLTool*) mGrab );
 	}
 

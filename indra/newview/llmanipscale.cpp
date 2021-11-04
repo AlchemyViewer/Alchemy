@@ -169,9 +169,9 @@ inline void LLManipScale::conditionalHighlight( U32 part, const LLColor4* highli
 
 void LLManipScale::handleSelect()
 {
-	LLBBox bbox = LLSelectMgr::getInstance()->getBBoxOfSelection();
+	LLBBox bbox = LLSelectMgr::getInstanceFast()->getBBoxOfSelection();
 	updateSnapGuides(bbox);
-	LLSelectMgr::getInstance()->saveSelectedObjectTransform(SELECT_ACTION_TYPE_PICK);
+	LLSelectMgr::getInstanceFast()->saveSelectedObjectTransform(SELECT_ACTION_TYPE_PICK);
     if (gFloaterTools)
     {
         gFloaterTools->setStatusText("scale");
@@ -215,7 +215,7 @@ void LLManipScale::render()
 	LLGLDepthTest gls_depth(GL_TRUE);
 	LLGLEnable gl_blend(GL_BLEND);
 	LLGLEnable gls_alpha_test(GL_ALPHA_TEST);
-	LLBBox bbox = LLSelectMgr::getInstance()->getBBoxOfSelection();
+	LLBBox bbox = LLSelectMgr::getInstanceFast()->getBBoxOfSelection();
 
 	if( canAffectSelection() )
 	{
@@ -346,10 +346,10 @@ BOOL LLManipScale::handleMouseDownOnPart( S32 x, S32 y, MASK mask )
 	highlightManipulators(x, y);
 	S32 hit_part = mHighlightedPart;
 
-	LLSelectMgr::getInstance()->enableSilhouette(FALSE);
+	LLSelectMgr::getInstanceFast()->enableSilhouette(FALSE);
 	mManipPart = (EManipPart)hit_part;
 
-	LLBBox bbox = LLSelectMgr::getInstance()->getBBoxOfSelection();
+	LLBBox bbox = LLSelectMgr::getInstanceFast()->getBBoxOfSelection();
 	LLVector3 box_center_agent = bbox.getCenterAgent();
 	LLVector3 box_corner_agent = bbox.localToAgent( unitVectorToLocalBBoxExtent( partToUnitVector( mManipPart ), bbox ) );
 
@@ -366,7 +366,7 @@ BOOL LLManipScale::handleMouseDownOnPart( S32 x, S32 y, MASK mask )
 	mDragPointGlobal = mDragStartPointGlobal;
 
 	// we just started a drag, so save initial object positions, orientations, and scales
-	LLSelectMgr::getInstance()->saveSelectedObjectTransform(SELECT_ACTION_TYPE_SCALE);
+	LLSelectMgr::getInstanceFast()->saveSelectedObjectTransform(SELECT_ACTION_TYPE_SCALE);
 	// Route future Mouse messages here preemptively.  (Release on mouse up.)
 	setMouseCapture( TRUE );
 
@@ -396,7 +396,7 @@ BOOL LLManipScale::handleMouseUp(S32 x, S32 y, MASK mask)
 		}
 
 		//send texture update
-		auto& select_mgr = LLSelectMgr::instance();
+		auto& select_mgr = LLSelectMgr::instanceFast();
 		select_mgr.adjustTexturesByScale(TRUE, getStretchTextures());
 
 		select_mgr.enableSilhouette(TRUE);
@@ -445,7 +445,7 @@ BOOL LLManipScale::handleHover(S32 x, S32 y, MASK mask)
 	}
 
 	// Patch up textures, if possible.
-	LLSelectMgr::getInstance()->adjustTexturesByScale(FALSE, getStretchTextures());
+	LLSelectMgr::getInstanceFast()->adjustTexturesByScale(FALSE, getStretchTextures());
 
 	gViewerWindow->setCursor(UI_CURSOR_TOOLSCALE);
 	return TRUE;
@@ -457,7 +457,7 @@ void LLManipScale::highlightManipulators(S32 x, S32 y)
 
 	// If we have something selected, try to hit its manipulator handles.
 	// Don't do this with nothing selected, as it kills the framerate.
-	LLBBox bbox = LLSelectMgr::getInstance()->getBBoxOfSelection();
+	LLBBox bbox = LLSelectMgr::getInstanceFast()->getBBoxOfSelection();
 
 	if( canAffectSelection() )
 	{
@@ -820,7 +820,7 @@ void LLManipScale::drag( S32 x, S32 y )
 	}
 
 	// store changes to override updates
-	auto& select_mgr = LLSelectMgr::instance();
+	auto& select_mgr = LLSelectMgr::instanceFast();
 	for (LLSelectNode* selectNode : select_mgr.getSelection()->begin_end())
 	{
 		LLViewerObject*cur = selectNode->getObject();
@@ -868,7 +868,7 @@ void LLManipScale::dragCorner( S32 x, S32 y )
 	}
 	mDragPointGlobal = lerp(mDragStartCenterGlobal, mDragStartPointGlobal, t);
 
-	LLBBox bbox	     = LLSelectMgr::getInstance()->getBBoxOfSelection();
+	LLBBox bbox	     = LLSelectMgr::getInstanceFast()->getBBoxOfSelection();
 	F32 scale_factor = 1.f;
 	F32 max_scale    = partToMaxScale(mManipPart, bbox);
 	F32 min_scale    = partToMinScale(mManipPart, bbox);
@@ -1060,7 +1060,7 @@ void LLManipScale::dragFace( S32 x, S32 y )
 	LLVector3 drag_start_dir_f;
 	drag_start_dir_f.set(drag_start_dir_d);
 
-	LLBBox bbox	= LLSelectMgr::getInstance()->getBBoxOfSelection();
+	LLBBox bbox	= LLSelectMgr::getInstanceFast()->getBBoxOfSelection();
 
 	F32 s = 0;
 	F32 t = 0;
@@ -1198,7 +1198,7 @@ void LLManipScale::sendUpdates( BOOL send_position_update, BOOL send_scale_updat
 		// enforce minimum update delay and don't stream updates on sub-object selections
 		if( elapsed_time > UPDATE_DELAY && !ALControlCache::EditLinkedParts )
 		{
-			LLSelectMgr::getInstance()->sendMultipleUpdate( update_flags );
+			LLSelectMgr::getInstanceFast()->sendMultipleUpdate( update_flags );
 			update_timer.reset();
 			mSendUpdateOnMouseUp = FALSE;
 		}
@@ -1337,7 +1337,7 @@ void LLManipScale::updateSnapGuides(const LLBBox& bbox)
 	LLVector3 grid_origin;
 	LLVector3 grid_scale;
 	LLQuaternion grid_rotation;
-	LLSelectMgr::getInstance()->getGrid(grid_origin, grid_rotation, grid_scale);
+	LLSelectMgr::getInstanceFast()->getGrid(grid_origin, grid_rotation, grid_scale);
 
 	bool uniform = LLManipScale::getUniform();
 
@@ -1779,7 +1779,7 @@ void LLManipScale::renderSnapGuides(const LLBBox& bbox)
 			{
 				LLVector3 text_origin = tick_pos + (mSnapGuideDir1 * mSnapRegimeOffset * (1.f + tick_scale));
 				
-				EGridMode grid_mode = LLSelectMgr::getInstance()->getGridMode();
+				EGridMode grid_mode = LLSelectMgr::getInstanceFast()->getGridMode();
 				F32 tick_value;
 				if (grid_mode == GRID_MODE_WORLD)
 				{
@@ -1826,7 +1826,7 @@ void LLManipScale::renderSnapGuides(const LLBBox& bbox)
 				{
 					LLVector3 text_origin = tick_pos + (mSnapGuideDir2 * mSnapRegimeOffset * (1.f + tick_scale));
 
-					EGridMode grid_mode = LLSelectMgr::getInstance()->getGridMode();
+					EGridMode grid_mode = LLSelectMgr::getInstanceFast()->getGridMode();
 					F32 tick_value;
 					if (grid_mode == GRID_MODE_WORLD)
 					{
@@ -1855,7 +1855,7 @@ void LLManipScale::renderSnapGuides(const LLBBox& bbox)
 		{
 			if (mHelpTextTimer.getElapsedTimeF32() < sHelpTextVisibleTime + sHelpTextFadeTime && sNumTimesHelpTextShown < sMaxTimesShowHelpText)
 			{
-				LLVector3 selection_center_start = LLSelectMgr::getInstance()->getSavedBBoxOfSelection().getCenterAgent();
+				LLVector3 selection_center_start = LLSelectMgr::getInstanceFast()->getSavedBBoxOfSelection().getCenterAgent();
 
 				LLVector3 offset_dir;
 				if (mSnapGuideDir1 * LLViewerCamera::getInstanceFast()->getAtAxis() > mSnapGuideDir2 * LLViewerCamera::getInstanceFast()->getAtAxis())

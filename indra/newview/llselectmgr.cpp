@@ -163,7 +163,7 @@ struct LLDeRezInfo
 
 LLSelectionCallbackData::LLSelectionCallbackData()
 {
-    LLSelectMgr *instance = LLSelectMgr::getInstance();
+    LLSelectMgr *instance = LLSelectMgr::getInstanceFast();
     LLObjectSelectionHandle selection = instance->getSelection();
     if (!selection->getNumNodes())
     {
@@ -3670,27 +3670,27 @@ bool LLSelectMgr::confirmDelete(const LLSD& notification, const LLSD& response, 
 			const LLUUID trash_id = gInventory.findCategoryUUIDForType(LLFolderType::FT_TRASH);
 			// attempt to derez into the trash.
 			LLDeRezInfo info(DRD_TRASH, trash_id);
-			LLSelectMgr::getInstance()->sendListToRegions("DeRezObject",
+			LLSelectMgr::getInstanceFast()->sendListToRegions("DeRezObject",
                                                           packDeRezHeader,
                                                           packObjectLocalID,
                                                           logNoOp,
                                                           (void*) &info,
                                                           SEND_ONLY_ROOTS);
 			// VEFFECT: Delete Object - one effect for all deletes
-			if (!gSavedSettings.getBOOL("AlchemyDisableEffectSpiral") && (LLSelectMgr::getInstance()->mSelectedObjects->mSelectType != SELECT_TYPE_HUD))
+			if (!gSavedSettings.getBOOL("AlchemyDisableEffectSpiral") && (LLSelectMgr::getInstanceFast()->mSelectedObjects->mSelectType != SELECT_TYPE_HUD))
 			{
 				LLHUDEffectSpiral *effectp = (LLHUDEffectSpiral *)LLHUDManager::getInstance()->createViewerEffect(LLHUDObject::LL_HUD_EFFECT_POINT, TRUE);
-				effectp->setPositionGlobal( LLSelectMgr::getInstance()->getSelectionCenterGlobal() );
+				effectp->setPositionGlobal( LLSelectMgr::getInstanceFast()->getSelectionCenterGlobal() );
 				effectp->setColor(LLColor4U(gAgent.getEffectColor()));
 				F32 duration = 0.5f;
-				duration += LLSelectMgr::getInstance()->mSelectedObjects->getObjectCount() / 64.f;
+				duration += LLSelectMgr::getInstanceFast()->mSelectedObjects->getObjectCount() / 64.f;
 				effectp->setDuration(duration);
 			}
 
 			gAgentCamera.setLookAt(LOOKAT_TARGET_CLEAR);
 
 			// Keep track of how many objects have been deleted.
-			add(LLStatViewer::DELETE_OBJECT, LLSelectMgr::getInstance()->mSelectedObjects->getObjectCount());
+			add(LLStatViewer::DELETE_OBJECT, LLSelectMgr::getInstanceFast()->mSelectedObjects->getObjectCount());
 		}
 		break;
 	case 1:
@@ -5593,7 +5593,7 @@ void LLSelectMgr::processForceObjectSelect(LLMessageSystem* msg, void**)
 
 	if (reset_list)
 	{
-		LLSelectMgr::getInstance()->deselectAll();
+		LLSelectMgr::getInstanceFast()->deselectAll();
 	}
 
 	LLUUID full_id;
@@ -5619,7 +5619,7 @@ void LLSelectMgr::processForceObjectSelect(LLMessageSystem* msg, void**)
 	}
 
 	// Don't select, just highlight
-	LLSelectMgr::getInstance()->highlightObjectAndFamily(objects);
+	LLSelectMgr::getInstanceFast()->highlightObjectAndFamily(objects);
 }
 
 extern F32	gGLModelView[16];
@@ -6531,9 +6531,9 @@ void LLSelectNode::renderOneSilhouette(const LLColor4 &color)
                 LLGLEnable fog(GL_FOG);
                 glFogi(GL_FOG_MODE, GL_LINEAR);
                 float d = (viewerCamera.getPointOfInterest() - viewerCamera.getOrigin()).magVec();
-                LLColor4 fogCol = color * (F32) llclamp((LLSelectMgr::getInstance()->getSelectionCenterGlobal() -
+                LLColor4 fogCol = color * (F32) llclamp((LLSelectMgr::getInstanceFast()->getSelectionCenterGlobal() -
                                    gAgentCamera.getCameraPositionGlobal()).magVec() /
-                                      (LLSelectMgr::getInstance()->getBBoxOfSelection().getExtentLocal().magVec() * 4),
+                                      (LLSelectMgr::getInstanceFast()->getBBoxOfSelection().getExtentLocal().magVec() * 4),
                                   0.0, 1.0);
                 glFogf(GL_FOG_START, d);
                 glFogf(GL_FOG_END, d * (1 + (viewerCamera.getView() / viewerCamera.getDefaultFOV())));

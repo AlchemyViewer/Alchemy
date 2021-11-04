@@ -866,7 +866,7 @@ void LLTextureView::draw()
 
 			if (!mOrderFetch)
 			{
-				if (pri < HIGH_PRIORITY && LLSelectMgr::getInstance())
+				if (pri < HIGH_PRIORITY && LLSelectMgr::getInstanceFast())
 				{
 					struct f : public LLSelectedTEFunctor
 					{
@@ -878,7 +878,7 @@ void LLTextureView::draw()
 						}
 					} func(imagep);
 					const bool firstonly = true;
-					bool match = LLSelectMgr::getInstance()->getSelection()->applyToTEs(&func, firstonly);
+					bool match = LLSelectMgr::getInstanceFast()->getSelection()->applyToTEs(&func, firstonly);
 					if (match)
 					{
 						pri += 3*HIGH_PRIORITY;
@@ -887,7 +887,7 @@ void LLTextureView::draw()
 
 				if (pri < HIGH_PRIORITY && (cur_discard< 0 || desired_discard < cur_discard))
 				{
-					LLSelectNode* hover_node = LLSelectMgr::instance().getHoverNode();
+					LLSelectNode* hover_node = LLSelectMgr::instanceFast().getHoverNode();
 					if (hover_node)
 					{
 						LLViewerObject *objectp = hover_node->getObject();

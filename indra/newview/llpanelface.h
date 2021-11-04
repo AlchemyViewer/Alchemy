@@ -355,7 +355,7 @@ private:
 			LLPanelFace *_panel;
 			const LLUUID & _only_for_object_id;
 		} editor(p, &edit, only_for_object_id);
-		LLSelectMgr::getInstance()->selectionSetMaterialParams(&editor, te);
+		LLSelectMgr::getInstanceFast()->selectionSetMaterialParams(&editor, te);
 	}
 
 	template<
@@ -387,7 +387,7 @@ private:
 			}
 			DataType _default;
 		} GetFunc(default_value);
-		identical = LLSelectMgr::getInstance()->getSelection()->getSelectedTEValue( &GetFunc, data_value, has_tolerance, tolerance);
+		identical = LLSelectMgr::getInstanceFast()->getSelection()->getSelectedTEValue( &GetFunc, data_value, has_tolerance, tolerance);
 		data_to_return = data_value;
 	}
 
@@ -409,7 +409,7 @@ private:
 			}
 			DataType _default;
 		} GetTEValFunc(default_value);
-		identical = LLSelectMgr::getInstance()->getSelection()->getSelectedTEValue( &GetTEValFunc, data_value, has_tolerance, tolerance );
+		identical = LLSelectMgr::getInstanceFast()->getSelection()->getSelectedTEValue( &GetTEValFunc, data_value, has_tolerance, tolerance );
 		data_to_return = data_value;
 	}
 

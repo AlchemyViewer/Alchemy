@@ -520,8 +520,8 @@ public:
 		static LLCachedControl<bool> analyze_target_texture(gSavedSettings, "AnalyzeTargetTexture", false);
 		if (analyze_target_texture)
 		{
-			LLSelectNode* nodep = LLSelectMgr::instance().getPrimaryHoverNode();
-			LLObjectSelectionHandle handle = LLSelectMgr::instance().getHoverObjects();
+			LLSelectNode* nodep = LLSelectMgr::instanceFast().getPrimaryHoverNode();
+			LLObjectSelectionHandle handle = LLSelectMgr::instanceFast().getHoverObjects();
 			if (nodep || handle.notNull())
 			{
 
@@ -705,7 +705,7 @@ public:
 				S32 visible_bytes = 0;
 
 				const char* label = "Region";
-				if (LLSelectMgr::getInstance()->getSelection()->getObjectCount() == 0)
+				if (LLSelectMgr::getInstanceFast()->getSelection()->getObjectCount() == 0)
 				{ //region
 					LLViewerRegion* region = gAgent.getRegion();
 					if (region)
@@ -740,9 +740,9 @@ public:
 				else
 				{
 					label = "Selection";
-					cost = LLSelectMgr::getInstance()->getSelection()->getSelectedObjectStreamingCost(&total_bytes, &visible_bytes);
-					count = LLSelectMgr::getInstance()->getSelection()->getSelectedObjectTriangleCount(&vcount);
-					object_count = LLSelectMgr::getInstance()->getSelection()->getObjectCount();
+					cost = LLSelectMgr::getInstanceFast()->getSelection()->getSelectedObjectStreamingCost(&total_bytes, &visible_bytes);
+					count = LLSelectMgr::getInstanceFast()->getSelection()->getSelectedObjectTriangleCount(&vcount);
+					object_count = LLSelectMgr::getInstanceFast()->getSelection()->getObjectCount();
 				}
 					
 				addText(xpos,ypos, llformat("%s streaming cost: %.1f", label, cost));
@@ -1004,7 +1004,7 @@ public:
 		{
 			LLViewerObject* objectp = NULL ;
 			
-			LLSelectNode* nodep = LLSelectMgr::instance().getHoverNode();
+			LLSelectNode* nodep = LLSelectMgr::instanceFast().getHoverNode();
 			if (nodep)
 			{
 				objectp = nodep->getObject();
@@ -1465,7 +1465,7 @@ LLWindowCallbacks::DragNDropResult LLViewerWindow::handleDragNDrop( LLWindow *wi
 		if (prim_media_dnd_enabled &&
 			result == LLWindowCallbacks::DND_NONE && !mDragHoveredObject.isNull())
 		{
-			LLSelectMgr::getInstance()->unhighlightObjectOnly(mDragHoveredObject);
+			LLSelectMgr::getInstanceFast()->unhighlightObjectOnly(mDragHoveredObject);
 			mDragHoveredObject = NULL;
 		}
 	}

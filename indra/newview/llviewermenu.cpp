@@ -1647,7 +1647,7 @@ class LLAdvancedEnableAppearanceToXML : public view_listener_t
 {
 	bool handleEvent(const LLSD& userdata)
 	{
-        LLViewerObject *obj = LLSelectMgr::getInstance()->getSelection()->getPrimaryObject();
+        LLViewerObject *obj = LLSelectMgr::getInstanceFast()->getSelection()->getPrimaryObject();
         if (obj && obj->isAnimatedObject() && obj->getControlAvatar())
         {
             return gSavedSettings.getBOOL("DebugAnimatedObjects");
@@ -1673,7 +1673,7 @@ class LLAdvancedAppearanceToXML : public view_listener_t
 	bool handleEvent(const LLSD& userdata)
 	{
 		std::string emptyname;
-        LLViewerObject *obj = LLSelectMgr::getInstance()->getSelection()->getPrimaryObject();
+        LLViewerObject *obj = LLSelectMgr::getInstanceFast()->getSelection()->getPrimaryObject();
         LLVOAvatar *avatar = NULL;
         if (obj)
         {
@@ -2661,7 +2661,7 @@ class LLObjectReportAbuse : public view_listener_t
 {
 	bool handleEvent(const LLSD& userdata)
 	{
-		LLViewerObject* objectp = LLSelectMgr::getInstance()->getSelection()->getPrimaryObject();
+		LLViewerObject* objectp = LLSelectMgr::getInstanceFast()->getSelection()->getPrimaryObject();
 		if (objectp)
 		{
 			LLFloaterReporter::showFromObject(objectp->getID());
@@ -2675,7 +2675,7 @@ class LLObjectEnableReportAbuse : public view_listener_t
 {
 	bool handleEvent(const LLSD& userdata)
 	{
-		bool new_value = LLSelectMgr::getInstance()->getSelection()->getObjectCount() != 0;
+		bool new_value = LLSelectMgr::getInstanceFast()->getSelection()->getObjectCount() != 0;
 		return new_value;
 	}
 };
@@ -2683,7 +2683,7 @@ class LLObjectEnableReportAbuse : public view_listener_t
 
 void handle_object_touch()
 {
-	LLViewerObject* object = LLSelectMgr::getInstance()->getSelection()->getPrimaryObject();
+	LLViewerObject* object = LLSelectMgr::getInstanceFast()->getSelection()->getPrimaryObject();
 	if (!object) return;
 
 	LLPickInfo pick = LLToolPie::getInstance()->getPick();
@@ -2737,7 +2737,7 @@ static LLStringExplicit get_default_item_label(const std::string& item_name)
 bool enable_object_touch(LLUICtrl* ctrl)
 {
 	bool new_value = false;
-	LLViewerObject* obj = LLSelectMgr::getInstance()->getSelection()->getPrimaryObject();
+	LLViewerObject* obj = LLSelectMgr::getInstanceFast()->getSelection()->getPrimaryObject();
 	if (obj)
 	{
 		LLViewerObject* parent = (LLViewerObject*)obj->getParent();
@@ -2756,7 +2756,7 @@ bool enable_object_touch(LLUICtrl* ctrl)
 	init_default_item_label(ctrl, item_name);
 
 	// Update label based on the node touch name if available.
-	LLSelectNode* node = LLSelectMgr::getInstance()->getSelection()->getFirstRootNode();
+	LLSelectNode* node = LLSelectMgr::getInstanceFast()->getSelection()->getFirstRootNode();
 	if (node && node->mValid && !node->mTouchName.empty())
 	{
 		ctrl->setValue(node->mTouchName);
@@ -2771,7 +2771,7 @@ bool enable_object_touch(LLUICtrl* ctrl)
 
 //void label_touch(std::string& label, void*)
 //{
-//	LLSelectNode* node = LLSelectMgr::getInstance()->getSelection()->getFirstRootNode();
+//	LLSelectNode* node = LLSelectMgr::getInstanceFast()->getSelection()->getFirstRootNode();
 //	if (node && node->mValid && !node->mTouchName.empty())
 //	{
 //		label.assign(node->mTouchName);
@@ -2795,7 +2795,7 @@ bool enable_object_open()
 {
 	// Look for contents in root object, which is all the LLFloaterOpenObject
 	// understands.
-	LLViewerObject* obj = LLSelectMgr::getInstance()->getSelection()->getPrimaryObject();
+	LLViewerObject* obj = LLSelectMgr::getInstanceFast()->getSelection()->getPrimaryObject();
 	if (!obj) return false;
 
 	LLViewerObject* root = obj->getRootEdit();
@@ -2863,7 +2863,7 @@ void handle_object_edit()
 	if (gAgentCamera.getFocusOnAvatar() && !LLToolMgr::getInstance()->inEdit())
 	{
 		LLFloaterTools::sPreviousFocusOnAvatar = true;
-		LLObjectSelectionHandle selection = LLSelectMgr::getInstance()->getSelection();
+		LLObjectSelectionHandle selection = LLSelectMgr::getInstanceFast()->getSelection();
 
 		if (selection->getSelectType() == SELECT_TYPE_HUD || !gSavedSettings.getBOOL("EditCameraMovement"))
 		{
@@ -2906,8 +2906,8 @@ void handle_attachment_edit(const LLUUID& inv_item_id)
 	{
 		if (LLViewerObject* attached_obj = gAgentAvatarp->getWornAttachment(inv_item_id))
 		{
-			LLSelectMgr::getInstance()->deselectAll();
-			LLSelectMgr::getInstance()->selectObjectAndFamily(attached_obj);
+			LLSelectMgr::getInstanceFast()->deselectAll();
+			LLSelectMgr::getInstanceFast()->selectObjectAndFamily(attached_obj);
 
 			handle_object_edit();
 		}
@@ -2920,9 +2920,9 @@ void handle_attachment_touch(const LLUUID& inv_item_id)
 	{
 		if (LLViewerObject* attach_obj = gAgentAvatarp->getWornAttachment(gInventory.getLinkedItemID(inv_item_id)))
 		{
-			LLSelectMgr::getInstance()->deselectAll();
+			LLSelectMgr::getInstanceFast()->deselectAll();
 
-			LLObjectSelectionHandle sel = LLSelectMgr::getInstance()->selectObjectAndFamily(attach_obj);
+			LLObjectSelectionHandle sel = LLSelectMgr::getInstanceFast()->selectObjectAndFamily(attach_obj);
 			if (!LLToolMgr::getInstance()->inBuildMode())
 			{
 				struct SetTransient : public LLSelectedNodeFunctor
@@ -2956,7 +2956,7 @@ bool enable_attachment_touch(const LLUUID& inv_item_id)
 
 void handle_object_inspect()
 {
-	LLObjectSelectionHandle selection = LLSelectMgr::getInstance()->getSelection();
+	LLObjectSelectionHandle selection = LLSelectMgr::getInstanceFast()->getSelection();
 	LLViewerObject* selected_objectp = selection->getFirstRootObject();
 	if (selected_objectp)
 	{
@@ -3067,14 +3067,14 @@ bool enable_object_edit()
 	if (gAgent.inPrelude())
 	{
 		enable = LLViewerParcelMgr::getInstance()->allowAgentBuild()
-			|| LLSelectMgr::getInstance()->getSelection()->isAttachment();
+			|| LLSelectMgr::getInstanceFast()->getSelection()->isAttachment();
 	} 
-	else if (LLSelectMgr::getInstance()->selectGetAllValidAndObjectsFound())
+	else if (LLSelectMgr::getInstanceFast()->selectGetAllValidAndObjectsFound())
 	{
 // [RLVa:KB] - @edit*
 		if (RlvActions::isRlvEnabled() && !RlvActions::canEdit(ERlvCheckType::All))
 		{
-			LLObjectSelectionHandle hSel = LLSelectMgr::getInstance()->getSelection();
+			LLObjectSelectionHandle hSel = LLSelectMgr::getInstanceFast()->getSelection();
 			RlvSelectIsEditable f;
 			enable = (hSel.notNull()) && (!hSel->getFirstRootNode(&f, true));
 		}
@@ -3104,7 +3104,7 @@ bool enable_object_build()
 
 bool enable_object_select_in_pathfinding_linksets()
 {
-	return LLPathfindingManager::getInstance()->isPathfindingEnabledForCurrentRegion() && LLSelectMgr::getInstance()->selectGetEditableLinksets();
+	return LLPathfindingManager::getInstance()->isPathfindingEnabledForCurrentRegion() && LLSelectMgr::getInstanceFast()->selectGetEditableLinksets();
 }
 
 bool visible_object_select_in_pathfinding_linksets()
@@ -3114,7 +3114,7 @@ bool visible_object_select_in_pathfinding_linksets()
 
 bool enable_object_select_in_pathfinding_characters()
 {
-	return LLPathfindingManager::getInstance()->isPathfindingEnabledForCurrentRegion() &&  LLSelectMgr::getInstance()->selectGetViewableCharacters();
+	return LLPathfindingManager::getInstance()->isPathfindingEnabledForCurrentRegion() &&  LLSelectMgr::getInstanceFast()->selectGetViewableCharacters();
 }
 
 class LLSelfRemoveAllAttachments : public view_listener_t
@@ -3164,7 +3164,7 @@ BOOL enable_has_attachments(void*)
 //void handle_follow(void *userdata)
 //{
 //	// follow a given avatar by ID
-//	LLViewerObject* objectp = LLSelectMgr::getInstance()->getSelection()->getPrimaryObject();
+//	LLViewerObject* objectp = LLSelectMgr::getInstanceFast()->getSelection()->getPrimaryObject();
 //	if (objectp)
 //	{
 //		gAgent.startFollowPilot(objectp->getID());
@@ -3228,7 +3228,7 @@ class LLAvatarCheckImpostorMode : public view_listener_t
 {	
 	bool handleEvent(const LLSD& userdata)
 	{
-		LLViewerObject* object = LLSelectMgr::getInstance()->getSelection()->getPrimaryObject();
+		LLViewerObject* object = LLSelectMgr::getInstanceFast()->getSelection()->getPrimaryObject();
 		if (!object) return false;
 
 		LLVOAvatar* avatar = find_avatar_from_object(object); 
@@ -3263,7 +3263,7 @@ class LLAvatarSetImpostorMode : public view_listener_t
 {
 	bool handleEvent(const LLSD& userdata)
 	{
-		LLViewerObject* object = LLSelectMgr::getInstance()->getSelection()->getPrimaryObject();
+		LLViewerObject* object = LLSelectMgr::getInstanceFast()->getSelection()->getPrimaryObject();
 		if (!object) return false;
 
 		LLVOAvatar* avatar = find_avatar_from_object(object); 
@@ -3395,7 +3395,7 @@ class LLAvatarReportAbuse : public view_listener_t
 {
 	bool handleEvent(const LLSD& userdata)
 	{
-		LLVOAvatar* avatar = find_avatar_from_object( LLSelectMgr::getInstance()->getSelection()->getPrimaryObject() );
+		LLVOAvatar* avatar = find_avatar_from_object( LLSelectMgr::getInstanceFast()->getSelection()->getPrimaryObject() );
 		if(avatar)
 		{
 
@@ -3453,7 +3453,7 @@ void handle_avatar_freeze(const LLSD& avatar_id)
 	else
 	{
 		avatar = find_avatar_from_object(
-			LLSelectMgr::getInstance()->getSelection()->getPrimaryObject());
+			LLSelectMgr::getInstanceFast()->getSelection()->getPrimaryObject());
 	}
 
 	if (avatar)
@@ -3474,7 +3474,7 @@ class LLAvatarDebug : public view_listener_t
 {
 	bool handleEvent(const LLSD& userdata)
 	{
-		LLVOAvatar* avatar = find_avatar_from_object( LLSelectMgr::getInstance()->getSelection()->getPrimaryObject() );
+		LLVOAvatar* avatar = find_avatar_from_object( LLSelectMgr::getInstanceFast()->getSelection()->getPrimaryObject() );
 		if( avatar )
 		{
 			if (avatar->isSelf())
@@ -3557,7 +3557,7 @@ void handle_avatar_eject(const LLSD& avatar_id)
 	else
 	{
 		avatar = find_avatar_from_object(
-			LLSelectMgr::getInstance()->getSelection()->getPrimaryObject());
+			LLSelectMgr::getInstanceFast()->getSelection()->getPrimaryObject());
 	}
 
 	if (avatar)
@@ -3588,7 +3588,7 @@ bool enable_freeze_eject(const LLSD& avatar_id)
 	else
 	{
 		avatar = find_avatar_from_object(
-			LLSelectMgr::getInstance()->getSelection()->getPrimaryObject());
+			LLSelectMgr::getInstanceFast()->getSelection()->getPrimaryObject());
 	}
 	if (!avatar) return false;
 
@@ -3642,9 +3642,9 @@ bool enable_buy_object()
 {
     // In order to buy, there must only be 1 purchaseable object in
     // the selection manager.
-	if(LLSelectMgr::getInstance()->getSelection()->getRootObjectCount() != 1) return false;
+	if(LLSelectMgr::getInstanceFast()->getSelection()->getRootObjectCount() != 1) return false;
     LLViewerObject* obj = NULL;
-    LLSelectNode* node = LLSelectMgr::getInstance()->getSelection()->getFirstRootNode();
+    LLSelectNode* node = LLSelectMgr::getInstanceFast()->getSelection()->getFirstRootNode();
 	if(node)
     {
         obj = node->getObject();
@@ -3670,7 +3670,7 @@ bool enable_buy_object()
 // received by the viewer and cached in the selection manager.
 void handle_buy_object(LLSaleInfo sale_info)
 {
-	if(!LLSelectMgr::getInstance()->selectGetAllRootsValid())
+	if(!LLSelectMgr::getInstanceFast()->selectGetAllRootsValid())
 	{
 		LLNotificationsUtil::add("UnableToBuyWhileDownloading");
 		return;
@@ -3678,7 +3678,7 @@ void handle_buy_object(LLSaleInfo sale_info)
 
 	LLUUID owner_id;
 	std::string owner_name;
-	BOOL owners_identical = LLSelectMgr::getInstance()->selectGetOwner(owner_id, owner_name);
+	BOOL owners_identical = LLSelectMgr::getInstanceFast()->selectGetOwner(owner_id, owner_name);
 	if (!owners_identical)
 	{
 		LLNotificationsUtil::add("CannotBuyObjectsFromDifferentOwners");
@@ -3686,9 +3686,9 @@ void handle_buy_object(LLSaleInfo sale_info)
 	}
 
 	LLPermissions perm;
-	BOOL valid = LLSelectMgr::getInstance()->selectGetPermissions(perm);
+	BOOL valid = LLSelectMgr::getInstanceFast()->selectGetPermissions(perm);
 	LLAggregatePermissions ag_perm;
-	valid &= LLSelectMgr::getInstance()->selectGetAggregatePermissions(ag_perm);
+	valid &= LLSelectMgr::getInstanceFast()->selectGetAggregatePermissions(ag_perm);
 	if(!valid || !sale_info.isForSale() || !perm.allowTransferTo(gAgent.getID()))
 	{
 		LLNotificationsUtil::add("ObjectNotForSale");
@@ -4056,7 +4056,7 @@ class LLAvatarEnableAddFriend : public view_listener_t
 {
 	bool handleEvent(const LLSD& userdata)
 	{
-		LLVOAvatar* avatar = find_avatar_from_object(LLSelectMgr::getInstance()->getSelection()->getPrimaryObject());
+		LLVOAvatar* avatar = find_avatar_from_object(LLSelectMgr::getInstanceFast()->getSelection()->getPrimaryObject());
 //		bool new_value = avatar && !LLAvatarActions::isFriend(avatar->getID());
 // [RLVa:KB] - Checked: RLVa-1.2.0
 		bool new_value = avatar && !LLAvatarActions::isFriend(avatar->getID()) && (RlvActions::canShowName(RlvActions::SNC_DEFAULT, avatar->getID()));
@@ -4139,7 +4139,7 @@ bool is_object_sittable()
 	}
 // [/RLVa:KB]
 
-	LLViewerObject* object = LLSelectMgr::getInstance()->getSelection()->getPrimaryObject();
+	LLViewerObject* object = LLSelectMgr::getInstanceFast()->getSelection()->getPrimaryObject();
 
 	if (object && object->getPCode() == LL_PCODE_VOLUME)
 	{
@@ -4375,7 +4375,7 @@ void handle_duplicate_in_place(void*)
 	LL_INFOS() << "handle_duplicate_in_place" << LL_ENDL;
 
 	LLVector3 offset(0.f, 0.f, 0.f);
-	LLSelectMgr::getInstance()->selectDuplicate(offset, TRUE);
+	LLSelectMgr::getInstanceFast()->selectDuplicate(offset, TRUE);
 }
 
 /* dead code 30-apr-2008
@@ -4383,20 +4383,20 @@ void handle_deed_object_to_group(void*)
 {
 	LLUUID group_id;
 	
-	LLSelectMgr::getInstance()->selectGetGroup(group_id);
-	LLSelectMgr::getInstance()->sendOwner(LLUUID::null, group_id, FALSE);
+	LLSelectMgr::getInstanceFast()->selectGetGroup(group_id);
+	LLSelectMgr::getInstanceFast()->sendOwner(LLUUID::null, group_id, FALSE);
 	LLViewerStats::getInstance()->incStat(LLViewerStats::ST_RELEASE_COUNT);
 }
 
 BOOL enable_deed_object_to_group(void*)
 {
-	if(LLSelectMgr::getInstance()->getSelection()->isEmpty()) return FALSE;
+	if(LLSelectMgr::getInstanceFast()->getSelection()->isEmpty()) return FALSE;
 	LLPermissions perm;
 	LLUUID group_id;
 
-	if (LLSelectMgr::getInstance()->selectGetGroup(group_id) &&
+	if (LLSelectMgr::getInstanceFast()->selectGetGroup(group_id) &&
 		gAgent.hasPowerInGroup(group_id, GP_OBJECT_DEED) &&
-		LLSelectMgr::getInstance()->selectGetPermissions(perm) &&
+		LLSelectMgr::getInstanceFast()->selectGetPermissions(perm) &&
 		perm.deedToGroup(gAgent.getID(), group_id))
 	{
 		return TRUE;
@@ -4450,8 +4450,8 @@ void handle_object_owner_permissive(void*)
 	if(gAgent.isGodlike())
 	{
 		// do the objects.
-		LLSelectMgr::getInstance()->selectionSetObjectPermissions(PERM_BASE, TRUE, PERM_ALL, TRUE);
-		LLSelectMgr::getInstance()->selectionSetObjectPermissions(PERM_OWNER, TRUE, PERM_ALL, TRUE);
+		LLSelectMgr::getInstanceFast()->selectionSetObjectPermissions(PERM_BASE, TRUE, PERM_ALL, TRUE);
+		LLSelectMgr::getInstanceFast()->selectionSetObjectPermissions(PERM_OWNER, TRUE, PERM_ALL, TRUE);
 	}
 }
 
@@ -4460,14 +4460,14 @@ void handle_object_owner_self(void*)
 	// only send this if they're a god.
 	if(gAgent.isGodlike())
 	{
-		LLSelectMgr::getInstance()->sendOwner(gAgent.getID(), gAgent.getGroupID(), TRUE);
+		LLSelectMgr::getInstanceFast()->sendOwner(gAgent.getID(), gAgent.getGroupID(), TRUE);
 	}
 }
 
 // Shortcut to set owner permissions to not editable.
 void handle_object_lock(void*)
 {
-	LLSelectMgr::getInstance()->selectionSetObjectPermissions(PERM_OWNER, FALSE, PERM_MODIFY);
+	LLSelectMgr::getInstanceFast()->selectionSetObjectPermissions(PERM_OWNER, FALSE, PERM_MODIFY);
 }
 
 void handle_object_asset_ids(void*)
@@ -4475,7 +4475,7 @@ void handle_object_asset_ids(void*)
 	// only send this if they're a god.
 	if (gAgent.isGodlike())
 	{
-		LLSelectMgr::getInstance()->sendGodlikeRequest("objectinfo", "assetids");
+		LLSelectMgr::getInstanceFast()->sendGodlikeRequest("objectinfo", "assetids");
 	}
 }
 
@@ -4535,7 +4535,7 @@ void handle_god_request_avatar_geometry(void *)
 {
 	if (gAgent.isGodlike())
 	{
-		LLSelectMgr::getInstance()->sendGodlikeRequest("avatar toggle", "");
+		LLSelectMgr::getInstanceFast()->sendGodlikeRequest("avatar toggle", "");
 	}
 }
 
@@ -4548,7 +4548,7 @@ static bool get_derezzable_objects(
 {
 	bool found = false;
 
-	LLObjectSelectionHandle selection = LLSelectMgr::getInstance()->getSelection();
+	LLObjectSelectionHandle selection = LLSelectMgr::getInstanceFast()->getSelection();
 	
 	if (derez_objectsp)
 		derez_objectsp->reserve(selection->getRootObjectCount());
@@ -4755,13 +4755,13 @@ static void derez_objects(EDeRezDestination dest, const LLUUID& dest_id)
 
 void handle_take_copy()
 {
-	if (LLSelectMgr::getInstance()->getSelection()->isEmpty()) return;
+	if (LLSelectMgr::getInstanceFast()->getSelection()->isEmpty()) return;
 
 // [RLVa:KB] - Checked: 2010-03-07 (RLVa-1.2.0c) | Modified: RLVa-1.2.0a
 	if ( (rlv_handler_t::isEnabled()) && (!RlvActions::canStand()) )
 	{
 		// Allow only if the avie isn't sitting on any of the selected objects
-		LLObjectSelectionHandle hSel = LLSelectMgr::getInstance()->getSelection();
+		LLObjectSelectionHandle hSel = LLSelectMgr::getInstanceFast()->getSelection();
 		RlvSelectIsSittingOn f(gAgentAvatarp);
 		if ( (hSel.notNull()) && (hSel->getFirstRootNode(&f, TRUE) != NULL) )
 			return;
@@ -4774,13 +4774,13 @@ void handle_take_copy()
 
 void handle_link_objects()
 {
-	if (LLSelectMgr::getInstance()->getSelection()->isEmpty())
+	if (LLSelectMgr::getInstanceFast()->getSelection()->isEmpty())
 	{
 		LLFloaterReg::toggleInstanceOrBringToFront("places");
 	}
 	else
 	{
-		LLSelectMgr::getInstance()->linkObjects();
+		LLSelectMgr::getInstanceFast()->linkObjects();
 	}
 }
 
@@ -4793,12 +4793,12 @@ public:
 private:
 	bool handleEvent(const LLSD& userdata)
 	{
-		if (LLSelectMgr::getInstance()->getSelection()->isEmpty()) return true;
+		if (LLSelectMgr::getInstanceFast()->getSelection()->isEmpty()) return true;
 // [RLVa:KB] - Checked: 2010-03-24 (RLVa-1.4.0a) | Modified: RLVa-1.0.0b
 		if ( (rlv_handler_t::isEnabled()) && (!rlvCanDeleteOrReturn()) ) return true;
 // [/RLVa:KB]
 
-		mObjectSelection = LLSelectMgr::getInstance()->getEditSelection();
+		mObjectSelection = LLSelectMgr::getInstanceFast()->getEditSelection();
 
 		// Save selected objects, so that we still know what to return after the confirmation dialog resets selection.
 		get_derezzable_objects(DRD_RETURN_TO_OWNER, mError, mFirstRegion, &mReturnableObjects);
@@ -4839,7 +4839,7 @@ class LLObjectEnableReturn : public view_listener_t
 {
 	bool handleEvent(const LLSD& userdata)
 	{
-		if (LLSelectMgr::getInstance()->getSelection()->isEmpty())
+		if (LLSelectMgr::getInstanceFast()->getSelection()->isEmpty())
 		{
 			// Do not enable if nothing selected
 			return false;
@@ -4869,7 +4869,7 @@ class LLObjectEnableReturn : public view_listener_t
 
 void force_take_copy(void*)
 {
-	if (LLSelectMgr::getInstance()->getSelection()->isEmpty()) return;
+	if (LLSelectMgr::getInstanceFast()->getSelection()->isEmpty()) return;
 	const LLUUID category_id = gInventory.findCategoryUUIDForType(LLFolderType::FT_OBJECT);
 	derez_objects(DRD_FORCE_TO_GOD_INVENTORY, category_id);
 }
@@ -4878,8 +4878,8 @@ void handle_take()
 {
 	// we want to use the folder this was derezzed from if it's
 	// available. Otherwise, derez to the normal place.
-	LLObjectSelectionHandle selection = LLSelectMgr::getInstance()->getSelection();
-//	if(LLSelectMgr::getInstance()->getSelection()->isEmpty())
+	LLObjectSelectionHandle selection = LLSelectMgr::getInstanceFast()->getSelection();
+//	if(LLSelectMgr::getInstanceFast()->getSelection()->isEmpty())
 // [RLVa:KB] - Checked: 2010-03-24 (RLVa-1.2.0e) | Modified: RLVa-1.0.0b
 	if ( (selection->isEmpty()) || ((rlv_handler_t::isEnabled()) && (!rlvCanDeleteOrReturn())) )
 // [/RLVa:KB]
@@ -4993,7 +4993,7 @@ void handle_take()
 
 void handle_object_show_inspector()
 {
-	LLObjectSelectionHandle selection = LLSelectMgr::getInstance()->getSelection();
+	LLObjectSelectionHandle selection = LLSelectMgr::getInstanceFast()->getSelection();
 	LLViewerObject* objectp = selection->getFirstRootObject(TRUE);
  	if (!objectp)
  	{
@@ -5007,7 +5007,7 @@ void handle_object_show_inspector()
 
 void handle_avatar_show_inspector()
 {
-	LLVOAvatar* avatar = find_avatar_from_object( LLSelectMgr::getInstance()->getSelection()->getPrimaryObject() );
+	LLVOAvatar* avatar = find_avatar_from_object( LLSelectMgr::getInstanceFast()->getSelection()->getPrimaryObject() );
 	if(avatar)
 	{
 		LLSD params;
@@ -5041,7 +5041,7 @@ BOOL enable_take()
 		return FALSE;
 	}
 
-	for (LLSelectNode* node : LLSelectMgr::getInstance()->getSelection()->valid_root_begin_end())
+	for (LLSelectNode* node : LLSelectMgr::getInstanceFast()->getSelection()->valid_root_begin_end())
 	{
 		LLViewerObject* object = node->getObject();
 		if (object->isAvatar())
@@ -5075,7 +5075,7 @@ BOOL enable_take()
 
 void handle_buy_or_take()
 {
-	if (LLSelectMgr::getInstance()->getSelection()->isEmpty())
+	if (LLSelectMgr::getInstanceFast()->getSelection()->isEmpty())
 	{
 		return;
 	}
@@ -5149,7 +5149,7 @@ class LLToolsEnableBuyOrTake : public view_listener_t
 //                FALSE if selection is a 'take'
 BOOL is_selection_buy_not_take()
 {
-	for (LLSelectNode* node : LLSelectMgr::getInstance()->getSelection()->root_begin_end())
+	for (LLSelectNode* node : LLSelectMgr::getInstanceFast()->getSelection()->root_begin_end())
 	{
 		LLViewerObject* obj = node->getObject();
 		if(obj && !(obj->permYouOwner()) && (node->mSaleInfo.isForSale()))
@@ -5170,7 +5170,7 @@ BOOL is_selection_buy_not_take()
 S32 selection_price()
 {
 	S32 total_price = 0;
-	for (LLSelectNode* node : LLSelectMgr::getInstance()->getSelection()->root_begin_end())
+	for (LLSelectNode* node : LLSelectMgr::getInstanceFast()->getSelection()->root_begin_end())
 	{
 		LLViewerObject* obj = node->getObject();
 		if(obj && !(obj->permYouOwner()) && (node->mSaleInfo.isForSale()))
@@ -5217,10 +5217,10 @@ void show_buy_currency(const char* extra)
 
 void handle_buy()
 {
-	if (LLSelectMgr::getInstance()->getSelection()->isEmpty()) return;
+	if (LLSelectMgr::getInstanceFast()->getSelection()->isEmpty()) return;
 
 	LLSaleInfo sale_info;
-	BOOL valid = LLSelectMgr::getInstance()->selectGetSaleInfo(sale_info);
+	BOOL valid = LLSelectMgr::getInstanceFast()->selectGetSaleInfo(sale_info);
 	if (!valid) return;
 
 	S32 price = sale_info.getSalePrice();
@@ -5260,7 +5260,7 @@ bool for_sale_selection(LLSelectNode* nodep)
 
 BOOL sitting_on_selection()
 {
-	LLSelectNode* node = LLSelectMgr::getInstance()->getSelection()->getFirstRootNode();
+	LLSelectNode* node = LLSelectMgr::getInstanceFast()->getSelection()->getFirstRootNode();
 	if (!node)
 	{
 		return FALSE;
@@ -5287,7 +5287,7 @@ class LLToolsSaveToObjectInventory : public view_listener_t
 {
 	bool handleEvent(const LLSD& userdata)
 	{
-		LLSelectNode* node = LLSelectMgr::getInstance()->getSelection()->getFirstRootNode();
+		LLSelectNode* node = LLSelectMgr::getInstanceFast()->getSelection()->getFirstRootNode();
 		if(node && (node->mValid) && (!node->mFromTaskID.isNull()))
 		{
 			// *TODO: check to see if the fromtaskid object exists.
@@ -5351,7 +5351,7 @@ class LLToolsSnapObjectXY : public view_listener_t
 	{
 		F64 snap_size = (F64)ALControlCache::GridResolution;
 
-		for (LLSelectNode* node : LLSelectMgr::getInstance()->getSelection()->root_begin_end())
+		for (LLSelectNode* node : LLSelectMgr::getInstanceFast()->getSelection()->root_begin_end())
 		{
 			LLViewerObject* obj = node->getObject();
 			if (obj->permModify())
@@ -5384,7 +5384,7 @@ class LLToolsSnapObjectXY : public view_listener_t
 				obj->setPositionGlobal(pos_global, FALSE);
 			}
 		}
-		LLSelectMgr::getInstance()->sendMultipleUpdate(UPD_POSITION);
+		LLSelectMgr::getInstanceFast()->sendMultipleUpdate(UPD_POSITION);
 		return true;
 	}
 };
@@ -5394,7 +5394,7 @@ class LLToolsEnableSelectNextPart : public view_listener_t
 {
 	bool handleEvent(const LLSD& userdata)
 	{
-        bool new_value = (!LLSelectMgr::getInstance()->getSelection()->isEmpty()
+        bool new_value = (!LLSelectMgr::getInstanceFast()->getSelection()->isEmpty()
                           && (ALControlCache::EditLinkedParts
                               || LLToolFace::getInstance() == LLToolMgr::getInstance()->getCurrentTool()));
 		return new_value;
@@ -5429,7 +5429,7 @@ class LLToolsSelectNextPartFace : public view_listener_t
         if (cycle_faces)
         {
             // Cycle through faces of current selection, if end is reached, swithc to next part (if present)
-            LLSelectNode* nodep = LLSelectMgr::getInstance()->getSelection()->getFirstNode();
+            LLSelectNode* nodep = LLSelectMgr::getInstanceFast()->getSelection()->getFirstNode();
             if (!nodep) return false;
             to_select = nodep->getObject();
             if (!to_select) return false;
@@ -5473,10 +5473,10 @@ class LLToolsSelectNextPartFace : public view_listener_t
             }
         }
 
-		S32 object_count = LLSelectMgr::getInstance()->getSelection()->getObjectCount();
+		S32 object_count = LLSelectMgr::getInstanceFast()->getSelection()->getObjectCount();
 		if (cycle_linked && object_count && restart_face_on_part)
 		{
-			LLViewerObject* selected = LLSelectMgr::getInstance()->getSelection()->getFirstObject();
+			LLViewerObject* selected = LLSelectMgr::getInstanceFast()->getSelection()->getFirstObject();
 			if (selected && selected->getRootEdit())
 			{
 				LLViewerObject::child_list_t children = selected->getRootEdit()->getChildren();
@@ -5531,7 +5531,7 @@ class LLToolsSelectNextPartFace : public view_listener_t
             }
             if (fwd || prev)
             {
-                LLSelectMgr::getInstance()->deselectAll();
+                LLSelectMgr::getInstanceFast()->deselectAll();
             }
             if (cycle_faces)
             {
@@ -5546,11 +5546,11 @@ class LLToolsSelectNextPartFace : public view_listener_t
                         new_te = to_select->getNumTEs() - 1;
                     }
                 }
-                LLSelectMgr::getInstance()->selectObjectOnly(to_select, new_te);
+                LLSelectMgr::getInstanceFast()->selectObjectOnly(to_select, new_te);
             }
             else
             {
-                LLSelectMgr::getInstance()->selectObjectOnly(to_select);
+                LLSelectMgr::getInstanceFast()->selectObjectOnly(to_select);
             }
             return true;
         }
@@ -5761,7 +5761,7 @@ bool enable_spellcheck_add_to_ignore(const LLUICtrl* ctrl)
 
 bool enable_object_return()
 {
-	return (!LLSelectMgr::getInstance()->getSelection()->isEmpty() &&
+	return (!LLSelectMgr::getInstanceFast()->getSelection()->isEmpty() &&
 		(gAgent.isGodlike() || can_derez(DRD_RETURN_TO_OWNER)));
 }
 
@@ -5775,7 +5775,7 @@ bool enable_object_delete()
 	(!LLGridManager::getInstance()->isInProductionGrid()
      && gAgent.isGodlike()) ||
 # endif
-	LLSelectMgr::getInstance()->canDoDelete();
+	LLSelectMgr::getInstanceFast()->canDoDelete();
 #endif
 	return new_value;
 }
@@ -5811,10 +5811,10 @@ static void return_objects(LLObjectsReturnPackage *objectsReturnPackage, const L
 
 void handle_object_return()
 {
-	if (!LLSelectMgr::getInstance()->getSelection()->isEmpty())
+	if (!LLSelectMgr::getInstanceFast()->getSelection()->isEmpty())
 	{
 		LLObjectsReturnPackage *objectsReturnPackage = new LLObjectsReturnPackage();
-		objectsReturnPackage->mObjectSelection = LLSelectMgr::getInstance()->getEditSelection();
+		objectsReturnPackage->mObjectSelection = LLSelectMgr::getInstanceFast()->getEditSelection();
 
 		// Save selected objects, so that we still know what to return after the confirmation dialog resets selection.
 		get_derezzable_objects(DRD_RETURN_TO_OWNER, objectsReturnPackage->mError, objectsReturnPackage->mFirstRegion, &objectsReturnPackage->mReturnableObjects);
@@ -5826,9 +5826,9 @@ void handle_object_return()
 void handle_object_delete()
 {
 
-		if (LLSelectMgr::getInstance())
+		if (LLSelectMgr::getInstanceFast())
 		{
-			LLSelectMgr::getInstance()->doDelete();
+			LLSelectMgr::getInstanceFast()->doDelete();
 		}
 
 		// and close any pie/context menus when done
@@ -5842,7 +5842,7 @@ void handle_object_delete()
 
 void handle_force_delete(void*)
 {
-	LLSelectMgr::getInstance()->selectForceDelete();
+	LLSelectMgr::getInstanceFast()->selectForceDelete();
 }
 
 class LLViewEnableJoystickFlycam : public view_listener_t
@@ -5954,7 +5954,7 @@ class LLEditRedo : public view_listener_t
 
 void print_object_info(void*)
 {
-	LLSelectMgr::getInstance()->selectionDump();
+	LLSelectMgr::getInstanceFast()->selectionDump();
 }
 
 void print_agent_nvpairs(void*)
@@ -6026,7 +6026,7 @@ void toggle_debug_menus(void*)
 
 // void handle_export_selected( void * )
 // {
-// 	LLObjectSelectionHandle selection = LLSelectMgr::getInstance()->getSelection();
+// 	LLObjectSelectionHandle selection = LLSelectMgr::getInstanceFast()->getSelection();
 // 	if (selection->isEmpty())
 // 	{
 // 		return;
@@ -6219,11 +6219,11 @@ void handle_look_at_selection(const LLSD& param)
 {
 	const F32 PADDING_FACTOR = 1.75f;
 	BOOL zoom = (param.asString() == "zoom");
-	if (!LLSelectMgr::getInstance()->getSelection()->isEmpty())
+	if (!LLSelectMgr::getInstanceFast()->getSelection()->isEmpty())
 	{
 		gAgentCamera.setFocusOnAvatar(FALSE, ANIMATE);
 
-		LLBBox selection_bbox = LLSelectMgr::getInstance()->getBBoxOfSelection();
+		LLBBox selection_bbox = LLSelectMgr::getInstanceFast()->getBBoxOfSelection();
 		F32 angle_of_view = llmax(0.1f, LLViewerCamera::getInstance()->getAspect() > 1.f ? LLViewerCamera::getInstance()->getView() * LLViewerCamera::getInstance()->getAspect() : LLViewerCamera::getInstance()->getView());
 		F32 distance = selection_bbox.getExtentLocal().magVec() * PADDING_FACTOR / atan(angle_of_view);
 
@@ -6231,24 +6231,24 @@ void handle_look_at_selection(const LLSD& param)
 		obj_to_cam.normVec();
 
 		LLUUID object_id;
-		if (LLSelectMgr::getInstance()->getSelection()->getPrimaryObject())
+		if (LLSelectMgr::getInstanceFast()->getSelection()->getPrimaryObject())
 		{
-			object_id = LLSelectMgr::getInstance()->getSelection()->getPrimaryObject()->mID;
+			object_id = LLSelectMgr::getInstanceFast()->getSelection()->getPrimaryObject()->mID;
 		}
 		if (zoom)
 		{
 			// Make sure we are not increasing the distance between the camera and object
-			LLVector3d orig_distance = gAgentCamera.getCameraPositionGlobal() - LLSelectMgr::getInstance()->getSelectionCenterGlobal();
+			LLVector3d orig_distance = gAgentCamera.getCameraPositionGlobal() - LLSelectMgr::getInstanceFast()->getSelectionCenterGlobal();
 			distance = llmin(distance, (F32) orig_distance.length());
 				
-			gAgentCamera.setCameraPosAndFocusGlobal(LLSelectMgr::getInstance()->getSelectionCenterGlobal() + LLVector3d(obj_to_cam * distance), 
-										LLSelectMgr::getInstance()->getSelectionCenterGlobal(), 
+			gAgentCamera.setCameraPosAndFocusGlobal(LLSelectMgr::getInstanceFast()->getSelectionCenterGlobal() + LLVector3d(obj_to_cam * distance), 
+										LLSelectMgr::getInstanceFast()->getSelectionCenterGlobal(), 
 										object_id );
 			
 		}
 		else
 		{
-			gAgentCamera.setFocusGlobal( LLSelectMgr::getInstance()->getSelectionCenterGlobal(), object_id );
+			gAgentCamera.setFocusGlobal( LLSelectMgr::getInstanceFast()->getSelectionCenterGlobal(), object_id );
 		}	
 	}
 }
@@ -6278,7 +6278,7 @@ class LLAvatarInviteToGroup : public view_listener_t
 {
 	bool handleEvent(const LLSD& userdata)
 	{
-		LLVOAvatar* avatar = find_avatar_from_object( LLSelectMgr::getInstance()->getSelection()->getPrimaryObject() );
+		LLVOAvatar* avatar = find_avatar_from_object( LLSelectMgr::getInstanceFast()->getSelection()->getPrimaryObject() );
 //		if(avatar)
 // [RLVa:KB] - Checked: RLVa-1.2.0
 		if ( (avatar) && (RlvActions::canShowName(RlvActions::SNC_DEFAULT, avatar->getID())) )
@@ -6294,7 +6294,7 @@ class LLAvatarAddFriend : public view_listener_t
 {
 	bool handleEvent(const LLSD& userdata)
 	{
-		LLVOAvatar* avatar = find_avatar_from_object( LLSelectMgr::getInstance()->getSelection()->getPrimaryObject() );
+		LLVOAvatar* avatar = find_avatar_from_object( LLSelectMgr::getInstanceFast()->getSelection()->getPrimaryObject() );
 //		if(avatar && !LLAvatarActions::isFriend(avatar->getID()))
 // [RLVa:KB] - Checked: RLVa-1.2.0
 		if ( (avatar && !LLAvatarActions::isFriend(avatar->getID())) && (RlvActions::canShowName(RlvActions::SNC_DEFAULT, avatar->getID())) )
@@ -6360,7 +6360,7 @@ class LLAvatarResetSkeleton: public view_listener_t
 {
     bool handleEvent(const LLSD& userdata)
     {
-		LLVOAvatar* avatar = find_avatar_from_object(LLSelectMgr::getInstance()->getSelection()->getPrimaryObject());
+		LLVOAvatar* avatar = find_avatar_from_object(LLSelectMgr::getInstanceFast()->getSelection()->getPrimaryObject());
 		if(avatar)
         {
             avatar->resetSkeleton(false);
@@ -6376,7 +6376,7 @@ class LLAvatarEnableResetSkeleton: public view_listener_t
 {
     bool handleEvent(const LLSD& userdata)
     {
-        LLViewerObject *obj = LLSelectMgr::getInstance()->getSelection()->getPrimaryObject();
+        LLViewerObject *obj = LLSelectMgr::getInstanceFast()->getSelection()->getPrimaryObject();
         if (obj && obj->getAvatar())
         {
             return true;
@@ -6390,7 +6390,7 @@ class LLAvatarResetSkeletonAndAnimations : public view_listener_t
 {
 	bool handleEvent(const LLSD& userdata)
 	{
-		LLVOAvatar* avatar = find_avatar_from_object(LLSelectMgr::getInstance()->getSelection()->getPrimaryObject());
+		LLVOAvatar* avatar = find_avatar_from_object(LLSelectMgr::getInstanceFast()->getSelection()->getPrimaryObject());
 		if (avatar)
 		{
 			avatar->resetSkeleton(true);
@@ -6406,7 +6406,7 @@ class LLAvatarAddContact : public view_listener_t
 {
 	bool handleEvent(const LLSD& userdata)
 	{
-		LLVOAvatar* avatar = find_avatar_from_object( LLSelectMgr::getInstance()->getSelection()->getPrimaryObject() );
+		LLVOAvatar* avatar = find_avatar_from_object( LLSelectMgr::getInstanceFast()->getSelection()->getPrimaryObject() );
 //		if(avatar)
 // [RLVa:KB] - Checked: RLVa-1.2.0
 		if ( (avatar) && (RlvActions::canShowName(RlvActions::SNC_DEFAULT, avatar->getID())) )
@@ -6457,7 +6457,7 @@ bool complete_give_money(const LLSD& notification, const LLSD& response, LLObjec
 void handle_give_money_dialog()
 {
 	LLNotification::Params params("DoNotDisturbModePay");
-	params.functor.function(boost::bind(complete_give_money, _1, _2, LLSelectMgr::getInstance()->getSelection()));
+	params.functor.function(boost::bind(complete_give_money, _1, _2, LLSelectMgr::getInstanceFast()->getSelection()));
 
 	if (gAgent.isDoNotDisturb())
 	{
@@ -6472,7 +6472,7 @@ void handle_give_money_dialog()
 
 bool enable_pay_avatar()
 {
-	LLViewerObject* obj = LLSelectMgr::getInstance()->getSelection()->getPrimaryObject();
+	LLViewerObject* obj = LLSelectMgr::getInstanceFast()->getSelection()->getPrimaryObject();
 	LLVOAvatar* avatar = find_avatar_from_object(obj);
 //	return (avatar != NULL);
 // [RLVa:KB] - @shownames and @pay
@@ -6482,7 +6482,7 @@ bool enable_pay_avatar()
 
 bool enable_pay_object()
 {
-	LLViewerObject* object = LLSelectMgr::getInstance()->getSelection()->getPrimaryObject();
+	LLViewerObject* object = LLSelectMgr::getInstanceFast()->getSelection()->getPrimaryObject();
 	if( object )
 	{
 		LLViewerObject *parent = (LLViewerObject *)object->getParent();
@@ -6518,7 +6518,7 @@ bool enable_object_sit(LLUICtrl* ctrl)
 		init_default_item_label(ctrl, item_name);
 
 		// Update label
-		LLSelectNode* node = LLSelectMgr::getInstance()->getSelection()->getFirstRootNode();
+		LLSelectNode* node = LLSelectMgr::getInstanceFast()->getSelection()->getFirstRootNode();
 		if (node && node->mValid && !node->mSitName.empty())
 		{
 			ctrl->setValue(node->mSitName);
@@ -6544,7 +6544,7 @@ bool enable_object_sit(LLUICtrl* ctrl)
 
 void dump_select_mgr(void*)
 {
-	LLSelectMgr::getInstance()->dump();
+	LLSelectMgr::getInstanceFast()->dump();
 }
 
 void dump_inventory(void*)
@@ -6786,7 +6786,7 @@ class LLShowAgentProfile : public view_listener_t
 		}
 		else if (userdata.asString() == "hit object")
 		{
-			LLViewerObject* objectp = LLSelectMgr::getInstance()->getSelection()->getPrimaryObject();
+			LLViewerObject* objectp = LLSelectMgr::getInstanceFast()->getSelection()->getPrimaryObject();
 			if (objectp)
 			{
 				agent_id = objectp->getID();
@@ -6829,7 +6829,7 @@ class LLToggleAgentProfile : public view_listener_t
 		}
 		else if (userdata.asString() == "hit object")
 		{
-			LLViewerObject* objectp = LLSelectMgr::getInstance()->getSelection()->getPrimaryObject();
+			LLViewerObject* objectp = LLSelectMgr::getInstanceFast()->getSelection()->getPrimaryObject();
 			if (objectp)
 			{
 				agent_id = objectp->getID();
@@ -6951,7 +6951,7 @@ public:
 private:
 	bool handleEvent(const LLSD& userdata)
 	{
-		setObjectSelection(LLSelectMgr::getInstance()->getSelection());
+		setObjectSelection(LLSelectMgr::getInstanceFast()->getSelection());
 		LLViewerObject* selectedObject = sObjectSelection->getFirstRootObject();
 		if (selectedObject)
 		{
@@ -7023,7 +7023,7 @@ void LLObjectAttachToAvatar::onNearAttachObject(BOOL success, void *user_data)
 			// interpret 0 as "default location"
 			attachment_id = 0;
 		}
-		LLSelectMgr::getInstance()->sendAttach(cb_data->getSelection(), attachment_id, cb_data->mReplace);
+		LLSelectMgr::getInstanceFast()->sendAttach(cb_data->getSelection(), attachment_id, cb_data->mReplace);
 	}
 	LLObjectAttachToAvatar::setObjectSelection(NULL);
 
@@ -7035,7 +7035,7 @@ void LLObjectAttachToAvatar::confirmReplaceAttachment(S32 option, LLViewerJointA
 {
 	if (option == 0/*YES*/)
 	{
-		LLViewerObject* selectedObject = LLSelectMgr::getInstance()->getSelection()->getFirstRootObject();
+		LLViewerObject* selectedObject = LLSelectMgr::getInstanceFast()->getSelection()->getFirstRootObject();
 		if (selectedObject)
 		{
 			const F32 MIN_STOP_DISTANCE = 1.f;	// meters
@@ -7105,9 +7105,9 @@ void callback_attachment_drop(const LLSD& notification, const LLSD& response)
 	}
 	
 	// reselect the object
-	LLSelectMgr::getInstance()->selectObjectAndFamily(object);
+	LLSelectMgr::getInstanceFast()->selectObjectAndFamily(object);
 
-	LLSelectMgr::getInstance()->sendDropAttachment();
+	LLSelectMgr::getInstanceFast()->sendDropAttachment();
 
 	return;
 }
@@ -7122,7 +7122,7 @@ class LLAttachmentDrop : public view_listener_t
 			if (gRlvAttachmentLocks.hasLockedAttachmentPoint(RLV_LOCK_REMOVE))
 			{
 				// NOTE: copy/paste of the code in enable_detach()
-				LLObjectSelectionHandle hSelect = LLSelectMgr::getInstance()->getSelection();
+				LLObjectSelectionHandle hSelect = LLSelectMgr::getInstanceFast()->getSelection();
 				RlvSelectHasLockedAttach f;
 				if ( (hSelect->isAttachment()) && (hSelect->getFirstRootNode(&f, FALSE) != NULL) )
 					return true;
@@ -7135,7 +7135,7 @@ class LLAttachmentDrop : public view_listener_t
 // [/RLVa:KB]
 
 		LLSD payload;
-		LLViewerObject *object = LLSelectMgr::getInstance()->getSelection()->getPrimaryObject();
+		LLViewerObject *object = LLSelectMgr::getInstanceFast()->getSelection()->getPrimaryObject();
 
 		if (object) 
 		{
@@ -7228,7 +7228,7 @@ class LLAttachmentDetach : public view_listener_t
 	{
 		// Called when the user clicked on an object attached to them
 		// and selected "Detach".
-		LLViewerObject *object = LLSelectMgr::getInstance()->getSelection()->getPrimaryObject();
+		LLViewerObject *object = LLSelectMgr::getInstanceFast()->getSelection()->getPrimaryObject();
 		if (!object)
 		{
 			LL_WARNS() << "handle_detach() - no object to detach" << LL_ENDL;
@@ -7262,7 +7262,7 @@ class LLAttachmentDetach : public view_listener_t
 		// NOTE: copy/paste of the code in enable_detach()
 		if ( (rlv_handler_t::isEnabled()) && (gRlvAttachmentLocks.hasLockedAttachmentPoint(RLV_LOCK_REMOVE)) )
 		{
-			LLObjectSelectionHandle hSelect = LLSelectMgr::getInstance()->getSelection();
+			LLObjectSelectionHandle hSelect = LLSelectMgr::getInstanceFast()->getSelection();
 			RlvSelectHasLockedAttach f;
 			if ( (hSelect->isAttachment()) && (hSelect->getFirstRootNode(&f, FALSE) != NULL) )
 				return true;
@@ -7311,12 +7311,12 @@ class LLAttachmentEnableDrop : public view_listener_t
 		// in your inventory.  Therefore, we disable the drop option until the
 		// item is in your inventory
 
-		LLViewerObject*              object         = LLSelectMgr::getInstance()->getSelection()->getPrimaryObject();
+		LLViewerObject*              object         = LLSelectMgr::getInstanceFast()->getSelection()->getPrimaryObject();
 		LLViewerJointAttachment*     attachment     = NULL;
 		LLInventoryItem*             item           = NULL;
 
 		// Do not enable drop if all faces of object are not enabled
-		if (object && LLSelectMgr::getInstance()->getSelection()->contains(object,SELECT_ALL_TES ))
+		if (object && LLSelectMgr::getInstanceFast()->getSelection()->contains(object,SELECT_ALL_TES ))
 		{
     		S32 attachmentID  = ATTACHMENT_ID_FROM_STATE(object->getAttachmentState());
 			attachment = get_if_there(gAgentAvatarp->mAttachmentPoints, attachmentID, (LLViewerJointAttachment*)NULL);
@@ -7354,12 +7354,14 @@ class LLAttachmentEnableDrop : public view_listener_t
 
 BOOL enable_detach(const LLSD&)
 {
-	LLViewerObject* object = LLSelectMgr::getInstance()->getSelection()->getPrimaryObject();
+	LLViewerObject* object = LLSelectMgr::getInstanceFast()->getSelection()->getPrimaryObject();
 	
+	LLObjectSelectionHandle hSelect = LLSelectMgr::getInstanceFast()->getSelection();
+
 	// Only enable detach if all faces of object are selected
 	if (!object ||
 		!object->isAttachment() ||
-		!LLSelectMgr::getInstance()->getSelection()->contains(object,SELECT_ALL_TES ))
+		!hSelect->contains(object,SELECT_ALL_TES ))
 	{
 		return FALSE;
 	}
@@ -7379,7 +7381,6 @@ BOOL enable_detach(const LLSD&)
 			//                          SEND_ONLY_ROOTS so we only need to examine the roots which saves us time
 			if ( (rlv_handler_t::isEnabled()) && (gRlvAttachmentLocks.hasLockedAttachmentPoint(RLV_LOCK_REMOVE)) )
 			{
-				LLObjectSelectionHandle hSelect = LLSelectMgr::getInstance()->getSelection();
 				RlvSelectHasLockedAttach f;
 				if ( (hSelect->isAttachment()) && (hSelect->getFirstRootNode(&f, FALSE) != NULL) )
 					return FALSE;
@@ -7431,7 +7432,7 @@ BOOL object_selected_and_point_valid(const LLSD& sdParam)
 	}
 // [/RLVa:KB]
 
-	LLObjectSelectionHandle selection = LLSelectMgr::getInstance()->getSelection();
+	LLObjectSelectionHandle selection = LLSelectMgr::getInstanceFast()->getSelection();
 	for (LLObjectSelection::root_iterator iter = selection->root_begin();
 		 iter != selection->root_end(); iter++)
 	{
@@ -7479,7 +7480,7 @@ BOOL object_is_wearable()
     {
         return FALSE;
     }
-	LLObjectSelectionHandle selection = LLSelectMgr::getInstance()->getSelection();
+	LLObjectSelectionHandle selection = LLSelectMgr::getInstanceFast()->getSelection();
 	for (LLSelectNode* node : selection->valid_root_begin_end())
 	{
 		if (node->mPermissions->getOwner() == gAgent.getID())
@@ -7513,7 +7514,7 @@ class LLAvatarSendIM : public view_listener_t
 {
 	bool handleEvent(const LLSD& userdata)
 	{
-		LLVOAvatar* avatar = find_avatar_from_object( LLSelectMgr::getInstance()->getSelection()->getPrimaryObject() );
+		LLVOAvatar* avatar = find_avatar_from_object( LLSelectMgr::getInstanceFast()->getSelection()->getPrimaryObject() );
 //		if(avatar)
 // [RLVa:KB] - Checked: RLVa-1.2.0
 		if ( (avatar) && (RlvActions::canShowName(RlvActions::SNC_DEFAULT, avatar->getID())) )
@@ -7529,7 +7530,7 @@ class LLAvatarCall : public view_listener_t
 {
 	bool handleEvent(const LLSD& userdata)
 	{
-		LLVOAvatar* avatar = find_avatar_from_object( LLSelectMgr::getInstance()->getSelection()->getPrimaryObject() );
+		LLVOAvatar* avatar = find_avatar_from_object( LLSelectMgr::getInstanceFast()->getSelection()->getPrimaryObject() );
 //		if(avatar)
 // [RLVa:KB] - Checked: RLVa-1.2.0
 		if ( (avatar) && (RlvActions::canShowName(RlvActions::SNC_DEFAULT, avatar->getID())) )
@@ -7546,7 +7547,7 @@ bool enable_avatar_call()
 {
 	if (RlvActions::isRlvEnabled())
 	{
-		const LLVOAvatar* pAvatar = find_avatar_from_object(LLSelectMgr::getInstance()->getSelection()->getPrimaryObject());
+		const LLVOAvatar* pAvatar = find_avatar_from_object(LLSelectMgr::getInstanceFast()->getSelection()->getPrimaryObject());
 		if ((!pAvatar) || (!RlvActions::canShowName(RlvActions::SNC_DEFAULT, pAvatar->getID())))
 			return false;
 	}
@@ -7588,7 +7589,7 @@ namespace
 void queue_actions(LLFloaterScriptQueue* q, const std::string& msg)
 {
 	QueueObjects func(q);
-	LLSelectMgr *mgr = LLSelectMgr::getInstance();
+	LLSelectMgr *mgr = LLSelectMgr::getInstanceFast();
 	LLObjectSelectionHandle selectHandle = mgr->getSelection();
 	bool fail = selectHandle->applyToNodes(&func);
 	if(fail)
@@ -7625,7 +7626,7 @@ class LLToolsSelectedScriptAction : public view_listener_t
 		// We'll allow resetting the scripts of objects on a non-attachable attach point since they wouldn't be able to circumvent anything
 		if ( (rlv_handler_t::isEnabled()) && (gRlvAttachmentLocks.hasLockedAttachmentPoint(RLV_LOCK_REMOVE)) )
 		{
-			LLObjectSelectionHandle hSel = LLSelectMgr::getInstance()->getSelection();
+			LLObjectSelectionHandle hSel = LLSelectMgr::getInstanceFast()->getSelection();
 			RlvSelectHasLockedAttach f;
 			if ( (hSel->isAttachment()) && (hSel->getFirstNode(&f) != NULL) )
 				return true;
@@ -7692,7 +7693,7 @@ class LLToolsSelectedScriptAction : public view_listener_t
 
 void handle_selected_texture_info(void*)
 {
-	for (LLSelectNode* node : LLSelectMgr::getInstance()->getSelection()->valid_begin_end())
+	for (LLSelectNode* node : LLSelectMgr::getInstanceFast()->getSelection()->valid_begin_end())
 	{
    		std::string msg;
    		msg.assign("Texture info for: ");
@@ -7736,7 +7737,7 @@ void handle_selected_texture_info(void*)
 
 void handle_selected_material_info()
 {
-	for (LLSelectNode* node : LLSelectMgr::getInstance()->getSelection()->valid_begin_end())
+	for (LLSelectNode* node : LLSelectMgr::getInstanceFast()->getSelection()->valid_begin_end())
 	{
 		std::string msg;
 		msg.assign("Material info for: \n");
@@ -7964,7 +7965,7 @@ class LLSomethingSelected : public view_listener_t
 {
 	bool handleEvent(const LLSD& userdata)
 	{
-		bool new_value = !(LLSelectMgr::getInstance()->getSelection()->isEmpty());
+		bool new_value = !(LLSelectMgr::getInstanceFast()->getSelection()->isEmpty());
 		return new_value;
 	}
 };
@@ -7973,7 +7974,7 @@ class LLSomethingSelectedNoHUD : public view_listener_t
 {
 	bool handleEvent(const LLSD& userdata)
 	{
-		LLObjectSelectionHandle selection = LLSelectMgr::getInstance()->getSelection();
+		LLObjectSelectionHandle selection = LLSelectMgr::getInstanceFast()->getSelection();
 		bool new_value = !(selection->isEmpty()) && !(selection->getSelectType() == SELECT_TYPE_HUD);
 		return new_value;
 	}
@@ -7981,12 +7982,11 @@ class LLSomethingSelectedNoHUD : public view_listener_t
 
 static bool is_editable_selected()
 {
-// [RLVa:KB] - Checked: 2010-09-28 (RLVa-1.2.1f) | Modified: RLVa-1.0.5a
+	LLObjectSelectionHandle hSelection = LLSelectMgr::getInstanceFast()->getSelection();
+	// [RLVa:KB] - Checked: 2010-09-28 (RLVa-1.2.1f) | Modified: RLVa-1.0.5a
 	// RELEASE-RLVa: [SL-2.2.0] Check that this still isn't called by anything but script actions in the Build menu
 	if ( (rlv_handler_t::isEnabled()) && (gRlvAttachmentLocks.hasLockedAttachmentPoint(RLV_LOCK_REMOVE)) )
 	{
-		LLObjectSelectionHandle hSelection = LLSelectMgr::getInstance()->getSelection();
-
 		// NOTE: this is called for 5 different menu items so we'll trade accuracy for efficiency and only
 		//       examine root nodes (LLToolsSelectedScriptAction::handleEvent() will catch what we miss)
 		RlvSelectHasLockedAttach f;
@@ -7997,7 +7997,7 @@ static bool is_editable_selected()
 	}
 // [/RLVa:KB]
 
-	return (LLSelectMgr::getInstance()->getSelection()->getFirstEditableObject() != NULL);
+	return (hSelection->getFirstEditableObject() != NULL);
 }
 
 class LLEditableSelected : public view_listener_t
@@ -8026,14 +8026,14 @@ class LLEditableSelectedMono : public view_listener_t
 bool enable_object_take_copy()
 {
 	bool all_valid = false;
-	if (LLSelectMgr::getInstance())
+	LLSelectMgr* select_mgr = LLSelectMgr::getInstanceFast();
 	{
-		if (!LLSelectMgr::getInstance()->getSelection()->isEmpty())
+		if (!select_mgr->getSelection()->isEmpty())
 		{
 		all_valid = true;
 #ifndef HACKED_GODLIKE_VIEWER
 # ifdef TOGGLE_HACKED_GODLIKE_VIEWER
-		if (LLGridManager::getInstance()->isInProductionGrid()
+		if (LLGridManager::getInstanceFast()->isInProductionGrid()
             || !gAgent.isGodlike())
 # endif
 		{
@@ -8049,7 +8049,7 @@ bool enable_object_take_copy()
 				}
 			} func;
 			const bool firstonly = true;
-			bool any_invalid = LLSelectMgr::getInstance()->getSelection()->applyToRootObjects(&func, firstonly);
+			bool any_invalid = select_mgr->getSelection()->applyToRootObjects(&func, firstonly);
 			all_valid = !any_invalid;
 		}
 #endif // HACKED_GODLIKE_VIEWER
@@ -8087,7 +8087,7 @@ bool LLHasAsset::operator()(LLInventoryCategory* cat,
 
 BOOL enable_save_into_task_inventory(void*)
 {
-	LLSelectNode* node = LLSelectMgr::getInstance()->getSelection()->getFirstRootNode();
+	LLSelectNode* node = LLSelectMgr::getInstanceFast()->getSelection()->getFirstRootNode();
 	if(node && (node->mValid) && (!node->mFromTaskID.isNull()))
 	{
 		// *TODO: check to see if the fromtaskid object exists.
@@ -8272,11 +8272,11 @@ class LLToolsEditLinkedParts : public view_listener_t
 		gSavedSettings.setBOOL( "EditLinkedParts", select_individuals );
 		if (select_individuals)
 		{
-			LLSelectMgr::getInstance()->demoteSelectionToIndividuals();
+			LLSelectMgr::getInstanceFast()->demoteSelectionToIndividuals();
 		}
 		else
 		{
-			LLSelectMgr::getInstance()->promoteSelectionToRoot();
+			LLSelectMgr::getInstanceFast()->promoteSelectionToRoot();
 		}
 		return true;
 	}
@@ -8299,7 +8299,7 @@ void handle_dump_timers()
 
 void handle_debug_avatar_textures(void*)
 {
-	LLViewerObject* objectp = LLSelectMgr::getInstance()->getSelection()->getPrimaryObject();
+	LLViewerObject* objectp = LLSelectMgr::getInstanceFast()->getSelection()->getPrimaryObject();
 	if (objectp)
 	{
 		LLFloaterReg::showInstance( "avatar_textures", LLSD(objectp->getID()) );
@@ -8463,17 +8463,17 @@ class LLToolsUseSelectionForGrid : public view_listener_t
 {
 	bool handleEvent(const LLSD& userdata)
 	{
-		LLSelectMgr::getInstance()->clearGridObjects();
+		LLSelectMgr::getInstanceFast()->clearGridObjects();
 		struct f : public LLSelectedObjectFunctor
 		{
 			virtual bool apply(LLViewerObject* objectp)
 			{
-				LLSelectMgr::getInstance()->addGridObject(objectp);
+				LLSelectMgr::getInstanceFast()->addGridObject(objectp);
 				return true;
 			}
 		} func;
-		LLSelectMgr::getInstance()->getSelection()->applyToRootObjects(&func);
-		LLSelectMgr::getInstance()->setGridMode(GRID_MODE_REF_OBJECT);
+		LLSelectMgr::getInstanceFast()->getSelection()->applyToRootObjects(&func);
+		LLSelectMgr::getInstanceFast()->setGridMode(GRID_MODE_REF_OBJECT);
 		LLFloaterTools::setGridMode((S32)GRID_MODE_REF_OBJECT);
 		return true;
 	}
@@ -9517,7 +9517,7 @@ void initialize_menus()
 	view_listener_t::addMenu(new LLToolsUseSelectionForGrid(), "Tools.UseSelectionForGrid");
 	view_listener_t::addMenu(new LLToolsSelectNextPartFace(), "Tools.SelectNextPart");
 	commit.add("Tools.Link", boost::bind(&handle_link_objects));
-	commit.add("Tools.Unlink", boost::bind(&LLSelectMgr::unlinkObjects, LLSelectMgr::getInstance()));
+	commit.add("Tools.Unlink", boost::bind(&LLSelectMgr::unlinkObjects, LLSelectMgr::getInstanceFast()));
 	view_listener_t::addMenu(new LLToolsStopAllAnimations(), "Tools.StopAllAnimations");
 	view_listener_t::addMenu(new LLToolsReleaseKeys(), "Tools.ReleaseKeys");
 	view_listener_t::addMenu(new LLToolsEnableReleaseKeys(), "Tools.EnableReleaseKeys");	
@@ -9529,8 +9529,8 @@ void initialize_menus()
 
 	view_listener_t::addMenu(new LLToolsEnableToolNotPie(), "Tools.EnableToolNotPie");
 	view_listener_t::addMenu(new LLToolsEnableSelectNextPart(), "Tools.EnableSelectNextPart");
-	enable.add("Tools.EnableLink", boost::bind(&LLSelectMgr::enableLinkObjects, LLSelectMgr::getInstance()));
-	enable.add("Tools.EnableUnlink", boost::bind(&LLSelectMgr::enableUnlinkObjects, LLSelectMgr::getInstance()));
+	enable.add("Tools.EnableLink", boost::bind(&LLSelectMgr::enableLinkObjects, LLSelectMgr::getInstanceFast()));
+	enable.add("Tools.EnableUnlink", boost::bind(&LLSelectMgr::enableUnlinkObjects, LLSelectMgr::getInstanceFast()));
 	view_listener_t::addMenu(new LLToolsEnableBuyOrTake(), "Tools.EnableBuyOrTake");
 	enable.add("Tools.EnableTakeCopy", boost::bind(&enable_object_take_copy));
 	enable.add("Tools.VisibleBuyObject", boost::bind(&tools_visible_buy_object));
@@ -9787,7 +9787,7 @@ void initialize_menus()
 	view_listener_t::addMenu(new LLObjectAttachToAvatar(true), "Object.AttachToAvatar");
 	view_listener_t::addMenu(new LLObjectAttachToAvatar(false), "Object.AttachAddToAvatar");
 	view_listener_t::addMenu(new LLObjectReturn(), "Object.Return");
-	commit.add("Object.Duplicate", boost::bind(&LLSelectMgr::duplicate, LLSelectMgr::getInstance()));
+	commit.add("Object.Duplicate", boost::bind(&LLSelectMgr::duplicate, LLSelectMgr::getInstanceFast()));
 	view_listener_t::addMenu(new LLObjectReportAbuse(), "Object.ReportAbuse");
 	view_listener_t::addMenu(new LLObjectMute(), "Object.Mute");
 
@@ -9809,7 +9809,7 @@ void initialize_menus()
 	enable.add("Object.EnableSit", boost::bind(&enable_object_sit, _1));
 
 	view_listener_t::addMenu(new LLObjectEnableReturn(), "Object.EnableReturn");
-	enable.add("Object.EnableDuplicate", boost::bind(&LLSelectMgr::canDuplicate, LLSelectMgr::getInstance()));
+	enable.add("Object.EnableDuplicate", boost::bind(&LLSelectMgr::canDuplicate, LLSelectMgr::getInstanceFast()));
 	view_listener_t::addMenu(new LLObjectEnableReportAbuse(), "Object.EnableReportAbuse");
 
 	enable.add("Avatar.EnableMute", boost::bind(&enable_object_mute));

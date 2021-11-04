@@ -75,16 +75,16 @@ BOOL LLToolIndividual::handleMouseDown(S32 x, S32 y, MASK mask)
 void LLToolIndividual::pickCallback(const LLPickInfo& pick_info)
 {
 	LLViewerObject* obj = pick_info.getObject();
-	LLSelectMgr::getInstance()->deselectAll();
+	LLSelectMgr::getInstanceFast()->deselectAll();
 	if(obj)
 	{
-		LLSelectMgr::getInstance()->selectObjectOnly(obj);
+		LLSelectMgr::getInstanceFast()->selectObjectOnly(obj);
 	}
 }
 
 BOOL LLToolIndividual::handleDoubleClick(S32 x, S32 y, MASK mask)
 {
-	if(!LLSelectMgr::getInstance()->getSelection()->isEmpty())
+	if(!LLSelectMgr::getInstanceFast()->getSelection()->isEmpty())
 	{
 		// You should already have an object selected from the mousedown.
 		// If so, show its inventory. 
@@ -102,11 +102,11 @@ BOOL LLToolIndividual::handleDoubleClick(S32 x, S32 y, MASK mask)
 void LLToolIndividual::handleSelect()
 {
 	const BOOL children_ok = TRUE;
-	LLViewerObject* obj = LLSelectMgr::getInstance()->getSelection()->getFirstRootObject(children_ok);
-	LLSelectMgr::getInstance()->deselectAll();
+	LLViewerObject* obj = LLSelectMgr::getInstanceFast()->getSelection()->getFirstRootObject(children_ok);
+	LLSelectMgr::getInstanceFast()->deselectAll();
 	if(obj)
 	{
-		LLSelectMgr::getInstance()->selectObjectOnly(obj);
+		LLSelectMgr::getInstanceFast()->selectObjectOnly(obj);
 	}
 }
 

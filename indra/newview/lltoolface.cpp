@@ -58,7 +58,7 @@ LLToolFace::~LLToolFace()
 
 BOOL LLToolFace::handleDoubleClick(S32 x, S32 y, MASK mask)
 {
-	if (!LLSelectMgr::getInstance()->getSelection()->isEmpty())
+	if (!LLSelectMgr::getInstanceFast()->getSelection()->isEmpty())
 	{
 		// You should already have an object selected from the mousedown.
 		// If so, show its properties
@@ -108,17 +108,17 @@ void LLToolFace::pickCallback(const LLPickInfo& pick_info)
 			if ( !hit_obj->isSelected() )
 			{
 				// object wasn't selected so add the object and face
-				LLSelectMgr::getInstance()->selectObjectOnly(hit_obj, hit_face);
+				LLSelectMgr::getInstanceFast()->selectObjectOnly(hit_obj, hit_face);
 			}
-			else if (!LLSelectMgr::getInstance()->getSelection()->contains(hit_obj, hit_face) )
+			else if (!LLSelectMgr::getInstanceFast()->getSelection()->contains(hit_obj, hit_face) )
 			{
 				// object is selected, but not this face, so add it.
-				LLSelectMgr::getInstance()->addAsIndividual(hit_obj, hit_face);
+				LLSelectMgr::getInstanceFast()->addAsIndividual(hit_obj, hit_face);
 			}
 			else
 			{
 				// object is selected, as is this face, so remove the face.
-				LLSelectMgr::getInstance()->remove(hit_obj, hit_face);
+				LLSelectMgr::getInstanceFast()->remove(hit_obj, hit_face);
 
 				// BUG: If you remove the last face, the simulator won't know about it.
 			}
@@ -127,15 +127,15 @@ void LLToolFace::pickCallback(const LLPickInfo& pick_info)
 		{
 			// clicked without modifiers, select only
 			// this face
-			LLSelectMgr::getInstance()->deselectAll();
-			LLSelectMgr::getInstance()->selectObjectOnly(hit_obj, hit_face);
+			LLSelectMgr::getInstanceFast()->deselectAll();
+			LLSelectMgr::getInstanceFast()->selectObjectOnly(hit_obj, hit_face);
 		}
 	}
 	else
 	{
 		if (!(pick_info.mKeyMask == MASK_SHIFT))
 		{
-			LLSelectMgr::getInstance()->deselectAll();
+			LLSelectMgr::getInstanceFast()->deselectAll();
 		}
 	}
 }
@@ -144,14 +144,14 @@ void LLToolFace::pickCallback(const LLPickInfo& pick_info)
 void LLToolFace::handleSelect()
 {
 	// From now on, draw faces
-	LLSelectMgr::getInstance()->setTEMode(TRUE);
+	LLSelectMgr::getInstanceFast()->setTEMode(TRUE);
 }
 
 
 void LLToolFace::handleDeselect()
 {
 	// Stop drawing faces
-	LLSelectMgr::getInstance()->setTEMode(FALSE);
+	LLSelectMgr::getInstanceFast()->setTEMode(FALSE);
 }
 
 

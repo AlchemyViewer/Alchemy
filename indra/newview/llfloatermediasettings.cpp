@@ -148,7 +148,7 @@ void LLFloaterMediaSettings::apply()
 		sInstance->mPanelMediaSettingsPermissions->preApply();
 		sInstance->mPanelMediaSettingsPermissions->getValues( settings, false );
 			
-		LLSelectMgr::getInstance()->selectionSetMedia( LLTextureEntry::MF_HAS_MEDIA, settings );
+		LLSelectMgr::getInstanceFast()->selectionSetMedia( LLTextureEntry::MF_HAS_MEDIA, settings );
 
 		sInstance->mPanelMediaSettingsGeneral->postApply();
 		sInstance->mPanelMediaSettingsSecurity->postApply();

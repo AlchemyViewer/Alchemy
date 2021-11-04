@@ -94,9 +94,9 @@ LLObjectSelectionHandle LLToolSelect::handleObjectSelection(const LLPickInfo& pi
 		if (!RlvActions::canEdit(object))
 		{
 			if (!temp_select)
-				return LLSelectMgr::getInstance()->getSelection();
-			else if (LLToolMgr::instance().inBuildMode())
-				LLToolMgr::instance().leaveBuildMode();
+				return LLSelectMgr::getInstanceFast()->getSelection();
+			else if (LLToolMgr::instanceFast().inBuildMode())
+				LLToolMgr::instanceFast().leaveBuildMode();
 		}
 
 		if ( (RlvActions::hasBehaviour(RLV_BHVR_FARTOUCH)) && ( (!object->isAttachment()) || (!object->permYouOwner())) )
@@ -112,13 +112,13 @@ LLObjectSelectionHandle LLToolSelect::handleObjectSelection(const LLPickInfo& pi
 				{
 					// Even the surface point is out of range so deny them the hit
 					if ( (LLFloaterReg::instanceVisible("build")) && (pick.mKeyMask != MASK_SHIFT) && (pick.mKeyMask != MASK_CONTROL) )
-						LLSelectMgr::getInstance()->deselectAll();
-					return LLSelectMgr::getInstance()->getSelection();
+						LLSelectMgr::getInstanceFast()->deselectAll();
+					return LLSelectMgr::getInstanceFast()->getSelection();
 				}
-				else if (LLToolMgr::instance().inBuildMode())
+				else if (LLToolMgr::instanceFast().inBuildMode())
 				{
 					// Allow the selection but keep it temporary by pulling them out of build mode when they click too far
-					LLToolMgr::instance().leaveBuildMode();
+					LLToolMgr::instanceFast().leaveBuildMode();
 				}
 			}
 		}
@@ -129,11 +129,11 @@ LLObjectSelectionHandle LLToolSelect::handleObjectSelection(const LLPickInfo& pi
 	BOOL select_movable = gSavedSettings.getBOOL("SelectMovableOnly");
 	
 	// *NOTE: These settings must be cleaned up at bottom of function.
-	if (temp_select || LLSelectMgr::getInstance()->mAllowSelectAvatar)
+	if (temp_select || LLSelectMgr::getInstanceFast()->mAllowSelectAvatar)
 	{
 		gSavedSettings.setBOOL("SelectOwnedOnly", FALSE);
 		gSavedSettings.setBOOL("SelectMovableOnly", FALSE);
-		LLSelectMgr::getInstance()->setForceSelection(TRUE);
+		LLSelectMgr::getInstanceFast()->setForceSelection(TRUE);
 	}
 
 	BOOL extend_select = (pick.mKeyMask == MASK_SHIFT) || (pick.mKeyMask == MASK_CONTROL);
@@ -149,7 +149,7 @@ LLObjectSelectionHandle LLToolSelect::handleObjectSelection(const LLPickInfo& pi
 		}
 		else if (!extend_select)
 		{
-			LLSelectMgr::getInstance()->deselectAll();
+			LLSelectMgr::getInstanceFast()->deselectAll();
 		}
 	}
 	else
@@ -158,7 +158,7 @@ LLObjectSelectionHandle LLToolSelect::handleObjectSelection(const LLPickInfo& pi
 
 		if (already_selected &&
 			object->getNumTEs() > 0 &&
-			!LLSelectMgr::getInstance()->getSelection()->contains(object,SELECT_ALL_TES))
+			!LLSelectMgr::getInstanceFast()->getSelection()->contains(object,SELECT_ALL_TES))
 		{
 			const LLTextureEntry* tep = object->getTE(pick.mObjectFace);
 			if (tep && !tep->isSelected() && !LLViewerMediaFocus::getInstance()->getFocusedObjectID().isNull())
@@ -177,22 +177,22 @@ LLObjectSelectionHandle LLToolSelect::handleObjectSelection(const LLPickInfo& pi
 			{
 				if ( ignore_group )
 				{
-					LLSelectMgr::getInstance()->deselectObjectOnly(object);
+					LLSelectMgr::getInstanceFast()->deselectObjectOnly(object);
 				}
 				else
 				{
-					LLSelectMgr::getInstance()->deselectObjectAndFamily(object, TRUE, TRUE);
+					LLSelectMgr::getInstanceFast()->deselectObjectAndFamily(object, TRUE, TRUE);
 				}
 			}
 			else
 			{
 				if ( ignore_group )
 				{
-					LLSelectMgr::getInstance()->selectObjectOnly(object, SELECT_ALL_TES);
+					LLSelectMgr::getInstanceFast()->selectObjectOnly(object, SELECT_ALL_TES);
 				}
 				else
 				{
-					LLSelectMgr::getInstance()->selectObjectAndFamily(object);
+					LLSelectMgr::getInstanceFast()->selectObjectAndFamily(object);
 				}
 			}
 		}
@@ -201,27 +201,27 @@ LLObjectSelectionHandle LLToolSelect::handleObjectSelection(const LLPickInfo& pi
 			// Save the current zoom values because deselect resets them.
 			F32 target_zoom;
 			F32 current_zoom;
-			LLSelectMgr::getInstance()->getAgentHUDZoom(target_zoom, current_zoom);
+			LLSelectMgr::getInstanceFast()->getAgentHUDZoom(target_zoom, current_zoom);
 
 			// JC - Change behavior to make it easier to select children
 			// of linked sets. 9/3/2002
 			if( !already_selected || ignore_group)
 			{
 				// ...lose current selection in favor of just this object
-				LLSelectMgr::getInstance()->deselectAll();
+				LLSelectMgr::getInstanceFast()->deselectAll();
 			}
 
 			if ( ignore_group )
 			{
-				LLSelectMgr::getInstance()->selectObjectOnly(object, SELECT_ALL_TES);
+				LLSelectMgr::getInstanceFast()->selectObjectOnly(object, SELECT_ALL_TES);
 			}
 			else
 			{
-				LLSelectMgr::getInstance()->selectObjectAndFamily(object);
+				LLSelectMgr::getInstanceFast()->selectObjectAndFamily(object);
 			}
 
 			// restore the zoom to the previously stored values.
-			LLSelectMgr::getInstance()->setAgentHUDZoom(target_zoom, current_zoom);
+			LLSelectMgr::getInstanceFast()->setAgentHUDZoom(target_zoom, current_zoom);
 		}
 
 		static LLCachedControl<bool> disablePointAt(gSavedSettings, "AlchemyPointAtPrivate", false);
@@ -230,7 +230,7 @@ LLObjectSelectionHandle LLToolSelect::handleObjectSelection(const LLPickInfo& pi
 			object != gAgentAvatarp)									// and it's not you
 		{
 			// have avatar turn to face the selected object(s)
-			LLVector3d selection_center = LLSelectMgr::getInstance()->getSelectionCenterGlobal();
+			LLVector3d selection_center = LLSelectMgr::getInstanceFast()->getSelectionCenterGlobal();
 			selection_center = selection_center - gAgent.getPositionGlobal();
 			LLVector3 selection_dir;
 			selection_dir.setVec(selection_center);
@@ -255,7 +255,7 @@ LLObjectSelectionHandle LLToolSelect::handleObjectSelection(const LLPickInfo& pi
 			if (!already_selected)
 			{
 				LLViewerObject* root_object = (LLViewerObject*)object->getRootEdit();
-				LLObjectSelectionHandle selection = LLSelectMgr::getInstance()->getSelection();
+				LLObjectSelectionHandle selection = LLSelectMgr::getInstanceFast()->getSelection();
 
 				// this is just a temporary selection
 				LLSelectNode* select_node = selection->findNode(root_object);
@@ -281,14 +281,14 @@ LLObjectSelectionHandle LLToolSelect::handleObjectSelection(const LLPickInfo& pi
 	} //if(!object)
 
 	// Cleanup temp select settings above.
-	if (temp_select ||LLSelectMgr::getInstance()->mAllowSelectAvatar)
+	if (temp_select ||LLSelectMgr::getInstanceFast()->mAllowSelectAvatar)
 	{
 		gSavedSettings.setBOOL("SelectOwnedOnly", select_owned);
 		gSavedSettings.setBOOL("SelectMovableOnly", select_movable);
-		LLSelectMgr::getInstance()->setForceSelection(FALSE);
+		LLSelectMgr::getInstanceFast()->setForceSelection(FALSE);
 	}
 
-	return LLSelectMgr::getInstance()->getSelection();
+	return LLSelectMgr::getInstanceFast()->getSelection();
 }
 
 BOOL LLToolSelect::handleMouseUp(S32 x, S32 y, MASK mask)
@@ -321,7 +321,7 @@ void LLToolSelect::onMouseCaptureLost()
 {
 	// Finish drag
 
-	LLSelectMgr::getInstance()->enableSilhouette(TRUE);
+	LLSelectMgr::getInstanceFast()->enableSilhouette(TRUE);
 
 	// Clean up drag-specific variables
 	mIgnoreGroup = FALSE;

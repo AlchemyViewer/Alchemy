@@ -289,6 +289,8 @@ void LLPanelPermissions::disableAll()
 
 void LLPanelPermissions::refresh()
 {
+	LLSelectMgr* select_mgr = LLSelectMgr::getInstanceFast();
+
 	LLButton*	BtnDeedToGroup = getChild<LLButton>("button deed");
 	if(BtnDeedToGroup)
 	{	
@@ -306,16 +308,16 @@ void LLPanelPermissions::refresh()
 		BtnDeedToGroup->setLabelUnselected(deedText);
 	}
 	BOOL root_selected = TRUE;
-	LLSelectNode* nodep = LLSelectMgr::getInstance()->getSelection()->getFirstRootNode();
-	S32 object_count = LLSelectMgr::getInstance()->getSelection()->getRootObjectCount();
+	LLSelectNode* nodep = select_mgr->getSelection()->getFirstRootNode();
+	S32 object_count = select_mgr->getSelection()->getRootObjectCount();
 	if(!nodep || 0 == object_count)
 	{
-		nodep = LLSelectMgr::getInstance()->getSelection()->getFirstNode();
-		object_count = LLSelectMgr::getInstance()->getSelection()->getObjectCount();
+		nodep = select_mgr->getSelection()->getFirstNode();
+		object_count = select_mgr->getSelection()->getObjectCount();
 		root_selected = FALSE;
 	}
 
-	//BOOL attachment_selected = LLSelectMgr::getInstance()->getSelection()->isAttachment();
+	//BOOL attachment_selected = select_mgr->getSelection()->isAttachment();
 	//attachment_selected = false;
 	LLViewerObject* objectp = NULL;
 	if(nodep) objectp = nodep->getObject();
@@ -330,12 +332,12 @@ void LLPanelPermissions::refresh()
 	const BOOL is_one_object = (object_count == 1);
 	
 	// BUG: fails if a root and non-root are both single-selected.
-	BOOL is_perm_modify = (LLSelectMgr::getInstance()->getSelection()->getFirstRootNode() 
-						   && LLSelectMgr::getInstance()->selectGetRootsModify())
-		|| LLSelectMgr::getInstance()->selectGetModify();
-	BOOL is_nonpermanent_enforced = (LLSelectMgr::getInstance()->getSelection()->getFirstRootNode() 
-						   && LLSelectMgr::getInstance()->selectGetRootsNonPermanentEnforced())
-		|| LLSelectMgr::getInstance()->selectGetNonPermanentEnforced();
+	BOOL is_perm_modify = (select_mgr->getSelection()->getFirstRootNode() 
+						   && select_mgr->selectGetRootsModify())
+		|| select_mgr->selectGetModify();
+	BOOL is_nonpermanent_enforced = (select_mgr->getSelection()->getFirstRootNode() 
+						   && select_mgr->selectGetRootsNonPermanentEnforced())
+		|| select_mgr->selectGetNonPermanentEnforced();
 	const LLFocusableElement* keyboard_focus_view = gFocusMgr.getKeyboardFocus();
 
 	S32 string_index = 0;
@@ -365,21 +367,21 @@ void LLPanelPermissions::refresh()
 
 	std::string pfAttrName;
 
-	if ((LLSelectMgr::getInstance()->getSelection()->getFirstRootNode() 
-		&& LLSelectMgr::getInstance()->selectGetRootsNonPathfinding())
-		|| LLSelectMgr::getInstance()->selectGetNonPathfinding())
+	if ((select_mgr->getSelection()->getFirstRootNode() 
+		&& select_mgr->selectGetRootsNonPathfinding())
+		|| select_mgr->selectGetNonPathfinding())
 	{
 		pfAttrName = "Pathfinding_Object_Attr_None";
 	}
-	else if ((LLSelectMgr::getInstance()->getSelection()->getFirstRootNode() 
-		&& LLSelectMgr::getInstance()->selectGetRootsPermanent())
-		|| LLSelectMgr::getInstance()->selectGetPermanent())
+	else if ((select_mgr->getSelection()->getFirstRootNode() 
+		&& select_mgr->selectGetRootsPermanent())
+		|| select_mgr->selectGetPermanent())
 	{
 		pfAttrName = "Pathfinding_Object_Attr_Permanent";
 	}
-	else if ((LLSelectMgr::getInstance()->getSelection()->getFirstRootNode() 
-		&& LLSelectMgr::getInstance()->selectGetRootsCharacter())
-		|| LLSelectMgr::getInstance()->selectGetCharacter())
+	else if ((select_mgr->getSelection()->getFirstRootNode() 
+		&& select_mgr->selectGetRootsCharacter())
+		|| select_mgr->selectGetCharacter())
 	{
 		pfAttrName = "Pathfinding_Object_Attr_Character";
 	}
@@ -395,11 +397,11 @@ void LLPanelPermissions::refresh()
 	getChildView("Creator:")->setEnabled(TRUE);
 	std::string creator_app_link;
 // [RLVa:KB] - Checked: 2010-11-02 (RLVa-1.2.2a) | Modified: RLVa-1.2.2a
-	const bool creators_identical = LLSelectMgr::getInstance()->selectGetCreator(mCreatorID, creator_app_link);
+	const bool creators_identical = select_mgr->selectGetCreator(mCreatorID, creator_app_link);
 	std::string owner_app_link;
-	const bool owners_identical = LLSelectMgr::getInstance()->selectGetOwner(mOwnerID, owner_app_link);
+	const bool owners_identical = select_mgr->selectGetOwner(mOwnerID, owner_app_link);
 // [/RLVa:KB]
-//	LLSelectMgr::getInstance()->selectGetCreator(mCreatorID, creator_app_link);
+//	select_mgr->selectGetCreator(mCreatorID, creator_app_link);
 
 	// Style for creator and owner links (both group and agent)
 	//LLStyle::Params style_params;
@@ -443,10 +445,10 @@ void LLPanelPermissions::refresh()
 	getChildView("Owner:")->setEnabled(TRUE);
 
 //	std::string owner_app_link;
-//	const BOOL owners_identical = LLSelectMgr::getInstance()->selectGetOwner(mOwnerID, owner_app_link);
+//	const BOOL owners_identical = select_mgr->selectGetOwner(mOwnerID, owner_app_link);
 
 
-	if (LLSelectMgr::getInstance()->selectIsGroupOwned())
+	if (select_mgr->selectIsGroupOwned())
 	{
 		// Group owned already displayed by selectGetOwner
 // [RLVa:KB] - Checked: RLVa-2.0.1
@@ -474,7 +476,7 @@ void LLPanelPermissions::refresh()
 		{
 			// Display last owner if public
 			std::string last_owner_app_link;
-			LLSelectMgr::getInstance()->selectGetLastOwner(mLastOwnerID, last_owner_app_link);
+			select_mgr->selectGetLastOwner(mLastOwnerID, last_owner_app_link);
 
 			// It should never happen that the last owner is null and the owner
 			// is null, but it seems to be a bug in the simulator right now. JC
@@ -518,7 +520,7 @@ void LLPanelPermissions::refresh()
 	getChildView("Group:")->setEnabled(TRUE);
 	getChild<LLUICtrl>("Group Name")->setValue(LLStringUtil::null);
 	LLUUID group_id;
-	BOOL groups_identical = LLSelectMgr::getInstance()->selectGetGroup(group_id);
+	BOOL groups_identical = select_mgr->selectGetGroup(group_id);
 	if (groups_identical)
 	{
 		if (mLabelGroupName)
@@ -587,17 +589,17 @@ void LLPanelPermissions::refresh()
 	BOOL is_for_sale_mixed = FALSE;
 	BOOL is_sale_price_mixed = FALSE;
 	U32 num_for_sale = FALSE;
-    LLSelectMgr::getInstance()->selectGetAggregateSaleInfo(num_for_sale,
+    select_mgr->selectGetAggregateSaleInfo(num_for_sale,
 														   is_for_sale_mixed,
 														   is_sale_price_mixed,
 														   total_sale_price,
 														   individual_sale_price);
 
 	const BOOL self_owned = (gAgent.getID() == mOwnerID);
-	const BOOL group_owned = LLSelectMgr::getInstance()->selectIsGroupOwned() ;
-	const BOOL public_owned = (mOwnerID.isNull() && !LLSelectMgr::getInstance()->selectIsGroupOwned());
-	const BOOL can_transfer = LLSelectMgr::getInstance()->selectGetRootsTransfer();
-	const BOOL can_copy = LLSelectMgr::getInstance()->selectGetRootsCopy();
+	const BOOL group_owned = select_mgr->selectIsGroupOwned() ;
+	const BOOL public_owned = (mOwnerID.isNull() && !select_mgr->selectIsGroupOwned());
+	const BOOL can_transfer = select_mgr->selectGetRootsTransfer();
+	const BOOL can_copy = select_mgr->selectGetRootsCopy();
 
 	if (!owners_identical)
 	{
@@ -685,22 +687,22 @@ void LLPanelPermissions::refresh()
 	U32 next_owner_mask_on 		= 0;
 	U32 next_owner_mask_off		= 0;
 
-	BOOL valid_base_perms 		= LLSelectMgr::getInstance()->selectGetPerm(PERM_BASE,
+	BOOL valid_base_perms 		= select_mgr->selectGetPerm(PERM_BASE,
 																			&base_mask_on,
 																			&base_mask_off);
 	//BOOL valid_owner_perms =//
-	LLSelectMgr::getInstance()->selectGetPerm(PERM_OWNER,
+	select_mgr->selectGetPerm(PERM_OWNER,
 											  &owner_mask_on,
 											  &owner_mask_off);
-	BOOL valid_group_perms 		= LLSelectMgr::getInstance()->selectGetPerm(PERM_GROUP,
+	BOOL valid_group_perms 		= select_mgr->selectGetPerm(PERM_GROUP,
 																			&group_mask_on,
 																			&group_mask_off);
 	
-	BOOL valid_everyone_perms 	= LLSelectMgr::getInstance()->selectGetPerm(PERM_EVERYONE,
+	BOOL valid_everyone_perms 	= select_mgr->selectGetPerm(PERM_EVERYONE,
 																			&everyone_mask_on,
 																			&everyone_mask_off);
 	
-	BOOL valid_next_perms 		= LLSelectMgr::getInstance()->selectGetPerm(PERM_NEXT_OWNER,
+	BOOL valid_next_perms 		= select_mgr->selectGetPerm(PERM_NEXT_OWNER,
 																			&next_owner_mask_on,
 																			&next_owner_mask_off);
 
@@ -724,7 +726,7 @@ void LLPanelPermissions::refresh()
 		{
 			if(object_count == 1)
 			{
-				LLSelectNode* node = LLSelectMgr::getInstance()->getSelection()->getFirstNode();
+				LLSelectNode* node = select_mgr->getSelection()->getFirstNode();
 				if (node && node->mValid)
 				{
 					getChild<LLUICtrl>("B:")->setValue("B: " + mask_to_string( node->mPermissions->getMaskBase()));
@@ -940,7 +942,7 @@ void LLPanelPermissions::refresh()
 
 	// reflect sale information
 	LLSaleInfo sale_info;
-	BOOL valid_sale_info = LLSelectMgr::getInstance()->selectGetSaleInfo(sale_info);
+	BOOL valid_sale_info = select_mgr->selectGetSaleInfo(sale_info);
 	LLSaleInfo::EForSale sale_type = sale_info.getSaleType();
 
 	LLComboBox* combo_sale_type = getChild<LLComboBox>("sale type");
@@ -971,16 +973,16 @@ void LLPanelPermissions::refresh()
 	}
 	
 	// Check search status of objects
-	const BOOL all_volume = LLSelectMgr::getInstance()->selectionAllPCode( LL_PCODE_VOLUME );
+	const BOOL all_volume = select_mgr->selectionAllPCode( LL_PCODE_VOLUME );
 	bool include_in_search;
-	const BOOL all_include_in_search = LLSelectMgr::getInstance()->selectionGetIncludeInSearch(&include_in_search);
+	const BOOL all_include_in_search = select_mgr->selectionGetIncludeInSearch(&include_in_search);
 	getChildView("search_check")->setEnabled(has_change_sale_ability && all_volume);
 	getChild<LLUICtrl>("search_check")->setValue(include_in_search);
 	getChild<LLUICtrl>("search_check")->setTentative( 				!all_include_in_search);
 
 	// Click action (touch, sit, buy)
 	U8 click_action = 0;
-	if (LLSelectMgr::getInstance()->selectionGetClickAction(&click_action))
+	if (select_mgr->selectionGetClickAction(&click_action))
 	{
 		LLComboBox*	combo_click_action = getChild<LLComboBox>("clickaction");
 		if(combo_click_action)
@@ -990,7 +992,7 @@ void LLPanelPermissions::refresh()
 		}
 	}
 
-	if(LLSelectMgr::getInstance()->getSelection()->isAttachment())
+	if(select_mgr->getSelection()->isAttachment())
 	{
 		getChildView("checkbox for sale")->setEnabled(FALSE);
 		getChildView("Edit Cost")->setEnabled(FALSE);
@@ -1057,21 +1059,21 @@ void LLPanelPermissions::updateCreatorName(const LLUUID& creator_id, const LLAva
 void LLPanelPermissions::onClickClaim(void*)
 {
 	// try to claim ownership
-	LLSelectMgr::getInstance()->sendOwner(gAgent.getID(), gAgent.getGroupID());
+	LLSelectMgr::getInstanceFast()->sendOwner(gAgent.getID(), gAgent.getGroupID());
 }
 
 // static
 void LLPanelPermissions::onClickRelease(void*)
 {
 	// try to release ownership
-	LLSelectMgr::getInstance()->sendOwner(LLUUID::null, LLUUID::null);
+	LLSelectMgr::getInstanceFast()->sendOwner(LLUUID::null, LLUUID::null);
 }
 
 void LLPanelPermissions::onClickGroup()
 {
 	LLUUID owner_id;
 	std::string name;
-	BOOL owners_identical = LLSelectMgr::getInstance()->selectGetOwner(owner_id, name);
+	BOOL owners_identical = LLSelectMgr::getInstanceFast()->selectGetOwner(owner_id, name);
 	LLFloater* parent_floater = gFloaterView->getParentFloater(this);
 
 	if(owners_identical && (owner_id == gAgent.getID()))
@@ -1097,7 +1099,7 @@ void LLPanelPermissions::cbGroupID(LLUUID group_id)
 	{
 		mLabelGroupName->setNameID(group_id, TRUE);
 	}
-	LLSelectMgr::getInstance()->sendGroup(group_id);
+	LLSelectMgr::getInstanceFast()->sendGroup(group_id);
 }
 
 bool callback_deed_to_group(const LLSD& notification, const LLSD& response)
@@ -1106,10 +1108,10 @@ bool callback_deed_to_group(const LLSD& notification, const LLSD& response)
 	if (0 == option)
 	{
 		LLUUID group_id;
-		BOOL groups_identical = LLSelectMgr::getInstance()->selectGetGroup(group_id);
+		BOOL groups_identical = LLSelectMgr::getInstanceFast()->selectGetGroup(group_id);
 		if(group_id.notNull() && groups_identical && (gAgent.hasPowerInGroup(group_id, GP_OBJECT_DEED)))
 		{
-			LLSelectMgr::getInstance()->sendOwner(LLUUID::null, group_id, FALSE);
+			LLSelectMgr::getInstanceFast()->sendOwner(LLUUID::null, group_id, FALSE);
 		}
 	}
 	return false;
@@ -1127,7 +1129,7 @@ void LLPanelPermissions::onClickDeedToGroup(void* data)
 // static
 void LLPanelPermissions::onCommitPerm(LLUICtrl *ctrl, void *data, U8 field, U32 perm)
 {
-	LLViewerObject* object = LLSelectMgr::getInstance()->getSelection()->getFirstRootObject();
+	LLViewerObject* object = LLSelectMgr::getInstanceFast()->getSelection()->getFirstRootObject();
 	if(!object) return;
 
 	// Checkbox will have toggled itself
@@ -1135,7 +1137,7 @@ void LLPanelPermissions::onCommitPerm(LLUICtrl *ctrl, void *data, U8 field, U32 
 	LLCheckBoxCtrl *check = (LLCheckBoxCtrl *)ctrl;
 	BOOL new_state = check->get();
 	
-	LLSelectMgr::getInstance()->selectionSetObjectPermissions(field, new_state, perm);
+	LLSelectMgr::getInstanceFast()->selectionSetObjectPermissions(field, new_state, perm);
 }
 
 // static
@@ -1187,8 +1189,8 @@ void LLPanelPermissions::onCommitName(LLUICtrl*, void* data)
 	{
 		return;
 	}
-	LLSelectMgr::getInstance()->selectionSetObjectName(tb->getText());
-	LLObjectSelectionHandle selection = LLSelectMgr::getInstance()->getSelection();
+	LLSelectMgr::getInstanceFast()->selectionSetObjectName(tb->getText());
+	LLObjectSelectionHandle selection = LLSelectMgr::getInstanceFast()->getSelection();
 	if (selection->isAttachment() && (selection->getNumNodes() == 1) && !tb->getText().empty())
 	{
 		LLUUID object_id = selection->getFirstObject()->getAttachmentItemID();
@@ -1214,8 +1216,8 @@ void LLPanelPermissions::onCommitDesc(LLUICtrl*, void* data)
 	{
 		return;
 	}
-	LLSelectMgr::getInstance()->selectionSetObjectDescription(le->getText());
-	LLObjectSelectionHandle selection = LLSelectMgr::getInstance()->getSelection();
+	LLSelectMgr::getInstanceFast()->selectionSetObjectDescription(le->getText());
+	LLObjectSelectionHandle selection = LLSelectMgr::getInstanceFast()->getSelection();
 	if (selection->isAttachment() && (selection->getNumNodes() == 1))
 	{
 		LLUUID object_id = selection->getFirstObject()->getAttachmentItemID();
@@ -1267,19 +1269,21 @@ void LLPanelPermissions::setAllSaleInfo()
 	if (price < 0)
 		sale_type = LLSaleInfo::FS_NOT;
 
+	LLSelectMgr* select_mgr = LLSelectMgr::getInstanceFast();
+
 	LLSaleInfo old_sale_info;
-	LLSelectMgr::getInstance()->selectGetSaleInfo(old_sale_info);
+	select_mgr->selectGetSaleInfo(old_sale_info);
 
 	LLSaleInfo new_sale_info(sale_type, price);
-	LLSelectMgr::getInstance()->selectionSetObjectSaleInfo(new_sale_info);
+	select_mgr->selectionSetObjectSaleInfo(new_sale_info);
 
     // Note: won't work right if a root and non-root are both single-selected (here and other places).
-    BOOL is_perm_modify = (LLSelectMgr::getInstance()->getSelection()->getFirstRootNode()
-                           && LLSelectMgr::getInstance()->selectGetRootsModify())
-                          || LLSelectMgr::getInstance()->selectGetModify();
-    BOOL is_nonpermanent_enforced = (LLSelectMgr::getInstance()->getSelection()->getFirstRootNode()
-                                     && LLSelectMgr::getInstance()->selectGetRootsNonPermanentEnforced())
-                                    || LLSelectMgr::getInstance()->selectGetNonPermanentEnforced();
+    BOOL is_perm_modify = (select_mgr->getSelection()->getFirstRootNode()
+                           && select_mgr->selectGetRootsModify())
+                          || select_mgr->selectGetModify();
+    BOOL is_nonpermanent_enforced = (select_mgr->getSelection()->getFirstRootNode()
+                                     && select_mgr->selectGetRootsNonPermanentEnforced())
+                                    || select_mgr->selectGetNonPermanentEnforced();
 
     if (is_perm_modify && is_nonpermanent_enforced)
     {
@@ -1294,12 +1298,12 @@ void LLPanelPermissions::setAllSaleInfo()
 
         // Selection should only contain objects that are of target
         // action already or of action we are aiming to remove.
-        bool default_actions = LLSelectMgr::getInstance()->getSelection()->applyToObjects(&check_actions);
+        bool default_actions = select_mgr->getSelection()->applyToObjects(&check_actions);
 
         if (default_actions && old_sale_info.isForSale() != new_sale_info.isForSale())
         {
             U8 new_click_action = new_sale_info.isForSale() ? CLICK_ACTION_BUY : CLICK_ACTION_TOUCH;
-            LLSelectMgr::getInstance()->selectionSetClickAction(new_click_action);
+            select_mgr->selectionSetClickAction(new_click_action);
         }
     }
 }
@@ -1326,14 +1330,14 @@ void LLPanelPermissions::onCommitClickAction(LLUICtrl* ctrl, void*)
 	if (click_action == CLICK_ACTION_BUY)
 	{
 		LLSaleInfo sale_info;
-		LLSelectMgr::getInstance()->selectGetSaleInfo(sale_info);
+		LLSelectMgr::getInstanceFast()->selectGetSaleInfo(sale_info);
 		if (!sale_info.isForSale())
 		{
 			LLNotificationsUtil::add("CantSetBuyObject");
 
 			// Set click action back to its old value
 			U8 click_action = 0;
-			LLSelectMgr::getInstance()->selectionGetClickAction(&click_action);
+			LLSelectMgr::getInstanceFast()->selectionGetClickAction(&click_action);
 			std::string item_value = click_action_to_string_value(click_action);
 			box->setValue(LLSD(item_value));
 			return;
@@ -1343,14 +1347,14 @@ void LLPanelPermissions::onCommitClickAction(LLUICtrl* ctrl, void*)
 	{
 		// Verify object has script with money() handler
 		LLSelectionPayable payable;
-		bool can_pay = LLSelectMgr::getInstance()->getSelection()->applyToObjects(&payable);
+		bool can_pay = LLSelectMgr::getInstanceFast()->getSelection()->applyToObjects(&payable);
 		if (!can_pay)
 		{
 			// Warn, but do it anyway.
 			LLNotificationsUtil::add("ClickActionNotPayable");
 		}
 	}
-	LLSelectMgr::getInstance()->selectionSetClickAction(click_action);
+	LLSelectMgr::getInstanceFast()->selectionSetClickAction(click_action);
 }
 
 // static
@@ -1359,7 +1363,7 @@ void LLPanelPermissions::onCommitIncludeInSearch(LLUICtrl* ctrl, void*)
 	LLCheckBoxCtrl* box = (LLCheckBoxCtrl*)ctrl;
 	llassert(box);
 
-	LLSelectMgr::getInstance()->selectionSetIncludeInSearch(box->get());
+	LLSelectMgr::getInstanceFast()->selectionSetIncludeInSearch(box->get());
 }
 
 

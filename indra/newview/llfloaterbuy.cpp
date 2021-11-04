@@ -90,7 +90,7 @@ void LLFloaterBuy::reset()
 // static
 void LLFloaterBuy::show(const LLSaleInfo& sale_info)
 {
-	LLObjectSelectionHandle selection = LLSelectMgr::getInstance()->getSelection();
+	LLObjectSelectionHandle selection = LLSelectMgr::getInstanceFast()->getSelection();
 
 	if (selection->getRootObjectCount() != 1)
 	{
@@ -106,9 +106,9 @@ void LLFloaterBuy::show(const LLSaleInfo& sale_info)
 	floater->reset();
 	floater->mSaleInfo = sale_info;
 // [RLVa:KB] - Checked: RLVa-2.0.0
-	floater->mObjectSelection = LLSelectMgr::getInstance()->getSelection();
+	floater->mObjectSelection = LLSelectMgr::getInstanceFast()->getSelection();
 // [/RLVa:KB]
-//	floater->mObjectSelection = LLSelectMgr::getInstance()->getEditSelection();
+//	floater->mObjectSelection = LLSelectMgr::getInstanceFast()->getEditSelection();
 	
 	LLSelectNode* node = selection->getFirstRootNode();
 	if (!node)
@@ -131,7 +131,7 @@ void LLFloaterBuy::show(const LLSaleInfo& sale_info)
 
 	LLUUID owner_id;
 	std::string owner_name;
-	BOOL owners_identical = LLSelectMgr::getInstance()->selectGetOwner(owner_id, owner_name);
+	BOOL owners_identical = LLSelectMgr::getInstanceFast()->selectGetOwner(owner_id, owner_name);
 	if (!owners_identical)
 	{
 		LLNotificationsUtil::add("BuyObjectOneOwner");
@@ -194,7 +194,7 @@ void LLFloaterBuy::show(const LLSaleInfo& sale_info)
 
 	if (!floater->mSelectionUpdateSlot.connected())
 	{
-		floater->mSelectionUpdateSlot = LLSelectMgr::getInstance()->mUpdateSignal.connect(boost::bind(&LLFloaterBuy::onSelectionChanged, floater));
+		floater->mSelectionUpdateSlot = LLSelectMgr::getInstanceFast()->mUpdateSignal.connect(boost::bind(&LLFloaterBuy::onSelectionChanged, floater));
 	}
 }
 
@@ -294,12 +294,12 @@ void LLFloaterBuy::inventoryChanged(LLViewerObject* obj,
 void LLFloaterBuy::onSelectionChanged()
 {
 	
-	if (LLSelectMgr::getInstance()->getEditSelection()->getRootObjectCount() == 0)
+	if (LLSelectMgr::getInstanceFast()->getEditSelection()->getRootObjectCount() == 0)
 	{
 		removeVOInventoryListener();
 		closeFloater();
 	}
-	else if (LLSelectMgr::getInstance()->getEditSelection()->getRootObjectCount() > 1)
+	else if (LLSelectMgr::getInstanceFast()->getEditSelection()->getRootObjectCount() > 1)
 	{
 		removeVOInventoryListener();
 		showViews(false);
@@ -324,7 +324,7 @@ void LLFloaterBuy::onClickBuy()
 	// *NOTE: doesn't work for multiple object buy, which UI does not
 	// currently support sale info is used for verification only, if
 	// it doesn't match region info then sale is canceled.
-	LLSelectMgr::getInstance()->sendBuy(gAgent.getID(), category_id, mSaleInfo );
+	LLSelectMgr::getInstanceFast()->sendBuy(gAgent.getID(), category_id, mSaleInfo );
 
 	closeFloater();
 }

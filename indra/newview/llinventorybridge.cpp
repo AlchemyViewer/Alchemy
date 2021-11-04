@@ -6791,10 +6791,10 @@ BOOL LLObjectBridge::renameItem(const std::string& new_name)
 			LLViewerObject* obj = gAgentAvatarp->getWornAttachment( item->getUUID() );
 			if(obj)
 			{
-				LLSelectMgr::getInstance()->deselectAll();
-				LLSelectMgr::getInstance()->addAsIndividual( obj, SELECT_ALL_TES, FALSE );
-				LLSelectMgr::getInstance()->selectionSetObjectName( new_name );
-				LLSelectMgr::getInstance()->deselectAll();
+				LLSelectMgr::getInstanceFast()->deselectAll();
+				LLSelectMgr::getInstanceFast()->addAsIndividual( obj, SELECT_ALL_TES, FALSE );
+				LLSelectMgr::getInstanceFast()->selectionSetObjectName( new_name );
+				LLSelectMgr::getInstanceFast()->deselectAll();
 			}
 		}
 	}

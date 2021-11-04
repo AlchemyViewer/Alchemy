@@ -76,7 +76,7 @@ void LLViewerMediaFocus::setFocusFace(LLPointer<LLViewerObject> objectp, S32 fac
 	}
 	
 	// Always clear the current selection.  If we're setting focus on a face, we'll reselect the correct object below.
-	LLSelectMgr::getInstance()->deselectAll();
+	LLSelectMgr::getInstanceFast()->deselectAll();
 	mSelection = NULL;
 
 	if (media_impl.notNull() && objectp.notNull())
@@ -89,7 +89,7 @@ void LLViewerMediaFocus::setFocusFace(LLPointer<LLViewerObject> objectp, S32 fac
 		mFocusedObjectNormal = pick_normal;
 		
 		// Set the selection in the selection manager so we can draw the focus ring.
-		mSelection = LLSelectMgr::getInstance()->selectObjectOnly(objectp, face);
+		mSelection = LLSelectMgr::getInstanceFast()->selectObjectOnly(objectp, face);
 
 		// Focusing on a media face clears its disable flag.
 		media_impl->setDisabled(false);

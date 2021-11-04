@@ -310,7 +310,7 @@ void LLPanelFace::sendTexture()
 		{
 			id = mTextureCtrl->getImageAssetID();
 		}
-		LLSelectMgr::getInstance()->selectionSetImage(id);
+		LLSelectMgr::getInstanceFast()->selectionSetImage(id);
 	}
 }
 
@@ -338,13 +338,13 @@ void LLPanelFace::sendBump(U32 bumpiness)
 	//
 	LLSelectedTEMaterial::setNormalID(this, current_normal_map);
 
-	LLSelectMgr::getInstance()->selectionSetBumpmap( bump );
+	LLSelectMgr::getInstanceFast()->selectionSetBumpmap( bump );
 }
 
 void LLPanelFace::sendTexGen()
 {
 	U8 tex_gen = (U8) mComboTexGen->getCurrentIndex() << TEM_TEX_GEN_SHIFT;
-	LLSelectMgr::getInstance()->selectionSetTexGen( tex_gen );
+	LLSelectMgr::getInstanceFast()->selectionSetTexGen( tex_gen );
 }
 
 void LLPanelFace::sendShiny(U32 shininess)
@@ -363,7 +363,7 @@ void LLPanelFace::sendShiny(U32 shininess)
 
 	LLSelectedTEMaterial::setSpecularID(this, specmap);
 
-	LLSelectMgr::getInstance()->selectionSetShiny( shiny );
+	LLSelectMgr::getInstanceFast()->selectionSetShiny( shiny );
 
 	updateShinyControls(!specmap.isNull(), true);
 	
@@ -372,20 +372,20 @@ void LLPanelFace::sendShiny(U32 shininess)
 void LLPanelFace::sendFullbright()
 {
 	U8 fullbright = mCheckFullbright->get() ? TEM_FULLBRIGHT_MASK : 0;
-	LLSelectMgr::getInstance()->selectionSetFullbright( fullbright );
+	LLSelectMgr::getInstanceFast()->selectionSetFullbright( fullbright );
 }
 
 void LLPanelFace::sendColor()
 {
 	const LLColor4& color = mColorSwatch->get();
-	LLSelectMgr::getInstance()->selectionSetColorOnly( color );
+	LLSelectMgr::getInstanceFast()->selectionSetColorOnly( color );
 }
 
 void LLPanelFace::sendAlpha()
 {	
 	F32 alpha = (100.f - mCtrlColorTransp->get()) / 100.f;
 
-	LLSelectMgr::getInstance()->selectionSetAlphaOnly( alpha );
+	LLSelectMgr::getInstanceFast()->selectionSetAlphaOnly( alpha );
 }
 
 
@@ -394,7 +394,7 @@ void LLPanelFace::sendGlow()
 	if (mCtrlGlow)
 	{
 		F32 glow = mCtrlGlow->get();
-		LLSelectMgr::getInstance()->selectionSetGlow( glow );
+		LLSelectMgr::getInstanceFast()->selectionSetGlow( glow );
 	}
 }
 
@@ -726,16 +726,16 @@ void LLPanelFace::sendTextureInfo()
 		bool identical_face =false;
 		LLSelectedTE::getFace(last_face, identical_face);		
 		LLPanelFaceSetAlignedTEFunctor setfunc(this, last_face);
-		LLSelectMgr::getInstance()->getSelection()->applyToTEs(&setfunc);
+		LLSelectMgr::getInstanceFast()->getSelection()->applyToTEs(&setfunc);
 	}
 	else
 	{
 		LLPanelFaceSetTEFunctor setfunc(this);
-		LLSelectMgr::getInstance()->getSelection()->applyToTEs(&setfunc);
+		LLSelectMgr::getInstanceFast()->getSelection()->applyToTEs(&setfunc);
 	}
 
 	LLPanelFaceSendFunctor sendfunc;
-	LLSelectMgr::getInstance()->getSelection()->applyToObjects(&sendfunc);
+	LLSelectMgr::getInstanceFast()->getSelection()->applyToObjects(&sendfunc);
 }
 
 void LLPanelFace::alignTestureLayer()
@@ -745,7 +745,7 @@ void LLPanelFace::alignTestureLayer()
     LLSelectedTE::getFace(last_face, identical_face);
 
     LLPanelFaceSetAlignedConcreteTEFunctor setfunc(this, last_face, static_cast<LLRender::eTexIndex>(mRadioMatType->getSelectedIndex()));
-    LLSelectMgr::getInstance()->getSelection()->applyToTEs(&setfunc);
+    LLSelectMgr::getInstanceFast()->getSelection()->applyToTEs(&setfunc);
 }
 
 void LLPanelFace::getState()
@@ -755,7 +755,7 @@ void LLPanelFace::getState()
 
 void LLPanelFace::updateUI(bool force_set_values /*false*/)
 { //set state of UI to match state of texture entry(ies)  (calls setEnabled, setValue, etc, but NOT setVisible)
-	LLViewerObject* objectp = LLSelectMgr::getInstance()->getSelection()->getFirstObject();
+	LLViewerObject* objectp = LLSelectMgr::getInstanceFast()->getSelection()->getFirstObject();
 
 	if( objectp
 		&& objectp->getPCode() == LL_PCODE_VOLUME
@@ -1012,7 +1012,7 @@ void LLPanelFace::updateUI(bool force_set_values /*false*/)
 			childSetValue("checkbox planar align", align_planar && enabled);
 			childSetVisible("checkbox planar align", enabled);
 			childSetEnabled("checkbox planar align", enabled);
-			childSetEnabled("button align textures", enabled && LLSelectMgr::getInstance()->getSelection()->getObjectCount() > 1);
+			childSetEnabled("button align textures", enabled && LLSelectMgr::getInstanceFast()->getSelection()->getObjectCount() > 1);
 
 			if (align_planar && enabled)
 			{
@@ -1022,7 +1022,7 @@ void LLPanelFace::updateUI(bool force_set_values /*false*/)
 
 				LLPanelFaceGetIsAlignedTEFunctor get_is_aligend_func(last_face);
 				// this will determine if the texture param controls are tentative:
-				identical_planar_aligned = LLSelectMgr::getInstance()->getSelection()->applyToTEs(&get_is_aligend_func);
+				identical_planar_aligned = LLSelectMgr::getInstanceFast()->getSelection()->applyToTEs(&get_is_aligend_func);
 			}
 		}
 		
@@ -1273,7 +1273,7 @@ void LLPanelFace::updateUI(bool force_set_values /*false*/)
 				F32  repeats = 1.0f;
 
 				U32 material_type = (mComboMatMedia->getCurrentIndex() == MATMEDIA_MATERIAL) ? mRadioMatType->getSelectedIndex() : MATTYPE_DIFFUSE;
-				LLSelectMgr::getInstance()->setTextureChannel(LLRender::eTexIndex(material_type));
+				LLSelectMgr::getInstanceFast()->setTextureChannel(LLRender::eTexIndex(material_type));
 
 				switch (material_type)
 			{
@@ -1508,24 +1508,24 @@ void LLPanelFace::onCommitAlpha(const LLSD& data)
 
 void LLPanelFace::onCancelColor(const LLSD& data)
 {
-	LLSelectMgr::getInstance()->selectionRevertColors();
+	LLSelectMgr::getInstanceFast()->selectionRevertColors();
 }
 
 void LLPanelFace::onCancelShinyColor(const LLSD& data)
 {
-	LLSelectMgr::getInstance()->selectionRevertShinyColors();
+	LLSelectMgr::getInstanceFast()->selectionRevertShinyColors();
 }
 
 void LLPanelFace::onSelectColor(const LLSD& data)
 {
-	LLSelectMgr::getInstance()->saveSelectedObjectColors();
+	LLSelectMgr::getInstanceFast()->saveSelectedObjectColors();
 	sendColor();
 }
 
 void LLPanelFace::onSelectShinyColor(const LLSD& data)
 {
     LLSelectedTEMaterial::setSpecularLightColor(this, mShinyColorSwatch->get());
-	LLSelectMgr::getInstance()->saveSelectedShinyColors();
+	LLSelectMgr::getInstanceFast()->saveSelectedShinyColors();
 }
 
 // static
@@ -1768,7 +1768,7 @@ void LLPanelFace::onCommitGlow(LLUICtrl* ctrl, void* userdata)
 BOOL LLPanelFace::onDragTexture(LLUICtrl*, LLInventoryItem* item)
 {
 	BOOL accept = TRUE;
-	for (LLSelectNode* node : LLSelectMgr::getInstance()->getSelection()->root_begin_end())
+	for (LLSelectNode* node : LLSelectMgr::getInstanceFast()->getSelection()->root_begin_end())
 	{
 		LLViewerObject* obj = node->getObject();
 		if(!LLToolDragAndDrop::isInventoryDropAcceptable(obj, item))
@@ -1788,12 +1788,12 @@ void LLPanelFace::onCommitTexture( const LLSD& data )
 
 void LLPanelFace::onCancelTexture(const LLSD& data)
 {
-	LLSelectMgr::getInstance()->selectionRevertTextures();
+	LLSelectMgr::getInstanceFast()->selectionRevertTextures();
 }
 
 void LLPanelFace::onSelectTexture(const LLSD& data)
 {
-	LLSelectMgr::getInstance()->saveSelectedObjectTextures();
+	LLSelectMgr::getInstanceFast()->saveSelectedObjectTextures();
 	sendTexture();
 
 	LLGLenum image_format;
@@ -2094,7 +2094,7 @@ void LLPanelFace::onCommitMaterialBumpyRot(LLUICtrl* ctrl, void* userdata)
             bool identical_face = false;
             LLSelectedTE::getFace(last_face, identical_face);
             LLPanelFaceSetAlignedTEFunctor setfunc(self, last_face);
-            LLSelectMgr::getInstance()->getSelection()->applyToTEs(&setfunc);
+            LLSelectMgr::getInstanceFast()->getSelection()->applyToTEs(&setfunc);
         }
         else
         {
@@ -2122,7 +2122,7 @@ void LLPanelFace::onCommitMaterialShinyRot(LLUICtrl* ctrl, void* userdata)
             bool identical_face = false;
             LLSelectedTE::getFace(last_face, identical_face);
             LLPanelFaceSetAlignedTEFunctor setfunc(self, last_face);
-            LLSelectMgr::getInstance()->getSelection()->applyToTEs(&setfunc);
+            LLSelectMgr::getInstanceFast()->getSelection()->applyToTEs(&setfunc);
         }
         else
         {
@@ -2278,7 +2278,7 @@ void LLPanelFace::onCommitRepeatsPerMeter(LLUICtrl* ctrl, void* userdata)
  
 	if (gSavedSettings.getBOOL("SyncMaterialSettings"))
 	{
-		LLSelectMgr::getInstance()->selectionTexScaleAutofit( repeats_per_meter );
+		LLSelectMgr::getInstanceFast()->selectionTexScaleAutofit( repeats_per_meter );
 
 		bumpy_scale_u->setValue(obj_scale_s * repeats_per_meter);
 		bumpy_scale_v->setValue(obj_scale_t * repeats_per_meter);
@@ -2298,7 +2298,7 @@ void LLPanelFace::onCommitRepeatsPerMeter(LLUICtrl* ctrl, void* userdata)
 		{
 			case MATTYPE_DIFFUSE:
 			{
-				LLSelectMgr::getInstance()->selectionTexScaleAutofit( repeats_per_meter );
+				LLSelectMgr::getInstanceFast()->selectionTexScaleAutofit( repeats_per_meter );
 			}
 			break;
 
@@ -2376,10 +2376,10 @@ struct LLPanelFaceSetMediaFunctor : public LLSelectedTEFunctor
 void LLPanelFace::onClickAutoFix(void* userdata)
 {
 	LLPanelFaceSetMediaFunctor setfunc;
-	LLSelectMgr::getInstance()->getSelection()->applyToTEs(&setfunc);
+	LLSelectMgr::getInstanceFast()->getSelection()->applyToTEs(&setfunc);
 
 	LLPanelFaceSendFunctor sendfunc;
-	LLSelectMgr::getInstance()->getSelection()->applyToObjects(&sendfunc);
+	LLSelectMgr::getInstanceFast()->getSelection()->applyToObjects(&sendfunc);
 }
 
 void LLPanelFace::onAlignTexture(void* userdata)
@@ -2431,10 +2431,10 @@ void LLPanelFace::onTextureSelectionChanged(LLInventoryItem* itemp)
 	{
 		LLUUID obj_owner_id;
 		std::string obj_owner_name;
-		LLSelectMgr::instance().selectGetOwner(obj_owner_id, obj_owner_name);
+		LLSelectMgr::instanceFast().selectGetOwner(obj_owner_id, obj_owner_name);
 
 		LLSaleInfo sale_info;
-		LLSelectMgr::instance().selectGetSaleInfo(sale_info);
+		LLSelectMgr::instanceFast().selectGetSaleInfo(sale_info);
 
 		bool can_copy = itemp->getPermissions().allowCopyBy(gAgentID); // do we have perm to copy this texture?
 		bool can_transfer = itemp->getPermissions().allowOperationBy(PERM_TRANSFER, gAgentID); // do we have perm to transfer this texture?
@@ -2474,7 +2474,7 @@ void LLPanelFace::LLSelectedTE::getFace(LLFace*& face_to_return, bool& identical
 			return (object->mDrawable) ? object->mDrawable->getFace(te): NULL;
 		}
 	} get_te_face_func;
-	identical_face = LLSelectMgr::getInstance()->getSelection()->getSelectedTEValue(&get_te_face_func, face_to_return, false, (LLFace*)nullptr);
+	identical_face = LLSelectMgr::getInstanceFast()->getSelection()->getSelectedTEValue(&get_te_face_func, face_to_return, false, (LLFace*)nullptr);
 }
 
 void LLPanelFace::LLSelectedTE::getImageFormat(LLGLenum& image_format_to_return, bool& identical_face)
@@ -2488,7 +2488,7 @@ void LLPanelFace::LLSelectedTE::getImageFormat(LLGLenum& image_format_to_return,
 			return image ? image->getPrimaryFormat() : GL_RGB;
 		}
 	} get_glenum;
-	identical_face = LLSelectMgr::getInstance()->getSelection()->getSelectedTEValue(&get_glenum, image_format);
+	identical_face = LLSelectMgr::getInstanceFast()->getSelection()->getSelectedTEValue(&get_glenum, image_format);
 	image_format_to_return = image_format;
 }
 
@@ -2533,7 +2533,7 @@ void LLPanelFace::LLSelectedTE::getTexId(LLUUID& id, bool& identical)
 			return id;
 		}
 	} func;
-	identical = LLSelectMgr::getInstance()->getSelection()->getSelectedTEValue( &func, id );
+	identical = LLSelectMgr::getInstanceFast()->getSelection()->getSelectedTEValue( &func, id );
 }
 
 void LLPanelFace::LLSelectedTEMaterial::getCurrent(LLMaterialPtr& material_ptr, bool& identical_material)
@@ -2545,7 +2545,7 @@ void LLPanelFace::LLSelectedTEMaterial::getCurrent(LLMaterialPtr& material_ptr, 
 			return object->getTE(te_index)->getMaterialParams();
 		}
 	} func;
-	identical_material = LLSelectMgr::getInstance()->getSelection()->getSelectedTEValue( &func, material_ptr);
+	identical_material = LLSelectMgr::getInstanceFast()->getSelection()->getSelectedTEValue( &func, material_ptr);
 }
 
 void LLPanelFace::LLSelectedTEMaterial::getMaxSpecularRepeats(F32& repeats, bool& identical)
@@ -2569,7 +2569,7 @@ void LLPanelFace::LLSelectedTEMaterial::getMaxSpecularRepeats(F32& repeats, bool
 		}
 
 	} max_spec_repeats_func;
-	identical = LLSelectMgr::getInstance()->getSelection()->getSelectedTEValue( &max_spec_repeats_func, repeats);
+	identical = LLSelectMgr::getInstanceFast()->getSelection()->getSelectedTEValue( &max_spec_repeats_func, repeats);
 }
 
 void LLPanelFace::LLSelectedTEMaterial::getMaxNormalRepeats(F32& repeats, bool& identical)
@@ -2593,7 +2593,7 @@ void LLPanelFace::LLSelectedTEMaterial::getMaxNormalRepeats(F32& repeats, bool& 
 		}
 
 	} max_norm_repeats_func;
-	identical = LLSelectMgr::getInstance()->getSelection()->getSelectedTEValue( &max_norm_repeats_func, repeats);
+	identical = LLSelectMgr::getInstanceFast()->getSelection()->getSelectedTEValue( &max_norm_repeats_func, repeats);
 }
 
 void LLPanelFace::LLSelectedTEMaterial::getCurrentDiffuseAlphaMode(U8& diffuse_alpha_mode, bool& identical, bool diffuse_texture_has_alpha)
@@ -2622,7 +2622,7 @@ void LLPanelFace::LLSelectedTEMaterial::getCurrentDiffuseAlphaMode(U8& diffuse_a
 		}
 		bool _isAlpha; // whether or not the diffuse texture selected contains alpha information
 	} get_diff_mode(diffuse_texture_has_alpha);
-	identical = LLSelectMgr::getInstance()->getSelection()->getSelectedTEValue( &get_diff_mode, diffuse_alpha_mode);
+	identical = LLSelectMgr::getInstanceFast()->getSelection()->getSelectedTEValue( &get_diff_mode, diffuse_alpha_mode);
 }
 
 void LLPanelFace::LLSelectedTE::getObjectScaleS(F32& scale_s, bool& identical)
@@ -2638,7 +2638,7 @@ void LLPanelFace::LLSelectedTE::getObjectScaleS(F32& scale_s, bool& identical)
 		}
 
 	} scale_s_func;
-	identical = LLSelectMgr::getInstance()->getSelection()->getSelectedTEValue( &scale_s_func, scale_s );
+	identical = LLSelectMgr::getInstanceFast()->getSelection()->getSelectedTEValue( &scale_s_func, scale_s );
 }
 
 void LLPanelFace::LLSelectedTE::getObjectScaleT(F32& scale_t, bool& identical)
@@ -2654,7 +2654,7 @@ void LLPanelFace::LLSelectedTE::getObjectScaleT(F32& scale_t, bool& identical)
 		}
 
 	} scale_t_func;
-	identical = LLSelectMgr::getInstance()->getSelection()->getSelectedTEValue( &scale_t_func, scale_t );
+	identical = LLSelectMgr::getInstanceFast()->getSelection()->getSelectedTEValue( &scale_t_func, scale_t );
 }
 
 void LLPanelFace::LLSelectedTE::getMaxDiffuseRepeats(F32& repeats, bool& identical)
@@ -2672,5 +2672,5 @@ void LLPanelFace::LLSelectedTE::getMaxDiffuseRepeats(F32& repeats, bool& identic
 		}
 
 	} max_diff_repeats_func;
-	identical = LLSelectMgr::getInstance()->getSelection()->getSelectedTEValue( &max_diff_repeats_func, repeats );
+	identical = LLSelectMgr::getInstanceFast()->getSelection()->getSelectedTEValue( &max_diff_repeats_func, repeats );
 }

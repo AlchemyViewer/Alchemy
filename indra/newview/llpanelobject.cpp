@@ -265,7 +265,7 @@ BOOL	LLPanelObject::postBuild()
 		// Allow any texture to be used during non-immediate mode.
 		mCtrlSculptTexture->setNonImmediateFilterPermMask(PERM_NONE);
 		LLAggregatePermissions texture_perms;
-		if (LLSelectMgr::getInstance()->selectGetAggregateTexturePermissions(texture_perms))
+		if (LLSelectMgr::getInstanceFast()->selectGetAggregateTexturePermissions(texture_perms))
 		{
 			BOOL can_copy =
 				texture_perms.getValue(PERM_COPY) == LLAggregatePermissions::AP_EMPTY ||
@@ -315,11 +315,12 @@ LLPanelObject::~LLPanelObject()
 
 void LLPanelObject::getState( )
 {
-	LLViewerObject* objectp = LLSelectMgr::getInstance()->getSelection()->getFirstRootObject();
+	LLSelectMgr* select_mgr = LLSelectMgr::getInstanceFast();
+	LLViewerObject* objectp = select_mgr->getSelection()->getFirstRootObject();
 	LLViewerObject* root_objectp = objectp;
 	if(!objectp)
 	{
-		objectp = LLSelectMgr::getInstance()->getSelection()->getFirstObject();
+		objectp = select_mgr->getSelection()->getFirstObject();
 		// *FIX: shouldn't we just keep the child?
 		if (objectp)
 		{
@@ -358,14 +359,14 @@ void LLPanelObject::getState( )
 		return;
 	}
 
-	S32 selected_count = LLSelectMgr::getInstance()->getSelection()->getObjectCount();
-	BOOL single_volume = (LLSelectMgr::getInstance()->selectionAllPCode( LL_PCODE_VOLUME ))
+	S32 selected_count = select_mgr->getSelection()->getObjectCount();
+	BOOL single_volume = (select_mgr->selectionAllPCode( LL_PCODE_VOLUME ))
 						 && (selected_count == 1);
 
 	bool enable_move;
 	bool enable_modify;
 
-	LLSelectMgr::getInstance()->selectGetEditMoveLinksetPermissions(enable_move, enable_modify);
+	select_mgr->selectGetEditMoveLinksetPermissions(enable_move, enable_modify);
 
 	BOOL enable_scale = enable_modify;
 	BOOL enable_rotate = enable_move; // already accounts for a case of children, which needs permModify() as well
@@ -477,10 +478,10 @@ void LLPanelObject::getState( )
 
 	LLUUID owner_id;
 	std::string owner_name;
-	LLSelectMgr::getInstance()->selectGetOwner(owner_id, owner_name);
+	select_mgr->selectGetOwner(owner_id, owner_name);
 
 	// BUG? Check for all objects being editable?
-	S32 roots_selected = LLSelectMgr::getInstance()->getSelection()->getRootObjectCount();
+	S32 roots_selected = select_mgr->getSelection()->getRootObjectCount();
 	BOOL editable = root_objectp->permModify();
 
 	BOOL is_flexible = volobjp && volobjp->isFlexible();
@@ -497,7 +498,7 @@ void LLPanelObject::getState( )
 	BOOL valid;
 	U32 owner_mask_on;
 	U32 owner_mask_off;
-	valid = LLSelectMgr::getInstance()->selectGetPerm(PERM_OWNER, &owner_mask_on, &owner_mask_off);
+	valid = select_mgr->selectGetPerm(PERM_OWNER, &owner_mask_on, &owner_mask_off);
 
 	if(valid)
 	{
@@ -1266,7 +1267,7 @@ void LLPanelObject::sendIsPhysical()
 	BOOL value = mCheckPhysics->get();
 	if( mIsPhysical != value )
 	{
-		LLSelectMgr::getInstance()->selectionUpdatePhysics(value);
+		LLSelectMgr::getInstanceFast()->selectionUpdatePhysics(value);
 		mIsPhysical = value;
 
 		LL_INFOS() << "update physics sent" << LL_ENDL;
@@ -1282,7 +1283,7 @@ void LLPanelObject::sendIsTemporary()
 	BOOL value = mCheckTemporary->get();
 	if( mIsTemporary != value )
 	{
-		LLSelectMgr::getInstance()->selectionUpdateTemporary(value);
+		LLSelectMgr::getInstanceFast()->selectionUpdateTemporary(value);
 		mIsTemporary = value;
 
 		LL_INFOS() << "update temporary sent" << LL_ENDL;
@@ -1299,7 +1300,7 @@ void LLPanelObject::sendIsPhantom()
 	BOOL value = mCheckPhantom->get();
 	if( mIsPhantom != value )
 	{
-		LLSelectMgr::getInstance()->selectionUpdatePhantom(value);
+		LLSelectMgr::getInstanceFast()->selectionUpdatePhantom(value);
 		mIsPhantom = value;
 
 		LL_INFOS() << "update phantom sent" << LL_ENDL;
@@ -1779,7 +1780,7 @@ void LLPanelObject::sendRotation(BOOL btn_down)
 		if(!btn_down)
 		{
 			child_positions.clear() ;
-			LLSelectMgr::getInstance()->sendMultipleUpdate(UPD_ROTATION | UPD_POSITION);
+			LLSelectMgr::getInstanceFast()->sendMultipleUpdate(UPD_ROTATION | UPD_POSITION);
 		}
 	}
 }
@@ -1803,17 +1804,17 @@ void LLPanelObject::sendScale(BOOL btn_down)
 		BOOL dont_stretch_textures = !LLManipScale::getStretchTextures();
 		if (dont_stretch_textures)
 		{
-			LLSelectMgr::getInstance()->saveSelectedObjectTransform(SELECT_ACTION_TYPE_SCALE);
+			LLSelectMgr::getInstanceFast()->saveSelectedObjectTransform(SELECT_ACTION_TYPE_SCALE);
 		}
 
 		mObject->setScale(newscale, TRUE);
 
 		if(!btn_down)
 		{
-			LLSelectMgr::getInstance()->sendMultipleUpdate(UPD_SCALE | UPD_POSITION);
+			LLSelectMgr::getInstanceFast()->sendMultipleUpdate(UPD_SCALE | UPD_POSITION);
 		}
 
-		LLSelectMgr::getInstance()->adjustTexturesByScale(TRUE, !dont_stretch_textures);
+		LLSelectMgr::getInstanceFast()->adjustTexturesByScale(TRUE, !dont_stretch_textures);
 //		LL_INFOS() << "scale sent" << LL_ENDL;
 	}
 	else
@@ -1899,10 +1900,10 @@ void LLPanelObject::sendPosition(BOOL btn_down)
 
 		if (!btn_down)
 		{
-			LLSelectMgr::getInstance()->sendMultipleUpdate(UPD_POSITION);
+			LLSelectMgr::getInstanceFast()->sendMultipleUpdate(UPD_POSITION);
 		}
 
-		LLSelectMgr::getInstance()->updateSelectionCenter();
+		LLSelectMgr::getInstanceFast()->updateSelectionCenter();
 	}
 	else if ( LLWorld::getInstanceFast()->positionRegionValidGlobal(new_pos_global) )
 	{
@@ -1934,10 +1935,10 @@ void LLPanelObject::sendPosition(BOOL btn_down)
 
 			if(!btn_down)
 			{
-				LLSelectMgr::getInstance()->sendMultipleUpdate(UPD_POSITION);
+				LLSelectMgr::getInstanceFast()->sendMultipleUpdate(UPD_POSITION);
 			}
 
-			LLSelectMgr::getInstance()->updateSelectionCenter();
+			LLSelectMgr::getInstanceFast()->updateSelectionCenter();
 		}
 	}
 	else
@@ -2127,7 +2128,7 @@ void LLPanelObject::onCommitLock(LLUICtrl *ctrl, void *data)
 
 	BOOL new_state = self->mCheckLock->get();
 	
-	LLSelectMgr::getInstance()->selectionSetObjectPermissions(PERM_OWNER, !new_state, PERM_MOVE | PERM_MODIFY);
+	LLSelectMgr::getInstanceFast()->selectionSetObjectPermissions(PERM_OWNER, !new_state, PERM_MOVE | PERM_MODIFY);
 }
 
 // static

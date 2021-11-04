@@ -110,7 +110,7 @@ void LLToolCamera::handleDeselect()
 	if (!mValidSelection && (override_mask != MASK_NONE || (gFloaterTools && gFloaterTools->getVisible())))
 	{
 		LLMenuGL::sMenuContainer->hideMenus();
-		LLSelectMgr::getInstance()->validateSelection();
+		LLSelectMgr::getInstanceFast()->validateSelection();
 	}
 }
 
@@ -168,7 +168,7 @@ void LLToolCamera::pickCallback(const LLPickInfo& pick_info)
 	// check for hud attachments
 	if (hit_obj && hit_obj->isHUDAttachment())
 	{
-		LLObjectSelectionHandle selection = LLSelectMgr::getInstance()->getSelection();
+		LLObjectSelectionHandle selection = LLSelectMgr::getInstanceFast()->getSelection();
 		if (!selection->getObjectCount() || selection->getSelectType() != SELECT_TYPE_HUD)
 		{
 			LLToolCamera::getInstance()->mValidClickPoint = FALSE;

@@ -4836,7 +4836,7 @@ void LLAppViewer::idle()
 	{
 		// After agent and camera moved, figure out if we need to
 		// deselect objects.
-		LLSelectMgr::getInstance()->deselectAllIfTooFar();
+		LLSelectMgr::getInstanceFast()->deselectAllIfTooFar();
 
 	}
 
@@ -4890,7 +4890,7 @@ void LLAppViewer::idle()
 
 	{
 		LL_RECORD_BLOCK_TIME(FTM_HUD_EFFECTS);
-		LLSelectMgr::getInstance()->updateEffects();
+		LLSelectMgr::getInstanceFast()->updateEffects();
 		LLHUDManager::getInstance()->cleanupEffects();
 		LLHUDManager::getInstance()->sendEffects();
 	}

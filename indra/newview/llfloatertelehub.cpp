@@ -79,7 +79,7 @@ void LLFloaterTelehub::onOpen(const LLSD& key)
 
 	sendTelehubInfoRequest();
 	
-	mObjectSelection = LLSelectMgr::getInstance()->getEditSelection();
+	mObjectSelection = LLSelectMgr::getInstanceFast()->getEditSelection();
 }
 
 LLFloaterTelehub::~LLFloaterTelehub()
@@ -104,7 +104,7 @@ void LLFloaterTelehub::refresh()
 	LLViewerObject* object = mObjectSelection->getFirstRootObject(children_ok);
 	
 	BOOL have_selection = (object != NULL);
-	BOOL all_volume = LLSelectMgr::getInstance()->selectionAllPCode( LL_PCODE_VOLUME );
+	BOOL all_volume = LLSelectMgr::getInstanceFast()->selectionAllPCode( LL_PCODE_VOLUME );
 	getChildView("connect_btn")->setEnabled(have_selection && all_volume);
 
 	BOOL have_telehub = mTelehubObjectID.notNull();
@@ -163,23 +163,23 @@ void LLFloaterTelehub::addBeacons()
 
 void LLFloaterTelehub::sendTelehubInfoRequest()
 {
-	LLSelectMgr::getInstance()->sendGodlikeRequest("telehub", "info ui");
+	LLSelectMgr::getInstanceFast()->sendGodlikeRequest("telehub", "info ui");
 }
 
 void LLFloaterTelehub::onClickConnect()
 {
-	LLSelectMgr::getInstance()->sendGodlikeRequest("telehub", "connect");
+	LLSelectMgr::getInstanceFast()->sendGodlikeRequest("telehub", "connect");
 }
 
 void LLFloaterTelehub::onClickDisconnect()
 {
-	LLSelectMgr::getInstance()->sendGodlikeRequest("telehub", "delete");
+	LLSelectMgr::getInstanceFast()->sendGodlikeRequest("telehub", "delete");
 }
 
 void LLFloaterTelehub::onClickAddSpawnPoint()
 {
-	LLSelectMgr::getInstance()->sendGodlikeRequest("telehub", "spawnpoint add");
-	LLSelectMgr::getInstance()->deselectAll();
+	LLSelectMgr::getInstanceFast()->sendGodlikeRequest("telehub", "spawnpoint add");
+	LLSelectMgr::getInstanceFast()->deselectAll();
 }
 
 void LLFloaterTelehub::onClickRemoveSpawnPoint()

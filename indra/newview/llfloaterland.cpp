@@ -192,7 +192,7 @@ void send_parcel_select_objects(S32 parcel_local_id, U32 return_type,
 
 	// Since new highlight will be coming in, drop any highlights
 	// that exist right now.
-	LLSelectMgr::getInstance()->unhighlightAll();
+	LLSelectMgr::getInstanceFast()->unhighlightAll();
 
 	msg->newMessageFast(_PREHASH_ParcelSelectObjects);
 	msg->nextBlockFast(_PREHASH_AgentData);
@@ -293,7 +293,7 @@ void LLFloaterLand::onVisibilityChanged(const LLSD& visible)
 	if (!visible.asBoolean())
 	{
 		// Might have been showing owned objects
-		LLSelectMgr::getInstance()->unhighlightAll();
+		LLSelectMgr::getInstanceFast()->unhighlightAll();
 
 		// Save which panel we had open
 		sLastTab = mTabLand->getCurrentPanelIndex();
@@ -1484,7 +1484,7 @@ bool LLPanelLandObjects::callbackReturnOwnerObjects(const LLSD& notification, co
 		}
 	}
 
-	LLSelectMgr::getInstance()->unhighlightAll();
+	LLSelectMgr::getInstanceFast()->unhighlightAll();
 	LLViewerParcelMgr::getInstance()->sendParcelPropertiesUpdate( parcel );
 	refresh();
 	return false;
@@ -1506,7 +1506,7 @@ bool LLPanelLandObjects::callbackReturnGroupObjects(const LLSD& notification, co
 			send_return_objects_message(parcel->getLocalID(), RT_GROUP);
 		}
 	}
-	LLSelectMgr::getInstance()->unhighlightAll();
+	LLSelectMgr::getInstanceFast()->unhighlightAll();
 	LLViewerParcelMgr::getInstance()->sendParcelPropertiesUpdate( parcel );
 	refresh();
 	return false;
@@ -1524,7 +1524,7 @@ bool LLPanelLandObjects::callbackReturnOtherObjects(const LLSD& notification, co
 			send_return_objects_message(parcel->getLocalID(), RT_OTHER);
 		}
 	}
-	LLSelectMgr::getInstance()->unhighlightAll();
+	LLSelectMgr::getInstanceFast()->unhighlightAll();
 	LLViewerParcelMgr::getInstance()->sendParcelPropertiesUpdate( parcel );
 	refresh();
 	return false;
@@ -1558,7 +1558,7 @@ bool LLPanelLandObjects::callbackReturnOwnerList(const LLSD& notification, const
 			}
 		}
 	}
-	LLSelectMgr::getInstance()->unhighlightAll();
+	LLSelectMgr::getInstanceFast()->unhighlightAll();
 	LLViewerParcelMgr::getInstance()->sendParcelPropertiesUpdate( parcel );
 	refresh();
 	return false;

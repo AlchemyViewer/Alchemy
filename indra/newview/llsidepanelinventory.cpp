@@ -426,7 +426,7 @@ void LLSidepanelInventory::onOpen(const LLSD& key)
 	if (key.has("task"))
 	{
 		if (mTaskPanel)
-			mTaskPanel->setObjectSelection(LLSelectMgr::getInstance()->getSelection());
+			mTaskPanel->setObjectSelection(LLSelectMgr::getInstanceFast()->getSelection());
 		showTaskInfoPanel();
 	}
 }

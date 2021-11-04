@@ -289,7 +289,7 @@ LLManipTranslate::~LLManipTranslate()
 
 void LLManipTranslate::handleSelect()
 {
-	LLSelectMgr::getInstance()->saveSelectedObjectTransform(SELECT_ACTION_TYPE_PICK);
+	LLSelectMgr::getInstanceFast()->saveSelectedObjectTransform(SELECT_ACTION_TYPE_PICK);
     if (gFloaterTools)
     {
         gFloaterTools->setStatusText("move");
@@ -340,12 +340,12 @@ BOOL LLManipTranslate::handleMouseDownOnPart( S32 x, S32 y, MASK mask )
 	mHelpTextTimer.reset();
 	sNumTimesHelpTextShown++;
 
-	LLSelectMgr::getInstance()->getGrid(mGridOrigin, mGridRotation, mGridScale);
+	LLSelectMgr::getInstanceFast()->getGrid(mGridOrigin, mGridRotation, mGridScale);
 
-	LLSelectMgr::getInstance()->enableSilhouette(FALSE);
+	LLSelectMgr::getInstanceFast()->enableSilhouette(FALSE);
 
 	// we just started a drag, so save initial object positions
-	LLSelectMgr::getInstance()->saveSelectedObjectTransform(SELECT_ACTION_TYPE_MOVE);
+	LLSelectMgr::getInstanceFast()->saveSelectedObjectTransform(SELECT_ACTION_TYPE_MOVE);
 
 	mManipPart = (EManipPart)hit_part;
 	mMouseDownX = x;
@@ -376,7 +376,7 @@ BOOL LLManipTranslate::handleMouseDownOnPart( S32 x, S32 y, MASK mask )
 	BOOL axis_exists = getManipAxis(selected_object, mManipPart, axis);
 	getManipNormal(selected_object, mManipPart, mManipNormal);
 
-	//LLVector3 select_center_agent = gAgent.getPosAgentFromGlobal(LLSelectMgr::getInstance()->getSelectionCenterGlobal());
+	//LLVector3 select_center_agent = gAgent.getPosAgentFromGlobal(LLSelectMgr::getInstanceFast()->getSelectionCenterGlobal());
 	// TomY: The above should (?) be identical to the below
 	LLVector3 select_center_agent = getPivotPoint();
 	mSubdivisions = getSubdivisionLevel(select_center_agent, axis_exists ? axis : LLVector3::z_axis, getMinGridScale());
@@ -398,7 +398,7 @@ BOOL LLManipTranslate::handleMouseDownOnPart( S32 x, S32 y, MASK mask )
 		}
 	}
 
-	LLSelectMgr::getInstance()->updateSelectionCenter();
+	LLSelectMgr::getInstanceFast()->updateSelectionCenter();
 	LLVector3d object_start_global = gAgent.getPosGlobalFromAgent(getPivotPoint());
 	getMousePointOnPlaneGlobal(mDragCursorStartGlobal, x, y, object_start_global, mManipNormal);
 	mDragSelectionStartGlobal = object_start_global;
@@ -483,7 +483,7 @@ BOOL LLManipTranslate::handleHover(S32 x, S32 y, MASK mask)
 			if (mask == MASK_COPY)
 			{
 				// ...we're trying to make a copy
-				LLSelectMgr::getInstance()->selectDuplicate(LLVector3::zero, FALSE);
+				LLSelectMgr::getInstanceFast()->selectDuplicate(LLVector3::zero, FALSE);
 				mCopyMadeThisDrag = TRUE;
 
 				// When we make the copy, we don't want to do any other processing.
@@ -526,7 +526,7 @@ BOOL LLManipTranslate::handleHover(S32 x, S32 y, MASK mask)
 
 	axis_d.setVec(axis_f);
 
-	LLSelectMgr::getInstance()->updateSelectionCenter();
+	LLSelectMgr::getInstanceFast()->updateSelectionCenter();
 	LLVector3d current_pos_global = gAgent.getPosGlobalFromAgent(getPivotPoint());
 
 	mSubdivisions = getSubdivisionLevel(getPivotPoint(), axis_f, getMinGridScale());
@@ -780,7 +780,7 @@ BOOL LLManipTranslate::handleHover(S32 x, S32 y, MASK mask)
 		}
 	}
 
-	LLSelectMgr::getInstance()->updateSelectionCenter();
+	LLSelectMgr::getInstanceFast()->updateSelectionCenter();
 	gAgentCamera.clearFocusObject();
 	dialog_refresh_all();		// ??? is this necessary?
 
@@ -800,7 +800,7 @@ void LLManipTranslate::highlightManipulators(S32 x, S32 y)
 		return;
 	}
 	
-	//LLBBox bbox = LLSelectMgr::getInstance()->getBBoxOfSelection();
+	//LLBBox bbox = LLSelectMgr::getInstanceFast()->getBBoxOfSelection();
 	LLMatrix4 projMatrix = LLViewerCamera::getInstanceFast()->getProjection();
 	LLMatrix4 modelView = LLViewerCamera::getInstanceFast()->getModelview();
 
@@ -1049,13 +1049,13 @@ BOOL LLManipTranslate::handleMouseUp(S32 x, S32 y, MASK mask)
 	{
 		// make sure arrow colors go back to normal
 		mManipPart = LL_NO_PART;
-		LLSelectMgr::getInstance()->enableSilhouette(TRUE);
+		LLSelectMgr::getInstanceFast()->enableSilhouette(TRUE);
 
 		// Might have missed last update due to UPDATE_DELAY timing.
-		LLSelectMgr::getInstance()->sendMultipleUpdate( UPD_POSITION );
+		LLSelectMgr::getInstanceFast()->sendMultipleUpdate( UPD_POSITION );
 		
 		mInSnapRegime = FALSE;
-		LLSelectMgr::getInstance()->saveSelectedObjectTransform(SELECT_ACTION_TYPE_PICK);
+		LLSelectMgr::getInstanceFast()->saveSelectedObjectTransform(SELECT_ACTION_TYPE_PICK);
 		//gAgent.setObjectTracking(gSavedSettings.getBOOL("TrackFocusObject"));
 	}
 
@@ -1119,8 +1119,8 @@ void LLManipTranslate::renderSnapGuides()
 	LLVector3 grid_scale;
 	LLQuaternion grid_rotation;
 
-	LLSelectMgr::getInstance()->getGrid(grid_origin, grid_rotation, grid_scale);
-	LLVector3 saved_selection_center = getSavedPivotPoint(); //LLSelectMgr::getInstance()->getSavedBBoxOfSelection().getCenterAgent();
+	LLSelectMgr::getInstanceFast()->getGrid(grid_origin, grid_rotation, grid_scale);
+	LLVector3 saved_selection_center = getSavedPivotPoint(); //LLSelectMgr::getInstanceFast()->getSavedBBoxOfSelection().getCenterAgent();
 	LLVector3 selection_center = getPivotPoint();
 
 	LLViewerObject *first_object = first_node->getObject();
@@ -1414,7 +1414,7 @@ void LLManipTranslate::renderSnapGuides()
 				
 				LLVector3 tick_offset = (tick_pos - mGridOrigin) * ~mGridRotation;
 				F32 offset_val = 0.5f * tick_offset.mV[ARROW_TO_AXIS[mManipPart]] / getMinGridScale();
-				EGridMode grid_mode = LLSelectMgr::getInstance()->getGridMode();
+				EGridMode grid_mode = LLSelectMgr::getInstanceFast()->getGridMode();
 				F32 text_highlight = 0.8f;
 				if(i - ll_round(offset_nearest_grid_unit / smallest_grid_unit_scale) == 0 && mInSnapRegime)
 				{
@@ -1448,7 +1448,7 @@ void LLManipTranslate::renderSnapGuides()
 					snap_offset_meters_up = -mSnapOffsetMeters;
 				}
 
-				LLVector3 selection_center_start = getSavedPivotPoint();//LLSelectMgr::getInstance()->getSavedBBoxOfSelection().getCenterAgent();
+				LLVector3 selection_center_start = getSavedPivotPoint();//LLSelectMgr::getInstanceFast()->getSavedBBoxOfSelection().getCenterAgent();
 
 				LLVector3 help_text_pos = selection_center_start + (snap_offset_meters_up * 3.f * mSnapOffsetAxis);
 				const LLFontGL* big_fontp = LLFontGL::getFontSansSerif();
@@ -1793,7 +1793,7 @@ void LLManipTranslate::renderTranslationHandles()
 	LLQuaternion grid_rotation;
 	LLGLDepthTest gls_depth(GL_FALSE);
 	
-	LLSelectMgr::getInstance()->getGrid(grid_origin, grid_rotation, grid_scale);
+	LLSelectMgr::getInstanceFast()->getGrid(grid_origin, grid_rotation, grid_scale);
 	LLVector3 at_axis;
 	if (mObjectSelection->getSelectType() == SELECT_TYPE_HUD)
 	{

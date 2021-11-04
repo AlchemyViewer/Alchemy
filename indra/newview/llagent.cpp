@@ -1055,7 +1055,7 @@ void LLAgent::setRegion(LLViewerRegion *regionp)
 	U64 handle = regionp->getHandle();
 	mRegionsVisited.insert(handle);
 
-	LLSelectMgr::getInstance()->updateSelectionCenter();
+	LLSelectMgr::getInstanceFast()->updateSelectionCenter();
 
 //	LLFloaterMove::sUpdateFlyingStatus();
 // [RLVa:KB] - Checked: 2011-05-27 (RLVa-1.4.0a) | Added: RLVa-1.4.0a

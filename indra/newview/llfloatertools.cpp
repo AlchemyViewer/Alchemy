@@ -410,8 +410,8 @@ LLFloaterTools::LLFloaterTools(const LLSD& key)
 	mCommitCallbackRegistrar.add("BuildTool.DeleteMedia",		boost::bind(&LLFloaterTools::onClickBtnDeleteMedia,this));
 	mCommitCallbackRegistrar.add("BuildTool.EditMedia",			boost::bind(&LLFloaterTools::onClickBtnEditMedia,this));
 
-	mCommitCallbackRegistrar.add("BuildTool.LinkObjects",		boost::bind(&LLSelectMgr::linkObjects, LLSelectMgr::getInstance()));
-	mCommitCallbackRegistrar.add("BuildTool.UnlinkObjects",		boost::bind(&LLSelectMgr::unlinkObjects, LLSelectMgr::getInstance()));
+	mCommitCallbackRegistrar.add("BuildTool.LinkObjects",		boost::bind(&LLSelectMgr::linkObjects, LLSelectMgr::getInstanceFast()));
+	mCommitCallbackRegistrar.add("BuildTool.UnlinkObjects",		boost::bind(&LLSelectMgr::unlinkObjects, LLSelectMgr::getInstanceFast()));
 
 	mCommitCallbackRegistrar.add("BuildTool.TreeGrass",			boost::bind(&LLFloaterTools::onSelectTreeGrassCombo, this));
 
@@ -537,22 +537,22 @@ void LLFloaterTools::refresh()
 	if (!gMeshRepo.meshRezEnabled())
 	{		
 		std::string obj_count_string;
-		LLResMgr::getIntegerString(obj_count_string, LLSelectMgr::getInstance()->getSelection()->getRootObjectCount());
+		LLResMgr::getIntegerString(obj_count_string, LLSelectMgr::getInstanceFast()->getSelection()->getRootObjectCount());
 		getChild<LLUICtrl>("selection_count")->setTextArg("[OBJ_COUNT]", obj_count_string);
 		std::string prim_count_string;
-		LLResMgr::getIntegerString(prim_count_string, LLSelectMgr::getInstance()->getSelection()->getObjectCount());
+		LLResMgr::getIntegerString(prim_count_string, LLSelectMgr::getInstanceFast()->getSelection()->getObjectCount());
 		getChild<LLUICtrl>("selection_count")->setTextArg("[PRIM_COUNT]", prim_count_string);
 
 		// calculate selection rendering cost
 		if (sShowObjectCost)
 		{
 			std::string prim_cost_string;
-			S32 render_cost = LLSelectMgr::getInstance()->getSelection()->getSelectedObjectRenderCost();
+			S32 render_cost = LLSelectMgr::getInstanceFast()->getSelection()->getSelectedObjectRenderCost();
 			LLResMgr::getIntegerString(prim_cost_string, render_cost);
 		}
 		
 		// disable the object and prim counts if nothing selected
-		bool have_selection = ! LLSelectMgr::getInstance()->getSelection()->isEmpty();
+		bool have_selection = ! LLSelectMgr::getInstanceFast()->getSelection()->isEmpty();
 		getChildView("link_num_obj_count")->setEnabled(have_selection);
 	}
 	else
@@ -625,7 +625,7 @@ void LLFloaterTools::refresh()
 
 void LLFloaterTools::draw()
 {
-    BOOL has_selection = !LLSelectMgr::getInstance()->getSelection()->isEmpty();
+    BOOL has_selection = !LLSelectMgr::getInstanceFast()->getSelection()->isEmpty();
     if(!has_selection && (mHasSelection != has_selection))
     {
         mDirty = TRUE;
@@ -756,13 +756,13 @@ void LLFloaterTools::updatePopup(LLCoordGL center, MASK mask)
 	mBtnLink->setVisible(edit_visible);
 	mBtnUnlink->setVisible(edit_visible);
 
-	mBtnLink->setEnabled(LLSelectMgr::instance().enableLinkObjects());
-	mBtnUnlink->setEnabled(LLSelectMgr::instance().enableUnlinkObjects());
+	mBtnLink->setEnabled(LLSelectMgr::instanceFast().enableLinkObjects());
+	mBtnUnlink->setEnabled(LLSelectMgr::instanceFast().enableUnlinkObjects());
 
 	mBtnPrevPart->setVisible(edit_visible);
 	mBtnNextPart->setVisible(edit_visible);
 
-	bool select_btn_enabled = (!LLSelectMgr::getInstance()->getSelection()->isEmpty()
+	bool select_btn_enabled = (!LLSelectMgr::getInstanceFast()->getSelection()->isEmpty()
 								&& (ALControlCache::EditLinkedParts || LLToolFace::getInstance() == LLToolMgr::getInstance()->getCurrentTool()));
 	mBtnPrevPart->setEnabled(select_btn_enabled);
 	mBtnNextPart->setEnabled(select_btn_enabled);
@@ -927,7 +927,7 @@ void LLFloaterTools::updatePopup(LLCoordGL center, MASK mask)
 		getChildView("Strength:")->setVisible( land_visible);
 	}
 
-	bool have_selection = !LLSelectMgr::getInstance()->getSelection()->isEmpty();
+	bool have_selection = !LLSelectMgr::getInstanceFast()->getSelection()->isEmpty();
 
 	getChildView("selection_count")->setVisible(!land_visible && have_selection);
 	getChildView("remaining_capacity")->setVisible(!land_visible && have_selection);
@@ -949,7 +949,7 @@ BOOL LLFloaterTools::canClose()
 void LLFloaterTools::onOpen(const LLSD& key)
 {
 	mParcelSelection = LLViewerParcelMgr::getInstance()->getFloatingParcelSelection();
-	mObjectSelection = LLSelectMgr::getInstance()->getEditSelection();
+	mObjectSelection = LLSelectMgr::getInstanceFast()->getEditSelection();
 	
 	std::string panel = key.asString();
 	if (!panel.empty())
@@ -988,7 +988,7 @@ void LLFloaterTools::onClose(bool app_quitting)
 	gAgentCamera.resetView(gSavedSettings.getBOOL("EditCameraMovement"));
 	
 	// exit component selection mode
-	LLSelectMgr::getInstance()->promoteSelectionToRoot();
+	LLSelectMgr::getInstanceFast()->promoteSelectionToRoot();
 	gSavedSettings.setBOOL("EditLinkedParts", FALSE);
 
 	gViewerWindow->showCursor();
@@ -1166,11 +1166,11 @@ void commit_select_component(void *data)
 
 	if (select_individuals)
 	{
-		LLSelectMgr::getInstance()->demoteSelectionToIndividuals();
+		LLSelectMgr::getInstanceFast()->demoteSelectionToIndividuals();
 	}
 	else
 	{
-		LLSelectMgr::getInstance()->promoteSelectionToRoot();
+		LLSelectMgr::getInstanceFast()->promoteSelectionToRoot();
 	}
 }
 
@@ -1187,7 +1187,7 @@ void commit_grid_mode(LLUICtrl *ctrl)
 {
 	LLComboBox* combo = (LLComboBox*)ctrl;
 
-	LLSelectMgr::getInstance()->setGridMode((EGridMode)combo->getCurrentIndex());
+	LLSelectMgr::getInstanceFast()->setGridMode((EGridMode)combo->getCurrentIndex());
 }
 
 // static
@@ -1249,15 +1249,15 @@ bool LLFloaterTools::selectedMediaEditable()
 {
 	U32 owner_mask_on;
 	U32 owner_mask_off;
-	U32 valid_owner_perms = LLSelectMgr::getInstance()->selectGetPerm( PERM_OWNER, 
+	U32 valid_owner_perms = LLSelectMgr::getInstanceFast()->selectGetPerm( PERM_OWNER, 
 																	  &owner_mask_on, &owner_mask_off );
 	U32 group_mask_on;
 	U32 group_mask_off;
-	U32 valid_group_perms = LLSelectMgr::getInstance()->selectGetPerm( PERM_GROUP, 
+	U32 valid_group_perms = LLSelectMgr::getInstanceFast()->selectGetPerm( PERM_GROUP, 
 																	  &group_mask_on, &group_mask_off );
 	U32 everyone_mask_on;
 	U32 everyone_mask_off;
-	S32 valid_everyone_perms = LLSelectMgr::getInstance()->selectGetPerm( PERM_EVERYONE, 
+	S32 valid_everyone_perms = LLSelectMgr::getInstanceFast()->selectGetPerm( PERM_EVERYONE, 
 																		 &everyone_mask_on, &everyone_mask_off );
 	
 	bool selected_Media_editable = false;
@@ -1322,7 +1322,7 @@ void LLFloaterTools::updateLandImpacts()
 
 void LLFloaterTools::getMediaState()
 {
-	LLObjectSelectionHandle selected_objects =LLSelectMgr::getInstance()->getSelection();
+	LLObjectSelectionHandle selected_objects =LLSelectMgr::getInstanceFast()->getSelection();
 	LLViewerObject* first_object = selected_objects->getFirstObject();
 	LLTextBox* media_info = getChild<LLTextBox>("media_info");
 	
@@ -1348,9 +1348,9 @@ void LLFloaterTools::getMediaState()
 		return;
 	}
 	
-	BOOL is_nonpermanent_enforced = (LLSelectMgr::getInstance()->getSelection()->getFirstRootNode() 
-		&& LLSelectMgr::getInstance()->selectGetRootsNonPermanentEnforced())
-		|| LLSelectMgr::getInstance()->selectGetNonPermanentEnforced();
+	BOOL is_nonpermanent_enforced = (LLSelectMgr::getInstanceFast()->getSelection()->getFirstRootNode() 
+		&& LLSelectMgr::getInstanceFast()->selectGetRootsNonPermanentEnforced())
+		|| LLSelectMgr::getInstanceFast()->selectGetNonPermanentEnforced();
 	bool editable = is_nonpermanent_enforced && (first_object->permModify() || selectedMediaEditable());
 
 	// Check modify permissions and whether any selected objects are in
@@ -1499,7 +1499,7 @@ void LLFloaterTools::getMediaState()
 void LLFloaterTools::onClickBtnAddMedia()
 {
 	// check if multiple faces are selected
-	if(LLSelectMgr::getInstance()->getSelection()->isMultipleTESelected())
+	if(LLSelectMgr::getInstanceFast()->getSelection()->isMultipleTESelected())
 	{
 		LLNotificationsUtil::add("MultipleFacesSelected", LLSD(), LLSD(), multipleFacesSelectedConfirm);
 	}
@@ -1549,7 +1549,7 @@ bool LLFloaterTools::deleteMediaConfirm(const LLSD& notification, const LLSD& re
 	switch( option )
 	{
 		case 0:  // "Yes"
-			LLSelectMgr::getInstance()->selectionSetMedia( 0, LLSD() );
+			LLSelectMgr::getInstanceFast()->selectionSetMedia( 0, LLSD() );
 			if(LLFloaterReg::instanceVisible("media_settings"))
 			{
 				LLFloaterReg::hideInstance("media_settings");
@@ -1642,7 +1642,7 @@ void LLFloaterTools::updateMediaSettings()
     std::string value_str( "" );
     int value_int = 0;
     bool value_bool = false;
-	LLObjectSelectionHandle selected_objects =LLSelectMgr::getInstance()->getSelection();
+	LLObjectSelectionHandle selected_objects =LLSelectMgr::getInstanceFast()->getSelection();
     // TODO: (CP) refactor this using something clever or boost or both !!
 
     const LLMediaEntry default_media_data;
@@ -2018,7 +2018,7 @@ void LLFloaterTools::updateMediaSettings()
 		const LLMediaEntry &mMediaEntry;
 		
     } func_perms_anyone_interact(default_media_data);
-    identical = LLSelectMgr::getInstance()->getSelection()->getSelectedTEValue( &func_perms_anyone_interact, value_bool );
+    identical = LLSelectMgr::getInstanceFast()->getSelection()->getSelectedTEValue( &func_perms_anyone_interact, value_bool );
     base_key = std::string( LLPanelContents::PERMS_ANYONE_INTERACT_KEY );
     mMediaSettings[ base_key ] = value_bool;
     mMediaSettings[ base_key + std::string( LLPanelContents::TENTATIVE_SUFFIX ) ] = ! identical;

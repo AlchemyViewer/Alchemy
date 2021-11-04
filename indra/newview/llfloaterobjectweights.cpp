@@ -116,7 +116,7 @@ void LLFloaterObjectWeights::onWeightsUpdate(const SelectionCost& selection_cost
 	mSelectedPhysicsWeight->setText(llformat("%.1f", selection_cost.mPhysicsCost));
 	mSelectedServerWeight->setText(llformat("%.1f", selection_cost.mSimulationCost));
 
-	S32 render_cost = LLSelectMgr::getInstance()->getSelection()->getSelectedObjectRenderCost();
+	S32 render_cost = LLSelectMgr::getInstanceFast()->getSelection()->getSelectedObjectRenderCost();
 	mSelectedDisplayWeight->setText(llformat("%d", render_cost));
 
 	toggleWeightsLoadingIndicators(false);
@@ -137,7 +137,7 @@ void LLFloaterObjectWeights::setErrorStatus(S32 status, const std::string& reaso
 
 void LLFloaterObjectWeights::updateLandImpacts(const LLParcel* parcel)
 {
-	if (!parcel || LLSelectMgr::getInstance()->getSelection()->isEmpty())
+	if (!parcel || LLSelectMgr::getInstanceFast()->getSelection()->isEmpty())
 	{
 		updateIfNothingSelected();
 	}
@@ -164,7 +164,7 @@ void LLFloaterObjectWeights::updateLandImpacts(const LLParcel* parcel)
 
 void LLFloaterObjectWeights::refresh()
 {
-	LLSelectMgr* sel_mgr = LLSelectMgr::getInstance();
+	LLSelectMgr* sel_mgr = LLSelectMgr::getInstanceFast();
 
 	if (sel_mgr->getSelection()->isEmpty())
 	{

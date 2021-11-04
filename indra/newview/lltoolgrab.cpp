@@ -121,7 +121,7 @@ void LLToolGrabBase::handleDeselect()
 	if (!mValidSelection && (override_mask != MASK_NONE || (gFloaterTools && gFloaterTools->getVisible())))
 	{
 		LLMenuGL::sMenuContainer->hideMenus();
-		LLSelectMgr::getInstance()->validateSelection();
+		LLSelectMgr::getInstanceFast()->validateSelection();
 	}
 
 }
@@ -158,19 +158,19 @@ BOOL LLToolGrabBase::handleMouseDown(S32 x, S32 y, MASK mask)
 
 void LLToolGrabBase::pickCallback(const LLPickInfo& pick_info)
 {
-	LLToolGrab::getInstance()->mGrabPick = pick_info;
+	LLToolGrab::getInstanceFast()->mGrabPick = pick_info;
 	LLViewerObject	*objectp = pick_info.getObject();
 
 	BOOL extend_select = (pick_info.mKeyMask & MASK_SHIFT);
 
-	if (!extend_select && !LLSelectMgr::getInstance()->getSelection()->isEmpty())
+	if (!extend_select && !LLSelectMgr::getInstanceFast()->getSelection()->isEmpty())
 	{
-		LLSelectMgr::getInstance()->deselectAll();
-		LLToolGrab::getInstance()->mDeselectedThisClick = TRUE;
+		LLSelectMgr::getInstanceFast()->deselectAll();
+		LLToolGrab::getInstanceFast()->mDeselectedThisClick = TRUE;
 	}
 	else
 	{
-		LLToolGrab::getInstance()->mDeselectedThisClick = FALSE;
+		LLToolGrab::getInstanceFast()->mDeselectedThisClick = FALSE;
 	}
 
 	// if not over object, do nothing
@@ -180,13 +180,13 @@ void LLToolGrabBase::pickCallback(const LLPickInfo& pick_info)
 	if ( (!objectp) || ((RlvActions::isRlvEnabled()) && (!RlvActions::canTouch(objectp, pick_info.mObjectOffset))) )
 // [/RLVa:KB]
 	{
-		LLToolGrab::getInstance()->setMouseCapture(TRUE);
-		LLToolGrab::getInstance()->mMode = GRAB_NOOBJECT;
-		LLToolGrab::getInstance()->mGrabPick.mObjectID.setNull();
+		LLToolGrab::getInstanceFast()->setMouseCapture(TRUE);
+		LLToolGrab::getInstanceFast()->mMode = GRAB_NOOBJECT;
+		LLToolGrab::getInstanceFast()->mGrabPick.mObjectID.setNull();
 	}
 	else
 	{
-		LLToolGrab::getInstance()->handleObjectHit(LLToolGrab::getInstance()->mGrabPick);
+		LLToolGrab::getInstanceFast()->handleObjectHit(LLToolGrab::getInstanceFast()->mGrabPick);
 	}
 }
 
@@ -297,7 +297,7 @@ BOOL LLToolGrabBase::handleObjectHit(const LLPickInfo& info)
 		startSpin();
 	}
 
-	LLSelectMgr::getInstance()->updateSelectionCenter();		// update selection beam
+	LLSelectMgr::getInstanceFast()->updateSelectionCenter();		// update selection beam
 
 	// update point at
 	LLViewerObject *edit_object = info.getObject();
@@ -733,7 +733,7 @@ void LLToolGrabBase::handleHoverActive(S32 x, S32 y, MASK mask)
 
 		gViewerWindow->moveCursorToCenter();
 
-		LLSelectMgr::getInstance()->updateSelectionCenter();
+		LLSelectMgr::getInstanceFast()->updateSelectionCenter();
 
 	}
 
@@ -1071,7 +1071,7 @@ void LLToolGrabBase::onMouseCaptureLost()
 
 	mGrabPick.mObjectID.setNull();
 
-	LLSelectMgr::getInstance()->updateSelectionCenter();
+	LLSelectMgr::getInstanceFast()->updateSelectionCenter();
 	gAgentCamera.setPointAt(POINTAT_TARGET_CLEAR);
 	gAgentCamera.setLookAt(LOOKAT_TARGET_CLEAR);
 

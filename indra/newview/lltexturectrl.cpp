@@ -1650,7 +1650,7 @@ void LLTextureCtrl::draw()
 
 		if (LLAvatarAppearanceDefines::LLAvatarAppearanceDictionary::isBakedImageId(mImageAssetID))
 		{
-			LLViewerObject* obj = LLSelectMgr::getInstance()->getSelection()->getFirstObject();
+			LLViewerObject* obj = LLSelectMgr::getInstanceFast()->getSelection()->getFirstObject();
 			if (obj)
 			{
 				LLViewerTexture* viewerTexture = obj->getBakedTextureForMagicId(mImageAssetID);

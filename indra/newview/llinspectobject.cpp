@@ -180,7 +180,7 @@ BOOL LLInspectObject::postBuild(void)
 		boost::bind(&LLInspectObject::onClickMoreInfo, this));
 
 	// Watch for updates to selection properties off the network
-	LLSelectMgr::getInstance()->mUpdateSignal.connect(
+	LLSelectMgr::getInstanceFast()->mUpdateSignal.connect(
 		boost::bind(&LLInspectObject::update, this) );
 
 	return TRUE;
@@ -213,8 +213,8 @@ void LLInspectObject::onOpen(const LLSD& data)
 		// Make sure any media is unfocused before changing the selection here.
 		LLViewerMediaFocus::getInstance()->clearFocus();
 		
-		LLSelectMgr::instance().deselectAll();
-		mObjectSelection = LLSelectMgr::instance().selectObjectAndFamily(obj,FALSE,TRUE);
+		LLSelectMgr::instanceFast().deselectAll();
+		mObjectSelection = LLSelectMgr::instanceFast().selectObjectAndFamily(obj,FALSE,TRUE);
 
 		// Mark this as a transient selection
 		struct SetTransient : public LLSelectedNodeFunctor
@@ -257,7 +257,7 @@ void LLInspectObject::update()
 	// but we're never destroyed.
 	if (!getVisible()) return;
 
-	LLObjectSelection* selection = LLSelectMgr::getInstance()->getSelection();
+	LLObjectSelection* selection = LLSelectMgr::getInstanceFast()->getSelection();
 	if (!selection) return;
 
 	LLSelectNode* nodep = selection->getFirstRootNode();
@@ -623,7 +623,7 @@ void LLInspectObject::onClickPay()
 
 void LLInspectObject::onClickTakeFreeCopy()
 {
-	LLObjectSelection* selection = LLSelectMgr::getInstance()->getSelection();
+	LLObjectSelection* selection = LLSelectMgr::getInstanceFast()->getSelection();
 	if (!selection) return;
 
 	LLSelectNode* nodep = selection->getFirstRootNode();

@@ -473,7 +473,7 @@ bool LLPanelMediaSettingsGeneral::navigateHomeSelectedFace(bool only_if_current_
 	} functor_navigate_media(only_if_current_is_empty);
 	
 	bool all_face_media_navigated = false;
-	LLObjectSelectionHandle selected_objects =LLSelectMgr::getInstance()->getSelection();
+	LLObjectSelectionHandle selected_objects =LLSelectMgr::getInstanceFast()->getSelection();
 	selected_objects->getSelectedTEValue( &functor_navigate_media, all_face_media_navigated );
 	
 	// Note: we don't update the 'current URL' field until the media data itself changes
@@ -511,7 +511,7 @@ void LLPanelMediaSettingsGeneral::updateCurrentUrl()
 		const LLMediaEntry &  mMediaEntry;
 		
 	} func_current_url(default_media_data);
-	bool identical = LLSelectMgr::getInstance()->getSelection()->getSelectedTEValue( &func_current_url, value_str );
+	bool identical = LLSelectMgr::getInstanceFast()->getSelection()->getSelectedTEValue( &func_current_url, value_str );
 	mCurrentURL->setText(value_str);
 	mCurrentURL->setTentative(identical);
 

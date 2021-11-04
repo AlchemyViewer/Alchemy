@@ -111,7 +111,7 @@ void LLManip::getManipNormal(LLViewerObject* object, EManipPart manip, LLVector3
 	LLVector3 grid_scale;
 	LLQuaternion grid_rotation;
 
-	LLSelectMgr::getInstance()->getGrid(grid_origin, grid_rotation, grid_scale);
+	LLSelectMgr::getInstanceFast()->getGrid(grid_origin, grid_rotation, grid_scale);
 
 	if (manip >= LL_X_ARROW && manip <= LL_Z_ARROW)
 	{
@@ -153,7 +153,7 @@ BOOL LLManip::getManipAxis(LLViewerObject* object, EManipPart manip, LLVector3 &
 	LLVector3 grid_scale;
 	LLQuaternion grid_rotation;
 
-	LLSelectMgr::getInstance()->getGrid(grid_origin, grid_rotation, grid_scale);
+	LLSelectMgr::getInstanceFast()->getGrid(grid_origin, grid_rotation, grid_scale);
 
 	if (manip == LL_X_ARROW)
 	{
@@ -200,7 +200,7 @@ F32 LLManip::getSubdivisionLevel(const LLVector3 &reference_point, const LLVecto
 
 void LLManip::handleSelect()
 {
-	mObjectSelection = LLSelectMgr::getInstance()->getEditSelection();
+	mObjectSelection = LLSelectMgr::getInstanceFast()->getEditSelection();
 }
 
 void LLManip::handleDeselect()
@@ -354,7 +354,7 @@ BOOL LLManip::nearestPointOnLineFromMouse( S32 x, S32 y, const LLVector3& b1, co
 
 LLVector3 LLManip::getSavedPivotPoint() const
 {
-	return LLSelectMgr::getInstance()->getSavedBBoxOfSelection().getCenterAgent();
+	return LLSelectMgr::getInstanceFast()->getSavedBBoxOfSelection().getCenterAgent();
 }
 
 LLVector3 LLManip::getPivotPoint()
@@ -365,7 +365,7 @@ LLVector3 LLManip::getPivotPoint()
 	{
 		return vobjp->getPivotPositionAgent();
 	}
-	return LLSelectMgr::getInstance()->getBBoxOfSelection().getCenterAgent();
+	return LLSelectMgr::getInstanceFast()->getBBoxOfSelection().getCenterAgent();
 }
 
 
@@ -374,7 +374,7 @@ void LLManip::renderGuidelines(BOOL draw_x, BOOL draw_y, BOOL draw_z)
 	LLVector3 grid_origin;
 	LLQuaternion grid_rot;
 	LLVector3 grid_scale;
-	LLSelectMgr::getInstance()->getGrid(grid_origin, grid_rot, grid_scale);
+	LLSelectMgr::getInstanceFast()->getGrid(grid_origin, grid_rot, grid_scale);
 
 	const BOOL children_ok = TRUE;
 	LLViewerObject* object = mObjectSelection->getFirstRootObject(children_ok);
@@ -383,7 +383,7 @@ void LLManip::renderGuidelines(BOOL draw_x, BOOL draw_y, BOOL draw_z)
 		return;
 	}
 
-	//LLVector3  center_agent  = LLSelectMgr::getInstance()->getBBoxOfSelection().getCenterAgent();
+	//LLVector3  center_agent  = LLSelectMgr::getInstanceFast()->getBBoxOfSelection().getCenterAgent();
 	LLVector3  center_agent  = getPivotPoint();
 
 	gGL.pushMatrix();

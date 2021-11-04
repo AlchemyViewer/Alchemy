@@ -68,17 +68,17 @@ void ALToolAlign::pickCallback(const LLPickInfo& pick_info)
 			// If object not selected, select it
 			if (!object->isSelected())
 			{
-				LLSelectMgr::getInstance()->selectObjectAndFamily(object);
+				LLSelectMgr::getInstanceFast()->selectObjectAndFamily(object);
 			}
 			else
 			{
-				LLSelectMgr::getInstance()->deselectObjectAndFamily(object);
+				LLSelectMgr::getInstanceFast()->deselectObjectAndFamily(object);
 			}
 		}
 		else
 		{
-			LLSelectMgr::getInstance()->deselectAll();
-			LLSelectMgr::getInstance()->selectObjectAndFamily(object);
+			LLSelectMgr::getInstanceFast()->deselectAll();
+			LLSelectMgr::getInstanceFast()->selectObjectAndFamily(object);
 		}
 
 	}
@@ -86,11 +86,11 @@ void ALToolAlign::pickCallback(const LLPickInfo& pick_info)
 	{
 		if (pick_info.mKeyMask != MASK_SHIFT)
 		{
-			LLSelectMgr::getInstance()->deselectAll();
+			LLSelectMgr::getInstanceFast()->deselectAll();
 		}
 	}
 
-	LLSelectMgr::getInstance()->promoteSelectionToRoot();
+	LLSelectMgr::getInstanceFast()->promoteSelectionToRoot();
 }
 
 void ALToolAlign::handleSelect()
@@ -98,7 +98,7 @@ void ALToolAlign::handleSelect()
 	// no parts, please
 
 	LL_DEBUGS("ALIGNTOOL") << "in select" << LL_ENDL;
-	LLSelectMgr::getInstance()->promoteSelectionToRoot();
+	LLSelectMgr::getInstanceFast()->promoteSelectionToRoot();
 }
 
 void ALToolAlign::handleDeselect()
@@ -231,7 +231,7 @@ void render_cone_bbox(LLBBox bbox)
 // should this be cached in the selection manager?  yes.
 LLBBox get_selection_axis_aligned_bbox()
 {
-	auto& select_mgr = LLSelectMgr::instance();
+	auto& select_mgr = LLSelectMgr::instanceFast();
 	LLBBox selection_bbox = select_mgr.getBBoxOfSelection();
 	LLVector3 position = selection_bbox.getPositionAgent();
 
@@ -259,7 +259,7 @@ void ALToolAlign::computeManipulatorSize()
 {
 	LLViewerCamera* camera = LLViewerCamera::getInstance();
 
-	if (LLSelectMgr::getInstance()->getSelection()->getSelectType() == SELECT_TYPE_HUD)
+	if (LLSelectMgr::getInstanceFast()->getSelection()->getSelectType() == SELECT_TYPE_HUD)
 	{
 		mManipulatorSize = MANIPULATOR_SIZE / (camera->getViewHeightInPixels() *
 											   gAgentCamera.mHUDCurZoom);
@@ -348,7 +348,7 @@ BOOL ALToolAlign::canAffectSelection()
 	// and it does not have any sitting agents. In case of editing linked parts,
 	// the object itself has to be modifiable.
 	static LLCachedControl<bool> edit_linked_parts(gSavedSettings, "EditLinkedParts");
-	BOOL can_scale = LLSelectMgr::getInstance()->getSelection()->getObjectCount() != 0;
+	BOOL can_scale = LLSelectMgr::getInstanceFast()->getSelection()->getObjectCount() != 0;
 	if (can_scale)
 	{
 		struct f : public LLSelectedObjectFunctor
@@ -358,7 +358,7 @@ BOOL ALToolAlign::canAffectSelection()
 				return (!edit_linked_parts || objectp->permModify()) && objectp->permMove() && !objectp->isSeat();
 			}
 		} func;
-		can_scale = LLSelectMgr::getInstance()->getSelection()->applyToObjects(&func);
+		can_scale = LLSelectMgr::getInstanceFast()->getSelection()->applyToObjects(&func);
 	}
 	return can_scale;
 }
@@ -423,7 +423,7 @@ public:
 void ALToolAlign::align()
 {
 	// no linkset parts, please
-	auto& select_mgr = LLSelectMgr::instance();
+	auto& select_mgr = LLSelectMgr::instanceFast();
 	select_mgr.promoteSelectionToRoot();
 
 	std::vector<LLPointer<LLViewerObject> > objects;

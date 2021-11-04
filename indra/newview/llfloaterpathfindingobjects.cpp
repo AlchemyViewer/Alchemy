@@ -79,7 +79,7 @@ void LLFloaterPathfindingObjects::onOpen(const LLSD &pKey)
 
 	if (!mSelectionUpdateSlot.connected())
 	{
-		mSelectionUpdateSlot = LLSelectMgr::getInstance()->mUpdateSignal.connect(boost::bind(&LLFloaterPathfindingObjects::onInWorldSelectionListChanged, this));
+		mSelectionUpdateSlot = LLSelectMgr::getInstanceFast()->mUpdateSignal.connect(boost::bind(&LLFloaterPathfindingObjects::onInWorldSelectionListChanged, this));
 	}
 
 	if (!mRegionBoundaryCrossingSlot.connected())
@@ -467,7 +467,7 @@ void LLFloaterPathfindingObjects::showFloaterWithSelectionObjects()
 {
 	mObjectsToBeSelected.clear();
 
-	LLObjectSelectionHandle selectedObjectsHandle = LLSelectMgr::getInstance()->getSelection();
+	LLObjectSelectionHandle selectedObjectsHandle = LLSelectMgr::getInstanceFast()->getSelection();
 	if (selectedObjectsHandle.notNull())
 	{
 		LLObjectSelection *selectedObjects = selectedObjectsHandle.get();
@@ -830,7 +830,7 @@ void LLFloaterPathfindingObjects::updateStateOnActionControls()
 void LLFloaterPathfindingObjects::selectScrollListItemsInWorld()
 {
 	mObjectsSelection.clear();
-	LLSelectMgr::getInstance()->deselectAll();
+	LLSelectMgr::getInstanceFast()->deselectAll();
 
 	std::vector<LLScrollListItem *> selectedItems = mObjectsScrollList->getAllSelected();
 	if (!selectedItems.empty())
@@ -854,7 +854,7 @@ void LLFloaterPathfindingObjects::selectScrollListItemsInWorld()
 
 		if (!viewerObjects.empty())
 		{
-			mObjectsSelection = LLSelectMgr::getInstance()->selectObjectAndFamily(viewerObjects);
+			mObjectsSelection = LLSelectMgr::getInstanceFast()->selectObjectAndFamily(viewerObjects);
 		}
 	}
 }

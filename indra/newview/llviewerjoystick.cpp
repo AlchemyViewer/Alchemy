@@ -829,14 +829,14 @@ void LLViewerJoystick::moveObjects(bool reset)
 		}
 				
 		// the selection update could fail, so we won't send 
-		if (LLSelectMgr::getInstance()->selectionMove(v, sDelta[3],sDelta[4],sDelta[5], upd_type))
+		if (LLSelectMgr::getInstanceFast()->selectionMove(v, sDelta[3],sDelta[4],sDelta[5], upd_type))
 		{
 			toggle_send_to_sim = true;
 		}
 	}
 	else if (toggle_send_to_sim)
 	{
-		LLSelectMgr::getInstance()->sendSelectionMove();
+		LLSelectMgr::getInstanceFast()->sendSelectionMove();
 		toggle_send_to_sim = false;
 	}
 }

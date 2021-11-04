@@ -447,7 +447,7 @@ void LLToolDragAndDrop::beginMultiDrag(
 void LLToolDragAndDrop::endDrag()
 {
 	mEndDragSignal();
-	LLSelectMgr::getInstance()->unhighlightAll();
+	LLSelectMgr::getInstanceFast()->unhighlightAll();
 	setMouseCapture(FALSE);
 }
 
@@ -807,9 +807,9 @@ void LLToolDragAndDrop::dragOrDrop3D( S32 x, S32 y, MASK mask, BOOL drop, EAccep
 
 void LLToolDragAndDrop::pickCallback(const LLPickInfo& pick_info)
 {
-	if (getInstance() != NULL)
+	if (getInstanceFast() != NULL)
 	{
-		getInstance()->pick(pick_info);
+		getInstanceFast()->pick(pick_info);
 	}
 }
 
@@ -819,7 +819,7 @@ void LLToolDragAndDrop::pick(const LLPickInfo& pick_info)
 	S32	hit_face = -1;
 
 	LLViewerObject* hit_obj = pick_info.getObject();
-	LLSelectMgr::getInstance()->unhighlightAll();
+	LLSelectMgr::getInstanceFast()->unhighlightAll();
 	bool highlight_object = false;
 	// Treat attachments as part of the avatar they are attached to.
 	if (hit_obj != NULL)
@@ -915,7 +915,7 @@ void LLToolDragAndDrop::pick(const LLPickInfo& pick_info)
 		{
 			if (mCargoTypes[i] != DAD_OBJECT || (pick_info.mKeyMask & MASK_CONTROL))
 			{
-				LLSelectMgr::getInstance()->highlightObjectAndFamily(hit_obj);
+				LLSelectMgr::getInstanceFast()->highlightObjectAndFamily(hit_obj);
 				break;
 			}
 		}
@@ -1131,7 +1131,7 @@ void LLToolDragAndDrop::dropTextureOneFace(LLViewerObject* hit_obj,
 
 	if (gFloaterTools->getVisible() && panel_face)
 	{
-		switch (LLSelectMgr::getInstance()->getTextureChannel())
+		switch (LLSelectMgr::getInstanceFast()->getTextureChannel())
 		{
 
 		case 0:
@@ -1382,7 +1382,7 @@ void LLToolDragAndDrop::dropObject(LLViewerObject* raycast_target,
 	// selected object.
 	if (rez_selected)
 	{
-		LLSelectMgr::getInstance()->deselectAll();
+		LLSelectMgr::getInstanceFast()->deselectAll();
 		gViewerWindow->getWindow()->incBusyCount();
 	}
 

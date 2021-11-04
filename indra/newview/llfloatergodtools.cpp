@@ -1144,12 +1144,12 @@ void LLPanelObjectTools::onClickSetBySelection(void* data)
 	if (!panelp) return;
 
 	const BOOL non_root_ok = TRUE; 
-	LLSelectNode* node = LLSelectMgr::getInstance()->getSelection()->getFirstRootNode(NULL, non_root_ok);
+	LLSelectNode* node = LLSelectMgr::getInstanceFast()->getSelection()->getFirstRootNode(NULL, non_root_ok);
 	if (!node) return;
 
 	std::string owner_name;
 	LLUUID owner_id;
-	LLSelectMgr::getInstance()->selectGetOwner(owner_id, owner_name);
+	LLSelectMgr::getInstanceFast()->selectGetOwner(owner_id, owner_name);
 
 	panelp->mTargetAvatar = owner_id;
 	LLStringUtil::format_map_t args;
@@ -1275,7 +1275,7 @@ void LLPanelRequestTools::onClickRequest()
 		std::string req =getChild<LLUICtrl>("request")->getValue();
 		req = req.substr(0, req.find_first_of(" "));
 		std::string param = getChild<LLUICtrl>("parameter")->getValue();
-		LLSelectMgr::getInstance()->sendGodlikeRequest(req, param);
+		LLSelectMgr::getInstanceFast()->sendGodlikeRequest(req, param);
 	}
 	else if(dest == AGENT_REGION)
 	{

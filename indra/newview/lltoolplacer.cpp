@@ -463,7 +463,7 @@ BOOL LLToolPlacer::addObject( LLPCode pcode, S32 x, S32 y, U8 use_physics )
 	// Spawns a message, so must be after above send
 	if (create_selected)
 	{
-		LLSelectMgr::getInstance()->deselectAll();
+		LLSelectMgr::getInstanceFast()->deselectAll();
 		gViewerWindow->getWindow()->incBusyCount();
 	}
 
@@ -519,7 +519,7 @@ BOOL LLToolPlacer::addDuplicate(S32 x, S32 y)
 		ray_target_id.setNull();
 	}
 
-	LLSelectMgr::getInstance()->selectDuplicateOnRay(ray_start_region,
+	LLSelectMgr::getInstanceFast()->selectDuplicateOnRay(ray_start_region,
 										ray_end_region,
 										b_hit_land,			// suppress raycast
 										FALSE,				// intersection

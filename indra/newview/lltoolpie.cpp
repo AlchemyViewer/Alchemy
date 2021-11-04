@@ -202,7 +202,7 @@ BOOL LLToolPie::handleRightMouseDown(S32 x, S32 y, MASK mask)
 
 BOOL LLToolPie::handleRightMouseUp(S32 x, S32 y, MASK mask)
 {
-	LLToolMgr::getInstance()->clearTransientTool();
+	LLToolMgr::getInstanceFast()->clearTransientTool();
 	return LLTool::handleRightMouseUp(x, y, mask);
 }
 
@@ -352,7 +352,7 @@ BOOL LLToolPie::handleLeftClickPick()
 					// pay event goes to object actually clicked on
 					mClickActionObject = object;
 					mLeftClickSelection = LLToolSelect::handleObjectSelection(mPick, FALSE, TRUE);
-					if (LLSelectMgr::getInstance()->selectGetAllValid())
+					if (LLSelectMgr::getInstanceFast()->selectGetAllValid())
 					{
 						// call this right away, since we have all the info we need to continue the action
 						selectionPropertiesReceived();
@@ -366,7 +366,7 @@ BOOL LLToolPie::handleLeftClickPick()
 			{
 				mClickActionObject = parent;
 				mLeftClickSelection = LLToolSelect::handleObjectSelection(mPick, FALSE, TRUE, TRUE);
-				if (LLSelectMgr::getInstance()->selectGetAllValid())
+				if (LLSelectMgr::getInstanceFast()->selectGetAllValid())
 				{
 					// call this right away, since we have all the info we need to continue the action
 					selectionPropertiesReceived();
@@ -379,7 +379,7 @@ BOOL LLToolPie::handleLeftClickPick()
 			{
 				mClickActionObject = parent;
 				mLeftClickSelection = LLToolSelect::handleObjectSelection(mPick, FALSE, TRUE, TRUE);
-				if (LLSelectMgr::getInstance()->selectGetAllValid())
+				if (LLSelectMgr::getInstanceFast()->selectGetAllValid())
 				{
 					// call this right away, since we have all the info we need to continue the action
 					selectionPropertiesReceived();
@@ -449,9 +449,9 @@ BOOL LLToolPie::handleLeftClickPick()
 
 		gGrabTransientTool = this;
 		mMouseButtonDown = false;
-		LLToolGrab::getInstance()->setClickedInMouselook(gAgentCamera.cameraMouselook());
-		LLToolMgr::getInstance()->getCurrentToolset()->selectTool( LLToolGrab::getInstance() );
-		return LLToolGrab::getInstance()->handleObjectHit( mPick );
+		LLToolGrab::getInstanceFast()->setClickedInMouselook(gAgentCamera.cameraMouselook());
+		LLToolMgr::getInstanceFast()->getCurrentToolset()->selectTool( LLToolGrab::getInstanceFast() );
+		return LLToolGrab::getInstanceFast()->handleObjectHit( mPick );
 	}
 	
 	LLHUDIcon* last_hit_hud_icon = mPick.mHUDIcon;
@@ -482,10 +482,10 @@ BOOL LLToolPie::handleLeftClickPick()
 	{
 		// we left clicked on avatar, switch to focus mode
 		mMouseButtonDown = false;
-		LLToolMgr::getInstance()->setTransientTool(LLToolCamera::getInstance());
+		LLToolMgr::getInstanceFast()->setTransientTool(LLToolCamera::getInstanceFast());
 		gViewerWindow->hideCursor();
-		LLToolCamera::getInstance()->setMouseCapture(TRUE);
-		LLToolCamera::getInstance()->pickCallback(mPick);
+		LLToolCamera::getInstanceFast()->setMouseCapture(TRUE);
+		LLToolCamera::getInstanceFast()->pickCallback(mPick);
 		gAgentCamera.setFocusOnAvatar(TRUE, TRUE);
 
 		return TRUE;
@@ -559,7 +559,7 @@ ECursorType LLToolPie::cursorFromObject(LLViewerObject* object)
 	case CLICK_ACTION_BUY:
 		if ( mClickActionBuyEnabled )
 		{ 
-			LLSelectNode* node = LLSelectMgr::getInstance()->getHoverNode();
+			LLSelectNode* node = LLSelectMgr::getInstanceFast()->getHoverNode();
 			if (!node || node->mSaleInfo.isForSale())
 			{
 // [RLVa:KB] - @buy
@@ -754,7 +754,7 @@ void LLToolPie::selectionPropertiesReceived()
 {
 	// Make sure all data has been received.
 	// This function will be called repeatedly as the data comes in.
-	if (!LLSelectMgr::getInstance()->selectGetAllValid())
+	if (!LLSelectMgr::getInstanceFast()->selectGetAllValid())
 	{
 		return;
 	}
@@ -809,7 +809,7 @@ BOOL LLToolPie::handleHover(S32 x, S32 y, MASK mask)
 		return TRUE;
 	}
 // [/RLVa:KB]
-	LLSelectMgr::getInstance()->setHoverObject(object, mHoverPick.mObjectFace);
+	LLSelectMgr::getInstanceFast()->setHoverObject(object, mHoverPick.mObjectFace);
 	if (object)
 	{
 		parent = object->getRootEdit();
@@ -941,7 +941,7 @@ BOOL LLToolPie::handleMouseUp(S32 x, S32 y, MASK mask)
 		setMouseCapture(FALSE);
 	}
 
-	LLToolMgr::getInstance()->clearTransientTool();
+	LLToolMgr::getInstanceFast()->clearTransientTool();
 	gAgentCamera.setLookAt(LOOKAT_TARGET_CONVERSATION, obj); // maybe look at object/person clicked on
 
 	return LLTool::handleMouseUp(x, y, mask);
@@ -1236,7 +1236,7 @@ BOOL LLToolPie::handleTooltipObject( LLViewerObject* hover_object, std::string l
 		//  Default prefs will suppress display unless the object is interactive
 		//
 		static const LLCachedControl<bool> show_all_object_tips(gSavedSettings, "ShowAllObjectHoverTip");			
-		LLSelectNode *nodep = LLSelectMgr::getInstance()->getHoverNode();
+		LLSelectNode *nodep = LLSelectMgr::getInstanceFast()->getHoverNode();
 		
 		// only show tooltip if same inspector not already open
 		LLFloater* existing_inspector = LLFloaterReg::findInstance("inspect_object");
@@ -1320,7 +1320,7 @@ BOOL LLToolPie::handleTooltipObject( LLViewerObject* hover_object, std::string l
 				              for_sale) &&
 				(has_media || 
 				 needs_tooltip(nodep) || 
-				 needs_tooltip(LLSelectMgr::getInstance()->getPrimaryHoverNode()));
+				 needs_tooltip(LLSelectMgr::getInstanceFast()->getPrimaryHoverNode()));
 			
 			if (show_all_object_tips || needs_tip)
 			{
@@ -1378,7 +1378,7 @@ BOOL LLToolPie::handleToolTip(S32 local_x, S32 local_y, MASK mask)
 // [/RLVa:KB]
 
 	// update hover object and hover parcel
-	LLSelectMgr::getInstance()->setHoverObject(hover_object, mHoverPick.mObjectFace);
+	LLSelectMgr::getInstanceFast()->setHoverObject(hover_object, mHoverPick.mObjectFace);
 	
 	
 	std::string tooltip_msg;
@@ -1558,7 +1558,7 @@ void LLToolPie::handleDeselect()
 		setMouseCapture( FALSE );  // Calls onMouseCaptureLost() indirectly
 	}
 	// remove temporary selection for pie menu
-	LLSelectMgr::getInstance()->setHoverObject(NULL);
+	LLSelectMgr::getInstanceFast()->setHoverObject(NULL);
 
 	// Menu may be still up during transfer to different tool.
 	// toolfocus and toolgrab should retain menu, they will clear it if needed
@@ -1567,7 +1567,7 @@ void LLToolPie::handleDeselect()
 	{
 		// in most cases menu is useless without correct selection, so either keep both or discard both
 		gMenuHolder->hideMenus();
-		LLSelectMgr::getInstance()->validateSelection();
+		LLSelectMgr::getInstanceFast()->validateSelection();
 	}
 }
 
@@ -1929,7 +1929,7 @@ BOOL LLToolPie::handleRightClickPick()
 	}
 	else if (object)
 	{
-		gMenuHolder->setObjectSelection(LLSelectMgr::getInstance()->getSelection());
+		gMenuHolder->setObjectSelection(LLSelectMgr::getInstanceFast()->getSelection());
 
 		bool is_other_attachment = (object->isAttachment() && !object->isHUDAttachment() && !object->permYouOwner());
 		if (object->isAvatar() || is_other_attachment)
