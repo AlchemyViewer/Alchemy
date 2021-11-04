@@ -17,6 +17,9 @@ if [ -z "${desired_handler}" ]; then
 	desired_handler="$(pwd)/etc/handle_secondlifeprotocol.sh"
 fi
 
+# Ensure the handle_secondlifeprotocol.sh file is executeable (otherwise, xdg-mime won't work)
+chmod +x "$desired_handler"
+
 # # Register handler for KDE-aware apps
 # for kdeconfig in ${LLKDECONFIG} kf5-config kde4-config kde-config; do
 #     if command -v "${kdeconfig}" >/dev/null 2>&1; then
@@ -61,7 +64,7 @@ if command -v xdg-mime query default x-scheme-handler/secondlife >/dev/null 2>&1
 	handlerpath="${localappdir}/${newhandler}"
 	cat >"${handlerpath}" <<EOFnew || print "Warning: Did not register secondlife:// handler with xdg-mime: Could not write $newhandler"s
 [Desktop Entry]
-Version=1.5
+Version=1.4
 Name="Second Life URL handler"
 Comment="secondlife:// URL handler"
 Type=Application
@@ -87,7 +90,7 @@ EOFnew
 			print "SLURL Handler has not changed, leaving as-is."
 		fi
 	fi
-	xdg-mime default ${newhandler} x-scheme-handler/secondlife
+	xdg-mime default "${newhandler}" x-scheme-handler/secondlife
 	if command -v update-desktop-database >/dev/null 2>&1; then
 		update-desktop-database "${localappdir}"
 		print "Registered ${desired_handler} as secondlife:// protocol handler with xdg-mime."
