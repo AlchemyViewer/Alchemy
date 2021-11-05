@@ -414,7 +414,7 @@ bool LLScrollContainer::autoScroll(S32 x, S32 y, bool do_scroll)
 
 void LLScrollContainer::calcVisibleSize( S32 *visible_width, S32 *visible_height, BOOL* show_h_scrollbar, BOOL* show_v_scrollbar ) const
 {
-	const LLRect& doc_rect = getScrolledViewRect();
+	const LLRect doc_rect = getScrolledViewRect();
 	static LLUICachedControl<S32> scrollbar_size_control ("UIScrollbarSize", 0);
 	S32 scrollbar_size = (mSize == -1 ? scrollbar_size_control : mSize);
 

@@ -197,8 +197,8 @@ void LLFocusMgr::setKeyboardFocus(LLFocusableElement* new_focus, BOOL lock, BOOL
 	if (mLockedView && 
 		(new_focus == NULL || 
 			(new_focus != mLockedView 
-			&& dynamic_cast<LLView*>(new_focus)
-			&& !dynamic_cast<LLView*>(new_focus)->hasAncestor(mLockedView))))
+			&& new_focus->isFocusView()
+			&& !static_cast<LLView*>(new_focus)->hasAncestor(mLockedView))))
 	{
 		// don't allow focus to go to anything that is not the locked focus
 		// or one of its descendants
@@ -217,9 +217,12 @@ void LLFocusMgr::setKeyboardFocus(LLFocusableElement* new_focus, BOOL lock, BOOL
 		view_handle_list_t new_focus_list;
 
 		// walk up the tree to root and add all views to the new_focus_list
-		for (LLView* ctrl = dynamic_cast<LLView*>(mKeyboardFocus); ctrl; ctrl = ctrl->getParent())
+		if (mKeyboardFocus && mKeyboardFocus->isFocusView())
 		{
-			new_focus_list.push_back(ctrl->getHandle());
+			for (LLView* ctrl = static_cast<LLView*>(mKeyboardFocus); ctrl; ctrl = ctrl->getParent())
+			{
+				new_focus_list.push_back(ctrl->getHandle());
+			}
 		}
 
 		// remove all common ancestors since their focus is unchanged
@@ -272,23 +275,25 @@ void LLFocusMgr::setKeyboardFocus(LLFocusableElement* new_focus, BOOL lock, BOOL
 			mDefaultKeyboardFocus->setFocus(TRUE);
 		}
 
-		LLView* focus_subtree = dynamic_cast<LLView*>(mKeyboardFocus);
-		LLView* viewp = dynamic_cast<LLView*>(mKeyboardFocus);
-		// find root-most focus root
-		while(viewp)
+		if (mKeyboardFocus && mKeyboardFocus->isFocusView())
 		{
-			if (viewp->isFocusRoot())
+			LLView* focus_subtree = static_cast<LLView*>(mKeyboardFocus);
+			LLView* viewp = static_cast<LLView*>(mKeyboardFocus);
+			// find root-most focus root
+			while (viewp)
 			{
-				focus_subtree = viewp;
+				if (viewp->isFocusRoot())
+				{
+					focus_subtree = viewp;
+				}
+				viewp = viewp->getParent();
 			}
-			viewp = viewp->getParent();
-		}
 
-		
-		if (focus_subtree)
-		{
-			LLView* focused_view = dynamic_cast<LLView*>(mKeyboardFocus);
-			mImpl->mFocusHistory[focus_subtree->getHandle()] = focused_view ? focused_view->getHandle() : LLHandle<LLView>(); 
+			if (focus_subtree)
+			{
+				LLView* focused_view = static_cast<LLView*>(mKeyboardFocus);
+				mImpl->mFocusHistory[focus_subtree->getHandle()] = focused_view ? focused_view->getHandle() : LLHandle<LLView>();
+			}
 		}
 	}
 	
@@ -304,7 +309,10 @@ void LLFocusMgr::setKeyboardFocus(LLFocusableElement* new_focus, BOOL lock, BOOL
 // Returns TRUE is parent or any descedent of parent has keyboard focus.
 BOOL LLFocusMgr::childHasKeyboardFocus(const LLView* parent ) const
 {
-	LLView* focus_view = dynamic_cast<LLView*>(mKeyboardFocus);
+	if (!mKeyboardFocus || !mKeyboardFocus->isFocusView())
+		return FALSE;
+
+	LLView* focus_view = static_cast<LLView*>(mKeyboardFocus);
 	while( focus_view )
 	{
 		if( focus_view == parent )
@@ -351,15 +359,18 @@ void LLFocusMgr::removeKeyboardFocusWithoutCallback( const LLFocusableElement* f
 
 bool LLFocusMgr::keyboardFocusHasAccelerators() const
 {
-	LLView* focus_view = dynamic_cast<LLView*>(mKeyboardFocus);
-	while( focus_view )
+	if (mKeyboardFocus && mKeyboardFocus->isFocusView())
 	{
-		if(focus_view->hasAccelerators())
+		LLView* focus_view = static_cast<LLView*>(mKeyboardFocus);
+		while (focus_view)
 		{
-			return true;
-		}
+			if (focus_view->hasAccelerators())
+			{
+				return true;
+			}
 
-		focus_view = focus_view->getParent();
+			focus_view = focus_view->getParent();
+		}
 	}
 	return false;
 }
@@ -441,7 +452,7 @@ void LLFocusMgr::removeTopCtrlWithoutCallback( const LLUICtrl* top_view )
 
 void LLFocusMgr::lockFocus()
 {
-	mLockedView = dynamic_cast<LLUICtrl*>(mKeyboardFocus); 
+	mLockedView = (mKeyboardFocus && mKeyboardFocus->isFocusView() && static_cast<LLView*>(mKeyboardFocus)->isCtrl()) ? static_cast<LLUICtrl*>(mKeyboardFocus) : nullptr;
 }
 
 void LLFocusMgr::unlockFocus()

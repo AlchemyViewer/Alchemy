@@ -169,6 +169,9 @@ private:
 	// widgets in general are not copyable
 	LLView(const LLView& other);
 public:
+
+	bool isFocusView() const override { return true; }
+
 //#if LL_DEBUG
 	static BOOL sIsDrawing;
 //#endif

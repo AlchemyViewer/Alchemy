@@ -45,6 +45,8 @@ public:
 	LLFocusableElement();
 	virtual ~LLFocusableElement();
 
+	virtual bool isFocusView() const { return false; }
+
 	virtual void	setFocus( BOOL b );
 	virtual BOOL	hasFocus() const;
 
