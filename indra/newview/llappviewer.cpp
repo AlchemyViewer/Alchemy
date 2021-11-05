@@ -4958,22 +4958,22 @@ void LLAppViewer::idle()
 	{
 		gAgentPilot.moveCamera();
 	}
-	else if (LLViewerJoystick::getInstance()->getOverrideCamera())
+	else if (LLViewerJoystick::getInstanceFast()->getOverrideCamera())
 	{
-		LLViewerJoystick::getInstance()->moveFlycam();
+		LLViewerJoystick::getInstanceFast()->moveFlycam();
 	}
 	else
 	{
 		if (LLToolMgr::getInstanceFast()->inBuildMode())
 		{
-			LLViewerJoystick::getInstance()->moveObjects();
+			LLViewerJoystick::getInstanceFast()->moveObjects();
 		}
 
 		gAgentCamera.updateCamera();
 	}
 
 	// update media focus
-	LLViewerMediaFocus::getInstance()->update();
+	LLViewerMediaFocus::getInstanceFast()->update();
 
 	// Update marketplace
 	LLMarketplaceInventoryImporter::update();

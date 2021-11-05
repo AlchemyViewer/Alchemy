@@ -109,7 +109,7 @@ void LLViewerCamera::updateCameraLocation(const LLVector3 &center,
 											const LLVector3 &point_of_interest)
 {
 	// do not update if avatar didn't move
-	if (!LLViewerJoystick::getInstance()->getCameraNeedsUpdate())
+	if (!LLViewerJoystick::getInstanceFast()->getCameraNeedsUpdate())
 	{
 		return;
 	}

@@ -1657,7 +1657,7 @@ BOOL LLViewerWindow::handleTranslatedKeyUp(KEY key,  MASK mask)
 
 void LLViewerWindow::handleScanKey(KEY key, BOOL key_down, BOOL key_up, BOOL key_level)
 {
-	LLViewerJoystick::getInstance()->setCameraNeedsUpdate(true);
+	LLViewerJoystick::getInstanceFast()->setCameraNeedsUpdate(true);
 	gViewerInput.scanKey(key, key_down, key_up, key_level);
 	return; // Be clear this function returns nothing
 }
@@ -1704,7 +1704,7 @@ BOOL LLViewerWindow::handleActivateApp(LLWindow *window, BOOL activating)
 {
 	//if (!activating) gAgentCamera.changeCameraToDefault();
 
-	LLViewerJoystick::getInstance()->setNeedsReset(true);
+	LLViewerJoystick::getInstanceFast()->setNeedsReset(true);
 	return FALSE;
 }
 
@@ -1800,9 +1800,9 @@ void LLViewerWindow::handleDataCopy(LLWindow *window, S32 data_type, void *data)
 
 BOOL LLViewerWindow::handleTimerEvent(LLWindow *window)
 {
-	if (LLViewerJoystick::getInstance()->getOverrideCamera())
+	if (LLViewerJoystick::getInstanceFast()->getOverrideCamera())
 	{
-		LLViewerJoystick::getInstance()->updateStatus();
+		LLViewerJoystick::getInstanceFast()->updateStatus();
 		return TRUE;
 	}
 	return FALSE;
@@ -1811,9 +1811,9 @@ BOOL LLViewerWindow::handleTimerEvent(LLWindow *window)
 BOOL LLViewerWindow::handleDeviceChange(LLWindow *window)
 {
 	// give a chance to use a joystick after startup (hot-plugging)
-	if (!LLViewerJoystick::getInstance()->isJoystickInitialized() )
+	if (!LLViewerJoystick::getInstanceFast()->isJoystickInitialized() )
 	{
-		LLViewerJoystick::getInstance()->init(true);
+		LLViewerJoystick::getInstanceFast()->init(true);
 		return TRUE;
 	}
 	return FALSE;
@@ -4488,7 +4488,7 @@ LLViewerObject* LLViewerWindow::cursorIntersect(S32 mouse_x, S32 mouse_y, F32 de
 	LLVector3 mouse_world_start = mouse_point_global;
 	LLVector3 mouse_world_end   = mouse_point_global + mouse_direction_global * depth;
 
-	if (!LLViewerJoystick::getInstance()->getOverrideCamera())
+	if (!LLViewerJoystick::getInstanceFast()->getOverrideCamera())
 	{ //always set raycast intersection to mouse_world_end unless
 		//flycam is on (for DoF effect)
 		gDebugRaycastIntersection.load3(mouse_world_end.mV);
