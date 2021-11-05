@@ -36,18 +36,21 @@
 
 class LLDrawable;
 class LLViewerObject;
+class LLViewerJointAttachment;
 
 extern const F32 MAX_ATTACHMENT_DIST;
 
 //-----------------------------------------------------------------------------
 // class LLViewerJointAttachment
 //-----------------------------------------------------------------------------
-class LLViewerJointAttachment :
+class LLViewerJointAttachment final :
 	public LLViewerJoint
 {
 public:
 	LLViewerJointAttachment();
 	virtual ~LLViewerJointAttachment();
+
+	LLViewerJointAttachment* asViewerJointAttachment() final { return static_cast<LLViewerJointAttachment*>(this); }
 
 	//virtual U32 render( F32 pixelArea );	// Returns triangle count
 
