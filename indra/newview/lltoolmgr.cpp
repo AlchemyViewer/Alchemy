@@ -490,7 +490,7 @@ void LLToolset::addTool(LLTool* tool)
 void LLToolset::selectTool(LLTool* tool)
 {
 	mSelectedTool = tool;
-	LLToolMgr::getInstance()->setCurrentTool( mSelectedTool );
+	LLToolMgr::getInstanceFast()->setCurrentTool( mSelectedTool );
 }
 
 
@@ -500,7 +500,7 @@ void LLToolset::selectToolByIndex( S32 index )
 	if (tool)
 	{
 		mSelectedTool = tool;
-		LLToolMgr::getInstance()->setCurrentTool( tool );
+		LLToolMgr::getInstanceFast()->setCurrentTool( tool );
 	}
 }
 
@@ -514,7 +514,7 @@ BOOL LLToolset::isToolSelected( S32 index )
 void LLToolset::selectFirstTool()
 {
 	mSelectedTool = (0 < mToolList.size()) ? mToolList[0] : NULL;
-	LLToolMgr::getInstance()->setCurrentTool( mSelectedTool );
+	LLToolMgr::getInstanceFast()->setCurrentTool( mSelectedTool );
 }
 
 
@@ -535,7 +535,7 @@ void LLToolset::selectNextTool()
 	if( next )
 	{
 		mSelectedTool = next;
-		LLToolMgr::getInstance()->setCurrentTool( mSelectedTool );
+		LLToolMgr::getInstanceFast()->setCurrentTool( mSelectedTool );
 	}
 	else
 	{
@@ -560,7 +560,7 @@ void LLToolset::selectPrevTool()
 	if( prev )
 	{
 		mSelectedTool = prev;
-		LLToolMgr::getInstance()->setCurrentTool( mSelectedTool );
+		LLToolMgr::getInstanceFast()->setCurrentTool( mSelectedTool );
 	}
 	else if (mToolList.size() > 0)
 	{

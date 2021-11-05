@@ -577,7 +577,7 @@ void LLFloaterTools::refresh()
 				// Select a parcel at the currently selected object's position.
 				if (!selected_object->isAttachment())
 				{
-					LLViewerParcelMgr::getInstance()->selectParcelAt(selected_object->getPositionGlobal());
+					LLViewerParcelMgr::getInstanceFast()->selectParcelAt(selected_object->getPositionGlobal());
 				}
 				else
 				{
@@ -666,7 +666,7 @@ void LLFloaterTools::resetToolState()
 
 void LLFloaterTools::updatePopup(LLCoordGL center, MASK mask)
 {
-	LLTool *tool = LLToolMgr::getInstance()->getCurrentTool();
+	LLTool *tool = LLToolMgr::getInstanceFast()->getCurrentTool();
 
 	// HACK to allow seeing the buttons when you have the app in a window.
 	// Keep the visibility the same as it 
@@ -681,7 +681,7 @@ void LLFloaterTools::updatePopup(LLCoordGL center, MASK mask)
 	}
 	
 	// Focus buttons
-	BOOL focus_visible = (	tool == LLToolCamera::getInstance() );
+	BOOL focus_visible = (	tool == LLToolCamera::getInstanceFast() );
 
 	mBtnFocus	->setToggleState( focus_visible );
 
@@ -715,7 +715,7 @@ void LLFloaterTools::updatePopup(LLCoordGL center, MASK mask)
 	getChild<LLUICtrl>("slider zoom")->setValue(gAgentCamera.getCameraZoomFraction() * 0.5f);
 
 	// Move buttons
-	BOOL move_visible = (tool == LLToolGrab::getInstance());
+	BOOL move_visible = (tool == LLToolGrab::getInstanceFast());
 
 	if (mBtnMove) mBtnMove	->setToggleState( move_visible );
 
@@ -740,13 +740,13 @@ void LLFloaterTools::updatePopup(LLCoordGL center, MASK mask)
 	}
 
 	// Edit buttons
-	BOOL edit_visible = tool == LLToolCompTranslate::getInstance() ||
-						tool == LLToolCompRotate::getInstance() ||
-						tool == LLToolCompScale::getInstance() ||
-						tool == LLToolFace::getInstance() ||
-						tool == LLToolIndividual::getInstance() ||
-						tool == ALToolAlign::getInstance() ||
-						tool == LLToolPipette::getInstance();
+	BOOL edit_visible = tool == LLToolCompTranslate::getInstanceFast() ||
+						tool == LLToolCompRotate::getInstanceFast() ||
+						tool == LLToolCompScale::getInstanceFast() ||
+						tool == LLToolFace::getInstanceFast() ||
+						tool == LLToolIndividual::getInstanceFast() ||
+						tool == ALToolAlign::getInstanceFast() ||
+						tool == LLToolPipette::getInstanceFast();
 
 	mBtnEdit	->setToggleState( edit_visible );
 	mRadioGroupEdit->setVisible( edit_visible );
@@ -763,7 +763,7 @@ void LLFloaterTools::updatePopup(LLCoordGL center, MASK mask)
 	mBtnNextPart->setVisible(edit_visible);
 
 	bool select_btn_enabled = (!LLSelectMgr::getInstanceFast()->getSelection()->isEmpty()
-								&& (ALControlCache::EditLinkedParts || LLToolFace::getInstance() == LLToolMgr::getInstance()->getCurrentTool()));
+								&& (ALControlCache::EditLinkedParts || LLToolFace::getInstanceFast() == LLToolMgr::getInstanceFast()->getCurrentTool()));
 	mBtnPrevPart->setEnabled(select_btn_enabled);
 	mBtnNextPart->setEnabled(select_btn_enabled);
 
@@ -773,23 +773,23 @@ void LLFloaterTools::updatePopup(LLCoordGL center, MASK mask)
 		//mCheckSelectIndividual->set(gSavedSettings.getBOOL("EditLinkedParts"));
 	}
 
-	if ( tool == LLToolCompTranslate::getInstance() )
+	if ( tool == LLToolCompTranslate::getInstanceFast() )
 	{
 		mRadioGroupEdit->setValue("radio position");
 	}
-	else if ( tool == LLToolCompRotate::getInstance() )
+	else if ( tool == LLToolCompRotate::getInstanceFast() )
 	{
 		mRadioGroupEdit->setValue("radio rotate");
 	}
-	else if ( tool == LLToolCompScale::getInstance() )
+	else if ( tool == LLToolCompScale::getInstanceFast() )
 	{
 		mRadioGroupEdit->setValue("radio stretch");
 	}
-	else if ( tool == LLToolFace::getInstance() )
+	else if ( tool == LLToolFace::getInstanceFast() )
 	{
 		mRadioGroupEdit->setValue("radio select face");
 	}
-	else if ( tool == ALToolAlign::getInstance() )
+	else if ( tool == ALToolAlign::getInstanceFast() )
 	{
 		mRadioGroupEdit->setValue("radio align");
 	}
@@ -821,8 +821,8 @@ void LLFloaterTools::updatePopup(LLCoordGL center, MASK mask)
 	}
 
 	// Snap to grid disabled for grab tool - very confusing
-	if (mCheckSnapToGrid) mCheckSnapToGrid->setVisible( edit_visible /* || tool == LLToolGrab::getInstance() */ );
-	if (mBtnGridOptions) mBtnGridOptions->setVisible( edit_visible /* || tool == LLToolGrab::getInstance() */ );
+	if (mCheckSnapToGrid) mCheckSnapToGrid->setVisible( edit_visible /* || tool == LLToolGrab::getInstanceFast() */ );
+	if (mBtnGridOptions) mBtnGridOptions->setVisible( edit_visible /* || tool == LLToolGrab::getInstanceFast() */ );
 
 	//mCheckSelectLinked	->setVisible( edit_visible );
 	if (mCheckStretchUniform) mCheckStretchUniform->setVisible( edit_visible );
@@ -831,13 +831,13 @@ void LLFloaterTools::updatePopup(LLCoordGL center, MASK mask)
 	if (mCheckActualRoot) mCheckActualRoot->setVisible( edit_visible );
 
 	// Create buttons
-	BOOL create_visible = (tool == LLToolCompCreate::getInstance());
+	BOOL create_visible = (tool == LLToolCompCreate::getInstanceFast());
 	
 	// Tree/grass picker
 	mTreeGrassCombo->setVisible(create_visible);
 	if (create_visible) buildTreeGrassCombo();
 
-	mBtnCreate	->setToggleState(	tool == LLToolCompCreate::getInstance() );
+	mBtnCreate	->setToggleState(	tool == LLToolCompCreate::getInstanceFast() );
 
 	if (mCheckCopySelection
 		&& mCheckCopySelection->get())
@@ -871,18 +871,18 @@ void LLFloaterTools::updatePopup(LLCoordGL center, MASK mask)
 	if (mCheckCopyRotates && mCheckCopySelection) mCheckCopyRotates->setEnabled( mCheckCopySelection->get() );
 
 	// Land buttons
-	BOOL land_visible = (tool == LLToolBrushLand::getInstance() || tool == LLToolSelectLand::getInstance() );
+	BOOL land_visible = (tool == LLToolBrushLand::getInstanceFast() || tool == LLToolSelectLand::getInstanceFast() );
 
 	mCostTextBorder->setVisible(!land_visible);
 
 	if (mBtnLand)	mBtnLand	->setToggleState( land_visible );
 
 	mRadioGroupLand->setVisible( land_visible );
-	if ( tool == LLToolSelectLand::getInstance() )
+	if ( tool == LLToolSelectLand::getInstanceFast() )
 	{
 		mRadioGroupLand->setValue("radio select land");
 	}
-	else if ( tool == LLToolBrushLand::getInstance() )
+	else if ( tool == LLToolBrushLand::getInstanceFast() )
 	{
 		S32 dozer_mode = gSavedSettings.getS32("RadioLandBrushAction");
 		switch(dozer_mode)
@@ -913,7 +913,7 @@ void LLFloaterTools::updatePopup(LLCoordGL center, MASK mask)
 	if (mBtnApplyToSelection)
 	{
 		mBtnApplyToSelection->setVisible( land_visible );
-		mBtnApplyToSelection->setEnabled( land_visible && !LLViewerParcelMgr::getInstance()->selectionEmpty() && tool != LLToolSelectLand::getInstance());
+		mBtnApplyToSelection->setEnabled( land_visible && !LLViewerParcelMgr::getInstanceFast()->selectionEmpty() && tool != LLToolSelectLand::getInstanceFast());
 	}
 	if (mSliderDozerSize)
 	{
@@ -948,7 +948,7 @@ BOOL LLFloaterTools::canClose()
 // virtual
 void LLFloaterTools::onOpen(const LLSD& key)
 {
-	mParcelSelection = LLViewerParcelMgr::getInstance()->getFloatingParcelSelection();
+	mParcelSelection = LLViewerParcelMgr::getInstanceFast()->getFloatingParcelSelection();
 	mObjectSelection = LLSelectMgr::getInstanceFast()->getEditSelection();
 	
 	std::string panel = key.asString();
@@ -957,9 +957,9 @@ void LLFloaterTools::onOpen(const LLSD& key)
 		mTab->selectTabByName(panel);
 	}
 
-	LLTool* tool = LLToolMgr::getInstance()->getCurrentTool();
-	if (tool == LLToolCompInspect::getInstance()
-		|| tool == LLToolDragAndDrop::getInstance())
+	LLTool* tool = LLToolMgr::getInstanceFast()->getCurrentTool();
+	if (tool == LLToolCompInspect::getInstanceFast()
+		|| tool == LLToolDragAndDrop::getInstanceFast())
 	{
 		// Something called floater up while it was supressed (during drag n drop, inspect),
 		// so it won't be getting any layout or visibility updates, update once
@@ -977,7 +977,7 @@ void LLFloaterTools::onClose(bool app_quitting)
 {
 	mTab->setVisible(FALSE);
 
-	LLViewerJoystick::getInstance()->moveAvatar(false);
+	LLViewerJoystick::getInstanceFast()->moveAvatar(false);
 
 	// destroy media source used to grab media title
 	if( mTitleMedia )
@@ -999,10 +999,10 @@ void LLFloaterTools::onClose(bool app_quitting)
 	mObjectSelection = NULL;
 
 	// Switch back to basic toolset
-	LLToolMgr::getInstance()->setCurrentToolset(gBasicToolset);
+	LLToolMgr::getInstanceFast()->setCurrentToolset(gBasicToolset);
 	// we were already in basic toolset, using build tools
 	// so manually reset tool to default (pie menu tool)
-	LLToolMgr::getInstance()->getCurrentToolset()->selectFirstTool();
+	LLToolMgr::getInstanceFast()->getCurrentToolset()->selectFirstTool();
 
 	//gMenuBarView->setItemVisible("BuildTools", FALSE);
 	LLFloaterReg::hideInstance("media_settings");
@@ -1090,7 +1090,7 @@ void commit_slider_dozer_force(LLUICtrl *ctrl)
 
 void click_apply_to_selection(void*)
 {
-	LLToolBrushLand::getInstance()->modifyLandInSelectionGlobal();
+	LLToolBrushLand::getInstanceFast()->modifyLandInSelectionGlobal();
 }
 
 void commit_radio_group_edit(LLUICtrl *ctrl)
@@ -1101,23 +1101,23 @@ void commit_radio_group_edit(LLUICtrl *ctrl)
 	std::string selected = group->getValue().asString();
 	if (selected == "radio position")
 	{
-		LLFloaterTools::setEditTool( LLToolCompTranslate::getInstance() );
+		LLFloaterTools::setEditTool( LLToolCompTranslate::getInstanceFast() );
 	}
 	else if (selected == "radio rotate")
 	{
-		LLFloaterTools::setEditTool( LLToolCompRotate::getInstance() );
+		LLFloaterTools::setEditTool( LLToolCompRotate::getInstanceFast() );
 	}
 	else if (selected == "radio stretch")
 	{
-		LLFloaterTools::setEditTool( LLToolCompScale::getInstance() );
+		LLFloaterTools::setEditTool( LLToolCompScale::getInstanceFast() );
 	}
 	else if (selected == "radio select face")
 	{
-		LLFloaterTools::setEditTool( LLToolFace::getInstance() );
+		LLFloaterTools::setEditTool( LLToolFace::getInstanceFast() );
 	}
 	else if (selected == "radio align")
 	{
-		LLFloaterTools::setEditTool( ALToolAlign::getInstance() );
+		LLFloaterTools::setEditTool( ALToolAlign::getInstanceFast() );
 	}
 	gSavedSettings.setBOOL("ShowParcelOwners", show_owners);
 }
@@ -1128,11 +1128,11 @@ void commit_radio_group_land(LLUICtrl* ctrl)
 	std::string selected = group->getValue().asString();
 	if (selected == "radio select land")
 	{
-		LLFloaterTools::setEditTool( LLToolSelectLand::getInstance() );
+		LLFloaterTools::setEditTool( LLToolSelectLand::getInstanceFast() );
 	}
 	else
 	{
-		LLFloaterTools::setEditTool( LLToolBrushLand::getInstance() );
+		LLFloaterTools::setEditTool( LLToolBrushLand::getInstanceFast() );
 		S32 dozer_mode = gSavedSettings.getS32("RadioLandBrushAction");
 		if (selected == "radio flatten")
 			dozer_mode = 0;
@@ -1213,29 +1213,29 @@ void LLFloaterTools::onClickGridOptions()
 void LLFloaterTools::setEditTool(void* tool_pointer)
 {
 	LLTool *tool = (LLTool *)tool_pointer;
-	LLToolMgr::getInstance()->getCurrentToolset()->selectTool( tool );
+	LLToolMgr::getInstanceFast()->getCurrentToolset()->selectTool( tool );
 }
 
 void LLFloaterTools::setTool(const LLSD& user_data)
 {
 	std::string control_name = user_data.asString();
 	if(control_name == "Focus")
-		LLToolMgr::getInstance()->getCurrentToolset()->selectTool((LLTool *) LLToolCamera::getInstance() );
+		LLToolMgr::getInstanceFast()->getCurrentToolset()->selectTool((LLTool *) LLToolCamera::getInstanceFast() );
 	else if (control_name == "Move" )
-		LLToolMgr::getInstance()->getCurrentToolset()->selectTool( (LLTool *)LLToolGrab::getInstance() );
+		LLToolMgr::getInstanceFast()->getCurrentToolset()->selectTool( (LLTool *)LLToolGrab::getInstanceFast() );
 	else if (control_name == "Edit" )
-		LLToolMgr::getInstance()->getCurrentToolset()->selectTool( (LLTool *) LLToolCompTranslate::getInstance());
+		LLToolMgr::getInstanceFast()->getCurrentToolset()->selectTool( (LLTool *) LLToolCompTranslate::getInstanceFast());
 	else if (control_name == "Create" )
-		LLToolMgr::getInstance()->getCurrentToolset()->selectTool( (LLTool *) LLToolCompCreate::getInstance());
+		LLToolMgr::getInstanceFast()->getCurrentToolset()->selectTool( (LLTool *) LLToolCompCreate::getInstanceFast());
 	else if (control_name == "Land" )
-		LLToolMgr::getInstance()->getCurrentToolset()->selectTool( (LLTool *) LLToolSelectLand::getInstance());
+		LLToolMgr::getInstanceFast()->getCurrentToolset()->selectTool( (LLTool *) LLToolSelectLand::getInstanceFast());
 	else
 		LL_WARNS()<<" no parameter name "<<control_name<<" found!! No Tool selected!!"<< LL_ENDL;
 }
 
 void LLFloaterTools::onFocusReceived()
 {
-	LLToolMgr::getInstance()->setCurrentToolset(gBasicToolset);
+	LLToolMgr::getInstanceFast()->setCurrentToolset(gBasicToolset);
 	LLFloater::onFocusReceived();
 }
 
@@ -1294,7 +1294,7 @@ void LLFloaterTools::updateLandImpacts()
 
 	S32 rezzed_prims = parcel->getSimWidePrimCount();
 	S32 total_capacity = parcel->getSimWideMaxPrimCapacity();
-	LLViewerRegion* region = LLViewerParcelMgr::getInstance()->getSelectionRegion();
+	LLViewerRegion* region = LLViewerParcelMgr::getInstanceFast()->getSelectionRegion();
 	if (region)
 	{
 		S32 max_tasks_per_region = (S32)region->getMaxTasks();

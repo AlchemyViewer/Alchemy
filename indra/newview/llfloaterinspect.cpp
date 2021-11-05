@@ -418,7 +418,7 @@ void LLFloaterInspect::refresh()
 
 void LLFloaterInspect::onFocusReceived()
 {
-	LLToolMgr::getInstance()->setTransientTool(LLToolCompInspect::getInstance());
+	LLToolMgr::getInstanceFast()->setTransientTool(LLToolCompInspect::getInstance());
 	LLFloater::onFocusReceived();
 }
 

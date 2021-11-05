@@ -193,12 +193,12 @@ void LLToolBrushLand::modifyLandAtPointGlobal(const LLVector3d &pos_global,
 
 void LLToolBrushLand::modifyLandInSelectionGlobal()
 {
-	if (LLViewerParcelMgr::getInstance()->selectionEmpty())
+	if (LLViewerParcelMgr::getInstanceFast()->selectionEmpty())
 	{
 		return;
 	}
 
-	if (LLToolMgr::getInstance()->getCurrentTool() == LLToolSelectLand::getInstance())
+	if (LLToolMgr::getInstanceFast()->getCurrentTool() == LLToolSelectLand::getInstanceFast())
 	{
 		// selecting land, don't do anything
 		return;
@@ -624,7 +624,7 @@ void LLToolBrushLand::onIdle( void* brush_tool )
 {
 	LLToolBrushLand* self = static_cast<LLToolBrushLand*>(brush_tool);
 
-	if( LLToolMgr::getInstance()->getCurrentTool() == self )
+	if( LLToolMgr::getInstanceFast()->getCurrentTool() == self )
 	{
 		self->brush();
 	}

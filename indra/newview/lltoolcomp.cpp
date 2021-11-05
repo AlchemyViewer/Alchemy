@@ -756,7 +756,7 @@ BOOL LLToolCompGun::handleMouseDown(S32 x, S32 y, MASK mask)
 
 	// On mousedown, start grabbing
 	gGrabTransientTool = this;
-	LLToolMgr::getInstance()->getCurrentToolset()->selectTool( (LLTool*) mGrab );
+	LLToolMgr::getInstanceFast()->getCurrentToolset()->selectTool( (LLTool*) mGrab );
 
 	return LLToolGrab::getInstance()->handleMouseDown(x, y, mask);
 }
@@ -773,9 +773,9 @@ BOOL LLToolCompGun::handleDoubleClick(S32 x, S32 y, MASK mask)
 
 	// On mousedown, start grabbing
 	gGrabTransientTool = this;
-	LLToolMgr::getInstance()->getCurrentToolset()->selectTool( (LLTool*) mGrab );
+	LLToolMgr::getInstanceFast()->getCurrentToolset()->selectTool( (LLTool*) mGrab );
 
-	return LLToolGrab::getInstance()->handleDoubleClick(x, y, mask);
+	return LLToolGrab::getInstanceFast()->handleDoubleClick(x, y, mask);
 }
 
 

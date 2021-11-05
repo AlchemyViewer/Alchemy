@@ -330,7 +330,7 @@ void LLToolDragAndDrop::beginDrag(EDragAndDropType type,
 	mObjectID = object_id;
 
 	setMouseCapture( TRUE );
-	LLToolMgr::getInstance()->setTransientTool( this );
+	LLToolMgr::getInstanceFast()->setTransientTool( this );
 	mCursor = UI_CURSOR_NO;
 	if ((mCargoTypes[0] == DAD_CATEGORY)
 	   && ((mSource == SOURCE_AGENT) || (mSource == SOURCE_LIBRARY)))
@@ -400,7 +400,7 @@ void LLToolDragAndDrop::beginMultiDrag(
 	mSourceID = source_id;
 
 	setMouseCapture( TRUE );
-	LLToolMgr::getInstance()->setTransientTool( this );
+	LLToolMgr::getInstanceFast()->setTransientTool( this );
 	mCursor = UI_CURSOR_NO;
 	if ((mSource == SOURCE_AGENT) || (mSource == SOURCE_LIBRARY))
 	{
@@ -454,7 +454,7 @@ void LLToolDragAndDrop::endDrag()
 void LLToolDragAndDrop::onMouseCaptureLost()
 {
 	// Called whenever the drag ends or if mouse capture is simply lost
-	LLToolMgr::getInstance()->clearTransientTool();
+	LLToolMgr::getInstanceFast()->clearTransientTool();
 	mCargoTypes.clear();
 	mCargoIDs.clear();
 	mSource = SOURCE_AGENT;
@@ -1303,7 +1303,7 @@ void LLToolDragAndDrop::dropObject(LLViewerObject* raycast_target,
 	LLUUID source_id = from_task_inventory ? mSourceID : LLUUID::null;
 
 	// Select the object only if we're editing.
-	BOOL rez_selected = LLToolMgr::getInstance()->inEdit();
+	BOOL rez_selected = LLToolMgr::getInstanceFast()->inEdit();
 
 
 	LLVector3 ray_start = regionp->getPosRegionFromGlobal(mLastCameraPos);

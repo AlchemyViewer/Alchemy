@@ -423,11 +423,11 @@ void LLFloaterColorPicker::onClickPipette( )
 	pipette_active = !pipette_active;
 	if (pipette_active)
 	{
-		LLToolMgr::getInstance()->setTransientTool(LLToolPipette::getInstance());
+		LLToolMgr::getInstanceFast()->setTransientTool(LLToolPipette::getInstance());
 	}
 	else
 	{
-		LLToolMgr::getInstance()->clearTransientTool();
+		LLToolMgr::getInstanceFast()->clearTransientTool();
 	}
 }
 
@@ -488,7 +488,7 @@ void LLFloaterColorPicker::draw()
 	static LLCachedControl<F32> max_opacity(gSavedSettings, "PickerContextOpacity", 0.4f);
 	drawConeToOwner(mContextConeOpacity, max_opacity, mSwatch, mContextConeFadeTime, mContextConeInAlpha, mContextConeOutAlpha);
 
-	mPipetteBtn->setToggleState(LLToolMgr::getInstance()->getCurrentTool() == LLToolPipette::getInstance());
+	mPipetteBtn->setToggleState(LLToolMgr::getInstanceFast()->getCurrentTool() == LLToolPipette::getInstance());
 	mApplyImmediateCheck->setEnabled(mActive && mCanApplyImmediately);
 	mSelectBtn->setEnabled(mActive);
 
@@ -1081,8 +1081,8 @@ void LLFloaterColorPicker::setActive(BOOL active)
 
 void LLFloaterColorPicker::stopUsingPipette()
 {
-	if (LLToolMgr::getInstance()->getCurrentTool() == LLToolPipette::getInstance())
+	if (LLToolMgr::getInstanceFast()->getCurrentTool() == LLToolPipette::getInstanceFast())
 	{
-		LLToolMgr::getInstance()->clearTransientTool();
+		LLToolMgr::getInstanceFast()->clearTransientTool();
 	}
 }

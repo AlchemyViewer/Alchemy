@@ -1108,12 +1108,12 @@ void LLViewerJoystick::moveFlycam(bool reset)
 		gSavedSettings.getS32("JoystickAxis6")
 	};
 
-	bool in_build_mode = LLToolMgr::getInstance()->inBuildMode();
+	bool in_build_mode = LLToolMgr::getInstanceFast()->inBuildMode();
 	if (reset || mResetFlag)
 	{
-		sFlycamPosition = LLViewerCamera::getInstance()->getOrigin();
-		sFlycamRotation = LLViewerCamera::getInstance()->getQuaternion();
-		sFlycamZoom = LLViewerCamera::getInstance()->getView();
+		sFlycamPosition = LLViewerCamera::getInstanceFast()->getOrigin();
+		sFlycamRotation = LLViewerCamera::getInstanceFast()->getQuaternion();
+		sFlycamZoom = LLViewerCamera::getInstanceFast()->getView();
 		
 		resetDeltas(axis);
 
@@ -1318,7 +1318,7 @@ void LLViewerJoystick::scanJoystick()
 		toggle_flycam = 0;
 	}
 	
-	if (!mOverrideCamera && !(LLToolMgr::getInstance()->inBuildMode() && gSavedSettings.getBOOL("JoystickBuildEnabled")))
+	if (!mOverrideCamera && !(LLToolMgr::getInstanceFast()->inBuildMode() && gSavedSettings.getBOOL("JoystickBuildEnabled")))
 	{
 		moveAvatar();
 	}

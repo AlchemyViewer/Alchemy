@@ -205,9 +205,9 @@ void LLFloaterTexturePicker::setCanApplyImmediately(BOOL b)
 
 void LLFloaterTexturePicker::stopUsingPipette()
 {
-	if (LLToolMgr::getInstance()->getCurrentTool() == LLToolPipette::getInstance())
+	if (LLToolMgr::getInstanceFast()->getCurrentTool() == LLToolPipette::getInstanceFast())
 	{
-		LLToolMgr::getInstance()->clearTransientTool();
+		LLToolMgr::getInstanceFast()->clearTransientTool();
 	}
 }
 
@@ -434,7 +434,7 @@ BOOL LLFloaterTexturePicker::postBuild()
 	updateFilterPermMask();
 	mSavedFolderState.setApply(FALSE);
 
-	LLToolPipette::getInstance()->setToolSelectCallback(boost::bind(&LLFloaterTexturePicker::onTextureSelect, this, _1));
+	LLToolPipette::getInstanceFast()->setToolSelectCallback(boost::bind(&LLFloaterTexturePicker::onTextureSelect, this, _1));
 	
 	getChild<LLComboBox>("l_bake_use_texture_combo_box")->setCommitCallback(onBakeTextureSelect, this);
 	getChild<LLCheckBoxCtrl>("hide_base_mesh_region")->setCommitCallback(onHideBaseMeshRegionCheck, this);
@@ -455,7 +455,7 @@ void LLFloaterTexturePicker::draw()
 	getChildView("show_folders_check")->setEnabled(mActive && mCanApplyImmediately && !mNoCopyTextureSelected);
 	getChildView("Select")->setEnabled(mActive && mCanApply);
 	getChildView("Pipette")->setEnabled(mActive);
-	getChild<LLUICtrl>("Pipette")->setValue(LLToolMgr::getInstance()->getCurrentTool() == LLToolPipette::getInstance());
+	getChild<LLUICtrl>("Pipette")->setValue(LLToolMgr::getInstanceFast()->getCurrentTool() == LLToolPipette::getInstanceFast());
 
 	//BOOL allow_copy = FALSE;
 	if( mOwner ) 
@@ -723,11 +723,11 @@ void LLFloaterTexturePicker::onBtnPipette()
 	pipette_active = !pipette_active;
 	if (pipette_active)
 	{
-		LLToolMgr::getInstance()->setTransientTool(LLToolPipette::getInstance());
+		LLToolMgr::getInstanceFast()->setTransientTool(LLToolPipette::getInstance());
 	}
 	else
 	{
-		LLToolMgr::getInstance()->clearTransientTool();
+		LLToolMgr::getInstanceFast()->clearTransientTool();
 	}
 }
 

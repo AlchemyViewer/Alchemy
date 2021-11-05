@@ -1506,7 +1506,7 @@ void LLToolPie::playCurrentMedia(const LLPickInfo& info)
 void LLToolPie::VisitHomePage(const LLPickInfo& info)
 {
 	//FIXME: how do we handle object in different parcel than us?
-	LLParcel* parcel = LLViewerParcelMgr::getInstance()->getAgentParcel();
+	LLParcel* parcel = LLViewerParcelMgr::getInstanceFast()->getAgentParcel();
 	if (!parcel) return;
 	
 	LLPointer<LLViewerObject> objectp = info.getObject();

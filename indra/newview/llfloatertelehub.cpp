@@ -74,8 +74,8 @@ BOOL LLFloaterTelehub::postBuild()
 void LLFloaterTelehub::onOpen(const LLSD& key)
 {
 	// Show tools floater by selecting translate (select) tool
-	LLToolMgr::getInstance()->setCurrentToolset(gBasicToolset);
-	LLToolMgr::getInstance()->getCurrentToolset()->selectTool( LLToolCompTranslate::getInstance() );
+	LLToolMgr::getInstanceFast()->setCurrentToolset(gBasicToolset);
+	LLToolMgr::getInstanceFast()->getCurrentToolset()->selectTool( LLToolCompTranslate::getInstance() );
 
 	sendTelehubInfoRequest();
 	

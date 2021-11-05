@@ -579,7 +579,7 @@ void LLAgent::onAppFocusGained()
 //	if (CAMERA_MODE_MOUSELOOK == gAgentCamera.getCameraMode())
 //	{
 //		gAgentCamera.changeCameraToDefault();
-//		LLToolMgr::getInstance()->clearSavedTool();
+//		LLToolMgr::getInstanceFast()->clearSavedTool();
 //	}
 }
 
@@ -2332,7 +2332,7 @@ void LLAgent::endAnimationUpdateUI()
 	{
 		// make sure we ask to save changes
 
-		LLToolMgr::getInstance()->setCurrentToolset(gBasicToolset);
+		LLToolMgr::getInstanceFast()->setCurrentToolset(gBasicToolset);
 
 		if( gMorphView )
 		{
@@ -2382,7 +2382,7 @@ void LLAgent::endAnimationUpdateUI()
 		// JC - Added for always chat in third person option
 		gFocusMgr.setKeyboardFocus(NULL);
 
-		LLToolMgr::getInstance()->setCurrentToolset(gMouselookToolset);
+		LLToolMgr::getInstanceFast()->setCurrentToolset(gMouselookToolset);
 
 		mViewsPushed = TRUE;
 
@@ -2454,7 +2454,7 @@ void LLAgent::endAnimationUpdateUI()
 	}
 	else if (gAgentCamera.getCameraMode() == CAMERA_MODE_CUSTOMIZE_AVATAR)
 	{
-		LLToolMgr::getInstance()->setCurrentToolset(gFaceEditToolset);
+		LLToolMgr::getInstanceFast()->setCurrentToolset(gFaceEditToolset);
 
 		if( gMorphView )
 		{

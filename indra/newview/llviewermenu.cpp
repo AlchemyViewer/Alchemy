@@ -2832,23 +2832,23 @@ class LLObjectBuild : public view_listener_t
 {
 	bool handleEvent(const LLSD& userdata)
 	{
-		if (gAgentCamera.getFocusOnAvatar() && !LLToolMgr::getInstance()->inEdit() && gSavedSettings.getBOOL("EditCameraMovement") )
+		if (gAgentCamera.getFocusOnAvatar() && !LLToolMgr::getInstanceFast()->inEdit() && gSavedSettings.getBOOL("EditCameraMovement") )
 		{
 			// zoom in if we're looking at the avatar
 			gAgentCamera.setFocusOnAvatar(FALSE, ANIMATE);
-			gAgentCamera.setFocusGlobal(LLToolPie::getInstance()->getPick());
+			gAgentCamera.setFocusGlobal(LLToolPie::getInstanceFast()->getPick());
 			gAgentCamera.cameraZoomIn(0.666f);
 			gAgentCamera.cameraOrbitOver( 30.f * DEG_TO_RAD );
 			gViewerWindow->moveCursorToCenter();
 		}
 		else if ( gSavedSettings.getBOOL("EditCameraMovement") )
 		{
-			gAgentCamera.setFocusGlobal(LLToolPie::getInstance()->getPick());
+			gAgentCamera.setFocusGlobal(LLToolPie::getInstanceFast()->getPick());
 			gViewerWindow->moveCursorToCenter();
 		}
 
-		LLToolMgr::getInstance()->setCurrentToolset(gBasicToolset);
-		LLToolMgr::getInstance()->getCurrentToolset()->selectTool( LLToolCompCreate::getInstance() );
+		LLToolMgr::getInstanceFast()->setCurrentToolset(gBasicToolset);
+		LLToolMgr::getInstanceFast()->getCurrentToolset()->selectTool( LLToolCompCreate::getInstanceFast() );
 
 		// Could be first use
 		//LLFirstUse::useBuild();
@@ -2858,9 +2858,9 @@ class LLObjectBuild : public view_listener_t
 
 void handle_object_edit()
 {
-	LLViewerParcelMgr::getInstance()->deselectLand();
+	LLViewerParcelMgr::getInstanceFast()->deselectLand();
 
-	if (gAgentCamera.getFocusOnAvatar() && !LLToolMgr::getInstance()->inEdit())
+	if (gAgentCamera.getFocusOnAvatar() && !LLToolMgr::getInstanceFast()->inEdit())
 	{
 		LLFloaterTools::sPreviousFocusOnAvatar = true;
 		LLObjectSelectionHandle selection = LLSelectMgr::getInstanceFast()->getSelection();
@@ -2889,8 +2889,8 @@ void handle_object_edit()
 	
 	LLFloaterReg::showInstance("build");
 	
-	LLToolMgr::getInstance()->setCurrentToolset(gBasicToolset);
-	gFloaterTools->setEditTool( LLToolCompTranslate::getInstance() );
+	LLToolMgr::getInstanceFast()->setCurrentToolset(gBasicToolset);
+	gFloaterTools->setEditTool( LLToolCompTranslate::getInstanceFast() );
 	
 	LLViewerJoystick::getInstance()->moveObjects(true);
 	LLViewerJoystick::getInstance()->setNeedsReset(true);
@@ -2923,7 +2923,7 @@ void handle_attachment_touch(const LLUUID& inv_item_id)
 			LLSelectMgr::getInstanceFast()->deselectAll();
 
 			LLObjectSelectionHandle sel = LLSelectMgr::getInstanceFast()->selectObjectAndFamily(attach_obj);
-			if (!LLToolMgr::getInstance()->inBuildMode())
+			if (!LLToolMgr::getInstanceFast()->inBuildMode())
 			{
 				struct SetTransient : public LLSelectedNodeFunctor
 				{
@@ -2980,11 +2980,11 @@ class LLLandBuild : public view_listener_t
 	{
 		LLViewerParcelMgr::getInstance()->deselectLand();
 
-		if (gAgentCamera.getFocusOnAvatar() && !LLToolMgr::getInstance()->inEdit() && gSavedSettings.getBOOL("EditCameraMovement") )
+		if (gAgentCamera.getFocusOnAvatar() && !LLToolMgr::getInstanceFast()->inEdit() && gSavedSettings.getBOOL("EditCameraMovement") )
 		{
 			// zoom in if we're looking at the avatar
 			gAgentCamera.setFocusOnAvatar(FALSE, ANIMATE);
-			gAgentCamera.setFocusGlobal(LLToolPie::getInstance()->getPick());
+			gAgentCamera.setFocusGlobal(LLToolPie::getInstanceFast()->getPick());
 			gAgentCamera.cameraZoomIn(0.666f);
 			gAgentCamera.cameraOrbitOver( 30.f * DEG_TO_RAD );
 			gViewerWindow->moveCursorToCenter();
@@ -2997,8 +2997,8 @@ class LLLandBuild : public view_listener_t
 		}
 
 
-		LLToolMgr::getInstance()->setCurrentToolset(gBasicToolset);
-		LLToolMgr::getInstance()->getCurrentToolset()->selectTool( LLToolCompCreate::getInstance() );
+		LLToolMgr::getInstanceFast()->setCurrentToolset(gBasicToolset);
+		LLToolMgr::getInstanceFast()->getCurrentToolset()->selectTool( LLToolCompCreate::getInstanceFast() );
 
 		// Could be first use
 		//LLFirstUse::useBuild();
@@ -5396,7 +5396,7 @@ class LLToolsEnableSelectNextPart : public view_listener_t
 	{
         bool new_value = (!LLSelectMgr::getInstanceFast()->getSelection()->isEmpty()
                           && (ALControlCache::EditLinkedParts
-                              || LLToolFace::getInstance() == LLToolMgr::getInstance()->getCurrentTool()));
+                              || LLToolFace::getInstanceFast() == LLToolMgr::getInstanceFast()->getCurrentTool()));
 		return new_value;
 	}
 };
@@ -5408,7 +5408,7 @@ class LLToolsSelectNextPartFace : public view_listener_t
 {
     bool handleEvent(const LLSD& userdata)
     {
-        bool cycle_faces = LLToolFace::getInstance() == LLToolMgr::getInstance()->getCurrentTool();
+        bool cycle_faces = LLToolFace::getInstanceFast() == LLToolMgr::getInstanceFast()->getCurrentTool();
         bool cycle_linked = ALControlCache::EditLinkedParts;
 
         if (!cycle_faces && !cycle_linked)
@@ -6881,7 +6881,7 @@ class LLLandEdit : public view_listener_t
 		LLFloaterReg::showInstance("build");
 
 		// Switch to land edit toolset
-		LLToolMgr::getInstance()->getCurrentToolset()->selectTool( LLToolSelectLand::getInstance() );
+		LLToolMgr::getInstanceFast()->getCurrentToolset()->selectTool( LLToolSelectLand::getInstance() );
 		return true;
 	}
 };
@@ -8133,7 +8133,7 @@ class LLToolsEnableToolNotPie : public view_listener_t
 {
 	bool handleEvent(const LLSD& userdata)
 	{
-		bool new_value = ( LLToolMgr::getInstance()->getBaseTool() != LLToolPie::getInstance() );
+		bool new_value = ( LLToolMgr::getInstanceFast()->getBaseTool() != LLToolPie::getInstanceFast() );
 		return new_value;
 	}
 };
@@ -8981,23 +8981,23 @@ class LLToolsSelectTool : public view_listener_t
 		std::string tool_name = userdata.asString();
 		if (tool_name == "focus")
 		{
-			LLToolMgr::getInstance()->getCurrentToolset()->selectToolByIndex(1);
+			LLToolMgr::getInstanceFast()->getCurrentToolset()->selectToolByIndex(1);
 		}
 		else if (tool_name == "move")
 		{
-			LLToolMgr::getInstance()->getCurrentToolset()->selectToolByIndex(2);
+			LLToolMgr::getInstanceFast()->getCurrentToolset()->selectToolByIndex(2);
 		}
 		else if (tool_name == "edit")
 		{
-			LLToolMgr::getInstance()->getCurrentToolset()->selectToolByIndex(3);
+			LLToolMgr::getInstanceFast()->getCurrentToolset()->selectToolByIndex(3);
 		}
 		else if (tool_name == "create")
 		{
-			LLToolMgr::getInstance()->getCurrentToolset()->selectToolByIndex(4);
+			LLToolMgr::getInstanceFast()->getCurrentToolset()->selectToolByIndex(4);
 		}
 		else if (tool_name == "land")
 		{
-			LLToolMgr::getInstance()->getCurrentToolset()->selectToolByIndex(5);
+			LLToolMgr::getInstanceFast()->getCurrentToolset()->selectToolByIndex(5);
 		}
 
 		// Note: if floater is not visible LLViewerWindow::updateLayout() will
