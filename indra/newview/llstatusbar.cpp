@@ -328,14 +328,16 @@ void LLStatusBar::refresh()
 		time_t utc_time;
 		utc_time = time_corrected();
 
-		std::string timeStr = getString("time");
+		static const std::string timeStrTemplate = getString("time");
+		std::string timeStr = timeStrTemplate;
 		LLSD substitution;
 		substitution["datetime"] = (S32) utc_time;
 		LLStringUtil::format (timeStr, substitution);
 		mTextTime->setText(timeStr);
 
 		// set the tooltip to have the date
-		std::string dtStr = getString("timeTooltip");
+		static const std::string dtStrTemplate = getString("timeTooltip");
+		std::string dtStr = dtStrTemplate;
 		LLStringUtil::format (dtStr, substitution);
 		mTextTime->setToolTip (dtStr);
 	}
