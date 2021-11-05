@@ -429,10 +429,10 @@ void LLMultiFloater::setFloaterFlashing(LLFloater* floaterp, BOOL flashing)
 
 void LLMultiFloater::onTabSelected()
 {
-	LLFloater* floaterp = dynamic_cast<LLFloater*>(mTabContainer->getCurrentPanel());
-	if (floaterp)
+	LLPanel* cur_panel = mTabContainer->getCurrentPanel();
+	if (cur_panel->isFloater())
 	{
-		tabOpen(floaterp, true);
+		tabOpen(static_cast<LLFloater*>(cur_panel), true);
 	}
 }
 

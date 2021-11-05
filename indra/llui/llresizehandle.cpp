@@ -130,10 +130,13 @@ BOOL LLResizeHandle::handleHover(S32 x, S32 y, MASK mask)
 		if( resizing_view )
 		{
 			// undock floater when user resize it
-			LLFloater* floater_parent = dynamic_cast<LLFloater*>(getParent());
-			if (floater_parent && floater_parent->isDocked()) 
+			if (resizing_view->isFloater())
 			{
-				floater_parent->setDocked(false, false);
+				LLFloater* floater_parent = static_cast<LLFloater*>(resizing_view);
+				if (floater_parent->isDocked())
+				{
+					floater_parent->setDocked(false, false);
+				}
 			}
 
 			// Resize the parent

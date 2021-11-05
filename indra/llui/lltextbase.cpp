@@ -637,7 +637,7 @@ void LLTextBase::drawCursor()
 	}
 }
 
-void LLTextBase::drawText()
+void LLTextBase::drawText(const std::pair<S32, S32>& line_range)
 {
 	S32 text_len = getLength();
 
@@ -659,7 +659,6 @@ void LLTextBase::drawText()
 		selection_right = llmax( mSelectionStart, mSelectionEnd );
 	}
 
-	std::pair<S32, S32> line_range = getVisibleLines(mClipPartial);
 	S32 first_line = line_range.first;
 	S32 last_line = line_range.second;
 	if (first_line >= last_line)
@@ -1319,6 +1318,8 @@ void LLTextBase::draw()
 		updateScrollFromCursor();
 	}
 
+	std::pair<S32, S32> visible_lines = getVisibleLines(mClipPartial);
+
 	LLRect text_rect;
 	if (mScroller)
 	{
@@ -1327,8 +1328,7 @@ void LLTextBase::draw()
 	else
 	{
 		LLRect visible_lines_rect;
-		std::pair<S32, S32> line_range = getVisibleLines(mClipPartial);
-		for (S32 i = line_range.first; i < line_range.second; i++)
+		for (S32 i = visible_lines.first; i < visible_lines.second; i++)
 		{
 			if (visible_lines_rect.isEmpty())
 			{
@@ -1391,7 +1391,7 @@ void LLTextBase::draw()
 			drawHighlightsBackground(mHighlights, mHighlightedBGColor);
 // [/SL:KB]
 		drawSelectionBackground();
-		drawText();
+		drawText(visible_lines);
 		drawCursor();
 	}
  

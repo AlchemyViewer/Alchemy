@@ -217,6 +217,8 @@ public:
 
 	virtual BOOL isPanel() const;
 	
+	virtual bool isFloater() const { return false; }
+
 	//
 	// MANIPULATORS
 	//

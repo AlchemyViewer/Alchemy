@@ -208,6 +208,8 @@ public:
 
 	virtual ~LLFloater();
 
+	bool isFloater() const override { return true; }
+
 	// Don't export top/left for rect, only height/width
 	static void setupParamsForExport(Params& p, LLView* parent);
 	bool buildFromFile(const std::string &filename);

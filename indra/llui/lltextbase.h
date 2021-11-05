@@ -603,7 +603,7 @@ protected:
 	void							drawHighlightsBackground(const highlight_list_t& highlights, const LLColor4& color);
 // [/SL:KB]
 	void							drawCursor();
-	void							drawText();
+	void							drawText(const std::pair<S32, S32>& line_range);
 
 	// modify contents
 	S32								insertStringNoUndo(S32 pos, const LLWString &wstr, segment_vec_t* segments = NULL); // returns num of chars actually inserted

@@ -681,9 +681,9 @@ LLFloater* LLMenuItemTearOffGL::getParentFloater()
 
 	while (parent_view)
 	{
-		if (dynamic_cast<LLFloater*>(parent_view))
+		if (parent_view->isFloater())
 		{
-			return dynamic_cast<LLFloater*>(parent_view);
+			return static_cast<LLFloater*>(parent_view);
 		}
 
 		bool parent_is_menu = dynamic_cast<LLMenuGL*>(parent_view) && !dynamic_cast<LLMenuBarGL*>(parent_view);
