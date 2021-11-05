@@ -236,7 +236,7 @@ void LLViewerAudio::startFading()
 		// The fade state here should only be one of FADE_IN or FADE_OUT, but, in case it is not,
 		// rather than check for both states assume a fade in and check for the fade out case.
 		mFadeTime = AUDIO_MUSIC_FADE_IN_TIME;
-		if (LLViewerAudio::getInstance()->getFadeState() == LLViewerAudio::FADE_OUT)
+		if (getFadeState() == LLViewerAudio::FADE_OUT)
 		{
 			mFadeTime = AUDIO_MUSIC_FADE_OUT_TIME;
 		}
@@ -259,7 +259,7 @@ F32 LLViewerAudio::getFadeVolume()
 		mDone = true;
 		// If we have been fading out set volume to 0 until the next fade state occurs to prevent
 		// an audio transient.
-		if (LLViewerAudio::getInstance()->getFadeState() == LLViewerAudio::FADE_OUT)
+		if (getFadeState() == LLViewerAudio::FADE_OUT)
 		{
 			fade_volume = 0.0f;
 		}
@@ -270,7 +270,7 @@ F32 LLViewerAudio::getFadeVolume()
 		// Calculate how far we are into the fade time
 		fade_volume = stream_fade_timer.getElapsedTimeF32() / mFadeTime;
 		
-		if (LLViewerAudio::getInstance()->getFadeState() == LLViewerAudio::FADE_OUT)
+		if (getFadeState() == LLViewerAudio::FADE_OUT)
 		{
 			// If we are not fading in then we are fading out, so invert the fade
 			// direction; start loud and move towards zero volume.
@@ -283,15 +283,15 @@ F32 LLViewerAudio::getFadeVolume()
 
 void LLViewerAudio::onTeleportStarted()
 {
-	if (gAudiop && !LLViewerAudio::getInstance()->getForcedTeleportFade())
+	if (gAudiop && !getForcedTeleportFade())
 	{
 		// Even though the music was turned off it was starting up (with autoplay disabled) occasionally
 		// after a failed teleport or after an intra-parcel teleport.  Also, the music sometimes was not
 		// restarting after a successful intra-parcel teleport. Setting mWasPlaying fixes these issues.
-		LLViewerAudio::getInstance()->setWasPlaying(!gAudiop->getInternetStreamURL().empty());
-		LLViewerAudio::getInstance()->setForcedTeleportFade(true);
-		LLViewerAudio::getInstance()->startInternetStreamWithAutoFade(LLStringUtil::null);
-		LLViewerAudio::getInstance()->setNextStreamURI(LLStringUtil::null);
+		setWasPlaying(!gAudiop->getInternetStreamURL().empty());
+		setForcedTeleportFade(true);
+		startInternetStreamWithAutoFade(LLStringUtil::null);
+		setNextStreamURI(LLStringUtil::null);
 	}
 }
 
@@ -432,7 +432,7 @@ void audio_update_volume(bool force_update)
 		//Play any deferred sounds when unmuted
 		if(!gAudiop->getMuted())
 		{
-			LLDeferredSounds::instance().playdeferredSounds();
+			LLDeferredSounds::instanceFast().playdeferredSounds();
 		}
 
 		if (force_update)
@@ -453,15 +453,15 @@ void audio_update_volume(bool force_update)
 
 		// Streaming Music
 
-		if (!progress_view_visible && LLViewerAudio::getInstance()->getForcedTeleportFade())
+		if (!progress_view_visible && LLViewerAudio::getInstanceFast()->getForcedTeleportFade())
 		{
-			LLViewerAudio::getInstance()->setWasPlaying(!gAudiop->getInternetStreamURL().empty());
-			LLViewerAudio::getInstance()->setForcedTeleportFade(false);
+			LLViewerAudio::getInstanceFast()->setWasPlaying(!gAudiop->getInternetStreamURL().empty());
+			LLViewerAudio::getInstanceFast()->setForcedTeleportFade(false);
 		}
 
 		static const LLCachedControl<F32> music_volume_setting(gSavedSettings, "AudioLevelMusic");
 		static const LLCachedControl<bool> music_muted(gSavedSettings, "MuteMusic");
-		const F32 fade_volume = LLViewerAudio::getInstance()->getFadeVolume();
+		const F32 fade_volume = LLViewerAudio::getInstanceFast()->getFadeVolume();
 
 		const F32 music_volume = mute_volume * master_volume * music_volume_setting * fade_volume;
 		gAudiop->setInternetStreamGain (music_muted ? 0.f : music_volume);
@@ -480,7 +480,7 @@ void audio_update_volume(bool force_update)
 		static const LLCachedControl<bool> voice_mute(gSavedSettings, "MuteVoice");
 		static const LLCachedControl<F32> mic_volume(gSavedSettings, "AudioLevelMic");
 		const F32 voice_volume = mute_volume * master_volume * voice_volume_setting;
-		LLVoiceClient *voice_inst = LLVoiceClient::getInstance();
+		LLVoiceClient *voice_inst = LLVoiceClient::getInstanceFast();
 		voice_inst->setVoiceVolume(voice_mute ? 0.f : voice_volume);
 		voice_inst->setMicGain(voice_mute ? 0.f : mic_volume);
 

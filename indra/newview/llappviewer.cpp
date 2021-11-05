@@ -523,7 +523,7 @@ static void deferred_ui_audio_callback(const LLUUID& uuid)
 	if (gAudiop)
 	{
 		SoundData soundData(uuid, gAgent.getID(), 1.0f, LLAudioEngine::AUDIO_TYPE_UI);
-		LLDeferredSounds::instance().deferSound(soundData);
+		LLDeferredSounds::instanceFast().deferSound(soundData);
 	}
 }
 
