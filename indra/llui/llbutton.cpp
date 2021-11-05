@@ -801,7 +801,7 @@ void LLButton::draw()
 		label_color = ll::ui::SearchableControl::getHighlightColor();
 
 	// Unselected label assignments
-	LLWString label = getCurrentLabel();
+	const LLWString& label = getCurrentLabel().getWString();
 
 	// overlay with keyboard focus border
 	if (hasFocus())
@@ -933,7 +933,7 @@ void LLButton::draw()
 	// Draw label
 	if( !label.empty() )
 	{
-		LLWStringUtil::trim(label);
+		//LLWStringUtil::trim(label);
 
 		S32 x;
 		switch( mHAlign )
