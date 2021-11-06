@@ -51,7 +51,7 @@ public:
 	LLViewerJoint(const std::string &name, LLJoint *parent = NULL);
 	virtual ~LLViewerJoint();
 
-	LLViewerJoint* asViewerJoint() final { return static_cast<LLViewerJoint*>(this); }
+	LLViewerJoint* asViewerJoint() override { return static_cast<LLViewerJoint*>(this); }
 
 	// Render character hierarchy.
 	// Traverses the entire joint hierarchy, setting up
