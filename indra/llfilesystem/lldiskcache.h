@@ -64,7 +64,7 @@
 
 #include "llsingleton.h"
 
-class LLDiskCache :
+class LLDiskCache final :
     public LLParamSingleton<LLDiskCache>
 {
     public:

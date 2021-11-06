@@ -52,7 +52,7 @@ public:
 	virtual ~LLAvatarJoint() = default;
 
 	// Gets the validity of this joint
-	BOOL getValid() { return mValid; }
+	BOOL getValid() const { return mValid; }
 
 	// Sets the validity of this joint
 	virtual void setValid( BOOL valid, BOOL recursive=FALSE );
