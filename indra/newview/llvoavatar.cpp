@@ -693,6 +693,8 @@ LLVOAvatar::LLVOAvatar(const LLUUID& id,
 {
 	LL_DEBUGS("AvatarRender") << "LLVOAvatar Constructor (0x" << this << ") id:" << mID << LL_ENDL;
 
+	mAttachedObjectsVector.reserve(38);
+
 	//VTResume();  // VTune
 	setHoverOffset(LLVector3(0.0, 0.0, 0.0));
 
@@ -811,6 +813,8 @@ LLVOAvatar::~LLVOAvatar()
 	logPendingPhases();
 	
 	LL_DEBUGS("Avatar") << "LLVOAvatar Destructor (0x" << this << ") id:" << mID << LL_ENDL;
+
+	mAttachedObjectsVector.clear();
 
 	std::for_each(mAttachmentPoints.begin(), mAttachmentPoints.end(), DeletePairedPointer());
 	mAttachmentPoints.clear();
@@ -1388,7 +1392,7 @@ void LLVOAvatar::calculateSpatialExtents(LLVector4a& newMin, LLVector4a& newMax)
     if (box_detail >= 2)
     {
         float max_attachment_span = get_default_max_prim_scale() * 5.0f;
-    
+#if SLOW_ATTACHMENT_LIST
         for (const auto& attach_pair : mAttachmentPoints)
         {
             LLViewerJointAttachment* attachment = attach_pair.second;
@@ -1398,6 +1402,14 @@ void LLVOAvatar::calculateSpatialExtents(LLVector4a& newMin, LLVector4a& newMax)
                 for (LLViewerObject* attached_object : attachment->mAttachedObjects)
                 {
                     // Don't we need to look at children of attached_object as well?
+#else
+		for(auto& iter : mAttachedObjectsVector)
+		{{{
+					LLViewerJointAttachment* attachment = iter.second;
+					if (!attachment->getValid())
+						continue;
+					LLViewerObject* attached_object = iter.first;
+#endif
                     if (attached_object && !attached_object->isHUDAttachment())
                     {
                         const LLVOVolume* vol = attached_object->asVolume();
@@ -1820,12 +1832,20 @@ BOOL LLVOAvatar::lineSegmentIntersect(const LLVector4a& start, const LLVector4a&
 
 		if (isSelf())
 		{
+#if SLOW_ATTACHMENT_LIST
 			for (const auto& attach_pair : mAttachmentPoints)
 			{
 				LLViewerJointAttachment* attachment = attach_pair.second;
 
 				for (LLViewerObject* attached_object : attachment->mAttachedObjects)
 				{
+#else
+			for(auto& iter : mAttachedObjectsVector)
+			{{
+					const LLViewerJointAttachment* attachment = iter.second;
+					const LLViewerObject* attached_object = iter.first;
+#endif
+					
 					if (attached_object && !attached_object->isDead() && attachment->getValid())
 					{
 						LLDrawable* drawable = attached_object->mDrawable;
@@ -1877,12 +1897,19 @@ LLViewerObject* LLVOAvatar::lineSegmentIntersectRiggedAttachments(const LLVector
 		LLVector4a local_intersection;
         local_intersection.clear();
 
+#if SLOW_ATTACHMENT_LIST
 		for (const auto& attach_pair : mAttachmentPoints)
 		{
 			LLViewerJointAttachment* attachment = attach_pair.second;
 
 			for (LLViewerObject* attached_object : attachment->mAttachedObjects)
 			{
+#else
+		for(auto& iter : mAttachedObjectsVector)
+		{{
+				LLViewerObject* attached_object = iter.first;
+#endif
+
 				if (attached_object->lineSegmentIntersect(start, local_end, face, pick_transparent, pick_rigged, face_hit, &local_intersection, tex_coord, normal, tangent))
 				{
 					local_end = local_intersection;
@@ -2190,9 +2217,15 @@ void LLVOAvatar::releaseMeshData()
 		}
 	}
 	
+#if SLOW_ATTACHMENT_LIST
 	for (const auto& attach_pair : mAttachmentPoints)
 	{
 		LLViewerJointAttachment* attachment = attach_pair.second;
+#else
+	for (auto& iter : mAttachedObjectsVector)
+	{
+		LLViewerJointAttachment* attachment = iter.second;
+#endif
 		if (!attachment->getIsHUDAttachment())
 		{
 			attachment->setAttachmentVisibility(FALSE);
@@ -2217,9 +2250,15 @@ void LLVOAvatar::restoreMeshData()
 	mMeshValid = TRUE;
 	updateJointLODs();
 
+#if SLOW_ATTACHMENT_LIST
 	for (const auto& attach_pair : mAttachmentPoints)
 	{
 		LLViewerJointAttachment* attachment = attach_pair.second;
+#else
+	for (auto& iter : mAttachedObjectsVector)
+	{
+		LLViewerJointAttachment* attachment = iter.second;
+#endif
 		if (!attachment->getIsHUDAttachment())
 		{
 			attachment->setAttachmentVisibility(TRUE);
@@ -2772,12 +2811,20 @@ void LLVOAvatar::idleUpdateMisc(bool detailed_update)
 	{
 		LL_RECORD_BLOCK_TIME(FTM_ATTACHMENT_UPDATE);
 		auto& selectMgr = LLSelectMgr::instanceFast();
+#if SLOW_ATTACHMENT_LIST
 		for (const auto& attach_point_pair : mAttachmentPoints)
 		{
 			LLViewerJointAttachment* attachment = attach_point_pair.second;
 
 			for (LLViewerObject* attached_object : attachment->mAttachedObjects)
 			{
+#else
+		for(auto& iter : mAttachedObjectsVector)
+		{{
+				LLViewerJointAttachment* attachment = iter.second;
+				LLViewerObject* attached_object = iter.first;
+#endif
+
 				BOOL visibleAttachment = visible || (attached_object && 
 													 !(attached_object->mDrawable->getSpatialBridge() &&
 													   attached_object->mDrawable->getSpatialBridge()->getRadius() < 2.0));
@@ -4914,15 +4961,22 @@ void LLVOAvatar::updateVisibility()
 			LL_INFOS() << "PA: " << getPositionAgent() << LL_ENDL;
 			/*LL_INFOS() << "SPA: " << sel_pos_agent << LL_ENDL;
 			LL_INFOS() << "WPA: " << wrist_right_pos_agent << LL_ENDL;*/
+#if SLOW_ATTACHMENT_LIST
 			for (const auto& attach_pair : mAttachmentPoints)
 			{
 				LLViewerJointAttachment* attachment = attach_pair.second;
 
 				for (LLViewerObject* attached_object : attachment->mAttachedObjects)
 				{
-					if (attached_object)
+#else
+			for (auto& iter : mAttachedObjectsVector)
+			{{
+					const LLViewerObject *attached_object = iter.first;
+					const LLViewerJointAttachment *attachment = iter.second;
+					if (attachment)
+#endif
 					{
-						if(attached_object->mDrawable->isVisible())
+						if(attached_object && attached_object->mDrawable->isVisible())
 						{
 							LL_INFOS() << attachment->getName() << " visible" << LL_ENDL;
 						}
@@ -6432,7 +6486,7 @@ void LLVOAvatar::rebuildAttachmentOverrides()
     }
 
     // Attached objects
-
+#if SLOW_ATTACHMENT_LIST
 	for (const auto& attach_pair : mAttachmentPoints)
 	{
 		LLViewerJointAttachment *attachment_pt = attach_pair.second;
@@ -6440,6 +6494,11 @@ void LLVOAvatar::rebuildAttachmentOverrides()
         {
             for (LLViewerObject* vo : attachment_pt->mAttachedObjects)
             {
+#else
+	for(auto& iter : mAttachedObjectsVector)
+	{{{
+				LLViewerObject *vo = iter.first;
+#endif
                 // Attached animated objects affect joints in their control
                 // avs, not the avs to which they are attached.
                 if (vo && !vo->isAnimatedObject())
@@ -6484,6 +6543,7 @@ void LLVOAvatar::updateAttachmentOverrides()
     }
 
     // Attached objects
+#if SLOW_ATTACHMENT_LIST
 	for (const auto& attach_pair : mAttachmentPoints)
 	{
 		const LLViewerJointAttachment* attachment_pt = attach_pair.second;
@@ -6491,6 +6551,11 @@ void LLVOAvatar::updateAttachmentOverrides()
         {
             for (LLViewerObject* vo : attachment_pt->mAttachedObjects)
             {
+#else
+	for(auto& iter : mAttachedObjectsVector)
+	{{{
+				LLViewerObject *vo = iter.first;
+#endif
                 // Attached animated objects affect joints in their control
                 // avs, not the avs to which they are attached.
                 if (vo && !vo->isAnimatedObject())
@@ -7454,6 +7519,13 @@ const LLViewerJointAttachment *LLVOAvatar::attachObject(LLViewerObject *viewer_o
 						   << (item ? item->getName() : "UNKNOWN") << " id " << item_id << LL_ENDL;	
 		return 0;
 	}
+	
+	// The object can already exist in the vector if it was attached while was already attached (causing a re-attach).
+	std::pair<LLViewerObject*, LLViewerJointAttachment*> const val(viewer_object, attachment);
+	if (std::find(mAttachedObjectsVector.begin(), mAttachedObjectsVector.end(), val) == mAttachedObjectsVector.end())
+	{
+		mAttachedObjectsVector.push_back(std::move(val));
+	}
 
     if (!viewer_object->isAnimatedObject())
     {
@@ -7491,9 +7563,15 @@ const LLViewerJointAttachment *LLVOAvatar::attachObject(LLViewerObject *viewer_o
 U32 LLVOAvatar::getNumAttachments() const
 {
 	U32 num_attachments = 0;
+#if SLOW_ATTACHMENT_LIST
 	for (const auto& attach_pair : mAttachmentPoints)
 	{
 		const LLViewerJointAttachment* attachment_pt = attach_pair.second;
+#else
+	for (auto& iter : mAttachedObjectsVector)
+	{
+		const LLViewerJointAttachment* attachment_pt = iter.second;
+#endif
 		num_attachments += attachment_pt->getNumObjects();
 	}
 	return num_attachments;
@@ -7522,9 +7600,15 @@ BOOL LLVOAvatar::canAttachMoreObjects(U32 n) const
 U32 LLVOAvatar::getNumAnimatedObjectAttachments() const
 {
 	U32 num_attachments = 0;
+#if SLOW_ATTACHMENT_LIST
 	for (const auto& attach_pair : mAttachmentPoints)
 	{
 		const LLViewerJointAttachment *attachment_pt = attach_pair.second;
+#else
+	for (auto& iter : mAttachedObjectsVector)
+	{
+		const LLViewerJointAttachment* attachment_pt = iter.second;
+#endif
 		num_attachments += attachment_pt->getNumAnimatedObjects();
 	}
 	return num_attachments;
@@ -7591,6 +7675,7 @@ void LLVOAvatar::lazyAttach()
 
 void LLVOAvatar::resetHUDAttachments()
 {
+#if SLOW_ATTACHMENT_LIST
 	for (const auto& attach_pair : mAttachmentPoints)
 	{
 		LLViewerJointAttachment* attachment = attach_pair.second;
@@ -7598,6 +7683,14 @@ void LLVOAvatar::resetHUDAttachments()
 		{
 			for (const LLViewerObject* attached_object : attachment->mAttachedObjects)
 			{
+#else
+	for(auto& iter : mAttachedObjectsVector)
+	{{{
+				const LLViewerJointAttachment* attachment = iter.second;
+				if (!attachment->getIsHUDAttachment())
+					continue;
+				const LLViewerObject* attached_object = iter.first;
+#endif
 				if (attached_object && attached_object->mDrawable.notNull())
 				{
 					gPipeline.markMoved(attached_object->mDrawable);
@@ -7609,11 +7702,18 @@ void LLVOAvatar::resetHUDAttachments()
 
 void LLVOAvatar::rebuildRiggedAttachments( void )
 {
+#if SLOW_ATTACHMENT_LIST
 	for (const auto& attach_pair : mAttachmentPoints)
 	{
 		LLViewerJointAttachment* pAttachment = attach_pair.second;
 		for (const LLViewerObject* pAttachedObject : pAttachment->mAttachedObjects)
 		{
+#else
+	for(auto& iter : mAttachedObjectsVector)
+	{{
+			const LLViewerObject* pAttachedObject = iter.first;
+			const LLViewerJointAttachment* pAttachment = iter.second;
+#endif
 			if ( pAttachment && pAttachedObject->mDrawable.notNull() )
 			{
 				gPipeline.markRebuild(pAttachedObject->mDrawable);
@@ -7651,6 +7751,7 @@ BOOL LLVOAvatar::detachObject(LLViewerObject *viewer_object)
 		if (attachment->isObjectAttached(viewer_object))
 		{
             updateVisualComplexity();
+			vector_replace_with_last(mAttachedObjectsVector,std::make_pair(viewer_object,attachment));
             bool is_animated_object = viewer_object->isAnimatedObject();
 			cleanupAttachedMesh(viewer_object);
 
@@ -7915,11 +8016,17 @@ BOOL LLVOAvatar::isWearingWearableType(LLWearableType::EType type) const
 
 LLViewerObject *	LLVOAvatar::findAttachmentByID( const LLUUID & target_id ) const
 {
+#if SLOW_ATTACHMENT_LIST
 	for (const auto& attach_pair : mAttachmentPoints)
 	{
 		LLViewerJointAttachment* attachment = attach_pair.second;
 		for (LLViewerObject* attached_object : attachment->mAttachedObjects)
 		{
+#else
+	for(auto& iter : mAttachedObjectsVector)
+	{{
+			LLViewerObject* attached_object =  iter.first;
+#endif
 			if (attached_object &&
 				attached_object->getID() == target_id)
 			{
@@ -7934,10 +8041,18 @@ LLViewerObject *	LLVOAvatar::findAttachmentByID( const LLUUID & target_id ) cons
 // [SL:KB] - Patch: Appearance-RefreshAttachments | Checked: Catznip-5.3
 void LLVOAvatar::rebuildAttachments()
 {
+#if SLOW_ATTACHMENT_LIST
 	for (const auto& kvpAttachPt : mAttachmentPoints)
 	{
 		for (LLViewerObject* pAttachObj : kvpAttachPt.second->mAttachedObjects)
 		{
+			{
+#else
+	for (auto& iter : mAttachedObjectsVector)
+	{
+		{
+			LLViewerObject* pAttachObj = iter.first;
+#endif
 			if (LLVOVolume* pAttachVol = (pAttachObj->isMesh()) ? pAttachObj->asVolume() : nullptr)
 			{
 				pAttachVol->forceLOD(3);
@@ -8394,9 +8509,15 @@ void LLVOAvatar::updateMeshVisibility()
 
 	if (getOverallAppearance() == AOA_NORMAL)
 	{
+#if SLOW_ATTACHMENT_LIST
 		for (const auto& attach_pair : mAttachmentPoints)
 		{
 			LLViewerJointAttachment* attachment = attach_pair.second;
+#else
+		for (auto& iter : mAttachedObjectsVector)
+		{
+			LLViewerJointAttachment* attachment = iter.second;
+#endif
 			if (attachment)
 			{
 				for (LLViewerObject* objectp : attachment->mAttachedObjects)
@@ -8698,12 +8819,19 @@ void LLVOAvatar::updateMeshTextures()
 	}
 
 	//refresh bakes on any attached objects
+#if SLOW_ATTACHMENT_LIST
 	for (const auto& attach_pair : mAttachmentPoints)
 	{
 		LLViewerJointAttachment* attachment = attach_pair.second;
 
 		for (LLViewerObject* attached_object : attachment->mAttachedObjects)
 		{
+#else
+	for (auto& iter : mAttachedObjectsVector)
+	{
+		{
+			LLViewerObject* attached_object = iter.first;
+#endif
 			if (attached_object && !attached_object->isDead())
 			{
 				attached_object->refreshBakeTexture();
@@ -8892,9 +9020,15 @@ void LLVOAvatar::clampAttachmentPositions()
 	{
 		return;
 	}
+#if SLOW_ATTACHMENT_LIST
 	for (const auto& attach_pair : mAttachmentPoints)
 	{
 		LLViewerJointAttachment* attachment = attach_pair.second;
+#else
+	for (auto& iter : mAttachedObjectsVector)
+	{
+		LLViewerJointAttachment* attachment = iter.second;
+#endif
 		if (attachment)
 		{
 			attachment->clampObjectPosition();
@@ -8904,10 +9038,17 @@ void LLVOAvatar::clampAttachmentPositions()
 
 BOOL LLVOAvatar::hasHUDAttachment() const
 {
+#if SLOW_ATTACHMENT_LIST
 	for (const auto& attach_pair : mAttachmentPoints)
 	{
 		LLViewerJointAttachment* attachment = attach_pair.second;
-		if (attachment->getIsHUDAttachment() && attachment->getNumObjects() > 0)
+
+#else
+	for (auto& iter : mAttachedObjectsVector)
+	{
+		const LLViewerJointAttachment* attachment = iter.second;
+#endif
+		if (attachment && attachment->getIsHUDAttachment() && attachment->getNumObjects() > 0)
 		{
 			return TRUE;
 		}
@@ -8918,6 +9059,7 @@ BOOL LLVOAvatar::hasHUDAttachment() const
 LLBBox LLVOAvatar::getHUDBBox() const
 {
 	LLBBox bbox;
+#if SLOW_ATTACHMENT_LIST
 	for (const auto& attach_pair : mAttachmentPoints)
 	{
 		LLViewerJointAttachment* attachment = attach_pair.second;
@@ -8925,6 +9067,14 @@ LLBBox LLVOAvatar::getHUDBBox() const
 		{
 			for (const LLViewerObject* attached_object : attachment->mAttachedObjects)
 			{
+#else
+	for(auto& iter : mAttachedObjectsVector)
+	{{{
+				const LLViewerJointAttachment* attachment = iter.second;
+				if (!attachment || !attachment->getIsHUDAttachment())
+					continue;
+				const LLViewerObject* attached_object =  iter.first;
+#endif
 				if (attached_object == NULL)
 				{
 					LL_WARNS() << "HUD attached object is NULL!" << LL_ENDL;
@@ -10286,6 +10436,7 @@ void showRigInfoTabExtents(LLVOAvatar *avatar, LLJointRiggingInfoTab& tab, S32& 
 
 void LLVOAvatar::getAssociatedVolumes(std::vector<LLVOVolume*>& volumes)
 {
+#if SLOW_ATTACHMENT_LIST
 	for (const auto& attach_pair : mAttachmentPoints)
 	{
 		LLViewerJointAttachment* attachment = attach_pair.second;
@@ -10294,6 +10445,11 @@ void LLVOAvatar::getAssociatedVolumes(std::vector<LLVOVolume*>& volumes)
 			if (!attached_object)
 				continue;
 
+#else
+	for(auto& iter : mAttachedObjectsVector)
+	{{
+			LLViewerObject* attached_object = iter.first;
+#endif
             LLVOVolume *volume = attached_object->asVolume();
             if (volume)
             {
@@ -10354,8 +10510,8 @@ void LLVOAvatar::updateRiggingInfo()
     LL_DEBUGS("RigSpammish") << getFullname() << " updating rig tab" << LL_ENDL;
 #endif
 
-    std::vector<LLVOVolume*> volumes;
-    volumes.reserve(mLastAssocVolSize);
+    static std::vector<LLVOVolume*> volumes;
+	volumes.clear();
 	{
 		LL_RECORD_BLOCK_TIME(FTM_AVATAR_RIGGING_AVOL_UPDATE);
 		getAssociatedVolumes(volumes);
@@ -10845,11 +11001,17 @@ void LLVOAvatar::calculateUpdateRenderComplexity()
         }
 
         // Account for complexity of all attachments.
+#if SLOW_ATTACHMENT_LIST
 		for (const auto& attach_pair : mAttachmentPoints)
 		{
 			const LLViewerJointAttachment* attachment = attach_pair.second;
 			for (const LLViewerObject* attached_object : attachment->mAttachedObjects)
 			{
+#else
+		for(auto& iter : mAttachedObjectsVector)
+		{{
+				const LLViewerObject* attached_object = iter.first;
+#endif
                 accountRenderComplexityForObject(attached_object, max_attachment_complexity,
                                                  textures, cost, hud_complexity_list);
 			}

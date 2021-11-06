@@ -1552,6 +1552,7 @@ void LLAgentCamera::updateCamera()
 		LLVector3 chest_scale = chest_joint->getScale();
 
 		// shorten avatar skeleton to avoid foot interpenetration
+#if 0 // This screws up mouselook attachments
 		if (!gAgentAvatarp->mInAir)
 		{
 			LLVector3 chest_offset = LLVector3(0.f, 0.f, chest_joint->getPosition().mV[VZ]) * torso_joint->getWorldRotation();
@@ -1565,6 +1566,7 @@ void LLAgentCamera::updateCamera()
 			chest_joint->setScale(LLVector3(1.f, 1.f, scale_factor));
 			diff.mV[VZ] = 0.f;
 		}
+#endif
 
 		if (useRealisticMouselook)
 		{
@@ -1595,11 +1597,18 @@ void LLAgentCamera::updateCamera()
 
 		gAgentAvatarp->mRoot->updateWorldMatrixChildren();
 
+#if SLOW_ATTACHMENT_LIST
 		for (auto& attach_point_pair : gAgentAvatarp->mAttachmentPoints)
 		{
             LLViewerJointAttachment* attachment = attach_point_pair.second;
             for (LLViewerObject* attached_object : attachment->mAttachedObjects)
 			{
+#else
+		for(auto attachment_iter = gAgentAvatarp->mAttachedObjectsVector.begin(), attachment_end = gAgentAvatarp->mAttachedObjectsVector.end();
+			attachment_iter != attachment_end; ++attachment_iter)
+		{{
+				LLViewerObject* attached_object = attachment_iter->first;
+#endif
 				if (attached_object && !attached_object->isDead() && attached_object->mDrawable.notNull())
 				{
 					// clear any existing "early" movements of attachment

@@ -1406,11 +1406,19 @@ std::vector<LLViewerObject*> LLAgentWearables::getTempAttachments()
 	llvo_vec_t temp_attachs;
 	if (isAgentAvatarValid())
 	{
+#if SLOW_ATTACHMENT_LIST
 		for (const auto& attach_pair : gAgentAvatarp->mAttachmentPoints)
 		{
 			LLViewerJointAttachment* attachment = attach_pair.second;
 			for (LLViewerObject* objectp : attachment->mAttachedObjects)
 			{
+#else
+		for (auto attachment_iter = gAgentAvatarp->mAttachedObjectsVector.begin(), attachment_end = gAgentAvatarp->mAttachedObjectsVector.end();
+			attachment_iter != attachment_end; ++attachment_iter)
+		{
+			{
+				LLViewerObject* objectp = attachment_iter->first;
+#endif
 				if (objectp && objectp->isTempAttachment())
 				{
 					temp_attachs.push_back(objectp);

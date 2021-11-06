@@ -11218,12 +11218,19 @@ void LLPipeline::generateImpostor(LLVOAvatar* avatar)
 		LL_RECORD_BLOCK_TIME(FTM_IMPOSTOR_MARK_VISIBLE);
 		markVisible(avatar->mDrawable, viewer_camera);
 
+#if SLOW_ATTACHMENT_LIST
 		for (const auto& attach_pair : avatar->mAttachmentPoints)
 		{
 			LLViewerJointAttachment *attachment = attach_pair.second;
 			for (LLViewerObject* attached_object : attachment->mAttachedObjects)
 			{
 				if (attached_object)
+#else
+		for(auto attachment_iter = avatar->mAttachedObjectsVector.begin(), attachment_end = avatar->mAttachedObjectsVector.end();
+			attachment_iter != attachment_end;++attachment_iter)
+		{{
+				if (LLViewerObject* attached_object = attachment_iter->first)
+#endif
 				{
 					markVisible(attached_object->mDrawable->getSpatialBridge(), viewer_camera);
 				}
