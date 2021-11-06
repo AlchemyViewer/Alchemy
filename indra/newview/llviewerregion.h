@@ -567,6 +567,12 @@ private:
 	caps_received_signal_t mSimulatorFeaturesReceivedSignal;		
 
 	LLSD mSimulatorFeatures;
+	U32 mMaxMaterialsPerTrans = 0;
+	bool mMeshUploadEnabled = false;
+	bool mBakesOnMeshEnabled = false;
+	bool mMeshRezEnabled = false;
+	bool mDynamicPathfindingEnabled = false;
+	bool mAvatarHoverHeightEnabled = false;
 
     typedef std::map<U32, LLPointer<LLVOCacheEntry> >	   vocache_entry_map_t;
     static vocache_entry_map_t sRegionCacheCleanup;

@@ -2285,6 +2285,27 @@ void LLViewerRegion::setSimulatorFeatures(const LLSD& sim_features)
 	LL_INFOS() << "region " << getName() << " "  << str.str() << LL_ENDL;
 	mSimulatorFeatures = sim_features;
 
+	if(mSimulatorFeatures.has("MaxMaterialsPerTransaction")
+		&& mSimulatorFeatures["MaxMaterialsPerTransaction"].isInteger())
+	{
+		mMaxMaterialsPerTrans = mSimulatorFeatures["MaxMaterialsPerTransaction"].asInteger();
+	}
+
+	mMeshUploadEnabled = (mSimulatorFeatures.has("MeshUploadEnabled") &&
+		mSimulatorFeatures["MeshUploadEnabled"].asBoolean());
+
+	mBakesOnMeshEnabled = (mSimulatorFeatures.has("BakesOnMeshEnabled") &&
+		mSimulatorFeatures["BakesOnMeshEnabled"].asBoolean());
+
+	mMeshRezEnabled = (mSimulatorFeatures.has("MeshRezEnabled") &&
+		mSimulatorFeatures["MeshRezEnabled"].asBoolean());
+
+	mDynamicPathfindingEnabled = (mSimulatorFeatures.has("DynamicPathfindingEnabled") &&
+		mSimulatorFeatures["DynamicPathfindingEnabled"].asBoolean());
+
+	mAvatarHoverHeightEnabled = (mSimulatorFeatures.has("AvatarHoverHeightEnabled") &&
+		mSimulatorFeatures["AvatarHoverHeightEnabled"].asBoolean());
+
 	setSimulatorFeaturesReceived(true);
 	
 }
@@ -3308,32 +3329,27 @@ std::string LLViewerRegion::getDescription() const
 
 bool LLViewerRegion::meshUploadEnabled() const
 {
-	return (mSimulatorFeatures.has("MeshUploadEnabled") &&
-		mSimulatorFeatures["MeshUploadEnabled"].asBoolean());
+	return mMeshUploadEnabled;
 }
 
 bool LLViewerRegion::bakesOnMeshEnabled() const
 {
-	return (mSimulatorFeatures.has("BakesOnMeshEnabled") &&
-		mSimulatorFeatures["BakesOnMeshEnabled"].asBoolean());
+	return mBakesOnMeshEnabled;
 }
 
 bool LLViewerRegion::meshRezEnabled() const
 {
-	return (mSimulatorFeatures.has("MeshRezEnabled") &&
-				mSimulatorFeatures["MeshRezEnabled"].asBoolean());
+	return mMeshRezEnabled;
 }
 
 bool LLViewerRegion::dynamicPathfindingEnabled() const
 {
-	return ( mSimulatorFeatures.has("DynamicPathfindingEnabled") &&
-			 mSimulatorFeatures["DynamicPathfindingEnabled"].asBoolean());
+	return mDynamicPathfindingEnabled;
 }
 
 bool LLViewerRegion::avatarHoverHeightEnabled() const
 {
-	return ( mSimulatorFeatures.has("AvatarHoverHeightEnabled") &&
-			 mSimulatorFeatures["AvatarHoverHeightEnabled"].asBoolean());
+	return mAvatarHoverHeightEnabled;
 }
 /* Static Functions */
 
@@ -3385,10 +3401,9 @@ void LLViewerRegion::resetMaterialsCapThrottle()
 U32 LLViewerRegion::getMaxMaterialsPerTransaction() const
 {
 	U32 max_entries = 50; // original hard coded default
-	if (   mSimulatorFeatures.has( "MaxMaterialsPerTransaction" )
-		&& mSimulatorFeatures[ "MaxMaterialsPerTransaction" ].isInteger())
+	if (mMaxMaterialsPerTrans != 0)
 	{
-		max_entries = mSimulatorFeatures[ "MaxMaterialsPerTransaction" ].asInteger();
+		max_entries = mMaxMaterialsPerTrans;
 	}
 	return max_entries;
 }
