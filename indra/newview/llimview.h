@@ -73,7 +73,6 @@ public:
 			P2P_SESSION,
 			GROUP_SESSION,
 			ADHOC_SESSION,
-			AVALINE_SESSION,
 			NONE_SESSION,
 		} SType;
 
@@ -102,12 +101,10 @@ public:
 		bool isAdHoc();
 		bool isP2P();
 		bool isGroupChat();
-		bool isOtherParticipantAvaline();
 
 		bool isP2PSessionType() const { return mSessionType == P2P_SESSION;}
 		bool isAdHocSessionType() const { return mSessionType == ADHOC_SESSION;}
 		bool isGroupSessionType() const { return mSessionType == GROUP_SESSION;}
-		bool isAvalineSessionType() const { return mSessionType == AVALINE_SESSION;}
 
 		LLUUID generateOutgoingAdHocHash() const;
 
@@ -154,7 +151,6 @@ public:
 		bool mCallBackEnabled;
 
 		bool mTextIMPossible;
-		bool mOtherParticipantIsAvatar;
 		bool mStartCallOnInitialize;
 
 		//if IM session is created for a voice call
@@ -545,7 +541,6 @@ private:
 
 protected:
 	std::string mPreviousSessionlName;
-	LLIMModel::LLIMSession::SType mPreviousSessionType;
 	std::string mCurrentSessionlName;
 	LLIMModel::LLIMSession* mSession;
 	LLVoiceChannel::EState mOldState;
