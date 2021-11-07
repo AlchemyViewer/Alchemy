@@ -1056,16 +1056,9 @@ void LLVOAvatarSelf::restoreMeshData()
 //-----------------------------------------------------------------------------
 void LLVOAvatarSelf::updateAttachmentVisibility(U32 camera_mode)
 {
-#if SLOW_ATTACHMENT_LIST
 	for (const auto& attach_pair : mAttachmentPoints)
 	{
 		LLViewerJointAttachment* attachment = attach_pair.second;
-#else
-	for (auto& iter : mAttachedObjectsVector)
-	{
-		LLViewerJointAttachment* attachment = iter.second;
-#endif
-
 		if (attachment->getIsHUDAttachment())
 		{
 			attachment->setAttachmentVisibility(TRUE);

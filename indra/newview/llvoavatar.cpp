@@ -2217,15 +2217,9 @@ void LLVOAvatar::releaseMeshData()
 		}
 	}
 	
-#if SLOW_ATTACHMENT_LIST
 	for (const auto& attach_pair : mAttachmentPoints)
 	{
 		LLViewerJointAttachment* attachment = attach_pair.second;
-#else
-	for (auto& iter : mAttachedObjectsVector)
-	{
-		LLViewerJointAttachment* attachment = iter.second;
-#endif
 		if (!attachment->getIsHUDAttachment())
 		{
 			attachment->setAttachmentVisibility(FALSE);
@@ -2250,15 +2244,9 @@ void LLVOAvatar::restoreMeshData()
 	mMeshValid = TRUE;
 	updateJointLODs();
 
-#if SLOW_ATTACHMENT_LIST
 	for (const auto& attach_pair : mAttachmentPoints)
 	{
 		LLViewerJointAttachment* attachment = attach_pair.second;
-#else
-	for (auto& iter : mAttachedObjectsVector)
-	{
-		LLViewerJointAttachment* attachment = iter.second;
-#endif
 		if (!attachment->getIsHUDAttachment())
 		{
 			attachment->setAttachmentVisibility(TRUE);
@@ -8502,15 +8490,17 @@ void LLVOAvatar::updateMeshVisibility()
 		for (const auto& attach_pair : mAttachmentPoints)
 		{
 			LLViewerJointAttachment* attachment = attach_pair.second;
-#else
-		for (auto& iter : mAttachedObjectsVector)
-		{
-			LLViewerJointAttachment* attachment = iter.second;
-#endif
 			if (attachment)
 			{
 				for (LLViewerObject* objectp : attachment->mAttachedObjects)
 				{
+#else
+		for (auto& iter : mAttachedObjectsVector)
+		{
+			{
+				{
+					LLViewerObject* objectp = iter.first;
+#endif
 					if (objectp)
 					{
 						for (int face_index = 0; face_index < objectp->getNumTEs(); face_index++)
@@ -8528,27 +8518,28 @@ void LLVOAvatar::updateMeshVisibility()
 							bake_flag[BAKED_AUX2] |= (tex_entry->getID() == IMG_USE_BAKED_AUX2);
 							bake_flag[BAKED_AUX3] |= (tex_entry->getID() == IMG_USE_BAKED_AUX3);
 						}
-					}
 
-					LLViewerObject::const_child_list_t& child_list = objectp->getChildren();
-					for (LLViewerObject* objectchild : child_list)
-					{
-						if (objectchild)
+
+						LLViewerObject::const_child_list_t& child_list = objectp->getChildren();
+						for (LLViewerObject* objectchild : child_list)
 						{
-							for (int face_index = 0; face_index < objectchild->getNumTEs(); face_index++)
+							if (objectchild)
 							{
-								LLTextureEntry* tex_entry = objectchild->getTE(face_index);
-								bake_flag[BAKED_HEAD] |= (tex_entry->getID() == IMG_USE_BAKED_HEAD);
-								bake_flag[BAKED_EYES] |= (tex_entry->getID() == IMG_USE_BAKED_EYES);
-								bake_flag[BAKED_HAIR] |= (tex_entry->getID() == IMG_USE_BAKED_HAIR);
-								bake_flag[BAKED_LOWER] |= (tex_entry->getID() == IMG_USE_BAKED_LOWER);
-								bake_flag[BAKED_UPPER] |= (tex_entry->getID() == IMG_USE_BAKED_UPPER);
-								bake_flag[BAKED_SKIRT] |= (tex_entry->getID() == IMG_USE_BAKED_SKIRT);
-								bake_flag[BAKED_LEFT_ARM] |= (tex_entry->getID() == IMG_USE_BAKED_LEFTARM);
-								bake_flag[BAKED_LEFT_LEG] |= (tex_entry->getID() == IMG_USE_BAKED_LEFTLEG);
-								bake_flag[BAKED_AUX1] |= (tex_entry->getID() == IMG_USE_BAKED_AUX1);
-								bake_flag[BAKED_AUX2] |= (tex_entry->getID() == IMG_USE_BAKED_AUX2);
-								bake_flag[BAKED_AUX3] |= (tex_entry->getID() == IMG_USE_BAKED_AUX3);
+								for (int face_index = 0; face_index < objectchild->getNumTEs(); face_index++)
+								{
+									LLTextureEntry* tex_entry = objectchild->getTE(face_index);
+									bake_flag[BAKED_HEAD] |= (tex_entry->getID() == IMG_USE_BAKED_HEAD);
+									bake_flag[BAKED_EYES] |= (tex_entry->getID() == IMG_USE_BAKED_EYES);
+									bake_flag[BAKED_HAIR] |= (tex_entry->getID() == IMG_USE_BAKED_HAIR);
+									bake_flag[BAKED_LOWER] |= (tex_entry->getID() == IMG_USE_BAKED_LOWER);
+									bake_flag[BAKED_UPPER] |= (tex_entry->getID() == IMG_USE_BAKED_UPPER);
+									bake_flag[BAKED_SKIRT] |= (tex_entry->getID() == IMG_USE_BAKED_SKIRT);
+									bake_flag[BAKED_LEFT_ARM] |= (tex_entry->getID() == IMG_USE_BAKED_LEFTARM);
+									bake_flag[BAKED_LEFT_LEG] |= (tex_entry->getID() == IMG_USE_BAKED_LEFTLEG);
+									bake_flag[BAKED_AUX1] |= (tex_entry->getID() == IMG_USE_BAKED_AUX1);
+									bake_flag[BAKED_AUX2] |= (tex_entry->getID() == IMG_USE_BAKED_AUX2);
+									bake_flag[BAKED_AUX3] |= (tex_entry->getID() == IMG_USE_BAKED_AUX3);
+								}
 							}
 						}
 					}
@@ -9009,15 +9000,10 @@ void LLVOAvatar::clampAttachmentPositions()
 	{
 		return;
 	}
-#if SLOW_ATTACHMENT_LIST
+
 	for (const auto& attach_pair : mAttachmentPoints)
 	{
 		LLViewerJointAttachment* attachment = attach_pair.second;
-#else
-	for (auto& iter : mAttachedObjectsVector)
-	{
-		LLViewerJointAttachment* attachment = iter.second;
-#endif
 		if (attachment)
 		{
 			attachment->clampObjectPosition();
@@ -9027,16 +9013,9 @@ void LLVOAvatar::clampAttachmentPositions()
 
 BOOL LLVOAvatar::hasHUDAttachment() const
 {
-#if SLOW_ATTACHMENT_LIST
 	for (const auto& attach_pair : mAttachmentPoints)
 	{
 		LLViewerJointAttachment* attachment = attach_pair.second;
-
-#else
-	for (auto& iter : mAttachedObjectsVector)
-	{
-		const LLViewerJointAttachment* attachment = iter.second;
-#endif
 		if (attachment && attachment->getIsHUDAttachment() && attachment->getNumObjects() > 0)
 		{
 			return TRUE;
@@ -9058,7 +9037,9 @@ LLBBox LLVOAvatar::getHUDBBox() const
 			{
 #else
 	for(auto& iter : mAttachedObjectsVector)
-	{{{
+	{
+		{
+			{
 				const LLViewerJointAttachment* attachment = iter.second;
 				if (!attachment || !attachment->getIsHUDAttachment())
 					continue;
