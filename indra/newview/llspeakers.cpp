@@ -299,7 +299,7 @@ LLPointer<LLSpeaker> LLSpeakerMgr::setSpeaker(const LLUUID& id, const std::strin
 	{
 		speakerp = new LLSpeaker(id, name, type);
 		speakerp->mStatus = status;
-		mSpeakers.insert(std::make_pair(speakerp->mID, speakerp));
+		mSpeakers.emplace(speakerp->mID, speakerp);
 		mSpeakersSorted.push_back(speakerp);
 		LL_DEBUGS("Speakers") << "Added speaker " << id << LL_ENDL;
 		fireEvent(new LLSpeakerListChangeEvent(this, speakerp->mID), "add");
@@ -498,12 +498,12 @@ void LLSpeakerMgr::updateSpeakerList()
 			// If the list is empty, we update it with whatever we have locally so that it doesn't stay empty too long.
 			// *TODO: Fix the server side code that sometimes forgets to send back the list of participants after a chat started.
 			// (IOW, fix why we get no ChatterBoxSessionAgentListUpdates message after the initial ChatterBoxSessionStartReply)
-			LLIMModel::LLIMSession* session = LLIMModel::getInstance()->findIMSession(session_id);
+			LLIMModel::LLIMSession* session = LLIMModel::getInstanceFast()->findIMSession(session_id);
 			if (session->isGroupSessionType() && (mSpeakers.size() <= 1))
 			{
 				// For groups, we need to hit the group manager.
 				// Note: The session uuid and the group uuid are actually one and the same. If that was to change, this will fail.
-				LLGroupMgrGroupData* gdatap = LLGroupMgr::getInstance()->getGroupData(session_id);
+				LLGroupMgrGroupData* gdatap = LLGroupMgr::getInstanceFast()->getGroupData(session_id);
 
 				if (gdatap && gdatap->isMemberDataComplete() && !gdatap->mMembers.empty())
 				{
@@ -531,7 +531,7 @@ void LLSpeakerMgr::updateSpeakerList()
                     mSpeakerListUpdated = true;
 				}
 			}
-			else if (mSpeakers.size() == 0)
+			else if (mSpeakers.empty())
 			{
 				// For all other session type (ad-hoc, P2P, avaline), we use the initial participants targets list
 				for (uuid_vec_t::iterator it = session->mInitialTargetIDs.begin();it!=session->mInitialTargetIDs.end();++it)
@@ -591,7 +591,7 @@ bool LLSpeakerMgr::removeSpeaker(const LLUUID& speaker_id)
 LLPointer<LLSpeaker> LLSpeakerMgr::findSpeaker(const LLUUID& speaker_id)
 {
 	//In some conditions map causes crash if it is empty(Windows only), adding check (EK)
-	if (mSpeakers.size() == 0)
+	if (mSpeakers.empty())
 		return NULL;
 	speaker_map_t::iterator found_it = mSpeakers.find(speaker_id);
 	if (found_it == mSpeakers.end())
@@ -649,7 +649,7 @@ void LLSpeakerMgr::speakerChatted(const LLUUID& speaker_id)
 BOOL LLSpeakerMgr::isVoiceActive()
 {
 	// mVoiceChannel = NULL means current voice channel, whatever it is
-	return LLVoiceClient::getInstance()->voiceEnabled() && mVoiceChannel && mVoiceChannel->isActive();
+	return LLVoiceClient::getInstanceFast()->voiceEnabled() && mVoiceChannel && mVoiceChannel->isActive();
 }
 
 
@@ -965,9 +965,9 @@ void LLActiveSpeakerMgr::updateSpeakerList()
 	LLSpeakerMgr::updateSpeakerList();
 
 	// clean up text only speakers
-	for (speaker_map_t::iterator speaker_it = mSpeakers.begin(); speaker_it != mSpeakers.end(); ++speaker_it)
+	for (auto& speaker_it : mSpeakers)
 	{
-		LLSpeaker* speakerp = speaker_it->second;
+		LLSpeaker* speakerp = speaker_it.second;
 		if (speakerp->mStatus == LLSpeaker::STATUS_TEXT_ONLY)
 		{
 			// automatically flag text only speakers for removal
@@ -1011,10 +1011,10 @@ void LLLocalSpeakerMgr::updateSpeakerList()
 	}
 
 	// check if text only speakers have moved out of chat range
-	for (speaker_map_t::iterator speaker_it = mSpeakers.begin(); speaker_it != mSpeakers.end(); ++speaker_it)
+	for (auto& speaker_it : mSpeakers)
 	{
-		LLUUID speaker_id = speaker_it->first;
-		LLPointer<LLSpeaker> speakerp = speaker_it->second;
+		LLUUID speaker_id = speaker_it.first;
+		LLPointer<LLSpeaker> speakerp = speaker_it.second;
 		if (speakerp.notNull() && speakerp->mStatus == LLSpeaker::STATUS_TEXT_ONLY)
 		{
 			LLVOAvatar* avatarp = (LLVOAvatar*)gObjectList.findObject(speaker_id);

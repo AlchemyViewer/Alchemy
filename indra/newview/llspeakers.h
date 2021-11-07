@@ -256,7 +256,7 @@ protected:
 	void setSpeakerNotInChannel(LLPointer<LLSpeaker> speackerp);
 	bool removeSpeaker(const LLUUID& speaker_id);
 
-	typedef std::map<LLUUID, LLPointer<LLSpeaker> > speaker_map_t;
+	typedef absl::flat_hash_map<LLUUID, LLPointer<LLSpeaker> > speaker_map_t;
 	speaker_map_t		mSpeakers;
 	bool                mSpeakerListUpdated;
     LLTimer             mGetListTime;
