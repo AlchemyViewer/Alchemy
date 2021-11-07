@@ -7563,15 +7563,10 @@ const LLViewerJointAttachment *LLVOAvatar::attachObject(LLViewerObject *viewer_o
 U32 LLVOAvatar::getNumAttachments() const
 {
 	U32 num_attachments = 0;
-#if SLOW_ATTACHMENT_LIST
+
 	for (const auto& attach_pair : mAttachmentPoints)
 	{
 		const LLViewerJointAttachment* attachment_pt = attach_pair.second;
-#else
-	for (auto& iter : mAttachedObjectsVector)
-	{
-		const LLViewerJointAttachment* attachment_pt = iter.second;
-#endif
 		num_attachments += attachment_pt->getNumObjects();
 	}
 	return num_attachments;
@@ -7600,15 +7595,10 @@ BOOL LLVOAvatar::canAttachMoreObjects(U32 n) const
 U32 LLVOAvatar::getNumAnimatedObjectAttachments() const
 {
 	U32 num_attachments = 0;
-#if SLOW_ATTACHMENT_LIST
+
 	for (const auto& attach_pair : mAttachmentPoints)
 	{
 		const LLViewerJointAttachment *attachment_pt = attach_pair.second;
-#else
-	for (auto& iter : mAttachedObjectsVector)
-	{
-		const LLViewerJointAttachment* attachment_pt = iter.second;
-#endif
 		num_attachments += attachment_pt->getNumAnimatedObjects();
 	}
 	return num_attachments;
@@ -7712,9 +7702,8 @@ void LLVOAvatar::rebuildRiggedAttachments( void )
 	for(auto& iter : mAttachedObjectsVector)
 	{{
 			const LLViewerObject* pAttachedObject = iter.first;
-			const LLViewerJointAttachment* pAttachment = iter.second;
 #endif
-			if ( pAttachment && pAttachedObject->mDrawable.notNull() )
+			if (pAttachedObject && pAttachedObject->mDrawable.notNull() )
 			{
 				gPipeline.markRebuild(pAttachedObject->mDrawable);
 			}
