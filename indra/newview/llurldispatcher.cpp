@@ -185,7 +185,7 @@ bool LLURLDispatcherImpl::dispatchRegion(const LLSLURL& slurl, const std::string
 	}
 
 	// Request a region handle by name
-	LLWorldMapMessage::getInstance()->sendNamedRegionRequest(slurl.getRegion(),
+	LLWorldMapMessage::getInstanceFast()->sendNamedRegionRequest(slurl.getRegion(),
 									  LLURLDispatcherImpl::regionNameCallback,
 									  slurl.getSLURLString(),
 									  LLUI::getInstance()->mSettingGroups["config"]->getBOOL("SLURLTeleportDirectly"));	// don't teleport
@@ -341,7 +341,7 @@ public:
 	static void teleport_via_slapp(std::string region_name, std::string callback_url)
 	{
 
-		LLWorldMapMessage::getInstance()->sendNamedRegionRequest(region_name,
+		LLWorldMapMessage::getInstanceFast()->sendNamedRegionRequest(region_name,
 			LLURLDispatcherImpl::regionHandleCallback,
 			callback_url,
 			true);	// teleport

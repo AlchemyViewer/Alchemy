@@ -347,7 +347,7 @@ void LLWorldMapView::draw()
 	gGL.setColorMask(true, true);
 
 	// Draw per sim overlayed information (names, mature, offline...)
-	for (const auto& sim_info_pair : LLWorldMap::getInstance()->getRegionMap())
+	for (const auto& sim_info_pair : LLWorldMap::getInstanceFast()->getRegionMap())
 	{
 		U64 handle = sim_info_pair.first;
 		LLSimInfo* info = sim_info_pair.second;
@@ -573,13 +573,13 @@ void LLWorldMapView::draw()
 			drawTracking( pos_global, map_track_color, TRUE, LLTracker::getLabel(), LLTracker::getToolTip() );
 		}
 	}
-	else if (LLWorldMap::getInstance()->isTracking())
+	else if (LLWorldMap::getInstanceFast()->isTracking())
 	{
-		if (LLWorldMap::getInstance()->isTrackingInvalidLocation())
+		if (LLWorldMap::getInstanceFast()->isTrackingInvalidLocation())
 		{
 			// We know this location to be invalid, draw a blue circle
 			LLColor4 loading_color(0.0, 0.5, 1.0, 1.0);
-			drawTracking( LLWorldMap::getInstance()->getTrackedPositionGlobal(), loading_color, TRUE, getString("InvalidLocation"), "");
+			drawTracking( LLWorldMap::getInstanceFast()->getTrackedPositionGlobal(), loading_color, TRUE, getString("InvalidLocation"), "");
 		}
 		else
 		{
@@ -587,7 +587,7 @@ void LLWorldMapView::draw()
 			double value = fmod(current_time, 2);
 			value = 0.5 + 0.5*cos(value * F_PI);
 			LLColor4 loading_color(0.0, F32(value/2), F32(value), 1.0);
-			drawTracking( LLWorldMap::getInstance()->getTrackedPositionGlobal(), loading_color, TRUE, getString("Loading"), "");
+			drawTracking( LLWorldMap::getInstanceFast()->getTrackedPositionGlobal(), loading_color, TRUE, getString("Loading"), "");
 		}
 	}
 
@@ -611,7 +611,7 @@ void LLWorldMapView::setVisible(BOOL visible)
 	if (!visible)
 	{
 		// Drop the download of tiles and images priority to nil if we hide the map
-		LLWorldMap::getInstance()->dropImagePriorities();
+		LLWorldMap::getInstanceFast()->dropImagePriorities();
 	}
 }
 
@@ -620,7 +620,7 @@ void LLWorldMapView::drawMipmap(S32 width, S32 height)
 	// Compute the level of the mipmap to use for the current scale level
 	S32 level = LLWorldMipmap::scaleToLevel(sMapScale);
 	// Set the tile boost level so that unused tiles get to 0
-	LLWorldMap::getInstance()->equalizeBoostLevels();
+	LLWorldMap::getInstanceFast()->equalizeBoostLevels();
 
 	// Render whatever we already have loaded if we haven't the current level
 	// complete and use it as a background (scaled up or scaled down)
@@ -685,7 +685,7 @@ bool LLWorldMapView::drawMipmapLevel(S32 width, S32 height, S32 level, bool load
 			// Convert to the mipmap level coordinates for that point (i.e. which tile to we hit)
 			LLWorldMipmap::globalToMipmap(pos_global[VX], pos_global[VY], level, &grid_x, &grid_y);
 			// Get the tile. Note: NULL means that the image does not exist (so it's considered "complete" as far as fetching is concerned)
-			LLPointer<LLViewerFetchedTexture> simimage = LLWorldMap::getInstance()->getObjectsTile(grid_x, grid_y, level, load);
+			LLPointer<LLViewerFetchedTexture> simimage = LLWorldMap::getInstanceFast()->getObjectsTile(grid_x, grid_y, level, load);
 			if (simimage)
 			{
 				// Checks that the image has a valid texture
@@ -828,7 +828,7 @@ void LLWorldMapView::drawItems()
 	for (handle_list_t::iterator iter = mVisibleRegions.begin(); iter != mVisibleRegions.end(); ++iter)
 	{
 		U64 handle = *iter;
-		LLSimInfo* info = LLWorldMap::getInstance()->simInfoFromHandle(handle);
+		LLSimInfo* info = LLWorldMap::getInstanceFast()->simInfoFromHandle(handle);
 		if ((info == NULL) || (info->isDown()))
 		{
 			continue;
@@ -880,7 +880,7 @@ void LLWorldMapView::drawAgents()
 	for (handle_list_t::iterator iter = mVisibleRegions.begin(); iter != mVisibleRegions.end(); ++iter)
 	{
 		U64 handle = *iter;
-		LLSimInfo* siminfo = LLWorldMap::getInstance()->simInfoFromHandle(handle);
+		LLSimInfo* siminfo = LLWorldMap::getInstanceFast()->simInfoFromHandle(handle);
 		if ((siminfo == NULL) || (siminfo->isDown()))
 		{
 			continue;
@@ -1080,7 +1080,7 @@ BOOL LLWorldMapView::handleToolTip( S32 x, S32 y, MASK mask )
 	U64 handle = to_region_handle(pos_global);
 	std::string tooltip_msg;
 
-	LLSimInfo* info = LLWorldMap::getInstance()->simInfoFromHandle(handle);
+	LLSimInfo* info = LLWorldMap::getInstanceFast()->simInfoFromHandle(handle);
 	if (info)
 	{
 		LLViewerRegion *region = gAgent.getRegion();
@@ -1478,7 +1478,7 @@ bool LLWorldMapView::checkItemHit(S32 x, S32 y, LLItemInfo& item, LLUUID* id, bo
 	if (y < item_y - BIG_DOT_RADIUS) return false;
 	if (y > item_y + BIG_DOT_RADIUS) return false;
 
-	LLSimInfo* sim_info = LLWorldMap::getInstance()->simInfoFromHandle(item.getRegionHandle());
+	LLSimInfo* sim_info = LLWorldMap::getInstanceFast()->simInfoFromHandle(item.getRegionHandle());
 	if (sim_info)
 	{
 		if (track)
@@ -1516,7 +1516,7 @@ void LLWorldMapView::handleClick(S32 x, S32 y, MASK mask,
 
 	*hit_type = 0; // hit nothing
 
-	LLWorldMap::getInstance()->cancelTracking();
+	LLWorldMap::getInstanceFast()->cancelTracking();
 
 	S32 level = LLWorldMipmap::scaleToLevel(sMapScale);
 	// If the zoom level is not too far out already, test hits
@@ -1532,7 +1532,7 @@ void LLWorldMapView::handleClick(S32 x, S32 y, MASK mask,
 			for (handle_list_t::iterator iter = mVisibleRegions.begin(); iter != mVisibleRegions.end(); ++iter)
 			{
 				U64 handle = *iter;
-				LLSimInfo* siminfo = LLWorldMap::getInstance()->simInfoFromHandle(handle);
+				LLSimInfo* siminfo = LLWorldMap::getInstanceFast()->simInfoFromHandle(handle);
 				if ((siminfo == NULL) || (siminfo->isDown()))
 				{
 					continue;
@@ -1706,7 +1706,7 @@ void LLWorldMapView::updateVisibleBlocks()
 	S32 world_top    = world_center_y + S32(half_height / sMapScale) + 1;
 
 	//LL_INFOS("WorldMap") << "LLWorldMapView::updateVisibleBlocks() : sMapScale = " << sMapScale << ", left = " << world_left << ", right = " << world_right << ", bottom  = " << world_bottom << ", top = " << world_top << LL_ENDL;
-	LLWorldMap::getInstance()->updateRegions(world_left, world_bottom, world_right, world_top);
+	LLWorldMap::getInstanceFast()->updateRegions(world_left, world_bottom, world_right, world_top);
 }
 
 BOOL LLWorldMapView::handleHover( S32 x, S32 y, MASK mask )
@@ -1791,7 +1791,7 @@ BOOL LLWorldMapView::handleDoubleClick( S32 x, S32 y, MASK mask )
 			{
 				LLVector3d pos_global = viewPosToGlobal(x, y);
 				std::string sim_name;
-				if (LLWorldMap::getInstance()->simNameFromPosGlobal(pos_global, sim_name))
+				if (LLWorldMap::getInstanceFast()->simNameFromPosGlobal(pos_global, sim_name))
 				{
 					LLFloaterReg::hideInstance("world_map");
 					LLFloaterReg::showInstance("search", LLSD().with("category", "land").with("query", sim_name));
@@ -1806,15 +1806,15 @@ BOOL LLWorldMapView::handleDoubleClick( S32 x, S32 y, MASK mask )
 			}
 		default:
 			{
-				if (LLWorldMap::getInstance()->isTracking())
+				if (LLWorldMap::getInstanceFast()->isTracking())
 				{
-					LLWorldMap::getInstance()->setTrackingDoubleClick();
+					LLWorldMap::getInstanceFast()->setTrackingDoubleClick();
 				}
 				else
 				{
 					// Teleport if we got a valid location
 					LLVector3d pos_global = viewPosToGlobal(x,y);
-					LLSimInfo* sim_info = LLWorldMap::getInstance()->simInfoFromPosGlobal(pos_global);
+					LLSimInfo* sim_info = LLWorldMap::getInstanceFast()->simInfoFromPosGlobal(pos_global);
 					if (sim_info && !sim_info->isDown())
 					{
 						gAgent.teleportViaLocation( pos_global );

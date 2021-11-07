@@ -165,8 +165,8 @@ void LLWorldMapMessage::processMapBlockReply(LLMessageSystem* msg, void**)
 
 	bool found_null_sim = false;
 
-	auto& world_map = LLWorldMap::instance();
-	auto& world_map_message = LLWorldMapMessage::instance();
+	auto& world_map = LLWorldMap::instanceFast();
+	auto& world_map_message = LLWorldMapMessage::instanceFast();
 
 	for (S32 block=0; block<num_blocks; ++block)
 	{
@@ -242,7 +242,7 @@ void LLWorldMapMessage::processMapItemReply(LLMessageSystem* msg, void**)
 
 	S32 num_blocks = msg->getNumberOfBlocksFast(_PREHASH_Data);
 
-	auto& world_map = LLWorldMap::instance();
+	auto& world_map = LLWorldMap::instanceFast();
 
 	for (S32 block=0; block<num_blocks; ++block)
 	{

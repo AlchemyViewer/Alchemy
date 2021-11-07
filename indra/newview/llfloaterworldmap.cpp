@@ -346,7 +346,7 @@ LLFloaterWorldMap* LLFloaterWorldMap::getInstance()
 void LLFloaterWorldMap::onClose(bool app_quitting)
 {
 	// While we're not visible, discard the overlay images we're using
-	LLWorldMap::getInstance()->clearImageRefs();
+	LLWorldMap::getInstanceFast()->clearImageRefs();
 }
 
 // virtual
@@ -369,7 +369,7 @@ void LLFloaterWorldMap::onOpen(const LLSD& key)
 		map_panel->updateVisibleBlocks();
 		
 		// Reload items as they may have changed
-		LLWorldMap::getInstance()->reloadItems();
+		LLWorldMap::getInstanceFast()->reloadItems();
 		
 		// We may already have a bounding box for the regions of the world,
 		// so use that to adjust the view.
@@ -380,7 +380,7 @@ void LLFloaterWorldMap::onOpen(const LLSD& key)
 		
 		// Start speculative download of landmarks
 		const LLUUID landmark_folder_id = gInventory.findCategoryUUIDForType(LLFolderType::FT_LANDMARK);
-		LLInventoryModelBackgroundFetch::instance().start(landmark_folder_id);
+		LLInventoryModelBackgroundFetch::instanceFast().start(landmark_folder_id);
 		
 		getChild<LLUICtrl>("location")->setFocus( TRUE);
 		gFocusMgr.triggerFocusFlash();
@@ -401,7 +401,7 @@ void LLFloaterWorldMap::onOpen(const LLSD& key)
 // static
 void LLFloaterWorldMap::reloadIcons(void*)
 {
-	LLWorldMap::getInstance()->reloadItems();
+	LLWorldMap::getInstanceFast()->reloadItems();
 }
 
 // virtual
@@ -499,9 +499,9 @@ void LLFloaterWorldMap::draw()
 	
 	getChildView("Teleport")->setEnabled((BOOL)tracking_status);
 	//	getChildView("Clear")->setEnabled((BOOL)tracking_status);
-	getChildView("Show Destination")->setEnabled((BOOL)tracking_status || LLWorldMap::getInstance()->isTracking());
+	getChildView("Show Destination")->setEnabled((BOOL)tracking_status || LLWorldMap::getInstanceFast()->isTracking());
 	getChildView("copy_slurl")->setEnabled((mSLURL.isValid()) );
-	mTrackRegionButton->setEnabled((BOOL) tracking_status || LLWorldMap::getInstance()->isTracking());
+	mTrackRegionButton->setEnabled((BOOL) tracking_status || LLWorldMap::getInstanceFast()->isTracking());
 // [RLVa:KB] - Checked: 2010-08-22 (RLVa-1.2.1a) | Added: RLVa-1.2.1a
 	childSetEnabled("Go Home", 
 		(!rlv_handler_t::isEnabled()) || !(gRlvHandler.hasBehaviour(RLV_BHVR_TPLM) && gRlvHandler.hasBehaviour(RLV_BHVR_TPLOC)));
@@ -637,15 +637,15 @@ void LLFloaterWorldMap::trackGenericItem(const LLItemInfo &item)
 
 void LLFloaterWorldMap::trackLocation(const LLVector3d& pos_global)
 {
-	LLSimInfo* sim_info = LLWorldMap::getInstance()->simInfoFromPosGlobal(pos_global);
+	LLSimInfo* sim_info = LLWorldMap::getInstanceFast()->simInfoFromPosGlobal(pos_global);
 	if (!sim_info)
 	{
 		// We haven't found a region for that point yet, leave the tracking to the world map
 		LLTracker::stopTracking(false);
-		LLWorldMap::getInstance()->setTracking(pos_global);
+		LLWorldMap::getInstanceFast()->setTracking(pos_global);
 		S32 world_x = S32(pos_global.mdV[0] / 256);
 		S32 world_y = S32(pos_global.mdV[1] / 256);
-		LLWorldMapMessage::getInstance()->sendMapBlockRequest(world_x, world_y, world_x, world_y, true);
+		LLWorldMapMessage::getInstanceFast()->sendMapBlockRequest(world_x, world_y, world_x, world_y, true);
 		setDefaultBtn("");
 		
 		// clicked on a non-region - turn off coord display
@@ -658,8 +658,8 @@ void LLFloaterWorldMap::trackLocation(const LLVector3d& pos_global)
 		// Down region. Show the blue circle of death!
 		// i.e. let the world map that this and tell it it's invalid
 		LLTracker::stopTracking(false);
-		LLWorldMap::getInstance()->setTracking(pos_global);
-		LLWorldMap::getInstance()->setTrackingInvalid();
+		LLWorldMap::getInstanceFast()->setTracking(pos_global);
+		LLWorldMap::getInstanceFast()->setTrackingInvalid();
 		setDefaultBtn("");
 		
 		// clicked on a down region - turn off coord display
@@ -679,7 +679,7 @@ void LLFloaterWorldMap::trackLocation(const LLVector3d& pos_global)
 	
 	std::string tooltip("");
 	mTrackedStatus = LLTracker::TRACKING_LOCATION;
-	LLWorldMap::getInstance()->cancelTracking();		// The floater is taking over the tracking
+	LLWorldMap::getInstanceFast()->cancelTracking();		// The floater is taking over the tracking
 // [RLVa:KB] - Checked: 2012-02-08 (RLVa-1.4.5) | Added: RLVa-1.4.5
 	LLTracker::trackLocation(pos_global, (!gRlvHandler.hasBehaviour(RLV_BHVR_SHOWLOC)) ? full_name : RlvStrings::getString(RlvStringKeys::Hidden::Generic).c_str(), tooltip);
 // [/RLVa:KB]
@@ -753,7 +753,7 @@ void LLFloaterWorldMap::updateLocation()
 		{
 			// Make sure we know where we are before setting the current user position
 			std::string agent_sim_name;
-			gotSimName = LLWorldMap::getInstance()->simNameFromPosGlobal( agentPos, agent_sim_name );
+			gotSimName = LLWorldMap::getInstanceFast()->simNameFromPosGlobal( agentPos, agent_sim_name );
 // [RLVa:KB] - Checked: 2012-02-08 (RLVa-1.4.5) | Added: RLVa-1.4.5
 			if (gRlvHandler.hasBehaviour(RLV_BHVR_SHOWLOC))
 			{
@@ -788,7 +788,7 @@ void LLFloaterWorldMap::updateLocation()
 		return; // invalid location
 	}
 	std::string sim_name;
-	gotSimName = LLWorldMap::getInstance()->simNameFromPosGlobal( pos_global, sim_name );
+	gotSimName = LLWorldMap::getInstanceFast()->simNameFromPosGlobal( pos_global, sim_name );
 	if ((status != LLTracker::TRACKING_NOTHING) &&
 		(status != mTrackedStatus || pos_global != mTrackedLocation || sim_name != mTrackedSimName))
 	{
@@ -836,7 +836,7 @@ void LLFloaterWorldMap::updateLocation()
 
 void LLFloaterWorldMap::trackURL(const std::string& region_name, S32 x_coord, S32 y_coord, S32 z_coord)
 {
-	LLSimInfo* sim_info = LLWorldMap::getInstance()->simInfoFromName(region_name);
+	LLSimInfo* sim_info = LLWorldMap::getInstanceFast()->simInfoFromName(region_name);
 	z_coord = llclamp(z_coord, 0, 4096);
 	if (sim_info)
 	{
@@ -860,9 +860,9 @@ void LLFloaterWorldMap::trackURL(const std::string& region_name, S32 x_coord, S3
 		
 		// pass sim name to combo box
 		gFloaterWorldMap->mCompletingRegionName = region_name;
-		LLWorldMapMessage::getInstance()->sendNamedRegionRequest(region_name);
+		LLWorldMapMessage::getInstanceFast()->sendNamedRegionRequest(region_name);
 		LLStringUtil::toLower(gFloaterWorldMap->mCompletingRegionName);
-		LLWorldMap::getInstance()->setTrackingCommit();
+		LLWorldMap::getInstanceFast()->setTrackingCommit();
 	}
 }
 
@@ -1026,7 +1026,7 @@ void LLFloaterWorldMap::clearLocationSelection(BOOL clear_ui, BOOL dest_reached)
 	{
 		list->operateOnAll(LLCtrlListInterface::OP_DELETE);
 	}
-	LLWorldMap::getInstance()->cancelTracking();
+	LLWorldMap::getInstanceFast()->cancelTracking();
 	mCompletingRegionName = "";
 }
 
@@ -1296,15 +1296,15 @@ void LLFloaterWorldMap::onLocationCommit()
 	
 	LLStringUtil::toLower(str);
 	mCompletingRegionName = str;
-	LLWorldMap::getInstance()->setTrackingCommit();
+	LLWorldMap::getInstanceFast()->setTrackingCommit();
 	if (str.length() >= 3)
 	{
-		LLWorldMapMessage::getInstance()->sendNamedRegionRequest(str);
+		LLWorldMapMessage::getInstanceFast()->sendNamedRegionRequest(str);
 	}
 	else
 	{
 		str += "#";
-		LLWorldMapMessage::getInstance()->sendNamedRegionRequest(str);
+		LLWorldMapMessage::getInstanceFast()->sendNamedRegionRequest(str);
 	}
 }
 
@@ -1328,7 +1328,7 @@ void LLFloaterWorldMap::onClearBtn()
 {
 	mTrackedStatus = LLTracker::TRACKING_NOTHING;
 	LLTracker::stopTracking(true);
-	LLWorldMap::getInstance()->cancelTracking();
+	LLWorldMap::getInstanceFast()->cancelTracking();
 	mSLURL = LLSLURL();					// Clear the SLURL since it's invalid
 	mSetToUserPosition = TRUE;	// Revert back to the current user position
 }
@@ -1368,7 +1368,7 @@ void LLFloaterWorldMap::onTrackRegion()
 		if (LLTracker::getTrackingStatus() != LLTracker::TRACKING_NOTHING)
 		{
 			std::string sim_name;
-			if (LLWorldMap::getInstance()->simNameFromPosGlobal(LLTracker::getTrackedPositionGlobal(), sim_name))
+			if (LLWorldMap::getInstanceFast()->simNameFromPosGlobal(LLTracker::getTrackedPositionGlobal(), sim_name))
 			{
 				const std::string& temp_label = floaterp->getRegionLabelIfExists(sim_name);
 				LLSD args, payload;
@@ -1402,9 +1402,9 @@ void LLFloaterWorldMap::centerOnTarget(BOOL animate)
 			pos_global = LLTracker::getTrackedPositionGlobal() - gAgentCamera.getCameraPositionGlobal();
 		}
 	}
-	else if(LLWorldMap::getInstance()->isTracking())
+	else if(LLWorldMap::getInstanceFast()->isTracking())
 	{
-		pos_global = LLWorldMap::getInstance()->getTrackedPositionGlobal() - gAgentCamera.getCameraPositionGlobal();;
+		pos_global = LLWorldMap::getInstanceFast()->getTrackedPositionGlobal() - gAgentCamera.getCameraPositionGlobal();;
 		
 		
 		
@@ -1588,7 +1588,7 @@ void LLFloaterWorldMap::updateSims(bool found_null_sim)
 
 	S32 num_results = 0;
 
-	std::vector<std::pair <U64, LLSimInfo*> > sim_info_vec(LLWorldMap::getInstance()->getRegionMap().begin(), LLWorldMap::getInstance()->getRegionMap().end());
+	std::vector<std::pair <U64, LLSimInfo*> > sim_info_vec(LLWorldMap::getInstanceFast()->getRegionMap().begin(), LLWorldMap::getInstanceFast()->getRegionMap().end());
 	std::sort(sim_info_vec.begin(), sim_info_vec.end(), SortRegionNames());
 
 	for (std::vector<std::pair <U64, LLSimInfo*> >::const_iterator it = sim_info_vec.begin(); it != sim_info_vec.end(); ++it)
@@ -1655,7 +1655,7 @@ void LLFloaterWorldMap::onCommitSearchResult()
 	}
 	LLStringUtil::toLower(sim_name);
 
-	for (const auto& sim_info_pair : LLWorldMap::getInstance()->getRegionMap())
+	for (const auto& sim_info_pair : LLWorldMap::getInstanceFast()->getRegionMap())
 	{
 		LLSimInfo* info = sim_info_pair.second;
 		

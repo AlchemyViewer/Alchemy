@@ -131,7 +131,7 @@ void ALFloaterRegionTracker::refresh()
 			maturity.column("region_maturity_icon").type("icon").font_halign(LLFontGL::HCENTER);
 			region.column("region_name").type("text").value(sim_name);
 			count.column("region_agent_count").type("text").value("...");
-			if (LLSimInfo* info = LLWorldMap::getInstance()->simInfoFromName(sim_name))
+			if (LLSimInfo* info = LLWorldMap::getInstanceFast()->simInfoFromName(sim_name))
 			{
 				maturity.value(info->getAccessIcon());
 
@@ -188,13 +188,13 @@ void ALFloaterRegionTracker::requestRegionData()
 	for (LLSD::map_const_iterator it = mRegionMap.beginMap(), end = mRegionMap.endMap(); it != end; ++it)
 	{
 		const auto& name = it->first;
-		if (LLSimInfo* info = LLWorldMap::getInstance()->simInfoFromName(name))
+		if (LLSimInfo* info = LLWorldMap::getInstanceFast()->simInfoFromName(name))
 		{
 			info->updateAgentCount(LLTimer::getElapsedSeconds());
 		}
 		else
 		{
-			LLWorldMapMessage::getInstance()->sendNamedRegionRequest(name);
+			LLWorldMapMessage::getInstanceFast()->sendNamedRegionRequest(name);
 		}
 	}
 	mEventTimer.start();
