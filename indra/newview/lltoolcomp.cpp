@@ -150,7 +150,7 @@ BOOL LLToolCompInspect::handleMouseDown(S32 x, S32 y, MASK mask)
 {
 	BOOL handled = FALSE;
 
-	if (mCur == LLToolCamera::getInstance())
+	if (mCur == LLToolCamera::getInstanceFast())
 	{
 		handled = mCur->handleMouseDown(x, y, mask);
 	}
@@ -224,7 +224,7 @@ void LLToolCompInspect::onMouseCaptureLost()
 
 void LLToolCompInspect::keyUp(KEY key, MASK mask)
 {
-	if (KEY_ALT == key && mCur == LLToolCamera::getInstance())
+	if (KEY_ALT == key && mCur == LLToolCamera::getInstanceFast())
 	{
 		setCurrentTool(mDefault);
 		mIsToolCameraActive = FALSE;
@@ -275,41 +275,43 @@ void LLToolCompTranslate::pickCallback(const LLPickInfo& pick_info)
 {
 	LLViewerObject* hit_obj = pick_info.getObject();
 
-	LLToolCompTranslate::getInstance()->mManip->highlightManipulators(pick_info.mMousePt.mX, pick_info.mMousePt.mY);
-	if (!LLToolCompTranslate::getInstance()->mMouseDown)
+	auto tool_comp_translate = LLToolCompTranslate::getInstanceFast();
+
+	LLToolCompTranslate::getInstanceFast()->mManip->highlightManipulators(pick_info.mMousePt.mX, pick_info.mMousePt.mY);
+	if (!tool_comp_translate->mMouseDown)
 	{
 		// fast click on object, but mouse is already up...just do select
-		LLToolCompTranslate::getInstance()->mSelectRect->handleObjectSelection(pick_info, ALControlCache::EditLinkedParts, FALSE);
+		tool_comp_translate->mSelectRect->handleObjectSelection(pick_info, ALControlCache::EditLinkedParts, FALSE);
 		return;
 	}
 
-	if( hit_obj || LLToolCompTranslate::getInstance()->mManip->getHighlightedPart() != LLManip::LL_NO_PART )
+	if( hit_obj || tool_comp_translate->mManip->getHighlightedPart() != LLManip::LL_NO_PART )
 	{
-		if (LLToolCompTranslate::getInstance()->mManip->getSelection()->getObjectCount())
+		if (tool_comp_translate->mManip->getSelection()->getObjectCount())
 		{
 			LLEditMenuHandler::gEditMenuHandler = LLSelectMgr::getInstanceFast();
 		}
 
-		BOOL can_move = LLToolCompTranslate::getInstance()->mManip->canAffectSelection();
+		BOOL can_move = tool_comp_translate->mManip->canAffectSelection();
 
-		if(	LLManip::LL_NO_PART != LLToolCompTranslate::getInstance()->mManip->getHighlightedPart() && can_move)
+		if(	LLManip::LL_NO_PART != tool_comp_translate->mManip->getHighlightedPart() && can_move)
 		{
-			LLToolCompTranslate::getInstance()->setCurrentTool( LLToolCompTranslate::getInstance()->mManip );
-			LLToolCompTranslate::getInstance()->mManip->handleMouseDownOnPart( pick_info.mMousePt.mX, pick_info.mMousePt.mY, pick_info.mKeyMask );
+			tool_comp_translate->setCurrentTool( tool_comp_translate->mManip );
+			tool_comp_translate->mManip->handleMouseDownOnPart( pick_info.mMousePt.mX, pick_info.mMousePt.mY, pick_info.mKeyMask );
 		}
 		else
 		{
-			LLToolCompTranslate::getInstance()->setCurrentTool( LLToolCompTranslate::getInstance()->mSelectRect );
-			LLToolCompTranslate::getInstance()->mSelectRect->handlePick( pick_info );
+			tool_comp_translate->setCurrentTool( tool_comp_translate->mSelectRect );
+			tool_comp_translate->mSelectRect->handlePick( pick_info );
 
 			// *TODO: add toggle to trigger old click-drag functionality
-			// LLToolCompTranslate::getInstance()->mManip->handleMouseDownOnPart( XY_part, x, y, mask);
+			// tool_comp_translate->mManip->handleMouseDownOnPart( XY_part, x, y, mask);
 		}
 	}
 	else
 	{
-		LLToolCompTranslate::getInstance()->setCurrentTool( LLToolCompTranslate::getInstance()->mSelectRect );
-		LLToolCompTranslate::getInstance()->mSelectRect->handlePick( pick_info );
+		tool_comp_translate->setCurrentTool( tool_comp_translate->mSelectRect );
+		tool_comp_translate->mSelectRect->handlePick( pick_info );
 	}
 }
 
@@ -323,11 +325,11 @@ LLTool* LLToolCompTranslate::getOverrideTool(MASK mask)
 {
 	if (mask == MASK_CONTROL)
 	{
-		return LLToolCompRotate::getInstance();
+		return LLToolCompRotate::getInstanceFast();
 	}
 	else if (mask == (MASK_CONTROL | MASK_SHIFT))
 	{
-		return LLToolCompScale::getInstance();
+		return LLToolCompScale::getInstanceFast();
 	}
 	return LLToolComposite::getOverrideTool(mask);
 }
@@ -399,36 +401,38 @@ void LLToolCompScale::pickCallback(const LLPickInfo& pick_info)
 {
 	LLViewerObject* hit_obj = pick_info.getObject();
 
-	LLToolCompScale::getInstance()->mManip->highlightManipulators(pick_info.mMousePt.mX, pick_info.mMousePt.mY);
-	if (!LLToolCompScale::getInstance()->mMouseDown)
+	auto tool_comp_scale = LLToolCompScale::getInstanceFast();
+
+	tool_comp_scale->mManip->highlightManipulators(pick_info.mMousePt.mX, pick_info.mMousePt.mY);
+	if (!tool_comp_scale->mMouseDown)
 	{
 		// fast click on object, but mouse is already up...just do select
-		LLToolCompScale::getInstance()->mSelectRect->handleObjectSelection(pick_info, ALControlCache::EditLinkedParts, FALSE);
+		tool_comp_scale->mSelectRect->handleObjectSelection(pick_info, ALControlCache::EditLinkedParts, FALSE);
 
 		return;
 	}
 
-	if( hit_obj || LLToolCompScale::getInstance()->mManip->getHighlightedPart() != LLManip::LL_NO_PART)
+	if( hit_obj || tool_comp_scale->mManip->getHighlightedPart() != LLManip::LL_NO_PART)
 	{
-		if (LLToolCompScale::getInstance()->mManip->getSelection()->getObjectCount())
+		if (tool_comp_scale->mManip->getSelection()->getObjectCount())
 		{
 			LLEditMenuHandler::gEditMenuHandler = LLSelectMgr::getInstanceFast();
 		}
-		if(	LLManip::LL_NO_PART != LLToolCompScale::getInstance()->mManip->getHighlightedPart() )
+		if(	LLManip::LL_NO_PART != tool_comp_scale->mManip->getHighlightedPart() )
 		{
-			LLToolCompScale::getInstance()->setCurrentTool( LLToolCompScale::getInstance()->mManip );
-			LLToolCompScale::getInstance()->mManip->handleMouseDownOnPart( pick_info.mMousePt.mX, pick_info.mMousePt.mY, pick_info.mKeyMask );
+			tool_comp_scale->setCurrentTool( tool_comp_scale->mManip );
+			tool_comp_scale->mManip->handleMouseDownOnPart( pick_info.mMousePt.mX, pick_info.mMousePt.mY, pick_info.mKeyMask );
 		}
 		else
 		{
-			LLToolCompScale::getInstance()->setCurrentTool( LLToolCompScale::getInstance()->mSelectRect );
-			LLToolCompScale::getInstance()->mSelectRect->handlePick( pick_info );
+			tool_comp_scale->setCurrentTool( tool_comp_scale->mSelectRect );
+			tool_comp_scale->mSelectRect->handlePick( pick_info );
 		}
 	}
 	else
 	{
-		LLToolCompScale::getInstance()->setCurrentTool( LLToolCompScale::getInstance()->mSelectRect );
-		LLToolCompScale::getInstance()->mSelectRect->handlePick( pick_info );
+		tool_comp_scale->setCurrentTool( tool_comp_scale->mSelectRect );
+		tool_comp_scale->mSelectRect->handlePick( pick_info );
 	}
 }
 
@@ -442,7 +446,7 @@ LLTool* LLToolCompScale::getOverrideTool(MASK mask)
 {
 	if (mask == MASK_CONTROL)
 	{
-		return LLToolCompRotate::getInstance();
+		return LLToolCompRotate::getInstanceFast();
 	}
 
 	return LLToolComposite::getOverrideTool(mask);
@@ -528,8 +532,9 @@ void LLToolCompCreate::pickCallback(const LLPickInfo& pick_info)
 	MASK mask = (pick_info.mKeyMask & ~MASK_SHIFT);
 	mask = (mask & ~MASK_CONTROL);
 
-	LLToolCompCreate::getInstance()->setCurrentTool( LLToolCompCreate::getInstance()->mSelectRect );
-	LLToolCompCreate::getInstance()->mSelectRect->handlePick( pick_info );
+	auto tool_comp_create = LLToolCompCreate::getInstanceFast();
+	tool_comp_create->setCurrentTool(tool_comp_create->mSelectRect );
+	tool_comp_create->mSelectRect->handlePick( pick_info );
 }
 
 BOOL LLToolCompCreate::handleDoubleClick(S32 x, S32 y, MASK mask)
@@ -599,35 +604,36 @@ void LLToolCompRotate::pickCallback(const LLPickInfo& pick_info)
 {
 	LLViewerObject* hit_obj = pick_info.getObject();
 
-	LLToolCompRotate::getInstance()->mManip->highlightManipulators(pick_info.mMousePt.mX, pick_info.mMousePt.mY);
-	if (!LLToolCompRotate::getInstance()->mMouseDown)
+	auto tool_comp_rotate = LLToolCompRotate::getInstanceFast();
+	tool_comp_rotate->mManip->highlightManipulators(pick_info.mMousePt.mX, pick_info.mMousePt.mY);
+	if (!tool_comp_rotate->mMouseDown)
 	{
 		// fast click on object, but mouse is already up...just do select
-		LLToolCompRotate::getInstance()->mSelectRect->handleObjectSelection(pick_info, ALControlCache::EditLinkedParts, FALSE);
+		tool_comp_rotate->mSelectRect->handleObjectSelection(pick_info, ALControlCache::EditLinkedParts, FALSE);
 		return;
 	}
 	
-	if( hit_obj || LLToolCompRotate::getInstance()->mManip->getHighlightedPart() != LLManip::LL_NO_PART)
+	if( hit_obj || tool_comp_rotate->mManip->getHighlightedPart() != LLManip::LL_NO_PART)
 	{
-		if (LLToolCompRotate::getInstance()->mManip->getSelection()->getObjectCount())
+		if (tool_comp_rotate->mManip->getSelection()->getObjectCount())
 		{
 			LLEditMenuHandler::gEditMenuHandler = LLSelectMgr::getInstanceFast();
 		}
-		if(	LLManip::LL_NO_PART != LLToolCompRotate::getInstance()->mManip->getHighlightedPart() )
+		if(	LLManip::LL_NO_PART != tool_comp_rotate->mManip->getHighlightedPart() )
 		{
-			LLToolCompRotate::getInstance()->setCurrentTool( LLToolCompRotate::getInstance()->mManip );
-			LLToolCompRotate::getInstance()->mManip->handleMouseDownOnPart( pick_info.mMousePt.mX, pick_info.mMousePt.mY, pick_info.mKeyMask );
+			tool_comp_rotate->setCurrentTool( tool_comp_rotate->mManip );
+			tool_comp_rotate->mManip->handleMouseDownOnPart( pick_info.mMousePt.mX, pick_info.mMousePt.mY, pick_info.mKeyMask );
 		}
 		else
 		{
-			LLToolCompRotate::getInstance()->setCurrentTool( LLToolCompRotate::getInstance()->mSelectRect );
-			LLToolCompRotate::getInstance()->mSelectRect->handlePick( pick_info );
+			tool_comp_rotate->setCurrentTool( tool_comp_rotate->mSelectRect );
+			tool_comp_rotate->mSelectRect->handlePick( pick_info );
 		}
 	}
 	else
 	{
-		LLToolCompRotate::getInstance()->setCurrentTool( LLToolCompRotate::getInstance()->mSelectRect );
-		LLToolCompRotate::getInstance()->mSelectRect->handlePick( pick_info );
+		tool_comp_rotate->setCurrentTool( tool_comp_rotate->mSelectRect );
+		tool_comp_rotate->mSelectRect->handlePick( pick_info );
 	}
 }
 
@@ -641,7 +647,7 @@ LLTool* LLToolCompRotate::getOverrideTool(MASK mask)
 {
 	if (mask == (MASK_CONTROL | MASK_SHIFT))
 	{
-		return LLToolCompScale::getInstance();
+		return LLToolCompScale::getInstanceFast();
 	}
 	return LLToolComposite::getOverrideTool(mask);
 }
@@ -758,7 +764,7 @@ BOOL LLToolCompGun::handleMouseDown(S32 x, S32 y, MASK mask)
 	gGrabTransientTool = this;
 	LLToolMgr::getInstanceFast()->getCurrentToolset()->selectTool( (LLTool*) mGrab );
 
-	return LLToolGrab::getInstance()->handleMouseDown(x, y, mask);
+	return LLToolGrab::getInstanceFast()->handleMouseDown(x, y, mask);
 }
 
 
