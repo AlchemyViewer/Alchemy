@@ -364,7 +364,7 @@ void LLSpeakerMgr::update(BOOL resort_ok)
 		return;
 	}
 	
-	auto& voice_client = LLVoiceClient::instance();
+	auto& voice_client = LLVoiceClient::instanceFast();
 
 	static const LLUIColor speaking_color = LLUIColorTable::instance().getColor("SpeakingColor");
 	static const LLUIColor overdriven_color = LLUIColorTable::instance().getColor("OverdrivenColor");
@@ -475,7 +475,7 @@ void LLSpeakerMgr::update(BOOL resort_ok)
 void LLSpeakerMgr::updateSpeakerList()
 {
 	// Are we bound to the currently active voice channel?
-	auto& voice_client = LLVoiceClient::instance();
+	auto& voice_client = LLVoiceClient::instanceFast();
 	if ((!mVoiceChannel && voice_client.inProximalChannel()) || (mVoiceChannel && mVoiceChannel->isActive()))
 	{
 		std::set<LLUUID> participants;

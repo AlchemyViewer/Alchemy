@@ -69,7 +69,7 @@ LLDrawPoolWater::~LLDrawPoolWater()
 
 void LLDrawPoolWater::setTransparentTextures(const LLUUID& transparentTextureId, const LLUUID& nextTransparentTextureId)
 {
-	const LLSettingsWater::ptr_t& pwater = LLEnvironment::instance().getCurrentWater();
+	const LLSettingsWater::ptr_t& pwater = LLEnvironment::instanceFast().getCurrentWater();
     mWaterImagep[0] = LLViewerTextureManager::getFetchedTexture(!transparentTextureId.isNull() ? transparentTextureId : pwater->GetDefaultTransparentTextureAssetId());
     mWaterImagep[1] = LLViewerTextureManager::getFetchedTexture(!nextTransparentTextureId.isNull() ? nextTransparentTextureId : (!transparentTextureId.isNull() ? transparentTextureId : pwater->GetDefaultTransparentTextureAssetId()));
     mWaterImagep[0]->addTextureStats(1024.f*1024.f);
@@ -84,7 +84,7 @@ void LLDrawPoolWater::setOpaqueTexture(const LLUUID& opaqueTextureId)
 
 void LLDrawPoolWater::setNormalMaps(const LLUUID& normalMapId, const LLUUID& nextNormalMapId)
 {
-	const LLSettingsWater::ptr_t& pwater = LLEnvironment::instance().getCurrentWater();
+	const LLSettingsWater::ptr_t& pwater = LLEnvironment::instanceFast().getCurrentWater();
     mWaterNormp[0] = LLViewerTextureManager::getFetchedTexture(!normalMapId.isNull() ? normalMapId : pwater->GetDefaultWaterNormalAssetId());
     mWaterNormp[1] = LLViewerTextureManager::getFetchedTexture(!nextNormalMapId.isNull() ? nextNormalMapId : (!normalMapId.isNull() ? normalMapId : pwater->GetDefaultWaterNormalAssetId()));
     mWaterNormp[0]->addTextureStats(1024.f*1024.f);

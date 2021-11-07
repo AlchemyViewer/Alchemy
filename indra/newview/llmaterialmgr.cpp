@@ -593,7 +593,7 @@ void LLMaterialMgr::onIdle(void*)
 {
 	LL_RECORD_BLOCK_TIME(FTM_MATERIALS_IDLE);
 
-	LLMaterialMgr* instancep = LLMaterialMgr::getInstance();
+	LLMaterialMgr* instancep = LLMaterialMgr::getInstanceFast();
 
 	if (!instancep->mGetQueue.empty())
 	{

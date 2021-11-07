@@ -411,7 +411,7 @@ std::string LLViewerMedia::getCurrentUserAgent()
 
 	// Just in case we need to check browser differences in A/B test
 	// builds.
-	std::string channel = LLVersionInfo::instance().getChannel();
+	std::string channel = LLVersionInfo::instanceFast().getChannel();
 
 	// append our magic version number string to the browser user agent id
 	// See the HTTP 1.0 and 1.1 specifications for allowed formats:
@@ -421,7 +421,7 @@ std::string LLViewerMedia::getCurrentUserAgent()
 	// http://www.mozilla.org/build/revised-user-agent-strings.html
 	std::ostringstream codec;
 	codec << "SecondLife/";
-	codec << LLVersionInfo::instance().getVersion();
+	codec << LLVersionInfo::instanceFast().getVersion();
 	codec << " (" << channel << "; " << skin_name << " skin)";
 	LL_INFOS() << codec.str() << LL_ENDL;
 
@@ -521,7 +521,7 @@ bool LLViewerMedia::isInterestingEnough(const LLVOVolume *object, const F64 &obj
 		result = false;
 	}
 	// Focused?  Then it is interesting!
-	else if (LLViewerMediaFocus::getInstance()->getFocusedObjectID() == object->getID())
+	else if (LLViewerMediaFocus::getInstanceFast()->getFocusedObjectID() == object->getID())
 	{
 		result = true;
 	}
@@ -837,7 +837,7 @@ void LLViewerMedia::updateMedia(void *dummy_arg)
 			{
 				if(LLViewerMedia::isParcelAudioPlaying() && gAudiop && LLViewerMedia::hasParcelAudio())
 				{
-					LLViewerAudio::getInstance()->stopInternetStreamWithAutoFade();
+					LLViewerAudio::getInstanceFast()->stopInternetStreamWithAutoFade();
 					restore_parcel_audio = true;
 				}
 			}
@@ -845,7 +845,7 @@ void LLViewerMedia::updateMedia(void *dummy_arg)
             {
                 if(gAudiop && LLViewerMedia::hasParcelAudio() && restore_parcel_audio && gSavedSettings.getBOOL("MediaTentativeAutoPlay"))
                 {
-                    LLViewerAudio::getInstance()->startInternetStreamWithAutoFade(LLViewerMedia::getParcelAudioURL());
+                    LLViewerAudio::getInstanceFast()->startInternetStreamWithAutoFade(LLViewerMedia::getParcelAudioURL());
                     restore_parcel_audio = false;
                 }
             }
@@ -956,7 +956,7 @@ void LLViewerMedia::setAllMediaEnabled(bool val)
 	{
 		if (!LLViewerMedia::isParcelMediaPlaying() && LLViewerMedia::hasParcelMedia())
 		{
-			LLViewerParcelMedia::getInstance()->play(LLViewerParcelMgr::getInstance()->getAgentParcel());
+			LLViewerParcelMedia::getInstanceFast()->play(LLViewerParcelMgr::getInstanceFast()->getAgentParcel());
 		}
 
 		static LLCachedControl<bool> audio_streaming_music(gSavedSettings, "AudioStreamingMusic", true);
@@ -972,16 +972,16 @@ void LLViewerMedia::setAllMediaEnabled(bool val)
 			}
 			else
 			{
-				LLViewerAudio::getInstance()->startInternetStreamWithAutoFade(LLViewerMedia::getParcelAudioURL());
+				LLViewerAudio::getInstanceFast()->startInternetStreamWithAutoFade(LLViewerMedia::getParcelAudioURL());
 			}
 		}
 	}
 	else {
 		// This actually unloads the impl, as opposed to "stop"ping the media
-		LLViewerParcelMedia::getInstance()->stop();
+		LLViewerParcelMedia::getInstanceFast()->stop();
 		if (gAudiop)
 		{
-			LLViewerAudio::getInstance()->stopInternetStreamWithAutoFade();
+			LLViewerAudio::getInstanceFast()->stopInternetStreamWithAutoFade();
 		}
 	}
 }
@@ -1029,7 +1029,7 @@ void LLViewerMedia::setAllMediaPaused(bool val)
     {
         if (!LLViewerMedia::isParcelMediaPlaying() && LLViewerMedia::hasParcelMedia())
         {
-            LLViewerParcelMedia::getInstance()->play(agent_parcel);
+            LLViewerParcelMedia::getInstanceFast()->play(agent_parcel);
         }
 
         static LLCachedControl<bool> audio_streaming_music(gSavedSettings, "AudioStreamingMusic", true);
@@ -1045,30 +1045,30 @@ void LLViewerMedia::setAllMediaPaused(bool val)
             }
             else
             {
-                LLViewerAudio::getInstance()->startInternetStreamWithAutoFade(LLViewerMedia::getParcelAudioURL());
+                LLViewerAudio::getInstanceFast()->startInternetStreamWithAutoFade(LLViewerMedia::getParcelAudioURL());
             }
         }
     }
     else {
         // This actually unloads the impl, as opposed to "stop"ping the media
-        LLViewerParcelMedia::getInstance()->stop();
+        LLViewerParcelMedia::getInstanceFast()->stop();
         if (gAudiop)
         {
-            LLViewerAudio::getInstance()->stopInternetStreamWithAutoFade();
+            LLViewerAudio::getInstanceFast()->stopInternetStreamWithAutoFade();
         }
     }
 
     // remove play choice for current parcel
     if (agent_parcel && gAgent.getRegion())
     {
-        LLViewerParcelAskPlay::getInstance()->resetSetting(gAgent.getRegion()->getRegionID(), agent_parcel->getLocalID());
+        LLViewerParcelAskPlay::getInstanceFast()->resetSetting(gAgent.getRegion()->getRegionID(), agent_parcel->getLocalID());
     }
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////
 bool LLViewerMedia::isParcelMediaPlaying()
 {
-    viewer_media_t media = LLViewerParcelMedia::getInstance()->getParcelMedia();
+    viewer_media_t media = LLViewerParcelMedia::getInstanceFast()->getParcelMedia();
     return (LLViewerMedia::hasParcelMedia() && media && media->hasMedia());
 }
 
@@ -1484,7 +1484,7 @@ bool LLViewerMedia::hasInWorldMedia()
 //////////////////////////////////////////////////////////////////////////////////////////
 bool LLViewerMedia::hasParcelMedia()
 {
-	return !LLViewerParcelMedia::getInstance()->getURL().empty();
+	return !LLViewerParcelMedia::getInstanceFast()->getURL().empty();
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////

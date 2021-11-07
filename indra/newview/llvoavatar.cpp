@@ -755,12 +755,12 @@ LLVOAvatar::LLVOAvatar(const LLUUID& id,
 	mDebugExistenceTimer.reset();
 	mLastAppearanceMessageTimer.reset();
 
-	if(LLSceneMonitor::getInstance()->isEnabled())
+	if(LLSceneMonitor::getInstanceFast()->isEnabled())
 	{
-	    LLSceneMonitor::getInstance()->freezeAvatar((LLCharacter*)this);
+	    LLSceneMonitor::getInstanceFast()->freezeAvatar((LLCharacter*)this);
 	}
 
-	mVisuallyMuteSetting = LLVOAvatar::VisualMuteSettings(LLRenderMuteList::getInstance()->getSavedVisualMuteSetting(getID()));
+	mVisuallyMuteSetting = LLVOAvatar::VisualMuteSettings(LLRenderMuteList::getInstanceFast()->getSavedVisualMuteSetting(getID()));
 }
 
 std::string LLVOAvatar::avString() const

@@ -779,9 +779,9 @@ void LLInventoryPanel::idle(void* user_data)
 {
 	LLInventoryPanel* panel = (LLInventoryPanel*)user_data;
 	// Nudge the filter if the clipboard state changed
-	if (panel->mClipboardState != LLClipboard::instance().getGeneration())
+	if (panel->mClipboardState != LLClipboard::instanceFast().getGeneration())
 	{
-		panel->mClipboardState = LLClipboard::instance().getGeneration();
+		panel->mClipboardState = LLClipboard::instanceFast().getGeneration();
 		const LLUUID trash_id = gInventory.findCategoryUUIDForType(LLFolderType::FT_TRASH);
 		LLFolderViewFolder* trash_folder = panel->getFolderByID(trash_id);
 		if (trash_folder)
@@ -797,9 +797,9 @@ void LLInventoryPanel::idle(void* user_data)
     {
         panel->mFolderRoot.get()->update();
         // while dragging, update selection rendering to reflect single/multi drag status
-        if (LLToolDragAndDrop::getInstance()->hasMouseCapture())
+        if (LLToolDragAndDrop::getInstanceFast()->hasMouseCapture())
         {
-            EAcceptance last_accept = LLToolDragAndDrop::getInstance()->getLastAccept();
+            EAcceptance last_accept = LLToolDragAndDrop::getInstanceFast()->getLastAccept();
             if (last_accept == ACCEPT_YES_SINGLE || last_accept == ACCEPT_YES_COPY_SINGLE)
             {
                 panel->mFolderRoot.get()->setShowSingleSelection(TRUE);

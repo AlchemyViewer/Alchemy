@@ -196,7 +196,7 @@ public:
 
 	void onMouseEnter(S32 x, S32 y, MASK mask)
 	{
-		if (LLToolDragAndDrop::getInstance()->hasMouseCapture())
+		if (LLToolDragAndDrop::getInstanceFast()->hasMouseCapture())
 		{
 			LLUICtrl::onMouseEnter(x, y, mask);
 		}
@@ -714,14 +714,14 @@ void LLFavoritesBarCtrl::draw()
 	{
 		if (mItemsChangedTimer.getElapsedTimeF32() > 1.f)
 		{
-			LLFavoritesOrderStorage::instance().saveFavoritesRecord();
+			LLFavoritesOrderStorage::instanceFast().saveFavoritesRecord();
 			mItemsChangedTimer.stop();
 		}
 	}
 
-	if(!mItemsChangedTimer.getStarted() && LLFavoritesOrderStorage::instance().mUpdateRequired)
+	if(!mItemsChangedTimer.getStarted() && LLFavoritesOrderStorage::instanceFast().mUpdateRequired)
 	{
-		LLFavoritesOrderStorage::instance().mUpdateRequired = false;
+		LLFavoritesOrderStorage::instanceFast().mUpdateRequired = false;
 		mItemsChangedTimer.start();
 	}
 

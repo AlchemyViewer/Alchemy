@@ -340,12 +340,20 @@ void LLViewerParcelOverlay::updateOverlayTexture()
 	{
 		return;
 	}
-	const LLColor4U avail = LLUIColorTable::instance().getColor("PropertyColorAvail").get();
-	const LLColor4U owned = LLUIColorTable::instance().getColor("PropertyColorOther").get();
-	const LLColor4U group = LLUIColorTable::instance().getColor("PropertyColorGroup").get();
-	const LLColor4U self  = LLUIColorTable::instance().getColor("PropertyColorSelf").get();
-	const LLColor4U for_sale  = LLUIColorTable::instance().getColor("PropertyColorForSale").get();
-	const LLColor4U auction  = LLUIColorTable::instance().getColor("PropertyColorAuction").get();
+	static const LLUIColor avail_color = LLUIColorTable::instance().getColor("PropertyColorAvail");
+	static const LLUIColor owned_color = LLUIColorTable::instance().getColor("PropertyColorOther");
+	static const LLUIColor group_color = LLUIColorTable::instance().getColor("PropertyColorGroup");
+	static const LLUIColor self_color = LLUIColorTable::instance().getColor("PropertyColorSelf");
+	static const LLUIColor for_sale_color = LLUIColorTable::instance().getColor("PropertyColorForSale");
+	static const LLUIColor auction_color = LLUIColorTable::instance().getColor("PropertyColorAuction");
+
+
+	const LLColor4U avail = avail_color.get();
+	const LLColor4U owned = owned_color.get();
+	const LLColor4U group = group_color.get();
+	const LLColor4U self  = self_color.get();
+	const LLColor4U for_sale  = for_sale_color.get();
+	const LLColor4U auction  = auction_color.get();
 
 	// Create the base texture.
 	U8 *raw = mImageRaw->getData();

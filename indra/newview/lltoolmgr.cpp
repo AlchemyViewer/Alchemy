@@ -226,14 +226,14 @@ LLTool* LLToolMgr::getCurrentTool()
 		}
 		if (cur_tool)
 		{
-			if (	LLToolCompInspect::getInstance()->isToolCameraActive()
-				&&	prev_tool == LLToolCamera::getInstance()
-				&&	cur_tool == LLToolPie::getInstance() )
+			if (	LLToolCompInspect::getInstanceFast()->isToolCameraActive()
+				&&	prev_tool == LLToolCamera::getInstanceFast()
+				&&	cur_tool == LLToolPie::getInstanceFast() )
 			{
 				LLFloaterInspect * inspect_instance = LLFloaterReg::findTypedInstance<LLFloaterInspect>("inspect");
 				if(inspect_instance && inspect_instance->getVisible())
 				{
-					setTransientTool(LLToolCompInspect::getInstance());
+					setTransientTool(LLToolCompInspect::getInstanceFast());
 				}
 			}
 			else
@@ -260,7 +260,7 @@ void LLToolMgr::updateToolStatus()
 
 bool LLToolMgr::inEdit()
 {
-	return mBaseTool != LLToolPie::getInstance() && mBaseTool != gToolNull;
+	return mBaseTool != LLToolPie::getInstanceFast() && mBaseTool != gToolNull;
 }
 
 bool LLToolMgr::canEdit()

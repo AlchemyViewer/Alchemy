@@ -51,7 +51,7 @@ static LLDefaultChildRegistry::Register<LLToolBarView> r("toolbar_view");
 
 bool isToolDragged()
 {
-	return (LLToolDragAndDrop::getInstance()->getSource() == LLToolDragAndDrop::SOURCE_VIEWER);
+	return (LLToolDragAndDrop::getInstanceFast()->getSource() == LLToolDragAndDrop::SOURCE_VIEWER);
 }
 
 LLToolBarView::Toolbar::Toolbar()

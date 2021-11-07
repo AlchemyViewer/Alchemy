@@ -891,7 +891,7 @@ void display(BOOL rebuild, F32 zoom_factor, int subfield, BOOL for_snapshot)
 			}
 		}
 
-		LLSceneMonitor::getInstance()->fetchQueryResult();
+		LLSceneMonitor::getInstanceFast()->fetchQueryResult();
 		
 		LLGLState::checkStates();
 		LLGLState::checkClientArrays();
@@ -1064,7 +1064,7 @@ void display(BOOL rebuild, F32 zoom_factor, int subfield, BOOL for_snapshot)
 
 		{
 			//capture the frame buffer.
-			LLSceneMonitor::getInstance()->capture();
+			LLSceneMonitor::getInstanceFast()->capture();
 		}
 
 		LLAppViewer::instance()->pingMainloopTimeout(STR_DISPLAY_RENDERUI);
@@ -1317,12 +1317,12 @@ void render_ui(F32 zoom_factor, int subfield)
 		set_current_modelview(copy_matrix(gGLLastModelView));
 	}
 	
-	if(LLSceneMonitor::getInstance()->needsUpdate())
+	if(LLSceneMonitor::getInstanceFast()->needsUpdate())
 	{
         LL_RECORD_BLOCK_TIME(FTM_RENDER_UI_SCENE_MON);
 		gGL.pushMatrix();
 		gViewerWindow->setup2DRender();
-		LLSceneMonitor::getInstance()->compare();
+		LLSceneMonitor::getInstanceFast()->compare();
 		gViewerWindow->setup3DRender();
 		gGL.popMatrix();
 	}

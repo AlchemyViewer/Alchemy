@@ -491,7 +491,9 @@ public:
 		mBackRectCamera1.mBottom = -1;
 		mBackRectCamera2 = mBackRectCamera1;
 
-		mBackColor = LLUIColorTable::instance().getColor( "MenuDefaultBgColor" );
+		static LLUIColor debug_background_color = LLUIColorTable::instance().getColor("MenuDefaultBgColor");
+
+		mBackColor = debug_background_color;
 
 		clearText();
 		

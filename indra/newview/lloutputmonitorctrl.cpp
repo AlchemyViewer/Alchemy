@@ -128,14 +128,14 @@ void LLOutputMonitorCtrl::draw()
 
 	if (getVisible() && mAutoUpdate && !getIsMuted() && mSpeakerId.notNull())
 	{
-		setPower(LLVoiceClient::getInstance()->getCurrentPower(mSpeakerId));
+		setPower(LLVoiceClient::getInstanceFast()->getCurrentPower(mSpeakerId));
 		if(mIsAgentControl)
 		{
-			setIsTalking(LLVoiceClient::getInstance()->getUserPTTState());
+			setIsTalking(LLVoiceClient::getInstanceFast()->getUserPTTState());
 		}
 		else
 		{
-			setIsTalking(LLVoiceClient::getInstance()->getIsSpeaking(mSpeakerId));
+			setIsTalking(LLVoiceClient::getInstanceFast()->getIsSpeaking(mSpeakerId));
 		}
 	}
 
@@ -307,7 +307,7 @@ void LLOutputMonitorCtrl::setSpeakerId(const LLUUID& speaker_id, const LLUUID& s
 		{
 			// check only blocking on voice. EXT-3542
 			mIsMuted = LLMuteList::getInstanceFast()->isMuted(mSpeakerId, LLMute::flagVoiceChat);
-			LLMuteList::getInstance()->addObserver(this);
+			LLMuteList::getInstanceFast()->addObserver(this);
 		}
 	}
 }
