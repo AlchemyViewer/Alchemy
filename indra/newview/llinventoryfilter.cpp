@@ -1406,7 +1406,7 @@ const std::string& LLInventoryFilter::getFilterText()
 		filtered_by_all_types = FALSE;
 	}
 
-	if (!LLInventoryModelBackgroundFetch::instance().folderFetchActive()
+	if (!LLInventoryModelBackgroundFetch::instanceFast().folderFetchActive()
 		&& filtered_by_type
 		&& !filtered_by_all_types)
 	{
