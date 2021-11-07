@@ -74,7 +74,7 @@ LLInventoryFilter::FilterOps::FilterOps(const Params& p)
 LLInventoryFilter::LLInventoryFilter(const Params& p)
 :	mName(p.name),
 	mFilterModified(FILTER_NONE),
-	mEmptyLookupMessage("InventoryNoMatchingItems"),
+	mEmptyLookupMessage(LLTrans::getString("InventoryNoMatchingItems")),
 	mDefaultEmptyLookupMessage(""),
 	mFilterOps(p.filter_ops),
 	mBackupFilterOps(mFilterOps),
