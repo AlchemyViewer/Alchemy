@@ -38,6 +38,7 @@
 #include "llstringtable.h"
 #include "llpointer.h"
 #include "llrefcount.h"
+#include "llsortedvector.h"
 
 #include <absl/container/flat_hash_map.h>
 
@@ -207,20 +208,20 @@ public:
 	// visual parameter accessors
 	LLVisualParam*	getFirstVisualParam()
 	{
-		mCurIterator = mVisualParamIndexMap.begin();
+		mCurIterator = mVisualParamSortedVector.begin();
 		return getNextVisualParam();
 	}
 	LLVisualParam*	getNextVisualParam()
 	{
-		if (mCurIterator == mVisualParamIndexMap.end())
-			return 0;
+		if (mCurIterator == mVisualParamSortedVector.end())
+			return nullptr;
 		return (mCurIterator++)->second;
 	}
 
 	S32 getVisualParamCountInGroup(const EVisualParamGroup group) const
 	{
 		S32 rtn = 0;
-		for (const auto& pair : mVisualParamIndexMap)
+		for (const auto& pair : mVisualParamSortedVector)
 		{
 			if (pair.second->getGroup() == group)
 			{
@@ -232,18 +233,10 @@ public:
 
 	LLVisualParam*	getVisualParam(S32 id) const
 	{
-		visual_param_index_hashmap_t::const_iterator iter = mVisualParamIndexHashmap.find(id);
-		return (iter == mVisualParamIndexHashmap.end()) ? 0 : iter->second;
+		visual_param_index_map_t::const_iterator iter = mVisualParamIndexMap.find(id);
+		return (iter == mVisualParamIndexMap.end()) ? 0 : iter->second;
 	}
-	S32 getVisualParamID(LLVisualParam *id)
-	{
-		for (const auto& param_pair : mVisualParamIndexHashmap)
-		{
-			if (param_pair.second == id)
-				return param_pair.first;
-		}
-		return 0;
-	}
+
 	S32				getVisualParamCount() const { return (S32)mVisualParamIndexMap.size(); }
 	LLVisualParam*	getVisualParam(const char *name);
 
@@ -277,15 +270,14 @@ protected:
 
 private:
 	// visual parameter stuff
-	typedef std::map<S32, LLVisualParam *> 		visual_param_index_map_t;
-	typedef absl::flat_hash_map<S32, LLVisualParam*> 		visual_param_index_hashmap_t;
+	typedef absl::flat_hash_map<S32, LLVisualParam *> 		visual_param_index_map_t;	//Hash map for fast lookup.
+	typedef LLSortedVector<S32,LLVisualParam *>				visual_param_sorted_vec_t;	//Contiguous sorted array.
 	typedef absl::flat_hash_map<char *, LLVisualParam *> 	visual_param_name_map_t;
 
-	visual_param_index_map_t::iterator 			mCurIterator;
-	visual_param_index_map_t 					mVisualParamIndexMap;
-	visual_param_index_hashmap_t				mVisualParamIndexHashmap;
-	visual_param_name_map_t  					mVisualParamNameMap;
-
+	visual_param_sorted_vec_t::iterator 			mCurIterator;
+	visual_param_sorted_vec_t						mVisualParamSortedVector;
+	visual_param_index_map_t 						mVisualParamIndexMap;
+	visual_param_name_map_t  						mVisualParamNameMap;
 	static LLStringTable sVisualParamNames;	
 
 	LLVector3 mHoverOffset;

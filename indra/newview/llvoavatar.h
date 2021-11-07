@@ -35,6 +35,8 @@
 
 #include <boost/signals2/trackable.hpp>
 
+#include "llsortedvector.h"
+
 #include "llavatarappearance.h"
 #include "llchat.h"
 #include "lldrawpoolalpha.h"
@@ -867,7 +869,7 @@ protected:
 	//--------------------------------------------------------------------
 public:
 	S32 				getAttachmentCount(); // Warning: order(N) not order(1) // currently used only by -self
-	typedef std::map<S32, LLViewerJointAttachment*> attachment_map_t;
+	typedef LLSortedVector<S32, LLViewerJointAttachment*> attachment_map_t;
 	attachment_map_t 								mAttachmentPoints;
 	std::vector<LLPointer<LLViewerObject> > 		mPendingAttachment;
 	std::vector<std::pair<LLViewerObject*,LLViewerJointAttachment*> >	mAttachedObjectsVector;	//A vector of all current attachments for fast iteration.

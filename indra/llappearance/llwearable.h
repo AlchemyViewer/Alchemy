@@ -31,6 +31,7 @@
 #include "llpermissions.h"
 #include "llsaleinfo.h"
 #include "llwearabletype.h"
+#include "llsortedvector.h"
 
 class LLMD5;
 class LLVisualParam;
@@ -113,7 +114,7 @@ public:
 	// Update the baked texture hash.
 	virtual void		addToBakedTextureHash(LLMD5& hash) const = 0;
 
-	typedef std::map<S32, LLVisualParam *>    visual_param_index_map_t;
+	typedef LLSortedVector<S32, LLVisualParam *>    visual_param_index_map_t;
 	visual_param_index_map_t mVisualParamIndexMap;
 
 protected:

@@ -37,7 +37,7 @@ public:
     typedef typename PairVector::const_iterator const_iterator;
 
     /// Empty
-    LLSortedVector() {}
+    LLSortedVector() = default;
 
     /// Fixed initial size
     LLSortedVector(std::size_t size):
@@ -85,13 +85,14 @@ public:
         return iterbool(mVector.begin() + index, true);
     }
 
-    iterator begin() { return mVector.begin(); }
-    iterator end()   { return mVector.end(); }
-    const_iterator begin() const { return mVector.begin(); }
-    const_iterator end()   const { return mVector.end(); }
+    iterator begin() noexcept { return mVector.begin(); }
+    iterator end()   noexcept { return mVector.end(); }
+    const_iterator begin() const noexcept { return mVector.begin(); }
+    const_iterator end()   const noexcept { return mVector.end(); }
 
-    bool empty() const { return mVector.empty(); }
-    std::size_t size() const { return mVector.size(); }
+    void clear() noexcept { mVector.clear(); }
+    bool empty() const noexcept { return mVector.empty(); }
+    std::size_t size() const noexcept { return mVector.size(); }
 
     /// find
     iterator find(const key_type& key)
@@ -130,10 +131,7 @@ private:
     // specialize 'less' rather than just defining a specific comparator
     // because LLSortedVector should be usable for other key_types as well.
     template <typename T>
-    struct less< std::pair<std::type_info*, T> >:
-        public std::binary_function<std::pair<std::type_info*, T>,
-                                    std::pair<std::type_info*, T>,
-                                    bool>
+    struct less< std::pair<std::type_info*, T> >
     {
         bool operator()(const std::pair<std::type_info*, T>& lhs,
                         const std::pair<std::type_info*, T>& rhs) const
@@ -144,10 +142,7 @@ private:
 
     // Same as above, but with const std::type_info*.
     template <typename T>
-    struct less< std::pair<const std::type_info*, T> >:
-        public std::binary_function<std::pair<const std::type_info*, T>,
-                                    std::pair<const std::type_info*, T>,
-                                    bool>
+    struct less< std::pair<const std::type_info*, T> >
     {
         bool operator()(const std::pair<const std::type_info*, T>& lhs,
                         const std::pair<const std::type_info*, T>& rhs) const
