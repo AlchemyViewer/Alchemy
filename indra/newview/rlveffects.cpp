@@ -337,7 +337,6 @@ void RlvSphereEffect::setShaderUniforms(LLGLSLShader* pShader)
 	pShader->uniform2f(LLShaderMgr::RLV_EFFECT_PARAM3, eDistExtend & (int)ESphereDistExtend::Min, eDistExtend & (int)ESphereDistExtend::Max);
 
 	// Pass effect params
-	const glh::vec4f effectParams(m_Params.get().mV);
 	pShader->uniform4fv(LLShaderMgr::RLV_EFFECT_PARAM4, 1, m_Params.get().mV);
 }
 

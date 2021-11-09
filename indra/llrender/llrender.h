@@ -565,8 +565,6 @@ void copy_matrix(const LLMatrix4a& src, F32* dst);
 void set_current_modelview(const LLMatrix4a& mat);
 void set_current_projection(const LLMatrix4a& mat);
 
-glh::matrix4f gl_perspective(GLfloat fovy, GLfloat aspect, GLfloat zNear, GLfloat zFar);
-
 #if LL_RELEASE_FOR_DOWNLOAD
     #define LL_SHADER_LOADING_WARNS(...) LL_WARNS_ONCE("ShaderLoading")
     #define LL_SHADER_UNIFORM_ERRS(...)  LL_WARNS_ONCE("Shader")

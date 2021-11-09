@@ -263,8 +263,7 @@ void LLCubeMap::setMatrix(S32 stage)
 		gGL.getTexUnit(stage)->activate();
 	}
 
-	LLMatrix4a trans;
-	trans.loadu(gGLModelView);
+	LLMatrix4a trans = get_current_modelview();
 	trans.setRow<3>(LLVector4a::getZero());
 	trans.transpose();
 

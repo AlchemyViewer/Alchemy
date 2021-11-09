@@ -5912,7 +5912,7 @@ void LLSelectMgr::renderSilhouettes(BOOL for_hud)
 		gGL.pushUIMatrix();
 		gGL.loadUIIdentity();
 		gGL.loadIdentity();
-		gGL.loadMatrix(OGL_TO_CFR_ROTATION);		// Load Cory's favorite reference frame
+		gGL.loadMatrix(OGL_TO_CFR_ROTATION_4A);		// Load Cory's favorite reference frame
 		gGL.translatef(-hud_bbox.getCenterLocal().mV[VX] + (depth *0.5f), 0.f, 0.f);
 		gGL.scalef(cur_zoom, cur_zoom, cur_zoom);
 	}

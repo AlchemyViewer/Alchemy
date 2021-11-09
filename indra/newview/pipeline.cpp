@@ -11024,13 +11024,13 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
 
 	if (!CameraOffset)
 	{
-		memcpy(gGLModelView, saved_view.getF32ptr(), sizeof(F32) * 16);
-		memcpy(gGLProjection, saved_proj.getF32ptr(), sizeof(F32) * 16);
+		set_current_modelview(saved_view);
+		set_current_projection(saved_proj);
 	}
 	else
 	{
-		memcpy(gGLModelView, view[1].getF32ptr(), sizeof(F32) * 16);
-		memcpy(gGLProjection, proj[1].getF32ptr(), sizeof(F32) * 16);
+		set_current_modelview(view[1]);
+		set_current_projection(proj[1]);
 
 		gGL.loadMatrix(view[1]);
 		gGL.matrixMode(LLRender::MM_PROJECTION);
