@@ -1885,7 +1885,7 @@ void parse_glsl_version(S32& major, S32& minor)
 	LLStringUtil::convertToS32(minor_str, minor);
 }
 
-LLGLUserClipPlane::LLGLUserClipPlane(const LLPlane& p, const glh::matrix4f& modelview, const glh::matrix4f& projection, bool apply)
+LLGLUserClipPlane::LLGLUserClipPlane(const LLPlane& p, const LLMatrix4a& modelview, const LLMatrix4a& projection, bool apply)
 {
 	mApply = apply;
 
@@ -1911,26 +1911,41 @@ void LLGLUserClipPlane::disable()
 
 void LLGLUserClipPlane::setPlane(F32 a, F32 b, F32 c, F32 d)
 {
-	glh::matrix4f& P = mProjection;
-	glh::matrix4f& M = mModelview;
-    
-	glh::matrix4f invtrans_MVP = (P * M).inverse().transpose();
-    glh::vec4f oplane(a,b,c,d);
-    glh::vec4f cplane;
-    invtrans_MVP.mult_matrix_vec(oplane, cplane);
+    LLMatrix4a& P = mProjection;
+	LLMatrix4a& M = mModelview;
 
-    cplane /= fabs(cplane[2]); // normalize such that depth is not scaled
-    cplane[3] -= 1;
+	LLMatrix4a invtrans_MVP;
+	invtrans_MVP.setMul(P,M);
+	invtrans_MVP.invert();
+	invtrans_MVP.transpose();
 
-    if(cplane[2] < 0)
-        cplane *= -1;
+	LLVector4a oplane(a,b,c,d);
+	LLVector4a cplane;
+	LLVector4a cplane_splat;
+	LLVector4a cplane_neg;
 
-    glh::matrix4f suffix;
-    suffix.set_row(2, cplane);
-    glh::matrix4f newP = suffix * P;
+	invtrans_MVP.rotate4(oplane,cplane);
+	
+	cplane_splat.splat<2>(cplane);
+	cplane_splat.setAbs(cplane_splat);
+	cplane.div(cplane_splat);
+	cplane.sub(LLVector4a(0.f,0.f,0.f,1.f));
+
+	cplane_splat.splat<2>(cplane);
+	cplane_neg = cplane;
+	cplane_neg.negate();
+
+	cplane.setSelectWithMask( cplane_splat.lessThan( _mm_setzero_ps() ), cplane_neg, cplane );
+
+	LLMatrix4a suffix;
+	suffix.setIdentity();
+	suffix.setColumn<2>(cplane);
+	LLMatrix4a newP;
+	newP.setMul(suffix,P);
+
     gGL.matrixMode(LLRender::MM_PROJECTION);
 	gGL.pushMatrix();
-    gGL.loadMatrix(newP.m);
+    gGL.loadMatrix(newP);
     gGL.matrixMode(LLRender::MM_MODELVIEW);
 }
 
@@ -2026,31 +2041,32 @@ void LLGLDepthTest::checkState()
 
 LLGLSquashToFarClip::LLGLSquashToFarClip()
 {
-    glh::matrix4f proj = get_current_projection();
+	LLMatrix4a proj;
+	proj.loadu(gGLProjection);
     setProjectionMatrix(proj, 0);
 }
 
-LLGLSquashToFarClip::LLGLSquashToFarClip(glh::matrix4f& P, U32 layer)
+LLGLSquashToFarClip::LLGLSquashToFarClip(const LLMatrix4a& projection, U32 layer)
 {
-    setProjectionMatrix(P, layer);
+    setProjectionMatrix(projection, layer);
 }
 
 
-void LLGLSquashToFarClip::setProjectionMatrix(glh::matrix4f& projection, U32 layer)
+void LLGLSquashToFarClip::setProjectionMatrix(const LLMatrix4a& P_in, U32 layer)
 {
+	LLMatrix4a P = P_in;
 
 	F32 depth = 0.99999f - 0.0001f * layer;
 
-	for (U32 i = 0; i < 4; i++)
-	{
-		projection.element(2, i) = projection.element(3, i) * depth;
-	}
+	LLVector4a col = P.getColumn<3>();
+	col.mul(depth);
+	P.setColumn<2>(col);
 
     LLRender::eMatrixMode last_matrix_mode = gGL.getMatrixMode();
 
 	gGL.matrixMode(LLRender::MM_PROJECTION);
 	gGL.pushMatrix();
-	gGL.loadMatrix(projection.m);
+	gGL.loadMatrix(P);
 
 	gGL.matrixMode(last_matrix_mode);
 }

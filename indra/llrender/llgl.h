@@ -38,6 +38,7 @@
 #include "llstring.h"
 #include "stdtypes.h"
 #include "v4math.h"
+#include "llmatrix4a.h"
 #include "llplane.h"
 #include "llgltypes.h"
 #include "llinstancetracker.h"
@@ -352,22 +353,24 @@ public:
   leaves this class.
   Does not stack.
 */
+LL_ALIGN_PREFIX(16)
 class LLGLUserClipPlane 
 {
 public:
 	
-	LLGLUserClipPlane(const LLPlane& plane, const glh::matrix4f& modelview, const glh::matrix4f& projection, bool apply = true);
+	LLGLUserClipPlane(const LLPlane& plane, const LLMatrix4a& modelview, const LLMatrix4a& projection, bool apply = true);
 	~LLGLUserClipPlane();
 
 	void setPlane(F32 a, F32 b, F32 c, F32 d);
     void disable();
 
 private:
-	bool mApply;
 
-	glh::matrix4f mProjection;
-	glh::matrix4f mModelview;
-};
+	LL_ALIGN_16(LLMatrix4a mProjection);
+	LL_ALIGN_16(LLMatrix4a mModelview);
+
+	bool mApply;
+} LL_ALIGN_POSTFIX(16);
 
 /*
   Modify and load projection matrix to push depth values to far clip plane.
@@ -380,9 +383,9 @@ class LLGLSquashToFarClip
 {
 public:
     LLGLSquashToFarClip();
-	LLGLSquashToFarClip(glh::matrix4f& projection, U32 layer = 0);
+	LLGLSquashToFarClip(const LLMatrix4a& projection, U32 layer = 0);
 
-    void setProjectionMatrix(glh::matrix4f& projection, U32 layer);
+    void setProjectionMatrix(const LLMatrix4a& P_in, U32 layer);
 
 	~LLGLSquashToFarClip();
 };

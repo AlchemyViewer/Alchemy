@@ -656,7 +656,7 @@ public:
 	LLMatrix4a				mSunShadowMatrix[6];
 	LLMatrix4a				mShadowModelview[6];
 	LLMatrix4a				mShadowProjection[6];
-    glh::matrix4f           mReflectionModelView;
+	LLMatrix4a				mReflectionModelView;
 
 	LLPointer<LLDrawable>	mShadowSpotLight[2];
 	F32						mSpotLightFade[2];

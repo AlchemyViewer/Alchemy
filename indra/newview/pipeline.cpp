@@ -8597,7 +8597,7 @@ void LLPipeline::bindDeferredShader(LLGLSLShader& shader, LLRenderTarget* light_
 
     if (sReflectionRender && !shader.getUniformLocation(LLShaderMgr::MODELVIEW_MATRIX))
     {
-        shader.uniformMatrix4fv(LLShaderMgr::MODELVIEW_MATRIX, 1, FALSE, mReflectionModelView.m);  
+        shader.uniformMatrix4fv(LLShaderMgr::MODELVIEW_MATRIX, 1, FALSE, mReflectionModelView.getF32ptr());  
     }
 
 	channel = shader.enableTexture(LLShaderMgr::DEFERRED_NOISE);
@@ -9560,9 +9560,11 @@ void LLPipeline::generateWaterReflection(LLCamera& camera_in)
 
         gPipeline.pushRenderTypeMask();
 
-        glh::matrix4f saved_modelview  = get_current_modelview();
-        glh::matrix4f saved_projection = get_current_projection();
-        glh::matrix4f mat;
+		LLMatrix4a saved_modelview;
+		saved_modelview.loadu(gGLModelView);
+		LLMatrix4a saved_projection;
+		saved_projection.loadu(gGLProjection);
+        LLMatrix4a mat;
 
         S32 reflection_detail  = RenderReflectionDetail;
 
@@ -9610,21 +9612,25 @@ void LLPipeline::generateWaterReflection(LLCamera& camera_in)
             gGL.matrixMode(LLRender::MM_MODELVIEW);
             gGL.pushMatrix();
 
-            mat.set_scale(glh::vec3f(1, 1, -1));
-            mat.set_translate(glh::vec3f(0,0,water_height*2.f));
-            mat = saved_modelview * mat;
+			mat.setIdentity();
+			mat.getRow<2>().negate();
+			mat.setTranslate_affine(LLVector3(0.f,0.f, water_height *2.f));
+			mat.setMul(saved_modelview,mat);
 
             mReflectionModelView = mat;
 
-            set_current_modelview(mat);
-            gGL.loadMatrix(mat.m);
+            set_current_modelview(mat.getF32ptr());
+            gGL.loadMatrix(mat);
 
             LLViewerCamera::updateFrustumPlanes(camera, FALSE, TRUE);
 
-            glh::vec3f    origin(0, 0, 0);
-            glh::matrix4f inv_mat = mat.inverse();
-            inv_mat.mult_matrix_vec(origin);
-            camera.setOrigin(origin.v);
+			LLMatrix4a inv_mat = mat;
+			inv_mat.invert();
+
+			LLVector4a origin;
+			origin.clear();
+			inv_mat.affineTransform(origin,origin);
+            camera.setOrigin(origin.getF32ptr());
 
             glCullFace(GL_FRONT);
 
@@ -9712,7 +9718,7 @@ void LLPipeline::generateWaterReflection(LLCamera& camera_in)
             gGL.matrixMode(LLRender::MM_MODELVIEW);
             gGL.popMatrix();
 
-            set_current_modelview(saved_modelview);
+            set_current_modelview(saved_modelview.getF32ptr());
         }
 
         //LLPipeline::sUseOcclusion = occlusion;

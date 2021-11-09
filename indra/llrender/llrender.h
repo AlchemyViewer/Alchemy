@@ -58,6 +58,7 @@ class LLCubeMap;
 class LLImageGL;
 class LLRenderTarget;
 class LLTexture ;
+class LLMatrix4a;
 
 #define LL_MATRIX_STACK_DEPTH 32
 
@@ -381,19 +382,28 @@ public:
 
 	void translatef(const GLfloat& x, const GLfloat& y, const GLfloat& z);
 	void scalef(const GLfloat& x, const GLfloat& y, const GLfloat& z);
+	//rotatef requires generation of a transform matrix involving sine/cosine. If rotating by a constant value, use genRot, store the result in a static variable, and pass that var to rotatef.
+	void rotatef(const LLMatrix4a& rot);
 	void rotatef(const GLfloat& a, const GLfloat& x, const GLfloat& y, const GLfloat& z);
 	void ortho(F32 left, F32 right, F32 bottom, F32 top, F32 zNear, F32 zFar);
 
 	void pushMatrix();
 	void popMatrix();
-	void loadMatrix(const GLfloat* m);
+	void loadMatrix(const LLMatrix4a& mat);
+	void loadMatrix(const F32* mat);
 	void loadIdentity();
-	void multMatrix(const GLfloat* m);
+	void multMatrix(const LLMatrix4a& mat);
+	inline void multMatrix(const F32* mat)
+	{
+		LLMatrix4a inmat;
+		inmat.loadu(mat);
+		multMatrix(inmat);
+	}
 	void matrixMode(eMatrixMode mode);	
 	eMatrixMode getMatrixMode();
 
-	const glh::matrix4f& getModelviewMatrix();
-	const glh::matrix4f& getProjectionMatrix();
+	const LLMatrix4a& getModelviewMatrix();
+	const LLMatrix4a& getProjectionMatrix();
 
 	void syncMatrices();
 	void syncLightState();
@@ -487,7 +497,7 @@ private:
 	eMatrixMode mMatrixMode;
 	U32 mMatIdx[NUM_MATRIX_MODES];
 	U32 mMatHash[NUM_MATRIX_MODES];
-	glh::matrix4f mMatrix[NUM_MATRIX_MODES][LL_MATRIX_STACK_DEPTH];
+	LL_ALIGN_16(LLMatrix4a mMatrix[NUM_MATRIX_MODES][LL_MATRIX_STACK_DEPTH]);
 	U32 mCurMatHash[NUM_MATRIX_MODES];
 	U32 mLightHash;
 	LLColor4 mAmbientLightColor;

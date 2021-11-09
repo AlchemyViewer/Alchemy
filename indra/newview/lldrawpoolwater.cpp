@@ -279,11 +279,12 @@ void LLDrawPoolWater::render(S32 pass)
 
 		gGL.matrixMode(LLRender::MM_TEXTURE);
 		gGL.loadIdentity();
-		LLMatrix4 camera_mat = LLViewerCamera::getInstanceFast()->getModelview();
-		LLMatrix4 camera_rot(camera_mat.getMat3());
+		LLMatrix4a camera_rot;
+		camera_rot.loadu((F32*)LLViewerCamera::getInstanceFast()->getModelview().mMatrix);
+		camera_rot.extractRotation_affine();
 		camera_rot.invert();
 
-		gGL.loadMatrix((F32 *)camera_rot.mMatrix);
+		gGL.loadMatrix(camera_rot);
 
 		gGL.matrixMode(LLRender::MM_MODELVIEW);
 		LLOverrideFaceColor overrid(this, 1.f, 1.f, 1.f,  0.5f*up_dot);
@@ -481,8 +482,11 @@ void LLDrawPoolWater::shade2(bool edge, LLGLSLShader* shader, const LLColor3& li
 	{
         if (shader->getUniformLocation(LLShaderMgr::DEFERRED_NORM_MATRIX) >= 0)
 	    {
-		    glh::matrix4f norm_mat = get_current_modelview().inverse().transpose();
-		    shader->uniformMatrix4fv(LLShaderMgr::DEFERRED_NORM_MATRIX, 1, FALSE, norm_mat.m);
+			LLMatrix4a norm_mat;
+			norm_mat.loadu(gGLModelView);
+			norm_mat.invert();
+			norm_mat.transpose();
+		    shader->uniformMatrix4fv(LLShaderMgr::DEFERRED_NORM_MATRIX, 1, FALSE, norm_mat.getF32ptr());
 	    }
 	}
 
@@ -628,7 +632,8 @@ void LLDrawPoolWater::shade2(bool edge, LLGLSLShader* shader, const LLColor3& li
 			}
 			else
 			{
-				auto proj = get_current_projection();
+				LLMatrix4a proj;
+				proj.loadu(gGLProjection);
 				LLGLSquashToFarClip far_clip(proj);
 				face->renderIndexed();
 			}

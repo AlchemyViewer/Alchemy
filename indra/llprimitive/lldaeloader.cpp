@@ -1162,9 +1162,11 @@ void LLDAELoader::processDomModel(LLModel* model, DAE* dae, daeElement* root, do
 		mesh_scale *= normalized_transformation;
 		normalized_transformation = mesh_scale;
 
-		glh::matrix4f inv_mat((F32*) normalized_transformation.mMatrix);
-		inv_mat = inv_mat.inverse();
-		LLMatrix4 inverse_normalized_transformation(inv_mat.m);
+		LLMatrix4a inv_mat;
+		inv_mat.loadu(normalized_transformation);
+		inv_mat.invert();
+
+		LLMatrix4 inverse_normalized_transformation(inv_mat.getF32ptr());
 
 		domSkin::domBind_shape_matrix* bind_mat = skin->getBind_shape_matrix();
 
