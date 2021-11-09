@@ -691,8 +691,8 @@ public:
     LLVector4			mMoonDir;
     bool                mNeedsShadowTargetClear;
 
-	LLVector4			mTransformedSunDir;
-    LLVector4			mTransformedMoonDir;
+	LL_ALIGN_16(LLVector4a			mTransformedSunDir);
+    LL_ALIGN_16(LLVector4a			mTransformedMoonDir);
 
 	bool					mInitialized;
 	bool					mVertexShadersEnabled;

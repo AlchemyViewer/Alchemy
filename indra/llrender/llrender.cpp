@@ -41,11 +41,11 @@
 LLRender gGL;
 
 // Handy copies of last good GL matrices
-F32	gGLModelView[16];
-F32	gGLLastModelView[16];
-F32 gGLLastProjection[16];
-F32 gGLProjection[16];
-S32	gGLViewport[4];
+alignas(16) F32	gGLModelView[16];
+alignas(16) F32	gGLLastModelView[16];
+alignas(16) F32 gGLLastProjection[16];
+alignas(16) F32 gGLProjection[16];
+alignas(16) S32	gGLViewport[4];
 
 U32 LLRender::sUICalls = 0;
 U32 LLRender::sUIVerts = 0;
@@ -1352,8 +1352,9 @@ void LLRender::syncMatrices()
             // but certain render paths (deferred lighting) require it to be mismatched *sigh*
             //if (shader->getUniformLocation(LLShaderMgr::INVERSE_PROJECTION_MATRIX))
             //{
-	        //    glh::matrix4f inv_proj = mat.inverse();
-	        //    shader->uniformMatrix4fv(LLShaderMgr::INVERSE_PROJECTION_MATRIX, 1, FALSE, inv_proj.m);
+	        //    LLMatrix4a inv_proj = mat
+			//    mat.invert();
+	        //    shader->uniformMatrix4fv(LLShaderMgr::INVERSE_PROJECTION_MATRIX, 1, FALSE, inv_proj.getF32ptr());
             //}
 
 			shader->uniformMatrix4fv(name[MM_PROJECTION], 1, GL_FALSE, mat.getF32ptr());
@@ -2445,82 +2446,44 @@ void LLRender::debugTexUnits(void)
 	LL_INFOS("TextureUnit") << "Active TexUnit Enabled : " << active_enabled << LL_ENDL;
 }
 
-
-
-glh::matrix4f copy_matrix(F32* src)
+LLMatrix4a copy_matrix(F32* src)
 {
-	glh::matrix4f ret;
-	ret.set_value(src);
-	return ret;
+	LLMatrix4a outmat;
+	outmat.load4a(src);
+	return outmat;
 }
 
-glh::matrix4f get_current_modelview()
+LLMatrix4a get_current_modelview()
 {
 	return copy_matrix(gGLModelView);
 }
 
-glh::matrix4f get_current_projection()
+LLMatrix4a get_current_projection()
 {
 	return copy_matrix(gGLProjection);
 }
 
-glh::matrix4f get_last_modelview()
+LLMatrix4a get_last_modelview()
 {
 	return copy_matrix(gGLLastModelView);
 }
 
-glh::matrix4f get_last_projection()
+LLMatrix4a get_last_projection()
 {
 	return copy_matrix(gGLLastProjection);
 }
 
-void copy_matrix(const glh::matrix4f& src, F32* dst)
+void copy_matrix(const LLMatrix4a& src, F32* dst)
 {
-	memcpy(dst, src.m, sizeof(F32) * 16);
+	src.store4a(dst);
 }
 
-void set_current_modelview(const glh::matrix4f& mat)
+void set_current_modelview(const LLMatrix4a& mat)
 {
 	copy_matrix(mat, gGLModelView);
 }
 
-void set_current_projection(const glh::matrix4f& mat)
+void set_current_projection(const LLMatrix4a& mat)
 {
 	copy_matrix(mat, gGLProjection);
-}
-
-glh::matrix4f gl_ortho(GLfloat left, GLfloat right, GLfloat bottom, GLfloat top, GLfloat znear, GLfloat zfar)
-{
-	glh::matrix4f ret(
-		2.f/(right-left), 0.f, 0.f, -(right+left)/(right-left),
-		0.f, 2.f/(top-bottom), 0.f, -(top+bottom)/(top-bottom),
-		0.f, 0.f, -2.f/(zfar-znear),  -(zfar+znear)/(zfar-znear),
-		0.f, 0.f, 0.f, 1.f);
-
-	return ret;
-}
-
-glh::matrix4f gl_perspective(GLfloat fovy, GLfloat aspect, GLfloat zNear, GLfloat zFar)
-{
-	GLfloat f = 1.f/tanf(DEG_TO_RAD*fovy/2.f);
-
-	return glh::matrix4f(f/aspect, 0, 0, 0,
-						 0, f, 0, 0,
-						 0, 0, (zFar+zNear)/(zNear-zFar), (2.f*zFar*zNear)/(zNear-zFar),
-						 0, 0, -1.f, 0);
-}
-
-glh::matrix4f gl_lookat(LLVector3 eye, LLVector3 center, LLVector3 up)
-{
-	LLVector3 f = center-eye;
-	f.normVec();
-	up.normVec();
-	LLVector3 s = f % up;
-	LLVector3 u = s % f;
-
-	return glh::matrix4f(s[0], s[1], s[2], 0,
-					  u[0], u[1], u[2], 0,
-					  -f[0], -f[1], -f[2], 0,
-					  0, 0, 0, 1);
-	
 }

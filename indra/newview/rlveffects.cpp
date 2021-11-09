@@ -304,7 +304,9 @@ ERlvCmdRet RlvSphereEffect::onValueMaxChanged(const LLUUID& idRlvObj, const boos
 
 void RlvSphereEffect::setShaderUniforms(LLGLSLShader* pShader)
 {
-	pShader->uniformMatrix4fv(LLShaderMgr::INVERSE_PROJECTION_MATRIX, 1, FALSE, get_current_projection().inverse().m);
+	LLMatrix4a proj = get_current_projection();
+	proj.invert();
+	pShader->uniformMatrix4fv(LLShaderMgr::INVERSE_PROJECTION_MATRIX, 1, FALSE, proj.getF32ptr());
 	pShader->uniform2f(LLShaderMgr::DEFERRED_SCREEN_RES, gPipeline.mScreen.getWidth(), gPipeline.mScreen.getHeight());
 	pShader->uniform1i(LLShaderMgr::RLV_EFFECT_MODE, llclamp((int)m_eMode, 0, (int)ESphereMode::Count));
 
@@ -320,15 +322,15 @@ void RlvSphereEffect::setShaderUniforms(LLGLSLShader* pShader)
 			posSphereOrigin.setVec((isAgentAvatarValid()) ? gAgentAvatarp->getRenderPosition() : gAgent.getPositionAgent(), 1.0f);
 			break;
 	}
-	glh::vec4f posSphereOriginGl(posSphereOrigin.mV);
-	const glh::matrix4f& mvMatrix = gGLModelView;
-	mvMatrix.mult_matrix_vec(posSphereOriginGl);
-	pShader->uniform4fv(LLShaderMgr::RLV_EFFECT_PARAM1, 1, posSphereOriginGl.v);
+	LLVector4a posSphereOriginGl;
+	posSphereOriginGl.loadua(posSphereOrigin.mV);
+	get_current_modelview().rotate4(posSphereOriginGl, posSphereOriginGl);
+	pShader->uniform4fv(LLShaderMgr::RLV_EFFECT_PARAM1, 1, posSphereOriginGl.getF32ptr());
 
 	// Pack min/max distance and alpha together
 	float nDistMin = m_nDistanceMin.get(), nDistMax = m_nDistanceMax.get();
-	const glh::vec4f sphereParams(m_nValueMin.get(), nDistMin, m_nValueMax.get(), (nDistMax >= nDistMin) ? nDistMax : nDistMin);
-	pShader->uniform4fv(LLShaderMgr::RLV_EFFECT_PARAM2, 1, sphereParams.v);
+	const LLVector4 sphereParams(m_nValueMin.get(), nDistMin, m_nValueMax.get(), (nDistMax >= nDistMin) ? nDistMax : nDistMin);
+	pShader->uniform4fv(LLShaderMgr::RLV_EFFECT_PARAM2, 1, sphereParams.mV);
 
 	// Pass dist extend
 	int eDistExtend = (int)m_eDistExtend;
@@ -336,7 +338,7 @@ void RlvSphereEffect::setShaderUniforms(LLGLSLShader* pShader)
 
 	// Pass effect params
 	const glh::vec4f effectParams(m_Params.get().mV);
-	pShader->uniform4fv(LLShaderMgr::RLV_EFFECT_PARAM4, 1, effectParams.v);
+	pShader->uniform4fv(LLShaderMgr::RLV_EFFECT_PARAM4, 1, m_Params.get().mV);
 }
 
 void RlvSphereEffect::renderPass(LLGLSLShader* pShader, const LLShaderEffectParams* pParams) const

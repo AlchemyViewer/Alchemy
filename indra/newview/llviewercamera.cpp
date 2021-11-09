@@ -310,7 +310,7 @@ void LLViewerCamera::setPerspective(BOOL for_selection,
 	
 	gGL.loadMatrix(proj_mat);
 	
-	set_current_projection(proj_mat.getF32ptr());
+	set_current_projection(proj_mat);
 
 	gGL.matrixMode(LLRender::MM_MODELVIEW);
 
@@ -338,7 +338,7 @@ void LLViewerCamera::setPerspective(BOOL for_selection,
 	if (!for_selection && mZoomFactor == 1.f)
 	{
 		// Save GL matrices for access elsewhere in code, especially project_world_to_screen
-		set_current_modelview(modelview.getF32ptr());
+		set_current_modelview(modelview);
 	}
 
 	updateFrustumPlanes(*this);

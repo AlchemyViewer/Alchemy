@@ -532,11 +532,11 @@ private:
 
 };
 
-extern F32 gGLModelView[16];
-extern F32 gGLLastModelView[16];
-extern F32 gGLLastProjection[16];
-extern F32 gGLProjection[16];
-extern S32 gGLViewport[4];
+extern alignas(16) F32 gGLModelView[16];
+extern alignas(16) F32 gGLLastModelView[16];
+extern alignas(16) F32 gGLLastProjection[16];
+extern alignas(16) F32 gGLProjection[16];
+extern alignas(16) S32 gGLViewport[4];
 
 extern LLRender gGL;
 
@@ -555,19 +555,17 @@ inline static LL_ALIGN_16(const LLMatrix4a) OGL_TO_CFR_ROTATION_4A(
 	LLVector4a(0.f, 1.f, 0.f, 0.f),		//  Y becomes Z
 	LLVector4a(0.f, 0.f, 0.f, 1.f));
 
-glh::matrix4f copy_matrix(F32* src);
-glh::matrix4f get_current_modelview();
-glh::matrix4f get_current_projection();
-glh::matrix4f get_last_modelview();
-glh::matrix4f get_last_projection();
+LLMatrix4a copy_matrix(F32* src);
+LLMatrix4a get_current_modelview();
+LLMatrix4a get_current_projection();
+LLMatrix4a get_last_modelview();
+LLMatrix4a get_last_projection();
 
-void copy_matrix(const glh::matrix4f& src, F32* dst);
-void set_current_modelview(const glh::matrix4f& mat);
-void set_current_projection(const glh::matrix4f& mat);
+void copy_matrix(const LLMatrix4a& src, F32* dst);
+void set_current_modelview(const LLMatrix4a& mat);
+void set_current_projection(const LLMatrix4a& mat);
 
-glh::matrix4f gl_ortho(GLfloat left, GLfloat right, GLfloat bottom, GLfloat top, GLfloat znear, GLfloat zfar);
 glh::matrix4f gl_perspective(GLfloat fovy, GLfloat aspect, GLfloat zNear, GLfloat zFar);
-glh::matrix4f gl_lookat(LLVector3 eye, LLVector3 center, LLVector3 up);
 
 #if LL_RELEASE_FOR_DOWNLOAD
     #define LL_SHADER_LOADING_WARNS(...) LL_WARNS_ONCE("ShaderLoading")
