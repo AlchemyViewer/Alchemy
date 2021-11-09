@@ -801,8 +801,8 @@ void LLManipTranslate::highlightManipulators(S32 x, S32 y)
 	}
 	
 	//LLBBox bbox = LLSelectMgr::getInstanceFast()->getBBoxOfSelection();
-	LLMatrix4 projMatrix = LLViewerCamera::getInstanceFast()->getProjection();
-	LLMatrix4 modelView = LLViewerCamera::getInstanceFast()->getModelview();
+	LLMatrix4 projMatrix( LLViewerCamera::getInstanceFast()->getProjection().getF32ptr() );
+	LLMatrix4 modelView( LLViewerCamera::getInstanceFast()->getModelview().getF32ptr() );
 
 	LLVector3 object_position = getPivotPoint();
 	

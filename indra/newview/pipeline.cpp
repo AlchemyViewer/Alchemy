@@ -6107,17 +6107,18 @@ void LLPipeline::setupAvatarLights(bool for_edit)
     LLEnvironment& environment = LLEnvironment::instanceFast();
     bool sun_up = environment.getIsSunUp();
 
-
 	if (for_edit)
 	{
 		LLColor4 diffuse(1.f, 1.f, 1.f, 0.f);
-		LLVector4 light_pos_cam(-8.f, 0.25f, 10.f, 0.f);  // w==0 => directional light
-		LLMatrix4 camera_mat = LLViewerCamera::getInstanceFast()->getModelview();
-		LLMatrix4 camera_rot(camera_mat.getMat3());
+		LLVector4a light_pos_cam(-8.f, 0.25f, 10.f, 0.f);  // w==0 => directional light
+		LLMatrix4a camera_rot = LLViewerCamera::getInstanceFast()->getModelview();
+		camera_rot.extractRotation_affine();
 		camera_rot.invert();
-		LLVector4 light_pos = light_pos_cam * camera_rot;
+		LLVector4a light_pos;
 		
-		light_pos.normalize();
+		camera_rot.rotate(light_pos_cam,light_pos);
+		
+		light_pos.normalize3fast();
 
 		LLLightState* light = gGL.getLight(1);
 
@@ -6126,7 +6127,7 @@ void LLPipeline::setupAvatarLights(bool for_edit)
 		light->setDiffuse(diffuse);
 		light->setAmbient(LLColor4::black);
 		light->setSpecular(LLColor4::black);
-		light->setPosition(light_pos);
+		light->setPosition(LLVector4(light_pos.getF32ptr()));
 		light->setConstantAttenuation(1.f);
 		light->setLinearAttenuation(0.f);
 		light->setQuadraticAttenuation(0.f);

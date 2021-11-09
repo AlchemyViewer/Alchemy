@@ -35,6 +35,7 @@
 #include "lltrace.h"
 
 class LLViewerObject;
+
 const BOOL FOR_SELECTION = TRUE;
 const BOOL NOT_FOR_SELECTION = FALSE;
 
@@ -83,8 +84,8 @@ public:
 	static void updateCameraAngle(void* user_data, const LLSD& value);
 	void setPerspective(BOOL for_selection, S32 x, S32 y_from_bot, S32 width, S32 height, BOOL limit_select_distance, F32 z_near = 0, F32 z_far = 0);
 
-	const LLMatrix4 &getProjection() const;
-	const LLMatrix4 &getModelview() const;
+	const LLMatrix4a &getProjection() const;
+	const LLMatrix4a &getModelview() const;
 
 	// Warning!  These assume the current global matrices are correct
 	void projectScreenToPosAgent(const S32 screen_x, const S32 screen_y, LLVector3* pos_agent ) const;
@@ -134,8 +135,9 @@ protected:
 	LLVector3 mVelocityDir ;
 	F32       mAverageSpeed ;
 	F32       mAverageAngularSpeed ;
-	mutable LLMatrix4	mProjectionMatrix;	// Cache of perspective matrix
-	mutable LLMatrix4	mModelviewMatrix;
+
+	LL_ALIGN_16(mutable LLMatrix4a	mProjectionMatrix);	// Cache of perspective matrix
+	LL_ALIGN_16(mutable LLMatrix4a	mModelviewMatrix);
 	F32					mCameraFOVDefault;
 	F32					mPrevCameraFOVDefault;
 	F32					mSavedFOVDefault;

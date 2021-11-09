@@ -279,8 +279,7 @@ void LLDrawPoolWater::render(S32 pass)
 
 		gGL.matrixMode(LLRender::MM_TEXTURE);
 		gGL.loadIdentity();
-		LLMatrix4a camera_rot;
-		camera_rot.loadu((F32*)LLViewerCamera::getInstanceFast()->getModelview().mMatrix);
+		LLMatrix4a camera_rot = LLViewerCamera::getInstanceFast()->getModelview();
 		camera_rot.extractRotation_affine();
 		camera_rot.invert();
 
