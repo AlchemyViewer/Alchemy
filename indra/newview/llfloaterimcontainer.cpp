@@ -2282,7 +2282,7 @@ void LLFloaterIMContainer::reSelectConversation()
 
 void LLFloaterIMContainer::updateSpeakBtnState()
 {
-	mSpeakBtn->setToggleState(LLVoiceClient::getInstance()->getUserPTTState());
+	mSpeakBtn->setToggleState(LLVoiceClient::getInstanceFast()->getUserPTTState());
 	mSpeakBtn->setEnabled(LLAgent::isActionAllowed("speak"));
 }
 

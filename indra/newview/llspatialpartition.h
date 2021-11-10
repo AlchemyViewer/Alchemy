@@ -102,9 +102,7 @@ public:
 	U32 mBlendFuncDst;
 	BOOL mHasGlow;
 	LLPointer<LLViewerTexture> mSpecularMap;
-	const LLMatrix4* mSpecularMapMatrix;
 	LLPointer<LLViewerTexture> mNormalMap;
-	const LLMatrix4* mNormalMapMatrix;
 	LLVector4 mSpecColor; // XYZ = Specular RGB, W = Specular Exponent
 	F32  mEnvIntensity;
 	F32  mAlphaMaskCutoff;
