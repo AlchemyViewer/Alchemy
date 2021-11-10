@@ -78,26 +78,26 @@ public:
 
 	void updateMesh();
 
-	void appendMesh(LLStrider<LLVector3>& vertices, 
-						 LLStrider<LLVector3>& normals, 
+	void appendMesh(LLStrider<LLVector4a>& vertices, 
+						 LLStrider<LLVector4a>& normals, 
 						 LLStrider<LLVector2>& tex_coords,
                          LLStrider<LLColor4U>& colors,
 						 LLStrider<U16>& indices,
 						 U16& idx_offset,
-						 LLMatrix4& matrix,
-						 LLMatrix4& norm_mat,
+						 LLMatrix4a& matrix,
+						 LLMatrix4a& norm_mat,
 						 S32 vertex_offset,
 						 S32 vertex_count,
 						 S32 index_count,
 						 S32 index_offset);
 
-	void genBranchPipeline(LLStrider<LLVector3>& vertices, 
-								 LLStrider<LLVector3>& normals, 
+	void genBranchPipeline(LLStrider<LLVector4a>& vertices, 
+								 LLStrider<LLVector4a>& normals, 
 								 LLStrider<LLVector2>& tex_coords, 
                                  LLStrider<LLColor4U>& colors,
 								 LLStrider<U16>& indices,
 								 U16& index_offset,
-								 LLMatrix4& matrix, 
+								 LLMatrix4a& matrix, 
 								 S32 trunk_LOD, 
 								 S32 stop_level, 
 								 U16 depth, 

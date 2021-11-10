@@ -30,6 +30,7 @@
 
 #include "lldrawpooltree.h"
 
+#include "alglmath.h"
 #include "llviewercontrol.h"
 #include "lldir.h"
 #include "llprimitive.h"
@@ -886,14 +887,12 @@ BOOL LLVOTree::updateGeometry(LLDrawable *drawable)
 
 void LLVOTree::updateMesh()
 {
-	LLMatrix4 matrix;
-	
 	// Translate to tree base  HACK - adjustment in Z plants tree underground
 	const LLVector3 &pos_region = getPositionRegion();
 	//gGL.translatef(pos_agent.mV[VX], pos_agent.mV[VY], pos_agent.mV[VZ] - 0.1f);
-	LLMatrix4 trans_mat;
-	trans_mat.setTranslation(pos_region.mV[VX], pos_region.mV[VY], pos_region.mV[VZ] - 0.1f);
-	trans_mat *= matrix;
+	LLMatrix4a trans_mat;
+	trans_mat.setIdentity();
+	trans_mat.setTranslate_affine(pos_region - LLVector3(0.f,0.f,0.1f));
 	
 	// Rotate to tree position and bend for current trunk/wind
 	// Note that trunk stiffness controls the amount of bend at the trunk as 
@@ -906,16 +905,12 @@ void LLVOTree::updateMesh()
 		LLQuaternion(90.f*DEG_TO_RAD, LLVector4(0,0,1)) *
 		getRotation();
 
-	LLMatrix4 rot_mat(rot);
-	rot_mat *= trans_mat;
+
+	LLMatrix4a rot_mat = trans_mat;
+	rot_mat.mul(LLQuaternion2(rot));
 
 	F32 radius = getScale().magVec()*0.05f;
-	LLMatrix4 scale_mat;
-	scale_mat.mMatrix[0][0] = 
-		scale_mat.mMatrix[1][1] =
-		scale_mat.mMatrix[2][2] = radius;
-
-	scale_mat *= rot_mat;
+	rot_mat.applyScale_affine(radius);
 
 //	const F32 THRESH_ANGLE_FOR_BILLBOARD = 15.f;
 //	const F32 BLEND_RANGE_FOR_BILLBOARD = 3.f;
@@ -950,8 +945,8 @@ void LLVOTree::updateMesh()
 
 	facep->setVertexBuffer(buff);
 	
-	LLStrider<LLVector3> vertices;
-	LLStrider<LLVector3> normals;
+	LLStrider<LLVector4a> vertices;
+	LLStrider<LLVector4a> normals;
 	LLStrider<LLVector2> tex_coords;
     LLStrider<LLColor4U> colors;
 	LLStrider<U16> indices;
@@ -963,27 +958,27 @@ void LLVOTree::updateMesh()
     buff->getColorStrider(colors);
 	buff->getIndexStrider(indices);
 
-	genBranchPipeline(vertices, normals, tex_coords, colors, indices, idx_offset, scale_mat, mTrunkLOD, stop_depth, mDepth, mTrunkDepth, 1.0, mTwist, droop, mBranches, alpha);
+	genBranchPipeline(vertices, normals, tex_coords, colors, indices, idx_offset, rot_mat, mTrunkLOD, stop_depth, mDepth, mTrunkDepth, 1.0, mTwist, droop, mBranches, alpha);
 	
 	mReferenceBuffer->flush();
 	buff->flush();
 }
 
-void LLVOTree::appendMesh(LLStrider<LLVector3>& vertices, 
-						 LLStrider<LLVector3>& normals, 
+void LLVOTree::appendMesh(LLStrider<LLVector4a>& vertices, 
+						 LLStrider<LLVector4a>& normals, 
 						 LLStrider<LLVector2>& tex_coords, 
                          LLStrider<LLColor4U>& colors, 
 						 LLStrider<U16>& indices,
 						 U16& cur_idx,
-						 LLMatrix4& matrix,
-						 LLMatrix4& norm_mat,
+						 LLMatrix4a& matrix,
+						 LLMatrix4a& norm_mat,
 						 S32 vert_start,
 						 S32 vert_count,
 						 S32 index_count,
 						 S32 index_offset)
 {
-	LLStrider<LLVector3> v;
-	LLStrider<LLVector3> n;
+	LLStrider<LLVector4a> v;
+	LLStrider<LLVector4a> n;
 	LLStrider<LLVector2> t;
     LLStrider<LLColor4U> c;
 	LLStrider<U16> idx;
@@ -998,10 +993,10 @@ void LLVOTree::appendMesh(LLStrider<LLVector3>& vertices,
 	for (S32 i = 0; i < vert_count; i++)
 	{ 
 		U16 index = vert_start + i;
-		*vertices++ = v[index] * matrix;
-		LLVector3 norm = n[index] * norm_mat;
-		norm.normalize();
-		*normals++ = norm;
+		matrix.affineTransform(v[index],*vertices++);
+		LLVector4a& norm = *normals++;
+		norm_mat.perspectiveTransform(n[index],norm);
+		norm.normalize3fast();
 		*tex_coords++ = t[index];
         *colors++ = c[index];
 	}
@@ -1018,13 +1013,13 @@ void LLVOTree::appendMesh(LLStrider<LLVector3>& vertices,
 }
 								 
 
-void LLVOTree::genBranchPipeline(LLStrider<LLVector3>& vertices, 
-								 LLStrider<LLVector3>& normals, 
+void LLVOTree::genBranchPipeline(LLStrider<LLVector4a>& vertices, 
+								 LLStrider<LLVector4a>& normals, 
 								 LLStrider<LLVector2>& tex_coords, 
                                  LLStrider<LLColor4U>& colors,
 								 LLStrider<U16>& indices,
 								 U16& index_offset,
-								 LLMatrix4& matrix, 
+								 LLMatrix4a& matrix, 
 								 S32 trunk_LOD, 
 								 S32 stop_level, 
 								 U16 depth, 
@@ -1053,45 +1048,44 @@ void LLVOTree::genBranchPipeline(LLStrider<LLVector3>& vertices,
 			{
 				llassert(sLODIndexCount[trunk_LOD] > 0);
 				width = scale * length * aspect;
-				LLMatrix4 scale_mat;
-				scale_mat.mMatrix[0][0] = width;
-				scale_mat.mMatrix[1][1] = width;
-				scale_mat.mMatrix[2][2] = scale*length;
-				scale_mat *= matrix;
 
-				glh::matrix4f norm((F32*) scale_mat.mMatrix);
-				LLMatrix4 norm_mat = LLMatrix4(norm.inverse().transpose().m);
+				LLMatrix4a scale_mat = matrix;
+				scale_mat.applyScale_affine(width,width,scale*length);
+
+				LLMatrix4a norm_mat = scale_mat;
+				norm_mat.invert();
+				norm_mat.transpose();
 
 				appendMesh(vertices, normals, tex_coords, colors, indices, index_offset, scale_mat, norm_mat, 
 							sLODVertexOffset[trunk_LOD], sLODVertexCount[trunk_LOD], sLODIndexCount[trunk_LOD], sLODIndexOffset[trunk_LOD]);
 			}
-			
+
+			LLMatrix4a trans_matrix = matrix;
+			trans_matrix.applyTranslation_affine(0.f,0.f,scale*length);
+			const LLMatrix4a& trans_mat = trans_matrix;
+
 			// Recurse to create more branches
 			for (S32 i=0; i < (S32)branches; i++) 
 			{
-				LLMatrix4 trans_mat;
-				trans_mat.setTranslation(0,0,scale*length);
-				trans_mat *= matrix;
 
 				LLQuaternion rot = 
 					LLQuaternion(20.f*DEG_TO_RAD, LLVector4(0.f, 0.f, 1.f)) *
 					LLQuaternion(droop*DEG_TO_RAD, LLVector4(0.f, 1.f, 0.f)) *
 					LLQuaternion(((constant_twist + ((i%2==0)?twist:-twist))*i)*DEG_TO_RAD, LLVector4(0.f, 0.f, 1.f));
-				
-				LLMatrix4 rot_mat(rot);
-				rot_mat *= trans_mat;
+
+				LLMatrix4a rot_mat = trans_mat;
+				rot_mat.mul(LLQuaternion2(rot));
 
 				genBranchPipeline(vertices, normals, tex_coords, colors, indices, index_offset, rot_mat, trunk_LOD, stop_level, depth - 1, 0, scale*mScaleStep, twist, droop, branches, alpha);
 			}
 			//  Recurse to continue trunk
 			if (trunk_depth)
 			{
-				LLMatrix4 trans_mat;
-				trans_mat.setTranslation(0,0,scale*length);
-				trans_mat *= matrix;
 
-				LLMatrix4 rot_mat(70.5f*DEG_TO_RAD, LLVector4(0,0,1));
-				rot_mat *= trans_mat; // rotate a bit around Z when ascending 
+				static const LLMatrix4a srot_mat = ALGLMath::genRot(70.5f,0.f,0.f,1.f);
+				LLMatrix4a rot_mat;
+				rot_mat.setMul(trans_mat, srot_mat);	// rotate a bit around Z when ascending
+
 				genBranchPipeline(vertices, normals, tex_coords, colors, indices, index_offset, rot_mat, trunk_LOD, stop_level, depth, trunk_depth-1, scale*mScaleStep, twist, droop, branches, alpha);
 			}
 		}
@@ -1101,15 +1095,12 @@ void LLVOTree::genBranchPipeline(LLStrider<LLVector3>& vertices,
 			//  Append leaves as two 90 deg crossed quads with leaf textures
 			//
 			{
-				LLMatrix4 scale_mat;
-				scale_mat.mMatrix[0][0] = 
-					scale_mat.mMatrix[1][1] =
-					scale_mat.mMatrix[2][2] = scale*mLeafScale;
+				LLMatrix4a scale_mat = matrix;
+				scale_mat.applyScale_affine(scale*mLeafScale);
 
-				scale_mat *= matrix;
-
-				glh::matrix4f norm((F32*) scale_mat.mMatrix);
-				LLMatrix4 norm_mat = LLMatrix4(norm.inverse().transpose().m);
+				LLMatrix4a norm_mat = scale_mat;
+				norm_mat.invert();
+				norm_mat.transpose();
 
 				appendMesh(vertices, normals, tex_coords, colors, indices, index_offset, scale_mat, norm_mat, 0, LEAF_VERTICES, LEAF_INDICES, 0);	
 			}
