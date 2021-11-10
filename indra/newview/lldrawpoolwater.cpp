@@ -481,8 +481,7 @@ void LLDrawPoolWater::shade2(bool edge, LLGLSLShader* shader, const LLColor3& li
 	{
         if (shader->getUniformLocation(LLShaderMgr::DEFERRED_NORM_MATRIX) >= 0)
 	    {
-			LLMatrix4a norm_mat;
-			norm_mat.loadu(gGLModelView);
+			LLMatrix4a norm_mat = get_current_modelview();
 			norm_mat.invert();
 			norm_mat.transpose();
 		    shader->uniformMatrix4fv(LLShaderMgr::DEFERRED_NORM_MATRIX, 1, FALSE, norm_mat.getF32ptr());
@@ -631,9 +630,7 @@ void LLDrawPoolWater::shade2(bool edge, LLGLSLShader* shader, const LLColor3& li
 			}
 			else
 			{
-				LLMatrix4a proj;
-				proj.loadu(gGLProjection);
-				LLGLSquashToFarClip far_clip(proj);
+				LLGLSquashToFarClip far_clip(get_current_projection());
 				face->renderIndexed();
 			}
 		}

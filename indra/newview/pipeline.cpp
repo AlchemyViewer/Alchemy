@@ -4455,14 +4455,14 @@ void LLPipeline::renderGeom(LLCamera& camera, bool forceVBOUpdate)
 
 	assertInitialized();
 
-	F32 saved_modelview[16];
-	F32 saved_projection[16];
+	LLMatrix4a saved_modelview;
+	LLMatrix4a saved_projection;
 
 	//HACK: preserve/restore matrices around HUD render
 	if (gPipeline.hasRenderType(LLPipeline::RENDER_TYPE_HUD))
 	{
-		memcpy(saved_modelview, gGLModelView, sizeof(F32) * 16);
-		memcpy(saved_projection, gGLProjection, sizeof(F32) * 16);
+		saved_modelview = get_current_modelview();
+		saved_projection = get_current_projection();
 	}
 
 	///////////////////////////////////////////
@@ -4692,8 +4692,8 @@ void LLPipeline::renderGeom(LLCamera& camera, bool forceVBOUpdate)
 		//HACK: preserve/restore matrices around HUD render
 		if (gPipeline.hasRenderType(LLPipeline::RENDER_TYPE_HUD))
 		{
-			memcpy(gGLModelView, saved_modelview, sizeof(F32) * 16);
-			memcpy(gGLProjection, saved_projection, sizeof(F32) * 16);
+			set_current_modelview(saved_modelview);
+			set_current_projection(saved_projection);
 		}
 	}
 
@@ -8709,7 +8709,7 @@ void LLPipeline::bindDeferredShader(LLGLSLShader& shader, LLRenderTarget* light_
 		{
 			cube_map->enable(channel);
 			cube_map->bind();
-			F32* m = gGLModelView;
+			const F32* m = get_current_modelview().getF32ptr();
 						
 			F32 mat[] = { m[0], m[1], m[2],
 						  m[4], m[5], m[6],
@@ -8834,7 +8834,7 @@ void LLPipeline::renderDeferredLighting(LLRenderTarget *screen_target)
         LLGLEnable cull(GL_CULL_FACE);
         LLGLEnable blend(GL_BLEND);
 
-        LLMatrix4a mat = get_current_modelview();
+        const LLMatrix4a& mat = get_current_modelview();
 		{
 			setupHWLights(NULL);  // to set mSun/MoonDir;
 
@@ -9366,13 +9366,10 @@ void LLPipeline::setupSpotLight(LLGLSLShader& shader, LLDrawable* drawablep)
 	//matrix from volume space to agent space
 	LLMatrix4 light_mat_(quat, LLVector4(origin,1.f));
 
-	LLMatrix4a cur_modelview;
-	cur_modelview.loadu(gGLModelView);
-
 	LLMatrix4a light_mat;
 	light_mat.loadu(light_mat_.mMatrix[0]);
 	LLMatrix4a light_to_screen;
-	light_to_screen.setMul(cur_modelview,light_mat);
+	light_to_screen.setMul(get_current_modelview(), light_mat);
 	LLMatrix4a screen_to_light = light_to_screen;
 	screen_to_light.invert();
 
@@ -9558,10 +9555,8 @@ void LLPipeline::generateWaterReflection(LLCamera& camera_in)
 
         gPipeline.pushRenderTypeMask();
 
-		LLMatrix4a saved_modelview;
-		saved_modelview.loadu(gGLModelView);
-		LLMatrix4a saved_projection;
-		saved_projection.loadu(gGLProjection);
+		LLMatrix4a saved_modelview = get_current_modelview();
+		LLMatrix4a saved_projection = get_current_projection();
         LLMatrix4a mat;
 
         S32 reflection_detail  = RenderReflectionDetail;
@@ -10329,10 +10324,8 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
 		gAgentAvatarp->updateAttachmentVisibility(CAMERA_MODE_THIRD_PERSON);
 	}
 
-	F32 last_modelview[16];
-	F32 last_projection[16];
-	memcpy(last_modelview, gGLLastModelView, sizeof(F32) * 16);
-	memcpy(last_projection, gGLLastProjection, sizeof(F32) * 16);
+	LLMatrix4a last_modelview = get_last_modelview();
+	LLMatrix4a last_projection = get_last_projection();
 
 	pushRenderTypeMask();
 	andRenderTypeMask(LLPipeline::RENDER_TYPE_SIMPLE,
@@ -10381,10 +10374,8 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
 	//get sun view matrix
 	
 	//store current projection/modelview matrix
-	LLMatrix4a saved_proj;
-	saved_proj.loadu(gGLProjection);
-	LLMatrix4a saved_view;
-	saved_view.loadu(gGLModelView);
+	LLMatrix4a saved_proj = get_current_projection();
+	LLMatrix4a saved_view = get_current_modelview();
 	LLMatrix4a inv_view(saved_view);
 	inv_view.invert();
 
@@ -10837,19 +10828,19 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
 
 			shadow_cam.setOrigin(0,0,0);
 
-			memcpy(gGLModelView, view[j].getF32ptr(), sizeof(F32) * 16);
-			memcpy(gGLProjection, proj[j].getF32ptr(), sizeof(F32) * 16);
+			set_current_modelview(view[j]);
+			set_current_projection(proj[j]);
 
 			LLViewerCamera::updateFrustumPlanes(shadow_cam, FALSE, FALSE, TRUE);
 
 			//shadow_cam.ignoreAgentFrustumPlane(LLCamera::AGENT_PLANE_NEAR);
 			shadow_cam.getAgentPlane(LLCamera::AGENT_PLANE_NEAR).set(shadow_near_clip);
 
-			memcpy(gGLModelView, view[j].getF32ptr(), sizeof(F32) * 16);
-			memcpy(gGLProjection, proj[j].getF32ptr(), sizeof(F32) * 16);
+			set_current_modelview(view[j]);
+			set_current_projection(proj[j]);
 
-			memcpy(gGLLastModelView, mShadowModelview[j].getF32ptr(), sizeof(F32) * 16);
-			memcpy(gGLLastProjection, mShadowProjection[j].getF32ptr(), sizeof(F32) * 16);
+			set_last_modelview(mShadowModelview[j]);
+			set_last_projection(mShadowProjection[j]);
 
 			mShadowModelview[j] = view[j];
 			mShadowProjection[j] = proj[j];
@@ -10921,8 +10912,8 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
 
 		for (S32 i = 0; i < 2; i++)
 		{
-			memcpy(gGLModelView, saved_view.getF32ptr(), sizeof(F32) * 16);
-			memcpy(gGLProjection, saved_proj.getF32ptr(), sizeof(F32) * 16);
+			set_current_modelview(saved_view);
+			set_current_projection(saved_proj);
 
 			if (mShadowSpotLight[i].isNull())
 			{
@@ -10976,11 +10967,11 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
 
 			proj[i+4] = ALGLMath::genPersp(fovy, aspect, near_clip, far_clip);
 
-			memcpy(gGLModelView, view[i + 4].getF32ptr(), sizeof(F32) * 16);
-			memcpy(gGLProjection, proj[i + 4].getF32ptr(), sizeof(F32) * 16);
+			set_current_modelview(view[i + 4]);
+			set_current_projection(proj[i + 4]);
 
-			memcpy(gGLLastModelView, mShadowModelview[i + 4].getF32ptr(), sizeof(F32) * 16);
-			memcpy(gGLLastProjection, mShadowProjection[i + 4].getF32ptr(), sizeof(F32) * 16);
+			set_last_modelview(mShadowModelview[i + 4]);
+			set_last_projection(mShadowProjection[i + 4]);
 
 			mShadowModelview[i+4] = view[i+4];
 			mShadowProjection[i+4] = proj[i+4];
@@ -11039,8 +11030,8 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
 	}
 	gGL.setColorMask(true, false);
 
-	memcpy(gGLLastModelView, last_modelview, sizeof(F32) * 16);
-	memcpy(gGLLastProjection, last_projection, sizeof(F32) * 16);
+	set_last_modelview(last_modelview);
+	set_last_projection(last_projection);
 
 	popRenderTypeMask();
 

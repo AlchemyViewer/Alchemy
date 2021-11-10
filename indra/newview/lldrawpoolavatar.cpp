@@ -170,10 +170,7 @@ LLMatrix4& LLDrawPoolAvatar::getModelView()
 {
 	static LLMatrix4 ret;
 
-	ret.initRows(LLVector4(gGLModelView+0),
-				 LLVector4(gGLModelView+4),
-				 LLVector4(gGLModelView+8),
-				 LLVector4(gGLModelView+12));
+	ret = LLMatrix4(gGLModelView.getF32ptr());
 
 	return ret;
 }

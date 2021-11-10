@@ -157,9 +157,8 @@ void LLViewerCamera::updateFrustumPlanes(LLCamera& camera, BOOL ortho, BOOL zfli
 {
 	LLVector3 frust[8];
 
-	LLMatrix4a modelview, projection;
-	modelview.loadu(gGLModelView);
-	projection.loadu(gGLProjection);
+	const LLMatrix4a& modelview = get_current_modelview();
+	const LLMatrix4a& projection = get_current_projection();
 
 	LLRect view_port(gGLViewport[0], gGLViewport[1] + gGLViewport[3], gGLViewport[0] + gGLViewport[2], gGLViewport[1]);
 
@@ -349,12 +348,8 @@ void LLViewerCamera::setPerspective(BOOL for_selection,
 // screen coordinates to the agent's region.
 void LLViewerCamera::projectScreenToPosAgent(const S32 screen_x, const S32 screen_y, LLVector3* pos_agent) const
 {
-	LLMatrix4a modelview, projection;
-	modelview.loadu(gGLModelView);
-	projection.loadu(gGLProjection);
-
 	ALGLMath::unprojectf(
-		LLVector3(screen_x, screen_y, 0.f), modelview, projection, 
+		LLVector3(screen_x, screen_y, 0.f), get_current_modelview(), get_current_projection(),
 		LLRect(gGLViewport[0], gGLViewport[1] + gGLViewport[3], gGLViewport[0] + gGLViewport[2], gGLViewport[1]),
 		*pos_agent);
 }
@@ -382,10 +377,8 @@ BOOL LLViewerCamera::projectPosAgentToScreen(const LLVector3 &pos_agent, LLCoord
 		}
 	}
 
-	LLMatrix4a modelview, projection;
-	modelview.loadu(gGLModelView);
-	projection.loadu(gGLProjection);
-
+	const LLMatrix4a& modelview = get_current_modelview();
+	const LLMatrix4a& projection = get_current_projection();
 	const LLRect& world_view_rect = gViewerWindow->getWorldViewRectRaw();
 
 	if (ALGLMath::projectf(pos_agent, modelview, projection, world_view_rect, window_coordinates))
@@ -485,9 +478,8 @@ BOOL LLViewerCamera::projectPosAgentToScreenEdge(const LLVector3 &pos_agent,
 		in_front = FALSE;
 	}
 
-	LLMatrix4a modelview, projection;
-	modelview.loadu(gGLModelView);
-	projection.loadu(gGLProjection);
+	const LLMatrix4a& modelview = get_current_modelview();
+	const LLMatrix4a& projection = get_current_projection();
 
 	const LLRect& world_view_rect = gViewerWindow->getWorldViewRectRaw();
 	LLVector3 window_coordinates;

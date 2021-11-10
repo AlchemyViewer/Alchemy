@@ -647,10 +647,7 @@ void LLPanelPrimMediaControls::updateShape()
 		LLMatrix4a mat;
 		if (!is_hud) 
 		{
-			LLMatrix4a proj, modelview;
-			proj.loadu(gGLProjection);
-			modelview.loadu(gGLModelView);
-			mat.setMul(proj, modelview);
+			mat.setMul(get_current_projection(), get_current_modelview());
 		}
 		else {
 			LLMatrix4a proj, modelview;

@@ -882,6 +882,7 @@ public:
 				av_iter++;
 			}
 		}
+
 		static LLCachedControl<bool> debugShowRenderMatrices(gSavedSettings, "DebugShowRenderMatrices");
 		if (debugShowRenderMatrices)
 		{
@@ -891,19 +892,19 @@ public:
 			// Projection last column is always <0,0,-1.0001,0>
 			// Projection last row is always <0,0,-0.2>
 			mBackRectCamera1.mBottom = ypos - y_inc + 2;
-			MATRIX_ROW_N32_TO_STR(gGLProjection, 12,camera_lines[7]); addText(xpos, ypos, std::string(camera_lines[7])); ypos += y_inc;
-			MATRIX_ROW_N32_TO_STR(gGLProjection,  8,camera_lines[6]); addText(xpos, ypos, std::string(camera_lines[6])); ypos += y_inc;
-			MATRIX_ROW_N32_TO_STR(gGLProjection,  4,camera_lines[5]); addText(xpos, ypos, std::string(camera_lines[5])); ypos += y_inc; mBackRectCamera1.mTop    = ypos + 2;
-			MATRIX_ROW_N32_TO_STR(gGLProjection,  0,camera_lines[4]); addText(xpos, ypos, std::string(camera_lines[4])); ypos += y_inc; mBackRectCamera2.mBottom = ypos + 2;
+			MATRIX_ROW_N32_TO_STR(gGLProjection.getF32ptr(), 12, camera_lines[7]); addText(xpos, ypos, std::string(camera_lines[7])); ypos += y_inc;
+			MATRIX_ROW_N32_TO_STR(gGLProjection.getF32ptr(),  8,camera_lines[6]); addText(xpos, ypos, std::string(camera_lines[6])); ypos += y_inc;
+			MATRIX_ROW_N32_TO_STR(gGLProjection.getF32ptr(),  4,camera_lines[5]); addText(xpos, ypos, std::string(camera_lines[5])); ypos += y_inc; mBackRectCamera1.mTop    = ypos + 2;
+			MATRIX_ROW_N32_TO_STR(gGLProjection.getF32ptr(),  0,camera_lines[4]); addText(xpos, ypos, std::string(camera_lines[4])); ypos += y_inc; mBackRectCamera2.mBottom = ypos + 2;
 
 			addText(xpos, ypos, "Projection Matrix");
 			ypos += y_inc;
 
 			// View last column is always <0,0,0,1>
-			MATRIX_ROW_F32_TO_STR(gGLModelView, 12,camera_lines[3]); addText(xpos, ypos, std::string(camera_lines[3])); ypos += y_inc;
-			MATRIX_ROW_N32_TO_STR(gGLModelView,  8,camera_lines[2]); addText(xpos, ypos, std::string(camera_lines[2])); ypos += y_inc;
-			MATRIX_ROW_N32_TO_STR(gGLModelView,  4,camera_lines[1]); addText(xpos, ypos, std::string(camera_lines[1])); ypos += y_inc; mBackRectCamera2.mTop = ypos + 2;
-			MATRIX_ROW_N32_TO_STR(gGLModelView,  0,camera_lines[0]); addText(xpos, ypos, std::string(camera_lines[0])); ypos += y_inc;
+			MATRIX_ROW_F32_TO_STR(gGLModelView.getF32ptr(), 12,camera_lines[3]); addText(xpos, ypos, std::string(camera_lines[3])); ypos += y_inc;
+			MATRIX_ROW_N32_TO_STR(gGLModelView.getF32ptr(),  8,camera_lines[2]); addText(xpos, ypos, std::string(camera_lines[2])); ypos += y_inc;
+			MATRIX_ROW_N32_TO_STR(gGLModelView.getF32ptr(),  4,camera_lines[1]); addText(xpos, ypos, std::string(camera_lines[1])); ypos += y_inc; mBackRectCamera2.mTop = ypos + 2;
+			MATRIX_ROW_N32_TO_STR(gGLModelView.getF32ptr(),  0,camera_lines[0]); addText(xpos, ypos, std::string(camera_lines[0])); ypos += y_inc;
 
 			addText(xpos, ypos, "View Matrix");
 			ypos += y_inc;

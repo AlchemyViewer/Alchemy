@@ -38,6 +38,7 @@
 #include "v3math.h"
 #include "v4coloru.h"
 #include "v4math.h"
+#include "llrect.h"
 #include "llstrider.h"
 #include "llpointer.h"
 #include "llglheaders.h"
@@ -532,11 +533,11 @@ private:
 
 };
 
-extern alignas(16) F32 gGLModelView[16];
-extern alignas(16) F32 gGLLastModelView[16];
-extern alignas(16) F32 gGLLastProjection[16];
-extern alignas(16) F32 gGLProjection[16];
-extern alignas(16) S32 gGLViewport[4];
+extern LLMatrix4a gGLModelView;
+extern LLMatrix4a gGLLastModelView;
+extern LLMatrix4a gGLLastProjection;
+extern LLMatrix4a gGLProjection;
+extern S32 gGLViewport[4];
 
 extern LLRender gGL;
 
@@ -555,15 +556,15 @@ inline static LL_ALIGN_16(const LLMatrix4a) OGL_TO_CFR_ROTATION_4A(
 	LLVector4a(0.f, 1.f, 0.f, 0.f),		//  Y becomes Z
 	LLVector4a(0.f, 0.f, 0.f, 1.f));
 
-LLMatrix4a copy_matrix(F32* src);
-LLMatrix4a get_current_modelview();
-LLMatrix4a get_current_projection();
-LLMatrix4a get_last_modelview();
-LLMatrix4a get_last_projection();
+const LLMatrix4a& get_current_modelview();
+const LLMatrix4a& get_current_projection();
+const LLMatrix4a& get_last_modelview();
+const LLMatrix4a& get_last_projection();
 
-void copy_matrix(const LLMatrix4a& src, F32* dst);
 void set_current_modelview(const LLMatrix4a& mat);
 void set_current_projection(const LLMatrix4a& mat);
+void set_last_modelview(const LLMatrix4a& mat);
+void set_last_projection(const LLMatrix4a& mat);
 
 #if LL_RELEASE_FOR_DOWNLOAD
     #define LL_SHADER_LOADING_WARNS(...) LL_WARNS_ONCE("ShaderLoading")

@@ -100,10 +100,6 @@ void hud_render_text(const LLWString &wstr, const LLVector3 &pos_agent,
 	LLVector3 render_pos = pos_agent + (floorf(x_offset) * right_axis) + (floorf(y_offset) * up_axis);
 
 	//get the render_pos in screen space
-	LLMatrix4a modelview, projection;
-	modelview.loadu(gGLModelView);
-	projection.loadu(gGLProjection);
-
 	LLVector3 window_coordinates;
 	F32& winX = window_coordinates.mV[VX];
 	F32& winY = window_coordinates.mV[VY];
@@ -111,7 +107,7 @@ void hud_render_text(const LLWString &wstr, const LLVector3 &pos_agent,
 
 	const LLRect& world_view_rect = gViewerWindow->getWorldViewRectRaw();
 
-	ALGLMath::projectf(render_pos, modelview, projection, world_view_rect, window_coordinates);
+	ALGLMath::projectf(render_pos, get_current_modelview(), get_current_projection(), world_view_rect, window_coordinates);
 		
 	//fonts all render orthographically, set up projection``
 	gGL.matrixMode(LLRender::MM_PROJECTION);

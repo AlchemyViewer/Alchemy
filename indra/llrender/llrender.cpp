@@ -41,11 +41,11 @@
 LLRender gGL;
 
 // Handy copies of last good GL matrices
-alignas(16) F32	gGLModelView[16];
-alignas(16) F32	gGLLastModelView[16];
-alignas(16) F32 gGLLastProjection[16];
-alignas(16) F32 gGLProjection[16];
-alignas(16) S32	gGLViewport[4];
+LLMatrix4a	gGLModelView;
+LLMatrix4a	gGLLastModelView;
+LLMatrix4a	gGLLastProjection;
+LLMatrix4a	gGLProjection;
+S32			gGLViewport[4];
 
 U32 LLRender::sUICalls = 0;
 U32 LLRender::sUIVerts = 0;
@@ -2446,44 +2446,42 @@ void LLRender::debugTexUnits(void)
 	LL_INFOS("TextureUnit") << "Active TexUnit Enabled : " << active_enabled << LL_ENDL;
 }
 
-LLMatrix4a copy_matrix(F32* src)
+const LLMatrix4a& get_current_modelview()
 {
-	LLMatrix4a outmat;
-	outmat.load4a(src);
-	return outmat;
+	return gGLModelView;
 }
 
-LLMatrix4a get_current_modelview()
+const LLMatrix4a& get_current_projection()
 {
-	return copy_matrix(gGLModelView);
+	return gGLProjection;
 }
 
-LLMatrix4a get_current_projection()
+const LLMatrix4a& get_last_modelview()
 {
-	return copy_matrix(gGLProjection);
+	return gGLLastModelView;
 }
 
-LLMatrix4a get_last_modelview()
+const LLMatrix4a& get_last_projection()
 {
-	return copy_matrix(gGLLastModelView);
-}
-
-LLMatrix4a get_last_projection()
-{
-	return copy_matrix(gGLLastProjection);
-}
-
-void copy_matrix(const LLMatrix4a& src, F32* dst)
-{
-	src.store4a(dst);
+	return gGLLastProjection;
 }
 
 void set_current_modelview(const LLMatrix4a& mat)
 {
-	copy_matrix(mat, gGLModelView);
+	gGLModelView = mat;
 }
 
 void set_current_projection(const LLMatrix4a& mat)
 {
-	copy_matrix(mat, gGLProjection);
+	gGLProjection = mat;
+}
+
+void set_last_modelview(const LLMatrix4a& mat)
+{
+	gGLLastModelView = mat;
+}
+
+void set_last_projection(const LLMatrix4a& mat)
+{
+	gGLLastProjection = mat;
 }

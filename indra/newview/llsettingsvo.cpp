@@ -940,8 +940,7 @@ void LLSettingsVOWater::applySpecial(void *ptarget, bool force)
         LLVector4a enorm(0.f, 0.f, 1.f);
         LLVector4a ep(0.f, 0.f, water_height + 0.1f);
 
-        LLMatrix4a mat;
-        mat.loadu(gGLModelView);
+        const LLMatrix4a& mat = get_current_modelview();
         LLMatrix4a invtrans = mat;
         invtrans.invert();
         invtrans.transpose();
