@@ -32,6 +32,7 @@
 #include "llviewerfloaterreg.h"
 
 #include "alfloaterao.h"
+#include "alfloaterexploresounds.h"
 #include "alfloaterparticleeditor.h"
 #include "alfloaterregiontracker.h"
 #include "llcommandhandler.h"
@@ -418,6 +419,7 @@ void LLViewerFloaterReg::registerFloaters()
 	LLFloaterReg::add("particle_editor", "floater_particle_editor.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<ALFloaterParticleEditor>);
 	LLFloaterReg::add("quick_settings", "floater_quick_settings.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloater>);
 	LLFloaterReg::add("region_tracker", "floater_region_tracker.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<ALFloaterRegionTracker>);
+	LLFloaterReg::add("sound_explorer", "floater_explore_sounds.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<ALFloaterExploreSounds>);
 	
 	LLFloaterReg::registerControlVariables(); // Make sure visibility and rect controls get preserved when saving
 }

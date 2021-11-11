@@ -40,6 +40,7 @@
 #include "llextendedstatus.h"
 
 #include "lllistener.h"
+#include "absl/container/node_hash_map.h"
 #include "absl/container/flat_hash_map.h"
 
 const F32 LL_WIND_UPDATE_INTERVAL = 0.1f;
@@ -49,7 +50,7 @@ const F32 ATTACHED_OBJECT_TIMEOUT = 5.0f;
 const F32 DEFAULT_MIN_DISTANCE = 2.0f;
 
 #define MAX_CHANNELS 30
-#define MAX_BUFFERS 40	// Some extra for preloading, maybe?
+#define MAX_BUFFERS 60	// Some extra for preloading, maybe?
 
 class LLAudioSource;
 class LLAudioData;
@@ -58,6 +59,7 @@ class LLAudioChannelOpenAL;
 class LLAudioBuffer;
 class LLStreamingAudioInterface;
 struct SoundData;
+struct LLSoundHistoryItem;
 
 //
 //  LLAudioEngine definition
@@ -133,7 +135,9 @@ public:
 	// Owner ID is the owner of the object making the request
 	void triggerSound(const LLUUID &sound_id, const LLUUID& owner_id, const F32 gain,
 					  const S32 type = LLAudioEngine::AUDIO_TYPE_NONE,
-					  const LLVector3d &pos_global = LLVector3d::zero);
+					  const LLVector3d &pos_global = LLVector3d::zero,
+					  const LLUUID& source_object = LLUUID::null,
+					  const LLUUID& audio_source_id = LLUUID::null);
 	void triggerSound(const SoundData& soundData);
 
 	bool preloadSound(const LLUUID &id);
@@ -239,6 +243,17 @@ protected:
 
 	LLFrameTimer mWindUpdateTimer;
 
+public:
+	void logSoundPlay(const LLUUID& id, LLVector3d position, S32 type, const LLUUID& assetid, const LLUUID& ownerid, const LLUUID& sourceid, bool is_trigger, bool is_looped);
+	void logSoundStop(const LLUUID& id);
+	void pruneSoundLog();
+
+	auto& getSoundLog() { return mSoundHistory; }
+private:
+	S32 mSoundHistoryPruneCounter = 0;
+
+	using sound_history_map = absl::node_hash_map<LLUUID, LLSoundHistoryItem>;
+	sound_history_map mSoundHistory;
 private:
 	void setDefaults();
 	LLStreamingAudioInterface *mStreamingAudioImpl;
@@ -257,7 +272,7 @@ class LLAudioSource
 public:
 	// owner_id is the id of the agent responsible for making this sound
 	// play, for example, the owner of the object currently playing it
-	LLAudioSource(const LLUUID &id, const LLUUID& owner_id, const F32 gain, const S32 type = LLAudioEngine::AUDIO_TYPE_NONE);
+	LLAudioSource(const LLUUID &id, const LLUUID& owner_id, const F32 gain, const S32 type = LLAudioEngine::AUDIO_TYPE_NONE, const LLUUID& source_id = LLUUID::null, const bool isTrigger = true);
 	virtual ~LLAudioSource();
 
 	virtual void update();						// Update this audio source
@@ -297,6 +312,8 @@ public:
 	virtual void setGain(const F32 gain)							{ mGain = llclamp(gain, 0.f, 1.f); }
 
 	const LLUUID &getID() const		{ return mID; }
+	const LLUUID &getLogID() const { return mLogID; }
+
 	bool isDone() const;
 	bool isMuted() const { return mSourceMuted; }
 
@@ -331,6 +348,9 @@ protected:
 	S32             mType;
 	LLVector3d		mPositionGlobal;
 	LLVector3		mVelocity;
+	LLUUID			mLogID;
+	LLUUID			mSourceID;
+	bool			mIsTrigger;
 
 	//LLAudioSource	*mSyncMasterp;	// If we're a slave, the source that we're synced to.
 	LLAudioChannel	*mChannelp;		// If we're currently playing back, this is the channel that we're assigned to.
@@ -472,5 +492,34 @@ struct SoundData
 
 
 extern LLAudioEngine* gAudiop;
+
+struct LLSoundHistoryItem
+{
+	LLUUID mID;
+	LLVector3d mPosition;
+	S32 mType;
+	bool mPlaying;
+	LLUUID mAssetID;
+	LLUUID mOwnerID;
+	LLUUID mSourceID;
+	bool mIsTrigger;
+	bool mIsLooped;
+	F64 mTimeStarted;
+	F64 mTimeStopped;
+	bool mReviewed;
+	bool mReviewedCollision;
+
+	LLSoundHistoryItem()
+	  : mType(0)
+	  , mPlaying(0)
+	  , mIsTrigger(0)
+	  , mIsLooped(0)
+	  , mTimeStarted(0.f)
+	  , mTimeStopped(0.f)
+	  , mReviewed(false)
+	  , mReviewedCollision(false)
+	{
+	}
+};
 
 #endif

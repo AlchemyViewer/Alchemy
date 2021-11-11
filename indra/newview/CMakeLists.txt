@@ -123,6 +123,7 @@ set(viewer_SOURCE_FILES
     alchatcommand.cpp
     alcontrolcache.cpp
     alfloaterao.cpp
+    alfloaterexploresounds.cpp
     alfloaterparticleeditor.cpp
     alfloaterregiontracker.cpp
     alpanelaomini.cpp
@@ -794,6 +795,7 @@ set(viewer_HEADER_FILES
     alchatcommand.h
     alcontrolcache.h
     alfloaterao.h
+    alfloaterexploresounds.h
     alfloaterparticleeditor.h
     alfloaterregiontracker.h
     alpanelaomini.h

@@ -687,6 +687,17 @@
           <menu_item_call.on_click
            function="World.SyncAnimations" />
         </menu_item_call>
+		<menu_item_check
+         label="Sound Explorer"
+         name="Sound Explorer"
+         use_mac_ctrl="true">
+			<menu_item_check.on_check
+             function="Floater.Visible"
+             parameter="sound_explorer" />
+			<menu_item_check.on_click
+             function="Floater.Toggle"
+             parameter="sound_explorer" />
+		</menu_item_check>
         <menu_item_separator/>
         <menu_item_call
          label="Landmark This Place"
