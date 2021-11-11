@@ -12,8 +12,7 @@
  title="Sounds"
  save_rect="true"
  save_visibility="true"
- single_instance="true"
- help_topic="fs_sound_explorer">
+ single_instance="true">
 	<floater.string name="Playing">
 		Playing
 	</floater.string>
