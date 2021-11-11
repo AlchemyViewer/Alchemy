@@ -440,7 +440,7 @@ bool LLDrawPoolAlpha::TexSetup(LLDrawInfo* draw, bool use_shaders, bool use_mate
 				tex_setup = true;
 				gGL.getTexUnit(0)->activate();
 				gGL.matrixMode(LLRender::MM_TEXTURE);
-				gGL.loadMatrix((GLfloat*) draw->mTextureMatrix->mMatrix);
+				gGL.loadMatrix(*draw->mTextureMatrix);
 				gPipeline.mTextureMatrixOps++;
 			}
 		}

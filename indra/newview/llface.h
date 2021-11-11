@@ -251,7 +251,7 @@ public:
 	F32			mLastUpdateTime;
 	F32			mLastSkinTime;
 	F32			mLastMoveTime;
-	LLMatrix4*	mTextureMatrix;
+	LLMatrix4a*	mTextureMatrix;
 	LLDrawInfo* mDrawInfo;
 
 private:

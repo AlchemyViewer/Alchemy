@@ -199,7 +199,7 @@ void LLDrawPoolMaterials::pushBatch(LLDrawInfo& params, U32 mask, BOOL texture, 
 				gGL.matrixMode(LLRender::MM_TEXTURE);
 			}
 			
-			gGL.loadMatrix((GLfloat*) params.mTextureMatrix->mMatrix);
+			gGL.loadMatrix(*params.mTextureMatrix);
 			gPipeline.mTextureMatrixOps++;
 			
 			tex_setup = true;

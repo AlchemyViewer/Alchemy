@@ -32,6 +32,7 @@
 
 #include <sstream>
 
+#include "alglmath.h"
 #include "llviewercontrol.h"
 #include "lldir.h"
 #include "llflexibleobject.h"
@@ -604,27 +605,27 @@ void LLVOVolume::animateTextures()
 
 				if (!facep->mTextureMatrix)
 				{
-					facep->mTextureMatrix = new LLMatrix4();
+					facep->mTextureMatrix = new LLMatrix4a();
 				}
 
-				LLMatrix4& tex_mat = *facep->mTextureMatrix;
+				LLMatrix4a& tex_mat = *facep->mTextureMatrix;
 				tex_mat.setIdentity();
 				LLVector3 trans ;
+				{
+					trans.set(LLVector3(off_s+0.5f, off_t+0.5f, 0.f));
+					tex_mat.setTranslate_affine(LLVector3(-0.5f, -0.5f, 0.f));
+				}
 
-					trans.set(LLVector3(off_s+0.5f, off_t+0.5f, 0.f));			
-					tex_mat.translate(LLVector3(-0.5f, -0.5f, 0.f));
+				LLVector3 scale(scale_s, scale_t, 1.f);
+	
+				tex_mat.setMul(ALGLMath::genRot(rot*RAD_TO_DEG,0.f,0.f,-1.f),tex_mat);	//left mul
 
-				LLVector3 scale(scale_s, scale_t, 1.f);			
-				LLQuaternion quat;
-				quat.setQuat(rot, 0, 0, -1.f);
-		
-				tex_mat.rotate(quat);				
+				LLMatrix4a scale_mat;
+				scale_mat.setIdentity();
+				scale_mat.applyScale_affine(scale);
+				tex_mat.setMul(scale_mat, tex_mat);	//left mul
 
-				LLMatrix4 mat;
-				mat.initAll(scale, LLQuaternion(), LLVector3());
-				tex_mat *= mat;
-		
-				tex_mat.translate(trans);
+				tex_mat.translate_affine(trans);		
 			}
 		}
 		else
@@ -5238,7 +5239,7 @@ void LLVolumeGeometryManager::registerFace(LLSpatialGroup* group, LLFace* facep,
 		return;
 	}
 
-	const LLMatrix4* tex_mat = NULL;
+	const LLMatrix4a* tex_mat = NULL;
 	if (facep->isState(LLFace::TEXTURE_ANIM) && facep->getVirtualSize() > MIN_TEX_ANIM_SIZE)
 	{
 		tex_mat = facep->mTextureMatrix;	

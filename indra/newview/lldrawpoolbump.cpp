@@ -1514,16 +1514,16 @@ void LLDrawPoolBump::pushBatch(LLDrawInfo& params, U32 mask, BOOL texture, BOOL 
 				{
 					gGL.getTexUnit(1)->activate();
 					gGL.matrixMode(LLRender::MM_TEXTURE);
-					gGL.loadMatrix((GLfloat*) params.mTextureMatrix->mMatrix);
+					gGL.loadMatrix(*params.mTextureMatrix);
 				}
 
 				gGL.getTexUnit(0)->activate();
 				gGL.matrixMode(LLRender::MM_TEXTURE);
-				gGL.loadMatrix((GLfloat*) params.mTextureMatrix->mMatrix);
+				gGL.loadMatrix(*params.mTextureMatrix);
 				gPipeline.mTextureMatrixOps++;
 			}
 
-			gGL.loadMatrix((GLfloat*) params.mTextureMatrix->mMatrix);
+			gGL.loadMatrix(*params.mTextureMatrix);
 			gPipeline.mTextureMatrixOps++;
 
 			tex_setup = true;

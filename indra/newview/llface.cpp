@@ -1025,9 +1025,9 @@ LLVector2 LLFace::surfaceToTexture(LLVector2 surface_coord, const LLVector4a& po
 
 	if (mTextureMatrix)	// if we have a texture matrix, use it
 	{
-		LLVector3 tc3(tc);
-		tc3 = tc3 * *mTextureMatrix;
-		tc = LLVector2(tc3);
+		LLVector4a tc4(tc.mV[VX],tc.mV[VY],0.f);
+		mTextureMatrix->affineTransform(tc4,tc4);
+		tc.set(tc4.getF32ptr());
 	}
 	
 	else // otherwise use the texture entry parameters
@@ -1650,16 +1650,12 @@ BOOL LLFace::getGeometryVolume(const LLVolume& volume,
 					else
 					{ //do tex mat, no texgen, no bump
 						for (S32 i = 0; i < num_vertices; i++)
-						{	
-							LLVector2 tc(vf.mTexCoords[i]);
+						{
 							//LLVector4a& norm = vf.mNormals[i];
 							//LLVector4a& center = *(vf.mCenter);
-
-							LLVector3 tmp(tc.mV[0], tc.mV[1], 0.f);
-							tmp = tmp * *mTextureMatrix;
-							tc.mV[0] = tmp.mV[0];
-							tc.mV[1] = tmp.mV[1];
-							*tex_coords0++ = tc;	
+							LLVector4a tc(vf.mTexCoords[i].mV[VX],vf.mTexCoords[i].mV[VY],0.f);
+							mTextureMatrix->affineTransform(tc,tc);
+							(tex_coords0++)->set(tc.getF32ptr());
 						}
 					}
 				}
@@ -1677,12 +1673,9 @@ BOOL LLFace::getGeometryVolume(const LLVolume& volume,
 							vec.mul(scalea);
 							planarProjection(tc, norm, center, vec);
 						
-							LLVector3 tmp(tc.mV[0], tc.mV[1], 0.f);
-							tmp = tmp * *mTextureMatrix;
-							tc.mV[0] = tmp.mV[0];
-							tc.mV[1] = tmp.mV[1];
-				
-							*tex_coords0++ = tc;	
+							LLVector4a tmp(tc.mV[VX],tc.mV[VY],0.f);
+							mTextureMatrix->affineTransform(tmp,tmp);
+							(tex_coords0++)->set(tmp.getF32ptr());
 						}
 					}
 					else
@@ -1796,10 +1789,10 @@ BOOL LLFace::getGeometryVolume(const LLVolume& volume,
 
 					if (tex_mode && mTextureMatrix)
 					{
-						LLVector3 tmp(tc.mV[0], tc.mV[1], 0.f);
-						tmp = tmp * *mTextureMatrix;
-						tc.mV[0] = tmp.mV[0];
-						tc.mV[1] = tmp.mV[1];
+						LLVector4a tmp(tc.mV[VX],tc.mV[VY],0.f);
+						mTextureMatrix->affineTransform(tmp,tmp);
+						tc.set(tmp.getF32ptr());
+
 					}
 					else
 					{
