@@ -95,7 +95,7 @@ LLPlane LLCamera::getUserClipPlane()
 
 // ---------------- LLCamera::setFoo() member functions ----------------
 
-void LLCamera::setUserClipPlane(LLPlane& plane)
+void LLCamera::setUserClipPlane(const LLPlane& plane)
 {
 	mPlaneCount = AGENT_PLANE_USER_CLIP_NUM;
 	mAgentPlanes[AGENT_PLANE_USER_CLIP] = plane;

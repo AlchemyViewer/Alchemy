@@ -89,7 +89,7 @@ public:
 	inline void getVector3(LLVector3& vec) const { vec.set(mV[0], mV[1], mV[2]); }
 	
 	// Retrieve the mask indicating which of the x, y, or z axis are greater or equal to zero.
-	inline U8 calcPlaneMask() 
+	inline U8 calcPlaneMask() const
 	{ 
 		return mV.greaterEqual(LLVector4a::getZero()).getGatheredBits() & LLVector4Logical::MASK_XYZ;
 	}
