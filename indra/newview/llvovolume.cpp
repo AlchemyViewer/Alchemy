@@ -1819,94 +1819,54 @@ void LLVOVolume::updateRelativeXform(bool force_identity)
 	if (drawable->isState(LLDrawable::RIGGED) && mRiggedVolume.notNull())
 	{ //rigged volume (which is in agent space) is used for generating bounding boxes etc
 	  //inverse of render matrix should go to partition space
-		mRelativeXform = getRenderMatrix();
-
-		F32* dst = (F32*) mRelativeXformInvTrans.mMatrix;
-		F32* src = (F32*) mRelativeXform.mMatrix;
-		dst[0] = src[0]; dst[1] = src[1]; dst[2] = src[2];
-		dst[3] = src[4]; dst[4] = src[5]; dst[5] = src[6];
-		dst[6] = src[8]; dst[7] = src[9]; dst[8] = src[10];
-		
+		mRelativeXform.loadu((F32*)&getRenderMatrix().mMatrix[0][0]);
+		mRelativeXformInvTrans = mRelativeXform;
 		mRelativeXform.invert();
 		mRelativeXformInvTrans.transpose();
 	}
 	else if (drawable->isActive() || force_identity)
 	{				
 		// setup relative transforms
-		LLQuaternion delta_rot;
-		LLVector3 delta_pos, delta_scale;
-		
-		//matrix from local space to parent relative/global space
+
 		bool use_identity = force_identity || drawable->isSpatialRoot();
-		delta_rot = use_identity ? LLQuaternion() : mDrawable->getRotation();
-		delta_pos = use_identity ? LLVector3(0,0,0) : mDrawable->getPosition();
-		delta_scale = mDrawable->getScale();
 
-		// Vertex transform (4x4)
-		LLVector3 x_axis = LLVector3(delta_scale.mV[VX], 0.f, 0.f) * delta_rot;
-		LLVector3 y_axis = LLVector3(0.f, delta_scale.mV[VY], 0.f) * delta_rot;
-		LLVector3 z_axis = LLVector3(0.f, 0.f, delta_scale.mV[VZ]) * delta_rot;
+		if(use_identity)
+		{
+			mRelativeXform.setIdentity();
+			mRelativeXform.applyScale_affine(mDrawable->getScale());
+		}
+		else
+		{
+			mRelativeXform = LLQuaternion2(mDrawable->getRotation());
+			mRelativeXform.applyScale_affine(mDrawable->getScale());
+			mRelativeXform.setTranslate_affine(mDrawable->getPosition());
+		}
 
-		mRelativeXform.initRows(LLVector4(x_axis, 0.f),
-								LLVector4(y_axis, 0.f),
-								LLVector4(z_axis, 0.f),
-								LLVector4(delta_pos, 1.f));
-
-		
-		// compute inverse transpose for normals
-		// mRelativeXformInvTrans.setRows(x_axis, y_axis, z_axis);
-		// mRelativeXformInvTrans.invert(); 
-		// mRelativeXformInvTrans.setRows(x_axis, y_axis, z_axis);
-		// grumble - invert is NOT a matrix invert, so we do it by hand:
-
-		LLMatrix3 rot_inverse = LLMatrix3(~delta_rot);
-
-		LLMatrix3 scale_inverse;
-		scale_inverse.setRows(LLVector3(1.0, 0.0, 0.0) / delta_scale.mV[VX],
-							  LLVector3(0.0, 1.0, 0.0) / delta_scale.mV[VY],
-							  LLVector3(0.0, 0.0, 1.0) / delta_scale.mV[VZ]);
-							   
-		
-		mRelativeXformInvTrans = rot_inverse * scale_inverse;
-
+		mRelativeXformInvTrans = mRelativeXform;
+		mRelativeXformInvTrans.invert();
 		mRelativeXformInvTrans.transpose();
 	}
 	else
 	{
-		LLVector3 pos = getPosition();
-		LLVector3 scale = getScale();
-		LLQuaternion rot = getRotation();
-	
+		LLVector4a pos;
+		pos.load3(getPosition().mV);
+		LLQuaternion2 rot(getRotation());
 		if (mParent)
 		{
-			pos *= mParent->getRotation();
-			pos += mParent->getPosition();
-			rot *= mParent->getRotation();
+			LLMatrix4a lrot = LLQuaternion2(mParent->getRotation());
+			lrot.rotate(pos,pos);
+			LLVector4a lpos;
+			lpos.load3(mParent->getPosition().mV);
+			pos.add(lpos);
+			rot.mul(LLQuaternion2(mParent->getRotation()));
 		}
-		
-		//LLViewerRegion* region = getRegion();
-		//pos += region->getOriginAgent();
-		
-		LLVector3 x_axis = LLVector3(scale.mV[VX], 0.f, 0.f) * rot;
-		LLVector3 y_axis = LLVector3(0.f, scale.mV[VY], 0.f) * rot;
-		LLVector3 z_axis = LLVector3(0.f, 0.f, scale.mV[VZ]) * rot;
 
-		mRelativeXform.initRows(LLVector4(x_axis, 0.f),
-								LLVector4(y_axis, 0.f),
-								LLVector4(z_axis, 0.f),
-								LLVector4(pos, 1.f));
+		mRelativeXform = rot;
+		mRelativeXform.applyScale_affine(getScale());
+		mRelativeXform.setTranslate_affine(LLVector3(pos.getF32ptr()));
 
-		// compute inverse transpose for normals
-		LLMatrix3 rot_inverse = LLMatrix3(~rot);
-
-		LLMatrix3 scale_inverse;
-		scale_inverse.setRows(LLVector3(1.0, 0.0, 0.0) / scale.mV[VX],
-							  LLVector3(0.0, 1.0, 0.0) / scale.mV[VY],
-							  LLVector3(0.0, 0.0, 1.0) / scale.mV[VZ]);
-							   
-		
-		mRelativeXformInvTrans = rot_inverse * scale_inverse;
-
+		mRelativeXformInvTrans = mRelativeXform;
+		mRelativeXformInvTrans.invert();
 		mRelativeXformInvTrans.transpose();
 	}
 }
@@ -3904,10 +3864,10 @@ void LLVOVolume::generateSilhouette(LLSelectNode* nodep, const LLVector3& view_p
 		}
 		
 		updateRelativeXform();
-		LLMatrix4 trans_mat = mRelativeXform;
+		LLMatrix4a trans_mat = mRelativeXform;
 		if (mDrawable->isStatic())
 		{
-			trans_mat.translate(getRegion()->getOriginAgent());
+			trans_mat.translate_affine(getRegion()->getOriginAgent());
 		}
 
 		volume->generateSilhouetteVertices(nodep->mSilhouetteVertices, nodep->mSilhouetteNormals, view_vector, trans_mat, mRelativeXformInvTrans, nodep->getTESelectMask());

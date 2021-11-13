@@ -5962,7 +5962,7 @@ void LLSelectMgr::renderSilhouettes(BOOL for_hud)
 		{
 			LLVertexBuffer::unbind();
 			gGL.pushMatrix();
-			gGL.multMatrix((F32*)vobj->getRelativeXform().mMatrix);
+			gGL.multMatrix(vobj->getRelativeXform());
 
 			if (objectp->mDrawable->isState(LLDrawable::RIGGED))
 			{

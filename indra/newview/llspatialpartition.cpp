@@ -2297,7 +2297,7 @@ void renderNormals(LLDrawable *drawablep)
         inv_scale.normalize3fast();
 
         gGL.pushMatrix();
-        gGL.multMatrix((F32 *) vol->getRelativeXform().mMatrix);
+        gGL.multMatrix(vol->getRelativeXform());
 
         gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
 
@@ -2462,7 +2462,7 @@ void renderPhysicsShape(LLDrawable* drawable, LLVOVolume* volume)
 	LLVector3 size(0.25f,0.25f,0.25f);
 
 	gGL.pushMatrix();
-	gGL.multMatrix((F32*) volume->getRelativeXform().mMatrix);
+	gGL.multMatrix(volume->getRelativeXform());
 		
 	if (type == LLPhysicsShapeBuilderUtil::PhysicsShapeSpecification::USER_MESH)
 	{
@@ -3195,7 +3195,7 @@ void renderRaycast(LLDrawable* drawablep)
 					
 					gGL.pushMatrix();
 					gGL.translatef(trans.mV[0], trans.mV[1], trans.mV[2]);					
-					gGL.multMatrix((F32*) vobj->getRelativeXform().mMatrix);
+					gGL.multMatrix(vobj->getRelativeXform());
 
 					LLVector4a start, end;
 					if (transform)

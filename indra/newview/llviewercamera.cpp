@@ -679,14 +679,12 @@ BOOL LLViewerCamera::areVertsVisible(LLViewerObject* volumep, BOOL all_verts)
 	LLVOVolume* vo_volume = (LLVOVolume*) volumep;
 
 	vo_volume->updateRelativeXform();
-	LLMatrix4 mat = vo_volume->getRelativeXform();
 	
 	LLMatrix4 render_mat(vo_volume->getRenderRotation(), LLVector4(vo_volume->getRenderPosition()));
 
 	LLMatrix4a render_mata;
 	render_mata.loadu(render_mat);
-	LLMatrix4a mata;
-	mata.loadu(mat);
+	const LLMatrix4a& mata = vo_volume->getRelativeXform();;
 
 	num_faces = volume->getNumVolumeFaces();
 	for (i = 0; i < num_faces; i++)

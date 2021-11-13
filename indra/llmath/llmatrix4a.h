@@ -560,7 +560,7 @@ public:
 		return ret;
 	}
 
-	void mulBoundBox(const LLVector4a *in_extents, LLVector4a *out_extents)
+	void mulBoundBox(const LLVector4a *in_extents, LLVector4a *out_extents) const
 	{
 		//get 8 corners of bounding box
 		LLVector4Logical mask[6];

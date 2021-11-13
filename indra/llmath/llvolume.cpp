@@ -3751,16 +3751,10 @@ S32 LLVolume::getNumTriangles(S32* vcount) const
 void LLVolume::generateSilhouetteVertices(std::vector<LLVector3> &vertices,
 										  std::vector<LLVector3> &normals,
 										  const LLVector3& obj_cam_vec_in,
-										  const LLMatrix4& mat_in,
-										  const LLMatrix3& norm_mat_in,
+										  const LLMatrix4a& mat,
+										  const LLMatrix4a& norm_mat,
 										  S32 face_mask)
 {
-	LLMatrix4a mat;
-	mat.loadu(mat_in);
-
-	LLMatrix4a norm_mat;
-	norm_mat.loadu(norm_mat_in);
-		
 	LLVector4a obj_cam_vec;
 	obj_cam_vec.load3(obj_cam_vec_in.mV);
 

@@ -908,32 +908,35 @@ LLQuaternion LLVolumeImplFlexible::getEndRotation()
 
 void LLVolumeImplFlexible::updateRelativeXform(bool force_identity)
 {
-	LLQuaternion delta_rot;
-	LLVector3 delta_pos, delta_scale;
+
 	LLVOVolume* vo = (LLVOVolume*) mVO;
 
 	bool use_identity = vo->mDrawable->isSpatialRoot() || force_identity;
 
+	vo->mRelativeXform.setIdentity();
+
 	//matrix from local space to parent relative/global space
-	delta_rot = use_identity ? LLQuaternion() : vo->mDrawable->getRotation();
-	delta_pos = use_identity ? LLVector3(0,0,0) : vo->mDrawable->getPosition();
-	delta_scale = LLVector3(1,1,1);
+	LLVector4a delta_pos;
+	LLQuaternion2 delta_rot;
+	if(use_identity)
+	{
+		delta_pos.set(0,0,0,1.f);
+		delta_rot.getVector4aRw() = delta_pos;
+	}
+	else
+	{
+		delta_pos.load3(vo->mDrawable->getPosition().mV,1.f);
+		delta_rot.getVector4aRw().loadua(vo->mDrawable->getRotation().mQ);
+		vo->mRelativeXform.getRow<0>().setRotated(delta_rot,vo->mRelativeXform.getRow<0>());
+		vo->mRelativeXform.getRow<1>().setRotated(delta_rot,vo->mRelativeXform.getRow<1>());
+		vo->mRelativeXform.getRow<2>().setRotated(delta_rot,vo->mRelativeXform.getRow<2>());
+	}
 
-	// Vertex transform (4x4)
-	LLVector3 x_axis = LLVector3(delta_scale.mV[VX], 0.f, 0.f) * delta_rot;
-	LLVector3 y_axis = LLVector3(0.f, delta_scale.mV[VY], 0.f) * delta_rot;
-	LLVector3 z_axis = LLVector3(0.f, 0.f, delta_scale.mV[VZ]) * delta_rot;
+	vo->mRelativeXform.setRow<3>(delta_pos);
 
-	vo->mRelativeXform.initRows(LLVector4(x_axis, 0.f),
-							LLVector4(y_axis, 0.f),
-							LLVector4(z_axis, 0.f),
-							LLVector4(delta_pos, 1.f));
-			
-	x_axis.normVec();
-	y_axis.normVec();
-	z_axis.normVec();
-	
-	vo->mRelativeXformInvTrans.setRows(x_axis, y_axis, z_axis);
+	vo->mRelativeXformInvTrans = vo->mRelativeXform;
+	vo->mRelativeXformInvTrans.invert();
+	vo->mRelativeXformInvTrans.transpose();
 }
 
 const LLMatrix4& LLVolumeImplFlexible::getWorldMatrix(LLXformMatrix* xform) const
