@@ -596,7 +596,7 @@ void LLFace::renderSelected(LLViewerTexture *imagep, const LLColor4& color)
                     // called when selecting a face during edit of a mesh object
 					LLGLEnable offset(GL_POLYGON_OFFSET_FILL);
 					glPolygonOffset(-1.f, -1.f);
-					gGL.multMatrix((F32*) volume->getRelativeXform().mMatrix);
+					gGL.multMatrix(volume->getRelativeXform());
 					const LLVolumeFace& vol_face = rigged->getVolumeFace(getTEOffset());
                     LLVertexBuffer::drawElements(LLRender::TRIANGLES,vol_face.mNumVertices, vol_face.mPositions, vol_face.mTexCoords, vol_face.mNumIndices, vol_face.mIndices);
 				}
