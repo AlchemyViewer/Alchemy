@@ -96,7 +96,7 @@ private:
 		bool isVolumeUnique() const { return true; }
 		bool isVolumeGlobal() const { return true; }
 		bool isActive() const { return true; }
-		const LLMatrix4& getWorldMatrix(LLXformMatrix* xform) const;
+		const LLMatrix4a& getWorldMatrix(LLXformMatrix* xform) const;
 		void updateRelativeXform(bool force_identity);
 		void doFlexibleUpdate(); // Called to update the simulation
 		void doFlexibleRebuild(bool rebuild_volume); // Called to rebuild the geometry

@@ -546,7 +546,11 @@ void LLFace::updateCenterAgent()
 {
 	if (mDrawablep->isActive())
 	{
-		mCenterAgent = mCenterLocal * getRenderMatrix();
+		LLVector4a local_pos;
+		local_pos.load3(mCenterLocal.mV);
+
+		getRenderMatrix().affineTransform(local_pos,local_pos);
+		mCenterAgent.set(local_pos.getF32ptr());
 	}
 	else
 	{
@@ -574,17 +578,21 @@ void LLFace::renderSelected(LLViewerTexture *imagep, const LLColor4& color)
 		gGL.getTexUnit(0)->bind(imagep);
 	
 		gGL.pushMatrix();
+
+		const LLMatrix4a* model_matrix = NULL;
 		if (mDrawablep->isActive())
 		{
-			gGL.multMatrix((GLfloat*)mDrawablep->getRenderMatrix().mMatrix);
+			model_matrix = &(mDrawablep->getRenderMatrix());
 		}
 		else
 		{
-			gGL.multMatrix((GLfloat*)mDrawablep->getRegion()->mRenderMatrix.mMatrix);
+			model_matrix = &mDrawablep->getRegion()->mRenderMatrix;
+		}
+		if(model_matrix && !model_matrix->isIdentity())
+		{
+			gGL.multMatrix(*model_matrix);
 		}
 
-		gGL.diffuseColor4fv(color.mV);
-	
 		if (mDrawablep->isState(LLDrawable::RIGGED))
 		{
 			LLVOVolume* volume = mDrawablep->getVOVolume();
@@ -1040,7 +1048,7 @@ LLVector2 LLFace::surfaceToTexture(LLVector2 surface_coord, const LLVector4a& po
 // by planarProjection(). This is needed to match planar texgen parameters.
 void LLFace::getPlanarProjectedParams(LLQuaternion* face_rot, LLVector3* face_pos, F32* scale) const
 {
-	const LLMatrix4& vol_mat = getWorldMatrix();
+	const LLMatrix4a& vol_mat = getWorldMatrix();
 	const LLVolumeFace& vf = getViewerObject()->getVolume()->getVolumeFace(mTEOffset);
     if (!vf.mNormals)
     {
@@ -1053,15 +1061,15 @@ void LLFace::getPlanarProjectedParams(LLQuaternion* face_rot, LLVector3* face_po
         LL_WARNS( ) << "Volume face without tangents (object id: " << getViewerObject()->getID().asString() << ")" << LL_ENDL;
         return;
     }
-	const LLVector4a& normal4a = vf.mNormals[0];
+	const LLVector4a& normal = vf.mNormals[0];
 	const LLVector4a& tangent = vf.mTangents[0];
 
-	LLVector4a binormal4a;
-	binormal4a.setCross3(normal4a, tangent);
-	binormal4a.mul(tangent.getF32ptr()[3]);
+	LLVector4a binormal;
+	binormal.setCross3(normal, tangent);
+	binormal.mul(tangent.getF32ptr()[3]);
 
 	LLVector2 projected_binormal;
-	planarProjection(projected_binormal, normal4a, *vf.mCenter, binormal4a);
+	planarProjection(projected_binormal, normal, *vf.mCenter, binormal);
 	projected_binormal -= LLVector2(0.5f, 0.5f); // this normally happens in xform()
 	*scale = projected_binormal.length();
 	// rotate binormal to match what planarProjection() thinks it is,
@@ -1070,13 +1078,16 @@ void LLFace::getPlanarProjectedParams(LLQuaternion* face_rot, LLVector3* face_po
 	F32 ang = acos(projected_binormal.mV[VY]);
 	ang = (projected_binormal.mV[VX] < 0.f) ? -ang : ang;
 
+	ALGLMath::genRot(RAD_TO_DEG * ang, normal).rotate(binormal, binormal);
+
+	LLVector4a x_axis;
+	x_axis.setCross3(binormal, normal);
+
 	//VECTORIZE THIS
-	LLVector3 binormal(binormal4a.getF32ptr());
-	LLVector3 normal(normal4a.getF32ptr());
-	binormal.rotVec(ang, normal);
-	LLQuaternion local_rot( binormal % normal, binormal, normal );
-	*face_rot = local_rot * vol_mat.quaternion();
-	*face_pos = vol_mat.getTranslation();
+	LLQuaternion local_rot(LLVector3(x_axis.getF32ptr()), LLVector3(binormal.getF32ptr()), LLVector3(normal.getF32ptr()));
+	*face_rot = local_rot * LLMatrix4(vol_mat.getF32ptr()).quaternion();
+
+	face_pos->set(vol_mat.getRow<VW>().getF32ptr());
 }
 
 // Returns the necessary texture transform to align this face's TE to align_to's TE
@@ -1478,7 +1489,7 @@ BOOL LLFace::getGeometryVolume(const LLVolume& volume,
 			{
 				if (mDrawablep->isActive())
 				{
-					bump_quat = LLQuaternion(mDrawablep->getRenderMatrix());
+					bump_quat = LLQuaternion(LLMatrix4(mDrawablep->getRenderMatrix().getF32ptr()));
 				}
 
 				if (bump_code)
@@ -1976,10 +1987,6 @@ BOOL LLFace::getGeometryVolume(const LLVolume& volume,
 			
 			mVObjp->getVolume()->genTangents(f);
 			
-			LLVector4Logical mask;
-			mask.clear();
-			mask.setElement<3>();
-
 			LLVector4a* src = vf.mTangents;
 			LLVector4a* end = vf.mTangents+num_vertices;
 			LLVector4a* src2 = vf.mNormals;
@@ -1997,7 +2004,7 @@ BOOL LLFace::getGeometryVolume(const LLVolume& volume,
 				}
 				mat_vert.rotate(tangent_out, tangent_out);
 				tangent_out.normalize3fast();
-				tangent_out.setSelectWithMask(mask, *src, tangent_out);
+				tangent_out.copyComponent<3>(*src);
 				tangent_out.store4a(tangents);
 				
 				src++;
@@ -2458,7 +2465,7 @@ S32 LLFace::pushVertices(const U16* index_array) const
 	return mIndicesCount;
 }
 
-const LLMatrix4& LLFace::getRenderMatrix() const
+const LLMatrix4a& LLFace::getRenderMatrix() const
 {
 	return mDrawablep->getRenderMatrix();
 }
@@ -2474,7 +2481,7 @@ S32 LLFace::renderElements(const U16 *index_array) const
 	else
 	{
 		gGL.pushMatrix();
-		gGL.multMatrix((float*)getRenderMatrix().mMatrix);
+		gGL.multMatrix(getRenderMatrix());
 		ret = pushVertices(index_array);
 		gGL.popMatrix();
 	}
@@ -2534,7 +2541,10 @@ LLVector3 LLFace::getPositionAgent() const
 	}
 	else
 	{
-		return mCenterLocal * getRenderMatrix();
+		LLVector4a center_local;
+		center_local.load3(mCenterLocal.mV);
+		getRenderMatrix().affineTransform(center_local,center_local);
+		return LLVector3(center_local.getF32ptr());
 	}
 }
 

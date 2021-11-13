@@ -28,6 +28,7 @@
 
 #include "v3math.h"
 #include "m4math.h"
+#include "llmatrix4a.h"
 #include "llquaternion.h"
 
 const F32 MAX_OBJECT_Z 		= 4096.f; // should match REGION_HEIGHT_METERS, Pre-havok4: 768.f
@@ -130,20 +131,21 @@ public:
 	const LLVector3&	getWorldPosition() const	{ return mWorldPosition; }
 };
 
+LL_ALIGN_PREFIX(16)
 class LLXformMatrix : public LLXform
 {
 public:
 	LLXformMatrix() : LLXform() {};
 	virtual ~LLXformMatrix() = default;
 
-	const LLMatrix4&    getWorldMatrix() const      { return mWorldMatrix; }
-	void setWorldMatrix (const LLMatrix4& mat)   { mWorldMatrix = mat; }
+	const LLMatrix4a&    getWorldMatrix() const      { return mWorldMatrix; }
+	void setWorldMatrix (const LLMatrix4a& mat)   { mWorldMatrix = mat; }
 
 	void init()
 	{
 		mWorldMatrix.setIdentity();
-		mMin.clearVec();
-		mMax.clearVec();
+		mMin.clear();
+		mMax.clear();
 
 		LLXform::init();
 	}
@@ -153,11 +155,11 @@ public:
 	void getMinMax(LLVector3& min,LLVector3& max) const;
 
 protected:
-	LLMatrix4	mWorldMatrix;
-	LLVector3	mMin;
-	LLVector3	mMax;
+	LL_ALIGN_16(LLMatrix4a	mWorldMatrix);
+	LL_ALIGN_16(LLVector4a	mMin);
+	LL_ALIGN_16(LLVector4a	mMax);
 
-};
+} LL_ALIGN_POSTFIX(16);
 
 BOOL LLXform::setParent(LLXform* parent)
 {

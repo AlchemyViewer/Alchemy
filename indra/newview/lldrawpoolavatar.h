@@ -180,7 +180,7 @@ typedef enum
 
 	LLDrawPoolAvatar(U32 type);
 
-	static LLMatrix4& getModelView();
+	static LLMatrix4a& getModelView();
 
 	/*virtual*/ S32  getNumPasses();
 	/*virtual*/ void beginRenderPass(S32 pass);

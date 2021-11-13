@@ -247,7 +247,7 @@ bool	gAvatarBacklight = false;
 
 bool	gDebugPipeline = false;
 LLPipeline gPipeline;
-const LLMatrix4* gGLLastMatrix = NULL;
+const LLMatrix4a* gGLLastMatrix = NULL;
 
 LLTrace::BlockTimerStatHandle FTM_RENDER_GEOMETRY("Render Geometry");
 LLTrace::BlockTimerStatHandle FTM_RENDER_GRASS("Grass");
@@ -5435,7 +5435,7 @@ void LLPipeline::renderDebug()
 		if (!bridge->isDead() && hasRenderType(bridge->mDrawableType))
 		{
 			gGL.pushMatrix();
-			gGL.multMatrix((F32*)bridge->mDrawable->getRenderMatrix().mMatrix);
+			gGL.multMatrix(bridge->mDrawable->getRenderMatrix());
 			bridge->renderDebug();
 			gGL.popMatrix();
 		}
@@ -5709,7 +5709,7 @@ void LLPipeline::renderDebug()
 			if (bridge)
 			{
 				gGL.pushMatrix();
-				gGL.multMatrix((F32*)bridge->mDrawable->getRenderMatrix().mMatrix);
+				gGL.multMatrix(bridge->mDrawable->getRenderMatrix());
 			}
 
 			F32 alpha = llclamp((F32) (size-count)/size, 0.f, 1.f);

@@ -82,30 +82,29 @@ void LLXformMatrix::updateMatrix(BOOL update_bounds)
 {
 	update();
 
-	mWorldMatrix.initAll(mScale, mWorldRotation, mWorldPosition);
+	LLMatrix4 world_matrix;
+	world_matrix.initAll(mScale, mWorldRotation, mWorldPosition);
+	mWorldMatrix.loadu(world_matrix);
 
 	if (update_bounds && (mChanged & MOVED))
 	{
-		mMin.mV[0] = mMax.mV[0] = mWorldMatrix.mMatrix[3][0];
-		mMin.mV[1] = mMax.mV[1] = mWorldMatrix.mMatrix[3][1];
-		mMin.mV[2] = mMax.mV[2] = mWorldMatrix.mMatrix[3][2];
+		mMax = mMin = mWorldMatrix.getRow<3>();
 
-		F32 f0 = (fabs(mWorldMatrix.mMatrix[0][0])+fabs(mWorldMatrix.mMatrix[1][0])+fabs(mWorldMatrix.mMatrix[2][0])) * 0.5f;
-		F32 f1 = (fabs(mWorldMatrix.mMatrix[0][1])+fabs(mWorldMatrix.mMatrix[1][1])+fabs(mWorldMatrix.mMatrix[2][1])) * 0.5f;
-		F32 f2 = (fabs(mWorldMatrix.mMatrix[0][2])+fabs(mWorldMatrix.mMatrix[1][2])+fabs(mWorldMatrix.mMatrix[2][2])) * 0.5f;
+		LLVector4a total_sum,sum1,sum2;
+		total_sum.setAbs(mWorldMatrix.getRow<0>());
+		sum1.setAbs(mWorldMatrix.getRow<1>());
+		sum2.setAbs(mWorldMatrix.getRow<2>());
+		sum1.add(sum2);
+		total_sum.add(sum1);
+		total_sum.mul(.5f);
 
-		mMin.mV[0] -= f0; 
-		mMin.mV[1] -= f1; 
-		mMin.mV[2] -= f2; 
-
-		mMax.mV[0] += f0; 
-		mMax.mV[1] += f1; 
-		mMax.mV[2] += f2; 
+		mMax.add(total_sum);
+		mMin.sub(total_sum);
 	}
 }
 
 void LLXformMatrix::getMinMax(LLVector3& min, LLVector3& max) const
 {
-	min = mMin;
-	max = mMax;
+	min.set(mMin.getF32ptr());
+	max.set(mMax.getF32ptr());
 }

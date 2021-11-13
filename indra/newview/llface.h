@@ -80,8 +80,8 @@ public:
 	}
 	~LLFace()  { destroy(); }
 
-	const LLMatrix4& getWorldMatrix()	const	{ return mVObjp->getWorldMatrix(mXform); }
-	const LLMatrix4& getRenderMatrix() const;
+	const LLMatrix4a& getWorldMatrix()	const	{ return mVObjp->getWorldMatrix(mXform); }
+	const LLMatrix4a& getRenderMatrix() const;
 	U32				getIndicesCount()	const	{ return mIndicesCount; };
 	S32				getIndicesStart()	const	{ return mIndicesIndex; };
 	U16				getGeomCount()		const	{ return mGeomCount; }		// vertex count for this face

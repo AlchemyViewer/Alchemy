@@ -138,9 +138,7 @@ void LLSkinningUtil::initSkinningMatrixPalette(
         llassert(joint);
         if (joint)
         {
-            LLMatrix4a world;
-            world.loadu(joint->getWorldMatrix());
-            mat[j].setMul(world, skin->mInvBindMatrix[j]);
+            mat[j].setMul(joint->getWorldMatrix(), skin->mInvBindMatrix[j]);
         }
         else
         {

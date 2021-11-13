@@ -166,11 +166,11 @@ void LLDrawPoolAvatar::prerender()
 	}
 }
 
-LLMatrix4& LLDrawPoolAvatar::getModelView()
+LLMatrix4a& LLDrawPoolAvatar::getModelView()
 {
-	static LLMatrix4 ret;
+	static LLMatrix4a ret;
 
-	ret = LLMatrix4(gGLModelView.getF32ptr());
+	ret = gGLModelView;
 
 	return ret;
 }

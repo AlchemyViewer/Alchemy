@@ -88,7 +88,7 @@ public:
 	virtual bool isVolumeUnique() const = 0; // Do we need a unique LLVolume instance?
 	virtual bool isVolumeGlobal() const = 0; // Are we in global space?
 	virtual bool isActive() const = 0; // Is this object currently active?
-	virtual const LLMatrix4& getWorldMatrix(LLXformMatrix* xform) const = 0;
+	virtual const LLMatrix4a& getWorldMatrix(LLXformMatrix* xform) const = 0;
 	virtual void updateRelativeXform(bool force_identity = false) = 0;
 	virtual U32 getID() const = 0;
 	virtual void preRebuild() = 0;
@@ -140,7 +140,7 @@ public:
 	const LLVector3		getPivotPositionAgent() const;
 	const LLMatrix4a&	getRelativeXform() const				{ return mRelativeXform; }
 	const LLMatrix4a&	getRelativeXformInvTrans() const		{ return mRelativeXformInvTrans; }
-	/*virtual*/	const LLMatrix4&	getRenderMatrix() const;
+	/*virtual*/	const LLMatrix4a&	getRenderMatrix() const;
 				typedef std::map<LLUUID, S32> texture_cost_t;
 				U32 	getRenderCost(texture_cost_t &textures) const;
     /*virtual*/	F32		getEstTrianglesMax() const;
@@ -173,7 +173,7 @@ public:
 				BOOL	getVolumeChanged() const				{ return mVolumeChanged; }
 				
 	/*virtual*/ F32  	getRadius() const						{ return mVObjRadius; };
-				const LLMatrix4& getWorldMatrix(LLXformMatrix* xform) const;
+				const LLMatrix4a& getWorldMatrix(LLXformMatrix* xform) const;
 
 				void	markForUpdate(BOOL priority);
 				void	markForUnload()							{ LLViewerObject::markForUnload(TRUE); mVolumeChanged = TRUE; }

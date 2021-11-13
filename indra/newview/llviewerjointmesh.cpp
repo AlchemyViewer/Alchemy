@@ -111,14 +111,14 @@ void LLViewerJointMesh::uploadJointMatrices()
 	//calculate joint matrices
 	for (joint_num = 0; joint_num < reference_mesh->mJointRenderData.size(); joint_num++)
 	{
-		LLMatrix4 joint_mat = *reference_mesh->mJointRenderData[joint_num]->mWorldMatrix;
+		LLMatrix4a joint_mat = *reference_mesh->mJointRenderData[joint_num]->mWorldMatrix;
 
 		if (hardware_skinning)
 		{
-			joint_mat *= LLDrawPoolAvatar::getModelView();
+			joint_mat.setMul(LLDrawPoolAvatar::getModelView(),joint_mat);
 		}
-		gJointMatUnaligned[joint_num] = joint_mat;
-		gJointRotUnaligned[joint_num] = joint_mat.getMat3();
+		gJointMatUnaligned[joint_num] = LLMatrix4(joint_mat.getF32ptr());
+		gJointRotUnaligned[joint_num] = gJointMatUnaligned[joint_num].getMat3();
 	}
 
 	BOOL last_pivot_uploaded = FALSE;
@@ -312,8 +312,7 @@ U32 LLViewerJointMesh::drawShape( F32 pixelArea, BOOL first_pass, BOOL is_dummy)
 	else
 	{
 		gGL.pushMatrix();
-		LLMatrix4 jointToWorld = getWorldMatrix();
-		gGL.multMatrix((GLfloat*)jointToWorld.mMatrix);
+		gGL.multMatrix(getWorldMatrix());
 		buff->setBuffer(mask);
 		buff->drawRange(LLRender::TRIANGLES, start, end, count, offset);
 		gGL.popMatrix();

@@ -108,8 +108,11 @@ void LLDrawPoolTree::render(S32 pass)
 
 		if(buff)
 		{
-			LLMatrix4* model_matrix = &(face->getDrawable()->getRegion()->mRenderMatrix);
-
+			LLMatrix4a* model_matrix = &(face->getDrawable()->getRegion()->mRenderMatrix);
+			if(model_matrix && model_matrix->isIdentity())
+			{
+				model_matrix = NULL;
+			}
 			if (model_matrix != gGLLastMatrix)
 			{
 				gGLLastMatrix = model_matrix;
@@ -117,7 +120,7 @@ void LLDrawPoolTree::render(S32 pass)
 				if (model_matrix)
 				{
 					llassert(gGL.getMatrixMode() == LLRender::MM_MODELVIEW);
-					gGL.multMatrix((GLfloat*) model_matrix->mMatrix);
+					gGL.multMatrix(*model_matrix);
 				}
 				gPipeline.mMatrixOpCount++;
 			}

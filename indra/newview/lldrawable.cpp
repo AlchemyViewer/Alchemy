@@ -243,7 +243,7 @@ LLVOVolume* LLDrawable::getVOVolume() const
 	}
 }
 
-const LLMatrix4& LLDrawable::getRenderMatrix() const
+const LLMatrix4a& LLDrawable::getRenderMatrix() const
 { 
 	return isRoot() ? getWorldMatrix() : getParent()->getWorldMatrix();
 }
@@ -1304,9 +1304,7 @@ void LLSpatialBridge::updateSpatialExtents()
 	LLVector4a offset;
 	LLVector4a size = root_bounds[1];
 		
-	//VECTORIZE THIS
-	LLMatrix4a mat;
-	mat.loadu(mDrawable->getXform()->getWorldMatrix());
+	const LLMatrix4a& mat = mDrawable->getXform()->getWorldMatrix();
 
 	LLVector4a t;
 	t.splat(0.f);
@@ -1372,27 +1370,35 @@ LLCamera LLSpatialBridge::transformCamera(LLCamera& camera)
 {
 	LLCamera ret = camera;
 	LLXformMatrix* mat = mDrawable->getXform();
-	LLVector3 center = LLVector3(0,0,0) * mat->getWorldMatrix();
+	const LLVector4a& center = mat->getWorldMatrix().getRow<3>();
 
-	LLVector3 delta = ret.getOrigin() - center;
-	LLQuaternion rot = ~mat->getRotation();
+	LLQuaternion2 invRot;
+	invRot.setConjugate( LLQuaternion2(mat->getRotation()) );
 
-	delta *= rot;
-	LLVector3 lookAt = ret.getAtAxis();
-	LLVector3 up_axis = ret.getUpAxis();
-	LLVector3 left_axis = ret.getLeftAxis();
+	LLVector4a delta;
+	delta.load3(ret.getOrigin().mV);
+	delta.sub(center);
 
-	lookAt *= rot;
-	up_axis *= rot;
-	left_axis *= rot;
+	LLVector4a lookAt;
+	lookAt.load3(ret.getAtAxis().mV);
+	LLVector4a up_axis;
 
-	if (!delta.isFinite())
+	up_axis.load3(ret.getUpAxis().mV);
+	LLVector4a left_axis;
+	left_axis.load3(ret.getLeftAxis().mV);
+
+	delta.setRotated(invRot, delta);
+	lookAt.setRotated(invRot, lookAt);
+	up_axis.setRotated(invRot, up_axis);
+	left_axis.setRotated(invRot, left_axis);
+
+	if (!delta.isFinite3())
 	{
-		delta.clearVec();
+		delta.clear();
 	}
 
-	ret.setOrigin(delta);
-	ret.setAxes(lookAt, left_axis, up_axis);
+	ret.setOrigin(LLVector3(delta.getF32ptr()));
+	ret.setAxes(LLVector3(lookAt.getF32ptr()), LLVector3(left_axis.getF32ptr()), LLVector3(up_axis.getF32ptr()));
 		
 	return ret;
 }
@@ -1667,12 +1673,17 @@ const LLVector3	LLDrawable::getPositionAgent() const
 	{
 		if (isActive())
 		{
-			LLVector3 pos(0,0,0);
 			if (!isRoot())
 			{
-				pos = mVObjp->getPosition();
+				LLVector4a pos;
+				pos.load3(mVObjp->getPosition().mV);
+				getRenderMatrix().affineTransform(pos,pos);
+				return LLVector3(pos.getF32ptr());
 			}
-			return pos * getRenderMatrix();
+			else
+			{
+				return LLVector3(getRenderMatrix().getRow<3>().getF32ptr());
+			}
 		}
 		else
 		{

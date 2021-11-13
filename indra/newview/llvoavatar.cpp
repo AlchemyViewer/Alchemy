@@ -1261,7 +1261,10 @@ const LLVector3 LLVOAvatar::getRenderPosition() const
 	}
 	else
 	{
-		return getPosition() * mDrawable->getParent()->getRenderMatrix();
+		LLVector4a pos;
+		pos.load3(getPosition().mV);
+		mDrawable->getParent()->getRenderMatrix().affineTransform(pos,pos);
+		return LLVector3(pos.getF32ptr());
 	}
 }
 
@@ -1373,9 +1376,7 @@ void LLVOAvatar::calculateSpatialExtents(LLVector4a& newMin, LLVector4a& newMax)
             LLPolyMesh *mesh = polymesh_pair.second;
             for (S32 joint_num = 0; joint_num < mesh->mJointRenderData.size(); joint_num++)
             {
-                LLVector4a trans;
-                trans.load3( mesh->mJointRenderData[joint_num]->mWorldMatrix->getTranslation().mV);
-                update_min_max(newMin, newMax, trans);
+                update_min_max(newMin, newMax, mesh->mJointRenderData[joint_num]->mWorldMatrix->getRow<LLMatrix4a::ROW_TRANS>());
             }
         }
     }
@@ -1483,9 +1484,9 @@ void LLVOAvatar::calculateSpatialExtents(LLVector4a& newMin, LLVector4a& newMax)
                     // Ignore bounding box of HUD joints
                     continue;
                 }
-                LLMatrix4a mat;
+
                 LLVector4a new_extents[2];
-                mat.loadu(joint->getWorldMatrix());
+				const LLMatrix4a& mat = joint->getWorldMatrix();
 				mat.mulBoundBox(rig_info->getRiggedExtents(), new_extents);
                 update_min_max(newMin, newMax, new_extents[0]);
                 update_min_max(newMin, newMax, new_extents[1]);
@@ -1562,7 +1563,7 @@ void LLVOAvatar::renderCollisionVolumes()
 		collision_volume.updateWorldMatrix();
 
 		gGL.pushMatrix();
-		gGL.multMatrix( &collision_volume.getXform()->getWorldMatrix().mMatrix[0][0] );
+		gGL.multMatrix(collision_volume.getXform()->getWorldMatrix());
 
         LLVector3 begin_pos(0,0,0);
         LLVector3 end_pos(collision_volume.getEnd());
@@ -1671,7 +1672,7 @@ void LLVOAvatar::renderBones(const std::string &selected_joint)
 
         
 		gGL.pushMatrix();
-		gGL.multMatrix( &jointp->getXform()->getWorldMatrix().mMatrix[0][0] );
+		gGL.multMatrix(jointp->getXform()->getWorldMatrix());
 
         render_sphere_and_line(begin_pos, end_pos, sphere_scale, occ_color, visible_color);
         
@@ -1699,7 +1700,7 @@ void LLVOAvatar::renderJoints()
 		jointp->updateWorldMatrix();
 	
 		gGL.pushMatrix();
-		gGL.multMatrix( &jointp->getXform()->getWorldMatrix().mMatrix[0][0] );
+		gGL.multMatrix(jointp->getXform()->getWorldMatrix());
 
 		gGL.diffuseColor3f( 1.f, 0.f, 1.f );
 	
@@ -1793,8 +1794,7 @@ BOOL LLVOAvatar::lineSegmentIntersect(const LLVector4a& start, const LLVector4a&
 		{
 			mCollisionVolumes[i].updateWorldMatrix();
             
-			LLMatrix4a mat;
-			mat.loadu(mCollisionVolumes[i].getXform()->getWorldMatrix());
+			LLMatrix4a mat = mCollisionVolumes[i].getXform()->getWorldMatrix();
 			LLMatrix4a inverse = mat;
 			inverse.invert();
 			LLMatrix4a norm_mat = inverse;
@@ -4284,7 +4284,7 @@ void LLVOAvatar::updateOrientation(LLAgent& agent, F32 speed, F32 delta_time)
 				}
 			}
 
-			LLQuaternion root_rotation = mRoot->getWorldMatrix().quaternion();
+			LLQuaternion root_rotation = LLMatrix4(mRoot->getWorldMatrix().getF32ptr()).quaternion();
 			F32 root_roll, root_pitch, root_yaw;
 			root_rotation.getEulerAngles(&root_roll, &root_pitch, &root_yaw);
 
@@ -4293,7 +4293,7 @@ void LLVOAvatar::updateOrientation(LLAgent& agent, F32 speed, F32 delta_time)
 			// and head turn.  Once in motion, it must conform however.
 			BOOL self_in_mouselook = isSelf() && gAgentCamera.cameraMouselook();
 
-			LLVector3 pelvisDir( mRoot->getWorldMatrix().getFwdRow4().mV );
+			LLVector3 pelvisDir( mRoot->getWorldMatrix().getRow<LLMatrix4a::ROW_FWD>().getF32ptr() );
 
 			static LLCachedControl<F32> s_pelvis_rot_threshold_slow(gSavedSettings, "AvatarRotateThresholdSlow", 60.0);
 			static LLCachedControl<F32> s_pelvis_rot_threshold_fast(gSavedSettings, "AvatarRotateThresholdFast", 2.0);
@@ -10132,9 +10132,8 @@ void LLVOAvatar::dumpArchetypeXML(const std::string& prefix, bool group_by_weara
                 LLJointRiggingInfo& rig_info = mJointRiggingInfoTab[joint_num];
                 if (rig_info.isRiggedTo())
                 {
-                    LLMatrix4a mat;
                     LLVector4a new_extents[2];
-                    mat.loadu(joint->getWorldMatrix());
+					const LLMatrix4a& mat = joint->getWorldMatrix();
                     mat.mulBoundBox(rig_info.getRiggedExtents(), new_extents);
                     LLVector4a rrp[2];
                     rrp[0].setSub(new_extents[0],rpv);

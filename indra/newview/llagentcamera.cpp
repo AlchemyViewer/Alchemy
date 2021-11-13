@@ -420,7 +420,7 @@ void LLAgentCamera::slamLookAt(const LLVector3 &look_at)
 //-----------------------------------------------------------------------------
 LLVector3 LLAgentCamera::calcFocusOffset(LLViewerObject *object, LLVector3 original_focus_point, S32 x, S32 y)
 {
-	const LLMatrix4& obj_matrix = object->getRenderMatrix();
+	const LLMatrix4a& obj_matrix = object->getRenderMatrix();
 	const LLQuaternion obj_rot = object->getRenderRotation();
 	const LLVector3 obj_pos = object->getRenderPosition();
 
@@ -455,24 +455,24 @@ LLVector3 LLAgentCamera::calcFocusOffset(LLViewerObject *object, LLVector3 origi
 
 	// find the largest ratio stored in obj_to_cam_ray_proportions
 	// this corresponds to the object's local axial plane (XY, YZ, XZ) that is *most* facing the camera
-	LLVector3 longest_object_axis;
+	LLVector4a focus_plane_normal;
 	// is x-axis longest?
 	if (obj_to_cam_ray_proportions.mV[VX] > obj_to_cam_ray_proportions.mV[VY] 
 		&& obj_to_cam_ray_proportions.mV[VX] > obj_to_cam_ray_proportions.mV[VZ])
 	{
 		// then grab it
-		longest_object_axis.setVec(obj_matrix.getFwdRow4());
+		focus_plane_normal = obj_matrix.getRow<LLMatrix4a::ROW_FWD>();
 	}
 	// is y-axis longest?
 	else if (obj_to_cam_ray_proportions.mV[VY] > obj_to_cam_ray_proportions.mV[VZ])
 	{
 		// then grab it
-		longest_object_axis.setVec(obj_matrix.getLeftRow4());
+		focus_plane_normal = obj_matrix.getRow<LLMatrix4a::ROW_LEFT>();
 	}
 	// otherwise, use z axis
 	else
 	{
-		longest_object_axis.setVec(obj_matrix.getUpRow4());
+		focus_plane_normal = obj_matrix.getRow<LLMatrix4a::ROW_UP>();
 	}
 
 	// Use this axis as the normal to project mouse click on to plane with that normal, at the object center.
@@ -481,11 +481,10 @@ LLVector3 LLAgentCamera::calcFocusOffset(LLViewerObject *object, LLVector3 origi
 	// We do this to allow the camera rotation tool to "tumble" the object by rotating the camera.
 	// If the focus point were the object surface under the mouse, camera rotation would introduce an undesirable
 	// eccentricity to the object orientation
-	LLVector3 focus_plane_normal(longest_object_axis);
-	focus_plane_normal.normalize();
+	focus_plane_normal.normalize3fast();
 
 	LLVector3d focus_pt_global;
-	gViewerWindow->mousePointOnPlaneGlobal(focus_pt_global, x, y, gAgent.getPosGlobalFromAgent(obj_pos), focus_plane_normal);
+	gViewerWindow->mousePointOnPlaneGlobal(focus_pt_global, x, y, gAgent.getPosGlobalFromAgent(obj_pos), LLVector3(focus_plane_normal.getF32ptr()));
 	LLVector3 focus_pt = gAgent.getPosAgentFromGlobal(focus_pt_global);
 
 	// find vector from camera to focus point in object space
@@ -1865,7 +1864,7 @@ LLVector3d LLAgentCamera::calcCameraPositionTargetGlobal(BOOL *hit_limit)
 			head_offset.mdV[VX] = gAgentAvatarp->mHeadOffset.mV[VX];
 			head_offset.mdV[VY] = gAgentAvatarp->mHeadOffset.mV[VY];
 			head_offset.mdV[VZ] = gAgentAvatarp->mHeadOffset.mV[VZ] + 0.1f;
-			const LLMatrix4& mat = ((LLViewerObject*) gAgentAvatarp->getParent())->getRenderMatrix();
+			const LLMatrix4 mat(((LLViewerObject*) gAgentAvatarp->getParent())->getRenderMatrix().getF32ptr());
 			camera_position_global = gAgent.getPosGlobalFromAgent
 								((gAgentAvatarp->getPosition()+
 								 LLVector3(head_offset)*gAgentAvatarp->getRotation()) * mat);

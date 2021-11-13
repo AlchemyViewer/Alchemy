@@ -1819,7 +1819,7 @@ void LLVOVolume::updateRelativeXform(bool force_identity)
 	if (drawable->isState(LLDrawable::RIGGED) && mRiggedVolume.notNull())
 	{ //rigged volume (which is in agent space) is used for generating bounding boxes etc
 	  //inverse of render matrix should go to partition space
-		mRelativeXform.loadu((F32*)&getRenderMatrix().mMatrix[0][0]);
+		mRelativeXform = getRenderMatrix();
 		mRelativeXformInvTrans = mRelativeXform;
 		mRelativeXform.invert();
 		mRelativeXformInvTrans.transpose();
@@ -3914,7 +3914,7 @@ BOOL LLVOVolume::isHUDAttachment() const
 }
 
 
-const LLMatrix4& LLVOVolume::getRenderMatrix() const
+const LLMatrix4a& LLVOVolume::getRenderMatrix() const
 {
 	if (mDrawable->isActive() && !mDrawable->isRoot())
 	{
@@ -4533,7 +4533,7 @@ void LLVOVolume::onShift(const LLVector4a &shift_vector)
 	updateRelativeXform();
 }
 
-const LLMatrix4& LLVOVolume::getWorldMatrix(LLXformMatrix* xform) const
+const LLMatrix4a& LLVOVolume::getWorldMatrix(LLXformMatrix* xform) const
 {
 	if (mVolumeImpl)
 	{
@@ -5205,7 +5205,7 @@ void LLVolumeGeometryManager::registerFace(LLSpatialGroup* group, LLFace* facep,
 		tex_mat = facep->mTextureMatrix;	
 	}
 
-	const LLMatrix4* model_mat = NULL;
+	const LLMatrix4a* model_mat = NULL;
 
 	LLDrawable* drawable = facep->getDrawable();
 	

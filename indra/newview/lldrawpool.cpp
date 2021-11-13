@@ -443,7 +443,7 @@ void LLRenderPass::applyModelMatrix(const LLDrawInfo& params)
 		gGL.loadMatrix(gGLModelView);
 		if (params.mModelMatrix)
 		{
-			gGL.multMatrix((GLfloat*) params.mModelMatrix->mMatrix);
+			gGL.multMatrix(*params.mModelMatrix);
 		}
 		gPipeline.mMatrixOpCount++;
 	}

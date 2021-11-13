@@ -36,6 +36,7 @@
 #include "v3math.h"
 #include "v4math.h"
 #include "m4math.h"
+#include "llmatrix4a.h"
 #include "llquaternion.h"
 #include "xform.h"
 
@@ -262,7 +263,7 @@ public:
 	void setScale( const LLVector3& scale, bool apply_attachment_overrides = false );
 
 	// get/set world matrix
-	const LLMatrix4 &getWorldMatrix();
+	const LLMatrix4a& getWorldMatrix();
 	void setWorldMatrix( const LLMatrix4& mat );
 
 	void updateWorldMatrixChildren();

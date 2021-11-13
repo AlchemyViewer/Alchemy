@@ -80,7 +80,7 @@ public:
 
 	U32 mDebugColor;
 	const LLMatrix4a* mTextureMatrix;
-	const LLMatrix4* mModelMatrix;
+	const LLMatrix4a* mModelMatrix;
 	U16 mStart;
 	U16 mEnd;
 	U32 mCount;
