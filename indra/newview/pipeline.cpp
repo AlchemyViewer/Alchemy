@@ -6244,19 +6244,6 @@ void LLPipeline::calcNearbyLights(LLCamera& camera)
 		for (const Light& light : mNearbyLights)
 		{
 			LLDrawable* drawable = light.drawable;
-            const LLViewerObject *vobj = light.drawable->getVObj();
-			if (vobj)
-			{
-				if (LLVOAvatar* avatarp = vobj->getAvatar())
-				{
-					if (avatarp->isTooComplex() || avatarp->isInMuteList())
-					{
-						drawable->clearState(LLDrawable::NEARBY_LIGHT);
-						continue;
-					}
-				}
-			}
-
 			LLVOVolume* volight = drawable->getVOVolume();
 			if (!volight || !drawable->isState(LLDrawable::LIGHT))
 			{
@@ -6268,10 +6255,19 @@ void LLPipeline::calcNearbyLights(LLCamera& camera)
 				drawable->clearState(LLDrawable::NEARBY_LIGHT);
 				continue;
 			}
-			if (!sRenderAttachedLights && volight && volight->isAttachment())
+			if (!sRenderAttachedLights && volight->isAttachment())
 			{
 				drawable->clearState(LLDrawable::NEARBY_LIGHT);
 				continue;
+			}
+			else if(volight->isAttachment())
+			{
+				LLVOAvatar* avatarp = volight->getAvatar();
+				if (avatarp && (avatarp->isTooComplex() || avatarp->isInMuteList()))
+				{
+					drawable->clearState(LLDrawable::NEARBY_LIGHT);
+					continue;
+				}
 			}
 
             F32 dist = calc_light_dist(volight, cam_pos, max_dist);
@@ -6322,22 +6318,26 @@ void LLPipeline::calcNearbyLights(LLCamera& camera)
 			{
 				continue; // no lighting from HUD objects
 			}
-            if (!sRenderAttachedLights && light && light->isAttachment())
+            if (!sRenderAttachedLights && light->isAttachment())
 			{
 				continue;
 			}
-            LLVOAvatar * av = light->getAvatar();
-            if (av && (av->isTooComplex() || av->isInMuteList()))
-            {
-                // avatars that are already in the list will be removed by removeMutedAVsLights
-                continue;
-            }
+			else if (light->isAttachment())
+			{
+				LLVOAvatar* av = light->getAvatar();
+				if (av && (av->isTooComplex() || av->isInMuteList()))
+				{
+					// avatars that are already in the list will be removed by removeMutedAVsLights
+					continue;
+				}
+			}
+
             F32 dist = calc_light_dist(light, cam_pos, max_dist);
             if (dist >= max_dist)
 			{
 				continue;
 			}
-			new_nearby_lights.insert(Light(drawable, dist, 0.f));
+			new_nearby_lights.emplace(drawable, dist, 0.f);
             if (!LLPipeline::sRenderDeferred && new_nearby_lights.size() > (U32)MAX_LOCAL_LIGHTS)
 			{
 				new_nearby_lights.erase(--new_nearby_lights.end());
