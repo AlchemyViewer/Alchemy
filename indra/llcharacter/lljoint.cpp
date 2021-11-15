@@ -880,7 +880,6 @@ void LLJoint::setWorldRotation( const LLQuaternion& rot )
 		return;
 	}
 	
-	LLMatrix4a parentWorldMatrix = mParent->getWorldMatrix();
 	LLQuaternion2 rota(rot);
 	LLMatrix4a temp_mat(rota);
 

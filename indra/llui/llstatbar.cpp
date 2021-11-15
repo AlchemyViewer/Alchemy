@@ -45,7 +45,7 @@
 // rate at which to update display of value that is rapidly changing
 const F32 MEAN_VALUE_UPDATE_TIME = 1.f / 4.f; 
 // time between value changes that qualifies as a "rapid change"
-const F32Seconds	RAPID_CHANGE_THRESHOLD(0.2f); 
+//const F32Seconds	RAPID_CHANGE_THRESHOLD(0.2f); 
 // maximum number of rapid changes in RAPID_CHANGE_WINDOW before switching over to displaying the mean 
 // instead of latest value
 const S32 MAX_RAPID_CHANGES_PER_SEC = 10;
