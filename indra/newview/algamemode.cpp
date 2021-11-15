@@ -32,12 +32,20 @@
 
 #include <boost/signals2.hpp>
 
+// static 
+ALGameMode& ALGameMode::instance()
+{ 
+	static ALGameMode inst; 
+	return inst;
+}
+
 void ALGameMode::init()
 {
 		enable(gSavedSettings.getBool("AlchemyGameModeEnable"));
 		gSavedSettings.getControl("AlchemyGameModeEnable")->getCommitSignal()->connect(boost::bind(&ALGameMode::onToggleGameModeControl, this));
 }
 
+// static
 void ALGameMode::shutdown()
 {
 	gamemode_request_end();

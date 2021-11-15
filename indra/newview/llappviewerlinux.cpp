@@ -118,7 +118,7 @@ int main( int argc, char **argv )
 	sentry_close();
 #endif
 
-	ALGameMode::instance().shutdown();
+	ALGameMode::shutdown();
 
 	return 0;
 }
