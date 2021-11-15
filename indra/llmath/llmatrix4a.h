@@ -276,9 +276,10 @@ public:
 	}
 
 	template<int N>
-	inline LLVector4a getColumn()
+	inline LLVector4a getColumn() const
 	{
 		LLVector4a v;
+		v.clear();
 		v.copyComponent<0>(mMatrix[0].getScalarAt<N>());
 		v.copyComponent<1>(mMatrix[1].getScalarAt<N>());
 		v.copyComponent<2>(mMatrix[2].getScalarAt<N>());
