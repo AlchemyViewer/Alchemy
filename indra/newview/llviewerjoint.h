@@ -57,7 +57,7 @@ public:
 	// Traverses the entire joint hierarchy, setting up
 	// transforms and calling the drawShape().
 	// Derived classes may add text/graphic output.
-	virtual U32 render( F32 pixelArea, BOOL first_pass = TRUE, BOOL is_dummy = FALSE );	// Returns triangle count
+	virtual U32 render( F32 pixelArea, BOOL first_pass = TRUE, BOOL is_dummy = FALSE ) override;	// Returns triangle count
 
 	// Draws the shape attached to a joint.
 	// Called by render().

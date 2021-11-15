@@ -383,9 +383,9 @@ public:
 	virtual void	setSnappedTo(const LLView* snap_view);
 
 	// inherited from LLFocusableElement
-	/* virtual */ BOOL	handleKey(KEY key, MASK mask, BOOL called_from_parent);
-	/* virtual */ BOOL	handleKeyUp(KEY key, MASK mask, BOOL called_from_parent);
-	/* virtual */ BOOL	handleUnicodeChar(llwchar uni_char, BOOL called_from_parent);
+	/* virtual */ BOOL	handleKey(KEY key, MASK mask, BOOL called_from_parent) override;
+	/* virtual */ BOOL	handleKeyUp(KEY key, MASK mask, BOOL called_from_parent) override;
+	/* virtual */ BOOL	handleUnicodeChar(llwchar uni_char, BOOL called_from_parent) override;
 
 	virtual BOOL	handleDragAndDrop(S32 x, S32 y, MASK mask, BOOL drop,
 									  EDragAndDropType cargo_type,
@@ -425,23 +425,23 @@ public:
 
 	// LLMouseHandler functions
 	//  Default behavior is to pass events to children
-	/*virtual*/ BOOL	handleHover(S32 x, S32 y, MASK mask);
-	/*virtual*/ BOOL	handleMouseUp(S32 x, S32 y, MASK mask);
-	/*virtual*/ BOOL	handleMouseDown(S32 x, S32 y, MASK mask);
-	/*virtual*/ BOOL	handleMiddleMouseUp(S32 x, S32 y, MASK mask);
-	/*virtual*/ BOOL	handleMiddleMouseDown(S32 x, S32 y, MASK mask);
-	/*virtual*/ BOOL	handleDoubleClick(S32 x, S32 y, MASK mask);
-	/*virtual*/ BOOL	handleScrollWheel(S32 x, S32 y, S32 clicks);
-	/*virtual*/ BOOL	handleScrollHWheel(S32 x, S32 y, S32 clicks);
-	/*virtual*/ BOOL	handleRightMouseDown(S32 x, S32 y, MASK mask);
-	/*virtual*/ BOOL	handleRightMouseUp(S32 x, S32 y, MASK mask);	
-	/*virtual*/ BOOL	handleToolTip(S32 x, S32 y, MASK mask);
+	/*virtual*/ BOOL	handleHover(S32 x, S32 y, MASK mask) override;
+	/*virtual*/ BOOL	handleMouseUp(S32 x, S32 y, MASK mask) override;
+	/*virtual*/ BOOL	handleMouseDown(S32 x, S32 y, MASK mask) override;
+	/*virtual*/ BOOL	handleMiddleMouseUp(S32 x, S32 y, MASK mask) override;
+	/*virtual*/ BOOL	handleMiddleMouseDown(S32 x, S32 y, MASK mask) override;
+	/*virtual*/ BOOL	handleDoubleClick(S32 x, S32 y, MASK mask) override;
+	/*virtual*/ BOOL	handleScrollWheel(S32 x, S32 y, S32 clicks) override;
+	/*virtual*/ BOOL	handleScrollHWheel(S32 x, S32 y, S32 clicks) override;
+	/*virtual*/ BOOL	handleRightMouseDown(S32 x, S32 y, MASK mask) override;
+	/*virtual*/ BOOL	handleRightMouseUp(S32 x, S32 y, MASK mask) override;	
+	/*virtual*/ BOOL	handleToolTip(S32 x, S32 y, MASK mask) override;
 
-	/*virtual*/ const std::string& getName() const;
-	/*virtual*/ void	onMouseCaptureLost();
-	/*virtual*/ BOOL	hasMouseCapture();
-	/*virtual*/ void	screenPointToLocal(S32 screen_x, S32 screen_y, S32* local_x, S32* local_y) const;
-	/*virtual*/ void	localPointToScreen(S32 local_x, S32 local_y, S32* screen_x, S32* screen_y) const;
+	/*virtual*/ const std::string& getName() const override;
+	/*virtual*/ void	onMouseCaptureLost() override;
+	/*virtual*/ BOOL	hasMouseCapture() override;
+	/*virtual*/ void	screenPointToLocal(S32 screen_x, S32 screen_y, S32* local_x, S32* local_y) const override;
+	/*virtual*/ void	localPointToScreen(S32 local_x, S32 local_y, S32* screen_x, S32* screen_y) const override;
 
 	virtual		LLView*	childFromPoint(S32 x, S32 y, bool recur=false);
 

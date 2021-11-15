@@ -221,12 +221,12 @@ public:
 	void initFromParams(const LLFloater::Params& p);
 	bool initFloaterXML(LLXMLNodePtr node, LLView *parent, const std::string& filename, LLXMLNodePtr output_node = NULL);
 
-	/*virtual*/ void handleReshape(const LLRect& new_rect, bool by_user = false);
-	/*virtual*/ BOOL canSnapTo(const LLView* other_view); 
-	/*virtual*/ void setSnappedTo(const LLView* snap_view);
-	/*virtual*/ void setFocus( BOOL b );
-	/*virtual*/ void setIsChrome(BOOL is_chrome);
-	/*virtual*/ void setRect(const LLRect &rect);
+	/*virtual*/ void handleReshape(const LLRect& new_rect, bool by_user = false) override;
+	/*virtual*/ BOOL canSnapTo(const LLView* other_view) override; 
+	/*virtual*/ void setSnappedTo(const LLView* snap_view) override;
+	/*virtual*/ void setFocus( BOOL b ) override;
+	/*virtual*/ void setIsChrome(BOOL is_chrome) override;
+	/*virtual*/ void setRect(const LLRect &rect) override;
                 void setIsSingleInstance(BOOL is_single_instance);
 
 	void 			initFloater(const Params& p);
@@ -239,7 +239,7 @@ public:
 	// Close the floater or its host. Use when hidding or toggling a floater instance.
 	virtual void	closeHostedFloater();
 
-	/*virtual*/ void reshape(S32 width, S32 height, BOOL called_from_parent = TRUE);
+	/*virtual*/ void reshape(S32 width, S32 height, BOOL called_from_parent = TRUE) override;
 	
 	// Release keyboard and mouse focus
 	void			releaseFocus();
@@ -295,26 +295,26 @@ public:
 	S32				getMinHeight() const{ return mMinHeight; }
 	S32				getHeaderHeight() const { return mHeaderHeight; }
 
-	virtual BOOL	handleMouseDown(S32 x, S32 y, MASK mask);
-	virtual BOOL	handleMouseUp(S32 x, S32 y, MASK mask);
-	virtual BOOL	handleRightMouseDown(S32 x, S32 y, MASK mask);
-	virtual BOOL	handleDoubleClick(S32 x, S32 y, MASK mask);
-	virtual BOOL	handleMiddleMouseDown(S32 x, S32 y, MASK mask);
+	BOOL	handleMouseDown(S32 x, S32 y, MASK mask) override;
+	BOOL	handleMouseUp(S32 x, S32 y, MASK mask) override;
+	BOOL	handleRightMouseDown(S32 x, S32 y, MASK mask) override;
+	BOOL	handleDoubleClick(S32 x, S32 y, MASK mask) override;
+	BOOL	handleMiddleMouseDown(S32 x, S32 y, MASK mask) override;
 	
-	virtual BOOL	handleScrollWheel(S32 x, S32 y, S32 mask);
+	BOOL	handleScrollWheel(S32 x, S32 y, S32 mask) override;
 	
-	virtual void	draw();
+	void	draw() override;
 	virtual void	drawShadow(LLPanel* panel);
 	
-	virtual void	onOpen(const LLSD& key) {}
+	void	onOpen(const LLSD& key) override {}
 	virtual void	onClose(bool app_quitting) {}
 
 	// This cannot be "const" until all derived floater canClose()
 	// methods are const as well.  JC
 	virtual BOOL	canClose() { return TRUE; }
 
-	/*virtual*/ void setVisible(BOOL visible); // do not override
-	/*virtual*/ void onVisibilityChange ( BOOL new_visibility ); // do not override
+	void setVisible(BOOL visible) override; // do not override
+	void onVisibilityChange ( BOOL new_visibility ) override; // do not override
 	
 	void			setFrontmost(BOOL take_focus = TRUE, BOOL restore = TRUE);
      virtual void	setVisibleAndFrontmost(BOOL take_focus=TRUE, const LLSD& key = LLSD());
