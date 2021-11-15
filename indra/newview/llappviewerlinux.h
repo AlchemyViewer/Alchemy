@@ -69,6 +69,8 @@ protected:
 
 	bool initSLURLHandler() override;
 	bool sendURLToOtherInstance(const std::string& url) override;
+private:
+	bool mSentryInitialized = false;
 };
 
 #if LL_DBUS_ENABLED
