@@ -25,7 +25,6 @@ set(cmake_SOURCE_FILES
     FindAPR.cmake
     FindAutobuild.cmake
     FindFMODSTUDIO.cmake
-    FindGLH.cmake
     FindHUNSPELL.cmake
     FindNDOF.cmake
     FindOpenJPEG.cmake
@@ -34,7 +33,6 @@ set(cmake_SOURCE_FILES
     FMODSTUDIO.cmake
     FreeType.cmake
     GLEXT.cmake
-    GLH.cmake
     GLOD.cmake
     GStreamer010Plugin.cmake
     Hunspell.cmake

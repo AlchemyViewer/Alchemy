@@ -45,14 +45,6 @@
 #include "llmatrix4a.h"
 #include "llvector4a.h"
 #include <boost/align/aligned_allocator.hpp>
-#if LL_GNUC
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wmisleading-indentation"
-#endif
-#include "glh/glh_linear.h"
-#if LL_GNUC
-#pragma GCC diagnostic pop
-#endif
 
 class LLVertexBuffer;
 class LLCubeMap;

@@ -44,14 +44,6 @@
 #include "llinstancetracker.h"
 
 #include "llglheaders.h"
-#if LL_GNUC
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wmisleading-indentation"
-#endif
-#include "glh/glh_linear.h"
-#if LL_GNUC
-#pragma GCC diagnostic pop
-#endif
 
 extern BOOL gDebugGL;
 extern BOOL gDebugSession;

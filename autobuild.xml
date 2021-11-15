@@ -657,38 +657,6 @@
         <key>version</key>
         <string>2.10.4</string>
       </map>
-      <key>glh_linear</key>
-      <map>
-        <key>copyright</key>
-        <string>Copyright (c) 2000 Cass Everitt</string>
-        <key>description</key>
-        <string>glh - is a platform-indepenedent C++ OpenGL helper library</string>
-        <key>license</key>
-        <string>BSD</string>
-        <key>license_file</key>
-        <string>LICENSES/glh-linear.txt</string>
-        <key>name</key>
-        <string>glh_linear</string>
-        <key>platforms</key>
-        <map>
-          <key>common</key>
-          <map>
-            <key>archive</key>
-            <map>
-              <key>hash</key>
-              <string>3bf5067722ac60db75c600e8a4e15c7be1147329847eb373971f1a90be76cbf71499ed14c5b91e175a221bd6b02d4ec9fc172930e34666cb2ffd24efedba87f9</string>
-              <key>hash_algorithm</key>
-              <string>blake2b</string>
-              <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/139/packages/generic/glh_linear/0.0.1.1174/glh_linear-0.0.1-common-1174.tar.zst</string>
-            </map>
-            <key>name</key>
-            <string>common</string>
-          </map>
-        </map>
-        <key>version</key>
-        <string>0.0.1</string>
-      </map>
       <key>glod</key>
       <map>
         <key>copyright</key>
