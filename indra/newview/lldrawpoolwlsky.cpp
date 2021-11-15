@@ -35,6 +35,7 @@
 #include "llenvironment.h" 
 #include "llglslshader.h"
 #include "llgl.h"
+#include "alglmath.h"
 
 #include "llviewerregion.h"
 #include "llviewershadermgr.h"
@@ -166,7 +167,8 @@ void LLDrawPoolWLSky::renderDome(LLGLSLShader * shader) const
 
 	// the windlight sky dome works most conveniently in a coordinate system
 	// where Y is up, so permute our basis vectors accordingly.
-	gGL.rotatef(120.f, 1.f / F_SQRT3, 1.f / F_SQRT3, 1.f / F_SQRT3);
+	static const LLMatrix4a rot = ALGLMath::genRot(120.f, 1.f / F_SQRT3, 1.f / F_SQRT3, 1.f / F_SQRT3);
+	gGL.rotatef(rot);
 
 	gGL.scalef(0.333f, 0.333f, 0.333f);
 

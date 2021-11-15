@@ -7634,34 +7634,6 @@ void LLPipeline::renderFullbrightMaskedObjects(U32 type, U32 mask, bool texture,
 	gGLLastMatrix = NULL;		
 }
 
-void apply_cube_face_rotation(U32 face)
-{
-	switch (face)
-	{
-		case 0: 
-			gGL.rotatef(90.f, 0, 1, 0);
-			gGL.rotatef(180.f, 1, 0, 0);
-		break;
-		case 2: 
-			gGL.rotatef(-90.f, 1, 0, 0);
-		break;
-		case 4:
-			gGL.rotatef(180.f, 0, 1, 0);
-			gGL.rotatef(180.f, 0, 0, 1);
-		break;
-		case 1: 
-			gGL.rotatef(-90.f, 0, 1, 0);
-			gGL.rotatef(180.f, 1, 0, 0);
-		break;
-		case 3:
-			gGL.rotatef(90, 1, 0, 0);
-		break;
-		case 5: 
-			gGL.rotatef(180, 0, 0, 1);
-		break;
-	}
-}
-
 void validate_framebuffer_object()
 {                                                           
 	GLenum status;                                            

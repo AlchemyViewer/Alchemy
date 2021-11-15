@@ -30,6 +30,7 @@
 
 // library includes
 #include "llmath.h"
+#include "alglmath.h"
 #include "llgl.h"
 #include "llrender.h"
 #include "v4color.h"
@@ -187,7 +188,8 @@ void LLManipRotate::render()
 
 				gGL.multMatrix( &mat.mMatrix[0][0] );
 
-				gGL.rotatef( -90, 0.f, 1.f, 0.f);
+				static const LLMatrix4a sphere_rot = ALGLMath::genRot(-90, 0.f, 1.f, 0.f);
+				gGL.rotatef(sphere_rot);
 				LLColor4 color;
 				if (mManipPart == LL_ROT_ROLL || mHighlightedPart == LL_ROT_ROLL)
 				{
@@ -255,7 +257,8 @@ void LLManipRotate::render()
 			mManipulatorScales = lerp(mManipulatorScales, LLVector4(1.f, SELECTED_MANIPULATOR_SCALE, 1.f, 1.f), LLSmoothInterpolation::getInterpolant(MANIPULATOR_SCALE_HALF_LIFE));
 			gGL.pushMatrix();
 			{
-				gGL.rotatef( 90.f, 1.f, 0.f, 0.f );
+				static const LLMatrix4a y_rot = ALGLMath::genRot(90.f, 1.f, 0.f, 0.f);
+				gGL.rotatef(y_rot);
 				gGL.scalef(mManipulatorScales.mV[VY], mManipulatorScales.mV[VY], mManipulatorScales.mV[VY]);
 				renderActiveRing( mRadiusMeters, width_meters, LLColor4( 0.f, 1.f, 0.f, 1.f), LLColor4( 0.f, 1.f, 0.f, 0.3f));
 			}
@@ -266,7 +269,8 @@ void LLManipRotate::render()
 			mManipulatorScales = lerp(mManipulatorScales, LLVector4(SELECTED_MANIPULATOR_SCALE, 1.f, 1.f, 1.f), LLSmoothInterpolation::getInterpolant(MANIPULATOR_SCALE_HALF_LIFE));
 			gGL.pushMatrix();
 			{
-				gGL.rotatef( 90.f, 0.f, 1.f, 0.f );
+				static const LLMatrix4a x_rot = ALGLMath::genRot(90.f, 0.f, 1.f, 0.f);
+				gGL.rotatef(x_rot);
 				gGL.scalef(mManipulatorScales.mV[VX], mManipulatorScales.mV[VX], mManipulatorScales.mV[VX]);
 				renderActiveRing( mRadiusMeters, width_meters, LLColor4( 1.f, 0.f, 0.f, 1.f), LLColor4( 1.f, 0.f, 0.f, 0.3f));
 			}
@@ -289,6 +293,8 @@ void LLManipRotate::render()
 			LLGLDisable gls_stencil(GL_STENCIL_TEST);
 
 			// First pass: centers. Second pass: sides.
+			static const LLMatrix4a side1_rot = ALGLMath::genRot(90.f, 1.f, 0.f, 0.f);
+			static const LLMatrix4a side2_rot = ALGLMath::genRot(90.f, 0.f, 1.f, 0.f);
 			for( S32 i=0; i<2; i++ )
 			{
 				
@@ -311,7 +317,7 @@ void LLManipRotate::render()
 				
 				gGL.pushMatrix();
 				{
-					gGL.rotatef( 90.f, 1.f, 0.f, 0.f );
+					gGL.rotatef(side1_rot);
 					if (mHighlightedPart == LL_ROT_Y)
 					{
 						mManipulatorScales = lerp(mManipulatorScales, LLVector4(1.f, SELECTED_MANIPULATOR_SCALE, 1.f, 1.f), LLSmoothInterpolation::getInterpolant(MANIPULATOR_SCALE_HALF_LIFE));
@@ -329,7 +335,7 @@ void LLManipRotate::render()
 
 				gGL.pushMatrix();
 				{
-					gGL.rotatef( 90.f, 0.f, 1.f, 0.f );
+					gGL.rotatef(side2_rot);
 					if (mHighlightedPart == LL_ROT_X)
 					{
 						mManipulatorScales = lerp(mManipulatorScales, LLVector4(SELECTED_MANIPULATOR_SCALE, 1.f, 1.f, 1.f), LLSmoothInterpolation::getInterpolant(MANIPULATOR_SCALE_HALF_LIFE));
