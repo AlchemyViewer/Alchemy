@@ -1466,6 +1466,7 @@ void LLSecAPIBasicHandler::_readProtectedData(unsigned char *unique_id, U32 id_l
 				// everything failed abort
 				LLTHROW(LLProtectedDataException("Config file cannot be decrypted."));
 			}
+		}
 	}
 }
 
