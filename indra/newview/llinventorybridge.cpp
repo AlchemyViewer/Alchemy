@@ -5557,11 +5557,20 @@ void LLTextureBridge::buildContextMenu(LLMenuGL& menu, U32 flags)
 		getClipboardEntries(true, items, disabled_items, flags);
 
 		items.push_back(std::string("Texture Separator"));
-		items.push_back(std::string("Save As"));
-		if (!canSaveTexture())
-		{
-			disabled_items.push_back(std::string("Save As"));
-		}
+		
+        if ((flags & ITEM_IN_MULTI_SELECTION) != 0)
+        {
+            items.push_back(std::string("Save Selected As"));
+        }
+        else
+        {
+            items.push_back(std::string("Save As"));
+            if (!canSaveTexture())
+            {
+                disabled_items.push_back(std::string("Save As"));
+            }
+        }
+
 	}
 	addLinkReplaceMenuOption(items, disabled_items);
 	hide_context_entries(menu, items, disabled_items);	
@@ -5579,6 +5588,23 @@ void LLTextureBridge::performAction(LLInventoryModel* model, std::string action)
 			preview_texture->saveAs();
 		}
 	}
+    else if ("save_selected_as" == action)
+    {
+        openItem();
+        if (canSaveTexture())
+        {
+            LLPreviewTexture* preview_texture = LLFloaterReg::getTypedInstance<LLPreviewTexture>("preview_texture", mUUID);
+            if (preview_texture)
+            {
+                preview_texture->saveMultipleToFile(mFileName);
+            }
+        }
+        else
+        {
+            LL_WARNS() << "You don't have permission to save " << getName() << " to disk." << LL_ENDL;
+        }
+
+    }
 	else LLItemBridge::performAction(model, action);
 }
 
@@ -6993,7 +7019,7 @@ void LLWearableBridge::buildContextMenu(LLMenuGL& menu, U32 flags)
 // [/RLVa:KB]
 					}
 
-					if (LLWearableType::getAllowMultiwear(mWearableType))
+					if (LLWearableType::getInstance()->getAllowMultiwear(mWearableType))
 					{
 						items.push_back(std::string("Wearable Add"));
 //						if (!gAgentWearables.canAddWearable(mWearableType))

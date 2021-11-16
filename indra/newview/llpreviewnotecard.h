@@ -31,6 +31,7 @@
 #include "llassetstorage.h"
 #include "llpreviewscript.h"
 #include "lliconctrl.h"
+#include "llvoinventorylistener.h"
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // Class LLPreviewNotecard
@@ -44,7 +45,7 @@ class LLButton;
 class LLTextEditor;
 // [/SL:KB]
 
-class LLPreviewNotecard final : public LLPreview
+class LLPreviewNotecard final : public LLPreview, public LLVOInventoryListener
 {
 public:
 	LLPreviewNotecard(const LLSD& key);
@@ -82,6 +83,11 @@ public:
 	void refreshFromInventory(const LLUUID& item_id = LLUUID::null);
 
 	void syncExternal();
+
+    void inventoryChanged(LLViewerObject* object,
+        LLInventoryObject::object_list_t* inventory,
+        S32 serial_num,
+        void* user_data) override;
 
 // [SL:KB] - Patch: Build-AssetRecovery | Checked: 2013-07-28 (Catznip-3.6)
 	void callbackSaveComplete();

@@ -1454,7 +1454,7 @@ bool LLImageRaw::scale( S32 new_width, S32 new_height, bool scale_image_data )
             setDataAndSize(new_data, new_width, new_height, components); 
 		}
 	}
-	else
+	else try
 	{
 		// copy	out	existing image data
 		S32	temp_data_size = old_width * old_height	* components;
@@ -1488,6 +1488,11 @@ bool LLImageRaw::scale( S32 new_width, S32 new_height, bool scale_image_data )
             }
         }
 	}
+    catch (std::bad_alloc&) // for temp_buffer
+    {
+        LL_WARNS() << "Failed to allocate temporary image buffer" << LL_ENDL;
+        return false;
+    }
 
 	return true ;
 }

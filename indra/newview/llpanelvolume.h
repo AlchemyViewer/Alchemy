@@ -41,6 +41,7 @@ class LLViewerObject;
 class LLComboBox;
 class LLColorSwatchCtrl;
 class LLTextureCtrl;
+class LLVOVolume;
 
 class LLPanelVolume final : public LLPanel
 {
@@ -73,6 +74,8 @@ public:
 
 	void		onLightCancelTexture(const LLSD& data); 
 	void		onLightSelectTexture(const LLSD& data);
+
+    static void    setLightTextureID(const LLUUID &asset_id, const LLUUID &item_id, LLVOVolume* volobjp);
 
 
 protected:

@@ -52,6 +52,7 @@
 #include <fstream>
 
 #include "lldir.h"
+#include "lldiriterator.h"
 #include <signal.h>
 #include <CoreAudio/CoreAudio.h>	// for systemwide mute
 class LLMediaCtrl;		// for LLURLDispatcher
@@ -131,6 +132,14 @@ void cleanupViewer()
 	gViewerAppPtr = NULL;
 }
 
+void clearDumpLogsDir()
+{
+    if (!LLAppViewer::instance()->isSecondInstance())
+    {
+        gDirUtilp->deleteDirAndContents(gDirUtilp->getDumpLogsDirPath());
+    }
+}
+
 // The BugsplatMac API is structured as a number of different method
 // overrides, each returning a different piece of metadata. But since we
 // obtain such metadata by opening and parsing a file, it seems ridiculous to
@@ -185,6 +194,24 @@ CrashMetadataSingleton::CrashMetadataSingleton()
         LLStringUtil::replaceChar(agentFullname, '_', ' ');
         regionName           = get_metadata(info, "CurrentRegion");
         fatalMessage         = get_metadata(info, "FatalMessage");
+        
+        if (gDirUtilp->fileExists(gDirUtilp->getDumpLogsDirPath()))
+        {
+            LLDirIterator file_iter(gDirUtilp->getDumpLogsDirPath(), "*.log");
+            std::string file_name;
+            bool found = true;
+            while(found)
+            {
+                if((found = file_iter.next(file_name)))
+                {
+                    std::string log_filename = gDirUtilp->getDumpLogsDirPath(file_name);
+                    if(LLError::logFileName() != log_filename)
+                    {
+                        secondLogFilePathname = log_filename;
+                    }
+                }
+            }
+        }
     }
 }
 

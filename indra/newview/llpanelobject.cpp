@@ -999,7 +999,7 @@ void LLPanelObject::getState( )
 		mSpinScaleY->setMaxValue(OBJECT_MAX_HOLE_SIZE_Y);
 		break;
 	default:
-		if (editable)
+		if (editable && single_volume)
 		{
 			if (selected_item == MI_BOX || selected_item == MI_CYLINDER || selected_item == MI_PRISM)
 			{

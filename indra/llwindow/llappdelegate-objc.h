@@ -36,6 +36,7 @@
 	LLNonInlineTextView __unsafe_unretained *inputView;
 	NSTimer *frameTimer;
 	NSString *currentInputLanguage;
+    std::string secondLogPath;
 }
 
 @property (assign) IBOutlet LLNSWindow *window;
