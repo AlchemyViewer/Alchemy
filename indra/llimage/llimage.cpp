@@ -1454,45 +1454,48 @@ bool LLImageRaw::scale( S32 new_width, S32 new_height, bool scale_image_data )
             setDataAndSize(new_data, new_width, new_height, components); 
 		}
 	}
-	else try
+	else 
 	{
-		// copy	out	existing image data
-		S32	temp_data_size = old_width * old_height	* components;
-		std::vector<U8> temp_buffer(temp_data_size);
-		memcpy(&temp_buffer[0],	getData(), temp_data_size);
+		try
+		{
+			// copy	out	existing image data
+			S32	temp_data_size = old_width * old_height * components;
+			std::vector<U8> temp_buffer(temp_data_size);
+			memcpy(&temp_buffer[0], getData(), temp_data_size);
 
-		// allocate	new	image data,	will delete	old	data
-		U8*	new_buffer = allocateDataSize(new_width, new_height, components);
+			// allocate	new	image data,	will delete	old	data
+			U8* new_buffer = allocateDataSize(new_width, new_height, components);
 
-        if (!new_buffer)
-        {
-            LL_WARNS() << "Failed to allocate new image data buffer" << LL_ENDL;
-            return false;
-        }
-        
-        for( S32 row = 0; row <	new_height;	row++ )
-        {
-            if (row	< old_height)
-            {
-                memcpy(new_buffer +	(new_width * row * components), &temp_buffer[0] + (old_width *	row	* components),	components * llmin(old_width, new_width));
-                if (old_width <	new_width)
-                {
-                    // pad out rest	of row with	black
-                    memset(new_buffer +	(components * ((new_width * row) +	old_width)), 0,	components * (new_width - old_width));
-                }
-            }
-            else
-            {
-                // pad remaining rows with black
-                memset(new_buffer +	(new_width * row * components), 0,	new_width *	components);
-            }
-        }
+			if (!new_buffer)
+			{
+				LL_WARNS() << "Failed to allocate new image data buffer" << LL_ENDL;
+				return false;
+			}
+
+			for (S32 row = 0; row < new_height; row++)
+			{
+				if (row < old_height)
+				{
+					memcpy(new_buffer + (new_width * row * components), &temp_buffer[0] + (old_width * row * components), components * llmin(old_width, new_width));
+					if (old_width < new_width)
+					{
+						// pad out rest	of row with	black
+						memset(new_buffer + (components * ((new_width * row) + old_width)), 0, components * (new_width - old_width));
+					}
+				}
+				else
+				{
+					// pad remaining rows with black
+					memset(new_buffer + (new_width * row * components), 0, new_width * components);
+				}
+			}
+		}
+		catch (const std::bad_alloc&) // for temp_buffer
+		{
+			LL_WARNS() << "Failed to allocate temporary image buffer" << LL_ENDL;
+			return false;
+		}
 	}
-    catch (std::bad_alloc&) // for temp_buffer
-    {
-        LL_WARNS() << "Failed to allocate temporary image buffer" << LL_ENDL;
-        return false;
-    }
 
 	return true ;
 }
