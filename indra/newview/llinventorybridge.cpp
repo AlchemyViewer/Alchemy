@@ -7019,7 +7019,7 @@ void LLWearableBridge::buildContextMenu(LLMenuGL& menu, U32 flags)
 // [/RLVa:KB]
 					}
 
-					if (LLWearableType::getInstance()->getAllowMultiwear(mWearableType))
+					if (LLWearableType::getInstanceFast()->getAllowMultiwear(mWearableType))
 					{
 						items.push_back(std::string("Wearable Add"));
 //						if (!gAgentWearables.canAddWearable(mWearableType))

@@ -2101,7 +2101,7 @@ void LLVOAvatarSelf::debugBakedTextureUpload(EBakedTextureIndex index, BOOL fini
 const std::string LLVOAvatarSelf::verboseDebugDumpLocalTextureDataInfo(const LLViewerTexLayerSet* layerset) const
 {
 	std::ostringstream outbuf;
-    LLWearableType *wr_inst = LLWearableType::getInstance();
+    LLWearableType *wr_inst = LLWearableType::getInstanceFast();
 	for (const auto& baked_pair : sAvatarDictionary->getBakedTextures())
 	{
 		const EBakedTextureIndex baked_index = baked_pair.first;
@@ -2175,7 +2175,7 @@ void LLVOAvatarSelf::dumpAllTextures() const
 const std::string LLVOAvatarSelf::debugDumpLocalTextureDataInfo(const LLViewerTexLayerSet* layerset) const
 {
 	std::string text="";
-    LLWearableType *wr_inst = LLWearableType::getInstance();
+    LLWearableType *wr_inst = LLWearableType::getInstanceFast();
 
 	text = llformat("[Final:%d Avail:%d] ",isLocalTextureDataFinal(layerset), isLocalTextureDataAvailable(layerset));
 
@@ -2906,7 +2906,7 @@ void LLVOAvatarSelf::dumpWearableInfo(LLAPRFile& outfile)
 	apr_file_printf( file, "\n<wearable_info>\n" );
 
 	LLWearableData *wd = getWearableData();
-    LLWearableType *wr_inst = LLWearableType::getInstance();
+    LLWearableType *wr_inst = LLWearableType::getInstanceFast();
 	for (S32 type = 0; type < LLWearableType::WT_COUNT; type++)
 	{
 		const std::string& type_name = wr_inst->getTypeName((LLWearableType::EType)type);

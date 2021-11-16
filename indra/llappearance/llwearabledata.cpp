@@ -235,7 +235,7 @@ BOOL LLWearableData::getWearableIndex(const LLWearable *wearable, U32& index_fou
 U32 LLWearableData::getClothingLayerCount() const
 {
 	U32 count = 0;
-    LLWearableType *wr_inst = LLWearableType::getInstance();
+    LLWearableType *wr_inst = LLWearableType::getInstanceFast();
 	for (S32 i = 0; i < LLWearableType::WT_COUNT; i++)
 	{
 		LLWearableType::EType type = (LLWearableType::EType)i;
@@ -249,7 +249,7 @@ U32 LLWearableData::getClothingLayerCount() const
 
 BOOL LLWearableData::canAddWearable(const LLWearableType::EType type) const
 {
-    LLAssetType::EType a_type = LLWearableType::getInstance()->getAssetType(type);
+    LLAssetType::EType a_type = LLWearableType::getInstanceFast()->getAssetType(type);
 	if (a_type==LLAssetType::AT_CLOTHING)
 	{
 		return (getClothingLayerCount() < MAX_CLOTHING_LAYERS);

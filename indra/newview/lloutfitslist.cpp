@@ -1187,7 +1187,7 @@ void LLOutfitListGearMenuBase::onRename()
 
 void LLOutfitListGearMenuBase::onCreate(const LLSD& data)
 {
-    LLWearableType::EType type = LLWearableType::getInstance()->typeNameToType(data.asString());
+    LLWearableType::EType type = LLWearableType::getInstanceFast()->typeNameToType(data.asString());
     if (type == LLWearableType::WT_NONE)
     {
         LL_WARNS() << "Invalid wearable type" << LL_ENDL;
