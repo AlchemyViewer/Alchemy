@@ -377,6 +377,17 @@
 		label="Play sounds from gestures"
 		top_pad="1"
 		left="25"/>
+	<check_box
+		name="sound_on_collisions"
+		control_name="EnableCollisionSounds"
+        disabled_control="MuteAudio"
+		value="true"
+		follows="left|bottom|right"
+		height="15"
+		tool_tip="Check this to hear sounds from collisions with objects and avatars"
+		label="Play sounds from collisions"
+		top_pad="1"
+		left="25"/>
     <text
      type="string"
      length="1"
