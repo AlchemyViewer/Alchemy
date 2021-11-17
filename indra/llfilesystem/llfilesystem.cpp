@@ -57,11 +57,16 @@ bool LLFileSystem::open()
     {
     case READ: mFile = LLFile::fopen(mFilePath, TEXT("rb")); break;
     case WRITE: mFile = LLFile::fopen(mFilePath, TEXT("wb")); break;
-    case READ_WRITE: mFile = LLFile::fopen(mFilePath, TEXT("rb+")); break;
-    case APPEND: mFile = LLFile::fopen(mFilePath, TEXT("ab")); break;
+    case READ_WRITE: mFile = LLFile::fopen(mFilePath, TEXT("r+b")); break;
+    case APPEND: mFile = LLFile::fopen(mFilePath, TEXT("a+b")); break;
     }
     if (mMode == READ_WRITE && !mFile)
         mFile = LLFile::fopen(mFilePath, TEXT("wb+"));
+
+    if (mFile)
+    {
+        mPosition = ftell(mFile);
+    }
 
     return mFile;
 }
@@ -85,44 +90,21 @@ BOOL LLFileSystem::read(U8* buffer, S32 bytes)
         return FALSE;
     }
 
-    BOOL success = TRUE;
+    BOOL success = FALSE;
 
-    fseek(mFile, mPosition, SEEK_SET);
-    size_t bytes_read = fread((void*)buffer, 1, bytes, mFile);
-    if (bytes_read == bytes)
+    if (fseek(mFile, mPosition, SEEK_SET) == 0)
     {
-        mBytesRead = bytes_read;
-    }
-    else
-    {
-        fseek(mFile, 0L, SEEK_END);
-        long fsize = ftell(mFile);
-        if (mPosition < fsize)
+        mBytesRead = fread(buffer, 1, bytes, mFile);
+
+        mPosition = ftell(mFile);
+
+        // It probably would be correct to check for mBytesRead == bytes,
+        // but that will break avatar rezzing...
+        if (mBytesRead)
         {
-            fseek(mFile, mPosition, SEEK_SET);
-            long rsize = fsize - mPosition;
-            bytes_read = fread((void*)buffer, 1, rsize, mFile);
-            if (bytes_read == rsize)
-            {
-                mBytesRead = bytes_read;
-            }
-            else
-            {
-                success = FALSE;
-            }
-        }
-        else
-        {
-            success = FALSE;
+            success = TRUE;
         }
     }
-
-    if (success == FALSE)
-    {
-        mBytesRead = 0;
-    }
-
-    mPosition += mBytesRead;
 
     // update the last access time for the file - this is required
     // even though we are reading and not writing because this is the
@@ -160,40 +142,20 @@ BOOL LLFileSystem::write(const U8* buffer, S32 bytes)
     BOOL success = FALSE;
     if (mMode == READ_WRITE)
     {
-        fseek(mFile, mPosition, SEEK_SET);
-
-        size_t bytes_written = fwrite((const void*)buffer, 1, bytes, mFile);
-        if (bytes_written == bytes)
+        if (fseek(mFile, mPosition, SEEK_SET) == 0)
         {
-            mPosition += bytes_written;
-
-            success = TRUE;
-        }
-    }
-    else if (mMode == APPEND)
-    {
-        fseek(mFile, 0L, SEEK_END);
-        long fsize = ftell(mFile);
-
-        size_t bytes_written = fwrite((const void*)buffer, 1, bytes, mFile);
-        if (bytes_written == bytes)
-        {
-            mPosition = fsize + bytes_written;
-
-            success = TRUE;
+            size_t bytes_written = fwrite((const void*)buffer, 1, bytes, mFile);
+            success = (bytes_written == bytes);
         }
     }
     else
     {
         size_t bytes_written = fwrite((const void*)buffer, 1, bytes, mFile);
-
-        if (bytes_written == bytes)
-        {
-            mPosition = bytes_written;
-
-            success = TRUE;
-        }
+        success = (bytes_written == bytes);
     }
+
+    // Always update position after any write operation in case file pointer position changed
+    mPosition = ftell(mFile);
 
     return success;
 }
@@ -236,20 +198,12 @@ S32 LLFileSystem::tell() const
 S32 LLFileSystem::getSize()
 {
     S32 file_size = 0;
-    if (mFile)
-    {
-        fseek(mFile, 0L, SEEK_END);
-        file_size = ftell(mFile);
-        fseek(mFile, mPosition, SEEK_SET);
-    }
-    else
-    {
-        llstat stat;
-        if (LLFile::stat(mFilePath, &stat) == 0)
-        {
-            file_size = stat.st_size;
-        }
-    }
+
+    llstat stat;
+	if (LLFile::stat(mFilePath, &stat) == 0)
+	{
+		file_size = stat.st_size;
+	}
 
     return file_size;
 }
