@@ -31,6 +31,7 @@
 #include "llappviewer.h"
 
 // Viewer includes
+#include "llregex.h"
 #include "llversioninfo.h"
 #include "llfeaturemanager.h"
 #include "lluictrlfactory.h"
@@ -1094,7 +1095,7 @@ bool LLAppViewer::init()
 
         const boost::regex is_intel_string("[0-9].[0-9].[0-9] - Build [0-9]{1,2}.[0-9]{2}.[0-9]{2}.[0-9]{4}");
 
-        if (boost::regex_search(version, is_intel_string))
+        if (ll_regex_search(version, is_intel_string))
         {
             // Valid string, extract driver version
             std::size_t found = version.find("Build ");

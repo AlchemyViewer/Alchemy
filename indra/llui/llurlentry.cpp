@@ -1573,7 +1573,7 @@ std::string LLUrlEntryIPv6::getLabel(const std::string &url, const LLUrlLabelCal
 	boost::regex regex = boost::regex(mHostPath, boost::regex::perl | boost::regex::icase);
 	boost::match_results<std::string::const_iterator> matches;
 
-	if (boost::regex_search(url, matches, regex))
+	if (ll_regex_search(url, matches, regex))
 	{
 		return  url.substr(0, matches[0].length());
 	}

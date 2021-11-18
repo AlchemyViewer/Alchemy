@@ -34,6 +34,7 @@
 #include "llavatarnamecache.h"		// name lookup cap url
 #include "llfloaterreg.h"
 #include "llmath.h"
+#include "llregex.h"
 #include "llregionflags.h"
 #include "llregionhandle.h"
 #include "llsurface.h"
@@ -151,7 +152,7 @@ public:
             {
                 url += "/";
             }
-			if (!boost::regex_match(params[i].asString(), i > 0 ? coord_rx : name_rx))
+			if (!ll_regex_match(params[i].asString(), i > 0 ? coord_rx : name_rx))
 			{
 				return false;
 			}
