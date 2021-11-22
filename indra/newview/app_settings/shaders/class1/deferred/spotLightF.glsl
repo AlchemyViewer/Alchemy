@@ -191,7 +191,7 @@ void main()
 			lit = da * dist_atten * noise;
 
 			col = dlit*lit*diff_tex;
-			amb_da += (da*0.5)*proj_ambiance;
+			amb_da += (da*0.5+0.5)*proj_ambiance;
 		}
 		//float diff = clamp((proj_range-proj_focus)/proj_range, 0.0, 1.0);
 		vec4 amb_plcol = texture2DLodAmbient(projectionMap, proj_tc.xy, proj_lod);
@@ -201,6 +201,9 @@ void main()
 		amb_da *= dist_atten * noise;
 			
 		amb_da = min(amb_da, 1.0-lit);
+
+		amb_da = max(amb_da, 0.0); // Prevent nan in lighting
+
 		col += amb_da*color.rgb*diff_tex.rgb*amb_plcol.rgb*amb_plcol.a;
 	}
 

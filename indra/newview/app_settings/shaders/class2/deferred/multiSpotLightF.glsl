@@ -215,6 +215,8 @@ void main()
         amb_da *= dist_atten * noise;
         amb_da = min(amb_da, 1.0-lit);
 
+        amb_da = max(amb_da, 0.0); // Prevent nan in lighting
+
         col += amb_da*color.rgb*diff_tex.rgb*amb_plcol.rgb*amb_plcol.a;
     }
     
@@ -275,10 +277,7 @@ void main()
     }
 #endif
 
-    //not sure why, but this line prevents MATBUG-194
-    col = max(col, vec3(0.0));
-
-    //output linear
+    //output linear, sum of lights will be gamma corrected later	
     frag_color.rgb = col;
     frag_color.a = 0.0;
 }
