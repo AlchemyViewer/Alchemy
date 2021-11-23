@@ -303,6 +303,17 @@
       <key>Value</key>
       <boolean>1</boolean>
     </map>
+	<key>AssetFetchConcurrency</key>
+	<map>
+		<key>Comment</key>
+		<string>Maximum number of HTTP connections used for asset fetches</string>
+		<key>Persist</key>
+		<integer>1</integer>
+		<key>Type</key>
+		<string>U32</string>
+		<key>Value</key>
+		<integer>0</integer>
+	</map>
   <key>ImporterDebug</key>
   <map>
     <key>Comment</key>
