@@ -64,6 +64,8 @@
 
 #include "llsingleton.h"
 
+#include "absl/container/flat_hash_set.h"
+
 class LLDiskCache final :
     public LLParamSingleton<LLDiskCache>
 {
@@ -108,10 +110,19 @@ class LLDiskCache final :
                                              LLAssetType::EType at);
 
         /**
+         * Update the "last write time" of a file to "now". This must be called whenever a
+         * file in the cache is read (not written) so that the last time the file was
+         * accessed is up to date (This is used in the mechanism for purging the cache)
+         */
+        void updateFileAccessTime(const boost::filesystem::path& file_path);
+        /**
          * Purge the oldest items in the cache so that the combined size of all files
          * is no bigger than mMaxSizeBytes.
          */
         void purge();
+
+        // copy from distribution into cache to replace static content
+        void prepopulateCacheWithStatic();
 
         /**
          * Clear the cache by removing all the files in the specified cache
@@ -176,6 +187,8 @@ class LLDiskCache final :
          * various parts of the code
          */
         bool mEnableCacheDebugInfo;
+        
+        absl::flat_hash_set<LLUUID> mSkipList;
 };
 
 #endif // _LLDISKCACHE

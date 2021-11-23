@@ -301,48 +301,15 @@ LLMotion::LLMotionInitStatus LLKeyframeMotion::onInitialize(LLCharacter *charact
 		return STATUS_SUCCESS;
 	}
 
+	//-------------------------------------------------------------------------
+	// Load named file by concatenating the character prefix with the motion name.
+	// Load data into a buffer to be parsed.
+	//-------------------------------------------------------------------------
 	BOOL success = FALSE;
 	U8* anim_data = nullptr;
 	S32 anim_file_size = 0;
 
-	//-------------------------------------------------------------------------
-	// First attempt to find the animation in the static animation cache.
-	//-------------------------------------------------------------------------
-	std::string filename = gDirUtilp->getExpandedFilename(LL_PATH_CHARACTER,
-		"animmations", gDirUtilp->getDirDelimiter(), mID.asString() + ".animatn");
-	LLUniqueFile fp = LLFile::fopen(filename, "rb");
-	if (fp)	// If the file exists
 	{
-		fseek(fp, 0L, SEEK_END);
-		anim_file_size = ftell(fp);
-		fseek(fp, 0L, SEEK_SET);
-
-		anim_data = new (std::nothrow) U8[anim_file_size];
-		if (anim_data)
-		{
-			success = fread(anim_data, 1,
-				anim_file_size, fp) == anim_file_size;
-			if (!success)
-			{
-				delete[] anim_data;
-				anim_data = nullptr;
-			}
-		}
-		else
-		{
-			LL_WARNS() << "Failed to allocate buffer: " << anim_file_size << mID << LL_ENDL;
-		}
-		fp.close();
-	}
-
-	if (!success)
-	{
-		//-------------------------------------------------------------------------
-		// Load named file by concatenating the character prefix with the motion name.
-		// Load data into a buffer to be parsed.
-		//-------------------------------------------------------------------------
-
-
 		LLFileSystem anim_file(mID, LLAssetType::AT_ANIMATION);
 		if (!anim_file.open() || !anim_file.getSize())
 		{
@@ -369,10 +336,6 @@ LLMotion::LLMotionInitStatus LLKeyframeMotion::onInitialize(LLCharacter *charact
 				LL_WARNS() << "Failed to allocate buffer: " << anim_file_size << mID << LL_ENDL;
 			}
 		}
-	}
-	else
-	{
-		LL_DEBUGS() << "Loaded keyframe data from static anim cache: " << mID << LL_ENDL;
 	}
 
 	if (!success)

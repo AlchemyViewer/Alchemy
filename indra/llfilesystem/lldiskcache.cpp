@@ -61,6 +61,7 @@ void LLDiskCache::createCache()
     {
         LLFile::mkdir(absl::StrCat(sCacheDir, gDirUtilp->getDirDelimiter(), prefixchar));
     }
+	prepopulateCacheWithStatic();
 }
 
 void LLDiskCache::purge()
@@ -116,22 +117,43 @@ void LLDiskCache::purge()
 
     LL_INFOS() << "Purging cache to a maximum of " << mMaxSizeBytes << " bytes" << LL_ENDL;
 
+    // Extra accounting to track the retention of static assets
+    int keep{0};
+    int del{0};
+    int skip{0};
     uintmax_t file_size_total = 0;
     for (const file_info_t& entry : file_info)
     {
         file_size_total += entry.second.first;
 
-        bool remove_file = false;
+        std::string action = "";
         if (file_size_total > mMaxSizeBytes)
         {
-            remove_file = true;
-            boost::system::error_code ec;
-            boost::filesystem::remove(entry.second.second, ec);
-            if (ec.failed())
+            action = "DELETE:";
+            auto uuid_as_string = LLUUID(gDirUtilp->getBaseFileName(entry.second.second.string(), true));
+            // LL_INFOS() << "checking UUID=" <<uuid_as_string<< LL_ENDL;
+            if (uuid_as_string.notNull() && mSkipList.find(uuid_as_string) != mSkipList.end())
             {
-                LL_WARNS() << "Failed to delete cached file " << entry.second.second << ": " << ec.message() << LL_ENDL;
-                continue;
+                // this is one of our protected items so no purging
+                action = "STATIC:";
+                skip++;
+                updateFileAccessTime(entry.second.second); // force these to the front of the list next time so that purge size works 
             }
+            else 
+            {
+                del++;    // Extra accounting to track the retention of static assets
+
+                boost::filesystem::remove(entry.second.second, ec);
+                if (ec.failed())
+                {
+                    LL_WARNS() << "Failed to delete cache file " << entry.second.second << ": " << ec.message() << LL_ENDL;
+                }
+            }
+        }
+        else
+        {
+            keep++;
+            action = "  KEEP:";
         }
 
         if (mEnableCacheDebugInfo)
@@ -139,7 +161,7 @@ void LLDiskCache::purge()
             // have to do this because of LL_INFO/LL_END weirdness
             std::ostringstream line;
 
-            line << (remove_file ? "DELETE:" : "  KEEP:" ) << "  ";
+            line << action << "  ";
             line << entry.first << "  ";
             line << entry.second.first << "  ";
             line << entry.second.second;
@@ -154,6 +176,7 @@ void LLDiskCache::purge()
         auto execute_time = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
         LL_INFOS() << "Total dir size after purge is " << dirFileSize(sCacheDir) << LL_ENDL;
         LL_INFOS() << "Cache purge took " << execute_time << " ms to execute for " << file_info.size() << " files" << LL_ENDL;
+        LL_INFOS() << "Deleted: " << del << " Skipped: " << skip << " Kept: " << keep << LL_ENDL;
     }
 }
 
@@ -214,6 +237,48 @@ const std::string LLDiskCache::metaDataToFilepath(const LLUUID& id,
     return absl::StrCat(sCacheDir, dirdelim, std::string_view(&uuidstr[0], 1), dirdelim, uuidstr, sCacheFilenameExt);
 }
 
+void LLDiskCache::updateFileAccessTime(const boost::filesystem::path& file_path)
+{
+    /**
+     * Threshold in time_t units that is used to decide if the last access time
+     * time of the file is updated or not. Added as a precaution for the concern
+     * outlined in SL-14582  about frequent writes on older SSDs reducing their
+     * lifespan. I think this is the right place for the threshold value - rather
+     * than it being a pref - do comment on that Jira if you disagree...
+     *
+     * Let's start with 1 hour in time_t units and see how that unfolds
+     */
+    static const std::time_t time_threshold = 1 * 60 * 60;
+
+    // current time
+    const std::time_t cur_time = std::time(nullptr);
+
+    boost::system::error_code ec;
+
+    // file last write time
+    const std::time_t last_write_time = boost::filesystem::last_write_time(file_path, ec);
+    if (ec.failed())
+    {
+        LL_WARNS() << "Failed to read last write time for cache file " << file_path << ": " << ec.message() << LL_ENDL;
+        return;
+    }
+
+    // delta between cur time and last time the file was written
+    const std::time_t delta_time = cur_time - last_write_time;
+
+    // we only write the new value if the time in time_threshold has elapsed
+    // before the last one
+    if (delta_time > time_threshold)
+    {
+        boost::filesystem::last_write_time(file_path, cur_time, ec);
+    }
+
+    if (ec.failed())
+    {
+        LL_WARNS() << "Failed to update last write time for cache file " << file_path << ": " << ec.message() << LL_ENDL;
+    }
+}
+
 const std::string LLDiskCache::getCacheInfo()
 {
     uintmax_t cache_used_mb = dirFileSize(sCacheDir) / (1024U * 1024U);
@@ -221,6 +286,55 @@ const std::string LLDiskCache::getCacheInfo()
     F64 percent_used = ((F64)cache_used_mb / (F64)max_in_mb) * 100.0;
 
     return llformat("%juMB / %juMB (%.1f%% used)", cache_used_mb, max_in_mb, percent_used);
+}
+
+// Copy static items into cache and add to the skip list that prevents their purging
+// Note that there is no de-duplication nor other validation of the list.
+void LLDiskCache::prepopulateCacheWithStatic()
+{
+    LL_INFOS() << "Prepopulating cache with static assets" << LL_ENDL;
+
+    mSkipList.clear();
+
+    std::vector<std::string> from_folders;
+    from_folders.emplace_back(gDirUtilp->getExpandedFilename(LL_PATH_APP_SETTINGS, "static_assets"));
+
+    for (const auto& from_folder : from_folders)
+    {
+        if (gDirUtilp->fileExists(from_folder))
+        {
+            auto assets_to_copy = gDirUtilp->getFilesInDir(from_folder);
+            for (auto from_asset_file : assets_to_copy)
+            {
+                from_asset_file = from_folder + gDirUtilp->getDirDelimiter() + from_asset_file;
+                // we store static assets as UUID.asset_type the asset_type is not used in the current simple cache format
+                auto uuid_as_string = LLUUID(gDirUtilp->getBaseFileName(from_asset_file, true));
+                if (uuid_as_string.notNull())
+                {
+                    auto to_asset_file = metaDataToFilepath(LLUUID(uuid_as_string), LLAssetType::AT_UNKNOWN);
+                    if (!gDirUtilp->fileExists(to_asset_file))
+                    {
+                        if (mEnableCacheDebugInfo)
+                        {
+                            LL_INFOS("LLDiskCache") << "Copying static asset " << from_asset_file << " to cache from " << from_folder << LL_ENDL;
+                        }
+                        if (!LLFile::copy(from_asset_file, to_asset_file))
+                        {
+                            LL_WARNS("LLDiskCache") << "Failed to copy " << from_asset_file << " to " << to_asset_file << LL_ENDL;
+                        }
+                    }
+                    if (mSkipList.find(uuid_as_string) == mSkipList.end())
+                    {
+                        if (mEnableCacheDebugInfo)
+                        {
+                            LL_INFOS("LLDiskCache") << "Adding " << uuid_as_string << " to skip list" << LL_ENDL;
+                        }
+                        mSkipList.insert(uuid_as_string);
+                    }
+                }
+            }
+        }
+    }
 }
 
 void LLDiskCache::clearCache()

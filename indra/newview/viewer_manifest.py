@@ -72,6 +72,9 @@ class ViewerManifest(LLManifest):
                 self.path("*.ini")
                 self.path("*.xml")
 
+                # include static assets
+                self.path("static_assets")
+
                 # include the entire shaders directory recursively
                 self.path("shaders")
                 # include the extracted list of contributors
@@ -139,8 +142,6 @@ class ViewerManifest(LLManifest):
 
 
             with self.prefix(src_dst="character"):
-                with self.prefix(src_dst="animations"):
-                    self.path("*.animatn")
                 self.path("*.llm")
                 self.path("*.xml")
                 self.path("*.tga")
