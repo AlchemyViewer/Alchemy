@@ -2967,8 +2967,8 @@ BOOL LLAgentCamera::setLookAt(ELookAtType target_type, LLViewerObject *object, L
 	static LLCachedControl<bool> isPrivate(gSavedSettings, "AlchemyLookAtPrivate", false);
 	if (isPrivate)
 	{
-		target_type = LOOKAT_TARGET_CLEAR;
-		object = nullptr;
+		target_type = LOOKAT_TARGET_NONE;
+		object = gAgentAvatarp;
 		position.clearVec();
 	}
 	else if(object && object->isAttachment())
