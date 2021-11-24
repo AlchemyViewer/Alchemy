@@ -61,7 +61,6 @@ public:
 		/// Pipelined:       no
 		AP_DEFAULT,
 
-		// <FS:Beq> Avoid stall in texture fetch due to asset fetching. [Drake]
 		/// Asset fetching policy class.  Used to
 		/// download assets via capability.
 		/// Deep queueing of requests.
@@ -75,7 +74,6 @@ public:
 		/// Request rate:    high
 		/// Pipelined:       yes
 		AP_ASSET,
-		// </FS:Beq>
 
 		/// Texture fetching policy class.  Used to
 		/// download textures via capability or SSA
