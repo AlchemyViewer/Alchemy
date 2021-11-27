@@ -740,6 +740,13 @@ bool LLLandmarksPanel::isActionEnabled(const LLSD& userdata) const
 	}
     else if ("add_landmark" == command_name)
     {
+// [RLVa:KB] - Checked: 2012-02-08 (RLVa-1.4.5) | Added: RLVa-1.4.5
+		if (gRlvHandler.hasBehaviour(RLV_BHVR_SHOWLOC))
+		{
+			return false;
+		}
+// [/RLVa:KB]
+
         if (!is_single_selection)
         {
             return false;
@@ -760,6 +767,13 @@ bool LLLandmarksPanel::isActionEnabled(const LLSD& userdata) const
     }
     else if ("add_landmark_root" == command_name)
     {
+// [RLVa:KB] - Checked: 2012-02-08 (RLVa-1.4.5) | Added: RLVa-1.4.5
+		if (gRlvHandler.hasBehaviour(RLV_BHVR_SHOWLOC))
+		{
+			return false;
+		}
+// [/RLVa:KB]
+
         LLViewerInventoryItem* landmark = LLLandmarkActions::findLandmarkForAgentPos();
         if (landmark)
         {
@@ -810,12 +824,6 @@ bool LLLandmarksPanel::isActionEnabled(const LLSD& userdata) const
 		}
 		return false;
 	}
-// [RLVa:KB] - Checked: 2012-02-08 (RLVa-1.4.5) | Added: RLVa-1.4.5
-	else if("add_landmark" == command_name)
-	{
-		return !gRlvHandler.hasBehaviour(RLV_BHVR_SHOWLOC);
-	}
-// [/RLVa:KB]
 	else
 	{
 		LL_WARNS() << "Unprocessed command has come: " << command_name << LL_ENDL;

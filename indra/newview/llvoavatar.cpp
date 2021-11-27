@@ -1,4 +1,4 @@
-/** 
+﻿/** 
  * @File llvoavatar.cpp
  * @brief Implementation of LLVOAvatar class which is a derivation of LLViewerObject
  *
@@ -3711,7 +3711,14 @@ bool LLVOAvatar::isVisuallyMuted()
 	// * check against the render cost and attachment limits
 	if (!isSelf())
 	{
-		if (mVisuallyMuteSetting == AV_ALWAYS_RENDER)
+// [RLVa:KB] - Checked: RLVa-2.2 (@setcam_avdist)
+		if (isRlvSilhouette())
+		{
+			muted = true;
+		}
+		else if (mVisuallyMuteSetting == AV_ALWAYS_RENDER)
+// [/RLVa:KB]
+//		if (mVisuallyMuteSetting == AV_ALWAYS_RENDER)
 		{
 			muted = false;
 		}
@@ -3728,12 +3735,6 @@ bool LLVOAvatar::isVisuallyMuted()
         {
             muted = true;
         }
-// [RLVa:KB] - Checked: RLVa-2.2 (@setcam_avdist)
-		else if (isRlvSilhouette())
-		{
-			muted = true;
-		}
-// [/RLVa:KB]
 		else 
 		{
 			muted = isTooComplex();
@@ -3782,9 +3783,9 @@ bool LLVOAvatar::isInBuddyList() const
 }
 
 // [RLVa:KB] - Checked: RLVa-2.2 (@setcam_avdist)
-bool LLVOAvatar::isRlvSilhouette()
+bool LLVOAvatar::isRlvSilhouette() const
 {
-	if (!gRlvHandler.hasBehaviour(RLV_BHVR_SETCAM_AVDIST))
+	if (!RlvActions::hasBehaviour(RLV_BHVR_SETCAM_AVDIST))
 		return false;
 
 	static RlvCachedBehaviourModifier<float> s_nSetCamAvDist(RLV_MODIFIER_SETCAM_AVDIST);
@@ -3792,14 +3793,14 @@ bool LLVOAvatar::isRlvSilhouette()
 	const F64 now = LLFrameTimer::getTotalSeconds();
 	if (now >= mCachedRlvSilhouetteUpdateTime)
 	{
-		const F64 SECONDS_BETWEEN_NEARBY_UPDATES = .5f;
+		const F64 SECONDS_BETWEEN_SILHOUETTE_UPDATES = .5f;
 		bool fIsRlvSilhouette = dist_vec_squared(gAgent.getPositionGlobal(), getPositionGlobal()) > s_nSetCamAvDist() * s_nSetCamAvDist();
 		if (fIsRlvSilhouette != mCachedIsRlvSilhouette)
 		{
 			mCachedIsRlvSilhouette = fIsRlvSilhouette;
 			mNeedsImpostorUpdate = TRUE;
 		}
-		mCachedRlvSilhouetteUpdateTime = now + SECONDS_BETWEEN_NEARBY_UPDATES;
+		mCachedRlvSilhouetteUpdateTime = now + SECONDS_BETWEEN_SILHOUETTE_UPDATES;
 	}
 	return mCachedIsRlvSilhouette;
 }
@@ -11244,23 +11245,19 @@ void LLVOAvatar::calcMutedAVColor()
     LLUUID av_id(getID());
 #endif
 
-    if (getVisualMuteSettings() == AV_DO_NOT_RENDER)
+// [RLVa:KB] - Checked: RLVa-2.2 (@setcam_avdist)
+	if (isRlvSilhouette())
+	{
+		new_color = LLColor4::silhouette;
+		change_msg = " not rendered: color is silhouette";
+	}
+    else if (getVisualMuteSettings() == AV_DO_NOT_RENDER)
+// [/RLVa:KB]
+//    if (getVisualMuteSettings() == AV_DO_NOT_RENDER)
     {
-// [RLVa:KB] - Checked: RLVa-2.2 (@setcam_avdist)
-		 if (isRlvSilhouette())
-		 {
-			 new_color = LLColor4::silhouette;
-			 change_msg = " not rendered: color is silhouette";
-		 }
-		 else
-		 {
-// [/RLVa:KB]
-			// explicitly not-rendered avatars are light grey
-			new_color = LLColor4::grey4;
-			change_msg = " not rendered: color is grey4";
-// [RLVa:KB] - Checked: RLVa-2.2 (@setcam_avdist)
-		 }
-// [/RLVa:KB]
+        // explicitly not-rendered avatars are light grey
+        new_color = LLColor4::grey4;
+        change_msg = " not rendered: color is grey4";
     }
     else if (isInMuteList()) // the user blocked them
     {
