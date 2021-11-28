@@ -848,6 +848,19 @@ void LLManipRotate::renderSnapGuides()
 	projected_snap_axis -= projected_vec(projected_snap_axis, constraint_axis);
 	projected_snap_axis.normVec();
 
+	static const LLWString direction_up_text = utf8string_to_wstring(LLTrans::getString("Direction_Up"));
+	static const LLWString direction_down_text = utf8string_to_wstring(LLTrans::getString("Direction_Down"));
+
+	static const LLWString direction_forward_text = utf8string_to_wstring(LLTrans::getString("Direction_Forward"));
+	static const LLWString direction_back_text = utf8string_to_wstring(LLTrans::getString("Direction_Back"));
+	static const LLWString direction_right_text = utf8string_to_wstring(LLTrans::getString("Direction_Right"));
+	static const LLWString direction_left_text = utf8string_to_wstring(LLTrans::getString("Direction_Left"));
+
+	static const LLWString direction_north_text = utf8string_to_wstring(LLTrans::getString("Direction_North"));
+	static const LLWString direction_south_text = utf8string_to_wstring(LLTrans::getString("Direction_South"));
+	static const LLWString direction_east_text = utf8string_to_wstring(LLTrans::getString("Direction_East"));
+	static const LLWString direction_west_text = utf8string_to_wstring(LLTrans::getString("Direction_West"));
+
 	S32 num_rings = mCamEdgeOn ? 2 : 1;
 	for (S32 ring_num = 0; ring_num < num_rings; ring_num++)
 	{
@@ -975,32 +988,32 @@ void LLManipRotate::renderSnapGuides()
 					{
 						if (i == 0)
 						{
-							renderTickText(text_point, mObjectSelection->isAttachment() ? LLTrans::getString("Direction_Forward") : LLTrans::getString("Direction_East"), LLColor4::white);
+							renderTickText(text_point, mObjectSelection->isAttachment() ? direction_forward_text : direction_east_text, LLColor4::white);
 						}
 						else if (i == 16)
 						{
 							if (constraint_axis.mV[VZ] > 0.f)
 							{
-								renderTickText(text_point, mObjectSelection->isAttachment() ? LLTrans::getString("Direction_Left") : LLTrans::getString("Direction_North"), LLColor4::white);
+								renderTickText(text_point, mObjectSelection->isAttachment() ? direction_left_text : direction_north_text, LLColor4::white);
 							}
 							else
 							{
-								renderTickText(text_point, mObjectSelection->isAttachment() ? LLTrans::getString("Direction_Right") : LLTrans::getString("Direction_South"), LLColor4::white);
+								renderTickText(text_point, mObjectSelection->isAttachment() ? direction_right_text : direction_south_text, LLColor4::white);
 							}
 						}
 						else if (i == 32)
 						{
-							renderTickText(text_point, mObjectSelection->isAttachment() ? LLTrans::getString("Direction_Back") : LLTrans::getString("Direction_West"), LLColor4::white);
+							renderTickText(text_point, mObjectSelection->isAttachment() ? direction_back_text : direction_west_text, LLColor4::white);
 						}
 						else
 						{
 							if (constraint_axis.mV[VZ] > 0.f)
 							{
-								renderTickText(text_point, mObjectSelection->isAttachment() ? LLTrans::getString("Direction_Right") : LLTrans::getString("Direction_South"), LLColor4::white);
+								renderTickText(text_point, mObjectSelection->isAttachment() ? direction_right_text : direction_south_text, LLColor4::white);
 							}
 							else
 							{
-								renderTickText(text_point, mObjectSelection->isAttachment() ? LLTrans::getString("Direction_Left") : LLTrans::getString("Direction_North"), LLColor4::white);
+								renderTickText(text_point, mObjectSelection->isAttachment() ? direction_left_text : direction_north_text, LLColor4::white);
 							}
 						}
 					}
@@ -1008,32 +1021,32 @@ void LLManipRotate::renderSnapGuides()
 					{
 						if (i == 0)
 						{
-							renderTickText(text_point, mObjectSelection->isAttachment() ? LLTrans::getString("Direction_Left") : LLTrans::getString("Direction_North"), LLColor4::white);
+							renderTickText(text_point, mObjectSelection->isAttachment() ? direction_left_text : direction_north_text, LLColor4::white);
 						}
 						else if (i == 16)
 						{
 							if (constraint_axis.mV[VX] > 0.f)
 							{
-								renderTickText(text_point, LLTrans::getString("Direction_Up"), LLColor4::white);
+								renderTickText(text_point, direction_up_text, LLColor4::white);
 							}
 							else
 							{
-								renderTickText(text_point, LLTrans::getString("Direction_Down"), LLColor4::white);
+								renderTickText(text_point, direction_down_text, LLColor4::white);
 							}
 						}
 						else if (i == 32)
 						{
-							renderTickText(text_point, mObjectSelection->isAttachment() ? LLTrans::getString("Direction_Right") : LLTrans::getString("Direction_South"), LLColor4::white);
+							renderTickText(text_point, mObjectSelection->isAttachment() ? direction_right_text : direction_south_text, LLColor4::white);
 						}
 						else
 						{
 							if (constraint_axis.mV[VX] > 0.f)
 							{
-								renderTickText(text_point, LLTrans::getString("Direction_Down"), LLColor4::white);
+								renderTickText(text_point, direction_down_text, LLColor4::white);
 							}
 							else
 							{
-								renderTickText(text_point, LLTrans::getString("Direction_Up"), LLColor4::white);
+								renderTickText(text_point, direction_up_text, LLColor4::white);
 							}
 						}
 					}
@@ -1041,32 +1054,32 @@ void LLManipRotate::renderSnapGuides()
 					{
 						if (i == 0)
 						{
-							renderTickText(text_point, LLTrans::getString("Direction_Up"), LLColor4::white);
+							renderTickText(text_point, direction_up_text, LLColor4::white);
 						}
 						else if (i == 16)
 						{
 							if (constraint_axis.mV[VY] > 0.f)
 							{
-								renderTickText(text_point, mObjectSelection->isAttachment() ? LLTrans::getString("Direction_Forward") : LLTrans::getString("Direction_East"), LLColor4::white);
+								renderTickText(text_point, mObjectSelection->isAttachment() ? direction_forward_text : direction_east_text, LLColor4::white);
 							}
 							else
 							{
-								renderTickText(text_point, mObjectSelection->isAttachment() ? LLTrans::getString("Direction_Back") : LLTrans::getString("Direction_West"), LLColor4::white);
+								renderTickText(text_point, mObjectSelection->isAttachment() ? direction_back_text : direction_west_text, LLColor4::white);
 							}
 						}
 						else if (i == 32)
 						{
-							renderTickText(text_point, LLTrans::getString("Direction_Down"), LLColor4::white);
+							renderTickText(text_point, direction_down_text, LLColor4::white);
 						}
 						else
 						{
 							if (constraint_axis.mV[VY] > 0.f)
 							{
-								renderTickText(text_point, mObjectSelection->isAttachment() ? LLTrans::getString("Direction_Back") : LLTrans::getString("Direction_West"), LLColor4::white);
+								renderTickText(text_point, mObjectSelection->isAttachment() ? direction_back_text : direction_west_text, LLColor4::white);
 							}
 							else
 							{
-								renderTickText(text_point, mObjectSelection->isAttachment() ? LLTrans::getString("Direction_Forward") : LLTrans::getString("Direction_East"), LLColor4::white);
+								renderTickText(text_point, mObjectSelection->isAttachment() ? direction_forward_text : direction_east_text, LLColor4::white);
 							}
 						}
 					}
@@ -1162,13 +1175,13 @@ void LLManipRotate::renderSnapGuides()
 			LLVector3 help_text_pos = selection_center_start + (mRadiusMeters * 3.f * offset_dir);
 			const LLFontGL* big_fontp = LLFontGL::getFontSansSerif();
 
-			std::string help_text =  LLTrans::getString("manip_hint1");
+			static const LLWString help_text = utf8str_to_wstring(LLTrans::getString("manip_hint1"));
 			LLColor4 help_text_color = LLColor4::white;
 			help_text_color.mV[VALPHA] = clamp_rescale(mHelpTextTimer.getElapsedTimeF32(), sHelpTextVisibleTime, sHelpTextVisibleTime + sHelpTextFadeTime, line_alpha, 0.f);
-			hud_render_utf8text(help_text, help_text_pos, *big_fontp, LLFontGL::NORMAL, LLFontGL::NO_SHADOW, -0.5f * big_fontp->getWidthF32(help_text), 3.f, help_text_color, false);
-			help_text =  LLTrans::getString("manip_hint2");
+			hud_render_text(help_text, help_text_pos, *big_fontp, LLFontGL::NORMAL, LLFontGL::NO_SHADOW, -0.5f * big_fontp->getWidthF32(help_text.c_str()), 3.f, help_text_color, false);
+			static const LLWString help_text2 = utf8str_to_wstring(LLTrans::getString("manip_hint2"));
 			help_text_pos -= offset_dir * mRadiusMeters * 0.4f;
-			hud_render_utf8text(help_text, help_text_pos, *big_fontp, LLFontGL::NORMAL, LLFontGL::NO_SHADOW, -0.5f * big_fontp->getWidthF32(help_text), 3.f, help_text_color, false);
+			hud_render_text(help_text2, help_text_pos, *big_fontp, LLFontGL::NORMAL, LLFontGL::NO_SHADOW, -0.5f * big_fontp->getWidthF32(help_text2.c_str()), 3.f, help_text_color, false);
 		}
 	}
 }

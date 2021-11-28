@@ -569,13 +569,16 @@ void LLHUDEffectLookAt::render()
 
 			const LLFontGL* fontp = LLFontGL::getFontSansSerif();
 			gGL.pushMatrix();
-			hud_render_utf8text(
-				text, 
+
+			LLWString wstr(utf8str_to_wstring(text));
+
+			hud_render_text(
+				wstr,
 				target + LLVector3(0.f, 0.f, 0.15f),
 				*fontp,
 				LLFontGL::NORMAL, 
 				LLFontGL::NO_SHADOW,
-				-0.5f * fontp->getWidthF32(text), 
+				-0.5f * fontp->getWidthF32(wstr.c_str()),
 				0.0f,
 				(*mAttentions)[mTargetType].mColor, 
 				FALSE

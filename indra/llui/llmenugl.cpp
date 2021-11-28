@@ -1621,7 +1621,7 @@ void LLMenuItemBranchDownGL::draw( void )
 		std::string::size_type offset = upper_case_label.find(getJumpKey());
 		if (offset != std::string::npos)
 		{
-			S32 x_offset = ll_round((F32)getRect().getWidth() / 2.f - getFont()->getWidthF32(mLabel.getString(), 0, S32_MAX) / 2.f);
+			S32 x_offset = ll_round((F32)getRect().getWidth() / 2.f - getFont()->getWidthF32(mLabel.getWString().c_str(), 0, S32_MAX) / 2.f);
 			S32 x_begin = x_offset + getFont()->getWidth(mLabel, 0, offset);
 			S32 x_end = x_offset + getFont()->getWidth(mLabel, 0, offset + 1);
 			gl_line_2d(x_begin, LABEL_BOTTOM_PAD_PIXELS, x_end, LABEL_BOTTOM_PAD_PIXELS);

@@ -1453,13 +1453,13 @@ void LLManipTranslate::renderSnapGuides()
 				LLVector3 help_text_pos = selection_center_start + (snap_offset_meters_up * 3.f * mSnapOffsetAxis);
 				const LLFontGL* big_fontp = LLFontGL::getFontSansSerif();
 
-				std::string help_text = LLTrans::getString("manip_hint1");
+				static const LLWString translate_help_text = utf8str_to_wstring(LLTrans::getString("manip_hint1"));
 				LLColor4 help_text_color = LLColor4::white;
 				help_text_color.mV[VALPHA] = clamp_rescale(mHelpTextTimer.getElapsedTimeF32(), sHelpTextVisibleTime, sHelpTextVisibleTime + sHelpTextFadeTime, line_alpha, 0.f);
-				hud_render_utf8text(help_text, help_text_pos, *big_fontp, LLFontGL::NORMAL, LLFontGL::NO_SHADOW, -0.5f * big_fontp->getWidthF32(help_text), 3.f, help_text_color, false);
-				help_text = LLTrans::getString("manip_hint2");
+				hud_render_text(translate_help_text, help_text_pos, *big_fontp, LLFontGL::NORMAL, LLFontGL::NO_SHADOW, -0.5f * big_fontp->getWidthF32(translate_help_text.c_str()), 3.f, help_text_color, false);
+				static const LLWString translate_help_text2 = utf8str_to_wstring(LLTrans::getString("manip_hint2"));
 				help_text_pos -= LLViewerCamera::getInstanceFast()->getUpAxis() * mSnapOffsetMeters * 0.2f;
-				hud_render_utf8text(help_text, help_text_pos, *big_fontp, LLFontGL::NORMAL, LLFontGL::NO_SHADOW, -0.5f * big_fontp->getWidthF32(help_text), 3.f, help_text_color, false);
+				hud_render_text(translate_help_text2, help_text_pos, *big_fontp, LLFontGL::NORMAL, LLFontGL::NO_SHADOW, -0.5f * big_fontp->getWidthF32(translate_help_text2.c_str()), 3.f, help_text_color, false);
 			}
 		}
 	}

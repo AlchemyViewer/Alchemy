@@ -498,7 +498,7 @@ void LLManip::renderXYZ(const LLVector3 &vec)
     gViewerWindow->setup3DRender();
 }
 
-void LLManip::renderTickText(const LLVector3& pos, const std::string& text, const LLColor4 &color)
+void LLManip::renderTickText(const LLVector3& pos, const LLWString& text, const LLColor4 &color)
 {
 	const LLFontGL* big_fontp = LLFontGL::getFontSansSerif();
 
@@ -519,9 +519,9 @@ void LLManip::renderTickText(const LLVector3& pos, const std::string& text, cons
 	LLColor4 shadow_color = LLColor4::black;
 	shadow_color.mV[VALPHA] = color.mV[VALPHA] * 0.5f;
 	gViewerWindow->setup3DViewport(1, -1);
-	hud_render_utf8text(text, render_pos, *big_fontp, LLFontGL::NORMAL, LLFontGL::NO_SHADOW,  -0.5f * big_fontp->getWidthF32(text), 3.f, shadow_color, mObjectSelection->getSelectType() == SELECT_TYPE_HUD);
+	hud_render_text(text, render_pos, *big_fontp, LLFontGL::NORMAL, LLFontGL::NO_SHADOW,  -0.5f * big_fontp->getWidthF32(text.c_str()), 3.f, shadow_color, mObjectSelection->getSelectType() == SELECT_TYPE_HUD);
 	gViewerWindow->setup3DViewport();
-	hud_render_utf8text(text, render_pos, *big_fontp, LLFontGL::NORMAL, LLFontGL::NO_SHADOW, -0.5f * big_fontp->getWidthF32(text), 3.f, color, mObjectSelection->getSelectType() == SELECT_TYPE_HUD);
+	hud_render_text(text, render_pos, *big_fontp, LLFontGL::NORMAL, LLFontGL::NO_SHADOW, -0.5f * big_fontp->getWidthF32(text.c_str()), 3.f, color, mObjectSelection->getSelectType() == SELECT_TYPE_HUD);
 
 	gGL.popMatrix();
 }
