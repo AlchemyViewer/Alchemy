@@ -173,7 +173,7 @@ mHelpImpl(NULL)
 		LL_ERRS() << "Failure to initialize configuration groups" << LL_ENDL;
 	}
 
-	LLFontGL::sShadowColor = LLUIColorTable::instance().getColor("ColorDropShadow");
+	LLFontGL::sShadowColor = LLColor4U(LLUIColorTable::instance().getColor("ColorDropShadow").get());
 
 	LLUICtrl::CommitCallbackRegistry::Registrar& reg = LLUICtrl::CommitCallbackRegistry::defaultRegistrar();
 

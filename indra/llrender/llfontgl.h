@@ -203,7 +203,7 @@ public:
 	static F32			sCurDepth;
 	static std::vector<std::pair<LLCoordGL, F32> > sOriginStack;
 
-	static LLColor4 sShadowColor;
+	static LLColor4U sShadowColor;
 
 	static F32 sVertDPI;
 	static F32 sHorizDPI;
