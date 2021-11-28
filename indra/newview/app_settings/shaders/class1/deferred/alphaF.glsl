@@ -183,13 +183,17 @@ void main()
 
     vec4 diffuse_srgb = diffuse_tap;
 
-#ifdef FOR_IMPOSTOR
-    vec4 color;
-    color.rgb = diffuse_srgb.rgb;
-    color.a = 1.0;
+    float final_alpha = diffuse_srgb.a;
 
-    float final_alpha = diffuse_srgb.a * vertex_color.a;
+#ifdef USE_VERTEX_COLOR
+    final_alpha *= vertex_color.a;
     diffuse_srgb.rgb *= vertex_color.rgb;
+#endif
+
+    vec3 diffuse_linear = srgb_to_linear(diffuse_srgb.rgb);
+
+#ifdef FOR_IMPOSTOR
+    vec4 color = vec4(diffuse_linear,final_alpha);
 
     // Insure we don't pollute depth with invis pixels in impostor rendering
     //
@@ -199,15 +203,6 @@ void main()
     }
 #else
     vec3 light_dir = (sun_up_factor == 1) ? sun_dir: moon_dir;
-
-    float final_alpha = diffuse_srgb.a;
-
-#ifdef USE_VERTEX_COLOR
-    final_alpha *= vertex_color.a;
-    diffuse_srgb.rgb *= vertex_color.rgb;
-#endif
-
-    vec3 diffuse_linear = srgb_to_linear(diffuse_srgb.rgb);
 
     vec3 sunlit;
     vec3 amblit;
