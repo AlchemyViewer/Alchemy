@@ -1,0 +1,240 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<panel
+ class="shadow_settings"
+ layout="topleft"
+ width="300"
+ height="175"
+ name="shadow_settings">
+  <text
+      follows="left|top"
+      height="15"
+      left="10"
+      top_pad="4"
+      width="60"
+      layout="topleft"
+      tool_tip="Controls which kind of shadows are allowed. Reloads renderer!"
+      value="Shadows: " />
+  <combo_box
+    allow_text_entry="false"
+    tool_tip="Controls which kind of shadows are allowed. Reloads renderer!"
+    control_name="RenderShadowDetail"
+    follows="left|top"
+    height="16"
+    layout="topleft"
+    left="70"
+    max_chars="128"
+    name="shadowtype_combo"
+    top_pad="-16"
+    width="140">
+      <combo_box.item
+        label="None"
+        name="shadowtype_none"
+        value="0" />
+      <combo_box.item
+        label="Sun/Moon"
+        name="shadowtype_sunmoon"
+        value="1" />
+      <combo_box.item
+        label="Sun/Moon + Projectors"
+        name="shadowtype_proj"
+        value="2" />
+    </combo_box>
+  <text
+    follows="left|top"
+    height="15"
+    left="30"
+    top_pad="4"
+    width="90"
+    layout="topleft"
+    tool_tip="Controls how detailed shadows are. Settings above 'Medium' are extremely demanding!"
+    value="Shadow Quality: " />
+  <combo_box
+    allow_text_entry="false"
+    tool_tip="Controls how detailed shadows are. Settings above 'Medium' are extremely demanding!"
+    control_name="RenderShadowResolutionScale"
+    follows="left|top"
+    height="16"
+    layout="topleft"
+    left="130"
+    max_chars="128"
+    name="shadowquality_combo"
+    top_pad="-16"
+    width="80">
+      <combo_box.item
+        label="Low"
+        name="shadow_low"
+        value="0.5" />
+      <combo_box.item
+        label="Medium"
+        name="shadow_med"
+        value="1.0" />
+      <combo_box.item
+        label="High"
+        name="shadow_high"
+        value="2" />
+      <combo_box.item
+        label="Very High"
+        name="shadow_vhigh"
+        value="3.0" />
+      <combo_box.item
+        label="Ultra"
+        name="shadow_ultra"
+        value="4.0" />
+  </combo_box>
+  <text
+    follows="left|top"
+    height="15"
+    left="30"
+    top_pad="4"
+    width="130"
+    layout="topleft"
+    tool_tip="Reduces self-shadowing errors by ignoring faces too close to the shadow's origins. Smaller values allow more fine/accurate shadows at the cost of more shadow errors."
+    value="Shadow Bias:" />
+  <slider_bar
+    top_pad="-18"
+    height="20"
+    increment=".001"
+    follows="left|top|right"
+    layout="topleft"
+    max_val="0"
+    min_val="-0.01"
+    left="140"
+    right="-68"
+    name="shadow_bias_slider"
+    tool_tip="Reduces self-shadowing errors by ignoring faces too close to the shadow's origins. Smaller values allow more fine/accurate shadows at the cost of more shadow errors."
+    control_name="RenderShadowBias"/>
+  <spinner
+    top_pad="-20"
+    height="15"
+    label_width="0"
+    right="-8"
+    decimal_digits="3"
+    follows="top|right"
+    layout="topleft"
+    max_val="0"
+    min_val="-0.01"
+    width="55"
+    increment=".001"
+    name="shadow_bias_spinner"
+    tool_tip="Reduces self-shadowing errors by ignoring faces too close to the shadow's origins. Smaller values allow more fine/accurate shadows at the cost of more shadow errors."
+    control_name="RenderShadowBias"/>
+  <text
+    follows="left|top"
+    height="15"
+    left="30"
+    top_pad="8"
+    width="130"
+    layout="topleft"
+    tool_tip="Used to reduce shadow errors by offsetting the entire shadowmap. Smaller values allow more accurate shadows and less light bleed from thin objects at the cost of possible shadow errors at extreme angles from source."
+    value="Shadow Offset:" />
+  <slider_bar
+    top_pad="-18"
+    height="20"
+    increment=".001"
+    follows="left|top|right"
+    layout="topleft"
+    max_val="0.05"
+    min_val="0"
+    left="140"
+    right="-68"
+    name="shadow_offset_slider"
+    tool_tip="Used to reduce shadow errors by offsetting the entire shadowmap. Smaller values allow more accurate shadows and less light bleed from thin objects at the cost of possible shadow errors at extreme angles from source."
+    control_name="RenderShadowOffset"/>
+  <spinner
+    top_pad="-20"
+    height="15"
+    label_width="0"
+    right="-8"
+    decimal_digits="3"
+    follows="top|right"
+    layout="topleft"
+    max_val="0.05"
+    min_val="0.0"
+    width="55"
+    increment=".001"
+    name="shadow_offset_spinner"
+    tool_tip="Used to reduce shadow errors by offsetting the entire shadowmap. Smaller values allow more accurate shadows and less light bleed from thin objects at the cost of possible shadow errors at extreme angles from source."
+    control_name="RenderShadowOffset"/>
+  <text
+    follows="left|top"
+    height="15"
+    left="30"
+    top_pad="8"
+    width="130"
+    layout="topleft"
+    tool_tip="Controls both Shadow and SSAO blurring. Low values may cause SSAO noise to become apparent."
+    value="Shadow Blur:" />
+  <slider_bar
+    top_pad="-18"
+    height="20"
+    increment=".1"
+    follows="left|top|right"
+    layout="topleft"
+    max_val="5.0"
+    min_val="0"
+    left="140"
+    right="-68"
+    name="shadow_blur_slider"
+    tool_tip="Controls both Shadow and SSAO blurring. Low values may cause SSAO noise to become apparent."
+    control_name="RenderShadowBlurSize"/>
+  <spinner
+    top_pad="-20"
+    height="15"
+    label_width="0"
+    right="-8"
+    decimal_digits="1"
+    follows="top|right"
+    layout="topleft"
+    max_val="5.0"
+    min_val="0.0"
+    width="55"
+    increment=".1"
+    name="shadow_blur_spinner"
+    tool_tip="Controls both Shadow and SSAO blurring. Low values may cause SSAO noise to become apparent."
+    control_name="RenderShadowBlurSize"/>
+  <text
+    follows="left|top"
+    height="15"
+    left="30"
+    top_pad="8"
+    width="130"
+    layout="topleft"
+    tool_tip="Controls how far away from the camera should blurring occur. Larger values reduce blur near the camera. Try using this for shadow sharpening if you encounter SSAO noise when lowering Shadow Blur!"
+    value="Blur Distance:" />
+  <slider_bar
+    top_pad="-18"
+    height="20"
+    increment=".1"
+    follows="left|top|right"
+    layout="topleft"
+    max_val="3.0"
+    min_val="0"
+    left="140"
+    right="-68"
+    name="shadow_blurdist_slider"
+    tool_tip="Controls how far away from the camera should blurring occur. Larger values reduce blur near the camera. Try using this for shadow sharpening if you encounter SSAO noise when lowering Shadow Blur!"
+    control_name="RenderShadowBlurDistFactor"/>
+  <spinner
+    top_pad="-20"
+    height="15"
+    label_width="0"
+    right="-8"
+    decimal_digits="1"
+    follows="top|right"
+    layout="topleft"
+    max_val="3.0"
+    min_val="0.0"
+    width="55"
+    increment=".1"
+    name="shadow_blurdist_spinner"
+    tool_tip="Controls how far away from the camera should blurring occur. Larger values reduce blur near the camera. Try using this for shadow sharpening if you encounter SSAO noise when lowering Shadow Blur!"
+    control_name="RenderShadowBlurDistFactor"/>
+  <panel
+				label="SSAO"
+				name="ssao_panel"
+				class="ssao_panel"
+				filename="panel_lightbox_ssao.xml"
+				layout="topleft"
+				follows="left|top"
+        left="0"/>
+</panel>
