@@ -202,15 +202,17 @@ void renderBadgeBackground(F32 centerX, F32 centerY, F32 width, F32 height, cons
 						ll_round(x) + width,
 						ll_round(y) + height);
 	
-	LLVector4a vertices[4];
-	vertices[0].set(screen_rect.mRight, screen_rect.mTop,    1.0f);
-	vertices[1].set(screen_rect.mLeft,  screen_rect.mTop,    1.0f);
-	vertices[2].set(screen_rect.mLeft,  screen_rect.mBottom, 1.0f);
-	vertices[3].set(screen_rect.mRight, screen_rect.mBottom, 1.0f);
+	LLVector4a vertices[6];
+	vertices[0].set(screen_rect.mLeft, screen_rect.mTop, 1.0f);
+	vertices[1].set(screen_rect.mLeft, screen_rect.mBottom, 1.0f);
+	vertices[2].set(screen_rect.mRight, screen_rect.mTop, 1.0f);
+	vertices[3].set(screen_rect.mRight, screen_rect.mTop, 1.0f);
+	vertices[4].set(screen_rect.mLeft, screen_rect.mBottom, 1.0f);
+	vertices[5].set(screen_rect.mRight, screen_rect.mBottom, 1.0f);
 	
-	gGL.begin(LLRender::QUADS);
+	gGL.begin(LLRender::TRIANGLES);
 	{
-		gGL.vertexBatchPreTransformed(vertices, 4);
+		gGL.vertexBatchPreTransformed(vertices, 6);
 	}
 	gGL.end();
 	gGL.setSceneBlendType(LLRender::BT_ALPHA);
@@ -361,7 +363,7 @@ void LLBadge::draw()
 							mLabelColor % alpha,
 							LLFontGL::HCENTER, LLFontGL::VCENTER, // centered around the position
 							LLFontGL::NORMAL, // normal text (not bold, italics, etc.)
-							LLFontGL::DROP_SHADOW_SOFT,
+							LLFontGL::DROP_SHADOW,
 							badge_char_length, badge_pixel_length,
 							right_position_out, do_not_use_ellipses);
 		}

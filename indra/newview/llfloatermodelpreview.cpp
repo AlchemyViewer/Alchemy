@@ -744,7 +744,7 @@ void LLFloaterModelPreview::draw3dPreview()
 
 	gGL.getTexUnit(0)->bind(mModelPreview);
 
-	gGL.begin( LLRender::QUADS );
+	gGL.begin(LLRender::TRIANGLES);
 	{
 		gGL.texCoord2f(0.f, 1.f);
 		gGL.vertex2i(mPreviewRect.mLeft+1, mPreviewRect.mTop-1);
@@ -752,8 +752,12 @@ void LLFloaterModelPreview::draw3dPreview()
 		gGL.vertex2i(mPreviewRect.mLeft+1, mPreviewRect.mBottom+1);
 		gGL.texCoord2f(1.f, 0.f);
 		gGL.vertex2i(mPreviewRect.mRight-1, mPreviewRect.mBottom+1);
+		gGL.texCoord2f(1.f, 0.f);
+		gGL.vertex2i(mPreviewRect.mRight - 1, mPreviewRect.mBottom + 1);
 		gGL.texCoord2f(1.f, 1.f);
 		gGL.vertex2i(mPreviewRect.mRight-1, mPreviewRect.mTop-1);
+		gGL.texCoord2f(0.f, 1.f);
+		gGL.vertex2i(mPreviewRect.mLeft + 1, mPreviewRect.mTop - 1);
 	}
 	gGL.end();
 
