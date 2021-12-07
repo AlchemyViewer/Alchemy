@@ -139,10 +139,8 @@ void LLViewerJointAttachment::setupDrawable(LLViewerObject *object)
 	}
 
 	LLViewerObject::const_child_list_t& child_list = object->getChildren();
-	for (LLViewerObject::child_list_t::const_iterator iter = child_list.begin();
-		 iter != child_list.end(); ++iter)
+	for (LLViewerObject* childp  : child_list)
 	{
-		LLViewerObject* childp = *iter;
 		if (childp && childp->mDrawable.notNull())
 		{
 			childp->mDrawable->setState(LLDrawable::USE_BACKLIGHT);
