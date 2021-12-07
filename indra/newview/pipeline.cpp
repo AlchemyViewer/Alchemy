@@ -9290,6 +9290,7 @@ void LLPipeline::renderDeferredLighting(LLRenderTarget *screen_target)
 	{
 		gGL.setColorMask(true, true);
 		mALRenderUtil->renderTonemap(&mHDRScreen, screen_target);
+		gGL.setColorMask(true, false);
 	}
 
     screen_target->bindTarget();

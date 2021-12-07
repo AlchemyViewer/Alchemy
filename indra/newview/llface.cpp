@@ -593,6 +593,8 @@ void LLFace::renderSelected(LLViewerTexture *imagep, const LLColor4& color)
 			gGL.multMatrix(*model_matrix);
 		}
 
+		gGL.diffuseColor4fv(color.mV);
+
 		if (mDrawablep->isState(LLDrawable::RIGGED))
 		{
 			LLVOVolume* volume = mDrawablep->getVOVolume();
