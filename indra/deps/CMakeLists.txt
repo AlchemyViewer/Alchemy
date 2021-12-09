@@ -33,7 +33,7 @@ endif()
 FetchContent_Declare(
   meshoptimizer
   GIT_REPOSITORY https://git.alchemyviewer.org/alchemy/mirrors/meshoptimizer.git
-  GIT_TAG        v0.16
+  GIT_TAG        v0.17
   )
 # FetchContent_Declare(
 #   Catch2
