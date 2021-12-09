@@ -487,7 +487,7 @@ void LLToolTipMgr::show(const LLToolTip::Params& params)
 
 	// fill in default tooltip params from tool_tip.xml
 	LLToolTip::Params params_with_defaults(params);
-	params_with_defaults.fillFrom(LLUICtrlFactory::instanceFast().getDefaultParams<LLToolTip>());
+	params_with_defaults.fillFrom(LLUICtrlFactory::getDefaultParams<LLToolTip>());
 	if (!params_with_defaults.validateBlock()) 
 	{
 		LL_WARNS() << "Could not display tooltip!" << LL_ENDL;

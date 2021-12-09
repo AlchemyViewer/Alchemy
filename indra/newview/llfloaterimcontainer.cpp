@@ -322,7 +322,7 @@ void LLFloaterIMContainer::addFloater(LLFloater* floaterp,
 	{
 		LLGroupIconCtrl::Params icon_params;
 		icon_params.group_id = session_id;
-		icon = LLUICtrlFactory::instance().create<LLGroupIconCtrl>(icon_params);
+		icon = LLUICtrlFactory::create<LLGroupIconCtrl>(icon_params);
 		icon_id = session_id;
 
 		mSessions[session_id] = floaterp;
@@ -334,7 +334,7 @@ void LLFloaterIMContainer::addFloater(LLFloater* floaterp,
 
 		LLAvatarIconCtrl::Params icon_params;
 		icon_params.avatar_id = avatar_id;
-		icon = LLUICtrlFactory::instance().create<LLAvatarIconCtrl>(icon_params);
+		icon = LLUICtrlFactory::create<LLAvatarIconCtrl>(icon_params);
 		icon_id = avatar_id;
 
 		mSessions[session_id] = floaterp;

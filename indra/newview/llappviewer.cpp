@@ -544,7 +544,7 @@ bool	create_text_segment_icon_from_url_match(LLUrlMatch* match,LLTextBase* base)
 		icon_params.group_id = match_id;
 		icon_params.rect = LLRect(0, 16, 16, 0);
 		icon_params.visible = true;
-		icon = LLUICtrlFactory::instance().create<LLGroupIconCtrl>(icon_params);
+		icon = LLUICtrlFactory::create<LLGroupIconCtrl>(icon_params);
 	}
 	else
 	{
@@ -552,7 +552,7 @@ bool	create_text_segment_icon_from_url_match(LLUrlMatch* match,LLTextBase* base)
 		icon_params.avatar_id = match_id;
 		icon_params.rect = LLRect(0, 16, 16, 0);
 		icon_params.visible = true;
-		icon = LLUICtrlFactory::instance().create<LLAvatarIconCtrl>(icon_params);
+		icon = LLUICtrlFactory::create<LLAvatarIconCtrl>(icon_params);
 	}
 
 	LLInlineViewSegment::Params params;

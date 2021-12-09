@@ -2650,7 +2650,7 @@ void LLLineEditor::showContextMenu(S32 x, S32 y)
 	if (!menu)
 	{
 		llassert(LLMenuGL::sMenuContainer != NULL);
-		menu = LLUICtrlFactory::instance().createFromFile<LLContextMenu>
+		menu = LLUICtrlFactory::createFromFile<LLContextMenu>
 			("menu_text_editor.xml",
 				LLMenuGL::sMenuContainer,
 				LLMenuHolderGL::child_registry_t::instance());
