@@ -394,9 +394,16 @@ std::string LLAppViewerMacOSX::generateSerialNumber()
 
 	// JC: Sample code from http://developer.apple.com/technotes/tn/tn1103.html
 	CFStringRef serialNumber = NULL;
-    io_service_t    platformExpert = IOServiceGetMatchingService(kIOMainPortDefault,
-																 IOServiceMatching("IOPlatformExpertDevice"));
-	if (platformExpert)
+    io_service_t platformExpert = NULL;
+    if (__builtin_available(macOS 12.0, *)) {
+        platformExpert = IOServiceGetMatchingService(kIOMainPortDefault,
+                                                                     IOServiceMatching("IOPlatformExpertDevice"));
+    } else {
+        platformExpert = IOServiceGetMatchingService(kIOMasterPortDefault,
+                                                                     IOServiceMatching("IOPlatformExpertDevice"));
+    }
+    
+    if (platformExpert)
     {
 		serialNumber = (CFStringRef) IORegistryEntryCreateCFProperty(platformExpert,
 																	 CFSTR(kIOPlatformSerialNumberKey),

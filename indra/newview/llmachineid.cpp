@@ -350,8 +350,15 @@ bool LLWMIMethods::getGenericSerialNumber(const BSTR &select, const LPCWSTR &var
 bool getSerialNumber(unsigned char *unique_id, size_t len)
 {
     CFStringRef serial_cf_str = NULL;
-    io_service_t platformExpert = IOServiceGetMatchingService(kIOMainPortDefault,
-                                                                 IOServiceMatching("IOPlatformExpertDevice"));
+    io_service_t platformExpert = NULL;
+    if (__builtin_available(macOS 12.0, *)) {
+        platformExpert = IOServiceGetMatchingService(kIOMainPortDefault,
+                                                                  IOServiceMatching("IOPlatformExpertDevice"));
+    } else {
+        platformExpert = IOServiceGetMatchingService(kIOMasterPortDefault,
+                                                                  IOServiceMatching("IOPlatformExpertDevice"));
+    }
+    
     if (platformExpert)
     {
         serial_cf_str = (CFStringRef) IORegistryEntryCreateCFProperty(platformExpert,
