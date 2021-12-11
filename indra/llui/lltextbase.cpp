@@ -1477,7 +1477,7 @@ void LLTextBase::replaceWithSuggestion(U32 index)
 			deselect();
 			// Insert the suggestion in its place
 			LLWString suggestion = utf8str_to_wstring(mSuggestionList[index]);
-			insertStringNoUndo(it->first, utf8str_to_wstring(mSuggestionList[index]));
+			insertStringNoUndo(it->first, suggestion);
 
 			// Delete the misspelled word
 			removeStringNoUndo(it->first + (S32)suggestion.length(), it->second - it->first);

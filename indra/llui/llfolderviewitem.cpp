@@ -138,7 +138,7 @@ LLFolderViewItem::LLFolderViewItem(const LLFolderViewItem::Params& p)
 	mItemHeight(p.item_height),
 	mControlLabelRotation(0.f),
 	mDragAndDropTarget(FALSE),
-	mLabel(p.name),
+	mLabel(utf8str_to_wstring(p.name)),
 	mRoot(p.root),
 	mViewModelItem(p.listener),
 	mIsMouseOverTitle(false),
@@ -185,7 +185,7 @@ BOOL LLFolderViewItem::postBuild()
     LLFolderViewModelItem& vmi = *getViewModelItem();
     // getDisplayName() is expensive (due to internal getLabelSuffix() and name building)
     // it also sets search strings so it requires a filter reset
-    mLabel = vmi.getDisplayName();
+    mLabel = utf8str_to_wstring(vmi.getDisplayName());
     setToolTip(vmi.getName());
 
     // Dirty the filter flag of the model from the view (CHUI-849)
@@ -297,7 +297,7 @@ void LLFolderViewItem::refresh()
 {
     LLFolderViewModelItem& vmi = *getViewModelItem();
 
-    mLabel = vmi.getDisplayName();
+    mLabel = utf8str_to_wstring(vmi.getDisplayName());
     setToolTip(vmi.getName());
     // icons are slightly expensive to get, can be optimized
     // see LLInventoryIcon::getIcon()
@@ -310,7 +310,7 @@ void LLFolderViewItem::refresh()
         // Very Expensive!
         // Can do a number of expensive checks, like checking active motions, wearables or friend list
         mLabelStyle = vmi.getLabelStyle();
-        mLabelSuffix = vmi.getLabelSuffix();
+        mLabelSuffix = utf8str_to_wstring(vmi.getLabelSuffix());
     }
 
     // Dirty the filter flag of the model from the view (CHUI-849)
@@ -335,7 +335,7 @@ void LLFolderViewItem::refreshSuffix()
         // Very Expensive!
         // Can do a number of expensive checks, like checking active motions, wearables or friend list
         mLabelStyle = vmi->getLabelStyle();
-        mLabelSuffix = vmi->getLabelSuffix();
+        mLabelSuffix = utf8str_to_wstring(vmi->getLabelSuffix());
 	}
 
     mLabelWidthDirty = true;
@@ -396,7 +396,7 @@ S32 LLFolderViewItem::arrange( S32* width, S32* height )
             // it is purely visual, so it is fine to do at our laisure
             refreshSuffix();
         }
-		mLabelWidth = getLabelXPos() + getLabelFontForStyle(mLabelStyle)->getWidth(mLabel) + getLabelFontForStyle(mLabelStyle)->getWidth(mLabelSuffix) + mLabelPaddingRight; 
+		mLabelWidth = getLabelXPos() + getLabelFontForStyle(mLabelStyle)->getWidth(mLabel.c_str()) + getLabelFontForStyle(mLabelStyle)->getWidth(mLabelSuffix.c_str()) + mLabelPaddingRight; 
 		mLabelWidthDirty = false;
 	}
 
@@ -872,7 +872,7 @@ void LLFolderViewItem::drawLabel(const LLFontGL * font, const F32 x, const F32 y
     //--------------------------------------------------------------------------------//
     // Draw the actual label text
     //
-    font->renderUTF8(mLabel, 0, x, y, color,
+    font->render(mLabel, 0, x, y, color,
         LLFontGL::LEFT, LLFontGL::BOTTOM, LLFontGL::NORMAL, LLFontGL::NO_SHADOW,
         S32_MAX, getRect().getWidth() - (S32) x - mLabelPaddingRight, &right_x, TRUE);
 }
@@ -923,12 +923,12 @@ void LLFolderViewItem::draw()
 	F32 right_x  = 0;
 	F32 y = (F32)getRect().getHeight() - font->getLineHeight() - (F32)mTextPad - (F32)TOP_PAD;
 	F32 text_left = (F32)getLabelXPos();
-	std::string combined_string = mLabel + mLabelSuffix;
+	LLWString combined_string = mLabel + mLabelSuffix;
 
 	if (filter_string_length > 0)
 	{
-		S32 left = ll_round(text_left) + font->getWidth(combined_string, 0, mViewModelItem->getFilterStringOffset()) - 2;
-		S32 right = left + font->getWidth(combined_string, mViewModelItem->getFilterStringOffset(), filter_string_length) + 2;
+		S32 left = ll_round(text_left) + font->getWidth(combined_string.c_str(), 0, mViewModelItem->getFilterStringOffset()) - 2;
+		S32 right = left + font->getWidth(combined_string.c_str(), mViewModelItem->getFilterStringOffset(), filter_string_length) + 2;
 		S32 bottom = llfloor(getRect().getHeight() - font->getLineHeight() - 3 - TOP_PAD);
 		S32 top = getRect().getHeight() - TOP_PAD;
 
@@ -951,7 +951,7 @@ void LLFolderViewItem::draw()
 	//
 	if (!mLabelSuffix.empty())
 	{
-		font->renderUTF8( mLabelSuffix, 0, right_x, y, isFadeItem() ? color : (LLColor4)sSuffixColor,
+		font->render( mLabelSuffix, 0, right_x, y, isFadeItem() ? color : (LLColor4)sSuffixColor,
 						  LLFontGL::LEFT, LLFontGL::BOTTOM, LLFontGL::NORMAL, LLFontGL::NO_SHADOW,
 						  S32_MAX, S32_MAX, &right_x, FALSE );
 	}
@@ -962,9 +962,9 @@ void LLFolderViewItem::draw()
     if (filter_string_length > 0)
     {
         S32 filter_offset = mViewModelItem->getFilterStringOffset();
-        F32 match_string_left = text_left + font->getWidthF32(combined_string, 0, filter_offset + filter_string_length) - font->getWidthF32(combined_string, filter_offset, filter_string_length);
+        F32 match_string_left = text_left + font->getWidthF32(combined_string.c_str(), 0, filter_offset + filter_string_length) - font->getWidthF32(combined_string.c_str(), filter_offset, filter_string_length);
         F32 yy = (F32)getRect().getHeight() - font->getLineHeight() - (F32)mTextPad - (F32)TOP_PAD;
-        font->renderUTF8( combined_string, filter_offset, match_string_left, yy,
+        font->render( combined_string, filter_offset, match_string_left, yy,
             sFilterTextColor, LLFontGL::LEFT, LLFontGL::BOTTOM, LLFontGL::NORMAL, LLFontGL::NO_SHADOW,
             filter_string_length, S32_MAX, &right_x, FALSE );
     }
