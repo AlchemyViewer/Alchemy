@@ -36,12 +36,6 @@
 
 #include "llapr.h"
 
-//virtual 
-LLPluginProcessParentOwner::~LLPluginProcessParentOwner()
-{
-	
-}
-
 bool LLPluginProcessParent::sUseReadThread = false;
 apr_pollset_t *LLPluginProcessParent::sPollSet = NULL;
 bool LLPluginProcessParent::sPollsetNeedsRebuild = false;

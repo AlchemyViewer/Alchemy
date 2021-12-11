@@ -44,7 +44,7 @@ public:
 	virtual void onCompleted(LLCore::HttpHandle handle, LLCore::HttpResponse * response);
 	
 protected:
-    LLHttpSDHandler();
+    LLHttpSDHandler() = default;
 
 	virtual void onSuccess(LLCore::HttpResponse * response, const LLSD &content) = 0;
 	virtual void onFailure(LLCore::HttpResponse * response, LLCore::HttpStatus status) = 0;

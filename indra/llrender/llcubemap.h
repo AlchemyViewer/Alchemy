@@ -75,7 +75,7 @@ public:
 
 protected:
 	friend class LLTexUnit;
-	~LLCubeMap();
+	~LLCubeMap() = default;
 	LLGLenum mTargets[6];
 	LLPointer<LLImageGL> mImages[6];
 	LLPointer<LLImageRaw> mRawImages[6];

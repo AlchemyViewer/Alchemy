@@ -33,7 +33,7 @@ class LLTransferSourceParamsFile : public LLTransferSourceParams
 {
 public:
 	LLTransferSourceParamsFile();
-	virtual ~LLTransferSourceParamsFile() {}
+	virtual ~LLTransferSourceParamsFile() = default;
 	/*virtual*/ void packParams(LLDataPacker &dp) const;
 	/*virtual*/ BOOL unpackParams(LLDataPacker &dp);
 

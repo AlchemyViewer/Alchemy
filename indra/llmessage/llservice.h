@@ -160,8 +160,8 @@ protected:
 	// deal with construction and not a public method. How that
 	// construction takes place will be handled by the service
 	// creators.
-	LLService();
-	virtual ~LLService();
+	LLService() = default;
+	virtual ~LLService() = default;
 
 protected:
 	// This frame timer records how long this service has

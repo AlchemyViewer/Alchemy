@@ -26,9 +26,6 @@
 
 #include "../llviewershadermgr.h"
 
-LLShaderMgr::LLShaderMgr() {}
-LLShaderMgr::~LLShaderMgr() {}
-
 LLViewerShaderMgr::LLViewerShaderMgr() {}
 LLViewerShaderMgr::~LLViewerShaderMgr() {}
 

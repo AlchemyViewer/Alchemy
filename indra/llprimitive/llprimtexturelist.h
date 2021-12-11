@@ -54,7 +54,7 @@ public:
 	static void setNewTextureEntryCallback( LLTextureEntry* (*callback)() );
 	static LLTextureEntry* (*sNewTextureEntryCallback)(); 
 
-	LLPrimTextureList();
+	LLPrimTextureList() = default;
 	virtual ~LLPrimTextureList();
 
 	void clear();

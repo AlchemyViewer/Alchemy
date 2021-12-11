@@ -337,11 +337,7 @@ struct HttpStatus
 
 	~HttpStatus() = default;
 
-	HttpStatus & operator=(const HttpStatus & rhs)
-	{
-        mDetails = rhs.mDetails;
-		return *this;
-	}
+	HttpStatus & operator=(const HttpStatus & rhs) = default;
 
     HttpStatus & clone(const HttpStatus &rhs)
     {

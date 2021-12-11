@@ -318,10 +318,6 @@ LLGLSLShader::LLGLSLShader()
     
 }
 
-LLGLSLShader::~LLGLSLShader()
-{
-}
-
 void LLGLSLShader::unload()
 {
     mShaderFiles.clear();

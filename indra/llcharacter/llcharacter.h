@@ -47,7 +47,7 @@ class LLPolyMesh;
 class LLPauseRequestHandle : public LLThreadSafeRefCount
 {
 public:
-	LLPauseRequestHandle() {};
+	LLPauseRequestHandle() = default;
 };
 
 typedef LLPointer<LLPauseRequestHandle> LLAnimPauseRequest;

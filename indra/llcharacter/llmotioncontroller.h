@@ -58,7 +58,7 @@ class LLMotionRegistry
 {
 public:
 	// Constructor
-	LLMotionRegistry();
+	LLMotionRegistry() = default;
 
 	// Destructor
 	~LLMotionRegistry();

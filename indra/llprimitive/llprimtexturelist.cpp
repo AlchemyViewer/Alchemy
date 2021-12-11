@@ -54,10 +54,6 @@ LLTextureEntry* LLPrimTextureList::newTextureEntry()
 	return (*sNewTextureEntryCallback)();
 }
 
-LLPrimTextureList::LLPrimTextureList()
-{
-}
-
 // virtual 
 LLPrimTextureList::~LLPrimTextureList()
 {

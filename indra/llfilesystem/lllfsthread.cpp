@@ -150,10 +150,6 @@ LLLFSThread::Request::Request(LLLFSThread* thread,
 	}
 }
 
-LLLFSThread::Request::~Request()
-{
-}
-
 // virtual, called from own thread
 void LLLFSThread::Request::finishRequest(bool completed)
 {
@@ -234,12 +230,6 @@ bool LLLFSThread::Request::processRequest()
 		LL_ERRS() << "LLLFSThread::unknown operation: " << (S32)mOperation << LL_ENDL;
 	}
 	return complete;
-}
-
-//============================================================================
-
-LLLFSThread::Responder::~Responder()
-{
 }
 
 //============================================================================

@@ -63,10 +63,6 @@ LLUserOperation::LLUserOperation() :
 {
 }
 
-LLUserOperation::~LLUserOperation()
-{
-}
-
 void LLUserOperation::SetNoExpireFlag(const BOOL flag)
 {
 	mNoExpire = flag;
@@ -90,11 +86,6 @@ void LLUserOperation::expire()
 ///----------------------------------------------------------------------------
 /// Class LLUserOperationMgr
 ///----------------------------------------------------------------------------
-
-LLUserOperationMgr::LLUserOperationMgr()
-{
-}
-
 
 LLUserOperationMgr::~LLUserOperationMgr()
 {

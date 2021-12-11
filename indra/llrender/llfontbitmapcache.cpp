@@ -42,10 +42,6 @@ LLFontBitmapCache::LLFontBitmapCache()
 {
 }
 
-LLFontBitmapCache::~LLFontBitmapCache()
-{
-}
-
 void LLFontBitmapCache::init(S32 num_components,
 							 S32 max_char_width,
 							 S32 max_char_height)

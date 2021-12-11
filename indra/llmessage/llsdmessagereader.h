@@ -40,7 +40,7 @@ class LLSDMessageReader final : public LLMessageReader
 public:
 
 	LLSDMessageReader();
-	virtual ~LLSDMessageReader();
+	virtual ~LLSDMessageReader() = default;
 
 	/** All get* methods expect pointers to canonical strings. */
 	virtual void getBinaryData(const char *block, const char *var, 

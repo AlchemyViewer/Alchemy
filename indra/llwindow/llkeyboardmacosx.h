@@ -42,7 +42,7 @@ class LLKeyboardMacOSX : public LLKeyboard
 {
 public:
 	LLKeyboardMacOSX();
-	/*virtual*/ ~LLKeyboardMacOSX() {};
+	/*virtual*/ ~LLKeyboardMacOSX() = default;
 	
 	/*virtual*/ BOOL	handleKeyUp(const U32 key, MASK mask);
 	/*virtual*/ BOOL	handleKeyDown(const U32 key, MASK mask);

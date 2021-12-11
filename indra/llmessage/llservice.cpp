@@ -30,14 +30,6 @@
 
 LLService::creators_t LLService::sCreatorFunctors;
 
-LLService::LLService()
-{
-}
-
-LLService::~LLService()
-{
-}
-
 // static
 bool LLService::registerCreator(const std::string& name, creator_t fn)
 {

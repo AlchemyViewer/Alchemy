@@ -36,10 +36,6 @@
 #include "direct.h"	// needed for _chdir()
 #endif
 
-/** Virtual destructor. */
-LLPluginInstanceMessageListener::~LLPluginInstanceMessageListener()
-{
-}
 
 /** 
  * TODO:DOC describe how it's used

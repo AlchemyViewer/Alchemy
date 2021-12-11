@@ -38,7 +38,7 @@ class LLUserOperation
 public:
 	LLUserOperation(const LLUUID& agent_id);
 	LLUserOperation(const LLUUID& agent_id, const LLUUID& transaction_id);
-	virtual ~LLUserOperation();
+	virtual ~LLUserOperation() = default;
 
 	const LLUUID& getTransactionID() const { return mTransactionID; }
 	const LLUUID& getAgentID() const { return mAgentID; }
@@ -75,7 +75,7 @@ protected:
 class LLUserOperationMgr
 {
 public:
-	LLUserOperationMgr();
+	LLUserOperationMgr() = default;
 	~LLUserOperationMgr();
 
 	void addOperation(LLUserOperation* op);

@@ -90,7 +90,7 @@ private:
 	public:
 
 		static LLPointer<Response> create(LLHTTPPipe* pipe);
-		virtual ~Response();
+		virtual ~Response() = default;
 
 		// from LLHTTPNode::Response
 		virtual void result(const LLSD&);
@@ -321,11 +321,6 @@ LLPointer<LLHTTPPipe::Response> LLHTTPPipe::Response::create(LLHTTPPipe* pipe)
 	return result;
 }
 
-// virtual
-LLHTTPPipe::Response::~Response()
-{
-}
-
 void LLHTTPPipe::Response::nullPipe()
 {
 	mPipe = NULL;
@@ -429,7 +424,7 @@ class LLHTTPResponseHeader : public LLIOPipe
 {
 public:
 	LLHTTPResponseHeader() : mCode(0) {}
-	virtual ~LLHTTPResponseHeader() {}
+	virtual ~LLHTTPResponseHeader() = default;
 
 protected:
 	/* @name LLIOPipe virtual implementations

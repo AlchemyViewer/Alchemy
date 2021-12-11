@@ -169,11 +169,6 @@ LLTransferTargetChannel *LLTransferManager::getTargetChannel(const LLHost &host,
 	return tcp->getTargetChannel(type);
 }
 
-// virtual
-LLTransferSourceParams::~LLTransferSourceParams()
-{ }
-
-
 LLTransferSource *LLTransferManager::findTransferSource(const LLUUID &transfer_id)
 {
 	// This linear traversal could screw us later if we do lots of

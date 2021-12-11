@@ -338,7 +338,3 @@ LLBufferStream::LLBufferStream(
 	mStreamBuf(channels, buffer)
 {
 }
-
-LLBufferStream::~LLBufferStream()
-{
-}

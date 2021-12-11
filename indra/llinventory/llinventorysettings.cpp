@@ -60,14 +60,10 @@ struct SettingsEntry final : public LLDictionaryEntry
 class LLSettingsDictionary final : public LLSingleton<LLSettingsDictionary>,
     public LLDictionary<LLSettingsType::type_e, SettingsEntry>
 {
-    LLSINGLETON(LLSettingsDictionary);
+    LLSINGLETON_EMPTY_CTOR(LLSettingsDictionary);
 
     void initSingleton() override;
 };
-
-LLSettingsDictionary::LLSettingsDictionary() 
-{
-}
 
 void LLSettingsDictionary::initSingleton()
 {

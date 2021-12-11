@@ -98,7 +98,7 @@ public:
 		S32 width, S32 height,
 		U32 flags,  BOOL fullscreen, BOOL clear_background,
 		BOOL disable_vsync, BOOL use_gl, BOOL ignore_pixel_depth);
-	virtual ~LLWindowHeadless();
+	virtual ~LLWindowHeadless() = default;
 
 private:
 };
@@ -106,8 +106,8 @@ private:
 class LLSplashScreenHeadless : public LLSplashScreen
 {
 public:
-	LLSplashScreenHeadless() {};
-	virtual ~LLSplashScreenHeadless() {};
+	LLSplashScreenHeadless() = default;
+	virtual ~LLSplashScreenHeadless() = default;
 
 	/*virtual*/ void showImpl() {};
 	/*virtual*/ void updateImpl(const std::string& mesg) {};

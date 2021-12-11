@@ -37,15 +37,6 @@ using std::string;
 
 LLShaderMgr * LLShaderMgr::sInstance = NULL;
 
-LLShaderMgr::LLShaderMgr()
-{
-}
-
-
-LLShaderMgr::~LLShaderMgr()
-{
-}
-
 // static
 LLShaderMgr * LLShaderMgr::instance()
 {

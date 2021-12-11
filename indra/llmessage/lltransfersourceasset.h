@@ -34,7 +34,7 @@ class LLTransferSourceParamsAsset : public LLTransferSourceParams
 {
 public:
 	LLTransferSourceParamsAsset();
-	virtual ~LLTransferSourceParamsAsset() {}
+	virtual ~LLTransferSourceParamsAsset() = default;
 	/*virtual*/ void packParams(LLDataPacker &dp) const;
 	/*virtual*/ BOOL unpackParams(LLDataPacker &dp);
 
@@ -52,7 +52,7 @@ class LLTransferSourceAsset : public LLTransferSource
 {
 public:
 	LLTransferSourceAsset(const LLUUID &request_id, const F32 priority);
-	virtual ~LLTransferSourceAsset();
+	virtual ~LLTransferSourceAsset() = default;
 
 	static void responderCallback(const LLUUID& uuid, LLAssetType::EType type,
 								  void *user_data, S32 result, LLExtStat ext_status );

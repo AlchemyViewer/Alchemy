@@ -34,13 +34,6 @@
 
 /**
  * Constructor.
- */
-LLPluginMessage::LLPluginMessage()
-{
-}
-
-/**
- * Constructor.
  *
  * @param[in] p Existing message
  */
@@ -58,14 +51,6 @@ LLPluginMessage::LLPluginMessage(const LLPluginMessage &p)
 LLPluginMessage::LLPluginMessage(const std::string &message_class, const std::string &message_name)
 {
 	setMessage(message_class, message_name);
-}
-
-
-/**
- * Destructor.
- */
-LLPluginMessage::~LLPluginMessage()
-{
 }
 
 /**
@@ -388,15 +373,6 @@ int LLPluginMessage::parse(const std::string &message)
 LLPluginMessageListener::~LLPluginMessageListener()
 {
 	// TODO: should listeners have a way to ensure they're removed from dispatcher lists when deleted?
-}
-
-
-/**
- * Destructor
- */
-LLPluginMessageDispatcher::~LLPluginMessageDispatcher()
-{
-	
 }
 	
 /**

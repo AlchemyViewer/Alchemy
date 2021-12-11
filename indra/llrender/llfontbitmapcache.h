@@ -36,7 +36,7 @@ class LLFontBitmapCache : public LLTrace::MemTrackable<LLFontBitmapCache>
 {
 public:
 	LLFontBitmapCache();
-	~LLFontBitmapCache();
+	~LLFontBitmapCache() = default;
 
 	// Need to call this once, before caching any glyphs.
  	void init(S32 num_components,

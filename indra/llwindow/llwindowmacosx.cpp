@@ -1697,10 +1697,6 @@ LLSplashScreenMacOSX::LLSplashScreenMacOSX()
 	mWindow = NULL;
 }
 
-LLSplashScreenMacOSX::~LLSplashScreenMacOSX()
-{
-}
-
 void LLSplashScreenMacOSX::showImpl()
 {
 	// This code _could_ be used to display a spash screen...

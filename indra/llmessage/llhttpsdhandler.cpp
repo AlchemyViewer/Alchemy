@@ -36,10 +36,6 @@
 #include "llcorehttputil.h"
 
 //========================================================================
-LLHttpSDHandler::LLHttpSDHandler()
-{
-}
-
 void LLHttpSDHandler::onCompleted(LLCore::HttpHandle handle, LLCore::HttpResponse * response)
 {
 	LLCore::HttpStatus status = response->getStatus();

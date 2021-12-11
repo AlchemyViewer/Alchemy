@@ -52,11 +52,6 @@ LLMessageStringTable::LLMessageStringTable()
 	}
 }
 
-
-LLMessageStringTable::~LLMessageStringTable()
-{ }
-
-
 char* LLMessageStringTable::getString(const char *str)
 {
 	U32 hash_value = message_hash_my_string(str);

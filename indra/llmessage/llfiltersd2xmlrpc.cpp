@@ -119,14 +119,6 @@ static const S32 DEFAULT_PRECISION = 20;
 /**
  * LLFilterSD2XMLRPC
  */
-LLFilterSD2XMLRPC::LLFilterSD2XMLRPC()
-{
-}
-
-LLFilterSD2XMLRPC::~LLFilterSD2XMLRPC()
-{
-}
-
 std::string xml_escape_string(const std::string& in)
 {
 	std::ostringstream out;
@@ -303,15 +295,6 @@ void LLFilterSD2XMLRPC::streamOut(std::ostream& ostr, const LLSD& sd)
  * LLFilterSD2XMLRPCResponse
  */
 
-LLFilterSD2XMLRPCResponse::LLFilterSD2XMLRPCResponse()
-{
-}
-
-LLFilterSD2XMLRPCResponse::~LLFilterSD2XMLRPCResponse()
-{
-}
-
-
 static LLTrace::BlockTimerStatHandle FTM_PROCESS_SD2XMLRPC_RESPONSE("SD2XMLRPC Response");
 // virtual
 LLIOPipe::EStatus LLFilterSD2XMLRPCResponse::process_impl(
@@ -373,20 +356,12 @@ LLIOPipe::EStatus LLFilterSD2XMLRPCResponse::process_impl(
 /**
  * LLFilterSD2XMLRPCRequest
  */
-LLFilterSD2XMLRPCRequest::LLFilterSD2XMLRPCRequest()
-{
-}
-
 LLFilterSD2XMLRPCRequest::LLFilterSD2XMLRPCRequest(const char* method)
 {
 	if(method)
 	{
 		mMethod.assign(method);
 	}
-}
-
-LLFilterSD2XMLRPCRequest::~LLFilterSD2XMLRPCRequest()
-{
 }
 
 static LLTrace::BlockTimerStatHandle FTM_PROCESS_SD2XMLRPC_REQUEST("S22XMLRPC Request");
@@ -588,14 +563,6 @@ LLIOPipe::EStatus stream_out(std::ostream& ostr, XMLRPC_VALUE value)
 	return status;
 }
 
-LLFilterXMLRPCResponse2LLSD::LLFilterXMLRPCResponse2LLSD()
-{
-}
-
-LLFilterXMLRPCResponse2LLSD::~LLFilterXMLRPCResponse2LLSD()
-{
-}
-
 static LLTrace::BlockTimerStatHandle FTM_PROCESS_XMLRPC2LLSD_RESPONSE("XMLRPC2LLSD Response");
 
 LLIOPipe::EStatus LLFilterXMLRPCResponse2LLSD::process_impl(
@@ -674,14 +641,6 @@ LLIOPipe::EStatus LLFilterXMLRPCResponse2LLSD::process_impl(
 /**
  * LLFilterXMLRPCRequest2LLSD
  */
-LLFilterXMLRPCRequest2LLSD::LLFilterXMLRPCRequest2LLSD()
-{
-}
-
-LLFilterXMLRPCRequest2LLSD::~LLFilterXMLRPCRequest2LLSD()
-{
-}
-
 static LLTrace::BlockTimerStatHandle FTM_PROCESS_XMLRPC2LLSD_REQUEST("XMLRPC2LLSD Request");
 LLIOPipe::EStatus LLFilterXMLRPCRequest2LLSD::process_impl(
 	const LLChannelDescriptors& channels,

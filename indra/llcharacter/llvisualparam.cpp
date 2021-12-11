@@ -173,22 +173,6 @@ LLVisualParam::LLVisualParam()
 }
 
 //-----------------------------------------------------------------------------
-// LLVisualParam()
-//-----------------------------------------------------------------------------
-LLVisualParam::LLVisualParam(const LLVisualParam& pOther)
-	: mCurWeight(pOther.mCurWeight),
-	mLastWeight(pOther.mLastWeight),
-	mNext(pOther.mNext),
-	mTargetWeight(pOther.mTargetWeight),
-	mIsAnimating(pOther.mIsAnimating),
-	mIsDummy(pOther.mIsDummy),
-	mID(pOther.mID),
-	mInfo(pOther.mInfo),
-	mParamLocation(pOther.mParamLocation)
-{
-}
-
-//-----------------------------------------------------------------------------
 // ~LLVisualParam()
 //-----------------------------------------------------------------------------
 LLVisualParam::~LLVisualParam()

@@ -227,7 +227,7 @@ class LLSplashScreenMacOSX : public LLSplashScreen
 {
 public:
 	LLSplashScreenMacOSX();
-	virtual ~LLSplashScreenMacOSX();
+	virtual ~LLSplashScreenMacOSX() = default;
 
 	/*virtual*/ void showImpl();
 	/*virtual*/ void updateImpl(const std::string& mesg);

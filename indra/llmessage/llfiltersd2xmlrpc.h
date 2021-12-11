@@ -48,8 +48,8 @@
 class LLFilterSD2XMLRPC : public LLIOPipe
 {
 public:
-	LLFilterSD2XMLRPC();
-	virtual ~LLFilterSD2XMLRPC();
+	LLFilterSD2XMLRPC() = default;
+	virtual ~LLFilterSD2XMLRPC() = default;
 
 protected:
 	/** 
@@ -86,10 +86,10 @@ class LLFilterSD2XMLRPCResponse : public LLFilterSD2XMLRPC
 {
 public:
 	// constructor
-	LLFilterSD2XMLRPCResponse();
+	LLFilterSD2XMLRPCResponse() = default;
 
 	// destructor
-	virtual ~LLFilterSD2XMLRPCResponse();
+	virtual ~LLFilterSD2XMLRPCResponse() = default;
 
 	/* @name LLIOPipe virtual implementations
 	 */
@@ -142,13 +142,13 @@ class LLFilterSD2XMLRPCRequest : public LLFilterSD2XMLRPC
 {
 public:
 	// constructor
-	LLFilterSD2XMLRPCRequest();
+	LLFilterSD2XMLRPCRequest() = default;
 
 	// constructor
 	LLFilterSD2XMLRPCRequest(const char* method);
 
 	// destructor
-	virtual ~LLFilterSD2XMLRPCRequest();
+	virtual ~LLFilterSD2XMLRPCRequest() = default;
 
 	/* @name LLIOPipe virtual implementations
 	 */
@@ -189,10 +189,10 @@ class LLFilterXMLRPCResponse2LLSD : public LLIOPipe
 {
 public:
 	// constructor
-	LLFilterXMLRPCResponse2LLSD();
+	LLFilterXMLRPCResponse2LLSD() = default;
 
 	// destructor
-	virtual ~LLFilterXMLRPCResponse2LLSD();
+	virtual ~LLFilterXMLRPCResponse2LLSD() = default;
 
 	/* @name LLIOPipe virtual implementations
 	 */
@@ -232,10 +232,10 @@ class LLFilterXMLRPCRequest2LLSD : public LLIOPipe
 {
 public:
 	// constructor
-	LLFilterXMLRPCRequest2LLSD();
+	LLFilterXMLRPCRequest2LLSD() = default;
 
 	// destructor
-	virtual ~LLFilterXMLRPCRequest2LLSD();
+	virtual ~LLFilterXMLRPCRequest2LLSD() = default;
 
 	/* @name LLIOPipe virtual implementations
 	 */

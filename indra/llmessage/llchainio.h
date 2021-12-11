@@ -72,10 +72,10 @@ class LLChainIOFactory
 {
 public:
 	// Constructor
-	LLChainIOFactory();
+	LLChainIOFactory() = default;
 
 	// Destructor
-	virtual ~LLChainIOFactory();
+	virtual ~LLChainIOFactory() = default;
 
 	/** 
 	 * @brief Build the chian with in as the first and end as the last

@@ -121,10 +121,6 @@ LLWindow::LLWindow(LLWindowCallbacks* callbacks, BOOL fullscreen, U32 flags)
 {
 }
 
-LLWindow::~LLWindow()
-{
-}
-
 //virtual
 BOOL LLWindow::isValid()
 {

@@ -102,7 +102,7 @@ public:
 	class Response : public LLRefCount
 	{
 	protected:
-		virtual ~Response();
+		virtual ~Response() = default;
 
 	public:
 		/**
@@ -350,7 +350,7 @@ public:
 	class NodeFactory
 	{
 	public:
-		virtual ~NodeFactory();
+		virtual ~NodeFactory() = default;
 		virtual LLHTTPNode* build() const = 0;
 	};
 

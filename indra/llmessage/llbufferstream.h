@@ -142,7 +142,7 @@ public:
 	LLBufferStream(
 		const LLChannelDescriptors& channels,
 		LLBufferArray* buffer);
-	~LLBufferStream();
+	~LLBufferStream() = default;
 
 protected:
 	LLBufferStreamBuf mStreamBuf;

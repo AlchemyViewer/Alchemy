@@ -56,7 +56,7 @@ public:
 	class Responder : public LLThreadSafeRefCount
 	{
 	protected:
-		~Responder();
+		~Responder() = default;
 	public:
 		virtual void completed(S32 bytes) = 0;
 	};
@@ -64,7 +64,7 @@ public:
 	class Request final : public QueuedRequest
 	{
 	protected:
-		virtual ~Request(); // use deleteRequest()
+		virtual ~Request() = default; // use deleteRequest()
 		
 	public:
 		Request(LLLFSThread* thread,

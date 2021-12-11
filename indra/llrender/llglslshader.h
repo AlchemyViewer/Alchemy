@@ -87,7 +87,7 @@ public:
 	static bool sProfileEnabled;
 
 	LLGLSLShader();
-	~LLGLSLShader();
+	~LLGLSLShader() = default;
 
 	static GLuint sCurBoundShader;
 	static LLGLSLShader* sCurBoundShaderPtr;

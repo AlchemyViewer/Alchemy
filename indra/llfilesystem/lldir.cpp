@@ -93,10 +93,6 @@ LLDir::LLDir()
 {
 }
 
-LLDir::~LLDir()
-{
-}
-
 std::vector<std::string> LLDir::getFilesInDir(const std::string &dirname)
 {
     //Returns a vector of fullpath filenames.

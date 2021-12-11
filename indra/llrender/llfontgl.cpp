@@ -73,14 +73,6 @@ const F32 DROP_SHADOW_SOFT_STRENGTH = 0.3f;
 
 const U32 GLYPH_VERTICES = 6;
 
-LLFontGL::LLFontGL()
-{
-}
-
-LLFontGL::~LLFontGL()
-{
-}
-
 void LLFontGL::reset()
 {
 	mFontFreetype->reset(sVertDPI, sHorizDPI);

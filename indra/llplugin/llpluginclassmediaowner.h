@@ -83,7 +83,7 @@ public:
 
 	} EMediaStatus;
 
-	virtual ~LLPluginClassMediaOwner() {};
+	virtual ~LLPluginClassMediaOwner() = default;
 	virtual void handleMediaEvent(LLPluginClassMedia* /*self*/, EMediaEvent /*event*/) {};
 };
 

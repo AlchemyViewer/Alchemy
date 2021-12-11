@@ -28,9 +28,6 @@
 #include "llkeyboardheadless.h"
 #include "llwindowcallbacks.h"
 
-LLKeyboardHeadless::LLKeyboardHeadless()
-{ }
-
 void LLKeyboardHeadless::resetMaskKeys()
 { }
 

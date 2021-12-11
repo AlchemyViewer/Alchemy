@@ -46,7 +46,7 @@
 class LLPluginProcessParentOwner : public boost::enable_shared_from_this < LLPluginProcessParentOwner > 
 {
 public:
-	virtual ~LLPluginProcessParentOwner();
+	virtual ~LLPluginProcessParentOwner() = default;
 	virtual void receivePluginMessage(const LLPluginMessage &message) = 0;
 	virtual bool receivePluginMessageEarly(const LLPluginMessage &message) {return false;};
 	// This will only be called when the plugin has died unexpectedly 

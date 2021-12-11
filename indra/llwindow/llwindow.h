@@ -176,7 +176,7 @@ public:
     virtual bool getInputDevices(U32 device_type_filter, void * devices_callback, void* userdata) { return false; };
 protected:
 	LLWindow(LLWindowCallbacks* callbacks, BOOL fullscreen, U32 flags);
-	virtual ~LLWindow();
+	virtual ~LLWindow() = default;
 	// Defaults to true
 	virtual BOOL isValid();
 	// Defaults to true
@@ -229,8 +229,8 @@ protected:
 class LLSplashScreen
 {
 public:
-	LLSplashScreen() { };
-	virtual ~LLSplashScreen() { };
+	LLSplashScreen() = default;
+	virtual ~LLSplashScreen() = default;
 
 
 	// Call to display the window.

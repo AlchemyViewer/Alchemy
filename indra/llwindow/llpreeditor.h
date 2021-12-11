@@ -38,7 +38,7 @@ public:
 	
 	// We don't delete against LLPreeditor, but compilers complain without this...
 	
-	virtual ~LLPreeditor() {};
+	virtual ~LLPreeditor() = default;
 
 	// Discard any preedit info. on this preeditor.
 	

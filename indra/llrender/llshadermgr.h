@@ -33,8 +33,8 @@
 class LLShaderMgr
 {
 public:
-	LLShaderMgr();
-	virtual ~LLShaderMgr();
+	LLShaderMgr() = default;
+	virtual ~LLShaderMgr() = default;
 
     // clang-format off
     typedef enum

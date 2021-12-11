@@ -79,8 +79,8 @@ public:
 		DROP_SHADOW_SOFT
 	};
 
-	LLFontGL();
-	~LLFontGL();
+	LLFontGL() = default;
+	~LLFontGL() = default;
 
 
 	void reset(); // Reset a font after GL cleanup.  ONLY works on an already loaded font.

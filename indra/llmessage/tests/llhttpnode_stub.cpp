@@ -66,7 +66,6 @@ LLSD LLHTTPNode::allNodePaths() const { return LLSD(); }
 const LLHTTPNode* LLHTTPNode::rootNode() const { return NULL; }
 const LLHTTPNode* LLHTTPNode::findNode(const std::string& name) const { return NULL; }
 
-LLHTTPNode::Response::~Response(){}
 void LLHTTPNode::Response::notFound(const std::string& message)
 {
 	status(404, message);
@@ -96,9 +95,6 @@ void LLHTTPNode::describe(Description& desc) const { }
 
 
 const LLChainIOFactory* LLHTTPNode::getProtocolHandler() const { return NULL; }
-
-
-LLHTTPRegistrar::NodeFactory::~NodeFactory() { }
 
 void LLHTTPRegistrar::registerFactory(
     const std::string& path, NodeFactory& factory) {}

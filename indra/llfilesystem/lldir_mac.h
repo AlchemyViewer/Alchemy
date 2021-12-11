@@ -39,7 +39,7 @@ class LLDir_Mac final : public LLDir
 {
 public:
 	LLDir_Mac();
-	virtual ~LLDir_Mac();
+	virtual ~LLDir_Mac() = default;
 
 	/*virtual*/ void initAppDirs(const std::string &app_name,
 		const std::string& app_read_only_data_dir);

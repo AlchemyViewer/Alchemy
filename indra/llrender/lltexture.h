@@ -48,7 +48,7 @@ class LLTexture : public virtual LLRefCount, public LLTrace::MemTrackable<LLText
 	friend class LLFontGL ;
 
 protected:
-	virtual ~LLTexture();
+	virtual ~LLTexture() = default;
 
 public:
 	LLTexture()

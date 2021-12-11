@@ -388,10 +388,6 @@ const LLHTTPNode* LLHTTPNode::findNode(const std::string& name) const
 	return impl.findNamedChild(name);
 }
 
-LLHTTPNode::Response::~Response()
-{
-}
-
 void LLHTTPNode::Response::statusUnknownError(S32 code)
 {
 	status(code, "Unknown Error");
@@ -442,8 +438,6 @@ namespace
         return theMap;
     }
 }
-
-LLHTTPRegistrar::NodeFactory::~NodeFactory() { }
 
 void LLHTTPRegistrar::registerFactory(
     const std::string& path, NodeFactory& factory)

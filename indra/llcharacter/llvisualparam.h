@@ -169,7 +169,7 @@ public:
 	EParamLocation			getParamLocation() const { return mParamLocation; }
 
 protected:
-	LLVisualParam(const LLVisualParam& pOther);
+	LLVisualParam(const LLVisualParam& pOther) = default;
 
 	F32					mCurWeight;			// current weight
 	F32					mLastWeight;		// last weight

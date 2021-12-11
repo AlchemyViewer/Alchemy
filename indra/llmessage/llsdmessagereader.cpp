@@ -45,12 +45,6 @@ LLSDMessageReader::LLSDMessageReader() :
 {
 }
 
-//virtual 
-LLSDMessageReader::~LLSDMessageReader()
-{
-}
-
-
 LLSD getLLSD(const LLSD& input, const char* block, const char* var, S32 blocknum)
 {
 	// babbage: log error to LL_ERRS() if variable not found to mimic

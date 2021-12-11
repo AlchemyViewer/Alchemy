@@ -252,7 +252,7 @@ protected:
 	{
 	public:
 		JointConstraint(JointConstraintSharedData* shared_data);
-		~JointConstraint();
+		~JointConstraint() = default;
 
 		JointConstraintSharedData*	mSharedData;
 		F32							mWeight;
@@ -430,7 +430,7 @@ class LLKeyframeDataCache
 {
 public:
 	// *FIX: implement this as an actual singleton member of LLKeyframeMotion
-	LLKeyframeDataCache(){};
+	LLKeyframeDataCache() = default;
 	~LLKeyframeDataCache();
 
 	typedef absl::flat_hash_map<LLUUID, class LLKeyframeMotion::JointMotionList*> keyframe_data_map_t; 

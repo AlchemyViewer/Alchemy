@@ -43,7 +43,7 @@ class LLUUID;
 
 class LLExperienceCache final : public LLSingleton < LLExperienceCache >
 {
-    LLSINGLETON(LLExperienceCache);
+    LLSINGLETON_EMPTY_CTOR(LLExperienceCache);
 
 public:
     typedef boost::function<std::string(const std::string &)> CapabilityQuery_t;
@@ -104,7 +104,7 @@ public:
     static const int PROPERTY_SUSPENDED;	// 1 << 7
 
 private:
-    virtual ~LLExperienceCache();
+    virtual ~LLExperienceCache() = default;
 
     virtual void initSingleton() override;
 

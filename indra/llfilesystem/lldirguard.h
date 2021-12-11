@@ -63,8 +63,8 @@ private:
 class LLDirectoryGuard
 {
 public:
-	LLDirectoryGuard() {}
-	~LLDirectoryGuard() {}
+	LLDirectoryGuard() = default;
+	~LLDirectoryGuard() = default;
 };
 #endif 
 

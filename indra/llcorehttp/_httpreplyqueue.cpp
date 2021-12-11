@@ -38,11 +38,6 @@ namespace LLCore
 {
 
 
-HttpReplyQueue::HttpReplyQueue()
-{
-}
-
-
 HttpReplyQueue::~HttpReplyQueue()
 {
     mQueue.clear();

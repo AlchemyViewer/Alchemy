@@ -57,9 +57,7 @@ public:
 		mCurPos = 0;
 	}
 
-	~LLKDUMemSource()
-	{
-	}
+	~LLKDUMemSource() = default;
 
 	int read(kdu_core::kdu_byte *buf, int num_bytes)
 	{
@@ -97,9 +95,7 @@ public:
 		mOutputSize = &output_size;
 	}
 
-	~LLKDUMemTarget()
-	{
-	}
+	~LLKDUMemTarget() = default;
 
 	bool write(const kdu_core::kdu_byte *buf, int num_bytes)
 	{

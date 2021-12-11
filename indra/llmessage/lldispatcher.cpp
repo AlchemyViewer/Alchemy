@@ -38,14 +38,6 @@
 ///----------------------------------------------------------------------------
 
 
-LLDispatcher::LLDispatcher()
-{
-}
-
-LLDispatcher::~LLDispatcher()
-{
-}
-
 bool LLDispatcher::isHandlerPresent(const key_t& name) const
 {
 	if(mHandlers.find(name) != mHandlers.end())

@@ -37,10 +37,10 @@ class LLPluginMessage
 {
 	LOG_CLASS(LLPluginMessage);
 public:
-	LLPluginMessage();
+	LLPluginMessage() = default;
 	LLPluginMessage(const LLPluginMessage &p);
 	LLPluginMessage(const std::string &message_class, const std::string &message_name);
-	~LLPluginMessage();
+	~LLPluginMessage() = default;
 	
 	// reset all internal state
 	void clear(void);
@@ -120,7 +120,7 @@ public:
 class LLPluginMessageDispatcher
 {
 public:
-	virtual ~LLPluginMessageDispatcher();
+	virtual ~LLPluginMessageDispatcher() = default;
 	
 	void addPluginMessageListener(LLPluginMessageListener *);
 	void removePluginMessageListener(LLPluginMessageListener *);

@@ -57,7 +57,7 @@ class LLDir
 {
  public:
 	LLDir();
-	virtual ~LLDir();
+	virtual ~LLDir() = default;
 
 	// app_name - Usually SecondLife, used for creating settings directories
 	// in OS-specific location, such as C:\Documents and Settings

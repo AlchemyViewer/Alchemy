@@ -56,7 +56,7 @@ public:
     typedef LLCoprocedureManager::CoProcedure_t CoProcedure_t;
 
     LLCoprocedurePool(const std::string &name, size_t size);
-    ~LLCoprocedurePool();
+    ~LLCoprocedurePool() = default;
 
     /// Places the coprocedure on the queue for processing. 
     /// 
@@ -129,10 +129,6 @@ private:
 };
 
 //=========================================================================
-LLCoprocedureManager::LLCoprocedureManager()
-{
-}
-
 LLCoprocedureManager::~LLCoprocedureManager()
 {
     close();
@@ -348,10 +344,6 @@ LLCoprocedurePool::LLCoprocedurePool(const std::string &poolName, size_t size):
     }
 
     LL_INFOS("CoProcMgr") << "Created coprocedure pool named \"" << mPoolName << "\" with " << size << " items, queue max " << LLCoprocedureManager::DEFAULT_QUEUE_SIZE << LL_ENDL;
-}
-
-LLCoprocedurePool::~LLCoprocedurePool() 
-{
 }
 
 //-------------------------------------------------------------------------

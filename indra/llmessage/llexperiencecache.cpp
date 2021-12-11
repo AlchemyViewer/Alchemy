@@ -88,14 +88,6 @@ const int LLExperienceCache::SEARCH_PAGE_SIZE     = 30;
 bool LLExperienceCache::sShutdown = false;
 
 //=========================================================================
-LLExperienceCache::LLExperienceCache()
-{
-}
-
-LLExperienceCache::~LLExperienceCache()
-{
-}
-
 void LLExperienceCache::initSingleton()
 {
     mCacheFileName = gDirUtilp->getExpandedFilename(LL_PATH_CACHE, "experience_cache.xml");

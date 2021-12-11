@@ -55,8 +55,8 @@ class LLServiceBuilder
 {
 	LOG_CLASS(LLServiceBuilder);
 public:
-	LLServiceBuilder(void) {}
-	~LLServiceBuilder(void) {}
+	LLServiceBuilder(void) = default;
+	~LLServiceBuilder(void) = default;
 
 	/** 
 	 * @brief Initialize this object with the service definitions.

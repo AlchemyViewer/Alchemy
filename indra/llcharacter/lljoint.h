@@ -62,7 +62,7 @@ const F32 LL_JOINT_TRESHOLD_POS_OFFSET = 0.0001f; //0.1 mm
 class LLVector3OverrideMap
 {
 public:
-	LLVector3OverrideMap() {}
+	LLVector3OverrideMap() = default;
 	bool findActiveOverride(LLUUID& mesh_id, LLVector3& pos) const;
 	void showJointVector3Overrides(std::ostringstream& os) const;
 	U32 count() const;
