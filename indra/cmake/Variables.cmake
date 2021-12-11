@@ -160,7 +160,7 @@ if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
     message( FATAL_ERROR "Xcode 12.0.0 or greater is required." )
   endif ()
   message( "Building with " ${CMAKE_OSX_SYSROOT} )
-  set(CMAKE_OSX_DEPLOYMENT_TARGET 10.13)
+  set(CMAKE_OSX_DEPLOYMENT_TARGET 10.15)
 
   set(CMAKE_XCODE_ATTRIBUTE_GCC_OPTIMIZATION_LEVEL 3)
   set(CMAKE_XCODE_ATTRIBUTE_GCC_FAST_MATH NO)
