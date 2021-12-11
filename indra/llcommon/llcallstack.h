@@ -46,7 +46,7 @@ LL_COMMON_API std::ostream& operator<<(std::ostream& s, const LLCallStack& call_
 class LLContextStrings
 {
 public:
-    LLContextStrings();
+    LLContextStrings() = default;
     static void addContextString(const std::string& str);
     static void removeContextString(const std::string& str);
     static void output(std::ostream& os);

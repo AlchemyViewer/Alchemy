@@ -128,7 +128,7 @@ protected:
 
 public:
 
-	~LLBadge();
+	~LLBadge() = default;
 
 	bool				addToView(LLView * view);
 

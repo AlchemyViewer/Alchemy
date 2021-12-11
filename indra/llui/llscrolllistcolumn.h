@@ -47,7 +47,7 @@ public:
 		Params();
 	};
 	LLScrollColumnHeader(const Params&);
-	~LLScrollColumnHeader();
+	~LLScrollColumnHeader() = default;
 
 	/*virtual*/ void draw();
 	/*virtual*/ BOOL handleDoubleClick(S32 x, S32 y, MASK mask);

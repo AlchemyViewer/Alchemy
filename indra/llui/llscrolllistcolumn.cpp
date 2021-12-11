@@ -68,9 +68,6 @@ LLScrollColumnHeader::LLScrollColumnHeader(const LLScrollColumnHeader::Params& p
 	addChild(mResizeBar);
 }
 
-LLScrollColumnHeader::~LLScrollColumnHeader()
-{}
-
 void LLScrollColumnHeader::draw()
 {
 	const std::string& sort_column = mColumn->mParentCtrl->getSortColumnName();

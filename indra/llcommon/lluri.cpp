@@ -300,10 +300,6 @@ std::string LLURI::escapePathAndData(const std::string &str)
     return result;
 }
 
-LLURI::LLURI()
-{
-}
-
 LLURI::LLURI(const std::string& escaped_str)
 {
 	std::string::size_type delim_pos;

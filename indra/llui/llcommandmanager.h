@@ -174,7 +174,7 @@ private:
 class LLCommandManager final
 :	public LLSingleton<LLCommandManager>
 {
-	LLSINGLETON(LLCommandManager);
+	LLSINGLETON_EMPTY_CTOR(LLCommandManager);
 	~LLCommandManager();
 
 public:

@@ -119,7 +119,7 @@ class LLDoubleDispatch
     typedef LLDoubleDispatch<ReturnType, ParamBaseType> self_type;
 
 public:
-    LLDoubleDispatch() {}
+    LLDoubleDispatch() = default;
 
     /**
      * Call the first matching entry.  If there's no registered Functor

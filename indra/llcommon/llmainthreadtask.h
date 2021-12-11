@@ -43,11 +43,10 @@
  */
 class LLMainThreadTask
 {
-private:
-    // Don't instantiate this class -- use dispatch() instead.
-    LLMainThreadTask() {}
-
 public:
+    // Don't instantiate this class -- use dispatch() instead.
+    LLMainThreadTask() = delete;
+
     /// dispatch() is the only way to invoke this functionality.
     template <typename CALLABLE>
     static auto dispatch(CALLABLE&& callable) -> decltype(callable())

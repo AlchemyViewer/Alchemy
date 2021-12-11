@@ -95,7 +95,7 @@ public:
 
 	typedef LLDefaultChildRegistry child_registry_t;
 
-	virtual ~LLAccordionCtrlTab();
+	virtual ~LLAccordionCtrlTab() = default;
 	
 	// Registers callback for expand/collapse events.
 	boost::signals2::connection setDropDownStateChangedCallback(commit_callback_t cb);

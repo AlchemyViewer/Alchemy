@@ -66,7 +66,7 @@ public:
 	/*virtual*/ std::string getCurrentElementName() { return LLStringUtil::null; }
 	/*virtual*/ std::string getCurrentFileName() { return LLStringUtil::null; }
 	LLXSDWriter();
-	~LLXSDWriter();
+	~LLXSDWriter() = default;
 
 protected:
 	void writeAttribute(const std::string& type, const Parser::name_stack_t&, S32 min_count, S32 max_count, const std::vector<std::string>* possible_values);
@@ -202,7 +202,7 @@ public:
 	typedef LLInitParam::BaseBlock* (*element_start_callback_t)(LLSimpleXUIParser&, const char* block_name);
 
 	LLSimpleXUIParser(element_start_callback_t element_cb = NULL);
-	virtual ~LLSimpleXUIParser();
+	virtual ~LLSimpleXUIParser() = default;
 
 	/*virtual*/ std::string getCurrentElementName();
 	/*virtual*/ std::string getCurrentFileName() { return mCurFileName; }

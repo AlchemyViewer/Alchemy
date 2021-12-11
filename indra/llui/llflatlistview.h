@@ -63,8 +63,8 @@ public:
 	class ItemComparator
 	{
 	public:
-		ItemComparator() {};
-		virtual ~ItemComparator() {};
+		ItemComparator() = default;
+		virtual ~ItemComparator() = default;
 
 		/** Returns true if item1 < item2, false otherwise */
 		virtual bool compare(const LLPanel* item1, const LLPanel* item2) const = 0;
@@ -77,7 +77,7 @@ public:
 	{
 	public:
 		ItemReverseComparator(const ItemComparator& comparator) : mComparator(comparator) {};
-		virtual ~ItemReverseComparator() {};
+		virtual ~ItemReverseComparator() = default;
 
 		virtual bool compare(const LLPanel* item1, const LLPanel* item2) const
 		{

@@ -352,7 +352,7 @@ public:
 		Params() : horizontal("horizontal", false) {}
 	};
 	LLImagePanel(const Params& p) : LLPanel(p), mHorizontal(p.horizontal) {}
-	virtual ~LLImagePanel() {}
+	virtual ~LLImagePanel() = default;
 
 	void draw()
 	{

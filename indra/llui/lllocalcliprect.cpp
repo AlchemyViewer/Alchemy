@@ -105,6 +105,3 @@ LLLocalClipRect::LLLocalClipRect(const LLRect& rect, BOOL enabled /* = TRUE */)
 					rect.mRight + LLFontGL::sCurOrigin.mX, 
 					rect.mBottom + LLFontGL::sCurOrigin.mY), enabled)
 {}
-
-LLLocalClipRect::~LLLocalClipRect()
-{}

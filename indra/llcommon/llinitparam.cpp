@@ -93,9 +93,6 @@ namespace LLInitParam
 	//
 	// Parser
 	//
-	Parser::~Parser()
-	{}
-
 	void Parser::parserWarning(const std::string& message)
 	{
 		if (mParseSilently) return;

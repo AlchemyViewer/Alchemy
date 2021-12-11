@@ -61,7 +61,7 @@ class LLTexGlobalColorInfo
 {
 	friend class LLTexGlobalColor;
 public:
-	LLTexGlobalColorInfo();
+	LLTexGlobalColorInfo() = default;
 	~LLTexGlobalColorInfo();
 
 	BOOL parseXml(LLXmlTreeNode* node);
@@ -78,7 +78,7 @@ public:
 	virtual ~LLTexParamGlobalColor() = default;
 	/*virtual*/ LLViewerVisualParam* cloneParam(LLWearable* wearable) const;
 protected:
-	LLTexParamGlobalColor(const LLTexParamGlobalColor& pOther);
+	LLTexParamGlobalColor(const LLTexParamGlobalColor& pOther) = default;
 	/*virtual*/ void onGlobalColorChanged();
 private:
 	LLTexGlobalColor*		mTexGlobalColor;

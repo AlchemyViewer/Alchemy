@@ -62,7 +62,7 @@ public:
 
 	/*virtual*/ void initFromParams(const Params&);
 
-	virtual ~LLRadioGroup();
+	virtual ~LLRadioGroup() = default;
 	
 	virtual BOOL postBuild();
 	

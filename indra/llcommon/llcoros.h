@@ -88,9 +88,9 @@ namespace boost {
 class LL_COMMON_API LLCoros final : public LLSingleton<LLCoros>
 {
     LLSINGLETON(LLCoros);
-    ~LLCoros();
+    ~LLCoros() = default;
 
-    void cleanupSingleton();
+    void cleanupSingleton() override;
 public:
     /// The viewer's use of the term "coroutine" became deeply embedded before
     /// the industry term "fiber" emerged to distinguish userland threads from

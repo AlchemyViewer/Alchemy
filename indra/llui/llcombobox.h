@@ -102,8 +102,8 @@ protected:
 	void	initFromParams(const Params&);
 	void	prearrangeList(std::string filter = "");
 
-    virtual std::string _getSearchText() const;
-    virtual void onSetHighlight() const;
+    std::string _getSearchText() const override;
+    void onSetHighlight() const override;
 
 public:
 	// LLView interface
@@ -262,7 +262,7 @@ public:
 		Params();
 	};
 
-	/*virtual*/ const std::string getSelectedItemLabel(S32 column = 0) const;
+	/*virtual*/ const std::string getSelectedItemLabel(S32 column = 0) const override;
 
 private:
 	enum EColumnIndex
@@ -273,7 +273,7 @@ private:
 
 	friend class LLUICtrlFactory;
 	LLIconsComboBox(const Params&);
-	virtual ~LLIconsComboBox() {};
+	virtual ~LLIconsComboBox() = default;
 
 	S32			mIconColumnIndex;
 	S32			mLabelColumnIndex;

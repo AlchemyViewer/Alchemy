@@ -44,7 +44,7 @@ public:
 	 * @param cb - callback to be called each tick
 	 */
 	LLFlashTimer(callback_t cb = NULL, S32 count = 0, F32 period = 0.0);
-	~LLFlashTimer() {};
+	~LLFlashTimer() = default;
 
 	/*virtual*/ BOOL tick();
 

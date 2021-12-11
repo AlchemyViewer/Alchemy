@@ -55,9 +55,7 @@ public:
 
     typedef std::vector<line> lines_t;
 
-    LLAllocatorHeapProfile()
-    {
-    }
+    LLAllocatorHeapProfile() = default;
 
 	void parse(std::string const & prof_text);
 

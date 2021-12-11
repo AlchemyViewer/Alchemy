@@ -68,7 +68,7 @@ public:
 	{
 	public:
 		WriteResponder(LLVorbisDecodeState* decoder) : mDecoder(decoder) {}
-		~WriteResponder() {}
+		~WriteResponder() = default;
 		void completed(S32 bytes)
 		{
 			mDecoder->ioComplete(bytes);
@@ -542,8 +542,8 @@ class LLAudioDecodeMgr::Impl
 {
 	friend class LLAudioDecodeMgr;
 public:
-	Impl() {};
-	~Impl() {};
+	Impl() = default;
+	~Impl() = default;
 
 	void processQueue(const F32 num_secs = 0.005);
 

@@ -108,7 +108,7 @@ public:
 
 	boost::signals2::connection setItemDoubleClickCallback(const mouse_signal_t::slot_type& cb);
 
-	virtual S32 notifyParent(const LLSD& info);
+    S32 notifyParent(const LLSD& info) override;
 
 	void handleDisplayNamesOptionChanged();
 

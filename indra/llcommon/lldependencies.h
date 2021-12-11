@@ -171,7 +171,7 @@ std::ostream& LLDependencies_describe(std::ostream& out, const std::string& key)
  */
 struct LLDependenciesEmpty
 {
-    LLDependenciesEmpty() {}
+    LLDependenciesEmpty() = default;
     /**
      * Give it a constructor accepting void* so caller can pass placeholder
      * values such as NULL or 0 rather than having to write
@@ -220,7 +220,7 @@ class LLDependencies: public LLDependenciesBase
     typedef boost::function<const typename DepNode::dep_set&(const DepNode&)> dep_selector;
 
 public:
-    LLDependencies() {}
+    LLDependencies() = default;
 
     typedef KEY key_type;
     typedef NODE node_type;

@@ -154,7 +154,7 @@ public:
 	typedef LLHandle<T> base_t;
 
 	LLRootHandle(T* object) { bind(object); }
-	LLRootHandle() {};
+	LLRootHandle() = default;
 	~LLRootHandle() { unbind(); }
 
 	// this is redundant, since an LLRootHandle *is* an LLHandle
@@ -231,7 +231,7 @@ public:
     };
 
 protected:
-    LLCheckedHandleBase() { }
+    LLCheckedHandleBase() = default;
 
 };
 

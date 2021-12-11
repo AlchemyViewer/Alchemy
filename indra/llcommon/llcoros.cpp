@@ -133,10 +133,6 @@ LLCoros::LLCoros():
 {
 }
 
-LLCoros::~LLCoros()
-{
-}
-
 void LLCoros::cleanupSingleton()
 {
     // Some of the coroutines (like voice) will depend onto

@@ -130,7 +130,7 @@ private:
 class LLListViewModel: public LLViewModel
 {
 public:
-    LLListViewModel() {}
+    LLListViewModel() = default;
     LLListViewModel(const LLSD& values);
 
     virtual void addColumn(const LLSD& column, EAddPosition pos = ADD_BOTTOM);

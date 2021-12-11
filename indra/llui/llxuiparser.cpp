@@ -333,8 +333,6 @@ LLXSDWriter::LLXSDWriter()
 	registerInspectFunc<LLSD>(boost::bind(&LLXSDWriter::writeAttribute, this, "xs:string", _1, _2, _3, _4));
 }
 
-LLXSDWriter::~LLXSDWriter() {}
-
 void LLXSDWriter::writeXSD(const std::string& type_name, LLXMLNodePtr node, const LLInitParam::BaseBlock& block, const std::string& xml_namespace)
 {
 	Schema schema(xml_namespace);
@@ -1376,11 +1374,6 @@ LLSimpleXUIParser::LLSimpleXUIParser(LLSimpleXUIParser::element_start_callback_t
 		registerParserFuncs<LLSD>(readSDValue);
 	}
 }
-
-LLSimpleXUIParser::~LLSimpleXUIParser()
-{
-}
-
 
 bool LLSimpleXUIParser::readXUI(const std::string& filename, LLInitParam::BaseBlock& block, bool silent)
 {

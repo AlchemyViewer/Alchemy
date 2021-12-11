@@ -41,14 +41,14 @@ typedef std::pair<BOOL, BOOL>		filterResult_t;
 class LLQueryFilter
 {
 public:
-	virtual ~LLQueryFilter() {};
+	virtual ~LLQueryFilter() = default;
 	virtual filterResult_t operator() (const LLView* const view, const viewList_t & children) const = 0;
 };
 
 class LLQuerySorter
 {
 public:
-	virtual ~LLQuerySorter() {};
+	virtual ~LLQuerySorter() = default;
 	virtual void sort(LLView * parent, viewList_t &children) const;
 };
 
@@ -107,7 +107,7 @@ public:
 	typedef filterList_t::const_iterator		filterList_const_iter_t;
 
 	LLViewQuery() : mPreFilters(), mPostFilters(), mSorterp() {}
-	virtual ~LLViewQuery() {}
+	virtual ~LLViewQuery() = default;
 
 	void addPreFilter(const LLQueryFilter* prefilter) { mPreFilters.push_back(prefilter); }
 	void addPostFilter(const LLQueryFilter* postfilter) { mPostFilters.push_back(postfilter); }

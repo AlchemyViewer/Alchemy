@@ -81,10 +81,6 @@ LLNotificationsListener::LLNotificationsListener(LLNotifications & notifications
 
 // This is here in the .cpp file so we don't need the definition of class
 // Forwarder in the header file.
-LLNotificationsListener::~LLNotificationsListener()
-{
-}
-
 void LLNotificationsListener::requestAdd(const LLSD& event_data) const
 {
 	if(event_data.has("reply"))

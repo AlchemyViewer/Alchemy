@@ -183,7 +183,7 @@ public:
     LLListenerOrPumpName(const T& listener): mListener(listener) {}
 
     /// for omitted method parameter: uninitialized mListener
-    LLListenerOrPumpName() {}
+    LLListenerOrPumpName() = default;
 
     /// test for validity
     operator bool() const { return bool(mListener); }
@@ -695,7 +695,7 @@ public:
         mReqid(request["reqid"])
     {}
     /// If you don't yet have the request, use setFrom() later.
-    LLReqID() {}
+    LLReqID() = default;
 
     /// Extract and store the ["reqid"] value from an incoming request.
     void setFrom(const LLSD& request)

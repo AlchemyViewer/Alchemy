@@ -571,7 +571,7 @@ namespace LLInitParam
 			mParserInspectFuncs(&inspect_map)
 		{}
 
-		virtual ~Parser();
+		virtual ~Parser() = default;
 
 		template <typename T> bool readValue(T& param, typename boost::disable_if<boost::is_enum<T> >::type* dummy = 0)
 		{
@@ -2881,8 +2881,7 @@ namespace LLInitParam
 		typedef LLSD			value_t;
 		typedef LLSD			default_value_t;
 
-		ParamValue()
-		{}
+		ParamValue() = default;
 
 		ParamValue(const default_value_t& other)
 		:	mValue(other)

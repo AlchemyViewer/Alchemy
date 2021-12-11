@@ -115,7 +115,7 @@ template<typename T>
 class LLSDParamAdapter : public T
 {
 public:
-	LLSDParamAdapter() {}
+	LLSDParamAdapter() = default;
 	LLSDParamAdapter(const LLSD& sd)
 	{
 		LL_RECORD_BLOCK_TIME(FTM_SD_PARAM_ADAPTOR);

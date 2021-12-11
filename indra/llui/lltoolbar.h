@@ -186,7 +186,7 @@ public:
 	public:
 		typedef boost::function<void(LLToolBarEnums::EToolBarLocation tb, const LLRect& rect)> reshape_callback_t;
 
-		virtual ~LLCenterLayoutPanel() {}
+		virtual ~LLCenterLayoutPanel() = default;
 		/*virtual*/ void handleReshape(const LLRect& rect, bool by_user) override;
 
 		void setLocationId(LLToolBarEnums::EToolBarLocation id) { mLocationId = id; }

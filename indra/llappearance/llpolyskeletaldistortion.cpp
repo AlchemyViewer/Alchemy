@@ -41,10 +41,6 @@
 //-----------------------------------------------------------------------------
 // LLPolySkeletalDistortionInfo()
 //-----------------------------------------------------------------------------
-LLPolySkeletalDistortionInfo::LLPolySkeletalDistortionInfo()
-{
-}
-
 BOOL LLPolySkeletalDistortionInfo::parseXml(LLXmlTreeNode* node)
 {
         llassert( node->hasName( "param" ) && node->getChildByName( "param_skeleton" ) );
@@ -117,15 +113,6 @@ LLPolySkeletalDistortion::LLPolySkeletalDistortion(LLAvatarAppearance *avatarp)
 //-----------------------------------------------------------------------------
 // LLPolySkeletalDistortion()
 //-----------------------------------------------------------------------------
-LLPolySkeletalDistortion::LLPolySkeletalDistortion(const LLPolySkeletalDistortion &pOther)
-	: LLViewerVisualParam(pOther),
-	mDefaultVec(pOther.mDefaultVec),
-	mJointScales(pOther.mJointScales),
-	mJointOffsets(pOther.mJointOffsets),
-	mAvatar(pOther.mAvatar)
-{
-}
-
 BOOL LLPolySkeletalDistortion::setInfo(LLPolySkeletalDistortionInfo *info)
 {
     if (info->mID < 0)

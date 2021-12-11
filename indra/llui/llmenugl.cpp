@@ -577,10 +577,6 @@ void LLMenuItemGL::onVisibilityChange(BOOL new_visibility)
 //
 // This class represents a separator.
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-LLMenuItemSeparatorGL::Params::Params()
-{
-}
-
 LLMenuItemSeparatorGL::LLMenuItemSeparatorGL(const LLMenuItemSeparatorGL::Params& p) :
 	LLMenuItemGL( p )
 {
@@ -3915,10 +3911,6 @@ LLTearOffMenu::LLTearOffMenu(LLMenuGL* menup) :
 	// Can't do this in postBuild() because that is only called for floaters
 	// constructed from XML.
 	mCloseSignal.connect(boost::bind(&LLTearOffMenu::closeTearOff, this));
-}
-
-LLTearOffMenu::~LLTearOffMenu()
-{
 }
 
 void LLTearOffMenu::draw()

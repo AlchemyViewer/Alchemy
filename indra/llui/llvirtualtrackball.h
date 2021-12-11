@@ -78,7 +78,7 @@ public:
     };
 
 
-    virtual ~LLVirtualTrackball();
+    virtual ~LLVirtualTrackball() = default;
     /*virtual*/ BOOL postBuild();
 
     virtual BOOL    handleHover(S32 x, S32 y, MASK mask);

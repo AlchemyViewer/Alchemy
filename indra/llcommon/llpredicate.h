@@ -136,8 +136,7 @@ namespace LLPredicate
 		:	mRule(other)
 		{}
 
-		Rule()
-		{}
+		Rule() = default;
 
 		void require(ENUM e, bool match)
 		{

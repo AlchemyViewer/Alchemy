@@ -138,10 +138,6 @@ LLXYVector::LLXYVector(const LLXYVector::Params& p)
     addChild(mTouchArea);
 }
 
-LLXYVector::~LLXYVector()
-{
-}
-
 BOOL LLXYVector::postBuild()
 {
     mLogScaleX = (2 * log(mMaxValueX)) / mTouchArea->getRect().getWidth();

@@ -44,7 +44,7 @@ class LLApp;
 class LL_COMMON_API LLURI
 {
 public:
-  LLURI();
+  LLURI() = default;
   LLURI(const std::string& escaped_str);
   LLURI(const std::string& scheme,
 		const std::string& userName,

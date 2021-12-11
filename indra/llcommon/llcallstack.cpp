@@ -115,10 +115,6 @@ std::ostream& operator<<(std::ostream& s, const LLCallStack& call_stack)
     return s;
 }
 
-LLContextStrings::LLContextStrings()
-{
-}
-
 // static
 LLContextStrings* LLContextStrings::getThreadLocalInstance()
 {

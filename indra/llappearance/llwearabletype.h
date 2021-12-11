@@ -36,7 +36,7 @@
 class LLWearableType final : public LLParamSingleton<LLWearableType>
 {
 	LLSINGLETON(LLWearableType, LLTranslationBridge::ptr_t &trans);
-	~LLWearableType();
+	~LLWearableType() = default;
 	void initSingleton() override;
 public: 
 	enum EType
@@ -109,7 +109,7 @@ private:
     {
     public:
         LLWearableDictionary(LLTranslationBridge::ptr_t& trans);
-        ~LLWearableDictionary() {}
+        ~LLWearableDictionary() = default;
     };
 
     LLWearableDictionary mDictionary;

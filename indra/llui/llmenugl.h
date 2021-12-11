@@ -234,7 +234,7 @@ class LLMenuItemSeparatorGL : public LLMenuItemGL
 public:
 	struct Params : public LLInitParam::Block<Params, LLMenuItemGL::Params>
 	{
-		Params();
+		Params() = default;
 	};
 	LLMenuItemSeparatorGL(const LLMenuItemSeparatorGL::Params& p = LLMenuItemSeparatorGL::Params());
 
@@ -704,7 +704,7 @@ protected:
 	friend class LLUICtrlFactory;
 
 public:
-	virtual ~LLContextMenu() {}
+	virtual ~LLContextMenu() = default;
 
 	// LLView Functionality
 	// can't set visibility directly, must call show or hide
@@ -821,7 +821,7 @@ public:
 	struct Params : public LLInitParam::Block<Params, LLPanel::Params>
 	{};
 	LLMenuHolderGL(const Params& p);
-	virtual ~LLMenuHolderGL() {}
+	virtual ~LLMenuHolderGL() = default;
 
 	virtual BOOL hideMenus();
 	void reshape(S32 width, S32 height, BOOL called_from_parent = TRUE);
@@ -863,7 +863,7 @@ class LLTearOffMenu : public LLFloater
 {
 public:
 	static LLTearOffMenu* create(LLMenuGL* menup);
-	virtual ~LLTearOffMenu();
+	virtual ~LLTearOffMenu() = default;
 
 	virtual void draw(void);
 	virtual void onFocusReceived();
@@ -912,9 +912,9 @@ public:
 		static LLEditMenuHandlerMgr instance;
 		return instance;
 	}
-	virtual ~LLEditMenuHandlerMgr() {}
+	virtual ~LLEditMenuHandlerMgr() = default;
 private:
-	LLEditMenuHandlerMgr() {};
+	LLEditMenuHandlerMgr() = default;
 };
 
 

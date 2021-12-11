@@ -62,13 +62,6 @@ LLTexLayerParam::LLTexLayerParam(LLAvatarAppearance *appearance)
 {
 }
 
-LLTexLayerParam::LLTexLayerParam(const LLTexLayerParam& pOther)
-	: LLViewerVisualParam(pOther),
-	mTexLayer(pOther.mTexLayer),
-	mAvatarAppearance(pOther.mAvatarAppearance)
-{
-}
-
 BOOL LLTexLayerParam::setInfo(LLViewerVisualParamInfo *info, BOOL add_to_appearance)
 {
 	LLViewerVisualParam::setInfo(info);
@@ -430,12 +423,6 @@ LLTexLayerParamColor::LLTexLayerParamColor(LLTexLayerInterface* layer)
 LLTexLayerParamColor::LLTexLayerParamColor(LLAvatarAppearance *appearance)
 	: LLTexLayerParam(appearance),
 	mAvgDistortionVec(1.f, 1.f, 1.f)
-{
-}
-
-LLTexLayerParamColor::LLTexLayerParamColor(const LLTexLayerParamColor& pOther)
-	: LLTexLayerParam(pOther),
-	mAvgDistortionVec(pOther.mAvgDistortionVec)
 {
 }
 

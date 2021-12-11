@@ -77,8 +77,7 @@ class LLThreadLocalPointer : public LLThreadLocalPointerBase
 {
 public:
 
-	LLThreadLocalPointer()
-	{}
+	LLThreadLocalPointer() = default;
 
 	explicit LLThreadLocalPointer(T* value)
 	{

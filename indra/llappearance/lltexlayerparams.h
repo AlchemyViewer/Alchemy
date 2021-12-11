@@ -52,7 +52,7 @@ public:
 	/*virtual*/ LLViewerVisualParam* cloneParam(LLWearable* wearable) const = 0;
 
 protected:
-	LLTexLayerParam(const LLTexLayerParam& pOther);
+	LLTexLayerParam(const LLTexLayerParam& pOther) = default;
 
 	LLTexLayerInterface*	mTexLayer;
 	LLAvatarAppearance*		mAvatarAppearance;
@@ -194,7 +194,7 @@ public:
 	// New functions
 	LLColor4				getNetColor() const;
 protected:
-	LLTexLayerParamColor(const LLTexLayerParamColor& pOther);
+	LLTexLayerParamColor(const LLTexLayerParamColor& pOther) = default;
 
 	virtual void onGlobalColorChanged() {}
 private:

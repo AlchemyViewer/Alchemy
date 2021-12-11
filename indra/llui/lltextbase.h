@@ -63,7 +63,7 @@ public:
 	:	mStart(start), 
 		mEnd(end)
 	{}
-	virtual ~LLTextSegment();
+	virtual ~LLTextSegment() = default;
 	bool						getDimensions(S32 first_char, S32 num_chars, S32& width, S32& height) const;
 
 	virtual bool				getDimensionsF32(S32 first_char, S32 num_chars, F32& width, S32& height) const;
@@ -240,7 +240,7 @@ public:
 
 	LLLineBreakTextSegment(LLStyleConstSP style,S32 pos);
 	LLLineBreakTextSegment(S32 pos);
-	~LLLineBreakTextSegment();
+	~LLLineBreakTextSegment() = default;
 	/*virtual*/ bool		getDimensionsF32(S32 first_char, S32 num_chars, F32& width, S32& height) const;
 	S32			getNumChars(S32 num_pixels, S32 segment_offset, S32 line_offset, S32 max_chars, S32 line_ind) const;
 	F32			draw(S32 start, S32 end, S32 selection_start, S32 selection_end, const LLRectf& draw_rect);
@@ -253,7 +253,7 @@ class LLImageTextSegment : public LLTextSegment
 {
 public:
 	LLImageTextSegment(LLStyleConstSP style,S32 pos,class LLTextBase& editor);
-	~LLImageTextSegment();
+	~LLImageTextSegment() = default;
 	/*virtual*/ bool		getDimensionsF32(S32 first_char, S32 num_chars, F32& width, S32& height) const;
 	S32			getNumChars(S32 num_pixels, S32 segment_offset, S32 char_offset, S32 max_chars, S32 line_ind) const;
 	F32			draw(S32 start, S32 end, S32 selection_start, S32 selection_end, const LLRectf& draw_rect);
@@ -560,7 +560,7 @@ protected:
 				mSegments.push_back(segment);
 			}
 		}
-		virtual			~TextCmd() {}
+		virtual			~TextCmd() = default;
 		virtual BOOL	execute(LLTextBase* editor, S32* delta) = 0;
 		virtual S32		undo(LLTextBase* editor) = 0;
 		virtual S32		redo(LLTextBase* editor) = 0;

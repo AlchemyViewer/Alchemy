@@ -151,10 +151,6 @@ LLBadge::LLBadge(const LLBadge::Params& p)
 	}
 }
 
-LLBadge::~LLBadge()
-{
-}
-
 bool LLBadge::addToView(LLView * view)
 {
 	bool child_added = view->addChild(this);

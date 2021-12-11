@@ -127,7 +127,7 @@ public:
 	typedef std::deque<Paragraph> paragraph_t;
 	paragraph_t mParagraphs;
 
-	~LLConsole(){};
+	~LLConsole()= default;
 
 	// each line lasts this long after being added
 	void			setLinePersistTime(F32 seconds);

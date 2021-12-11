@@ -93,12 +93,6 @@ LLTexParamGlobalColor::LLTexParamGlobalColor(LLTexGlobalColor* tex_global_color)
 //-----------------------------------------------------------------------------
 // LLTexParamGlobalColor
 //-----------------------------------------------------------------------------
-LLTexParamGlobalColor::LLTexParamGlobalColor(const LLTexParamGlobalColor& pOther)
-	: LLTexLayerParamColor(pOther),
-	mTexGlobalColor(pOther.mTexGlobalColor)
-{
-}
-
 /*virtual*/ LLViewerVisualParam* LLTexParamGlobalColor::cloneParam(LLWearable* wearable) const
 {
 	return new LLTexParamGlobalColor(*this);
@@ -112,11 +106,6 @@ void LLTexParamGlobalColor::onGlobalColorChanged()
 //-----------------------------------------------------------------------------
 // LLTexGlobalColorInfo
 //-----------------------------------------------------------------------------
-
-LLTexGlobalColorInfo::LLTexGlobalColorInfo()
-{
-}
-
 
 LLTexGlobalColorInfo::~LLTexGlobalColorInfo()
 {

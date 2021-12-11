@@ -42,35 +42,35 @@
 class RCFoo: public LLRefCount
 {
 public:
-    RCFoo() {}
+    RCFoo() = default;
 };
 
 // a refcounted subclass
 class RCSubFoo: public RCFoo
 {
 public:
-    RCSubFoo() {}
+    RCSubFoo() = default;
 };
 
 // a refcounted class using the other refcount base class
 class TSRCFoo: public LLThreadSafeRefCount
 {
 public:
-    TSRCFoo() {}
+    TSRCFoo() = default;
 };
 
 // a non-refcounted class
 class Bar
 {
 public:
-    Bar() {}
+    Bar() = default;
 };
 
 // a non-refcounted subclass
 class SubBar: public Bar
 {
 public:
-    SubBar() {}
+    SubBar() = default;
 };
 
 int main(int argc, char *argv[])

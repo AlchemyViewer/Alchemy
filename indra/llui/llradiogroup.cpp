@@ -50,7 +50,7 @@ class LLRadioCtrl : public LLCheckBoxCtrl
 {
 public:
 	typedef LLRadioGroup::ItemParams Params;
-	/*virtual*/ ~LLRadioCtrl();
+	/*virtual*/ ~LLRadioCtrl() = default;
 	/*virtual*/ void setValue(const LLSD& value);
 
 	/*virtual*/ BOOL postBuild();
@@ -111,11 +111,6 @@ void LLRadioGroup::initFromParams(const Params& p)
 
 	// call this *after* setting up mRadioButtons so we can handle setValue() calls
 	LLUICtrl::initFromParams(p);
-}
-
-
-LLRadioGroup::~LLRadioGroup()
-{
 }
 
 // virtual
@@ -491,10 +486,6 @@ BOOL LLRadioCtrl::handleMouseDown(S32 x, S32 y, MASK mask)
     }
 
     return LLCheckBoxCtrl::handleMouseDown(x, y, mask);
-}
-
-LLRadioCtrl::~LLRadioCtrl()
-{
 }
 
 void LLRadioCtrl::setValue(const LLSD& value)

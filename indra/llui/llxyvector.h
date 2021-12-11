@@ -65,7 +65,7 @@ public:
     };
 
 
-    virtual ~LLXYVector();
+    virtual ~LLXYVector() = default;
     /*virtual*/ BOOL postBuild();
 
     virtual BOOL	handleHover(S32 x, S32 y, MASK mask);

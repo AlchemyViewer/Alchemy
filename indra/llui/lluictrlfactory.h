@@ -55,7 +55,7 @@ public:
 	};
 
 protected:
-	LLChildRegistry() {}
+	LLChildRegistry() = default;
 };
 
 class LLDefaultChildRegistry final : public LLChildRegistry<LLDefaultChildRegistry>
@@ -311,7 +311,7 @@ LLUICtrlFactory::ParamDefaults<PARAM_BLOCK, DUMMY>::ParamDefaults()
 }
 
 template <int DUMMY>
-LLUICtrlFactory::ParamDefaults<LLInitParam::BaseBlock, DUMMY>::ParamDefaults() {}
+LLUICtrlFactory::ParamDefaults<LLInitParam::BaseBlock, DUMMY>::ParamDefaults() = default;
 
 // this is here to make gcc happy with reference to LLUICtrlFactory
 template<typename DERIVED>

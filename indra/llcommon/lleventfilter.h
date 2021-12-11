@@ -211,7 +211,7 @@ private:
 class LL_COMMON_API LLEventTimeout: public LLEventTimeoutBase
 {
 public:
-    LLEventTimeout();
+    LLEventTimeout() = default;
     LLEventTimeout(LLEventPump& source);
 
     /// using LLEventTimeout as namespace for free functions

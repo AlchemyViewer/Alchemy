@@ -80,10 +80,10 @@ protected:
 LL_ALIGN_PREFIX(16)
 class LLDriverParam final : public LLViewerVisualParam
 {
-private:
-	// Hide the default constructor.  Force construction with LLAvatarAppearance.
-	LLDriverParam() {}
 public:
+	// Delete the default constructor.  Force construction with LLAvatarAppearance.
+	LLDriverParam() = delete;
+
 	LLDriverParam(LLAvatarAppearance *appearance, LLWearable* wearable = NULL);
 	~LLDriverParam() = default;
 

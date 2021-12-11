@@ -70,7 +70,7 @@ public:
 			bool useTongue, const LLSD& key,
 			const Params& params = getDefaultParams());
 
-	virtual ~LLDockableFloater();
+	virtual ~LLDockableFloater() = default;
 
 	static LLHandle<LLFloater> getInstanceHandle() { return sInstanceHandle; }
 

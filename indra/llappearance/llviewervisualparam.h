@@ -106,7 +106,7 @@ public:
 	BOOL				getCrossWearable() const 	{ return getInfo()->mCrossWearable; }
 
 protected:
-	LLViewerVisualParam(const LLViewerVisualParam& pOther);
+	LLViewerVisualParam(const LLViewerVisualParam& pOther) = default;
 } LL_ALIGN_POSTFIX(16);
 
 #endif // LL_LLViewerVisualParam_H

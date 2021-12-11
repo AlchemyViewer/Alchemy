@@ -55,7 +55,7 @@ public:
 
 	struct Params : public LLInitParam::Block<Params, LLAccordionCtrlTab::Params>
 	{
-		Params();
+		Params() = default;
 	};
 
 	LLAccordionCtrlTabHeader(const LLAccordionCtrlTabHeader::Params& p);
@@ -111,10 +111,6 @@ private:
 
 	LLFrameTimer mAutoOpenTimer;
 };
-
-LLAccordionCtrlTab::LLAccordionCtrlTabHeader::Params::Params()
-{
-}
 
 LLAccordionCtrlTab::LLAccordionCtrlTabHeader::LLAccordionCtrlTabHeader(
 	const LLAccordionCtrlTabHeader::Params& p)
@@ -375,11 +371,6 @@ LLAccordionCtrlTab::LLAccordionCtrlTab(const LLAccordionCtrlTab::Params&p)
 
 	reshape(100, 200,FALSE);
 }
-
-LLAccordionCtrlTab::~LLAccordionCtrlTab()
-{
-}
-
 
 void LLAccordionCtrlTab::setDisplayChildren(bool display)
 {

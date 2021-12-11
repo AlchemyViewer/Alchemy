@@ -109,9 +109,7 @@ struct grammar
 				FPT
 			>
 	{
-		constant_()
-		{
-		}
+		constant_() = default;
 	} constant;
  
 	// symbol table for unary functions like "abs"

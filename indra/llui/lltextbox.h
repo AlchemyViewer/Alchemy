@@ -46,7 +46,7 @@ protected:
 	friend class LLUICtrlFactory;
 
 public:
-	virtual ~LLTextBox();
+	virtual ~LLTextBox() = default;
 
 	/*virtual*/ BOOL handleMouseDown(S32 x, S32 y, MASK mask);
 	/*virtual*/ BOOL handleMouseUp(S32 x, S32 y, MASK mask);

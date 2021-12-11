@@ -3389,10 +3389,6 @@ boost::signals2::connection LLTextBase::setIsObjectBlockedCallback(const is_bloc
 //
 // LLTextSegment
 //
-
-LLTextSegment::~LLTextSegment()
-{}
-
 bool LLTextSegment::getDimensionsF32(S32 first_char, S32 num_chars, F32& width, S32& height) const { width = 0; height = 0; return false; }
 bool LLTextSegment::getDimensions(S32 first_char, S32 num_chars, S32& width, S32& height) const
 {
@@ -3911,9 +3907,6 @@ LLLineBreakTextSegment::LLLineBreakTextSegment(LLStyleConstSP style,S32 pos):LLT
 {
 	mFontHeight = style->getFont()->getLineHeight();
 }
-LLLineBreakTextSegment::~LLLineBreakTextSegment()
-{
-}
 bool LLLineBreakTextSegment::getDimensionsF32(S32 first_char, S32 num_chars, F32& width, S32& height) const
 {
 	width = 0;
@@ -3934,10 +3927,6 @@ LLImageTextSegment::LLImageTextSegment(LLStyleConstSP style,S32 pos,class LLText
 :	LLTextSegment(pos,pos+1),
 	mStyle( style ),
 	mEditor(editor)
-{
-}
-
-LLImageTextSegment::~LLImageTextSegment()
 {
 }
 

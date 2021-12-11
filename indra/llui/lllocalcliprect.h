@@ -57,7 +57,7 @@ class LLLocalClipRect : public LLScreenClipRect
 {
 public:
 	LLLocalClipRect(const LLRect& rect, BOOL enabled = TRUE);
-	~LLLocalClipRect();
+	~LLLocalClipRect() = default;
 };
 
 #endif

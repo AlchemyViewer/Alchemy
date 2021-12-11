@@ -66,7 +66,7 @@ class LLTextBox;
 class LLFolderViewScrollContainer : public LLScrollContainer
 {
 public:
-	/*virtual*/ ~LLFolderViewScrollContainer() {};
+	/*virtual*/ ~LLFolderViewScrollContainer() = default;
 	/*virtual*/ const LLRect getScrolledViewRect() const;
 
 protected:
@@ -350,7 +350,7 @@ public:
 class LLFolderViewFunctor
 {
 public:
-	virtual ~LLFolderViewFunctor() {}
+	virtual ~LLFolderViewFunctor() = default;
 	virtual void doFolder(LLFolderViewFolder* folder) = 0;
 	virtual void doItem(LLFolderViewItem* item) = 0;
 };
@@ -370,7 +370,7 @@ class LLSelectFirstFilteredItem : public LLFolderViewFunctor
 {
 public:
 	LLSelectFirstFilteredItem() : mItemSelected(FALSE), mFolderSelected(FALSE) {}
-	virtual ~LLSelectFirstFilteredItem() {}
+	virtual ~LLSelectFirstFilteredItem() = default;
 	virtual void doFolder(LLFolderViewFolder* folder);
 	virtual void doItem(LLFolderViewItem* item);
 	BOOL wasItemSelected() { return mItemSelected || mFolderSelected; }
@@ -382,8 +382,8 @@ protected:
 class LLOpenFilteredFolders : public LLFolderViewFunctor
 {
 public:
-	LLOpenFilteredFolders()  {}
-	virtual ~LLOpenFilteredFolders() {}
+	LLOpenFilteredFolders()  = default;
+	virtual ~LLOpenFilteredFolders() = default;
 	virtual void doFolder(LLFolderViewFolder* folder);
 	virtual void doItem(LLFolderViewItem* item);
 };
@@ -392,7 +392,7 @@ class LLSaveFolderState : public LLFolderViewFunctor
 {
 public:
 	LLSaveFolderState() : mApply(FALSE) {}
-	virtual ~LLSaveFolderState() {}
+	virtual ~LLSaveFolderState() = default;
 	virtual void doFolder(LLFolderViewFolder* folder);
 	virtual void doItem(LLFolderViewItem* item) {}
 	void setApply(BOOL apply);
@@ -405,8 +405,8 @@ protected:
 class LLOpenFoldersWithSelection : public LLFolderViewFunctor
 {
 public:
-	LLOpenFoldersWithSelection() {}
-	virtual ~LLOpenFoldersWithSelection() {}
+	LLOpenFoldersWithSelection() = default;
+	virtual ~LLOpenFoldersWithSelection() = default;
 	virtual void doFolder(LLFolderViewFolder* folder);
 	virtual void doItem(LLFolderViewItem* item);
 };
@@ -415,7 +415,7 @@ class LLAllDescendentsPassedFilter : public LLFolderViewFunctor
 {
 public:
 	LLAllDescendentsPassedFilter() : mAllDescendentsPassedFilter(true) {}
-	/*virtual*/ ~LLAllDescendentsPassedFilter() {}
+	/*virtual*/ ~LLAllDescendentsPassedFilter() = default;
 	/*virtual*/ void doFolder(LLFolderViewFolder* folder);
 	/*virtual*/ void doItem(LLFolderViewItem* item);
 	bool allDescendentsPassedFilter() const { return mAllDescendentsPassedFilter; }

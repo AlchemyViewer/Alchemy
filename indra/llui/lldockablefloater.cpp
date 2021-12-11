@@ -70,10 +70,6 @@ LLDockableFloater::LLDockableFloater(LLDockControl* dockControl, bool uniqueDock
 	init(this);
 }
 
-LLDockableFloater::~LLDockableFloater()
-{
-}
-
 BOOL LLDockableFloater::postBuild()
 {
 	// Remember we should force docking when the floater is opened for the first time

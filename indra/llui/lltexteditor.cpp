@@ -87,7 +87,7 @@ public:
 		: TextCmd(pos, group_with_next, segment), mWString(ws)
 	{
 	}
-	virtual ~TextCmdInsert() {}
+	virtual ~TextCmdInsert() = default;
 	virtual BOOL execute( LLTextBase* editor, S32* delta )
 	{
 		*delta = insert(editor, getPosition(), mWString );
