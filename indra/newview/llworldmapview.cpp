@@ -1034,7 +1034,7 @@ void LLWorldMapView::drawTracking(const LLVector3d& pos_global, const LLColor4& 
 			LLColor4::white, LLFontGL::HCENTER,
 			LLFontGL::BASELINE, LLFontGL::NORMAL, LLFontGL::DROP_SHADOW);
 
-		if (tooltip != "")
+		if (!tooltip.empty())
 		{
 			text_y -= font->getLineHeight();
 
