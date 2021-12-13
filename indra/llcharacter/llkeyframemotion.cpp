@@ -324,16 +324,17 @@ LLMotion::LLMotionInitStatus LLKeyframeMotion::onInitialize(LLCharacter *charact
 			anim_data = new(std::nothrow) U8[anim_file_size];
 			if (anim_data)
 			{
-				success = anim_file.read(anim_data, anim_file_size);	/*Flawfinder: ignore*/
+				success = anim_file.read(anim_data, anim_file_size);
 				if (!success)
 				{
 					delete[] anim_data;
 					anim_data = nullptr;
+					LL_WARNS() << "Failed to read animation from cache. ID: " << mID << LL_ENDL;
 				}
 			}
 			else
 			{
-				LL_WARNS() << "Failed to allocate buffer: " << anim_file_size << mID << LL_ENDL;
+				LL_WARNS() << "Failed to allocate buffer: " << anim_file_size << " " << mID << LL_ENDL;
 			}
 		}
 	}
