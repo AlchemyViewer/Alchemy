@@ -29,7 +29,7 @@ variables:
   variables:
     USE_SENTRY: "TRUE"
   before_script:
-    - virtualenv -p C:\Python39\python.exe .venv
+    - virtualenv -p python .venv
     - .\.venv\Scripts\activate.ps1
     - pip3 install --upgrade autobuild -i https://ci-job-token:${CI_JOB_TOKEN}@git.alchemyviewer.org/api/v4/projects/54/packages/pypi/simple
   script:
