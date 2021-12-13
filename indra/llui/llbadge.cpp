@@ -90,7 +90,7 @@ LLBadge::LLBadge(const LLBadge::Params& p)
 	, mGLFont(p.font)
 	, mImage(p.image)
 	, mImageColor(p.image_color)
-	, mLabel(p.label)
+	, mLabel(utf8str_to_wstring(p.label))
 	, mLabelColor(p.label_color)
 	, mLabelOffsetHoriz(p.label_offset_horiz)
 	, mLabelOffsetVert(p.label_offset_vert)
@@ -174,7 +174,7 @@ bool LLBadge::addToView(LLView * view)
 
 void LLBadge::setLabel(const LLStringExplicit& label)
 {
-	mLabel = label;
+	mLabel = utf8str_to_wstring(label);
 }
 
 //
@@ -228,9 +228,6 @@ void LLBadge::draw()
 			//
 			// Calculate badge size based on label text
 			//
-
-			const LLWString& badge_label_wstring = mLabel.getWString();
-
 			S32 badge_label_begin_offset = 0;
 			S32 badge_char_length = S32_MAX;
 			S32 badge_pixel_length = S32_MAX;
@@ -238,7 +235,7 @@ void LLBadge::draw()
 			BOOL do_not_use_ellipses = false;
 
 			F32 badge_width = (2.0f * mPaddingHoriz) +
-				mGLFont->getWidthF32(badge_label_wstring.c_str(), badge_label_begin_offset, badge_char_length);
+				mGLFont->getWidthF32(mLabel.c_str(), badge_label_begin_offset, badge_char_length);
 
 			F32 badge_height = (2.0f * mPaddingVert) + mGLFont->getLineHeight();
 
@@ -352,7 +349,7 @@ void LLBadge::draw()
 			// Draw the label
 			//
 
-			mGLFont->render(badge_label_wstring,
+			mGLFont->render(mLabel,
 							badge_label_begin_offset,
 							badge_center_x + mLabelOffsetHoriz,
 							badge_center_y + mLabelOffsetVert,

@@ -1018,7 +1018,7 @@ void LLWorldMapView::drawTracking(const LLVector3d& pos_global, const LLColor4& 
 
 //	if (label != "")
 // [RLVa:KB] - Checked: 2009-07-04 (RLVa-1.4.5) | Added: RLVa-1.0.0
-	if ( (label != "") && (RlvActions::canShowLocation()) )
+	if (!label.empty() && (RlvActions::canShowLocation()))
 // [/RLVa:KB]
 	{
 		// clamp text position to on-screen

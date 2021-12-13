@@ -569,7 +569,6 @@ void LLTextBase::drawCursor()
 		&& !mReadOnly)
 	{
 		const LLWString &wtext = getWText();
-		const llwchar* text = wtext.c_str();
 
 		LLRect cursor_rect = getLocalRectFromDocIndex(mCursorPos);
 		cursor_rect.translate(-1, 0);
@@ -613,13 +612,13 @@ void LLTextBase::drawCursor()
 			
 			gl_rect_2d(cursor_rect);
 
-			if (LL_KIM_OVERWRITE == gKeyboard->getInsertMode() && !hasSelection() && text[mCursorPos] != '\n')
+			if (LL_KIM_OVERWRITE == gKeyboard->getInsertMode() && !hasSelection() && wtext[mCursorPos] != '\n')
 			{
 				LLColor4 text_color;
 				const LLFontGL* fontp;
 				text_color = segmentp->getColor();
 				fontp = segmentp->getStyle()->getFont();
-				fontp->render(text, mCursorPos, cursor_rect, 
+				fontp->render(wtext, mCursorPos, cursor_rect,
 					LLColor4(1.f - text_color.mV[VRED], 1.f - text_color.mV[VGREEN], 1.f - text_color.mV[VBLUE], alpha),
 					LLFontGL::LEFT, mVAlign,
 					LLFontGL::NORMAL,

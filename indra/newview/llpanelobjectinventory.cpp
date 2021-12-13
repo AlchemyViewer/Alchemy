@@ -1791,7 +1791,8 @@ void LLPanelObjectInventory::draw()
 	{
 		if((LLUUID::null != mTaskUUID) && (!mHaveInventory))
 		{
-			LLFontGL::getFontSansSerif()->renderUTF8(LLTrans::getString("LoadingContents"), 0,
+			static const LLWString loading_contents_str = utf8str_to_wstring(LLTrans::getString("LoadingContents"));
+			LLFontGL::getFontSansSerif()->render(loading_contents_str, 0,
 													 (S32)(getRect().getWidth() * 0.5f),
 													 10,
 													 LLColor4( 1, 1, 1, 1 ),
@@ -1800,7 +1801,8 @@ void LLPanelObjectInventory::draw()
 		}
 		else if(mHaveInventory)
 		{
-			LLFontGL::getFontSansSerif()->renderUTF8(LLTrans::getString("NoContents"), 0,
+			static const LLWString no_contents_str = utf8str_to_wstring(LLTrans::getString("NoContents"));
+			LLFontGL::getFontSansSerif()->render(no_contents_str, 0,
 													 (S32)(getRect().getWidth() * 0.5f),
 													 10,
 													 LLColor4( 1, 1, 1, 1 ),

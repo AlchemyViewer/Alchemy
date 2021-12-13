@@ -87,7 +87,7 @@ namespace LLInitParam
 // Classes
 //
 
-class LLBadge
+class LLBadge final
 : public LLUICtrl
 {
 public:
@@ -134,7 +134,7 @@ public:
 
 	virtual void		draw();
 
-	const std::string&	getLabel() const { return mLabel.getString(); }
+	//const std::string&	getLabel() const { return mLabel.getString(); }
 	void				setLabel( const LLStringExplicit& label);
 
 	void				setDrawAtParentTop(bool draw_at_top) { mDrawAtParentTop = draw_at_top;}
@@ -148,7 +148,7 @@ private:
 	LLPointer< LLUIImage >	mImage;
 	LLUIColor				mImageColor;
 	
-	LLUIString				mLabel;
+	LLWString				mLabel;
 	LLUIColor				mLabelColor;
 
 	S32						mLabelOffsetHoriz;

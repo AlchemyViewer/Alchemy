@@ -231,7 +231,8 @@ void LLPreviewTexture::draw()
 
 			if( mLoadingFullImage )
 			{
-				LLFontGL::getFontSansSerif()->renderUTF8(LLTrans::getString("Receiving"), 0,
+				static const LLWString receiving_str = utf8str_to_wstring(LLTrans::getString("Receiving"));
+				LLFontGL::getFontSansSerif()->render(receiving_str, 0,
 					interior.mLeft + 4, 
 					interior.mBottom + 4,
 					LLColor4::white, LLFontGL::LEFT, LLFontGL::BOTTOM,
@@ -268,7 +269,8 @@ void LLPreviewTexture::draw()
 			else
 			if( !mSavedFileTimer.hasExpired() )
 			{
-				LLFontGL::getFontSansSerif()->renderUTF8(LLTrans::getString("FileSaved"), 0,
+				static const LLWString file_saved_str = utf8str_to_wstring(LLTrans::getString("FileSaved"));
+				LLFontGL::getFontSansSerif()->render(file_saved_str, 0,
 					interior.mLeft + 4,
 					interior.mBottom + 4,
 					LLColor4::white, LLFontGL::LEFT, LLFontGL::BOTTOM,

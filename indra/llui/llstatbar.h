@@ -107,7 +107,7 @@ private:
 		const LLTrace::StatType<LLTrace::MemAccumulator>*		memStatp;
 	} mStat;
 
-	LLUIString   mLabel;
+	LLWString   mLabel;
 	std::string  mUnitLabel;
 
 	bool         mDisplayBar,			// Display the bar graph.

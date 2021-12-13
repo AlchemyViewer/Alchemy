@@ -395,11 +395,11 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
 
 	if (draw_ellipses)
 	{
-		
+		static const LLWString elipses = utf8str_to_wstring(std::string("..."));
 		// recursively render ellipses at end of string
 		// we've already reserved enough room
 		gGL.pushUIMatrix();
-		renderUTF8(std::string("..."), 
+		render(elipses,
 				0,
 				(cur_x - origin.mV[VX]) / sScaleX, (F32)y,
 				color,
