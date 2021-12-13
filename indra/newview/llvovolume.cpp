@@ -5940,7 +5940,7 @@ void LLVolumeGeometryManager::rebuildGeom(LLSpatialGroup* group)
 						}
 						else
 						{
-							if (te->getColor().mV[3] > 0.f)
+							if (te->getColor().mV[3] > 0.f || te->getGlow() > 0.f)
 							{ //only treat as alpha in the pipeline if < 100% transparent
 								drawablep->setState(LLDrawable::HAS_ALPHA);
 								if (alpha_count < MAX_FACE_COUNT)
@@ -6651,7 +6651,7 @@ U32 LLVolumeGeometryManager::genDrawInfo(LLSpatialGroup* group, U32 mask, LLFace
 
 			const LLTextureEntry* te = facep->getTextureEntry();
 
-			if (!LLDrawPoolAlpha::sShowDebugAlpha && te->getColor().mV[3] <= 0.001f)
+			if (!LLDrawPoolAlpha::sShowDebugAlpha && te->getColor().mV[3] <= 0.001f && te->getGlow() <= 0.f)
 			{
 				++face_iter;
 				continue;

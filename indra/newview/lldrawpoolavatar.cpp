@@ -2412,8 +2412,8 @@ void LLDrawPoolAvatar::addRiggedFace(LLFace* facep, U32 type)
 	}
 
 	const LLTextureEntry* tex_entry = facep->getTextureEntry();
-	// Don't render invisible faces even when they are in a linkset.
-	if (tex_entry && tex_entry->getColor().mV[VW] <= 0.001f)
+	// Don't render invisible faces even when they are in a linkset except if there's glow.
+	if (tex_entry && tex_entry->getColor().mV[VW] <= 0.001f && tex_entry->getGlow() <= 0.f)
 	{
 		return;
 	}
