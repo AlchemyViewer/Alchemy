@@ -132,7 +132,7 @@ void LLViewerPartSourceScript::update(const F32 dt)
 	if( mIsSuspended )
 		return;
 
-	if (mOwnerAvatarp.isNull() && mOwnerUUID != LLUUID::null)
+	if (mOwnerAvatarp.isNull() && mOwnerUUID.notNull())
 	{
 		mOwnerAvatarp = find_avatar(mOwnerUUID);
 	}

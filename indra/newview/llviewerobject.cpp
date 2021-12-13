@@ -4964,7 +4964,7 @@ S32 LLViewerObject::setTETextureCore(const U8 te, LLViewerTexture *image)
 	const LLUUID& uuid = image->getID();
 	S32 retval = 0;
 	if (uuid != getTE(te)->getID() ||
-		uuid == LLUUID::null)
+		uuid.isNull())
 	{
 		retval = LLPrimitive::setTETexture(te, uuid);
 		LLViewerTexture* baked_texture = getBakedTextureForMagicId(uuid);
@@ -4984,7 +4984,7 @@ S32 LLViewerObject::setTENormalMapCore(const U8 te, LLViewerTexture *image)
 	S32 retval = TEM_CHANGE_TEXTURE;
 	const LLUUID& uuid = image ? image->getID() : LLUUID::null;
 	if (uuid != getTE(te)->getID() ||
-		uuid == LLUUID::null)
+		uuid.isNull())
 	{
 		LLTextureEntry* tep = getTE(te);
 		LLMaterial* mat = NULL;
@@ -5007,7 +5007,7 @@ S32 LLViewerObject::setTESpecularMapCore(const U8 te, LLViewerTexture *image)
 	S32 retval = TEM_CHANGE_TEXTURE;
 	const LLUUID& uuid = image ? image->getID() : LLUUID::null;
 	if (uuid != getTE(te)->getID() ||
-		uuid == LLUUID::null)
+		uuid.isNull())
 	{
 		LLTextureEntry* tep = getTE(te);
 		LLMaterial* mat = NULL;
@@ -5065,14 +5065,14 @@ S32 LLViewerObject::setTETexture(const U8 te, const LLUUID& uuid)
 
 S32 LLViewerObject::setTENormalMap(const U8 te, const LLUUID& uuid)
 {
-	LLViewerFetchedTexture *image = (uuid == LLUUID::null) ? NULL : LLViewerTextureManager::getFetchedTexture(
+	LLViewerFetchedTexture *image = (uuid.isNull()) ? NULL : LLViewerTextureManager::getFetchedTexture(
 		uuid, FTT_DEFAULT, TRUE, LLGLTexture::BOOST_ALM, LLViewerTexture::LOD_TEXTURE, 0, 0, LLHost());
 	return setTENormalMapCore(te, image);
 }
 
 S32 LLViewerObject::setTESpecularMap(const U8 te, const LLUUID& uuid)
 {
-	LLViewerFetchedTexture *image = (uuid == LLUUID::null) ? NULL : LLViewerTextureManager::getFetchedTexture(
+	LLViewerFetchedTexture *image = (uuid.isNull()) ? NULL : LLViewerTextureManager::getFetchedTexture(
 		uuid, FTT_DEFAULT, TRUE, LLGLTexture::BOOST_ALM, LLViewerTexture::LOD_TEXTURE, 0, 0, LLHost());
 	return setTESpecularMapCore(te, image);
 }
@@ -5766,7 +5766,7 @@ void LLViewerObject::setParticleSource(const LLPartSysData& particle_parameters,
 		if (mPartSourcep->getImage()->getID() != mPartSourcep->mPartSysData.mPartImageID)
 		{
 			LLViewerTexture* image;
-			if (mPartSourcep->mPartSysData.mPartImageID == LLUUID::null)
+			if (mPartSourcep->mPartSysData.mPartImageID.isNull())
 			{
 				image = LLViewerFetchedTexture::sPixieSmallImagep;
 			}
@@ -5815,7 +5815,7 @@ void LLViewerObject::unpackParticleSource(const S32 block_num, const LLUUID& own
 		if (mPartSourcep->getImage()->getID() != mPartSourcep->mPartSysData.mPartImageID)
 		{
 			LLViewerTexture* image;
-			if (mPartSourcep->mPartSysData.mPartImageID == LLUUID::null)
+			if (mPartSourcep->mPartSysData.mPartImageID.isNull())
 			{
 				image = LLViewerFetchedTexture::sPixieSmallImagep;
 			}
@@ -5862,7 +5862,7 @@ void LLViewerObject::unpackParticleSource(LLDataPacker &dp, const LLUUID& owner_
 		if (mPartSourcep->getImage()->getID() != mPartSourcep->mPartSysData.mPartImageID)
 		{
 			LLViewerTexture* image;
-			if (mPartSourcep->mPartSysData.mPartImageID == LLUUID::null)
+			if (mPartSourcep->mPartSysData.mPartImageID.isNull())
 			{
 				image = LLViewerFetchedTexture::sPixieSmallImagep;
 			}

@@ -5937,7 +5937,7 @@ void LLCallingCardBridge::performAction(LLInventoryModel* model, std::string act
 // [/RLVa:KB]
 
 			LLUUID session_id = gIMMgr->addSession(callingcard_name, IM_NOTHING_SPECIAL, item->getCreatorUUID());
-			if (session_id != LLUUID::null)
+			if (session_id.notNull())
 			{
 				LLFloaterIMContainer::getInstance()->showConversation(session_id);
 			}

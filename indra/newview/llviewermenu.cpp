@@ -3093,7 +3093,7 @@ bool enable_mute_particle()
 {
 	const LLPickInfo& pick = LLToolPie::getInstance()->getPick();
 
-	return pick.mParticleOwnerID != LLUUID::null && pick.mParticleOwnerID != gAgent.getID();
+	return pick.mParticleOwnerID.notNull() && pick.mParticleOwnerID != gAgent.getID();
 }
 
 // mutually exclusive - show either edit option or build in menu

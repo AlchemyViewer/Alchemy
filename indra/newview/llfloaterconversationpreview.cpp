@@ -72,7 +72,7 @@ BOOL LLFloaterConversationPreview::postBuild()
 		name = mCompleteName;
 		file = mAccountName;
 	}
-	else if (mSessionID != LLUUID::null && conv)
+	else if (mSessionID.notNull() && conv)
 	{
 		name = conv->getConversationName();
 		file = conv->getHistoryFileName();

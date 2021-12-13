@@ -227,7 +227,7 @@ void LLGroupActions::startCall(const LLUUID& group_id)
 // [/RLVa:KB]
 
 	LLUUID session_id = gIMMgr->addSession(gdata.mName, IM_SESSION_GROUP_START, group_id, true);
-	if (session_id == LLUUID::null)
+	if (session_id.isNull())
 	{
 		LL_WARNS() << "Error adding session" << LL_ENDL;
 		return;
@@ -496,7 +496,7 @@ LLUUID LLGroupActions::startIM(const LLUUID& group_id)
 			group_data.mName,
 			IM_SESSION_GROUP_START,
 			group_id);
-		if (session_id != LLUUID::null)
+		if (session_id.notNull())
 		{
 			LLFloaterIMContainer::getInstance()->showConversation(session_id);
 		}
@@ -520,7 +520,7 @@ static void close_group_im(const LLUUID& group_id, LLIMModel::LLIMSession::SClos
 		return;
 	
 	LLUUID session_id = gIMMgr->computeSessionID(IM_SESSION_GROUP_START, group_id);
-	if (session_id != LLUUID::null)
+	if (session_id.notNull())
 	{
 		LLIMModel::LLIMSession* pIMSession = LLIMModel::getInstance()->findIMSession(session_id);
 		if (pIMSession)
@@ -557,7 +557,7 @@ void LLGroupActions::endIM(const LLUUID& group_id)
 //		return;
 //	
 //	LLUUID session_id = gIMMgr->computeSessionID(IM_SESSION_GROUP_START, group_id);
-//	if (session_id != LLUUID::null)
+//	if (session_id.notNull())
 //	{
 //		gIMMgr->leaveSession(session_id);
 //	}

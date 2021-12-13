@@ -67,7 +67,7 @@ BOOL LLPanelGroupExperiences::postBuild()
 
 void LLPanelGroupExperiences::activate()
 {
-	if ((getGroupID() == LLUUID::null) || gDisconnected)
+	if ((getGroupID().isNull()) || gDisconnected)
 	{
 		return;
 	}
@@ -80,7 +80,7 @@ void LLPanelGroupExperiences::setGroupID(const LLUUID& id)
 {
 	LLPanelGroupTab::setGroupID(id);
 
-	if(id == LLUUID::null)
+	if(id.isNull())
 	{
 		return;
 	}

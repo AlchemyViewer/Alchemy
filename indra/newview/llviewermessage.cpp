@@ -4004,7 +4004,7 @@ void process_kill_object(LLMessageSystem *mesgsys, void **user_data)
 		mesgsys->getU32Fast(_PREHASH_ObjectData, _PREHASH_ID, local_id, i);
 
 		LLViewerObjectList::getUUIDFromLocal(id, local_id, ip, port); 
-		if (id == LLUUID::null)
+		if (id.isNull())
 		{
 			LL_DEBUGS("Messaging") << "Unknown kill for local " << local_id << LL_ENDL;
 			continue;

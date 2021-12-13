@@ -843,7 +843,7 @@ void LLGroupMgr::clearGroupData(const LLUUID& group_id)
 
 void LLGroupMgr::addObserver(LLGroupMgrObserver* observer) 
 { 
-	if( observer->getID() != LLUUID::null )
+	if( observer->getID().notNull())
 		mObservers.insert(std::pair<LLUUID, LLGroupMgrObserver*>(observer->getID(), observer));
 }
 

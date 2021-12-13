@@ -365,7 +365,7 @@ void LLFloaterPreference::processProperties( void* pData, EAvatarProcessorType t
 	if ( APT_PROPERTIES == type )
 	{
 		const LLAvatarData* pAvatarData = static_cast<const LLAvatarData*>( pData );
-		if (pAvatarData && (gAgent.getID() == pAvatarData->avatar_id) && (pAvatarData->avatar_id != LLUUID::null))
+		if (pAvatarData && (gAgent.getID() == pAvatarData->avatar_id) && (pAvatarData->avatar_id.notNull()))
 		{
 			storeAvatarProperties( pAvatarData );
 			processProfileProperties( pAvatarData );

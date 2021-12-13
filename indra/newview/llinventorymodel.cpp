@@ -2608,7 +2608,7 @@ void LLInventoryModel::buildParentChildMap()
 		}
 	}
 
-	const BOOL COF_exists = (findCategoryUUIDForType(LLFolderType::FT_CURRENT_OUTFIT, FALSE) != LLUUID::null);
+	const BOOL COF_exists = (findCategoryUUIDForType(LLFolderType::FT_CURRENT_OUTFIT, FALSE).notNull());
 	sFirstTimeInViewer2 = !COF_exists || gAgent.isFirstLogin();
 
 

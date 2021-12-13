@@ -2097,7 +2097,7 @@ LLViewerObject *LLViewerObjectList::createObject(const LLPCode pcode, LLViewerRe
 {
 	
 	LLUUID fullid;
-	if (uuid == LLUUID::null)
+	if (uuid.isNull())
 	{
 		fullid.generate();
 	}

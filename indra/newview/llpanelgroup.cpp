@@ -121,7 +121,7 @@ void LLPanelGroup::onOpen(const LLSD& key)
 
 	if(str_action == "refresh")
 	{
-		if(mID == group_id || group_id == LLUUID::null)
+		if(mID == group_id || group_id.isNull())
 			refreshData();
 	}
 	else if(str_action == "close")
@@ -365,7 +365,7 @@ void LLPanelGroup::setGroupID(const LLUUID& group_id)
 	LLButton* button_chat = findChild<LLButton>("btn_chat");
 
 
-	bool is_null_group_id = group_id == LLUUID::null;
+	bool is_null_group_id = group_id.isNull();
 	if(button_apply)
 		button_apply->setVisible(!is_null_group_id);
 	if(button_refresh)

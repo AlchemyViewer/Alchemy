@@ -1432,7 +1432,7 @@ void LLFavoritesBarCtrl::onEndDrag()
 
 BOOL LLFavoritesBarCtrl::handleHover(S32 x, S32 y, MASK mask)
 {
-	if (mDragItemId != LLUUID::null && mStartDrag)
+	if (mDragItemId.notNull() && mStartDrag)
 	{
 		S32 screenX, screenY;
 		localPointToScreen(x, y, &screenX, &screenY);

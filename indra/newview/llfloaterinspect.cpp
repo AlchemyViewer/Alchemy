@@ -170,7 +170,7 @@ void LLFloaterInspect::onClickOwnerProfile()
 
 void LLFloaterInspect::onSelectObject()
 {
-	if(LLFloaterInspect::getSelectedUUID() != LLUUID::null)
+	if(LLFloaterInspect::getSelectedUUID().notNull())
 	{
 		if (!RlvActions::isRlvEnabled())
 		{
@@ -256,7 +256,7 @@ void LLFloaterInspect::onSelectObject()
 
 //void LLFloaterInspect::onSelectObject()
 //{
-//	if(LLFloaterInspect::getSelectedUUID() != LLUUID::null)
+//	if(LLFloaterInspect::getSelectedUUID().notNull())
 //	{
 //		getChildView("button owner")->setEnabled(true);
 //		getChildView("button creator")->setEnabled(true);

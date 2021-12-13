@@ -1271,7 +1271,7 @@ bool idle_startup()
 		set_startup_status(0.30f, LLTrans::getString("LoginInitializingWorld"), gAgent.mMOTD);
 		display_startup();
 		// We should have an agent id by this point.
-		llassert(!(gAgentID == LLUUID::null));
+		llassert(gAgentID.notNull());
 
 		// Finish agent initialization.  (Requires gSavedSettings, builds camera)
 		gAgent.init();

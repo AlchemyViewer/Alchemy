@@ -288,7 +288,7 @@ void LLPanelGroupInvite::impl::addRoleNames(LLGroupMgrGroupData* gdatap)
 				// Add all roles user is in
 				|| (can_assign_limited && member_data && member_data->isInRole(role_id))
 				// Everyone role.
-				|| role_id == LLUUID::null )
+				|| role_id.isNull() )
 			{
 				mRoleNames->add(rd.mRoleName,
 								role_id,

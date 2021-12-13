@@ -1488,7 +1488,7 @@ bool LLInventoryPanel::beginIMSession()
 	}
 // [/RLVa:KB]
 //	LLUUID session_id = gIMMgr->addSession(name, type, members[0], members);
-//	if (session_id != LLUUID::null)
+//	if (session_id.notNull())
 //	{
 //		LLFloaterIMContainer::getInstance()->showConversation(session_id);
 //	}

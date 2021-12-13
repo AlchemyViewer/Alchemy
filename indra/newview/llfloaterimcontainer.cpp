@@ -165,7 +165,7 @@ void LLFloaterIMContainer::sessionRemoved(const LLUUID& session_id)
 // static
 void LLFloaterIMContainer::onCurrentChannelChanged(const LLUUID& session_id)
 {
-    if (session_id != LLUUID::null)
+    if (session_id.notNull())
     {
     	LLFloaterIMContainer::getInstance()->showConversation(session_id);
     }

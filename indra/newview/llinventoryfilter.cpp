@@ -836,7 +836,7 @@ void LLInventoryFilter::setFilterNoMarketplaceFolder()
 
 void LLInventoryFilter::setFilterUUID(const LLUUID& object_id)
 {
-	if (mFilterOps.mFilterUUID == LLUUID::null)
+	if (mFilterOps.mFilterUUID.isNull())
 	{
 		setModified(FILTER_MORE_RESTRICTIVE);
 	}

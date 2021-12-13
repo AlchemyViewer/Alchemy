@@ -2101,7 +2101,7 @@ void LLViewerMediaImpl::updateVolume()
 			}
 		}
 
-		if (sOnlyAudibleTextureID == LLUUID::null || sOnlyAudibleTextureID == mTextureId)
+		if (sOnlyAudibleTextureID.isNull() || sOnlyAudibleTextureID == mTextureId)
 		{
 			mMediaSource->setVolume(volume);
 		}

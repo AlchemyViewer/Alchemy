@@ -2206,7 +2206,7 @@ BOOL LLPanelObject::onDropSculpt(LLInventoryItem* item)
 
 void LLPanelObject::onCancelSculpt(const LLSD& data)
 {
-	if(mSculptTextureRevert == LLUUID::null)
+	if(mSculptTextureRevert.isNull())
 	{
 		mSculptTextureRevert = LLUUID(SCULPT_DEFAULT_TEXTURE);
 	}

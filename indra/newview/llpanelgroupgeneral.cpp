@@ -797,7 +797,7 @@ void LLPanelGroupGeneral::setGroupID(const LLUUID& id)
 {
 	LLPanelGroupTab::setGroupID(id);
 
-	if(id == LLUUID::null)
+	if(id.isNull())
 	{
 		reset();
 		return;

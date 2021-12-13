@@ -6793,7 +6793,7 @@ void LLSelectMgr::updateSelectionCenter()
 
 	}
 	
-	if ( !(gAgentID == LLUUID::null)) 
+	if (gAgentID.notNull())
 	{
 		LLTool		*tool = LLToolMgr::getInstanceFast()->getCurrentTool();
 		if (mShowSelection)

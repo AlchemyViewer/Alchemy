@@ -71,7 +71,7 @@ LLInventoryObserver::~LLInventoryObserver()
 LLInventoryFetchObserver::LLInventoryFetchObserver(const LLUUID& id)
 {
 	mIDs.clear();
-	if (id != LLUUID::null)
+	if (id.notNull())
 	{
 		setFetchID(id);
 	}

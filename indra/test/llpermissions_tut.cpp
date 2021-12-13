@@ -53,8 +53,8 @@ namespace tut
 		LLUUID	uuid2 = permissions.getGroup();
 		LLUUID	uuid3 = permissions.getLastOwner(); 
 
-		ensure("LLPermission Get Functions failed", (uuid == LLUUID::null && uuid1 == LLUUID::null && 
-			uuid2 == LLUUID::null && uuid3 == LLUUID::null));
+		ensure("LLPermission Get Functions failed", (uuid.isNull() && uuid1.isNull() &&
+			uuid2.isNull() && uuid3.isNull()));
 		ensure("LLPermission Get Functions failed", (permissions.getMaskBase() == PERM_ALL && permissions.getMaskOwner() == PERM_ALL && 
 			permissions.getMaskGroup() == PERM_ALL && permissions.getMaskEveryone() == PERM_ALL && permissions.getMaskNextOwner() == PERM_ALL));
 		ensure("Ownership functions failed", ((! permissions.isGroupOwned()) && (! permissions.isOwned())));

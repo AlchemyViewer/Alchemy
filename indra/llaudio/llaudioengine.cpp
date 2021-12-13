@@ -1267,7 +1267,7 @@ void LLAudioEngine::assetCallback(const LLUUID &uuid, LLAssetType::EType type, v
 		    gAudioDecodeMgrp->addDecodeRequest(uuid);
 		}
 	}
-	gAudiop->mCurrentTransfer = LLUUID::null;
+	gAudiop->mCurrentTransfer.setNull();
 	gAudiop->startNextTransfer();
 }
 

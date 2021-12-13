@@ -2541,7 +2541,7 @@ void LLAgent::setStartPosition( U32 location_id )
 {
     LLViewerObject          *object;
 
-    if (gAgentID == LLUUID::null)
+    if (gAgentID.isNull())
     {
         return;
     }

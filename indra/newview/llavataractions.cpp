@@ -211,7 +211,7 @@ static void on_avatar_name_cache_start_im(const LLUUID& agent_id,
 {
 	std::string name = av_name.getDisplayName();
 	LLUUID session_id = gIMMgr->addSession(name, IM_NOTHING_SPECIAL, agent_id);
-	if (session_id != LLUUID::null)
+	if (session_id.notNull())
 	{
 		LLFloaterIMContainer::getInstance()->showConversation(session_id);
 	}
@@ -243,7 +243,7 @@ void LLAvatarActions::endIM(const LLUUID& id)
 		return;
 	
 	LLUUID session_id = gIMMgr->computeSessionID(IM_NOTHING_SPECIAL, id);
-	if (session_id != LLUUID::null)
+	if (session_id.notNull())
 	{
 		gIMMgr->leaveSession(session_id);
 	}
@@ -254,7 +254,7 @@ static void on_avatar_name_cache_start_call(const LLUUID& agent_id,
 {
 	std::string name = av_name.getDisplayName();
 	LLUUID session_id = gIMMgr->addSession(name, IM_NOTHING_SPECIAL, agent_id, true);
-	if (session_id != LLUUID::null)
+	if (session_id.notNull())
 	{
 		gIMMgr->startCall(session_id);
 	}
@@ -311,7 +311,7 @@ void LLAvatarActions::startAdhocCall(const uuid_vec_t& ids, const LLUUID& floate
 	const std::string title = LLTrans::getString("conference-title");
 	LLUUID session_id = gIMMgr->addSession(title, IM_SESSION_CONFERENCE_START,
 										   ids[0], id_array, true, floater_id);
-	if (session_id == LLUUID::null)
+	if (session_id.isNull())
 	{
 		return;
 	}
@@ -366,7 +366,7 @@ void LLAvatarActions::startConference(const uuid_vec_t& ids, const LLUUID& float
 	const std::string title = LLTrans::getString("conference-title");
 	LLUUID session_id = gIMMgr->addSession(title, IM_SESSION_CONFERENCE_START, ids[0], id_array, false, floater_id);
 
-	if (session_id == LLUUID::null)
+	if (session_id.isNull())
 	{
 		return;
 	}

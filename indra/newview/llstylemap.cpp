@@ -40,7 +40,7 @@ const LLStyle::Params &LLStyleMap::lookupAgent(const LLUUID &source)
 	if (mMap.find(source) == mMap.end())
 	{
 		LLStyle::Params style_params;
-		if (source != LLUUID::null)
+		if (source.notNull())
 		{
 			style_params.color.control = "HTMLLinkColor";
 			style_params.readonly_color.control = "HTMLLinkColor";
@@ -60,7 +60,7 @@ const LLStyle::Params &LLStyleMap::lookup(const LLUUID& id, const std::string& l
 	{
 		LLStyle::Params style_params;
 
-		if (id != LLUUID::null && !link.empty())
+		if (id.notNull() && !link.empty())
 		{
 			style_params.color.control = "HTMLLinkColor";
 			style_params.readonly_color.control = "HTMLLinkColor";
