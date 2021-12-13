@@ -516,8 +516,6 @@ private:
 	eBlendFactor mCurrBlendAlphaSFactor;
 	eBlendFactor mCurrBlendAlphaDFactor;
 
-    U32             mDummyVAO;
-
 	std::vector<LLVector4a, boost::alignment::aligned_allocator<LLVector4a, 64> > mUIOffset;
 	std::vector<LLVector4a, boost::alignment::aligned_allocator<LLVector4a, 64> > mUIScale;
 

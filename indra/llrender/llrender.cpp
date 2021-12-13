@@ -1085,7 +1085,6 @@ LLRender::LLRender()
     mMode(LLRender::TRIANGLES),
     mCurrTextureUnitIndex(0),
     mLineWidth(1.f),
-    mDummyVAO(0),
 	mPrimitiveReset(false)
 {	
 	mTexUnits.reserve(LL_NUM_TEXTURE_LAYERS);
@@ -1138,22 +1137,6 @@ LLRender::~LLRender()
 
 void LLRender::init()
 {
-	if (mDummyVAO != 0)
-	{ 
-#ifdef GL_ARB_vertex_array_object
-		glDeleteVertexArrays(1, &mDummyVAO);
-#endif
-		mDummyVAO = 0;
-	}
-
-	if (sGLCoreProfile && !LLVertexBuffer::sUseVAO)
-	{ //bind a dummy vertex array object so we're core profile compliant
-#ifdef GL_ARB_vertex_array_object
-		glGenVertexArrays(1, &mDummyVAO);
-		glBindVertexArray(mDummyVAO);
-#endif
-	}
-	stop_glerror();
 	restoreVertexBuffers();
 }
 
@@ -1174,14 +1157,6 @@ void LLRender::shutdown()
 	mLightState.clear();
 
 	mBuffer = nullptr;
-	
-	if (mDummyVAO != 0)
-    { //bind a dummy vertex array object so we're core profile compliant
-#ifdef GL_ARB_vertex_array_object
-        glDeleteVertexArrays(1, &mDummyVAO);
-#endif
-        mDummyVAO = 0;
-    }
 }
 
 void LLRender::refreshState(void)

@@ -352,6 +352,7 @@ public:
 
 private:
 	static LLVertexBuffer* sUtilityBuffer;
+	static U32 sDummyVAO;
 };
 
 

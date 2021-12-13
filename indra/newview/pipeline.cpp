@@ -7590,8 +7590,9 @@ void LLPipeline::doResetVertexBuffers(bool forced)
 
 	LLVertexBuffer::initClass(LLVertexBuffer::sEnableVBOs, LLVertexBuffer::sDisableVBOMapping);
 
-	LLVOPartGroup::restoreGL();
 	gGL.restoreVertexBuffers();
+
+	LLVOPartGroup::restoreGL();
 
 	if (mCubeVB.isNull())
 	{

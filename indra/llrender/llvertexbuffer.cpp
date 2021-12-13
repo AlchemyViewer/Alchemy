@@ -120,6 +120,7 @@ bool LLVertexBuffer::sUseStreamDraw = true;
 bool LLVertexBuffer::sUseVAO = false;
 bool LLVertexBuffer::sPreferStreamDraw = false;
 LLVertexBuffer* LLVertexBuffer::sUtilityBuffer = nullptr;
+U32 LLVertexBuffer::sDummyVAO = 0;
 
 #if LL_DEBUG || LL_RELEASE_WITH_DEBUG_INFO || defined(RELEASE_SHOW_ASSERT)
 static absl::flat_hash_set<U32> sActiveBufferNames;
@@ -996,6 +997,24 @@ void LLVertexBuffer::initClass(bool use_vbo, bool no_vbo_mapping)
 {
 	sEnableVBOs = use_vbo && gGLManager.mHasVertexBufferObject;
 	sDisableVBOMapping = sEnableVBOs && no_vbo_mapping;
+
+#ifdef GL_ARB_vertex_array_object
+	if (LLRender::sGLCoreProfile && !sUseVAO)
+	{
+		if (sDummyVAO != 0)
+		{
+			glBindVertexArray(0);
+			glDeleteVertexArrays(1, &sDummyVAO);
+			sDummyVAO = 0;
+		}
+
+		{ //bind a dummy vertex array object so we're core profile compliant
+			glGenVertexArrays(1, &sDummyVAO);
+			glBindVertexArray(sDummyVAO);
+		}
+		stop_glerror();
+	}
+#endif
 }
 
 //static 
@@ -1050,6 +1069,17 @@ void LLVertexBuffer::cleanupClass()
 
 	delete sUtilityBuffer;
 	sUtilityBuffer = nullptr;
+
+
+	if (sDummyVAO != 0)
+	{
+#ifdef GL_ARB_vertex_array_object
+		glBindVertexArray(0);
+		glDeleteVertexArrays(1, &sDummyVAO);
+#endif
+		sDummyVAO = 0;
+	}
+	stop_glerror();
 }
 
 //----------------------------------------------------------------------------
