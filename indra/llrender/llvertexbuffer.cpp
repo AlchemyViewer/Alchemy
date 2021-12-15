@@ -94,7 +94,7 @@ U64 LLVBOPool::sBytesPooled = 0;
 U64 LLVBOPool::sIndexBytesPooled = 0;
 std::vector<U32> LLVBOPool::sPendingDeletions;
 
-std::list<U32> LLVertexBuffer::sAvailableVAOName;
+std::vector<U32> LLVertexBuffer::sAvailableVAOName;
 U32 LLVertexBuffer::sCurVAOName = 1;
 
 U64 LLVertexBuffer::sAllocatedIndexBytes = 0;
@@ -509,8 +509,8 @@ U32 LLVertexBuffer::getVAOName()
 
 	if (!sAvailableVAOName.empty())
 	{
-		ret = sAvailableVAOName.front();
-		sAvailableVAOName.pop_front();
+		ret = sAvailableVAOName.back();
+		sAvailableVAOName.pop_back();
 	}
 	else
 	{
@@ -1058,12 +1058,12 @@ void LLVertexBuffer::cleanupClass()
 	sDynamicVBOPool.cleanup();
 	clean_validate_buffers();
 
-	while (!sAvailableVAOName.empty())
+	if (!sAvailableVAOName.empty())
 	{
 #if GL_ARB_vertex_array_object
-		glDeleteVertexArrays(1, &sAvailableVAOName.front());
+		glDeleteVertexArrays(sAvailableVAOName.size(), sAvailableVAOName.data());
 #endif
-		sAvailableVAOName.pop_front();
+		sAvailableVAOName.clear();
 	}
 	sLastMask = 0;
 
