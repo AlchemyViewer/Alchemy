@@ -766,14 +766,17 @@ void LLVertexBuffer::drawElements(U32 mode, const S32 num_vertices, const LLVect
 	LLStrider<LLVector4a> vertex_strider;
 	sUtilityBuffer->getIndexStrider(index_strider);
 	sUtilityBuffer->getVertexStrider(vertex_strider);
-    index_strider.copyArray(0, indicesp, num_indices);
-    vertex_strider.copyArray(0, pos, num_vertices);
+	const S32 index_size = ((num_indices * sizeof(U16)) + 0xF) & ~0xF;
+	const S32 vertex_size = ((num_vertices * 4 * sizeof(F32)) + 0xF) & ~0xF;
+	LLVector4a::memcpyNonAliased16((F32*)index_strider.get(), (F32*)indicesp, index_size);
+	LLVector4a::memcpyNonAliased16((F32*)vertex_strider.get(), (F32*)pos, vertex_size);
 	if (tc)
 	{
 		mask = mask | LLVertexBuffer::MAP_TEXCOORD0;
 		LLStrider<LLVector2> tc_strider;
 		sUtilityBuffer->getTexCoord0Strider(tc_strider);
-        tc_strider.copyArray(0, tc, num_vertices);
+		const S32 tc_size = ((num_vertices * 2 * sizeof(F32)) + 0xF) & ~0xF;
+		LLVector4a::memcpyNonAliased16((F32*)tc_strider.get(), (F32*)tc, tc_size);
 	}
 
 	sUtilityBuffer->setBuffer(mask);
