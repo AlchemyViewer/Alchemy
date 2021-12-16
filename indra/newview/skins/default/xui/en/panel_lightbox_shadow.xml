@@ -2,8 +2,8 @@
 <panel
  class="shadow_settings"
  layout="topleft"
- width="300"
- height="175"
+ width="350"
+ height="275"
  name="shadow_settings">
   <text
       follows="left|top"
@@ -46,11 +46,11 @@
     top_pad="4"
     width="90"
     layout="topleft"
-    tool_tip="Controls how detailed shadows are. Settings above 'Medium' are extremely demanding!"
+    tool_tip="(Default: Medium) Controls how detailed shadows are. Settings above 'Medium' are extremely demanding!"
     value="Shadow Quality: " />
   <combo_box
     allow_text_entry="false"
-    tool_tip="Controls how detailed shadows are. Settings above 'Medium' are extremely demanding!"
+    tool_tip="(Default: Medium) Controls how detailed shadows are. Settings above 'Medium' are extremely demanding!"
     control_name="RenderShadowResolutionScale"
     follows="left|top"
     height="16"
@@ -67,11 +67,11 @@
       <combo_box.item
         label="Medium"
         name="shadow_med"
-        value="1.0" />
+        value="1.000" />
       <combo_box.item
         label="High"
         name="shadow_high"
-        value="2" />
+        value="2.0" />
       <combo_box.item
         label="Very High"
         name="shadow_vhigh"
@@ -88,7 +88,7 @@
     top_pad="4"
     width="130"
     layout="topleft"
-    tool_tip="Reduces self-shadowing errors by ignoring faces too close to the shadow's origins. Smaller values allow more fine/accurate shadows at the cost of more shadow errors."
+    tool_tip="(Default: -0.03) Reduces self-shadowing errors by ignoring faces too close to the shadow's origins. Smaller values allow more fine/accurate shadows at the cost of more shadow errors."
     value="Shadow Bias:" />
   <slider_bar
     top_pad="-18"
@@ -101,7 +101,7 @@
     left="140"
     right="-68"
     name="shadow_bias_slider"
-    tool_tip="Reduces self-shadowing errors by ignoring faces too close to the shadow's origins. Smaller values allow more fine/accurate shadows at the cost of more shadow errors."
+    tool_tip="(Default: -0.03) Reduces self-shadowing errors by ignoring faces too close to the shadow's origins. Smaller values allow more fine/accurate shadows at the cost of more shadow errors."
     control_name="RenderShadowBias"/>
   <spinner
     top_pad="-20"
@@ -116,7 +116,7 @@
     width="55"
     increment=".001"
     name="shadow_bias_spinner"
-    tool_tip="Reduces self-shadowing errors by ignoring faces too close to the shadow's origins. Smaller values allow more fine/accurate shadows at the cost of more shadow errors."
+    tool_tip="(Default: -0.03) Reduces self-shadowing errors by ignoring faces too close to the shadow's origins. Smaller values allow more fine/accurate shadows at the cost of more shadow errors."
     control_name="RenderShadowBias"/>
   <text
     follows="left|top"
@@ -125,7 +125,7 @@
     top_pad="8"
     width="130"
     layout="topleft"
-    tool_tip="Used to reduce shadow errors by offsetting the entire shadowmap. Smaller values allow more accurate shadows and less light bleed from thin objects at the cost of possible shadow errors at extreme angles from source."
+    tool_tip="(Default: -0.01) Used to reduce shadow errors by offsetting the entire shadowmap. Smaller values allow more accurate shadows and less light bleed from thin objects at the cost of possible shadow errors at extreme angles from source."
     value="Shadow Offset:" />
   <slider_bar
     top_pad="-18"
@@ -138,7 +138,7 @@
     left="140"
     right="-68"
     name="shadow_offset_slider"
-    tool_tip="Used to reduce shadow errors by offsetting the entire shadowmap. Smaller values allow more accurate shadows and less light bleed from thin objects at the cost of possible shadow errors at extreme angles from source."
+    tool_tip="(Default: -0.01) Used to reduce shadow errors by offsetting the entire shadowmap. Smaller values allow more accurate shadows and less light bleed from thin objects at the cost of possible shadow errors at extreme angles from source."
     control_name="RenderShadowOffset"/>
   <spinner
     top_pad="-20"
@@ -153,7 +153,7 @@
     width="55"
     increment=".001"
     name="shadow_offset_spinner"
-    tool_tip="Used to reduce shadow errors by offsetting the entire shadowmap. Smaller values allow more accurate shadows and less light bleed from thin objects at the cost of possible shadow errors at extreme angles from source."
+    tool_tip="(Default: -0.01) Used to reduce shadow errors by offsetting the entire shadowmap. Smaller values allow more accurate shadows and less light bleed from thin objects at the cost of possible shadow errors at extreme angles from source."
     control_name="RenderShadowOffset"/>
   <text
     follows="left|top"
@@ -162,7 +162,81 @@
     top_pad="8"
     width="130"
     layout="topleft"
-    tool_tip="Controls both Shadow and SSAO blurring. Low values may cause SSAO noise to become apparent."
+    tool_tip="(Default: 0.0) Reduces self-shadowing errors by ignoring faces too close to the shadow's origins. Smaller values allow more fine/accurate shadows at the cost of more shadow errors."
+    value="Spot Shadow Bias:" />
+  <slider_bar
+    top_pad="-18"
+    height="20"
+    increment=".001"
+    follows="left|top|right"
+    layout="topleft"
+    max_val="0"
+    min_val="-0.01"
+    left="140"
+    right="-68"
+    name="shadow_spotbias_slider"
+    tool_tip="(Default: 0.0) Reduces self-shadowing errors by ignoring faces too close to the shadow's origins. Smaller values allow more fine/accurate shadows at the cost of more shadow errors."
+    control_name="RenderSpotShadowBias"/>
+  <spinner
+    top_pad="-20"
+    height="15"
+    label_width="0"
+    right="-8"
+    decimal_digits="3"
+    follows="top|right"
+    layout="topleft"
+    max_val="0"
+    min_val="-0.01"
+    width="55"
+    increment=".001"
+    name="shadow_spotbias_spinner"
+    tool_tip="(Default: 0.0) Reduces self-shadowing errors by ignoring faces too close to the shadow's origins. Smaller values allow more fine/accurate shadows at the cost of more shadow errors."
+    control_name="RenderSpotShadowBias"/>
+  <text
+    follows="left|top"
+    height="15"
+    left="30"
+    top_pad="8"
+    width="130"
+    layout="topleft"
+    tool_tip="(Default: 0.15) Used to reduce shadow errors by offsetting the entire projector shadowmap. Smaller values allow more accurate shadows and less light bleed from thin objects at the cost of possible shadow errors at extreme angles from source."
+    value="Spot Shadow Offset:" />
+  <slider_bar
+    top_pad="-18"
+    height="20"
+    increment=".001"
+    follows="left|top|right"
+    layout="topleft"
+    max_val="0.15"
+    min_val="0"
+    left="140"
+    right="-68"
+    name="shadow_spotoffset_slider"
+    tool_tip="(Default: 0.15) Used to reduce shadow errors by offsetting the entire projector shadowmap. Smaller values allow more accurate shadows and less light bleed from thin objects at the cost of possible shadow errors at extreme angles from source."
+    control_name="RenderSpotShadowOffset"/>
+  <spinner
+    top_pad="-20"
+    height="15"
+    label_width="0"
+    right="-8"
+    decimal_digits="3"
+    follows="top|right"
+    layout="topleft"
+    max_val="0.15"
+    min_val="0.0"
+    width="55"
+    increment=".001"
+    name="shadow_spotoffset_spinner"
+    tool_tip="(Default: 0.15) Used to reduce shadow errors by offsetting the entire projector shadowmap. Smaller values allow more accurate shadows and less light bleed from thin objects at the cost of possible shadow errors at extreme angles from source."
+    control_name="RenderSpotShadowOffset"/>
+  <text
+    follows="left|top"
+    height="15"
+    left="30"
+    top_pad="8"
+    width="130"
+    layout="topleft"
+    tool_tip="(Default: 3.0) Controls both Shadow and SSAO blurring. Low values may cause SSAO noise to become apparent."
     value="Shadow Blur:" />
   <slider_bar
     top_pad="-18"
@@ -175,7 +249,7 @@
     left="140"
     right="-68"
     name="shadow_blur_slider"
-    tool_tip="Controls both Shadow and SSAO blurring. Low values may cause SSAO noise to become apparent."
+    tool_tip="(Default: 3.0) Controls both Shadow and SSAO blurring. Low values may cause SSAO noise to become apparent."
     control_name="RenderShadowBlurSize"/>
   <spinner
     top_pad="-20"
@@ -190,7 +264,7 @@
     width="55"
     increment=".1"
     name="shadow_blur_spinner"
-    tool_tip="Controls both Shadow and SSAO blurring. Low values may cause SSAO noise to become apparent."
+    tool_tip="(Default: 3.0) Controls both Shadow and SSAO blurring. Low values may cause SSAO noise to become apparent."
     control_name="RenderShadowBlurSize"/>
   <text
     follows="left|top"
@@ -199,7 +273,7 @@
     top_pad="8"
     width="130"
     layout="topleft"
-    tool_tip="Controls how far away from the camera should blurring occur. Larger values reduce blur near the camera. Try using this for shadow sharpening if you encounter SSAO noise when lowering Shadow Blur!"
+    tool_tip="(Default: 0.0) Controls how far away from the camera should blurring occur. Larger values reduce blur near the camera. Try using this for shadow sharpening if you encounter SSAO noise when lowering Shadow Blur!"
     value="Blur Distance:" />
   <slider_bar
     top_pad="-18"
@@ -212,7 +286,7 @@
     left="140"
     right="-68"
     name="shadow_blurdist_slider"
-    tool_tip="Controls how far away from the camera should blurring occur. Larger values reduce blur near the camera. Try using this for shadow sharpening if you encounter SSAO noise when lowering Shadow Blur!"
+    tool_tip="(Default: 0.0) Controls how far away from the camera should blurring occur. Larger values reduce blur near the camera. Try using this for shadow sharpening if you encounter SSAO noise when lowering Shadow Blur!"
     control_name="RenderShadowBlurDistFactor"/>
   <spinner
     top_pad="-20"
@@ -227,7 +301,7 @@
     width="55"
     increment=".1"
     name="shadow_blurdist_spinner"
-    tool_tip="Controls how far away from the camera should blurring occur. Larger values reduce blur near the camera. Try using this for shadow sharpening if you encounter SSAO noise when lowering Shadow Blur!"
+    tool_tip="(Default: 0.0) Controls how far away from the camera should blurring occur. Larger values reduce blur near the camera. Try using this for shadow sharpening if you encounter SSAO noise when lowering Shadow Blur!"
     control_name="RenderShadowBlurDistFactor"/>
   <panel
 				label="SSAO"

@@ -96,11 +96,11 @@
    top_pad="4"
    width="75"
    layout="topleft"
-   tool_tip="Which algorithm should translate HDR values to SDR Colorspace"
+   tool_tip="(Default: Uchimura) Which algorithm should translate HDR values to SDR Colorspace"
    value="Tonemapper:" />
   <combo_box
      allow_text_entry="false"
-	 tool_tip="Which algorithm should translate HDR values to SDR Colorspace"
+	 tool_tip="(Default: Uchimura) Which algorithm should translate HDR values to SDR Colorspace"
      control_name="RenderToneMapType"
      follows="left|top"
      height="16"
@@ -154,7 +154,7 @@
     top_pad="4"
     width="130"
     layout="topleft"
-    tool_tip="Adjusts the overall brightness of the image via the Tonemapper"
+    tool_tip="(Default: 1.0) Adjusts the overall brightness of the image via the Tonemapper"
     value="Exposure:" />
   <slider_bar
     top_pad="-18"
@@ -167,7 +167,7 @@
     left="90"
     right="-68"
     name="exposure_slider"
-    tool_tip="Adjusts the overall brightness of the image via the Tonemapper"
+    tool_tip="(Default: 1.0) Adjusts the overall brightness of the image via the Tonemapper"
     control_name="RenderToneMapExposure"/>
   <spinner
     top_pad="-20"
@@ -182,7 +182,7 @@
     width="55"
     increment=".1"
     name="exposure_spinner"
-    tool_tip="Adjusts the overall brightness of the image via the Tonemapper"
+    tool_tip="(Default: 1.0) Adjusts the overall brightness of the image via the Tonemapper"
     control_name="RenderToneMapExposure"/>
   <text
 	    follows="left|top"
@@ -350,6 +350,7 @@
     tool_tip="NOT YET IMPLEMENTED!"
     value="Strength:" />
   <slider_bar
+    enabled="false"
     top_pad="-18"
     height="20"
     increment=".1"
@@ -363,6 +364,7 @@
     tool_tip="NOT YET IMPLEMENTED!"
     control_name=""/>
   <spinner
+    enabled="false"
     top_pad="-20"
     height="15"
     label_width="0"

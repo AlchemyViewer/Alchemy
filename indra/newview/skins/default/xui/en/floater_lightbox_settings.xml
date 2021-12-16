@@ -1,15 +1,15 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes" ?>
 <floater
- width="300"
+ width="350"
  height="300"
  layout="topleft"
  min_height="300"
- min_width="300"
+ min_width="350"
  name="floater_lightbox_settings"
  positioning="cascading"
  title="LIGHTBOX SETTINGS"
  save_rect="true"
- can_resize="true"
+ can_resize="false"
  can_resize_height="false">
   <tab_container 
 		top_pad="0" 
@@ -21,23 +21,23 @@
 		 name="lightbox_tab_container" 
 		 tab_position="top"
 		 tab_stop="false" 
-		 width="300">
+		 width="350">
 			<panel
-				label="Image Enhancement"
+				label="Image"
 				name="colortone_panel"
 				class="colortone_panel"
 				filename="panel_lightbox_image.xml"
 				layout="topleft"
 				follows="all" />
 			<panel
-				label="Depth of Field"
+				label="DoF"
 				name="dof_panel"
 				class="dof_panel"
 				filename="panel_lightbox_dof.xml"
 				layout="topleft"
 				follows="all" />
          <panel
-				label="Shadows + SSAO"
+				label="Shadows/SSAO"
 				name="shadow_panel"
 				class="shadow_panel"
 				filename="panel_lightbox_shadow.xml"

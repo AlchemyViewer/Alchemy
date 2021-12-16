@@ -2,8 +2,8 @@
 <panel
  class="ssao_settings"
  layout="topleft"
- width="300"
- height="175"
+ width="350"
+ height="125"
  name="ssao_settings">
   <check_box
     follows="left|top"
@@ -16,6 +16,7 @@
     tool_tip="Toggles SSAO (Also toggles Shadow Smoothing!)"
     control_name="RenderDeferredSSAO"/>
   <text
+    enabled="false"
     follows="left|top"
     height="15"
     left="30"
@@ -23,8 +24,9 @@
     width="130"
     layout="topleft"
     tool_tip="NYI!"
-    value="SSAO Strength:(NYI!)" />
+    value="SSAO Strength:" />
   <slider_bar
+    enabled="false"
     top_pad="-18"
     height="20"
     increment=".1"
@@ -38,6 +40,7 @@
     tool_tip="NYI!"
     control_name=""/>
   <spinner
+    enabled="false"
     top_pad="-20"
     height="15"
     label_width="0"
@@ -59,7 +62,44 @@
     top_pad="8"
     width="130"
     layout="topleft"
-    tool_tip="Determines distance from surface to check for occlusion. Higher = Wider occlusion NOTE: Large values may produce artifacts."
+    tool_tip="(Default: 5.0) Occlusion sensitivity factor, larger = more."
+    value="SSAO Factor:" />
+  <slider_bar
+    top_pad="-18"
+    height="20"
+    increment=".1"
+    follows="left|top|right"
+    layout="topleft"
+    max_val="10"
+    min_val="0"
+    left="140"
+    right="-68"
+    name="ssao_factor_slider"
+    tool_tip="(Default: 5.0) Occlusion sensitivity factor, larger = more."
+    control_name="RenderSSAOFactor"/>
+  <spinner
+    top_pad="-20"
+    height="15"
+    label_width="0"
+    right="-8"
+    decimal_digits="1"
+    follows="top|right"
+    layout="topleft"
+    max_val="10"
+    min_val="0"
+    width="55"
+    increment=".1"
+    name="ssao_factor_spinner"
+    tool_tip="(Default: 5.0) Occlusion sensitivity factor, larger = more."
+    control_name="RenderSSAOFactor"/>
+  <text
+    follows="left|top"
+    height="15"
+    left="30"
+    top_pad="8"
+    width="130"
+    layout="topleft"
+    tool_tip="(Default: 1500) Determines distance from surface to check for occlusion. Higher = Wider occlusion NOTE: Large values may produce artifacts."
     value="SSAO Scale:" />
   <slider_bar
     top_pad="-18"
@@ -71,8 +111,8 @@
     min_val="0"
     left="140"
     right="-68"
-    name="ssao_factor_slider"
-    tool_tip="Determines distance from surface to check for occlusion. Higher = Wider occlusion NOTE: Large values may produce artifacts."
+    name="ssao_scale_slider"
+    tool_tip="(Default: 1500) Determines distance from surface to check for occlusion. Higher = Wider occlusion NOTE: Large values may produce artifacts."
     control_name="RenderSSAOScale"/>
   <spinner
     top_pad="-20"
@@ -85,9 +125,9 @@
     max_val="5000"
     min_val="0"
     width="55"
-    increment=".1"
-    name="ssao_factor_spinner"
-    tool_tip="Determines distance from surface to check for occlusion. Higher = Wider occlusion NOTE: Large values may produce artifacts."
+    increment="50"
+    name="ssao_scale_spinner"
+    tool_tip="(Default: 1500) Determines distance from surface to check for occlusion. Higher = Wider occlusion NOTE: Large values may produce artifacts."
     control_name="RenderSSAOScale"/>
   <text
     follows="left|top"
@@ -96,7 +136,7 @@
     top_pad="8"
     width="130"
     layout="topleft"
-    tool_tip="Determines max screen radius to use for occlusion. NOTE: Large values may produce artifacts."
+    tool_tip="(Default: 400) Determines max screen radius to use for occlusion. NOTE: Large values may produce artifacts."
     value="SSAO Max Scale:" />
   <slider_bar
     top_pad="-18"
@@ -109,7 +149,7 @@
     left="140"
     right="-68"
     name="ssao_maxScale_slider"
-    tool_tip="Determines max screen radius to use for occlusion. NOTE: Large values may produce artifacts."
+    tool_tip="(Default: 400) Determines max screen radius to use for occlusion. NOTE: Large values may produce artifacts."
     control_name="RenderSSAOMaxScale"/>
   <spinner
     top_pad="-20"
@@ -122,8 +162,8 @@
     max_val="1000"
     min_val="0"
     width="55"
-    increment=".1"
+    increment="50"
     name="ssao_maxScale_spinner"
-    tool_tip="Determines max screen radius to use for occlusion. NOTE: Large values may produce artifacts."
+    tool_tip="(Default: 400) Determines max screen radius to use for occlusion. NOTE: Large values may produce artifacts."
     control_name="RenderSSAOMaxScale"/>
 </panel>
