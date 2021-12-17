@@ -630,11 +630,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>93f4ca93365b314ced5d325a625cf8b4f83edfd8ccebd22d641c00d2ca5cf3baee6db94dc32344b66b8afcf0ac136d51442100d373ad818890f8d990ee24244e</string>
+              <string>ebde685f65e9281a438f3377aa9185b54cd5b187a3e7dfc117e1f322c8889bc6abdb2dad229167b5b7d4f7767b3b9d3fb2d90a8dd35f0c5c9898926709263bf3</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/94/packages/generic/freetype/2.10.4.1291/freetype-2.10.4-darwin64-1291.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/94/packages/generic/freetype/2.11.1.1328/freetype-2.11.1-darwin64-1328.tar.zst</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
@@ -644,18 +644,18 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>9929ee0885c2f6cb0a3a272764c1245ece51710cefdc387c01753f9c7d279c94f0b8ae70178950f5ffcb8f1e380bf72726b12bae070851e8458b75b53dc7f028</string>
+              <string>8f18967a394297ec9f9660d87a96fb196d433f5338dc59637511578a43525a90e7d33f666cd28edf3e2bc10989e8907b0ed93398d1c0f5489af478ee8e59340f</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/94/packages/generic/freetype/2.10.4.1291/freetype-2.10.4-windows64-1291.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/94/packages/generic/freetype/2.11.1.1328/freetype-2.11.1-windows64-1328.tar.zst</string>
             </map>
             <key>name</key>
             <string>windows64</string>
           </map>
         </map>
         <key>version</key>
-        <string>2.10.4</string>
+        <string>2.11.1</string>
       </map>
       <key>glod</key>
       <map>
