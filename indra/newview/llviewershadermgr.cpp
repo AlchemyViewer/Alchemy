@@ -1764,6 +1764,9 @@ BOOL LLViewerShaderMgr::loadShadersDeferred()
 	if (success)
 	{
 		gDeferredImpostorProgram.mName = "Deferred Impostor Shader";
+		gDeferredImpostorProgram.mFeatures.calculatesAtmospherics = true;
+		gDeferredImpostorProgram.mFeatures.hasGamma = true;
+		gDeferredImpostorProgram.mFeatures.hasTransport = true;
 		gDeferredImpostorProgram.mFeatures.hasSrgb = true;
 		gDeferredImpostorProgram.mFeatures.encodesNormal = true;
 		//gDeferredImpostorProgram.mFeatures.isDeferred = true;

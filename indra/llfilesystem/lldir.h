@@ -223,6 +223,8 @@ class LLDir
 		return destpath;
 	}
 
+	static std::string escapePathString(std::string_view str);
+
 protected:
 	// Does an add() or append() call need a directory delimiter?
 	typedef std::pair<bool, unsigned short> SepOff;

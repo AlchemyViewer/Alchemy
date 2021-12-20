@@ -135,6 +135,9 @@ set(viewer_SOURCE_FILES
     altoolalign.cpp
     alunzip.cpp
     alviewermenu.cpp
+    bdanimator.cpp
+    bdfloaterposer.cpp
+    bdposingmotion.cpp
     groupchatlistener.cpp
     llaccountingcostmanager.cpp
     llaisapi.cpp
@@ -807,6 +810,9 @@ set(viewer_HEADER_FILES
     altoolalign.h
     alunzip.h
     alviewermenu.h
+    bdanimator.h
+    bdfloaterposer.h
+    bdposingmotion.h
     groupchatlistener.h
     llaccountingcost.h
     llaccountingcostmanager.h
