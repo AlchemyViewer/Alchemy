@@ -286,7 +286,6 @@ void main()
     shadow = sampleDirectionalShadow(pos.xyz, norm.xyz, pos_screen);
 #endif
 
-    spec = final_specular;
     vec4 diffuse = final_color;
     float envIntensity = final_normal.z;
 
@@ -334,7 +333,9 @@ void main()
 
     float glare = 0.0;
 
-    if (spec.a > 0.0)  // specular reflection
+    final_specular.rgb = srgb_to_linear(final_specular.rgb); // SL-14035
+
+    if (final_specular.a > 0.0)  // specular reflection
     {
         /*  // Reverting this specular calculation to previous 'dumbshiny' version - DJH 6/17/2020
             // Preserving the refactored version as a comment for potential reconsideration,
@@ -342,7 +343,7 @@ void main()
             //
             //  If you're reading this in 2021+, feel free to obliterate.
         */
-#if 0
+#if 1
         vec3 npos = -normalize(pos.xyz);
 
         //vec3 ref = dot(pos+lv, norm);
@@ -358,18 +359,22 @@ void main()
 
         if (nh > 0.0)
         {
-            float scol = fres*texture2D(lightFunc, vec2(nh, spec.a)).r*gt / (nh*da);
-            vec3 sp = sun_contrib*scol / 6.0f;
+            float scol = fres*texture2D(lightFunc, vec2(nh, final_specular.a)).r*gt / (nh*da);
+            vec3 sp = sun_contrib*scol / 6.0;
             sp = clamp(sp, vec3(0), vec3(1));
-            bloom += dot(sp, sp) / 4.0;
-            color += sp * spec.rgb;
+            glare += dot(sp, sp) / 4.0;
+
+            vec3 spec_contrib = sp * final_specular.rgb;
+            color.rgb = srgb_to_linear(color.rgb);
+            color.rgb += spec_contrib;
+            color.rgb = linear_to_srgb(color.rgb);
         }
 #else
         float sa        = dot(refnormpersp, sun_dir.xyz);
-        vec3  dumbshiny = sunlit * shadow * (texture2D(lightFunc, vec2(sa, spec.a)).r);
+        vec3  dumbshiny = sunlit * shadow * (texture2D(lightFunc, vec2(sa, final_specular.a)).r);
 
         // add the two types of shiny together
-        vec3 spec_contrib = dumbshiny * spec.rgb;
+        vec3 spec_contrib = dumbshiny * final_specular.rgb;
         bloom             = dot(spec_contrib, spec_contrib) / 6;
 
         glare = max(spec_contrib.r, spec_contrib.g);
@@ -406,8 +411,6 @@ void main()
 
     vec3 light = vec3(0, 0, 0);
     
-    final_specular.rgb = srgb_to_linear(final_specular.rgb); // SL-14035
-
 #define LIGHT_LOOP(i) light.rgb += calcPointLightOrSpotLight(light_diffuse[i].rgb, npos, diffuse.rgb, final_specular, pos.xyz, norm.xyz, light_position[i], light_direction[i].xyz, light_attenuation[i].x, light_attenuation[i].y, light_attenuation[i].z, glare, light_attenuation[i].w );
 
     LIGHT_LOOP(1)
