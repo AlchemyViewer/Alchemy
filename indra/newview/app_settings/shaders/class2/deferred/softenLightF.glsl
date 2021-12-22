@@ -117,8 +117,7 @@ void main()
 
     if (spec.a > 0.0)  // specular reflection
     {
-        spec.rgb = linear_to_srgb(spec.rgb);
-#if 0 //EEP
+#if 1 //EEP
         vec3 npos = -normalize(pos.xyz);
 
         //vec3 ref = dot(pos+lv, norm);
@@ -138,9 +137,12 @@ void main()
             vec3 sp = sun_contrib*scontrib / 6.0;
             sp = clamp(sp, vec3(0), vec3(1));
             bloom += dot(sp, sp) / 4.0;
-            color += sp * spec.rgb;
+            color.rgb = srgb_to_linear(color.rgb);
+            color.rgb += sp * spec.rgb;
+            color.rgb = linear_to_srgb(color.rgb);
         }
 #else //PRODUCTION
+        spec.rgb = linear_to_srgb(spec.rgb);
         float sa        = dot(refnormpersp, light_dir.xyz);
         vec3  dumbshiny = sunlit * scol * (texture2D(lightFunc, vec2(sa, spec.a)).r);
 
