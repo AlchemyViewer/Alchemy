@@ -331,6 +331,11 @@ void main()
 
     color *= gamma_diff.rgb;
 
+    color = mix(color.rgb, gamma_diff.rgb, diffuse.a);
+
+    // Begin Linear for Specular
+    color.rgb = srgb_to_linear(color.rgb);
+
     float glare = 0.0;
 
     final_specular.rgb = srgb_to_linear(final_specular.rgb); // SL-14035
@@ -360,14 +365,11 @@ void main()
         if (nh > 0.0)
         {
             float scol = fres*texture2D(lightFunc, vec2(nh, final_specular.a)).r*gt / (nh*da);
-            vec3 sp = sun_contrib*scol / 6.0;
+            vec3 sp = srgb_to_linear(sun_contrib)*scol*final_specular.rgb;
             sp = clamp(sp, vec3(0), vec3(1));
-            glare += dot(sp, sp) / 4.0;
-
-            vec3 spec_contrib = sp * final_specular.rgb;
-            color.rgb = srgb_to_linear(color.rgb);
-            color.rgb += spec_contrib;
-            color.rgb = linear_to_srgb(color.rgb);
+            glare += dot(sp, sp) / 2;
+	    
+	        color.rgb += sp;
         }
 #else
         float sa        = dot(refnormpersp, sun_dir.xyz);
@@ -375,7 +377,7 @@ void main()
 
         // add the two types of shiny together
         vec3 spec_contrib = dumbshiny * final_specular.rgb;
-        bloom             = dot(spec_contrib, spec_contrib) / 6;
+        glare             = dot(spec_contrib, spec_contrib) / 6;
 
         glare = max(spec_contrib.r, spec_contrib.g);
         glare = max(glare, spec_contrib.b);
@@ -384,8 +386,6 @@ void main()
 #endif
     }
 
-    color = mix(color.rgb, diffcol.rgb, diffuse.a);
-
     if (envIntensity > 0.0)
     {
         //add environmentmap
@@ -393,7 +393,7 @@ void main()
 
         vec3 reflected_color = textureCube(environmentMap, env_vec).rgb;
 
-        color = mix(color, reflected_color, envIntensity);
+        color = mix(color.rgb, srgb_to_linear(reflected_color), envIntensity);
 
         float cur_glare = max(reflected_color.r, reflected_color.g);
         cur_glare = max(cur_glare, reflected_color.b);
@@ -401,8 +401,11 @@ void main()
         glare += cur_glare;
     }
 
-    color = atmosFragLighting(color, additive, atten);
-    color = scaleSoftClipFrag(color);
+    color.rgb = linear_to_srgb(color.rgb);
+    // End Linear for Specular
+
+    color = mix(atmosFragLighting(color, additive, atten), fullbrightAtmosTransportFrag(color, additive, atten), diffuse.a);
+    color = mix(scaleSoftClipFrag(color), fullbrightScaleSoftClip(color), diffuse.a);
 
     //convert to linear before adding local lights
     color = srgb_to_linear(color);

@@ -84,11 +84,8 @@ void main()
     da = pow(da, light_gamma);
     
     vec4 diffuse = texture2DRect(diffuseRect, tc);
-
-    //convert to gamma space
-    //diffuse.rgb = linear_to_srgb(diffuse.rgb); // SL-14035
-
     vec4 spec = texture2DRect(specularRect, vary_fragcoord.xy);
+
     vec3 color = vec3(0);
     float bloom = 0.0;
     {
@@ -116,11 +113,13 @@ void main()
 
         color.rgb *= diffuse.rgb;
 
-        vec3 refnormpersp = normalize(reflect(pos.xyz, norm.xyz));
+       color.rgb = mix(color.rgb, diffuse.rgb, diffuse.a);
+
+        // Begin Linear for Specular Rendering
+        color.rgb = srgb_to_linear(color.rgb);
 
         if (spec.a > 0.0) // specular reflection
         {
-
 #if 1 //EEP
             vec3 npos = -normalize(pos.xyz);
 
@@ -138,16 +137,14 @@ void main()
             if (nh > 0.0)
             {
                 float scontrib = fres*texture2D(lightFunc, vec2(nh, spec.a)).r*gt/(nh*da);
-                vec3 sp = sun_contrib*scontrib / 6.0;
-                sp = clamp(sp, vec3(0), vec3(1));
-                bloom += dot(sp, sp) / 4.0;
-                color.rgb = srgb_to_linear(color.rgb);
-                color.rgb += sp * spec.rgb;
-                color.rgb = linear_to_srgb(color.rgb);
+                vec3 sp = srgb_to_linear(sun_contrib)*scontrib*spec.rgb;
+            	sp = clamp(sp, vec3(0), vec3(1));
+                bloom += dot(sp, sp) / 2;
+                color.rgb += sp;
             }
 #else //PRODUCTION
             spec.rgb = linear_to_srgb(spec.rgb);
-            float sa        = dot(refnormpersp, light_dir.xyz);
+            float sa        = dot(normalize(reflect(pos.xyz, norm.xyz)), light_dir.xyz);
             vec3  dumbshiny = sunlit * (texture2D(lightFunc, vec2(sa, spec.a)).r);
 
             // add the two types of shiny together
@@ -157,15 +154,16 @@ void main()
 #endif
         }
 
-       color.rgb = mix(color.rgb, diffuse.rgb, diffuse.a);
-
         if (envIntensity > 0.0)
         { //add environmentmap
-            vec3 env_vec = env_mat * refnormpersp;
+            vec3 env_vec = env_mat * normalize(reflect(pos.xyz, norm.xyz));
             vec3 reflected_color = textureCube(environmentMap, env_vec).rgb;
-            color = mix(color.rgb, reflected_color, envIntensity);
+            color = mix(color.rgb, srgb_to_linear(reflected_color), envIntensity);
         }
        
+        color.rgb = linear_to_srgb(color.rgb);
+        // End Linear
+
         if (norm.w < 0.5)
         {
             color = mix(atmosFragLighting(color, additive, atten), fullbrightAtmosTransportFrag(color, additive, atten), diffuse.a);

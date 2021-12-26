@@ -29,10 +29,12 @@ ATTRIBUTE vec3 position;
 
 uniform vec2 screen_res;
 
+VARYING vec2 vary_fragcoord;
+
+// forwards
 void setAtmosAttenuation(vec3 c);
 void setAdditiveColor(vec3 c);
 
-VARYING vec2 vary_fragcoord;
 void main()
 {
     //transform vertex

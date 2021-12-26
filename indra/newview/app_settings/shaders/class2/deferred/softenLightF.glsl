@@ -53,6 +53,7 @@ VARYING vec2 vary_fragcoord;
 uniform mat4 inv_proj;
 uniform vec2 screen_res;
 
+vec3 decode_normal(vec2 enc);
 vec4 getPositionWithDepth(vec2 pos_screen, float depth);
 
 void calcAtmosphericVars(vec3 inPositionEye, vec3 light_dir, float ambFactor, out vec3 sunlit, out vec3 amblit, out vec3 additive, out vec3 atten, bool use_ao);
@@ -62,7 +63,6 @@ vec3  scaleSoftClipFrag(vec3 l);
 vec3  fullbrightAtmosTransportFrag(vec3 light, vec3 additive, vec3 atten);
 vec3  fullbrightScaleSoftClip(vec3 light);
 
-vec3 decode_normal(vec2 enc);
 vec3 linear_to_srgb(vec3 c);
 vec3 srgb_to_linear(vec3 c);
 
@@ -107,13 +107,19 @@ void main()
     ambient *= 0.5;
     ambient *= ambient;
     ambient = (1.0 - ambient);
+
     color.rgb *= ambient;
 
     vec3 sun_contrib = min(da, scol) * sunlit;
+
     color.rgb += sun_contrib;
+
     color.rgb *= diffuse.rgb;
 
-    vec3 refnormpersp = normalize(reflect(pos.xyz, norm.xyz));
+    color.rgb = mix(color.rgb, diffuse.rgb, diffuse.a);
+
+    // Begin Linear for Specular Rendering
+    color.rgb = srgb_to_linear(color.rgb);
 
     if (spec.a > 0.0)  // specular reflection
     {
@@ -134,12 +140,10 @@ void main()
         if (nh > 0.0)
         {
             float scontrib = fres*texture2D(lightFunc, vec2(nh, spec.a)).r*gt/(nh*da);
-            vec3 sp = sun_contrib*scontrib / 6.0;
+            vec3 sp = srgb_to_linear(sun_contrib)*scol*scontrib*spec.rgb;
             sp = clamp(sp, vec3(0), vec3(1));
-            bloom += dot(sp, sp) / 4.0;
-            color.rgb = srgb_to_linear(color.rgb);
-            color.rgb += sp * spec.rgb;
-            color.rgb = linear_to_srgb(color.rgb);
+            bloom += dot(sp, sp) / 2;
+            color.rgb += sp;
         }
 #else //PRODUCTION
         spec.rgb = linear_to_srgb(spec.rgb);
@@ -153,14 +157,15 @@ void main()
 #endif
     }
 
-    color.rgb = mix(color.rgb, diffuse.rgb, diffuse.a);
-
     if (envIntensity > 0.0)
     {  // add environmentmap
-        vec3 env_vec         = env_mat * refnormpersp;
-        vec3 reflected_color = textureCube(environmentMap, env_vec).rgb;
-        color                = mix(color.rgb, reflected_color, envIntensity);
+    	vec3 env_vec = env_mat * normalize(reflect(pos.xyz, norm.xyz));
+    	vec3 reflected_color = textureCube(environmentMap, env_vec).rgb;
+        color                = mix(color.rgb, srgb_to_linear(reflected_color), envIntensity);
     }
+
+    color.rgb = linear_to_srgb(color.rgb);
+    // End Linear
 
     if (norm.w < 0.5)
     {

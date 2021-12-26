@@ -225,7 +225,6 @@ void main()
 
 		vec3 npos = -normalize(pos);
 
-		//vec3 ref = dot(pos+lv, norm);
 		vec3 h = normalize(lv+npos);
 		float nh = dot(norm, h);
 		float nv = dot(norm, npos);
