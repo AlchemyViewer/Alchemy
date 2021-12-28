@@ -204,7 +204,7 @@ private:
 	// so it needs own pool (not thread safe by itself, relies onto header's mutex)
 	LLVolatileAPRPool*   mHeaderAPRFilePoolp;
 	
-	typedef std::map<handle_t, LLTextureCacheWorker*> handle_map_t;
+	typedef absl::flat_hash_map<handle_t, LLTextureCacheWorker*> handle_map_t;
 	handle_map_t mReaders;
 	handle_map_t mWriters;
 
