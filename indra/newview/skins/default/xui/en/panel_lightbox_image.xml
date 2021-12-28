@@ -90,6 +90,43 @@
       value="16" />
   </combo_box>
   <text
+    follows="left|top"
+    height="15"
+    left="10"
+    top_pad="4"
+    width="130"
+    layout="topleft"
+    tool_tip="(Default: 1.0) [DANGEROUS] Internal render resolution scale. Sharpening interacts poorly with this setting, disable it for best results."
+    value="Resolution Scale:" />
+  <slider_bar
+    top_pad="-18"
+    height="20"
+    increment=".1"
+    follows="left|top|right"
+    layout="topleft"
+    max_val="2"
+    min_val="0.1"
+    left="90"
+    right="-68"
+    name="resMult_slider"
+    tool_tip="(Default: 1.0) [DANGEROUS] Internal render resolution scale. Sharpening interacts poorly with this setting, disable it for best results."
+    control_name="RenderResolutionMultiplier"/>
+  <spinner
+    top_pad="-20"
+    height="15"
+    label_width="0"
+    right="-8"
+    decimal_digits="1"
+    follows="top|right"
+    layout="topleft"
+    max_val="3"
+    min_val="0.1"
+    width="55"
+    increment=".1"
+    name="resMult_spinner"
+    tool_tip="(Default: 1.0) [DANGEROUS] Internal render resolution scale. Sharpening interacts poorly with this setting, disable it for best results."
+    control_name="RenderResolutionMultiplier"/>
+  <text
    follows="left|top"
    height="15"
    left="10"
@@ -313,11 +350,11 @@
     top_pad="4"
     width="90"
     layout="topleft"
-    tool_tip="Which Contrast-Aware Sharpen(CAS) method to use. FidelityFX: AMD's method, nVidia DLS: nVidia's method."
+    tool_tip="Which Contrast-Aware Sharpen(CAS) method to use. FidelityFX: AMD's method, nVidia DLS: nVidia's method. Requires Anti-Aliasing to be enabled!"
     value="Sharpen Method:" />
     <combo_box
     allow_text_entry="false"
-    tool_tip="Which Contrast-Aware Sharpen(CAS) method to use. FidelityFX: AMD's method, nVidia DLS: nVidia's method."
+    tool_tip="Which Contrast-Aware Sharpen(CAS) method to use. FidelityFX: AMD's method, nVidia DLS: nVidia's method. Requires Anti-Aliasing to be enabled!"
     control_name="RenderSharpenMethod"
     follows="left|top"
     height="16"
