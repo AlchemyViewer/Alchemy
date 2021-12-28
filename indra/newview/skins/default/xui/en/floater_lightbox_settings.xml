@@ -43,5 +43,12 @@
 				filename="panel_lightbox_shadow.xml"
 				layout="topleft"
 				follows="all" />
+		 <panel
+				label="Glow"
+				name="glow_panel"
+				class="glow_panel"
+				filename="panel_lightbox_glow.xml"
+				layout="topleft"
+				follows="all" />
 	</tab_container>
 </floater>
