@@ -234,3 +234,4 @@
     name="dof_focaltime_spinner"
     tool_tip="(Default: 0.5s) Time it takes for the camera to transition to a new focal point."
     control_name="CameraFocusTransitionTime"/>
+</panel>
