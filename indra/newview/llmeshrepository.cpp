@@ -3249,18 +3249,17 @@ void LLMeshHeaderHandler::processData(LLCore::BufferArray * /* body */, S32 /* b
 
 				file.write(data, data_size);
 
-				// zero out the rest of the file 
-				static const U8 block[65536] = {};
-
-				while (bytes - file.tell() > sizeof(block))
-				{
-					file.write(block, sizeof(block));
-				}
-
+				// <FS:Ansariel> Fix asset caching
 				S32 remaining = bytes - file.tell();
 				if (remaining > 0)
 				{
-					file.write(block, remaining);
+					U8* block = new(std::nothrow) U8[remaining];
+					if (block)
+					{
+						memset(block, 0, remaining);
+						file.write(block, remaining);
+						delete[] block;
+					}
 				}
 				file.close();
 

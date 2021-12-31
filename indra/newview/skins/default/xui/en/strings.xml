@@ -4150,6 +4150,8 @@ Try enclosing path to the editor with double quotes.
 
   <!-- commands -->
 
+  <string 
+name="Command_360_Capture_Label">360 snapshot</string>
   <string name="Command_AboutLand_Label">About land</string>
   <string name="Command_AnimationOverride_Label">AO</string>
   <string name="Command_Appearance_Label">Outfits</string>
@@ -4189,6 +4191,8 @@ Try enclosing path to the editor with double quotes.
   <string name="Command_Voice_Label">Voice Settings</string>
   <string name="Command_Webbrowser_Label">Web Browser</string>
 
+  <string 
+name="Command_360_Capture_Tooltip">Capture a 360 equirectangular image</string>
   <string name="Command_AboutLand_Tooltip">Information about the land you're visiting</string>
   <string name="Command_AnimationOverride_Tooltip">Animation Override</string>
   <string name="Command_Appearance_Tooltip">Change your avatar</string>

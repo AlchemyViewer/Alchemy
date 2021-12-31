@@ -115,9 +115,17 @@ class LLDiskCache final :
          * accessed is up to date (This is used in the mechanism for purging the cache)
          */
         void updateFileAccessTime(const boost::filesystem::path& file_path);
+
         /**
          * Purge the oldest items in the cache so that the combined size of all files
          * is no bigger than mMaxSizeBytes.
+         *
+         * WARNING: purge() is called by LLPurgeDiskCacheThread. As such it must
+         * NOT touch any LLDiskCache data without introducing and locking a mutex!
+         *
+         * Purging the disk cache involves nontrivial work on the viewer's
+         * filesystem. If called on the main thread, this causes a noticeable
+         * freeze.
          */
         void purge();
 
@@ -191,4 +199,12 @@ class LLDiskCache final :
         absl::flat_hash_set<LLUUID> mSkipList;
 };
 
+class LLPurgeDiskCacheThread : public LLThread
+{
+public:
+    LLPurgeDiskCacheThread();
+
+protected:
+    void run() override;
+};
 #endif // _LLDISKCACHE

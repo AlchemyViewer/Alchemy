@@ -27,7 +27,6 @@
 #ifndef LL_LLTHREAD_H
 #define LL_LLTHREAD_H
 
-#include "llapp.h"
 #include "llapr.h"
 #include "llrefcount.h"
 #include <thread>
