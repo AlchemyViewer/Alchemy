@@ -306,11 +306,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>a860e8b942ee0bb7d88c7ca17d5b63dd5cb5160a0377d78416da4e7f12d1edf4e14795165ad99ef8c1686de1f1c449f567701860070e6c04b2a5d7c4047abd8c</string>
+              <string>7d7a74d6a7a71816310b5147caf4c7f512202738ca40b4073ebac0bdd7774d2e447c7a45e29fcd3596c08c798157dea19bd061bfe64dd2fa68f9a240689ae7f3</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/175/packages/generic/cubemaptoequirectangular/1.1.0.1337/cubemaptoequirectangular-1.1.0-common-1337.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/175/packages/generic/cubemaptoequirectangular/1.1.0.1341/cubemaptoequirectangular-1.1.0-common-1341.tar.zst</string>
             </map>
             <key>name</key>
             <string>common</string>
