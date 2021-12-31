@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes" ?>
 <floater
- width="350"
- height="300"
+ width="360"
+ height="310"
  layout="topleft"
- min_height="300"
- min_width="350"
+ min_height="310"
+ min_width="360"
  name="floater_lightbox_settings"
  positioning="cascading"
  title="LIGHTBOX SETTINGS"
@@ -16,12 +16,12 @@
 		enabled="true" 
 		follows="left|top" 
 		height="300" 
-		left="0"
-		 mouse_opaque="false" 
-		 name="lightbox_tab_container" 
-		 tab_position="top"
-		 tab_stop="false" 
-		 width="350">
+		left_delta="0"
+		mouse_opaque="false" 
+		name="lightbox_tab_container" 
+		tab_position="top"
+		tab_stop="false" 
+		width="350">
 			<panel
 				label="Image"
 				name="colortone_panel"
@@ -36,14 +36,14 @@
 				filename="panel_lightbox_dof.xml"
 				layout="topleft"
 				follows="all" />
-         <panel
-				label="Shadows/SSAO"
+			<panel
+				label="Shadows"
 				name="shadow_panel"
 				class="shadow_panel"
 				filename="panel_lightbox_shadow.xml"
 				layout="topleft"
 				follows="all" />
-		 <panel
+			<panel
 				label="Glow"
 				name="glow_panel"
 				class="glow_panel"
