@@ -39,6 +39,10 @@ uniform mat4 modelview_projection_matrix;
 
 #if (DIFFUSE_ALPHA_MODE == DIFFUSE_ALPHA_MODE_BLEND)
 
+// forwards
+void setAtmosAttenuation(vec3 c);
+void setAdditiveColor(vec3 c);
+
 #if !defined(HAS_SKIN)
 uniform mat4 modelview_matrix;
 #endif
@@ -137,6 +141,10 @@ vary_normal  = n;
 	vertex_color = diffuse_color;
 
 #if (DIFFUSE_ALPHA_MODE == DIFFUSE_ALPHA_MODE_BLEND)
+    // appease OSX GLSL compiler/linker by touching all the varyings we said we would
+    setAtmosAttenuation(vec3(1));
+    setAdditiveColor(vec3(0));
+
 #if !defined(HAS_SKIN)
 	vary_position = (modelview_matrix*vec4(position.xyz, 1.0)).xyz;
 #endif
