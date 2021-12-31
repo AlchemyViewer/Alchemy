@@ -301,41 +301,19 @@
         <string>cubemaptoequirectangular</string>
         <key>platforms</key>
         <map>
-          <key>darwin64</key>
+          <key>common</key>
           <map>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>7e4622b497bc465b01ff6d3e7e0b4214</string>
+              <string>a860e8b942ee0bb7d88c7ca17d5b63dd5cb5160a0377d78416da4e7f12d1edf4e14795165ad99ef8c1686de1f1c449f567701860070e6c04b2a5d7c4047abd8c</string>
+              <key>hash_algorithm</key>
+              <string>blake2b</string>
               <key>url</key>
-              <string>https://automated-builds-secondlife-com.s3.amazonaws.com/ct2/89303/815402/cubemaptoequirectangular-1.1.0-darwin64-564841.tar.bz2</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/175/packages/generic/cubemaptoequirectangular/1.1.0.1337/cubemaptoequirectangular-1.1.0-common-1337.tar.zst</string>
             </map>
             <key>name</key>
-            <string>darwin64</string>
-          </map>
-          <key>windows</key>
-          <map>
-            <key>archive</key>
-            <map>
-              <key>hash</key>
-              <string>b5ea7097ae10037024b0c2b3df9812b5</string>
-              <key>url</key>
-              <string>https://automated-builds-secondlife-com.s3.amazonaws.com/ct2/89307/815434/cubemaptoequirectangular-1.1.0-windows-564841.tar.bz2</string>
-            </map>
-            <key>name</key>
-            <string>windows</string>
-          </map>
-          <key>windows64</key>
-          <map>
-            <key>archive</key>
-            <map>
-              <key>hash</key>
-              <string>ac54672e0b38f52726f5c99047c913e4</string>
-              <key>url</key>
-              <string>https://automated-builds-secondlife-com.s3.amazonaws.com/ct2/89306/815431/cubemaptoequirectangular-1.1.0-windows64-564841.tar.bz2</string>
-            </map>
-            <key>name</key>
-            <string>windows64</string>
+            <string>common</string>
           </map>
         </map>
         <key>version</key>
@@ -807,41 +785,19 @@
         <string>jpegencoderbasic</string>
         <key>platforms</key>
         <map>
-          <key>darwin64</key>
+          <key>common</key>
           <map>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>c3c9e60bdc12b35e0e3d6b67d5635f60</string>
+              <string>1af3afbf1ce81013c5107dfb41d3fc10735f727f12260fc38cd345c748f1eafb36100ede324da44105205084b9aac32dd723fd0d1d45b686a4a922bcad9525eb</string>
+              <key>hash_algorithm</key>
+              <string>blake2b</string>
               <key>url</key>
-              <string>https://automated-builds-secondlife-com.s3.amazonaws.com/ct2/89304/815407/jpegencoderbasic-1.0-darwin64-564842.tar.bz2</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/176/packages/generic/jpegencoderbasic/1.0.1340/jpegencoderbasic-1.0-common-1340.tar.zst</string>
             </map>
             <key>name</key>
-            <string>darwin64</string>
-          </map>
-          <key>windows</key>
-          <map>
-            <key>archive</key>
-            <map>
-              <key>hash</key>
-              <string>0a376676dbb43fdd0c81ffdfbc5e6f81</string>
-              <key>url</key>
-              <string>https://automated-builds-secondlife-com.s3.amazonaws.com/ct2/89308/815432/jpegencoderbasic-1.0-windows-564842.tar.bz2</string>
-            </map>
-            <key>name</key>
-            <string>windows</string>
-          </map>
-          <key>windows64</key>
-          <map>
-            <key>archive</key>
-            <map>
-              <key>hash</key>
-              <string>e70898903475d8ac2e81ff33278fc987</string>
-              <key>url</key>
-              <string>https://automated-builds-secondlife-com.s3.amazonaws.com/ct2/89309/815433/jpegencoderbasic-1.0-windows64-564842.tar.bz2</string>
-            </map>
-            <key>name</key>
-            <string>windows64</string>
+            <string>common</string>
           </map>
         </map>
         <key>version</key>
@@ -2001,45 +1957,23 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
         <string>threejs</string>
         <key>platforms</key>
         <map>
-          <key>darwin64</key>
+          <key>common</key>
           <map>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>24440e8219e59d81423b68d3be381fef</string>
+              <string>3fbe0e0a9752b4d2247a9f5cfc895677b5877c4804bfc6d0b65dba2853f8f4451fcc6f741bc097bcfceda2c8a9ee99080b3c438e27fe659d679444364235e8e1</string>
+              <key>hash_algorithm</key>
+              <string>blake2b</string>
               <key>url</key>
-              <string>https://automated-builds-secondlife-com.s3.amazonaws.com/ct2/89305/815412/threejs-0.132.2-darwin64-564843.tar.bz2</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/174/packages/generic/threejs/0.135.0.1339/threejs-0.135.0-common-1339.tar.zst</string>
             </map>
             <key>name</key>
-            <string>darwin64</string>
-          </map>
-          <key>windows</key>
-          <map>
-            <key>archive</key>
-            <map>
-              <key>hash</key>
-              <string>e1303fb9f2242a79aee5fd9f97726ace</string>
-              <key>url</key>
-              <string>https://automated-builds-secondlife-com.s3.amazonaws.com/ct2/89311/815452/threejs-0.132.2-windows-564843.tar.bz2</string>
-            </map>
-            <key>name</key>
-            <string>windows</string>
-          </map>
-          <key>windows64</key>
-          <map>
-            <key>archive</key>
-            <map>
-              <key>hash</key>
-              <string>46edf0f55417f8ef0d33a5c007bc3644</string>
-              <key>url</key>
-              <string>https://automated-builds-secondlife-com.s3.amazonaws.com/ct2/89310/815451/threejs-0.132.2-windows64-564843.tar.bz2</string>
-            </map>
-            <key>name</key>
-            <string>windows64</string>
+            <string>common</string>
           </map>
         </map>
         <key>version</key>
-        <string>0.132.2</string>
+        <string>0.135.0</string>
       </map>
       <key>tut</key>
       <map>
