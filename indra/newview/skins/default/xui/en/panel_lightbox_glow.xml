@@ -3,7 +3,7 @@
  class="glow_settings"
  layout="topleft"
  width="350"
- height="275"
+ height="150"
  name="glow_settings">
   <check_box
     follows="left|top"
@@ -33,7 +33,7 @@
     max_val="10"
     min_val="1"
     left="140"
-    right="-68"
+    right="-75"
     name="glow_iteration_slider"
     tool_tip="(Default: 2) How many passes of the glow shader to use. More passes makes it overall stronger, softer, wider, and slower to render."
     control_name="RenderGlowIterations"/>
@@ -41,7 +41,7 @@
     top_pad="-20"
     height="15"
     label_width="0"
-    right="-8"
+    right="-20"
     decimal_digits="0"
     follows="top|right"
     layout="topleft"
@@ -52,11 +52,25 @@
     name="glow_iteration_spinner"
     tool_tip="(Default: 2) How many passes of the glow shader to use. More passes makes it overall stronger, softer, wider, and slower to render."
     control_name="RenderGlowIterations"/>
+  <button
+    name="glowIteration_default_btn"
+    follows="top|right"
+    layout="topleft"
+    height="22"
+    left_delta="55"
+    top_pad="-15"
+    width="18"
+    scale_image="true"
+    image_overlay="Refresh_Off"
+    image_overlay_alignment="center">
+    <button.commit_callback
+       function="ClickDefault" />
+  </button>
   <text
     follows="left|top"
     height="15"
     left="30"
-    top_pad="8"
+    top_pad="3"
     width="130"
     layout="topleft"
     tool_tip="(Default: 9) Overall resolution of glow. Higher values allow for wider glow. Use in conjunction with other glow settings for best effect."
@@ -70,7 +84,7 @@
     max_val="10"
     min_val="0"
     left="140"
-    right="-68"
+    right="-75"
     name="glow_resPow_slider"
     tool_tip="(Default: 9) Overall resolution of glow. Higher values allow for wider glow. Use in conjunction with other glow settings for best effect."
     control_name="RenderGlowResolutionPow"/>
@@ -78,7 +92,7 @@
     top_pad="-20"
     height="15"
     label_width="0"
-    right="-8"
+    right="-20"
     decimal_digits="0"
     follows="top|right"
     layout="topleft"
@@ -89,11 +103,25 @@
     name="glow_resPow_spinner"
     tool_tip="(Default: 9) Overall resolution of glow. Higher values allow for wider glow. Use in conjunction with other glow settings for best effect."
     control_name="RenderGlowResolutionPow"/>
+  <button
+    name="glowRes_default_btn"
+    follows="top|right"
+    layout="topleft"
+    height="22"
+    left_delta="55"
+    top_pad="-15"
+    width="18"
+    scale_image="true"
+    image_overlay="Refresh_Off"
+    image_overlay_alignment="center">
+    <button.commit_callback
+       function="ClickDefault" />
+  </button>
   <text
     follows="left|top"
     height="15"
     left="30"
-    top_pad="8"
+    top_pad="3"
     width="130"
     layout="topleft"
     tool_tip="(Default: .350) Overall strength of the glow shader."
@@ -107,7 +135,7 @@
     max_val="1"
     min_val="0"
     left="140"
-    right="-68"
+    right="-75"
     name="glow_strength_slider"
     tool_tip="(Default: .350) Overall strength of the glow shader."
     control_name="RenderGlowStrength"/>
@@ -115,7 +143,7 @@
     top_pad="-20"
     height="15"
     label_width="0"
-    right="-8"
+    right="-20"
     decimal_digits="3"
     follows="top|right"
     layout="topleft"
@@ -126,11 +154,25 @@
     name="glow_strength_spinner"
     tool_tip="(Default: .350) Overall strength of the glow shader."
     control_name="RenderGlowStrength"/>
+  <button
+    name="glowStrength_default_btn"
+    follows="top|right"
+    layout="topleft"
+    height="22"
+    left_delta="55"
+    top_pad="-15"
+    width="18"
+    scale_image="true"
+    image_overlay="Refresh_Off"
+    image_overlay_alignment="center">
+    <button.commit_callback
+       function="ClickDefault" />
+  </button>
   <text
     follows="left|top"
     height="15"
     left="30"
-    top_pad="8"
+    top_pad="3"
     width="130"
     layout="topleft"
     tool_tip="(Default: 1.3) Softness or width of glow, eventually gets pixelated at higher sizes."
@@ -144,7 +186,7 @@
     max_val="10"
     min_val="0"
     left="140"
-    right="-68"
+    right="-75"
     name="glow_width_slider"
     tool_tip="(Default: 1.3) Softness or width of glow, eventually gets pixelated at higher sizes."
     control_name="RenderGlowWidth"/>
@@ -152,7 +194,7 @@
     top_pad="-20"
     height="15"
     label_width="0"
-    right="-8"
+    right="-20"
     decimal_digits="2"
     follows="top|right"
     layout="topleft"
@@ -163,11 +205,25 @@
     name="glow_width_spinner"
     tool_tip="(Default: 1.3) Softness or width of glow, eventually gets pixelated at higher sizes."
     control_name="RenderGlowWidth"/>
+  <button
+    name="glowWidth_default_btn"
+    follows="top|right"
+    layout="topleft"
+    height="22"
+    left_delta="55"
+    top_pad="-15"
+    width="18"
+    scale_image="true"
+    image_overlay="Refresh_Off"
+    image_overlay_alignment="center">
+    <button.commit_callback
+       function="ClickDefault" />
+  </button>
   <text
     follows="left|top"
     height="15"
     left="30"
-    top_pad="8"
+    top_pad="3"
     width="130"
     layout="topleft"
     tool_tip="(Default: 1) Also called Minmum Luminance, how bright an object must be before it starts to automatically glow. 1 = Never"
@@ -181,7 +237,7 @@
     max_val="1"
     min_val="0"
     left="140"
-    right="-68"
+    right="-75"
     name="glow_minLum_slider"
     tool_tip="(Default: 1) Also called Minmum Luminance, how bright an object must be before it starts to automatically glow. 1 = Never"
     control_name="RenderGlowMinLuminance"/>
@@ -189,7 +245,7 @@
     top_pad="-20"
     height="15"
     label_width="0"
-    right="-8"
+    right="-20"
     decimal_digits="2"
     follows="top|right"
     layout="topleft"
@@ -200,11 +256,25 @@
     name="glow_minLum_spinner"
     tool_tip="(Default: 1) Also called Minmum Luminance, how bright an object must be before it starts to automatically glow. 1 = Never"
     control_name="RenderGlowMinLuminance"/>
+  <button
+    name="glowMinLum_default_btn"
+    follows="top|right"
+    layout="topleft"
+    height="22"
+    left_delta="55"
+    top_pad="-15"
+    width="18"
+    scale_image="true"
+    image_overlay="Refresh_Off"
+    image_overlay_alignment="center">
+    <button.commit_callback
+       function="ClickDefault" />
+  </button>
   <text
     follows="left|top"
     height="15"
     left="30"
-    top_pad="8"
+    top_pad="3"
     width="130"
     layout="topleft"
     tool_tip="(Default: 0.25) Also called Max Extract Alpha, controls strength of autoglow."
@@ -218,7 +288,7 @@
     max_val="1"
     min_val="0"
     left="140"
-    right="-68"
+    right="-75"
     name="glow_maxExtractAlpha_slider"
     tool_tip="(Default: 0.25) Also called Max Extract Alpha, controls strength of autoglow."
     control_name="RenderGlowMaxExtractAlpha"/>
@@ -226,7 +296,7 @@
     top_pad="-20"
     height="15"
     label_width="0"
-    right="-8"
+    right="-20"
     decimal_digits="2"
     follows="top|right"
     layout="topleft"
@@ -237,5 +307,18 @@
     name="glow_maxExtractAlpha_spinner"
     tool_tip="(Default: 0.25) Also called Max Extract Alpha, controls strength of autoglow."
     control_name="RenderGlowMaxExtractAlpha"/>
-  
+  <button
+    name="glowMaxAlpha_default_btn"
+    follows="top|right"
+    layout="topleft"
+    height="22"
+    left_delta="55"
+    top_pad="-15"
+    width="18"
+    scale_image="true"
+    image_overlay="Refresh_Off"
+    image_overlay_alignment="center">
+    <button.commit_callback
+       function="ClickDefault" />
+  </button>
 </panel>

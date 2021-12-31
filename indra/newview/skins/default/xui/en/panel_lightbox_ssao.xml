@@ -35,7 +35,7 @@
     max_val="1"
     min_val="-1"
     left="140"
-    right="-68"
+    right="-75"
     name="ssao_strength_slider"
     tool_tip="NYI!"
     control_name=""/>
@@ -44,7 +44,7 @@
     top_pad="-20"
     height="15"
     label_width="0"
-    right="-8"
+    right="-20"
     decimal_digits="1"
     follows="top|right"
     layout="topleft"
@@ -55,11 +55,25 @@
     name="ssao_strength_spinner"
     tool_tip="NYI!"
     control_name=""/>
+  <button
+    name="ssaoStrength_default_btn"
+    follows="top|right"
+    layout="topleft"
+    height="22"
+    left_delta="55"
+    top_pad="-15"
+    width="18"
+    scale_image="true"
+    image_overlay="Refresh_Off"
+    image_overlay_alignment="center">
+    <button.commit_callback
+       function="ClickDefault" />
+  </button>
   <text
     follows="left|top"
     height="15"
     left="30"
-    top_pad="8"
+    top_pad="3"
     width="130"
     layout="topleft"
     tool_tip="(Default: 5.0) Occlusion sensitivity factor, larger = more."
@@ -73,7 +87,7 @@
     max_val="10"
     min_val="0"
     left="140"
-    right="-68"
+    right="-75"
     name="ssao_factor_slider"
     tool_tip="(Default: 5.0) Occlusion sensitivity factor, larger = more."
     control_name="RenderSSAOFactor"/>
@@ -81,7 +95,7 @@
     top_pad="-20"
     height="15"
     label_width="0"
-    right="-8"
+    right="-20"
     decimal_digits="1"
     follows="top|right"
     layout="topleft"
@@ -92,11 +106,25 @@
     name="ssao_factor_spinner"
     tool_tip="(Default: 5.0) Occlusion sensitivity factor, larger = more."
     control_name="RenderSSAOFactor"/>
+  <button
+    name="ssaoFactor_default_btn"
+    follows="top|right"
+    layout="topleft"
+    height="22"
+    left_delta="55"
+    top_pad="-15"
+    width="18"
+    scale_image="true"
+    image_overlay="Refresh_Off"
+    image_overlay_alignment="center">
+    <button.commit_callback
+       function="ClickDefault" />
+  </button>
   <text
     follows="left|top"
     height="15"
     left="30"
-    top_pad="8"
+    top_pad="3"
     width="130"
     layout="topleft"
     tool_tip="(Default: 1500) Determines distance from surface to check for occlusion. Higher = Wider occlusion NOTE: Large values may produce artifacts."
@@ -110,7 +138,7 @@
     max_val="5000"
     min_val="0"
     left="140"
-    right="-68"
+    right="-75"
     name="ssao_scale_slider"
     tool_tip="(Default: 1500) Determines distance from surface to check for occlusion. Higher = Wider occlusion NOTE: Large values may produce artifacts."
     control_name="RenderSSAOScale"/>
@@ -118,7 +146,7 @@
     top_pad="-20"
     height="15"
     label_width="0"
-    right="-8"
+    right="-20"
     decimal_digits="0"
     follows="top|right"
     layout="topleft"
@@ -129,11 +157,25 @@
     name="ssao_scale_spinner"
     tool_tip="(Default: 1500) Determines distance from surface to check for occlusion. Higher = Wider occlusion NOTE: Large values may produce artifacts."
     control_name="RenderSSAOScale"/>
+  <button
+    name="ssaoScale_default_btn"
+    follows="top|right"
+    layout="topleft"
+    height="22"
+    left_delta="55"
+    top_pad="-15"
+    width="18"
+    scale_image="true"
+    image_overlay="Refresh_Off"
+    image_overlay_alignment="center">
+    <button.commit_callback
+       function="ClickDefault" />
+  </button>
   <text
     follows="left|top"
     height="15"
     left="30"
-    top_pad="8"
+    top_pad="3"
     width="130"
     layout="topleft"
     tool_tip="(Default: 400) Determines max screen radius to use for occlusion. NOTE: Large values may produce artifacts."
@@ -147,7 +189,7 @@
     max_val="1000"
     min_val="0"
     left="140"
-    right="-68"
+    right="-75"
     name="ssao_maxScale_slider"
     tool_tip="(Default: 400) Determines max screen radius to use for occlusion. NOTE: Large values may produce artifacts."
     control_name="RenderSSAOMaxScale"/>
@@ -155,7 +197,7 @@
     top_pad="-20"
     height="15"
     label_width="0"
-    right="-8"
+    right="-20"
     decimal_digits="0"
     follows="top|right"
     layout="topleft"
@@ -166,4 +208,18 @@
     name="ssao_maxScale_spinner"
     tool_tip="(Default: 400) Determines max screen radius to use for occlusion. NOTE: Large values may produce artifacts."
     control_name="RenderSSAOMaxScale"/>
+  <button
+    name="ssaoMaxScale_default_btn"
+    follows="top|right"
+    layout="topleft"
+    height="22"
+    left_delta="55"
+    top_pad="-15"
+    width="18"
+    scale_image="true"
+    image_overlay="Refresh_Off"
+    image_overlay_alignment="center">
+    <button.commit_callback
+       function="ClickDefault" />
+  </button>
 </panel>
