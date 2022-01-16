@@ -509,7 +509,7 @@ HttpStatus HttpOpRequest::prepareRequest(HttpService * service)
 	check_curl_easy_setopt(mCurlHandle, CURLOPT_NOPROGRESS, 1);
 	check_curl_easy_setopt(mCurlHandle, CURLOPT_URL, mReqURL.c_str());
 	check_curl_easy_setopt(mCurlHandle, CURLOPT_PRIVATE, getHandle());
-	check_curl_easy_setopt(mCurlHandle, CURLOPT_ENCODING, "");
+	check_curl_easy_setopt(mCurlHandle, CURLOPT_ACCEPT_ENCODING, "");
 
 	check_curl_easy_setopt(mCurlHandle, CURLOPT_AUTOREFERER, 1);
 	check_curl_easy_setopt(mCurlHandle, CURLOPT_MAXREDIRS, HTTP_REDIRECTS_DEFAULT);
@@ -532,7 +532,7 @@ HttpStatus HttpOpRequest::prepareRequest(HttpService * service)
 	long follow_redirect(1L);
 	long sslPeerV(0L);
 	long sslHostV(0L);
-    long dnsCacheTimeout(-1L);
+    long dnsCacheTimeout(60); // Refetch dns after 60 seconds
     long nobody(0L);
 
 	if (mReqOptions)
@@ -599,7 +599,7 @@ HttpStatus HttpOpRequest::prepareRequest(HttpService * service)
 	case HOR_POST:
 		{
 			check_curl_easy_setopt(mCurlHandle, CURLOPT_POST, 1);
-			check_curl_easy_setopt(mCurlHandle, CURLOPT_ENCODING, "");
+			check_curl_easy_setopt(mCurlHandle, CURLOPT_ACCEPT_ENCODING, "");
 			long data_size(0);
 			if (mReqBody)
 			{
