@@ -1630,11 +1630,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>343405bd013c5492c9d1a89d2b27c8289f713a3789ab260d85049f7cd56d755cdc3a0f8438a62fce32d68acd72b9200bdbb581e8ed9d2fa09df1e8a2864c851a</string>
+              <string>d2b6104fce7af06ee5f61d91e61deb4816cdbb0e70dbad66c92c1f2d8909d994d647b6ce545e80d1a8a828db51d010d8d39aa4404da4df190c923226372aac58</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/99/packages/generic/open-libndofdev/0.12.0.1325/open_libndofdev-0.12.0-linux64-1325.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/99/packages/generic/open-libndofdev/0.12.0.1372/open_libndofdev-0.12.0-linux64-1372.tar.zst</string>
             </map>
             <key>name</key>
             <string>linux64</string>
