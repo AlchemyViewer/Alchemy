@@ -16,7 +16,7 @@ else (USESYSTEMLIBS)
     set(CRYPTO_LIBRARY
         debug ${ARCH_PREBUILT_DIRS_DEBUG}/libcrypto.lib
         optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libcrypto.lib)
-    set(OPENSSL_LIBRARIES ${SSL_LIBRARY} ${CRYPTO_LIBRARY})
+    set(OPENSSL_LIBRARIES ${SSL_LIBRARY} ${CRYPTO_LIBRARY} Crypt32.lib)
   else (WINDOWS)
     set(OPENSSL_LIBRARIES ssl crypto)
   endif (WINDOWS)

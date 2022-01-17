@@ -498,11 +498,10 @@ void LLXMLRPCTransaction::Impl::setHttpStatus(const LLCore::HttpStatus &status)
 		message = LLTrans::getString("couldnt_resolve_host", args);
 		break;
 
-	case CURLE_SSL_PEER_CERTIFICATE:
+	case CURLE_PEER_FAILED_VERIFICATION:
 		message = LLTrans::getString("ssl_peer_certificate");
 		break;
 
-	case CURLE_SSL_CACERT:
 	case CURLE_SSL_CONNECT_ERROR:		
 		message = LLTrans::getString("ssl_connect_error");
 		break;

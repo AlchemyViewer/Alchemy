@@ -504,12 +504,14 @@ HttpStatus HttpOpRequest::prepareRequest(HttpService * service)
 		return HttpStatus(HttpStatus::LLCORE, HE_BAD_ALLOC);
 	}
 
+	check_curl_easy_setopt(mCurlHandle, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_2TLS);
+
 	check_curl_easy_setopt(mCurlHandle, CURLOPT_IPRESOLVE, CURL_IPRESOLVE_V4);
 	check_curl_easy_setopt(mCurlHandle, CURLOPT_NOSIGNAL, 1);
 	check_curl_easy_setopt(mCurlHandle, CURLOPT_NOPROGRESS, 1);
 	check_curl_easy_setopt(mCurlHandle, CURLOPT_URL, mReqURL.c_str());
 	check_curl_easy_setopt(mCurlHandle, CURLOPT_PRIVATE, getHandle());
-	check_curl_easy_setopt(mCurlHandle, CURLOPT_ACCEPT_ENCODING, "");
+	//check_curl_easy_setopt(mCurlHandle, CURLOPT_ACCEPT_ENCODING, "gzip,deflate");
 
 	check_curl_easy_setopt(mCurlHandle, CURLOPT_AUTOREFERER, 1);
 	check_curl_easy_setopt(mCurlHandle, CURLOPT_MAXREDIRS, HTTP_REDIRECTS_DEFAULT);
@@ -573,18 +575,18 @@ HttpStatus HttpOpRequest::prepareRequest(HttpService * service)
 		LLProxy::applyProxySettings(mCurlHandle);
 
 	}
-	else if (gpolicy.mHttpProxy.size())
+	else if (!gpolicy.mHttpProxy.empty())
 	{
 		// *TODO:  This is fine for now but get fuller socks5/
 		// authentication thing going later....
 		check_curl_easy_setopt(mCurlHandle, CURLOPT_PROXY, gpolicy.mHttpProxy.c_str());
 		check_curl_easy_setopt(mCurlHandle, CURLOPT_PROXYTYPE, CURLPROXY_HTTP);
 	}
-	if (gpolicy.mCAPath.size())
+	if (!gpolicy.mCAPath.empty())
 	{
 		check_curl_easy_setopt(mCurlHandle, CURLOPT_CAPATH, gpolicy.mCAPath.c_str());
 	}
-	if (gpolicy.mCAFile.size())
+	if (!gpolicy.mCAFile.empty())
 	{
 		check_curl_easy_setopt(mCurlHandle, CURLOPT_CAINFO, gpolicy.mCAFile.c_str());
 	}
@@ -599,7 +601,7 @@ HttpStatus HttpOpRequest::prepareRequest(HttpService * service)
 	case HOR_POST:
 		{
 			check_curl_easy_setopt(mCurlHandle, CURLOPT_POST, 1);
-			check_curl_easy_setopt(mCurlHandle, CURLOPT_ACCEPT_ENCODING, "");
+
 			long data_size(0);
 			if (mReqBody)
 			{
@@ -739,13 +741,6 @@ HttpStatus HttpOpRequest::prepareRequest(HttpService * service)
 		//
 		// xfer_timeout *= cpolicy.mPipelining;
 		xfer_timeout *= 2L;
-
-		// Also try requesting HTTP/2.
-/******************************/
-		// but for test purposes, only if overriding VIEWERASSET
-		if (getenv("VIEWERASSET"))
-/******************************/
-		check_curl_easy_setopt(mCurlHandle, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_2_0);
 	}
 	// *DEBUG:  Enable following override for timeout handling and "[curl:bugs] #1420" tests
     //if (cpolicy.mPipelining)

@@ -69,12 +69,12 @@ static const struct
 		"other"
 	},
 	{ // AP_ASSET
-		8,		1,		16,		0,		true,
+		16,		1,		32,		0,		true,
 		"AssetFetchConcurrency",
 		"asset fetch"
 	},
 	{ // AP_TEXTURE
-		8,		1,		12,		0,		true,
+		16,		1,		32,		0,		true,
 		"TextureFetchConcurrency",
 		"texture fetch"
 	},
@@ -84,7 +84,7 @@ static const struct
 		"mesh fetch"
 	},
 	{ // AP_MESH2
-		8,		1,		32,		0,		true,	
+		16,		1,		32,		0,		true,	
 		"Mesh2MaxConcurrentRequests",
 		"mesh2 fetch"
 	},
@@ -277,12 +277,16 @@ void LLAppCoreHttp::init()
 	}
 
 	// Global pipelining setting
-	static const std::string http_pipelining("HttpPipelining");
-	if (gSavedSettings.controlExists(http_pipelining))
+	//static const std::string http_pipelining("HttpPipelining");
+	//if (gSavedSettings.controlExists(http_pipelining))
+	//{
+	//	// Default to true (in ctor) if absent.
+	//	mPipelined = gSavedSettings.getBOOL(http_pipelining);
+	//	LL_INFOS("Init") << "HTTP Pipelining " << (mPipelined ? "enabled" : "disabled") << "!" << LL_ENDL;
+	//}
+
 	{
-		// Default to true (in ctor) if absent.
-		mPipelined = gSavedSettings.getBOOL(http_pipelining);
-		LL_INFOS("Init") << "HTTP Pipelining " << (mPipelined ? "enabled" : "disabled") << "!" << LL_ENDL;
+		mPipelined = false;
 	}
 
 	// Register signals for settings and state changes

@@ -284,8 +284,8 @@ CURL *getCurlTemplateHandle()
             check_curl_code(result, CURLOPT_NOSIGNAL);
             result = curl_easy_setopt(curlpTemplateHandle, CURLOPT_NOPROGRESS, 1);
             check_curl_code(result, CURLOPT_NOPROGRESS);
-            result = curl_easy_setopt(curlpTemplateHandle, CURLOPT_ACCEPT_ENCODING, "");
-            check_curl_code(result, CURLOPT_ACCEPT_ENCODING);
+            //result = curl_easy_setopt(curlpTemplateHandle, CURLOPT_ACCEPT_ENCODING, "gzip,deflate");
+            //check_curl_code(result, CURLOPT_ACCEPT_ENCODING);
             result = curl_easy_setopt(curlpTemplateHandle, CURLOPT_AUTOREFERER, 1);
             check_curl_code(result, CURLOPT_AUTOREFERER);
             result = curl_easy_setopt(curlpTemplateHandle, CURLOPT_FOLLOWLOCATION, 1);
@@ -303,6 +303,9 @@ CURL *getCurlTemplateHandle()
             // seconds and no RSTs.
             result = curl_easy_setopt(curlpTemplateHandle, CURLOPT_DNS_CACHE_TIMEOUT, 60); // Refetch dns after 60 seconds
             check_curl_code(result, CURLOPT_DNS_CACHE_TIMEOUT);
+
+			result = curl_easy_setopt(curlpTemplateHandle, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_2TLS);
+			check_curl_code(result, CURLOPT_HTTP_VERSION);
         }
     }
 

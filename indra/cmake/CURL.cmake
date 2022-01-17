@@ -11,8 +11,10 @@ else (USESYSTEMLIBS)
   use_prebuilt_binary(curl)
   if (WINDOWS)
     set(CURL_LIBRARIES 
-    debug ${ARCH_PREBUILT_DIRS_DEBUG}/libcurld.lib
-    optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libcurl.lib)
+      debug ${ARCH_PREBUILT_DIRS_DEBUG}/libcurld.lib
+      optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libcurl.lib
+      Normaliz.lib
+    )
   else (WINDOWS)
     set(CURL_LIBRARIES libcurl.a)
   endif (WINDOWS)
