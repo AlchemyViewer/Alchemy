@@ -6,7 +6,7 @@
       <key>SDL2</key>
       <map>
         <key>copyright</key>
-        <string>Copyright (C) 1997-2020 Sam Lantinga (slouken@libsdl.org)</string>
+        <string>Copyright (C) 1997-2022 Sam Lantinga (slouken@libsdl.org)</string>
         <key>description</key>
         <string>Simple DirectMedia Layer is a cross-platform multimedia library designed to provide low level access to audio, keyboard, mouse, joystick, 3D hardware via OpenGL, and 2D video framebuffer.</string>
         <key>license</key>
@@ -22,11 +22,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>3606af8b8d6f369be9871ad15c6a2b40aa14a91e29e4b074168d042d215a69f3849995de29cf851e05498d52be8e067dccf08d8e2913e1dd7600b3d5b584fa1d</string>
+              <string>e78c6a101b654747099e9e54602c8cdaf43713e41702c3ad6eb1f7a4913e1f858fbf6202d82addb485f7122403483f766aa27194f12be729897d5d17868e0b67</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/100/packages/generic/SDL2/2.0.18.1324/SDL2-2.0.18-darwin64-1324.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/100/packages/generic/SDL2/2.0.20.1370/SDL2-2.0.20-darwin64-1370.tar.zst</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
@@ -36,18 +36,18 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>fd45ffc171bb10b9d3b3063c54134344bbdf27577e1fd82719ad15f4b015870c34b5d7d92a58fe0854a816cd38b6afa0ec2c498cb7bcfa6d70c3444b215662de</string>
+              <string>d6631c268f5f002d09c10f10a5dc8e8637f13eb450ac26d7a2aabcb6be132dd9513534ce3603643a82ce02e6913c87b610ee8d9ece440e873ec4e47590a3e645</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/100/packages/generic/SDL2/2.0.18.1324/SDL2-2.0.18-linux64-1324.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/100/packages/generic/SDL2/2.0.20.1370/SDL2-2.0.20-linux64-1370.tar.zst</string>
             </map>
             <key>name</key>
             <string>linux64</string>
           </map>
         </map>
         <key>version</key>
-        <string>2.0.18</string>
+        <string>2.0.20</string>
       </map>
       <key>abseil-cpp</key>
       <map>
