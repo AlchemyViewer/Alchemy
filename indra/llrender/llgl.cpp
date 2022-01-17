@@ -899,7 +899,7 @@ void LLGLManager::initExtensions()
 	mHasDebugOutput = mGLVersion >= 4.3f || epoxy_has_gl_extension("GL_ARB_debug_output");
 	mHasTransformFeedback = mGLVersion >= 4.0f ? TRUE : FALSE;
 #if !LL_DARWIN
-	mHasPointParameters = !mIsATI && (mGLVersion >= 1.4f || epoxy_has_gl_extension("GL_ARB_point_parameters"));
+	mHasPointParameters = mGLVersion >= 1.4f || epoxy_has_gl_extension("GL_ARB_point_parameters");
 #endif
 	mHasShaderObjects = mGLVersion >= 2.0f || (epoxy_has_gl_extension("GL_ARB_shader_objects") && (LLRender::sGLCoreProfile || epoxy_has_gl_extension("GL_ARB_shading_language_100")));
 	mHasVertexShader = mGLVersion >= 2.0f || (epoxy_has_gl_extension("GL_ARB_vertex_program") && epoxy_has_gl_extension("GL_ARB_vertex_shader")
