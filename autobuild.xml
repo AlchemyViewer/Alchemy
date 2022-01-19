@@ -231,6 +231,70 @@
         <key>version</key>
         <string>1.78.0</string>
       </map>
+      <key>c-ares</key>
+      <map>
+        <key>canonical_repo</key>
+        <string>https://git.alchemyviewer.org/alchemy/thirdparty/3p-c-ares</string>
+        <key>copyright</key>
+        <string>Copyright (c) 1996 - 2018, Daniel Stenberg, (daniel@haxx.se), and many contributors</string>
+        <key>description</key>
+        <string>Library for transferring data specified with URL syntax</string>
+        <key>license</key>
+        <string>curl</string>
+        <key>license_file</key>
+        <string>LICENSES/c-ares.txt</string>
+        <key>name</key>
+        <string>c-ares</string>
+        <key>platforms</key>
+        <map>
+          <key>darwin64</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>hash</key>
+              <string>14d2d1664450fca1fe667d88802bbf581498f80e221bc8faf24a3e407459b21be5a25f22c8b32039f2e3494663b1246b7f9c9a51b2d323791b9d59ba4dabba8e</string>
+              <key>hash_algorithm</key>
+              <string>blake2b</string>
+              <key>url</key>
+              <string>https://git.alchemyviewer.org/api/v4/projects/177/packages/generic/c-ares/1.18.1.1381/c_ares-1.18.1-darwin64-1381.tar.zst</string>
+            </map>
+            <key>name</key>
+            <string>darwin64</string>
+          </map>
+          <key>linux64</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>hash</key>
+              <string>af10b515ba01ee4f3f816605aaca405b31897a43a32f24385261cfe446671fc222c4c8db7135800307d31b54a91f3ef883f214aa93d12f9bf78dd590714354dd</string>
+              <key>hash_algorithm</key>
+              <string>blake2b</string>
+              <key>url</key>
+              <string>https://git.alchemyviewer.org/api/v4/projects/177/packages/generic/c-ares/1.18.1.1381/c_ares-1.18.1-linux64-1381.tar.zst</string>
+            </map>
+            <key>name</key>
+            <string>linux64</string>
+          </map>
+          <key>windows64</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>hash</key>
+              <string>091d861970c73dafb08a35a806545f5d83e1b0ab41f699cd314c4b5f5283a2c886617ca6989deef7c51d7f1f9762966984e2a59ad34b978ce8a60935ce3c6d38</string>
+              <key>hash_algorithm</key>
+              <string>blake2b</string>
+              <key>url</key>
+              <string>https://git.alchemyviewer.org/api/v4/projects/177/packages/generic/c-ares/1.18.1.1381/c_ares-1.18.1-windows64-1381.tar.zst</string>
+            </map>
+            <key>name</key>
+            <string>windows64</string>
+          </map>
+        </map>
+        <key>source_type</key>
+        <string>git</string>
+        <key>version</key>
+        <string>1.18.1</string>
+      </map>
       <key>colladadom</key>
       <map>
         <key>copyright</key>
@@ -338,11 +402,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>f8146bb5c8ed17867dec424bc8af4f11f245f86899525324c05b27e774a8def44424dbf19c0001e0f2275e8f46bf9e28bb6cc0ac8cc0e06444c6b69f8e34b144</string>
+              <string>e81ce3f4eeb944d841b783052d1bfb0cc0d09fbc278d47dea0f325f7a92a58665d1f385d07e230d26c5bcc8ba85501db8486dc617a477d0004858c4da290cdfd</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/89/packages/generic/curl/7.81.0.1366/curl-7.81.0-darwin64-1366.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/89/packages/generic/curl/7.81.0.1385/curl-7.81.0-darwin64-1385.tar.zst</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
@@ -352,11 +416,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>8ddf37d9862ada64b70b6e2da7be9cc47de11913aeae7f9bfacb67da5cd97aff031351c82c7d8a32f6fa0cf5380e4615e3845498a0faa8877948b86f4998d05c</string>
+              <string>db3f405875875ba630c3c1b7eb4e40eceecf4aa516b85941c214c0ce2b6c6d76516c3631988f56f96a0d65bb501e55f43961eab714b5f7c94484b3b9796f9446</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/89/packages/generic/curl/7.81.0.1366/curl-7.81.0-linux64-1366.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/89/packages/generic/curl/7.81.0.1385/curl-7.81.0-linux64-1385.tar.zst</string>
             </map>
             <key>name</key>
             <string>linux64</string>
@@ -366,11 +430,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>3c4a83ab006ef466b7cdba6246f7c60bdf34e0fc13d45f6318ec25b35a77e988d617336a0b833f29b7b4996ae5c9be6c63d2cd647b6a8813f45ab55a4b1f2679</string>
+              <string>8df2a87fc0ab2d7bb1934b0c1eea9c98b2b65bbcecab7508821e52503210ee3cb5aa68dbcf7977262dd4411cafc4f173dd6424c89775f24ce12973f2b92e4af6</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/89/packages/generic/curl/7.81.0.1366/curl-7.81.0-windows64-1366.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/89/packages/generic/curl/7.81.0.1385/curl-7.81.0-windows64-1385.tar.zst</string>
             </map>
             <key>name</key>
             <string>windows64</string>
