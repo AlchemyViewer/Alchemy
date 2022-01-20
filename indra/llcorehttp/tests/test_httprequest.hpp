@@ -1570,10 +1570,6 @@ void HttpRequestTestObjectType::test<16>()
 				boost::regex("\\*/\\*", boost::regex::icase)));
 		handler.mHeadersRequired.push_back(
 			regex_container_t::value_type(
-				boost::regex("X-Reflect-accept-encoding", boost::regex::icase),
-				boost::regex("((gzip|deflate),\\s*)+(gzip|deflate)", boost::regex::icase))); // close enough
-		handler.mHeadersRequired.push_back(
-			regex_container_t::value_type(
 				boost::regex("X-Reflect-keep-alive", boost::regex::icase),
 				boost::regex("\\d+", boost::regex::icase)));
 		handler.mHeadersRequired.push_back(
@@ -1642,10 +1638,6 @@ void HttpRequestTestObjectType::test<16>()
 			regex_container_t::value_type(
 				boost::regex("X-Reflect-accept", boost::regex::icase),
 				boost::regex("image/x-j2c", boost::regex::icase)));
-		handler.mHeadersRequired.push_back(
-			regex_container_t::value_type(
-				boost::regex("X-Reflect-accept-encoding", boost::regex::icase),
-				boost::regex("((gzip|deflate),\\s*)+(gzip|deflate)", boost::regex::icase))); // close enough
 		handler.mHeadersRequired.push_back(
 			regex_container_t::value_type(
 				boost::regex("X-Reflect-keep-alive", boost::regex::icase),
@@ -1813,10 +1805,6 @@ void HttpRequestTestObjectType::test<17>()
 			regex_container_t::value_type(
 				boost::regex("X-Reflect-accept", boost::regex::icase),
 				boost::regex("\\*/\\*", boost::regex::icase)));
-		handler.mHeadersRequired.push_back(
-			regex_container_t::value_type(
-				boost::regex("X-Reflect-accept-encoding", boost::regex::icase),
-				boost::regex("((gzip|deflate),\\s*)+(gzip|deflate)", boost::regex::icase))); // close enough
 		handler.mHeadersRequired.push_back(
 			regex_container_t::value_type(
 				boost::regex("X-Reflect-keep-alive", boost::regex::icase),
@@ -1998,10 +1986,6 @@ void HttpRequestTestObjectType::test<18>()
 			regex_container_t::value_type(
 				boost::regex("X-Reflect-accept", boost::regex::icase),
 				boost::regex("\\*/\\*", boost::regex::icase)));
-		handler.mHeadersRequired.push_back(
-			regex_container_t::value_type(
-				boost::regex("X-Reflect-accept-encoding", boost::regex::icase),
-				boost::regex("((gzip|deflate),\\s*)+(gzip|deflate)", boost::regex::icase))); // close enough
 		handler.mHeadersRequired.push_back(
 			regex_container_t::value_type(
 				boost::regex("X-Reflect-keep-alive", boost::regex::icase),
@@ -2186,10 +2170,6 @@ void HttpRequestTestObjectType::test<19>()
 				boost::regex("text/plain", boost::regex::icase)));
 		handler.mHeadersRequired.push_back(
 			regex_container_t::value_type(
-				boost::regex("X-Reflect-accept-encoding", boost::regex::icase),
-				boost::regex("deflate", boost::regex::icase))); // close enough
-		handler.mHeadersRequired.push_back(
-			regex_container_t::value_type(
 				boost::regex("X-Reflect-keep-alive", boost::regex::icase),
 				boost::regex("120", boost::regex::icase)));
 		handler.mHeadersRequired.push_back(
@@ -2372,10 +2352,6 @@ void HttpRequestTestObjectType::test<20>()
 			regex_container_t::value_type(
 				boost::regex("X-Reflect-accept", boost::regex::icase),
 				boost::regex("text/html", boost::regex::icase)));
-		handler.mHeadersRequired.push_back(
-			regex_container_t::value_type(
-				boost::regex("X-Reflect-accept-encoding", boost::regex::icase),
-				boost::regex("((gzip|deflate),\\s*)+(gzip|deflate)", boost::regex::icase))); // close enough
 		handler.mHeadersRequired.push_back(
 			regex_container_t::value_type(
 				boost::regex("X-Reflect-keep-alive", boost::regex::icase),
@@ -2575,10 +2551,6 @@ void HttpRequestTestObjectType::test<21>()
 			regex_container_t::value_type(
 				boost::regex("X-Reflect-accept", boost::regex::icase),
 				boost::regex("\\*/\\*", boost::regex::icase)));
-		handler.mHeadersRequired.push_back(
-			regex_container_t::value_type(
-				boost::regex("X-Reflect-accept-encoding", boost::regex::icase),
-				boost::regex("((gzip|deflate),\\s*)+(gzip|deflate)", boost::regex::icase))); // close enough
 		handler.mHeadersRequired.push_back(
 			regex_container_t::value_type(
 				boost::regex("X-Reflect-keep-alive", boost::regex::icase),
