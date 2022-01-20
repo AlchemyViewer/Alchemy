@@ -402,11 +402,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>e81ce3f4eeb944d841b783052d1bfb0cc0d09fbc278d47dea0f325f7a92a58665d1f385d07e230d26c5bcc8ba85501db8486dc617a477d0004858c4da290cdfd</string>
+              <string>4640e06bc5637729e31e3f01b082587409413493bdf2524e158f23c63a0da461add982fa2378ed95cef7092d0dfbc9efcba70f325ea0923060e0475b48242a1c</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/89/packages/generic/curl/7.81.0.1385/curl-7.81.0-darwin64-1385.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/89/packages/generic/curl/7.81.0.1390/curl-7.81.0-darwin64-1390.tar.zst</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
@@ -416,11 +416,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>db3f405875875ba630c3c1b7eb4e40eceecf4aa516b85941c214c0ce2b6c6d76516c3631988f56f96a0d65bb501e55f43961eab714b5f7c94484b3b9796f9446</string>
+              <string>009cd83fa8402f07cc0ba4b9f16d59c3dcc3214db15e33a7e64d3ed26b3ba80a02c2f5166341df537943657cd31aa5bec90177eaf5ceebdc5c586c806bfa244c</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/89/packages/generic/curl/7.81.0.1385/curl-7.81.0-linux64-1385.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/89/packages/generic/curl/7.81.0.1390/curl-7.81.0-linux64-1390.tar.zst</string>
             </map>
             <key>name</key>
             <string>linux64</string>
@@ -430,11 +430,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>8df2a87fc0ab2d7bb1934b0c1eea9c98b2b65bbcecab7508821e52503210ee3cb5aa68dbcf7977262dd4411cafc4f173dd6424c89775f24ce12973f2b92e4af6</string>
+              <string>58162176b33ad415ca3ba80af6021d3d9b9aebdb526dc57fc9c882c81a7979094f06b25285225e3a3d8baceb26f47e3af3c22d7fb6d14d22b2bfa551b42ec007</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/89/packages/generic/curl/7.81.0.1385/curl-7.81.0-windows64-1385.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/89/packages/generic/curl/7.81.0.1390/curl-7.81.0-windows64-1390.tar.zst</string>
             </map>
             <key>name</key>
             <string>windows64</string>

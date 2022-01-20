@@ -28,7 +28,10 @@ else (USESYSTEMLIBS)
       resolv
     )
   else ()
-    set(CURL_LIBRARIES libcurl.a)
+    set(CURL_LIBRARIES libcurl.a
+      debug ${ARCH_PREBUILT_DIRS_DEBUG}/libcares.a
+      optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libcares.a
+      )
   endif ()
   set(CURL_INCLUDE_DIRS ${LIBS_PREBUILT_DIR}/include)
 endif (USESYSTEMLIBS)
