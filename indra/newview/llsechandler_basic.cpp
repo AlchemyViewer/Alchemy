@@ -1356,6 +1356,7 @@ LLSecAPIBasicHandler::~LLSecAPIBasicHandler()
 	_writeProtectedData();
 }
 
+#if LEGACY_PASSWORD_STORAGE
 // compat_rc4 reads old rc4 encrypted files
 void compat_rc4(llifstream &protected_data_stream, std::string &decrypted_data)
 {
@@ -1394,6 +1395,7 @@ void compat_rc4(llifstream &protected_data_stream, std::string &decrypted_data)
 
 	EVP_CIPHER_CTX_free(ctx);
 }
+#endif
 
 void LLSecAPIBasicHandler::_readProtectedData(unsigned char *unique_id, U32 id_len)
 {
@@ -1452,6 +1454,7 @@ void LLSecAPIBasicHandler::_readProtectedData(unsigned char *unique_id, U32 id_l
 		if (parser->parse(parse_stream, mProtectedDataMap, 
 						  LLSDSerialize::SIZE_UNLIMITED) == LLSDParser::PARSE_FAILURE)
 		{
+#if LEGACY_PASSWORD_STORAGE
 			// clear and reset to try compat
 			parser->reset();
 			decrypted_data.clear();
@@ -1466,6 +1469,10 @@ void LLSecAPIBasicHandler::_readProtectedData(unsigned char *unique_id, U32 id_l
 				// everything failed abort
 				LLTHROW(LLProtectedDataException("Config file cannot be decrypted."));
 			}
+#else
+            // everything failed abort
+            LLTHROW(LLProtectedDataException("Config file cannot be decrypted."));
+#endif
 		}
 	}
 }
