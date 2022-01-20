@@ -88,6 +88,7 @@ const std::string HTTP_OUT_HEADER_VARY("Vary");
 const std::string HTTP_OUT_HEADER_VIA("Via");
 const std::string HTTP_OUT_HEADER_WARNING("Warning");
 const std::string HTTP_OUT_HEADER_WWW_AUTHENTICATE("WWW-Authenticate");
+const std::string HTTP_OUT_HEADER_SL_UDP_LISTEN_PORT("X-SecondLife-UDP-Listen-Port");
 
 // Incoming headers are normalized to lower-case.
 const std::string HTTP_IN_HEADER_ACCEPT_LANGUAGE("accept-language");

@@ -2334,7 +2334,7 @@ void HttpRequestTestObjectType::test<20>()
 		headers = HttpHeaders::ptr_t(new HttpHeaders());
         headers->append("Keep-Alive", "120");
 		headers->append("Accept", "text/html");
-		headers->append("Content-Type", "application/llsd+xml");
+		headers->append(HTTP_OUT_HEADER_CONTENT_TYPE "application/llsd+xml");
 		headers->append("Cache-Control", "no-store");
 		
 		// And a buffer array
@@ -2532,9 +2532,9 @@ void HttpRequestTestObjectType::test<21>()
 
 		// headers
 		headers = HttpHeaders::ptr_t(new HttpHeaders);
-		headers->append("Content-Type", "text/plain");
-		headers->append("Content-Type", "text/html");
-		headers->append("Content-Type", "application/llsd+xml");
+		headers->append(HTTP_OUT_HEADER_CONTENT_TYPE, "text/plain");
+		headers->append(HTTP_OUT_HEADER_CONTENT_TYPE, "text/html");
+		headers->append(HTTP_OUT_HEADER_CONTENT_TYPE, "application/llsd+xml");
 		
 		// And a buffer array
 		const char * msg("<xml><llsd><string>It was the best of times, it was the worst of times.</string></llsd></xml>");

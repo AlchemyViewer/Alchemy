@@ -648,12 +648,12 @@ HttpStatus HttpOpRequest::prepareRequest(HttpService * service)
 		break;
 	}
 
-	if (!mReqHeaders || !mReqHeaders->find("Connection"))
+	if (!mReqHeaders || !mReqHeaders->find(HTTP_OUT_HEADER_CONNECTION))
 	{
         mCurlHeaders = curl_slist_append(mCurlHeaders, "Connection: keep-alive");
 	}
 
-	if (!mReqHeaders || !mReqHeaders->find("Keep-Alive"))
+	if (!mReqHeaders || !mReqHeaders->find(HTTP_OUT_HEADER_KEEP_ALIVE))
 	{
         mCurlHeaders = curl_slist_append(mCurlHeaders, "Keep-Alive: 300");
 	}

@@ -178,6 +178,7 @@ extern const std::string HTTP_OUT_HEADER_VARY;
 extern const std::string HTTP_OUT_HEADER_VIA;
 extern const std::string HTTP_OUT_HEADER_WARNING;
 extern const std::string HTTP_OUT_HEADER_WWW_AUTHENTICATE;
+extern const std::string HTTP_OUT_HEADER_SL_UDP_LISTEN_PORT;
 
 // Incoming headers are normalized to lower-case.
 extern const std::string HTTP_IN_HEADER_ACCEPT_LANGUAGE;
