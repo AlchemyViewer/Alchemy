@@ -17,6 +17,7 @@ else (USESYSTEMLIBS)
       debug ${ARCH_PREBUILT_DIRS_DEBUG}/libcaresd.lib
       optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libcares.lib
       Normaliz.lib
+      Iphlpapi.lib
     )
   elseif(DARWIN)
     set(CURL_LIBRARIES 
