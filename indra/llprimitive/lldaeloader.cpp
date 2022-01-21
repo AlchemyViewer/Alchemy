@@ -994,6 +994,8 @@ bool LLDAELoader::OpenFile(const std::string& filename)
 
 	mTransform.condition();	
 
+	mBindTransform.setIdentity();
+	
 	U32 submodel_limit = count > 0 ? mGeneratedModelLimit/count : 0;
 	for (daeInt idx = 0; idx < count; ++idx)
 	{ //build map of domEntities to LLModel
@@ -1049,33 +1051,7 @@ bool LLDAELoader::OpenFile(const std::string& filename)
 	}
 
 	count = db->getElementCount(NULL, COLLADA_TYPE_SKIN);
-	for (daeInt idx = 0; idx < count; ++idx)
-	{ //add skinned meshes as instances
-		domSkin* skin = NULL;
-		db->getElement((daeElement**) &skin, idx, NULL, COLLADA_TYPE_SKIN);
-		
-		if (skin)
-		{
-			domGeometry* geom = daeSafeCast<domGeometry>(skin->getSource().getElement());
-			
-			if (geom)
-			{
-				domMesh* mesh = geom->getMesh();
-				if (mesh)
-				{
-					std::vector< LLPointer< LLModel > >::iterator i = mModelsMap[mesh].begin();
-					while (i != mModelsMap[mesh].end())
-					{
-						LLPointer<LLModel> mdl = *i;
-						LLDAELoader::processDomModel(mdl, &dae, root, mesh, skin);
-						i++;
-					}
-				}
-			}
-		}
-	}
-
-	LL_INFOS()<< "Collada skins processed: " << count <<LL_ENDL;
+	LL_INFOS()<< "Collada skins to be processed: " << count <<LL_ENDL;
 
 	daeElement* scene = root->getDescendant("visual_scene");
 	
@@ -1090,7 +1066,7 @@ bool LLDAELoader::OpenFile(const std::string& filename)
 
 	bool badElement = false;
 	
-	processElement( scene, badElement, &dae );
+	processElement( scene, badElement, &dae, root);
 	
 	if ( badElement )
 	{
@@ -1179,6 +1155,8 @@ void LLDAELoader::processDomModel(LLModel* model, DAE* dae, daeElement* root, do
 
 			LLMatrix4 trans = normalized_transformation;
 			trans *= mat;
+			trans *= mBindTransform;
+
 			skin_info.mBindShapeMatrix.loadu(trans);							
 		}
 
@@ -1946,9 +1924,9 @@ daeElement* LLDAELoader::getChildFromElement( daeElement* pElement, std::string 
     return NULL;
 }
 
-void LLDAELoader::processElement( daeElement* element, bool& badElement, DAE* dae )
+void LLDAELoader::processElement( daeElement* element, bool& badElement, DAE* dae, daeElement* domRoot)
 {
-	LLMatrix4 saved_transform;
+	LLMatrix4 saved_transform, saved_bind_transform;
 	bool pushed_mat = false;
 
 	domNode* node = daeSafeCast<domNode>(element);
@@ -1956,6 +1934,7 @@ void LLDAELoader::processElement( daeElement* element, bool& badElement, DAE* da
 	{
 		pushed_mat = true;
 		saved_transform = mTransform;
+		saved_bind_transform = mBindTransform;
 	}
 
 	domTranslate* translate = daeSafeCast<domTranslate>(element);
@@ -1963,12 +1942,17 @@ void LLDAELoader::processElement( daeElement* element, bool& badElement, DAE* da
 	{
 		domFloat3 dom_value = translate->getValue();
 
-		LLMatrix4 translation;
+		LLMatrix4 translation, translation2;
 		translation.setTranslation(LLVector3(dom_value[0], dom_value[1], dom_value[2]));
+		translation2 = translation;
 
 		translation *= mTransform;
 		mTransform = translation;
 		mTransform.condition();
+
+		translation2 *= mBindTransform;
+		mBindTransform = translation2;
+		mBindTransform.condition();
 	}
 
 	domRotate* rotate = daeSafeCast<domRotate>(element);
@@ -1976,12 +1960,17 @@ void LLDAELoader::processElement( daeElement* element, bool& badElement, DAE* da
 	{
 		domFloat4 dom_value = rotate->getValue();
 
-		LLMatrix4 rotation;
+		LLMatrix4 rotation, rotation2;
 		rotation.initRotTrans(dom_value[3] * DEG_TO_RAD, LLVector3(dom_value[0], dom_value[1], dom_value[2]), LLVector3(0, 0, 0));
+		rotation2 = rotation;
 
 		rotation *= mTransform;
 		mTransform = rotation;
 		mTransform.condition();
+
+		rotation2 *= mBindTransform;
+		mBindTransform = rotation2;
+		mBindTransform.condition();
 	}
 
 	domScale* scale = daeSafeCast<domScale>(element);
@@ -1992,12 +1981,17 @@ void LLDAELoader::processElement( daeElement* element, bool& badElement, DAE* da
 
 		LLVector3 scale_vector = LLVector3(dom_value[0], dom_value[1], dom_value[2]);
 		scale_vector.abs(); // Set all values positive, since we don't currently support mirrored meshes
-		LLMatrix4 scaling;
+		LLMatrix4 scaling, scaling2;
 		scaling.initScale(scale_vector);
+		scaling2 = scaling;
 
 		scaling *= mTransform;
 		mTransform = scaling;
 		mTransform.condition();
+
+		scaling2 *= mBindTransform;
+		mBindTransform = scaling2;
+		mBindTransform.condition();
 	}
 
 	domMatrix* matrix = daeSafeCast<domMatrix>(element);
@@ -2005,7 +1999,7 @@ void LLDAELoader::processElement( daeElement* element, bool& badElement, DAE* da
 	{
 		domFloat4x4 dom_value = matrix->getValue();
 
-		LLMatrix4 matrix_transform;
+		LLMatrix4 matrix_transform, matrix_transform2;
 
 		for (int i = 0; i < 4; i++)
 		{
@@ -2015,9 +2009,15 @@ void LLDAELoader::processElement( daeElement* element, bool& badElement, DAE* da
 			}
 		}
 
+		matrix_transform2 = matrix_transform;
+
 		matrix_transform *= mTransform;
 		mTransform = matrix_transform;
 		mTransform.condition();
+
+		matrix_transform2 *= mBindTransform;
+		mBindTransform = matrix_transform2;
+		mBindTransform.condition();
 	}
 
 	domInstance_geometry* instance_geo = daeSafeCast<domInstance_geometry>(element);
@@ -2115,7 +2115,36 @@ void LLDAELoader::processElement( daeElement* element, bool& badElement, DAE* da
 		daeElement* instance = instance_node->getUrl().getElement();
 		if (instance)
 		{
-			processElement(instance,badElement, dae);
+			processElement(instance,badElement, dae, domRoot);
+		}
+	}
+
+	domInstance_controller* instance_ctl = daeSafeCast<domInstance_controller>(element);
+	if (instance_ctl)
+	{
+		domController* ctl = daeSafeCast<domController>(instance_ctl->getUrl().getElement());
+		if (ctl)
+		{
+			domSkin* skin = ctl->getSkin();
+			if (skin)
+			{
+				domGeometry* geom = daeSafeCast<domGeometry>(skin->getSource().getElement());
+
+				if (geom)
+				{
+					domMesh* mesh = geom->getMesh();
+					if (mesh)
+					{
+						std::vector< LLPointer< LLModel > >::iterator i = mModelsMap[mesh].begin();
+						while (i != mModelsMap[mesh].end())
+						{
+							LLPointer<LLModel> mdl = *i;
+							LLDAELoader::processDomModel(mdl, dae, domRoot, mesh, skin);
+							i++;
+						}
+					}
+				}
+			}
 		}
 	}
 
@@ -2124,12 +2153,13 @@ void LLDAELoader::processElement( daeElement* element, bool& badElement, DAE* da
 	int childCount = children.getCount();
 	for (S32 i = 0; i < childCount; i++)
 	{
-		processElement(children[i],badElement, dae);
+		processElement(children[i],badElement, dae, domRoot);
 	}
 
 	if (pushed_mat)
 	{ //this element was a node, restore transform before processiing siblings
 		mTransform = saved_transform;
+		mBindTransform = saved_bind_transform;
 	}
 }
 
