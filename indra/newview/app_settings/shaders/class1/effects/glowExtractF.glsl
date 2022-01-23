@@ -49,8 +49,8 @@ void main()
 	/// http://en.wikipedia.org/wiki/Luma_%28video%29
 	float lum = smoothstep(minLuminance, minLuminance+1.0, dot(col.rgb, lumWeights ) );
 	float warmth = smoothstep(minLuminance, minLuminance+1.0, max(col.r * warmthWeights.r, max(col.g * warmthWeights.g, col.b * warmthWeights.b)) ); 
-	
-	frag_color.rgb = col.rgb; 
+
+	frag_color.rgb = max(col.rgb, vec3(0)); 
 	frag_color.a = max(col.a, mix(lum, warmth, warmthAmount) * maxExtractAlpha);
 	
 }

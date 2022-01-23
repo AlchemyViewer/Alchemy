@@ -268,7 +268,7 @@ bool ALRenderUtil::setupColorGrade()
 	return true;
 }
 
-void ALRenderUtil::renderTonemap(LLRenderTarget* src, LLRenderTarget* dst)
+void ALRenderUtil::renderTonemap(LLRenderTarget* src, LLRenderTarget* dst, LLRenderTarget* bloom)
 {
 	gGL.matrixMode(LLRender::MM_PROJECTION);
 	gGL.pushMatrix();
@@ -292,6 +292,13 @@ void ALRenderUtil::renderTonemap(LLRenderTarget* src, LLRenderTarget* dst)
 	{
 		src->bindTexture(0, channel, LLTexUnit::TFO_POINT);
 	}
+
+	channel = tone_shader->enableTexture(LLShaderMgr::DEFERRED_BLOOM, bloom->getUsage());
+	if (channel > -1)
+	{
+		bloom->bindTexture(0, channel);
+	}
+
 	tone_shader->uniform2f(LLShaderMgr::DEFERRED_SCREEN_RES, src->getWidth(), src->getHeight());
 	tone_shader->uniform1f(al_exposure, mTonemapExposure);
 

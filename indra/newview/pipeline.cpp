@@ -274,6 +274,7 @@ LLTrace::BlockTimerStatHandle FTM_DEFERRED_POOLRENDER("RenderPool (Deferred)");
 LLTrace::BlockTimerStatHandle FTM_DEFERRED_POOLS("Pools (Deferred)");
 LLTrace::BlockTimerStatHandle FTM_POST_DEFERRED_POOLRENDER("RenderPool (Post)");
 LLTrace::BlockTimerStatHandle FTM_POST_DEFERRED_POOLS("Pools (Post)");
+LLTrace::BlockTimerStatHandle FTM_RENDER_DEFERRED_BLOOM("HDRBloom");
 LLTrace::BlockTimerStatHandle FTM_RENDER_BLOOM_FBO("First FBO");
 LLTrace::BlockTimerStatHandle FTM_STATESORT("Sort Draw State");
 LLTrace::BlockTimerStatHandle FTM_PIPELINE("Pipeline");
@@ -1382,12 +1383,21 @@ void LLPipeline::createGLBuffers()
 	GLuint resY = gViewerWindow->getWorldViewHeightRaw();
 
     // allocate screen space glow buffers
-    const U32 glow_res = llmax(1, llmin(512, 1 << gSavedSettings.getS32("RenderGlowResolutionPow")));
+    const U32 glow_res = llmax(1, llmin(1024, 1 << gSavedSettings.getS32("RenderGlowResolutionPow")));
     glClearColor(0,0,0,0);
     gGL.setColorMask(true, true);
+
+	U32 color_fmt = GL_RGBA;
+	U32 pix_type = GL_UNSIGNED_BYTE;
+	if (sRenderDeferred)
+	{
+		color_fmt = GL_RGBA16F;
+		pix_type = GL_FLOAT;
+	}
+
     for (U32 i = 0; i < 2; i++)
     {
-        if(mGlow[i].allocate(512,glow_res,GL_RGBA,FALSE,FALSE))
+        if(mGlow[i].allocate(llmax(512U, glow_res), glow_res, color_fmt, FALSE, FALSE, LLTexUnit::TT_TEXTURE, false, 0, GL_RGBA, pix_type))
         {
             mGlow[i].bindTarget();
             mGlow[i].clear();
@@ -7673,6 +7683,8 @@ void LLPipeline::bindScreenToTexture()
 	
 }
 
+static LLTrace::BlockTimerStatHandle FTM_RENDER_FINALIZE("Render Finalize");
+
 static LLTrace::BlockTimerStatHandle FTM_RENDER_BLOOM("Bloom");
 
 void LLPipeline::renderFinalize()
@@ -7691,7 +7703,7 @@ void LLPipeline::renderFinalize()
     LLVector2 tc1(0, 0);
     LLVector2 tc2((F32) mScreen.getWidth() * 2, (F32) mScreen.getHeight() * 2);
 
-    LL_RECORD_BLOCK_TIME(FTM_RENDER_BLOOM);
+    LL_RECORD_BLOCK_TIME(FTM_RENDER_FINALIZE);
     gGL.color4f(1, 1, 1, 1);
     LLGLDepthTest depth(GL_FALSE);
     LLGLDisable blend(GL_BLEND);
@@ -7711,118 +7723,122 @@ void LLPipeline::renderFinalize()
     gGL.setColorMask(true, true);
     glClearColor(0, 0, 0, 0);
 
-    if (sRenderGlow)
-    {
-        {
-            LL_RECORD_BLOCK_TIME(FTM_RENDER_BLOOM_FBO);
-            mGlow[1].bindTarget();
-            mGlow[1].clear();
-        }
+	if (!sRenderDeferred)
+	{
+		LL_RECORD_BLOCK_TIME(FTM_RENDER_BLOOM);
+		if (sRenderGlow)
+		{
+			{
+				LL_RECORD_BLOCK_TIME(FTM_RENDER_BLOOM_FBO);
+				mGlow[1].bindTarget();
+				mGlow[1].clear();
+			}
 
-        gGlowExtractProgram.bind();
-        F32 minLum = llmax((F32) RenderGlowMinLuminance, 0.0f);
-        F32 maxAlpha = RenderGlowMaxExtractAlpha;
-        F32 warmthAmount = RenderGlowWarmthAmount;
-        LLVector3 lumWeights = RenderGlowLumWeights;
-        LLVector3 warmthWeights = RenderGlowWarmthWeights;
+			gGlowExtractProgram.bind();
+			F32 minLum = llmax((F32)RenderGlowMinLuminance, 0.0f);
+			F32 maxAlpha = RenderGlowMaxExtractAlpha;
+			F32 warmthAmount = RenderGlowWarmthAmount;
+			LLVector3 lumWeights = RenderGlowLumWeights;
+			LLVector3 warmthWeights = RenderGlowWarmthWeights;
 
-        gGlowExtractProgram.uniform1f(LLShaderMgr::GLOW_MIN_LUMINANCE, minLum);
-        gGlowExtractProgram.uniform1f(LLShaderMgr::GLOW_MAX_EXTRACT_ALPHA, maxAlpha);
-        gGlowExtractProgram.uniform3f(LLShaderMgr::GLOW_LUM_WEIGHTS, lumWeights.mV[0], lumWeights.mV[1],
-                                      lumWeights.mV[2]);
-        gGlowExtractProgram.uniform3f(LLShaderMgr::GLOW_WARMTH_WEIGHTS, warmthWeights.mV[0], warmthWeights.mV[1],
-                                      warmthWeights.mV[2]);
-        gGlowExtractProgram.uniform1f(LLShaderMgr::GLOW_WARMTH_AMOUNT, warmthAmount);
-        
-        {
-            LLGLEnable blend_on(GL_BLEND);
-            LLGLEnable test(GL_ALPHA_TEST);
+			gGlowExtractProgram.uniform1f(LLShaderMgr::GLOW_MIN_LUMINANCE, minLum);
+			gGlowExtractProgram.uniform1f(LLShaderMgr::GLOW_MAX_EXTRACT_ALPHA, maxAlpha);
+			gGlowExtractProgram.uniform3f(LLShaderMgr::GLOW_LUM_WEIGHTS, lumWeights.mV[0], lumWeights.mV[1],
+				lumWeights.mV[2]);
+			gGlowExtractProgram.uniform3f(LLShaderMgr::GLOW_WARMTH_WEIGHTS, warmthWeights.mV[0], warmthWeights.mV[1],
+				warmthWeights.mV[2]);
+			gGlowExtractProgram.uniform1f(LLShaderMgr::GLOW_WARMTH_AMOUNT, warmthAmount);
 
-            gGL.setSceneBlendType(LLRender::BT_ADD_WITH_ALPHA);
+			{
+				LLGLEnable blend_on(GL_BLEND);
+				LLGLEnable test(GL_ALPHA_TEST);
 
-            mScreen.bindTexture(0, 0, LLTexUnit::TFO_POINT);
+				gGL.setSceneBlendType(LLRender::BT_ADD_WITH_ALPHA);
 
-            gGL.color4f(1, 1, 1, 1);
-            gPipeline.enableLightsFullbright();
-            gGL.begin(LLRender::TRIANGLE_STRIP);
-            gGL.texCoord2f(tc1.mV[0], tc1.mV[1]);
-            gGL.vertex2f(-1, -1);
+				mScreen.bindTexture(0, 0, LLTexUnit::TFO_POINT);
 
-            gGL.texCoord2f(tc1.mV[0], tc2.mV[1]);
-            gGL.vertex2f(-1, 3);
+				gGL.color4f(1, 1, 1, 1);
+				gPipeline.enableLightsFullbright();
+				gGL.begin(LLRender::TRIANGLE_STRIP);
+				gGL.texCoord2f(tc1.mV[0], tc1.mV[1]);
+				gGL.vertex2f(-1, -1);
 
-            gGL.texCoord2f(tc2.mV[0], tc1.mV[1]);
-            gGL.vertex2f(3, -1);
+				gGL.texCoord2f(tc1.mV[0], tc2.mV[1]);
+				gGL.vertex2f(-1, 3);
 
-            gGL.end();
+				gGL.texCoord2f(tc2.mV[0], tc1.mV[1]);
+				gGL.vertex2f(3, -1);
 
-            gGL.getTexUnit(0)->unbind(mScreen.getUsage());
+				gGL.end();
 
-            mGlow[1].flush();
+				gGL.getTexUnit(0)->unbind(mScreen.getUsage());
 
-            tc1.setVec(0, 0);
-            tc2.setVec(2, 2); 
-        }
+				mGlow[1].flush();
 
-        // power of two between 1 and 1024
-        U32 glowResPow = RenderGlowResolutionPow;
-        const U32 glow_res = llmax(1, llmin(1024, 1 << glowResPow));
+				tc1.setVec(0, 0);
+				tc2.setVec(2, 2);
+			}
 
-        S32 kernel = RenderGlowIterations * 2;
-        F32 delta = RenderGlowWidth / glow_res;
-        // Use half the glow width if we have the res set to less than 9 so that it looks
-        // almost the same in either case.
-        if (glowResPow < 9)
-        {
-            delta *= 0.5f;
-        }
-        F32 strength = RenderGlowStrength;
+			// power of two between 1 and 1024
+			U32 glowResPow = RenderGlowResolutionPow;
+			const U32 glow_res = llmax(1, llmin(1024, 1 << glowResPow));
 
-        gGlowProgram.bind();
-        gGlowProgram.uniform1f(LLShaderMgr::GLOW_STRENGTH, strength);
+			S32 kernel = RenderGlowIterations * 2;
+			F32 delta = RenderGlowWidth / glow_res;
+			if (glowResPow < 9)
+			{
+				// Use half the glow width if we have the res set to less than 9 so that it looks
+				// almost the same in either case.
+				delta *= 0.5f;
+			}
+			F32 strength = RenderGlowStrength;
 
-        for (S32 i = 0; i < kernel; i++)
-        {
-            {
-                LL_RECORD_BLOCK_TIME(FTM_RENDER_BLOOM_FBO);
-                mGlow[i % 2].bindTarget();
-                mGlow[i % 2].clear();
-            }
+			gGlowProgram.bind();
+			gGlowProgram.uniform1f(LLShaderMgr::GLOW_STRENGTH, strength);
 
-            gGL.getTexUnit(0)->bind(&mGlow[(i+1)%2]);
+			for (S32 i = 0; i < kernel; i++)
+			{
+				{
+					LL_RECORD_BLOCK_TIME(FTM_RENDER_BLOOM_FBO);
+					mGlow[i % 2].bindTarget();
+					mGlow[i % 2].clear();
+				}
 
-            if (i % 2 == 0)
-            {
-                gGlowProgram.uniform2f(LLShaderMgr::GLOW_DELTA, delta, 0);
-            }
-            else
-            {
-                gGlowProgram.uniform2f(LLShaderMgr::GLOW_DELTA, 0, delta);
-            }
+				gGL.getTexUnit(0)->bind(&mGlow[(i + 1) % 2]);
 
-            gGL.begin(LLRender::TRIANGLE_STRIP);
-            gGL.texCoord2f(tc1.mV[0], tc1.mV[1]);
-            gGL.vertex2f(-1, -1);
+				if (i % 2 == 0)
+				{
+					gGlowProgram.uniform2f(LLShaderMgr::GLOW_DELTA, delta, 0);
+				}
+				else
+				{
+					gGlowProgram.uniform2f(LLShaderMgr::GLOW_DELTA, 0, delta);
+				}
 
-            gGL.texCoord2f(tc1.mV[0], tc2.mV[1]);
-            gGL.vertex2f(-1, 3);
+				gGL.begin(LLRender::TRIANGLE_STRIP);
+				gGL.texCoord2f(tc1.mV[0], tc1.mV[1]);
+				gGL.vertex2f(-1, -1);
 
-            gGL.texCoord2f(tc2.mV[0], tc1.mV[1]);
-            gGL.vertex2f(3, -1);
+				gGL.texCoord2f(tc1.mV[0], tc2.mV[1]);
+				gGL.vertex2f(-1, 3);
 
-            gGL.end();
+				gGL.texCoord2f(tc2.mV[0], tc1.mV[1]);
+				gGL.vertex2f(3, -1);
 
-            mGlow[i % 2].flush();
-        }
+				gGL.end();
 
-        gGlowProgram.unbind();
-    }
-    else // !sRenderGlow, skip the glow ping-pong and just clear the result target
-    {
-        mGlow[1].bindTarget();
-        mGlow[1].clear();
-        mGlow[1].flush();
-    }
+				mGlow[i % 2].flush();
+			}
+
+			gGlowProgram.unbind();
+		}
+		else // !sRenderGlow, skip the glow ping-pong and just clear the result target
+		{
+			mGlow[1].bindTarget();
+			mGlow[1].clear();
+			mGlow[1].flush();
+		}
+	}
 
     gGLViewport[0] = gViewerWindow->getWorldViewRectRaw().mLeft;
     gGLViewport[1] = gViewerWindow->getWorldViewRectRaw().mBottom;
@@ -8103,43 +8119,10 @@ void LLPipeline::renderFinalize()
 // [RLVa:KB] - @setsphere
             if (pRenderBuffer)
             {
-				pRenderBuffer->bindTarget();
+				pRenderBuffer->copyContents(mScreen, 0, 0, mScreen.getWidth(), mScreen.getHeight(), 0, 0,
+					mScreen.getWidth(), mScreen.getHeight(), GL_COLOR_BUFFER_BIT, GL_NEAREST);
             }
 // [/RLVa:KB]
-            LLGLSLShader *shader = &gDeferredPostNoDoFProgram;
-
-            bindDeferredShader(*shader);
-
-            S32 channel = shader->enableTexture(LLShaderMgr::DEFERRED_DIFFUSE, mScreen.getUsage());
-            if (channel > -1)
-            {
-                mScreen.bindTexture(0, channel);
-            }
-
-            gGL.begin(LLRender::TRIANGLE_STRIP);
-            gGL.texCoord2f(tc1.mV[0], tc1.mV[1]);
-            gGL.vertex2f(-1, -1);
-
-            gGL.texCoord2f(tc1.mV[0], tc2.mV[1]);
-            gGL.vertex2f(-1, 3);
-
-            gGL.texCoord2f(tc2.mV[0], tc1.mV[1]);
-            gGL.vertex2f(3, -1);
-
-            gGL.end();
-
-            unbindDeferredShader(*shader);
-
-// [RLVa:KB] - @setsphere
-            if (pRenderBuffer)
-            {
-				pRenderBuffer->flush();
-            }
-// [/RLVa:KB]
-//            if (multisample)
-//            {
-//                mDeferredLight.flush();
-//            }
         }
 
 // [RLVa:KB] - @setsphere
@@ -8770,6 +8753,8 @@ void LLPipeline::renderDeferredLighting(LLRenderTarget *screen_target)
         return;
     }
 
+	LL_RECORD_BLOCK_TIME(FTM_RENDER_DEFERRED);
+
     LLRenderTarget *deferred_target       = &mDeferredScreen;
     LLRenderTarget *deferred_depth_target = &mDeferredDepth;
     LLRenderTarget *deferred_light_target = &mDeferredLight;
@@ -8777,7 +8762,6 @@ void LLPipeline::renderDeferredLighting(LLRenderTarget *screen_target)
 	LLViewerCamera& camera = LLViewerCamera::instanceFast();
 
     {
-        LL_RECORD_BLOCK_TIME(FTM_RENDER_DEFERRED);
         {
             LLGLDepthTest depth(GL_TRUE);
             deferred_depth_target->copyContents(*deferred_target,
@@ -9288,10 +9272,148 @@ void LLPipeline::renderDeferredLighting(LLRenderTarget *screen_target)
 
 	mHDRScreen.flush();
 
+	// And now render HDR glow
+	if (sRenderGlow)
+	{
+		LL_RECORD_BLOCK_TIME(FTM_RENDER_DEFERRED_BLOOM);
+		gGL.color4f(1, 1, 1, 1);
+		LLGLDepthTest depth(GL_FALSE);
+		LLGLDisable blend(GL_BLEND);
+		LLGLDisable cull(GL_CULL_FACE);
+
+		gGL.matrixMode(LLRender::MM_PROJECTION);
+		gGL.pushMatrix();
+		gGL.loadIdentity();
+		gGL.matrixMode(LLRender::MM_MODELVIEW);
+		gGL.pushMatrix();
+		gGL.loadIdentity();
+
+		LLGLDisable test(GL_ALPHA_TEST);
+
+		gGL.setColorMask(true, true);
+		glClearColor(0, 0, 0, 0);
+
+		LLVector2 tc1(0, 0);
+		LLVector2 tc2((F32)mScreen.getWidth() * 2, (F32)mScreen.getHeight() * 2);
+
+		{
+			mGlow[1].bindTarget();
+			mGlow[1].clear();
+		}
+
+		gGlowExtractProgram.bind();
+		F32 minLum = llmax((F32)RenderGlowMinLuminance, 0.0f);
+		F32 maxAlpha = RenderGlowMaxExtractAlpha;
+		F32 warmthAmount = RenderGlowWarmthAmount;
+		LLVector3 lumWeights = RenderGlowLumWeights;
+		LLVector3 warmthWeights = RenderGlowWarmthWeights;
+
+		gGlowExtractProgram.uniform1f(LLShaderMgr::GLOW_MIN_LUMINANCE, minLum);
+		gGlowExtractProgram.uniform1f(LLShaderMgr::GLOW_MAX_EXTRACT_ALPHA, maxAlpha);
+		gGlowExtractProgram.uniform3f(LLShaderMgr::GLOW_LUM_WEIGHTS, lumWeights.mV[0], lumWeights.mV[1],
+			lumWeights.mV[2]);
+		gGlowExtractProgram.uniform3f(LLShaderMgr::GLOW_WARMTH_WEIGHTS, warmthWeights.mV[0], warmthWeights.mV[1],
+			warmthWeights.mV[2]);
+		gGlowExtractProgram.uniform1f(LLShaderMgr::GLOW_WARMTH_AMOUNT, warmthAmount);
+
+		{
+			LLGLEnable blend_on(GL_BLEND);
+			LLGLEnable test(GL_ALPHA_TEST);
+
+			gGL.setSceneBlendType(LLRender::BT_ADD_WITH_ALPHA);
+
+			mHDRScreen.bindTexture(0, 0, LLTexUnit::TFO_BILINEAR);
+
+			gGL.color4f(1, 1, 1, 1);
+			gPipeline.enableLightsFullbright();
+			gGL.begin(LLRender::TRIANGLE_STRIP);
+			gGL.texCoord2f(tc1.mV[0], tc1.mV[1]);
+			gGL.vertex2f(-1, -1);
+
+			gGL.texCoord2f(tc1.mV[0], tc2.mV[1]);
+			gGL.vertex2f(-1, 3);
+
+			gGL.texCoord2f(tc2.mV[0], tc1.mV[1]);
+			gGL.vertex2f(3, -1);
+
+			gGL.end();
+
+			gGL.getTexUnit(0)->unbind(mScreen.getUsage());
+
+			mGlow[1].flush();
+
+			tc1.setVec(0, 0);
+			tc2.setVec(2, 2);
+		}
+
+		// power of two between 1 and 1024
+		U32 glowResPow = RenderGlowResolutionPow;
+		const U32 glow_res = llmax(1, llmin(1024, 1 << glowResPow));
+
+		S32 kernel = RenderGlowIterations * 2;
+		F32 delta = RenderGlowWidth / glow_res;
+		if (glowResPow < 9)
+		{
+			// Use half the glow width if we have the res set to less than 9 so that it looks
+			// almost the same in either case.
+			delta *= 0.5f;
+		}
+		F32 strength = RenderGlowStrength;
+
+		gGlowProgram.bind();
+		gGlowProgram.uniform1f(LLShaderMgr::GLOW_STRENGTH, strength);
+
+		for (S32 i = 0; i < kernel; i++)
+		{
+			{
+				mGlow[i % 2].bindTarget();
+				mGlow[i % 2].clear();
+			}
+
+			gGL.getTexUnit(0)->bind(&mGlow[(i + 1) % 2]);
+
+			if (i % 2 == 0)
+			{
+				gGlowProgram.uniform2f(LLShaderMgr::GLOW_DELTA, delta, 0);
+			}
+			else
+			{
+				gGlowProgram.uniform2f(LLShaderMgr::GLOW_DELTA, 0, delta);
+			}
+
+			gGL.begin(LLRender::TRIANGLE_STRIP);
+			gGL.texCoord2f(tc1.mV[0], tc1.mV[1]);
+			gGL.vertex2f(-1, -1);
+
+			gGL.texCoord2f(tc1.mV[0], tc2.mV[1]);
+			gGL.vertex2f(-1, 3);
+
+			gGL.texCoord2f(tc2.mV[0], tc1.mV[1]);
+			gGL.vertex2f(3, -1);
+
+			gGL.end();
+
+			mGlow[i % 2].flush();
+		}
+
+		gGlowProgram.unbind();
+
+		gGL.matrixMode(LLRender::MM_PROJECTION);
+		gGL.popMatrix();
+		gGL.matrixMode(LLRender::MM_MODELVIEW);
+		gGL.popMatrix();
+	}
+	else // !sRenderGlow, skip the glow ping-pong and just clear the result target
+	{
+		mGlow[1].bindTarget();
+		mGlow[1].clear();
+		mGlow[1].flush();
+	}
+
 	// Tonemapping & Gamma Correction
 	{
 		gGL.setColorMask(true, true);
-		mALRenderUtil->renderTonemap(&mHDRScreen, screen_target);
+		mALRenderUtil->renderTonemap(&mHDRScreen, screen_target, &mGlow[1]);
 		gGL.setColorMask(true, false);
 	}
 

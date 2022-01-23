@@ -35,7 +35,6 @@ out vec4 frag_color;
 
 uniform sampler2DRect diffuseRect;
 uniform sampler2DRect depthMap;
-uniform sampler2D bloomMap;
 
 uniform float focal_distance;
 uniform float blur_constant;
@@ -78,8 +77,7 @@ void main()
 	float sc = calc_cof(depth);
 	sc = min(sc, max_cof);
 	sc = max(sc, -max_cof);
-	
-	vec4 bloom = texture2D(bloomMap, vary_fragcoord.xy/screen_res);
-	frag_color.rgb = diff.rgb + bloom.rgb;
+
+	frag_color.rgb = diff.rgb;
 	frag_color.a = sc/max_cof*0.5+0.5;
 }
