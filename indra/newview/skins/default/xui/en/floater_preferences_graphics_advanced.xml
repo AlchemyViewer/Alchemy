@@ -81,7 +81,7 @@
     layout="topleft"
     left="30"
     min_val="8"
-    max_val="9"
+    max_val="10"
     name="RenderPostProcess"
     show_text="false"
     top_delta="16"

@@ -13,7 +13,7 @@
 	<!--Default for now-->
 	<RenderFlexTimeFactor value="1"/>
 	<!--256... but they do not use this-->
-	<RenderGlowResolutionPow value="9"/>
+	<RenderGlowResolutionPow value="10"/>
 	<!--Low number-->
 	<RenderMaxPartCount value="4096"/>
 	<!--bump okay-->

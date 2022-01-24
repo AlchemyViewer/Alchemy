@@ -41,7 +41,7 @@ RenderFarClip				1	256
 RenderFlexTimeFactor		1	1.0
 RenderFogRatio				1	4.0
 RenderGamma					1	0
-RenderGlowResolutionPow		1	9
+RenderGlowResolutionPow		1	10
 RenderGround				1	1
 RenderMaxPartCount			1	8192
 RenderObjectBump			1	1
@@ -258,7 +258,7 @@ RenderAvatarPhysicsLODFactor 1	1.0
 RenderAvatarVP				1	1
 RenderFarClip				1	128
 RenderFlexTimeFactor		1	1.0
-RenderGlowResolutionPow		1	9
+RenderGlowResolutionPow		1	10
 RenderMaxPartCount			1	4096
 RenderObjectBump			1	1
 RenderLocalLights			1	1
@@ -286,7 +286,7 @@ RenderAvatarPhysicsLODFactor 1	1.0
 RenderAvatarVP				1	1
 RenderFarClip				1	256
 RenderFlexTimeFactor		1	1.0
-RenderGlowResolutionPow		1	9
+RenderGlowResolutionPow		1	10
 RenderLocalLights			1	1
 RenderMaxPartCount			1	8192
 RenderObjectBump			1	1
