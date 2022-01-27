@@ -386,7 +386,9 @@ BOOL LLMediaCtrl::handleDoubleClick( S32 x, S32 y, MASK mask )
 		mMediaSource->mouseDoubleClick( x, y, mask);
 
 	gFocusMgr.setMouseCapture( this );
+#if LL_LINUX
 	gFocusMgr.setKeyboardFocus( this );
+#endif
 
 	if (mTakeFocusOnClick)
 	{
@@ -403,8 +405,10 @@ void LLMediaCtrl::onFocusReceived()
 	if (mMediaSource)
 	{
 		mMediaSource->focus(true);
+#if LL_LINUX
 		getWindow()->allowLanguageTextInput(NULL, TRUE);
-		
+#endif
+
 		// Set focus for edit menu items
 		LLEditMenuHandler::gEditMenuHandler = mMediaSource;
 	}
@@ -419,7 +423,9 @@ void LLMediaCtrl::onFocusLost()
 	if (mMediaSource)
 	{
 		mMediaSource->focus(false);
+#if LL_LINUX
 		getWindow()->allowLanguageTextInput(NULL, FALSE);
+#endif
 
 		if( LLEditMenuHandler::gEditMenuHandler == mMediaSource )
 		{
