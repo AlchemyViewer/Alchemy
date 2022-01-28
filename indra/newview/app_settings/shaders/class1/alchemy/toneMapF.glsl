@@ -213,6 +213,9 @@ void main()
     #define NEEDS_GAMMA_CORRECT 1
     #endif
     
+    // We should always be 0-1 past here.
+    diff.rgb = clamp(diff.rgb, 0, 1);
+
     #if NEEDS_GAMMA_CORRECT != 0
     diff.rgb = linear_to_srgb(diff.rgb);
     #endif
