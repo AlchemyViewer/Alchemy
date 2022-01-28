@@ -8122,6 +8122,11 @@ void LLPipeline::renderFinalize()
 				pRenderBuffer->copyContents(mScreen, 0, 0, mScreen.getWidth(), mScreen.getHeight(), 0, 0,
 					mScreen.getWidth(), mScreen.getHeight(), GL_COLOR_BUFFER_BIT, GL_NEAREST);
             }
+			else
+			{
+				LLRenderTarget::copyContentsToFramebuffer(mScreen, 0, 0, mScreen.getWidth(), mScreen.getHeight(), 0, 0,
+					mScreen.getWidth(), mScreen.getHeight(), GL_COLOR_BUFFER_BIT, GL_NEAREST);
+			}
 // [/RLVa:KB]
         }
 
