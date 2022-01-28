@@ -9327,7 +9327,7 @@ void LLPipeline::renderDeferredLighting(LLRenderTarget *screen_target)
 
 			gGL.setSceneBlendType(LLRender::BT_ADD_WITH_ALPHA);
 
-			mHDRScreen.bindTexture(0, 0, LLTexUnit::TFO_BILINEAR);
+			mHDRScreen.bindTexture(0, 0, LLTexUnit::TFO_POINT);
 
 			gGL.color4f(1, 1, 1, 1);
 			gPipeline.enableLightsFullbright();
