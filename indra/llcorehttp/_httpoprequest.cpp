@@ -533,7 +533,7 @@ HttpStatus HttpOpRequest::prepareRequest(HttpService * service)
 	long follow_redirect(1L);
 	long sslPeerV(0L);
 	long sslHostV(0L);
-    long dnsCacheTimeout(60); // Refetch dns after 60 seconds
+    long dnsCacheTimeout(600); // Refetch dns after 600 seconds
     long nobody(0L);
 
 	if (mReqOptions)

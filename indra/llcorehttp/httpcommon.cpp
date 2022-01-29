@@ -299,7 +299,7 @@ CURL *getCurlTemplateHandle()
             // about 700 or so requests and starts issuing TCP RSTs to
             // new connections.  Reuse the DNS lookups for even a few
             // seconds and no RSTs.
-            result = curl_easy_setopt(curlpTemplateHandle, CURLOPT_DNS_CACHE_TIMEOUT, 60); // Refetch dns after 60 seconds
+            result = curl_easy_setopt(curlpTemplateHandle, CURLOPT_DNS_CACHE_TIMEOUT, 600); // Refetch dns after 600 seconds
             check_curl_code(result, CURLOPT_DNS_CACHE_TIMEOUT);
 
 			result = curl_easy_setopt(curlpTemplateHandle, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_2TLS);
