@@ -7,8 +7,8 @@ sl_url="$*"
 
 echo "Got SLURL: ${sl_url}"
 if [ -z "${sl_url}" ]; then
-    echo "Usage: $0 secondlife:// ..."
-    exit
+	echo "Usage: $0 secondlife:// ..."
+	exit
 fi
 
 run_path=$(dirname "$0" || echo .)
