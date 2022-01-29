@@ -20,43 +20,7 @@ fi
 # Ensure the handle_secondlifeprotocol.sh file is executeable (otherwise, xdg-mime won't work)
 chmod +x "$desired_handler"
 
-# # Register handler for KDE-aware apps
-# for kdeconfig in ${LLKDECONFIG} kf5-config kde4-config kde-config; do
-#     if command -v "${kdeconfig}" >/dev/null 2>&1; then
-#         kde_protocols_folder=$("${kdeconfig}" --path services | cut -d ':' -f 1)
-# 				mkdir -p "${kde_protocols_folder}"
-#         if [ -d "${kde_protocols_folder}" ]; then
-#             kde_proto_file=${kde_protocols_folder}/secondlife.protocol
-# 						kde_handler_string="
-# [Protocol]
-# exec=${desired_handler} %U
-# protocol=secondlife
-# input=none
-# output=none
-# helper=true
-# listing=
-# reading=false
-# writing=false
-# makedir=false
-# deleting=false"
-#             if echo "${kde_handler_string}" > "${kde_proto_file}"; then
-# 						print "Registered secondlife:// handler with KDE"
-# 							success=1
-# 						else
-# 							print 'Warning: Did not register secondlife:// handler with KDE: Could not write '"${kde_proto_file}"
-# 						fi
-#         else
-#             print 'Warning: Did not register secondlife:// handler with KDE: Directory '"${kde_protocols_folder}"' does not exist.'
-#         fi
-#     # else
-# 			# print "Warning: KDE-Config binary '${kdeconfig}' not found"
-# 		fi
-# done
-# if [[ -z "${success}" ]]; then
-# 	print "Warning: secondlife:// protocol not registered with KDE: could not find any configuration utility. You can still register the application manually by editing ${HOME}/.local/share/mimeapps.list"
-# fi
-
-#Check if xdg-mime is present, if so, use it to register new protocol.
+# Check if xdg-mime is present, if so, use it to register new protocol.
 if command -v xdg-mime query default x-scheme-handler/secondlife >/dev/null 2>&1; then
 	urlhandler=$(xdg-mime query default x-scheme-handler/secondlife)
 	localappdir="${HOME}/.local/share/applications"
