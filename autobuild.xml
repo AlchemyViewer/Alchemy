@@ -748,9 +748,9 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>89c37441a806ed80c0102d380eec6fd0</string>
+              <string>d3d1b920d95551cc332e0e9040d30cbd</string>
               <key>url</key>
-              <string>http://s3-proxy.lindenlab.com/private-builds-secondlife-com/ct2/65400/612632/fmodstudio-2.00.11.546392-darwin64-546392.tar.bz2</string>
+              <string>https://downloads.catznip.com/packages/fmodstudio-2.01.10-darwin64-211781159.tar.bz2</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
