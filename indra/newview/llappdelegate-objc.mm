@@ -73,8 +73,9 @@
 	{
 		// Set up recurring calls to oneFrame (repeating timer with timeout 0)
 		// until applicationShouldTerminate.
-		frameTimer = [NSTimer scheduledTimerWithTimeInterval:0.0 target:self
+		frameTimer = [NSTimer timerWithTimeInterval:0.0001 target:self
 							  selector:@selector(oneFrame) userInfo:nil repeats:YES];
+        [[NSRunLoop currentRunLoop] addTimer:frameTimer forMode:NSRunLoopCommonModes];
 	} else {
 		exit(0);
 	}
