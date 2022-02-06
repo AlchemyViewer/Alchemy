@@ -2746,7 +2746,7 @@ BOOL LLViewerShaderMgr::loadShadersDeferred()
         }
     }
 
-	if (gGLManager.mGLVersion >= 3.1f)
+	if (success)
     {
         std::vector<std::pair<std::string, std::string>> smaa_preset_pair = {{"SMAA_PRESET_LOW", "Low"},
                                                                              {"SMAA_PRESET_MEDIUM", "Medium"},
@@ -2758,8 +2758,12 @@ BOOL LLViewerShaderMgr::loadShadersDeferred()
             std::map<std::string, std::string> defines;
             if (gGLManager.mGLVersion >= 4.f)
                 defines.emplace("SMAA_GLSL_4", "1");
+			else if (gGLManager.mGLVersion >= 3.1f)
+				defines.emplace("SMAA_GLSL_3", "1");
             else
-                defines.emplace("SMAA_GLSL_3", "1");
+                defines.emplace("SMAA_GLSL_2", "1");
+			defines.emplace("SMAA_PREDICATION", "0");
+			defines.emplace("SMAA_REPROJECTION", "0");
             defines.emplace(smaa_pair.first, "1");
 
             if (success)

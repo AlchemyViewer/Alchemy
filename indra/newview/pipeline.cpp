@@ -8165,7 +8165,7 @@ void LLPipeline::renderFinalize()
             static LLCachedControl<bool> use_smaa(gSavedSettings, "AlchemyRenderSMAA", true);
 
 			bool sharpen_enabled = mALRenderUtil->getSharpenMethod() != ALRenderUtil::ALSharpen::SHARPEN_NONE;
-			if (use_smaa && gGLManager.mGLVersion >= 3.1)
+			if (use_smaa)
             {
                 mFXAABuffer.copyContents(*pRenderBuffer, 0, 0, mFXAABuffer.getWidth(), mFXAABuffer.getHeight(), 0, 0,
                                          mFXAABuffer.getWidth(), mFXAABuffer.getHeight(), GL_COLOR_BUFFER_BIT, GL_NEAREST);
