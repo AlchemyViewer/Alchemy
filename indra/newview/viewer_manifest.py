@@ -848,8 +848,8 @@ class DarwinManifest(ViewerManifest):
 
                 if self.args['openal'] == 'ON' or self.args['openal'] == 'TRUE':
                     for libfile in (
-                                    'libopenal.*.dylib',
-                                    'libalut.*.dylib',
+                                    'libopenal.dylib',
+                                    'libalut.dylib',
                                     ):
                         self.path(libfile)
 

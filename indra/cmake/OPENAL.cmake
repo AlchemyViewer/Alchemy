@@ -16,6 +16,13 @@ if (USE_OPENAL)
       set(FREEALUT_LIBRARIES
           debug ${ARCH_PREBUILT_DIRS_DEBUG}/alut.lib
           optimized ${ARCH_PREBUILT_DIRS_RELEASE}/alut.lib)
+    elseif (DARWIN)
+      set(OPENAL_LIBRARIES
+        debug ${ARCH_PREBUILT_DIRS_DEBUG}/libopenal.dylib
+        optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libopenal.dylib)
+      set(FREEALUT_LIBRARIES
+          debug ${ARCH_PREBUILT_DIRS_DEBUG}/libalut.dylib
+          optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libalut.dylib)
     else()
       set(OPENAL_LIBRARIES openal)
       set(FREEALUT_LIBRARIES alut)

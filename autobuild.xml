@@ -1726,11 +1726,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>0f3237cdfa760f16a690c1eb35f67d90b1f8305fa6108ddfdab4daf58999dd7568ff713a77e1b0f3fc0a495956b97fef45d6f8642e44e6a802a6941fabfdbfe9</string>
+              <string>6359e6b21b7f01b4f551e270c4eec363a3e43756e2360323f95d1f5e1562e6ec3c3d82baba65557f611e4566e571ce7a9fa5de95dc7b7d7390ead9df3539b0f4</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/141/packages/generic/openal/1.21.1.1310/openal-1.21.1-darwin64-1310.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/141/packages/generic/openal/1.21.1.1440/openal-1.21.1-darwin64-1440.tar.zst</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
@@ -1740,11 +1740,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>e57559027bf5c36e531b57e7e28a139f714497932359adff1b9a0589bb2e8abace5fb52994002d421059b43532f48b27b2519c460891cc815c31a255269ff916</string>
+              <string>ebfb74be84eba8927cfde61660ec2fb0cf41e40add643f12568e85e4e7f5edd22535310a739533bd7447d8e871d33a0f13b03616d7d34c5520b572f4307da3d4</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/141/packages/generic/openal/1.21.1.1310/openal-1.21.1-linux64-1310.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/141/packages/generic/openal/1.21.1.1440/openal-1.21.1-linux64-1440.tar.zst</string>
             </map>
             <key>name</key>
             <string>linux64</string>
@@ -1754,11 +1754,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>1a6b651db66bcdb010883d93017bfe76f6dc91412776c7f7c347ea40fe455e7d26a92073c1e770e232bb720e2ca23bd8d4c6d4e772742ec8f043add294fcc11e</string>
+              <string>c5f609abada2dd0476da90b9bef1e3d15b38989dc51c14fc18ade99f4257c8724cf0daf6af0987c135f5a29fd414ee4afd039819f65ad4cc950d962968b3f4a8</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/141/packages/generic/openal/1.21.1.1310/openal-1.21.1-windows64-1310.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/141/packages/generic/openal/1.21.1.1440/openal-1.21.1-windows64-1440.tar.zst</string>
             </map>
             <key>name</key>
             <string>windows64</string>
