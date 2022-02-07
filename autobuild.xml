@@ -1068,11 +1068,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>3df1cdc2ef3aa46de03bcacfd6cb5e20e00e038eab2b68e18bca53672c2be9fe64988991461c63091c1175b2f1d82de0127d3c09638c6f8caa3170af1e1ef663</string>
+              <string>0d2f7d042df56a08a9a4022e0b77e79b977be3155d2b041fddf1fc835e492e23d89d8ae1449b56f0453821d3c8983a5c6475119d90997409a5a94b181dd8147e</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/115/packages/generic/libjpeg-turbo/2.1.2.1318/libjpeg_turbo-2.1.2-darwin64-1318.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/115/packages/generic/libjpeg-turbo/2.1.2.1437/libjpeg_turbo-2.1.2-darwin64-1437.tar.zst</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
@@ -1082,11 +1082,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>bb7420a8236b8cbc6a6d2e7b204bd070fb3d9938bb35df11fc335add788d204b6567919790b44f0c3abbbf43fdc676af8ae6cc68650c2ccfec113cc6cfffc5b0</string>
+              <string>ef279d070f7a4bd8b799b98c55cd80ea28df80624f903c7e21f245f79e9f25d9b97b01b3e9d42d6428a42275187899925a3926e0f8b7855b43b3e66a75f38520</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/115/packages/generic/libjpeg-turbo/2.1.2.1318/libjpeg_turbo-2.1.2-linux64-1318.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/115/packages/generic/libjpeg-turbo/2.1.2.1437/libjpeg_turbo-2.1.2-linux64-1437.tar.zst</string>
             </map>
             <key>name</key>
             <string>linux64</string>
@@ -1096,11 +1096,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>94e52e575dd7bd83f93178b0414ca16f6d13f5b7fa91181f426ccd41616fd150ff25fa33137a7c4462e7d7aec626d49ac03b23b1b39c506b8055f942bcfc57ff</string>
+              <string>c3e33ca4d3e0aecb7f424c1fc9ee1e7f05284cd52e1e4bcc34d927f9a6a725d391908cac0581f12d397e0eabcd4010271fc7b442f371a872918f25ffc19288ca</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/115/packages/generic/libjpeg-turbo/2.1.2.1318/libjpeg_turbo-2.1.2-windows64-1318.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/115/packages/generic/libjpeg-turbo/2.1.2.1437/libjpeg_turbo-2.1.2-windows64-1437.tar.zst</string>
             </map>
             <key>name</key>
             <string>windows64</string>
@@ -1634,11 +1634,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>d5c36e32b1aa0f98cd18285d652519d25a4ad6fe8ccaf43eca831dd1899e5cc82126f116fd5c149ef38d8c29750649252bf817cd3b6fc34e2e6ea65eca89f6d4</string>
+              <string>0f0671e017d53f535f1b215d6e8732406ffae9a5acb2425f8b1565bd3fefdc7edcc512dac8686d0acceb102a26c437a22f0c0bfdf2ed5fdd18627cb27f117229</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/112/packages/generic/ogg_vorbis/1.3.5.1315/ogg_vorbis-1.3.5-darwin64-1315.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/112/packages/generic/ogg_vorbis/1.3.5.1443/ogg_vorbis-1.3.5-darwin64-1443.tar.zst</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
@@ -1648,11 +1648,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>b7807ae153416f7a56add30d0723492388aae3c9c1655677e5031ada377dc1382ed15ba4f1dee6cc49d2de97bf60ccd0b1d6b2fd8499edbbfceb5a39885966f0</string>
+              <string>251cb3c51fdb67c1ba8ca47046c4279600262832d36ecf07b1435f063847492dd1c0b909945f45d26ec4b9343398f999d9742162a731f54439c9653bb629bc42</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/112/packages/generic/ogg_vorbis/1.3.5.1315/ogg_vorbis-1.3.5-linux64-1315.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/112/packages/generic/ogg_vorbis/1.3.5.1443/ogg_vorbis-1.3.5-linux64-1443.tar.zst</string>
             </map>
             <key>name</key>
             <string>linux64</string>
@@ -1662,11 +1662,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>b74af0f241a24ee1baeda0c16a71138c58a93bbc488102ea29f8d3569d91884a70607ff1f11ee2ef60f03cdeb16ed62677f592d42fa8ef239e9cf292981b8dde</string>
+              <string>4d3ab708150ba546804116fd8b29d508e710aecd7cc3d78e149f6ddc20a4456a3b73295bf4e194ec717036b6e0cf56d245c52634e7be593e8b48671c58ad4c0c</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/112/packages/generic/ogg_vorbis/1.3.5.1315/ogg_vorbis-1.3.5-windows64-1315.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/112/packages/generic/ogg_vorbis/1.3.5.1443/ogg_vorbis-1.3.5-windows64-1443.tar.zst</string>
             </map>
             <key>name</key>
             <string>windows64</string>
