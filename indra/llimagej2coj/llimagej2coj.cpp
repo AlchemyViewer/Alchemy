@@ -274,6 +274,8 @@ bool LLImageJ2COJ::decodeImpl(LLImageJ2C &base, LLImageRaw &raw_image, F32 decod
 		return true; // done
 	}
 
+	opj_decoder_set_strict_mode(opj_decoder_p, OPJ_FALSE);
+
 	/* open a byte stream */
 	LLJp2StreamReader streamReader(&base);
 	opj_stream_t* opj_stream_p = opj_stream_default_create(OPJ_STREAM_READ);
