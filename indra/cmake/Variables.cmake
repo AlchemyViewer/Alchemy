@@ -51,6 +51,12 @@ set(VIEWER_SYMBOL_FILE "" CACHE STRING "Name of tarball into which to place symb
 option(USE_CEF "Enable CEF media plugin" ON)
 option(USE_VLC "Enable VLC media plugin" ON)
 
+#Crash reporting
+option(USE_SENTRY "Use the Sentry crash reporting system" OFF)
+if (DEFINED ENV{USE_SENTRY})
+  set(USE_SENTRY $ENV{USE_SENTRY} CACHE BOOL "" FORCE)
+endif()
+
 if(LIBS_CLOSED_DIR)
   file(TO_CMAKE_PATH "${LIBS_CLOSED_DIR}" LIBS_CLOSED_DIR)
 else(LIBS_CLOSED_DIR)
@@ -171,7 +177,7 @@ if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
   endif()
 
   set(CMAKE_XCODE_ATTRIBUTE_GCC_GENERATE_DEBUGGING_SYMBOLS YES)
-  if(FULL_DEBUG_SYMS OR USE_CRASHPAD)
+  if(FULL_DEBUG_SYMS OR USE_SENTRY)
     set(CMAKE_XCODE_ATTRIBUTE_DEBUG_INFORMATION_FORMAT dwarf-with-dsym)
   else()
     set(CMAKE_XCODE_ATTRIBUTE_DEBUG_INFORMATION_FORMAT dwarf)

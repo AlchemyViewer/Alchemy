@@ -1,7 +1,4 @@
-option(USE_SENTRY "Use the Sentry crash reporting system" OFF)
-if (DEFINED ENV{USE_SENTRY})
-  set(USE_SENTRY $ENV{USE_SENTRY} CACHE BOOL "" FORCE)
-endif()
+include(Variables)
 
 if (USE_SENTRY)
     if (NOT USESYSTEMLIBS)
