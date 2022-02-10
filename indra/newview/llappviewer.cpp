@@ -64,7 +64,6 @@
 #include "llfocusmgr.h"
 #include "llurlfloaterdispatchhandler.h"
 #include "llviewerjoystick.h"
-#include "llallocator.h"
 #include "llcalc.h"
 #include "llconversationlog.h"
 #if LL_WINDOWS
@@ -817,8 +816,6 @@ bool LLAppViewer::init()
 		// much on successful startup!
 		LLError::setFatalFunction([rc](const std::string&){ _exit(rc); });
 	}
-
-    mAlloc.setProfilingEnabled(gSavedSettings.getBOOL("MemProfiling"));
 
 	// Initialize the non-LLCurl libcurl library.  Should be called
 	// before consumers (LLTextureFetch).

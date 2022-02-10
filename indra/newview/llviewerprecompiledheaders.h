@@ -54,7 +54,6 @@
 // Library headers from llcommon project:
 #include "indra_constants.h"
 #include "llinitparam.h"
-#include "llallocator.h"
 #include "llapp.h"
 #include "llcriticaldamp.h"
 #include "lldefs.h"
