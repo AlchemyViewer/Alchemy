@@ -2102,7 +2102,6 @@ endif (WINDOWS)
 # modern version.
 
 target_link_libraries(${VIEWER_BINARY_NAME}
-    ${LEGACY_STDIO_LIBS}
     ${PNG_PRELOAD_ARCHIVES}
     ${ZLIB_PRELOAD_ARCHIVES}
     ${URIPARSER_PRELOAD_ARCHIVES}

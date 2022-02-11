@@ -30,11 +30,6 @@ endif (NOT CMAKE_BUILD_TYPE)
 include(Variables)
 include(BuildVersion)
 
-set(LEGACY_STDIO_LIBS)
-if (WINDOWS)
-      set(LEGACY_STDIO_LIBS legacy_stdio_definitions)
-endif (WINDOWS)
-
 add_subdirectory(cmake)
 add_subdirectory(deps)
 

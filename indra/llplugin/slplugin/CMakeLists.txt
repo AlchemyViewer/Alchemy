@@ -51,7 +51,6 @@ add_executable(SLPlugin
     )
 
 target_link_libraries(SLPlugin
-  ${LEGACY_STDIO_LIBS}
   ${LLPLUGIN_LIBRARIES}
   ${LLMESSAGE_LIBRARIES}
   ${LLCOMMON_LIBRARIES}

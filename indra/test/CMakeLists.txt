@@ -85,7 +85,6 @@ if (USE_SENTRY)
 endif (USE_SENTRY)
 
 target_link_libraries(lltest
-    ${LEGACY_STDIO_LIBS}
     ${LLDATABASE_LIBRARIES}
     ${LLINVENTORY_LIBRARIES}
     ${LLMESSAGE_LIBRARIES}
