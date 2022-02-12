@@ -1786,11 +1786,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>eaf9a2718f1b75131ee3c111fe487688e3d1eacadb6e31a01b1e136b6b5b229aaab76eea6a7a6e92a907537abe60215ba64274516a7fedbd7f2f4b704e1719b2</string>
+              <string>8dfcc3034005ddd3bdbbc22dba8e221220489c1901de89859ddef6c4a8e69ea4ef32f97f66bedb5abb7f6c7f1fa2d31ffff4c7cea49172091af02433d6b7cd51</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/147/packages/generic/openjpeg/2.5.0.1449/openjpeg-2.5.0-darwin64-1449.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/147/packages/generic/openjpeg/2.4.0.1309/openjpeg-2.4.0-darwin64-1309.tar.zst</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
@@ -1800,11 +1800,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>9b5af869c290b6794d6f7027a85e303e557d11f97f68e568c48f80aaf9b937322ec4df399cbbe25c166bf593ddddcc0960027aed86fa10013d3a2538e00e72e1</string>
+              <string>55f0657ca8448c7403876a7f57970831f77e23d761001bdb5b6d9f8871c364ea3cccd4ae1b10a0818fd4e38315e6b4b145b957fd5e23f8f85b2207523727968f</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/147/packages/generic/openjpeg/2.5.0.1449/openjpeg-2.5.0-linux64-1449.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/147/packages/generic/openjpeg/2.4.0.1309/openjpeg-2.4.0-linux64-1309.tar.zst</string>
             </map>
             <key>name</key>
             <string>linux64</string>
@@ -1814,18 +1814,18 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>2a4a52e31555cd93f8a73d39b62a525649b9aa66ee9e9c2f18b5327cfdb1a7704562fef41bf6456d5b52fba0935c1418c64182d80f6914fd66933c894260a23e</string>
+              <string>bb71b60514ece0e390548a19fce3d64cd5270705b6686cba6f5dadbb352102dc20c3ad90570159c071afa19773a0f3791f3b535266dc5a5382db89579c0829b3</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/147/packages/generic/openjpeg/2.5.0.1449/openjpeg-2.5.0-windows64-1449.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/147/packages/generic/openjpeg/2.4.0.1309/openjpeg-2.4.0-windows64-1309.tar.zst</string>
             </map>
             <key>name</key>
             <string>windows64</string>
           </map>
         </map>
         <key>version</key>
-        <string>2.5.0</string>
+        <string>2.4.0</string>
       </map>
       <key>openssl</key>
       <map>
