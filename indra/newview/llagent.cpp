@@ -5301,14 +5301,17 @@ LLUUID LLAgent::getGroupForRezzing()
 	if (gSavedSettings.getBOOL("AlchemyRezUnderLandGroup"))
 	{
 		LLParcel* land_parcel = LLViewerParcelMgr::getInstanceFast()->getAgentParcel();
-		// Is the agent in the land group
-		if (gAgent.isInGroup(land_parcel->getGroupID()))
-			return land_parcel->getGroupID();
-		// Is the agent in the land group (the group owns the land)
-		else if (gAgent.isInGroup(land_parcel->getOwnerID()))
-			return land_parcel->getOwnerID();
+		if (land_parcel)
+		{
+			// Is the agent in the land group
+			if (isInGroup(land_parcel->getGroupID()))
+				return land_parcel->getGroupID();
+			// Is the agent in the land group (the group owns the land)
+			else if (isInGroup(land_parcel->getOwnerID()))
+				return land_parcel->getOwnerID();
+		}
 	}
-	return LLUUID::null;
+	return getGroupID();
 }
 
 // EOF
