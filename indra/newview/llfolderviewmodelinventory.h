@@ -53,6 +53,7 @@ public:
     virtual LLWearableType::EType getWearableType() const = 0;
     virtual LLSettingsType::type_e getSettingsType() const = 0;
     virtual EInventorySortGroup getSortGroup() const = 0;
+	virtual BOOL isLink() const = 0;
 	virtual LLInventoryObject* getInventoryObject() const = 0;
 	virtual void requestSort();
 	virtual void setPassedFilter(bool filtered, S32 filter_generation, std::string::size_type string_offset = std::string::npos, std::string::size_type string_size = 0);

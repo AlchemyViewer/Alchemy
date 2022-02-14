@@ -5,6 +5,7 @@
  * $LicenseInfo:firstyear=2001&license=viewerlgpl$
  * Second Life Viewer Source Code
  * Copyright (C) 2010, Linden Research, Inc.
+ * Copyright (C) 2010-2015, Kitty Barnett
  * 
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -902,7 +903,11 @@ BOOL LLFolderView::canCopy() const
 	for (selected_items_t::const_iterator selected_it = mSelectedItems.begin(); selected_it != mSelectedItems.end(); ++selected_it)
 	{
 		const LLFolderViewItem* item = *selected_it;
-		if (!item->getViewModelItem()->isItemCopyable())
+// [SL:KB] - Patch: Inventory-Actions | Checked: 2013-09-19 (Catznip-3.6)
+		const LLFolderViewFolder* folder = dynamic_cast<const LLFolderViewFolder*>(item);
+		if ( (!item->getViewModelItem()->isItemCopyable()) && ((folder) || (!item->getViewModelItem()->isItemLinkable())) )
+// [/SL:KB]
+//		if (!item->getViewModelItem()->isItemCopyable())
 		{
 			return FALSE;
 		}
@@ -944,7 +949,10 @@ BOOL LLFolderView::canCut() const
 		const LLFolderViewItem* item = *selected_it;
 		const LLFolderViewModelItem* listener = item->getViewModelItem();
 
-		if (!listener || !listener->isItemRemovable())
+//		if (!listener || !listener->isItemRemovable())
+// [SL:KB] - Patch: Inventory-Actions | Checked: 2015-07-15 (Catznip-3.8)
+		if (!listener || !listener->isItemMovable())
+// [/SL:KB]
 		{
 			return FALSE;
 		}

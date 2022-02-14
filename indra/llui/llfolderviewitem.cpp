@@ -5,6 +5,7 @@
 * $LicenseInfo:firstyear=2001&license=viewerlgpl$
 * Second Life Viewer Source Code
 * Copyright (C) 2010, Linden Research, Inc.
+* Copyright (C) 2010-2017, Kitty Barnett
 * 
 * This library is free software; you can redistribute it and/or
 * modify it under the terms of the GNU Lesser General Public
@@ -897,18 +898,30 @@ void LLFolderViewItem::draw()
 	// Draw open icon
 	//
 	const S32 icon_x = mIndentation + mArrowSize + mTextPad;
+// [SL:KB] - Patch: Inventory-Actions | Checked: 2012-06-30 (Catznip-3.3)
+	const F32 label_alpha = (isFadeItem()) ? 0.6f : 1.0f;
+// [/SL:KB]
 	if (!mIconOpen.isNull() && (llabs(mControlLabelRotation) > 80)) // For open folders
  	{
-		mIconOpen->draw(icon_x, getRect().getHeight() - mIconOpen->getHeight() - TOP_PAD + 1);
+// [SL:KB] - Patch: Inventory-Actions | Checked: 2012-06-30 (Catznip-3.3)
+		mIconOpen->draw(icon_x, getRect().getHeight() - mIconOpen->getHeight() - TOP_PAD + 1, UI_VERTEX_COLOR % label_alpha);
+// [/SL:KB]
+//		mIconOpen->draw(icon_x, getRect().getHeight() - mIconOpen->getHeight() - TOP_PAD + 1);
 	}
 	else if (mIcon)
 	{
- 		mIcon->draw(icon_x, getRect().getHeight() - mIcon->getHeight() - TOP_PAD + 1);
+// [SL:KB] - Patch: Inventory-Actions | Checked: 2012-06-30 (Catznip-3.3)
+ 		mIcon->draw(icon_x, getRect().getHeight() - mIcon->getHeight() - TOP_PAD + 1, UI_VERTEX_COLOR % label_alpha);
+// [/SL:KB]
+// 		mIcon->draw(icon_x, getRect().getHeight() - mIcon->getHeight() - TOP_PAD + 1);
  	}
 
 	if (mIconOverlay && getRoot()->showItemLinkOverlays())
 	{
-		mIconOverlay->draw(icon_x, getRect().getHeight() - mIcon->getHeight() - TOP_PAD + 1);
+// [SL:KB] - Patch: Inventory-Actions | Checked: 2012-06-30 (Catznip-3.3)
+		mIconOverlay->draw(icon_x, getRect().getHeight() - mIcon->getHeight() - TOP_PAD + 1, UI_VERTEX_COLOR % label_alpha);
+// [/SL:KB]
+//		mIconOverlay->draw(icon_x, getRect().getHeight() - mIcon->getHeight() - TOP_PAD + 1);
 	}
 
 	//--------------------------------------------------------------------------------//
@@ -938,12 +951,15 @@ void LLFolderViewItem::draw()
     }
 
     LLColor4 color = (mIsSelected && filled) ? mFontHighlightColor : mFontColor;
+// [SL:KB] - Patch: Inventory-Actions | Checked: 2012-06-30 (Catznip-3.3)
+	color.setAlpha(label_alpha);
+// [/SL:KB]
 
-    if (isFadeItem())
-    {
-         // Fade out item color to indicate it's being cut
-         color.mV[VALPHA] *= 0.5f;
-    }
+//    if (isFadeItem())
+//    {
+//         // Fade out item color to indicate it's being cut
+//         color.mV[VALPHA] *= 0.5f;
+//    }
     drawLabel(font, text_left, y, color, right_x);
 
 	//--------------------------------------------------------------------------------//

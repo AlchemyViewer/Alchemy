@@ -5,6 +5,7 @@
  * $LicenseInfo:firstyear=2001&license=viewerlgpl$
  * Second Life Viewer Source Code
  * Copyright (C) 2010, Linden Research, Inc.
+ * Copyright (C) 2010-2020, Kitty Barnett
  * 
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -312,7 +313,10 @@ BOOL LLInvFVBridge::isItemRemovable() const
 // Can be moved to another folder
 BOOL LLInvFVBridge::isItemMovable() const
 {
-	return TRUE;
+// [SL:KB] - Patch: Inventory-Actions | Checked: 2012-08-18 (Catznip-3.3)
+	return get_is_item_movable(getInventoryModel(), mUUID);
+// [/SL:KB]
+//	return TRUE;
 }
 
 BOOL LLInvFVBridge::isLink() const
@@ -332,7 +336,10 @@ BOOL LLInvFVBridge::isLibraryItem() const
 BOOL LLInvFVBridge::cutToClipboard()
 {
 	const LLInventoryObject* obj = gInventory.getObject(mUUID);
-	if (obj && isItemMovable() && isItemRemovable())
+//	if (obj && isItemMovable() && isItemRemovable())
+// [SL:KB] - Patch: Inventory-Actions | Checked: 2012-08-18 (Catznip-3.3)
+	if ( (obj) && (isItemMovable()) )
+// [/SL:KB]
 	{
         const LLUUID &marketplacelistings_id = gInventory.findCategoryUUIDForType(LLFolderType::FT_MARKETPLACE_LISTINGS, false);
         const BOOL cut_from_marketplacelistings = gInventory.isObjectDescendentOf(mUUID, marketplacelistings_id);
@@ -378,7 +385,10 @@ BOOL LLInvFVBridge::callback_cutToClipboard(const LLSD& notification, const LLSD
 BOOL LLInvFVBridge::perform_cutToClipboard()
 {
 	const LLInventoryObject* obj = gInventory.getObject(mUUID);
-	if (obj && isItemMovable() && isItemRemovable())
+//	if (obj && isItemMovable() && isItemRemovable())
+// [SL:KB] - Patch: Inventory-Actions | Checked: 2012-08-18 (Catznip-3.3)
+	if ( (obj) && (isItemMovable()) )
+// [/SL:KB]
 	{
 		LLClipboard::instance().setCutMode(true);
 		return LLClipboard::instance().addToClipboard(mUUID);
@@ -389,7 +399,10 @@ BOOL LLInvFVBridge::perform_cutToClipboard()
 BOOL LLInvFVBridge::copyToClipboard() const
 {
 	const LLInventoryObject* obj = gInventory.getObject(mUUID);
-	if (obj && isItemCopyable())
+//	if (obj && isItemCopyable())
+// [SL:KB] - Patch: Inventory-Actions | Checked: 2013-09-19 (Catznip-3.6)
+	if ( (obj) && ( (isItemCopyable()) || (isItemLinkable()) ) )
+// [/SL:KB]
 	{
 		return LLClipboard::instance().addToClipboard(mUUID);
 	}
@@ -792,12 +805,12 @@ void LLInvFVBridge::getClipboardEntries(bool show_asset_id,
 	if (obj)
 	{
 		
-		items.push_back(std::string("Copy Separator"));
-		items.push_back(std::string("Copy"));
-		if (!isItemCopyable())
-		{
-			disabled_items.push_back(std::string("Copy"));
-		}
+//		items.push_back(std::string("Copy Separator"));
+//		items.push_back(std::string("Copy"));
+//		if (!isItemCopyable())
+//		{
+//			disabled_items.push_back(std::string("Copy"));
+//		}
 
 		if (obj->getIsLinkType())
 		{
@@ -809,7 +822,11 @@ void LLInvFVBridge::getClipboardEntries(bool show_asset_id,
 		}
 		else
 		{
-			if (LLAssetType::lookupCanLink(obj->getType()))
+//			if (LLAssetType::lookupCanLink(obj->getType()))
+// [SL:KB] - Patch: Inventory-Actions | Checked: 2012-08-15 (Catznip-3.3)
+			// Don't show 'Find Links' for folders
+			if ( (LLAssetType::AT_CATEGORY != obj->getType()) && (LLAssetType::lookupCanLink(obj->getType())) )
+// [/SL:KB]
 			{
 				items.push_back(std::string("Find Links"));
 			}
@@ -842,11 +859,11 @@ void LLInvFVBridge::getClipboardEntries(bool show_asset_id,
 				}
 			}
 
-			items.push_back(std::string("Cut"));
-			if (!isItemMovable() || !isItemRemovable())
-			{
-				disabled_items.push_back(std::string("Cut"));
-			}
+//			items.push_back(std::string("Cut"));
+//			if (!isItemMovable() || !isItemRemovable())
+//			{
+//				disabled_items.push_back(std::string("Cut"));
+//			}
 
 			if (canListOnMarketplace() && !isMarketplaceListingsFolder() && !isInboxFolder())
 			{
@@ -864,6 +881,22 @@ void LLInvFVBridge::getClipboardEntries(bool show_asset_id,
                 }
 			}
 		}
+
+// [SL:KB] - Patch: Inventory-Actions | Checked: 2010-04-12 (Catznip-2.0)
+		items.push_back(std::string("Copy Separator"));
+	
+		items.push_back(std::string("Copy"));
+		if ( (!isItemCopyable()) && (!isItemLinkable()) )
+		{
+			disabled_items.push_back(std::string("Copy"));
+		}
+
+		items.push_back(std::string("Cut"));
+		if ( (!isItemMovable()) || (isLibraryItem()) )
+		{
+			disabled_items.push_back(std::string("Cut"));
+		}
+// [/SL:KB]
 	}
 
 	// Don't allow items to be pasted directly into the COF or the inbox
@@ -913,11 +946,18 @@ void LLInvFVBridge::buildContextMenu(LLMenuGL& menu, U32 flags)
 	}	
 	else
 	{
-		items.push_back(std::string("Share"));
-		if (!canShare())
+// [SL:KB] - Patch: Inventory-Links | Checked: 2013-09-17 (Catznip-3.6)
+		if (!isLink())
 		{
-			disabled_items.push_back(std::string("Share"));
+// [/SL:KB]
+			items.push_back(std::string("Share"));
+			if (!canShare())
+			{
+				disabled_items.push_back(std::string("Share"));
+			}
+// [SL:KB] - Patch: Inventory-Links | Checked: 2013-09-17 (Catznip-3.6)
 		}
+// [/SL:KB]
 		
 		addOpenRightClickMenuOption(items);
 		items.push_back(std::string("Properties"));
@@ -2070,7 +2110,10 @@ BOOL LLItemBridge::removeItem()
 	// we can't do this check because we may have items in a folder somewhere that is
 	// not yet in memory, so we don't want false negatives.  (If disabled, then we 
 	// know we only have links in the Outfits folder which we explicitly fetch.)
-	if (!gSavedSettings.getBOOL("InventoryLinking"))
+// [SL:KB] - Patch: Inventory-Links | Checked: 2010-06-01 (Catznip-2.0)
+	// Users move folders around and reuse links that way... if we know something has links then it's just bad not to warn them :|
+// [/SL:KB]
+//	if (!gSavedSettings.getBOOL("InventoryLinking"))
 	{
 		if (!item->getIsLinkType())
 		{
@@ -2118,18 +2161,38 @@ BOOL LLItemBridge::isItemCopyable() const
 	LLViewerInventoryItem* item = getItem();
 	if (item)
 	{
-		// Can't copy worn objects.
-		// Worn objects are tied to their inworld conterparts
-		// Copy of modified worn object will return object with obsolete asset and inventory
-		if(get_is_item_worn(mUUID))
-		{
-			return FALSE;
-		}
+//		// Can't copy worn objects.
+//		// Worn objects are tied to their inworld conterparts
+//		// Copy of modified worn object will return object with obsolete asset and inventory
+//		if(get_is_item_worn(mUUID))
+//			return FALSE;
+//		}
 
-		return item->getPermissions().allowCopyBy(gAgent.getID()) || gSavedSettings.getBOOL("InventoryLinking");
+// [SL:KB] - Patch: Inventory-Links | Checked: 2010-04-12 (Catznip-2.0)
+		// We'll allow copying a link if:
+		//   - its target is available
+		//   - it doesn't point to another link [see LLViewerInventoryItem::getLinkedItem() which returns NULL in that case]
+		if (item->getIsLinkType())
+		{
+			return (NULL != item->getLinkedItem());
+		}
+// [/SL:KB]
+
+// [SL:KB] - Patch: Inventory-Links | Checked: 2010-04-12 (Catznip-2.0)
+		return (item->getPermissions().allowCopyBy(gAgent.getID()));
+// [/SL:KB]
+//		return item->getPermissions().allowCopyBy(gAgent.getID()) || gSavedSettings.getBOOL("InventoryLinking");
 	}
 	return FALSE;
 }
+
+// [SL:KB] - Patch: Inventory-Links | Checked: 2013-09-19 (Catznip-3.6)
+bool LLItemBridge::isItemLinkable() const
+{
+	LLViewerInventoryItem* item = getItem();
+	return (item) && (LLAssetType::lookupCanLink(item->getType()));
+}
+// [/SL:KB]
 
 LLViewerInventoryItem* LLItemBridge::getItem() const
 {
@@ -2161,15 +2224,18 @@ LLHandle<LLFolderBridge> LLFolderBridge::sSelf;
 // Can be moved to another folder
 BOOL LLFolderBridge::isItemMovable() const
 {
-	LLInventoryObject* obj = getInventoryObject();
-	if(obj)
-	{
-		// If it's a protected type folder, we can't move it
-		if (LLFolderType::lookupIsProtectedType(((LLInventoryCategory*)obj)->getPreferredType()))
-			return FALSE;
-		return TRUE;
-	}
-	return FALSE;
+// [SL:KB] - Patch: Inventory-Actions | Checked: 2012-08-18 (Catznip-3.3)
+	return get_is_category_movable(getInventoryModel(), mUUID);
+// [/SL:KB]
+//	LLInventoryObject* obj = getInventoryObject();
+//	if(obj)
+//	{
+//		// If it's a protected type folder, we can't move it
+//		if (LLFolderType::lookupIsProtectedType(((LLInventoryCategory*)obj)->getPreferredType()))
+//			return FALSE;
+//		return TRUE;
+//	}
+//	return FALSE;
 }
 
 void LLFolderBridge::selectItem()
@@ -2361,6 +2427,14 @@ BOOL LLFolderBridge::isItemCopyable() const
 	
 		return TRUE;
 	}
+
+// [SL:KB] - Patch: Inventory-Links | Checked: 2013-09-19 (Catznip-3.6)
+bool LLFolderBridge::isItemLinkable() const
+{
+	LLFolderType::EType ftType = getPreferredType();
+	return (LLFolderType::FT_NONE == ftType) || (LLFolderType::FT_OUTFIT == ftType);
+}
+// [/SL:KB]
 
 BOOL LLFolderBridge::isClipboardPasteable() const
 {
@@ -5545,11 +5619,18 @@ void LLTextureBridge::buildContextMenu(LLMenuGL& menu, U32 flags)
     }
 	else
 	{
-		items.push_back(std::string("Share"));
-		if (!canShare())
+// [SL:KB] - Patch: Inventory-Links | Checked: 2013-09-17 (Catznip-3.6)
+		if (!isLink())
 		{
-			disabled_items.push_back(std::string("Share"));
+// [/SL:KB]
+			items.push_back(std::string("Share"));
+			if (!canShare())
+			{
+				disabled_items.push_back(std::string("Share"));
+			}
+// [SL:KB] - Patch: Inventory-Links | Checked: 2013-09-17 (Catznip-3.6)
 		}
+// [/SL:KB]
 
 		addOpenRightClickMenuOption(items);
 		items.push_back(std::string("Properties"));
@@ -5647,11 +5728,18 @@ void LLSoundBridge::buildContextMenu(LLMenuGL& menu, U32 flags)
 		}	
 		else
 		{
-			items.push_back(std::string("Share"));
-			if (!canShare())
+// [SL:KB] - Patch: Inventory-Links | Checked: 2013-09-17 (Catznip-3.6)
+			if (!isLink())
 			{
-				disabled_items.push_back(std::string("Share"));
+// [/SL:KB]
+				items.push_back(std::string("Share"));
+				if (!canShare())
+				{
+					disabled_items.push_back(std::string("Share"));
+				}
+// [SL:KB] - Patch: Inventory-Links | Checked: 2013-09-17 (Catznip-3.6)
 			}
+// [/SL:KB]
 			items.push_back(std::string("Sound Open"));
 			items.push_back(std::string("Properties"));
 
@@ -5725,11 +5813,19 @@ void LLLandmarkBridge::buildContextMenu(LLMenuGL& menu, U32 flags)
 		}	
 		else
 		{
-			items.push_back(std::string("Share"));
-			if (!canShare())
+// [SL:KB] - Patch: Inventory-Links | Checked: 2013-09-17 (Catznip-3.6)
+			if (!isLink())
 			{
-				disabled_items.push_back(std::string("Share"));
+// [/SL:KB]
+				items.push_back(std::string("Share"));
+				if (!canShare())
+				{
+					disabled_items.push_back(std::string("Share"));
+				}
+// [SL:KB] - Patch: Inventory-Links | Checked: 2013-09-17 (Catznip-3.6)
 			}
+// [/SL:KB]
+
 			items.push_back(std::string("Landmark Open"));
 			items.push_back(std::string("Properties"));
 
@@ -6024,11 +6120,18 @@ void LLCallingCardBridge::buildContextMenu(LLMenuGL& menu, U32 flags)
     }
 	else
 	{
-		items.push_back(std::string("Share"));
-		if (!canShare())
+// [SL:KB] - Patch: Inventory-Links | Checked: 2013-09-17 (Catznip-3.6)
+		if (!isLink())
 		{
-			disabled_items.push_back(std::string("Share"));
+// [/SL:KB]
+			items.push_back(std::string("Share"));
+			if (!canShare())
+			{
+				disabled_items.push_back(std::string("Share"));
+			}
+// [SL:KB] - Patch: Inventory-Links | Checked: 2013-09-17 (Catznip-3.6)
 		}
+// [/SL:KB]
 		if ((flags & FIRST_SELECTED_ITEM) == 0)
 		{
 		disabled_items.push_back(std::string("Open"));
@@ -6327,11 +6430,18 @@ void LLGestureBridge::buildContextMenu(LLMenuGL& menu, U32 flags)
     }
 	else
 	{
-		items.push_back(std::string("Share"));
-		if (!canShare())
+// [SL:KB] - Patch: Inventory-Links | Checked: 2013-09-17 (Catznip-3.6)
+		if (!isLink())
 		{
-			disabled_items.push_back(std::string("Share"));
+// [/SL:KB]
+			items.push_back(std::string("Share"));
+			if (!canShare())
+			{
+				disabled_items.push_back(std::string("Share"));
+			}
+// [SL:KB] - Patch: Inventory-Links | Checked: 2013-09-17 (Catznip-3.6)
 		}
+// [/SL:KB]
 
 		addOpenRightClickMenuOption(items);
 		items.push_back(std::string("Properties"));
@@ -6390,11 +6500,18 @@ void LLAnimationBridge::buildContextMenu(LLMenuGL& menu, U32 flags)
 		}	
 		else
 		{
-			items.push_back(std::string("Share"));
-			if (!canShare())
+// [SL:KB] - Patch: Inventory-Links | Checked: 2013-09-17 (Catznip-3.6)
+			if (!isLink())
 			{
-				disabled_items.push_back(std::string("Share"));
+// [/SL:KB]
+				items.push_back(std::string("Share"));
+				if (!canShare())
+				{
+					disabled_items.push_back(std::string("Share"));
+				}
+// [SL:KB] - Patch: Inventory-Links | Checked: 2013-09-17 (Catznip-3.6)
 			}
+// [/SL:KB]
 			items.push_back(std::string("Animation Open"));
 			items.push_back(std::string("Properties"));
 
@@ -6687,11 +6804,18 @@ void LLObjectBridge::buildContextMenu(LLMenuGL& menu, U32 flags)
     }
 	else
 	{
-		items.push_back(std::string("Share"));
-		if (!canShare())
+// [SL:KB] - Patch: Inventory-Links | Checked: 2013-09-17 (Catznip-3.6)
+		if (!isLink())
 		{
-			disabled_items.push_back(std::string("Share"));
+// [/SL:KB]
+			items.push_back(std::string("Share"));
+			if (!canShare())
+			{
+				disabled_items.push_back(std::string("Share"));
+			}
+// [SL:KB] - Patch: Inventory-Links | Checked: 2013-09-17 (Catznip-3.6)
 		}
+// [/SL:KB]
 
 		items.push_back(std::string("Properties"));
 
@@ -6948,11 +7072,18 @@ void LLWearableBridge::buildContextMenu(LLMenuGL& menu, U32 flags)
 		{
 			can_open = FALSE;
 		}
-		items.push_back(std::string("Share"));
-		if (!canShare())
+// [SL:KB] - Patch: Inventory-Links | Checked: 2013-09-17 (Catznip-3.6)
+		if (!isLink())
 		{
-			disabled_items.push_back(std::string("Share"));
+// [/SL:KB]
+			items.push_back(std::string("Share"));
+			if (!canShare())
+			{
+				disabled_items.push_back(std::string("Share"));
+			}
+// [SL:KB] - Patch: Inventory-Links | Checked: 2013-09-17 (Catznip-3.6)
 		}
+// [/SL:KB]
 		
 		if (can_open)
 		{
@@ -6976,7 +7107,10 @@ void LLWearableBridge::buildContextMenu(LLMenuGL& menu, U32 flags)
 			disabled_items.push_back(std::string("Wearable Edit"));
 		}
 		// Don't allow items to be worn if their baseobj is in the trash.
-		if (isLinkedObjectInTrash() || isLinkedObjectMissing() || isCOFFolder())
+//		if (isLinkedObjectInTrash() || isLinkedObjectMissing() || isCOFFolder())
+// [SL:KB] - Patch: Inventory-Actions | Checked: 2012-08-15 (Catznip-3.3)
+		if (isLinkedObjectInTrash() || isLinkedObjectMissing())
+// [/SL:KB]
 		{
 			disabled_items.push_back(std::string("Wearable And Object Wear"));
 			disabled_items.push_back(std::string("Wearable Add"));

@@ -6,6 +6,7 @@
 * $LicenseInfo:firstyear=2005&license=viewerlgpl$
 * Second Life Viewer Source Code
 * Copyright (C) 2010, Linden Research, Inc.
+* Copyright (C) 2010-2017, Kitty Barnett
 * 
 * This library is free software; you can redistribute it and/or
 * modify it under the terms of the GNU Lesser General Public
@@ -96,7 +97,10 @@ bool LLInventoryFilter::check(const LLFolderViewModelItem* item)
 	const LLFolderViewModelItemInventory* listener = dynamic_cast<const LLFolderViewModelItemInventory*>(item);
 
 	// If it's a folder and we're showing all folders, return automatically.
-	const BOOL is_folder = listener->getInventoryType() == LLInventoryType::IT_CATEGORY;
+//	const BOOL is_folder = listener->getInventoryType() == LLInventoryType::IT_CATEGORY;
+// [SL:KB] - Patch: Inventory-Links | Checked: Catznip-3.6
+	const BOOL is_folder = (listener->getInventoryType() == LLInventoryType::IT_CATEGORY) && (!listener->isLink());
+// [/SL:KB]
 	if (is_folder && (mFilterOps.mShowFolderState == LLInventoryFilter::SHOW_ALL_FOLDERS))
 	{
 		return true;
