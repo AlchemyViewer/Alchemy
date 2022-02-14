@@ -1387,17 +1387,19 @@ void LLPipeline::createGLBuffers()
     glClearColor(0,0,0,0);
     gGL.setColorMask(true, true);
 
-	U32 color_fmt = GL_RGBA;
+	U32 color_fmt = GL_RGBA8;
+	U32 pix_format = GL_RGBA;
 	U32 pix_type = GL_UNSIGNED_BYTE;
 	if (sRenderDeferred)
 	{
-		color_fmt = GL_RGBA16F;
+		color_fmt = GL_R11F_G11F_B10F;
+		pix_format = GL_RGB;
 		pix_type = GL_FLOAT;
 	}
 
     for (U32 i = 0; i < 2; i++)
     {
-        if(mGlow[i].allocate(llmax(512U, glow_res), glow_res, color_fmt, FALSE, FALSE, LLTexUnit::TT_TEXTURE, false, 0, GL_RGBA, pix_type))
+        if(mGlow[i].allocate(llmax(512U, glow_res), glow_res, color_fmt, FALSE, FALSE, LLTexUnit::TT_TEXTURE, false, 0, pix_format, pix_type))
         {
             mGlow[i].bindTarget();
             mGlow[i].clear();
@@ -9280,8 +9282,12 @@ void LLPipeline::renderDeferredLighting(LLRenderTarget *screen_target)
 	// And now render HDR glow
 	if (sRenderGlow)
 	{
+		LLVertexBuffer::unbind();
+
+		LLVector2 tc1(0, 0);
+		LLVector2 tc2((F32)mScreen.getWidth() * 2, (F32)mScreen.getHeight() * 2);
+
 		LL_RECORD_BLOCK_TIME(FTM_RENDER_DEFERRED_BLOOM);
-		gGL.color4f(1, 1, 1, 1);
 		LLGLDepthTest depth(GL_FALSE);
 		LLGLDisable blend(GL_BLEND);
 		LLGLDisable cull(GL_CULL_FACE);
@@ -9297,9 +9303,6 @@ void LLPipeline::renderDeferredLighting(LLRenderTarget *screen_target)
 
 		gGL.setColorMask(true, true);
 		glClearColor(0, 0, 0, 0);
-
-		LLVector2 tc1(0, 0);
-		LLVector2 tc2((F32)mScreen.getWidth() * 2, (F32)mScreen.getHeight() * 2);
 
 		{
 			mGlow[1].bindTarget();
@@ -9330,7 +9333,6 @@ void LLPipeline::renderDeferredLighting(LLRenderTarget *screen_target)
 			mHDRScreen.bindTexture(0, 0, LLTexUnit::TFO_POINT);
 
 			gGL.color4f(1, 1, 1, 1);
-			gPipeline.enableLightsFullbright();
 			gGL.begin(LLRender::TRIANGLE_STRIP);
 			gGL.texCoord2f(tc1.mV[0], tc1.mV[1]);
 			gGL.vertex2f(-1, -1);
@@ -9340,10 +9342,9 @@ void LLPipeline::renderDeferredLighting(LLRenderTarget *screen_target)
 
 			gGL.texCoord2f(tc2.mV[0], tc1.mV[1]);
 			gGL.vertex2f(3, -1);
-
 			gGL.end();
 
-			gGL.getTexUnit(0)->unbind(mScreen.getUsage());
+			gGL.getTexUnit(0)->unbind(mHDRScreen.getUsage());
 
 			mGlow[1].flush();
 
@@ -9417,7 +9418,7 @@ void LLPipeline::renderDeferredLighting(LLRenderTarget *screen_target)
 
 	// Tonemapping & Gamma Correction
 	{
-		gGL.setColorMask(true, true);
+		gGL.setColorMask(true, false);
 		mALRenderUtil->renderTonemap(&mHDRScreen, screen_target, &mGlow[1]);
 		gGL.setColorMask(true, false);
 	}
