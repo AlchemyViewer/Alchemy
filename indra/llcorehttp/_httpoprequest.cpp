@@ -504,8 +504,6 @@ HttpStatus HttpOpRequest::prepareRequest(HttpService * service)
 		return HttpStatus(HttpStatus::LLCORE, HE_BAD_ALLOC);
 	}
 
-	check_curl_easy_setopt(mCurlHandle, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_2TLS);
-
 	check_curl_easy_setopt(mCurlHandle, CURLOPT_IPRESOLVE, CURL_IPRESOLVE_V4);
 	check_curl_easy_setopt(mCurlHandle, CURLOPT_NOSIGNAL, 1);
 	check_curl_easy_setopt(mCurlHandle, CURLOPT_NOPROGRESS, 1);

@@ -301,9 +301,6 @@ CURL *getCurlTemplateHandle()
             // seconds and no RSTs.
             result = curl_easy_setopt(curlpTemplateHandle, CURLOPT_DNS_CACHE_TIMEOUT, 600); // Refetch dns after 600 seconds
             check_curl_code(result, CURLOPT_DNS_CACHE_TIMEOUT);
-
-			result = curl_easy_setopt(curlpTemplateHandle, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_2TLS);
-			check_curl_code(result, CURLOPT_HTTP_VERSION);
         }
     }
 

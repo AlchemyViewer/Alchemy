@@ -402,11 +402,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>4a8825561380d3d102aa05a77dbd5f5123df7e3b41fb4994a4a8cfd157f9d37564e1f0e694d266fee5eedb5054782b95291330468c9b5b8017880bd1ec0aa0a2</string>
+              <string>415b2fd0f14a6117f644b64e01ae132cf1af734ea629ad0e8aafdd1dfa014abc2cec3f66f07a88e3093fdf8669885361c578b96b222ae6ab94a3264f4f90ac56</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/89/packages/generic/curl/7.81.0.1422/curl-7.81.0-darwin64-1422.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/89/packages/generic/curl/7.54.1.1462/curl-7.54.1-darwin64-1462.tar.zst</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
@@ -416,11 +416,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>8d130cf79a56eaf2374cbfe6515ad1d6fb0d0272ce3b0335498d12aea71ab1c607080b3c70726e6f274a8d338633f166bfdac32875d94c2f77c92693d877e776</string>
+              <string>7b50400b276fba8fc2e40f9828912206b271874f9da7918a857ec4056972af36bd1dcc162fc9f5a7e8db8208f932b173e7bee8ad4d7c7fc5a7a8b2ccba125430</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/89/packages/generic/curl/7.81.0.1422/curl-7.81.0-linux64-1422.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/89/packages/generic/curl/7.54.1.1462/curl-7.54.1-linux64-1462.tar.zst</string>
             </map>
             <key>name</key>
             <string>linux64</string>
@@ -430,18 +430,18 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>faf077e1975e2dec42639fe4b1939c5e61ac95a4ef0b70b36607b7a2098fd4261f15f0a97cd3b7e8dea75a36b32fdc33ecbbb4639c9f968bac1857399997d96b</string>
+              <string>ed38b56f83f954ee030a0435491c05d12dcf14681752bd70125b98a7c321ff1e31ea7a61156e0b1689d53dbbe3814325a310b0cb0f37708aa0195f4f62f479d9</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/89/packages/generic/curl/7.81.0.1422/curl-7.81.0-windows64-1422.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/89/packages/generic/curl/7.54.1.1462/curl-7.54.1-windows64-1462.tar.zst</string>
             </map>
             <key>name</key>
             <string>windows64</string>
           </map>
         </map>
         <key>version</key>
-        <string>7.81.0</string>
+        <string>7.54.1</string>
       </map>
       <key>dbus_glib</key>
       <map>
@@ -1846,11 +1846,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>8238ce0faf9ed65a0136b40a2115c244b0eaf64126632aca2033097861844b14dce6d93516caf8cb0dbad6bbe340ee405dfd5fa8523372bbea1bc51947daeea9</string>
+              <string>cd5f90019af7aa0e480391113d014aef7ce6bc762e86b878bfbf4684fc446a0a838c904cd8c910012ca43894d1a40d12327527ff803ecbe8800ccc5b4eb0f1e7</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/90/packages/generic/openssl/3.0.1.1420/openssl-3.0.1-darwin64-1420.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/90/packages/generic/openssl/1.1.1m.1458/openssl-1.1.1m-darwin64-1458.tar.zst</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
@@ -1860,11 +1860,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>0c025af7d1de95aa0acbfc60cbe27c67afcad451f3792df3e17771ab5f2be7a8c679c02e3cdf0dfb4a322ac38e4245a13e7343e941d26e37de03dbd16ff26a26</string>
+              <string>118469c310d3cf0d33300738ce871793cce5f70ad83207a5bf35ec1383e6536b915c8a5832f0c2f8fd5e21aee64f6637b9f91531f7ab4625f4d43888aec1b331</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/90/packages/generic/openssl/3.0.1.1420/openssl-3.0.1-linux64-1420.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/90/packages/generic/openssl/1.1.1m.1458/openssl-1.1.1m-linux64-1458.tar.zst</string>
             </map>
             <key>name</key>
             <string>linux64</string>
@@ -1874,18 +1874,18 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>675e9ad3014cdcf71338a74120264b7a8955334c9452f2660372c75f2a3ee8475bb4a946e0eef08292d5bc7e365d3b9c68acf747d843cd7b4414eee70f313c3a</string>
+              <string>0c77f95f7fbd1346db5da1f5b1f806786f7296804b247a65d88da29bb125e14e10f38bb4a4aa6207e22ae03f3a5343527e51cc80b51821c68d8fc6dd7430993a</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/90/packages/generic/openssl/3.0.1.1420/openssl-3.0.1-windows64-1420.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/90/packages/generic/openssl/1.1.1m.1458/openssl-1.1.1m-windows64-1458.tar.zst</string>
             </map>
             <key>name</key>
             <string>windows64</string>
           </map>
         </map>
         <key>version</key>
-        <string>3.0.1</string>
+        <string>1.1.1m</string>
       </map>
       <key>sentry</key>
       <map>
@@ -1908,11 +1908,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>59462875a2c9c6be30c6fc9da4f14ae01e228f2629a09dc05f1aedd728074c3d0e8ef3fd009baaac8a05655ddf54b85c33e59a87752c24e45e5d9df4d99e1574</string>
+              <string>df7e52f8c3e0443d8f3db3ad71c36a244a67f21fbe10e19ba92fb3e38662f6f6d8088cca0f27569b1a42abac427270c7ca0a7d679c010abdd2fe71a9c7921cca</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/164/packages/generic/sentry/1.1.0.1450/sentry-1.1.0-darwin64-1450.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/164/packages/generic/sentry/1.1.0.1463/sentry-1.1.0-darwin64-1463.tar.zst</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
@@ -1922,11 +1922,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>a42b390242746f71e2e9caf60fce049bd90d3fae7db19cb086780e5419d6b64241f36b2783066764af46d6b7285f228c21f4d3aefa7419238abb1c699f114b52</string>
+              <string>a254327115693d3870109a6f62bf1f4b03d1a753bdb49355a4634aeb8461533fe3299638de931b47d9ff75b4a6eaf526caa41261105048750e6e6726322d8cde</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/164/packages/generic/sentry/1.1.0.1450/sentry-1.1.0-linux64-1450.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/164/packages/generic/sentry/1.1.0.1463/sentry-1.1.0-linux64-1463.tar.zst</string>
             </map>
             <key>name</key>
             <string>linux64</string>
@@ -1936,11 +1936,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>a9433f02383640f5b3402acf07926a8875f16bc326f9d664896a866b25510d26da5c981489792b44ab1d9748c89a0f594f0cfa7f6c4501566869b3b3f362b687</string>
+              <string>b0aae7a09813d074ee240519f399f2cfab7a4819ef3b911b3257435eb8722929819aff26d19ef1c5cddc206e44a9d53904a367f8b00ad0979f34cb9b9e03a337</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/164/packages/generic/sentry/1.1.0.1450/sentry-1.1.0-windows64-1450.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/164/packages/generic/sentry/1.1.0.1463/sentry-1.1.0-windows64-1463.tar.zst</string>
             </map>
             <key>name</key>
             <string>windows64</string>
