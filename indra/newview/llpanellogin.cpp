@@ -986,17 +986,8 @@ void LLPanelLogin::onClickConnect(bool commit_fields)
 
 		// the grid definitions may come from a user-supplied grids.xml, so they may not be good
 		LL_DEBUGS("AppInit")<<"grid "<<combo_val.asString()<<LL_ENDL;
-		try
-		{
-			LLGridManager::getInstance()->setGridChoice(combo_val.asString());
-		}
-		catch (const LLInvalidGridName& ex)
-		{
-			LLSD args;
-			args["GRID"] = ex.name();
-			LLNotificationsUtil::add("InvalidGrid", args);
-			return;
-		}
+
+		LLGridManager::getInstance()->setGridChoice(combo_val.asString());
 
 		// The start location SLURL has already been sent to LLStartUp::setStartSLURL
 
@@ -1088,16 +1079,16 @@ void LLPanelLogin::onClickForgotPassword(void*)
 {
 	if (sInstance )
 	{
-		LLWeb::loadURLExternal(sInstance->getString( "forgot_password_url" ));
+		LLWeb::loadURLExternal(LLGridManager::getInstance()->getForgotPasswordURL());
 	}
 }
 
-//static
+// static
 void LLPanelLogin::onClickSignUp(void*)
 {
 	if (sInstance)
 	{
-		LLWeb::loadURLExternal(sInstance->getString("sign_up_url"));
+		LLWeb::loadURLExternal(LLGridManager::getInstance()->getCreateAccountURL());
 	}
 }
 
@@ -1185,61 +1176,47 @@ void LLPanelLogin::updateServer()
 {
 	if (sInstance)
 	{
-		try 
-		{
-			// if they've selected another grid, we should load the credentials
-			// for that grid and set them to the UI. But if there were any modifications to
-			// fields, modifications should carry over.
-			// Not sure if it should carry over password but it worked like this before login changes
-			// Example: you started typing in and found that your are under wrong grid,
-			// you switch yet don't lose anything
-			if (sInstance->areCredentialFieldsDirty())
-			{
-				// save modified creds
-				LLComboBox* user_combo = sInstance->getChild<LLComboBox>("username_combo");
-				LLLineEditor* pswd_edit = sInstance->getChild<LLLineEditor>("password_edit");
-				std::string username = user_combo->getSimple();
-				LLStringUtil::trim(username);
-				std::string password = pswd_edit->getValue().asString();
+		// if they've selected another grid, we should load the credentials
+		// for that grid and set them to the UI. But if there were any modifications to
+		// fields, modifications should carry over.
+		// Not sure if it should carry over password but it worked like this before login changes
+		// Example: you started typing in and found that your are under wrong grid,
+		// you switch yet don't lose anything
+		if (sInstance->areCredentialFieldsDirty())
+        {
+			// save modified creds
+			LLComboBox* user_combo = sInstance->getChild<LLComboBox>("username_combo");
+			LLLineEditor* pswd_edit = sInstance->getChild<LLLineEditor>("password_edit");
+			std::string username = user_combo->getSimple();
+			LLStringUtil::trim(username);
+			std::string password = pswd_edit->getValue().asString();
 
-				// populate dropbox and setFields
-				// Note: following call is related to initializeLoginInfo()
-				LLPointer<LLCredential> credential = gSecAPIHandler->loadCredential(LLGridManager::getInstance()->getGrid());
-				sInstance->populateUserList(credential);
+			// populate dropbox and setFields
+			// Note: following call is related to initializeLoginInfo()
+			LLPointer<LLCredential> credential = gSecAPIHandler->loadCredential(LLGridManager::getInstance()->getGrid());	
+			sInstance->populateUserList(credential);
 
-				// restore creds
-				user_combo->setTextEntry(username);
-				pswd_edit->setValue(password);
-				sInstance->mUsernameLength = username.length();
-				sInstance->mPasswordLength = password.length();
-			}
-			else
-			{
-				// populate dropbox and setFields
-				// Note: following call is related to initializeLoginInfo()
-				LLPointer<LLCredential> credential = gSecAPIHandler->loadCredential(LLGridManager::getInstance()->getGrid());
-				sInstance->populateUserList(credential);
-			}
-
-			// update the login panel links 
-			bool system_grid = LLGridManager::getInstance()->isSystemGrid();
-
-			// Want to vanish not only create_new_account_btn, but also the
-			// title text over it, so turn on/off the whole layout_panel element.
-			sInstance->getChild<LLLayoutPanel>("links")->setVisible(system_grid);
-			sInstance->getChildView("forgot_password_text")->setVisible(system_grid);
-
-			// grid changed so show new splash screen (possibly)
-			loadLoginPage();
+			// restore creds
+			user_combo->setTextEntry(username);
+			pswd_edit->setValue(password);
+			sInstance->mUsernameLength = username.length();
+			sInstance->mPasswordLength = password.length();
 		}
-		catch (const LLInvalidGridName& ex)
+		else
 		{
-			LL_WARNS("AppInit")<<"server '"<<ex.name()<<"' selection failed"<<LL_ENDL;
-			LLSD args;
-			args["GRID"] = ex.name();
-			LLNotificationsUtil::add("InvalidGrid", args);	
-			return;
-		}
+			// populate dropbox and setFields
+			// Note: following call is related to initializeLoginInfo()
+			LLPointer<LLCredential> credential = gSecAPIHandler->loadCredential(LLGridManager::getInstance()->getGrid());
+			sInstance->populateUserList(credential);
+        }
+
+        // Want to vanish not only create_new_account_btn, but also the
+        // title text over it, so turn on/off the whole layout_panel element.
+        sInstance->getChild<LLLayoutPanel>("links")->setVisible(!LLGridManager::getInstance()->getCreateAccountURL().empty());
+        sInstance->getChildView("forgot_password_text")->setVisible(!LLGridManager::getInstance()->getForgotPasswordURL().empty());
+
+        // grid changed so show new splash screen (possibly)
+        loadLoginPage();
 	}
 }
 
