@@ -37,7 +37,7 @@ class LLPanelLoginListener;
 class LLSLURL;
 class LLCredential;
 
-class LLPanelLogin:	
+class LLPanelLogin final :
 	public LLPanel,
 	public LLViewerMediaObserver
 {
@@ -48,7 +48,7 @@ public:
 				void *callback_data);
 	~LLPanelLogin();
 
-	virtual void setFocus( BOOL b );
+	void setFocus( BOOL b ) override;
 
 	static void show(const LLRect &rect,
 		void (*callback)(S32 option, void* user_data), 
@@ -70,14 +70,13 @@ public:
 
 	static void closePanel();
 
-	void setSiteIsAlive( bool alive );
 
 	static void loadLoginPage();	
 	static void giveFocus();
 	static void setAlwaysRefresh(bool refresh); 
 	
 	// inherited from LLViewerMediaObserver
-	/*virtual*/ void handleMediaEvent(LLPluginClassMedia* self, EMediaEvent event);
+	/*virtual*/ void handleMediaEvent(LLPluginClassMedia* self, EMediaEvent event) override;
 	static void updateServer();  // update the combo box, change the login page to the new server, clear the combo
 
 	/// to be called from LLStartUp::setStartSLURL
@@ -95,11 +94,11 @@ private:
 	void addUsersWithFavoritesToUsername();
 	void onSelectServer();
 	void onLocationSLURL();
+	void refreshGridList();
 
 	static void setFields(LLPointer<LLCredential> credential);
 
 	static void onClickConnect(bool commit_fields = true);
-	static void onClickNewAccount(void*);
 	static void onClickVersion(void*);
 	static void onClickForgotPassword(void*);
 	static void onClickSignUp(void*);
@@ -107,7 +106,9 @@ private:
 	static void onUserListCommit(void*);
 	static void onRememberUserCheck(void*);
 	static void onPassKey(LLLineEditor* caller, void* user_data);
-	static void updateServerCombo();
+
+	static void connectCallback(const LLSD& notification, const LLSD& response);
+	static void connect();
 
 private:
 	std::unique_ptr<LLPanelLoginListener> mListener;
@@ -130,6 +131,8 @@ private:
 	unsigned int mUsernameLength;
 	unsigned int mPasswordLength;
 	unsigned int mLocationLength;
+
+	boost::signals2::connection mGridListChangedConnection;
 };
 
 #endif

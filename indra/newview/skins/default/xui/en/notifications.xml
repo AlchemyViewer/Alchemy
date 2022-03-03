@@ -12307,6 +12307,23 @@ Your privilege to find [NAME]&apos;s map location has been revoked.
 [NAME] has given you permission to find their location on the map.
   </notification>
   
+  <notification
+    icon="alertmodal.tga"
+    label="Warn on insecure login"
+    name="InsecureLogin"
+    type="alertmodal">
+[GRID] does not provide a secure connection for login.
+Login details will be sent in plaintext where they may be vulnerable to snooping.
+
+Are you sure you wish to continue?
+    <tag>confirm</tag>
+    <usetemplate
+     ignoretext="Warn me before I login using an insecure connection"
+     name="okcancelignore"
+     notext="Cancel"
+     yestext="OK"/>
+  </notification>
+  
     <notification
     icon="notifytip.tga"
     name="AlwaysRunEnabled"
