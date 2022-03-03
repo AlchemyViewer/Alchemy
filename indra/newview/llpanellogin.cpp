@@ -260,6 +260,7 @@ LLPanelLogin::LLPanelLogin(const LLRect &rect,
     server_choice_combo->setCommitCallback(boost::bind(&LLPanelLogin::onSelectServer, this));
 
 	refreshGridList();
+	mGridListChangedConnection = LLGridManager::getInstance()->addGridListChangedCallback(boost::bind(&LLPanelLogin::refreshGridList, this));
 
 	LLSLURL start_slurl(LLStartUp::getStartSLURL());
 	// The StartSLURL might have been set either by an explicit command-line
@@ -427,6 +428,9 @@ void LLPanelLogin::addFavoritesToStartLocation()
 
 LLPanelLogin::~LLPanelLogin()
 {
+	if (mGridListChangedConnection.connected())
+		mGridListChangedConnection.disconnect();
+	
 	LLPanelLogin::sInstance = NULL;
 
 	// Controls having keyboard focus by default
