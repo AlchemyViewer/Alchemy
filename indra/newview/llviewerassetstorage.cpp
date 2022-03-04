@@ -33,6 +33,7 @@
 
 #include "llagent.h"
 #include "llappcorehttp.h"
+#include "llviewernetwork.h"
 #include "llviewerregion.h"
 
 #include "lltransfersourceasset.h"
@@ -379,10 +380,6 @@ void LLViewerAssetStorage::checkForTimeouts()
     {
         CoroWaitList &request = mCoroWaitList.front();
         
-        bool with_http = true;
-        bool is_temp = false;
-        LLViewerAssetStatsFF::record_enqueue(request.mType, with_http, is_temp);
-
         manager->enqueueCoprocedure(VIEWER_ASSET_STORAGE_CORO_POOL, "LLViewerAssetStorage::assetRequestCoro",
             boost::bind(&LLViewerAssetStorage::assetRequestCoro, this, request.mRequest, request.mId, request.mType, request.mCallback, request.mUserData));
 
@@ -451,10 +448,6 @@ void LLViewerAssetStorage::queueRequestHttp(
         // Coroutine buffer has fixed size (synchronization buffer, so we have no alternatives), so buffer any request above limit
         if (LLCoprocedureManager::instance().count(VIEWER_ASSET_STORAGE_CORO_POOL) < LLCoprocedureManager::DEFAULT_QUEUE_SIZE)
         {
-            bool with_http = true;
-            bool is_temp = false;
-            LLViewerAssetStatsFF::record_enqueue(atype, with_http, is_temp);
-
             LLCoprocedureManager::instance().enqueueCoprocedure(VIEWER_ASSET_STORAGE_CORO_POOL, "LLViewerAssetStorage::assetRequestCoro",
                 boost::bind(&LLViewerAssetStorage::assetRequestCoro, this, req, uuid, atype, callback, user_data));
         }
@@ -539,18 +532,44 @@ void LLViewerAssetStorage::assetRequestCoro(
         LL_WARNS_ONCE("ViewerAsset") << "capsRecv got event" << LL_ENDL;
         LL_WARNS_ONCE("ViewerAsset") << "region " << gAgent.getRegion() << " mViewerAssetUrl " << mViewerAssetUrl << LL_ENDL;
     }
-    if (mViewerAssetUrl.empty() && gAgent.getRegion())
+    if (gAgent.getRegion())
     {
         mViewerAssetUrl = gAgent.getRegion()->getViewerAssetUrl();
     }
     if (mViewerAssetUrl.empty())
     {
+        if (!LLGridManager::instance().isInSecondlife() && isUpstreamOK())
+        {
+            req->mWithHTTP = false;
+
+            // send request message to our upstream data provider
+            // Create a new asset transfer.
+            LLTransferSourceParamsAsset spa;
+            spa.setAsset(uuid, atype);
+
+            // Set our destination file, and the completion callback.
+            LLTransferTargetParamsVFile tpvf;
+            tpvf.setAsset(uuid, atype);
+            tpvf.setCallback(downloadCompleteCallback, *req);
+
+            LL_DEBUGS("ViewerAsset") << "Starting transfer for " << uuid << LL_ENDL;
+            LLTransferTargetChannel *ttcp = gTransferManager.getTargetChannel(mUpstreamHost, LLTCT_ASSET);
+            ttcp->requestTransfer(spa, tpvf, 100.f + (req->mIsPriority ? 1.f : 0.f));
+
+			LLViewerAssetStatsFF::record_enqueue(atype, req->mWithHTTP, false);
+        }
+        else
+        {
         LL_WARNS_ONCE("ViewerAsset") << "asset request fails: caps received but no viewer asset cap found" << LL_ENDL;
         result_code = LL_ERR_ASSET_REQUEST_FAILED;
         ext_status = LLExtStat::NONE;
         removeAndCallbackPendingDownloads(uuid, atype, uuid, atype, result_code, ext_status);
+        }
 		return;
     }
+
+    LLViewerAssetStatsFF::record_enqueue(atype, req->mWithHTTP, false);
+
     std::string url = getAssetURL(mViewerAssetUrl, uuid,atype);
 #ifdef SHOW_DEBUG
     LL_DEBUGS("ViewerAsset") << "request url: " << url << LL_ENDL;
