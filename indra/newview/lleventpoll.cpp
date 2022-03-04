@@ -29,6 +29,7 @@
 #include "lleventpoll.h"
 #include "llappviewer.h"
 #include "llagent.h"
+#include "llviewernetwork.h"
 
 #include "llsdserialize.h"
 #include "lleventtimer.h"
@@ -69,6 +70,7 @@ namespace Details
 
         bool                            mDone;
         LLCore::HttpRequest::ptr_t      mHttpRequest;
+        LLCore::HttpOptions::ptr_t		mHttpOptions;
         LLCore::HttpRequest::policy_t   mHttpPolicy;
         std::string                     mSenderIp;
         int                             mCounter;
@@ -88,6 +90,7 @@ namespace Details
     LLEventPollImpl::LLEventPollImpl(const LLHost &sender) :
         mDone(false),
         mHttpRequest(),
+        mHttpOptions(),
         mHttpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID),
         mSenderIp(),
         mCounter(sNextCounter++)
@@ -97,6 +100,13 @@ namespace Details
 
         mHttpRequest = LLCore::HttpRequest::ptr_t(new LLCore::HttpRequest);
         mHttpPolicy = app_core_http.getPolicy(LLAppCoreHttp::AP_LONG_POLL);
+        mHttpOptions = LLCore::HttpOptions::ptr_t(new LLCore::HttpOptions);
+        if (!LLGridManager::instance().isInSecondlife())
+        {
+            mHttpOptions->setRetries(0);
+            mHttpOptions->setTransferTimeout(60);
+        }
+
         mSenderIp = sender.getIPandPort();
     }
 
@@ -106,7 +116,6 @@ namespace Details
         LLSD message;
         message["sender"] = mSenderIp;
         message["body"] = content["body"];
-
         LLMessageSystem::dispatch(msg_name, message);
     }
 
@@ -161,7 +170,7 @@ namespace Details
 //              << LLSDXMLStreamer(request) << LL_ENDL;
 
             LL_DEBUGS("LLEventPollImpl") << " <" << counter << "> posting and yielding." << LL_ENDL;
-            LLSD result = httpAdapter->postAndSuspend(mHttpRequest, url, request);
+            LLSD result = httpAdapter->postAndSuspend(mHttpRequest, url, request, mHttpOptions);
 
 //          LL_DEBUGS("LLEventPollImpl::eventPollCoro") << "<" << counter << "> result = "
 //              << LLSDXMLStreamer(result) << LL_ENDL;
@@ -179,7 +188,7 @@ namespace Details
 
             if (!status)
             {
-                if (status == LLCore::HttpStatus(LLCore::HttpStatus::EXT_CURL_EASY, CURLE_OPERATION_TIMEDOUT))
+                if (status == LLCore::HttpStatus(LLCore::HttpStatus::EXT_CURL_EASY, CURLE_OPERATION_TIMEDOUT) || status == LLCore::HttpStatus(HTTP_BAD_GATEWAY))
                 {   // A standard timeout response we get this when there are no events.
                     LL_DEBUGS("LLEventPollImpl") << "All is very quiet on target server. It may have gone idle?" << LL_ENDL;
                     errorCount = 0;
