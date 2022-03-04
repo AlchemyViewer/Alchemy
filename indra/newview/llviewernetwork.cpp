@@ -99,9 +99,10 @@ const std::string ALCHEMY_UPDATE_SERVICE = "https://app.alchemyviewer.org/update
 
 //
 const std::string GRIDS_USER_FILE = "grids_user.xml";
+
 LLGridManager::LLGridManager()
 :	mLoggedIn(false)
-,   mIsInProductionGrid(false)
+,	mPlatform(NOPLATFORM)
 {
 	// by default, we use the 'grids.xml' file in the user settings directory
 	// this file is an LLSD file containing multiple grid definitions.
@@ -959,34 +960,86 @@ LLSD LLGridManager::getGridInfo(const std::string& grid) const
 
 void LLGridManager::updateIsInProductionGrid()
 {
-	mIsInProductionGrid = false;
-
 	// *NOTE:Mani This used to compare GRID_INFO_AGNI to gGridChoice,
 	// but it seems that loginURI trumps that.
 	std::vector<std::string> uris;
 	getLoginURIs(uris);
 	if (uris.empty())
 	{
-		mIsInProductionGrid = true;
+		LL_DEBUGS("GridManager") << "uri is empty, Setting grid platform to NOTHING." << LL_ENDL;
+		mPlatform = NOPLATFORM;
+		return;
 	}
-	else
+
+	// Detect Second Life Agni. We want to match the exact uri here because we're dealing with a live economy
+	for (const std::string& uri : uris)
 	{
-		for ( std::vector<std::string>::iterator uri_it = uris.begin();
-			  ! mIsInProductionGrid && uri_it != uris.end();
-			  uri_it++
-			 )
+		if (MAIN_GRID_LOGIN_URI == uri)
 		{
-			if( MAIN_GRID_LOGIN_URI == *uri_it )
-			{
-				mIsInProductionGrid = true;
-			}
+			LL_DEBUGS("GridManager") << "Setting grid platform to SLMAIN" << LL_ENDL;
+			mPlatform = SLMAIN;
+			return;
 		}
 	}
+	
+	// Detect Second Life Aditi et al.
+	for (const std::string& uri : uris)
+	{
+		LLURI login_uri = LLURI(uri);
+		if (login_uri.authority().find("lindenlab.com") != std::string::npos) // Any old lab domain will do
+		{
+			LL_DEBUGS("GridManager") << "Setting grid platform to SLBETA" << LL_ENDL;
+			mPlatform = SLBETA;
+			return;
+		}
+	}
+	
+	if (getPlatformString() == "OpenSim")
+	{
+		LL_DEBUGS("GridManager") << "Setting grid platform to OPENSIM" << LL_ENDL;
+		mPlatform = OPENSIM;
+		return;
+	}
+	if (getPlatformString() == "Halcyon")
+	{
+		LL_DEBUGS("GridManager") << "Setting grid platform to HALCYON" << LL_ENDL;
+		mPlatform = HALCYON;
+		return;
+	}
+	
+	// Default to OpenSim
+	LL_DEBUGS("GridManager")<< "Defaulting to OPENSIM" << LL_ENDL;
+	mPlatform = OPENSIM;
 }
 
-bool LLGridManager::isInProductionGrid()
+bool LLGridManager::isInSecondlife() const
 {
-	return mIsInProductionGrid;
+	return (isInSLMain() || isInSLBeta());
+}
+
+bool LLGridManager::isInOpenSim() const
+{
+	return (mPlatform == OPENSIM || mPlatform == HALCYON);
+}
+
+bool LLGridManager::isInOpenSimulator() const
+{
+	return mPlatform == OPENSIM;
+}
+
+bool LLGridManager::isInHalcyon() const
+{
+	return mPlatform == HALCYON;
+}
+
+bool LLGridManager::isInSLMain() const
+{
+	return mPlatform == SLMAIN;
+}
+
+bool LLGridManager::isInSLBeta() const
+{
+	return mPlatform == SLBETA;
 }
 
 bool LLGridManager::isSystemGrid(const std::string& grid) const

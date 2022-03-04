@@ -2631,7 +2631,7 @@ void LLViewerWindow::setNormalControlsVisible( BOOL visible )
 
 		// ...and set the menu color appropriately.
 		setMenuBackgroundColor(gAgent.getGodLevel() > GOD_NOT, 
-			LLGridManager::getInstance()->isInProductionGrid());
+			LLGridManager::getInstance()->isInSLBeta());
 	}
         
 	if ( gStatusBar )
@@ -5657,7 +5657,7 @@ void LLViewerWindow::initTextures(S32 location_id)
 {
     if (mProgressView)
     {
-        mProgressView->initTextures(location_id, LLGridManager::getInstance()->isInProductionGrid());
+        mProgressView->initTextures(location_id, !LLGridManager::getInstance()->isInSLBeta());
     }
 }
 

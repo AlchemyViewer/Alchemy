@@ -1900,7 +1900,7 @@ std::string LLInventoryModel::getInvCacheAddres(const LLUUID& owner_id)
     std::string owner_id_str;
     owner_id.toString(owner_id_str);
     std::string path(gDirUtilp->getExpandedFilename(LL_PATH_CACHE, owner_id_str));
-    if (LLGridManager::getInstance()->isInProductionGrid())
+    if (LLGridManager::getInstance()->isInSLMain())
     {
         inventory_addr = llformat(PRODUCTION_CACHE_FORMAT_STRING, path.c_str());
     }

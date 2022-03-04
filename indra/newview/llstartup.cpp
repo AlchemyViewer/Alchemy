@@ -2684,7 +2684,7 @@ bool callback_choose_gender(const LLSD& notification, const LLSD& response)
 
 std::string get_screen_filename(const std::string& pattern)
 {
-    if (LLGridManager::getInstance()->isInProductionGrid())
+    if (LLGridManager::getInstance()->isInSLMain())
     {
         return llformat(pattern.c_str(), "");
     }

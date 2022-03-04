@@ -61,49 +61,9 @@ BOOL LLFloaterForgetUser::postBuild()
     mScrollList = getChild<LLScrollListCtrl>("user_list");
 
 
-    bool show_grid_marks = gSavedSettings.getBOOL("ForceShowGrid");
-    show_grid_marks |= !LLGridManager::getInstance()->isInProductionGrid();
-
     std::map<std::string, std::string> known_grids = LLGridManager::getInstance()->getKnownGrids();
 
-    if (!show_grid_marks)
-    {
-        // Figure out if there are records for more than one grid in storage
-        for (std::map<std::string, std::string>::iterator grid_iter = known_grids.begin();
-            grid_iter != known_grids.end();
-            grid_iter++)
-        {
-            if (!grid_iter->first.empty()
-                && grid_iter->first != MAINGRID) // a workaround since 'mIsInProductionGrid' might not be set
-            {
-                if (!gSecAPIHandler->emptyCredentialMap("login_list", grid_iter->first))
-                {
-                    show_grid_marks = true;
-                    break;
-                }
-
-                // "Legacy" viewer support
-                LLPointer<LLCredential> cred = gSecAPIHandler->loadCredential(grid_iter->first);
-                if (cred.notNull())
-                {
-                    const LLSD &ident = cred->getIdentifier();
-                    if (ident.isMap() && ident.has("type"))
-                    {
-                        show_grid_marks = true;
-                        break;
-                    }
-                }
-            }
-        }
-    }
-
     mUserGridsCount.clear();
-    if (!show_grid_marks)
-    {
-        // just load maingrid
-        loadGridToList(MAINGRID, false);
-    }
-    else
     {
         for (std::map<std::string, std::string>::iterator grid_iter = known_grids.begin();
             grid_iter != known_grids.end();
@@ -256,7 +216,7 @@ void LLFloaterForgetUser::loadGridToList(const std::string &grid, bool show_grid
     std::string grid_label;
     if (show_grid_name)
     {
-        grid_label = LLGridManager::getInstance()->getGridId(grid); //login id (shortened label)
+        grid_label = LLGridManager::getInstance()->getGridLabel(grid); //login id (shortened label)
     }
     if (gSecAPIHandler->hasCredentialMap("login_list", grid))
     {

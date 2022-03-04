@@ -501,13 +501,13 @@ void init_menus()
 	gPopupMenuView->setBackgroundColor( color );
 
 	// If we are not in production, use a different color to make it apparent.
-	if (LLGridManager::getInstance()->isInProductionGrid())
+	if (LLGridManager::getInstance()->isInSLBeta())
 	{
-		color = LLUIColorTable::instance().getColor( "MenuBarBgColor" );
+		color = LLUIColorTable::instance().getColor("MenuNonProductionBgColor");
 	}
 	else
 	{
-		color = LLUIColorTable::instance().getColor( "MenuNonProductionBgColor" );
+		color = LLUIColorTable::instance().getColor("MenuBarBgColor");
 	}
 
 	LLView* menu_bar_holder = gViewerWindow->getRootView()->getChildView("menu_bar_holder");
@@ -519,7 +519,7 @@ void init_menus()
 	menu_bar_holder->addChild(gMenuBarView);
   
     gViewerWindow->setMenuBackgroundColor(false, 
-        LLGridManager::getInstance()->isInProductionGrid());
+        LLGridManager::getInstance()->isInSLBeta());
 
 	// *TODO:Also fix cost in llfolderview.cpp for Inventory menus
 	const std::string texture_upload_cost_str = fmt::to_string(LLAgentBenefitsMgr::current().getTextureUploadCost());
@@ -3972,7 +3972,7 @@ void set_god_level(U8 god_level)
         if(gViewerWindow)
         {
             gViewerWindow->setMenuBackgroundColor(god_level > GOD_NOT,
-            LLGridManager::getInstance()->isInProductionGrid());
+            LLGridManager::getInstance()->isInSLBeta());
         }
     
         LLSD args;
@@ -4012,7 +4012,7 @@ BOOL check_toggle_hacked_godmode(void*)
 
 bool enable_toggle_hacked_godmode(void*)
 {
-  return !LLGridManager::getInstance()->isInProductionGrid();
+  return LLGridManager::getInstance()->isInSLBeta();
 }
 #endif
 
@@ -5087,7 +5087,7 @@ BOOL enable_take()
 		return TRUE;
 #else
 # ifdef TOGGLE_HACKED_GODLIKE_VIEWER
-		if (!LLGridManager::getInstance()->isInProductionGrid() 
+		if (LLGridManager::getInstance()->isInSLBeta()
             && gAgent.isGodlike())
 		{
 			return TRUE;
@@ -5805,7 +5805,7 @@ bool enable_object_delete()
 	TRUE;
 #else
 # ifdef TOGGLE_HACKED_GODLIKE_VIEWER
-	(!LLGridManager::getInstance()->isInProductionGrid()
+	(LLGridManager::getInstance()->isInSLBeta()
      && gAgent.isGodlike()) ||
 # endif
 	LLSelectMgr::getInstanceFast()->canDoDelete();
@@ -8070,7 +8070,7 @@ bool enable_object_take_copy()
 		all_valid = true;
 #ifndef HACKED_GODLIKE_VIEWER
 # ifdef TOGGLE_HACKED_GODLIKE_VIEWER
-		if (LLGridManager::getInstanceFast()->isInProductionGrid()
+		if (!LLGridManager::getInstanceFast()->isInSLBeta()
             || !gAgent.isGodlike())
 # endif
 		{

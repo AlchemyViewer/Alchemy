@@ -229,12 +229,25 @@ class LLGridManager final : public LLSingleton<LLGridManager>
 
 	/// Is the selected grid one of the hard-coded default grids (Agni or Aditi)
 	bool isSystemGrid() const { return isSystemGrid(mGrid); }
-
-	/// Is the selected grid a production grid?
-	bool isInProductionGrid();
-	/**
-	 * yes, that's not a very helpful description.
-	 * I don't really know why that is different from isSystemGrid()
+	
+	/// Is the selected grid Second Life?
+	bool isInSecondlife() const;
+	
+	/// Is the selected grid OpenSim or OpenSim-derived?
+	bool isInOpenSim() const;
+	
+	/// Is the selected grid OpenSimulator?
+	bool isInOpenSimulator() const;
+	
+	/// Is the selected grid Halcyon?
+	bool isInHalcyon() const;
+	
+	/// Is the selected grid agni?
+	bool isInSLMain() const;
+	
+	/// Is the selected grid aditi?
+	bool isInSLBeta() const;
+	
 	/* ===============================================================
 	 * @name User grid management functions
 	 * @{
@@ -285,7 +298,7 @@ private:
 	std::string mGrid;
 	std::string mGridFile;
 	LLSD mGridList;
-	bool mIsInProductionGrid;
+	EGridPlatform mPlatform;
 	
 	
 	/* ===============================================================
