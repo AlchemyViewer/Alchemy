@@ -83,6 +83,7 @@
 #include "llcallstack.h"
 #include "llsettingsdaycycle.h"
 #include "llviewerparcelmgr.h"
+#include "lllogininstance.h"
 #include "llviewernetwork.h"
 
 #include <boost/regex.hpp>
@@ -579,6 +580,12 @@ LLViewerRegion::LLViewerRegion(const U64 &handle,
 :	mImpl(new LLViewerRegionImpl(this, host)),
 	mHandle(handle),
 	mTimeDilation(1.0f),
+	mMaxBakes(LLGridManager::getInstance()->isInSecondlife()?
+		LLAvatarAppearanceDefines::EBakedTextureIndex::BAKED_NUM_INDICES:
+		LLAvatarAppearanceDefines::EBakedTextureIndex::BAKED_LEFT_ARM),
+	mMaxTEs(LLGridManager::getInstance()->isInSecondlife()?
+		LLAvatarAppearanceDefines::ETextureIndex::TEX_NUM_INDICES:
+		LLAvatarAppearanceDefines::ETextureIndex::TEX_HEAD_UNIVERSAL_TATTOO),
 	mName(""),
 	mZoning(""),
 	mIsEstateManager(FALSE),
@@ -2294,6 +2301,19 @@ void LLViewerRegion::setSimulatorFeatures(const LLSD& sim_features)
 	LLSDSerialize::toPrettyXML(sim_features, str);
 	LL_INFOS() << "region " << getName() << " "  << str.str() << LL_ENDL;
 	mSimulatorFeatures = sim_features;
+	if (LLGridManager::getInstance()->isInOpenSim())
+	{
+		setGodnames();
+		if (mSimulatorFeatures.has("OpenSimExtras"))
+		{
+			if (mSimulatorFeatures["OpenSimExtras"].has("GridURL"))
+			{
+				const std::string& grid_url = mSimulatorFeatures["OpenSimExtras"]["GridURL"].asString();
+				if (LLGridManager::getInstance()->getGrid(LLURI(grid_url).authority()).empty())
+					LLGridManager::getInstance()->addRemoteGrid(grid_url, LLGridManager::ADD_HYPERGRID);
+			}
+		}
+	}
 
 	if(mSimulatorFeatures.has("MaxMaterialsPerTransaction")
 		&& mSimulatorFeatures["MaxMaterialsPerTransaction"].isInteger())
@@ -2316,8 +2336,18 @@ void LLViewerRegion::setSimulatorFeatures(const LLSD& sim_features)
 	mAvatarHoverHeightEnabled = (mSimulatorFeatures.has("AvatarHoverHeightEnabled") &&
 		mSimulatorFeatures["AvatarHoverHeightEnabled"].asBoolean());
 
+	if (mBakesOnMeshEnabled)
+	{
+		mMaxBakes = LLAvatarAppearanceDefines::EBakedTextureIndex::BAKED_NUM_INDICES;
+		mMaxTEs   = LLAvatarAppearanceDefines::ETextureIndex::TEX_NUM_INDICES;
+	}
+	else
+	{
+		mMaxBakes = LLAvatarAppearanceDefines::EBakedTextureIndex::BAKED_LEFT_ARM;
+		mMaxTEs   = LLAvatarAppearanceDefines::ETextureIndex::TEX_HEAD_UNIVERSAL_TATTOO;
+	}
+
 	setSimulatorFeaturesReceived(true);
-	
 }
 
 //this is called when the parent is not cacheable.
@@ -2700,7 +2730,7 @@ void LLViewerRegion::addCacheMissFull(const U32 local_id)
 
 void LLViewerRegion::requestCacheMisses()
 {
-	if (!mCacheMissList.size()) 
+	if (mCacheMissList.empty()) 
 	{
 		return;
 	}
@@ -3451,6 +3481,44 @@ std::string LLViewerRegion::getSimHostName()
 	return std::string("...");
 }
 
+std::string LLViewerRegion::getAvatarPickerURL() const
+{
+	std::string url = LLStringUtil::null;
+	if (mSimulatorFeatures.has("OpenSimExtras")
+		&& mSimulatorFeatures["OpenSimExtras"].has("avatar-picker-url"))
+	{
+		url = mSimulatorFeatures["OpenSimExtras"]["avatar-picker-url"].asString();
+	}
+	else if (LLLoginInstance::getInstance()->hasResponse("avatar_picker_url"))
+	{
+		url = LLLoginInstance::getInstance()->getResponse("avatar_picker_url").asString();
+	}
+	else if (LLGridManager::getInstance()->isInSecondlife())
+	{
+		url = gSavedSettings.getString("AvatarPickerURL");
+	}
+	return url;
+}
+
+std::string LLViewerRegion::getDestinationGuideURL() const
+{
+	std::string url = LLStringUtil::null;
+	if (mSimulatorFeatures.has("OpenSimExtras")
+		&& mSimulatorFeatures["OpenSimExtras"].has("destination-guide-url"))
+	{
+		url = mSimulatorFeatures["OpenSimExtras"]["destination-guide-url"].asString();
+	}
+	else if (LLLoginInstance::getInstance()->hasResponse("destination_guide_url"))
+	{
+		url = LLLoginInstance::getInstance()->getResponse("destination_guide_url").asString();
+	}
+	else if (LLGridManager::getInstance()->isInSecondlife())
+	{
+		url = gSavedSettings.getString("DestinationGuideURL");
+	}
+	return url;
+}
+
 std::string LLViewerRegion::getMapServerURL() const
 {
 	std::string url;
@@ -3466,6 +3534,70 @@ std::string LLViewerRegion::getMapServerURL() const
 	return url;
 }
 
+std::string LLViewerRegion::getSearchServerURL() const
+{
+	std::string url;
+	// Check the region it trumps the grid
+	if (mSimulatorFeatures.has("OpenSimExtras")
+		&& mSimulatorFeatures["OpenSimExtras"].has("search-server-url"))
+	{
+		url = mSimulatorFeatures["OpenSimExtras"]["search-server-url"].asString();
+	}
+	// Check the login message
+	else if (LLLoginInstance::getInstance()->hasResponse("search"))
+	{
+		url = LLLoginInstance::getInstance()->getResponse("search").asString();
+	}
+	// If all else fails, fall back to defaults
+	else
+	{
+		url = gSavedSettings.getString(LLGridManager::getInstance()->isInOpenSim() ? "OpenSimSearchURL" : "SearchURL");
+	}
+	return url;
+}
+
+std::string LLViewerRegion::getBuyCurrencyServerURL() const
+{
+	std::string url = LLGridManager::getInstance()->getHelperURI() + "currency.php";
+	// If we have the feature, override grid default.
+	if (mSimulatorFeatures.has("OpenSimExtras")
+		&& mSimulatorFeatures["OpenSimExtras"].has("currency-base-uri"))
+	{
+		url = mSimulatorFeatures["OpenSimExtras"]["currency-base-uri"].asString();
+	}
+	return url;
+}
+
+std::string LLViewerRegion::getHGGrid() const
+{
+	std::string authority = LLStringUtil::null;
+	if (mSimulatorFeatures.has("OpenSimExtras")
+		&& mSimulatorFeatures["OpenSimExtras"].has("GridURL"))
+	{
+		const std::string& url = mSimulatorFeatures["OpenSimExtras"]["GridURL"].asString();
+		authority = LLURI(url).authority();
+	}
+	else
+	{
+		authority = LLGridManager::getInstance()->getGrid();
+	}
+	return authority;
+}
+
+std::string LLViewerRegion::getHGGridName() const
+{
+	std::string name;
+	if (mSimulatorFeatures.has("OpenSimExtras")
+		&& mSimulatorFeatures["OpenSimExtras"].has("GridName"))
+	{
+		name = mSimulatorFeatures["OpenSimExtras"]["GridName"].asString();
+	}
+	else
+	{
+		name = LLGridManager::getInstance()->getGridLabel();
+	}
+	return name;
+}
 
 U32 LLViewerRegion::getChatRange() const
 {
@@ -3500,6 +3632,34 @@ U32 LLViewerRegion::getWhisperRange() const
     return range;
 }
 
+void LLViewerRegion::setGodnames()
+{
+	mGodNames.clear();
+	if (mSimulatorFeatures.has("god_names"))
+	{
+		if (mSimulatorFeatures["god_names"].has("full_names"))
+		{
+			LLSD god_names = mSimulatorFeatures["god_names"]["full_names"];
+			for (LLSD::array_const_iterator itr = god_names.beginArray(),
+				ite = god_names.endArray();
+				 itr != ite;
+				 ++itr)
+			{
+				mGodNames.insert((*itr).asString());
+			}
+		}
+		if (mSimulatorFeatures["god_names"].has("last_names"))
+		{
+			LLSD god_names = mSimulatorFeatures["god_names"]["last_names"];
+			for (LLSD::array_const_iterator itr = god_names.beginArray(), ite = god_names.endArray();
+				 itr != ite;
+				 ++itr)
+			{
+				mGodNames.insert((*itr).asString());
+			}
+		}
+	}
+}
 
 const LLViewerRegion::tex_matrix_t& LLViewerRegion::getWorldMapTiles() const
 {

@@ -236,6 +236,8 @@ public:
 	// regions are expensive to release, this function gradually releases cache from memory
 	static void idleCleanup(F32 max_update_time);
 
+	S32 getRegionMaxBakes() const						{ return mMaxBakes; }
+	S32 getRegionMaxTEs() const							{ return mMaxTEs; }
 	void idleUpdate(F32 max_update_time);
 	void lightIdleUpdate();
 	bool addVisibleGroup(LLViewerOctreeGroup* group);
@@ -399,14 +401,34 @@ public:
 
 	static BOOL isNewObjectCreationThrottleDisabled() {return sNewObjectCreationThrottle < 0;}
 
+	/* ================================================================
+	 * @name OpenSimExtras Simulator Features capability
+	 * @{
+	 */
+	/// Avatar picker url
+	std::string getAvatarPickerURL() const;
+	/// Destination guide url
+	std::string getDestinationGuideURL() const;
 	/// Hypergrid map server url
 	std::string getMapServerURL() const;
+	/// Hypergrid search server url
+	std::string getSearchServerURL() const;
+	/// Buy currency server url
+	std::string getBuyCurrencyServerURL() const;
+	/// Grid login/gateway authority (0.8.1)
+	std::string getHGGrid() const;
+	/// Grid name (0.8.1)
+	std::string getHGGridName() const;
     /// Chat Range (0.8.1)
     U32 getChatRange() const;
     /// Shout Range (0.8.1)
     U32 getShoutRange() const;
     /// Whisper Range (0.8.1)
     U32 getWhisperRange() const;
+
+	/// "God names" surname and full account names map
+	const auto& getGods() const { return mGodNames; };
+	//@}
 
 	typedef std::vector<LLPointer<LLViewerTexture> > tex_matrix_t;
 	const tex_matrix_t& getWorldMapTiles() const;
@@ -424,6 +446,7 @@ private:
 	void addCacheMiss(U32 id, LLViewerRegion::eCacheMissType miss_type);
 	void decodeBoundingInfo(LLVOCacheEntry* entry);
 	bool isNonCacheableObjectCreated(U32 local_id);	
+	void setGodnames();
 
 public:
 	struct CompareDistance
@@ -496,6 +519,8 @@ private:
 	U64			mHandle;
 	F32			mTimeDilation;	// time dilation of physics simulation on simulator
 	S32         mLastUpdate; //last time called idleUpdate()
+	S32			mMaxBakes; // store max bakes on the region
+	S32			mMaxTEs; // store max TEs on the region
 
 	// simulator name
 	std::string mName;
@@ -585,6 +610,7 @@ private:
 	LLFrameTimer mRenderInfoReportTimer;
 
 	mutable tex_matrix_t mWorldMapTiles;
+	absl::flat_hash_set<std::string> mGodNames;
 };
 
 inline BOOL LLViewerRegion::getRegionProtocol(U64 protocol) const
