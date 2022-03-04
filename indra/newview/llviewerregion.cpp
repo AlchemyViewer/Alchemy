@@ -647,6 +647,11 @@ LLViewerRegion::LLViewerRegion(const U64 &handle,
 
 	// Create the object lists
 	initStats();
+	initPartitions();
+}
+
+void LLViewerRegion::initPartitions()
+{
 
 	//create object partitions
 	//MUST MATCH declaration of eObjectPartitions
@@ -669,6 +674,12 @@ LLViewerRegion::LLViewerRegion(const U64 &handle,
 	setCapabilitiesReceivedCallback(boost::bind(&LLAvatarRenderInfoAccountant::scanNewRegion, _1));
 }
 
+void LLViewerRegion::reInitPartitions()
+{
+	std::for_each(mImpl->mObjectPartition.begin(), mImpl->mObjectPartition.end(), DeletePointer());
+	mImpl->mObjectPartition.clear();
+	initPartitions();
+}
 
 void LLViewerRegion::initStats()
 {
