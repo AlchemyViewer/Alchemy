@@ -29,6 +29,7 @@
 #include "llpanelprofilepicks.h"
 
 #include "llagent.h"
+#include "llagentbenefits.h"
 #include "llagentpicksinfo.h"
 #include "llavataractions.h"
 #include "llavatarpropertiesprocessor.h"
@@ -360,7 +361,7 @@ void LLPanelProfilePicks::updateData()
 bool LLPanelProfilePicks::canAddNewPick()
 {
     return (!LLAgentPicksInfo::getInstanceFast()->isPickLimitReached() &&
-        mTabContainer->getTabCount() < LLAgentPicksInfo::getInstanceFast()->getMaxNumberOfPicks() &&
+        mTabContainer->getTabCount() < LLAgentBenefitsMgr::current().getPicksLimit() &&
         RlvActions::canShowLocation());
 }
 

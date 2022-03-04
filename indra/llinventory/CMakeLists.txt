@@ -19,6 +19,7 @@ include_directories(
 
 set(llinventory_SOURCE_FILES
     llcategory.cpp
+    lleconomy.cpp
     llfoldertype.cpp
     llinventory.cpp
     llinventorydefines.cpp
@@ -41,6 +42,7 @@ set(llinventory_HEADER_FILES
     CMakeLists.txt
 
     llcategory.h
+    lleconomy.h
     llfoldertype.h
     llinventory.h
     llinventorydefines.h

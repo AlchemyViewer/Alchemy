@@ -2775,7 +2775,7 @@ bool LLAppViewer::initConfiguration()
 		LLStartUp::setStartSLURL(start_slurl);
 		if(start_slurl.getType() == LLSLURL::LOCATION)
 		{
-			LLGridManager::getInstance()->setGridChoice(start_slurl.getGrid());
+			LLGridManager::getInstance()->setGridChoice(start_slurl.getGrid(), false);
 		}
 	}
 

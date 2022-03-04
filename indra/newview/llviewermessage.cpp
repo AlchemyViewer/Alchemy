@@ -32,6 +32,7 @@
 #include "llaudioengine.h" 
 #include "llavataractions.h"
 #include "llavatarnamecache.h"		// IDEVO HACK
+#include "lleconomy.h"
 #include "lleventtimer.h"
 #include "llfloaterreg.h"
 #include "llfolderview.h"
@@ -93,6 +94,7 @@
 #include "lluri.h"
 #include "llviewergenericmessage.h"
 #include "llviewermenu.h"
+#include "llviewernetwork.h"
 #include "llviewerinventory.h"
 #include "llviewerjoystick.h"
 #include "llviewerobjectlist.h"
@@ -5832,7 +5834,21 @@ void process_frozen_message(LLMessageSystem *msgsystem, void **user_data)
 // do some extra stuff once we get our economy data
 void process_economy_data(LLMessageSystem *msg, void** /*user_data*/)
 {
-	LL_DEBUGS("Benefits") << "Received economy data, not currently used" << LL_ENDL;
+	if (!LLGridManager::getInstance()->isInSecondlife())
+	{
+		LLGlobalEconomy::processEconomyData(msg, LLGlobalEconomy::getInstance());
+
+		const std::string texture_upload_cost_str = std::to_string(LLAgentBenefitsMgr::current().getTextureUploadCost());
+		const std::string sound_upload_cost_str = std::to_string(LLAgentBenefitsMgr::current().getSoundUploadCost());
+		const std::string animation_upload_cost_str = std::to_string(LLAgentBenefitsMgr::current().getAnimationUploadCost());
+		gMenuHolder->getChild<LLUICtrl>("Upload Image")->setLabelArg("[COST]",  texture_upload_cost_str);
+		gMenuHolder->getChild<LLUICtrl>("Upload Sound")->setLabelArg("[COST]",  sound_upload_cost_str);
+		gMenuHolder->getChild<LLUICtrl>("Upload Animation")->setLabelArg("[COST]", animation_upload_cost_str);
+	}
+	else
+	{
+		LL_DEBUGS("Benefits") << "Received economy data, not currently used" << LL_ENDL;
+	}
 }
 
 void notify_cautioned_script_question(const LLSD& notification, const LLSD& response, S32 orig_questions, BOOL granted)

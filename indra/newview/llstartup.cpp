@@ -219,6 +219,7 @@
 // exported globals
 //
 bool gAgentMovementCompleted = false;
+S32  gMaxAgentGroups;
 
 const std::string SCREEN_HOME_FILENAME = "screen_home%s.png";
 const std::string SCREEN_LAST_FILENAME = "screen_last%s.png";
@@ -1635,6 +1636,11 @@ bool idle_startup()
 			send_complete_agent_movement(regionp->getHost());
 			gAssetStorage->setUpstream(regionp->getHost());
 			gCacheName->setUpstream(regionp->getHost());
+			if (!LLGridManager::instance().isInSecondlife())
+			{
+				msg->newMessageFast(_PREHASH_EconomyDataRequest);
+				gAgent.sendReliableMessage();
+			}
 		}
 		display_startup();
 
@@ -3331,7 +3337,14 @@ bool process_login_success_response()
 {
 	LLSD response = LLLoginInstance::getInstance()->getResponse();
 
-	mBenefitsSuccessfullyInit = init_benefits(response);
+	if (LLGridManager::instance().isInSecondlife())
+	{
+		mBenefitsSuccessfullyInit = init_benefits(response);
+	}
+	else
+	{
+		mBenefitsSuccessfullyInit = true;
+	}
 
 	std::string text(response["udp_blacklist"]);
 	if(!text.empty())
@@ -3649,6 +3662,27 @@ bool process_login_success_response()
 		std::string openid_token = response["openid_token"];
 		LLViewerMedia::getInstance()->openIDSetup(openid_url, openid_token);
 	}
+
+	if (!LLGridManager::instance().isInSecondlife())
+	{
+		if (response.has("max-agent-groups") || response.has("max_groups"))
+		{
+			std::string max_agent_groups;
+			response.has("max_groups") ?
+				max_agent_groups = response["max_groups"].asString()
+				: max_agent_groups = response["max-agent-groups"].asString();
+
+			gMaxAgentGroups = atoi(max_agent_groups.c_str());
+			LL_INFOS("LLStartup") << "gMaxAgentGroups read from login.cgi: "
+				<< gMaxAgentGroups << LL_ENDL;
+		}
+		else
+		{
+			gMaxAgentGroups = 0;
+			LL_INFOS("LLStartup") << "did not receive max-agent-groups. unlimited groups activated" << LL_ENDL;
+		}
+	}
+
 
 	bool success = false;
 	// JC: gesture loading done below, when we have an asset system
