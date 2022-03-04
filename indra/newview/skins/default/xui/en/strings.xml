@@ -126,7 +126,6 @@ Voice Server Version: [VOICE_VERSION]
 	<string name="LoginFailedNoNetwork">Network error: Could not establish connection, please check your network connection.</string>
 	<string name="LoginFailed">Login failed.</string>
 	<string name="Quit">Quit</string>
-	<string name="create_account_url">http://join.secondlife.com/?sourceid=[sourceid]</string>
 	
 	<string name="AgniGridLabel">Second Life Main Grid (Agni)</string>
 	<string name="AditiGridLabel">Second Life Beta Test Grid (Aditi)</string>

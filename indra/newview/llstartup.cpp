@@ -2405,7 +2405,7 @@ bool first_run_dialog_callback(const LLSD& notification, const LLSD& response)
 	if (0 == option)
 	{
 		LL_DEBUGS("AppInit") << "First run dialog cancelling" << LL_ENDL;
-		LLWeb::loadURLExternal(LLTrans::getString("create_account_url") );
+		LLWeb::loadURLExternal(LLGridManager::getInstance()->getCreateAccountURL());
 	}
 
 	LLPanelLogin::giveFocus();

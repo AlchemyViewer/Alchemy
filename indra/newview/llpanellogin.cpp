@@ -997,7 +997,9 @@ void LLPanelLogin::onClickConnect(bool commit_fields)
 		if(username.empty())
 		{
 			// user must type in something into the username field
-			LLNotificationsUtil::add("MustHaveAccountToLogIn");
+			LLSD args;
+			args["create_account_url"] = LLGridManager::getInstance()->getCreateAccountURL();
+			LLNotificationsUtil::add("MustHaveAccountToLogIn", args);
 		}
 		else if(password.empty())
 		{
