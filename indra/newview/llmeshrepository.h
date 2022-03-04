@@ -332,12 +332,16 @@ public:
 	LLCore::HttpOptions::ptr_t			mHttpLargeOptions;
 	LLCore::HttpHeaders::ptr_t			mHttpHeaders;
 	LLCore::HttpRequest::policy_t		mHttpPolicyClass;
+	LLCore::HttpRequest::policy_t		mHttpLegacyPolicyClass;
 	LLCore::HttpRequest::policy_t		mHttpLargePolicyClass;
 	LLCore::HttpRequest::priority_t		mHttpPriority;
 
 	typedef std::set<LLCore::HttpHandler::ptr_t> http_request_set;
 	http_request_set					mHttpRequestSet;			// Outstanding HTTP requests
 
+	std::string mLegacyGetMeshCapability;
+	std::string mLegacyGetMesh2Capability;
+	int mLegacyGetMeshVersion;
 	std::string mGetMeshCapability;
 
 	LLMeshRepoThread();
@@ -385,10 +389,10 @@ public:
 	// mesh fetch URLs.
 	//
 	// Mutex:  must be holding mMutex when called
-	void setGetMeshCap(const std::string & get_mesh);
+	void setGetMeshCap(const std::string & get_mesh, const std::string & legacy_get_mesh1, const std::string & legacy_get_mesh2, int legacy_pref_version);
 
 	// Mutex:  acquires mMutex
-	void constructUrl(LLUUID mesh_id, std::string * url);
+	void constructUrl(LLUUID mesh_id, std::string * url, int * legacy_version);
 
 private:
 	// Issue a GET request to a URL with 'Range' header using
@@ -397,7 +401,7 @@ private:
 	// or dispose of handler.
 	//
 	// Threads:  Repo thread only
-	LLCore::HttpHandle getByteRange(const std::string & url, 
+	LLCore::HttpHandle getByteRange(const std::string & url, int legacy_cap_version,
 									size_t offset, size_t len, 
 									const LLCore::HttpHandler::ptr_t &handler);
 };
@@ -682,6 +686,7 @@ public:
 
 	void uploadError(LLSD& args);
 	void updateInventory(inventory_data data);
+	int mLegacyGetMeshVersion;		// Shadows value in LLMeshRepoThread
 };
 
 extern LLMeshRepository gMeshRepo;

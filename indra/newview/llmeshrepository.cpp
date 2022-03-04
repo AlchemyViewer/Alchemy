@@ -73,6 +73,7 @@
 #include "llinventorypanel.h"
 #include "lluploaddialog.h"
 #include "llfloaterreg.h"
+#include "llviewernetwork.h"
 
 #include <boost/smart_ptr/make_shared.hpp>
 #include <boost/iostreams/device/array.hpp>
@@ -340,6 +341,10 @@ LLMeshRepository gMeshRepo;
 
 const S32 MESH_HEADER_SIZE = 4096;                      // Important:  assumption is that headers fit in this space
 
+const S32 REQUEST_HIGH_WATER_MIN = 32;					// Limits for GetMesh regions
+const S32 REQUEST_HIGH_WATER_MAX = 150;					// Should remain under 2X throttle
+const S32 REQUEST_LOW_WATER_MIN = 16;
+const S32 REQUEST_LOW_WATER_MAX = 75;
 
 const S32 REQUEST2_HIGH_WATER_MIN = 32;					// Limits for GetMesh2 regions
 const S32 REQUEST2_HIGH_WATER_MAX = 100;
@@ -822,8 +827,10 @@ LLMeshRepoThread::LLMeshRepoThread()
   mHttpLargeOptions(),
   mHttpHeaders(),
   mHttpPolicyClass(LLCore::HttpRequest::DEFAULT_POLICY_ID),
+  mHttpLegacyPolicyClass(LLCore::HttpRequest::DEFAULT_POLICY_ID),
   mHttpLargePolicyClass(LLCore::HttpRequest::DEFAULT_POLICY_ID),
-  mHttpPriority(0)
+  mHttpPriority(0),
+  mLegacyGetMeshVersion(0)
 {
 	LLAppCoreHttp & app_core_http(LLAppViewer::instance()->getAppCoreHttp());
 
@@ -840,6 +847,7 @@ LLMeshRepoThread::LLMeshRepoThread()
 	mHttpHeaders = LLCore::HttpHeaders::ptr_t(new LLCore::HttpHeaders);
 	mHttpHeaders->append(HTTP_OUT_HEADER_ACCEPT, HTTP_CONTENT_VND_LL_MESH);
 	mHttpPolicyClass = app_core_http.getPolicy(LLAppCoreHttp::AP_MESH2);
+	mHttpLegacyPolicyClass = app_core_http.getPolicy(LLAppCoreHttp::AP_MESH1);
 	mHttpLargePolicyClass = app_core_http.getPolicy(LLAppCoreHttp::AP_LARGE_MESH);
 }
 
@@ -1206,8 +1214,13 @@ void LLMeshRepoThread::loadMeshLOD(const LLVolumeParams& mesh_params, S32 lod)
 }
 
 // Mutex:  must be holding mMutex when called
-void LLMeshRepoThread::setGetMeshCap(const std::string & mesh_cap)
+void LLMeshRepoThread::setGetMeshCap(const std::string & mesh_cap, const std::string & legacy_get_mesh1,
+																	const std::string & legacy_get_mesh2,
+																	int legacy_pref_version)
 {
+	mLegacyGetMeshCapability = legacy_get_mesh1;
+	mLegacyGetMesh2Capability = legacy_get_mesh2;
+	mLegacyGetMeshVersion = legacy_pref_version;
 	mGetMeshCapability = mesh_cap;
 }
 
@@ -1216,15 +1229,29 @@ void LLMeshRepoThread::setGetMeshCap(const std::string & mesh_cap)
 // over a GetMesh cap.
 //
 // Mutex:  acquires mMutex
-void LLMeshRepoThread::constructUrl(LLUUID mesh_id, std::string * url)
+void LLMeshRepoThread::constructUrl(LLUUID mesh_id, std::string * url, int * legacy_version)
 {
 	std::string res_url;
+	int res_version(0);
 	
 	if (gAgent.getRegion())
 	{
 		{
 			LLMutexLock lock(mMutex);
-			res_url = mGetMeshCapability;
+	        if (!mGetMeshCapability.empty() && mLegacyGetMeshVersion == 0)
+	        {
+	        	res_url = mGetMeshCapability;
+	        }
+	        else if (!mLegacyGetMesh2Capability.empty() && mLegacyGetMeshVersion > 1)
+	        {
+	            res_url = mLegacyGetMesh2Capability;
+	            res_version = 2;
+	        }
+	        else
+	        {
+	            res_url = mLegacyGetMeshCapability;
+	            res_version = 1;
+	        }
 		}
 
 		if (!res_url.empty())
@@ -1233,7 +1260,7 @@ void LLMeshRepoThread::constructUrl(LLUUID mesh_id, std::string * url)
 		}
 		else
 		{
-			LL_WARNS_ONCE(LOG_MESH) << "Current region does not have ViewerAsset capability!  Cannot load meshes. Region id: "
+			LL_WARNS_ONCE(LOG_MESH) << "Current region does not have ViewerAsset or GetMesh capability!  Cannot load meshes. Region id: "
 									<< gAgent.getRegion()->getRegionID() << LL_ENDL;
 			LL_DEBUGS_ONCE(LOG_MESH) << "Cannot load mesh " << mesh_id << " due to missing capability." << LL_ENDL;
 		}
@@ -1245,6 +1272,7 @@ void LLMeshRepoThread::constructUrl(LLUUID mesh_id, std::string * url)
 	}
 
 	*url = std::move(res_url);
+	*legacy_version = res_version;
 }
 
 // Issue an HTTP GET request with byte range using the right
@@ -1256,7 +1284,7 @@ void LLMeshRepoThread::constructUrl(LLUUID mesh_id, std::string * url)
 //				next call to this method.
 //
 // Thread:  repo
-LLCore::HttpHandle LLMeshRepoThread::getByteRange(const std::string & url,
+LLCore::HttpHandle LLMeshRepoThread::getByteRange(const std::string & url, int legacy_cap_version,
 												  size_t offset, size_t len,
 												  const LLCore::HttpHandler::ptr_t &handler)
 {
@@ -1267,7 +1295,7 @@ LLCore::HttpHandle LLMeshRepoThread::getByteRange(const std::string & url,
 	
 	if (len < LARGE_MESH_FETCH_THRESHOLD)
 	{
-		handle = mHttpRequest->requestGetByteRange( mHttpPolicyClass,
+		handle = mHttpRequest->requestGetByteRange( ((legacy_cap_version == 0 || legacy_cap_version == 2) ? mHttpPolicyClass : mHttpLegacyPolicyClass),
                                                     mHttpPriority,
                                                     url,
                                                     (disable_range_req ? size_t(0) : offset),
@@ -1373,12 +1401,13 @@ bool LLMeshRepoThread::fetchMeshSkinInfo(const LLUUID& mesh_id, bool can_retry)
 
 			//reading from cache failed for whatever reason, fetch from sim
 			std::string http_url;
-			constructUrl(mesh_id, &http_url);
+			int legacy_cap_version(0);
+			constructUrl(mesh_id, &http_url, &legacy_cap_version);
 
 			if (!http_url.empty())
 			{
                 auto handler = boost::make_shared<LLMeshSkinInfoHandler>(mesh_id, offset, size);
-				LLCore::HttpHandle handle = getByteRange(http_url, offset, size, handler);
+				LLCore::HttpHandle handle = getByteRange(http_url, legacy_cap_version, offset, size, handler);
 				if (LLCORE_HTTP_HANDLE_INVALID == handle)
 				{
 					LL_WARNS(LOG_MESH) << "HTTP GET request failed for skin info on mesh " << mID
@@ -1488,12 +1517,13 @@ bool LLMeshRepoThread::fetchMeshDecomposition(const LLUUID& mesh_id)
 
 			//reading from cache failed for whatever reason, fetch from sim
 			std::string http_url;
-			constructUrl(mesh_id, &http_url);
+			int legacy_cap_version(0);
+			constructUrl(mesh_id, &http_url, &legacy_cap_version);
 			
 			if (!http_url.empty())
 			{
                 auto handler = boost::make_shared<LLMeshDecompositionHandler>(mesh_id, offset, size);
-				LLCore::HttpHandle handle = getByteRange(http_url, offset, size, handler);
+				LLCore::HttpHandle handle = getByteRange(http_url, legacy_cap_version, offset, size, handler);
 				if (LLCORE_HTTP_HANDLE_INVALID == handle)
 				{
 					LL_WARNS(LOG_MESH) << "HTTP GET request failed for decomposition mesh " << mID
@@ -1587,12 +1617,13 @@ bool LLMeshRepoThread::fetchMeshPhysicsShape(const LLUUID& mesh_id)
 
 			//reading from cache failed for whatever reason, fetch from sim
 			std::string http_url;
-			constructUrl(mesh_id, &http_url);
+			int legacy_cap_version(0);
+			constructUrl(mesh_id, &http_url, &legacy_cap_version);
 			
 			if (!http_url.empty())
 			{
                 auto handler = boost::make_shared<LLMeshPhysicsShapeHandler>(mesh_id, offset, size);
-				LLCore::HttpHandle handle = getByteRange(http_url, offset, size, handler);
+				LLCore::HttpHandle handle = getByteRange(http_url, legacy_cap_version, offset, size, handler);
 				if (LLCORE_HTTP_HANDLE_INVALID == handle)
 				{
 					LL_WARNS(LOG_MESH) << "HTTP GET request failed for physics shape on mesh " << mID
@@ -1681,7 +1712,8 @@ bool LLMeshRepoThread::fetchMeshHeader(const LLVolumeParams& mesh_params, bool c
 	//either cache entry doesn't exist or is corrupt, request header from simulator	
 	bool retval = true;
 	std::string http_url;
-	constructUrl(mesh_params.getSculptID(), &http_url);
+	int legacy_cap_version(0);
+	constructUrl(mesh_params.getSculptID(), &http_url, &legacy_cap_version);
 	
 	if (!http_url.empty())
 	{
@@ -1690,7 +1722,7 @@ bool LLMeshRepoThread::fetchMeshHeader(const LLVolumeParams& mesh_params, bool c
 		//NOTE -- this will break of headers ever exceed 4KB		
 
 		auto handler = boost::make_shared<LLMeshHeaderHandler>(mesh_params, 0, MESH_HEADER_SIZE);
-		LLCore::HttpHandle handle = getByteRange(http_url, 0, MESH_HEADER_SIZE, handler);
+		LLCore::HttpHandle handle = getByteRange(http_url, legacy_cap_version, 0, MESH_HEADER_SIZE, handler);
 		if (LLCORE_HTTP_HANDLE_INVALID == handle)
 		{
 			LL_WARNS(LOG_MESH) << "HTTP GET request failed for mesh header " << mID
@@ -1780,12 +1812,13 @@ bool LLMeshRepoThread::fetchMeshLOD(const LLVolumeParams& mesh_params, S32 lod, 
 
 			//reading from cache failed for whatever reason, fetch from sim
 			std::string http_url;
-			constructUrl(mesh_id, &http_url);
+			int legacy_cap_version(0);
+			constructUrl(mesh_id, &http_url, &legacy_cap_version);
 			
 			if (!http_url.empty())
 			{
                 auto handler = boost::make_shared<LLMeshLODHandler>(mesh_params, lod, offset, size);
-				LLCore::HttpHandle handle = getByteRange(http_url, offset, size, handler);
+				LLCore::HttpHandle handle = getByteRange(http_url, legacy_cap_version, offset, size, handler);
 				if (LLCORE_HTTP_HANDLE_INVALID == handle)
 				{
 					LL_WARNS(LOG_MESH) << "HTTP GET request failed for LOD on mesh " << mID
@@ -3505,7 +3538,8 @@ LLMeshRepository::LLMeshRepository()
 : mMeshMutex(NULL),
   mDecompThread(NULL),
   mMeshThreadCount(0),
-  mThread(NULL)
+  mThread(NULL),
+  mLegacyGetMeshVersion(0)
 {
 
 }
@@ -3717,20 +3751,34 @@ void LLMeshRepository::notifyLoadedMeshes()
     // GetMesh2 operation with keepalives, etc.  With pipelining,
     // we'll increase this.  See llappcorehttp and llcorehttp for
     // discussion on connection strategies.
-    LLAppCoreHttp & app_core_http(LLAppViewer::instance()->getAppCoreHttp());
-    S32 scale(app_core_http.isPipelined(LLAppCoreHttp::AP_MESH2)
-              ? (2 * LLAppCoreHttp::PIPELINING_DEPTH)
-              : 5);
+    if (mLegacyGetMeshVersion == 1)
+    {
+        static const LLCachedControl<U32> mesh_max_con_req(gSavedSettings, "MeshMaxConcurrentRequests");
+        LLMeshRepoThread::sMaxConcurrentRequests = mesh_max_con_req;
+        LLMeshRepoThread::sRequestHighWater = llclamp(2 * S32(LLMeshRepoThread::sMaxConcurrentRequests),
+                                                      REQUEST_HIGH_WATER_MIN,
+                                                      REQUEST_HIGH_WATER_MAX);
+        LLMeshRepoThread::sRequestLowWater = llclamp(LLMeshRepoThread::sRequestHighWater / 2,
+                                                     REQUEST_LOW_WATER_MIN,
+                                                     REQUEST_LOW_WATER_MAX);
+    }
+    else
+    {
+        LLAppCoreHttp & app_core_http(LLAppViewer::instance()->getAppCoreHttp());
+        S32 scale(app_core_http.isPipelined(LLAppCoreHttp::AP_MESH2)
+                  ? (2 * LLAppCoreHttp::PIPELINING_DEPTH)
+                  : 5);
 
-	static const LLCachedControl<U32> mesh2_max_con_req(gSavedSettings, "Mesh2MaxConcurrentRequests");
-	LLMeshRepoThread::sMaxConcurrentRequests = mesh2_max_con_req;
-    LLMeshRepoThread::sRequestHighWater = llclamp(scale * S32(LLMeshRepoThread::sMaxConcurrentRequests),
-                                                  REQUEST2_HIGH_WATER_MIN,
-                                                  REQUEST2_HIGH_WATER_MAX);
-    LLMeshRepoThread::sRequestLowWater = llclamp(LLMeshRepoThread::sRequestHighWater / 2,
-                                                 REQUEST2_LOW_WATER_MIN,
-                                                 REQUEST2_LOW_WATER_MAX);
-	
+        static const LLCachedControl<U32> mesh2_max_con_req(gSavedSettings, "Mesh2MaxConcurrentRequests");
+        LLMeshRepoThread::sMaxConcurrentRequests = mesh2_max_con_req;
+        LLMeshRepoThread::sRequestHighWater = llclamp(scale * S32(LLMeshRepoThread::sMaxConcurrentRequests),
+                                                      REQUEST2_HIGH_WATER_MIN,
+                                                      REQUEST2_HIGH_WATER_MAX);
+        LLMeshRepoThread::sRequestLowWater = llclamp(LLMeshRepoThread::sRequestHighWater / 2,
+                                                     REQUEST2_LOW_WATER_MIN,
+                                                     REQUEST2_LOW_WATER_MAX);
+    }
+
 	//clean up completed upload threads
 	for (std::vector<LLMeshUploadThread*>::iterator iter = mUploads.begin(); iter != mUploads.end(); )
 	{
@@ -3827,18 +3875,26 @@ void LLMeshRepository::notifyLoadedMeshes()
 		}
 		hold_offs = 0;
 		
-		if (gAgent.getRegion())
+		LLViewerRegion* regionp = gAgent.getRegion();
+		if (regionp)
 		{
 			// Update capability urls
 			static std::string region_name("never name a region this");
 			
-			if (gAgent.getRegion()->getName() != region_name && gAgent.getRegion()->capabilitiesReceived())
+			if (regionp->getName() != region_name && regionp->capabilitiesReceived())
 			{
-				region_name = gAgent.getRegion()->getName();
-				const std::string mesh_cap(gAgent.getRegion()->getViewerAssetUrl());
-				mThread->setGetMeshCap(mesh_cap);
+				region_name = regionp->getName();
+				const bool use_v1(gSavedSettings.getBOOL("MeshUseGetMesh1"));
+				const std::string mesh_cap(regionp->getViewerAssetUrl());
+				const std::string legacy_mesh1_cap(regionp->getCapability("GetMesh"));
+				const std::string legacy_mesh2_cap(regionp->getCapability("GetMesh2"));
+				mLegacyGetMeshVersion = ((mesh_cap.empty() && legacy_mesh2_cap.empty()) || use_v1) ? 1 : (!mesh_cap.empty() ? 0 : 2);
+				mThread->setGetMeshCap(mesh_cap, legacy_mesh1_cap, legacy_mesh2_cap, mLegacyGetMeshVersion);
 				LL_DEBUGS(LOG_MESH) << "Retrieving caps for region '" << region_name
 									<< "', ViewerAsset cap:  " << mesh_cap
+									<< ", GetMesh2 cap:  " << legacy_mesh2_cap
+									<< ", GetMesh cap:  " << legacy_mesh1_cap
+									<< ", using version:  " << mLegacyGetMeshVersion
 									<< LL_ENDL;
 			}
 		}

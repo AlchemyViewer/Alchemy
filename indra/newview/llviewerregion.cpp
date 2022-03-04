@@ -593,6 +593,7 @@ LLViewerRegion::LLViewerRegion(const U64 &handle,
 	mColoName("unknown"),
 	mProductSKU("unknown"),
 	mProductName("unknown"),
+	mLegacyHttpUrl(""),
 	mViewerAssetUrl(""),
 	mCacheLoaded(FALSE),
 	mCacheDirty(FALSE),
@@ -3024,9 +3025,18 @@ void LLViewerRegionImpl::buildCapabilityNames(LLSD& capabilityNames)
 	capabilityNames.append("IsExperienceContributor");
 	capabilityNames.append("RegionExperiences");
     capabilityNames.append("ExperienceQuery");
+	if(!LLGridManager::instanceFast().isInSecondlife())
+	{
+		capabilityNames.append("GetMesh");
+		capabilityNames.append("GetMesh2");
+	}
 	capabilityNames.append("GetMetadata");
 	capabilityNames.append("GetObjectCost");
 	capabilityNames.append("GetObjectPhysicsData");
+	if(!LLGridManager::instanceFast().isInSecondlife())
+	{
+		capabilityNames.append("GetTexture");
+	}
 	capabilityNames.append("GroupAPIv1");
 	capabilityNames.append("GroupMemberData");
 	capabilityNames.append("GroupProposalBallot");
@@ -3153,10 +3163,15 @@ void LLViewerRegion::setCapability(const std::string& name, const std::string& u
 				mImpl->mCapabilities[name] = VIEWERASSET;
 				mViewerAssetUrl = VIEWERASSET;
 			}
-			else /*==============================================================*/
+			else
 			{
 				mViewerAssetUrl = url;
 			}
+			/*==============================================================*/
+		}
+		else if (name == "GetTexture")
+		{
+			mLegacyHttpUrl = url;
 		}
 	}
 }
@@ -3178,10 +3193,15 @@ void LLViewerRegion::setCapabilityDebug(const std::string& name, const std::stri
 				mImpl->mSecondCapabilitiesTracker[name] = VIEWERASSET;
 				mViewerAssetUrl = VIEWERASSET;
 			}
-			else /*==============================================================*/
+			else
 			{
 				mViewerAssetUrl = url;
 			}
+			/*==============================================================*/
+		}
+		else if (name == "GetTexture")
+		{
+			mLegacyHttpUrl = url;
 		}
 	}
 }
