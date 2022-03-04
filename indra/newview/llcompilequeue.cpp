@@ -382,11 +382,18 @@ bool LLFloaterCompileQueue::processScript(LLHandle<LLFloaterCompileQueue> hfloat
     // Attempt to retrieve the experience
     LLUUID experienceId;
     {
-        LLExperienceCache::instance().fetchAssociatedExperience(inventory->getParentUUID(), inventory->getUUID(),
-            boost::bind(&LLFloaterCompileQueue::handleHTTPResponse, pump.getName(), _1));
+        if (object->getRegion() && object->getRegion()->isCapabilityAvailable("GetMetadata"))
+        {
+            LLExperienceCache::instance().fetchAssociatedExperience(inventory->getParentUUID(), inventory->getUUID(),
+                boost::bind(&LLFloaterCompileQueue::handleHTTPResponse, pump.getName(), _1));
 
-        result = llcoro::suspendUntilEventOnWithTimeout(pump, fetch_timeout,
+            result = llcoro::suspendUntilEventOnWithTimeout(pump, fetch_timeout, 
             LLSDMap("timeout", LLSD::Boolean(true)));
+        }
+        else
+        {
+            result = LLSD();
+        }
 
         floater.check();
 
@@ -539,6 +546,10 @@ bool LLFloaterCompileQueue::startQueue()
                 success, failure);
             return TRUE;
         }
+		else
+		{
+			processExperienceIdResults(LLSD(), getKey().asUUID());
+		}
     }
 
     return true;
