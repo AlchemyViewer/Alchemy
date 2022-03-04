@@ -615,7 +615,7 @@ void LLInventoryModelBackgroundFetch::bulkFetch()
 						folder_sd["fetch_folders"]	= LLSD::Boolean(TRUE); //(LLSD::Boolean)sFullFetchStarted;
 						folder_sd["fetch_items"]	= LLSD::Boolean(TRUE);
 				    
-						if (ALEXANDRIA_LINDEN_ID == cat->getOwnerID())
+						if (gInventory.getLibraryOwnerID() == cat->getOwnerID())
 						{
 							folder_request_body_lib["folders"].append(folder_sd);
 						}

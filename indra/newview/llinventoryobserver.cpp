@@ -215,7 +215,7 @@ void fetch_items_from_llsd(const LLSD& items_llsd)
 			body[0]["items"].append(items_llsd[i]);
 			continue;
 		}
-		else if (items_llsd[i]["owner_id"].asString() == ALEXANDRIA_LINDEN_ID.asString())
+		else if (items_llsd[i]["owner_id"].asString() == gInventory.getLibraryOwnerID().asString())
 		{
 			body[1]["items"].append(items_llsd[i]);
 			continue;
