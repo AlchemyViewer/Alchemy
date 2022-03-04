@@ -269,6 +269,10 @@ public:
     const std::string& getCapabilityDebug(std::string_view name) const;
 
 
+	virtual std::set<std::string> getCapURLNames(const std::string& cap_url);
+	virtual bool isCapURLMapped(const std::string& cap_url);
+	virtual std::set<std::string> getAllCaps();
+
 	// has region received its final (not seed) capability list?
 	bool capabilitiesReceived() const;
 	void setCapabilitiesReceived(bool received);
@@ -613,6 +617,9 @@ private:
 
 	mutable tex_matrix_t mWorldMapTiles;
 	absl::flat_hash_set<std::string> mGodNames;
+
+	using url_mapping_t = std::unordered_multimap<std::string, std::string>;
+	url_mapping_t mCapURLMappings;
 };
 
 inline BOOL LLViewerRegion::getRegionProtocol(U64 protocol) const
