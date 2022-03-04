@@ -50,6 +50,7 @@
 #include "llviewerinventory.h"
 #include "llviewermenufile.h"
 #include "llviewermessage.h"
+#include "llviewernetwork.h"
 #include "llviewerobjectlist.h"
 #include "llviewerregion.h"
 #include "llviewertexturelist.h"
@@ -4381,7 +4382,7 @@ F32 LLMeshRepository::getStreamingCostLegacy(LLSD& header, F32 radius, S32* byte
 {
 	if (header.has("404")
 		|| !header.has("lowest_lod")
-		|| (header.has("version") && header["version"].asInteger() > MAX_MESH_VERSION))
+		|| ((header.has("version") || !LLGridManager::instanceFast().isInSecondlife()) && header["version"].asInteger() > MAX_MESH_VERSION))
 	{
 		return 0.f;
 	}
