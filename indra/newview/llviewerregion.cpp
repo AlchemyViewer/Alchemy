@@ -83,6 +83,7 @@
 #include "llcallstack.h"
 #include "llsettingsdaycycle.h"
 #include "llviewerparcelmgr.h"
+#include "llviewernetwork.h"
 
 #include <boost/regex.hpp>
 
@@ -2997,12 +2998,15 @@ void LLViewerRegionImpl::buildCapabilityNames(LLSD& capabilityNames)
 	capabilityNames.append("EventQueueGet");
     capabilityNames.append("ExtEnvironment");
 
-	capabilityNames.append("FetchLib2");
-	capabilityNames.append("FetchLibDescendents2");
-	capabilityNames.append("FetchInventory2");
-	capabilityNames.append("FetchInventoryDescendents2");
-	capabilityNames.append("IncrementCOFVersion");
-	AISAPI::getCapNames(capabilityNames);
+	if (LLGridManager::instanceFast().isInSecondlife() || gSavedSettings.getBOOL("UseHTTPInventory"))
+	{
+		capabilityNames.append("FetchLib2");
+		capabilityNames.append("FetchLibDescendents2");
+		capabilityNames.append("FetchInventory2");
+		capabilityNames.append("FetchInventoryDescendents2");
+		capabilityNames.append("IncrementCOFVersion");
+		AISAPI::getCapNames(capabilityNames);
+	}
 
 	capabilityNames.append("InterestList");
 

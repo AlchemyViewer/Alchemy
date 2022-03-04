@@ -3035,7 +3035,9 @@ void LLInventoryModel::registerCallbacks(LLMessageSystem* msg)
 	msg->setHandlerFuncFast(_PREHASH_BulkUpdateInventory,
 							processBulkUpdateInventory,
 							NULL);
+	msg->setHandlerFuncFast(_PREHASH_InventoryDescendents, processInventoryDescendents);
 	msg->setHandlerFuncFast(_PREHASH_MoveInventoryItem, processMoveInventoryItem);
+	msg->setHandlerFuncFast(_PREHASH_FetchInventoryReply, processFetchInventoryReply);
 }
 
 
@@ -3054,6 +3056,14 @@ void LLInventoryModel::processUpdateCreateInventoryItem(LLMessageSystem* msg, vo
 	}
 
 }
+
+// static
+void LLInventoryModel::processFetchInventoryReply(LLMessageSystem* msg, void**)
+{
+	// no accounting
+	gInventory.messageUpdateCore(msg, false);
+}
+
 
 bool LLInventoryModel::messageUpdateCore(LLMessageSystem* msg, bool account, U32 mask)
 {
@@ -3517,6 +3527,62 @@ void LLInventoryModel::processBulkUpdateInventory(LLMessageSystem* msg, void**)
 		InventoryCallbackInfo cbinfo = (*inv_it);
 		gInventoryCallbacks.fire(cbinfo.mCallback, cbinfo.mInvID);
 	}
+}
+
+// static
+void LLInventoryModel::processInventoryDescendents(LLMessageSystem* msg,void**)
+{
+	LLUUID agent_id;
+	msg->getUUIDFast(_PREHASH_AgentData, _PREHASH_AgentID, agent_id);
+	if(agent_id != gAgent.getID())
+	{
+		LL_WARNS() << "Got a UpdateInventoryItem for the wrong agent." << LL_ENDL;
+		return;
+	}
+	LLUUID parent_id;
+	msg->getUUID("AgentData", "FolderID", parent_id);
+	LLUUID owner_id;
+	msg->getUUID("AgentData", "OwnerID", owner_id);
+	S32 version;
+	msg->getS32("AgentData", "Version", version);
+	S32 descendents;
+	msg->getS32("AgentData", "Descendents", descendents);
+
+	S32 i;
+	S32 count = msg->getNumberOfBlocksFast(_PREHASH_FolderData);
+	LLPointer<LLViewerInventoryCategory> tcategory = new LLViewerInventoryCategory(owner_id);
+	for(i = 0; i < count; ++i)
+	{
+		tcategory->unpackMessage(msg, _PREHASH_FolderData, i);
+		gInventory.updateCategory(tcategory);
+	}
+
+	count = msg->getNumberOfBlocksFast(_PREHASH_ItemData);
+	LLPointer<LLViewerInventoryItem> titem = new LLViewerInventoryItem;
+	for(i = 0; i < count; ++i)
+	{
+		titem->unpackMessage(msg, _PREHASH_ItemData, i);
+		// If the item has already been added (e.g. from link prefetch), then it doesn't need to be re-added.
+		if (gInventory.getItem(titem->getUUID()))
+		{
+			LL_DEBUGS("Inventory") << "Skipping prefetched item [ Name: " << titem->getName()
+								   << " | Type: " << titem->getActualType() << " | ItemUUID: " << titem->getUUID() << " ] " << LL_ENDL;
+			continue;
+		}
+		gInventory.updateItem(titem);
+	}
+
+	// set version and descendentcount according to message.
+	LLViewerInventoryCategory* cat = gInventory.getCategory(parent_id);
+	if(cat)
+	{
+		cat->setVersion(version);
+		cat->setDescendentCount(descendents);
+		// Get this UUID on the changed list so that whatever's listening for it
+		// will get triggered.
+		gInventory.addChangedMask(LLInventoryObserver::INTERNAL, cat->getUUID());
+	}
+	gInventory.notifyObservers();
 }
 
 // static

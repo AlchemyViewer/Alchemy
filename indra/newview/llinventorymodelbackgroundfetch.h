@@ -89,7 +89,11 @@ private:
 	S32 mFetchCount;
 
 	LLFrameTimer mFetchTimer;
+	BOOL mTimelyFetchPending;
+	S32 mNumFetchRetries;
 	F32 mMinTimeBetweenFetches;
+	F32 mMaxTimeBetweenFetches;
+
 
 	struct FetchQueueInfo
 	{
