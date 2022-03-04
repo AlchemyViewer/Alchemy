@@ -1165,6 +1165,10 @@ LLSD LLInventoryCategory::asLLSD() const
     return sd;
 }
 
+bool LLInventoryCategory::isPreferredTypeRoot() const
+{
+	return (mPreferredType == LLFolderType::FT_ROOT_INVENTORY || mPreferredType == 9);
+}
 
 // virtual
 void LLInventoryCategory::packMessage(LLMessageSystem* msg) const

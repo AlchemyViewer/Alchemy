@@ -254,6 +254,7 @@ public:
 	void setPreferredType(LLFolderType::EType type);
 	LLSD asLLSD() const;
 	bool fromLLSD(const LLSD& sd);
+	bool isPreferredTypeRoot() const;
 
 	//--------------------------------------------------------------------
 	// Messaging

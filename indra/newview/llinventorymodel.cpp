@@ -2545,7 +2545,7 @@ void LLInventoryModel::buildParentChildMap()
 		   // Only the two root folders should be children of null.
 		   // Others should go to lost & found.
 		   (cat->getParentUUID().notNull() || 
-			cat->getPreferredType() == LLFolderType::FT_ROOT_INVENTORY ))
+			cat->isPreferredTypeRoot()))
 		{
 			catsp->push_back(cat);
 		}
