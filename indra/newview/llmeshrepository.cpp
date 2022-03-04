@@ -586,12 +586,10 @@ public:
 		  mRequestedBytes(requested_bytes)
 		{}
 
-	virtual ~LLMeshHandlerBase()
-		{}
+    virtual ~LLMeshHandlerBase() = default;
 
-protected:
-	LLMeshHandlerBase(const LLMeshHandlerBase &);				// Not defined
-	void operator=(const LLMeshHandlerBase &);					// Not defined
+	LLMeshHandlerBase(const LLMeshHandlerBase &) = delete;				// Not defined
+	LLMeshHandlerBase& operator=(const LLMeshHandlerBase &) = delete;	// Not defined
 	
 public:
 	virtual void onCompleted(LLCore::HttpHandle handle, LLCore::HttpResponse * response);
@@ -622,13 +620,11 @@ public:
 	}
 	virtual ~LLMeshHeaderHandler();
 
-protected:
-	LLMeshHeaderHandler(const LLMeshHeaderHandler &);			// Not defined
-	void operator=(const LLMeshHeaderHandler &);				// Not defined
+	LLMeshHeaderHandler(const LLMeshHeaderHandler &) = delete;				// Not defined
+	LLMeshHeaderHandler& operator=(const LLMeshHeaderHandler &) = delete;	// Not defined
 	
-public:
-	virtual void processData(LLCore::BufferArray * body, S32 body_offset, U8 * data, S32 data_size);
-	virtual void processFailure(LLCore::HttpStatus status);
+	void processData(LLCore::BufferArray * body, S32 body_offset, U8 * data, S32 data_size) override;
+	void processFailure(LLCore::HttpStatus status) override;
 };
 
 
@@ -648,13 +644,11 @@ public:
 		}
 	virtual ~LLMeshLODHandler();
 	
-protected:
-	LLMeshLODHandler(const LLMeshLODHandler &);					// Not defined
-	void operator=(const LLMeshLODHandler &);					// Not defined
+	LLMeshLODHandler(const LLMeshLODHandler &) = delete;					// Not defined
+	LLMeshLODHandler& operator=(const LLMeshLODHandler &) = delete;			// Not defined
 	
-public:
-	virtual void processData(LLCore::BufferArray * body, S32 body_offset, U8 * data, S32 data_size);
-	virtual void processFailure(LLCore::HttpStatus status);
+	void processData(LLCore::BufferArray * body, S32 body_offset, U8 * data, S32 data_size) override;
+	void processFailure(LLCore::HttpStatus status) override;
 
 public:
 	S32 mLOD;
@@ -674,13 +668,11 @@ public:
 	{}
 	virtual ~LLMeshSkinInfoHandler();
 
-protected:
-	LLMeshSkinInfoHandler(const LLMeshSkinInfoHandler &);		// Not defined
-	void operator=(const LLMeshSkinInfoHandler &);				// Not defined
+	LLMeshSkinInfoHandler(const LLMeshSkinInfoHandler &) = delete;				// Not defined
+	LLMeshSkinInfoHandler& operator=(const LLMeshSkinInfoHandler &) = delete;	// Not defined
 
-public:
-	virtual void processData(LLCore::BufferArray * body, S32 body_offset, U8 * data, S32 data_size);
-	virtual void processFailure(LLCore::HttpStatus status);
+	void processData(LLCore::BufferArray * body, S32 body_offset, U8 * data, S32 data_size) override;
+	void processFailure(LLCore::HttpStatus status) override;
 
 public:
 	LLUUID mMeshID;
@@ -700,13 +692,11 @@ public:
 	{}
 	virtual ~LLMeshDecompositionHandler();
 
-protected:
-	LLMeshDecompositionHandler(const LLMeshDecompositionHandler &);		// Not defined
-	void operator=(const LLMeshDecompositionHandler &);					// Not defined
+	LLMeshDecompositionHandler(const LLMeshDecompositionHandler &) = delete;			// Not defined
+	LLMeshDecompositionHandler& operator=(const LLMeshDecompositionHandler &) = delete;	// Not defined
 
-public:
-	virtual void processData(LLCore::BufferArray * body, S32 body_offset, U8 * data, S32 data_size);
-	virtual void processFailure(LLCore::HttpStatus status);
+	void processData(LLCore::BufferArray * body, S32 body_offset, U8 * data, S32 data_size) override;
+	void processFailure(LLCore::HttpStatus status) override;
 
 public:
 	LLUUID mMeshID;
@@ -726,13 +716,11 @@ public:
 	{}
 	virtual ~LLMeshPhysicsShapeHandler();
 
-protected:
-	LLMeshPhysicsShapeHandler(const LLMeshPhysicsShapeHandler &);	// Not defined
-	void operator=(const LLMeshPhysicsShapeHandler &);				// Not defined
+	LLMeshPhysicsShapeHandler(const LLMeshPhysicsShapeHandler &) = delete;				// Not defined
+	LLMeshPhysicsShapeHandler operator=(const LLMeshPhysicsShapeHandler &) = delete;	// Not defined
 
-public:
-	virtual void processData(LLCore::BufferArray * body, S32 body_offset, U8 * data, S32 data_size);
-	virtual void processFailure(LLCore::HttpStatus status);
+	void processData(LLCore::BufferArray * body, S32 body_offset, U8 * data, S32 data_size) override;
+	void processFailure(LLCore::HttpStatus status) override;
 
 public:
 	LLUUID mMeshID;

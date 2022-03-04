@@ -119,6 +119,11 @@ enum EHTTPMethod
 // Parses 'Retry-After' header contents and returns seconds until retry should occur.
 bool getSecondsUntilRetryAfter(const std::string& retry_after, F32& seconds_to_wait);
 
+const std::string& httpMethodAsVerb(EHTTPMethod method);
+EHTTPMethod httpVerbAsMethod(const std::string&);
+
+std::string get_base_cap_url(std::string url);
+
 //// HTTP Headers /////
 
 // Outgoing headers. Do *not* use these to check incoming headers.

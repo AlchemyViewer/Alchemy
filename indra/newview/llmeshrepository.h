@@ -467,7 +467,7 @@ public:
 	~LLMeshUploadThread();
 
 	bool finished() const { return mFinished; }
-	virtual void run();
+	void run() override;
 	void preStart();
 	void discard() ;
 	bool isDiscarded() const;
@@ -488,7 +488,7 @@ public:
 	void setUploadObserverHandle(LLHandle<LLWholeModelUploadObserver> observer_handle) { mUploadObserverHandle = observer_handle; }
 
 	// Inherited from LLCore::HttpHandler
-	virtual void onCompleted(LLCore::HttpHandle handle, LLCore::HttpResponse * response);
+	void onCompleted(LLCore::HttpHandle handle, LLCore::HttpResponse * response) override;
 
         LLViewerFetchedTexture* FindViewerTexture(const LLImportMaterial& material);
 
