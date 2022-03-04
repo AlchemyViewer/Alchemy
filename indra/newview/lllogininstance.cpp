@@ -199,7 +199,19 @@ void LLLoginInstance::constructAuthParams(LLPointer<LLCredential> user_credentia
 		gSavedSettings.setBOOL("UseDebugMenus", TRUE);
 		requested_options.append("god-connect");
 	}
-	
+
+	// Hey guys, let's stuff all the opensim options right here, ok?
+	if (LLGridManager::getInstance()->isInOpenSim())
+	{
+		requested_options.append("avatar_picker_url");
+		requested_options.append("classified_fee");
+		requested_options.append("currency");
+		requested_options.append("destination_guide_url");
+		requested_options.append("max_groups");
+		requested_options.append("profile-server-url");
+		requested_options.append("search");
+	}
+
 	LLSD request_params;
 
     unsigned char hashed_unique_id_string[MD5HEX_STR_SIZE];
@@ -498,6 +510,12 @@ bool LLLoginInstance::handleTOSResponse(bool accepted, const std::string& key)
 
 	LLEventPumps::instance().obtain(TOS_REPLY_PUMP).stopListening(TOS_LISTENER_NAME);
 	return true;
+}
+
+void LLLoginInstance::attemptComplete()
+{
+	mAttemptComplete = true;
+	LLGridManager::getInstance()->setLoggedIn(mLoginState == LLStringExplicit("online")); 
 }
 
 std::string construct_start_string()

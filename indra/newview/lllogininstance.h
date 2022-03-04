@@ -55,6 +55,7 @@ public:
 	bool authSuccess() { return mAttemptComplete && mLoginState == "online"; }
 
 	const std::string& getLoginState() { return mLoginState; }
+	bool hasResponse(const std::string& key) { return getResponse().has(key); }
 	LLSD getResponse(const std::string& key) { return getResponse()[key]; }
 	LLSD getResponse();
 
@@ -84,7 +85,7 @@ private:
 
 	bool handleTOSResponse(bool v, const std::string& key);
 
-	void attemptComplete() { mAttemptComplete = true; } // In the future an event?
+	void attemptComplete();
 
 	std::unique_ptr<LLLogin> mLoginModule;
 	LLNotificationsInterface* mNotifications;
