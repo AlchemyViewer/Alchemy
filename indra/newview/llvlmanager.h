@@ -48,6 +48,7 @@ public:
 	U32Bits getLandBits() const;
 	U32Bits getWindBits() const;
 	U32Bits getCloudBits() const;
+	U32Bits getWaterBits() const;
 
 	void resetBitCounts();
 
@@ -58,6 +59,7 @@ protected:
 	U32Bits mLandBits;
 	U32Bits mWindBits;
 	U32Bits mCloudBits;
+	U32Bits mWaterBits;
 };
 
 class LLVLData

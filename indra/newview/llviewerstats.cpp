@@ -380,7 +380,7 @@ void update_statistics()
 	}
 	add(LLStatViewer::FPS, 1);
 
-	F64Bits layer_bits = gVLManager.getLandBits() + gVLManager.getWindBits() + gVLManager.getCloudBits();
+	F64Bits layer_bits = gVLManager.getLandBits() + gVLManager.getWindBits() + gVLManager.getCloudBits() + gVLManager.getWaterBits();
 	add(LLStatViewer::LAYERS_NETWORK_DATA_RECEIVED, layer_bits);
 	add(LLStatViewer::OBJECT_NETWORK_DATA_RECEIVED, gObjectData);
 	add(LLStatViewer::ASSET_UDP_DATA_RECEIVED, F64Bits(gTransferManager.getTransferBitsIn(LLTCT_ASSET)));

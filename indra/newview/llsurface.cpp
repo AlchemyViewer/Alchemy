@@ -169,6 +169,7 @@ void LLSurface::create(const S32 grids_per_edge,
 	mNumberOfPatches = mPatchesPerEdge * mPatchesPerEdge;
 	mMetersPerGrid = width / ((F32)(mGridsPerEdge - 1));
 	mMetersPerEdge = mMetersPerGrid * (mGridsPerEdge - 1);
+	sTextureSize = width;
 
 	mOriginGlobal.setVec(origin_global);
 
@@ -293,7 +294,7 @@ void LLSurface::initTextures()
 		mWaterObjp = (LLVOWater *)gObjectList.createObjectViewer(LLViewerObject::LL_VO_WATER, mRegionp);
 		gPipeline.createObject(mWaterObjp);
 		LLVector3d water_pos_global = from_region_handle(mRegionp->getHandle());
-		water_pos_global += LLVector3d(128.0, 128.0, DEFAULT_WATER_HEIGHT);		// region doesn't have a valid water height yet
+		water_pos_global += LLVector3d(mRegionp->getWidth()/2.0, mRegionp->getWidth()/2.0, DEFAULT_WATER_HEIGHT);
 		mWaterObjp->setPositionGlobal(water_pos_global);
 	}
 }
@@ -323,8 +324,8 @@ void LLSurface::setOriginGlobal(const LLVector3d &origin_global)
 	// Hack!
 	if (mWaterObjp.notNull() && mWaterObjp->mDrawable.notNull())
 	{
-		const F64 x = origin_global.mdV[VX] + 128.0;
-		const F64 y = origin_global.mdV[VY] + 128.0;
+		const F64 x = origin_global.mdV[VX] + (F64)mRegionp->getWidth() / 2.0;
+		const F64 y = origin_global.mdV[VY] + (F64)mRegionp->getWidth() / 2.0;
 		const F64 z = mWaterObjp->getPositionGlobal().mdV[VZ];
 
 		LLVector3d water_origin_global(x, y, z);
@@ -362,15 +363,48 @@ void LLSurface::connectNeighbor(LLSurface *neighborp, U32 direction)
 {
 	S32 i;
 	LLSurfacePatch *patchp, *neighbor_patchp;
+	S32 neighborPatchesPerEdge = neighborp->mPatchesPerEdge;
 
 	mNeighbors[direction] = neighborp;
 	neighborp->mNeighbors[gDirOpposite[direction]] = this;
 
+	S32 ppe[2];
+	S32 own_offset[2] = {0, 0};
+	S32 neighbor_offset[2] = {0, 0};
+	U32 own_xpos, own_ypos, neighbor_xpos, neighbor_ypos;
+
+	ppe[0] = (mPatchesPerEdge < neighborPatchesPerEdge) ? mPatchesPerEdge : neighborPatchesPerEdge; // used for x
+	ppe[1] = ppe[0]; // used for y
+
+	from_region_handle(mRegionp->getHandle(), &own_xpos, &own_ypos);
+	from_region_handle(neighborp->getRegion()->getHandle(), &neighbor_xpos, &neighbor_ypos);
+
+	if(own_ypos >= neighbor_ypos)
+	{
+		neighbor_offset[1] = (own_ypos - neighbor_ypos) / mGridsPerPatchEdge;
+		ppe[1] = llmin(mPatchesPerEdge, neighborPatchesPerEdge-neighbor_offset[1]);
+	}
+	else
+	{
+		own_offset[1] = (neighbor_ypos - own_ypos) / mGridsPerPatchEdge;
+		ppe[1] = llmin(mPatchesPerEdge-own_offset[1], neighborPatchesPerEdge);
+	}
+
+	if(own_xpos >= neighbor_xpos)
+	{
+		neighbor_offset[0] = (own_xpos - neighbor_xpos) / mGridsPerPatchEdge;
+		ppe[0] = llmin(mPatchesPerEdge, neighborPatchesPerEdge-neighbor_offset[0]);
+	}
+	else
+	{
+		own_offset[0] = (neighbor_xpos - own_xpos) / mGridsPerPatchEdge;
+		ppe[0] = llmin(mPatchesPerEdge-own_offset[0], neighborPatchesPerEdge);
+	}
 	// Connect patches
 	if (NORTHEAST == direction)
 	{
 		patchp = getPatch(mPatchesPerEdge - 1, mPatchesPerEdge - 1);
-		neighbor_patchp = neighborp->getPatch(0, 0);
+		neighbor_patchp = neighborp->getPatch(neighbor_offset[0], neighbor_offset[1]);
 
 		patchp->connectNeighbor(neighbor_patchp, direction);
 		neighbor_patchp->connectNeighbor(patchp, gDirOpposite[direction]);
@@ -380,8 +414,14 @@ void LLSurface::connectNeighbor(LLSurface *neighborp, U32 direction)
 	}
 	else if (NORTHWEST == direction)
 	{
+		S32 off = mPatchesPerEdge + neighbor_offset[1] - own_offset[1];
 		patchp = getPatch(0, mPatchesPerEdge - 1);
-		neighbor_patchp = neighborp->getPatch(mPatchesPerEdge - 1, 0);
+		neighbor_patchp = neighborp->getPatch(neighbor_offset[0] - 1, off); //neighborPatchesPerEdge - 1
+		if (!neighbor_patchp)
+		{
+			mNeighbors[direction] = NULL;
+			return;
+		}
 
 		patchp->connectNeighbor(neighbor_patchp, direction);
 		neighbor_patchp->connectNeighbor(patchp, gDirOpposite[direction]);
@@ -389,18 +429,29 @@ void LLSurface::connectNeighbor(LLSurface *neighborp, U32 direction)
 	else if (SOUTHWEST == direction)
 	{
 		patchp = getPatch(0, 0);
-		neighbor_patchp = neighborp->getPatch(mPatchesPerEdge - 1, mPatchesPerEdge - 1);
+		neighbor_patchp = neighborp->getPatch(neighbor_offset[0] - 1, neighbor_offset[1] - 1);
+		if (!neighbor_patchp)
+		{
+			mNeighbors[direction] = NULL;
+			return;
+		}
 
 		patchp->connectNeighbor(neighbor_patchp, direction);
 		neighbor_patchp->connectNeighbor(patchp, gDirOpposite[direction]);
 
-		neighbor_patchp->updateNorthEdge(); // Only update one of north or east.
+		neighbor_patchp->updateEastEdge(); // Only update one of north or east.
 		neighbor_patchp->dirtyZ();
 	}
 	else if (SOUTHEAST == direction)
 	{
+		S32 off = mPatchesPerEdge + neighbor_offset[0] - own_offset[0];
 		patchp = getPatch(mPatchesPerEdge - 1, 0);
-		neighbor_patchp = neighborp->getPatch(0, mPatchesPerEdge - 1);
+		neighbor_patchp = neighborp->getPatch(off, neighbor_offset[1] - 1); //0
+		if (!neighbor_patchp)
+		{
+			mNeighbors[direction] = NULL;
+			return;
+		}
 
 		patchp->connectNeighbor(neighbor_patchp, direction);
 		neighbor_patchp->connectNeighbor(patchp, gDirOpposite[direction]);
@@ -408,10 +459,10 @@ void LLSurface::connectNeighbor(LLSurface *neighborp, U32 direction)
 	else if (EAST == direction)
 	{
 		// Do east/west connections, first
-		for (i = 0; i < (S32)mPatchesPerEdge; i++)
+		for (i = 0; i < ppe[1]; i++)
 		{
-			patchp = getPatch(mPatchesPerEdge - 1, i);
-			neighbor_patchp = neighborp->getPatch(0, i);
+			patchp = getPatch(mPatchesPerEdge - 1, i + own_offset[1]);
+			neighbor_patchp = neighborp->getPatch(0, i + neighbor_offset[1]);
 
 			patchp->connectNeighbor(neighbor_patchp, direction);
 			neighbor_patchp->connectNeighbor(patchp, gDirOpposite[direction]);
@@ -421,19 +472,19 @@ void LLSurface::connectNeighbor(LLSurface *neighborp, U32 direction)
 		}
 
 		// Now do northeast/southwest connections
-		for (i = 0; i < (S32)mPatchesPerEdge - 1; i++)
+		for (i = 0; i < ppe[1] - 1; i++)
 		{
-			patchp = getPatch(mPatchesPerEdge - 1, i);
-			neighbor_patchp = neighborp->getPatch(0, i+1);
+			patchp = getPatch(mPatchesPerEdge - 1, i + own_offset[1]);
+			neighbor_patchp = neighborp->getPatch(0, i+1 + neighbor_offset[1]);
 
 			patchp->connectNeighbor(neighbor_patchp, NORTHEAST);
 			neighbor_patchp->connectNeighbor(patchp, SOUTHWEST);
 		}
 		// Now do southeast/northwest connections
-		for (i = 1; i < (S32)mPatchesPerEdge; i++)
+		for (i = 1; i < ppe[1]; i++)
 		{
-			patchp = getPatch(mPatchesPerEdge - 1, i);
-			neighbor_patchp = neighborp->getPatch(0, i-1);
+			patchp = getPatch(mPatchesPerEdge - 1, i + own_offset[1]);
+			neighbor_patchp = neighborp->getPatch(0, i-1 + neighbor_offset[1]);
 
 			patchp->connectNeighbor(neighbor_patchp, SOUTHEAST);
 			neighbor_patchp->connectNeighbor(patchp, NORTHWEST);
@@ -442,10 +493,10 @@ void LLSurface::connectNeighbor(LLSurface *neighborp, U32 direction)
 	else if (NORTH == direction)
 	{
 		// Do north/south connections, first
-		for (i = 0; i < (S32)mPatchesPerEdge; i++)
+		for (i = 0; i < ppe[0]; i++)
 		{
-			patchp = getPatch(i, mPatchesPerEdge - 1);
-			neighbor_patchp = neighborp->getPatch(i, 0);
+			patchp = getPatch(i + own_offset[0], mPatchesPerEdge - 1);
+			neighbor_patchp = neighborp->getPatch(i + neighbor_offset[0], 0);
 
 			patchp->connectNeighbor(neighbor_patchp, direction);
 			neighbor_patchp->connectNeighbor(patchp, gDirOpposite[direction]);
@@ -455,19 +506,19 @@ void LLSurface::connectNeighbor(LLSurface *neighborp, U32 direction)
 		}
 
 		// Do northeast/southwest connections
-		for (i = 0; i < (S32)mPatchesPerEdge - 1; i++)
+		for (i = 0; i < ppe[0] - 1; i++)
 		{
-			patchp = getPatch(i, mPatchesPerEdge - 1);
-			neighbor_patchp = neighborp->getPatch(i+1, 0);
+			patchp = getPatch(i + own_offset[0], mPatchesPerEdge - 1);
+			neighbor_patchp = neighborp->getPatch(i+1 + neighbor_offset[0], 0);
 
 			patchp->connectNeighbor(neighbor_patchp, NORTHEAST);
 			neighbor_patchp->connectNeighbor(patchp, SOUTHWEST);
 		}
 		// Do southeast/northwest connections
-		for (i = 1; i < (S32)mPatchesPerEdge; i++)
+		for (i = 1; i < ppe[0]; i++)
 		{
-			patchp = getPatch(i, mPatchesPerEdge - 1);
-			neighbor_patchp = neighborp->getPatch(i-1, 0);
+			patchp = getPatch(i + own_offset[0], mPatchesPerEdge - 1);
+			neighbor_patchp = neighborp->getPatch(i-1 + neighbor_offset[0], 0);
 
 			patchp->connectNeighbor(neighbor_patchp, NORTHWEST);
 			neighbor_patchp->connectNeighbor(patchp, SOUTHEAST);
@@ -476,10 +527,11 @@ void LLSurface::connectNeighbor(LLSurface *neighborp, U32 direction)
 	else if (WEST == direction)
 	{
 		// Do east/west connections, first
-		for (i = 0; i < mPatchesPerEdge; i++)
+		for (i = 0; i < ppe[1]; i++)
 		{
-			patchp = getPatch(0, i);
-			neighbor_patchp = neighborp->getPatch(mPatchesPerEdge - 1, i);
+			patchp = getPatch(0, i + own_offset[1]);
+			neighbor_patchp = neighborp->getPatch(neighborPatchesPerEdge - 1, i + neighbor_offset[1]);
+			if (!neighbor_patchp) continue;
 
 			patchp->connectNeighbor(neighbor_patchp, direction);
 			neighbor_patchp->connectNeighbor(patchp, gDirOpposite[direction]);
@@ -489,20 +541,22 @@ void LLSurface::connectNeighbor(LLSurface *neighborp, U32 direction)
 		}
 
 		// Now do northeast/southwest connections
-		for (i = 1; i < mPatchesPerEdge; i++)
+		for (i = 1; i < ppe[1]; i++)
 		{
-			patchp = getPatch(0, i);
-			neighbor_patchp = neighborp->getPatch(mPatchesPerEdge - 1, i - 1);
+			patchp = getPatch(0, i + own_offset[1]);
+			neighbor_patchp = neighborp->getPatch(neighborPatchesPerEdge - 1, i - 1 + neighbor_offset[1]);
+			if (!neighbor_patchp) continue;
 
 			patchp->connectNeighbor(neighbor_patchp, SOUTHWEST);
 			neighbor_patchp->connectNeighbor(patchp, NORTHEAST);
 		}
 
 		// Now do northwest/southeast connections
-		for (i = 0; i < mPatchesPerEdge - 1; i++)
+		for (i = 0; i < ppe[1] - 1; i++)
 		{
-			patchp = getPatch(0, i);
-			neighbor_patchp = neighborp->getPatch(mPatchesPerEdge - 1, i + 1);
+			patchp = getPatch(0, i + own_offset[1]);
+			neighbor_patchp = neighborp->getPatch(neighborPatchesPerEdge - 1, i + 1 + neighbor_offset[1]);
+			if (!neighbor_patchp) continue;
 
 			patchp->connectNeighbor(neighbor_patchp, NORTHWEST);
 			neighbor_patchp->connectNeighbor(patchp, SOUTHEAST);
@@ -511,10 +565,11 @@ void LLSurface::connectNeighbor(LLSurface *neighborp, U32 direction)
 	else if (SOUTH == direction)
 	{
 		// Do north/south connections, first
-		for (i = 0; i < mPatchesPerEdge; i++)
+		for (i = 0; i < ppe[0]; i++)
 		{
-			patchp = getPatch(i, 0);
-			neighbor_patchp = neighborp->getPatch(i, mPatchesPerEdge - 1);
+			patchp = getPatch(i + own_offset[0], 0);
+			neighbor_patchp = neighborp->getPatch(i + neighbor_offset[0], neighborPatchesPerEdge - 1);
+			if (!neighbor_patchp) continue;
 
 			patchp->connectNeighbor(neighbor_patchp, direction);
 			neighbor_patchp->connectNeighbor(patchp, gDirOpposite[direction]);
@@ -524,19 +579,19 @@ void LLSurface::connectNeighbor(LLSurface *neighborp, U32 direction)
 		}
 
 		// Now do northeast/southwest connections
-		for (i = 1; i < mPatchesPerEdge; i++)
+		for (i = 1; i < ppe[0]; i++)
 		{
-			patchp = getPatch(i, 0);
-			neighbor_patchp = neighborp->getPatch(i - 1, mPatchesPerEdge - 1);
+			patchp = getPatch(i + own_offset[0], 0);
+			neighbor_patchp = neighborp->getPatch(i - 1 + neighbor_offset[0], neighborPatchesPerEdge - 1);
 
 			patchp->connectNeighbor(neighbor_patchp, SOUTHWEST);
 			neighbor_patchp->connectNeighbor(patchp, NORTHEAST);
 		}
 		// Now do northeast/southwest connections
-		for (i = 0; i < mPatchesPerEdge - 1; i++)
+		for (i = 0; i < ppe[0] - 1; i++)
 		{
-			patchp = getPatch(i, 0);
-			neighbor_patchp = neighborp->getPatch(i + 1, mPatchesPerEdge - 1);
+			patchp = getPatch(i + own_offset[0], 0);
+			neighbor_patchp = neighborp->getPatch(i + 1 + neighbor_offset[0], neighborPatchesPerEdge - 1);
 
 			patchp->connectNeighbor(neighbor_patchp, SOUTHEAST);
 			neighbor_patchp->connectNeighbor(patchp, NORTHWEST);
@@ -657,7 +712,7 @@ BOOL LLSurface::idleUpdate(F32 max_update_time)
 
 	// If the Z height data has changed, we need to rebuild our
 	// property line vertex arrays.
-	if (mDirtyPatchList.size() > 0)
+	if (!mDirtyPatchList.empty())
 	{
 		getRegion()->dirtyHeights();
 	}
@@ -698,14 +753,22 @@ void LLSurface::decompressDCTPatch(LLBitPack &bitpack, LLGroupHeader *gopp, BOOL
 
 	while (1)
 	{
-		decode_patch_header(bitpack, &ph);
+		decode_patch_header(bitpack, &ph, b_large_patch);
 		if (ph.quant_wbits == END_OF_PATCHES)
 		{
 			break;
 		}
 
-		i = ph.patchids >> 5;
-		j = ph.patchids & 0x1F;
+		if (b_large_patch)
+		{
+			i = ph.patchids >> 16; //x
+			j = ph.patchids & 0xFFFF; //y
+		}
+		else
+		{
+			i = ph.patchids >> 5; //x
+			j = ph.patchids & 0x1F; //y
+		}
 
 		if ((i >= mPatchesPerEdge) || (j >= mPatchesPerEdge))
 		{
@@ -1149,12 +1212,12 @@ LLSurfacePatch *LLSurface::getPatch(const S32 x, const S32 y) const
 {
 	if ((x < 0) || (x >= mPatchesPerEdge))
 	{
-		LL_ERRS() << "Asking for patch out of bounds" << LL_ENDL;
+		LL_WARNS() << "Asking for patch out of bounds" << LL_ENDL;
 		return NULL;
 	}
 	if ((y < 0) || (y >= mPatchesPerEdge))
 	{
-		LL_ERRS() << "Asking for patch out of bounds" << LL_ENDL;
+		LL_WARNS() << "Asking for patch out of bounds" << LL_ENDL;
 		return NULL;
 	}
 
@@ -1226,7 +1289,7 @@ BOOL LLSurface::generateWaterTexture(const F32 x, const F32 y,
 	LLPointer<LLImageRaw> raw = new LLImageRaw(tex_width, tex_height, tex_comps);
 	U8 *rawp = raw->getData();
 
-	F32 scale = 256.f * getMetersPerGrid() / (F32)tex_width;
+	F32 scale = getRegion()->getWidth() * getMetersPerGrid() / (F32)tex_width;
 	F32 scale_inv = 1.f / scale;
 
 	S32 x_begin, y_begin, x_end, y_end;

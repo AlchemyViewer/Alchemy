@@ -462,9 +462,10 @@ LLParcelSelectionHandle LLViewerParcelMgr::selectParcelInRectangle()
 void LLViewerParcelMgr::selectCollisionParcel()
 {
 	// BUG: Claim to be in the agent's region
-	mWestSouth = gAgent.getRegion()->getOriginGlobal();
+	mWestSouth = getSelectionRegion()->getOriginGlobal();
 	mEastNorth = mWestSouth;
-	mEastNorth += LLVector3d(PARCEL_GRID_STEP_METERS, PARCEL_GRID_STEP_METERS, 0.0);
+	mEastNorth += LLVector3d((getSelectionRegion()->getWidth() / REGION_WIDTH_METERS) * PARCEL_GRID_STEP_METERS, 
+		                     (getSelectionRegion()->getWidth() / REGION_WIDTH_METERS) * PARCEL_GRID_STEP_METERS, 0.0);
 
 	// BUG: must be in the sim you are in
 	LLMessageSystem *msg = gMessageSystem;
@@ -1582,6 +1583,10 @@ void LLViewerParcelMgr::processParcelProperties(LLMessageSystem *msg, void **use
     if(msg_region)
         parcel_mgr.mParcelsPerEdge = S32(msg_region->getWidth() / PARCEL_GRID_STEP_METERS);
     else
+		if (!gAgent.getRegion())
+		{
+			return;
+		}
         parcel_mgr.mParcelsPerEdge = S32(gAgent.getRegion()->getWidth() / PARCEL_GRID_STEP_METERS);
 
     msg->getS32Fast(_PREHASH_ParcelData, _PREHASH_RequestResult, request_result);
