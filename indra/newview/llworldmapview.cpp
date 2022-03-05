@@ -50,6 +50,7 @@
 #include "lltextureview.h"
 #include "lltracker.h"
 #include "llviewercamera.h"
+#include "llviewernetwork.h"
 #include "llviewertexture.h"
 #include "llviewertexturelist.h"
 #include "llviewerregion.h"
@@ -363,8 +364,8 @@ void LLWorldMapView::draw()
 		// When the view isn't panned, 0,0 = center of rectangle
 		F32 bottom =    sPanY + half_height + relative_y;
 		F32 left =      sPanX + half_width + relative_x;
-		F32 top =       bottom + sMapScale ;
-		F32 right =     left + sMapScale ;
+		F32 top =		bottom+ (sMapScale * (info->getSizeY() / REGION_WIDTH_METERS));
+		F32 right =		left  + (sMapScale * (info->getSizeX() / REGION_WIDTH_METERS));
 
 		// Discard if region is outside the screen rectangle (not visible on screen)
 		if ((top < 0.f)   || (bottom > height) ||
@@ -425,8 +426,12 @@ void LLWorldMapView::draw()
 			if (overlayimage)
 			{
 				// Inform the fetch mechanism of the size we need
-				S32 draw_size = ll_round(sMapScale);
-				overlayimage->setKnownDrawSize(ll_round(draw_size * LLUI::getScaleFactor().mV[VX]), ll_round(draw_size * LLUI::getScaleFactor().mV[VY]));
+				S32 x_draw_size = ll_round(sMapScale);
+				S32 y_draw_size = ll_round(sMapScale);
+				x_draw_size *= (info->getSizeX() / REGION_WIDTH_METERS);
+				y_draw_size *= (info->getSizeY() / REGION_WIDTH_METERS);
+
+				overlayimage->setKnownDrawSize(ll_round(x_draw_size * LLUI::getScaleFactor().mV[VX]), ll_round(y_draw_size * LLUI::getScaleFactor().mV[VY]));
 				// Draw something whenever we have enough info
 				if (overlayimage->hasGLTexture())
 				{

@@ -1209,7 +1209,7 @@ U32 LLViewerObject::processUpdateMessage(LLMessageSystem *mesgsys,
 	U16 valswizzle[4];
 #endif
 	U16	*val;
-	const F32 size = worldInst.getRegionWidthInMeters();	
+	const F32 size = mRegionp->getWidth();	
 	const F32 MAX_HEIGHT = worldInst.getRegionMaxHeight();
 	const F32 MIN_HEIGHT = worldInst.getRegionMinHeight();
 	S32 length;
