@@ -3444,6 +3444,8 @@ bool process_login_success_response(U32& first_sim_size_x, U32& first_sim_size_y
 	{
 		// agent_access can be 'A', 'M', and 'PG'.
 		gAgent.setMaturity(text[0]);
+		U32 preferredMaturity = (U32)LLAgent::convertTextToMaturity(text[0]);
+		gSavedSettings.setU32("PreferredMaturity", preferredMaturity);
 	}
 	
 	// this is the value of their preference setting for that content
