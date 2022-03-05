@@ -86,6 +86,7 @@
 #include "llviewertexlayer.h"
 #include "llviewertexturelist.h"
 #include "llviewermenu.h"
+#include "llviewernetwork.h"
 #include "llviewerobjectlist.h"
 #include "llviewerparcelmgr.h"
 #include "llviewerregion.h"
@@ -763,6 +764,25 @@ LLVOAvatar::LLVOAvatar(const LLUUID& id,
 	mVisuallyMuteSetting = LLVOAvatar::VisualMuteSettings(LLRenderMuteList::getInstanceFast()->getSavedVisualMuteSetting(getID()));
 }
 
+S32 LLVOAvatar::getNumBakes() const 
+{
+	// BAKED_LEFT_ARM is equal to the pre-BOM BAKED_NUM_INDICES
+	if(getRegion())
+	{
+		// LL_INFOS("BOMOS") 
+		// 				<< getFullname()
+		// 				<< "Using avatar region settings [" << getRegion()->getName() << "]"
+		// 				<< " bakesOnMesh = " << static_cast<const char *>(getRegion()->bakesOnMeshEnabled()?"True":"False")
+		// 				<< LL_ENDL;
+		return getRegion()->getRegionMaxBakes();
+	}
+	// LL_INFOS("BOMOS") 
+	// 				<< " Using fallback settings"
+	// 				<< " bakesOnMesh = " << static_cast<const char *>(LLGridManager::instance().isInSecondLife()?"True":"False")
+	// 				<< LL_ENDL;
+	// fallback, in SL assume BOM, elsewhere assume not.
+	return LLGridManager::instanceFast().isInSecondlife() ? BAKED_NUM_INDICES : BAKED_LEFT_ARM;
+}
 std::string LLVOAvatar::avString() const
 {
     if (isControlAvatar())
@@ -848,7 +868,7 @@ BOOL LLVOAvatar::isFullyBaked()
 	if (mIsDummy) return TRUE;
 	if (getNumTEs() == 0) return FALSE;
 
-	for (U32 i = 0; i < mBakedTextureDatas.size(); i++)
+	for (U32 i = 0; i < getNumBakes(); i++)
 	{
 		if (!isTextureDefined(mBakedTextureDatas[i].mTextureIndex)
 			&& ((i != BAKED_SKIRT) || isWearingWearableType(LLWearableType::WT_SKIRT))
@@ -8628,7 +8648,7 @@ void LLVOAvatar::updateMeshTextures()
 
 	mBakedTextureDebugText += llformat("%06d\n",update_counter++);
 	mBakedTextureDebugText += "indx layerset linvld ltda ilb ulkg ltid\n";
-	for (U32 i=0; i < mBakedTextureDatas.size(); i++)
+	for (U32 i=0; i < getNumBakes(); i++)
 	{
 		is_layer_baked[i] = isTextureDefined(mBakedTextureDatas[i].mTextureIndex);
 		LLViewerTexLayerSet* layerset = NULL;
@@ -8676,8 +8696,7 @@ void LLVOAvatar::updateMeshTextures()
 										   use_lkg_baked_layer[i],
 										   last_id_string.c_str());
 	}
-
-	for (U32 i=0; i < mBakedTextureDatas.size(); i++)
+	for (U32 i=0; i < getNumBakes(); i++)
 	{
 		debugColorizeSubMeshes(i, LLColor4::white);
 
@@ -8943,7 +8962,7 @@ void LLVOAvatar::releaseComponentTextures()
 		}
 	}
 
-	for (U8 baked_index = 0; baked_index < BAKED_NUM_INDICES; baked_index++)
+	for (U8 baked_index = 0; baked_index < getNumBakes(); baked_index++)
 	{
 		const LLAvatarAppearanceDictionary::BakedEntry * bakedDicEntry = LLAvatarAppearance::getDictionary()->getBakedTexture((EBakedTextureIndex)baked_index);
 		// skip if this is a skirt and av is not wearing one, or if we don't have a baked texture UUID
@@ -9626,7 +9645,7 @@ void LLVOAvatar::applyParsedAppearanceMessage(LLAppearanceMessageContents& conte
 
 LLViewerTexture* LLVOAvatar::getBakedTexture(const U8 te)
 {
-	if (te < 0 || te >= BAKED_NUM_INDICES)
+	if (te < 0 || te >= getNumBakes())
 	{
 		return NULL;
 	}
@@ -10923,7 +10942,7 @@ void LLVOAvatar::calculateUpdateRenderComplexity()
 		LLVOVolume::texture_cost_t textures;
 		hud_complexity_list_t hud_complexity_list;
 
-		for (U8 baked_index = 0; baked_index < BAKED_NUM_INDICES; baked_index++)
+		for (U8 baked_index = 0; baked_index < getNumBakes(); baked_index++)
 		{
 		    const LLAvatarAppearanceDictionary::BakedEntry *baked_dict
 				= LLAvatarAppearance::getDictionary()->getBakedTexture((EBakedTextureIndex)baked_index);

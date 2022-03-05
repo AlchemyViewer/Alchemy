@@ -9040,6 +9040,13 @@ Avatar '[NAME]' became cloud.
 
   <notification
    icon="notifytip.tga"
+   name="AvatarRezSelfBakeForceUpdateNotification"
+   type="notifytip">
+The viewer has detected that you may appear as a cloud and is attempting to fix this automatically.
+  </notification>
+
+  <notification
+   icon="notifytip.tga"
    name="AvatarRezArrivedNotification"
    type="notifytip">
 ( [EXISTENCE] seconds alive )

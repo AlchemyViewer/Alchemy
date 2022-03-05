@@ -399,6 +399,8 @@ private:
 	F32 					mDebugBakedTextureTimes[LLAvatarAppearanceDefines::BAKED_NUM_INDICES][2]; // time to start upload and finish upload of each baked texture
 	void					debugTimingLocalTexLoaded(BOOL success, LLViewerFetchedTexture *src_vi, LLImageRaw* src, LLImageRaw* aux_src, S32 discard_level, BOOL final, void* userdata);
 
+	void 					checkBOMRebakeRequired();
+
 // [SL:KB] - Patch: Appearance-TeleportAttachKill | Checked: Catznip-4.0
 //public:
 //	void addPendingDetach(const LLUUID& idObject);

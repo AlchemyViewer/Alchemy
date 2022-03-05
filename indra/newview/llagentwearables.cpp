@@ -1035,6 +1035,15 @@ void LLAgentWearables::setWearableOutfit(const LLInventoryItem::item_array_t& it
 		LLPointer<LLInventoryItem> new_item = items[i];
 
 		const LLWearableType::EType type = new_wearable->getType();
+		if(!gAgent.getRegion()->bakesOnMeshEnabled())
+		{
+			if(type == LLWearableType::WT_UNIVERSAL)
+			{
+				LL_DEBUGS("Avatar") << "Universal wearable not supported on this region - ignoring." << LL_ENDL;
+				mismatched++;
+				continue;
+			}
+		}
 		if (type < 0 || type>=LLWearableType::WT_COUNT)
 		{
 			LL_WARNS() << "invalid type " << type << LL_ENDL;
