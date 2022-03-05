@@ -151,6 +151,7 @@ void LLEstateInfoModel::commitEstateInfoCapsCoro(std::string url)
     body["allow_voice_chat"] = getAllowVoiceChat();
     body["override_public_access"] = getAllowAccessOverride();
 
+    body["override_environment"] = getAllowEnvironmentOverride();
     body["invoice"] = LLFloaterRegionInfo::getLastInvoice();
 
     LL_DEBUGS("WindlightSync") << "Sending estate caps: "

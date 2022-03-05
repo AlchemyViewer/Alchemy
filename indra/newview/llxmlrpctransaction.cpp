@@ -265,6 +265,15 @@ void LLXMLRPCTransaction::Handler::onCompleted(LLCore::HttpHandle handle,
 	// the contents of a buffer array are potentially noncontiguous, so we
 	// will need to copy them into an contiguous block of memory for XMLRPC.
 	LLCore::BufferArray *body = response->getBody();
+    if (!body)
+    {
+        mImpl->setStatus(LLXMLRPCTransaction::StatusXMLRPCError);
+        LL_WARNS() << "LLXMLRPCTransaction XMLRPC error:"
+            << "Response has no body! OpenSim grid admins screw the pooch again!" << LL_ENDL;
+        LL_WARNS() << "LLXMLRPCTransaction request URI: "
+            << mImpl->mURI << LL_ENDL;
+        return;
+    }
 	char * bodydata = new char[body->size()];
 
 	body->read(0, bodydata, body->size());

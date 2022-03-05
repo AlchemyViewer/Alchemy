@@ -4463,6 +4463,11 @@ void LLAgent::teleportViaLocation(const LLVector3d& pos_global)
 // [RLVa:KB] - Checked: RLVa-2.0.0
 	if ( (RlvActions::isRlvEnabled()) && (!RlvUtil::isForceTp()) )
 	{
+		if (LLStartUp::getStartupState() < STATE_STARTED)
+		{
+			return;
+		}
+
 		if ( (RlvActions::isLocalTp(pos_global)) ? !RlvActions::canTeleportToLocal(pos_global) : !RlvActions::canTeleportToLocation() )
 		{
 			RlvUtil::notifyBlocked(RlvStringKeys::Blocked::Teleport);
@@ -4489,19 +4494,42 @@ void LLAgent::doTeleportViaLocation(const LLVector3d& pos_global)
 		return;
 	}
 
-	U64 handle = to_region_handle(pos_global);
-	LLSimInfo* info = LLWorldMap::getInstanceFast()->simInfoFromHandle(handle);
-	if(regionp && info)
+	auto region_origin { regionp->getOriginGlobal() };
+	LLVector3 pos_local{};
+	U64 handle { to_region_handle(pos_global, region_origin, regionp->getWidth()) };
+	bool is_local { regionp->getHandle() == handle };
+	if(is_local)
 	{
-		LLVector3d region_origin = info->getGlobalOrigin();
-		LLVector3 pos_local(
+		pos_local.set(
 			(F32)(pos_global.mdV[VX] - region_origin.mdV[VX]),
 			(F32)(pos_global.mdV[VY] - region_origin.mdV[VY]),
 			(F32)(pos_global.mdV[VZ]));
-		teleportRequest(handle, pos_local);
+		LL_INFOS("Teleport") << "Local in-region TP:"
+							 << " pos_global " << pos_global
+							 << " region " << region_origin
+							 << " local " << pos_local
+							 << " region_handle " << handle
+							 << LL_ENDL;
 	}
-	else if(regionp && 
-		teleportCore(regionp->getHandle() == to_region_handle_global((F32)pos_global.mdV[VX], (F32)pos_global.mdV[VY])))
+	else
+	{
+		// determine non-local region location as best we can using global coords
+		// In SL we have uniform region size. This is normal.
+		// In opensim the handle will resolve to a 256m quantised world tile which the server maps back to a region
+		// it "should" also compensate for the local coords. Handle has been "correctly" determined already so we use global % 256
+		static const F32 width = REGION_WIDTH_METERS;// Note: reverted back to previous hardcode 256 for non-local. Whilst this appears incorrect server side logic expects %256 and will overshoot otherwise.
+		pos_local.set( fmod((F32)pos_global.mdV[VX], width),
+					   fmod((F32)pos_global.mdV[VY], width),
+					   (F32)pos_global.mdV[VZ] );
+		LL_INFOS("Teleport") << "Non-local TP:"
+							 << " pos_global " << pos_global
+							 << " region " << region_origin
+							 << " local " << pos_local
+							 << " region_handle " << handle
+							 << LL_ENDL;
+	}
+
+	if(teleportCore(is_local)) // Rather a pointless if as teleportCore currently always returns true
 	{
 		// send the message
 		LLMessageSystem* msg = gMessageSystem;
@@ -4511,26 +4539,20 @@ void LLAgent::doTeleportViaLocation(const LLVector3d& pos_global)
 		msg->addUUIDFast(_PREHASH_SessionID, getSessionID());
 
 		msg->nextBlockFast(_PREHASH_Info);
-		F32 width = regionp->getWidth();
-		LLVector3 pos(fmod((F32)pos_global.mdV[VX], width),
-					  fmod((F32)pos_global.mdV[VY], width),
-					  (F32)pos_global.mdV[VZ]);
-		F32 region_x = (F32)(pos_global.mdV[VX]);
-		F32 region_y = (F32)(pos_global.mdV[VY]);
-		U64 region_handle = to_region_handle_global(region_x, region_y);
-		msg->addU64Fast(_PREHASH_RegionHandle, region_handle);
-		msg->addVector3Fast(_PREHASH_Position, pos);
-		pos.mV[VX] += 1;
-		msg->addVector3Fast(_PREHASH_LookAt, pos);
-
-		LL_WARNS("Teleport") << "Sending deprecated(?) TeleportLocationRequest."
-							 << " pos_global " << pos_global
-							 << " region_x " << region_x
-							 << " region_y " << region_y
-							 << " region_handle " << region_handle
-							 << LL_ENDL; 
+		msg->addU64Fast(_PREHASH_RegionHandle, handle);
+		msg->addVector3Fast(_PREHASH_Position, pos_local);
+		pos_local.mV[VX] += 1;
+		msg->addVector3Fast(_PREHASH_LookAt, pos_local);
 
 		sendReliableMessage();
+		LL_INFOS("Teleport") << "Sending deprecated TeleportLocationRequest."
+							 << " pos_global " << pos_global
+							 << " region coord (" << (pos_global.mdV[VX] - pos_local.mV[VX])
+							 << "," << (pos_global.mdV[VY] - pos_local.mV[VY])
+							 << " pos_local " << pos_local
+							 << ") region_handle " << handle
+							 << LL_ENDL; 
+
 	}
 }
 

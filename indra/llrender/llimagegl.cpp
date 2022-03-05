@@ -537,12 +537,14 @@ bool LLImageGL::setSize(S32 width, S32 height, S32 ncomponents, S32 discard_leve
 {
 	if (width != mWidth || height != mHeight || ncomponents != mComponents)
 	{
+#ifdef NO_STUPID
 		// Check if dimensions are a power of two!
 		if (!checkSize(width,height))
 		{
 			LL_WARNS() << llformat("Texture has non power of two dimension: %dx%d",width,height) << LL_ENDL;
 			return false;
 		}
+#endif
 		
 		if (mTexName)
 		{
@@ -1419,11 +1421,15 @@ BOOL LLImageGL::createGLTexture(S32 discard_level, const LLImageRaw* imageraw, S
 	S32 h = raw_h << discard_level;
 
 	// setSize may call destroyGLTexture if the size does not match
+#ifdef NO_STUPID
 	if (!setSize(w, h, imageraw->getComponents(), discard_level))
 	{
 		LL_WARNS() << "Trying to create a texture with incorrect dimensions!" << LL_ENDL;
 		return FALSE;
 	}
+#else
+	setSize(w, h, imageraw->getComponents(), discard_level);	
+#endif
 
 	if (mHasExplicitFormat && 
 		((mFormatPrimary == GL_RGBA && mComponents < 4) ||

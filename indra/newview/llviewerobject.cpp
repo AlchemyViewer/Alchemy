@@ -4961,8 +4961,10 @@ void LLViewerObject::setTEImage(const U8 te, LLViewerTexture *imagep)
 
 S32 LLViewerObject::setTETextureCore(const U8 te, LLViewerTexture *image)
 {
+	if (!image)
+		return 0;
 	LLUUID old_image_id = getTE(te)->getID();
-	const LLUUID& uuid = image->getID();
+	const LLUUID& uuid = image ? image->getID() : LLUUID::null;
 	S32 retval = 0;
 	if (uuid != getTE(te)->getID() ||
 		uuid.isNull())

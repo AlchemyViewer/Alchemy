@@ -9647,7 +9647,6 @@ void LLVOAvatar::applyParsedAppearanceMessage(LLAppearanceMessageContents& conte
 
 	updateMeshTextures();
 	updateMeshVisibility();
-
 }
 
 LLViewerTexture* LLVOAvatar::getBakedTexture(const U8 te)
