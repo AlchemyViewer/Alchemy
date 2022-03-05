@@ -260,6 +260,10 @@ public:
 private:
     void serverAppearanceUpdateCoro(LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t &httpAdapter);
 
+// [SL:KB] - Patch: Appearance-Misc
+	void syncCofVersionAndRefreshCoro();
+// [/SL:KB]
+
     static void debugAppearanceUpdateCOF(const LLSD& content);
 
 	std::string		mAppearanceServiceURL;
