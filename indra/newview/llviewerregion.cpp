@@ -578,8 +578,10 @@ LLViewerRegion::LLViewerRegion(const U64 &handle,
 							   const U32 grids_per_patch_edge, 
 							   const F32 region_width_meters)
 :	mImpl(new LLViewerRegionImpl(this, host)),
+	mWidth(region_width_meters),
 	mHandle(handle),
 	mTimeDilation(1.0f),
+	mWidthScaleFactor(region_width_meters / REGION_WIDTH_METERS),
 	mMaxBakes(LLGridManager::getInstance()->isInSecondlife()?
 		LLAvatarAppearanceDefines::EBakedTextureIndex::BAKED_NUM_INDICES:
 		LLAvatarAppearanceDefines::EBakedTextureIndex::BAKED_LEFT_ARM),
@@ -616,8 +618,6 @@ LLViewerRegion::LLViewerRegion(const U64 &handle,
 	mRegionCacheHitCount(0),
 	mRegionCacheMissCount(0)
 {
-	mWidth = region_width_meters;
-
 	mRenderMatrix.setIdentity();
 
 	mImpl->mOriginGlobal = from_region_handle(handle); 
@@ -629,7 +629,7 @@ LLViewerRegion::LLViewerRegion(const U64 &handle,
 	mImpl->mCompositionp =
 		new LLVLComposition(mImpl->mLandp,
 							grids_per_region_edge,
-							region_width_meters / grids_per_region_edge);
+							mWidth / grids_per_region_edge);
 	mImpl->mCompositionp->setSurface(mImpl->mLandp);
 
 	// Create the surfaces
@@ -1851,11 +1851,11 @@ LLVLComposition * LLViewerRegion::getComposition() const
 
 F32 LLViewerRegion::getCompositionXY(const S32 x, const S32 y) const
 {
-	if (x >= 256)
+	if (x >= mWidth)
 	{
-		if (y >= 256)
+		if (y >= mWidth)
 		{
-			LLVector3d center = getCenterGlobal() + LLVector3d(256.f, 256.f, 0.f);
+			LLVector3d center = getCenterGlobal() + LLVector3d(mWidth, mWidth, 0.f);
 			LLViewerRegion *regionp = LLWorld::getInstanceFast()->getRegionFromPosGlobal(center);
 			if (regionp)
 			{
@@ -1864,8 +1864,8 @@ F32 LLViewerRegion::getCompositionXY(const S32 x, const S32 y) const
 				// If we're attempting to blend, then we want to make the fractional part of
 				// this region match the fractional of the adjacent.  For now, just minimize
 				// the delta.
-				F32 our_comp = getComposition()->getValueScaled(255, 255);
-				F32 adj_comp = regionp->getComposition()->getValueScaled(x - 256.f, y - 256.f);
+				F32 our_comp = getComposition()->getValueScaled(mWidth-1.f, mWidth-1.f);
+				F32 adj_comp = regionp->getComposition()->getValueScaled(x - regionp->getWidth(), y - regionp->getWidth());
 				while (llabs(our_comp - adj_comp) >= 1.f)
 				{
 					if (our_comp > adj_comp)
@@ -1882,7 +1882,7 @@ F32 LLViewerRegion::getCompositionXY(const S32 x, const S32 y) const
 		}
 		else
 		{
-			LLVector3d center = getCenterGlobal() + LLVector3d(256.f, 0, 0.f);
+			LLVector3d center = getCenterGlobal() + LLVector3d(mWidth, 0, 0.f);
 			LLViewerRegion *regionp = LLWorld::getInstanceFast()->getRegionFromPosGlobal(center);
 			if (regionp)
 			{
@@ -1891,8 +1891,8 @@ F32 LLViewerRegion::getCompositionXY(const S32 x, const S32 y) const
 				// If we're attempting to blend, then we want to make the fractional part of
 				// this region match the fractional of the adjacent.  For now, just minimize
 				// the delta.
-				F32 our_comp = getComposition()->getValueScaled(255.f, (F32)y);
-				F32 adj_comp = regionp->getComposition()->getValueScaled(x - 256.f, (F32)y);
+				F32 our_comp = getComposition()->getValueScaled(mWidth-1.f, (F32)y);
+				F32 adj_comp = regionp->getComposition()->getValueScaled(x - regionp->getWidth(), (F32)y);
 				while (llabs(our_comp - adj_comp) >= 1.f)
 				{
 					if (our_comp > adj_comp)
@@ -1908,9 +1908,9 @@ F32 LLViewerRegion::getCompositionXY(const S32 x, const S32 y) const
 			}
 		}
 	}
-	else if (y >= 256)
+	else if (y >= mWidth)
 	{
-		LLVector3d center = getCenterGlobal() + LLVector3d(0.f, 256.f, 0.f);
+		LLVector3d center = getCenterGlobal() + LLVector3d(0.f, mWidth, 0.f);
 		LLViewerRegion *regionp = LLWorld::getInstanceFast()->getRegionFromPosGlobal(center);
 		if (regionp)
 		{
@@ -1919,8 +1919,8 @@ F32 LLViewerRegion::getCompositionXY(const S32 x, const S32 y) const
 			// If we're attempting to blend, then we want to make the fractional part of
 			// this region match the fractional of the adjacent.  For now, just minimize
 			// the delta.
-			F32 our_comp = getComposition()->getValueScaled((F32)x, 255.f);
-			F32 adj_comp = regionp->getComposition()->getValueScaled((F32)x, y - 256.f);
+			F32 our_comp = getComposition()->getValueScaled((F32)x, mWidth-1.f);
+			F32 adj_comp = regionp->getComposition()->getValueScaled((F32)x, y - regionp->getWidth());
 			while (llabs(our_comp - adj_comp) >= 1.f)
 			{
 				if (our_comp > adj_comp)
@@ -2150,8 +2150,8 @@ public:
 			if(i == target_index)
 			{
 				LLVector3d global_pos(region->getOriginGlobal());
-				global_pos.mdV[VX] += (F64)x;
-				global_pos.mdV[VY] += (F64)y;
+				global_pos.mdV[VX] += (F64)x * region->getWidthScaleFactor();
+				global_pos.mdV[VY] += (F64)y * region->getWidthScaleFactor();
 				global_pos.mdV[VZ] += (F64)z * 4.0;
 				LLAvatarTracker::instance().setTrackedCoarseLocation(global_pos);
 			}
@@ -2225,8 +2225,8 @@ void LLViewerRegion::updateCoarseLocations(LLMessageSystem* msg)
 		if(i == target_index)
 		{
 			LLVector3d global_pos(mImpl->mOriginGlobal);
-			global_pos.mdV[VX] += (F64)(x_pos);
-			global_pos.mdV[VY] += (F64)(y_pos);
+			global_pos.mdV[VX] += (F64)(x_pos) * mWidthScaleFactor;
+			global_pos.mdV[VY] += (F64)(y_pos) * mWidthScaleFactor;
 			global_pos.mdV[VZ] += (F64)(z_pos) * 4.0;
 			LLAvatarTracker::instance().setTrackedCoarseLocation(global_pos);
 		}

@@ -1445,6 +1445,10 @@ extern char const* const _PREHASH_AvatarNotesReply;
 extern char const* const _PREHASH_CacheID;
 extern char const* const _PREHASH_OwnerMask;
 extern char const* const _PREHASH_TransferInventoryAck;
+extern char const* const _PREHASH_RegionSizeX;
+extern char const* const _PREHASH_RegionSizeY;
+extern char const* const _PREHASH_SizeX;
+extern char const* const _PREHASH_SizeY;
 
 
 #endif

@@ -1445,3 +1445,8 @@ char const* const _PREHASH_AvatarNotesReply = LLMessageStringTable::getInstance(
 char const* const _PREHASH_CacheID = LLMessageStringTable::getInstance()->getString("CacheID");
 char const* const _PREHASH_OwnerMask = LLMessageStringTable::getInstance()->getString("OwnerMask");
 char const* const _PREHASH_TransferInventoryAck = LLMessageStringTable::getInstance()->getString("TransferInventoryAck");
+
+char const* const _PREHASH_RegionSizeX = LLMessageStringTable::getInstance()->getString("RegionSizeX");
+char const* const _PREHASH_RegionSizeY = LLMessageStringTable::getInstance()->getString("RegionSizey");
+char const* const _PREHASH_SizeX = LLMessageStringTable::getInstance()->getString("SizeX");
+char const* const _PREHASH_SizeY = LLMessageStringTable::getInstance()->getString("SizeY");

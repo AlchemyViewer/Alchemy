@@ -3240,7 +3240,15 @@ void process_teleport_finish(LLMessageSystem* msg, void**)
 
 	// Viewer trusts the simulator.
 	gMessageSystem->enableCircuit(sim_host, TRUE);
-	LLViewerRegion* regionp =  LLWorld::getInstanceFast()->addRegion(region_handle, sim_host);
+	if (LLGridManager::getInstance()->isInOpenSim())
+	{
+		U32 region_size_x = 256;
+		msg->getU32Fast(_PREHASH_Info, _PREHASH_RegionSizeX, region_size_x);
+		U32 region_size_y = 256;
+		msg->getU32Fast(_PREHASH_Info, _PREHASH_RegionSizeY, region_size_y);
+		LLWorld::getInstance()->setRegionSize(region_size_x, region_size_y);
+	}
+	LLViewerRegion* regionp = LLWorld::getInstance()->addRegion(region_handle, sim_host);
 
 /*
 	// send camera update to new region
@@ -3548,10 +3556,18 @@ void process_crossed_region(LLMessageSystem* msg, void**)
 
 	send_complete_agent_movement(sim_host);
 
-	LLViewerRegion* regionp = LLWorld::getInstanceFast()->addRegion(region_handle, sim_host);
+	if (LLGridManager::getInstance()->isInOpenSim())
+	{
+		U32 region_size_x = 256;
+		msg->getU32(_PREHASH_RegionData, _PREHASH_RegionSizeX, region_size_x);
+		U32 region_size_y = 256;
+		msg->getU32(_PREHASH_RegionData, _PREHASH_RegionSizeY, region_size_y);
+		LLWorld::getInstance()->setRegionSize(region_size_x, region_size_y);
+	}
+	LLViewerRegion* regionp = LLWorld::getInstance()->addRegion(region_handle, sim_host);
 
 	LL_DEBUGS("CrossingCaps") << "Calling setSeedCapability from process_crossed_region(). Seed cap == "
-			<< seedCap << LL_ENDL;
+		<< seedCap << LL_ENDL;
 	regionp->setSeedCapability(seedCap);
 }
 

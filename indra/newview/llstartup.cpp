@@ -286,7 +286,7 @@ LLSD transform_cert_args(LLPointer<LLCertificate> cert);
 void general_cert_done(const LLSD& notification, const LLSD& response);
 void trust_cert_done(const LLSD& notification, const LLSD& response);
 void apply_udp_blacklist(const std::string& csv);
-bool process_login_success_response();
+bool process_login_success_response(U32& first_sim_size_x, U32& first_sim_size_y);
 void on_benefits_failed_callback(const LLSD& notification, const LLSD& response);
 void transition_back_to_login_panel(const std::string& emsg);
 // [SL:KB] - Patch: Chat-Alerts | Checked: 2012-09-22 (Catznip-3.3)
@@ -347,6 +347,9 @@ bool idle_startup()
 
 	static std::string auth_desc;
 	static std::string auth_message;
+
+	static U32 first_sim_size_x = 256;
+	static U32 first_sim_size_y = 256;
 
 	static LLVector3 agent_start_position_region(10.f, 10.f, 10.f);		// default for when no space server
 
@@ -1239,7 +1242,7 @@ bool idle_startup()
 		}
 		else if(LLLoginInstance::getInstance()->authSuccess())
 		{
-			if(process_login_success_response())
+			if(process_login_success_response(first_sim_size_x, first_sim_size_y))
 			{
 				// Pass the user information to the voice chat server interface.
 				LLVoiceClient::getInstance()->userAuthorized(gUserCredential->userID(), gAgentID);
@@ -1334,6 +1337,7 @@ bool idle_startup()
 		gAgent.initOriginGlobal(from_region_handle(gFirstSimHandle));
 		display_startup();
 
+		LLWorld::getInstance()->setRegionSize(first_sim_size_x, first_sim_size_y);
 		LLWorld::getInstance()->addRegion(gFirstSimHandle, gFirstSim);
 		display_startup();
 
@@ -3333,7 +3337,7 @@ bool init_benefits(LLSD& response)
 	return succ;
 }
 
-bool process_login_success_response()
+bool process_login_success_response(U32& first_sim_size_x, U32& first_sim_size_y)
 {
 	LLSD response = LLLoginInstance::getInstance()->getResponse();
 
@@ -3376,7 +3380,7 @@ bool process_login_success_response()
 	// otherwise if the response contains a first and/or last name,
 	// use those.  Otherwise use the credential identifier
 
-	gDisplayName = "";
+	gDisplayName.clear();
 	if (response.has("display_name"))
 	{
 		gDisplayName.assign(response["display_name"].asString());
@@ -3482,7 +3486,13 @@ bool process_login_success_response()
 		U32 region_y = strtoul(region_y_str.c_str(), NULL, 10);
 		gFirstSimHandle = to_region_handle(region_x, region_y);
 	}
-	
+
+	text = response["region_size_x"].asString();
+	if (!text.empty()) LLViewerParcelMgr::getInstance()->init(first_sim_size_x = atoi(text.c_str()));
+	//region Y size is currently unused, major refactoring required. - Patrick Sapinski (2/10/2011)
+	text = response["region_size_y"].asString();
+	if (!text.empty()) first_sim_size_y = atoi(text.c_str());
+
 	const std::string look_at_str = response["look_at"];
 	if (!look_at_str.empty())
 	{

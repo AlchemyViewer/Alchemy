@@ -235,6 +235,7 @@ public:
 
 	// regions are expensive to release, this function gradually releases cache from memory
 	static void idleCleanup(F32 max_update_time);
+	F32 getWidthScaleFactor() const				{ return mWidthScaleFactor; } // Scaling for OpenSim VarRegions
 
 	S32 getRegionMaxBakes() const						{ return mMaxBakes; }
 	S32 getRegionMaxTEs() const							{ return mMaxTEs; }
@@ -525,6 +526,7 @@ private:
 	U64			mHandle;
 	F32			mTimeDilation;	// time dilation of physics simulation on simulator
 	S32         mLastUpdate; //last time called idleUpdate()
+	F32			mWidthScaleFactor; // Scaling for OpenSim VarRegions
 	S32			mMaxBakes; // store max bakes on the region
 	S32			mMaxTEs; // store max TEs on the region
 

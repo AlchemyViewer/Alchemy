@@ -108,6 +108,7 @@ public:
 	LLSurfacePatch *		resolveLandPatchGlobal(const LLVector3d &position);
 	LLVector3				resolveLandNormalGlobal(const LLVector3d &position);		// absolute frame
 
+	void					setRegionSize(const U32& width = 0, const U32& length = 0);
 	U32						getRegionWidthInPoints() const	{ return mWidth; }
 	F32						getRegionScale() const			{ return mScale; }
 
@@ -196,12 +197,13 @@ private:
 	region_remove_signal_t mRegionRemovedSignal;
 
 	// Number of points on edge
-	static const U32 mWidth;
+	static U32 mWidth;
+	static U32 mLength;
 
 	// meters/point, therefore mWidth * mScale = meters per edge
 	static const F32 mScale;
 
-	static const F32 mWidthInMeters;
+	static F32 mWidthInMeters;
 
 	F32 mLandFarClip;					// Far clip distance for land.
 	LLPatchVertexArray		mLandPatch;

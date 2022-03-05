@@ -74,12 +74,13 @@ const S32 WORLD_PATCH_SIZE = 16;
 
 extern LLColor4U MAX_WATER_COLOR;
 
-const U32 LLWorld::mWidth = 256;
+U32 LLWorld::mWidth = 256;
+U32 LLWorld::mLength = 256;
 
 // meters/point, therefore mWidth * mScale = meters per edge
 const F32 LLWorld::mScale = 1.f;
 
-const F32 LLWorld::mWidthInMeters = mWidth * mScale;
+F32 LLWorld::mWidthInMeters = mWidth * mScale;
 
 //
 // Functions
@@ -137,6 +138,12 @@ void LLWorld::destroyClass()
 	LLSceneMonitor::deleteSingleton();
 }
 
+void LLWorld::setRegionSize(const U32& width, const U32& length)
+{
+	mWidth = width ? width : 256; // Width of 0 is really 256
+	mLength = length ? length : 256; // Length of 0 is really 256
+	mWidthInMeters = mWidth * mScale;
+}
 
 LLViewerRegion* LLWorld::addRegion(const U64 &region_handle, const LLHost &host)
 {
@@ -180,8 +187,8 @@ LLViewerRegion* LLWorld::addRegion(const U64 &region_handle, const LLHost &host)
 	U32 iindex = 0;
 	U32 jindex = 0;
 	from_region_handle(region_handle, &iindex, &jindex);
-	S32 x = (S32)(iindex/mWidth);
-	S32 y = (S32)(jindex/mWidth);
+	S32 x = (S32)(iindex/256);
+	S32 y = (S32)(jindex/256);
 	LL_INFOS() << "Adding new region (" << x << ":" << y << ")" 
 		<< " on host: " << host << LL_ENDL;
 
@@ -229,13 +236,43 @@ LLViewerRegion* LLWorld::addRegion(const U64 &region_handle, const LLHost &host)
 	{
 		adj_x = region_x + width * gDirAxes[dir][0];
 		adj_y = region_y + width * gDirAxes[dir][1];
-		to_region_handle(adj_x, adj_y, &adj_handle);
 
-		neighborp = getRegionFromHandle(adj_handle);
-		if (neighborp)
+		if (mWidth == 256 && mLength == 256)
 		{
-			//LL_INFOS() << "Connecting " << region_x << ":" << region_y << " -> " << adj_x << ":" << adj_y << LL_ENDL;
-			regionp->connectNeighbor(neighborp, dir);
+			to_region_handle(adj_x, adj_y, &adj_handle);
+			neighborp = getRegionFromHandle(adj_handle);
+			if (neighborp)
+			{
+				//LL_INFOS() << "Connecting " << region_x << ":" << region_y << " -> " << adj_x << ":" << adj_y << LL_ENDL;
+				regionp->connectNeighbor(neighborp, dir);
+			}
+		}
+		else // Unconventional region size
+		{
+			LLViewerRegion* last_neighborp = nullptr;
+			if(gDirAxes[dir][0] < 0) adj_x = region_x - WORLD_PATCH_SIZE;
+			if(gDirAxes[dir][1] < 0) adj_y = region_y - WORLD_PATCH_SIZE;
+
+			for (S32 offset = 0; offset < width; offset += WORLD_PATCH_SIZE)
+			{
+				to_region_handle(adj_x, adj_y, &adj_handle);
+				neighborp = getRegionFromHandle(adj_handle);
+
+				if (neighborp && last_neighborp != neighborp)
+				{
+					//LL_INFOS() << "Connecting " << region_x << ":" << region_y << " -> " << adj_x << ":" << adj_y << LL_ENDL;
+					regionp->connectNeighbor(neighborp, dir);
+					last_neighborp = neighborp;
+				}
+
+				if (dir == NORTH || dir == SOUTH)
+					adj_x += WORLD_PATCH_SIZE;
+				else if (dir == EAST || dir == WEST)
+					adj_y += WORLD_PATCH_SIZE;
+				else if (dir == NORTHEAST || dir == NORTHWEST || dir == SOUTHWEST || dir == SOUTHEAST)
+					break;
+
+			}
 		}
 	}
 
@@ -402,9 +439,17 @@ LLVector3d	LLWorld::clipToVisibleRegions(const LLVector3d &start_pos, const LLVe
 
 LLViewerRegion* LLWorld::getRegionFromHandle(const U64 &handle)
 {
+	U32 x, y;
+	from_region_handle(handle, &x, &y);
+
 	for (LLViewerRegion* regionp : mRegionList)
 	{
-		if (regionp->getHandle() == handle)
+		U32 checkRegionX, checkRegionY;
+		F32 checkRegionWidth = regionp->getWidth();
+		from_region_handle(regionp->getHandle(), &checkRegionX, &checkRegionY);
+
+		if (x >= checkRegionX && x < (checkRegionX + checkRegionWidth) &&
+			y >= checkRegionY && y < (checkRegionY + checkRegionWidth))
 		{
 			return regionp;
 		}
@@ -836,7 +881,7 @@ F32 LLWorld::getLandFarClip() const
 
 void LLWorld::setLandFarClip(const F32 far_clip)
 {
-	static S32 const rwidth = (S32)REGION_WIDTH_U32;
+	S32 const rwidth = (S32)getRegionWidthInMeters();
 	S32 const n1 = (llceil(mLandFarClip) - 1) / rwidth;
 	S32 const n2 = (llceil(far_clip) - 1) / rwidth;
 	bool need_water_objects_update = n1 != n2;
@@ -931,18 +976,20 @@ void LLWorld::updateWaterObjects()
 	S32 max_y = 0;
 	U32 region_x, region_y;
 
-	S32 rwidth = 256;
+	LLViewerRegion const* regionp = gAgent.getRegion();
+
+	// Region width in meters.
+	S32 const rwidth = (S32)regionp->getWidth();
 
 	// We only want to fill in water for stuff that's near us, say, within 256 or 512m
 	S32 range = LLViewerCamera::getInstanceFast()->getFar() > 256.f ? 512 : 256;
 
-	LLViewerRegion* regionp = gAgent.getRegion();
 	from_region_handle(regionp->getHandle(), &region_x, &region_y);
 
 	min_x = (S32)region_x - range;
 	min_y = (S32)region_y - range;
-	max_x = (S32)region_x + range;
-	max_y = (S32)region_y + range;
+	max_x = (S32)region_x + (rwidth-256) + range;
+	max_y = (S32)region_y + (rwidth-256) + range;
 
 	for (LLViewerRegion* regionp : mRegionList)
 	{
@@ -953,32 +1000,31 @@ void LLWorld::updateWaterObjects()
 		}
 	}
 
-	for (std::list<LLPointer<LLVOWater> >::iterator iter = mHoleWaterObjects.begin();
-		 iter != mHoleWaterObjects.end(); ++ iter)
+	for (LLVOWater* waterp : mHoleWaterObjects)
 	{
-		LLVOWater* waterp = (*iter).get();
 		gObjectList.killObject(waterp);
 	}
 	mHoleWaterObjects.clear();
 
 	// Use the water height of the region we're on for areas where there is no region
-	F32 water_height = gAgent.getRegion()->getWaterHeight();
+	F32 water_height = gAgent.getRegion()->getWaterHeight() + 256.f;
 
 	// Now, get a list of the holes
 	S32 x, y;
-	for (x = min_x; x <= max_x; x += rwidth)
+	const S32 step = 256;
+	for (x = min_x; x <= max_x; x += step)
 	{
-		for (y = min_y; y <= max_y; y += rwidth)
+		for (y = min_y; y <= max_y; y += step)
 		{
 			U64 region_handle = to_region_handle(x, y);
 			if (!getRegionFromHandle(region_handle))
 			{	// No region at that area, so make water
 				LLVOWater* waterp = (LLVOWater *)gObjectList.createObjectViewer(LLViewerObject::LL_VO_WATER, gAgent.getRegion());
 				waterp->setUseTexture(FALSE);
-				waterp->setPositionGlobal(LLVector3d(x + rwidth/2,
-													 y + rwidth/2,
-													 256.f + water_height));
-				waterp->setScale(LLVector3((F32)rwidth, (F32)rwidth, 512.f));
+				waterp->setPositionGlobal(LLVector3d(x + step/2,
+													 y + step/2,
+													 water_height));
+				waterp->setScale(LLVector3((F32)step, (F32)step, 512.f));
 				gPipeline.createObject(waterp);
 				mHoleWaterObjects.push_back(waterp);
 			}
@@ -988,16 +1034,16 @@ void LLWorld::updateWaterObjects()
 	// Update edge water objects
 	S32 wx, wy;
 	S32 center_x, center_y;
-	wx = (max_x - min_x) + rwidth;
-	wy = (max_y - min_y) + rwidth;
+	wx = (max_x - min_x) + step;
+	wy = (max_y - min_y) + step;
 	center_x = min_x + (wx >> 1);
 	center_y = min_y + (wy >> 1);
 
 	S32 add_boundary[4] = {
-		(S32)(512 - (max_x - region_x)),
-		(S32)(512 - (max_y - region_y)),
-		(S32)(512 - (region_x - min_x)),
-		(S32)(512 - (region_y - min_y)) };
+        static_cast<S32>(512 - (max_x - (rwidth - 256) - region_x)),
+        static_cast<S32>(512 - (max_y - (rwidth - 256) - region_y)),
+        512 - ((S32)region_x - min_x),
+        512 - ((S32)region_y - min_y) };
 		
 	S32 dir;
 	for (dir = 0; dir < 8; dir++)
@@ -1034,7 +1080,7 @@ void LLWorld::updateWaterObjects()
 		}
 
 		waterp->setRegion(gAgent.getRegion());
-		LLVector3d water_pos(water_center_x, water_center_y, 256.f + water_height) ;
+		LLVector3d water_pos(water_center_x, water_center_y, water_height) ;
 		LLVector3 water_scale((F32) dim[0], (F32) dim[1], 512.f);
 
 		//stretch out to horizon
@@ -1137,7 +1183,15 @@ void process_enable_simulator(LLMessageSystem *msg, void **user_data)
 
 	// Viewer trusts the simulator.
 	msg->enableCircuit(sim, TRUE);
-	LLWorld::getInstanceFast()->addRegion(handle, sim);
+	if (LLGridManager::getInstance()->isInOpenSim())
+	{
+		U32 region_size_x = 256;
+		msg->getU32Fast(_PREHASH_SimulatorInfo, _PREHASH_RegionSizeX, region_size_x);
+		U32 region_size_y = 256;
+		msg->getU32Fast(_PREHASH_SimulatorInfo, _PREHASH_RegionSizeY, region_size_y);
+		LLWorld::getInstance()->setRegionSize(region_size_x, region_size_y);
+	}
+	LLWorld::getInstance()->addRegion(handle, sim);
 
 	// give the simulator a message it can use to get ip and port
 	LL_INFOS() << "simulator_enable() Enabling " << sim << " with code " << msg->getOurCircuitCode() << LL_ENDL;
@@ -1287,14 +1341,17 @@ void send_agent_resume()
 	LLAppViewer::instance()->resumeMainloopTimeout();
 }
 
-static LLVector3d unpackLocalToGlobalPosition(U32 compact_local, const LLVector3d& region_origin)
+static LLVector3d unpackLocalToGlobalPosition(U32 compact_local, const LLVector3d& region_origin, F32 width_scale_factor)
 {
 	LLVector3d pos_local;
 
-	pos_local.mdV[VZ] = (compact_local & 0xFFU) * 4;
+	pos_local.mdV[VZ] = (compact_local & 0xFFU) * 4U;
 	pos_local.mdV[VY] = (compact_local >> 8) & 0xFFU;
 	pos_local.mdV[VX] = (compact_local >> 16) & 0xFFU;
 
+	// Scaling for OpenSim VarRegions
+	pos_local.mdV[VX] *= width_scale_factor;
+	pos_local.mdV[VY] *= width_scale_factor;
 	return region_origin + pos_local;
 }
 
@@ -1345,7 +1402,7 @@ void LLWorld::getAvatars(uuid_vec_t* avatar_ids, std::vector<LLVector3d>* positi
 		S32 count = regionp->mMapAvatars.size();
 		for (S32 i = 0; i < count; i++)
 		{
-			LLVector3d pos_global = unpackLocalToGlobalPosition(regionp->mMapAvatars[i], origin_global);
+			LLVector3d pos_global = unpackLocalToGlobalPosition(regionp->mMapAvatars[i], origin_global, regionp->getWidthScaleFactor());
 			if(dist_vec_squared(pos_global, relative_to) <= radius_squared)
 			{
 				LLUUID uuid = regionp->mMapAvatarIDs[i];
@@ -1400,7 +1457,7 @@ void LLWorld::getAvatars(pos_map_t* umap, const LLVector3d& relative_to, F32 rad
 			LLUUID uuid = regionp->mMapAvatarIDs[i];
 			if (uuid.isNull()) continue;
 
-			LLVector3d pos_global = unpackLocalToGlobalPosition(regionp->mMapAvatars[i], origin_global);
+			LLVector3d pos_global = unpackLocalToGlobalPosition(regionp->mMapAvatars[i], origin_global, regionp->getWidthScaleFactor());
 			if(dist_vec_squared(pos_global, relative_to) <= radius_squared && umap->find(uuid) == umap->end())
 			{
 				umap->emplace(std::move(uuid), std::move(pos_global));
@@ -1447,7 +1504,7 @@ void LLWorld::getAvatars(region_gpos_map_t* umap, const LLVector3d& relative_to,
 			LLUUID uuid = regionp->mMapAvatarIDs[i];
 			if (uuid.isNull()) continue;
 
-			LLVector3d pos_global = unpackLocalToGlobalPosition(regionp->mMapAvatars[i], origin_global);
+			LLVector3d pos_global = unpackLocalToGlobalPosition(regionp->mMapAvatars[i], origin_global, regionp->getWidthScaleFactor());
 			if (dist_vec_squared(pos_global, relative_to) <= radius_squared && umap->find(uuid) == umap->end())
 			{
 				umap->emplace(std::move(uuid), std::make_pair(regionp, std::move(pos_global)));
@@ -1475,7 +1532,7 @@ bool LLWorld::getAvatar(const LLUUID& idAvatar, LLVector3d& posAvatar) const
 		{
 			if (idAvatar == pRegion->mMapAvatarIDs[idxAgent])
 			{
-				posAvatar = unpackLocalToGlobalPosition(pRegion->mMapAvatars[idxAgent], pRegion->getOriginGlobal());
+				posAvatar = unpackLocalToGlobalPosition(pRegion->mMapAvatars[idxAgent], pRegion->getOriginGlobal(), pRegion->getWidthScaleFactor());
 				return true;
 			}
 		}
