@@ -127,6 +127,7 @@ set(viewer_SOURCE_FILES
     alcontrolcache.cpp
     alfloaterao.cpp
     alfloaterexploresounds.cpp
+    alfloatergenerictext.cpp
     alfloaterparticleeditor.cpp
     alfloaterregiontracker.cpp
     alpanelaomini.cpp
@@ -800,6 +801,7 @@ set(viewer_HEADER_FILES
     alcontrolcache.h
     alfloaterao.h
     alfloaterexploresounds.h
+    alfloatergenerictext.h
     alfloaterparticleeditor.h
     alfloaterregiontracker.h
     alpanelaomini.h

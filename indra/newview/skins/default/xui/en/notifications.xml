@@ -11996,6 +11996,82 @@ Unable to load the track from [TRACK1] into [TRACK2].
 
   <notification
    icon="alertmodal.tga"
+   name="InvalidGrid"
+   type="alertmodal">
+    <tag>fail</tag>
+    <tag>opensim</tag>
+    '[GRID]' is not a valid grid identifier.
+  </notification>
+  <notification
+   icon="alertmodal.tga"
+   name="MalformedGridInfo"
+   type="alertmodal">
+    <tag>fail</tag>
+    <tag>opensim</tag>
+    [GRID] provided malformed grid info.
+
+    Please contact them for support.
+  </notification>
+  <notification
+   icon="alertmodal.tga"
+   name="CannotRemoveConnectedGrid"
+   type="alertmodal">
+    <tag>fail</tag>
+    <tag>opensim</tag>
+    [GRID] cannot be removed while you are connected to it.
+  </notification>
+  <notification
+   icon="alertmodal.tga"
+   name="ConfirmRemoveGrid"
+   type="alertmodal">
+    <tag>opensim</tag>
+    <tag>confirm</tag>
+    Are you sure you want to remove [GRID] from the grid list?
+    <usetemplate
+     ignoretext="Confirm removing grids"
+     name="okcancelignore"
+     notext="Cancel"
+     yestext="OK"/>
+  </notification>
+  <notification
+   icon="alertmodal.tga"
+   name="RemoveGridFailure"
+   type="alertmodal">
+    <tag>fail</tag>
+    <tag>opensim</tag>
+    Failed to remove [GRID] from the list.
+  </notification>
+  <notification
+   icon="alertmodal.tga"
+   name="CantAddGrid"
+   type="alertmodal">
+    <tag>fail</tag>
+    <tag>opensim</tag>
+Could not get grid info for [GRID].
+Error: [STATUS] [REASON]
+  </notification>
+  <notification
+   icon="alertmodal.tga"
+   name="AddGridSuccess"
+   type="alertmodal">
+    <form name="form">
+      <ignore name="ignore"
+       text="A grid was added to the grid list"/>
+    </form>
+    <tag>fail</tag>
+    <tag>opensim</tag>
+[GRID] has been added to your grid list.
+  </notification>
+
+  <notification
+   icon="notify.tga"
+   name="SecondLifePasswordTooLong"
+   type="notify">
+    Due to a bug in the Second Life signup process, your password is longer than 16 characters and had been truncated to allow logging in.
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
    name="ConfirmRemoveSkin"
    type="alertmodal">
     <tag>confirm</tag>

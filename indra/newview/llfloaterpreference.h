@@ -202,6 +202,14 @@ private:
 	void updateMaxComplexity();
 	static bool loadFromFilename(const std::string& filename, std::map<std::string, std::string> &label_map);
 
+	void refreshGridList();
+	void onClickAddGrid();
+    void onClickActivateGrid();
+	void onClickRemoveGrid();
+	void onClickRefreshGrid();
+	void onClickDebugGrid();
+	void onSelectGrid(const LLSD& data);
+	bool handleRemoveGridCB(const LLSD& notification, const LLSD& response);
 	
 	void loadUserSkins();
 	void reloadSkinList();
@@ -230,6 +238,8 @@ private:
 	typedef std::map<std::string, skin_t> skinmap_t;
 	skinmap_t mUserSkins;
 	
+	boost::signals2::connection mGridListChangedConnection;
+
 	LOG_CLASS(LLFloaterPreference);
 
 	LLSearchEditor *mFilterEdit;

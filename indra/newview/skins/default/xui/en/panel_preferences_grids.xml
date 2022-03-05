@@ -1,0 +1,144 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<panel
+ border="true"
+ follows="left|top|right|bottom"
+ height="408"
+ label="Grids"
+ layout="topleft"
+ left="102"
+ name="grids"
+ top="1"
+ width="517">
+  <text
+   type="string"
+   length="1"
+   follows="left|top"
+   height="12"
+   layout="topleft"
+   left="30"
+   name="add_grid_text"
+   top="12"
+   width="400">
+   Add new grid:
+  </text>
+  <line_editor
+   border_style="line"
+   border_thickness="1"
+   follows="left|top"
+   font="SansSerif"
+   height="19"
+   layout="topleft"
+   left="50"
+   max_length_chars="4096"
+   name="add_grid"
+   top_pad="8"
+   label="Enter a LoginURI"
+   width="320" />
+  <button
+   layout="topleft"
+   follows="left|top"
+   height="19"
+   label="Add"
+   left_pad="2"
+   name="add_grid_commit"
+   top_delta="0"
+   width="50">
+    <button.commit_callback
+     function="Pref.AddGrid" />
+  </button>
+  <text
+   type="string"
+   length="1"
+   layout="topleft"
+   follows="left|top"
+   height="12"
+   left="30"
+   name="manage_grid_text"
+   top_pad="4"
+   width="400">
+   Manage grids:
+  </text>
+  <scroll_list
+   layout="topleft"
+   follows="left|top"
+   height="225"
+   left="50"
+   name="grid_list"
+   draw_heading="true"
+   top_pad="8"
+   width="370">
+    <scroll_list.columns
+     label="Grid name"
+     name="grid_label"
+     width="150" />
+    <scroll_list.columns
+     dynamic_width="true"
+     label="Login URI"
+     name="login_uri" />
+    <scroll_list.commit_callback
+     function="Pref.SelectGrid" />
+  </scroll_list>
+  <button
+   enabled="false"
+   layout="topleft"
+   follows="left|top"
+   height="19"
+   label="Activate"
+   left_pad="5"
+   name="activate_grid"
+   top_delta="5"
+   width="75">
+    <button.commit_callback
+     function="Pref.ActivateGrid" />
+  </button>
+  <button
+    enabled="false"
+    layout="topleft"
+    follows="left|top"
+    height="19"
+    label="Refresh"
+    left_delta="0"
+    name="refresh_grid"
+    top_pad="5"
+    width="75">
+     <button.commit_callback
+      function="Pref.RefreshGrid" />
+  </button>
+  <button
+   enabled="false"
+   layout="topleft"
+   follows="left|top"
+   height="19"
+   label="Remove"
+   left_delta="0"
+   name="remove_grid"
+   top_pad="5"
+   width="75">
+    <button.commit_callback
+     function="Pref.RemoveGrid" />
+  </button>
+  <button
+   enabled="false"
+   layout="topleft"
+   follows="left|top"
+   height="19"
+   label="Debug"
+   left_delta="0"
+   name="debug_grid"
+   top_pad="5"
+   width="75">
+    <button.commit_callback
+     function="Pref.DebugGrid" />
+  </button>
+  <check_box
+   control_name="ForceShowGrid"
+   height="20"
+   layout="topleft"
+   follows="left|top"
+   label="Show Grid Selection at Login"
+   left="30"
+   name="show_grid_selection_check"
+   tool_tip="Show grid selection on login screen to login to other worlds"
+   width="280"
+   top="310" />
+</panel>
