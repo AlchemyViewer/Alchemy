@@ -263,7 +263,7 @@ void LLNetMap::draw()
 		auto& worldInst = LLWorld::instanceFast();
 
 		// figure out where agent is
-		S32 region_width = ll_round(worldInst.getRegionWidthInMeters());
+		S32 region_width = ll_round(REGION_WIDTH_METERS);
 
 		for (LLViewerRegion* regionp : worldInst.getRegionList())
 		{
@@ -277,8 +277,9 @@ void LLNetMap::draw()
 			// background region rectangle
 			F32 bottom =	relative_y;
 			F32 left =		relative_x;
-			F32 top =		bottom + mScale ;
-			F32 right =		left + mScale ;
+			F32 top =		bottom + (real_width / region_width) * mScale ;
+			F32 right =		left + (real_width / region_width) * mScale ;
+
 
 			if (regionp == curregionp)
 			{
@@ -592,7 +593,7 @@ void LLNetMap::draw()
 		}
 
 		// Draw frustum
-		F32 meters_to_pixels = mScale/ worldInst.getRegionWidthInMeters();
+		F32 meters_to_pixels = mScale/ REGION_WIDTH_METERS;
 
 		F32 horiz_fov = viewer_camera.getView() * viewer_camera.getAspect();
 		F32 far_clip_meters = viewer_camera.getFar();
@@ -685,6 +686,8 @@ LLVector3 LLNetMap::globalPosToView(const LLVector3d& global_pos)
 	LLVector3 pos_local;
 	pos_local.setVec(relative_pos_global);  // convert to floats from doubles
 
+	mPixelsPerMeter = mScale / REGION_WIDTH_METERS;
+
 	pos_local.mV[VX] *= mPixelsPerMeter;
 	pos_local.mV[VY] *= mPixelsPerMeter;
 	// leave Z component in meters
@@ -745,7 +748,7 @@ LLVector3d LLNetMap::viewPosToGlobal( S32 x, S32 y )
 		pos_local.rotVec( rot );
 	}
 
-	pos_local *= ( LLWorld::getInstanceFast()->getRegionWidthInMeters() / mScale );
+	pos_local *= ( REGION_WIDTH_METERS / mScale );
 	
 	LLVector3d pos_global;
 	pos_global.setVec( pos_local );
