@@ -1526,7 +1526,7 @@ bool LLAvatarActions::canBlock(const LLUUID& id)
 	LLAvatarNameCache::get(id, &av_name);
 
 	std::string full_name = av_name.getUserName();
-	bool is_linden = (full_name.find("Linden") != std::string::npos);
+	bool is_linden = LLMuteList::isLinden(full_name);
 	bool is_self = id == gAgentID;
 	return !is_self && !is_linden;
 }

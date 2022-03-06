@@ -60,7 +60,10 @@
 #include "llimview.h"
 #include "llnotifications.h"
 #include "llviewercontrol.h"
+#include "llviewernetwork.h"
 #include "llviewerobjectlist.h"
+#include "llviewerregion.h"
+#include "llvoavatar.h"
 #include "lltrans.h"
 
 namespace 
@@ -192,6 +195,15 @@ void LLMuteList::cleanupSingleton()
     LLAvatarNameCache::getInstance()->setAccountNameChangedCallback(NULL);
 }
 
+// static
+BOOL LLMuteList::isLinden(const LLUUID& id)
+{
+	std::string name;
+	gCacheName->getFullName(id, name);
+	return isLinden(name);
+}
+
+// static
 BOOL LLMuteList::isLinden(const std::string& name)
 {
 	std::string username = boost::replace_all_copy(name, ".", " ");
@@ -201,12 +213,25 @@ BOOL LLMuteList::isLinden(const std::string& name)
 	tokenizer::iterator token_iter = tokens.begin();
 	
 	if (token_iter == tokens.end()) return FALSE;
-	token_iter++;
+	++token_iter;
 	if (token_iter == tokens.end()) return FALSE;
 	
 	std::string last_name = *token_iter;
-	LLStringUtil::toLower(last_name);
-	return last_name == "linden";
+	if (LLGridManager::getInstance()->isInSecondlife())
+	{
+		// Simple!
+		return last_name == "Linden" || last_name == "ProductEngine";
+	}
+	else if (LLGridManager::getInstance()->isInOpenSim())
+	{
+		LLViewerRegion* region = gAgent.getRegion();
+		if (!region) return FALSE;
+		const auto& gods = region->getGods();
+		if (gods.empty()) return FALSE;
+		
+		return (gods.find(name) != gods.cend() || gods.find(last_name) != gods.cend());
+	}
+	return FALSE;
 }
 
 static LLVOAvatar* find_avatar(const LLUUID& id)
@@ -432,6 +457,7 @@ BOOL LLMuteList::remove(const LLMute& mute, U32 flags)
 		// Must be after erase.
 		notifyObservers();
 		notifyObserversDetailed(localmute);
+		found = TRUE;
 	}
 	else
 	{
@@ -446,6 +472,7 @@ BOOL LLMuteList::remove(const LLMute& mute, U32 flags)
 			// Must be after erase.
 			notifyObservers();
 			notifyObserversDetailed(mute);
+			found = TRUE;
 		}
 	}
 	
@@ -665,9 +692,16 @@ BOOL LLMuteList::saveToFile(const std::string& filename)
 
 BOOL LLMuteList::isMuted(const LLUUID& id, const std::string& name, U32 flags) const
 {
+	if (mMutes.empty() && mLegacyMutes.empty())
+		return FALSE;
+
 	// for objects, check for muting on their parent prim
 	LLViewerObject* mute_object = get_object_to_mute_from_id(id);
 	LLUUID id_to_check  = (mute_object) ? mute_object->getID() : id;
+	if (id_to_check == gAgentID)
+	{
+		return FALSE;
+	}
 
 	// don't need name or type for lookup
 	LLMute mute(id_to_check);
@@ -683,8 +717,7 @@ BOOL LLMuteList::isMuted(const LLUUID& id, const std::string& name, U32 flags) c
 	}
 
 	// empty names can't be legacy-muted
-	bool avatar = mute_object && mute_object->isAvatar();
-	if (name.empty() || avatar) return FALSE;
+	if (name.empty()) return FALSE;
 
 	// Look in legacy pile
 	string_set_t::const_iterator legacy_it = mLegacyMutes.find(name);

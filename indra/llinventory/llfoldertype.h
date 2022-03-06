@@ -93,11 +93,12 @@ public:
 
         FT_SETTINGS = 56,
 
+		FT_ANIM_OVERRIDES = 57,
+		FT_TOXIC = 58,
+		FT_RLV = 59,
+
 		FT_SUITCASE = 100,
 
-		FT_ANIM_OVERRIDES,
-		FT_TOXIC,
-		FT_RLV,
 
 		FT_COUNT,
 

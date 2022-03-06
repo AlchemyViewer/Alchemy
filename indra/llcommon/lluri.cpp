@@ -510,11 +510,20 @@ LLURI LLURI::buildHTTP(const std::string& prefix,
 }
 
 // static
+LLURI LLURI::buildHTTP(const std::string& scheme,
+	const std::string& prefix,
+	const LLSD& path,
+	const LLSD& query)
+{
+	return buildHTTP(fmt::format(FMT_STRING("{:s}://{:s}"), scheme, prefix), path, query);
+}
+
+// static
 LLURI LLURI::buildHTTP(const std::string& host,
 					   const U32& port,
 					   const LLSD& path)
 {
-	return LLURI::buildHTTP(llformat("%s:%u", host.c_str(), port), path);
+	return LLURI::buildHTTP(fmt::format(FMT_STRING("{:s}:{:d}"), host, port), path);
 }
 
 // static
@@ -523,7 +532,7 @@ LLURI LLURI::buildHTTP(const std::string& host,
 					   const LLSD& path,
 					   const LLSD& query)
 {
-	return LLURI::buildHTTP(llformat("%s:%u", host.c_str(), port), path, query);
+	return LLURI::buildHTTP(fmt::format(FMT_STRING("{:s}:{:d}"), host, port), path, query);
 }
 
 std::string LLURI::asString() const
@@ -592,6 +601,14 @@ std::string LLURI::hostName() const
 	findAuthorityParts(mEscapedAuthority, user, host, port);
 	return unescape(host);
 }
+
+std::string LLURI::hostNameAndPort() const
+{
+	std::string user, host, port;
+	findAuthorityParts(mEscapedAuthority, user, host, port);
+	return port.empty() ? unescape(host) : unescape(host + ":" + port);
+}
+
 
 std::string LLURI::userName() const
 {

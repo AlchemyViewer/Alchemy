@@ -669,8 +669,10 @@ void LLFloaterWorldMap::trackLocation(const LLVector3d& pos_global)
 	}
 	
 	std::string sim_name = sim_info->getName();
-	F32 region_x = (F32)fmod( pos_global.mdV[VX], (F64)REGION_WIDTH_METERS );
-	F32 region_y = (F32)fmod( pos_global.mdV[VY], (F64)REGION_WIDTH_METERS );
+	U32 locX, locY;
+	from_region_handle(sim_info->getHandle(), &locX, &locY);
+	F32 region_x = pos_global.mdV[VX] - locX;
+	F32 region_y = pos_global.mdV[VY] - locY;
 	std::string full_name = llformat("%s (%d, %d, %d)", 
 									 sim_name.c_str(), 
 									 ll_round(region_x), 
@@ -722,17 +724,32 @@ void LLFloaterWorldMap::enableTeleportCoordsDisplay( bool enabled )
 void LLFloaterWorldMap::updateTeleportCoordsDisplay( const LLVector3d& pos )
 {
 	// if we're going to update their value, we should also enable them
-	enableTeleportCoordsDisplay( true );
-	
+	enableTeleportCoordsDisplay(true);
+
 	// convert global specified position to a local one
-	F32 region_local_x = (F32)fmod( pos.mdV[VX], (F64)REGION_WIDTH_METERS );
-	F32 region_local_y = (F32)fmod( pos.mdV[VY], (F64)REGION_WIDTH_METERS );
-	F32 region_local_z = (F32)llclamp( pos.mdV[VZ], 0.0, (F64)REGION_HEIGHT_METERS );
+	F32 region_local_x;
+	F32 region_local_y;
+	F32 region_local_z;
+	LLSimInfo* sim_info = LLWorldMap::getInstanceFast()->simInfoFromPosGlobal(pos);
+	if (sim_info)
+	{
+		U32 locX, locY;
+		from_region_handle(sim_info->getHandle(), &locX, &locY);
+		region_local_x = pos.mdV[VX] - locX;
+		region_local_y = pos.mdV[VY] - locY;
+		region_local_z = (F32)pos.mdV[VZ];
+	}
+	else
+	{
+		region_local_x = (F32)fmod(pos.mdV[VX], (F64)REGION_WIDTH_METERS);
+		region_local_y = (F32)fmod(pos.mdV[VY], (F64)REGION_WIDTH_METERS);
+		region_local_z = (F32)llclamp(pos.mdV[VZ], 0.0, (F64)REGION_HEIGHT_METERS);
+	}
 
 	// write in the values
-	childSetValue("teleport_coordinate_x", region_local_x );
-	childSetValue("teleport_coordinate_y", region_local_y );
-	childSetValue("teleport_coordinate_z", region_local_z );
+	childSetValue("teleport_coordinate_x", region_local_x);
+	childSetValue("teleport_coordinate_y", region_local_y);
+	childSetValue("teleport_coordinate_z", region_local_z);
 }
 
 void LLFloaterWorldMap::updateLocation()

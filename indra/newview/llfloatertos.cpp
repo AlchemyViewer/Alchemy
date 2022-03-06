@@ -29,6 +29,7 @@
 #include "llfloatertos.h"
 
 // viewer includes
+#include "llviewernetwork.h"
 #include "llviewerstats.h"
 #include "llviewerwindow.h"
 
@@ -44,6 +45,9 @@
 #include "llstartup.h"              // login_alert_done
 #include "llcorehttputil.h"
 #include "llfloaterreg.h"
+
+// system includes
+#include <boost/regex.hpp>
 
 LLFloaterTOS::LLFloaterTOS(const LLSD& data)
 :	LLModalDialog( data["message"].asString() ),
@@ -80,7 +84,27 @@ BOOL LLFloaterTOS::postBuild()
 	editor->setVisible( FALSE );
 
 	LLMediaCtrl* web_browser = getChild<LLMediaCtrl>("tos_html");
-	if ( web_browser )
+
+	bool use_web_browser = false;
+	if (LLGridManager::getInstance()->isInOpenSim())
+	{
+		//Check to see if the message is a link to display
+		const boost::regex url_regex("https?://([^\\s/?\\.#]+\\.?)+\\.\\w+(:\\d+)?(/\\S*)?",
+			boost::regex::perl | boost::regex::icase);
+
+		//IF it has http:// in it, we use the web browser
+		if(mMessage.size() >= 4 && boost::regex_match(mMessage, url_regex))
+		{
+			// it exists
+			use_web_browser = true;
+		}
+	}
+	else
+	{
+		use_web_browser = true;
+	}
+
+	if (web_browser && use_web_browser)
 	{
 // if we are forced to send users to an external site in their system browser
 // (e.g.) Linux users because of lack of media support for HTML ToS page
@@ -98,16 +122,43 @@ BOOL LLFloaterTOS::postBuild()
 #else
 		web_browser->addObserver(this);
 
-		// Don't use the start_url parameter for this browser instance -- it may finish loading before we get to add our observer.
-		// Store the URL separately and navigate here instead.
-		web_browser->navigateTo( getString( "loading_url" ) );
-		LLPluginClassMedia* media_plugin = web_browser->getMediaPlugin();
-		if (media_plugin)
+		if (LLGridManager::getInstance()->isInOpenSim())
 		{
-			// All links from tos_html should be opened in external browser
-			media_plugin->setOverrideClickTarget("_external");
+			mRealNavigateBegun = true;
+			updateAgreeEnabled(true);
+			web_browser->navigateTo(mMessage);
+		}
+		else
+		{
+			// Don't use the start_url parameter for this browser instance -- it may finish loading before we get to add our observer.
+			// Store the URL separately and navigate here instead.
+			web_browser->navigateTo( getString( "loading_url" ) );
+			LLPluginClassMedia* media_plugin = web_browser->getMediaPlugin();
+			if (media_plugin)
+			{
+				// All links from tos_html should be opened in external browser
+				media_plugin->setOverrideClickTarget("_external");
+			}
 		}
 #endif
+	}
+	else if (LLGridManager::getInstance()->isInOpenSim())
+	{
+		std::string showTos = "data:text/html,%3Chtml%3E%3Chead%3E"
+							  "%3Cstyle%3E%0A"
+							  "body%20%7B%0A"
+							  "background-color%3Argb%2831%2C%2031%2C%2031%29%3B%0A"
+							  "margin%3A5px%2020px%205px%2030px%3B%0A"
+							  "padding%3A0%3B%0A%7D%0A"
+							  "pre%20%7B%0Afont-size%3A12px%3B%0A"
+							  "font-family%3A%22Deja%20Vu%20Sans%22%2C%20Helvetica%2C%20Arial%2C%20sans-serif%3B%0A"
+							  "color%3A%23fff%3B%0A%7D%0A"
+							  "%3C/style%3E"
+			                  "%3C/head%3E%3Cbody%3E%3Cpre%3E" + mMessage + "%3C/pre%3E%3C/body%3E%3C/html%3E";
+
+		mRealNavigateBegun = true;
+		updateAgreeEnabled(true);
+		web_browser->navigateTo(showTos);
 	}
 
 	return TRUE;

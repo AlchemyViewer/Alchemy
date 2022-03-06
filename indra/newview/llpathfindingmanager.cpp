@@ -183,8 +183,10 @@ bool LLPathfindingManager::isPathfindingEnabledForCurrentRegion() const
 
 bool LLPathfindingManager::isPathfindingEnabledForRegion(LLViewerRegion *pRegion) const
 {
-	std::string retrieveNavMeshURL = getRetrieveNavMeshURLForRegion(pRegion);
-	return !retrieveNavMeshURL.empty();
+	if (pRegion)
+		return pRegion->isCapabilityAvailable(CAP_SERVICE_RETRIEVE_NAVMESH);
+
+	return false;
 }
 
 bool LLPathfindingManager::isAllowViewTerrainProperties() const
