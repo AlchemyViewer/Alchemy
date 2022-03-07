@@ -82,9 +82,6 @@ static LLDefaultChildRegistry::Register<LLChatHistory> r("chat_history");
 
 const static std::string NEW_LINE(rawstr_to_utf8("\n"));
 
-const static std::string SLURL_APP_AGENT = "secondlife:///app/agent/";
-const static std::string SLURL_ABOUT = "/about";
-
 // support for secondlife:///app/objectim/{UUID}/ SLapps
 class LLObjectIMHandler : public LLCommandHandler
 {
@@ -1580,7 +1577,7 @@ void LLChatHistory::appendMessage(const LLChat& chat, const LLSD &args, const LL
 		//*HACK getting rid of redundant sender names in system notifications sent using sender name (see EXT-5010)
 		if (use_plain_text_chat_history && !from_me && chat.mFromID.notNull())
 		{
-			std::string slurl_about = SLURL_APP_AGENT + chat.mFromID.asString() + SLURL_ABOUT;
+			std::string slurl_about = LLSLURL("agent", chat.mFromID, "about").getSLURLString();
 			if (message.length() > slurl_about.length() && 
 				message.compare(0, slurl_about.length(), slurl_about) == 0)
 			{

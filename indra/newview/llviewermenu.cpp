@@ -3223,7 +3223,6 @@ bool enable_object_mute()
 	if (avatar)
 	{
 		// It's an avatar
-		LLNameValue *lastname = avatar->getNVPair("LastName");
 		bool is_linden = LLMuteList::isLinden(avatar->getFullname());
 		bool is_self = avatar->isSelf();
 //		return !is_linden && !is_self;
@@ -3249,7 +3248,6 @@ bool enable_object_unmute()
 	if (avatar)
 	{
 		// It's an avatar
-		LLNameValue *lastname = avatar->getNVPair("LastName");
 		bool is_linden = LLMuteList::isLinden(avatar->getFullname());
 		bool is_self = avatar->isSelf();
 		return !is_linden && !is_self;
