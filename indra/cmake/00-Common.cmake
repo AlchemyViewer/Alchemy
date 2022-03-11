@@ -23,6 +23,10 @@ include(Variables)
 set(CMAKE_CXX_FLAGS_RELEASE "$ENV{LL_BUILD_RELEASE}")
 set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "$ENV{LL_BUILD_RELWITHDEBINFO}")
 set(CMAKE_CXX_FLAGS_DEBUG "$ENV{LL_BUILD_DEBUG}")
+set(CMAKE_EXE_LINKER_FLAGS "$ENV{LL_BUILD_BASE_LINKER}")
+set(CMAKE_EXE_LINKER_FLAGS_RELEASE "$ENV{LL_BUILD_RELEASE_LINKER}")
+set(CMAKE_EXE_LINKER_FLAGS_RELWITHDEBINFO "$ENV{LL_BUILD_RELWITHDEBINFO_LINKER}")
+set(CMAKE_EXE_LINKER_FLAGS_DEBUG "$ENV{LL_BUILD_DEBUG_LINKER}")
 # Given that, all the flags you see added below are flags NOT present in
 # https://bitbucket.org/lindenlab/viewer-build-variables/src/tip/variables.
 # Before adding new ones here, it's important to ask: can this flag really be
