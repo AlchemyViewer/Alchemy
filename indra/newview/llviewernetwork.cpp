@@ -747,7 +747,7 @@ std::string LLGridManager::getGridLabel(const std::string& grid) const
 {
 	std::string grid_label;
 	std::string grid_name = getGrid(grid);
-	if (!grid.empty())
+	if (!grid_name.empty())
 	{
 		grid_label = mGridList[grid_name][GRID_LABEL_VALUE].asString();
 	}
@@ -763,7 +763,7 @@ std::string LLGridManager::getGridId(const std::string& grid) const
 {
 	std::string grid_id;
 	std::string grid_name = getGrid(grid);
-	if (!grid.empty())
+	if (!grid_name.empty())
 	{
 		grid_id = mGridList[grid_name][GRID_ID_VALUE].asString();
 	}
@@ -779,15 +779,15 @@ std::string LLGridManager::getGridAdministrator(const std::string& grid) const
 {
 	std::string admininstrator = "Linden Lab"; // gotta default to something
 	std::string grid_name = getGrid(grid);
-	if(!grid_name.empty() && mGridList.has(grid))
+	if(!grid_name.empty())
 	{
-		if (mGridList[grid].has(GRID_ADMIN))
+		if (mGridList[grid_name].has(GRID_ADMIN))
 		{
-			admininstrator = mGridList[grid][GRID_ADMIN].asString();
+			admininstrator = mGridList[grid_name][GRID_ADMIN].asString();
 		}
-		else if (mGridList[grid].has(GRID_LABEL_VALUE))
+		else if (mGridList[grid_name].has(GRID_LABEL_VALUE))
 		{
-			admininstrator = mGridList[grid][GRID_LABEL_VALUE].asString();
+			admininstrator = mGridList[grid_name][GRID_LABEL_VALUE].asString();
 		}
 	}
 	return admininstrator;
@@ -1047,9 +1047,9 @@ bool LLGridManager::isSystemGrid(const std::string& grid) const
 	std::string grid_name = getGrid(grid);
 
 	return (   !grid_name.empty()
-			&& mGridList.has(grid)
-			&& mGridList[grid].has(GRID_IS_SYSTEM_GRID_VALUE)
-			&& mGridList[grid][GRID_IS_SYSTEM_GRID_VALUE].asBoolean()
+			&& mGridList.has(grid_name)
+			&& mGridList[grid_name].has(GRID_IS_SYSTEM_GRID_VALUE)
+			&& mGridList[grid_name][GRID_IS_SYSTEM_GRID_VALUE].asBoolean()
 			);
 }
 
@@ -1058,7 +1058,7 @@ std::string LLGridManager::getSLURLBase(const std::string& grid) const
 {
 	std::string grid_base = "";
 	std::string grid_name = getGrid(grid);
-	if( ! grid_name.empty() && mGridList.has(grid_name) )
+	if(!grid_name.empty())
 	{
 		if (mGridList[grid_name].has(GRID_SLURL_BASE))
 		{
@@ -1078,11 +1078,11 @@ std::string LLGridManager::getAppSLURLBase(const std::string& grid) const
 {
 	std::string grid_base = "";
 	std::string grid_name = getGrid(grid);
-	if(!grid_name.empty() && mGridList.has(grid))
+	if(!grid_name.empty())
 	{
-		if (mGridList[grid].has(GRID_APP_SLURL_BASE))
+		if (mGridList[grid_name].has(GRID_APP_SLURL_BASE))
 		{
-			grid_base = mGridList[grid][GRID_APP_SLURL_BASE].asString();
+			grid_base = mGridList[grid_name][GRID_APP_SLURL_BASE].asString();
 		}
 		else
 		{
