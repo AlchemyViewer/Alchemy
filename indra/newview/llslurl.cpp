@@ -32,6 +32,7 @@
 #include "llpanellogin.h"
 #include "llviewercontrol.h"
 #include "llviewernetwork.h"
+#include "llworldmap.h"
 #include "llfiltersd2xmlrpc.h"
 #include "curl/curl.h"
 // [RLVa:KB] - Checked: 2010-04-05 (RLVa-1.2.0d)
@@ -48,7 +49,8 @@ const char* LLSLURL::SLURL_COM		         = "slurl.com";
 
 const char* LLSLURL::WWW_SLURL_COM				 = "www.slurl.com";
 const char* LLSLURL::MAPS_SECONDLIFE_COM		 = "maps.secondlife.com";
-const char* LLSLURL::SLURL_X_GRID_LOCATION_INFO_SCHEME = "x-grid-location-info";
+const char* LLSLURL::SLURL_X_GRID_INFO_SCHEME	 = "x-grid-info";
+const char* LLSLURL::SLURL_X_GRID_LOCATION_INFO_SCHEME = "x-grid-location-info"; // <- deprecated!
 const char* LLSLURL::SLURL_APP_PATH              = "app";
 const char* LLSLURL::SLURL_REGION_PATH           = "region";
 const char* LLSLURL::SIM_LOCATION_HOME           = "home";
@@ -183,13 +185,14 @@ LLSLURL::LLSLURL(const std::string& slurl)
 		    }
 		}
 		else if((slurl_uri.scheme() == LLSLURL::SLURL_HTTP_SCHEME) ||
-		   (slurl_uri.scheme() == LLSLURL::SLURL_HTTPS_SCHEME) || 
-		   (slurl_uri.scheme() == LLSLURL::SLURL_X_GRID_LOCATION_INFO_SCHEME))
+			(slurl_uri.scheme() == LLSLURL::SLURL_HTTPS_SCHEME) ||
+			(slurl_uri.scheme() == LLSLURL::SLURL_X_GRID_INFO_SCHEME) ||
+			(slurl_uri.scheme() == LLSLURL::SLURL_X_GRID_LOCATION_INFO_SCHEME))
 		{
-		    // We're dealing with either a Standalone style slurl or slurl.com slurl
-		  if ((slurl_uri.hostName() == LLSLURL::SLURL_COM) ||
-		      (slurl_uri.hostName() == LLSLURL::WWW_SLURL_COM) || 
-		      (slurl_uri.hostName() == LLSLURL::MAPS_SECONDLIFE_COM))
+			// We're dealing with either a Standalone style slurl or slurl.com slurl
+			if ((slurl_uri.hostName() == LLSLURL::SLURL_COM) ||
+				(slurl_uri.hostName() == LLSLURL::WWW_SLURL_COM) ||
+				(slurl_uri.hostName() == LLSLURL::MAPS_SECONDLIFE_COM))
 			{
 				// slurl.com implies maingrid
 				mGrid = MAINGRID;
@@ -209,7 +212,7 @@ LLSLURL::LLSLURL(const std::string& slurl)
 
 				// As it's a Standalone grid/open, we will always have a hostname, as Standalone/open  style
 				// urls are properly formed, unlike the stinky maingrid style
-				mGrid = slurl_uri.hostName();
+				mGrid = slurl_uri.hostNameAndPort();
 			}
 		    if (path_array.size() == 0)
 			{
@@ -290,11 +293,9 @@ LLSLURL::LLSLURL(const std::string& slurl)
 			  
 			  mPosition = LLVector3(path_array); // this construction handles LLSD without all components (values default to 0.f)
 			  if((F32(mPosition[VX]) < 0.f) || 
-                             (mPosition[VX] > REGION_WIDTH_METERS) ||
+                             (mPosition[VX] > 8192.f) ||
 			     (F32(mPosition[VY]) < 0.f) || 
-                             (mPosition[VY] > REGION_WIDTH_METERS) ||
-			     (F32(mPosition[VZ]) < 0.f) || 
-                             (mPosition[VZ] > REGION_HEIGHT_METERS))
+                             (mPosition[VY] > 8192.f))
 			    {
 			      mType = INVALID;
 			      return;
@@ -303,7 +304,7 @@ LLSLURL::LLSLURL(const std::string& slurl)
 			}
 			else
 			{
-				// if x, y and z were not fully passed in, go to the middle of the region.
+				// if x and y were not fully passed in, go to the middle of the region.
 				// teleport will adjust the actual location to make sure you're on the ground
 				// and such
 				mPosition = LLVector3(REGION_WIDTH_METERS/2, REGION_WIDTH_METERS/2, 0);
@@ -333,9 +334,9 @@ LLSLURL::LLSLURL(const std::string& grid,
 {
 	mGrid = grid;
 	mRegion = region;
-	S32 x = ll_round( (F32)fmod( position[VX], (F32)REGION_WIDTH_METERS ) );
-	S32 y = ll_round( (F32)fmod( position[VY], (F32)REGION_WIDTH_METERS ) );
-	S32 z = ll_round( (F32)position[VZ] );
+	S32 x = ll_round(position[VX]);
+	S32 y = ll_round(position[VY]);
+	S32 z = ll_round(position[VZ]);
 	mType = LOCATION;
 	mPosition = LLVector3(x, y, z);
 }
@@ -354,7 +355,7 @@ LLSLURL::LLSLURL(const std::string& grid,
 		 const std::string& region, 
 		 const LLVector3d& global_position)
 {
-	*this = LLSLURL(LLGridManager::getInstance()->getGridId(grid),
+	*this = LLSLURL(grid,
 		  region, LLVector3(global_position.mdV[VX],
 				    global_position.mdV[VY],
 				    global_position.mdV[VZ]));

@@ -47,6 +47,7 @@
 #include "lltexturectrl.h"
 #include "llviewerregion.h"
 #include "llhttpconstants.h"
+#include "llworldmap.h"
 
 LLPanelPlaceInfo::LLPanelPlaceInfo()
 :	LLPanel(),
@@ -147,9 +148,17 @@ void LLPanelPlaceInfo::displayParcelInfo(const LLUUID& region_id,
 	if (!region)
 		return;
 
-	mPosRegion.setVec((F32)fmod(pos_global.mdV[VX], (F64)REGION_WIDTH_METERS),
-					  (F32)fmod(pos_global.mdV[VY], (F64)REGION_WIDTH_METERS),
-					  (F32)pos_global.mdV[VZ]);
+	const LLSimInfo* siminfo = LLWorldMap::getInstance()->simInfoFromPosGlobal(pos_global);
+	if (siminfo)
+	{
+		mPosRegion = siminfo->getLocalPos(pos_global);
+	}
+	else
+	{
+		mPosRegion.setVec((F32)fmod(pos_global.mdV[VX], (F64)REGION_WIDTH_METERS),
+			(F32)fmod(pos_global.mdV[VY], (F64)REGION_WIDTH_METERS),
+			(F32)pos_global.mdV[VZ]);
+	}
 
 	LLSD body;
 	std::string url = region->getCapability("RemoteParcelRequest");

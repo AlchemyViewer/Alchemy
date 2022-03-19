@@ -92,8 +92,8 @@ const std::string SYSTEM_GRID_APP_SLURL_BASE = "secondlife:///app";
 const std::string MAIN_GRID_WEB_PROFILE_URL = "https://my.secondlife.com/";
 
 const char* SYSTEM_GRID_SLURL_BASE = "secondlife://%s/secondlife/";
-const char* DEFAULT_SLURL_BASE = "https://%s/region/";
-const char* DEFAULT_APP_SLURL_BASE = "x-grid-location-info://%s/app";
+const char* DEFAULT_SLURL_BASE = "x-grid-info://%s/region/";
+const char* DEFAULT_APP_SLURL_BASE = "x-grid-info://%s/app";
 
 const std::string ALCHEMY_UPDATE_SERVICE = "https://app.alchemyviewer.org/update";
 
@@ -344,7 +344,7 @@ bool LLGridManager::addGrid(LLSD& grid_data)
 			}
 			else
 			{
-				LL_WARNS("GridManager")<<"duplicate grid id'"<<grid_id<<"' ignored"<<LL_ENDL;
+				LL_WARNS("GridManager")<<"duplicate grid id '"<<grid_id<<"' ignored"<<LL_ENDL;
 			}
 		}
 		else
@@ -697,17 +697,26 @@ std::string LLGridManager::getGrid(const std::string& grid) const
 	else
 	{
 		// search the grid list for a grid with a matching id
-		for(LLSD::map_const_iterator grid_iter = mGridList.beginMap();
-			grid_name.empty() && grid_iter != mGridList.endMap();
-		    ++grid_iter)
+		for(const auto& grid_pair : mGridList.map())
 		{
-			if (grid_iter->second.has(GRID_ID_VALUE))
+			if (grid_pair.second.has(GRID_ID_VALUE))
 			{
 				if (0 == (LLStringUtil::compareInsensitive(grid,
-														   grid_iter->second[GRID_ID_VALUE].asString())))
+														   grid_pair.second[GRID_ID_VALUE].asString())))
 				{
 					// found a matching label, return this name
-					grid_name = grid_iter->first;
+					grid_name = grid_pair.first;
+					break;
+				}
+			}
+			if (grid_pair.second.has(GRID_GATEKEEPER))
+			{
+				if (0 == (LLStringUtil::compareInsensitive(grid,
+					grid_pair.second[GRID_GATEKEEPER].asString())))
+				{
+					// found a matching label, return this name
+					grid_name = grid_pair.first;
+					break;
 				}
 			}
 		}
@@ -730,14 +739,12 @@ std::string LLGridManager::getGridByAttribute(const std::string& attribute, cons
 {
 	if (attribute.empty() || value.empty()) return LLStringUtil::null;
 	
-	for(LLSD::map_const_iterator grid_iter = mGridList.beginMap();
-		grid_iter != mGridList.endMap();
-	    ++grid_iter)
+	for(const auto& grid_iter : mGridList.map())
 	{
-		if (grid_iter->second.has(attribute)
-			&& LLStringUtil::compareStrings(value, grid_iter->second[attribute].asString()) == 0)
+		if (grid_iter.second.has(attribute)
+			&& LLStringUtil::compareInsensitive(value, grid_iter.second[attribute].asString()) == 0)
 		{
-			return grid_iter->first;
+			return grid_iter.first;
 		}
 	}
 	return LLStringUtil::null;
@@ -1047,7 +1054,6 @@ bool LLGridManager::isSystemGrid(const std::string& grid) const
 	std::string grid_name = getGrid(grid);
 
 	return (   !grid_name.empty()
-			&& mGridList.has(grid_name)
 			&& mGridList[grid_name].has(GRID_IS_SYSTEM_GRID_VALUE)
 			&& mGridList[grid_name][GRID_IS_SYSTEM_GRID_VALUE].asBoolean()
 			);
@@ -1066,7 +1072,7 @@ std::string LLGridManager::getSLURLBase(const std::string& grid) const
 		}
 		else
 		{
-			grid_base = llformat(DEFAULT_SLURL_BASE, grid_name.c_str());
+			grid_base = llformat(DEFAULT_SLURL_BASE, grid.c_str());
 		}
 	}
 	LL_DEBUGS("GridManager")<<"returning '"<<grid_base<<"'"<<LL_ENDL;
@@ -1076,7 +1082,7 @@ std::string LLGridManager::getSLURLBase(const std::string& grid) const
 // build a slurl for the given region within the selected grid
 std::string LLGridManager::getAppSLURLBase(const std::string& grid) const
 {
-	std::string grid_base = "";
+	std::string grid_base;
 	std::string grid_name = getGrid(grid);
 	if(!grid_name.empty())
 	{
@@ -1086,7 +1092,7 @@ std::string LLGridManager::getAppSLURLBase(const std::string& grid) const
 		}
 		else
 		{
-			grid_base = llformat(DEFAULT_APP_SLURL_BASE, grid_name.c_str());
+			grid_base = llformat(DEFAULT_APP_SLURL_BASE, grid.c_str());
 		}
 	}
 	LL_DEBUGS("GridManager")<<"returning '"<<grid_base<<"'"<<LL_ENDL;

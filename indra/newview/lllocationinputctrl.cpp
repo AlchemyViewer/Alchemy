@@ -63,6 +63,7 @@
 #include "llviewermenu.h"
 #include "llurllineeditorctrl.h"
 #include "llagentui.h"
+#include "llworldmap.h"
 // [RLVa:KB] - Checked: 2010-04-05 (RLVa-1.2.0d)
 #include "rlvhandler.h"
 // [/RLVa:KB]
@@ -747,9 +748,22 @@ void LLLocationInputCtrl::onLocationPrearrange(const LLSD& data)
 				value["item_type"] = TELEPORT_HISTORY;
 				value["global_pos"] = result->mGlobalPos.getValue();
 				std::string region_name = result->mTitle.substr(0, result->mTitle.find(','));
-				//TODO*: add Surl to teleportitem or parse region name from title
-				value["tooltip"] = LLSLURL(region_name, result->mGlobalPos).getSLURLString();
-				add(result->getTitle(), value); 
+
+				LLSimInfo* sim_info = LLWorldMap::getInstanceFast()->simInfoFromPosGlobal(result->mGlobalPos);
+				if (sim_info)
+				{
+					//TODO*: add Surl to teleportitem or parse region name from title
+					value["tooltip"] = LLSLURL(region_name, sim_info->getLocalPos(result->mGlobalPos)).getSLURLString();
+				}
+				else
+				{
+					//TODO*: add Surl to teleportitem or parse region name from title
+					LLVector3 tempvector(result->mGlobalPos);
+					tempvector[VX] = fmodf(result->mGlobalPos[VX], REGION_WIDTH_METERS);
+					tempvector[VY] = fmodf(result->mGlobalPos[VY], REGION_WIDTH_METERS);
+					value["tooltip"] = LLSLURL(region_name, tempvector).getSLURLString();
+				}
+				add(result->getTitle(), value);
 			}
 			result = std::find_if(result + 1, th_items.end(), boost::bind(
 									&LLLocationInputCtrl::findTeleportItemsByTitle, this,
@@ -1132,7 +1146,7 @@ void LLLocationInputCtrl::changeLocationPresentation()
 		//needs unescaped one
 		LLSLURL slurl;
 		LLAgentUI::buildSLURL(slurl, false);
-		mTextEntry->setText(LLURI::unescape(slurl.getSLURLString()));
+		mTextEntry->setText(slurl.getSLURLString());
 		mTextEntry->selectAll();
 
 		mMaturityButton->setVisible(FALSE);

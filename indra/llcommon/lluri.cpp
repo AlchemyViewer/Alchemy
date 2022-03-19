@@ -341,7 +341,8 @@ void LLURI::parseAuthorityAndPathUsingOpaque()
 {
 	if (mScheme == "http" || mScheme == "https" ||
 		mScheme == "ftp" || mScheme == "secondlife" || 
-		mScheme == "x-grid-location-info")
+		mScheme == "x-grid-info" ||
+		mScheme == "x-grid-location-info") // legacy
 	{
 		if (mEscapedOpaque.substr(0,2) != "//")
 		{

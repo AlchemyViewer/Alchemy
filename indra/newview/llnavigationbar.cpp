@@ -52,6 +52,7 @@
 #include "llurldispatcher.h"
 #include "llviewerinventory.h"
 #include "llviewermenu.h"
+#include "llviewernetwork.h"
 #include "llviewerparcelmgr.h"
 #include "llworldmapmessage.h"
 #include "llappviewer.h"
@@ -524,6 +525,13 @@ void LLNavigationBar::onLocationSelection()
 	  return;
 	}
 	
+	const std::string& grid = slurl.getGrid();
+	const std::string& current_grid = LLGridManager::getInstance()->getGrid();
+	if (grid != current_grid)
+	{
+		region_name.insert(0, llformat("%s:", grid.c_str()));
+	}
+	
 	// Resolve the region name to its global coordinates.
 	// If resolution succeeds we'll teleport.
 	LLWorldMapMessage::url_callback_t cb = boost::bind(
@@ -551,9 +559,10 @@ void LLNavigationBar::onTeleportFinished(const LLVector3d& global_agent_pos)
 	 * At this moment gAgent.getPositionAgent() contains previous coordinates.
 	 * according to EXT-65 agent position is being reseted on each frame.  
 	 */
+	LLVector3 local_agent_pos = gAgent.getPosAgentFromGlobal(global_agent_pos);
 		LLAgentUI::buildLocationString(location, LLAgentUI::LOCATION_FORMAT_NO_MATURITY,
-					gAgent.getPosAgentFromGlobal(global_agent_pos));
-	std::string tooltip (LLSLURL(gAgent.getRegion()->getName(), global_agent_pos).getSLURLString());
+			local_agent_pos);
+	std::string tooltip (LLSLURL(gAgent.getRegion()->getName(), local_agent_pos).getSLURLString());
 	
 	LLLocationHistoryItem item (location,
 			global_agent_pos, tooltip,TYPED_REGION_SLURL);// we can add into history only TYPED location
@@ -638,7 +647,7 @@ void LLNavigationBar::onRegionNameResponse(
 		LLVector3d region_pos = from_region_handle(region_handle);
 		LLVector3d global_pos = region_pos + (LLVector3d) local_coords;
 
-		LL_INFOS() << "Teleporting to: " << LLSLURL(region_name,	global_pos).getSLURLString()  << LL_ENDL;
+		LL_INFOS() << "Teleporting to: " << LLSLURL(region_name, local_coords).getSLURLString()  << LL_ENDL;
 		gAgent.teleportViaLocation(global_pos);
 	}
 	else if (gSavedSettings.getBOOL("SearchFromAddressBar"))

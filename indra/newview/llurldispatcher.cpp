@@ -183,6 +183,13 @@ bool LLURLDispatcherImpl::dispatchRegion(const LLSLURL& slurl, const std::string
 		LLPanelLogin::setLocation(slurl);
 		return true;
 	}
+	LLSLURL _slurl = slurl;
+	const std::string& grid = slurl.getGrid();
+	const std::string& current_grid = LLGridManager::getInstance()->getGrid();
+	if (grid != current_grid)
+	{
+		_slurl = LLSLURL(llformat("%s:%s", grid.c_str(), slurl.getRegion().c_str()), slurl.getPosition());
+	}
 
 	// Request a region handle by name
 	LLWorldMapMessage::getInstanceFast()->sendNamedRegionRequest(slurl.getRegion(),
