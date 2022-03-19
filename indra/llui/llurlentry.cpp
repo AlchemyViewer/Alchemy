@@ -687,9 +687,10 @@ std::string LLUrlEntryAgent::getLabel(const std::string &url, const LLUrlLabelCa
 
 LLStyle::Params LLUrlEntryAgent::getStyle() const
 {
+	static const LLUIColor html_link_col = LLUIColorTable::instance().getColor("HTMLLinkColor");
 	LLStyle::Params style_params = LLUrlEntryBase::getStyle();
-	style_params.color = LLUIColorTable::instance().getColor("HTMLLinkColor");
-	style_params.readonly_color = LLUIColorTable::instance().getColor("HTMLLinkColor");
+	style_params.color = html_link_col;
+	style_params.readonly_color = html_link_col;
 	return style_params;
 }
 
@@ -953,9 +954,10 @@ std::string LLUrlEntryGroup::getLabel(const std::string &url, const LLUrlLabelCa
 
 LLStyle::Params LLUrlEntryGroup::getStyle() const
 {
+	static const LLUIColor html_link_col = LLUIColorTable::instance().getColor("HTMLLinkColor");
 	LLStyle::Params style_params = LLUrlEntryBase::getStyle();
-	style_params.color = LLUIColorTable::instance().getColor("HTMLLinkColor");
-	style_params.readonly_color = LLUIColorTable::instance().getColor("HTMLLinkColor");
+	style_params.color = html_link_col;
+	style_params.readonly_color = html_link_col;
 	return style_params;
 }
 
