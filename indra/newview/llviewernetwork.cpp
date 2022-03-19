@@ -638,14 +638,12 @@ void LLGridManager::saveGridList()
 std::map<std::string, std::string> LLGridManager::getKnownGrids() const
 {
 	std::map<std::string, std::string> result;
-	for(LLSD::map_const_iterator grid_iter = mGridList.beginMap();
-		grid_iter != mGridList.endMap();
-	    ++grid_iter)
+	for(const auto& grid_pair : mGridList.map())
 	{
 		// skip temp grids. since this is just for "grid label mappings for UI purposes"
-		if (grid_iter->second.has(GRID_TEMPORARY) && grid_iter->second[GRID_TEMPORARY].asBoolean())
+		if (grid_pair.second.has(GRID_TEMPORARY) && grid_pair.second[GRID_TEMPORARY].asBoolean())
 			continue;
-		result[grid_iter->first] = grid_iter->second[GRID_LABEL_VALUE].asString();
+		result[grid_pair.first] = grid_pair.second[GRID_LABEL_VALUE].asString();
 	}
 
 	return result;
