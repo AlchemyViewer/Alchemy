@@ -395,8 +395,9 @@ void LLPanelPlaceProfile::displaySelectedParcelInfo(LLParcel* parcel,
 	parcel_data.name = parcel->getName();
 	parcel_data.sim_name = region->getName();
 	parcel_data.snapshot_id = parcel->getSnapshotID();
-	mPosRegion.setVec((F32)fmod(pos_global.mdV[VX], (F64)REGION_WIDTH_METERS),
-					  (F32)fmod(pos_global.mdV[VY], (F64)REGION_WIDTH_METERS),
+	const auto& global_origin = region->getOriginGlobal();
+	mPosRegion.setVec((F32)(pos_global.mdV[VX] - global_origin.mdV[VX]),
+					  (F32)(pos_global.mdV[VY] - global_origin.mdV[VY]),
 					  (F32)pos_global.mdV[VZ]);
 	parcel_data.global_x = pos_global.mdV[VX];
 	parcel_data.global_y = pos_global.mdV[VY];

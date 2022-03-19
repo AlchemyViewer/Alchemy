@@ -690,7 +690,7 @@ void LLFloaterExperienceProfile::onClickLocation()
     if(region)
     {
         LLTextBox* child = getChild<LLTextBox>(EDIT TF_SLURL);
-		mLocationSLURL = LLSLURL(region->getName(), gAgent.getPositionGlobal()).getSLURLString();
+		mLocationSLURL = LLSLURL(region->getName(), gAgent.getPositionAgent()).getSLURLString();
         child->setText(mLocationSLURL);
         onFieldChanged();
     }

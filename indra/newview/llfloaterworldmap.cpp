@@ -798,14 +798,16 @@ void LLFloaterWorldMap::updateLocation()
 				
 				// Figure out where user is
 				// Set the current SLURL
-				mSLURL = LLSLURL(agent_sim_name, gAgent.getPositionGlobal());
+				mSLURL = LLSLURL(agent_sim_name, gAgent.getPositionAgent());
 			}
 		}
 		
 		return; // invalid location
 	}
 	std::string sim_name;
-	gotSimName = LLWorldMap::getInstanceFast()->simNameFromPosGlobal( pos_global, sim_name );
+	LLSimInfo* sim_info = LLWorldMap::getInstance()->simInfoFromPosGlobal(pos_global);
+	if (sim_info)
+		sim_name = sim_info->getName();
 	if ((status != LLTracker::TRACKING_NOTHING) &&
 		(status != mTrackedStatus || pos_global != mTrackedLocation || sim_name != mTrackedSimName))
 	{
@@ -838,11 +840,11 @@ void LLFloaterWorldMap::updateLocation()
 
 			childSetValue("location", RlvStrings::getString(RlvStringKeys::Hidden::Region));
 		}
-		else if (gotSimName)
+		else if (sim_info)
 // [/RLVa:KB]
 //		if ( gotSimName )
 		{
-			mSLURL = LLSLURL(sim_name, pos_global);
+			mSLURL = LLSLURL(sim_name, sim_info->getLocalPos(pos_global));
 		}
 		else
 		{	// Empty SLURL will disable the "Copy SLURL to clipboard" button
