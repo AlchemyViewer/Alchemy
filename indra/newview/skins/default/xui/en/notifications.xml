@@ -1984,6 +1984,20 @@ He or she will temporarily be unable to move, chat, or interact with the world.
      yestext="Freeze"/>
   </notification>
 
+   <notification
+   icon="alertmodal.tga"
+   name="FreezeAvatarFullname"
+   type="alertmodal">
+Freeze [AVATAR_NAMES]?
+He or she will temporarily be unable to move, chat, or interact with the world.
+    <tag>confirm</tag>
+    <usetemplate
+     canceltext="Cancel"
+     name="yesnocancelbuttons"
+     notext="Unfreeze"
+     yestext="Freeze"/>
+  </notification>
+
   <notification
    icon="alertmodal.tga"
    name="FreezeAvatarMultiple"
