@@ -63,7 +63,7 @@ protected:
 // 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 LL_ALIGN_PREFIX(16)
-class LLTexLayerParamAlpha : public LLTexLayerParam
+class LLTexLayerParamAlpha final : public LLTexLayerParam
 {
 public:
 	LLTexLayerParamAlpha( LLTexLayerInterface* layer );
@@ -122,7 +122,7 @@ public:
 	typedef std::list< LLTexLayerParamAlpha* > param_alpha_ptr_list_t;
 	static param_alpha_ptr_list_t sInstances;
 } LL_ALIGN_POSTFIX(16);
-class LLTexLayerParamAlphaInfo : public LLViewerVisualParamInfo
+class LLTexLayerParamAlphaInfo final : public LLViewerVisualParamInfo
 {
 	friend class LLTexLayerParamAlpha;
 public:
@@ -201,7 +201,7 @@ private:
 	LL_ALIGN_16(LLVector4a				mAvgDistortionVec);
 } LL_ALIGN_POSTFIX(16);
 
-class LLTexLayerParamColorInfo : public LLViewerVisualParamInfo
+class LLTexLayerParamColorInfo final : public LLViewerVisualParamInfo
 {
 	friend class LLTexLayerParamColor;
 

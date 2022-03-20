@@ -115,7 +115,7 @@ protected:
 //
 // Only exists for llvoavatarself.
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-class LLTexLayerTemplate : public LLTexLayerInterface
+class LLTexLayerTemplate final : public LLTexLayerInterface
 {
 public:
 	LLTexLayerTemplate(LLTexLayerSet* const layer_set, LLAvatarAppearance* const appearance);
@@ -143,7 +143,7 @@ private:
 //
 // A single texture layer.  Only exists for llvoavatarself.
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-class LLTexLayer : public LLTexLayerInterface
+class LLTexLayer final : public LLTexLayerInterface
 {
 public:
 	LLTexLayer(LLTexLayerSet* const layer_set);

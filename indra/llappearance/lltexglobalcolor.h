@@ -71,7 +71,7 @@ private:
 	std::string				mName;
 };
 
-class LLTexParamGlobalColor : public LLTexLayerParamColor
+class LLTexParamGlobalColor final : public LLTexLayerParamColor
 {
 public:
 	LLTexParamGlobalColor(LLTexGlobalColor *tex_color);

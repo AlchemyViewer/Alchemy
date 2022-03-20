@@ -1019,10 +1019,8 @@ void LLTerrainPartition::getGeometry(LLSpatialGroup* group)
 	U32 indices_index = 0;
 	U32 index_offset = 0;
 
-	for (std::vector<LLFace*>::iterator i = mFaceList.begin(); i != mFaceList.end(); ++i)
+	for (LLFace* facep : mFaceList)
 	{
-		LLFace* facep = *i;
-
 		facep->setIndicesIndex(indices_index);
 		facep->setGeomIndex(index_offset);
 		facep->setVertexBuffer(buffer);

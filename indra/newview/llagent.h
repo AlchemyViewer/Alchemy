@@ -89,7 +89,7 @@ class LLAgentListener;
 //------------------------------------------------------------------------
 // LLAgent
 //------------------------------------------------------------------------
-class LLAgent : public LLOldEvents::LLObservable
+class LLAgent final : public LLOldEvents::LLObservable
 {
 	LOG_CLASS(LLAgent);
 
