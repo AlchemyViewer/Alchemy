@@ -141,6 +141,7 @@ set(viewer_SOURCE_FILES
     alviewermenu.cpp
     groupchatlistener.cpp
     llaccountingcostmanager.cpp
+    lladdgridhandler.cpp
     llaisapi.cpp
     llagent.cpp
     llagentaccess.cpp
@@ -816,6 +817,7 @@ set(viewer_HEADER_FILES
     groupchatlistener.h
     llaccountingcost.h
     llaccountingcostmanager.h
+    lladdgridhandler.h
     llaisapi.h
     llagent.h
     llagentaccess.h
