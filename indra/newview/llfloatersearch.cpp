@@ -38,6 +38,8 @@
 #include "llagent.h"
 #include "llui.h"
 #include "llviewercontrol.h"
+#include "llviewernetwork.h"
+#include "llviewerregion.h"
 #include "llweb.h"
 
 // support secondlife:///app/search/{CATEGORY}/{QUERY} SLapps
@@ -199,7 +201,9 @@ void LLFloaterSearch::search(const SearchQuery &p)
 
 	// get the search URL and expand all of the substitutions
 	// (also adds things like [LANGUAGE], [VERSION], [OS], etc.)
-	std::string url = gSavedSettings.getString("SearchURL");
+	LLViewerRegion* regionp = gAgent.getRegion();
+	std::string url = regionp != nullptr ? regionp->getSearchServerURL()
+		: gSavedSettings.getString(LLGridManager::getInstance()->isInOpenSim() ? "OpenSimSearchURL" : "SearchURL") :
 	url = LLWeb::expandURLSubstitutions(url, subs);
 
 	// and load the URL in the web view

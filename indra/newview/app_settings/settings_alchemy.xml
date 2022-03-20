@@ -706,6 +706,17 @@
       <key>Value</key>
       <string />
     </map>
+	<key>OpenSimSearchURL</key>
+	<map>
+      <key>Comment</key>
+      <string>OpenSim fallback search url</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>String</string>
+      <key>Value</key>
+      <string>http://search.metaverseink.com/opensim/results.jsp?query=[QUERY]&amp;submit=[CATEGORY]</string>
+	</map>
     <key>RenderAutoMaskAlphaUseRMSE</key>
     <map>
       <key>Comment</key>
