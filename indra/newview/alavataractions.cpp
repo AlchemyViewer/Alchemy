@@ -331,7 +331,7 @@ void ALAvatarActions::parcelFreeze(const uuid_vec_t& ids)
 	LLSD args;
 	args["AVATAR_NAMES"] = avatars;
 
-	LLNotificationsUtil::add((payload["avatar_ids"].size() == 1) ? "FreezeAvatarFullname" : "FreezeAvatarMultiple", args, payload, handleParcelFreeze);
+	LLNotificationsUtil::add((payload["avatar_ids"].size() == 1) ? "FreezeAvatar" : "FreezeAvatarMultiple", args, payload, handleParcelFreeze);
 }
 
 // static
