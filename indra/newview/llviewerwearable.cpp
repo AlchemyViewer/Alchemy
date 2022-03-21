@@ -266,7 +266,7 @@ void LLViewerWearable::setParamsToDefaults()
 	{
 		if( (((LLViewerVisualParam*)param)->getWearableType() == mType ) && (param->isTweakable() ) )
 		{
-			setVisualParamWeight(param->getID(),param->getDefaultWeight(), FALSE);
+			setVisualParamWeight(param->getID(),param->getDefaultWeight(), false);
 		}
 	}
 }
@@ -358,7 +358,7 @@ void LLViewerWearable::writeToAvatar(LLAvatarAppearance *avatarp)
 
 // Updates the user's avatar's appearance, replacing this wearables' parameters and textures with default values.
 // static 
-void LLViewerWearable::removeFromAvatar( LLWearableType::EType type, BOOL upload_bake)
+void LLViewerWearable::removeFromAvatar( LLWearableType::EType type, bool upload_bake)
 {
 	if (!isAgentAvatarValid()) return;
 
@@ -387,7 +387,7 @@ void LLViewerWearable::removeFromAvatar( LLWearableType::EType type, BOOL upload
 	}
 
 	gAgentAvatarp->updateVisualParams();
-	gAgentAvatarp->wearableUpdated(type, FALSE);
+	gAgentAvatarp->wearableUpdated(type, false);
 }
 
 // Does not copy mAssetID.

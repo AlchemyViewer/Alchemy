@@ -92,7 +92,7 @@ public:
 	// Note: False for shape, skin, eyes, and hair, unless you have MORE than 1.
 	bool			canWearableBeRemoved(const LLViewerWearable* wearable) const;
 
-	void			animateAllWearableParams(F32 delta, BOOL upload_bake);
+	void			animateAllWearableParams(F32 delta, bool upload_bake);
 
 	//--------------------------------------------------------------------
 	// Accessors

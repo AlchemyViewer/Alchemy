@@ -245,7 +245,7 @@ public:
 	// Composites
 	//--------------------------------------------------------------------
 public:
-	virtual void	invalidateComposite(LLTexLayerSet* layerset, BOOL upload_result) = 0;
+	virtual void	invalidateComposite(LLTexLayerSet* layerset, bool upload_result) = 0;
 
 /********************************************************************************
  **                                                                            **
@@ -280,7 +280,7 @@ protected:
 	// Clothing colors (convenience functions to access visual parameters)
 	//--------------------------------------------------------------------
 public:
-	void			setClothesColor(LLAvatarAppearanceDefines::ETextureIndex te, const LLColor4& new_color, BOOL upload_bake);
+	void			setClothesColor(LLAvatarAppearanceDefines::ETextureIndex te, const LLColor4& new_color, bool upload_bake);
 	LLColor4		getClothesColor(LLAvatarAppearanceDefines::ETextureIndex te);
 	static BOOL		teToColorParams(LLAvatarAppearanceDefines::ETextureIndex te, U32 *param_name);
 
@@ -289,7 +289,7 @@ public:
 	//--------------------------------------------------------------------
 public:
 	LLColor4		getGlobalColor(const std::string& color_name ) const;
-	virtual void	onGlobalColorChanged(const LLTexGlobalColor* global_color, BOOL upload_bake) = 0;
+	virtual void	onGlobalColorChanged(const LLTexGlobalColor* global_color, bool upload_bake) = 0;
 protected:
 	LLTexGlobalColor* mTexSkinColor;
 	LLTexGlobalColor* mTexHairColor;

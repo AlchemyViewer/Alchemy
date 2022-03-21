@@ -1495,7 +1495,7 @@ BOOL LLAvatarAppearance::teToColorParams( ETextureIndex te, U32 *param_name )
 	return TRUE;
 }
 
-void LLAvatarAppearance::setClothesColor( ETextureIndex te, const LLColor4& new_color, BOOL upload_bake )
+void LLAvatarAppearance::setClothesColor( ETextureIndex te, const LLColor4& new_color, bool upload_bake )
 {
 	U32 param_name[3];
 	if( teToColorParams( te, param_name ) )

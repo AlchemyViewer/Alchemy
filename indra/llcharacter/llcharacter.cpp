@@ -295,7 +295,7 @@ void LLCharacter::removeAnimationData(std::string_view name)
 //-----------------------------------------------------------------------------
 // setVisualParamWeight()
 //-----------------------------------------------------------------------------
-BOOL LLCharacter::setVisualParamWeight(const LLVisualParam* which_param, F32 weight, BOOL upload_bake)
+BOOL LLCharacter::setVisualParamWeight(const LLVisualParam* which_param, F32 weight, bool upload_bake)
 {
 	S32 index = which_param->getID();
 	auto index_iter = mVisualParamIndexMap.find(index);
@@ -310,7 +310,7 @@ BOOL LLCharacter::setVisualParamWeight(const LLVisualParam* which_param, F32 wei
 //-----------------------------------------------------------------------------
 // setVisualParamWeight()
 //-----------------------------------------------------------------------------
-BOOL LLCharacter::setVisualParamWeight(const char* param_name, F32 weight, BOOL upload_bake)
+BOOL LLCharacter::setVisualParamWeight(const char* param_name, F32 weight, bool upload_bake)
 {
 	std::string tname(param_name);
 	LLStringUtil::toLower(tname);
@@ -328,7 +328,7 @@ BOOL LLCharacter::setVisualParamWeight(const char* param_name, F32 weight, BOOL 
 //-----------------------------------------------------------------------------
 // setVisualParamWeight()
 //-----------------------------------------------------------------------------
-BOOL LLCharacter::setVisualParamWeight(S32 index, F32 weight, BOOL upload_bake)
+BOOL LLCharacter::setVisualParamWeight(S32 index, F32 weight, bool upload_bake)
 {
 	auto index_iter = mVisualParamIndexMap.find(index);
 	if (index_iter != mVisualParamIndexMap.end())
@@ -402,7 +402,7 @@ void LLCharacter::clearVisualParamWeights()
 		LLVisualParam* param = param_pair.second;
 		if (param->isTweakable())
 		{
-			param->setWeight( param->getDefaultWeight(), FALSE);
+			param->setWeight( param->getDefaultWeight(), false);
 		}
 	}
 }

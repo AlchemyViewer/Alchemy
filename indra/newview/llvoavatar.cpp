@@ -1087,7 +1087,7 @@ void LLVOAvatar::restoreGL()
 	gAgentAvatarp->setCompositeUpdatesEnabled(TRUE);
 	for (U32 i = 0; i < gAgentAvatarp->mBakedTextureDatas.size(); i++)
 	{
-		gAgentAvatarp->invalidateComposite(gAgentAvatarp->getTexLayerSet(i), FALSE);
+		gAgentAvatarp->invalidateComposite(gAgentAvatarp->getTexLayerSet(i), false);
 	}
 	gAgentAvatarp->updateMeshTextures();
 }
@@ -2093,7 +2093,7 @@ void LLVOAvatar::applyDefaultParams()
 
 		U8 value = it->second;
 		F32 newWeight = U8_to_F32(value, param->getMinWeight(), param->getMaxWeight());
-		param->setWeight(newWeight, FALSE); // Most likely FALSE is correct here because it's used in resetSkeleton, which is a local operation
+		param->setWeight(newWeight, false); // Most likely FALSE is correct here because it's used in resetSkeleton, which is a local operation
 	}
 }
 
@@ -2774,8 +2774,8 @@ void LLVOAvatar::idleUpdateVoiceVisualizer(bool voice_enabled)
 				
 				if ( mLipSyncActive )
 				{
-					if( mOohMorph ) mOohMorph->setWeight(mOohMorph->getMinWeight(), FALSE);
-					if( mAahMorph ) mAahMorph->setWeight(mAahMorph->getMinWeight(), FALSE);
+					if( mOohMorph ) mOohMorph->setWeight(mOohMorph->getMinWeight(), false);
+					if( mAahMorph ) mAahMorph->setWeight(mAahMorph->getMinWeight(), false);
 					
 					mLipSyncActive = false;
 					LLCharacter::updateVisualParams();
@@ -3031,7 +3031,7 @@ void LLVOAvatar::idleUpdateLipSync(bool voice_enabled)
 			F32 ooh_weight = mOohMorph->getMinWeight()
 				+ ooh_morph_amount * (mOohMorph->getMaxWeight() - mOohMorph->getMinWeight());
 
-			mOohMorph->setWeight( ooh_weight, FALSE);
+			mOohMorph->setWeight( ooh_weight, false);
 		}
 
 		if( mAahMorph )
@@ -3039,7 +3039,7 @@ void LLVOAvatar::idleUpdateLipSync(bool voice_enabled)
 			F32 aah_weight = mAahMorph->getMinWeight()
 				+ aah_morph_amount * (mAahMorph->getMaxWeight() - mAahMorph->getMinWeight());
 
-			mAahMorph->setWeight( aah_weight, FALSE);
+			mAahMorph->setWeight( aah_weight, false);
 		}
 
 		mLipSyncActive = true;
@@ -7421,7 +7421,7 @@ BOOL LLVOAvatar::updateGeometry(LLDrawable *drawable)
 //-----------------------------------------------------------------------------
 // updateSexDependentLayerSets()
 //-----------------------------------------------------------------------------
-void LLVOAvatar::updateSexDependentLayerSets(BOOL upload_bake)
+void LLVOAvatar::updateSexDependentLayerSets(bool upload_bake)
 {
 	invalidateComposite( mBakedTextureDatas[BAKED_HEAD].mTexLayerSet, upload_bake);
 	invalidateComposite( mBakedTextureDatas[BAKED_UPPER].mTexLayerSet, upload_bake);
@@ -8120,7 +8120,7 @@ void LLVOAvatar::rebuildAttachments()
 // [/SL:KB]
 
 // virtual
-void LLVOAvatar::invalidateComposite( LLTexLayerSet* layerset, BOOL upload_result)
+void LLVOAvatar::invalidateComposite( LLTexLayerSet* layerset, bool upload_result)
 {
 }
 
@@ -8129,7 +8129,7 @@ void LLVOAvatar::invalidateAll()
 }
 
 // virtual
-void LLVOAvatar::onGlobalColorChanged(const LLTexGlobalColor* global_color, BOOL upload_bake)
+void LLVOAvatar::onGlobalColorChanged(const LLTexGlobalColor* global_color, bool upload_bake)
 {
 	if (global_color == mTexSkinColor)
 	{
@@ -9615,12 +9615,12 @@ void LLVOAvatar::applyParsedAppearanceMessage(LLAppearanceMessageContents& conte
 				if(is_first_appearance_message || slam_params)
 				{
 					//LL_DEBUGS("Avatar") << "param slam " << i << " " << newWeight << LL_ENDL;
-					param->setWeight(newWeight, FALSE);
+					param->setWeight(newWeight, false);
 				}
 				else
 				{
 					interp_params = TRUE;
-					param->setAnimationTarget(newWeight, FALSE);
+					param->setAnimationTarget(newWeight, false);
 				}
 			}
 		}

@@ -364,7 +364,7 @@ public:
 	BOOL			hasGray() const; 
 	S32				getRezzedStatus() const; // 0 = cloud, 1 = gray, 2 = textured, 3 = textured and fully downloaded.
 	void			updateRezzedStatusTimers(S32 status);
-	S32 			getNumBakes() const;//<FS:Beq/> BOM bake limits
+	S32 			getNumBakes() const;
 
 	S32				mLastRezzedStatus;
 
@@ -552,7 +552,7 @@ public:
 	// Global colors
 	//--------------------------------------------------------------------
 public:
-	/*virtual*/void onGlobalColorChanged(const LLTexGlobalColor* global_color, BOOL upload_bake) override;
+	/*virtual*/void onGlobalColorChanged(const LLTexGlobalColor* global_color, bool upload_bake) override;
 
 	//--------------------------------------------------------------------
 	// Visibility
@@ -563,17 +563,6 @@ private:
 	U32	 		mVisibilityRank;
 	BOOL 		mVisible;
 	
-	//--------------------------------------------------------------------
-	// Shadowing
-	//--------------------------------------------------------------------
-public:
-	void 		updateShadowFaces();
-	LLDrawable*	mShadow;
-private:
-	LLFace* 	mShadow0Facep;
-	LLFace* 	mShadow1Facep;
-	LLPointer<LLViewerTexture> mShadowImagep;
-
 	//--------------------------------------------------------------------
 	// Impostors
 	//--------------------------------------------------------------------
@@ -728,7 +717,7 @@ protected:
 	// Composites
 	//--------------------------------------------------------------------
 public:
-	void	invalidateComposite(LLTexLayerSet* layerset, BOOL upload_result) override;
+	void	invalidateComposite(LLTexLayerSet* layerset, bool upload_result) override;
 	virtual void	invalidateAll();
 	virtual void	setCompositeUpdatesEnabled(bool b) {}
 	virtual void 	setCompositeUpdatesEnabled(U32 index, bool b) {}
@@ -762,7 +751,7 @@ private:
 public:
 	void			debugColorizeSubMeshes(U32 i, const LLColor4& color);
 	void 	updateMeshTextures() final override;
-	void 			updateSexDependentLayerSets(BOOL upload_bake);
+	void 			updateSexDependentLayerSets(bool upload_bake);
 	void	dirtyMesh() final override; // Dirty the avatar mesh
 	void 			updateMeshData();
 	void			updateMeshVisibility();

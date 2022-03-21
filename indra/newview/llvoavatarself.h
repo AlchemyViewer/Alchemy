@@ -92,16 +92,16 @@ public:
 	/*virtual*/ void 		requestStopMotion(LLMotion* motion) override;
 	/*virtual*/ LLJoint*	getJoint(const std::string &name) override;
 	
-	/*virtual*/ BOOL setVisualParamWeight(const LLVisualParam *which_param, F32 weight, BOOL upload_bake = FALSE) override;
-	/*virtual*/ BOOL setVisualParamWeight(const char* param_name, F32 weight, BOOL upload_bake = FALSE) override;
-	/*virtual*/ BOOL setVisualParamWeight(S32 index, F32 weight, BOOL upload_bake = FALSE) override;
+	/*virtual*/ BOOL setVisualParamWeight(const LLVisualParam *which_param, F32 weight, bool upload_bake = false) override;
+	/*virtual*/ BOOL setVisualParamWeight(const char* param_name, F32 weight, bool upload_bake = false) override;
+	/*virtual*/ BOOL setVisualParamWeight(S32 index, F32 weight, bool upload_bake = false) override;
 	/*virtual*/ void updateVisualParams() override;
 	void writeWearablesToAvatar();
 	/*virtual*/ void idleUpdateAppearanceAnimation() override;
 
 private:
 	// helper function. Passed in param is assumed to be in avatar's parameter list.
-	BOOL setParamWeight(const LLViewerVisualParam *param, F32 weight, BOOL upload_bake = FALSE);
+	BOOL setParamWeight(const LLViewerVisualParam *param, F32 weight, bool upload_bake = false);
 
 /********************************************************************************
  **                                                                            **
@@ -241,7 +241,7 @@ public:
 	// Composites
 	//--------------------------------------------------------------------
 public:
-	/* virtual */ void	invalidateComposite(LLTexLayerSet* layerset, BOOL upload_result) override;
+	/* virtual */ void	invalidateComposite(LLTexLayerSet* layerset, bool upload_result) override;
 	/* virtual */ void	invalidateAll() override;
 	/* virtual */ void	setCompositeUpdatesEnabled(bool b) override; // only works for self
 	/* virtual */ void  setCompositeUpdatesEnabled(U32 index, bool b) override;
@@ -283,7 +283,7 @@ protected:
  **/
 
 public:
-	void				wearableUpdated(LLWearableType::EType type, BOOL upload_result);
+	void				wearableUpdated(LLWearableType::EType type, bool upload_result);
 protected:
 	U32 getNumWearables(LLAvatarAppearanceDefines::ETextureIndex i) const;
 
