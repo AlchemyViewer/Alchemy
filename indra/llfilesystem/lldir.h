@@ -184,8 +184,8 @@ class LLDir
 
 
 	virtual void setChatLogsDir(const std::string &path);		// Set the chat logs dir to this user's dir
-	virtual void setPerAccountChatLogsDir(const std::string &username);		// Set the per user chat log directory.
-	virtual void setLindenUserDir(const std::string &username);		// Set the linden user dir to this user's dir
+	virtual void setPerAccountChatLogsDir(const std::string &username, const std::string &gridname);		// Set the per user chat log directory.
+	virtual void setLindenUserDir(const std::string &username, const std::string &gridname);		// Set the linden user dir to this user's dir
 	virtual void setSkinFolder(const std::string &skin_folder, const std::string& language);
 	virtual std::string getSkinFolder() const;
 	virtual std::string getLanguage() const;
@@ -269,6 +269,7 @@ protected:
 	std::string mLLPluginDir;			// Location for plugins and plugin shell
     static std::string sDumpDir;            // Per-run crash report subdir of log directory.
 	std::string mUserName;				// Current user name
+	std::string mGrid;					// Current grid
 };
 
 void dir_exists_or_crash(const std::string &dir_name);

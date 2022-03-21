@@ -4580,8 +4580,19 @@ void LLAppViewer::saveFinalSnapshot()
 void LLAppViewer::loadNameCache()
 {
 	// display names cache
+	std::string file;
+	if (LLGridManager::getInstance()->isInSecondlife())
+	{
+		file = "avatar_name_cache.xml";
+	}
+	else
+	{
+		std::string gridlabel = LLGridManager::getInstance()->getGridId();
+		LLStringUtil::toLower(gridlabel);
+		file = llformat("avatar_name_cache.%s.xml", gridlabel.c_str());
+	}
 	std::string filename =
-		gDirUtilp->getExpandedFilename(LL_PATH_CACHE, "avatar_name_cache.xml");
+		gDirUtilp->getExpandedFilename(LL_PATH_CACHE, file);
 	LL_INFOS("AvNameCache") << filename << LL_ENDL;
 	llifstream name_cache_stream(filename.c_str());
 	if(name_cache_stream.is_open())
@@ -4596,8 +4607,19 @@ void LLAppViewer::loadNameCache()
 
 	if (!gCacheName) return;
 
-	std::string name_cache;
-	name_cache = gDirUtilp->getExpandedFilename(LL_PATH_CACHE, "name.cache");
+	std::string name_file;
+	if (LLGridManager::getInstance()->isInSecondlife())
+	{
+		name_file = "name.cache";
+	}
+	else
+	{
+		std::string gridid = LLGridManager::getInstance()->getGridId();
+		LLStringUtil::toLower(gridid);
+		name_file = llformat("name.%s.cache", gridid.c_str());
+	}
+
+	std::string name_cache = gDirUtilp->getExpandedFilename(LL_PATH_CACHE, name_file);
 	llifstream cache_file(name_cache.c_str());
 	if(cache_file.is_open())
 	{
@@ -4608,8 +4630,19 @@ void LLAppViewer::loadNameCache()
 void LLAppViewer::saveNameCache()
 {
 	// display names cache
+	std::string file;
+	if (LLGridManager::getInstance()->isInSecondlife())
+	{
+		file = "avatar_name_cache.xml";
+	}
+	else
+	{
+		std::string gridlabel = LLGridManager::getInstance()->getGridId();
+		LLStringUtil::toLower(gridlabel);
+		file = llformat("avatar_name_cache.%s.xml", gridlabel.c_str());
+	}
 	std::string filename =
-		gDirUtilp->getExpandedFilename(LL_PATH_CACHE, "avatar_name_cache.xml");
+		gDirUtilp->getExpandedFilename(LL_PATH_CACHE, file);
 	llofstream name_cache_stream(filename.c_str());
 	if(name_cache_stream.is_open())
 	{
@@ -4619,8 +4652,19 @@ void LLAppViewer::saveNameCache()
     // real names cache
 	if (gCacheName)
     {
-        std::string name_cache;
-        name_cache = gDirUtilp->getExpandedFilename(LL_PATH_CACHE, "name.cache");
+		std::string name_file;
+		if (LLGridManager::getInstance()->isInSecondlife())
+		{
+			name_file = "name.cache";
+		}
+		else
+		{
+			std::string gridid = LLGridManager::getInstance()->getGridId();
+			LLStringUtil::toLower(gridid);
+			name_file = llformat("name.%s.cache", gridid.c_str());
+		}
+
+        std::string name_cache = gDirUtilp->getExpandedFilename(LL_PATH_CACHE, name_file);
         llofstream cache_file(name_cache.c_str());
         if(cache_file.is_open())
         {

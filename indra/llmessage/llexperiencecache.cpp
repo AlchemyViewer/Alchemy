@@ -88,10 +88,26 @@ const int LLExperienceCache::SEARCH_PAGE_SIZE     = 30;
 bool LLExperienceCache::sShutdown = false;
 
 //=========================================================================
+LLExperienceCache::LLExperienceCache(std::string grid)
+{
+    LLStringUtil::toLower(grid);
+    LLStringUtil::replaceChar(grid, ' ', '_');
+
+    std::string file;
+    if (grid.empty())
+    {
+        file = "experience_cache.xml";
+    }
+    else
+    {
+        file = llformat("experience_cache.%s.xml", grid);
+    }
+
+    mCacheFileName = gDirUtilp->getExpandedFilename(LL_PATH_CACHE, file);
+}
+
 void LLExperienceCache::initSingleton()
 {
-    mCacheFileName = gDirUtilp->getExpandedFilename(LL_PATH_CACHE, "experience_cache.xml");
-
     LL_INFOS("ExperienceCache") << "Loading " << mCacheFileName << LL_ENDL;
     llifstream cache_stream(mCacheFileName.c_str());
 
