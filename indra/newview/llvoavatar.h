@@ -234,7 +234,7 @@ public:
     size_t mLastRiggingInfoMeshCount = 0;
 	
     std::set<LLUUID>		mActiveOverrideMeshes;
-    virtual void			onActiveOverrideMeshesChanged();
+    void			onActiveOverrideMeshesChanged();
     
 	/*virtual*/ const LLUUID&	getID() const;
 	/*virtual*/ void			addDebugText(const std::string& text);
@@ -552,7 +552,7 @@ public:
 	// Global colors
 	//--------------------------------------------------------------------
 public:
-	/*virtual*/void onGlobalColorChanged(const LLTexGlobalColor* global_color);
+	/*virtual*/void onGlobalColorChanged(const LLTexGlobalColor* global_color, BOOL upload_bake) override;
 
 	//--------------------------------------------------------------------
 	// Visibility
@@ -728,7 +728,7 @@ protected:
 	// Composites
 	//--------------------------------------------------------------------
 public:
-	virtual void	invalidateComposite(LLTexLayerSet* layerset);
+	void	invalidateComposite(LLTexLayerSet* layerset, BOOL upload_result) override;
 	virtual void	invalidateAll();
 	virtual void	setCompositeUpdatesEnabled(bool b) {}
 	virtual void 	setCompositeUpdatesEnabled(U32 index, bool b) {}
@@ -761,9 +761,9 @@ private:
 
 public:
 	void			debugColorizeSubMeshes(U32 i, const LLColor4& color);
-	virtual void 	updateMeshTextures();
-	void 			updateSexDependentLayerSets();
-	virtual void	dirtyMesh(); // Dirty the avatar mesh
+	void 	updateMeshTextures() final override;
+	void 			updateSexDependentLayerSets(BOOL upload_bake);
+	void	dirtyMesh() final override; // Dirty the avatar mesh
 	void 			updateMeshData();
 	void			updateMeshVisibility();
 	LLViewerTexture*		getBakedTexture(const U8 te);
@@ -772,7 +772,7 @@ protected:
 	void 			releaseMeshData();
 	virtual void restoreMeshData();
 private:
-	virtual void	dirtyMesh(S32 priority); // Dirty the avatar mesh, with priority
+	void	dirtyMesh(S32 priority) final override; // Dirty the avatar mesh, with priority
 	LLViewerJoint*	getViewerJoint(S32 idx);
 	S32 			mDirtyMesh; // 0 -- not dirty, 1 -- morphed, 2 -- LOD
 	BOOL			mMeshTexturesDirty;
@@ -801,6 +801,7 @@ public:
     void            applyParsedAppearanceMessage(LLAppearanceMessageContents& contents, bool slam_params);
 	void 			hideSkirt();
 	void			startAppearanceAnimation();
+	/*virtual*/ void bodySizeChanged() override;
 	
 	//--------------------------------------------------------------------
 	// Appearance morphing
@@ -811,11 +812,14 @@ public:
 	// True if we are computing our appearance via local compositing
 	// instead of baked textures, as for example during wearable
 	// editing or when waiting for a subsequent server rebake.
-	/*virtual*/ BOOL	isUsingLocalAppearance() const { return mUseLocalAppearance; }
+	/*virtual*/ BOOL	isUsingLocalAppearance() const override { return mUseLocalAppearance; }
+
+	BOOL				isUsingServerBakes() const override;
+	void 				setIsUsingServerBakes(BOOL newval);
 
 	// True if we are currently in appearance editing mode. Often but
 	// not always the same as isUsingLocalAppearance().
-	/*virtual*/ BOOL	isEditingAppearance() const { return mIsEditingAppearance; }
+	/*virtual*/ BOOL	isEditingAppearance() const override { return mIsEditingAppearance; }
 
 	// FIXME review isUsingLocalAppearance uses, some should be isEditing instead.
 
@@ -825,6 +829,7 @@ private:
 	F32				mLastAppearanceBlendTime;
 	BOOL			mIsEditingAppearance; // flag for if we're actively in appearance editing mode
 	BOOL			mUseLocalAppearance; // flag for if we're using a local composite
+	BOOL			mUseServerBakes; // flag for if baked textures should be fetched from baking service (false if they're temporary uploads)
 
 	//--------------------------------------------------------------------
 	// Visibility
@@ -993,9 +998,9 @@ private:
  **/
 
 public:
-	/*virtual*/ BOOL 	setParent(LLViewerObject* parent);
-	/*virtual*/ void 	addChild(LLViewerObject *childp);
-	/*virtual*/ void 	removeChild(LLViewerObject *childp);
+	/*virtual*/ BOOL 	setParent(LLViewerObject* parent) override;
+	/*virtual*/ void 	addChild(LLViewerObject *childp) override;
+	/*virtual*/ void 	removeChild(LLViewerObject *childp) override;
 
 	//--------------------------------------------------------------------
 	// Sitting

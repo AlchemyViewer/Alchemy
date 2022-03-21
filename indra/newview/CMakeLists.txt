@@ -140,6 +140,7 @@ set(viewer_SOURCE_FILES
     alunzip.cpp
     alviewermenu.cpp
     groupchatlistener.cpp
+    llagentwearablesfetch.cpp
     llaccountingcostmanager.cpp
     lladdgridhandler.cpp
     llaisapi.cpp
@@ -816,6 +817,7 @@ set(viewer_HEADER_FILES
     alviewermenu.h
     groupchatlistener.h
     llaccountingcost.h
+    llagentwearablesfetch.h
     llaccountingcostmanager.h
     lladdgridhandler.h
     llaisapi.h

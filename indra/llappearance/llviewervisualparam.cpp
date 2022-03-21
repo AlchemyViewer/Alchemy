@@ -134,7 +134,7 @@ BOOL LLViewerVisualParam::setInfo(LLViewerVisualParamInfo *info)
 		return FALSE;
 	mInfo = info;
 	mID = info->mID;
-	setWeight(getDefaultWeight());
+	setWeight(getDefaultWeight(), FALSE);
 	return TRUE;
 }
 

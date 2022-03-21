@@ -174,8 +174,8 @@ LLViewerObject *LLViewerObject::createObject(const LLUUID &id, const LLPCode pco
 			if (!gAgentAvatarp)
 			{
 				gAgentAvatarp = new LLVOAvatarSelf(id, pcode, regionp);
+				gAgentWearables.setAvatarObject(gAgentAvatarp); // Set before instance init
 				gAgentAvatarp->initInstance();
-				gAgentWearables.setAvatarObject(gAgentAvatarp);
 			}
 			else 
 			{

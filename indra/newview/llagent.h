@@ -717,6 +717,7 @@ private:
 
 	void            handleTeleportFinished();
 	void            handleTeleportFailed();
+	void			handleServerBakeRegionTransition(const LLUUID& region_id);
 
     static void     addTPNearbyChatSeparator();
     static void     onCapabilitiesReceivedAfterTeleport();
@@ -855,6 +856,7 @@ public:
 	
 private:
 	BOOL			mShowAvatar; 		// Should we render the avatar?
+	U32				mAppearanceSerialNum;
 
 	//--------------------------------------------------------------------
 	// Rendering state bitmap helpers
@@ -956,6 +958,8 @@ private:
 public:
 	void			sendMessage(); // Send message to this agent's region
 	void			sendReliableMessage();
+	void 			dumpSentAppearance(const std::string& dump_prefix);
+	void			sendAgentSetAppearance();
 	void 			sendAgentDataUpdateRequest();
 	void 			sendAgentUserInfoRequest();
 
@@ -977,6 +981,7 @@ public:
 	static void		processAgentGroupDataUpdate(LLMessageSystem *msg, void **);
 	static void		processAgentDropGroup(LLMessageSystem *msg, void **);
 	static void		processScriptControlChange(LLMessageSystem *msg, void **);
+	static void		processAgentCachedTextureResponse(LLMessageSystem *mesgsys, void **user_data);
 	
 /**                    Messaging
  **                                                                            **
@@ -1022,5 +1027,25 @@ inline bool operator==(const LLGroupData &a, const LLGroupData &b)
 {
 	return (a.mID == b.mID);
 }
+
+class LLAgentQueryManager
+{
+	friend class LLAgent;
+	friend class LLAgentWearables;
+	
+public:
+	LLAgentQueryManager();
+	virtual ~LLAgentQueryManager();
+	
+	BOOL 			hasNoPendingQueries() const 	{ return getNumPendingQueries() == 0; }
+	S32 			getNumPendingQueries() const 	{ return mNumPendingQueries; }
+private:
+	S32				mNumPendingQueries;
+	S32				mWearablesCacheQueryID;
+	U32				mUpdateSerialNum;
+	S32		    	mActiveCacheQueries[LLAvatarAppearanceDefines::BAKED_NUM_INDICES];
+};
+
+extern LLAgentQueryManager gAgentQueryManager;
 
 #endif

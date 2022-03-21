@@ -560,6 +560,7 @@ void LLAvatarAppearance::computeBodySize()
 #ifdef SHOW_DEBUG
         compareJointStateMaps(mLastBodySizeState, mCurrBodySizeState);
 #endif
+		bodySizeChanged();
 	}
 }
 
@@ -1494,14 +1495,14 @@ BOOL LLAvatarAppearance::teToColorParams( ETextureIndex te, U32 *param_name )
 	return TRUE;
 }
 
-void LLAvatarAppearance::setClothesColor( ETextureIndex te, const LLColor4& new_color)
+void LLAvatarAppearance::setClothesColor( ETextureIndex te, const LLColor4& new_color, BOOL upload_bake )
 {
 	U32 param_name[3];
 	if( teToColorParams( te, param_name ) )
 	{
-		setVisualParamWeight( param_name[0], new_color.mV[VX]);
-		setVisualParamWeight( param_name[1], new_color.mV[VY]);
-		setVisualParamWeight( param_name[2], new_color.mV[VZ]);
+		setVisualParamWeight( param_name[0], new_color.mV[VX], upload_bake );
+		setVisualParamWeight( param_name[1], new_color.mV[VY], upload_bake );
+		setVisualParamWeight( param_name[2], new_color.mV[VZ], upload_bake );
 	}
 }
 
@@ -2143,7 +2144,7 @@ BOOL LLAvatarAppearance::LLAvatarXmlInfo::parseXmlMorphNodes(LLXmlTreeNode* root
 LLAvatarAppearance::LLMaskedMorph::LLMaskedMorph(LLVisualParam *morph_target, BOOL invert, std::string layer) :
 			mMorphTarget(morph_target), 
 			mInvert(invert),
-			mLayer(layer)
+			mLayer(std::move(layer))
 {
 	LLPolyMorphTarget *target = dynamic_cast<LLPolyMorphTarget*>(morph_target);
 	if (target)

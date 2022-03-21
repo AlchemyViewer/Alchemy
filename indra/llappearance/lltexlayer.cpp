@@ -158,7 +158,7 @@ BOOL LLTexLayerSetBuffer::renderTexLayerSet(LLRenderTarget* bound_target)
 									 getCompositeWidth(), getCompositeHeight(), bound_target );
 	gGL.flush();
 
-	midRenderTexLayerSet(success);
+	midRenderTexLayerSet(success, bound_target);
 
 	if (use_shaders)
 	{
@@ -181,8 +181,8 @@ BOOL LLTexLayerSetBuffer::renderTexLayerSet(LLRenderTarget* bound_target)
 
 LLTexLayerSetInfo::LLTexLayerSetInfo() :
 	mBodyRegion( "" ),
-	mWidth( 512 ),
-	mHeight( 512 ),
+	mWidth( 1024 ),
+	mHeight( 1024 ),
 	mClearAlpha( TRUE )
 {
 }

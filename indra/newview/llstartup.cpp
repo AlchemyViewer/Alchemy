@@ -2145,7 +2145,8 @@ bool idle_startup()
 		{
 			gAgentWearables.notifyLoadingStarted();
 			gAgent.setOutfitChosen(TRUE);
-			gAgentWearables.sendDummyAgentWearablesUpdate();
+			if (LLGridManager::getInstance()->isInSecondlife())
+				gAgentWearables.sendDummyAgentWearablesUpdate();
 			callAfterCategoryFetch(LLAppearanceMgr::instance().getCOF(), set_flags_and_update_appearance);
 		}
 
@@ -2206,22 +2207,22 @@ bool idle_startup()
 
 		if (gAgent.isOutfitChosen() && (wearables_time > max_wearables_time))
 		{
-			LLNotificationsUtil::add("ClothingLoading");
+			if (gInventory.isInventoryUsable())
+			{
+				LLNotificationsUtil::add("ClothingLoading");
+			}			
 			record(LLStatViewer::LOADING_WEARABLES_LONG_DELAY, wearables_time);
 			LLStartUp::setStartupState( STATE_CLEANUP );
 		}
+		// wait for avatar to be completely loaded
 		else if (gAgent.isFirstLogin()
 				&& isAgentAvatarValid()
 				&& gAgentAvatarp->isFullyLoaded())
 		{
-			// wait for avatar to be completely loaded
-			if (isAgentAvatarValid()
-				&& gAgentAvatarp->isFullyLoaded())
-			{
-				LL_DEBUGS("Avatar") << "avatar fully loaded" << LL_ENDL;
-				LLStartUp::setStartupState( STATE_CLEANUP );
-				return TRUE;
-			}
+			
+			LL_DEBUGS("Avatar") << "avatar fully loaded" << LL_ENDL;
+			LLStartUp::setStartupState( STATE_CLEANUP );
+			return TRUE;
 		}
 		else
 		{
@@ -2519,6 +2520,8 @@ void register_viewer_callbacks(LLMessageSystem* msg)
 	msg->setHandlerFuncFast(_PREHASH_AvatarAnimation,		process_avatar_animation);
 	msg->setHandlerFuncFast(_PREHASH_ObjectAnimation,		process_object_animation);
 	msg->setHandlerFuncFast(_PREHASH_AvatarAppearance,		process_avatar_appearance);
+	msg->setHandlerFunc("AgentCachedTextureResponse",	LLAgent::processAgentCachedTextureResponse);
+	msg->setHandlerFunc("RebakeAvatarTextures", LLVOAvatarSelf::processRebakeAvatarTextures);
 	msg->setHandlerFuncFast(_PREHASH_CameraConstraint,		process_camera_constraint);
 	msg->setHandlerFuncFast(_PREHASH_AvatarSitResponse,		process_avatar_sit_response);
 	msg->setHandlerFuncFast(_PREHASH_SetFollowCamProperties,			process_set_follow_cam_properties);
@@ -2591,6 +2594,8 @@ void register_viewer_callbacks(LLMessageSystem* msg)
 	// ratings deprecated
 	// msg->setHandlerFuncFast(_PREHASH_ReputationIndividualReply,
 	//					LLFloaterRate::processReputationIndividualReply);
+
+	msg->setHandlerFuncFast(_PREHASH_AgentWearablesUpdate, LLAgentWearables::processAgentInitialWearablesUpdate );
 
 	msg->setHandlerFuncFast(_PREHASH_ScriptControlChange,
 						LLAgent::processScriptControlChange );
@@ -2772,7 +2777,10 @@ void LLStartUp::loadInitialOutfit( const std::string& outfit_folder_name,
 	}
 
 	gAgent.setOutfitChosen(TRUE);
-	gAgentWearables.sendDummyAgentWearablesUpdate();
+	if (LLGridManager::getInstance()->isInSecondlife())
+	{
+		gAgentWearables.sendDummyAgentWearablesUpdate();
+	}
 }
 
 std::string& LLStartUp::getInitialOutfitName()

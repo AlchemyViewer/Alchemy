@@ -65,9 +65,9 @@ public:
 	LLDriverParamInfo();
 	/*virtual*/ ~LLDriverParamInfo() = default;
 	
-	/*virtual*/ BOOL parseXml(LLXmlTreeNode* node);
+	/*virtual*/ BOOL parseXml(LLXmlTreeNode* node) override;
 
-	/*virtual*/ void toStream(std::ostream &out);	
+	/*virtual*/ void toStream(std::ostream &out) override;	
 
 protected:
 	typedef std::deque<LLDrivenEntryInfo> entry_info_list_t;
@@ -107,24 +107,24 @@ public:
 
 	void					updateCrossDrivenParams(LLWearableType::EType driven_type);
 
-	/*virtual*/ LLViewerVisualParam* cloneParam(LLWearable* wearable) const;
+	/*virtual*/ LLViewerVisualParam* cloneParam(LLWearable* wearable) const override;
 
 	// LLVisualParam Virtual functions
-	/*virtual*/ void				apply( ESex sex ) {} // apply is called separately for each driven param.
-	/*virtual*/ void				setWeight(F32 weight);
-	/*virtual*/ void				setAnimationTarget( F32 target_value);
-	/*virtual*/ void				stopAnimating();
-	/*virtual*/ BOOL				linkDrivenParams(visual_param_mapper mapper, BOOL only_cross_params);
-	/*virtual*/ void				resetDrivenParams();
-	/*virtual*/ bool				isDriverParam() { return true; }
+	/*virtual*/ void				apply( ESex sex ) override {} // apply is called separately for each driven param.
+	/*virtual*/ void				setWeight(F32 weight, BOOL upload_bake) override;
+	/*virtual*/ void				setAnimationTarget( F32 target_value, BOOL upload_bake) override;
+	/*virtual*/ void				stopAnimating(BOOL upload_bake) override;
+	/*virtual*/ BOOL				linkDrivenParams(visual_param_mapper mapper, BOOL only_cross_params) override;
+	/*virtual*/ void				resetDrivenParams() override;
+	/*virtual*/ bool				isDriverParam() override { return true; }
 
 	// LLViewerVisualParam Virtual functions
-	/*virtual*/ F32					getTotalDistortion();
-	/*virtual*/ const LLVector4a&	getAvgDistortion();
-	/*virtual*/ F32					getMaxDistortion();
-	/*virtual*/ LLVector4a			getVertexDistortion(S32 index, LLPolyMesh *poly_mesh);
-	/*virtual*/ const LLVector4a*	getFirstDistortion(U32 *index, LLPolyMesh **poly_mesh);
-	/*virtual*/ const LLVector4a*	getNextDistortion(U32 *index, LLPolyMesh **poly_mesh);
+	/*virtual*/ F32					getTotalDistortion() override;
+	/*virtual*/ const LLVector4a&	getAvgDistortion() override;
+	/*virtual*/ F32					getMaxDistortion() override;
+	/*virtual*/ LLVector4a			getVertexDistortion(S32 index, LLPolyMesh *poly_mesh) override;
+	/*virtual*/ const LLVector4a*	getFirstDistortion(U32 *index, LLPolyMesh **poly_mesh) override;
+	/*virtual*/ const LLVector4a*	getNextDistortion(U32 *index, LLPolyMesh **poly_mesh) override;
 
 	S32								getDrivenParamsCount() const;
 	const LLViewerVisualParam*		getDrivenParam(S32 index) const;
@@ -136,7 +136,7 @@ public:
 protected:
 	LLDriverParam(const LLDriverParam& pOther);
 	F32 getDrivenWeight(const LLDrivenEntry* driven, F32 input_weight);
-	void setDrivenWeight(LLDrivenEntry *driven, F32 driven_weight);
+	void setDrivenWeight(LLDrivenEntry *driven, F32 driven_weight, bool upload_bake);
 
 
 	LL_ALIGN_16(LLVector4a	mDefaultVec); // temp holder

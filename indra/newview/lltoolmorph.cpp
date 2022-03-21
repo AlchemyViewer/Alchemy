@@ -154,7 +154,7 @@ void LLVisualParamHint::preRender(BOOL clear_depth)
 		wearable->setVolatile(TRUE);
 	}
 	mLastParamWeight = mVisualParam->getWeight();
-	mWearablePtr->setVisualParamWeight(mVisualParam->getID(), mVisualParamWeight);
+	mWearablePtr->setVisualParamWeight(mVisualParam->getID(), mVisualParamWeight, FALSE);
 	gAgentAvatarp->setVisualParamWeight(mVisualParam->getID(), mVisualParamWeight);
 	gAgentAvatarp->setVisualParamWeight("Blink_Left", 0.f);
 	gAgentAvatarp->setVisualParamWeight("Blink_Right", 0.f);
@@ -253,8 +253,8 @@ BOOL LLVisualParamHint::render()
 		gGL.setSceneBlendType(LLRender::BT_ALPHA);
 		gGL.setAlphaRejectSettings(LLRender::CF_DEFAULT);
 	}
-	gAgentAvatarp->setVisualParamWeight(mVisualParam->getID(), mLastParamWeight);
-	mWearablePtr->setVisualParamWeight(mVisualParam->getID(), mLastParamWeight);
+	gAgentAvatarp->setVisualParamWeight(mVisualParam->getID(), mLastParamWeight, FALSE);
+	mWearablePtr->setVisualParamWeight(mVisualParam->getID(), mLastParamWeight, FALSE);
 	LLViewerWearable* wearable = (LLViewerWearable*)mWearablePtr;
 	if (wearable)
 	{
