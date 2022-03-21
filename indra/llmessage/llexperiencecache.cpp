@@ -90,9 +90,6 @@ bool LLExperienceCache::sShutdown = false;
 //=========================================================================
 LLExperienceCache::LLExperienceCache(std::string grid)
 {
-    LLStringUtil::toLower(grid);
-    LLStringUtil::replaceChar(grid, ' ', '_');
-
     std::string file;
     if (grid.empty())
     {
@@ -100,6 +97,8 @@ LLExperienceCache::LLExperienceCache(std::string grid)
     }
     else
     {
+        LLStringUtil::toLower(grid);
+        LLStringUtil::replaceChar(grid, ' ', '_');
         file = llformat("experience_cache.%s.xml", grid);
     }
 
