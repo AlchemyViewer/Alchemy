@@ -3270,13 +3270,16 @@ void LLAgent::sendAnimationRequests(const std::vector<LLUUID> &anim_ids, EAnimRe
 		msg->addBOOLFast(_PREHASH_StartAnim, (request == ANIM_REQUEST_START) ? TRUE : FALSE);
 		num_valid_anims++;
 	}
-
+	if (!num_valid_anims)
+	{
+		msg->clearMessage();
+		return;
+	}
+	
 	msg->nextBlockFast(_PREHASH_PhysicalAvatarEventList);
 	msg->addBinaryDataFast(_PREHASH_TypeData, NULL, 0);
-	if (num_valid_anims)
-	{
-		sendReliableMessage();
-	}
+
+	sendReliableMessage();
 }
 
 void LLAgent::sendAnimationRequest(const LLUUID &anim_id, EAnimRequest request)
