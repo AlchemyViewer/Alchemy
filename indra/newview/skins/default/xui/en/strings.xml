@@ -6,12 +6,16 @@
 <strings>
 
 	<!-- Default Args - these arguments will be replaced in all strings -->
-	<string name="SECOND_LIFE">Second Life</string>
-	<string name="ALCHEMY">Alchemy</string>
+	<string name="SECOND_LIFE">[CURRENT_GRID]</string>
 	<string name="APP_NAME">Alchemy</string>
 	<string name="CAPITALIZED_APP_NAME">ALCHEMY</string>
-	<string name="SECOND_LIFE_GRID">Second Life Grid</string>
-	<string name="SUPPORT_SITE">Second Life Support Portal</string>
+	<string name="SECOND_LIFE_GRID">[CURRENT_GRID] Grid</string>
+	<string name="SUPPORT_SITE">Support Portal</string>
+
+	<!-- Default Args set in LLViewerNetwork -->
+	<string name="CURRENT_GRID"/>
+	<string name="GRID_ADMIN"/>
+
 
 	<!-- starting up -->
 	<string name="StartupDetectingHardware">Detecting hardware...</string>
@@ -132,7 +136,7 @@ Voice Server Version: [VOICE_VERSION]
 	
 	<string name="ViewerDownloadURL">https://www.alchemyviewer.org/pages/downloads.html</string>
 	<string name="LoginFailedViewerNotPermitted">
-The viewer you are using can no longer access Second Life. Please visit the following page to download a new viewer:
+    The viewer you are using can no longer access [CURRENT_GRID]. Please visit the following page to download a new viewer:
 https://www.alchemyviewer.org/pages/downloads.html</string>
 	<string name="LoginIntermediateOptionalUpdateAvailable">Optional viewer update available: [VERSION]</string>
 	<string name="LoginFailedRequiredUpdate">Required viewer update: [VERSION]</string>
@@ -144,47 +148,43 @@ Please check to make sure you entered the right
     * Password
 Also, please make sure your Caps Lock key is off.</string>
 	<string name="LoginFailedPasswordChanged">As a security precaution your password has been changed.
-Please go to your account page at http://secondlife.com/password
-and answer the security question to reset your password.
+Please go to your account page and answer the security question to reset your password.
 We are very sorry for the inconvenience.</string>
 	<string name="LoginFailedPasswordReset">We made some changes to our system and you will need to reset your password.
-Please go to your account page at http://secondlife.com/password
-and answer the security question to reset your password.
+Please go to your account page and answer the security question to reset your password.
 We are very sorry for the inconvenience.</string>
-	<string name="LoginFailedEmployeesOnly">Second Life is temporarily closed for maintenance.
-Logins are currently restricted to employees only.
-Check www.secondlife.com/status for updates.</string>
-	<string name="LoginFailedPremiumOnly">Second Life logins are temporarily restricted in order to make sure that those in-world have the best possible experience.
+	<string name="LoginFailedEmployeesOnly">[CURRENT_GRID] is temporarily closed for maintenance.
+Logins are currently restricted to [GRID_ADMIN] employees only.</string>
+	<string name="LoginFailedPremiumOnly">[CURRENT_GRID] logins are temporarily restricted in order to make sure that those in-world have the best possible experience.
 
-People with free accounts will not be able to access Second Life during this time, to make room for those who have paid for Second Life.</string>
-	<string name="LoginFailedComputerProhibited">Second Life cannot be accessed from this computer.
-If you feel this is an error, please contact
-support@secondlife.com.</string>
+People with free accounts will not be able to access [CURRENT_GRID] during this time, to make room for those who have paid for [CURRENT_GRID].</string>
+	<string name="LoginFailedComputerProhibited">[CURRENT_GRID] cannot be accessed from this computer.
+If you feel this is an error, please contact support.</string>
 	<string name="LoginFailedAcountSuspended">Your account is not accessible until
 [TIME] Pacific Time.</string>
 	<string name="LoginFailedAccountDisabled">We are unable to complete your request at this time.
-Please contact Second Life support for assistance at http://support.secondlife.com.</string>
+Please contact [CURRENT_GRID] support for assistance.</string>
 	<string name="LoginFailedTransformError">Data inconsistency found during login.
-Please contact support@secondlife.com.</string>
+Please contact [CURRENT_GRID] support.</string>
 	<string name="LoginFailedAccountMaintenance">Your account is undergoing minor maintenance.
 Your account is not accessible until
 [TIME] Pacific Time.
-If you feel this is an error, please contact support@secondlife.com.</string>
+If you feel this is an error, please contact [CURRENT_GRID] support.</string>
 	<string name="LoginFailedPendingLogoutFault">Request for logout responded with a fault from simulator.</string>
 	<string name="LoginFailedPendingLogout">The system is logging you out right now.
 Please wait a minute before you try logging in again.</string>
 	<string name="LoginFailedUnableToCreateSession">Unable to create valid session.</string>
 	<string name="LoginFailedUnableToConnectToSimulator">Unable to connect to a simulator.</string>
-	<string name="LoginFailedRestrictedHours">Your account can only access Second Life
+	<string name="LoginFailedRestrictedHours">Your account can only access [CURRENT_GRID]
 between [START] and [END] Pacific Time.
 Please come back during those hours.
-If you feel this is an error, please contact support@secondlife.com.</string>
+If you feel this is an error, please contact [CURRENT_GRID] support.</string>
 	<string name="LoginFailedIncorrectParameters">Incorrect parameters.
-If you feel this is an error, please contact support@secondlife.com.</string>
+If you feel this is an error, please contact [CURRENT_GRID] support.</string>
 	<string name="LoginFailedFirstNameNotAlphanumeric">First name parameter must be alphanumeric.
-If you feel this is an error, please contact support@secondlife.com.</string>
+If you feel this is an error, please contact [CURRENT_GRID] support.</string>
 	<string name="LoginFailedLastNameNotAlphanumeric">Last name parameter must be alphanumeric.
-If you feel this is an error, please contact support@secondlife.com.</string>
+If you feel this is an error, please contact [CURRENT_GRID] support.</string>
 	<string name="LogoutFailedRegionGoingOffline">Region is going offline.
 Please try logging in again in a minute.</string>
 	<string name="LogoutFailedAgentNotInRegion">Agent not in region.
@@ -909,7 +909,7 @@ Returns the rotation velocity in radians per second
 	</string>
 	<string name="LSLTipText_llGetTimeOfDay" translate="false">
 float llGetTimeOfDay()
-Returns the time in seconds since [SECOND_LIFE] server midnight or since region up-time, whichever is smaller
+Returns the time in seconds since [CURRENT_GRID] server midnight or since region up-time, whichever is smaller
 	</string>
 	<string name="LSLTipText_llGetWallclock" translate="false">
 float llGetWallclock()

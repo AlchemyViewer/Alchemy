@@ -350,7 +350,7 @@ void LLGiveInventory::logInventoryOffer(const LLUUID& to_agent, const LLUUID &im
 			std::string full_name = LLCacheName::buildUsername(av_name.getUserName());
 			LLUIString message = LLTrans::getString(message_name + "-im");
 			message.setArgs(args);
-			LLIMModel::instance().logToFile(full_name, LLTrans::getString("ALCHEMY"), im_session_id, message.getString());
+			LLIMModel::instance().logToFile(full_name, LLTrans::getString("APP_NAME"), im_session_id, message.getString());
 		}
 	}
 }

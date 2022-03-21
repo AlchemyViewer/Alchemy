@@ -703,7 +703,7 @@ public:
         else if (chat.mFromName.empty()
                  || mSourceType == CHAT_SOURCE_SYSTEM)
 		{
-			mFrom = LLTrans::getString("ALCHEMY");
+			mFrom = LLTrans::getString("APP_NAME");
 			if(!chat.mFromName.empty() && (mFrom != chat.mFromName))
 			{
 				mFrom += " (" + chat.mFromName + ")";
