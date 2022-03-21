@@ -435,6 +435,7 @@ void LLGridManager::addRemoteGrid(const std::string& login_uri, const EAddGridTy
 	if (login_uri.empty()) return;
 
 	std::string grid = utf8str_tolower(login_uri);
+	LLStringUtil::trim(grid);
 	// Grid needs to be in the form of a dns address,
 	// but also support localhost:9000 or localhost:9000/login
 	if (grid.find_first_not_of("abcdefghijklmnopqrstuvwxyz1234567890-_.:/@% ") != std::string::npos)
