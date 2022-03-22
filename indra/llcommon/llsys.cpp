@@ -58,6 +58,25 @@ using namespace llsd;
 #	include "llwin32headerslean.h"
 #   include <psapi.h>               // GetPerformanceInfo() et al.
 #	include <VersionHelpers.h>
+
+VERSIONHELPERAPI
+IsWindows11OrGreater()
+{
+	OSVERSIONINFOEXW osvi = { sizeof(osvi), 0, 0, 0, 0, {0}, 0, 0 };
+	DWORDLONG const dwlConditionMask = VerSetConditionMask(
+		VerSetConditionMask(
+			VerSetConditionMask(
+				0, VER_MAJORVERSION, VER_GREATER_EQUAL),
+			VER_MINORVERSION, VER_GREATER_EQUAL),
+		VER_BUILDNUMBER, VER_GREATER_EQUAL);
+
+	osvi.dwMajorVersion = HIBYTE(_WIN32_WINNT_WIN10);
+	osvi.dwMinorVersion = LOBYTE(_WIN32_WINNT_WIN10);
+	osvi.dwBuildNumber = 22000;
+
+	return VerifyVersionInfoW(&osvi, VER_MAJORVERSION | VER_MINORVERSION | VER_BUILDNUMBER, dwlConditionMask) != FALSE;
+}
+
 #elif LL_DARWIN
 #   include "llsys_objc.h"
 #	include <errno.h>
@@ -97,7 +116,20 @@ LLOSInfo::LLOSInfo() :
 
 #if LL_WINDOWS
 
-	if (IsWindows10OrGreater())
+	if (IsWindows11OrGreater())
+	{
+		mMajorVer = 10;
+		mMinorVer = 0;
+		if (IsWindowsServer())
+		{
+			mOSStringSimple = "Windows Server ";
+		}
+		else
+		{
+			mOSStringSimple = "Microsoft Windows 11 ";
+		}
+	}
+	else if (IsWindows10OrGreater())
 	{
 		mMajorVer = 10;
 		mMinorVer = 0;
