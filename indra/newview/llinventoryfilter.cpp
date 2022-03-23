@@ -278,7 +278,11 @@ bool LLInventoryFilter::checkFolder(const LLUUID& folder_id) const
 		if (!cat)
 			return folder_id.isNull();
 		LLFolderType::EType cat_type = cat->getPreferredType();
-		if (cat_type != LLFolderType::FT_NONE && (1LL << cat_type & mFilterOps.mFilterCategoryTypes) == U64(0))
+		if (cat_type == LLFolderType::FT_SUITCASE)
+		{
+			return true; // suitcase will always be shown
+		}
+		if (cat_type != LLFolderType::FT_NONE && (1ULL << cat_type & mFilterOps.mFilterCategoryTypes) == U64(0))
 			return false;
 	}
 
