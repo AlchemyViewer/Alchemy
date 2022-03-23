@@ -9476,18 +9476,16 @@ void LLVOAvatar::processAvatarAppearance( LLMessageSystem* mesgsys )
         // we must prevent rolling this one backwards backwards or processing 
         // stale versions.
 
-        S32 aisCOFVersion(LLAppearanceMgr::instance().getCOFVersion());
-
-        LL_DEBUGS("Avatar") << "handling self appearance message #" << thisAppearanceVersion <<
+		LL_DEBUGS("Avatar") << "handling self appearance message #" << thisAppearanceVersion <<
             " (highest seen #" << mLastUpdateReceivedCOFVersion <<
-            ") (AISCOF=#" << aisCOFVersion << ")" << LL_ENDL;
+            ") (AISCOF=#" << LLAppearanceMgr::instance().getCOFVersion() << ")" << LL_ENDL;
 
         if (mFirstTEMessageReceived && (appearance_version == 0))
         {
             return;
         }
 
-        if (mLastUpdateReceivedCOFVersion >= thisAppearanceVersion)
+        if ((appearance_version > 0) && mLastUpdateReceivedCOFVersion >= thisAppearanceVersion)
         {
             LL_WARNS("Avatar") << "Stale appearance received #" << thisAppearanceVersion <<
                 " attempt to roll back from #" << mLastUpdateReceivedCOFVersion <<
