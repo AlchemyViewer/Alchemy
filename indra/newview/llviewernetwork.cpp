@@ -52,6 +52,10 @@ const std::string  GRID_HELPER_URI_VALUE = "helper_uri";
 const std::string  GRID_LOGIN_PAGE_VALUE = "login_page";
 /// url for the web profile site
 const std::string  GRID_WEB_PROFILE_VALUE = "web_profile_url";
+/// url for the web profile site
+const std::string  GRID_STATUS_PAGE_URL = "grid_status";
+/// url for the web profile site
+const std::string  GRID_STATUS_RSS_URL = "grid_status_rss";
 /// internal data on system grids
 const std::string  GRID_IS_SYSTEM_GRID_VALUE = "system_grid";
 /// whether this is single or double names
@@ -148,6 +152,8 @@ void LLGridManager::initialize(const std::string& grid_file)
 				  "https://join.secondlife.com/?sourceid=AlchemyViewer",
 				  ALCHEMY_UPDATE_SERVICE,
 				  MAIN_GRID_WEB_PROFILE_URL,
+				  "http://status.secondlifegrid.net/",
+				  "https://status.secondlifegrid.net/history.atom",
 				  "Linden Lab",
 				  "secondlife",
 				  "Agni");
@@ -160,6 +166,8 @@ void LLGridManager::initialize(const std::string& grid_file)
 				  "https://join.secondlife.com/?sourceid=AlchemyViewer",
 				  ALCHEMY_UPDATE_SERVICE,
 				  "https://my.aditi.lindenlab.com/",
+				  "http://status.secondlifegrid.net/",
+				  "https://status.secondlifegrid.net/history.atom",
 				  "Linden Lab",
 				  "secondlife",
 				  "Aditi");
@@ -383,6 +391,8 @@ void LLGridManager::addSystemGrid(const std::string& label,
 								  const std::string& register_url,
 								  const std::string& update_url_base,
 								  const std::string& web_profile_url,
+								  const std::string& grid_status_url,
+								  const std::string& grid_status_rss_url,
 								  const std::string& administrator,
 								  const std::string& platform,
 								  const std::string& login_id)
@@ -396,6 +406,8 @@ void LLGridManager::addSystemGrid(const std::string& label,
 	grid[GRID_LOGIN_PAGE_VALUE] = login_page;
 	grid[GRID_UPDATE_SERVICE_URL] = update_url_base;
 	grid[GRID_WEB_PROFILE_VALUE] = web_profile_url;
+	grid[GRID_STATUS_PAGE_URL] = grid_status_url;
+	grid[GRID_STATUS_RSS_URL] = grid_status_rss_url;
 	grid[GRID_IS_SYSTEM_GRID_VALUE] = true;
 	grid[GRID_LOGIN_IDENTIFIER_TYPES] = LLSD::emptyArray();
 	grid[GRID_LOGIN_IDENTIFIER_TYPES].append(CRED_IDENTIFIER_TYPE_AGENT);
@@ -574,6 +586,16 @@ void LLGridManager::gridInfoResponderCoro(const std::string uri, bool hypergrid)
 		{
 			grid[GRID_ACCOUNT_REGISTRATION_URL] = node->getTextContents();
 			LL_DEBUGS("GridManager") << "[\"register\"]: " << grid[GRID_ACCOUNT_REGISTRATION_URL] << LL_ENDL;
+		}
+		else if (node->hasName("GridStatus"))
+		{
+			grid[GRID_STATUS_PAGE_URL] = node->getTextContents();
+			LL_DEBUGS("GridManager") << "[\"gridstatus\"]: " << grid[GRID_STATUS_PAGE_URL] << LL_ENDL;
+		}
+		else if (node->hasName("GridStatusRSS"))
+		{
+			grid[GRID_STATUS_RSS_URL] = node->getTextContents();
+			LL_DEBUGS("GridManager") << "[\"gridstatusrss\"]: " << grid[GRID_STATUS_RSS_URL] << LL_ENDL;
 		}
 		else if (node->hasName("password"))
 		{
@@ -907,6 +929,36 @@ std::string LLGridManager::getCreateAccountURL() const
 					  : LLStringUtil::null;
 	LL_DEBUGS("GridManager") << "returning " << url << LL_ENDL;
 	return url;
+}
+
+std::string LLGridManager::getGridStatusURL(const std::string& grid) const
+{
+	std::string grid_status_url;
+	std::string grid_name = getGrid(grid);
+	if (!grid_name.empty())
+	{
+		grid_status_url = mGridList[grid_name][GRID_STATUS_PAGE_URL].asString();
+	}
+	else
+	{
+		LL_WARNS("GridManager") << "invalid grid '" << grid << "'" << LL_ENDL;
+	}
+	return grid_status_url;
+}
+
+std::string LLGridManager::getGridStatusRSSURL(const std::string& grid) const
+{
+	std::string grid_status_rss_url;
+	std::string grid_name = getGrid(grid);
+	if (!grid_name.empty())
+	{
+		grid_status_rss_url = mGridList[grid_name][GRID_STATUS_RSS_URL].asString();
+	}
+	else
+	{
+		LL_WARNS("GridManager") << "invalid grid '" << grid << "'" << LL_ENDL;
+	}
+	return grid_status_rss_url;
 }
 
 std::string LLGridManager::getWebProfileURL(const std::string& grid)

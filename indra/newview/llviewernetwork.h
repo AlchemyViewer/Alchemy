@@ -143,6 +143,14 @@ class LLGridManager final : public LLSingleton<LLGridManager>
 	/// Get the url for creating an account for the selected grid
 	std::string getCreateAccountURL() const;
 
+	/// Get the url for the grid status page
+	std::string getGridStatusURL(const std::string& grid) const;
+	std::string getGridStatusURL() const { return getGridStatusURL(mGrid); };
+
+	/// Get the url for the grid status rss feed
+	std::string getGridStatusRSSURL(const std::string& grid) const;
+	std::string getGridStatusRSSURL() const { return getGridStatusRSSURL(mGrid); };
+
 	/// Get the id to be used as a short name in url path components or parameters
 	std::string getGridLoginID() const;
 	
@@ -290,6 +298,8 @@ private:
 					   const std::string& register_url,
 					   const std::string& update_url_base,
 					   const std::string& web_profile_url,
+					   const std::string& grid_status_url,
+					   const std::string& grid_status_rss_url,
 					   const std::string& administrator,
 					   const std::string& platform,
 					   const std::string& login_id = "");

@@ -37,6 +37,7 @@
 #include "lltoolbarview.h"
 #include "llviewercontrol.h"
 #include "llxmltree.h"
+#include "llviewernetwork.h"
 
 std::map<std::string, std::string> LLFloaterGridStatus::sItemsMap;
 const std::string DEFAULT_GRID_STATUS_URL = "http://status.secondlifegrid.net/";
@@ -65,7 +66,7 @@ void LLFloaterGridStatus::onOpen(const LLSD& key)
     applyPreferredRect();
     if (mWebBrowser)
     {
-        mWebBrowser->navigateTo(DEFAULT_GRID_STATUS_URL, HTTP_CONTENT_TEXT_HTML);
+        mWebBrowser->navigateTo(LLGridManager::instance().getGridStatusURL(), HTTP_CONTENT_TEXT_HTML);
     }
 }
 
@@ -97,7 +98,7 @@ void LLFloaterGridStatus::getGridStatusRSSCoro()
 
     httpOpts->setSSLVerifyPeer(false); // We want this data even if SSL fails
     httpHeaders->append(HTTP_OUT_HEADER_CONTENT_TYPE, HTTP_CONTENT_TEXT_XML);
-    std::string url = gSavedSettings.getString("GridStatusRSS");
+    std::string url = LLGridManager::instance().getGridStatusRSSURL();
 
     LLSD result = httpAdapter->getRawAndSuspend(httpRequest, url, httpOpts, httpHeaders);
     LLSD httpResults = result[LLCoreHttpUtil::HttpCoroutineAdapter::HTTP_RESULTS];
@@ -110,7 +111,7 @@ void LLFloaterGridStatus::getGridStatusRSSCoro()
     const LLSD::Binary &rawBody = result[LLCoreHttpUtil::HttpCoroutineAdapter::HTTP_RESULTS_RAW].asBinary();
     std::string body(rawBody.begin(), rawBody.end());
 
-    std::string fullpath = gDirUtilp->getExpandedFilename(LL_PATH_LOGS,"grid_status_rss.xml");
+    std::string fullpath = gDirUtilp->getExpandedFilename(LL_PATH_CACHE_PER_GRID, "grid_status_rss.xml");
     if(!gSavedSettings.getBOOL("TestGridStatusRSSFromFile"))
     {
         llofstream custom_file_out(fullpath.c_str(), std::ios::trunc);
