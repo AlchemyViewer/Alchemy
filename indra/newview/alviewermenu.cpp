@@ -23,6 +23,8 @@
 // library
 #include "llclipboard.h"
 #include "llfloaterreg.h"
+#include "llsdserialize.h"
+#include "lltrans.h"
 #include "llview.h"
 
 // newview
@@ -301,6 +303,20 @@ namespace
 
 		}
 	}
+
+	void spawn_debug_simfeatures()
+	{
+		if (LLViewerRegion* regionp = gAgent.getRegion())
+		{
+			LLSD sim_features, args;
+			std::stringstream features_str;
+			regionp->getSimulatorFeatures(sim_features);
+			LLSDSerialize::toPrettyXML(sim_features, features_str);
+			args["title"] = llformat("%s - %s", LLTrans::getString("SimulatorFeaturesTitle").c_str(), regionp->getName().c_str());
+			args["data"] = features_str.str();
+			LLFloaterReg::showInstance("generic_text", args);
+		}
+	}
 }
 
 ////////////////////////////////////////////////////////
@@ -317,6 +333,8 @@ void ALViewerMenu::initialize_menus()
 	commit.add("Avatar.CopyData",		[](LLUICtrl* ctrl, const LLSD& param) { avatar_copy_data(param); });
 	commit.add("Avatar.ManageEstate", [](LLUICtrl* ctrl, const LLSD& param) { manage_estate(param); });
 	commit.add("Avatar.TeleportTo", [](LLUICtrl* ctrl, const LLSD& param) { teleport_to(); });
+
+	commit.add("Advanced.DebugSimFeatures", [](LLUICtrl* ctrl, const LLSD& param) { spawn_debug_simfeatures(); });
 
 	commit.add("Object.CopyID", [](LLUICtrl* ctrl, const LLSD& param) { object_copy_key(); });
 	commit.add("Object.EditParticles",	[](LLUICtrl* ctrl, const LLSD& param) { edit_particle_source(); });
