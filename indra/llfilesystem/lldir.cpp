@@ -1108,20 +1108,20 @@ void LLDir::dumpCurrentDirectories(LLError::ELevel level)
 	LL_VLOGS(level, "AppInit", "Directories") << "  UserSkinDir:           " << getUserSkinDir() << LL_ENDL;
 }
 
-void LLDir::append(std::string& destpath, const std::string& name) const
+void LLDir::append(std::string& destpath, std::string_view name) const
 {
 	// Delegate question of whether we need a separator to helper method.
 	SepOff sepoff(needSep(destpath, name));
 	if (sepoff.first)               // do we need a separator?
 	{
-		destpath += mDirDelimiter;
+		destpath.append(mDirDelimiter);
 	}
 	// If destpath ends with a separator, AND name starts with one, skip
 	// name's leading separator.
-	destpath += name.substr(sepoff.second);
+	destpath.append(name.substr(sepoff.second));
 }
 
-LLDir::SepOff LLDir::needSep(const std::string& path, const std::string& name) const
+LLDir::SepOff LLDir::needSep(std::string_view path, std::string_view name) const
 {
 	if (path.empty() || name.empty())
 	{

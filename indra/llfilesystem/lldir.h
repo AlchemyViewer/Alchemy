@@ -201,11 +201,11 @@ class LLDir
 
 	/// Append specified @a name to @a destpath, separated by getDirDelimiter()
 	/// if both are non-empty.
-	void append(std::string& destpath, const std::string& name) const;
+	void append(std::string& destpath, std::string_view name) const;
 	/// Variadic form: append @a name0 and @a name1 and arbitrary other @a
 	/// names to @a destpath, separated by getDirDelimiter() as needed.
 	template <typename... NAMES>
-	void append(std::string& destpath, const std::string& name0, const std::string& name1,
+	void append(std::string& destpath, std::string_view name0, std::string_view name1,
 				const NAMES& ... names) const
 	{
 		// In a typical recursion case, we'd accept (destpath, name0, names).
@@ -230,7 +230,7 @@ class LLDir
 protected:
 	// Does an add() or append() call need a directory delimiter?
 	typedef std::pair<bool, unsigned short> SepOff;
-	SepOff needSep(const std::string& path, const std::string& name) const;
+	SepOff needSep(std::string_view path, std::string_view name) const;
 	// build mSearchSkinDirs without adding duplicates
 	void addSearchSkinDir(const std::string& skindir);
 
