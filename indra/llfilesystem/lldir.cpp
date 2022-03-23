@@ -375,6 +375,12 @@ const std::string  LLDir::getCacheDir(bool get_default) const
 	}
 }
 
+const std::string  LLDir::getCacheDirPerGrid(bool get_default) const
+{
+	using namespace std::literals;
+	return add(getCacheDir(get_default), (mGrid.empty() ? "" : "gridcache"), mGrid);
+}
+
 // Return the default cache directory
 std::string LLDir::buildSLOSCacheDir() const
 {
@@ -473,6 +479,7 @@ static std::string ELLPathToString(ELLPath location)
 		ENT(LL_PATH_EXECUTABLE)
 		ENT(LL_PATH_DEFAULT_SKIN)
 		ENT(LL_PATH_FONTS)
+		ENT(LL_PATH_CACHE_PER_GRID)
 		ENT(LL_PATH_LAST)
 	;
 #undef ENT
@@ -518,6 +525,10 @@ std::string LLDir::getExpandedFilename(ELLPath location, const std::string& subd
 		prefix = getCacheDir();
 		break;
 		
+	case LL_PATH_CACHE_PER_GRID:
+		prefix = getCacheDirPerGrid();
+		break;
+
     case LL_PATH_DUMP:
         prefix=getDumpDir();
         break;
@@ -957,12 +968,12 @@ void LLDir::setChatLogsDir(const std::string &path)
 
 void LLDir::updatePerAccountChatLogsDir()
 {
-	const std::string& logname = (mGrid.empty())
-		? mUserName : mUserName.append(".").append(mGrid);
+	const std::string logname = (mGrid.empty())
+		? mUserName : std::string(mUserName).append(".").append(mGrid);
 	mPerAccountChatLogsDir = add(getChatLogsDir(), logname);
 }
 
-void LLDir::setPerAccountChatLogsDir(const std::string &username, const std::string &gridname)
+void LLDir::setPerAccountChatLogsDir(const std::string &username)
 {
 	// if both first and last aren't set, assume we're grabbing the cached dir
 	if (!username.empty())
@@ -972,12 +983,8 @@ void LLDir::setPerAccountChatLogsDir(const std::string &username, const std::str
 		std::string userlower(username);
 		LLStringUtil::toLower(userlower);
 		LLStringUtil::replaceChar(userlower, ' ', '_');
-		std::string gridlower(gridname);
-		LLStringUtil::toLower(gridlower);
-		LLStringUtil::replaceChar(gridlower, ' ', '_');
 		
 		mUserName = userlower;
-		mGrid = gridlower;
 		updatePerAccountChatLogsDir();
 	}
 	else
@@ -1062,6 +1069,21 @@ bool LLDir::setCacheDir(const std::string &path)
 			return true;
 		}
 		return false;
+	}
+}
+
+void LLDir::setCurrentGrid(std::string gridname)
+{
+	if (gridname.empty())
+	{
+		mGrid.clear();
+	}
+	else
+	{
+		LLStringUtil::toLower(gridname);
+		LLStringUtil::replaceChar(gridname, ' ', '_');
+
+		mGrid = gridname;
 	}
 }
 

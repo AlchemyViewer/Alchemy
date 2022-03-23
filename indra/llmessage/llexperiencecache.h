@@ -41,9 +41,9 @@ class LLSD;
 class LLUUID;
 
 
-class LLExperienceCache final : public LLParamSingleton < LLExperienceCache >
+class LLExperienceCache final : public LLSingleton < LLExperienceCache >
 {
-    LLSINGLETON(LLExperienceCache, std::string);
+    LLSINGLETON_EMPTY_CTOR(LLExperienceCache);
 
 public:
     typedef boost::function<std::string(const std::string &)> CapabilityQuery_t;

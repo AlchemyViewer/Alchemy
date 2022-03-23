@@ -175,6 +175,7 @@
 #include "llviewerwindow.h"
 #include "llvoavatar.h"
 #include "llvoavatarself.h"
+#include "llvocache.h"
 #include "llweb.h"
 #include "llworld.h"
 #include "llworldmapmessage.h"
@@ -948,6 +949,12 @@ bool idle_startup()
 		// create necessary directories
 		// *FIX: these mkdir's should error check
 		const std::string& gridlabel = !LLGridManager::getInstance()->isInSecondlife() ? LLGridManager::getInstance()->getGridId() : LLStringUtil::null;
+		gDirUtilp->setCurrentGrid(gridlabel);
+		LLFile::mkdir(gDirUtilp->getExpandedFilename(LL_PATH_CACHE, "gridcache", ""));
+		LLFile::mkdir(gDirUtilp->getCacheDirPerGrid());
+
+		LLVOCache::getInstance()->initCache(LL_PATH_CACHE_PER_GRID, gSavedSettings.getU32("CacheNumberOfRegionsForObjects"), LLAppViewer::getObjectCacheVersion());
+
 		gDirUtilp->setLindenUserDir(userid, gridlabel);
 		LLFile::mkdir(gDirUtilp->getLindenUserDir());
 
@@ -996,7 +1003,7 @@ bool idle_startup()
 		{
 			gDirUtilp->setChatLogsDir(gSavedPerAccountSettings.getString("InstantMessageLogPath"));		
 		}
-		gDirUtilp->setPerAccountChatLogsDir(userid, gridlabel);
+		gDirUtilp->setPerAccountChatLogsDir(userid);
 		
 		LLFile::mkdir(gDirUtilp->getChatLogsDir());
 		LLFile::mkdir(gDirUtilp->getPerAccountChatLogsDir());
@@ -2147,7 +2154,9 @@ bool idle_startup()
 			gAgentWearables.notifyLoadingStarted();
 			gAgent.setOutfitChosen(TRUE);
 			if (LLGridManager::getInstance()->isInSecondlife())
+			{
 				gAgentWearables.sendDummyAgentWearablesUpdate();
+			}
 			callAfterCategoryFetch(LLAppearanceMgr::instance().getCOF(), set_flags_and_update_appearance);
 		}
 
@@ -2235,6 +2244,9 @@ bool idle_startup()
 				LLStartUp::setStartupState( STATE_CLEANUP );
 				return TRUE;
 			}
+
+			// Can't fall through here, so return
+			return TRUE;
 		}
 		//fall through this frame to STATE_CLEANUP
 	}
@@ -2935,8 +2947,6 @@ void LLStartUp::initNameCache()
 void LLStartUp::initExperiences()
 {   
     // Should trigger loading the cache.
-	const std::string& gridlabel = !LLGridManager::getInstance()->isInSecondlife() ? LLGridManager::getInstance()->getGridId() : LLStringUtil::null;
-	LLExperienceCache::initParamSingleton(gridlabel);
     LLExperienceCache::instance().setCapabilityQuery(
         boost::bind(&LLAgent::getRegionCapability, &gAgent, _1));
 

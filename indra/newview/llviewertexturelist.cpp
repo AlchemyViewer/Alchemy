@@ -201,7 +201,7 @@ void LLViewerTextureList::doPreloadImages()
 
 static std::string get_texture_list_name()
 {
-	return gDirUtilp->getExpandedFilename(LL_PATH_CACHE, "texture_list_" + gSavedSettings.getString("LoginLocation") + "." + gDirUtilp->getUserName() + ".xml");
+	return gDirUtilp->getExpandedFilename(LL_PATH_CACHE_PER_GRID, "texture_list_" + gSavedSettings.getString("LoginLocation") + "." + gDirUtilp->getUserName() + ".xml");
 }
 
 void LLViewerTextureList::doPrefetchImages()

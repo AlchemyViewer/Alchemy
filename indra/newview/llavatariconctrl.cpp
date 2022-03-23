@@ -75,7 +75,7 @@ void LLAvatarIconIDCache::load	()
 	LL_INFOS() << "Loading avatar icon id cache." << LL_ENDL;
 	
 	// build filename for each user
-	std::string resolved_filename = gDirUtilp->getExpandedFilename(LL_PATH_CACHE, mFilename);
+	std::string resolved_filename = gDirUtilp->getExpandedFilename(LL_PATH_CACHE_PER_GRID, mFilename);
 	llifstream file(resolved_filename.c_str());
 
 	if (!file.is_open())
@@ -111,7 +111,7 @@ void LLAvatarIconIDCache::load	()
 
 void LLAvatarIconIDCache::save	()
 {
-	std::string resolved_filename = gDirUtilp->getExpandedFilename(LL_PATH_CACHE, mFilename);
+	std::string resolved_filename = gDirUtilp->getExpandedFilename(LL_PATH_CACHE_PER_GRID, mFilename);
 
 	// open a file for writing
 	llofstream file (resolved_filename.c_str());

@@ -81,8 +81,6 @@ BOOL LLInventoryModel::sFirstTimeInViewer2 = TRUE;
 ///----------------------------------------------------------------------------
 
 //BOOL decompress_file(const char* src_filename, const char* dst_filename);
-static const char PRODUCTION_CACHE_FORMAT_STRING[] = "%s.inv.llsd";
-static const char GRID_CACHE_FORMAT_STRING[] = "%s.%s.inv.llsd";
 static const char * const LOG_INV("Inventory");
 
 struct InventoryIDPtrLess
@@ -1896,24 +1894,7 @@ bool LLInventoryModel::fetchDescendentsOf(const LLUUID& folder_id) const
 //static
 std::string LLInventoryModel::getInvCacheAddres(const LLUUID& owner_id)
 {
-    std::string inventory_addr;
-    std::string owner_id_str;
-    owner_id.toString(owner_id_str);
-    std::string path(gDirUtilp->getExpandedFilename(LL_PATH_CACHE, owner_id_str));
-    if (LLGridManager::getInstance()->isInSLMain())
-    {
-        inventory_addr = llformat(PRODUCTION_CACHE_FORMAT_STRING, path.c_str());
-    }
-    else
-    {
-        // NOTE: The inventory cache filenames now include the grid name.
-        // Add controls against directory traversal or problematic pathname lengths
-        // if your viewer uses grid names from an untrusted source.
-        const std::string& grid_id_str = LLGridManager::getInstance()->getGridId();
-        const std::string& grid_id_lower = utf8str_tolower(grid_id_str);
-        inventory_addr = llformat(GRID_CACHE_FORMAT_STRING, path.c_str(), grid_id_lower.c_str());
-    }
-    return inventory_addr;
+	return gDirUtilp->getExpandedFilename(LL_PATH_CACHE_PER_GRID, owner_id.asString(), ".inv.llsd");
 }
 
 void LLInventoryModel::cache(

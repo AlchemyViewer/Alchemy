@@ -35,6 +35,7 @@
 #include "pipeline.h"
 #include "llagentcamera.h"
 #include "llmemory.h"
+#include "llviewernetwork.h"
 
 //static variables
 U32 LLVOCacheEntry::sMinFrameRange = 0;
@@ -1196,12 +1197,9 @@ void LLVOCache::clearCacheInMemory()
 void LLVOCache::getObjectCacheFilename(U64 handle, std::string& filename) 
 {
 	U32 region_x, region_y;
-
 	grid_from_region_handle(handle, &region_x, &region_y);
-	filename = gDirUtilp->getExpandedFilename(LL_PATH_CACHE, object_cache_dirname,
-			   llformat(OBJECT_CACHE_FILENAME, region_x, region_y));
 
-	return ;
+	filename = gDirUtilp->add(mObjectCacheDirName, llformat(OBJECT_CACHE_FILENAME, region_x, region_y));
 }
 
 void LLVOCache::removeFromCache(HeaderEntryInfo* entry)

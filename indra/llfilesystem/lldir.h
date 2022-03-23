@@ -49,6 +49,7 @@ typedef enum ELLPath
 	LL_PATH_DEFAULT_SKIN = 17,
 	LL_PATH_FONTS = 18,
     LL_PATH_DUMP = 19,
+	LL_PATH_CACHE_PER_GRID = 20,
 	LL_PATH_LAST
 } ELLPath;
 
@@ -94,6 +95,7 @@ class LLDir
 	const std::string &getPerAccountChatLogsDir() const;	// Location of the per account chat logs dir.
 	const std::string &getTempDir() const;			// Common temporary directory
 	const std::string  getCacheDir(bool get_default = false) const;	// Location of the cache.
+	const std::string  getCacheDirPerGrid(bool get_default = false) const;	// Location of the per-grid cache.
 	const std::string &getOSCacheDir() const;		// location of OS-specific cache folder (may be empty string)
 	const std::string &getCAFile() const;			// File containing TLS certificate authorities
 	const std::string &getDirDelimiter() const;	// directory separator for platform (ie. '\' or '/' or ':')
@@ -184,7 +186,7 @@ class LLDir
 
 
 	virtual void setChatLogsDir(const std::string &path);		// Set the chat logs dir to this user's dir
-	virtual void setPerAccountChatLogsDir(const std::string &username, const std::string &gridname);		// Set the per user chat log directory.
+	virtual void setPerAccountChatLogsDir(const std::string &username);		// Set the per user chat log directory.
 	virtual void setLindenUserDir(const std::string &username, const std::string &gridname);		// Set the linden user dir to this user's dir
 	virtual void setSkinFolder(const std::string &skin_folder, const std::string& language);
 	virtual std::string getSkinFolder() const;
@@ -222,6 +224,8 @@ class LLDir
 		append(destpath, names...);
 		return destpath;
 	}
+
+	void setCurrentGrid(std::string grid);
 
 protected:
 	// Does an add() or append() call need a directory delimiter?
