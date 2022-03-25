@@ -2317,13 +2317,43 @@ void LLViewerRegion::setSimulatorFeatures(const LLSD& sim_features)
 		setGodnames();
 		if (mSimulatorFeatures.has("OpenSimExtras"))
 		{
-			if (mSimulatorFeatures["OpenSimExtras"].has("GridURL"))
+			const LLSD& extras(mSimulatorFeatures["OpenSimExtras"]);
+
+			if (extras.has("GridURL"))
 			{
-				const std::string& grid_url = mSimulatorFeatures["OpenSimExtras"]["GridURL"].asString();
+				const std::string& grid_url = extras["GridURL"].asString();
 				if (LLGridManager::getInstance()->getGrid(LLURI(grid_url).authority()).empty())
 					LLGridManager::getInstance()->addRemoteGrid(grid_url, LLGridManager::ADD_HYPERGRID);
 			}
+
+			mMinSimHeight = extras.has("MinSimHeight") ? extras["MinSimHeight"].asReal() : OS_MIN_OBJECT_Z;
+			mMaxSimHeight = extras.has("MaxSimHeight") ? extras["MaxSimHeight"].asReal() : OS_MAX_OBJECT_Z;
+			mMinPrimScale = extras.has("MinPrimScale") ? extras["MinPrimScale"].asReal() : OS_MIN_PRIM_SCALE;
+			mMaxPrimScale = extras.has("MaxPrimScale") ? extras["MaxPrimScale"].asReal() : OS_DEFAULT_MAX_PRIM_SCALE;
+			mMaxPrimScaleNoMesh = extras.has("MaxPrimScale") ? extras["MaxPrimScale"].asReal() : OS_DEFAULT_MAX_PRIM_SCALE;
+			mMinPhysPrimScale = extras.has("MinPhysPrimScale") ? extras["MinPhysPrimScale"].asReal() : OS_MIN_PRIM_SCALE;
+			mMaxPhysPrimScale = extras.has("MaxPhysPrimScale") ? extras["MaxPhysPrimScale"].asReal() : OS_DEFAULT_MAX_PRIM_SCALE;
 		}
+		else
+		{
+			mMinSimHeight = OS_MIN_OBJECT_Z;
+			mMaxSimHeight = OS_MAX_OBJECT_Z;
+			mMinPrimScale = OS_MIN_PRIM_SCALE;
+			mMaxPrimScale = OS_DEFAULT_MAX_PRIM_SCALE;
+			mMaxPrimScaleNoMesh = OS_DEFAULT_MAX_PRIM_SCALE;
+			mMinPhysPrimScale = OS_MIN_PRIM_SCALE;
+			mMaxPhysPrimScale = OS_DEFAULT_MAX_PRIM_SCALE;
+		}
+	}
+	else
+	{
+		mMinSimHeight = SL_MIN_OBJECT_Z;
+		mMaxSimHeight = SL_MAX_OBJECT_Z;
+		mMinPrimScale = SL_MIN_PRIM_SCALE;
+		mMaxPrimScale = SL_DEFAULT_MAX_PRIM_SCALE;
+		mMaxPrimScaleNoMesh = SL_DEFAULT_MAX_PRIM_SCALE_NO_MESH;
+		mMinPhysPrimScale = SL_MIN_PRIM_SCALE;
+		mMaxPhysPrimScale = SL_DEFAULT_MAX_PRIM_SCALE;
 	}
 
 	if(mSimulatorFeatures.has("MaxMaterialsPerTransaction")
@@ -3696,6 +3726,36 @@ U32 LLViewerRegion::getWhisperRange() const
         range = mSimulatorFeatures["OpenSimExtras"]["whisper-range"].asInteger();
     }
     return range;
+}
+
+F32 LLViewerRegion::getMinPrimScale() const
+{
+	return mMinPrimScale;
+}
+
+F32 LLViewerRegion::getMaxPrimScale() const
+{
+	return mMaxPrimScale;
+}
+
+F32 LLViewerRegion::getMinPhysPrimScale() const
+{
+	return mMinPhysPrimScale;
+}
+
+F32 LLViewerRegion::getMaxPhysPrimScale() const
+{
+	return mMaxPhysPrimScale;
+}
+
+F32 LLViewerRegion::getMinRegionHeight() const
+{
+	return mMinSimHeight;
+}
+
+F32 LLViewerRegion::getMaxRegionHeight() const
+{
+	return mMaxSimHeight;
 }
 
 void LLViewerRegion::setGodnames()

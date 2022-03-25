@@ -51,6 +51,7 @@
 #include "llstatusbar.h"
 #include "llui.h"
 #include "llviewercamera.h"
+#include "llviewernetwork.h"
 #include "llviewerobject.h"
 #include "llviewerregion.h"
 #include "llviewerwindow.h"
@@ -94,11 +95,11 @@ F32 get_default_max_prim_scale(bool is_flora)
 	if (gMeshRepo.meshRezEnabled() &&
 		!is_flora)
 	{
-		return DEFAULT_MAX_PRIM_SCALE;
+		return LLWorld::getInstance()->getRegionMaxPrimScale();
 	}
 	else
 	{
-		return DEFAULT_MAX_PRIM_SCALE_NO_MESH;
+		return LLWorld::getInstance()->getRegionMaxPrimScaleNoMesh();
 	}
 }
 
@@ -945,9 +946,10 @@ void LLManipScale::dragCorner( S32 x, S32 y )
 		}
 	}
 
+	LLWorld* world_inst = LLWorld::getInstanceFast();
 
-	F32 max_scale_factor = get_default_max_prim_scale() / MIN_PRIM_SCALE;
-	F32 min_scale_factor = MIN_PRIM_SCALE / get_default_max_prim_scale();
+	F32 max_scale_factor = LLWorld::getInstance()->getRegionMaxPrimScale() / LLWorld::getInstance()->getRegionMinPrimScale();
+	F32 min_scale_factor = LLWorld::getInstance()->getRegionMinPrimScale() / LLWorld::getInstance()->getRegionMaxPrimScale();
 
 	// find max and min scale factors that will make biggest object hit max absolute scale and smallest object hit min absolute scale
 	for (LLObjectSelection::iterator iter = mObjectSelection->begin();
@@ -962,10 +964,16 @@ void LLManipScale::dragCorner( S32 x, S32 y )
 		{
 			const LLVector3& scale = selectNode->mSavedScale;
 
-			F32 cur_max_scale_factor = llmin( get_default_max_prim_scale(LLPickInfo::isFlora(cur)) / scale.mV[VX], get_default_max_prim_scale(LLPickInfo::isFlora(cur)) / scale.mV[VY], get_default_max_prim_scale(LLPickInfo::isFlora(cur)) / scale.mV[VZ] );
+			F32 cur_max_scale_factor = llmin( get_default_max_prim_scale(LLPickInfo::isFlora(cur)) 
+											 / scale.mV[VX], get_default_max_prim_scale(LLPickInfo::isFlora(cur))
+											 / scale.mV[VY], get_default_max_prim_scale(LLPickInfo::isFlora(cur))
+											 / scale.mV[VZ] );
 			max_scale_factor = llmin( max_scale_factor, cur_max_scale_factor );
 
-			F32 cur_min_scale_factor = llmax( MIN_PRIM_SCALE / scale.mV[VX], MIN_PRIM_SCALE / scale.mV[VY], MIN_PRIM_SCALE / scale.mV[VZ] );
+			F32 cur_min_scale_factor = llmax( LLWorld::getInstance()->getRegionMinPrimScale()
+											 / scale.mV[VX], LLWorld::getInstance()->getRegionMinPrimScale()
+											 / scale.mV[VY], LLWorld::getInstance()->getRegionMinPrimScale()
+											 / scale.mV[VZ] );
 			min_scale_factor = llmax( min_scale_factor, cur_min_scale_factor );
 		}
 	}
@@ -975,7 +983,6 @@ void LLManipScale::dragCorner( S32 x, S32 y )
 	LLVector3d drag_global = uniform ? mDragStartCenterGlobal : mDragFarHitGlobal;
 
 	// do the root objects i.e. (TRUE == cur->isRootEdit())
-	LLWorld* world_inst = LLWorld::getInstanceFast();
 	for (LLObjectSelection::iterator iter = mObjectSelection->begin();
 		 iter != mObjectSelection->end(); iter++)
 	{
@@ -1005,11 +1012,8 @@ void LLManipScale::dragCorner( S32 x, S32 y )
 			{
 				// counter-translate child objects if we are moving the root as an individual
 				LLViewerObject::const_child_list_t& child_list = cur->getChildren();
-				for (LLViewerObject::child_list_t::const_iterator iter = child_list.begin();
-					 iter != child_list.end(); iter++)
+				for (LLViewerObject* childp : child_list)
 				{
-					LLViewerObject* childp = *iter;
-
 					if (cur->isAttachment())
 					{
 						LLVector3 child_pos = childp->getPosition() - (delta_pos * ~cur->getRotationEdit());
@@ -1259,7 +1263,7 @@ void LLManipScale::stretchFace( const LLVector3& drag_start_agent, const LLVecto
 
 			F32 denom = axis * dir_local;
 			F32 desired_delta_size	= is_approx_zero(denom) ? 0.f : (delta_local_mag / denom);  // in meters
-			F32 desired_scale		= llclamp(selectNode->mSavedScale.mV[axis_index] + desired_delta_size, MIN_PRIM_SCALE, get_default_max_prim_scale(LLPickInfo::isFlora(cur)));
+			F32 desired_scale		= llclamp(selectNode->mSavedScale.mV[axis_index] + desired_delta_size, LLWorld::getInstance()->getRegionMinPrimScale(), get_default_max_prim_scale(LLPickInfo::isFlora(cur)));
 			// propagate scale constraint back to position offset
 			desired_delta_size		= desired_scale - selectNode->mSavedScale.mV[axis_index]; // propagate constraint back to position
 
@@ -1301,10 +1305,8 @@ void LLManipScale::stretchFace( const LLVector3& drag_start_agent, const LLVecto
 			{
 				// counter-translate child objects if we are moving the root as an individual
 				LLViewerObject::const_child_list_t& child_list = cur->getChildren();
-				for (LLViewerObject::child_list_t::const_iterator iter = child_list.begin();
-					 iter != child_list.end(); iter++)
+				for (LLViewerObject* childp : child_list)
 				{
-					LLViewerObject* childp = *iter;
 					if (!getUniform())
 					{
 						LLVector3 child_pos = childp->getPosition() - (delta_pos * ~cur->getRotationEdit());
@@ -1331,7 +1333,7 @@ void LLManipScale::renderGuidelinesPart( const LLBBox& bbox )
 
 	guideline_end -= guideline_start;
 	guideline_end.normalize();
-	guideline_end *= LLWorld::getInstanceFast()->getRegionWidthInMeters();
+	guideline_end *=  gAgent.getRegion() ? gAgent.getRegion()->getWidth() : LLWorld::getInstanceFast()->getRegionWidthInMeters();
 	guideline_end += guideline_start;
 
 	{
@@ -2047,7 +2049,7 @@ F32		LLManipScale::partToMinScale( S32 part, const LLBBox &bbox ) const
 			min_extent = bbox_extents.mV[i];
 		}
 	}
-	F32 min_scale_factor = bbox_extents.length() * MIN_PRIM_SCALE / min_extent;
+	F32 min_scale_factor = bbox_extents.magVec() * LLWorld::getInstance()->getRegionMinPrimScale() / min_extent;
 
 	if (getUniform())
 	{

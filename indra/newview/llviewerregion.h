@@ -430,6 +430,14 @@ public:
     U32 getShoutRange() const;
     /// Whisper Range (0.8.1)
     U32 getWhisperRange() const;
+	/// Prim Scale
+	F32 getMinPrimScale() const;
+	F32 getMaxPrimScale() const;
+	F32 getMinPhysPrimScale() const;
+	F32 getMaxPhysPrimScale() const;
+	/// Sim Z
+	F32 getMinRegionHeight() const;
+	F32 getMaxRegionHeight() const;
 
 	/// "God names" surname and full account names map
 	const auto& getGods() const { return mGodNames; };
@@ -608,6 +616,13 @@ private:
 	bool mMeshRezEnabled = false;
 	bool mDynamicPathfindingEnabled = false;
 	bool mAvatarHoverHeightEnabled = false;
+	F32  mMinSimHeight = SL_MIN_OBJECT_Z;
+	F32  mMaxSimHeight = SL_MAX_OBJECT_Z;
+	F32  mMinPrimScale = SL_MIN_PRIM_SCALE;
+	F32  mMaxPrimScale = SL_DEFAULT_MAX_PRIM_SCALE;
+	F32  mMaxPrimScaleNoMesh = SL_DEFAULT_MAX_PRIM_SCALE_NO_MESH;
+	F32  mMinPhysPrimScale = SL_MIN_PRIM_SCALE;
+	F32  mMaxPhysPrimScale = SL_DEFAULT_MAX_PRIM_SCALE;
 
     typedef std::map<U32, LLPointer<LLVOCacheEntry> >	   vocache_entry_map_t;
     static vocache_entry_map_t sRegionCacheCleanup;

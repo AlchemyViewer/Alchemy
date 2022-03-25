@@ -44,17 +44,17 @@ class LLTextureCtrl;
 class LLInventoryItem;
 class LLUUID;
 
-class LLPanelObject : public LLPanel
+class LLPanelObject final : public LLPanel
 {
 public:
 	LLPanelObject();
 	virtual ~LLPanelObject();
 
-	virtual BOOL	postBuild();
-	virtual void	draw();
-	virtual void 	clearCtrls();
+	BOOL	postBuild() override;
+	void	draw() override;
+	void 	clearCtrls() override;
 
-	void			refresh();
+	void			refresh() override;
 
 	static bool		precommitValidate(const LLSD& data);
 	
@@ -166,6 +166,13 @@ protected:
 
 	LLUUID          mSculptTextureRevert;   // so we can revert the sculpt texture on cancel
 	U8              mSculptTypeRevert;      // so we can revert the sculpt type on cancel
+	
+	F32				mRegionMaxHeight;
+	F32				mRegionMaxDepth;
+	F32				mMinScale;
+	F32				mMaxScale;
+	F32				mMaxHollowSize;
+	F32				mMinHoleSize;
 
 	LLPointer<LLViewerObject> mObject;
 	LLPointer<LLViewerObject> mRootObject;

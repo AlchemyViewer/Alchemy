@@ -660,9 +660,9 @@ void LLToolGrabBase::handleHoverActive(S32 x, S32 y, MASK mask)
 			}
 
 			// For safety, cap heights where objects can be dragged
-			if (grab_point_global.mdV[VZ] > MAX_OBJECT_Z)
+			if (grab_point_global.mdV[VZ] > LLWorld::getInstanceFast()->getRegionMaxHeight())
 			{
-				grab_point_global.mdV[VZ] = MAX_OBJECT_Z;
+				grab_point_global.mdV[VZ] = LLWorld::getInstanceFast()->getRegionMaxHeight();
 			}
 
 			grab_point_global = LLWorld::getInstanceFast()->clipToVisibleRegions(mDragStartPointGlobal, grab_point_global);

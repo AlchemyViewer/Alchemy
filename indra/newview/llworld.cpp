@@ -72,6 +72,9 @@ U32			gAgentPauseSerialNum = 0;
 //
 const S32 WORLD_PATCH_SIZE = 16;
 
+const S32 SL_MAX_LINK_OBJECTS = 255;
+const S32 OS_MAX_LINK_OBJECTS = 8191;	// Magic and arbitrary
+
 extern LLColor4U MAX_WATER_COLOR;
 
 U32 LLWorld::mWidth = 256;
@@ -88,6 +91,7 @@ F32 LLWorld::mWidthInMeters = mWidth * mScale;
 
 // allocate the stack
 LLWorld::LLWorld() :
+	mRefreshLimits(true),
 	mLandFarClip(DEFAULT_FAR_PLANE),
 	mLastPacketsIn(0),
 	mLastPacketsOut(0),
@@ -277,6 +281,8 @@ LLViewerRegion* LLWorld::addRegion(const U64 &region_handle, const LLHost &host)
 	}
 
 	updateWaterObjects();
+	if (mRefreshLimits)
+		refreshLimits();
 
 	return regionp;
 }
@@ -782,6 +788,32 @@ void LLWorld::clearAllVisibleObjects()
 	{
 		//clear all cached visible objects.
 		(*iter)->clearCachedVisibleObjects();
+	}
+}
+
+void LLWorld::refreshLimits()
+{
+	mRefreshLimits = false;
+
+	if (LLGridManager::getInstance()->isInOpenSim())
+	{
+		mRegionMaxHeight = OS_MAX_OBJECT_Z; //llmath/xform.h
+		mRegionMinPrimScale = OS_MIN_PRIM_SCALE;
+		mRegionMaxPrimScale = OS_DEFAULT_MAX_PRIM_SCALE;
+		mRegionMaxPrimScaleNoMesh = OS_DEFAULT_MAX_PRIM_SCALE; // no restrictions here
+		mRegionMaxHollowSize = OS_OBJECT_MAX_HOLLOW_SIZE;
+		mRegionMinHoleSize = OS_OBJECT_MIN_HOLE_SIZE;
+		mRegionMaxLinkObjects = OS_MAX_LINK_OBJECTS;
+	}
+	else
+	{
+		mRegionMaxHeight = SL_MAX_OBJECT_Z;
+		mRegionMinPrimScale = SL_MIN_PRIM_SCALE;
+		mRegionMaxPrimScale = SL_DEFAULT_MAX_PRIM_SCALE;
+		mRegionMaxPrimScaleNoMesh = SL_DEFAULT_MAX_PRIM_SCALE_NO_MESH;
+		mRegionMaxHollowSize = SL_OBJECT_MAX_HOLLOW_SIZE;
+		mRegionMinHoleSize = SL_OBJECT_MIN_HOLE_SIZE;
+		mRegionMaxLinkObjects = SL_MAX_LINK_OBJECTS;
 	}
 }
 

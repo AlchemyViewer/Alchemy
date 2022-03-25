@@ -80,9 +80,13 @@ extern const F32 OBJECT_TWIST_LINEAR_MIN;
 extern const F32 OBJECT_TWIST_LINEAR_MAX;
 extern const F32 OBJECT_TWIST_LINEAR_INC;
 
-extern const F32 OBJECT_MIN_HOLE_SIZE;
+extern const F32 SL_OBJECT_MIN_HOLE_SIZE;
+extern const F32 OS_OBJECT_MIN_HOLE_SIZE;
 extern const F32 OBJECT_MAX_HOLE_SIZE_X;
 extern const F32 OBJECT_MAX_HOLE_SIZE_Y;
+
+extern const F32 SL_OBJECT_MAX_HOLLOW_SIZE;
+extern const F32 OS_OBJECT_MAX_HOLLOW_SIZE;
 
 // Revolutions parameters.
 extern const F32 OBJECT_REV_MIN;
@@ -140,10 +144,10 @@ private:
 
 public:
 	LLLightParams();
-	/*virtual*/ BOOL pack(LLDataPacker &dp) const;
-	/*virtual*/ BOOL unpack(LLDataPacker &dp);
-	/*virtual*/ bool operator==(const LLNetworkData& data) const;
-	/*virtual*/ void copy(const LLNetworkData& data);
+	/*virtual*/ BOOL pack(LLDataPacker &dp) const override;
+	/*virtual*/ BOOL unpack(LLDataPacker &dp) override;
+	/*virtual*/ bool operator==(const LLNetworkData& data) const override;
+	/*virtual*/ void copy(const LLNetworkData& data) override;
 	// LLSD implementations here are provided by Eddy Stryker.
 	// NOTE: there are currently unused in protocols
 	LLSD asLLSD() const;
@@ -243,10 +247,10 @@ public:
 
 	//------ the constructor for the structure ------------
 	LLFlexibleObjectData();
-	BOOL pack(LLDataPacker &dp) const;
-	BOOL unpack(LLDataPacker &dp);
-	bool operator==(const LLNetworkData& data) const;
-	void copy(const LLNetworkData& data);
+	BOOL pack(LLDataPacker &dp) const override;
+	BOOL unpack(LLDataPacker &dp) override;
+	bool operator==(const LLNetworkData& data) const override;
+	void copy(const LLNetworkData& data) override;
 	LLSD asLLSD() const;
 	operator LLSD() const { return asLLSD(); }
 	bool fromLLSD(LLSD& sd);
@@ -262,10 +266,10 @@ protected:
 	
 public:
 	LLSculptParams();
-	/*virtual*/ BOOL pack(LLDataPacker &dp) const;
-	/*virtual*/ BOOL unpack(LLDataPacker &dp);
-	/*virtual*/ bool operator==(const LLNetworkData& data) const;
-	/*virtual*/ void copy(const LLNetworkData& data);
+	/*virtual*/ BOOL pack(LLDataPacker &dp) const override;
+	/*virtual*/ BOOL unpack(LLDataPacker &dp) override;
+	/*virtual*/ bool operator==(const LLNetworkData& data) const override;
+	/*virtual*/ void copy(const LLNetworkData& data) override;
 	LLSD asLLSD() const;
 	operator LLSD() const { return asLLSD(); }
 	bool fromLLSD(LLSD& sd);
@@ -283,10 +287,10 @@ protected:
 	
 public:
 	LLLightImageParams();
-	/*virtual*/ BOOL pack(LLDataPacker &dp) const;
-	/*virtual*/ BOOL unpack(LLDataPacker &dp);
-	/*virtual*/ bool operator==(const LLNetworkData& data) const;
-	/*virtual*/ void copy(const LLNetworkData& data);
+	/*virtual*/ BOOL pack(LLDataPacker &dp) const override;
+	/*virtual*/ BOOL unpack(LLDataPacker &dp) override;
+	/*virtual*/ bool operator==(const LLNetworkData& data) const override;
+	/*virtual*/ void copy(const LLNetworkData& data) override;
 	LLSD asLLSD() const;
 	operator LLSD() const { return asLLSD(); }
 	bool fromLLSD(LLSD& sd);

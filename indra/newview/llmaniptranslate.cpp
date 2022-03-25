@@ -736,9 +736,9 @@ BOOL LLManipTranslate::handleHover(S32 x, S32 y, MASK mask)
 				}
 
 				// For safety, cap heights where objects can be dragged
-				if (new_position_global.mdV[VZ] > MAX_OBJECT_Z)
+				if (new_position_global.mdV[VZ] > LLWorld::getInstanceFast()->getRegionMaxHeight())
 				{
-					new_position_global.mdV[VZ] = MAX_OBJECT_Z;
+					new_position_global.mdV[VZ] = LLWorld::getInstanceFast()->getRegionMaxHeight();
 				}
 
 				// Grass is always drawn on the ground, so clamp its position to the ground

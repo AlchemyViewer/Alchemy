@@ -63,6 +63,7 @@
 #include "llworld.h"
 #include "pipeline.h"
 #include "llviewercontrol.h"
+#include "llviewernetwork.h"
 #include "lluictrlfactory.h"
 //#include "llfirstuse.h"
 // [RLVa:KB] - Checked: 2011-05-22 (RLVa-1.3.1a)
@@ -303,7 +304,9 @@ LLPanelObject::LLPanelObject()
 	mSelectedType(MI_BOX),
 	mSculptTextureRevert(LLUUID::null),
 	mSculptTypeRevert(0),
-	mSizeChanged(FALSE)
+	mSizeChanged(FALSE),
+	mRegionMaxHeight(256.f),
+	mRegionMaxDepth(0.f)
 {
 }
 
@@ -417,8 +420,8 @@ void LLPanelObject::getState( )
 	mCtrlPosX->setMaxValue(is_attachment ? MAX_ATTACHMENT_DIST : width);
 	mCtrlPosY->setMinValue(is_attachment ? -MAX_ATTACHMENT_DIST : -width);
 	mCtrlPosY->setMaxValue(is_attachment ? MAX_ATTACHMENT_DIST : width);
-	mCtrlPosZ->setMinValue(is_attachment ? -MAX_ATTACHMENT_DIST : 0);
-	mCtrlPosZ->setMaxValue(is_attachment ? MAX_ATTACHMENT_DIST : 4096);
+	mCtrlPosZ->setMinValue(is_attachment ? -MAX_ATTACHMENT_DIST : mRegionMaxDepth);
+	mCtrlPosZ->setMaxValue(is_attachment ? MAX_ATTACHMENT_DIST : mRegionMaxHeight);
 
 	if (enable_scale)
 	{
@@ -993,9 +996,9 @@ void LLPanelObject::getState( )
 		mSpinScaleY->set( scale_y );
 		calcp->setVar(LLCalc::X_HOLE, scale_x);
 		calcp->setVar(LLCalc::Y_HOLE, scale_y);
-		mSpinScaleX->setMinValue(OBJECT_MIN_HOLE_SIZE);
+		mSpinScaleX->setMinValue(mMinHoleSize);
 		mSpinScaleX->setMaxValue(OBJECT_MAX_HOLE_SIZE_X);
-		mSpinScaleY->setMinValue(OBJECT_MIN_HOLE_SIZE);
+		mSpinScaleY->setMinValue(mMinHoleSize);
 		mSpinScaleY->setMaxValue(OBJECT_MAX_HOLE_SIZE_Y);
 		break;
 	default:
@@ -2000,12 +2003,44 @@ void LLPanelObject::refresh()
 	{
 		mRootObject = NULL;
 	}
-	
-	F32 max_scale = get_default_max_prim_scale(LLPickInfo::isFlora(mObject));
 
-	mCtrlScaleX->setMaxValue(max_scale);
-	mCtrlScaleY->setMaxValue(max_scale);
-	mCtrlScaleZ->setMaxValue(max_scale);
+	LLWorld* worldp = LLWorld::getInstanceFast();
+	if (mObject && mObject->getRegion())
+	{
+		auto region = mObject->getRegion();
+
+		mRegionMaxHeight = region->getMaxRegionHeight();
+		mRegionMaxDepth = region->getMinRegionHeight();
+		mCtrlPosZ->setMaxValue(mRegionMaxHeight);
+		mMinScale = region->getMinPrimScale();
+		mMaxScale = LLGridManager::getInstanceFast()->isInOpenSimulator() ? region->getMaxPrimScale() : get_default_max_prim_scale(LLPickInfo::isFlora(mObject));
+		mCtrlScaleX->setMinValue(mMinScale);
+		mCtrlScaleX->setMaxValue(mMaxScale);
+		mCtrlScaleY->setMinValue(mMinScale);
+		mCtrlScaleY->setMaxValue(mMaxScale);
+		mCtrlScaleZ->setMinValue(mMinScale);
+		mCtrlScaleZ->setMaxValue(mMaxScale);
+	}
+	else
+	{
+		mRegionMaxHeight = worldp->getRegionMaxHeight();
+		mRegionMaxDepth = LLGridManager::getInstanceFast()->isInOpenSimulator() ? -256.f : 0.f; // OpenSim is derp
+		mCtrlPosZ->setMaxValue(mRegionMaxHeight);
+		mMinScale = worldp->getRegionMinPrimScale();
+		mMaxScale = get_default_max_prim_scale(LLPickInfo::isFlora(mObject));
+		mCtrlScaleX->setMinValue(mMinScale);
+		mCtrlScaleX->setMaxValue(mMaxScale);
+		mCtrlScaleY->setMinValue(mMinScale);
+		mCtrlScaleY->setMaxValue(mMaxScale);
+		mCtrlScaleZ->setMinValue(mMinScale);
+		mCtrlScaleZ->setMaxValue(mMaxScale);
+	}
+
+	mMaxHollowSize = worldp->getRegionMaxHollowSize();
+	mSpinHollow->setMaxValue(mMaxHollowSize);
+	mMinHoleSize = worldp->getRegionMinHoleSize();
+	mSpinScaleX->setMinValue(mMinHoleSize);
+	mSpinScaleY->setMinValue(mMinHoleSize);
 }
 
 
