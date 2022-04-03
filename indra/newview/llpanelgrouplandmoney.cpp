@@ -30,6 +30,7 @@
 
 #include "lluiconstants.h"
 #include "roles_constants.h"
+#include "llcurrencywrapper.h"
 
 #include "llparcel.h"
 #include "llqueryflags.h"
@@ -844,7 +845,7 @@ void LLPanelGroupLandMoney::processPlacesReply(LLMessageSystem* msg, void**)
 	group_id_map_t::iterator found_it = sGroupIDs.find(group_id);
 	if(found_it == sGroupIDs.end())
 	{
-		LL_INFOS() << "Group Panel Land L$ " << group_id << " no longer in existence."
+		LL_INFOS() << LLCurrencyWrapper::instance().wrapCurrency("Group Panel Land L$ ") << group_id << " no longer in existence."
 				<< LL_ENDL;
 		return;
 	}
@@ -1136,7 +1137,7 @@ void LLPanelGroupLandMoney::processGroupAccountDetailsReply(LLMessageSystem* msg
 	msg->getUUIDFast(_PREHASH_AgentData, _PREHASH_AgentID, agent_id );
 	if (gAgent.getID() != agent_id)
 	{
-		LL_WARNS() << "Got group L$ history reply for another agent!" << LL_ENDL;
+		LL_WARNS() << LLCurrencyWrapper::instance().wrapCurrency("Got group L$ history reply for another agent!") << LL_ENDL;
 		return;
 	}
 
@@ -1313,7 +1314,7 @@ void LLPanelGroupLandMoney::processGroupAccountTransactionsReply(LLMessageSystem
 	msg->getUUIDFast(_PREHASH_AgentData, _PREHASH_AgentID, agent_id );
 	if (gAgent.getID() != agent_id)
 	{
-		LL_WARNS() << "Got group L$ history reply for another agent!" << LL_ENDL;
+		LL_WARNS() << LLCurrencyWrapper::instance().wrapCurrency("Got group L$ history reply for another agent!") << LL_ENDL;
 		return;
 	}
 
@@ -1493,7 +1494,7 @@ void LLPanelGroupLandMoney::processGroupAccountSummaryReply(LLMessageSystem* msg
 	msg->getUUIDFast(_PREHASH_AgentData, _PREHASH_AgentID, agent_id );
 	if (gAgent.getID() != agent_id)
 	{
-		LL_WARNS() << "Got group L$ history reply for another agent!" << LL_ENDL;
+		LL_WARNS() << LLCurrencyWrapper::instance().wrapCurrency("Got group L$ history reply for another agent!") << LL_ENDL;
 		return;
 	}
 
@@ -1505,7 +1506,7 @@ void LLPanelGroupLandMoney::processGroupAccountSummaryReply(LLMessageSystem* msg
 	self = get_ptr_in_map(LLGroupMoneyTabEventHandler::sInstanceIDs, request_id);
 	if (!self)
 	{
-		LL_WARNS() << "GroupAccountSummary recieved for non-existent group L$ planning tab." << LL_ENDL;
+		LL_WARNS() << LLCurrencyWrapper::instance().wrapCurrency("GroupAccountSummary recieved for non-existent group L$ planning tab.") << LL_ENDL;
 		return;
 	}
 

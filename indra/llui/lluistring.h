@@ -94,10 +94,10 @@ public:
 	void insert(S32 charidx, const LLWString& wchars);
 	void replace(S32 charidx, llwchar wc);
 
-private:
 	// something changed, requiring reformatting of strings
 	void dirty();
 
+private:
 	std::string& getUpdatedResult() const { if (mNeedsResult) { updateResult(); } return mResult; }
 	LLWString& getUpdatedWResult() const{ if (mNeedsWResult) { updateWResult(); } return mWResult; }
 

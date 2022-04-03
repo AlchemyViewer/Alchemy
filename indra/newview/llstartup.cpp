@@ -53,6 +53,7 @@
 #include "llexperiencecache.h"
 #include "lllandmark.h"
 #include "llcachename.h"
+#include "llcurrencywrapper.h"
 #include "lldir.h"
 #include "lldonotdisturbnotificationstorage.h"
 #include "llerrorcontrol.h"
@@ -3682,11 +3683,11 @@ bool process_login_success_response(U32& first_sim_size_x, U32& first_sim_size_y
 	}
 
 	// Set the location of the snapshot sharing config endpoint
-	std::string snapshot_config_url = response["snapshot_config_url"];
-	if(!snapshot_config_url.empty())
-	{
-		gSavedSettings.setString("SnapshotConfigURL", snapshot_config_url);
-	}
+	//std::string snapshot_config_url = response["snapshot_config_url"];
+	//if(!snapshot_config_url.empty())
+	//{
+	//	gSavedSettings.setString("SnapshotConfigURL", snapshot_config_url);
+	//}
 
 	// Start the process of fetching the OpenID session cookie for this user login
 	std::string openid_url = response["openid_url"];
@@ -3716,6 +3717,16 @@ bool process_login_success_response(U32& first_sim_size_x, U32& first_sim_size_y
 		}
 	}
 
+	std::string currency = "L$";
+	if(response.has("currency"))
+	{
+		currency = response["currency"].asString();
+	}
+	else if (LLGridManager::getInstance()->isInOpenSim())
+	{
+		currency = "$";
+	}
+	LLCurrencyWrapper::getInstance()->setHomeCurrency(currency);
 
 	bool success = false;
 	// JC: gesture loading done below, when we have an asset system

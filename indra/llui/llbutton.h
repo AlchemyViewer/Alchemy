@@ -284,6 +284,8 @@ public:
 	
 	void 		setAutoResize(bool auto_resize) { mAutoResize = auto_resize; }
 
+    void        updateCurrencySymbols();
+
 protected:
 	LLPointer<LLUIImage> getImageUnselected() const	{ return mImageUnselected; }
 	LLPointer<LLUIImage> getImageSelected() const	{ return mImageSelected; }

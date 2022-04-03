@@ -620,6 +620,13 @@ BOOL LLButton::handleHover(S32 x, S32 y, MASK mask)
 	return TRUE;
 }
 
+void LLButton::updateCurrencySymbols()
+{
+    mUnselectedLabel.dirty();
+    mSelectedLabel.dirty();
+    mDisabledSelectedLabel.dirty();
+}
+
 void LLButton::getOverlayImageSize(S32& overlay_width, S32& overlay_height)
 {
 	overlay_width = mImageOverlay->getWidth();

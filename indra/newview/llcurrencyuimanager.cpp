@@ -44,6 +44,7 @@
 #include "llviewchildren.h"
 #include "llxmlrpctransaction.h"
 #include "llviewernetwork.h"
+#include "llviewerregion.h"
 #include "llpanel.h"
 
 
@@ -279,17 +280,15 @@ void LLCurrencyUIManager::Impl::finishCurrencyBuy()
 void LLCurrencyUIManager::Impl::startTransaction(TransactionType type,
 		const char* method, LLXMLRPCValue params)
 {
-	static std::string transactionURI;
-	if (transactionURI.empty())
-	{
-		transactionURI = LLGridManager::getInstance()->getHelperURI() + "currency.php";
-	}
+    LLViewerRegion* region = gAgent.getRegion();
+    const std::string transaction_uri = (region != nullptr) ? region->getBuyCurrencyServerURL()
+        : LLGridManager::getInstance()->getHelperURI() + "currency.php";
 
 	delete mTransaction;
 
 	mTransactionType = type;
 	mTransaction = new LLXMLRPCTransaction(
-		transactionURI,
+        transaction_uri,
 		method,
 		params,
 		false /* don't use gzip */

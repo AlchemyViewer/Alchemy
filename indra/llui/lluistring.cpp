@@ -27,6 +27,7 @@
 #include "linden_common.h"
 #include "lluistring.h"
 
+#include "llcurrencywrapper.h"
 #include "llfasttimer.h"
 #include "llsd.h"
 #include "lltrans.h"
@@ -148,6 +149,9 @@ void LLUIString::updateResult() const
 		combined_args.insert(mArgs->begin(), mArgs->end());
 	}
 	LLStringUtil::format(mResult, combined_args);
+	// Impact on lag: at average frame time 15.9 ms
+	// FTM_UI_STRING 0.01ms both with/without wrapCurrency so bite me.
+	LLCurrencyWrapper::instance().wrapCurrency(mResult);
 }
 
 void LLUIString::updateWResult() const

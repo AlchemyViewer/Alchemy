@@ -27,6 +27,8 @@
 
 #include "llpanelgroupcreate.h"
 
+#include "llcurrencywrapper.h"
+
 // UI includes
 #include "llbutton.h"
 #include "llcheckboxctrl.h"
@@ -149,7 +151,7 @@ void LLPanelGroupCreate::addMembershipRow(const std::string &name)
         }
         item_params.columns.add(cell_params);
         cell_params.column = "clmn_price";
-        cell_params.value = llformat("L$ %d",LLAgentBenefitsMgr::get(name).getCreateGroupCost());
+        cell_params.value = LLCurrencyWrapper::instance().wrapCurrency(llformat("L$ %d",LLAgentBenefitsMgr::get(name).getCreateGroupCost()));
         item_params.columns.add(cell_params);
         mMembershipList->addRow(item_params);
     }

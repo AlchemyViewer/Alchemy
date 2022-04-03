@@ -161,6 +161,12 @@ BOOL LLTextBox::setTextArg( const std::string& key, const LLStringExplicit& text
 	return TRUE;
 }
 
+void LLTextBox::updateCurrencySymbols()
+{
+    mLabel.dirty();
+    mText.dirty();
+    LLTextBase::setText(mText.getString());
+}
 
 void LLTextBox::reshapeToFitText(BOOL called_from_parent)
 {

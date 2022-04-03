@@ -137,6 +137,11 @@ LLStatusBar::LLStatusBar(const LLRect& rect)
 
 LLStatusBar::~LLStatusBar()
 {
+    if (mCurrencyChangedSlot.connected())
+	{
+        mCurrencyChangedSlot.disconnect();
+	}
+
 	delete mBalanceTimer;
 	mBalanceTimer = NULL;
 
@@ -171,8 +176,8 @@ BOOL LLStatusBar::postBuild()
 
 	mTextTime = getChild<LLTextBox>("TimeText" );
 	
-	getChild<LLUICtrl>("buyL")->setCommitCallback(
-		boost::bind(&LLStatusBar::onClickBuyCurrency, this));
+	mBtnBuyL = getChild<LLButton>("buyL");
+	mBtnBuyL->setCommitCallback(boost::bind(&LLStatusBar::onClickBuyCurrency, this));
 
     getChild<LLUICtrl>("goShop")->setCommitCallback(boost::bind(&LLWeb::loadURL, gSavedSettings.getString("MarketplaceURL"), LLStringUtil::null, LLStringUtil::null));
 
@@ -297,6 +302,8 @@ BOOL LLStatusBar::postBuild()
 		updateMenuSearchPosition();
 	}
 
+    mCurrencyChangedSlot = LLCurrencyWrapper::getInstance()->addCurrencyChangedCb(
+        [&] { mBtnBuyL->updateCurrencySymbols(); sendMoneyBalanceRequest(); });
 	return TRUE;
 }
 
@@ -542,7 +549,7 @@ S32 LLStatusBar::getSquareMetersLeft() const
 	return mSquareMetersCredit - mSquareMetersCommitted;
 }
 
-void LLStatusBar::onClickBuyCurrency()
+void LLStatusBar::onClickBuyCurrency() const
 {
 	// open a currency floater - actual one open depends on 
 	// value specified in settings.xml
