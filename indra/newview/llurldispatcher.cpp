@@ -153,7 +153,7 @@ bool LLURLDispatcherImpl::dispatchApp(const LLSLURL& slurl,
 									  bool trusted_browser)
 {
 	LL_INFOS() << "cmd: " << slurl.getAppCmd() << " path: " << slurl.getAppPath() << " query: " << slurl.getAppQuery() << LL_ENDL;
-	const LLSD& query_map = LLURI::queryMap(slurl.getAppQuery());
+	const LLSD& query_map = slurl.getAppQueryMap();
 	bool handled = LLCommandDispatcher::dispatch(
 			slurl.getAppCmd(), slurl.getAppPath(), query_map, web, nav_type, trusted_browser);
 
@@ -214,8 +214,9 @@ void LLURLDispatcherImpl::regionHandleCallback(U64 region_handle, const LLSLURL&
 {
 
   // we can't teleport cross grid at this point
-	if(   LLGridManager::getInstance()->getGrid(slurl.getGrid())
-	   != LLGridManager::getInstance()->getGrid())
+	if(LLGridManager::instance().isInSecondlife() &&
+		(LLGridManager::getInstance()->getGrid(slurl.getGrid())
+	   != LLGridManager::getInstance()->getGrid()))
 	{
 		LLSD args;
 		args["SLURL"] = slurl.getLocationString();
