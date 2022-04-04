@@ -949,7 +949,7 @@ bool idle_startup()
          
 		// create necessary directories
 		// *FIX: these mkdir's should error check
-		const std::string& gridlabel = !LLGridManager::getInstance()->isInSecondlife() ? LLGridManager::getInstance()->getGridId() : LLStringUtil::null;
+		std::string gridlabel = LLGridManager::getInstance()->isInSLMain() ? LLStringUtil::null : LLGridManager::getInstance()->getGridId();
 		gDirUtilp->setCurrentGrid(gridlabel);
 		LLFile::mkdir(gDirUtilp->getExpandedFilename(LL_PATH_CACHE, "gridcache", ""));
 		LLFile::mkdir(gDirUtilp->getCacheDirPerGrid());
