@@ -352,11 +352,19 @@ bool LLGridManager::addGrid(LLSD& grid_data)
 			}
 			else
 			{
+				if (grid_data.has(GRID_GATEKEEPER))
+				{
+					mGridList[grid][GRID_GATEKEEPER] = grid_data[GRID_GATEKEEPER];
+				}
 				LL_WARNS("GridManager")<<"duplicate grid id '"<<grid_id<<"' ignored"<<LL_ENDL;
 			}
 		}
 		else
 		{
+			if (grid_data.has(GRID_GATEKEEPER))
+			{
+				mGridList[grid][GRID_GATEKEEPER] = grid_data[GRID_GATEKEEPER];
+			}
 			LL_WARNS("GridManager")<<"duplicate grid name '"<<grid<<"' ignored"<<LL_ENDL;
 		}
 	}
