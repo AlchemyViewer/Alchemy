@@ -174,6 +174,7 @@ const std::string& LLInventoryIcon::getIconName(LLAssetType::EType asset_type,
 			break;
 		case LLAssetType::AT_MESH:
 			idx = LLInventoryType::ICONNAME_MESH;
+			break;
 		case LLAssetType::AT_SETTINGS:
 			idx = assignSettingsIcon(misc_flag);
 			break;
