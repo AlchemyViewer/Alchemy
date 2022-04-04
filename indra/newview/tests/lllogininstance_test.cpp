@@ -144,11 +144,11 @@ bool LLGridManager::addGrid(LLSD& grid_data)
 }
 LLGridManager::LLGridManager()
 :
-	mIsInProductionGrid(false)
+	mPlatform(NOPLATFORM)
 {	
 }
 
-void LLGridManager::getLoginURIs(std::vector<std::string>& uris)
+void LLGridManager::getLoginURIs(std::vector<std::string>& uris) const
 {
 	uris.push_back(VIEWERLOGIN_URI);
 }
@@ -158,31 +158,42 @@ void LLGridManager::addSystemGrid(const std::string& label,
 								  const std::string& login, 
 								  const std::string& helper,
 								  const std::string& login_page,
+								  const std::string& password_url,
+								  const std::string& register_url,
 								  const std::string& update_url_base,
 								  const std::string& web_profile_url,
+								  const std::string& grid_status_url,
+								  const std::string& grid_status_rss_url,
+								  const std::string& administrator,
+								  const std::string& platform,
 								  const std::string& login_id)
 {
 }
-std::map<std::string, std::string> LLGridManager::getKnownGrids()
+std::map<std::string, std::string> LLGridManager::getKnownGrids() const
 {
 	std::map<std::string, std::string> result;
 	return result;
 }
 
-void LLGridManager::setGridChoice(const std::string& grid_name)
+void LLGridManager::setGridChoice(const std::string&, const bool)
 {
 }
 
-bool LLGridManager::isInProductionGrid()
+bool LLGridManager::isInSecondlife() const
 {
 	return false;
 }
 
-std::string LLGridManager::getSLURLBase(const std::string& grid_name)
+bool LLGridManager::isInOpenSim() const
+{
+	return false;
+}
+
+std::string LLGridManager::getSLURLBase(const std::string& grid_name) const
 {
 	return "myslurl";
 }
-std::string LLGridManager::getAppSLURLBase(const std::string& grid_name)
+std::string LLGridManager::getAppSLURLBase(const std::string& grid_name) const
 {
 	return "myappslurl";
 }

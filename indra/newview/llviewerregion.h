@@ -31,7 +31,9 @@
 // that are in to a particular region.
 #include <string>
 #include <boost/signals2.hpp>
+#include <absl/container/flat_hash_set.h>
 
+#include "xform.h"
 #include "llwind.h"
 #include "v3dmath.h"
 #include "llstring.h"

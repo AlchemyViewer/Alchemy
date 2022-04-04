@@ -51,6 +51,22 @@ void LLGLTexture::setBoostLevel(S32 ) { }
 void LLGLTexture::setAddressMode(LLTexUnit::eTextureAddressMode ) { }
 LLViewerFetchedTexture* LLViewerTextureManager::getFetchedTexture(const LLUUID&, FTType, BOOL, LLGLTexture::EBoostLevel, S8,
 																  LLGLint, LLGLenum, LLHost ) { return NULL; }
+LLViewerFetchedTexture* LLViewerTextureManager::findFetchedTexture(const LLUUID& id, S32 tex_type) { return NULL; }
+
+class LLTextureCache
+{
+public:
+	bool removeFromCache(const LLUUID& id);
+};
+
+bool LLTextureCache::removeFromCache(const LLUUID& id) { return true; }
+
+class LLAppViewer
+{
+	static LLTextureCache* sTextureCache;
+};
+
+LLTextureCache* LLAppViewer::sTextureCache = NULL;
 
 // Stub related map calls
 LLWorldMapMessage::LLWorldMapMessage() { }
@@ -395,8 +411,8 @@ namespace tut
 		bool success;
 		LLUUID id;
 		std::string name_sim = SIM_NAME_TEST;
-		success = mWorld->insertRegion(	U32(X_WORLD_TEST), 
-						U32(Y_WORLD_TEST), 
+		success = mWorld->insertRegion(U32(X_WORLD_TEST), U32(Y_WORLD_TEST),
+									   REGION_WIDTH_UNITS, REGION_WIDTH_UNITS,
 										name_sim,
 										id,
 										SIM_ACCESS_PG,

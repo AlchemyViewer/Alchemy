@@ -30,6 +30,7 @@
 #include "../test/lltut.h"
 #include "../../llxml/llcontrol.h"
 #include "llfile.h"
+#include "llnotificationsutil.h"
 
 namespace
 {
@@ -39,6 +40,8 @@ static const char * const TEST_FILENAME("llviewernetwork_test.xml");
 
 }
 
+const std::string REMOTE_GRID = "http://grid.example.com:8002/";
+
 //
 // Stub implementation for LLTrans
 //
@@ -46,6 +49,7 @@ class LLTrans
 {
 public:
 	static std::string getString(const std::string_view xml_desc, const LLStringUtil::format_map_t& args, bool def_string = false);
+	static void setDefaultArg(const std::string& name, std::string value);
 };
 
 std::string LLTrans::getString(const std::string_view xml_desc, const LLStringUtil::format_map_t& args, bool def_string)
@@ -53,14 +57,18 @@ std::string LLTrans::getString(const std::string_view xml_desc, const LLStringUt
 	std::string grid_label = std::string();
 	if(xml_desc == "AgniGridLabel")
 	{
-		grid_label = "Second Life Main Grid (Agni)";
+		grid_label = "Second Life";
 	}
 	else if(xml_desc == "AditiGridLabel")
 	{
-		grid_label = "Second Life Beta Test Grid (Aditi)";
+		grid_label = "Second Life Beta";
 	}
 
 	return grid_label;
+}
+
+void LLTrans::setDefaultArg(const std::string& name, std::string value)
+{
 }
 
 //----------------------------------------------------------------------------
@@ -74,6 +82,7 @@ LLControlVariable* LLControlGroup::declareString(const std::string& name,
                                    const std::string& comment,
                                    LLControlVariable::ePersist persist) {return NULL;}
 void LLControlGroup::setString(const std::string_view name, const std::string& val){}
+LLNotificationPtr LLNotificationsUtil::add(const std::string& name, const LLSD& substitutions) { return NULL; }
 
 std::string gCmdLineLoginURI;
 std::string gCmdLineGridChoice;
@@ -208,22 +217,22 @@ namespace tut
 		ensure_equals("Known grids is a string-string map of size 2", known_grids.size(), 2);
 		ensure_equals("Agni has the right name and label",
 					  known_grids[std::string("util.agni.lindenlab.com")],
-					  std::string("Second Life Main Grid (Agni)"));
+					  std::string("Second Life"));
 		ensure_equals("Aditi has the right name and label",
 					  known_grids[std::string("util.aditi.lindenlab.com")],
-					  std::string("Second Life Beta Test Grid (Aditi)"));
+					  std::string("Second Life Beta"));
 		ensure_equals("name for agni",
 					  LLGridManager::getInstance()->getGrid("util.agni.lindenlab.com"),
 					  std::string("util.agni.lindenlab.com"));
 		ensure_equals("id for agni",
 					  std::string("Agni"),
 					  LLGridManager::getInstance()->getGridId("util.agni.lindenlab.com"));
-		ensure_equals("update url base for Agni", // relies on agni being the default
-					  std::string("https://app.alchemyviewer.org/update"),
-					  LLGridManager::getInstance()->getUpdateServiceURL());
+		//ensure_equals("update url base for Agni", // relies on agni being the default
+		//			  std::string("https://update.secondlife.com/update"),
+		//			  LLGridManager::getInstance()->getUpdateServiceURL());
 		ensure_equals("label for agni",
 					  LLGridManager::getInstance()->getGridLabel("util.agni.lindenlab.com"),
-					  std::string("Second Life Main Grid (Agni)"));
+					  std::string("Second Life"));
 
 		std::vector<std::string> login_uris;
 		LLGridManager::getInstance()->getLoginURIs(std::string("util.agni.lindenlab.com"), login_uris);
@@ -248,7 +257,7 @@ namespace tut
 					  std::string("Aditi"));
 		ensure_equals("label for aditi",
 					  LLGridManager::getInstance()->getGridLabel("util.aditi.lindenlab.com"),
-					  std::string("Second Life Beta Test Grid (Aditi)"));
+					  std::string("Second Life Beta"));
 
 		LLGridManager::getInstance()->getLoginURIs(std::string("util.aditi.lindenlab.com"), login_uris);
 
@@ -282,22 +291,22 @@ namespace tut
 		// Verify that Agni and Aditi were not overwritten
 		ensure_equals("Agni has the right name and label",
 					  known_grids[std::string("util.agni.lindenlab.com")], 
-					  std::string("Second Life Main Grid (Agni)"));
+					  std::string("Second Life"));
 		ensure_equals("Aditi has the right name and label",
 					  known_grids[std::string("util.aditi.lindenlab.com")], 
-					  std::string("Second Life Beta Test Grid (Aditi)"));
+					  std::string("Second Life Beta"));
 		ensure_equals("name for agni",
 					  LLGridManager::getInstance()->getGrid("util.agni.lindenlab.com"),
 					  std::string("util.agni.lindenlab.com"));
 		ensure_equals("id for agni",
 					  LLGridManager::getInstance()->getGridId("util.agni.lindenlab.com"),
 					  std::string("Agni"));
-		ensure_equals("update url base for Agni", // relies on agni being the default
-					  std::string("https://app.alchemyviewer.org/update"),
-					  LLGridManager::getInstance()->getUpdateServiceURL());
+		//ensure_equals("update url base for Agni", // relies on agni being the default
+		//			  std::string("https://update.secondlife.com/update"),
+		//			  LLGridManager::getInstance()->getUpdateServiceURL());
 		ensure_equals("label for agni",
 					  LLGridManager::getInstance()->getGridLabel("util.agni.lindenlab.com"),
-					  std::string("Second Life Main Grid (Agni)"));
+					  std::string("Second Life"));
 		std::vector<std::string> login_uris;
 		LLGridManager::getInstance()->getLoginURIs(std::string("util.agni.lindenlab.com"), login_uris);
 		ensure_equals("Number of login uris for agni", 1, login_uris.size());
@@ -321,7 +330,7 @@ namespace tut
 					  std::string("Aditi"));
 		ensure_equals("label for aditi",
 					  LLGridManager::getInstance()->getGridLabel("util.aditi.lindenlab.com"),
-					  std::string("Second Life Beta Test Grid (Aditi)"));
+					  std::string("Second Life Beta"));
 
 		LLGridManager::getInstance()->getLoginURIs(std::string("util.aditi.lindenlab.com"), login_uris);
 		ensure_equals("Number of login uris for aditi", 1, login_uris.size());
@@ -398,7 +407,7 @@ namespace tut
 
 	// validate grid selection
 	template<> template<>
-	void viewerNetworkTestObject::test<7>()
+	void viewerNetworkTestObject::test<3>()
 	{
 		// adding a grid with simply a name will populate the values.
 		llofstream gridfile(TEST_FILENAME);
@@ -407,10 +416,10 @@ namespace tut
 
 		LLGridManager::getInstance()->initialize(TEST_FILENAME);
 
-		LLGridManager::getInstance()->setGridChoice("util.agni.lindenlab.com");
+		LLGridManager::getInstance()->setGridChoice(std::string("util.agni.lindenlab.com"));
 		ensure_equals("getGridLabel",
 					  LLGridManager::getInstance()->getGridLabel(),
-					  std::string("Second Life Main Grid (Agni)"));
+					  std::string("Second Life"));
 		ensure_equals("getGridId",
 					  LLGridManager::getInstance()->getGridId(),
 					  std::string("Agni"));
@@ -423,10 +432,11 @@ namespace tut
 		ensure_equals("getLoginPage",
 					  LLGridManager::getInstance()->getLoginPage(),
 					  std::string("https://viewer-splash.secondlife.com/"));
-		ensure_equals("update url base for Agni", // relies on agni being the default
-					  std::string("https://app.alchemyviewer.org/update"),
-					  LLGridManager::getInstance()->getUpdateServiceURL());
-		ensure("Is Agni a production grid", LLGridManager::getInstance()->isInProductionGrid());
+		//ensure_equals("update url base for Agni", // relies on agni being the default
+		//			  std::string("https://update.secondlife.com/update"),
+		//			  LLGridManager::getInstance()->getUpdateServiceURL());
+		ensure("Is Agni Second Life", LLGridManager::getInstance()->isInSecondlife());
+		ensure("Agni is NOT OpenSim", !LLGridManager::getInstance()->isInOpenSim());
 		std::vector<std::string> uris;
 		LLGridManager::getInstance()->getLoginURIs(uris);
 		ensure_equals("getLoginURIs size", 1, uris.size());
@@ -434,7 +444,7 @@ namespace tut
 					  uris[0],
 					  std::string("https://login.agni.lindenlab.com/cgi-bin/login.cgi"));
 
-		LLGridManager::getInstance()->setGridChoice("altgrid.long.name");
+		LLGridManager::getInstance()->setGridChoice(std::string("altgrid.long.name"));
 		ensure_equals("getGridLabel",
 					  LLGridManager::getInstance()->getGridLabel(),
 					  std::string("Alternative Grid"));
@@ -443,8 +453,10 @@ namespace tut
 					  std::string("AltGrid"));
 		ensure("alternative grid is not a system grid",
 			   !LLGridManager::getInstance()->isSystemGrid());
-		ensure("alternative grid is not a production grid",
-			   !LLGridManager::getInstance()->isInProductionGrid());
+		ensure("alternative grid is OpenSim",
+			   LLGridManager::getInstance()->isInOpenSim());
+		ensure("alternative grid is not Second Life",
+			   !LLGridManager::getInstance()->isInSecondlife());
 	}
 
 }

@@ -42,6 +42,17 @@
 // * Do not make any assumption as to how those classes or methods work (i.e. don't copy/paste code)
 // * A simulator for a class can be implemented here. Please comment and document thoroughly.
 
+
+#include "../llagent.h"
+LLAgent::LLAgent() : mAgentAccess(NULL) { }
+LLAgent::~LLAgent() { }
+LLViewerRegion* LLAgent::getRegion() const { return nullptr; }
+
+LLAgent gAgent;
+
+#include "../llviewerregion.h"
+std::string LLViewerRegion::getMapServerURL() const { return {}; }
+
 void LLGLTexture::setBoostLevel(S32 ) { }
 LLViewerFetchedTexture* LLViewerTextureManager::getFetchedTextureFromUrl(const std::string&, FTType, BOOL, LLGLTexture::EBoostLevel, S8, 
 																		 LLGLint, LLGLenum, const LLUUID& ) { return NULL; }
