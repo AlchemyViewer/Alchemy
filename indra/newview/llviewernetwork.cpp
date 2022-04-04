@@ -1131,8 +1131,12 @@ std::string LLGridManager::getSLURLBase(const std::string& grid) const
 		}
 		else
 		{
-			grid_base = llformat(DEFAULT_SLURL_BASE, grid.c_str());
+			grid_base = llformat(DEFAULT_SLURL_BASE, grid_name.c_str());
 		}
+	}
+	else
+	{
+		grid_base = llformat(DEFAULT_SLURL_BASE, grid.c_str());
 	}
 	LL_DEBUGS("GridManager")<<"returning '"<<grid_base<<"'"<<LL_ENDL;
 	return grid_base;
@@ -1151,8 +1155,12 @@ std::string LLGridManager::getAppSLURLBase(const std::string& grid) const
 		}
 		else
 		{
-			grid_base = llformat(DEFAULT_APP_SLURL_BASE, grid.c_str());
+			grid_base = llformat(DEFAULT_APP_SLURL_BASE, grid_name.c_str());
 		}
+	}
+	else
+	{
+		grid_base = llformat(DEFAULT_APP_SLURL_BASE, grid.c_str());
 	}
 	LL_DEBUGS("GridManager")<<"returning '"<<grid_base<<"'"<<LL_ENDL;
 	return grid_base;
