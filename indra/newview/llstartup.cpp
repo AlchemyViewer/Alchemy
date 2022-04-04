@@ -3697,7 +3697,7 @@ bool process_login_success_response(U32& first_sim_size_x, U32& first_sim_size_y
 		LLViewerMedia::getInstance()->openIDSetup(openid_url, openid_token);
 	}
 
-	if (!LLGridManager::instance().isInSecondlife())
+	if (LLGridManager::instance().isInOpenSim())
 	{
 		if (response.has("max-agent-groups") || response.has("max_groups"))
 		{
@@ -3724,7 +3724,7 @@ bool process_login_success_response(U32& first_sim_size_x, U32& first_sim_size_y
 	}
 	else if (LLGridManager::getInstance()->isInOpenSim())
 	{
-		currency = "$";
+		currency = "OS$";
 	}
 	LLCurrencyWrapper::getInstance()->setHomeCurrency(currency);
 
