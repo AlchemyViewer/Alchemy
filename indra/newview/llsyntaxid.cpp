@@ -59,7 +59,7 @@ LLSyntaxIdLSL::LLSyntaxIdLSL()
 
 void LLSyntaxIdLSL::buildFullFileSpec()
 {
-	ELLPath path = mSyntaxId.isNull() ? LL_PATH_APP_SETTINGS : LL_PATH_CACHE;
+	ELLPath path = mSyntaxId.isNull() ? LL_PATH_APP_SETTINGS : LL_PATH_CACHE_PER_GRID;
 	const std::string filename = mSyntaxId.isNull() ? FILENAME_DEFAULT : "keywords_lsl_" + mSyntaxId.asString() + ".llsd.xml";
 	mFullFileSpec = gDirUtilp->getExpandedFilename(path, filename);
 }
