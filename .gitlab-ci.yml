@@ -24,7 +24,6 @@ variables:
     paths:
       - .cache/autobuild
       - .cache/pip
-      - .venv/
     when: 'always'
   variables:
     USE_SENTRY: "TRUE"
@@ -81,7 +80,6 @@ variables:
     paths:
       - .cache/autobuild
       - .cache/pip
-      - .venv
     when: 'always'
   variables:
     USE_SENTRY: "TRUE"
@@ -134,7 +132,6 @@ variables:
     paths:
       - .cache/autobuild
       - .cache/pip
-      - .venv
     when: 'always'
   variables:
     USE_SENTRY: "TRUE"
@@ -190,7 +187,6 @@ coverity_scan:
     paths:
       - .cache/autobuild
       - .cache/pip
-      - .venv
     when: 'always'
   variables:
     AUTOBUILD_ADDRSIZE: 64
