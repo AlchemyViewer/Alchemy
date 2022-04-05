@@ -2594,7 +2594,6 @@ if (LL_TESTS)
     ${WINDOWS_LIBRARIES}
     ${LLFILESYSTEM_LIBRARIES}
     ${LLMATH_LIBRARIES}
-    ${LLXML_LIBRARIES}
     ${LLCOMMON_LIBRARIES}
     ${LLMESSAGE_LIBRARIES}
     ${LLCOREHTTP_LIBRARIES}
@@ -2652,17 +2651,6 @@ if (LL_TESTS)
   #ADD_VIEWER_BUILD_TEST(llmemoryview viewer)
   #ADD_VIEWER_BUILD_TEST(lltextureinfo viewer)
   #ADD_VIEWER_BUILD_TEST(lltextureinfodetails viewer)
-
-include(LLAddBuildTest)
-SET(viewer_TEST_SOURCE_FILES
-  llagentaccess.cpp
-  )
-set_source_files_properties(
-  ${viewer_TEST_SOURCE_FILES}
-  PROPERTIES
-    LL_TEST_ADDITIONAL_SOURCE_FILES llviewerprecompiledheaders.cpp
-  )
-
 endif (LL_TESTS)
 
 check_message_template(${VIEWER_BINARY_NAME})

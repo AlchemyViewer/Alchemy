@@ -74,6 +74,11 @@ void LLTrans::setDefaultArg(const std::string& name, std::string value)
 //----------------------------------------------------------------------------
 // Mock objects for the dependencies of the code we're testing
 
+bool LLXMLNode::parseBuffer(U8* buffer,	U32 length,	LLXMLNodePtr& node,	LLXMLNode* defaults) { return false; }
+std::string LLXMLNode::getTextContents() const { return {}; }
+LLXMLNodePtr LLXMLNode::getFirstChild() const { return {}; }
+LLXMLNodePtr LLXMLNode::getNextSibling() const { return {}; }
+
 LLControlGroup::LLControlGroup(const std::string& name)
 : LLInstanceTracker<LLControlGroup, std::string>(name) {}
 LLControlGroup::~LLControlGroup() {}
