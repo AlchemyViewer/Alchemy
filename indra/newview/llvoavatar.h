@@ -640,7 +640,7 @@ public:
 	virtual LLViewerTexture::EBoostLevel 	getAvatarBoostLevel() const { return LLGLTexture::BOOST_AVATAR; }
 	virtual LLViewerTexture::EBoostLevel 	getAvatarBakedBoostLevel() const { return LLGLTexture::BOOST_AVATAR_BAKED; }
 	virtual S32 						getTexImageSize() const;
-	/*virtual*/ S32						getTexImageArea() const { return getTexImageSize()*getTexImageSize(); }
+	S32						getTexImageArea() const { return getTexImageSize()*getTexImageSize(); }
 
 /**                    Rendering
  **                                                                            **
@@ -668,7 +668,7 @@ public:
 	// Baked textures
 	//--------------------------------------------------------------------
 public:
-	/*virtual*/ LLTexLayerSet*	createTexLayerSet(); // Return LLViewerTexLayerSet
+	/*virtual*/ LLTexLayerSet*	createTexLayerSet() override; // Return LLViewerTexLayerSet
 	void			releaseComponentTextures(); // ! BACKWARDS COMPATIBILITY !
 
 protected:
@@ -848,7 +848,7 @@ public:
 	static bool		    getRiggedMeshID( LLViewerObject* pVO, LLUUID& mesh_id );
 	void				cleanupAttachedMesh( LLViewerObject* pVO );
 	static LLVOAvatar*  findAvatarFromAttachment(LLViewerObject* obj);
-	/*virtual*/ BOOL	isWearingWearableType(LLWearableType::EType type ) const;
+	/*virtual*/ BOOL	isWearingWearableType(LLWearableType::EType type ) const override;
 	LLViewerObject *	findAttachmentByID( const LLUUID & target_id ) const;
 	LLViewerJointAttachment* getTargetAttachmentPoint(LLViewerObject* viewer_object);
 // [SL:KB] - Patch: Appearance-RefreshAttachments | Checked: Catznip-5.3
