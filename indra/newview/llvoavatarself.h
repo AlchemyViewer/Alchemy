@@ -109,22 +109,22 @@ private:
  **/
 
 public:
-	/*virtual*/ bool 	isSelf() const { return true; }
-	/*virtual*/ BOOL	isValid() const;
+	/*virtual*/ bool 	isSelf() const override { return true; }
+	/*virtual*/ BOOL	isValid() const override;
 
 	//--------------------------------------------------------------------
 	// Updates
 	//--------------------------------------------------------------------
 public:
-	/*virtual*/ bool 	updateCharacter(LLAgent &agent);
-	/*virtual*/ void 	idleUpdateTractorBeam();
+	/*virtual*/ bool 	updateCharacter(LLAgent &agent) override;
+	void 				idleUpdateTractorBeam();
 	bool				checkStuckAppearance();
 
 	//--------------------------------------------------------------------
 	// Loading state
 	//--------------------------------------------------------------------
 public:
-	/*virtual*/ bool    getIsCloud() const;
+	/*virtual*/ bool    getIsCloud() const override;
 
 	//--------------------------------------------------------------------
 	// Region state
@@ -175,7 +175,7 @@ public:
 	// Loading status
 	//--------------------------------------------------------------------
 public:
-	/*virtual*/ bool	hasPendingBakedUploads() const;
+	bool				hasPendingBakedUploads() const;
 	S32					getLocalDiscardLevel(LLAvatarAppearanceDefines::ETextureIndex type, U32 index) const;
 	bool				areTexturesCurrent() const;
 	BOOL				isLocalTextureDataAvailable(const LLViewerTexLayerSet* layerset) const;
@@ -271,7 +271,7 @@ private:
  **                    MESHES
  **/
 protected:
-	/*virtual*/ void   restoreMeshData();
+	/*virtual*/ void   restoreMeshData() override;
 
 /**                    Meshes
  **                                                                            **
@@ -298,8 +298,8 @@ public:
 // [RLVa:KB] - Checked: 2009-12-18 (RLVa-1.1.0i) | Added: RLVa-1.1.0i
 	LLViewerJointAttachment* getWornAttachmentPoint(const LLUUID& inv_item_id) const;
 // [/RLVa:KB]
-	/*virtual*/ const LLViewerJointAttachment *attachObject(LLViewerObject *viewer_object);
-	/*virtual*/ BOOL 	detachObject(LLViewerObject *viewer_object);
+	/*virtual*/ const LLViewerJointAttachment *attachObject(LLViewerObject *viewer_object) override;
+	/*virtual*/ BOOL 	detachObject(LLViewerObject *viewer_object) override;
 	static BOOL			detachAttachmentIntoInventory(const LLUUID& item_id);
 
 // [RLVa:KB] - Checked: 2012-07-28 (RLVa-1.4.7)
@@ -334,7 +334,7 @@ public:
 	// Visibility
 	//--------------------------------------------------------------------
 
-    /* virtual */ bool shouldRenderRigged() const;
+    /* virtual */ bool shouldRenderRigged() const override;
     
 public:
 	bool			sendAppearanceMessage(LLMessageSystem *mesgsys) const;
@@ -342,7 +342,7 @@ public:
 	// -- care and feeding of hover height.
 	void 			setHoverIfRegionEnabled();
 	void			sendHoverHeight() const;
-	/*virtual*/ void setHoverOffset(const LLVector3& hover_offset, bool send_update=true);
+	/*virtual*/ void setHoverOffset(const LLVector3& hover_offset, bool send_update=true) override;
 
 private:
 	mutable LLVector3 mLastHoverOffsetSent;

@@ -139,7 +139,7 @@ public:
 													 void **user_data,
 													 U32 block_num,
 													 const EObjectUpdateType update_type,
-													 LLDataPacker *dp);
+													 LLDataPacker *dp) override;
 	virtual void   	 	 	idleUpdate(LLAgent &agent, const F64 &time) override;
 	/*virtual*/ BOOL   	 	 	updateLOD() override;
 	BOOL  	 	 	 	 	updateJointLODs();
