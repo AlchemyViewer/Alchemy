@@ -3105,29 +3105,32 @@ void LLViewerObject::updateControlAvatar()
     if (is_animated_object)
     {
         bool any_rigged_mesh = root->isRiggedMesh();
-        LLViewerObject::const_child_list_t& child_list = root->getChildren();
-        for (LLViewerObject::const_child_list_t::const_iterator iter = child_list.begin();
-             iter != child_list.end(); ++iter)
-        {
-            const LLViewerObject* child = *iter;
-            any_rigged_mesh = any_rigged_mesh || child->isRiggedMesh();
-        }
+		if (!any_rigged_mesh)
+		{
+			LLViewerObject::const_child_list_t& child_list = root->getChildren();
+			for (const LLViewerObject* child : child_list)
+			{
+				any_rigged_mesh = any_rigged_mesh || child->isRiggedMesh();
+				if (any_rigged_mesh)
+					break;
+			}
+		}
         should_have_control_avatar = is_animated_object && any_rigged_mesh;
     }
 
     if (should_have_control_avatar && !has_control_avatar)
     {
-        std::string vobj_name = llformat("Vol%p", root);
 #ifdef SHOW_DEBUG
-        LL_DEBUGS("AnimatedObjects") << vobj_name << " calling linkControlAvatar()" << LL_ENDL;
+		std::string vobj_name = llformat("Vol%p", root);
+		LL_DEBUGS("AnimatedObjects") << vobj_name << " calling linkControlAvatar()" << LL_ENDL;
 #endif
         root->linkControlAvatar();
     }
     if (!should_have_control_avatar && has_control_avatar)
     {
-        std::string vobj_name = llformat("Vol%p", root);
 #ifdef SHOW_DEBUG
-        LL_DEBUGS("AnimatedObjects") << vobj_name << " calling unlinkControlAvatar()" << LL_ENDL;
+		std::string vobj_name = llformat("Vol%p", root);
+		LL_DEBUGS("AnimatedObjects") << vobj_name << " calling unlinkControlAvatar()" << LL_ENDL;
 #endif
         root->unlinkControlAvatar();
     }
