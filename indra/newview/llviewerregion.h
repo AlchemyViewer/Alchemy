@@ -268,7 +268,7 @@ public:
 	void setCapabilityDebug(const std::string& name, const std::string& url);
 	bool isCapabilityAvailable(std::string_view name) const;
 	// implements LLCapabilityProvider
-    virtual const std::string& getCapability(std::string_view name) const;
+    const std::string& getCapability(std::string_view name) const override;
     const std::string& getCapabilityDebug(std::string_view name) const;
 
 
@@ -285,7 +285,7 @@ public:
 	void logActiveCapabilities() const;
 
     /// implements LLCapabilityProvider
-	/*virtual*/ const LLHost& getHost() const;
+	/*virtual*/ const LLHost& getHost() const override;
 	const U64 		&getHandle() const 			{ return mHandle; }
 
 	LLSurface		&getLand() const;

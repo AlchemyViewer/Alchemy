@@ -173,14 +173,14 @@ public:
 
 	/* virtual */ ~LLTexLayerParamColor() = default;
 
-	/*virtual*/ LLViewerVisualParam* cloneParam(LLWearable* wearable = NULL) const;
+	/*virtual*/ LLViewerVisualParam* cloneParam(LLWearable* wearable = NULL) const override;
 
 	// LLVisualParam Virtual functions
 	///*virtual*/ BOOL			parseData(LLXmlTreeNode* node);
 	/*virtual*/ void			apply( ESex avatar_sex ) override {}
 	/*virtual*/ void			setWeight(F32 weight, bool upload_bake) override;
 	/*virtual*/ void			setAnimationTarget(F32 target_value, bool upload_bake) override;
-	/*virtual*/ void			animate(F32 delta, bool upload_bake);
+	/*virtual*/ void			animate(F32 delta, bool upload_bake) override;
 
 
 	// LLViewerVisualParam Virtual functions

@@ -43,9 +43,9 @@ public:
 	LLViewerVisualParamInfo();
 	/*virtual*/ ~LLViewerVisualParamInfo() = default;
 	
-	/*virtual*/ BOOL parseXml(LLXmlTreeNode* node);
+	/*virtual*/ BOOL parseXml(LLXmlTreeNode* node) override;
 
-	/*virtual*/ void toStream(std::ostream &out);
+	/*virtual*/ void toStream(std::ostream &out) override;
 
 protected:
 	S32			mWearableType;

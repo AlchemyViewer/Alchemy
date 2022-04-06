@@ -71,9 +71,7 @@ public:
 	LLPolySkeletalDistortionInfo() = default;
 	/*virtual*/ ~LLPolySkeletalDistortionInfo() = default;
 	
-	/*virtual*/ BOOL parseXml(LLXmlTreeNode* node);
-
-
+	/*virtual*/ BOOL parseXml(LLXmlTreeNode* node) override;
 
 	void* operator new(size_t size)
 	{
@@ -116,19 +114,19 @@ public:
 	//   This sets mInfo and calls initialization functions
 	BOOL							setInfo(LLPolySkeletalDistortionInfo *info);
 
-	/*virtual*/ LLViewerVisualParam* cloneParam(LLWearable* wearable) const;
+	/*virtual*/ LLViewerVisualParam* cloneParam(LLWearable* wearable) const override;
 
 	// LLVisualParam Virtual functions
 	///*virtual*/ BOOL				parseData(LLXmlTreeNode* node);
-	/*virtual*/ void				apply( ESex sex );
+	/*virtual*/ void				apply( ESex sex ) override;
 	
 	// LLViewerVisualParam Virtual functions
-	/*virtual*/ F32					getTotalDistortion() { return 0.1f; }
-	/*virtual*/ const LLVector4a&	getAvgDistortion()	{ return mDefaultVec; }
-	/*virtual*/ F32					getMaxDistortion() { return 0.1f; }
-	/*virtual*/ LLVector4a			getVertexDistortion(S32 index, LLPolyMesh *poly_mesh){return LLVector4a(0.001f, 0.001f, 0.001f);}
-	/*virtual*/ const LLVector4a*	getFirstDistortion(U32 *index, LLPolyMesh **poly_mesh){index = 0; poly_mesh = NULL; return &mDefaultVec;};
-	/*virtual*/ const LLVector4a*	getNextDistortion(U32 *index, LLPolyMesh **poly_mesh){index = 0; poly_mesh = NULL; return NULL;};
+	/*virtual*/ F32					getTotalDistortion() override { return 0.1f; }
+	/*virtual*/ const LLVector4a&	getAvgDistortion() override { return mDefaultVec; }
+	/*virtual*/ F32					getMaxDistortion() override { return 0.1f; }
+	/*virtual*/ LLVector4a			getVertexDistortion(S32 index, LLPolyMesh *poly_mesh) override {return LLVector4a(0.001f, 0.001f, 0.001f);}
+	/*virtual*/ const LLVector4a*	getFirstDistortion(U32 *index, LLPolyMesh **poly_mesh) override {index = 0; poly_mesh = NULL; return &mDefaultVec;};
+	/*virtual*/ const LLVector4a*	getNextDistortion(U32 *index, LLPolyMesh **poly_mesh) override {index = 0; poly_mesh = NULL; return NULL;};
 
 protected:
 	LLPolySkeletalDistortion(const LLPolySkeletalDistortion& pOther) = default;
