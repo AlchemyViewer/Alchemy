@@ -714,10 +714,8 @@ void LLViewerObject::setNameValueList(const std::string& name_value_list)
 BOOL LLViewerObject::isAnySelected() const
 {
     bool any_selected = isSelected();
-    for (child_list_t::const_iterator iter = mChildList.begin();
-         iter != mChildList.end(); iter++)
+    for (const LLViewerObject* child : mChildList)
     {
-        const LLViewerObject* child = *iter;
         any_selected = any_selected || child->isSelected();
     }
     return any_selected;
@@ -751,10 +749,8 @@ bool LLViewerObject::isReturnable()
 // [/RLVa:KB]
 	std::vector<LLBBox> boxes;
 	boxes.push_back(LLBBox(getPositionRegion(), getRotationRegion(), getScale() * -0.5f, getScale() * 0.5f).getAxisAligned());
-	for (child_list_t::iterator iter = mChildList.begin();
-		 iter != mChildList.end(); iter++)
+	for (const LLViewerObject* child : mChildList)
 	{
-		LLViewerObject* child = *iter;
 		boxes.push_back( LLBBox(child->getPositionRegion(), child->getRotationRegion(), child->getScale() * -0.5f, child->getScale() * 0.5f).getAxisAligned());
 	}
 
@@ -779,9 +775,8 @@ bool LLViewerObject::isReturnable()
 			//to test for any edge overlap
 			buildReturnablesForChildrenVO( returnables, this, pTargetRegion );
 			//Add it's children
-			for (child_list_t::iterator iter = mChildList.begin();  iter != mChildList.end(); iter++)
+			for (LLViewerObject* pChild : mChildList)
 			{
-				LLViewerObject* pChild = *iter;		
 				buildReturnablesForChildrenVO( returnables, pChild, pTargetRegion );
 			}
 		}	
@@ -819,9 +814,8 @@ void LLViewerObject::buildReturnablesForChildrenVO( std::vector<PotentialReturna
 	constructAndAddReturnable( returnables, pChild, pTargetRegion );
 	
 	//We want to handle any children VO's as well
-	for (child_list_t::iterator iter = pChild->mChildList.begin();  iter != pChild->mChildList.end(); iter++)
+	for (LLViewerObject* pChildofChild : mChildList)
 	{
-		LLViewerObject* pChildofChild = *iter;
 		buildReturnablesForChildrenVO( returnables, pChildofChild, pTargetRegion );
 	}
 }
@@ -856,10 +850,8 @@ bool LLViewerObject::crossesParcelBounds()
 {
 	std::vector<LLBBox> boxes;
 	boxes.push_back(LLBBox(getPositionRegion(), getRotationRegion(), getScale() * -0.5f, getScale() * 0.5f).getAxisAligned());
-	for (child_list_t::iterator iter = mChildList.begin();
-		 iter != mChildList.end(); iter++)
+	for (const LLViewerObject* child : mChildList)
 	{
-		LLViewerObject* child = *iter;
 		boxes.push_back(LLBBox(child->getPositionRegion(), child->getRotationRegion(), child->getScale() * -0.5f, child->getScale() * 0.5f).getAxisAligned());
 	}
 
@@ -884,9 +876,9 @@ BOOL LLViewerObject::setParent(LLViewerObject* parent)
 
 void LLViewerObject::addChild(LLViewerObject *childp)
 {
-	for (child_list_t::iterator i = mChildList.begin(); i != mChildList.end(); ++i)
+	for (const LLViewerObject* child : mChildList)
 	{
-		if (*i == childp)
+		if (child == childp)
 		{	//already has child
 			return;
 		}
@@ -920,7 +912,7 @@ void LLViewerObject::afterReparent()
 
 void LLViewerObject::removeChild(LLViewerObject *childp)
 {
-	for (child_list_t::iterator i = mChildList.begin(); i != mChildList.end(); ++i)
+	for (auto i = mChildList.begin(), end = mChildList.end(); i != end; ++i)
 	{
 		if (*i == childp)
 		{
@@ -955,10 +947,8 @@ void LLViewerObject::removeChild(LLViewerObject *childp)
 void LLViewerObject::addThisAndAllChildren(std::vector<LLViewerObject*>& objects)
 {
 	objects.push_back(this);
-	for (child_list_t::iterator iter = mChildList.begin();
-		 iter != mChildList.end(); iter++)
+	for (LLViewerObject* child : mChildList)
 	{
-		LLViewerObject* child = *iter;
 		if (!child->isAvatar())
 		{
 			child->addThisAndAllChildren(objects);
@@ -974,10 +964,8 @@ void LLViewerObject::addThisAndNonJointChildren(std::vector<LLViewerObject*>& ob
 	{
 		return;
 	}
-	for (child_list_t::iterator iter = mChildList.begin();
-		 iter != mChildList.end(); iter++)
+	for (LLViewerObject* child : mChildList)
 	{
-		LLViewerObject* child = *iter;
 		if ( (!child->isAvatar()))
 		{
 			child->addThisAndNonJointChildren(objects);
@@ -990,10 +978,8 @@ void LLViewerObject::addThisAndNonJointChildren(std::vector<LLViewerObject*>& ob
 BOOL LLViewerObject::isChild(const LLViewerObject *childp) const
 // [/RLVa:KB]
 {
-	for (child_list_t::const_iterator iter = mChildList.begin();
-		 iter != mChildList.end(); iter++)
+	for (const LLViewerObject* testchild : mChildList)
 	{
-		LLViewerObject* testchild = *iter;
 		if (testchild == childp)
 			return TRUE;
 	}
@@ -2478,10 +2464,8 @@ U32 LLViewerObject::processUpdateMessage(LLMessageSystem *mesgsys,
 	// Additionally, if any child is selected, need to update the dialogs and selection
 	// center.
 	BOOL needs_refresh = mUserSelected;
-	for (child_list_t::iterator iter = mChildList.begin();
-		 iter != mChildList.end(); iter++)
+	for (const LLViewerObject* child : mChildList)
 	{
-		LLViewerObject* child = *iter;
 		needs_refresh = needs_refresh || child->mUserSelected;
 	}
 
@@ -3880,10 +3864,8 @@ F32 LLViewerObject::getLinksetPhysicsCost()
 F32 LLViewerObject::recursiveGetEstTrianglesMax() const
 {
     F32 est_tris = getEstTrianglesMax();
-    for (child_list_t::const_iterator iter = mChildList.begin();
-         iter != mChildList.end(); iter++)
-    {
-        const LLViewerObject* child = *iter;
+	for (const LLViewerObject* child : mChildList)
+	{
         if (!child->isAvatar())
         {
             est_tris += child->recursiveGetEstTrianglesMax();
@@ -4093,10 +4075,8 @@ void LLViewerObject::boostTexturePriority(BOOL boost_children /* = TRUE */)
 	
 	if (boost_children)
 	{
-		for (child_list_t::iterator iter = mChildList.begin();
-			 iter != mChildList.end(); iter++)
+		for (LLViewerObject* child : mChildList)
 		{
-			LLViewerObject* child = *iter;
 			child->boostTexturePriority();
 		}
 	}
@@ -5559,10 +5539,8 @@ S32 LLViewerObject::countInventoryContents(LLAssetType::EType type)
 void LLViewerObject::setCanSelect(BOOL canSelect)
 {
 	mbCanSelect = canSelect;
-	for (child_list_t::iterator iter = mChildList.begin();
-		 iter != mChildList.end(); iter++)
+	for (LLViewerObject* child : mChildList)
 	{
-		LLViewerObject* child = *iter;
 		child->mbCanSelect = canSelect;
 	}
 }
@@ -6205,10 +6183,8 @@ void LLViewerObject::setDrawableState(U32 state, BOOL recursive)
 	}
 	if (recursive)
 	{
-		for (child_list_t::iterator iter = mChildList.begin();
-			 iter != mChildList.end(); iter++)
+		for (LLViewerObject* child : mChildList)
 		{
-			LLViewerObject* child = *iter;
 			child->setDrawableState(state, recursive);
 		}
 	}
@@ -6222,10 +6198,8 @@ void LLViewerObject::clearDrawableState(U32 state, BOOL recursive)
 	}
 	if (recursive)
 	{
-		for (child_list_t::iterator iter = mChildList.begin();
-			 iter != mChildList.end(); iter++)
+		for (LLViewerObject* child : mChildList)
 		{
-			LLViewerObject* child = *iter;
 			child->clearDrawableState(state, recursive);
 		}
 	}
@@ -6240,10 +6214,8 @@ BOOL LLViewerObject::isDrawableState(U32 state, BOOL recursive) const
 	}
 	if (recursive)
 	{
-		for (child_list_t::const_iterator iter = mChildList.begin();
-			 (iter != mChildList.end()) && matches; iter++)
+		for (LLViewerObject* child : mChildList)
 		{
-			LLViewerObject* child = *iter;
 			matches &= child->isDrawableState(state, recursive);
 		}
 	}
@@ -6456,10 +6428,8 @@ void LLViewerObject::updateVolume(const LLVolumeParams& volume_params)
 
 void LLViewerObject::recursiveMarkForUpdate(BOOL priority)
 {
-    for (LLViewerObject::child_list_t::iterator iter = mChildList.begin();
-         iter != mChildList.end(); iter++)
-    {
-        LLViewerObject* child = *iter;
+	for (LLViewerObject* child : mChildList)
+	{
         child->markForUpdate(priority);
     }
     markForUpdate(priority);
@@ -6518,9 +6488,8 @@ void LLViewerObject::setRegion(LLViewerRegion *regionp)
 	mLatestRecvPacketID = 0;
 	mRegionp = regionp;
 
-	for (child_list_t::iterator i = mChildList.begin(); i != mChildList.end(); ++i)
+	for (LLViewerObject* child : mChildList)
 	{
-		LLViewerObject* child = *i;
 		child->setRegion(regionp);
 	}
 
@@ -6759,10 +6728,8 @@ void LLViewerObject::saveUnselectedChildrenPosition(std::vector<LLVector3>& posi
 		return ;
 	}
 
-	for (LLViewerObject::child_list_t::const_iterator iter = mChildList.begin();
-			iter != mChildList.end(); iter++)
+	for (const LLViewerObject* childp : mChildList)
 	{
-		LLViewerObject* childp = *iter;
 		if (!childp->isSelected() && childp->mDrawable.notNull())
 		{
 			positions.push_back(childp->getPositionEdit());		
@@ -6779,10 +6746,8 @@ void LLViewerObject::saveUnselectedChildrenRotation(std::vector<LLQuaternion>& r
 		return ;
 	}
 
-	for (LLViewerObject::child_list_t::const_iterator iter = mChildList.begin();
-			iter != mChildList.end(); iter++)
+	for (const LLViewerObject* childp : mChildList)
 	{
-		LLViewerObject* childp = *iter;
 		if (!childp->isSelected() && childp->mDrawable.notNull())
 		{
 			rotations.push_back(childp->getRotationEdit());				
@@ -6804,10 +6769,8 @@ void LLViewerObject::resetChildrenRotationAndPosition(const std::vector<LLQuater
 	S32 index = 0 ;
 	LLQuaternion inv_rotation = ~getRotationEdit() ;
 	LLVector3 offset = getPositionEdit() ;
-	for (LLViewerObject::child_list_t::const_iterator iter = mChildList.begin();
-			iter != mChildList.end(); iter++)
+	for (LLViewerObject* childp : mChildList)
 	{
-		LLViewerObject* childp = *iter;
 		if (!childp->isSelected() && childp->mDrawable.notNull())
 		{
 			if (childp->getPCode() != LL_PCODE_LEGACY_AVATAR)
@@ -6863,10 +6826,8 @@ void LLViewerObject::resetChildrenPosition(const LLVector3& offset, BOOL simplif
 		}
 	}
 
-	for (LLViewerObject::child_list_t::const_iterator iter = mChildList.begin();
-			iter != mChildList.end(); iter++)
+	for (LLViewerObject* childp : mChildList)
 	{
-		LLViewerObject* childp = *iter;
 
 		if (!childp->isSelected() && childp->mDrawable.notNull())
 		{
