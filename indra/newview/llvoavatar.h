@@ -112,10 +112,10 @@ public:
 	}
 
 	LLVOAvatar(const LLUUID &id, const LLPCode pcode, LLViewerRegion *regionp);
-	virtual void		markDead();
+	void		markDead() override;
 	static void			initClass(); // Initialize data that's only init'd once per class.
 	static void			cleanupClass();	// Cleanup data that's only init'd once per class.
-	virtual void 		initInstance(); // Called after construction to initialize the class.
+	void 		initInstance() override; // Called after construction to initialize the class.
 protected:
 	virtual				~LLVOAvatar();
 
@@ -132,19 +132,19 @@ protected:
 	// LLViewerObject interface and related
 	//--------------------------------------------------------------------
 public:
-	/*virtual*/ void			updateGL();
-	/*virtual*/ LLVOAvatar*		asAvatar();
+	/*virtual*/ void			updateGL() override;
+	/*virtual*/ LLVOAvatar*		asAvatar() override;
 
 	virtual U32    	 	 	processUpdateMessage(LLMessageSystem *mesgsys,
 													 void **user_data,
 													 U32 block_num,
 													 const EObjectUpdateType update_type,
 													 LLDataPacker *dp);
-	virtual void   	 	 	idleUpdate(LLAgent &agent, const F64 &time);
-	/*virtual*/ BOOL   	 	 	updateLOD();
+	virtual void   	 	 	idleUpdate(LLAgent &agent, const F64 &time) override;
+	/*virtual*/ BOOL   	 	 	updateLOD() override;
 	BOOL  	 	 	 	 	updateJointLODs();
 	void					updateLODRiggedAttachments( void );
-	/*virtual*/ BOOL   	 	 	isActive() const; // Whether this object needs to do an idleUpdate.
+	/*virtual*/ BOOL   	 	 	isActive() const override; // Whether this object needs to do an idleUpdate.
 	S32Bytes				totalTextureMemForUUIDS(std::set<LLUUID>& ids);
 	bool 						allTexturesCompletelyDownloaded(std::set<LLUUID>& ids) const;
 	bool 						allLocalTexturesCompletelyDownloaded() const;
@@ -156,18 +156,18 @@ public:
 	void 						collectBakedTextureUUIDs(std::set<LLUUID>& ids) const;
 	void 						collectTextureUUIDs(std::set<LLUUID>& ids);
 	void						releaseOldTextures();
-	/*virtual*/ void   	 	 	updateTextures();
+	/*virtual*/ void   	 	 	updateTextures() override;
 	LLViewerFetchedTexture*		getBakedTextureImage(const U8 te, const LLUUID& uuid);
-	/*virtual*/ S32    	 	 	setTETexture(const U8 te, const LLUUID& uuid); // If setting a baked texture, need to request it from a non-local sim.
-	/*virtual*/ void   	 	 	onShift(const LLVector4a& shift_vector);
-	/*virtual*/ U32    	 	 	getPartitionType() const;
-	/*virtual*/ const  	 	 	LLVector3 getRenderPosition() const;
-	/*virtual*/ void   	 	 	updateDrawable(BOOL force_damped);
-	/*virtual*/ LLDrawable* 	createDrawable(LLPipeline *pipeline);
-	/*virtual*/ BOOL   	 	 	updateGeometry(LLDrawable *drawable);
-	/*virtual*/ void   	 	 	setPixelAreaAndAngle(LLAgent &agent);
-	/*virtual*/ void   	 	 	updateRegion(LLViewerRegion *regionp);
-	/*virtual*/ void   	 	 	updateSpatialExtents(LLVector4a& newMin, LLVector4a &newMax);
+	/*virtual*/ S32    	 	 	setTETexture(const U8 te, const LLUUID& uuid) override; // If setting a baked texture, need to request it from a non-local sim.
+	/*virtual*/ void   	 	 	onShift(const LLVector4a& shift_vector) override;
+	/*virtual*/ U32    	 	 	getPartitionType() const override;
+	/*virtual*/ const  	 	 	LLVector3 getRenderPosition() const override;
+	/*virtual*/ void   	 	 	updateDrawable(BOOL force_damped) override;
+	/*virtual*/ LLDrawable* 	createDrawable(LLPipeline *pipeline) override;
+	/*virtual*/ BOOL   	 	 	updateGeometry(LLDrawable *drawable) override;
+	/*virtual*/ void   	 	 	setPixelAreaAndAngle(LLAgent &agent) override;
+	/*virtual*/ void   	 	 	updateRegion(LLViewerRegion *regionp) override;
+	/*virtual*/ void   	 	 	updateSpatialExtents(LLVector4a& newMin, LLVector4a &newMax) override;
 	void			   	 	 	calculateSpatialExtents(LLVector4a& newMin, LLVector4a& newMax);
 	/*virtual*/ BOOL   	 	 	lineSegmentIntersect(const LLVector4a& start, const LLVector4a& end,
 												 S32 face = -1,                    // which face to check, -1 = ALL_SIDES
@@ -177,7 +177,7 @@ public:
 												 LLVector4a* intersection = NULL,   // return the intersection point
 												 LLVector2* tex_coord = NULL,      // return the texture coordinates of the intersection point
 												 LLVector4a* normal = NULL,         // return the surface normal at the intersection point
-												 LLVector4a* tangent = NULL);     // return the surface tangent at the intersection point
+												 LLVector4a* tangent = NULL) override;     // return the surface tangent at the intersection point
 	virtual LLViewerObject*	lineSegmentIntersectRiggedAttachments(
                                                  const LLVector4a& start, const LLVector4a& end,
 												 S32 face = -1,                    // which face to check, -1 = ALL_SIDES
@@ -193,14 +193,14 @@ public:
 	// LLCharacter interface and related
 	//--------------------------------------------------------------------
 public:
-	/*virtual*/ LLVector3    	getCharacterPosition();
-	/*virtual*/ LLQuaternion 	getCharacterRotation();
-	/*virtual*/ LLVector3    	getCharacterVelocity();
-	/*virtual*/ LLVector3    	getCharacterAngularVelocity();
+	/*virtual*/ LLVector3    	getCharacterPosition() override;
+	/*virtual*/ LLQuaternion 	getCharacterRotation() override;
+	/*virtual*/ LLVector3    	getCharacterVelocity() override;
+	/*virtual*/ LLVector3    	getCharacterAngularVelocity() override;
 
-	/*virtual*/ LLUUID			remapMotionID(const LLUUID& id);
-	/*virtual*/ BOOL			startMotion(const LLUUID& id, F32 time_offset = 0.f);
-	/*virtual*/ BOOL			stopMotion(const LLUUID& id, BOOL stop_immediate = FALSE);
+	LLUUID			remapMotionID(const LLUUID& id);
+	/*virtual*/ BOOL			startMotion(const LLUUID& id, F32 time_offset = 0.f) override;
+	/*virtual*/ BOOL			stopMotion(const LLUUID& id, BOOL stop_immediate = FALSE) override;
 	virtual bool			hasMotionFromSource(const LLUUID& source_id);
 	virtual void			stopMotionFromSource(const LLUUID& source_id);
 	virtual void			requestStopMotion(LLMotion* motion);
@@ -208,7 +208,7 @@ public:
 	void					startDefaultMotions();
 	void					dumpAnimationState();
 
-	virtual LLJoint*		getJoint(const std::string &name);
+	virtual LLJoint*		getJoint(const std::string &name) override;
 	LLJoint*		        getJoint(S32 num);
 
 	void 					addAttachmentOverridesForObject(LLViewerObject *vo, std::set<LLUUID>* meshes_seen = NULL, bool recursive = true);
@@ -225,7 +225,7 @@ public:
     void 					getAssociatedVolumes(std::vector<LLVOVolume*>& volumes);
 
     // virtual
-    void 					updateRiggingInfo();
+    void 					updateRiggingInfo() override;
     
     size_t mLastAssocVolSize = 0;
 	// This encodes mesh id and LOD, so we can see whether display is up-to-date.
@@ -236,14 +236,14 @@ public:
     std::set<LLUUID>		mActiveOverrideMeshes;
     void			onActiveOverrideMeshesChanged();
     
-	/*virtual*/ const LLUUID&	getID() const;
-	/*virtual*/ void			addDebugText(const std::string& text);
-	/*virtual*/ F32				getTimeDilation();
-	/*virtual*/ void			getGround(const LLVector3 &inPos, LLVector3 &outPos, LLVector3 &outNorm);
-	/*virtual*/ F32				getPixelArea() const;
-	/*virtual*/ LLVector3d		getPosGlobalFromAgent(const LLVector3 &position);
-	/*virtual*/ LLVector3		getPosAgentFromGlobal(const LLVector3d &position);
-	virtual void				updateVisualParams();
+	/*virtual*/ const LLUUID&	getID() const override;
+	/*virtual*/ void			addDebugText(const std::string& text) override;
+	/*virtual*/ F32				getTimeDilation() override;
+	/*virtual*/ void			getGround(const LLVector3 &inPos, LLVector3 &outPos, LLVector3 &outNorm) override;
+	/*virtual*/ F32				getPixelArea() const override;
+	/*virtual*/ LLVector3d		getPosGlobalFromAgent(const LLVector3 &position) override;
+	/*virtual*/ LLVector3		getPosAgentFromGlobal(const LLVector3d &position) override;
+	virtual void				updateVisualParams() override;
 
 /**                    Inherited
  **                                                                            **
@@ -255,7 +255,7 @@ public:
  **/
 
 public:
-	virtual bool 	isSelf() const { return false; } // True if this avatar is for this viewer's agent
+	bool 	isSelf() const override { return false; } // True if this avatar is for this viewer's agent
 
 	virtual bool 	isControlAvatar() const { return mIsControlAvatar; } // True if this avatar is a control av (no associated user)
 	virtual bool 	isUIAvatar() const { return mIsUIAvatar; } // True if this avatar is a supplemental av used in some UI views (no associated user)
@@ -410,17 +410,17 @@ protected:
  **/
 
 protected:
-	/*virtual*/ LLAvatarJoint*	createAvatarJoint(); // Returns LLViewerJoint
-	/*virtual*/ LLAvatarJoint*	createAvatarJoint(S32 joint_num); // Returns LLViewerJoint
-	/*virtual*/ LLAvatarJointMesh*	createAvatarJointMesh(); // Returns LLViewerJointMesh
+	/*virtual*/ LLAvatarJoint*	createAvatarJoint() override; // Returns LLViewerJoint
+	/*virtual*/ LLAvatarJoint*	createAvatarJoint(S32 joint_num) override; // Returns LLViewerJoint
+	/*virtual*/ LLAvatarJointMesh*	createAvatarJointMesh() override; // Returns LLViewerJointMesh
 public:
 	void				updateHeadOffset();
     void				debugBodySize() const;
 	void				postPelvisSetRecalc( void );
 
-	/*virtual*/ BOOL	loadSkeletonNode();
+	/*virtual*/ BOOL	loadSkeletonNode() override;
     void                initAttachmentPoints(bool ignore_hud_joints = false);
-	/*virtual*/ void	buildCharacter();
+	/*virtual*/ void	buildCharacter() override;
     void                resetVisualParams();
 	void				applyDefaultParams();
     void				resetSkeleton(bool reset_animations);
@@ -544,7 +544,7 @@ public:
 	// Morph masks
 	//--------------------------------------------------------------------
 public:
-	/*virtual*/ void	applyMorphMask(U8* tex_data, S32 width, S32 height, S32 num_components, LLAvatarAppearanceDefines::EBakedTextureIndex index = LLAvatarAppearanceDefines::BAKED_NUM_INDICES);
+	/*virtual*/ void	applyMorphMask(U8* tex_data, S32 width, S32 height, S32 num_components, LLAvatarAppearanceDefines::EBakedTextureIndex index = LLAvatarAppearanceDefines::BAKED_NUM_INDICES) override;
 	BOOL 		morphMaskNeedsUpdate(LLAvatarAppearanceDefines::EBakedTextureIndex index = LLAvatarAppearanceDefines::BAKED_NUM_INDICES);
 
 	
