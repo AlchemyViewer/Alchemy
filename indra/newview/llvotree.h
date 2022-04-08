@@ -61,7 +61,6 @@ public:
 	/*virtual*/ void idleUpdate(LLAgent &agent, const F64 &time) override;
 	
 	// Graphical stuff for objects - maybe broken out into render class later?
-	/*virtual*/ void render(LLAgent &agent);
 	/*virtual*/ void setPixelAreaAndAngle(LLAgent &agent) override;
 	/*virtual*/ void updateTextures() override;
 

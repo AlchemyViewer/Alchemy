@@ -227,14 +227,14 @@ public:
 	void cacheEnvironment(const LLSettingsSky::ptr_t& psky, AtmosphericsVars& atmosphericsVars);
     void calc(const LLSettingsSky::ptr_t& psky);
 
-	/*virtual*/ void idleUpdate(LLAgent &agent, const F64 &time);
+	/*virtual*/ void idleUpdate(LLAgent &agent, const F64 &time) override;
 	bool updateSky();
 	
 	// Graphical stuff for objects - maybe broken out into render class
 	// later?
-	/*virtual*/ void updateTextures();
-	/*virtual*/ LLDrawable* createDrawable(LLPipeline *pipeline);
-	/*virtual*/ BOOL		updateGeometry(LLDrawable *drawable);
+	/*virtual*/ void updateTextures() override;
+	/*virtual*/ LLDrawable* createDrawable(LLPipeline *pipeline) override;
+	/*virtual*/ BOOL		updateGeometry(LLDrawable *drawable) override;
 
 	const LLHeavenBody& getSun() const						{ return mSun;  }
 	const LLHeavenBody& getMoon() const						{ return mMoon; }

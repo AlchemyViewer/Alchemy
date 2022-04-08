@@ -412,11 +412,6 @@ void LLVOTree::idleUpdate(LLAgent &agent, const F64 &time)
 	mTrunkLOD = trunk_LOD;
 }
 
-void LLVOTree::render(LLAgent &agent)
-{
-}
-
-
 void LLVOTree::setPixelAreaAndAngle(LLAgent &agent)
 {
 	auto& viewerCamera = LLViewerCamera::instanceFast();
