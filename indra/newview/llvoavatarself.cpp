@@ -935,7 +935,7 @@ void LLVOAvatarSelf::checkBOMRebakeRequired()
 	{
 		auto newBOMStatus = getRegion()->bakesOnMeshEnabled();
 		static const LLCachedControl<bool> using_bom(gSavedSettings, "CurrentlyUsingBakesOnMesh", true);
-		if(!using_bom != newBOMStatus)
+		if(using_bom != newBOMStatus)
 		{
 			// force a rebake when the last grid we were on (including previous login) had different BOM support
 			// This replicates forceAppearanceUpdate rather than pulling in the whole of llavatarself.
