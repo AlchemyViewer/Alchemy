@@ -2013,7 +2013,7 @@ void LLPanelObject::refresh()
 		mRegionMaxDepth = region->getMinRegionHeight();
 		mCtrlPosZ->setMaxValue(mRegionMaxHeight);
 		mMinScale = region->getMinPrimScale();
-		mMaxScale = LLGridManager::getInstanceFast()->isInOpenSimulator() ? region->getMaxPrimScale() : get_default_max_prim_scale(LLPickInfo::isFlora(mObject));
+		mMaxScale = LLGridManager::getInstanceFast()->isInOpenSim() ? region->getMaxPrimScale() : get_default_max_prim_scale(LLPickInfo::isFlora(mObject));
 		mCtrlScaleX->setMinValue(mMinScale);
 		mCtrlScaleX->setMaxValue(mMaxScale);
 		mCtrlScaleY->setMinValue(mMinScale);
@@ -2024,7 +2024,7 @@ void LLPanelObject::refresh()
 	else
 	{
 		mRegionMaxHeight = worldp->getRegionMaxHeight();
-		mRegionMaxDepth = LLGridManager::getInstanceFast()->isInOpenSimulator() ? -256.f : 0.f; // OpenSim is derp
+		mRegionMaxDepth = LLGridManager::getInstanceFast()->isInOpenSim() ? -256.f : 0.f; // OpenSim is derp
 		mCtrlPosZ->setMaxValue(mRegionMaxHeight);
 		mMinScale = worldp->getRegionMinPrimScale();
 		mMaxScale = get_default_max_prim_scale(LLPickInfo::isFlora(mObject));

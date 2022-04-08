@@ -98,7 +98,7 @@ std::string get_user_key_from_name(const std::string &username)
     std::string key = username;
     LLStringUtil::trim(key);
     LLStringUtil::toLower(key);
-    if (!LLGridManager::getInstance()->isSystemGrid())
+    if (!LLGridManager::getInstance()->isInSecondlife())
     {
         size_t separator_index = username.find_first_of(" ");
         if (separator_index == username.npos)
@@ -656,7 +656,7 @@ void LLPanelLogin::getFields(LLPointer<LLCredential>& credential,
 	// determine if the username is a first/last form or not.
 	size_t separator_index = username.find_first_of(' ');
 	if (separator_index == username.npos
-		&& !LLGridManager::getInstance()->isSystemGrid())
+		&& !LLGridManager::getInstance()->isInSecondlife())
 	{
 		LL_INFOS("Credentials", "Authentication") << "account: " << username << LL_ENDL;
 		// single username, so this is a 'clear' identifier
