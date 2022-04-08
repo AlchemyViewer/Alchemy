@@ -4428,6 +4428,7 @@ void LLAppViewer::purgeCache()
 	{
 		gDirUtilp->deleteDirAndContents(browser_data);
 	}
+	gDirUtilp->deleteDirAndContents(gDirUtilp->getExpandedFilename(LL_PATH_CACHE, "gridcache"));
 	gDirUtilp->deleteFilesInDir(gDirUtilp->getExpandedFilename(LL_PATH_CACHE, ""), "*");
 }
 
