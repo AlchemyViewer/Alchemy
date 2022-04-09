@@ -1613,6 +1613,18 @@ void LLRender::scaleUI(F32 x, F32 y, F32 z)
 	mUIScale.back().mul(scale);
 }
 
+void LLRender::rotateUI(LLQuaternion& rot)
+{
+	if (mUIRotation.empty())
+	{
+		mUIRotation.push_back(rot);
+	}
+	else
+	{
+		mUIRotation.push_back(mUIRotation.back()*rot);
+	}
+}
+
 void LLRender::pushUIMatrix()
 {
 	if (mUIOffset.empty())
@@ -1632,6 +1644,10 @@ void LLRender::pushUIMatrix()
 	{
 		mUIScale.push_back(mUIScale.back());
 	}
+	if (!mUIRotation.empty())
+	{
+		mUIRotation.push_back(mUIRotation.back());
+	}
 }
 
 void LLRender::popUIMatrix()
@@ -1643,6 +1659,10 @@ void LLRender::popUIMatrix()
 
 	mUIOffset.pop_back();
 	mUIScale.pop_back();
+	if (!mUIRotation.empty())
+	{
+		mUIRotation.pop_back();
+	}
 }
 
 LLVector3 LLRender::getUITranslation()
@@ -1672,6 +1692,8 @@ void LLRender::loadUIIdentity()
 	}
 	mUIOffset.back().splat(0.f);
 	mUIScale.back().splat(1.f);
+	if (!mUIRotation.empty())
+		mUIRotation.push_back(LLQuaternion());
 }
 
 void LLRender::setColorMask(bool writeColor, bool writeAlpha)
@@ -2040,12 +2062,32 @@ void LLRender::vertex4a(const LLVector4a& vertex)
 
 	if (mUIOffset.empty())
 	{
+		if (!mUIRotation.empty() && mUIRotation.back().isNotIdentity())
+		{
+			LLVector4 vert(vertex.getF32ptr());
+			mVerticesp[mCount].loadua((vert*mUIRotation.back()).mV);
+		}
+		else
+		{
 		mVerticesp[mCount] = vertex;
+		}
 	}
 	else
 	{
-		mVerticesp[mCount].setAdd(vertex, mUIOffset.back());
-		mVerticesp[mCount].mul(mUIScale.back());
+		if (!mUIRotation.empty() && mUIRotation.back().isNotIdentity())
+		{
+			LLVector4 vert(vertex.getF32ptr());
+			vert = vert * mUIRotation.back();
+			LLVector4a postrot_vert;
+			postrot_vert.loadua(vert.mV);
+			mVerticesp[mCount].setAdd(postrot_vert, mUIOffset.back());
+			mVerticesp[mCount].mul(mUIScale.back());
+		}
+		else
+		{
+			mVerticesp[mCount].setAdd(vertex, mUIOffset.back());
+			mVerticesp[mCount].mul(mUIScale.back());
+		}
 	}
 
 	mCount++;

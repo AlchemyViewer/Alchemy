@@ -402,6 +402,8 @@ public:
 
 	void translateUI(F32 x, F32 y, F32 z);
 	void scaleUI(F32 x, F32 y, F32 z);
+	// Rotates vertices, pre-translation/scale
+	void rotateUI(LLQuaternion& rot);
 	void pushUIMatrix();
 	void popUIMatrix();
 	void loadUIIdentity();
@@ -412,6 +414,7 @@ public:
 
 	void begin(const GLuint& mode);
 	void end();
+
 	LL_FORCE_INLINE void vertex2i(const GLint& x, const GLint& y) { vertex4a(LLVector4a((GLfloat)x,(GLfloat)y,0.f)); }
 	LL_FORCE_INLINE void vertex2f(const GLfloat& x, const GLfloat& y) { vertex4a(LLVector4a(x,y,0.f)); }
 	LL_FORCE_INLINE void vertex3f(const GLfloat& x, const GLfloat& y, const GLfloat& z) { vertex4a(LLVector4a(x,y,z)); }
@@ -518,6 +521,7 @@ private:
 
 	std::vector<LLVector4a, boost::alignment::aligned_allocator<LLVector4a, 64> > mUIOffset;
 	std::vector<LLVector4a, boost::alignment::aligned_allocator<LLVector4a, 64> > mUIScale;
+	std::vector<LLQuaternion> mUIRotation;
 
 	bool			mPrimitiveReset;
 };
