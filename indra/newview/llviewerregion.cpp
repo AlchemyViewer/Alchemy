@@ -2951,6 +2951,18 @@ void LLViewerRegion::unpackRegionHandshake()
 	}
 
 	mCentralBakeVersion = region_protocols & 1; // was (S32)gSavedSettings.getBOOL("UseServerTextureBaking");
+
+	if (LLGridManager::instance().isInSecondlife() || region_protocols & 0x8000000000000000ll) // OS sets bit 63 when BOM supported
+	{
+		mMaxBakes = LLAvatarAppearanceDefines::EBakedTextureIndex::BAKED_NUM_INDICES;
+		mMaxTEs = LLAvatarAppearanceDefines::ETextureIndex::TEX_NUM_INDICES;
+	}
+	else
+	{
+		mMaxBakes = LLAvatarAppearanceDefines::EBakedTextureIndex::BAKED_LEFT_ARM;
+		mMaxTEs = LLAvatarAppearanceDefines::ETextureIndex::TEX_HEAD_UNIVERSAL_TATTOO;
+	}
+
 	LLVLComposition *compp = getComposition();
 	if (compp)
 	{
@@ -3688,7 +3700,7 @@ std::string LLViewerRegion::getHGGrid() const
 	}
 	else
 	{
-		authority = LLGridManager::getInstance()->getGrid();
+		authority = LLGridManager::getInstanceFast()->getGrid();
 	}
 	return authority;
 }
@@ -3703,7 +3715,7 @@ std::string LLViewerRegion::getHGGridName() const
 	}
 	else
 	{
-		name = LLGridManager::getInstance()->getGridLabel();
+		name = LLGridManager::getInstanceFast()->getGridLabel();
 	}
 	return name;
 }
