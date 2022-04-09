@@ -246,14 +246,14 @@ bool ALRenderUtil::setupColorGrade()
 						mCGLutSize = LLVector4(1.f / image_width, 1.f / image_height, (F32)image_width, (F32)image_height);
 
 						LLImageGL::generateTextures(1, &mCGLut);
-						gGL.getTexUnit(0)->bindManual(LLTexUnit::TT_TEXTURE, mCGLut);
-						LLImageGL::setManualImage(LLTexUnit::getInternalType(LLTexUnit::TT_TEXTURE), 0, int_format, image_width,
-							image_height, primary_format, GL_UNSIGNED_BYTE, raw_image->getData(), false);
+						gGL.getTexUnit(0)->bindManual(LLTexUnit::TT_TEXTURE_3D, mCGLut);
+						LLImageGL::setManualImage3D(LLTexUnit::getInternalType(LLTexUnit::TT_TEXTURE_3D), 0, int_format, image_height,
+							image_height, image_height, primary_format, GL_UNSIGNED_BYTE, raw_image->getData(), false);
 						stop_glerror();
 						gGL.getTexUnit(0)->setTextureFilteringOption(LLTexUnit::TFO_BILINEAR);
-						gGL.getTexUnit(0)->setTextureAddressMode(LLTexUnit::TAM_WRAP);
+						gGL.getTexUnit(0)->setTextureAddressMode(LLTexUnit::TAM_CLAMP);
 						gGL.getTexUnit(0)->setTextureColorSpace(LLTexUnit::TCS_LINEAR);
-						gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+						gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE_3D);
 					}
 					else
 					{
@@ -331,12 +331,12 @@ void ALRenderUtil::renderTonemap(LLRenderTarget* src, LLRenderTarget* dst, LLRen
 
 	if (mCGLut != 0)
 	{
-		S32 channel = tone_shader->enableTexture(LLShaderMgr::COLORGRADE_LUT, LLTexUnit::TT_TEXTURE);
+		S32 channel = tone_shader->enableTexture(LLShaderMgr::COLORGRADE_LUT, LLTexUnit::TT_TEXTURE_3D);
 		if (channel > -1)
 		{
-			gGL.getTexUnit(channel)->bindManual(LLTexUnit::TT_TEXTURE, mCGLut);
+			gGL.getTexUnit(channel)->bindManual(LLTexUnit::TT_TEXTURE_3D, mCGLut);
 			gGL.getTexUnit(channel)->setTextureFilteringOption(LLTexUnit::TFO_BILINEAR);
-			gGL.getTexUnit(channel)->setTextureAddressMode(LLTexUnit::TAM_WRAP);
+			gGL.getTexUnit(channel)->setTextureAddressMode(LLTexUnit::TAM_CLAMP);
 			gGL.getTexUnit(channel)->setTextureColorSpace(LLTexUnit::TCS_LINEAR);
 		}
 

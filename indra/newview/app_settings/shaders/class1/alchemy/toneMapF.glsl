@@ -42,7 +42,7 @@ vec3 srgb_to_linear(vec3 cl);
 vec3 linear_to_srgb(vec3 cl);
 
 #if COLOR_GRADE_LUT != 0
-uniform sampler2D colorgrade_lut;
+uniform sampler3D colorgrade_lut;
 uniform vec4 colorgrade_lut_size;
 #endif
 
@@ -223,25 +223,13 @@ void main()
     
     #if COLOR_GRADE_LUT != 0
     // Invert coord for compat with DX-style LUT
-    diff.y = 1.0 - diff.y;
+    diff.g = 1.0 - diff.g;
     
-    // Convert to texel coords
-    vec3 lutRange = diff.rgb * ( colorgrade_lut_size.w - 1);
-    
-    // Calculate coords in texel space
-    vec2 lutX = vec2(floor(lutRange.z)*colorgrade_lut_size.w+lutRange.x, lutRange.y);
-    vec2 lutY = vec2(ceil(lutRange.z)*colorgrade_lut_size.w+lutRange.x, lutRange.y);
-    
-    // texel to ndc
-    lutX = (lutX+0.5)*colorgrade_lut_size.xy;
-    lutY = (lutY+0.5)*colorgrade_lut_size.xy;
-    
-    // LUT interpolation
-    diff.rgb = mix(
-    linear_to_srgb(texture2D(colorgrade_lut, lutX).rgb),
-    linear_to_srgb(texture2D(colorgrade_lut, lutY).rgb),
-    fract(lutRange.z)
-    );
+    //see https://developer.nvidia.com/gpugems/GPUGems2/gpugems2_chapter24.html
+    vec3 scale = (vec3(colorgrade_lut_size.w) - 1.0) / vec3(colorgrade_lut_size.w);
+    vec3 offset = 1.0 / (2.0 * vec3(colorgrade_lut_size.w));
+
+    diff = vec4(linear_to_srgb(textureLod(colorgrade_lut, scale * diff.rbg + offset, 0).rgb), diff.a);
     #endif
 
     frag_color = diff;

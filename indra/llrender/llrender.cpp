@@ -472,9 +472,9 @@ void LLTexUnit::setTextureAddressMode(eTextureAddressMode mode)
 
 	glTexParameteri (sGLTextureType[mCurrTexType], GL_TEXTURE_WRAP_S, sGLAddressMode[mode]);
 	glTexParameteri (sGLTextureType[mCurrTexType], GL_TEXTURE_WRAP_T, sGLAddressMode[mode]);
-	if (mCurrTexType == TT_CUBE_MAP)
+	if (mCurrTexType == TT_CUBE_MAP || mCurrTexType == TT_TEXTURE_3D)
 	{
-		glTexParameteri (GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, sGLAddressMode[mode]);
+		glTexParameteri (sGLTextureType[mCurrTexType], GL_TEXTURE_WRAP_R, sGLAddressMode[mode]);
 	}
 }
 
@@ -2396,6 +2396,9 @@ void LLRender::debugTexUnits(void)
 					break;
 				case LLTexUnit::TT_CUBE_MAP:
 					LL_CONT << "Cube Map";
+					break;
+				case LLTexUnit::TT_TEXTURE_3D:
+					LL_CONT << "Texture 3D";
 					break;
 				default:
 					LL_CONT << "ARGH!!! NONE!";

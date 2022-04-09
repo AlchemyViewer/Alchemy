@@ -1354,6 +1354,153 @@ void LLImageGL::setManualImage(U32 target, S32 miplevel, S32 intformat, S32 widt
 	stop_glerror();
 }
 
+void LLImageGL::setManualImage3D(U32 target, S32 miplevel, S32 intformat, S32 width, S32 height, S32 depth, U32 pixformat, U32 pixtype, const void* pixels, bool allow_compression)
+{
+	LL_RECORD_BLOCK_TIME(FTM_SET_MANUAL_IMAGE);
+	std::vector<U32> scratch;
+	if (LLRender::sGLCoreProfile)
+	{
+#ifdef GL_ARB_texture_swizzle
+		if (gGLManager.mHasTextureSwizzle)
+		{
+			if (pixformat == GL_ALPHA)
+			{ //GL_ALPHA is deprecated, convert to RGBA
+				const GLint mask[] = { GL_ZERO, GL_ZERO, GL_ZERO, GL_RED };
+				glTexParameteriv(GL_TEXTURE_3D, GL_TEXTURE_SWIZZLE_RGBA, mask);
+				pixformat = GL_RED;
+				intformat = GL_R8;
+			}
+
+			if (pixformat == GL_LUMINANCE)
+			{ //GL_LUMINANCE is deprecated, convert to GL_RGBA
+				const GLint mask[] = { GL_RED, GL_RED, GL_RED, GL_ONE };
+				glTexParameteriv(GL_TEXTURE_3D, GL_TEXTURE_SWIZZLE_RGBA, mask);
+				pixformat = GL_RED;
+				intformat = GL_R8;
+			}
+
+			if (pixformat == GL_LUMINANCE_ALPHA)
+			{ //GL_LUMINANCE_ALPHA is deprecated, convert to RGBA
+				const GLint mask[] = { GL_RED, GL_RED, GL_RED, GL_GREEN };
+				glTexParameteriv(GL_TEXTURE_3D, GL_TEXTURE_SWIZZLE_RGBA, mask);
+				pixformat = GL_RG;
+				intformat = GL_RG8;
+			}
+		}
+		else
+#endif
+		{
+			if (pixformat == GL_ALPHA && pixtype == GL_UNSIGNED_BYTE)
+			{ //GL_ALPHA is deprecated, convert to RGBA
+				scratch.resize(width * height);
+
+				U32 pixel_count = (U32)(width * height);
+				for (U32 i = 0; i < pixel_count; i++)
+				{
+					U8* pix = (U8*)&scratch[i];
+					pix[0] = pix[1] = pix[2] = 0;
+					pix[3] = ((U8*)pixels)[i];
+				}
+
+				pixels = &scratch[0];
+
+				pixformat = GL_RGBA;
+				intformat = GL_RGBA8;
+			}
+
+			if (pixformat == GL_LUMINANCE_ALPHA && pixtype == GL_UNSIGNED_BYTE)
+			{ //GL_LUMINANCE_ALPHA is deprecated, convert to RGBA
+				scratch.resize(width * height);
+
+				U32 pixel_count = (U32)(width * height);
+				for (U32 i = 0; i < pixel_count; i++)
+				{
+					U8 lum = ((U8*)pixels)[i * 2 + 0];
+					U8 alpha = ((U8*)pixels)[i * 2 + 1];
+
+					U8* pix = (U8*)&scratch[i];
+					pix[0] = pix[1] = pix[2] = lum;
+					pix[3] = alpha;
+				}
+
+				pixels = &scratch[0];
+
+				pixformat = GL_RGBA;
+				intformat = GL_RGBA8;
+			}
+
+			if (pixformat == GL_LUMINANCE && pixtype == GL_UNSIGNED_BYTE)
+			{ //GL_LUMINANCE_ALPHA is deprecated, convert to RGB
+				scratch.resize(width * height);
+
+				U32 pixel_count = (U32)(width * height);
+				for (U32 i = 0; i < pixel_count; i++)
+				{
+					U8 lum = ((U8*)pixels)[i];
+
+					U8* pix = (U8*)&scratch[i];
+					pix[0] = pix[1] = pix[2] = lum;
+					pix[3] = 255;
+				}
+
+				pixels = &scratch[0];
+
+				pixformat = GL_RGBA;
+				intformat = GL_RGB8;
+			}
+		}
+	}
+	if (LLImageGL::sCompressTextures && allow_compression)
+	{
+		switch (intformat)
+		{
+		case GL_RED:
+		case GL_R8:
+			intformat = GL_COMPRESSED_RED;
+			break;
+		case GL_RG:
+		case GL_RG8:
+			intformat = GL_COMPRESSED_RG;
+			break;
+		case GL_RGB:
+		case GL_RGB8:
+			intformat = GL_COMPRESSED_RGB;
+			break;
+		case GL_SRGB:
+		case GL_SRGB8:
+			intformat = GL_COMPRESSED_SRGB;
+			break;
+		case GL_RGBA:
+		case GL_RGBA8:
+			intformat = GL_COMPRESSED_RGBA;
+			break;
+		case GL_SRGB_ALPHA:
+		case GL_SRGB8_ALPHA8:
+			intformat = GL_COMPRESSED_SRGB_ALPHA;
+			break;
+		case GL_LUMINANCE:
+		case GL_LUMINANCE8:
+			intformat = GL_COMPRESSED_LUMINANCE;
+			break;
+		case GL_LUMINANCE_ALPHA:
+		case GL_LUMINANCE8_ALPHA8:
+			intformat = GL_COMPRESSED_LUMINANCE_ALPHA;
+			break;
+		case GL_ALPHA:
+		case GL_ALPHA8:
+			intformat = GL_COMPRESSED_ALPHA;
+			break;
+		default:
+			LL_WARNS() << "Could not compress format: " << std::hex << intformat << std::dec << LL_ENDL;
+			break;
+		}
+	}
+
+	stop_glerror();
+	glTexImage3D(target, miplevel, intformat, width, height, depth, 0, pixformat, pixtype, pixels);
+	stop_glerror();
+}
+
 //create an empty GL texture: just create a texture name
 //the texture is assiciate with some image by calling glTexImage outside LLImageGL
 static LLTrace::BlockTimerStatHandle FTM_CREATE_GL_TEXTURE1("createGLTexture()");
