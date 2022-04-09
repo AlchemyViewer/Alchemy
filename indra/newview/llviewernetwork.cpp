@@ -696,6 +696,14 @@ void LLGridManager::setGridChoice(const std::string& grid, const bool only_selec
 		gSavedSettings.setString("CurrentGrid", grid_name);
 		LLTrans::setDefaultArg("CURRENT_GRID", getGridLabel());
 		LLTrans::setDefaultArg("GRID_ADMIN", getGridAdministrator());
+		if (isInSecondlife())
+		{
+			SYSTEM_FROM = "Second Life";
+		}
+		else
+		{
+			SYSTEM_FROM = "Grid";
+		}
 		
 		updateIsInProductionGrid();
 	}
