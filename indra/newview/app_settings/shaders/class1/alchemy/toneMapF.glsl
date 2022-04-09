@@ -38,12 +38,13 @@ uniform sampler2D bloomMap;
 uniform vec2 screen_res;
 uniform float exposure;
 
+vec3 srgb_to_linear(vec3 cl);
+vec3 linear_to_srgb(vec3 cl);
+
 #if COLOR_GRADE_LUT != 0
 uniform sampler2D colorgrade_lut;
 uniform vec4 colorgrade_lut_size;
 #endif
-
-vec3 linear_to_srgb(vec3 cl);
 
 vec3 reinhard(vec3 x)
 {
@@ -237,12 +238,11 @@ void main()
     
     // LUT interpolation
     diff.rgb = mix(
-    texture2D(colorgrade_lut, lutX).rgb,
-    texture2D(colorgrade_lut, lutY).rgb,
+    linear_to_srgb(texture2D(colorgrade_lut, lutX).rgb),
+    linear_to_srgb(texture2D(colorgrade_lut, lutY).rgb),
     fract(lutRange.z)
     );
     #endif
-    
+
     frag_color = diff;
 }
-
