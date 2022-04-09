@@ -680,7 +680,7 @@ std::map<std::string, std::string> LLGridManager::getKnownGrids() const
 	return result;
 }
 
-void LLGridManager::setGridChoice(const std::string& grid, const bool only_select /* = true */)
+void LLGridManager::setGridChoice(const std::string& grid, const bool only_select /* = true */, const bool for_login /* = false */)
 {
 	// Can't change grid once we are logged in
 	if (mLoggedIn) return;
@@ -719,7 +719,8 @@ void LLGridManager::setGridChoice(const std::string& grid, const bool only_selec
 		// the grid was not in the list of grids.
 		LL_WARNS("GridManager")<<"unknown grid "<<grid<<LL_ENDL;
 	}
-	mGridListChangedSignal();
+	if(!for_login)
+		mGridListChangedSignal();
 }
 
 std::string LLGridManager::getGrid(const std::string& grid) const

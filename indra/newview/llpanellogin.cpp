@@ -987,7 +987,7 @@ void LLPanelLogin::onClickConnect(bool commit_fields)
 		// the grid definitions may come from a user-supplied grids.xml, so they may not be good
 		LL_DEBUGS("AppInit")<<"grid "<<combo_val.asString()<<LL_ENDL;
 
-		LLGridManager::getInstance()->setGridChoice(combo_val.asString());
+		LLGridManager::getInstance()->setGridChoice(combo_val.asString(), true, true);
 
 		// The start location SLURL has already been sent to LLStartUp::setStartSLURL
 
