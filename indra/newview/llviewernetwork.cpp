@@ -27,6 +27,7 @@
 
 #include "llviewerprecompiledheaders.h"
 
+#include "llinstantmessage.h"
 #include "llviewernetwork.h"
 #include "llviewercontrol.h"
 #include "llcorehttputil.h"

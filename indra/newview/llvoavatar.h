@@ -203,7 +203,7 @@ public:
 	/*virtual*/ BOOL			stopMotion(const LLUUID& id, BOOL stop_immediate = FALSE) override;
 	virtual bool			hasMotionFromSource(const LLUUID& source_id);
 	virtual void			stopMotionFromSource(const LLUUID& source_id);
-	virtual void			requestStopMotion(LLMotion* motion);
+	virtual void			requestStopMotion(LLMotion* motion) override;
 	LLMotion*				findMotion(const LLUUID& id) const;
 	void					startDefaultMotions();
 	void					dumpAnimationState();
@@ -655,7 +655,7 @@ public:
 	// Loading status
 	//--------------------------------------------------------------------
 public:
-	virtual BOOL    isTextureDefined(LLAvatarAppearanceDefines::ETextureIndex type, U32 index = 0) const;
+	virtual BOOL    isTextureDefined(LLAvatarAppearanceDefines::ETextureIndex type, U32 index = 0) const override;
 	virtual BOOL	isTextureVisible(LLAvatarAppearanceDefines::ETextureIndex type, U32 index = 0) const;
 	virtual BOOL	isTextureVisible(LLAvatarAppearanceDefines::ETextureIndex type, LLViewerWearable *wearable) const;
 
