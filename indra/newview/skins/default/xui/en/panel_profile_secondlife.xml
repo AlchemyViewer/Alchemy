@@ -212,7 +212,7 @@
              />
             <text
              name="label"
-             value="Second Life Birthdate:"
+             value="[CURRENT_GRID] Birthdate:"
              top_pad="2"
              right="-6"
              height="16"
