@@ -57,12 +57,14 @@
 #include "llstatusbar.h"			// getHealth()
 #include "lltrans.h"
 #include "llviewerinventory.h"
+#include "llviewernetwork.h"
 #include "llviewerparcelmgr.h"
 #include "llviewerregion.h"
 #include "llviewercontrol.h"
 #include "llviewermenu.h"
 #include "llurllineeditorctrl.h"
 #include "llagentui.h"
+#include "llworld.h"
 #include "llworldmap.h"
 // [RLVa:KB] - Checked: 2010-04-05 (RLVa-1.2.0d)
 #include "rlvhandler.h"
@@ -752,8 +754,11 @@ void LLLocationInputCtrl::onLocationPrearrange(const LLSD& data)
 				LLSimInfo* sim_info = LLWorldMap::getInstanceFast()->simInfoFromPosGlobal(result->mGlobalPos);
 				if (sim_info)
 				{
-					//TODO*: add Surl to teleportitem or parse region name from title
 					value["tooltip"] = LLSLURL(region_name, sim_info->getLocalPos(result->mGlobalPos)).getSLURLString();
+				}
+				else if(LLViewerRegion* regionp = LLWorld::instance().getRegionFromID(result->mRegionID))
+				{
+					value["tooltip"] = LLSLURL(region_name, LLVector3(result->mGlobalPos - regionp->getOriginGlobal())).getSLURLString();
 				}
 				else
 				{
@@ -904,7 +909,7 @@ void LLLocationInputCtrl::refreshParcelIcons()
 		mParcelIcon[SCRIPTS_ICON]->setVisible( !allow_scripts );
 		mParcelIcon[DAMAGE_ICON]->setVisible(  allow_damage );
 		mParcelIcon[PATHFINDING_DIRTY_ICON]->setVisible(mIsNavMeshDirty);
-		mParcelIcon[PATHFINDING_DISABLED_ICON]->setVisible(!mIsNavMeshDirty && !pathfinding_dynamic_enabled);
+		mParcelIcon[PATHFINDING_DISABLED_ICON]->setVisible(!mIsNavMeshDirty && !pathfinding_dynamic_enabled && !LLGridManager::getInstance()->isInOpenSim());
 
 		mDamageText->setVisible(allow_damage);
 		mParcelIcon[SEE_AVATARS_ICON]->setVisible( !see_avs );
