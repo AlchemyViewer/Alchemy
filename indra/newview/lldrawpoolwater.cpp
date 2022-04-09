@@ -589,7 +589,7 @@ void LLDrawPoolWater::shade2(bool edge, LLGLSLShader* shader, const LLColor3& li
     shader->uniform1i(LLShaderMgr::SUN_UP_FACTOR, environment.getIsSunUp() ? 1 : 0);
 	shader->uniform1f(LLShaderMgr::WATER_SUN_ANGLE, 0.1f + 0.2f * sunAngle);
 
-    LLVector4 rotated_light_direction = environment.getRotatedLightNorm();
+    LLVector4 rotated_light_direction = environment.getClampedLightNorm();
     shader->uniform4fv(LLViewerShaderMgr::LIGHTNORM, 1, rotated_light_direction.mV);
     shader->uniform3fv(LLShaderMgr::WL_CAMPOSLOCAL, 1, viewerCamera.getOrigin().mV);
 
