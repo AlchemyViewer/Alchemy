@@ -89,6 +89,7 @@
 #include "llexperiencecache.h"
 #include "llfloaterexperienceprofile.h"
 #include "llviewerassetupload.h"
+#include "llviewernetwork.h"
 // [RLVa:KB] - Checked: 2011-05-22 (RLVa-1.3.1a)
 #include "rlvhandler.h"
 #include "rlvlocks.h"
@@ -1951,7 +1952,8 @@ BOOL LLLiveLSLEditor::postBuild()
 
 	mMonoCheckbox =	getChild<LLCheckBoxCtrl>("mono");
 	childSetCommitCallback("mono", &LLLiveLSLEditor::onMonoCheckboxClicked, this);
-	getChildView("mono")->setEnabled(FALSE);
+	mMonoCheckbox->setEnabled(FALSE);
+	mMonoCheckbox->setVisible(LLGridManager::instance().isInSecondlife());
 
 	mScriptEd->mEditor->makePristine();
 	mScriptEd->mEditor->setFocus(TRUE);
