@@ -169,34 +169,57 @@ std::string LLKeywords::getAttribute(std::string_view key)
 
 LLColor4 LLKeywords::getColorGroup(std::string_view key_in)
 {
-	std::string color_group = "ScriptText";
+	enum
+	{
+		ScriptText = 0,
+		SyntaxLslFunction,
+		SyntaxLslControlFlow,
+		SyntaxLslEvent,
+		SyntaxLslDataType,
+		SyntaxLslDeprecated,
+		SyntaxLslGodMode,
+		SyntaxLslConstant
+	};
+	static std::vector<LLUIColor> script_colors;
+	if (script_colors.empty())
+	{
+		script_colors.push_back(LLUIColorTable::instanceFast().getColor("ScriptText"));
+		script_colors.push_back(LLUIColorTable::instanceFast().getColor("SyntaxLslFunction"));
+		script_colors.push_back(LLUIColorTable::instanceFast().getColor("SyntaxLslControlFlow"));
+		script_colors.push_back(LLUIColorTable::instanceFast().getColor("SyntaxLslEvent"));
+		script_colors.push_back(LLUIColorTable::instanceFast().getColor("SyntaxLslDataType"));
+		script_colors.push_back(LLUIColorTable::instanceFast().getColor("SyntaxLslDeprecated"));
+		script_colors.push_back(LLUIColorTable::instanceFast().getColor("SyntaxLslGodMode"));
+		script_colors.push_back(LLUIColorTable::instanceFast().getColor("SyntaxLslConstant"));
+	}
+
 	if (key_in == "functions")
 	{
-		color_group = "SyntaxLslFunction";
+		return script_colors[SyntaxLslFunction].get();
 	}
 	else if (key_in == "controls")
 	{
-		color_group = "SyntaxLslControlFlow";
+		return script_colors[SyntaxLslControlFlow].get();
 	}
 	else if (key_in == "events")
 	{
-		color_group = "SyntaxLslEvent";
+		return script_colors[SyntaxLslEvent].get();
 	}
 	else if (key_in == "types")
 	{
-		color_group = "SyntaxLslDataType";
+		return script_colors[SyntaxLslDataType].get();
 	}
 	else if (key_in == "misc-flow-label")
 	{
-		color_group = "SyntaxLslControlFlow";
+		return script_colors[SyntaxLslControlFlow].get();
 	}
 	else if (key_in =="deprecated")
 	{
-		color_group = "SyntaxLslDeprecated";
+		return script_colors[SyntaxLslDeprecated].get();
 	}
 	else if (key_in =="god-mode")
 	{
-		color_group = "SyntaxLslGodMode";
+		return script_colors[SyntaxLslGodMode].get();
 	}
 	else if (key_in == "constants"
 			 || key_in == "constants-integer"
@@ -206,14 +229,14 @@ LLColor4 LLKeywords::getColorGroup(std::string_view key_in)
 			 || key_in == "constants-rotation"
 			 || key_in == "constants-vector")
 	{
-		color_group = "SyntaxLslConstant";
+		return script_colors[SyntaxLslConstant].get();
 	}
 	else
 	{
 		LL_WARNS("SyntaxLSL") << "Color key '" << key_in << "' not recognized." << LL_ENDL;
 	}
 
-	return LLUIColorTable::instanceFast().getColor(color_group);
+	return script_colors[ScriptText].get();
 }
 
 void LLKeywords::initialize(LLSD SyntaxXML)
@@ -230,11 +253,12 @@ void LLKeywords::processTokens()
 	}
 
 	// Add 'standard' stuff: Quotes, Comments, Strings, Labels, etc. before processing the LLSD
+	static LLUIColor syntax_lsl_comment_color = LLUIColorTable::instanceFast().getColor("SyntaxLslComment");
 	std::string delimiter;
 	addToken(LLKeywordToken::TT_LABEL, "@", getColorGroup("misc-flow-label"), "Label\nTarget for jump statement", delimiter );
-	addToken(LLKeywordToken::TT_ONE_SIDED_DELIMITER, "//", LLUIColorTable::instanceFast().getColor("SyntaxLslComment"), "Comment (single-line)\nNon-functional commentary or disabled code", delimiter );
-	addToken(LLKeywordToken::TT_TWO_SIDED_DELIMITER, "/*", LLUIColorTable::instanceFast().getColor("SyntaxLslComment"), "Comment (multi-line)\nNon-functional commentary or disabled code", "*/" );
-	addToken(LLKeywordToken::TT_DOUBLE_QUOTATION_MARKS, "\"", LLUIColorTable::instanceFast().getColor("SyntaxLslStringLiteral"), "String literal", "\"" );
+	addToken(LLKeywordToken::TT_ONE_SIDED_DELIMITER, "//", syntax_lsl_comment_color, "Comment (single-line)\nNon-functional commentary or disabled code", delimiter );
+	addToken(LLKeywordToken::TT_TWO_SIDED_DELIMITER, "/*", syntax_lsl_comment_color, "Comment (multi-line)\nNon-functional commentary or disabled code", "*/" );
+	addToken(LLKeywordToken::TT_DOUBLE_QUOTATION_MARKS, "\"", syntax_lsl_comment_color, "String literal", "\"" );
 
 	for (const auto& llsd_pair : mSyntax.map())
 	{
@@ -261,8 +285,8 @@ void LLKeywords::processTokensGroup(const LLSD& tokens, std::string_view group)
 {
 	LLColor4 color;
 	LLColor4 color_group;
-	LLColor4 color_deprecated = getColorGroup("deprecated");
-	LLColor4 color_god_mode = getColorGroup("god-mode");
+	const LLColor4 color_deprecated = getColorGroup("deprecated");
+	const LLColor4 color_god_mode = getColorGroup("god-mode");
 
 	LLKeywordToken::ETokenType token_type = LLKeywordToken::TT_UNKNOWN;
 	// If a new token type is added here, it must also be added to the 'addToken' method
