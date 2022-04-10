@@ -1334,10 +1334,11 @@ void LLIMProcessing::processNewMessage(LLUUID from_id,
 // [RLVa:KB] - Checked: RLVa-1.4.9
 				if (rlv_handler_t::isEnabled())
 				{
-					if ( ((IM_LURE_USER == dialog) && (!RlvActions::canAcceptTpOffer(from_id))) ||
-					     ((IM_TELEPORT_REQUEST == dialog) && (!RlvActions::canAcceptTpRequest(from_id))) )
+                    bool fBlockTpLure = (IM_LURE_USER == dialog) && (!RlvActions::canAcceptTpOffer(from_id));
+                    bool fBlockTpRequest = (IM_TELEPORT_REQUEST == dialog) && (!RlvActions::canAcceptTpRequest(from_id));
+					if ( fBlockTpLure || fBlockTpRequest )
 					{
-						RlvUtil::sendBusyMessage(from_id, RlvStrings::getString(RlvStringKeys::Blocked::TpLureRequestRemote));
+						RlvUtil::sendBusyMessage(from_id, RlvStrings::getString(fBlockTpLure ? RlvStringKeys::Blocked::TpLureRemote : RlvStringKeys::Blocked::TpRequestRemote));
 						if (is_do_not_disturb)
 							send_do_not_disturb_message(gMessageSystem, from_id);
 						return;

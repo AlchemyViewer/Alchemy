@@ -279,6 +279,23 @@ void RlvStrings::initClass()
 	}
 }
 
+// Used to provide fallback behaviour whenever we rename/split/join customizable string values
+LLSD& RlvStrings::cleanStringValues(LLSD& sdStringValues)
+{
+	LLSD sdValues(sdStringValues);
+	for (LLSD::map_const_iterator itString = sdValues.beginMap(); itString != sdValues.endMap(); ++itString)
+	{
+		if (itString->first == "blocked_tplurerequest_remote")
+		{
+			sdStringValues.erase("blocked_tplurerequest_remote");
+			sdStringValues[RlvStringKeys::Blocked::TpLureRemote] = itString->second;
+			sdStringValues[RlvStringKeys::Blocked::TpRequestRemote] = itString->second;
+		}
+	}
+
+	return sdStringValues;
+}
+
 // Checked: 2011-11-08 (RLVa-1.5.0)
 void RlvStrings::loadFromFile(const std::string& strFilePath, bool fUserOverride)
 {
@@ -289,7 +306,7 @@ void RlvStrings::loadFromFile(const std::string& strFilePath, bool fUserOverride
 
 	if (sdFileData.has("strings"))
 	{
-		const LLSD& sdStrings = sdFileData["strings"];
+		const LLSD sdStrings = (!fUserOverride) ? sdFileData["strings"] : cleanStringValues(sdFileData["strings"]);
 		for (LLSD::map_const_iterator itString = sdStrings.beginMap(); itString != sdStrings.endMap(); ++itString)
 		{
 			if ( (!itString->second.has("value")) || ((fUserOverride) && (!hasString(itString->first))) )

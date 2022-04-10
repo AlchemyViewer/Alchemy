@@ -148,6 +148,7 @@ class RlvStrings
 {
 public:
 	static void initClass();
+	static LLSD& cleanStringValues(LLSD& sdValues);
 	static void loadFromFile(const std::string& strFilePath, bool fDefault);
 	static void saveToFile(const std::string& strFilePath);
 
