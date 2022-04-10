@@ -45,25 +45,25 @@ protected:
 public:
 	virtual ~LLViewerTextEditor();
 
-	virtual void makePristine();
+	virtual void makePristine() override;
 
 	/*virtual*/ void onVisibilityChange( BOOL new_visibility ) override;
 	
 	// mousehandler overrides
-	virtual BOOL	handleMouseDown(S32 x, S32 y, MASK mask);
-	virtual BOOL	handleMouseUp(S32 x, S32 y, MASK mask);
-	virtual BOOL	handleHover(S32 x, S32 y, MASK mask);
-	virtual BOOL	handleDoubleClick(S32 x, S32 y, MASK mask );
+	BOOL	handleMouseDown(S32 x, S32 y, MASK mask) override;
+	BOOL	handleMouseUp(S32 x, S32 y, MASK mask) override;
+	BOOL	handleHover(S32 x, S32 y, MASK mask) override;
+	BOOL	handleDoubleClick(S32 x, S32 y, MASK mask ) override;
 
-	virtual BOOL	handleDragAndDrop(S32 x, S32 y, MASK mask,
+	BOOL	handleDragAndDrop(S32 x, S32 y, MASK mask,
 										BOOL drop, EDragAndDropType cargo_type, 
-										void *cargo_data, EAcceptance *accept, std::string& tooltip_msg);
+										void *cargo_data, EAcceptance *accept, std::string& tooltip_msg) override;
 
   	const class LLInventoryItem* getDragItem() const { return mDragItem; }
-	virtual BOOL 	importBuffer(const char* buffer, S32 length);
+	BOOL 	importBuffer(const char* buffer, S32 length) override;
 	virtual bool	importStream(std::istream& str);
-	virtual BOOL 	exportBuffer(std::string& buffer);
-	virtual void	onValueChange(S32 start, S32 end);
+	BOOL 	exportBuffer(std::string& buffer) override;
+	void	onValueChange(S32 start, S32 end) override;
 
 	void setNotecardInfo(const LLUUID& notecard_item_id, const LLUUID& object_id, const LLUUID& preview_id)
 	{
@@ -93,7 +93,7 @@ public:
 private:
 	// Embedded object operations
 	void findEmbeddedItemSegments(S32 start, S32 end);
-	virtual llwchar	pasteEmbeddedItem(llwchar ext_char);
+	llwchar	pasteEmbeddedItem(llwchar ext_char) override;
 
 	BOOL			openEmbeddedItemAtPos( S32 pos );
 	BOOL			openEmbeddedItem(LLPointer<LLInventoryItem> item, llwchar wc);

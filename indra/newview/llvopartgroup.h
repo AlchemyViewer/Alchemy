@@ -94,11 +94,11 @@ public:
 								LLStrider<LLVector2>& texcoordsp,
 								LLStrider<LLColor4U>& colorsp, 
 								LLStrider<LLColor4U>& emissivep,
-								LLStrider<U16>& indicesp);
+								LLStrider<U16>& indicesp) override;
 
-	void updateFaceSize(S32 idx) { }
-	F32 getPartSize(S32 idx);
-	void getBlendFunc(S32 idx, U32& src, U32& dst);
+	void updateFaceSize(S32 idx) override { }
+	F32 getPartSize(S32 idx) override;
+	void getBlendFunc(S32 idx, U32& src, U32& dst) override;
 	LLUUID getPartOwner(S32 idx);
 	LLUUID getPartSource(S32 idx);
 
@@ -123,9 +123,9 @@ public:
 	{
 	}
 protected:
-	LLDrawable* createDrawable(LLPipeline *pipeline);
-	U32 getPartitionType() const;
-	virtual LLVector3 getCameraPosition() const;
+	LLDrawable* createDrawable(LLPipeline *pipeline) override;
+	U32 getPartitionType() const override;
+	virtual LLVector3 getCameraPosition() const override;
 };
 
 #endif // LL_LLVOPARTGROUP_H
