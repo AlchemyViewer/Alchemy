@@ -5374,7 +5374,7 @@ LLViewerTexture *LLViewerObject::getTEImage(const U8 face) const
 		}
 	}
 
-	LL_ERRS() << llformat("Requested Image from invalid face: %d/%d",face,getNumTEs()) << LL_ENDL;
+	LL_WARNS() << llformat("Requested Image from invalid face: %d/%d",face,getNumTEs()) << LL_ENDL;
 
 	return NULL;
 }
