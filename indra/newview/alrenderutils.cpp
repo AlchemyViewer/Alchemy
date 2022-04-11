@@ -28,6 +28,8 @@
 
 #include "alrenderutils.h"
 
+#include "llimagebmp.h"
+#include "llimagejpeg.h"
 #include "llimagepng.h"
 #include "llimagetga.h"
 #include "llimagewebp.h"
@@ -38,6 +40,8 @@
 #include "llviewercontrol.h"
 #include "llviewershadermgr.h"
 #include "pipeline.h"
+
+#include "absl/strings/numbers.h"
 
 const U32 ALRENDER_BUFFER_MASK = LLVertexBuffer::MAP_VERTEX | LLVertexBuffer::MAP_TEXCOORD0 | LLVertexBuffer::MAP_TEXCOORD1;
 
@@ -50,6 +54,195 @@ static LLStaticHashedString tone_uncharted_a("tone_uncharted_a");
 static LLStaticHashedString tone_uncharted_b("tone_uncharted_b");
 static LLStaticHashedString tone_uncharted_c("tone_uncharted_c");
 static LLStaticHashedString sharpen_params("sharpen_params");
+
+// BEGIN ZLIB LICENSE
+
+/*
+Copyright (c) 2019 - 2020 Georg Lehmann
+
+This software is provided 'as-is', without any express or implied
+warranty. In no event will the authors be held liable for any damages
+arising from the use of this software.
+
+Permission is granted to anyone to use this software for any purpose,
+including commercial applications, and to alter it and redistribute it
+freely, subject to the following restrictions:
+
+1. The origin of this software must not be misrepresented; you must not
+   claim that you wrote the original software. If you use this software
+   in a product, an acknowledgment in the product documentation would be
+   appreciated but is not required.
+
+2. Altered source versions must be plainly marked as such, and must not be
+   misrepresented as being the original software.
+
+3. This notice may not be removed or altered from any source distribution.
+*/
+ 
+/*
+   reads .cube files
+   returns a vector of bytes
+   one byte is one color value
+   4 bytes stand for rgba
+   the alpha value is always 255
+   size will be set according to the size in the file, which can be in [2,256]
+   the cube will have the dimentions size * size * size
+   so the vector will have a length of size*size*size*4
+   See: https://wwwimages2.adobe.com/content/dam/acom/en/products/speedgrade/cc/pdfs/cube-lut-specification-1.0.pdf
+*/
+
+class LutCube
+{
+public:
+	std::vector<unsigned char> colorCube;
+	int                        size = 0;
+
+	LutCube(const std::string& file);
+	LutCube() = default;
+
+private:
+	float minX = 0.0f;
+	float minY = 0.0f;
+	float minZ = 0.0f;
+
+	float maxX = 1.0f;
+	float maxY = 1.0f;
+	float maxZ = 1.0f;
+
+	int currentX = 0;
+	int currentY = 0;
+	int currentZ = 0;
+
+	void writeColor(int x, int y, int z, unsigned char r, unsigned char g, unsigned char b);
+
+	void parseLine(std::string line);
+
+	// splits a tripel of floats
+	void splitTripel(std::string tripel, float& x, float& y, float& z);
+
+	void clampTripel(float x, float y, float z, unsigned char& outX, unsigned char& outY, unsigned char& outZ);
+
+	// returns the text without leading whitespace
+	std::string skipWhiteSpace(std::string text);
+};
+
+LutCube::LutCube(const std::string& file)
+{
+	llifstream cubeStream(file);
+	if (!cubeStream.good())
+	{
+		LL_WARNS() << "lut cube file does not exist" << LL_ENDL;
+		return;
+	}
+
+	std::string line;
+
+	while (std::getline(cubeStream, line))
+	{
+		parseLine(line);
+	}
+}
+void LutCube::parseLine(std::string line)
+{
+	if (line.length() == 0)
+	{
+		return;
+	}
+	if (line[0] == '#')
+	{
+		return;
+	}
+	if (line.find("LUT_3D_SIZE") != std::string::npos)
+	{
+		line = line.substr(line.find("LUT_3D_SIZE") + 11);
+		line = skipWhiteSpace(line);
+		size = std::stoi(line);
+
+		colorCube = std::vector<unsigned char>(size * size * size * 4, 255);
+		return;
+	}
+	if (line.find("DOMAIN_MIN") != std::string::npos)
+	{
+		line = line.substr(line.find("DOMAIN_MIN") + 10);
+		splitTripel(line, minX, minY, minZ);
+		return;
+	}
+	if (line.find("DOMAIN_MAX") != std::string::npos)
+	{
+		line = line.substr(line.find("DOMAIN_MAX") + 10);
+		splitTripel(line, maxX, maxY, maxZ);
+		return;
+	}
+	if (line.find_first_of("0123456789") == 0)
+	{
+		float         x, y, z;
+		unsigned char outX, outY, outZ;
+		splitTripel(line, x, y, z);
+		clampTripel(x, y, z, outX, outY, outZ);
+		writeColor(currentX, currentY, currentZ, outX, outY, outZ);
+		if (currentX != size - 1)
+		{
+			currentX++;
+		}
+		else if (currentY != size - 1)
+		{
+			currentY++;
+			currentX = 0;
+		}
+		else if (currentZ != size - 1)
+		{
+			currentZ++;
+			currentX = 0;
+			currentY = 0;
+		}
+		return;
+	}
+}
+
+std::string LutCube::skipWhiteSpace(std::string text)
+{
+	while (text.size() > 0 && (text[0] == ' ' || text[0] == '\t'))
+	{
+		text = text.substr(1);
+	}
+	return text;
+}
+
+void LutCube::splitTripel(std::string tripel, float& x, float& y, float& z)
+{
+	tripel = skipWhiteSpace(tripel);
+	size_t after = tripel.find_first_of(" \n");
+	x = std::stof(tripel.substr(0, after));
+	tripel = tripel.substr(after);
+
+	tripel = skipWhiteSpace(tripel);
+	after = tripel.find_first_of(" \n");
+	y = std::stof(tripel.substr(0, after));
+	tripel = tripel.substr(after);
+
+	tripel = skipWhiteSpace(tripel);
+	z = std::stof(tripel);
+}
+
+void LutCube::clampTripel(float x, float y, float z, unsigned char& outX, unsigned char& outY, unsigned char& outZ)
+{
+	outX = (unsigned char)255 * (x / (maxX - minX));
+	outY = (unsigned char)255 * (y / (maxY - minY));
+	outZ = (unsigned char)255 * (z / (maxZ - minZ));
+}
+
+void LutCube::writeColor(int x, int y, int z, unsigned char r, unsigned char g, unsigned char b)
+{
+	static const int colorSize = 4; // 4 bytes per point in the cube, rgba
+
+	int locationR = (((z * size) + y) * size + x) * colorSize;
+
+	colorCube[locationR + 0] = r;
+	colorCube[locationR + 1] = g;
+	colorCube[locationR + 2] = b;
+}
+
+// END ZLIB LICENSE
 
 ALRenderUtil::ALRenderUtil()
 {
@@ -150,69 +343,121 @@ bool ALRenderUtil::setupColorGrade()
 		std::string lut_name = gSavedSettings.getString("RenderColorGradeLUT");
 		if (!lut_name.empty())
 		{
-			enum class ELutExt
-			{
-				EXT_IMG_TGA = 0,
-				EXT_IMG_PNG,
-				EXT_IMG_WEBP,
-				EXT_NONE
-			};
 			std::string lut_path = gDirUtilp->getExpandedFilename(LL_PATH_APP_SETTINGS, "colorlut", lut_name);
 			if (!lut_path.empty())
 			{
 				std::string temp_exten = gDirUtilp->getExtension(lut_path);
-
-				ELutExt extension = ELutExt::EXT_NONE;
-				if (temp_exten == "tga")
-				{
-					extension = ELutExt::EXT_IMG_TGA;
-				}
-				else if (temp_exten == "png")
-				{
-					extension = ELutExt::EXT_IMG_PNG;
-				}
-				else if (temp_exten == "webp")
-				{
-					extension = ELutExt::EXT_IMG_WEBP;
-				}
-
-				LLPointer<LLImageRaw> raw_image = new LLImageRaw;
 				bool decode_success = false;
+				LLPointer<LLImageRaw> raw_image;
+				bool flip_green = true;
+				bool swap_bluegreen = true;
+				if (temp_exten == "cube")
+				{
+					LutCube  lutCube(lut_path);
+					if (!lutCube.colorCube.empty())
+					{
+						try
+						{
+							raw_image = new LLImageRaw(lutCube.colorCube.data(), lutCube.size * lutCube.size, lutCube.size, 4);
+						}
+						catch (const std::bad_alloc&)
+						{
+							return true;
+						}
+						flip_green = false;
+						swap_bluegreen = false;
+						decode_success = true;
+					}
+				}
+				else
+				{
+					enum class ELutExt
+					{
+						EXT_IMG_TGA = 0,
+						EXT_IMG_PNG,
+						EXT_IMG_JPEG,
+						EXT_IMG_BMP,
+						EXT_IMG_WEBP,
+						EXT_NONE
+					};
 
-				switch (extension)
-				{
-				default:
-					break;
-				case ELutExt::EXT_IMG_TGA:
-				{
-					LLPointer<LLImageTGA> tga_image = new LLImageTGA;
-					if (tga_image->load(lut_path) && tga_image->decode(raw_image, 0.0f))
+					ELutExt extension = ELutExt::EXT_NONE;
+					if (temp_exten == "tga")
 					{
-						decode_success = true;
+						extension = ELutExt::EXT_IMG_TGA;
 					}
-					break;
-				}
-				case ELutExt::EXT_IMG_PNG:
-				{
-					LLPointer<LLImagePNG> png_image = new LLImagePNG;
-					if (png_image->load(lut_path) && png_image->decode(raw_image, 0.0f))
+					else if (temp_exten == "png")
 					{
-						decode_success = true;
+						extension = ELutExt::EXT_IMG_PNG;
 					}
-					break;
-				}
-				case ELutExt::EXT_IMG_WEBP:
-				{
-					LLPointer<LLImageWebP> webp_image = new LLImageWebP;
-					if (webp_image->load(lut_path) && webp_image->decode(raw_image, 0.0f))
+					else if (temp_exten == "jpg" || temp_exten == "jpeg")
 					{
-						decode_success = true;
+						extension = ELutExt::EXT_IMG_JPEG;
 					}
-					break;
-				}
+					else if (temp_exten == "bmp")
+					{
+						extension = ELutExt::EXT_IMG_BMP;
+					}
+					else if (temp_exten == "webp")
+					{
+						extension = ELutExt::EXT_IMG_WEBP;
+					}
+
+					raw_image = new LLImageRaw;
+
+					switch (extension)
+					{
+					default:
+						break;
+					case ELutExt::EXT_IMG_TGA:
+					{
+						LLPointer<LLImageTGA> tga_image = new LLImageTGA;
+						if (tga_image->load(lut_path) && tga_image->decode(raw_image, 0.0f))
+						{
+							decode_success = true;
+						}
+						break;
+					}
+					case ELutExt::EXT_IMG_PNG:
+					{
+						LLPointer<LLImagePNG> png_image = new LLImagePNG;
+						if (png_image->load(lut_path) && png_image->decode(raw_image, 0.0f))
+						{
+							decode_success = true;
+						}
+						break;
+					}
+					case ELutExt::EXT_IMG_JPEG:
+					{
+						LLPointer<LLImageJPEG> jpg_image = new LLImageJPEG;
+						if (jpg_image->load(lut_path) && jpg_image->decode(raw_image, 0.0f))
+						{
+							decode_success = true;
+						}
+						break;
+					}
+					case ELutExt::EXT_IMG_BMP:
+					{
+						LLPointer<LLImageBMP> bmp_image = new LLImageBMP;
+						if (bmp_image->load(lut_path) && bmp_image->decode(raw_image, 0.0f))
+						{
+							decode_success = true;
+						}
+						break;
+					}
+					case ELutExt::EXT_IMG_WEBP:
+					{
+						LLPointer<LLImageWebP> webp_image = new LLImageWebP;
+						if (webp_image->load(lut_path) && webp_image->decode(raw_image, 0.0f))
+						{
+							decode_success = true;
+						}
+						break;
+					}
+					}
 				}
 
-				if (decode_success)
+				if (decode_success && raw_image)
 				{
 					U32 primary_format = 0;
 					U32 int_format = 0;
@@ -240,10 +485,9 @@ bool ALRenderUtil::setupColorGrade()
 					S32 image_height = raw_image->getHeight();
 					S32 image_width = raw_image->getWidth();
 					if ((image_height > 0 && image_height <= 64)		   // within dimension limit
-						&& ((image_height & (image_height - 1)) == 0)	   // height is power of 2
 						&& ((image_height * image_height) == image_width)) // width is height * height
 					{
-						mCGLutSize = LLVector4(1.f / image_width, 1.f / image_height, (F32)image_width, (F32)image_height);
+						mCGLutSize = LLVector4(image_height, (float)flip_green, (float)swap_bluegreen);
 
 						LLImageGL::generateTextures(1, &mCGLut);
 						gGL.getTexUnit(0)->bindManual(LLTexUnit::TT_TEXTURE_3D, mCGLut);

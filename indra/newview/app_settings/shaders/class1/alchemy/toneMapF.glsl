@@ -223,13 +223,15 @@ void main()
     
     #if COLOR_GRADE_LUT != 0
     // Invert coord for compat with DX-style LUT
-    diff.g = 1.0 - diff.g;
-    
-    //see https://developer.nvidia.com/gpugems/GPUGems2/gpugems2_chapter24.html
-    vec3 scale = (vec3(colorgrade_lut_size.w) - 1.0) / vec3(colorgrade_lut_size.w);
-    vec3 offset = 1.0 / (2.0 * vec3(colorgrade_lut_size.w));
+    diff.g = colorgrade_lut_size.y > 0.5 ? 1.0 - diff.g : diff.g;
 
-    diff = vec4(linear_to_srgb(textureLod(colorgrade_lut, scale * diff.rbg + offset, 0).rgb), diff.a);
+    // swap bluegreen if needed
+    diff.rgb = colorgrade_lut_size.z > 0.5 ? diff.rbg: diff.rgb;
+
+    //see https://developer.nvidia.com/gpugems/GPUGems2/gpugems2_chapter24.html
+    vec3 scale = (vec3(colorgrade_lut_size.x) - 1.0) / vec3(colorgrade_lut_size.x);
+    vec3 offset = 1.0 / (2.0 * vec3(colorgrade_lut_size.x));
+    diff = vec4(linear_to_srgb(textureLod(colorgrade_lut, scale * diff.rgb + offset, 0).rgb), diff.a);
     #endif
 
     frag_color = diff;
