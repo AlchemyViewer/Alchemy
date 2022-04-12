@@ -66,6 +66,7 @@
 
 #include "llfavoritesbar.h"
 #include "llagentui.h"
+#include "llviewerregion.h"
 
 #include <boost/regex.hpp>
 
@@ -525,9 +526,19 @@ void LLNavigationBar::onLocationSelection()
 	  return;
 	}
 	
+	std::string current_grid;
+	auto regionp = gAgent.getRegion();
+	if (regionp)
+	{
+		current_grid = LLGridManager::getInstance()->getGridByProbing(regionp->getHGGrid());
+	}
+	else
+	{
+		current_grid = LLGridManager::getInstance()->getGrid();
+	}
+
 	const std::string& grid = slurl.getGrid();
-	const std::string& current_grid = LLGridManager::getInstance()->getGrid();
-	if (grid != current_grid)
+	if (LLStringUtil::compareInsensitive(LLGridManager::getInstance()->getGridByProbing(grid), current_grid) != 0)
 	{
 		region_name.insert(0, llformat("%s:", grid.c_str()));
 	}

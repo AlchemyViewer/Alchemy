@@ -353,19 +353,11 @@ bool LLGridManager::addGrid(LLSD& grid_data)
 			}
 			else
 			{
-				if (grid_data.has(GRID_GATEKEEPER))
-				{
-					mGridList[grid][GRID_GATEKEEPER] = grid_data[GRID_GATEKEEPER];
-				}
 				LL_WARNS("GridManager")<<"duplicate grid id '"<<grid_id<<"' ignored"<<LL_ENDL;
 			}
 		}
 		else
 		{
-			if (grid_data.has(GRID_GATEKEEPER))
-			{
-				mGridList[grid][GRID_GATEKEEPER] = grid_data[GRID_GATEKEEPER];
-			}
 			LL_WARNS("GridManager")<<"duplicate grid name '"<<grid<<"' ignored"<<LL_ENDL;
 		}
 	}
@@ -763,14 +755,40 @@ std::string LLGridManager::getGrid(const std::string& grid) const
 	return grid_name;
 }
 
-std::string LLGridManager::getGridByProbing(const std::string& identifier) const
+std::string LLGridManager::getGridByProbing(const std::string& grid) const
 {
-	std::string grid = getGridByAttribute(GRID_GATEKEEPER, identifier);
-	if (!grid.empty()) return grid;
-	grid = getGridByAttribute(GRID_VALUE, identifier);
-	if (!grid.empty()) return grid;
-	grid = getGridByAttribute(GRID_ID_VALUE, identifier);
-	if (!grid.empty()) return grid;
+	if (mGridList.has(grid))
+	{
+		// the grid was the long name, so we're good, return it
+		return grid;
+	}
+	else
+	{
+		// search the grid list for a grid with a matching id
+		for (const auto& grid_pair : mGridList.map())
+		{
+			if (grid_pair.second.has(GRID_ID_VALUE))
+			{
+				if (0 == (LLStringUtil::compareInsensitive(grid,
+					grid_pair.second[GRID_ID_VALUE].asString())))
+				{
+					// found a matching label, return this name
+					return grid_pair.first;
+					break;
+				}
+			}
+			if (grid_pair.second.has(GRID_GATEKEEPER))
+			{
+				if (0 == (LLStringUtil::compareInsensitive(grid,
+					grid_pair.second[GRID_GATEKEEPER].asString())))
+				{
+					// found a matching label, return this name
+					return grid_pair.first;
+					break;
+				}
+			}
+		}
+	}
 	return grid;
 }
 
@@ -879,7 +897,7 @@ std::string LLGridManager::getGatekeeper(const std::string& grid) const
 
 std::string LLGridManager::getUserAccountServiceURL(const std::string& grid) const
 {
-	std::string url = LLStringUtil::null;
+	std::string url;
 	std::string grid_name = getGrid(grid);
 	if (!grid_name.empty())
 	{

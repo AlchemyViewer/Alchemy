@@ -43,6 +43,7 @@
 #include "llworldmapmessage.h"
 #include "llurldispatcherlistener.h"
 #include "llviewernetwork.h"
+#include "llviewerregion.h"
 
 // library includes
 #include "llnotificationsutil.h"
@@ -183,12 +184,27 @@ bool LLURLDispatcherImpl::dispatchRegion(const LLSLURL& slurl, const std::string
 		LLPanelLogin::setLocation(slurl);
 		return true;
 	}
-	LLSLURL _slurl = slurl;
-	const std::string& grid = slurl.getGrid();
-	const std::string& current_grid = LLGridManager::getInstance()->getGrid();
-	if (grid != current_grid)
+	
+	std::string current_grid;
+	auto regionp = gAgent.getRegion();
+	if (regionp)
 	{
-		_slurl = LLSLURL(llformat("%s:%s", grid.c_str(), slurl.getRegion().c_str()), slurl.getPosition());
+		current_grid = LLGridManager::getInstance()->getGridByProbing(regionp->getHGGrid());
+	}
+	else
+	{
+		current_grid = LLGridManager::getInstance()->getGrid();
+	}
+
+	std::string region_name;
+	const std::string& grid = slurl.getGrid();
+	if (LLStringUtil::compareInsensitive(LLGridManager::getInstance()->getGridByProbing(grid), current_grid) != 0)
+	{
+		region_name = llformat("%s:%s", grid.c_str(), slurl.getRegion().c_str());
+	}
+	else
+	{
+		region_name = slurl.getRegion();
 	}
 
 	// Request a region handle by name
