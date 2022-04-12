@@ -41,6 +41,7 @@
 // Timers to temporise database requests
 const F32 AGENTS_UPDATE_TIMER = 30.f;			// Seconds between 2 agent requests for a region
 const F32 REQUEST_ITEMS_TIMER = 10.f * 60.f;	// Seconds before we consider re-requesting item data for the grid
+const F64 BLOCK_UPDATE_TIMER = 60.0;			// Periodically update sim info
 
 //---------------------------------------------------------------------------
 // LLItemInfo
@@ -310,6 +311,7 @@ void LLWorldMap::clearImageRefs()
 void LLWorldMap::clearSimFlags()
 {
 	mMapBlockLoaded.fill(false);
+	mMapBlockLastUpdateOffsets.clear();
 }
 
 LLSimInfo* LLWorldMap::createSimInfoFromHandle(const U64 handle)
@@ -618,6 +620,20 @@ void LLWorldMap::updateRegions(S32 x0, S32 y0, S32 x1, S32 y1)
 	y0 = y0 / MAP_BLOCK_SIZE;
 	y1 = y1 / MAP_BLOCK_SIZE;
 
+	block_last_update_map_t new_offsets;
+	F64 time_now = LLTimer::getElapsedSeconds();
+
+	// Remove blocks that have been request more than BLOCK_UPDATE_TIMER ago
+	// so we re-request them for an update
+	for (block_last_update_map_t::iterator it = mMapBlockLastUpdateOffsets.begin(); it != mMapBlockLastUpdateOffsets.end(); ++it)
+	{
+		if ((time_now - it->second) <= BLOCK_UPDATE_TIMER)
+		{
+			new_offsets[it->first] = it->second;
+		}
+	}
+	mMapBlockLastUpdateOffsets.swap(new_offsets);
+
 	// Load the region info those blocks
 	auto& world_map_message = LLWorldMapMessage::instanceFast();
 	for (S32 block_x = llmax(x0, 0); block_x <= llmin(x1, MAP_BLOCK_RES-1); ++block_x)
@@ -625,11 +641,12 @@ void LLWorldMap::updateRegions(S32 x0, S32 y0, S32 x1, S32 y1)
 		for (S32 block_y = llmax(y0, 0); block_y <= llmin(y1, MAP_BLOCK_RES-1); ++block_y)
 		{
 			S32 offset = block_x | (block_y * MAP_BLOCK_RES);
-			if (!mMapBlockLoaded[offset])
+			if (!mMapBlockLoaded[offset] || mMapBlockLastUpdateOffsets.find(offset) == mMapBlockLastUpdateOffsets.end())
 			{
  				//LL_INFOS("WorldMap") << "Loading Block (" << block_x << "," << block_y << ")" << LL_ENDL;
 				world_map_message.sendMapBlockRequest(block_x * MAP_BLOCK_SIZE, block_y * MAP_BLOCK_SIZE, (block_x * MAP_BLOCK_SIZE) + MAP_BLOCK_SIZE - 1, (block_y * MAP_BLOCK_SIZE) + MAP_BLOCK_SIZE - 1);
 				mMapBlockLoaded[offset] = true;
+				mMapBlockLastUpdateOffsets[offset] = time_now;
 			}
 		}
 	}

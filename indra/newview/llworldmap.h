@@ -278,6 +278,9 @@ private:
 	// cases where a block is never retrieved and, because of this boolean being set, never re-requested
 	std::array<bool, MAP_BLOCK_RES*MAP_BLOCK_RES>	mMapBlockLoaded;		// Telling us if the block of regions has been requested or not
 
+	typedef std::map<S32, F64> block_last_update_map_t;
+	block_last_update_map_t	mMapBlockLastUpdateOffsets;
+
 	// Track location data : used while there's nothing tracked yet by LLTracker
 	bool			mIsTrackingLocation;	// True when we're tracking a point
 	bool			mIsTrackingFound;		// True when the tracking position has been found, valid or not
