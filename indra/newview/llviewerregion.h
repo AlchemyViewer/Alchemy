@@ -426,6 +426,8 @@ public:
 	std::string getHGGrid() const;
 	/// Grid name (0.8.1)
 	std::string getHGGridName() const;
+	/// Grid nick (0.8.1)
+	std::string getHGGridNick() const;
     /// Chat Range (0.8.1)
     U32 getChatRange() const;
     /// Shout Range (0.8.1)
@@ -625,6 +627,9 @@ private:
 	F32  mMaxPrimScaleNoMesh = SL_DEFAULT_MAX_PRIM_SCALE_NO_MESH;
 	F32  mMinPhysPrimScale = SL_MIN_PRIM_SCALE;
 	F32  mMaxPhysPrimScale = SL_DEFAULT_MAX_PRIM_SCALE;
+	std::string mHGGridName;
+	std::string mHGGridNick;
+	std::string mHGGridURL;
 
     typedef std::map<U32, LLPointer<LLVOCacheEntry> >	   vocache_entry_map_t;
     static vocache_entry_map_t sRegionCacheCleanup;

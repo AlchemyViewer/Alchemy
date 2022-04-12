@@ -2324,9 +2324,19 @@ void LLViewerRegion::setSimulatorFeatures(const LLSD& sim_features)
 
 			if (extras.has("GridURL"))
 			{
-				const std::string& grid_url = extras["GridURL"].asString();
-				if (LLGridManager::getInstance()->getGrid(LLURI(grid_url).authority()).empty())
-					LLGridManager::getInstance()->addRemoteGrid(grid_url, LLGridManager::ADD_HYPERGRID);
+				mHGGridURL = extras["GridURL"].asString();
+				if (LLGridManager::getInstance()->getGrid(LLURI(mHGGridURL).authority()).empty())
+					LLGridManager::getInstance()->addRemoteGrid(mHGGridURL, LLGridManager::ADD_HYPERGRID);
+			}
+
+			if (extras.has("GridName"))
+			{
+				mHGGridName = extras["GridName"].asString();
+			}
+
+			if (extras.has("GridNick"))
+			{
+				mHGGridNick = extras["GridNick"].asString();
 			}
 
 			if (extras.has("currency"))
@@ -3604,7 +3614,7 @@ std::string LLViewerRegion::getSimHostName()
 
 std::string LLViewerRegion::getAvatarPickerURL() const
 {
-	std::string url = LLStringUtil::null;
+	std::string url;
 	if (mSimulatorFeatures.has("OpenSimExtras")
 		&& mSimulatorFeatures["OpenSimExtras"].has("avatar-picker-url"))
 	{
@@ -3623,7 +3633,7 @@ std::string LLViewerRegion::getAvatarPickerURL() const
 
 std::string LLViewerRegion::getDestinationGuideURL() const
 {
-	std::string url = LLStringUtil::null;
+	std::string url;
 	if (mSimulatorFeatures.has("OpenSimExtras")
 		&& mSimulatorFeatures["OpenSimExtras"].has("destination-guide-url"))
 	{
@@ -3691,12 +3701,10 @@ std::string LLViewerRegion::getBuyCurrencyServerURL() const
 
 std::string LLViewerRegion::getHGGrid() const
 {
-	std::string authority = LLStringUtil::null;
-	if (mSimulatorFeatures.has("OpenSimExtras")
-		&& mSimulatorFeatures["OpenSimExtras"].has("GridURL"))
+	std::string authority;
+	if (!mHGGridURL.empty())
 	{
-		const std::string& url = mSimulatorFeatures["OpenSimExtras"]["GridURL"].asString();
-		authority = LLURI(url).authority();
+		authority = LLURI(mHGGridURL).authority();
 	}
 	else
 	{
@@ -3708,14 +3716,27 @@ std::string LLViewerRegion::getHGGrid() const
 std::string LLViewerRegion::getHGGridName() const
 {
 	std::string name;
-	if (mSimulatorFeatures.has("OpenSimExtras")
-		&& mSimulatorFeatures["OpenSimExtras"].has("GridName"))
+	if (!mHGGridName.empty())
 	{
-		name = mSimulatorFeatures["OpenSimExtras"]["GridName"].asString();
+		name = mHGGridName;
 	}
 	else
 	{
 		name = LLGridManager::getInstanceFast()->getGridLabel();
+	}
+	return name;
+}
+
+std::string LLViewerRegion::getHGGridNick() const
+{
+	std::string name;
+	if (!mHGGridNick.empty())
+	{
+		name = mHGGridNick;
+	}
+	else
+	{
+		name = LLGridManager::getInstanceFast()->getGridId();
 	}
 	return name;
 }
