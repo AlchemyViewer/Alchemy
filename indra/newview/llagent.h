@@ -702,7 +702,7 @@ private:
 	void            startTeleportRequest();
 
 // [RLVa:KB] - Checked: RLVa-2.0.0
-	void 			teleportRequest(const U64& region_handle, const LLVector3& pos_local, const LLVector3& look_at = LLVector3(0, 1, 0));
+	void 			teleportRequest(const LLVector3d& pos_global, const LLVector3& look_at = LLVector3(0, 1, 0));
 // [/RLVa:KB]
 //	void 			teleportRequest(const U64& region_handle,
 //									const LLVector3& pos_local,				// Go to a named location home

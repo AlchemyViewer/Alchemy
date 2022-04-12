@@ -4440,11 +4440,44 @@ void LLAgent::onCapabilitiesReceivedAfterTeleport()
 //	const LLVector3& pos_local,
 //	bool look_at_from_camera)
 // [RLVa:KB] - Checked: RLVa-2.0.0
-void LLAgent::teleportRequest(const U64& region_handle, const LLVector3& pos_local, const LLVector3& look_at)
+void LLAgent::teleportRequest(const LLVector3d& pos_global, const LLVector3& look_at)
 // [/RLVa:KB]
 {
 	LLViewerRegion* regionp = getRegion();
-	if (regionp && teleportCore(region_handle == regionp->getHandle()))
+	if (!regionp) return;
+
+	LLVector3 pos_local;
+	U64 region_handle;
+	bool is_local = false;
+	if (regionp->pointInRegionGlobal(pos_global))
+	{
+		pos_local = regionp->getPosRegionFromGlobal(pos_global);
+		region_handle = regionp->getHandle();
+		is_local = true;
+	}
+	else if (LLViewerRegion* other_regionp = LLWorld::instance().getRegionFromPosGlobal(pos_global))
+	{
+		pos_local = LLVector3(pos_global - other_regionp->getOriginGlobal());
+		region_handle = other_regionp->getHandle();
+	}
+	else if (LLSimInfo* sim_info = LLWorldMap::getInstanceFast()->simInfoFromPosGlobal(pos_global))
+	{
+		pos_local = sim_info->getLocalPos(pos_global);
+		region_handle = sim_info->getHandle();
+	}
+	else
+	{
+		region_handle = to_region_handle(pos_global);
+		// determine non-local region location as best we can using global coords
+		// In SL we have uniform region size. This is normal.
+		// In opensim the handle will resolve to a 256m quantised world tile which the server maps back to a region
+		// it "should" also compensate for the local coords. Handle has been "correctly" determined already so we use global % 256
+		pos_local.set(fmod((F32)pos_global.mdV[VX], REGION_WIDTH_METERS),
+			fmod((F32)pos_global.mdV[VY], REGION_WIDTH_METERS),
+			(F32)pos_global.mdV[VZ]);
+	}
+
+	if (teleportCore(region_handle == regionp->getHandle()))
 	{
 		LL_INFOS("Teleport") << "Sending TeleportLocationRequest: '" << region_handle << "':"
 							 << pos_local << LL_ENDL;
@@ -4620,39 +4653,35 @@ void LLAgent::doTeleportViaLocation(const LLVector3d& pos_global)
 		return;
 	}
 
-	auto region_origin { regionp->getOriginGlobal() };
-	LLVector3 pos_local{};
-	U64 handle { to_region_handle(pos_global, region_origin, regionp->getWidth()) };
-	bool is_local { regionp->getHandle() == handle };
-	if(is_local)
+	LLVector3 pos_local;
+	U64 handle;
+	bool is_local = false;
+	if (regionp->pointInRegionGlobal(pos_global))
 	{
-		pos_local.set(
-			(F32)(pos_global.mdV[VX] - region_origin.mdV[VX]),
-			(F32)(pos_global.mdV[VY] - region_origin.mdV[VY]),
-			(F32)(pos_global.mdV[VZ]));
-		LL_INFOS("Teleport") << "Local in-region TP:"
-							 << " pos_global " << pos_global
-							 << " region " << region_origin
-							 << " local " << pos_local
-							 << " region_handle " << handle
-							 << LL_ENDL;
+		pos_local = regionp->getPosRegionFromGlobal(pos_global);
+		handle = regionp->getHandle();
+		is_local = true;
+	}
+	else if (LLViewerRegion* other_regionp = LLWorld::instance().getRegionFromPosGlobal(pos_global))
+	{
+		pos_local = LLVector3(pos_global - other_regionp->getOriginGlobal());
+		handle = other_regionp->getHandle();
+	}
+	else if (LLSimInfo* sim_info = LLWorldMap::getInstanceFast()->simInfoFromPosGlobal(pos_global))
+	{
+		pos_local = sim_info->getLocalPos(pos_global);
+		handle = sim_info->getHandle();
 	}
 	else
 	{
+		handle = to_region_handle(pos_global);
 		// determine non-local region location as best we can using global coords
 		// In SL we have uniform region size. This is normal.
 		// In opensim the handle will resolve to a 256m quantised world tile which the server maps back to a region
 		// it "should" also compensate for the local coords. Handle has been "correctly" determined already so we use global % 256
-		static const F32 width = REGION_WIDTH_METERS;// Note: reverted back to previous hardcode 256 for non-local. Whilst this appears incorrect server side logic expects %256 and will overshoot otherwise.
-		pos_local.set( fmod((F32)pos_global.mdV[VX], width),
-					   fmod((F32)pos_global.mdV[VY], width),
-					   (F32)pos_global.mdV[VZ] );
-		LL_INFOS("Teleport") << "Non-local TP:"
-							 << " pos_global " << pos_global
-							 << " region " << region_origin
-							 << " local " << pos_local
-							 << " region_handle " << handle
-							 << LL_ENDL;
+		pos_local.set(fmod((F32)pos_global.mdV[VX], REGION_WIDTH_METERS),
+			fmod((F32)pos_global.mdV[VY], REGION_WIDTH_METERS),
+			(F32)pos_global.mdV[VZ]);
 	}
 
 	if(teleportCore(is_local)) // Rather a pointless if as teleportCore currently always returns true
@@ -4720,9 +4749,7 @@ void LLAgent::doTeleportViaLocationLookAt(const LLVector3d& pos_global, const LL
 		gAgentCamera.setFocusOnAvatar(FALSE, ANIMATE);	// detach camera form avatar, so it keeps direction
 	}
 
-	U64 region_handle = to_region_handle(pos_global);
-	LLVector3 pos_local = (LLVector3)(pos_global - from_region_handle(region_handle));
-	teleportRequest(region_handle, pos_local, look_at);
+	teleportRequest(pos_global, look_at);
 }
 // [/RLVa:KB]
 //void LLAgent::doTeleportViaLocationLookAt(const LLVector3d& pos_global, const LLVector3& look_at)
