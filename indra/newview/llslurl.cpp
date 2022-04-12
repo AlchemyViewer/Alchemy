@@ -205,7 +205,7 @@ LLSLURL::LLSLURL(const std::string& slurl)
 				// (or its a slurl.com or maps.secondlife.com URL).
 				if ((slurl_uri.scheme() == LLSLURL::SLURL_HTTP_SCHEME ||
 					 slurl_uri.scheme() == LLSLURL::SLURL_HTTPS_SCHEME) &&
-					slurl_uri.hostName() != LLGridManager::getInstance()->getGrid())
+					LLGridManager::getInstance()->getGridByProbing(slurl_uri.hostName()) != LLGridManager::getInstance()->getGrid())
 				{
 					return;
 				}
