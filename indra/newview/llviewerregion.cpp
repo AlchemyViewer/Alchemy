@@ -2344,6 +2344,24 @@ void LLViewerRegion::setSimulatorFeatures(const LLSD& sim_features)
 				cur_symbol = extras["currency"].asString();
 			}
 
+			if (extras.has("map-server-url"))
+			{
+				mHGMapServerURL = extras["map-server-url"].asString();
+			}
+
+			if (extras.has("whisper-range"))
+			{
+				mWhisperRange = extras["whisper-range"].asInteger();
+			}
+			if (extras.has("say-range"))
+			{
+				mSayRange = extras["say-range"].asInteger();
+			}
+			if (extras.has("shout-range"))
+			{
+				mShoutRange = extras["shout-range"].asInteger();
+			}
+
 			mMinSimHeight = extras.has("MinSimHeight") ? extras["MinSimHeight"].asReal() : OS_MIN_OBJECT_Z;
 			mMaxSimHeight = extras.has("MaxSimHeight") ? extras["MaxSimHeight"].asReal() : OS_MAX_OBJECT_Z;
 			mMinPrimScale = extras.has("MinPrimScale") ? extras["MinPrimScale"].asReal() : OS_MIN_PRIM_SCALE;
@@ -2354,6 +2372,9 @@ void LLViewerRegion::setSimulatorFeatures(const LLSD& sim_features)
 		}
 		else
 		{
+			mWhisperRange = 10;
+			mSayRange = 20;
+			mShoutRange = 100;
 			mMinSimHeight = OS_MIN_OBJECT_Z;
 			mMaxSimHeight = OS_MAX_OBJECT_Z;
 			mMinPrimScale = OS_MIN_PRIM_SCALE;
@@ -2377,6 +2398,9 @@ void LLViewerRegion::setSimulatorFeatures(const LLSD& sim_features)
 		mMaxPrimScaleNoMesh = SL_DEFAULT_MAX_PRIM_SCALE_NO_MESH;
 		mMinPhysPrimScale = SL_MIN_PRIM_SCALE;
 		mMaxPhysPrimScale = SL_DEFAULT_MAX_PRIM_SCALE;
+		mWhisperRange = 10;
+		mSayRange = 20;
+		mShoutRange = 100;
 	}
 
 	if(mSimulatorFeatures.has("MaxMaterialsPerTransaction")
@@ -3652,17 +3676,15 @@ std::string LLViewerRegion::getDestinationGuideURL() const
 
 std::string LLViewerRegion::getMapServerURL() const
 {
-	std::string url;
-	if (mSimulatorFeatures.has("OpenSimExtras")
-		&& mSimulatorFeatures["OpenSimExtras"].has("map-server-url"))
+	if (!mHGMapServerURL.empty())
 	{
-		url = mSimulatorFeatures["OpenSimExtras"]["map-server-url"].asString();
+		return mHGMapServerURL;
 	}
 	else
 	{
-		url = gSavedSettings.getString("CurrentMapServerURL");
+		static const LLCachedControl<std::string> map_server_url(gSavedSettings, "CurrentMapServerURL");
+		return map_server_url();
 	}
-	return url;
 }
 
 std::string LLViewerRegion::getSearchServerURL() const
@@ -3747,35 +3769,17 @@ std::string LLViewerRegion::getHGGridNick() const
 
 U32 LLViewerRegion::getChatRange() const
 {
-    U32 range = 20;
-    if (mSimulatorFeatures.has("OpenSimExtras")
-        && mSimulatorFeatures["OpenSimExtras"].has("say-range"))
-    {
-        range = mSimulatorFeatures["OpenSimExtras"]["say-range"].asInteger();
-    }
-    return range;
+     return mSayRange;
 }
 
 U32 LLViewerRegion::getShoutRange() const
 {
-    U32 range = 100;
-    if (mSimulatorFeatures.has("OpenSimExtras")
-        && mSimulatorFeatures["OpenSimExtras"].has("shout-range"))
-    {
-        range = mSimulatorFeatures["OpenSimExtras"]["shout-range"].asInteger();
-    }
-    return range;
+    return mShoutRange;
 }
 
 U32 LLViewerRegion::getWhisperRange() const
 {
-    U32 range = 10;
-    if (mSimulatorFeatures.has("OpenSimExtras")
-        && mSimulatorFeatures["OpenSimExtras"].has("whisper-range"))
-    {
-        range = mSimulatorFeatures["OpenSimExtras"]["whisper-range"].asInteger();
-    }
-    return range;
+    return mWhisperRange;
 }
 
 F32 LLViewerRegion::getMinPrimScale() const
@@ -3855,9 +3859,8 @@ const LLViewerRegion::tex_matrix_t& LLViewerRegion::getWorldMapTiles() const
 			{
 				const std::string map_url = getMapServerURL().append(llformat("map-1-%d-%d-objects.jpg", gridX + x, gridY + y));
 				LLPointer<LLViewerTexture> tex(LLViewerTextureManager::getFetchedTextureFromUrl(map_url, FTT_MAP_TILE, TRUE,
-											   LLViewerTexture::BOOST_NONE, LLViewerTexture::LOD_TEXTURE));
+											   LLViewerTexture::BOOST_MAP, LLViewerTexture::LOD_TEXTURE));
 				mWorldMapTiles.push_back(tex);
-				tex->setBoostLevel(LLViewerTexture::BOOST_MAP);
 			}
 	}
 	return mWorldMapTiles;

@@ -627,6 +627,10 @@ private:
 	F32  mMaxPrimScaleNoMesh = SL_DEFAULT_MAX_PRIM_SCALE_NO_MESH;
 	F32  mMinPhysPrimScale = SL_MIN_PRIM_SCALE;
 	F32  mMaxPhysPrimScale = SL_DEFAULT_MAX_PRIM_SCALE;
+	U32  mWhisperRange = 10;
+	U32  mSayRange = 20;
+	U32  mShoutRange = 100;
+	std::string mHGMapServerURL;
 	std::string mHGGridName;
 	std::string mHGGridNick;
 	std::string mHGGridURL;
