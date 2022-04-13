@@ -538,7 +538,7 @@ void LLNavigationBar::onLocationSelection()
 	}
 
 	const std::string& grid = slurl.getGrid();
-	if (LLStringUtil::compareInsensitive(LLGridManager::getInstance()->getGridByProbing(grid), current_grid) != 0)
+	if (LLGridManager::getInstance()->getGridByProbing(grid) != current_grid)
 	{
 		region_name.insert(0, llformat("%s:", grid.c_str()));
 	}

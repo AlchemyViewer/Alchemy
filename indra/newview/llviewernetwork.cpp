@@ -742,8 +742,8 @@ std::string LLGridManager::getGrid(const std::string& grid) const
 			}
 			if (grid_pair.second.has(GRID_GATEKEEPER))
 			{
-				if (0 == (LLStringUtil::compareInsensitive(grid,
-					grid_pair.second[GRID_GATEKEEPER].asString())))
+				std::string gatekeeper = grid_pair.second[GRID_GATEKEEPER].asString();
+				if (0 == (strncasecmp(grid.c_str(), gatekeeper.c_str(), gatekeeper.size())))
 				{
 					// found a matching label, return this name
 					grid_name = grid_pair.first;
@@ -779,8 +779,8 @@ std::string LLGridManager::getGridByProbing(const std::string& grid) const
 			}
 			if (grid_pair.second.has(GRID_GATEKEEPER))
 			{
-				if (0 == (LLStringUtil::compareInsensitive(grid,
-					grid_pair.second[GRID_GATEKEEPER].asString())))
+				std::string gatekeeper = grid_pair.second[GRID_GATEKEEPER].asString();
+				if (0 == (strncasecmp(grid.c_str(),	gatekeeper.c_str(), gatekeeper.size())))
 				{
 					// found a matching label, return this name
 					return grid_pair.first;

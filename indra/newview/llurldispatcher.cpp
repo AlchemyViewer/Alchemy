@@ -198,7 +198,7 @@ bool LLURLDispatcherImpl::dispatchRegion(const LLSLURL& slurl, const std::string
 
 	std::string region_name;
 	const std::string& grid = slurl.getGrid();
-	if (LLStringUtil::compareInsensitive(LLGridManager::getInstance()->getGridByProbing(grid), current_grid) != 0)
+	if (LLGridManager::getInstance()->getGridByProbing(grid) != current_grid)
 	{
 		region_name = llformat("%s:%s", grid.c_str(), slurl.getRegion().c_str());
 	}

@@ -20,6 +20,11 @@
 			<key>value</key>
 			<string>(Hidden region)</string>
 		</map>
+		<key>hidden_grid</key>
+		<map>
+			<key>value</key>
+			<string>(Hidden grid)</string>
+		</map>
 
 		<!-- Received/sent IMs will be replaced by the matching string when @recvim/sendim restricted -->
 		<key>blocked_recvim</key>

@@ -3720,6 +3720,10 @@ std::string LLViewerRegion::getHGGridName() const
 	{
 		name = mHGGridName;
 	}
+	else if (!mHGGridURL.empty())
+	{
+		name = LLURI(mHGGridURL).authority();
+	}
 	else
 	{
 		name = LLGridManager::getInstanceFast()->getGridLabel();
