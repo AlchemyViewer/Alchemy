@@ -403,9 +403,7 @@ namespace tut
 		}
 
 		// Test 9 : Verify that all the region list is empty
-		LLWorldMap::sim_info_map_t list;
-		list = mWorld->getRegionMap();
-		ensure("LLWorldMap::getRegionMap() empty at init test failed", list.empty());
+		ensure("LLWorldMap::getRegionMap() empty at init test failed", mWorld->getRegionMap().empty());
 
 		// Test 10 : Insert a region
 		bool success;
@@ -417,8 +415,7 @@ namespace tut
 										id,
 										SIM_ACCESS_PG,
 										REGION_FLAGS_SANDBOX);
-		list = mWorld->getRegionMap();
-		ensure("LLWorldMap::insertRegion() failed", success && (list.size() == 1));
+		ensure("LLWorldMap::insertRegion() failed", success && (mWorld->getRegionMap().size() == 1));
 
 		// Test 11 : Insert an item in the same region -> number of regions doesn't increase
 		std::string name_item = ITEM_NAME_TEST;
@@ -428,8 +425,7 @@ namespace tut
 										id,
 										MAP_ITEM_LAND_FOR_SALE,
 										0, 0);
-		list = mWorld->getRegionMap();
-		ensure("LLWorldMap::insertItem() in existing region failed", success && (list.size() == 1));
+		ensure("LLWorldMap::insertItem() in existing region failed", success && (mWorld->getRegionMap().size() == 1));
 
 		// Test 12 : Insert an item in another region -> number of regions increases
 		success = mWorld->insertItem(	U32(X_WORLD_TEST + REGION_WIDTH_METERS*2), 
@@ -438,8 +434,7 @@ namespace tut
 										id,
 										MAP_ITEM_LAND_FOR_SALE,
 										0, 0);
-		list = mWorld->getRegionMap();
-		ensure("LLWorldMap::insertItem() in unexisting region failed", success && (list.size() == 2));
+		ensure("LLWorldMap::insertItem() in unexisting region failed", success && (mWorld->getRegionMap().size() == 2));
 
 		// Test 13 : simInfoFromPosGlobal() in region
 		LLVector3d pos1(	X_WORLD_TEST + REGION_WIDTH_METERS*2 + REGION_WIDTH_METERS/2, 
@@ -480,8 +475,7 @@ namespace tut
 		}
 
 		// Test 19 : Verify that all the region list is empty
-		list = mWorld->getRegionMap();
-		ensure("LLWorldMap::getRegionMap() empty at end test failed", list.empty());
+		ensure("LLWorldMap::getRegionMap() empty at end test failed", mWorld->getRegionMap().empty());
 	}
 	// Test tracking
 	template<> template<>

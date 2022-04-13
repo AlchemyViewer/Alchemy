@@ -262,7 +262,6 @@ void LLWorldMap::reset()
 	clearSimFlags();		// Clear the block info flags array 
 
 	// Finally, clear the region map itself
-	for_each(mSimInfoMap.begin(), mSimInfoMap.end(), DeletePairedPointer());
 	mSimInfoMap.clear();
 }
 
@@ -277,7 +276,7 @@ bool LLWorldMap::clearItems(bool force)
 		LLSimInfo* sim_info = NULL;
 		for (sim_info_map_t::iterator it = mSimInfoMap.begin(); it != mSimInfoMap.end(); ++it)
 		{
-			sim_info = it->second;
+			sim_info = it->second.get();
 			if (sim_info)
 			{
 				sim_info->clearItems();
@@ -299,7 +298,7 @@ void LLWorldMap::clearImageRefs()
 	LLSimInfo* sim_info = NULL;
 	for (sim_info_map_t::iterator it = mSimInfoMap.begin(); it != mSimInfoMap.end(); ++it)
 	{
-		sim_info = it->second;
+		sim_info = it->second.get();
 		if (sim_info)
 		{
 			sim_info->clearImage();
@@ -316,9 +315,8 @@ void LLWorldMap::clearSimFlags()
 
 LLSimInfo* LLWorldMap::createSimInfoFromHandle(const U64 handle)
 {
-	LLSimInfo* sim_info = new LLSimInfo(handle);
-	mSimInfoMap[handle] = sim_info;
-	return sim_info;
+	auto ret = mSimInfoMap.insert_or_assign(handle, std::make_unique<LLSimInfo>(handle));
+	return ret.first->second.get();
 }
 
 void LLWorldMap::equalizeBoostLevels()
@@ -338,7 +336,7 @@ LLSimInfo* LLWorldMap::simInfoFromHandle(const U64 handle)
 	sim_info_map_t::iterator it = mSimInfoMap.find(handle);
 	if (it != mSimInfoMap.end())
 	{
-		return it->second;
+		return it->second.get();
 	}
 	U32 x = 0, y = 0;
 	from_region_handle(handle, &x, &y);
@@ -348,7 +346,7 @@ LLSimInfo* LLWorldMap::simInfoFromHandle(const U64 handle)
 		U32 checkRegionX, checkRegionY;
 		from_region_handle(sim_info_pair.first, &checkRegionX, &checkRegionY);
 
-		LLSimInfo* info = sim_info_pair.second;
+		LLSimInfo* info = sim_info_pair.second.get();
 		if (x >= checkRegionX && x < (checkRegionX + info->getSizeX()) &&
 			y >= checkRegionY && y < (checkRegionY + info->getSizeY()))
 		{
@@ -367,7 +365,7 @@ LLSimInfo* LLWorldMap::simInfoFromName(const std::string& sim_name)
 		// Iterate through the entire sim info map and compare the name
 		for (const auto& sim_info_pair : mSimInfoMap)
 		{
-			auto temp_sim_info = sim_info_pair.second;
+			auto temp_sim_info = sim_info_pair.second.get();
 			if (temp_sim_info && temp_sim_info->isName(sim_name) )
 			{
 				sim_info = temp_sim_info;
@@ -606,7 +604,7 @@ void LLWorldMap::dropImagePriorities()
 	// Same for the "land for sale" tiles per region
 	for (sim_info_map_t::iterator it = mSimInfoMap.begin(); it != mSimInfoMap.end(); ++it)
 	{
-		LLSimInfo* info = it->second;
+		LLSimInfo* info = it->second.get();
 		info->dropImagePriority();
 	}
 }
@@ -657,7 +655,7 @@ void LLWorldMap::dump()
 	LL_INFOS("WorldMap") << "LLWorldMap::dump()" << LL_ENDL;
 	for (sim_info_map_t::iterator it = mSimInfoMap.begin(); it != mSimInfoMap.end(); ++it)
 	{
-		LLSimInfo* info = it->second;
+		LLSimInfo* info = it->second.get();
 		if (info)
 		{
 			info->dump();

@@ -351,7 +351,7 @@ void LLWorldMapView::draw()
 	for (const auto& sim_info_pair : LLWorldMap::getInstanceFast()->getRegionMap())
 	{
 		U64 handle = sim_info_pair.first;
-		LLSimInfo* info = sim_info_pair.second;
+		LLSimInfo* info = sim_info_pair.second.get();
 
 		LLVector3d origin_global = from_region_handle(handle);
 
