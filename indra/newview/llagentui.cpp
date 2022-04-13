@@ -81,7 +81,6 @@ BOOL LLAgentUI::buildLocationString(std::string& str, ELocationFormat fmt,const 
 	std::string remote_grid = LLGridManager::instanceFast().getGridByProbing(region->getHGGrid());
 	std::string cur_grid = LLGridManager::instanceFast().getGrid();
 	bool is_hypergrid = remote_grid != cur_grid;
-	LL_INFOS() << "remote: " << remote_grid << " cur: " << cur_grid << " hypergrid: " << is_hypergrid << LL_ENDL;
 
 	S32 pos_x = S32(agent_pos_region.mV[VX]);
 	S32 pos_y = S32(agent_pos_region.mV[VY]);
