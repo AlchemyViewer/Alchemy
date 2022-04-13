@@ -972,7 +972,7 @@ S32	LLStringOps::collate(const llwchar* a, const llwchar* b)
 	#if LL_WINDOWS
 		// in Windows, wide string functions operator on 16-bit strings, 
 		// not the proper 32 bit wide string
-		return strcmp(wstring_to_utf8str(LLWString(a)).c_str(), wstring_to_utf8str(LLWString(b)).c_str());
+		return wcscoll(ll_convert_wstring_to_wide(LLWString(a)).c_str(), ll_convert_wstring_to_wide(LLWString(b)).c_str());
 	#else
 		return wcscoll(a, b);
 	#endif
