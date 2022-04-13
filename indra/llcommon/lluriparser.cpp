@@ -128,7 +128,7 @@ void LLUriParser::textRangeToString(UriTextRangeA& textRange, std::string& str)
 	}
 	else
 	{
-		str = LLStringUtil::null;
+		str.clear();
 	}
 }
 
