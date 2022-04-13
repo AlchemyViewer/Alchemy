@@ -3730,7 +3730,7 @@ std::string LLViewerRegion::getHGGrid() const
 	}
 	else
 	{
-		authority = LLGridManager::getInstanceFast()->getGrid();
+		authority = LLGridManager::getInstanceFast()->getGatekeeper(LLGridManager::getInstanceFast()->getGrid());
 	}
 	return authority;
 }

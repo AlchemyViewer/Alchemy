@@ -888,11 +888,9 @@ void LLGridManager::getLoginURIs(std::vector<std::string>& uris) const
 
 std::string LLGridManager::getGatekeeper(const std::string& grid) const
 {
-	std::string url = mGridList[grid].has(GRID_GATEKEEPER)
-					  ? mGridList[grid][GRID_GATEKEEPER].asString()
-					  : LLStringUtil::null;
-	LL_DEBUGS("GridManager") << "returning " << url << LL_ENDL;
-	return url;
+	return mGridList[grid].has(GRID_GATEKEEPER)
+		? mGridList[grid][GRID_GATEKEEPER].asString()
+		: grid;
 }
 
 std::string LLGridManager::getUserAccountServiceURL(const std::string& grid) const
