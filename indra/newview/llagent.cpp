@@ -2723,7 +2723,7 @@ void LLAgent::onAnimStop(const LLUUID& id)
 		setControlFlags(AGENT_CONTROL_FINISH_ANIM);
 
 		// now trigger dusting self off animation
-		if (isAgentAvatarValid() && !gAgentAvatarp->mBelowWater && ll_rand() % 3 == 0)
+		if (isAgentAvatarValid() && !gAgentAvatarp->mBelowWater && rand() % 3 == 0)
 			sendAnimationRequest( ANIM_AGENT_BRUSH, ANIM_REQUEST_START );
 	}
 	else if (id == ANIM_AGENT_PRE_JUMP || id == ANIM_AGENT_LAND || id == ANIM_AGENT_MEDIUM_LAND)
@@ -4829,11 +4829,17 @@ void LLAgent::stopCurrentAnimations()
 	{
 		std::vector<LLUUID> anim_ids;
 
+		bool restore_stand_animation = true;
 		for ( LLVOAvatar::AnimIterator anim_it =
 			      gAgentAvatarp->mPlayingAnimations.begin();
 		      anim_it != gAgentAvatarp->mPlayingAnimations.end();
 		      anim_it++)
 		{
+			if (anim_it->first == ANIM_AGENT_SIT_GROUND_CONSTRAINED)
+			{
+				restore_stand_animation = false;
+			}
+
 			if ((anim_it->first == ANIM_AGENT_DO_NOT_DISTURB)||
 				(anim_it->first == ANIM_AGENT_SIT_GROUND_CONSTRAINED))
 			{
@@ -4870,7 +4876,10 @@ void LLAgent::stopCurrentAnimations()
 
 		// re-assert at least the default standing animation, because
 		// viewers get confused by avs with no associated anims.
-		sendAnimationRequest(ANIM_AGENT_STAND, ANIM_REQUEST_START);
+		if (restore_stand_animation)
+		{
+			sendAnimationRequest(ANIM_AGENT_STAND, ANIM_REQUEST_START);
+		}
 	}
 }
 
