@@ -113,27 +113,31 @@ void LLDiskCache::purge()
 #endif
     if (boost::filesystem::is_directory(cache_path, ec) && !ec.failed())
     {
-        for (auto& entry : boost::make_iterator_range(boost::filesystem::recursive_directory_iterator(cache_path), {}))
+        boost::filesystem::recursive_directory_iterator dir_iter(cache_path, ec);
+        if (!ec.failed())
         {
-            ec.clear();
-            if (boost::filesystem::is_regular_file(entry, ec) && !ec.failed())
+            for (auto& entry : boost::make_iterator_range(dir_iter, {}))
             {
-                if (entry.path().string().rfind(sCacheFilenameExt) != std::string::npos)
+                ec.clear();
+                if (boost::filesystem::is_regular_file(entry, ec) && !ec.failed())
                 {
-                    const uintmax_t file_size = boost::filesystem::file_size(entry, ec);
-                    if (ec.failed())
+                    if (entry.path().string().rfind(sCacheFilenameExt) != std::string::npos)
                     {
-                        LL_WARNS() << "Failed to read file size for cache file " << entry.path().string() << ": " << ec.message() << LL_ENDL;
-                        continue;
-                    }
-                    const std::time_t file_time = boost::filesystem::last_write_time(entry, ec);
-					if (ec.failed())
-					{
-						LL_WARNS() << "Failed to read last write time for cache file " << entry.path().string() << ": " << ec.message() << LL_ENDL;
-                        continue;
-					}
+                        const uintmax_t file_size = boost::filesystem::file_size(entry, ec);
+                        if (ec.failed())
+                        {
+                            LL_WARNS() << "Failed to read file size for cache file " << entry.path().string() << ": " << ec.message() << LL_ENDL;
+                            continue;
+                        }
+                        const std::time_t file_time = boost::filesystem::last_write_time(entry, ec);
+                        if (ec.failed())
+                        {
+                            LL_WARNS() << "Failed to read last write time for cache file " << entry.path().string() << ": " << ec.message() << LL_ENDL;
+                            continue;
+                        }
 
-                    file_info.push_back(file_info_t(file_time, { file_size, entry.path() }));
+                        file_info.push_back(file_info_t(file_time, { file_size, entry.path() }));
+                    }
                 }
             }
         }
@@ -176,6 +180,7 @@ void LLDiskCache::purge()
                 if (ec.failed())
                 {
                     LL_WARNS() << "Failed to delete cache file " << entry.second.second << ": " << ec.message() << LL_ENDL;
+                    continue;
                 }
             }
         }
@@ -414,20 +419,24 @@ uintmax_t LLDiskCache::dirFileSize(const std::string dir)
 #endif
     if (boost::filesystem::is_directory(dir_path, ec) && !ec.failed())
     {
-        for (auto& entry : boost::make_iterator_range(boost::filesystem::recursive_directory_iterator(dir_path), {}))
+        boost::filesystem::recursive_directory_iterator dir_iter(dir_path,ec);
+        if (!ec.failed())
         {
-            ec.clear();
-            if (boost::filesystem::is_regular_file(entry, ec) && !ec.failed())
+            for (auto& entry : boost::make_iterator_range(dir_iter, {}))
             {
-                if (entry.path().string().rfind(sCacheFilenameExt) != std::string::npos)
+                ec.clear();
+                if (boost::filesystem::is_regular_file(entry, ec) && !ec.failed())
                 {
-                    uintmax_t file_size = boost::filesystem::file_size(entry, ec);
-                    if (ec.failed())
+                    if (entry.path().string().rfind(sCacheFilenameExt) != std::string::npos)
                     {
-                        LL_WARNS() << "Failed to get file size for cache file " << entry.path().string() << " : " << ec.message() << LL_ENDL;
-                        continue;
+                        uintmax_t file_size = boost::filesystem::file_size(entry, ec);
+                        if (ec.failed())
+                        {
+                            LL_WARNS() << "Failed to get file size for cache file " << entry.path().string() << " : " << ec.message() << LL_ENDL;
+                            continue;
+                        }
+                        total_file_size += file_size;
                     }
-                    total_file_size += file_size;
                 }
             }
         }
