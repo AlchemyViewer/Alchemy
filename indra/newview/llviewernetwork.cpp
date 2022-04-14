@@ -37,6 +37,8 @@
 #include "lltrans.h"
 #include "llxmlnode.h"
 
+#include "absl/strings/match.h"
+
 /// key used to store the grid, and the name attribute in the grid data
 const std::string  GRID_VALUE = "keyname";
 /// the value displayed in the grid selector menu, and other human-oriented text
@@ -732,8 +734,7 @@ std::string LLGridManager::getGrid(const std::string& grid) const
 		{
 			if (grid_pair.second.has(GRID_ID_VALUE))
 			{
-				if (0 == (LLStringUtil::compareInsensitive(grid,
-														   grid_pair.second[GRID_ID_VALUE].asString())))
+				if (absl::EqualsIgnoreCase(grid, grid_pair.second[GRID_ID_VALUE].asStringRef()))
 				{
 					// found a matching label, return this name
 					grid_name = grid_pair.first;
@@ -742,8 +743,7 @@ std::string LLGridManager::getGrid(const std::string& grid) const
 			}
 			if (grid_pair.second.has(GRID_GATEKEEPER))
 			{
-				std::string gatekeeper = grid_pair.second[GRID_GATEKEEPER].asString();
-				if (0 == (strncasecmp(grid.c_str(), gatekeeper.c_str(), gatekeeper.size())))
+				if (absl::StartsWithIgnoreCase(grid, grid_pair.second[GRID_GATEKEEPER].asStringRef()))
 				{
 					// found a matching label, return this name
 					grid_name = grid_pair.first;
@@ -769,8 +769,7 @@ std::string LLGridManager::getGridByProbing(const std::string& grid) const
 		{
 			if (grid_pair.second.has(GRID_ID_VALUE))
 			{
-				if (0 == (LLStringUtil::compareInsensitive(grid,
-					grid_pair.second[GRID_ID_VALUE].asString())))
+				if (absl::EqualsIgnoreCase(grid, grid_pair.second[GRID_ID_VALUE].asStringRef()))
 				{
 					// found a matching label, return this name
 					return grid_pair.first;
@@ -779,8 +778,7 @@ std::string LLGridManager::getGridByProbing(const std::string& grid) const
 			}
 			if (grid_pair.second.has(GRID_GATEKEEPER))
 			{
-				std::string gatekeeper = grid_pair.second[GRID_GATEKEEPER].asString();
-				if (0 == (strncasecmp(grid.c_str(),	gatekeeper.c_str(), gatekeeper.size())))
+				if (absl::StartsWithIgnoreCase(grid, grid_pair.second[GRID_GATEKEEPER].asStringRef()))
 				{
 					// found a matching label, return this name
 					return grid_pair.first;
