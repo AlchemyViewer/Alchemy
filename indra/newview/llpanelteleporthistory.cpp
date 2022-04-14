@@ -1006,16 +1006,6 @@ LLFlatListView* LLTeleportHistoryPanel::getFlatListViewFromTab(LLAccordionCtrlTa
 	return NULL;
 }
 
-void LLTeleportHistoryPanel::gotSLURLCallback(const std::string& slurl)
-{
-    LLClipboard::instance().copyToClipboard(utf8str_to_wstring(slurl), 0, slurl.size());
-
-    LLSD args;
-    args["SLURL"] = slurl;
-
-    LLNotificationsUtil::add("CopySLURL", args);
-}
-
 void LLTeleportHistoryPanel::onGearMenuAction(const LLSD& userdata)
 {
     std::string command_name = userdata.asString();
@@ -1070,9 +1060,16 @@ void LLTeleportHistoryPanel::onGearMenuAction(const LLSD& userdata)
     }
     else if ("copy_slurl" == command_name)
     {
-        LLVector3d globalPos = LLTeleportHistoryStorage::getInstance()->getItems()[index].mGlobalPos;
-        LLLandmarkActions::getSLURLfromPosGlobal(globalPos,
-            boost::bind(&LLTeleportHistoryPanel::gotSLURLCallback, _1));
+        const auto& tp_item = LLTeleportHistoryStorage::getInstance()->getItems()[index];
+
+		std::string slurl = LLSLURL(tp_item.mGrid, tp_item.mRegion, tp_item.mLocalPos).getSLURLString();
+
+		LLClipboard::instance().copyToClipboard(utf8str_to_wstring(slurl), 0, slurl.size());
+
+		LLSD args;
+		args["SLURL"] = slurl;
+
+		LLNotificationsUtil::add("CopySLURL", args);
     }
 }
 

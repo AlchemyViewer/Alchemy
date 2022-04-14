@@ -476,13 +476,45 @@ void LLNavigationBar::onLocationSelection()
 		case TELEPORT_HISTORY:
 			//in case of teleport item was selected, teleport by position too.
 		case TYPED_REGION_SLURL:
-			if(value.has("global_pos"))
-			{
-				gAgent.teleportViaLocation(LLVector3d(value["global_pos"]));
+		{
+				const LLVector3d global_pos = value.has("global_pos") ? LLVector3d(value["global_pos"]) : LLVector3d();
+				const LLVector3 local_pos = value.has("local_pos") ? LLVector3(value["local_pos"]) : LLVector3();
+				const std::string grid_name = value["grid"].asString();
+				std::string region_name = value["region"].asString();
+
+				if (LLGridManager::instance().isInSecondlife() || (region_name.empty() || grid_name.empty() || local_pos.isExactlyZero()))
+				{
+					if (!global_pos.isExactlyZero())
+					{
+						gAgent.teleportViaLocation(global_pos);
+					}
+					return;
+				}
+
+				std::string current_grid;
+				auto regionp = gAgent.getRegion();
+				if (regionp)
+				{
+					current_grid = LLGridManager::getInstance()->getGridByProbing(regionp->getHGGrid());
+				}
+				else
+				{
+					current_grid = LLGridManager::getInstance()->getGrid();
+				}
+
+				if (LLGridManager::getInstance()->getGridByProbing(grid_name) != current_grid)
+				{
+					region_name.insert(0, llformat("%s:", grid_name.c_str()));
+				}
+
+				// Resolve the region name to its global coordinates.
+				// If resolution succeeds we'll teleport.
+				LLWorldMapMessage::url_callback_t cb = boost::bind(
+					&LLNavigationBar::onRegionNameResponse, this,
+					std::string(), region_name, local_pos, _1, _2, _3, _4);
+				LLWorldMapMessage::getInstance()->sendNamedRegionRequest(region_name, cb, std::string("unused"), false);
 				return;
-			}
-			break;
-			
+		}
 		default:
 			break;		
 		}
@@ -573,10 +605,13 @@ void LLNavigationBar::onTeleportFinished(const LLVector3d& global_agent_pos)
 	LLVector3 local_agent_pos = gAgent.getPosAgentFromGlobal(global_agent_pos);
 		LLAgentUI::buildLocationString(location, LLAgentUI::LOCATION_FORMAT_NO_MATURITY,
 			local_agent_pos);
-	std::string tooltip (LLSLURL(gAgent.getRegion()->getName(), local_agent_pos).getSLURLString());
 	
-	LLLocationHistoryItem item (location,
-			global_agent_pos, tooltip,TYPED_REGION_SLURL);// we can add into history only TYPED location
+	std::string grid = gAgent.getRegion()->getHGGrid();
+	std::string region_name = gAgent.getRegion()->getName();
+	std::string tooltip (LLSLURL(grid, region_name, local_agent_pos).getSLURLString());
+	
+	LLLocationHistoryItem item (location, grid, region_name,
+		local_agent_pos, global_agent_pos, tooltip,TYPED_REGION_SLURL);// we can add into history only TYPED location
 	//Touch it, if it is at list already, add new location otherwise
 	if ( !lh->touchItem(item) ) {
 		lh->addItem(item);
@@ -661,7 +696,7 @@ void LLNavigationBar::onRegionNameResponse(
 		LL_INFOS() << "Teleporting to: " << LLSLURL(region_name, local_coords).getSLURLString()  << LL_ENDL;
 		gAgent.teleportViaLocation(global_pos);
 	}
-	else if (gSavedSettings.getBOOL("SearchFromAddressBar"))
+	else if (!typed_location.empty() && gSavedSettings.getBOOL("SearchFromAddressBar"))
 	{
 		invokeSearch(typed_location);
 	}

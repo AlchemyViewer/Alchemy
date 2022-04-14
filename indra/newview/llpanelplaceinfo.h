@@ -84,6 +84,7 @@ public:
 	// Displays information about a remote parcel.
 	// Sends a request to the server.
 	void displayParcelInfo(const LLUUID& region_id,
+						   const LLVector3& local_pos,
 						   const LLVector3d& pos_global);
 
 	/*virtual*/ void setErrorStatus(S32 status, const std::string& reason);

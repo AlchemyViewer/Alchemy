@@ -35,6 +35,11 @@
 #include "llagent.h"
 #include "llfloaterreg.h"
 #include "llfloaterworldmap.h"
+#include "llviewernetwork.h"
+#include "llworldmapmessage.h"
+#include "llregionhandle.h"
+#include "llagent.h"
+#include "llviewerregion.h"
 // [RLVa:KB] - Checked: 2010-09-03 (RLVa-1.2.1b)
 #include "rlvactions.h"
 // [/RLVa:KB]
@@ -45,8 +50,11 @@ const F64 MAX_GLOBAL_POS_OFFSET = 5.0f;
 LLTeleportHistoryPersistentItem::LLTeleportHistoryPersistentItem(const LLSD& val)
 {
 	mTitle = val["title"].asString();
-	mGlobalPos.setValue(val["global_pos"]);
-	mDate = val["date"];
+	if (val.has("global_pos")) mGlobalPos.setValue(val["global_pos"]);
+	if (val.has("local_pos")) mLocalPos.setValue(val["local_pos"]);
+	mRegion = val["region"].asString();
+	mGrid = val["grid"].asString();
+	mDate = val["date"].asDate();
 }
 
 LLSD LLTeleportHistoryPersistentItem::toLLSD() const
@@ -54,8 +62,11 @@ LLSD LLTeleportHistoryPersistentItem::toLLSD() const
 	LLSD val;
 
 	val["title"]		= mTitle;
+	val["local_pos"]	= mLocalPos.getValue();
 	val["global_pos"]	= mGlobalPos.getValue();
-	val["date"]		= mDate;
+	val["grid"]			= mGrid;
+	val["region"]		= mRegion;
+	val["date"]			= mDate;
 
 	return val;
 }
@@ -105,7 +116,7 @@ void LLTeleportHistoryStorage::onTeleportHistoryChange()
 	}
 // [/RLVa:KB]
 
-	addItem(item.mTitle, item.mGlobalPos);
+	addItem(item.mGrid, item.mRegion, item.mTitle, item.mLocalPos, item.mGlobalPos);
 	save();
 }
 
@@ -115,9 +126,9 @@ void LLTeleportHistoryStorage::purgeItems()
 	mHistoryChangedSignal(-1);
 }
 
-void LLTeleportHistoryStorage::addItem(const std::string title, const LLVector3d& global_pos)
+void LLTeleportHistoryStorage::addItem(const std::string grid, const std::string region, const std::string title, const LLVector3& local_pos, const LLVector3d& global_pos)
 {
-	addItem(title, global_pos, LLDate::now());
+	addItem(grid, region, title, local_pos, global_pos, LLDate::now());
 }
 
 
@@ -126,7 +137,7 @@ bool LLTeleportHistoryStorage::compareByTitleAndGlobalPos(const LLTeleportHistor
 	return a.mTitle == b.mTitle && (a.mGlobalPos - b.mGlobalPos).length() < MAX_GLOBAL_POS_OFFSET;
 }
 
-void LLTeleportHistoryStorage::addItem(const std::string title, const LLVector3d& global_pos, const LLDate& date)
+void LLTeleportHistoryStorage::addItem(const std::string grid, const std::string region, const std::string title, const LLVector3& local_pos, const LLVector3d& global_pos, const LLDate& date)
 {
 // [RLVa:KB] - Checked: 2010-09-03 (RLVa-1.2.1b) | Added: RLVa-1.2.1b
 	if (!RlvActions::canShowLocation())
@@ -135,7 +146,7 @@ void LLTeleportHistoryStorage::addItem(const std::string title, const LLVector3d
 	}
 // [/RLVa:KB]
 
-	LLTeleportHistoryPersistentItem item(title, global_pos, date);
+	LLTeleportHistoryPersistentItem item(grid, region, title, local_pos, global_pos, date);
 
 	slurl_list_t::iterator item_iter = std::find_if(mItems.begin(), mItems.end(),
 							    boost::bind(&LLTeleportHistoryStorage::compareByTitleAndGlobalPos, this, _1, item));
@@ -274,8 +285,40 @@ void LLTeleportHistoryStorage::goToItem(S32 idx)
 		return;
 	}
 
-	// Attempt to teleport to the requested item.
-	gAgent.teleportViaLocation(mItems[idx].mGlobalPos);
+	auto& grid_mgr = LLGridManager::instance();
+	if (grid_mgr.isInSecondlife() || (gAgent.getRegion() && grid_mgr.getGridByProbing(mItems[idx].mGrid) == grid_mgr.getGridByProbing(gAgent.getRegion()->getHGGrid())))
+	{
+		// Attempt to teleport to the requested item.
+		gAgent.teleportViaLocation(mItems[idx].mGlobalPos);
+	}
+	else
+	{
+		std::string region_name = llformat("%s:%s", mItems[idx].mGrid.c_str(), mItems[idx].mRegion.c_str());
+
+		// Resolve the region name to its global coordinates.
+		// If resolution succeeds we'll teleport.
+		LLWorldMapMessage::url_callback_t cb = boost::bind(
+			&LLTeleportHistoryStorage::onRegionNameResponse, this,
+			region_name, mItems[idx].mLocalPos, _1, _2, _3, _4);
+		LLWorldMapMessage::getInstance()->sendNamedRegionRequest(region_name, cb, std::string("unused"), false);
+	}
+}
+
+void LLTeleportHistoryStorage::onRegionNameResponse(
+	std::string region_name,
+	LLVector3 local_coords,
+	U64 region_handle, const std::string& url, const LLUUID& snapshot_id, bool teleport)
+{
+	// Invalid location?
+	if (region_handle)
+	{
+		// Teleport to the location.
+		LLVector3d region_pos = from_region_handle(region_handle);
+		LLVector3d global_pos = region_pos + (LLVector3d)local_coords;
+
+		LL_INFOS() << "Teleporting to: " << LLSLURL(region_name, local_coords).getSLURLString() << LL_ENDL;
+		gAgent.teleportViaLocation(global_pos);
+	}
 }
 
 void LLTeleportHistoryStorage::showItemOnMap(S32 idx)

@@ -749,25 +749,11 @@ void LLLocationInputCtrl::onLocationPrearrange(const LLSD& data)
 				LLSD value;
 				value["item_type"] = TELEPORT_HISTORY;
 				value["global_pos"] = result->mGlobalPos.getValue();
-				std::string region_name = result->mTitle.substr(0, result->mTitle.find(','));
+				value["local_pos"] = result->mLocalPos.getValue();
+				value["grid"] = result->mGrid;
+				value["region"] = result->mRegion;
+				value["tooltip"] = LLSLURL(result->mGrid, result->mRegion, result->mLocalPos).getSLURLString();
 
-				LLSimInfo* sim_info = LLWorldMap::getInstanceFast()->simInfoFromPosGlobal(result->mGlobalPos);
-				if (sim_info)
-				{
-					value["tooltip"] = LLSLURL(region_name, sim_info->getLocalPos(result->mGlobalPos)).getSLURLString();
-				}
-				else if(LLViewerRegion* regionp = LLWorld::instance().getRegionFromID(result->mRegionID))
-				{
-					value["tooltip"] = LLSLURL(region_name, LLVector3(result->mGlobalPos - regionp->getOriginGlobal())).getSLURLString();
-				}
-				else
-				{
-					//TODO*: add Surl to teleportitem or parse region name from title
-					LLVector3 tempvector(result->mGlobalPos);
-					tempvector[VX] = fmodf(result->mGlobalPos[VX], REGION_WIDTH_METERS);
-					tempvector[VY] = fmodf(result->mGlobalPos[VY], REGION_WIDTH_METERS);
-					value["tooltip"] = LLSLURL(region_name, tempvector).getSLURLString();
-				}
 				add(result->getTitle(), value);
 			}
 			result = std::find_if(result + 1, th_items.end(), boost::bind(
@@ -1054,6 +1040,10 @@ void LLLocationInputCtrl::rebuildLocationHistory(const std::string& filter)
 		//location history can contain only typed locations
 		value["item_type"] = TYPED_REGION_SLURL;
 		value["global_pos"] = it->mGlobalPos.getValue();
+		value["local_pos"] = it->mLocalPos.getValue();
+		value["grid"] = it->mGrid;
+		value["region"] = it->mRegion;
+		value["tooltip"] = LLSLURL(it->mGrid, it->mRegion, it->mLocalPos).getSLURLString();
 		add(it->getLocation(), value);
 	}
 }

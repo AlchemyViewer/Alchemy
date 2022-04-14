@@ -83,7 +83,6 @@ private:
 	void showTeleportHistory();
 	void handleItemSelect(LLFlatListView* );
 	LLFlatListView* getFlatListViewFromTab(LLAccordionCtrlTab *);
-	static void gotSLURLCallback(const std::string& slurl);
 	void onGearMenuAction(const LLSD& userdata);
 	bool isActionEnabled(const LLSD& userdata) const;
 

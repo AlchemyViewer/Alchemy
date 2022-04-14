@@ -47,26 +47,28 @@ enum ELocationType {
 class LLLocationHistoryItem {
 			
 public:
-	LLLocationHistoryItem(){}
-	LLLocationHistoryItem(std::string typed_location, 
-			LLVector3d global_position, std::string tooltip,ELocationType type ):
-		mLocation(typed_location),		
+	LLLocationHistoryItem() = default;
+	LLLocationHistoryItem(std::string typed_location, std::string grid, std::string region_name,
+			LLVector3 local_position, LLVector3d global_position, std::string tooltip,ELocationType type ):
+		mGrid(std::move(grid)),
+		mRegion(std::move(region_name)),
+		mToolTip(std::move(tooltip)),
+		mLocation(std::move(typed_location)),
 		mGlobalPos(global_position),
-		mToolTip(tooltip),
+		mLocalPos(local_position),
 		mType(type)
 	{}
-	LLLocationHistoryItem(const LLLocationHistoryItem& item):
-		mGlobalPos(item.mGlobalPos),
-		mToolTip(item.mToolTip),
-		mLocation(item.mLocation),
-		mType(item.mType)
-	{}
+
 	LLLocationHistoryItem(const LLSD& data):
+	mGrid(data["grid"]),
+	mRegion(data["region"]),
 	mLocation(data["location"]),
-	mGlobalPos(data["global_pos"]),
 	mToolTip(data["tooltip"]),
 	mType(ELocationType(data["item_type"].asInteger()))
-	{}
+	{
+		if (data.has("local_pos")) mLocalPos = LLVector3(data["local_pos"]);
+		if (data.has("global_pos")) mGlobalPos = LLVector3d(data["global_pos"]);
+	}
 
 	bool operator==(const LLLocationHistoryItem& item)
 	{
@@ -81,7 +83,10 @@ public:
 	LLSD toLLSD() const
 	{
 		LLSD val;
+		val["grid"] = mGrid;
+		val["region"] = mRegion;
 		val["location"]= mLocation;
+		val["local_pos"] = mLocalPos.getValue();
 		val["global_pos"]	= mGlobalPos.getValue();
 		val["tooltip"]	= mToolTip;
 		val["item_type"] = mType;
@@ -94,10 +99,13 @@ public:
 	{
 		return  item1.getLocation() == item_location;
 	}
-	
-	LLVector3d	mGlobalPos; // global position
+
+	std::string mGrid;// SURL
+	std::string mRegion;// SURL
 	std::string mToolTip;// SURL
 	std::string mLocation;// typed_location
+	LLVector3d	mGlobalPos; // global position
+	LLVector3	mLocalPos; // local position
 	ELocationType mType;
 };
 

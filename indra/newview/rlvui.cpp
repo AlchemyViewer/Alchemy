@@ -142,7 +142,7 @@ void RlvUIEnabler::onToggleShowLoc()
 		{
 			const LLTeleportHistoryItem& tpItem = pTpHistory->getItems().back();
 			const LLTeleportHistoryPersistentItem& tpItemStg = pTpHistoryStg->getItems().back();
-			if (pTpHistoryStg->compareByTitleAndGlobalPos(tpItemStg, LLTeleportHistoryPersistentItem(tpItem.mTitle, tpItem.mGlobalPos)))
+			if (pTpHistoryStg->compareByTitleAndGlobalPos(tpItemStg, LLTeleportHistoryPersistentItem(tpItem.mGrid, tpItem.mRegion, tpItem.mTitle, tpItem.mLocalPos, tpItem.mGlobalPos)))
 			{
 				// TODO-RLVa: [RLVa-1.2.2] Is there a reason why LLTeleportHistoryStorage::removeItem() doesn't trigger history changed?
 				pTpHistoryStg->removeItem(pTpHistoryStg->getItems().size() - 1);

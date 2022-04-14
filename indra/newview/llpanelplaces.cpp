@@ -450,6 +450,7 @@ void LLPanelPlaces::onOpen(const LLSD& key)
 				LLUUID dest_folder = key["dest_folder"];
 				mLandmarkInfo->setInfoAndCreateLandmark(dest_folder);
 
+				LLVector3 local_pos;
 				if (key.has("x") && key.has("y") && key.has("z"))
 				{
 					mPosGlobal = LLVector3d(key["x"].asReal(),
@@ -459,9 +460,10 @@ void LLPanelPlaces::onOpen(const LLSD& key)
 				else
 				{
 					mPosGlobal = gAgent.getPositionGlobal();
+					local_pos = gAgent.getPositionAgent();
 				}
 
-				mLandmarkInfo->displayParcelInfo(LLUUID(), mPosGlobal);
+				mLandmarkInfo->displayParcelInfo(LLUUID(), local_pos, mPosGlobal);
 
 				mSaveBtn->setEnabled(FALSE);
 			}
@@ -491,7 +493,7 @@ void LLPanelPlaces::onOpen(const LLSD& key)
 					mPosGlobal = LLVector3d(key["x"].asReal(),
 											key["y"].asReal(),
 											key["z"].asReal());
-					mPlaceProfile->displayParcelInfo(LLUUID(), mPosGlobal);
+					mPlaceProfile->displayParcelInfo(LLUUID(), LLVector3(), mPosGlobal);
 				}
 
 				mPlaceProfile->setInfoType(LLPanelPlaceInfo::PLACE);
@@ -506,7 +508,7 @@ void LLPanelPlaces::onOpen(const LLSD& key)
 				mPosGlobal = hist_items[index].mGlobalPos;
 
 				mPlaceProfile->setInfoType(LLPanelPlaceInfo::TELEPORT_HISTORY);
-				mPlaceProfile->displayParcelInfo(LLUUID(), mPosGlobal);
+				mPlaceProfile->displayParcelInfo(LLUUID(), hist_items[index].mLocalPos, mPosGlobal);
 			}
 
 			updateVerbs();
@@ -622,7 +624,7 @@ void LLPanelPlaces::onLandmarkLoaded(LLLandmark* landmark)
 	LLUUID region_id;
 	landmark->getRegionID(region_id);
 	landmark->getGlobalPos(mPosGlobal);
-	mLandmarkInfo->displayParcelInfo(region_id, mPosGlobal);
+	mLandmarkInfo->displayParcelInfo(region_id, landmark->getRegionPos(), mPosGlobal);
 
 	updateVerbs();
 }

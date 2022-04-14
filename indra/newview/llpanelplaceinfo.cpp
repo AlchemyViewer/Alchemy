@@ -47,6 +47,7 @@
 #include "lltexturectrl.h"
 #include "llviewerregion.h"
 #include "llhttpconstants.h"
+#include "llworld.h"
 #include "llworldmap.h"
 
 LLPanelPlaceInfo::LLPanelPlaceInfo()
@@ -142,22 +143,34 @@ void LLPanelPlaceInfo::sendParcelInfoRequest()
 }
 
 void LLPanelPlaceInfo::displayParcelInfo(const LLUUID& region_id,
+										 const LLVector3& local_pos,
 										 const LLVector3d& pos_global)
 {
 	LLViewerRegion* region = gAgent.getRegion();
 	if (!region)
 		return;
 
-	const LLSimInfo* siminfo = LLWorldMap::getInstance()->simInfoFromPosGlobal(pos_global);
-	if (siminfo)
+	if (!local_pos.isNull())
 	{
-		mPosRegion = siminfo->getLocalPos(pos_global);
+		mPosRegion = local_pos;
 	}
 	else
 	{
-		mPosRegion.setVec((F32)fmod(pos_global.mdV[VX], (F64)REGION_WIDTH_METERS),
-			(F32)fmod(pos_global.mdV[VY], (F64)REGION_WIDTH_METERS),
-			(F32)pos_global.mdV[VZ]);
+		const LLSimInfo* siminfo = LLWorldMap::getInstance()->simInfoFromPosGlobal(pos_global);
+		if (siminfo)
+		{
+			mPosRegion = siminfo->getLocalPos(pos_global);
+		}
+		else if (LLViewerRegion* regionp = LLWorld::instance().getRegionFromID(region_id))
+		{
+			mPosRegion = LLVector3(pos_global - regionp->getOriginGlobal());
+		}
+		else
+		{
+			mPosRegion.setVec((F32)fmod(pos_global.mdV[VX], (F64)REGION_WIDTH_METERS),
+				(F32)fmod(pos_global.mdV[VY], (F64)REGION_WIDTH_METERS),
+				(F32)pos_global.mdV[VZ]);
+		}
 	}
 
 	LLSD body;

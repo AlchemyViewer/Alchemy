@@ -43,22 +43,24 @@ class LLSD;
 class LLTeleportHistoryPersistentItem
 {
 public:
-	LLTeleportHistoryPersistentItem()
+	LLTeleportHistoryPersistentItem() = default;
+
+	LLTeleportHistoryPersistentItem(std::string grid, std::string region, std::string title, const LLVector3& local_pos, const LLVector3d& global_pos)
+		: mGrid(std::move(grid)), mRegion(std::move(region)), mTitle(std::move(title)), mGlobalPos(global_pos), mLocalPos(local_pos), mDate(LLDate::now())
 	{}
 
-	LLTeleportHistoryPersistentItem(const std::string title, const LLVector3d& global_pos)
-		: mTitle(title), mGlobalPos(global_pos), mDate(LLDate::now())
-	{}
-
-	LLTeleportHistoryPersistentItem(const std::string title, const LLVector3d& global_pos, const LLDate& date)
-		: mTitle(title), mGlobalPos(global_pos), mDate(date)
+	LLTeleportHistoryPersistentItem(std::string grid, std::string region, std::string title, const LLVector3& local_pos, const LLVector3d& global_pos, const LLDate& date)
+		: mGrid(std::move(grid)), mRegion(std::move(region)), mTitle(std::move(title)), mGlobalPos(global_pos), mLocalPos(local_pos), mDate(date)
 	{}
 
 	LLTeleportHistoryPersistentItem(const LLSD& val);
 	LLSD toLLSD() const;
 
+	std::string mGrid;
+	std::string mRegion;
 	std::string	mTitle;
 	LLVector3d	mGlobalPos;
+	LLVector3	mLocalPos;
 	LLDate		mDate;
 };
 
@@ -86,8 +88,8 @@ public:
 	const slurl_list_t& getItems() const { return mItems; }
 	void			purgeItems();
 
-	void addItem(const std::string title, const LLVector3d& global_pos);
-	void addItem(const std::string title, const LLVector3d& global_pos, const LLDate& date);
+	void addItem(const std::string grid, const std::string region, const std::string title, const LLVector3& local_pos, const LLVector3d& global_pos);
+	void addItem(const std::string grid, const std::string region, const std::string title, const LLVector3& local_pos, const LLVector3d& global_pos, const LLDate& date);
 
 	void removeItem(S32 idx);
 
@@ -125,6 +127,10 @@ protected:
 	
 	void onTeleportHistoryChange();
 	bool compareByTitleAndGlobalPos(const LLTeleportHistoryPersistentItem& a, const LLTeleportHistoryPersistentItem& b);
+	void onRegionNameResponse(
+		std::string region_name,
+		LLVector3 local_coords,
+		U64 region_handle, const std::string& url, const LLUUID& snapshot_id, bool teleport);
 
 	slurl_list_t	mItems;
 	std::string	mFilename;
