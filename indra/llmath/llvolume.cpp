@@ -5250,8 +5250,6 @@ bool LLVolumeFace::cacheOptimize()
 	llassert(!mOptimized);
 	mOptimized = TRUE;
 
-	LLVCacheLRU cache;
-
     if (mNumVertices < 3 || mNumIndices < 3)
     { //nothing to do
         return true;
@@ -5285,12 +5283,10 @@ bool LLVolumeFace::cacheOptimize()
         }
     }
 
-    std::vector<unsigned int> remap(mNumIndices);
-    std::vector<U16> indices(mNumIndices);
+    std::vector<unsigned int> remap;
     try
     {
         remap.reserve(mNumIndices);
-        indices.reserve(mNumIndices);
     }
     catch (const std::bad_alloc&)
     {
@@ -5298,7 +5294,7 @@ bool LLVolumeFace::cacheOptimize()
     }
 
     size_t total_vertices = meshopt_generateVertexRemapMulti(remap.data(), mIndices, mNumIndices, mNumVertices, streams.data(), streams.size());
-    meshopt_remapIndexBuffer(indices.data(), mIndices, mNumIndices, remap.data());
+    meshopt_remapIndexBuffer(mIndices, mIndices, mNumIndices, remap.data());
     bool failed = false;
     for (auto& entry : buffers)
     {
@@ -5367,10 +5363,10 @@ bool LLVolumeFace::cacheOptimize()
         }
     }
 
-    meshopt_optimizeVertexCache(mIndices, indices.data(), mNumIndices, total_vertices);
-    //meshopt_optimizeOverdraw(indices.data(), mIndices, mNumIndices, (float*)buffers[0].scratch, total_vertices, buffers[0].stride, 1.01f);
-    meshopt_optimizeVertexFetchRemap(remap.data(), indices.data(), mNumIndices, total_vertices);
-    meshopt_remapIndexBuffer(mIndices, indices.data(), mNumIndices, remap.data());
+    meshopt_optimizeVertexCache(mIndices, mIndices, mNumIndices, total_vertices);
+    meshopt_optimizeOverdraw(mIndices, mIndices, mNumIndices, (float*)buffers[0].scratch, total_vertices, buffers[0].stride, 1.05f);
+    meshopt_optimizeVertexFetchRemap(remap.data(), mIndices, mNumIndices, total_vertices);
+    meshopt_remapIndexBuffer(mIndices, mIndices, mNumIndices, remap.data());
     for (auto& entry : buffers)
     {
         // Write to llvolume attribute buffer
