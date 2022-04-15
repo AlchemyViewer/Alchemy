@@ -115,12 +115,12 @@ public:
 	BGItemHttpHandler(const LLSD & request_sd)
 		: LLInventoryModel::FetchItemHttpHandler(request_sd)
 		{
-			LLInventoryModelBackgroundFetch::instance().incrFetchCount(1);
+			LLInventoryModelBackgroundFetch::instanceFast().incrFetchCount(1);
 		}
 
 	virtual ~BGItemHttpHandler()
 		{
-			LLInventoryModelBackgroundFetch::instance().incrFetchCount(-1);
+			LLInventoryModelBackgroundFetch::instanceFast().incrFetchCount(-1);
 		}
 
 protected:
@@ -148,12 +148,12 @@ public:
 		  mRequestSD(request_sd),
 		  mRecursiveCatUUIDs(recursive_cats)
 		{
-			LLInventoryModelBackgroundFetch::instance().incrFetchCount(1);
+			LLInventoryModelBackgroundFetch::instanceFast().incrFetchCount(1);
 		}
 
 	virtual ~BGFolderHttpHandler()
 		{
-			LLInventoryModelBackgroundFetch::instance().incrFetchCount(-1);
+			LLInventoryModelBackgroundFetch::instanceFast().incrFetchCount(-1);
 		}
 	
 protected:
@@ -339,7 +339,7 @@ void LLInventoryModelBackgroundFetch::setAllFoldersFetched()
 
 void LLInventoryModelBackgroundFetch::backgroundFetchCB(void *)
 {
-	LLInventoryModelBackgroundFetch::instance().backgroundFetch();
+	LLInventoryModelBackgroundFetch::instanceFast().backgroundFetch();
 }
 
 void LLInventoryModelBackgroundFetch::backgroundFetch()
@@ -571,7 +571,9 @@ void LLInventoryModelBackgroundFetch::bulkFetch()
 	U32 item_count(0);
 	U32 folder_count(0);
 
-	const U32 sort_order(gSavedSettings.getU32(LLInventoryPanel::DEFAULT_SORT_ORDER) & 0x1);
+	static LLCachedControl<U32> inv_sort_order(gSavedSettings, LLInventoryPanel::DEFAULT_SORT_ORDER);
+
+	const U32 sort_order(inv_sort_order & 0x1);
 
 	// *TODO:  Think I'd like to get a shared pointer to this and share it
 	// among all the folder requests.
@@ -679,7 +681,7 @@ void LLInventoryModelBackgroundFetch::bulkFetch()
 		{
 			if (folder_request_body["folders"].size())
 			{
-				const std::string url(region->getCapability("FetchInventoryDescendents2"));
+				const std::string& url = region->getCapability("FetchInventoryDescendents2");
 
 				if (! url.empty())
 				{
@@ -690,7 +692,7 @@ void LLInventoryModelBackgroundFetch::bulkFetch()
 			
 			if (folder_request_body_lib["folders"].size())
 			{
-				const std::string url(region->getCapability("FetchLibDescendents2"));
+				const std::string& url = region->getCapability("FetchLibDescendents2");
 
 				if (! url.empty())
 				{
@@ -704,7 +706,7 @@ void LLInventoryModelBackgroundFetch::bulkFetch()
 		{
 			if (item_request_body.size())
 			{
-				const std::string url(region->getCapability("FetchInventory2"));
+				const std::string& url = region->getCapability("FetchInventory2");
 
 				if (! url.empty())
 				{
@@ -717,7 +719,7 @@ void LLInventoryModelBackgroundFetch::bulkFetch()
 
 			if (item_request_body_lib.size())
 			{
-				const std::string url(region->getCapability("FetchLib2"));
+				const std::string& url = region->getCapability("FetchLib2");
 
 				if (! url.empty())
 				{
@@ -820,7 +822,7 @@ void BGFolderHttpHandler::onCompleted(LLCore::HttpHandle handle, LLCore::HttpRes
 
 void BGFolderHttpHandler::processData(LLSD & content, LLCore::HttpResponse * response)
 {
-	LLInventoryModelBackgroundFetch * fetcher(LLInventoryModelBackgroundFetch::getInstance());
+	LLInventoryModelBackgroundFetch * fetcher(LLInventoryModelBackgroundFetch::getInstanceFast());
 
 	// API V2 and earlier should probably be testing for "error" map
 	// in response as an application-level error.
@@ -959,7 +961,7 @@ void BGFolderHttpHandler::processFailure(LLCore::HttpStatus status, LLCore::Http
 	// cause of the retry.  The new http library should be doing
 	// adquately on retries but I want to keep the structure of a
 	// retry for reference.
-	LLInventoryModelBackgroundFetch *fetcher = LLInventoryModelBackgroundFetch::getInstance();
+	LLInventoryModelBackgroundFetch *fetcher = LLInventoryModelBackgroundFetch::getInstanceFast();
 	if (false)
 	{
 		// timed out or curl failure
@@ -999,7 +1001,7 @@ void BGFolderHttpHandler::processFailure(const char * const reason, LLCore::Http
 	// the same but be aware that this may be a source of problems.
 	// Philosophy is that inventory folders are so essential to
 	// operation that this is a reasonable action.
-	LLInventoryModelBackgroundFetch *fetcher = LLInventoryModelBackgroundFetch::getInstance();
+	LLInventoryModelBackgroundFetch *fetcher = LLInventoryModelBackgroundFetch::getInstanceFast();
 	if (true)
 	{
 		for (const auto& folder_sd : mRequestSD["folders"].array())
