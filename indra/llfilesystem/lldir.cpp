@@ -106,13 +106,15 @@ std::vector<std::string> LLDir::getFilesInDir(const std::string &dirname)
 
     std::vector<std::string> v;
     
-    if (exists(p))
+	boost::system::error_code ec;
+    if (boost::filesystem::exists(p, ec) && !ec.failed())
     {
-        if (is_directory(p))
+        if (boost::filesystem::is_directory(p, ec) && !ec.failed())
         {
             boost::filesystem::directory_iterator end_iter;
-            for (boost::filesystem::directory_iterator dir_itr(p);
-                 dir_itr != end_iter;
+			boost::filesystem::directory_iterator dir_itr(p, ec);
+			if (ec.failed()) return v;
+            for (; dir_itr != end_iter;
                  ++dir_itr)
             {
                 if (boost::filesystem::is_regular_file(dir_itr->status()))
@@ -185,44 +187,41 @@ S32 LLDir::deleteFilesInDir(const std::string &dirname, const std::string &mask)
 
 U32 LLDir::deleteDirAndContents(const std::string& dir_name)
 {
-    //Removes the directory and its contents.  Returns number of files deleted.
-	
+	//Removes the directory and its contents.  Returns number of files deleted.
+
 	U32 num_deleted = 0;
-
-	try
-	{
+	boost::system::error_code ec;
 #ifdef LL_WINDOWS // or BOOST_WINDOWS_API
-		boost::filesystem::path dir_path(ll_convert_string_to_wide(dir_name));
+	boost::filesystem::path dir_path(ll_convert_string_to_wide(dir_name));
 #else
-		boost::filesystem::path dir_path(dir_name);
+	boost::filesystem::path dir_path(dir_name);
 #endif
-
-	   if (boost::filesystem::exists (dir_path))
-	   {
-	      if (!boost::filesystem::is_empty (dir_path))
-		  {   // Directory has content
-			  boost::system::error_code ec;
-			  num_deleted = boost::filesystem::remove_all(dir_path, ec);
-			  if (ec.failed())
-			  {
-				  LL_WARNS() << "Failed to delete file " << dir_path << ": " << ec.message() << LL_ENDL;
-			  }
-		  }
-		  else
-		  {   // Directory is empty
-			 boost::system::error_code ec;
-			 num_deleted = boost::filesystem::remove(dir_path, ec);
-			 if (ec.failed())
-			 {
-				 LL_WARNS() << "Failed to delete folder " << dir_path << ": " << ec.message() << LL_ENDL;
-			 }
-		  }
-	   }
+	bool exists = boost::filesystem::exists(dir_path, ec);
+	if (ec.failed())
+	{
+		LL_WARNS() << "Failed to delete path " << dir_path << ": " << ec.message() << LL_ENDL;
+		return num_deleted;
 	}
-	catch (const boost::filesystem::filesystem_error &er)
-	{ 
-		LL_WARNS() << "Failed to delete " << dir_name << " with error " << er.code().message() << LL_ENDL;
-	} 
+	if (exists)
+	{
+		if (!boost::filesystem::is_empty(dir_path, ec) && !ec.failed())
+		{   // Directory has content
+
+			num_deleted = boost::filesystem::remove_all(dir_path, ec);
+			if (ec.failed())
+			{
+				LL_WARNS() << "Failed to delete file " << dir_path << ": " << ec.message() << LL_ENDL;
+			}
+		}
+		else if(!ec.failed())
+		{   // Directory is empty
+			num_deleted = boost::filesystem::remove(dir_path, ec);
+			if (ec.failed())
+			{
+				LL_WARNS() << "Failed to delete folder " << dir_path << ": " << ec.message() << LL_ENDL;
+			}
+		}
+	}
 	return num_deleted;
 }
 

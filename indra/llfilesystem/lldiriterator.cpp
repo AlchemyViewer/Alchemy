@@ -56,17 +56,14 @@ LLDirIterator::Impl::Impl(const std::string &dirname, const std::string &mask)
 #else
 	fs::path dir_path(dirname);
 #endif
-
+	boost::system::error_code ec;
 	bool is_dir = false;
 
 	// Check if path is a directory.
-	try
+	is_dir = fs::is_directory(dir_path, ec);
+	if(ec.failed())
 	{
-		is_dir = fs::is_directory(dir_path);
-	}
-	catch (const fs::filesystem_error& e)
-	{
-		LL_WARNS() << e.what() << LL_ENDL;
+		LL_WARNS() << ec.what() << LL_ENDL;
 		return;
 	}
 
@@ -77,13 +74,10 @@ LLDirIterator::Impl::Impl(const std::string &dirname, const std::string &mask)
 	}
 
 	// Initialize the directory iterator for the given path.
-	try
+	mIter = fs::directory_iterator(dir_path, ec);
+	if (ec.failed())
 	{
-		mIter = fs::directory_iterator(dir_path);
-	}
-	catch (const fs::filesystem_error& e)
-	{
-		LL_WARNS() << e.what() << LL_ENDL;
+		LL_WARNS() << ec.what() << LL_ENDL;
 		return;
 	}
 
