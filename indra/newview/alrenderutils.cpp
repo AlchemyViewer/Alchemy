@@ -484,7 +484,7 @@ bool ALRenderUtil::setupColorGrade()
 
 					S32 image_height = raw_image->getHeight();
 					S32 image_width = raw_image->getWidth();
-					if ((image_height > 0 && image_height <= 64)		   // within dimension limit
+					if ((image_height > 0 && image_height <= gGLManager.mGLMaxTextureSize)		   // within dimension limit
 						&& ((image_height * image_height) == image_width)) // width is height * height
 					{
 						mCGLutSize = LLVector4(image_height, (float)flip_green, (float)swap_bluegreen);
