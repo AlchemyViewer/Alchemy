@@ -94,8 +94,8 @@ public:
 	/*virtual*/ const LLVector4a&	getAvgDistortion()									  override { return mAvgDistortionVec; }
 	/*virtual*/ F32					getMaxDistortion()									  override { return 3.f; }
 	/*virtual*/ LLVector4a			getVertexDistortion(S32 index, LLPolyMesh *poly_mesh) override { return LLVector4a(1.f, 1.f, 1.f);}
-	/*virtual*/ const LLVector4a*	getFirstDistortion(U32 *index, LLPolyMesh **poly_mesh) override	{ index = 0; poly_mesh = NULL; return &mAvgDistortionVec;};
-	/*virtual*/ const LLVector4a*	getNextDistortion(U32 *index, LLPolyMesh **poly_mesh) override	{ index = 0; poly_mesh = NULL; return NULL;};
+	/*virtual*/ const LLVector4a*	getFirstDistortion(U32 *index, LLPolyMesh **poly_mesh)override { if( index ){ *index = 0;} if( poly_mesh ){ *poly_mesh = NULL; } return &mAvgDistortionVec; };
+	/*virtual*/ const LLVector4a*	getNextDistortion(U32 *index, LLPolyMesh **poly_mesh) override { if( index ){ *index = 0;} if( poly_mesh ){ *poly_mesh = NULL; } return NULL; };
 
 	// New functions
 	BOOL					render( S32 x, S32 y, S32 width, S32 height );
