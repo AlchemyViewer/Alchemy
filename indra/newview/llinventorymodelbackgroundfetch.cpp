@@ -556,7 +556,7 @@ void LLInventoryModelBackgroundFetch::bulkFetch()
 		// OnIdle it will be called anyway due to Add flag for processed item.
 		// It seems like in some cases we are updaiting on fail (no flag),
 		// but is there anything to update?
-		if (LLGridManager::getInstance()->isInSecondlife())
+		if (LLGridManager::getInstanceFast()->isInSecondlife())
 		{
 			gInventory.notifyObservers();
 		}
@@ -868,7 +868,7 @@ void BGFolderHttpHandler::processData(LLSD & content, LLCore::HttpResponse * res
                         titem->setParent(lost_uuid);
                         titem->updateParentOnServer(FALSE);
                         gInventory.updateItem(titem);
-                        if (!LLGridManager::getInstance()->isInSecondlife())
+                        if (!LLGridManager::getInstanceFast()->isInSecondlife())
                         {
                             gInventory.notifyObservers();
                         }
@@ -934,7 +934,7 @@ void BGFolderHttpHandler::processData(LLSD & content, LLCore::HttpResponse * res
 		fetcher->setAllFoldersFetched();
 	}
 
-	if (!LLGridManager::getInstance()->isInSecondlife())
+	if (!LLGridManager::getInstanceFast()->isInSecondlife())
 	{
 		gInventory.notifyObservers();
 	}
@@ -978,7 +978,7 @@ void BGFolderHttpHandler::processFailure(LLCore::HttpStatus status, LLCore::Http
 		}
 	}
 
-	if (!LLGridManager::getInstance()->isInSecondlife())
+	if (!LLGridManager::getInstanceFast()->isInSecondlife())
 	{
 		gInventory.notifyObservers();
 	}
@@ -1017,7 +1017,7 @@ void BGFolderHttpHandler::processFailure(const char * const reason, LLCore::Http
 		}
 	}
 
-	if (!LLGridManager::getInstance()->isInSecondlife())
+	if (!LLGridManager::getInstanceFast()->isInSecondlife())
 	{
 		gInventory.notifyObservers();
 	}
