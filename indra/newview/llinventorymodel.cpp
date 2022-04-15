@@ -1889,7 +1889,7 @@ bool LLInventoryModel::fetchDescendentsOf(const LLUUID& folder_id) const
 //static
 std::string LLInventoryModel::getInvCacheAddres(const LLUUID& owner_id)
 {
-	return gDirUtilp->getExpandedFilename(LL_PATH_CACHE_PER_GRID, owner_id.asString(), ".inv.llsd");
+	return gDirUtilp->getExpandedFilename(LL_PATH_CACHE_PER_GRID, owner_id.asString()).append(".inv.llsd");
 }
 
 void LLInventoryModel::cache(
