@@ -11486,14 +11486,16 @@ BOOL LLVOAvatar::isTextureDefined(LLAvatarAppearanceDefines::ETextureIndex te, U
 		return FALSE;
 	}
 	
-	if( !getImage( te, index ) )
+	LLViewerTexture* imagep = getImage(te, index);
+
+	if(!imagep)
 	{
 		LL_WARNS() << "getImage( " << te << ", " << index << " ) returned 0" << LL_ENDL;
 		return FALSE;
 	}
 
-	return (getImage(te, index)->getID() != IMG_DEFAULT_AVATAR && 
-			getImage(te, index)->getID() != IMG_DEFAULT);
+	const auto& id = imagep->getID();
+	return (id != IMG_DEFAULT_AVATAR && id != IMG_DEFAULT);
 }
 
 //virtual

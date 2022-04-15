@@ -2985,8 +2985,8 @@ void LLViewerRegion::unpackRegionHandshake()
 	}
 
 	mCentralBakeVersion = region_protocols & 1; // was (S32)gSavedSettings.getBOOL("UseServerTextureBaking");
-
-	if (LLGridManager::instance().isInSecondlife() || region_protocols & 0x8000000000000000ll) // OS sets bit 63 when BOM supported
+	constexpr U64 REGION_SUPPORTS_BOM{ 1ULL << 63ULL };
+	if (LLGridManager::instance().isInSecondlife() || (region_protocols & REGION_SUPPORTS_BOM)) // OS sets bit 63 when BOM supported
 	{
 		mMaxBakes = LLAvatarAppearanceDefines::EBakedTextureIndex::BAKED_NUM_INDICES;
 		mMaxTEs = LLAvatarAppearanceDefines::ETextureIndex::TEX_NUM_INDICES;
