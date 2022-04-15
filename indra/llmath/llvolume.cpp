@@ -5244,9 +5244,7 @@ public:
 
 
 bool LLVolumeFace::cacheOptimize()
-{ //optimize for vertex cache according to Forsyth method: 
-  // http://home.comcast.net/~tom_forsyth/papers/fast_vert_cache_opt.html
-	
+{
 	llassert(!mOptimized);
 	mOptimized = TRUE;
 
@@ -5364,7 +5362,7 @@ bool LLVolumeFace::cacheOptimize()
     }
 
     meshopt_optimizeVertexCache(mIndices, mIndices, mNumIndices, total_vertices);
-    meshopt_optimizeOverdraw(mIndices, mIndices, mNumIndices, (float*)buffers[0].scratch, total_vertices, buffers[0].stride, 1.05f);
+    //meshopt_optimizeOverdraw(mIndices, mIndices, mNumIndices, (float*)buffers[0].scratch, total_vertices, buffers[0].stride, 1.05f);
     meshopt_optimizeVertexFetchRemap(remap.data(), mIndices, mNumIndices, total_vertices);
     meshopt_remapIndexBuffer(mIndices, mIndices, mNumIndices, remap.data());
     for (auto& entry : buffers)
