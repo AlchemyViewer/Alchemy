@@ -338,8 +338,8 @@ LLScrollListCtrl::~LLScrollListCtrl()
 
 	std::for_each(mItemList.begin(), mItemList.end(), DeletePointer());
 	mItemList.clear();
-	std::for_each(mColumns.begin(), mColumns.end(), DeletePairedPointer());
-	mColumns.clear();
+
+	clearColumns(); //clears columns and deletes headers
 	auto menu = mPopupMenuHandle.get();
 	if (menu)
 	{
@@ -2726,11 +2726,10 @@ void LLScrollListCtrl::dirtyColumns()
 	// just in case someone indexes into it immediately
 	mColumnsIndexed.resize(mColumns.size());
 
-	column_map_t::iterator column_itor;
-	for (column_itor = mColumns.begin(); column_itor != mColumns.end(); ++column_itor)
+	for (const auto& column_pair : mColumns)
 	{
-		LLScrollListColumn *column = column_itor->second;
-		mColumnsIndexed[column_itor->second->mIndex] = column;
+		LLScrollListColumn *column = column_pair.second;
+		mColumnsIndexed[column->mIndex] = column;
 	}
 }
 
@@ -3031,6 +3030,10 @@ void LLScrollListCtrl::clearColumns()
 	mSortColumns.clear();
 	mTotalStaticColumnWidth = 0;
 	mTotalColumnPadding = 0;
+
+	mNumDynamicWidthColumns = 0;
+
+    dirtyColumns(); // Clears mColumnsIndexed
 }
 
 void LLScrollListCtrl::setColumnLabel(std::string_view column, const std::string& label)
