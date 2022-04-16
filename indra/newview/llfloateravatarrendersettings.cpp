@@ -227,7 +227,7 @@ bool LLFloaterAvatarRenderSettings::isActionChecked(const LLSD& userdata, const 
 
 void LLFloaterAvatarRenderSettings::setNeedsUpdate()
 {
-    LLFloaterAvatarRenderSettings* instance = LLFloaterReg::getTypedInstance<LLFloaterAvatarRenderSettings>("avatar_render_settings");
+    LLFloaterAvatarRenderSettings* instance = LLFloaterReg::findTypedInstance<LLFloaterAvatarRenderSettings>("avatar_render_settings");
     if(!instance) return;
     instance->mNeedsUpdate = true;
 }
