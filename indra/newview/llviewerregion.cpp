@@ -328,8 +328,6 @@ void LLViewerRegionImpl::requestBaseCapabilitiesCoro(U64 regionHandle)
             return;
         }
 
-        ++mSeedCapAttempts;
-
         regionp = LLWorld::getInstanceFast()->getRegionFromHandle(regionHandle);
         if (!regionp) //region was removed
         {
@@ -341,6 +339,7 @@ void LLViewerRegionImpl::requestBaseCapabilitiesCoro(U64 regionHandle)
         {
             LL_WARNS("AppInit", "Capabilities") << "Received results for a stale capabilities request!" << LL_ENDL;
             // setup for retry.
+            ++mSeedCapAttempts; // <FS:Ansariel> Fix seed cap retry count
             continue;
         }
 
@@ -348,6 +347,7 @@ void LLViewerRegionImpl::requestBaseCapabilitiesCoro(U64 regionHandle)
         {
             LL_WARNS("AppInit", "Capabilities") << "Malformed response" << LL_ENDL;
             // setup for retry.
+            ++mSeedCapAttempts; // <FS:Ansariel> Fix seed cap retry count
             continue;
         }
 
@@ -357,6 +357,7 @@ void LLViewerRegionImpl::requestBaseCapabilitiesCoro(U64 regionHandle)
         {
             LL_WARNS("AppInit", "Capabilities") << "HttpStatus error " << LL_ENDL;
             // setup for retry.
+            ++mSeedCapAttempts; // <FS:Ansariel> Fix seed cap retry count
             continue;
         }
 
@@ -394,7 +395,6 @@ void LLViewerRegionImpl::requestBaseCapabilitiesCoro(U64 regionHandle)
     {   // *HACK: we're waiting for the ServerReleaseNotes
         regionp->showReleaseNotes();
     }
-
 }
 
 
