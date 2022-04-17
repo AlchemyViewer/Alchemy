@@ -5327,8 +5327,7 @@ void LLAgent::sendAgentUpdateUserInfoMessage(bool im_via_email, const std::strin
     gMessageSystem->addUUIDFast(_PREHASH_AgentID, getID());
     gMessageSystem->addUUIDFast(_PREHASH_SessionID, getSessionID());
     gMessageSystem->nextBlockFast(_PREHASH_UserData);
-    if (!LLGridManager::instance().isInSecondlife())
-        gMessageSystem->addBOOLFast(_PREHASH_IMViaEMail, im_via_email);
+    gMessageSystem->addBOOLFast(_PREHASH_IMViaEMail, im_via_email);
     gMessageSystem->addStringFast(_PREHASH_DirectoryVisibility, directory_visibility);
     gAgent.sendReliableMessage();
 
