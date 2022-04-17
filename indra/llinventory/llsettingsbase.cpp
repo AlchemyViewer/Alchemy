@@ -169,7 +169,7 @@ LLSD LLSettingsBase::interpolateSDMap(const LLSD &settings, const LLSD &other, c
     const stringset_t& skip = getSkipInterpolateKeys();
     const stringset_t& slerps = getSlerpKeys();
 
-    llassert(mix >= 0.0f && mix <= 1.0f);
+    //llassert(mix >= 0.0f && mix <= 1.0f);
 
     for (const auto& llsd_pair : settings.map())
     {

@@ -2196,6 +2196,8 @@ void errorCallback(LLError::ELevel level, const std::string &error_string)
     if (level == LLError::LEVEL_ERROR)
     {
 #ifdef SHOW_ASSERT
+		static std::string last_message;
+		if (error_string == last_message) return;
         OSMessageBox(error_string, LLTrans::getString("MBFatalError"), OSMB_OK);
 		U32 response = OSMessageBox(error_string, LLTrans::getString("MBFatalError"), OSMB_YESNO);
 		if (response == OSBTN_NO)
@@ -4416,7 +4418,6 @@ void LLAppViewer::purgeCache()
 	LL_INFOS("AppCache") << "Purging Cache and Texture Cache..." << LL_ENDL;
 	LLAppViewer::getTextureCache()->purgeCache(LL_PATH_CACHE);
 	LLVOCache::getInstance()->removeCache(LL_PATH_CACHE);
-	LLVOCache::getInstance()->removeCache(LL_PATH_CACHE_PER_GRID);
 	std::string browser_cache = gDirUtilp->getExpandedFilename(LL_PATH_CACHE, "cef_cache");
 	if (LLFile::isdir(browser_cache))
 	{

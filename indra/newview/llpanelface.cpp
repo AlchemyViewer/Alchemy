@@ -429,7 +429,6 @@ struct LLPanelFaceSetTEFunctor : public LLSelectedTEFunctor
 		LLCheckBoxCtrl*	cb_planar_align = mPanel->getChild<LLCheckBoxCtrl>("checkbox planar align");
 		bool align_planar = (cb_planar_align && cb_planar_align->get());
 
-		llassert(comboTexGen);
 		llassert(object);
 
 		if (ctrlTexScaleS)
