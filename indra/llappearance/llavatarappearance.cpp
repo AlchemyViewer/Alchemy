@@ -288,6 +288,7 @@ LLAvatarAppearance::~LLAvatarAppearance()
     {
         mRoot->removeAllChildren();
         delete mRoot;
+		mRoot = nullptr;
     }
 	mJointMap.clear();
 
