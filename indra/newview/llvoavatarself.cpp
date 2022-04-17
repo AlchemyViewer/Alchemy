@@ -1656,8 +1656,9 @@ BOOL LLVOAvatarSelf::isTextureVisible(LLAvatarAppearanceDefines::ETextureIndex t
 		return LLVOAvatar::isTextureVisible(type, (U32)0);
 	}
 
-	const LLUUID& tex_id = getLocalTextureID(type,index);
-	return (tex_id != IMG_INVISIBLE) || (LLDrawPoolAlpha::sShowDebugAlpha);
+	LLUUID tex_id = getLocalTextureID(type,index);
+	return (tex_id != IMG_INVISIBLE) 
+			|| (LLDrawPoolAlpha::sShowDebugAlpha);
 }
 
 //virtual

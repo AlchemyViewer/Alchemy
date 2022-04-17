@@ -2619,8 +2619,6 @@
 		<string>Boolean</string>
 		<key>Value</key>
 		<integer>1</integer>
-		<key>Backup</key>
-		<integer>0</integer>
 	</map>
     <key>CurrentGrid</key>
     <map>
