@@ -45,22 +45,23 @@
         label="Email me IMs when I'm offline ([EMAIL])"
         layout="topleft"
         name="send_im_to_email"
-        top_pad="6"
+        top_pad="4"
         width="330">
     </check_box>
-    <text
-       font="SansSerifSmall"
-       height="16"
-       layout="topleft"
-       length="1"       
-       name="email_settings"
-       skip_link_underline="true"
-       top_pad="6"
-       left_delta="2"
-       type="string"
-       width="350">
-      [https://accounts.secondlife.com/change_email Open email notification settings for offline IMs]
-    </text>
+		<text
+		 font="SansSerifSmall"
+		 follows="left|top"
+		 height="18"
+		 layout="topleft"
+		 left_delta="5"
+		 length="1"
+		 name="email_settings"
+		 skip_link_underline="true"
+		 top_delta="0"
+		 type="string"
+		 width="400">
+		 [https://accounts.secondlife.com/change_email Open email notification settings for offline IMs]
+		</text>
 
     <text
         layout="topleft"

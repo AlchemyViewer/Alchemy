@@ -2151,10 +2151,12 @@ void LLFloaterPreference::setPersonalInfo(const std::string& visibility, bool im
 	getChildView("log_path_button")->setEnabled(TRUE);
 	getChildView("chat_font_size")->setEnabled(TRUE);
 	getChildView("conversation_log_combo")->setEnabled(TRUE);
+	LLCheckBoxCtrl* send_im_to_email = getChild<LLCheckBoxCtrl>("send_im_to_email");
 	if (LLGridManager::instance().isInSecondlife())
 	{
 		childSetEnabled("email_settings", true);
 		childSetVisible("email_settings", true);
+		send_im_to_email->setVisible(FALSE);
 	}
 	else
 	{
@@ -2164,8 +2166,6 @@ void LLFloaterPreference::setPersonalInfo(const std::string& visibility, bool im
 			display_email.resize(30);
 			display_email += "...";
 		}
-
-		LLCheckBoxCtrl* send_im_to_email = getChild<LLCheckBoxCtrl>("send_im_to_email");
 		send_im_to_email->setVisible(TRUE);
 		send_im_to_email->setEnabled(is_verified_email);
 		send_im_to_email->setValue(im_via_email);
