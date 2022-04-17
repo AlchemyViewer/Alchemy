@@ -39,7 +39,15 @@
         name="play_typing_animation"
         width="330">
     </check_box>
-
+    <check_box
+        enabled="false"
+        height="16"
+        label="Email me IMs when I'm offline ([EMAIL])"
+        layout="topleft"
+        name="send_im_to_email"
+        top_pad="6"
+        width="330">
+    </check_box>
     <text
        font="SansSerifSmall"
        height="16"
@@ -51,7 +59,7 @@
        left_delta="2"
        type="string"
        width="350">
-      [https://accounts.secondlife.com/change_email Email me IMs when I'm offline]
+      [https://accounts.secondlife.com/change_email Open email notification settings for offline IMs]
     </text>
 
     <text

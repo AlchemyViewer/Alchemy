@@ -87,6 +87,7 @@
 #include "llviewerjoystick.h"
 #include "llviewermediafocus.h"
 #include "llviewermenu.h"
+#include "llviewernetwork.h"
 #include "llviewerobjectlist.h"
 #include "llviewerparcelmgr.h"
 #include "llviewerregion.h"
@@ -5235,19 +5236,27 @@ void LLAgent::requestAgentUserInfoCoro(std::string capurl)
         return;
     }
 
+    bool im_via_email = false;
+    bool is_verified_email = false;
     std::string email;
     std::string dir_visibility;
+
+	if(result.has("im_via_email"))
+		im_via_email = result["im_via_email"].asBoolean();
+
+	if (result.has("is_verified"))
+		im_via_email = result["is_verified"].asBoolean();
 
     email = result["email"].asString();
     dir_visibility = result["directory_visibility"].asString();
 
     // TODO: This should probably be changed.  I'm not entirely comfortable 
     // having LLAgent interact directly with the UI in this way.
-    LLFloaterPreference::updateUserInfo(dir_visibility);
+    LLFloaterPreference::updateUserInfo(dir_visibility, im_via_email, is_verified_email, email);
     LLFloaterSnapshot::setAgentEmail(email);
 }
 
-void LLAgent::sendAgentUpdateUserInfo(const std::string& directory_visibility)
+void LLAgent::sendAgentUpdateUserInfo(bool im_via_email, const std::string& directory_visibility)
 {
     std::string cap;
 
@@ -5260,16 +5269,16 @@ void LLAgent::sendAgentUpdateUserInfo(const std::string& directory_visibility)
     if (!cap.empty())
     {
         LLCoros::instance().launch("updateAgentUserInfoCoro",
-            boost::bind(&LLAgent::updateAgentUserInfoCoro, this, cap, directory_visibility));
+            boost::bind(&LLAgent::updateAgentUserInfoCoro, this, cap, im_via_email, directory_visibility));
     }
     else
     {
-        sendAgentUpdateUserInfoMessage(directory_visibility);
+        sendAgentUpdateUserInfoMessage(im_via_email, directory_visibility);
     }
 }
 
 
-void LLAgent::updateAgentUserInfoCoro(std::string capurl, std::string directory_visibility)
+void LLAgent::updateAgentUserInfoCoro(std::string capurl, bool im_via_email, std::string directory_visibility)
 {
     LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
     LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t
@@ -5282,6 +5291,8 @@ void LLAgent::updateAgentUserInfoCoro(std::string capurl, std::string directory_
     LLSD body(LLSDMap
         ("dir_visibility",  LLSD::String(directory_visibility)));
 
+    if (!LLGridManager::instance().isInSecondlife())
+        body.insert("im_via_email", LLSD::Boolean(im_via_email));
 
     LLSD result = httpAdapter->postAndSuspend(httpRequest, capurl, body, httpOpts, httpHeaders);
 
@@ -5309,13 +5320,15 @@ void LLAgent::sendAgentUserInfoRequestMessage()
     sendReliableMessage();
 }
 
-void LLAgent::sendAgentUpdateUserInfoMessage(const std::string& directory_visibility)
+void LLAgent::sendAgentUpdateUserInfoMessage(bool im_via_email, const std::string& directory_visibility)
 {
     gMessageSystem->newMessageFast(_PREHASH_UpdateUserInfo);
     gMessageSystem->nextBlockFast(_PREHASH_AgentData);
     gMessageSystem->addUUIDFast(_PREHASH_AgentID, getID());
     gMessageSystem->addUUIDFast(_PREHASH_SessionID, getSessionID());
     gMessageSystem->nextBlockFast(_PREHASH_UserData);
+    if (!LLGridManager::instance().isInSecondlife())
+        gMessageSystem->addBOOLFast(_PREHASH_IMViaEMail, im_via_email);
     gMessageSystem->addStringFast(_PREHASH_DirectoryVisibility, directory_visibility);
     gAgent.sendReliableMessage();
 

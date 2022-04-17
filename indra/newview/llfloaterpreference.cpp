@@ -292,6 +292,7 @@ std::string LLFloaterPreference::sSkin = "";
 LLFloaterPreference::LLFloaterPreference(const LLSD& key)
 	: LLFloater(key),
 	mGotPersonalInfo(false),
+	mOriginalIMViaEmail(false),
 	mLanguageChanged(false),
 	mAvatarDataInitialized(false),
 	mSearchDataDirty(true)
@@ -961,9 +962,11 @@ void LLFloaterPreference::apply()
 	
 	if (mGotPersonalInfo)
 	{ 
+		bool new_im_via_email = getChild<LLUICtrl>("send_im_to_email")->getValue().asBoolean();
 		bool new_hide_online = getChild<LLUICtrl>("online_visibility")->getValue().asBoolean();		
 	
-		if (new_hide_online != mOriginalHideOnlineStatus)
+		if ((new_im_via_email != mOriginalIMViaEmail)
+			||(new_hide_online != mOriginalHideOnlineStatus))
 		{
 			// This hack is because we are representing several different 	 
 			// possible strings with a single checkbox. Since most users 	 
@@ -977,7 +980,7 @@ void LLFloaterPreference::apply()
 			 //Update showonline value, otherwise multiple applys won't work
 				mOriginalHideOnlineStatus = new_hide_online;
 			}
-			gAgent.sendAgentUpdateUserInfo(mDirectoryVisibility);
+			gAgent.sendAgentUpdateUserInfo(new_im_via_email,mDirectoryVisibility);
 		}
 	}
 
@@ -1373,12 +1376,12 @@ void LLFloaterPreference::onBtnCancel(const LLSD& userdata)
 }
 
 // static 
-void LLFloaterPreference::updateUserInfo(const std::string& visibility)
+void LLFloaterPreference::updateUserInfo(const std::string& visibility, bool im_via_email, bool is_verified_email, const std::string& email)
 {
 	LLFloaterPreference* instance = LLFloaterReg::findTypedInstance<LLFloaterPreference>("preferences");
 	if (instance)
 	{
-        instance->setPersonalInfo(visibility);
+        instance->setPersonalInfo(visibility, im_via_email, is_verified_email, email);
 	}
 }
 
@@ -2119,9 +2122,10 @@ bool LLFloaterPreference::moveTranscriptsAndLog()
 	return true;
 }
 
-void LLFloaterPreference::setPersonalInfo(const std::string& visibility)
+void LLFloaterPreference::setPersonalInfo(const std::string& visibility, bool im_via_email, bool is_verified_email, const std::string& email)
 {
 	mGotPersonalInfo = true;
+	mOriginalIMViaEmail = im_via_email;
 	mDirectoryVisibility = visibility;
 	
 	if (visibility == VISIBILITY_DEFAULT)
@@ -2143,11 +2147,37 @@ void LLFloaterPreference::setPersonalInfo(const std::string& visibility)
 	getChildView("friends_online_notify_checkbox")->setEnabled(TRUE);
 	getChild<LLUICtrl>("online_visibility")->setValue(mOriginalHideOnlineStatus); 	 
 	getChild<LLUICtrl>("online_visibility")->setLabelArg("[DIR_VIS]", mDirectoryVisibility);
-
 	getChildView("favorites_on_login_check")->setEnabled(TRUE);
 	getChildView("log_path_button")->setEnabled(TRUE);
 	getChildView("chat_font_size")->setEnabled(TRUE);
 	getChildView("conversation_log_combo")->setEnabled(TRUE);
+	if (LLGridManager::instance().isInSecondlife())
+	{
+		childSetEnabled("email_settings", true);
+		childSetVisible("email_settings", true);
+	}
+	else
+	{
+		std::string display_email(email);
+		if (display_email.size() > 30)
+		{
+			display_email.resize(30);
+			display_email += "...";
+		}
+
+		LLCheckBoxCtrl* send_im_to_email = getChild<LLCheckBoxCtrl>("send_im_to_email");
+		send_im_to_email->setVisible(TRUE);
+		send_im_to_email->setEnabled(is_verified_email);
+		send_im_to_email->setValue(im_via_email);
+		send_im_to_email->setLabelArg("[EMAIL]", display_email);
+		
+	    std::string tooltip;
+	    if (!is_verified_email)
+	        tooltip = getString("email_unverified_tooltip");
+
+		send_im_to_email->setToolTip(tooltip);
+	}
+
 	getChild<LLUICtrl>("voice_call_friends_only_check")->setEnabled(TRUE);
 	getChild<LLUICtrl>("voice_call_friends_only_check")->setValue(gSavedPerAccountSettings.getBOOL("VoiceCallsFriendsOnly"));
 	getChild<LLUICtrl>("conferences_friends_only_check")->setEnabled(TRUE);

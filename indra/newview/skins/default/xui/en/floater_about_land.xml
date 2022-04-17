@@ -1239,6 +1239,41 @@ Only large parcels can be listed in search.
            height="16"
            layout="topleft"
            left="20"
+           name="allow_label1"
+           width="150">
+            Edit Terrain:
+          </text>
+
+          <check_box
+             height="16"
+             label="Everyone"
+             layout="topleft"
+             name="edit land check"
+             tool_tip="If checked, anyone can terraform your land. It is best to leave this unchecked, as you can always edit your own land."
+             left_pad="2"
+             width="130" />
+			 
+  	     <text
+          font="SansSerifSmall"
+          type="string"
+          text_color="White_50"
+          length="1"
+          follows="left|top"
+          height="16"
+          layout="topleft"
+          left_pad="-55"
+          name="caution_text"
+          width="200">
+           (Use with caution!)
+         </text>
+		 
+          <text
+           type="string"
+           length="1"
+           follows="left|top"
+           height="16"
+           layout="topleft"
+           left="20"
            name="allow_label0"
            width="150">
             Fly:

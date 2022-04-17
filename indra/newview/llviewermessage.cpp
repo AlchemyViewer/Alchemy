@@ -6932,12 +6932,16 @@ void process_user_info_reply(LLMessageSystem* msg, void**)
 				<< "wrong agent id." << LL_ENDL;
 	}
 	
+	BOOL im_via_email = FALSE;
+	if (!LLGridManager::instance().isInSecondlife())
+		msg->getBOOLFast(_PREHASH_UserData, _PREHASH_IMViaEMail, im_via_email);
 	std::string email;
 	msg->getStringFast(_PREHASH_UserData, _PREHASH_EMail, email);
 	std::string dir_visibility;
 	msg->getStringFast(_PREHASH_UserData, _PREHASH_DirectoryVisibility, dir_visibility);
 
-	LLFloaterPreference::updateUserInfo(dir_visibility);   
+    // For Message based user info information the is_verified is assumed to be false.
+	LLFloaterPreference::updateUserInfo(dir_visibility, im_via_email, false, email);   
 	LLFloaterSnapshot::setAgentEmail(email);
 }
 
