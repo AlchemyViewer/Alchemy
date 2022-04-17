@@ -161,6 +161,9 @@ protected:
 	static BOOL			parseSkeletonFile(const std::string& filename, LLXmlTree& skeleton_xml_tree);
 	virtual void		buildCharacter();
 	virtual BOOL		loadAvatar();
+// [RLVa:KB] - Checked: 2013-03-03 (RLVa-1.4.8)
+	virtual F32			getAvatarOffset() /*const*/;
+// [/RLVa:KB]
 	virtual void		bodySizeChanged() = 0;
 
 	BOOL				setupBone(const LLAvatarBoneInfo* info, LLJoint* parent, S32 &current_volume_num, S32 &current_joint_num);

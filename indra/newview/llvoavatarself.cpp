@@ -3151,6 +3151,13 @@ void LLVOAvatarSelf::setHoverOffset(const LLVector3& hover_offset, bool send_upd
 	}
 }
 
+// [RLVa:KB] - Checked: 2013-03-03 (RLVa-1.4.8)
+F32 LLVOAvatarSelf::getAvatarOffset() /*const*/
+{
+	return (isUsingServerBakes()) ? LLAvatarAppearance::getAvatarOffset() : gSavedPerAccountSettings.getF32("AvatarHoverOffsetZ");
+}
+// [/RLVa:KB]
+
 //------------------------------------------------------------------------
 // needsRenderBeam()
 //------------------------------------------------------------------------

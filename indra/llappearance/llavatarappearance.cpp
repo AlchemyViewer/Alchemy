@@ -529,7 +529,10 @@ void LLAvatarAppearance::computeBodySize()
 
 	F32 old_offset = mAvatarOffset.mV[VZ];
 
-	mAvatarOffset.mV[VZ] = getVisualParamWeight(AVATAR_HOVER);
+// [RLVa:KB] - Checked: 2013-03-03 (RLVa-1.4.8)
+	mAvatarOffset.mV[VZ] = getAvatarOffset();
+// [/RLVa:KB]
+//	mAvatarOffset.mV[VZ] = getVisualParamWeight(AVATAR_HOVER);
 
 	mPelvisToFoot = hip.mV[VZ] * pelvis_scale.mV[VZ] -
 				 	knee.mV[VZ] * hip_scale.mV[VZ] -
@@ -556,13 +559,20 @@ void LLAvatarAppearance::computeBodySize()
 	if (new_body_size != mBodySize || old_offset != mAvatarOffset.mV[VZ])
 	{
 		mBodySize = new_body_size;
+		bodySizeChanged();
 
 #ifdef SHOW_DEBUG
         compareJointStateMaps(mLastBodySizeState, mCurrBodySizeState);
 #endif
-		bodySizeChanged();
 	}
 }
+
+// [RLVa:KB] - Checked: 2013-03-03 (RLVa-1.4.8)
+F32 LLAvatarAppearance::getAvatarOffset() /*const*/
+{
+	return getVisualParamWeight(AVATAR_HOVER);
+}
+// [/RLVa:KB]
 
 //-----------------------------------------------------------------------------
 // parseSkeletonFile()

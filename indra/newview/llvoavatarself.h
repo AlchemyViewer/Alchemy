@@ -347,6 +347,11 @@ public:
 private:
 	mutable LLVector3 mLastHoverOffsetSent;
 
+// [RLVa:KB] - Checked: 2013-03-03 (RLVa-1.4.8)
+protected:
+	/*virtual*/ F32	getAvatarOffset() /*const*/ override;
+// [/RLVa:KB]
+
 /**                    Appearance
  **                                                                            **
  *******************************************************************************/
