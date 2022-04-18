@@ -153,22 +153,22 @@ void LLAttachmentsMgr::onIdle()
 		return;
 	}
 
-    if (LLApp::isExiting())
-    {
-        return;
-    }
+	if (LLApp::isExiting())
+	{
+		return;
+	}
 
 	requestPendingAttachments();
 
-    linkRecentlyArrivedAttachments();
+	linkRecentlyArrivedAttachments();
 
-    expireOldAttachmentRequests();
+	expireOldAttachmentRequests();
 
-    expireOldDetachRequests();
+	expireOldDetachRequests();
 
 //    checkInvalidCOFLinks();
-    
-    spamStatusInfo();
+	
+	spamStatusInfo();
 }
 
 void LLAttachmentsMgr::requestPendingAttachments()
@@ -572,6 +572,10 @@ bool LLAttachmentsMgr::isAttachmentStateComplete() const
 //
 //void LLAttachmentsMgr::checkInvalidCOFLinks()
 //{
+//	if (!gInventory.isInventoryUsable())
+//	{
+//		return;
+//	}
 //        LLInventoryModel::cat_array_t cat_array;
 //        LLInventoryModel::item_array_t item_array;
 //        gInventory.collectDescendents(LLAppearanceMgr::instance().getCOF(),

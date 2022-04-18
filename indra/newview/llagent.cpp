@@ -2094,8 +2094,8 @@ void LLAgent::propagate(const F32 dt)
 //-----------------------------------------------------------------------------
 void LLAgent::updateAgentPosition(const F32 dt, const F32 yaw_radians, const S32 mouse_x, const S32 mouse_y)
 {
-	static const LLCachedControl<F32> not_moving_hint_timeout(gSavedSettings, "NotMovingHintTimeout");
-	if (mMoveTimer.getStarted() && mMoveTimer.getElapsedTimeF32() > not_moving_hint_timeout)
+    static const LLCachedControl<F32> hint_timeout(gSavedSettings, "NotMovingHintTimeout");
+	if (mMoveTimer.getStarted() && mMoveTimer.getElapsedTimeF32() > hint_timeout)
 	{
 		LLFirstUse::notMoving();
 	}
@@ -2279,7 +2279,8 @@ void LLAgent::endAnimationUpdateUI()
 		LLNavigationBar::getInstance()->setVisible(TRUE && gSavedSettings.getBOOL("ShowNavbarNavigationPanel"));
 		gStatusBar->setVisibleForMouselook(true);
 
-		if (gSavedSettings.getBOOL("ShowMiniLocationPanel"))
+        static LLCachedControl<bool> show_mini_location_panel(gSavedSettings, "ShowMiniLocationPanel");
+		if (show_mini_location_panel)
 		{
 			LLPanelTopInfoBar::getInstance()->setVisible(TRUE);
 		}
@@ -4170,25 +4171,11 @@ bool LLAgent::teleportCore(bool is_local)
 	// yet if the teleport will succeed.  Look in 
 	// process_teleport_location_reply
 
-	// close the map panel so we can see our destination.
-	// we don't close search floater, see EXT-5840.
-	LLFloaterReg::hideInstance("world_map");
-
 	// hide land floater too - it'll be out of date
 	LLFloaterReg::hideInstance("about_land");
 
 	// hide the Region/Estate floater
 	LLFloaterReg::hideInstance("region_info");
-
-	// minimize the Search floater (STORM-1474)
-	{
-		LLFloater* instance = LLFloaterReg::getInstance("search");
-
-		if (instance && instance->getVisible())
-		{
-			instance->setMinimized(TRUE);
-		}
-	}
 
 	LLViewerParcelMgr::getInstance()->deselectLand();
 	LLViewerMediaFocus::getInstance()->clearFocus();

@@ -1795,6 +1795,7 @@ void LLPanelObjectInventory::createViewsForCategory(LLInventoryObject::object_li
 							   child_categories[i]->second );
 		delete child_categories[i];
 	}
+    folder->setChildrenInited(true);
 }
 
 void LLPanelObjectInventory::refresh()

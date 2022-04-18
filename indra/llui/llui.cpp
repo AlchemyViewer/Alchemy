@@ -181,6 +181,7 @@ mHelpImpl(NULL)
 	reg.add("Floater.Toggle", [](LLUICtrl* ctrl, const LLSD& param) -> void { LLFloaterReg::toggleInstance(param.asStringRef()); });
 	reg.add("Floater.ToggleOrBringToFront", [](LLUICtrl* ctrl, const LLSD& param) -> void { LLFloaterReg::toggleInstanceOrBringToFront(param.asStringRef()); });
 	reg.add("Floater.Show", [](LLUICtrl* ctrl, const LLSD& param) -> void { LLFloaterReg::showInstance(param.asStringRef(), LLSD(), FALSE); });
+	reg.add("Floater.ShowOrBringToFront", [](LLUICtrl* ctrl, const LLSD& param) -> void { LLFloaterReg::showInstanceOrBringToFront(param.asStringRef(), LLSD()); });
 	reg.add("Floater.Hide", [](LLUICtrl* ctrl, const LLSD& param) -> void { LLFloaterReg::hideInstance(param.asStringRef()); });
 	
 	// Button initialization callback for toggle buttons

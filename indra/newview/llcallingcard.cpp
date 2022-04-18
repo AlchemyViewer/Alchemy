@@ -647,7 +647,7 @@ void LLAvatarTracker::processChange(LLMessageSystem* msg)
 			if(mBuddyInfo.find(agent_id) != mBuddyInfo.end())
 			{
 				S32 change = buddy_it->second->getRightsGrantedFrom() ^ new_rights;
-				if (change)
+				if (change && !gAgent.isDoNotDisturb())
 				{
 					LLSD args = LLSD().with("NAME", LLSLURL("agent", agent_id, "displayname").getSLURLString());
 					LLSD payload = LLSD().with("from_id", agent_id);

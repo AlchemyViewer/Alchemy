@@ -224,18 +224,6 @@ LLOSInfo::LLOSInfo() :
 		GetSystemInfo(&si); //if it fails get regular system info 
 	//(Warning: If GetSystemInfo it may result in incorrect information in a WOW64 machine, if the kernel fails to load)
 
-	//msdn microsoft finds 32 bit and 64 bit flavors this way..
-	//http://msdn.microsoft.com/en-us/library/ms724429(VS.85).aspx (example code that contains quite a few more flavors
-	//of windows than this code does (in case it is needed for the future)
-	if (si.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_AMD64) //check for 64 bit
-	{
-		mOSStringSimple += "64-bit ";
-	}
-	else if (si.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_INTEL)
-	{
-		mOSStringSimple += "32-bit ";
-	}
-
 	// Try calling GetVersionEx using the OSVERSIONINFOEX structure.
 	OSVERSIONINFOEX osvi;
 	ZeroMemory(&osvi, sizeof(OSVERSIONINFOEX));
@@ -269,7 +257,19 @@ LLOSInfo::LLOSInfo() :
 				ubr = data;
 			}
 		}
-	}
+    }
+
+    //msdn microsoft finds 32 bit and 64 bit flavors this way..
+    //http://msdn.microsoft.com/en-us/library/ms724429(VS.85).aspx (example code that contains quite a few more flavors
+    //of windows than this code does (in case it is needed for the future)
+    if (si.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_AMD64) //check for 64 bit
+    {
+        mOSStringSimple += "64-bit ";
+    }
+    else if (si.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_INTEL)
+    {
+        mOSStringSimple += "32-bit ";
+    }
 
 	mOSString = mOSStringSimple;
 	if (mBuild > 0)
@@ -1260,7 +1260,7 @@ BOOL gunzip_file(const std::string& srcfile, const std::string& dstfile)
 	std::wstring utf16filename = ll_convert_string_to_wide(srcfile);
 	src = gzopen_w(utf16filename.c_str(), "rb");
 #else
-	src = gzopen(srcfile.c_str(), "rb");/* Flawfinder: ignore */
+	src = gzopen(srcfile.c_str(), "rb");
 #endif
 	
 	if (! src) goto err;
@@ -1301,7 +1301,7 @@ BOOL gzip_file(const std::string& srcfile, const std::string& dstfile)
 	std::wstring utf16filename = ll_convert_string_to_wide(tmpfile);
 	dst = gzopen_w(utf16filename.c_str(), "wb");
 #else
-	dst = gzopen(tmpfile.c_str(), "wb");/* Flawfinder: ignore */
+	dst = gzopen(tmpfile.c_str(), "wb");
 #endif
 	
 	if (! dst) goto err;

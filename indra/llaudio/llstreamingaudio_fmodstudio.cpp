@@ -423,14 +423,14 @@ void LLStreamingAudio_FMODSTUDIO::stop()
 
 	if (mCurrentInternetStreamp)
 	{
-		LL_INFOS() << "Stopping internet stream: " << mCurrentInternetStreamp->getURL() << LL_ENDL;
+        LL_INFOS("FMOD") << "Stopping internet stream: " << mCurrentInternetStreamp->getURL() << LL_ENDL;
 		if (mCurrentInternetStreamp->stopStream())
 		{
 			delete mCurrentInternetStreamp;
 		}
 		else
 		{
-			LL_WARNS() << "Pushing stream to dead list: " << mCurrentInternetStreamp->getURL() << LL_ENDL;
+            LL_WARNS("FMOD") << "Pushing stream to dead list: " << mCurrentInternetStreamp->getURL() << LL_ENDL;
 			mDeadStreams.push_back(mCurrentInternetStreamp);
 		}
 		mCurrentInternetStreamp = nullptr;
@@ -448,6 +448,7 @@ void LLStreamingAudio_FMODSTUDIO::pause(S32 pauseopt)
 	{
 		if (mCurrentInternetStreamp)
 		{
+            LL_INFOS("FMOD") << "Pausing internet stream" << LL_ENDL;
 			stop();
 		}
 	}
@@ -558,7 +559,7 @@ LLAudioStreamManagerFMODSTUDIO::LLAudioStreamManagerFMODSTUDIO(FMOD::System *sys
 
 	if (result!= FMOD_OK)
 	{
-		LL_WARNS() << "Couldn't open fmod stream, error "
+        LL_WARNS("FMOD") << "Couldn't open fmod stream, error "
 			<< FMOD_ErrorString(result)
 			<< LL_ENDL;
 		mReady = false;
@@ -574,7 +575,7 @@ FMOD::Channel *LLAudioStreamManagerFMODSTUDIO::startStream()
 	FMOD_OPENSTATE open_state;
 	if (getOpenState(open_state) != FMOD_OK || open_state != FMOD_OPENSTATE_READY)
 	{
-		LL_WARNS() << "No internet stream to start playing!" << LL_ENDL;
+        LL_WARNS("FMOD") << "No internet stream to start playing!" << LL_ENDL;
 		return nullptr;
 	}
 

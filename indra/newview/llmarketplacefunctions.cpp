@@ -1017,6 +1017,12 @@ void LLMarketplaceData::createSLMListingCoro(LLUUID folderId, LLUUID versionId, 
     
     log_SLM_infos("Post /listings", status.getType(), result);
 
+    if (!result.has("listings") || !result["listings"].isArray() || result["listings"].size() == 0)
+    {
+        LL_INFOS("SLM") << "Received an empty response for folder " << folderId << LL_ENDL;
+        return;
+    }
+
     // Extract the info from the results
     for (const LLSD& listing : result["listings"].array())
     {
@@ -1080,6 +1086,19 @@ void LLMarketplaceData::updateSLMListingCoro(LLUUID folderId, S32 listingId, LLU
     }
 
     log_SLM_infos("Put /listing", status.getType(), result);
+
+    if (!result.has("listings") || !result["listings"].isArray() || result["listings"].size() == 0)
+    {
+        LL_INFOS("SLM") << "Received an empty response for listing " << listingId << " folder " << folderId << LL_ENDL;
+        // Try to get listing more directly after a delay
+        const float FORCE_UPDATE_TIMEOUT = 5.0;
+        llcoro::suspendUntilTimeout(FORCE_UPDATE_TIMEOUT);
+        if (!LLApp::isExiting() && LLMarketplaceData::instanceExists())
+        {
+            getSLMListing(listingId);
+        }
+        return;
+    }
 
     // Extract the info from the Json string
     for (const LLSD& listing : result["listings"].array())

@@ -452,7 +452,7 @@ class LLManifest(object, metaclass=LLManifestRegistry):
             # if we restore the length of each stack to what it was before the
             # current prefix() block, it doesn't matter whether end_prefix()
             # was called or not.
-            for stack, prevlen in self.prevlen.items():
+            for stack, prevlen in list(self.prevlen.items()):
                 # find the attribute in 'self.manifest' named by 'stack', and
                 # truncate that list back to 'prevlen'
                 del getattr(self.manifest, stack)[prevlen:]
@@ -618,7 +618,7 @@ class LLManifest(object, metaclass=LLManifestRegistry):
                 organize[frozenset(missingfile.tried)].add(missingfile.pattern)
             # Now dump all the patterns sought in each group of 'tried'
             # directories.
-            for tried, patterns in organize.items():
+            for tried, patterns in list(organize.items()):
                 print("  Could not find in:")
                 for dir in sorted(tried):
                     print("    %s" % dir)
@@ -869,7 +869,7 @@ class LLManifest(object, metaclass=LLManifestRegistry):
                 break
         else:
             # no more prefixes left to try
-            print("\nunable to find '%s'; looked in:\n  %s" % (src, '\n  '.join(try_prefixes)))
+            print(("\nunable to find '%s'; looked in:\n  %s" % (src, '\n  '.join(try_prefixes))))
             if err_if_missing == True:
                 self.missing.append(MissingFile(pattern=src, tried=try_prefixes))
             # At this point 'count' might never have been successfully

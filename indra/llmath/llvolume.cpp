@@ -2423,7 +2423,14 @@ bool LLVolume::unpackVolumeFacesInternal(const LLSD& mdl)
 			
 
 			//copy out indices
-			face.resizeIndices(idx.size()/2);
+            S32 num_indices = idx.size() / 2;
+            face.resizeIndices(num_indices);
+
+            if (num_indices > 2 && !face.mIndices)
+            {
+                LL_WARNS() << "Failed to allocate " << num_indices << " indices for face index: " << i << " Total: " << face_count << LL_ENDL;
+                continue;
+            }
 			
 			if (idx.empty() || face.mNumIndices < 3)
 			{ //why is there an empty index list?
@@ -2441,6 +2448,13 @@ bool LLVolume::unpackVolumeFacesInternal(const LLSD& mdl)
 			//copy out vertices
 			U32 num_verts = pos.size()/(3*2);
 			face.resizeVertices(num_verts);
+
+            if (num_verts > 0 && !face.mPositions)
+            {
+                LL_WARNS() << "Failed to allocate " << num_verts << " vertices for face index: " << i << " Total: " << face_count << LL_ENDL;
+                face.resizeIndices(0);
+                continue;
+            }
 
 			LLVector3 minp;
 			LLVector3 maxp;
@@ -2543,6 +2557,13 @@ bool LLVolume::unpackVolumeFacesInternal(const LLSD& mdl)
 			if (mdl[i].has("Weights"))
 			{
 				face.allocateWeights(num_verts);
+                if (!face.mWeights && num_verts)
+                {
+                    LL_WARNS() << "Failed to allocate " << num_verts << " weights for face index: " << i << " Total: " << face_count << LL_ENDL;
+                    face.resizeIndices(0);
+                    face.resizeVertices(0);
+                    continue;
+                }
 
 				LLSD::Binary weights = mdl[i]["Weights"];
 
@@ -5588,7 +5609,16 @@ BOOL LLVolumeFace::createUnCutCubeCap(LLVolume* volume, BOOL partial_build)
 		resizeIndices(grid_size*grid_size*6);
 		if (!volume->isMeshAssetLoaded())
 		{
-			mEdge.resize(grid_size*grid_size * 6);
+            S32 size = grid_size * grid_size * 6;
+            try
+            {
+                mEdge.resize(size);
+            }
+            catch (std::bad_alloc&)
+            {
+                LL_WARNS("LLVOLUME") << "Resize of mEdge to " << size << " failed" << LL_ENDL;
+                return false;
+            }
 		}
 
 		U16* out = mIndices;
@@ -6190,7 +6220,16 @@ bool LLVolumeFace::resizeVertices(S32 num_verts)
 		return false;
 	}
 
-	mNumVertices = num_verts;
+
+    if (mPositions)
+    {
+        mNumVertices = num_verts;
+    }
+    else
+    {
+        // Either num_verts is zero or allocation failure
+        mNumVertices = 0;
+    }
 
     // Force update
     mJointRiggingInfoTab.clear();
@@ -6337,7 +6376,15 @@ bool LLVolumeFace::allocateIndices(S32 num_indices, bool copy)
 		}
 	}
 
-	mNumIndices = num_indices;
+    if (mIndices)
+    {
+        mNumIndices = num_indices;
+    }
+	else
+    {
+        // Either num_indices is zero or allocation failure
+        mNumIndices = 0;
+    }
 	return true;
 }
 
@@ -6405,7 +6452,15 @@ BOOL LLVolumeFace::createSide(LLVolume* volume, BOOL partial_build)
 
 		if (!volume->isMeshAssetLoaded())
 		{
-			mEdge.resize(num_indices);
+            try
+            {
+                mEdge.resize(num_indices);
+            }
+            catch (std::bad_alloc&)
+            {
+                LL_WARNS("LLVOLUME") << "Resize of mEdge to " << num_indices << " failed" << LL_ENDL;
+                return false;
+            }
 		}
 	}
 
@@ -6633,7 +6688,15 @@ BOOL LLVolumeFace::createSide(LLVolume* volume, BOOL partial_build)
 	LLVector4a* norm = mNormals;
 
 	static LLAlignedArray<LLVector4a, 64> triangle_normals;
-	triangle_normals.resize(count);
+    try
+    {
+        triangle_normals.resize(count);
+    }
+    catch (std::bad_alloc&)
+    {
+        LL_WARNS("LLVOLUME") << "Resize of triangle_normals to " << count << " failed" << LL_ENDL;
+        return false;
+    }
 	LLVector4a* output = triangle_normals.mArray;
 	LLVector4a* end_output = output+count;
 

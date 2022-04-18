@@ -1870,7 +1870,6 @@ namespace tut
 
         python("write Python notation",
                placeholders::arg1 <<
-               "from __future__ import with_statement\n" <<
                import_llsd <<
                "DATA = [\n"
                "    17,\n"

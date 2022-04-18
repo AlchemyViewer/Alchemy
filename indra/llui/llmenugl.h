@@ -872,6 +872,8 @@ public:
 	virtual BOOL handleKeyHere(KEY key, MASK mask);
 	virtual void translate(S32 x, S32 y);
 
+	void updateSize();
+
 private:
 	LLTearOffMenu(LLMenuGL* menup);
 	
@@ -879,7 +881,8 @@ private:
 	
 	LLView*		mOldParent;
 	LLMenuGL*	mMenu;
-	F32			mTargetHeight;
+	S32			mTargetHeight;
+    bool        mQuitRequested;
 };
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

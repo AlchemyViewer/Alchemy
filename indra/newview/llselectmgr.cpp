@@ -1380,7 +1380,6 @@ void LLSelectMgr::getGrid(LLVector3& origin, LLQuaternion &rotation, LLVector3 &
 		case SELECT_TYPE_WORLD:
 			mGridScale = LLVector3(1.f, 1.f, 1.f) * ALControlCache::GridResolution;
 			break;
-
 		}
 	}
 	llassert(mGridOrigin.isFinite());

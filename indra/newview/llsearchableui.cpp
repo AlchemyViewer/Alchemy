@@ -127,8 +127,11 @@ void ll::statusbar::SearchableItem::setNotHighlighted( )
 	{
 		mCtrl->setHighlighted( false );
 
-		if( mWasHiddenBySearch )
-			mMenu->setVisible( TRUE );
+        if (mWasHiddenBySearch)
+        {
+            mMenu->setVisible(TRUE);
+            mWasHiddenBySearch = false;
+        }
 	}
 }
 

@@ -186,7 +186,6 @@ LLMetricPerformanceTesterBasic::LLMetricPerformanceTesterBasic(std::string name)
 void LLMetricPerformanceTesterBasic::preOutputTestResults(LLSD* sd)
 {
 	incrementCurrentCount() ;
-	(*sd)[getCurrentLabelName()]["Name"] = mName ;
 }
 
 void LLMetricPerformanceTesterBasic::postOutputTestResults(LLSD* sd)

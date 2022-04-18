@@ -29,6 +29,8 @@ $/LicenseInfo$
 
 from io import open
 import errno
+import glob
+import itertools
 import json
 import os
 import os.path
@@ -267,13 +269,13 @@ class ViewerManifest(LLManifest):
         return "icons/" + self.channel_type()
 
     def extract_names(self,src):
+        """Extract contributor names from source file, returns string"""
         try:
-            contrib_file = open(src, 'r', encoding='utf-8')
+            with open(src, 'r', encoding='utf-8') as contrib_file: 
+                lines = contrib_file.readlines()
         except IOError:
             print("Failed to open '%s'" % src)
             raise
-        lines = contrib_file.readlines()
-        contrib_file.close()
 
         # All lines up to and including the first blank line are the file header; skip them
         lines.reverse() # so that pop will pull from first to last line
@@ -652,7 +654,7 @@ class WindowsManifest(ViewerManifest):
         result = ""
         dest_files = [pair[1] for pair in self.file_list if pair[0] and os.path.isfile(pair[1])]
         # sort deepest hierarchy first
-        dest_files.sort(key=lambda path: (path.count(os.path.sep), path), reverse=True)
+        dest_files.sort(key=lambda f: (f.count(os.path.sep), f), reverse=True)
         out_path = None
         for pkg_file in dest_files:
             rel_file = os.path.normpath(pkg_file.replace(self.get_dst_prefix()+os.path.sep,''))
@@ -675,7 +677,7 @@ class WindowsManifest(ViewerManifest):
             for d in deleted_file_dirs:
                 deleted_dirs.extend(path_ancestors(d))
             # sort deepest hierarchy first
-            deleted_dirs.sort(key=lambda path: (path.count(os.path.sep), path), reverse=True)
+            deleted_dirs.sort(key=lambda f: (f.count(os.path.sep), f), reverse=True)
             prev = None
             for d in deleted_dirs:
                 if d != prev:   # skip duplicates
@@ -1289,9 +1291,9 @@ class Linux_x86_64_Manifest(LinuxManifest):
 if __name__ == "__main__":
     # Report our own command line so that, in case of trouble, a developer can
     # manually rerun the same command.
-    print('%s \\\n%s' %
+    print(('%s \\\n%s' %
           (sys.executable,
-           ' '.join((("'%s'" % arg) if ' ' in arg else arg) for arg in sys.argv)))
+           ' '.join((("'%s'" % arg) if ' ' in arg else arg) for arg in sys.argv))))
     # fmodstudio and openal can be used simultaneously and controled by environment
     extra_arguments = [
         dict(name='sentry', description="""Enable Sentry crash report system""", default=''),

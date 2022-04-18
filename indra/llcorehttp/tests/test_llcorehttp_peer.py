@@ -37,6 +37,7 @@ import getopt
 from io import StringIO
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
+
 from llbase.fastest_elementtree import parse as xml_parse
 from llbase import llsd
 
@@ -94,13 +95,13 @@ class TestHTTPRequestHandler(BaseHTTPRequestHandler):
         except (KeyError, ValueError):
             return ""
         max_chunk_size = 10*1024*1024
-        L = []
+        L = bytes()
         while size_remaining:
             chunk_size = min(size_remaining, max_chunk_size)
             chunk = self.rfile.read(chunk_size)
-            L.append(chunk.decode('utf-8'))
+            L += chunk
             size_remaining -= len(chunk)
-        return (''.join(L)).encode('utf-8')
+        return L.decode("utf-8")
         # end of swiped read() logic
 
     def read_xml(self):
@@ -218,7 +219,7 @@ class TestHTTPRequestHandler(BaseHTTPRequestHandler):
             self.send_header("Content-type", "text/plain")
             self.end_headers()
             if body:
-                self.wfile.write(body.encode('utf-8'))
+                self.wfile.write(body.encode("utf-8"))
         elif "fail" not in self.path:
             data = data.copy()          # we're going to modify
             # Ensure there's a "reply" key in data, even if there wasn't before
@@ -252,9 +253,9 @@ class TestHTTPRequestHandler(BaseHTTPRequestHandler):
             self.end_headers()
 
     def reflect_headers(self):
-        for name in list(self.headers.keys()):
-            # print("Header:  %s: %s" % (name, self.headers[name]))
-            self.send_header("X-Reflect-" + name, str(self.headers[name]))
+        for (name, val) in self.headers.items():
+            # print("Header: %s %s" % (name, val), file=sys.stderr)
+            self.send_header("X-Reflect-" + name, val)
 
     if not VERBOSE:
         # When VERBOSE is set, skip both these overrides because they exist to
@@ -281,9 +282,9 @@ class Server(HTTPServer):
     # a failure status.
     def handle_error(self, request, client_address):
         print('-'*40)
-        print('Ignoring exception during processing of request from', end=' ')
-        print(client_address)
+        print('Ignoring exception during processing of request from %' % (client_address))
         print('-'*40)
+
 
 if __name__ == "__main__":
     do_valgrind = False
