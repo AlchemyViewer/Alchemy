@@ -2160,6 +2160,9 @@ void LLFloaterPreference::setPersonalInfo(const std::string& visibility, bool im
 	}
 	else
 	{
+		childSetEnabled("email_settings", false);
+		childSetVisible("email_settings", false);
+
 		std::string display_email(email);
 		if (display_email.size() > 30)
 		{
