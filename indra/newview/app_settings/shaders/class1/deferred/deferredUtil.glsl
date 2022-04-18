@@ -39,8 +39,6 @@ vec2 getScreenCoordinate(vec2 screenpos)
     return sc - vec2(1.0, 1.0);
 }
 
-vec3 decode_normal(vec2 enc)
-
 vec3 decode_normal(vec2 f)
 {
     f = f * 2.0 - 1.0;
