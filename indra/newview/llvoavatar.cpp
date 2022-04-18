@@ -3191,10 +3191,10 @@ void LLVOAvatar::idleUpdateNameTag(const LLVector3& root_pos_last)
 		fRlvShowAvName = (fRlvShowAvTag) && (RlvActions::canShowName(RlvActions::SNC_DEFAULT, getID()));
 	}
 // [/RLVa:KB]
-	BOOL visible_avatar = isVisible() || mNeedsAnimUpdate;
+	bool visible_avatar = isVisible() || mNeedsAnimUpdate;
 	static const LLCachedControl<bool> use_chat_bubble(gSavedSettings, "UseChatBubbles");
-	BOOL visible_chat = use_chat_bubble && (mChats.size() || mTyping);
-	BOOL render_name =	visible_chat ||
+	bool visible_chat = use_chat_bubble && (mChats.size() || mTyping);
+	bool render_name =	visible_chat ||
 		                (visible_avatar &&
 // [RLVa:KB] - Checked: RLVa-2.0.1
 						(fRlvShowAvTag) &&
@@ -6140,8 +6140,7 @@ BOOL LLVOAvatar::processSingleAnimationStateChange( const LLUUID& anim_id, BOOL 
 					//else
 					{
                         static LLCachedControl<std::string> ui_snd_string(gSavedSettings, "UISndTyping");
-						LLUUID sound_id = LLUUID(ui_snd_string);
-						gAudiop->triggerSound(sound_id, getID(), 1.0f, LLAudioEngine::AUDIO_TYPE_SFX, char_pos_global);
+						gAudiop->triggerSound(LLUUID(ui_snd_string()), getID(), 1.0f, LLAudioEngine::AUDIO_TYPE_SFX, char_pos_global);
 					}
 				}
 			}

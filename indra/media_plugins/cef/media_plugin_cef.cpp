@@ -89,9 +89,6 @@ private:
 	bool mCookiesEnabled;
 	bool mPluginsEnabled;
 	bool mJavascriptEnabled;
-    bool mProxyEnabled;
-    std::string mProxyHost;
-    int mProxyPort;
 	bool mDisableGPU;
 	bool mDisableNetworkService;
 	bool mUseMockKeyChain;
@@ -664,13 +661,13 @@ void MediaPluginCEF::receiveMessage(const char* message_string)
                 settings.context_cache_path = mContextCachePath;
                 settings.cookies_enabled = mCookiesEnabled;
 
-                // configure proxy argument if enabled and valid
-                if (mProxyEnabled && mProxyHost.length())
-                {
-                    std::ostringstream proxy_url;
-                    proxy_url << mProxyHost << ":" << mProxyPort;
-                    settings.proxy_host_port = proxy_url.str();
-                }
+                //// configure proxy argument if enabled and valid
+                //if (mProxyEnabled && mProxyHost.length())
+                //{
+                //    std::ostringstream proxy_url;
+                //    proxy_url << mProxyHost << ":" << mProxyPort;
+                //    settings.proxy_host_port = proxy_url.str();
+                //}
 				settings.disable_gpu = mDisableGPU;
 #if LL_DARWIN
 				settings.disable_network_service = mDisableNetworkService;
