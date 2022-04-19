@@ -3111,7 +3111,7 @@ void LLViewerObject::updateControlAvatar()
 			LLViewerObject::const_child_list_t& child_list = root->getChildren();
 			for (const LLViewerObject* child : child_list)
 			{
-				any_rigged_mesh = any_rigged_mesh || child->isRiggedMesh();
+				any_rigged_mesh = child->isRiggedMesh();
 				if (any_rigged_mesh)
 					break;
 			}
@@ -4207,6 +4207,11 @@ LLNameValue *LLViewerObject::getNVPair(const std::string& name) const
 	char		*canonical_name;
 
 	canonical_name = gNVNameTable.addString(name);
+	// It's possible for addString to return NULL.
+	if (canonical_name == NULL)
+	{
+		return NULL;
+	}
 
 	// If you access a map with a name that isn't in it, it will add the name and a null pointer.
 	// So first check if the data is in the map.
@@ -4788,6 +4793,9 @@ void LLViewerObject::sendMaterialUpdate() const
 //formerly send_object_shape(LLViewerObject *object)
 void LLViewerObject::sendShapeUpdate()
 {
+	LLViewerRegion* regionp = getRegion();
+	if(!regionp) return;
+
 	gMessageSystem->newMessageFast(_PREHASH_ObjectShape);
 	gMessageSystem->nextBlockFast(_PREHASH_AgentData);
 	gMessageSystem->addUUIDFast(_PREHASH_AgentID, gAgent.getID() );
@@ -4797,13 +4805,15 @@ void LLViewerObject::sendShapeUpdate()
 
 	LLVolumeMessage::packVolumeParams(&getVolume()->getParams(), gMessageSystem);
 
-	LLViewerRegion *regionp = getRegion();
 	gMessageSystem->sendReliable( regionp->getHost() );
 }
 
 
 void LLViewerObject::sendTEUpdate() const
 {
+	LLViewerRegion* regionp = getRegion();
+	if(!regionp) return;
+
 	LLMessageSystem* msg = gMessageSystem;
 	msg->newMessageFast(_PREHASH_ObjectImage);
 
@@ -4826,7 +4836,6 @@ void LLViewerObject::sendTEUpdate() const
 
 	packTEMessage(msg);
 
-	LLViewerRegion *regionp = getRegion();
 	msg->sendReliable( regionp->getHost() );
 }
 
