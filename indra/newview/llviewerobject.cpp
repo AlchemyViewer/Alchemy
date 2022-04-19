@@ -4954,12 +4954,11 @@ void LLViewerObject::setTEImage(const U8 te, LLViewerTexture *imagep)
 
 S32 LLViewerObject::setTETextureCore(const U8 te, LLViewerTexture *image)
 {
-	if (!image)
-		return 0;
-	LLUUID old_image_id = getTE(te)->getID();
+	LLTextureEntry* tep = getTE(te);
+	LLUUID old_image_id = tep ? tep->getID() : LLUUID();
 	const LLUUID& uuid = image ? image->getID() : LLUUID::null;
 	S32 retval = 0;
-	if (uuid != getTE(te)->getID() ||
+	if ((tep && uuid != tep->getID()) ||
 		uuid.isNull())
 	{
 		retval = LLPrimitive::setTETexture(te, uuid);
@@ -4979,7 +4978,8 @@ S32 LLViewerObject::setTENormalMapCore(const U8 te, LLViewerTexture *image)
 {
 	S32 retval = TEM_CHANGE_TEXTURE;
 	const LLUUID& uuid = image ? image->getID() : LLUUID::null;
-	if (uuid != getTE(te)->getID() ||
+	LLTextureEntry* tep = getTE(te);
+	if ((tep && uuid != tep->getID()) ||
 		uuid.isNull())
 	{
 		LLTextureEntry* tep = getTE(te);
@@ -5002,10 +5002,10 @@ S32 LLViewerObject::setTESpecularMapCore(const U8 te, LLViewerTexture *image)
 {
 	S32 retval = TEM_CHANGE_TEXTURE;
 	const LLUUID& uuid = image ? image->getID() : LLUUID::null;
-	if (uuid != getTE(te)->getID() ||
+	LLTextureEntry* tep = getTE(te);
+	if ((tep && uuid != tep->getID()) ||
 		uuid.isNull())
 	{
-		LLTextureEntry* tep = getTE(te);
 		LLMaterial* mat = NULL;
 		if (tep)
 		{
