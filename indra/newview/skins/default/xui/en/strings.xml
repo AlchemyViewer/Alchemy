@@ -2914,13 +2914,13 @@ Expected .wav, .tga, .bmp, .jpg, .jpeg, or .anim
 	<string name="None">None</string>
 	<string name="Linden Location">Linden Location</string>
 	<string name="Adult">Adult</string>
-	<string name="Arts&amp;Culture">Arts &amp; Culture</string>
+	<string name="Arts and Culture">Arts &amp; Culture</string>
 	<string name="Business">Business</string>
 	<string name="Educational">Educational</string>
 	<string name="Gaming">Gaming</string>
 	<string name="Hangout">Hangout</string>
 	<string name="Newcomer Friendly">Newcomer Friendly</string>
-	<string name="Parks&amp;Nature">Parks &amp; Nature</string>
+	<string name="Parks and Nature">Parks &amp; Nature</string>
 	<string name="Residential">Residential</string>
 	<!--<string name="Shopping">Shopping</string>	-->
 	<string name="Stage">Stage</string>
@@ -4366,6 +4366,13 @@ and report the problem.
   <string name="outfit_photo_load_codec_error">Invalid image format. Please use another image</string>
 
   <!-- Alchemy Strings -->
+  <string name="not_found">&apos;[TEXT]&apos; not found</string>
+  <string name="no_results">No results</string>
+  <string name="searching">Searching...</string>
+  <string name="all_categories">All Categories</string>
+  <string name="search_banned">Some terms in your search query were excluded due to content restrictions as clarified in the Community Standards.</string>
+  <string name="search_short">Your search terms were too short so no search was performed.</string>
+  <string name="search_disabled">Legacy Search has been disabled in this region.</string>
   <string name="NotifyIncomingMessage">Incoming message from [NAME]...</string>
   <string name="AvatarTyping">Typing</string>
   <string name="UnknownAvatar">Unknown Avatar</string>

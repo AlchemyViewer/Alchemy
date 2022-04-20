@@ -61,6 +61,11 @@ public:
 
 	~LLSearchComboBox();
 
+	/**
+	 * Sets focus to text box
+	 */
+	void focusTextEntry();
+
 protected:
 
 	LLSearchComboBox(const Params&p);
@@ -92,11 +97,6 @@ protected:
 	 * Callback for text box or combo box commit
 	 */
 	void onSelectionCommit();
-
-	/**
-	 * Sets focus to text box
-	 */
-	void focusTextEntry();
 
 	LLButton* mSearchButton;
 };

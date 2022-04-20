@@ -48,6 +48,8 @@
 #include "llfloatercamera.h"
 #include "llinitparam.h"
 #include "llselectmgr.h"
+#include "fsfloatersearch.h"
+#include "llfloaterwebcontent.h"
 // [RLVa:KB] - Checked: 2021-07-29 (RLVa-1.4.4a)
 #include "rlvactions.h"
 #include "rlvhandler.h"
@@ -674,6 +676,12 @@ bool start_chat( EKeystate s )
 
 bool start_gesture( EKeystate s )
 {
+    LLFloater* focused_floater = gFloaterView->getFocusedFloater();
+    if (focused_floater && (dynamic_cast<LLFloaterWebContent*>(focused_floater) || dynamic_cast<FSFloaterSearch*>(focused_floater)))
+    {
+        return true;
+    }
+
 	LLUICtrl* focus_ctrlp = dynamic_cast<LLUICtrl*>(gFocusMgr.getKeyboardFocus());
 	if (KEYSTATE_UP == s &&
 		! (focus_ctrlp && focus_ctrlp->acceptsTextInput()))

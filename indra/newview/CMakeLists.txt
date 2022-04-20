@@ -139,6 +139,7 @@ set(viewer_SOURCE_FILES
     altoolalign.cpp
     alunzip.cpp
     alviewermenu.cpp
+    fsfloatersearch.cpp
     groupchatlistener.cpp
     llagentwearablesfetch.cpp
     llaccountingcostmanager.cpp
@@ -815,6 +816,7 @@ set(viewer_HEADER_FILES
     altoolalign.h
     alunzip.h
     alviewermenu.h
+    fsfloatersearch.h
     groupchatlistener.h
     llaccountingcost.h
     llagentwearablesfetch.h

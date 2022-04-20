@@ -380,6 +380,8 @@ void LLAvatarPropertiesProcessor::processClassifiedInfoReply(LLMessageSystem* ms
 	// Request processed, no longer pending
 	self->removePendingRequest(c_info.creator_id, APT_CLASSIFIED_INFO);
 	self->notifyObservers(c_info.creator_id, &c_info, APT_CLASSIFIED_INFO);
+	self->removePendingRequest(c_info.classified_id, APT_CLASSIFIED_INFO);
+	self->notifyObservers(c_info.classified_id, &c_info, APT_CLASSIFIED_INFO);
 }
 
 

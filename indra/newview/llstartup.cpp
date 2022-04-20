@@ -216,6 +216,7 @@
 #if LL_WINDOWS
 #include "lldxhardware.h"
 #endif
+#include "fsfloatersearch.h"
 
 //
 // exported globals
@@ -2660,6 +2661,13 @@ void register_viewer_callbacks(LLMessageSystem* msg)
 	// Special handler as this message is sometimes used for group land.
 	msg->setHandlerFuncFast(_PREHASH_PlacesReply, process_places_reply);
 	msg->setHandlerFuncFast(_PREHASH_GroupNoticesListReply, LLPanelGroupNotices::processGroupNoticesListReply);
+
+	msg->setHandlerFuncFast(_PREHASH_DirPeopleReply, FSPanelSearchPeople::processSearchReply);
+	msg->setHandlerFuncFast(_PREHASH_DirPlacesReply, FSPanelSearchPlaces::processSearchReply);
+	msg->setHandlerFuncFast(_PREHASH_DirGroupsReply, FSPanelSearchGroups::processSearchReply);
+	msg->setHandlerFuncFast(_PREHASH_DirEventsReply, FSPanelSearchEvents::processSearchReply);
+	msg->setHandlerFuncFast(_PREHASH_DirLandReply,   FSPanelSearchLand::processSearchReply);
+	msg->setHandlerFuncFast(_PREHASH_DirClassifiedReply,  FSPanelSearchClassifieds::processSearchReply);
 
 	msg->setHandlerFuncFast(_PREHASH_AvatarPickerReply, LLFloaterAvatarPicker::processAvatarPickerReply);
 

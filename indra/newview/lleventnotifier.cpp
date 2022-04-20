@@ -44,7 +44,7 @@ public:
 	// requires trusted browser to trigger
 	LLEventHandler() : LLCommandHandler("event", UNTRUSTED_THROTTLE) { }
 	bool handle(const LLSD& params, const LLSD& query_map,
-				LLMediaCtrl* web)
+				LLMediaCtrl* web) override
 	{
 		if (params.size() < 2)
 		{
@@ -103,7 +103,7 @@ LLEventNotifier::~LLEventNotifier()
 
 	for (iter = mEventNotifications.begin();
 		 iter != mEventNotifications.end();
-		 iter++)
+		 ++iter)
 	{
 		delete iter->second;
 	}
@@ -124,7 +124,7 @@ void LLEventNotifier::update()
 		{
 			LLEventNotification *np = iter->second;
 
-			iter++;
+			++iter;
 			if (np->getEventDateEpoch() < alert_time)
 			{
 				LLSD args;
@@ -164,11 +164,12 @@ bool LLEventNotifier::handleResponse(U32 eventId, const LLSD& notification, cons
 	return true;
 }
 
-bool LLEventNotifier::add(U32 eventId, F64 eventEpoch, const std::string& eventDateStr, const std::string &eventName)
+bool LLEventNotifier::add(const LLEventStruct& event)
 {
-	LLEventNotification *new_enp = new LLEventNotification(eventId, eventEpoch, eventDateStr, eventName);
+	if (mNewEventSignal(event)) return false;
+	LLEventNotification *new_enp = new LLEventNotification(event.eventId, event.eventEpoch, event.eventDateStr, event.eventName);
 	
-	LL_INFOS() << "Add event " << eventName << " id " << eventId << " date " << eventDateStr << LL_ENDL;
+	LL_INFOS() << "Add event " << event.eventName << " id " << event.eventId << " date " << event.eventDateStr << LL_ENDL;
 	if(!new_enp->isValid())
 	{
 		delete new_enp;
@@ -204,12 +205,23 @@ void LLEventNotifier::processEventInfoReply(LLMessageSystem *msg, void **)
 	U32 event_time_utc;
 	
 	msg->getUUIDFast(_PREHASH_AgentData, _PREHASH_AgentID, agent_id );
-	msg->getU32Fast(_PREHASH_EventData, _PREHASH_EventID, event_id);
-	msg->getStringFast(_PREHASH_EventData, _PREHASH_Name, event_name);
-	msg->getStringFast(_PREHASH_EventData, _PREHASH_Date, eventd_date);
-	msg->getU32Fast(_PREHASH_EventData, _PREHASH_DateUTC, event_time_utc);
+	msg->getU32("EventData", "EventID", event_id);
+	msg->getString("EventData", "Name", event_name);
+	msg->getString("EventData", "Date", eventd_date);
+	msg->getU32("EventData", "DateUTC", event_time_utc);
 	
-	gEventNotifier.add(event_id, (F64)event_time_utc, eventd_date, event_name);
+	LLEventStruct event(event_id, (F64)event_time_utc, eventd_date, event_name);
+	msg->getString("EventData", "Creator", event.creator);
+	msg->getString("EventData", "Category", event.category);
+	msg->getString("EventData", "Desc", event.desc);
+	msg->getU32("EventData", "Duration", event.duration);
+	msg->getU32("EventData", "Cover", event.cover);
+	msg->getU32("EventData", "Amount", event.amount);
+	msg->getString("EventData", "SimName", event.simName);
+	msg->getVector3d("EventData", "GlobalPos", event.globalPos);
+	msg->getU32("EventData", "EventFlags", event.flags);
+	
+	gEventNotifier.add(event);
 }	
 	
 	
@@ -247,11 +259,13 @@ void LLEventNotifier::load(const LLSD& event_options)
             substitution["datetime"] = date;
             LLStringUtil::format(dateStr, substitution);
 
-            add(response["event_id"].asInteger(), response["event_date_ut"], dateStr, response["event_name"].asString());
+			LLEventStruct event(response["event_id"].asInteger(), response["event_date_ut"], dateStr, response["event_name"].asString());
+            add(event);
         }
         else
         {
-            add(response["event_id"].asInteger(), response["event_date_ut"], response["event_date"].asString(), response["event_name"].asString());
+			LLEventStruct event(response["event_id"].asInteger(), response["event_date_ut"], response["event_date"].asString(), response["event_name"].asString());
+            add(event);
         }
 	}
 }
@@ -295,11 +309,11 @@ void LLEventNotifier::serverPushRequest(U32 event_id, bool add)
 }
 
 
-LLEventNotification::LLEventNotification(U32 eventId, F64 eventEpoch, const std::string& eventDateStr, const std::string &eventName) :
+LLEventNotification::LLEventNotification(U32 eventId, F64 eventEpoch, std::string eventDateStr, std::string eventName) :
 	mEventID(eventId),
-	mEventName(eventName),
+	mEventName(std::move(eventName)),
 	mEventDateEpoch(eventEpoch),
-    mEventDateStr(eventDateStr)
+    mEventDateStr(std::move(eventDateStr))
 {
 	
 }
