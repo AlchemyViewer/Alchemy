@@ -3057,15 +3057,6 @@ void FSPanelSearchWeb::loadURL(const SearchQuery &p)
 	{
 		url.append("&maturity=" + maturity + "&" + mCategoryPaths[p.category.getValue()].asString());
 	}
-	// for OpenSim, do the same as in earlier versions
-	else
-	{
-		std::string debug_url = gSavedSettings.getString("SearchURLDebug");
-		if (gSavedSettings.getBOOL("DebugSearch") && !debug_url.empty())
-		{
-			url = debug_url;
-		}
-	}
 
 	url = LLWeb::expandURLSubstitutions(url, subs);
 
