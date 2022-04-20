@@ -133,15 +133,18 @@ BOOL LLFloaterAvatarPicker::postBuild()
 	LLScrollListCtrl* searchresults = getChild<LLScrollListCtrl>("SearchResults");
 	searchresults->setDoubleClickCallback( boost::bind(&LLFloaterAvatarPicker::onBtnSelect, this));
 	searchresults->setCommitCallback(boost::bind(&LLFloaterAvatarPicker::onList, this));
+	searchresults->setContextMenu(LLScrollListCtrl::MENU_AVATAR);
 	getChildView("SearchResults")->setEnabled(FALSE);
 	
 	LLScrollListCtrl* nearme = getChild<LLScrollListCtrl>("NearMe");
 	nearme->setDoubleClickCallback(boost::bind(&LLFloaterAvatarPicker::onBtnSelect, this));
 	nearme->setCommitCallback(boost::bind(&LLFloaterAvatarPicker::onList, this));
+	nearme->setContextMenu(LLScrollListCtrl::MENU_AVATAR);
 
 	LLScrollListCtrl* friends = getChild<LLScrollListCtrl>("Friends");
 	friends->setDoubleClickCallback(boost::bind(&LLFloaterAvatarPicker::onBtnSelect, this));
-	getChild<LLUICtrl>("Friends")->setCommitCallback(boost::bind(&LLFloaterAvatarPicker::onList, this));
+	friends->setCommitCallback(boost::bind(&LLFloaterAvatarPicker::onList, this));
+	friends->setContextMenu(LLScrollListCtrl::MENU_AVATAR);
 
 	childSetAction("ok_btn", boost::bind(&LLFloaterAvatarPicker::onBtnSelect, this));
 	getChildView("ok_btn")->setEnabled(FALSE);
