@@ -99,6 +99,7 @@
 #include "llmenuoptionpathfindingrebakenavmesh.h"
 #include "llmoveview.h"
 #include "llparcel.h"
+#include "llregex.h"
 #include "llrootview.h"
 #include "llsceneview.h"
 #include "llscenemonitor.h"
@@ -135,7 +136,6 @@
 #include "llpathfindingmanager.h"
 #include "llstartup.h"
 #include "boost/unordered_map.hpp"
-#include <boost/regex.hpp>
 #include <boost/algorithm/string.hpp>
 #include "llcleanup.h"
 #include "llviewershadermgr.h"
@@ -8665,9 +8665,8 @@ void handle_report_bug(const LLSD& param)
 	
 	LLStringUtil::format_map_t replace;
 	std::string environment = LLAppViewer::instance()->getViewerInfoString(true);
-	boost::regex regex;
-	regex.assign("</?nolink>");
-	std::string stripped_env = boost::regex_replace(environment, regex, "");
+	const boost::regex regex("</?nolink>");
+	std::string stripped_env = ll_regex_replace(environment, regex, "");
 
 	replace["[ENVIRONMENT]"] = LLURI::escape(stripped_env);
 	LLSLURL location_url;

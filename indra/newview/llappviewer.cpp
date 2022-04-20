@@ -3157,7 +3157,7 @@ LLSD LLAppViewer::getViewerInfo() const
 			info["REGION"] = gAgent.getRegion()->getName();
 
 			boost::regex regex("\\.(secondlife|lindenlab)\\..*");
-			info["HOSTNAME"] = boost::regex_replace(gAgent.getRegion()->getSimHostName(), regex, "");
+			info["HOSTNAME"] = ll_regex_replace(gAgent.getRegion()->getSimHostName(), regex, "");
 			info["SERVER_VERSION"] = gLastVersionChannel;
 			LLSLURL slurl;
 			LLAgentUI::buildSLURL(slurl);

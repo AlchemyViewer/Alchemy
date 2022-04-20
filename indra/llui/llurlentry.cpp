@@ -1597,7 +1597,7 @@ std::string LLUrlEntryIPv6::getQuery(const std::string &url) const
 	boost::regex regex = boost::regex(mHostPath, boost::regex::perl | boost::regex::icase);
 	boost::match_results<std::string::const_iterator> matches;
 
-	return boost::regex_replace(url, regex, "");
+	return ll_regex_replace(url, regex, "");
 }
 
 std::string LLUrlEntryIPv6::getUrl(const std::string &string) const

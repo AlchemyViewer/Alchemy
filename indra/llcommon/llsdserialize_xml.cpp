@@ -31,7 +31,8 @@
 #include <deque>
 
 #include "apr_base64.h"
-#include <boost/regex.hpp>
+
+#include "llregex.h"
 
 extern "C"
 {
@@ -775,9 +776,8 @@ void LLSDXMLParser::Impl::endElementHandler(const XML_Char* name)
 			// created by python and other non-linden systems - DEV-39358
 			// Fortunately we have very little binary passing now,
 			// so performance impact shold be negligible. + poppy 2009-09-04
-			boost::regex r;
-			r.assign("\\s");
-			std::string stripped = boost::regex_replace(mCurrentContent, r, "");
+			static const boost::regex binary_regex("\\s");
+			std::string stripped = ll_regex_replace(mCurrentContent, binary_regex, "");
 			S32 len = apr_base64_decode_len(stripped.c_str());
 			std::vector<U8> data;
 			data.resize(len);

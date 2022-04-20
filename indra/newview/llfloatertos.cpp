@@ -45,6 +45,7 @@
 #include "llstartup.h"              // login_alert_done
 #include "llcorehttputil.h"
 #include "llfloaterreg.h"
+#include "llregex.h"
 
 // system includes
 #include <boost/regex.hpp>
@@ -93,7 +94,7 @@ BOOL LLFloaterTOS::postBuild()
 			boost::regex::perl | boost::regex::icase);
 
 		//IF it has http:// in it, we use the web browser
-		if(mMessage.size() >= 4 && boost::regex_match(mMessage, url_regex))
+		if(mMessage.size() >= 4 && ll_regex_match(mMessage, url_regex))
 		{
 			// it exists
 			use_web_browser = true;
