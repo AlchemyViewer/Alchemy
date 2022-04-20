@@ -5275,11 +5275,18 @@ void LLAgent::updateAgentUserInfoCoro(std::string capurl, bool im_via_email, std
     LLCore::HttpHeaders::ptr_t httpHeaders;
 
     httpOpts->setFollowRedirects(true);
-    LLSD body(LLSDMap
-        ("dir_visibility",  LLSD::String(directory_visibility)));
-
-    if (!LLGridManager::instance().isInSecondlife())
-        body.insert("im_via_email", LLSD::Boolean(im_via_email));
+	LLSD body;
+	if (LLGridManager::instance().isInSecondlife())
+	{
+		body = LLSDMap
+		("dir_visibility", LLSD::String(directory_visibility));
+	}
+	else
+	{
+		body = LLSDMap
+		("dir_visibility", LLSD::String(directory_visibility))
+			("im_via_email", LLSD::Boolean(im_via_email));
+	}
 
     LLSD result = httpAdapter->postAndSuspend(httpRequest, capurl, body, httpOpts, httpHeaders);
 

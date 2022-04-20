@@ -965,7 +965,7 @@ void LLFloaterPreference::apply()
 		bool new_im_via_email = getChild<LLUICtrl>("send_im_to_email")->getValue().asBoolean();
 		bool new_hide_online = getChild<LLUICtrl>("online_visibility")->getValue().asBoolean();		
 	
-		if ((new_im_via_email != mOriginalIMViaEmail)
+		if ((!LLGridManager::instance().isInSecondlife() && (new_im_via_email != mOriginalIMViaEmail))
 			||(new_hide_online != mOriginalHideOnlineStatus))
 		{
 			// This hack is because we are representing several different 	 
