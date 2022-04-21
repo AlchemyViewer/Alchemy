@@ -2117,6 +2117,9 @@ void LLViewerMediaImpl::focus(bool focus)
 	{
 		// call focus just for the hell of it, even though this apopears to be a nop
 		mMediaSource->focus(focus);
+#if LL_LINUX
+		LLUI::getWindow()->allowLanguageTextInput(NULL, focus);
+#endif
 		if (focus)
 		{
 			// spoof a mouse click to *actually* pass focus
