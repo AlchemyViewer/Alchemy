@@ -574,8 +574,8 @@ void LLAgentWearables::saveAllWearables()
 		for (U32 j=0; j < getWearableCount((LLWearableType::EType)i); j++)
 			saveWearable((LLWearableType::EType)i, j, FALSE);
 	}
-	sendAgentWearablesUpdate();
-	//gAgent.sendAgentSetAppearance();
+
+	gAgent.sendAgentSetAppearance();
 }
 
 // Called when the user changes the name of a wearable inventory item that is currently being worn.
@@ -1104,7 +1104,11 @@ void LLAgentWearables::createStandardWearables()
 			FALSE, //LLWearableType::WT_GLOVES
 			TRUE,  //LLWearableType::WT_UNDERSHIRT
 			TRUE,  //LLWearableType::WT_UNDERPANTS
-			FALSE  //LLWearableType::WT_SKIRT
+			FALSE, //LLWearableType::WT_SKIRT
+			FALSE, //LLWearableType::WT_ALPHA
+			FALSE, //LLWearableType::WT_TATTOO
+			FALSE, //LLWearableType::WT_PHYSICS
+			FALSE  //LLWearableType::WT_UNIVERSAL
 		};
 
 	LLPointer<LLInventoryCallback> cb = new OnWearableItemCreatedCB;
@@ -1223,13 +1227,6 @@ void LLAgentWearables::addWearableToAgentInventory(LLPointer<LLInventoryCallback
 
 void LLAgentWearables::removeWearable(const LLWearableType::EType type, bool do_remove_all, U32 index)
 {
-	if (gAgent.isTeen() &&
-		(type == LLWearableType::WT_UNDERSHIRT || type == LLWearableType::WT_UNDERPANTS))
-	{
-		// Can't take off underclothing in simple UI mode or on PG accounts
-		// TODO: enable the removing of a single undershirt/underpants if multiple are worn. - Nyx
-		return;
-	}
 	if (getWearableCount(type) == 0)
 	{
 		// no wearables to remove
