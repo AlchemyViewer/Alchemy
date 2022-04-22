@@ -1363,7 +1363,7 @@ LLMeshSkinInfo::LLMeshSkinInfo():
 {
 }
 
-LLMeshSkinInfo::LLMeshSkinInfo(LLSD& skin):
+LLMeshSkinInfo::LLMeshSkinInfo(const LLSD& skin):
     mPelvisOffset(0.0),
     mLockScaleIfJointPosition(false),
     mInvalidJointsScrubbed(false),
@@ -1372,7 +1372,17 @@ LLMeshSkinInfo::LLMeshSkinInfo(LLSD& skin):
 	fromLLSD(skin);
 }
 
-void LLMeshSkinInfo::fromLLSD(LLSD& skin)
+LLMeshSkinInfo::LLMeshSkinInfo(const LLUUID& mesh_id, const LLSD& skin) :
+	mMeshID(mesh_id),
+	mPelvisOffset(0.0),
+	mLockScaleIfJointPosition(false),
+	mInvalidJointsScrubbed(false),
+	mJointNumsInitialized(false)
+{
+	fromLLSD(skin);
+}
+
+void LLMeshSkinInfo::fromLLSD(const LLSD& skin)
 {
 	if (skin.has("joint_names"))
 	{

@@ -38,12 +38,14 @@ class domMesh;
 
 #define MAX_MODEL_FACES 8
 
-class LLMeshSkinInfo 
+class LLMeshSkinInfo : public LLRefCount
 {
 public:
 	LLMeshSkinInfo();
-	LLMeshSkinInfo(LLSD& data);
-	void fromLLSD(LLSD& data);
+	LLMeshSkinInfo(const LLSD& data);
+	LLMeshSkinInfo(const LLUUID& mesh_id, const LLSD& skin);
+	~LLMeshSkinInfo() = default;
+	void fromLLSD(const LLSD& data);
 	LLSD asLLSD(bool include_joints, bool lock_scale_if_joint_position) const;
 
 	LLUUID mMeshID;

@@ -311,7 +311,7 @@ public:
 	std::deque<LODRequest> mUnavailableQ;
 
 	// list of completed skin info requests
-	std::deque<LLMeshSkinInfo> mSkinInfoQ;
+	std::vector<LLMeshSkinInfo*> mSkinInfoQ;
 
 	// list of skin info requests that have failed or are unavailaibe
 	std::deque<UUIDBasedRequest> mSkinUnavailableQ;
@@ -597,13 +597,13 @@ public:
 	void notifyLoadedMeshes();
 	void notifyMeshLoaded(const LLVolumeParams& mesh_params, LLVolume* volume);
 	void notifyMeshUnavailable(const LLVolumeParams& mesh_params, S32 lod);
-	void notifySkinInfoReceived(LLMeshSkinInfo& info);
+	void notifySkinInfoReceived(LLMeshSkinInfo* info);
 	void notifySkinInfoUnavailable(const LLUUID& info);
 	void notifyDecompositionReceived(LLModel::Decomposition* info);
 
 	S32 getActualMeshLOD(const LLVolumeParams& mesh_params, S32 lod);
 	static S32 getActualMeshLOD(LLSD& header, S32 lod);
-	const LLMeshSkinInfo* getSkinInfo(const LLUUID& mesh_id, LLVOVolume* requesting_obj);
+	LLPointer<LLMeshSkinInfo> getSkinInfo(const LLUUID& mesh_id, LLVOVolume* requesting_obj);
 	LLModel::Decomposition* getDecomposition(const LLUUID& mesh_id);
 	void fetchPhysicsShape(const LLUUID& mesh_id);
 	bool hasPhysicsShape(const LLUUID& mesh_id);
@@ -631,7 +631,7 @@ public:
 	typedef absl::node_hash_map<LLUUID, std::vector<LLVOVolume*> > mesh_load_map;
 	mesh_load_map mLoadingMeshes[4];
 	
-	typedef absl::node_hash_map<LLUUID, LLMeshSkinInfo> skin_map;
+	typedef absl::flat_hash_map<LLUUID, LLPointer<LLMeshSkinInfo>> skin_map;
 	skin_map mSkinMap;
 
 	typedef std::map<LLUUID, LLModel::Decomposition*> decomposition_map;
@@ -667,6 +667,8 @@ public:
 	std::vector<LLMeshUploadThread*> mUploadWaitList;
 
 	LLPhysicsDecomp* mDecompThread;
+
+	LLFrameTimer     mSkinInfoCullTimer;
 	
 	class inventory_data
 	{

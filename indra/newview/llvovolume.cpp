@@ -259,6 +259,8 @@ LLVOVolume::~LLVOVolume()
 	delete mVolumeImpl;
 	mVolumeImpl = NULL;
 
+	mSkinInfo = nullptr;
+
 	gMeshRepo.unregisterMesh(this);
 
 	if(!mMediaImplList.empty())
@@ -1200,7 +1202,7 @@ void LLVOVolume::notifyMeshLoaded()
     updateVisualComplexity();
 }
 
-void LLVOVolume::notifySkinInfoLoaded(const LLMeshSkinInfo* skin)
+void LLVOVolume::notifySkinInfoLoaded(LLMeshSkinInfo* skin)
 {
 	mSkinInfoFailed = false;
 	mSkinInfo = skin;
