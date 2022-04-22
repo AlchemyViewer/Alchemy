@@ -344,9 +344,9 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>91e8729460590d076f772d6c58d2d64b</string>
+              <string>5d0729b835d63b7fe69acdc6b7c60188</string>
               <key>url</key>
-              <string>https://viewer.catznip.com/downloads/packages/colladadom-2.3.545362-windows-545362b.tar.bz2</string>
+              <string>https://viewer.catznip.com/downloads/packages/colladadom-2.3.559710-windows-559710.tar.bz2</string>
             </map>
             <key>name</key>
             <string>windows</string>
@@ -356,9 +356,9 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>c5c388b512d9e1d880c1e7b3240764c7</string>
+              <string>985e3081e41c76b6176d39e44d7fb4b8</string>
               <key>url</key>
-              <string>https://viewer.catznip.com/downloads/packages/colladadom-2.3.545362-windows64-545362b.tar.bz2</string>
+              <string>https://viewer.catznip.com/downloads/packages/colladadom-2.3.559710-windows64-559710.tar.bz2</string>
             </map>
             <key>name</key>
             <string>windows64</string>
