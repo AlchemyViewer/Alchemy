@@ -1191,13 +1191,15 @@ void LLVOVolume::notifyMeshLoaded()
 	mSculptChanged = TRUE;
 	gPipeline.markRebuild(mDrawable, LLDrawable::REBUILD_GEOMETRY, TRUE);
 
-    if (getAvatar() && !isAnimatedObject())
+	LLVOAvatar* rigged_avatar = getAvatar();
+    if (rigged_avatar && !isAnimatedObject())
     {
-        getAvatar()->addAttachmentOverridesForObject(this);
+		rigged_avatar->addAttachmentOverridesForObject(this);
     }
-    if (getControlAvatar() && isAnimatedObject())
+	LLControlAvatar* control_avatar = getControlAvatar();
+    if (control_avatar && isAnimatedObject())
     {
-        getControlAvatar()->addAttachmentOverridesForObject(this);
+		control_avatar->addAttachmentOverridesForObject(this);
     }
     updateVisualComplexity();
 }
