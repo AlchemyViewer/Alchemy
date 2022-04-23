@@ -51,6 +51,13 @@ public:
 	 */
 	void addAvatarIDExceptAgent(const LLUUID& avatar_id);
 
+// [RLVa:KB] - @shownames
+	/**
+	 * Refreshes the name of each (avatar) participant
+	 */
+	void refreshNames();
+// [/RLVa:KB]
+
 	/**
 	 * Refreshes the participant list.
 	 */

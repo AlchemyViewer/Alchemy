@@ -1311,6 +1311,23 @@ void LLFloaterIMContainer::doToSelected(const LLSD& userdata)
     const LLConversationItem * conversationItem = getCurSelectedViewModelItem();
     uuid_vec_t selected_uuids;
 
+// [RLVa:KB] - @shownames
+	// Bulldozer block of all actions but both Catznip and Firestorm have no need for CHUI
+	if (!RlvActions::canShowName(RlvActions::SNC_DEFAULT))
+	{
+		if (LLConversationItemParticipant* pParticipantItem = dynamic_cast<LLConversationItemParticipant*>(const_cast<LLConversationItem*>(conversationItem)))
+		{
+			if (LLConversationItemSession* pParentSession = pParticipantItem->getParentSession())
+			{
+				if ( (pParentSession->getUUID().isNull()) && (selected_uuids.size() != 1 || !RlvActions::canShowName(RlvActions::SNC_DEFAULT, selected_uuids.front())) )
+				{
+					return;
+				}
+			}
+		}
+	}
+// [/RLVa:KB]
+
     if(conversationItem != NULL)
     {
     	getParticipantUUIDs(selected_uuids);

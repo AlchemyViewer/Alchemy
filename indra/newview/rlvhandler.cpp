@@ -38,6 +38,7 @@
 #include "llavatarnamecache.h"			// @shownames
 #include "llavatarlist.h"				// @shownames
 #include "llfloatercamera.h"			// @setcam family
+#include "llfloaterimnearbychat.h"		// @shownames
 #include "llfloatersidepanelcontainer.h"// @shownames
 #include "llnotifications.h"			// @list IM query
 #include "llnotificationsutil.h"
@@ -45,6 +46,7 @@
 #include "llpaneloutfitsinventory.h"	// @showinv - "Appearance" floater
 #include "llpanelpeople.h"				// @shownames
 #include "llpanelwearing.h"				// @showinv - "Appearance / Current Outfit" panel
+#include "llparticipantlist.h"			// @shownames
 #include "llregionhandle.h"				// @tpto
 #include "llsidepanelappearance.h"		// @showinv - "Appearance / Edit appearance" panel
 #include "lltabcontainer.h"				// @showinv - Tab container control for inventory tabs
@@ -2602,6 +2604,27 @@ void RlvBehaviourToggleHandler<RLV_BHVR_SHOWNAMES>::onCommandToggle(ERlvBehaviou
 		pPeoplePanel->getNearbyList()->updateAvatarNames();
 	}
 
+	// Refresh the nearby participant list
+	if (LLFloaterIMNearbyChat* pNearbyChatFloater = LLFloaterReg::findTypedInstance<LLFloaterIMNearbyChat>("nearby_chat"))
+	{
+#ifdef CATZNIP
+		// Legacy chat (Catznip)
+		if (LLParticipantAvatarList* pParticipantList = dynamic_cast<LLParticipantAvatarList*>(pNearbyChatFloater->getParticipantList()))
+		{
+			if (LLAvatarList* pAvatarList = pParticipantList->getAvatarList())
+			{
+				pAvatarList->updateAvatarNames();
+			}
+		}
+#else
+		// CHUI
+		if (LLParticipantList* pParticipantList = pNearbyChatFloater->getParticipantList())
+		{
+			pParticipantList->reset();
+		}
+#endif // CATZNIP
+	}
+
 	// Force the use of the "display name" cache so we can filter both display and legacy names (or return back to the user's preference)
 	if (fHasBhvr)
 	{
@@ -2692,6 +2715,17 @@ void RlvBehaviourToggleHandler<RLV_BHVR_SHOWNEARBY>::onCommandToggle(ERlvBehavio
 			pPeoplePanel->onCommit();
 		if (!fHasBhvr)
 			pPeoplePanel->updateNearbyList();
+	}
+
+	// Refresh the nearby participant list
+	if (LLFloaterIMNearbyChat* pNearbyChatFloater = LLFloaterReg::findTypedInstance<LLFloaterIMNearbyChat>("nearby_chat"))
+	{
+#ifdef CATZNIP
+		pNearbyChatFloater->updateShowParticipantList();
+		pNearbyChatFloater->updateExpandCollapseBtn();
+#else
+		// *TODO - Solution for CHUI
+#endif // CATZNIP
 	}
 
 	// Refresh that avatar's name tag and all HUD text

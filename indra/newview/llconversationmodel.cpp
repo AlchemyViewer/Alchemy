@@ -36,6 +36,9 @@
 #include "llconversationmodel.h"
 #include "llimview.h" //For LLIMModel
 #include "lltrans.h"
+// [RLVa:KB] - @shownames
+#include "rlvactions.h"
+// [/RLVa:KB]
 
 #include <boost/foreach.hpp>
 
@@ -559,8 +562,13 @@ void LLConversationItemParticipant::onAvatarNameCache(const LLAvatarName& av_nam
 
 void LLConversationItemParticipant::updateName(const LLAvatarName& av_name)
 {
-	mName = av_name.getUserName();
-	mDisplayName = av_name.getDisplayName();
+// [RLVa:KB] - @shownames
+	bool fRlvCanShowName = (!mRlvCheckShowNames) || (RlvActions::canShowName(RlvActions::SNC_DEFAULT, mUUID));
+	mName = (fRlvCanShowName) ? av_name.getUserName() : LLStringUtil::null;
+	mDisplayName = (fRlvCanShowName) ? av_name.getDisplayName() : RlvStrings::getAnonym(av_name);
+// [/RLVa:KB]
+//	mName = av_name.getUserName();
+//	mDisplayName = av_name.getDisplayName();
 	
 	if (mDisplayModeratorLabel)
 	{
