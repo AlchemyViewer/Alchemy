@@ -2607,22 +2607,10 @@ void RlvBehaviourToggleHandler<RLV_BHVR_SHOWNAMES>::onCommandToggle(ERlvBehaviou
 	// Refresh the nearby participant list
 	if (LLFloaterIMNearbyChat* pNearbyChatFloater = LLFloaterReg::findTypedInstance<LLFloaterIMNearbyChat>("nearby_chat"))
 	{
-#ifdef CATZNIP
-		// Legacy chat (Catznip)
-		if (LLParticipantAvatarList* pParticipantList = dynamic_cast<LLParticipantAvatarList*>(pNearbyChatFloater->getParticipantList()))
-		{
-			if (LLAvatarList* pAvatarList = pParticipantList->getAvatarList())
-			{
-				pAvatarList->updateAvatarNames();
-			}
-		}
-#else
-		// CHUI
 		if (LLParticipantList* pParticipantList = pNearbyChatFloater->getParticipantList())
 		{
-			pParticipantList->reset();
+			pParticipantList->refreshNames();
 		}
-#endif // CATZNIP
 	}
 
 	// Force the use of the "display name" cache so we can filter both display and legacy names (or return back to the user's preference)
