@@ -31,6 +31,8 @@
 #include "v3math.h"
 #include "llvector4a.h"
 #include <vector>
+#include "fix_macros.h"
+#include <boost/pool/pool.hpp>
 
 #define OCT_ERRS LL_WARNS("OctreeErrors")
 
@@ -44,6 +46,10 @@ extern float gOctreeMinSize;
 #else
 #define LL_OCTREE_MAX_CAPACITY 128
 #endif*/
+
+#if !LL_DEBUG
+#define LL_OCTREE_POOLS 1
+#endif
 
 template <class T> class LLOctreeNode;
 
@@ -93,6 +99,40 @@ public:
 	typedef LLOctreeNode<T>		oct_node;
 	typedef LLOctreeListener<T>	oct_listener;
 
+#if LL_OCTREE_POOLS
+	struct octree_pool_alloc
+	{
+		typedef std::size_t size_type;
+		typedef std::ptrdiff_t difference_type;
+
+		static char * malloc(const size_type bytes)
+		{ return (char *)ll_aligned_malloc_16(bytes); }
+		static void free(char * const block)
+		{ ll_aligned_free_16(block); }
+	};
+	static boost::pool<octree_pool_alloc>& getPool(const std::size_t& size)
+	{
+		static boost::pool<octree_pool_alloc> sPool((std::size_t)LL_NEXT_ALIGNED_ADDRESS((char*)size),1200);
+		llassert_always((std::size_t)LL_NEXT_ALIGNED_ADDRESS((char*)size) == sPool.get_requested_size());
+		return sPool;
+	}
+	void* operator new(size_t size)
+	{
+		return getPool(size).malloc();
+	}
+	void* operator new[](size_t size)
+	{
+		return getPool(size).malloc();
+	}
+	void operator delete(void* ptr)
+	{
+		getPool(sizeof(LLOctreeNode<T>)).free(ptr);
+	}
+	void operator delete[](void* ptr)
+	{
+		getPool(sizeof(LLOctreeNode<T>)).free(ptr);
+	}
+#else
 	void* operator new(size_t size)
 	{
 		return ll_aligned_malloc_16(size);
@@ -102,6 +142,7 @@ public:
 	{
 		ll_aligned_free_16(ptr);
 	}
+#endif
 
 	LLOctreeNode(	const LLVector4a& center, 
 					const LLVector4a& size, 
@@ -676,6 +717,42 @@ public:
 	:	BaseType(center, size, parent)
 	{
 	}
+
+#if LL_OCTREE_POOLS 
+	void* operator new(size_t size)
+	{
+		return LLOctreeNode<T>::getPool(size).malloc();
+	}
+	void* operator new[](size_t size)
+	{
+		return LLOctreeNode<T>::getPool(size).malloc();
+	}
+	void operator delete(void* ptr)
+	{
+		LLOctreeNode<T>::getPool(sizeof(LLOctreeNode<T>)).free(ptr);
+	}
+	void operator delete[](void* ptr)
+	{
+		LLOctreeNode<T>::getPool(sizeof(LLOctreeNode<T>)).free(ptr);
+	}
+#else
+	void* operator new(size_t size)
+	{
+		return ll_aligned_malloc_16(size);
+	}
+	void* operator new[](size_t size)
+	{
+		return ll_aligned_malloc_16(size);
+	}
+	void operator delete(void* ptr)
+	{
+		ll_aligned_free_16(ptr);
+	}
+	void operator delete[](void* ptr)
+	{
+		ll_aligned_free_16(ptr);
+	}
+#endif
 	
 	bool balance()
 	{	
