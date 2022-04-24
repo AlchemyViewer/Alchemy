@@ -351,6 +351,8 @@ void display(BOOL rebuild, F32 zoom_factor, int subfield, BOOL for_snapshot)
 			stop_glerror();
 		}
 
+		LLHUDObject::renderAllForTimer();
+
 		stop_glerror();
 		gViewerWindow->returnEmptyPicks();
 		stop_glerror();
