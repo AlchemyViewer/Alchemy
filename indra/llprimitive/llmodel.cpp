@@ -1003,7 +1003,7 @@ LLModel::weight_list& LLModel::getJointInfluences(const LLVector3& pos)
 		}
 		weight_map::iterator best = iter_up;
 
-		F32 min_dist = (iter->first - pos).magVec();
+		F32 min_dist = (best->first - pos).magVec();
 
 		bool done = false;
 		while (!done)
