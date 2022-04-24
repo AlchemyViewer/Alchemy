@@ -1152,7 +1152,7 @@ void create_inventory_callingcard(const LLUUID& avatar_id, const LLUUID& parent 
 	LLAvatarName av_name;
 	LLAvatarNameCache::get(avatar_id, &av_name);
 	create_inventory_item(gAgent.getID(), gAgent.getSessionID(),
-						  parent, LLTransactionID::tnull, av_name.getUserName(), item_desc, LLAssetType::AT_CALLINGCARD,
+						  (parent.isNull() ? gInventory.findCategoryUUIDForType(LLFolderType::FT_CALLINGCARD) : parent), LLTransactionID::tnull, av_name.getUserName(), item_desc, LLAssetType::AT_CALLINGCARD,
                           LLInventoryType::IT_CALLINGCARD, NO_INV_SUBTYPE, PERM_MOVE | PERM_TRANSFER, cb);
 }
 
@@ -2464,7 +2464,7 @@ LLUUID find_possible_item_for_regeneration(const LLViewerInventoryItem *target_i
 		 ++item_iter)
 	{
 	    const LLViewerInventoryItem *item = (*item_iter);
-		if (true) return item->getUUID();
+		if (item) return item->getUUID();
 	}
 	return LLUUID::null;
 }
