@@ -1193,8 +1193,6 @@ void LLDAELoader::processDomModel(LLModel* model, DAE* dae, daeElement* root, do
 			skin_info.mBindShapeMatrix.loadu(trans);							
 		}
 
-		// Build the joint to node mapping array and update joint aliases (mJointMap)
-		buildJointToNodeMappingFromScene(root);
 
 		//Some collada setup for accessing the skeleton
         U32 skeleton_count = dae->getDatabase()->getElementCount( NULL, "skeleton" );
@@ -1424,6 +1422,7 @@ void LLDAELoader::processDomModel(LLModel* model, DAE* dae, daeElement* root, do
 		//(which means we have all the joint sthat are required for an avatar versus
 		//a skinned asset attached to a node in a file that contains an entire skeleton,
 		//but does not use the skeleton).						
+		buildJointToNodeMappingFromScene( root );
 		critiqueRigForUploadApplicability( model->mSkinInfo.mJointNames );
 
 		if ( !missingSkeletonOrScene )
@@ -1666,11 +1665,7 @@ void LLDAELoader::processJointToNodeMapping( domNode* pNode )
 		std::string nodeName = pNode->getName();
 		if ( !nodeName.empty() )
 		{
-			mJointsFromNode.push_front(nodeName);
-			// Alias joint node SIDs to joint names for compatibility
-			const auto nodeSID = std::string(pNode->getSid());
-			if (!nodeSID.empty())
-				mJointMap[nodeSID] = mJointMap[nodeName];
+			mJointsFromNode.push_front( pNode->getName() );
 		}
 		//2. Handle the kiddo's
 		processChildJoints( pNode );
