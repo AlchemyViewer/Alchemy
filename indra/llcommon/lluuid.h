@@ -112,7 +112,7 @@ public:
 #if defined(__SSE4_1__)
 		return _mm_test_all_zeros(mm, mm) != 0;
 #else
-		mm = _mm_cmpeq_epi8(mm, _mm_setzero_si128());
+		mm = _mm_cmpeq_epi32(mm, _mm_setzero_si128());
 		return _mm_movemask_epi8(mm) == 0xFFFF;
 #endif
 	}
@@ -132,10 +132,11 @@ public:
 		__m128i mm_left = load_unaligned_si128(mData);
 		__m128i mm_right = load_unaligned_si128(rhs.mData);
 
-		__m128i mm_cmp = _mm_cmpeq_epi32(mm_left, mm_right);
 #if defined(__SSE4_1__)
-		return _mm_test_all_ones(mm_cmp);
+		__m128i mm = _mm_xor_si128(mm_left, mm_right);
+		return _mm_test_all_zeros(mm, mm) != 0;
 #else
+		__m128i mm_cmp = _mm_cmpeq_epi32(mm_left, mm_right);
 		return _mm_movemask_epi8(mm_cmp) == 0xFFFF;
 #endif
 	}
@@ -176,7 +177,7 @@ public:
 		cmp = (cmp - 1u) ^ cmp;
 		rcmp = (rcmp - 1u) ^ rcmp;
 
-		return static_cast<uint16_t>(cmp) < static_cast<uint16_t>(rcmp);
+		return cmp < rcmp;
 	}
 
 	bool operator>(const LLUUID& rhs) const
