@@ -43,7 +43,7 @@ public:
 	static void initClass();
 	static void cleanupClass();
 
-	virtual U32 getPartitionType() const;
+	U32 getPartitionType() const override;
 
 	/*virtual*/ U32 processUpdateMessage(LLMessageSystem *mesgsys,
 											void **user_data,
@@ -65,7 +65,7 @@ public:
 								LLStrider<LLColor4U>& emissivep,
 								LLStrider<U16>& indicesp);
 
-	void updateFaceSize(S32 idx) { }
+	void updateFaceSize(S32 idx) override { }
 	/*virtual*/ void updateTextures();											
 	/*virtual*/ BOOL updateLOD();
 	/*virtual*/ void setPixelAreaAndAngle(LLAgent &agent); // generate accurate apparent angle and area

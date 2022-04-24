@@ -53,13 +53,13 @@ public:
 
 	/*virtual*/ void markDead() override;
 
-	virtual U32 getPartitionType() const;
+	virtual U32 getPartitionType() const override;
 
 	/*virtual*/ LLDrawable* createDrawable(LLPipeline *pipeline) override;
 	/*virtual*/ void		updateGL() override;
 	/*virtual*/ BOOL        updateGeometry(LLDrawable *drawable) override;
 	/*virtual*/ BOOL		updateLOD() override;
-	/*virtual*/ void		updateFaceSize(S32 idx);
+	/*virtual*/ void		updateFaceSize(S32 idx) override;
 	void getGeometry(LLStrider<LLVector3> &verticesp,
 								LLStrider<LLVector3> &normalsp,
 								LLStrider<LLVector2> &texCoords0p,

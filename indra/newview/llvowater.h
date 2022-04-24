@@ -89,7 +89,7 @@ public:
 		mRenderType = LLPipeline::RENDER_TYPE_VOIDWATER;
 	}
 
-	/*virtual*/ U32 getPartitionType() const;
+	/*virtual*/ U32 getPartitionType() const override;
 };
 
 
