@@ -5273,7 +5273,7 @@ void LLVolumeGeometryManager::registerFace(LLSpatialGroup* group, LLFace* facep,
 	U8 index = facep->getTextureIndex();
 
 	LLMaterial* mat = facep->getTextureEntry()->getMaterialParams().get(); 
-	LLMaterialID mat_id = facep->getTextureEntry()->getMaterialID();
+	const LLMaterialID& mat_id = facep->getTextureEntry()->getMaterialID();
 
 	bool batchable = false;
 
