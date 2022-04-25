@@ -771,64 +771,6 @@
         <key>version</key>
         <string>2.12.1</string>
       </map>
-      <key>glod</key>
-      <map>
-        <key>copyright</key>
-        <string>Copyright 2003 Jonathan Cohen, Nat Duca, David Luebke, Brenden Schubert - Johns Hopkins University and University of Virginia</string>
-        <key>license</key>
-        <string>GLOD Open-Source License   Version 1.0</string>
-        <key>license_file</key>
-        <string>LICENSES/GLOD.txt</string>
-        <key>name</key>
-        <string>glod</string>
-        <key>platforms</key>
-        <map>
-          <key>darwin64</key>
-          <map>
-            <key>archive</key>
-            <map>
-              <key>hash</key>
-              <string>999502c58fed6ac261a35394c1f98380c5a4e5991bc0138090a02a9796515a487e33087799fc3ba2bf7df2f62514059f91af4f4fdb71540d2b71ca802afebcc6</string>
-              <key>hash_algorithm</key>
-              <string>blake2b</string>
-              <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/116/packages/generic/glod/1.0.3.1312/glod-1.0.3-darwin64-1312.tar.zst</string>
-            </map>
-            <key>name</key>
-            <string>darwin64</string>
-          </map>
-          <key>linux64</key>
-          <map>
-            <key>archive</key>
-            <map>
-              <key>hash</key>
-              <string>4a5fa692403499d53b4674b32ff3f4fa1c196e618dd14f1e6327dcd10a9ab7ebf6fd220385a84a1f8629b4d020486eff2ded9bf69e3ef3308fe6a4a304fdb195</string>
-              <key>hash_algorithm</key>
-              <string>blake2b</string>
-              <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/116/packages/generic/glod/1.0.3.1312/glod-1.0.3-linux64-1312.tar.zst</string>
-            </map>
-            <key>name</key>
-            <string>linux64</string>
-          </map>
-          <key>windows64</key>
-          <map>
-            <key>archive</key>
-            <map>
-              <key>hash</key>
-              <string>4dbbb434b9ee4c99896690eb3b65c54cce553798a00a0c103d3220b8f7445c870c3b7e31dd5874880982569f16c28f5412a4d5c3e9697dbb6ae36e800d693459</string>
-              <key>hash_algorithm</key>
-              <string>blake2b</string>
-              <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/116/packages/generic/glod/1.0.3.1312/glod-1.0.3-windows64-1312.tar.zst</string>
-            </map>
-            <key>name</key>
-            <string>windows64</string>
-          </map>
-        </map>
-        <key>version</key>
-        <string>1.0.3</string>
-      </map>
       <key>gstreamer</key>
       <map>
         <key>copyright</key>

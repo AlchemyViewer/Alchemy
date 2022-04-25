@@ -79,7 +79,6 @@ if(WINDOWS)
     set(debug_files
         epoxy-0.dll
         libexpatd.dll
-        glod.dll
         libapr-1.dll
         libaprutil-1.dll
         libapriconv-1.dll
@@ -95,7 +94,6 @@ if(WINDOWS)
     set(release_files
         epoxy-0.dll
         libexpat.dll
-        glod.dll
         libapr-1.dll
         libaprutil-1.dll
         libapriconv-1.dll
@@ -148,7 +146,6 @@ elseif(DARWIN)
         libaprutil-1.0.dylib
         libaprutil-1.dylib
         ${EXPAT_COPY}
-        libGLOD.dylib
         libhunspell-1.7.0.dylib
         libndofdev.dylib
        )
@@ -187,7 +184,6 @@ elseif(LINUX)
         libapr-1.so.0
         libaprutil-1.so.0
         ${EXPAT_COPY}
-        libGLOD.so
         libopenal.so
         libepoxy.so
         libepoxy.so.0
