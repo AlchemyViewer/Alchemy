@@ -1855,8 +1855,6 @@ void LLDrawPoolAvatar::updateRiggedFaceVertexBuffer(
 		return;
 	}
 
-    const U32 max_joints = LLSkinningUtil::getMaxJointCount();
-
     // FIXME ugly const cast
     LLSkinningUtil::scrubInvalidJoints(avatar, const_cast<LLMeshSkinInfo*>(skin));
 
@@ -1947,7 +1945,7 @@ void LLDrawPoolAvatar::updateRiggedFaceVertexBuffer(
             for (S32 j = 0, j_end = buffer->getNumVerts(); j < j_end; ++j)
 		    {
 			    LLMatrix4a final_mat;
-				LLSkinningUtil::getPerVertexSkinMatrixUnchecked(weights[j], mat, final_mat, max_joints);
+				LLSkinningUtil::getPerVertexSkinMatrixUnchecked(weights[j], mat, final_mat);
 
 			    LLVector4a& v = vol_face.mPositions[j];
 			    LLVector4a t;

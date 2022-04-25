@@ -29,6 +29,7 @@
 
 #define DEBUG_SKINNING  LL_DEBUG
 
+#include "lljoint.h"
 #include "v2math.h"
 #include "v4math.h"
 #include "llvector4a.h"
@@ -42,14 +43,17 @@ class LLJointRiggingInfoTab;
 
 namespace LLSkinningUtil
 {
-    S32 getMaxJointCount();
+    inline U32 getMaxJointCount()
+    {
+        return LL_MAX_JOINTS_PER_MESH_OBJECT;
+    }
     U32 getMeshJointCount(const LLMeshSkinInfo *skin);
     void scrubInvalidJoints(LLVOAvatar *avatar, LLMeshSkinInfo* skin);
 
     void initJointNums(LLMeshSkinInfo* skin, LLVOAvatar *avatar);
     void initSkinningMatrixPalette(LLMatrix4a* mat, S32 count, const LLMeshSkinInfo* skin, LLVOAvatar *avatar);
     void checkSkinWeights(LLVector4a* weights, U32 num_vertices, const LLMeshSkinInfo* skin);
-    void getPerVertexSkinMatrix(F32* weights, LLMatrix4a* mat, bool handle_bad_scale, LLMatrix4a& final_mat, U32 max_joints);
+    void getPerVertexSkinMatrix(F32* weights, LLMatrix4a* mat, bool handle_bad_scale, LLMatrix4a& final_mat);
 
     void updateRiggingInfo(const LLMeshSkinInfo* skin, LLVOAvatar *avatar, LLVolumeFace& vol_face);
 
@@ -72,14 +76,14 @@ namespace LLSkinningUtil
 #endif
     }
 
-    inline void getPerVertexSkinMatrixChecked(const LLVector4a& weights, LLMatrix4a* mat, LLMatrix4a& final_mat, U32 max_joints)
+    inline void getPerVertexSkinMatrixChecked(const LLVector4a& weights, LLMatrix4a* mat, LLMatrix4a& final_mat)
     {
 #if DEBUG_SKINNING
         bool valid_weights = true;
 #endif
         alignas(16) S32 idx[4];
 
-        LLIVector4a max_joint_count((S16)max_joints - 1);
+        LLIVector4a max_joint_count((S16)(getMaxJointCount() - 1));
         LLIVector4a current_joint_index;
         current_joint_index.setFloatTrunc(weights);
 
@@ -121,11 +125,11 @@ namespace LLSkinningUtil
 #endif
     }
 
-    inline void getPerVertexSkinMatrixUnchecked(const LLVector4a& weights, LLMatrix4a* mat, LLMatrix4a& final_mat, U32 max_joints)
+    inline void getPerVertexSkinMatrixUnchecked(const LLVector4a& weights, LLMatrix4a* mat, LLMatrix4a& final_mat)
     {
         alignas(16) S32 idx[4];
 
-        LLIVector4a max_joint_count((S16)max_joints - 1);
+        LLIVector4a max_joint_count((S16)(getMaxJointCount() - 1));
         LLIVector4a current_joint_index;
         current_joint_index.setFloatTrunc(weights);
 

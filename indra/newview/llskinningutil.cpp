@@ -87,11 +87,6 @@ void dump_avatar_and_skin_state(const std::string& reason, LLVOAvatar *avatar, c
 #endif
 }
 
-S32 LLSkinningUtil::getMaxJointCount()
-{
-    return (S32)LL_MAX_JOINTS_PER_MESH_OBJECT;
-}
-
 U32 LLSkinningUtil::getMeshJointCount(const LLMeshSkinInfo *skin)
 {
 	return llmin((U32)getMaxJointCount(), (U32)skin->mJointNames.size());
@@ -185,8 +180,7 @@ void LLSkinningUtil::getPerVertexSkinMatrix(
     F32* weights,
     LLMatrix4a* mat,
     bool handle_bad_scale,
-    LLMatrix4a& final_mat,
-    U32 max_joints)
+    LLMatrix4a& final_mat)
 {
 #ifdef SHOW_ASSERT
     bool valid_weights = true;
@@ -208,7 +202,7 @@ void LLSkinningUtil::getPerVertexSkinMatrix(
         // >= 0.0, we can use int instead of floorf; the latter
         // allegedly has a lot of overhead due to ieeefp error
         // checking which we should not need.
-        idx[k] = llclamp((S32) floorf(w), (S32)0, (S32)max_joints-1);
+        idx[k] = llclamp((S32) floorf(w), (S32)0, (S32)getMaxJointCount() - 1);
 
         wght[k] = w - floorf(w);
         scale += wght[k];
