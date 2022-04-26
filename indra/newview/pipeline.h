@@ -340,8 +340,6 @@ public:
 	LLCullResult::sg_iterator endAlphaGroups();
 	
 
-	void addTrianglesDrawn(S32 index_count, U32 render_type = LLRender::TRIANGLES);
-
 	bool hasRenderDebugFeatureMask(const U32 mask) const	{ return bool(mRenderDebugFeatureMask & mask); }
 	bool hasRenderDebugMask(const U64 mask) const			{ return bool(mRenderDebugMask & mask); }
 	void setAllRenderDebugFeatures() { mRenderDebugFeatureMask = 0xffffffff; }

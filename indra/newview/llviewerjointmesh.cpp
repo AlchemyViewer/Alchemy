@@ -317,7 +317,6 @@ U32 LLViewerJointMesh::drawShape( F32 pixelArea, BOOL first_pass, BOOL is_dummy)
 		buff->drawRange(LLRender::TRIANGLES, start, end, count, offset);
 		gGL.popMatrix();
 	}
-	gPipeline.addTrianglesDrawn(count);
 
 	triangle_count += count;
 	

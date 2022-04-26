@@ -4975,32 +4975,6 @@ void LLPipeline::renderGeomShadow(LLCamera& camera)
 	gGL.loadMatrix(gGLModelView);
 }
 
-
-void LLPipeline::addTrianglesDrawn(S32 index_count, U32 render_type)
-{
-#ifndef LL_RELEASE_FOR_DOWNLOAD
-	assertInitialized();
-	S32 count = 0;
-	if (render_type == LLRender::TRIANGLE_STRIP)
-	{
-		count = index_count-2;
-	}
-	else
-	{
-		count = index_count/3;
-	}
-
-	record(sStatBatchSize, count);
-	add(LLStatViewer::TRIANGLES_DRAWN, LLUnits::Triangles::fromValue(count));
-
-	if (LLPipeline::sRenderFrameTest)
-	{
-		gViewerWindow->getWindow()->swapBuffers();
-		ms_sleep(16);
-	}
-#endif
-}
-
 void LLPipeline::renderPhysicsDisplay()
 {
 	if (!hasRenderDebugMask(LLPipeline::RENDER_DEBUG_PHYSICS_SHAPES))

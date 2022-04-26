@@ -2468,7 +2468,6 @@ S32 LLFace::pushVertices(const U16* index_array) const
 			render_type = mDrawInfo->mDrawMode;
 		}
 		mVertexBuffer->drawRange(render_type, mGeomIndex, mGeomIndex+mGeomCount-1, mIndicesCount, mIndicesIndex);
-		gPipeline.addTrianglesDrawn(mIndicesCount, render_type);
 	}
 
 	return mIndicesCount;

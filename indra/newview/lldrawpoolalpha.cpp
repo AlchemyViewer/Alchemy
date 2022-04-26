@@ -354,7 +354,6 @@ void LLDrawPoolAlpha::renderAlphaHighlight(U32 mask)
 				}
 				params.mVertexBuffer->setBuffer(mask);
 				params.mVertexBuffer->drawRange(params.mDrawMode, params.mStart, params.mEnd, params.mCount, params.mOffset);
-				gPipeline.addTrianglesDrawn(params.mCount, params.mDrawMode);
 			}
 		}
 	}
@@ -380,7 +379,6 @@ inline void Draw(LLDrawInfo* draw, U32 mask)
     draw->mVertexBuffer->setBuffer(mask);
     LLRenderPass::applyModelMatrix(*draw);
 	draw->mVertexBuffer->drawRange(draw->mDrawMode, draw->mStart, draw->mEnd, draw->mCount, draw->mOffset);                    
-    gPipeline.addTrianglesDrawn(draw->mCount, draw->mDrawMode);
 }
 
 bool LLDrawPoolAlpha::TexSetup(LLDrawInfo* draw, bool use_shaders, bool use_material, LLGLSLShader* current_shader)
@@ -563,7 +561,6 @@ void LLDrawPoolAlpha::drawEmissive(U32 mask, LLDrawInfo* draw)
 {
     draw->mVertexBuffer->setBuffer((mask & ~LLVertexBuffer::MAP_COLOR) | LLVertexBuffer::MAP_EMISSIVE);
 	draw->mVertexBuffer->drawRange(draw->mDrawMode, draw->mStart, draw->mEnd, draw->mCount, draw->mOffset);
-	gPipeline.addTrianglesDrawn(draw->mCount, draw->mDrawMode);
 }
 
 void LLDrawPoolAlpha::drawEmissiveInline(U32 mask, LLDrawInfo* draw)
@@ -801,7 +798,6 @@ void LLDrawPoolAlpha::renderAlpha(U32 mask, S32 pass)
                     {
                         //LL_RECORD_BLOCK_TIME(FTM_RENDER_ALPHA_DRAW);
 					    params.mVertexBuffer->drawRange(params.mDrawMode, params.mStart, params.mEnd, params.mCount, params.mOffset);
-					    gPipeline.addTrianglesDrawn(params.mCount, params.mDrawMode);
                     }
 				}
 

@@ -340,8 +340,6 @@ void update_statistics()
 
 	LLTrace::Recording& last_frame_recording = LLTrace::get_frame_recording().getLastRecording();
 
-	record(LLStatViewer::TRIANGLES_DRAWN_PER_FRAME, last_frame_recording.getSum(LLStatViewer::TRIANGLES_DRAWN));
-
 	sample(LLStatViewer::ENABLE_VBO,      (F64)LLVertexBuffer::sEnableVBOs);
 	sample(LLStatViewer::LIGHTING_DETAIL, (F64)gPipeline.getLightingDetail());
 	sample(LLStatViewer::DRAW_DISTANCE,   (F64)LLPipeline::RenderFarClip);
