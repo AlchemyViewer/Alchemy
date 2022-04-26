@@ -231,7 +231,7 @@ void main()
     //see https://developer.nvidia.com/gpugems/GPUGems2/gpugems2_chapter24.html
     vec3 scale = (vec3(colorgrade_lut_size.x) - 1.0) / vec3(colorgrade_lut_size.x);
     vec3 offset = 1.0 / (2.0 * vec3(colorgrade_lut_size.x));
-    diff = vec4(linear_to_srgb(textureLod(colorgrade_lut, scale * diff.rgb + offset, 0).rgb), diff.a);
+    diff = vec4(linear_to_srgb(texture2DLod(colorgrade_lut, scale * diff.rgb + offset, 0).rgb), diff.a);
     #endif
 
     frag_color = diff;
