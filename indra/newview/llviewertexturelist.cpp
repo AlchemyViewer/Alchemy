@@ -190,7 +190,12 @@ void LLViewerTextureList::doPreloadImages()
 		image->setAddressMode(LLTexUnit::TAM_CLAMP);
 		mImagePreloads.insert(image);
 	}
-
+	image = LLViewerTextureManager::getFetchedTextureFromFile("SoftDotNoBack.png", FTT_LOCAL_FILE, MIPMAP_YES, LLViewerFetchedTexture::BOOST_UI);
+	if (image)
+	{
+		image->setAddressMode(LLTexUnit::TAM_WRAP);
+		mImagePreloads.insert(image);
+	}
 	LLPointer<LLImageRaw> img_blak_square_tex(new LLImageRaw(2, 2, 3));
 	memset(img_blak_square_tex->getData(), 0, img_blak_square_tex->getDataSize());
 	LLPointer<LLViewerFetchedTexture> img_blak_square(new LLViewerFetchedTexture(img_blak_square_tex, FTT_DEFAULT, FALSE));

@@ -3079,27 +3079,29 @@ void LLVOAvatar::idleUpdateLoadingEffect()
 			LLPartSysData particle_parameters;
 
 			// fancy particle cloud designed by Brent
-			particle_parameters.mPartData.mMaxAge            = 4.f;
-			particle_parameters.mPartData.mStartScale.mV[VX] = 0.8f;
-			particle_parameters.mPartData.mStartScale.mV[VY] = 1.0f;
-			particle_parameters.mPartData.mEndScale.mV[VX]   = 0.02f;
-			particle_parameters.mPartData.mEndScale.mV[VY]   = 0.02f;
-			particle_parameters.mPartData.mStartColor        = LLColor4(1, 1, 1, 0.5f);
-			particle_parameters.mPartData.mEndColor          = LLColor4(1, 1, 1, 0.0f);
-			particle_parameters.mPartData.mStartScale.mV[VX] = 0.8f;
-			LLViewerTexture* cloud = LLViewerTextureManager::getFetchedTextureFromFile("cloud-particle.j2c");
+			particle_parameters.mPartData.mMaxAge            = 5.f;
+			particle_parameters.mPartData.mStartScale		 = LLVector2(0.100250f, 0.100250f);
+			particle_parameters.mPartData.mEndScale			 = LLVector2(1.000250f, 1.000250f);
+		    particle_parameters.mPartData.mStartGlow		 = 0;
+		    particle_parameters.mPartData.mEndGlow			 = 0;
+			particle_parameters.mPartData.mStartColor        = LLColor4(0.501773, 0.743102, 1.000000, 1.f);
+			particle_parameters.mPartData.mEndColor          = LLColor4(0.000000, 0.000000, 0.000000, 1.f);
+			particle_parameters.mPartData.mBlendFuncSource	 = LLPartData::LL_PART_BF_SOURCE_COLOR;
+			particle_parameters.mPartData.mBlendFuncDest	 = LLPartData::LL_PART_BF_SOURCE_ALPHA;
+
+			LLViewerTexture* cloud = LLViewerTextureManager::getFetchedTextureFromFile("SoftDotNoBack.png");
 			particle_parameters.mPartImageID                 = cloud->getID();
 			particle_parameters.mMaxAge                      = 0.f;
-			particle_parameters.mPattern                     = LLPartSysData::LL_PART_SRC_PATTERN_ANGLE_CONE;
-			particle_parameters.mInnerAngle                  = F_PI;
+			particle_parameters.mPattern                     = LLPartSysData::LL_PART_SRC_PATTERN_EXPLODE;
+			particle_parameters.mInnerAngle                  = 0.f;
 			particle_parameters.mOuterAngle                  = 0.f;
 			particle_parameters.mBurstRate                   = 0.02f;
 			particle_parameters.mBurstRadius                 = 0.0f;
 			particle_parameters.mBurstPartCount              = 1;
-			particle_parameters.mBurstSpeedMin               = 0.1f;
-			particle_parameters.mBurstSpeedMax               = 1.f;
+			particle_parameters.mBurstSpeedMin               = 0.01f;
+			particle_parameters.mBurstSpeedMax               = 0.6f;
 			particle_parameters.mPartData.mFlags             = ( LLPartData::LL_PART_INTERP_COLOR_MASK | LLPartData::LL_PART_INTERP_SCALE_MASK |
-																 LLPartData::LL_PART_EMISSIVE_MASK | // LLPartData::LL_PART_FOLLOW_SRC_MASK |
+																 LLPartData::LL_PART_EMISSIVE_MASK | LLPartData::LL_PART_FOLLOW_SRC_MASK |
 																 LLPartData::LL_PART_TARGET_POS_MASK );
 			
 			// do not generate particles for dummy or overly-complex avatars
