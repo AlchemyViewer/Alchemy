@@ -1,0 +1,307 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<panel
+ class="dof_settings"
+ layout="topleft"
+ width="300"
+ height="175"
+ name="dof_settings">
+  <check_box
+    follows="left|top"
+    height="15"
+    left="8"
+    top_pad="4"
+    width="80"
+    layout="topleft"
+    label="Depth of Field"
+    tool_tip="Toggles Depth of Field"
+    control_name="RenderDepthOfField"/>
+  <text
+      follows="left|top"
+      height="15"
+      left="30"
+      top_pad="4"
+      width="80"
+      layout="topleft"
+      tool_tip="(Default: Half) What fraction of screen resolution should be used for rendering Depth of Field. NOTE: Viewer may become unresponsive if DoF becomes intense when Full Resolution is used."
+      value="DoF Resolution: " />
+  <combo_box
+    allow_text_entry="false"
+    tool_tip="(Default: Half) What fraction of screen resolution should be used for rendering Depth of Field. NOTE: Viewer may become unresponsive if DoF becomes intense when Full Resolution is used."
+    control_name="CameraDoFResScale"
+    follows="left|top"
+    height="16"
+    layout="topleft"
+    left="120"
+    max_chars="128"
+    name="dof_res_combo"
+    top_pad="-16"
+    width="70">
+      <combo_box.item
+        label="Quarter"
+        name="dof_quarterres"
+        value="0.25" />
+      <combo_box.item
+        label="Half"
+        name="dof_halfres"
+        value="0.5" />
+      <combo_box.item
+        label="Full"
+        name="dof_fullres"
+        value="1.0" />
+    </combo_box>
+  <text
+    follows="left|top"
+    height="15"
+    left="30"
+    top_pad="4"
+    width="70"
+    layout="topleft"
+    tool_tip="(Default: 60) Vertical FoV for DoF calculations"
+    value="Field of View:" />
+  <slider_bar
+    top_pad="-18"
+    height="20"
+    increment="1"
+    follows="left|top|right"
+    layout="topleft"
+    max_val="175"
+    min_val="10"
+    left="130"
+    right="-75"
+    name="dof_fov_slider"
+    tool_tip="(Default: 60) Vertical FoV for DoF calculations"
+    control_name="CameraFieldOfView"/>
+  <spinner
+    top_pad="-20"
+    height="15"
+    label_width="0"
+    right="-20"
+    decimal_digits="0"
+    follows="top|right"
+    layout="topleft"
+    max_val="175"
+    min_val="10"
+    width="55"
+    increment="1"
+    name="dof_fov_spinner"
+    tool_tip="(Default: 60) Vertical FoV for DoF calculations"
+    control_name="CameraFieldOfView"/>
+  <button
+    name="dofFOV_default_btn"
+    follows="top|right"
+    layout="topleft"
+    height="22"
+    left_delta="55"
+    top_pad="-15"
+    width="18"
+    scale_image="true"
+    image_overlay="Refresh_Off"
+    image_overlay_alignment="center">
+    <button.commit_callback
+       function="ClickDefault" />
+  </button>
+  <text
+    follows="left|top"
+    height="15"
+    left="30"
+    top_pad="3"
+    width="65"
+    layout="topleft"
+    tool_tip="(Default: f/9) Simulated camera apature f-value. Smaller f-stops result in a narrower focal range. Larger increases focal range."
+    value="Aperture (f):" />
+  <slider_bar
+    top_pad="-18"
+    height="20"
+    increment=".1"
+    follows="left|top|right"
+    layout="topleft"
+    max_val="256"
+    min_val="0.5"
+    left="130"
+    right="-75"
+    name="dof_fstop_slider"
+    tool_tip="(Default: f/9) Simulated camera apature f-value. Smaller f-stops result in a narrower focal range. Larger increases focal range."
+    control_name="CameraFNumber"/>
+  <spinner
+    top_pad="-20"
+    height="15"
+    label_width="0"
+    right="-20"
+    decimal_digits="1"
+    follows="top|right"
+    layout="topleft"
+    max_val="256"
+    min_val="0.5"
+    width="55"
+    increment=".1"
+    name="dof_fstop_spinner"
+    tool_tip="(Default: f/9) Simulated camera apature f-value. Smaller f-stops result in a narrower focal range. Larger increases focal range."
+    control_name="CameraFNumber"/>
+  <button
+    name="dofFNumber_default_btn"
+    follows="top|right"
+    layout="topleft"
+    height="22"
+    left_delta="55"
+    top_pad="-15"
+    width="18"
+    scale_image="true"
+    image_overlay="Refresh_Off"
+    image_overlay_alignment="center">
+    <button.commit_callback
+       function="ClickDefault" />
+  </button>
+  <text
+    follows="left|top"
+    height="15"
+    left="30"
+    top_pad="3"
+    width="100"
+    layout="topleft"
+    tool_tip="(Default: 30mm) Focal length of simulated camera."
+    value="Focal Length (mm):" />
+  <slider_bar
+    top_pad="-18"
+    height="20"
+    increment="5"
+    follows="left|top|right"
+    layout="topleft"
+    max_val="600"
+    min_val="10"
+    left="130"
+    right="-75"
+    name="dof_length_slider"
+    tool_tip="(Default: 30mm) Focal length of simulated camera."
+    control_name="CameraFocalLength"/>
+  <spinner
+    top_pad="-20"
+    height="15"
+    label_width="0"
+    right="-20"
+    decimal_digits="0"
+    follows="top|right"
+    layout="topleft"
+    max_val="600"
+    min_val="10"
+    width="55"
+    increment="5"
+    name="dof_length_spinner"
+    tool_tip="(Default: 30mm) Focal length of simulated camera."
+    control_name="CameraFocalLength"/>
+  <button
+    name="dofFocal_default_btn"
+    follows="top|right"
+    layout="topleft"
+    height="22"
+    left_delta="55"
+    top_pad="-15"
+    width="18"
+    scale_image="true"
+    image_overlay="Refresh_Off"
+    image_overlay_alignment="center">
+    <button.commit_callback
+       function="ClickDefault" />
+  </button>
+  <text
+    follows="left|top"
+    height="15"
+    left="30"
+    top_pad="3"
+    width="80"
+    layout="topleft"
+    tool_tip="(Default: 20) Circle of Confusion, blur intensity of out objects out of focus. This limits the amount of blur applied. High values produce softer out of focus objects, but can cause the viewer or system to become unresponsive"
+    value="CoC Maximum:" />
+  <slider_bar
+    top_pad="-18"
+    height="20"
+    increment=".5"
+    follows="left|top|right"
+    layout="topleft"
+    max_val="40"
+    min_val="0"
+    left="130"
+    right="-75"
+    name="dof_coc_slider"
+    tool_tip="(Default: 20) Circle of Confusion, blur intensity of out objects out of focus. This limits the amount of blur applied. High values produce softer out of focus objects, but can cause the viewer or system to become unresponsive"
+    control_name="CameraMaxCoF"/>
+  <spinner
+    top_pad="-20"
+    height="15"
+    label_width="0"
+    right="-20"
+    decimal_digits="1"
+    follows="top|right"
+    layout="topleft"
+    max_val="40"
+    min_val="0"
+    width="55"
+    increment=".5"
+    name="dof_coc_spinner"
+    tool_tip="(Default: 20) Circle of Confusion, blur intensity of out objects out of focus. This limits the amount of blur applied. High values produce softer out of focus objects, but can cause the viewer or system to become unresponsive"
+    control_name="CameraMaxCoF"/>
+  <button
+    name="dofCOF_default_btn"
+    follows="top|right"
+    layout="topleft"
+    height="22"
+    left_delta="55"
+    top_pad="-15"
+    width="18"
+    scale_image="true"
+    image_overlay="Refresh_Off"
+    image_overlay_alignment="center">
+    <button.commit_callback
+       function="ClickDefault" />
+  </button>
+  <text
+    follows="left|top"
+    height="15"
+    left="30"
+    top_pad="3"
+    width="100"
+    layout="topleft"
+    tool_tip="(Default: 0.5s) Time it takes for the camera to transition to a new focal point."
+    value="Transition Time (s):" />
+  <slider_bar
+    top_pad="-18"
+    height="20"
+    increment=".1"
+    follows="left|top|right"
+    layout="topleft"
+    max_val="2"
+    min_val="0"
+    left="130"
+    right="-75"
+    name="dof_focaltime_slider"
+    tool_tip="(Default: 0.5s) Time it takes for the camera to transition to a new focal point."
+    control_name="CameraFocusTransitionTime"/>
+  <spinner
+    top_pad="-20"
+    height="15"
+    label_width="0"
+    right="-20"
+    decimal_digits="1"
+    follows="top|right"
+    layout="topleft"
+    max_val="2"
+    min_val="0"
+    width="55"
+    increment=".1"
+    name="dof_focaltime_spinner"
+    tool_tip="(Default: 0.5s) Time it takes for the camera to transition to a new focal point."
+    control_name="CameraFocusTransitionTime"/>
+  <button
+    name="dofTime_default_btn"
+    follows="top|right"
+    layout="topleft"
+    height="22"
+    left_delta="55"
+    top_pad="-15"
+    width="18"
+    scale_image="true"
+    image_overlay="Refresh_Off"
+    image_overlay_alignment="center">
+    <button.commit_callback
+       function="ClickDefault" />
+  </button>
+</panel>

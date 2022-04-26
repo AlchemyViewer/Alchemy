@@ -421,6 +421,7 @@ void LLViewerFloaterReg::registerFloaters()
 	LLFloaterReg::add("ao", "floater_ao.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<ALFloaterAO>);
 	LLFloaterReg::add("delete_queue", "floater_script_queue.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterDeleteQueue>);
 	LLFloaterReg::add("generic_text", "floater_generic_text.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterGenericText>);
+    LLFloaterReg::add("lightbox_settings", "floater_lightbox_settings.xml", (LLFloaterBuildFunc) &LLFloaterReg::build<LLFloater>);
 	LLFloaterReg::add("music_ticker", "floater_music_ticker.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloater>);
 	LLFloaterReg::add("particle_editor", "floater_particle_editor.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<ALFloaterParticleEditor>);
 	LLFloaterReg::add("quick_settings", "floater_quick_settings.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloater>);
