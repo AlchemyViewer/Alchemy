@@ -3281,11 +3281,10 @@ BOOL LLModelPreview::render()
                                 skin, getPreviewAvatar());
 
                             LLMatrix4a bind_shape_matrix = skin->mBindShapeMatrix;
-                            U32 max_joints = LLSkinningUtil::getMaxJointCount();
                             for (U32 j = 0; j < buffer->getNumVerts(); ++j)
                             {
                                 LLMatrix4a final_mat;
-                                 LLSkinningUtil::getPerVertexSkinMatrixChecked(weight[j], mat, final_mat, max_joints);
+                                 LLSkinningUtil::getPerVertexSkinMatrixChecked(weight[j], mat, final_mat);
 
                                 //VECTORIZE THIS
                                 LLVector4a& v = face.mPositions[j];
