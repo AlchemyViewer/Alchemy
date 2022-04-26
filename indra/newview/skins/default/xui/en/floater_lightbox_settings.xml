@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes" ?>
 <floater
  width="360"
- height="310"
+ height="320"
  layout="topleft"
- min_height="310"
+ min_height="320"
  min_width="360"
  name="floater_lightbox_settings"
  positioning="cascading"
@@ -15,7 +15,7 @@
 		top_pad="0" 
 		enabled="true" 
 		follows="left|top" 
-		height="300" 
+		height="320" 
 		left_delta="0"
 		mouse_opaque="false" 
 		name="lightbox_tab_container" 
