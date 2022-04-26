@@ -242,9 +242,9 @@
            label_ref="Command_Lightbox_Settings_Label"
            tooltip_ref="Command_Lightbox_Settings_Tooltip"
            execute_function="Floater.ToggleOrBringToFront"
-           execute_parameters="lightbox_settings"
+           execute_parameters="lightbox"
            is_running_function="Floater.IsOpen"
-           is_running_parameters="lightbox_settings"
+           is_running_parameters="lightbox"
            />
   <command name="regiontracker"
            available_in_toybox="true"

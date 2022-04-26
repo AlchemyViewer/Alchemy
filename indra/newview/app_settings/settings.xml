@@ -10633,7 +10633,7 @@
       <key>Type</key>
       <string>S32</string>
       <key>Value</key>
-      <integer>512</integer>
+      <integer>4096</integer>
     </map>
     <key>RenderNameFadeDuration</key>
     <map>
