@@ -2,10 +2,10 @@
 <panel
  class="colortone_settings"
  layout="topleft"
- width="300"
+ width="350"
  height="310"
  name="colortone_settings"
- can_resize="true">
+ can_resize="false">
   <text
     follows="left|top"
     height="15"
@@ -34,7 +34,7 @@
     max_chars="128"
     name="sharpenmethod_combo"
     top_pad="-16"
-    width="125">
+    width="80">
     <combo_box.item
     label="None"
     name="sharp_none"
@@ -48,21 +48,31 @@
     name="sharp_DLS"
     value="2" />
     </combo_box>
+  <slider_bar
+    top_pad="-18"
+    height="20"
+    increment=".1"
+    follows="left|top|right"
+    layout="topleft"
+    max_val="1.0"
+    min_val="0.0"
+    left_delta="80"
+    right="-75"
+    name="sharp_strength_slider"
+    control_name=""/>
   <spinner
-    enabled="false"
-    top_pad="-19"
+    top_pad="-20"
     height="15"
     label_width="0"
     right="-20"
     decimal_digits="1"
     follows="top|right"
     layout="topleft"
-    max_val="1"
-    min_val="0"
+    max_val="1.0"
+    min_val="0.0"
     width="55"
     increment=".1"
     name="sharp_strength_spinner"
-    tool_tip="Sharpen Strength"
     control_name=""/>
   <button
     name="sharpen_default_btn"
@@ -98,7 +108,7 @@
      max_chars="128"
      name="tonemap_type_combo"
      top_pad="-16"
-     width="125">
+     width="80">
         <combo_box.item
          label="Linear"
          name="toneLinear"
@@ -136,6 +146,19 @@
          name="toneUncharted"
          value="9" />
     </combo_box>
+  <slider_bar
+    top_pad="-18"
+    height="20"
+    increment=".1"
+    follows="left|top|right"
+    layout="topleft"
+    max_val="16.0"
+    min_val="0.1"
+    left_delta="80"
+    right="-75"
+    name="exposure_slider"
+    tool_tip="(Default: 1.0) Adjusts the overall brightness of the image via the Tonemapper"
+    control_name="RenderToneMapExposure"/>
   <spinner
     top_pad="-19"
     height="15"
@@ -186,7 +209,7 @@
       max_chars="200"
       name="colorlut_combo"
 	    top_pad="-18"
-      width="198">
+      width="248">
       <combo_box.item
          label="Neutral"
          name="lut_neutral"
@@ -318,8 +341,8 @@
     follows="top|left"
     layout="topleft"
     height="16"
-    width="177"
-    left_delta="90"
+    width="150"
+    right="-2"
     top_pad="-16"
     max_chars="128"
     allow_text_entry="false"
@@ -352,10 +375,10 @@
     height="15"
     left="30"
     top_pad="4"
-    width="90"
+    width="120"
     layout="topleft"
     tool_tip="Controls Anisotropic Filtering Quality"
-    value="Aniso. Filtering:" />
+    value="Anisotropic Filtering:" />
   <combo_box
     allow_text_entry="false"
     tool_tip="Controls Anisotropic Filtering Quality"
@@ -363,11 +386,11 @@
     follows="left|top"
     height="16"
     layout="topleft"
-    left="120"
+    right="-2"
     max_chars="128"
     name="anisotropicfilter_combo"
     top_pad="-16"
-    width="177">
+    width="150">
     <combo_box.item
       label="Disable"
       name="anisotropicfilter_off"
@@ -388,6 +411,51 @@
       label="Ultra (x16)"
       name="anisotropicfilter_16"
       value="16" />
+  </combo_box>
+  <text
+    follows="left|top"
+    height="15"
+    left="30"
+    top_pad="3"
+    width="90"
+    layout="topleft"
+    value="Reflections:" />
+  <combo_box
+    control_name="RenderReflectionDetail"
+    height="16"
+    layout="topleft"
+    right="-2"
+    top_delta="0"
+    name="Reflections"
+    width="150">
+      <combo_box.item
+        label="None; opaque"
+        name="0"
+        value="-2"/>
+      <combo_box.item
+        label="None; transparent"
+        name="0"
+        value="-1"/>
+      <combo_box.item
+        label="Minimal"
+        name="0"
+        value="0"/>
+      <combo_box.item
+        label="Terrain and trees"
+        name="1"
+        value="1"/>
+      <combo_box.item
+        label="All static objects"
+        name="2"
+        value="2"/>
+      <combo_box.item
+        label="All avatars and objects"
+        name="3"
+        value="3"/>
+      <combo_box.item
+        label="Everything"
+        name="4"
+        value="4"/>
   </combo_box>
   <text
     follows="left|top"
@@ -562,49 +630,5 @@
     increment="1"
     name="max_avatar_spinner"
     control_name="RenderAvatarMaxNonImpostors"/>
-  <text
-    follows="left|top"
-    height="15"
-    left="30"
-    top_pad="8"
-    width="90"
-    layout="topleft"
-    value="Reflections:" />
-  <combo_box
-    control_name="RenderReflectionDetail"
-    height="18"
-    layout="topleft"
-    left_delta="90"
-    top_delta="0"
-    name="Reflections"
-    width="177">
-      <combo_box.item
-        label="None; opaque"
-        name="0"
-        value="-2"/>
-      <combo_box.item
-        label="None; transparent"
-        name="0"
-        value="-1"/>
-      <combo_box.item
-        label="Minimal"
-        name="0"
-        value="0"/>
-      <combo_box.item
-        label="Terrain and trees"
-        name="1"
-        value="1"/>
-      <combo_box.item
-        label="All static objects"
-        name="2"
-        value="2"/>
-      <combo_box.item
-        label="All avatars and objects"
-        name="3"
-        value="3"/>
-      <combo_box.item
-        label="Everything"
-        name="4"
-        value="4"/>
-  </combo_box>
+  
 </panel>
