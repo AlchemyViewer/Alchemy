@@ -1068,11 +1068,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>0d2f7d042df56a08a9a4022e0b77e79b977be3155d2b041fddf1fc835e492e23d89d8ae1449b56f0453821d3c8983a5c6475119d90997409a5a94b181dd8147e</string>
+              <string>deb31dea9b8def3c1eb38ef3c63321f8f4af712a3c75edaa5576ad1dcea7dc4f14cb95e42b82ddd7d3515f575b9e720c0e0f80164b0909da146390283bfc43b1</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/115/packages/generic/libjpeg-turbo/2.1.2.1437/libjpeg_turbo-2.1.2-darwin64-1437.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/115/packages/generic/libjpeg-turbo/2.1.3.1499/libjpeg_turbo-2.1.3-darwin64-1499.tar.zst</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
@@ -1082,11 +1082,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>ef279d070f7a4bd8b799b98c55cd80ea28df80624f903c7e21f245f79e9f25d9b97b01b3e9d42d6428a42275187899925a3926e0f8b7855b43b3e66a75f38520</string>
+              <string>bc9f05787ad23063f07c7a8d043e1822ca84f0040a5cc9666ccfaff239c98eaa0c1e30de8d3df6efb907bfd2f1a8a35ea4efeb692731dab2d54adef096759a76</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/115/packages/generic/libjpeg-turbo/2.1.2.1437/libjpeg_turbo-2.1.2-linux64-1437.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/115/packages/generic/libjpeg-turbo/2.1.3.1499/libjpeg_turbo-2.1.3-linux64-1499.tar.zst</string>
             </map>
             <key>name</key>
             <string>linux64</string>
@@ -1096,18 +1096,18 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>c3e33ca4d3e0aecb7f424c1fc9ee1e7f05284cd52e1e4bcc34d927f9a6a725d391908cac0581f12d397e0eabcd4010271fc7b442f371a872918f25ffc19288ca</string>
+              <string>fcad3a9866888ff4a7a124d0d98ab23d8e2cd6e8a70a9139c4b2626ac40ab47d988ce58b73a8ae9ad70231b36bfeefabc7716a2ff8d6868a69076474215fc7a1</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/115/packages/generic/libjpeg-turbo/2.1.2.1437/libjpeg_turbo-2.1.2-windows64-1437.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/115/packages/generic/libjpeg-turbo/2.1.3.1499/libjpeg_turbo-2.1.3-windows64-1499.tar.zst</string>
             </map>
             <key>name</key>
             <string>windows64</string>
           </map>
         </map>
         <key>version</key>
-        <string>2.1.2</string>
+        <string>2.1.3</string>
       </map>
       <key>libndofdev</key>
       <map>
@@ -1726,11 +1726,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>6359e6b21b7f01b4f551e270c4eec363a3e43756e2360323f95d1f5e1562e6ec3c3d82baba65557f611e4566e571ce7a9fa5de95dc7b7d7390ead9df3539b0f4</string>
+              <string>51467718bcdc43b78ee567bed2941cf4cfe4c9cf564c293561329dd2af9a5d18e4dc3e88e5b916c02b30a8e7fb58c43b8da83185779f526b4e8034b2d16dcef5</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/141/packages/generic/openal/1.21.1.1440/openal-1.21.1-darwin64-1440.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/141/packages/generic/openal/1.22.0.1497/openal-1.22.0-darwin64-1497.tar.zst</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
@@ -1740,11 +1740,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>ebfb74be84eba8927cfde61660ec2fb0cf41e40add643f12568e85e4e7f5edd22535310a739533bd7447d8e871d33a0f13b03616d7d34c5520b572f4307da3d4</string>
+              <string>fd91aadb2e53e3f8f17081318a1e04408fed83bf141ac26a8ab58eb3152d5a3316d37eafa2cb5aa20e6ae5b9ec663b36da65bc04ea33ead87e95f6005dfa5488</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/141/packages/generic/openal/1.21.1.1440/openal-1.21.1-linux64-1440.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/141/packages/generic/openal/1.22.0.1497/openal-1.22.0-linux64-1497.tar.zst</string>
             </map>
             <key>name</key>
             <string>linux64</string>
@@ -1754,18 +1754,18 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>c5f609abada2dd0476da90b9bef1e3d15b38989dc51c14fc18ade99f4257c8724cf0daf6af0987c135f5a29fd414ee4afd039819f65ad4cc950d962968b3f4a8</string>
+              <string>3b032dd6279abc32f8f7ff3ead59f39731e06b5fbf9633f492fafa52ed83c9076eb5d1e26b40ad2152330e5c1d775526b0ab0988989bb258de74b7cb24771b9c</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/141/packages/generic/openal/1.21.1.1440/openal-1.21.1-windows64-1440.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/141/packages/generic/openal/1.22.0.1497/openal-1.22.0-windows64-1497.tar.zst</string>
             </map>
             <key>name</key>
             <string>windows64</string>
           </map>
         </map>
         <key>version</key>
-        <string>1.21.1</string>
+        <string>1.22.0</string>
       </map>
       <key>openjpeg</key>
       <map>
@@ -1908,11 +1908,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>55b2f3dfaa6b23150fd3e6e641c8be240e4289b5c1a326ed2c352d44eb6f38aa280e49b1f39421b906b129cd89f95cc991e4620cd5b3f19a4265d40ec2dd2010</string>
+              <string>ba2b9b6fb458f2fbf14e48b495ea9dcb50729461ad1414e905ede9f1c3fb06f4aafd8a459c86953c73c538467d98fe14a6f65a33e7cb18b1b15805c0339007be</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/164/packages/generic/sentry/1.2.0.1490/sentry-1.2.0-darwin64-1490.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/164/packages/generic/sentry/1.3.0.1498/sentry-1.3.0-darwin64-1498.tar.zst</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
@@ -1922,11 +1922,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>88d17a09d968ee4789dd7383be79110b5c1ea80f6507c0b5d02fd89632ada8923a91f99864147385bf54d7087bf351d3f476dc249656553871f1375a072069a0</string>
+              <string>ff185147ae0b467d8120f2c039c262aeeb3e208d93e779caf24c63649598a8d48c70a0cdf4e45ec2d09d37828f505cdf100d54de16427a59e6dada16b4878325</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/164/packages/generic/sentry/1.2.0.1490/sentry-1.2.0-linux64-1490.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/164/packages/generic/sentry/1.3.0.1498/sentry-1.3.0-linux64-1498.tar.zst</string>
             </map>
             <key>name</key>
             <string>linux64</string>
@@ -1936,18 +1936,18 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>b41f6935df52b4ee5eda97324b86a2a5513d11470f3cecc5399dd8bd5cb590852f2e45a0c47adebf2079ed7d0e3205f4f581f752c6ceda719009054c915dc590</string>
+              <string>70b5765faf5417f776aa9be348717a82300a011f1da59ac9e059e6a78c6eade4153be659e2d0f138d4313e859540ddcff06c897157bc67e4251fda603536833e</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/164/packages/generic/sentry/1.2.0.1490/sentry-1.2.0-windows64-1490.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/164/packages/generic/sentry/1.3.0.1498/sentry-1.3.0-windows64-1498.tar.zst</string>
             </map>
             <key>name</key>
             <string>windows64</string>
           </map>
         </map>
         <key>version</key>
-        <string>1.2.0</string>
+        <string>1.3.0</string>
       </map>
       <key>slvoice</key>
       <map>
