@@ -237,7 +237,7 @@ const LLExperienceCache::cache_t& LLExperienceCache::getCached()
 
 void LLExperienceCache::requestExperiencesCoro(LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t &httpAdapter, std::string url, RequestQueue_t requests)
 {
-    LLCore::HttpRequest::ptr_t httpRequest = boost::make_shared<LLCore::HttpRequest>();
+    LLCore::HttpRequest::ptr_t httpRequest = std::make_shared<LLCore::HttpRequest>();
 
     //LL_INFOS("requestExperiencesCoro") << "url: " << url << LL_ENDL;
 
@@ -515,7 +515,7 @@ void LLExperienceCache::get(const LLUUID& key, LLExperienceCache::ExperienceGetF
 
 	fetch(key);
 
-	signal_ptr signal = boost::make_shared<callback_signal_t>();
+	signal_ptr signal = std::make_shared<callback_signal_t>();
 	
 	std::pair<signal_map_t::iterator, bool> result = mSignalMap.insert(signal_map_t::value_type(key, signal));
 	if (!result.second)
@@ -550,7 +550,7 @@ void LLExperienceCache::fetchAssociatedExperience(const LLUUID& objectId, const 
 
 void LLExperienceCache::fetchAssociatedExperienceCoro(LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t &httpAdapter, LLUUID objectId, LLUUID itemId, std::string url, ExperienceGetFn_t fn)
 {
-    LLCore::HttpRequest::ptr_t httpRequest = boost::make_shared<LLCore::HttpRequest>();
+    LLCore::HttpRequest::ptr_t httpRequest = std::make_shared<LLCore::HttpRequest>();
 
     if (url.empty())
     {
@@ -612,7 +612,7 @@ void LLExperienceCache::findExperienceByName(const std::string text, int page, E
 
 void LLExperienceCache::findExperienceByNameCoro(LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t &httpAdapter, std::string text, int page, ExperienceGetFn_t fn)
 {
-    LLCore::HttpRequest::ptr_t httpRequest = boost::make_shared<LLCore::HttpRequest>();
+    LLCore::HttpRequest::ptr_t httpRequest = std::make_shared<LLCore::HttpRequest>();
     std::ostringstream url;
 
 
@@ -655,7 +655,7 @@ void LLExperienceCache::getGroupExperiences(const LLUUID &groupId, ExperienceGet
 
 void LLExperienceCache::getGroupExperiencesCoro(LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t &httpAdapter, LLUUID groupId, ExperienceGetFn_t fn)
 {
-    LLCore::HttpRequest::ptr_t httpRequest = boost::make_shared<LLCore::HttpRequest>();
+    LLCore::HttpRequest::ptr_t httpRequest = std::make_shared<LLCore::HttpRequest>();
 
     // search for experiences owned by the current group
     std::string url = mCapability("GroupExperiences");
@@ -698,7 +698,7 @@ void LLExperienceCache::setRegionExperiences(CapabilityQuery_t regioncaps, const
 void LLExperienceCache::regionExperiencesCoro(LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t &httpAdapter,
     CapabilityQuery_t regioncaps, bool update, LLSD experiences, ExperienceGetFn_t fn)
 {
-    LLCore::HttpRequest::ptr_t httpRequest = boost::make_shared<LLCore::HttpRequest>();
+    LLCore::HttpRequest::ptr_t httpRequest = std::make_shared<LLCore::HttpRequest>();
 
     // search for experiences owned by the current group
     std::string url = regioncaps("RegionExperiences");
@@ -810,7 +810,7 @@ void LLExperienceCache::forgetExperiencePermission(const LLUUID &experienceId, E
 
 void LLExperienceCache::experiencePermissionCoro(LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t &httpAdapter, permissionInvoker_fn invokerfn, std::string url, ExperienceGetFn_t fn)
 {
-    LLCore::HttpRequest::ptr_t httpRequest = boost::make_shared<LLCore::HttpRequest>();
+    LLCore::HttpRequest::ptr_t httpRequest = std::make_shared<LLCore::HttpRequest>();
 
     // search for experiences owned by the current group
 
@@ -841,7 +841,7 @@ void LLExperienceCache::getExperienceAdmin(const LLUUID &experienceId, Experienc
 
 void LLExperienceCache::getExperienceAdminCoro(LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t &httpAdapter, LLUUID experienceId, ExperienceGetFn_t fn)
 {
-    LLCore::HttpRequest::ptr_t httpRequest = boost::make_shared<LLCore::HttpRequest>();
+    LLCore::HttpRequest::ptr_t httpRequest = std::make_shared<LLCore::HttpRequest>();
 
     std::string url = mCapability("IsExperienceAdmin");
     if (url.empty())
@@ -873,7 +873,7 @@ void LLExperienceCache::updateExperience(LLSD updateData, ExperienceGetFn_t fn)
 
 void LLExperienceCache::updateExperienceCoro(LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t &httpAdapter, LLSD updateData, ExperienceGetFn_t fn)
 {
-    LLCore::HttpRequest::ptr_t httpRequest = boost::make_shared<LLCore::HttpRequest>();
+    LLCore::HttpRequest::ptr_t httpRequest = std::make_shared<LLCore::HttpRequest>();
 
     std::string url = mCapability("UpdateExperience");
     if (url.empty())

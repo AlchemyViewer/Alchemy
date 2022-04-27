@@ -92,7 +92,7 @@ HttpStatus HttpRequestQueue::addOp(const HttpRequestQueue::opPtr_t &op)
 
 HttpRequestQueue::opPtr_t HttpRequestQueue::fetchOp(bool wait)
 {
-	HttpOperation::ptr_t result;
+	HttpRequestQueue::opPtr_t result;
 
 	{
 		HttpScopedLock lock(mQueueMutex);
@@ -100,7 +100,7 @@ HttpRequestQueue::opPtr_t HttpRequestQueue::fetchOp(bool wait)
 		while (mQueue.empty())
 		{
 			if (! wait || mQueueStopped)
-                return HttpOperation::ptr_t();
+                return {};
 			mQueueCV.wait(lock);
 		}
 

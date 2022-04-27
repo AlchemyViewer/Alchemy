@@ -505,9 +505,9 @@ void LLGridManager::gridInfoResponderCoro(const std::string uri, bool hypergrid)
         grid[GRID_TEMPORARY] = true;
     
     LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
-    auto httpAdapter = boost::make_shared<HttpCoroutineAdapter>("GridInfoRequest", httpPolicy);
-    auto httpRequest = boost::make_shared<LLCore::HttpRequest>();
-    auto httpOptions = boost::make_shared<LLCore::HttpOptions>();
+    auto httpAdapter = std::make_shared<HttpCoroutineAdapter>("GridInfoRequest", httpPolicy);
+    auto httpRequest = std::make_shared<LLCore::HttpRequest>();
+    auto httpOptions = std::make_shared<LLCore::HttpOptions>();
     httpOptions->setTimeout(5);
     
     LLSD result = httpAdapter->getRawAndSuspend(httpRequest, llformat("%s/get_grid_info", grid_uri.asString().c_str()), httpOptions);

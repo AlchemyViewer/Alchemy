@@ -571,7 +571,7 @@ S32 LLMeshRepoThread::sRequestWaterLevel = 0;
 //   LLMeshUploadThread
 
 class LLMeshHandlerBase : public LLCore::HttpHandler,
-    public boost::enable_shared_from_this<LLMeshHandlerBase>
+    public std::enable_shared_from_this<LLMeshHandlerBase>
 {
 public:
     typedef boost::shared_ptr<LLMeshHandlerBase> ptr_t;
@@ -1396,7 +1396,7 @@ bool LLMeshRepoThread::fetchMeshSkinInfo(const LLUUID& mesh_id, bool can_retry)
 
 			if (!http_url.empty())
 			{
-                auto handler = boost::make_shared<LLMeshSkinInfoHandler>(mesh_id, offset, size);
+                auto handler = std::make_shared<LLMeshSkinInfoHandler>(mesh_id, offset, size);
 				LLCore::HttpHandle handle = getByteRange(http_url, legacy_cap_version, offset, size, handler);
 				if (LLCORE_HTTP_HANDLE_INVALID == handle)
 				{
@@ -1512,7 +1512,7 @@ bool LLMeshRepoThread::fetchMeshDecomposition(const LLUUID& mesh_id)
 			
 			if (!http_url.empty())
 			{
-                auto handler = boost::make_shared<LLMeshDecompositionHandler>(mesh_id, offset, size);
+                auto handler = std::make_shared<LLMeshDecompositionHandler>(mesh_id, offset, size);
 				LLCore::HttpHandle handle = getByteRange(http_url, legacy_cap_version, offset, size, handler);
 				if (LLCORE_HTTP_HANDLE_INVALID == handle)
 				{
@@ -1612,7 +1612,7 @@ bool LLMeshRepoThread::fetchMeshPhysicsShape(const LLUUID& mesh_id)
 			
 			if (!http_url.empty())
 			{
-                auto handler = boost::make_shared<LLMeshPhysicsShapeHandler>(mesh_id, offset, size);
+                auto handler = std::make_shared<LLMeshPhysicsShapeHandler>(mesh_id, offset, size);
 				LLCore::HttpHandle handle = getByteRange(http_url, legacy_cap_version, offset, size, handler);
 				if (LLCORE_HTTP_HANDLE_INVALID == handle)
 				{
@@ -1711,7 +1711,7 @@ bool LLMeshRepoThread::fetchMeshHeader(const LLVolumeParams& mesh_params, bool c
 		//within the first 4KB
 		//NOTE -- this will break of headers ever exceed 4KB		
 
-		auto handler = boost::make_shared<LLMeshHeaderHandler>(mesh_params, 0, MESH_HEADER_SIZE);
+		auto handler = std::make_shared<LLMeshHeaderHandler>(mesh_params, 0, MESH_HEADER_SIZE);
 		LLCore::HttpHandle handle = getByteRange(http_url, legacy_cap_version, 0, MESH_HEADER_SIZE, handler);
 		if (LLCORE_HTTP_HANDLE_INVALID == handle)
 		{
@@ -1807,7 +1807,7 @@ bool LLMeshRepoThread::fetchMeshLOD(const LLVolumeParams& mesh_params, S32 lod, 
 			
 			if (!http_url.empty())
 			{
-                auto handler = boost::make_shared<LLMeshLODHandler>(mesh_params, lod, offset, size);
+                auto handler = std::make_shared<LLMeshLODHandler>(mesh_params, lod, offset, size);
 				LLCore::HttpHandle handle = getByteRange(http_url, legacy_cap_version, offset, size, handler);
 				if (LLCORE_HTTP_HANDLE_INVALID == handle)
 				{

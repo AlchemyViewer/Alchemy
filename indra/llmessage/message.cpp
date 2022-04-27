@@ -910,7 +910,7 @@ LLStoredMessagePtr LLMessageSystem::getReceivedMessage() const
 	const std::string& name = mMessageReader->getMessageName();
 	LLSD message = wrapReceivedTemplateData();
 
-	return boost::make_shared<LLStoredMessage>(name, message);
+	return std::make_shared<LLStoredMessage>(name, message);
 }
 
 LLStoredMessagePtr LLMessageSystem::getBuiltMessage() const
@@ -918,7 +918,7 @@ LLStoredMessagePtr LLMessageSystem::getBuiltMessage() const
 	const std::string& name = mMessageBuilder->getMessageName();
 	LLSD message = wrapBuiltTemplateData();
 
-	return boost::make_shared<LLStoredMessage>(name, message);
+	return std::make_shared<LLStoredMessage>(name, message);
 }
 
 S32 LLMessageSystem::sendMessage(const LLHost &host, LLStoredMessagePtr message)
@@ -4063,9 +4063,9 @@ void LLMessageSystem::sendUntrustedSimulatorMessageCoro(std::string url, std::st
 {
     LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
     LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t httpAdapter 
-		= boost::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("untrustedSimulatorMessage", httpPolicy);
-    LLCore::HttpRequest::ptr_t httpRequest = boost::make_shared<LLCore::HttpRequest>();
-    LLCore::HttpOptions::ptr_t httpOpts = boost::make_shared<LLCore::HttpOptions>();
+		= std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("untrustedSimulatorMessage", httpPolicy);
+    LLCore::HttpRequest::ptr_t httpRequest = std::make_shared<LLCore::HttpRequest>();
+    LLCore::HttpOptions::ptr_t httpOpts = std::make_shared<LLCore::HttpOptions>();
 
 
     if (url.empty())

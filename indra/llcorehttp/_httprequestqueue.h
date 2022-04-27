@@ -54,14 +54,14 @@ protected:
 	HttpRequestQueue();
 
 protected:
-	virtual ~HttpRequestQueue();						// Use release()
+	~HttpRequestQueue() override;						// Use release()
 
 private:
-	HttpRequestQueue(const HttpRequestQueue &);			// Not defined
-	void operator=(const HttpRequestQueue &);			// Not defined
+	HttpRequestQueue(const HttpRequestQueue &) = delete;			// Not defined
+	void operator=(const HttpRequestQueue &) = delete;			// Not defined
 
 public:
-    typedef boost::shared_ptr<HttpOperation> opPtr_t;
+    typedef std::shared_ptr<HttpOperation> opPtr_t;
 
 	static void init();
 	static void term();
