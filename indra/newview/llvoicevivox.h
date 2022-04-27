@@ -296,8 +296,8 @@ protected:
 		bool mAvatarIDValid;
 		bool mIsSelf;
 	};
-    typedef boost::shared_ptr<participantState> participantStatePtr_t;
-    typedef boost::weak_ptr<participantState> participantStateWptr_t;
+    typedef std::shared_ptr<participantState> participantStatePtr_t;
+    typedef std::weak_ptr<participantState> participantStateWptr_t;
 
     typedef std::map<const std::string, participantStatePtr_t> participantMap;
     typedef std::map<const LLUUID, participantStatePtr_t> participantUUIDMap;
@@ -305,8 +305,10 @@ protected:
 	struct sessionState
 	{
     public:
-        typedef boost::shared_ptr<sessionState> ptr_t;
-        typedef boost::weak_ptr<sessionState> wptr_t;
+        typedef std::shared_ptr<sessionState> ptr_t;
+        typedef std::weak_ptr<sessionState> wptr_t;
+
+		using session_wptr_set = std::set<wptr_t, std::owner_less<wptr_t>>;
 
         typedef boost::function<void(const ptr_t &)> sessionFunc_t;
 
@@ -372,8 +374,8 @@ protected:
     private:
         sessionState();
 
-        static std::set<wptr_t> mSession;   // canonical list of outstanding sessions.
-        std::set<wptr_t>::iterator  mMyIterator;    // used for delete
+        static session_wptr_set mSession;   // canonical list of outstanding sessions.
+		session_wptr_set::iterator  mMyIterator;    // used for delete
 
         static void for_eachPredicate(const wptr_t &a, sessionFunc_t func);
 
@@ -383,7 +385,7 @@ protected:
         static bool testByCallerId(const LLVivoxVoiceClient::sessionState::wptr_t &a, LLUUID participantId);
 
 	};
-    typedef boost::shared_ptr<sessionState> sessionStatePtr_t;
+    typedef std::shared_ptr<sessionState> sessionStatePtr_t;
 
     typedef std::map<std::string, sessionStatePtr_t> sessionMap;
 	
