@@ -350,7 +350,7 @@ public:
 	// "init_history" message 
 	void initializeUrlHistory(const LLSD& url_history);
 
-	boost::shared_ptr<LLPluginClassMedia> getSharedPrt() { return boost::dynamic_pointer_cast<LLPluginClassMedia>(shared_from_this()); } // due to enable_shared_from_this
+	std::shared_ptr<LLPluginClassMedia> getSharedPrt() { return std::dynamic_pointer_cast<LLPluginClassMedia>(shared_from_this()); } // due to enable_shared_from_this
 
 protected:
 

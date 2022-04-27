@@ -152,12 +152,12 @@ public:
 
 	virtual void reset()
 	{
-		boost::dynamic_pointer_cast<RecordToTempFile>(mRecorder)->reset();
+		std::dynamic_pointer_cast<RecordToTempFile>(mRecorder)->reset();
 	}
 
 	virtual void replay(std::ostream& out)
 	{
-		boost::dynamic_pointer_cast<RecordToTempFile>(mRecorder)->replay(out);
+		std::dynamic_pointer_cast<RecordToTempFile>(mRecorder)->replay(out);
 	}
 
 private:

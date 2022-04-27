@@ -174,7 +174,7 @@ namespace LLError
 		bool mWantsMultiline;
 	};
 
-	typedef boost::shared_ptr<Recorder> RecorderPtr;
+	typedef std::shared_ptr<Recorder> RecorderPtr;
 
     /**
      * Instantiate GenericRecorder with a callable(level, message) to get
@@ -197,7 +197,7 @@ namespace LLError
     };
 
 	/**
-	 * @NOTE: addRecorder() and removeRecorder() uses the boost::shared_ptr to allow for shared ownership
+	 * @NOTE: addRecorder() and removeRecorder() uses the std::shared_ptr to allow for shared ownership
 	 * while still ensuring that the allocated memory is eventually freed
 	 */
 	LL_COMMON_API void addRecorder(RecorderPtr);

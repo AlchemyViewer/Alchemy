@@ -30,7 +30,6 @@
 #define LL_LLRUN_H
 
 #include <vector>
-#include <boost/shared_ptr.hpp>
 
 class LLRunnable;
 
@@ -48,7 +47,7 @@ public:
 	/**
 	 * @brief The pointer to a runnable.
 	 */
-	typedef boost::shared_ptr<LLRunnable> run_ptr_t;
+	typedef std::shared_ptr<LLRunnable> run_ptr_t;
 
 	/**
 	 * @brief The handle for use in the API.
