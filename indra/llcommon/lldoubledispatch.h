@@ -191,7 +191,7 @@ public:
         insert(Type<Type1>(), Type<Type2>(), func, insertion);
         if (symmetrical)
         {
-            insert(Type<Type2>(), Type<Type1>(), std::bind(func, _2, _1), insertion);
+            insert(Type<Type2>(), Type<Type1>(), std::bind(func, std::placeholders::_2, std::placeholders::_1), insertion);
         }
     }
 
