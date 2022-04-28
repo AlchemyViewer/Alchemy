@@ -77,8 +77,8 @@ void LLAvatarRenderInfoAccountant::avatarRenderInfoGetCoro(std::string url, U64 
 {
     LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
     LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t 
-        httpAdapter(new LLCoreHttpUtil::HttpCoroutineAdapter("AvatarRenderInfoAccountant", httpPolicy));
-    LLCore::HttpRequest::ptr_t httpRequest(new LLCore::HttpRequest);
+        httpAdapter(std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("AvatarRenderInfoAccountant", httpPolicy));
+    LLCore::HttpRequest::ptr_t httpRequest(std::make_shared<LLCore::HttpRequest>());
 
     LLSD result = httpAdapter->getAndSuspend(httpRequest, url);
 
@@ -180,8 +180,8 @@ void LLAvatarRenderInfoAccountant::avatarRenderInfoReportCoro(std::string url, U
 {
     LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
     LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t
-        httpAdapter(new LLCoreHttpUtil::HttpCoroutineAdapter("AvatarRenderInfoAccountant", httpPolicy));
-    LLCore::HttpRequest::ptr_t httpRequest(new LLCore::HttpRequest);
+        httpAdapter(std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("AvatarRenderInfoAccountant", httpPolicy));
+    LLCore::HttpRequest::ptr_t httpRequest(std::make_shared<LLCore::HttpRequest>());
 
     LLViewerRegion * regionp = LLWorld::getInstanceFast()->getRegionFromHandle(regionHandle);
     if (!regionp)

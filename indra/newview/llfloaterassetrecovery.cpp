@@ -340,11 +340,13 @@ void LLAssetRecoverQueue::onCreateItem(const LLUUID& idItem)
 		{
 			case LLAssetType::AT_LSL_TEXT:
 				strCapsUrl = gAgent.getRegion()->getCapability("UpdateScriptAgent");
-				uploadInfo = LLResourceUploadInfo::ptr_t(new LLScriptAssetUpload(idItem, strBuffer, boost::bind(&LLAssetRecoverQueue::onSavedAsset, this, _1, _4)));
+				uploadInfo = std::make_shared<LLScriptAssetUpload>(idItem, strBuffer,
+                                                                   boost::bind(&LLAssetRecoverQueue::onSavedAsset, this, _1, _4));
 				break;
 			case LLAssetType::AT_NOTECARD:
 				strCapsUrl = gAgent.getRegion()->getCapability("UpdateNotecardAgentInventory");
-				uploadInfo = LLResourceUploadInfo::ptr_t(new LLBufferedAssetUploadInfo(itItem->idItem, LLAssetType::AT_NOTECARD, strBuffer, boost::bind(&LLAssetRecoverQueue::onSavedAsset, this, _1, _4)));
+				uploadInfo = std::make_shared<LLBufferedAssetUploadInfo>(itItem->idItem, LLAssetType::AT_NOTECARD, strBuffer,
+                                                                         boost::bind(&LLAssetRecoverQueue::onSavedAsset, this, _1, _4));
 				break;
 			default:
 				LL_WARNS() << "Unsupported iventory type '" << pItem->getType() << "' for asset recovery" << LL_ENDL;

@@ -4074,7 +4074,7 @@ void LLAppearanceMgr::serverAppearanceUpdateCoro(LLCoreHttpUtil::HttpCoroutineAd
         LL_DEBUGS("Avatar") << "Will send request for cof_version " << cofVersion << LL_ENDL;
 
         bRetry = false;
-        LLCore::HttpRequest::ptr_t httpRequest(new LLCore::HttpRequest());
+        LLCore::HttpRequest::ptr_t httpRequest(std::make_shared<LLCore::HttpRequest>());
 
         if (gSavedSettings.getBOOL("DebugForceAppearanceRequestFailure"))
         {
@@ -4188,7 +4188,7 @@ void LLAppearanceMgr::syncCofVersionAndRefreshCoro()
 	LL_INFOS("Avatar") << "Requesting cof_version be incremented via capability to: " << url << LL_ENDL;
 
 	LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t httpAdapter(
-		new LLCoreHttpUtil::HttpCoroutineAdapter("syncCofVersionAndRefreshCoro", LLCore::HttpRequest::DEFAULT_POLICY_ID));
+		std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("syncCofVersionAndRefreshCoro", LLCore::HttpRequest::DEFAULT_POLICY_ID));
 
 	llcoro::suspend();
 	S32 retryCount(0);
@@ -4199,7 +4199,7 @@ void LLAppearanceMgr::syncCofVersionAndRefreshCoro()
 		LL_DEBUGS("Avatar") << "Will send request COF sync" << LL_ENDL;
 
 		bRetry = false;
-		LLCore::HttpRequest::ptr_t httpRequest(new LLCore::HttpRequest());
+	    LLCore::HttpRequest::ptr_t httpRequest(std::make_shared<LLCore::HttpRequest>());
 
 		LLSD result = httpAdapter->getAndSuspend(httpRequest, url);
 

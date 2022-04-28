@@ -356,7 +356,7 @@ void LLXMLRPCTransaction::Impl::init(XMLRPC_REQUEST request, bool useGzip, const
 
 	if (!mHttpRequest)
 	{
-		mHttpRequest = LLCore::HttpRequest::ptr_t(new LLCore::HttpRequest);
+		mHttpRequest = LLCore::HttpRequest::ptr_t(std::make_shared<LLCore::HttpRequest>());
 	}
 
 

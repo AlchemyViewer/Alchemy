@@ -454,8 +454,8 @@ void LLPathfindingManager::navMeshStatusRequestCoro(std::string url, U64 regionH
 {
     LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
     LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t
-        httpAdapter(new LLCoreHttpUtil::HttpCoroutineAdapter("NavMeshStatusRequest", httpPolicy));
-    LLCore::HttpRequest::ptr_t httpRequest(new LLCore::HttpRequest);
+        httpAdapter(std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("NavMeshStatusRequest", httpPolicy));
+    LLCore::HttpRequest::ptr_t httpRequest(std::make_shared<LLCore::HttpRequest>());
 
     LLViewerRegion *region = LLWorld::getInstanceFast()->getRegionFromHandle(regionHandle);
     if (!region)
@@ -544,8 +544,8 @@ void LLPathfindingManager::navAgentStateRequestCoro(std::string url)
 {
     LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
     LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t
-        httpAdapter(new LLCoreHttpUtil::HttpCoroutineAdapter("NavAgentStateRequest", httpPolicy));
-    LLCore::HttpRequest::ptr_t httpRequest(new LLCore::HttpRequest);
+        httpAdapter(std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("NavAgentStateRequest", httpPolicy));
+    LLCore::HttpRequest::ptr_t httpRequest(std::make_shared<LLCore::HttpRequest>());
 
     LLSD result = httpAdapter->getAndSuspend(httpRequest, url);
 
@@ -572,8 +572,8 @@ void LLPathfindingManager::navMeshRebakeCoro(std::string url, rebake_navmesh_cal
 {
     LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
     LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t
-        httpAdapter(new LLCoreHttpUtil::HttpCoroutineAdapter("NavMeshRebake", httpPolicy));
-    LLCore::HttpRequest::ptr_t httpRequest(new LLCore::HttpRequest);
+        httpAdapter(std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("NavMeshRebake", httpPolicy));
+    LLCore::HttpRequest::ptr_t httpRequest(std::make_shared<LLCore::HttpRequest>());
 
 
     LLSD postData = LLSD::emptyMap();
@@ -601,8 +601,8 @@ void LLPathfindingManager::linksetObjectsCoro(std::string url, LinksetsResponder
 {
     LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
     LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t
-        httpAdapter(new LLCoreHttpUtil::HttpCoroutineAdapter("LinksetObjects", httpPolicy));
-    LLCore::HttpRequest::ptr_t httpRequest(new LLCore::HttpRequest);
+        httpAdapter(std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("LinksetObjects", httpPolicy));
+    LLCore::HttpRequest::ptr_t httpRequest(std::make_shared<LLCore::HttpRequest>());
 
     LLSD result;
 
@@ -637,8 +637,8 @@ void LLPathfindingManager::linksetTerrainCoro(std::string url, LinksetsResponder
 {
     LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
     LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t
-        httpAdapter(new LLCoreHttpUtil::HttpCoroutineAdapter("LinksetTerrain", httpPolicy));
-    LLCore::HttpRequest::ptr_t httpRequest(new LLCore::HttpRequest);
+        httpAdapter(std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("LinksetTerrain", httpPolicy));
+    LLCore::HttpRequest::ptr_t httpRequest(std::make_shared<LLCore::HttpRequest>());
 
     LLSD result;
 
@@ -672,8 +672,8 @@ void LLPathfindingManager::charactersCoro(std::string url, request_id_t requestI
 {
     LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
     LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t
-        httpAdapter(new LLCoreHttpUtil::HttpCoroutineAdapter("LinksetTerrain", httpPolicy));
-    LLCore::HttpRequest::ptr_t httpRequest(new LLCore::HttpRequest);
+        httpAdapter(std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("LinksetTerrain", httpPolicy));
+    LLCore::HttpRequest::ptr_t httpRequest(std::make_shared<LLCore::HttpRequest>());
 
     LLSD result = httpAdapter->getAndSuspend(httpRequest, url);
 
@@ -685,13 +685,13 @@ void LLPathfindingManager::charactersCoro(std::string url, request_id_t requestI
         LL_WARNS("PathfindingManager") << "HTTP status, " << status.toTerseString() <<
             ". characters failed." << LL_ENDL;
 
-        LLPathfindingObjectListPtr characterListPtr = LLPathfindingObjectListPtr(new LLPathfindingCharacterList());
+        LLPathfindingObjectListPtr characterListPtr = std::make_shared<LLPathfindingCharacterList>();
         callback(requestId, LLPathfindingManager::kRequestError, characterListPtr);
     }
     else
     {
         result.erase(LLCoreHttpUtil::HttpCoroutineAdapter::HTTP_RESULTS);
-        LLPathfindingObjectListPtr characterListPtr = LLPathfindingObjectListPtr(new LLPathfindingCharacterList(result));
+        LLPathfindingObjectListPtr characterListPtr = std::make_shared<LLPathfindingCharacterList>(result);
         callback(requestId, LLPathfindingManager::kRequestCompleted, characterListPtr);
     }
 }
@@ -857,7 +857,7 @@ LinksetsResponder::~LinksetsResponder()
 
 void LinksetsResponder::handleObjectLinksetsResult(const LLSD &pContent)
 {
-	mObjectLinksetListPtr = LLPathfindingObjectListPtr(new LLPathfindingLinksetList(pContent));
+	mObjectLinksetListPtr = std::make_shared<LLPathfindingLinksetList>(pContent);
 
 	mObjectMessagingState = kReceivedGood;
 	if (mTerrainMessagingState != kWaiting)
@@ -878,7 +878,7 @@ void LinksetsResponder::handleObjectLinksetsError()
 
 void LinksetsResponder::handleTerrainLinksetsResult(const LLSD &pContent)
 {
-	mTerrainLinksetPtr = LLPathfindingObjectPtr(new LLPathfindingLinkset(pContent));
+	mTerrainLinksetPtr = std::make_shared<LLPathfindingLinkset>(pContent);
 
 	mTerrainMessagingState = kReceivedGood;
 	if (mObjectMessagingState != kWaiting)
@@ -908,7 +908,7 @@ void LinksetsResponder::sendCallback()
 
 	if (mObjectMessagingState != kReceivedGood)
 	{
-		mObjectLinksetListPtr = LLPathfindingObjectListPtr(new LLPathfindingLinksetList());
+		mObjectLinksetListPtr = std::make_shared<LLPathfindingLinksetList>();
 	}
 
 	if (mTerrainMessagingState == kReceivedGood)

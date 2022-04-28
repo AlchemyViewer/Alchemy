@@ -2676,14 +2676,14 @@ LLTextureFetch::LLTextureFetch(LLTextureCache* cache, LLImageDecodeThread* image
 #endif
 
 	LLAppCoreHttp & app_core_http(LLAppViewer::instance()->getAppCoreHttp());
-	mHttpRequest = new LLCore::HttpRequest;
-	mHttpOptions = LLCore::HttpOptions::ptr_t(new LLCore::HttpOptions);
-	mHttpOptionsWithHeaders = LLCore::HttpOptions::ptr_t(new LLCore::HttpOptions);
+	mHttpRequest            = new LLCore::HttpRequest;
+	mHttpOptions            = std::make_shared<LLCore::HttpOptions>();
+	mHttpOptionsWithHeaders = std::make_shared<LLCore::HttpOptions>();
 	mHttpOptionsWithHeaders->setWantHeaders(true);
-    mHttpHeaders = LLCore::HttpHeaders::ptr_t(new LLCore::HttpHeaders);
+    mHttpHeaders = std::make_shared<LLCore::HttpHeaders>();
 	mHttpHeaders->append(HTTP_OUT_HEADER_ACCEPT, HTTP_CONTENT_IMAGE_X_J2C);
 	mHttpPolicyClass = app_core_http.getPolicy(LLAppCoreHttp::AP_TEXTURE);
-    mHttpMetricsHeaders = LLCore::HttpHeaders::ptr_t(new LLCore::HttpHeaders);
+    mHttpMetricsHeaders = std::make_shared<LLCore::HttpHeaders>();
 	mHttpMetricsHeaders->append(HTTP_OUT_HEADER_CONTENT_TYPE, HTTP_CONTENT_LLSD_XML);
 	mHttpMetricsPolicyClass = app_core_http.getPolicy(LLAppCoreHttp::AP_REPORTING);
 	mHttpHighWater = HTTP_NONPIPE_REQUESTS_HIGH_WATER;
@@ -4383,7 +4383,7 @@ void LLTextureFetchDebugger::init()
 
 	if (! mHttpHeaders)
 	{
-        mHttpHeaders = LLCore::HttpHeaders::ptr_t(new LLCore::HttpHeaders);
+        mHttpHeaders = std::make_shared<LLCore::HttpHeaders>();
 		mHttpHeaders->append(HTTP_OUT_HEADER_ACCEPT, HTTP_CONTENT_IMAGE_X_J2C);
 	}
 }

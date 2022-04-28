@@ -102,8 +102,8 @@ void LLEnvironmentRequest::environmentRequestCoro(std::string url, LLEnvironment
     LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
     S32 requestId = ++LLEnvironmentRequest::sLastRequest;
     LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t 
-            httpAdapter(new LLCoreHttpUtil::HttpCoroutineAdapter("EnvironmentRequest", httpPolicy));
-    LLCore::HttpRequest::ptr_t httpRequest(new LLCore::HttpRequest);
+            httpAdapter(std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("EnvironmentRequest", httpPolicy));
+    LLCore::HttpRequest::ptr_t httpRequest(std::make_shared<LLCore::HttpRequest>());
 
     LLSD result = httpAdapter->getAndSuspend(httpRequest, url);
 
@@ -196,9 +196,9 @@ void LLEnvironmentApply::environmentApplyCoro(std::string url, LLSD content, LLE
 {
     LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
     LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t
-        httpAdapter(new LLCoreHttpUtil::HttpCoroutineAdapter("EnvironmentApply", httpPolicy));
-    LLCore::HttpRequest::ptr_t httpRequest(new LLCore::HttpRequest);
-
+        httpAdapter(std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("EnvironmentApply", httpPolicy));
+    LLCore::HttpRequest::ptr_t httpRequest(std::make_shared<LLCore::HttpRequest>());
+ 
     LLSD result = httpAdapter->postAndSuspend(httpRequest, url, content);
 
     LLSD notify; // for error reporting.  If there is something to report to user this will be defined.

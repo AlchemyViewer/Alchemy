@@ -212,9 +212,9 @@ void LLFloaterURLEntry::getMediaTypeCoro(std::string url, LLHandle<LLFloater> pa
 {
     LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
     LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t
-        httpAdapter(new LLCoreHttpUtil::HttpCoroutineAdapter("getMediaTypeCoro", httpPolicy));
-    LLCore::HttpRequest::ptr_t httpRequest(new LLCore::HttpRequest);
-    LLCore::HttpOptions::ptr_t httpOpts = LLCore::HttpOptions::ptr_t(new LLCore::HttpOptions);
+        httpAdapter(std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("getMediaTypeCoro", httpPolicy));
+    LLCore::HttpRequest::ptr_t httpRequest(std::make_shared<LLCore::HttpRequest>());
+    LLCore::HttpOptions::ptr_t httpOpts(std::make_shared<LLCore::HttpOptions>());
 
     httpOpts->setHeadersOnly(true);
 

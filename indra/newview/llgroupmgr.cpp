@@ -1977,8 +1977,8 @@ void LLGroupMgr::getGroupBanRequestCoro(std::string url, LLUUID groupId)
 {
     LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
     LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t
-        httpAdapter(new LLCoreHttpUtil::HttpCoroutineAdapter("groupMembersRequest", httpPolicy));
-    LLCore::HttpRequest::ptr_t httpRequest(new LLCore::HttpRequest);
+        httpAdapter(std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("groupMembersRequest", httpPolicy));
+    LLCore::HttpRequest::ptr_t httpRequest(std::make_shared<LLCore::HttpRequest>());
 
     std::string finalUrl = url + "?group_id=" + groupId.asString();
 
@@ -2006,10 +2006,10 @@ void LLGroupMgr::postGroupBanRequestCoro(std::string url, LLUUID groupId,
 {
     LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
     LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t
-        httpAdapter(new LLCoreHttpUtil::HttpCoroutineAdapter("groupMembersRequest", httpPolicy));
-    LLCore::HttpRequest::ptr_t httpRequest(new LLCore::HttpRequest);
-    LLCore::HttpHeaders::ptr_t httpHeaders(new LLCore::HttpHeaders);
-    LLCore::HttpOptions::ptr_t httpOptions(new LLCore::HttpOptions);
+        httpAdapter(std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("groupMembersRequest", httpPolicy));
+    LLCore::HttpRequest::ptr_t httpRequest(std::make_shared<LLCore::HttpRequest>());
+    LLCore::HttpHeaders::ptr_t httpHeaders(std::make_shared<LLCore::HttpHeaders>());
+    LLCore::HttpOptions::ptr_t httpOptions(std::make_shared<LLCore::HttpOptions>());
 
     httpOptions->setFollowRedirects(false);
 
@@ -2144,9 +2144,9 @@ void LLGroupMgr::groupMembersRequestCoro(std::string url, LLUUID groupId)
 {
     LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
     LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t
-        httpAdapter(new LLCoreHttpUtil::HttpCoroutineAdapter("groupMembersRequest", httpPolicy));
-    LLCore::HttpRequest::ptr_t httpRequest(new LLCore::HttpRequest);
-    LLCore::HttpOptions::ptr_t httpOpts = LLCore::HttpOptions::ptr_t(new LLCore::HttpOptions);
+        httpAdapter(std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("groupMembersRequest", httpPolicy));
+    LLCore::HttpRequest::ptr_t httpRequest(std::make_shared<LLCore::HttpRequest>());
+    LLCore::HttpOptions::ptr_t httpOpts(std::make_shared<LLCore::HttpOptions>());
 
     mMemberRequestInFlight = true;
 

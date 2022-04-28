@@ -4079,10 +4079,10 @@ void collectChildren( LLView const *aView, ll::prefs::PanelDataPtr aParentPanel,
 		{
 			pCurPanelData.reset();
 
-			pCurTabContainer = ll::prefs::TabContainerDataPtr( new ll::prefs::TabContainerData );
+			pCurTabContainer                = std::make_shared<ll::prefs::TabContainerData>();
 			pCurTabContainer->mTabContainer = const_cast< LLTabContainer *>( pTabContainer );
-			pCurTabContainer->mLabel = pTabContainer->getLabel();
-			pCurTabContainer->mPanel = 0;
+			pCurTabContainer->mLabel        = pTabContainer->getLabel();
+			pCurTabContainer->mPanel        = 0;
 
 			if( aParentPanel )
 				aParentPanel->mChildPanel.push_back( pCurTabContainer );
@@ -4093,7 +4093,7 @@ void collectChildren( LLView const *aView, ll::prefs::PanelDataPtr aParentPanel,
 		{
 			pCurTabContainer.reset();
 
-			pCurPanelData = ll::prefs::PanelDataPtr( new ll::prefs::PanelData );
+			pCurPanelData         = std::make_shared<ll::prefs::PanelData>();
 			pCurPanelData->mPanel = pPanel;
 			pCurPanelData->mLabel = pPanel->getLabel();
 
@@ -4106,9 +4106,9 @@ void collectChildren( LLView const *aView, ll::prefs::PanelDataPtr aParentPanel,
 		}
 		else if( pSCtrl && pSCtrl->getSearchText().size() )
 		{
-			ll::prefs::SearchableItemPtr item = ll::prefs::SearchableItemPtr( new ll::prefs::SearchableItem() );
-			item->mView = pView;
-			item->mCtrl = pSCtrl;
+			ll::prefs::SearchableItemPtr item = std::make_shared<ll::prefs::SearchableItem>();
+			item->mView                       = pView;
+			item->mCtrl                       = pSCtrl;
 
 			item->mLabel = utf8str_to_wstring( pSCtrl->getSearchText() );
 			LLWStringUtil::toLower( item->mLabel );
@@ -4133,10 +4133,10 @@ void LLFloaterPreference::collectSearchableItems()
 	{
 		mSearchData.reset(new ll::prefs::SearchData() );
 
-		ll::prefs::TabContainerDataPtr pRootTabcontainer = ll::prefs::TabContainerDataPtr( new ll::prefs::TabContainerData );
-		pRootTabcontainer->mTabContainer = pRoot;
-		pRootTabcontainer->mLabel = pRoot->getLabel();
-		mSearchData->mRootTab = pRootTabcontainer;
+		ll::prefs::TabContainerDataPtr pRootTabcontainer = std::make_shared<ll::prefs::TabContainerData>();
+		pRootTabcontainer->mTabContainer                 = pRoot;
+		pRootTabcontainer->mLabel                        = pRoot->getLabel();
+		mSearchData->mRootTab                            = pRootTabcontainer;
 
 		collectChildren( this, ll::prefs::PanelDataPtr(), pRootTabcontainer );
 	}

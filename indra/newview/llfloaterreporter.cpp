@@ -427,8 +427,8 @@ void LLFloaterReporter::requestAbuseCategoriesCoro(std::string url, LLHandle<LLF
 {
     LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
     LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t
-        httpAdapter(new LLCoreHttpUtil::HttpCoroutineAdapter("requestAbuseCategoriesCoro", httpPolicy));
-    LLCore::HttpRequest::ptr_t httpRequest(new LLCore::HttpRequest);
+        httpAdapter(std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("requestAbuseCategoriesCoro", httpPolicy));
+    LLCore::HttpRequest::ptr_t httpRequest(std::make_shared<LLCore::HttpRequest>());
 
     LLSD result = httpAdapter->getAndSuspend(httpRequest, url);
 

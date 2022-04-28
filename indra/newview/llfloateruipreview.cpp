@@ -1151,7 +1151,8 @@ void LLFloaterUIPreview::onClickToggleDiffHighlighting()
 						child->getAttributeString("message",error_message);
 						if(mDiffsMap.find(error_file) != mDiffsMap.end())
 						{
-							mDiffsMap.insert(std::make_pair(error_file,std::make_pair(StringListPtr(new StringList), StringListPtr(new StringList))));
+							mDiffsMap.insert(std::make_pair(error_file,std::make_pair(std::make_shared<StringList>(),
+                                                                                      std::make_shared<StringList>())));
 						}
 						mDiffsMap[error_file].second->push_back(error_message);
 					}
@@ -1213,7 +1214,7 @@ void LLFloaterUIPreview::scanDiffFile(LLXmlTreeNode* file_node)
 			child->getAttributeString("id",id);
 			if(mDiffsMap.find(file_name) == mDiffsMap.end())
 			{
-				mDiffsMap.insert(std::make_pair(file_name,std::make_pair(StringListPtr(new StringList), StringListPtr(new StringList))));
+				mDiffsMap.insert(std::make_pair(file_name,std::make_pair(std::make_shared<StringList>(), std::make_shared<StringList>())));
 			}
 			mDiffsMap[file_name].first->push_back(std::string(id.c_str()));
 		}

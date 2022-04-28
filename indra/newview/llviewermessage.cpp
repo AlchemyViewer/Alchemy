@@ -166,8 +166,8 @@ void accept_friendship_coro(std::string url, LLSD notification)
 {
     LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
     LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t
-        httpAdapter(new LLCoreHttpUtil::HttpCoroutineAdapter("friendshipResponceErrorProcessing", httpPolicy));
-    LLCore::HttpRequest::ptr_t httpRequest(new LLCore::HttpRequest);
+        httpAdapter(std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("friendshipResponceErrorProcessing", httpPolicy));
+    LLCore::HttpRequest::ptr_t httpRequest(std::make_shared<LLCore::HttpRequest>());
     if (url.empty())
     {
         LL_WARNS("Friendship") << "Empty capability!" << LL_ENDL;
@@ -216,8 +216,8 @@ void decline_friendship_coro(std::string url, LLSD notification, S32 option)
     }
     LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
     LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t
-        httpAdapter(new LLCoreHttpUtil::HttpCoroutineAdapter("friendshipResponceErrorProcessing", httpPolicy));
-    LLCore::HttpRequest::ptr_t httpRequest(new LLCore::HttpRequest);
+        httpAdapter(std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("friendshipResponceErrorProcessing", httpPolicy));
+    LLCore::HttpRequest::ptr_t httpRequest(std::make_shared<LLCore::HttpRequest>());
 
     LLSD payload = notification["payload"];
     url += "?from=" + payload["from_id"].asString();
@@ -769,8 +769,8 @@ void response_group_invitation_coro(std::string url, LLUUID group_id, bool notif
 
     LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
     LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t
-        httpAdapter(new LLCoreHttpUtil::HttpCoroutineAdapter("responseGroupInvitation", httpPolicy));
-    LLCore::HttpRequest::ptr_t httpRequest(new LLCore::HttpRequest);
+        httpAdapter(std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("responseGroupInvitation", httpPolicy));
+    LLCore::HttpRequest::ptr_t httpRequest(std::make_shared<LLCore::HttpRequest>());
 
     LLSD payload;
     payload["group"] = group_id;

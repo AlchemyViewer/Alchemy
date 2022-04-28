@@ -549,8 +549,8 @@ void LLEventDispatcher::addArrayParamsDispatchEntry(const std::string& name,
                                                     LLSD::Integer arity)
 {
     mDispatch.insert(
-        DispatchMap::value_type(name, DispatchMap::mapped_type(
-                                    new ArrayParamsDispatchEntry(desc, invoker, arity))));
+        DispatchMap::value_type(name, std::static_pointer_cast<DispatchEntry>(
+                                    std::make_shared<ArrayParamsDispatchEntry>(desc, invoker, arity))));
 }
 
 void LLEventDispatcher::addMapParamsDispatchEntry(const std::string& name,
@@ -560,8 +560,8 @@ void LLEventDispatcher::addMapParamsDispatchEntry(const std::string& name,
                                                   const LLSD& defaults)
 {
     mDispatch.insert(
-        DispatchMap::value_type(name, DispatchMap::mapped_type(
-                                    new MapParamsDispatchEntry(name, desc, invoker, params, defaults))));
+        DispatchMap::value_type(name, std::static_pointer_cast<DispatchEntry>(
+                                    std::make_shared<MapParamsDispatchEntry>(name, desc, invoker, params, defaults))));
 }
 
 /// Register a callable by name
@@ -569,8 +569,8 @@ void LLEventDispatcher::add(const std::string& name, const std::string& desc,
                             const Callable& callable, const LLSD& required)
 {
     mDispatch.insert(
-        DispatchMap::value_type(name, DispatchMap::mapped_type(
-                                    new LLSDDispatchEntry(desc, callable, required))));
+        DispatchMap::value_type(name, std::static_pointer_cast<
+                                    DispatchEntry>(std::make_shared<LLSDDispatchEntry>(desc, callable, required))));
 }
 
 void LLEventDispatcher::addFail(const std::string& name, const std::string& classname) const
