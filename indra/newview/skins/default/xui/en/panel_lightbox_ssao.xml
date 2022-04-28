@@ -21,7 +21,7 @@
     height="15"
     left="30"
     top_pad="4"
-    width="130"
+    width="110"
     layout="topleft"
     tool_tip="NYI!"
     value="SSAO Strength:" />
@@ -74,7 +74,7 @@
     height="15"
     left="30"
     top_pad="3"
-    width="130"
+    width="110"
     layout="topleft"
     tool_tip="(Default: 5.0) Occlusion sensitivity factor, larger = more."
     value="SSAO Factor:" />
@@ -125,7 +125,7 @@
     height="15"
     left="30"
     top_pad="3"
-    width="130"
+    width="110"
     layout="topleft"
     tool_tip="(Default: 1500) Determines distance from surface to check for occlusion. Higher = Wider occlusion NOTE: Large values may produce artifacts."
     value="SSAO Scale:" />
@@ -176,7 +176,7 @@
     height="15"
     left="30"
     top_pad="3"
-    width="130"
+    width="110"
     layout="topleft"
     tool_tip="(Default: 400) Determines max screen radius to use for occlusion. NOTE: Large values may produce artifacts."
     value="SSAO Max Scale:" />

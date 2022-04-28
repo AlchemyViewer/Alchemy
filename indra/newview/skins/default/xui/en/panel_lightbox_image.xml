@@ -2,116 +2,64 @@
 <panel
  class="colortone_settings"
  layout="topleft"
- width="300"
- height="175"
+ width="350"
+ height="310"
  name="colortone_settings"
- can_resize="true">
-  <text
-   follows="top"
-   layout="top"
-   height="15"
-   left_delta="10"
-   top_pad="4"
-   width="70"
-   tool_tip="Controls SMAA Quality"
-   value="Anti-Aliasing:" />
-  <combo_box
-    follows="top|left"
-    layout="topleft"
-    height="16"
-    width="95"
-    left_delta="120"
-    top_pad="-16"
-    max_chars="128"
-    allow_text_entry="false"
-    tool_tip="Controls SMAA Quality"
-    control_name="RenderFSAASamples"
-    name="smaa_combo">
-    <combo_box.item
-      label="Disable"
-      name="smaa_off"
-      value="0" />
-    <combo_box.item
-      label="Low (x2)"
-      name="smaa_2"
-      value="2" />
-    <combo_box.item
-      label="Medium (x4)"
-      name="smaa_4"
-      value="4" />
-    <combo_box.item
-      label="High (x8)"
-      name="smaa_8"
-      value="8" />
-    <combo_box.item
-      label="Ultra (x16)"
-      name="smaa_16"
-      value="16" />
-  </combo_box>
+ can_resize="false">
   <text
     follows="left|top"
     height="15"
     left="10"
     top_pad="4"
-    width="105"
+    width="100"
     layout="topleft"
-    tool_tip="Controls Anisotropic Filtering Quality"
-    value="Anisotropic Filtering:" />
-  <combo_box
+    value="Image Processing" />
+    <text
+    follows="left|top"
+    height="15"
+    left="30"
+    top_pad="5"
+    width="50"
+    layout="topleft"
+    tool_tip="Which Sharpen method to use."
+    value="Sharpen:" />
+    <combo_box
     allow_text_entry="false"
-    tool_tip="Controls Anisotropic Filtering Quality"
-    control_name="RenderAnisotropicLevel"
+    tool_tip="Which Sharpen method to use."
+    control_name="RenderSharpenMethod"
     follows="left|top"
     height="16"
     layout="topleft"
-    left="130"
+    left_delta="70"
     max_chars="128"
-    name="anisotropicfilter_combo"
+    name="sharpenmethod_combo"
     top_pad="-16"
-    width="95">
+    width="80">
     <combo_box.item
-      label="Disable"
-      name="anisotropicfilter_off"
-      value="0" />
+    label="None"
+    name="sharp_none"
+    value="0" />
     <combo_box.item
-      label="Low (x2)"
-      name="anisotropicfilter_2"
-      value="2" />
+    label="CAS"
+    name="sharp_cas"
+    value="1" />
     <combo_box.item
-      label="Medium (x4)"
-      name="anisotropicfilter_4"
-      value="4" />
-    <combo_box.item
-      label="High (x8)"
-      name="anisotropicfilter_8"
-      value="8" />
-    <combo_box.item
-      label="Ultra (x16)"
-      name="anisotropicfilter_16"
-      value="16" />
-  </combo_box>
-  <text
-    follows="left|top"
-    height="15"
-    left="10"
-    top_pad="4"
-    width="90"
-    layout="topleft"
-    tool_tip="(Default: 1.0) [DANGEROUS] Internal render resolution scale. Sharpening interacts poorly with this setting, disable it for best results."
-    value="Resolution Scale:" />
+    label="DLS"
+    name="sharp_DLS"
+    value="2" />
+    </combo_box>
   <slider_bar
     top_pad="-18"
     height="20"
     increment=".1"
     follows="left|top|right"
     layout="topleft"
-    max_val="2"
-    min_val="0.1"
-    left="100"
+    max_val="1.0"
+    min_val="0.0"
+    left_delta="80"
     right="-75"
-    name="resMult_slider"
-    tool_tip="(Default: 1.0) [DANGEROUS] Internal render resolution scale. Sharpening interacts poorly with this setting, disable it for best results."
-    control_name="RenderResolutionMultiplier"/>
+    name="sharp_strength_slider"
+    control_name=""/>
   <spinner
     top_pad="-20"
     height="15"
@@ -120,15 +68,14 @@
     decimal_digits="1"
     follows="top|right"
     layout="topleft"
-    max_val="3"
-    min_val="0.1"
+    max_val="1.0"
+    min_val="0.0"
     width="55"
     increment=".1"
-    name="resMult_spinner"
-    tool_tip="(Default: 1.0) [DANGEROUS] Internal render resolution scale. Sharpening interacts poorly with this setting, disable it for best results."
-    control_name="RenderResolutionMultiplier"/>
+    name="sharp_strength_spinner"
+    control_name=""/>
   <button
-    name="resMult_default_btn"
+    name="sharpen_default_btn"
     follows="top|right"
     layout="topleft"
     height="22"
@@ -144,24 +91,24 @@
   <text
    follows="left|top"
    height="15"
-   left="10"
-   top_pad="2"
-   width="75"
+   left="30"
+   top_pad="4"
+   width="70"
    layout="topleft"
    tool_tip="(Default: Uchimura) Which algorithm should translate HDR values to SDR Colorspace"
    value="Tonemapper:" />
   <combo_box
      allow_text_entry="false"
-	 tool_tip="(Default: Uchimura) Which algorithm should translate HDR values to SDR Colorspace"
+	  tool_tip="(Default: Uchimura) Which algorithm should translate HDR values to SDR Colorspace"
      control_name="RenderToneMapType"
      follows="left|top"
      height="16"
      layout="topleft"
-	   left="130"
+	   left_delta="70"
      max_chars="128"
      name="tonemap_type_combo"
      top_pad="-16"
-     width="95">
+     width="80">
         <combo_box.item
          label="Linear"
          name="toneLinear"
@@ -199,15 +146,6 @@
          name="toneUncharted"
          value="9" />
     </combo_box>
-  <text
-    follows="left|top"
-    height="15"
-    left="30"
-    top_pad="4"
-    width="55"
-    layout="topleft"
-    tool_tip="(Default: 1.0) Adjusts the overall brightness of the image via the Tonemapper"
-    value="Exposure:" />
   <slider_bar
     top_pad="-18"
     height="20"
@@ -216,13 +154,13 @@
     layout="topleft"
     max_val="16.0"
     min_val="0.1"
-    left="100"
+    left_delta="80"
     right="-75"
     name="exposure_slider"
     tool_tip="(Default: 1.0) Adjusts the overall brightness of the image via the Tonemapper"
     control_name="RenderToneMapExposure"/>
   <spinner
-    top_pad="-20"
+    top_pad="-19"
     height="15"
     label_width="0"
     right="-20"
@@ -250,11 +188,12 @@
     <button.commit_callback
        function="ClickDefault" />
   </button>
-  <text
+  
+<text
 	    follows="left|top"
 	    height="15"
-	    left="10"
-	    top_pad="2"
+	    left="30"
+	    top_pad="4"
 	    width="60"
 	    layout="topleft"
 	    tool_tip="What Colorgrading LUT (Look Up Texture) to be used to colorgrade the image. Custom LUTs require the full filename!"
@@ -264,13 +203,13 @@
 	    tool_tip="What Colorgrading LUT (Look Up Texture) to be used to colorgrade the image. Custom LUTs require the full filename!"
       control_name="RenderColorGradeLUT"
       follows="left|top"
-      height="15"
+      height="20"
       layout="topleft"
-	    right="-20"
+	    right="-2"
       max_chars="200"
       name="colorlut_combo"
-	    top_pad="-15"
-      width="180">
+	    top_pad="-18"
+      width="248">
       <combo_box.item
          label="Neutral"
          name="lut_neutral"
@@ -372,91 +311,324 @@
          name="lut_AST5"
          value="AESTHETICS_5.png" />
   </combo_box>
-  <text
+<view_border
+        bevel_style="none"
+        height="0"
+        layout="topleft"
+        left="15"
+        name="render_divider"
+        top_pad="7"
+        width="275"/>
+
+<text
     follows="left|top"
     height="15"
     left="10"
+    top_pad="7"
+    width="100"
+    layout="topleft"
+    value="Rendering Settings" />
+<text
+   follows="left|top"
+    height="15"
+    left="30"
     top_pad="4"
     width="90"
     layout="topleft"
-    tool_tip="Which Contrast-Aware Sharpen(CAS) method to use. FidelityFX: AMD's method, nVidia DLS: nVidia's method. Requires Anti-Aliasing to be enabled!"
-    value="Sharpen Method:" />
-    <combo_box
-    allow_text_entry="false"
-    tool_tip="Which Contrast-Aware Sharpen(CAS) method to use. FidelityFX: AMD's method, nVidia DLS: nVidia's method. Requires Anti-Aliasing to be enabled!"
-    control_name="RenderSharpenMethod"
-    follows="left|top"
-    height="16"
+   tool_tip="Controls SMAA Quality"
+   value="Anti-Aliasing:" />
+  <combo_box
+    follows="top|left"
     layout="topleft"
-    left="130"
-    max_chars="128"
-    name="sharpenmethod_combo"
+    height="16"
+    width="150"
+    right="-2"
     top_pad="-16"
-    width="95">
+    max_chars="128"
+    allow_text_entry="false"
+    tool_tip="Controls SMAA Quality"
+    control_name="RenderFSAASamples"
+    name="smaa_combo">
     <combo_box.item
-    label="Disable"
-    name="sharp_none"
-    value="0" />
+      label="Disable"
+      name="smaa_off"
+      value="0" />
     <combo_box.item
-    label="FidelityFX"
-    name="sharp_amdfx"
-    value="1" />
+      label="Low (x2)"
+      name="smaa_2"
+      value="2" />
     <combo_box.item
-    label="nVidia DLS"
-    name="sharp_nv"
-    value="2" />
-    </combo_box>
+      label="Medium (x4)"
+      name="smaa_4"
+      value="4" />
+    <combo_box.item
+      label="High (x8)"
+      name="smaa_8"
+      value="8" />
+    <combo_box.item
+      label="Ultra (x16)"
+      name="smaa_16"
+      value="16" />
+  </combo_box>
   <text
     follows="left|top"
     height="15"
     left="30"
     top_pad="4"
-    width="50"
+    width="120"
     layout="topleft"
-    tool_tip="NOT YET IMPLEMENTED!"
-    value="Strength:" />
+    tool_tip="Controls Anisotropic Filtering Quality"
+    value="Anisotropic Filtering:" />
+  <combo_box
+    allow_text_entry="false"
+    tool_tip="Controls Anisotropic Filtering Quality"
+    control_name="RenderAnisotropicLevel"
+    follows="left|top"
+    height="16"
+    layout="topleft"
+    right="-2"
+    max_chars="128"
+    name="anisotropicfilter_combo"
+    top_pad="-16"
+    width="150">
+    <combo_box.item
+      label="Disable"
+      name="anisotropicfilter_off"
+      value="0" />
+    <combo_box.item
+      label="Low (x2)"
+      name="anisotropicfilter_2"
+      value="2" />
+    <combo_box.item
+      label="Medium (x4)"
+      name="anisotropicfilter_4"
+      value="4" />
+    <combo_box.item
+      label="High (x8)"
+      name="anisotropicfilter_8"
+      value="8" />
+    <combo_box.item
+      label="Ultra (x16)"
+      name="anisotropicfilter_16"
+      value="16" />
+  </combo_box>
+  <text
+    follows="left|top"
+    height="15"
+    left="30"
+    top_pad="3"
+    width="90"
+    layout="topleft"
+    value="Reflections:" />
+  <combo_box
+    control_name="RenderReflectionDetail"
+    height="16"
+    layout="topleft"
+    right="-2"
+    top_delta="0"
+    name="Reflections"
+    width="150">
+      <combo_box.item
+        label="None; opaque"
+        name="0"
+        value="-2"/>
+      <combo_box.item
+        label="None; transparent"
+        name="0"
+        value="-1"/>
+      <combo_box.item
+        label="Minimal"
+        name="0"
+        value="0"/>
+      <combo_box.item
+        label="Terrain and trees"
+        name="1"
+        value="1"/>
+      <combo_box.item
+        label="All static objects"
+        name="2"
+        value="2"/>
+      <combo_box.item
+        label="All avatars and objects"
+        name="3"
+        value="3"/>
+      <combo_box.item
+        label="Everything"
+        name="4"
+        value="4"/>
+  </combo_box>
+  <text
+    follows="left|top"
+    height="15"
+    left="30"
+    top_pad="4"
+    width="90"
+    layout="topleft"
+    tool_tip="(Default: 1.0) [DANGEROUS] Internal render resolution scale. Sharpening interacts poorly with this setting, disable it for best results."
+    value="Resolution Scale:" />
   <slider_bar
-    enabled="false"
     top_pad="-18"
     height="20"
     increment=".1"
     follows="left|top|right"
     layout="topleft"
-    max_val="1"
-    min_val="0"
-    left="100"
-    right="-75"
-    name="sharp_strength_slider"
-    tool_tip="NOT YET IMPLEMENTED!"
-    control_name=""/>
+    max_val="2"
+    min_val=".5"
+    left="120"
+    right="-55"
+    name="resMult_slider"
+    tool_tip="(Default: 1.0) [DANGEROUS] Internal render resolution scale. Sharpening interacts poorly with this setting, disable it for best results."
+    control_name="RenderResolutionMultiplier"/>
   <spinner
-    enabled="false"
     top_pad="-20"
     height="15"
     label_width="0"
-    right="-20"
+    right="-2"
     decimal_digits="1"
     follows="top|right"
     layout="topleft"
-    max_val="1"
-    min_val="0"
+    max_val="3"
+    min_val=".5"
     width="55"
     increment=".1"
-    name="sharp_strength_spinner"
-    tool_tip="NOT YET IMPLEMENTED!"
-    control_name=""/>
-  <button
-    name="sharpen_default_btn"
+    name="resMult_spinner"
+    tool_tip="(Default: 1.0) [DANGEROUS] Internal render resolution scale. Sharpening interacts poorly with this setting, disable it for best results."
+    control_name="RenderResolutionMultiplier"/>
+<text
+    follows="left|top"
+    height="15"
+    left="30"
+    top_pad="8"
+    width="90"
+    layout="topleft"
+    value="Draw Distance:" />
+  <slider_bar
+    top_pad="-18"
+    height="20"
+    increment="32"
+    follows="left|top|right"
+    layout="topleft"
+    max_val="1024"
+    min_val="32"
+    left="120"
+    right="-55"
+    name="draw_dist_slider_bar"
+    control_name="RenderFarClip"/>
+  <spinner
+    top_pad="-20"
+    height="15"
+    label_width="0"
+    right="-2"
+    decimal_digits="0"
     follows="top|right"
     layout="topleft"
-    height="22"
-    left_delta="55"
-    top_pad="-15"
-    width="18"
-    scale_image="true"
-    image_overlay="Refresh_Off"
-    image_overlay_alignment="center">
-    <button.commit_callback
-       function="ClickDefault" />
-  </button>
+    max_val="1024"
+    min_val="32"
+    width="55"
+    increment="32"
+    name="draw_dist_spinner"
+    control_name="RenderFarClip"/>
+<text
+    follows="left|top"
+    height="15"
+    left="30"
+    top_pad="8"
+    width="90"
+    layout="topleft"
+    value="Object LOD:" />
+  <slider_bar
+    top_pad="-18"
+    height="20"
+    increment=".1"
+    follows="left|top|right"
+    layout="topleft"
+    max_val="4.0"
+    min_val="1.0"
+    left="120"
+    right="-55"
+    name="lod_slider_bar"
+    control_name="RenderVolumeLODFactor"/>
+  <spinner
+    top_pad="-20"
+    height="15"
+    label_width="0"
+    right="-2"
+    decimal_digits="1"
+    follows="top|right"
+    layout="topleft"
+    max_val="4.0"
+    min_val="1.0"
+    width="55"
+    increment=".1"
+    name="lod_spinner"
+    control_name="RenderVolumeLODFactor"/>
+<text
+    follows="left|top"
+    height="15"
+    left="30"
+    top_pad="8"
+    width="90"
+    layout="topleft"
+    value="Max Particles:" />
+  <slider_bar
+    top_pad="-18"
+    height="20"
+    increment="256"
+    follows="left|top|right"
+    layout="topleft"
+    max_val="8192"
+    min_val="0"
+    left="120"
+    right="-55"
+    name="max_particles_slider_bar"
+    control_name="RenderMaxPartCount"/>
+  <spinner
+    top_pad="-20"
+    height="15"
+    label_width="0"
+    right="-2"
+    decimal_digits="0"
+    follows="top|right"
+    layout="topleft"
+    max_val="8192"
+    min_val="0"
+    width="55"
+    increment="256"
+    name="max_particles_spinner"
+    control_name="RenderMaxPartCount"/>
+<text
+    follows="left|top"
+    height="15"
+    left="30"
+    top_pad="8"
+    width="90"
+    layout="topleft"
+    value="Max Avatars:" />
+  <slider_bar
+    top_pad="-18"
+    height="20"
+    increment="1"
+    follows="left|top|right"
+    layout="topleft"
+    max_val="65"
+    min_val="0"
+    left="120"
+    right="-55"
+    name="max_avatar_slider_bar"
+    control_name="RenderAvatarMaxNonImpostors"/>
+  <spinner
+    top_pad="-20"
+    height="15"
+    label_width="0"
+    right="-2"
+    decimal_digits="0"
+    follows="top|right"
+    layout="topleft"
+    max_val="65"
+    min_val="0"
+    width="55"
+    increment="1"
+    name="max_avatar_spinner"
+    control_name="RenderAvatarMaxNonImpostors"/>
+  
 </panel>
