@@ -171,7 +171,7 @@ class LLTestCallback : public chained_callback
 
 public:
 	LLTestCallback(bool verbose_mode, std::ostream *stream,
-				   boost::shared_ptr<LLReplayLog> replayer) :
+				   std::shared_ptr<LLReplayLog> replayer) :
 		mVerboseMode(verbose_mode),
 		mTotalTests(0),
 		mPassedTests(0),
@@ -179,7 +179,7 @@ public:
 		mSkippedTests(0),
 		// By default, capture a shared_ptr to std::cout, with a no-op "deleter"
 		// so that destroying the shared_ptr makes no attempt to delete std::cout.
-		mStream(boost::shared_ptr<std::ostream>(&std::cout, [](std::ostream*){})),
+		mStream(std::shared_ptr<std::ostream>(&std::cout, [](std::ostream*){})),
 		mReplayer(replayer)
 	{
 		if (stream)
@@ -193,7 +193,7 @@ public:
 			// Allocate and assign in two separate steps, per Herb Sutter.
 			// (Until we turn on C++11 support, have to wrap *stream with
 			// boost::ref() due to lack of perfect forwarding.)
-			boost::shared_ptr<std::ostream> pstream(new TeeStream(std::cout, boost::ref(*stream)));
+			std::shared_ptr<std::ostream> pstream(new TeeStream(std::cout, boost::ref(*stream)));
 			mStream = pstream;
 		}
 	}
@@ -317,8 +317,8 @@ protected:
 	int mPassedTests;
 	int mFailedTests;
 	int mSkippedTests;
-	boost::shared_ptr<std::ostream> mStream;
-	boost::shared_ptr<LLReplayLog> mReplayer;
+	std::shared_ptr<std::ostream> mStream;
+	std::shared_ptr<LLReplayLog> mReplayer;
 };
 
 // TeamCity specific class which emits service messages
@@ -328,7 +328,7 @@ class LLTCTestCallback : public LLTestCallback
 {
 public:
 	LLTCTestCallback(bool verbose_mode, std::ostream *stream,
-					 boost::shared_ptr<LLReplayLog> replayer) :
+					 std::shared_ptr<LLReplayLog> replayer) :
 		LLTestCallback(verbose_mode, stream, replayer)
 	{
 	}
@@ -594,7 +594,7 @@ int main(int argc, char **argv)
 
 	// set up logging
 	const char* LOGFAIL = getenv("LOGFAIL");
-	boost::shared_ptr<LLReplayLog> replayer{boost::make_shared<LLReplayLog>()};
+	std::shared_ptr<LLReplayLog> replayer{std::make_shared<LLReplayLog>()};
 
 	// Testing environment variables for both 'set' and 'not empty' allows a
 	// user to suppress a pre-existing environment variable by forcing empty.

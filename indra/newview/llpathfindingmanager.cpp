@@ -114,7 +114,7 @@ public:
 	void handleTerrainLinksetsResult(const LLSD &pContent);
 	void handleTerrainLinksetsError();
 
-    typedef boost::shared_ptr<LinksetsResponder> ptr_t;
+    typedef std::shared_ptr<LinksetsResponder> ptr_t;
 
 protected:
 
@@ -139,7 +139,7 @@ private:
 	LLPathfindingObjectPtr                          mTerrainLinksetPtr;
 };
 
-typedef boost::shared_ptr<LinksetsResponder> LinksetsResponderPtr;
+typedef std::shared_ptr<LinksetsResponder> LinksetsResponderPtr;
 
 //---------------------------------------------------------------------------
 // LLPathfindingManager
@@ -721,7 +721,7 @@ LLPathfindingNavMeshPtr LLPathfindingManager::getNavMeshForRegion(const LLUUID &
 	NavMeshMap::iterator navMeshIter = mNavMeshMap.find(pRegionUUID);
 	if (navMeshIter == mNavMeshMap.end())
 	{
-		navMeshPtr = LLPathfindingNavMeshPtr(new LLPathfindingNavMesh(pRegionUUID));
+		navMeshPtr = std::make_shared<LLPathfindingNavMesh>(pRegionUUID);
 		mNavMeshMap.insert(std::pair<LLUUID, LLPathfindingNavMeshPtr>(pRegionUUID, navMeshPtr));
 	}
 	else

@@ -73,7 +73,7 @@ namespace
     class ObjectInventoryFetcher: public LLVOInventoryListener
     {
     public:
-        typedef boost::shared_ptr<ObjectInventoryFetcher> ptr_t;
+        typedef std::shared_ptr<ObjectInventoryFetcher> ptr_t;
 
         ObjectInventoryFetcher(LLEventPump &pump, LLViewerObject* object, void* user_data) :
             mPump(pump),
@@ -475,7 +475,7 @@ bool LLFloaterCompileQueue::processScript(LLHandle<LLFloaterCompileQueue> hfloat
     std::string url = object->getRegion()->getCapability("UpdateScriptTask");
 
     {
-        LLResourceUploadInfo::ptr_t uploadInfo(new LLQueuedScriptAssetUpload(object->getID(), 
+        LLResourceUploadInfo::ptr_t uploadInfo = std::make_shared<LLQueuedScriptAssetUpload>(object->getID(), 
             inventory->getUUID(), 
             assetId, 
             monocompile ? LLScriptAssetUpload::MONO : LLScriptAssetUpload::LSL2,
@@ -483,7 +483,7 @@ bool LLFloaterCompileQueue::processScript(LLHandle<LLFloaterCompileQueue> hfloat
             inventory->getName(), 
             LLUUID(), 
             experienceId, 
-            boost::bind(&LLFloaterCompileQueue::handleHTTPResponse, pump.getName(), _4)));
+            boost::bind(&LLFloaterCompileQueue::handleHTTPResponse, pump.getName(), _4));
 
         LLViewerAssetUpload::EnqueueInventoryUpload(url, uploadInfo);
     }
@@ -808,7 +808,7 @@ void LLFloaterScriptQueue::objectScriptProcessingQueueCoro(std::string action, L
             LLInventoryObject::object_list_t inventory;
             if (obj)
             {
-                ObjectInventoryFetcher::ptr_t fetcher(new ObjectInventoryFetcher(maildrop, obj, NULL));
+                ObjectInventoryFetcher::ptr_t fetcher = std::make_shared<ObjectInventoryFetcher>(maildrop, obj, nullptr);
 
                 fetcher->fetchInventory();
 

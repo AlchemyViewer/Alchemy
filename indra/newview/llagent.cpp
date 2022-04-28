@@ -4502,7 +4502,7 @@ void LLAgent::teleportViaLandmark(const LLUUID& landmark_asset_id)
 	}
 // [/RLVa:KB]
 
-	mTeleportRequest = LLTeleportRequestPtr(new LLTeleportRequestViaLandmark(landmark_asset_id));
+	mTeleportRequest = std::make_shared<LLTeleportRequestViaLandmark>(landmark_asset_id);
 	startTeleportRequest();
 }
 
@@ -4528,7 +4528,7 @@ void LLAgent::doTeleportViaLandmark(const LLUUID& landmark_asset_id)
 
 void LLAgent::teleportViaLure(const LLUUID& lure_id, BOOL godlike)
 {
-	mTeleportRequest = LLTeleportRequestPtr(new LLTeleportRequestViaLure(lure_id, godlike));
+	mTeleportRequest = std::make_shared<LLTeleportRequestViaLure>(lure_id, godlike);
 	startTeleportRequest();
 }
 
@@ -4628,7 +4628,7 @@ void LLAgent::teleportViaLocation(const LLVector3d& pos_global)
 	}
 // [/RLVa:KB]
 
-	mTeleportRequest = LLTeleportRequestPtr(new LLTeleportRequestViaLocation(pos_global));
+	mTeleportRequest = std::make_shared<LLTeleportRequestViaLocation>(pos_global);
 	startTeleportRequest();
 }
 
@@ -4717,7 +4717,7 @@ void LLAgent::teleportViaLocationLookAt(const LLVector3d& pos_global, const LLVe
 		}
 	}
 
-	mTeleportRequest = LLTeleportRequestPtr(new LLTeleportRequestViaLocationLookAt(pos_global, (look_at.isExactlyZero()) ? LLViewerCamera::getInstance()->getAtAxis() : look_at));
+	mTeleportRequest = std::make_shared<LLTeleportRequestViaLocationLookAt>(pos_global, (look_at.isExactlyZero()) ? LLViewerCamera::getInstance()->getAtAxis() : look_at);
 	startTeleportRequest();
 }
 // [/RLVa:KB]

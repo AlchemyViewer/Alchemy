@@ -26,8 +26,9 @@
 #ifndef LL_SEARCHABLE_UI_H
 #define LL_SEARCHABLE_UI_H
 
+#include "llview.h"
+
 class LLMenuItemGL;
-class LLView;
 class LLPanel;
 class LLTabContainer;
 
@@ -41,9 +42,9 @@ namespace ll
 		struct PanelData;
 		struct TabContainerData;
 
-		typedef boost::shared_ptr< SearchableItem > SearchableItemPtr;
-		typedef boost::shared_ptr< PanelData > PanelDataPtr;
-		typedef boost::shared_ptr< TabContainerData > TabContainerDataPtr;
+		typedef std::shared_ptr< SearchableItem > SearchableItemPtr;
+		typedef std::shared_ptr< PanelData > PanelDataPtr;
+		typedef std::shared_ptr< TabContainerData > TabContainerDataPtr;
 
 		typedef std::vector< TabContainerData > tTabContainerDataList;
 		typedef std::vector< SearchableItemPtr > tSearchableItemList;
@@ -52,10 +53,10 @@ namespace ll
 		struct SearchableItem
 		{
 			LLWString mLabel;
-			LLView const *mView;
+			const LLView*	  mView;
 			ll::ui::SearchableControl const *mCtrl;
 
-			std::vector< boost::shared_ptr< SearchableItem >  > mChildren;
+			std::vector< std::shared_ptr< SearchableItem >  > mChildren;
 
 			virtual ~SearchableItem();
 
@@ -68,8 +69,8 @@ namespace ll
 			LLPanel const *mPanel;
 			std::string mLabel;
 
-			std::vector< boost::shared_ptr< SearchableItem > > mChildren;
-			std::vector< boost::shared_ptr< PanelData > > mChildPanel;
+			std::vector< std::shared_ptr< SearchableItem > > mChildren;
+			std::vector< std::shared_ptr< PanelData > > mChildPanel;
 
 			virtual ~PanelData();
 
@@ -93,7 +94,7 @@ namespace ll
 	{
 		struct SearchableItem;
 
-		typedef boost::shared_ptr< SearchableItem > SearchableItemPtr;
+		typedef std::shared_ptr< SearchableItem > SearchableItemPtr;
 
 		typedef std::vector< SearchableItemPtr > tSearchableItemList;
 
