@@ -85,8 +85,9 @@
     scale_image="true"
     image_overlay="Refresh_Off"
     image_overlay_alignment="center">
-    <button.commit_callback
-       function="ClickDefault" />
+	<button.commit_callback
+	   function="LightBox.ResetGroupDefault"
+	   parameter="sharpen" />
   </button>
   <text
    follows="left|top"
@@ -185,8 +186,9 @@
     scale_image="true"
     image_overlay="Refresh_Off"
     image_overlay_alignment="center">
-    <button.commit_callback
-       function="ClickDefault" />
+	  <button.commit_callback
+		 function="LightBox.ResetGroupDefault"
+		 parameter="tonemap" />
   </button>
   
 <text

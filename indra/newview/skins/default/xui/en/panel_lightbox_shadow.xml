@@ -87,8 +87,9 @@
     scale_image="true"
     image_overlay="Refresh_Off"
     image_overlay_alignment="center">
-    <button.commit_callback
-       function="ClickDefault" />
+	  <button.commit_callback
+		 function="LightBox.ResetControlDefault"
+		 parameter="RenderShadowResolutionScale" />
   </button>
   <text
     follows="left|top"
@@ -138,8 +139,9 @@
     scale_image="true"
     image_overlay="Refresh_Off"
     image_overlay_alignment="center">
-    <button.commit_callback
-       function="ClickDefault" />
+	  <button.commit_callback
+		  function="LightBox.ResetControlDefault"
+		  parameter="RenderShadowBias" />
   </button>
   <text
     follows="left|top"
@@ -189,8 +191,9 @@
     scale_image="true"
     image_overlay="Refresh_Off"
     image_overlay_alignment="center">
-    <button.commit_callback
-       function="ClickDefault" />
+	  <button.commit_callback
+		  function="LightBox.ResetControlDefault"
+		  parameter="RenderShadowOffset" />
   </button>
   <text
     follows="left|top"
@@ -240,8 +243,9 @@
     scale_image="true"
     image_overlay="Refresh_Off"
     image_overlay_alignment="center">
-    <button.commit_callback
-       function="ClickDefault" />
+	  <button.commit_callback
+		  function="LightBox.ResetControlDefault"
+		  parameter="RenderSpotShadowBias" />
   </button>
   <text
     follows="left|top"
@@ -291,8 +295,9 @@
     scale_image="true"
     image_overlay="Refresh_Off"
     image_overlay_alignment="center">
-    <button.commit_callback
-       function="ClickDefault" />
+	  <button.commit_callback
+		  function="LightBox.ResetControlDefault"
+		  parameter="RenderSpotShadowOffset" />
   </button>
   <text
     follows="left|top"
@@ -342,8 +347,9 @@
     scale_image="true"
     image_overlay="Refresh_Off"
     image_overlay_alignment="center">
-    <button.commit_callback
-       function="ClickDefault" />
+	  <button.commit_callback
+		  function="LightBox.ResetControlDefault"
+		  parameter="RenderShadowBlurSize" />
   </button>
   <text
     follows="left|top"
@@ -393,8 +399,9 @@
     scale_image="true"
     image_overlay="Refresh_Off"
     image_overlay_alignment="center">
-    <button.commit_callback
-       function="ClickDefault" />
+	  <button.commit_callback
+		  function="LightBox.ResetControlDefault"
+		  parameter="RenderShadowBlurDistFactor" />
   </button>
   <panel
 				label="SSAO"

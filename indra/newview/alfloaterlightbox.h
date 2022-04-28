@@ -41,6 +41,8 @@ public:
 	ALFloaterLightBox(const LLSD& key);
 	BOOL postBuild() override;
 private:
+	void onClickResetControlDefault(const LLSD& userdata);
+	void onClickResetGroupDefault(const LLSD& userdata);
 	
 };
 

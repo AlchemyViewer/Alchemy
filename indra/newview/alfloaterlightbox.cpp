@@ -31,12 +31,63 @@
 #include "llviewerprecompiledheaders.h"
 #include "alfloaterlightbox.h"
 
+#include "llviewercontrol.h"
+
 ALFloaterLightBox::ALFloaterLightBox(const LLSD& key)
 :	LLFloater(key)
 {
+    mCommitCallbackRegistrar.add("LightBox.ResetControlDefault", std::bind(&ALFloaterLightBox::onClickResetControlDefault, this, std::placeholders::_2));
+    mCommitCallbackRegistrar.add("LightBox.ResetGroupDefault", std::bind(&ALFloaterLightBox::onClickResetGroupDefault, this, std::placeholders::_2));
 }
 
 BOOL ALFloaterLightBox::postBuild()
 {
 	return TRUE;
+}
+
+void ALFloaterLightBox::onClickResetControlDefault(const LLSD& userdata)
+{
+	const std::string& control_name = userdata.asString();
+	LLControlVariable* controlp = gSavedSettings.getControl(control_name);
+	if (controlp)
+	{
+		controlp->resetToDefault(true);
+	}
+}
+
+void ALFloaterLightBox::onClickResetGroupDefault(const LLSD& userdata)
+{
+	const std::string& setting_group = userdata.asString();
+	LLControlVariable* controlp = nullptr;
+	if (setting_group == "sharpen")
+	{
+		controlp = gSavedSettings.getControl("RenderSharpenMethod");
+		if (controlp)
+		{
+			controlp->resetToDefault(true);
+		}
+		controlp = gSavedSettings.getControl("RenderSharpenCASParams");
+		if (controlp)
+		{
+			controlp->resetToDefault(true);
+		}
+	    controlp = gSavedSettings.getControl("RenderSharpenDLSParams");
+		if (controlp)
+		{
+			controlp->resetToDefault(true);
+		}
+	}
+	else if (setting_group == "tonemap")
+	{
+		controlp = gSavedSettings.getControl("RenderToneMapType");
+		if (controlp)
+		{
+			controlp->resetToDefault(true);
+		}
+		controlp = gSavedSettings.getControl("RenderToneMapExposure");
+		if (controlp)
+		{
+			controlp->resetToDefault(true);
+		}
+	}
 }
