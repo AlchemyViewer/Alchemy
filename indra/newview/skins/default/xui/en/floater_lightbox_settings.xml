@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes" ?>
 <floater
- width="360"
- height="320"
+ width="365"
+ height="330"
  layout="topleft"
- min_height="320"
- min_width="360"
+ min_height="330"
+ min_width="365"
  name="floater_lightbox_settings"
  positioning="cascading"
  title="LIGHTBOX SETTINGS"
@@ -15,40 +15,1860 @@
 		top_pad="0" 
 		enabled="true" 
 		follows="left|top" 
-		height="320" 
-		left_delta="0"
+		height="330" 
+		left_delta="5"
 		mouse_opaque="false" 
 		name="lightbox_tab_container" 
 		tab_position="top"
 		tab_stop="false" 
 		width="350">
+			<!--Image Panel-->
 			<panel
 				label="Image"
-				name="colortone_panel"
-				class="colortone_panel"
-				filename="panel_lightbox_image.xml"
+				class="colortone_settings"
 				layout="topleft"
-				follows="all" />
-			<panel
-				label="DoF"
-				name="dof_panel"
-				class="dof_panel"
-				filename="panel_lightbox_dof.xml"
-				layout="topleft"
-				follows="all" />
+				name="colortone_settings"
+				can_resize="false">
+				<text
+					follows="left|top"
+					height="15"
+					left="10"
+					top_pad="4"
+					width="100"
+					layout="topleft"
+					value="Image Processing" />
+				<!--Sharpen Controls-->
+				<text
+					follows="left|top"
+					height="15"
+					left="30"
+					top_pad="5"
+					width="50"
+					layout="topleft"
+					tool_tip="Which Sharpen method to use."
+					value="Sharpen:"/>
+				<combo_box
+					allow_text_entry="false"
+					tool_tip="Which Sharpen method to use."
+					control_name="RenderSharpenMethod"
+					follows="left|top"
+					height="16"
+					layout="topleft"
+					left_delta="70"
+					max_chars="128"
+					name="sharpenmethod_combo"
+					top_pad="-16"
+					width="80">
+					<combo_box.item
+						label="None"
+						name="sharp_none"
+						value="0" />
+					<combo_box.item
+						label="CAS"
+						name="sharp_cas"
+						value="1" />
+					<combo_box.item
+						label="DLS"
+						name="sharp_DLS"
+						value="2" />
+					</combo_box>
+				<!--TODO: Hookup to RenderSharpenCASParams.X, RenderSharpenDLS.X-->
+				<slider_bar
+					top_pad="-18"
+					height="20"
+					increment=".1"
+					follows="left|top|right"
+					layout="topleft"
+					max_val="1.0"
+					min_val="0.0"
+					left_delta="80"
+					right="-75"
+					name="sharp_strength_slider"
+					control_name=""/>
+				<spinner
+					top_pad="-20"
+					height="15"
+					label_width="0"
+					right="-20"
+					decimal_digits="1"
+					follows="top|right"
+					layout="topleft"
+					max_val="1.0"
+					min_val="0.0"
+					width="55"
+					increment=".1"
+					name="sharp_strength_spinner"
+					control_name=""/>
+				<button
+					name="sharpen_default_btn"
+					follows="top|right"
+					layout="topleft"
+					height="22"
+					left_delta="55"
+					top_pad="-15"
+					width="18"
+					scale_image="true"
+					image_overlay="Refresh_Off"
+					image_overlay_alignment="center">
+					<button.commit_callback
+					function="LightBox.ResetGroupDefault"
+					parameter="sharpen" />
+				</button>
+				<!--Tonemapper Control-->
+				<text
+					follows="left|top"
+					height="15"
+					left="30"
+					top_pad="4"
+					width="70"
+					layout="topleft"
+					tool_tip="Which algorithm should translate HDR values to SDR Colorspace"
+					value="Tonemapper:" />
+				<combo_box
+					allow_text_entry="false"
+					tool_tip="Which algorithm should translate HDR values to SDR Colorspace"
+					control_name="RenderToneMapType"
+					follows="left|top"
+					height="16"
+					layout="topleft"
+					left_delta="70"
+					max_chars="128"
+					name="tonemap_type_combo"
+					top_pad="-16"
+					width="80">
+					<combo_box.item
+						label="Linear"
+						name="toneLinear"
+						value="1" />
+					<combo_box.item
+						label="Reinhard"
+						name="toneReinhard"
+						value="2" />
+					<combo_box.item
+						label="Reinhard2"
+						name="toneReinhard2"
+						value="3" />
+					<combo_box.item
+						label="Filmic"
+						name="toneFilmic"
+						value="4" />
+					<combo_box.item
+						label="Unreal"
+						name="toneUnreal"
+						value="5" />
+					<combo_box.item
+						label="ACES"
+						name="toneACES"
+						value="6" />
+					<combo_box.item
+						label="Uchimura"
+						name="toneUchimura"
+						value="7" />
+					<combo_box.item
+						label="Lottes"
+						name="toneLottes"
+						value="8" />
+					<combo_box.item
+						label="Uncharted"
+						name="toneUncharted"
+						value="9" />
+				</combo_box>
+				<slider_bar
+					top_pad="-18"
+					height="20"
+					increment=".1"
+					follows="left|top|right"
+					layout="topleft"
+					max_val="16.0"
+					min_val="0.1"
+					left_delta="80"
+					right="-75"
+					name="exposure_slider"
+					tool_tip="Adjusts the overall brightness of the image via the Tonemapper"
+					control_name="RenderToneMapExposure"/>
+				<spinner
+					top_pad="-19"
+					height="15"
+					label_width="0"
+					right="-20"
+					decimal_digits="1"
+					follows="top|right"
+					layout="topleft"
+					max_val="16.0"
+					min_val="0.1"
+					width="55"
+					increment=".1"
+					name="exposure_spinner"
+					tool_tip="Adjusts the overall brightness of the image via the Tonemapper"
+					control_name="RenderToneMapExposure"/>
+				<button
+					name="exposure_default_btn"
+					follows="top|right"
+					layout="topleft"
+					height="22"
+					left_delta="55"
+					top_pad="-15"
+					width="18"
+					scale_image="true"
+					image_overlay="Refresh_Off"
+					image_overlay_alignment="center">
+					<button.commit_callback
+						function="LightBox.ResetGroupDefault"
+						parameter="tonemap" />
+				</button>
+				<!--LUT Control-->
+				<text
+					follows="left|top"
+					height="15"
+					left="30"
+					top_pad="4"
+					width="60"
+					layout="topleft"
+					tool_tip="What Colorgrading LUT (Look Up Texture) to be used to colorgrade the image. Custom LUTs require the full filename!"
+					value="Active LUT:" />
+				<!--TODO: Make more flexible?-->
+				<combo_box
+					allow_text_entry="true"
+					tool_tip="What Colorgrading LUT (Look Up Texture) to be used to colorgrade the image. Custom LUTs require the full filename!"
+					control_name="RenderColorGradeLUT"
+					follows="left|top"
+					height="20"
+					layout="topleft"
+					right="-4"
+					max_chars="200"
+					name="colorlut_combo"
+					top_pad="-18"
+					width="246">
+					<combo_box.item
+						label="Neutral"
+						name="lut_neutral"
+						value="NeutralLUT.png" />
+					<combo_box.item
+						label="CrossProcess - Warm"
+						name="lut_xprocess_warm"
+						value="CrossWarm.png" />
+					<combo_box.item
+						label="CrossProcess - Cool"
+						name="lut_xprocess_cool"
+						value="CrossCool.png" />
+					<combo_box.item
+						label="Acid Trip"
+						name="lut_acidTrip"
+						value="AcidTrip.png" />
+					<combo_box.item
+						label="Battleblue"
+						name="lut_battleblue"
+						value="Battleblue.png" />
+					<combo_box.item
+						label="Crunchy"
+						name="lut_crunchy"
+						value="Crunchy.png" />
+					<combo_box.item
+						label="Dreary"
+						name="lut_dreary"
+						value="Dreary.png" />
+					<combo_box.item
+						label="Fall Painty"
+						name="lut_fallPainty"
+						value="FallPainty.png" />
+					<combo_box.item
+						label="Harshness"
+						name="lut_harshness"
+						value="Harshness.png" />
+					<combo_box.item
+						label="Nuked"
+						name="lut_nuked"
+						value="Nuked.png" />
+					<combo_box.item
+						label="OG Boy"
+						name="lut_ogBoy"
+						value="OGBoy.png" />
+					<combo_box.item
+						label="Old Photo"
+						name="lut_oldPhoto"
+						value="OldPhoto.png" />
+					<combo_box.item
+						label="Pastel Dreams"
+						name="lut_pastelDreams"
+						value="PastelDreams.png" />
+					<combo_box.item
+						label="Purple Haze"
+						name="lut_purpleHaze"
+						value="PurpleHaze.png" />
+					<combo_box.item
+						label="Sickly Blue"
+						name="lut_sicklyBlue"
+						value="SicklyBlue.png" />
+					<combo_box.item
+						label="Sinner 1"
+						name="lut_sinner1"
+						value="Sinner.png" />
+					<combo_box.item
+						label="Sinner 2"
+						name="lut_sinner2"
+						value="Sinner2.png" />
+					<combo_box.item
+						label="Tealness"
+						name="lut_tealness"
+						value="Tealness.png" />
+					<combo_box.item
+						label="Toonland"
+						name="lut_toonland"
+						value="Toonland.png" />
+					<combo_box.item
+						label="Warm"
+						name="lut_warm"
+						value="Warm.png" />
+					<combo_box.item
+						label="A E S T H E T I C S  1"
+						name="lut_AST1"
+						value="AESTHETICS_1.png" />
+					<combo_box.item
+						label="A E S T H E T I C S  2"
+						name="lut_AST2"
+						value="AESTHETICS_2.png" />
+					<combo_box.item
+						label="A E S T H E T I C S  3"
+						name="lut_AST3"
+						value="AESTHETICS_3.png" />
+					<combo_box.item
+						label="A E S T H E T I C S  4"
+						name="lut_AST4"
+						value="AESTHETICS_4.png" />
+					<combo_box.item
+						label="A E S T H E T I C S  5"
+						name="lut_AST5"
+						value="AESTHETICS_5.png" />
+				</combo_box>
+				<!--Render Settings Section-->
+				<view_border
+					bevel_style="none"
+					height="0"
+					layout="topleft"
+					left="0"
+					name="render_divider"
+					top_pad="7"
+					width="350"/>
+				<text
+					follows="left|top"
+					height="15"
+					left="10"
+					top_pad="7"
+					width="100"
+					layout="topleft"
+					value="Rendering Settings" />
+				<!--Anti-Aliasing-->
+				<text
+					follows="left|top"
+					height="15"
+					left="30"
+					top_pad="4"
+					width="90"
+					layout="topleft"
+					tool_tip="Controls SMAA Quality"
+					value="Anti-Aliasing:" />
+				<combo_box
+					follows="top|left"
+					layout="topleft"
+					height="16"
+					width="150"
+					right="-4"
+					top_pad="-16"
+					max_chars="128"
+					allow_text_entry="false"
+					tool_tip="Controls SMAA Quality"
+					control_name="RenderFSAASamples"
+					name="smaa_combo">
+					<combo_box.item
+						label="Disable"
+						name="smaa_off"
+						value="0" />
+					<combo_box.item
+						label="Low (x2)"
+						name="smaa_2"
+						value="2" />
+					<combo_box.item
+						label="Medium (x4)"
+						name="smaa_4"
+						value="4" />
+					<combo_box.item
+						label="High (x8)"
+						name="smaa_8"
+						value="8" />
+					<combo_box.item
+						label="Ultra (x16)"
+						name="smaa_16"
+						value="16" />
+				</combo_box>
+				<!--Anisotropic Filtering-->
+				<text
+					follows="left|top"
+					height="15"
+					left="30"
+					top_pad="4"
+					width="120"
+					layout="topleft"
+					tool_tip="Controls Anisotropic Filtering Quality"
+					value="Anisotropic Filtering:" />
+				<combo_box
+					allow_text_entry="false"
+					tool_tip="Controls Anisotropic Filtering Quality"
+					control_name="RenderAnisotropicLevel"
+					follows="left|top"
+					height="16"
+					layout="topleft"
+					right="-4"
+					max_chars="128"
+					name="anisotropicfilter_combo"
+					top_pad="-16"
+					width="150">
+					<combo_box.item
+						label="Disable"
+						name="anisotropicfilter_off"
+						value="0" />
+					<combo_box.item
+						label="Low (x2)"
+						name="anisotropicfilter_2"
+						value="2" />
+					<combo_box.item
+						label="Medium (x4)"
+						name="anisotropicfilter_4"
+						value="4" />
+					<combo_box.item
+						label="High (x8)"
+						name="anisotropicfilter_8"
+						value="8" />
+					<combo_box.item
+						label="Ultra (x16)"
+						name="anisotropicfilter_16"
+						value="16" />
+				</combo_box>
+				<!--Water Reflections-->
+				<text
+					follows="left|top"
+					height="15"
+					left="30"
+					top_pad="3"
+					width="90"
+					layout="topleft"
+					value="Reflections:" />
+				<combo_box
+					control_name="RenderReflectionDetail"
+					height="16"
+					layout="topleft"
+					right="-2"
+					top_delta="0"
+					name="Reflections"
+					width="150">
+					<combo_box.item
+						label="None; opaque"
+						name="0"
+						value="-2"/>
+					<combo_box.item
+						label="None; transparent"
+						name="0"
+						value="-1"/>
+					<combo_box.item
+						label="Minimal"
+						name="0"
+						value="0"/>
+					<combo_box.item
+						label="Terrain and trees"
+						name="1"
+						value="1"/>
+					<combo_box.item
+						label="All static objects"
+						name="2"
+						value="2"/>
+					<combo_box.item
+						label="All avatars and objects"
+						name="3"
+						value="3"/>
+					<combo_box.item
+						label="Everything"
+						name="4"
+						value="4"/>
+				</combo_box>
+				<!--Resolution Scale-->
+				<!--TODO: Disable if AA is also disabled. This option causes broken rendering otherwise! Bug maybe?-->
+				<text
+					follows="left|top"
+					height="15"
+					left="30"
+					top_pad="4"
+					width="90"
+					layout="topleft"
+					tool_tip="(Default: 1.0) [DANGEROUS] Internal render resolution scale. Sharpening interacts poorly with this setting, disable it for best results."
+					value="Resolution Scale:" />
+				<slider_bar
+					top_pad="-18"
+					height="20"
+					increment=".1"
+					follows="left|top|right"
+					layout="topleft"
+					max_val="2"
+					min_val=".5"
+					left="120"
+					right="-55"
+					name="resMult_slider"
+					tool_tip="(Default: 1.0) [DANGEROUS] Internal render resolution scale. Sharpening interacts poorly with this setting, disable it for best results."
+					control_name="RenderResolutionMultiplier"/>
+				<spinner
+					top_pad="-20"
+					height="15"
+					label_width="0"
+					right="-2"
+					decimal_digits="1"
+					follows="top|right"
+					layout="topleft"
+					max_val="3"
+					min_val=".5"
+					width="55"
+					increment=".1"
+					name="resMult_spinner"
+					tool_tip="(Default: 1.0) [DANGEROUS] Internal render resolution scale. Sharpening interacts poorly with this setting, disable it for best results."
+					control_name="RenderResolutionMultiplier"/>
+				<!--Draw Distance-->
+				<text
+					follows="left|top"
+					height="15"
+					left="30"
+					top_pad="8"
+					width="90"
+					layout="topleft"
+					value="Draw Distance:" />
+				<slider_bar
+					top_pad="-18"
+					height="20"
+					increment="32"
+					follows="left|top|right"
+					layout="topleft"
+					max_val="1024"
+					min_val="32"
+					left="120"
+					right="-55"
+					name="draw_dist_slider_bar"
+					control_name="RenderFarClip"/>
+				<spinner
+					top_pad="-20"
+					height="15"
+					label_width="0"
+					right="-2"
+					decimal_digits="0"
+					follows="top|right"
+					layout="topleft"
+					max_val="1024"
+					min_val="32"
+					width="55"
+					increment="32"
+					name="draw_dist_spinner"
+					control_name="RenderFarClip"/>
+				<!--Object LOD-->
+				<text
+					follows="left|top"
+					height="15"
+					left="30"
+					top_pad="8"
+					width="90"
+					layout="topleft"
+					value="Object LOD:" />
+				<slider_bar
+					top_pad="-18"
+					height="20"
+					increment=".1"
+					follows="left|top|right"
+					layout="topleft"
+					max_val="4.0"
+					min_val="1.0"
+					left="120"
+					right="-55"
+					name="lod_slider_bar"
+					control_name="RenderVolumeLODFactor"/>
+				<spinner
+					top_pad="-20"
+					height="15"
+					label_width="0"
+					right="-2"
+					decimal_digits="1"
+					follows="top|right"
+					layout="topleft"
+					max_val="4.0"
+					min_val="1.0"
+					width="55"
+					increment=".1"
+					name="lod_spinner"
+					control_name="RenderVolumeLODFactor"/>
+				<!--Max Particles-->
+				<text
+					follows="left|top"
+					height="15"
+					left="30"
+					top_pad="8"
+					width="90"
+					layout="topleft"
+					value="Max Particles:" />
+				<slider_bar
+					top_pad="-18"
+					height="20"
+					increment="256"
+					follows="left|top|right"
+					layout="topleft"
+					max_val="8192"
+					min_val="0"
+					left="120"
+					right="-55"
+					name="max_particles_slider_bar"
+					control_name="RenderMaxPartCount"/>
+				<spinner
+					top_pad="-20"
+					height="15"
+					label_width="0"
+					right="-2"
+					decimal_digits="0"
+					follows="top|right"
+					layout="topleft"
+					max_val="8192"
+					min_val="0"
+					width="55"
+					increment="256"
+					name="max_particles_spinner"
+					control_name="RenderMaxPartCount"/>
+				<!--Max Non-Impostors-->
+				<text
+					follows="left|top"
+					height="15"
+					left="30"
+					top_pad="8"
+					width="90"
+					layout="topleft"
+					value="Max Avatars:" />
+				<slider_bar
+					top_pad="-18"
+					height="20"
+					increment="1"
+					follows="left|top|right"
+					layout="topleft"
+					max_val="65"
+					min_val="0"
+					left="120"
+					right="-55"
+					name="max_avatar_slider_bar"
+					control_name="RenderAvatarMaxNonImpostors"/>
+				<spinner
+					top_pad="-20"
+					height="15"
+					label_width="0"
+					right="-2"
+					decimal_digits="0"
+					follows="top|right"
+					layout="topleft"
+					max_val="65"
+					min_val="0"
+					width="55"
+					increment="1"
+					name="max_avatar_spinner"
+					control_name="RenderAvatarMaxNonImpostors"/>
+			</panel>
+			<!--Shadows/SSAO Panel-->
 			<panel
 				label="Shadows"
-				name="shadow_panel"
-				class="shadow_panel"
-				filename="panel_lightbox_shadow.xml"
+				class="shadow_settings"
 				layout="topleft"
-				follows="all" />
+				name="shadow_settings">
+				<!--TODO: Display a warning message and disable this panel if Advanced Lighting Model is disabled?-->
+				<!--Shadow Detail-->
+				<!--TODO: Disable sliders if set to None?-->
+				<text
+					follows="left|top"
+					height="15"
+					left="10"
+					top_pad="4"
+					width="60"
+					layout="topleft"
+					tool_tip="Controls which kind of shadows are allowed. Reloads renderer!"
+					value="Shadows: " />
+				<combo_box
+					allow_text_entry="false"
+					tool_tip="Controls which kind of shadows are allowed. Reloads renderer!"
+					control_name="RenderShadowDetail"
+					follows="left|top"
+					height="16"
+					layout="topleft"
+					left="70"
+					max_chars="128"
+					name="shadowtype_combo"
+					top_pad="-16"
+					width="140">
+					<combo_box.item
+						label="None"
+						name="shadowtype_none"
+						value="0" />
+					<combo_box.item
+						label="Sun/Moon"
+						name="shadowtype_sunmoon"
+						value="1" />
+					<combo_box.item
+						label="Sun/Moon + Projectors"
+						name="shadowtype_proj"
+						value="2" />
+				</combo_box>
+				<!--Shadow Resolution-->
+				<!--TODO: While this option is exceptionally powerful, this option as-is is extremely dangerous! Login-crash dangerous on anything lower than a 1080Ti. Either needs to be limited via reported VRAM and/or GPU String, or this value needs to be flagged as temporary!-->
+				<text
+					follows="left|top"
+					height="15"
+					left="30"
+					top_pad="4"
+					width="110"
+					layout="topleft"
+					tool_tip="Multiplier for shadowmap resolution. Use number input to override safe limits. High multipliers may overload and crash GPU drivers, especially on VRAM-limited systems!"
+					value="Shadow Resolution: " />
+				<slider_bar
+					top_pad="-18"
+					height="20"
+					increment=".1"
+					follows="left|top|right"
+					layout="topleft"
+					max_val="2"
+					min_val=".5"
+					left="140"
+					right="-75"
+					name="shadowres_slider"
+					tool_tip="Multiplier for shadowmap resolution. Use number input to override safe limits. High multipliers may overload and crash GPU drivers, especially on VRAM-limited systems!"
+					control_name="RenderShadowResolutionScale"/>
+				<spinner
+					top_pad="-20"
+					height="15"
+					label_width="0"
+					right="-20"
+					decimal_digits="1"
+					follows="top|right"
+					layout="topleft"
+					max_val="4"
+					min_val=".5"
+					width="55"
+					increment=".1"
+					name="shadowres_spinner"
+					tool_tip="Multiplier for shadowmap resolution. Use number input to override safe limits. High multipliers may overload and crash GPU drivers, especially on VRAM-limited systems!"
+					control_name="RenderShadowResolutionScale"/>
+				<button
+					name="shadowRes_default_btn"
+					follows="top|right"
+					layout="topleft"
+					height="22"
+					left_delta="55"
+					top_pad="-15"
+					width="18"
+					scale_image="true"
+					image_overlay="Refresh_Off"
+					image_overlay_alignment="center">
+					<button.commit_callback
+						function="LightBox.ResetControlDefault"
+						parameter="RenderShadowResolutionScale" />
+				</button>
+				<!--Shadow Bias-->
+				<text
+					follows="left|top"
+					height="15"
+					left="30"
+					top_pad="3"
+					width="110"
+					layout="topleft"
+					tool_tip="Reduces self-shadowing errors by ignoring faces too close to the shadow's origins. Smaller values allow more fine/accurate shadows at the cost of more shadow errors."
+					value="Shadow Bias:" />
+				<slider_bar
+					top_pad="-18"
+					height="20"
+					increment=".001"
+					follows="left|top|right"
+					layout="topleft"
+					max_val="0"
+					min_val="-0.01"
+					left="140"
+					right="-75"
+					name="shadow_bias_slider"
+					tool_tip="Reduces self-shadowing errors by ignoring faces too close to the shadow's origins. Smaller values allow more fine/accurate shadows at the cost of more shadow errors."
+					control_name="RenderShadowBias"/>
+				<spinner
+					top_pad="-20"
+					height="15"
+					label_width="0"
+					right="-20"
+					decimal_digits="3"
+					follows="top|right"
+					layout="topleft"
+					max_val="0"
+					min_val="-0.01"
+					width="55"
+					increment=".001"
+					name="shadow_bias_spinner"
+					tool_tip="Reduces self-shadowing errors by ignoring faces too close to the shadow's origins. Smaller values allow more fine/accurate shadows at the cost of more shadow errors."
+					control_name="RenderShadowBias"/>
+				<button
+					name="shadowBias_default_btn"
+					follows="top|right"
+					layout="topleft"
+					height="22"
+					left_delta="55"
+					top_pad="-15"
+					width="18"
+					scale_image="true"
+					image_overlay="Refresh_Off"
+					image_overlay_alignment="center">
+					<button.commit_callback
+						function="LightBox.ResetControlDefault"
+						parameter="RenderShadowBias" />
+				</button>
+				<!--Shadow Offset-->
+				<text
+					follows="left|top"
+					height="15"
+					left="30"
+					top_pad="3"
+					width="110"
+					layout="topleft"
+					tool_tip="Used to reduce shadow errors by offsetting the entire shadowmap. Smaller values allow more accurate shadows and less light bleed from thin objects at the cost of possible shadow errors at extreme angles from source."
+					value="Shadow Offset:" />
+				<slider_bar
+					top_pad="-18"
+					height="20"
+					increment=".001"
+					follows="left|top|right"
+					layout="topleft"
+					max_val="0.05"
+					min_val="0"
+					left="140"
+					right="-75"
+					name="shadow_offset_slider"
+					tool_tip="Used to reduce shadow errors by offsetting the entire shadowmap. Smaller values allow more accurate shadows and less light bleed from thin objects at the cost of possible shadow errors at extreme angles from source."
+					control_name="RenderShadowOffset"/>
+				<spinner
+					top_pad="-20"
+					height="15"
+					label_width="0"
+					right="-20"
+					decimal_digits="3"
+					follows="top|right"
+					layout="topleft"
+					max_val="0.05"
+					min_val="0.0"
+					width="55"
+					increment=".001"
+					name="shadow_offset_spinner"
+					tool_tip="Used to reduce shadow errors by offsetting the entire shadowmap. Smaller values allow more accurate shadows and less light bleed from thin objects at the cost of possible shadow errors at extreme angles from source."
+					control_name="RenderShadowOffset"/>
+				<button
+					name="shadowOffset_default_btn"
+					follows="top|right"
+					layout="topleft"
+					height="22"
+					left_delta="55"
+					top_pad="-15"
+					width="18"
+					scale_image="true"
+					image_overlay="Refresh_Off"
+					image_overlay_alignment="center">
+					<button.commit_callback
+						function="LightBox.ResetControlDefault"
+						parameter="RenderShadowOffset" />
+				</button>
+				<!--Projector Bias-->
+				<text
+					follows="left|top"
+					height="15"
+					left="30"
+					top_pad="3"
+					width="110"
+					layout="topleft"
+					tool_tip="Reduces self-shadowing errors by ignoring faces too close to the shadow's origins. Smaller values allow more fine/accurate shadows at the cost of more shadow errors."
+					value="Spot Shadow Bias:" />
+				<slider_bar
+					top_pad="-18"
+					height="20"
+					increment=".001"
+					follows="left|top|right"
+					layout="topleft"
+					max_val="0"
+					min_val="-0.01"
+					left="140"
+					right="-75"
+					name="shadow_spotbias_slider"
+					tool_tip="Reduces self-shadowing errors by ignoring faces too close to the shadow's origins. Smaller values allow more fine/accurate shadows at the cost of more shadow errors."
+					control_name="RenderSpotShadowBias"/>
+				<spinner
+					top_pad="-20"
+					height="15"
+					label_width="0"
+					right="-20"
+					decimal_digits="3"
+					follows="top|right"
+					layout="topleft"
+					max_val="0"
+					min_val="-0.01"
+					width="55"
+					increment=".001"
+					name="shadow_spotbias_spinner"
+					tool_tip="Reduces self-shadowing errors by ignoring faces too close to the shadow's origins. Smaller values allow more fine/accurate shadows at the cost of more shadow errors."
+					control_name="RenderSpotShadowBias"/>
+				<button
+					name="spotBias_default_btn"
+					follows="top|right"
+					layout="topleft"
+					height="22"
+					left_delta="55"
+					top_pad="-15"
+					width="18"
+					scale_image="true"
+					image_overlay="Refresh_Off"
+					image_overlay_alignment="center">
+					<button.commit_callback
+						function="LightBox.ResetControlDefault"
+						parameter="RenderSpotShadowBias" />
+				</button>
+				<!--Projector Offset-->
+				<text
+					follows="left|top"
+					height="15"
+					left="30"
+					top_pad="3"
+					width="110"
+					layout="topleft"
+					tool_tip="Used to reduce shadow errors by offsetting the entire projector shadowmap. Smaller values allow more accurate shadows and less light bleed from thin objects at the cost of possible shadow errors at extreme angles from source."
+					value="Spot Shadow Offset:" />
+				<slider_bar
+					top_pad="-18"
+					height="20"
+					increment=".001"
+					follows="left|top|right"
+					layout="topleft"
+					max_val="0.15"
+					min_val="0"
+					left="140"
+					right="-75"
+					name="shadow_spotoffset_slider"
+					tool_tip="Used to reduce shadow errors by offsetting the entire projector shadowmap. Smaller values allow more accurate shadows and less light bleed from thin objects at the cost of possible shadow errors at extreme angles from source."
+					control_name="RenderSpotShadowOffset"/>
+				<spinner
+					top_pad="-20"
+					height="15"
+					label_width="0"
+					right="-20"
+					decimal_digits="3"
+					follows="top|right"
+					layout="topleft"
+					max_val="0.15"
+					min_val="0.0"
+					width="55"
+					increment=".001"
+					name="shadow_spotoffset_spinner"
+					tool_tip="Used to reduce shadow errors by offsetting the entire projector shadowmap. Smaller values allow more accurate shadows and less light bleed from thin objects at the cost of possible shadow errors at extreme angles from source."
+					control_name="RenderSpotShadowOffset"/>
+				<button
+					name="spotOffset_default_btn"
+					follows="top|right"
+					layout="topleft"
+					height="22"
+					left_delta="55"
+					top_pad="-15"
+					width="18"
+					scale_image="true"
+					image_overlay="Refresh_Off"
+					image_overlay_alignment="center">
+					<button.commit_callback
+						function="LightBox.ResetControlDefault"
+						parameter="RenderSpotShadowOffset" />
+				</button>
+				<!--Shadow/SSAO Blur-->
+				<text
+					follows="left|top"
+					height="15"
+					left="30"
+					top_pad="3"
+					width="110"
+					layout="topleft"
+					tool_tip="Controls both Shadow and SSAO blurring. Low values may cause SSAO noise to become apparent."
+					value="Shadow Blur:" />
+				<slider_bar
+					top_pad="-18"
+					height="20"
+					increment=".1"
+					follows="left|top|right"
+					layout="topleft"
+					max_val="5.0"
+					min_val="0"
+					left="140"
+					right="-75"
+					name="shadow_blur_slider"
+					tool_tip="Controls both Shadow and SSAO blurring. Low values may cause SSAO noise to become apparent."
+					control_name="RenderShadowBlurSize"/>
+				<spinner
+					top_pad="-20"
+					height="15"
+					label_width="0"
+					right="-20"
+					decimal_digits="1"
+					follows="top|right"
+					layout="topleft"
+					max_val="5.0"
+					min_val="0.0"
+					width="55"
+					increment=".1"
+					name="shadow_blur_spinner"
+					tool_tip="Controls both Shadow and SSAO blurring. Low values may cause SSAO noise to become apparent."
+					control_name="RenderShadowBlurSize"/>
+				<button
+					name="blur_default_btn"
+					follows="top|right"
+					layout="topleft"
+					height="22"
+					left_delta="55"
+					top_pad="-15"
+					width="18"
+					scale_image="true"
+					image_overlay="Refresh_Off"
+					image_overlay_alignment="center">
+					<button.commit_callback
+						function="LightBox.ResetControlDefault"
+						parameter="RenderShadowBlurSize" />
+				</button>
+				<!--Blur Distance-->
+				<text
+					follows="left|top"
+					height="15"
+					left="30"
+					top_pad="3"
+					width="110"
+					layout="topleft"
+					tool_tip="Controls how far away from the camera should blurring occur. Larger values reduce blur near the camera. Try using this for shadow sharpening if you encounter SSAO noise when lowering Shadow Blur!"
+					value="Blur Distance:" />
+				<slider_bar
+					top_pad="-18"
+					height="20"
+					increment=".1"
+					follows="left|top|right"
+					layout="topleft"
+					max_val="3.0"
+					min_val="0"
+					left="140"
+					right="-75"
+					name="shadow_blurdist_slider"
+					tool_tip="Controls how far away from the camera should blurring occur. Larger values reduce blur near the camera. Try using this for shadow sharpening if you encounter SSAO noise when lowering Shadow Blur!"
+					control_name="RenderShadowBlurDistFactor"/>
+				<spinner
+					top_pad="-20"
+					height="15"
+					label_width="0"
+					right="-20"
+					decimal_digits="1"
+					follows="top|right"
+					layout="topleft"
+					max_val="3.0"
+					min_val="0.0"
+					width="55"
+					increment=".1"
+					name="shadow_blurdist_spinner"
+					tool_tip="Controls how far away from the camera should blurring occur. Larger values reduce blur near the camera. Try using this for shadow sharpening if you encounter SSAO noise when lowering Shadow Blur!"
+					control_name="RenderShadowBlurDistFactor"/>
+				<button
+					name="blurdist_default_btn"
+					follows="top|right"
+					layout="topleft"
+					height="22"
+					left_delta="55"
+					top_pad="-15"
+					width="18"
+					scale_image="true"
+					image_overlay="Refresh_Off"
+					image_overlay_alignment="center">
+					<button.commit_callback
+						function="LightBox.ResetControlDefault"
+						parameter="RenderShadowBlurDistFactor" />
+				</button>
+				<!--SSAO Settings-->
+				<view_border
+					bevel_style="none"
+					height="0"
+					layout="topleft"
+					left="0"
+					name="ssao_divider"
+					top_pad="7"
+					width="350"/>
+				<!--SSAO Toggle-->
+				<!--TODO: Disable Sliders if not enabled?-->
+				<check_box
+					follows="left|top"
+					height="15"
+					left="8"
+					top_pad="8"
+					width="80"
+					layout="topleft"
+					label="Use Screen Space Ambient Occlusion"
+					tool_tip="Toggles SSAO (Also toggles Shadow Smoothing!)"
+					control_name="RenderDeferredSSAO"/>
+				<!--TODO: Hook to RenderSSAOEffect.X-->
+				<!-- Range should be mapped to 0.0:-1.0 = 0.0:2.0 -->
+				<text
+					follows="left|top"
+					height="15"
+					left="30"
+					top_pad="4"
+					width="110"
+					layout="topleft"
+					tool_tip="Controls the strength of the SSAO effect."
+					value="SSAO Strength:" />
+				<slider_bar
+					top_pad="-18"
+					height="20"
+					increment=".1"
+					follows="left|top|right"
+					layout="topleft"
+					max_val="2"
+					min_val="0"
+					left="140"
+					right="-75"
+					name="ssao_strength_slider"
+					tool_tip="Controls the strength of the SSAO effect."
+					control_name=""/>
+				<spinner
+					top_pad="-20"
+					height="15"
+					label_width="0"
+					right="-20"
+					decimal_digits="1"
+					follows="top|right"
+					layout="topleft"
+					max_val="2"
+					min_val="0"
+					width="55"
+					increment=".1"
+					name="ssao_strength_spinner"
+					tool_tip="Controls the strength of the SSAO effect."
+					control_name=""/>
+				<button
+					name="ssaoStrength_default_btn"
+					follows="top|right"
+					layout="topleft"
+					height="22"
+					left_delta="55"
+					top_pad="-15"
+					width="18"
+					scale_image="true"
+					image_overlay="Refresh_Off"
+					image_overlay_alignment="center">
+					<button.commit_callback
+						function="LightBox.ResetControlDefault"
+						parameter="RenderSSAOEffect" />
+				</button>
+				<!--SSAO Factor-->
+				<text
+					follows="left|top"
+					height="15"
+					left="30"
+					top_pad="3"
+					width="110"
+					layout="topleft"
+					tool_tip="Occlusion sensitivity factor, larger = more."
+					value="SSAO Factor:" />
+				<slider_bar
+					top_pad="-18"
+					height="20"
+					increment=".1"
+					follows="left|top|right"
+					layout="topleft"
+					max_val="10"
+					min_val="0"
+					left="140"
+					right="-75"
+					name="ssao_factor_slider"
+					tool_tip="Occlusion sensitivity factor, larger = more."
+					control_name="RenderSSAOFactor"/>
+				<spinner
+					top_pad="-20"
+					height="15"
+					label_width="0"
+					right="-20"
+					decimal_digits="1"
+					follows="top|right"
+					layout="topleft"
+					max_val="10"
+					min_val="0"
+					width="55"
+					increment=".1"
+					name="ssao_factor_spinner"
+					tool_tip="Occlusion sensitivity factor, larger = more."
+					control_name="RenderSSAOFactor"/>
+				<button
+					name="ssaoFactor_default_btn"
+					follows="top|right"
+					layout="topleft"
+					height="22"
+					left_delta="55"
+					top_pad="-15"
+					width="18"
+					scale_image="true"
+					image_overlay="Refresh_Off"
+					image_overlay_alignment="center">
+					<button.commit_callback
+						function="LightBox.ResetControlDefault"
+						parameter="RenderSSAOFactor" />
+				</button>
+				<!--SSAO Scale-->
+				<text
+					follows="left|top"
+					height="15"
+					left="30"
+					top_pad="3"
+					width="110"
+					layout="topleft"
+					tool_tip="Determines distance from surface to check for occlusion. Higher = Wider occlusion NOTE: Large values may produce artifacts."
+					value="SSAO Scale:" />
+				<slider_bar
+					top_pad="-18"
+					height="20"
+					increment="10"
+					follows="left|top|right"
+					layout="topleft"
+					max_val="5000"
+					min_val="0"
+					left="140"
+					right="-75"
+					name="ssao_scale_slider"
+					tool_tip="Determines distance from surface to check for occlusion. Higher = Wider occlusion NOTE: Large values may produce artifacts."
+					control_name="RenderSSAOScale"/>
+				<spinner
+					top_pad="-20"
+					height="15"
+					label_width="0"
+					right="-20"
+					decimal_digits="0"
+					follows="top|right"
+					layout="topleft"
+					max_val="5000"
+					min_val="0"
+					width="55"
+					increment="50"
+					name="ssao_scale_spinner"
+					tool_tip="Determines distance from surface to check for occlusion. Higher = Wider occlusion NOTE: Large values may produce artifacts."
+					control_name="RenderSSAOScale"/>
+				<button
+					name="ssaoScale_default_btn"
+					follows="top|right"
+					layout="topleft"
+					height="22"
+					left_delta="55"
+					top_pad="-15"
+					width="18"
+					scale_image="true"
+					image_overlay="Refresh_Off"
+					image_overlay_alignment="center">
+					<button.commit_callback
+						function="LightBox.ResetControlDefault"
+						parameter="RenderSSAOScale" />
+				</button>
+				<!--SSAO Max Scale-->
+				<text
+					follows="left|top"
+					height="15"
+					left="30"
+					top_pad="3"
+					width="110"
+					layout="topleft"
+					tool_tip="Determines max screen radius to use for occlusion. NOTE: Large values may produce artifacts."
+					value="SSAO Max Scale:" />
+				<slider_bar
+					top_pad="-18"
+					height="20"
+					increment="10"
+					follows="left|top|right"
+					layout="topleft"
+					max_val="1000"
+					min_val="0"
+					left="140"
+					right="-75"
+					name="ssao_maxScale_slider"
+					tool_tip="Determines max screen radius to use for occlusion. NOTE: Large values may produce artifacts."
+					control_name="RenderSSAOMaxScale"/>
+				<spinner
+					top_pad="-20"
+					height="15"
+					label_width="0"
+					right="-20"
+					decimal_digits="0"
+					follows="top|right"
+					layout="topleft"
+					max_val="1000"
+					min_val="0"
+					width="55"
+					increment="50"
+					name="ssao_maxScale_spinner"
+					tool_tip="Determines max screen radius to use for occlusion. NOTE: Large values may produce artifacts."
+					control_name="RenderSSAOMaxScale"/>
+				<button
+					name="ssaoMaxScale_default_btn"
+					follows="top|right"
+					layout="topleft"
+					height="22"
+					left_delta="55"
+					top_pad="-15"
+					width="18"
+					scale_image="true"
+					image_overlay="Refresh_Off"
+					image_overlay_alignment="center">
+					<button.commit_callback
+						function="LightBox.ResetControlDefault"
+						parameter="RenderSSAOMaxScale" />
+				</button>
+			</panel>
+			<!--Glow Panel-->
 			<panel
 				label="Glow"
-				name="glow_panel"
-				class="glow_panel"
-				filename="panel_lightbox_glow.xml"
+				class="glow_settings"
 				layout="topleft"
-				follows="all" />
+				name="glow_settings">
+				<!--Glow Toggle-->
+				<check_box
+					follows="left|top"
+					height="15"
+					left="8"
+					top_pad="4"
+					width="80"
+					layout="topleft"
+					label="Use Glow Shader"
+					tool_tip="Toggles glow (Reloads Renderer!)"
+					control_name="RenderGlow"/>
+				<!--Glow Iterations-->
+				<text
+					follows="left|top"
+					height="15"
+					left="30"
+					top_pad="4"
+					width="60"
+					layout="topleft"
+					tool_tip="How many passes of the glow shader to use. More passes makes it overall stronger, softer, wider, and slower to render."
+					value="Iterations:" />
+				<slider_bar
+					top_pad="-18"
+					height="20"
+					increment="1"
+					follows="left|top|right"
+					layout="topleft"
+					max_val="10"
+					min_val="1"
+					left="90"
+					right="-75"
+					name="glow_iteration_slider"
+					tool_tip="How many passes of the glow shader to use. More passes makes it overall stronger, softer, wider, and slower to render."
+					control_name="RenderGlowIterations"/>
+				<spinner
+					top_pad="-20"
+					height="15"
+					label_width="0"
+					right="-20"
+					decimal_digits="0"
+					follows="top|right"
+					layout="topleft"
+					max_val="10"
+					min_val="1"
+					width="55"
+					increment="1"
+					name="glow_iteration_spinner"
+					tool_tip="How many passes of the glow shader to use. More passes makes it overall stronger, softer, wider, and slower to render."
+					control_name="RenderGlowIterations"/>
+				<button
+					name="glowIteration_default_btn"
+					follows="top|right"
+					layout="topleft"
+					height="22"
+					left_delta="55"
+					top_pad="-15"
+					width="18"
+					scale_image="true"
+					image_overlay="Refresh_Off"
+					image_overlay_alignment="center">
+					<button.commit_callback
+						function="LightBox.ResetControlDefault"
+						parameter="RenderGlowIterations" />
+				</button>
+				<!--Glow Resolution-->
+				<text
+					follows="left|top"
+					height="15"
+					left="30"
+					top_pad="3"
+					width="60"
+					layout="topleft"
+					tool_tip="Overall resolution of glow. Higher values allow for wider glow. Use in conjunction with other glow settings for best effect."
+					value="Resolution:" />
+				<slider_bar
+					top_pad="-18"
+					height="20"
+					increment="1"
+					follows="left|top|right"
+					layout="topleft"
+					max_val="10"
+					min_val="0"
+					left="90"
+					right="-75"
+					name="glow_resPow_slider"
+					tool_tip="Overall resolution of glow. Higher values allow for wider glow. Use in conjunction with other glow settings for best effect."
+					control_name="RenderGlowResolutionPow"/>
+				<spinner
+					top_pad="-20"
+					height="15"
+					label_width="0"
+					right="-20"
+					decimal_digits="0"
+					follows="top|right"
+					layout="topleft"
+					max_val="10"
+					min_val="0"
+					width="55"
+					increment="1"
+					name="glow_resPow_spinner"
+					tool_tip="Overall resolution of glow. Higher values allow for wider glow. Use in conjunction with other glow settings for best effect."
+					control_name="RenderGlowResolutionPow"/>
+				<button
+					name="glowRes_default_btn"
+					follows="top|right"
+					layout="topleft"
+					height="22"
+					left_delta="55"
+					top_pad="-15"
+					width="18"
+					scale_image="true"
+					image_overlay="Refresh_Off"
+					image_overlay_alignment="center">
+					<button.commit_callback
+						function="LightBox.ResetControlDefault"
+						parameter="RenderGlowResolutionPow" />
+				</button>
+				<!--Glow Strength-->
+				<text
+					follows="left|top"
+					height="15"
+					left="30"
+					top_pad="3"
+					width="60"
+					layout="topleft"
+					tool_tip="Overall strength of the glow shader."
+					value="Strength:" />
+				<slider_bar
+					top_pad="-18"
+					height="20"
+					increment="0.005"
+					follows="left|top|right"
+					layout="topleft"
+					max_val="1"
+					min_val="0"
+					left="90"
+					right="-75"
+					name="glow_strength_slider"
+					tool_tip="Overall strength of the glow shader."
+					control_name="RenderGlowStrength"/>
+				<spinner
+					top_pad="-20"
+					height="15"
+					label_width="0"
+					right="-20"
+					decimal_digits="3"
+					follows="top|right"
+					layout="topleft"
+					max_val="2"
+					min_val="0"
+					width="55"
+					increment="0.005"
+					name="glow_strength_spinner"
+					tool_tip="Overall strength of the glow shader."
+					control_name="RenderGlowStrength"/>
+				<button
+					name="glowStrength_default_btn"
+					follows="top|right"
+					layout="topleft"
+					height="22"
+					left_delta="55"
+					top_pad="-15"
+					width="18"
+					scale_image="true"
+					image_overlay="Refresh_Off"
+					image_overlay_alignment="center">
+					<button.commit_callback
+						function="LightBox.ResetControlDefault"
+						parameter="RenderGlowStrength" />
+				</button>
+				<!--Glow Softness-->
+				<text
+					follows="left|top"
+					height="15"
+					left="30"
+					top_pad="3"
+					width="60"
+					layout="topleft"
+					tool_tip="Softness or width of glow, eventually gets pixelated at higher sizes."
+					value="Softness:" />
+				<slider_bar
+					top_pad="-18"
+					height="20"
+					increment=".05"
+					follows="left|top|right"
+					layout="topleft"
+					max_val="10"
+					min_val="0"
+					left="90"
+					right="-75"
+					name="glow_width_slider"
+					tool_tip="Softness or width of glow, eventually gets pixelated at higher sizes."
+					control_name="RenderGlowWidth"/>
+				<spinner
+					top_pad="-20"
+					height="15"
+					label_width="0"
+					right="-20"
+					decimal_digits="2"
+					follows="top|right"
+					layout="topleft"
+					max_val="10"
+					min_val="0"
+					width="55"
+					increment=".05"
+					name="glow_width_spinner"
+					tool_tip="Softness or width of glow, eventually gets pixelated at higher sizes."
+					control_name="RenderGlowWidth"/>
+				<button
+					name="glowWidth_default_btn"
+					follows="top|right"
+					layout="topleft"
+					height="22"
+					left_delta="55"
+					top_pad="-15"
+					width="18"
+					scale_image="true"
+					image_overlay="Refresh_Off"
+					image_overlay_alignment="center">
+					<button.commit_callback
+						function="LightBox.ResetControlDefault"
+						parameter="RenderGlowWidth" />
+				</button>
+			</panel>
+			<!--DOF Panel-->
+			<panel
+				label="DoF"
+				class="dof_settings"
+				layout="topleft"
+				name="dof_settings">
+				<!--DOF Toggle-->
+				<!--TODO: Disable sliders if disabled?-->
+				<check_box
+					follows="left|top"
+					height="15"
+					left="8"
+					top_pad="4"
+					width="80"
+					layout="topleft"
+					label="Depth of Field"
+					tool_tip="Toggles Depth of Field"
+					control_name="RenderDepthOfField"/>
+				<!--DOF Resolution-->
+				<!--TODO: Ensure this setting is temporary? Large CoC @ Full Res has caused Login-Crashes on other viewers, even on high end GPUs!-->
+				<text
+					follows="left|top"
+					height="15"
+					left="30"
+					top_pad="4"
+					width="80"
+					layout="topleft"
+					tool_tip="What fraction of screen resolution should be used for rendering Depth of Field. NOTE: Viewer may become unresponsive if DoF becomes intense when Full Resolution is used."
+					value="DoF Resolution: " />
+				<combo_box
+					allow_text_entry="false"
+					tool_tip="What fraction of screen resolution should be used for rendering Depth of Field. NOTE: Viewer may become unresponsive if DoF becomes intense when Full Resolution is used."
+					control_name="CameraDoFResScale"
+					follows="left|top"
+					height="16"
+					layout="topleft"
+					left="120"
+					max_chars="128"
+					name="dof_res_combo"
+					top_pad="-16"
+					width="70">
+					<combo_box.item
+						label="Quarter"
+						name="dof_quarterres"
+						value="0.25" />
+					<combo_box.item
+						label="Half"
+						name="dof_halfres"
+						value="0.5" />
+					<combo_box.item
+						label="Full"
+						name="dof_fullres"
+						value="1.0" />
+				</combo_box>
+				<!--DOF FoV-->
+				<text
+					follows="left|top"
+					height="15"
+					left="30"
+					top_pad="4"
+					width="70"
+					layout="topleft"
+					tool_tip="Vertical FoV for DoF calculations"
+					value="Field of View:" />
+				<slider_bar
+					top_pad="-18"
+					height="20"
+					increment="1"
+					follows="left|top|right"
+					layout="topleft"
+					max_val="175"
+					min_val="10"
+					left="130"
+					right="-75"
+					name="dof_fov_slider"
+					tool_tip="Vertical FoV for DoF calculations"
+					control_name="CameraFieldOfView"/>
+				<spinner
+					top_pad="-20"
+					height="15"
+					label_width="0"
+					right="-20"
+					decimal_digits="0"
+					follows="top|right"
+					layout="topleft"
+					max_val="175"
+					min_val="10"
+					width="55"
+					increment="1"
+					name="dof_fov_spinner"
+					tool_tip="Vertical FoV for DoF calculations"
+					control_name="CameraFieldOfView"/>
+				<button
+					name="dofFOV_default_btn"
+					follows="top|right"
+					layout="topleft"
+					height="22"
+					left_delta="55"
+					top_pad="-15"
+					width="18"
+					scale_image="true"
+					image_overlay="Refresh_Off"
+					image_overlay_alignment="center">
+					<button.commit_callback
+						function="LightBox.ResetControlDefault"
+						parameter="CameraFieldOfView" />
+				</button>
+				<!--Aperture-->
+				<text
+					follows="left|top"
+					height="15"
+					left="30"
+					top_pad="3"
+					width="65"
+					layout="topleft"
+					tool_tip="Simulated camera aperture f-value. Smaller f-stops result in a narrower focal range. Larger increases focal range."
+					value="Aperture (f):" />
+				<slider_bar
+					top_pad="-18"
+					height="20"
+					increment=".1"
+					follows="left|top|right"
+					layout="topleft"
+					max_val="256"
+					min_val="0.5"
+					left="130"
+					right="-75"
+					name="dof_fstop_slider"
+					tool_tip="Simulated camera aperture f-value. Smaller f-stops result in a narrower focal range. Larger increases focal range."
+					control_name="CameraFNumber"/>
+				<spinner
+					top_pad="-20"
+					height="15"
+					label_width="0"
+					right="-20"
+					decimal_digits="1"
+					follows="top|right"
+					layout="topleft"
+					max_val="256"
+					min_val="0.5"
+					width="55"
+					increment=".1"
+					name="dof_fstop_spinner"
+					tool_tip="Simulated camera aperture f-value. Smaller f-stops result in a narrower focal range. Larger increases focal range."
+					control_name="CameraFNumber"/>
+				<button
+					name="dofFNumber_default_btn"
+					follows="top|right"
+					layout="topleft"
+					height="22"
+					left_delta="55"
+					top_pad="-15"
+					width="18"
+					scale_image="true"
+					image_overlay="Refresh_Off"
+					image_overlay_alignment="center">
+					<button.commit_callback
+						function="LightBox.ResetControlDefault"
+						parameter="CameraFNumber" />
+				</button>
+				<!--Focal Length-->
+				<text
+					follows="left|top"
+					height="15"
+					left="30"
+					top_pad="3"
+					width="100"
+					layout="topleft"
+					tool_tip="Focal length of simulated camera."
+					value="Focal Length (mm):" />
+				<slider_bar
+					top_pad="-18"
+					height="20"
+					increment="5"
+					follows="left|top|right"
+					layout="topleft"
+					max_val="600"
+					min_val="10"
+					left="130"
+					right="-75"
+					name="dof_length_slider"
+					tool_tip="Focal length of simulated camera."
+					control_name="CameraFocalLength"/>
+				<spinner
+					top_pad="-20"
+					height="15"
+					label_width="0"
+					right="-20"
+					decimal_digits="0"
+					follows="top|right"
+					layout="topleft"
+					max_val="600"
+					min_val="10"
+					width="55"
+					increment="5"
+					name="dof_length_spinner"
+					tool_tip="Focal length of simulated camera."
+					control_name="CameraFocalLength"/>
+				<button
+					name="dofFocal_default_btn"
+					follows="top|right"
+					layout="topleft"
+					height="22"
+					left_delta="55"
+					top_pad="-15"
+					width="18"
+					scale_image="true"
+					image_overlay="Refresh_Off"
+					image_overlay_alignment="center">
+					<button.commit_callback
+						function="LightBox.ResetControlDefault"
+						parameter="CameraFocalLength" />
+				</button>
+				<!--Circle of Confusion-->
+				<!--TODO: This can get dangerous on low-end machines! See DoF Resolution-->
+				<text
+					follows="left|top"
+					height="15"
+					left="30"
+					top_pad="3"
+					width="80"
+					layout="topleft"
+					tool_tip="Circle of Confusion, blur intensity of out objects out of focus. This limits the amount of blur applied. High values produce softer out of focus objects, but can cause the viewer or system to become unresponsive"
+					value="CoC Maximum:" />
+				<slider_bar
+					top_pad="-18"
+					height="20"
+					increment=".5"
+					follows="left|top|right"
+					layout="topleft"
+					max_val="40"
+					min_val="0"
+					left="130"
+					right="-75"
+					name="dof_coc_slider"
+					tool_tip="Circle of Confusion, blur intensity of out objects out of focus. This limits the amount of blur applied. High values produce softer out of focus objects, but can cause the viewer or system to become unresponsive"
+					control_name="CameraMaxCoF"/>
+				<spinner
+					top_pad="-20"
+					height="15"
+					label_width="0"
+					right="-20"
+					decimal_digits="1"
+					follows="top|right"
+					layout="topleft"
+					max_val="40"
+					min_val="0"
+					width="55"
+					increment=".5"
+					name="dof_coc_spinner"
+					tool_tip="Circle of Confusion, blur intensity of out objects out of focus. This limits the amount of blur applied. High values produce softer out of focus objects, but can cause the viewer or system to become unresponsive"
+					control_name="CameraMaxCoF"/>
+				<button
+					name="dofCOF_default_btn"
+					follows="top|right"
+					layout="topleft"
+					height="22"
+					left_delta="55"
+					top_pad="-15"
+					width="18"
+					scale_image="true"
+					image_overlay="Refresh_Off"
+					image_overlay_alignment="center">
+					<button.commit_callback
+						function="LightBox.ResetControlDefault"
+						parameter="CameraMaxCoF" />
+				</button>
+				<!--Focus Transition Time-->
+				<text
+					follows="left|top"
+					height="15"
+					left="30"
+					top_pad="3"
+					width="100"
+					layout="topleft"
+					tool_tip="Time it takes for the camera to transition to a new focal point."
+					value="Transition Time (s):" />
+				<slider_bar
+					top_pad="-18"
+					height="20"
+					increment=".1"
+					follows="left|top|right"
+					layout="topleft"
+					max_val="2"
+					min_val="0"
+					left="130"
+					right="-75"
+					name="dof_focaltime_slider"
+					tool_tip="Time it takes for the camera to transition to a new focal point."
+					control_name="CameraFocusTransitionTime"/>
+				<spinner
+					top_pad="-20"
+					height="15"
+					label_width="0"
+					right="-20"
+					decimal_digits="1"
+					follows="top|right"
+					layout="topleft"
+					max_val="2"
+					min_val="0"
+					width="55"
+					increment=".1"
+					name="dof_focaltime_spinner"
+					tool_tip="Time it takes for the camera to transition to a new focal point."
+					control_name="CameraFocusTransitionTime"/>
+				<button
+					name="dofTime_default_btn"
+					follows="top|right"
+					layout="topleft"
+					height="22"
+					left_delta="55"
+					top_pad="-15"
+					width="18"
+					scale_image="true"
+					image_overlay="Refresh_Off"
+					image_overlay_alignment="center">
+					<button.commit_callback
+						function="LightBox.ResetControlDefault"
+						parameter="CameraFocusTransitionTime" />
+				</button>
+			</panel>
 	</tab_container>
 </floater>
