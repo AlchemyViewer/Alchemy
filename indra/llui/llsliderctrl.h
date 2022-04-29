@@ -45,7 +45,6 @@ public:
 		Optional<S32>			text_width;
 		Optional<bool>			show_text;
 		Optional<bool>			can_edit_text;
-		Optional<bool>			is_volume_slider;
 		Optional<S32>			decimal_digits;
 
 		Optional<LLUIColor>		text_color,
@@ -64,7 +63,6 @@ public:
 			label_width("label_width"),
 			show_text("show_text"),
 			can_edit_text("can_edit_text"),
-			is_volume_slider("volume"),
 			decimal_digits("decimal_digits", 3),
 			text_color("text_color"),
 			text_disabled_color("text_disabled_color"),
