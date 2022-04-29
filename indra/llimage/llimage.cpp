@@ -1781,14 +1781,8 @@ bool LLImageRaw::validateSrcAndDst(std::string func, LLImageRaw* src, LLImageRaw
 }
 
 //----------------------------------------------------------------------------
-
-static struct
-{
-	const char* exten;
-	EImageCodec codec;
-}
-file_extensions[] =
-{
+std::array<std::pair<const char*, EImageCodec>, 11> file_extensions =
+{ {
 	{ "bmp", IMG_CODEC_BMP },
 	{ "tga", IMG_CODEC_TGA },
 	{ "j2c", IMG_CODEC_J2C },
@@ -1800,8 +1794,8 @@ file_extensions[] =
 	{ "dxt", IMG_CODEC_DXT },
 	{ "png", IMG_CODEC_PNG },
 	{ "webp", IMG_CODEC_WEBP }
-};
-#define NUM_FILE_EXTENSIONS LL_ARRAY_SIZE(file_extensions)
+} };
+
 #if 0
 static std::string find_file(std::string &name, S8 *codec)
 {
@@ -1825,10 +1819,10 @@ EImageCodec LLImageBase::getCodecFromExtension(const std::string& exten)
 {
 	if (!exten.empty())
 	{
-		for (int i = 0; i < (int)(NUM_FILE_EXTENSIONS); i++)
+		for (const auto& exten_pair : file_extensions)
 		{
-			if (exten == file_extensions[i].exten)
-				return file_extensions[i].codec;
+			if (exten == exten_pair.first)
+				return exten_pair.second;
 		}
 	}
 	return IMG_CODEC_INVALID;

@@ -587,7 +587,7 @@ public:
     }
 
     // Thread unsafe access
-    inline static DERIVED_TYPE* getInstanceFast()
+    static DERIVED_TYPE* getInstanceFast()
     {
         if (!sUnsafeInstance)
         {
@@ -605,7 +605,7 @@ public:
     }
 
     // Thread unsafe access
-    inline static DERIVED_TYPE& instanceFast()
+    static DERIVED_TYPE& instanceFast()
     {
         return *getInstanceFast();
     }
