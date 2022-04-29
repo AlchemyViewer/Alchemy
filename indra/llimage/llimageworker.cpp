@@ -35,7 +35,7 @@ std::atomic< U32 > sImageThreads = 0;
 class PoolWorkerThread final : public LLThread
 {
 public:
-	PoolWorkerThread(std::string name) : LLThread(name), mRequestQueue(30)
+	PoolWorkerThread(std::string name) : LLThread(name), mRequestQueue(1024)
 	{
 	}
 
@@ -64,8 +64,10 @@ public:
 	bool setRequest(LLImageDecodeThread::ImageRequest* req)
 	{
         bool bSuccess = mRequestQueue.try_enqueue(req);
-		wake();
-
+		if(bSuccess)
+		{
+		    wake();
+		}
 		return bSuccess;
 	}
 
@@ -102,7 +104,11 @@ LLImageDecodeThread::LLImageDecodeThread(bool threaded, U32 pool_size)
 		{
 			// Using number of (virtual) cores - 1 (for the main image worker
 			// thread).
-            --pool_size;
+            pool_size = llclamp(pool_size, 0U, 2U);
+		}
+		else
+		{
+		    pool_size = 0;
 		}
 	}
     else if (pool_size == 1)  // Disable if only 1
@@ -334,9 +340,8 @@ bool LLImageDecodeThread::ImageRequest::tut_isOK()
 
 bool LLImageDecodeThread::enqueRequest(ImageRequest * req)
 {
-    for (U32 i = 0, count = mThreadPool.size(); i < count; ++i)
     {
-        if (mLastPoolAllocation >= count)
+        if (mLastPoolAllocation >= mThreadPool.size())
         {
             mLastPoolAllocation = 0;
         }
