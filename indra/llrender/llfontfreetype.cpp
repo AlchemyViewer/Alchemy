@@ -586,7 +586,7 @@ void LLFontFreetype::renderGlyph(U32 glyph_index) const
 	if (FT_Load_Glyph(mFTFace, glyph_index, FT_LOAD_DEFAULT | FT_LOAD_RENDER | FT_LOAD_TARGET_LIGHT) != 0)
 	{
 		// If glyph fails to load and/or render, render a fallback character
-		llassert_always(!FT_Load_Char(mFTFace, L'?', FT_LOAD_RENDER | FT_LOAD_TARGET_LIGHT));
+		llassert_always(!FT_Load_Char(mFTFace, static_cast<FT_ULong>('?'), FT_LOAD_RENDER | FT_LOAD_TARGET_LIGHT));
 	}
 
 	mRenderGlyphCount++;
