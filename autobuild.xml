@@ -344,9 +344,9 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>e78ecf919eee01567556787c3a358d15</string>
+              <string>5d0729b835d63b7fe69acdc6b7c60188</string>
               <key>url</key>
-              <string>https://automated-builds-secondlife-com.s3.amazonaws.com/ct2/78637/744269/colladadom-2.3.557064-windows-557064.tar.bz2</string>
+              <string>https://viewer.catznip.com/downloads/packages/colladadom-2.3.559710-windows-559710.tar.bz2</string>
             </map>
             <key>name</key>
             <string>windows</string>
@@ -356,9 +356,9 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>7e63a212c8909a25236138422fe01298</string>
+              <string>985e3081e41c76b6176d39e44d7fb4b8</string>
               <key>url</key>
-              <string>https://automated-builds-secondlife-com.s3.amazonaws.com/ct2/78636/744273/colladadom-2.3.557064-windows64-557064.tar.bz2</string>
+              <string>https://viewer.catznip.com/downloads/packages/colladadom-2.3.559710-windows64-559710.tar.bz2</string>
             </map>
             <key>name</key>
             <string>windows64</string>
