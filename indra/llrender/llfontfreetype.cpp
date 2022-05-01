@@ -230,7 +230,7 @@ BOOL LLFontFreetype::loadFace(const std::string& filename, F32 point_size, F32 v
 	x_max = mFTFace->bbox.xMax * pixels_per_unit;
 	x_min = mFTFace->bbox.xMin * pixels_per_unit;
 	mAscender = mFTFace->ascender * pixels_per_unit;
-	mDescender = -mFTFace->descender * pixels_per_unit;
+	mDescender = -(mFTFace->descender * pixels_per_unit);
 	mLineHeight = mFTFace->height * pixels_per_unit;
 
 	S32 max_char_width = ll_round(0.5f + (x_max - x_min));
@@ -332,7 +332,7 @@ F32 LLFontFreetype::getDescenderHeight() const
 F32 LLFontFreetype::getXAdvance(llwchar wch) const
 {
 	if (mFTFace == NULL)
-		return 0.0;
+		return 0.f;
 
 	// Return existing info only if it is current
 	LLFontGlyphInfo* gi = getGlyphInfo(wch);
@@ -356,40 +356,22 @@ F32 LLFontFreetype::getXAdvance(llwchar wch) const
 F32 LLFontFreetype::getXAdvance(const LLFontGlyphInfo* glyph) const
 {
 	if (mFTFace == NULL)
-		return 0.0;
+		return 0.f;
 
 	return glyph->mXAdvance;
 }
 
 F32 LLFontFreetype::getXKerning(llwchar char_left, llwchar char_right) const
 {
-	if (mFTFace == NULL)
-		return 0.0;
-
-	//llassert(!mIsFallback);
 	LLFontGlyphInfo* left_glyph_info = getGlyphInfo(char_left);;
-	U32 left_glyph = left_glyph_info ? left_glyph_info->mGlyphIndex : 0;
-	// Kern this puppy.
 	LLFontGlyphInfo* right_glyph_info = getGlyphInfo(char_right);
-	U32 right_glyph = right_glyph_info ? right_glyph_info->mGlyphIndex : 0;
-
-	F32 kerning = 0.0f;
-	if (getKerningCache(left_glyph,  right_glyph, kerning))
-		return kerning;
-
-	FT_Vector  delta;
-
-	llverify(!FT_Get_Kerning(mFTFace, left_glyph, right_glyph, FT_KERNING_DEFAULT, &delta));
-
-	kerning = delta.x*(1.f/64.f);
-	setKerningCache(left_glyph, right_glyph, kerning);
-	return kerning;
+	return getXKerning(left_glyph_info, right_glyph_info);
 }
 
 F32 LLFontFreetype::getXKerning(const LLFontGlyphInfo* left_glyph_info, const LLFontGlyphInfo* right_glyph_info) const
 {
 	if (mFTFace == nullptr)
-		return 0.0;
+		return 0.f;
 
 	U32 left_glyph = left_glyph_info ? left_glyph_info->mGlyphIndex : 0;
 	U32 right_glyph = right_glyph_info ? right_glyph_info->mGlyphIndex : 0;
@@ -398,11 +380,20 @@ F32 LLFontFreetype::getXKerning(const LLFontGlyphInfo* left_glyph_info, const LL
 	if (getKerningCache(left_glyph,  right_glyph, kerning))
 		return kerning;
 
-	FT_Vector  delta;
+    FT_Vector delta;
+    delta.x = delta.y = 0;
+	if(FT_HAS_KERNING(mFTFace))
+	    FT_Get_Kerning(mFTFace, left_glyph, right_glyph, FT_KERNING_UNFITTED, &delta);
 
-	llverify(!FT_Get_Kerning(mFTFace, left_glyph, right_glyph, FT_KERNING_DEFAULT, &delta));
+	if (!FT_IS_SCALABLE(mFTFace))
+		kerning = static_cast<float>(delta.x);
+	else
+	{
+	    S32 left_delta = left_glyph_info ? left_glyph_info->mRightSideBearingDelta : 0;
+	    S32 right_delta = right_glyph_info ? right_glyph_info->mLeftSideBearingDelta : 0;
+		kerning = llfloor((right_delta - left_delta + static_cast<float>(delta.x) + 32) / 64.f);
+	}
 
-	kerning = delta.x*(1.f/64.f);
 	setKerningCache(left_glyph, right_glyph, kerning);
 	return kerning;
 }
@@ -470,8 +461,10 @@ LLFontGlyphInfo* LLFontFreetype::addGlyphFromFont(const LLFontFreetype *fontp, l
 	gi->mXBearing = fontp->mFTFace->glyph->bitmap_left;
 	gi->mYBearing = fontp->mFTFace->glyph->bitmap_top;
 	// Convert these from 26.6 units to float pixels.
-	gi->mXAdvance = fontp->mFTFace->glyph->advance.x / 64.f;
-	gi->mYAdvance = fontp->mFTFace->glyph->advance.y / 64.f;
+	gi->mXAdvance = fontp->mFTFace->glyph->advance.x * (1.f/64.f);
+	gi->mYAdvance = fontp->mFTFace->glyph->advance.y * (1.f/64.f);
+	gi->mRightSideBearingDelta = fontp->mFTFace->glyph->rsb_delta;
+	gi->mLeftSideBearingDelta = fontp->mFTFace->glyph->lsb_delta;
 
 	insertGlyphInfo(wch, gi);
 
@@ -583,10 +576,10 @@ void LLFontFreetype::renderGlyph(U32 glyph_index) const
 	if (mFTFace == NULL)
 		return;
 
-	if (FT_Load_Glyph(mFTFace, glyph_index, FT_LOAD_DEFAULT | FT_LOAD_RENDER | FT_LOAD_TARGET_LIGHT) != 0)
+	if (FT_Load_Glyph(mFTFace, glyph_index, FT_LOAD_DEFAULT | FT_LOAD_RENDER | FT_LOAD_FORCE_AUTOHINT) != 0)
 	{
 		// If glyph fails to load and/or render, render a fallback character
-		llassert_always(!FT_Load_Char(mFTFace, static_cast<FT_ULong>('?'), FT_LOAD_RENDER | FT_LOAD_TARGET_LIGHT));
+		llassert_always(!FT_Load_Char(mFTFace, static_cast<FT_ULong>('?'), FT_LOAD_DEFAULT || FT_LOAD_RENDER | FT_LOAD_FORCE_AUTOHINT));
 	}
 
 	mRenderGlyphCount++;

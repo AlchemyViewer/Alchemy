@@ -91,6 +91,8 @@ struct LLFontGlyphInfo
 	S32 mXBearing;	// Distance from baseline to left in pixels
 	S32 mYBearing;	// Distance from baseline to top in pixels
 	S32 mBitmapNum; // Which bitmap in the bitmap cache contains this glyph
+	S32 mRightSideBearingDelta;
+	S32 mLeftSideBearingDelta;
 };
 
 extern LLFontManager *gFontManagerp;

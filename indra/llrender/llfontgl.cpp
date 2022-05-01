@@ -355,13 +355,6 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
 			cur_x += mFontFreetype->getXKerning(fgi, next_glyph);
 		}
 
-		// Round after kerning.
-		// Must do this to cur_x, not just to cur_render_x, otherwise you
-		// will squish sub-pixel kerned characters too close together.
-		// For example, "CCCCC" looks bad.
-		cur_x = (F32)ll_round(cur_x);
-		//cur_y = (F32)ll_round(cur_y);
-
 		cur_render_x = cur_x;
 		cur_render_y = cur_y;
 	}
@@ -534,8 +527,6 @@ F32 LLFontGL::getWidthF32(const llwchar* wchars, S32 begin_offset, S32 max_chars
 			next_glyph = mFontFreetype->getGlyphInfo(next_char);
 			cur_x += mFontFreetype->getXKerning(fgi, next_glyph);
 		}
-		// Round after kerning.
-		cur_x = (F32)ll_round(cur_x);
 	}
 
 	// add in extra pixels for last character's width past its xadvance
@@ -641,9 +632,6 @@ S32 LLFontGL::maxDrawableChars(const llwchar* wchars, F32 max_pixels, S32 max_ch
 			next_glyph = mFontFreetype->getGlyphInfo(wchars[i+1]);
 			cur_x += mFontFreetype->getXKerning(fgi, next_glyph);
 		}
-
-		// Round after kerning.
-		cur_x = (F32)ll_round(cur_x);
 	}
 
 	if( clip )
@@ -711,9 +699,6 @@ S32	LLFontGL::firstDrawableChar(const llwchar* wchars, F32 max_pixels, S32 text_
 			// kerning
 			total_width += mFontFreetype->getXKerning(wchars[i-1], wch);
 		}
-
-		// Round after kerning.
-		total_width = (F32)ll_round(total_width);
 	}
 
 	if (drawable_chars == 0)
@@ -793,10 +778,6 @@ S32 LLFontGL::charFromPixelOffset(const llwchar* wchars, S32 begin_offset, F32 t
 			next_glyph = mFontFreetype->getGlyphInfo(wchars[pos + 1]);
 			cur_x += mFontFreetype->getXKerning(glyph, next_glyph);
 		}
-
-
-		// Round after kerning.
-		cur_x = (F32)ll_round(cur_x);
 	}
 
 	return llmin(max_chars, pos - begin_offset);
