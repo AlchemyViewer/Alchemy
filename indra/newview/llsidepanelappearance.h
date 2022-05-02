@@ -33,7 +33,7 @@
 #include "llinventory.h"
 #include "llpaneloutfitedit.h"
 
-class LLFilterEditor;
+class LLSearchEditor;
 class LLCurrentlyWornFetchObserver;
 class LLPanelEditWearable;
 class LLViewerWearable;
@@ -85,7 +85,7 @@ private:
 	void toggleOutfitEditPanel(BOOL visible, BOOL disable_camera_switch = FALSE);
 	void toggleWearableEditPanel(BOOL visible, LLViewerWearable* wearable = NULL, BOOL disable_camera_switch = FALSE);
 
-	LLFilterEditor*			mFilterEditor;
+	LLSearchEditor*			mFilterEditor;
 	LLPanelOutfitsInventory* mPanelOutfitsInventory;
 	LLPanelOutfitEdit*		mOutfitEdit;
 	LLPanelEditWearable*	mEditWearable;
