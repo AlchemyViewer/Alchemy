@@ -468,7 +468,6 @@ U32 LLVOVolume::processUpdateMessage(LLMessageSystem *mesgsys,
 			if (TEM_INVALID == res2)
 			{
 				// There's something bogus in the data that we're unpacking.
-				dp->dumpBufferToLog();
 				LL_WARNS() << "Flushing cache files" << LL_ENDL;
 
 				if(LLVOCache::instanceExists() && getRegion())
