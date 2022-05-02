@@ -30,6 +30,7 @@
 #include "llcheckboxctrl.h"
 #include "llpanelgenerictip.h"
 #include "llpanelonlinestatus.h"
+#include "alpanelradaralert.h"
 #include "llnotifications.h"
 #include "lltoastnotifypanel.h"
 #include "lltoastpanel.h"
@@ -122,6 +123,11 @@ LLToastPanel* LLToastPanel::buidPanelFromNotification(
 		if ("FriendOnlineOffline" == notification->getName())
 		{
 			res = new LLPanelOnlineStatus(notification);
+		}
+		else if (notification->matchesTag("radar"))
+		{
+			res = new ALPanelRadarAlert(notification);
+		}
 		}
 		// in all other case we use generic tip panel
 		else

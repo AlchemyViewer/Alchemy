@@ -134,6 +134,7 @@ set(viewer_SOURCE_FILES
     alpanelaomini.cpp
     alpanelaopulldown.cpp
     alpanelmusicticker.cpp
+    alpanelradaralert.cpp
     alpanelquicksettings.cpp
     alpanelquicksettingspulldown.cpp
     alrenderutils.cpp
@@ -812,6 +813,7 @@ set(viewer_HEADER_FILES
     alpanelaomini.h
     alpanelaopulldown.h
     alpanelmusicticker.h
+    alpanelradaralert.h
     alpanelquicksettings.h
     alpanelquicksettingspulldown.h
     alrenderutils.h
