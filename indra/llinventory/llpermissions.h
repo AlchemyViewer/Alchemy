@@ -273,6 +273,7 @@ public:
 	inline bool allowModifyBy(const LLUUID &agent_id, const LLUUID& group) const;
 	inline bool allowCopyBy(const LLUUID& agent_id, const LLUUID& group) const;
 	inline bool allowMoveBy(const LLUUID &agent_id, const LLUUID &group) const;
+	inline bool allowExportBy(const LLUUID& agent_id) const;
 
 	// This somewhat specialized function is meant for testing if the
 	// current owner is allowed to transfer to the specified agent id.
@@ -351,6 +352,11 @@ bool LLPermissions::allowCopyBy(const LLUUID& agent) const
 bool LLPermissions::allowMoveBy(const LLUUID& agent) const
 {
 	return allowOperationBy(PERM_MOVE, agent, LLUUID::null);
+}
+
+bool LLPermissions::allowExportBy(const LLUUID& agent) const
+{
+	return ((mCreator == agent) ? true : (allowOperationBy(PERM_EXPORT, agent, LLUUID::null)));
 }
 
 bool LLPermissions::allowTransferTo(const LLUUID &agent_id) const

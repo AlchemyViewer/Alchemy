@@ -3701,6 +3701,16 @@ std::string LLViewerRegion::getSimHostName()
 	return std::string("...");
 }
 
+bool LLViewerRegion::getRegionAllowsExport() const
+{
+	if (mSimulatorFeatures.has("OpenSimExtras")
+		&& mSimulatorFeatures["OpenSimExtras"].has("ExportSupported"))
+	{
+		return mSimulatorFeatures["OpenSimExtras"]["ExportSupported"].asBoolean();
+	}
+	return false;
+}
+
 std::string LLViewerRegion::getAvatarPickerURL() const
 {
 	std::string url;

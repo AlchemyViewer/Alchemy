@@ -986,7 +986,17 @@ void mask_to_string(U32 mask, char* str)
 	else
 	{
 		*str = ' ';
-	}	
+	}
+	str++;
+	
+	if (mask & PERM_EXPORT)
+	{
+		*str = 'X';
+	}
+	else
+	{
+		*str = ' ';
+	}
 	str++;	
 	*str = '\0';
 }

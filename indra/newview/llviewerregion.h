@@ -412,6 +412,8 @@ public:
 	 * @name OpenSimExtras Simulator Features capability
 	 * @{
 	 */
+	/// Get region allows export
+	bool getRegionAllowsExport() const;
 	/// Avatar picker url
 	std::string getAvatarPickerURL() const;
 	/// Destination guide url
