@@ -46,6 +46,7 @@
 #include "llagent.h"
 #include "llagentcamera.h"
 #include "llappviewer.h"
+#include "alavataractions.h"
 #include "llavatarrenderinfoaccountant.h"
 #include "llcallingcard.h"
 #include "llcommandhandler.h"
@@ -85,6 +86,8 @@
 #include "llviewerparcelmgr.h"
 #include "lllogininstance.h"
 #include "llviewernetwork.h"
+#include "llslurl.h"
+#include "llnotificationsutil.h"
 
 #include <boost/regex.hpp>
 
@@ -2210,7 +2213,7 @@ void sendRadarAlert(const LLUUID& agent, const std::string& region_str, bool ent
 	{
 		LLNotificationsUtil::add(sLogToChat ? "RadarAlertEnterChat" : "RadarAlertEnter", args,
 			LLSD().with("respond_on_mousedown", TRUE),
-			boost::bind(&LLAvatarActions::zoomIn, agent));
+			boost::bind(&ALAvatarActions::zoomIn, agent));
 	}
 	else
 	{
