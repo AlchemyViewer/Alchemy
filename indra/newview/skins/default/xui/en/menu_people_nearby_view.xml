@@ -68,4 +68,24 @@
          function="CheckControl"
          parameter="NearbyListHideUsernames" />
     </menu_item_check>
+    <menu_item_separator layout="topleft" />
+	<menu_item_check name ="radar_alerts" label="Show Radar Alerts">
+		<menu_item_check.on_check
+         function="CheckControl"
+         parameter="AlchemyRadarAlerts" />
+		<menu_item_check.on_click
+         function="ToggleControl"
+         parameter="AlchemyRadarAlerts" />
+	</menu_item_check>
+	<menu_item_check name ="radar_alerts_chat" label="Log Alerts to Chat">
+		<menu_item_check.on_check
+         function="CheckControl"
+         parameter="AlchemyRadarAlertsToChat" />
+		<menu_item_check.on_click
+         function="ToggleControl"
+         parameter="AlchemyRadarAlertsToChat" />
+		<menu_item_check.on_enable
+         function="CheckControl"
+         parameter="AlchemyRadarAlerts" />
+	</menu_item_check>
 </toggleable_menu>
