@@ -38,6 +38,7 @@ class LLPanelWearing;
 class LLMenuGL;
 class LLSidepanelAppearance;
 class LLTabContainer;
+class LLInventoryCategoriesObserver;
 
 class LLPanelOutfitsInventory : public LLPanel
 {
@@ -73,6 +74,9 @@ protected:
 private:
 	LLTabContainer*			mAppearanceTabs;
 	std::string 			mFilterSubString;
+
+	LLInventoryCategoriesObserver* mCategoriesObserver;
+	void onCOFChanged();
 
 	//////////////////////////////////////////////////////////////////////////////////
 	// tab panels                                                                   //

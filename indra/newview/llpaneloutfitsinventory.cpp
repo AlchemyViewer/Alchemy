@@ -43,6 +43,7 @@
 #include "llsidepanelappearance.h"
 #include "llviewercontrol.h"
 #include "llviewerfoldertype.h"
+#include "llvoavatarself.h"
 
 static const std::string OUTFITS_TAB_NAME = "outfitslist_tab";
 static const std::string OUTFIT_GALLERY_TAB_NAME = "outfit_gallery_tab";
@@ -67,6 +68,8 @@ LLPanelOutfitsInventory::LLPanelOutfitsInventory() :
 	observer.addBOFChangedCallback(boost::bind(&LLPanelOutfitsInventory::updateVerbs, this));
 	observer.addCOFChangedCallback(boost::bind(&LLPanelOutfitsInventory::updateVerbs, this));
 	observer.addOutfitLockChangedCallback(boost::bind(&LLPanelOutfitsInventory::updateVerbs, this));
+
+	mCategoriesObserver = new LLInventoryCategoriesObserver();
 }
 
 LLPanelOutfitsInventory::~LLPanelOutfitsInventory()
@@ -75,6 +78,12 @@ LLPanelOutfitsInventory::~LLPanelOutfitsInventory()
 	{
 		gSavedSettings.setS32("LastAppearanceTab", mAppearanceTabs->getCurrentPanelIndex());
 	}
+
+	if (gInventory.containsObserver(mCategoriesObserver))
+	{
+		gInventory.removeObserver(mCategoriesObserver);
+	}
+	delete mCategoriesObserver;
 }
 
 // virtual
@@ -114,6 +123,9 @@ void LLPanelOutfitsInventory::onOpen(const LLSD& key)
 			panel_appearance->fetchInventory();
 			panel_appearance->refreshCurrentOutfitName();
 		}
+		gInventory.addObserver(mCategoriesObserver);
+		mCategoriesObserver->addCategory(LLAppearanceMgr::instance().getCOF(), boost::bind(&LLPanelOutfitsInventory::onCOFChanged, this));
+		onCOFChanged();
 
 		if (!mAppearanceTabs->selectTab(gSavedSettings.getS32("LastAppearanceTab")))
 			mAppearanceTabs->selectFirstTab();
@@ -244,6 +256,27 @@ void LLPanelOutfitsInventory::onSave()
 	//payload["ids"].append(*it);
 	
 	LLNotificationsUtil::add("SaveOutfitAs", args, payload, boost::bind(&LLPanelOutfitsInventory::onSaveCommit, this, _1, _2));
+}
+
+void LLPanelOutfitsInventory::onCOFChanged()
+{
+	if (!isAgentAvatarValid())
+	{
+		return;
+	}
+
+	const LLUUID cof = LLAppearanceMgr::instance().getCOF();
+	LLInventoryModel::item_array_t obj_items;
+	LLInventoryModel::cat_array_t cats;
+	LLIsType is_of_type(LLAssetType::AT_OBJECT);
+	gInventory.collectDescendentsIf(cof, cats, obj_items, LLInventoryModel::EXCLUDE_TRASH, is_of_type);
+	U32 attachments = obj_items.size();
+
+	LLStringUtil::format_map_t args;
+	args["COUNT"] = llformat("%d", attachments);
+	args["MAX"] = llformat("%d", gAgentAvatarp->getMaxAttachments());
+	std::string title = getString("cof_tab_label", args);
+	mAppearanceTabs->setPanelTitle(mAppearanceTabs->getIndexForPanel(mCurrentOutfitPanel), title);
 }
 
 //static
