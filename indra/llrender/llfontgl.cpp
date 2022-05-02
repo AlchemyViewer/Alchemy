@@ -267,10 +267,10 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
 
 	const LLFontGlyphInfo* next_glyph = NULL;
 
-	const S32 GLYPH_BATCH_SIZE = 30;
-	LLVector4a vertices[GLYPH_BATCH_SIZE * GLYPH_VERTICES];
-	LLVector2 uvs[GLYPH_BATCH_SIZE * GLYPH_VERTICES];
-	LLColor4U colors[GLYPH_BATCH_SIZE * GLYPH_VERTICES];
+	constexpr S32 GLYPH_BATCH_SIZE = 30;
+	static LLVector4a vertices[GLYPH_BATCH_SIZE * GLYPH_VERTICES];
+	static LLVector2 uvs[GLYPH_BATCH_SIZE * GLYPH_VERTICES];
+	static LLColor4U colors[GLYPH_BATCH_SIZE * GLYPH_VERTICES];
 
 	LLColor4U text_color(color);
 
