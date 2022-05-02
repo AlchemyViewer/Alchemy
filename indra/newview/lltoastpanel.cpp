@@ -128,7 +128,6 @@ LLToastPanel* LLToastPanel::buidPanelFromNotification(
 		{
 			res = new ALPanelRadarAlert(notification);
 		}
-		}
 		// in all other case we use generic tip panel
 		else
 		{
