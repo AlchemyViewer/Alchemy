@@ -12,8 +12,8 @@
   single_instance="true"
   reuse_instance="true"
   title="AVATAR"
-  min_height="440"
-  min_width="333"
+  min_height="200"
+  min_width="351"
   width="333">
     <panel
       top="18"

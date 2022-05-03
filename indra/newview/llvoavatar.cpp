@@ -120,6 +120,7 @@
 #include "llrendersphere.h"
 
 #include "alcinematicmode.h"
+#include "llsidepanelappearance.h"
 
 extern F32 SPEED_ADJUST_MAX;
 extern F32 SPEED_ADJUST_MAX_SEC;
@@ -10902,7 +10903,9 @@ void LLVOAvatar::accountRenderComplexityForObject(
     const F32 max_attachment_complexity,
     LLVOVolume::texture_cost_t& textures,
     U32& cost,
-    hud_complexity_list_t& hud_complexity_list)
+    hud_complexity_list_t& hud_complexity_list,
+    std::map<LLUUID, U32>& item_complexity,
+    std::map<LLUUID, U32>& temp_item_complexity)
 {
     if (attached_object && !attached_object->isHUDAttachment())
 		{
@@ -10921,12 +10924,12 @@ void LLVOAvatar::accountRenderComplexityForObject(
                             F32 attachment_volume_cost = 0;
                             F32 attachment_texture_cost = 0;
                             F32 attachment_children_cost = 0;
-                const F32 animated_object_attachment_surcharge = 1000;
+			                const F32 animated_object_attachment_surcharge = 1000;
 
-                if (attached_object->isAnimatedObject())
-                {
-                    attachment_volume_cost += animated_object_attachment_surcharge;
-                }
+			                if (attached_object->isAnimatedObject())
+			                {
+			                    attachment_volume_cost += animated_object_attachment_surcharge;
+			                }
 							attachment_volume_cost += volume->getRenderCost(textures);
 
 							const_child_list_t& children = volume->getChildren();
@@ -10957,6 +10960,18 @@ void LLVOAvatar::accountRenderComplexityForObject(
 #endif
                             // Limit attachment complexity to avoid signed integer flipping of the wearer's ACI
                             cost += (U32)llclamp(attachment_total_cost, MIN_ATTACHMENT_COMPLEXITY, max_attachment_complexity);
+
+							if (isSelf())
+							{
+								if (!attached_object->isTempAttachment())
+								{
+									item_complexity.insert(std::make_pair(attached_object->getAttachmentItemID(), (U32)attachment_total_cost));
+								}
+								else
+								{
+									temp_item_complexity.insert(std::make_pair(attached_object->getID(), (U32)attachment_total_cost));
+								}
+							}
 						}
 					}
 				}
@@ -11042,6 +11057,9 @@ void LLVOAvatar::calculateUpdateRenderComplexity()
 		// Diagnostic list of all textures on our avatar
 		static std::set<LLUUID> all_textures;
 
+		std::map<LLUUID, U32> item_complexity;
+		std::map<LLUUID, U32> temp_item_complexity;
+		U32 body_parts_complexity;
 
 		U32 cost = VISUAL_COMPLEXITY_UNKNOWN;
 		LLVOVolume::texture_cost_t textures;
@@ -11077,6 +11095,8 @@ void LLVOAvatar::calculateUpdateRenderComplexity()
         LL_DEBUGS("ARCdetail") << "Avatar body parts complexity: " << cost << LL_ENDL;
 #endif
 
+		body_parts_complexity = cost;
+
         mAttachmentVisibleTriangleCount = 0;
         mAttachmentEstTriangleCount = 0.f;
         mAttachmentSurfaceArea = 0.f;
@@ -11091,7 +11111,7 @@ void LLVOAvatar::calculateUpdateRenderComplexity()
             if (volp && !volp->isAttachment())
             {
                 accountRenderComplexityForObject(volp, max_attachment_complexity,
-                                                 textures, cost, hud_complexity_list);
+                                                 textures, cost, hud_complexity_list, item_complexity, temp_item_complexity);
             }
         }
 
@@ -11108,7 +11128,7 @@ void LLVOAvatar::calculateUpdateRenderComplexity()
 				const LLViewerObject* attached_object = iter.first;
 #endif
                 accountRenderComplexityForObject(attached_object, max_attachment_complexity,
-                                                 textures, cost, hud_complexity_list);
+                                                 textures, cost, hud_complexity_list, item_complexity, temp_item_complexity);
 			}
 		}
 
@@ -11181,6 +11201,11 @@ void LLVOAvatar::calculateUpdateRenderComplexity()
 
             // HUD complexity
             LLHUDRenderNotifier::getInstance()->updateNotificationHUD(hud_complexity_list);
+        }
+
+        if (isSelf())
+        {
+            LLSidepanelAppearance::updateAvatarComplexity(mVisualComplexity, item_complexity, temp_item_complexity, body_parts_complexity);
         }
     }
 }

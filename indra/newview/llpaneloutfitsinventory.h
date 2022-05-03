@@ -68,6 +68,8 @@ public:
 
 	void openApearanceTab(const std::string& tab_name);
 
+	void updateAvatarComplexity(U32 complexity, const std::map<LLUUID, U32>& item_complexity, const std::map<LLUUID, U32>& temp_item_complexity, U32 body_parts_complexity);
+
 protected:
 	void updateVerbs();
 

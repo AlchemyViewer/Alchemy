@@ -18,7 +18,7 @@
    </panel.string>
    <panel.string
      name="cof_tab_label">
-     Wearing ([COUNT]/[MAX] Att.)
+     WEARING ([COUNT]/[MAX] Att.)
    </panel.string>
    <tab_container
      follows="all"

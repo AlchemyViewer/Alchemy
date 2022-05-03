@@ -42,6 +42,7 @@ class LLInventoryCategoriesObserver;
 class LLOutfitListGearMenuBase;
 class LLWearableItemsList;
 class LLListContextMenu;
+class LLTextBox;
 
 
 /**
@@ -108,6 +109,8 @@ public:
 
     virtual bool getHasExpandableFolders() = 0;
 
+	void updateAvatarComplexity(U32 complexity);
+
 protected:
     virtual LLOutfitListGearMenuBase* createGearMenu() = 0;
     virtual void onHighlightBaseOutfit(LLUUID base_id, LLUUID prev_id) = 0;
@@ -124,6 +127,7 @@ protected:
     selection_change_signal_t		mSelectionChangeSignal;
     LLListContextMenu*				mOutfitMenu;
     LLOutfitListGearMenuBase*		mGearMenu;
+	LLTextBox*						mAvatarComplexityLabel;
 };
 
 //////////////////////////////////////////////////////////////////////////

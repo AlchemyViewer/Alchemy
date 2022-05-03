@@ -9,7 +9,7 @@
    layout="topleft"
    left="0"
    top="0"
-   width="318">
+   width="312">
   <string name="outfit_photo_string">
     Photo of "[OUTFIT_NAME]" outfit
   </string>
@@ -22,7 +22,7 @@
   <text
     type="string"
     clip_partial="false"
-    follows="left|top"
+    follows="left|top|right"
     layout="topleft"
     left="13"
     name="no_outfits_txt"
@@ -35,14 +35,13 @@
   </text> 
   <scroll_container
    follows="all"
-   height="400"
-   width="312"
+   height="395"
+   right="310"
    layout="topleft"
-   left="4"
+   left="3"
    top="0"
    name="gallery_scroll_panel"
-   opaque="false"
-   top_pad="0">
+   opaque="false">
    <!--outfit_gallery_item
     layout="topleft"
     left="10"
@@ -91,7 +90,7 @@
 	 height="28"
 	 layout="topleft"
 	 left="4"
-	 top_pad="0"
+	 top_pad="5"
 	 visible="true"
 	 name="bottom_panel"
 	 width="312">
@@ -116,6 +115,34 @@
        left_pad="1"
        name="dummy_icon"
        width="243"/>
+     <text
+       type="string"
+       length="1"
+       height="25"
+       layout="topleft"
+       left_delta="5"
+       name="OutfitcountText"
+       font="SansSerifMedium"
+       follows="bottom|left"
+       v_pad="6"
+       width="100">
+          [COUNT] Outfits
+      </text>
+      <text
+       top_delta="0"
+       type="string"
+       length="1"
+       height="25"
+       layout="topleft"
+       right="-42"
+       name="avatar_complexity_label"
+       font="SansSerifMedium"
+       follows="bottom|right"
+       halign="right"
+       v_pad="6"
+       width="150">
+          Complexity: [WEIGHT]
+      </text>
       <button
        follows="bottom|right"
        height="25"
@@ -124,7 +151,7 @@
        image_selected="Toolbar_Right_Selected"
        image_unselected="Toolbar_Right_Off"
        layout="topleft"
-       left_pad="1"
+       left_pad="6"
        name="trash_btn"
        tool_tip="Delete selected outfit"
        width="31"/>

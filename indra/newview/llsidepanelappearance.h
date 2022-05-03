@@ -74,6 +74,8 @@ public:
 	LLPanelEditWearable* getWearableEditPanel() { return mEditWearable; }
 // [/RLVa:KB]
 
+	static void updateAvatarComplexity(U32 complexity, const std::map<LLUUID, U32>& item_complexity, const std::map<LLUUID, U32>& temp_item_complexity, U32 body_parts_complexity);
+
 private:
 	void onFilterEdit(const std::string& search_string);
 	void onVisibilityChanged ( const LLSD& new_visibility );
@@ -103,6 +105,8 @@ private:
 
 	// Gets set to true when we're opened for the first time.
 	bool mOpened;
+
+	U32 mLastAvatarComplexity;
 };
 
 #endif //LL_LLSIDEPANELAPPEARANCE_H

@@ -74,6 +74,7 @@
 // [RLVa:KB] - Checked: 2010-09-16 (RLVa-1.2.1a)
 #include "rlvhandler.h"
 // [/RLVa:KB]
+#include "llresmgr.h"
 
 static LLPanelInjector<LLPanelOutfitEdit> t_outfit_edit("panel_outfit_edit");
 
@@ -407,7 +408,9 @@ LLPanelOutfitEdit::LLPanelOutfitEdit()
 	mWearableListManager(NULL),
 	mPlusBtn(NULL),
 	mWearablesGearMenuBtn(NULL),
-	mGearMenuBtn(NULL)
+	mGearMenuBtn(NULL),
+	mAvatarComplexityLabel(NULL),
+	mAvatarComplexityAddingLabel(NULL)
 {
 	mSavedFolderState = new LLSaveFolderState();
 	mSavedFolderState->setApply(FALSE);
@@ -571,6 +574,9 @@ BOOL LLPanelOutfitEdit::postBuild()
 
 	getChild<LLButton>(SAVE_BTN)->setCommitCallback(boost::bind(&LLPanelOutfitEdit::saveOutfit, this, false));
 	getChild<LLButton>(SAVE_AS_BTN)->setCommitCallback(boost::bind(&LLPanelOutfitEdit::saveOutfit, this, true));
+
+	mAvatarComplexityLabel = getChild<LLTextBox>("avatar_complexity_label");
+	mAvatarComplexityAddingLabel = getChild<LLTextBox>("avatar_complexity_adding_label");
 
 	onOutfitChanging(gAgentWearables.isCOFChangeInProgress());
 	return TRUE;
@@ -1448,4 +1454,13 @@ void LLPanelOutfitEdit::saveOutfit(bool as_new)
 	} 	
 }
 
+void LLPanelOutfitEdit::updateAvatarComplexity(U32 complexity)
+{
+	std::string complexity_string;
+	LLLocale locale("");
+	LLResMgr::getInstance()->getIntegerString(complexity_string, complexity);
+
+	mAvatarComplexityLabel->setTextArg("[WEIGHT]", complexity_string);
+	mAvatarComplexityAddingLabel->setTextArg("[WEIGHT]", complexity_string);
+}
 // EOF

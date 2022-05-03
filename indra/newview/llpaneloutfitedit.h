@@ -187,6 +187,8 @@ public:
 									  EAcceptance* accept,
 									  std::string& tooltip_msg);
 
+
+	void updateAvatarComplexity(U32 complexity);
 private:
 	void onAddMoreButtonClicked();
 	void showFilteredWearablesListView(LLWearableType::EType type);
@@ -219,6 +221,8 @@ private:
 	LLButton*			mListViewBtn;
 	LLButton*			mPlusBtn;
 	LLPanel*			mAddWearablesPanel;
+	LLTextBox*			mAvatarComplexityLabel;
+	LLTextBox*			mAvatarComplexityAddingLabel;
 	
 	LLComboBox*			mFolderViewFilterCmbBox;
 	LLComboBox*			mListViewFilterCmbBox;

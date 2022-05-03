@@ -431,3 +431,10 @@ void LLPanelOutfitsInventory::saveOutfit(bool as_new)
 
 	onSave();
 }
+
+void LLPanelOutfitsInventory::updateAvatarComplexity(U32 complexity, const std::map<LLUUID, U32>& item_complexity, const std::map<LLUUID, U32>& temp_item_complexity, U32 body_parts_complexity)
+{
+	mOutfitGalleryPanel->updateAvatarComplexity(complexity);
+	mMyOutfitsPanel->updateAvatarComplexity(complexity);
+	mCurrentOutfitPanel->updateAvatarComplexity(complexity, item_complexity, temp_item_complexity, body_parts_complexity);
+}

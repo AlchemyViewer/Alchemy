@@ -48,6 +48,7 @@
 #include "llvoavatar.h"
 #include "llvoavatarself.h"
 #include "llwearableitemslist.h"
+#include "llresmgr.h"
 
 static bool is_tab_header_clicked(LLAccordionCtrlTab* tab, S32 y);
 
@@ -765,6 +766,7 @@ bool is_tab_header_clicked(LLAccordionCtrlTab* tab, S32 y)
 LLOutfitListBase::LLOutfitListBase()
     :   LLPanelAppearanceTab()
     ,   mIsInitialized(false)
+	,	mAvatarComplexityLabel(nullptr)
 {
     mCategoriesObserver = new LLInventoryCategoriesObserver();
     mOutfitMenu = new LLOutfitContextMenu(this);
@@ -842,6 +844,13 @@ void LLOutfitListBase::refreshList(const LLUUID& category_id)
 
     // Create added and removed items vectors.
     computeDifference(cat_array, vadded, vremoved);
+
+	{
+		std::string count_string;
+		LLLocale locale("");
+		LLResMgr::getInstance()->getIntegerString(count_string, (S32)cat_array.size());
+		getChild<LLTextBox>("OutfitcountText")->setTextArg("COUNT", count_string);
+	}
 
     // Handle added tabs.
     for (uuid_vec_t::const_iterator iter = vadded.begin();
@@ -968,6 +977,8 @@ BOOL LLOutfitListBase::postBuild()
 {
     mGearMenu = createGearMenu();
 
+	mAvatarComplexityLabel = getChild<LLTextBox>("avatar_complexity_label");
+
     LLMenuButton* menu_gear_btn = getChild<LLMenuButton>("options_gear_btn");
 
     menu_gear_btn->setMouseDownCallback(boost::bind(&LLOutfitListGearMenuBase::updateItemsVisibility, mGearMenu));
@@ -993,6 +1004,15 @@ void LLOutfitListBase::deselectOutfit(const LLUUID& category_id)
         mSelectedOutfitUUID = LLUUID::null;
         signalSelectionOutfitUUID(mSelectedOutfitUUID);
     }
+}
+
+void LLOutfitListBase::updateAvatarComplexity(U32 complexity)
+{
+	std::string complexity_string;
+	LLLocale locale("");
+	LLResMgr::getInstance()->getIntegerString(complexity_string, complexity);
+
+	mAvatarComplexityLabel->setTextArg("[WEIGHT]", complexity_string);
 }
 
 LLContextMenu* LLOutfitContextMenu::createMenu()

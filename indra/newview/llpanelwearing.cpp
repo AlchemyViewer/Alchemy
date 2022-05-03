@@ -50,6 +50,9 @@
 #include "rlvcommon.h"
 #include "rlvhandler.h"
 // [/RLVa:KB]
+#include "lltextbox.h"
+#include "llresmgr.h"
+#include "lltrans.h"
 
 // Context menu and Gear menu helper.
 static void edit_outfit()
@@ -234,7 +237,8 @@ static LLPanelInjector<LLPanelWearing> t_panel_wearing("panel_wearing");
 
 LLPanelWearing::LLPanelWearing()
 	:	LLPanelAppearanceTab()
-	,	mCOFItemsList(NULL)
+	,	mCOFItemsList(nullptr)
+	,	mAvatarComplexityLabel(nullptr)
 	,	mIsInitialized(false)
 	,	mAttachmentsChangedConnection()
 {
@@ -277,6 +281,8 @@ BOOL LLPanelWearing::postBuild()
 	mTempItemsList = getChild<LLScrollListCtrl>("temp_attachments_list");
 	mTempItemsList->setFgUnselectedColor(LLColor4::white);
 	mTempItemsList->setRightMouseDownCallback(boost::bind(&LLPanelWearing::onTempAttachmentsListRightClick, this, _1, _2, _3));
+
+	mAvatarComplexityLabel = getChild<LLTextBox>("avatar_complexity_label");
 
 	LLMenuButton* menu_gear_btn = getChild<LLMenuButton>("options_gear_btn");
 
@@ -461,9 +467,15 @@ bool LLPanelWearing::populateAttachmentsList(bool update)
 			}
 			else
 			{
-				row["columns"][1]["value"] = "Loading...";
+				row["columns"][1]["value"] = LLTrans::getString("LoadingData");
 				populated = false;
 			}
+			std::string complexity_string;
+			LLLocale locale("");
+			LLResMgr::getInstance()->getIntegerString(complexity_string, mTempItemComplexityMap[attachment->getID()]);
+			row["columns"][2]["column"] = "weight";
+			row["columns"][2]["value"] = complexity_string;
+			row["columns"][2]["halign"] = "right";
 			mTempItemsList->addElement(row);
 			mAttachmentsMap[attachment->getID()] = attachment;
 		}
@@ -625,5 +637,17 @@ void LLPanelWearing::copyToClipboard()
 	}
 
 	LLClipboard::instance().copyToClipboard(utf8str_to_wstring(text),0,text.size());
+}
+
+void LLPanelWearing::updateAvatarComplexity(U32 complexity, const std::map<LLUUID, U32>& item_complexity, const std::map<LLUUID, U32>& temp_item_complexity, U32 body_parts_complexity)
+{
+	std::string complexity_string;
+	LLLocale locale("");
+	LLResMgr::getInstance()->getIntegerString(complexity_string, complexity);
+
+	mAvatarComplexityLabel->setTextArg("[WEIGHT]", complexity_string);
+	
+	mTempItemComplexityMap = temp_item_complexity;
+	updateAttachmentsList();
 }
 // EOF
