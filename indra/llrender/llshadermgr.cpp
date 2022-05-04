@@ -767,8 +767,10 @@ GLuint LLShaderMgr::loadShaderFile(const std::string& filename, S32 & shader_lev
 
 		//backwards compatibility with legacy texture lookup syntax
 		extra_code_text[extra_code_count++] = strdup("#define texture2D texture\n");
+		extra_code_text[extra_code_count++] = strdup("#define texture3D texture\n");
 		extra_code_text[extra_code_count++] = strdup("#define textureCube texture\n");
 		extra_code_text[extra_code_count++] = strdup("#define texture2DLod textureLod\n");
+		extra_code_text[extra_code_count++] = strdup("#define texture3DLod textureLod\n");
         extra_code_text[extra_code_count++] = strdup("#define texture2DLodOffset textureLodOffset\n");
 		extra_code_text[extra_code_count++] = strdup("#define shadow2D(a,b) vec2(texture(a,b))\n");
 		
