@@ -338,7 +338,7 @@ void LLFloaterIMSession::sendMsg(const std::string& msg)
 {
 //	const std::string utf8_text = utf8str_truncate(msg, MAX_MSG_BUF_SIZE - 1);
 // [RLVa:KB] - Checked: 2010-11-30 (RLVa-1.3.0)
-	std::string utf8_text = utf8str_truncate(msg, MAX_MSG_BUF_SIZE - 1);
+	std::string utf8_text = msg;
 
 	if ( (RlvActions::hasBehaviour(RLV_BHVR_SENDIM)) || (RlvActions::hasBehaviour(RLV_BHVR_SENDIMTO)) )
 	{
@@ -490,7 +490,11 @@ BOOL LLFloaterIMSession::postBuild()
 
 	BOOL result = LLFloaterIMSessionTab::postBuild();
 
-	mInputEditor->setMaxTextLength(DB_CHAT_MSG_STR_LEN);
+//	mInputEditor->setMaxTextLength(DB_CHAT_MSG_STR_LEN);
+// [SL:KB]
+	mInputEditor->setMaxTextLength(DB_CHAT_MSG_STR_LEN * 5);
+// [/SL:KB]
+
 	mInputEditor->setAutoreplaceCallback(boost::bind(&LLAutoReplace::autoreplaceCallback, LLAutoReplace::getInstance(), _1, _2, _3, _4, _5));
 	mInputEditor->setFocusReceivedCallback( boost::bind(onInputEditorFocusReceived, _1, this) );
 	mInputEditor->setFocusLostCallback( boost::bind(onInputEditorFocusLost, _1, this) );

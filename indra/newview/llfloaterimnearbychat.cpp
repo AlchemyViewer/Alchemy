@@ -885,7 +885,7 @@ LLWString LLFloaterIMNearbyChat::stripChannelNumber(const LLWString &mesg, S32* 
 
 //void send_chat_from_viewer(const std::string& utf8_out_text, EChatType type, S32 channel)
 // [RLVa:KB] - Checked: 2010-02-27 (RLVa-1.2.0b) | Modified: RLVa-0.2.2a
-void send_chat_from_viewer(std::string utf8_out_text, EChatType type, S32 channel)
+void send_chat_from_viewer_impl(std::string utf8_out_text, EChatType type, S32 channel)
 // [/RLVa:KB]
 {
 // [RLVa:KB] - Checked: 2010-02-27 (RLVa-1.2.0b) | Modified: RLVa-1.2.0a
@@ -960,6 +960,24 @@ void send_chat_from_viewer(std::string utf8_out_text, EChatType type, S32 channe
     gAgent.sendReliableMessage();
     add(LLStatViewer::CHAT_COUNT, 1);
 }
+
+// [SL:KB]
+void send_chat_from_viewer(std::string utf8_out_text, EChatType type, S32 channel)
+{
+	size_t maxChatLen = (channel >= 0) ? DB_CHAT_MSG_STR_LEN : DB_CHAT_MSG_STR_LEN / 2;
+	if (utf8_out_text.length() <= maxChatLen)
+	{
+		send_chat_from_viewer_impl(utf8_out_text, type, channel);
+	}
+	else
+	{
+		std::list<std::string> lines;
+		utf8str_split(lines, utf8_out_text, maxChatLen, ' ');
+		for (const std::string& strLine : lines)
+			send_chat_from_viewer_impl(strLine, type, channel);
+	}
+}
+// [/SL:KB]
 
 class LLChatCommandHandler : public LLCommandHandler
 {

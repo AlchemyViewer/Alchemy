@@ -1419,18 +1419,56 @@ void LLIMModel::sendMessage(const std::string& utf8_text,
 		{
 			new_dialog = IM_SESSION_SEND;
 		}
-		pack_instant_message(
-			gMessageSystem,
-			gAgent.getID(),
-			FALSE,
-			gAgent.getSessionID(),
-			other_participant_id,
-			name.c_str(),
-			utf8_text.c_str(),
-			offline,
-			(EInstantMessage)new_dialog,
-			im_session_id);
-		gAgent.sendReliableMessage();
+// [SL:KB]
+		size_t maxChatLen = MAX_MSG_STR_LEN;
+		if (utf8_text.length() <= maxChatLen)
+		{
+			pack_instant_message(
+				gMessageSystem,
+				gAgent.getID(),
+				FALSE,
+				gAgent.getSessionID(),
+				other_participant_id,
+				name.c_str(),
+				utf8_text.c_str(),
+				offline,
+				(EInstantMessage)new_dialog,
+				im_session_id);
+			gAgent.sendReliableMessage();
+		}
+		else
+		{
+			std::list<std::string> lines;
+			utf8str_split(lines, utf8_text, maxChatLen, ' ');
+			for (const std::string& strLine : lines)
+			{
+				pack_instant_message(
+					gMessageSystem,
+					gAgent.getID(),
+					FALSE,
+					gAgent.getSessionID(),
+					other_participant_id,
+					name.c_str(),
+					strLine.c_str(),
+					offline,
+					(EInstantMessage)new_dialog,
+					im_session_id);
+				gAgent.sendReliableMessage();
+			}
+		}
+// [/SL:KB]
+		//pack_instant_message(
+		//	gMessageSystem,
+		//	gAgent.getID(),
+		//	FALSE,
+		//	gAgent.getSessionID(),
+		//	other_participant_id,
+		//	name.c_str(),
+		//	utf8_text.c_str(),
+		//	offline,
+		//	(EInstantMessage)new_dialog,
+		//	im_session_id);
+		//gAgent.sendReliableMessage();
 	}
 
 	bool is_group_chat = false;
