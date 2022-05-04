@@ -841,7 +841,6 @@ class DarwinManifest(ViewerManifest):
                                 'libGLOD.dylib',
                                 'libhunspell-*.dylib',
                                 'libndofdev.dylib',
-                                'libxmlrpc-epi.*.dylib',
                                 ):
                     self.path(libfile)
 

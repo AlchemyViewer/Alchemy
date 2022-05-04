@@ -151,8 +151,6 @@ elseif(DARWIN)
         libGLOD.dylib
         libhunspell-1.7.0.dylib
         libndofdev.dylib
-        libxmlrpc-epi.dylib
-        libxmlrpc-epi.0.dylib
        )
 
     if (USE_FMODSTUDIO)
