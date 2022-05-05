@@ -460,7 +460,7 @@ void LLLoginInstance::handleLoginFailure(const LLSD& event)
             gViewerWindow->setShowProgress(FALSE);
         }
 
-        LLSD args(llsd::map( "MESSAGE", LLTrans::getString(response["message_id"]) ));
+        LLSD args(llsd::map( "MESSAGE", LLTrans::getString(response["message_id"].asString()) ));
         LLSD payload;
         LLNotificationsUtil::add("PromptMFAToken", args, payload, [=](LLSD const & notif, LLSD const & response) {
             bool continue_clicked = response["continue"].asBoolean();

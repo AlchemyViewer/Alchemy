@@ -197,7 +197,7 @@ std::string LLGridManager::getAppSLURLBase(const std::string& grid_name) const
 {
 	return "myappslurl";
 }
-std::string LLGridManager::getGridId(const std::string& grid)
+std::string LLGridManager::getGridId(const std::string& grid) const
 {
     return std::string();
 }
