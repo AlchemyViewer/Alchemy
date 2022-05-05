@@ -4436,12 +4436,10 @@ void LLAgent::teleportRequest(const LLVector3d& pos_global, const LLVector3& loo
 
 	LLVector3 pos_local;
 	U64 region_handle;
-	bool is_local = false;
 	if (regionp->pointInRegionGlobal(pos_global))
 	{
 		pos_local = regionp->getPosRegionFromGlobal(pos_global);
 		region_handle = regionp->getHandle();
-		is_local = true;
 	}
 	else if (LLViewerRegion* other_regionp = LLWorld::instance().getRegionFromPosGlobal(pos_global))
 	{
