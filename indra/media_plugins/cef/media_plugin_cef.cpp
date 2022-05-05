@@ -684,16 +684,6 @@ void MediaPluginCEF::receiveMessage(const char* message_string)
                 settings.disable_web_security = false;
                 settings.file_access_from_file_urls = false;
 
-				// This setting applies to all plugins, not just Flash
-				// Regarding, SL-15559 PDF files do not load in CEF v91,
-				// it turns out that on Windows, PDF support is treated
-				// as a plugin on Windows only so turning all plugins
-				// off, disabled built in PDF support.  (Works okay in
-				// macOS surprisingly). To mitigrate this, we set the global
-				// media enabled flag to whatever the consumer wants and 
-				// explicitly disable Flash with a different setting (below)
-				settings.plugins_enabled = mPluginsEnabled;
-
 				settings.flip_mouse_y = false;
 				settings.flip_pixels_y = true;
 				settings.frame_rate = 60;
