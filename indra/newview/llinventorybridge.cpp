@@ -7502,8 +7502,6 @@ void LLSettingsBridge::buildContextMenu(LLMenuGL& menu, U32 flags)
 
     if (isMarketplaceListingsFolder())
     {
-        menuentry_vec_t items;
-        menuentry_vec_t disabled_items;
         addMarketplaceContextMenuOptions(flags, items, disabled_items);
         items.push_back(std::string("Properties"));
         getClipboardEntries(false, items, disabled_items, flags);
@@ -8060,7 +8058,7 @@ void LLFolderViewGroupedItemBridge::groupFilterContextMenu(folder_view_item_dequ
 	menuentry_vec_t disabled_items;
     if (get_selection_item_uuids(selected_items, ids))
     {
-		if (!LLAppearanceMgr::instance().canAddWearables(ids) && canWearSelected(ids))
+		if (!canWearSelected(ids) || !LLAppearanceMgr::instance().canAddWearables(ids))
         {
             disabled_items.push_back(std::string("Wearable And Object Wear"));
             disabled_items.push_back(std::string("Wearable Add"));
@@ -8076,7 +8074,7 @@ bool LLFolderViewGroupedItemBridge::canWearSelected(const uuid_vec_t& item_ids) 
 	for (uuid_vec_t::const_iterator it = item_ids.begin(); it != item_ids.end(); ++it)
 	{
 		const LLViewerInventoryItem* item = gInventory.getItem(*it);
-		if (!item || (item->getType() >= LLAssetType::AT_COUNT) || (item->getType() <= LLAssetType::AT_NONE))
+		if (!item || (item->getType() != LLAssetType::AT_CLOTHING && item->getType() != LLAssetType::AT_OBJECT && item->getType() != LLAssetType::AT_BODYPART && item->getType() != LLAssetType::AT_GESTURE))
 		{
 			return false;
 		}

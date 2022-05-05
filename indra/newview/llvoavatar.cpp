@@ -769,14 +769,14 @@ LLVOAvatar::LLVOAvatar(const LLUUID& id,
 S32 LLVOAvatar::getNumBakes() const 
 {
 	// BAKED_LEFT_ARM is equal to the pre-BOM BAKED_NUM_INDICES
-	if(getRegion())
+	if(LLViewerRegion* regionp = getRegion())
 	{
 		// LL_INFOS("BOMOS") 
 		// 				<< getFullname()
 		// 				<< "Using avatar region settings [" << getRegion()->getName() << "]"
 		// 				<< " bakesOnMesh = " << static_cast<const char *>(getRegion()->bakesOnMeshEnabled()?"True":"False")
 		// 				<< LL_ENDL;
-		return getRegion()->getRegionMaxBakes();
+		return regionp->getRegionMaxBakes();
 	}
 	// LL_INFOS("BOMOS") 
 	// 				<< " Using fallback settings"

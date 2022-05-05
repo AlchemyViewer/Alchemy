@@ -214,7 +214,7 @@ namespace LLMarketplaceImport
         httpOpts->setFollowRedirects(true);
 
         httpHeaders->append(HTTP_OUT_HEADER_ACCEPT, "*/*");
-        httpHeaders->append(HTTP_OUT_HEADER_CONNECTION, "keep-alive");
+        httpHeaders->append(HTTP_OUT_HEADER_CONNECTION, "Keep-Alive");
         httpHeaders->append(HTTP_OUT_HEADER_COOKIE, sMarketplaceCookie);
         httpHeaders->append(HTTP_OUT_HEADER_CONTENT_TYPE, HTTP_CONTENT_XML);
         httpHeaders->append(HTTP_OUT_HEADER_USER_AGENT, LLViewerMedia::getInstanceFast()->getCurrentUserAgent());
