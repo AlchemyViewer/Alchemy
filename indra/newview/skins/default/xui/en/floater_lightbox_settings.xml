@@ -276,6 +276,10 @@
 					top_pad="-18"
 					width="246">
 					<combo_box.item
+						label="None"
+						name="lut_none"
+						value="" />
+					<combo_box.item
 						label="Neutral"
 						name="lut_neutral"
 						value="NeutralLUT.png" />
