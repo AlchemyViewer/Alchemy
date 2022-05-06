@@ -3706,7 +3706,7 @@ bool LLViewerRegion::getRegionAllowsExport() const
 	if (mSimulatorFeatures.has("OpenSimExtras")
 		&& mSimulatorFeatures["OpenSimExtras"].has("ExportSupported"))
 	{
-		return mSimulatorFeatures["OpenSimExtras"]["ExportSupported"].asBoolean();
+		return mSimulatorFeatures["OpenSimExtras"]["ExportSupported"].asBoolean() || mSimulatorFeatures["OpenSimExtras"]["ExportSupported"].asString() == "true";
 	}
 	return false;
 }
