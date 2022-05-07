@@ -314,13 +314,13 @@
          name="perms_inv"
          left="0"
          top_pad="15"
-         height="135"
+         height="115"
          width="313">
 	  <text
              type="string"
              length="1"
           left="5"
-             top_pad="15"
+          top_pad="4"
              text_color="EmphasisColor"
 	     height="15"
              follows="left|top|right"
@@ -338,26 +338,34 @@
 			 left="10"
                name="Anyone can:"
 			 top_pad="8"
-			 width="100">
+			 width="80">
 			Anyone:
 	    </text>
-	    <check_box
-			 height="18"
-			 label="Copy"
-			 layout="topleft"
-			 left_pad="0"
-             name="checkbox allow everyone copy"
-             tool_tip="Anyone can take a copy of the object. Object and all of its contents must be copy and transfer permissive."
-			 top_delta="-2"
-			 width="90" />
 	    <check_box
              height="18"
              label="Move"
              layout="topleft"
              name="checkbox allow everyone move"
              tool_tip="Anyone can move the object."
+			    left_pad="0"
+             top_delta="-2"
+             width="70" />
+	    <check_box
+			 height="18"
+			 label="Copy"
+			 layout="topleft"
 			 left_pad="0"
-             width="150" />
+          name="checkbox allow everyone copy"
+          tool_tip="Anyone can take a copy of the object. Object and all of its contents must be copy and transfer permissive."
+			 width="70" />
+	    <check_box
+             height="18"
+             label="Export"
+             layout="topleft"
+             name="checkbox allow export"
+             tool_tip="Next owner can export this object to other grids"
+			    left_pad="0"
+             width="70" />
 	       	<text
 			 type="string"
 			 length="1"
@@ -367,14 +375,14 @@
 			 left="10"
 			 name="GroupLabel"
 			 top_pad="8"
-			 width="100">
+			 width="80">
 			Group:
     	</text>
 			    <check_box
 			 height="18"
 			 label="Share"
 			 layout="topleft"
-			 left_pad="90"
+			 left_pad="0"
 			 top_delta="-2"
              name="checkbox share with group"
 			 tool_tip="Allow all members of the set group to share your modify permissions for this object. You must Deed to enable role restrictions."

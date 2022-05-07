@@ -335,6 +335,14 @@
           left_pad="0"
           name="CheckOwnerTransfer"
           width="106" />
+        <check_box
+          height="18"
+          label="Export"
+          layout="topleft"
+          left="20"
+          top_pad="4"
+          name="CheckOwnerExport"
+          width="106" />
         <text
           type="string"
           length="1"
@@ -415,6 +423,15 @@
           name="CheckNextOwnerTransfer"
           tool_tip="Next owner can give away or resell this object."
           width="106" />
+        <check_box
+          height="18"
+          label="Export"
+          layout="topleft"
+          left="20"
+          top_pad="4"
+          name="CheckNextOwnerExport"
+          tool_tip="Next owner can export this object to other grids"
+          width="106" />
       </panel>
       <check_box
         height="18"
@@ -422,7 +439,7 @@
         layout="topleft"
         left="20"
         name="CheckPurchase"
-        top_pad="20"
+        top_pad="30"
         width="100"
         tool_tip="Lets people buy this object, its content or it copy inworld for specified price." />
       <combo_box

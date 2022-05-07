@@ -991,7 +991,7 @@ void mask_to_string(U32 mask, char* str)
 	
 	if (mask & PERM_EXPORT)
 	{
-		*str = 'X';
+		*str = 'E';
 	}
 	else
 	{

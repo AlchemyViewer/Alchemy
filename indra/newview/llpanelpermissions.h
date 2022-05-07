@@ -81,6 +81,7 @@ protected:
 
 	static void	onCommitClickAction(LLUICtrl* ctrl, void*);
 	static void onCommitIncludeInSearch(LLUICtrl* ctrl, void*);
+	static void onCommitExport(LLUICtrl* ctrl, void*);
 
 	static LLViewerInventoryItem* findItem(LLUUID &object_id);
 

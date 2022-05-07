@@ -214,6 +214,14 @@
      name="CheckOwnerTransfer"
      top_pad="5"
      width="106" />
+    <check_box
+     height="16"
+     label="Export"
+     layout="topleft"
+     left_delta="0"
+     name="CheckOwnerExport"
+     top_pad="5"
+     width="106" />
     <text
      type="string"
      length="1"

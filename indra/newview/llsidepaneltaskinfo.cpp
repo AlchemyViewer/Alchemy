@@ -64,10 +64,15 @@
 #include "lltextbase.h"
 #include "llstring.h"
 #include "lltrans.h"
+#include "llviewerregion.h"
 // [RLVa:KB] - Checked: 2010-08-25 (RLVa-1.2.2a)
 #include "llslurl.h"
 #include "rlvhandler.h"
 // [/RLVa:KB]
+
+extern bool can_set_export(const U32& base, const U32& own, const U32& next);
+extern bool perms_allow_export(const LLPermissions& perms);
+extern bool is_asset_exportable(const LLUUID& asset_id);
 
 ///----------------------------------------------------------------------------
 /// Class llsidepaneltaskinfo
@@ -118,6 +123,7 @@ BOOL LLSidepanelTaskInfo::postBuild()
 	childSetAction("button deed",								&LLSidepanelTaskInfo::onClickDeedToGroup,this);
 	childSetCommitCallback("checkbox allow everyone move",		&LLSidepanelTaskInfo::onCommitEveryoneMove,this);
 	childSetCommitCallback("checkbox allow everyone copy",		&LLSidepanelTaskInfo::onCommitEveryoneCopy,this);
+	childSetCommitCallback("checkbox allow export",				&LLSidepanelTaskInfo::onCommitNextOwnerExport,this);
 	childSetCommitCallback("checkbox for sale",					&LLSidepanelTaskInfo::onCommitSaleInfo,this);
 	childSetCommitCallback("sale type",							&LLSidepanelTaskInfo::onCommitSaleType,this);
 	childSetCommitCallback("Edit Cost", 						&LLSidepanelTaskInfo::onCommitSaleInfo, this);
@@ -140,6 +146,7 @@ BOOL LLSidepanelTaskInfo::postBuild()
 	mDAButtonDeed = getChildView("button deed");
 	mDACheckboxAllowEveryoneMove = getChild<LLUICtrl>("checkbox allow everyone move");
 	mDACheckboxAllowEveryoneCopy = getChild<LLUICtrl>("checkbox allow everyone copy");
+	mDACheckboxAllowExport = getChild<LLUICtrl>("checkbox allow export");
 	mDACheckboxNextOwnerCanModify = getChild<LLUICtrl>("checkbox next owner can modify");
 	mDACheckboxNextOwnerCanCopy = getChild<LLUICtrl>("checkbox next owner can copy");
 	mDACheckboxNextOwnerCanTransfer = getChild<LLUICtrl>("checkbox next owner can transfer");
@@ -227,6 +234,9 @@ void LLSidepanelTaskInfo::disablePermissions()
 	mDACheckboxAllowEveryoneCopy->setValue(FALSE);
 	mDACheckboxAllowEveryoneCopy->setEnabled(FALSE);
 
+	mDACheckboxAllowExport->setValue(FALSE);
+	mDACheckboxAllowExport->setEnabled(FALSE);
+
 	//Next owner can:
 	mDACheckboxNextOwnerCanModify->setValue(FALSE);
 	mDACheckboxNextOwnerCanModify->setEnabled(FALSE);
@@ -298,6 +308,7 @@ void LLSidepanelTaskInfo::refresh()
 	}
 
 	// figure out a few variables
+	const bool export_perm_supported = objectp->getRegion() && objectp->getRegion()->getRegionAllowsExport();
 	const BOOL is_one_object = (object_count == 1);
 	
 	// BUG: fails if a root and non-root are both single-selected.
@@ -361,14 +372,9 @@ void LLSidepanelTaskInfo::refresh()
 	
 	// Update creator text field
 	getChildView("Creator:")->setEnabled(TRUE);
-// [RLVa:KB] - Checked: 2010-11-01 (RLVa-1.2.2a) | Modified: RLVa-1.2.2a
-	BOOL creators_identical = FALSE;
-// [/RLVa:KB]
-
 	std::string creator_name;
-	LLUUID creator_id;
 // [RLVa:KB] - Checked: 2010-11-01 (RLVa-1.2.2a) | Modified: RLVa-1.2.2a
-	creators_identical = LLSelectMgr::getInstanceFast()->selectGetCreator(creator_id, creator_name);
+	BOOL creators_identical = LLSelectMgr::getInstanceFast()->selectGetCreator(mCreatorID, creator_name);
 // [/RLVa:KB]
 //	LLSelectMgr::getInstanceFast()->selectGetCreator(creator_id, creator_name);
 
@@ -388,9 +394,8 @@ void LLSidepanelTaskInfo::refresh()
 	getChildView("Owner:")->setEnabled(TRUE);
 
 	std::string owner_name;
-	LLUUID owner_id;
-	const BOOL owners_identical = LLSelectMgr::getInstanceFast()->selectGetOwner(owner_id, owner_name);
-	if (owner_id.isNull())
+	const BOOL owners_identical = LLSelectMgr::getInstanceFast()->selectGetOwner(mOwnerID, owner_name);
+	if (mOwnerID.isNull())
 	{
 		if (LLSelectMgr::getInstanceFast()->selectIsGroupOwned())
 		{
@@ -435,16 +440,10 @@ void LLSidepanelTaskInfo::refresh()
 			owner_name = LLSLURL("agent", mOwnerID, "rlvanonym").getSLURLString();
 	}
 
-	if(mDACreatorName->getValue().asString() == LLStringUtil::null)
-	{
-		mDACreatorName->setValue(creator_name);
-	}
+	mDACreatorName->setValue(creator_name);
 	mDACreatorName->setEnabled(TRUE);
 
-	if(mDAOwnerName->getValue().asString() == LLStringUtil::null)
-	{
-		mDAOwnerName->setValue(owner_name);
-	}
+	mDAOwnerName->setValue(owner_name);
 	mDAOwnerName->setEnabled(TRUE);
 // [/RLVa:KB]
 
@@ -644,18 +643,24 @@ void LLSidepanelTaskInfo::refresh()
 	{
 		if (valid_base_perms)
 		{
-			getChild<LLUICtrl>("B:")->setValue("B: " + mask_to_string(base_mask_on));
-			getChildView("B:")->setVisible(							TRUE);
-			
-			getChild<LLUICtrl>("O:")->setValue("O: " + mask_to_string(owner_mask_on));
-			getChildView("O:")->setVisible(							TRUE);
-			
+			std::string perm_string = mask_to_string(base_mask_on);
+			if (!export_perm_supported && base_mask_on & PERM_EXPORT) // Hide Export when not available
+				perm_string.erase(perm_string.find_last_of("E"));
+			getChild<LLUICtrl>("B:")->setValue("B: " + perm_string);
+			getChildView("B:")->setVisible(TRUE);
+			perm_string = mask_to_string(owner_mask_on);
+			if (!export_perm_supported && owner_mask_on & PERM_EXPORT) // Hide Export when not available
+				perm_string.erase(perm_string.find_last_of("E"));
+			getChild<LLUICtrl>("O:")->setValue("O: " + perm_string);
+			getChildView("O:")->setVisible(TRUE);
 			getChild<LLUICtrl>("G:")->setValue("G: " + mask_to_string(group_mask_on));
-			getChildView("G:")->setVisible(							TRUE);
-			
-			getChild<LLUICtrl>("E:")->setValue("E: " + mask_to_string(everyone_mask_on));
-			getChildView("E:")->setVisible(							TRUE);
-			
+			getChildView("G:")->setVisible(TRUE);
+			perm_string = mask_to_string(everyone_mask_on);
+			if (!export_perm_supported && everyone_mask_on & PERM_EXPORT) // Hide Export when not available
+				perm_string.erase(perm_string.find_last_of("E"));
+			getChild<LLUICtrl>("E:")->setValue("E: " + perm_string);
+			getChildView("E:")->setVisible(TRUE);
+		
 			getChild<LLUICtrl>("N:")->setValue("N: " + mask_to_string(next_owner_mask_on));
 			getChildView("N:")->setVisible(							TRUE);
 		}
@@ -712,6 +717,44 @@ void LLSidepanelTaskInfo::refresh()
 		getChildView("checkbox allow everyone copy")->setEnabled(FALSE);
 	}
 
+	if (export_perm_supported && self_owned && mCreatorID == mOwnerID
+		&& can_set_export(base_mask_on, owner_mask_on, next_owner_mask_on))
+	{
+		bool can_export = false;
+		LLInventoryObject::object_list_t objects;
+		objectp->getInventoryContents(objects);
+		if (!objects.empty())
+		{
+			for (LLInventoryObject::object_list_t::iterator i = objects.begin(); i != objects.end(); ++i) //The object's inventory must have EXPORT.
+			{
+				LLViewerInventoryItem* item = static_cast<LLViewerInventoryItem*>(i->get()); //getInventoryContents() filters out categories, static_cast.
+				can_export = perms_allow_export(item->getPermissions());
+				if (!can_export) break;
+			}
+		}
+		else
+			can_export = true;
+
+		if(can_export)
+		{
+			for (U8 i = 0; i < objectp->getNumTEs(); ++i) // Can the textures be exported?
+			{
+				if (LLTextureEntry* texture = objectp->getTE(i))
+				{
+					can_export = is_asset_exportable(texture->getID());
+					if(!can_export) break;
+				}
+			}
+		}
+		mDACheckboxAllowExport->setEnabled(can_export);
+		mDACheckboxAllowExport->setVisible(true);
+	}
+	else
+	{
+		mDACheckboxAllowExport->setEnabled(false);
+		mDACheckboxAllowExport->setVisible(export_perm_supported);
+	}
+
 	if (has_change_sale_ability && (owner_mask_on & PERM_TRANSFER))
 	{
 		getChildView("checkbox for sale")->setEnabled(can_transfer || (!can_transfer && num_for_sale));
@@ -720,9 +763,10 @@ void LLSidepanelTaskInfo::refresh()
 		getChild<LLUICtrl>("checkbox for sale")->setTentative( 				is_for_sale_mixed);
 		getChildView("sale type")->setEnabled(num_for_sale && can_transfer && !is_sale_price_mixed);
 
-		getChildView("checkbox next owner can modify")->setEnabled(base_mask_on & PERM_MODIFY);
-		getChildView("checkbox next owner can copy")->setEnabled(base_mask_on & PERM_COPY);
-		getChildView("checkbox next owner can transfer")->setEnabled(next_owner_mask_on & PERM_COPY);
+		bool no_export = everyone_mask_off & PERM_EXPORT; // Next owner perms can't be changed if set
+		getChildView("checkbox next owner can modify")->setEnabled(no_export && base_mask_on & PERM_MODIFY);
+		getChildView("checkbox next owner can copy")->setEnabled(no_export && base_mask_on & PERM_COPY);
+		getChildView("checkbox next owner can transfer")->setEnabled(no_export && next_owner_mask_on & PERM_COPY);
 	}
 	else 
 	{
@@ -790,6 +834,31 @@ void LLSidepanelTaskInfo::refresh()
 		{
 			getChild<LLUICtrl>("checkbox allow everyone copy")->setValue(TRUE);
 			getChild<LLUICtrl>("checkbox allow everyone copy")->setTentative(	TRUE);
+		}
+
+		// Export == next owner cannot export
+		if (export_perm_supported)
+		{
+			if(everyone_mask_on & PERM_EXPORT)
+			{
+				mDACheckboxAllowExport->setValue(TRUE);
+				mDACheckboxAllowExport->setTentative(	FALSE);
+			}
+			else if(everyone_mask_off & PERM_EXPORT)
+			{
+				mDACheckboxAllowExport->setValue(FALSE);
+				mDACheckboxAllowExport->setTentative(FALSE);
+			}
+			else
+			{
+				mDACheckboxAllowExport->setValue(TRUE);
+				mDACheckboxAllowExport->setTentative(TRUE);
+			}
+		}
+		else
+		{
+			mDACheckboxAllowExport->setValue(FALSE);
+			mDACheckboxAllowExport->setTentative(FALSE);
 		}
 	}
 
@@ -911,6 +980,7 @@ void LLSidepanelTaskInfo::refresh()
 				"button deed",
 				"checkbox allow everyone move",
 				"checkbox allow everyone copy",
+				"checkbox allow export",
 				"checkbox for sale",
 				"sale type",
 				"Edit Cost",
@@ -1059,6 +1129,11 @@ void LLSidepanelTaskInfo::onCommitNextOwnerTransfer(LLUICtrl* ctrl, void* data)
 {
 	//LL_INFOS() << "LLSidepanelTaskInfo::onCommitNextOwnerTransfer" << LL_ENDL;
 	onCommitPerm(ctrl, data, PERM_NEXT_OWNER, PERM_TRANSFER);
+}
+
+void LLSidepanelTaskInfo::onCommitNextOwnerExport(LLUICtrl* ctrl, void* data)
+{
+	onCommitPerm(ctrl, data, PERM_EVERYONE, PERM_EXPORT);
 }
 
 // static
@@ -1291,6 +1366,7 @@ void LLSidepanelTaskInfo::save()
 	onCommitGroupShare(getChild<LLCheckBoxCtrl>("checkbox share with group"), this);
 	onCommitEveryoneMove(getChild<LLCheckBoxCtrl>("checkbox allow everyone move"), this);
 	onCommitEveryoneCopy(getChild<LLCheckBoxCtrl>("checkbox allow everyone copy"), this);
+	onCommitNextOwnerExport(getChild<LLCheckBoxCtrl>("checkbox allow export"), this);
 	onCommitNextOwnerModify(getChild<LLCheckBoxCtrl>("checkbox next owner can modify"), this);
 	onCommitNextOwnerCopy(getChild<LLCheckBoxCtrl>("checkbox next owner can copy"), this);
 	onCommitNextOwnerTransfer(getChild<LLCheckBoxCtrl>("checkbox next owner can transfer"), this);
