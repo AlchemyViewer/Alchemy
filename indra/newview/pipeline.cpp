@@ -195,6 +195,8 @@ F32 LLPipeline::RenderGlowWidth;
 F32 LLPipeline::RenderGlowStrength;
 bool LLPipeline::RenderDepthOfField;
 bool LLPipeline::RenderDepthOfFieldInEditMode;
+bool LLPipeline::RenderFocusPointLocked;
+bool LLPipeline::RenderFocusPointFollowsPointer;
 F32 LLPipeline::CameraFocusTransitionTime;
 F32 LLPipeline::CameraFNumber;
 F32 LLPipeline::CameraFocalLength;
@@ -648,6 +650,10 @@ void LLPipeline::init()
 	connectRefreshCachedSettingsSafe("CameraDoFResScale");
 	connectRefreshCachedSettingsSafe("RenderAutoHideSurfaceAreaLimit");
 	connectRefreshCachedSettingsSafe("RenderNormalMapScale");
+	connectRefreshCachedSettingsSafe("RenderAttachedLights");
+	connectRefreshCachedSettingsSafe("RenderAttachedParticles");
+	connectRefreshCachedSettingsSafe("RenderFocusPointLocked");
+	connectRefreshCachedSettingsSafe("RenderFocusPointFollowsPointer");
 }
 
 LLPipeline::~LLPipeline()
@@ -1164,6 +1170,8 @@ void LLPipeline::refreshCachedSettings()
 	LLVOAvatar::sMaxNonImpostors = gSavedSettings.getU32("RenderAvatarMaxNonImpostors");
 	LLVOAvatar::updateImpostorRendering(LLVOAvatar::sMaxNonImpostors);
 	LLPipeline::sDelayVBUpdate = gSavedSettings.getBOOL("RenderDelayVBUpdate");
+	LLPipeline::sRenderAttachedLights = gSavedSettings.getBOOL("RenderAttachedLights");
+	LLPipeline::sRenderAttachedParticles = gSavedSettings.getBOOL("RenderAttachedParticles");
 
 	LLPipeline::sUseOcclusion = 
 			(!gUseWireframe
@@ -1215,6 +1223,8 @@ void LLPipeline::refreshCachedSettings()
 	RenderGlowStrength = gSavedSettings.getF32("RenderGlowStrength");
 	RenderDepthOfField = gSavedSettings.getBOOL("RenderDepthOfField");
 	RenderDepthOfFieldInEditMode = gSavedSettings.getBOOL("RenderDepthOfFieldInEditMode");
+	RenderFocusPointLocked = gSavedSettings.getBOOL("RenderFocusPointLocked");
+	RenderFocusPointFollowsPointer = gSavedSettings.getBOOL("RenderFocusPointFollowsPointer");
 	CameraFocusTransitionTime = gSavedSettings.getF32("CameraFocusTransitionTime");
 	CameraFNumber = gSavedSettings.getF32("CameraFNumber");
 	CameraFocalLength = gSavedSettings.getF32("CameraFocalLength");
@@ -7873,31 +7883,43 @@ void LLPipeline::renderFinalize()
                 }
             }
 
-            if (focus_point.isExactlyZero())
-            {
-                if (LLViewerJoystick::getInstanceFast()->getOverrideCamera())
-                { // focus on point under cursor
-                    focus_point.set(gDebugRaycastIntersection.getF32ptr());
-                }
-                else if (gAgentCamera.cameraMouselook())
-                { // focus on point under mouselook crosshairs
-                    LLVector4a result;
-                    result.clear();
+			// <FS:Beq> FIRE-16728 focus point lock & free focus DoF - based on a feature developed by NiranV Dean
+			static LLVector3 last_focus_point{};
+			if (LLPipeline::RenderFocusPointLocked && !last_focus_point.isExactlyZero())
+			{
+				focus_point = last_focus_point;
+			}
+			else
+			{
+				// </FS:Beq>
+				if (focus_point.isExactlyZero())
+				{
+					if (LLViewerJoystick::getInstanceFast()->getOverrideCamera() || LLPipeline::RenderFocusPointFollowsPointer)
+					{ // focus on point under cursor
+						focus_point.set(gDebugRaycastIntersection.getF32ptr());
+					}
+					else if (gAgentCamera.cameraMouselook())
+					{ // focus on point under mouselook crosshairs
+						LLVector4a result;
+						result.clear();
 
-                    gViewerWindow->cursorIntersect(-1, -1, 512.f, NULL, -1, FALSE, FALSE, NULL, &result);
+						gViewerWindow->cursorIntersect(-1, -1, 512.f, NULL, -1, FALSE, FALSE, NULL, &result);
 
-                    focus_point.set(result.getF32ptr());
-                }
-                else
-                {
-                    // focus on alt-zoom target
-                    LLViewerRegion *region = gAgent.getRegion();
-                    if (region)
-                    {
-                        focus_point = LLVector3(gAgentCamera.getFocusGlobal() - region->getOriginGlobal());
-                    }
-                }
-            }
+						focus_point.set(result.getF32ptr());
+					}
+					else
+					{
+						// focus on alt-zoom target
+						LLViewerRegion* region = gAgent.getRegion();
+						if (region)
+						{
+							focus_point = LLVector3(gAgentCamera.getFocusGlobal() - region->getOriginGlobal());
+						}
+					}
+				}
+			}
+
+			last_focus_point = focus_point;
 
 			const LLVector3& eye = viewerCamera.getOrigin();
             F32 target_distance = 16.f;

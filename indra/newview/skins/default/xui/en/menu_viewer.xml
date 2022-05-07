@@ -921,6 +921,18 @@
           </menu_item_check>
           <menu_item_separator />
           <menu_item_check
+	          label="Depth of Field Focus lock"
+	          layout="topleft"
+	          shortcut="alt|shift|X"
+	          name="lock_focus_point">
+	          <menu_item_check.on_check
+		          function="CheckControl"
+		          parameter="RenderFocusPointLocked" />
+	          <menu_item_check.on_click
+		          function="ToggleControl"
+		          parameter="RenderFocusPointLocked" />
+          </menu_item_check>
+          <menu_item_check
              label="Advanced Menu"
              name="Show Advanced Menu"
              shortcut="control|alt|D">
