@@ -140,6 +140,8 @@ LLSnapshotModel::ESnapshotLayerType LLFloaterSnapshot::Impl::getLayerType(LLFloa
 		type = LLSnapshotModel::SNAPSHOT_TYPE_COLOR;
 	else if (id == "depth")
 		type = LLSnapshotModel::SNAPSHOT_TYPE_DEPTH;
+	else if (id == "depth24")
+		type = LLSnapshotModel::SNAPSHOT_TYPE_DEPTH24;
 	return type;
 }
 

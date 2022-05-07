@@ -5141,7 +5141,7 @@ BOOL LLViewerWindow::rawSnapshot(LLImageRaw *raw, S32 image_width, S32 image_hei
 		if ((image_width <= gGLManager.mGLMaxTextureSize && image_height <= gGLManager.mGLMaxTextureSize) && 
 			(image_width > window_width || image_height > window_height) && LLPipeline::sRenderDeferred && !show_ui)
 		{
-			U32 color_fmt = type == LLSnapshotModel::SNAPSHOT_TYPE_DEPTH ? GL_DEPTH_COMPONENT : GL_RGBA;
+			U32 color_fmt = (type == LLSnapshotModel::SNAPSHOT_TYPE_DEPTH || type == LLSnapshotModel::SNAPSHOT_TYPE_DEPTH24) ? GL_DEPTH_COMPONENT : GL_RGBA;
 			if (scratch_space.allocate(image_width, image_height, color_fmt, true, true))
 			{
 				original_width = gPipeline.mDeferredScreen.getWidth();
@@ -5286,6 +5286,36 @@ BOOL LLViewerWindow::rawSnapshot(LLImageRaw *raw, S32 image_width, S32 image_hei
 									 GL_RGB, GL_UNSIGNED_BYTE,
 									 raw->getData() + output_buffer_offset
 									 );
+						}
+						else if (type == LLSnapshotModel::SNAPSHOT_TYPE_DEPTH24)
+						{
+							LLPointer<LLImageRaw> depth_line_buffer = new LLImageRaw(read_width, 1, sizeof(GLfloat)); // need to store floating point values
+							glReadPixels(
+										 subimage_x_offset, out_y + subimage_y_offset,
+										 read_width, 1,
+										 GL_DEPTH_COMPONENT, GL_FLOAT,
+										 depth_line_buffer->getData()// current output pixel is beginning of buffer...
+										 );
+
+							for (S32 i = 0; i < (S32)read_width; i++)
+							{
+								F32 depth_float = *(F32*)(depth_line_buffer->getData() + (i * sizeof(F32)));
+					
+								F32 linear_depth_float = 1.f / (depth_conversion_factor_1 - (depth_float * depth_conversion_factor_2));
+								U32 RGB24 = F32_to_U32(linear_depth_float, viewerCamera.getNear(), viewerCamera.getFar());
+								//A max value of 16777215 for RGB24 evaluates to black when it shold be white.  The clamp assures that the divisions do not somehow become >=256.
+								U8 depth_byteR = (U8)(llclamp(llfloor(RGB24 / 65536.f), 0, 255));
+								U8 depth_byteG = (U8)(llclamp(llfloor((RGB24 - depth_byteR * 65536) / 256.f), 0, 255));
+								U8 depth_byteB = (U8)(llclamp((RGB24 - depth_byteR * 65536 - depth_byteG * 256), 0u, 255u));
+								// write converted scanline out to result image
+								*(raw->getData() + output_buffer_offset + (i * raw->getComponents())) = depth_byteR;
+								*(raw->getData() + output_buffer_offset + (i * raw->getComponents()) + 1) = depth_byteG;
+								*(raw->getData() + output_buffer_offset + (i * raw->getComponents()) + 2) = depth_byteB;
+								for (S32 j = 3; j < raw->getComponents(); j++)
+								{
+									*(raw->getData() + output_buffer_offset + (i * raw->getComponents()) + j) = depth_byteR;
+								}
+							}
 						}
 						else // LLSnapshotModel::SNAPSHOT_TYPE_DEPTH
 						{
