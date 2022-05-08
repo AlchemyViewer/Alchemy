@@ -341,10 +341,14 @@ void* LLPluginMessage::getValuePointer(const std::string &key) const
 std::string LLPluginMessage::generate(void) const
 {
 	std::ostringstream result;
-	
+
+#if LL_DEBUG
 	// Pretty XML may be slightly easier to deal with while debugging...
 //	LLSDSerialize::toXML(mMessage, result);
 	LLSDSerialize::toPrettyXML(mMessage, result);
+#else
+	LLSDSerialize::toXML(mMessage, result);
+#endif
 	
 	return result.str();
 }
@@ -359,10 +363,15 @@ int LLPluginMessage::parse(const std::string &message)
 	// clear any previous state
 	clear();
 
+#if LL_DEBUG
 	std::istringstream input(message);
-	
 	S32 parse_result = LLSDSerialize::fromXML(mMessage, input);
-	
+#else
+	std::istringstream input(message);
+	S32 parse_result = LLSDSerialize::fromXMLDocument(mMessage, input);
+#endif
+
+
 	return (int)parse_result;
 }
 
