@@ -862,17 +862,23 @@ void MediaPluginCEF::receiveMessage(const char* message_string)
 					mCEFLib->mouseButton(btn, dullahan::ME_MOUSE_DOWN, x, y);
 					mCEFLib->setFocus();
 
-					std::stringstream str;
-					str << "Mouse down at = " << x << ", " << y;
-					postDebugMessage(str.str());
+					if(mEnableMediaPluginDebugging)
+					{
+						std::stringstream str;
+						str << "Mouse down at = " << x << ", " << y;
+						postDebugMessage(str.str());
+					}
 				}
 				else if (event == "up" && button == 0)
 				{
 					mCEFLib->mouseButton(btn, dullahan::ME_MOUSE_UP, x, y);
 
-					std::stringstream str;
-					str << "Mouse up at = " << x << ", " << y;
-					postDebugMessage(str.str());
+					if (mEnableMediaPluginDebugging)
+					{
+						std::stringstream str;
+						str << "Mouse up at = " << x << ", " << y;
+						postDebugMessage(str.str());
+					}
 				}
 				else if (event == "double_click")
 				{

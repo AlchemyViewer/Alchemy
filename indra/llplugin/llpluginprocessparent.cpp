@@ -120,7 +120,9 @@ LLPluginProcessParent::LLPluginProcessParent(LLPluginProcessParentOwner *owner):
 
 LLPluginProcessParent::~LLPluginProcessParent()
 {
+#ifdef SHOW_DEBUG
 	LL_DEBUGS("Plugin") << "destructor" << LL_ENDL;
+#endif
     if (pProcessCreationThread)
     {
         if (!pProcessCreationThread->isStopped())
@@ -1295,7 +1297,9 @@ std::string LLPluginProcessParent::getPluginVersion(void)
 
 void LLPluginProcessParent::setState(EState state)
 {
+#ifdef SHOW_DEBUG
 	LL_DEBUGS("Plugin") << "setting state to " << state << LL_ENDL;
+#endif
 	mState = state; 
 };
 
