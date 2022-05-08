@@ -29,6 +29,7 @@
 
 #include <iostream>
 #include <deque>
+#include <stack>
 
 #include "apr_base64.h"
 
@@ -220,6 +221,13 @@ std::string LLSDXMLFormatter::escapeString(const std::string& in)
 	std::string::const_iterator end = in.end();
 	for(; it != end; ++it)
 	{
+		// See http://en.wikipedia.org/wiki/Valid_characters_in_XML
+		if( *it >= 0 && *it < 20 && *it != 0x09 && *it != 0x0A && *it != 0x0D )
+		{
+			out << "?";
+			continue;
+		}
+
 		switch((*it))
 		{
 		case '<':
@@ -304,8 +312,9 @@ private:
 	bool mInLLSDElement;			// true if we're on LLSD
 	bool mGracefullStop;			// true if we found the </llsd
 	
-	typedef std::deque<LLSD*> LLSDRefStack;
+	typedef std::vector<LLSD*> LLSDRefStack;
 	LLSDRefStack mStack;
+	std::vector<Element> mStackElements;
 	
 	int mDepth;
 	bool mSkipping;
@@ -506,7 +515,8 @@ void LLSDXMLParser::Impl::reset()
 	mGracefullStop = false;
 
 	mStack.clear();
-	
+	mStackElements.clear();
+
 	mSkipping = false;
 	
 	mCurrentKey.clear();
@@ -593,19 +603,24 @@ void LLSDXMLParser::Impl::startElementHandler(const XML_Char* name, const XML_Ch
 	}
 
 	Element element = readElement(name);
-	
+	mStackElements.push_back(element);
 	mCurrentContent.clear();
 
 	switch (element)
 	{
 		case ELEMENT_LLSD:
-			if (mInLLSDElement) { return startSkipping(); }
+			if (mInLLSDElement)
+			{
+				mStackElements.pop_back();
+				return startSkipping();
+			}
 			mInLLSDElement = true;
 			return;
 	
 		case ELEMENT_KEY:
 			if (mStack.empty()  ||  !(mStack.back()->isMap()))
 			{
+				mStackElements.pop_back();
 				return startSkipping();
 			}
 			return;
@@ -613,7 +628,11 @@ void LLSDXMLParser::Impl::startElementHandler(const XML_Char* name, const XML_Ch
 		case ELEMENT_BINARY:
 		{
 			const XML_Char* encoding = findAttribute("encoding", attributes);
-			if(encoding && strcmp("base64", encoding) != 0) { return startSkipping(); }
+			if(encoding && strcmp("base64", encoding) != 0)
+			{
+				mStackElements.pop_back();
+				return startSkipping();
+			}
 			break;
 		}
 		
@@ -623,7 +642,11 @@ void LLSDXMLParser::Impl::startElementHandler(const XML_Char* name, const XML_Ch
 	}
 	
 
-	if (!mInLLSDElement) { return startSkipping(); }
+	if (!mInLLSDElement)
+	{
+		mStackElements.pop_back();
+		return startSkipping();
+	}
 	
 	if (mStack.empty())
 	{
@@ -631,7 +654,11 @@ void LLSDXMLParser::Impl::startElementHandler(const XML_Char* name, const XML_Ch
 	}
 	else if (mStack.back()->isMap())
 	{
-		if (mCurrentKey.empty()) { return startSkipping(); }
+		if (mCurrentKey.empty())
+		{
+			mStackElements.pop_back();
+			return startSkipping();
+		}
 		
 		LLSD& map = *mStack.back();
 		LLSD& newElement = map[mCurrentKey];
@@ -648,6 +675,7 @@ void LLSDXMLParser::Impl::startElementHandler(const XML_Char* name, const XML_Ch
 	}
 	else {
 		// improperly nested value in a non-structure
+		mStackElements.pop_back();
 		return startSkipping();
 	}
 
@@ -684,8 +712,9 @@ void LLSDXMLParser::Impl::endElementHandler(const XML_Char* name)
 		return;
 	}
 	
-	Element element = readElement(name);
-	
+	Element element = mStackElements.back(); //readElement(name);
+	mStackElements.pop_back();
+
 	switch (element)
 	{
 		case ELEMENT_LLSD:
