@@ -979,6 +979,9 @@ void LLWindowWin32::close()
 		resetDisplayResolution();
 	}
 
+	// Don't process events in our mainWindowProc any longer.
+	SetWindowLongPtr(mWindowHandle, GWLP_USERDATA, NULL);
+
 	// Make sure cursor is visible and we haven't mangled the clipping state.
 	showCursor();
 	setMouseClipping(FALSE);
