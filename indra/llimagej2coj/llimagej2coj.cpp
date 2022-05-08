@@ -253,7 +253,9 @@ bool LLImageJ2COJ::decodeImpl(LLImageJ2C &base, LLImageRaw &raw_image, F32 decod
 	opj_codec_t* opj_decoder_p = opj_create_decompress(OPJ_CODEC_J2K);
 	if (!opj_decoder_p)
 	{
+#ifdef SHOW_DEBUG
 		LL_DEBUGS("Texture") << "ERROR -> decodeImpl: failed to create decoder!" << LL_ENDL;
+#endif
 		base.decodeFailed();
 		return true; // done
 	}
@@ -268,7 +270,9 @@ bool LLImageJ2COJ::decodeImpl(LLImageJ2C &base, LLImageRaw &raw_image, F32 decod
 	/* setup the decoder decoding parameters using user parameters */
 	if (!opj_setup_decoder(opj_decoder_p, &parameters))
 	{
+#ifdef SHOW_DEBUG
 		LL_DEBUGS("Texture") << "ERROR -> decodeImpl: failed to decode image!" << LL_ENDL;
+#endif
 		opj_destroy_codec(opj_decoder_p);
 		base.decodeFailed();
 		return true; // done
@@ -300,7 +304,9 @@ bool LLImageJ2COJ::decodeImpl(LLImageJ2C &base, LLImageRaw &raw_image, F32 decod
 	// dereference the array.
 	if (!success || !image || !image->numcomps)
 	{
+#ifdef SHOW_DEBUG
 		LL_DEBUGS("Texture") << "ERROR -> decodeImpl: failed to decode image!" << LL_ENDL;
+#endif
 		if (image)
 		{
 			opj_image_destroy(image);

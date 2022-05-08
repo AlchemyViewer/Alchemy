@@ -281,9 +281,11 @@ HttpService::ELoopSpeed HttpPolicy::processReadyQueue()
 					if (now >= state.mThrottleEnd)
 					{
 						// Throttle expired, move to next window
+#ifdef SHOW_DEBUG
 						LL_DEBUGS(LOG_CORE) << "Throttle expired with " << state.mThrottleLeft
 											<< " requests to go and " << state.mRequestCount
 											<< " requests issued." << LL_ENDL;
+#endif
 						state.mThrottleLeft = state.mOptions.mThrottleRate;
 						state.mThrottleEnd = now + HttpTime(1000000);
 					}
@@ -310,9 +312,11 @@ HttpService::ELoopSpeed HttpPolicy::processReadyQueue()
 					if (now >= state.mThrottleEnd)
 					{
 						// Throttle expired, move to next window
+#ifdef SHOW_DEBUG
 						LL_DEBUGS(LOG_CORE) << "Throttle expired with " << state.mThrottleLeft
 											<< " requests to go and " << state.mRequestCount
 											<< " requests issued." << LL_ENDL;
+#endif
 						state.mThrottleLeft = state.mOptions.mThrottleRate;
 						state.mThrottleEnd = now + HttpTime(1000000);
 					}
@@ -443,12 +447,14 @@ bool HttpPolicy::stageAfterCompletion(const HttpOpRequest::ptr_t &op)
 						   << " (" << op->mStatus.toTerseString() << ")"
 						   << LL_ENDL;
 	}
+#ifdef SHOW_DEBUG
 	else if (op->mPolicyRetries)
 	{
         LL_DEBUGS(LOG_CORE) << "HTTP request " << op->getHandle()
 							<< " succeeded on retry " << op->mPolicyRetries << "."
 							<< LL_ENDL;
 	}
+#endif
 
 	op->stageFromActive(mService);
 

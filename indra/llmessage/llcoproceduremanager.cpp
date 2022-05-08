@@ -415,7 +415,9 @@ void LLCoprocedurePool::coprocedureInvokerCoro(
         --mPending;
         mActiveCoprocsCount++;
 
+#ifdef SHOW_DEBUG
         LL_DEBUGS("CoProcMgr") << "Dequeued and invoking coprocedure(" << coproc->mName << ") with id=" << coproc->mId.asString() << " in pool \"" << mPoolName << "\" (" << mPending << " left)" << LL_ENDL;
+#endif
 
         try
         {
@@ -437,7 +439,9 @@ void LLCoprocedurePool::coprocedureInvokerCoro(
             continue;
         }
 
+#ifdef SHOW_DEBUG
         LL_DEBUGS("CoProcMgr") << "Finished coprocedure(" << coproc->mName << ")" << " in pool \"" << mPoolName << "\"" << LL_ENDL;
+#endif
 
         mActiveCoprocsCount--;
     }

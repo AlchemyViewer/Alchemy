@@ -217,6 +217,7 @@ public:
 					remainptr += written;
 					remainlen -= written;
 
+#if SHOW_DEBUG
 					char msgbuf[512];
 					LL_DEBUGS("LLProcess") << "wrote " << written << " of " << towrite
 										   << " bytes to " << mDesc
@@ -224,6 +225,7 @@ public:
 										   << " code " << err << ": "
 										   << apr_strerror(err, msgbuf, sizeof(msgbuf))
 										   << LL_ENDL;
+#endif
 
 					// The parent end of this pipe is nonblocking. If we weren't able
 					// to write everything we wanted, don't keep banging on it -- that
@@ -386,7 +388,9 @@ public:
 					// Handle EOF specially: it's part of normal-case processing.
 					if (err == APR_EOF)
 					{
+#if SHOW_DEBUG
 						LL_DEBUGS("LLProcess") << "EOF on " << mDesc << LL_ENDL;
+#endif
 					}
 					else
 					{
@@ -406,8 +410,10 @@ public:
 				// received. Make sure we commit those later. (Don't commit them
 				// now, that would invalidate the buffer iterator sequence!)
 				tocommit += gotten;
+#if SHOW_DEBUG
 				LL_DEBUGS("LLProcess") << "filled " << gotten << " of " << toread
 									   << " bytes from " << mDesc << LL_ENDL;
+#endif
 
 				// The parent end of this pipe is nonblocking. If we weren't even
 				// able to fill this buffer, don't loop to try to fill the next --
