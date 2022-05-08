@@ -237,8 +237,10 @@ void BlockTimer::incrementalUpdateTimerTree()
 {
 				// since ancestors have already been visited, re-parenting won't affect tree traversal
 			//step up tree, bringing our descendants with us
+#ifdef SHOW_DEBUG
 			LL_DEBUGS("FastTimers") << "Moving " << timerp->getName() << " from child of " << timerp->getParent()->getName() <<
 				" to child of " << timerp->getParent()->getParent()->getName() << LL_ENDL;
+#endif
 			timerp->setParent(timerp->getParent()->getParent());
 				accumulator.mParent = timerp->getParent();
 				accumulator.mMoveUpTree = false;

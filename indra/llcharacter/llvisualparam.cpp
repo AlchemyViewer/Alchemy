@@ -352,9 +352,11 @@ void LLVisualParam::setParamLocation(EParamLocation loc)
 	{
 		// no action
 	}
+#ifdef SHOW_DEBUG
 	else
 	{
 		LL_DEBUGS() << "param location is already " << mParamLocation << ", not slamming to " << loc << LL_ENDL;
 	}
+#endif
 }
 

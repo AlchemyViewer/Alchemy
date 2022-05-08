@@ -278,6 +278,7 @@ bool LLTexUnit::bind(LLTexture* texture, bool for_rendering, bool forceBind)
 		}
 		else
 		{
+#if SHOW_DEBUG
 			if (texture)
 			{
 				LL_DEBUGS() << "NULL LLTexUnit::bind GL image" << LL_ENDL;
@@ -286,6 +287,7 @@ bool LLTexUnit::bind(LLTexture* texture, bool for_rendering, bool forceBind)
 			{
 				LL_DEBUGS() << "NULL LLTexUnit::bind texture" << LL_ENDL;
 			}
+#endif
 			return false;
 		}
 	}
@@ -304,7 +306,9 @@ bool LLTexUnit::bind(LLImageGL* texture, bool for_rendering, bool forceBind)
 
 	if(!texture)
 	{
+#if SHOW_DEBUG
 		LL_DEBUGS() << "NULL LLTexUnit::bind texture" << LL_ENDL;
+#endif
 		return false;
 	}
 

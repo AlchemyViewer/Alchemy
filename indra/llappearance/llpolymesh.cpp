@@ -302,7 +302,9 @@ BOOL LLPolyMeshSharedData::loadMesh( const std::string& fileName )
         BOOL status = FALSE;
         if ( strncmp(header, HEADER_BINARY, strlen(HEADER_BINARY)) == 0 )       /*Flawfinder: ignore*/
         {
+#ifdef SHOW_DEBUG
                 LL_DEBUGS() << "Loading " << fileName << LL_ENDL;
+#endif
 
                 //----------------------------------------------------------------
                 // File Header (seek past it)
@@ -559,10 +561,12 @@ BOOL LLPolyMeshSharedData::loadMesh( const std::string& fileName )
                         numTris++;
                 }
 
+#ifdef SHOW_DEBUG
                 LL_DEBUGS() << "verts: " << numVertices 
                          << ", faces: "   << numFaces
                          << ", tris: "    << numTris
                          << LL_ENDL;
+#endif
 
                 //----------------------------------------------------------------
                 // NumSkinJoints

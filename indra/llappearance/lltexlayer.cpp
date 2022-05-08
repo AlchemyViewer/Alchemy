@@ -1429,7 +1429,9 @@ void LLTexLayer::renderMorphMasks(S32 x, S32 y, S32 width, S32 height, const LLC
 {
 	if (!force_render && !hasMorph())
 	{
+#ifdef SHOW_DEBUG
 		LL_DEBUGS() << "skipping renderMorphMasks for " << getUUID() << LL_ENDL;
+#endif
 		return;
 	}
 	LL_RECORD_BLOCK_TIME(FTM_RENDER_MORPH_MASKS);
@@ -1470,7 +1472,9 @@ void LLTexLayer::renderMorphMasks(S32 x, S32 y, S32 width, S32 height, const LLC
 		success &= param->render( x, y, width, height );
 		if (!success && !force_render)
 		{
+#ifdef SHOW_DEBUG
 			LL_DEBUGS() << "Failed to render param " << param->getID() << " ; skipping morph mask." << LL_ENDL;
+#endif
 			return;
 		}
 	}
@@ -1556,8 +1560,10 @@ void LLTexLayer::renderMorphMasks(S32 x, S32 y, S32 width, S32 height, const LLC
                 // We can get bad morph masks during login, on minimize, and occasional gl errors.
                 // We should only be doing this when we believe something has changed with respect to the user's appearance.
 		{
-                       LL_DEBUGS("Avatar") << "gl alpha cache of morph mask not found, doing readback: " << getName() << LL_ENDL;
-                        // clear out a slot if we have filled our cache
+#ifdef SHOW_DEBUG
+			LL_DEBUGS("Avatar") << "gl alpha cache of morph mask not found, doing readback: " << getName() << LL_ENDL;
+#endif
+			// clear out a slot if we have filled our cache
 			S32 max_cache_entries = getTexLayerSet()->getAvatarAppearance()->isSelf() ? 4 : 1;
 			while ((S32)mAlphaCache.size() >= max_cache_entries)
 			{
