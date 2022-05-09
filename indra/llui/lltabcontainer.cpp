@@ -1447,6 +1447,7 @@ void LLTabContainer::selectLastTab()
 
 void LLTabContainer::selectNextTab()
 {
+	if (mTabList.empty()) return;
 	BOOL tab_has_focus = FALSE;
 	if (mCurrentTabIdx >= 0 && mTabList[mCurrentTabIdx]->mButton->hasFocus())
 	{
@@ -2146,7 +2147,7 @@ void LLTabContainer::commitHoveredButton(S32 x, S32 y)
 			LLTabTuple* tuple = *iter;
 			S32 local_x = x - tuple->mButton->getRect().mLeft;
 			S32 local_y = y - tuple->mButton->getRect().mBottom;
-			if (tuple->mButton->pointInView(local_x, local_y) && tuple->mButton->getEnabled() && !tuple->mTabPanel->getVisible())
+			if (tuple->mButton->pointInView(local_x, local_y) && tuple->mButton->getEnabled() && tuple->mButton->getVisible() && !tuple->mTabPanel->getVisible())
 			{
 				tuple->mButton->onCommit();
 			}
