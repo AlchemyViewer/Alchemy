@@ -1607,6 +1607,26 @@
 					label="Depth of Field"
 					tool_tip="Toggles Depth of Field"
 					control_name="RenderDepthOfField"/>
+				<check_box
+					follows="left|top"
+					height="15"
+					left="30"
+					top_pad="4"
+					width="80"
+					layout="topleft"
+					label="Follow Mouse"
+					tool_tip="Allows DoF's focus point to follow mouse cursor"
+					control_name="RenderFocusPointFollowsPointer"/>
+				<check_box
+					follows="left|top"
+					height="15"
+					left="30"
+					top_pad="4"
+					width="80"
+					layout="topleft"
+					label="Lock Focus (alt+shift+X)"
+					tool_tip="Locks the current focus point for DoF"
+					control_name="RenderFocusPointLocked"/>
 				<!--DOF Resolution-->
 				<!--TODO: Ensure this setting is temporary? Large CoC @ Full Res has caused Login-Crashes on other viewers, even on high end GPUs!-->
 				<text
