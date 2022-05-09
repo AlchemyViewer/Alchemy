@@ -29,234 +29,11 @@
 				layout="topleft"
 				name="colortone_settings"
 				can_resize="false">
-				<text
-					follows="left|top"
-					height="15"
-					left="10"
-					top_pad="4"
-					width="100"
-					layout="topleft"
-					value="Image Processing" />
-				<!--Sharpen Controls-->
-				<text
-					follows="left|top"
-					height="15"
-					left="30"
-					top_pad="5"
-					width="50"
-					layout="topleft"
-					tool_tip="Which Sharpen method to use."
-					value="Sharpen:"/>
-				<combo_box
-					allow_text_entry="false"
-					tool_tip="Which Sharpen method to use."
-					control_name="RenderSharpenMethod"
-					follows="left|top"
-					height="16"
-					layout="topleft"
-					left_delta="70"
-					max_chars="128"
-					name="sharpenmethod_combo"
-					top_pad="-16"
-					width="80">
-					<combo_box.item
-						label="None"
-						name="sharp_none"
-						value="0" />
-					<combo_box.item
-						label="CAS"
-						name="sharp_cas"
-						value="1" />
-					<combo_box.item
-						label="DLS"
-						name="sharp_DLS"
-						value="2" />
-					</combo_box>
-				<!--TODO: Hookup to RenderSharpenCASParams.X, RenderSharpenDLS.X-->
-				<slider_bar
-					top_pad="-18"
-					height="20"
-					increment=".1"
-					follows="left|top|right"
-					layout="topleft"
-					max_val="1.0"
-					min_val="0.0"
-					left_delta="80"
-					right="-75"
-					name="sharp_strength_slider"
-					control_name=""/>
-				<spinner
-					top_pad="-20"
-					height="15"
-					label_width="0"
-					right="-20"
-					decimal_digits="1"
-					follows="top|right"
-					layout="topleft"
-					max_val="1.0"
-					min_val="0.0"
-					width="55"
-					increment=".1"
-					name="sharp_strength_spinner"
-					control_name=""/>
-				<!--TODO: This effects multiple values that need to be hooked up-->
-				<text
-					name="sharp_dynamic_text"
-					follows="left|top"
-					height="15"
-					left="100"
-					top_pad="10"
-					width="50"
-					layout="topleft"
-					value="Contrast:" />
-				<slider_bar
-					top_pad="-18"
-					height="20"
-					increment=".1"
-					follows="left|top|right"
-					layout="topleft"
-					max_val="1.0"
-					min_val="0.0"
-					left_delta="80"
-					right="-75"
-					name="sharp_dynamic_slider"
-					control_name=""/>
-				<spinner
-					top_pad="-20"
-					height="15"
-					label_width="0"
-					right="-20"
-					decimal_digits="1"
-					follows="top|right"
-					layout="topleft"
-					max_val="1.0"
-					min_val="0.0"
-					width="55"
-					increment=".1"
-					name="sharp_dynamic_spinner"
-					control_name=""/>
-				<button
-					name="sharpen_default_btn"
-					follows="top|right"
-					layout="topleft"
-					height="42"
-					left_delta="55"
-					top_pad="-36"
-					width="18"
-					scale_image="true"
-					image_overlay="Refresh_Off"
-					image_overlay_alignment="center">
-					<button.commit_callback
-					function="LightBox.ResetGroupDefault"
-					parameter="sharpen" />
-				</button>
-				<!--Tonemapper Control-->
-				<text
-					follows="left|top"
-					height="15"
-					left="30"
-					top_pad="3"
-					width="70"
-					layout="topleft"
-					tool_tip="Which algorithm should translate HDR values to SDR Colorspace"
-					value="Tonemapper:" />
-				<combo_box
-					allow_text_entry="false"
-					tool_tip="Which algorithm should translate HDR values to SDR Colorspace"
-					control_name="RenderToneMapType"
-					follows="left|top"
-					height="16"
-					layout="topleft"
-					left_delta="70"
-					max_chars="128"
-					name="tonemap_type_combo"
-					top_pad="-16"
-					width="80">
-					<combo_box.item
-						label="Linear"
-						name="toneLinear"
-						value="1" />
-					<combo_box.item
-						label="Reinhard"
-						name="toneReinhard"
-						value="2" />
-					<combo_box.item
-						label="Reinhard2"
-						name="toneReinhard2"
-						value="3" />
-					<combo_box.item
-						label="Filmic"
-						name="toneFilmic"
-						value="4" />
-					<combo_box.item
-						label="Unreal"
-						name="toneUnreal"
-						value="5" />
-					<combo_box.item
-						label="ACES"
-						name="toneACES"
-						value="6" />
-					<combo_box.item
-						label="Uchimura"
-						name="toneUchimura"
-						value="7" />
-					<combo_box.item
-						label="Lottes"
-						name="toneLottes"
-						value="8" />
-					<combo_box.item
-						label="Uncharted"
-						name="toneUncharted"
-						value="9" />
-				</combo_box>
-				<slider_bar
-					top_pad="-18"
-					height="20"
-					increment=".1"
-					follows="left|top|right"
-					layout="topleft"
-					max_val="16.0"
-					min_val="0.1"
-					left_delta="80"
-					right="-75"
-					name="exposure_slider"
-					tool_tip="Adjusts the overall brightness of the image via the Tonemapper"
-					control_name="RenderToneMapExposure"/>
-				<spinner
-					top_pad="-19"
-					height="15"
-					label_width="0"
-					right="-20"
-					decimal_digits="1"
-					follows="top|right"
-					layout="topleft"
-					max_val="16.0"
-					min_val="0.1"
-					width="55"
-					increment=".1"
-					name="exposure_spinner"
-					tool_tip="Adjusts the overall brightness of the image via the Tonemapper"
-					control_name="RenderToneMapExposure"/>
-				<button
-					name="exposure_default_btn"
-					follows="top|right"
-					layout="topleft"
-					height="20"
-					left_delta="55"
-					top_pad="-15"
-					width="18"
-					scale_image="true"
-					image_overlay="Refresh_Off"
-					image_overlay_alignment="center">
-					<button.commit_callback
-						function="LightBox.ResetGroupDefault"
-						parameter="tonemap" />
-				</button>
 				<!--LUT Control-->
 				<text
 					follows="left|top"
 					height="15"
-					left="30"
+					left="10"
 					top_pad="6"
 					width="60"
 					layout="topleft"
@@ -274,7 +51,7 @@
 					max_chars="200"
 					name="colorlut_combo"
 					top_pad="-18"
-					width="246">
+					width="265">
 					<combo_box.item
 						label="None"
 						name="lut_none"
@@ -380,28 +157,550 @@
 						name="lut_AST5"
 						value="AESTHETICS_5.png" />
 				</combo_box>
-				<!--Render Settings Section-->
-				<view_border
-					bevel_style="none"
-					height="0"
-					layout="topleft"
-					left="0"
-					name="render_divider"
-					top_pad="7"
-					width="350"/>
+				<!--Sharpen Controls-->
 				<text
 					follows="left|top"
 					height="15"
 					left="10"
-					top_pad="7"
-					width="100"
+					top_pad="5"
+					width="50"
 					layout="topleft"
-					value="Rendering Settings" />
-				<!--Anti-Aliasing-->
+					tool_tip="Which Sharpen method to use."
+					value="Sharpen:"/>
+				<combo_box
+					allow_text_entry="false"
+					tool_tip="Which Sharpen method to use."
+					control_name="RenderSharpenMethod"
+					follows="left|top"
+					height="16"
+					layout="topleft"
+					left_delta="70"
+					max_chars="128"
+					name="sharpenmethod_combo"
+					top_pad="-16"
+					width="80">
+					<combo_box.item
+						label="None"
+						name="sharp_none"
+						value="0" />
+					<combo_box.item
+						label="CAS"
+						name="sharp_cas"
+						value="1" />
+					<combo_box.item
+						label="DLS"
+						name="sharp_DLS"
+						value="2" />
+					</combo_box>
+				<!--TODO: Hookup to RenderSharpenCASParams.X, RenderSharpenDLS.X-->
+				<slider_bar
+					top_pad="-18"
+					height="20"
+					increment=".1"
+					follows="left|top|right"
+					layout="topleft"
+					max_val="1.0"
+					min_val="0.0"
+					left_delta="80"
+					right="-75"
+					name="sharp_strength_slider"
+					control_name=""/>
+				<spinner
+					top_pad="-20"
+					height="15"
+					label_width="0"
+					right="-20"
+					decimal_digits="1"
+					follows="top|right"
+					layout="topleft"
+					max_val="1.0"
+					min_val="0.0"
+					width="55"
+					increment=".1"
+					name="sharp_strength_spinner"
+					control_name=""/>
+				<!--TODO: This effects multiple values that need to be hooked up-->
+				<text
+					name="sharp_dynamic_text"
+					follows="left|top"
+					height="15"
+					left="30"
+					top_pad="10"
+					width="50"
+					layout="topleft"
+					value="Contrast:" />
+				<slider_bar
+					top_pad="-18"
+					height="20"
+					increment=".1"
+					follows="left|top|right"
+					layout="topleft"
+					max_val="1.0"
+					min_val="0.0"
+					left_delta="80"
+					right="-75"
+					name="sharp_dynamic_slider"
+					control_name=""/>
+				<spinner
+					top_pad="-20"
+					height="15"
+					label_width="0"
+					right="-20"
+					decimal_digits="1"
+					follows="top|right"
+					layout="topleft"
+					max_val="1.0"
+					min_val="0.0"
+					width="55"
+					increment=".1"
+					name="sharp_dynamic_spinner"
+					control_name=""/>
+				<button
+					name="sharpen_default_btn"
+					follows="top|right"
+					layout="topleft"
+					height="42"
+					left_delta="55"
+					top_pad="-36"
+					width="18"
+					scale_image="true"
+					image_overlay="Refresh_Off"
+					image_overlay_alignment="center">
+					<button.commit_callback
+					function="LightBox.ResetGroupDefault"
+					parameter="sharpen" />
+				</button>
+				<!--Tonemapper Control-->
+				<text
+					follows="left|top"
+					height="15"
+					left="10"
+					top_pad="6"
+					width="70"
+					layout="topleft"
+					tool_tip="Which algorithm should translate HDR values to SDR Colorspace"
+					value="Tonemapper:" />
+				<combo_box
+					allow_text_entry="false"
+					tool_tip="Which algorithm should translate HDR values to SDR Colorspace"
+					control_name="RenderToneMapType"
+					follows="left|top"
+					height="16"
+					layout="topleft"
+					left_delta="70"
+					max_chars="128"
+					name="tonemap_type_combo"
+					top_pad="-16"
+					width="80">
+					<combo_box.item
+						label="Linear"
+						name="toneLinear"
+						value="1" />
+					<combo_box.item
+						label="Reinhard"
+						name="toneReinhard"
+						value="2" />
+					<combo_box.item
+						label="Reinhard2"
+						name="toneReinhard2"
+						value="3" />
+					<combo_box.item
+						label="Filmic"
+						name="toneFilmic"
+						value="4" />
+					<combo_box.item
+						label="Unreal"
+						name="toneUnreal"
+						value="5" />
+					<combo_box.item
+						label="ACES"
+						name="toneACES"
+						value="6" />
+					<combo_box.item
+						label="Uchimura"
+						name="toneUchimura"
+						value="7" />
+					<combo_box.item
+						label="Lottes"
+						name="toneLottes"
+						value="8" />
+					<combo_box.item
+						label="Uncharted"
+						name="toneUncharted"
+						value="9" />
+				</combo_box>
+				<button
+					name="exposure_default_btn"
+					follows="top|right"
+					layout="topleft"
+					height="20"
+					right="-2"
+					top_pad="-18"
+					label="Reset Tonemapper Sliders"
+					halign="left"
+					width="155"
+					scale_image="true"
+					image_overlay="Refresh_Off"
+					image_overlay_alignment="right">
+					<button.commit_callback
+						function="LightBox.ResetGroupDefault"
+						parameter="tonemap" />
+				</button>
 				<text
 					follows="left|top"
 					height="15"
 					left="30"
+					top_pad="4"
+					width="100"
+					layout="topleft"
+					tool_tip="Adjusts the overall brightness of the image via the Tonemapper"
+					value="Exposure:" />
+				<slider_bar
+					top_pad="-18"
+					height="20"
+					increment=".1"
+					follows="left|top|right"
+					layout="topleft"
+					max_val="16.0"
+					min_val="0.1"
+					left_delta="100"
+					right="-55"
+					name="exposure_slider"
+					tool_tip="Adjusts the overall brightness of the image via the Tonemapper"
+					control_name="RenderToneMapExposure"/>
+				<spinner
+					top_pad="-20"
+					height="15"
+					label_width="0"
+					right="-1"
+					decimal_digits="1"
+					follows="top|right"
+					layout="topleft"
+					max_val="16.0"
+					min_val="0.1"
+					width="55"
+					increment=".1"
+					name="exposure_spinner"
+					tool_tip="Adjusts the overall brightness of the image via the Tonemapper"
+					control_name="RenderToneMapExposure"/>
+				<!--TODO: This effects multiple values that need to be hooked up-->
+				<text
+					visible="false"
+					name="tonemapper_dynamic_text1"
+					follows="left|top"
+					height="15"
+					left="30"
+					top_pad="10"
+					width="100"
+					layout="topleft"
+					value="TonemapD1:" />
+				<slider_bar
+					visible="false"
+					top_pad="-18"
+					height="20"
+					increment=".1"
+					follows="left|top|right"
+					layout="topleft"
+					max_val="1.0"
+					min_val="0.0"
+					left_delta="100"
+					right="-55"
+					name="tonemapper_dynamic_slider1"
+					control_name=""/>
+				<spinner
+					visible="false"
+					top_pad="-20"
+					height="15"
+					label_width="0"
+					right="-1"
+					decimal_digits="1"
+					follows="top|right"
+					layout="topleft"
+					max_val="1.0"
+					min_val="0.0"
+					width="55"
+					increment=".1"
+					name="tonemapper_dynamic_spinner1"
+					control_name=""/>
+				<text
+					visible="false"
+					name="tonemapper_dynamic_text2"
+					follows="left|top"
+					height="15"
+					left="30"
+					top_pad="10"
+					width="100"
+					layout="topleft"
+					value="TonemapD2:" />
+				<slider_bar
+					visible="false"
+					top_pad="-18"
+					height="20"
+					increment=".1"
+					follows="left|top|right"
+					layout="topleft"
+					max_val="1.0"
+					min_val="0.0"
+					left_delta="100"
+					right="-55"
+					name="tonemapper_dynamic_slider2"
+					control_name=""/>
+				<spinner
+					visible="false"
+					top_pad="-20"
+					height="15"
+					label_width="0"
+					right="-1"
+					decimal_digits="1"
+					follows="top|right"
+					layout="topleft"
+					max_val="1.0"
+					min_val="0.0"
+					width="55"
+					increment=".1"
+					name="tonemapper_dynamic_spinner2"
+					control_name=""/>
+				<text
+					visible="false"
+					name="tonemapper_dynamic_text3"
+					follows="left|top"
+					height="15"
+					left="30"
+					top_pad="10"
+					width="100"
+					layout="topleft"
+					value="TonemapD3:" />
+				<slider_bar
+					visible="false"
+					top_pad="-18"
+					height="20"
+					increment=".1"
+					follows="left|top|right"
+					layout="topleft"
+					max_val="1.0"
+					min_val="0.0"
+					left_delta="100"
+					right="-55"
+					name="tonemapper_dynamic_slider3"
+					control_name=""/>
+				<spinner
+					visible="false"
+					top_pad="-20"
+					height="15"
+					label_width="0"
+					right="-1"
+					decimal_digits="1"
+					follows="top|right"
+					layout="topleft"
+					max_val="1.0"
+					min_val="0.0"
+					width="55"
+					increment=".1"
+					name="tonemapper_dynamic_spinner3"
+					control_name=""/>
+				<text
+					visible="false"
+					name="tonemapper_dynamic_text4"
+					follows="left|top"
+					height="15"
+					left="30"
+					top_pad="10"
+					width="100"
+					layout="topleft"
+					value="TonemapD4:" />
+				<slider_bar
+					visible="false"
+					top_pad="-18"
+					height="20"
+					increment=".1"
+					follows="left|top|right"
+					layout="topleft"
+					max_val="1.0"
+					min_val="0.0"
+					left_delta="100"
+					right="-55"
+					name="tonemapper_dynamic_slider4"
+					control_name=""/>
+				<spinner
+					visible="false"
+					top_pad="-20"
+					height="15"
+					label_width="0"
+					right="-1"
+					decimal_digits="1"
+					follows="top|right"
+					layout="topleft"
+					max_val="1.0"
+					min_val="0.0"
+					width="55"
+					increment=".1"
+					name="tonemapper_dynamic_spinner4"
+					control_name=""/>
+				<text
+					visible="false"
+					name="tonemapper_dynamic_text5"
+					follows="left|top"
+					height="15"
+					left="30"
+					top_pad="10"
+					width="100"
+					layout="topleft"
+					value="TonemapD5:" />
+				<slider_bar
+					visible="false"
+					top_pad="-18"
+					height="20"
+					increment=".1"
+					follows="left|top|right"
+					layout="topleft"
+					max_val="1.0"
+					min_val="0.0"
+					left_delta="100"
+					right="-55"
+					name="tonemapper_dynamic_slider5"
+					control_name=""/>
+				<spinner
+					visible="false"
+					top_pad="-20"
+					height="15"
+					label_width="0"
+					right="-1"
+					decimal_digits="1"
+					follows="top|right"
+					layout="topleft"
+					max_val="1.0"
+					min_val="0.0"
+					width="55"
+					increment=".1"
+					name="tonemapper_dynamic_spinner5"
+					control_name=""/>
+				<text
+					visible="false"
+					name="tonemapper_dynamic_text6"
+					follows="left|top"
+					height="15"
+					left="30"
+					top_pad="10"
+					width="100"
+					layout="topleft"
+					value="TonemapD6:" />
+				<slider_bar
+					visible="false"
+					top_pad="-18"
+					height="20"
+					increment=".1"
+					follows="left|top|right"
+					layout="topleft"
+					max_val="1.0"
+					min_val="0.0"
+					left_delta="100"
+					right="-55"
+					name="tonemapper_dynamic_slider6"
+					control_name=""/>
+				<spinner
+					visible="false"
+					top_pad="-20"
+					height="15"
+					label_width="0"
+					right="-1"
+					decimal_digits="1"
+					follows="top|right"
+					layout="topleft"
+					max_val="1.0"
+					min_val="0.0"
+					width="55"
+					increment=".1"
+					name="tonemapper_dynamic_spinner6"
+					control_name=""/>
+				<text
+					visible="false"
+					name="tonemapper_dynamic_text7"
+					follows="left|top"
+					height="15"
+					left="30"
+					top_pad="10"
+					width="100"
+					layout="topleft"
+					value="TonemapD7:" />
+				<slider_bar
+					visible="false"
+					top_pad="-18"
+					height="20"
+					increment=".1"
+					follows="left|top|right"
+					layout="topleft"
+					max_val="1.0"
+					min_val="0.0"
+					left_delta="100"
+					right="-55"
+					name="tonemapper_dynamic_slider7"
+					control_name=""/>
+				<spinner
+					visible="false"
+					top_pad="-20"
+					height="15"
+					label_width="0"
+					right="-1"
+					decimal_digits="1"
+					follows="top|right"
+					layout="topleft"
+					max_val="1.0"
+					min_val="0.0"
+					width="55"
+					increment=".1"
+					name="tonemapper_dynamic_spinner7"
+					control_name=""/>
+				<text
+					visible="false"
+					name="tonemapper_dynamic_text8"
+					follows="left|top"
+					height="15"
+					left="30"
+					top_pad="10"
+					width="100"
+					layout="topleft"
+					value="TonemapD8:" />
+				<slider_bar
+					visible="false"
+					top_pad="-18"
+					height="20"
+					increment=".1"
+					follows="left|top|right"
+					layout="topleft"
+					max_val="1.0"
+					min_val="0.0"
+					left_delta="100"
+					right="-55"
+					name="tonemapper_dynamic_slider8"
+					control_name=""/>
+				<spinner
+					visible="false"
+					top_pad="-20"
+					height="15"
+					label_width="0"
+					right="-1"
+					decimal_digits="1"
+					follows="top|right"
+					layout="topleft"
+					max_val="1.0"
+					min_val="0.0"
+					width="55"
+					increment=".1"
+					name="tonemapper_dynamic_spinner8"
+					control_name=""/>
+				
+			</panel>
+			<!--Rendering Panel-->
+			<panel
+				label="Rendering"
+				class="render_settings"
+				layout="topleft"
+				name="render_settings">
+				<!--Anti-Aliasing-->
+				<text
+					follows="left|top"
+					height="15"
+					left="10"
 					top_pad="4"
 					width="90"
 					layout="topleft"
@@ -412,7 +711,7 @@
 					layout="topleft"
 					height="16"
 					width="150"
-					right="-4"
+					right="-2"
 					top_pad="-16"
 					max_chars="128"
 					allow_text_entry="false"
@@ -444,7 +743,7 @@
 				<text
 					follows="left|top"
 					height="15"
-					left="30"
+					left="10"
 					top_pad="4"
 					width="120"
 					layout="topleft"
@@ -457,7 +756,7 @@
 					follows="left|top"
 					height="16"
 					layout="topleft"
-					right="-4"
+					right="-2"
 					max_chars="128"
 					name="anisotropicfilter_combo"
 					top_pad="-16"
@@ -487,7 +786,7 @@
 				<text
 					follows="left|top"
 					height="15"
-					left="30"
+					left="10"
 					top_pad="3"
 					width="90"
 					layout="topleft"
@@ -534,7 +833,7 @@
 				<text
 					follows="left|top"
 					height="15"
-					left="30"
+					left="10"
 					top_pad="4"
 					width="90"
 					layout="topleft"
@@ -572,7 +871,7 @@
 				<text
 					follows="left|top"
 					height="15"
-					left="30"
+					left="10"
 					top_pad="8"
 					width="90"
 					layout="topleft"
@@ -607,7 +906,7 @@
 				<text
 					follows="left|top"
 					height="15"
-					left="30"
+					left="10"
 					top_pad="8"
 					width="90"
 					layout="topleft"
@@ -642,7 +941,7 @@
 				<text
 					follows="left|top"
 					height="15"
-					left="30"
+					left="10"
 					top_pad="8"
 					width="90"
 					layout="topleft"
@@ -677,7 +976,7 @@
 				<text
 					follows="left|top"
 					height="15"
-					left="30"
+					left="10"
 					top_pad="8"
 					width="90"
 					layout="topleft"
@@ -1607,6 +1906,26 @@
 					label="Depth of Field"
 					tool_tip="Toggles Depth of Field"
 					control_name="RenderDepthOfField"/>
+				<check_box
+					follows="left|top"
+					height="15"
+					left="30"
+					top_pad="4"
+					width="80"
+					layout="topleft"
+					label="Follow Mouse"
+					tool_tip="Allows DoF's focus point to follow mouse cursor"
+					control_name="RenderFocusPointFollowsPointer"/>
+				<check_box
+					follows="left|top"
+					height="15"
+					left="30"
+					top_pad="4"
+					width="80"
+					layout="topleft"
+					label="Lock Focus (alt+shift+X)"
+					tool_tip="Locks the current focus point for DoF"
+					control_name="RenderFocusPointLocked"/>
 				<!--DOF Resolution-->
 				<!--TODO: Ensure this setting is temporary? Large CoC @ Full Res has caused Login-Crashes on other viewers, even on high end GPUs!-->
 				<text
