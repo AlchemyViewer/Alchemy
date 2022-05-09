@@ -367,14 +367,7 @@ int LLPluginMessage::parse(const std::string &message)
 	clear();
 
 	boost::iostreams::stream<boost::iostreams::array_source> input(message.data(), message.size());
-#if LL_DEBUG
-	S32 parse_result = LLSDSerialize::fromXML(mMessage, input);
-#else
-	S32 parse_result = LLSDSerialize::fromXMLDocument(mMessage, input);
-#endif
-
-
-	return (int)parse_result;
+	return LLSDSerialize::fromXML(mMessage, input);
 }
 
 
