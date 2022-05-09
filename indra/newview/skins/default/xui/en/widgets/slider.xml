@@ -2,7 +2,6 @@
 <slider name="slider" 
         can_edit_text="false" 
         font="SansSerifSmall"
-        volume="false"
         mouse_opaque="true" 
         show_text="true" 
         text_color="LabelTextColor" 
