@@ -41,6 +41,9 @@
 #include "llstring.h"
 #include "llfasttimer.h"
 
+#include <boost/iostreams/device/array.hpp>
+#include <boost/iostreams/stream.hpp>
+
 static const F64 DATE_EPOCH = 0.0;
 
 static const F64 LL_APR_USEC_PER_SEC = 1000000.0;
@@ -182,7 +185,7 @@ bool LLDate::split(S32 *year, S32 *month, S32 *day, S32 *hour, S32 *min, S32 *se
 
 bool LLDate::fromString(const std::string& iso8601_date)
 {
-	std::istringstream stream(iso8601_date);
+	boost::iostreams::stream<boost::iostreams::array_source> stream(iso8601_date.data(), iso8601_date.size());
 	return fromStream(stream);
 }
 

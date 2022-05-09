@@ -2373,10 +2373,7 @@ void LLViewerRegion::getSimulatorFeatures(LLSD& sim_features) const
 
 void LLViewerRegion::setSimulatorFeatures(const LLSD& sim_features)
 {
-	std::stringstream str;
-	
-	LLSDSerialize::toPrettyXML(sim_features, str);
-	LL_INFOS() << "region " << getName() << " "  << str.str() << LL_ENDL;
+	LL_INFOS() << "region " << getName() << " "  << ll_pretty_print_sd(sim_features) << LL_ENDL;
 	mSimulatorFeatures = sim_features;
 	if (LLGridManager::getInstance()->isInOpenSim())
 	{

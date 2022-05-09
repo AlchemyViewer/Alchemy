@@ -61,6 +61,8 @@
 #include "lldrawpoolwater.h"
 
 #include <boost/algorithm/string/replace.hpp>
+#include <boost/iostreams/device/array.hpp>
+#include <boost/iostreams/stream.hpp>
 #include "llinventoryobserver.h"
 #include "llinventorydefines.h"
 
@@ -313,7 +315,7 @@ void LLSettingsVOBase::onAssetDownloadComplete(const LLUUID &asset_id, S32 statu
             {
                 file.close();
 
-                std::stringstream llsdstream(buffer);
+                boost::iostreams::stream<boost::iostreams::array_source> llsdstream(buffer.data(), buffer.size());
                 LLSD llsdsettings;
 
                 if (LLSDSerialize::deserialize(llsdsettings, llsdstream, -1))

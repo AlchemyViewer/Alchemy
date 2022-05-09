@@ -44,6 +44,9 @@
 #include "rlvactions.h"
 // [/RLVa:KB]
 
+#include <boost/iostreams/device/array.hpp>
+#include <boost/iostreams/stream.hpp>
+
 // Max offset for two global positions to consider them as equal
 const F64 MAX_GLOBAL_POS_OFFSET = 5.0f;
 
@@ -238,7 +241,7 @@ void LLTeleportHistoryStorage::load()
 		}
 		
 		LLSD s_item;
-		std::istringstream iss(line);
+		boost::iostreams::stream<boost::iostreams::array_source> iss(line.data(), line.size());
 		if (parser->parse(iss, s_item, line.length()) == LLSDParser::PARSE_FAILURE)
 		{
 			LL_INFOS() << "Parsing saved teleport history failed" << LL_ENDL;

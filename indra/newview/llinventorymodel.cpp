@@ -74,6 +74,8 @@
 
 #include <algorithm>
 #include <boost/algorithm/string/join.hpp>
+#include <boost/iostreams/device/array.hpp>
+#include <boost/iostreams/stream.hpp>
 
 // Increment this if the inventory contents change in a non-backwards-compatible way.
 // For viewer 2, the addition of link items makes a pre-viewer-2 cache incorrect.
@@ -2990,7 +2992,7 @@ bool LLInventoryModel::loadFromFile(const std::string& filename,
 	while (std::getline(file, line)) 
 	{
 		LLSD s_item;
-		std::istringstream iss(line);
+		boost::iostreams::stream<boost::iostreams::array_source> iss(line.data(), line.size());
 		if (parser->parse(iss, s_item, line.length()) == LLSDParser::PARSE_FAILURE)
 		{
 			LL_WARNS(LOG_INV)<< "Parsing inventory cache failed" << LL_ENDL;
@@ -4555,7 +4557,6 @@ std::string LLInventoryModel::getFullPath(const LLInventoryObject *obj) const
 		visited[obj->getUUID()] = true;
 		obj = getObject(obj->getParentUUID());
 	}
-	std::stringstream s;
 	std::string delim("/");
 	std::reverse(path_elts.begin(), path_elts.end());
 	std::string result = "/" + boost::algorithm::join(path_elts, delim);

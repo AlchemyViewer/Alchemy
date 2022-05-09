@@ -32,6 +32,9 @@
 #include "llsdserialize.h"
 #include "u64.h"
 
+#include <boost/iostreams/device/array.hpp>
+#include <boost/iostreams/stream.hpp>
+
 /**
  * Constructor.
  *
@@ -363,11 +366,10 @@ int LLPluginMessage::parse(const std::string &message)
 	// clear any previous state
 	clear();
 
+	boost::iostreams::stream<boost::iostreams::array_source> input(message.data(), message.size());
 #if LL_DEBUG
-	std::istringstream input(message);
 	S32 parse_result = LLSDSerialize::fromXML(mMessage, input);
 #else
-	std::istringstream input(message);
 	S32 parse_result = LLSDSerialize::fromXMLDocument(mMessage, input);
 #endif
 
