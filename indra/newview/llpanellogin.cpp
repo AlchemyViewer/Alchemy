@@ -1184,11 +1184,15 @@ void LLPanelLogin::updateServer()
 		// Not sure if it should carry over password but it worked like this before login changes
 		// Example: you started typing in and found that your are under wrong grid,
 		// you switch yet don't lose anything
+		constexpr S32 MAX_PASSWORD_SL{16};
+		constexpr S32 MAX_PASSWORD_OPENSIM{64};
+		LLLineEditor* pswd_edit = sInstance->getChild<LLLineEditor>("password_edit");
+		pswd_edit->setMaxTextChars(LLGridManager::getInstance()->isInSecondlife() ? MAX_PASSWORD_SL : MAX_PASSWORD_OPENSIM);
 		if (sInstance->areCredentialFieldsDirty())
         {
 			// save modified creds
 			LLComboBox* user_combo = sInstance->getChild<LLComboBox>("username_combo");
-			LLLineEditor* pswd_edit = sInstance->getChild<LLLineEditor>("password_edit");
+
 			std::string username = user_combo->getSimple();
 			LLStringUtil::trim(username);
 			std::string password = pswd_edit->getValue().asString();
