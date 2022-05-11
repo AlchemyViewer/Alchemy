@@ -33,6 +33,8 @@
 
 #if LL_WINDOWS
 #include <intrin.h>
+#else
+#include <x86intrin.h>
 #endif
 
 #define LL_FAST_TIMER_ON 1
