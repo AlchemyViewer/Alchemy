@@ -362,7 +362,7 @@ public:
 	void requestCacheMisses();
 	void addCacheMissFull(const U32 local_id);
 	//update object cache if the object receives a full-update or terse update
-	LLViewerObject* updateCacheEntry(U32 local_id, LLViewerObject* objectp);
+	LLViewerObject* updateCacheEntry(U32 local_id, LLViewerObject* objectp, U32 update_type);
 	void findOrphans(U32 parent_id);
 	void clearCachedVisibleObjects();
 	void dumpCache();
