@@ -354,6 +354,17 @@
       <key>Value</key>
       <integer>0</integer>
     </map>
+    <key>AlchemyKeepSettingsOnGPUChange</key>
+    <map>
+      <key>Comment</key>
+      <string>Keep graphical preferences when GPU changes</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>S32</string>
+      <key>Value</key>
+      <integer>-1</integer>
+    </map>
     <key>AlchemyLookAtShow</key>
     <map>
       <key>Comment</key>
