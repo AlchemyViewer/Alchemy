@@ -49,6 +49,7 @@
 #include "llwindow.h"
 #include "llviewerstats.h"
 #include "llviewerstatsrecorder.h"
+#include "llkeyconflict.h" // for legacy keybinding support, remove later
 #include "llmarketplacefunctions.h"
 #include "llmarketplacenotifications.h"
 #include "llmd5.h"
@@ -58,6 +59,7 @@
 #include "llslurl.h"
 #include "llstartup.h"
 #include "llfocusmgr.h"
+#include "llurlfloaterdispatchhandler.h"
 #include "llviewerjoystick.h"
 #include "llallocator.h"
 #include "llcalc.h"
@@ -89,6 +91,7 @@
 #include "llsdutil_math.h"
 #include "lllocationhistory.h"
 #include "llfasttimerview.h"
+#include "lltelemetry.h"
 #include "llvector4a.h"
 #include "llviewermenufile.h"
 #include "llvoicechannel.h"
@@ -158,7 +161,7 @@
 #include "llapr.h"
 #include <boost/lexical_cast.hpp>
 
-#include "llviewerkeyboard.h"
+#include "llviewerinput.h"
 #include "lllfsthread.h"
 #include "llworkerthread.h"
 #include "lltexturecache.h"
@@ -263,9 +266,9 @@
 // define a self-registering event API object
 #include "llappviewerlistener.h"
 
-#if (LL_LINUX || LL_SOLARIS) && LL_GTK
+#if LL_LINUX && LL_GTK
 #include "glib.h"
-#endif // (LL_LINUX || LL_SOLARIS) && LL_GTK
+#endif // (LL_LINUX) && LL_GTK
 
 #if LL_MSVC
 // disable boost::lexical_cast warning
@@ -934,6 +937,7 @@ bool LLAppViewer::init()
 
 	// Load translations for tooltips
 	LLFloater::initClass();
+	LLUrlFloaterDispatchHandler::registerInDispatcher();
 
 	/////////////////////////////////////////////////
 
@@ -1023,23 +1027,6 @@ bool LLAppViewer::init()
 
 	gGLManager.getGLInfo(gDebugInfo);
 	gGLManager.printGLInfoString();
-
-	// Load Default bindings
-	std::string key_bindings_file = gDirUtilp->findFile("keys.xml",
-														gDirUtilp->getExpandedFilename(LL_PATH_USER_SETTINGS, ""),
-														gDirUtilp->getExpandedFilename(LL_PATH_APP_SETTINGS, ""));
-
-
-	if (!gViewerKeyboard.loadBindingsXML(key_bindings_file))
-	{
-		std::string key_bindings_file = gDirUtilp->findFile("keys.ini",
-															gDirUtilp->getExpandedFilename(LL_PATH_USER_SETTINGS, ""),
-															gDirUtilp->getExpandedFilename(LL_PATH_APP_SETTINGS, ""));
-		if (!gViewerKeyboard.loadBindings(key_bindings_file))
-		{
-			LL_ERRS("InitInfo") << "Unable to open keys.ini" << LL_ENDL;
-		}
-	}
 
 	// If we don't have the right GL requirements, exit.
 	if (!gGLManager.mHasRequirements)
@@ -1132,6 +1119,46 @@ bool LLAppViewer::init()
 		}
 	}
 
+#if LL_WINDOWS && ADDRESS_SIZE == 64
+    if (gGLManager.mIsIntel)
+    {
+        // Check intel driver's version
+        // Ex: "3.1.0 - Build 8.15.10.2559";
+        std::string version = ll_safe_string((const char *)glGetString(GL_VERSION));
+
+        const boost::regex is_intel_string("[0-9].[0-9].[0-9] - Build [0-9]{1,2}.[0-9]{2}.[0-9]{2}.[0-9]{4}");
+
+        if (boost::regex_search(version, is_intel_string))
+        {
+            // Valid string, extract driver version
+            std::size_t found = version.find("Build ");
+            std::string driver = version.substr(found + 6);
+            S32 v1, v2, v3, v4;
+            S32 count = sscanf(driver.c_str(), "%d.%d.%d.%d", &v1, &v2, &v3, &v4);
+            if (count > 0 && v1 <= 10)
+            {
+                LL_INFOS("AppInit") << "Detected obsolete intel driver: " << driver << LL_ENDL;
+                LLUIString details = LLNotifications::instance().getGlobalString("UnsupportedIntelDriver");
+                std::string gpu_name = ll_safe_string((const char *)glGetString(GL_RENDERER));
+                details.setArg("[VERSION]", driver);
+                details.setArg("[GPUNAME]", gpu_name);
+                S32 button = OSMessageBox(details.getString(),
+                                          LLStringUtil::null,
+                                          OSMB_YESNO);
+                if (OSBTN_YES == button && gViewerWindow)
+                {
+                    std::string url = LLWeb::escapeURL(LLTrans::getString("IntelDriverPage"));
+                    if (gViewerWindow->getWindow())
+                    {
+                        gViewerWindow->getWindow()->spawnWebBrowser(url, false);
+                    }
+                }
+            }
+        }
+    }
+#endif
+
+    // Obsolete? mExpectedGLVersion is always zero
 #if LL_WINDOWS
 	if (gGLManager.mGLVersion < LLFeatureManager::getInstance()->getExpectedGLVersion())
 	{
@@ -1206,7 +1233,16 @@ bool LLAppViewer::init()
 	// add LEAP mode command-line argument to whichever of these we selected
 	updater.args.add("leap");
 	// UpdaterServiceSettings
-	updater.args.add(stringize(gSavedSettings.getU32("UpdaterServiceSetting")));
+    if (gSavedSettings.getBOOL("FirstLoginThisInstall"))
+    {
+        // Befor first login, treat this as 'manual' updates,
+        // updater won't install anything, but required updates
+        updater.args.add("0");
+    }
+    else
+    {
+        updater.args.add(stringize(gSavedSettings.getU32("UpdaterServiceSetting")));
+    }
 	// channel
 	updater.args.add(LLVersionInfo::instance().getChannel());
 	// testok
@@ -1324,6 +1360,9 @@ bool LLAppViewer::init()
 	gSavedSettings.getControl("FramePerSecondLimit")->getSignal()->connect(boost::bind(&LLAppViewer::onChangeFrameLimit, this, _2));
 	onChangeFrameLimit(gSavedSettings.getLLSD("FramePerSecondLimit"));
 
+	// Load User's bindings
+	loadKeyBindings();
+
 	return true;
 }
 
@@ -1344,39 +1383,8 @@ void LLAppViewer::initMaxHeapSize()
 
 	//F32 max_heap_size_gb = llmin(1.6f, (F32)gSavedSettings.getF32("MaxHeapSize")) ;
 	F32Gigabytes max_heap_size_gb = (F32Gigabytes)gSavedSettings.getF32("MaxHeapSize") ;
-	BOOL enable_mem_failure_prevention = (BOOL)gSavedSettings.getBOOL("MemoryFailurePreventionEnabled") ;
 
-	LLMemory::initMaxHeapSizeGB(max_heap_size_gb, enable_mem_failure_prevention) ;
-}
-
-void LLAppViewer::checkMemory()
-{
-	const static F32 MEMORY_CHECK_INTERVAL = 1.0f ; //second
-	//const static F32 MAX_QUIT_WAIT_TIME = 30.0f ; //seconds
-	//static F32 force_quit_timer = MAX_QUIT_WAIT_TIME + MEMORY_CHECK_INTERVAL ;
-
-	if(!gGLManager.mDebugGPU)
-	{
-		return ;
-	}
-
-	if(MEMORY_CHECK_INTERVAL > mMemCheckTimer.getElapsedTimeF32())
-	{
-		return ;
-	}
-	mMemCheckTimer.reset() ;
-
-		//update the availability of memory
-		LLMemory::updateMemoryInfo() ;
-
-	bool is_low = LLMemory::isMemoryPoolLow() ;
-
-	LLPipeline::throttleNewMemoryAllocation(is_low) ;
-
-	if(is_low)
-	{
-		LLMemory::logMemoryInfo() ;
-	}
+	LLMemory::initMaxHeapSizeGB(max_heap_size_gb);
 }
 
 static LLTrace::BlockTimerStatHandle FTM_MESSAGES("System Messages");
@@ -1455,9 +1463,6 @@ bool LLAppViewer::doFrame()
 	//clear call stack records
 	LL_CLEAR_CALLSTACKS();
 
-	//check memory availability information
-	checkMemory() ;
-
 	{
 		pingMainloopTimeout("Main:MiscNativeWindowEvents");
 
@@ -1513,6 +1518,7 @@ bool LLAppViewer::doFrame()
 			{
 				joystick->scanJoystick();
 				gKeyboard->scanKeyboard();
+                gViewerInput.scanMouse();
 			}
 
 			// Update state based on messages, user input, object idle.
@@ -1684,11 +1690,14 @@ bool LLAppViewer::doFrame()
 		}
 
 		delete gServicePump;
+		gServicePump = NULL;
 
 		destroyMainloopTimeout();
 
 		LL_INFOS() << "Exiting main_loop" << LL_ENDL;
 	}
+
+    LLPROFILE_UPDATE();
 
 	return ! LLApp::isRunning();
 }
@@ -1741,7 +1750,11 @@ bool LLAppViewer::cleanup()
 	//dump scene loading monitor results
 	if (LLSceneMonitor::instanceExists())
 	{
-		LLSceneMonitor::instance().dumpToFile(gDirUtilp->getExpandedFilename(LL_PATH_LOGS, "scene_monitor_results.csv"));
+		if (!isSecondInstance())
+		{
+			LLSceneMonitor::instance().dumpToFile(gDirUtilp->getExpandedFilename(LL_PATH_LOGS, "scene_monitor_results.csv"));
+		}
+		LLSceneMonitor::deleteSingleton();
 	}
 
 	// There used to be an 'if (LLFastTimerView::sAnalyzePerformance)' block
@@ -3575,6 +3588,12 @@ void LLAppViewer::writeSystemInfo()
 	gDebugInfo["FirstRunThisInstall"] = gSavedSettings.getBOOL("FirstRunThisInstall");
     gDebugInfo["StartupState"] = LLStartUp::getStartupStateString();
 
+	std::vector<std::string> resolutions = gViewerWindow->getWindow()->getDisplaysResolutionList();
+	for (auto res_iter : resolutions)
+	{
+		gDebugInfo["DisplayInfo"].append(res_iter);
+	}
+
 	writeDebugInfo(); // Save out debug_info.log early, in case of crash.
 }
 
@@ -4493,6 +4512,134 @@ bool LLAppViewer::initCache()
 void LLAppViewer::addOnIdleCallback(const boost::function<void()>& cb)
 {
 	LLDeferredTaskList::instance().addTask(cb);
+}
+
+void LLAppViewer::loadKeyBindings()
+{
+	std::string key_bindings_file = gDirUtilp->getExpandedFilename(LL_PATH_USER_SETTINGS, "key_bindings.xml");
+#if 1
+	// Legacy support
+	// Remove #if-#endif section half a year after DRTVWR-501 releases.
+	// Mouse actions are part of keybinding file since DRTVWR-501 instead of being stored in
+	// settings.xml. To support legacy viewers that were storing in  settings.xml we need to
+	// transfer old variables to new format.
+	// Also part of backward compatibility is present in LLKeyConflictHandler to modify
+	// legacy variables on changes in new system (to make sure we won't enforce
+	// legacy values again if user dropped to defaults in new system)
+	if (LLVersionInfo::getInstance()->getChannelAndVersion() != gLastRunVersion
+		|| !gDirUtilp->fileExists(key_bindings_file)) // if file is missing, assume that there were no changes by user yet
+	{
+		// copy mouse actions and voice key changes to new file
+		LL_INFOS("InitInfo") << "Converting legacy mouse bindings to new format" << LL_ENDL;
+		// Load settings from file
+		LLKeyConflictHandler third_person_view(LLKeyConflictHandler::MODE_THIRD_PERSON);
+		LLKeyConflictHandler sitting_view(LLKeyConflictHandler::MODE_SITTING);
+
+		// Since we are only modifying keybindings if personal file doesn't exist yet,
+		// it should be safe to just overwrite the value
+		// If key is already in use somewhere by default, LLKeyConflictHandler should resolve it.
+		BOOL value = gSavedSettings.getBOOL("DoubleClickAutoPilot");
+		third_person_view.registerControl("walk_to",
+			0,
+			value ? EMouseClickType::CLICK_DOUBLELEFT : EMouseClickType::CLICK_NONE,
+			KEY_NONE,
+			MASK_NONE,
+			value);
+
+		U32 index = value ? 1 : 0; // we can store multiple combinations per action, so if first is in use by doubleclick, go to second
+		value = gSavedSettings.getBOOL("ClickToWalk");
+		third_person_view.registerControl("walk_to",
+			index,
+			value ? EMouseClickType::CLICK_LEFT : EMouseClickType::CLICK_NONE,
+			KEY_NONE,
+			MASK_NONE,
+			value);
+
+		value = gSavedSettings.getBOOL("DoubleClickTeleport");
+		third_person_view.registerControl("teleport_to",
+			0,
+			value ? EMouseClickType::CLICK_DOUBLELEFT : EMouseClickType::CLICK_NONE,
+			KEY_NONE,
+			MASK_NONE,
+			value);
+
+		// sitting also supports teleport
+		sitting_view.registerControl("teleport_to",
+			0,
+			value ? EMouseClickType::CLICK_DOUBLELEFT : EMouseClickType::CLICK_NONE,
+			KEY_NONE,
+			MASK_NONE,
+			value);
+
+		std::string key_string = gSavedSettings.getString("PushToTalkButton");
+		EMouseClickType mouse = EMouseClickType::CLICK_NONE;
+		KEY key = KEY_NONE;
+		if (key_string == "MiddleMouse")
+		{
+			mouse = EMouseClickType::CLICK_MIDDLE;
+		}
+		else if (key_string == "MouseButton4")
+		{
+			mouse = EMouseClickType::CLICK_BUTTON4;
+		}
+		else if (key_string == "MouseButton5")
+		{
+			mouse = EMouseClickType::CLICK_BUTTON5;
+		}
+		else
+		{
+			LLKeyboard::keyFromString(key_string, &key);
+		}
+
+		value = gSavedSettings.getBOOL("PushToTalkToggle");
+		std::string control_name = value ? "toggle_voice" : "voice_follow_key";
+		third_person_view.registerControl(control_name, 0, mouse, key, MASK_NONE, true);
+		sitting_view.registerControl(control_name, 0, mouse, key, MASK_NONE, true);
+
+		if (third_person_view.hasUnsavedChanges())
+		{
+			// calls loadBindingsXML()
+			third_person_view.saveToSettings();
+		}
+
+		if (sitting_view.hasUnsavedChanges())
+		{
+			// calls loadBindingsXML()
+			sitting_view.saveToSettings();
+		}
+
+		// in case of voice we need to repeat this in other modes
+
+		for (U32 i = 0; i < LLKeyConflictHandler::MODE_COUNT - 1; ++i)
+		{
+			// edit and first person modes; MODE_SAVED_SETTINGS not in use at the moment
+			if (i != LLKeyConflictHandler::MODE_THIRD_PERSON && i != LLKeyConflictHandler::MODE_SITTING)
+			{
+				LLKeyConflictHandler handler((LLKeyConflictHandler::ESourceMode)i);
+
+				handler.registerControl(control_name, 0, mouse, key, MASK_NONE, true);
+
+				if (handler.hasUnsavedChanges())
+				{
+					// calls loadBindingsXML()
+					handler.saveToSettings();
+				}
+			}
+		}
+	}
+	// since something might have gone wrong or there might have been nothing to save
+	// (and because otherwise following code will have to be encased in else{}),
+	// load everything one last time
+#endif
+	if (!gDirUtilp->fileExists(key_bindings_file) || !gViewerInput.loadBindingsXML(key_bindings_file))
+	{
+		// Failed to load custom bindings, try default ones
+		key_bindings_file = gDirUtilp->getExpandedFilename(LL_PATH_APP_SETTINGS, "key_bindings.xml");
+		if (!gViewerInput.loadBindingsXML(key_bindings_file))
+		{
+			LL_ERRS("InitInfo") << "Unable to open default key bindings from " << key_bindings_file << LL_ENDL;
+		}
+	}
 }
 
 void LLAppViewer::purgeCache()

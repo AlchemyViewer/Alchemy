@@ -259,11 +259,7 @@ LLParticipantList::~LLParticipantList()
 */
 void LLParticipantList::onAvalineCallerFound(const LLUUID& participant_id)
 {
-	LLConversationItemParticipant* participant = findParticipant(participant_id);
-	if (participant)
-	{
-		removeParticipant(participant);
-	}
+	removeParticipant(participant_id);
 	// re-add avaline caller with a correct class instance.
 	addAvatarIDExceptAgent(participant_id);
 }
@@ -279,6 +275,19 @@ void LLParticipantList::setValidateSpeakerCallback(validate_speaker_callback_t c
 {
 	mValidateSpeakerCallback = cb;
 }
+
+// [RLVa:KB] - @shownames
+void LLParticipantList::refreshNames()
+{
+	for (LLFolderViewModelItem* pChildItem : mChildren)
+	{
+		if (LLConversationItemParticipant* pConversationItem = dynamic_cast<LLConversationItemParticipant*>(pChildItem))
+		{
+			pConversationItem->updateName();
+		}
+	}
+}
+// [/RLVa:KB]
 
 void LLParticipantList::update()
 {
@@ -392,11 +401,15 @@ void LLParticipantList::addAvatarIDExceptAgent(const LLUUID& avatar_id)
 		participant = new LLConversationItemParticipant(display_name.empty() ? LLTrans::getString("AvatarNameWaiting") : display_name, avatar_id, mRootViewModel);
 		mAvalineUpdater->watchAvalineCaller(avatar_id);
 	}
+// [RLVa:KB] - @shownames
+	participant->setRlvCheckShowNames(mSpeakerMgr->getSessionID().isNull());
+// [/RLVa:KB]
 
 	// *TODO : Need to update the online/offline status of the participant
 	// Hack for this: LLAvatarTracker::instance().isBuddyOnline(avatar_id))
 	
 	// Add the participant model to the session's children list
+	// This will post "add_participant" event
 	addParticipant(participant);
 
 	adjustParticipant(avatar_id);

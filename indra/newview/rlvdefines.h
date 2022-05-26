@@ -469,28 +469,30 @@ namespace RlvStringKeys
 		/*inline*/ constexpr boost::string_view StartIm = make_string_view("blocked_startim");
 		/*inline*/ constexpr boost::string_view Teleport = make_string_view("blocked_teleport");
 		/*inline*/ constexpr boost::string_view TeleportOffer = make_string_view("blocked_teleport_offer");
-		/*inline*/ constexpr boost::string_view TpLureRequestRemote = make_string_view("blocked_tplurerequest_remote");
+		/*inline*/ constexpr boost::string_view TpLureRemote = make_string_view("blocked_tplure_remote");
+		/*inline*/ constexpr boost::string_view TpRequestRemote = make_string_view("blocked_tprequest_remote");
 		/*inline*/ constexpr boost::string_view ViewXxx = make_string_view("blocked_viewxxx");
 		/*inline*/ constexpr boost::string_view Wireframe = make_string_view("blocked_wireframe");
 #else
-		constexpr const char AutoPilot[] = "blocked_autopilot";
-		constexpr const char Generic[] = "blocked_generic";
-		constexpr const char GroupChange[] = "blocked_groupchange";
-		constexpr const char InvFolder[] = "blocked_invfolder";
-		constexpr const char PermissionAttach[] = "blocked_permattach";
-		constexpr const char PermissionTeleport[] = "blocked_permteleport";
-		constexpr const char RecvIm[] = "blocked_recvim";
-		constexpr const char RecvImRemote[] = "blocked_recvim_remote";
-		constexpr const char SendIm[] = "blocked_sendim";
-		constexpr const char Share[] = "blocked_share";
-		constexpr const char ShareGeneric[] = "blocked_share_generic";
-		constexpr const char StartConference[] = "blocked_startconf";
-		constexpr const char StartIm[] = "blocked_startim";
-		constexpr const char Teleport[] = "blocked_teleport";
-		constexpr const char TeleportOffer[] = "blocked_teleport_offer";
-		constexpr const char TpLureRequestRemote[] = "blocked_tplurerequest_remote";
-		constexpr const char ViewXxx[] = "blocked_viewxxx";
-		constexpr const char Wireframe[] = "blocked_wireframe";
+		static constexpr const char AutoPilot[] = "blocked_autopilot";
+		static constexpr const char Generic[] = "blocked_generic";
+		static constexpr const char GroupChange[] = "blocked_groupchange";
+		static constexpr const char InvFolder[] = "blocked_invfolder";
+		static constexpr const char PermissionAttach[] = "blocked_permattach";
+		static constexpr const char PermissionTeleport[] = "blocked_permteleport";
+		static constexpr const char RecvIm[] = "blocked_recvim";
+		static constexpr const char RecvImRemote[] = "blocked_recvim_remote";
+		static constexpr const char SendIm[] = "blocked_sendim";
+		static constexpr const char Share[] = "blocked_share";
+		static constexpr const char ShareGeneric[] = "blocked_share_generic";
+		static constexpr const char StartConference[] = "blocked_startconf";
+		static constexpr const char StartIm[] = "blocked_startim";
+		static constexpr const char Teleport[] = "blocked_teleport";
+		static constexpr const char TeleportOffer[] = "blocked_teleport_offer";
+		static constexpr const char TpLureRemote[] = "blocked_tplure_remote";
+		static constexpr const char TpRequestRemote[] = "blocked_tprequest_remote";
+		static constexpr const char ViewXxx[] = "blocked_viewxxx";
+		static constexpr const char Wireframe[] = "blocked_wireframe";
 #endif // CATZNIP_STRINGVIEW
 	}
 

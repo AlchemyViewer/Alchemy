@@ -165,6 +165,7 @@ public:
 	void removeParticipant(LLConversationItemParticipant* participant);
 	void removeParticipant(const LLUUID& participant_id);
 	void clearParticipants();
+	void clearAndDeparentModels(); // will delete unowned models and deparent owned ones
 	LLConversationItemParticipant* findParticipant(const LLUUID& participant_id);
 
 	void setParticipantIsMuted(const LLUUID& participant_id, bool is_muted);
@@ -213,6 +214,10 @@ public:
 	void setModeratorOptionsVisible(bool visible) { mDisplayModeratorOptions = visible; }
 	void setDisplayModeratorRole(bool displayRole);
 	void setGroupBanVisible(bool visible) { mDisplayGroupBanOptions = visible; }
+// [RLVa:KB] - @shownames
+	void setRlvCheckShowNames(bool fRlvCheckShowNames) { mRlvCheckShowNames = fRlvCheckShowNames; }
+// [/RLVa:KB]
+
 
 private:
 	void onAvatarNameCache(const LLAvatarName& av_name);	// callback used by fetchAvatarName
@@ -221,6 +226,9 @@ private:
 	bool mIsModeratorMuted;	         // default is false
 	bool mIsModerator;	         // default is false
 	bool mDisplayModeratorLabel; // default is false
+// [RLVa:KB] - @shownames
+	bool mRlvCheckShowNames;
+// [/RLVa:KB]
 	std::string mDisplayName;
 	F64  mDistToAgent;  // Distance to the agent. A negative (meaningless) value means the distance has not been set.
 	boost::signals2::connection mAvatarNameCacheConnection;
