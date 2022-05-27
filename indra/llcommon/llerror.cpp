@@ -1360,7 +1360,12 @@ namespace LLError
 			return;
 		}
 
+// [SL:KB] - Patch: Viewer-Build | Checked: Catznip-2.4
+#if LL_RELEASE_FOR_DOWNLOAD || !LL_WINDOWS
 		Globals* g = Globals::getInstance();
+#endif // LL_RELEASE_FOR_DOWNLOAD || !LL_WINDOWS
+// [/SL:KB]
+//		Globals* g = Globals::getInstance();
 		SettingsConfigPtr s = Settings::getInstance()->getSettingsConfig();
 
 		std::string message = out.str();
@@ -1396,8 +1401,16 @@ namespace LLError
 
 		if (site.mLevel == LEVEL_ERROR)
 		{
+// [SL:KB] - Patch: Viewer-Build | Checked: Catznip-2.4
+#if !LL_RELEASE_FOR_DOWNLOAD && LL_WINDOWS
+		    DebugBreak();
+#else
 			g->mFatalMessage = message;
 			s->mCrashFunction(message);
+#endif // !LL_RELEASE_FOR_DOWNLOAD && LL_WINDOWS
+// [/SL:KB]
+//			g->mFatalMessage = message;
+//			s->mCrashFunction(message);
 		}
 	}
 }

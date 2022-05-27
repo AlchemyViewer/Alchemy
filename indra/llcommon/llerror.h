@@ -381,12 +381,24 @@ typedef LLError::NoClassInfo _LL_CLASS_TO_LOG;
 #define LL_NEWLINE '\n'
 
 // Use this only in LL_ERRS or in a place that LL_ERRS may not be used
+// [SL:KB] - Patch: Viewer-Build | Checked: Catznip-2.4
+#if !LL_RELEASE_FOR_DOWNLOAD
+#define LLERROR_CRASH         ;
+#else
 #define LLERROR_CRASH         \
 {                             \
     int* make_me_crash = NULL;\
     *make_me_crash = 0;       \
     exit(*make_me_crash);     \
 }
+#endif // !LL_RELEASE_FOR_DOWNLOAD
+// [/SL:KB]
+//#define LLERROR_CRASH         \
+//{                             \
+//    int* make_me_crash = NULL;\
+//    *make_me_crash = 0;       \
+//    exit(*make_me_crash);     \
+//}
 
 #define LL_ENDL                                         \
             LLError::End();                             \
