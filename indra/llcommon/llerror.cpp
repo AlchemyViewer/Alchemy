@@ -1431,10 +1431,16 @@ namespace LLError
 		if (site.mLevel == LEVEL_ERROR)
 		{
 			g->mFatalMessage = message;
+// [SL:KB] - Patch: Viewer-Build | Checked: Catznip-2.4
+#if !LL_RELEASE_FOR_DOWNLOAD && LL_WINDOWS
+			DebugBreak();
+#else
             if (s->mCrashFunction)
             {
                 s->mCrashFunction(message);
             }
+#endif // !LL_RELEASE_FOR_DOWNLOAD && LL_WINDOWS
+// [/SL:KB]
 		}
 	}
 }
