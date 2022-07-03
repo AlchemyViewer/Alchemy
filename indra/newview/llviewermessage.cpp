@@ -38,14 +38,14 @@
 #include "llfollowcamparams.h"
 #include "llinventorydefines.h"
 #include "lllslconstants.h"
+#include "llmaterialtable.h"
 #include "llregionhandle.h"
 #include "llsd.h"
 #include "llsdserialize.h"
 #include "llteleportflags.h"
 #include "lltoastnotifypanel.h"
 #include "lltransactionflags.h"
-#include "llvfile.h"
-#include "llvfs.h"
+#include "llfilesystem.h"
 #include "llxfermanager.h"
 #include "mean_collision_data.h"
 
@@ -4032,6 +4032,7 @@ void process_kill_object(LLMessageSystem *mesgsys, void **user_data)
 				{
 					LLColor4 color(0.f,1.f,0.f,1.f);
 					gPipeline.addDebugBlip(objectp->getPositionAgent(), color);
+					LL_DEBUGS("MessageBlip") << "Kill blip for local " << local_id << " at " << objectp->getPositionAgent() << LL_ENDL;
 				}
 
 				// Do the kill
@@ -4137,7 +4138,17 @@ void process_sound_trigger(LLMessageSystem *msg, void **)
 	}
 		
 	// Don't play sounds from gestures if they are not enabled.
-	if (object_id == owner_id && !gSavedSettings.getBOOL("EnableGestureSounds"))
+	// Do play sounds triggered by avatar, since muting your own
+	// gesture sounds and your own sounds played inworld from 
+	// Inventory can cause confusion.
+	if (object_id == owner_id
+        && owner_id != gAgentID
+        && !gSavedSettings.getBOOL("EnableGestureSounds"))
+	{
+		return;
+	}
+
+	if (LLMaterialTable::basic.isCollisionSound(sound_id) && !gSavedSettings.getBOOL("EnableCollisionSounds"))
 	{
 		return;
 	}
@@ -6854,15 +6865,12 @@ void process_user_info_reply(LLMessageSystem* msg, void**)
 				<< "wrong agent id." << LL_ENDL;
 	}
 	
-	BOOL im_via_email;
-	msg->getBOOLFast(_PREHASH_UserData, _PREHASH_IMViaEMail, im_via_email);
 	std::string email;
 	msg->getStringFast(_PREHASH_UserData, _PREHASH_EMail, email);
 	std::string dir_visibility;
 	msg->getString( "UserData", "DirectoryVisibility", dir_visibility);
 
-    // For Message based user info information the is_verified is assumed to be false.
-	LLFloaterPreference::updateUserInfo(dir_visibility, im_via_email, false);   
+	LLFloaterPreference::updateUserInfo(dir_visibility);   
 	LLFloaterSnapshot::setAgentEmail(email);
 }
 
@@ -7295,16 +7303,15 @@ void process_covenant_reply(LLMessageSystem* msg, void**)
 	}
 }
 
-void onCovenantLoadComplete(LLVFS *vfs,
-					const LLUUID& asset_uuid,
-					LLAssetType::EType type,
-					void* user_data, S32 status, LLExtStat ext_status)
+void onCovenantLoadComplete(const LLUUID& asset_uuid,
+							LLAssetType::EType type,
+							void* user_data, S32 status, LLExtStat ext_status)
 {
 	LL_DEBUGS("Messaging") << "onCovenantLoadComplete()" << LL_ENDL;
 	std::string covenant_text;
 	if(0 == status)
 	{
-		LLVFile file(vfs, asset_uuid, type, LLVFile::READ);
+		LLFileSystem file(asset_uuid, type, LLFileSystem::READ);
 		
 		S32 file_length = file.getSize();
 		

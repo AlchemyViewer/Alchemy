@@ -54,7 +54,6 @@
 #include "llslurl.h"
 #include "llrender.h"
 
-#include "llvoiceclient.h"	// for push-to-talk button handling
 #include "stringize.h"
 
 //
@@ -222,6 +221,7 @@
 
 #if LL_WINDOWS
 #include <tchar.h> // For Unicode conversion methods
+#include "llwindowwin32.h" // For AltGr handling
 #endif
 
 //
@@ -1072,6 +1072,9 @@ BOOL LLViewerWindow::handleAnyMouseClick(LLWindow *window, LLCoordGL pos, MASK m
 	x = ll_round((F32)x / mDisplayScale.mV[VX]);
 	y = ll_round((F32)y / mDisplayScale.mV[VY]);
 
+    // Handle non-consuming global keybindings, like voice 
+    gViewerInput.handleGlobalBindsMouse(clicktype, mask, down);
+
 	// only send mouse clicks to UI if UI is visible
 	if(gPipeline.hasRenderDebugFeatureMask(LLPipeline::RENDER_DEBUG_FEATURE_UI))
 	{	
@@ -1592,6 +1595,10 @@ void LLViewerWindow::handleFocusLost(LLWindow *window)
 
 BOOL LLViewerWindow::handleTranslatedKeyDown(KEY key,  MASK mask, BOOL repeated)
 {
+    // Handle non-consuming global keybindings, like voice 
+    // Never affects event processing.
+    gViewerInput.handleGlobalBindsKeyDown(key, mask);
+
 	if (gAwayTimer.getElapsedTimeF32() > LLAgent::MIN_AFK_TIME)
 	{
 		gAgent.clearAFK();
@@ -1616,6 +1623,10 @@ BOOL LLViewerWindow::handleTranslatedKeyDown(KEY key,  MASK mask, BOOL repeated)
 
 BOOL LLViewerWindow::handleTranslatedKeyUp(KEY key,  MASK mask)
 {
+    // Handle non-consuming global keybindings, like voice 
+    // Never affects event processing.
+    gViewerInput.handleGlobalBindsKeyUp(key, mask);
+
 	// Let the inspect tool code check for ALT key to set LLToolSelectRect active instead LLToolCamera
 	LLToolCompInspect * tool_inspectp = LLToolCompInspect::getInstance();
 	if (LLToolMgr::getInstance()->getCurrentTool() == tool_inspectp)
@@ -1943,7 +1954,8 @@ LLViewerWindow::LLViewerWindow(const Params& p)
 	
 	if (!LLAppViewer::instance()->restoreErrorTrap())
 	{
-		LL_WARNS("Window") << " Someone took over my signal/exception handler (post createWindow)!" << LL_ENDL;
+        // this always happens, so downgrading it to INFO
+		LL_INFOS("Window") << " Someone took over my signal/exception handler (post createWindow; normal)" << LL_ENDL;
 	}
 
 	const bool do_not_enforce = false;
@@ -2715,7 +2727,7 @@ void LLViewerWindow::draw()
 
 	if (!gSavedSettings.getBOOL("RenderUIBuffer"))
 	{
-		LLUI::getInstance()->mDirtyRect = getWindowRectScaled();
+		LLView::sDirtyRect = getWindowRectScaled();
 	}
 
 	// HACK for timecode debugging
@@ -2894,57 +2906,64 @@ BOOL LLViewerWindow::handleKey(KEY key, MASK mask)
     if (keyboard_focus
         && !gFocusMgr.getKeystrokesOnly())
     {
-#ifdef LL_WINDOWS
-        // On windows Alt Gr key generates additional Ctrl event, as result handling situations
-        // like 'AltGr + D' will result in 'Alt+Ctrl+D'. If it results in WM_CHAR, don't let it
-        // pass into menu or it will trigger 'develop' menu assigned to this combination on top
-        // of character handling.
-        // Alt Gr can be additionally modified by Shift
-        const MASK alt_gr = MASK_CONTROL | MASK_ALT;
-        if ((mask & alt_gr) != 0
-            && key >= 0x30
-            && key <= 0x5A
-            && (GetKeyState(VK_RMENU) & 0x8000) != 0
-            && (GetKeyState(VK_RCONTROL) & 0x8000) == 0) // ensure right control is not pressed, only left one
+        LLUICtrl* cur_focus = dynamic_cast<LLUICtrl*>(keyboard_focus);
+        if (cur_focus && cur_focus->acceptsTextInput())
         {
-            // Alt Gr key is represented as right alt and left control.
-            // Any alt+ctrl combination is treated as Alt Gr by TranslateMessage() and
-            // will generate a WM_CHAR message, but here we only treat virtual Alt Graph
-            // key by checking if this specific combination has unicode char.
-            //
-            // I decided to handle only virtual RAlt+LCtrl==AltGr combination to minimize
-            // impact on menu, but the right way might be to handle all Alt+Ctrl calls.
-
-            BYTE keyboard_state[256];
-            if (GetKeyboardState(keyboard_state))
+#ifdef LL_WINDOWS
+            // On windows Alt Gr key generates additional Ctrl event, as result handling situations
+            // like 'AltGr + D' will result in 'Alt+Ctrl+D'. If it results in WM_CHAR, don't let it
+            // pass into menu or it will trigger 'develop' menu assigned to this combination on top
+            // of character handling.
+            // Alt Gr can be additionally modified by Shift
+            const MASK alt_gr = MASK_CONTROL | MASK_ALT;
+            LLWindowWin32 *window = static_cast<LLWindowWin32*>(mWindow);
+            U32 raw_key = window->getRawWParam();
+            if ((mask & alt_gr) != 0
+                && ((raw_key >= 0x30 && raw_key <= 0x5A) //0-9, plus normal chartacters
+                    || (raw_key >= 0xBA && raw_key <= 0xE4)) // Misc/OEM characters that can be covered by AltGr, ex: -, =, ~
+                && (GetKeyState(VK_RMENU) & 0x8000) != 0
+                && (GetKeyState(VK_RCONTROL) & 0x8000) == 0) // ensure right control is not pressed, only left one
             {
-                const int char_count = 6;
-                wchar_t chars[char_count];
-                HKL layout = GetKeyboardLayout(0);
-                // ToUnicodeEx changes buffer state on OS below Win10, which is undesirable,
-                // but since we already did a TranslateMessage() in gatherInput(), this
-                // should have no negative effect
-                int res = ToUnicodeEx(key, 0, keyboard_state, chars, char_count, 1 << 2 /*do not modify buffer flag*/, layout);
-                if (res == 1 && chars[0] >= 0x20)
+                // Alt Gr key is represented as right alt and left control.
+                // Any alt+ctrl combination is treated as Alt Gr by TranslateMessage() and
+                // will generate a WM_CHAR message, but here we only treat virtual Alt Graph
+                // key by checking if this specific combination has unicode char.
+                //
+                // I decided to handle only virtual RAlt+LCtrl==AltGr combination to minimize
+                // impact on menu, but the right way might be to handle all Alt+Ctrl calls.
+
+                BYTE keyboard_state[256];
+                if (GetKeyboardState(keyboard_state))
                 {
-                    // Let it fall through to character handler and get a WM_CHAR.
-                    return TRUE;
+                    const int char_count = 6;
+                    wchar_t chars[char_count];
+                    HKL layout = GetKeyboardLayout(0);
+                    // ToUnicodeEx changes buffer state on OS below Win10, which is undesirable,
+                    // but since we already did a TranslateMessage() in gatherInput(), this
+                    // should have no negative effect
+                    // ToUnicodeEx works with virtual key codes
+                    int res = ToUnicodeEx(raw_key, 0, keyboard_state, chars, char_count, 1 << 2 /*do not modify buffer flag*/, layout);
+                    if (res == 1 && chars[0] >= 0x20)
+                    {
+                        // Let it fall through to character handler and get a WM_CHAR.
+                        return TRUE;
+                    }
                 }
             }
-        }
 #endif
 
-        if (!(mask & (MASK_CONTROL | MASK_ALT)))
-        {
-            // We have keyboard focus, and it's not an accelerator
-            if (keyboard_focus && keyboard_focus->wantsKeyUpKeyDown())
+            if (!(mask & (MASK_CONTROL | MASK_ALT)))
             {
-                return keyboard_focus->handleKey(key, mask, FALSE);
-            }
-            else if (key < 0x80)
-            {
-                // Not a special key, so likely (we hope) to generate a character.  Let it fall through to character handler first.
-                return TRUE;
+                // We have keyboard focus, and it's not an accelerator
+                if (keyboard_focus && keyboard_focus->wantsKeyUpKeyDown())
+                {
+                    return keyboard_focus->handleKey(key, mask, FALSE);
+                }
+                else if (key < 0x80)
+                {
+                    // Not a special key, so likely (we hope) to generate a character.  Let it fall through to character handler first.
+                    return TRUE;
+                }
             }
         }
     }
@@ -5196,6 +5215,104 @@ BOOL LLViewerWindow::rawSnapshot(LLImageRaw *raw, S32 image_width, S32 image_hei
 	}
 	
 	return ret;
+}
+
+BOOL LLViewerWindow::simpleSnapshot(LLImageRaw* raw, S32 image_width, S32 image_height, const int num_render_passes)
+{
+    gDisplaySwapBuffers = FALSE;
+
+    glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
+    setCursor(UI_CURSOR_WAIT);
+
+    BOOL prev_draw_ui = gPipeline.hasRenderDebugFeatureMask(LLPipeline::RENDER_DEBUG_FEATURE_UI) ? TRUE : FALSE;
+    if (prev_draw_ui != false)
+    {
+        LLPipeline::toggleRenderDebugFeature(LLPipeline::RENDER_DEBUG_FEATURE_UI);
+    }
+
+    LLPipeline::sShowHUDAttachments = FALSE;
+    LLRect window_rect = getWorldViewRectRaw();
+
+    S32 original_width = LLPipeline::sRenderDeferred ? gPipeline.mDeferredScreen.getWidth() : gViewerWindow->getWorldViewWidthRaw();
+    S32 original_height = LLPipeline::sRenderDeferred ? gPipeline.mDeferredScreen.getHeight() : gViewerWindow->getWorldViewHeightRaw();
+
+    LLRenderTarget scratch_space;
+    U32 color_fmt = GL_RGBA;
+    const bool use_depth_buffer = true;
+    const bool use_stencil_buffer = true;
+    if (scratch_space.allocate(image_width, image_height, color_fmt, use_depth_buffer, use_stencil_buffer))
+    {
+        if (gPipeline.allocateScreenBuffer(image_width, image_height))
+        {
+            mWorldViewRectRaw.set(0, image_height, image_width, 0);
+
+            scratch_space.bindTarget();
+        }
+        else
+        {
+            scratch_space.release();
+            gPipeline.allocateScreenBuffer(original_width, original_height);
+        }
+    }
+
+    // we render the scene more than once since this helps
+    // greatly with the objects not being drawn in the 
+    // snapshot when they are drawn in the scene. This is 
+    // evident when you set this value via the debug setting
+    // called 360CaptureNumRenderPasses to 1. The theory is
+    // that the missing objects are caused by the sUseOcclusion
+    // property in pipeline but that the use in pipeline.cpp
+    // lags by a frame or two so rendering more than once
+    // appears to help a lot.
+    for (int i = 0; i < num_render_passes; ++i)
+    {
+        // turning this flag off here prohibits the screen swap
+        // to present the new page to the viewer - this stops
+        // the black flash in between captures when the number
+        // of render passes is more than 1. We need to also
+        // set it here because code in LLViewerDisplay resets
+        // it to TRUE each time.
+        gDisplaySwapBuffers = FALSE;
+
+        // actually render the scene
+        const U32 subfield = 0;
+        const bool do_rebuild = true;
+        const F32 zoom = 1.0;
+        const bool for_snapshot = TRUE;
+        display(do_rebuild, zoom, subfield, for_snapshot);
+    }
+
+    glReadPixels(
+        0, 0,
+        image_width,
+        image_height,
+        GL_RGB, GL_UNSIGNED_BYTE,
+        raw->getData()
+    );
+    stop_glerror();
+
+    gDisplaySwapBuffers = FALSE;
+    gDepthDirty = TRUE;
+
+    if (!gPipeline.hasRenderDebugFeatureMask(LLPipeline::RENDER_DEBUG_FEATURE_UI))
+    {
+        if (prev_draw_ui != false)
+        {
+            LLPipeline::toggleRenderDebugFeature(LLPipeline::RENDER_DEBUG_FEATURE_UI);
+        }
+    }
+
+    LLPipeline::sShowHUDAttachments = TRUE;
+
+    setCursor(UI_CURSOR_ARROW);
+
+    gPipeline.resetDrawOrders();
+    mWorldViewRectRaw = window_rect;
+    scratch_space.flush();
+    scratch_space.release();
+    gPipeline.allocateScreenBuffer(original_width, original_height);
+
+    return true;
 }
 
 void LLViewerWindow::destroyWindow()

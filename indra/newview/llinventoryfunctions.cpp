@@ -47,6 +47,7 @@
 #include "llappviewer.h"
 #include "llavataractions.h"
 #include "llclipboard.h"
+#include "lldirpicker.h"
 #include "lldonotdisturbnotificationstorage.h"
 #include "llfloatersidepanelcontainer.h"
 #include "llfocusmgr.h"
@@ -258,7 +259,7 @@ void update_marketplace_folder_hierarchy(const LLUUID cat_id)
     return;
 }
 
-void update_marketplace_category(const LLUUID& cur_uuid, bool perform_consistency_enforcement)
+void update_marketplace_category(const LLUUID& cur_uuid, bool perform_consistency_enforcement, bool skip_clear_listing)
 {
     // When changing the marketplace status of an item, we usually have to change the status of all
     // folders in the same listing. This is because the display of each folder is affected by the
@@ -330,7 +331,7 @@ void update_marketplace_category(const LLUUID& cur_uuid, bool perform_consistenc
     else
     {
         // If the folder is outside the marketplace listings root, clear its SLM data if needs be
-        if (perform_consistency_enforcement && LLMarketplaceData::instance().isListed(cur_uuid))
+        if (perform_consistency_enforcement && !skip_clear_listing && LLMarketplaceData::instance().isListed(cur_uuid))
         {
             LL_INFOS("SLM") << "Disassociate as the listing folder is not under the marketplace folder anymore!!" << LL_ENDL;
             LLMarketplaceData::instance().clearListing(cur_uuid);
@@ -1879,7 +1880,7 @@ bool validate_marketplacelistings(LLInventoryCategory* cat, validation_callback_
 		result &= validate_marketplacelistings(category, cb, fix_hierarchy, depth + 1);
 	}
     
-    update_marketplace_category(cat->getUUID());
+    update_marketplace_category(cat->getUUID(), true, true);
     gInventory.notifyObservers();
     return result && !has_bad_items;
 }
@@ -2554,6 +2555,10 @@ void LLInventoryAction::doToSelected(LLInventoryModel* model, LLFolderView* root
     {
         LLAppearanceMgr::instance().removeItemsFromAvatar(ids);
     }
+    else if ("save_selected_as" == action)
+    {
+        (new LLDirPickerThread(boost::bind(&LLInventoryAction::saveMultipleTextures, _1, selected_items, model), std::string()))->getFile();
+    }
     else
     {
         std::set<LLFolderViewItem*>::iterator set_iter;
@@ -2579,6 +2584,41 @@ void LLInventoryAction::doToSelected(LLInventoryModel* model, LLFolderView* root
 	{
 		multi_propertiesp->openFloater(LLSD());
 	}
+}
+
+void LLInventoryAction::saveMultipleTextures(const std::vector<std::string>& filenames, std::set<LLFolderViewItem*> selected_items, LLInventoryModel* model)
+{
+    gSavedSettings.setString("TextureSaveLocation", filenames[0]);
+ 
+    LLMultiPreview* multi_previewp = new LLMultiPreview();
+    gFloaterView->addChild(multi_previewp);
+
+    LLFloater::setFloaterHost(multi_previewp);
+
+    std::map<std::string, S32> tex_names_map;
+    std::set<LLFolderViewItem*>::iterator set_iter;
+   
+    for (set_iter = selected_items.begin(); set_iter != selected_items.end(); ++set_iter)
+    {
+        LLFolderViewItem* folder_item = *set_iter;
+        if(!folder_item) continue;
+        LLTextureBridge* bridge = (LLTextureBridge*)folder_item->getViewModelItem();
+        if(!bridge) continue;
+
+        std::string tex_name = bridge->getName();
+        if(!tex_names_map.insert(std::pair<std::string, S32>(tex_name, 0)).second) 
+        { 
+            tex_names_map[tex_name]++;
+            bridge->setFileName(tex_name + llformat("_%.3d", tex_names_map[tex_name]));            
+        }
+        bridge->performAction(model, "save_selected_as");
+    }
+
+    LLFloater::setFloaterHost(NULL);
+    if (multi_previewp)
+    {
+        multi_previewp->openFloater(LLSD());
+    }
 }
 
 void LLInventoryAction::removeItemFromDND(LLFolderView* root)

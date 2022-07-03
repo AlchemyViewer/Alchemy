@@ -32,7 +32,7 @@
 
 // llcommon
 #include "llcommonutils.h"
-#include "llvfile.h"
+#include "llfilesystem.h"
 
 #include "llaccordionctrltab.h"
 #include "llappearancemgr.h"
@@ -61,12 +61,15 @@ static LLPanelInjector<LLOutfitGallery> t_outfit_gallery("outfit_gallery");
 #define MAX_OUTFIT_PHOTO_WIDTH 256
 #define MAX_OUTFIT_PHOTO_HEIGHT 256
 
+const S32 GALLERY_ITEMS_PER_ROW_MIN = 2;
+
 LLOutfitGallery::LLOutfitGallery(const LLOutfitGallery::Params& p)
     : LLOutfitListBase(),
       mTexturesObserver(NULL),
       mOutfitsObserver(NULL),
       mScrollPanel(NULL),
       mGalleryPanel(NULL),
+      mLastRowPanel(NULL),
       mGalleryCreated(false),
       mRowCount(0),
       mItemsAddedCount(0),
@@ -94,7 +97,7 @@ LLOutfitGallery::Params::Params()
       item_width("item_width", 150),
       item_height("item_height", 175),
       item_horizontal_gap("item_horizontal_gap", 16),
-      items_in_row("items_in_row", 3),
+      items_in_row("items_in_row", GALLERY_ITEMS_PER_ROW_MIN),
       row_panel_width_factor("row_panel_width_factor", 166),
       gallery_width_factor("gallery_width_factor", 163)
 {
@@ -152,7 +155,7 @@ void LLOutfitGallery::updateRowsIfNeeded()
     {
         reArrangeRows(1);
     }
-    else if((mRowPanelWidth > (getRect().getWidth() + mItemHorizontalGap)) && mItemsInRow > 3)
+    else if((mRowPanelWidth > (getRect().getWidth() + mItemHorizontalGap)) && mItemsInRow > GALLERY_ITEMS_PER_ROW_MIN)
     {
         reArrangeRows(-1);
     }
@@ -166,9 +169,7 @@ bool compareGalleryItem(LLOutfitGalleryItem* item1, LLOutfitGalleryItem* item2)
         std::string name1 = item1->getItemName();
         std::string name2 = item2->getItemName();
 
-        LLStringUtil::toUpper(name1);
-        LLStringUtil::toUpper(name2);
-        return name1 < name2;
+        return (LLStringUtil::compareDict(name1, name2) < 0);
     }
     else
     {
@@ -241,7 +242,15 @@ void LLOutfitGallery::removeLastRow()
     mGalleryPanel->removeChild(mLastRowPanel);
     mUnusedRowPanels.push_back(mLastRowPanel);
     mRowPanels.pop_back();
-    mLastRowPanel = mRowPanels.back();
+    if (mRowPanels.size() > 0)
+    {
+        // Just removed last row
+        mLastRowPanel = mRowPanels.back();
+    }
+    else
+    {
+        mLastRowPanel = NULL;
+    }
 }
 
 LLPanel* LLOutfitGallery::addToRow(LLPanel* row_stack, LLOutfitGalleryItem* item, int pos, int hgap)
@@ -893,7 +902,7 @@ void LLOutfitGalleryContextMenu::onOutfitsRemovalConfirmation(const LLSD& notifi
 
 void LLOutfitGalleryContextMenu::onCreate(const LLSD& data)
 {
-    LLWearableType::EType type = LLWearableType::typeNameToType(data.asString());
+    LLWearableType::EType type = LLWearableType::getInstance()->typeNameToType(data.asString());
     if (type == LLWearableType::WT_NONE)
     {
         LL_WARNS() << "Invalid wearable type" << LL_ENDL;
@@ -1111,7 +1120,7 @@ void LLOutfitGallery::refreshOutfit(const LLUUID& category_id)
         }
     }
     
-    if (mGalleryCreated && !LLApp::isQuitting())
+    if (mGalleryCreated && !LLApp::isExiting())
     {
         reArrangeRows();
     }

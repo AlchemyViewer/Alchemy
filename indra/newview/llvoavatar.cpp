@@ -1145,7 +1145,6 @@ void LLVOAvatar::initInstance()
 	//-------------------------------------------------------------------------
 	if (LLCharacter::sInstances.size() == 1)
 	{
-		LLKeyframeMotion::setVFS(gStaticVFS);
 		registerMotion( ANIM_AGENT_DO_NOT_DISTURB,					LLNullMotion::create );
 		registerMotion( ANIM_AGENT_CROUCH,					LLKeyframeStandMotion::create );
 		registerMotion( ANIM_AGENT_CROUCHWALK,				LLKeyframeWalkMotion::create );
@@ -9068,7 +9067,7 @@ void dump_visual_param(apr_file_t* file, LLVisualParam* viewer_param, F32 value)
 	S32 u8_value = F32_to_U8(value,viewer_param->getMinWeight(),viewer_param->getMaxWeight());
 	apr_file_printf(file, "\t\t<param id=\"%d\" name=\"%s\" display=\"%s\" value=\"%.3f\" u8=\"%d\" type=\"%s\" wearable=\"%s\" group=\"%d\"/>\n",
 					viewer_param->getID(), viewer_param->getName().c_str(), viewer_param->getDisplayName().c_str(), value, u8_value, type_string.c_str(),
-					LLWearableType::getTypeName(LLWearableType::EType(wtype)).c_str(),
+					LLWearableType::getInstance()->getTypeName(LLWearableType::EType(wtype)).c_str(),
 					viewer_param->getGroup());
 	}
 	
@@ -9846,6 +9845,7 @@ void LLVOAvatar::dumpArchetypeXML(const std::string& prefix, bool group_by_weara
 	std::string outfilename = get_sequential_numbered_file_name(outprefix,".xml");
 	
 	LLAPRFile outfile;
+    LLWearableType *wr_inst = LLWearableType::getInstance();
 	std::string fullpath = gDirUtilp->getExpandedFilename(LL_PATH_LOGS,outfilename);
 	if (APR_SUCCESS == outfile.open(fullpath, LL_APR_WB ))
 	{
@@ -9862,7 +9862,7 @@ void LLVOAvatar::dumpArchetypeXML(const std::string& prefix, bool group_by_weara
 		{
 			for (S32 type = LLWearableType::WT_SHAPE; type < LLWearableType::WT_COUNT; type++)
 			{
-				const std::string& wearable_name = LLWearableType::getTypeName((LLWearableType::EType)type);
+				const std::string& wearable_name = wr_inst->getTypeName((LLWearableType::EType)type);
 				apr_file_printf( file, "\n\t\t<!-- wearable: %s -->\n", wearable_name.c_str() );
 
 				for (LLVisualParam* param = getFirstVisualParam(); param; param = getNextVisualParam())
@@ -10700,7 +10700,8 @@ void LLVOAvatar::accountRenderComplexityForObject(
                             LL_DEBUGS("ARCdetail") << "Attachment costs " << attached_object->getAttachmentItemID()
                                                    << " total: " << attachment_total_cost
                                                    << ", volume: " << attachment_volume_cost
-                                                   << ", textures: " << attachment_texture_cost
+                                                   << ", " << textures.size()
+                                                   << " textures: " << attachment_texture_cost
                                                    << ", " << volume->numChildren()
                                                    << " children: " << attachment_children_cost
                                                    << LL_ENDL;
@@ -10800,10 +10801,23 @@ void LLVOAvatar::calculateUpdateRenderComplexity()
 			ETextureIndex tex_index = baked_dict->mTextureIndex;
 			if ((tex_index != TEX_SKIRT_BAKED) || (isWearingWearableType(LLWearableType::WT_SKIRT)))
 			{
-				if (isTextureVisible(tex_index))
-				{
-					cost +=COMPLEXITY_BODY_PART_COST;
-				}
+                // Same as isTextureVisible(), but doesn't account for isSelf to ensure identical numbers for all avatars
+                if (isIndexLocalTexture(tex_index))
+                {
+                    if (isTextureDefined(tex_index, 0))
+                    {
+                        cost += COMPLEXITY_BODY_PART_COST;
+                    }
+                }
+                else
+                {
+                    // baked textures can use TE images directly
+                    if (isTextureDefined(tex_index)
+                        && (getTEImage(tex_index)->getID() != IMG_INVISIBLE || LLDrawPoolAlpha::sShowDebugAlpha))
+                    {
+                        cost += COMPLEXITY_BODY_PART_COST;
+                    }
+                }
 			}
 		}
         LL_DEBUGS("ARCdetail") << "Avatar body parts complexity: " << cost << LL_ENDL;
@@ -10844,8 +10858,7 @@ void LLVOAvatar::calculateUpdateRenderComplexity()
 
 		// Diagnostic output to identify all avatar-related textures.
 		// Does not affect rendering cost calculation.
-		// Could be wrapped in a debug option if output becomes problematic.
-		if (isSelf())
+		if (isSelf() && debugLoggingEnabled("ARCdetail"))
 		{
 			// print any attachment textures we didn't already know about.
 			for (LLVOVolume::texture_cost_t::iterator it = textures.begin(); it != textures.end(); ++it)

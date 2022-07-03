@@ -54,7 +54,7 @@ class LLTexturePipelineTester ;
 
 typedef	void	(*loaded_callback_func)( BOOL success, LLViewerFetchedTexture *src_vi, LLImageRaw* src, LLImageRaw* src_aux, S32 discard_level, BOOL final, void* userdata );
 
-class LLVFile;
+class LLFileSystem;
 class LLMessageSystem;
 class LLViewerMediaImpl ;
 class LLVOVolume ;
@@ -415,6 +415,7 @@ public:
 	BOOL		isFullyLoaded() const;
 
 	BOOL        hasFetcher() const { return mHasFetcher;}
+	bool        isFetching() const { return mIsFetching;}
 	void        setCanUseHTTP(bool can_use_http) {mCanUseHTTP = can_use_http;}
 
 	void        forceToDeleteRequest();

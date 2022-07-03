@@ -132,7 +132,6 @@ LLFolderViewItem::LLFolderViewItem(const LLFolderViewItem::Params& p)
 	mCutGeneration(0),
 	mLabelStyle( LLFontGL::NORMAL ),
 	mHasVisibleChildren(FALSE),
-	mIsFolderComplete(true),
     mLocalIndentation(p.folder_indentation),
 	mIndentation(0),
 	mItemHeight(p.item_height),
@@ -962,9 +961,10 @@ void LLFolderViewItem::draw()
 	//
     if (filter_string_length > 0)
     {
-        F32 match_string_left = text_left + font->getWidthF32(combined_string, 0, mViewModelItem->getFilterStringOffset());
+        S32 filter_offset = mViewModelItem->getFilterStringOffset();
+        F32 match_string_left = text_left + font->getWidthF32(combined_string, 0, filter_offset + filter_string_length) - font->getWidthF32(combined_string, filter_offset, filter_string_length);
         F32 yy = (F32)getRect().getHeight() - font->getLineHeight() - (F32)mTextPad - (F32)TOP_PAD;
-        font->renderUTF8( combined_string, mViewModelItem->getFilterStringOffset(), match_string_left, yy,
+        font->renderUTF8( combined_string, filter_offset, match_string_left, yy,
             sFilterTextColor, LLFontGL::LEFT, LLFontGL::BOTTOM, LLFontGL::NORMAL, LLFontGL::NO_SHADOW,
             filter_string_length, S32_MAX, &right_x, FALSE );
     }
@@ -1002,11 +1002,11 @@ LLFolderViewFolder::LLFolderViewFolder( const LLFolderViewItem::Params& p ):
 	mCurHeight(0.f),
 	mTargetHeight(0.f),
 	mAutoOpenCountdown(0.f),
+	mIsFolderComplete(false), // folder might have children that are not loaded yet.
+	mAreChildrenInited(false), // folder might have children that are not built yet.
 	mLastArrangeGeneration( -1 ),
 	mLastCalculatedWidth(0)
 {
-	// folder might have children that are not loaded yet. Mark it as incomplete until chance to check it.
-	mIsFolderComplete = false;
 }
 
 void LLFolderViewFolder::updateLabelRotation()
@@ -1062,13 +1062,16 @@ S32 LLFolderViewFolder::arrange( S32* width, S32* height )
 {
 	// Sort before laying out contents
     // Note that we sort from the root (CHUI-849)
-	getRoot()->getFolderViewModel()->sort(this);
+    if (mAreChildrenInited)
+    {
+        getRoot()->getFolderViewModel()->sort(this);
+    }
 
 	LL_RECORD_BLOCK_TIME(FTM_ARRANGE);
 	
 	// evaluate mHasVisibleChildren
 	mHasVisibleChildren = false;
-	if (getViewModelItem()->descendantsPassedFilter())
+	if (mAreChildrenInited && getViewModelItem()->descendantsPassedFilter())
 	{
 		// We have to verify that there's at least one child that's not filtered out
 		bool found = false;
@@ -1094,7 +1097,7 @@ S32 LLFolderViewFolder::arrange( S32* width, S32* height )
 
 		mHasVisibleChildren = found;
 	}
-	if (!mIsFolderComplete)
+	if (!mIsFolderComplete && mAreChildrenInited)
 	{
 		mIsFolderComplete = getFolderViewModel()->isFolderComplete(this);
 	}
@@ -1607,7 +1610,7 @@ void LLFolderViewFolder::destroyView()
 
 // extractItem() removes the specified item from the folder, but
 // doesn't delete it.
-void LLFolderViewFolder::extractItem( LLFolderViewItem* item )
+void LLFolderViewFolder::extractItem( LLFolderViewItem* item, bool deparent_model )
 {
 	if (item->isSelected())
 		getRoot()->clearSelection();
@@ -1630,7 +1633,11 @@ void LLFolderViewFolder::extractItem( LLFolderViewItem* item )
 		mItems.erase(it);
 	}
 	//item has been removed, need to update filter
-	getViewModelItem()->removeChild(item->getViewModelItem());
+    if (deparent_model)
+    {
+        // in some cases model does not belong to parent view, is shared between views
+        getViewModelItem()->removeChild(item->getViewModelItem());
+    }
 	//because an item is going away regardless of filter status, force rearrange
 	requestArrange();
 	removeChild(item);

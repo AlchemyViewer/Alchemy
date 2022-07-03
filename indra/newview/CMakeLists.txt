@@ -8,18 +8,18 @@ include(00-Common)
 include(Linking)
 
 include(Boost)
-if (BUGSPLAT_DB)
-  include(bugsplat)
-endif (BUGSPLAT_DB)
+include(bugsplat)
 include(BuildPackagesInfo)
 include(BuildVersion)
 include(CMakeCopyIfDifferent)
+include(CubemapToEquirectangularJS)
 include(DBusGlib)
 include(DragDrop)
 include(EXPAT)
 include(FMODSTUDIO)
 include(GLOD)
 include(Hunspell)
+include(JPEGEncoderBasic)
 include(JsonCpp)
 include(LLAppearance)
 include(LLAudio)
@@ -39,7 +39,7 @@ include(LLPlugin)
 include(LLPrimitive)
 include(LLRender)
 include(LLUI)
-include(LLVFS)
+include(LLFileSystem)
 include(LLWindow)
 include(LLXML)
 include(NDOF)
@@ -49,6 +49,7 @@ include(OpenGL)
 include(OpenSSL)
 include(PNG)
 include(TemplateCheck)
+include(ThreeJS)
 include(UI)
 include(UnixInstall)
 include(ViewerMiscLibs)
@@ -84,7 +85,7 @@ include_directories(
     ${LLPRIMITIVE_INCLUDE_DIRS}
     ${LLRENDER_INCLUDE_DIRS}
     ${LLUI_INCLUDE_DIRS}
-    ${LLVFS_INCLUDE_DIRS}
+    ${LLFILESYSTEM_INCLUDE_DIRS}
     ${LLWINDOW_INCLUDE_DIRS}
     ${LLXML_INCLUDE_DIRS}
     ${LLLOGIN_INCLUDE_DIRS}
@@ -96,17 +97,17 @@ include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}
     )
 
-if (BUGSPLAT_DB)
-  include_directories(
-    ${BUGSPLAT_INCLUDE_DIR}
-    )
-endif (BUGSPLAT_DB)
-
 include_directories(SYSTEM
     ${LLCOMMON_SYSTEM_INCLUDE_DIRS}
     ${LLXML_SYSTEM_INCLUDE_DIRS}
     ${LLPHYSICSEXTENSIONS_INCLUDE_DIRS}
     )
+
+if (USE_BUGSPLAT)
+  include_directories(AFTER
+    ${BUGSPLAT_INCLUDE_DIR}
+    )
+endif (USE_BUGSPLAT)
 
 set(viewer_SOURCE_FILES
     groupchatlistener.cpp
@@ -207,6 +208,7 @@ set(viewer_SOURCE_FILES
     llfilteredwearablelist.cpp
     llfirstuse.cpp
     llflexibleobject.cpp
+    llfloater360capture.cpp
     llfloaterabout.cpp
     llfloaterbvhpreview.cpp
     llfloateraddpaymentmethod.cpp
@@ -280,7 +282,7 @@ set(viewer_SOURCE_FILES
     llfloaternamedesc.cpp
     llfloaternotificationsconsole.cpp
     llfloaternotificationstabbed.cpp
-    llfloateroutfitphotopreview.cpp 
+    llfloateroutfitphotopreview.cpp
     llfloateroutfitsnapshot.cpp
     llfloaterobjectweights.cpp
     llfloateropenobject.cpp
@@ -858,6 +860,7 @@ set(viewer_HEADER_FILES
     llfilteredwearablelist.h
     llfirstuse.h
     llflexibleobject.h
+    llfloater360capture.h
     llfloaterabout.h
     llfloaterbvhpreview.h
     llfloateraddpaymentmethod.h
@@ -1409,7 +1412,7 @@ file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/viewer_version.txt"
            "${VIEWER_SHORT_VERSION}.${VIEWER_VERSION_REVISION}\n")
 
 set_source_files_properties(
-   llversioninfo.cpp tests/llversioninfo_test.cpp 
+   llversioninfo.cpp tests/llversioninfo_test.cpp
    PROPERTIES
    COMPILE_DEFINITIONS "${VIEWER_CHANNEL_VERSION_DEFINES}" # see BuildVersion.cmake
    )
@@ -1449,11 +1452,11 @@ if (DARWIN)
     ${COREAUDIO_LIBRARY}
     )
 
-  if (BUGSPLAT_DB)
+  if (USE_BUGSPLAT)
     list(APPEND viewer_LIBRARIES
       ${BUGSPLAT_LIBRARIES}
       )
-  endif (BUGSPLAT_DB)
+  endif (USE_BUGSPLAT)
 
   # Add resource files to the project.
   set(viewer_RESOURCE_FILES
@@ -1774,6 +1777,10 @@ endif (HAVOK OR HAVOK_TPV)
 # progress view disables/enables icons based on available packages
 set_source_files_properties(llprogressview.cpp PROPERTIES COMPILE_FLAGS "${LLSTARTUP_COMPILE_FLAGS}")
 
+if (GLODLIB)
+  set_source_files_properties(llfloatermodelpreview.cpp PROPERTIES COMPILE_FLAGS "-DLL_GLOD")
+endif (GLODLIB)
+
 list(APPEND viewer_SOURCE_FILES ${viewer_HEADER_FILES})
 
 set_source_files_properties(${viewer_HEADER_FILES}
@@ -1791,10 +1798,10 @@ if (SDL_FOUND)
     )
 endif (SDL_FOUND)
 
-if (BUGSPLAT_DB)
+if (USE_BUGSPLAT)
   set_property(TARGET ${VIEWER_BINARY_NAME}
-    PROPERTY COMPILE_DEFINITIONS "LL_BUGSPLAT")
-endif (BUGSPLAT_DB)
+    PROPERTY COMPILE_DEFINITIONS "${BUGSPLAT_DEFINE}")
+endif (USE_BUGSPLAT)
 
 # add package files
 file(GLOB EVENT_HOST_SCRIPT_GLOB_LIST
@@ -1867,28 +1874,31 @@ if (WINDOWS)
       ${CMAKE_CURRENT_SOURCE_DIR}/licenses-win32.txt
       #${CMAKE_CURRENT_SOURCE_DIR}/featuretable.txt
       #${CMAKE_CURRENT_SOURCE_DIR}/featuretable_xp.txt
-      ${ARCH_PREBUILT_DIRS_RELEASE}/libeay32.dll
-      ${ARCH_PREBUILT_DIRS_RELEASE}/ssleay32.dll
-      #${ARCH_PREBUILT_DIRS_DEBUG}/libeay32.dll
-      #${ARCH_PREBUILT_DIRS_DEBUG}/ssleay32.dll
       ${viewer_APPSETTINGS_FILES}
       SLPlugin
       media_plugin_cef
       media_plugin_libvlc
       media_plugin_example
       #winmm_shim
-      windows-crash-logger
       )
+
+    if (NOT USE_BUGSPLAT)
+        LIST(APPEND COPY_INPUT_DEPENDENCIES windows-crash-logger)
+    endif (NOT USE_BUGSPLAT)
 
     if (ADDRESS_SIZE EQUAL 64)
         list(APPEND COPY_INPUT_DEPENDENCIES
             ${SHARED_LIB_STAGING_DIR}/${CMAKE_CFG_INTDIR}/vivoxsdk_x64.dll
             ${SHARED_LIB_STAGING_DIR}/${CMAKE_CFG_INTDIR}/ortp_x64.dll
+           ${ARCH_PREBUILT_DIRS_RELEASE}/libcrypto-1_1-x64.dll
+           ${ARCH_PREBUILT_DIRS_RELEASE}/libssl-1_1-x64.dll
             )
     else (ADDRESS_SIZE EQUAL 64)
         list(APPEND COPY_INPUT_DEPENDENCIES
             ${SHARED_LIB_STAGING_DIR}/${CMAKE_CFG_INTDIR}/vivoxsdk.dll
             ${SHARED_LIB_STAGING_DIR}/${CMAKE_CFG_INTDIR}/ortp.dll
+            ${ARCH_PREBUILT_DIRS_RELEASE}/libcrypto-1_1.dll
+            ${ARCH_PREBUILT_DIRS_RELEASE}/libssl-1_1.dll
             )
     endif (ADDRESS_SIZE EQUAL 64)
 
@@ -1944,7 +1954,6 @@ if (WINDOWS)
 
     add_dependencies(${VIEWER_BINARY_NAME}
       SLPlugin
-      windows-crash-logger
     )
 
     # sets the 'working directory' for debugging from visual studio.
@@ -2032,7 +2041,7 @@ endif (WINDOWS)
 # one of these being libz where you can find four or more versions in play
 # at once.  On Linux, libz can be found at link and run time via a number
 # of paths:
-#     
+#
 #      => -lfreetype
 #        => libz.so.1 (on install machine, not build)
 #      => -lSDL
@@ -2063,7 +2072,7 @@ target_link_libraries(${VIEWER_BINARY_NAME}
     ${LLRENDER_LIBRARIES}
     ${FREETYPE_LIBRARIES}
     ${LLUI_LIBRARIES}
-    ${LLVFS_LIBRARIES}
+    ${LLFILESYSTEM_LIBRARIES}
     ${LLWINDOW_LIBRARIES}
     ${LLXML_LIBRARIES}
     ${LLMATH_LIBRARIES}
@@ -2097,11 +2106,11 @@ target_link_libraries(${VIEWER_BINARY_NAME}
     ${LLAPPEARANCE_LIBRARIES}
     )
 
-if (BUGSPLAT_DB)
+if (USE_BUGSPLAT)
   target_link_libraries(${VIEWER_BINARY_NAME}
     ${BUGSPLAT_LIBRARIES}
     )
-endif (BUGSPLAT_DB)
+endif (USE_BUGSPLAT)
 
 set(ARTWORK_DIR ${CMAKE_CURRENT_SOURCE_DIR} CACHE PATH
     "Path to artwork files.")
@@ -2112,12 +2121,15 @@ if (LINUX)
   # These are the generated targets that are copied to package/
   set(COPY_INPUT_DEPENDENCIES
     ${VIEWER_BINARY_NAME}
-    linux-crash-logger
     SLPlugin
     media_plugin_gstreamer010
     media_plugin_libvlc
     llcommon
     )
+
+  if (NOT USE_BUGSPLAT)
+      LIST(APPEND COPY_INPUT_DEPENDENCIES linux-crash-logger)
+  endif (NOT USE_BUGSPLAT)
 
   add_custom_command(
       OUTPUT ${product}.tar.bz2
@@ -2200,7 +2212,7 @@ if (DARWIN)
 
   # https://blog.kitware.com/upcoming-in-cmake-2-8-12-osx-rpath-support/
   set(CMAKE_MACOSX_RPATH 1)
-  
+
   set_target_properties(
     ${VIEWER_BINARY_NAME}
     PROPERTIES
@@ -2210,8 +2222,8 @@ if (DARWIN)
     # SIGH, as of 2018-05-24 (cmake 3.11.1) the INSTALL_RPATH property simply
     # does not work. Try this:
     LINK_FLAGS "-rpath @loader_path/../Frameworks"
-    MACOSX_BUNDLE_INFO_PLIST
-    "${CMAKE_CURRENT_SOURCE_DIR}/Info-SecondLife.plist"
+    MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/Info-SecondLife.plist"
+    XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "${MACOSX_BUNDLE_GUI_IDENTIFIER}"
     )
 
   set(VIEWER_APP_BUNDLE "${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/${product}.app")
@@ -2249,8 +2261,7 @@ if (DARWIN)
       ${CMAKE_CURRENT_SOURCE_DIR}/viewer_manifest.py
     )
 
-  add_dependencies(${VIEWER_BINARY_NAME} SLPlugin media_plugin_libvlc media_plugin_cef mac-crash-logger)
-  add_dependencies(${VIEWER_BINARY_NAME} mac-crash-logger)
+  add_dependencies(${VIEWER_BINARY_NAME} SLPlugin media_plugin_libvlc media_plugin_cef)
 
   if (ENABLE_SIGNING)
       set(SIGNING_SETTING "--signature=${SIGNING_IDENTITY}")
@@ -2293,62 +2304,7 @@ endif (INSTALL)
 
 # Note that the conventional VIEWER_SYMBOL_FILE is set by ../../build.sh
 if (PACKAGE AND (RELEASE_CRASH_REPORTING OR NON_RELEASE_CRASH_REPORTING) AND VIEWER_SYMBOL_FILE)
-  if (NOT BUGSPLAT_DB)
-    # Breakpad symbol-file generation
-    set(SYMBOL_SEARCH_DIRS "")
-    if (WINDOWS)
-      list(APPEND SYMBOL_SEARCH_DIRS "${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}")
-      # slplugin.exe failing symbols dump - need to debug, might have to do with updated version of google breakpad
-      # set(VIEWER_EXE_GLOBS "${VIEWER_BINARY_NAME}${CMAKE_EXECUTABLE_SUFFIX} slplugin.exe")
-      set(VIEWER_EXE_GLOBS "${VIEWER_BINARY_NAME}${CMAKE_EXECUTABLE_SUFFIX}")
-      set(VIEWER_LIB_GLOB "*${CMAKE_SHARED_MODULE_SUFFIX}")
-      set(VIEWER_COPY_MANIFEST copy_w_viewer_manifest)
-    endif (WINDOWS)
-    if (DARWIN)
-      list(APPEND SYMBOL_SEARCH_DIRS "${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}")
-      # *TODO: Generate these search dirs in the cmake files related to each binary.
-      list(APPEND SYMBOL_SEARCH_DIRS "${CMAKE_BINARY_DIR}/llplugin/slplugin/${CMAKE_CFG_INTDIR}")
-      list(APPEND SYMBOL_SEARCH_DIRS "${CMAKE_BINARY_DIR}/mac_crash_logger/${CMAKE_CFG_INTDIR}")
-      list(APPEND SYMBOL_SEARCH_DIRS "${CMAKE_BINARY_DIR}/media_plugins/gstreamer010/${CMAKE_CFG_INTDIR}")
-      set(VIEWER_EXE_GLOBS "'${product}' SLPlugin mac-crash-logger")
-      set(VIEWER_EXE_GLOBS "'${product}' mac-crash-logger")
-      set(VIEWER_LIB_GLOB "*.dylib")
-    endif (DARWIN)
-    if (LINUX)
-      list(APPEND SYMBOL_SEARCH_DIRS "${CMAKE_CURRENT_BINARY_DIR}/packaged")
-      set(VIEWER_EXE_GLOBS "do-not-directly-run-secondlife-bin SLPlugin")
-      set(VIEWER_EXE_GLOBS "do-not-directly-run-secondlife-bin")
-      set(VIEWER_LIB_GLOB "*${CMAKE_SHARED_MODULE_SUFFIX}*")
-      set(VIEWER_COPY_MANIFEST copy_l_viewer_manifest)
-    endif (LINUX)
-
-    if(CMAKE_CFG_INTDIR STREQUAL ".")
-        set(LLBUILD_CONFIG ${CMAKE_BUILD_TYPE})
-    else(CMAKE_CFG_INTDIR STREQUAL ".")
-        # set LLBUILD_CONFIG to be a shell variable evaluated at build time
-        # reflecting the configuration we are currently building.
-        set(LLBUILD_CONFIG ${CMAKE_CFG_INTDIR})
-    endif(CMAKE_CFG_INTDIR STREQUAL ".")
-    add_custom_command(OUTPUT "${VIEWER_SYMBOL_FILE}"
-      COMMAND "${PYTHON_EXECUTABLE}"
-      ARGS
-        "${CMAKE_CURRENT_SOURCE_DIR}/generate_breakpad_symbols.py"
-        "${LLBUILD_CONFIG}"
-        "${SYMBOL_SEARCH_DIRS}"
-        "${VIEWER_EXE_GLOBS}"
-        "${VIEWER_LIB_GLOB}"
-        "${AUTOBUILD_INSTALL_DIR}/bin/dump_syms"
-        "${VIEWER_SYMBOL_FILE}"
-      DEPENDS generate_breakpad_symbols.py
-          VERBATIM)
-
-    add_custom_target(generate_symbols DEPENDS "${VIEWER_SYMBOL_FILE}" ${VIEWER_BINARY_NAME} "${VIEWER_COPY_MANIFEST}")
-    add_dependencies(generate_symbols ${VIEWER_BINARY_NAME})
-    if (WINDOWS OR LINUX)
-      add_dependencies(generate_symbols "${VIEWER_COPY_MANIFEST}")
-    endif (WINDOWS OR LINUX)
-
-  else (NOT BUGSPLAT_DB)
+  if (BUGSPLAT_DB)
     # BugSplat symbol-file generation
     if (WINDOWS)
       # Just pack up a tarball containing only the .pdb file for the
@@ -2432,9 +2388,9 @@ if (PACKAGE AND (RELEASE_CRASH_REPORTING OR NON_RELEASE_CRASH_REPORTING) AND VIE
     if (LINUX)
       # TBD
     endif (LINUX)
-  endif (NOT BUGSPLAT_DB)
+  endif (BUGSPLAT_DB)
 
-  # for both BUGSPLAT_DB and Breakpad
+  # for both Bugsplat and Breakpad
   add_dependencies(llpackage generate_symbols)
 endif ()
 
@@ -2458,7 +2414,7 @@ if (LL_TESTS)
     llworldmap.cpp
     llworldmipmap.cpp
     PROPERTIES
-    LL_TEST_ADDITIONAL_SOURCE_FILES 
+    LL_TEST_ADDITIONAL_SOURCE_FILES
     tests/llviewertexture_stub.cpp
     #llviewertexturelist.cpp
   )
@@ -2492,7 +2448,7 @@ if (LL_TESTS)
     llworldmap.cpp
     llworldmipmap.cpp
     PROPERTIES
-    LL_TEST_ADDITIONAL_SOURCE_FILES 
+    LL_TEST_ADDITIONAL_SOURCE_FILES
     tests/llviewertexture_stub.cpp
     #llviewertexturelist.cpp
     LL_TEST_ADDITIONAL_LIBRARIES "${BOOST_SYSTEM_LIBRARY}"
@@ -2539,7 +2495,7 @@ if (LL_TESTS)
   set(test_libs
     ${LLMESSAGE_LIBRARIES}
     ${WINDOWS_LIBRARIES}
-    ${LLVFS_LIBRARIES}
+    ${LLFILESYSTEM_LIBRARIES}
     ${LLMATH_LIBRARIES}
     ${LLCOMMON_LIBRARIES}
     ${GOOGLEMOCK_LIBRARIES}
@@ -2554,7 +2510,7 @@ if (LL_TESTS)
 
   set(test_libs
     ${WINDOWS_LIBRARIES}
-    ${LLVFS_LIBRARIES}
+    ${LLFILESYSTEM_LIBRARIES}
     ${LLMATH_LIBRARIES}
     ${LLCOMMON_LIBRARIES}
     ${LLMESSAGE_LIBRARIES}
@@ -2567,6 +2523,10 @@ if (LL_TESTS)
     ${BOOST_CONTEXT_LIBRARY}
   )
 
+  LL_ADD_INTEGRATION_TEST(cppfeatures
+    ""
+    "${test_libs}"
+    )
   LL_ADD_INTEGRATION_TEST(llsechandler_basic
     llsechandler_basic.cpp
     "${test_libs}"

@@ -30,18 +30,16 @@
 #include "llassetstorage.h"
 #include "llcorehttputil.h"
 
-class LLVFile;
+class LLFileSystem;
 
 class LLViewerAssetRequest;
 
 class LLViewerAssetStorage : public LLAssetStorage
 {
 public:
-	LLViewerAssetStorage(LLMessageSystem *msg, LLXferManager *xfer,
-				   LLVFS *vfs, LLVFS *static_vfs, const LLHost &upstream_host);
+	LLViewerAssetStorage(LLMessageSystem *msg, LLXferManager *xfer, const LLHost &upstream_host);
 
-	LLViewerAssetStorage(LLMessageSystem *msg, LLXferManager *xfer,
-				   LLVFS *vfs, LLVFS *static_vfs);
+	LLViewerAssetStorage(LLMessageSystem *msg, LLXferManager *xfer);
 
 	~LLViewerAssetStorage();
 
@@ -124,12 +122,13 @@ protected:
     wait_list_t mCoroWaitList;
 
     std::string mViewerAssetUrl;
-    S32 mAssetCoroCount;
     S32 mCountRequests;
     S32 mCountStarted;
     S32 mCountCompleted;
     S32 mCountSucceeded;
     S64 mTotalBytesFetched;
+
+    static S32 sAssetCoroCount; // coroutine count, static since coroutines can outlive LLViewerAssetStorage
 };
 
 #endif

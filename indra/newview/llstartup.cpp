@@ -82,7 +82,6 @@
 #include "llversioninfo.h"
 #include "llviewercontrol.h"
 #include "llviewerhelp.h"
-#include "llvfs.h"
 #include "llxorcipher.h"	// saved password, MAC address
 #include "llwindow.h"
 #include "message.h"
@@ -274,7 +273,7 @@ bool login_alert_status(const LLSD& notification, const LLSD& response);
 void login_packet_failed(void**, S32 result);
 void use_circuit_callback(void**, S32 result);
 void register_viewer_callbacks(LLMessageSystem* msg);
-void asset_callback_nothing(LLVFS*, const LLUUID&, LLAssetType::EType, void*, S32);
+void asset_callback_nothing(const LLUUID&, LLAssetType::EType, void*, S32);
 bool callback_choose_gender(const LLSD& notification, const LLSD& response);
 void init_start_screen(S32 location_id);
 void release_start_screen();
@@ -588,7 +587,7 @@ bool idle_startup()
 			// start the xfer system. by default, choke the downloads
 			// a lot...
 			const S32 VIEWER_MAX_XFER = 3;
-			start_xfer_manager(gVFS);
+			start_xfer_manager();
 			gXferManager->setMaxIncomingXfers(VIEWER_MAX_XFER);
 			F32 xfer_throttle_bps = gSavedSettings.getF32("XferThrottle");
 			if (xfer_throttle_bps > 1.f)
@@ -596,7 +595,7 @@ bool idle_startup()
 				gXferManager->setUseAckThrottling(TRUE);
 				gXferManager->setAckThrottleBPS(xfer_throttle_bps);
 			}
-			gAssetStorage = new LLViewerAssetStorage(msg, gXferManager, gVFS, gStaticVFS);
+			gAssetStorage = new LLViewerAssetStorage(msg, gXferManager);
 
 
 			F32 dropPercent = gSavedSettings.getF32("PacketDropPercentage");
@@ -1034,13 +1033,6 @@ bool idle_startup()
 
 		gViewerWindow->revealIntroPanel();
 
-		// Poke the VFS, which could potentially block for a while if
-		// Windows XP is acting up
-		set_startup_status(0.07f, LLTrans::getString("LoginVerifyingCache"), LLStringUtil::null);
-		display_startup();
-
-		gVFS->pokeFiles();
-
 		LLStartUp::setStartupState( STATE_LOGIN_AUTH_INIT );
 
 		return FALSE;
@@ -1206,6 +1198,10 @@ bool idle_startup()
 
 						}
 					}
+                    else if (reason_response == "BadType")
+                    {
+                        LLNotificationsUtil::add("LoginFailedToParse", LLSD(), LLSD(), login_alert_done);
+                    }
 					else if (!message.empty())
 					{
 						// This wasn't a certificate error, so throw up the normal
@@ -1852,6 +1848,17 @@ bool idle_startup()
 		// This method MUST be called before gInventory.findCategoryUUIDForType because of 
 		// gInventory.mIsAgentInvUsable is set to true in the gInventory.buildParentChildMap.
 		gInventory.buildParentChildMap();
+
+		// If buildParentChildMap succeeded, inventory will now be in
+		// a usable state and gInventory.isInventoryUsable() will be
+		// true.
+
+		// if inventory is unusable, show warning.
+		if (!gInventory.isInventoryUsable())
+		{
+			LLNotificationsUtil::add("InventoryUnusable");
+		}
+		
 		gInventory.createCommonSystemCategories();
 
 		// It's debatable whether this flag is a good idea - sets all
@@ -1862,9 +1869,6 @@ bool idle_startup()
 		gInventory.notifyObservers();
 		
 		display_startup();
-
-		//all categories loaded. lets create "My Favorites" category
-		gInventory.findCategoryUUIDForType(LLFolderType::FT_FAVORITE,true);
 
 		// set up callbacks
 		LL_INFOS() << "Registering Callbacks" << LL_ENDL;
@@ -1895,6 +1899,7 @@ bool idle_startup()
 // [/RLVa:KB]
 		LLStartUp::setStartupState( STATE_MISC );
 		display_startup();
+
 		return FALSE;
 	}
 
@@ -2184,7 +2189,10 @@ bool idle_startup()
 
 		if (gAgent.isOutfitChosen() && (wearables_time > max_wearables_time))
 		{
-			LLNotificationsUtil::add("ClothingLoading");
+			if (gInventory.isInventoryUsable())
+			{
+				LLNotificationsUtil::add("ClothingLoading");
+			}			
 			record(LLStatViewer::LOADING_WEARABLES_LONG_DELAY, wearables_time);
 			LLStartUp::setStartupState( STATE_CLEANUP );
 		}
@@ -2640,7 +2648,7 @@ void register_viewer_callbacks(LLMessageSystem* msg)
 	msg->setHandlerFuncFast(_PREHASH_FeatureDisabled, process_feature_disabled_message);
 }
 
-void asset_callback_nothing(LLVFS*, const LLUUID&, LLAssetType::EType, void*, S32)
+void asset_callback_nothing(const LLUUID&, LLAssetType::EType, void*, S32)
 {
 	// nothing
 }
@@ -2853,6 +2861,11 @@ void reset_login()
 	// Hide any other stuff
 	LLFloaterReg::hideVisibleInstances();
     LLStartUp::setStartupState( STATE_BROWSER_INIT );
+
+    // Clear any verified certs and verify them again on next login
+    // to ensure cert matches server instead of just getting reused
+    LLPointer<LLCertificateStore> store = gSecAPIHandler->getCertificateStore("");
+    store->clearSertCache();
 }
 
 //---------------------------------------------------------------------------

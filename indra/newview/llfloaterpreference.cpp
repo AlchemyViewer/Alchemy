@@ -264,9 +264,9 @@ std::string LLFloaterPreference::sSkin = "";
 LLFloaterPreference::LLFloaterPreference(const LLSD& key)
 	: LLFloater(key),
 	mGotPersonalInfo(false),
-	mOriginalIMViaEmail(false),
 	mLanguageChanged(false),
-	mAvatarDataInitialized(false)
+	mAvatarDataInitialized(false),
+	mSearchDataDirty(true)
 {
 	LLConversationLog::instance().addObserver(this);
 
@@ -559,11 +559,9 @@ void LLFloaterPreference::apply()
 	
 	if (mGotPersonalInfo)
 	{ 
-		bool new_im_via_email = getChild<LLUICtrl>("send_im_to_email")->getValue().asBoolean();
 		bool new_hide_online = getChild<LLUICtrl>("online_visibility")->getValue().asBoolean();		
 	
-		if ((new_im_via_email != mOriginalIMViaEmail)
-			||(new_hide_online != mOriginalHideOnlineStatus))
+		if (new_hide_online != mOriginalHideOnlineStatus)
 		{
 			// This hack is because we are representing several different 	 
 			// possible strings with a single checkbox. Since most users 	 
@@ -577,7 +575,7 @@ void LLFloaterPreference::apply()
 			 //Update showonline value, otherwise multiple applys won't work
 				mOriginalHideOnlineStatus = new_hide_online;
 			}
-			gAgent.sendAgentUpdateUserInfo(new_im_via_email,mDirectoryVisibility);
+			gAgent.sendAgentUpdateUserInfo(mDirectoryVisibility);
 		}
 	}
 
@@ -982,12 +980,12 @@ void LLFloaterPreference::onBtnCancel(const LLSD& userdata)
 }
 
 // static 
-void LLFloaterPreference::updateUserInfo(const std::string& visibility, bool im_via_email, bool is_verified_email)
+void LLFloaterPreference::updateUserInfo(const std::string& visibility)
 {
 	LLFloaterPreference* instance = LLFloaterReg::findTypedInstance<LLFloaterPreference>("preferences");
 	if (instance)
 	{
-        instance->setPersonalInfo(visibility, im_via_email, is_verified_email);
+        instance->setPersonalInfo(visibility);
 	}
 }
 
@@ -1711,10 +1709,9 @@ bool LLFloaterPreference::moveTranscriptsAndLog()
 	return true;
 }
 
-void LLFloaterPreference::setPersonalInfo(const std::string& visibility, bool im_via_email, bool is_verified_email)
+void LLFloaterPreference::setPersonalInfo(const std::string& visibility)
 {
 	mGotPersonalInfo = true;
-	mOriginalIMViaEmail = im_via_email;
 	mDirectoryVisibility = visibility;
 	
 	if (visibility == VISIBILITY_DEFAULT)
@@ -1736,16 +1733,7 @@ void LLFloaterPreference::setPersonalInfo(const std::string& visibility, bool im
 	getChildView("friends_online_notify_checkbox")->setEnabled(TRUE);
 	getChild<LLUICtrl>("online_visibility")->setValue(mOriginalHideOnlineStatus); 	 
 	getChild<LLUICtrl>("online_visibility")->setLabelArg("[DIR_VIS]", mDirectoryVisibility);
-	getChildView("send_im_to_email")->setEnabled(is_verified_email);
 
-    std::string tooltip;
-    if (!is_verified_email)
-        tooltip = getString("email_unverified_tooltip");
-
-    getChildView("send_im_to_email")->setToolTip(tooltip);
-
-    // *TODO: Show or hide verify email text here based on is_verified_email
-    getChild<LLUICtrl>("send_im_to_email")->setValue(im_via_email);
 	getChildView("favorites_on_login_check")->setEnabled(TRUE);
 	getChildView("log_path_button")->setEnabled(TRUE);
 	getChildView("chat_font_size")->setEnabled(TRUE);
@@ -2168,6 +2156,11 @@ void LLFloaterPreference::updateClickActionViews()
 	getChild<LLComboBox>("double_click_action_combo")->setValue(dbl_click_to_teleport ? 2 : (int)dbl_click_to_walk);
 }
 
+void LLFloaterPreference::updateSearchableItems()
+{
+    mSearchDataDirty = true;
+}
+
 void LLFloaterPreference::applyUIColor(LLUICtrl* ctrl, const LLSD& param)
 {
 	LLUIColorTable::instance().setColor(param.asString(), LLColor4(ctrl->getValue()));
@@ -2350,7 +2343,7 @@ BOOL LLPanelPreference::postBuild()
 	}
 
 	//////////////////////PanelSetup ///////////////////
-	if (hasChild("max_bandwidth"), TRUE)
+	if (hasChild("max_bandwidth", TRUE))
 	{
 		mBandWidthUpdater = new LLPanelPreference::Updater(boost::bind(&handleBandwidthChanged, _1), BANDWIDTH_UPDATER_TIMEOUT);
 		gSavedSettings.getControl("ThrottleBandwidthKBPS")->getSignal()->connect(boost::bind(&LLPanelPreference::Updater::update, mBandWidthUpdater, _2));
@@ -2924,10 +2917,19 @@ void LLPanelPreferenceControls::populateControlTable()
         filename = "control_table_contents_columns_basic.xml";
         break;
     default:
-        // Either unknown mode or MODE_SAVED_SETTINGS
-        // It doesn't have UI or actual settings yet
-        LL_INFOS() << "Unimplemented mode" << LL_ENDL;
-        return;
+        {
+            // Either unknown mode or MODE_SAVED_SETTINGS
+            // It doesn't have UI or actual settings yet
+            LL_WARNS() << "Unimplemented mode" << LL_ENDL;
+
+            // Searchable columns were removed, mark searchables for an update
+            LLFloaterPreference* instance = LLFloaterReg::findTypedInstance<LLFloaterPreference>("preferences");
+            if (instance)
+            {
+                instance->updateSearchableItems();
+            }
+            return;
+        }
     }
     addControlTableColumns(filename);
 
@@ -2958,8 +2960,18 @@ void LLPanelPreferenceControls::populateControlTable()
     }
     else
     {
-        LL_INFOS() << "Unimplemented mode" << LL_ENDL;
-        return;
+        LL_WARNS() << "Unimplemented mode" << LL_ENDL;
+    }
+
+    // explicit update to make sure table is ready for llsearchableui
+    pControlsTable->updateColumns();
+
+    // Searchable columns were removed and readded, mark searchables for an update
+    // Note: at the moment tables/lists lack proper llsearchableui support
+    LLFloaterPreference* instance = LLFloaterReg::findTypedInstance<LLFloaterPreference>("preferences");
+    if (instance)
+    {
+        instance->updateSearchableItems();
     }
 }
 
@@ -3202,7 +3214,12 @@ void LLPanelPreferenceControls::setKeyBind(const std::string &control, EMouseCli
                 break;
             }
         }
-        mConflictHandler[mode].registerControl(control, index, click, key, mask, true);
+        // At the moment 'ignore_mask' mask is mostly ignored, a placeholder
+        // Todo: implement it since it's preferable for things like teleport to match
+        // mask exactly but for things like running to ignore additional masks
+        // Ideally this needs representation in keybindings UI
+        bool ignore_mask = true;
+        mConflictHandler[mode].registerControl(control, index, click, key, mask, ignore_mask);
     }
     else if (!set)
     {
@@ -3577,6 +3594,12 @@ void LLFloaterPreference::onUpdateFilterTerm(bool force)
 	if( !mSearchData || (mSearchData->mLastFilter == seachValue && !force))
 		return;
 
+    if (mSearchDataDirty)
+    {
+        // Data exists, but is obsolete, regenerate
+        collectSearchableItems();
+    }
+
 	mSearchData->mLastFilter = seachValue;
 
 	if( !mSearchData->mRootTab )
@@ -3674,4 +3697,5 @@ void LLFloaterPreference::collectSearchableItems()
 
 		collectChildren( this, ll::prefs::PanelDataPtr(), pRootTabcontainer );
 	}
+	mSearchDataDirty = false;
 }

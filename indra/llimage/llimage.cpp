@@ -1456,7 +1456,7 @@ bool LLImageRaw::scale( S32 new_width, S32 new_height, bool scale_image_data )
             setDataAndSize(new_data, new_width, new_height, components); 
 		}
 	}
-	else
+	else try
 	{
 		// copy	out	existing image data
 		S32	temp_data_size = old_width * old_height	* components;
@@ -1490,6 +1490,11 @@ bool LLImageRaw::scale( S32 new_width, S32 new_height, bool scale_image_data )
             }
         }
 	}
+    catch (std::bad_alloc&) // for temp_buffer
+    {
+        LL_WARNS() << "Failed to allocate temporary image buffer" << LL_ENDL;
+        return false;
+    }
 
 	return true ;
 }
@@ -2219,19 +2224,10 @@ bool LLImageFormatted::save(const std::string &filename)
 	return true;
 }
 
-// bool LLImageFormatted::save(LLVFS *vfs, const LLUUID &uuid, LLAssetType::EType type)
-// Depricated to remove VFS dependency.
-// Use:
-// LLVFile::writeFile(image->getData(), image->getDataSize(), vfs, uuid, type);
-
-//----------------------------------------------------------------------------
-
 S8 LLImageFormatted::getCodec() const
 {
 	return mCodec;
 }
-
-//============================================================================
 
 static void avg4_colors4(const U8* a, const U8* b, const U8* c, const U8* d, U8* dst)
 {

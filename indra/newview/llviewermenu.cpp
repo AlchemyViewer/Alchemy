@@ -210,6 +210,7 @@ LLContextMenu* gDetachBodyPartPieMenus[9];
 
 // File Menu
 void handle_compress_image(void*);
+void handle_compress_file_test(void*);
 
 
 // Edit menu
@@ -299,6 +300,8 @@ void force_error_bad_memory_access(void *);
 void force_error_infinite_loop(void *);
 void force_error_software_exception(void *);
 void force_error_driver_crash(void *);
+void force_error_coroutine_crash(void *);
+void force_error_thread_crash(void *);
 
 void handle_force_delete(void*);
 void print_object_info(void*);
@@ -366,11 +369,21 @@ LLMenuParcelObserver::~LLMenuParcelObserver()
 void LLMenuParcelObserver::changed()
 {
 	LLParcel *parcel = LLViewerParcelMgr::getInstance()->getParcelSelection()->getParcel();
-	gMenuHolder->childSetEnabled("Land Buy Pass", LLPanelLandGeneral::enableBuyPass(NULL) && !(parcel->getOwnerID()== gAgent.getID()));
-	
-	BOOL buyable = enable_buy_land(NULL);
-	gMenuHolder->childSetEnabled("Land Buy", buyable);
-	gMenuHolder->childSetEnabled("Buy Land...", buyable);
+    if (gMenuLand && parcel)
+    {
+        LLView* child = gMenuLand->findChild<LLView>("Land Buy Pass");
+        if (child)
+        {
+            child->setEnabled(LLPanelLandGeneral::enableBuyPass(NULL) && !(parcel->getOwnerID() == gAgent.getID()));
+        }
+
+        child = gMenuLand->findChild<LLView>("Land Buy");
+        if (child)
+        {
+            BOOL buyable = enable_buy_land(NULL);
+            child->setEnabled(buyable);
+        }
+    }
 }
 
 
@@ -1285,9 +1298,52 @@ class LLAdvancedDumpScriptedCamera : public view_listener_t
 class LLAdvancedDumpRegionObjectCache : public view_listener_t
 {
 	bool handleEvent(const LLSD& userdata)
-{
+	{
 		handle_dump_region_object_cache(NULL);
 		return true;
+	}
+};
+
+class LLAdvancedInterestListFullUpdate : public view_listener_t
+{
+	bool handleEvent(const LLSD& userdata)
+	{
+		LLSD request;
+		LLSD body;
+		static bool using_360 = false;
+
+		if (using_360)
+		{
+			body["mode"] = LLSD::String("default");
+		}
+		else
+		{
+			body["mode"] = LLSD::String("360");
+		}
+		using_360 = !using_360;
+
+        if (gAgent.requestPostCapability("InterestList", body, [](const LLSD& response)
+        {
+            LL_INFOS("360Capture") <<
+                "InterestList capability responded: \n" <<
+                ll_pretty_print_sd(response) <<
+                LL_ENDL;
+        }))
+        {
+            LL_INFOS("360Capture") <<
+                "Successfully posted an InterestList capability request with payload: \n" <<
+                ll_pretty_print_sd(body) <<
+                LL_ENDL;
+            return true;
+        }
+        else
+        {
+            LL_INFOS("360Capture") <<
+                "Unable to post an InterestList capability request with payload: \n" <<
+                ll_pretty_print_sd(body) <<
+                LL_ENDL;
+            return false;
+        }
 	}
 };
 
@@ -2202,6 +2258,21 @@ class LLAdvancedCompressImage : public view_listener_t
 };
 
 
+
+////////////////////////
+// COMPRESS FILE TEST //
+////////////////////////
+
+class LLAdvancedCompressFileTest : public view_listener_t
+{
+    bool handleEvent(const LLSD& userdata)
+    {
+        handle_compress_file_test(NULL);
+        return true;
+    }
+};
+
+
 /////////////////////////
 // SHOW DEBUG SETTINGS //
 /////////////////////////
@@ -2340,11 +2411,10 @@ class LLAdvancedLeaveAdminStatus : public view_listener_t
 // Advanced > Debugging //
 //////////////////////////
 
-
 class LLAdvancedForceErrorBreakpoint : public view_listener_t
 {
 	bool handleEvent(const LLSD& userdata)
-	{
+	{		
 		force_error_breakpoint(NULL);
 		return true;
 	}
@@ -2392,6 +2462,24 @@ class LLAdvancedForceErrorDriverCrash : public view_listener_t
 		force_error_driver_crash(NULL);
 		return true;
 	}
+};
+
+class LLAdvancedForceErrorCoroutineCrash : public view_listener_t
+{
+    bool handleEvent(const LLSD& userdata)
+    {
+        force_error_coroutine_crash(NULL);
+        return true;
+    }
+};
+
+class LLAdvancedForceErrorThreadCrash : public view_listener_t
+{
+    bool handleEvent(const LLSD& userdata)
+    {
+        force_error_thread_crash(NULL);
+        return true;
+    }
 };
 
 class LLAdvancedForceErrorDisconnectViewer : public view_listener_t
@@ -4265,30 +4353,36 @@ void near_sit_down_point(BOOL success, void *)
 
 class LLLandSit : public view_listener_t
 {
-	bool handleEvent(const LLSD& userdata)
-	{
+    bool handleEvent(const LLSD& userdata)
+    {
 // [RLVa:KB] - Checked: 2010-09-28 (RLVa-1.2.1f) | Modified: RLVa-1.2.1f
 		if ( (rlv_handler_t::isEnabled()) && ((!RlvActions::canStand()) || (gRlvHandler.hasBehaviour(RLV_BHVR_SIT))) )
 			return true;
 // [/RLVa:KB]
 
-		gAgent.standUp();
-		LLViewerParcelMgr::getInstance()->deselectLand();
+        LLVector3d posGlobal = LLToolPie::getInstance()->getPick().mPosGlobal;
 
-		LLVector3d posGlobal = LLToolPie::getInstance()->getPick().mPosGlobal;
-		
-		LLQuaternion target_rot;
-		if (isAgentAvatarValid())
-		{
-			target_rot = gAgentAvatarp->getRotation();
-		}
-		else
-		{
-			target_rot = gAgent.getFrameAgent().getQuaternion();
-		}
-		gAgent.startAutoPilotGlobal(posGlobal, "Sit", &target_rot, near_sit_down_point, NULL, 0.7f);
-		return true;
-	}
+        LLQuaternion target_rot;
+        if (isAgentAvatarValid())
+        {
+            target_rot = gAgentAvatarp->getRotation();
+        }
+        else
+        {
+            target_rot = gAgent.getFrameAgent().getQuaternion();
+        }
+        gAgent.startAutoPilotGlobal(posGlobal, "Sit", &target_rot, near_sit_down_point, NULL, 0.7f);
+        return true;
+    }
+};
+
+class LLLandCanSit : public view_listener_t
+{
+    bool handleEvent(const LLSD& userdata)
+    {
+        LLVector3d posGlobal = LLToolPie::getInstance()->getPick().mPosGlobal;
+        return !posGlobal.isExactlyZero(); // valid position, not beyond draw distance
+    }
 };
 
 //-------------------------------------------------------------------
@@ -6389,6 +6483,32 @@ class LLAvatarToggleMyProfile : public view_listener_t
 	}
 };
 
+class LLAvatarToggleSearch : public view_listener_t
+{
+	bool handleEvent(const LLSD& userdata)
+	{
+		LLFloater* instance = LLFloaterReg::findInstance("search");
+		if (LLFloater::isMinimized(instance))
+		{
+			instance->setMinimized(FALSE);
+			instance->setFocus(TRUE);
+		}
+		else if (!LLFloater::isShown(instance))
+		{
+			LLFloaterReg::showInstance("search");
+		}
+		else if (!instance->hasFocus() && !instance->getIsChrome())
+		{
+			instance->setFocus(TRUE);
+		}
+		else
+		{
+			instance->closeFloater();
+		}
+		return true;
+	}
+};
+
 class LLAvatarResetSkeleton: public view_listener_t
 {
     bool handleEvent(const LLSD& userdata)
@@ -7624,7 +7744,7 @@ namespace
 	};
 }
 
-void queue_actions(LLFloaterScriptQueue* q, const std::string& msg)
+bool queue_actions(LLFloaterScriptQueue* q, const std::string& msg)
 {
 	QueueObjects func(q);
 	LLSelectMgr *mgr = LLSelectMgr::getInstance();
@@ -7646,6 +7766,7 @@ void queue_actions(LLFloaterScriptQueue* q, const std::string& msg)
 		{
 			LL_ERRS() << "Bad logic." << LL_ENDL;
 		}
+		q->closeFloater();
 	}
 	else
 	{
@@ -7654,6 +7775,7 @@ void queue_actions(LLFloaterScriptQueue* q, const std::string& msg)
 			LL_WARNS() << "Unexpected script compile failure." << LL_ENDL;
 		}
 	}
+	return !fail;
 }
 
 class LLToolsSelectedScriptAction : public view_listener_t
@@ -7712,8 +7834,10 @@ class LLToolsSelectedScriptAction : public view_listener_t
 		if (queue)
 		{
 			queue->setMono(mono);
-			queue_actions(queue, msg);
-			queue->setTitle(title);
+			if (queue_actions(queue, msg))
+			{
+				queue->setTitle(title);
+			}			
 		}
 		else
 		{
@@ -8494,6 +8618,16 @@ void force_error_driver_crash(void *)
     LLAppViewer::instance()->forceErrorDriverCrash();
 }
 
+void force_error_coroutine_crash(void *)
+{
+    LLAppViewer::instance()->forceErrorCoroutineCrash();
+}
+
+void force_error_thread_crash(void *)
+{
+    LLAppViewer::instance()->forceErrorThreadCrash();
+}
+
 class LLToolsUseSelectionForGrid : public view_listener_t
 {
 	bool handleEvent(const LLSD& userdata)
@@ -8953,7 +9087,7 @@ class LLEditEnableTakeOff : public view_listener_t
 	bool handleEvent(const LLSD& userdata)
 	{
 		std::string clothing = userdata.asString();
-		LLWearableType::EType type = LLWearableType::typeNameToType(clothing);
+		LLWearableType::EType type = LLWearableType::getInstance()->typeNameToType(clothing);
 //		if (type >= LLWearableType::WT_SHAPE && type < LLWearableType::WT_COUNT)
 // [RLVa:KB] - Checked: 2010-03-20 (RLVa-1.2.0c) | Modified: RLVa-1.2.0a
 		// NOTE: see below - enable if there is at least one wearable on this type that can be removed
@@ -8976,7 +9110,7 @@ class LLEditTakeOff : public view_listener_t
 			LLAppearanceMgr::instance().removeAllClothesFromAvatar();
 		else
 		{
-			LLWearableType::EType type = LLWearableType::typeNameToType(clothing);
+			LLWearableType::EType type = LLWearableType::getInstance()->typeNameToType(clothing);
 			if (type >= LLWearableType::WT_SHAPE 
 				&& type < LLWearableType::WT_COUNT
 				&& (gAgentWearables.getWearableCount(type) > 0))
@@ -9624,6 +9758,7 @@ void initialize_menus()
 	// Advanced > World
 	view_listener_t::addMenu(new LLAdvancedDumpScriptedCamera(), "Advanced.DumpScriptedCamera");
 	view_listener_t::addMenu(new LLAdvancedDumpRegionObjectCache(), "Advanced.DumpRegionObjectCache");
+	view_listener_t::addMenu(new LLAdvancedInterestListFullUpdate(), "Advanced.InterestListFullUpdate");
 
 	// Advanced > UI
 	commit.add("Advanced.WebBrowserTest", boost::bind(&handle_web_browser_test,	_2));	// sigh! this one opens the MEDIA browser
@@ -9714,12 +9849,15 @@ void initialize_menus()
 	view_listener_t::addMenu(new LLAdvancedForceErrorInfiniteLoop(), "Advanced.ForceErrorInfiniteLoop");
 	view_listener_t::addMenu(new LLAdvancedForceErrorSoftwareException(), "Advanced.ForceErrorSoftwareException");
 	view_listener_t::addMenu(new LLAdvancedForceErrorDriverCrash(), "Advanced.ForceErrorDriverCrash");
+    view_listener_t::addMenu(new LLAdvancedForceErrorCoroutineCrash(), "Advanced.ForceErrorCoroutineCrash");
+    view_listener_t::addMenu(new LLAdvancedForceErrorThreadCrash(), "Advanced.ForceErrorThreadCrash");
 	view_listener_t::addMenu(new LLAdvancedForceErrorDisconnectViewer(), "Advanced.ForceErrorDisconnectViewer");
 
 	// Advanced (toplevel)
 	view_listener_t::addMenu(new LLAdvancedToggleShowObjectUpdates(), "Advanced.ToggleShowObjectUpdates");
 	view_listener_t::addMenu(new LLAdvancedCheckShowObjectUpdates(), "Advanced.CheckShowObjectUpdates");
 	view_listener_t::addMenu(new LLAdvancedCompressImage(), "Advanced.CompressImage");
+    view_listener_t::addMenu(new LLAdvancedCompressFileTest(), "Advanced.CompressFileTest");
 	view_listener_t::addMenu(new LLAdvancedShowDebugSettings(), "Advanced.ShowDebugSettings");
 	view_listener_t::addMenu(new LLAdvancedEnableViewAdminOptions(), "Advanced.EnableViewAdminOptions");
 	view_listener_t::addMenu(new LLAdvancedToggleViewAdminOptions(), "Advanced.ToggleViewAdminOptions");
@@ -9787,6 +9925,7 @@ void initialize_menus()
 // [/RLVa:KB]
 	view_listener_t::addMenu(new LLAvatarReportAbuse(), "Avatar.ReportAbuse");
 	view_listener_t::addMenu(new LLAvatarToggleMyProfile(), "Avatar.ToggleMyProfile");
+	view_listener_t::addMenu(new LLAvatarToggleSearch(), "Avatar.ToggleSearch");
 	view_listener_t::addMenu(new LLAvatarResetSkeleton(), "Avatar.ResetSkeleton");
 	view_listener_t::addMenu(new LLAvatarEnableResetSkeleton(), "Avatar.EnableResetSkeleton");
 	view_listener_t::addMenu(new LLAvatarResetSkeletonAndAnimations(), "Avatar.ResetSkeletonAndAnimations");
@@ -9848,6 +9987,7 @@ void initialize_menus()
 	// Land pie menu
 	view_listener_t::addMenu(new LLLandBuild(), "Land.Build");
 	view_listener_t::addMenu(new LLLandSit(), "Land.Sit");
+    view_listener_t::addMenu(new LLLandCanSit(), "Land.CanSit");
 	view_listener_t::addMenu(new LLLandBuyPass(), "Land.BuyPass");
 	view_listener_t::addMenu(new LLLandEdit(), "Land.Edit");
 

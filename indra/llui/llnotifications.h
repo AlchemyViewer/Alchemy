@@ -84,8 +84,6 @@
 #include <sstream>
 
 #include <boost/utility.hpp>
-#include <boost/shared_ptr.hpp>
-#include <boost/enable_shared_from_this.hpp>
 #include <boost/type_traits.hpp>
 #include <boost/signals2.hpp>
 #include <boost/range.hpp>
@@ -132,7 +130,7 @@ public:
 
 typedef boost::function<void (const LLSD&, const LLSD&)> LLNotificationResponder;
 
-typedef boost::shared_ptr<LLNotificationResponderInterface> LLNotificationResponderPtr;
+typedef std::shared_ptr<LLNotificationResponderInterface> LLNotificationResponderPtr;
 
 typedef LLFunctorRegistry<LLNotificationResponder> LLNotificationFunctorRegistry;
 typedef LLFunctorRegistration<LLNotificationResponder> LLNotificationFunctorRegistration;
@@ -277,19 +275,19 @@ private:
 	bool								mInvertSetting;
 };
 
-typedef boost::shared_ptr<LLNotificationForm> LLNotificationFormPtr;
+typedef std::shared_ptr<LLNotificationForm> LLNotificationFormPtr;
 
 
 struct LLNotificationTemplate;
 
 // we want to keep a map of these by name, and it's best to manage them
 // with smart pointers
-typedef boost::shared_ptr<LLNotificationTemplate> LLNotificationTemplatePtr;
+typedef std::shared_ptr<LLNotificationTemplate> LLNotificationTemplatePtr;
 
 
 struct LLNotificationVisibilityRule;
 
-typedef boost::shared_ptr<LLNotificationVisibilityRule> LLNotificationVisibilityRulePtr;
+typedef std::shared_ptr<LLNotificationVisibilityRule> LLNotificationVisibilityRulePtr;
 
 /**
  * @class LLNotification
@@ -305,7 +303,7 @@ typedef boost::shared_ptr<LLNotificationVisibilityRule> LLNotificationVisibility
  */
 class LLNotification  : 
 	boost::noncopyable,
-	public boost::enable_shared_from_this<LLNotification>
+	public std::enable_shared_from_this<LLNotification>
 {
 LOG_CLASS(LLNotification);
 friend class LLNotifications;
@@ -748,7 +746,14 @@ public:
 	:	mFilter(filter), 
 		mItems() 
 	{}
-	virtual ~LLNotificationChannelBase() {}
+    virtual ~LLNotificationChannelBase()
+    {
+        // explicit cleanup for easier issue detection
+        mChanged.disconnect_all_slots();
+        mPassedFilter.disconnect_all_slots();
+        mFailedFilter.disconnect_all_slots();
+        mItems.clear();
+    }
 	// you can also connect to a Channel, so you can be notified of
 	// changes to this channel
     LLBoundListener connectChanged(const LLEventListener& slot)
@@ -878,6 +883,7 @@ class LLNotifications :
 {
 	LLSINGLETON(LLNotifications);
 	LOG_CLASS(LLNotifications);
+	virtual ~LLNotifications() {}
 
 public:
 
@@ -915,6 +921,7 @@ public:
 	LLNotificationPtr add(const LLNotification::Params& p);
 
 	void add(const LLNotificationPtr pNotif);
+	void load(const LLNotificationPtr pNotif);
 	void cancel(LLNotificationPtr pNotif);
 	void cancelByName(const std::string& name);
 	void cancelByOwner(const LLUUID ownerId);
@@ -1075,7 +1082,11 @@ public:
 	LLPersistentNotificationChannel() 
 		:	LLNotificationChannel("Persistent", "Visible", &notificationFilter)
 	{}
-	virtual ~LLPersistentNotificationChannel() {}
+
+    virtual ~LLPersistentNotificationChannel()
+    {
+        mHistory.clear();
+    }
 
 	typedef std::vector<LLNotificationPtr> history_list_t;
 	history_list_t::iterator beginHistory() { sortHistory(); return mHistory.begin(); }
@@ -1107,6 +1118,11 @@ private:
 	}
 
 	void onAdd(LLNotificationPtr p) 
+	{
+		mHistory.push_back(p);
+	}
+
+	void onLoad(LLNotificationPtr p) 
 	{
 		mHistory.push_back(p);
 	}

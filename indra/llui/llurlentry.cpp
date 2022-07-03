@@ -35,6 +35,7 @@
 
 #include "llavatarnamecache.h"
 #include "llcachename.h"
+#include "llregex.h"
 #include "lltrans.h"
 #include "lluicolortable.h"
 #include "message.h"
@@ -176,16 +177,56 @@ void LLUrlEntryBase::callObservers(const std::string &id,
 bool LLUrlEntryBase::isLinkDisabled() const
 {
 	// this allows us to have a global setting to turn off text hyperlink highlighting/action
-	bool globally_disabled = LLUI::getInstance()->mSettingGroups["config"]->getBOOL("DisableTextHyperlinkActions");
+	static LLCachedControl<bool> globally_disabled(*LLUI::getInstance()->mSettingGroups["config"], "DisableTextHyperlinkActions", false);
 
 	return globally_disabled;
 }
 
-bool LLUrlEntryBase::isWikiLinkCorrect(std::string url)
+bool LLUrlEntryBase::isWikiLinkCorrect(const std::string &labeled_url) const
 {
-	LLWString label = utf8str_to_wstring(getLabelFromWikiLink(url));
-	label.erase(std::remove(label.begin(), label.end(), L'\u200B'), label.end());
-	return (LLUrlRegistry::instance().hasUrl(wstring_to_utf8str(label))) ? false : true;
+	LLWString wlabel = utf8str_to_wstring(getLabelFromWikiLink(labeled_url));
+	wlabel.erase(std::remove(wlabel.begin(), wlabel.end(), L'\u200B'), wlabel.end());
+
+    // Unicode URL validation, see SL-15243
+    std::replace_if(wlabel.begin(),
+                    wlabel.end(),
+                    [](const llwchar &chr)
+                    {
+                        return (chr == L'\u2024') // "One Dot Leader"
+                               || (chr == L'\uFE52') // "Small Full Stop"
+                               || (chr == L'\uFF0E') // "Fullwidth Full Stop"
+                               // Not a decomposition, but suficiently similar
+                               || (chr == L'\u05C5'); // "Hebrew Mark Lower Dot"
+                    },
+                    L'\u002E'); // Dot "Full Stop"
+
+    std::replace_if(wlabel.begin(),
+        wlabel.end(),
+        [](const llwchar &chr)
+    {
+        return (chr == L'\u02D0') // "Modifier Letter Colon"
+            || (chr == L'\uFF1A') // "Fullwidth Colon"
+            || (chr == L'\uFE55'); // "Small Colon"
+    },
+        L'\u003A'); // Colon
+
+    std::replace_if(wlabel.begin(),
+        wlabel.end(),
+        [](const llwchar &chr)
+    {
+        return (chr == L'\uFF0F'); // "Fullwidth Solidus"
+    },
+        L'\u002F'); // Solidus
+
+    std::string label = wstring_to_utf8str(wlabel);
+    if ((label.find(".com") != std::string::npos
+         || label.find("www.") != std::string::npos)
+        && label.find("://") == std::string::npos)
+    {
+        label = "http://" + label;
+    }
+
+	return (LLUrlRegistry::instance().hasUrl(label)) ? false : true;
 }
 
 std::string LLUrlEntryBase::urlToLabelWithGreyQuery(const std::string &url) const
@@ -464,7 +505,9 @@ LLUrlEntrySecondlifeURL::LLUrlEntrySecondlifeURL()
 							"|"
 							"(https://([-\\w\\.]*\\.)?(secondlife|lindenlab|tilia-inc)\\.com(:\\d{1,5})?)"
 							"|"
-							"(https://([-\\w\\.]*\\.)?secondlifegrid\\.net(:\\d{1,5})?))"
+							"(https://([-\\w\\.]*\\.)?secondlifegrid\\.net(:\\d{1,5})?)"
+							"|"
+							"(https?://([-\\w\\.]*\\.)?secondlife\\.io(:\\d{1,5})?))"
 							"\\/\\S*",
 		boost::regex::perl|boost::regex::icase);
 	
@@ -1148,7 +1191,7 @@ std::string LLUrlEntryPlace::getLocation(const std::string &url) const
 //
 LLUrlEntryRegion::LLUrlEntryRegion()
 {
-	mPattern = boost::regex("secondlife:///app/region/[^/\\s]+(/\\d+)?(/\\d+)?(/\\d+)?/?",
+	mPattern = boost::regex("secondlife:///app/region/[A-Za-z0-9()_%]+(/\\d+)?(/\\d+)?(/\\d+)?/?",
 							boost::regex::perl|boost::regex::icase);
 	mMenuName = "menu_url_slurl.xml";
 	mTooltip = LLTrans::getString("TooltipSLURL");
@@ -1435,7 +1478,7 @@ std::string LLUrlEntryIcon::getIcon(const std::string &url)
 	// Grep icon info between <icon>...</icon> tags
 	// matches[1] contains the icon name/path
 	boost::match_results<std::string::const_iterator> matches;
-	mIcon = (boost::regex_match(url, matches, mPattern) && matches[1].matched)
+	mIcon = (ll_regex_match(url, matches, mPattern) && matches[1].matched)
 		? matches[1]
 		: LLStringUtil::null;
 	LLStringUtil::trim(mIcon);

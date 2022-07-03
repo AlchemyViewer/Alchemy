@@ -52,7 +52,6 @@ public:
 	BOOL assetExists(const LLUUID& asset_uuid);
 	LLLandmark* getAsset(const LLUUID& asset_uuid, loaded_callback_t cb = NULL);
 	static void processGetAssetReply(
-		LLVFS *vfs,
 		const LLUUID& uuid,
 		LLAssetType::EType type,
 		void* user_data,
@@ -65,6 +64,7 @@ public:
 
 protected:
 	void onRegionHandle(const LLUUID& landmark_id);
+	void eraseCallbacks(const LLUUID& landmark_id);
 	void makeCallbacks(const LLUUID& landmark_id);
 
 	typedef std::map<LLUUID, LLLandmark*> landmark_list_t;

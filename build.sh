@@ -16,6 +16,29 @@
 # * The special style in which python is invoked is intentional to permit
 #   use of a native python install on windows - which requires paths in DOS form
 
+retry_cmd()
+{
+    max_attempts="$1"; shift
+    initial_wait="$1"; shift
+    attempt_num=1
+    echo "trying" "$@"
+    until "$@"
+    do
+        if ((attempt_num==max_attempts))
+        then
+            echo "Last attempt $attempt_num failed"
+            return 1
+        else
+            wait_time=$(($attempt_num*$initial_wait))
+            echo "Attempt $attempt_num failed. Trying again in $wait_time seconds..."
+            sleep $wait_time
+            attempt_num=$(($attempt_num+1))
+        fi
+    done
+    echo "succeeded"
+    return 0
+}
+
 build_dir_Darwin()
 {
   echo build-darwin-x86_64
@@ -129,11 +152,6 @@ pre_build()
     then # show that we're doing this, just not the contents
          echo source "$bugsplat_sh"
          source "$bugsplat_sh"
-         # important: we test this and use its value in [grand-]child processes
-         if [ -n "${BUGSPLAT_DB:-}" ]
-         then echo export BUGSPLAT_DB
-              export BUGSPLAT_DB
-         fi
     fi
     set -x
 
@@ -279,6 +297,22 @@ end_section "select viewer channel"
 python_cmd "$helpers/codeticket.py" addinput "Viewer Channel" "${viewer_channel}"
 
 initialize_version # provided by buildscripts build.sh; sets version id
+
+begin_section "coding policy check"
+# On our TC Windows build hosts, the GitPython library underlying our
+# coding_policy_git.py script fails to run git for reasons we have not tried
+# to diagnose. Clearly git works fine on those hosts, or we would never get
+# this far. Running coding policy checks on one platform *should* suffice...
+if [[ "$arch" == "Darwin" ]]
+then
+    # install the git-hooks dependencies
+    pip install -r "$(native_path "$git_hooks_checkout/requirements.txt")" || \
+        fatal "pip install git-hooks failed"
+    # validate the branch we're about to build
+    python_cmd "$git_hooks_checkout/coding_policy_git.py" --all_files || \
+        fatal "coding policy check failed"
+fi
+end_section "coding policy check"
 
 # Now run the build
 succeeded=true
@@ -429,6 +463,15 @@ then
   fi
 fi
 
+# Some of the uploads takes a long time to finish in the codeticket backend,
+# causing the next codeticket upload attempt to fail.
+# Inserting this after each potentially large upload may prevent those errors.
+# JJ is making changes to Codeticket that we hope will eliminate this failure, then this can be removed
+wait_for_codeticket()
+{
+    sleep $(( 60 * 6 ))
+}
+
 # check status and upload results to S3
 if $succeeded
 then
@@ -443,8 +486,9 @@ then
       succeeded=$build_coverity
     else
       # Upload base package.
-      python_cmd "$helpers/codeticket.py" addoutput Installer "$package"  \
+      retry_cmd 4 30 python_cmd "$helpers/codeticket.py" addoutput Installer "$package"  \
           || fatal "Upload of installer failed"
+      wait_for_codeticket
 
       # Upload additional packages.
       for package_id in $additional_packages
@@ -452,8 +496,9 @@ then
         package=$(installer_$arch "$package_id")
         if [ x"$package" != x ]
         then
-          python_cmd "$helpers/codeticket.py" addoutput "Installer $package_id" "$package" \
+          retry_cmd 4 30 python_cmd "$helpers/codeticket.py" addoutput "Installer $package_id" "$package" \
               || fatal "Upload of installer $package_id failed"
+          wait_for_codeticket
         else
           record_failure "Failed to find additional package for '$package_id'."
         fi
@@ -465,8 +510,9 @@ then
           if [ "${RELEASE_CRASH_REPORTING:-}" != "OFF" ]
           then
               # Upload crash reporter file
-              python_cmd "$helpers/codeticket.py" addoutput "Symbolfile" "$VIEWER_SYMBOL_FILE" \
+              retry_cmd 4 30 python_cmd "$helpers/codeticket.py" addoutput "Symbolfile" "$VIEWER_SYMBOL_FILE" \
                   || fatal "Upload of symbolfile failed"
+              wait_for_codeticket
           fi
 
           # Upload the llphysicsextensions_tpv package, if one was produced
@@ -474,7 +520,7 @@ then
           if [ -r "$build_dir/llphysicsextensions_package" ]
           then
               llphysicsextensions_package=$(cat $build_dir/llphysicsextensions_package)
-              python_cmd "$helpers/codeticket.py" addoutput "Physics Extensions Package" "$llphysicsextensions_package" --private \
+              retry_cmd 4 30 python_cmd "$helpers/codeticket.py" addoutput "Physics Extensions Package" "$llphysicsextensions_package" --private \
                   || fatal "Upload of physics extensions package failed"
           fi
       fi
@@ -486,6 +532,7 @@ then
               begin_section "Upload Extension $extension"
               . $extension
               [ $? -eq 0 ] || fatal "Upload of extension $extension failed"
+              wait_for_codeticket
               end_section "Upload Extension $extension"
           done
       fi
@@ -495,7 +542,6 @@ then
     record_event "skipping upload of installer"
   fi
 
-  
 else
     record_event "skipping upload of installer due to failed build"
 fi

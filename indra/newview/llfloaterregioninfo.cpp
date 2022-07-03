@@ -36,7 +36,7 @@
 #include "llglheaders.h"
 #include "llregionflags.h"
 #include "llstl.h"
-#include "llvfile.h"
+#include "llfilesystem.h"
 #include "llxfermanager.h"
 #include "indra_constants.h"
 #include "message.h"
@@ -468,6 +468,29 @@ void LLFloaterRegionInfo::processRegionInfo(LLMessageSystem* msg)
 		U32 flags = 0;
 		msg->getU32("RegionInfo", "RegionFlags", flags);
 		region_flags = flags;
+	}
+
+	if (msg->has(_PREHASH_RegionInfo5))
+	{
+		F32 chat_whisper_range;
+		F32 chat_normal_range;
+		F32 chat_shout_range;
+		F32 chat_whisper_offset;
+		F32 chat_normal_offset;
+		F32 chat_shout_offset;
+		U32 chat_flags;
+
+		msg->getF32Fast(_PREHASH_RegionInfo5, _PREHASH_ChatWhisperRange, chat_whisper_range);
+		msg->getF32Fast(_PREHASH_RegionInfo5, _PREHASH_ChatNormalRange, chat_normal_range);
+		msg->getF32Fast(_PREHASH_RegionInfo5, _PREHASH_ChatShoutRange, chat_shout_range);
+		msg->getF32Fast(_PREHASH_RegionInfo5, _PREHASH_ChatWhisperOffset, chat_whisper_offset);
+		msg->getF32Fast(_PREHASH_RegionInfo5, _PREHASH_ChatNormalOffset, chat_normal_offset);
+		msg->getF32Fast(_PREHASH_RegionInfo5, _PREHASH_ChatShoutOffset, chat_shout_offset);
+		msg->getU32Fast(_PREHASH_RegionInfo5, _PREHASH_ChatFlags, chat_flags);
+
+		LL_INFOS() << "Whisper range: " << chat_whisper_range << " normal range: " << chat_normal_range << " shout range: " << chat_shout_range
+			<< " whisper offset: " << chat_whisper_offset << " normal offset: " << chat_normal_offset << " shout offset: " << chat_shout_offset
+			<< " chat flags: " << chat_flags << LL_ENDL;
 	}
 
 	// GENERAL PANEL
@@ -2235,10 +2258,9 @@ void LLPanelEstateCovenant::loadInvItem(LLInventoryItem *itemp)
 }
 
 // static
-void LLPanelEstateCovenant::onLoadComplete(LLVFS *vfs,
-									   const LLUUID& asset_uuid,
-									   LLAssetType::EType type,
-									   void* user_data, S32 status, LLExtStat ext_status)
+void LLPanelEstateCovenant::onLoadComplete(const LLUUID& asset_uuid,
+									       LLAssetType::EType type,
+									       void* user_data, S32 status, LLExtStat ext_status)
 {
 	LL_INFOS() << "LLPanelEstateCovenant::onLoadComplete()" << LL_ENDL;
 	LLPanelEstateCovenant* panelp = (LLPanelEstateCovenant*)user_data;
@@ -2246,7 +2268,7 @@ void LLPanelEstateCovenant::onLoadComplete(LLVFS *vfs,
 	{
 		if(0 == status)
 		{
-			LLVFile file(vfs, asset_uuid, type, LLVFile::READ);
+			LLFileSystem file(asset_uuid, type, LLFileSystem::READ);
 
 			S32 file_length = file.getSize();
 

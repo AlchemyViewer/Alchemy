@@ -43,12 +43,12 @@
 #include "llerrorcontrol.h"
 #include "llevents.h"
 #include "llformat.h"
+#include "llregex.h"
 #include "lltimer.h"
 #include "llsdserialize.h"
 #include "llsdutil.h"
 #include <boost/bind.hpp>
 #include <boost/circular_buffer.hpp>
-#include <boost/regex.hpp>
 #include <boost/foreach.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/range.hpp>
@@ -101,46 +101,13 @@ static const F32 MEM_INFO_THROTTLE = 20;
 // dropped below the login framerate, we'd have very little additional data.
 static const F32 MEM_INFO_WINDOW = 10*60;
 
-// Wrap boost::regex_match() with a function that doesn't throw.
-template <typename S, typename M, typename R>
-static bool regex_match_no_exc(const S& string, M& match, const R& regex)
-{
-    try
-    {
-        return boost::regex_match(string, match, regex);
-    }
-    catch (const std::runtime_error& e)
-    {
-        LL_WARNS("LLMemoryInfo") << "error matching with '" << regex.str() << "': "
-                                 << e.what() << ":\n'" << string << "'" << LL_ENDL;
-        return false;
-    }
-}
-
-// Wrap boost::regex_search() with a function that doesn't throw.
-template <typename S, typename M, typename R>
-static bool regex_search_no_exc(const S& string, M& match, const R& regex)
-{
-    try
-    {
-        return boost::regex_search(string, match, regex);
-    }
-    catch (const std::runtime_error& e)
-    {
-        LL_WARNS("LLMemoryInfo") << "error searching with '" << regex.str() << "': "
-                                 << e.what() << ":\n'" << string << "'" << LL_ENDL;
-        return false;
-    }
-}
-
-
 LLOSInfo::LLOSInfo() :
 	mMajorVer(0), mMinorVer(0), mBuild(0), mOSVersionString("")	 
 {
 
 #if LL_WINDOWS
 
-	if (IsWindowsVersionOrGreater(10, 0, 0))
+    if (IsWindows10OrGreater())
 	{
 		mMajorVer = 10;
 		mMinorVer = 0;
@@ -273,6 +240,21 @@ LLOSInfo::LLOSInfo() :
 				ubr = data;
 			}
 		}
+
+        if (mBuild >= 22000)
+        {
+            // At release Windows 11 version was 10.0.22000.194
+            // Windows 10 version was 10.0.19043.1266
+            // There is no warranty that Win10 build won't increase,
+            // so until better solution is found or Microsoft updates
+            // SDK with IsWindows11OrGreater(), indicate "10/11"
+            //
+            // Current alternatives:
+            // Query WMI's Win32_OperatingSystem for OS string. Slow
+            // and likely to return 'compatibility' string.
+            // Check presence of dlls/libs or may be their version.
+            mOSStringSimple = "Microsoft Windows 10/11";
+        }
 	}
 
 	mOSString = mOSStringSimple;
@@ -377,7 +359,7 @@ LLOSInfo::LLOSInfo() :
 	boost::smatch matched;
 
 	std::string glibc_version(gnu_get_libc_version());
-	if ( regex_match_no_exc(glibc_version, matched, os_version_parse) )
+	if ( ll_regex_match(glibc_version, matched, os_version_parse) )
 	{
 		LL_INFOS("AppInit") << "Using glibc version '" << glibc_version << "' as OS version" << LL_ENDL;
 	
@@ -1045,7 +1027,7 @@ LLSD LLMemoryInfo::loadStatsMap()
 		while (std::getline(meminfo, line))
 		{
 			LL_DEBUGS("LLMemoryInfo") << line << LL_ENDL;
-			if (regex_match_no_exc(line, matched, stat_rx))
+			if (ll_regex_match(line, matched, stat_rx))
 			{
 				// e.g. "MemTotal:		4108424 kB"
 				LLSD::String key(matched[1].first, matched[1].second);
@@ -1255,7 +1237,12 @@ BOOL gunzip_file(const std::string& srcfile, const std::string& dstfile)
 	LLFILE *dst = NULL;
 	S32 bytes = 0;
 	tmpfile = dstfile + ".t";
-	src = gzopen(srcfile.c_str(), "rb");
+#ifdef LL_WINDOWS
+    llutf16string utf16filename = utf8str_to_utf16str(srcfile);
+    src = gzopen_w(utf16filename.c_str(), "rb");
+#else
+    src = gzopen(srcfile.c_str(), "rb");
+#endif
 	if (! src) goto err;
 	dst = LLFile::fopen(tmpfile, "wb");		/* Flawfinder: ignore */
 	if (! dst) goto err;
@@ -1289,7 +1276,14 @@ BOOL gzip_file(const std::string& srcfile, const std::string& dstfile)
 	LLFILE *src = NULL;
 	S32 bytes = 0;
 	tmpfile = dstfile + ".t";
-	dst = gzopen(tmpfile.c_str(), "wb");		/* Flawfinder: ignore */
+
+#ifdef LL_WINDOWS
+    llutf16string utf16filename = utf8str_to_utf16str(tmpfile);
+    dst = gzopen_w(utf16filename.c_str(), "wb");
+#else
+    dst = gzopen(tmpfile.c_str(), "wb");
+#endif
+
 	if (! dst) goto err;
 	src = LLFile::fopen(srcfile, "rb");		/* Flawfinder: ignore */
 	if (! src) goto err;

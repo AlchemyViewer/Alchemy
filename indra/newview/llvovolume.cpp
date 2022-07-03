@@ -381,6 +381,18 @@ U32 LLVOVolume::processUpdateMessage(LLMessageSystem *mesgsys,
 				{
 					delete mTextureAnimp;
 					mTextureAnimp = NULL;
+
+                    for (S32 i = 0; i < getNumTEs(); i++)
+                    {
+                        LLFace* facep = mDrawable->getFace(i);
+                        if (facep && facep->mTextureMatrix)
+                        {
+                            // delete or reset
+                            delete facep->mTextureMatrix;
+                            facep->mTextureMatrix = NULL;
+                        }
+                    }
+
 					gPipeline.markTextured(mDrawable);
 					mFaceMappingChanged = TRUE;
 					mTexAnimMode = 0;
@@ -480,6 +492,18 @@ U32 LLVOVolume::processUpdateMessage(LLMessageSystem *mesgsys,
 			{
 				delete mTextureAnimp;
 				mTextureAnimp = NULL;
+
+                for (S32 i = 0; i < getNumTEs(); i++)
+                {
+                    LLFace* facep = mDrawable->getFace(i);
+                    if (facep && facep->mTextureMatrix)
+                    {
+                        // delete or reset
+                        delete facep->mTextureMatrix;
+                        facep->mTextureMatrix = NULL;
+                    }
+                }
+
 				gPipeline.markTextured(mDrawable);
 				mFaceMappingChanged = TRUE;
 				mTexAnimMode = 0;
@@ -3991,7 +4015,25 @@ U32 LLVOVolume::getRenderCost(texture_cost_t &textures) const
 		{
 			if (textures.find(img->getID()) == textures.end())
 			{
-				S32 texture_cost = 256 + (S32)(ARC_TEXTURE_COST * (img->getFullHeight() / 128.f + img->getFullWidth() / 128.f));
+                S32 texture_cost = 0;
+                S8 type = img->getType();
+                if (type == LLViewerTexture::FETCHED_TEXTURE || type == LLViewerTexture::LOD_TEXTURE)
+                {
+                    const LLViewerFetchedTexture* fetched_texturep = static_cast<const LLViewerFetchedTexture*>(img);
+                    if (fetched_texturep
+                        && fetched_texturep->getFTType() == FTT_LOCAL_FILE
+                        && (img->getID() == IMG_ALPHA_GRAD_2D || img->getID() == IMG_ALPHA_GRAD)
+                        )
+                    {
+                        // These two textures appear to switch between each other, but are of different sizes (4x256 and 256x256).
+                        // Hardcode cost from larger one to not cause random complexity changes
+                        texture_cost = 320;
+                    }
+                }
+                if (texture_cost == 0)
+                {
+                    texture_cost = 256 + (S32)(ARC_TEXTURE_COST * (img->getFullHeight() / 128.f + img->getFullWidth() / 128.f));
+                }
 				textures.insert(texture_cost_t::value_type(img->getID(), texture_cost));
 			}
 		}
@@ -5476,8 +5518,8 @@ void LLVolumeGeometryManager::rebuildGeom(LLSpatialGroup* group)
 
 	U32 useage = group->getSpatialPartition()->mBufferUsage;
 
-	LLCachedControl<S32> max_vbo_size(gSavedSettings, "RenderMaxVBOSize", 512);
-	LLCachedControl<S32> max_node_size(gSavedSettings, "RenderMaxNodeSize", 65536);
+	static LLCachedControl<S32> max_vbo_size(gSavedSettings, "RenderMaxVBOSize", 512);
+	static LLCachedControl<S32> max_node_size(gSavedSettings, "RenderMaxNodeSize", 65536);
 	U32 max_vertices = (max_vbo_size * 1024)/LLVertexBuffer::calcVertexSize(group->getSpatialPartition()->mVertexDataMask);
 	U32 max_total = (max_node_size * 1024) / LLVertexBuffer::calcVertexSize(group->getSpatialPartition()->mVertexDataMask);
 	max_vertices = llmin(max_vertices, (U32) 65535);
@@ -6073,14 +6115,25 @@ void LLVolumeGeometryManager::rebuildMesh(LLSpatialGroup* group)
 				LLVOVolume* vobj = drawablep->getVOVolume();
                 if (debugLoggingEnabled("AnimatedObjectsLinkset"))
                 {
-                    if (vobj->isAnimatedObject() && vobj->isRiggedMesh())
+                    if (vobj && vobj->isAnimatedObject() && vobj->isRiggedMesh())
                     {
                         std::string vobj_name = llformat("Vol%p", vobj);
                         F32 est_tris = vobj->getEstTrianglesMax();
-                        LL_DEBUGS("AnimatedObjectsLinkset") << vobj_name << " rebuildMesh, tris " << est_tris << LL_ENDL; 
+                        LL_DEBUGS("AnimatedObjectsLinkset") << vobj_name << " rebuildMesh, tris " << est_tris << LL_ENDL;
                     }
                 }
-				if (vobj->isNoLOD()) continue;
+
+                if (!vobj || vobj->isNoLOD())
+                {
+                    continue;
+                }
+
+                LLVolume* volume = vobj->getVolume();
+
+                if (!volume)
+                {
+                    continue;
+                }
 
 				vobj->preRebuild();
 
@@ -6089,7 +6142,6 @@ void LLVolumeGeometryManager::rebuildMesh(LLSpatialGroup* group)
 					vobj->updateRelativeXform(true);
 				}
 
-				LLVolume* volume = vobj->getVolume();
 				for (S32 i = 0; i < drawablep->getNumFaces(); ++i)
 				{
 					LLFace* face = drawablep->getFace(i);
@@ -6243,7 +6295,7 @@ U32 LLVolumeGeometryManager::genDrawInfo(LLSpatialGroup* group, U32 mask, LLFace
 #endif
 	
 	//calculate maximum number of vertices to store in a single buffer
-	LLCachedControl<S32> max_vbo_size(gSavedSettings, "RenderMaxVBOSize", 512);
+	static LLCachedControl<S32> max_vbo_size(gSavedSettings, "RenderMaxVBOSize", 512);
 	U32 max_vertices = (max_vbo_size * 1024)/LLVertexBuffer::calcVertexSize(group->getSpatialPartition()->mVertexDataMask);
 	max_vertices = llmin(max_vertices, (U32) 65535);
 

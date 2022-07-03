@@ -56,17 +56,24 @@ if(WINDOWS)
         libapr-1.dll
         libaprutil-1.dll
         libapriconv-1.dll
-        ssleay32.dll
-        libeay32.dll
         nghttp2.dll
         glod.dll
         libhunspell.dll
         uriparser.dll
         )
 
+    # OpenSSL
+    if(ADDRESS_SIZE EQUAL 64)
+        set(release_files ${release_files} libcrypto-1_1-x64.dll)
+        set(release_files ${release_files} libssl-1_1-x64.dll)
+    else(ADDRESS_SIZE EQUAL 64)
+        set(release_files ${release_files} libcrypto-1_1.dll)
+        set(release_files ${release_files} libssl-1_1.dll)
+    endif(ADDRESS_SIZE EQUAL 64)
+
     # Filenames are different for 32/64 bit BugSplat file and we don't
     # have any control over them so need to branch.
-    if (BUGSPLAT_DB)
+    if (USE_BUGSPLAT)
       if(ADDRESS_SIZE EQUAL 32)
         set(release_files ${release_files} BugSplat.dll)
         set(release_files ${release_files} BugSplatRc.dll)
@@ -76,7 +83,7 @@ if(WINDOWS)
         set(release_files ${release_files} BugSplatRc64.dll)
         set(release_files ${release_files} BsSndRpt64.exe)
       endif(ADDRESS_SIZE EQUAL 32)
-    endif (BUGSPLAT_DB)
+    endif (USE_BUGSPLAT)
 
     if (FMODSTUDIO)
         set(debug_files ${debug_files} fmodL.dll)
@@ -158,7 +165,6 @@ elseif(DARWIN)
         libapr-1.dylib
         libaprutil-1.0.dylib
         libaprutil-1.dylib
-        libexception_handler.dylib
         ${EXPAT_COPY}
         libGLOD.dylib
         libhunspell-1.3.0.dylib

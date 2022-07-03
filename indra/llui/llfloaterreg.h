@@ -146,6 +146,7 @@ public:
 
 	// Callback wrappers
 	static void toggleInstanceOrBringToFront(const LLSD& sdname, const LLSD& key = LLSD());
+	static void showInstanceOrBringToFront(const LLSD& sdname, const LLSD& key = LLSD());
 	
 	// Typed find / get / show
 	template <class T>

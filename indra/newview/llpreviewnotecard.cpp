@@ -46,7 +46,7 @@
 #include "llselectmgr.h"
 #include "lltrans.h"
 #include "llviewertexteditor.h"
-#include "llvfile.h"
+#include "llfilesystem.h"
 #include "llviewerinventory.h"
 #include "llviewerobject.h"
 #include "llviewerobjectlist.h"
@@ -232,6 +232,7 @@ void LLPreviewNotecard::loadAsset()
 	if (!editor)
 		return;
 
+	bool fail = false;
 
 	if(item)
 	{
@@ -315,7 +316,31 @@ void LLPreviewNotecard::loadAsset()
 			getChildView("Delete")->setEnabled(TRUE);
 		}
 	}
-	else
+    else if (mObjectUUID.notNull() && mItemUUID.notNull())
+    {
+        LLViewerObject* objectp = gObjectList.findObject(mObjectUUID);
+        if (objectp && (objectp->isInventoryPending() || objectp->isInventoryDirty()))
+        {
+            // It's a notecard in object's inventory and we failed to get it because inventory is not up to date.
+            // Subscribe for callback and retry at inventoryChanged()
+            registerVOInventoryListener(objectp, NULL); //removes previous listener
+
+            if (objectp->isInventoryDirty())
+            {
+                objectp->requestInventory();
+            }
+        }
+        else
+        {
+            fail = true;
+        }
+    }
+    else
+    {
+        fail = true;
+    }
+
+	if (fail)
 	{
 		editor->setText(LLStringUtil::null);
 		editor->makePristine();
@@ -327,8 +352,7 @@ void LLPreviewNotecard::loadAsset()
 }
 
 // static
-void LLPreviewNotecard::onLoadComplete(LLVFS *vfs,
-									   const LLUUID& asset_uuid,
+void LLPreviewNotecard::onLoadComplete(const LLUUID& asset_uuid,
 									   LLAssetType::EType type,
 									   void* user_data, S32 status, LLExtStat ext_status)
 {
@@ -339,7 +363,7 @@ void LLPreviewNotecard::onLoadComplete(LLVFS *vfs,
 	{
 		if(0 == status)
 		{
-			LLVFile file(vfs, asset_uuid, type, LLVFile::READ);
+			LLFileSystem file(asset_uuid, type, LLFileSystem::READ);
 
 			S32 file_length = file.getSize();
 
@@ -446,7 +470,7 @@ void LLPreviewNotecard::finishInventoryUpload(LLUUID itemId, LLUUID newAssetId, 
     LLPreviewNotecard* nc = LLFloaterReg::findTypedInstance<LLPreviewNotecard>("preview_notecard", LLSD(itemId));
     if (nc)
     {
-        // *HACK: we have to delete the asset in the VFS so
+        // *HACK: we have to delete the asset in the cache so
         // that the viewer will redownload it. This is only
         // really necessary if the asset had to be modified by
         // the uploader, so this can be optimized away in some
@@ -454,7 +478,7 @@ void LLPreviewNotecard::finishInventoryUpload(LLUUID itemId, LLUUID newAssetId, 
         // script actually changed the asset.
         if (nc->hasEmbeddedInventory())
         {
-            gVFS->removeFile(newAssetId, LLAssetType::AT_NOTECARD);
+            LLFileSystem::removeFile(newAssetId, LLAssetType::AT_NOTECARD);
         }
         if (newItemId.isNull())
         {
@@ -479,7 +503,7 @@ void LLPreviewNotecard::finishTaskUpload(LLUUID itemId, LLUUID newAssetId, LLUUI
     {
         if (nc->hasEmbeddedInventory())
         {
-            gVFS->removeFile(newAssetId, LLAssetType::AT_NOTECARD);
+            LLFileSystem::removeFile(newAssetId, LLAssetType::AT_NOTECARD);
         }
         nc->setAssetId(newAssetId);
         nc->refreshFromInventory();
@@ -558,14 +582,13 @@ bool LLPreviewNotecard::saveIfNeeded(LLInventoryItem* copyitem, bool sync)
                 tid.generate();
                 asset_id = tid.makeAssetID(gAgent.getSecureSessionID());
 
-                LLVFile file(gVFS, asset_id, LLAssetType::AT_NOTECARD, LLVFile::APPEND);
+                LLFileSystem file(asset_id, LLAssetType::AT_NOTECARD, LLFileSystem::APPEND);
 
 
 				LLSaveNotecardInfo* info = new LLSaveNotecardInfo(this, mItemUUID, mObjectUUID,
 																tid, copyitem);
 
                 S32 size = buffer.length() + 1;
-                file.setMaxSize(size);
                 file.write((U8*)buffer.c_str(), size);
 
 				gAssetStorage->storeAssetData(tid, LLAssetType::AT_NOTECARD,
@@ -599,6 +622,17 @@ void LLPreviewNotecard::syncExternal()
 		writeToFile(tmp_file);
 	}
 }
+
+/*virtual*/
+void LLPreviewNotecard::inventoryChanged(LLViewerObject* object,
+    LLInventoryObject::object_list_t* inventory,
+    S32 serial_num,
+    void* user_data)
+{
+    removeVOInventoryListener();
+    loadAsset();
+}
+
 
 void LLPreviewNotecard::deleteNotecard()
 {

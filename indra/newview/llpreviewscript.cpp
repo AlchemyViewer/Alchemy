@@ -51,7 +51,7 @@
 #include "llsdserialize.h"
 #include "llslider.h"
 #include "lltooldraganddrop.h"
-#include "llvfile.h"
+#include "llfilesystem.h"
 
 #include "llagent.h"
 #include "llmenugl.h"
@@ -640,14 +640,17 @@ bool LLScriptEdCore::writeToFile(const std::string& filename)
 
 void LLScriptEdCore::sync()
 {
-	// Sync with external editor.
-	std::string tmp_file = mContainer->getTmpFileName();
-	llstat s;
-	if (LLFile::stat(tmp_file, &s) == 0) // file exists
-	{
-		if (mLiveFile) mLiveFile->ignoreNextUpdate();
-		writeToFile(tmp_file);
-	}
+    // Sync with external editor.
+    if (mLiveFile)
+    {
+        std::string tmp_file = mLiveFile->filename();
+        llstat s;
+        if (LLFile::stat(tmp_file, &s) == 0) // file exists
+        {
+            mLiveFile->ignoreNextUpdate();
+            writeToFile(tmp_file);
+        }
+    }
 }
 
 bool LLScriptEdCore::hasChanged()
@@ -1031,9 +1034,25 @@ void LLScriptEdCore::openInExternalEditor()
 {
 	delete mLiveFile; // deletes file
 
-	// Save the script to a temporary file.
-	std::string filename = mContainer->getTmpFileName();
-	writeToFile(filename);
+	// Generate a suitable filename
+    std::string script_name = mScriptName;
+    std::string forbidden_chars = "<>:\"\\/|?*";
+    for (std::string::iterator c = forbidden_chars.begin(); c != forbidden_chars.end(); c++)
+    {
+        script_name.erase(std::remove(script_name.begin(), script_name.end(), *c), script_name.end());
+    }
+	std::string filename = mContainer->getTmpFileName(script_name);
+
+    // Save the script to a temporary file.
+    if (!writeToFile(filename))
+    {
+        // In case some characters from script name are forbidden
+        // and not accounted for, name is too long or some other issue,
+        // try file that doesn't include script name
+        script_name.clear();
+        filename = mContainer->getTmpFileName(script_name);
+        writeToFile(filename);
+    }
 
 	// Start watching file changes.
 	mLiveFile = new LLLiveLSLFile(filename, boost::bind(&LLScriptEdContainer::onExternalChange, mContainer, _1));
@@ -1423,7 +1442,7 @@ LLScriptEdContainer::LLScriptEdContainer(const LLSD& key) :
 {
 }
 
-std::string LLScriptEdContainer::getTmpFileName()
+std::string LLScriptEdContainer::getTmpFileName(const std::string& script_name)
 {
 	// Take script inventory item id (within the object inventory)
 	// to consideration so that it's possible to edit multiple scripts
@@ -1435,7 +1454,14 @@ std::string LLScriptEdContainer::getTmpFileName()
 	LLMD5 script_id_hash((const U8 *)script_id.c_str());
 	script_id_hash.hex_digest(script_id_hash_str);
 
-	return std::string(LLFile::tmpdir()) + "sl_script_" + script_id_hash_str + ".lsl";
+    if (script_name.empty())
+    {
+        return std::string(LLFile::tmpdir()) + "sl_script_" + script_id_hash_str + ".lsl";
+    }
+    else
+    {
+        return std::string(LLFile::tmpdir()) + "sl_script_" + script_name + "_" + script_id_hash_str + ".lsl";
+    }
 }
 
 bool LLScriptEdContainer::onExternalChange(const std::string& filename)
@@ -1692,8 +1718,11 @@ void LLPreviewLSL::saveIfNeeded(bool sync /*= true*/)
         {
             std::string buffer(mScriptEd->mEditor->getText());
 
+            LLUUID old_asset_id = inv_item->getAssetUUID().isNull() ? mScriptEd->getAssetID() : inv_item->getAssetUUID();
+
             LLResourceUploadInfo::ptr_t uploadInfo(std::make_shared<LLScriptAssetUpload>(mItemUUID, buffer, 
-                [](LLUUID itemId, LLUUID, LLUUID, LLSD response) {
+                [old_asset_id](LLUUID itemId, LLUUID, LLUUID, LLSD response) {
+                    LLFileSystem::removeFile(old_asset_id, LLAssetType::AT_LSL_TEXT);
                     LLPreviewLSL::finishedLSLUpload(itemId, response);
                 }));
 
@@ -1703,8 +1732,8 @@ void LLPreviewLSL::saveIfNeeded(bool sync /*= true*/)
 }
 
 // static
-void LLPreviewLSL::onLoadComplete( LLVFS *vfs, const LLUUID& asset_uuid, LLAssetType::EType type,
-								   void* user_data, S32 status, LLExtStat ext_status)
+void LLPreviewLSL::onLoadComplete(const LLUUID& asset_uuid, LLAssetType::EType type,
+								  void* user_data, S32 status, LLExtStat ext_status)
 {
 	LL_DEBUGS() << "LLPreviewLSL::onLoadComplete: got uuid " << asset_uuid
 		 << LL_ENDL;
@@ -1714,7 +1743,7 @@ void LLPreviewLSL::onLoadComplete( LLVFS *vfs, const LLUUID& asset_uuid, LLAsset
 	{
 		if(0 == status)
 		{
-			LLVFile file(vfs, asset_uuid, type);
+			LLFileSystem file(asset_uuid, type);
 			S32 file_length = file.getSize();
 
 			std::vector<char> buffer(file_length+1);
@@ -1741,6 +1770,7 @@ void LLPreviewLSL::onLoadComplete( LLVFS *vfs, const LLUUID& asset_uuid, LLAsset
 			}
 			preview->mScriptEd->setScriptName(script_name);
 			preview->mScriptEd->setEnableEditing(is_modifiable);
+            preview->mScriptEd->setAssetID(asset_uuid);
 			preview->mAssetStatus = PREVIEW_ASSET_LOADED;
 		}
 		else
@@ -1977,7 +2007,7 @@ void LLLiveLSLEditor::loadAsset()
 }
 
 // static
-void LLLiveLSLEditor::onLoadComplete(LLVFS *vfs, const LLUUID& asset_id,
+void LLLiveLSLEditor::onLoadComplete(const LLUUID& asset_id,
 									 LLAssetType::EType type,
 									 void* user_data, S32 status, LLExtStat ext_status)
 {
@@ -1991,9 +2021,10 @@ void LLLiveLSLEditor::onLoadComplete(LLVFS *vfs, const LLUUID& asset_id,
 	{
 		if( LL_ERR_NOERR == status )
 		{
-			instance->loadScriptText(vfs, asset_id, type);
+			instance->loadScriptText(asset_id, type);
 			instance->mScriptEd->setEnableEditing(TRUE);
 			instance->mAssetStatus = PREVIEW_ASSET_LOADED;
+            instance->mScriptEd->setAssetID(asset_id);
 		}
 		else
 		{
@@ -2017,9 +2048,9 @@ void LLLiveLSLEditor::onLoadComplete(LLVFS *vfs, const LLUUID& asset_id,
 	delete floater_key;
 }
 
-void LLLiveLSLEditor::loadScriptText(LLVFS *vfs, const LLUUID &uuid, LLAssetType::EType type)
+void LLLiveLSLEditor::loadScriptText(const LLUUID &uuid, LLAssetType::EType type)
 {
-	LLVFile file(vfs, uuid, type);
+	LLFileSystem file(uuid, type);
 	S32 file_length = file.getSize();
 	std::vector<char> buffer(file_length + 1);
 	file.read((U8*)&buffer[0], file_length);
@@ -2189,6 +2220,7 @@ void LLLiveLSLEditor::finishLSLUpload(LLUUID itemId, LLUUID taskId, LLUUID newAs
     if (preview)
     {
         preview->mItem->setAssetUUID(newAssetId);
+        preview->mScriptEd->setAssetID(newAssetId);
 
         // Bytecode save completed
         if (response["compiled"])
@@ -2267,12 +2299,14 @@ void LLLiveLSLEditor::saveIfNeeded(bool sync /*= true*/)
     if (!url.empty())
     {
         std::string buffer(mScriptEd->mEditor->getText());
+        LLUUID old_asset_id = mScriptEd->getAssetID();
 
         LLResourceUploadInfo::ptr_t uploadInfo(std::make_shared<LLScriptAssetUpload>(mObjectUUID, mItemUUID, 
                 monoChecked() ? LLScriptAssetUpload::MONO : LLScriptAssetUpload::LSL2, 
                 isRunning, mScriptEd->getAssociatedExperience(), buffer, 
-                [isRunning](LLUUID itemId, LLUUID taskId, LLUUID newAssetId, LLSD response) { 
-                    LLLiveLSLEditor::finishLSLUpload(itemId, taskId, newAssetId, response, isRunning);
+                [isRunning, old_asset_id](LLUUID itemId, LLUUID taskId, LLUUID newAssetId, LLSD response) { 
+                        LLFileSystem::removeFile(old_asset_id, LLAssetType::AT_LSL_TEXT);
+                        LLLiveLSLEditor::finishLSLUpload(itemId, taskId, newAssetId, response, isRunning);
                 }));
 
         LLViewerAssetUpload::EnqueueInventoryUpload(url, uploadInfo);

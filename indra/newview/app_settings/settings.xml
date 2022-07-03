@@ -1681,6 +1681,39 @@
       <key>Value</key>
       <integer>23</integer>
     </map>
+    <key>EnableDiskCacheDebugInfo</key>
+    <map>
+      <key>Comment</key>
+      <string>When set, display additional cache debugging information</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <integer>0</integer>
+    </map>
+    <key>DiskCachePercentOfTotal</key>
+    <map>
+      <key>Comment</key>
+      <string>The percent of total cache size (defined by CacheSize) to use for the disk cache</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>F32</string>
+      <key>Value</key>
+      <real>20.0</real>
+    </map>
+    <key>DiskCacheDirName</key>
+    <map>
+      <key>Comment</key>
+      <string>The name of the disk cache (within the standard Viewer disk cache directory)</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>String</string>
+      <key>Value</key>
+      <string>cache</string>
+    </map>
     <key>CacheLocation</key>
     <map>
       <key>Comment</key>
@@ -1903,10 +1936,11 @@
       <key>Value</key>
       <real>1.0</real>
     </map>
-    <key>CameraPreset</key>  <!-- deprecated (see SL-12429) -->
+    <key>CameraPreset</key>
+    <!-- deprecated (see SL-12429) -->
     <map>
       <key>Comment</key>
-      <string>Preset camera position - view (0 - rear, 1 - front, 2 - group)</string>
+      <string>(Deprecated) Preset camera position - view (0 - rear, 1 - front, 2 - group)</string>
       <key>Persist</key>
       <integer>1</integer>
       <key>Type</key>
@@ -2395,6 +2429,17 @@
       <key>Value</key>
       <integer>1</integer>
     </map>
+    <key>BrowserFileAccessFromFileUrls</key>
+    <map>
+      <key>Comment</key>
+      <string>Allow access to local files via file urls in the embedded browser</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <integer>1</integer>
+    </map>
     <key>BrowserPluginsEnabled</key>
     <map>
       <key>Comment</key>
@@ -2824,10 +2869,11 @@
       <key>Value</key>
       <integer>0</integer>
     </map>
-    <key>DEPRECATED: DebugShowPrivateMem</key>  <!-- deprecated (see MAINT-8091) -->
+    <key>DebugShowPrivateMem</key>
+    <!-- deprecated (see MAINT-8091) -->
     <map>
       <key>Comment</key>
-      <string>Show Private Mem Info</string>
+      <string>(Deprecated) Show Private Mem Info</string>
       <key>Persist</key>
       <integer>1</integer>
       <key>Type</key>
@@ -3144,17 +3190,6 @@
       <integer>-1</integer>
     </map>
     <key>DebugStatModeActualOut</key>
-    <map>
-      <key>Comment</key>
-      <string>Mode of stat in Statistics floater</string>
-      <key>Persist</key>
-      <integer>1</integer>
-      <key>Type</key>
-      <string>S32</string>
-      <key>Value</key>
-      <integer>-1</integer>
-    </map>
-    <key>DebugStatModeVFSPendingOps</key>
     <map>
       <key>Comment</key>
       <string>Mode of stat in Statistics floater</string>
@@ -3869,7 +3904,7 @@
       <key>Value</key>
       <integer>0</integer>
     </map>
-    <key>DoubleClickTeleport</key> 
+    <key>DoubleClickTeleport</key>
     <map>
       <key>Comment</key>
       <string>Enable double-click to teleport where allowed (afects minimap and people panel)</string>
@@ -3956,17 +3991,6 @@
       <string>S32</string>
       <key>Value</key>
       <integer>4</integer>
-    </map>
-    <key>DumpVFSCaches</key>
-    <map>
-      <key>Comment</key>
-      <string>Dump VFS caches on startup.</string>
-      <key>Persist</key>
-      <integer>1</integer>
-      <key>Type</key>
-      <string>Boolean</string>
-      <key>Value</key>
-      <integer>0</integer>
     </map>
     <key>DynamicCameraStrength</key>
     <map>
@@ -4060,6 +4084,17 @@
     <map>
       <key>Comment</key>
       <string>Play sounds from gestures</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <integer>1</integer>
+    </map>
+    <key>EnableCollisionSounds</key>
+    <map>
+      <key>Comment</key>
+      <string>Play sounds on collision</string>
       <key>Persist</key>
       <integer>1</integer>
       <key>Type</key>
@@ -6138,7 +6173,7 @@
   <key>LoginSRVPump</key>
   <map>
     <key>Comment</key>
-    <string>Name of the message pump that handles SRV request (deprecated)</string>
+    <string>(Deprecated) Name of the message pump that handles SRV request)</string>
     <key>Persist</key>
     <integer>0</integer>
     <key>Type</key>
@@ -6949,10 +6984,11 @@
         <key>Value</key>
             <real>600.0</real>
         </map>
-    <key>MemoryPrivatePoolEnabled</key>  <!-- deprecated (see MAINT-8091) -->
+    <key>MemoryPrivatePoolEnabled</key>
+    <!-- deprecated (see MAINT-8091) -->
     <map>
       <key>Comment</key>
-      <string>DEPRECATED: Enable the private memory pool management</string>
+      <string>(Deprecated) Enable the private memory pool management</string>
       <key>Persist</key>
       <integer>1</integer>
       <key>Type</key>
@@ -6960,10 +6996,11 @@
       <key>Value</key>
       <integer>0</integer>
     </map>
-    <key>MemoryPrivatePoolSize</key>  <!-- deprecated (see MAINT-8091) -->
+    <key>MemoryPrivatePoolSize</key>
+    <!-- deprecated (see MAINT-8091) -->
     <map>
       <key>Comment</key>
-      <string>DEPRECATED: Size of the private memory pool in MB (min. value is 256)</string>
+      <string>(Deprecated) Size of the private memory pool in MB (min. value is 256)</string>
       <key>Persist</key>
       <integer>1</integer>
       <key>Type</key>
@@ -8645,7 +8682,7 @@
     <key>PushToTalkToggle</key>
     <map>
       <key>Comment</key>
-      <string>Should the push-to-talk button behave as a toggle</string>
+      <string>Should the push-to-talk toolbar button behave as a toggle</string>
       <key>Persist</key>
       <integer>1</integer>
       <key>Type</key>
@@ -8667,7 +8704,7 @@
     <key>QAModeEventHostPort</key>
     <map>
       <key>Comment</key>
-      <string>DEPRECATED: Port on which lleventhost should listen</string>
+      <string>(Deprecated) Port on which lleventhost should listen</string>
       <key>Persist</key>
       <integer>0</integer>
       <key>Type</key>
@@ -8689,7 +8726,18 @@
     <key>QAModeMetrics</key>
     <map>
       <key>Comment</key>
-      <string>"Enables QA features (logging, faster cycling) for metrics collector"</string>
+      <string>Enables QA features (logging, faster cycling) for metrics collector</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <integer>0</integer>
+    </map>
+    <key>QAModeFakeSystemFolderIssues</key>
+    <map>
+      <key>Comment</key>
+      <string>Simulates system folder issues in inventory</string>
       <key>Persist</key>
       <integer>1</integer>
       <key>Type</key>
@@ -9210,7 +9258,7 @@
     <key>Value</key>
     <integer>0</integer>
   </map>
-   <key>RenderHiDPI</key>
+    <key>RenderHiDPI</key>
   <map>
     <key>Comment</key>
     <string>Enable support for HiDPI displays, like Retina (MacOS X ONLY, requires restart)</string>
@@ -11943,7 +11991,7 @@
             <string>Boolean</string>
         <key>Value</key>
             <integer>0</integer>
-    </map> 
+    </map>
     <key>NearbyListShowMap</key>
     <map>
       <key>Comment</key>
@@ -12872,6 +12920,17 @@
       <key>Value</key>
       <integer>0</integer>
     </map>
+    <key>TextureFetchMinTimeToLog</key>
+    <map>
+      <key>Comment</key>
+      <string>If texture fetching time exceeds this value, texture fetch tester will log info</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>F32</string>
+      <key>Value</key>
+      <real>2.0</real>
+    </map>
   <key>TextureFetchFakeFailureRate</key>
   <map>
     <key>Comment</key>
@@ -12960,6 +13019,17 @@
       <key>Value</key>
       <integer>32</integer>
     </map>
+    <key>TextureListFetchingThreshold</key>
+    <map>
+      <key>Comment</key>
+      <string>If the ratio between fetched and all textures in the list is greater than this threshold, which we assume that almost all textures are fetched</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>F32</string>
+      <key>Value</key>
+      <real>0.97</real>
+    </map>
     <key>TextureLoadFullRes</key>
     <map>
       <key>Comment</key>
@@ -13025,6 +13095,17 @@
       <string>S32</string>
       <key>Value</key>
       <integer>50</integer>
+    </map>
+    <key>TextureSaveLocation</key>
+    <map>
+      <key>Comment</key>
+      <string>Current location for bulk saving textures to disk</string>
+      <key>Persist</key>
+      <integer>0</integer>
+      <key>Type</key>
+      <string>String</string>
+      <key>Value</key>
+      <string />
     </map>
     <key>ThrottleBandwidthKBPS</key>
     <map>
@@ -14412,10 +14493,11 @@
       <key>Value</key>
       <string>Default</string>
     </map>
-    <key>UseExternalBrowser</key> <!-- deprecated (see MAINT-4127) -->
+    <key>UseExternalBrowser</key>
+    <!-- deprecated (see MAINT-4127) -->
     <map>
       <key>Comment</key>
-      <string>Use default browser when opening web pages instead of in-world browser.</string>
+      <string>(Deprecated) Use default browser when opening web pages instead of in-world browser.</string>
       <key>Persist</key>
       <integer>1</integer>
       <key>Type</key>
@@ -14621,28 +14703,6 @@
       <key>Value</key>
       <string/>
     </map>
-    <key>VFSOldSize</key>
-    <map>
-      <key>Comment</key>
-      <string>[DO NOT MODIFY] Controls resizing of local file cache</string>
-      <key>Persist</key>
-      <integer>1</integer>
-      <key>Type</key>
-      <string>U32</string>
-      <key>Value</key>
-      <integer>0</integer>
-    </map>
-    <key>VFSSalt</key>
-    <map>
-      <key>Comment</key>
-      <string>[DO NOT MODIFY] Controls local file caching behavior</string>
-      <key>Persist</key>
-      <integer>1</integer>
-      <key>Type</key>
-      <string>U32</string>
-      <key>Value</key>
-      <integer>1</integer>
-    </map>
     <key>VelocityInterpolate</key>
     <map>
       <key>Comment</key>
@@ -14687,19 +14747,6 @@
       <key>Value</key>
       <integer>1</integer>
     </map>
-    <!-- SL-12594 removes fixed function rendering
-    <key>VertexShaderEnable</key>
-    <map>
-      <key>Comment</key>
-      <string>Enable/disable all GLSL shaders (debug)</string>
-      <key>Persist</key>
-      <integer>1</integer>
-      <key>Type</key>
-      <string>Boolean</string>
-      <key>Value</key>
-      <integer>0</integer>
-    </map>
-    <-->
     <key>VivoxAutoPostCrashDumps</key>
     <map>
       <key>Comment</key>
@@ -14788,7 +14835,7 @@
       <key>Value</key>
       <integer>44125</integer>
     </map>
-    
+
   <key>VivoxVadAuto</key>
   <map>
     <key>Comment</key>
@@ -14825,8 +14872,7 @@
   <key>VivoxVadSensitivity</key>
   <map>
     <key>Comment</key>
-    <string>
-      A dimensionless value between 0 and 100, indicating the 'sensitivity of the VAD'. Increasing this value corresponds to decreasing the sensitivity of the VAD and 0 is turned off altogether</string>
+    <string>A dimensionless value between 0 and 100, indicating the 'sensitivity of the VAD'. Increasing this value corresponds to decreasing the sensitivity of the VAD and 0 is turned off altogether</string>
     <key>Persist</key>
     <integer>1</integer>
     <key>Type</key>
@@ -14835,6 +14881,7 @@
     <integer>0</integer>
   </map>
   <key>VoiceCallsFriendsOnly</key>
+  <!-- deprecated (see SL-12871) -->
     <map>
       <key>Comment</key>
       <string>(Deprecated) Only accept voice calls from residents on your friends list</string>
@@ -17030,9 +17077,95 @@
       <key>Type</key>
       <string>Boolean</string>
       <key>Value</key>
-      <integer>1</integer>        
+      <integer>1</integer>
+  </map>
+  <key>360CaptureUseInterestListCap</key>
+  <map>
+    <key>Comment</key>
+    <string>Flag if set, uses the new InterestList cap to ask the simulator for full content</string>
+    <key>Persist</key>
+    <integer>1</integer>
+    <key>Type</key>
+    <string>Boolean</string>
+    <key>Value</key>
+    <integer>1</integer>
+  </map>
+  <key>360CaptureJPEGEncodeQuality</key>
+  <map>
+    <key>Comment</key>
+    <string>Quality value to use in the JPEG encoder (0..100)</string>
+    <key>Persist</key>
+    <integer>1</integer>
+    <key>Type</key>
+    <string>U32</string>
+    <key>Value</key>
+    <integer>95</integer>
+  </map>
+  <key>360CaptureDebugSaveImage</key>
+  <map>
+    <key>Comment</key>
+    <string>Flag if set, saves off each cube map as an image, as well as the JavaScript data URL, for debugging purposes</string>
+    <key>Persist</key>
+    <integer>1</integer>
+    <key>Type</key>
+    <string>Boolean</string>
+    <key>Value</key>
+    <integer>0</integer>
+  </map>
+  <key>360CaptureOutputImageWidth</key>
+  <map>
+    <key>Comment</key>
+    <string>Width of the output 360 equirectangular image</string>
+    <key>Persist</key>
+    <integer>1</integer>
+    <key>Type</key>
+    <string>U32</string>
+    <key>Value</key>
+    <integer>4096</integer>
+  </map>
+  <key>360CaptureHideAvatars</key>
+  <map>
+    <key>Comment</key>
+    <string>Flag if set, removes all the avatars from the 360 snapshot</string>
+    <key>Persist</key>
+    <integer>1</integer>
+    <key>Type</key>
+    <string>Boolean</string>
+    <key>Value</key>
+    <integer>0</integer>
     </map>
+  <key>360CaptureCameraFOV</key>
+  <map>
+    <key>Comment</key>
+    <string>Field of view of the WebGL camera that converts the cubemap to an equirectangular image</string>
+    <key>Persist</key>
+    <integer>1</integer>
+    <key>Type</key>
+    <string>U32</string>
+    <key>Value</key>
+    <integer>75</integer>
+  </map>
+  <key>360CaptureNumRenderPasses</key>
+  <map>
+    <key>Comment</key>
+    <string>Number of times to render the scene while taking a snapshot</string>
+    <key>Persist</key>
+    <integer>1</integer>
+    <key>Type</key>
+    <string>U32</string>
+    <key>Value</key>
+    <integer>3</integer>
+  </map>
+  <key>ResetUIScaleOnFirstRun</key>
+  <map>
+  <key>Comment</key>
+  <string>Resets the UI scale factor on first run due to changed display scaling behavior</string>
+  <key>Persist</key>
+  <integer>1</integer>
+  <key>Type</key>
+  <string>Boolean</string>
+  <key>Value</key>
+  <integer>1</integer>
+  </map>
 </map>
 </llsd>
-
-

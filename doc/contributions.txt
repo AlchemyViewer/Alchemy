@@ -226,7 +226,15 @@ Ansariel Hiller
 	SL-13364
 	SL-13858
 	SL-13697
+	SL-14939
+	SL-14940
+	SL-14941
+	SL-13395
 	SL-3136
+	SL-15200
+	SL-15226
+	SL-15227
+	SL-15398
 Aralara Rajal
 Arare Chantilly
 	CHUIBUG-191
@@ -268,6 +276,9 @@ Beq Janus
     SL-11300
 	SL-13583
 	SL-14766
+	SL-14927
+	SL-11300
+	SL-16021
 Beth Walcher
 Bezilon Kasei
 Biancaluce Robbiani
@@ -804,6 +815,7 @@ Jonathan Yap
 	STORM-2104
 	STORM-2142
 	SL-10089
+	BUG-229818
 Kadah Coba
 	STORM-1060
     STORM-1843
@@ -1094,6 +1106,7 @@ Nicky Dasmijn
 	OPEN-187
 	STORM-1937
 	OPEN-187
+	SL-15234
     STORM-2010
 	STORM-2082
 	MAINT-6665
@@ -1103,6 +1116,7 @@ Nicky Dasmijn
     SL-11072
 	SL-13141
 	SL-13642
+	SL-16438
 Nicky Perian
 	OPEN-1
 	STORM-1087
@@ -1356,7 +1370,8 @@ Sovereign Engineer
     MAINT-7343
     SL-11079
     OPEN-343
-	SL-11625
+    SL-11625
+    BUG-229030
 	SL-14705
 	SL-14706
 	SL-14707

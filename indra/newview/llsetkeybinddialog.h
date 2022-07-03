@@ -76,6 +76,8 @@ public:
     static void onDefault(void* user_data);
     static void onClickTimeout(void* user_data, MASK mask);
 
+    static bool isRecording() { return sRecordKeys; }
+
     class Updater;
 
 private:
@@ -83,7 +85,7 @@ private:
     void setKeyBind(EMouseClickType click, KEY key, MASK mask, bool all_modes);
     LLKeyBindResponderInterface *pParent;
     LLCheckBoxCtrl *pCheckBox;
-    LLTextBase *pDesription;
+    LLTextBase *pDescription;
 
     U32 mKeyFilterMask;
     Updater *pUpdater;

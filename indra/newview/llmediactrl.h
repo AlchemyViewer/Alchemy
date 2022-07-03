@@ -31,6 +31,7 @@
 
 #include "lluictrl.h"
 #include "llframetimer.h"
+#include "llnotificationptr.h"
 
 class LLViewBorder;
 class LLUICtrlFactory;
@@ -145,10 +146,12 @@ public:
 
 		void setTextureSize(S32 width, S32 height);
 
-		void showNotification(boost::shared_ptr<class LLNotification> notify);
+		void showNotification(LLNotificationPtr notify);
 		void hideNotification();
 
 		void setTrustedContent(bool trusted);
+
+        void setAllowFileDownload(bool allow) { mAllowFileDownload = allow; }
 
 		// over-rides
 		virtual BOOL handleKeyHere( KEY key, MASK mask);
@@ -204,7 +207,8 @@ public:
 				mClearCache,
 				mHoverTextChanged,
 				mDecoupleTextureSize,
-				mUpdateScrolls;
+				mUpdateScrolls,
+                mAllowFileDownload;
 
 		std::string mHomePageUrl,
 					mHomePageMimeType,
