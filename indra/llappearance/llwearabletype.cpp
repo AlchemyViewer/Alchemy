@@ -49,12 +49,6 @@ LLWearableType::LLWearableDictionary::LLWearableDictionary(LLTranslationBridge::
 	addEntry(LLWearableType::WT_TATTOO,       new WearableEntry(trans, "tattoo",      "New Tattoo",		LLAssetType::AT_CLOTHING, 	LLInventoryType::ICONNAME_CLOTHING_TATTOO, FALSE, TRUE));
 	addEntry(LLWearableType::WT_UNIVERSAL,    new WearableEntry(trans, "universal",   "New Universal",     LLAssetType::AT_CLOTHING,   LLInventoryType::ICONNAME_CLOTHING_UNIVERSAL, FALSE, TRUE));
 
-// [RLVa:KB] - Checked: 2010-03-03 (RLVa-1.2.0a) | Added: RLVa-1.2.0a
-protected:
-	// The default implementation asserts on 'notFound()' and returns -1 which isn't a valid EWearableType
-	virtual LLWearableType::EType notFound() const { return LLWearableType::WT_INVALID; }
-// [/RLVa:KB]
-
 // [SL:KB] - Patch: Appearance-Misc | Checked: 2011-05-29 (Catznip-2.6)
 	addEntry(LLWearableType::WT_PHYSICS,      new WearableEntry(trans, "physics",     "New Physics",		LLAssetType::AT_CLOTHING, 	LLInventoryType::ICONNAME_CLOTHING_PHYSICS, TRUE, FALSE));
 // [/SL:KB]

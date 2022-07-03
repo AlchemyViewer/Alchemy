@@ -110,6 +110,12 @@ private:
     public:
         LLWearableDictionary(LLTranslationBridge::ptr_t& trans);
         ~LLWearableDictionary() {}
+
+// [RLVa:KB] - Checked: 2010-03-03 (RLVa-1.2.0a) | Added: RLVa-1.2.0a
+	protected:
+		// The default implementation asserts on 'notFound()' and returns -1 which isn't a valid EWearableType
+		LLWearableType::EType notFound() const override { return LLWearableType::WT_INVALID; }
+// [/RLVa:KB]
     };
 
     LLWearableDictionary mDictionary;
