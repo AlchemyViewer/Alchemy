@@ -32,17 +32,35 @@
 #include "alfloaterlightbox.h"
 
 #include "llviewercontrol.h"
+#include "llspinctrl.h"
+#include "llsliderctrl.h"
+#include "lltextbox.h"
+#include "llcombobox.h"
 
 ALFloaterLightBox::ALFloaterLightBox(const LLSD& key)
 :	LLFloater(key)
 {
     mCommitCallbackRegistrar.add("LightBox.ResetControlDefault", std::bind(&ALFloaterLightBox::onClickResetControlDefault, this, std::placeholders::_2));
     mCommitCallbackRegistrar.add("LightBox.ResetGroupDefault", std::bind(&ALFloaterLightBox::onClickResetGroupDefault, this, std::placeholders::_2));
+    mCommitCallbackRegistrar.add("LightBox.CASSelect", boost::bind(&ALFloaterLightBox::updateCAS, this));
+    mCommitCallbackRegistrar.add("LightBox.TonemapperSelect", boost::bind(&ALFloaterLightBox::updateTonemapper, this));
+    mCommitCallbackRegistrar.add("LightBox.TonemapperCommit", std::bind(&ALFloaterLightBox::commitTonemapper, this, std::placeholders::_2));
+    mCommitCallbackRegistrar.add("LightBox.CASCommit", std::bind(&ALFloaterLightBox::commitCAS, this, std::placeholders::_2));
+    mCommitCallbackRegistrar.add("LightBox.SSAOCommit", std::bind(&ALFloaterLightBox::commitSSAO, this, std::placeholders::_2));
 }
 
 BOOL ALFloaterLightBox::postBuild()
 {
 	return TRUE;
+}
+
+void ALFloaterLightBox::draw()
+{
+    updateTonemapper();
+    updateSSAO();
+    updateCAS();
+
+    LLFloater::draw();
 }
 
 void ALFloaterLightBox::onClickResetControlDefault(const LLSD& userdata)
@@ -89,5 +107,564 @@ void ALFloaterLightBox::onClickResetGroupDefault(const LLSD& userdata)
 		{
 			controlp->resetToDefault(true);
 		}
+        controlp = gSavedSettings.getControl("RenderToneMapUchimuraA");
+        if (controlp)
+        {
+            controlp->resetToDefault(true);
+        }
+        controlp = gSavedSettings.getControl("RenderToneMapUchimuraB");
+        if (controlp)
+        {
+            controlp->resetToDefault(true);
+        }
+        controlp = gSavedSettings.getControl("RenderToneMapLottesA");
+        if (controlp)
+        {
+            controlp->resetToDefault(true);
+        }
+        controlp = gSavedSettings.getControl("RenderToneMapLottesB");
+        if (controlp)
+        {
+            controlp->resetToDefault(true);
+        }
+        controlp = gSavedSettings.getControl("RenderToneMapUnchartedA");
+        if (controlp)
+        {
+            controlp->resetToDefault(true);
+        }
+        controlp = gSavedSettings.getControl("RenderToneMapUnchartedB");
+        if (controlp)
+        {
+            controlp->resetToDefault(true);
+        }
+        controlp = gSavedSettings.getControl("RenderToneMapUnchartedC");
+        if (controlp)
+        {
+            controlp->resetToDefault(true);
+        }
 	}
+}
+
+void ALFloaterLightBox::updateTonemapper()
+{
+    //TODO: We should figure out how to call this on floater open, otherwise it'll be weird.
+    
+    //Init Text
+    LLTextBox* text1 = getChild<LLTextBox>("tonemapper_dynamic_text1");
+    LLTextBox* text2 = getChild<LLTextBox>("tonemapper_dynamic_text2");
+    LLTextBox* text3 = getChild<LLTextBox>("tonemapper_dynamic_text3");
+    LLTextBox* text4 = getChild<LLTextBox>("tonemapper_dynamic_text4");
+    LLTextBox* text5 = getChild<LLTextBox>("tonemapper_dynamic_text5");
+    LLTextBox* text6 = getChild<LLTextBox>("tonemapper_dynamic_text6");
+    LLTextBox* text7 = getChild<LLTextBox>("tonemapper_dynamic_text7");
+    LLTextBox* text8 = getChild<LLTextBox>("tonemapper_dynamic_text8");
+
+	//Init Spinners
+    LLSpinCtrl* spinner1 = getChild<LLSpinCtrl>("tonemapper_dynamic_spinner1");
+    LLSpinCtrl* spinner2 = getChild<LLSpinCtrl>("tonemapper_dynamic_spinner2");
+    LLSpinCtrl* spinner3 = getChild<LLSpinCtrl>("tonemapper_dynamic_spinner3");
+    LLSpinCtrl* spinner4 = getChild<LLSpinCtrl>("tonemapper_dynamic_spinner4");
+    LLSpinCtrl* spinner5 = getChild<LLSpinCtrl>("tonemapper_dynamic_spinner5");
+    LLSpinCtrl* spinner6 = getChild<LLSpinCtrl>("tonemapper_dynamic_spinner6");
+    LLSpinCtrl* spinner7 = getChild<LLSpinCtrl>("tonemapper_dynamic_spinner7");
+    LLSpinCtrl* spinner8 = getChild<LLSpinCtrl>("tonemapper_dynamic_spinner8");
+
+    // Init Sliders
+    LLSliderCtrl* slider1 = getChild<LLSliderCtrl>("tonemapper_dynamic_slider1");
+    LLSliderCtrl* slider2 = getChild<LLSliderCtrl>("tonemapper_dynamic_slider2");
+    LLSliderCtrl* slider3 = getChild<LLSliderCtrl>("tonemapper_dynamic_slider3");
+    LLSliderCtrl* slider4 = getChild<LLSliderCtrl>("tonemapper_dynamic_slider4");
+    LLSliderCtrl* slider5 = getChild<LLSliderCtrl>("tonemapper_dynamic_slider5");
+    LLSliderCtrl* slider6 = getChild<LLSliderCtrl>("tonemapper_dynamic_slider6");
+    LLSliderCtrl* slider7 = getChild<LLSliderCtrl>("tonemapper_dynamic_slider7");
+    LLSliderCtrl* slider8 = getChild<LLSliderCtrl>("tonemapper_dynamic_slider8");
+
+    // Check the state of RenderToneMapType
+    U32 TMap = gSavedSettings.getU32("RenderToneMapType");
+
+    //Init Ctrl Objects
+    ALToneMapCtrl tm1;
+    ALToneMapCtrl tm2;
+    ALToneMapCtrl tm3;
+    ALToneMapCtrl tm4;
+    ALToneMapCtrl tm5;
+    ALToneMapCtrl tm6;
+    ALToneMapCtrl tm7;
+    ALToneMapCtrl tm8;
+
+    //These get to live on their own, lucky!
+	LLVector3 vTM_A;
+    LLVector3 vTM_B;
+    LLVector3 vTM_C;
+
+    if (TMap == 7)  // Uchimura
+    {
+        vTM_A = gSavedSettings.getVector3("RenderToneMapUchimuraA");
+
+        // max display brightness
+        tm1.TM_Enable = TRUE;
+        tm1.TM_CtrlName = "Max Brightness:";
+        tm1.TM_Min      = 0.0f;
+        tm1.TM_Max      = 1.0f;
+
+        // contrast
+        tm2.TM_Enable = TRUE;
+        tm2.TM_CtrlName = "Contrast:";
+        tm2.TM_Min      = 0.01f;
+        tm2.TM_Max      = 1.0f;
+
+        // linear section start
+        tm3.TM_Enable = TRUE;
+        tm3.TM_CtrlName = "Linear Start:";
+        tm3.TM_Min      = 0.01f;
+        tm3.TM_Max      = 2.0f;
+
+        vTM_B = gSavedSettings.getVector3("RenderToneMapUchimuraB");
+
+        // linear section length
+        tm4.TM_Enable   = TRUE;
+        tm4.TM_CtrlName = "Linear Length:";
+        tm4.TM_Min      = 0.01f;
+        tm4.TM_Max      = 1.0f;
+
+        // black
+        tm5.TM_Enable   = TRUE;
+        tm5.TM_CtrlName = "Black Level:";
+        tm5.TM_Min      = -4.0f;
+        tm5.TM_Max      = 4.0f;
+
+        // pedestal
+        tm6.TM_Enable   = TRUE;
+        tm6.TM_CtrlName = "Pedestal:";
+        tm6.TM_Min      = -2.0f;
+        tm6.TM_Max      = 2.0f;
+    }
+    else if (TMap == 8)  // Lottes
+    {
+        //TODO: Better names?
+        vTM_A = gSavedSettings.getVector3("RenderToneMapLottesA");
+
+        // a
+        tm1.TM_Enable   = TRUE;
+        tm1.TM_CtrlName = "A:";
+        tm1.TM_Min      = 0.0f;
+        tm1.TM_Max      = 1.0f;
+
+        // d
+        tm2.TM_Enable   = TRUE;
+        tm2.TM_CtrlName = "D:";
+        tm2.TM_Min      = 0.01f;
+        tm2.TM_Max      = 1.0f;
+
+        // maxhdr
+        tm3.TM_Enable   = TRUE;
+        tm3.TM_CtrlName = "Max HDR:";
+        tm3.TM_Min      = 0.01f;
+        tm3.TM_Max      = 2.0f;
+
+        vTM_B = gSavedSettings.getVector3("RenderToneMapLottesB");
+
+        // midln
+        tm4.TM_Enable   = TRUE;
+        tm4.TM_CtrlName = "Mid Level:";
+        tm4.TM_Min      = 0.01f;
+        tm4.TM_Max      = 1.0f;
+
+        // black
+        tm5.TM_Enable   = TRUE;
+        tm5.TM_CtrlName = "Black Level:";
+        tm5.TM_Min      = -4.0f;
+        tm5.TM_Max      = 4.0f;
+    }
+    else if (TMap == 9)  // Uncharted
+    {
+        //TODO: What in the world are these settings actually called?!
+        vTM_A = gSavedSettings.getVector3("RenderToneMapUnchartedA");
+
+        // a
+        tm1.TM_Enable   = TRUE;
+        tm1.TM_CtrlName = "A:";
+        tm1.TM_Min      = 0.0f;
+        tm1.TM_Max      = 4.0f;
+
+        // b
+        tm2.TM_Enable   = TRUE;
+        tm2.TM_CtrlName = "B:";
+        tm2.TM_Min      = 0.0f;
+        tm2.TM_Max      = 4.0f;
+
+        // c
+        tm3.TM_Enable   = TRUE;
+        tm3.TM_CtrlName = "C:";
+        tm3.TM_Min      = 0.0f;
+        tm3.TM_Max      = 4.0f;
+
+        vTM_B = gSavedSettings.getVector3("RenderToneMapUnchartedB");
+
+        // d
+        tm4.TM_Enable   = TRUE;
+        tm4.TM_CtrlName = "D:";
+        tm4.TM_Min      = 0.0f;
+        tm4.TM_Max      = 4.0f;
+
+        // e
+        tm5.TM_Enable   = TRUE;
+        tm5.TM_CtrlName = "E:";
+        tm5.TM_Min      = -0.5f;
+        tm5.TM_Max      = 0.05f;
+        tm5.TM_Inc      = 0.001f;
+        tm5.TM_Precision = 3;
+
+        // f
+        tm6.TM_Enable   = TRUE;
+        tm6.TM_CtrlName = "F:";
+        tm6.TM_Min      = 0.04f;
+        tm6.TM_Max      = 4.0f;
+
+        vTM_C = gSavedSettings.getVector3("RenderToneMapUnchartedC");
+
+        // w
+        tm7.TM_Enable   = TRUE;
+        tm7.TM_CtrlName = "W:";
+        tm7.TM_Min      = 0.0f;
+        tm7.TM_Max      = 12.0f;
+
+        // exposure bias
+        tm8.TM_Enable   = TRUE;
+        tm8.TM_CtrlName = "Exposure Bias:";
+        tm8.TM_Min      = 0.0f;
+        tm8.TM_Max      = 16.0f;
+    }
+
+    //Set Controls
+
+    //Visibilty
+    text1->setVisible(tm1.TM_Enable);
+    text1->setText(tm1.TM_CtrlName);
+    spinner1->setVisible(tm1.TM_Enable);
+    slider1->setVisible(tm1.TM_Enable);
+
+    text2->setVisible(tm2.TM_Enable);
+    text2->setText(tm2.TM_CtrlName);
+    spinner2->setVisible(tm2.TM_Enable);
+    slider2->setVisible(tm2.TM_Enable);
+
+    text3->setVisible(tm3.TM_Enable);
+    text3->setText(tm3.TM_CtrlName);
+    spinner3->setVisible(tm3.TM_Enable);
+    slider3->setVisible(tm3.TM_Enable);
+
+    text4->setVisible(tm4.TM_Enable);
+    text4->setText(tm4.TM_CtrlName);
+    spinner4->setVisible(tm4.TM_Enable);
+    slider4->setVisible(tm4.TM_Enable);
+
+    text5->setVisible(tm5.TM_Enable);
+    text5->setText(tm5.TM_CtrlName);
+    spinner5->setVisible(tm5.TM_Enable);
+    slider5->setVisible(tm5.TM_Enable);
+
+    text6->setVisible(tm6.TM_Enable);
+    text6->setText(tm6.TM_CtrlName);
+    spinner6->setVisible(tm6.TM_Enable);
+    slider6->setVisible(tm6.TM_Enable);
+
+    text7->setVisible(tm7.TM_Enable);
+    text7->setText(tm7.TM_CtrlName);
+    spinner7->setVisible(tm7.TM_Enable);
+    slider7->setVisible(tm7.TM_Enable);
+
+    text8->setVisible(tm8.TM_Enable);
+    text8->setText(tm8.TM_CtrlName);
+    spinner8->setVisible(tm8.TM_Enable);
+    slider8->setVisible(tm8.TM_Enable);
+
+    //Min Values
+    spinner1->setMinValue(tm1.TM_Min);
+    slider1->setMinValue(tm1.TM_Min);
+
+    spinner2->setMinValue(tm2.TM_Min);
+    slider2->setMinValue(tm2.TM_Min);
+
+    spinner3->setMinValue(tm3.TM_Min);
+    slider3->setMinValue(tm3.TM_Min);
+
+    spinner4->setMinValue(tm4.TM_Min);
+    slider4->setMinValue(tm4.TM_Min);
+
+    spinner5->setMinValue(tm5.TM_Min);
+    slider5->setMinValue(tm5.TM_Min);
+
+    spinner6->setMinValue(tm6.TM_Min);
+    slider6->setMinValue(tm6.TM_Min);
+
+    spinner7->setMinValue(tm7.TM_Min);
+    slider7->setMinValue(tm7.TM_Min);
+
+    spinner8->setMinValue(tm8.TM_Min);
+    slider8->setMinValue(tm8.TM_Min);
+
+    //Max Values
+    spinner1->setMaxValue(tm1.TM_Max);
+    slider1->setMaxValue(tm1.TM_Max);
+
+    spinner2->setMaxValue(tm2.TM_Max);
+    slider2->setMaxValue(tm2.TM_Max);
+
+    spinner3->setMaxValue(tm3.TM_Max);
+    slider3->setMaxValue(tm3.TM_Max);
+
+    spinner4->setMaxValue(tm4.TM_Max);
+    slider4->setMaxValue(tm4.TM_Max);
+
+    spinner5->setMaxValue(tm5.TM_Max);
+    slider5->setMaxValue(tm5.TM_Max);
+
+    spinner6->setMaxValue(tm6.TM_Max);
+    slider6->setMaxValue(tm6.TM_Max);
+
+    spinner7->setMaxValue(tm7.TM_Max);
+    slider7->setMaxValue(tm7.TM_Max);
+
+    spinner8->setMaxValue(tm8.TM_Max);
+    slider8->setMaxValue(tm8.TM_Max);
+
+    //Precision
+    spinner1->setPrecision(tm1.TM_Precision);
+    slider1->setPrecision(tm1.TM_Precision);
+
+    spinner2->setPrecision(tm2.TM_Precision);
+    slider2->setPrecision(tm2.TM_Precision);
+
+    spinner3->setPrecision(tm3.TM_Precision);
+    slider3->setPrecision(tm3.TM_Precision);
+
+    spinner4->setPrecision(tm4.TM_Precision);
+    slider4->setPrecision(tm4.TM_Precision);
+
+    spinner5->setPrecision(tm5.TM_Precision);
+    slider5->setPrecision(tm5.TM_Precision);
+
+    spinner6->setPrecision(tm6.TM_Precision);
+    slider6->setPrecision(tm6.TM_Precision);
+
+    spinner7->setPrecision(tm7.TM_Precision);
+    slider7->setPrecision(tm7.TM_Precision);
+
+    spinner8->setPrecision(tm8.TM_Precision);
+    slider8->setPrecision(tm8.TM_Precision);
+
+    //Increment
+    spinner1->setIncrement(tm1.TM_Inc);
+    slider1->setIncrement(tm1.TM_Inc);
+
+    spinner2->setIncrement(tm2.TM_Inc);
+    slider2->setIncrement(tm2.TM_Inc);
+
+    spinner3->setIncrement(tm3.TM_Inc);
+    slider3->setIncrement(tm3.TM_Inc);
+
+    spinner4->setIncrement(tm4.TM_Inc);
+    slider4->setIncrement(tm4.TM_Inc);
+
+    spinner5->setIncrement(tm5.TM_Inc);
+    slider5->setIncrement(tm5.TM_Inc);
+
+    spinner6->setIncrement(tm6.TM_Inc);
+    slider6->setIncrement(tm6.TM_Inc);
+
+    spinner7->setIncrement(tm7.TM_Inc);
+    slider7->setIncrement(tm7.TM_Inc);
+
+    spinner8->setIncrement(tm8.TM_Inc);
+    slider8->setIncrement(tm8.TM_Inc);
+
+    // Values
+    spinner1->setValue(vTM_A[VX]);
+    slider1->setValue(vTM_A[VX]);
+
+    spinner2->setValue(vTM_A[VY]);
+    slider2->setValue(vTM_A[VY]);
+
+    spinner3->setValue(vTM_A[VZ]);
+    slider3->setValue(vTM_A[VZ]);
+
+    spinner4->setValue(vTM_B[VX]);
+    slider4->setValue(vTM_B[VX]);
+
+    spinner5->setValue(vTM_B[VY]);
+    slider5->setValue(vTM_B[VY]);
+
+    spinner6->setValue(vTM_B[VZ]);
+    slider6->setValue(vTM_B[VZ]);
+
+    spinner7->setValue(vTM_C[VX]);
+    slider7->setValue(vTM_C[VX]);
+
+    spinner8->setValue(vTM_C[VY]);
+    slider8->setValue(vTM_C[VY]);
+}
+
+void ALFloaterLightBox::updateSSAO() 
+{
+    //TODO: Make generic in case more Vec3 values need to be poked
+    LLVector3 SSAO_PARAMS = gSavedSettings.getVector3("RenderSSAOEffect");
+    F32       SSAO_Strength_Relative = clamp(1 - SSAO_PARAMS[VX], 0.0f, 1.0f);  // Remapped Value to Slider's Expecations, also clamped
+
+    // Init UI
+    LLSpinCtrl*   spinner1 = getChild<LLSpinCtrl>("ssao_strength_spinner");
+    LLSliderCtrl* slider1  = getChild<LLSliderCtrl>("ssao_strength_slider");
+
+    spinner1->setMinValue(0.0f);
+    spinner1->setMaxValue(1.0f);
+    spinner1->setPrecision(2);
+    spinner1->setIncrement(0.01f);
+    spinner1->setValue(SSAO_Strength_Relative);
+
+    slider1->setMinValue(0.0f);
+    slider1->setMaxValue(1.0f);
+    slider1->setIncrement(0.01f);
+    slider1->setValue(SSAO_Strength_Relative);
+}
+
+void ALFloaterLightBox::updateCAS() 
+{
+    // Check the state of RenderSharpenMethod
+    U32 CAS_MODE = gSavedSettings.getU32("RenderSharpenMethod");
+
+    // Init UI
+    LLTextBox* text2 = getChild<LLTextBox>("sharp_dynamic_text");
+    LLSpinCtrl* spinner1 = getChild<LLSpinCtrl>("sharp_strength_spinner");
+    LLSpinCtrl* spinner2 = getChild<LLSpinCtrl>("sharp_dynamic_spinner");
+    LLSliderCtrl* slider1 = getChild<LLSliderCtrl>("sharp_strength_slider");
+    LLSliderCtrl* slider2 = getChild<LLSliderCtrl>("sharp_dynamic_slider");
+
+    // Init Ctrl Objects
+    ALToneMapCtrl sharp1;
+    ALToneMapCtrl sharp2;
+    LLVector3     CAS_PARAMS;
+
+    //Due to how ALToneMapCtrl inits, we don't need to check if it's been disabled.
+    if (CAS_MODE==1) //CAS
+    {
+        CAS_PARAMS = gSavedSettings.getVector3("RenderSharpenCASParams");
+        sharp1.TM_Enable = TRUE;
+        sharp1.TM_Min      = 0.0f;
+        sharp1.TM_CtrlName = "Contrast:";
+    }
+    else if (CAS_MODE == 2)  // DLS
+    {
+        CAS_PARAMS         = gSavedSettings.getVector3("RenderSharpenDLSParams");
+        sharp1.TM_Enable   = TRUE;
+        sharp1.TM_Min      = 0.0f;
+        sharp1.TM_CtrlName = "Denoise:";
+    }
+    spinner1->setEnabled(sharp1.TM_Enable);
+    spinner1->setMinValue(sharp1.TM_Min);
+    spinner1->setMaxValue(sharp1.TM_Max);
+    spinner1->setPrecision(sharp1.TM_Precision);
+    spinner1->setIncrement(sharp1.TM_Inc);
+    spinner1->setValue(CAS_PARAMS[VX]);
+    slider1->setEnabled(sharp1.TM_Enable);
+    slider1->setMinValue(sharp1.TM_Min);
+    slider1->setMaxValue(sharp1.TM_Max);
+    slider1->setIncrement(sharp1.TM_Inc);
+    slider1->setValue(CAS_PARAMS[VX]);
+
+    text2->setVisible(sharp1.TM_Enable);
+    text2->setText(sharp1.TM_CtrlName);
+    spinner2->setEnabled(sharp1.TM_Enable);
+    spinner2->setMinValue(sharp1.TM_Min);
+    spinner2->setMaxValue(sharp1.TM_Max);
+    spinner2->setPrecision(sharp1.TM_Precision);
+    spinner2->setIncrement(sharp1.TM_Inc);
+    spinner2->setValue(CAS_PARAMS[VY]);
+    slider2->setEnabled(sharp1.TM_Enable);
+    slider2->setMinValue(sharp1.TM_Min);
+    slider2->setMaxValue(sharp1.TM_Max);
+    slider2->setIncrement(sharp1.TM_Inc);
+    slider2->setValue(CAS_PARAMS[VY]);
+}
+
+void ALFloaterLightBox::commitTonemapper(const LLSD& userdata)
+{
+    const std::string& active_control = userdata.asString();
+    // Check the state of RenderToneMapType
+    U32 TMap = gSavedSettings.getU32("RenderToneMapType");
+
+    LLVector3 vTM_A;
+    LLVector3 vTM_B;
+    LLVector3 vTM_C;
+    if (TMap == 7)  // Uchimura
+    {
+        vTM_A[VX] = (F32) getChild<LLUICtrl>("tonemapper_dynamic_" + active_control + "1")->getValue().asReal();
+        vTM_A[VY] = (F32) getChild<LLUICtrl>("tonemapper_dynamic_" + active_control + "2")->getValue().asReal();
+        vTM_A[VZ] = (F32) getChild<LLUICtrl>("tonemapper_dynamic_" + active_control + "3")->getValue().asReal();
+        vTM_B[VX] = (F32) getChild<LLUICtrl>("tonemapper_dynamic_" + active_control + "4")->getValue().asReal();
+        vTM_B[VY] = (F32) getChild<LLUICtrl>("tonemapper_dynamic_" + active_control + "5")->getValue().asReal();
+        vTM_B[VZ] = (F32) getChild<LLUICtrl>("tonemapper_dynamic_" + active_control + "6")->getValue().asReal();
+        gSavedSettings.setVector3("RenderToneMapUchimuraA", vTM_A);
+        gSavedSettings.setVector3("RenderToneMapUchimuraB", vTM_B);
+    }
+    else if (TMap == 8)  // Lottes
+    {
+        vTM_A[VX] = (F32) getChild<LLUICtrl>("tonemapper_dynamic_" + active_control + "1")->getValue().asReal();
+        vTM_A[VY] = (F32) getChild<LLUICtrl>("tonemapper_dynamic_" + active_control + "2")->getValue().asReal();
+        vTM_A[VZ] = (F32) getChild<LLUICtrl>("tonemapper_dynamic_" + active_control + "3")->getValue().asReal();
+        vTM_B[VX] = (F32) getChild<LLUICtrl>("tonemapper_dynamic_" + active_control + "4")->getValue().asReal();
+        vTM_B[VY] = (F32) getChild<LLUICtrl>("tonemapper_dynamic_" + active_control + "5")->getValue().asReal();
+        vTM_B[VZ] = 0.0f;
+        gSavedSettings.setVector3("RenderToneMapLottesA", vTM_A);
+        gSavedSettings.setVector3("RenderToneMapLottesB", vTM_B);
+    }
+    else if (TMap == 9)  // Uncharted
+    {
+        vTM_A[VX] = (F32) getChild<LLUICtrl>("tonemapper_dynamic_" + active_control + "1")->getValue().asReal();
+        vTM_A[VY] = (F32) getChild<LLUICtrl>("tonemapper_dynamic_" + active_control + "2")->getValue().asReal();
+        vTM_A[VZ] = (F32) getChild<LLUICtrl>("tonemapper_dynamic_" + active_control + "3")->getValue().asReal();
+        vTM_B[VX] = (F32) getChild<LLUICtrl>("tonemapper_dynamic_" + active_control + "4")->getValue().asReal();
+        vTM_B[VY] = (F32) getChild<LLUICtrl>("tonemapper_dynamic_" + active_control + "5")->getValue().asReal();
+        vTM_B[VZ] = (F32) getChild<LLUICtrl>("tonemapper_dynamic_" + active_control + "6")->getValue().asReal();
+        vTM_C[VX] = (F32) getChild<LLUICtrl>("tonemapper_dynamic_" + active_control + "7")->getValue().asReal();
+        vTM_C[VY] = (F32) getChild<LLUICtrl>("tonemapper_dynamic_" + active_control + "8")->getValue().asReal();
+        vTM_C[VZ] = 0.0f;
+        gSavedSettings.setVector3("RenderToneMapUnchartedA", vTM_A);
+        gSavedSettings.setVector3("RenderToneMapUnchartedB", vTM_B);
+        gSavedSettings.setVector3("RenderToneMapUnchartedC", vTM_C);
+    }
+}
+
+void ALFloaterLightBox::commitSSAO(const LLSD& userdata)
+{
+    // TODO: This should probably be more generic in case I need to poke another vec3 setting.
+    const std::string& active_control = userdata.asString();
+
+    // Remap back to what the value expects, also clamp
+    F32 SSAO_Strength_Real = clamp(1 - (F32) getChild<LLUICtrl>("ssao_strength_" + active_control)->getValue().asReal(), 0.0f, 1.0f);
+    
+    LLVector3 SSAO;
+    SSAO[VX] = SSAO_Strength_Real;
+    SSAO[VY] = 1.0f;
+    SSAO[VZ] = 0.0f;
+    gSavedSettings.setVector3("RenderSSAOEffect", SSAO);
+}
+
+void ALFloaterLightBox::commitCAS(const LLSD& userdata)
+{
+    const std::string& active_control = userdata.asString();
+    // Check the state of RenderSharpenMethod
+    U32 CAS_MODE = gSavedSettings.getU32("RenderSharpenMethod");
+
+    LLVector3 CAS_PARAMS;
+    CAS_PARAMS[VX] = (F32) getChild<LLUICtrl>("sharp_strength_" + active_control)->getValue().asReal();
+    CAS_PARAMS[VY] = (F32) getChild<LLUICtrl>("sharp_dynamic_" + active_control)->getValue().asReal();
+    CAS_PARAMS[VZ] = 0.0f;
+    if (CAS_MODE == 1)  // CAS
+    {
+        gSavedSettings.setVector3("RenderSharpenCASParams", CAS_PARAMS);
+    }
+    else if (CAS_MODE == 2)  // DLS
+    {
+        gSavedSettings.setVector3("RenderSharpenDLSParams", CAS_PARAMS);
+    }
 }

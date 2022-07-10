@@ -34,16 +34,39 @@
 #define AL_FLOATERLIGHTBOX_H
 
 #include "llfloater.h"
+#include <string>
+using namespace std;
 
 class ALFloaterLightBox final : public LLFloater
 {
 public:
 	ALFloaterLightBox(const LLSD& key);
 	BOOL postBuild() override;
-private:
+    virtual void draw();
+
+  private:
 	void onClickResetControlDefault(const LLSD& userdata);
 	void onClickResetGroupDefault(const LLSD& userdata);
+    void updateTonemapper();
+    void updateCAS();
+    void updateSSAO();
+    void commitTonemapper(const LLSD& userdata);
+    void commitCAS(const LLSD& userdata);
+    void commitSSAO(const LLSD& userdata);
 	
+};
+
+//Initalizing this with values allows more straightforward usage in the context of UI Control
+//TODO: Genericize!
+class ALToneMapCtrl
+{
+  public:
+    BOOL TM_Enable      = FALSE;
+    string TM_CtrlName = "Ctrl_Text";
+    F32 TM_Min          = 0.1f;
+    F32 TM_Max          = 1.0f;
+    F32 TM_Inc          = 0.01f;
+    U32 TM_Precision    = 2;
 };
 
 #endif // AL_FLOATERLIGHTBOX_H
