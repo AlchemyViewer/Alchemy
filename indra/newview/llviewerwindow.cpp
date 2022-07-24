@@ -2034,7 +2034,10 @@ LLViewerWindow::LLViewerWindow(const Params& p)
 		|| (gSavedSettings.getString("LastGPUString") != LLFeatureManager::getInstance()->getGPUString())
 		|| (gSavedSettings.getBOOL("ProbeHardwareOnStartup")))
 	{
-		LLFeatureManager::getInstance()->applyRecommendedSettings();
+		if (gSavedSettings.getS32("AlchemyKeepSettingsOnGPUChange") < 1)
+		{
+			LLFeatureManager::getInstance()->applyRecommendedSettings();
+		}
 		gSavedSettings.setBOOL("ProbeHardwareOnStartup", FALSE);
 	}
 

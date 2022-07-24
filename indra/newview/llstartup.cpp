@@ -296,6 +296,7 @@ void transition_back_to_login_panel(const std::string& emsg);
 // [SL:KB] - Patch: Chat-Alerts | Checked: 2012-09-22 (Catznip-3.3)
 void handleLoadChatAlertSounds();
 // [/SL:KB]
+bool callbackConfirmDisplayPreferencesReset(const LLSD& notification, const LLSD& response);
 
 void callback_cache_name(const LLUUID& id, const std::string& full_name, bool is_group)
 {
@@ -425,12 +426,12 @@ bool idle_startup()
 		{
 			LLNotificationsUtil::add("DisplaySetToRecommendedFeatureChange");
 		}
-		else if ( ! lastGPU.empty() && (lastGPU != thisGPU))
+		else if ( ! lastGPU.empty() && (gSavedSettings.getS32("AlchemyKeepSettingsOnGPUChange") == -1) && (lastGPU != thisGPU))
 		{
 			LLSD subs;
 			subs["LAST_GPU"] = lastGPU;
 			subs["THIS_GPU"] = thisGPU;
-			LLNotificationsUtil::add("DisplaySetToRecommendedGPUChange", subs);
+			LLNotificationsUtil::add("AskForDisplayPreferencesReset", subs, callbackConfirmDisplayPreferencesReset);
 		}
 		else if (!gViewerWindow->getInitAlert().empty())
 		{
@@ -3859,3 +3860,23 @@ void handleLoadChatAlertSounds()
 	}
 }
 // [/SL:KB]
+
+bool callbackConfirmDisplayPreferencesReset(const LLSD& notification, const LLSD& response)
+{
+	S32 option = LLNotification::getSelectedOption(notification, response);
+	switch (option)
+	{
+	case 0: // Yes
+		LLFeatureManager::getInstance()->applyRecommendedSettings();
+		break;
+	case 1: // No
+		break;
+	case -1: // Cancel/window closed
+		break;
+	default:
+		// Don't ask again
+		gSavedSettings.setS32("AlchemyKeepSettingsOnGPUChange", 1);
+		break;
+	}
+	return false;
+}
