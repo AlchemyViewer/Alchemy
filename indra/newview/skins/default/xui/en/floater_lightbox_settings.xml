@@ -179,10 +179,10 @@
 					name="sharpenmethod_combo"
 					top_pad="-16"
 					width="80">
-					<combo_box.item
+					<!--<combo_box.item
 						label="None"
 						name="sharp_none"
-						value="0" />
+						value="0" />-->
 					<combo_box.item
 						label="CAS"
 						name="sharp_cas"
@@ -810,10 +810,10 @@
 					tool_tip="Controls SMAA Quality"
 					control_name="RenderFSAASamples"
 					name="smaa_combo">
-					<combo_box.item
+					<!--<combo_box.item
 						label="Disable"
 						name="smaa_off"
-						value="0" />
+						value="0" />-->
 					<combo_box.item
 						label="Low (x2)"
 						name="smaa_2"
