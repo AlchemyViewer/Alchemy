@@ -426,12 +426,12 @@ bool idle_startup()
 		{
 			LLNotificationsUtil::add("DisplaySetToRecommendedFeatureChange");
 		}
-		else if ( ! lastGPU.empty() && (gSavedSettings.getS32("AlchemyKeepSettingsOnGPUChange") == -1) && (lastGPU != thisGPU))
+		else if ( ! lastGPU.empty() && lastGPU != thisGPU && !gSavedSettings.getBool("AlchemyKeepSettingsOnGPUChange"))
 		{
 			LLSD subs;
 			subs["LAST_GPU"] = lastGPU;
 			subs["THIS_GPU"] = thisGPU;
-			LLNotificationsUtil::add("AskForDisplayPreferencesReset", subs, callbackConfirmDisplayPreferencesReset);
+			LLNotificationsUtil::add("AskForDisplayPreferencesReset", subs, LLSD(), callbackConfirmDisplayPreferencesReset);
 		}
 		else if (!gViewerWindow->getInitAlert().empty())
 		{
@@ -3863,20 +3863,12 @@ void handleLoadChatAlertSounds()
 
 bool callbackConfirmDisplayPreferencesReset(const LLSD& notification, const LLSD& response)
 {
-	S32 option = LLNotification::getSelectedOption(notification, response);
-	switch (option)
+	S32 option = LLNotificationsUtil::getSelectedOption(notification, response);
+	if (0 == option)
 	{
-	case 0: // Yes
 		LLFeatureManager::getInstance()->applyRecommendedSettings();
-		break;
-	case 1: // No
-		break;
-	case -1: // Cancel/window closed
-		break;
-	default:
-		// Don't ask again
-		gSavedSettings.setS32("AlchemyKeepSettingsOnGPUChange", 1);
-		break;
 	}
+	gSavedSettings.setBOOL("AlchemyKeepSettingsOnGPUChange", (2 == option));
+	gSavedSettings.saveToFile(gSavedSettings.getString("ClientSettingsFile"), TRUE);
 	return false;
 }
