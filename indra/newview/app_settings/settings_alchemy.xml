@@ -361,9 +361,9 @@
       <key>Persist</key>
       <integer>1</integer>
       <key>Type</key>
-      <string>S32</string>
+      <string>Boolean</string>
       <key>Value</key>
-      <integer>-1</integer>
+      <integer>0</integer>
     </map>
     <key>AlchemyLookAtShow</key>
     <map>
