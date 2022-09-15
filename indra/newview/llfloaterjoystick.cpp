@@ -292,7 +292,7 @@ void LLFloaterJoystick::refreshListOfDevices()
         std::string desc = LLViewerJoystick::getInstance()->getDescription();
         if (!desc.empty())
         {
-            LLSD value = LLSD::Integer(0);
+            LLSD value = LLSD::Integer(1);
             addDevice(desc, value);
             mHasDeviceList = true;
         }
