@@ -643,6 +643,8 @@
           <map>
             <key>archive</key>
             <map>
+              <key>creds</key>
+              <string>gitlab</string>
               <key>hash</key>
               <string>db27e5c974e41d822c75038a6816b07362d54f1b0a64f21a63f0b7076f94c4a34934145bc326a1cc946996abec4b9a5c47e8ef9c68a694e129f09876080d74ac</string>
               <key>hash_algorithm</key>
@@ -657,6 +659,8 @@
           <map>
             <key>archive</key>
             <map>
+              <key>creds</key>
+              <string>gitlab</string>
               <key>hash</key>
               <string>f430175d7af2a8f5e084cd789df904944b117eebb462211eafa80ea5c7f23399449c5a52faf35b3b81a09c51fdff0273741fb32c55f9c615a51b1f15a5094ca5</string>
               <key>hash_algorithm</key>
@@ -671,6 +675,8 @@
           <map>
             <key>archive</key>
             <map>
+              <key>creds</key>
+              <string>gitlab</string>
               <key>hash</key>
               <string>7ad5fe064e3a7f45234a3658315a86d80b85f5f49f8a1767e1453116bd23eda67a014c521cf26529fb6bbada3441e64ddffef98ddfa85ae846d8aec72ba6fc70</string>
               <key>hash_algorithm</key>
@@ -911,6 +917,8 @@
           <map>
             <key>archive</key>
             <map>
+              <key>creds</key>
+              <string>gitlab</string>
               <key>hash</key>
               <string>388c77f035b7b68dbeb494c57f0479799c55ab694d330d1dc8a921145d1ad01412b042b0803d27438a05af73eecc452474919f190604adf82c47a5858c81d652</string>
               <key>hash_algorithm</key>
@@ -925,6 +933,8 @@
           <map>
             <key>archive</key>
             <map>
+              <key>creds</key>
+              <string>gitlab</string>
               <key>hash</key>
               <string>dc19ff2932abbe6ad9d023da725e1453b2804bb7cafa707856ef3480594f3de1d6f7559885ff8bd00a8c89accb83b0b805366609705ea1c53f61060a9f5c7852</string>
               <key>hash_algorithm</key>
@@ -1615,6 +1625,8 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
           <map>
             <key>archive</key>
             <map>
+              <key>creds</key>
+              <string>gitlab</string>
               <key>hash</key>
               <string>b098bab37d4f4967bec96b5eb2867262965a1ccaa48f595600fea9f98a7f5d8a01ae85272db51cc368528973793c2f006c822d130d78e65592072ff598afc9d7</string>
               <key>hash_algorithm</key>
