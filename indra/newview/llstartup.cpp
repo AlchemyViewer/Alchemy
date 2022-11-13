@@ -3864,11 +3864,20 @@ void handleLoadChatAlertSounds()
 bool callbackConfirmDisplayPreferencesReset(const LLSD& notification, const LLSD& response)
 {
 	S32 option = LLNotificationsUtil::getSelectedOption(notification, response);
-	if (0 == option)
+
+	switch (option)
 	{
-		LLFeatureManager::getInstance()->applyRecommendedSettings();
+		case 2:
+			LL_INFOS() << "User chose to always keep graphic settings despite GPU changes." << LL_ENDL;
+			gSavedSettings.setBOOL("AlchemyKeepSettingsOnGPUChange", true);
+			gSavedSettings.saveToFile(gSavedSettings.getString("ClientSettingsFile"), TRUE);
+			break;
+		case 1:
+			LL_INFOS() << "User chose to keep graphic settings despite a GPU change." << LL_ENDL;
+			break;
+		default:
+			LL_INFOS() << "User chose to reset graphic settings due to GPU change." << LL_ENDL;
+			LLFeatureManager::getInstance()->applyRecommendedSettings();
 	}
-	gSavedSettings.setBOOL("AlchemyKeepSettingsOnGPUChange", (2 == option));
-	gSavedSettings.saveToFile(gSavedSettings.getString("ClientSettingsFile"), TRUE);
 	return false;
 }
