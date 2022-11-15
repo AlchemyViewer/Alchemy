@@ -154,6 +154,7 @@
    follows="left|top"
    height="20"
    label="Enable Moon Walk"
+   tool_tip="Disables turning around when walking backwards. This is only visible to you"
    layout="topleft"
    left_delta="0"
    name="moon_walk"
