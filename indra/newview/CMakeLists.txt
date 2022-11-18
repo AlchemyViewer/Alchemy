@@ -333,6 +333,7 @@ set(viewer_SOURCE_FILES
     llfloaterpreference.cpp
     llfloaterpreferenceviewadvanced.cpp
     llfloaterpreviewtrash.cpp
+    llfloaterprogressview.cpp
     llfloaterproperties.cpp
     llfloaterregiondebugconsole.cpp
     llfloaterregioninfo.cpp
@@ -1026,6 +1027,7 @@ set(viewer_HEADER_FILES
     llfloaterpreference.h
     llfloaterpreferenceviewadvanced.h
     llfloaterpreviewtrash.h
+    llfloaterprogressview.h
     llfloaterproperties.h
     llfloaterregiondebugconsole.h
     llfloaterregioninfo.h

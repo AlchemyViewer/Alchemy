@@ -126,6 +126,7 @@
 #include "llfloaterpreferenceviewadvanced.h"
 #include "llfloaterpreviewtrash.h"
 #include "llfloaterprofile.h"
+#include "llfloaterprogressview.h"
 #include "llfloaterproperties.h"
 #include "llfloaterregiondebugconsole.h"
 #include "llfloaterregioninfo.h"
@@ -424,6 +425,7 @@ void LLViewerFloaterReg::registerFloaters()
     LLFloaterReg::add("lightbox", "floater_lightbox_settings.xml", (LLFloaterBuildFunc) &LLFloaterReg::build<ALFloaterLightBox>);
 	LLFloaterReg::add("music_ticker", "floater_music_ticker.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloater>);
 	LLFloaterReg::add("particle_editor", "floater_particle_editor.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<ALFloaterParticleEditor>);
+	LLFloaterReg::add("progress_view", "floater_progress_view.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterProgressView>);
 	LLFloaterReg::add("quick_settings", "floater_quick_settings.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloater>);
 	LLFloaterReg::add("region_tracker", "floater_region_tracker.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<ALFloaterRegionTracker>);
 	LLFloaterReg::add("search", "floater_directory.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterDirectory>);
