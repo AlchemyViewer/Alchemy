@@ -121,10 +121,13 @@ BOOL  LLAvatarListItem::postBuild()
 
 	mIconPermissionEditTheirs = getChild<LLIconCtrl>("permission_edit_theirs_icon");
 	mIconPermissionMapTheirs = getChild<LLIconCtrl>("permission_map_theirs_icon");
+	mIconPermissionOnlineTheirs = getChild<LLIconCtrl>("permission_online_theirs_icon");
+
 	mIconPermissionOnline->setVisible(false);
 	mIconPermissionMap->setVisible(false);
 	mIconPermissionEditMine->setVisible(false);
 	mIconPermissionEditTheirs->setVisible(false);
+	mIconPermissionOnlineTheirs->setVisible(false);
 	mIconPermissionMapTheirs->setVisible(false);
 
 	mIconHovered = getChild<LLIconCtrl>("hovered_icon");
@@ -156,7 +159,9 @@ BOOL  LLAvatarListItem::postBuild()
 	mIconPermissionMap->setEnabled(SP_NEVER != mShowPermissions);
 	mIconPermissionEditMine->setEnabled(SP_NEVER != mShowPermissions);
 	mIconPermissionEditTheirs->setEnabled(SP_NEVER != mShowPermissions);
+	mIconPermissionOnlineTheirs->setEnabled(SP_NEVER != mShowPermissions);
 	mIconPermissionMapTheirs->setEnabled(SP_NEVER != mShowPermissions);
+
 	return TRUE;
 }
 
@@ -331,6 +336,7 @@ void LLAvatarListItem::setShowPermissions(EShowPermissionType spType)
 	mIconPermissionMap->setEnabled(SP_NEVER != mShowPermissions);
 	mIconPermissionEditMine->setEnabled(SP_NEVER != mShowPermissions);
 	mIconPermissionEditTheirs->setEnabled(SP_NEVER != mShowPermissions);
+	mIconPermissionOnlineTheirs->setEnabled(SP_NEVER != mShowPermissions);
 	mIconPermissionMapTheirs->setEnabled(SP_NEVER != mShowPermissions);
 	
 	refreshPermissions();
@@ -675,6 +681,7 @@ void LLAvatarListItem::initChildrenWidths(LLAvatarListItem* avatar_item)
 	S32 permission_edit_theirs_width = avatar_item->mIconPermissionEditMine->getRect().mLeft - avatar_item->mIconPermissionEditTheirs->getRect().mLeft;
 
 	S32 permission_map_theirs_width = avatar_item->mIconPermissionEditTheirs->getRect().mLeft - avatar_item->mIconPermissionMapTheirs->getRect().mLeft;
+	S32 permission_online_theirs_width = avatar_item->mIconPermissionMapTheirs->getRect().mLeft - avatar_item->mIconPermissionOnlineTheirs->getRect().mLeft;
 
 
 	// avatar icon width + padding
@@ -685,6 +692,7 @@ void LLAvatarListItem::initChildrenWidths(LLAvatarListItem* avatar_item)
 	S32 index = ALIC_COUNT;
 	sChildrenWidths[--index] = icon_width;
 	sChildrenWidths[--index] = 0; // for avatar name we don't need its width, it will be calculated as "left available space"
+	sChildrenWidths[--index] = permission_online_theirs_width;
 	sChildrenWidths[--index] = permission_map_theirs_width;
 	sChildrenWidths[--index] = permission_edit_theirs_width;
 	sChildrenWidths[--index] = permission_edit_mine_width;
@@ -794,6 +802,7 @@ bool LLAvatarListItem::refreshPermissions()
 		mIconPermissionEditMine->setImageOverlay( (fGrantedEditMine) ? "" : strUngrantedOverlay);
 
 		mIconPermissionEditTheirs->setVisible(relation->isRightGrantedFrom(LLRelationship::GRANT_MODIFY_OBJECTS));
+		mIconPermissionOnlineTheirs->setVisible(relation->isRightGrantedFrom(LLRelationship::GRANT_ONLINE_STATUS));
 		mIconPermissionMapTheirs->setVisible(relation->isRightGrantedFrom(LLRelationship::GRANT_MAP_LOCATION));
 	}
 	else
@@ -802,6 +811,7 @@ bool LLAvatarListItem::refreshPermissions()
 		mIconPermissionMap->setVisible(false);
 		mIconPermissionEditMine->setVisible(false);
 		mIconPermissionEditTheirs->setVisible(false);
+		mIconPermissionOnlineTheirs->setVisible(false);
 		mIconPermissionMapTheirs->setVisible(false);
 	}
 
@@ -840,6 +850,9 @@ LLView* LLAvatarListItem::getItemChildView(EAvatarListItemChildIndex child_view_
 		break;
 	case ALIC_PERMISSION_MAP_THEIRS:
 		child_view = mIconPermissionMapTheirs;
+		break;
+	case ALIC_PERMISSION_ONLINE_THEIRS:
+		child_view = mIconPermissionOnlineTheirs;
 		break;
 	case ALIC_INFO_BUTTON:
 		child_view = mInfoBtn;

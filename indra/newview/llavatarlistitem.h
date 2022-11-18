@@ -151,6 +151,8 @@ protected:
 	LLIconCtrl* mIconPermissionEditTheirs = nullptr;
 	/// Indicator for permission to show their position on the map.
 	LLIconCtrl* mIconPermissionMapTheirs = nullptr;
+	/// Indicator for permission to see their online status.
+	LLIconCtrl* mIconPermissionOnlineTheirs = nullptr;
 
 	LLIconCtrl* mIconHovered = nullptr;
 
@@ -179,6 +181,7 @@ private:
 		ALIC_PERMISSION_EDIT_MINE,
 		ALIC_PERMISSION_EDIT_THEIRS,
 		ALIC_PERMISSION_MAP_THEIRS,
+		ALIC_PERMISSION_ONLINE_THEIRS,
 		ALIC_NAME,
 		ALIC_ICON,
 		ALIC_COUNT,
