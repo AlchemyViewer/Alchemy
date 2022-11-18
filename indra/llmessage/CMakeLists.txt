@@ -29,6 +29,7 @@ include_directories(
     )
 
 set(llmessage_SOURCE_FILES
+    llaescipher.cpp
     llassetstorage.cpp
     llavatarname.cpp
     llavatarnamecache.cpp
@@ -106,6 +107,7 @@ set(llmessage_SOURCE_FILES
 set(llmessage_HEADER_FILES
     CMakeLists.txt
 
+    llaescipher.h
     llassetstorage.h
     llavatarname.h
     llavatarnamecache.h
