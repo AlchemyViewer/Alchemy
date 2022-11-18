@@ -6879,8 +6879,7 @@ void LLObjectBridge::buildContextMenu(LLMenuGL& menu, U32 flags)
 				items.push_back(std::string("Wearable Add"));
 				items.push_back(std::string("Attach To"));
 				items.push_back(std::string("Attach To HUD"));
-				// commented out for DEV-32347
-				//items.push_back(std::string("Restore to Last Position"));
+				items.push_back(std::string("Restore to Last Position"));
 
 				if (!gAgentAvatarp->canAttachMoreObjects())
 				{
