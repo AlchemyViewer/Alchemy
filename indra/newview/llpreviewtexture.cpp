@@ -35,6 +35,9 @@
 #include "llcombobox.h"
 #include "llfilepicker.h"
 #include "llfloaterreg.h"
+#include "llimagebmp.h"
+#include "llimagejpeg.h"
+#include "llimagej2c.h"
 #include "llimagetga.h"
 #include "llimagepng.h"
 #include "llimagewebp.h"
@@ -469,6 +472,18 @@ void LLPreviewTexture::onFileLoadedForSave(BOOL success,
 		else if(extension == "tga")
 		{
 			image = new LLImageTGA;
+		}
+		else if(extension == "jpg" || extension == "jpeg")
+		{
+			image = new LLImageJPEG;
+		}
+		else if(extension == "j2c")
+		{
+			image = new LLImageJ2C;
+		}
+		else if(extension == "bmp")
+		{
+			image = new LLImageBMP;
 		}
 		else if (extension == "webp")
 		{
