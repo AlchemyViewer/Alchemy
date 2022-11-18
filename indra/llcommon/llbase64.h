@@ -31,7 +31,11 @@
 class LL_COMMON_API LLBase64
 {
 public:
+	static std::string encode(const std::string& in_str);
 	static std::string encode(const U8* input, size_t input_size);
+	static size_t decode(const std::string& input, U8 * buffer, size_t buffer_size);
+	static std::string decode(const std::string& input);
+	static size_t requiredDecryptionSpace(const std::string& str);
 };
 
 #endif

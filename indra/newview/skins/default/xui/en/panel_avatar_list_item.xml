@@ -69,6 +69,18 @@
      enabled="false"
      height="16"
      follows="right"
+     image_name="Permission_Visible_Them_Online"
+     layout="topleft"
+     left_pad="3"
+     right="-215"
+     name="permission_online_theirs_icon"
+     tool_tip="You can see when this friend is online"
+     top="4"
+     width="16" />
+    <icon
+     enabled="false"
+     height="16"
+     follows="right"
      image_name="Permission_Visible_Them_Map"
      layout="topleft"
      left_pad="3"

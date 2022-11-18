@@ -1181,6 +1181,30 @@ LLView* LLFloaterIMSessionTab::getChatHistory()
 	return mChatHistory;
 }
 
+// virtual
+void LLFloaterIMSessionTab::applyMUPose(std::string& text)
+{
+	static LLCachedControl<bool> useMUPose(gSavedSettings, "AlchemyChatMUPose", false);
+	if (!useMUPose)
+		return;
+
+	if (text.at(0) == ':'
+		&& text.length() > 3)
+	{
+		if (text.find(":'") == 0)
+		{
+			text.replace(0, 1, "/me");
+ 		}
+		// Account for emotes and smilies
+		else if (!isdigit(text.at(1))
+				 && !ispunct(text.at(1))
+				 && !isspace(text.at(1)))
+		{
+			text.replace(0, 1, "/me ");
+		}
+	}
+}
+
 BOOL LLFloaterIMSessionTab::handleKeyHere(KEY key, MASK mask )
 {
 	BOOL handled = FALSE;

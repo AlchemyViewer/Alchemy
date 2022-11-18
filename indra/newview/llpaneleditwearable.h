@@ -88,6 +88,8 @@ private:
 	void				buildParamList(LLScrollingPanelList *panel_list, value_map_t &sorted_params, LLAccordionCtrlTab *tab, LLJoint* jointp);
 	// update bottom bar buttons ("Save", "Revert", etc)
 	void				updateVerbs();
+	
+	void				onClickedImportBtn();
 
 	void				onColorSwatchCommit(const LLUICtrl*);
 	void				onTexturePickerCommit(const LLUICtrl*);

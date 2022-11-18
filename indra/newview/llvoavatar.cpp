@@ -56,6 +56,7 @@
 #include "llpolyskeletaldistortion.h"
 #include "lleditingmotion.h"
 #include "llemote.h"
+#include "llfilepicker.h"
 #include "llfloatertools.h"
 #include "llheadrotmotion.h"
 #include "llhudeffecttrail.h"
@@ -10045,10 +10046,17 @@ void LLVOAvatar::dumpArchetypeXML(const std::string& prefix, bool group_by_weara
 		outprefix = std::string("new_archetype");
 	}
 	std::string outfilename = get_sequential_numbered_file_name(outprefix,".xml");
+
+	LLFilePicker& file_picker = LLFilePicker::instance();
+	if (!file_picker.getSaveFile(LLFilePicker::FFSAVE_XML, outfilename))
+	{
+		LL_INFOS("DumpArchetypeXML") << "User closed the filepicker" << LL_ENDL;
+		return;
+	}
 	
 	LLAPRFile outfile;
     LLWearableType *wr_inst = LLWearableType::getInstanceFast();
-	std::string fullpath = gDirUtilp->getExpandedFilename(LL_PATH_LOGS,outfilename);
+	std::string fullpath = file_picker.getFirstFile();
 	if (APR_SUCCESS == outfile.open(fullpath, LL_APR_WB ))
 	{
 		apr_file_t* file = outfile.getFileHandle();
@@ -10271,6 +10279,8 @@ void LLVOAvatar::dumpArchetypeXML(const std::string& prefix, bool group_by_weara
 		LLNotificationsUtil::add("AppearanceToXMLFailed");
 	}
 	// File will close when handle goes out of scope
+	LL_INFOS("DumpArchetypeXML") << "Archetype xml written successfully!" << LL_ENDL;
+	LLNotificationsUtil::add("DumpArchetypeSuccess", LLSD().with("FILE_PATH", fullpath));
 }
 
 

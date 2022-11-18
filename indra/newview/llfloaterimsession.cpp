@@ -321,7 +321,7 @@ void LLFloaterIMSession::sendMsgFromInputEditor()
 			{
 				// Truncate and convert to UTF8 for transport
 				std::string utf8_text = wstring_to_utf8str(text);
-
+                applyMUPose(utf8_text);
 				sendMsg(utf8_text);
 
 				mInputEditor->setText(LLStringUtil::null);
