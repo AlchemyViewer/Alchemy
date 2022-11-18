@@ -42,6 +42,7 @@
 #include "llinventorymodel.h"
 #include "llnotificationsutil.h"
 #include "llresmgr.h"
+#include "llslurl.h"
 #include "lltrans.h"
 #include "lltextbox.h"
 #include "lltextureview.h"
@@ -530,6 +531,18 @@ void LLPreviewTexture::updateDimensions()
 
 
 	// Update the width/height display every time
+	LLUICtrl* dimensions = getChild<LLUICtrl>("dimensions");
+	if (mImage->getUploader().notNull())
+	{
+		LLStringUtil::format_map_t args;
+		args["UPLOADER"] = LLSLURL("agent", mImage->getUploader(), "inspect").getSLURLString();
+		args["DATE"] = mImage->getUploadTime().toHTTPDateString(LLStringExplicit("%d %b %Y"));
+		std::string info = getString("UploadInfo", args);
+		dimensions->setTextArg("[UPLOAD_INFO]", info);
+	}
+	else
+		dimensions->setTextArg("[UPLOAD_INFO]", LLStringUtil::null);
+
 	getChild<LLUICtrl>("dimensions")->setTextArg("[WIDTH]",  llformat("%d", img_width));
 	getChild<LLUICtrl>("dimensions")->setTextArg("[HEIGHT]", llformat("%d", img_height));
 
