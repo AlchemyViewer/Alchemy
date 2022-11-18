@@ -875,6 +875,12 @@ with the same filename but different name
   <texture name="Camera_Drag_Dot" file_name="world/CameraDragDot.png"/>
   <texture name="NavBar Separator" file_name="navbar/separator.png"/>
 
+  <texture name="Cake" file_name="icons/cake_32.png" preload="false"/>
+  <texture name="Clipboard_Copy" file_name="icons/clipboard_copy.png" preload="false" />
+  <texture name="Clipboard_Cut" file_name="icons/clipboard_cut.png" preload="false" />
+  <texture name="Clipboard_Paste" file_name="icons/clipboard_paste.png" preload="false" />
+
+
   <texture name="Default_Outfit_Photo" file_name="icons/Default_Outfit_Photo.png" preload="true"/>
   <texture name="Notification_Condense" file_name="icons/Icon_Notification_Condense.png" preload="true"/>
   <texture name="Notification_Expand" file_name="icons/Icon_Notification_Expand.png" preload="true"/>
