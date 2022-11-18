@@ -186,6 +186,7 @@
 #include "llappviewer.h"
 #include "llfasttimerview.h"
 #include "lltelemetry.h"
+#include "llfloaterdirectory.h"
 #include "llfloatermap.h"
 #include "llweb.h"
 #include "llvoiceclient.h"
@@ -217,7 +218,6 @@
 #if LL_WINDOWS
 #include "lldxhardware.h"
 #endif
-#include "fsfloatersearch.h"
 
 //
 // exported globals
@@ -2687,12 +2687,14 @@ void register_viewer_callbacks(LLMessageSystem* msg)
 	msg->setHandlerFuncFast(_PREHASH_PlacesReply, process_places_reply);
 	msg->setHandlerFuncFast(_PREHASH_GroupNoticesListReply, LLPanelGroupNotices::processGroupNoticesListReply);
 
-	msg->setHandlerFuncFast(_PREHASH_DirPeopleReply, FSPanelSearchPeople::processSearchReply);
-	msg->setHandlerFuncFast(_PREHASH_DirPlacesReply, FSPanelSearchPlaces::processSearchReply);
-	msg->setHandlerFuncFast(_PREHASH_DirGroupsReply, FSPanelSearchGroups::processSearchReply);
-	msg->setHandlerFuncFast(_PREHASH_DirEventsReply, FSPanelSearchEvents::processSearchReply);
-	msg->setHandlerFuncFast(_PREHASH_DirLandReply,   FSPanelSearchLand::processSearchReply);
-	msg->setHandlerFuncFast(_PREHASH_DirClassifiedReply,  FSPanelSearchClassifieds::processSearchReply);
+	// directory search
+	msg->setHandlerFunc("DirPeopleReply", LLFloaterDirectory::processSearchPeopleReply);
+	msg->setHandlerFunc("DirGroupsReply", LLFloaterDirectory::processSearchGroupsReply);
+	msg->setHandlerFunc("DirPlacesReply", LLFloaterDirectory::processSearchPlacesReply);
+	msg->setHandlerFunc("DirEventsReply", LLFloaterDirectory::processSearchEventsReply);
+	msg->setHandlerFunc("DirLandReply",   LLFloaterDirectory::processSearchLandReply);
+	msg->setHandlerFunc("DirClassifiedReply",  LLFloaterDirectory::processSearchClassifiedsReply);
+
 
 	msg->setHandlerFuncFast(_PREHASH_AvatarPickerReply, LLFloaterAvatarPicker::processAvatarPickerReply);
 
