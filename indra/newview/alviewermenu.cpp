@@ -32,10 +32,13 @@
 #include "alcinematicmode.h"
 #include "alfloaterparticleeditor.h"
 #include "llagent.h"
+#include "llappviewer.h"
+#include "llavatarpropertiesprocessor.h"
 #include "llhudobject.h"
 #include "llnotifications.h"
 #include "llnotificationsutil.h"
 #include "llselectmgr.h"
+#include "lltexturecache.h"
 #include "llviewercontrol.h"
 #include "llviewermenu.h"
 #include "llviewerobject.h"
@@ -321,6 +324,88 @@ namespace
 			LLFloaterReg::showInstance("generic_text", args);
 		}
 	}
+
+    void destroy_texture(const LLUUID& id)
+    {
+        if (id.isNull() || id == IMG_DEFAULT)
+            return;
+        LLViewerFetchedTexture* texture = LLViewerTextureManager::getFetchedTexture(id);
+        if (texture)
+            texture->clearFetchedResults();
+        LLAppViewer::getTextureCache()->removeFromCache(id);
+    }
+
+    void object_texture_refresh()
+	{
+        for (LLObjectSelection::valid_iterator iter = LLSelectMgr::getInstance()->getSelection()->valid_begin();
+             iter != LLSelectMgr::getInstance()->getSelection()->valid_end();
+             ++iter)
+        {
+            LLSelectNode* node = *iter;
+            if (!node)
+                continue;
+            std::map<LLUUID, std::vector<U8>> faces_per_tex;
+            for (U8 i = 0; i < node->getObject()->getNumTEs(); ++i)
+            {
+                if (!node->isTESelected(i))
+                continue;
+                LLViewerTexture* img = node->getObject()->getTEImage(i);
+                faces_per_tex[img->getID()].push_back(i);
+
+                if (node->getObject()->getTE(i)->getMaterialParams().notNull())
+                {
+                LLViewerTexture* norm_img = node->getObject()->getTENormalMap(i);
+                faces_per_tex[norm_img->getID()].push_back(i);
+                LLViewerTexture* spec_img = node->getObject()->getTESpecularMap(i);
+                faces_per_tex[spec_img->getID()].push_back(i);
+                }
+            }
+
+            for (auto const& it : faces_per_tex)
+            {
+                destroy_texture(it.first);
+            }
+
+            if (node->getObject()->isSculpted() && !node->getObject()->isMesh())
+            {
+                const LLSculptParams* sculpt_params = node->getObject()->getSculptParams();
+                if (sculpt_params)
+                {
+                LLUUID                  sculptie = sculpt_params->getSculptTexture();
+                LLViewerFetchedTexture* tx       = LLViewerTextureManager::getFetchedTexture(sculptie);
+                if (tx)
+                {
+                        const LLViewerTexture::ll_volume_list_t* pVolumeList = tx->getVolumeList(LLRender::SCULPT_TEX);
+                        destroy_texture(sculptie);
+                        for (S32 idxVolume = 0; idxVolume < tx->getNumVolumes(LLRender::SCULPT_TEX); ++idxVolume)
+                        {
+                            LLVOVolume* pVolume = pVolumeList->at(idxVolume);
+                            if (pVolume)
+                                pVolume->notifyMeshLoaded();
+                        }
+                }
+                }
+            }
+        }
+	}
+
+    void avatar_texture_refresh()
+	{
+        LLVOAvatar* avatar = find_avatar_from_object(LLSelectMgr::getInstance()->getSelection()->getPrimaryObject());
+        if (!avatar) { return; }
+
+        for (U32 baked_idx = 0; baked_idx < LLAvatarAppearanceDefines::BAKED_NUM_INDICES; ++baked_idx)
+        {
+            LLAvatarAppearanceDefines::ETextureIndex te_idx =
+                LLAvatarAppearance::getDictionary()->bakedToLocalTextureIndex(
+					static_cast<LLAvatarAppearanceDefines::EBakedTextureIndex>(baked_idx));
+            destroy_texture(avatar->getTE(te_idx)->getID());
+        }
+        LLAvatarPropertiesProcessor::getInstance()->sendAvatarTexturesRequest(avatar->getID());
+
+        // *TODO: We want to refresh their attachments too!
+	}
+
 }
 
 ////////////////////////////////////////////////////////
@@ -338,6 +423,7 @@ void ALViewerMenu::initialize_menus()
 	commit.add("Avatar.CopyData",		[](LLUICtrl* ctrl, const LLSD& param) { avatar_copy_data(param); });
 	commit.add("Avatar.ManageEstate", [](LLUICtrl* ctrl, const LLSD& param) { manage_estate(param); });
 	commit.add("Avatar.TeleportTo", [](LLUICtrl* ctrl, const LLSD& param) { teleport_to(); });
+    commit.add("Avatar.RefreshTexture", [](LLUICtrl* ctrl, const LLSD& param) { avatar_texture_refresh(); });
 
 	commit.add("Advanced.DebugSimFeatures", [](LLUICtrl* ctrl, const LLSD& param) { spawn_debug_simfeatures(); });
 
@@ -346,6 +432,7 @@ void ALViewerMenu::initialize_menus()
 	commit.add("Object.AlchemyExplode", [](LLUICtrl* ctrl, const LLSD& param) { object_explode(); });
 	commit.add("Object.AlchemyDestroy", [](LLUICtrl* ctrl, const LLSD& param) { object_destroy(); });
 	commit.add("Object.AlchemyForceDelete", [](LLUICtrl* ctrl, const LLSD& param) { object_force_delete(); });
+    commit.add("Object.RefreshTexture", [](LLUICtrl* ctrl, const LLSD& param) { object_texture_refresh(); });
 
 	commit.add("Tools.UndeformSelf", [](LLUICtrl* ctrl, const LLSD& param) { avatar_undeform_self(); });
 
