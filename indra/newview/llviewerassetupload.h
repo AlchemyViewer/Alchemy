@@ -88,7 +88,7 @@ public:
     LLAssetID           getAssetId() const { return mAssetId; }
 
 	static bool			findAssetTypeOfExtension(const std::string& exten, LLAssetType::EType& asset_type);
-	static bool			findAssetTypeAndCodecOfExtension(const std::string& exten, LLAssetType::EType& asset_type, U32& codec, bool bulk_upload = true);
+	static bool			findAssetTypeAndCodecOfExtension(const std::string& exten, LLAssetType::EType& asset_type, U32& codec);
 
 // [SL:KB] - Patch: Build-ScriptRecover | Checked: Catznip-4.0
     typedef boost::function<void(LLUUID itemId)> upload_error_f;
@@ -163,7 +163,7 @@ public:
         S32 expectedCost,
         bool show_inventory = true);
 
-    virtual LLSD        prepareUpload();
+    LLSD                prepareUpload() override;
 
     std::string         getFileName() const { return mFileName; };
 

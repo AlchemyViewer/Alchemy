@@ -82,16 +82,16 @@
 
 class LLFileEnableUpload : public view_listener_t
 {
-	bool handleEvent(const LLSD& userdata)
-	{
+	bool handleEvent(const LLSD& userdata) override
+    {
         return true;
 	}
 };
 
 class LLFileEnableUploadModel : public view_listener_t
 {
-	bool handleEvent(const LLSD& userdata)
-	{
+	bool handleEvent(const LLSD& userdata) override
+    {
 		LLFloaterModelPreview* fmp = (LLFloaterModelPreview*) LLFloaterReg::findInstance("upload_model");
 		if (fmp && fmp->isModelLoading())
 		{
@@ -104,8 +104,8 @@ class LLFileEnableUploadModel : public view_listener_t
 
 class LLMeshEnabled : public view_listener_t
 {
-	bool handleEvent(const LLSD& userdata)
-	{
+	bool handleEvent(const LLSD& userdata) override
+    {
 		static const LLCachedControl<bool> mesh_enabled(gSavedSettings, "MeshEnabled", true);
 		return mesh_enabled;
 	}
@@ -113,8 +113,8 @@ class LLMeshEnabled : public view_listener_t
 
 class LLMeshUploadVisible : public view_listener_t
 {
-	bool handleEvent(const LLSD& userdata)
-	{
+	bool handleEvent(const LLSD& userdata) override
+    {
 		return gMeshRepo.meshUploadEnabled();
 	}
 };
@@ -464,20 +464,14 @@ void do_bulk_upload(std::vector<std::string> filenames, const LLSD& notification
 }
 }
 
-bool get_bulk_upload_expected_cost(const std::vector<std::string>& filenames, S32& total_cost, S32& file_count, S32& bvh_count)
+bool get_bulk_upload_expected_cost(const std::vector<std::string>& filenames, S32& total_cost, S32& file_count)
 {
 	total_cost = 0;
 	file_count = 0;
-	bvh_count = 0;
 	for (std::vector<std::string>::const_iterator in_iter = filenames.begin(); in_iter != filenames.end(); ++in_iter)
 	{
 		std::string filename = (*in_iter);
 		std::string ext = gDirUtilp->getExtension(filename);
-
-		if (ext == "bvh")
-		{
-			bvh_count++;
-		}
 
 		LLAssetType::EType asset_type;
 		U32 codec;
@@ -519,8 +513,7 @@ const void upload_bulk(const std::vector<std::string>& filenames, LLFilePicker::
 
 	S32 expected_upload_cost;
 	S32 expected_upload_count;
-	S32 bvh_count;
-	if (get_bulk_upload_expected_cost(filtered_filenames, expected_upload_cost, expected_upload_count, bvh_count))
+	if (get_bulk_upload_expected_cost(filtered_filenames, expected_upload_cost, expected_upload_count))
 	{
 		LLSD args;
 		args["COST"] = expected_upload_cost;
@@ -529,19 +522,8 @@ const void upload_bulk(const std::vector<std::string>& filenames, LLFilePicker::
 
 		if (filtered_filenames.size() > expected_upload_count)
 		{
-			if (bvh_count == filtered_filenames.size() - expected_upload_count)
-			{
-				LLNotificationsUtil::add("DoNotSupportBulkAnimationUpload");
-			}
-			else
-			{
-				LLNotificationsUtil::add("BulkUploadIncompatibleFiles");
-			}
+			LLNotificationsUtil::add("BulkUploadIncompatibleFiles");
 		}
-	}
-	else if (bvh_count == filtered_filenames.size())
-	{
-		LLNotificationsUtil::add("DoNotSupportBulkAnimationUpload");
 	}
 	else
 	{
@@ -552,8 +534,8 @@ const void upload_bulk(const std::vector<std::string>& filenames, LLFilePicker::
 
 class LLFileUploadImage : public view_listener_t
 {
-	bool handleEvent(const LLSD& userdata)
-	{
+	bool handleEvent(const LLSD& userdata) override
+    {
 		if (gAgentCamera.cameraMouselook())
 		{
 			gAgentCamera.changeCameraToDefault();
@@ -565,8 +547,8 @@ class LLFileUploadImage : public view_listener_t
 
 class LLFileUploadModel : public view_listener_t
 {
-	bool handleEvent(const LLSD& userdata)
-	{
+	bool handleEvent(const LLSD& userdata) override
+    {
         LLFloaterModelPreview::showModelPreview();
         return TRUE;
 	}
@@ -574,8 +556,8 @@ class LLFileUploadModel : public view_listener_t
 	
 class LLFileUploadSound : public view_listener_t
 {
-	bool handleEvent(const LLSD& userdata)
-	{
+	bool handleEvent(const LLSD& userdata) override
+    {
 		if (gAgentCamera.cameraMouselook())
 		{
 			gAgentCamera.changeCameraToDefault();
@@ -587,8 +569,8 @@ class LLFileUploadSound : public view_listener_t
 
 class LLFileUploadAnim : public view_listener_t
 {
-	bool handleEvent(const LLSD& userdata)
-	{
+	bool handleEvent(const LLSD& userdata) override
+    {
 		if (gAgentCamera.cameraMouselook())
 		{
 			gAgentCamera.changeCameraToDefault();
@@ -600,8 +582,8 @@ class LLFileUploadAnim : public view_listener_t
 
 class LLFileUploadBulk : public view_listener_t
 {
-	bool handleEvent(const LLSD& userdata)
-	{
+	bool handleEvent(const LLSD& userdata) override
+    {
 		if (gAgentCamera.cameraMouselook())
 		{
 			gAgentCamera.changeCameraToDefault();
@@ -624,8 +606,8 @@ void upload_error(const std::string& error_message, const std::string& label, co
 
 class LLFileEnableCloseWindow : public view_listener_t
 {
-	bool handleEvent(const LLSD& userdata)
-	{
+	bool handleEvent(const LLSD& userdata) override
+    {
 		bool frontmost_fl_exists = (NULL != gFloaterView->getFrontmostClosableFloater());
 		bool frontmost_snapshot_fl_exists = (NULL != gSnapshotFloaterView->getFrontmostClosableFloater());
 
@@ -635,8 +617,8 @@ class LLFileEnableCloseWindow : public view_listener_t
 
 class LLFileCloseWindow : public view_listener_t
 {
-	bool handleEvent(const LLSD& userdata)
-	{
+	bool handleEvent(const LLSD& userdata) override
+    {
 		bool frontmost_fl_exists = (NULL != gFloaterView->getFrontmostClosableFloater());
 		LLFloater* snapshot_floater = gSnapshotFloaterView->getFrontmostClosableFloater();
 
@@ -659,8 +641,8 @@ class LLFileCloseWindow : public view_listener_t
 
 class LLFileEnableCloseAllWindows : public view_listener_t
 {
-	bool handleEvent(const LLSD& userdata)
-	{
+	bool handleEvent(const LLSD& userdata) override
+    {
 		LLFloaterSnapshot* floater_snapshot = LLFloaterSnapshot::findInstance();
 		LLFloaterOutfitSnapshot* floater_outfit_snapshot = LLFloaterOutfitSnapshot::findInstance();
 		bool is_floaters_snapshot_opened = (floater_snapshot && floater_snapshot->isInVisibleChain())
@@ -672,8 +654,8 @@ class LLFileEnableCloseAllWindows : public view_listener_t
 
 class LLFileCloseAllWindows : public view_listener_t
 {
-	bool handleEvent(const LLSD& userdata)
-	{
+	bool handleEvent(const LLSD& userdata) override
+    {
 		bool app_quitting = false;
 		gFloaterView->closeAllChildren(app_quitting);
 		LLFloaterSnapshot* floater_snapshot = LLFloaterSnapshot::findInstance();
@@ -689,8 +671,8 @@ class LLFileCloseAllWindows : public view_listener_t
 
 class LLFileTakeSnapshotToDisk : public view_listener_t
 {
-	bool handleEvent(const LLSD& userdata)
-	{
+	bool handleEvent(const LLSD& userdata) override
+    {
 		LLPointer<LLImageRaw> raw = new LLImageRaw;
 
 		S32 width = gViewerWindow->getWindowWidthRaw();
@@ -750,8 +732,8 @@ class LLFileTakeSnapshotToDisk : public view_listener_t
 
 class LLFileQuit : public view_listener_t
 {
-	bool handleEvent(const LLSD& userdata)
-	{
+	bool handleEvent(const LLSD& userdata) override
+    {
 		LLAppViewer::instance()->userQuit();
 		return true;
 	}
@@ -856,14 +838,14 @@ void handle_compress_file_test(void*)
                 }
                 else
                 {
-                    LL_INFOS() << "Failed to uncompress file: " << packfile << LL_ENDL;
+                    LL_INFOS() << "Failed to decompress file: " << packfile << LL_ENDL;
                     LLFile::remove(packfile);
                 }
 
             }
             else
             {
-                LL_INFOS() << "Failed to compres file: " << infile << LL_ENDL;
+                LL_INFOS() << "Failed to compress file: " << infile << LL_ENDL;
             }
         }
         else
