@@ -227,7 +227,11 @@ namespace
 		return true;
 	}
 
-	bool is_powerful_wizard()
+    bool is_powerful_wizard() {
+	    return gSavedSettings.getBOOL("AlchemyPowerfulWizard");
+    }
+
+	bool is_powerful_wizard_object()
 	{
 		LLViewerObject* objpos = LLSelectMgr::getInstanceFast()->getSelection()->getFirstRootObject();
 		if (objpos)
@@ -324,7 +328,8 @@ namespace
 void ALViewerMenu::initialize_menus()
 {
 	LLUICtrl::EnableCallbackRegistry::Registrar& enable = LLUICtrl::EnableCallbackRegistry::currentRegistrar();
-	enable.add("Alchemy.PowerfulWizard", [](LLUICtrl* ctrl, const LLSD& param) { return is_powerful_wizard(); });
+    enable.add("Alchemy.PowerfulWizard", [](LLUICtrl* ctrl, const LLSD& param) { return is_powerful_wizard(); });
+	enable.add("Alchemy.PowerfulWizardObject", [](LLUICtrl* ctrl, const LLSD& param) { return is_powerful_wizard_object(); });
 	enable.add("Avatar.EnableManageEstate", [](LLUICtrl* ctrl, const LLSD& param) { return can_manage_avatar_estate(); });
 	enable.add("Avatar.EnableTeleportTo", [](LLUICtrl* ctrl, const LLSD& param) { return can_teleport_to(); });
 	enable.add("Object.EnableEditParticles", [](LLUICtrl* ctrl, const LLSD& param) { return enable_edit_particle_source(); });

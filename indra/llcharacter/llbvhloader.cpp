@@ -148,8 +148,7 @@ LLBVHLoader::LLBVHLoader(const char* buffer, ELoadStatus &loadStatus, S32 &error
 	}
     
     // Recognize all names we've been told are legal.
-    std::map<std::string, std::string>::iterator iter;
-    for (iter = joint_alias_map.begin(); iter != joint_alias_map.end(); iter++)
+    for (auto iter = joint_alias_map.begin(); iter != joint_alias_map.end(); ++iter)
     {
         makeTranslation( iter->first , iter->second );
     }

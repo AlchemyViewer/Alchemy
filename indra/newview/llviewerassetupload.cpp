@@ -44,16 +44,20 @@
 #include "llsdutil.h"
 #include "llviewerassetupload.h"
 #include "llappviewer.h"
+#include "llavatarappearance.h"
 #include "llviewerstats.h"
 #include "llfilesystem.h"
 #include "llgesturemgr.h"
 #include "llpreviewnotecard.h"
 #include "llpreviewgesture.h"
 #include "llcoproceduremanager.h"
+#include "lldatapacker.h"
+#include "llbvhloader.h"
+#include "llbvhconsts.h"
 
 void dialog_refresh_all();
 
-static const U32 LL_ASSET_UPLOAD_TIMEOUT_SEC = 60;
+static constexpr U32 LL_ASSET_UPLOAD_TIMEOUT_SEC = 60;
 
 LLResourceUploadInfo::LLResourceUploadInfo(LLTransactionID transactId,
         LLAssetType::EType assetType, std::string name, std::string description,
@@ -309,11 +313,11 @@ std::string LLResourceUploadInfo::getDisplayName() const
 bool LLResourceUploadInfo::findAssetTypeOfExtension(const std::string& exten, LLAssetType::EType& asset_type)
 {
 	U32 codec;
-	return findAssetTypeAndCodecOfExtension(exten, asset_type, codec, false);
+	return findAssetTypeAndCodecOfExtension(exten, asset_type, codec);
 }
 
 // static
-bool LLResourceUploadInfo::findAssetTypeAndCodecOfExtension(const std::string& exten, LLAssetType::EType& asset_type, U32& codec, bool bulk_upload)
+bool LLResourceUploadInfo::findAssetTypeAndCodecOfExtension(const std::string& exten, LLAssetType::EType& asset_type, U32& codec)
 {
 	bool succ = false;
 	std::string exten_lc(exten);
@@ -334,7 +338,7 @@ bool LLResourceUploadInfo::findAssetTypeAndCodecOfExtension(const std::string& e
 		asset_type = LLAssetType::AT_ANIMATION; 
 		succ = true;
 	}
-	else if (!bulk_upload && (exten_lc == "bvh"))
+	else if (exten_lc == "bvh")
 	{
 		asset_type = LLAssetType::AT_ANIMATION;
 		succ = true;
@@ -446,9 +450,46 @@ LLSD LLNewFileResourceUploadInfo::exportTempFile()
     }
     else if (exten == "bvh")
     {
-        errorMessage = llformat("We do not currently support bulk upload of animation files\n");
-        errorLabel = "DoNotSupportBulkAnimationUpload";
-        error = true;
+        assetType = LLAssetType::AT_ANIMATION;
+        apr_off_t file_size;
+        LLAPRFile infile;
+        infile.open(filename, LL_APR_RB, nullptr, &file_size);
+        if (!infile.getFileHandle())
+        {
+            LL_WARNS() << "Can't open BVH file:" << filename << LL_ENDL;
+        }
+        else
+        {
+            auto joint_aliases = LLAvatarAppearance::buildJointAliases();
+
+            char*        file_buffer = new char[file_size + 1];
+            ELoadStatus  load_status = E_ST_OK;
+            S32          line_number = 0;
+            LLBVHLoader* loaderp     = new LLBVHLoader(file_buffer, load_status, line_number, joint_aliases);
+
+            if (load_status == E_ST_NO_XLT_FILE)
+            {
+            LL_WARNS() << "NOTE: No translation table found." << LL_ENDL;
+            }
+            else
+            {
+            LL_WARNS() << "ERROR: [line: " << line_number << "] " << BVHSTATUS[load_status] << LL_ENDL;
+            }
+            // create data buffer for keyframe initialization
+            S32                      buffer_size = loaderp->getOutputSize();
+            U8*                      buffer      = new U8[buffer_size];
+            LLDataPackerBinaryBuffer dp(buffer, buffer_size);
+
+            // pass animation data through memory buffer
+            loaderp->serialize(dp);
+            LLAPRFile apr_file(filename, LL_APR_WB);
+            apr_file.write(buffer, buffer_size);
+            apr_file.close();
+            delete[] file_buffer;
+            delete[] buffer;
+            delete loaderp;
+        }
+        infile.close();
     }
     else if (assetType == LLAssetType::AT_ANIMATION)
     {
