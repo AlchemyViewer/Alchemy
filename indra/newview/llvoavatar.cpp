@@ -6153,7 +6153,14 @@ BOOL LLVOAvatar::processSingleAnimationStateChange( const LLUUID& anim_id, BOOL 
 		{
 			sitDown(TRUE);
 		}
-
+        else if (anim_id == ANIM_AGENT_SNAPSHOT)
+        {
+            static LLCachedControl<bool> announce_snapshot(gSavedSettings, "SnapshotDetection");
+            if (announce_snapshot)
+            {
+                LLNotificationsUtil::add("SnapshotDetected", LLSD().with("NAME", LLSLURL("agent", mID, "about").getSLURLString()));
+            }
+        }
 
 		if (startMotion(anim_id))
 		{

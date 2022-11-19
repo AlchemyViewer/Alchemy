@@ -12540,6 +12540,13 @@ Are you sure you wish to continue?
   </notification>
 
   <notification
+	icon="notifytip.tga"
+	name="SnapshotDetected"
+	type="notifytip">
+	[NAME] took a snapshot! :O
+  </notification>
+
+  <notification
    icon="notifytip.tga"
    name="AlwaysRunEnabled"
    persist="true"
