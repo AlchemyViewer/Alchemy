@@ -1006,6 +1006,17 @@
       <key>Value</key>
       <integer>1</integer>
     </map>
+    <key>SnapshotDetection</key>
+    <map>
+      <key>Comment</key>
+      <string>Detect snapshot animation being played</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <integer>1</integer>
+    </map>
     <key>UIImgTransparentUUID</key>
     <map>
       <key>Comment</key>
