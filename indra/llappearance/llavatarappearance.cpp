@@ -1736,7 +1736,7 @@ void LLAvatarAppearance::makeJointAliases(LLAvatarBoneInfo* bone_info, joint_ali
     boost::tokenizer tok(aliases, sep);
     for(auto i = tok.begin(); i != tok.end(); ++i)
     {
-        if (joint_alias_map.contains(*i))
+        if (joint_alias_map.find(*i) != joint_alias_map.end())
         {
             LL_WARNS() << "avatar skeleton:  Joint alias \"" << *i << "\" remapped from " << joint_alias_map[*i] << " to " << bone_name << LL_ENDL;
         }
