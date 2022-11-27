@@ -2780,7 +2780,8 @@ void LLIMMgr::addMessage(
 
 //			// Logically it would make more sense to reject the session sooner, in another area of the
 //			// code, but the session has to be established inside the server before it can be left.
-//			if (LLMuteList::getInstance()->isMuted(other_participant_id, LLMute::flagTextChat) && !from_linden)
+//			if ((LLMuteList::getInstance()->isMuted(other_participant_id, LLMute::flagTextChat) && !from_linden)
+				|| LLMuteList::getInstance()->isGroupMuted(new_session_id))
 //			{
 //				LL_WARNS() << "Leaving IM session from initiating muted resident " << from << LL_ENDL;
 //				if (!gIMMgr->leaveSession(new_session_id))

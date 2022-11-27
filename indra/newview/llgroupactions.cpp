@@ -497,6 +497,8 @@ LLUUID LLGroupActions::startIM(const LLUUID& group_id)
 	LLGroupData group_data;
 	if (gAgent.getGroupData(group_id, group_data))
 	{
+		// Unmute the group if the user tries to start a session with it.
+		LLMuteList::instance().removeGroup(group_id);
 		LLUUID session_id = gIMMgr->addSession(
 			group_data.mName,
 			IM_SESSION_GROUP_START,
