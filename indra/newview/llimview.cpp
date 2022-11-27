@@ -2781,7 +2781,7 @@ void LLIMMgr::addMessage(
 //			// Logically it would make more sense to reject the session sooner, in another area of the
 //			// code, but the session has to be established inside the server before it can be left.
 //			if ((LLMuteList::getInstance()->isMuted(other_participant_id, LLMute::flagTextChat) && !from_linden)
-				|| LLMuteList::getInstance()->isGroupMuted(new_session_id))
+//				|| LLMuteList::getInstance()->isGroupMuted(new_session_id))
 //			{
 //				LL_WARNS() << "Leaving IM session from initiating muted resident " << from << LL_ENDL;
 //				if (!gIMMgr->leaveSession(new_session_id))
@@ -3841,7 +3841,8 @@ public:
 
 // [SL:KB] - Patch: Chat-GroupOptions | Checked: 2012-06-21 (Catznip-3.3)
 			const LLGroupOptions* pGroupOptions = LLGroupOptionsMgr::getInstance()->getOptions(session_id);
-			if ( (pGroupOptions) && (!pGroupOptions->mReceiveGroupChat) )
+			if ((pGroupOptions && !pGroupOptions->mReceiveGroupChat)
+				|| LLMuteList::instance().isGroupMuted(session_id))
 			{
 				const std::string strUrl = gAgent.getRegion()->getCapability("ChatSessionRequest");
 				if (!strUrl.empty())
