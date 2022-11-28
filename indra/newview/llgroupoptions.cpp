@@ -18,6 +18,8 @@
 
 #include "llagent.h"
 #include "llgroupoptions.h"
+
+#include "llmutelist.h"
 #include "llsdserialize.h"
 
 // ============================================================================
@@ -65,10 +67,6 @@ LLGroupOptionsMgr::LLGroupOptionsMgr()
 	load();
 }
 
-LLGroupOptionsMgr::~LLGroupOptionsMgr()
-{
-}
-
 void LLGroupOptionsMgr::clearOptions(const LLUUID& idGroup)
 {
 	options_map_t::iterator itOption = mGroupOptions.find(idGroup);
@@ -81,6 +79,22 @@ void LLGroupOptionsMgr::clearOptions(const LLUUID& idGroup)
 
 void LLGroupOptionsMgr::setOptionReceiveChat(const LLUUID& idGroup, bool fReceiveChat)
 {
+	// oh baby we can't forget Ansa's server backed Group Mute HAX
+    if (fReceiveChat)
+    {
+        if (LLMuteList::instance().isGroupMuted(idGroup))
+        {
+            LLMuteList::instance().removeGroup(idGroup);
+        }
+    }
+    else
+    {
+        if (!LLMuteList::instance().isGroupMuted(idGroup))
+        {
+            LLMuteList::instance().addGroup(idGroup);
+        }
+    }
+
 	if (LLGroupOptions* pOptions = getOptions(idGroup))
 	{
 		pOptions->mReceiveGroupChat = fReceiveChat;
@@ -153,54 +167,6 @@ bool LLGroupOptionsMgr::load()
 
 	return true;
 }
-
-//bool LLGroupOptionsMgr::loadLegacy()
-//{
-//	const std::string strFile = gDirUtilp->getExpandedFilename(LL_PATH_PER_SL_ACCOUNT, GROUP_OPTIONS_FILENAME_LEGACY);
-//	if (!gDirUtilp->fileExists(strFile))
-//	{
-//		return false;
-//	}
-//
-//	llifstream fileGroupOptions(strFile);
-//	if (!fileGroupOptions.is_open())
-//	{
-//		LL_WARNS() << "Can't open group options file" << LL_ENDL;
-//		return false;
-//	}
-//
-//	for_each(mGroupOptions.begin(), mGroupOptions.end(), DeletePairedPointer());
-//	mGroupOptions.clear();
-//
-//	LLPointer<LLSDNotationParser> sdParser = new LLSDNotationParser(); std::string strLine;
-//	while (std::getline(fileGroupOptions, strLine))
-//	{
-//		std::istringstream iss(strLine); LLSD sdData;
-//		if (LLSDParser::PARSE_FAILURE == sdParser->parse(iss, sdData, strLine.length()))
-//		{
-//			LL_INFOS() << "Failed to parse group option entry" << LL_ENDL;
-//			continue;
-//		}
-//
-//		LLGroupOptions* pOptions = new LLGroupOptions(sdData);
-//		if (!pOptions->isValid())
-//		{
-//			delete pOptions;
-//			continue;
-//		}
-//		mGroupOptions.insert(std::pair<LLUUID, LLGroupOptions*>(pOptions->mGroupId, pOptions));
-//	}
-//
-//	fileGroupOptions.close();
-//
-//	// Save in the new format and delete the legacy file
-//	if (save())
-//	{
-//		LLFile::remove(strFile);
-//	}
-//
-//	return true;
-//}
 
 bool LLGroupOptionsMgr::save()
 {

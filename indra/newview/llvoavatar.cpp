@@ -79,6 +79,7 @@
 #include "llregionhandle.h"
 #include "llresmgr.h"
 #include "llselectmgr.h"
+#include "llslurl.h"
 #include "llsprite.h"
 #include "lltargetingmotion.h"
 #include "lltoolmgr.h"

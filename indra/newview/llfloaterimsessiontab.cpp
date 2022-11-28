@@ -1184,10 +1184,6 @@ LLView* LLFloaterIMSessionTab::getChatHistory()
 // virtual
 void LLFloaterIMSessionTab::applyMUPose(std::string& text)
 {
-	static LLCachedControl<bool> useMUPose(gSavedSettings, "AlchemyChatMUPose", false);
-	if (!useMUPose)
-		return;
-
 	if (text.at(0) == ':'
 		&& text.length() > 3)
 	{
