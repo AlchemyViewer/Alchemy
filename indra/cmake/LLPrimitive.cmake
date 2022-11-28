@@ -4,11 +4,11 @@
 include(Linking)
 include(Prebuilt)
 include(Boost)
+include(LibXML2)
 include(URIPARSER)
 include(ZLIB)
 
 use_prebuilt_binary(colladadom)
-use_prebuilt_binary(libxml2)
 use_prebuilt_binary(minizip-ng)
 
 set(LLPRIMITIVE_INCLUDE_DIRS
@@ -22,8 +22,7 @@ if (WINDOWS)
         optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libcollada14dom23-s.lib
         ${BOOST_FILESYSTEM_LIBRARY}
         ${BOOST_SYSTEM_LIBRARIES}
-        debug ${ARCH_PREBUILT_DIRS_DEBUG}/libxml2_a.lib
-        optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libxml2_a.lib
+        ${LIBXML2_LIBRARIES}
         ${URIPARSER_LIBRARIES}
         ${MINIZIP_LIBRARIES}
         ${ZLIB_LIBRARIES}
@@ -35,8 +34,7 @@ elseif (DARWIN)
         optimized collada14dom
         ${BOOST_FILESYSTEM_LIBRARY}
         ${BOOST_SYSTEM_LIBRARIES}
-        xml2
-        iconv           # Required by libxml2
+        ${LIBXML2_LIBRARIES}
         ${URIPARSER_LIBRARIES}
         ${MINIZIP_LIBRARIES}
         ${ZLIB_LIBRARIES}
@@ -48,7 +46,7 @@ elseif (LINUX)
         optimized collada14dom
         ${BOOST_FILESYSTEM_LIBRARY}
         ${BOOST_SYSTEM_LIBRARIES}
-        xml2
+        ${LIBXML2_LIBRARIES}
         ${URIPARSER_LIBRARIES}
         ${MINIZIP_LIBRARIES}
         ${ZLIB_LIBRARIES}

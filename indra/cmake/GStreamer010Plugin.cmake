@@ -1,5 +1,6 @@
 # -*- cmake -*-
 include(Prebuilt)
+include(LibXML2)
 
 if (USESYSTEMLIBS)
   include(FindPkgConfig)
@@ -8,14 +9,13 @@ if (USESYSTEMLIBS)
   pkg_check_modules(GSTREAMER010_PLUGINS_BASE REQUIRED gstreamer-plugins-base-0.10)
 elseif (LINUX)
   use_prebuilt_binary(gstreamer)
-  # possible libxml2 should have its own .cmake file instead
-  use_prebuilt_binary(libxml2)
+
   set(GSTREAMER010_FOUND ON FORCE BOOL)
   set(GSTREAMER010_PLUGINS_BASE_FOUND ON FORCE BOOL)
   set(GSTREAMER010_INCLUDE_DIRS
       ${LIBS_PREBUILT_DIR}/include/gstreamer-0.10
       ${LIBS_PREBUILT_DIR}/include/glib-2.0
-      ${LIBS_PREBUILT_DIR}/include/libxml2
+      ${LIBXML2_INCLUDE_DIRS}
       )
   # We don't need to explicitly link against gstreamer itself, because
   # LLMediaImplGStreamer probes for the system's copy at runtime.
@@ -26,7 +26,7 @@ elseif (LINUX)
       gthread-2.0
       glib-2.0
       )
-endif (USESYSTEMLIBS)
+endif ()
 
 if (GSTREAMER010_FOUND AND GSTREAMER010_PLUGINS_BASE_FOUND)
   set(GSTREAMER010 ON CACHE BOOL "Build with GStreamer-0.10 streaming media support.")
