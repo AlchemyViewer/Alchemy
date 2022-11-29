@@ -55,6 +55,19 @@ class LLCloudPuff;
 class LLCloudGroup;
 class LLVOAvatar;
 
+class CapUrlMatches
+{
+public:
+	CapUrlMatches(std::set<LLViewerRegion*>& regions, std::set<std::string>& cap_names)
+		: mRegions(regions)
+		, mCapNames(cap_names)
+	{
+	}
+
+	std::set<LLViewerRegion*> mRegions;
+	std::set<std::string> mCapNames;
+};
+
 // LLWorld maintains a stack of unused viewer_regions and an array of pointers to viewer regions
 // as simulators are connected to, viewer_regions are popped off the stack and connected as required
 // as simulators are removed, they are pushed back onto the stack
@@ -159,6 +172,9 @@ public:
 
 	void clearAllVisibleObjects();
 	void refreshLimits();
+
+	virtual CapUrlMatches getCapURLMatches(const std::string& cap_url);
+	virtual bool isCapURLMapped(const std::string& cap_url);
 
 public:
 	typedef std::list<LLViewerRegion*> region_list_t;

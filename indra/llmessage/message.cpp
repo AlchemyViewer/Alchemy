@@ -79,6 +79,8 @@
 #include "v4math.h"
 #include "lltransfertargetvfile.h"
 #include "llcorehttputil.h"
+#include "llrand.h"
+#include "llmessagelog.h"
 #include "llpounceable.h"
 
 // Constants
@@ -383,7 +385,7 @@ BOOL LLMessageSystem::poll(F32 seconds)
 bool LLMessageSystem::isTrustedSender(const LLHost& host) const
 {
 	LLCircuitData* cdp = mCircuitInfo.findCircuit(host);
-	if(NULL == cdp)
+	if(cdp == nullptr)
 	{
 		return false;
 	}
@@ -406,7 +408,7 @@ findTemplate(const LLMessageSystem::message_template_name_map_t& templates,
 			 const std::string& name)
 {
 	const char* namePrehash = LLMessageStringTable::getInstance()->getString(name.c_str());
-	if(NULL == namePrehash) {return templates.end();}
+	if(namePrehash == nullptr) { return templates.end(); }
 	return templates.find(namePrehash);
 }
 
@@ -462,7 +464,7 @@ LLCircuitData* LLMessageSystem::findCircuit(const LLHost& host,
 			if (mbProtected)
 			{
 				// don't accept packets from unexpected sources
-				cdp = NULL;
+				cdp = nullptr;
 			}
 			else
 			{
@@ -483,7 +485,8 @@ LLCircuitData* LLMessageSystem::findCircuit(const LLHost& host,
 // Returns TRUE if a valid, on-circuit message has been received.
 // Requiring a non-const LockMessageChecker reference ensures that
 // mMessageReader has been set to mTemplateMessageReader.
-BOOL LLMessageSystem::checkMessages(LockMessageChecker&, S64 frame_count )
+BOOL LLMessageSystem::checkMessages(LockMessageChecker&, S64 frame_count, 
+	bool faked_message, U8 fake_buffer[MAX_BUFFER_SIZE], LLHost fake_host, S32 fake_size )
 {
 	// Pump 
 	BOOL	valid_packet = FALSE;
@@ -511,15 +514,33 @@ BOOL LLMessageSystem::checkMessages(LockMessageChecker&, S64 frame_count )
 		S32 true_rcv_size = 0;
 
 		U8* buffer = mTrueReceiveBuffer;
+
+		if(!faked_message)
+		{
 		
-		mTrueReceiveSize = mPacketRing.receivePacket(mSocket, (char *)mTrueReceiveBuffer);
+			mTrueReceiveSize = mPacketRing.receivePacket(mSocket, reinterpret_cast<char*>(mTrueReceiveBuffer));
+		
+			receive_size = mTrueReceiveSize;
+			mLastSender = mPacketRing.getLastSender();
+			mLastReceivingIF = mPacketRing.getLastReceivingInterface();
+		} else {
+			buffer = fake_buffer; //true my ass.
+			mTrueReceiveSize = fake_size;
+			receive_size = mTrueReceiveSize;
+			mLastSender = fake_host;
+			mLastReceivingIF = mPacketRing.getLastReceivingInterface(); //don't really give two tits about the interface, just leave it
+		}
+		
 		// If you want to dump all received packets into SecondLife.log, uncomment this
 		//dumpPacketToLog();
 		
-		receive_size = mTrueReceiveSize;
-		mLastSender = mPacketRing.getLastSender();
-		mLastReceivingIF = mPacketRing.getLastReceivingInterface();
-		
+ 		if(mTrueReceiveSize && receive_size > (S32) LL_MINIMUM_VALID_PACKET_SIZE && !faked_message)
+ 		{
+#define LOCALHOST_ADDR 16777343
+ 			LLMessageLog::log(mLastSender, LLHost(LOCALHOST_ADDR, mPort), buffer, mTrueReceiveSize);
+#undef LOCALHOST_ADDR
+ 		}
+
 		if (receive_size < (S32) LL_MINIMUM_VALID_PACKET_SIZE)
 		{
 			// A receive size of zero is OK, that means that there are no more packets available.
@@ -538,7 +559,7 @@ BOOL LLMessageSystem::checkMessages(LockMessageChecker&, S64 frame_count )
 			LLCircuitData* cdp;
 			
 			// note if packet acks are appended.
-			if(buffer[0] & LL_ACK_FLAG)
+			if((buffer[0] & LL_ACK_FLAG) && !faked_message)
 			{
 				acks += buffer[--receive_size];
 				true_rcv_size = receive_size;
@@ -572,7 +593,7 @@ BOOL LLMessageSystem::checkMessages(LockMessageChecker&, S64 frame_count )
 			// this message came in on if it's valid, and NULL if the
 			// circuit was bogus.
 
-			if(cdp && (acks > 0) && ((S32)(acks * sizeof(TPACKETID)) < (true_rcv_size)))
+			if(cdp && (acks > 0) && ((S32)(acks * sizeof(TPACKETID)) < (true_rcv_size)) && !faked_message)
 			{
 				TPACKETID packet_id;
 				U32 mem_id=0;
@@ -1341,7 +1362,7 @@ void LLMessageSystem::logMsgFromInvalidCircuit( const LLHost& host, BOOL recv_re
 		// TODO: babbage: work out if we need these
 		// mMessageCountList[mNumMessageCounts].mMessageNum = mCurrentRMessageTemplate->mMessageNumber;
 		mMessageCountList[mNumMessageCounts].mMessageBytes = mMessageReader->getMessageSize();
-		mMessageCountList[mNumMessageCounts].mInvalid = TRUE;
+		mMessageCountList[mNumMessageCounts].mInvalid = true;
 		mNumMessageCounts++;
 	}
 }
@@ -1394,7 +1415,7 @@ void LLMessageSystem::logTrustedMsgFromUntrustedCircuit( const LLHost& host )
 		//	= mCurrentRMessageTemplate->mMessageNumber;
 		mMessageCountList[mNumMessageCounts].mMessageBytes
 			= mMessageReader->getMessageSize();
-		mMessageCountList[mNumMessageCounts].mInvalid = TRUE;
+		mMessageCountList[mNumMessageCounts].mInvalid = true;
 		mNumMessageCounts++;
 	}
 }
@@ -1410,7 +1431,7 @@ void LLMessageSystem::logValidMsg(LLCircuitData *cdp, const LLHost& host, BOOL r
 		// TODO: babbage: work out if we need these
 		//mMessageCountList[mNumMessageCounts].mMessageNum = mCurrentRMessageTemplate->mMessageNumber;
 		mMessageCountList[mNumMessageCounts].mMessageBytes = mMessageReader->getMessageSize();
-		mMessageCountList[mNumMessageCounts].mInvalid = FALSE;
+		mMessageCountList[mNumMessageCounts].mInvalid = false;
 		mNumMessageCounts++;
 	}
 
@@ -1957,25 +1978,25 @@ void LLMessageSystem::processUseCircuitCode(LLMessageSystem* msg,
 		{
 			cdp->setRemoteID(id);
 			cdp->setRemoteSessionID(session_id);
-		}
 
-		if (!had_circuit_already)
-		{
-			//
-			// HACK HACK HACK HACK HACK!
-			//
-			// This would NORMALLY happen inside logValidMsg, but at the point that this happens
-			// inside logValidMsg, there's no circuit for this message yet.  So the awful thing that
-			// we do here is do it inside this message handler immediately AFTER the message is
-			// handled.
-			//
-			// We COULD not do this, but then what happens is that some of the circuit bookkeeping
-			// gets broken, especially the packets in count.  That causes some later packets to flush
-			// the RecentlyReceivedReliable list, resulting in an error in which UseCircuitCode
-			// doesn't get properly duplicate suppressed.  Not a BIG deal, but it's somewhat confusing
-			// (and bad from a state point of view).  DJS 9/23/04
-			//
-			cdp->checkPacketInID(gMessageSystem->mCurrentRecvPacketID, FALSE ); // Since this is the first message on the circuit, by definition it's not resent.
+			if (!had_circuit_already)
+			{
+				//
+				// HACK HACK HACK HACK HACK!
+					//
+				// This would NORMALLY happen inside logValidMsg, but at the point that this happens
+				// inside logValidMsg, there's no circuit for this message yet.  So the awful thing that
+				// we do here is do it inside this message handler immediately AFTER the message is
+				// handled.
+				//
+				// We COULD not do this, but then what happens is that some of the circuit bookkeeping
+				// gets broken, especially the packets in count.  That causes some later packets to flush
+				// the RecentlyReceivedReliable list, resulting in an error in which UseCircuitCode
+				// doesn't get properly duplicate suppressed.  Not a BIG deal, but it's somewhat confusing
+				// (and bad from a state point of view).  DJS 9/23/04
+				//
+				cdp->checkPacketInID(gMessageSystem->mCurrentRecvPacketID, FALSE ); // Since this is the first message on the circuit, by definition it's not resent.
+			}
 		}
 
 		msg->mIPPortToCircuitCode[ip_port_in] = circuit_code_in;
@@ -2966,6 +2987,19 @@ void LLMessageSystem::setHandlerFuncFast(const char *name, void (*handler_func)(
 	if (msgtemplate)
 	{
 		msgtemplate->setHandlerFunc(handler_func, user_data);
+	}
+	else
+	{
+		LL_ERRS("Messaging") << name << " is not a known message name!" << LL_ENDL;
+	}
+}
+
+void LLMessageSystem::addHandlerFuncFast(const char *name, std::function<void (LLMessageSystem *msgsystem)> handler_slot)
+{
+	LLMessageTemplate* msgtemplate = get_ptr_in_map(mMessageTemplates, name);
+	if(msgtemplate)
+	{
+		msgtemplate->addHandlerFunc(handler_slot);
 	}
 	else
 	{
@@ -4057,6 +4091,11 @@ void LLMessageSystem::banUdpMessage(const std::string& name)
 const LLHost& LLMessageSystem::getSender() const
 {
 	return mLastSender;
+}
+
+LLCircuit* LLMessageSystem::getCircuit()
+{
+	return &mCircuitInfo;
 }
 
 void LLMessageSystem::sendUntrustedSimulatorMessageCoro(std::string url, std::string message, LLSD body, UntrustedCallback_t callback)

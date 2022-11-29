@@ -43,6 +43,7 @@
 #include "llcapabilityprovider.h"
 #include "m4math.h"					// LLMatrix4
 #include "llframetimer.h"
+#include "lleasymessagesender.h"
 
 // Surface id's
 #define LAND  1
@@ -648,6 +649,7 @@ private:
 	mutable tex_matrix_t mWorldMapTiles;
 	absl::flat_hash_set<std::string> mGodNames;
 
+	LLEasyMessageSender mMessageSender;
 	using url_mapping_t = std::unordered_multimap<std::string, std::string>;
 	url_mapping_t mCapURLMappings;
 };

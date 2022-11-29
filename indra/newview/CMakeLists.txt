@@ -22,6 +22,7 @@ include(Fonts)
 include(GLOD)
 include(Hunspell)
 include(JPEGEncoderBasic)
+include(LibXML2)
 include(LLAppearance)
 include(LLAudio)
 include(LLCA)
@@ -76,6 +77,7 @@ include_directories(
     ${DBUSGLIB_INCLUDE_DIRS}
     ${ZLIB_INCLUDE_DIRS}
     ${GLOD_INCLUDE_DIR}
+    ${LIBXML2_INCLUDE_DIRS}
     ${LLAUDIO_INCLUDE_DIRS}
     ${LLCHARACTER_INCLUDE_DIRS}
     ${LLCOMMON_INCLUDE_DIRS}
@@ -226,6 +228,9 @@ set(viewer_SOURCE_FILES
     lldrawpoolwlsky.cpp
     lldroptarget.cpp
     lldynamictexture.cpp
+    lleasymessagelogentry.cpp
+    lleasymessagereader.cpp
+    lleasymessagesender.cpp
     llemote.cpp
     llenvironment.cpp
     llestateinfomodel.cpp
@@ -313,6 +318,9 @@ set(viewer_SOURCE_FILES
     llfloatermap.cpp
     llfloatermediasettings.cpp
     llfloatermemleak.cpp
+    llfloatermessagebuilder.cpp
+    llfloatermessagelog.cpp
+    llfloatermessagerewriter.cpp
     llfloatermodelpreview.cpp
     llfloatermodeluploadbase.cpp
     llfloatermyscripts.cpp
@@ -918,6 +926,9 @@ set(viewer_HEADER_FILES
     lldrawpoolwlsky.h
     lldroptarget.h
     lldynamictexture.h
+    lleasymessagelogentry.h
+    lleasymessagereader.h
+    lleasymessagesender.h
     llemote.h
     llenvironment.h
     llestateinfomodel.h
@@ -1008,6 +1019,9 @@ set(viewer_HEADER_FILES
     llfloatermarketplacelistings.h
     llfloatermediasettings.h
     llfloatermemleak.h
+    llfloatermessagebuilder.h
+    llfloatermessagelog.h
+    llfloatermessagerewriter.h
     llfloatermodelpreview.h
     llfloatermodeluploadbase.h
     llfloatermyscripts.h
@@ -2177,6 +2191,7 @@ target_link_libraries(${VIEWER_BINARY_NAME}
     ${UI_LIBRARIES}
     ${WINDOWS_LIBRARIES}
     ${EXPAT_LIBRARIES}
+    ${LIBXML2_LIBRARIES}
     ${XMLRPCEPI_LIBRARIES}
     ${OPENSSL_LIBRARIES}
     ${CRYPTO_LIBRARIES}

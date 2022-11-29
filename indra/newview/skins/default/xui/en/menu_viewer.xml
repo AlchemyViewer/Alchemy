@@ -3668,6 +3668,30 @@ function="World.EnvPreset"
                  parameter="AgentPause" />
             </menu_item_check>
 
+	        <menu_item_separator/>
+
+			<menu_item_call
+				label="Message Log..."
+				name="Message Log">
+				<menu_item_call.on_click
+					function="Floater.Show"
+					parameter="message_log" />
+			</menu_item_call>
+			<menu_item_call
+				label="Message Builder..."
+				name="Message Builder">
+				<menu_item_call.on_click
+					function="Floater.Show"
+					parameter="message_builder" />
+			</menu_item_call>
+			<menu_item_call
+				label="Message Rewriter..."
+				name="Message Rewriter">
+				<menu_item_call.on_click
+					function="Floater.Show"
+					parameter="message_rewriter" />
+			</menu_item_call>
+
             <menu_item_separator/>
 
             <menu_item_call

@@ -46,7 +46,7 @@
 
 #include "llhttpconstants.h"
 #include "llproxy.h"
-
+#include "llmessagelog.h"
 #include "httpstats.h"
 
 // *DEBUG:  "[curl:bugs] #1420" problem and testing.
@@ -154,7 +154,8 @@ HttpOpRequest::HttpOpRequest()
 	  mPolicyRetryLimit(HTTP_RETRY_COUNT_DEFAULT),
 	  mPolicyMinRetryBackoff(HttpTime(HTTP_RETRY_BACKOFF_MIN_DEFAULT)),
 	  mPolicyMaxRetryBackoff(HttpTime(HTTP_RETRY_BACKOFF_MAX_DEFAULT)),
-	  mCallbackSSLVerify(NULL)
+	  mCallbackSSLVerify(NULL),
+	  mRequestId(0)
 {
 	// *NOTE:  As members are added, retry initialization/cleanup
 	// may need to be extended in @see prepareRequest().
@@ -260,6 +261,7 @@ void HttpOpRequest::visitNotifier(HttpRequest * request)
         response->setRequestURL(mReqURL);
 
         response->setRequestMethod(methodToString(mReqMethod));
+        response->setRequestId(mRequestId);
 
         if (mReplyOffset || mReplyLength)
 		{
@@ -278,7 +280,7 @@ void HttpOpRequest::visitNotifier(HttpRequest * request)
 		response->setTransferStats(stats);
 
 		mUserHandler->onCompleted(this->getHandle(), response);
-
+		if (LLMessageLog::haveLogger())  LLMessageLog::log(response);
 		response->release();
 	}
 }
@@ -415,6 +417,7 @@ HttpStatus HttpOpRequest::setupMove(HttpRequest::policy_t policy_id,
     return HttpStatus();
 }
 
+static U64 sRequestId = 0;
 
 void HttpOpRequest::setupCommon(HttpRequest::policy_t policy_id,
 								HttpRequest::priority_t priority,
@@ -423,6 +426,7 @@ void HttpOpRequest::setupCommon(HttpRequest::policy_t policy_id,
                                 const HttpOptions::ptr_t & options,
 								const HttpHeaders::ptr_t & headers)
 {
+	mRequestId = sRequestId++;
 	mProcFlags = 0U;
 	mReqPolicy = policy_id;
 	mReqPriority = priority;

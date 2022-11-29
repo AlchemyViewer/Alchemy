@@ -139,7 +139,7 @@ const std::string HTTP_VERB_COPY("COPY");
 
 const std::string& httpMethodAsVerb(EHTTPMethod method)
 {
-	static const std::string VERBS [] =
+	static const std::string VERBS [10] =
 	{
 		HTTP_VERB_INVALID,
 		HTTP_VERB_HEAD,
@@ -161,7 +161,7 @@ const std::string& httpMethodAsVerb(EHTTPMethod method)
 
 EHTTPMethod httpVerbAsMethod(const std::string& verb)
 {
-	static const std::string VERBS [] = {
+	static const std::string VERBS [10] = {
 		HTTP_VERB_INVALID,
 		HTTP_VERB_HEAD,
 		HTTP_VERB_GET,
@@ -176,8 +176,10 @@ EHTTPMethod httpVerbAsMethod(const std::string& verb)
 
 	for (int i = 0; i<HTTP_METHOD_COUNT; ++i)
 	{
-		if (VERBS[i] == verb)
-			return (EHTTPMethod) i;
+        if (VERBS[i] == verb)
+        {
+            return static_cast<EHTTPMethod>(i);
+        }
 	}
 	return HTTP_INVALID;
 }
