@@ -44,16 +44,11 @@ LLEasyMessageLogEntry::LLEasyMessageLogEntry(LogPayload entry, LLEasyMessageRead
     {
         mFlags = mEntry->mData[0];
 
-        LLMessageTemplate* temp = nullptr;
-
-        if (mEasyMessageReader)
-            temp = mEasyMessageReader->decodeTemplateMessage(&(mEntry->mData[0]), mEntry->mDataSize, mEntry->mFromHost, mSequenceID);
-
-        if (temp)
-            mNames.insert(temp->mName);
-        else
-            mNames.insert("Invalid");
-
+        const LLMessageTemplate* temp = mEasyMessageReader
+                ? mEasyMessageReader->decodeTemplateMessage(
+                    &(mEntry->mData[0]), mEntry->mDataSize, mEntry->mFromHost, mSequenceID)
+                : nullptr;
+        mNames.insert(temp ? temp->mName : "Invalid");
         mRegionHosts.insert(isOutgoing() ? mEntry->mToHost : mEntry->mFromHost);
     }
     else if (mEntry->mType == LLMessageLogEntry::HTTP_REQUEST) // not template
@@ -70,7 +65,9 @@ LLEasyMessageLogEntry::LLEasyMessageLogEntry(LogPayload entry, LLEasyMessageRead
             }
         }
         else
+        {
             mNames.insert(mEntry->mURL);
+        }
     }
     else // not template
     {
@@ -115,10 +112,9 @@ std::string LLEasyMessageLogEntry::getFull(BOOL beautify, BOOL show_header) cons
     {
     case LLMessageLogEntry::TEMPLATE:
     {
-        LLMessageTemplate* temp = nullptr;
-
-        if (mEasyMessageReader)
-            temp = mEasyMessageReader->decodeTemplateMessage(&(mEntry->mData[0]), mEntry->mDataSize, mEntry->mFromHost);
+        LLMessageTemplate* temp = mEasyMessageReader
+            ? mEasyMessageReader->decodeTemplateMessage(&(mEntry->mData[0]), mEntry->mDataSize, mEntry->mFromHost)
+            : nullptr;
 
         if (temp)
         {
@@ -159,8 +155,10 @@ std::string LLEasyMessageLogEntry::getFull(BOOL beautify, BOOL show_header) cons
         else
         {
             full << (isOutgoing() ? "out" : "in ") << "\n";
-            for (S32 i = 0; i < mEntry->mDataSize; i++)
+            for (S32 i = 0; i < mEntry->mDataSize; ++i)
+            {
                 full << llformat("%02X ", mEntry->mData[i]);
+            }
         }
         break;
     }
@@ -190,60 +188,78 @@ std::string LLEasyMessageLogEntry::getFull(BOOL beautify, BOOL show_header) cons
 
         if (mEntry->mDataSize)
         {
-            bool can_beautify = false;
-            if (beautify)
+            bool data_processed = false;
+            if (!mEntry->mContentType.empty())
             {
-                if (!mEntry->mContentType.empty())
+                std::string parsed_content_type = mEntry->mContentType.substr(0, mEntry->mContentType.find_first_of(';'));
+                boost::algorithm::trim(parsed_content_type); // trim excess data
+                boost::algorithm::trim(parsed_content_type); // trim excess data
+                boost::algorithm::to_lower(parsed_content_type); // convert to lowercase
+                if (beautify && (parsed_content_type == HTTP_CONTENT_LLSD_XML || parsed_content_type == HTTP_CONTENT_XML))
                 {
-                    std::string parsed_content_type = mEntry->mContentType.substr(0, mEntry->mContentType.find_first_of(';'));
-                    boost::algorithm::trim(parsed_content_type); // trim excess data
-                    boost::algorithm::trim(parsed_content_type); // trim excess data
-                    boost::algorithm::to_lower(parsed_content_type); // convert to lowercase
-                    if (parsed_content_type == "application/llsd+xml" || parsed_content_type == "application/xml")
+                    // Use libxml2 instead of expat for safety.
+                    const int parse_opts = XML_PARSE_NONET | XML_PARSE_NOCDATA | XML_PARSE_NOXINCNODE | XML_PARSE_NOBLANKS;
+                    xmlDocPtr doc = xmlReadMemory(reinterpret_cast<char *>(mEntry->mData), mEntry->mDataSize, 
+                        "noname.xml", nullptr, parse_opts);
+                    if (doc)
                     {
-                        // Use libxml2 instead of expat for safety.
-                        const int parse_opts = XML_PARSE_NONET | XML_PARSE_NOCDATA | XML_PARSE_NOXINCNODE | XML_PARSE_NOBLANKS;
-                        xmlDocPtr doc = xmlReadMemory(reinterpret_cast<char *>(mEntry->mData), mEntry->mDataSize, "noname.xml", nullptr, parse_opts);
-                        if (doc)
-                        {
-                            xmlChar *xmlbuffer = nullptr;
-                            int buffersize = 0;
-                            xmlDocDumpFormatMemory(doc, &xmlbuffer, &buffersize, 1);
-                            full << std::string(reinterpret_cast<char*>(xmlbuffer), buffersize);
+                        xmlChar *xmlbuffer = nullptr;
+                        int buffersize = 0;
+                        xmlDocDumpFormatMemory(doc, &xmlbuffer, &buffersize, 1);
+                        full << std::string(reinterpret_cast<char*>(xmlbuffer), buffersize);
 
-                            xmlFree(xmlbuffer);
-                            xmlFreeDoc(doc);
-                            can_beautify = true;
-                        }
-                        else
-                        {
-                            LL_DEBUGS("EasyMessageReader") << "libxml2 failed to parse xml" << LL_ENDL;
-                        }
+                        xmlFree(xmlbuffer);
+                        xmlFreeDoc(doc);
+                        data_processed = true;
                     }
-                    else if (parsed_content_type == "text/html")
+                    else
                     {
-                        const int parse_opts = HTML_PARSE_NONET | HTML_PARSE_NOERROR | HTML_PARSE_NOIMPLIED | HTML_PARSE_NOBLANKS;
-                        htmlDocPtr doc = htmlReadMemory(reinterpret_cast<char *>(mEntry->mData), mEntry->mDataSize, "noname.html", nullptr, parse_opts);
-                        if (doc)
-                        {
-                            xmlChar * htmlbuffer = nullptr;
-                            int buffersize = 0;
-                            htmlDocDumpMemoryFormat(doc, &htmlbuffer, &buffersize, 1);
-                            full << std::string(reinterpret_cast<char*>(htmlbuffer), buffersize);
+                        LL_DEBUGS("EasyMessageReader") << "libxml2 failed to parse xml" << LL_ENDL;
+                    }
+                }
+                else if (beautify && parsed_content_type == HTTP_CONTENT_TEXT_HTML)
+                {
+                    const int parse_opts = HTML_PARSE_NONET | HTML_PARSE_NOERROR | HTML_PARSE_NOIMPLIED | HTML_PARSE_NOBLANKS;
+                    htmlDocPtr doc = htmlReadMemory(reinterpret_cast<char *>(mEntry->mData), mEntry->mDataSize, 
+                        "noname.html", nullptr, parse_opts);
+                    if (doc)
+                    {
+                        xmlChar * htmlbuffer = nullptr;
+                        int buffersize = 0;
+                        htmlDocDumpMemoryFormat(doc, &htmlbuffer, &buffersize, 1);
+                        full << std::string(reinterpret_cast<char*>(htmlbuffer), buffersize);
 
-                            xmlFree(htmlbuffer);
-                            xmlFreeDoc(doc);
-                            can_beautify = true;
-                        }
-                        else
-                        {
-                            LL_DEBUGS("EasyMessageReader") << "libxml2 failed to parse html" << LL_ENDL;
-                        }
-                    }// else if (parsed_content_type == "image/x-j2c"
+                        xmlFree(htmlbuffer);
+                        xmlFreeDoc(doc);
+                        data_processed = true;
+                    }
+                    else
+                    {
+                        LL_DEBUGS("EasyMessageReader") << "libxml2 failed to parse html" << LL_ENDL;
+                    }
+                }
+                else if (parsed_content_type == HTTP_CONTENT_IMAGE_X_J2C
+                         || parsed_content_type == HTTP_CONTENT_IMAGE_J2C
+                         || parsed_content_type == HTTP_CONTENT_IMAGE_JPEG
+                         || parsed_content_type == HTTP_CONTENT_IMAGE_PNG
+                         || parsed_content_type == HTTP_CONTENT_IMAGE_BMP
+                         || parsed_content_type == HTTP_CONTENT_VND_LL_ANIMATION
+                         || parsed_content_type == HTTP_CONTENT_VND_LL_MESH
+                         || parsed_content_type == HTTP_CONTENT_OCTET_STREAM
+                         || parsed_content_type == HTTP_CONTENT_OGG_STREAM)
+                {
+                    for (S32 i = 0; i < mEntry->mDataSize; ++i)
+                    {
+                        full << llformat("%02X ", mEntry->mData[i]);
+                    }
+                    data_processed = true;
                 }
             }
-            if (!can_beautify)
+
+            if (!data_processed)
+            {
                 full << mEntry->mData;
+            }
         }
         break;
     }

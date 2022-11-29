@@ -107,7 +107,9 @@ const std::string HTTP_IN_HEADER_X_FORWARDED_FOR("x-forwarded-for");
 
 const std::string HTTP_CONTENT_LLSD_XML("application/llsd+xml");
 const std::string HTTP_CONTENT_OCTET_STREAM("application/octet-stream");
-const std::string HTTP_CONTENT_VND_LL_MESH("application/vnd.ll.mesh");
+const std::string HTTP_CONTENT_OGG_STREAM("application/ogg");
+const std::string HTTP_CONTENT_VND_LL_MESH("application/vnd.ll.animation");
+const std::string HTTP_CONTENT_VND_LL_ANIMATION("application/vnd.ll.mesh");
 const std::string HTTP_CONTENT_XML("application/xml");
 const std::string HTTP_CONTENT_JSON("application/json");
 const std::string HTTP_CONTENT_TEXT_HTML("text/html");
