@@ -42,6 +42,7 @@
 #include "llrand.h"
 #include "message.h"
 #include "u64.h"
+#include "llmessagelog.h"
 
 ///////////////////////////////////////////////////////////
 LLPacketRing::LLPacketRing () :
@@ -270,8 +271,11 @@ S32 LLPacketRing::receivePacket (S32 socket, char *datap)
 	return packet_size;
 }
 
-BOOL LLPacketRing::sendPacket(int h_socket, char * send_buffer, S32 buf_size, LLHost host)
+BOOL LLPacketRing::sendPacket(int h_socket, char * send_buffer, S32 buf_size, const LLHost& host)
 {
+#define LOCALHOST_ADDR 16777343
+	LLMessageLog::log(LLHost(LOCALHOST_ADDR, gMessageSystem->getListenPort()), host, (U8*)send_buffer, buf_size);
+#undef LOCALHOST_ADDR
 	BOOL status = TRUE;
 	if (!mUseOutThrottle)
 	{
@@ -344,7 +348,7 @@ BOOL LLPacketRing::sendPacket(int h_socket, char * send_buffer, S32 buf_size, LL
 	return status;
 }
 
-BOOL LLPacketRing::sendPacketImpl(int h_socket, const char * send_buffer, S32 buf_size, LLHost host)
+BOOL LLPacketRing::sendPacketImpl(int h_socket, const char * send_buffer, S32 buf_size, const LLHost& host)
 {
 	
 	if (!LLProxy::isSOCKSProxyEnabled())

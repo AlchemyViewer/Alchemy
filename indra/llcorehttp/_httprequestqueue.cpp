@@ -28,6 +28,7 @@
 
 #include "_httpoperation.h"
 #include "_mutex.h"
+#include "llmessagelog.h"
 
 
 using namespace LLCoreInt;
@@ -68,7 +69,7 @@ void HttpRequestQueue::term()
 }
 
 
-HttpStatus HttpRequestQueue::addOp(const HttpRequestQueue::opPtr_t &op)
+HttpStatus HttpRequestQueue::addOp(const HttpRequestQueue::opPtr_t &op, bool loggable /* = true */)
 {
 	bool wake(false);
 	{
@@ -79,6 +80,7 @@ HttpStatus HttpRequestQueue::addOp(const HttpRequestQueue::opPtr_t &op)
 			// Return op and error to caller
 			return HttpStatus(HttpStatus::LLCORE, HE_SHUTTING_DOWN);
 		}
+        if (loggable && LLMessageLog::haveLogger()) { LLMessageLog::log(op); }
 		wake = mQueue.empty();
 		mQueue.push_back(op);
 	}

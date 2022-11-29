@@ -653,7 +653,6 @@ protected:
 	void							updateScrollFromCursor();
 
 	// text selection
-	bool							hasSelection() const { return (mSelectionStart !=mSelectionEnd); }
 	void 							startSelection();
 	void 							endSelection();
 
@@ -675,6 +674,9 @@ protected:
 	{
 		return mLabel.getString() + getToolTip();
 	}
+	
+public:
+	bool							hasSelection() const { return (mSelectionStart !=mSelectionEnd); }
 
 protected:
 	// text segmentation and flow

@@ -37,6 +37,7 @@ set(cmake_SOURCE_FILES
     GStreamer010Plugin.cmake
     Hunspell.cmake
     JPEG.cmake
+    LibXML2.cmake
     LLAddBuildTest.cmake
     LLAppearance.cmake
     LLAudio.cmake

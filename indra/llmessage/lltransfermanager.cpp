@@ -405,7 +405,7 @@ void LLTransferManager::processTransferInfo(LLMessageSystem *msgp, void **)
 			}
 			else
 			{
-				LL_INFOS() << "LLTransferManager::processTransferInfo replay FINISHED for " << transfer_id << LL_ENDL;
+				LL_DEBUGS() << "LLTransferManager::processTransferInfo replay FINISHED for " << transfer_id << LL_ENDL;
 			}
 			// This transfer is done, either via error or not.
 			ttp->completionCallback(status);

@@ -34,6 +34,8 @@
 #include "v4color.h"
 #include "llui.h"
 
+#include "lllineeditor.h"
+
 class LLCheckBoxCtrl;
 class LLSD;
 class LLUIImage;
@@ -193,10 +195,16 @@ public:
 	/*virtual*/ void	setColor(const LLColor4&);
 	/*virtual*/ void	setValue(const LLSD& value);
 
+	void setClickCallback(BOOL (*callback)(void*), void* user_data);
+	BOOL handleClick() override;
+
 private:
 	LLPointer<LLUIImage>	mIcon;
 	LLColor4				mColor;
 	LLFontGL::HAlign		mAlignment;
+
+	BOOL (*mCallback)(void*);
+	void* mUserData;
 };
 
 /*
@@ -253,6 +261,28 @@ public:
 private:
     LLPointer<LLUIImage>	mIcon;
     S32						mPad;
+};
+
+class LLScrollListLineEditor : public LLScrollListCell
+{
+public:
+	LLScrollListLineEditor( const LLScrollListCell::Params&);
+	/*virtual*/ ~LLScrollListLineEditor();
+	void	draw(const LLColor4& color, const LLColor4& highlight_color) const override;
+	S32		getHeight() const override { return 0; }
+	const LLSD	getValue() const override { return mLineEditor->getValue(); }
+	void	setValue(const LLSD& value) override { mLineEditor->setValue(value); }
+	void	onCommit() override { mLineEditor->onCommit(); }
+	BOOL	handleClick() override;
+	virtual BOOL	handleUnicodeChar(llwchar uni_char, BOOL called_from_parent);
+	virtual BOOL	handleUnicodeCharHere(llwchar uni_char );
+	void	setEnabled(BOOL enable) override { mLineEditor->setEnabled(enable); }
+
+	LLLineEditor*	getLineEditor()				{ return mLineEditor; }
+	BOOL	isText() const override { return FALSE; }
+
+private:
+	LLLineEditor* mLineEditor;
 };
 
 #endif
