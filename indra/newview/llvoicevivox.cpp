@@ -536,6 +536,7 @@ void LLVivoxVoiceClient::connectorCreate()
 		<< "<ClientName>V2 SDK</ClientName>"
 		<< "<AccountManagementServer>" << mVoiceAccountServerURI << "</AccountManagementServer>"
 		<< "<Mode>Normal</Mode>"
+        << (gSavedSettings.getBOOL("VoiceMultiInstance") ? "<MinimumPort>30000</MinimumPort><MaximumPort>50000</MaximumPort>" : "")
 #ifndef LL_LINUX
         << "<ConnectorHandle>" << LLVivoxSecurity::getInstance()->connectorHandle() << "</ConnectorHandle>"
 #endif
@@ -964,6 +965,18 @@ bool LLVivoxVoiceClient::startAndLaunchDaemon()
             }
             params.args.add("-ll");
             params.args.add(loglevel);
+
+			if (gSavedSettings.getBOOL("VoiceMultiInstance"))
+            {
+                S32 port_nr = 30000 + ll_rand(20000);
+                LLControlVariable* voice_port = gSavedSettings.getControl("VivoxVoicePort");
+                if (voice_port)
+                {
+                    voice_port->setValue(LLSD(port_nr), false);
+                    params.args.add("-i");
+                    params.args.add(llformat("127.0.0.1:%u", gSavedSettings.getU32("VivoxVoicePort")));
+                }
+            }
 
             std::string log_folder = gSavedSettings.getString("VivoxLogDirectory");
 
