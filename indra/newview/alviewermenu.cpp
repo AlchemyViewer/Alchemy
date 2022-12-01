@@ -327,7 +327,8 @@ namespace
 
     void destroy_texture(const LLUUID& id)
     {
-        if (id.isNull() || id == IMG_DEFAULT)
+        if (id.isNull() || id == IMG_DEFAULT 
+			|| id == IMG_TRANSPARENT|| id == "8dcd4a48-2d37-4909-9f78-f7a9eb4ef903")
             return;
         LLViewerFetchedTexture* texture = LLViewerTextureManager::getFetchedTexture(id);
         if (texture)
