@@ -42,6 +42,9 @@ class LLViewerInventoryCategory;
 class LLInventoryCallback;
 class LLAvatarName;
 
+extern LLUUID gLocalInventory;
+extern const char* const LOCAL_INVENTORY_FOLDER_NAME;
+
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // Class LLViewerInventoryItem
 //

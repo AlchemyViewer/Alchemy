@@ -150,6 +150,8 @@ LLViewerFolderDictionary::LLViewerFolderDictionary()
 	addEntry(LLFolderType::FT_NONE, 				new ViewerFolderEntry("New Folder",				"Inv_FolderOpen",		"Inv_FolderClosed",		FALSE,     false, "default"));
 	addEntry(LLFolderType::FT_TOXIC, 			new ViewerFolderEntry("Firstorm",				"Inv_FolderOpenToxic",		"Inv_FolderClosedToxic",		FALSE,     false));
 	addEntry(LLFolderType::FT_RLV, 					new ViewerFolderEntry("RlvRoot",				"Inv_SysOpen",			"Inv_SysClosed",		FALSE,     false));
+    addEntry(LLFolderType::FT_LOCAL,				new ViewerFolderEntry("Local Inventory",		"Inv_SysOpen",		"Inv_SysClosed",		FALSE, true));
+
 
 	for (U32 type = (U32)LLFolderType::FT_ENSEMBLE_START; type <= (U32)LLFolderType::FT_ENSEMBLE_END; ++type)
 	{

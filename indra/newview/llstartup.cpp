@@ -228,6 +228,8 @@ S32  gMaxAgentGroups;
 const std::string SCREEN_HOME_FILENAME = "screen_home%s.png";
 const std::string SCREEN_LAST_FILENAME = "screen_last%s.png";
 
+extern const char* const LOCAL_INVENTORY_FOLDER_NAME;
+
 LLPointer<LLViewerTexture> gStartTexture;
 
 //
@@ -1930,6 +1932,12 @@ bool idle_startup()
 		LL_INFOS() << "Requesting Agent Data" << LL_ENDL;
 		gAgent.sendAgentDataUpdateRequest();
 		display_startup();
+		if (gSavedSettings.getBOOL("LocalInventoryEnabled"))
+ 		{
+			gLocalInventory = gInventory.createNewCategory(LLUUID::null,
+														   LLFolderType::FT_LOCAL, 
+				                                           LOCAL_INVENTORY_FOLDER_NAME);
+ 		}
 		// Create the inventory views
 		LL_INFOS() << "Creating Inventory Views" << LL_ENDL;
 		LLFloaterReg::getInstance("inventory");

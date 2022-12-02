@@ -3872,6 +3872,7 @@ Abuse Report</string>
   <string name="Common Gestures">Common Gestures</string>
   <!-- Additional inventory entries -->
   <string name="RlvRoot">#RLV</string>
+  <string name="Local Inventory">Local Inventory</string>
   <!-- gestures -->
   <string name="Male - Excuse me">Male - Excuse me</string>
   <string name="Male - Get lost">Male - Get lost</string>
