@@ -325,6 +325,27 @@ bool ALChatCommand::parseCommand(std::string data)
 				}
 			}
 		}
+        else if (cmd == "/sendmenu")
+        {
+            S32 channel;
+            if (!(input >> channel))
+                return false;
+            std::string button;
+            if (!(input >> button))
+                return false;
+            LLMessageSystem* msg = gMessageSystem;
+            msg->newMessageFast(_PREHASH_ScriptDialogReply);
+            msg->nextBlockFast(_PREHASH_AgentData);
+            msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID());
+            msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
+            msg->nextBlockFast(_PREHASH_Data);
+            msg->addUUIDFast(_PREHASH_ObjectID, gAgent.getID());
+            msg->addS32(_PREHASH_ChatChannel, channel);
+            msg->addS32Fast(_PREHASH_ButtonIndex, 0);
+            msg->addStringFast(_PREHASH_ButtonLabel, button);
+            gAgent.sendReliableMessage();
+            return true;
+        }
 	}
 	return false;
 }

@@ -690,7 +690,8 @@ void LLIMProcessing::processNewMessage(LLUUID from_id,
 					parent_estate_id,
 					region_id,
 					position,
-					false
+					false,
+					LLSD().with("announcement", true)
 				);
 			}
 

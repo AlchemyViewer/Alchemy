@@ -771,7 +771,8 @@ void LLIMModel::LLIMSession::sessionInitReplyReceived(const LLUUID& new_session_
 	}
 }
 
-void LLIMModel::LLIMSession::addMessage(const std::string& from, const LLUUID& from_id, const std::string& utf8_text, const std::string& time, const bool is_history)
+void LLIMModel::LLIMSession::addMessage(const std::string& from, const LLUUID& from_id, const std::string& utf8_text, 
+	const std::string& time, const bool is_history, const LLSD& bonus)
 {
 	LLSD message;
 	message["from"] = from;
@@ -780,6 +781,7 @@ void LLIMModel::LLIMSession::addMessage(const std::string& from, const LLUUID& f
 	message["time"] = time; 
 	message["index"] = (LLSD::Integer)mMsgs.size(); 
 	message["is_history"] = is_history;
+    message["is_announcement"] = bonus.has("announcement");
 
 	mMsgs.push_front(message); 
 
@@ -1144,7 +1146,7 @@ void LLIMModel::sendNoUnreadMessages(const LLUUID& session_id)
 	mNoUnreadMsgsSignal(arg);
 }
 
-bool LLIMModel::addToHistory(const LLUUID& session_id, const std::string& from, const LLUUID& from_id, const std::string& utf8_text) {
+bool LLIMModel::addToHistory(const LLUUID& session_id, const std::string& from, const LLUUID& from_id, const std::string& utf8_text, const LLSD& bonus) {
 	
 	LLIMSession* session = findIMSession(session_id);
 
@@ -1154,7 +1156,7 @@ bool LLIMModel::addToHistory(const LLUUID& session_id, const std::string& from, 
 		return false;
 	}
 
-	session->addMessage(from, from_id, utf8_text, LLLogChat::timestamp(false)); //might want to add date separately
+	session->addMessage(from, from_id, utf8_text, LLLogChat::timestamp(false), bonus); //might want to add date separately
 
 	return true;
 }
@@ -1192,9 +1194,9 @@ bool LLIMModel::proccessOnlineOfflineNotification(
 }
 
 bool LLIMModel::addMessage(const LLUUID& session_id, const std::string& from, const LLUUID& from_id, 
-						   const std::string& utf8_text, bool log2file /* = true */) { 
+						   const std::string& utf8_text, bool log2file /* = true */, const LLSD& bonus) { 
 
-	LLIMSession* session = addMessageSilently(session_id, from, from_id, utf8_text, log2file);
+	LLIMSession* session = addMessageSilently(session_id, from, from_id, utf8_text, log2file, bonus);
 	if (!session) return false;
 
 	//good place to add some1 to recent list
@@ -1219,7 +1221,7 @@ bool LLIMModel::addMessage(const LLUUID& session_id, const std::string& from, co
 }
 
 LLIMModel::LLIMSession* LLIMModel::addMessageSilently(const LLUUID& session_id, const std::string& from, const LLUUID& from_id, 
-													 const std::string& utf8_text, bool log2file /* = true */)
+													 const std::string& utf8_text, bool log2file /* = true */, const LLSD& bonus)
 {
 	LLIMSession* session = findIMSession(session_id);
 
@@ -1236,7 +1238,7 @@ LLIMModel::LLIMSession* LLIMModel::addMessageSilently(const LLUUID& session_id, 
 		from_name = SYSTEM_FROM;
 	}
 
-	addToHistory(session_id, from_name, from_id, utf8_text);
+	addToHistory(session_id, from_name, from_id, utf8_text, bonus);
 	if (log2file)
 	{
 		logToFile(getHistoryFileName(session_id), from_name, from_id, utf8_text);
@@ -2703,7 +2705,8 @@ void LLIMMgr::addMessage(
 	U32 parent_estate_id,
 	const LLUUID& region_id,
 	const LLVector3& position,
-	bool link_name) // If this is true, then we insert the name and link it to a profile
+	bool link_name, // If this is true, then we insert the name and link it to a profile
+	const LLSD& bonus)
 {
 	LLUUID other_participant_id = target_id;
 
@@ -2809,7 +2812,7 @@ void LLIMMgr::addMessage(
 	if (!LLMuteList::getInstanceFast()->isMuted(other_participant_id, LLMute::flagTextChat))
 // [/SL:KB]
 	{
-		LLIMModel::instance().addMessage(new_session_id, from, other_participant_id, msg);
+		LLIMModel::instance().addMessage(new_session_id, from, other_participant_id, msg, bonus);
 	}
 
 	// Open conversation floater if offline messages are present

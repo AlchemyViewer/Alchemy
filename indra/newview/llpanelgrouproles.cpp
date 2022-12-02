@@ -55,6 +55,7 @@
 #include "llviewercontrol.h"
 
 #include "roles_constants.h"
+#include "llfilepicker.h"
 
 static LLPanelInjector<LLPanelGroupRoles> t_panel_group_roles("panel_group_roles");
 
@@ -852,6 +853,13 @@ BOOL LLPanelGroupMembersSubTab::postBuildSubTab(LLView* root)
 		button->setClickedCallback(onInviteMember, this);
 		button->setEnabled(gAgent.hasPowerInGroup(mGroupID, GP_MEMBER_INVITE));
 	}
+	
+	button = parent->getChild<LLButton>("export_list", recurse);
+	if (button)
+	{
+		button->setClickedCallback(boost::bind(&LLPanelGroupMembersSubTab::onExportMembersToCSV, this));
+		button->setEnabled(gAgent.hasPowerInGroup(mGroupID, GP_MEMBER_VISIBLE_IN_DIR));
+	}
 
 	mEjectBtn = parent->getChild<LLButton>("member_eject", recurse);
 	if ( mEjectBtn )
@@ -872,6 +880,10 @@ BOOL LLPanelGroupMembersSubTab::postBuildSubTab(LLView* root)
 
 void LLPanelGroupMembersSubTab::setGroupID(const LLUUID& id)
 {
+	LLButton* button = getChild<LLButton>("export_list");
+	if (button)
+		button->setEnabled(gAgent.hasPowerInGroup(mGroupID, GP_MEMBER_VISIBLE_IN_DIR));
+
 	//clear members list
 	if(mMembersList) mMembersList->deleteAllItems();
 	if(mAssignedRolesList) mAssignedRolesList->deleteAllItems();
@@ -1947,6 +1959,40 @@ void LLPanelGroupMembersSubTab::handleBanMember()
 	handleEjectMembers();
 }
 
+
+void LLPanelGroupMembersSubTab::onExportMembersToCSV()
+{
+	if (mPendingMemberUpdate) return;
+	
+	LLGroupMgrGroupData* gdatap = LLGroupMgr::getInstance()->getGroupData(mGroupID);
+	LLFilePicker& file_picker = LLFilePicker::instance();
+	if (!file_picker.getSaveFile(LLFilePicker::FFSAVE_CSV, LLDir::getScrubbedFileName(gdatap->mName + "_members.csv")))
+	{
+		return;
+	}
+	std::string fullpath = file_picker.getFirstFile();
+	
+	LLAPRFile outfile;
+	outfile.open(fullpath, LL_APR_WB );
+	apr_file_t* file = outfile.getFileHandle();
+	if (!file) return;
+	
+	apr_file_printf(file, "Group membership record for %s", gdatap->mName.c_str());
+	
+	LLSD memberlist;
+	LLAvatarName av_name;
+	for (LLGroupMgrGroupData::member_list_t::const_iterator member_itr = gdatap->mMembers.begin();
+		 member_itr != gdatap->mMembers.end();
+		 ++member_itr)
+	{
+		LLAvatarNameCache::get(member_itr->first, &av_name);
+		apr_file_printf(file, "\n%s,%s,%s",
+						member_itr->first.asString().c_str(),
+						av_name.getLegacyName().c_str(),
+						member_itr->second->getOnlineStatus().c_str());
+	}
+	apr_file_printf(file, "\n");
+}
 
 // LLPanelGroupRolesSubTab ///////////////////////////////////////////////
 static LLPanelInjector<LLPanelGroupRolesSubTab> t_panel_group_roles_subtab("panel_group_roles_subtab");
