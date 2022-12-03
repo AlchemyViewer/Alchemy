@@ -115,7 +115,7 @@ BOOL LLFileSystem::read(U8* buffer, S32 bytes)
     return success;
 }
 
-S32 LLFileSystem::getLastBytesRead()
+S32 LLFileSystem::getLastBytesRead() const
 {
     return mBytesRead;
 }
@@ -195,7 +195,7 @@ S32 LLFileSystem::tell() const
     return mPosition;
 }
 
-S32 LLFileSystem::getSize()
+S32 LLFileSystem::getSize() const
 {
     S32 file_size = 0;
 
@@ -253,7 +253,7 @@ BOOL LLFileSystem::remove()
     return TRUE;
 }
 
-BOOL LLFileSystem::exists()
+BOOL LLFileSystem::exists() const
 {
     llstat stat;
     if (LLFile::stat(mFilePath, &stat) == 0)
