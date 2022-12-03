@@ -13,7 +13,7 @@ include(LLSharedLibs)
 include(Copy3rdPartyLibs)
 include(ZLIB)
 include(URIPARSER)
-inclue(OpenSSL)
+include(OpenSSL)
 
 include_directories(
     ${EXPAT_INCLUDE_DIRS}
