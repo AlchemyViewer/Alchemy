@@ -30,7 +30,7 @@ variables:
   before_script:
     - virtualenv -p python .venv
     - .\.venv\Scripts\activate.ps1
-    - pip3 install --upgrade autobuild
+    - pip3 install --upgrade llbase autobuild
   script:
     - autobuild configure -c ReleaseOS -- -DUSE_FMODSTUDIO=ON -DUSE_NVAPI=ON -DUSE_LTO=ON -DDISABLE_FATAL_WARNINGS=ON -DREVISION_FROM_VCS=FALSE
     - autobuild build -c ReleaseOS --no-configure
@@ -86,7 +86,7 @@ variables:
   before_script:
     - virtualenv .venv -p python3
     - source .venv/bin/activate
-    - pip3 install --upgrade autobuild dmgbuild
+    - pip3 install --upgrade llbase autobuild dmgbuild
   script:
     - autobuild configure -c ReleaseOS -- -DUSE_FMODSTUDIO=ON -DUSE_NVAPI=ON -DUSE_LTO=ON -DDISABLE_FATAL_WARNINGS=ON -DREVISION_FROM_VCS=FALSE
     - autobuild build -c ReleaseOS --no-configure
@@ -138,7 +138,7 @@ variables:
   before_script:
     - virtualenv .venv -p python3
     - source .venv/bin/activate
-    - pip3 install --upgrade autobuild
+    - pip3 install --upgrade llbase autobuild
   script:
     - autobuild configure -c ReleaseOS -- -DUSE_FMODSTUDIO=ON -DUSE_NVAPI=ON -DUSE_LTO=ON -DDISABLE_FATAL_WARNINGS=ON -DREVISION_FROM_VCS=FALSE
     - autobuild build -c ReleaseOS --no-configure
