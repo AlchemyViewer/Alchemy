@@ -13,8 +13,10 @@ else(USESYSTEMLIBS)
             debug ${ARCH_PREBUILT_DIRS_DEBUG}/libxml2_a.lib
             optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libxml2_a.lib
         )
-    else()
+    elseif(DARWIN)
         set(LIBXML2_LIBRARIES xml2 iconv)
+    else()
+        set(LIBXML2_LIBRARIES xml2)
     endif()
     set(LIBXML2_INCLUDE_DIRS ${LIBS_PREBUILT_DIR}/include/libxml2)
 endif(USESYSTEMLIBS)
