@@ -34,7 +34,7 @@ variables:
   script:
     - autobuild configure -c ReleaseOS -- -DUSE_FMODSTUDIO=ON -DUSE_NVAPI=ON -DUSE_LTO=ON -DDISABLE_FATAL_WARNINGS=ON -DREVISION_FROM_VCS=FALSE
     - autobuild build -c ReleaseOS --no-configure
-    - autobuild graph -c ReleaseOS --graph-file alchemy-windows${AUTOBUILD_ADDRSIZE}-dependencies.svg 
+    #- autobuild graph -c ReleaseOS --graph-file alchemy-windows${AUTOBUILD_ADDRSIZE}-dependencies.svg 
     - |
         If ($env:USE_SENTRY -eq 'TRUE') 
         {
@@ -64,7 +64,7 @@ variables:
       - build-vc-*/newview/Release/alchemy-bin.pdb
       - build-vc-*/newview/Release/alchemy-bin.src.zip
       - build-vc-*/newview/Release/Alchemy_*_Setup.exe
-      - alchemy-*-dependencies.svg
+      #- alchemy-*-dependencies.svg
 
 .mac_build:
   stage: build
@@ -90,7 +90,7 @@ variables:
   script:
     - autobuild configure -c ReleaseOS -- -DUSE_FMODSTUDIO=ON -DUSE_NVAPI=ON -DUSE_LTO=ON -DDISABLE_FATAL_WARNINGS=ON -DREVISION_FROM_VCS=FALSE
     - autobuild build -c ReleaseOS --no-configure
-    - autobuild graph -c ReleaseOS --graph-file alchemy-darwin${AUTOBUILD_ADDRSIZE}-dependencies.svg
+    #- autobuild graph -c ReleaseOS --graph-file alchemy-darwin${AUTOBUILD_ADDRSIZE}-dependencies.svg
     - | 
         if [ "$USE_SENTRY" = "TRUE" ] 
         then 
@@ -116,7 +116,7 @@ variables:
       - build-darwin-*/newview/Release/*.app/Contents/MacOS/*
       - build-darwin-*/newview/Release/*.dSYM
       - build-darwin-*/newview/Release/*.src.zip
-      - alchemy-*-dependencies.svg
+      #- alchemy-*-dependencies.svg
 
 .linux_build:
   stage: build
@@ -142,7 +142,7 @@ variables:
   script:
     - autobuild configure -c ReleaseOS -- -DUSE_FMODSTUDIO=ON -DUSE_NVAPI=ON -DUSE_LTO=ON -DDISABLE_FATAL_WARNINGS=ON -DREVISION_FROM_VCS=FALSE
     - autobuild build -c ReleaseOS --no-configure
-    - autobuild graph -c ReleaseOS --graph-file alchemy-linuxs${AUTOBUILD_ADDRSIZE}-dependencies.svg
+    #- autobuild graph -c ReleaseOS --graph-file alchemy-linuxs${AUTOBUILD_ADDRSIZE}-dependencies.svg
     - |
         if [ "$USE_SENTRY" = "TRUE" ] 
         then
@@ -168,7 +168,7 @@ variables:
       - build-linux-*/newview/alchemy-bin
       - build-linux-*/newview/alchemy-bin.debug
       - build-linux-*/newview/alchemy-bin.src.zip
-      - alchemy-*-dependencies.svg
+      #- alchemy-*-dependencies.svg
 
 
 coverity_scan:
