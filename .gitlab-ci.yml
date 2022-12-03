@@ -30,7 +30,7 @@ variables:
   before_script:
     - virtualenv -p python .venv
     - .\.venv\Scripts\activate.ps1
-    - pip3 install --upgrade autobuild -i https://ci-job-token:${CI_JOB_TOKEN}@git.alchemyviewer.org/api/v4/projects/54/packages/pypi/simple
+    - pip3 install --upgrade autobuild
   script:
     - autobuild configure -c ReleaseOS -- -DUSE_FMODSTUDIO=ON -DUSE_NVAPI=ON -DUSE_LTO=ON -DDISABLE_FATAL_WARNINGS=ON -DREVISION_FROM_VCS=FALSE
     - autobuild build -c ReleaseOS --no-configure
@@ -86,7 +86,7 @@ variables:
   before_script:
     - virtualenv .venv -p python3
     - source .venv/bin/activate
-    - pip3 install --upgrade autobuild dmgbuild -i https://ci-job-token:${CI_JOB_TOKEN}@git.alchemyviewer.org/api/v4/projects/54/packages/pypi/simple
+    - pip3 install --upgrade autobuild dmgbuild
   script:
     - autobuild configure -c ReleaseOS -- -DUSE_FMODSTUDIO=ON -DUSE_NVAPI=ON -DUSE_LTO=ON -DDISABLE_FATAL_WARNINGS=ON -DREVISION_FROM_VCS=FALSE
     - autobuild build -c ReleaseOS --no-configure
@@ -138,7 +138,7 @@ variables:
   before_script:
     - virtualenv .venv -p python3
     - source .venv/bin/activate
-    - pip3 install --upgrade autobuild -i https://ci-job-token:${CI_JOB_TOKEN}@git.alchemyviewer.org/api/v4/projects/54/packages/pypi/simple
+    - pip3 install --upgrade autobuild
   script:
     - autobuild configure -c ReleaseOS -- -DUSE_FMODSTUDIO=ON -DUSE_NVAPI=ON -DUSE_LTO=ON -DDISABLE_FATAL_WARNINGS=ON -DREVISION_FROM_VCS=FALSE
     - autobuild build -c ReleaseOS --no-configure
@@ -194,7 +194,7 @@ coverity_scan:
   before_script:
     - virtualenv .venv -p python3
     - source .venv/bin/activate
-    - pip3 install --upgrade autobuild -i https://ci-job-token:${CI_JOB_TOKEN}@git.alchemyviewer.org/api/v4/projects/54/packages/pypi/simple
+    - pip3 install --upgrade autobuild
   script:
     - cov-configure --template --comptype clangcc --compiler clang-12
     - cov-configure --template --comptype clangcxx --compiler clang++-12
