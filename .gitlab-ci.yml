@@ -48,7 +48,6 @@ variables:
       - build-vc-*/packages/lib/release/alut*.dll
       - build-vc-*/packages/lib/release/epoxy-*.dll
       - build-vc-*/packages/lib/release/fmod*.dll
-      - build-vc-*/packages/lib/release/glod*.dll
       - build-vc-*/packages/lib/release/libapr*.dll
       - build-vc-*/packages/lib/release/libexpat*.dll
       - build-vc-*/packages/lib/release/libhunspell*.dll
@@ -105,7 +104,6 @@ variables:
       - build-darwin-*/packages/lib/release/libapr*.dylib
       - build-darwin-*/packages/lib/release/libepoxy*.dylib
       - build-darwin-*/packages/lib/release/libfmod*.dylib
-      - build-darwin-*/packages/lib/release/libGLOD*.dylib
       - build-darwin-*/packages/lib/release/libhunspell*.dylib
       - build-darwin-*/packages/lib/release/libndofdev*.dylib
       - build-darwin-*/packages/lib/release/libopenal*.dylib
@@ -159,7 +157,6 @@ variables:
       - build-linux-*/packages/lib/release/libepoxy*.so*
       - build-linux-*/packages/lib/release/libexpat*.so*
       - build-linux-*/packages/lib/release/libfmod*.so*
-      - build-linux-*/packages/lib/release/libGLOD.so*
       - build-linux-*/packages/lib/release/libjpeg.so*
       - build-linux-*/packages/lib/release/libopenal.so*
       - build-linux-*/packages/lib/release/libopenjp2.so*
