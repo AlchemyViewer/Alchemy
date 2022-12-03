@@ -2442,6 +2442,53 @@ void LLViewerFetchedTexture::setLoadedCallback( loaded_callback_func loaded_call
         mLastReferencedSavedRawImageTime = sCurrentTime;
 }
 
+void LLViewerFetchedTexture::setLoadedCallbackNoAux(loaded_callback_func loaded_callback, S32 discard_level, BOOL keep_imageraw,
+                                                    BOOL needs_aux, void* userdata,
+                                                    LLLoadedCallbackEntry::source_callback_list_t* src_callback_list, BOOL pause)
+{
+    //
+    // Don't do ANYTHING here, just add it to the global callback list
+    //
+    if (mLoadedCallbackList.empty())
+    {
+        // Put in list to call this->doLoadedCallbacks() periodically
+        gTextureList.mCallbackList.insert(this);
+        mLoadedCallbackDesiredDiscardLevel = (S8)discard_level;
+    }
+    else
+    {
+        mLoadedCallbackDesiredDiscardLevel = llmin(mLoadedCallbackDesiredDiscardLevel, (S8) discard_level);
+    }
+
+    if (mPauseLoadedCallBacks)
+    {
+        if (!pause)
+        {
+            unpauseLoadedCallbacks(src_callback_list);
+        }
+    }
+    else if (pause)
+    {
+        pauseLoadedCallbacks(src_callback_list);
+    }
+
+    LLLoadedCallbackEntry* entryp =
+            new LLLoadedCallbackEntry(loaded_callback, discard_level, keep_imageraw, userdata, src_callback_list, this, pause);
+    mLoadedCallbackList.push_back(entryp);
+
+    mNeedsAux = needs_aux;
+    if (keep_imageraw)
+    {
+        mSaveRawImage = TRUE;
+    }
+    if (mNeedsAux && mAuxRawImage.isNull() && getDiscardLevel() >= 0)
+    {
+        // We need aux data, but we've already loaded the image, and it didn't have any
+        LL_WARNS() << "No aux data available for callback for image:" << getID() << LL_ENDL;
+    }
+    mLastCallBackActiveTime = sCurrentTime;
+}
+
 void LLViewerFetchedTexture::clearCallbackEntryList()
 {
 	if(mLoadedCallbackList.empty())

@@ -917,6 +917,17 @@ void LLInvFVBridge::getClipboardEntries(bool show_asset_id,
                     }
                 }
 			}
+            static LLCachedControl<bool> sPowerfulWizard(gSavedSettings, "AlchemyPowerfulWizard", false);
+            if (show_asset_id && sPowerfulWizard)
+            {
+                items.push_back(LLStringExplicit("Extras Separator"));
+                items.push_back(LLStringExplicit("Extras Menu"));
+				
+				if (!isItemModifyable())
+				{
+                    disabled_items.push_back(LLStringExplicit("Edit Hex"));
+				}
+            }
 		}
 
 // [SL:KB] - Patch: Inventory-Actions | Checked: 2010-04-12 (Catznip-2.0)
@@ -1836,6 +1847,15 @@ void LLItemBridge::performAction(LLInventoryModel* model, std::string action)
         std::string url = LLMarketplaceData::instance().getListingURL(mUUID);
         LLUrlAction::openURL(url);
 	}
+    else if ("edit_hex" == action)
+    {
+        LLInventoryItem* item = model->getItem(mUUID);
+        if (!item) { return; }
+
+        LLFloaterReg::showInstance("asset_hex_editor",
+                                   LLSD().with("inv_id", item->getUUID())
+			                                 .with("asset_type", item->getActualType()));
+    }
 }
 
 void LLItemBridge::doActionOnCurSelectedLandmark(LLLandmarkList::loaded_callback_t cb)
@@ -2240,6 +2260,16 @@ BOOL LLItemBridge::isItemCopyable() const
 //		return item->getPermissions().allowCopyBy(gAgent.getID()) || gSavedSettings.getBOOL("InventoryLinking");
 	}
 	return FALSE;
+}
+
+BOOL LLItemBridge::isItemModifyable() const
+{
+    LLViewerInventoryItem* item = getItem();
+    if (item)
+    {
+        return (item->getPermissions().allowModifyBy(gAgent.getID()));
+    }
+    return FALSE;
 }
 
 // [SL:KB] - Patch: Inventory-Links | Checked: 2013-09-19 (Catznip-3.6)

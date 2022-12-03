@@ -931,6 +931,21 @@
         function="Inventory.DoToSelected"
         parameter="move_to_marketplace_listings" />
 	</menu_item_call>
+	<menu_item_separator
+	 layout="topleft"
+	 name="Extras Separator" />
+	<menu
+	 label="Extras"
+	 layout="topleft"
+	 name="Extras Menu">
+		<menu_item_call
+		  label="Edit Hex"
+		  name="Edit Hex">
+			<on_click
+			  function="Inventory.DoToSelected"
+			  parameter="edit_hex" />
+		</menu_item_call>
+	</menu>
 	<menu_item_call
      label="--no options--"
      layout="topleft"
