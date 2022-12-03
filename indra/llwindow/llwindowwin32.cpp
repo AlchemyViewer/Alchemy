@@ -436,7 +436,7 @@ LLWindowWin32::LLWindowWin32(LLWindowCallbacks* callbacks,
 {
 	
 	//MAINT-516 -- force a load of opengl32.dll just in case windows went sideways 
-	mOpenGL32DLL = LoadLibrary(TEXT("opengl32.dll"));
+	//mOpenGL32DLL = LoadLibrary(TEXT("opengl32.dll"));
 
 	mUser32DLL = LoadLibrary(TEXT("User32.dll"));
 	if (mUser32DLL != nullptr)

@@ -47,7 +47,6 @@ include(LLXML)
 include(NDOF)
 include(NVAPI)
 include(OPENAL)
-include(OpenGL)
 include(OpenSSL)
 include(PNG)
 include(Sentry)
@@ -2182,10 +2181,8 @@ target_link_libraries(${VIEWER_BINARY_NAME}
     ${BOOST_CONTEXT_LIBRARY}
     ${DBUSGLIB_LIBRARIES}
     ${EPOXY_LIBRARIES}
-    ${OPENGL_LIBRARIES}
     ${FMODWRAPPER_LIBRARY} # must come after LLAudio
     ${GLOD_LIBRARIES}
-    ${OPENGL_LIBRARIES}
     ${SDL_LIBRARIES}
     ${SMARTHEAP_LIBRARY}
     ${UI_LIBRARIES}
