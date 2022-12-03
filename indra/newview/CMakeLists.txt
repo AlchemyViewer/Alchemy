@@ -326,6 +326,7 @@ set(viewer_SOURCE_FILES
     llfloatermyscripts.cpp
     llfloatermyenvironment.cpp
     llfloaternamedesc.cpp
+    llfloaternewlocalinventory.cpp
     llfloaternotificationsconsole.cpp
     llfloaternotificationstabbed.cpp
     llfloateroutfitphotopreview.cpp
@@ -1027,6 +1028,7 @@ set(viewer_HEADER_FILES
     llfloatermyscripts.h
     llfloatermyenvironment.h
     llfloaternamedesc.h
+    llfloaternewlocalinventory.h
     llfloaternotificationsconsole.h
     llfloaternotificationstabbed.h
     llfloateroutfitphotopreview.h

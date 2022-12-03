@@ -114,6 +114,7 @@
 #include "llfloatermyscripts.h"
 #include "llfloatermyenvironment.h"
 #include "llfloaternamedesc.h"
+#include "llfloaternewlocalinventory.h"
 #include "llfloaternotificationsconsole.h"
 #include "llfloaternotificationstabbed.h"
 #include "llfloaterobjectweights.h"
@@ -430,6 +431,7 @@ void LLViewerFloaterReg::registerFloaters()
 	LLFloaterReg::add("message_log", "floater_message_log.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterMessageLog>);
 	LLFloaterReg::add("message_rewriter", "floater_message_rewriter.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterMessageRewriter>);
 	LLFloaterReg::add("music_ticker", "floater_music_ticker.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloater>);
+    LLFloaterReg::add("new_local_inventory", "floater_new_local_inventory.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterNewLocalInventory>);
 	LLFloaterReg::add("particle_editor", "floater_particle_editor.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<ALFloaterParticleEditor>);
 	LLFloaterReg::add("progress_view", "floater_progress_view.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterProgressView>);
 	LLFloaterReg::add("quick_settings", "floater_quick_settings.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloater>);

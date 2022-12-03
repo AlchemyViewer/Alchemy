@@ -674,7 +674,8 @@
      function="Inventory.DoToSelected"
      parameter="restoreToWorld" />
     <menu_item_call.on_enable
-     function="Alchemy.PowerfulWizard" />
+     function="SavedSetting"
+     parameter="AlchemyPowerfulWizard" />
 	</menu_item_call>
     <menu_item_call
      label="Delete"

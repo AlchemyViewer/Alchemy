@@ -230,8 +230,9 @@ namespace
 		return true;
 	}
 
-    bool is_powerful_wizard() {
-	    return gSavedSettings.getBOOL("AlchemyPowerfulWizard");
+    bool get_saved_setting(const LLSD& userdata)
+    {
+	    return gSavedSettings.getBOOL(userdata.asString());
     }
 
 	bool is_powerful_wizard_object()
@@ -414,11 +415,11 @@ namespace
 void ALViewerMenu::initialize_menus()
 {
 	LLUICtrl::EnableCallbackRegistry::Registrar& enable = LLUICtrl::EnableCallbackRegistry::currentRegistrar();
-    enable.add("Alchemy.PowerfulWizard", [](LLUICtrl* ctrl, const LLSD& param) { return is_powerful_wizard(); });
 	enable.add("Alchemy.PowerfulWizardObject", [](LLUICtrl* ctrl, const LLSD& param) { return is_powerful_wizard_object(); });
 	enable.add("Avatar.EnableManageEstate", [](LLUICtrl* ctrl, const LLSD& param) { return can_manage_avatar_estate(); });
 	enable.add("Avatar.EnableTeleportTo", [](LLUICtrl* ctrl, const LLSD& param) { return can_teleport_to(); });
 	enable.add("Object.EnableEditParticles", [](LLUICtrl* ctrl, const LLSD& param) { return enable_edit_particle_source(); });
+    enable.add("SavedSetting", [](LLUICtrl* ctrl, const LLSD& param) { return get_saved_setting(param); });
 
 	LLUICtrl::CommitCallbackRegistry::Registrar& commit = LLUICtrl::CommitCallbackRegistry::currentRegistrar();
 	commit.add("Avatar.CopyData",		[](LLUICtrl* ctrl, const LLSD& param) { avatar_copy_data(param); });
