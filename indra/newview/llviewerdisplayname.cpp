@@ -47,9 +47,9 @@ namespace LLViewerDisplayName
 	// Fired when there is a change in the agent's name
 	name_changed_signal_t sNameChangedSignal;
 
-	void addNameChangedCallback(const name_changed_signal_t::slot_type& cb) 
+	boost::signals2::connection addNameChangedCallback(const name_changed_signal_t::slot_type& cb) 
 	{ 
-		sNameChangedSignal.connect(cb); 
+		return sNameChangedSignal.connect(cb);
 	}
 
 	void doNothing() { }
