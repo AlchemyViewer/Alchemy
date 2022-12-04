@@ -877,3 +877,8 @@ LLPanel* LLPanel::createFactoryPanel(const std::string& name)
 	LLPanel::Params panel_p;
 	return LLUICtrlFactory::create<LLPanel>(panel_p);
 }
+
+void set_child_visible(LLView* parent, const std::string& child_name, bool visible)
+{
+    parent->getChildView(child_name)->setVisible(visible);
+}
