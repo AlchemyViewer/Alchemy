@@ -747,7 +747,7 @@ void LLPanelProfileSecondLife::updateButtons()
             mAddFriendButton->setEnabled(true);
         }
 
-        bool enable_map_btn = ((is_buddy_online && is_agent_mappable(av_id)) || gAgent.isGodlike()) && !gRlvHandler.hasBehaviour(RLV_BHVR_SHOWWORLDMAP);
+        bool enable_map_btn = ((is_buddy_online && LLAvatarActions::isAgentMappable(av_id)) || gAgent.isGodlike()) && !gRlvHandler.hasBehaviour(RLV_BHVR_SHOWWORLDMAP);
         mShowOnMapButton->setEnabled(enable_map_btn);
 
         bool enable_block_btn = LLAvatarActions::canBlock(av_id) && !LLAvatarActions::isBlocked(av_id);

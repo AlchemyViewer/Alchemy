@@ -234,6 +234,11 @@ public:
 	static bool canShareSelectedItems(LLInventoryPanel* inv_panel = NULL);
 
 	/**
+	 * Checks whether agent is mappable
+	 */
+	static bool isAgentMappable(const LLUUID& agent_id);
+
+	/**
 	 * Builds a string of residents' display names separated by "words_separator" string.
 	 *
 	 * @param avatar_names - a vector of given avatar names from which resulting string is built

@@ -1530,3 +1530,18 @@ bool LLAvatarActions::canBlock(const LLUUID& id)
 	bool is_self = id == gAgentID;
 	return !is_self && !is_linden;
 }
+
+//static
+bool LLAvatarActions::isAgentMappable(const LLUUID& agent_id)
+{
+	const LLRelationship* buddy_info = nullptr;
+	bool is_friend = LLAvatarActions::isFriend(agent_id);
+	
+	if (is_friend)
+		buddy_info = LLAvatarTracker::instance().getBuddyInfo(agent_id);
+	
+	return (buddy_info &&
+			buddy_info->isOnline() &&
+			buddy_info->isRightGrantedFrom(LLRelationship::GRANT_MAP_LOCATION)
+			);
+}
