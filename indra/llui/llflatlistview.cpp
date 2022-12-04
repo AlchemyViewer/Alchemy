@@ -112,7 +112,7 @@ bool LLFlatListView::addItemPairs(pairs_list_t panel_list, bool rearrange /*= tr
         LL_WARNS_ONCE() << "No comparator specified for inserting FlatListView items." << LL_ENDL;
         return false;
     }
-    if (panel_list.size() == 0)
+    if (panel_list.empty())
     {
         return false;
     }
@@ -259,6 +259,13 @@ LLPanel* LLFlatListView::getItemByValue(const LLSD& value) const
 	item_pair_t* pair = getItemPair(value);
 	if (pair) return pair->first;
 	return NULL;
+}
+
+bool LLFlatListView::valueExists(const LLSD& value) const
+{
+	if (value.isUndefined()) return false;
+	item_pair_t* pair = getItemPair(value);
+	return pair != nullptr;
 }
 
 bool LLFlatListView::selectItem(LLPanel* item, bool select /*= true*/)
