@@ -56,20 +56,9 @@ enum EAvatarProcessorType
 	APT_PICKS,
 	APT_PICK_INFO,
 	APT_TEXTURES,
-    APT_INTERESTS_INFO,
+	APT_INTERESTS,
 	APT_CLASSIFIEDS,
 	APT_CLASSIFIED_INFO
-};
-
-struct LLInterestsData
-{
-    LLUUID      agent_id;
-    LLUUID      avatar_id; //target id
-    U32         want_to_mask;
-    std::string want_to_text;
-    U32         skills_mask;
-    std::string skills_text;
-    std::string languages_text;
 };
 
 struct LLAvatarData
@@ -189,10 +178,21 @@ struct LLAvatarClassifiedInfo
 	S32 price_for_listing;
 };
 
+struct LLAvatarInterests
+{
+	LLUUID      agent_id;
+	LLUUID      avatar_id; //target id
+	U32         want_to_mask;
+	std::string want_to_text;
+	U32         skills_mask;
+	std::string skills_text;
+	std::string languages_text;
+};
+
 class LLAvatarPropertiesObserver
 {
 public:
-	virtual ~LLAvatarPropertiesObserver() {}
+	virtual ~LLAvatarPropertiesObserver() = default;
 	virtual void processProperties(void* data, EAvatarProcessorType type) = 0;
 };
 
@@ -226,16 +226,16 @@ public:
 	void sendPickInfoUpdate(const LLPickData* new_pick);
 
 	void sendClassifiedInfoUpdate(const LLAvatarClassifiedInfo* c_data);
+	
+	void sendInterestsUpdate(const LLAvatarInterests* i_data);
 
 	void sendFriendRights(const LLUUID& avatar_id, S32 rights);
 
-	void sendNotes(const LLUUID& avatar_id, const std::string notes);
+	void sendNotes(const LLUUID& avatar_id, const std::string& notes);
 
 	void sendPickDelete(const LLUUID& pick_id);
 
 	void sendClassifiedDelete(const LLUUID& classified_id);
-
-    void sendInterestsInfoUpdate(const LLInterestsData* interests_data);
 
 	// Returns translated, human readable string for account type, such
 	// as "Resident" or "Linden Employee".  Used for profiles, inspectors.
@@ -266,7 +266,7 @@ public:
 
 protected:
 
-	void sendGenericRequest(const LLUUID& avatar_id, EAvatarProcessorType type, const std::string method);
+	void sendGenericRequest(const LLUUID& avatar_id, EAvatarProcessorType type, const std::string& method);
 
 	void notifyObservers(const LLUUID& id,void* data, EAvatarProcessorType type);
 

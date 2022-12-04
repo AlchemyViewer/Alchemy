@@ -95,7 +95,7 @@ void LLAvatarPropertiesProcessor::removeObserver(const LLUUID& avatar_id, LLAvat
 }
 
 
-void LLAvatarPropertiesProcessor::sendGenericRequest(const LLUUID& avatar_id, EAvatarProcessorType type, const std::string method)
+void LLAvatarPropertiesProcessor::sendGenericRequest(const LLUUID& avatar_id, EAvatarProcessorType type, const std::string& method)
 {
 	// Suppress duplicate requests while waiting for a response from the network
 	if (isPendingRequest(avatar_id, type))
@@ -211,13 +211,13 @@ std::string LLAvatarPropertiesProcessor::accountType(const LLAvatarData* avatar_
 	{
 		return avatar_data->caption_text;
 	}
-	const char* const ACCT_TYPE[] = {
+	static const std::array<const char*, 4> ACCT_TYPE{{
 		"AcctTypeResident",
 		"AcctTypeTrial",
 		"AcctTypeCharterMember",
 		"AcctTypeEmployee"
-	};
-	U8 caption_max = (U8)LL_ARRAY_SIZE(ACCT_TYPE)-1;
+	}};
+	U8 caption_max = (U8)ACCT_TYPE.size() - 1;
 	U8 caption_index = llclamp(avatar_data->caption_index, (U8)0, caption_max);
 	return LLTrans::getString(ACCT_TYPE[caption_index]);
 }
@@ -257,6 +257,7 @@ std::string LLAvatarPropertiesProcessor::paymentInfo(const LLAvatarData* avatar_
 bool LLAvatarPropertiesProcessor::hasPaymentInfoOnFile(const LLAvatarData* avatar_data)
 {
 	// Special accounts like M Linden don't have payment info revealed.
+	// M Linden? lol Who the fuck wrote this? A dinosaur?
 	if (!avatar_data->caption_text.empty()) return true;
 
 	// Linden employees don't have payment info revealed
@@ -279,7 +280,7 @@ void LLAvatarPropertiesProcessor::processAvatarPropertiesReply(LLMessageSystem* 
 	msg->getStringFast(	_PREHASH_PropertiesData,	_PREHASH_AboutText,		avatar_data.about_text);
 	msg->getStringFast(	_PREHASH_PropertiesData,	_PREHASH_FLAboutText,	avatar_data.fl_about_text);
 	msg->getStringFast(	_PREHASH_PropertiesData,	_PREHASH_BornOn,		birth_date);
-	msg->getStringFast( _PREHASH_PropertiesData,	_PREHASH_ProfileURL,	avatar_data.profile_url);
+	msg->getStringFast(	_PREHASH_PropertiesData,	_PREHASH_ProfileURL,	avatar_data.profile_url);
 	msg->getU32Fast(	_PREHASH_PropertiesData,	_PREHASH_Flags,			avatar_data.flags);
 
 
@@ -304,29 +305,20 @@ void LLAvatarPropertiesProcessor::processAvatarPropertiesReply(LLMessageSystem* 
 
 void LLAvatarPropertiesProcessor::processAvatarInterestsReply(LLMessageSystem* msg, void**)
 {
-/*
-	AvatarInterestsReply is automatically sent by the server in response to the 
-	AvatarPropertiesRequest sent when the panel is opened (in addition to the AvatarPropertiesReply message). 
-	If the interests panel is no longer part of the design (?) we should just register the message 
-	to a handler function that does nothing. 
-	That will suppress the warnings and be compatible with old server versions.
-	WARNING: LLTemplateMessageReader::decodeData: Message from 216.82.37.237:13000 with no handler function received: AvatarInterestsReply
-*/
-
-    LLInterestsData interests_data;
-    
-    msg->getUUIDFast(   _PREHASH_AgentData,         _PREHASH_AgentID,       interests_data.agent_id );
-    msg->getUUIDFast(   _PREHASH_AgentData,         _PREHASH_AvatarID,      interests_data.avatar_id );
-    msg->getU32Fast(    _PREHASH_PropertiesData,	_PREHASH_WantToMask,    interests_data.want_to_mask );
-    msg->getStringFast( _PREHASH_PropertiesData,    _PREHASH_WantToText,    interests_data.want_to_text );
-    msg->getU32Fast(    _PREHASH_PropertiesData,	_PREHASH_SkillsMask,    interests_data.skills_mask );
-    msg->getStringFast( _PREHASH_PropertiesData,    _PREHASH_SkillsText,    interests_data.skills_text );
-    msg->getStringFast(     _PREHASH_PropertiesData,    _PREHASH_LanguagesText, interests_data.languages_text );
-    
-    LLAvatarPropertiesProcessor* self = getInstanceFast();
-    // Request processed, no longer pending
-    self->removePendingRequest(interests_data.avatar_id, APT_INTERESTS_INFO);
-    self->notifyObservers(interests_data.avatar_id, &interests_data, APT_INTERESTS_INFO);
+	LLAvatarInterests interests;
+	
+	msg->getUUIDFast(   _PREHASH_AgentData,         _PREHASH_AgentID,       interests.agent_id);
+	msg->getUUIDFast(   _PREHASH_AgentData,         _PREHASH_AvatarID,      interests.avatar_id);
+	msg->getU32Fast(    _PREHASH_PropertiesData,	_PREHASH_WantToMask,    interests.want_to_mask);
+	msg->getStringFast( _PREHASH_PropertiesData,    _PREHASH_WantToText,    interests.want_to_text);
+	msg->getU32Fast(    _PREHASH_PropertiesData,	_PREHASH_SkillsMask,    interests.skills_mask);
+	msg->getStringFast( _PREHASH_PropertiesData,    _PREHASH_SkillsText,    interests.skills_text);
+	msg->getStringFast(     _PREHASH_PropertiesData,    _PREHASH_LanguagesText, interests.languages_text);
+	
+	LLAvatarPropertiesProcessor* self = getInstance();
+	// Request processed, no longer pending
+	self->removePendingRequest(interests.avatar_id, APT_INTERESTS);
+	self->notifyObservers(interests.avatar_id, &interests, APT_INTERESTS);
 }
 
 void LLAvatarPropertiesProcessor::processAvatarClassifiedsReply(LLMessageSystem* msg, void**)
@@ -514,7 +506,7 @@ void LLAvatarPropertiesProcessor::sendFriendRights(const LLUUID& avatar_id, S32 
 	}
 }
 
-void LLAvatarPropertiesProcessor::sendNotes(const LLUUID& avatar_id, const std::string notes)
+void LLAvatarPropertiesProcessor::sendNotes(const LLUUID& avatar_id, const std::string& notes)
 {
 	if(!avatar_id.isNull())
 	{
@@ -566,29 +558,6 @@ void LLAvatarPropertiesProcessor::sendClassifiedDelete(const LLUUID& classified_
 	gAgent.sendReliableMessage();
 }
 
-void LLAvatarPropertiesProcessor::sendInterestsInfoUpdate(const LLInterestsData* interests_data)
-{
-    if(!interests_data)
-    {
-        return;
-    }
-
-    LLMessageSystem* msg = gMessageSystem;
-
-    msg->newMessageFast(_PREHASH_AvatarInterestsUpdate);
-    msg->nextBlockFast( _PREHASH_AgentData);
-    msg->addUUIDFast(	_PREHASH_AgentID,       gAgent.getID() );
-    msg->addUUIDFast(   _PREHASH_SessionID,     gAgent.getSessionID() );
-    msg->nextBlockFast( _PREHASH_PropertiesData);
-    msg->addU32Fast(	_PREHASH_WantToMask,    interests_data->want_to_mask);
-    msg->addStringFast(	_PREHASH_WantToText,    interests_data->want_to_text);
-    msg->addU32Fast(	_PREHASH_SkillsMask,    interests_data->skills_mask);
-    msg->addStringFast(	_PREHASH_SkillsText,    interests_data->skills_text);
-    msg->addStringFast(     _PREHASH_LanguagesText, interests_data->languages_text);
-    
-    gAgent.sendReliableMessage();
-}
-
 void LLAvatarPropertiesProcessor::sendPickInfoUpdate(const LLPickData* new_pick)
 {
 	if (!new_pick) return;
@@ -605,7 +574,7 @@ void LLAvatarPropertiesProcessor::sendPickInfoUpdate(const LLPickData* new_pick)
 	msg->addUUIDFast(_PREHASH_CreatorID, new_pick->creator_id);
 
 	//legacy var need to be deleted
-	msg->addBOOLFast(_PREHASH_TopPick, FALSE);	
+	msg->addBOOLFast(_PREHASH_TopPick, FALSE);
 
 	// fills in on simulator if null
 	msg->addUUIDFast(_PREHASH_ParcelID, new_pick->parcel_id);
@@ -650,6 +619,26 @@ void LLAvatarPropertiesProcessor::sendClassifiedInfoUpdate(const LLAvatarClassif
 	msg->addU8Fast(_PREHASH_ClassifiedFlags, c_data->flags);
 	msg->addS32Fast(_PREHASH_PriceForListing, c_data->price_for_listing);
 
+	gAgent.sendReliableMessage();
+}
+
+void LLAvatarPropertiesProcessor::sendInterestsUpdate(const LLAvatarInterests* i_data)
+{
+	if(!i_data) return;
+	
+	LLMessageSystem* msg = gMessageSystem;
+	
+	msg->newMessageFast(_PREHASH_AvatarInterestsUpdate);
+	msg->nextBlockFast( _PREHASH_AgentData);
+	msg->addUUIDFast(	_PREHASH_AgentID,       gAgent.getID());
+	msg->addUUIDFast(   _PREHASH_SessionID,     gAgent.getSessionID());
+	msg->nextBlockFast( _PREHASH_PropertiesData);
+	msg->addU32Fast(	_PREHASH_WantToMask,    i_data->want_to_mask);
+	msg->addStringFast(	_PREHASH_WantToText,    i_data->want_to_text);
+	msg->addU32Fast(	_PREHASH_SkillsMask,    i_data->skills_mask);
+	msg->addStringFast(	_PREHASH_SkillsText,    i_data->skills_text);
+	msg->addStringFast(     _PREHASH_LanguagesText, i_data->languages_text);
+	
 	gAgent.sendReliableMessage();
 }
 

@@ -1018,9 +1018,9 @@ BOOL LLPanelProfileInterests::postBuild()
 
 void LLPanelProfileInterests::processProperties(void* data, EAvatarProcessorType type)
 {
-    if (APT_INTERESTS_INFO == type)
+    if (APT_INTERESTS == type)
     {
-        const LLInterestsData* interests_data = static_cast<const LLInterestsData*>(data);
+        const LLAvatarInterests* interests_data = static_cast<const LLAvatarInterests*>(data);
         if (interests_data && getAvatarId() == interests_data->avatar_id)
         {
             for (S32 i = 0; i < WANT_CHECKS; ++i)
@@ -1077,7 +1077,7 @@ void LLPanelProfileInterests::apply()
 {
     if (getIsLoaded() && getSelfProfile())
     {
-        LLInterestsData interests_data = LLInterestsData();
+        LLAvatarInterests interests_data = LLAvatarInterests();
 
         interests_data.want_to_mask = 0;
         for (S32 i = 0; i < WANT_CHECKS; ++i)
@@ -1101,7 +1101,7 @@ void LLPanelProfileInterests::apply()
         interests_data.skills_text = mSkillsEditor->getText();
         interests_data.languages_text = mLanguagesEditor->getText();
 
-        LLAvatarPropertiesProcessor::getInstanceFast()->sendInterestsInfoUpdate(&interests_data);
+        LLAvatarPropertiesProcessor::getInstanceFast()->sendInterestsUpdate(&interests_data);
     }
 
 }
