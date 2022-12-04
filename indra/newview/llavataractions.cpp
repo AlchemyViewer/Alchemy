@@ -153,7 +153,7 @@ void LLAvatarActions::removeFriendDialog(const LLUUID& id)
 // static
 void LLAvatarActions::removeFriendsDialog(const uuid_vec_t& ids)
 {
-	if(ids.size() == 0)
+	if(ids.empty())
 		return;
 
 	LLSD args;
@@ -200,7 +200,7 @@ void LLAvatarActions::offerTeleport(const LLUUID& invitee)
 // static
 void LLAvatarActions::offerTeleport(const uuid_vec_t& ids) 
 {
-	if (ids.size() == 0)
+	if (ids.empty())
 		return;
 
 	handle_lure(ids);
@@ -284,7 +284,7 @@ void LLAvatarActions::startCall(const LLUUID& id)
 // static
 void LLAvatarActions::startAdhocCall(const uuid_vec_t& ids, const LLUUID& floater_id)
 {
-	if (ids.size() == 0)
+	if (ids.empty())
 	{
 		return;
 	}
