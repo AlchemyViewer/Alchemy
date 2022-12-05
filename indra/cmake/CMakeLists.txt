@@ -33,7 +33,6 @@ set(cmake_SOURCE_FILES
     FMODSTUDIO.cmake
     FreeType.cmake
     GLEXT.cmake
-    GLOD.cmake
     GStreamer010Plugin.cmake
     Hunspell.cmake
     JPEG.cmake

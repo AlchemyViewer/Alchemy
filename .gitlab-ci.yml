@@ -30,11 +30,11 @@ variables:
   before_script:
     - virtualenv -p python .venv
     - .\.venv\Scripts\activate.ps1
-    - pip3 install --upgrade autobuild -i https://ci-job-token:${CI_JOB_TOKEN}@git.alchemyviewer.org/api/v4/projects/54/packages/pypi/simple
+    - pip3 install --upgrade llbase autobuild
   script:
     - autobuild configure -c ReleaseOS -- -DUSE_FMODSTUDIO=ON -DUSE_NVAPI=ON -DUSE_LTO=ON -DDISABLE_FATAL_WARNINGS=ON -DREVISION_FROM_VCS=FALSE
     - autobuild build -c ReleaseOS --no-configure
-    - autobuild graph -c ReleaseOS --graph-file alchemy-windows${AUTOBUILD_ADDRSIZE}-dependencies.svg 
+    #- autobuild graph -c ReleaseOS --graph-file alchemy-windows${AUTOBUILD_ADDRSIZE}-dependencies.svg 
     - |
         If ($env:USE_SENTRY -eq 'TRUE') 
         {
@@ -48,7 +48,6 @@ variables:
       - build-vc-*/packages/lib/release/alut*.dll
       - build-vc-*/packages/lib/release/epoxy-*.dll
       - build-vc-*/packages/lib/release/fmod*.dll
-      - build-vc-*/packages/lib/release/glod*.dll
       - build-vc-*/packages/lib/release/libapr*.dll
       - build-vc-*/packages/lib/release/libexpat*.dll
       - build-vc-*/packages/lib/release/libhunspell*.dll
@@ -64,7 +63,7 @@ variables:
       - build-vc-*/newview/Release/alchemy-bin.pdb
       - build-vc-*/newview/Release/alchemy-bin.src.zip
       - build-vc-*/newview/Release/Alchemy_*_Setup.exe
-      - alchemy-*-dependencies.svg
+      #- alchemy-*-dependencies.svg
 
 .mac_build:
   stage: build
@@ -86,11 +85,11 @@ variables:
   before_script:
     - virtualenv .venv -p python3
     - source .venv/bin/activate
-    - pip3 install --upgrade autobuild dmgbuild -i https://ci-job-token:${CI_JOB_TOKEN}@git.alchemyviewer.org/api/v4/projects/54/packages/pypi/simple
+    - pip3 install --upgrade llbase autobuild dmgbuild
   script:
     - autobuild configure -c ReleaseOS -- -DUSE_FMODSTUDIO=ON -DUSE_NVAPI=ON -DUSE_LTO=ON -DDISABLE_FATAL_WARNINGS=ON -DREVISION_FROM_VCS=FALSE
     - autobuild build -c ReleaseOS --no-configure
-    - autobuild graph -c ReleaseOS --graph-file alchemy-darwin${AUTOBUILD_ADDRSIZE}-dependencies.svg
+    #- autobuild graph -c ReleaseOS --graph-file alchemy-darwin${AUTOBUILD_ADDRSIZE}-dependencies.svg
     - | 
         if [ "$USE_SENTRY" = "TRUE" ] 
         then 
@@ -105,7 +104,6 @@ variables:
       - build-darwin-*/packages/lib/release/libapr*.dylib
       - build-darwin-*/packages/lib/release/libepoxy*.dylib
       - build-darwin-*/packages/lib/release/libfmod*.dylib
-      - build-darwin-*/packages/lib/release/libGLOD*.dylib
       - build-darwin-*/packages/lib/release/libhunspell*.dylib
       - build-darwin-*/packages/lib/release/libndofdev*.dylib
       - build-darwin-*/packages/lib/release/libopenal*.dylib
@@ -116,7 +114,7 @@ variables:
       - build-darwin-*/newview/Release/*.app/Contents/MacOS/*
       - build-darwin-*/newview/Release/*.dSYM
       - build-darwin-*/newview/Release/*.src.zip
-      - alchemy-*-dependencies.svg
+      #- alchemy-*-dependencies.svg
 
 .linux_build:
   stage: build
@@ -138,11 +136,11 @@ variables:
   before_script:
     - virtualenv .venv -p python3
     - source .venv/bin/activate
-    - pip3 install --upgrade autobuild -i https://ci-job-token:${CI_JOB_TOKEN}@git.alchemyviewer.org/api/v4/projects/54/packages/pypi/simple
+    - pip3 install --upgrade llbase autobuild
   script:
     - autobuild configure -c ReleaseOS -- -DUSE_FMODSTUDIO=ON -DUSE_NVAPI=ON -DUSE_LTO=ON -DDISABLE_FATAL_WARNINGS=ON -DREVISION_FROM_VCS=FALSE
     - autobuild build -c ReleaseOS --no-configure
-    - autobuild graph -c ReleaseOS --graph-file alchemy-linuxs${AUTOBUILD_ADDRSIZE}-dependencies.svg
+    #- autobuild graph -c ReleaseOS --graph-file alchemy-linuxs${AUTOBUILD_ADDRSIZE}-dependencies.svg
     - |
         if [ "$USE_SENTRY" = "TRUE" ] 
         then
@@ -159,7 +157,6 @@ variables:
       - build-linux-*/packages/lib/release/libepoxy*.so*
       - build-linux-*/packages/lib/release/libexpat*.so*
       - build-linux-*/packages/lib/release/libfmod*.so*
-      - build-linux-*/packages/lib/release/libGLOD.so*
       - build-linux-*/packages/lib/release/libjpeg.so*
       - build-linux-*/packages/lib/release/libopenal.so*
       - build-linux-*/packages/lib/release/libopenjp2.so*
@@ -168,7 +165,7 @@ variables:
       - build-linux-*/newview/alchemy-bin
       - build-linux-*/newview/alchemy-bin.debug
       - build-linux-*/newview/alchemy-bin.src.zip
-      - alchemy-*-dependencies.svg
+      #- alchemy-*-dependencies.svg
 
 
 coverity_scan:
@@ -194,7 +191,7 @@ coverity_scan:
   before_script:
     - virtualenv .venv -p python3
     - source .venv/bin/activate
-    - pip3 install --upgrade autobuild -i https://ci-job-token:${CI_JOB_TOKEN}@git.alchemyviewer.org/api/v4/projects/54/packages/pypi/simple
+    - pip3 install --upgrade autobuild
   script:
     - cov-configure --template --comptype clangcc --compiler clang-12
     - cov-configure --template --comptype clangcxx --compiler clang++-12

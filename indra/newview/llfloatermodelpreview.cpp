@@ -138,10 +138,10 @@ mAvatarTabIndex(0)
 	mStatusLock = std::make_unique<LLMutex>();
 	mModelPreview = NULL;
 
-	mLODMode[LLModel::LOD_HIGH] = 0;
+	mLODMode[LLModel::LOD_HIGH] = LLModelPreview::LOD_FROM_FILE;
 	for (U32 i = 0; i < LLModel::LOD_HIGH; i++)
 	{
-		mLODMode[i] = 1;
+		mLODMode[i] = LLModelPreview::MESH_OPTIMIZER_AUTO;
 	}
 }
 
@@ -350,15 +350,6 @@ void LLFloaterModelPreview::initModelPreview()
 //static
 bool LLFloaterModelPreview::showModelPreview()
 {
-#ifdef LL_GLOD
-    if (LLRender::sGLCoreProfile)
-    {
-        // GLOD is incompatible with RenderGLCoreProfile, will crash on init
-        LLNotificationsUtil::add("MeshUploadProfilerError");
-        return false;
-    }
-#endif
-
     LLFloaterModelPreview* fmp = (LLFloaterModelPreview*)LLFloaterReg::getInstance("upload_model");
     if (fmp && !fmp->isModelLoading())
     {
@@ -743,7 +734,19 @@ void LLFloaterModelPreview::onAutoFillCommit(LLUICtrl* ctrl, void* userdata)
 
 void LLFloaterModelPreview::onLODParamCommit(S32 lod, bool enforce_tri_limit)
 {
-	mModelPreview->onLODParamCommit(lod, enforce_tri_limit);
+    LLComboBox* lod_source_combo = getChild<LLComboBox>("lod_source_" + lod_name[lod]);
+    S32 mode = lod_source_combo->getCurrentIndex();
+    switch (mode)
+    {
+    case LLModelPreview::MESH_OPTIMIZER_AUTO:
+    case LLModelPreview::MESH_OPTIMIZER_SLOPPY:
+    case LLModelPreview::MESH_OPTIMIZER_COMBINE:
+        mModelPreview->onLODMeshOptimizerParamCommit(lod, enforce_tri_limit, mode);
+        break;
+    default:
+        LL_ERRS() << "Only supposed to be called to generate models" << LL_ENDL;
+        break;
+    }
 
 	//refresh LoDs that reference this one
 	for (S32 i = lod - 1; i >= 0; --i)
@@ -1742,19 +1745,10 @@ void LLFloaterModelPreview::onLoDSourceCommit(S32 lod)
 	mModelPreview->updateLodControls(lod);
 
 	LLComboBox* lod_source_combo = getChild<LLComboBox>("lod_source_" + lod_name[lod]);
-
-    if (lod_source_combo->getCurrentIndex() == LLModelPreview::LOD_FROM_FILE
-        && mModelPreview->mLODFile[lod].empty())
-    {
-        // File wasn't selected, so nothing to do yet, refreshing
-        // hovewer will cause a small freeze with large meshes
-        // Might be good idea to open filepicker here
-        return;
-    }
-
-	refresh();
-
-	if (lod_source_combo->getCurrentIndex() == LLModelPreview::GENERATE)
+    S32 index = lod_source_combo->getCurrentIndex();
+	if (index == LLModelPreview::MESH_OPTIMIZER_AUTO
+        || index == LLModelPreview::MESH_OPTIMIZER_SLOPPY
+        || index == LLModelPreview::MESH_OPTIMIZER_COMBINE)
 	{ //rebuild LoD to update triangle counts
 		onLODParamCommit(lod, true);
 	}
@@ -1785,7 +1779,7 @@ void LLFloaterModelPreview::resetUploadOptions()
 	getChild<LLComboBox>("lod_source_" + lod_name[NUM_LOD - 1])->setCurrentByIndex(LLModelPreview::LOD_FROM_FILE);
 	for (S32 lod = 0; lod < NUM_LOD - 1; ++lod)
 	{
-		getChild<LLComboBox>("lod_source_" + lod_name[lod])->setCurrentByIndex(LLModelPreview::GENERATE);
+		getChild<LLComboBox>("lod_source_" + lod_name[lod])->setCurrentByIndex(LLModelPreview::MESH_OPTIMIZER_AUTO);
 		childSetValue("lod_file_" + lod_name[lod], "");
 	}
 

@@ -4,7 +4,6 @@ project(llrender)
 
 include(00-Common)
 include(Epoxy)
-include(OpenGL)
 include(FreeType)
 include(LLCommon)
 include(LLImage)
@@ -127,8 +126,7 @@ target_link_libraries(llrender
     ${LLXML_LIBRARIES}
     ${LLWINDOW_LIBRARIES}
     ${FREETYPE_LIBRARIES}
-    ${EPOXY_LIBRARIES}
-    ${OPENGL_LIBRARIES})
+    ${EPOXY_LIBRARIES})
 
 if(USE_PRECOMPILED_HEADERS AND ${CMAKE_VERSION} VERSION_GREATER "3.15.0") 
   target_precompile_headers(llrender

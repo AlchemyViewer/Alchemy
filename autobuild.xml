@@ -646,11 +646,11 @@
               <key>creds</key>
               <string>gitlab</string>
               <key>hash</key>
-              <string>db27e5c974e41d822c75038a6816b07362d54f1b0a64f21a63f0b7076f94c4a34934145bc326a1cc946996abec4b9a5c47e8ef9c68a694e129f09876080d74ac</string>
+              <string>8d6ab0c2caf7ee0d70ea835c944f6b809e1e3f42cebf24bc002fa77594175e6eb025ba7e169b2217343f21462ba8d238517486f8dcf78633829bb8b0b65b038a</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/49/packages/generic/fmodstudio/2.02.06.1475/fmodstudio-2.02.06-darwin64-1475.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/49/packages/generic/fmodstudio/2.02.11.1673/fmodstudio-2.02.11-darwin64-1673.tar.zst</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
@@ -662,11 +662,11 @@
               <key>creds</key>
               <string>gitlab</string>
               <key>hash</key>
-              <string>f430175d7af2a8f5e084cd789df904944b117eebb462211eafa80ea5c7f23399449c5a52faf35b3b81a09c51fdff0273741fb32c55f9c615a51b1f15a5094ca5</string>
+              <string>0a4c0603a25c25bd6e06072ee457440a490eda951c1a7dd5123e0a70c329917829b34439f56abd31fb781f722986de5652d0ab95ff042c6395e9db8f8f8e6b5c</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/49/packages/generic/fmodstudio/2.02.06.1475/fmodstudio-2.02.06-linux64-1475.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/49/packages/generic/fmodstudio/2.02.11.1673/fmodstudio-2.02.11-linux64-1673.tar.zst</string>
             </map>
             <key>name</key>
             <string>linux64</string>
@@ -678,18 +678,18 @@
               <key>creds</key>
               <string>gitlab</string>
               <key>hash</key>
-              <string>7ad5fe064e3a7f45234a3658315a86d80b85f5f49f8a1767e1453116bd23eda67a014c521cf26529fb6bbada3441e64ddffef98ddfa85ae846d8aec72ba6fc70</string>
+              <string>b408f3d8b74352bbe2dbf20a24a30d9746818e8086970750d80d3aeb4d1591040de1a8bd6af79638ca109221a2218161cae22770e8922f4034ddf47176308cad</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/49/packages/generic/fmodstudio/2.02.06.1475/fmodstudio-2.02.06-windows64-1475.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/49/packages/generic/fmodstudio/2.02.11.1673/fmodstudio-2.02.11-windows64-1673.tar.zst</string>
             </map>
             <key>name</key>
             <string>windows64</string>
           </map>
         </map>
         <key>version</key>
-        <string>2.02.06</string>
+        <string>2.02.11</string>
       </map>
       <key>fonts</key>
       <map>
@@ -770,64 +770,6 @@
         </map>
         <key>version</key>
         <string>2.12.1</string>
-      </map>
-      <key>glod</key>
-      <map>
-        <key>copyright</key>
-        <string>Copyright 2003 Jonathan Cohen, Nat Duca, David Luebke, Brenden Schubert - Johns Hopkins University and University of Virginia</string>
-        <key>license</key>
-        <string>GLOD Open-Source License   Version 1.0</string>
-        <key>license_file</key>
-        <string>LICENSES/GLOD.txt</string>
-        <key>name</key>
-        <string>glod</string>
-        <key>platforms</key>
-        <map>
-          <key>darwin64</key>
-          <map>
-            <key>archive</key>
-            <map>
-              <key>hash</key>
-              <string>999502c58fed6ac261a35394c1f98380c5a4e5991bc0138090a02a9796515a487e33087799fc3ba2bf7df2f62514059f91af4f4fdb71540d2b71ca802afebcc6</string>
-              <key>hash_algorithm</key>
-              <string>blake2b</string>
-              <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/116/packages/generic/glod/1.0.3.1312/glod-1.0.3-darwin64-1312.tar.zst</string>
-            </map>
-            <key>name</key>
-            <string>darwin64</string>
-          </map>
-          <key>linux64</key>
-          <map>
-            <key>archive</key>
-            <map>
-              <key>hash</key>
-              <string>4a5fa692403499d53b4674b32ff3f4fa1c196e618dd14f1e6327dcd10a9ab7ebf6fd220385a84a1f8629b4d020486eff2ded9bf69e3ef3308fe6a4a304fdb195</string>
-              <key>hash_algorithm</key>
-              <string>blake2b</string>
-              <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/116/packages/generic/glod/1.0.3.1312/glod-1.0.3-linux64-1312.tar.zst</string>
-            </map>
-            <key>name</key>
-            <string>linux64</string>
-          </map>
-          <key>windows64</key>
-          <map>
-            <key>archive</key>
-            <map>
-              <key>hash</key>
-              <string>4dbbb434b9ee4c99896690eb3b65c54cce553798a00a0c103d3220b8f7445c870c3b7e31dd5874880982569f16c28f5412a4d5c3e9697dbb6ae36e800d693459</string>
-              <key>hash_algorithm</key>
-              <string>blake2b</string>
-              <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/116/packages/generic/glod/1.0.3.1312/glod-1.0.3-windows64-1312.tar.zst</string>
-            </map>
-            <key>name</key>
-            <string>windows64</string>
-          </map>
-        </map>
-        <key>version</key>
-        <string>1.0.3</string>
       </map>
       <key>gstreamer</key>
       <map>
@@ -1934,11 +1876,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>ba2b9b6fb458f2fbf14e48b495ea9dcb50729461ad1414e905ede9f1c3fb06f4aafd8a459c86953c73c538467d98fe14a6f65a33e7cb18b1b15805c0339007be</string>
+              <string>c869f6bf2f5ac9adda5430b7d4addd1d67c53e36de0eacbc1bdacd6dafd25adcec686a715d6d27e5c6a2c4efec9611d1a628843b882c0305c7e88da6f99c190b</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/164/packages/generic/sentry/1.3.0.1498/sentry-1.3.0-darwin64-1498.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/164/packages/generic/sentry/7.31.3-0.5.2.1643/sentry-7.31.3-0.5.2-darwin64-1643.tar.zst</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
@@ -1948,11 +1890,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>ff185147ae0b467d8120f2c039c262aeeb3e208d93e779caf24c63649598a8d48c70a0cdf4e45ec2d09d37828f505cdf100d54de16427a59e6dada16b4878325</string>
+              <string>96c7ad919ad3ffd3985b8b55f9044e3c653cc355f03c949b4cec93b9258125c63dca1e8994e13f75dcad98e800972a72c617ca77a5403901e4d750d21f0e2f9d</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/164/packages/generic/sentry/1.3.0.1498/sentry-1.3.0-linux64-1498.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/164/packages/generic/sentry/7.31.3-0.5.2.1643/sentry-7.31.3-0.5.2-linux64-1643.tar.zst</string>
             </map>
             <key>name</key>
             <string>linux64</string>
@@ -1962,18 +1904,18 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>70b5765faf5417f776aa9be348717a82300a011f1da59ac9e059e6a78c6eade4153be659e2d0f138d4313e859540ddcff06c897157bc67e4251fda603536833e</string>
+              <string>7594ea6b075e1b54d130bedd0379af6604f58b1e59f097c936ed34a7e1a20cd271c8cf7ab3e5c623850371c55945c65ecb83f987249ddfbff5011226d73b610b</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/164/packages/generic/sentry/1.3.0.1498/sentry-1.3.0-windows64-1498.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/164/packages/generic/sentry/7.31.3-0.5.2.1643/sentry-7.31.3-0.5.2-windows64-1643.tar.zst</string>
             </map>
             <key>name</key>
             <string>windows64</string>
           </map>
         </map>
         <key>version</key>
-        <string>1.3.0</string>
+        <string>7.31.3-0.5.2</string>
       </map>
       <key>slvoice</key>
       <map>

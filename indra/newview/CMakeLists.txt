@@ -19,7 +19,6 @@ include(Epoxy)
 include(EXPAT)
 include(FMODSTUDIO)
 include(Fonts)
-include(GLOD)
 include(Hunspell)
 include(JPEGEncoderBasic)
 include(LibXML2)
@@ -47,7 +46,6 @@ include(LLXML)
 include(NDOF)
 include(NVAPI)
 include(OPENAL)
-include(OpenGL)
 include(OpenSSL)
 include(PNG)
 include(Sentry)
@@ -76,7 +74,6 @@ include_directories(
     ${CMAKE_CURRENT_BINARY_DIR}
     ${DBUSGLIB_INCLUDE_DIRS}
     ${ZLIB_INCLUDE_DIRS}
-    ${GLOD_INCLUDE_DIR}
     ${LIBXML2_INCLUDE_DIRS}
     ${LLAUDIO_INCLUDE_DIRS}
     ${LLCHARACTER_INCLUDE_DIRS}
@@ -1850,10 +1847,6 @@ if (USE_FMODSTUDIO)
   set(FMODWRAPPER_LIBRARY ${FMODSTUDIO_LIBRARY})
 endif (USE_FMODSTUDIO)
 
-if (GLODLIB)
-  set_source_files_properties(llfloatermodelpreview.cpp PROPERTIES COMPILE_FLAGS "-DLL_GLOD")
-endif (GLODLIB)
-
 list(APPEND viewer_SOURCE_FILES ${viewer_HEADER_FILES})
 
 set_source_files_properties(${viewer_HEADER_FILES}
@@ -1933,7 +1926,6 @@ if (WINDOWS)
       ${SHARED_LIB_STAGING_DIR}/${CMAKE_CFG_INTDIR}/libapr-1.dll
       ${SHARED_LIB_STAGING_DIR}/${CMAKE_CFG_INTDIR}/libaprutil-1.dll
       ${SHARED_LIB_STAGING_DIR}/${CMAKE_CFG_INTDIR}/libapriconv-1.dll
-      ${SHARED_LIB_STAGING_DIR}/${CMAKE_CFG_INTDIR}/glod.dll
       ${SHARED_LIB_STAGING_DIR}/${CMAKE_CFG_INTDIR}/openjp2.dll
       ${SHARED_LIB_STAGING_DIR}/${CMAKE_CFG_INTDIR}/libhunspell.dll
       ${SHARED_LIB_STAGING_DIR}/${CMAKE_CFG_INTDIR}/epoxy-0.dll
@@ -2194,10 +2186,7 @@ target_link_libraries(${VIEWER_BINARY_NAME}
     ${BOOST_CONTEXT_LIBRARY}
     ${DBUSGLIB_LIBRARIES}
     ${EPOXY_LIBRARIES}
-    ${OPENGL_LIBRARIES}
     ${FMODWRAPPER_LIBRARY} # must come after LLAudio
-    ${GLOD_LIBRARIES}
-    ${OPENGL_LIBRARIES}
     ${SDL_LIBRARIES}
     ${SMARTHEAP_LIBRARY}
     ${UI_LIBRARIES}

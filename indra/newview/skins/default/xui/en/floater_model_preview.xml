@@ -187,9 +187,17 @@
                  label="Load from file"
                  value="Load from file" />
                 <item
-                 name="Generate"
-                 label="Generate"
-                 value="Generate" />
+                 name="MeshOpt Auto"
+                 label="Generate Auto"
+                 value="MeshOpt Auto" />
+                <item
+                 name="MeshOptCombine"
+                 label="Generate Precise"
+                 value="MeshOptCombine" />
+                <item
+                 name="MeshOptSloppy"
+                 label="Generate Sloppy"
+                 value="MeshOptSloppy" />
             </combo_box>
             <line_editor
              follows="left|top"
@@ -316,9 +324,17 @@
                  label="Load from file"
                  value="Load from file" />
                 <item
-                 name="Generate"
-                 label="Generate"
-                 value="Generate" />
+                 name="MeshOpt Auto"
+                 label="Generate Auto"
+                 value="MeshOpt Auto" />
+                <item
+                 name="MeshOptCombine"
+                 label="Generate Precise"
+                 value="MeshOptCombine" />
+                <item
+                 name="MeshOptSloppy"
+                 label="Generate Sloppy"
+                 value="MeshOptSloppy" />
                 <item
                  name="Use LoD above"
                  label="Use LoD above"
@@ -449,9 +465,17 @@
                  label="Load from file"
                  value="Load from file" />
                 <item
-                 name="Generate"
-                 label="Generate"
-                 value="Generate" />
+                 name="MeshOpt Auto"
+                 label="Generate Auto"
+                 value="MeshOpt Auto" />
+                <item
+                 name="MeshOptCombine"
+                 label="Generate Precise"
+                 value="MeshOptCombine" />
+                <item
+                 name="MeshOptSloppy"
+                 label="Generate Sloppy"
+                 value="MeshOptSloppy" />
                 <item
                  name="Use LoD above"
                  label="Use LoD above"
@@ -582,9 +606,17 @@
                  label="Load from file"
                  value="Load from file" />
                 <item
-                 name="Generate"
-                 label="Generate"
-                 value="Generate" />
+                 name="MeshOpt Auto"
+                 label="Generate Auto"
+                 value="MeshOpt Auto" />
+                <item
+                 name="MeshOptCombine"
+                 label="Generate Precise"
+                 value="MeshOptCombine" />
+                <item
+                 name="MeshOptSloppy"
+                 label="Generate Sloppy"
+                 value="MeshOptSloppy" />
                 <item
                  name="Use LoD above"
                  label="Use LoD above"

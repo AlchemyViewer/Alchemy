@@ -13,6 +13,7 @@ include(LLSharedLibs)
 include(Copy3rdPartyLibs)
 include(ZLIB)
 include(URIPARSER)
+include(OpenSSL)
 
 include_directories(
     ${EXPAT_INCLUDE_DIRS}
@@ -285,6 +286,7 @@ target_link_libraries(
     ${APRUTIL_LIBRARIES}
     ${APR_LIBRARIES}
     ${EXPAT_LIBRARIES}
+    ${OPENSSL_LIBRARIES}
     ${ZLIB_LIBRARIES}
     ${WINDOWS_LIBRARIES}
     ${BOOST_FIBER_LIBRARY}
@@ -343,7 +345,10 @@ if (LL_TESTS)
       ${BOOST_FIBER_LIBRARY} 
       ${BOOST_CONTEXT_LIBRARY} 
       ${BOOST_THREAD_LIBRARY} 
-      ${BOOST_SYSTEM_LIBRARY})
+      ${BOOST_SYSTEM_LIBRARY}
+      ${OPENSSL_LIBRARIES}
+      ${ZLIB_LIBRARIES}
+      )
   LL_ADD_INTEGRATION_TEST(commonmisc "" "${test_libs}")
   LL_ADD_INTEGRATION_TEST(bitpack "" "${test_libs}")
   LL_ADD_INTEGRATION_TEST(llbase64 "" "${test_libs}")
