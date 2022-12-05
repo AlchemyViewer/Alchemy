@@ -78,8 +78,6 @@ BOOL enable_deselect(void*);
 BOOL enable_undo(void*);
 BOOL enable_redo(void*);
 
-BOOL is_agent_mappable(const LLUUID& agent_id);
-
 void confirm_replace_attachment(S32 option, void* user_data);
 void handle_detach_from_avatar(const LLSD& user_data);
 void attach_label(std::string& label, const LLSD&);

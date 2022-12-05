@@ -244,3 +244,15 @@ bool LLAssetType::lookupIsAssetIDKnowable(EType asset_type)
 	}
 	return false;
 }
+
+std::vector<std::string> LLAssetType::getAssetTypeNames()
+{
+    std::vector<std::string> names;
+    const LLAssetDictionary& dict = LLAssetDictionary::instanceFast();
+    for (const auto& dict_pair : dict)
+    {
+        const AssetEntry* entry = dict_pair.second;
+        names.push_back(entry->mTypeName);
+    }
+    return names;
+}

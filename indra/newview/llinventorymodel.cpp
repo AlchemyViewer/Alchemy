@@ -266,14 +266,33 @@ void LLInventoryModel::cleanupInventory()
 // This is a convenience function to check if one object has a parent
 // chain up to the category specified by UUID.
 BOOL LLInventoryModel::isObjectDescendentOf(const LLUUID& obj_id,
-											const LLUUID& cat_id) const
+											const LLUUID& cat_id,
+											const bool break_on_recursion) const
 {
 	if (obj_id == cat_id) return TRUE;
+
+	if (cat_id.isNull()) return FALSE;
+	U32 depthCounter = 0;
 
 	const LLInventoryObject* obj = getObject(obj_id);
 	while(obj)
 	{
 		const LLUUID& parent_id = obj->getParentUUID();
+		if(break_on_recursion)
+		{
+			if (depthCounter++ > 100)
+			{
+				LL_WARNS(LOG_INV) << "Possibly recursive parenting!" << LL_ENDL;
+				LL_INFOS(LOG_INV) << obj->getName() << " : " << obj->getUUID() << " : " << parent_id << LL_ENDL;
+				return FALSE;
+			}
+			if (parent_id == obj->getUUID())
+			{
+				// infinite loop... same thing as having no parent.
+				LL_WARNS(LOG_INV) << "Object has itself as parent! " << parent_id.asString() << ", " << obj->getName() << LL_ENDL;
+				return FALSE;
+			}
+		}
 		if( parent_id.isNull() )
 		{
 			return FALSE;
@@ -727,7 +746,7 @@ LLUUID LLInventoryModel::createNewCategory(const LLUUID& parent_id,
 		return id;
 	}
 
-	if (preferred_type != LLFolderType::FT_NONE)
+	if (preferred_type != LLFolderType::FT_NONE && preferred_type != LLFolderType::FT_LOCAL)
 	{
 		// Ultimately this should only be done for non-singleton
 		// types. Requires back-end changes to guarantee that others
@@ -745,7 +764,21 @@ LLUUID LLInventoryModel::createNewCategory(const LLUUID& parent_id,
 	{
 		name.assign(LLViewerFolderType::lookupNewCategoryName(preferred_type));
 	}
-	
+
+	// Local Inventory is local as such, finish up before server comms.
+    if (preferred_type == LLFolderType::FT_LOCAL || parent_id.isNull() || parent_id == gLocalInventory)
+    {
+        LLPointer<LLViewerInventoryCategory> cat = new LLViewerInventoryCategory(id, parent_id, preferred_type, name, gAgent.getID());
+        cat->setVersion(LLViewerInventoryCategory::VERSION_INITIAL - 1);  // accountForUpdate() will increase version by 1
+        cat->setDescendentCount(0);
+        LLCategoryUpdate update(cat->getParentUUID(), 1);
+        accountForUpdate(update);
+        updateCategory(cat);
+
+		return id;
+	}
+
+	// back to our regularly scheduled programming
 	LLViewerRegion* viewer_region = gAgent.getRegion();
 	std::string url;
 	if ( viewer_region )
@@ -1468,6 +1501,8 @@ void LLInventoryModel::changeItemParent(LLViewerInventoryItem* item,
 										const LLUUID& new_parent_id,
 										BOOL restamp)
 {
+	bool send_parent_update = gInventory.isObjectDescendentOf(item->getUUID(), gInventory.getRootFolderID());
+
 	if (item->getParentUUID() == new_parent_id)
 	{
 		LL_DEBUGS(LOG_INV) << "'" << item->getName() << "' (" << item->getUUID()
@@ -1487,7 +1522,10 @@ void LLInventoryModel::changeItemParent(LLViewerInventoryItem* item,
 
 		LLPointer<LLViewerInventoryItem> new_item = new LLViewerInventoryItem(item);
 		new_item->setParent(new_parent_id);
-		new_item->updateParentOnServer(restamp);
+
+		if(send_parent_update) {
+			new_item->updateParentOnServer(restamp);
+		}
 		updateItem(new_item);
 		notifyObservers();
 	}
@@ -2280,6 +2318,8 @@ LLInventoryModel::EHasChildren LLInventoryModel::categoryHasChildren(
 
 bool LLInventoryModel::isCategoryComplete(const LLUUID& cat_id) const
 {
+	if((cat_id == gLocalInventory) || gInventory.isObjectDescendentOf(cat_id, gLocalInventory)) return true;
+
 	LLViewerInventoryCategory* cat = getCategory(cat_id);
 	if(cat && (cat->getVersion()!=LLViewerInventoryCategory::VERSION_UNKNOWN))
 	{
@@ -2525,7 +2565,7 @@ bool LLInventoryModel::loadSkeleton(
 		// reason (e.g. one of the descendents was a broken link).
 		for (cat_set_t::iterator invalid_cat_it = invalid_categories.begin();
 			 invalid_cat_it != invalid_categories.end();
-			 invalid_cat_it++)
+			 ++invalid_cat_it)
 		{
 			LLViewerInventoryCategory* cat = (*invalid_cat_it).get();
 			cat->setVersion(NO_VERSION);
@@ -3860,10 +3900,45 @@ void LLInventoryModel::removeCategory(const LLUUID& category_id)
 	LLViewerInventoryCategory* cat = getCategory(category_id);
 	if (cat)
 	{
-		const LLUUID trash_id = findCategoryUUIDForType(LLFolderType::FT_TRASH);
-		if (trash_id.notNull())
+		if(gInventory.isObjectDescendentOf(cat->getUUID(), gLocalInventory))
 		{
-			changeCategoryParent(cat, trash_id, TRUE);
+			S32 descendents = cat->getDescendentCount();
+			if(descendents > 0)
+			{
+				LLInventoryModel::LLCategoryUpdate up(cat->getUUID(), -descendents);
+				gInventory.accountForUpdate(up);
+			}
+			cat->setDescendentCount(0);
+			LLInventoryModel::cat_array_t categories;
+			LLInventoryModel::item_array_t items;
+			gInventory.collectDescendents(cat->getUUID(),
+			                              categories,
+			                              items,
+			                              false); // include trash?
+			S32 count = items.size();
+			S32 i;
+			for(i = 0; i < count; ++i)
+			{
+				gInventory.deleteObject(items.at(i)->getUUID());
+			}
+			count = categories.size();
+			for(i = 0; i < count; ++i)
+			{
+				gInventory.deleteObject(categories.at(i)->getUUID());
+			}
+
+			LLInventoryModel::LLCategoryUpdate up(cat->getParentUUID(), -descendents);
+			gInventory.deleteObject(cat->getUUID());
+			gInventory.accountForUpdate(up);
+			gInventory.notifyObservers();
+		}
+		else
+		{
+			const LLUUID& trash_id = findCategoryUUIDForType(LLFolderType::FT_TRASH);
+			if (trash_id.notNull())
+			{
+				changeCategoryParent(cat, trash_id, TRUE);
+			}
 		}
 	}
 

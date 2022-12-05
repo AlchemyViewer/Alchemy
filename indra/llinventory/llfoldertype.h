@@ -97,6 +97,8 @@ public:
 		FT_TOXIC = 58,
 		FT_RLV = 59,
 
+		FT_LOCAL = 69,
+
 		FT_SUITCASE = 100,
 
 

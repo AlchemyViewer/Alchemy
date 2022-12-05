@@ -1604,7 +1604,7 @@ bool LLFloaterIMContainer::enableContextMenuItem(const std::string& item, uuid_v
 	}
     else if ("can_show_on_map" == item)
     {
-        return (is_single_select ? (LLAvatarTracker::instance().isBuddyOnline(single_id) && is_agent_mappable(single_id)) || gAgent.isGodlike() : false);
+        return (is_single_select ? (LLAvatarTracker::instance().isBuddyOnline(single_id) && LLAvatarActions::isAgentMappable(single_id)) || gAgent.isGodlike() : false);
     }
     else if ("can_offer_teleport" == item)
     {

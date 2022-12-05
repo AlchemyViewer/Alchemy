@@ -28,6 +28,7 @@
 #define LL_LLASSETTYPE_H
 
 #include <string>
+#include <vector>
 
 class LL_COMMON_API LLAssetType
 {
@@ -161,6 +162,8 @@ public:
 
 	static bool 				lookupIsAssetFetchByIDAllowed(EType asset_type); // the asset allows direct download
 	static bool 				lookupIsAssetIDKnowable(EType asset_type); // asset data can be known by the viewer
+
+	static std::vector<std::string> getAssetTypeNames();
 
     static const std::string    BADLOOKUP;
 

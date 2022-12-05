@@ -2,7 +2,7 @@
  * @file llfloaterdirectory.cpp
  * @brief Legacy search facility
  *
- * Copyright (c) 2014, Cinder Roxley <cinder@sdf.org>
+ * Copyright (c) 2014-2022, Cinder Roxley <cinder@sdf.org>
  *
  * Permission is hereby granted, free of charge, to any person or organization
  * obtaining a copy of the software and accompanying documentation covered by
@@ -67,7 +67,6 @@ LLFloaterDirectory::LLFloaterDirectory(const Params& key)
 	, mNumResultsReceived(0)
 	, mQueryID()
 	, mTabContainer(nullptr)
-	, mDetailPeople(nullptr)
 	, mPanelWeb(nullptr)
 	, mResultList(nullptr)
 	, mResultsStatus(nullptr)

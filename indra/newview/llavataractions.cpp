@@ -153,7 +153,7 @@ void LLAvatarActions::removeFriendDialog(const LLUUID& id)
 // static
 void LLAvatarActions::removeFriendsDialog(const uuid_vec_t& ids)
 {
-	if(ids.size() == 0)
+	if(ids.empty())
 		return;
 
 	LLSD args;
@@ -200,7 +200,7 @@ void LLAvatarActions::offerTeleport(const LLUUID& invitee)
 // static
 void LLAvatarActions::offerTeleport(const uuid_vec_t& ids) 
 {
-	if (ids.size() == 0)
+	if (ids.empty())
 		return;
 
 	handle_lure(ids);
@@ -284,7 +284,7 @@ void LLAvatarActions::startCall(const LLUUID& id)
 // static
 void LLAvatarActions::startAdhocCall(const uuid_vec_t& ids, const LLUUID& floater_id)
 {
-	if (ids.size() == 0)
+	if (ids.empty())
 	{
 		return;
 	}
@@ -1529,4 +1529,19 @@ bool LLAvatarActions::canBlock(const LLUUID& id)
 	bool is_linden = LLMuteList::isLinden(full_name);
 	bool is_self = id == gAgentID;
 	return !is_self && !is_linden;
+}
+
+//static
+bool LLAvatarActions::isAgentMappable(const LLUUID& agent_id)
+{
+	const LLRelationship* buddy_info = nullptr;
+	bool is_friend = LLAvatarActions::isFriend(agent_id);
+	
+	if (is_friend)
+		buddy_info = LLAvatarTracker::instance().getBuddyInfo(agent_id);
+	
+	return (buddy_info &&
+			buddy_info->isOnline() &&
+			buddy_info->isRightGrantedFrom(LLRelationship::GRANT_MAP_LOCATION)
+			);
 }

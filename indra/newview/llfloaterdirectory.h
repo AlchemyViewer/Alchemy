@@ -2,7 +2,7 @@
  * @file llfloaterdirectory.h
  * @brief Legacy search facility definitions
  *
- * Copyright (c) 2014, Cinder Roxley <cinder@sdf.org>
+ * Copyright (c) 2014-2022, Cinder Roxley <cinder@sdf.org>
  *
  * Permission is hereby granted, free of charge, to any person or organization
  * obtaining a copy of the software and accompanying documentation covered by
@@ -124,7 +124,6 @@ private:
 	LLUUID mQueryID;
 	
 	LLTabContainer*	mTabContainer;
-	LLPanel* mDetailPeople;
 	LLPanelSearchWeb* mPanelWeb;
 	LLScrollListCtrl* mResultList;
 	LLTextBase* mResultsStatus;

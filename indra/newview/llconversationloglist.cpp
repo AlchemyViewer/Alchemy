@@ -411,7 +411,7 @@ bool LLConversationLogList::isActionEnabled(const LLSD& userdata)
 	}
 	else if ("can_show_on_map" == command_name)
 	{
-		return is_p2p && ((LLAvatarTracker::instance().isBuddyOnline(selected_id) && is_agent_mappable(selected_id)) || gAgent.isGodlike());
+		return is_p2p && ((LLAvatarTracker::instance().isBuddyOnline(selected_id) && LLAvatarActions::isAgentMappable(selected_id)) || gAgent.isGodlike());
 	}
 
 	return false;
