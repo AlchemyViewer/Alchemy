@@ -901,7 +901,11 @@
       name="PanelNotificationListItem"
       value="0.3 0.3 0.3 .3" />
 
-	<!-- profiles -->
+	<color
+	 name="ProfileOnlineIndicatorColor"
+	 reference="Green" />
+
+	<!-- dildo profiles -->
     <color
         name="StatusUserOnline"
         reference="White" />
