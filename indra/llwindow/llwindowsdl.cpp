@@ -318,6 +318,21 @@ LLWindowSDL::LLWindowSDL(LLWindowCallbacks* callbacks,
 	mKeyModifiers = KMOD_NONE;
 }
 
+static SDL_Surface *Load_BMP_Resource(const char *basename)
+{
+	const int PATH_BUFFER_SIZE=1000;
+	char path_buffer[PATH_BUFFER_SIZE];	/* Flawfinder: ignore */
+	
+	// Figure out where our BMP is living on the disk
+	snprintf(path_buffer, PATH_BUFFER_SIZE-1, "%s%sres-sdl%s%s",	
+		 gDirUtilp->getAppRODataDir().c_str(),
+		 gDirUtilp->getDirDelimiter().c_str(),
+		 gDirUtilp->getDirDelimiter().c_str(),
+		 basename);
+	path_buffer[PATH_BUFFER_SIZE-1] = '\0';
+	
+	return SDL_LoadBMP(path_buffer);
+}
 
 void LLWindowSDL::setIcon()
 {
@@ -342,22 +357,6 @@ void LLWindowSDL::setIcon()
         bmpsurface = NULL;
     }
 #endif
-}
-
-static SDL_Surface *Load_BMP_Resource(const char *basename)
-{
-	const int PATH_BUFFER_SIZE=1000;
-	char path_buffer[PATH_BUFFER_SIZE];	/* Flawfinder: ignore */
-	
-	// Figure out where our BMP is living on the disk
-	snprintf(path_buffer, PATH_BUFFER_SIZE-1, "%s%sres-sdl%s%s",	
-		 gDirUtilp->getAppRODataDir().c_str(),
-		 gDirUtilp->getDirDelimiter().c_str(),
-		 gDirUtilp->getDirDelimiter().c_str(),
-		 basename);
-	path_buffer[PATH_BUFFER_SIZE-1] = '\0';
-	
-	return SDL_LoadBMP(path_buffer);
 }
 
 #if LL_X11
