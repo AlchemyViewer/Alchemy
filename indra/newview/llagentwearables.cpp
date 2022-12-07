@@ -1413,7 +1413,7 @@ void LLAgentWearables::setWearableOutfit(const LLInventoryItem::item_array_t& it
 	}
 
 	// updating inventory
-    LLWearableType* wearable_type_inst = LLWearableType::getInstanceFast();
+    LLWearableType* wearable_type_inst = LLWearableType::getInstance();
 
 	// TODO: Removed check for ensuring that teens don't remove undershirt and underwear. Handle later
 	// note: shirt is the first non-body part wearable item. Update if wearable order changes.
@@ -2095,7 +2095,7 @@ void LLAgentWearables::editWearable(const LLUUID& item_id)
 		return;
 	}
 
-	const BOOL disable_camera_switch = LLWearableType::getInstanceFast()->getDisableCameraSwitch(wearable->getType());
+	const BOOL disable_camera_switch = LLWearableType::getInstance()->getDisableCameraSwitch(wearable->getType());
 	LLPanel* panel = LLFloaterSidePanelContainer::getPanel("appearance");
 	LLSidepanelAppearance::editWearable(wearable, panel, disable_camera_switch);
 }

@@ -750,13 +750,13 @@ void LLPanelMainInventory::updateItemcountText()
 
 	std::string text = "";
 
-	if (LLInventoryModelBackgroundFetch::instanceFast().folderFetchActive())
+	if (LLInventoryModelBackgroundFetch::instance().folderFetchActive())
 	{
 		static LLUIString itemcount_fetching_str = getString("ItemcountFetching");
 		itemcount_fetching_str.setArgList(string_args);
 		text = itemcount_fetching_str.getString();
 	}
-	else if (LLInventoryModelBackgroundFetch::instanceFast().isEverythingFetched())
+	else if (LLInventoryModelBackgroundFetch::instance().isEverythingFetched())
 	{
 		static LLUIString itemcount_completed_str = getString("ItemcountCompleted");
 		itemcount_completed_str.setArgList(string_args);

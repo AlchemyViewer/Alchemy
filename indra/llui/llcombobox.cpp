@@ -676,7 +676,7 @@ void LLComboBox::showList()
 	mButton->setToggleState(TRUE);
 	mList->setVisible(TRUE);
 	
-	LLUI::getInstanceFast()->addPopup(this);
+	LLUI::getInstance()->addPopup(this);
 
 	setUseBoundingRect(TRUE);
 //	updateBoundingRect();
@@ -702,7 +702,7 @@ void LLComboBox::hideList()
 		mList->mouseOverHighlightNthItem(-1);
 
 		setUseBoundingRect(FALSE);
-		LLUI::getInstanceFast()->removePopup(this);
+		LLUI::getInstance()->removePopup(this);
 //		updateBoundingRect();
 	}
 }
@@ -794,7 +794,7 @@ BOOL LLComboBox::handleToolTip(S32 x, S32 y, MASK mask)
 	
 	if( !tool_tip.empty() )
 	{
-		LLToolTipMgr::instanceFast().show(LLToolTip::Params()
+		LLToolTipMgr::instance().show(LLToolTip::Params()
 			.message(tool_tip)
 			.sticky_rect(calcScreenRect()));
 	}

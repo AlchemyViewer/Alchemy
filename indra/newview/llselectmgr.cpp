@@ -164,7 +164,7 @@ struct LLDeRezInfo
 
 LLSelectionCallbackData::LLSelectionCallbackData()
 {
-    LLSelectMgr *instance = LLSelectMgr::getInstanceFast();
+    LLSelectMgr *instance = LLSelectMgr::getInstance();
     LLObjectSelectionHandle selection = instance->getSelection();
     if (!selection->getNumNodes())
     {
@@ -581,7 +581,7 @@ BOOL LLSelectMgr::removeObjectFromSelections(const LLUUID &id)
 	BOOL object_found = FALSE;
 	LLTool *tool = NULL;
 
-	tool = LLToolMgr::getInstanceFast()->getCurrentTool();
+	tool = LLToolMgr::getInstance()->getCurrentTool();
 
 	// It's possible that the tool is editing an object that is not selected
 	LLViewerObject* tool_editing_object = tool->getEditingObject();
@@ -3701,27 +3701,27 @@ bool LLSelectMgr::confirmDelete(const LLSD& notification, const LLSD& response, 
 			const LLUUID trash_id = gInventory.findCategoryUUIDForType(LLFolderType::FT_TRASH);
 			// attempt to derez into the trash.
 			LLDeRezInfo info(DRD_TRASH, trash_id);
-			LLSelectMgr::getInstanceFast()->sendListToRegions("DeRezObject",
+			LLSelectMgr::getInstance()->sendListToRegions("DeRezObject",
                                                           packDeRezHeader,
                                                           packObjectLocalID,
                                                           logNoOp,
                                                           (void*) &info,
                                                           SEND_ONLY_ROOTS);
 			// VEFFECT: Delete Object - one effect for all deletes
-			if (!gSavedSettings.getBOOL("AlchemyDisableEffectSpiral") && (LLSelectMgr::getInstanceFast()->mSelectedObjects->mSelectType != SELECT_TYPE_HUD))
+			if (!gSavedSettings.getBOOL("AlchemyDisableEffectSpiral") && (LLSelectMgr::getInstance()->mSelectedObjects->mSelectType != SELECT_TYPE_HUD))
 			{
 				LLHUDEffectSpiral *effectp = (LLHUDEffectSpiral *)LLHUDManager::getInstance()->createViewerEffect(LLHUDObject::LL_HUD_EFFECT_POINT, TRUE);
-				effectp->setPositionGlobal( LLSelectMgr::getInstanceFast()->getSelectionCenterGlobal() );
+				effectp->setPositionGlobal( LLSelectMgr::getInstance()->getSelectionCenterGlobal() );
 				effectp->setColor(LLColor4U(gAgent.getEffectColor()));
 				F32 duration = 0.5f;
-				duration += LLSelectMgr::getInstanceFast()->mSelectedObjects->getObjectCount() / 64.f;
+				duration += LLSelectMgr::getInstance()->mSelectedObjects->getObjectCount() / 64.f;
 				effectp->setDuration(duration);
 			}
 
 			gAgentCamera.setLookAt(LOOKAT_TARGET_CLEAR);
 
 			// Keep track of how many objects have been deleted.
-			add(LLStatViewer::DELETE_OBJECT, LLSelectMgr::getInstanceFast()->mSelectedObjects->getObjectCount());
+			add(LLStatViewer::DELETE_OBJECT, LLSelectMgr::getInstance()->mSelectedObjects->getObjectCount());
 		}
 		break;
 	case 1:
@@ -4441,7 +4441,7 @@ void LLSelectMgr::deselectAllIfTooFar()
 // [RLVa:KB] - Checked: 2010-04-11 (RLVa-1.2.0e) | Modified: RLVa-0.2.0f
 	static RlvCachedBehaviourModifier<float> s_nFartouchDist(RLV_MODIFIER_FARTOUCHDIST);
 
-	BOOL fRlvFartouch = gRlvHandler.hasBehaviour(RLV_BHVR_FARTOUCH) && LLToolMgr::instanceFast().inEdit();
+	BOOL fRlvFartouch = gRlvHandler.hasBehaviour(RLV_BHVR_FARTOUCH) && LLToolMgr::instance().inEdit();
 	if ( (ALControlCache::LimitSelectDistance || (fRlvFartouch) )
 // [/RLVa:KB]
 		&& (!mSelectedObjects->getPrimaryObject() || !mSelectedObjects->getPrimaryObject()->isAvatar())
@@ -4569,7 +4569,7 @@ void LLSelectMgr::sendAttach(LLObjectSelectionHandle selection_handle, U8 attach
 		return;
 	}
 
-	BOOL build_mode = LLToolMgr::getInstanceFast()->inEdit();
+	BOOL build_mode = LLToolMgr::getInstance()->inEdit();
 	// Special case: Attach to default location for this object.
 	if (0 == attachment_point ||
 		get_if_there(gAgentAvatarp->mAttachmentPoints, (S32)attachment_point, (LLViewerJointAttachment*)NULL))
@@ -5456,7 +5456,7 @@ void LLSelectMgr::processObjectProperties(LLMessageSystem* msg, void** user_data
 				return (node->getObject() && node->getObject()->mID == mID);
 			}
 		} func(id);
-		LLSelectNode* node = LLSelectMgr::getInstanceFast()->getSelection()->getFirstNode(&func);
+		LLSelectNode* node = LLSelectMgr::getInstance()->getSelection()->getFirstNode(&func);
 
 		if (!node)
 		{
@@ -5585,7 +5585,7 @@ void LLSelectMgr::processObjectPropertiesFamily(LLMessageSystem* msg, void** use
 	else if (request_flags & OBJECT_PAY_REQUEST)
 	{
 		// check if the owner of the paid object is muted
-		LLMuteList::getInstanceFast()->autoRemove(owner_id, LLMuteList::AR_MONEY);
+		LLMuteList::getInstance()->autoRemove(owner_id, LLMuteList::AR_MONEY);
 	}
 
 	// Now look through all of the hovered nodes
@@ -5598,7 +5598,7 @@ void LLSelectMgr::processObjectPropertiesFamily(LLMessageSystem* msg, void** use
 			return (node->getObject() && node->getObject()->mID == mID);
 		}
 	} func(id);
-	LLSelectNode* node = LLSelectMgr::getInstanceFast()->mHoverObjects->getFirstNode(&func);
+	LLSelectNode* node = LLSelectMgr::getInstance()->mHoverObjects->getFirstNode(&func);
 
 	if (node)
 	{
@@ -5624,7 +5624,7 @@ void LLSelectMgr::processForceObjectSelect(LLMessageSystem* msg, void**)
 
 	if (reset_list)
 	{
-		LLSelectMgr::getInstanceFast()->deselectAll();
+		LLSelectMgr::getInstance()->deselectAll();
 	}
 
 	LLUUID full_id;
@@ -5650,7 +5650,7 @@ void LLSelectMgr::processForceObjectSelect(LLMessageSystem* msg, void**)
 	}
 
 	// Don't select, just highlight
-	LLSelectMgr::getInstanceFast()->highlightObjectAndFamily(objects);
+	LLSelectMgr::getInstance()->highlightObjectAndFamily(objects);
 }
 
 void LLSelectMgr::updateSilhouettes()
@@ -5795,7 +5795,7 @@ void LLSelectMgr::updateSilhouettes()
 		num_sils_genned	= 0;
 
 		// render silhouettes for highlighted objects
-		const auto& viewer_cam_origin = LLViewerCamera::instanceFast().getOrigin();
+		const auto& viewer_cam_origin = LLViewerCamera::instance().getOrigin();
 		//BOOL subtracting_from_selection = (gKeyboard->currentMask(TRUE) == MASK_CONTROL);
 		for (S32 pass = 0; pass < 2; pass++)
 		{
@@ -5870,7 +5870,7 @@ void LLSelectMgr::updateSelectionSilhouette(LLObjectSelectionHandle object_handl
 
 		//mSilhouetteImagep->bindTexture();
 		//glAlphaFunc(GL_GREATER, sHighlightAlphaTest);
-		const auto& viewer_cam_origin = LLViewerCamera::instanceFast().getOrigin();
+		const auto& viewer_cam_origin = LLViewerCamera::instance().getOrigin();
 		for (S32 pass = 0; pass < 2; pass++)
 		{
 			for (LLSelectNode* node : object_handle->begin_end())
@@ -5933,7 +5933,7 @@ void LLSelectMgr::renderSilhouettes(BOOL for_hud)
 		gGL.pushMatrix();
 		gGL.loadIdentity();
 		F32 depth = llmax(1.f, hud_bbox.getExtentLocal().mV[VX] * 1.1f);
-		auto& viewerCamera = LLViewerCamera::instanceFast();
+		auto& viewerCamera = LLViewerCamera::instance();
 		gGL.ortho(-0.5f * viewerCamera.getAspect(), 0.5f * viewerCamera.getAspect(), -0.5f, 0.5f, 0.f, depth);
 
 		gGL.matrixMode(LLRender::MM_MODELVIEW);
@@ -6533,7 +6533,7 @@ void LLSelectNode::renderOneSilhouette(const LLColor4 &color)
 	LLVolume *volume = objectp->getVolume();
 	if (volume)
 	{
-		auto& viewerCamera = LLViewerCamera::instanceFast();
+		auto& viewerCamera = LLViewerCamera::instance();
 
 		F32 silhouette_thickness;
 		if (isAgentAvatarValid() && is_hud_object)
@@ -6560,9 +6560,9 @@ void LLSelectNode::renderOneSilhouette(const LLColor4 &color)
                 LLGLEnable fog(GL_FOG);
                 glFogi(GL_FOG_MODE, GL_LINEAR);
                 float d = (viewerCamera.getPointOfInterest() - viewerCamera.getOrigin()).magVec();
-                LLColor4 fogCol = color * (F32) llclamp((LLSelectMgr::getInstanceFast()->getSelectionCenterGlobal() -
+                LLColor4 fogCol = color * (F32) llclamp((LLSelectMgr::getInstance()->getSelectionCenterGlobal() -
                                    gAgentCamera.getCameraPositionGlobal()).magVec() /
-                                      (LLSelectMgr::getInstanceFast()->getBBoxOfSelection().getExtentLocal().magVec() * 4),
+                                      (LLSelectMgr::getInstance()->getBBoxOfSelection().getExtentLocal().magVec() * 4),
                                   0.0, 1.0);
                 glFogf(GL_FOG_START, d);
                 glFogf(GL_FOG_END, d * (1 + (viewerCamera.getView() / viewerCamera.getDefaultFOV())));
@@ -6662,7 +6662,7 @@ void dialog_refresh_all()
 	// make cleaning up the functions below easier.  Also, sometimes entities
 	// outside the selection manager change properties of selected objects
 	// and call into this function.  Yuck.
-	LLSelectMgr::getInstanceFast()->mUpdateSignal();
+	LLSelectMgr::getInstance()->mUpdateSignal();
 
 	// *TODO: Eliminate all calls into outside classes below, make those
 	// objects register with the update signal.
@@ -6716,7 +6716,7 @@ S32 get_family_count(LLViewerObject *parent)
 		}
 		else
 		{
-			if (LLSelectMgr::getInstanceFast()->canSelectObject(child))
+			if (LLSelectMgr::getInstance()->canSelectObject(child))
 			{
 				count += get_family_count( child );
 			}
@@ -6796,7 +6796,7 @@ void LLSelectMgr::updateSelectionCenter()
 	
 	if (gAgentID.notNull())
 	{
-		LLTool		*tool = LLToolMgr::getInstanceFast()->getCurrentTool();
+		LLTool		*tool = LLToolMgr::getInstance()->getCurrentTool();
 		if (mShowSelection)
 		{
 			LLVector3d select_center_global;
@@ -7053,9 +7053,9 @@ void LLSelectMgr::validateSelection()
 	{
 		virtual bool apply(LLViewerObject* object)
 		{
-			if (!instanceFast().canSelectObject(object))
+			if (!instance().canSelectObject(object))
 			{
-				instanceFast().deselectObjectOnly(object);
+				instance().deselectObjectOnly(object);
 			}
 			return true;
 		}
@@ -7912,7 +7912,7 @@ bool LLSelectMgr::selectionMove(const LLVector3& displ,
 		// calculate the distance of the object closest to the camera origin
 		F32 min_dist_squared = F32_MAX; // value will be overridden in the loop
 		
-		const auto& origin = LLViewerCamera::getInstanceFast()->getOrigin();
+		const auto& origin = LLViewerCamera::getInstance()->getOrigin();
 
 		LLVector3 obj_pos;
 		for (LLSelectNode* nodep : selection->root_begin_end())
@@ -7934,16 +7934,16 @@ bool LLSelectMgr::selectionMove(const LLVector3& displ,
 							displ.mV[2] * min_dist);
 
 		// equates to: Displ_global = Displ * M_cam_axes_in_global_frame
-		displ_global = LLViewerCamera::getInstanceFast()->rotateToAbsolute(displ_global);
+		displ_global = LLViewerCamera::getInstance()->rotateToAbsolute(displ_global);
 	}
 
 	LLQuaternion new_rot;
 	if (update_rotation)
 	{
 		// let's calculate the rotation around each camera axes 
-		LLQuaternion qx(roll, LLViewerCamera::getInstanceFast()->getAtAxis());
-		LLQuaternion qy(pitch, LLViewerCamera::getInstanceFast()->getLeftAxis());
-		LLQuaternion qz(yaw, LLViewerCamera::getInstanceFast()->getUpAxis());
+		LLQuaternion qx(roll, LLViewerCamera::getInstance()->getAtAxis());
+		LLQuaternion qy(pitch, LLViewerCamera::getInstance()->getLeftAxis());
+		LLQuaternion qz(yaw, LLViewerCamera::getInstance()->getUpAxis());
 		new_rot.setQuat(qx * qy * qz);
 	}
 	

@@ -180,7 +180,7 @@ BOOL LLInspectObject::postBuild(void)
 		boost::bind(&LLInspectObject::onClickMoreInfo, this));
 
 	// Watch for updates to selection properties off the network
-	LLSelectMgr::getInstanceFast()->mUpdateSignal.connect(
+	LLSelectMgr::getInstance()->mUpdateSignal.connect(
 		boost::bind(&LLInspectObject::update, this) );
 
 	return TRUE;
@@ -213,8 +213,8 @@ void LLInspectObject::onOpen(const LLSD& data)
 		// Make sure any media is unfocused before changing the selection here.
 		LLViewerMediaFocus::getInstance()->clearFocus();
 		
-		LLSelectMgr::instanceFast().deselectAll();
-		mObjectSelection = LLSelectMgr::instanceFast().selectObjectAndFamily(obj,FALSE,TRUE);
+		LLSelectMgr::instance().deselectAll();
+		mObjectSelection = LLSelectMgr::instance().selectObjectAndFamily(obj,FALSE,TRUE);
 
 		// Mark this as a transient selection
 		struct SetTransient : public LLSelectedNodeFunctor
@@ -236,7 +236,7 @@ void LLInspectObject::onOpen(const LLSD& data)
 		if(!mMediaEntry)
 			return;
 		
-		mMediaImpl = LLViewerMedia::getInstanceFast()->getMediaImplFromTextureID(mMediaEntry->getMediaID());
+		mMediaImpl = LLViewerMedia::getInstance()->getMediaImplFromTextureID(mMediaEntry->getMediaID());
 	}
 }
 
@@ -257,7 +257,7 @@ void LLInspectObject::update()
 	// but we're never destroyed.
 	if (!getVisible()) return;
 
-	LLObjectSelection* selection = LLSelectMgr::getInstanceFast()->getSelection();
+	LLObjectSelection* selection = LLSelectMgr::getInstance()->getSelection();
 	if (!selection) return;
 
 	LLSelectNode* nodep = selection->getFirstRootNode();
@@ -295,7 +295,7 @@ void LLInspectObject::update()
 	if(!mMediaEntry)
 		return;
 	
-	mMediaImpl = LLViewerMedia::getInstanceFast()->getMediaImplFromTextureID(mMediaEntry->getMediaID());
+	mMediaImpl = LLViewerMedia::getInstance()->getMediaImplFromTextureID(mMediaEntry->getMediaID());
 	
 	updateMediaCurrentURL();
 	updateSecureBrowsing();
@@ -623,7 +623,7 @@ void LLInspectObject::onClickPay()
 
 void LLInspectObject::onClickTakeFreeCopy()
 {
-	LLObjectSelection* selection = LLSelectMgr::getInstanceFast()->getSelection();
+	LLObjectSelection* selection = LLSelectMgr::getInstance()->getSelection();
 	if (!selection) return;
 
 	LLSelectNode* nodep = selection->getFirstRootNode();

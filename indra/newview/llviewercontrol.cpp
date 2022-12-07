@@ -117,7 +117,7 @@ static bool handleRenderFarClipChanged(const LLSD& newvalue)
 {
 	F32 draw_distance = (F32) newvalue.asReal();
 	gAgentCamera.mDrawDistance = draw_distance;
-	LLWorld::getInstanceFast()->setLandFarClip(draw_distance);
+	LLWorld::getInstance()->setLandFarClip(draw_distance);
 	return true;
 }
 
@@ -148,7 +148,7 @@ static bool handleAvatarHoverOffsetChanged(const LLSD& newvalue)
 static bool handleSetShaderChanged(const LLSD& newvalue)
 {
 // [RLVa:KB] - @setenv and @setsphere
-	if ( (RlvActions::isRlvEnabled()) && (!RlvActions::canChangeEnvironment() || (LLVfxManager::instanceFast().hasEffect(EVisualEffect::RlvSphere))) &&
+	if ( (RlvActions::isRlvEnabled()) && (!RlvActions::canChangeEnvironment() || (LLVfxManager::instance().hasEffect(EVisualEffect::RlvSphere))) &&
 		 (LLFeatureManager::getInstance()->isFeatureAvailable("WindLightUseAtmosShaders"))&& (!gSavedSettings.getBOOL("WindLightUseAtmosShaders")) )
 	{
 		gSavedSettings.setBOOL("WindLightUseAtmosShaders", TRUE);
@@ -242,7 +242,7 @@ bool handleRenderTransparentWaterChanged(const LLSD& newvalue)
 		gPipeline.resetVertexBuffers();
 		LLViewerShaderMgr::instance()->setShaders();
 	}
-	LLWorld::getInstanceFast()->updateWaterObjects();
+	LLWorld::getInstance()->updateWaterObjects();
 	return true;
 }
 

@@ -923,7 +923,7 @@ const LLSettingsWater::ptr_t& LLEnvironment::getCurrentWater() const
 
 bool LLEnvironment::canAgentUpdateParcelEnvironment() const
 {
-    LLParcel *parcel(LLViewerParcelMgr::instanceFast().getAgentOrSelectedParcel());
+    LLParcel *parcel(LLViewerParcelMgr::instance().getAgentOrSelectedParcel());
 
     return canAgentUpdateParcelEnvironment(parcel);
 }
@@ -989,7 +989,7 @@ void LLEnvironment::onRegionChange()
 void LLEnvironment::onParcelChange()
 {
     S32 parcel_id(INVALID_PARCEL_ID);
-    LLParcel* parcel = LLViewerParcelMgr::instanceFast().getAgentParcel();
+    LLParcel* parcel = LLViewerParcelMgr::instance().getAgentParcel();
 
     if (parcel)
     {
@@ -1836,7 +1836,7 @@ void LLEnvironment::requestParcel(S32 parcel_id, environment_apply_fn cb)
         {
             if (!cb)
             {
-                LLSettingsBase::Seconds transition = LLViewerParcelMgr::getInstanceFast()->getTeleportInProgress() ? TRANSITION_FAST : TRANSITION_DEFAULT;
+                LLSettingsBase::Seconds transition = LLViewerParcelMgr::getInstance()->getTeleportInProgress() ? TRANSITION_FAST : TRANSITION_DEFAULT;
                 cb = [this, transition](S32 pid, EnvironmentInfo::ptr_t envinfo)
                 {
                     clearEnvironment(ENV_PARCEL);
@@ -1853,7 +1853,7 @@ void LLEnvironment::requestParcel(S32 parcel_id, environment_apply_fn cb)
 
     if (!cb)
     {
-        LLSettingsBase::Seconds transition = LLViewerParcelMgr::getInstanceFast()->getTeleportInProgress() ? TRANSITION_FAST : TRANSITION_DEFAULT;
+        LLSettingsBase::Seconds transition = LLViewerParcelMgr::getInstance()->getTeleportInProgress() ? TRANSITION_FAST : TRANSITION_DEFAULT;
         cb = [this, transition](S32 pid, EnvironmentInfo::ptr_t envinfo) { recordEnvironment(pid, envinfo, transition); };
     }
 
@@ -3356,7 +3356,7 @@ namespace
         }
 
         {
-            LLParcel* parcel = LLViewerParcelMgr::instanceFast().getAgentParcel();
+            LLParcel* parcel = LLViewerParcelMgr::instance().getAgentParcel();
             if (!parcel)
                 return;
 
@@ -3475,7 +3475,7 @@ namespace
     void DayInjection::onParcelChange()
     {
         S32 parcel_id(INVALID_PARCEL_ID);
-        LLParcel* parcel = LLViewerParcelMgr::instanceFast().getAgentParcel();
+        LLParcel* parcel = LLViewerParcelMgr::instance().getAgentParcel();
 
         if (!parcel)
             return;

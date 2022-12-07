@@ -42,7 +42,7 @@ public:
 	void reshape(S32 width, S32 height, BOOL called_from_parent);
 	void setFocus(BOOL b);
 	
-	BOOL handleScrollWheel(S32 x, S32 y, S32 clicks) const;
+	BOOL handleScrollWheel(S32 x, S32 y, S32 clicks) override;
 	BOOL handleMouseDown(S32 x, S32 y, MASK mask);
 	BOOL handleHover(S32 x, S32 y, MASK mask);
 	BOOL handleMouseUp(S32 x, S32 y, MASK mask);

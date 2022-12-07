@@ -299,7 +299,7 @@ bool handleSlowMotionAnimation(const LLSD& newvalue)
 
 void LLAgent::setCanEditParcel() // called via mParcelChangedSignal
 {
-	bool can_edit = LLToolMgr::getInstanceFast()->canEdit();
+	bool can_edit = LLToolMgr::getInstance()->canEdit();
 	gAgent.mCanEditParcel = can_edit;
 }
 
@@ -319,7 +319,7 @@ bool LLAgent::isActionAllowed(const LLSD& sdname)
             if (channel->getSessionName().empty() && channel->getSessionID().isNull())
             {
                 // default channel
-                allow_agent_voice = LLViewerParcelMgr::getInstanceFast()->allowAgentVoice();
+                allow_agent_voice = LLViewerParcelMgr::getInstance()->allowAgentVoice();
             }
             else
             {
@@ -581,7 +581,7 @@ void LLAgent::onAppFocusGained()
 //	if (CAMERA_MODE_MOUSELOOK == gAgentCamera.getCameraMode())
 //	{
 //		gAgentCamera.changeCameraToDefault();
-//		LLToolMgr::getInstanceFast()->clearSavedTool();
+//		LLToolMgr::getInstance()->clearSavedTool();
 //	}
 }
 
@@ -795,7 +795,7 @@ BOOL LLAgent::canFly()
 	LLViewerRegion* regionp = getRegion();
 	if (regionp && regionp->getBlockFly()) return FALSE;
 	
-	LLParcel* parcel = LLViewerParcelMgr::getInstanceFast()->getAgentParcel();
+	LLParcel* parcel = LLViewerParcelMgr::getInstance()->getAgentParcel();
 	if (!parcel) return FALSE;
 
 	// Allow owners to fly on their own land.
@@ -1002,11 +1002,11 @@ void LLAgent::setRegion(LLViewerRegion *regionp)
 
 			setPositionAgent(getPositionAgent() - delta);
 
-			LLVector3 camera_position_agent = LLViewerCamera::getInstanceFast()->getOrigin();
-			LLViewerCamera::getInstanceFast()->setOrigin(camera_position_agent - delta);
+			LLVector3 camera_position_agent = LLViewerCamera::getInstance()->getOrigin();
+			LLViewerCamera::getInstance()->setOrigin(camera_position_agent - delta);
 
 			// Update all of the regions.
-			LLWorld::getInstanceFast()->updateAgentOffset(agent_offset_global);
+			LLWorld::getInstance()->updateAgentOffset(agent_offset_global);
 
 			// Hack to keep sky in the agent's region, otherwise it may get deleted - DJS 08/02/02
 			// *TODO: possibly refactor into gSky->setAgentRegion(regionp)? -Brad
@@ -1040,11 +1040,11 @@ void LLAgent::setRegion(LLViewerRegion *regionp)
 			delta.setVec(regionp->getOriginGlobal());
 
 			setPositionAgent(getPositionAgent() - delta);
-			LLVector3 camera_position_agent = LLViewerCamera::getInstanceFast()->getOrigin();
-			LLViewerCamera::getInstanceFast()->setOrigin(camera_position_agent - delta);
+			LLVector3 camera_position_agent = LLViewerCamera::getInstance()->getOrigin();
+			LLViewerCamera::getInstance()->setOrigin(camera_position_agent - delta);
 
 			// Update all of the regions.
-			LLWorld::getInstanceFast()->updateAgentOffset(mAgentOriginGlobal);
+			LLWorld::getInstance()->updateAgentOffset(mAgentOriginGlobal);
 
             if (regionp->capabilitiesReceived())
             {
@@ -1070,7 +1070,7 @@ void LLAgent::setRegion(LLViewerRegion *regionp)
 
 	// Must shift hole-covering water object locations because local
 	// coordinate frame changed.
-	LLWorld::getInstanceFast()->updateWaterObjects();
+	LLWorld::getInstance()->updateWaterObjects();
 
 	// keep a list of regions we've been too
 	// this is just an interesting stat, logged at the dataserver
@@ -1078,7 +1078,7 @@ void LLAgent::setRegion(LLViewerRegion *regionp)
 	U64 handle = regionp->getHandle();
 	mRegionsVisited.insert(handle);
 
-	LLSelectMgr::getInstanceFast()->updateSelectionCenter();
+	LLSelectMgr::getInstance()->updateSelectionCenter();
 
 //	LLFloaterMove::sUpdateFlyingStatus();
 // [RLVa:KB] - Checked: 2011-05-27 (RLVa-1.4.0a) | Added: RLVa-1.4.0a
@@ -1698,7 +1698,7 @@ void LLAgent::startAutoPilotGlobal(
 	LLVector3d intersection;
 	LLVector3 normal;
 	LLViewerObject *hit_obj;
-	F32 heightDelta = LLWorld::getInstanceFast()->resolveStepHeightGlobal(NULL, target_global, trace_target, intersection, normal, &hit_obj);
+	F32 heightDelta = LLWorld::getInstance()->resolveStepHeightGlobal(NULL, target_global, trace_target, intersection, normal, &hit_obj);
 
 	if (stop_distance > 0.f)
 	{
@@ -1775,7 +1775,7 @@ void LLAgent::setAutoPilotTargetGlobal(const LLVector3d &target_global)
 		LLVector3 groundNorm;
 		LLViewerObject *obj;
 
-		LLWorld::getInstanceFast()->resolveStepHeightGlobal(NULL, target_global, traceEndPt, targetOnGround, groundNorm, &obj);
+		LLWorld::getInstance()->resolveStepHeightGlobal(NULL, target_global, traceEndPt, targetOnGround, groundNorm, &obj);
 		// Note: this might malfunction for sitting agent, since pelvis stays same, but agent's position becomes lower
 		// But for autopilot to work we assume that agent is standing and ready to go.
 		F64 target_height = llmax((F64)gAgentAvatarp->getPelvisToFoot(), target_global.mdV[VZ] - targetOnGround.mdV[VZ]);
@@ -2233,8 +2233,8 @@ U8 LLAgent::getRenderState()
 		stopTyping();
 	}
 	
-	if ((!LLSelectMgr::getInstanceFast()->getSelection()->isEmpty() && LLSelectMgr::getInstanceFast()->shouldShowSelection())
-		|| LLToolMgr::getInstanceFast()->getCurrentTool()->isEditing() )
+	if ((!LLSelectMgr::getInstance()->getSelection()->isEmpty() && LLSelectMgr::getInstance()->shouldShowSelection())
+		|| LLToolMgr::getInstance()->getCurrentTool()->isEditing() )
 	{
 		setRenderState(AGENT_STATE_EDITING);
 	}
@@ -2289,7 +2289,7 @@ void LLAgent::endAnimationUpdateUI()
 
 		LLPanelStandStopFlying::getInstance()->setVisible(TRUE);
 
-		LLToolMgr::getInstanceFast()->setCurrentToolset(gBasicToolset);
+		LLToolMgr::getInstance()->setCurrentToolset(gBasicToolset);
 
 		LLFloaterCamera::onLeavingMouseLook();
 
@@ -2366,7 +2366,7 @@ void LLAgent::endAnimationUpdateUI()
 	{
 		// make sure we ask to save changes
 
-		LLToolMgr::getInstanceFast()->setCurrentToolset(gBasicToolset);
+		LLToolMgr::getInstance()->setCurrentToolset(gBasicToolset);
 
 		if( gMorphView )
 		{
@@ -2416,7 +2416,7 @@ void LLAgent::endAnimationUpdateUI()
 		// JC - Added for always chat in third person option
 		gFocusMgr.setKeyboardFocus(NULL);
 
-		LLToolMgr::getInstanceFast()->setCurrentToolset(gMouselookToolset);
+		LLToolMgr::getInstance()->setCurrentToolset(gMouselookToolset);
 
 		mViewsPushed = TRUE;
 
@@ -2473,7 +2473,7 @@ void LLAgent::endAnimationUpdateUI()
 			}
 			if (gAgentAvatarp->getParent())
 			{
-				LLVector3 at_axis = LLViewerCamera::getInstanceFast()->getAtAxis();
+				LLVector3 at_axis = LLViewerCamera::getInstance()->getAtAxis();
 				LLViewerObject* root_object = (LLViewerObject*)gAgentAvatarp->getRoot();
 				if (root_object->flagCameraDecoupled())
 				{
@@ -2488,7 +2488,7 @@ void LLAgent::endAnimationUpdateUI()
 	}
 	else if (gAgentCamera.getCameraMode() == CAMERA_MODE_CUSTOMIZE_AVATAR)
 	{
-		LLToolMgr::getInstanceFast()->setCurrentToolset(gFaceEditToolset);
+		LLToolMgr::getInstance()->setCurrentToolset(gFaceEditToolset);
 
 		if( gMorphView )
 		{
@@ -2607,7 +2607,7 @@ void LLAgent::setStartPosition( U32 location_id )
     // Don't let them go below ground, or too high.
     agent_pos.mV[VZ] = llclamp( agent_pos.mV[VZ],
                                 mRegionp->getLandHeightRegion( agent_pos ),
-                                LLWorld::getInstanceFast()->getRegionMaxHeight() );
+                                LLWorld::getInstance()->getRegionMaxHeight() );
     // Send the CapReq
     LLSD request;
     LLSD body;
@@ -2766,7 +2766,7 @@ bool LLAgent::canAccessAdult() const
 
 bool LLAgent::canAccessMaturityInRegion( U64 region_handle ) const
 {
-	LLViewerRegion *regionp = LLWorld::getInstanceFast()->getRegionFromHandle( region_handle );
+	LLViewerRegion *regionp = LLWorld::getInstance()->getRegionFromHandle( region_handle );
 	if( regionp )
 	{
 		switch( regionp->getSimAccess() )
@@ -3265,7 +3265,7 @@ LLQuaternion LLAgent::getHeadRotation()
 	}
 
 	// We must be in mouselook
-	LLVector3 look_dir( LLViewerCamera::getInstanceFast()->getAtAxis() );
+	LLVector3 look_dir( LLViewerCamera::getInstance()->getAtAxis() );
 	LLVector3 up = look_dir % mFrameAgent.getLeftAxis();
 	LLVector3 left = up % look_dir;
 
@@ -4371,7 +4371,7 @@ void LLAgent::handleTeleportFailed()
 void LLAgent::addTPNearbyChatSeparator()
 {
     LLViewerRegion* agent_region = gAgent.getRegion();
-    LLParcel* agent_parcel = LLViewerParcelMgr::getInstanceFast()->getAgentParcel();
+    LLParcel* agent_parcel = LLViewerParcelMgr::getInstance()->getAgentParcel();
     if (!agent_region || !agent_parcel)
     {
         return;
@@ -4446,7 +4446,7 @@ void LLAgent::teleportRequest(const LLVector3d& pos_global, const LLVector3& loo
 		pos_local = LLVector3(pos_global - other_regionp->getOriginGlobal());
 		region_handle = other_regionp->getHandle();
 	}
-	else if (LLSimInfo* sim_info = LLWorldMap::getInstanceFast()->simInfoFromPosGlobal(pos_global))
+	else if (LLSimInfo* sim_info = LLWorldMap::getInstance()->simInfoFromPosGlobal(pos_global))
 	{
 		pos_local = sim_info->getLocalPos(pos_global);
 		region_handle = sim_info->getHandle();
@@ -4653,7 +4653,7 @@ void LLAgent::doTeleportViaLocation(const LLVector3d& pos_global)
 		pos_local = LLVector3(pos_global - other_regionp->getOriginGlobal());
 		handle = other_regionp->getHandle();
 	}
-	else if (LLSimInfo* sim_info = LLWorldMap::getInstanceFast()->simInfoFromPosGlobal(pos_global))
+	else if (LLSimInfo* sim_info = LLWorldMap::getInstance()->simInfoFromPosGlobal(pos_global))
 	{
 		pos_local = sim_info->getLocalPos(pos_global);
 		handle = sim_info->getHandle();
@@ -4796,7 +4796,7 @@ void LLAgent::setTeleportState(ETeleportState state)
 		//LLViewerStats::getInstance()->mAgentPositionSnaps.mCountOfNextUpdatesToIgnore = 2;
 
 		// Let the interested parties know we've teleported.
-		LLViewerParcelMgr::getInstanceFast()->onTeleportFinished(false, getPositionGlobal());
+		LLViewerParcelMgr::getInstance()->onTeleportFinished(false, getPositionGlobal());
 			break;
 
 		default:
@@ -5708,7 +5708,7 @@ LLUUID LLAgent::getGroupForRezzing()
 {
 	if (gSavedSettings.getBOOL("AlchemyRezUnderLandGroup"))
 	{
-		LLParcel* land_parcel = LLViewerParcelMgr::getInstanceFast()->getAgentParcel();
+		LLParcel* land_parcel = LLViewerParcelMgr::getInstance()->getAgentParcel();
 		if (land_parcel)
 		{
 			// Is the agent in the land group

@@ -7044,10 +7044,10 @@ BOOL LLObjectBridge::renameItem(const std::string& new_name)
 			LLViewerObject* obj = gAgentAvatarp->getWornAttachment( item->getUUID() );
 			if(obj)
 			{
-				LLSelectMgr::getInstanceFast()->deselectAll();
-				LLSelectMgr::getInstanceFast()->addAsIndividual( obj, SELECT_ALL_TES, FALSE );
-				LLSelectMgr::getInstanceFast()->selectionSetObjectName( new_name );
-				LLSelectMgr::getInstanceFast()->deselectAll();
+				LLSelectMgr::getInstance()->deselectAll();
+				LLSelectMgr::getInstance()->addAsIndividual( obj, SELECT_ALL_TES, FALSE );
+				LLSelectMgr::getInstance()->selectionSetObjectName( new_name );
+				LLSelectMgr::getInstance()->deselectAll();
 			}
 		}
 	}
@@ -7256,7 +7256,7 @@ void LLWearableBridge::buildContextMenu(LLMenuGL& menu, U32 flags)
 // [/RLVa:KB]
 					}
 
-					if (LLWearableType::getInstanceFast()->getAllowMultiwear(mWearableType))
+					if (LLWearableType::getInstance()->getAllowMultiwear(mWearableType))
 					{
 						items.push_back(std::string("Wearable Add"));
 //						if (!gAgentWearables.canAddWearable(mWearableType))

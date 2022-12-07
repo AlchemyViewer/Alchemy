@@ -197,7 +197,7 @@ public:
 	
 	virtual bool isInterestingEnough() const
 		{
-			return LLViewerMedia::getInstanceFast()->isInterestingEnough(mObject, getMediaInterest());
+			return LLViewerMedia::getInstance()->isInterestingEnough(mObject, getMediaInterest());
 		}
 
 	virtual std::string getCapabilityUrl(const std::string &name) const
@@ -472,7 +472,7 @@ U32 LLVOVolume::processUpdateMessage(LLMessageSystem *mesgsys,
 
 				if(LLVOCache::instanceExists() && getRegion())
 				{
-					LLVOCache::getInstanceFast()->removeEntry(getRegion()->getHandle()) ;
+					LLVOCache::getInstance()->removeEntry(getRegion()->getHandle()) ;
 				}
 				
 				LL_WARNS() << "Bogus TE data in " << getID() << LL_ENDL;
@@ -789,7 +789,7 @@ void LLVOVolume::updateTextureVirtualSize(bool forced)
 
 	const S32 num_faces = mDrawable->getNumFaces();
 	F32 min_vsize=999999999.f, max_vsize=0.f;
-	LLViewerCamera* camera = LLViewerCamera::getInstanceFast();
+	LLViewerCamera* camera = LLViewerCamera::getInstance();
 	for (S32 i = 0; i < num_faces; i++)
 	{
 		LLFace* face = mDrawable->getFace(i);
@@ -1010,7 +1010,7 @@ LLDrawable *LLVOVolume::createDrawable(LLPipeline *pipeline)
 	
 	updateRadius();
 	bool force_update = true; // avoid non-alpha mDistance update being optimized away
-	mDrawable->updateDistance(LLViewerCamera::instanceFast(), force_update);
+	mDrawable->updateDistance(LLViewerCamera::instance(), force_update);
 
 	return mDrawable;
 }
@@ -1492,7 +1492,7 @@ BOOL LLVOVolume::calcLOD()
 	static LLCachedControl<bool> ignore_fov_zoom(gSavedSettings,"IgnoreFOVZoomForLODs");
 	if(!ignore_fov_zoom)
 	{
-		lod_factor *= DEFAULT_FIELD_OF_VIEW / LLViewerCamera::getInstanceFast()->getDefaultFOV();
+		lod_factor *= DEFAULT_FIELD_OF_VIEW / LLViewerCamera::getInstance()->getDefaultFOV();
 	}
 
     mLODAdjustedDistance = distance;
@@ -2320,14 +2320,14 @@ S32 LLVOVolume::setTEMaterialID(const U8 te, const LLMaterialID& pMaterialID)
 	S32 res = LLViewerObject::setTEMaterialID(te, pMaterialID);
 #ifdef SHOW_DEBUG
 	LL_DEBUGS("MaterialTEs") << "te "<< (S32)te << " materialid " << pMaterialID.asString() << " res " << res
-								<< ( LLSelectMgr::getInstanceFast()->getSelection()->contains(const_cast<LLVOVolume*>(this), te) ? " selected" : " not selected" )
+								<< ( LLSelectMgr::getInstance()->getSelection()->contains(const_cast<LLVOVolume*>(this), te) ? " selected" : " not selected" )
 								<< LL_ENDL;
 		
 	LL_DEBUGS("MaterialTEs") << " " << pMaterialID.asString() << LL_ENDL;
 #endif
 	if (res)
 	{
-		LLMaterialMgr::instanceFast().getTE(getRegion()->getRegionID(), pMaterialID, te, boost::bind(&LLVOVolume::setTEMaterialParamsCallbackTE, getID(), _1, _2, _3));
+		LLMaterialMgr::instance().getTE(getRegion()->getRegionID(), pMaterialID, te, boost::bind(&LLVOVolume::setTEMaterialParamsCallbackTE, getID(), _1, _2, _3));
 
 		setChanged(ALL_CHANGED);
 		if (!mDrawable.isNull())
@@ -2580,7 +2580,7 @@ S32 LLVOVolume::setTEMaterialParams(const U8 te, const LLMaterialPtr pMaterialPa
 
 #ifdef SHOW_DEBUG
 	LL_DEBUGS("MaterialTEs") << "te " << (S32)te << " material " << ((pMaterial) ? pMaterial->asLLSD() : LLSD("null")) << " res " << res
-							 << ( LLSelectMgr::getInstanceFast()->getSelection()->contains(const_cast<LLVOVolume*>(this), te) ? " selected" : " not selected" )
+							 << ( LLSelectMgr::getInstance()->getSelection()->contains(const_cast<LLVOVolume*>(this), te) ? " selected" : " not selected" )
 							 << LL_ENDL;
 #endif
 	setChanged(ALL_CHANGED);
@@ -2774,7 +2774,7 @@ void LLVOVolume::syncMediaData(S32 texture_index, const LLSD &media_data, bool m
 			LLUUID updating_agent = LLTextureEntry::getAgentIDFromMediaVersionString(getMediaURL());
 			update_from_self = (updating_agent == gAgent.getID());
 		}
-		viewer_media_t media_impl = LLViewerMedia::getInstanceFast()->updateMediaImpl(mep, previous_url, update_from_self);
+		viewer_media_t media_impl = LLViewerMedia::getInstance()->updateMediaImpl(mep, previous_url, update_from_self);
 			
 		addMediaImpl(media_impl, texture_index) ;
 	}
@@ -2864,7 +2864,7 @@ bool LLVOVolume::hasMediaPermission(const LLMediaEntry* media_entry, MediaPermTy
     // Group permissions
     else if (0 != (media_perms & LLMediaEntry::PERM_GROUP))
     {
-		LLPermissions* obj_perm = LLSelectMgr::getInstanceFast()->findObjectPermissions(this);
+		LLPermissions* obj_perm = LLSelectMgr::getInstance()->findObjectPermissions(this);
 		if (obj_perm && gAgent.isInGroup(obj_perm->getGroup()))
 		{
 			return true;
@@ -3122,7 +3122,7 @@ F64 LLVOVolume::getTotalMediaInterest() const
 	// If this object is selected, this object has "high" interest, but since 
 	// there can be more than one, we still add in calculated impl interest
 	// XXX Sadly, 'contains()' doesn't take a const :(
-	if (LLSelectMgr::getInstanceFast()->getSelection()->contains(const_cast<LLVOVolume*>(this)))
+	if (LLSelectMgr::getInstance()->getSelection()->contains(const_cast<LLVOVolume*>(this)))
 		interest = F64_MAX / 2.0;
 	
 	int i = 0;
@@ -3379,7 +3379,7 @@ F32 LLVOVolume::getSpotLightPriority() const
 
 void LLVOVolume::updateSpotLightPriority()
 {
-	auto& viewerCamera = LLViewerCamera::instanceFast();
+	auto& viewerCamera = LLViewerCamera::instance();
 
     F32 r = getLightRadius();
 	LLVector3 pos = mDrawable->getPositionAgent();
@@ -4670,7 +4670,7 @@ BOOL LLVOVolume::lineSegmentIntersect(const LLVector4a& start, const LLVector4a&
 
 	if (mDrawable->isState(LLDrawable::RIGGED))
 	{
-		if (pick_rigged || LLToolMgr::getInstanceFast()->inBuildMode())
+		if (pick_rigged || LLToolMgr::getInstance()->inBuildMode())
 		{
 			updateRiggedVolume(true);
 			volume = mRiggedVolume;
@@ -5211,7 +5211,7 @@ void LLVolumeGeometryManager::registerFace(LLSpatialGroup* group, LLFace* facep,
 // [RLVa:KB] - Checked: 2010-11-29 (RLVa-1.3.0c) | Modified: RLVa-1.3.0c
 	const LLViewerObject* pObj = facep->getViewerObject();
 	bool selected = pObj->isSelected();
-	if ( (pObj->isSelected() && LLSelectMgr::getInstanceFast()->mHideSelectedObjects) &&
+	if ( (pObj->isSelected() && LLSelectMgr::getInstance()->mHideSelectedObjects) &&
 		 ( (!RlvActions::isRlvEnabled()) ||
 		   ( ((!pObj->isHUDAttachment()) || (!gRlvAttachmentLocks.isLockedAttachment(pObj->getRootEdit()))) &&
 		     (RlvActions::canEdit(pObj)) ) ) )

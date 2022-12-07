@@ -190,7 +190,7 @@ static void remove_media_impl(LLViewerMediaImpl* media)
 
 class LLViewerMediaMuteListObserver : public LLMuteListObserver
 {
-	/* virtual */ void onChange()  { LLViewerMedia::getInstanceFast()->muteListChanged();}
+	/* virtual */ void onChange()  { LLViewerMedia::getInstance()->muteListChanged();}
 };
 
 static LLViewerMediaMuteListObserver sViewerMediaMuteListObserver;
@@ -382,7 +382,7 @@ std::string LLViewerMedia::getCurrentUserAgent()
 
 	// Just in case we need to check browser differences in A/B test
 	// builds.
-	std::string channel = LLVersionInfo::instanceFast().getChannel();
+	std::string channel = LLVersionInfo::instance().getChannel();
 
 	// append our magic version number string to the browser user agent id
 	// See the HTTP 1.0 and 1.1 specifications for allowed formats:
@@ -392,7 +392,7 @@ std::string LLViewerMedia::getCurrentUserAgent()
 	// http://www.mozilla.org/build/revised-user-agent-strings.html
 	std::ostringstream codec;
 	codec << "SecondLife/";
-	codec << LLVersionInfo::instanceFast().getVersion();
+	codec << LLVersionInfo::instance().getVersion();
 	codec << " (" << channel << "; " << skin_name << " skin)";
 	LL_INFOS() << codec.str() << LL_ENDL;
 
@@ -492,13 +492,13 @@ bool LLViewerMedia::isInterestingEnough(const LLVOVolume *object, const F64 &obj
 		result = false;
 	}
 	// Focused?  Then it is interesting!
-	else if (LLViewerMediaFocus::getInstanceFast()->getFocusedObjectID() == object->getID())
+	else if (LLViewerMediaFocus::getInstance()->getFocusedObjectID() == object->getID())
 	{
 		result = true;
 	}
 	// Selected?  Then it is interesting!
 	// XXX Sadly, 'contains()' doesn't take a const :(
-	else if (LLSelectMgr::getInstanceFast()->getSelection()->contains(const_cast<LLVOVolume*>(object)))
+	else if (LLSelectMgr::getInstance()->getSelection()->contains(const_cast<LLVOVolume*>(object)))
 	{
 		result = true;
 	}
@@ -614,7 +614,7 @@ static LLTrace::BlockTimerStatHandle FTM_MEDIA_MISC("Misc");
 //////////////////////////////////////////////////////////////////////////////////////////
 void LLViewerMedia::onIdle(void *dummy_arg)
 {
-    LLViewerMedia::getInstanceFast()->updateMedia(dummy_arg);
+    LLViewerMedia::getInstance()->updateMedia(dummy_arg);
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////
@@ -808,7 +808,7 @@ void LLViewerMedia::updateMedia(void *dummy_arg)
 			{
 				if(LLViewerMedia::isParcelAudioPlaying() && gAudiop && LLViewerMedia::hasParcelAudio())
 				{
-					LLViewerAudio::getInstanceFast()->stopInternetStreamWithAutoFade();
+					LLViewerAudio::getInstance()->stopInternetStreamWithAutoFade();
 					restore_parcel_audio = true;
 				}
 			}
@@ -816,7 +816,7 @@ void LLViewerMedia::updateMedia(void *dummy_arg)
             {
                 if(gAudiop && LLViewerMedia::hasParcelAudio() && restore_parcel_audio && gSavedSettings.getBOOL("MediaTentativeAutoPlay"))
                 {
-                    LLViewerAudio::getInstanceFast()->startInternetStreamWithAutoFade(LLViewerMedia::getParcelAudioURL());
+                    LLViewerAudio::getInstance()->startInternetStreamWithAutoFade(LLViewerMedia::getParcelAudioURL());
                     restore_parcel_audio = false;
                 }
             }
@@ -927,7 +927,7 @@ void LLViewerMedia::setAllMediaEnabled(bool val)
 	{
 		if (!LLViewerMedia::isParcelMediaPlaying() && LLViewerMedia::hasParcelMedia())
 		{
-			LLViewerParcelMedia::getInstanceFast()->play(LLViewerParcelMgr::getInstanceFast()->getAgentParcel());
+			LLViewerParcelMedia::getInstance()->play(LLViewerParcelMgr::getInstance()->getAgentParcel());
 		}
 
 		static LLCachedControl<bool> audio_streaming_music(gSavedSettings, "AudioStreamingMusic", true);
@@ -943,16 +943,16 @@ void LLViewerMedia::setAllMediaEnabled(bool val)
 			}
 			else
 			{
-				LLViewerAudio::getInstanceFast()->startInternetStreamWithAutoFade(LLViewerMedia::getParcelAudioURL());
+				LLViewerAudio::getInstance()->startInternetStreamWithAutoFade(LLViewerMedia::getParcelAudioURL());
 			}
 		}
 	}
 	else {
 		// This actually unloads the impl, as opposed to "stop"ping the media
-		LLViewerParcelMedia::getInstanceFast()->stop();
+		LLViewerParcelMedia::getInstance()->stop();
 		if (gAudiop)
 		{
-			LLViewerAudio::getInstanceFast()->stopInternetStreamWithAutoFade();
+			LLViewerAudio::getInstance()->stopInternetStreamWithAutoFade();
 		}
 	}
 }
@@ -993,14 +993,14 @@ void LLViewerMedia::setAllMediaPaused(bool val)
         }
     }
 
-    LLParcel *agent_parcel = LLViewerParcelMgr::getInstanceFast()->getAgentParcel();
+    LLParcel *agent_parcel = LLViewerParcelMgr::getInstance()->getAgentParcel();
 
     // Also do Parcel Media and Parcel Audio
     if (!val)
     {
         if (!LLViewerMedia::isParcelMediaPlaying() && LLViewerMedia::hasParcelMedia())
         {
-            LLViewerParcelMedia::getInstanceFast()->play(agent_parcel);
+            LLViewerParcelMedia::getInstance()->play(agent_parcel);
         }
 
         static LLCachedControl<bool> audio_streaming_music(gSavedSettings, "AudioStreamingMusic", true);
@@ -1016,30 +1016,30 @@ void LLViewerMedia::setAllMediaPaused(bool val)
             }
             else
             {
-                LLViewerAudio::getInstanceFast()->startInternetStreamWithAutoFade(LLViewerMedia::getParcelAudioURL());
+                LLViewerAudio::getInstance()->startInternetStreamWithAutoFade(LLViewerMedia::getParcelAudioURL());
             }
         }
     }
     else {
         // This actually unloads the impl, as opposed to "stop"ping the media
-        LLViewerParcelMedia::getInstanceFast()->stop();
+        LLViewerParcelMedia::getInstance()->stop();
         if (gAudiop)
         {
-            LLViewerAudio::getInstanceFast()->stopInternetStreamWithAutoFade();
+            LLViewerAudio::getInstance()->stopInternetStreamWithAutoFade();
         }
     }
 
     // remove play choice for current parcel
     if (agent_parcel && gAgent.getRegion())
     {
-        LLViewerParcelAskPlay::getInstanceFast()->resetSetting(gAgent.getRegion()->getRegionID(), agent_parcel->getLocalID());
+        LLViewerParcelAskPlay::getInstance()->resetSetting(gAgent.getRegion()->getRegionID(), agent_parcel->getLocalID());
     }
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////
 bool LLViewerMedia::isParcelMediaPlaying()
 {
-    viewer_media_t media = LLViewerParcelMedia::getInstanceFast()->getParcelMedia();
+    viewer_media_t media = LLViewerParcelMedia::getInstance()->getParcelMedia();
     return (LLViewerMedia::hasParcelMedia() && media && media->hasMedia());
 }
 
@@ -1461,7 +1461,7 @@ bool LLViewerMedia::hasInWorldMedia()
 //////////////////////////////////////////////////////////////////////////////////////////
 bool LLViewerMedia::hasParcelMedia()
 {
-	return !LLViewerParcelMedia::getInstanceFast()->getURL().empty();
+	return !LLViewerParcelMedia::getInstance()->getURL().empty();
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////
@@ -1473,7 +1473,7 @@ bool LLViewerMedia::hasParcelAudio()
 //////////////////////////////////////////////////////////////////////////////////////////
 std::string LLViewerMedia::getParcelAudioURL()
 {
-	return LLViewerParcelMgr::getInstanceFast()->getAgentParcel()->getMusicURL();
+	return LLViewerParcelMgr::getInstance()->getAgentParcel()->getMusicURL();
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////
@@ -1677,7 +1677,7 @@ LLPluginClassMedia* LLViewerMediaImpl::newSourceFromMediaType(std::string media_
 	if ((plugin_basename == "media_plugin_cef") &&
         !gSavedSettings.getBOOL("PluginAttachDebuggerToPlugins") && !clean_browser)
 	{
-		media_source = LLViewerMedia::getInstanceFast()->getSpareBrowserMediaSource();
+		media_source = LLViewerMedia::getInstance()->getSpareBrowserMediaSource();
 		if(media_source)
 		{
 			media_source->setOwner(owner);
@@ -1752,7 +1752,7 @@ LLPluginClassMedia* LLViewerMediaImpl::newSourceFromMediaType(std::string media_
 			media_source->enableMediaPluginDebugging( media_plugin_debugging_enabled  || clean_browser);
 
 			// need to set agent string here before instance created
-			media_source->setBrowserUserAgent(LLViewerMedia::getInstanceFast()->getCurrentUserAgent());
+			media_source->setBrowserUserAgent(LLViewerMedia::getInstance()->getCurrentUserAgent());
 
             // configure and pass proxy setup based on debug settings that are 
             // configured by UI in prefs -> setup
@@ -1828,7 +1828,7 @@ bool LLViewerMediaImpl::initializePlugin(const std::string& media_type)
 		media_source->setDisableTimeout(gSavedSettings.getBOOL("DebugPluginDisableTimeout"));
 		media_source->setLoop(mMediaLoop);
 		media_source->setAutoScale(mMediaAutoScale);
-		media_source->setBrowserUserAgent(LLViewerMedia::getInstanceFast()->getCurrentUserAgent());
+		media_source->setBrowserUserAgent(LLViewerMedia::getInstance()->getCurrentUserAgent());
 		media_source->focus(mHasFocus);
 		media_source->setBackgroundColor(mBackgroundColor);
 
@@ -2068,7 +2068,7 @@ void LLViewerMediaImpl::updateVolume()
 	if(mMediaSource)
 	{
 		// always scale the volume by the global media volume
-		F32 volume = mRequestedVolume * LLViewerMedia::getInstanceFast()->getVolume();
+		F32 volume = mRequestedVolume * LLViewerMedia::getInstance()->getVolume();
 
 		if (mProximityCamera > 0)
 		{
@@ -3631,7 +3631,7 @@ void LLViewerMediaImpl::calculateInterest()
 			llassert(obj);
 			if (!obj) continue;
 			if(mutelist_exists &&
-			   LLMuteList::getInstanceFast()->isMuted(obj->getID()))
+			   LLMuteList::getInstance()->isMuted(obj->getID()))
 			{
 				mIsMuted = true;
 			}
@@ -3640,11 +3640,11 @@ void LLViewerMediaImpl::calculateInterest()
 				// We won't have full permissions data for all objects.  Attempt to mute objects when we can tell their owners are muted.
 				if (selectmgr_exists)
 				{
-					LLPermissions* obj_perm = LLSelectMgr::getInstanceFast()->findObjectPermissions(obj);
+					LLPermissions* obj_perm = LLSelectMgr::getInstance()->findObjectPermissions(obj);
 					if(obj_perm)
 					{
 						if(mutelist_exists &&
-						   LLMuteList::getInstanceFast()->isMuted(obj_perm->getOwner()))
+						   LLMuteList::getInstance()->isMuted(obj_perm->getOwner()))
 							mIsMuted = true;
 					}
 				}
@@ -3986,5 +3986,5 @@ LLNotificationPtr LLViewerMediaImpl::getCurrentNotification() const
 // static
 bool LLViewerMediaImpl::isObjectInAgentParcel(LLVOVolume *obj)
 {
-	return (LLViewerParcelMgr::getInstanceFast()->inAgentParcel(obj->getPositionGlobal()));
+	return (LLViewerParcelMgr::getInstance()->inAgentParcel(obj->getPositionGlobal()));
 }

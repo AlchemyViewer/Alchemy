@@ -111,7 +111,7 @@ void LLFloaterBulkPermission::doApply()
 	LLScrollListCtrl* list = getChild<LLScrollListCtrl>("queue output");
 	list->deleteAllItems();
 	ModifiableGatherer gatherer(mObjectIDs);
-	LLSelectMgr::getInstanceFast()->getSelection()->applyToNodes(&gatherer);
+	LLSelectMgr::getInstance()->getSelection()->applyToNodes(&gatherer);
 	if(mObjectIDs.empty())
 	{
 		list->setCommentText(getString("nothing_to_modify_text"));

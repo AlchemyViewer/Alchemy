@@ -387,8 +387,8 @@ void update_statistics()
 	gTransferManager.resetTransferBitsIn(LLTCT_ASSET);
 
 	sample(LLStatViewer::VISIBLE_AVATARS, LLVOAvatar::sNumVisibleAvatars);
-	LLWorld::getInstanceFast()->updateNetStats();
-	LLWorld::getInstanceFast()->requestCacheMisses();
+	LLWorld::getInstance()->updateNetStats();
+	LLWorld::getInstance()->requestCacheMisses();
 	
 	// Reset all of these values.
 	gVLManager.resetBitCounts();

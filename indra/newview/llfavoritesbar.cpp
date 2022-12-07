@@ -174,7 +174,7 @@ public:
 			params.max_width = 1000;			
 			params.sticky_rect = calcScreenRect(); 
 
-			LLToolTipMgr::instanceFast().show(params);
+			LLToolTipMgr::instance().show(params);
 		}
 		return TRUE;
 	}
@@ -196,7 +196,7 @@ public:
 
 	void onMouseEnter(S32 x, S32 y, MASK mask)
 	{
-		if (LLToolDragAndDrop::getInstanceFast()->hasMouseCapture())
+		if (LLToolDragAndDrop::getInstance()->hasMouseCapture())
 		{
 			LLUICtrl::onMouseEnter(x, y, mask);
 		}
@@ -232,7 +232,7 @@ public:
 			LLToolTip::Params params;
 			params.message = llformat("%s\n%s (%d, %d)", getLabel().c_str(), region_name.c_str(), mLandmarkInfoGetter.getPosX(), mLandmarkInfoGetter.getPosY());
 			params.sticky_rect = calcScreenRect();
-			LLToolTipMgr::instanceFast().show(params);
+			LLToolTipMgr::instance().show(params);
 		}
 		return TRUE;
 	}
@@ -718,14 +718,14 @@ void LLFavoritesBarCtrl::draw()
 	{
 		if (mItemsChangedTimer.getElapsedTimeF32() > 1.f)
 		{
-			LLFavoritesOrderStorage::instanceFast().saveFavoritesRecord();
+			LLFavoritesOrderStorage::instance().saveFavoritesRecord();
 			mItemsChangedTimer.stop();
 		}
 	}
 
-	if(!mItemsChangedTimer.getStarted() && LLFavoritesOrderStorage::instanceFast().mUpdateRequired)
+	if(!mItemsChangedTimer.getStarted() && LLFavoritesOrderStorage::instance().mUpdateRequired)
 	{
-		LLFavoritesOrderStorage::instanceFast().mUpdateRequired = false;
+		LLFavoritesOrderStorage::instance().mUpdateRequired = false;
 		mItemsChangedTimer.start();
 	}
 

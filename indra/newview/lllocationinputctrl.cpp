@@ -496,7 +496,7 @@ BOOL LLLocationInputCtrl::handleToolTip(S32 x, S32 y, MASK mask)
 				LLSD value = item->getValue();
 				if (value.has("tooltip"))
 				{
-					LLToolTipMgr::instanceFast().show(value["tooltip"]);
+					LLToolTipMgr::instance().show(value["tooltip"]);
 				}
 			}
 		}
@@ -846,7 +846,7 @@ void LLLocationInputCtrl::refreshParcelIcons()
 	// Our "cursor" moving right to left
 	S32 x = mAddLandmarkBtn->getRect().mLeft;
 
-	LLViewerParcelMgr* vpm = LLViewerParcelMgr::getInstanceFast();
+	LLViewerParcelMgr* vpm = LLViewerParcelMgr::getInstance();
 
 	LLViewerRegion* agent_region = gAgent.getRegion();
 	LLParcel* agent_parcel = vpm->getAgentParcel();

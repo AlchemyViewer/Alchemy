@@ -249,11 +249,11 @@ LLPanelVolume::~LLPanelVolume()
 
 void LLPanelVolume::getState( )
 {
-	LLViewerObject* objectp = LLSelectMgr::getInstanceFast()->getSelection()->getFirstRootObject();
+	LLViewerObject* objectp = LLSelectMgr::getInstance()->getSelection()->getFirstRootObject();
 	LLViewerObject* root_objectp = objectp;
 	if(!objectp)
 	{
-		objectp = LLSelectMgr::getInstanceFast()->getSelection()->getFirstObject();
+		objectp = LLSelectMgr::getInstance()->getSelection()->getFirstObject();
 		// *FIX: shouldn't we just keep the child?
 		if (objectp)
 		{
@@ -297,14 +297,14 @@ void LLPanelVolume::getState( )
 
 	LLUUID owner_id;
 	std::string owner_name;
-	LLSelectMgr::getInstanceFast()->selectGetOwner(owner_id, owner_name);
+	LLSelectMgr::getInstance()->selectGetOwner(owner_id, owner_name);
 
 	// BUG? Check for all objects being editable?
 	BOOL editable = root_objectp->permModify() && !root_objectp->isPermanentEnforced();
-	BOOL single_volume = LLSelectMgr::getInstanceFast()->selectionAllPCode( LL_PCODE_VOLUME )
-		&& LLSelectMgr::getInstanceFast()->getSelection()->getObjectCount() == 1;
-    BOOL single_root_volume = LLSelectMgr::getInstanceFast()->selectionAllPCode( LL_PCODE_VOLUME ) && 
-        LLSelectMgr::getInstanceFast()->getSelection()->getRootObjectCount() == 1;
+	BOOL single_volume = LLSelectMgr::getInstance()->selectionAllPCode( LL_PCODE_VOLUME )
+		&& LLSelectMgr::getInstance()->getSelection()->getObjectCount() == 1;
+    BOOL single_root_volume = LLSelectMgr::getInstance()->selectionAllPCode( LL_PCODE_VOLUME ) && 
+        LLSelectMgr::getInstance()->getSelection()->getRootObjectCount() == 1;
 
 	// Select Single Message
 	if (single_volume)
@@ -501,7 +501,7 @@ void LLPanelVolume::getState( )
 			return object->getMaterial();
 		}
 	} func;
-	bool material_same = LLSelectMgr::getInstanceFast()->getSelection()->getSelectedTEValue( &func, material_code );
+	bool material_same = LLSelectMgr::getInstance()->getSelection()->getSelectedTEValue( &func, material_code );
 	std::string LEGACY_FULLBRIGHT_DESC = LLTrans::getString("Fullbright");
 	if (editable && single_volume && material_same)
 	{
@@ -713,7 +713,7 @@ void LLPanelVolume::sendIsFlexible()
 
 		if (objectp->getClickAction() == CLICK_ACTION_SIT)
 		{
-			LLSelectMgr::getInstanceFast()->selectionSetClickAction(CLICK_ACTION_NONE);
+			LLSelectMgr::getInstance()->selectionSetClickAction(CLICK_ACTION_NONE);
 		}
 
 	}
@@ -721,7 +721,7 @@ void LLPanelVolume::sendIsFlexible()
 	if (volobjp->setIsFlexible(is_flexible))
 	{
 		mObject->sendShapeUpdate();
-		LLSelectMgr::getInstanceFast()->selectionUpdatePhantom(volobjp->flagPhantom());
+		LLSelectMgr::getInstance()->selectionUpdatePhantom(volobjp->flagPhantom());
 	}
 
 	LL_INFOS() << "update flexible sent" << LL_ENDL;
@@ -730,7 +730,7 @@ void LLPanelVolume::sendIsFlexible()
 void LLPanelVolume::sendPhysicsShapeType(LLUICtrl* ctrl, void* userdata)
 {
 	U8 type = ctrl->getValue().asInteger();
-	LLSelectMgr::getInstanceFast()->selectionSetPhysicsType(type);
+	LLSelectMgr::getInstance()->selectionSetPhysicsType(type);
 
 	refreshCost();
 }
@@ -738,30 +738,30 @@ void LLPanelVolume::sendPhysicsShapeType(LLUICtrl* ctrl, void* userdata)
 void LLPanelVolume::sendPhysicsGravity(LLUICtrl* ctrl, void* userdata)
 {
 	F32 val = ctrl->getValue().asReal();
-	LLSelectMgr::getInstanceFast()->selectionSetGravity(val);
+	LLSelectMgr::getInstance()->selectionSetGravity(val);
 }
 
 void LLPanelVolume::sendPhysicsFriction(LLUICtrl* ctrl, void* userdata)
 {
 	F32 val = ctrl->getValue().asReal();
-	LLSelectMgr::getInstanceFast()->selectionSetFriction(val);
+	LLSelectMgr::getInstance()->selectionSetFriction(val);
 }
 
 void LLPanelVolume::sendPhysicsRestitution(LLUICtrl* ctrl, void* userdata)
 {
 	F32 val = ctrl->getValue().asReal();
-	LLSelectMgr::getInstanceFast()->selectionSetRestitution(val);
+	LLSelectMgr::getInstance()->selectionSetRestitution(val);
 }
 
 void LLPanelVolume::sendPhysicsDensity(LLUICtrl* ctrl, void* userdata)
 {
 	F32 val = ctrl->getValue().asReal();
-	LLSelectMgr::getInstanceFast()->selectionSetDensity(val);
+	LLSelectMgr::getInstance()->selectionSetDensity(val);
 }
 
 void LLPanelVolume::refreshCost()
 {
-	LLViewerObject* obj = LLSelectMgr::getInstanceFast()->getSelection()->getFirstObject();
+	LLViewerObject* obj = LLSelectMgr::getInstance()->getSelection()->getFirstObject();
 	
 	if (obj)
 	{
@@ -854,7 +854,7 @@ void LLPanelVolume::onCommitMaterial( LLUICtrl* ctrl, void* userdata )
 					objectp->setPhysicsRestitution(LLMaterialTable::basic.getRestitution(material_code));
 				}
 			}
-			LLSelectMgr::getInstanceFast()->selectionSetMaterial(material_code);
+			LLSelectMgr::getInstance()->selectionSetMaterial(material_code);
 		}
 	}
 }

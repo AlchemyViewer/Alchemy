@@ -180,7 +180,7 @@ void LLPanelMarketplaceListings::draw()
     // Get the audit button enabled only after the whole inventory is fetched
     if (!mAuditBtn->getEnabled())
     {
-        mAuditBtn->setEnabled(LLInventoryModelBackgroundFetch::instanceFast().isEverythingFetched());
+        mAuditBtn->setEnabled(LLInventoryModelBackgroundFetch::instance().isEverythingFetched());
     }
     
 	LLPanel::draw();
@@ -431,7 +431,7 @@ void LLFloaterMarketplaceListings::fetchContents()
 	{
         LLMarketplaceData::instance().setDataFetchedSignal(boost::bind(&LLFloaterMarketplaceListings::updateView, this));
         LLMarketplaceData::instance().setSLMDataFetched(MarketplaceFetchCodes::MARKET_FETCH_LOADING);
-		LLInventoryModelBackgroundFetch::instanceFast().start(mRootFolderId);
+		LLInventoryModelBackgroundFetch::instance().start(mRootFolderId);
         LLMarketplaceData::instance().getSLMListings();
 	}
 }

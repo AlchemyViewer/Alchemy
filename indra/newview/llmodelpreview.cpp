@@ -3127,9 +3127,9 @@ BOOL LLModelPreview::render()
 
     F32 aspect = (F32)preview_rect.getWidth() / preview_rect.getHeight();
 
-    LLViewerCamera::getInstanceFast()->setAspect(aspect);
+    LLViewerCamera::getInstance()->setAspect(aspect);
 
-    LLViewerCamera::getInstanceFast()->setView(LLViewerCamera::getInstanceFast()->getDefaultFOV() / mCameraZoom);
+    LLViewerCamera::getInstance()->setView(LLViewerCamera::getInstance()->getDefaultFOV() / mCameraZoom);
 
     LLVector3 offset = mCameraOffset;
     LLVector3 target_pos = mPreviewTarget + offset;
@@ -3157,7 +3157,7 @@ BOOL LLModelPreview::render()
 
     LLQuaternion av_rot = camera_rot;
     F32 camera_distance = skin_weight ? SKIN_WEIGHT_CAMERA_DISTANCE : mCameraDistance;
-    LLViewerCamera::getInstanceFast()->setOriginAndLookAt(
+    LLViewerCamera::getInstance()->setOriginAndLookAt(
         target_pos + ((LLVector3(camera_distance, 0.f, 0.f) + offset) * av_rot),		// camera
         LLVector3::z_axis,																	// up
         target_pos);											// point of interest
@@ -3165,7 +3165,7 @@ BOOL LLModelPreview::render()
 
     z_near = llclamp(z_far * 0.001f, 0.001f, 0.1f);
 
-    LLViewerCamera::getInstanceFast()->setPerspective(FALSE, mOrigin.mX, mOrigin.mY, width, height, FALSE, z_near, z_far);
+    LLViewerCamera::getInstance()->setPerspective(FALSE, mOrigin.mX, mOrigin.mY, width, height, FALSE, z_near, z_far);
 
     stop_glerror();
 
@@ -3483,7 +3483,7 @@ BOOL LLModelPreview::render()
             getPreviewAvatar()->addPelvisFixup(mPelvisZOffset, fake_mesh_id);
             bool pelvis_recalc = false;
 
-            LLViewerCamera::getInstanceFast()->setOriginAndLookAt(
+            LLViewerCamera::getInstance()->setOriginAndLookAt(
                 target_pos + ((LLVector3(camera_distance, 0.f, 0.f) + offset) * av_rot),		// camera
                 LLVector3::z_axis,																	// up
                 target_pos);											// point of interest

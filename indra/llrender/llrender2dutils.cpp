@@ -948,7 +948,7 @@ void gl_rect_2d_checkerboard(const LLRect& rect, GLfloat alpha)
 	}
 	else
 	{ //polygon stipple is deprecated, use "Checker" texture
-		LLUIImagePtr img = LLRender2D::getInstanceFast()->getUIImage("Checker");
+		LLUIImagePtr img = LLRender2D::getInstance()->getUIImage("Checker");
 		gGL.getTexUnit(0)->bind(img->getImage());
 		gGL.getTexUnit(0)->setTextureAddressMode(LLTexUnit::TAM_WRAP);
 		gGL.getTexUnit(0)->setTextureFilteringOption(LLTexUnit::TFO_POINT);

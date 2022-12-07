@@ -905,14 +905,14 @@ BOOL LLView::handleToolTip(S32 x, S32 y, MASK mask)
         static LLUICachedControl<bool> allow_ui_tooltips("BasicUITooltips", true);
 		// allow "scrubbing" over ui by showing next tooltip immediately
 		// if previous one was still visible
-		F32 timeout = LLToolTipMgr::instanceFast().toolTipVisible() 
+		F32 timeout = LLToolTipMgr::instance().toolTipVisible() 
 		              ? tooltip_fast_delay
 		              : tooltip_delay;
 
 		// Even if we don't show tooltips, consume the event, nothing below should show tooltip
 		if (allow_ui_tooltips)
 		{
-			LLToolTipMgr::instanceFast().show(LLToolTip::Params()
+			LLToolTipMgr::instance().show(LLToolTip::Params()
 			                              .message(tooltip)
 			                              .sticky_rect(calcScreenRect())
 			                              .delay_time(timeout));
@@ -1985,11 +1985,11 @@ const LLViewQuery & LLView::getTabOrderQuery()
 {
 	static LLViewQuery query;
 	if(query.getPreFilters().size() == 0) {
-		query.addPreFilter(LLVisibleFilter::getInstanceFast());
-		query.addPreFilter(LLEnabledFilter::getInstanceFast());
-		query.addPreFilter(LLTabStopFilter::getInstanceFast());
-		query.addPostFilter(LLLeavesFilter::getInstanceFast());
-		query.setSorter(SortByTabOrder::getInstanceFast());
+		query.addPreFilter(LLVisibleFilter::getInstance());
+		query.addPreFilter(LLEnabledFilter::getInstance());
+		query.addPreFilter(LLTabStopFilter::getInstance());
+		query.addPostFilter(LLLeavesFilter::getInstance());
+		query.setSorter(SortByTabOrder::getInstance());
 	}
 	return query;
 }
@@ -2009,10 +2009,10 @@ const LLViewQuery & LLView::getFocusRootsQuery()
 {
 	static LLViewQuery query;
 	if(query.getPreFilters().size() == 0) {
-		query.addPreFilter(LLVisibleFilter::getInstanceFast());
-		query.addPreFilter(LLEnabledFilter::getInstanceFast());
-		query.addPreFilter(LLFocusRootsFilter::getInstanceFast());
-		query.addPostFilter(LLRootsFilter::getInstanceFast());
+		query.addPreFilter(LLVisibleFilter::getInstance());
+		query.addPreFilter(LLEnabledFilter::getInstance());
+		query.addPreFilter(LLFocusRootsFilter::getInstance());
+		query.addPostFilter(LLRootsFilter::getInstance());
 	}
 	return query;
 }
@@ -2281,9 +2281,9 @@ LLControlVariable *LLView::findControl(std::string_view name)
 		std::string control_group_key(name.substr(0, key_pos));
 		LLControlVariable* control;
 		// check if it's in the control group that name indicated
-		if(LLUI::getInstanceFast()->mSettingGroups[control_group_key])
+		if(LLUI::getInstance()->mSettingGroups[control_group_key])
 		{
-			control = LLUI::getInstanceFast()->mSettingGroups[control_group_key]->getControl(name);
+			control = LLUI::getInstance()->mSettingGroups[control_group_key]->getControl(name);
 			if (control)
 			{
 				return control;
@@ -2291,7 +2291,7 @@ LLControlVariable *LLView::findControl(std::string_view name)
 		}
 	}
 	
-	LLControlGroup& control_group = LLUI::getInstanceFast()->getControlControlGroup(name);
+	LLControlGroup& control_group = LLUI::getInstance()->getControlControlGroup(name);
 	return control_group.getControl(name);	
 }
 

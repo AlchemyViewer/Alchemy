@@ -205,9 +205,9 @@ void LLFloaterTexturePicker::setCanApplyImmediately(BOOL b)
 
 void LLFloaterTexturePicker::stopUsingPipette()
 {
-	if (LLToolMgr::getInstanceFast()->getCurrentTool() == LLToolPipette::getInstanceFast())
+	if (LLToolMgr::getInstance()->getCurrentTool() == LLToolPipette::getInstance())
 	{
-		LLToolMgr::getInstanceFast()->clearTransientTool();
+		LLToolMgr::getInstance()->clearTransientTool();
 	}
 }
 
@@ -434,7 +434,7 @@ BOOL LLFloaterTexturePicker::postBuild()
 	updateFilterPermMask();
 	mSavedFolderState.setApply(FALSE);
 
-	LLToolPipette::getInstanceFast()->setToolSelectCallback(boost::bind(&LLFloaterTexturePicker::onTextureSelect, this, _1));
+	LLToolPipette::getInstance()->setToolSelectCallback(boost::bind(&LLFloaterTexturePicker::onTextureSelect, this, _1));
 	
 	getChild<LLComboBox>("l_bake_use_texture_combo_box")->setCommitCallback(onBakeTextureSelect, this);
 	getChild<LLCheckBoxCtrl>("hide_base_mesh_region")->setCommitCallback(onHideBaseMeshRegionCheck, this);
@@ -455,7 +455,7 @@ void LLFloaterTexturePicker::draw()
 	getChildView("show_folders_check")->setEnabled(mActive && mCanApplyImmediately && !mNoCopyTextureSelected);
 	getChildView("Select")->setEnabled(mActive && mCanApply);
 	getChildView("Pipette")->setEnabled(mActive);
-	getChild<LLUICtrl>("Pipette")->setValue(LLToolMgr::getInstanceFast()->getCurrentTool() == LLToolPipette::getInstanceFast());
+	getChild<LLUICtrl>("Pipette")->setValue(LLToolMgr::getInstance()->getCurrentTool() == LLToolPipette::getInstance());
 
 	//BOOL allow_copy = FALSE;
 	if( mOwner ) 
@@ -467,7 +467,7 @@ void LLFloaterTexturePicker::draw()
 
 			if (LLAvatarAppearanceDefines::LLAvatarAppearanceDictionary::isBakedImageId(mImageAssetID))
 			{
-				LLViewerObject* obj = LLSelectMgr::getInstanceFast()->getSelection()->getFirstObject();
+				LLViewerObject* obj = LLSelectMgr::getInstance()->getSelection()->getFirstObject();
 				if (obj)
 				{
 					LLViewerTexture* viewerTexture = obj->getBakedTextureForMagicId(mImageAssetID);
@@ -723,11 +723,11 @@ void LLFloaterTexturePicker::onBtnPipette()
 	pipette_active = !pipette_active;
 	if (pipette_active)
 	{
-		LLToolMgr::getInstanceFast()->setTransientTool(LLToolPipette::getInstance());
+		LLToolMgr::getInstance()->setTransientTool(LLToolPipette::getInstance());
 	}
 	else
 	{
-		LLToolMgr::getInstanceFast()->clearTransientTool();
+		LLToolMgr::getInstance()->clearTransientTool();
 	}
 }
 
@@ -1650,7 +1650,7 @@ void LLTextureCtrl::draw()
 
 		if (LLAvatarAppearanceDefines::LLAvatarAppearanceDictionary::isBakedImageId(mImageAssetID))
 		{
-			LLViewerObject* obj = LLSelectMgr::getInstanceFast()->getSelection()->getFirstObject();
+			LLViewerObject* obj = LLSelectMgr::getInstance()->getSelection()->getFirstObject();
 			if (obj)
 			{
 				LLViewerTexture* viewerTexture = obj->getBakedTextureForMagicId(mImageAssetID);

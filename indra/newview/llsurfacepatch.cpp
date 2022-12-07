@@ -897,7 +897,7 @@ void LLSurfacePatch::updateVisibility()
 	radius.splat(mRadius);
 
 	// sphere in frustum on global coordinates
-	if (LLViewerCamera::getInstanceFast()->AABBInFrustumNoFarClip(center, radius))
+	if (LLViewerCamera::getInstance()->AABBInFrustumNoFarClip(center, radius))
 	{
 		// We now need to calculate the render stride based on patchp's distance 
 		// from LLCamera render_stride is governed by a relation something like this...

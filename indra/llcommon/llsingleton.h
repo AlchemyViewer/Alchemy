@@ -34,7 +34,6 @@
 #include "mutex.h"
 #include "lockstatic.h"
 #include "llthread.h"               // on_main_thread()
-#include "llmutex.h"
 #include "llmainthreadtask.h"
 
 class LLSingletonBase: private boost::noncopyable
@@ -293,17 +292,13 @@ private:
     {
         // Use a recursive_mutex in case of constructor circularity. With a
         // non-recursive mutex, that would result in deadlock.
-        typedef LLMutex mutex_t;
+        typedef std::recursive_mutex mutex_t;
         mutex_t mMutex;             // LockStatic looks for mMutex
 
         EInitState      mInitState{UNINITIALIZED};
         DERIVED_TYPE*   mInstance{nullptr};
     };
-    typedef llthread::LockStaticLL<SingletonData> LockStatic;
-
-protected:
-    inline static DERIVED_TYPE* sUnsafeInstance = nullptr;
-private:
+    typedef llthread::LockStatic<SingletonData> LockStatic;
 
     // Allow LLParamSingleton subclass -- but NOT DERIVED_TYPE itself -- to
     // access our private members.
@@ -351,9 +346,6 @@ private:
             // breaking cyclic dependencies
             lk->mInstance->initSingleton();
             lk->mInitState = INITIALIZED;
-
-            // Cache for fast unsafe access
-            sUnsafeInstance = lk->mInstance;
 
             // pop this off stack of initializing singletons
             pop_initializing(lk->mInstance);
@@ -423,8 +415,6 @@ protected:
         // deleteSingleton() to defend against manual deletion. When we moved
         // cleanup to deleteSingleton(), we hit crashes due to dangling
         // pointers in the MasterList.
-        sUnsafeInstance = nullptr;
-
         LockStatic lk;
         lk->mInstance  = nullptr;
         lk->mInitState = DELETED;
@@ -586,28 +576,11 @@ public:
         return instance;
     }
 
-    // Thread unsafe access
-    static DERIVED_TYPE* getInstanceFast()
-    {
-        if (!sUnsafeInstance)
-        {
-            // Dummy call to force populate
-            return getInstance();
-        }
-        return sUnsafeInstance;
-    }
-
     // Reference version of getInstance()
     // Preferred over getInstance() as it disallows checking for nullptr
     static DERIVED_TYPE& instance()
     {
         return *getInstance();
-    }
-
-    // Thread unsafe access
-    static DERIVED_TYPE& instanceFast()
-    {
-        return *getInstanceFast();
     }
 
     // Has this singleton been created yet?
@@ -763,27 +736,12 @@ public:
         return nullptr;
     }
 
-    static DERIVED_TYPE* getInstanceFast()
-    {
-        if (!super::sUnsafeInstance)
-        {
-            // Dummy call to force populate
-            return getInstance();
-        }
-        return super::sUnsafeInstance;
-    }
-
     // instance() is replicated here so it calls
     // LLParamSingleton::getInstance() rather than LLSingleton::getInstance()
     // -- avoid making getInstance() virtual
     static DERIVED_TYPE& instance()
     {
         return *getInstance();
-    }
-
-    static DERIVED_TYPE& instanceFast()
-    {
-        return *getInstanceFast();
     }
 };
 

@@ -462,7 +462,7 @@ void LLVOSky::init()
     llassert(!mInitialized);
 
     // Update sky at least once to get correct initial sun/moon directions and lighting calcs performed
-	const LLSettingsSky::ptr_t& psky = LLEnvironment::instanceFast().getCurrentSky();
+	const LLSettingsSky::ptr_t& psky = LLEnvironment::instance().getCurrentSky();
 	psky->update();
 
 	updateDirections(psky);
@@ -501,7 +501,7 @@ void LLVOSky::cacheEnvironment(const LLSettingsSky::ptr_t& psky, AtmosphericsVar
 	m_atmosphericsVars.density_multiplier = psky->getDensityMultiplier();
 	m_atmosphericsVars.distance_multiplier = psky->getDistanceMultiplier();
 	m_atmosphericsVars.max_y = psky->getMaxY();
-	m_atmosphericsVars.sun_norm = LLEnvironment::getInstanceFast()->getClampedSunNorm();
+	m_atmosphericsVars.sun_norm = LLEnvironment::getInstance()->getClampedSunNorm();
 	m_atmosphericsVars.sunlight = psky->getIsSunUp() ? psky->getSunlightColor() : psky->getMoonlightColor();
 	m_atmosphericsVars.ambient = psky->getAmbientColor();
 	m_atmosphericsVars.glow = psky->getGlow();
@@ -570,7 +570,7 @@ void LLVOSky::restoreGL()
 		mSkyTex[i].restoreGL();
 	}
 
-	const LLSettingsSky::ptr_t& psky = LLEnvironment::instanceFast().getCurrentSky();
+	const LLSettingsSky::ptr_t& psky = LLEnvironment::instance().getCurrentSky();
 
 	if (psky)
 	{
@@ -678,7 +678,7 @@ bool LLVOSky::updateSky()
 
 	static S32 next_frame = 0;
 	
-	LLEnvironment& environment = LLEnvironment::instanceFast();
+	LLEnvironment& environment = LLEnvironment::instance();
 	const LLSettingsSky::ptr_t& psky = environment.getCurrentSky();
 
     mNeedUpdate = mForceUpdate;
@@ -709,7 +709,7 @@ bool LLVOSky::updateSky()
         if (mNeedUpdate && (mForceUpdateThrottle.hasExpired() || mForceUpdate))
 		{
             // start updating cube map sides
-            updateFog(&environment, psky, LLViewerCamera::getInstanceFast()->getFar());
+            updateFog(&environment, psky, LLViewerCamera::getInstance()->getFar());
             mCubeMapUpdateStage = 0;
             mForceUpdate = FALSE;
 		}
@@ -944,7 +944,7 @@ void LLVOSky::setCloudNoiseTextures(const LLUUID& cloud_noise_texture, const LLU
 
 void LLVOSky::setBloomTextures(const LLUUID& bloom_texture, const LLUUID& bloom_texture_next)
 {
-    const LLSettingsSky::ptr_t& psky = LLEnvironment::instanceFast().getCurrentSky();
+    const LLSettingsSky::ptr_t& psky = LLEnvironment::instance().getCurrentSky();
 
     LLUUID bloom_tex = bloom_texture.isNull() ? psky->GetDefaultBloomTextureId() : bloom_texture;
     LLUUID bloom_tex_next = bloom_texture_next.isNull() ? (bloom_texture.isNull() ? psky->GetDefaultBloomTextureId() : bloom_texture) : bloom_texture_next;
@@ -1047,7 +1047,7 @@ BOOL LLVOSky::updateGeometry(LLDrawable *drawable)
 		}
 	}
 
-	const LLVector3 &look_at = LLViewerCamera::getInstanceFast()->getAtAxis();
+	const LLVector3 &look_at = LLViewerCamera::getInstance()->getAtAxis();
 	LLVector3 right = look_at % LLVector3::z_axis;
 	LLVector3 up = right % look_at;
 	right.normalize();
@@ -1056,7 +1056,7 @@ BOOL LLVOSky::updateGeometry(LLDrawable *drawable)
     bool draw_sun  = updateHeavenlyBodyGeometry(drawable, mSunScale, FACE_SUN, mSun, up, right);
     bool draw_moon = updateHeavenlyBodyGeometry(drawable, mMoonScale, FACE_MOON, mMoon, up, right);
 
-	LLEnvironment& environment = LLEnvironment::instanceFast();
+	LLEnvironment& environment = LLEnvironment::instance();
     draw_sun  &= environment.getIsSunUp();
     draw_moon &= environment.getIsMoonUp();
 
@@ -1223,7 +1223,7 @@ F32 dtClip(const LLVector3& v0, const LLVector3& v1, F32 far_clip2)
 void LLVOSky::updateReflectionGeometry(LLDrawable *drawable, F32 H,
 										 const LLHeavenBody& HB)
 {
-	const LLVector3 &look_at = LLViewerCamera::getInstanceFast()->getAtAxis();
+	const LLVector3 &look_at = LLViewerCamera::getInstance()->getAtAxis();
 	// const F32 water_height = gAgent.getRegion()->getWaterHeight() + 0.001f;
 	// LLWorld::getInstance()->getWaterHeight() + 0.001f;
 
@@ -1554,7 +1554,7 @@ void LLVOSky::setSunAndMoonDirectionsCFR(const LLVector3& sun_dir_cfr, const LLV
 		mBumpSunDir.normalize();
 	}
 
-	const LLSettingsSky::ptr_t& psky = LLEnvironment::instanceFast().getCurrentSky();
+	const LLSettingsSky::ptr_t& psky = LLEnvironment::instance().getCurrentSky();
 	updateDirections(psky);
 }
 
@@ -1577,13 +1577,13 @@ void LLVOSky::setSunDirectionCFR(const LLVector3& sun_dir_cfr)
 		mBumpSunDir = adjustedDir * sunDot + sun_dir_cfr * (1.0f - sunDot);
 		mBumpSunDir.normalize();
 	}
-	const LLSettingsSky::ptr_t& psky = LLEnvironment::instanceFast().getCurrentSky();
+	const LLSettingsSky::ptr_t& psky = LLEnvironment::instance().getCurrentSky();
 	updateDirections(psky);
 }
 
 void LLVOSky::setMoonDirectionCFR(const LLVector3& moon_dir_cfr)
 {
 	mMoon.setDirection(moon_dir_cfr);
-	const LLSettingsSky::ptr_t& psky = LLEnvironment::instanceFast().getCurrentSky();
+	const LLSettingsSky::ptr_t& psky = LLEnvironment::instance().getCurrentSky();
 	updateDirections(psky);
 }

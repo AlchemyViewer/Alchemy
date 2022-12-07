@@ -69,7 +69,7 @@ LLDrawPoolWater::~LLDrawPoolWater()
 
 void LLDrawPoolWater::setTransparentTextures(const LLUUID& transparentTextureId, const LLUUID& nextTransparentTextureId)
 {
-	const LLSettingsWater::ptr_t& pwater = LLEnvironment::instanceFast().getCurrentWater();
+	const LLSettingsWater::ptr_t& pwater = LLEnvironment::instance().getCurrentWater();
     mWaterImagep[0] = LLViewerTextureManager::getFetchedTexture(!transparentTextureId.isNull() ? transparentTextureId : pwater->GetDefaultTransparentTextureAssetId());
     mWaterImagep[1] = LLViewerTextureManager::getFetchedTexture(!nextTransparentTextureId.isNull() ? nextTransparentTextureId : (!transparentTextureId.isNull() ? transparentTextureId : pwater->GetDefaultTransparentTextureAssetId()));
     mWaterImagep[0]->addTextureStats(1024.f*1024.f);
@@ -84,7 +84,7 @@ void LLDrawPoolWater::setOpaqueTexture(const LLUUID& opaqueTextureId)
 
 void LLDrawPoolWater::setNormalMaps(const LLUUID& normalMapId, const LLUUID& nextNormalMapId)
 {
-	const LLSettingsWater::ptr_t& pwater = LLEnvironment::instanceFast().getCurrentWater();
+	const LLSettingsWater::ptr_t& pwater = LLEnvironment::instance().getCurrentWater();
     mWaterNormp[0] = LLViewerTextureManager::getFetchedTexture(!normalMapId.isNull() ? normalMapId : pwater->GetDefaultWaterNormalAssetId());
     mWaterNormp[1] = LLViewerTextureManager::getFetchedTexture(!nextNormalMapId.isNull() ? nextNormalMapId : (!normalMapId.isNull() ? normalMapId : pwater->GetDefaultWaterNormalAssetId()));
     mWaterNormp[0]->addTextureStats(1024.f*1024.f);
@@ -110,7 +110,7 @@ void LLDrawPoolWater::prerender()
 
 S32 LLDrawPoolWater::getNumPasses()
 {
-	if (LLViewerCamera::getInstanceFast()->getOrigin().mV[2] < 1024.f)
+	if (LLViewerCamera::getInstance()->getOrigin().mV[2] < 1024.f)
 	{
 		return 1;
 	}
@@ -202,11 +202,11 @@ void LLDrawPoolWater::render(S32 pass)
 	gGL.getTexUnit(2)->enable(LLTexUnit::TT_TEXTURE);
 	gGL.getTexUnit(2)->bind(mWaterImagep[1]) ;
 
-	LLVector3 camera_up = LLViewerCamera::getInstanceFast()->getUpAxis();
+	LLVector3 camera_up = LLViewerCamera::getInstance()->getUpAxis();
 	F32 up_dot = camera_up * LLVector3::z_axis;
 
 	LLColor4 water_color;
-	if (LLViewerCamera::getInstanceFast()->cameraUnderWater())
+	if (LLViewerCamera::getInstance()->cameraUnderWater())
 	{
 		water_color.setVec(1.f, 1.f, 1.f, 0.4f);
 	}
@@ -279,7 +279,7 @@ void LLDrawPoolWater::render(S32 pass)
 
 		gGL.matrixMode(LLRender::MM_TEXTURE);
 		gGL.loadIdentity();
-		LLMatrix4a camera_rot = LLViewerCamera::getInstanceFast()->getModelview();
+		LLMatrix4a camera_rot = LLViewerCamera::getInstance()->getModelview();
 		camera_rot.extractRotation_affine();
 		camera_rot.invert();
 
@@ -463,8 +463,8 @@ void LLDrawPoolWater::renderReflection(LLFace* face)
 
 void LLDrawPoolWater::shade2(bool edge, LLGLSLShader* shader, const LLColor3& light_diffuse, const LLVector3& light_dir, F32 light_exp)
 {
-	LLEnvironment& environment = LLEnvironment::instanceFast();
-	LLViewerCamera& viewerCamera = LLViewerCamera::instanceFast();
+	LLEnvironment& environment = LLEnvironment::instance();
+	LLViewerCamera& viewerCamera = LLViewerCamera::instance();
 
 	F32  water_height  = environment.getWaterHeight();
     F32  camera_height = viewerCamera.getOrigin().mV[2];
@@ -668,7 +668,7 @@ void LLDrawPoolWater::shade()
 	F32 light_exp = 0.0f;
 	LLVector3 light_dir;
 
-    LLEnvironment& environment = LLEnvironment::instanceFast();
+    LLEnvironment& environment = LLEnvironment::instance();
 	const LLSettingsSky::ptr_t& psky   = environment.getCurrentSky();
 
     light_dir = environment.getLightDirection();
@@ -704,7 +704,7 @@ void LLDrawPoolWater::shade()
 
 	LLGLSLShader* shader = nullptr;
 
-	F32 eyedepth = LLViewerCamera::getInstanceFast()->getOrigin().mV[2] - environment.getWaterHeight();
+	F32 eyedepth = LLViewerCamera::getInstance()->getOrigin().mV[2] - environment.getWaterHeight();
 	
 	if (eyedepth < 0.f && LLPipeline::sWaterReflections)
 	{

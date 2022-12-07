@@ -85,12 +85,12 @@ LLFloaterInspect::~LLFloaterInspect(void)
 	}
 	if(!LLFloaterReg::instanceVisible("build"))
 	{
-		if(LLToolMgr::getInstanceFast()->getBaseTool() == LLToolCompInspect::getInstanceFast())
+		if(LLToolMgr::getInstance()->getBaseTool() == LLToolCompInspect::getInstance())
 		{
-			LLToolMgr::getInstanceFast()->clearTransientTool();
+			LLToolMgr::getInstance()->clearTransientTool();
 		}
 		// Switch back to basic toolset
-		LLToolMgr::getInstanceFast()->setCurrentToolset(gBasicToolset);
+		LLToolMgr::getInstance()->setCurrentToolset(gBasicToolset);
 	}
 	else
 	{
@@ -100,10 +100,10 @@ LLFloaterInspect::~LLFloaterInspect(void)
 
 void LLFloaterInspect::onOpen(const LLSD& key)
 {
-	BOOL forcesel = LLSelectMgr::getInstanceFast()->setForceSelection(TRUE);
-	LLToolMgr::getInstanceFast()->setTransientTool(LLToolCompInspect::getInstance());
-	LLSelectMgr::getInstanceFast()->setForceSelection(forcesel);	// restore previouis value
-	mObjectSelection = LLSelectMgr::getInstanceFast()->getSelection();
+	BOOL forcesel = LLSelectMgr::getInstance()->setForceSelection(TRUE);
+	LLToolMgr::getInstance()->setTransientTool(LLToolCompInspect::getInstance());
+	LLSelectMgr::getInstance()->setForceSelection(forcesel);	// restore previouis value
+	mObjectSelection = LLSelectMgr::getInstance()->getSelection();
 	refresh();
 }
 
@@ -418,7 +418,7 @@ void LLFloaterInspect::refresh()
 
 void LLFloaterInspect::onFocusReceived()
 {
-	LLToolMgr::getInstanceFast()->setTransientTool(LLToolCompInspect::getInstance());
+	LLToolMgr::getInstance()->setTransientTool(LLToolCompInspect::getInstance());
 	LLFloater::onFocusReceived();
 }
 

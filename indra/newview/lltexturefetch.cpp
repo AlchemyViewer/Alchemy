@@ -1391,7 +1391,7 @@ bool LLTextureFetchWorker::doWork(S32 param)
 			if (mHost.isInvalid())
 				region = gAgent.getRegion();
 			else
-				region = LLWorld::getInstanceFast()->getRegion(mHost);
+				region = LLWorld::getInstance()->getRegion(mHost);
 
 			if (region)
 			{

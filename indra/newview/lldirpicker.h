@@ -104,7 +104,7 @@ class LLDirPickerThread final : public LLThread
 public:
 
 	static std::queue<LLDirPickerThread*> sDeadQ;
-	static LLMutex sMutex;
+	static LLMutex* sMutex;
 
 	static void initClass();
 	static void cleanupClass();

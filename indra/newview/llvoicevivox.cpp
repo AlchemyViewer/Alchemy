@@ -4541,7 +4541,7 @@ void LLVivoxVoiceClient::messageEvent(
 		if(session)
 		{
 			bool is_do_not_disturb = gAgent.isDoNotDisturb();
-			bool is_muted = LLMuteList::getInstanceFast()->isMuted(session->mCallerID, session->mName, LLMute::flagTextChat);
+			bool is_muted = LLMuteList::getInstance()->isMuted(session->mCallerID, session->mName, LLMute::flagTextChat);
 			bool is_linden = LLMuteList::isLinden(session->mName);
 			LLChat chat;
 
@@ -4729,7 +4729,7 @@ bool LLVivoxVoiceClient::participantState::updateMuteState()
 {
 	bool result = false;
 
-	bool isMuted = LLMuteList::getInstanceFast()->isMuted(mAvatarID, LLMute::flagVoiceChat);
+	bool isMuted = LLMuteList::getInstance()->isMuted(mAvatarID, LLMute::flagVoiceChat);
 	if(mOnMuteList != isMuted)
 	{
 	    mOnMuteList = isMuted;
@@ -4885,7 +4885,7 @@ LLVivoxVoiceClient::participantStatePtr_t LLVivoxVoiceClient::findParticipantByI
 bool LLVivoxVoiceClient::checkParcelChanged(bool update)
 {
 	LLViewerRegion *region = gAgent.getRegion();
-	LLParcel *parcel = LLViewerParcelMgr::getInstanceFast()->getAgentParcel();
+	LLParcel *parcel = LLViewerParcelMgr::getInstance()->getAgentParcel();
 	
 	if(region && parcel)
 	{
@@ -5457,8 +5457,8 @@ void LLVivoxVoiceClient::updatePosition(void)
 		// They're currently always set to zero.
 		
 		// Send the current camera position to the voice code
-		rot.setRows(LLViewerCamera::getInstanceFast()->getAtAxis(), LLViewerCamera::getInstanceFast()->getLeftAxis (),  LLViewerCamera::getInstanceFast()->getUpAxis());
-		pos = gAgent.getRegion()->getPosGlobalFromRegion(LLViewerCamera::getInstanceFast()->getOrigin());
+		rot.setRows(LLViewerCamera::getInstance()->getAtAxis(), LLViewerCamera::getInstance()->getLeftAxis (),  LLViewerCamera::getInstance()->getUpAxis());
+		pos = gAgent.getRegion()->getPosGlobalFromRegion(LLViewerCamera::getInstance()->getOrigin());
 		
 		LLVivoxVoiceClient::getInstance()->setCameraPosition(
 															 pos,				// position

@@ -272,7 +272,7 @@ void LLViewerRegionImpl::requestBaseCapabilitiesCoro(U64 regionHandle)
             return;
         }
 
-        regionp = LLWorld::getInstanceFast()->getRegionFromHandle(regionHandle);
+        regionp = LLWorld::getInstance()->getRegionFromHandle(regionHandle);
         if (!regionp) //region was removed
         {
             LL_WARNS("AppInit", "Capabilities") << "Attempting to get capabilities for region that no longer exists!" << LL_ENDL;
@@ -333,7 +333,7 @@ void LLViewerRegionImpl::requestBaseCapabilitiesCoro(U64 regionHandle)
             return;
         }
 
-        regionp = LLWorld::getInstanceFast()->getRegionFromHandle(regionHandle);
+        regionp = LLWorld::getInstance()->getRegionFromHandle(regionHandle);
         if (!regionp) //region was removed
         {
             LL_WARNS("AppInit", "Capabilities") << "Received capabilities for region that no longer exists!" << LL_ENDL;
@@ -418,7 +418,7 @@ void LLViewerRegionImpl::requestBaseCapabilitiesCompleteCoro(U64 regionHandle)
     // This loop is used for retrying a capabilities request.
     do
     {
-        regionp = LLWorld::getInstanceFast()->getRegionFromHandle(regionHandle);
+        regionp = LLWorld::getInstance()->getRegionFromHandle(regionHandle);
         if (!regionp) //region was removed
         {
             LL_WARNS("AppInit", "Capabilities") << "Attempting to get capabilities for region that no longer exists!" << LL_ENDL;
@@ -456,7 +456,7 @@ void LLViewerRegionImpl::requestBaseCapabilitiesCompleteCoro(U64 regionHandle)
             break;
         }
 
-        regionp = LLWorld::getInstanceFast()->getRegionFromHandle(regionHandle);
+        regionp = LLWorld::getInstance()->getRegionFromHandle(regionHandle);
         if (!regionp) //region was removed
         {
             LL_WARNS("AppInit", "Capabilities") << "Received capabilities for region that no longer exists!" << LL_ENDL;
@@ -539,7 +539,7 @@ void LLViewerRegionImpl::requestSimulatorFeatureCoro(std::string url, U64 region
             break;
         }
 
-        regionp = LLWorld::getInstanceFast()->getRegionFromHandle(regionHandle);
+        regionp = LLWorld::getInstance()->getRegionFromHandle(regionHandle);
         if (!regionp) //region was removed
         {
             LL_WARNS("AppInit", "SimulatorFeatures") << "Attempting to request Sim Feature for region that no longer exists!" << LL_ENDL;
@@ -565,7 +565,7 @@ void LLViewerRegionImpl::requestSimulatorFeatureCoro(std::string url, U64 region
         // remove the http_result from the llsd
         result.erase("http_result");
 
-        regionp = LLWorld::getInstanceFast()->getRegionFromHandle(regionHandle);
+        regionp = LLWorld::getInstance()->getRegionFromHandle(regionHandle);
         if (!regionp) //region was removed
         {
             LL_WARNS("AppInit", "SimulatorFeatures") << "Attempting to set Sim Feature for region that no longer exists!" << LL_ENDL;
@@ -780,7 +780,7 @@ void LLViewerRegion::loadObjectCache()
 
 	if(LLVOCache::instanceExists())
 	{
-		LLVOCache::getInstanceFast()->readFromCache(mHandle, mImpl->mCacheID, mImpl->mCacheMap) ;
+		LLVOCache::getInstance()->readFromCache(mHandle, mImpl->mCacheID, mImpl->mCacheMap) ;
 		if (mImpl->mCacheMap.empty())
 		{
 			mCacheDirty = TRUE;
@@ -806,7 +806,7 @@ void LLViewerRegion::saveObjectCache()
 		const F32 start_time_threshold = 600.0f; //seconds
 		bool removal_enabled = sVOCacheCullingEnabled && (mRegionTimer.getElapsedTimeF32() > start_time_threshold); //allow to remove invalid objects from object cache file.
 		
-		LLVOCache::getInstanceFast()->writeToCache(mHandle, mImpl->mCacheID, mImpl->mCacheMap, mCacheDirty, removal_enabled) ;
+		LLVOCache::getInstance()->writeToCache(mHandle, mImpl->mCacheID, mImpl->mCacheMap, mCacheDirty, removal_enabled) ;
 		mCacheDirty = FALSE;
 	}
 
@@ -1339,7 +1339,7 @@ void LLViewerRegion::updateVisibleEntries(F32 max_time)
 	}
 
 	const F32 LARGE_SCENE_CONTRIBUTION = 1000.f; //a large number to force to load the object.
-	const LLVector3 camera_origin = LLViewerCamera::getInstanceFast()->getOrigin();
+	const LLVector3 camera_origin = LLViewerCamera::getInstance()->getOrigin();
 	const U32 cur_frame = LLViewerOctreeEntryData::getCurrentFrame();
 	bool needs_update = ((cur_frame - mImpl->mLastCameraUpdate) > 5) && ((camera_origin - mImpl->mLastCameraOrigin).lengthSquared() > 10.f);	
 	U32 last_update = mImpl->mLastCameraUpdate;
@@ -1656,9 +1656,9 @@ void LLViewerRegion::killInvisibleObjects(F32 max_time)
 
 	LLTimer update_timer;
 	LLVector4a camera_origin;
-	camera_origin.load3(LLViewerCamera::getInstanceFast()->getOrigin().mV);
+	camera_origin.load3(LLViewerCamera::getInstance()->getOrigin().mV);
 	LLVector4a local_origin;
-	local_origin.load3((LLViewerCamera::getInstanceFast()->getOrigin() - getOriginAgent()).mV);
+	local_origin.load3((LLViewerCamera::getInstance()->getOrigin() - getOriginAgent()).mV);
 	F32 back_threshold = LLVOCacheEntry::sRearFarRadius;
 	
 	size_t max_update = 64; 
@@ -1869,7 +1869,7 @@ F32 LLViewerRegion::getCompositionXY(const S32 x, const S32 y) const
 		if (y >= mWidth)
 		{
 			LLVector3d center = getCenterGlobal() + LLVector3d(mWidth, mWidth, 0.f);
-			LLViewerRegion *regionp = LLWorld::getInstanceFast()->getRegionFromPosGlobal(center);
+			LLViewerRegion *regionp = LLWorld::getInstance()->getRegionFromPosGlobal(center);
 			if (regionp)
 			{
 				// OK, we need to do some hackery here - different simulators no longer use
@@ -1896,7 +1896,7 @@ F32 LLViewerRegion::getCompositionXY(const S32 x, const S32 y) const
 		else
 		{
 			LLVector3d center = getCenterGlobal() + LLVector3d(mWidth, 0.f, 0.f);
-			LLViewerRegion *regionp = LLWorld::getInstanceFast()->getRegionFromPosGlobal(center);
+			LLViewerRegion *regionp = LLWorld::getInstance()->getRegionFromPosGlobal(center);
 			if (regionp)
 			{
 				// OK, we need to do some hackery here - different simulators no longer use
@@ -1924,7 +1924,7 @@ F32 LLViewerRegion::getCompositionXY(const S32 x, const S32 y) const
 	else if (y >= mWidth)
 	{
 		LLVector3d center = getCenterGlobal() + LLVector3d(0.f, mWidth, 0.f);
-		LLViewerRegion *regionp = LLWorld::getInstanceFast()->getRegionFromPosGlobal(center);
+		LLViewerRegion *regionp = LLWorld::getInstance()->getRegionFromPosGlobal(center);
 		if (regionp)
 		{
 			// OK, we need to do some hackery here - different simulators no longer use
@@ -2125,7 +2125,7 @@ public:
 		const LLSD& input) const override
 	{
 		LLHost host(input["sender"].asString());
-		LLViewerRegion* region = LLWorld::getInstanceFast()->getRegion(host);
+		LLViewerRegion* region = LLWorld::getInstance()->getRegion(host);
 		if( !region )
 		{
 			return;
@@ -3190,7 +3190,7 @@ void LLViewerRegionImpl::buildCapabilityNames(LLSD& capabilityNames)
 	capabilityNames.append("EventQueueGet");
     capabilityNames.append("ExtEnvironment");
 
-	if (LLGridManager::instanceFast().isInSecondlife() || gSavedSettings.getBOOL("UseHTTPInventory"))
+	if (LLGridManager::instance().isInSecondlife() || gSavedSettings.getBOOL("UseHTTPInventory"))
 	{
 		capabilityNames.append("FetchLib2");
 		capabilityNames.append("FetchLibDescendents2");
@@ -3216,7 +3216,7 @@ void LLViewerRegionImpl::buildCapabilityNames(LLSD& capabilityNames)
 	capabilityNames.append("IsExperienceContributor");
 	capabilityNames.append("RegionExperiences");
     capabilityNames.append("ExperienceQuery");
-	if(!LLGridManager::instanceFast().isInSecondlife())
+	if(!LLGridManager::instance().isInSecondlife())
 	{
 		capabilityNames.append("GetMesh");
 		capabilityNames.append("GetMesh2");
@@ -3224,7 +3224,7 @@ void LLViewerRegionImpl::buildCapabilityNames(LLSD& capabilityNames)
 	capabilityNames.append("GetMetadata");
 	capabilityNames.append("GetObjectCost");
 	capabilityNames.append("GetObjectPhysicsData");
-	if(!LLGridManager::instanceFast().isInSecondlife())
+	if(!LLGridManager::instance().isInSecondlife())
 	{
 		capabilityNames.append("GetTexture");
 	}
@@ -3802,7 +3802,7 @@ std::string LLViewerRegion::getHGGrid() const
 	}
 	else
 	{
-		authority = LLGridManager::getInstanceFast()->getGatekeeper(LLGridManager::getInstanceFast()->getGrid());
+		authority = LLGridManager::getInstance()->getGatekeeper(LLGridManager::getInstance()->getGrid());
 	}
 	return authority;
 }
@@ -3820,7 +3820,7 @@ std::string LLViewerRegion::getHGGridName() const
 	}
 	else
 	{
-		name = LLGridManager::getInstanceFast()->getGridLabel();
+		name = LLGridManager::getInstance()->getGridLabel();
 	}
 	return name;
 }
@@ -3834,7 +3834,7 @@ std::string LLViewerRegion::getHGGridNick() const
 	}
 	else
 	{
-		name = LLGridManager::getInstanceFast()->getGridId();
+		name = LLGridManager::getInstance()->getGridId();
 	}
 	return name;
 }

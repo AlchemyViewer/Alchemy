@@ -210,7 +210,7 @@ LLLayoutStack::Params::Params()
 	open_time_constant("open_time_constant", 0.02f),
 	close_time_constant("close_time_constant", 0.03f),
 	resize_bar_overlap("resize_bar_overlap", 1),
-	border_size("border_size", LLUI::getInstanceFast()->mSettingGroups["config"]->getS32("UIResizeBarHeight")),
+	border_size("border_size", LLUI::getInstance()->mSettingGroups["config"]->getS32("UIResizeBarHeight")),
 	show_drag_handle("show_drag_handle", false),
 	drag_handle_first_indent("drag_handle_first_indent", 0),
 	drag_handle_second_indent("drag_handle_second_indent", 0),
@@ -567,11 +567,11 @@ void LLLayoutStack::createResizeBar(LLLayoutPanel* panelp)
 				resize_bar_bg_panel_p.follows.flags = FOLLOWS_ALL;
 				resize_bar_bg_panel_p.tab_stop = false;
 				resize_bar_bg_panel_p.background_visible = true;
-				resize_bar_bg_panel_p.bg_alpha_color = LLUIColorTable::instanceFast().getColor("ResizebarBody");
+				resize_bar_bg_panel_p.bg_alpha_color = LLUIColorTable::instance().getColor("ResizebarBody");
 				resize_bar_bg_panel_p.has_border = true;
 				resize_bar_bg_panel_p.border.border_thickness = 1;
-				resize_bar_bg_panel_p.border.highlight_light_color = LLUIColorTable::instanceFast().getColor("ResizebarBorderLight");
-				resize_bar_bg_panel_p.border.shadow_dark_color = LLUIColorTable::instanceFast().getColor("ResizebarBorderDark");
+				resize_bar_bg_panel_p.border.highlight_light_color = LLUIColorTable::instance().getColor("ResizebarBorderLight");
+				resize_bar_bg_panel_p.border.shadow_dark_color = LLUIColorTable::instance().getColor("ResizebarBorderDark");
 
 				LLPanel* resize_bar_bg_panel = LLUICtrlFactory::create<LLPanel>(resize_bar_bg_panel_p);
 

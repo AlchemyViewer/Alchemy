@@ -1297,10 +1297,10 @@ void LLButton::showHelp(LLUICtrl* ctrl, const LLSD& sdname)
 	// search back through the button's parents for a panel
 	// with a help_topic string defined
 	std::string help_topic;
-	if (LLUI::getInstanceFast()->mHelpImpl &&
+	if (LLUI::getInstance()->mHelpImpl &&
 	    ctrl->findHelpTopic(help_topic))
 	{
-		LLUI::getInstanceFast()->mHelpImpl->showTopic(help_topic);
+		LLUI::getInstance()->mHelpImpl->showTopic(help_topic);
 		return; // success
 	}
 

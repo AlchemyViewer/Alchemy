@@ -162,7 +162,7 @@ BOOL LLToolPlacer::raycastForNewObjPos( S32 x, S32 y, LLViewerObject** hit_obj, 
 // [/RLVa:KB]
 
 	// Find the sim where the surface lives.
-	LLViewerRegion *regionp = LLWorld::getInstanceFast()->getRegionFromPosGlobal(surface_pos_global);
+	LLViewerRegion *regionp = LLWorld::getInstance()->getRegionFromPosGlobal(surface_pos_global);
 	if (!regionp)
 	{
 		LL_WARNS() << "Trying to add object outside of all known regions!" << LL_ENDL;
@@ -175,8 +175,8 @@ BOOL LLToolPlacer::raycastForNewObjPos( S32 x, S32 y, LLViewerObject** hit_obj, 
 
 	*region = regionp;
 	*ray_start_region =	regionp->getPosRegionFromGlobal( ray_start_global );
-	F32 near_clip = LLViewerCamera::getInstanceFast()->getNear() + 0.01f;  // Include an epsilon to avoid rounding issues.
-	*ray_start_region += LLViewerCamera::getInstanceFast()->getAtAxis() * near_clip;
+	F32 near_clip = LLViewerCamera::getInstance()->getNear() + 0.01f;  // Include an epsilon to avoid rounding issues.
+	*ray_start_region += LLViewerCamera::getInstance()->getAtAxis() * near_clip;
 
 	if( bypass_sim_raycast )
 	{
@@ -463,7 +463,7 @@ BOOL LLToolPlacer::addObject( LLPCode pcode, S32 x, S32 y, U8 use_physics )
 	// Spawns a message, so must be after above send
 	if (create_selected)
 	{
-		LLSelectMgr::getInstanceFast()->deselectAll();
+		LLSelectMgr::getInstance()->deselectAll();
 		gViewerWindow->getWindow()->incBusyCount();
 	}
 
@@ -519,7 +519,7 @@ BOOL LLToolPlacer::addDuplicate(S32 x, S32 y)
 		ray_target_id.setNull();
 	}
 
-	LLSelectMgr::getInstanceFast()->selectDuplicateOnRay(ray_start_region,
+	LLSelectMgr::getInstance()->selectDuplicateOnRay(ray_start_region,
 										ray_end_region,
 										b_hit_land,			// suppress raycast
 										FALSE,				// intersection
@@ -561,7 +561,7 @@ BOOL LLToolPlacer::placeObject(S32 x, S32 y, MASK mask)
 	// ...and go back to the default tool
 	if (added && !gSavedSettings.getBOOL("CreateToolKeepSelected"))
 	{
-		LLToolMgr::getInstanceFast()->getCurrentToolset()->selectTool( LLToolCompTranslate::getInstance() );
+		LLToolMgr::getInstance()->getCurrentToolset()->selectTool( LLToolCompTranslate::getInstance() );
 	}
 
 	return added;

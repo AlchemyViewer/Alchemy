@@ -4447,7 +4447,7 @@ F32 LLMeshRepository::getStreamingCostLegacy(LLSD& header, F32 radius, S32* byte
 {
 	if (header.has("404")
 		|| !header.has("lowest_lod")
-		|| ((header.has("version") || !LLGridManager::instanceFast().isInSecondlife()) && header["version"].asInteger() > MAX_MESH_VERSION))
+		|| ((header.has("version") || !LLGridManager::instance().isInSecondlife()) && header["version"].asInteger() > MAX_MESH_VERSION))
 	{
 		return 0.f;
 	}

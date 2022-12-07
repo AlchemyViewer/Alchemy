@@ -74,7 +74,7 @@ public:
             return true;
         }
 
-        if (!LLUI::getInstanceFast()->mSettingGroups["config"]->getBOOL("EnablePicks"))
+        if (!LLUI::getInstance()->mSettingGroups["config"]->getBOOL("EnablePicks"))
         {
             LLNotificationsUtil::add("NoPicks", LLSD(), LLSD(), std::string("SwitchToStandardSkinAndQuit"));
             return true;
@@ -236,7 +236,7 @@ void LLPanelProfilePicks::callbackDeletePick(const LLSD& notification, const LLS
 
         if (pick_id.notNull())
         {
-            LLAvatarPropertiesProcessor::getInstanceFast()->sendPickDelete(pick_id);
+            LLAvatarPropertiesProcessor::getInstance()->sendPickDelete(pick_id);
         }
 
         updateButtons();
@@ -354,13 +354,13 @@ void LLPanelProfilePicks::updateData()
         mNoItemsLabel->setValue(LLTrans::getString("PicksClassifiedsLoadingText"));
         mNoItemsLabel->setVisible(TRUE);
 
-        LLAvatarPropertiesProcessor::getInstanceFast()->sendAvatarPicksRequest(avatar_id);
+        LLAvatarPropertiesProcessor::getInstance()->sendAvatarPicksRequest(avatar_id);
     }
 }
 
 bool LLPanelProfilePicks::canAddNewPick()
 {
-    return (!LLAgentPicksInfo::getInstanceFast()->isPickLimitReached() &&
+    return (!LLAgentPicksInfo::getInstance()->isPickLimitReached() &&
         mTabContainer->getTabCount() < LLAgentBenefitsMgr::current().getPicksLimit() &&
         RlvActions::canShowLocation());
 }
@@ -401,7 +401,7 @@ LLPanelProfilePick::~LLPanelProfilePick()
 {
     if (mParcelId.notNull())
     {
-        LLRemoteParcelInfoProcessor::getInstanceFast()->removeObserver(mParcelId, this);
+        LLRemoteParcelInfoProcessor::getInstance()->removeObserver(mParcelId, this);
     }
 }
 
@@ -423,7 +423,7 @@ void LLPanelProfilePick::setAvatarId(const LLUUID& avatar_id)
         LLUUID parcel_id = LLUUID::null, snapshot_id = LLUUID::null;
         std::string pick_name, pick_desc, region_name;
 
-        LLParcel* parcel = LLViewerParcelMgr::getInstanceFast()->getAgentParcel();
+        LLParcel* parcel = LLViewerParcelMgr::getInstance()->getAgentParcel();
         if (parcel)
         {
             parcel_id = parcel->getID();
@@ -448,7 +448,7 @@ void LLPanelProfilePick::setAvatarId(const LLUUID& avatar_id)
     }
     else
     {
-        LLAvatarPropertiesProcessor::getInstanceFast()->sendPickInfoRequest(getAvatarId(), getPickId());
+        LLAvatarPropertiesProcessor::getInstance()->sendPickInfoRequest(getAvatarId(), getPickId());
 
         enableSaveButton(FALSE);
     }
@@ -644,7 +644,7 @@ void LLPanelProfilePick::onClickSetLocation()
 
     std::string parcel_name, region_name;
 
-    LLParcel* parcel = LLViewerParcelMgr::getInstanceFast()->getAgentParcel();
+    LLParcel* parcel = LLViewerParcelMgr::getInstance()->getAgentParcel();
     if (parcel)
     {
         mParcelId = parcel->getID();
@@ -682,10 +682,10 @@ void LLPanelProfilePick::sendParcelInfoRequest()
     {
         if (mRequestedId.notNull())
         {
-            LLRemoteParcelInfoProcessor::getInstanceFast()->removeObserver(mRequestedId, this);
+            LLRemoteParcelInfoProcessor::getInstance()->removeObserver(mRequestedId, this);
         }
-        LLRemoteParcelInfoProcessor::getInstanceFast()->addObserver(mParcelId, this);
-        LLRemoteParcelInfoProcessor::getInstanceFast()->sendParcelInfoRequest(mParcelId);
+        LLRemoteParcelInfoProcessor::getInstance()->addObserver(mParcelId, this);
+        LLRemoteParcelInfoProcessor::getInstance()->sendParcelInfoRequest(mParcelId);
 
         mRequestedId = mParcelId;
     }
@@ -700,7 +700,7 @@ void LLPanelProfilePick::processParcelInfo(const LLParcelData& parcel_data)
 
     if (mParcelId.notNull())
     {
-        LLRemoteParcelInfoProcessor::getInstanceFast()->removeObserver(mParcelId, this);
+        LLRemoteParcelInfoProcessor::getInstance()->removeObserver(mParcelId, this);
     }
 }
 
@@ -730,14 +730,14 @@ void LLPanelProfilePick::sendUpdate()
     pick_data.sort_order = 0;
     pick_data.enabled = TRUE;
 
-    LLAvatarPropertiesProcessor::getInstanceFast()->sendPickInfoUpdate(&pick_data);
+    LLAvatarPropertiesProcessor::getInstance()->sendPickInfoUpdate(&pick_data);
 
     if(mNewPick)
     {
         // Assume a successful create pick operation, make new number of picks
         // available immediately. Actual number of picks will be requested in
         // LLAvatarPropertiesProcessor::sendPickInfoUpdate and updated upon server respond.
-        LLAgentPicksInfo::getInstanceFast()->incrementNumberOfPicks();
+        LLAgentPicksInfo::getInstance()->incrementNumberOfPicks();
     }
 }
 

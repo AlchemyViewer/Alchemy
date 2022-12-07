@@ -716,7 +716,7 @@ void LLPanelStandStopFlying::onStandButtonClick()
 	{
 		LLFirstUse::sit(false);
 
-		LLSelectMgr::getInstanceFast()->deselectAllForStandingUp();
+		LLSelectMgr::getInstance()->deselectAllForStandingUp();
 		gAgent.setControlFlags(AGENT_CONTROL_STAND_UP);
 	}
 // [/RLVa:KB]

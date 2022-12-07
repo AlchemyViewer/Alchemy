@@ -585,8 +585,8 @@ void LLPanelWearing::onEditAttachment()
 	LLScrollListItem* item = mTempItemsList->getFirstSelected();
 	if (item)
 	{
-		LLSelectMgr::getInstanceFast()->deselectAll();
-		LLSelectMgr::getInstanceFast()->selectObjectAndFamily(mAttachmentsMap[item->getUUID()]);
+		LLSelectMgr::getInstance()->deselectAll();
+		LLSelectMgr::getInstance()->selectObjectAndFamily(mAttachmentsMap[item->getUUID()]);
 		handle_object_edit();
 	}
 }
@@ -596,9 +596,9 @@ void LLPanelWearing::onRemoveAttachment()
 	LLScrollListItem* item = mTempItemsList->getFirstSelected();
 	if (item && item->getUUID().notNull())
 	{
-		LLSelectMgr::getInstanceFast()->deselectAll();
-		LLSelectMgr::getInstanceFast()->selectObjectAndFamily(mAttachmentsMap[item->getUUID()]);
-		LLSelectMgr::getInstanceFast()->sendDropAttachment();
+		LLSelectMgr::getInstance()->deselectAll();
+		LLSelectMgr::getInstance()->selectObjectAndFamily(mAttachmentsMap[item->getUUID()]);
+		LLSelectMgr::getInstance()->sendDropAttachment();
 	}
 }
 

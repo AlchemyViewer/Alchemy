@@ -206,11 +206,11 @@ void display_update_camera()
 	{
 		final_far *= 0.5f;
 	}
-	LLViewerCamera::getInstanceFast()->setFar(final_far);
+	LLViewerCamera::getInstance()->setFar(final_far);
 	gViewerWindow->setup3DRender();
 	
 	// Update land visibility too
-	LLWorld::getInstanceFast()->setLandFarClip(final_far);
+	LLWorld::getInstance()->setLandFarClip(final_far);
 }
 
 // Write some stats to LL_INFOS()
@@ -615,7 +615,7 @@ pProgFloater->setProgressCancelButtonVisible(FALSE, LLTrans::getString("Cancel")
 	//
 
 	LLAppViewer::instance()->pingMainloopTimeout(STR_DISPLAY_CAMERA);
-	auto& vwrCamera = LLViewerCamera::instanceFast();
+	auto& vwrCamera = LLViewerCamera::instance();
 	vwrCamera.setZoomParameters(zoom_factor, subfield);
 	vwrCamera.setNear(MIN_NEAR_PLANE);
 
@@ -692,7 +692,7 @@ pProgFloater->setProgressCancelButtonVisible(FALSE, LLTrans::getString("Cancel")
 		{
 			LL_RECORD_BLOCK_TIME(FTM_EEP_UPDATE);
             // update all the sky/atmospheric/water settings
-            LLEnvironment::getInstanceFast()->update(&vwrCamera);
+            LLEnvironment::getInstance()->update(&vwrCamera);
 		}
 
 		// *TODO: merge these two methods
@@ -897,7 +897,7 @@ pProgFloater->setProgressCancelButtonVisible(FALSE, LLTrans::getString("Cancel")
 			}
 		}
 
-		LLSceneMonitor::getInstanceFast()->fetchQueryResult();
+		LLSceneMonitor::getInstance()->fetchQueryResult();
 		
 		LLGLState::checkStates();
 		LLGLState::checkClientArrays();
@@ -978,7 +978,7 @@ pProgFloater->setProgressCancelButtonVisible(FALSE, LLTrans::getString("Cancel")
             gPipeline.mScreen.bindTarget();
             if (LLPipeline::sUnderWaterRender && !gPipeline.canUseWindLightShaders())
             {
-                const LLColor3 col = LLEnvironment::getInstanceFast()->getCurrentWater()->getWaterFogColor();
+                const LLColor3 col = LLEnvironment::getInstance()->getCurrentWater()->getWaterFogColor();
                 glClearColor(col.mV[0], col.mV[1], col.mV[2], 0.f);
             }
             gPipeline.mScreen.clear();
@@ -1068,7 +1068,7 @@ pProgFloater->setProgressCancelButtonVisible(FALSE, LLTrans::getString("Cancel")
 
 		{
 			//capture the frame buffer.
-			LLSceneMonitor::getInstanceFast()->capture();
+			LLSceneMonitor::getInstance()->capture();
 		}
 
 		LLAppViewer::instance()->pingMainloopTimeout(STR_DISPLAY_RENDERUI);
@@ -1130,7 +1130,7 @@ void render_hud_attachments()
 	if (!ALCinematicMode::isEnabled() && LLPipeline::sShowHUDAttachments && !gDisconnected && setup_hud_matrices())
 	{
 		LLPipeline::sRenderingHUDs = TRUE;
-		LLCamera hud_cam = LLViewerCamera::instanceFast();
+		LLCamera hud_cam = LLViewerCamera::instance();
 		hud_cam.setOrigin(-1.f,0,0);
 		hud_cam.setAxes(LLVector3(1,0,0), LLVector3(0,1,0), LLVector3(0,0,1));
 		LLViewerCamera::updateFrustumPlanes(hud_cam, TRUE);
@@ -1222,7 +1222,7 @@ LLRect get_whole_screen_region()
 	LLRect whole_screen = gViewerWindow->getWorldViewRectScaled();
 	
 	// apply camera zoom transform (for high res screenshots)
-	auto& vwrCamera = LLViewerCamera::instanceFast();
+	auto& vwrCamera = LLViewerCamera::instance();
 	F32 zoom_factor = vwrCamera.getZoomFactor();
 	S16 sub_region = vwrCamera.getZoomSubRegion();
 	if (zoom_factor > 1.f)
@@ -1242,7 +1242,7 @@ bool get_hud_matrices(const LLRect& screen_region, LLMatrix4a &proj, LLMatrix4a 
 {
 	if (isAgentAvatarValid() && gAgentAvatarp->hasHUDAttachment())
 	{
-		auto& vwrCamera = LLViewerCamera::instanceFast();
+		auto& vwrCamera = LLViewerCamera::instance();
 		F32 zoom_level = gAgentCamera.mHUDCurZoom;
 		LLBBox hud_bbox = gAgentAvatarp->getHUDBBox();
 		
@@ -1317,12 +1317,12 @@ void render_ui(F32 zoom_factor, int subfield)
 		set_current_modelview(get_last_modelview());
 	}
 	
-	if(LLSceneMonitor::getInstanceFast()->needsUpdate())
+	if(LLSceneMonitor::getInstance()->needsUpdate())
 	{
         LL_RECORD_BLOCK_TIME(FTM_RENDER_UI_SCENE_MON);
 		gGL.pushMatrix();
 		gViewerWindow->setup2DRender();
-		LLSceneMonitor::getInstanceFast()->compare();
+		LLSceneMonitor::getInstance()->compare();
 		gViewerWindow->setup3DRender();
 		gGL.popMatrix();
 	}
@@ -1335,7 +1335,7 @@ void render_ui(F32 zoom_factor, int subfield)
 // [RLVa:KB] - Checked: RLVa-2.2 (@setoverlay)
     if (RlvActions::hasBehaviour(RLV_BHVR_SETOVERLAY))
     {
-        LLVfxManager::instanceFast().runEffect(EVisualEffect::RlvOverlay);
+        LLVfxManager::instance().runEffect(EVisualEffect::RlvOverlay);
     }
 // [/RLVa:KB]
 	render_hud_attachments();
@@ -1516,7 +1516,7 @@ void render_ui_2d()
 	//  Menu overlays, HUD, etc
 	gViewerWindow->setup2DRender();
 
-	auto& vwrCamera = LLViewerCamera::instanceFast();
+	auto& vwrCamera = LLViewerCamera::instance();
 	F32 zoom_factor = vwrCamera.getZoomFactor();
 	S16 sub_region = vwrCamera.getZoomSubRegion();
 

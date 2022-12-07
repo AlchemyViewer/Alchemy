@@ -218,7 +218,7 @@ void LLNetMap::draw()
 
 	gGL.pushUIMatrix();
 	
-	auto& viewer_camera = LLViewerCamera::instanceFast();
+	auto& viewer_camera = LLViewerCamera::instance();
 	{
 		LLLocalClipRect clip(getLocalRect());
 		{
@@ -246,7 +246,7 @@ void LLNetMap::draw()
 			gGL.rotateUI(rot);
 		}
 
-		auto& worldInst = LLWorld::instanceFast();
+		auto& worldInst = LLWorld::instance();
 
 		// figure out where agent is
 		S32 region_width = REGION_WIDTH_UNITS;
@@ -661,7 +661,7 @@ LLVector3 LLNetMap::globalPosToView(const LLVector3d& global_pos)
 	static LLUICachedControl<bool> rotate_map("MiniMapRotate", true);
 	if( rotate_map )
 	{
-		F32 radians = atan2( LLViewerCamera::getInstanceFast()->getAtAxis().mV[VX], LLViewerCamera::getInstanceFast()->getAtAxis().mV[VY] );
+		F32 radians = atan2( LLViewerCamera::getInstance()->getAtAxis().mV[VX], LLViewerCamera::getInstance()->getAtAxis().mV[VY] );
 		LLQuaternion rot(radians, LLVector3(0.f, 0.f, 1.f));
 		pos_local.rotVec( rot );
 	}
@@ -705,7 +705,7 @@ LLVector3d LLNetMap::viewPosToGlobal( S32 x, S32 y )
 
 	LLVector3 pos_local( (F32)x, (F32)y, 0 );
 
-	F32 radians = - atan2( LLViewerCamera::getInstanceFast()->getAtAxis().mV[VX], LLViewerCamera::getInstanceFast()->getAtAxis().mV[VY] );
+	F32 radians = - atan2( LLViewerCamera::getInstance()->getAtAxis().mV[VX], LLViewerCamera::getInstance()->getAtAxis().mV[VY] );
 
 	static LLUICachedControl<bool> rotate_map("MiniMapRotate", true);
 	if( rotate_map )
@@ -769,7 +769,7 @@ BOOL LLNetMap::handleToolTip( S32 x, S32 y, MASK mask )
 
 	LLRect sticky_rect;
 	std::string region_name;
-	LLViewerRegion*	region = LLWorld::getInstanceFast()->getRegionFromPosGlobal( viewPosToGlobal( x, y ) );
+	LLViewerRegion*	region = LLWorld::getInstance()->getRegionFromPosGlobal( viewPosToGlobal( x, y ) );
 	if(region)
 	{
 		// set sticky_rect
@@ -978,7 +978,7 @@ void LLNetMap::renderPropertyLinesForRegion(const LLViewerRegion* region, const 
 	const S32 GRIDS_PER_EDGE = real_width / GRID_STEP;
 
 	const U8* ownership = region->getParcelOverlay()->getOwnership();
-	const U8* collision = (region->getHandle() == LLViewerParcelMgr::instanceFast().getCollisionRegionHandle()) ? LLViewerParcelMgr::instanceFast().getCollisionBitmap() : NULL;
+	const U8* collision = (region->getHandle() == LLViewerParcelMgr::instance().getCollisionRegionHandle()) ? LLViewerParcelMgr::instance().getCollisionBitmap() : NULL;
 	for (S32 idxRow = 0; idxRow < GRIDS_PER_EDGE; idxRow++)
 	{
 		for (S32 idxCol = 0; idxCol < GRIDS_PER_EDGE; idxCol++)

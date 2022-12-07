@@ -487,7 +487,7 @@ void LLViewerObject::markDead()
 
 		if (flagCameraSource())
 		{
-			LLFollowCamMgr::getInstanceFast()->removeFollowCamParams(mID);
+			LLFollowCamMgr::getInstance()->removeFollowCamParams(mID);
 		}
 
 		sNumZombieObjects++;
@@ -938,9 +938,9 @@ void LLViewerObject::removeChild(LLViewerObject *childp)
 	
 	if (childp->isSelected())
 	{
-		LLSelectMgr::getInstanceFast()->deselectObjectAndFamily(childp);
+		LLSelectMgr::getInstance()->deselectObjectAndFamily(childp);
 		BOOL add_to_end = TRUE;
-		LLSelectMgr::getInstanceFast()->selectObjectAndFamily(childp, add_to_end);
+		LLSelectMgr::getInstance()->selectObjectAndFamily(childp, add_to_end);
 	}
 }
 
@@ -1124,7 +1124,7 @@ U32 LLViewerObject::processUpdateMessage(LLMessageSystem *mesgsys,
 
 	U32 retval = 0x0;
 	
-	auto& worldInst = LLWorld::instanceFast();
+	auto& worldInst = LLWorld::instance();
 
 	// If region is removed from the list it is also deleted.
 	if (!worldInst.isRegionListed(mRegionp))
@@ -2472,7 +2472,7 @@ U32 LLViewerObject::processUpdateMessage(LLMessageSystem *mesgsys,
 
 	if (needs_refresh)
 	{
-		LLSelectMgr::getInstanceFast()->updateSelectionCenter();
+		LLSelectMgr::getInstance()->updateSelectionCenter();
 		dialog_refresh_all();
 	} 
 
@@ -2655,7 +2655,7 @@ void LLViewerObject::interpolateLinearMotion(const F64SecondsImplicit& frame_tim
 		new_pos = new_pos + getPositionRegion();
 		new_v = new_v + vel;
 
-		auto& worldInst = LLWorld::instanceFast();
+		auto& worldInst = LLWorld::instance();
 
 		// Clamp interpolated position to minimum underground and maximum region height
 		LLVector3d new_pos_global = mRegionp->getPosGlobalFromRegion(new_pos);
@@ -2823,7 +2823,7 @@ void LLViewerObject::doUpdateInventory(
 		// make sure that the serial number does not match.
 		deleteInventoryItem(item_id);
 		LLPermissions perm(item->getPermissions());
-		LLPermissions* obj_perm = LLSelectMgr::getInstanceFast()->findObjectPermissions(this);
+		LLPermissions* obj_perm = LLSelectMgr::getInstance()->findObjectPermissions(this);
 		bool is_atomic = ((S32)LLAssetType::AT_OBJECT == item->getType()) ? false : true;
 		if(obj_perm)
 		{
@@ -3140,7 +3140,7 @@ void LLViewerObject::updateControlAvatar()
         getControlAvatar()->updateAnimations();
         if (isSelected())
         {
-            LLSelectMgr::getInstanceFast()->pauseAssociatedAvatars();
+            LLSelectMgr::getInstance()->pauseAssociatedAvatars();
         }
     }
 }
@@ -3691,7 +3691,7 @@ void LLViewerObject::setPixelAreaAndAngle(LLAgent &agent)
 	// I don't think there's a better way to do this without calculating distance per-poly
 	F32 range = sqrt(dx*dx + dy*dy + dz*dz) - min_scale/2;
 
-	LLViewerCamera* camera = LLViewerCamera::getInstanceFast();
+	LLViewerCamera* camera = LLViewerCamera::getInstance();
 	if (range < 0.001f || isHUDAttachment())		// range == zero
 	{
 		mAppAngle = 180.f;
@@ -3754,7 +3754,7 @@ void LLViewerObject::setScale(const LLVector3 &scale, BOOL damped)
 		{
 			if (!mOnMap)
 			{
-				llassert_always(LLWorld::getInstanceFast()->getRegionFromHandle(getRegion()->getHandle()));
+				llassert_always(LLWorld::getInstance()->getRegionFromHandle(getRegion()->getHandle()));
 
 				gObjectList.addToMap(this);
 				mOnMap = TRUE;
@@ -4229,7 +4229,7 @@ LLNameValue *LLViewerObject::getNVPair(const std::string& name) const
 void LLViewerObject::updatePositionCaches() const
 {
 	// If region is removed from the list it is also deleted.
-	if(mRegionp && LLWorld::instanceFast().isRegionListed(mRegionp))
+	if(mRegionp && LLWorld::instance().isRegionListed(mRegionp))
 	{
 		if (!isRoot())
 		{
@@ -4247,7 +4247,7 @@ void LLViewerObject::updatePositionCaches() const
 const LLVector3d LLViewerObject::getPositionGlobal() const
 {	
 	// If region is removed from the list it is also deleted.
-	if(mRegionp && LLWorld::instanceFast().isRegionListed(mRegionp))
+	if(mRegionp && LLWorld::instance().isRegionListed(mRegionp))
 	{
 		LLVector3d position_global = mRegionp->getPosGlobalFromRegion(getPositionRegion());
 
@@ -4267,7 +4267,7 @@ const LLVector3d LLViewerObject::getPositionGlobal() const
 const LLVector3 &LLViewerObject::getPositionAgent() const
 {
 	// If region is removed from the list it is also deleted.
-	if(mRegionp && LLWorld::instanceFast().isRegionListed(mRegionp))
+	if(mRegionp && LLWorld::instance().isRegionListed(mRegionp))
 	{
 		if (mDrawable.notNull() && (!mDrawable->isRoot() && getParent()))
 		{
@@ -5695,7 +5695,7 @@ bool LLViewerObject::isOwnerInMuteList(LLUUID id)
 	}
 	else
 	{
-		muted = LLMuteList::getInstanceFast()->isMuted(owner_id);
+		muted = LLMuteList::getInstance()->isMuted(owner_id);
 
 		const F64 SECONDS_BETWEEN_MUTE_UPDATES = 1;
 		mCachedMuteListUpdateTime = now + SECONDS_BETWEEN_MUTE_UPDATES;
@@ -5771,7 +5771,7 @@ void LLViewerObject::setParticleSource(const LLPartSysData& particle_parameters,
 			mPartSourcep->setImage(image);
 		}
 	}
-	LLViewerPartSim::getInstanceFast()->addPartSource(pss);
+	LLViewerPartSim::getInstance()->addPartSource(pss);
 }
 
 void LLViewerObject::unpackParticleSource(const S32 block_num, const LLUUID& owner_id)
@@ -5793,7 +5793,7 @@ void LLViewerObject::unpackParticleSource(const S32 block_num, const LLUUID& own
 	{
 		LLPointer<LLViewerPartSourceScript> pss = LLViewerPartSourceScript::unpackPSS(this, NULL, block_num);
 		//If the owner is muted, don't create the system
-		if(LLMuteList::getInstanceFast()->isMuted(owner_id, LLMute::flagParticles)) return;
+		if(LLMuteList::getInstance()->isMuted(owner_id, LLMute::flagParticles)) return;
 
 		// We need to be able to deal with a particle source that hasn't changed, but still got an update!
 		if (pss)
@@ -5801,7 +5801,7 @@ void LLViewerObject::unpackParticleSource(const S32 block_num, const LLUUID& own
 // 			LL_INFOS() << "Making particle system with owner " << owner_id << LL_ENDL;
 			pss->setOwnerUUID(owner_id);
 			mPartSourcep = pss;
-			LLViewerPartSim::getInstanceFast()->addPartSource(pss);
+			LLViewerPartSim::getInstance()->addPartSource(pss);
 		}
 	}
 	if (mPartSourcep)
@@ -5841,14 +5841,14 @@ void LLViewerObject::unpackParticleSource(LLDataPacker &dp, const LLUUID& owner_
 	{
 		LLPointer<LLViewerPartSourceScript> pss = LLViewerPartSourceScript::unpackPSS(this, NULL, dp, legacy);
 		//If the owner is muted, don't create the system
-		if(LLMuteList::getInstanceFast()->isMuted(owner_id, LLMute::flagParticles)) return;
+		if(LLMuteList::getInstance()->isMuted(owner_id, LLMute::flagParticles)) return;
 		// We need to be able to deal with a particle source that hasn't changed, but still got an update!
 		if (pss)
 		{
 // 			LL_INFOS() << "Making particle system with owner " << owner_id << LL_ENDL;
 			pss->setOwnerUUID(owner_id);
 			mPartSourcep = pss;
-			LLViewerPartSim::getInstanceFast()->addPartSource(pss);
+			LLViewerPartSim::getInstance()->addPartSource(pss);
 		}
 	}
 	if (mPartSourcep)
@@ -6263,7 +6263,7 @@ BOOL LLViewerObject::permYouOwner() const
 		return TRUE;
 #else
 # ifdef TOGGLE_HACKED_GODLIKE_VIEWER
-		if (LLGridManager::getInstanceFast()->isInSLBeta()
+		if (LLGridManager::getInstance()->isInSLBeta()
             && (gAgent.getGodLevel() >= GOD_MAINTENANCE))
 		{
 			return TRUE;
@@ -6300,7 +6300,7 @@ BOOL LLViewerObject::permOwnerModify() const
 		return TRUE;
 #else
 # ifdef TOGGLE_HACKED_GODLIKE_VIEWER
-		if (LLGridManager::getInstanceFast()->isInSLBeta()
+		if (LLGridManager::getInstance()->isInSLBeta()
             && (gAgent.getGodLevel() >= GOD_MAINTENANCE))
 	{
 			return TRUE;
@@ -6324,7 +6324,7 @@ BOOL LLViewerObject::permModify() const
 		return TRUE;
 #else
 # ifdef TOGGLE_HACKED_GODLIKE_VIEWER
-		if (LLGridManager::getInstanceFast()->isInSLBeta()
+		if (LLGridManager::getInstance()->isInSLBeta()
             && (gAgent.getGodLevel() >= GOD_MAINTENANCE))
 	{
 			return TRUE;
@@ -6348,7 +6348,7 @@ BOOL LLViewerObject::permCopy() const
 		return TRUE;
 #else
 # ifdef TOGGLE_HACKED_GODLIKE_VIEWER
-		if (LLGridManager::getInstanceFast()->isInSLBeta()
+		if (LLGridManager::getInstance()->isInSLBeta()
             && (gAgent.getGodLevel() >= GOD_MAINTENANCE))
 		{
 			return TRUE;
@@ -6372,7 +6372,7 @@ BOOL LLViewerObject::permMove() const
 		return TRUE;
 #else
 # ifdef TOGGLE_HACKED_GODLIKE_VIEWER
-		if (LLGridManager::getInstanceFast()->isInSLBeta()
+		if (LLGridManager::getInstance()->isInSLBeta()
             && (gAgent.getGodLevel() >= GOD_MAINTENANCE))
 		{
 			return TRUE;
@@ -6396,7 +6396,7 @@ BOOL LLViewerObject::permTransfer() const
 		return TRUE;
 #else
 # ifdef TOGGLE_HACKED_GODLIKE_VIEWER
-		if (LLGridManager::getInstanceFast()->isInSLBeta()
+		if (LLGridManager::getInstance()->isInSLBeta()
             && (gAgent.getGodLevel() >= GOD_MAINTENANCE))
 		{
 			return TRUE;
@@ -6998,7 +6998,7 @@ public:
 				}
 			} func(local_id);
 
-			LLSelectNode* node = LLSelectMgr::getInstanceFast()->getSelection()->getFirstNode(&func);
+			LLSelectNode* node = LLSelectMgr::getInstance()->getSelection()->getFirstNode(&func);
 
 			if (node)
 			{

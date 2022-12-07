@@ -81,7 +81,7 @@ LLPanelProfileTab::~LLPanelProfileTab()
 {
     if(getAvatarId().notNull())
     {
-        LLAvatarPropertiesProcessor::getInstanceFast()->removeObserver(getAvatarId(),this);
+        LLAvatarPropertiesProcessor::getInstance()->removeObserver(getAvatarId(),this);
     }
 }
 
@@ -91,10 +91,10 @@ void LLPanelProfileTab::setAvatarId(const LLUUID& avatar_id)
     {
         if (getAvatarId().notNull())
         {
-            LLAvatarPropertiesProcessor::getInstanceFast()->removeObserver(mAvatarId, this);
+            LLAvatarPropertiesProcessor::getInstance()->removeObserver(mAvatarId, this);
         }
         mAvatarId = avatar_id;
-        LLAvatarPropertiesProcessor::getInstanceFast()->addObserver(getAvatarId(), this);
+        LLAvatarPropertiesProcessor::getInstance()->addObserver(getAvatarId(), this);
 
         mSelfProfile = (getAvatarId() == gAgentID);
     }

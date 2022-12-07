@@ -120,7 +120,7 @@ void LLAvatarActions::requestFriendshipDialog(const LLUUID& id, const std::strin
     	LLNotificationsUtil::add("AddFriendWithMessage", args, payload, &callbackAddFriendWithMessage);
 
 	// add friend to recent people list
-	LLRecentPeople::instanceFast().add(id);
+	LLRecentPeople::instance().add(id);
 }
 
 static void on_avatar_name_friendship(const LLUUID& id, const LLAvatarName av_name)
@@ -1165,14 +1165,14 @@ bool LLAvatarActions::toggleBlock(const LLUUID& id)
 
 	LLMute mute(id, av_name.getUserName(), LLMute::AGENT);
 
-	if (LLMuteList::getInstanceFast()->isMuted(mute.mID, mute.mName))
+	if (LLMuteList::getInstance()->isMuted(mute.mID, mute.mName))
 	{
-		LLMuteList::getInstanceFast()->remove(mute);
+		LLMuteList::getInstance()->remove(mute);
 		return false;
 	}
 	else
 	{
-		LLMuteList::getInstanceFast()->add(mute);
+		LLMuteList::getInstance()->add(mute);
 		return true;
 	}
 }
@@ -1183,7 +1183,7 @@ void LLAvatarActions::toggleMute(const LLUUID& id, U32 flags)
 	LLAvatarName av_name;
 	LLAvatarNameCache::get(id, &av_name);
 
-	LLMuteList* mute_list = LLMuteList::getInstanceFast();
+	LLMuteList* mute_list = LLMuteList::getInstance();
 	bool is_muted = mute_list->isMuted(id, flags);
 
 	LLMute mute(id, av_name.getUserName(), LLMute::AGENT);
@@ -1510,13 +1510,13 @@ bool LLAvatarActions::isBlocked(const LLUUID& id)
 {
 	LLAvatarName av_name;
 	LLAvatarNameCache::get(id, &av_name);
-	return LLMuteList::getInstanceFast()->isMuted(id, av_name.getUserName());
+	return LLMuteList::getInstance()->isMuted(id, av_name.getUserName());
 }
 
 // static
 bool LLAvatarActions::isVoiceMuted(const LLUUID& id)
 {
-	return LLMuteList::getInstanceFast()->isMuted(id, LLMute::flagVoiceChat);
+	return LLMuteList::getInstance()->isMuted(id, LLMute::flagVoiceChat);
 }
 
 // static

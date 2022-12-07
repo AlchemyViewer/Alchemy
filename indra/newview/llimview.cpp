@@ -314,7 +314,7 @@ void notify_of_message(const LLSD& msg, bool is_dnd_msg)
 				 	 	 	 	 	 	|| NOT_ON_TOP == conversations_floater_status))
 		|| is_dnd_msg)
     {
-    	if(!LLMuteList::getInstanceFast()->isMuted(participant_id))
+    	if(!LLMuteList::getInstance()->isMuted(participant_id))
     	{
 			if(gAgent.isDoNotDisturb())
 			{
@@ -343,7 +343,7 @@ void notify_of_message(const LLSD& msg, bool is_dnd_msg)
 		&& !is_session_focused
 		&& !is_dnd_msg) //prevent flashing FUI button because the conversation floater will have already opened
 	{
-		if(!LLMuteList::getInstanceFast()->isMuted(participant_id))
+		if(!LLMuteList::getInstance()->isMuted(participant_id))
     {
 			if(!gAgent.isDoNotDisturb())
     	{
@@ -1203,7 +1203,7 @@ bool LLIMModel::addMessage(const LLUUID& session_id, const std::string& from, co
 	//other places may be called from message history.
 	if( !from_id.isNull() &&
 		( session->isP2PSessionType() || session->isAdHocSessionType() ) )
-		LLRecentPeople::instanceFast().add(from_id);
+		LLRecentPeople::instance().add(from_id);
 
 	// notify listeners
 	LLSD arg;
@@ -1497,7 +1497,7 @@ void LLIMModel::sendMessage(const std::string& utf8_text,
 		case IM_LURE_USER:
 		case IM_GODLIKE_LURE_USER:
 		case IM_FRIENDSHIP_OFFERED:
-			LLMuteList::getInstanceFast()->autoRemove(other_participant_id, LLMuteList::AR_IM);
+			LLMuteList::getInstance()->autoRemove(other_participant_id, LLMuteList::AR_IM);
 			break;
 		default: ; // do nothing
 		}
@@ -1532,7 +1532,7 @@ void LLIMModel::sendMessage(const std::string& utf8_text,
 	{
 		if( session == 0)//??? shouldn't really happen
 		{
-			LLRecentPeople::instanceFast().add(other_participant_id);
+			LLRecentPeople::instance().add(other_participant_id);
 			return;
 		}
 		// IM_SESSION_INVITE means that this is an Ad-hoc incoming chat
@@ -1552,7 +1552,7 @@ void LLIMModel::sendMessage(const std::string& utf8_text,
 			// Add the recepient of the session.
 			if (!session->mInitialTargetIDs.empty())
 			{
-				LLRecentPeople::instanceFast().add(*(session->mInitialTargetIDs.begin()));
+				LLRecentPeople::instance().add(*(session->mInitialTargetIDs.begin()));
 			}
 		}
 	}
@@ -1569,7 +1569,7 @@ void LLIMModel::addSpeakersToRecent(const LLUUID& im_session_id)
 	for(LLSpeakerMgr::speaker_list_t::iterator it = speaker_list.begin(); it != speaker_list.end(); it++)
 	{
 		const LLPointer<LLSpeaker>& speakerp = *it;
-		LLRecentPeople::instanceFast().add(speakerp->mID);
+		LLRecentPeople::instance().add(speakerp->mID);
 	}
 }
 
@@ -2809,7 +2809,7 @@ void LLIMMgr::addMessage(
 
 //	if (!LLMuteList::getInstance()->isMuted(other_participant_id, LLMute::flagTextChat) && !skip_message)
 // [SL:KB] - Patch: Chat-Misc | Checked: 2014-05-01 (Catznip-3.6)
-	if (!LLMuteList::getInstanceFast()->isMuted(other_participant_id, LLMute::flagTextChat))
+	if (!LLMuteList::getInstance()->isMuted(other_participant_id, LLMute::flagTextChat))
 // [/SL:KB]
 	{
 		LLIMModel::instance().addMessage(new_session_id, from, other_participant_id, msg, bonus);
@@ -3152,14 +3152,14 @@ void LLIMMgr::inviteToSession(
 	//ignore invites from muted residents
 	if (!is_linden)
 	{
-		if (LLMuteList::getInstanceFast()->isMuted(caller_id, LLMute::flagVoiceChat)
+		if (LLMuteList::getInstance()->isMuted(caller_id, LLMute::flagVoiceChat)
 			&& voice_invite && "VoiceInviteQuestionDefault" == question_type)
 		{
 			LL_INFOS("IMVIEW") << "Rejecting voice call from initiating muted resident " << caller_name << LL_ENDL;
 			LLIncomingCallDialog::processCallResponse(1, payload);
 			return;
 		}
-		else if (LLMuteList::getInstanceFast()->isMuted(caller_id, LLMute::flagAll & ~LLMute::flagVoiceChat) && !voice_invite)
+		else if (LLMuteList::getInstance()->isMuted(caller_id, LLMute::flagAll & ~LLMute::flagVoiceChat) && !voice_invite)
 		{
 			LL_INFOS("IMVIEW") << "Rejecting session invite from initiating muted resident " << caller_name << LL_ENDL;
 			return;
@@ -3237,7 +3237,7 @@ void LLIMMgr::inviteToSession(
 		// the call, the caller should be added to the recent list
 		// anyway. STORM-507.
 		if(type == IM_SESSION_P2P_INVITE)
-			LLRecentPeople::instanceFast().add(caller_id);
+			LLRecentPeople::instance().add(caller_id);
 		
 		mPendingInvitations[session_id.asString()] = LLSD();
 	}
@@ -3567,7 +3567,7 @@ void LLIMMgr::noteMutedUsers(const LLUUID& session_id,
 								  const std::vector<LLUUID>& ids)
 {
 	// Don't do this if we don't have a mute list.
-	LLMuteList *ml = LLMuteList::getInstanceFast();
+	LLMuteList *ml = LLMuteList::getInstance();
 	if( !ml )
 	{
 		return;
@@ -3790,7 +3790,7 @@ public:
 
 			BOOL is_do_not_disturb = gAgent.isDoNotDisturb();
  // [SL:KB] - Patch: Chat-GroupOptions | Checked: 2012-06-21 (Catznip-3.3)
-			BOOL is_muted = LLMuteList::getInstanceFast()->isMuted(from_id, LLMute::flagTextChat);
+			BOOL is_muted = LLMuteList::getInstance()->isMuted(from_id, LLMute::flagTextChat);
 			BOOL is_group = gAgent.isInGroup(session_id);
 
 			// Just return if the user is currently marked DnD or if the group session was started by someone on the mute list (we'll get another invitation later)
@@ -3888,7 +3888,7 @@ public:
 				ll_vector3_from_sd(message_params["position"]),
 				true);
 
-			if (LLMuteList::getInstanceFast()->isMuted(from_id, name, LLMute::flagTextChat))
+			if (LLMuteList::getInstance()->isMuted(from_id, name, LLMute::flagTextChat))
 			{
 				return;
 			}

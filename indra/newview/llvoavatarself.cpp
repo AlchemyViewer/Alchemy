@@ -366,7 +366,7 @@ BOOL LLVOAvatarSelf::buildSkeletonSelf(const LLAvatarSkeletonInfo *info)
 	mScreenp = new LLViewerJoint("mScreen", NULL);
 	// for now, put screen at origin, as it is only used during special
 	// HUD rendering mode
-	F32 aspect = LLViewerCamera::getInstanceFast()->getAspect();
+	F32 aspect = LLViewerCamera::getInstance()->getAspect();
 	LLVector3 scale(1.f, aspect, 1.f);
 	mScreenp->setScale(scale);
 	// SL-315
@@ -703,7 +703,7 @@ bool LLVOAvatarSelf::updateCharacter(LLAgent &agent)
 	// update screen joint size
 	if (mScreenp)
 	{
-		F32 aspect = LLViewerCamera::getInstanceFast()->getAspect();
+		F32 aspect = LLViewerCamera::getInstance()->getAspect();
 		LLVector3 scale(1.f, aspect, 1.f);
 		mScreenp->setScale(scale);
 		mScreenp->updateWorldMatrixChildren();
@@ -1023,7 +1023,7 @@ void LLVOAvatarSelf::idleUpdateTractorBeam()
 	else if (!mBeam || mBeam->isDead())
 	{
 		// VEFFECT: Tractor Beam
-		mBeam = (LLHUDEffectSpiral *)LLHUDManager::getInstanceFast()->createViewerEffect(LLHUDObject::LL_HUD_EFFECT_BEAM);
+		mBeam = (LLHUDEffectSpiral *)LLHUDManager::getInstance()->createViewerEffect(LLHUDObject::LL_HUD_EFFECT_BEAM);
 		mBeam->setColor(LLColor4U(gAgent.getEffectColor()));
 		mBeam->setSourceObject(this);
 		mBeamTimer.reset();
@@ -1031,7 +1031,7 @@ void LLVOAvatarSelf::idleUpdateTractorBeam()
 
 	if (!mBeam.isNull())
 	{
-		LLObjectSelectionHandle selection = LLSelectMgr::getInstanceFast()->getSelection();
+		LLObjectSelectionHandle selection = LLSelectMgr::getInstance()->getSelection();
 
 		if (gAgentCamera.mPointAt.notNull())
 		{
@@ -1048,7 +1048,7 @@ void LLVOAvatarSelf::idleUpdateTractorBeam()
 		else
 		{
 			mBeam->setTargetObject(NULL);
-			LLTool *tool = LLToolMgr::getInstanceFast()->getCurrentTool();
+			LLTool *tool = LLToolMgr::getInstance()->getCurrentTool();
 			if (tool->isEditing())
 			{
 				if (tool->getEditingObject())
@@ -1334,7 +1334,7 @@ BOOL LLVOAvatarSelf::detachObject(LLViewerObject *viewer_object)
 		// the simulator should automatically handle permission revocation
 		
 		stopMotionFromSource(attachment_id);
-		LLFollowCamMgr::getInstanceFast()->setCameraActive(viewer_object->getID(), FALSE);
+		LLFollowCamMgr::getInstance()->setCameraActive(viewer_object->getID(), FALSE);
 		
 		LLViewerObject::const_child_list_t& child_list = viewer_object->getChildren();
 		for (LLViewerObject* child_objectp : child_list)
@@ -1343,7 +1343,7 @@ BOOL LLVOAvatarSelf::detachObject(LLViewerObject *viewer_object)
 			// permissions revocation
 			
 			stopMotionFromSource(child_objectp->getID());
-			LLFollowCamMgr::getInstanceFast()->setCameraActive(child_objectp->getID(), FALSE);
+			LLFollowCamMgr::getInstance()->setCameraActive(child_objectp->getID(), FALSE);
 		}
 		
 		// Make sure the inventory is in sync with the avatar.
@@ -1387,7 +1387,7 @@ BOOL LLVOAvatarSelf::detachAttachmentIntoInventory(const LLUUID &item_id)
 		LLViewerObject *found_obj = gObjectList.findObject(item_id);
 		if (found_obj)
 		{
-			LLSelectMgr::getInstanceFast()->remove(found_obj);
+			LLSelectMgr::getInstance()->remove(found_obj);
 		}
 
 		// Error checking in case this object was attached to an invalid point
@@ -2205,7 +2205,7 @@ void LLVOAvatarSelf::debugBakedTextureUpload(EBakedTextureIndex index, BOOL fini
 const std::string LLVOAvatarSelf::verboseDebugDumpLocalTextureDataInfo(const LLViewerTexLayerSet* layerset) const
 {
 	std::ostringstream outbuf;
-    LLWearableType *wr_inst = LLWearableType::getInstanceFast();
+    LLWearableType *wr_inst = LLWearableType::getInstance();
 	for (const auto& baked_pair : sAvatarDictionary->getBakedTextures())
 	{
 		const EBakedTextureIndex baked_index = baked_pair.first;
@@ -2279,7 +2279,7 @@ void LLVOAvatarSelf::dumpAllTextures() const
 const std::string LLVOAvatarSelf::debugDumpLocalTextureDataInfo(const LLViewerTexLayerSet* layerset) const
 {
 	std::string text="";
-    LLWearableType *wr_inst = LLWearableType::getInstanceFast();
+    LLWearableType *wr_inst = LLWearableType::getInstance();
 
 	text = llformat("[Final:%d Avail:%d] ",isLocalTextureDataFinal(layerset), isLocalTextureDataAvailable(layerset));
 
@@ -3163,16 +3163,16 @@ F32 LLVOAvatarSelf::getAvatarOffset() /*const*/
 //------------------------------------------------------------------------
 BOOL LLVOAvatarSelf::needsRenderBeam()
 {
-	LLTool *tool = LLToolMgr::getInstanceFast()->getCurrentTool();
+	LLTool *tool = LLToolMgr::getInstance()->getCurrentTool();
 
-	BOOL is_touching_or_grabbing = (tool == LLToolGrab::getInstanceFast() && LLToolGrab::getInstanceFast()->isEditing());
-	if (LLToolGrab::getInstanceFast()->getEditingObject() &&
-		LLToolGrab::getInstanceFast()->getEditingObject()->isAttachment())
+	BOOL is_touching_or_grabbing = (tool == LLToolGrab::getInstance() && LLToolGrab::getInstance()->isEditing());
+	if (LLToolGrab::getInstance()->getEditingObject() &&
+		LLToolGrab::getInstance()->getEditingObject()->isAttachment())
 	{
 		// don't render selection beam on hud objects
 		is_touching_or_grabbing = FALSE;
 	}
-	return is_touching_or_grabbing || (getAttachmentState() & AGENT_STATE_EDITING && LLSelectMgr::getInstanceFast()->shouldShowSelection());
+	return is_touching_or_grabbing || (getAttachmentState() & AGENT_STATE_EDITING && LLSelectMgr::getInstance()->shouldShowSelection());
 }
 
 // static
@@ -3216,7 +3216,7 @@ void LLVOAvatarSelf::dumpWearableInfo(LLAPRFile& outfile)
 	apr_file_printf( file, "\n<wearable_info>\n" );
 
 	LLWearableData *wd = getWearableData();
-    LLWearableType *wr_inst = LLWearableType::getInstanceFast();
+    LLWearableType *wr_inst = LLWearableType::getInstance();
 	for (S32 type = 0; type < LLWearableType::WT_COUNT; type++)
 	{
 		const std::string& type_name = wr_inst->getTypeName((LLWearableType::EType)type);

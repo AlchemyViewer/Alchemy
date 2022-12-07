@@ -221,10 +221,10 @@ void LLFloaterSnapshotBase::ImplBase::updateLayout(LLFloaterSnapshotBase* floate
 		// freeze everything else
 		gSavedSettings.setBOOL("FreezeTime", TRUE);
 
-		if (LLToolMgr::getInstanceFast()->getCurrentToolset() != gCameraToolset)
+		if (LLToolMgr::getInstance()->getCurrentToolset() != gCameraToolset)
 		{
-			floaterp->impl->mLastToolset = LLToolMgr::getInstanceFast()->getCurrentToolset();
-			LLToolMgr::getInstanceFast()->setCurrentToolset(gCameraToolset);
+			floaterp->impl->mLastToolset = LLToolMgr::getInstance()->getCurrentToolset();
+			LLToolMgr::getInstance()->setCurrentToolset(gCameraToolset);
 		}
 	}
 	else // turning off freeze frame mode
@@ -247,7 +247,7 @@ void LLFloaterSnapshotBase::ImplBase::updateLayout(LLFloaterSnapshotBase* floate
 		// restore last tool (e.g. pie menu, etc)
 		if (floaterp->impl->mLastToolset)
 		{
-			LLToolMgr::getInstanceFast()->setCurrentToolset(floaterp->impl->mLastToolset);
+			LLToolMgr::getInstance()->setCurrentToolset(floaterp->impl->mLastToolset);
 		}
 	}
 }
@@ -948,7 +948,7 @@ LLFloaterSnapshotBase::~LLFloaterSnapshotBase()
 
 	if (impl->mLastToolset)
 	{
-		LLToolMgr::getInstanceFast()->setCurrentToolset(impl->mLastToolset);
+		LLToolMgr::getInstance()->setCurrentToolset(impl->mLastToolset);
 	}
 
 	delete impl;
@@ -1154,7 +1154,7 @@ void LLFloaterSnapshotBase::onClose(bool app_quitting)
 
 	if (impl->mLastToolset)
 	{
-		LLToolMgr::getInstanceFast()->setCurrentToolset(impl->mLastToolset);
+		LLToolMgr::getInstance()->setCurrentToolset(impl->mLastToolset);
 	}
 }
 
@@ -1441,7 +1441,7 @@ BOOL LLSnapshotFloaterView::handleMouseDown(S32 x, S32 y, MASK mask)
 	// give floater a change to handle mouse, else camera tool
 	if (childrenHandleMouseDown(x, y, mask) == NULL)
 	{
-		LLToolMgr::getInstanceFast()->getCurrentTool()->handleMouseDown( x, y, mask );
+		LLToolMgr::getInstance()->getCurrentTool()->handleMouseDown( x, y, mask );
 	}
 	return TRUE;
 }
@@ -1457,7 +1457,7 @@ BOOL LLSnapshotFloaterView::handleMouseUp(S32 x, S32 y, MASK mask)
 	// give floater a change to handle mouse, else camera tool
 	if (childrenHandleMouseUp(x, y, mask) == NULL)
 	{
-		LLToolMgr::getInstanceFast()->getCurrentTool()->handleMouseUp( x, y, mask );
+		LLToolMgr::getInstance()->getCurrentTool()->handleMouseUp( x, y, mask );
 	}
 	return TRUE;
 }
@@ -1473,7 +1473,7 @@ BOOL LLSnapshotFloaterView::handleHover(S32 x, S32 y, MASK mask)
 	// give floater a change to handle mouse, else camera tool
 	if (childrenHandleHover(x, y, mask) == NULL)
 	{
-		LLToolMgr::getInstanceFast()->getCurrentTool()->handleHover( x, y, mask );
+		LLToolMgr::getInstance()->getCurrentTool()->handleHover( x, y, mask );
 	}
 	return TRUE;
 }

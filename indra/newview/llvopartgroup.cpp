@@ -223,7 +223,7 @@ void LLVOPartGroup::setPixelAreaAndAngle(LLAgent &agent)
 {
 	// mPixelArea is calculated during render
 	F32 mid_scale = getMidScale();
-	F32 range = (getRenderPosition()-LLViewerCamera::getInstanceFast()->getOrigin()).length();
+	F32 range = (getRenderPosition()-LLViewerCamera::getInstance()->getOrigin()).length();
 
 	if (range < 0.001f || isHUDAttachment())		// range == zero
 	{
@@ -351,7 +351,7 @@ BOOL LLVOPartGroup::updateGeometry(LLDrawable *drawable)
 	F32 tot_area = 0;
 
 	F32 max_area = LLViewerPartSim::getMaxPartCount() * MAX_PARTICLE_AREA_SCALE; 
-	F32 pixel_meter_ratio = LLViewerCamera::getInstanceFast()->getPixelMeterRatio();
+	F32 pixel_meter_ratio = LLViewerCamera::getInstance()->getPixelMeterRatio();
 	pixel_meter_ratio *= pixel_meter_ratio;
 
 	LLViewerPartSim::checkParticleCount(mViewerPartGroupp->mParticles.size()) ;
@@ -724,7 +724,7 @@ void LLVOPartGroup::getGeometry(S32 idx,
 
 	if (!(part.mFlags & LLPartData::LL_PART_EMISSIVE_MASK))
 	{ //not fullbright, needs normal
-		LLVector3 normal = -LLViewerCamera::getInstanceFast()->getXAxis();
+		LLVector3 normal = -LLViewerCamera::getInstance()->getXAxis();
 		*normalsp++   = normal;
 		*normalsp++   = normal;
 		*normalsp++   = normal;
@@ -803,7 +803,7 @@ void LLParticlePartition::addGeometryCount(LLSpatialGroup* group, U32& vertex_co
 
 	mFaceList.clear();
 
-	LLViewerCamera* camera = LLViewerCamera::getInstanceFast();
+	LLViewerCamera* camera = LLViewerCamera::getInstance();
 	for (LLSpatialGroup::element_iter i = group->getDataBegin(), i_end = group->getDataEnd(); i != i_end; ++i)
 	{
 		LLDrawable* drawablep = (LLDrawable*)(*i)->getDrawable();

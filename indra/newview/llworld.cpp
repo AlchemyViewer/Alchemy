@@ -654,7 +654,7 @@ LLVector3 LLWorld::resolveLandNormalGlobal(const LLVector3d &pos_global)
 
 void LLWorld::updateVisibilities()
 {
-	auto& viewerCamera = LLViewerCamera::instanceFast();
+	auto& viewerCamera = LLViewerCamera::instance();
 
 	F32 cur_far_clip = viewerCamera.getFar();
 
@@ -720,7 +720,7 @@ void LLWorld::updateRegions(F32 max_update_time)
 	LLTimer update_timer;
 	mNumOfActiveCachedObjects = 0;
 	
-	if(LLViewerCamera::getInstanceFast()->isChanged())
+	if(LLViewerCamera::getInstance()->isChanged())
 	{
 		LLViewerRegion::sLastCameraUpdated = LLViewerOctreeEntryData::getCurrentFrame() + 1;
 	}
@@ -819,7 +819,7 @@ void LLWorld::refreshLimits()
 
 void LLWorld::updateParticles()
 {
-	LLViewerPartSim::getInstanceFast()->updateSimulation();
+	LLViewerPartSim::getInstance()->updateSimulation();
 }
 
 void LLWorld::renderPropertyLines()
@@ -899,7 +899,7 @@ void LLWorld::printPacketsLost()
 
 void LLWorld::processCoarseUpdate(LLMessageSystem* msg, void** user_data)
 {
-	LLViewerRegion* region = LLWorld::getInstanceFast()->getRegion(msg->getSender());
+	LLViewerRegion* region = LLWorld::getInstance()->getRegion(msg->getSender());
 	if( region )
 	{
 		region->updateCoarseLocations(msg);
@@ -1014,7 +1014,7 @@ void LLWorld::updateWaterObjects()
 	S32 const rwidth = (S32)regionp->getWidth();
 
 	// We only want to fill in water for stuff that's near us, say, within 256 or 512m
-	S32 range = LLViewerCamera::getInstanceFast()->getFar() > 256.f ? 512 : 256;
+	S32 range = LLViewerCamera::getInstance()->getFar() > 256.f ? 512 : 256;
 
 	from_region_handle(regionp->getHandle(), &region_x, &region_y);
 
@@ -1137,7 +1137,7 @@ void LLWorld::shiftRegions(const LLVector3& offset)
 		region->updateRenderMatrix();
 	}
 
-	LLViewerPartSim::getInstanceFast()->shift(offset);
+	LLViewerPartSim::getInstance()->shift(offset);
 }
 
 LLViewerTexture* LLWorld::getDefaultWaterTexture()
@@ -1280,7 +1280,7 @@ public:
             return;
         }
 
-		LLViewerRegion* regionp = LLWorld::getInstanceFast()->getRegion(sim);
+		LLViewerRegion* regionp = LLWorld::getInstance()->getRegion(sim);
 		if (!regionp)
 		{
 			LL_WARNS() << "Got EstablishAgentCommunication for unknown region "
@@ -1305,7 +1305,7 @@ void process_disable_simulator(LLMessageSystem *mesgsys, void **user_data)
     LLHost host = mesgsys->getSender();
 
 	//LL_INFOS() << "Disabling simulator with message from " << host << LL_ENDL;
-	LLWorld::getInstanceFast()->removeRegion(host);
+	LLWorld::getInstance()->removeRegion(host);
 
 	mesgsys->disableCircuit(host);
 }
@@ -1314,7 +1314,7 @@ void process_disable_simulator(LLMessageSystem *mesgsys, void **user_data)
 void process_region_handshake(LLMessageSystem* msg, void** user_data)
 {
 	LLHost host = msg->getSender();
-	LLViewerRegion* regionp = LLWorld::getInstanceFast()->getRegion(host);
+	LLViewerRegion* regionp = LLWorld::getInstance()->getRegion(host);
 	if (!regionp)
 	{
 		LL_WARNS() << "Got region handshake for unknown region "
@@ -1348,7 +1348,7 @@ void send_agent_pause()
 	gAgentPauseSerialNum++;
 	gMessageSystem->addU32Fast(_PREHASH_SerialNum, gAgentPauseSerialNum);
 
-	for (LLViewerRegion* regionp : LLWorld::getInstanceFast()->getRegionList())
+	for (LLViewerRegion* regionp : LLWorld::getInstance()->getRegionList())
 	{
 		gMessageSystem->sendReliable(regionp->getHost());
 	}
@@ -1406,7 +1406,7 @@ void send_agent_resume()
 	gMessageSystem->addU32Fast(_PREHASH_SerialNum, gAgentPauseSerialNum);
 	
 
-	for (LLViewerRegion* regionp : LLWorld::getInstanceFast()->getRegionList())
+	for (LLViewerRegion* regionp : LLWorld::getInstance()->getRegionList())
 	{
 		gMessageSystem->sendReliable(regionp->getHost());
 	}

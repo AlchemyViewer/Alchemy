@@ -315,7 +315,7 @@ void LLFloaterAvatarPicker::populateNearMe()
 	near_me_scroller->deleteAllItems();
 
 	uuid_vec_t avatar_ids;
-	LLWorld::getInstanceFast()->getAvatars(&avatar_ids, NULL, gAgent.getPositionGlobal(), ALControlCache::NearMeRange);
+	LLWorld::getInstance()->getAvatars(&avatar_ids, NULL, gAgent.getPositionGlobal(), ALControlCache::NearMeRange);
 	for(U32 i=0; i<avatar_ids.size(); i++)
 	{
 		LLUUID& av = avatar_ids[i];

@@ -266,7 +266,7 @@ BOOL	LLPanelObject::postBuild()
 		// Allow any texture to be used during non-immediate mode.
 		mCtrlSculptTexture->setNonImmediateFilterPermMask(PERM_NONE);
 		LLAggregatePermissions texture_perms;
-		if (LLSelectMgr::getInstanceFast()->selectGetAggregateTexturePermissions(texture_perms))
+		if (LLSelectMgr::getInstance()->selectGetAggregateTexturePermissions(texture_perms))
 		{
 			BOOL can_copy =
 				texture_perms.getValue(PERM_COPY) == LLAggregatePermissions::AP_EMPTY ||
@@ -318,7 +318,7 @@ LLPanelObject::~LLPanelObject()
 
 void LLPanelObject::getState( )
 {
-	LLSelectMgr* select_mgr = LLSelectMgr::getInstanceFast();
+	LLSelectMgr* select_mgr = LLSelectMgr::getInstance();
 	LLViewerObject* objectp = select_mgr->getSelection()->getFirstRootObject();
 	LLViewerObject* root_objectp = objectp;
 	if(!objectp)
@@ -1270,7 +1270,7 @@ void LLPanelObject::sendIsPhysical()
 	BOOL value = mCheckPhysics->get();
 	if( mIsPhysical != value )
 	{
-		LLSelectMgr::getInstanceFast()->selectionUpdatePhysics(value);
+		LLSelectMgr::getInstance()->selectionUpdatePhysics(value);
 		mIsPhysical = value;
 
 		LL_INFOS() << "update physics sent" << LL_ENDL;
@@ -1286,7 +1286,7 @@ void LLPanelObject::sendIsTemporary()
 	BOOL value = mCheckTemporary->get();
 	if( mIsTemporary != value )
 	{
-		LLSelectMgr::getInstanceFast()->selectionUpdateTemporary(value);
+		LLSelectMgr::getInstance()->selectionUpdateTemporary(value);
 		mIsTemporary = value;
 
 		LL_INFOS() << "update temporary sent" << LL_ENDL;
@@ -1303,7 +1303,7 @@ void LLPanelObject::sendIsPhantom()
 	BOOL value = mCheckPhantom->get();
 	if( mIsPhantom != value )
 	{
-		LLSelectMgr::getInstanceFast()->selectionUpdatePhantom(value);
+		LLSelectMgr::getInstance()->selectionUpdatePhantom(value);
 		mIsPhantom = value;
 
 		LL_INFOS() << "update phantom sent" << LL_ENDL;
@@ -1783,7 +1783,7 @@ void LLPanelObject::sendRotation(BOOL btn_down)
 		if(!btn_down)
 		{
 			child_positions.clear() ;
-			LLSelectMgr::getInstanceFast()->sendMultipleUpdate(UPD_ROTATION | UPD_POSITION);
+			LLSelectMgr::getInstance()->sendMultipleUpdate(UPD_ROTATION | UPD_POSITION);
 		}
 	}
 }
@@ -1807,17 +1807,17 @@ void LLPanelObject::sendScale(BOOL btn_down)
 		BOOL dont_stretch_textures = !LLManipScale::getStretchTextures();
 		if (dont_stretch_textures)
 		{
-			LLSelectMgr::getInstanceFast()->saveSelectedObjectTransform(SELECT_ACTION_TYPE_SCALE);
+			LLSelectMgr::getInstance()->saveSelectedObjectTransform(SELECT_ACTION_TYPE_SCALE);
 		}
 
 		mObject->setScale(newscale, TRUE);
 
 		if(!btn_down)
 		{
-			LLSelectMgr::getInstanceFast()->sendMultipleUpdate(UPD_SCALE | UPD_POSITION);
+			LLSelectMgr::getInstance()->sendMultipleUpdate(UPD_SCALE | UPD_POSITION);
 		}
 
-		LLSelectMgr::getInstanceFast()->adjustTexturesByScale(TRUE, !dont_stretch_textures);
+		LLSelectMgr::getInstance()->adjustTexturesByScale(TRUE, !dont_stretch_textures);
 //		LL_INFOS() << "scale sent" << LL_ENDL;
 	}
 	else
@@ -1841,7 +1841,7 @@ void LLPanelObject::sendPosition(BOOL btn_down)
 	}
 	else
 	{
-		LLWorld* world_inst = LLWorld::getInstanceFast();
+		LLWorld* world_inst = LLWorld::getInstance();
 
 		// Clamp the Z height
 		const F32 height = newpos.mV[VZ];
@@ -1903,12 +1903,12 @@ void LLPanelObject::sendPosition(BOOL btn_down)
 
 		if (!btn_down)
 		{
-			LLSelectMgr::getInstanceFast()->sendMultipleUpdate(UPD_POSITION);
+			LLSelectMgr::getInstance()->sendMultipleUpdate(UPD_POSITION);
 		}
 
-		LLSelectMgr::getInstanceFast()->updateSelectionCenter();
+		LLSelectMgr::getInstance()->updateSelectionCenter();
 	}
-	else if ( LLWorld::getInstanceFast()->positionRegionValidGlobal(new_pos_global) )
+	else if ( LLWorld::getInstance()->positionRegionValidGlobal(new_pos_global) )
 	{
 		// send only if the position is changed, that is, the delta vector is not zero
 		LLVector3d old_pos_global = mObject->getPositionGlobal();
@@ -1938,10 +1938,10 @@ void LLPanelObject::sendPosition(BOOL btn_down)
 
 			if(!btn_down)
 			{
-				LLSelectMgr::getInstanceFast()->sendMultipleUpdate(UPD_POSITION);
+				LLSelectMgr::getInstance()->sendMultipleUpdate(UPD_POSITION);
 			}
 
-			LLSelectMgr::getInstanceFast()->updateSelectionCenter();
+			LLSelectMgr::getInstance()->updateSelectionCenter();
 		}
 	}
 	else
@@ -2004,7 +2004,7 @@ void LLPanelObject::refresh()
 		mRootObject = NULL;
 	}
 
-	LLWorld* worldp = LLWorld::getInstanceFast();
+	LLWorld* worldp = LLWorld::getInstance();
 	if (mObject && mObject->getRegion())
 	{
 		auto region = mObject->getRegion();
@@ -2013,7 +2013,7 @@ void LLPanelObject::refresh()
 		mRegionMaxDepth = region->getMinRegionHeight();
 		mCtrlPosZ->setMaxValue(mRegionMaxHeight);
 		mMinScale = region->getMinPrimScale();
-		mMaxScale = LLGridManager::getInstanceFast()->isInOpenSim() ? region->getMaxPrimScale() : get_default_max_prim_scale(LLPickInfo::isFlora(mObject));
+		mMaxScale = LLGridManager::getInstance()->isInOpenSim() ? region->getMaxPrimScale() : get_default_max_prim_scale(LLPickInfo::isFlora(mObject));
 		mCtrlScaleX->setMinValue(mMinScale);
 		mCtrlScaleX->setMaxValue(mMaxScale);
 		mCtrlScaleY->setMinValue(mMinScale);
@@ -2024,7 +2024,7 @@ void LLPanelObject::refresh()
 	else
 	{
 		mRegionMaxHeight = worldp->getRegionMaxHeight();
-		mRegionMaxDepth = LLGridManager::getInstanceFast()->isInOpenSim() ? -256.f : 0.f; // OpenSim is derp
+		mRegionMaxDepth = LLGridManager::getInstance()->isInOpenSim() ? -256.f : 0.f; // OpenSim is derp
 		mCtrlPosZ->setMaxValue(mRegionMaxHeight);
 		mMinScale = worldp->getRegionMinPrimScale();
 		mMaxScale = get_default_max_prim_scale(LLPickInfo::isFlora(mObject));
@@ -2052,7 +2052,7 @@ void LLPanelObject::draw()
 	static const LLColor4	blue(	0.f,	0.5f,	1.0f,	1);
 
 	// Tune the colors of the labels
-	LLTool* tool = LLToolMgr::getInstanceFast()->getCurrentTool();
+	LLTool* tool = LLToolMgr::getInstance()->getCurrentTool();
 
 	if (tool == LLToolCompTranslate::getInstance())
 	{
@@ -2163,7 +2163,7 @@ void LLPanelObject::onCommitLock(LLUICtrl *ctrl, void *data)
 
 	BOOL new_state = self->mCheckLock->get();
 	
-	LLSelectMgr::getInstanceFast()->selectionSetObjectPermissions(PERM_OWNER, !new_state, PERM_MOVE | PERM_MODIFY);
+	LLSelectMgr::getInstance()->selectionSetObjectPermissions(PERM_OWNER, !new_state, PERM_MOVE | PERM_MODIFY);
 }
 
 // static

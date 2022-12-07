@@ -593,7 +593,7 @@ void LLMaterialMgr::onIdle(void*)
 {
 	LL_RECORD_BLOCK_TIME(FTM_MATERIALS_IDLE);
 
-	LLMaterialMgr* instancep = LLMaterialMgr::getInstanceFast();
+	LLMaterialMgr* instancep = LLMaterialMgr::getInstance();
 
 	if (!instancep->mGetQueue.empty())
 	{
@@ -624,7 +624,7 @@ void LLMaterialMgr::CapsRecvForRegion(const LLUUID& regionId, LLUUID regionTest,
 
 void LLMaterialMgr::processGetQueue()
 {
-	auto& worldInst = LLWorld::instanceFast();
+	auto& worldInst = LLWorld::instance();
     get_queue_t::iterator loopRegionQueue = mGetQueue.begin();
     while (mGetQueue.end() != loopRegionQueue)
     {
@@ -839,7 +839,7 @@ void LLMaterialMgr::processGetAllQueue()
 
 void LLMaterialMgr::processGetAllQueueCoro(LLUUID regionId)
 {
-	auto& worldInst = LLWorld::instanceFast();
+	auto& worldInst = LLWorld::instance();
     LLViewerRegion* regionp = worldInst.getRegionFromID(regionId);
     if (regionp == NULL)
     {

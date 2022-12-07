@@ -103,7 +103,7 @@ void LLToolSelectRect::handleRectangleSelection(S32 x, S32 y, MASK mask)
 	top = ll_round((F32) top * LLUI::getScaleFactor().mV[VY]);
 	bottom = ll_round((F32) bottom * LLUI::getScaleFactor().mV[VY]);
 
-	LLViewerCamera* viewer_cam = LLViewerCamera::getInstanceFast();
+	LLViewerCamera* viewer_cam = LLViewerCamera::getInstance();
 
 	F32 old_far_plane = viewer_cam->getFar();
 	F32 old_near_plane = viewer_cam->getNear();
@@ -192,17 +192,17 @@ void LLToolSelectRect::handleRectangleSelection(S32 x, S32 y, MASK mask)
 				{
 					return true;
 				}
-				S32 result = LLViewerCamera::getInstanceFast()->sphereInFrustum(drawable->getPositionAgent(), drawable->getRadius());
+				S32 result = LLViewerCamera::getInstance()->sphereInFrustum(drawable->getPositionAgent(), drawable->getRadius());
 				switch (result)
 				{
 				  case 0:
-					LLSelectMgr::getInstanceFast()->unhighlightObjectOnly(vobjp);
+					LLSelectMgr::getInstance()->unhighlightObjectOnly(vobjp);
 					break;
 				  case 1:
 					// check vertices
-					if (!LLViewerCamera::getInstanceFast()->areVertsVisible(vobjp, LLSelectMgr::sRectSelectInclusive))
+					if (!LLViewerCamera::getInstance()->areVertsVisible(vobjp, LLSelectMgr::sRectSelectInclusive))
 					{
-						LLSelectMgr::getInstanceFast()->unhighlightObjectOnly(vobjp);
+						LLSelectMgr::getInstance()->unhighlightObjectOnly(vobjp);
 					}
 					break;
 				  default:
@@ -211,14 +211,14 @@ void LLToolSelectRect::handleRectangleSelection(S32 x, S32 y, MASK mask)
 				return true;
 			}
 		} func;
-		LLSelectMgr::getInstanceFast()->getHighlightedObjects()->applyToObjects(&func);
+		LLSelectMgr::getInstance()->getHighlightedObjects()->applyToObjects(&func);
 	}
 
 	if (grow_selection)
 	{
 		std::vector<LLDrawable*> potentials;
 				
-		for (LLViewerRegion* region : LLWorld::getInstanceFast()->getRegionList())
+		for (LLViewerRegion* region : LLWorld::getInstance()->getRegionList())
 		{
 			for (U32 i = 0; i < LLViewerRegion::NUM_PARTITIONS; i++)
 			{
@@ -265,11 +265,11 @@ void LLToolSelectRect::handleRectangleSelection(S32 x, S32 y, MASK mask)
 					// check vertices
 					if (viewer_cam->areVertsVisible(vobjp, LLSelectMgr::sRectSelectInclusive))
 					{
-						LLSelectMgr::getInstanceFast()->highlightObjectOnly(vobjp);
+						LLSelectMgr::getInstance()->highlightObjectOnly(vobjp);
 					}
 					break;
 				case 2:
-					LLSelectMgr::getInstanceFast()->highlightObjectOnly(vobjp);
+					LLSelectMgr::getInstance()->highlightObjectOnly(vobjp);
 					break;
 				default:
 					break;
@@ -284,8 +284,8 @@ void LLToolSelectRect::handleRectangleSelection(S32 x, S32 y, MASK mask)
 	gGL.matrixMode(LLRender::MM_MODELVIEW);
 
 	// restore camera
-	LLViewerCamera::getInstanceFast()->setFar(old_far_plane);
-	LLViewerCamera::getInstanceFast()->setNear(old_near_plane);
+	LLViewerCamera::getInstance()->setFar(old_far_plane);
+	LLViewerCamera::getInstance()->setNear(old_near_plane);
 	gViewerWindow->setup3DRender();
 }
 
@@ -352,7 +352,7 @@ void LLViewerParcelMgr::renderRect(const LLVector3d &west_south_bottom_global,
 	// resolves correctly so we can get a height value.
 	const F32 FUDGE = 0.01f;
 
-	auto& worldInst = LLWorld::instanceFast();
+	auto& worldInst = LLWorld::instance();
 
 	F32 sw_bottom = worldInst.resolveLandHeightAgent( LLVector3( west, south, 0.f ) );
 	F32 se_bottom = worldInst.resolveLandHeightAgent( LLVector3( east-FUDGE, south, 0.f ) );

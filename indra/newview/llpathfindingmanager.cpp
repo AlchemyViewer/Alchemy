@@ -457,7 +457,7 @@ void LLPathfindingManager::navMeshStatusRequestCoro(std::string url, U64 regionH
         httpAdapter(std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("NavMeshStatusRequest", httpPolicy));
     LLCore::HttpRequest::ptr_t httpRequest(std::make_shared<LLCore::HttpRequest>());
 
-    LLViewerRegion *region = LLWorld::getInstanceFast()->getRegionFromHandle(regionHandle);
+    LLViewerRegion *region = LLWorld::getInstance()->getRegionFromHandle(regionHandle);
     if (!region)
     {
         LL_WARNS("PathfindingManager") << "Attempting to retrieve navmesh status for region that has gone away." << LL_ENDL;
@@ -468,7 +468,7 @@ void LLPathfindingManager::navMeshStatusRequestCoro(std::string url, U64 regionH
     region = NULL;
     LLSD result = httpAdapter->getAndSuspend(httpRequest, url);
 
-    region = LLWorld::getInstanceFast()->getRegionFromHandle(regionHandle);
+    region = LLWorld::getInstance()->getRegionFromHandle(regionHandle);
 
     LLSD httpResults = result[LLCoreHttpUtil::HttpCoroutineAdapter::HTTP_RESULTS];
     LLCore::HttpStatus status = LLCoreHttpUtil::HttpCoroutineAdapter::getStatusFromLLSD(httpResults);

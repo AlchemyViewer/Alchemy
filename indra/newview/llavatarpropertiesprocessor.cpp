@@ -297,7 +297,7 @@ void LLAvatarPropertiesProcessor::processAvatarPropertiesReply(LLMessageSystem* 
 	{
 		msg->getStringFast(_PREHASH_PropertiesData, _PREHASH_CharterMember, avatar_data.caption_text);
 	}
-	LLAvatarPropertiesProcessor* self = getInstanceFast();
+	LLAvatarPropertiesProcessor* self = getInstance();
 	// Request processed, no longer pending
 	self->removePendingRequest(avatar_data.avatar_id, APT_PROPERTIES);
 	self->notifyObservers(avatar_data.avatar_id,&avatar_data,APT_PROPERTIES);
@@ -340,7 +340,7 @@ void LLAvatarPropertiesProcessor::processAvatarClassifiedsReply(LLMessageSystem*
 		classifieds.classifieds_list.push_back(data);
 	}
 
-	LLAvatarPropertiesProcessor* self = getInstanceFast();
+	LLAvatarPropertiesProcessor* self = getInstance();
 	// Request processed, no longer pending
 	self->removePendingRequest(classifieds.target_id, APT_CLASSIFIEDS);
 	self->notifyObservers(classifieds.target_id,&classifieds,APT_CLASSIFIEDS);
@@ -368,7 +368,7 @@ void LLAvatarPropertiesProcessor::processClassifiedInfoReply(LLMessageSystem* ms
 	msg->getU8Fast(_PREHASH_Data, _PREHASH_ClassifiedFlags, c_info.flags);
 	msg->getS32Fast(_PREHASH_Data, _PREHASH_PriceForListing, c_info.price_for_listing);
 
-	LLAvatarPropertiesProcessor* self = getInstanceFast();
+	LLAvatarPropertiesProcessor* self = getInstance();
 	// Request processed, no longer pending
 	self->removePendingRequest(c_info.creator_id, APT_CLASSIFIED_INFO);
 	self->notifyObservers(c_info.creator_id, &c_info, APT_CLASSIFIED_INFO);
@@ -383,7 +383,7 @@ void LLAvatarPropertiesProcessor::processAvatarNotesReply(LLMessageSystem* msg, 
 	msg->getUUIDFast(_PREHASH_Data, _PREHASH_TargetID, avatar_notes.target_id);
 	msg->getStringFast(_PREHASH_Data, _PREHASH_Notes, avatar_notes.notes);
 
-	LLAvatarPropertiesProcessor* self = getInstanceFast();
+	LLAvatarPropertiesProcessor* self = getInstance();
 	// Request processed, no longer pending
 	self->removePendingRequest(avatar_notes.target_id, APT_NOTES);
 	self->notifyObservers(avatar_notes.target_id,&avatar_notes,APT_NOTES);
@@ -406,7 +406,7 @@ void LLAvatarPropertiesProcessor::processAvatarPicksReply(LLMessageSystem* msg, 
 
 		avatar_picks.picks_list.push_back(std::make_pair(pick_id,pick_name));
 	}
-	LLAvatarPropertiesProcessor* self = getInstanceFast();
+	LLAvatarPropertiesProcessor* self = getInstance();
 	// Request processed, no longer pending
 	self->removePendingRequest(avatar_picks.target_id, APT_PICKS);
 	self->notifyObservers(avatar_picks.target_id,&avatar_picks,APT_PICKS);
@@ -437,7 +437,7 @@ void LLAvatarPropertiesProcessor::processPickInfoReply(LLMessageSystem* msg, voi
 	msg->getS32Fast(_PREHASH_Data, _PREHASH_SortOrder, pick_data.sort_order);
 	msg->getBOOLFast(_PREHASH_Data, _PREHASH_Enabled, pick_data.enabled);
 
-	LLAvatarPropertiesProcessor* self = getInstanceFast();
+	LLAvatarPropertiesProcessor* self = getInstance();
 	// don't need to remove pending request as we don't track pick info
 	self->notifyObservers(pick_data.creator_id, &pick_data, APT_PICK_INFO);
 }
@@ -462,7 +462,7 @@ void LLAvatarPropertiesProcessor::processAvatarGroupsReply(LLMessageSystem* msg,
 		avatar_groups.group_list.push_back(group_data);
 	}
 
-	LLAvatarPropertiesProcessor* self = getInstanceFast();
+	LLAvatarPropertiesProcessor* self = getInstance();
 	self->removePendingRequest(avatar_groups.avatar_id, APT_GROUPS);
 	self->notifyObservers(avatar_groups.avatar_id,&avatar_groups,APT_GROUPS);
 }
@@ -538,8 +538,8 @@ void LLAvatarPropertiesProcessor::sendPickDelete( const LLUUID& pick_id )
 	msg->addUUIDFast(_PREHASH_PickID, pick_id);
 	gAgent.sendReliableMessage();
 
-	LLAgentPicksInfo::getInstanceFast()->requestNumberOfPicks();
-	LLAgentPicksInfo::getInstanceFast()->decrementNumberOfPicks();
+	LLAgentPicksInfo::getInstance()->requestNumberOfPicks();
+	LLAgentPicksInfo::getInstance()->decrementNumberOfPicks();
 }
 
 void LLAvatarPropertiesProcessor::sendClassifiedDelete(const LLUUID& classified_id)
@@ -589,7 +589,7 @@ void LLAvatarPropertiesProcessor::sendPickInfoUpdate(const LLPickData* new_pick)
 	msg->addBOOLFast(_PREHASH_Enabled, new_pick->enabled);
 	gAgent.sendReliableMessage();
 
-	LLAgentPicksInfo::getInstanceFast()->requestNumberOfPicks();
+	LLAgentPicksInfo::getInstance()->requestNumberOfPicks();
 }
 
 void LLAvatarPropertiesProcessor::sendClassifiedInfoUpdate(const LLAvatarClassifiedInfo* c_data)

@@ -1736,7 +1736,7 @@ BOOL LLScrollListCtrl::handleToolTip(S32 x, S32 y, MASK mask)
 			localRectToScreen(cell_rect, &sticky_rect);
 
 			// display tooltip exactly over original cell, in same font
-			LLToolTipMgr::instanceFast().show(LLToolTip::Params()
+			LLToolTipMgr::instance().show(LLToolTip::Params()
 										.message(hit_cell->getToolTip())
 										.font(LLFontGL::getFontSansSerifSmall())
 										.pos(LLCoordGL(sticky_rect.mLeft - 5, sticky_rect.mTop + 6))

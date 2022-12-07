@@ -1639,11 +1639,11 @@ bool LLFloaterIMContainer::checkContextMenuItem(const std::string& item, uuid_ve
     {
 		if ("is_blocked" == item)
 		{
-			return LLMuteList::getInstanceFast()->isMuted(uuids.front(), LLMute::flagVoiceChat);
+			return LLMuteList::getInstance()->isMuted(uuids.front(), LLMute::flagVoiceChat);
 		}
 		else if (item == "is_muted")
 		{
-		    return LLMuteList::getInstanceFast()->isMuted(uuids.front(), LLMute::flagTextChat);
+		    return LLMuteList::getInstance()->isMuted(uuids.front(), LLMute::flagTextChat);
 	    }
 		else if ("is_allowed_text_chat" == item)
 		{
@@ -1802,7 +1802,7 @@ void LLFloaterIMContainer::setNearbyDistances()
 		// Get the positions of the nearby avatars and their ids
 		std::vector<LLVector3d> positions;
 		uuid_vec_t avatar_ids;
-		LLWorld::getInstanceFast()->getAvatars(&avatar_ids, &positions, gAgent.getPositionGlobal(), ALControlCache::NearMeRange);
+		LLWorld::getInstance()->getAvatars(&avatar_ids, &positions, gAgent.getPositionGlobal(), ALControlCache::NearMeRange);
 		// Get the position of the agent
 		const LLVector3d& me_pos = gAgent.getPositionGlobal();
 		// For each nearby avatar, compute and update the distance
@@ -2285,7 +2285,7 @@ void LLFloaterIMContainer::reSelectConversation()
 
 void LLFloaterIMContainer::updateSpeakBtnState()
 {
-	mSpeakBtn->setToggleState(LLVoiceClient::getInstanceFast()->getUserPTTState());
+	mSpeakBtn->setToggleState(LLVoiceClient::getInstance()->getUserPTTState());
 	mSpeakBtn->setEnabled(LLAgent::isActionAllowed("speak"));
 }
 

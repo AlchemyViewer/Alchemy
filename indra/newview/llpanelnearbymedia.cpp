@@ -504,7 +504,7 @@ void LLPanelNearByMedia::refreshParcelItems()
 	// Only show "special parcel items" if "All" or "Within" filter
 	// (and if media is "enabled")
 	bool should_include = (choice == MEDIA_CLASS_ALL || choice == MEDIA_CLASS_WITHIN_PARCEL);
-	LLViewerMedia* media_inst = LLViewerMedia::getInstanceFast();
+	LLViewerMedia* media_inst = LLViewerMedia::getInstance();
 
 	// First Parcel Media: add or remove it as necessary
 	if (gSavedSettings.getBOOL("AudioStreamingMedia") && should_include && media_inst->hasParcelMedia())
@@ -615,7 +615,7 @@ void LLPanelNearByMedia::refreshList()
 	refreshParcelItems();
 	
 	// Get the canonical list from LLViewerMedia
-	LLViewerMedia* media_inst = LLViewerMedia::getInstanceFast();
+	LLViewerMedia* media_inst = LLViewerMedia::getInstance();
 	LLViewerMedia::impl_list impls = media_inst->getPriorityList();
 	LLViewerMedia::impl_list::iterator priority_iter;
 	
@@ -739,19 +739,19 @@ void LLPanelNearByMedia::updateColumns()
 
 void LLPanelNearByMedia::onClickEnableAll()
 {
-	LLViewerMedia::getInstanceFast()->setAllMediaEnabled(true);
+	LLViewerMedia::getInstance()->setAllMediaEnabled(true);
 }
 
 void LLPanelNearByMedia::onClickDisableAll()
 {
-	LLViewerMedia::getInstanceFast()->setAllMediaEnabled(false);
+	LLViewerMedia::getInstance()->setAllMediaEnabled(false);
 }
 
 void LLPanelNearByMedia::onClickEnableParcelMedia()
 {	
-	if ( ! LLViewerMedia::getInstanceFast()->isParcelMediaPlaying() )
+	if ( ! LLViewerMedia::getInstance()->isParcelMediaPlaying() )
 	{
-		LLViewerParcelMedia::getInstance()->play(LLViewerParcelMgr::getInstanceFast()->getAgentParcel());
+		LLViewerParcelMedia::getInstance()->play(LLViewerParcelMgr::getInstance()->getAgentParcel());
 	}
 }
 
@@ -795,7 +795,7 @@ bool LLPanelNearByMedia::setDisabled(const LLUUID &row_id, bool disabled)
 		return true;
 	}
 	else {
-		LLViewerMediaImpl* impl = LLViewerMedia::getInstanceFast()->getMediaImplFromTextureID(row_id);
+		LLViewerMediaImpl* impl = LLViewerMedia::getInstance()->getMediaImplFromTextureID(row_id);
 		if(impl)
 		{
 			impl->setDisabled(disabled, true);
@@ -852,7 +852,7 @@ void LLPanelNearByMedia::onClickParcelAudioPlay()
 	}
 	else
 	{
-		LLViewerAudio::getInstance()->startInternetStreamWithAutoFade(LLViewerMedia::getInstanceFast()->getParcelAudioURL());
+		LLViewerAudio::getInstance()->startInternetStreamWithAutoFade(LLViewerMedia::getInstance()->getParcelAudioURL());
 	}
 }
 
@@ -944,7 +944,7 @@ void LLPanelNearByMedia::onMoreLess()
 void LLPanelNearByMedia::updateControls()
 {
 	LLUUID selected_media_id = mMediaList->getValue().asUUID();
-	LLViewerMedia* media_inst = LLViewerMedia::getInstanceFast();
+	LLViewerMedia* media_inst = LLViewerMedia::getInstance();
 	
 	if (selected_media_id == PARCEL_AUDIO_LIST_ITEM_UUID)
 	{
@@ -1080,7 +1080,7 @@ void LLPanelNearByMedia::onClickSelectedMediaPlay()
 	if (selected_media_id != PARCEL_AUDIO_LIST_ITEM_UUID)
 	{
 		LLViewerMediaImpl *impl = (selected_media_id == PARCEL_MEDIA_LIST_ITEM_UUID) ?
-			((LLViewerMediaImpl*)LLViewerParcelMedia::getInstanceFast()->getParcelMedia()) : LLViewerMedia::getInstanceFast()->getMediaImplFromTextureID(selected_media_id);
+			((LLViewerMediaImpl*)LLViewerParcelMedia::getInstance()->getParcelMedia()) : LLViewerMedia::getInstance()->getMediaImplFromTextureID(selected_media_id);
 		if (NULL != impl)
 		{
 			if (impl->isMediaTimeBased() && impl->isMediaPaused())
@@ -1091,7 +1091,7 @@ void LLPanelNearByMedia::onClickSelectedMediaPlay()
 			}
 			else if (impl->isParcelMedia())
 			{
-				LLViewerParcelMedia::getInstanceFast()->play(LLViewerParcelMgr::getInstance()->getAgentParcel());
+				LLViewerParcelMedia::getInstance()->play(LLViewerParcelMgr::getInstance()->getAgentParcel());
 			}
 		}
 	}	
@@ -1109,7 +1109,7 @@ void LLPanelNearByMedia::onClickSelectedMediaPause()
 		onClickParcelMediaPause();
 	}
 	else {
-		LLViewerMediaImpl* impl = LLViewerMedia::getInstanceFast()->getMediaImplFromTextureID(selected_media_id);
+		LLViewerMediaImpl* impl = LLViewerMedia::getInstance()->getMediaImplFromTextureID(selected_media_id);
 		if (NULL != impl && impl->isMediaTimeBased() && impl->isMediaPlaying())
 		{
 			impl->pause();
@@ -1126,7 +1126,7 @@ void LLPanelNearByMedia::onClickSelectedMediaMute()
 	}
 	else {
 		LLViewerMediaImpl* impl = (selected_media_id == PARCEL_MEDIA_LIST_ITEM_UUID) ?
-			((LLViewerMediaImpl*)LLViewerParcelMedia::getInstance()->getParcelMedia()) : LLViewerMedia::getInstanceFast()->getMediaImplFromTextureID(selected_media_id);
+			((LLViewerMediaImpl*)LLViewerParcelMedia::getInstance()->getParcelMedia()) : LLViewerMedia::getInstance()->getMediaImplFromTextureID(selected_media_id);
 		if (NULL != impl)
 		{
 			F32 volume = impl->getVolume();
@@ -1157,7 +1157,7 @@ void LLPanelNearByMedia::onCommitSelectedMediaVolume()
 	}
 	else {
 		LLViewerMediaImpl* impl = (selected_media_id == PARCEL_MEDIA_LIST_ITEM_UUID) ?
-			((LLViewerMediaImpl*)LLViewerParcelMedia::getInstance()->getParcelMedia()) : LLViewerMedia::getInstanceFast()->getMediaImplFromTextureID(selected_media_id);
+			((LLViewerMediaImpl*)LLViewerParcelMedia::getInstance()->getParcelMedia()) : LLViewerMedia::getInstance()->getMediaImplFromTextureID(selected_media_id);
 		if (NULL != impl)
 		{
 			impl->setVolume(mVolumeSlider->getValueF32());

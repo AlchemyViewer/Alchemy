@@ -1042,7 +1042,7 @@ BOOL LLViewerShaderMgr::loadShadersEnvironment()
 		return FALSE;
 	}
 	
-	LLWorld::getInstanceFast()->updateWaterObjects();
+	LLWorld::getInstance()->updateWaterObjects();
 	
 	return TRUE;
 }
@@ -1159,7 +1159,7 @@ BOOL LLViewerShaderMgr::loadShadersWater()
 		return loadShadersWater();
 	}
 	
-	LLWorld::getInstanceFast()->updateWaterObjects();
+	LLWorld::getInstance()->updateWaterObjects();
 
 	return TRUE;
 }
@@ -4444,7 +4444,7 @@ std::string LLViewerShaderMgr::getShaderDirPrefix(void)
 
 void LLViewerShaderMgr::updateShaderUniforms(LLGLSLShader * shader)
 {
-    LLEnvironment::getInstanceFast()->updateShaderUniforms(shader);
+    LLEnvironment::getInstance()->updateShaderUniforms(shader);
 }
 
 LLViewerShaderMgr::shader_iter LLViewerShaderMgr::beginShaders() const

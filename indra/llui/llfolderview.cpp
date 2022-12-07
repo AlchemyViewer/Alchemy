@@ -743,7 +743,7 @@ void LLFolderView::closeRenamer( void )
 	if (mRenamer && mRenamer->getVisible())
 	{
 		// Triggers onRenamerLost() that actually closes the renamer.
-		LLUI::getInstanceFast()->removePopup(mRenamer);
+		LLUI::getInstance()->removePopup(mRenamer);
 	}
 }
 
@@ -921,7 +921,7 @@ BOOL LLFolderView::canCopy() const
 void LLFolderView::copy()
 {
 	// *NOTE: total hack to clear the inventory clipboard
-	LLClipboard::instanceFast().reset();
+	LLClipboard::instance().reset();
 	S32 count = mSelectedItems.size();
 	if(getVisible() && getEnabled() && (count > 0))
 	{
@@ -965,7 +965,7 @@ BOOL LLFolderView::canCut() const
 void LLFolderView::cut()
 {
 	// clear the inventory clipboard
-	LLClipboard::instanceFast().reset();
+	LLClipboard::instance().reset();
 	if(getVisible() && getEnabled() && (mSelectedItems.size() > 0))
 	{
 		// Find out which item will be selected once the selection will be cut
@@ -1080,7 +1080,7 @@ void LLFolderView::startRenamingSelectedItem( void )
 		// set focus will fail unless item is visible
 		mRenamer->setFocus( TRUE );
 		mRenamer->setTopLostCallback(boost::bind(&LLFolderView::onRenamerLost, this));
-		LLUI::getInstanceFast()->addPopup(mRenamer);
+		LLUI::getInstance()->addPopup(mRenamer);
 	}
 }
 
@@ -1463,12 +1463,12 @@ BOOL LLFolderView::handleRightMouseDown( S32 x, S32 y, MASK mask )
 			mEnableRegistrar->pushScope();
 		}
 		llassert(LLMenuGL::sMenuContainer != NULL);
-		menu = LLUICtrlFactory::getInstanceFast()->createFromFile<LLMenuGL>(mMenuFileName, LLMenuGL::sMenuContainer, LLMenuHolderGL::child_registry_t::instanceFast());
+		menu = LLUICtrlFactory::getInstance()->createFromFile<LLMenuGL>(mMenuFileName, LLMenuGL::sMenuContainer, LLMenuHolderGL::child_registry_t::instance());
 		if (!menu)
 		{
 			menu = LLUICtrlFactory::getDefaultWidget<LLMenuGL>("inventory_menu");
 		}
-	menu->setBackgroundColor(LLUIColorTable::instanceFast().getColor("MenuPopupBgColor"));
+	menu->setBackgroundColor(LLUIColorTable::instance().getColor("MenuPopupBgColor"));
 		mPopupMenuHandle = menu->getHandle();
 		if (mEnableRegistrar)
 		{

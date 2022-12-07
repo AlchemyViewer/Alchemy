@@ -521,7 +521,7 @@ static void deferred_ui_audio_callback(const LLUUID& uuid)
 	if (gAudiop)
 	{
 		SoundData soundData(uuid, gAgent.getID(), 1.0f, LLAudioEngine::AUDIO_TYPE_UI);
-		LLDeferredSounds::instanceFast().deferSound(soundData);
+		LLDeferredSounds::instance().deferSound(soundData);
 	}
 }
 
@@ -2179,6 +2179,7 @@ bool LLAppViewer::initThreads()
 
 	if (LLTrace::BlockTimer::sLog || LLTrace::BlockTimer::sMetricLog)
 	{
+		LLTrace::BlockTimer::setLogLock(new LLMutex());
 		mFastTimerLogThread = new LLFastTimerLogThread(LLTrace::BlockTimer::sLogName);
 		mFastTimerLogThread->start();
 	}
@@ -4627,7 +4628,7 @@ void LLAppViewer::idle()
 		gGLActive = FALSE;
 	}
 
-	auto& worldInst = LLWorld::instanceFast();
+	auto& worldInst = LLWorld::instance();
 
     F32 yaw = 0.f;				// radians
 
@@ -4790,7 +4791,7 @@ void LLAppViewer::idle()
 	{
 		// After agent and camera moved, figure out if we need to
 		// deselect objects.
-		LLSelectMgr::getInstanceFast()->deselectAllIfTooFar();
+		LLSelectMgr::getInstance()->deselectAllIfTooFar();
 
 	}
 
@@ -4844,7 +4845,7 @@ void LLAppViewer::idle()
 
 	{
 		LL_RECORD_BLOCK_TIME(FTM_HUD_EFFECTS);
-		LLSelectMgr::getInstanceFast()->updateEffects();
+		LLSelectMgr::getInstance()->updateEffects();
 		LLHUDManager::getInstance()->cleanupEffects();
 		LLHUDManager::getInstance()->sendEffects();
 	}
@@ -4912,22 +4913,22 @@ void LLAppViewer::idle()
 	{
 		gAgentPilot.moveCamera();
 	}
-	else if (LLViewerJoystick::getInstanceFast()->getOverrideCamera())
+	else if (LLViewerJoystick::getInstance()->getOverrideCamera())
 	{
-		LLViewerJoystick::getInstanceFast()->moveFlycam();
+		LLViewerJoystick::getInstance()->moveFlycam();
 	}
 	else
 	{
-		if (LLToolMgr::getInstanceFast()->inBuildMode())
+		if (LLToolMgr::getInstance()->inBuildMode())
 		{
-			LLViewerJoystick::getInstanceFast()->moveObjects();
+			LLViewerJoystick::getInstance()->moveObjects();
 		}
 
 		gAgentCamera.updateCamera();
 	}
 
 	// update media focus
-	LLViewerMediaFocus::getInstanceFast()->update();
+	LLViewerMediaFocus::getInstance()->update();
 
 	// Update marketplace
 	LLMarketplaceInventoryImporter::update();

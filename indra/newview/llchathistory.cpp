@@ -599,7 +599,7 @@ public:
 		mUserNameTextBox = getChild<LLTextBox>("user_name");
 		mTimeBoxTextBox = getChild<LLTextBox>("time_box");
 
-		mInfoCtrl = LLUICtrlFactory::getInstanceFast()->createFromFile<LLUICtrl>("inspector_info_ctrl.xml", this, LLPanel::child_registry_t::instanceFast());
+		mInfoCtrl = LLUICtrlFactory::getInstance()->createFromFile<LLUICtrl>("inspector_info_ctrl.xml", this, LLPanel::child_registry_t::instance());
 		llassert(mInfoCtrl != NULL);
 		mInfoCtrl->setCommitCallback(boost::bind(&LLChatHistoryHeader::onClickInfoCtrl, mInfoCtrl));
 		mInfoCtrl->setVisible(FALSE);
@@ -824,7 +824,7 @@ public:
 			std::string slurl = args["slurl"].asString();
 			if (slurl.empty())
 			{
-				LLViewerRegion *region = LLWorld::getInstanceFast()->getRegionFromPosAgent(chat.mPosAgent);
+				LLViewerRegion *region = LLWorld::getInstance()->getRegionFromPosAgent(chat.mPosAgent);
 				if(region)
 				{
 					LLSLURL region_slurl(region->getName(), chat.mPosAgent);

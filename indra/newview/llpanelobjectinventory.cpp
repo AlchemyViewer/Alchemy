@@ -1803,7 +1803,7 @@ void LLPanelObjectInventory::refresh()
 	//LL_INFOS() << "LLPanelObjectInventory::refresh()" << LL_ENDL;
 	BOOL has_inventory = FALSE;
 	const BOOL non_root_ok = TRUE;
-	LLObjectSelectionHandle selection = LLSelectMgr::getInstanceFast()->getSelection();
+	LLObjectSelectionHandle selection = LLSelectMgr::getInstance()->getSelection();
 	LLSelectNode* node = selection->getFirstRootNode(NULL, non_root_ok);
 	if(node && node->mValid)
 	{
@@ -1837,7 +1837,7 @@ void LLPanelObjectInventory::refresh()
 				{
 					// Server unsubsribes viewer (deselects object) from property
 					// updates after "ObjectAttach" so we need to resubscribe
-					LLSelectMgr::getInstanceFast()->sendSelect();
+					LLSelectMgr::getInstance()->sendSelect();
 				}
 			}
 

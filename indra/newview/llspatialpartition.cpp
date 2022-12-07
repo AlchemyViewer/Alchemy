@@ -3739,7 +3739,7 @@ public:
 void LLSpatialPartition::renderPhysicsShapes()
 {
 	LLSpatialBridge* bridge = asBridge();
-	LLCamera* camera = LLViewerCamera::getInstanceFast();
+	LLCamera* camera = LLViewerCamera::getInstance();
 	
 	if (bridge)
 	{
@@ -3787,7 +3787,7 @@ void LLSpatialPartition::renderDebug()
 	if (gPipeline.hasRenderDebugMask(LLPipeline::RENDER_DEBUG_TEXTURE_PRIORITY))
 	{
 		//sLastMaxTexPriority = lerp(sLastMaxTexPriority, sCurMaxTexPriority, gFrameIntervalSeconds);
-		sLastMaxTexPriority = (F32) LLViewerCamera::getInstanceFast()->getScreenPixelArea();
+		sLastMaxTexPriority = (F32) LLViewerCamera::getInstance()->getScreenPixelArea();
 		sCurMaxTexPriority = 0.f;
 	}
 
@@ -3798,7 +3798,7 @@ void LLSpatialPartition::renderDebug()
 	gPipeline.disableLights();
 
 	LLSpatialBridge* bridge = asBridge();
-	LLCamera* camera = LLViewerCamera::getInstanceFast();
+	LLCamera* camera = LLViewerCamera::getInstance();
 	
 	if (bridge)
 	{
@@ -3854,7 +3854,7 @@ bool LLSpatialPartition::isHUDPartition()
 
 BOOL LLSpatialPartition::isVisible(const LLVector3& v)
 {
-	if (!LLViewerCamera::getInstanceFast()->sphereInFrustum(v, 4.0f))
+	if (!LLViewerCamera::getInstance()->sphereInFrustum(v, 4.0f))
 	{
 		return FALSE;
 	}

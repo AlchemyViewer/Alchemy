@@ -244,7 +244,7 @@ void LLViewerParcelMgr::dump()
 
 LLViewerRegion* LLViewerParcelMgr::getSelectionRegion()
 {
-	return LLWorld::getInstanceFast()->getRegionFromPosGlobal( mWestSouth );
+	return LLWorld::getInstance()->getRegionFromPosGlobal( mWestSouth );
 }
 
 
@@ -531,8 +531,8 @@ LLParcelSelectionHandle LLViewerParcelMgr::selectLand(const LLVector3d &corner1,
 	east_north_region_check.mdV[VX] -= 0.5;
 	east_north_region_check.mdV[VY] -= 0.5;
 
-	LLViewerRegion *region = LLWorld::getInstanceFast()->getRegionFromPosGlobal(mWestSouth);
-	LLViewerRegion *region_other = LLWorld::getInstanceFast()->getRegionFromPosGlobal( east_north_region_check );
+	LLViewerRegion *region = LLWorld::getInstance()->getRegionFromPosGlobal(mWestSouth);
+	LLViewerRegion *region_other = LLWorld::getInstance()->getRegionFromPosGlobal( east_north_region_check );
 
 	if(!region)
 	{
@@ -760,7 +760,7 @@ bool LLViewerParcelMgr::allowAgentDamage(const LLViewerRegion* region, const LLP
 
 BOOL LLViewerParcelMgr::isOwnedAt(const LLVector3d& pos_global) const
 {
-	LLViewerRegion* region = LLWorld::getInstanceFast()->getRegionFromPosGlobal( pos_global );
+	LLViewerRegion* region = LLWorld::getInstance()->getRegionFromPosGlobal( pos_global );
 	if (!region) return FALSE;
 
 	LLViewerParcelOverlay* overlay = region->getParcelOverlay();
@@ -773,7 +773,7 @@ BOOL LLViewerParcelMgr::isOwnedAt(const LLVector3d& pos_global) const
 
 BOOL LLViewerParcelMgr::isOwnedSelfAt(const LLVector3d& pos_global) const
 {
-	LLViewerRegion* region = LLWorld::getInstanceFast()->getRegionFromPosGlobal( pos_global );
+	LLViewerRegion* region = LLWorld::getInstance()->getRegionFromPosGlobal( pos_global );
 	if (!region) return FALSE;
 
 	LLViewerParcelOverlay* overlay = region->getParcelOverlay();
@@ -786,7 +786,7 @@ BOOL LLViewerParcelMgr::isOwnedSelfAt(const LLVector3d& pos_global) const
 
 BOOL LLViewerParcelMgr::isOwnedOtherAt(const LLVector3d& pos_global) const
 {
-	LLViewerRegion* region = LLWorld::getInstanceFast()->getRegionFromPosGlobal( pos_global );
+	LLViewerRegion* region = LLWorld::getInstance()->getRegionFromPosGlobal( pos_global );
 	if (!region) return FALSE;
 
 	LLViewerParcelOverlay* overlay = region->getParcelOverlay();
@@ -799,7 +799,7 @@ BOOL LLViewerParcelMgr::isOwnedOtherAt(const LLVector3d& pos_global) const
 
 BOOL LLViewerParcelMgr::isSoundLocal(const LLVector3d& pos_global) const
 {
-	LLViewerRegion* region = LLWorld::getInstanceFast()->getRegionFromPosGlobal( pos_global );
+	LLViewerRegion* region = LLWorld::getInstance()->getRegionFromPosGlobal( pos_global );
 	if (!region) return FALSE;
 
 	LLViewerParcelOverlay* overlay = region->getParcelOverlay();
@@ -842,7 +842,7 @@ BOOL LLViewerParcelMgr::canHearSound(const LLVector3d &pos_global) const
 
 BOOL LLViewerParcelMgr::inAgentParcel(const LLVector3d &pos_global) const
 {
-	LLViewerRegion* region = LLWorld::getInstanceFast()->getRegionFromPosGlobal(pos_global);
+	LLViewerRegion* region = LLWorld::getInstance()->getRegionFromPosGlobal(pos_global);
 	LLViewerRegion* agent_region = gAgent.getRegion();
 	if (!region || !agent_region)
 		return FALSE;
@@ -904,7 +904,7 @@ void LLViewerParcelMgr::render()
 	{
 		// Rendering is done in agent-coordinates, so need to supply
 		// an appropriate offset to the render code.
-		LLViewerRegion* regionp = LLWorld::getInstanceFast()->getRegionFromPosGlobal(mWestSouth);
+		LLViewerRegion* regionp = LLWorld::getInstance()->getRegionFromPosGlobal(mWestSouth);
 		if (!regionp) return;
 
 		renderHighlightSegments(mHighlightSegments, regionp);
@@ -940,7 +940,7 @@ void LLViewerParcelMgr::sendParcelAccessListRequest(U32 flags)
 		return;
 	}
 
-	LLViewerRegion *region = LLWorld::getInstanceFast()->getRegionFromPosGlobal( mWestSouth );
+	LLViewerRegion *region = LLWorld::getInstance()->getRegionFromPosGlobal( mWestSouth );
 	if (!region) return;
 
 	LLMessageSystem *msg = gMessageSystem;
@@ -983,7 +983,7 @@ void LLViewerParcelMgr::sendParcelDwellRequest()
 		return;
 	}
 
-	LLViewerRegion *region = LLWorld::getInstanceFast()->getRegionFromPosGlobal( mWestSouth );
+	LLViewerRegion *region = LLWorld::getInstance()->getRegionFromPosGlobal( mWestSouth );
 	if (!region) return;
 
 	LLMessageSystem *msg = gMessageSystem;
@@ -1015,7 +1015,7 @@ void LLViewerParcelMgr::sendParcelGodForceOwner(const LLUUID& owner_id)
 	east_north_region_check.mdV[VX] -= 0.5;
 	east_north_region_check.mdV[VY] -= 0.5;
 
-	LLViewerRegion *region = LLWorld::getInstanceFast()->getRegionFromPosGlobal( mWestSouth );
+	LLViewerRegion *region = LLWorld::getInstance()->getRegionFromPosGlobal( mWestSouth );
 	if (!region)
 	{
 		// TODO: Add a force owner version of this alert.
@@ -1024,7 +1024,7 @@ void LLViewerParcelMgr::sendParcelGodForceOwner(const LLUUID& owner_id)
 	}
 
 	// BUG: Make work for cross-region selections
-	LLViewerRegion *region2 = LLWorld::getInstanceFast()->getRegionFromPosGlobal( east_north_region_check );
+	LLViewerRegion *region2 = LLWorld::getInstance()->getRegionFromPosGlobal( east_north_region_check );
 	if (region != region2)
 	{
 		LLNotificationsUtil::add("CannotSetLandOwnerMultipleRegions");
@@ -1075,7 +1075,7 @@ void LLViewerParcelMgr::sendParcelGodForceToContent()
 		LLNotificationsUtil::add("CannotContentifyNothingSelected");
 		return;
 	}
-	LLViewerRegion* region = LLWorld::getInstanceFast()->getRegionFromPosGlobal( mWestSouth );
+	LLViewerRegion* region = LLWorld::getInstance()->getRegionFromPosGlobal( mWestSouth );
 	if (!region)
 	{
 		LLNotificationsUtil::add("CannotContentifyNoRegion");
@@ -1100,7 +1100,7 @@ void LLViewerParcelMgr::sendParcelRelease()
 		return;
 	}
 
-	LLViewerRegion *region = LLWorld::getInstanceFast()->getRegionFromPosGlobal( mWestSouth );
+	LLViewerRegion *region = LLWorld::getInstance()->getRegionFromPosGlobal( mWestSouth );
 	if (!region)
 	{
 		LLNotificationsUtil::add("CannotReleaseLandNoRegion");
@@ -1162,7 +1162,7 @@ LLViewerParcelMgr::ParcelBuyInfo* LLViewerParcelMgr::setupParcelBuy(
 		return NULL;
 	}
 
-	LLViewerRegion *region = LLWorld::getInstanceFast()->getRegionFromPosGlobal( mWestSouth );
+	LLViewerRegion *region = LLWorld::getInstance()->getRegionFromPosGlobal( mWestSouth );
 	if (!region)
 	{
 		LLNotificationsUtil::add("CannotBuyLandNoRegion");
@@ -1179,7 +1179,7 @@ LLViewerParcelMgr::ParcelBuyInfo* LLViewerParcelMgr::setupParcelBuy(
 		east_north_region_check.mdV[VX] -= 0.5;
 		east_north_region_check.mdV[VY] -= 0.5;
 
-		LLViewerRegion *region2 = LLWorld::getInstanceFast()->getRegionFromPosGlobal( east_north_region_check );
+		LLViewerRegion *region2 = LLWorld::getInstance()->getRegionFromPosGlobal( east_north_region_check );
 
 		if (region != region2)
 		{
@@ -1273,7 +1273,7 @@ void LLViewerParcelMgr::sendParcelDeed(const LLUUID& group_id)
 		LLNotificationsUtil::add("CannotDeedLandNoGroup");
 		return;
 	}
-	LLViewerRegion *region = LLWorld::getInstanceFast()->getRegionFromPosGlobal( mWestSouth );
+	LLViewerRegion *region = LLWorld::getInstance()->getRegionFromPosGlobal( mWestSouth );
 	if (!region)
 	{
 		LLNotificationsUtil::add("CannotDeedLandNoRegion");
@@ -1348,7 +1348,7 @@ void LLViewerParcelMgr::sendParcelPropertiesUpdate(LLParcel* parcel, bool use_ag
 	if(!parcel) 
         return;
 
-	LLViewerRegion *region = use_agent_region ? gAgent.getRegion() : LLWorld::getInstanceFast()->getRegionFromPosGlobal( mWestSouth );
+	LLViewerRegion *region = use_agent_region ? gAgent.getRegion() : LLWorld::getInstance()->getRegionFromPosGlobal( mWestSouth );
 	if (!region) 
         return;
 
@@ -1402,7 +1402,7 @@ void LLViewerParcelMgr::setHoverParcel(const LLVector3d& pos)
 		return;
 	}
 
-	LLViewerRegion* region = LLWorld::getInstanceFast()->getRegionFromPosGlobal( pos );
+	LLViewerRegion* region = LLWorld::getInstance()->getRegionFromPosGlobal( pos );
 	if (!region)
 	{
 		return;
@@ -1529,7 +1529,7 @@ void LLViewerParcelMgr::processParcelOverlay(LLMessageSystem *msg, void **user)
 			expected_size);
 
 	LLHost host = msg->getSender();
-	LLViewerRegion *region = LLWorld::getInstanceFast()->getRegion(host);
+	LLViewerRegion *region = LLWorld::getInstance()->getRegion(host);
 	if (region)
 	{
 		region->mParcelOverlay->uncompressLandOverlay( sequence_id, sPackedOverlay );
@@ -1578,8 +1578,8 @@ void LLViewerParcelMgr::processParcelProperties(LLMessageSystem *msg, void **use
 
     S32		other_clean_time = 0;
 
-    LLViewerParcelMgr& parcel_mgr = LLViewerParcelMgr::instanceFast();
-    LLViewerRegion* msg_region = LLWorld::getInstanceFast()->getRegion(msg->getSender());
+    LLViewerParcelMgr& parcel_mgr = LLViewerParcelMgr::instance();
+    LLViewerRegion* msg_region = LLWorld::getInstance()->getRegion(msg->getSender());
     if(msg_region)
         parcel_mgr.mParcelsPerEdge = S32(msg_region->getWidth() / PARCEL_GRID_STEP_METERS);
     else
@@ -1689,7 +1689,7 @@ void LLViewerParcelMgr::processParcelProperties(LLMessageSystem *msg, void **use
         if (local_id == parcel_mgr.mAgentParcel->getLocalID())
         {
             // Parcels in different regions can have same ids.
-            LLViewerRegion* parcel_region = LLWorld::getInstanceFast()->getRegion(msg->getSender());
+            LLViewerRegion* parcel_region = LLWorld::getInstance()->getRegion(msg->getSender());
             LLViewerRegion* agent_region = gAgent.getRegion();
             if (parcel_region && agent_region && parcel_region->getRegionID() == agent_region->getRegionID())
             {
@@ -1789,7 +1789,7 @@ void LLViewerParcelMgr::processParcelProperties(LLMessageSystem *msg, void **use
 							(request_result == PARCEL_RESULT_MULTIPLE);
 
 		// Select the whole parcel
-		LLViewerRegion* region = LLWorld::getInstanceFast()->getRegion( msg->getSender() );
+		LLViewerRegion* region = LLWorld::getInstance()->getRegion( msg->getSender() );
 		if (region)
 		{
 			if (!snap_selection)
@@ -1884,7 +1884,7 @@ void LLViewerParcelMgr::processParcelProperties(LLMessageSystem *msg, void **use
 		parcel_mgr.resetSegments(parcel_mgr.mCollisionSegments);
 		parcel_mgr.writeSegmentsFromBitmap(parcel_mgr.mCollisionBitmap, parcel_mgr.mCollisionSegments);
 
-		LLViewerRegion* pRegion = LLWorld::getInstanceFast()->getRegion(msg->getSender());
+		LLViewerRegion* pRegion = LLWorld::getInstance()->getRegion(msg->getSender());
 		parcel_mgr.mCollisionRegionHandle = (pRegion) ? pRegion->getHandle() : 0;
 
 		if (parcel_mgr.mCollisionUpdateSignal)
@@ -1892,7 +1892,7 @@ void LLViewerParcelMgr::processParcelProperties(LLMessageSystem *msg, void **use
 	}
 	else if (sequence_id == HOVERED_PARCEL_SEQ_ID)
 	{
-		LLViewerRegion *region = LLWorld::getInstanceFast()->getRegion( msg->getSender() );
+		LLViewerRegion *region = LLWorld::getInstance()->getRegion( msg->getSender() );
 		if (region)
 		{
 			parcel_mgr.mHoverWestSouth = region->getPosGlobalFromRegion( aabb_min );
@@ -1931,7 +1931,7 @@ void LLViewerParcelMgr::processParcelProperties(LLMessageSystem *msg, void **use
                         if (music_url.substr(0, 7) == "http://"
                             || music_url.substr(0, 8) == "https://")
                         {
-                            LLViewerRegion *region = LLWorld::getInstanceFast()->getRegion(msg->getSender());
+                            LLViewerRegion *region = LLWorld::getInstance()->getRegion(msg->getSender());
                             if (region)
                             {
                                 optionallyStartMusic(music_url, parcel->mLocalID, region->getRegionID(), !agent_parcel_update);
@@ -2050,7 +2050,7 @@ void LLViewerParcelMgr::processParcelAccessListReply(LLMessageSystem *msg, void 
 	msg->getU32Fast( _PREHASH_Data, _PREHASH_Flags, message_flags);
 	msg->getS32Fast( _PREHASH_Data, _PREHASH_LocalID, parcel_id);
 
-	LLParcel* parcel = LLViewerParcelMgr::getInstanceFast()->mCurrentParcel;
+	LLParcel* parcel = LLViewerParcelMgr::getInstance()->mCurrentParcel;
 	if (!parcel) return;
 
 	if (parcel_id != parcel->getLocalID())
@@ -2081,7 +2081,7 @@ void LLViewerParcelMgr::processParcelAccessListReply(LLMessageSystem *msg, void 
 		parcel->unpackAccessEntries(msg, &(parcel->mRenterList) );
 	}*/
 
-	LLViewerParcelMgr::getInstanceFast()->notifyObservers();
+	LLViewerParcelMgr::getInstance()->notifyObservers();
 }
 
 
@@ -2100,7 +2100,7 @@ void LLViewerParcelMgr::processParcelDwellReply(LLMessageSystem* msg, void**)
 	F32 dwell;
 	msg->getF32Fast(_PREHASH_Data, _PREHASH_Dwell, dwell);
 
-	auto& parcel_mgr = LLViewerParcelMgr::instanceFast();
+	auto& parcel_mgr = LLViewerParcelMgr::instance();
 	if (local_id == parcel_mgr.mCurrentParcel->getLocalID())
 	{
 		parcel_mgr.mSelectedDwell = dwell;
@@ -2116,7 +2116,7 @@ void LLViewerParcelMgr::sendParcelAccessListUpdate(U32 which)
 		return;
 	}
 
-	LLViewerRegion* region = LLWorld::getInstanceFast()->getRegionFromPosGlobal( mWestSouth );
+	LLViewerRegion* region = LLWorld::getInstance()->getRegionFromPosGlobal( mWestSouth );
 	if (!region) return;
 
 	LLParcel* parcel = mCurrentParcel;
@@ -2229,13 +2229,13 @@ bool LLViewerParcelMgr::deedAlertCB(const LLSD& notification, const LLSD& respon
 	S32 option = LLNotificationsUtil::getSelectedOption(notification, response);
 	if (option == 0)
 	{
-		LLParcel* parcel = LLViewerParcelMgr::getInstanceFast()->getParcelSelection()->getParcel();
+		LLParcel* parcel = LLViewerParcelMgr::getInstance()->getParcelSelection()->getParcel();
 		LLUUID group_id;
 		if(parcel)
 		{
 			group_id = parcel->getGroupID();
 		}
-		LLViewerParcelMgr::getInstanceFast()->sendParcelDeed(group_id);
+		LLViewerParcelMgr::getInstance()->sendParcelDeed(group_id);
 	}
 	return false;
 }
@@ -2269,7 +2269,7 @@ void LLViewerParcelMgr::startReleaseLand()
 	}
 
 	LLVector3d parcel_center = (mWestSouth + mEastNorth) / 2.0;
-	LLViewerRegion* region = LLWorld::getInstanceFast()->getRegionFromPosGlobal(parcel_center);
+	LLViewerRegion* region = LLWorld::getInstance()->getRegionFromPosGlobal(parcel_center);
 	if (!region)
 	{
 		LLNotificationsUtil::add("CannotReleaseLandRegionNotFound");
@@ -2322,7 +2322,7 @@ bool LLViewerParcelMgr::canAgentBuyParcel(LLParcel* parcel, bool forGroup) const
 	}
 	
 	LLVector3 parcel_coord = parcel->getCenterpoint();
-	LLViewerRegion* regionp = LLWorld::getInstanceFast()->getRegionFromPosAgent(parcel_coord);
+	LLViewerRegion* regionp = LLWorld::getInstance()->getRegionFromPosAgent(parcel_coord);
 	if (regionp)
 	{
 		U8 sim_access = regionp->getSimAccess();
@@ -2399,7 +2399,7 @@ bool LLViewerParcelMgr::callbackDivideLand(const LLSD& notification, const LLSD&
 	LLVector3d east_north_d = ll_vector3d_from_sd(notification["payload"]["east_north_border"]);
 	LLVector3d parcel_center = (west_south_d + east_north_d) / 2.0;
 
-	LLViewerRegion* region = LLWorld::getInstanceFast()->getRegionFromPosGlobal(parcel_center);
+	LLViewerRegion* region = LLWorld::getInstance()->getRegionFromPosGlobal(parcel_center);
 	if (!region)
 	{
 		LLNotificationsUtil::add("CannotDivideLandNoRegion");
@@ -2462,7 +2462,7 @@ bool LLViewerParcelMgr::callbackJoinLand(const LLSD& notification, const LLSD& r
 	LLVector3d east_north_d = ll_vector3d_from_sd(notification["payload"]["east_north_border"]);
 	LLVector3d parcel_center = (west_south_d + east_north_d) / 2.0;
 
-	LLViewerRegion* region = LLWorld::getInstanceFast()->getRegionFromPosGlobal(parcel_center);
+	LLViewerRegion* region = LLWorld::getInstance()->getRegionFromPosGlobal(parcel_center);
 	if (!region)
 	{
 		LLNotificationsUtil::add("CannotJoinLandNoRegion");
@@ -2511,7 +2511,7 @@ void LLViewerParcelMgr::startDeedLandToGroup()
 	}
 
 	LLVector3d parcel_center = (mWestSouth + mEastNorth) / 2.0;
-	LLViewerRegion* region = LLWorld::getInstanceFast()->getRegionFromPosGlobal(parcel_center);
+	LLViewerRegion* region = LLWorld::getInstance()->getRegionFromPosGlobal(parcel_center);
 	if (!region)
 	{
 		LLNotificationsUtil::add("CannotDeedLandNoRegion");
@@ -2536,8 +2536,8 @@ void LLViewerParcelMgr::startDeedLandToGroup()
 }
 void LLViewerParcelMgr::reclaimParcel()
 {
-	LLParcel* parcel = LLViewerParcelMgr::getInstanceFast()->getParcelSelection()->getParcel();
-	LLViewerRegion* regionp = LLViewerParcelMgr::getInstanceFast()->getSelectionRegion();
+	LLParcel* parcel = LLViewerParcelMgr::getInstance()->getParcelSelection()->getParcel();
+	LLViewerRegion* regionp = LLViewerParcelMgr::getInstance()->getSelectionRegion();
 	if(parcel && parcel->getOwnerID().notNull()
 	   && (parcel->getOwnerID() != gAgent.getID())
 	   && regionp && (regionp->getOwner() == gAgent.getID()))
@@ -2560,7 +2560,7 @@ bool LLViewerParcelMgr::releaseAlertCB(const LLSD& notification, const LLSD& res
 	if (option == 0)
 	{
 		// Send the release message, not a force
-		LLViewerParcelMgr::getInstanceFast()->sendParcelRelease();
+		LLViewerParcelMgr::getInstance()->sendParcelRelease();
 	}
 	return false;
 }

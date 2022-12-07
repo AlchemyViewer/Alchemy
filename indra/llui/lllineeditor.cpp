@@ -606,7 +606,7 @@ void LLLineEditor::addToDictionary()
 {
 	if (canAddToDictionary())
 	{
-		LLSpellChecker::instanceFast().addToCustomDictionary(getMisspelledWord(mCursorPos));
+		LLSpellChecker::instance().addToCustomDictionary(getMisspelledWord(mCursorPos));
 	}
 }
 
@@ -619,7 +619,7 @@ void LLLineEditor::addToIgnore()
 {
 	if (canAddToIgnore())
 	{
-		LLSpellChecker::instanceFast().addToIgnoreList(getMisspelledWord(mCursorPos));
+		LLSpellChecker::instance().addToIgnoreList(getMisspelledWord(mCursorPos));
 	}
 }
 
@@ -1252,7 +1252,7 @@ void LLLineEditor::copy()
 
 BOOL LLLineEditor::canPaste() const
 {
-	return !mReadOnly && LLClipboard::instanceFast().isTextAvailable();
+	return !mReadOnly && LLClipboard::instance().isTextAvailable();
 }
 
 void LLLineEditor::paste()
@@ -1375,7 +1375,7 @@ void LLLineEditor::copyPrimary()
 
 BOOL LLLineEditor::canPastePrimary() const
 {
-	return !mReadOnly && LLClipboard::instanceFast().isTextAvailable(true);
+	return !mReadOnly && LLClipboard::instance().isTextAvailable(true);
 }
 
 void LLLineEditor::updatePrimary()
@@ -2002,7 +2002,7 @@ void LLLineEditor::draw()
 
 				// Don't process words shorter than 3 characters
 				std::string word = wstring_to_utf8str(text.substr(word_start, word_end - word_start));
-				if ( (word.length() >= 3) && (!LLSpellChecker::instanceFast().checkSpelling(word)) )
+				if ( (word.length() >= 3) && (!LLSpellChecker::instance().checkSpelling(word)) )
 				{
 					mMisspellRanges.push_back(std::pair<U32, U32>(start + word_start, start + word_end));
 				}
@@ -2699,7 +2699,7 @@ void LLLineEditor::showContextMenu(S32 x, S32 y)
 			std::string misspelled_word = getMisspelledWord(mCursorPos);
 			if ((is_misspelled = !misspelled_word.empty()) == true)
 			{
-				LLSpellChecker::instanceFast().getSuggestions(misspelled_word, mSuggestionList);
+				LLSpellChecker::instance().getSuggestions(misspelled_word, mSuggestionList);
 			}
 		}
 

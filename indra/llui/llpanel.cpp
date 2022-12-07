@@ -398,7 +398,7 @@ LLView* LLPanel::fromXML(LLXMLNodePtr node, LLView* parent, LLXMLNodePtr output_
 		
 		if(!class_attr.empty())
 		{
-			panelp = LLRegisterPanelClass::instanceFast().createPanelClass(class_attr);
+			panelp = LLRegisterPanelClass::instance().createPanelClass(class_attr);
 			if (!panelp)
 			{
 				LL_WARNS() << "Panel class \"" << class_attr << "\" not registered." << LL_ENDL;
@@ -518,7 +518,7 @@ BOOL LLPanel::initPanelXML(LLXMLNodePtr node, LLView *parent, LLXMLNodePtr outpu
 			setXMLFilename(xml_filename);
 		}
 
-		auto& uictrl_factory = LLUICtrlFactory::instanceFast();
+		auto& uictrl_factory = LLUICtrlFactory::instance();
 
 		LLXUIParser parser;
 
@@ -550,7 +550,7 @@ BOOL LLPanel::initPanelXML(LLXMLNodePtr node, LLView *parent, LLXMLNodePtr outpu
 
 			// add children using dimensions from referenced xml for consistent layout
 			setShape(params.rect);
-			LLUICtrlFactory::createChildren(this, referenced_xml, child_registry_t::instanceFast());
+			LLUICtrlFactory::createChildren(this, referenced_xml, child_registry_t::instance());
 
 			uictrl_factory.popFileName();
 		}
@@ -574,7 +574,7 @@ BOOL LLPanel::initPanelXML(LLXMLNodePtr node, LLView *parent, LLXMLNodePtr outpu
 		}
 
 		// add children
-		LLUICtrlFactory::createChildren(this, node, child_registry_t::instanceFast(), output_node);
+		LLUICtrlFactory::createChildren(this, node, child_registry_t::instance(), output_node);
 
 		// Connect to parent after children are built, because tab containers
 		// do a reshape() on their child panels, which requires that the children
@@ -609,7 +609,7 @@ std::string LLPanel::getString(std::string_view name, const LLStringUtil::format
 		return formatted_string.getString();
 	}
 	std::string err_str = absl::StrCat("Failed to find string ", name, " in panel ", getName()); //*TODO: Translate
-	if(LLUI::getInstanceFast()->mSettingGroups["config"]->getBOOL("QAMode"))
+	if(LLUI::getInstance()->mSettingGroups["config"]->getBOOL("QAMode"))
 	{
 		LL_ERRS() << err_str << LL_ENDL;
 	}
@@ -628,7 +628,7 @@ std::string LLPanel::getString(std::string_view name) const
 		return found_it->second;
 	}
 	std::string err_str = absl::StrCat("Failed to find string ", name, " in panel ", getName()); //*TODO: Translate
-	if(LLUI::getInstanceFast()->mSettingGroups["config"]->getBOOL("QAMode"))
+	if(LLUI::getInstance()->mSettingGroups["config"]->getBOOL("QAMode"))
 	{
 		LL_ERRS() << err_str << LL_ENDL;
 	}
@@ -828,7 +828,7 @@ BOOL LLPanel::buildFromFile(const std::string& filename, const LLPanel::Params& 
 	LL_DEBUGS() << "Building panel " << filename << LL_ENDL;
 #endif
 
-	LLUICtrlFactory::instanceFast().pushFileName(filename);
+	LLUICtrlFactory::instance().pushFileName(filename);
 	{
 		if (!getFactoryMap().empty())
 		{
@@ -851,7 +851,7 @@ BOOL LLPanel::buildFromFile(const std::string& filename, const LLPanel::Params& 
 			sFactoryStack.pop_back();
 		}
 	}
-	LLUICtrlFactory::instanceFast().popFileName();
+	LLUICtrlFactory::instance().popFileName();
 	return didPost;
 }
 

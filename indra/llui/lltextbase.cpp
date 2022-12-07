@@ -743,7 +743,7 @@ void LLTextBase::drawText(const std::pair<S32, S32>& line_range)
 						std::string word = wstring_to_utf8str(wstrText.substr(word_start, word_end - word_start));
 
 						// Don't process words shorter than 3 characters
-						if ( (word.length() >= 3) && (!LLSpellChecker::instanceFast().checkSpelling(word)) )
+						if ( (word.length() >= 3) && (!LLSpellChecker::instance().checkSpelling(word)) )
 						{
 							mMisspellRanges.push_back(std::pair<U32, U32>(word_start, word_end));
 						}
@@ -1495,7 +1495,7 @@ void LLTextBase::addToDictionary()
 {
 	if (canAddToDictionary())
 	{
-		LLSpellChecker::instanceFast().addToCustomDictionary(getMisspelledWord(mCursorPos));
+		LLSpellChecker::instance().addToCustomDictionary(getMisspelledWord(mCursorPos));
 	}
 }
 
@@ -1508,7 +1508,7 @@ void LLTextBase::addToIgnore()
 {
 	if (canAddToIgnore())
 	{
-		LLSpellChecker::instanceFast().addToIgnoreList(getMisspelledWord(mCursorPos));
+		LLSpellChecker::instance().addToIgnoreList(getMisspelledWord(mCursorPos));
 	}
 }
 
@@ -2114,7 +2114,7 @@ void LLTextBase::createUrlContextMenu(S32 x, S32 y, const std::string &in_url)
 	// work out the XUI menu file to use for this url
 	LLUrlMatch match;
 	std::string url = in_url;
-	if (! LLUrlRegistry::instanceFast().findUrl(url, match))
+	if (! LLUrlRegistry::instance().findUrl(url, match))
 	{
 		return;
 	}
@@ -2244,7 +2244,7 @@ void LLTextBase::appendTextImpl(const std::string &new_text, const LLStyle::Para
 
 // [SL:KB] - Patch: Control-TextParser | Checked: 2012-07-10 (Catznip-3.3)
 	const LLHighlightEntry* pEntry = NULL;
-	if ( (mParseHighlights) && (LLTextParser::instanceFast().parseFullLineHighlights(new_text, mHighlightsMask, &pEntry)) )
+	if ( (mParseHighlights) && (LLTextParser::instance().parseFullLineHighlights(new_text, mHighlightsMask, &pEntry)) )
 	{
 		if (mHighlightsSignal)
 			(*mHighlightsSignal)(new_text, pEntry);
@@ -2262,7 +2262,7 @@ void LLTextBase::appendTextImpl(const std::string &new_text, const LLStyle::Para
 		S32 start=0,end=0;
 		LLUrlMatch match;
 		std::string text = new_text;
-		auto& url_reg = LLUrlRegistry::instanceFast();
+		auto& url_reg = LLUrlRegistry::instance();
 		while (url_reg.findUrl(text, match,
 				boost::bind(&LLTextBase::replaceUrl, this, _1, _2, _3),isContentTrusted() || mAlwaysShowIcons))
 		{
@@ -2486,10 +2486,10 @@ void LLTextBase::appendAndHighlightTextImpl(const std::string &new_text, S32 hig
 	{
 		LLStyle::Params highlight_params(style_params);
 
-//		LLSD pieces = LLTextParser::instanceFast().parsePartialLineHighlights(new_text, highlight_params.color(), (LLTextParser::EHighlightPosition)highlight_part);
+//		LLSD pieces = LLTextParser::instance().parsePartialLineHighlights(new_text, highlight_params.color(), (LLTextParser::EHighlightPosition)highlight_part);
 //		for (S32 i = 0; i < pieces.size(); i++)
 // [SL:KB] - Patch: Control-TextParser | Checked: 2012-07-10 (Catznip-3.3)
-		LLTextParser::partial_results_t results = LLTextParser::instanceFast().parsePartialLineHighlights(new_text, mHighlightsMask, (LLTextParser::EHighlightPosition)highlight_part);
+		LLTextParser::partial_results_t results = LLTextParser::instance().parsePartialLineHighlights(new_text, mHighlightsMask, (LLTextParser::EHighlightPosition)highlight_part);
 		for (LLTextParser::partial_results_t::const_iterator itResult = results.begin(); itResult != results.end(); ++itResult)
 // [/SL:KB]
 		{
@@ -3624,13 +3624,13 @@ BOOL LLNormalTextSegment::handleToolTip(S32 x, S32 y, MASK mask)
 	if (mToken && !mToken->getToolTip().empty())
 	{
 		const LLWString& wmsg = mToken->getToolTip();
-		LLToolTipMgr::instanceFast().show(wstring_to_utf8str(wmsg));
+		LLToolTipMgr::instance().show(wstring_to_utf8str(wmsg));
 		return TRUE;
 	}
 	// or do we have an explicitly set tooltip (e.g., for Urls)
 	if (!mTooltip.empty())
 	{
-		LLToolTipMgr::instanceFast().show(mTooltip);
+		LLToolTipMgr::instance().show(mTooltip);
 		return TRUE;
 	}
 
@@ -3970,7 +3970,7 @@ BOOL LLImageTextSegment::handleToolTip(S32 x, S32 y, MASK mask)
 {
 	if (!mTooltip.empty())
 	{
-		LLToolTipMgr::instanceFast().show(mTooltip);
+		LLToolTipMgr::instance().show(mTooltip);
 		return TRUE;
 	}
 

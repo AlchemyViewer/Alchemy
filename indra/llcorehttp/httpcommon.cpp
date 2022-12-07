@@ -127,7 +127,7 @@ std::string HttpStatus::toString() const
 	
 	if (*this)
 	{
-		return LLStringUtil::null;
+		return std::string("");
 	}
 	switch (getType())
 	{
@@ -309,9 +309,8 @@ CURL *getCurlTemplateHandle()
     
 LLMutex *getCurlMutex()
 {
-	static LLMutex sHandleMutexp(LLMutex::E_CONST_INIT);
-
-    return &sHandleMutexp;
+    static LLMutex sHandleMutex;
+    return &sHandleMutex;
 }
 
 void deallocateEasyCurl(CURL *curlp)

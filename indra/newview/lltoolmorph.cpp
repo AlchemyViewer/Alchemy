@@ -234,13 +234,13 @@ BOOL LLVisualParamHint::render()
 	
 	gGL.flush();
 	
-	LLViewerCamera::getInstanceFast()->setAspect((F32)mFullWidth / (F32)mFullHeight);
-	LLViewerCamera::getInstanceFast()->setOriginAndLookAt(
+	LLViewerCamera::getInstance()->setAspect((F32)mFullWidth / (F32)mFullHeight);
+	LLViewerCamera::getInstance()->setOriginAndLookAt(
 		camera_pos,			// camera
 		LLVector3::z_axis,	// up
 		target_pos );		// point of interest
 
-	LLViewerCamera::getInstanceFast()->setPerspective(FALSE, mOrigin.mX, mOrigin.mY, mFullWidth, mFullHeight, FALSE);
+	LLViewerCamera::getInstance()->setPerspective(FALSE, mOrigin.mX, mOrigin.mY, mFullWidth, mFullHeight, FALSE);
 
 	if (gAgentAvatarp->mDrawable.notNull() &&
 		gAgentAvatarp->mDrawable->getFace(0))

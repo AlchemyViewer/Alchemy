@@ -73,13 +73,13 @@ BOOL LLAgentUI::checkAgentDistance(const LLVector3& pole, F32 radius)
 BOOL LLAgentUI::buildLocationString(std::string& str, ELocationFormat fmt,const LLVector3& agent_pos_region)
 {
 	LLViewerRegion* region = gAgent.getRegion();
-	LLViewerParcelMgr& parcelMGr = LLViewerParcelMgr::instanceFast();
+	LLViewerParcelMgr& parcelMGr = LLViewerParcelMgr::instance();
 	LLParcel* parcel = parcelMGr.getAgentParcel();
 
 	if (!region || !parcel) return FALSE;
 
-	std::string remote_grid = LLGridManager::instanceFast().getGridByProbing(region->getHGGrid());
-	std::string cur_grid = LLGridManager::instanceFast().getGrid();
+	std::string remote_grid = LLGridManager::instance().getGridByProbing(region->getHGGrid());
+	std::string cur_grid = LLGridManager::instance().getGrid();
 	bool is_hypergrid = remote_grid != cur_grid;
 
 	S32 pos_x = S32(agent_pos_region.mV[VX]);
