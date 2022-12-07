@@ -134,6 +134,8 @@ public:
 	
 	static std::vector<std::string> getDynamicFallbackFontList();
 
+	SDL_Window* getSDLWindow() { return mWindow; }
+
 	// Not great that these are public, but they have to be accessible
 	// by non-class code and it's better than making them global.
 #if LL_X11
@@ -184,6 +186,8 @@ protected:
 	U32 SDLCheckGrabbyKeys(SDL_Keycode keysym, BOOL gain);
 	BOOL SDLReallyCaptureInput(BOOL capture);
 
+	void setIcon();
+
 	//
 	// Platform specific variables
 	//
@@ -206,6 +210,10 @@ protected:
 
 	friend class LLWindowManager;
 
+#if LL_WINDOWS
+	HICON mWinWindowIcon;
+#endif
+
 private:
 	BOOL mFlashing;
 	LLTimer mFlashTimer;
@@ -213,6 +221,11 @@ private:
 	U32 mKeyScanCode;
 	U32 mKeyVirtualKey;
 	SDL_Keymod mKeyModifiers;
+#if LL_WINDOWS
+	U32				mRawMsg;
+	U32				mRawWParam;
+	U32				mRawLParam;
+#endif
 
 	bool			mLanguageTextInputAllowed;
 	LLPreeditor*	mPreeditor;
