@@ -2,13 +2,13 @@
 <floater
  name="avatarinfo"
  height="510"
- width="450"
+ width="510"
  layout="topleft"
  can_close="true"
  can_resize="true"
  help_topic="panel_my_profile_tab"
  min_height="510"
- min_width="450"
+ min_width="510"
  positioning="centered"
  save_rect="true"
  title="Profile"
@@ -18,7 +18,7 @@
      top="0"
      left="0"
      height="500"
-     width="445"
+     width="505"
      follows="all"
      class="panel_profile"
     >
@@ -27,16 +27,17 @@
          top_pad="5"
          left="0"
          height="500"
-         width="445"
+         width="505"
          follows="all"
          layout="topleft"
          halign="center"
-         tab_min_width="55"
+         tab_min_width="81"
+         tab_height="30"
          tab_position="top"
         >
             <panel
              name="panel_profile_secondlife"
-             label="2nd Life"
+             label="BIO"
              layout="topleft"
              class="panel_profile_secondlife"
              filename="panel_profile_secondlife.xml"
@@ -44,23 +45,15 @@
             />
             <panel
              name="panel_profile_web"
-             label="Feed"
+             label="FEED"
              layout="topleft"
              class="panel_profile_web"
              filename="panel_profile_web.xml"
              help_topic="profile_web_tab"
             />
             <panel
-             name="panel_profile_interests"
-             label="Interests"
-             layout="topleft"
-             class="panel_profile_interests"
-             filename="panel_profile_interests.xml"
-             help_topic="profile_interests_tab"
-            />
-            <panel
              name="panel_profile_picks"
-             label="Picks"
+             label="PICKS"
              layout="topleft"
              class="panel_profile_picks"
              filename="panel_profile_picks.xml"
@@ -68,7 +61,7 @@
             />
             <panel
              name="panel_profile_classifieds"
-             label="Classified"
+             label="CLASSIFIEDS"
              layout="topleft"
              class="panel_profile_classifieds"
              filename="panel_profile_classifieds.xml"
@@ -76,7 +69,7 @@
             />
             <panel
              name="panel_profile_firstlife"
-             label="Real Life"
+             label="REAL LIFE"
              layout="topleft"
              class="panel_profile_firstlife"
              filename="panel_profile_firstlife.xml"
@@ -84,37 +77,12 @@
             />
             <panel
              name="panel_profile_notes"
-             label="Notes"
+             label="MY NOTES"
              layout="topleft"
              class="panel_profile_notes"
              filename="panel_profile_notes.xml"
              help_topic="profile_notes_tab"
             />
         </tab_container>
-        <button
-         name="ok_btn"
-         label="OK"
-         tool_tip="Save changes to profile and close"
-         bottom_delta="0"
-         left="10"
-         height="20"
-         width="90"
-         follows="left|bottom"
-         layout="topleft"
-         visible="false"
-        />
-        <button
-         name="cancel_btn"
-         label="Cancel"
-         tool_tip="Discard unsaved changes and close"
-         bottom_delta="0"
-         right="-10"
-         height="20"
-         width="90"
-         follows="right|bottom"
-         layout="topleft"
-         label_selected="Cancel"
-         visible="false"
-        />
     </panel>
 </floater>

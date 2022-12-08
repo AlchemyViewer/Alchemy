@@ -274,6 +274,7 @@ set(viewer_SOURCE_FILES
     llfloatercamerapresets.cpp
     llfloaterchatalerts.cpp
     llfloaterchatvoicevolume.cpp
+    llfloaterclassified.cpp
     llfloatercolorpicker.cpp
     llfloaterconversationlog.cpp
     llfloaterconversationpreview.cpp
@@ -346,6 +347,7 @@ set(viewer_SOURCE_FILES
     llfloaterpreference.cpp
     llfloaterpreferenceviewadvanced.cpp
     llfloaterpreviewtrash.cpp
+    llfloaterprofiletexture.cpp
     llfloaterprogressview.cpp
     llfloaterproperties.cpp
     llfloaterregiondebugconsole.cpp
@@ -538,7 +540,6 @@ set(viewer_SOURCE_FILES
     llpanelpeople.cpp
     llpanelpeoplemenus.cpp
     llpanelpermissions.cpp
-    llpanelpick.cpp
     llpanelplaceinfo.cpp
     llpanelplaceprofile.cpp
     llpanelplaces.cpp
@@ -975,6 +976,7 @@ set(viewer_HEADER_FILES
     llfloatercamera.h
     llfloaterchatalerts.h
     llfloaterchatvoicevolume.h
+    llfloaterclassified.h
     llfloatercolorpicker.h
     llfloaterconversationlog.h
     llfloaterconversationpreview.h
@@ -1050,6 +1052,7 @@ set(viewer_HEADER_FILES
     llfloaterpreference.h
     llfloaterpreferenceviewadvanced.h
     llfloaterpreviewtrash.h
+    llfloaterprofiletexture.h
     llfloaterprogressview.h
     llfloaterproperties.h
     llfloaterregiondebugconsole.h
@@ -1232,7 +1235,6 @@ set(viewer_HEADER_FILES
     llpanelpeople.h
     llpanelpeoplemenus.h
     llpanelpermissions.h
-    llpanelpick.h
     llpanelplaceinfo.h
     llpanelplaceprofile.h
     llpanelplaces.h
