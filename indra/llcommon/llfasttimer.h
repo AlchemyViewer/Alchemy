@@ -30,6 +30,7 @@
 #include "llinstancetracker.h"
 #include "lltrace.h"
 #include "lltreeiterators.h"
+#include "llprofiler.h"
 
 #if LL_WINDOWS
 #include <intrin.h>

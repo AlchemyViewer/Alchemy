@@ -47,11 +47,11 @@ class LLRotation;
 // of this writing, July 08, 2010) about getting it implemented before you resort to
 // LLVector3/LLVector4. 
 /////////////////////////////////
-struct LLIVector4a;
+class LLIVector4a;
 
 class alignas(16) LLVector4a
 {
-	friend struct LLIVector4a;
+	friend class LLIVector4a;
     LL_ALIGN_NEW
 public:
 
@@ -92,27 +92,6 @@ public:
 	// Copy words 16-byte blocks from src to dst. Source and destination must not overlap. 
 	// Source and dest must be 16-byte aligned and size must be multiple of 16.
 	static void memcpyNonAliased16(F32* __restrict dst, const F32* __restrict src, size_t bytes);
-
-
-	void* operator new(size_t size)
-	{
-		return ll_aligned_malloc_16(size);
-	}
-
-	void* operator new[](size_t size)
-	{
-		return ll_aligned_malloc_16(size);
-	}
-
-	void operator delete(void* ptr)
-	{
-		ll_aligned_free_16(ptr);
-	}
-
-	void operator delete[](void* ptr)
-	{
-		ll_aligned_free_16(ptr);
-	}
 
 	////////////////////////////////////
 	// CONSTRUCTORS 
@@ -400,9 +379,10 @@ inline std::ostream& operator<<(std::ostream& s, const LLVector4a& v)
     return s;
 }
 
-struct alignas(16) LLIVector4a
+class alignas(16) LLIVector4a
 {
-	friend struct LLVector4a;
+public:
+	friend class LLVector4a;
     LL_ALIGN_NEW
 
 	// Constants

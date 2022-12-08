@@ -760,14 +760,34 @@ std::wstring ll_convert_string_to_wide(const char* in, size_t len, unsigned int 
 	return {&w_out[0]};
 }
 
+S32 wchart_to_llwchar(const wchar_t* inchars, llwchar* outchar)
+{
+	const wchar_t* base = inchars;
+	wchar_t cur_char = *inchars++;
+	llwchar char32;
+	if ((cur_char >= 0xD800) && (cur_char <= 0xDFFF))
+	{
+		// Surrogates
+		char32 = ((llwchar)(cur_char - 0xD800)) << 10;
+		cur_char = *inchars++;
+		char32 += (llwchar)(cur_char - 0xDC00) + 0x0010000UL;
+	}
+	else
+	{
+		char32 = (llwchar)cur_char;
+	}
+	*outchar = char32;
+	return inchars - base;
+}
+
 LLWString ll_convert_wide_to_wstring(const wchar_t* in, size_t len)
 {
 	LLWString wout;
-	if (in.empty()) return wout;
+	if (!in) return wout;
 
 	S32 i = 0;
 	// craziness to make gcc happy (llutf16string.c_str() is tweaked on linux):
-	const wchar_t* chars16 = &(*(in.begin()));
+	const wchar_t* chars16 = &in[0];
 	while (i < len)
 	{
 		llwchar cur_char;

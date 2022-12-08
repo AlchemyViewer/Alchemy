@@ -1486,62 +1486,6 @@
         <key>version</key>
         <string>0.1.2</string>
       </map>
-      <key>meshoptimizer</key>
-      <map>
-        <key>canonical_repo</key>
-        <string>https://bitbucket.org/lindenlab/3p-meshoptimizer</string>
-        <key>copyright</key>
-        <string>Copyright (c) 2016-2021 Arseny Kapoulkine</string>
-        <key>description</key>
-        <string>Meshoptimizer. Mesh optimization library.</string>
-        <key>license</key>
-        <string>meshoptimizer</string>
-        <key>license_file</key>
-        <string>LICENSES/meshoptimizer.txt</string>
-        <key>name</key>
-        <string>meshoptimizer</string>
-        <key>platforms</key>
-        <map>
-          <key>darwin64</key>
-          <map>
-            <key>archive</key>
-            <map>
-              <key>hash</key>
-              <string>30bc37db57bbd87c4b5f62634964242a</string>
-              <key>url</key>
-              <string>https://automated-builds-secondlife-com.s3.amazonaws.com/ct2/84218/784918/meshoptimizer-0.16.561408-darwin64-561408.tar.bz2</string>
-            </map>
-            <key>name</key>
-            <string>darwin64</string>
-          </map>
-          <key>windows</key>
-          <map>
-            <key>archive</key>
-            <map>
-              <key>hash</key>
-              <string>ca3684bcf0447746cd2844e94f6d1fc7</string>
-              <key>url</key>
-              <string>https://automated-builds-secondlife-com.s3.amazonaws.com/ct2/84219/784924/meshoptimizer-0.16.561408-windows-561408.tar.bz2</string>
-            </map>
-            <key>name</key>
-            <string>windows</string>
-          </map>
-          <key>windows64</key>
-          <map>
-            <key>archive</key>
-            <map>
-              <key>hash</key>
-              <string>aef28c089d20f69d13c9c3e113fb3895</string>
-              <key>url</key>
-              <string>https://automated-builds-secondlife-com.s3.amazonaws.com/ct2/84220/784931/meshoptimizer-0.16.561408-windows64-561408.tar.bz2</string>
-            </map>
-            <key>name</key>
-            <string>windows64</string>
-          </map>
-        </map>
-        <key>version</key>
-        <string>0.16.561408</string>
-      </map>
       <key>nghttp2</key>
       <map>
         <key>copyright</key>
