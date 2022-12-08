@@ -37,6 +37,7 @@ class LLCheckBoxCtrl;
 class LLTextBox;
 class LLUICtrl;
 class LLButton;
+class LLMenuButton;
 class LLViewerObject;
 class LLComboBox;
 class LLColorSwatchCtrl;
@@ -77,6 +78,13 @@ public:
 
     static void    setLightTextureID(const LLUUID &asset_id, const LLUUID &item_id, LLVOVolume* volobjp);
 
+    void            onCopyFeatures();
+    void            onPasteFeatures();
+    void            onCopyLight();
+    void            onPasteLight();
+ 
+    void        menuDoToSelected(const LLSD& userdata);
+    bool        menuEnableItem(const LLSD& userdata);
 
 protected:
 	void			getState();
@@ -135,6 +143,11 @@ protected:
     LLSpinCtrl*     mSpinPhysicsFriction   = nullptr;
     LLSpinCtrl*     mSpinPhysicsDensity    = nullptr;
     LLSpinCtrl*     mSpinPhysicsRestitution = nullptr;
+
+    LLMenuButton*   mMenuClipboardFeatures;
+    LLMenuButton*   mMenuClipboardLight;
+
+    LLSD            mClipboardParams;
 };
 
 #endif

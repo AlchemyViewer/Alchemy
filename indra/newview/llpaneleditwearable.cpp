@@ -1312,7 +1312,8 @@ void LLPanelEditWearable::changeCamera(U8 subpart)
         gMorphView->setCameraOffset( subpart_entry->mCameraOffset );
         if (gSavedSettings.getBOOL("AppearanceCameraMovement"))
         {
-                gMorphView->updateCamera();
+            gAgentCamera.setFocusOnAvatar(FALSE, FALSE);
+            gMorphView->updateCamera();
         }
 }
 

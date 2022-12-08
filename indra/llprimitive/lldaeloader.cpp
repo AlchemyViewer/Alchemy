@@ -2575,7 +2575,7 @@ bool LLDAELoader::loadModelsFromDomMesh(domMesh* mesh, std::vector<LLModel*>& mo
 
 		if (!mNoOptimize)
 		{
-			ret->optimizeVolumeFaces();
+			ret->remapVolumeFaces();
 		}
 
 		volume_faces = remainder.size();

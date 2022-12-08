@@ -131,6 +131,8 @@ protected:
 	void			onCopySLURL();
 	void			onTrackRegion();
 
+    //void            onExpandCollapseBtn();
+
 	void			centerOnTarget(BOOL animate);
 	void			updateLocation();
 
