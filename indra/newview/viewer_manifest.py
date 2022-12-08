@@ -568,10 +568,6 @@ class WindowsManifest(ViewerManifest):
                     self.path("v8_context_snapshot.bin")
                     self.path("vk_swiftshader_icd.json")
 
-                # CEF software renderer files
-                with self.prefix(src=os.path.join(pkgdir, 'bin', config, 'swiftshader'), dst='swiftshader'):
-                    self.path("libEGL.dll")
-                    self.path("libGLESv2.dll")
                 self.path_optional("vcruntime140_1.dll")
 
                 # CEF files common to all configurations
