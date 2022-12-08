@@ -854,7 +854,7 @@ void LLPanelVolume::onCopyFeatures()
     // Flexi Prim
     if (volobjp && volobjp->isFlexible())
     {
-        LLFlexibleObjectData *attributes = (LLFlexibleObjectData *)objectp->getParameterEntry(LLNetworkData::PARAMS_FLEXIBLE);
+        LLFlexibleObjectData *attributes = (LLFlexibleObjectData *)objectp->getFlexibleObjectData();
         if (attributes)
         {
             clipboard["flex"]["lod"] = attributes->getSimulateLOD();
@@ -952,7 +952,7 @@ void LLPanelVolume::onPasteFeatures()
             objectp->setClickAction(CLICK_ACTION_NONE);
         }
 
-        LLFlexibleObjectData *attributes = (LLFlexibleObjectData *)objectp->getParameterEntry(LLNetworkData::PARAMS_FLEXIBLE);
+        LLFlexibleObjectData *attributes = (LLFlexibleObjectData *)objectp->getFlexibleObjectData();
         if (attributes)
         {
             LLFlexibleObjectData new_attributes;

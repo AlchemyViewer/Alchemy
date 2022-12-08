@@ -2447,9 +2447,17 @@ void LLPanelObject::onPasteSize()
 {
     if (!mHasClipboardSize) return;
 
-    mClipboardSize.mV[VX] = llclamp(mClipboardSize.mV[VX], MIN_PRIM_SCALE, DEFAULT_MAX_PRIM_SCALE);
-    mClipboardSize.mV[VY] = llclamp(mClipboardSize.mV[VY], MIN_PRIM_SCALE, DEFAULT_MAX_PRIM_SCALE);
-    mClipboardSize.mV[VZ] = llclamp(mClipboardSize.mV[VZ], MIN_PRIM_SCALE, DEFAULT_MAX_PRIM_SCALE);
+	F32 min_scale = SL_MIN_PRIM_SCALE;
+	F32 max_scale = SL_DEFAULT_MAX_PRIM_SCALE;
+	if(gAgent.getRegion())
+	{
+		min_scale = gAgent.getRegion()->getMinPrimScale();
+		max_scale = gAgent.getRegion()->getMaxPrimScale();
+	}
+
+    mClipboardSize.mV[VX] = llclamp(mClipboardSize.mV[VX], min_scale, max_scale);
+    mClipboardSize.mV[VY] = llclamp(mClipboardSize.mV[VY], min_scale, max_scale);
+    mClipboardSize.mV[VZ] = llclamp(mClipboardSize.mV[VZ], min_scale, max_scale);
 
     mCtrlScaleX->set(mClipboardSize.mV[VX]);
     mCtrlScaleY->set(mClipboardSize.mV[VY]);
@@ -2485,9 +2493,9 @@ void LLPanelObject::onCopyParams()
     mClipboardParams["volume_params"] = params.asLLSD();
 
     // Sculpted Prim
-    if (objectp->getParameterEntryInUse(LLNetworkData::PARAMS_SCULPT))
+    if (objectp->getSculptParams())
     {
-        LLSculptParams *sculpt_params = (LLSculptParams *)objectp->getParameterEntry(LLNetworkData::PARAMS_SCULPT);
+        LLSculptParams *sculpt_params = (LLSculptParams *)objectp->getSculptParams();
 
         LLUUID texture_id = sculpt_params->getSculptTexture();
         if (get_can_copy_texture(texture_id))
@@ -2523,7 +2531,7 @@ void LLPanelObject::onPasteParams()
     }
     else
     {
-        LLSculptParams *sculpt_params = (LLSculptParams *)objectp->getParameterEntry(LLNetworkData::PARAMS_SCULPT);
+        LLSculptParams *sculpt_params = (LLSculptParams *)objectp->getSculptParams();
         if (sculpt_params)
         {
             objectp->setParameterEntryInUse(LLNetworkData::PARAMS_SCULPT, FALSE, TRUE);

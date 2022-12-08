@@ -1819,6 +1819,8 @@ BOOL LLVOVolume::genBBoxes(BOOL force_global, BOOL should_update_octree_bounds)
                 max.setMax(max, face->mExtents[1]);
             }
         }
+    }
+
     if (any_valid_boxes)
     {
         if (rebuild && should_update_octree_bounds)
