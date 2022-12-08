@@ -4704,7 +4704,7 @@ void LLPipeline::renderGeomDeferred(LLCamera& camera)
 			}
 		}
 
-		LLGLEnable multisample(RenderFSAASamples > 0 ? GL_MULTISAMPLE_ARB : 0);
+		LLGLEnable multisample(RenderFSAASamples > 0 ? GL_MULTISAMPLE : 0);
 
 		LLVertexBuffer::unbind();
 
@@ -11192,11 +11192,11 @@ void LLPipeline::generateImpostor(LLVOAvatar* avatar, bool preview_avatar)
 			for(auto attachment_iter = avatar->mAttachedObjectsVector.begin(), attachment_end = avatar->mAttachedObjectsVector.end();
 				attachment_iter != attachment_end;++attachment_iter)
 			{{
-				LLViewerObject* attached_object = attachment_iter->first
+				LLViewerObject* attached_object = attachment_iter->first;
 #endif
                     if (attached_object && attached_object->isRiggedMesh())
                     {
-                        markVisible(attached_object->mDrawable->getSpatialBridge(), *viewer_camera);
+                        markVisible(attached_object->mDrawable->getSpatialBridge(), viewer_camera);
                     }
                 }
             }
@@ -11216,7 +11216,7 @@ void LLPipeline::generateImpostor(LLVOAvatar* avatar, bool preview_avatar)
                     LLViewerObject* attached_object = attachment_iter->get();
                     if (attached_object)
                     {
-                        markVisible(attached_object->mDrawable->getSpatialBridge(), *viewer_camera);
+                        markVisible(attached_object->mDrawable->getSpatialBridge(), viewer_camera);
                     }
                 }
             }

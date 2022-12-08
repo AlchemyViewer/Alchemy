@@ -64,7 +64,7 @@ namespace
 	constexpr S32 NUM_TILES_X = 8;
 	constexpr S32 NUM_TILES_Y = 4;
 	constexpr S32 NUM_TILES = NUM_TILES_X * NUM_TILES_Y;
-	constexpr S32 NUM_CUBEMAP_FACES = 6; // See sResolution for face dimensions
+	constexpr S32 NUM_CUBEMAP_FACES = 6; // See SKYTEX_RESOLUTION for face dimensions
 	constexpr S32 TOTAL_TILES = NUM_CUBEMAP_FACES * NUM_TILES;
 	constexpr S32 MAX_TILES = TOTAL_TILES + 1;
 
@@ -75,9 +75,9 @@ namespace
 
 // Texture coordinates:
     const LLVector2 TEX00 = LLVector2(0.f, 0.f);
-	const LLVector2 TEX01 = LLVector2(0.f, 1.f);
-	const LLVector2 TEX10 = LLVector2(1.f, 0.f);
-	const LLVector2 TEX11 = LLVector2(1.f, 1.f);
+    const LLVector2 TEX01 = LLVector2(0.f, 1.f);
+    const LLVector2 TEX10 = LLVector2(1.f, 0.f);
+    const LLVector2 TEX11 = LLVector2(1.f, 1.f);
 
 	constexpr F32Seconds UPDATE_EXPRY(0.25f);
 
@@ -88,6 +88,7 @@ namespace
 ***************************************/
 
 S32 LLSkyTex::sCurrent = 0;
+
 
 LLSkyTex::LLSkyTex() :
 	mSkyData(NULL),
@@ -567,11 +568,11 @@ void LLVOSky::restoreGL()
 
 	const LLSettingsSky::ptr_t& psky = LLEnvironment::instance().getCurrentSky();
 
-	if (psky)
+    if (psky)
 	{
-		setSunTextures(psky->getSunTextureId(), psky->getNextSunTextureId());
-		setMoonTextures(psky->getMoonTextureId(), psky->getNextMoonTextureId());
-	}
+        setSunTextures(psky->getSunTextureId(), psky->getNextSunTextureId());
+        setMoonTextures(psky->getMoonTextureId(), psky->getNextMoonTextureId());
+    }
 
 	updateDirections(psky);
 
@@ -580,7 +581,7 @@ void LLVOSky::restoreGL()
 		initCubeMap();
 	}
 
-	forceSkyUpdate();
+    forceSkyUpdate();
 
 	if (mDrawable)
 	{

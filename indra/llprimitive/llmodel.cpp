@@ -36,7 +36,7 @@
 #ifdef LL_USESYSTEMLIBS
 # include <zlib.h>
 #else
-# include "zlib-ng/zlib.h"
+# include "zlib/zlib.h"
 #endif
 
 std::string model_names[] =

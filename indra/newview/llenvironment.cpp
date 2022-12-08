@@ -1613,16 +1613,10 @@ void LLEnvironment::update(const LLViewerCamera * cam)
         end_shaders = LLViewerShaderMgr::instance()->endShaders();
         for (shaders_iter = LLViewerShaderMgr::instance()->beginShaders(); shaders_iter != end_shaders; ++shaders_iter)
         {
-			if ((shaders_iter->mProgramObject != 0) &&
-				(shaders_iter->mFeatures.atmosphericHelpers
-					|| shaders_iter->mFeatures.calculatesAtmospherics
-					|| shaders_iter->mFeatures.hasAtmospherics
-					|| shaders_iter->mFeatures.hasGamma
-					|| shaders_iter->mFeatures.hasTransport
-					|| shaders_iter->mFeatures.hasWaterFog) &&
-				(gPipeline.canUseWindLightShaders()
-					|| shaders_iter->mShaderGroup == LLGLSLShader::SG_WATER))
-			{
+            if ((shaders_iter->mProgramObject != 0)
+                && (gPipeline.canUseWindLightShaders()
+                || shaders_iter->mShaderGroup == LLGLSLShader::SG_WATER))
+            {
                 shaders_iter->mUniformsDirty = TRUE;
             }
         }
@@ -2623,7 +2617,7 @@ void LLEnvironment::setExperienceEnvironment(LLUUID experience_id, LLSD data, F3
 
     if (!water.isUndefined())
     {
-        environment->injectWaterSettings(sky, experience_id, LLSettingsBase::Seconds(transition_time));
+        environment->injectWaterSettings(water, experience_id, LLSettingsBase::Seconds(transition_time));
     }
 
     if (updateenvironment)

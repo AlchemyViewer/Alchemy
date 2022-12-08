@@ -169,6 +169,7 @@ LLGLManager::LLGLManager() :
 	mHasOcclusionQuery2(FALSE),
 	mHasPointParameters(FALSE),
 	mHasDrawBuffers(FALSE),
+	mHasDepthClamp(FALSE),
 	mHasTextureRectangle(FALSE),
 	mHasTextureMultisample(FALSE),
 	mHasTransformFeedback(FALSE),
@@ -797,7 +798,7 @@ void LLGLManager::initExtensions()
 	mHasMapBufferRange = mGLVersion >= 3.0f || epoxy_has_gl_extension("GL_ARB_map_buffer_range");
 	mHasFlushBufferRange = epoxy_has_gl_extension("GL_APPLE_flush_buffer_range");
     // NOTE: Using extensions breaks reflections when Shadows are set to projector.  See: SL-16727
-	mHasDepthClamp = mGLVersion >= 3.2f || (epoxy_has_gl_extension("GL_ARB_depth_clamp") || epoxy_has_gl_extension("GL_NV_depth_clamp"));
+	//mHasDepthClamp = mGLVersion >= 3.2f || (epoxy_has_gl_extension("GL_ARB_depth_clamp") || epoxy_has_gl_extension("GL_NV_depth_clamp"));
 	// mask out FBO support when packed_depth_stencil isn't there 'cause we need it for LLRenderTarget -Brad
 #ifdef GL_ARB_framebuffer_object
 	mHasFramebufferObject = mGLVersion >= 3.0f || epoxy_has_gl_extension("GL_ARB_framebuffer_object");

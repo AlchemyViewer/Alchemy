@@ -738,6 +738,7 @@ void LLSettingsVOSky::applySpecial(void *ptarget, bool force)
     //F32 display_gamma = gSavedSettings.getF32("RenderDeferredDisplayGamma");
 
     shader->uniform1f(LLShaderMgr::GAMMA, g);
+    //shader->uniform1f(LLShaderMgr::DISPLAY_GAMMA, display_gamma);
 }
 
 const LLSettingsSky::parammapping_t& LLSettingsVOSky::getParameterMap() const

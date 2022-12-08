@@ -6822,7 +6822,7 @@ void LLVolumeGeometryManager::addGeometryCount(LLSpatialGroup* group, U32& verte
 
         if (drawablep->isAnimating())
         { //fall back to stream draw for animating verts
-            usage = GL_STREAM_DRAW_ARB;
+            usage = GL_STREAM_DRAW;
         }
     }
 

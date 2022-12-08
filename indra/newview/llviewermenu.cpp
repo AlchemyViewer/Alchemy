@@ -4222,7 +4222,6 @@ void handle_object_sit(LLViewerObject *object, const LLVector3 &offset)
 			gRlvHandler.setSitSource(gAgent.getPositionGlobal());
 		}
 // [/RLVa:KB]
-	{
 
 		gMessageSystem->newMessageFast(_PREHASH_AgentRequestSit);
 		gMessageSystem->nextBlockFast(_PREHASH_AgentData);
