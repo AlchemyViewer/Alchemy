@@ -462,7 +462,7 @@ void LLAvatarList::addNewItem(const LLUUID& id, const std::string& name, BOOL is
 BOOL LLAvatarList::handleRightMouseDown(S32 x, S32 y, MASK mask)
 {
 	BOOL handled = LLUICtrl::handleRightMouseDown(x, y, mask);
-	if (mContextMenu)
+	if ( mContextMenu)
 	{
 		uuid_vec_t selected_uuids;
 		getSelectedUUIDs(selected_uuids);

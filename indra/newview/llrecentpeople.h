@@ -63,7 +63,7 @@ public:
 	 * @param id avatar to add.
 	 *
 	 * @param userdata additional information about last interaction party.
-	 *				   For example a session id can be added. lol
+	 *				   For example session id can be added.
 	 *
 	 * @return false if the avatar is in the list already, true otherwise
 	 */

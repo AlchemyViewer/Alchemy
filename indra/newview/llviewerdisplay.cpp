@@ -782,7 +782,6 @@ pProgFloater->setProgressCancelButtonVisible(FALSE, LLTrans::getString("Cancel")
 				LLMatrix4a proj = get_current_projection();
 				LLMatrix4a mod = get_current_modelview();
 				glViewport(0,0,512,512);
-				LLVOAvatar::updateFreezeCounter() ;
 
 				LLVOAvatar::updateImpostors();
 

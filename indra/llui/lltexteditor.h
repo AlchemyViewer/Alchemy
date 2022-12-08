@@ -207,6 +207,7 @@ public:
 	const LLUUID&	getSourceID() const						{ return mSourceID; }
 
 	const LLTextSegmentPtr	getPreviousSegment() const;
+    const LLTextSegmentPtr	getLastSegment() const;
 	void			getSelectedSegments(segment_vec_t& segments) const;
 
 	void			setShowContextMenu(bool show) { mShowContextMenu = show; }

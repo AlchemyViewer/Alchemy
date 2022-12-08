@@ -387,6 +387,9 @@ U32 LLMeshRepository::sLODPending = 0;
 
 U32 LLMeshRepository::sCacheBytesRead = 0;
 U32 LLMeshRepository::sCacheBytesWritten = 0;
+U32 LLMeshRepository::sCacheBytesHeaders = 0;
+U32 LLMeshRepository::sCacheBytesSkins = 0;
+U32 LLMeshRepository::sCacheBytesDecomps = 0;
 U32 LLMeshRepository::sCacheReads = 0;
 U32 LLMeshRepository::sCacheWrites = 0;
 U32 LLMeshRepository::sMaxLockHoldoffs = 0;
@@ -1900,6 +1903,7 @@ EMeshProcessingResult LLMeshRepoThread::headerReceived(const LLVolumeParams& mes
 		{
 			LLMutexLock lock(mHeaderMutex);
 			mMeshHeader[mesh_id] = { header_size, header };
+            LLMeshRepository::sCacheBytesHeaders += header_size;
 		}
 
 		
@@ -3035,8 +3039,6 @@ S32 LLMeshRepository::getActualMeshLOD(LLSD& header, S32 lod)
 	//header exists and no good lod found, treat as 404
 	header["404"] = 1;
 	return -1;
-}
-
 // Handle failed or successful requests for mesh assets.
 //
 // Support for 200 responses was added for several reasons.  One,
@@ -4007,6 +4009,8 @@ void LLMeshRepository::notifyLoadedMeshes()
 void LLMeshRepository::notifySkinInfoReceived(LLMeshSkinInfo* info)
 {
 	auto pair = mSkinMap.emplace(info->mMeshID, info); // Cache into LLPointer
+    // Alternative: We can get skin size from header
+    sCacheBytesSkins += info->sizeBytes();
 
 	skin_load_map::iterator iter = mLoadingSkins.find(info->mMeshID);
 	if (iter != mLoadingSkins.end())
@@ -4045,10 +4049,14 @@ void LLMeshRepository::notifyDecompositionReceived(LLModel::Decomposition* decom
 	{ //just insert decomp into map
 		mDecompositionMap[decomp->mMeshID] = decomp;
 		mLoadingDecompositions.erase(decomp->mMeshID);
+        sCacheBytesDecomps += decomp->sizeBytes();
 	}
 	else
 	{ //merge decomp with existing entry
+        sCacheBytesDecomps -= iter->second->sizeBytes();
 		iter->second->merge(decomp);
+        sCacheBytesDecomps += iter->second->sizeBytes();
+
 		mLoadingDecompositions.erase(decomp->mMeshID);
 		delete decomp;
 	}

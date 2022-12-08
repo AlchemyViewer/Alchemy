@@ -1280,7 +1280,15 @@ void LLImageGL::setManualImage(U32 target, S32 miplevel, S32 intformat, S32 widt
 		{
 			if (pixformat == GL_ALPHA && pixtype == GL_UNSIGNED_BYTE)
 			{ //GL_ALPHA is deprecated, convert to RGBA
-				scratch.resize(width * height);
+				try
+				{
+					scratch.resize(width * height);
+				}
+				catch(const std::bad_alloc&)
+				{
+					LL_ERRS() << "Failed to allocate " << (U32)(width * height * sizeof(U32))
+                        << " bytes for a manual image W" << width << " H" << height << LL_ENDL;
+				}
 
 				U32 pixel_count = (U32)(width * height);
 				for (U32 i = 0; i < pixel_count; i++)
@@ -1298,7 +1306,15 @@ void LLImageGL::setManualImage(U32 target, S32 miplevel, S32 intformat, S32 widt
 
 			if (pixformat == GL_LUMINANCE_ALPHA && pixtype == GL_UNSIGNED_BYTE)
 			{ //GL_LUMINANCE_ALPHA is deprecated, convert to RGBA
-				scratch.resize(width * height);
+				try
+				{
+					scratch.resize(width * height);
+				}
+				catch(const std::bad_alloc&)
+				{
+					LL_ERRS() << "Failed to allocate " << (U32)(width * height * sizeof(U32))
+                        << " bytes for a manual image W" << width << " H" << height << LL_ENDL;
+				}
 
 				U32 pixel_count = (U32)(width * height);
 				for (U32 i = 0; i < pixel_count; i++)
@@ -1319,7 +1335,15 @@ void LLImageGL::setManualImage(U32 target, S32 miplevel, S32 intformat, S32 widt
 
 			if (pixformat == GL_LUMINANCE && pixtype == GL_UNSIGNED_BYTE)
 			{ //GL_LUMINANCE_ALPHA is deprecated, convert to RGB
-				scratch.resize(width * height);
+				try
+				{
+					scratch.resize(width * height);
+				}
+				catch(const std::bad_alloc&)
+				{
+					LL_ERRS() << "Failed to allocate " << (U32)(width * height * sizeof(U32))
+                        << " bytes for a manual image W" << width << " H" << height << LL_ENDL;
+				}
 
 				U32 pixel_count = (U32)(width * height);
 				for (U32 i = 0; i < pixel_count; i++)

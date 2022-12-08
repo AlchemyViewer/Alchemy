@@ -913,8 +913,6 @@ bool LLIMModel::LLIMSession::isP2P()
 bool LLIMModel::LLIMSession::isGroupChat()
 {
 	return IM_SESSION_GROUP_START == mType || (IM_SESSION_INVITE == mType && gAgent.isInGroup(mSessionID, TRUE));
-}
-
 LLUUID LLIMModel::LLIMSession::generateOutgoingAdHocHash() const
 {
 	LLUUID hash = LLUUID::null;
@@ -2084,8 +2082,8 @@ void LLCallDialog::setIcon(const LLSD& session_id, const LLSD& participant_id)
 	}
 	else
 	{
-		LL_WARNS() << "Participant neither avatar nor group" << LL_ENDL;
-		group_icon->setValue(session_id);
+        LL_WARNS() << "Participant neither avatar nor group" << LL_ENDL;
+        group_icon->setValue(session_id);
 	}
 }
 
@@ -2358,7 +2356,7 @@ BOOL LLIncomingCallDialog::postBuild()
 		call_type = getString(notify_box_type);
 	}
 
-	if (caller_name == "anonymous") // obsolete? Likely was part of avaline support
+	if (caller_name == "anonymous") // obsolete?  Likely was part of avaline support
 	{
 		caller_name = getString("anonymous");
 		setCallerName(caller_name, caller_name, call_type);

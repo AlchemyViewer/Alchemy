@@ -585,6 +585,7 @@ void LLViewerObjectList::processObjectUpdate(LLMessageSystem *mesgsys,
         
 		if(update_cache)
 		{
+            //update object cache if the object receives a full-update or terse update
 			objectp = regionp->updateCacheEntry(local_id, objectp);
 		}
 
