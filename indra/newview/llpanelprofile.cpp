@@ -904,7 +904,7 @@ BOOL LLPanelProfileSecondLife::postBuild()
     mCantEditObjectsIcon->setMouseUpCallback([this](LLUICtrl*, S32 x, S32 y, MASK mask) { onShowAgentPermissionsDialog(); });
     mSecondLifePic->setMouseUpCallback([this](LLUICtrl*, S32 x, S32 y, MASK mask) { onShowAgentProfileTexture(); });
 
-    mRlvBehaviorConn = gRlvHandler.setBehaviourToggleCallback([this](ERlvBehaviour eBhvr, ERlvParamType eParam) { if (eBhvr == RLV_BHVR_SHOWWORLDMAP) updateButtons(); });
+    //mRlvBehaviorConn = gRlvHandler.setBehaviourToggleCallback([this](ERlvBehaviour eBhvr, ERlvParamType eParam) { if (eBhvr == RLV_BHVR_SHOWWORLDMAP) updateButtons(); });
 
     return TRUE;
 }
@@ -1635,7 +1635,7 @@ bool LLPanelProfileSecondLife::onEnableMenu(const LLSD& userdata)
     }
     else if (item_name == "can_show_on_map")
     {
-        return (LLAvatarTracker::instance().isBuddyOnline(agent_id) && is_agent_mappable(agent_id))
+        return (LLAvatarTracker::instance().isBuddyOnline(agent_id) && LLAvatarActions::isAgentMappable(agent_id))
         || gAgent.isGodlike();
     }
     else if (item_name == "toggle_block_agent")
@@ -1851,6 +1851,7 @@ void LLPanelProfileSecondLife::onShowTexturePicker()
             LLFloaterTexturePicker* texture_floaterp = new LLFloaterTexturePicker(
                 this,
                 mImageId,
+                LLUUID::null,
                 LLUUID::null,
                 mImageId,
                 FALSE,
@@ -2209,6 +2210,7 @@ void LLPanelProfileFirstLife::onChangePhoto()
             LLFloaterTexturePicker* texture_floaterp = new LLFloaterTexturePicker(
                 this,
                 mImageId,
+                LLUUID::null,
                 LLUUID::null,
                 mImageId,
                 FALSE,
