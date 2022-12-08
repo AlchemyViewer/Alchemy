@@ -696,7 +696,7 @@ namespace
             // Ideally we need to check for texture in injection, but
             // in this case user is setting value explicitly, potentially
             // with different transitions, don't ignore it
-            F64 result = lerp(value, injection->mValue.asReal(), mix);
+            F64 result = ll_lerp(value, injection->mValue.asReal(), mix);
             injection->mLastValue = LLSD::Real(result);
             this->mSettings[injection->mKeyName] = injection->mLastValue;
         }

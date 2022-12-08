@@ -1038,7 +1038,7 @@ void LLJoint::updateWorldMatrix()
 	{
 		sNumUpdates++;
 		mXform.updateMatrix(FALSE);
-        mWorldMatrix.loadu(mXform.getWorldMatrix());
+        mWorldMatrix = mXform.getWorldMatrix();
 		mDirtyFlags = 0x0;
 	}
 }

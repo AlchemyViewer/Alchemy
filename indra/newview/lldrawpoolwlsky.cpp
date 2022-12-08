@@ -200,9 +200,9 @@ void LLDrawPoolWLSky::renderSkyHaze() const
             sky_shader->bindTexture(LLShaderMgr::HALO_MAP, halo_tex);
 
             LLSettingsVOSky* voskysetp = ((LLSettingsVOSky*)mCurrentSky.get());
-            F32 moisture_level = (float)voskysetp->getSkyMoistureLevelFast();
-            F32 droplet_radius = (float)voskysetp->getSkyDropletRadiusFast();
-            F32 ice_level = (float)voskysetp->getSkyIceLevelFast();
+            F32 moisture_level = (float)voskysetp->getSkyMoistureLevel();
+            F32 droplet_radius = (float)voskysetp->getSkyDropletRadius();
+            F32 ice_level = (float)voskysetp->getSkyIceLevel();
 
             // hobble halos and rainbows when there's no light source to generate them
             if (!voskysetp->getIsSunUp() && !voskysetp->getIsMoonUp())
@@ -292,7 +292,7 @@ void LLDrawPoolWLSky::renderStarsDeferred() const
 
     LLSettingsVOSky* voskysetp = ((LLSettingsVOSky*)mCurrentSky.get());
 
-    F32 star_alpha = voskysetp->getStarBrightnessFast() / 500.0f;
+    F32 star_alpha = voskysetp->getStarBrightness() / 500.0f;
 
 	// If start_brightness is not set, exit
 	if(star_alpha < 0.001f)
@@ -368,7 +368,7 @@ void LLDrawPoolWLSky::renderSkyClouds() const
 
         LLSettingsVOSky* voskysetp = ((LLSettingsVOSky*)mCurrentSky.get());
 
-        F32 cloud_variance = voskysetp->getCloudVarianceFast();
+        F32 cloud_variance = voskysetp->getCloudVariance();
         F32 blend_factor = voskysetp->getBlendFactor();
 
         // if we even have sun disc textures to work with...
@@ -394,7 +394,7 @@ void LLDrawPoolWLSky::renderSkyClouds() const
 
         cloud_shader->uniform1f(LLShaderMgr::BLEND_FACTOR, blend_factor);
         cloud_shader->uniform1f(LLShaderMgr::CLOUD_VARIANCE, cloud_variance);
-        cloudshader->uniform1f(LLShaderMgr::SUN_MOON_GLOW_FACTOR, psky->getSunMoonGlowFactor());
+        cloud_shader->uniform1f(LLShaderMgr::SUN_MOON_GLOW_FACTOR, voskysetp->getSunMoonGlowFactor());
 
 		/// Render the skydome
         renderDome(cloud_shader);
@@ -502,7 +502,7 @@ void LLDrawPoolWLSky::renderHeavenlyBodies()
 
             LLSettingsVOSky* voskysetp = ((LLSettingsVOSky*)mCurrentSky.get());
 
-            F32 moon_brightness = (float)voskysetp->getMoonBrightnessFast();
+            F32 moon_brightness = (float)voskysetp->getMoonBrightness();
             LLColor4 moon_color(gSky.mVOSkyp->getMoon().getColor());
             
             moon_shader->uniform1f(LLShaderMgr::MOON_BRIGHTNESS, moon_brightness);

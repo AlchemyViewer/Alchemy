@@ -204,22 +204,22 @@ public:
 
 	void* operator new(std::size_t size)
 	{
-		return aligned_new<64>(size);
+		return ll_aligned_malloc<64>(size);
 	}
 
 	void operator delete(void* ptr, std::size_t size)
 	{
-		aligned_delete<64>(ptr, size);
+		ll_aligned_free<64>(ptr);
 	}
 
 	void* operator new[](std::size_t size)
 	{
-		return aligned_new<64>(size);
+		return ll_aligned_malloc<64>(size);
 	}
 
 	void operator delete[](void* ptr, std::size_t size)
 	{
-		aligned_delete<64>(ptr, size);
+		ll_aligned_free<64>(ptr);
 	}
 
 	static U32 sNodeCount;

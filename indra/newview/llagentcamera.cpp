@@ -2213,7 +2213,7 @@ LLVector3 LLAgentCamera::getCameraOffsetInitial()
     // getCameraOffsetInitial and getFocusOffsetInitial can be called on update from idle before init()
     static LLCachedControl<LLVector3> camera_offset_initial (gSavedSettings, "CameraOffsetRearView", LLVector3());
 // [RLVa:KB] - @setcam_eyeoffset
-	return convert_from_llsd<LLVector3>( (ECameraPreset::CAMERA_RLV_SETCAM_VIEW != mCameraPreset) ? camera_offset_initial : mRlvCameraOffsetInitialControl->get(), TYPE_VEC3, "");
+	return (ECameraPreset::CAMERA_RLV_SETCAM_VIEW != mCameraPreset) ? camera_offset_initial : convert_from_llsd<LLVector3>(mRlvCameraOffsetInitialControl->get(), TYPE_VEC3, "");
 // [/RLVa:KB]	
 //	return camera_offset_initial;
 }
@@ -2222,7 +2222,7 @@ LLVector3d LLAgentCamera::getFocusOffsetInitial()
 {
     static LLCachedControl<LLVector3d> focus_offset_initial(gSavedSettings, "FocusOffsetRearView", LLVector3d());
 // [RLVa:KB] - @setcam_focusoffset
-	return convert_from_llsd<LLVector3d>( (ECameraPreset::CAMERA_RLV_SETCAM_VIEW != mCameraPreset) ? focus_offset_initial : mRlvFocusOffsetInitialControl->get(), TYPE_VEC3D, "");
+	return (ECameraPreset::CAMERA_RLV_SETCAM_VIEW != mCameraPreset) ? focus_offset_initial :convert_from_llsd<LLVector3d>(mRlvFocusOffsetInitialControl->get(), TYPE_VEC3D, "");
 // [/RLVa:KB]
 //	return focus_offset_initial;
 }

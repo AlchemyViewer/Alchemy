@@ -76,7 +76,7 @@ public:
 	BOOL isClipboardTextAvailable() override;
 	BOOL pasteTextFromClipboard(LLWString &dst) override;
 	BOOL copyTextToClipboard(const LLWString & src) override;
-	void setWindowTitle(const std::string& title) override;
+	void setTitle(const std::string title) override;
 	void flashIcon(F32 seconds) override;
 	F32 getGamma() override;
 	BOOL setGamma(const F32 gamma) override; // Set the gamma

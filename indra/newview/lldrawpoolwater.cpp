@@ -582,10 +582,12 @@ void LLDrawPoolWater::renderWater()
         if (deferred_render)
         {
             if (shader->getUniformLocation(LLShaderMgr::DEFERRED_NORM_MATRIX) >= 0)
-            {
-                glh::matrix4f norm_mat = get_current_modelview().inverse().transpose();
-                shader->uniformMatrix4fv(LLShaderMgr::DEFERRED_NORM_MATRIX, 1, FALSE, norm_mat.m);
-            }
+			{
+				LLMatrix4a norm_mat = get_current_modelview();
+				norm_mat.invert();
+				norm_mat.transpose();
+				shader->uniformMatrix4fv(LLShaderMgr::DEFERRED_NORM_MATRIX, 1, FALSE, norm_mat.getF32ptr());
+			}
         }
 
         shader->uniform2fv(LLShaderMgr::DEFERRED_SCREEN_RES, 1, screenRes);
@@ -615,7 +617,7 @@ void LLDrawPoolWater::renderWater()
         shader->uniform4fv(LLShaderMgr::WATER_FOGCOLOR, 1, fog_color.mV);
 
         shader->uniform3fv(LLShaderMgr::WATER_SPECULAR, 1, light_diffuse.mV);
-        shader->uniform1f(LLShaderMgr::WATER_SPECULAR_EXP, light_exp);
+        //shader->uniform1f(LLShaderMgr::WATER_SPECULAR_EXP, light_exp);
 
         shader->uniform2fv(LLShaderMgr::WATER_WAVE_DIR1, 1, pwater->getWave1Dir().mV);
         shader->uniform2fv(LLShaderMgr::WATER_WAVE_DIR2, 1, pwater->getWave2Dir().mV);
@@ -632,8 +634,8 @@ void LLDrawPoolWater::renderWater()
 
         shader->uniform1i(LLShaderMgr::SUN_UP_FACTOR, sun_up ? 1 : 0);
         shader->uniform1f(LLShaderMgr::WATER_SUN_ANGLE, sunAngle);
-        shader->uniform1f(LLShaderMgr::WATER_SCALED_ANGLE, scaledAngle);
-        shader->uniform1f(LLShaderMgr::WATER_SUN_ANGLE2, 0.1f + 0.2f * sunAngle);
+        //shader->uniform1f(LLShaderMgr::WATER_SCALED_ANGLE, scaledAngle);
+        //shader->uniform1f(LLShaderMgr::WATER_SUN_ANGLE2, 0.1f + 0.2f * sunAngle);
         shader->uniform1i(LLShaderMgr::WATER_EDGE_FACTOR, edge ? 1 : 0);
 
         LLVector4 rotated_light_direction = environment.getRotatedLightNorm();
@@ -678,7 +680,7 @@ void LLDrawPoolWater::renderWater()
         shader->disableTexture(LLShaderMgr::BUMP_MAP);
         shader->disableTexture(LLShaderMgr::DIFFUSE_MAP);
         shader->disableTexture(LLShaderMgr::WATER_REFTEX);
-        shader->disableTexture(LLShaderMgr::WATER_SCREENDEPTH);
+        //shader->disableTexture(LLShaderMgr::WATER_SCREENDEPTH);
 
         // clean up
         shader->unbind();

@@ -1378,10 +1378,6 @@ void LLImageGL::setManualImage(U32 target, S32 miplevel, S32 intformat, S32 widt
         case GL_ALPHA8:
             intformat = GL_COMPRESSED_ALPHA;
             break;
-        case GL_RED:
-        case GL_R8:
-            intformat = GL_COMPRESSED_RED;
-            break;
         default:
             LL_WARNS() << "Could not compress format: " << std::hex << intformat << std::dec << LL_ENDL;
             break;
@@ -1398,7 +1394,7 @@ void LLImageGL::setManualImage(U32 target, S32 miplevel, S32 intformat, S32 widt
 
 void LLImageGL::setManualImage3D(U32 target, S32 miplevel, S32 intformat, S32 width, S32 height, S32 depth, U32 pixformat, U32 pixtype, const void* pixels, bool allow_compression)
 {
-	LL_RECORD_BLOCK_TIME(FTM_SET_MANUAL_IMAGE);
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
 	stop_glerror();
 	glTexImage3D(target, miplevel, intformat, width, height, depth, 0, pixformat, pixtype, pixels);
 	stop_glerror();

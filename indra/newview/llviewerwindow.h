@@ -175,7 +175,6 @@ public:
 	void			setUIVisibility(bool);
 	bool			getUIVisibility();
 	void			handlePieMenu(S32 x, S32 y, MASK mask);
-	void			setWindowTitle(const std::string& title);
 
 	BOOL handleAnyMouseClick(LLWindow *window, LLCoordGL pos, MASK mask, EMouseClickType clicktype, BOOL down);
 

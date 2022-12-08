@@ -1999,7 +1999,7 @@ void LLWindowWin32::setTitle(const std::string title)
     // to support non-ascii usernames (and region names?)
     mWindowThread->post([=]()
         {
-            SetWindowTextA(mWindowHandle, title.c_str());
+			SetWindowText(mWindowHandle, ll_convert_string_to_wide(title).c_str());
         });
 }
 
@@ -2259,13 +2259,6 @@ void LLWindowWin32::gatherInput()
         if (mInputProcessingPaused)
         {
             continue;
-        }
-
-        // For async host by name support.  Really hacky.
-        if (gAsyncMsgCallback && (LL_WM_HOST_RESOLVED == msg.message))
-        {
-            LL_PROFILE_ZONE_NAMED_CATEGORY_WIN32("gi - callback");
-            gAsyncMsgCallback(msg);
         }
     }
 
@@ -3370,11 +3363,6 @@ BOOL LLWindowWin32::pasteTextFromClipboard(LLWString &dst)
 	}
 
 	return success;
-}
-
-void LLWindowWin32::setWindowTitle(const std::string& title)
-{
-	SetWindowText(mWindowHandle, ll_convert_string_to_wide(title).c_str());
 }
 
 BOOL LLWindowWin32::copyTextToClipboard(const LLWString& wstr)

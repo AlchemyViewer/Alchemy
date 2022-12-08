@@ -808,7 +808,7 @@ ll_convert_cp_forms(ll_convert_wstr_alias, std::wstring, std::string,  ll_conver
  * Converts incoming string into utf8 string
  *
  */
-LL_COMMON_API std::string ll_convert_string_to_utf8_string(std::string_view in);
+LL_COMMON_API std::string ll_convert_string_to_utf8_string(const std::string& in);
 
 /// Get Windows message string for passed GetLastError() code
 // VS 2013 doesn't let us forward-declare this template, which is what we

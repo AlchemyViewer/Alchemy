@@ -91,7 +91,7 @@ public:
 	/*virtual*/ BOOL isPrimaryTextAvailable() override;
 	/*virtual*/ BOOL pasteTextFromPrimary(LLWString &dst) override;
 	/*virtual*/ BOOL copyTextToPrimary(const LLWString & src) override;
-	/*virtual*/ void setWindowTitle(const std::string& title) override;
+	/*virtual*/ void setTitle(const std::string title) override;
 	/*virtual*/ void flashIcon(F32 seconds) override;
 	/*virtual*/ F32 getGamma() override;
 	/*virtual*/ BOOL setGamma(const F32 gamma) override; // Set the gamma

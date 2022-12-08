@@ -610,7 +610,7 @@ void LLFace::renderSelected(LLViewerTexture *imagep, const LLColor4& color)
 					glPolygonOffset(-1.f, -1.f);
 					gGL.multMatrix(volume->getRelativeXform());
 					const LLVolumeFace& vol_face = rigged->getVolumeFace(getTEOffset());
-                    LLVertexBuffer::drawElements(LLRender::TRIANGLES,vol_face.mNumVertices, vol_face.mPositions, vol_face.mTexCoords, vol_face.mNumIndices, vol_face.mIndices);
+                    LLVertexBuffer::drawElements(LLRender::TRIANGLES,vol_face.mPositions, vol_face.mTexCoords, vol_face.mNumIndices, vol_face.mIndices);
 				}
 			}
 		}
@@ -648,7 +648,7 @@ void renderFace(LLDrawable* drawable, LLFace *face)
         if (volume)
         {
             const LLVolumeFace& vol_face = volume->getVolumeFace(face->getTEOffset());
-            LLVertexBuffer::drawElements(LLRender::TRIANGLES, vol_face.mNumVertices, vol_face.mPositions, NULL, vol_face.mNumIndices, vol_face.mIndices);
+            LLVertexBuffer::drawElements(LLRender::TRIANGLES, vol_face.mPositions, NULL, vol_face.mNumIndices, vol_face.mIndices);
         }
     }
 }
@@ -1243,7 +1243,7 @@ bool LLFace::canRenderAsMask()
 
 BOOL LLFace::getGeometryVolume(const LLVolume& volume,
 							   const S32 &f,
-								const LLMatrix4a& mat_vert, const LLMatrix4a& mat_normal,
+								const LLMatrix4a& mat_vert_in, const LLMatrix4a& mat_norm_in,
 								const U16 &index_offset,
 								bool force_rebuild)
 {
@@ -1475,7 +1475,7 @@ BOOL LLFace::getGeometryVolume(const LLVolume& volume,
         }
         else
         {
-            mat_vert.loadu(mat_vert_in);
+            mat_vert = mat_vert_in;
         }
     }
 
@@ -1490,13 +1490,13 @@ BOOL LLFace::getGeometryVolume(const LLVolume& volume,
             }
 
             //TODO -- cache this (check profile marker above)?
-            glh::matrix4f m((F32*) skin->mBindShapeMatrix.getF32ptr());
-            m = m.inverse().transpose();
-            mat_normal.loadu(m.m);
+			mat_normal = skin->mBindShapeMatrix;
+			mat_normal.invert();
+			mat_normal.transpose();
         }
         else
         {
-            mat_normal.loadu(mat_norm_in);
+            mat_normal = mat_norm_in;
         }
     }
 

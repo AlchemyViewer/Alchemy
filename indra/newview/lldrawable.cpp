@@ -1416,12 +1416,9 @@ LLCamera LLSpatialBridge::transformCamera(LLCamera& camera)
 
 void LLSpatialBridge::transformExtents(const LLVector4a* src, LLVector4a* dst)
 {
-    LLMatrix4 mat = mDrawable->getXform()->getWorldMatrix();
+    LLMatrix4a mat = mDrawable->getXform()->getWorldMatrix();
     mat.invert();
-
-    LLMatrix4a world_to_bridge(mat);
-
-    matMulBoundBox(world_to_bridge, src, dst);
+	mat.mulBoundBox(src,dst);
 }
 
 

@@ -1256,7 +1256,7 @@ BOOL LLWindowMacOSX::copyTextToClipboard(const LLWString &s)
 	return result;
 }
 
-void LLWindowMacOSX::setWindowTitle(const std::string& title)
+void LLWindowMacOSX::setTitle(const std::string title)
 {
 	setTitle(title);
 }

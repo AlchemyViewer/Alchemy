@@ -934,13 +934,3 @@ LLColor3 LLDrawPoolAvatar::getDebugColor() const
 {
 	return LLColor3(0.f, 1.f, 0.f);
 }
-
-
-LLVertexBufferAvatar::LLVertexBufferAvatar()
-: LLVertexBuffer(sDataMask, 
-	GL_STREAM_DRAW_ARB) //avatars are always stream draw due to morph targets
-{
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_AVATAR
-}
-
-
