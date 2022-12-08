@@ -406,7 +406,7 @@ void LLDiskCache::removeOldVFSFiles()
 
     boost::system::error_code ec;
 #if LL_WINDOWS
-    std::wstring cache_path(utf8str_to_utf16str(gDirUtilp->getExpandedFilename(LL_PATH_CACHE, "")));
+    std::wstring cache_path(ll_convert_string_to_wide(gDirUtilp->getExpandedFilename(LL_PATH_CACHE, "")));
 #else
     std::string cache_path(gDirUtilp->getExpandedFilename(LL_PATH_CACHE, ""));
 #endif

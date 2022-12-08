@@ -3039,6 +3039,8 @@ S32 LLMeshRepository::getActualMeshLOD(LLSD& header, S32 lod)
 	//header exists and no good lod found, treat as 404
 	header["404"] = 1;
 	return -1;
+}
+
 // Handle failed or successful requests for mesh assets.
 //
 // Support for 200 responses was added for several reasons.  One,

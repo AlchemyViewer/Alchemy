@@ -913,6 +913,8 @@ bool LLIMModel::LLIMSession::isP2P()
 bool LLIMModel::LLIMSession::isGroupChat()
 {
 	return IM_SESSION_GROUP_START == mType || (IM_SESSION_INVITE == mType && gAgent.isInGroup(mSessionID, TRUE));
+}
+
 LLUUID LLIMModel::LLIMSession::generateOutgoingAdHocHash() const
 {
 	LLUUID hash = LLUUID::null;

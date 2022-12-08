@@ -246,7 +246,6 @@ public:
     LLColorSwatchCtrl* mShinyColorSwatch = nullptr;
 
     LLComboBox* mComboTexGen   = nullptr;
-    LLComboBox* mComboMatMedia = nullptr;
     LLComboBox* mComboBumpiness = nullptr;
     LLComboBox* mComboShininess = nullptr;
     LLComboBox* mComboAlphaMode    = nullptr;
