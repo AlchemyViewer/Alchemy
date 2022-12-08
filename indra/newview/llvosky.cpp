@@ -659,9 +659,7 @@ void LLVOSky::idleUpdate(LLAgent &agent, const F64 &time)
 void LLVOSky::forceSkyUpdate()
 {
     mForceUpdate = TRUE;
-
-    m_lastAtmosphericsVars = AtmosphericsVars();
-
+    m_lastAtmosphericsVars = {};
     mCubeMapUpdateStage = -1;
 }
 

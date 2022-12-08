@@ -86,6 +86,7 @@ Voice Server Version: [VOICE_VERSION]
 	</string>
 	<string name="AboutTraffic">Packets Lost: [PACKETS_LOST,number,0]/[PACKETS_IN,number,0] ([PACKETS_PCT,number,1]%)</string>
 	<string name="AboutTime">[month, datetime, slt] [day, datetime, slt] [year, datetime, slt] [hour, datetime, slt]:[min, datetime, slt]:[second,datetime,slt]</string>
+  <string name="LocalTime">[month, datetime, local] [day, datetime, local] [year, datetime, local] [hour, datetime, local]:[min, datetime, local]:[second,datetime, local]</string>
 	<string name="ErrorFetchingServerReleaseNotesURL">Error fetching server release notes URL.</string>
 	<string name="BuildConfiguration">Build Configuration</string>
 	
@@ -128,7 +129,7 @@ Voice Server Version: [VOICE_VERSION]
 	<string name="CertAllocationFailure">Failed to allocate openssl memory for certificate.</string>
 
 	<string name="LoginFailedNoNetwork">Network error: Could not establish connection, please check your network connection.</string>
-	<string name="LoginFailed">Login failed.</string>
+	<string name="LoginFailedHeader">Login failed.</string>
 	<string name="Quit">Quit</string>
 	
 	<string name="AgniGridLabel">Second Life Main Grid (Agni)</string>
@@ -138,6 +139,8 @@ Voice Server Version: [VOICE_VERSION]
 	<string name="LoginFailedViewerNotPermitted">
     The viewer you are using can no longer access [CURRENT_GRID]. Please visit the following page to download a new viewer:
 https://www.alchemyviewer.org/pages/downloads.html</string>
+	<string name="LoginFailed">Grid emergency login failure.
+If you feel this is an error, please contact support.</string>
 	<string name="LoginIntermediateOptionalUpdateAvailable">Optional viewer update available: [VERSION]</string>
 	<string name="LoginFailedRequiredUpdate">Required viewer update: [VERSION]</string>
 	<string name="LoginFailedAlreadyLoggedIn">This agent is already logged in.
@@ -161,15 +164,18 @@ Logins are currently restricted to [GRID_ADMIN] employees only.</string>
 People with free accounts will not be able to access [CURRENT_GRID] during this time, to make room for those who have paid for [CURRENT_GRID].</string>
 	<string name="LoginFailedComputerProhibited">[CURRENT_GRID] cannot be accessed from this computer.
 If you feel this is an error, please contact support.</string>
+  <!--'Pacific time' placeholder for [TIME] in case time from server can't be decoded-->
+  <string name="PacificTime">Pacific Time</string>
 	<string name="LoginFailedAcountSuspended">Your account is not accessible until
-[TIME] Pacific Time.</string>
+[TIME].
+If you feel this is an error, please contact support.</string>
 	<string name="LoginFailedAccountDisabled">We are unable to complete your request at this time.
 Please contact [CURRENT_GRID] support for assistance.</string>
 	<string name="LoginFailedTransformError">Data inconsistency found during login.
 Please contact [CURRENT_GRID] support.</string>
 	<string name="LoginFailedAccountMaintenance">Your account is undergoing minor maintenance.
 Your account is not accessible until
-[TIME] Pacific Time.
+[TIME].
 If you feel this is an error, please contact [CURRENT_GRID] support.</string>
 	<string name="LoginFailedPendingLogoutFault">Request for logout responded with a fault from simulator.</string>
 	<string name="LoginFailedPendingLogout">The system is logging you out right now.

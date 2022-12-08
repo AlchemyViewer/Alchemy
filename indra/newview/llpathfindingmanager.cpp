@@ -765,7 +765,7 @@ std::string LLPathfindingManager::getRetrieveObjectLinksetsURLForCurrentRegion()
 
 std::string LLPathfindingManager::getChangeObjectLinksetsURLForCurrentRegion() const
 {
-	return getCapabilityURLForCurrentRegion(CAP_SERVICE_SET_OBJECT_LINKSETS);
+    return getCapabilityURLForCurrentRegion(CAP_SERVICE_SET_OBJECT_LINKSETS);
 }
 
 std::string LLPathfindingManager::getTerrainLinksetsURLForCurrentRegion() const

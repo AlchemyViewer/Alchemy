@@ -9,7 +9,7 @@ include(URIPARSER)
 include(ZLIB)
 
 use_prebuilt_binary(colladadom)
-use_prebuilt_binary(minizip-ng)
+use_prebuilt_binary(minizip-ng) # needed for colladadom
 
 set(LLPRIMITIVE_INCLUDE_DIRS
     ${LIBS_OPEN_DIR}/llprimitive

@@ -772,6 +772,14 @@ void LLFavoritesBarCtrl::updateButtons(bool force_update)
 	    }
 	    LLFavoritesOrderStorage::instance().mPrevFavorites = mItems;
 		mGetPrevItems = false;
+
+		if (LLFavoritesOrderStorage::instance().isStorageUpdateNeeded())
+		{
+			if (!mItemsChangedTimer.getStarted())
+			{
+				mItemsChangedTimer.start();
+			}
+		}
 	}
 
 	const LLButton::Params& button_params = getButtonParams();
@@ -1607,7 +1615,7 @@ void LLFavoritesOrderStorage::destroyClass()
 		file.close();
 		LLFile::remove(filename);
 	}
-	if(mSaveOnExit)
+	if(mSaveOnExit || gSavedSettings.getBOOL("UpdateRememberPasswordSetting"))
 	{
 	    LLFavoritesOrderStorage::instance().saveFavoritesRecord(true);
 	}
@@ -1651,7 +1659,6 @@ void LLFavoritesOrderStorage::load()
 			llifstream in_file;
 			in_file.open(filename.c_str());
 			LLSD fav_llsd;
-			LLSD user_llsd;
 			if (in_file.is_open())
 			{
 				LLSDSerialize::fromXML(fav_llsd, in_file);
@@ -1661,12 +1668,12 @@ void LLFavoritesOrderStorage::load()
 				in_file.close();
 				if (fav_llsd.isMap() && fav_llsd.has(gAgentUsername))
 				{
-					user_llsd = fav_llsd[gAgentUsername];
+					mStorageFavorites = fav_llsd[gAgentUsername];
 
 					S32 index = 0;
 					bool needs_validation = gSavedPerAccountSettings.getBOOL("ShowFavoritesOnLogin");
-					for (LLSD::array_iterator iter = user_llsd.beginArray();
-						iter != user_llsd.endArray(); ++iter)
+					for (LLSD::array_iterator iter = mStorageFavorites.beginArray();
+						iter != mStorageFavorites.endArray(); ++iter)
 					{
 						// Validation
 						LLUUID fv_id = iter->get("id").asUUID();
@@ -1972,7 +1979,7 @@ BOOL LLFavoritesOrderStorage::saveFavoritesRecord(bool pref_changed)
 		}
 	}
 
-	if((items != mPrevFavorites) || name_changed || pref_changed)
+	if((items != mPrevFavorites) || name_changed || pref_changed || gSavedSettings.getBOOL("UpdateRememberPasswordSetting"))
 	{
 	    std::string filename = getStoredFavoritesFilename();
 		if (!filename.empty())
@@ -1993,6 +2000,12 @@ BOOL LLFavoritesOrderStorage::saveFavoritesRecord(bool pref_changed)
 			LLSD user_llsd;
 			S32 fav_iter = 0;
 			mMissingSLURLs.clear();
+
+            LLSD save_pass;
+            save_pass["save_password"] = gSavedSettings.getBOOL("RememberPassword");
+            user_llsd[fav_iter] = save_pass;
+            fav_iter++;
+
 			for (LLInventoryModel::item_array_t::iterator it = items.begin(); it != items.end(); it++)
 			{
 				LLSD value;
@@ -2061,6 +2074,23 @@ void LLFavoritesOrderStorage::showFavoritesOnLoginChanged(BOOL show)
 	{
 		removeFavoritesRecordOfUser();
 	}
+}
+
+bool LLFavoritesOrderStorage::isStorageUpdateNeeded()
+{
+	if (!mRecreateFavoriteStorage)
+	{
+		for (LLSD::array_iterator iter = mStorageFavorites.beginArray();
+			iter != mStorageFavorites.endArray(); ++iter)
+		{
+			if (mFavoriteNames[iter->get("id").asUUID()] != iter->get("name").asString())
+			{
+				mRecreateFavoriteStorage = true;
+				return true;
+			}
+		}
+	}
+	return false;
 }
 
 void AddFavoriteLandmarkCallback::fire(const LLUUID& inv_item_id)

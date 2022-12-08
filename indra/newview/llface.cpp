@@ -68,7 +68,6 @@
 #pragma GCC diagnostic ignored "-Wuninitialized"
 #endif
 
-extern BOOL gGLDebugLoggingEnabled;
 #define LL_MAX_INDICES_COUNT 1000000
 
 static LLStaticHashedString sTextureIndexIn("texture_index_in");

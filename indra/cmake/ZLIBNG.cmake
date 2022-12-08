@@ -1,13 +1,13 @@
 # -*- cmake -*-
 
-set(ZLIB_FIND_QUIETLY ON)
-set(ZLIB_FIND_REQUIRED ON)
+set(ZLIBNG_FIND_QUIETLY ON)
+set(ZLIBNG_FIND_REQUIRED ON)
 
 include(Prebuilt)
 include(Linking)
 
 if (USESYSTEMLIBS)
-  include(FindZLIB)
+  include(FindZLIBNG)
 else (USESYSTEMLIBS)
   use_prebuilt_binary(zlib-ng)
   use_prebuilt_binary(minizip-ng)
@@ -16,7 +16,7 @@ else (USESYSTEMLIBS)
       debug ${ARCH_PREBUILT_DIRS_DEBUG}/libminizip.lib
       optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libminizip.lib)
 
-    set(ZLIB_LIBRARIES 
+    set(ZLIBNG_LIBRARIES 
       debug ${ARCH_PREBUILT_DIRS_DEBUG}/zlibd.lib
       optimized ${ARCH_PREBUILT_DIRS_RELEASE}/zlib.lib)
   elseif (LINUX)
@@ -33,11 +33,11 @@ else (USESYSTEMLIBS)
     # second whole-archive load of the archive.  See viewer's
     # CMakeLists.txt for more information.
     #
-    set(ZLIB_PRELOAD_ARCHIVES -Wl,--whole-archive z -Wl,--no-whole-archive)
-    set(ZLIB_LIBRARIES z)
+    set(ZLIBNG_PRELOAD_ARCHIVES -Wl,--whole-archive z -Wl,--no-whole-archive)
+    set(ZLIBNG_LIBRARIES z)
   elseif (DARWIN)
     set(MINIZIP_LIBRARIES minizip)
-    set(ZLIB_LIBRARIES -Wl,-force_load,${ARCH_PREBUILT_DIRS_RELEASE}/libz.a)
+    set(ZLIBNG_LIBRARIES -Wl,-force_load,${ARCH_PREBUILT_DIRS_RELEASE}/libz.a)
   endif (WINDOWS)
-  set(ZLIB_INCLUDE_DIRS ${LIBS_PREBUILT_DIR}/include/zlib)
+  set(ZLIBNG_INCLUDE_DIRS ${LIBS_PREBUILT_DIR}/include/zlib-ng)
 endif (USESYSTEMLIBS)
