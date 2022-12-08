@@ -884,7 +884,7 @@ void LLJoint::setWorldRotation( const LLQuaternion& rot )
 	LLMatrix4a temp_mat(rota);
 
 	LLMatrix4a invParentWorldMatrix = mParent->getWorldMatrix();
-	invParentWorldMatrix.setTranslate_affine(LLVector3(0.f));
+	invParentWorldMatrix.setTranslate_affine(LLVector3(0.f, 0.f, 0.f));
 
 	invParentWorldMatrix.invert();
 

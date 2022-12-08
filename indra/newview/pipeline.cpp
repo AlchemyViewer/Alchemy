@@ -3982,7 +3982,7 @@ void LLPipeline::postSort(LLCamera& camera)
                 if (!sShadowRender && !sReflectionRender)
                 {
                     touchTextures(info);
-                    addTrianglesDrawn(info->mCount, info->mDrawMode);
+                    //addTrianglesDrawn(info->mCount, info->mDrawMode);
                 }
 			}
 		}
@@ -8623,9 +8623,10 @@ void LLPipeline::renderDeferredLighting(LLRenderTarget *screen_target)
     LLRenderTarget *deferred_depth_target = &mDeferredDepth;
     LLRenderTarget *deferred_light_target = &mDeferredLight;
 
+	LLViewerCamera& camera = LLViewerCamera::instance();
+
     {
         LL_PROFILE_ZONE_NAMED_CATEGORY_PIPELINE("deferred"); //LL_RECORD_BLOCK_TIME(FTM_RENDER_DEFERRED);
-        LLViewerCamera *camera = LLViewerCamera::getInstance();
         {
             LLGLDepthTest depth(GL_TRUE);
             deferred_depth_target->copyContents(*deferred_target,

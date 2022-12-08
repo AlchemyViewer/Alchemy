@@ -901,7 +901,7 @@ void LLVOTree::updateMesh()
 
 
 	LLMatrix4a rot_mat = trans_mat;
-	rot_mat.mul(LLQuaternion2(rot));
+	rot_mat.mul(LLMatrix4a(LLQuaternion2(rot)));
 
 	F32 radius = getScale().magVec()*0.05f;
 	rot_mat.applyScale_affine(radius);
@@ -1068,7 +1068,7 @@ void LLVOTree::genBranchPipeline(LLStrider<LLVector4a>& vertices,
 					LLQuaternion(((constant_twist + ((i%2==0)?twist:-twist))*i)*DEG_TO_RAD, LLVector4(0.f, 0.f, 1.f));
 
 				LLMatrix4a rot_mat = trans_mat;
-				rot_mat.mul(LLQuaternion2(rot));
+				rot_mat.mul(LLMatrix4a(LLQuaternion2(rot)));
 
 				genBranchPipeline(vertices, normals, tex_coords, colors, indices, index_offset, rot_mat, trunk_LOD, stop_level, depth - 1, 0, scale*mScaleStep, twist, droop, branches, alpha);
 			}

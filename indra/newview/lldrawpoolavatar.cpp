@@ -240,11 +240,11 @@ void LLDrawPoolAvatar::beginPostDeferredPass(S32 pass)
 
 	sSkipOpaque = TRUE;
 	sShaderLevel = mShaderLevel;
-	if (LLPipeline::sUnderWaterRender)
-	{
-		sVertexProgram = &gDeferredAvatarAlphaWaterProgram;
-	}
-	else
+	//if (LLPipeline::sUnderWaterRender)
+	//{
+	//	sVertexProgram = &gDeferredAvatarAlphaWaterProgram;
+	//}
+	//else
 	{
 		sVertexProgram = &gDeferredAvatarAlphaProgram;
 	}

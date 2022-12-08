@@ -289,7 +289,7 @@ static std::string STR_DISPLAY_DONE("Display:Done");
 // Paint the display!
 void display(BOOL rebuild, F32 zoom_factor, int subfield, BOOL for_snapshot)
 {
-	LL_ALWAYS_RECORD_BLOCK_TIME(FTM_RENDER);
+	LL_RECORD_BLOCK_TIME(FTM_RENDER);
 	LLVBOPool::deleteReleasedBuffers();
 
 	if (gWindowResized)
@@ -699,7 +699,7 @@ pProgFloater->setProgressCancelButtonVisible(FALSE, LLTrans::getString("Cancel")
 		{
 			LL_RECORD_BLOCK_TIME(FTM_EEP_UPDATE);
             // update all the sky/atmospheric/water settings
-            LLEnvironment::getInstance()->update(&vwrCamera);
+            LLEnvironment::instance().update(LLViewerCamera::getInstance());
 		}
 
 		// *TODO: merge these two methods
@@ -743,8 +743,8 @@ pProgFloater->setProgressCancelButtonVisible(FALSE, LLTrans::getString("Cancel")
 
 		static LLCullResult result;
 		LLViewerCamera::sCurCameraID = LLViewerCamera::CAMERA_WORLD;
-		LLPipeline::sUnderWaterRender = vwrCamera.cameraUnderWater();
-		gPipeline.updateCull(vwrCamera, result);
+		LLPipeline::sUnderWaterRender = LLViewerCamera::getInstance()->cameraUnderWater();
+		gPipeline.updateCull(*LLViewerCamera::getInstance(), result);
 		stop_glerror();
 
 		LLGLState::checkStates();
@@ -771,7 +771,7 @@ pProgFloater->setProgressCancelButtonVisible(FALSE, LLTrans::getString("Cancel")
 				if (gFrameCount > 1)
 				{ //for some reason, ATI 4800 series will error out if you 
 				  //try to generate a shadow before the first frame is through
-					gPipeline.generateSunShadow(vwrCamera);
+					gPipeline.generateSunShadow(*LLViewerCamera::getInstance());
 				}
 
 				LLVertexBuffer::unbind();
@@ -807,8 +807,8 @@ pProgFloater->setProgressCancelButtonVisible(FALSE, LLTrans::getString("Cancel")
 		{
 			LL_PROFILE_ZONE_NAMED_CATEGORY_DISPLAY("display - 3")
 			LLAppViewer::instance()->pingMainloopTimeout(STR_DISPLAY_IMAGERY);
-			gPipeline.generateWaterReflection(vwrCamera);
-			gPipeline.generateHighlight(vwrCamera);
+			gPipeline.generateWaterReflection(*LLViewerCamera::getInstance());
+			gPipeline.generateHighlight(*LLViewerCamera::getInstance());
 			gPipeline.renderPhysicsDisplay();
 		}
 
@@ -867,7 +867,7 @@ pProgFloater->setProgressCancelButtonVisible(FALSE, LLTrans::getString("Cancel")
 		{
 			LL_PROFILE_ZONE_NAMED_CATEGORY_DISPLAY("display - 4")
 			LLViewerCamera::sCurCameraID = LLViewerCamera::CAMERA_WORLD;
-			gPipeline.stateSort(vwrCamera, result);
+			gPipeline.stateSort(*LLViewerCamera::getInstance(), result);
 			stop_glerror();
 				
 			if (rebuild)
@@ -942,7 +942,7 @@ pProgFloater->setProgressCancelButtonVisible(FALSE, LLTrans::getString("Cancel")
 		//	gGL.popMatrix();
 		//}
 
-		LLPipeline::sUnderWaterRender = vwrCamera.cameraUnderWater() ? TRUE : FALSE;
+		LLPipeline::sUnderWaterRender = LLViewerCamera::getInstance()->cameraUnderWater() ? TRUE : FALSE;
 
 		LLGLState::checkStates();
 
@@ -1002,11 +1002,11 @@ pProgFloater->setProgressCancelButtonVisible(FALSE, LLTrans::getString("Cancel")
 			gGL.setColorMask(true, false);
 			if (LLPipeline::sRenderDeferred)
 			{
-				gPipeline.renderGeomDeferred(vwrCamera);
+				gPipeline.renderGeomDeferred(*LLViewerCamera::getInstance());
 			}
 			else
 			{
-				gPipeline.renderGeom(vwrCamera, TRUE);
+				gPipeline.renderGeom(*LLViewerCamera::getInstance(), TRUE);
 			}
 			
 			gGL.setColorMask(true, true);

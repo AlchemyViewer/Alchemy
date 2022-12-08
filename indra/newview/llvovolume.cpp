@@ -1797,22 +1797,11 @@ BOOL LLVOVolume::genBBoxes(BOOL force_global)
         }
     }
 
-    bool rigged = false;
-
-    if (!isAnimatedObject())
-    {
-        rigged = isRiggedMesh() && isAttachment();
-    }
-    else
-    {
-        rigged = isRiggedMesh() && getControlAvatar() && getControlAvatar()->mPlaying;
-    }
-
     if (any_valid_boxes)
     {
         if (rebuild)
         {
-#ifdef SHOW_DEBUG
+            //get the Avatar associated with this object if it's rigged
             LLVOAvatar* avatar = nullptr;
             if (isRiggedMesh())
             {
@@ -1832,7 +1821,7 @@ BOOL LLVOVolume::genBBoxes(BOOL force_global)
                     }
                 }
             }
-#endif
+
             mDrawable->setSpatialExtents(min, max);
 
             if (avatar)
@@ -1900,7 +1889,7 @@ void LLVOVolume::updateRelativeXform(bool force_identity)
 		}
 		else
 		{
-			mRelativeXform = LLQuaternion2(mDrawable->getRotation());
+			mRelativeXform = LLMatrix4a(LLQuaternion2(mDrawable->getRotation()));
 			mRelativeXform.applyScale_affine(mDrawable->getScale());
 			mRelativeXform.setTranslate_affine(mDrawable->getPosition());
 		}
@@ -1916,7 +1905,7 @@ void LLVOVolume::updateRelativeXform(bool force_identity)
 		LLQuaternion2 rot(getRotation());
 		if (mParent)
 		{
-			LLMatrix4a lrot = LLQuaternion2(mParent->getRotation());
+			LLMatrix4a lrot = LLMatrix4a(LLQuaternion2(mParent->getRotation()));
 			lrot.rotate(pos,pos);
 			LLVector4a lpos;
 			lpos.load3(mParent->getPosition().mV);
@@ -1924,7 +1913,7 @@ void LLVOVolume::updateRelativeXform(bool force_identity)
 			rot.mul(LLQuaternion2(mParent->getRotation()));
 		}
 
-		mRelativeXform = rot;
+		mRelativeXform = LLMatrix4a(rot);
 		mRelativeXform.applyScale_affine(getScale());
 		mRelativeXform.setTranslate_affine(LLVector3(pos.getF32ptr()));
 

@@ -630,7 +630,7 @@ void LLDrawPoolWater::renderWater()
         shader->uniform1f(LLShaderMgr::WATER_BLUR_MULTIPLIER, pwater->getBlurMultiplier());
 
         F32 sunAngle    = llmax(0.f, light_dir.mV[1]);
-        F32 scaledAngle = 1.f - sunAngle;
+        //F32 scaledAngle = 1.f - sunAngle;
 
         shader->uniform1i(LLShaderMgr::SUN_UP_FACTOR, sun_up ? 1 : 0);
         shader->uniform1f(LLShaderMgr::WATER_SUN_ANGLE, sunAngle);

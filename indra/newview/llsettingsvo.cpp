@@ -735,7 +735,7 @@ void LLSettingsVOSky::applySpecial(void *ptarget, bool force)
     shader->uniform1f(LLShaderMgr::DISTANCE_MULTIPLIER, getDistanceMultiplier());
     
     F32 g             = getGamma();
-    F32 display_gamma = gSavedSettings.getF32("RenderDeferredDisplayGamma");
+    //F32 display_gamma = gSavedSettings.getF32("RenderDeferredDisplayGamma");
 
     shader->uniform1f(LLShaderMgr::GAMMA, g);
 }
@@ -954,7 +954,7 @@ void LLSettingsVOWater::applySpecial(void *ptarget, bool force)
         ep.negate();
         enorm.copyComponent<3>(ep);
 
-        shader->uniform4fv(LLShaderMgr::WATER_WATERPLANE, 1, enorm.getF32ptr());
+        shader->uniform4fv(LLShaderMgr::WATER_WATERPLANE, enorm.getF32ptr());
 
         LLVector4 light_direction = env.getClampedLightNorm();
 

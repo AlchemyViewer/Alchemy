@@ -642,7 +642,7 @@ void LLVOSky::createSkyTexture(const LLSettingsSky::ptr_t &psky, AtmosphericsVar
 	}
 }
 
-void LLVOSky::updateDirections(LLSettingsSky::ptr_t psky)
+void LLVOSky::updateDirections(const LLSettingsSky::ptr_t& psky)
 {
     mSun.setDirection(psky->getSunDirection());
     mMoon.setDirection(psky->getMoonDirection());
@@ -707,7 +707,7 @@ bool LLVOSky::updateSky()
         if (mNeedUpdate && (mForceUpdateThrottle.hasExpired() || mForceUpdate))
 		{
             // start updating cube map sides
-            updateFog(LLViewerCamera::getInstance()->getFar());
+            updateFog(&environment, psky, LLViewerCamera::getInstance()->getFar());
             mCubeMapUpdateStage = 0;
             mForceUpdate = FALSE;
 		}
@@ -1521,15 +1521,14 @@ void LLVOSky::updateReflectionGeometry(LLDrawable *drawable, F32 H,
 }
 }
 
-void LLVOSky::updateFog(const F32 distance)
+void LLVOSky::updateFog(LLEnvironment* environment, const LLSettingsSky::ptr_t& psky, const F32 distance)
 {
-    LLEnvironment& environment = LLEnvironment::instance();
-    if (environment.getCurrentSky() != nullptr)
+    if (psky)
 	{
-        LLVector3 light_dir = LLVector3(environment.getClampedLightNorm());
+        LLVector3 light_dir = LLVector3(environment->getClampedLightNorm());
         m_legacyAtmospherics.updateFog(distance, light_dir);
-		}
 	}
+}
 
 void LLVOSky::setSunAndMoonDirectionsCFR(const LLVector3 &sun_dir_cfr, const LLVector3 &moon_dir_cfr)
 {

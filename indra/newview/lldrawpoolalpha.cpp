@@ -91,8 +91,8 @@ S32 LLDrawPoolAlpha::getNumPostDeferredPasses()
 // set some common parameters on the given shader to prepare for alpha rendering
 static void prepare_alpha_shader(LLGLSLShader* shader, bool textureGamma, bool deferredEnvironment)
 {
-    static LLCachedControl<F32> displayGamma(gSavedSettings, "RenderDeferredDisplayGamma");
-    F32 gamma = displayGamma;
+    //static LLCachedControl<F32> displayGamma(gSavedSettings, "RenderDeferredDisplayGamma");
+    //F32 gamma = displayGamma;
 
     // Does this deferred shader need environment uniforms set such as sun_dir, etc. ?
     // NOTE: We don't actually need a gbuffer since we are doing forward rendering (for transparency) post deferred rendering
