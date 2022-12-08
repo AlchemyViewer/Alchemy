@@ -301,7 +301,9 @@ public:
 	BOOL setIsFlexible(BOOL is_flexible);
 
     const LLMeshSkinInfo* getSkinInfo() const;
-	absl::optional<std::pair<LLMatrix4a*, F32*>> getCachedSkinRenderMatrix(U32& joint_count, LLVOAvatar* avatar, const LLMeshSkinInfo* skin = nullptr);
+
+    //convenience accessor for mesh ID (which is stored in sculpt id for legacy reasons)
+    const LLUUID& getMeshID() const { return getVolume()->getParams().getSculptID(); }
     
     // Extended Mesh Properties
     U32 getExtendedMeshFlags() const;
@@ -419,6 +421,7 @@ private:
 	S32			mLOD;
 	BOOL		mLODChanged;
 	BOOL		mSculptChanged;
+    BOOL		mColorChanged;
 	F32			mSpotLightPriority;
 	LL_ALIGN_16(LLMatrix4a	mRelativeXform);
 	LL_ALIGN_16(LLMatrix4a	mRelativeXformInvTrans);

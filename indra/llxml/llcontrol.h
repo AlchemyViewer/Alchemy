@@ -237,6 +237,7 @@ public:
 	// generic getter
 	template<typename T> T get(std::string_view  name)
 	{
+        LL_PROFILE_ZONE_SCOPED_CATEGORY_LLSD;
 		LLControlVariable* control = getControl(name);
 		LLSD value;
 		eControlType type = TYPE_COUNT;
@@ -395,8 +396,8 @@ public:
 					const T& default_value, 
 					const std::string& comment = "Declared In Code")
 	{
-		mCachedControlPtr = LLControlCache<T>::getInstance(name);
-		if (mCachedControlPtr.isNull())
+		mCachedControlPtr = LLControlCache<T>::getInstance(name).get();
+		if (! mCachedControlPtr)
 		{
 			mCachedControlPtr = new LLControlCache<T>(group, name, default_value, comment);
 		}
@@ -405,8 +406,8 @@ public:
 	LLCachedControl(LLControlGroup& group,
 					const std::string& name)
 	{
-		mCachedControlPtr = LLControlCache<T>::getInstance(name);
-		if (mCachedControlPtr.isNull())
+		mCachedControlPtr = LLControlCache<T>::getInstance(name).get();
+		if (! mCachedControlPtr)
 		{
 			mCachedControlPtr = new LLControlCache<T>(group, name);
 		}

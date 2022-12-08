@@ -1,6 +1,6 @@
 /** 
  * @file lljointsolverrp3.cpp
- * @brief Implementation of LLJointSolverRP3 class.
+ * @brief Implementation of Joint Solver in 3D Real Projective space (RP3). See: https://en.wikipedia.org/wiki/Real_projective_space
  *
  * $LicenseInfo:firstyear=2001&license=viewerlgpl$
  * Second Life Viewer Source Code
@@ -35,6 +35,11 @@
 
 #define F_EPSILON 0.00001f
 
+#if LL_RELEASE
+    #define DEBUG_JOINT_SOLVER 0
+#else
+    #define DEBUG_JOINT_SOLVER 1
+#endif
 
 //-----------------------------------------------------------------------------
 // Constructor
@@ -142,7 +147,7 @@ void LLJointSolverRP3::solve()
 	LLVector3 cPos = mJointC->getWorldPosition();
 	LLVector3 gPos = mJointGoal->getWorldPosition();
 
-#ifdef SHOW_DEBUG
+#if DEBUG_JOINT_SOLVER
 	LL_DEBUGS("JointSolver") << "LLJointSolverRP3::solve()" << LL_NEWLINE
 							<< "bPosLocal = " << mJointB->getPosition() << LL_NEWLINE
 							<< "cPosLocal = " << mJointC->getPosition() << LL_NEWLINE
@@ -190,7 +195,7 @@ void LLJointSolverRP3::solve()
 	//-------------------------------------------------------------------------
 	LLVector3 abacCompOrthoVec = abVec - acVec * ((abVec * acVec)/(acVec * acVec));
 
-#ifdef SHOW_DEBUG
+#if DEBUG_JOINT_SOLVER
 	LL_DEBUGS("JointSolver") << "abVec : " << abVec << LL_NEWLINE
 		<< "bcVec : " << bcVec << LL_NEWLINE
 		<< "acVec : " << acVec << LL_NEWLINE
@@ -267,7 +272,7 @@ void LLJointSolverRP3::solve()
 
 	LLQuaternion bRot(theta - abbcAng, abbcOrthoVec);
 
-#ifdef SHOW_DEBUG
+#if DEBUG_JOINT_SOLVER
 	LL_DEBUGS("JointSolver") << "abbcAng      : " << abbcAng << LL_NEWLINE
 							<< "abbcOrthoVec : " << abbcOrthoVec << LL_NEWLINE
 							<< "agLenSq      : " << agLenSq << LL_NEWLINE
@@ -293,7 +298,7 @@ void LLJointSolverRP3::solve()
 	LLQuaternion cgRot;
 	cgRot.shortestArc( acVec, agVec );
 
-#ifdef SHOW_DEBUG
+#if DEBUG_JOINT_SOLVER
 	LL_DEBUGS("JointSolver") << "bcVec : " << bcVec << LL_NEWLINE
 							<< "acVec : " << acVec << LL_NEWLINE
 							<< "cgRot : " << cgRot << LL_ENDL;
@@ -360,7 +365,7 @@ void LLJointSolverRP3::solve()
 	//-------------------------------------------------------------------------
 	LLQuaternion twistRot( mTwist, agVec );
 
-#ifdef SHOW_DEBUG
+#if DEBUG_JOINT_SOLVER
 	LL_DEBUGS("JointSolver") << "abcNorm = " << abcNorm << LL_NEWLINE
 							<< "apgNorm = " << apgNorm << LL_NEWLINE
 							<< "pRot = " << pRot << LL_NEWLINE

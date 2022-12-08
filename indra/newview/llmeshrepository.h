@@ -27,6 +27,7 @@
 #ifndef LL_MESH_REPOSITORY_H
 #define LL_MESH_REPOSITORY_H
 
+#include <unordered_map>
 #include "llassettype.h"
 #include "llmodel.h"
 #include "lluuid.h"
@@ -603,7 +604,7 @@ public:
 
 	S32 getActualMeshLOD(const LLVolumeParams& mesh_params, S32 lod);
 	static S32 getActualMeshLOD(LLSD& header, S32 lod);
-	LLPointer<LLMeshSkinInfo> getSkinInfo(const LLUUID& mesh_id, LLVOVolume* requesting_obj);
+	LLPointer<LLMeshSkinInfo> getSkinInfo(const LLUUID& mesh_id, LLVOVolume* requesting_obj = nullptr);
 	LLModel::Decomposition* getDecomposition(const LLUUID& mesh_id);
 	void fetchPhysicsShape(const LLUUID& mesh_id);
 	bool hasPhysicsShape(const LLUUID& mesh_id);

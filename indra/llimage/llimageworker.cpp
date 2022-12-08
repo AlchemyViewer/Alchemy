@@ -141,6 +141,7 @@ LLImageDecodeThread::~LLImageDecodeThread()
 // virtual
 S32 LLImageDecodeThread::update(F32 max_time_ms)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
 	if (mCreationListSize > 0)
 	{
 		LLMutexLock lock(mCreationMutex);
@@ -172,6 +173,7 @@ S32 LLImageDecodeThread::update(F32 max_time_ms)
 LLImageDecodeThread::handle_t LLImageDecodeThread::decodeImage(LLImageFormatted* image, 
 	U32 priority, S32 discard, BOOL needs_aux, Responder* responder)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
 	handle_t handle = generateHandle();
 	// If we have a thread pool dispatch this directly.
 	// Note: addRequest could cause the handling to take place on the fetch thread, this is unlikely to be an issue. 
@@ -238,6 +240,7 @@ LLImageDecodeThread::ImageRequest::~ImageRequest()
 // Returns true when done, whether or not decode was successful.
 bool LLImageDecodeThread::ImageRequest::processRequest()
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
 	// If not async, decode using this thread
 	if ((mFlags & FLAG_ASYNC) == 0)
 		return processRequestIntern();
@@ -323,6 +326,7 @@ bool LLImageDecodeThread::ImageRequest::processRequestIntern()
 
 void LLImageDecodeThread::ImageRequest::finishRequest(bool completed)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
 	if (mResponder.notNull())
 	{
 		bool success = completed && mDecodedRaw && (!mNeedsAux || mDecodedAux);

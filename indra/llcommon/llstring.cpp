@@ -37,9 +37,6 @@
 #include <winnls.h> // for WideCharToMultiByte
 #endif
 
-LLTrace::BlockTimerStatHandle FT_STRING_FORMAT("String Format");
-
-
 std::string ll_safe_string(const char* in)
 {
 	if(in) return std::string(in);
@@ -215,7 +212,7 @@ S32 utf16chars_to_wchar(const U16* inchars, llwchar* outchar)
 	return inchars - base;
 }
 
-llutf16string wstring_to_utf16str(const LLWString &utf32str, S32 len)
+llutf16string wstring_to_utf16str(const llwchar* utf32str, size_t len)
 {
 	llutf16string out;
 
@@ -237,27 +234,19 @@ llutf16string wstring_to_utf16str(const LLWString &utf32str, S32 len)
 	return out;
 }
 
-llutf16string wstring_to_utf16str(const LLWString &utf32str)
+llutf16string utf8str_to_utf16str( const char* utf8str, size_t len )
 {
-	const S32 len = (S32)utf32str.length();
-	return wstring_to_utf16str(utf32str, len);
-}
-
-llutf16string utf8str_to_utf16str ( const std::string& utf8str )
-{
-	LLWString wstr = utf8str_to_wstring ( utf8str );
+	LLWString wstr = utf8str_to_wstring ( utf8str, len );
 	return wstring_to_utf16str ( wstr );
 }
 
-
-LLWString utf16str_to_wstring(const llutf16string &utf16str, S32 len)
+LLWString utf16str_to_wstring(const U16* utf16str, size_t len)
 {
 	LLWString wout;
-	if((len <= 0) || utf16str.empty()) return wout;
+	if (len == 0) return wout;
 
 	S32 i = 0;
-	// craziness to make gcc happy (llutf16string.c_str() is tweaked on linux):
-	const U16* chars16 = &(*(utf16str.begin()));
+	const U16* chars16 = utf16str;
 	while (i < len)
 	{
 		llwchar cur_char;
@@ -265,12 +254,6 @@ LLWString utf16str_to_wstring(const llutf16string &utf16str, S32 len)
 		wout += cur_char;
 	}
 	return wout;
-}
-
-LLWString utf16str_to_wstring(const llutf16string &utf16str)
-{
-	const S32 len = (S32)utf16str.length();
-	return utf16str_to_wstring(utf16str, len);
 }
 
 // Length in llwchar (UTF-32) of the first len units (16 bits) of the given UTF-16 string.
@@ -392,8 +375,7 @@ S32 wstring_utf8_length(const LLWString& wstr)
 	return len;
 }
 
-
-LLWString utf8str_to_wstring(const std::string& utf8str, S32 len)
+LLWString utf8str_to_wstring(const char* utf8str, size_t len)
 {
 	LLWString wout;
 
@@ -481,13 +463,7 @@ LLWString utf8str_to_wstring(const std::string& utf8str, S32 len)
 	return wout;
 }
 
-LLWString utf8str_to_wstring(const std::string& utf8str)
-{
-	const S32 len = (S32)utf8str.length();
-	return utf8str_to_wstring(utf8str, len);
-}
-
-std::string wstring_to_utf8str(const LLWString& utf32str, S32 len)
+std::string wstring_to_utf8str(const llwchar* utf32str, size_t len)
 {
 	std::string out;
 
@@ -503,20 +479,9 @@ std::string wstring_to_utf8str(const LLWString& utf32str, S32 len)
 	return out;
 }
 
-std::string wstring_to_utf8str(const LLWString& utf32str)
+std::string utf16str_to_utf8str(const U16* utf16str, size_t len)
 {
-	const S32 len = (S32)utf32str.length();
-	return wstring_to_utf8str(utf32str, len);
-}
-
-std::string utf16str_to_utf8str(const llutf16string& utf16str)
-{
-	return wstring_to_utf8str(utf16str_to_wstring(utf16str));
-}
-
-std::string utf16str_to_utf8str(const llutf16string& utf16str, S32 len)
-{
-	return wstring_to_utf8str(utf16str_to_wstring(utf16str, len), len);
+	return wstring_to_utf8str(utf16str_to_wstring(utf16str, len));
 }
 
 std::string utf8str_trim(const std::string& utf8str)
@@ -729,80 +694,73 @@ std::string utf8str_removeCRLF(const std::string& utf8str)
 }
 
 #if LL_WINDOWS
-std::string ll_convert_wide_to_string(std::wstring_view in)
+unsigned int ll_wstring_default_code_page()
 {
-	return ll_convert_wide_to_string(in, CP_UTF8);
+    return CP_UTF8;
 }
 
-std::string ll_convert_wide_to_string(std::wstring_view in, unsigned int code_page)
+std::string ll_convert_wide_to_string(const wchar_t* in, size_t len_in, unsigned int code_page)
 {
-    std::string out {};
-    if (in.length() > 0)
-    {
-        int len = WideCharToMultiByte(code_page, 0, in.data(), in.length(), NULL, 0, 0, 0);
-        if (len == 0)
-        {
-            return out;
-        }
-
-        out.resize(len);
-
-        WideCharToMultiByte(code_page, 0, in.data(), in.length(), out.data(), out.length(), 0, 0);
-    }
-    return out;
-}
-
-std::wstring ll_convert_string_to_wide(std::string_view in)
-{
-	return ll_convert_string_to_wide(in, CP_UTF8);
-}
-
-std::wstring ll_convert_string_to_wide(std::string_view in, unsigned int code_page)
-{
-	std::wstring out{};
-
-	if (in.length() > 0)
+	std::string out;
+	if(in)
 	{
-		// Calculate target buffer size (not including the zero terminator).
-		int len = MultiByteToWideChar(code_page, 0,
-			in.data(), in.size(), NULL, 0);
-		if (len == 0)
+		int len_out = WideCharToMultiByte(
+			code_page,
+			0,
+			in,
+			len_in,
+			NULL,
+			0,
+			0,
+			0);
+		// We will need two more bytes for the double NULL ending
+		// created in WideCharToMultiByte().
+		char* pout = new char [len_out + 2];
+		memset(pout, 0, len_out + 2);
+		if(pout)
 		{
-			return out;
+			WideCharToMultiByte(
+				code_page,
+				0,
+				in,
+				len_in,
+				pout,
+				len_out,
+				0,
+				0);
+			out.assign(pout);
+			delete[] pout;
 		}
-
-		out.resize(len);
-		// No error checking. We already know, that the conversion will succeed.
-		MultiByteToWideChar(code_page, 0,
-			in.data(), in.size(), out.data(), out.size());
-		// Use out.data() in place of &out[0] for C++17
 	}
-
 	return out;
-
 }
 
-S32 wchart_to_llwchar(const wchar_t* inchars, llwchar* outchar)
+std::wstring ll_convert_string_to_wide(const char* in, size_t len, unsigned int code_page)
 {
-	const wchar_t* base = inchars;
-	wchar_t cur_char = *inchars++;
-	llwchar char32;
-	if ((cur_char >= 0xD800) && (cur_char <= 0xDFFF))
-	{
-		// Surrogates
-		char32 = ((llwchar)(cur_char - 0xD800)) << 10;
-		cur_char = *inchars++;
-		char32 += (llwchar)(cur_char - 0xDC00) + 0x0010000UL;
-	}
-	else
-	{
-		char32 = (llwchar)cur_char;
-	}
-	*outchar = char32;
-	return inchars - base;
+	// From review:
+	// We can preallocate a wide char buffer that is the same length (in wchar_t elements) as the utf8 input,
+	// plus one for a null terminator, and be guaranteed to not overflow.
+
+	//	Normally, I'd call that sort of thing premature optimization,
+	// but we *are* seeing string operations taking a bunch of time, especially when constructing widgets.
+//	int output_str_len = MultiByteToWideChar(code_page, 0, in.c_str(), in.length(), NULL, 0);
+
+	// reserve an output buffer that will be destroyed on exit, with a place
+	// to put NULL terminator
+	std::vector<wchar_t> w_out(len + 1);
+
+	memset(&w_out[0], 0, w_out.size());
+	int real_output_str_len = MultiByteToWideChar(code_page, 0, in, len,
+												  &w_out[0], w_out.size() - 1);
+
+	//looks like MultiByteToWideChar didn't add null terminator to converted string, see EXT-4858.
+	w_out[real_output_str_len] = 0;
+
+	// construct string<wchar_t> from our temporary output buffer
+	return {&w_out[0]};
 }
 
-LLWString ll_convert_wide_to_wstring(std::wstring_view in)
+LLWString ll_convert_wide_to_wstring(const wchar_t* in, size_t len)
 {
 	LLWString wout;
 	if (in.empty()) return wout;
@@ -810,7 +768,7 @@ LLWString ll_convert_wide_to_wstring(std::wstring_view in)
 	S32 i = 0;
 	// craziness to make gcc happy (llutf16string.c_str() is tweaked on linux):
 	const wchar_t* chars16 = &(*(in.begin()));
-	while (i < in.size())
+	while (i < len)
 	{
 		llwchar cur_char;
 		i += wchart_to_llwchar(chars16 + i, &cur_char);
@@ -819,12 +777,12 @@ LLWString ll_convert_wide_to_wstring(std::wstring_view in)
 	return wout;
 }
 
-std::wstring ll_convert_wstring_to_wide(LLWStringView in)
+std::wstring ll_convert_wstring_to_wide(const llwchar* in, size_t len)
 {
 	std::wstring out;
 
 	S32 i = 0;
-	while (i < in.size())
+	while (i < len)
 	{
 		U32 cur_char = in[i];
 		if (cur_char > 0xFFFF)
@@ -841,12 +799,13 @@ std::wstring ll_convert_wstring_to_wide(LLWStringView in)
 	return out;
 }
 
-std::string ll_convert_string_to_utf8_string(std::string_view in)
+std::string ll_convert_string_to_utf8_string(const std::string& in)
 {
-	auto w_mesg = ll_convert_string_to_wide(in, CP_ACP);
-	std::string out_utf8(ll_convert_wide_to_string(w_mesg, CP_UTF8));
-
-	return out_utf8;
+	// If you pass code_page, you must also pass length, otherwise the code
+	// page parameter will be mistaken for length.
+	auto w_mesg = ll_convert_string_to_wide(in, in.length(), CP_ACP);
+	// CP_UTF8 is default -- see ll_wstring_default_code_page() above.
+	return ll_convert_wide_to_string(w_mesg);
 }
 
 namespace
@@ -1450,7 +1409,7 @@ bool LLStringUtil::formatDatetime(std::string& replacement, std::string token,
 template<> 
 S32 LLStringUtil::format(std::string& s, const format_map_t& substitutions)
 {
-	LL_RECORD_BLOCK_TIME(FT_STRING_FORMAT);
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_STRING;
 	S32 res = 0;
 
 	std::string output;
@@ -1523,7 +1482,7 @@ S32 LLStringUtil::format(std::string& s, const format_map_t& substitutions)
 template<> 
 S32 LLStringUtil::format(std::string& s, const LLSD& substitutions)
 {
-	LL_RECORD_BLOCK_TIME(FT_STRING_FORMAT);
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_STRING;
 	S32 res = 0;
 
 	if (!substitutions.isMap()) 

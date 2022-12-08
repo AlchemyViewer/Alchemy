@@ -64,8 +64,7 @@ BOOL check_write(LLAPRFile* apr_file, void* src, S32 n_bytes)
 //---------------------------------------------------------------------------
 
 LLVOCacheEntry::LLVOCacheEntry(U32 local_id, U32 crc, LLDataPackerBinaryBuffer &dp)
-:	LLTrace::MemTrackable<LLVOCacheEntry, 16>("LLVOCacheEntry"),
-	LLViewerOctreeEntryData(LLViewerOctreeEntry::LLVOCACHEENTRY),
+:	LLViewerOctreeEntryData(LLViewerOctreeEntry::LLVOCACHEENTRY),
 	mLocalID(local_id),
 	mCRC(crc),
 	mUpdateFlags(-1),
@@ -84,8 +83,7 @@ LLVOCacheEntry::LLVOCacheEntry(U32 local_id, U32 crc, LLDataPackerBinaryBuffer &
 }
 
 LLVOCacheEntry::LLVOCacheEntry()
-:	LLTrace::MemTrackable<LLVOCacheEntry, 16>("LLVOCacheEntry"),
-	LLViewerOctreeEntryData(LLViewerOctreeEntry::LLVOCACHEENTRY),
+:	LLViewerOctreeEntryData(LLViewerOctreeEntry::LLVOCACHEENTRY),
 	mLocalID(0),
 	mCRC(0),
 	mUpdateFlags(-1),
@@ -103,8 +101,7 @@ LLVOCacheEntry::LLVOCacheEntry()
 }
 
 LLVOCacheEntry::LLVOCacheEntry(LLAPRFile* apr_file)
-:	LLTrace::MemTrackable<LLVOCacheEntry, 16>("LLVOCacheEntry"),
-	LLViewerOctreeEntryData(LLViewerOctreeEntry::LLVOCACHEENTRY), 
+:	LLViewerOctreeEntryData(LLViewerOctreeEntry::LLVOCACHEENTRY), 
 	mBuffer(NULL),
 	mUpdateFlags(-1),
 	mState(INACTIVE),
@@ -616,7 +613,6 @@ void LLVOCacheGroup::handleChildAddition(const OctreeNode* parent, OctreeNode* c
 }
 
 LLVOCachePartition::LLVOCachePartition(LLViewerRegion* regionp)
-:	LLTrace::MemTrackable<LLVOCachePartition>("LLVOCachePartition")
 {
 	mLODPeriod = 16;
 	mRegionp = regionp;
@@ -631,6 +627,13 @@ LLVOCachePartition::LLVOCachePartition(LLViewerRegion* regionp)
 	mCullHistory = -1;
 
 	new LLVOCacheGroup(mOctree, this);
+}
+
+LLVOCachePartition::~LLVOCachePartition()
+{
+    // SL-17276 make sure to do base class cleanup while this instance
+    // can still be treated as an LLVOCachePartition 
+    cleanup();
 }
 
 bool LLVOCachePartition::addEntry(LLViewerOctreeEntry* entry)

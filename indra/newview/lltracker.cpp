@@ -110,8 +110,16 @@ void LLTracker::stopTracking(bool clear_ui)
 // static virtual
 void LLTracker::drawHUDArrow()
 {
-	static const LLCachedControl<bool> render_tracker_beacon(gSavedSettings, "RenderTrackerBeacon");
-	if (!render_tracker_beacon) return;
+    if (!LLWorld::instanceExists())
+    {
+        return;
+    }
+
+    static LLCachedControl<bool> render_beacon(gSavedSettings, "RenderTrackerBeacon", true);
+    if (!render_beacon)
+    {
+        return;
+    }
 
 	if (gViewerWindow->getProgressView()->getVisible()) return;
 

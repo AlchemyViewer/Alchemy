@@ -509,6 +509,7 @@ class WindowsManifest(ViewerManifest):
                     self.path("kdud.dll", "kdud.dll")
                 else:
                     self.path(src="kdu.dll", dst="kdu.dll")
+            self.path_optional("vcruntime140_1.dll")
 
             # SLVoice executable
             with self.prefix(src=os.path.join(pkgdir, 'bin', 'release')):
@@ -571,6 +572,7 @@ class WindowsManifest(ViewerManifest):
                 with self.prefix(src=os.path.join(pkgdir, 'bin', config, 'swiftshader'), dst='swiftshader'):
                     self.path("libEGL.dll")
                     self.path("libGLESv2.dll")
+                self.path_optional("vcruntime140_1.dll")
 
                 # CEF files common to all configurations
                 with self.prefix(src=os.path.join(pkgdir, 'resources')):

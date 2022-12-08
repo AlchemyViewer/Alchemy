@@ -101,15 +101,6 @@ public:
 
     bool isAdvanced() const { return  m_isAdvanced; }
 
-    void updateShader(LLGLSLShader* shader) { applySpecial(shader, true); }
-
-    F32 getSkyMoistureLevelFast() const { return mSkyMoistureCached; }
-    F32 getSkyDropletRadiusFast() const { return mSkyDropletRadius; }
-    F32 getSkyIceLevelFast() const { return mSkyIceLevel; }
-    F32 getCloudVarianceFast() const { return mCloudVarianceCached;; }
-    F32 getMoonBrightnessFast() const { return mMoonBrightnessCached; }
-    F32 getStarBrightnessFast() const { return mStarBrightnessCached; }
-
 protected:
     LLSettingsVOSky();
 
@@ -122,21 +113,8 @@ protected:
 
     const parammapping_t& getParameterMap() const final;
 
-    LLVector4 mCloudPosDensityCached;
-    LLColor4 mSunDiffuseCached;
-    LLColor4 mMoonDiffuseCached;
-    LLColor4 mCloudColorCached;
-    F32 mDensityMultiplierCached;
-    F32 mDistanceMultiplierCached;
-    F32 mGammaCached = 1.f;
-    F32 mCloudVarianceCached;
-    F32 mMoonBrightnessCached;
-    F32 mStarBrightnessCached;
-    F32 mSkyMoistureCached;
-    F32 mSkyDropletRadius;
-    F32 mSkyIceLevel;
-    F32 mSceneLightStrength = 3.0f;
     bool m_isAdvanced = false;
+    F32 mSceneLightStrength = 3.0f;
 };
 
 //=========================================================================
@@ -155,8 +133,6 @@ public:
 
     static LLSD     convertToLegacy(const ptr_t &);
 
-    void    updateShader(LLGLSLShader* shader) { applySpecial(shader, true); }
-
 protected:
     LLSettingsVOWater();
 
@@ -167,11 +143,8 @@ protected:
 
 
 private:
-    LLColor4 mCachedWaterFogColor;
-    F32 mCachedWaterFogDensity;
-    F32 mCachedFogMod;
-
     static const F32 WATER_FOG_LIGHT_CLAMP;
+
 };
 
 //=========================================================================

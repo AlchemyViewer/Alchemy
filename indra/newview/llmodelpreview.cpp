@@ -41,6 +41,7 @@
 #include "lliconctrl.h"
 #include "llmatrix4a.h"
 #include "llmeshrepository.h"
+#include "llmeshoptimizer.h"
 #include "llrender.h"
 #include "llsdutil_math.h"
 #include "llskinningutil.h"
@@ -67,7 +68,6 @@
 #include "lltabcontainer.h"
 #include "lltextbox.h"
 
-#include <meshoptimizer.h>
 #include <boost/algorithm/string.hpp>
 
 bool LLModelPreview::sIgnoreLoadedCallback = false;
@@ -89,7 +89,6 @@ static const F32 PREVIEW_DEG_POINT_SIZE(8.f);
 static const F32 PREVIEW_ZOOM_LIMIT(10.f);
 
 const F32 SKIN_WEIGHT_CAMERA_DISTANCE = 16.f;
-
 LLViewerFetchedTexture* bindMaterialDiffuseTexture(const LLImportMaterial& material)
 {
     LLViewerFetchedTexture *texture = LLViewerTextureManager::getFetchedTexture(material.getDiffuseMap(), FTT_DEFAULT, TRUE, LLGLTexture::BOOST_PREVIEW);
@@ -495,9 +494,7 @@ void LLModelPreview::rebuildUploadData()
                 bool upload_skinweights = fmp && fmp->childGetValue("upload_skin").asBoolean();
                 if (upload_skinweights && high_lod_model->mSkinInfo.mJointNames.size() > 0)
                 {
-                    alignas(16) LLMatrix4 bind_mat(LLMatrix4::kUninitialized);
-                    high_lod_model->mSkinInfo.mBindShapeMatrix.store4a((F32*)bind_mat.mMatrix);
-                    LLQuaternion bind_rot = LLSkinningUtil::getUnscaledQuaternion(bind_mat);
+                    LLQuaternion bind_rot = LLSkinningUtil::getUnscaledQuaternion(LLMatrix4(high_lod_model->mSkinInfo.mBindShapeMatrix));
                     LLQuaternion identity;
                     if (!bind_rot.isEqualEps(identity, 0.01f))
                     {
@@ -1299,34 +1296,18 @@ F32 LLModelPreview::genMeshOptimizerPerModel(LLModel *base_model, LLModel *targe
     {
         target_indices = 3;
     }
-    if (sloppy)
-    {
-        new_indices = meshopt_simplifySloppy(
-			output_indices,
-            combined_indices,
-            size_indices,
-            (const float*)combined_positions,
-            size_vertices,
-            LLVertexBuffer::sTypeSize[LLVertexBuffer::TYPE_VERTEX],
-            target_indices,
-            error_threshold,
-            &result_error
-            );
-    }
-    else
-    {
-        new_indices = meshopt_simplify(
-			output_indices,
-            combined_indices,
-            size_indices,
-            (const float*)combined_positions,
-            size_vertices,
-            LLVertexBuffer::sTypeSize[LLVertexBuffer::TYPE_VERTEX],
-            target_indices,
-            error_threshold,
-            &result_error
-            );
-    }
+    new_indices = LLMeshOptimizer::simplifyU32(
+        output_indices,
+        combined_indices,
+        size_indices,
+        combined_positions,
+        size_vertices,
+        LLVertexBuffer::sTypeSize[LLVertexBuffer::TYPE_VERTEX],
+        target_indices,
+        error_threshold,
+        sloppy,
+        &result_error);
+
 
     if (result_error < 0)
     {
@@ -1526,32 +1507,17 @@ F32 LLModelPreview::genMeshOptimizerPerFace(LLModel *base_model, LLModel *target
     {
         target_indices = 3;
     }
-    if (sloppy)
-    {
-        new_indices = meshopt_simplifySloppy(
-            output,
-            face.mIndices,
-            size_indices,
-            (const float*)face.mPositions,
-            face.mNumVertices,
-            LLVertexBuffer::sTypeSize[LLVertexBuffer::TYPE_VERTEX],
-            target_indices,
-            error_threshold,
-            &result_error);
-    }
-    else
-	{
-		new_indices = meshopt_simplify(
-			output,
-			face.mIndices,
-			size_indices,
-			(const float*)face.mPositions,
-			face.mNumVertices,
-			LLVertexBuffer::sTypeSize[LLVertexBuffer::TYPE_VERTEX],
-			target_indices,
-			error_threshold,
-			&result_error);
-    }
+    new_indices = LLMeshOptimizer::simplify(
+        output,
+        face.mIndices,
+        size_indices,
+        face.mPositions,
+        face.mNumVertices,
+        LLVertexBuffer::sTypeSize[LLVertexBuffer::TYPE_VERTEX],
+        target_indices,
+        error_threshold,
+        sloppy,
+        &result_error);
 
 
     if (result_error < 0)
@@ -1626,7 +1592,7 @@ void LLModelPreview::genMeshOptimizerLODs(S32 which_lod, S32 meshopt_mode, U32 d
         out << "Invalid level of detail: " << which_lod;
         LL_WARNS() << out.str() << LL_ENDL;
         LLFloaterModelPreview::addStringToLog(out, false);
-        llassert(which_lod >= -1 && which_lod < LLModel::NUM_LODS);
+        assert(lod >= -1 && lod < LLModel::NUM_LODS);
         return;
     }
 
@@ -3334,6 +3300,14 @@ BOOL LLModelPreview::render()
 
                                 if (!physics.mMesh.empty())
                                 { //render hull instead of mesh
+                                    // SL-16993 physics.mMesh[i].mNormals were being used to light the exploded
+                                    // analyzed physics shape but the drawArrays() interface changed
+                                    //  causing normal data <0,0,0> to be passed to the shader.
+                                    // The Phyics Preview shader uses plain vertex coloring so the physics hull is full lit.
+                                    // We could also use interface/ui shaders.
+                                    gObjectPreviewProgram.unbind();
+                                    gPhysicsPreviewProgram.bind();
+
                                     for (U32 i = 0; i < physics.mMesh.size(); ++i)
                                     {
                                         if (explode > 0.f)
@@ -3354,13 +3328,16 @@ BOOL LLModelPreview::render()
                                         }
 
                                         gGL.diffuseColor4ubv(hull_colors[i].mV);
-                                        LLVertexBuffer::drawArrays(LLRender::TRIANGLES, physics.mMesh[i].mPositions, physics.mMesh[i].mNormals);
+                                        LLVertexBuffer::drawArrays(LLRender::TRIANGLES, physics.mMesh[i].mPositions);
 
                                         if (explode > 0.f)
                                         {
                                             gGL.popMatrix();
                                         }
                                     }
+
+                                    gPhysicsPreviewProgram.unbind();
+                                    gObjectPreviewProgram.bind();
                                 }
                             }
                         }
@@ -3520,7 +3497,7 @@ BOOL LLModelPreview::render()
                                 LLJoint *joint = getPreviewAvatar()->getJoint(skin->mJointNums[j]);
                                 if (joint)
                                 {
-                                    const LLVector3& jointPos = skin->mAlternateBindMatrix[j].getTranslation();
+                                    const LLVector3& jointPos = LLVector3(skin->mAlternateBindMatrix[j].getTranslation());
                                     if (joint->aboveJointPosThreshold(jointPos))
                                     {
                                         bool override_changed;
@@ -3565,7 +3542,7 @@ BOOL LLModelPreview::render()
                             LLSkinningUtil::initSkinningMatrixPalette(mat, joint_count,
                                 skin, getPreviewAvatar());
 
-                            LLMatrix4a bind_shape_matrix = skin->mBindShapeMatrix;
+                            const LLMatrix4a& bind_shape_matrix = skin->mBindShapeMatrix;
                             for (U32 j = 0; j < buffer->getNumVerts(); ++j)
                             {
                                 LLMatrix4a final_mat;

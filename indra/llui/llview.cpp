@@ -140,8 +140,7 @@ LLView::Params::Params()
 }
 
 LLView::LLView(const LLView::Params& p)
-:	LLTrace::MemTrackable<LLView>("LLView"),
-	mVisible(p.visible),
+:	mVisible(p.visible),
 	mInDraw(false),
 	mName(p.name),
 	mParentView(NULL),
@@ -1613,15 +1612,11 @@ LLView* LLView::getChildView(std::string_view name, BOOL recurse) const
 	return getChild<LLView>(name, recurse);
 }
 
-static LLTrace::BlockTimerStatHandle FTM_FIND_VIEWS("Find Widgets");
-
 LLView* LLView::findChildView(std::string_view name, BOOL recurse) const
 {
-	LL_RECORD_BLOCK_TIME(FTM_FIND_VIEWS);
-	//richard: should we allow empty names?
-	//if(name.empty())
-	//	return NULL;
-	// Look for direct children *first*
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
+	
+    // Look for direct children *first*
 	for (LLView* childp : mChildList)
 	{
 		llassert(childp);

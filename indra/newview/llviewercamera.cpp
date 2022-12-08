@@ -63,9 +63,6 @@ LLTrace::CountStatHandle<> LLViewerCamera::sAngularVelocityStat("camera_angular_
 
 LLViewerCamera::eCameraID LLViewerCamera::sCurCameraID = LLViewerCamera::CAMERA_WORLD;
 
-// Build time optimization, generate this once in .cpp file
-template class LLViewerCamera* LLSingleton<class LLViewerCamera>::getInstance();
-
 LLViewerCamera::LLViewerCamera() : LLCamera()
 {
 	calcProjection(getFar());

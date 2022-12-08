@@ -119,8 +119,11 @@ BOOL LLViewerDynamicTexture::render()
 void LLViewerDynamicTexture::preRender(BOOL clear_depth)
 {
 	gPipeline.allocatePhysicsBuffer();
-	llassert(mFullWidth <= static_cast<S32>(gPipeline.mBake.getWidth()));
-	llassert(mFullHeight <= static_cast<S32>(gPipeline.mBake.getHeight()));
+	if (!gNonInteractive)
+	{
+		llassert(mFullWidth <= static_cast<S32>(gPipeline.mBake.getWidth()));
+		llassert(mFullHeight <= static_cast<S32>(gPipeline.mBake.getHeight()));
+	}
 
 	if (gGLManager.mHasFramebufferObject && gPipeline.mBake.isComplete())
 	{ //using offscreen render target, just use the bottom left corner

@@ -152,6 +152,7 @@ BOOL LLShaderMgr::attachShaderFeatures(LLGLSLShader * shader)
 
 	if (features->hasObjectSkinning)
 	{
+        shader->mRiggedVariant = shader;
         if (!shader->attachVertexObject("avatar/objectSkinV.glsl"))
 		{
 			return FALSE;
@@ -596,7 +597,7 @@ void LLShaderMgr::dumpObjectLog(bool is_program, GLuint ret, BOOL warns, const s
 	}
  }
 
-GLuint LLShaderMgr::loadShaderFile(const std::string& filename, S32 & shader_level, GLenum type, boost::unordered_map<std::string, std::string>* defines, S32 texture_index_channels)
+GLuint LLShaderMgr::loadShaderFile(const std::string& filename, S32 & shader_level, GLenum type, std::unordered_map<std::string, std::string>* defines, S32 texture_index_channels)
 {
 
 // endsure work-around for missing GLSL funcs gets propogated to feature shader files (e.g. srgbF.glsl)
@@ -792,14 +793,14 @@ GLuint LLShaderMgr::loadShaderFile(const std::string& filename, S32 & shader_lev
 	
 	if (defines)
 	{
-		for (boost::unordered_map<std::string,std::string>::iterator iter = defines->begin(); iter != defines->end(); ++iter)
+		for (std::unordered_map<std::string,std::string>::iterator iter = defines->begin(); iter != defines->end(); ++iter)
 		{
 			std::string define = "#define " + iter->first + " " + iter->second + "\n";
 			extra_code_text[extra_code_count++] = (GLchar*) strdup(define.c_str());
 		}
 	}
 
-	if( gGLManager.mIsATI )
+	if( gGLManager.mIsAMD )
 	{
 		extra_code_text[extra_code_count++] = strdup( "#define IS_AMD_CARD 1\n" );
 	}
@@ -1071,43 +1072,6 @@ BOOL LLShaderMgr::linkProgramObject(GLuint obj, BOOL suppress_errors)
 		LL_SHADER_LOADING_WARNS() << "GLSL Linker Error:" << LL_ENDL;
 	}
 
-#if LL_DARWIN
-
-	// For some reason this absolutely kills the frame rate when VBO's are enabled
-	/*if (0)
-	{
-		// Force an evaluation of the gl state so the driver can tell if the shader will run in hardware or software
-		// per Apple's suggestion
-		LLGLSLShader::sNoFixedFunction = false;
-		
-		glUseProgram(obj);
-
-		gGL.begin(LLRender::TRIANGLES);
-		gGL.vertex3f(0.0f, 0.0f, 0.0f);
-		gGL.vertex3f(0.0f, 0.0f, 0.0f);
-		gGL.vertex3f(0.0f, 0.0f, 0.0f);
-		gGL.end();
-		gGL.flush();
-		
-		glUseProgram(0);
-		
-		LLGLSLShader::sNoFixedFunction = true;
-
-		// Query whether the shader can or cannot run in hardware
-		// http://developer.apple.com/qa/qa2007/qa1502.html
-		GLint vertexGPUProcessing, fragmentGPUProcessing;
-		CGLContextObj ctx = CGLGetCurrentContext();
-		CGLGetParameter(ctx, kCGLCPGPUVertexProcessing, &vertexGPUProcessing);	
-		CGLGetParameter(ctx, kCGLCPGPUFragmentProcessing, &fragmentGPUProcessing);
-		if (!fragmentGPUProcessing || !vertexGPUProcessing)
-		{
-			LL_SHADER_LOADING_WARNS() << "GLSL Linker: Running in Software:" << LL_ENDL;
-			success = GL_FALSE;
-			suppress_errors = FALSE;		
-		}
-	}*/
-
-#else
 	std::string log = get_program_log(obj);
 	LLStringUtil::toLower(log);
 	if (log.find("software") != std::string::npos)
@@ -1116,7 +1080,6 @@ BOOL LLShaderMgr::linkProgramObject(GLuint obj, BOOL suppress_errors)
 		success = GL_FALSE;
 		suppress_errors = FALSE;
 	}
-#endif
 	return success;
 }
 

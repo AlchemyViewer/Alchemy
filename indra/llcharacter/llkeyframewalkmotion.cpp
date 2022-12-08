@@ -97,6 +97,7 @@ void LLKeyframeWalkMotion::onDeactivate()
 //-----------------------------------------------------------------------------
 BOOL LLKeyframeWalkMotion::onUpdate(F32 time, U8* joint_mask)
 {
+    LL_PROFILE_ZONE_SCOPED;
 	// compute time since last update
 	F32 deltaTime = time - mRealTimeLast;
 
@@ -190,6 +191,7 @@ BOOL LLWalkAdjustMotion::onActivate()
 //-----------------------------------------------------------------------------
 BOOL LLWalkAdjustMotion::onUpdate(F32 time, U8* joint_mask)
 {
+    LL_PROFILE_ZONE_SCOPED;
 	// delta_time is guaranteed to be non zero
 	F32 delta_time = llclamp(time - mLastTime, TIME_EPSILON, MAX_TIME_DELTA);
 	mLastTime = time;
@@ -366,6 +368,7 @@ BOOL LLFlyAdjustMotion::onActivate()
 //-----------------------------------------------------------------------------
 BOOL LLFlyAdjustMotion::onUpdate(F32 time, U8* joint_mask)
 {
+    LL_PROFILE_ZONE_SCOPED;
 	LLVector3 ang_vel = mCharacter->getCharacterAngularVelocity() * mCharacter->getTimeDilation();
 	F32 speed = mCharacter->getCharacterVelocity().magVec();
 

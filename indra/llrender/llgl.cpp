@@ -54,6 +54,7 @@
 
 BOOL gDebugSession = FALSE;
 BOOL gHeadlessClient = FALSE;
+BOOL gNonInteractive = FALSE;
 BOOL gGLActive = FALSE;
 BOOL gGLDebugLoggingEnabled = TRUE;
 
@@ -77,24 +78,32 @@ void APIENTRY gl_debug_callback(GLenum source,
 {
 	if (gGLDebugLoggingEnabled)
 	{
-		if (severity == GL_DEBUG_SEVERITY_HIGH)
-		{
-			LL_WARNS() << "----- GL ERROR --------" << LL_ENDL;
-		}
-		else
-		{
-			LL_WARNS() << "----- GL WARNING -------" << LL_ENDL;
-		}
-		LL_WARNS() << "Type: " << std::hex << type << LL_ENDL;
-		LL_WARNS() << "ID: " << std::hex << id << LL_ENDL;
-		LL_WARNS() << "Severity: " << std::hex << severity << LL_ENDL;
-		LL_WARNS() << "Message: " << message << LL_ENDL;
-		LL_WARNS() << "-----------------------" << LL_ENDL;
-		if (severity == GL_DEBUG_SEVERITY_HIGH)
-		{
-			LL_ERRS() << "Halting on GL Error" << LL_ENDL;
-		}
-	}
+
+        if (severity != GL_DEBUG_SEVERITY_HIGH &&
+            severity != GL_DEBUG_SEVERITY_MEDIUM &&
+            severity != GL_DEBUG_SEVERITY_LOW)
+        { //suppress out-of-spec messages sent by nvidia driver (mostly vertexbuffer hints)
+            return;
+        }
+
+	    if (severity == GL_DEBUG_SEVERITY_HIGH)
+	    {
+		    LL_WARNS() << "----- GL ERROR --------" << LL_ENDL;
+	    }
+	    else
+	    {
+		    LL_WARNS() << "----- GL WARNING -------" << LL_ENDL;
+	    }
+	    LL_WARNS() << "Type: " << std::hex << type << LL_ENDL;
+	    LL_WARNS() << "ID: " << std::hex << id << LL_ENDL;
+	    LL_WARNS() << "Severity: " << std::hex << severity << LL_ENDL;
+	    LL_WARNS() << "Message: " << message << LL_ENDL;
+	    LL_WARNS() << "-----------------------" << LL_ENDL;
+	    if (severity == GL_DEBUG_SEVERITY_HIGH)
+	    {
+		    LL_ERRS() << "Halting on GL Error" << LL_ENDL;
+	    }
+    }
 }
 
 void parse_glsl_version(S32& major, S32& minor);
@@ -158,9 +167,6 @@ LLGLManager::LLGLManager() :
 	mHasMapBufferRange(FALSE),
 	mHasFlushBufferRange(FALSE),
 	mHasPBuffer(FALSE),
-	mHasShaderObjects(FALSE),
-	mHasVertexShader(FALSE),
-	mHasFragmentShader(FALSE),
 	mNumTextureImageUnits(0),
 	mHasOcclusionQuery(FALSE),
 	mHasTimerQuery(FALSE),
@@ -183,14 +189,9 @@ LLGLManager::LLGLManager() :
 	mHasTextureSwizzle(false),
     mHasGPUShader4(false),
     mHasClipControl(false),
-	mIsATI(FALSE),
+	mIsAMD(FALSE),
 	mIsNVIDIA(FALSE),
 	mIsIntel(FALSE),
-	mIsGF2or4MX(FALSE),
-	mIsGF3(FALSE),
-	mIsGFFX(FALSE),
-	mATIOffsetVerticalLines(FALSE),
-	mATIOldDriver(FALSE),
 #if LL_DARWIN
 	mIsMobileGF(FALSE),
 #endif
@@ -315,59 +316,17 @@ bool LLGLManager::initGL()
 	
 	// Trailing space necessary to keep "nVidia Corpor_ati_on" cards
 	// from being recognized as ATI.
+    // NOTE: AMD has been pretty good about not breaking this check, do not rename without good reason
 	if (mGLVendor.substr(0,4) == "ATI ")
 	{
-		mGLVendorShort = "ATI";
+		mGLVendorShort = "AMD";
 		// *TODO: Fix this?
-		mIsATI = TRUE;
-
-#if LL_WINDOWS && !LL_MESA_HEADLESS
-		if (mDriverVersionRelease < 3842)
-		{
-			mATIOffsetVerticalLines = TRUE;
-		}
-#endif // LL_WINDOWS
-
-#if (LL_WINDOWS || LL_LINUX) && !LL_MESA_HEADLESS
-		// count any pre OpenGL 3.0 implementation as an old driver
-		if (mGLVersion < 3.f) 
-		{
-			mATIOldDriver = TRUE;
-		}
-#endif // (LL_WINDOWS || LL_LINUX) && !LL_MESA_HEADLESS
+		mIsAMD = TRUE;
 	}
 	else if (mGLVendor.find("NVIDIA ") != std::string::npos)
 	{
 		mGLVendorShort = "NVIDIA";
 		mIsNVIDIA = TRUE;
-		if (   mGLRenderer.find("GEFORCE4 MX") != std::string::npos
-			|| mGLRenderer.find("GEFORCE2") != std::string::npos
-			|| mGLRenderer.find("GEFORCE 2") != std::string::npos
-			|| mGLRenderer.find("GEFORCE4 460 GO") != std::string::npos
-			|| mGLRenderer.find("GEFORCE4 440 GO") != std::string::npos
-			|| mGLRenderer.find("GEFORCE4 420 GO") != std::string::npos)
-		{
-			mIsGF2or4MX = TRUE;
-		}
-		else if (mGLRenderer.find("GEFORCE FX") != std::string::npos
-				 || mGLRenderer.find("QUADRO FX") != std::string::npos
-				 || mGLRenderer.find("NV34") != std::string::npos)
-		{
-			mIsGFFX = TRUE;
-		}
-		else if(mGLRenderer.find("GEFORCE3") != std::string::npos)
-		{
-			mIsGF3 = TRUE;
-		}
-#if LL_DARWIN
-		else if ((mGLRenderer.find("9400M") != std::string::npos)
-			  || (mGLRenderer.find("9600M") != std::string::npos)
-			  || (mGLRenderer.find("9800M") != std::string::npos))
-		{
-			mIsMobileGF = TRUE;
-		}
-#endif
-
 	}
 	else if (mGLVendor.find("INTEL") != std::string::npos
 #if LL_LINUX
@@ -480,29 +439,29 @@ bool LLGLManager::initGL()
 
 	stop_glerror();
 
-	if (mHasFragmentShader)
-	{
-		GLint num_tex_image_units;
-		glGetIntegerv(GL_MAX_TEXTURE_IMAGE_UNITS, &num_tex_image_units);
-		mNumTextureImageUnits = llmin(num_tex_image_units, 32);
-	}
+	GLint num_tex_image_units;
+	glGetIntegerv(GL_MAX_TEXTURE_IMAGE_UNITS_ARB, &num_tex_image_units);
+	mNumTextureImageUnits = llmin(num_tex_image_units, 32);
 
 	LL_INFOS() << "NUM TEX IMAGE UNITS: " << mNumTextureImageUnits << LL_ENDL;
 
-	if (LLRender::sGLCoreProfile)
-	{
-		mNumTextureUnits = llmin(mNumTextureImageUnits, MAX_GL_TEXTURE_UNITS);
-	}
-	else if (mHasMultitexture)
-	{
-		GLint num_tex_units;		
-		glGetIntegerv(GL_MAX_TEXTURE_UNITS, &num_tex_units);
-		mNumTextureUnits = llmin(num_tex_units, (GLint)MAX_GL_TEXTURE_UNITS);
-		if (mIsIntel)
-		{
-			mNumTextureUnits = llmin(mNumTextureUnits, 2);
-		}
-	}
+    if (mHasMultitexture)
+    {
+        if (LLRender::sGLCoreProfile)
+        {
+            mNumTextureUnits = llmin(mNumTextureImageUnits, MAX_GL_TEXTURE_UNITS);
+        }
+        else
+        {
+            GLint num_tex_units;
+            glGetIntegerv(GL_MAX_TEXTURE_UNITS_ARB, &num_tex_units);
+            mNumTextureUnits = llmin(num_tex_units, (GLint)MAX_GL_TEXTURE_UNITS);
+            if (mIsIntel)
+            {
+                mNumTextureUnits = llmin(mNumTextureUnits, 2);
+            }
+        }
+    }
 	else
 	{
 		mHasRequirements = FALSE;
@@ -534,24 +493,9 @@ bool LLGLManager::initGL()
     
     stop_glerror();
 
-	if (mHasDebugOutput && gDebugGL)
-	{ //setup debug output callback
-		glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DEBUG_SEVERITY_LOW, 0, NULL, GL_TRUE);
-		glDebugMessageCallback((GLDEBUGPROC) gl_debug_callback, NULL);
-		glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
-	}
-
-	stop_glerror();
-
 	//HACK always disable texture multisample, use FXAA instead
 	mHasTextureMultisample = FALSE;
 #if LL_WINDOWS
-	if (mIsATI)
-	{ //using multisample textures on ATI results in black screen for some reason
-		mHasTextureMultisample = FALSE;
-	}
-
-
 	if (mIsIntel && mGLVersion <= 3.f)
 	{ //never try to use framebuffer objects on older intel drivers (crashy)
 		mHasFramebufferObject = FALSE;
@@ -732,9 +676,9 @@ void LLGLManager::asLLSD(LLSD& info)
 	info["has_map_buffer_range"] = mHasMapBufferRange;
 	info["has_flush_buffer_range"] = mHasFlushBufferRange;
 	info["has_pbuffer"] = mHasPBuffer;
-	info["has_shader_objects"] = mHasShaderObjects;
-	info["has_vertex_shader"] = mHasVertexShader;
-	info["has_fragment_shader"] = mHasFragmentShader;
+    info["has_shader_objects"] = std::string("Assumed TRUE");   // was mHasShaderObjects;
+	info["has_vertex_shader"] = std::string("Assumed TRUE");    // was mHasVertexShader;
+	info["has_fragment_shader"] = std::string("Assumed TRUE");  // was mHasFragmentShader;
 	info["num_texture_image_units"] =  mNumTextureImageUnits;
 	info["has_occlusion_query"] = mHasOcclusionQuery;
 	info["has_timer_query"] = mHasTimerQuery;
@@ -762,14 +706,9 @@ void LLGLManager::asLLSD(LLSD& info)
     info["has_clip_control"] = mHasClipControl;
 
 	// Vendor-specific extensions
-	info["is_ati"] = mIsATI;
+	info["is_ati"] = mIsAMD;  // note, do not rename is_ati to is_amd without coordinating with DW
 	info["is_nvidia"] = mIsNVIDIA;
 	info["is_intel"] = mIsIntel;
-	info["is_gf2or4mx"] = mIsGF2or4MX;
-	info["is_gf3"] = mIsGF3;
-	info["is_gf_gfx"] = mIsGFFX;
-	info["ati_offset_vertical_lines"] = mATIOffsetVerticalLines;
-	info["ati_old_driver"] = mATIOldDriver;
 
 	// Other fields
 	info["has_requirements"] = mHasRequirements;
@@ -842,9 +781,6 @@ void LLGLManager::initExtensions()
 	mHasCubeMap = FALSE;
 	mHasOcclusionQuery = FALSE;
 	mHasPointParameters = FALSE;
-	mHasShaderObjects = FALSE;
-	mHasVertexShader = FALSE;
-	mHasFragmentShader = FALSE;
 	mHasTextureRectangle = FALSE;
 #else // LL_MESA_HEADLESS
 	mHasMultitexture = mGLVersion >= 1.3f || epoxy_has_gl_extension("GL_ARB_multitexture");
@@ -864,6 +800,7 @@ void LLGLManager::initExtensions()
 	mHasSync = mGLVersion >= 3.2f || epoxy_has_gl_extension("GL_ARB_sync");
 	mHasMapBufferRange = mGLVersion >= 3.0f || epoxy_has_gl_extension("GL_ARB_map_buffer_range");
 	mHasFlushBufferRange = epoxy_has_gl_extension("GL_APPLE_flush_buffer_range");
+    // NOTE: Using extensions breaks reflections when Shadows are set to projector.  See: SL-16727
 	mHasDepthClamp = mGLVersion >= 3.2f || (epoxy_has_gl_extension("GL_ARB_depth_clamp") || epoxy_has_gl_extension("GL_NV_depth_clamp"));
 	// mask out FBO support when packed_depth_stencil isn't there 'cause we need it for LLRenderTarget -Brad
 #ifdef GL_ARB_framebuffer_object
@@ -901,10 +838,6 @@ void LLGLManager::initExtensions()
 #if !LL_DARWIN
 	mHasPointParameters = mGLVersion >= 1.4f || epoxy_has_gl_extension("GL_ARB_point_parameters");
 #endif
-	mHasShaderObjects = mGLVersion >= 2.0f || (epoxy_has_gl_extension("GL_ARB_shader_objects") && (LLRender::sGLCoreProfile || epoxy_has_gl_extension("GL_ARB_shading_language_100")));
-	mHasVertexShader = mGLVersion >= 2.0f || (epoxy_has_gl_extension("GL_ARB_vertex_program") && epoxy_has_gl_extension("GL_ARB_vertex_shader")
-		&& (LLRender::sGLCoreProfile || epoxy_has_gl_extension("GL_ARB_shading_language_100")));
-	mHasFragmentShader = mGLVersion >= 2.0f || (epoxy_has_gl_extension("GL_ARB_fragment_shader") && (LLRender::sGLCoreProfile || epoxy_has_gl_extension("GL_ARB_shading_language_100")));
 
 	mHasTextureSwizzle = mGLVersion >= 3.3f || epoxy_has_gl_extension("GL_ARB_texture_swizzle");
     mHasGPUShader4 = mGLVersion >= 3.0f || epoxy_has_gl_extension("GL_EXT_gpu_shader4");
@@ -931,9 +864,6 @@ void LLGLManager::initExtensions()
 		mHasCubeMap = FALSE;
 		mHasOcclusionQuery = FALSE;
 		mHasPointParameters = FALSE;
-		mHasShaderObjects = FALSE;
-		mHasVertexShader = FALSE;
-		mHasFragmentShader = FALSE;
 		mHasTextureSwizzle = FALSE;
         mHasGPUShader4 = FALSE;
         mHasClipControl = FALSE;
@@ -949,9 +879,6 @@ void LLGLManager::initExtensions()
 		mHasAnisotropic = FALSE;
 		//mHasCubeMap = FALSE; // apparently fatal on Intel 915 & similar
 		//mHasOcclusionQuery = FALSE; // source of many ATI system hangs
-		mHasShaderObjects = FALSE;
-		mHasVertexShader = FALSE;
-		mHasFragmentShader = FALSE;
 		mHasBlendFuncSeparate = FALSE;
 		LL_WARNS("RenderInit") << "GL extension support forced to SIMPLE level via LL_GL_BASICEXT" << LL_ENDL;
 	}
@@ -973,9 +900,6 @@ void LLGLManager::initExtensions()
 		if (strchr(blacklist,'j')) mHasCubeMap = FALSE;//S
 // 		if (strchr(blacklist,'k')) mHasATIVAO = FALSE;//S
 		if (strchr(blacklist,'l')) mHasOcclusionQuery = FALSE;
-		if (strchr(blacklist,'m')) mHasShaderObjects = FALSE;//S
-		if (strchr(blacklist,'n')) mHasVertexShader = FALSE;//S
-		if (strchr(blacklist,'o')) mHasFragmentShader = FALSE;//S
 		if (strchr(blacklist,'p')) mHasPointParameters = FALSE;//S
 		if (strchr(blacklist,'q')) mHasFramebufferObject = FALSE;//S
 		if (strchr(blacklist,'r')) mHasDrawBuffers = FALSE;//S
@@ -1022,18 +946,6 @@ void LLGLManager::initExtensions()
 	{
 		LL_INFOS("RenderInit") << "Couldn't initialize GL_ARB_point_parameters" << LL_ENDL;
 	}
-	if (!mHasShaderObjects)
-	{
-		LL_INFOS("RenderInit") << "Couldn't initialize GL_ARB_shader_objects" << LL_ENDL;
-	}
-	if (!mHasVertexShader)
-	{
-		LL_INFOS("RenderInit") << "Couldn't initialize GL_ARB_vertex_shader" << LL_ENDL;
-	}
-	if (!mHasFragmentShader)
-	{
-		LL_INFOS("RenderInit") << "Couldn't initialize GL_ARB_fragment_shader" << LL_ENDL;
-	}
 	if (!mHasBlendFuncSeparate)
 	{
 		LL_INFOS("RenderInit") << "Couldn't initialize GL_EXT_blend_func_separate" << LL_ENDL;
@@ -1049,7 +961,6 @@ void LLGLManager::initExtensions()
 //		LL_INFOS("RenderInit") << "Disabling mip-map generation for Intel GPUs" << LL_ENDL;
 //		mHasMipMapGeneration = FALSE;
 //	}
-	
 	// Misc
 	glGetIntegerv(GL_MAX_ELEMENTS_VERTICES, (GLint*) &mGLMaxVertexRange);
 	glGetIntegerv(GL_MAX_ELEMENTS_INDICES, (GLint*) &mGLMaxIndexRange);
@@ -1470,205 +1381,29 @@ void LLGLState::checkTextureChannels(const std::string& msg)
 #endif
 }
 
-void LLGLState::checkClientArrays(const std::string& msg, U32 data_mask)
-{
-	if (!gDebugGL || LLGLSLShader::sNoFixedFunction)
-	{
-		return;
-	}
-
-	stop_glerror();
-	BOOL error = FALSE;
-
-	GLint active_texture;
-	glGetIntegerv(GL_CLIENT_ACTIVE_TEXTURE, &active_texture);
-
-	if (active_texture != GL_TEXTURE0)
-	{
-		LL_WARNS() << "Client active texture corrupted: " << active_texture << LL_ENDL;
-		if (gDebugSession)
-		{
-			gFailLog << "Client active texture corrupted: " << active_texture << std::endl;
-		}
-		error = TRUE;
-	}
-
-	/*glGetIntegerv(GL_ACTIVE_TEXTURE, &active_texture);
-	if (active_texture != GL_TEXTURE0)
-	{
-		LL_WARNS() << "Active texture corrupted: " << active_texture << LL_ENDL;
-		if (gDebugSession)
-		{
-			gFailLog << "Active texture corrupted: " << active_texture << std::endl;
-		}
-		error = TRUE;
-	}*/
-
-	static const char* label[] =
-	{
-		"GL_VERTEX_ARRAY",
-		"GL_NORMAL_ARRAY",
-		"GL_COLOR_ARRAY",
-		"GL_TEXTURE_COORD_ARRAY"
-	};
-
-	static GLint value[] =
-	{
-		GL_VERTEX_ARRAY,
-		GL_NORMAL_ARRAY,
-		GL_COLOR_ARRAY,
-		GL_TEXTURE_COORD_ARRAY
-	};
-
-	static const U32 mask[] = 
-	{ //copied from llvertexbuffer.h
-		0x0001, //MAP_VERTEX,
-		0x0002, //MAP_NORMAL,
-		0x0010, //MAP_COLOR,
-		0x0004, //MAP_TEXCOORD
-	};
-
-
-	for (S32 j = 1; j < 4; j++)
-	{
-		if (glIsEnabled(value[j]))
-		{
-			if (!(mask[j] & data_mask))
-			{
-				error = TRUE;
-				LL_WARNS("RenderState") << "GL still has " << label[j] << " enabled." << LL_ENDL;
-				if (gDebugSession)
-				{
-					gFailLog << "GL still has " << label[j] << " enabled." << std::endl;
-				}
-			}
-		}
-		else
-		{
-			if (mask[j] & data_mask)
-			{
-				error = TRUE;
-				LL_WARNS("RenderState") << "GL does not have " << label[j] << " enabled." << LL_ENDL;
-				if (gDebugSession)
-				{
-					gFailLog << "GL does not have " << label[j] << " enabled." << std::endl;
-				}
-			}
-		}
-	}
-
-	glClientActiveTexture(GL_TEXTURE1);
-	gGL.getTexUnit(1)->activate();
-	if (glIsEnabled(GL_TEXTURE_COORD_ARRAY))
-	{
-		if (!(data_mask & 0x0008))
-		{
-			error = TRUE;
-			LL_WARNS("RenderState") << "GL still has GL_TEXTURE_COORD_ARRAY enabled on channel 1." << LL_ENDL;
-			if (gDebugSession)
-			{
-				gFailLog << "GL still has GL_TEXTURE_COORD_ARRAY enabled on channel 1." << std::endl;
-			}
-		}
-	}
-	else
-	{
-		if (data_mask & 0x0008)
-		{
-			error = TRUE;
-			LL_WARNS("RenderState") << "GL does not have GL_TEXTURE_COORD_ARRAY enabled on channel 1." << LL_ENDL;
-			if (gDebugSession)
-			{
-				gFailLog << "GL does not have GL_TEXTURE_COORD_ARRAY enabled on channel 1." << std::endl;
-			}
-		}
-	}
-
-	/*if (glIsEnabled(GL_TEXTURE_2D))
-	{
-		if (!(data_mask & 0x0008))
-		{
-			error = TRUE;
-			LL_WARNS("RenderState") << "GL still has GL_TEXTURE_2D enabled on channel 1." << LL_ENDL;
-			if (gDebugSession)
-			{
-				gFailLog << "GL still has GL_TEXTURE_2D enabled on channel 1." << std::endl;
-			}
-		}
-	}
-	else
-	{
-		if (data_mask & 0x0008)
-		{
-			error = TRUE;
-			LL_WARNS("RenderState") << "GL does not have GL_TEXTURE_2D enabled on channel 1." << LL_ENDL;
-			if (gDebugSession)
-			{
-				gFailLog << "GL does not have GL_TEXTURE_2D enabled on channel 1." << std::endl;
-			}
-		}
-	}*/
-
-	glClientActiveTexture(GL_TEXTURE0);
-	gGL.getTexUnit(0)->activate();
-
-	if (gGLManager.mHasVertexShader && LLGLSLShader::sNoFixedFunction)
-	{	//make sure vertex attribs are all disabled
-		GLint count;
-		glGetIntegerv(GL_MAX_VERTEX_ATTRIBS, &count);
-		for (GLint i = 0; i < count; i++)
-		{
-			GLint enabled;
-			glGetVertexAttribiv((GLuint) i, GL_VERTEX_ATTRIB_ARRAY_ENABLED, &enabled);
-			if (enabled)
-			{
-				error = TRUE;
-				LL_WARNS("RenderState") << "GL still has vertex attrib array " << i << " enabled." << LL_ENDL;
-				if (gDebugSession)
-				{
-					gFailLog <<  "GL still has vertex attrib array " << i << " enabled." << std::endl;
-				}
-			}
-		}
-	}
-
-	if (error)
-	{
-		if (gDebugSession)
-		{
-			ll_fail("LLGLState::checkClientArrays failed.");
-		}
-		else
-		{
-			LL_GL_ERRS << "GL client array corruption detected.  " << msg << LL_ENDL;
-		}
-	}
-}
-
 ///////////////////////////////////////////////////////////////////////
 
 LLGLState::LLGLState(LLGLenum state, S32 enabled) :
 	mState(state), mWasEnabled(FALSE), mIsEnabled(FALSE)
 {
-	if (LLGLSLShader::sNoFixedFunction)
-	{ //always ignore state that's deprecated post GL 3.0
-		switch (state)
-		{
-			case GL_ALPHA_TEST:
-			case GL_NORMALIZE:
-			case GL_TEXTURE_GEN_R:
-			case GL_TEXTURE_GEN_S:
-			case GL_TEXTURE_GEN_T:
-			case GL_TEXTURE_GEN_Q:
-			case GL_LIGHTING:
-			case GL_COLOR_MATERIAL:
-			case GL_FOG:
-			case GL_LINE_STIPPLE:
-			case GL_POLYGON_STIPPLE:
-				mState = 0;
-				break;
-		}
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_PIPELINE;
+	switch (state)
+	{
+		case GL_ALPHA_TEST:
+		case GL_NORMALIZE:
+		case GL_TEXTURE_GEN_R:
+		case GL_TEXTURE_GEN_S:
+		case GL_TEXTURE_GEN_T:
+		case GL_TEXTURE_GEN_Q:
+		case GL_LIGHTING:
+		case GL_COLOR_MATERIAL:
+		case GL_FOG:
+		case GL_LINE_STIPPLE:
+		case GL_POLYGON_STIPPLE:
+			mState = 0;
+			break;
 	}
+
 
 	stop_glerror();
 	if (mState)
@@ -1708,6 +1443,7 @@ void LLGLState::setEnabled(S32 enabled)
 
 LLGLState::~LLGLState() 
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_PIPELINE;
 	stop_glerror();
 	if (mState)
 	{
@@ -1894,7 +1630,8 @@ LLGLUserClipPlane::LLGLUserClipPlane(const LLPlane& p, const LLMatrix4a& modelvi
 		mModelview = modelview;
 		mProjection = projection;
 
-		setPlane(p[0], p[1], p[2], p[3]);
+        //flip incoming LLPlane to get consistent behavior compared to frustum culling
+		setPlane(-p[0], -p[1], -p[2], -p[3]);
 	}
 }
 
@@ -2144,22 +1881,10 @@ LLGLSPipelineSkyBox::LLGLSPipelineSkyBox()
 , mCullFace(GL_CULL_FACE)
 , mSquashClip()
 { 
-    if (!LLGLSLShader::sNoFixedFunction)
-    {
-        glDisable(GL_LIGHTING);
-        glDisable(GL_FOG);
-        glDisable(GL_CLIP_PLANE0);
-    }
 }
 
 LLGLSPipelineSkyBox::~LLGLSPipelineSkyBox()
 {
-    if (!LLGLSLShader::sNoFixedFunction)
-    {
-        glEnable(GL_LIGHTING);
-        glEnable(GL_FOG);
-        glEnable(GL_CLIP_PLANE0);
-    }
 }
 
 LLGLSPipelineDepthTestSkyBox::LLGLSPipelineDepthTestSkyBox(bool depth_test, bool depth_write)
@@ -2185,4 +1910,5 @@ extern "C"
     __declspec(dllexport) int AmdPowerXpressRequestHighPerformance = 1;
 }
 #endif
+
 

@@ -13,6 +13,7 @@ include(LLSharedLibs)
 include(Copy3rdPartyLibs)
 include(ZLIB)
 include(URIPARSER)
+include(Tracy)
 include(OpenSSL)
 
 include_directories(
@@ -21,6 +22,7 @@ include_directories(
     ${LLMATH_INCLUDE_DIRS}
     ${ZLIB_INCLUDE_DIRS}
     ${URIPARSER_INCLUDE_DIRS}
+    ${TRACY_INCLUDE_DIR}
     )
 
 # add_executable(lltreeiterators lltreeiterators.cpp)
@@ -118,14 +120,16 @@ set(llcommon_SOURCE_FILES
     lluriparser.cpp
     lluuid.cpp
     llworkerthread.cpp
-    timing.cpp
     u64.cpp
+    threadpool.cpp
+    workqueue.cpp
     StackWalker.cpp
     )
     
 set(llcommon_HEADER_FILES
     CMakeLists.txt
 
+    chrono.h
     ctype_workaround.h
     fix_macros.h
     indra_constants.h
@@ -198,6 +202,8 @@ set(llcommon_HEADER_FILES
     llmutex.h
     llnametable.h
     llpointer.h
+    llprofiler.h
+    llprofilercategories.h
     llpounceable.h
     llpredicate.h
     llpreprocessor.h
@@ -253,8 +259,12 @@ set(llcommon_HEADER_FILES
     lockstatic.h
     stdtypes.h
     stringize.h
+    threadpool.h
+    threadsafeschedule.h
     timer.h
+    tuple.h
     u64.h
+    workqueue.h
     StackWalker.h
     )
 
@@ -305,6 +315,7 @@ target_link_libraries(
     absl::strings
     nlohmann_json::nlohmann_json
     fmt::fmt
+    ${TRACY_LIBRARY}
     ${DL_LIBRARY}
     ${RT_LIBRARY}
     )
@@ -379,6 +390,9 @@ if (LL_TESTS)
   LL_ADD_INTEGRATION_TEST(lluri "" "${test_libs}")
   LL_ADD_INTEGRATION_TEST(llunits "" "${test_libs}")
   LL_ADD_INTEGRATION_TEST(stringize "" "${test_libs}")
+  LL_ADD_INTEGRATION_TEST(threadsafeschedule "" "${test_libs}")
+  LL_ADD_INTEGRATION_TEST(tuple "" "${test_libs}")
+  LL_ADD_INTEGRATION_TEST(workqueue "" "${test_libs}")
 
 ## llexception_test.cpp isn't a regression test, and doesn't need to be run
 ## every build. It's to help a developer make implementation choices about

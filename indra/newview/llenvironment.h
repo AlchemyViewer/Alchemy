@@ -36,20 +36,21 @@
 #include "llsettingswater.h"
 #include "llsettingsdaycycle.h"
 
+#include "llglslshader.h"
+
 #include <boost/signals2.hpp>
 
 //-------------------------------------------------------------------------
 class LLViewerCamera;
-class LLGLSLShader;
 class LLParcel;
 
 //-------------------------------------------------------------------------
-class LLEnvironment final : public LLSingleton<LLEnvironment>
+class LLEnvironment final : public LLSimpleton<LLEnvironment>
 {
-    LLSINGLETON(LLEnvironment);
     LOG_CLASS(LLEnvironment);
-
 public:
+    LLEnvironment();
+
     static const F64Seconds     TRANSITION_INSTANT;
     static const F64Seconds     TRANSITION_FAST;
     static const F64Seconds     TRANSITION_DEFAULT;
@@ -112,7 +113,7 @@ public:
     typedef std::array<F32, 4>                                      altitude_list_t;
     typedef std::vector<F32>                                        altitudes_vect_t;
 
-    virtual                     ~LLEnvironment() = default;
+    ~LLEnvironment();
 
     bool                        canEdit() const;
     bool                        isExtendedEnvironmentEnabled() const;
@@ -127,8 +128,13 @@ public:
 
     void                        update(const LLViewerCamera * cam);
 
-    static void                 updateGLVariablesForSettings(LLGLSLShader *shader, const LLSettingsBase::ptr_t &psetting);
+    static void                 updateGLVariablesForSettings(LLShaderUniforms* uniforms, const LLSettingsBase::ptr_t &psetting);
+    
+    // apply current sky settings to given shader
     void                        updateShaderUniforms(LLGLSLShader *shader);
+
+    // prepare settings to be applied to shaders (call whenever settings are updated)
+    void                        updateSettingsUniforms();
 
     void                        setSelectedEnvironment(EnvSelection_t env, LLSettingsBase::Seconds transition = TRANSITION_DEFAULT, bool forced = false);
     EnvSelection_t              getSelectedEnvironment() const                  { return mSelectedEnvironment; }
@@ -147,6 +153,8 @@ public:
     void                        clearEnvironment(EnvSelection_t env);
 
     static void                 logEnvironment(EnvSelection_t env, const LLSettingsBase::ptr_t &settings, S32 env_version = NO_VERSION);
+
+    void                        setCurrentEnvironmentSelection(LLEnvironment::EnvSelection_t env);
 
 
     LLSettingsDay::ptr_t        getEnvironmentDay(EnvSelection_t env);
@@ -228,6 +236,11 @@ public:
 
     void                        handleEnvironmentPush(LLSD &message);
 
+    //cached uniform values from LLSD values
+    LLShaderUniforms mWaterUniforms[LLGLSLShader::SG_COUNT];
+    LLShaderUniforms mSkyUniforms[LLGLSLShader::SG_COUNT];
+    // =======================================================================================
+
     class DayInstance: public std::enable_shared_from_this<DayInstance>
     {
     public:
@@ -285,6 +298,7 @@ public:
         LLSettingsDay::ptr_t        mDayCycle;
         LLSettingsSky::ptr_t        mSky;
         LLSettingsWater::ptr_t      mWater;
+
         S32                         mSkyTrack;
 
         bool                        mInitialized;
@@ -328,9 +342,10 @@ public:
 // [/RLVa:KB]
     DayInstance::ptr_t          getSharedEnvironmentInstance();
 
+    void                initSingleton();
+
 protected:
-    virtual void                initSingleton() override;
-    virtual void                cleanupSingleton() override;
+    void                cleanupSingleton();
 
 
 private:

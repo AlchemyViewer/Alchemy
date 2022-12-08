@@ -883,33 +883,47 @@ class LLManifest(object, metaclass=LLManifestRegistry):
         return count
 
     def path_optional(self, src, dst=None):
-        """
-        For a number of our self.path() calls, not only do we want
-        to deal with the absence of src, we also want to remember
-        which were present. Return either an empty list (absent)
-        or a list containing dst (present). Concatenate these
-        return values to get a list of all libs that are present.
-        """
-        if dst is None:
+        sys.stdout.flush()
+        if src == None:
+            raise ManifestError("No source file, dst is " + dst)
+        if dst == None:
             dst = src
+        dst = os.path.join(self.get_dst_prefix(), dst)
+        sys.stdout.write("Processing %s => %s ... " % (src, self._relative_dst_path(dst)))
 
-        # This was simple before we started needing to pass
-        # wildcards. Fortunately, self.path() ends up appending a
-        # (source, dest) pair to self.file_list for every expanded
-        # file processed. Remember its size before the call.
-        oldlen = len(self.file_list)
-        try:
-            self.path(src, dst, False)
-            # The dest appended to self.file_list has been prepended
-            # with self.get_dst_prefix(). Strip it off again.
-            added = [os.path.relpath(d, self.get_dst_prefix())
-                     for s, d in self.file_list[oldlen:]]
-        except (ManifestError, MissingError) as err:
-            print("Warning: %s" % err.msg, file=sys.stderr)
-            added = []
-        if not added:
-            print("Skipping %s" % dst)
-        return added
+        def try_path(src):
+            # expand globs
+            count = 0
+            if self.wildcard_pattern.search(src):
+                for s,d in self.expand_globs(src, dst):
+                    assert(s != d)
+                    count += self.process_file(s, d)
+            else:
+                # if we're specifying a single path (not a glob),
+                # we should error out if it doesn't exist
+                self.check_file_exists(src)
+                count += self.process_either(src, dst)
+            return count
+
+        try_prefixes = [self.get_src_prefix(), self.get_artwork_prefix(), self.get_build_prefix()]
+        for pfx in try_prefixes:
+            try:
+                count = try_path(os.path.join(pfx, src))
+            except MissingError:
+                # if we produce MissingError, just try the next prefix
+                continue
+            # If we actually found nonzero files, stop looking
+            if count:
+                break
+        else:
+            sys.stdout.write("Skipping %s\n" % (src))
+            return 0
+
+        print("%d files" % count)
+
+        # Let caller check whether we processed as many files as expected. In
+        # particular, let caller notice 0.
+        return count
 
     def do(self, *actions):
         self.actions = actions

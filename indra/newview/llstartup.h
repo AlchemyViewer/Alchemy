@@ -27,6 +27,7 @@
 #ifndef LL_LLSTARTUP_H
 #define LL_LLSTARTUP_H
 
+#include <memory>                   // unique_ptr
 class LLViewerTexture ;
 class LLEventPump;
 class LLStartupListener;

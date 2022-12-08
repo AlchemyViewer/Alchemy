@@ -355,14 +355,15 @@ namespace tut
 
         // Create a script file in a temporary place.
         NamedTempFile script("py",
+			"from __future__ import print_function" EOL
             "import sys" EOL
             "import time" EOL
             EOL
             "time.sleep(2)" EOL
-            "print('stdout after wait', file=sys.stdout)" EOL
+            "print('stdout after wait',file=sys.stdout)" EOL
             "sys.stdout.flush()" EOL
             "time.sleep(2)" EOL
-            "print('stderr after wait', file=sys.stderr)" EOL
+            "print('stderr after wait',file=sys.stderr)" EOL
             "sys.stderr.flush()" EOL
             );
 
@@ -569,12 +570,12 @@ namespace tut
     {
         set_test_name("arguments");
         PythonProcessLauncher py(get_test_name(),
-                                 "from __future__ import with_statement\n"
+                                 "from __future__ import with_statement, print_function\n"
                                  "import sys\n"
                                  // note nonstandard output-file arg!
                                  "with open(sys.argv[3], 'w') as f:\n"
                                  "    for arg in sys.argv[1:]:\n"
-                                 "        print(arg, file=f)\n");
+                                 "        print(arg,file=f)\n");
         // We expect that PythonProcessLauncher has already appended
         // its own NamedTempFile to mParams.args (sys.argv[0]).
         py.mParams.args.add("first arg");          // sys.argv[1]
@@ -858,6 +859,7 @@ namespace tut
         set_test_name("'bogus' test");
         CaptureLog recorder;
         PythonProcessLauncher py(get_test_name(),
+                                 "from __future__ import print_function\n"
                                  "print('Hello world')\n");
         py.mParams.files.add(LLProcess::FileParam("bogus"));
         py.mPy = LLProcess::create(py.mParams);
@@ -873,6 +875,7 @@ namespace tut
         // Replace this test with one or more real 'file' tests when we
         // implement 'file' support
         PythonProcessLauncher py(get_test_name(),
+                                 "from __future__ import print_function\n"
                                  "print('Hello world')\n");
         py.mParams.files.add(LLProcess::FileParam());
         py.mParams.files.add(LLProcess::FileParam("file"));
@@ -888,6 +891,7 @@ namespace tut
         // implement 'tpipe' support
         CaptureLog recorder;
         PythonProcessLauncher py(get_test_name(),
+                                 "from __future__ import print_function\n"
                                  "print('Hello world')\n");
         py.mParams.files.add(LLProcess::FileParam());
         py.mParams.files.add(LLProcess::FileParam("tpipe"));
@@ -905,6 +909,7 @@ namespace tut
         // implement 'npipe' support
         CaptureLog recorder;
         PythonProcessLauncher py(get_test_name(),
+                                 "from __future__ import print_function\n"
                                  "print('Hello world')\n");
         py.mParams.files.add(LLProcess::FileParam());
         py.mParams.files.add(LLProcess::FileParam());
@@ -981,7 +986,8 @@ namespace tut
     {
         set_test_name("get*Pipe() validation");
         PythonProcessLauncher py(get_test_name(),
-                                 "print('this output is expected)'\n");
+                                 "from __future__ import print_function\n"
+                                 "print('this output is expected')\n");
         py.mParams.files.add(LLProcess::FileParam("pipe")); // pipe for  stdin
         py.mParams.files.add(LLProcess::FileParam());       // inherit stdout
         py.mParams.files.add(LLProcess::FileParam("pipe")); // pipe for stderr
@@ -1001,6 +1007,7 @@ namespace tut
     {
         set_test_name("talk to stdin/stdout");
         PythonProcessLauncher py(get_test_name(),
+                                 "from __future__ import print_function\n"
                                  "import sys, time\n"
                                  "print('ok')\n"
                                  "sys.stdout.flush()\n"
@@ -1119,6 +1126,7 @@ namespace tut
     {
         set_test_name("ReadPipe \"eof\" event");
         PythonProcessLauncher py(get_test_name(),
+                                 "from __future__ import print_function\n"
                                  "print('Hello from Python!')\n");
         py.mParams.files.add(LLProcess::FileParam()); // stdin
         py.mParams.files.add(LLProcess::FileParam("pipe")); // stdout

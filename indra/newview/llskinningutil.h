@@ -53,7 +53,7 @@ namespace LLSkinningUtil
     void initJointNums(LLMeshSkinInfo* skin, LLVOAvatar *avatar);
     void initSkinningMatrixPalette(LLMatrix4a* mat, S32 count, const LLMeshSkinInfo* skin, LLVOAvatar *avatar);
     void checkSkinWeights(LLVector4a* weights, U32 num_vertices, const LLMeshSkinInfo* skin);
-    void getPerVertexSkinMatrix(F32* weights, LLMatrix4a* mat, bool handle_bad_scale, LLMatrix4a& final_mat);
+    void getPerVertexSkinMatrix(F32* weights, const LLMatrix4a* mat, bool handle_bad_scale, LLMatrix4a& final_mat);
 
     void updateRiggingInfo(const LLMeshSkinInfo* skin, LLVOAvatar *avatar, LLVolumeFace& vol_face);
 

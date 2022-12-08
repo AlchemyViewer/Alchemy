@@ -1,25 +1,25 @@
-/** 
+/**
  * @file llvosky.cpp
  * @brief LLVOSky class implementation
  *
  * $LicenseInfo:firstyear=2001&license=viewerlgpl$
  * Second Life Viewer Source Code
  * Copyright (C) 2010, Linden Research, Inc.
- * 
+ *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation;
  * version 2.1 of the License only.
- * 
+ *
  * This library is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * Lesser General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU Lesser General Public
  * License along with this library; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
- * 
+ *
  * Linden Research, Inc., 945 Battery Street, San Francisco, CA  94111  USA
  * $/LicenseInfo$
  */
@@ -79,11 +79,6 @@ namespace
 	const LLVector2 TEX10 = LLVector2(1.f, 0.f);
 	const LLVector2 TEX11 = LLVector2(1.f, 1.f);
 
-    LLTrace::BlockTimerStatHandle FTM_VOSKY_UPDATETIMER("VOSky Update Timer Tick");
-    LLTrace::BlockTimerStatHandle FTM_VOSKY_CALC("VOSky Update Calculations");
-    LLTrace::BlockTimerStatHandle FTM_VOSKY_CREATETEXTURES("VOSky Update Textures");
-    LLTrace::BlockTimerStatHandle FTM_VOSKY_UPDATEFORCED("VOSky Update Forced");
-
 	constexpr F32Seconds UPDATE_EXPRY(0.25f);
 
 	constexpr F32 UPDATE_MIN_DELTA_THRESHOLD = 0.0005f;
@@ -104,15 +99,15 @@ LLSkyTex::LLSkyTex() :
 void LLSkyTex::init(bool isShiny)
 {
     mIsShiny = isShiny;
-	mSkyData = new LLColor4[SKYTEX_RES * SKYTEX_RES];
-	mSkyDirs = new LLVector3[SKYTEX_RES * SKYTEX_RES];
+	mSkyData = new LLColor4[SKYTEX_RESOLUTION * SKYTEX_RESOLUTION];
+	mSkyDirs = new LLVector3[SKYTEX_RESOLUTION * SKYTEX_RESOLUTION];
 
 	for (S32 i = 0; i < 2; ++i)
 	{
 		mTexture[i] = LLViewerTextureManager::getLocalTexture(FALSE);
 		mTexture[i]->setAddressMode(LLTexUnit::TAM_CLAMP);
-		mImageRaw[i] = new LLImageRaw(SKYTEX_RES, SKYTEX_RES, SKYTEX_COMPONENTS);
-		
+		mImageRaw[i] = new LLImageRaw(SKYTEX_RESOLUTION, SKYTEX_RESOLUTION, SKYTEX_COMPONENTS);
+
 		initEmpty(i);
 	}
 }
@@ -143,7 +138,7 @@ LLSkyTex::~LLSkyTex()
 
 S32 LLSkyTex::getResolution()
 {
-    return SKYTEX_RES;
+    return SKYTEX_RESOLUTION;
 }
 
 S32 LLSkyTex::getCurrent()
@@ -171,11 +166,11 @@ S32 LLSkyTex::getWhich(const BOOL curr)
 void LLSkyTex::initEmpty(const S32 tex)
 {
 	U8* data = mImageRaw[tex]->getData();
-	for (S32 i = 0; i < SKYTEX_RES; ++i)
+	for (S32 i = 0; i < SKYTEX_RESOLUTION; ++i)
 	{
-		for (S32 j = 0; j < SKYTEX_RES; ++j)
+		for (S32 j = 0; j < SKYTEX_RESOLUTION; ++j)
 		{
-			const S32 basic_offset = (i * SKYTEX_RES + j);
+			const S32 basic_offset = (i * SKYTEX_RESOLUTION + j);
 			S32 offset = basic_offset * SKYTEX_COMPONENTS;
 			data[offset] = 0;
 			data[offset+1] = 0;
@@ -192,11 +187,11 @@ void LLSkyTex::initEmpty(const S32 tex)
 void LLSkyTex::create()
 {
 	U8* data = mImageRaw[sCurrent]->getData();
-	for (S32 i = 0; i < SKYTEX_RES; ++i)
+	for (S32 i = 0; i < SKYTEX_RESOLUTION; ++i)
 	{
-		for (S32 j = 0; j < SKYTEX_RES; ++j)
+		for (S32 j = 0; j < SKYTEX_RESOLUTION; ++j)
 		{
-			const S32 basic_offset = (i * SKYTEX_RES + j);
+			const S32 basic_offset = (i * SKYTEX_RESOLUTION + j);
 			S32 offset = basic_offset * SKYTEX_COMPONENTS;
 			U32* pix = (U32*)(data + offset);
 			LLColor4U temp = LLColor4U(mSkyData[basic_offset]);
@@ -207,7 +202,7 @@ void LLSkyTex::create()
 }
 
 void LLSkyTex::createGLImage(S32 which)
-{	
+{
 	mTexture[which]->setExplicitFormat(GL_RGBA8, GL_RGBA);
 	mTexture[which]->createGLTexture(0, mImageRaw[which], 0, TRUE, LLGLTexture::LOCAL);
 	mTexture[which]->setAddressMode(LLTexUnit::TAM_CLAMP);
@@ -394,12 +389,8 @@ const LLVector3* LLHeavenBody::corners() const
 		Sky
 ***************************************/
 
-namespace
-{
-	constexpr S32 VOSKY_RES = SKYTEX_RES;
-	constexpr S32 VOSKY_TILE_RES_X = VOSKY_RES / NUM_TILES_X;
-	constexpr S32 VOSKY_TILE_RES_Y = VOSKY_RES / NUM_TILES_Y;
-}
+const S32 SKYTEX_TILE_RES_X = SKYTEX_RESOLUTION / NUM_TILES_X;
+const S32 SKYTEX_TILE_RES_Y = SKYTEX_RESOLUTION / NUM_TILES_Y;
 
 LLVOSky::LLVOSky(const LLUUID &id, const LLPCode pcode, LLViewerRegion *regionp)
 :	LLStaticViewerObject(id, pcode, regionp, TRUE),
@@ -434,7 +425,7 @@ LLVOSky::LLVOSky(const LLUUID &id, const LLPCode pcode, LLViewerRegion *regionp)
 	{
 		mFace[i] = NULL;
 	}
-	
+
 	mCameraPosAgent = gAgentCamera.getCameraPositionAgent();
 	mAtmHeight = ATM_HEIGHT;
 	mEarthCenter = LLVector3(mCameraPosAgent.mV[0], mCameraPosAgent.mV[1], -EARTH_RADIUS);
@@ -462,12 +453,12 @@ void LLVOSky::init()
     llassert(!mInitialized);
 
     // Update sky at least once to get correct initial sun/moon directions and lighting calcs performed
-	const LLSettingsSky::ptr_t& psky = LLEnvironment::instance().getCurrentSky();
-	psky->update();
+    const LLSettingsSky::ptr_t& psky = LLEnvironment::instance().getCurrentSky();
+    psky->update();
 
-	updateDirections(psky);
+    updateDirections(psky);
 
-	cacheEnvironment(psky, m_atmosphericsVars);
+    cacheEnvironment(psky,m_atmosphericsVars);
 
 	// Initialize the cached normalized direction vectors
 	for (S32 side = 0; side < NUM_CUBEMAP_FACES; ++side)
@@ -491,32 +482,36 @@ void LLVOSky::init()
     mHaloMap    = LLViewerTextureManager::getFetchedTexture(psky->getHaloTextureId(),  FTT_DEFAULT, TRUE, LLGLTexture::BOOST_UI);
 }
 
-void LLVOSky::cacheEnvironment(const LLSettingsSky::ptr_t& psky, AtmosphericsVars& atmosphericsVars)
+
+void LLVOSky::cacheEnvironment(LLSettingsSky::ptr_t psky,AtmosphericsVars& atmosphericsVars)
 {
-	// invariants across whole sky tex process...
-	m_atmosphericsVars.blue_density = psky->getBlueDensity();
-	m_atmosphericsVars.blue_horizon = psky->getBlueHorizon();
-	m_atmosphericsVars.haze_density = psky->getHazeDensity();
-	m_atmosphericsVars.haze_horizon = psky->getHazeHorizon();
-	m_atmosphericsVars.density_multiplier = psky->getDensityMultiplier();
-	m_atmosphericsVars.distance_multiplier = psky->getDistanceMultiplier();
-	m_atmosphericsVars.max_y = psky->getMaxY();
-	m_atmosphericsVars.sun_norm = LLEnvironment::getInstance()->getClampedSunNorm();
-	m_atmosphericsVars.sunlight = psky->getIsSunUp() ? psky->getSunlightColor() : psky->getMoonlightColor();
-	m_atmosphericsVars.ambient = psky->getAmbientColor();
-	m_atmosphericsVars.glow = psky->getGlow();
-	m_atmosphericsVars.cloud_shadow = psky->getCloudShadow();
-	m_atmosphericsVars.dome_radius = psky->getDomeRadius();
-	m_atmosphericsVars.dome_offset = psky->getDomeOffset();
-	m_atmosphericsVars.total_density = psky->getTotalDensityFast(m_atmosphericsVars.blue_density, m_atmosphericsVars.haze_density);
-	m_atmosphericsVars.light_atten = psky->getLightAttenuationFast(m_atmosphericsVars.density_multiplier, m_atmosphericsVars.blue_density, m_atmosphericsVars.haze_density, m_atmosphericsVars.max_y);
-	m_atmosphericsVars.light_transmittance = psky->getLightTransmittanceFast(m_atmosphericsVars.total_density, m_atmosphericsVars.density_multiplier, m_atmosphericsVars.max_y);
-	m_atmosphericsVars.gamma = psky->getGamma();
+    // NOTE: Also see: LLAtmospherics::updateFog()
+    // invariants across whole sky tex process...
+    atmosphericsVars.blue_density = psky->getBlueDensity();
+    atmosphericsVars.blue_horizon = psky->getBlueHorizon();
+    atmosphericsVars.haze_density = psky->getHazeDensity();
+    atmosphericsVars.haze_horizon = psky->getHazeHorizon();
+    atmosphericsVars.density_multiplier = psky->getDensityMultiplier();
+    atmosphericsVars.distance_multiplier = psky->getDistanceMultiplier();
+    atmosphericsVars.max_y = psky->getMaxY();
+    atmosphericsVars.sun_norm = LLEnvironment::instance().getClampedSunNorm();
+    atmosphericsVars.sunlight = psky->getIsSunUp() ? psky->getSunlightColor() : psky->getMoonlightColor();
+    atmosphericsVars.ambient = psky->getAmbientColor();
+    atmosphericsVars.glow = psky->getGlow();
+    atmosphericsVars.cloud_shadow = psky->getCloudShadow();
+    atmosphericsVars.dome_radius = psky->getDomeRadius();
+    atmosphericsVars.dome_offset = psky->getDomeOffset();
+    atmosphericsVars.light_atten = psky->getLightAttenuation(atmosphericsVars.max_y);
+    atmosphericsVars.light_transmittance = psky->getLightTransmittance(atmosphericsVars.max_y);
+    atmosphericsVars.total_density = psky->getTotalDensity();
+    atmosphericsVars.gamma = psky->getGamma();
 }
 
-void LLVOSky::calc(const LLSettingsSky::ptr_t& psky)
+void LLVOSky::calc()
 {
-	cacheEnvironment(psky, m_atmosphericsVars);
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_ENVIRONMENT;
+    LLSettingsSky::ptr_t psky = LLEnvironment::instance().getCurrentSky();
+    cacheEnvironment(psky,m_atmosphericsVars);
 
 	mSun.setColor(psky->getSunDiffuse());
 	mMoon.setColor(LLColor3(1.0f, 1.0f, 1.0f));
@@ -527,14 +522,14 @@ void LLVOSky::calc(const LLSettingsSky::ptr_t& psky)
 	mMoon.renewColor();
 }
 
-void LLVOSky::initCubeMap() 
+void LLVOSky::initCubeMap()
 {
 	std::vector<LLPointer<LLImageRaw> > images;
 	for (S32 side = 0; side < NUM_CUBEMAP_FACES; side++)
 	{
 		images.push_back(mShinyTex[side].getImageRaw());
 	}
-	
+
 	if (!mCubeMap && gSavedSettings.getBOOL("RenderWater") && gGLManager.mHasCubeMap && LLCubeMap::sUseCubeMaps)
 	{
         mCubeMap = new LLCubeMap(false);
@@ -599,8 +594,8 @@ void LLVOSky::initSkyTextureDirs(const S32 side, const S32 tile)
 	S32 tile_x = tile % NUM_TILES_X;
 	S32 tile_y = tile / NUM_TILES_X;
 
-	S32 tile_x_pos = tile_x * VOSKY_TILE_RES_X;
-	S32 tile_y_pos = tile_y * VOSKY_TILE_RES_Y;
+	S32 tile_x_pos = tile_x * SKYTEX_TILE_RES_X;
+	S32 tile_y_pos = tile_y * SKYTEX_TILE_RES_Y;
 
 	F32 coeff[3] = {0, 0, 0};
 	const S32 curr_coef = side >> 1; // 0/1 = Z axis, 2/3 = Y, 4/5 = X
@@ -610,11 +605,11 @@ void LLVOSky::initSkyTextureDirs(const S32 side, const S32 tile)
 
 	coeff[curr_coef] = (F32)side_dir;
 
-	F32 inv_res = 1.f/ VOSKY_RES;
+	F32 inv_res = 1.f/SKYTEX_RESOLUTION;
 	S32 x, y;
-	for (y = tile_y_pos; y < (tile_y_pos + VOSKY_TILE_RES_Y); ++y)
+	for (y = tile_y_pos; y < (tile_y_pos + SKYTEX_TILE_RES_Y); ++y)
 	{
-		for (x = tile_x_pos; x < (tile_x_pos + VOSKY_TILE_RES_X); ++x)
+		for (x = tile_x_pos; x < (tile_x_pos + SKYTEX_TILE_RES_X); ++x)
 		{
 			coeff[x_coef] = F32((x<<1) + 1) * inv_res - 1.f;
 			coeff[y_coef] = F32((y<<1) + 1) * inv_res - 1.f;
@@ -626,33 +621,35 @@ void LLVOSky::initSkyTextureDirs(const S32 side, const S32 tile)
 	}
 }
 
-void LLVOSky::createSkyTexture(const LLSettingsSky::ptr_t& psky, AtmosphericsVars& vars, const S32 side, const S32 tile)
+void LLVOSky::createSkyTexture(const LLSettingsSky::ptr_t &psky, AtmosphericsVars& vars, const S32 side, const S32 tile)
 {
+    const bool low_end = !gPipeline.canUseWindLightShaders();
+
 	S32 tile_x = tile % NUM_TILES_X;
 	S32 tile_y = tile / NUM_TILES_X;
 
-	S32 tile_x_pos = tile_x * VOSKY_TILE_RES_X;
-	S32 tile_y_pos = tile_y * VOSKY_TILE_RES_Y;
+	S32 tile_x_pos = tile_x * SKYTEX_TILE_RES_X;
+	S32 tile_y_pos = tile_y * SKYTEX_TILE_RES_Y;
 
 	S32 x, y;
-	for (y = tile_y_pos; y < (tile_y_pos + VOSKY_TILE_RES_Y); ++y)
+	for (y = tile_y_pos; y < (tile_y_pos + SKYTEX_TILE_RES_Y); ++y)
 	{
-		for (x = tile_x_pos; x < (tile_x_pos + VOSKY_TILE_RES_X); ++x)
+		for (x = tile_x_pos; x < (tile_x_pos + SKYTEX_TILE_RES_X); ++x)
 		{
-			mSkyTex[side].setPixel(m_legacyAtmospherics.calcSkyColorInDir(psky, vars, mSkyTex[side].getDir(x, y), false), x, y);
-			mShinyTex[side].setPixel(m_legacyAtmospherics.calcSkyColorInDir(psky, vars, mShinyTex[side].getDir(x, y), true), x, y);
+			mSkyTex  [side].setPixel(m_legacyAtmospherics.calcSkyColorInDir(psky, vars, mSkyTex  [side].getDir(x, y), false, low_end), x, y);
+			mShinyTex[side].setPixel(m_legacyAtmospherics.calcSkyColorInDir(psky, vars, mShinyTex[side].getDir(x, y), true , low_end), x, y);
 		}
 	}
 }
 
-void LLVOSky::updateDirections(const LLSettingsSky::ptr_t& psky)
+void LLVOSky::updateDirections(LLSettingsSky::ptr_t psky)
 {
     mSun.setDirection(psky->getSunDirection());
-	mMoon.setDirection(psky->getMoonDirection());
+    mMoon.setDirection(psky->getMoonDirection());
     mSun.setRotation(psky->getSunRotation());
-	mMoon.setRotation(psky->getMoonRotation());
-	mSun.renewDirection();
-	mMoon.renewDirection();
+    mMoon.setRotation(psky->getMoonRotation());
+    mSun.renewDirection();
+    mMoon.renewDirection();
 }
 
 void LLVOSky::idleUpdate(LLAgent &agent, const F64 &time)
@@ -676,8 +673,10 @@ bool LLVOSky::updateSky()
 		return TRUE;
 	}
 
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_ENVIRONMENT;
+
 	static S32 next_frame = 0;
-	
+
 	LLEnvironment& environment = LLEnvironment::instance();
 	const LLSettingsSky::ptr_t& psky = environment.getCurrentSky();
 
@@ -696,11 +695,10 @@ bool LLVOSky::updateSky()
         mForceUpdate = FALSE;
         return TRUE;
 	}
-	
+
     if (mCubeMapUpdateStage < 0)
     {
-        LL_RECORD_BLOCK_TIME(FTM_VOSKY_CALC);
-        calc(psky);
+        calc();
 
         bool same_atmospherics = approximatelyEqual(m_lastAtmosphericsVars, m_atmosphericsVars, UPDATE_MIN_DELTA_THRESHOLD);
 
@@ -709,14 +707,14 @@ bool LLVOSky::updateSky()
         if (mNeedUpdate && (mForceUpdateThrottle.hasExpired() || mForceUpdate))
 		{
             // start updating cube map sides
-            updateFog(&environment, psky, LLViewerCamera::getInstance()->getFar());
+            updateFog(LLViewerCamera::getInstance()->getFar());
             mCubeMapUpdateStage = 0;
             mForceUpdate = FALSE;
 		}
 	}
     else if (mCubeMapUpdateStage == NUM_CUBEMAP_FACES)
 	{
-        LL_RECORD_BLOCK_TIME(FTM_VOSKY_UPDATEFORCED);
+        LL_PROFILE_ZONE_NAMED("updateSky - forced");
         LLSkyTex::stepCurrent();
 
         bool is_alm_wl_sky = gPipeline.canUseWindLightShaders();
@@ -777,7 +775,7 @@ bool LLVOSky::updateSky()
     // run 0 to 5 faces, each face in own frame
     else if (mCubeMapUpdateStage >= 0 && mCubeMapUpdateStage < NUM_CUBEMAP_FACES)
 	{
-        LL_RECORD_BLOCK_TIME(FTM_VOSKY_CREATETEXTURES);
+        LL_PROFILE_ZONE_NAMED("updateSky - create");
         S32 side = mCubeMapUpdateStage;
         // CPU hungry part, createSkyTexture() is math heavy
         // Prior to EEP it was mostly per tile, but since EPP it is per face.
@@ -860,10 +858,10 @@ void LLVOSky::setSunScale(F32 sun_scale)
 void LLVOSky::setMoonScale(F32 moon_scale)
 {
     mMoonScale = moon_scale;
-	}
-	
+}
+
 void LLVOSky::setSunTextures(const LLUUID& sun_texture, const LLUUID& sun_texture_next)
-	{
+{
     // We test the UUIDs here because we explicitly do not want the default image returned by getFetchedTexture in that case...
     mSunTexturep[0] = sun_texture.isNull() ? nullptr : LLViewerTextureManager::getFetchedTexture(sun_texture, FTT_DEFAULT, TRUE, LLGLTexture::BOOST_UI);
     mSunTexturep[1] = sun_texture_next.isNull() ? nullptr : LLViewerTextureManager::getFetchedTexture(sun_texture_next, FTT_DEFAULT, TRUE, LLGLTexture::BOOST_UI);
@@ -881,30 +879,31 @@ void LLVOSky::setSunTextures(const LLUUID& sun_texture, const LLUUID& sun_textur
         LLViewerTexture* current_tex1 = mFace[FACE_SUN]->getTexture(LLRender::ALTERNATE_DIFFUSE_MAP);
 
         if (current_tex0 && (mSunTexturep[0] != current_tex0) && current_tex0->isViewerMediaTexture())
-			{
+        {
             static_cast<LLViewerMediaTexture*>(current_tex0)->removeMediaFromFace(mFace[FACE_SUN]);
         }
 
         if (current_tex1 && (mSunTexturep[1] != current_tex1) && current_tex1->isViewerMediaTexture())
-				{
+        {
             static_cast<LLViewerMediaTexture*>(current_tex1)->removeMediaFromFace(mFace[FACE_SUN]);
-						}
+        }
 
         mFace[FACE_SUN]->setTexture(LLRender::DIFFUSE_MAP, mSunTexturep[0]);
 
         if (can_use_wl)
         {
             if (mSunTexturep[1])
-						{
-	            mSunTexturep[1]->setAddressMode(LLTexUnit::TAM_CLAMP);            
-						}
+            {
+                mSunTexturep[1]->setAddressMode(LLTexUnit::TAM_CLAMP);
+            }
             mFace[FACE_SUN]->setTexture(LLRender::ALTERNATE_DIFFUSE_MAP, mSunTexturep[1]);
-					}
-				}
-			}
+        }
+    }
+}
 
 void LLVOSky::setMoonTextures(const LLUUID& moon_texture, const LLUUID& moon_texture_next)
 {
+			
     bool can_use_wl = gPipeline.canUseWindLightShaders();
 
     mMoonTexturep[0] = moon_texture.isNull()      ? nullptr : LLViewerTextureManager::getFetchedTexture(moon_texture, FTT_DEFAULT, TRUE, LLGLTexture::BOOST_UI);
@@ -913,24 +912,24 @@ void LLVOSky::setMoonTextures(const LLUUID& moon_texture, const LLUUID& moon_tex
     if (mFace[FACE_MOON])
     {
         if (mMoonTexturep[0])
-		{
-	        mMoonTexturep[0]->setAddressMode(LLTexUnit::TAM_CLAMP);
-	}
+        {
+            mMoonTexturep[0]->setAddressMode(LLTexUnit::TAM_CLAMP);
+        }
         mFace[FACE_MOON]->setTexture(LLRender::DIFFUSE_MAP, mMoonTexturep[0]);
 
         if (mMoonTexturep[1] && can_use_wl)
-	{
-	        mMoonTexturep[1]->setAddressMode(LLTexUnit::TAM_CLAMP);
+        {
+            mMoonTexturep[1]->setAddressMode(LLTexUnit::TAM_CLAMP);
             mFace[FACE_MOON]->setTexture(LLRender::ALTERNATE_DIFFUSE_MAP, mMoonTexturep[1]);
-	}
-	}
+        }
+    }
 }
 
 void LLVOSky::setCloudNoiseTextures(const LLUUID& cloud_noise_texture, const LLUUID& cloud_noise_texture_next)
 {
     mCloudNoiseTexturep[0] = cloud_noise_texture.isNull() ? nullptr : LLViewerTextureManager::getFetchedTexture(cloud_noise_texture, FTT_DEFAULT, TRUE, LLGLTexture::BOOST_UI);
     mCloudNoiseTexturep[1] = cloud_noise_texture_next.isNull() ? nullptr : LLViewerTextureManager::getFetchedTexture(cloud_noise_texture_next, FTT_DEFAULT, TRUE, LLGLTexture::BOOST_UI);
-	
+
     if (mCloudNoiseTexturep[0])
 	{
 	    mCloudNoiseTexturep[0]->setAddressMode(LLTexUnit::TAM_WRAP);
@@ -953,21 +952,19 @@ void LLVOSky::setBloomTextures(const LLUUID& bloom_texture, const LLUUID& bloom_
     mBloomTexturep[1] = bloom_tex_next.isNull() ? nullptr : LLViewerTextureManager::getFetchedTexture(bloom_tex_next, FTT_DEFAULT, TRUE, LLGLTexture::BOOST_UI);
 
     if (mBloomTexturep[0])
-{	
-	    mBloomTexturep[0]->setAddressMode(LLTexUnit::TAM_CLAMP);
+    {
+        mBloomTexturep[0]->setAddressMode(LLTexUnit::TAM_CLAMP);
     }
 
     if (mBloomTexturep[1])
-	{
-	    mBloomTexturep[1]->setAddressMode(LLTexUnit::TAM_CLAMP);
+    {
+        mBloomTexturep[1]->setAddressMode(LLTexUnit::TAM_CLAMP);
     }
-	}
-
-static LLTrace::BlockTimerStatHandle FTM_GEO_SKY("Sky Geometry");
+}
 
 BOOL LLVOSky::updateGeometry(LLDrawable *drawable)
 {
-	LL_RECORD_BLOCK_TIME(FTM_GEO_SKY);
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWABLE;
 	if (mFace[FACE_REFLECTION] == NULL)
 	{
 		LLDrawPoolWater *poolp = (LLDrawPoolWater*) gPipeline.getPool(LLDrawPool::POOL_WATER);
@@ -996,11 +993,11 @@ BOOL LLVOSky::updateGeometry(LLDrawable *drawable)
 	LLStrider<LLVector2> texCoordsp;
 	LLStrider<U16> indicesp;
 	U16 index_offset;
-	LLFace *face;	
+	LLFace *face;
 
 	for (S32 side = 0; side < NUM_CUBEMAP_FACES; ++side)
 	{
-		face = mFace[FACE_SIDE0 + side]; 
+		face = mFace[FACE_SIDE0 + side];
 
 		if (!face->getVertexBuffer())
 		{
@@ -1012,7 +1009,7 @@ BOOL LLVOSky::updateGeometry(LLDrawable *drawable)
 			face->setVertexBuffer(buff);
 
 			index_offset = face->getGeometry(verticesp,normalsp,texCoordsp, indicesp);
-			
+
 			S32 vtx = 0;
 			S32 curr_bit = side >> 1; // 0/1 = Z axis, 2/3 = Y, 4/5 = X
 			S32 side_dir = side & 1;  // even - 0, odd - 1
@@ -1131,11 +1128,11 @@ bool LLVOSky::updateHeavenlyBodyGeometry(LLDrawable *drawable, F32 scale, const 
 
 	hb.setVisible(TRUE);
 
-	facep = mFace[f]; 
+	facep = mFace[f];
 
 	if (!facep->getVertexBuffer())
 	{
-		facep->setSize(4, 6);	
+		facep->setSize(4, 6);
 		LLVertexBuffer* buff = new LLVertexBuffer(LLDrawPoolSky::VERTEX_DATA_MASK, GL_STREAM_DRAW);
 		if (!buff->allocateBuffer(facep->getGeomCount(), facep->getIndicesCount(), TRUE))
 		{
@@ -1369,7 +1366,7 @@ void LLVOSky::updateReflectionGeometry(LLDrawable *drawable, F32 H,
 		dt_clip = -0.1f;
 	}
 
-	LLFace *face = mFace[FACE_REFLECTION]; 
+	LLFace *face = mFace[FACE_REFLECTION];
 
     if (face)
     {
@@ -1387,13 +1384,13 @@ void LLVOSky::updateReflectionGeometry(LLDrawable *drawable, F32 H,
 		face->setGeomIndex(0);
 		face->setVertexBuffer(buff);
 	}
-	
+
 	LLStrider<LLVector3> verticesp;
 	LLStrider<LLVector3> normalsp;
 	LLStrider<LLVector2> texCoordsp;
 	LLStrider<U16> indicesp;
 	S32 index_offset;
-	
+
 	index_offset = face->getGeometry(verticesp,normalsp,texCoordsp, indicesp);
 	if (-1 == index_offset)
 	{
@@ -1411,7 +1408,7 @@ void LLVOSky::updateReflectionGeometry(LLDrawable *drawable, F32 H,
 
         LLColor4 hb_refl_col = (1 - attenuation) * hb_col + attenuation * getSkyFogColor();
 	face->setFaceColor(hb_refl_col);
-	
+
 	LLVector3 v_far[2];
 	v_far[0] = v_refl_corner[1];
 	v_far[1] = v_refl_corner[3];
@@ -1524,66 +1521,64 @@ void LLVOSky::updateReflectionGeometry(LLDrawable *drawable, F32 H,
 }
 }
 
-void LLVOSky::updateFog(LLEnvironment* environment, const LLSettingsSky::ptr_t& psky, const F32 distance)
+void LLVOSky::updateFog(const F32 distance)
 {
-	if (psky != nullptr)
+    LLEnvironment& environment = LLEnvironment::instance();
+    if (environment.getCurrentSky() != nullptr)
 	{
-		LLVector3 light_dir = LLVector3(environment->getClampedLightNorm());
-		m_legacyAtmospherics.updateFog(distance, light_dir);
-	}
-}
-
-void LLVOSky::setSunAndMoonDirectionsCFR(const LLVector3& sun_dir_cfr, const LLVector3& moon_dir_cfr)
-{
-	mSun.setDirection(sun_dir_cfr);
-	mMoon.setDirection(moon_dir_cfr);
-
-	// Push the sun "South" as it approaches directly overhead so that we can always see bump mapping
-	// on the upward facing faces of cubes.
-	{
-		// Same as dot product with the up direction + clamp.
-		F32 sunDot = llmax(0.f, sun_dir_cfr.mV[2]);
-		sunDot *= sunDot;
-
-		// Create normalized vector that has the sunDir pushed south about an hour and change.
-		LLVector3 adjustedDir = (sun_dir_cfr + LLVector3(0.f, -0.70711f, 0.70711f)) * 0.5f;
-
-		// Blend between normal sun dir and adjusted sun dir based on how close we are
-		// to having the sun overhead.
-		mBumpSunDir = adjustedDir * sunDot + sun_dir_cfr * (1.0f - sunDot);
-		mBumpSunDir.normalize();
+        LLVector3 light_dir = LLVector3(environment.getClampedLightNorm());
+        m_legacyAtmospherics.updateFog(distance, light_dir);
+		}
 	}
 
-	const LLSettingsSky::ptr_t& psky = LLEnvironment::instance().getCurrentSky();
-	updateDirections(psky);
+void LLVOSky::setSunAndMoonDirectionsCFR(const LLVector3 &sun_dir_cfr, const LLVector3 &moon_dir_cfr)
+{
+    mSun.setDirection(sun_dir_cfr);
+    mMoon.setDirection(moon_dir_cfr);
+
+    // Push the sun "South" as it approaches directly overhead so that we can always see bump mapping
+    // on the upward facing faces of cubes.
+    // Same as dot product with the up direction + clamp.
+    F32 sunDot = llmax(0.f, sun_dir_cfr.mV[2]);
+    sunDot *= sunDot;
+
+    // Create normalized vector that has the sunDir pushed south about an hour and change.
+    LLVector3 adjustedDir = (sun_dir_cfr + LLVector3(0.f, -0.70711f, 0.70711f)) * 0.5f;
+
+    // Blend between normal sun dir and adjusted sun dir based on how close we are
+    // to having the sun overhead.
+    mBumpSunDir = adjustedDir * sunDot + sun_dir_cfr * (1.0f - sunDot);
+    mBumpSunDir.normalize();
+
+    LLSettingsSky::ptr_t psky = LLEnvironment::instance().getCurrentSky();
+    updateDirections(psky);
 }
 
-void LLVOSky::setSunDirectionCFR(const LLVector3& sun_dir_cfr)
+void LLVOSky::setSunDirectionCFR(const LLVector3 &sun_dir_cfr)
 {
-	mSun.setDirection(sun_dir_cfr);
+    mSun.setDirection(sun_dir_cfr);
 
-	// Push the sun "South" as it approaches directly overhead so that we can always see bump mapping
-	// on the upward facing faces of cubes.
-	{
-		// Same as dot product with the up direction + clamp.
-		F32 sunDot = llmax(0.f, sun_dir_cfr.mV[2]);
-		sunDot *= sunDot;
+    // Push the sun "South" as it approaches directly overhead so that we can always see bump mapping
+    // on the upward facing faces of cubes.
+    // Same as dot product with the up direction + clamp.
+    F32 sunDot = llmax(0.f, sun_dir_cfr.mV[2]);
+    sunDot *= sunDot;
 
-		// Create normalized vector that has the sunDir pushed south about an hour and change.
-		LLVector3 adjustedDir = (sun_dir_cfr + LLVector3(0.f, -0.70711f, 0.70711f)) * 0.5f;
+    // Create normalized vector that has the sunDir pushed south about an hour and change.
+    LLVector3 adjustedDir = (sun_dir_cfr + LLVector3(0.f, -0.70711f, 0.70711f)) * 0.5f;
 
-		// Blend between normal sun dir and adjusted sun dir based on how close we are
-		// to having the sun overhead.
-		mBumpSunDir = adjustedDir * sunDot + sun_dir_cfr * (1.0f - sunDot);
-		mBumpSunDir.normalize();
-	}
-	const LLSettingsSky::ptr_t& psky = LLEnvironment::instance().getCurrentSky();
-	updateDirections(psky);
+    // Blend between normal sun dir and adjusted sun dir based on how close we are
+    // to having the sun overhead.
+    mBumpSunDir = adjustedDir * sunDot + sun_dir_cfr * (1.0f - sunDot);
+    mBumpSunDir.normalize();
+
+    LLSettingsSky::ptr_t psky = LLEnvironment::instance().getCurrentSky();
+    updateDirections(psky);
 }
 
-void LLVOSky::setMoonDirectionCFR(const LLVector3& moon_dir_cfr)
+void LLVOSky::setMoonDirectionCFR(const LLVector3 &moon_dir_cfr)
 {
-	mMoon.setDirection(moon_dir_cfr);
-	const LLSettingsSky::ptr_t& psky = LLEnvironment::instance().getCurrentSky();
-	updateDirections(psky);
+    mMoon.setDirection(moon_dir_cfr);
+    LLSettingsSky::ptr_t psky = LLEnvironment::instance().getCurrentSky();
+    updateDirections(psky);
 }

@@ -66,6 +66,11 @@ public:
 	}
 
 	LLMatrix4a() = default;
+    explicit LLMatrix4a(const LLMatrix4& val)
+    {
+        loadu(val);
+    }
+
 	LLMatrix4a(const LLQuad& q1,const LLQuad& q2,const LLQuad& q3,const LLQuad& q4)
 	{
 		mMatrix[0] = q1;
@@ -73,7 +78,7 @@ public:
 		mMatrix[2] = q3;
 		mMatrix[3] = q4;
 	}
-	LLMatrix4a(const LLQuaternion2& quat)
+	explicit LLMatrix4a(const LLQuaternion2& quat)
 	{
 		const LLVector4a& xyzw = quat.getVector4a(); 
 		LLVector4a nyxwz = _mm_shuffle_ps(xyzw, xyzw, _MM_SHUFFLE(2,3,0,1));
@@ -443,6 +448,8 @@ public:
 		mMatrix[3] = _mm_movehl_ps(q4,q1);
 	}
 
+    const LLVector4a& getTranslation() const { return mMatrix[3]; }
+
 //  Following procedure adapted from:
 //		http://software.intel.com/en-us/articles/optimized-matrix-library-for-use-with-the-intel-pentiumr-4-processors-sse2-instructions/
 //
@@ -794,6 +801,15 @@ public:
 static_assert(std::is_trivial<LLMatrix4a>::value, "LLMatrix4a must be a trivial type");
 static_assert(std::is_standard_layout<LLMatrix4a>::value, "LLMatrix4a must be a standard layout type");
 #endif
+
+//Faster version of matMul wehere res must not be a or b
+inline void matMulUnsafe(const LLMatrix4a &a, const LLMatrix4a &b, LLMatrix4a &res)
+{
+    res.mMatrix[0] = rowMul(a.mMatrix[0], b);
+    res.mMatrix[1] = rowMul(a.mMatrix[1], b);
+    res.mMatrix[2] = rowMul(a.mMatrix[2], b);
+    res.mMatrix[3] = rowMul(a.mMatrix[3], b);
+}
 
 inline std::ostream& operator<<(std::ostream& s, const LLMatrix4a& m)
 {

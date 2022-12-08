@@ -833,10 +833,7 @@ void LLViewerObjectList::renderObjectBeacons()
 
 	LLGLSUIDefault gls_ui;
 
-	if (LLGLSLShader::sNoFixedFunction)
-	{
-		gUIProgram.bind();
-	}
+	gUIProgram.bind();
 
 	{
 		gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
@@ -924,10 +921,7 @@ void LLViewerObjectList::renderObjectBeacons()
 void LLSky::renderSunMoonBeacons(const LLVector3& pos_agent, const LLVector3& direction, LLColor4 color)
 {
 	LLGLSUIDefault gls_ui;
-	if (LLGLSLShader::sNoFixedFunction)
-	{
-		gUIProgram.bind();
-	}
+	gUIProgram.bind();
 	gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
 
 	LLVector3 pos_end;
@@ -1060,9 +1054,8 @@ private:
 //-----------------------------------------------------------------------------
 F32 gpu_benchmark()
 {
-	if (!gGLManager.mHasShaderObjects || !gGLManager.mHasTimerQuery)
-	{ // don't bother benchmarking the fixed function
-      // or venerable drivers which don't support accurate timing anyway
+	if (!gGLManager.mHasTimerQuery)
+	{ // don't bother benchmarking venerable drivers which don't support accurate timing anyway
       // and are likely to be correctly identified by the GPU table already.
 		return -1.f;
 	}
@@ -1165,7 +1158,7 @@ F32 gpu_benchmark()
     delete [] pixels;
 
 	//make a dummy triangle to draw with
-	LLPointer<LLVertexBuffer> buff = new LLVertexBuffer(LLVertexBuffer::MAP_VERTEX | LLVertexBuffer::MAP_TEXCOORD0, GL_STREAM_DRAW);
+	LLPointer<LLVertexBuffer> buff = new LLVertexBuffer(LLVertexBuffer::MAP_VERTEX, GL_STREAM_DRAW);
 
 	if (!buff->allocateBuffer(3, 0, true))
 	{
@@ -1175,7 +1168,6 @@ F32 gpu_benchmark()
 	}
 
 	LLStrider<LLVector3> v;
-	LLStrider<LLVector2> tc;
 
 	if (! buff->getVertexStrider(v))
 	{
@@ -1196,6 +1188,16 @@ F32 gpu_benchmark()
 
 	// ensure matched pair of bind() and unbind() calls
 	ShaderBinder binder(gBenchmarkProgram);
+
+#ifdef GL_ARB_vertex_array_object
+    U32 glarray = 0;
+
+    if (LLRender::sGLCoreProfile)
+    {
+        glGenVertexArrays(1, &glarray);
+        glBindVertexArray(glarray);
+    }
+#endif
 
 	buff->setBuffer(LLVertexBuffer::MAP_VERTEX);
 	glFinish();
@@ -1228,6 +1230,15 @@ F32 gpu_benchmark()
 			results.push_back(gbps);
 		}
 	}
+
+#ifdef GL_ARB_vertex_array_object
+    if (LLRender::sGLCoreProfile)
+    {
+        glBindVertexArray(0);
+        glDeleteVertexArrays(1, &glarray);
+    }
+#endif
+
 
 	std::sort(results.begin(), results.end());
 
