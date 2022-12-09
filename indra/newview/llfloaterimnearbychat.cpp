@@ -897,11 +897,6 @@ LLWString LLFloaterIMNearbyChat::stripChannelNumber(const LLWString &mesg, S32* 
 void send_chat_from_viewer_impl(std::string utf8_out_text, EChatType type, S32 channel)
 // [/RLVa:KB]
 {
-	LL_DEBUGS("UIUsage") << "Nearby chat, text " << utf8_out_text << " type " << type << " channel " << channel << LL_ENDL;
-	if (type != CHAT_TYPE_START && type != CHAT_TYPE_STOP) // prune back some redundant logging
-	{
-		LLUIUsage::instance().logCommand("Chat.SendNearby"); // pseuo-command
-	}
 // [RLVa:KB] - Checked: 2010-02-27 (RLVa-1.2.0b) | Modified: RLVa-1.2.0a
 	// Only process chat messages (ie not CHAT_TYPE_START, CHAT_TYPE_STOP, etc)
 	if ( (RlvActions::isRlvEnabled()) && ( (CHAT_TYPE_WHISPER == type) || (CHAT_TYPE_NORMAL == type) || (CHAT_TYPE_SHOUT == type) ) )

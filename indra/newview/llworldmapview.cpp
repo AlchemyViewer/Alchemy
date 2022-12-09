@@ -375,8 +375,8 @@ void LLWorldMapView::draw()
 	mVisibleRegions.clear();
 
     // animate pan if necessary
-    mPanX = lerp(mPanX, mTargetPanX, LLSmoothInterpolation::getInterpolant(mMapIterpTime));
-    mPanY = lerp(mPanY, mTargetPanY, LLSmoothInterpolation::getInterpolant(mMapIterpTime));
+    mPanX = ll_lerp(mPanX, mTargetPanX, LLSmoothInterpolation::getInterpolant(mMapIterpTime));
+    mPanY = ll_lerp(mPanY, mTargetPanY, LLSmoothInterpolation::getInterpolant(mMapIterpTime));
     
     //RN: snaps to zoom value because interpolation caused jitter in the text rendering
     if (!sZoomTimer.getStarted() && mMapScale != mTargetMapScale)
@@ -387,7 +387,7 @@ void LLWorldMapView::draw()
     F32 interp = llmin(MAP_ZOOM_MAX_INTERP, sZoomTimer.getElapsedTimeF32() / MAP_ZOOM_ACCELERATION_TIME);
     F32 current_zoom_val = zoomFromScale(mMapScale);
     F32 target_zoom_val = zoomFromScale(mTargetMapScale);
-    F32 new_zoom_val = lerp(current_zoom_val, target_zoom_val, interp);
+    F32 new_zoom_val = ll_lerp(current_zoom_val, target_zoom_val, interp);
     if (abs(new_zoom_val - current_zoom_val) < MAP_SCALE_SNAP_THRESHOLD)
     {
         sZoomTimer.stop();
@@ -444,8 +444,8 @@ void LLWorldMapView::draw()
 
 		// Coordinates of the sim in pixels in the UI panel
 		// When the view isn't panned, 0,0 = center of rectangle
-		F32 bottom =    sPanY + half_height + relative_y;
-		F32 left =      sPanX + half_width + relative_x;
+		F32 bottom =    mPanY + half_height + relative_y;
+		F32 left =      mPanX + half_width + relative_x;
 		F32 top =		bottom+ (mMapScale * (info->getSizeY() / REGION_WIDTH_METERS));
 		F32 right =		left  + (mMapScale * (info->getSizeX() / REGION_WIDTH_METERS));
 

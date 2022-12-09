@@ -78,7 +78,6 @@
 #include "llsidepanelinventory.h"
 #include "llavatarname.h"
 #include "llagentui.h"
-#include "lluiusage.h"
 // [RLVa:KB] - Checked: 2011-04-11 (RLVa-1.3.0)
 #include "rlvactions.h"
 #include "rlvcommon.h"
@@ -1525,8 +1524,6 @@ bool LLAvatarActions::handleUnfreeze(const LLSD& notification, const LLSD& respo
 void LLAvatarActions::requestFriendship(const LLUUID& target_id, const std::string& target_name, const std::string& message)
 {
 	const LLUUID calling_card_folder_id = gInventory.findCategoryUUIDForType(LLFolderType::FT_CALLINGCARD);
-	LLUIUsage::instance().logCommand("Agent.SendFriendRequest");
-
 	send_improved_im(target_id,
 					 target_name,
 					 message,

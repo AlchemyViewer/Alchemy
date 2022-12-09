@@ -53,7 +53,6 @@
 #include "llviewerregion.h"
 #include <boost/regex.hpp>
 #include "llcorehttputil.h"
-#include "lluiusage.h"
 
 #include <boost/lexical_cast.hpp>
 
@@ -1847,9 +1846,6 @@ void LLGroupMgr::sendGroupRoleMemberChanges(const LLUUID& group_id)
 //static
 void LLGroupMgr::sendGroupMemberJoin(const LLUUID& group_id)
 {
-
-	LLUIUsage::instance().logCommand("Group.Join");
-
 	LLMessageSystem *msg = gMessageSystem;
 
 	msg->newMessageFast(_PREHASH_JoinGroupRequest);

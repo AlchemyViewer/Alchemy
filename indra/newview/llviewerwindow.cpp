@@ -5848,7 +5848,7 @@ void LLViewerWindow::restoreGL(const std::string& progress_message)
 		LL_INFOS() << "Restoring GL..." << LL_ENDL;
 		gGLManager.mIsDisabled = FALSE;
 		
-		gGL.init();
+		gGL.init(true);
 		initGLDefaults();
 		gGL.refreshState();
 		LLGLState::restoreGL();

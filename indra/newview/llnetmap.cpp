@@ -159,7 +159,6 @@ BOOL LLNetMap::postBuild()
     commitRegistrar.add("Minimap.AboutLand", boost::bind(&LLNetMap::popupShowAboutLand, this, _2));
 
 	LLMenuGL* menu = LLUICtrlFactory::getInstance()->createFromFile<LLMenuGL>("menu_mini_map.xml", gMenuHolder, LLViewerMenuHolderGL::child_registry_t::instance());
-                                                                          LLViewerMenuHolderGL::child_registry_t::instance());
     menu->setItemEnabled("Re-center map", false);
 	mPopupMenuHandle = menu->getHandle();
 
@@ -214,7 +213,8 @@ void LLNetMap::draw()
     static LLUIColor map_chat_ring_color = LLUIColorTable::instance().getColor("MapChatRingColor", LLColor4::white);
     static LLUIColor map_shout_ring_color = LLUIColorTable::instance().getColor("MapShoutRingColor", LLColor4::white);
 	//static LLUIColor map_track_disabled_color = LLUIColorTable::instance().getColor("MapTrackDisabledColor", LLColor4::white);
-	static LLUIColor map_frustum_color = LLUIColorTable::instance().getColor("MapFrustumColor", LLColor4::white);
+	static LLUIColor map_frustum_color = LLUIColorTable::instance().getColor("MapFrustumRotatingColor", LLColor4::white);
+	static LLUIColor map_frustum_rotating_color = LLUIColorTable::instance().getColor("MapFrustumColor", LLColor4::white);
 	static LLUIColor map_parcel_outline_color = LLUIColorTable::instance().getColor("MapParcelOutlineColor", LLColor4(LLColor3(LLColor4::yellow), 0.5f));
 	static LLUIColor map_line_color = LLUIColorTable::instance().getColor("MapLineColor", LLColor4::red);
     static LLUIColor map_parcel_line_color = LLUIColorTable::instance().getColor("MapParcelBoundryLine", LLColor4::white);
@@ -251,7 +251,9 @@ void LLNetMap::draw()
     }
 
     bool can_recenter_map = !(centered || mCentering || auto_centering);
-    mPopupMenu->setItemEnabled("Re-center map", can_recenter_map);
+	auto menu = (LLMenuGL*)mPopupMenuHandle.get();
+	if(menu) menu->setItemEnabled("Re-center map", can_recenter_map);
+
     updateAboutLandPopupButton();
 
 	// Prepare a scissor region
@@ -738,14 +740,15 @@ void LLNetMap::drawTracking(const LLVector3d& pos_global, const LLColor4& color,
 
 bool LLNetMap::isMouseOnPopupMenu()
 {
-    if (!mPopupMenu->isOpen())
+	auto menu = (LLMenuGL*)mPopupMenuHandle.get();
+    if (!menu || !menu->isOpen())
     {
         return false;
     }
 
     S32 popup_x;
     S32 popup_y;
-    LLUI::getInstance()->getMousePositionLocal(mPopupMenu, &popup_x, &popup_y);
+    LLUI::getInstance()->getMousePositionLocal(mPopupMenuHandle.get(), &popup_x, &popup_y);
     // *NOTE: Tolerance is larger than it needs to be because the context menu is offset from the mouse when the menu is opened from certain
     // directions. This may be a quirk of LLMenuGL::showPopup. -Cosmic,2022-03-22
     constexpr S32 tolerance = 10;
@@ -756,7 +759,7 @@ bool LLNetMap::isMouseOnPopupMenu()
     {
         for (S32 sign_y = -1; sign_y <= 1; sign_y += 2)
         {
-            if (mPopupMenu->pointInView(popup_x + (sign_x * tolerance), popup_y + (sign_y * tolerance)))
+            if (menu->pointInView(popup_x + (sign_x * tolerance), popup_y + (sign_y * tolerance)))
             {
                 return true;
             }
@@ -767,7 +770,8 @@ bool LLNetMap::isMouseOnPopupMenu()
 
 void LLNetMap::updateAboutLandPopupButton()
 {
-    if (!mPopupMenu->isOpen())
+	auto menu = (LLMenuGL*)mPopupMenuHandle.get();
+    if (!menu || !menu->isOpen())
     {
         return;
     }
@@ -775,7 +779,7 @@ void LLNetMap::updateAboutLandPopupButton()
     LLViewerRegion *region = LLWorld::getInstance()->getRegionFromPosGlobal(mPopupWorldPos);
     if (!region)
     {
-        mPopupMenu->setItemEnabled("About Land", false);
+        menu->setItemEnabled("About Land", false);
     }
     else
     {
@@ -790,7 +794,7 @@ void LLNetMap::updateAboutLandPopupButton()
             {
                 valid_parcel = hover_parcel->getOwnerID().notNull();
             }
-            mPopupMenu->setItemEnabled("About Land", valid_parcel);
+            menu->setItemEnabled("About Land", valid_parcel);
         }
     }
 }

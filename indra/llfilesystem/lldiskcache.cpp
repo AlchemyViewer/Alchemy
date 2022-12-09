@@ -151,6 +151,11 @@ void LLDiskCache::purge()
     LL_INFOS() << "Purging cache to a maximum of " << mMaxSizeBytes << " bytes" << LL_ENDL;
 
     // Extra accounting to track the retention of static assets
+    std::vector<bool> file_removed;
+    if (mEnableCacheDebugInfo)
+    {
+        file_removed.reserve(file_info.size());
+    }
     int keep{0};
     int del{0};
     int skip{0};
