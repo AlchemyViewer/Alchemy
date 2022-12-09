@@ -223,7 +223,7 @@ void LLNetMap::draw()
 	static LLCachedControl<bool> enable_object_render(gSavedSettings, "AlchemyMinimapRenderObjects", true);
 	static LLCachedControl<bool> render_guide_line(gSavedSettings, "AlchemyMinimapGuideLine", false);
     static LLCachedControl<bool> map_chat_ring(gSavedSettings, "AlchemyMinimapChatRings", false);
-    static LLCachedControl<bool> minimap_parcel_boundries(gSavedSettings, "AlchemyMinimapParcelBoundries", false);
+    static LLCachedControl<bool> minimap_parcel_boundries(gSavedSettings, "MiniMapShowPropertyLines", false);
 	
 	if (mObjectImagep.isNull())
 	{
@@ -1277,6 +1277,8 @@ void LLNetMap::createParcelImage()
 
 BOOL LLNetMap::handleMouseDown(S32 x, S32 y, MASK mask)
 {
+	if (!(mask & MASK_SHIFT)) return FALSE;
+
     // Start panning
     gFocusMgr.setMouseCapture(this);
 
@@ -1427,17 +1429,18 @@ BOOL LLNetMap::handleHover( S32 x, S32 y, MASK mask )
 			gViewerWindow->moveCursorToCenter();
 		}
 	}
-
-    if (mask & MASK_SHIFT)
-    {
-        // If shift is held, change the cursor to hint that the map can be
-        // dragged. However, holding shift is not required to drag the map.
-        gViewerWindow->setCursor( UI_CURSOR_TOOLPAN );
-    }
-    else
-    {
-        gViewerWindow->setCursor( UI_CURSOR_CROSS );
-    }
+	else
+	{
+		if (mask & MASK_SHIFT)
+		{
+			// If shift is held, change the cursor to hint that the map can be dragged
+			gViewerWindow->setCursor( UI_CURSOR_TOOLPAN );
+		}
+		else
+		{
+			gViewerWindow->setCursor( UI_CURSOR_CROSS );
+		}
+	}
 
 	return TRUE;
 }

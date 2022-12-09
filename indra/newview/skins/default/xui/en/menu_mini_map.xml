@@ -71,16 +71,6 @@
     </menu_item_check>
 	<menu_item_separator />
     <menu_item_check
-     label="Show parcel boundaries"
-     name="Show parcel boundaries">
-        <menu_item_check.on_check
-         control="MiniMapShowPropertyLines" />
-        <menu_item_check.on_click
-         function="ToggleControl"
-         parameter="MiniMapShowPropertyLines" />
-    </menu_item_check>
-    <menu_item_separator />
-    <menu_item_check
      label="Auto-center map"
      name="Auto-center map">
         <menu_item_check.on_check
@@ -131,13 +121,13 @@
     label="Parcel Boundries"
     name="Parcel Boundries">
     <menu_item_check.on_check
-      control="AlchemyMinimapParcelBoundries" />
+      control="MiniMapShowPropertyLines" />
     <menu_item_check.on_click
       function="ToggleControl"
-      parameter="AlchemyMinimapParcelBoundries" />
+      parameter="MiniMapShowPropertyLines" />
   </menu_item_check>
     <menu_item_check
-    enabled_control="AlchemyMinimapParcelBoundries"
+    enabled_control="MiniMapShowPropertyLines"
     label="Parcels For Sale"
     name="Parcels For Sale">
     <menu_item_check.on_check
@@ -147,7 +137,7 @@
       parameter="AlchemyMiniMapForSaleParcels" />
   </menu_item_check>
     <menu_item_check
-    enabled_control="AlchemyMinimapParcelBoundries"
+    enabled_control="MiniMapShowPropertyLines"
     label="Parcel Access"
     name="Parcel Access">
     <menu_item_check.on_check
