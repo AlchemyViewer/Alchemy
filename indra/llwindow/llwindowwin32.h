@@ -302,7 +302,7 @@ private:
 	LLThreadSafeQueue<std::function<void()>> mMouseQueue;
 	void post(const std::function<void()>& func);
 	void postMouseButtonEvent(const std::function<void()>& func);
-	void recreateWindow(RECT window_rect, DWORD dw_ex_style, DWORD dw_style);
+	void recreateWindow(RECT window_rect, DWORD dw_ex_style, DWORD dw_style, bool no_destroy = false);
 	void kickWindowThread(HWND windowHandle=0);
 
 	friend class LLWindowManager;
