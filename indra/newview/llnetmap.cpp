@@ -967,7 +967,7 @@ BOOL LLNetMap::handleToolTip(S32 x, S32 y, MASK mask)
         tool_tip_hint_msg = mToolTipHintMsg;
     }
 
-    LLStringUtil::format_map_t args;
+ //   LLStringUtil::format_map_t args;
     args["[PARCEL_NAME_MSG]"]       = parcel_name_msg.empty() ? "" : parcel_name_msg + '\n';
     args["[PARCEL_SALE_PRICE_MSG]"] = parcel_sale_price_msg.empty() ? "" : parcel_sale_price_msg + '\n';
     args["[PARCEL_SALE_AREA_MSG]"]  = parcel_sale_area_msg.empty() ? "" : parcel_sale_area_msg + '\n';
