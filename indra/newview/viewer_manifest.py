@@ -1153,10 +1153,6 @@ class LinuxManifest(ViewerManifest):
             self.path("resources.pak")
             self.path("icudtl.dat")
 
-        with self.prefix(src=os.path.join(pkgdir, 'lib', 'release', 'swiftshader'), dst=os.path.join('bin', 'llplugin', 'swiftshader') ):
-            self.path("libEGL.so")
-            self.path("libGLESv2.so")
-
         with self.prefix(src=os.path.join(pkgdir, 'resources', 'locales'), dst=os.path.join('bin', 'llplugin', 'locales')):
             self.path("*.pak")
 
