@@ -69,6 +69,8 @@ RenderShadowDetail			1	2
 RenderUseStreamVBO			1	1
 RenderFSAASamples			1	16
 RenderMaxTextureIndex		1	16
+RenderGLContextCoreProfile         1   1
+RenderGLMultiThreaded       1   1
 
 //
 // Low Graphics Settings (fixed function)
