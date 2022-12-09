@@ -28,6 +28,6 @@
 #define LL_LLSYS_OBJC_H
 
 bool LLGetDarwinOSInfo(int &major, int &minor, int &patch);
-
+const char* LLGetDarwinPreferredLanguage();
 
 #endif // LL_LLSYS_OBJC_H

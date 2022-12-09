@@ -35,31 +35,15 @@ static int intAtStringIndex(NSArray *array, int index)
 bool LLGetDarwinOSInfo(int &major, int &minor, int &patch)
 {
     NSOperatingSystemVersion osVersion = [[NSProcessInfo processInfo] operatingSystemVersion];
-    major = osVersion.majorVersion;
-    minor = osVersion.minorVersion;
-    patch = osVersion.patchVersion;
-    return true;
+    major = (int)osVersion.majorVersion;
+    minor = (int)osVersion.minorVersion;
+    patch = (int)osVersion.patchVersion;
+	return true;
 }
 
 const char* LLGetDarwinPreferredLanguage()
 {
 	NSString* lang = [[NSLocale preferredLanguages] objectAtIndex:0];
 	const char* ret = [lang cStringUsingEncoding:NSASCIIStringEncoding];
-                                    @"/System/Library/CoreServices/SystemVersion.plist"] objectForKey:@"ProductVersion"];
-        NSArray* versions = [versionString componentsSeparatedByString:@"."];
-        NSUInteger count = [versions count];
-        if (count > 0)
-        {
-            major = intAtStringIndex(versions, 0);
-            if (count > 1)
-            {
-                minor = intAtStringIndex(versions, 1);
-                if (count > 2)
-                {
-                    patch = intAtStringIndex(versions, 2);
-                }
-            }
-        }
-    }
 	return ret;
 }
