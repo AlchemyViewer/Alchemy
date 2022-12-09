@@ -55,4 +55,23 @@
 
 #endif // LL_MESA
 
+#if defined(TRACY_ENABLE) && LL_PROFILER_ENABLE_TRACY_OPENGL
+    // Tracy uses the following:
+    //    glGenQueries
+    //    glGetQueryiv
+    //    glGetQueryObjectiv
+    #define glGenQueries        glGenQueriesARB
+    #define glGetQueryiv        glGetQueryivARB
+    #define glGetQueryObjectiv  glGetQueryObjectivARB
+    #include <tracy/TracyOpenGL.hpp>
+
+    #define LL_PROFILER_GPU_ZONEC(name,color) TracyGpuZoneC(name,color);
+    #define LL_PROFILER_GPU_COLLECT           TracyGpuCollect
+    #define LL_PROFILER_GPU_CONTEXT           TracyGpuContext
+#else
+    #define LL_PROFILER_GPU_ZONEC(name,color) (void)name;(void)color;
+    #define LL_PROFILER_GPU_COLLECT
+    #define LL_PROFILER_GPU_CONTEXT
+#endif
+
 #endif // LL_LLGLHEADERS_H

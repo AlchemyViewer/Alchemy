@@ -330,7 +330,7 @@ void LLToolDragAndDrop::beginDrag(EDragAndDropType type,
 	mObjectID = object_id;
 
 	setMouseCapture( TRUE );
-	LLToolMgr::getInstanceFast()->setTransientTool( this );
+	LLToolMgr::getInstance()->setTransientTool( this );
 	mCursor = UI_CURSOR_NO;
 	if ((mCargoTypes[0] == DAD_CATEGORY)
 	   && ((mSource == SOURCE_AGENT) || (mSource == SOURCE_LIBRARY)))
@@ -400,7 +400,7 @@ void LLToolDragAndDrop::beginMultiDrag(
 	mSourceID = source_id;
 
 	setMouseCapture( TRUE );
-	LLToolMgr::getInstanceFast()->setTransientTool( this );
+	LLToolMgr::getInstance()->setTransientTool( this );
 	mCursor = UI_CURSOR_NO;
 	if ((mSource == SOURCE_AGENT) || (mSource == SOURCE_LIBRARY))
 	{
@@ -447,14 +447,14 @@ void LLToolDragAndDrop::beginMultiDrag(
 void LLToolDragAndDrop::endDrag()
 {
 	mEndDragSignal();
-	LLSelectMgr::getInstanceFast()->unhighlightAll();
+	LLSelectMgr::getInstance()->unhighlightAll();
 	setMouseCapture(FALSE);
 }
 
 void LLToolDragAndDrop::onMouseCaptureLost()
 {
 	// Called whenever the drag ends or if mouse capture is simply lost
-	LLToolMgr::getInstanceFast()->clearTransientTool();
+	LLToolMgr::getInstance()->clearTransientTool();
 	mCargoTypes.clear();
 	mCargoIDs.clear();
 	mSource = SOURCE_AGENT;
@@ -807,9 +807,9 @@ void LLToolDragAndDrop::dragOrDrop3D( S32 x, S32 y, MASK mask, BOOL drop, EAccep
 
 void LLToolDragAndDrop::pickCallback(const LLPickInfo& pick_info)
 {
-	if (getInstanceFast() != NULL)
+	if (getInstance() != NULL)
 	{
-		getInstanceFast()->pick(pick_info);
+		getInstance()->pick(pick_info);
 	}
 }
 
@@ -819,7 +819,7 @@ void LLToolDragAndDrop::pick(const LLPickInfo& pick_info)
 	S32	hit_face = -1;
 
 	LLViewerObject* hit_obj = pick_info.getObject();
-	LLSelectMgr::getInstanceFast()->unhighlightAll();
+	LLSelectMgr::getInstance()->unhighlightAll();
 	bool highlight_object = false;
 	// Treat attachments as part of the avatar they are attached to.
 	if (hit_obj != NULL)
@@ -915,7 +915,7 @@ void LLToolDragAndDrop::pick(const LLPickInfo& pick_info)
 		{
 			if (mCargoTypes[i] != DAD_OBJECT || (pick_info.mKeyMask & MASK_CONTROL))
 			{
-				LLSelectMgr::getInstanceFast()->highlightObjectAndFamily(hit_obj);
+				LLSelectMgr::getInstance()->highlightObjectAndFamily(hit_obj);
 				break;
 			}
 		}
@@ -1107,7 +1107,8 @@ void LLToolDragAndDrop::dropTextureOneFace(LLViewerObject* hit_obj,
 										   S32 hit_face,
 										   LLInventoryItem* item,
 										   LLToolDragAndDrop::ESource source,
-										   const LLUUID& src_id)
+										   const LLUUID& src_id,
+                                           S32 tex_channel)
 {
 	if (hit_face == -1) return;
 	if (!item)
@@ -1131,7 +1132,8 @@ void LLToolDragAndDrop::dropTextureOneFace(LLViewerObject* hit_obj,
 
 	if (gFloaterTools->getVisible() && panel_face)
 	{
-		switch (LLSelectMgr::getInstanceFast()->getTextureChannel())
+        tex_channel = (tex_channel > -1) ? tex_channel : LLSelectMgr::getInstance()->getTextureChannel();
+        switch (tex_channel)
 		{
 
 		case 0:
@@ -1240,7 +1242,7 @@ void LLToolDragAndDrop::dropObject(LLViewerObject* raycast_target,
 				   BOOL from_task_inventory,
 				   BOOL remove_from_inventory)
 {
-	LLViewerRegion* regionp = LLWorld::getInstanceFast()->getRegionFromPosGlobal(mLastHitPos);
+	LLViewerRegion* regionp = LLWorld::getInstance()->getRegionFromPosGlobal(mLastHitPos);
 	if (!regionp)
 	{
 		LL_WARNS() << "Couldn't find region to rez object" << LL_ENDL;
@@ -1303,7 +1305,7 @@ void LLToolDragAndDrop::dropObject(LLViewerObject* raycast_target,
 	LLUUID source_id = from_task_inventory ? mSourceID : LLUUID::null;
 
 	// Select the object only if we're editing.
-	BOOL rez_selected = LLToolMgr::getInstanceFast()->inEdit();
+	BOOL rez_selected = LLToolMgr::getInstance()->inEdit();
 
 
 	LLVector3 ray_start = regionp->getPosRegionFromGlobal(mLastCameraPos);
@@ -1382,7 +1384,7 @@ void LLToolDragAndDrop::dropObject(LLViewerObject* raycast_target,
 	// selected object.
 	if (rez_selected)
 	{
-		LLSelectMgr::getInstanceFast()->deselectAll();
+		LLSelectMgr::getInstance()->deselectAll();
 		gViewerWindow->getWindow()->incBusyCount();
 	}
 

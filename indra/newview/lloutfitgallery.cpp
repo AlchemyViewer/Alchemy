@@ -908,7 +908,7 @@ void LLOutfitGalleryContextMenu::onOutfitsRemovalConfirmation(const LLSD& notifi
 
 void LLOutfitGalleryContextMenu::onCreate(const LLSD& data)
 {
-    LLWearableType::EType type = LLWearableType::getInstanceFast()->typeNameToType(data.asString());
+    LLWearableType::EType type = LLWearableType::getInstance()->typeNameToType(data.asString());
     if (type == LLWearableType::WT_NONE)
     {
         LL_WARNS() << "Invalid wearable type" << LL_ENDL;
@@ -1390,6 +1390,7 @@ void LLOutfitGallery::onSelectPhoto(LLUUID selected_outfit_id)
                 texture_floaterp->setOnFloaterCommitCallback(boost::bind(&LLOutfitGallery::onTexturePickerCommit, this, _1, _2));
                 texture_floaterp->setOnUpdateImageStatsCallback(boost::bind(&LLOutfitGallery::onTexturePickerUpdateImageStats, this, _1));
                 texture_floaterp->setLocalTextureEnabled(FALSE);
+                texture_floaterp->setBakeTextureEnabled(FALSE);
                 texture_floaterp->setCanApply(false, true);
             }
 

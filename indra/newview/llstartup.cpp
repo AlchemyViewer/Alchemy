@@ -37,6 +37,7 @@
 #else
 #	include <sys/stat.h>		// mkdir()
 #endif
+#include <memory>                   // std::unique_ptr
 
 #include "llviewermedia_streamingaudio.h"
 #include "llaudioengine.h"
@@ -127,7 +128,6 @@
 #include "llpanellogin.h"
 #include "llmutelist.h"
 #include "llavatarpropertiesprocessor.h"
-#include "llpanelpick.h"
 #include "llpanelgrouplandmoney.h"
 #include "llpanelgroupnotices.h"
 #include "llparcel.h"
@@ -185,7 +185,6 @@
 #include "pipeline.h"
 #include "llappviewer.h"
 #include "llfasttimerview.h"
-#include "lltelemetry.h"
 #include "llfloaterdirectory.h"
 #include "llfloatermap.h"
 #include "llweb.h"
@@ -200,6 +199,7 @@
 #include "llavatariconctrl.h"
 #include "llvoicechannel.h"
 #include "llpathfindingmanager.h"
+#include "llremoteparcelrequest.h"
 // [RLVa:KB] - Checked: RLVa-1.2.0
 #include "rlvhandler.h"
 // [/RLVa:KB]
@@ -214,6 +214,9 @@
 #include "llenvironment.h"
 
 #include "llstacktrace.h"
+
+#include "threadpool.h"
+
 
 #if LL_WINDOWS
 #include "lldxhardware.h"
@@ -264,6 +267,7 @@ static bool mLoginStatePastUI = false;
 static bool mBenefitsSuccessfullyInit = false;
 
 const F32 STATE_AGENT_WAIT_TIMEOUT = 240; //seconds
+const S32 MAX_SEED_CAP_ATTEMPTS_BEFORE_LOGIN = 3; // Give region 3 chances
 
 std::unique_ptr<LLEventPump> LLStartUp::sStateWatcher(new LLEventStream("StartupState"));
 std::unique_ptr<LLStartupListener> LLStartUp::sListener(new LLStartupListener());
@@ -324,6 +328,12 @@ void update_texture_fetch()
 	LLAppViewer::getImageDecodeThread()->update(1); // unpauses the image thread
 	LLAppViewer::getTextureFetch()->update(1); // unpauses the texture fetch thread
 	gTextureList.updateImages(0.10f);
+
+    if (LLImageGLThread::sEnabled)
+    {
+        std::shared_ptr<LL::WorkQueue> main_queue = LL::WorkQueue::getInstance("mainloop");
+        main_queue->runFor(std::chrono::milliseconds(1));
+    }
 }
 
 void set_flags_and_update_appearance()
@@ -557,8 +567,6 @@ bool idle_startup()
 			}
 
 			#if LL_WINDOWS
-                LLPROFILE_STARTUP();
-
 				// On the windows dev builds, unpackaged, the message.xml file will 
 				// be located in indra/build-vc**/newview/<config>/app_settings.
 				std::string message_path = gDirUtilp->getExpandedFilename(LL_PATH_APP_SETTINGS,"message.xml");
@@ -685,7 +693,7 @@ bool idle_startup()
 #else
 				void* window_handle = NULL;
 #endif
-				bool init = gAudiop->init(kAUDIO_NUM_SOURCES, window_handle, LLAppViewer::instance()->getSecondLifeTitle());
+				bool init = gAudiop->init(window_handle, LLAppViewer::instance()->getSecondLifeTitle());
 				if(init)
 				{
 					gAudiop->setMuted(TRUE);
@@ -972,6 +980,12 @@ bool idle_startup()
 			LLPersistentNotificationStorage::initParamSingleton();
 			LLDoNotDisturbNotificationStorage::initParamSingleton();
 		}
+        else
+        {
+            // reinitialize paths in case user switched grids or accounts
+            LLPersistentNotificationStorage::getInstance()->reset();
+            LLDoNotDisturbNotificationStorage::getInstance()->reset();
+        }
 
 		// Set PerAccountSettingsFile to the default value.
 		std::string settings_per_account = gDirUtilp->getExpandedFilename(LL_PATH_PER_SL_ACCOUNT, LLAppViewer::instance()->getSettingsFilename("Default", "PerAccount"));
@@ -1122,6 +1136,7 @@ bool idle_startup()
 	{
 		// Generic failure message
 		std::ostringstream emsg;
+		emsg << LLTrans::getString("LoginFailedHeader") << "\n";
 		if(LLLoginInstance::getInstance()->authFailure())
 		{
 			LL_INFOS("LLStartup") << "Login failed, LLLoginInstance::getResponse(): "
@@ -1134,11 +1149,37 @@ bool idle_startup()
 			std::string message_id = response["message_id"];
 			std::string message; // actual string to show the user
 
-			if(!message_id.empty() && LLTrans::findString(message, message_id, response["message_args"]))
-			{
-				// message will be filled in with the template and arguments
-			}
-			else if(!message_response.empty())
+            bool localized_by_id = false;
+            if(!message_id.empty())
+            {
+                LLSD message_args = response["message_args"];
+                if (message_args.has("TIME")
+                    && (message_id == "LoginFailedAcountSuspended"
+                        || message_id == "LoginFailedAccountMaintenance"))
+                {
+                    LLDate date;
+                    std::string time_string;
+                    if (date.fromString(message_args["TIME"].asString()))
+                    {
+                        LLSD args;
+                        args["datetime"] = (S32)date.secondsSinceEpoch();
+                        LLTrans::findString(time_string, "LocalTime", args);
+                    }
+                    else
+                    {
+                        time_string = message_args["TIME"].asString() + " " + LLTrans::getString("PacificTime");
+                    }
+
+                    message_args["TIME"] = time_string;
+                }
+                // message will be filled in with the template and arguments
+                if (LLTrans::findString(message, message_id, message_args))
+                {
+                    localized_by_id = true;
+                }
+            }
+
+            if(!localized_by_id && !message_response.empty())
 			{
 				// *HACK: "no_inventory_host" sent as the message itself.
 				// Remove this clause when server is sending message_id as well.
@@ -1421,10 +1462,21 @@ bool idle_startup()
 		{
 			LLStartUp::setStartupState( STATE_SEED_CAP_GRANTED );
 		}
+        else if (regionp->capabilitiesError())
+        {
+            // Try to connect despite capabilities' error state
+            LLStartUp::setStartupState(STATE_SEED_CAP_GRANTED);
+        }
 		else
 		{
 			U32 num_retries = regionp->getNumSeedCapRetries();
-			if (num_retries > 0)
+            if (num_retries > MAX_SEED_CAP_ATTEMPTS_BEFORE_LOGIN)
+            {
+                // Region will keep trying to get capabilities,
+                // but for now continue as if caps were granted
+                LLStartUp::setStartupState(STATE_SEED_CAP_GRANTED);
+            }
+			else if (num_retries > 0)
 			{
 				LLStringUtil::format_map_t args;
 				args["[NUMBER]"] = llformat("%d", num_retries + 1);
@@ -1555,6 +1607,9 @@ bool idle_startup()
 		gAgentCamera.resetCamera();
 		display_startup();
 
+		// start up the ThreadPool we'll use for textures et al.
+        LLAppViewer::instance()->initGeneralThread();
+
 		// Initialize global class data needed for surfaces (i.e. textures)
 		LL_DEBUGS("AppInit") << "Initializing sky..." << LL_ENDL;
 		// Initialize all of the viewer object classes for the first time (doing things like texture fetches.
@@ -1569,7 +1624,11 @@ bool idle_startup()
 		display_startup();
 
 		LL_DEBUGS("AppInit") << "Decoding images..." << LL_ENDL;
-		// For all images pre-loaded into viewer cache, decode them.
+		// For all images pre-loaded into viewer cache, init
+        // priorities and fetching using decodeAllImages.
+        // Most of the fetching and decoding likely to be done
+        // by update_texture_fetch() later, while viewer waits.
+        //
 		// Need to do this AFTER we init the sky
 		const S32 DECODE_TIME_SEC = 2;
 		for (int i = 0; i < DECODE_TIME_SEC; i++)
@@ -2431,6 +2490,11 @@ void login_callback(S32 option, void *userdata)
 void show_release_notes_if_required()
 {
     static bool release_notes_shown = false;
+    // We happen to know that instantiating LLVersionInfo implicitly
+    // instantiates the LLEventMailDrop named "relnotes", which we (might) use
+    // below. If viewer release notes stop working, might be because that
+    // LLEventMailDrop got moved out of LLVersionInfo and hasn't yet been
+    // instantiated.
     if (!release_notes_shown && (LLVersionInfo::instance().getChannelAndVersion() != gLastRunVersion)
         && LLVersionInfo::instance().getViewerMaturity() != LLVersionInfo::TEST_VIEWER // don't show Release Notes for the test builds
         && gSavedSettings.getBOOL("UpdaterShowReleaseNotes")
@@ -2952,7 +3016,7 @@ void reset_login()
 	gAgentWearables.cleanup();
 	gAgentCamera.cleanup();
 	gAgent.cleanup();
-	LLWorld::getInstance()->destroyClass();
+	LLWorld::getInstance()->resetClass();
 
 	if ( gViewerWindow )
 	{	// Hide menus and normal buttons
@@ -3420,12 +3484,6 @@ bool init_benefits(LLSD& response)
 		succ = false;
 	}
 
-	// FIXME PREMIUM - for testing if login does not yet provide Premium Plus. Should be removed thereafter.
-	//if (succ && !LLAgentBenefitsMgr::has("Premium Plus"))
-	//{
-	//	LLAgentBenefitsMgr::init("Premium Plus", packages_sd["Premium"]["benefits"]);
-	//	llassert(LLAgentBenefitsMgr::has("Premium Plus"));
-	//}
 	return succ;
 }
 

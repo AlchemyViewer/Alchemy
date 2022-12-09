@@ -228,7 +228,7 @@ bool LLViewerFolderDictionary::initEnsemblesFromFile()
 
 const std::string &LLViewerFolderType::lookupXUIName(LLFolderType::EType folder_type)
 {
-	const ViewerFolderEntry *entry = LLViewerFolderDictionary::getInstanceFast()->lookup(folder_type);
+	const ViewerFolderEntry *entry = LLViewerFolderDictionary::getInstance()->lookup(folder_type);
 	if (entry)
 	{
 		return entry->mName;
@@ -238,12 +238,12 @@ const std::string &LLViewerFolderType::lookupXUIName(LLFolderType::EType folder_
 
 LLFolderType::EType LLViewerFolderType::lookupTypeFromXUIName(const std::string &name)
 {
-	return LLViewerFolderDictionary::getInstanceFast()->lookup(name);
+	return LLViewerFolderDictionary::getInstance()->lookup(name);
 }
 
 const std::string &LLViewerFolderType::lookupIconName(LLFolderType::EType folder_type, BOOL is_open)
 {
-	const ViewerFolderEntry *entry = LLViewerFolderDictionary::getInstanceFast()->lookup(folder_type);
+	const ViewerFolderEntry *entry = LLViewerFolderDictionary::getInstance()->lookup(folder_type);
 	if (entry)
 	{
 		if (is_open)
@@ -253,7 +253,7 @@ const std::string &LLViewerFolderType::lookupIconName(LLFolderType::EType folder
 	}
 	
 	// Error condition.  Return something so that we don't show a grey box in inventory view.
-	const ViewerFolderEntry *default_entry = LLViewerFolderDictionary::getInstanceFast()->lookup(LLFolderType::FT_NONE);
+	const ViewerFolderEntry *default_entry = LLViewerFolderDictionary::getInstance()->lookup(LLFolderType::FT_NONE);
 	if (default_entry)
 	{
 		return default_entry->mIconNameClosed;
@@ -265,7 +265,7 @@ const std::string &LLViewerFolderType::lookupIconName(LLFolderType::EType folder
 
 BOOL LLViewerFolderType::lookupIsQuietType(LLFolderType::EType folder_type)
 {
-	const ViewerFolderEntry *entry = LLViewerFolderDictionary::getInstanceFast()->lookup(folder_type);
+	const ViewerFolderEntry *entry = LLViewerFolderDictionary::getInstance()->lookup(folder_type);
 	if (entry)
 	{
 		return entry->mIsQuiet;
@@ -275,7 +275,7 @@ BOOL LLViewerFolderType::lookupIsQuietType(LLFolderType::EType folder_type)
 
 bool LLViewerFolderType::lookupIsHiddenIfEmpty(LLFolderType::EType folder_type)
 {
-	const ViewerFolderEntry *entry = LLViewerFolderDictionary::getInstanceFast()->lookup(folder_type);
+	const ViewerFolderEntry *entry = LLViewerFolderDictionary::getInstance()->lookup(folder_type);
 	if (entry)
 	{
 		return entry->mHideIfEmpty;
@@ -285,7 +285,7 @@ bool LLViewerFolderType::lookupIsHiddenIfEmpty(LLFolderType::EType folder_type)
 
 const std::string &LLViewerFolderType::lookupNewCategoryName(LLFolderType::EType folder_type)
 {
-	const ViewerFolderEntry *entry = LLViewerFolderDictionary::getInstanceFast()->lookup(folder_type);
+	const ViewerFolderEntry *entry = LLViewerFolderDictionary::getInstance()->lookup(folder_type);
 	if (entry)
 	{
 		return entry->mNewCategoryName;
@@ -295,7 +295,7 @@ const std::string &LLViewerFolderType::lookupNewCategoryName(LLFolderType::EType
 
 LLFolderType::EType LLViewerFolderType::lookupTypeFromNewCategoryName(const std::string& name)
 {
-	for (const auto& pair : LLViewerFolderDictionary::instanceFast())
+	for (const auto& pair : LLViewerFolderDictionary::instance())
 	{
 		const ViewerFolderEntry *entry = pair.second;
 		if (entry->mNewCategoryName == name)
@@ -310,7 +310,7 @@ LLFolderType::EType LLViewerFolderType::lookupTypeFromNewCategoryName(const std:
 U64 LLViewerFolderType::lookupValidFolderTypes(const std::string& item_name)
 {
 	U64 matching_folders = 0;
-	for (const auto& pair : LLViewerFolderDictionary::instanceFast())
+	for (const auto& pair : LLViewerFolderDictionary::instance())
 	{
 		const ViewerFolderEntry *entry = pair.second;
 		if (entry->getIsAllowedName(item_name))

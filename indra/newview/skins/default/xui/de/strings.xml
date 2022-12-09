@@ -186,7 +186,7 @@ Voice-Server-Version: [VOICE_VERSION]
 	<string name="LoginFailedNoNetwork">
 		Netzwerkfehler: Verbindung konnte nicht hergestellt werden. Bitte überprüfen Sie Ihre Netzwerkverbindung.
 	</string>
-	<string name="LoginFailed">
+	<string name="LoginFailedHeader">
 		Anmeldung fehlgeschlagen
 	</string>
 	<string name="Quit">
@@ -690,9 +690,6 @@ nächsten Eigentümer angehängt werden.
 	</string>
 	<string name="GroupNameNone">
 		(keiner)
-	</string>
-	<string name="AvalineCaller">
-		Avaline-Anfrufer [ORDER]
 	</string>
 	<string name="AssetErrorNone">
 		Kein Fehler
@@ -5134,7 +5131,7 @@ Bitte überprüfen Sie http://status.secondlifegrid.net, um herauszufinden, ob e
 	<string name="PremiumMembership">
 		Premium
 	</string>
-	<string name="Premium PlusMembership">
+	<string name="Premium_PlusMembership">
 		Premium Plus
 	</string>
 	<string name="DeleteItems">

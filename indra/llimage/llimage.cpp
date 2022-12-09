@@ -586,7 +586,7 @@ static void bilinear_scale(const U8 *src, U32 srcW, U32 srcH, U32 srcCh, U32 src
 
 //static
 std::string LLImage::sLastErrorMessage;
-LLMutex LLImage::sMutex(LLMutex::E_CONST_INIT);
+LLMutex* LLImage::sMutex = NULL;
 bool LLImage::sUseNewByteRange = false;
 S32  LLImage::sMinimalReverseByteRangePercent = 75;
 
@@ -595,11 +595,14 @@ void LLImage::initClass(bool use_new_byte_range, S32 minimal_reverse_byte_range_
 {
 	sUseNewByteRange = use_new_byte_range;
     sMinimalReverseByteRangePercent = minimal_reverse_byte_range_percent;
+	sMutex = new LLMutex();
 }
 
 //static
 void LLImage::cleanupClass()
 {
+	delete sMutex;
+	sMutex = NULL;
 }
 
 //static
@@ -612,7 +615,7 @@ const std::string& LLImage::getLastError()
 //static
 void LLImage::setLastError(const std::string& message)
 {
-	LLMutexLock m(&sMutex);
+	LLMutexLock m(sMutex);
 	sLastErrorMessage = message;
 }
 
@@ -621,8 +624,7 @@ void LLImage::setLastError(const std::string& message)
 //---------------------------------------------------------------------------
 
 LLImageBase::LLImageBase()
-:	LLTrace::MemTrackable<LLImageBase>("LLImage"),
-	mData(NULL),
+:	mData(NULL),
 	mDataSize(0),
 	mWidth(0),
 	mHeight(0),
@@ -671,7 +673,6 @@ void LLImageBase::sanityCheck()
 void LLImageBase::deleteData()
 {
 	ll_aligned_free_16(mData);
-	disclaimMem(mDataSize);
 	mDataSize = 0;
 	mData = NULL;
 }
@@ -729,7 +730,6 @@ U8* LLImageBase::allocateData(S32 size)
 		}
 	}
 	mDataSize = size;
-	claimMem(mDataSize);
 
 	return mData;
 }
@@ -750,9 +750,7 @@ U8* LLImageBase::reallocateData(S32 size)
 		ll_aligned_free_16(mData) ;
 	}
 	mData = new_datap;
-	disclaimMem(mDataSize);
 	mDataSize = size;
-	claimMem(mDataSize);
 	mBadBufferAllocation = false;
 	return mData;
 }
@@ -863,6 +861,12 @@ U8* LLImageRaw::reallocateData(S32 size)
 	return res;
 }
 
+void LLImageRaw::releaseData()
+{
+    LLImageBase::setSize(0, 0, 0);
+    LLImageBase::setDataAndSize(nullptr, 0);
+}
+
 // virtual
 void LLImageRaw::deleteData()
 {
@@ -881,8 +885,6 @@ void LLImageRaw::setDataAndSize(U8 *data, S32 width, S32 height, S8 components)
 
 	LLImageBase::setSize(width, height, components) ;
 	LLImageBase::setDataAndSize(data, width * height * components) ;
-	
-	sGlobalRawMemory += getDataSize();
 }
 
 bool LLImageRaw::resize(U16 width, U16 height, S8 components)
@@ -2253,9 +2255,7 @@ void LLImageBase::setDataAndSize(U8 *data, S32 size)
 { 
 	ll_assert_aligned(data, 16);
 	mData = data; 
-	disclaimMem(mDataSize); 
 	mDataSize = size; 
-	claimMem(mDataSize);
 }	
 
 //static

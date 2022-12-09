@@ -51,6 +51,7 @@
 #include "llsdserialize.h"
 #include "llvector4a.h"
 #include "llmatrix4a.h"
+#include "llmeshoptimizer.h"
 #include "lltimer.h"
 
 #define DEBUG_SILHOUETTE_BINORMALS 0
@@ -90,7 +91,7 @@ const F32 SKEW_MAX	=  0.95f;
 const F32 SCULPT_MIN_AREA = 0.002f;
 const S32 SCULPT_MIN_AREA_DETAIL = 1;
 
-BOOL gDebugGL = FALSE;
+BOOL gDebugGL = FALSE; // See settings.xml "RenderDebugGL"
 
 BOOL check_same_clock_dir( const LLVector3& pt1, const LLVector3& pt2, const LLVector3& pt3, const LLVector3& norm)
 {    
@@ -372,7 +373,7 @@ BOOL LLTriangleRayIntersect(const LLVector3& vert0, const LLVector3& vert1, cons
 	}
 }
 
-class LLVolumeOctreeRebound : public LLOctreeTravelerDepthFirst<LLVolumeTriangle>
+class LLVolumeOctreeRebound : public LLOctreeTravelerDepthFirst<LLVolumeTriangle, LLVolumeTriangle*>
 {
 public:
 	const LLVolumeFace* mFace;
@@ -382,9 +383,10 @@ public:
 		mFace = face;
 	}
 
-	virtual void visit(const LLOctreeNode<LLVolumeTriangle>* branch)
+    virtual void visit(const LLOctreeNode<LLVolumeTriangle, LLVolumeTriangle*>* branch)
 	{ //this is a depth first traversal, so it's safe to assum all children have complete
 		//bounding data
+	LL_PROFILE_ZONE_SCOPED_CATEGORY_VOLUME
 
 		LLVolumeOctreeListener* node = (LLVolumeOctreeListener*) branch->getListener(0);
 
@@ -399,8 +401,7 @@ public:
 			min = *(tri->mV[0]);
 			max = *(tri->mV[0]);
 			
-			for (LLOctreeNode<LLVolumeTriangle>::const_element_iter iter = 
-				branch->getDataBegin(), iter_end = branch->getDataEnd(); iter != iter_end; ++iter)
+            for (LLOctreeNode<LLVolumeTriangle, LLVolumeTriangle*>::const_element_iter iter = branch->getDataBegin(); iter != branch->getDataEnd(); ++iter)
 			{ //for each triangle in node
 
 				//stretch by triangles in node
@@ -415,7 +416,7 @@ public:
 				max.setMax(max, *tri->mV[2]);
 			}
 		}
-		else if (!branch->isLeaf())
+		else if (branch->getChildCount() > 0)
 		{ //no data, but child nodes exist
 			LLVolumeOctreeListener* child = (LLVolumeOctreeListener*) branch->getChild(0)->getListener(0);
 
@@ -425,7 +426,7 @@ public:
 		}
 		else
 		{
-			LL_ERRS() << "Empty leaf" << LL_ENDL;
+            llassert(!branch->isLeaf()); // Empty leaf
 		}
 
 		for (S32 i = 0; i < branch->getChildCount(); ++i)
@@ -682,7 +683,7 @@ LLProfile::Face* LLProfile::addHole(const LLProfileParams& params, BOOL flat, F3
 
 	Face *face = addFace(mTotalOut, mTotal-mTotalOut,0,LL_FACE_INNER_SIDE, flat);
 
-	static LLAlignedArray<LLVector4a,64> pt;
+	static thread_local LLAlignedArray<LLVector4a,64> pt;
 	pt.resize(mTotal) ;
 
 	for (S32 i=mTotalOut;i<mTotal;i++)
@@ -822,6 +823,8 @@ S32 LLProfile::getNumPoints(const LLProfileParams& params, BOOL path_open,F32 de
 BOOL LLProfile::generate(const LLProfileParams& params, BOOL path_open,F32 detail, S32 split,
 						 BOOL is_sculpted, S32 sculpt_size)
 {
+	LL_PROFILE_ZONE_SCOPED_CATEGORY_VOLUME
+
 	if ((!mDirty) && (!is_sculpted))
 	{
 		return FALSE;
@@ -1298,6 +1301,8 @@ S32 LLPath::getNumNGonPoints(const LLPathParams& params, S32 sides, F32 startOff
 
 void LLPath::genNGon(const LLPathParams& params, S32 sides, F32 startOff, F32 end_scale, F32 twist_scale)
 {
+	LL_PROFILE_ZONE_SCOPED_CATEGORY_VOLUME
+
 	// Generates a circular path, starting at (1, 0, 0), counterclockwise along the xz plane.
 	static const F32 tableScale[] = { 1, 1, 1, 0.5f, 0.707107f, 0.53f, 0.525f, 0.5f };
 
@@ -1533,6 +1538,8 @@ S32 LLPath::getNumPoints(const LLPathParams& params, F32 detail)
 BOOL LLPath::generate(const LLPathParams& params, F32 detail, S32 split,
 					  BOOL is_sculpted, S32 sculpt_size)
 {
+	LL_PROFILE_ZONE_SCOPED_CATEGORY_VOLUME
+
 	if ((!mDirty) && (!is_sculpted))
 	{
 		return FALSE;
@@ -2100,6 +2107,8 @@ LLVolume::~LLVolume()
 
 BOOL LLVolume::generate()
 {
+	LL_PROFILE_ZONE_SCOPED_CATEGORY_VOLUME
+
 	LL_CHECK_MEMORY
 	llassert_always(mProfilep);
 	
@@ -2361,6 +2370,8 @@ bool LLVolumeFace::VertexData::compareNormal(const LLVolumeFace::VertexData& rhs
 
 bool LLVolume::unpackVolumeFaces(std::istream& is, S32 size)
 {
+	LL_PROFILE_ZONE_SCOPED_CATEGORY_VOLUME
+
 	//input stream is now pointing at a zlib compressed block of LLSD
 	//decompress block
 	LLSD mdl;
@@ -2424,6 +2435,13 @@ bool LLVolume::unpackVolumeFacesInternal(const LLSD& mdl)
 
 			//copy out indices
             S32 num_indices = idx.size() / 2;
+            const S32 indices_to_discard = num_indices % 3;
+            if (indices_to_discard > 0)
+            {
+                // Invalid number of triangle indices
+                LL_WARNS() << "Incomplete triangle discarded from face! Indices count " << num_indices << " was not divisible by 3. face index: " << i << " Total: " << face_count << LL_ENDL;
+                num_indices -= indices_to_discard;
+            }
             face.resizeIndices(num_indices);
 
             if (num_indices > 2 && !face.mIndices)
@@ -2439,8 +2457,7 @@ bool LLVolume::unpackVolumeFacesInternal(const LLSD& mdl)
 			}
 
 			U16* indices = (U16*) &(idx[0]);
-			U32 count = idx.size()/2;
-			for (U32 j = 0; j < count; ++j)
+            for (U32 j = 0; j < num_indices; ++j)
 			{
 				face.mIndices[j] = indices[j];
 			}
@@ -2785,6 +2802,8 @@ S32	LLVolume::getNumFaces() const
 
 void LLVolume::createVolumeFaces()
 {
+	LL_PROFILE_ZONE_SCOPED_CATEGORY_VOLUME
+
 	if (mGenerateSingleFace)
 	{
 		// do nothing
@@ -3772,6 +3791,8 @@ void LLVolume::generateSilhouetteVertices(std::vector<LLVector3> &vertices,
 										  const LLMatrix4a& norm_mat,
 										  S32 face_mask)
 {
+	LL_PROFILE_ZONE_SCOPED_CATEGORY_VOLUME
+
 	LLVector4a obj_cam_vec;
 	obj_cam_vec.load3(obj_cam_vec_in.mV);
 
@@ -3844,8 +3865,8 @@ void LLVolume::generateSilhouetteVertices(std::vector<LLVector3> &vertices,
 #if DEBUG_SILHOUETTE_EDGE_MAP
 
 			//for each triangle
-			U32 count = face.mNumIndices;
-			for (U32 j = 0; j < count/3; j++) {
+            U32 tri_count = face.mNumIndices / 3;
+            for (U32 j = 0; j < tri_count; j++) {
 				//get vertices
 				S32 v1 = face.mIndices[j*3+0];
 				S32 v2 = face.mIndices[j*3+1];
@@ -3863,7 +3884,7 @@ void LLVolume::generateSilhouetteVertices(std::vector<LLVector3> &vertices,
 						continue;
 					}
 
-					if (nIndex >= (S32) count/3) {
+                    if (nIndex >= (S32)tri_count) {
 						continue;
 					}
 					//get neighbor vertices
@@ -4155,13 +4176,13 @@ S32 LLVolume::lineSegmentIntersect(const LLVector4a& start, const LLVector4a& en
 			}
 			else
 			{
-				if (!face.mOctree)
+                if (!face.getOctree())
 				{
 					face.createOctree();
 				}
 			
 				LLOctreeTriangleRayIntersect intersect(start, dir, &face, &closest_t, intersection, tex_coord, normal, tangent_out);
-				intersect.traverse(face.mOctree);
+                intersect.traverse(face.getOctree());
 				if (intersect.mHitFace)
 				{
 					hit_face = i;
@@ -4710,6 +4731,7 @@ LLVolumeFace::LLVolumeFace() :
 	mWeights(NULL),
     mWeightsScrubbed(FALSE),
 	mOctree(NULL),
+    mOctreeTriangles(NULL),
 	mOptimized(FALSE)
 {
 	mExtents = (LLVector4a*) ll_aligned_malloc_16(sizeof(LLVector4a)*3);
@@ -4736,8 +4758,9 @@ LLVolumeFace::LLVolumeFace(const LLVolumeFace& src)
 	mWeights(NULL),
     mWeightsScrubbed(FALSE),
 	mOctree(NULL),
+    mOctreeTriangles(NULL),
 	mOptimized(FALSE)
-{ 
+{
 	mExtents = (LLVector4a*) ll_aligned_malloc_16(sizeof(LLVector4a)*3);
 	mCenter = mExtents+2;
 	*this = src;
@@ -4833,15 +4856,15 @@ void LLVolumeFace::freeData()
 	allocateWeights(0);
 	allocateIndices(0);
 
-	delete mOctree;
-	mOctree = NULL;
+    destroyOctree();
 }
 
 BOOL LLVolumeFace::create(LLVolume* volume, BOOL partial_build)
 {
+	LL_PROFILE_ZONE_SCOPED_CATEGORY_VOLUME
+
 	//tree for this face is no longer valid
-	delete mOctree;
-	mOctree = NULL;
+    destroyOctree();
 
 	LL_CHECK_MEMORY
 	BOOL ret = FALSE ;
@@ -4905,6 +4928,50 @@ bool LLVolumeFace::VertexMapData::ComparePosition::operator()(const LLVector3& a
 	}
 	
 	return a.mV[2] < b.mV[2];
+}
+
+void LLVolumeFace::remap()
+{
+    // Generate a remap buffer
+    std::vector<unsigned int> remap(mNumVertices);
+    S32 remap_vertices_count = LLMeshOptimizer::generateRemapMultiU16(&remap[0],
+        mIndices,
+        mNumIndices,
+        mPositions,
+        mNormals,
+        mTexCoords,
+        mNumVertices);
+
+    // Allocate new buffers
+    S32 size = ((mNumIndices * sizeof(U16)) + 0xF) & ~0xF;
+    U16* remap_indices = (U16*)ll_aligned_malloc_16(size);
+
+    S32 tc_bytes_size = ((remap_vertices_count * sizeof(LLVector2)) + 0xF) & ~0xF;
+    LLVector4a* remap_positions = (LLVector4a*)ll_aligned_malloc<64>(sizeof(LLVector4a) * 2 * remap_vertices_count + tc_bytes_size);
+    LLVector4a* remap_normals = remap_positions + remap_vertices_count;
+    LLVector2* remap_tex_coords = (LLVector2*)(remap_normals + remap_vertices_count);
+
+    // Fill the buffers
+    LLMeshOptimizer::remapIndexBufferU16(remap_indices, mIndices, mNumIndices, &remap[0]);
+    LLMeshOptimizer::remapPositionsBuffer(remap_positions, mPositions, mNumVertices, &remap[0]);
+    LLMeshOptimizer::remapNormalsBuffer(remap_normals, mNormals, mNumVertices, &remap[0]);
+    LLMeshOptimizer::remapUVBuffer(remap_tex_coords, mTexCoords, mNumVertices, &remap[0]);
+
+    // Free unused buffers
+    ll_aligned_free_16(mIndices);
+    ll_aligned_free<64>(mPositions);
+
+    // Tangets are now invalid
+    ll_aligned_free_16(mTangents);
+    mTangents = NULL;
+
+    // Assign new values
+    mIndices = remap_indices;
+    mPositions = remap_positions;
+    mNormals = remap_normals;
+    mTexCoords = remap_tex_coords;
+    mNumVertices = remap_vertices_count;
+    mNumAllocatedVertices = remap_vertices_count;
 }
 
 void LLVolumeFace::optimize(F32 angle_cutoff)
@@ -5400,21 +5467,29 @@ bool LLVolumeFace::cacheOptimize()
 
 void LLVolumeFace::createOctree(F32 scaler, const LLVector4a& center, const LLVector4a& size)
 {
-	if (mOctree)
+	LL_PROFILE_ZONE_SCOPED_CATEGORY_VOLUME
+
+    if (getOctree())
 	{
 		return;
 	}
 
-	mOctree = new LLOctreeRoot<LLVolumeTriangle>(center, size, NULL);
-	new LLVolumeOctreeListener(mOctree);
+    llassert(mNumIndices % 3 == 0);
 
-	for (U32 i = 0; i < mNumIndices; i+= 3)
+    mOctree = new LLOctreeRoot<LLVolumeTriangle, LLVolumeTriangle*>(center, size, NULL);
+	new LLVolumeOctreeListener(mOctree);
+    const U32 num_triangles = mNumIndices / 3;
+    // Initialize all the triangles we need
+    mOctreeTriangles = new LLVolumeTriangle[num_triangles];
+
+    for (U32 triangle_index = 0; triangle_index < num_triangles; ++triangle_index)
 	{ //for each triangle
-		LLPointer<LLVolumeTriangle> tri = new LLVolumeTriangle();
+        const U32 index = triangle_index * 3;
+        LLVolumeTriangle* tri = &mOctreeTriangles[triangle_index];
 				
-		const LLVector4a& v0 = mPositions[mIndices[i]];
-		const LLVector4a& v1 = mPositions[mIndices[i+1]];
-		const LLVector4a& v2 = mPositions[mIndices[i+2]];
+		const LLVector4a& v0 = mPositions[mIndices[index]];
+		const LLVector4a& v1 = mPositions[mIndices[index + 1]];
+		const LLVector4a& v2 = mPositions[mIndices[index + 2]];
 
 		//store pointers to vertex data
 		tri->mV[0] = &v0;
@@ -5422,9 +5497,9 @@ void LLVolumeFace::createOctree(F32 scaler, const LLVector4a& center, const LLVe
 		tri->mV[2] = &v2;
 
 		//store indices
-		tri->mIndex[0] = mIndices[i];
-		tri->mIndex[1] = mIndices[i+1];
-		tri->mIndex[2] = mIndices[i+2];
+		tri->mIndex[0] = mIndices[index];
+		tri->mIndex[1] = mIndices[index + 1];
+		tri->mIndex[2] = mIndices[index + 2];
 
 		//get minimum point
 		LLVector4a min = v0;
@@ -5465,6 +5540,19 @@ void LLVolumeFace::createOctree(F32 scaler, const LLVector4a& center, const LLVe
 		LLVolumeOctreeValidate validate;
 		validate.traverse(mOctree);
 	}
+}
+
+void LLVolumeFace::destroyOctree()
+{
+    delete mOctree;
+    mOctree = NULL;
+    delete[] mOctreeTriangles;
+    mOctreeTriangles = NULL;
+}
+
+const LLOctreeNode<LLVolumeTriangle, LLVolumeTriangle*>* LLVolumeFace::getOctree() const
+{
+    return mOctree;
 }
 
 
@@ -6183,6 +6271,8 @@ void CalculateTangentArray(U32 vertexCount, const LLVector4a *vertex, const LLVe
 
 void LLVolumeFace::createTangents()
 {
+	LL_PROFILE_ZONE_SCOPED_CATEGORY_VOLUME
+
 	if (!mTangents)
 	{
 		allocateTangents(mNumVertices);
@@ -6344,6 +6434,7 @@ bool LLVolumeFace::allocateVertices(S32 num_verts, bool copy)
 
 bool LLVolumeFace::allocateIndices(S32 num_indices, bool copy)
 {
+	llassert(num_indices % 3 == 0);
 	if (num_indices == mNumIndices)
 	{
 		return true;
@@ -6420,6 +6511,8 @@ void LLVolumeFace::fillFromLegacyData(std::vector<LLVolumeFace::VertexData>& v, 
 
 BOOL LLVolumeFace::createSide(LLVolume* volume, BOOL partial_build)
 {
+	LL_PROFILE_ZONE_SCOPED_CATEGORY_VOLUME
+
 	LL_CHECK_MEMORY
 	BOOL flat = mTypeMask & FLAT_MASK;
 
@@ -6495,13 +6588,19 @@ BOOL LLVolumeFace::createSide(LLVolume* volume, BOOL partial_build)
 			else
 			{
 				// Get s value for tex-coord.
-				if (!flat)
+                S32 index = mBeginS + s;
+                if (index >= profile.size())
+                {
+                    // edge?
+                    ss = flat ? 1.f - begin_stex : 1.f;
+                }
+				else if (!flat)
 				{
-					ss = profile[mBeginS + s][2];
+					ss = profile[index][2];
 				}
 				else
 				{
-					ss = profile[mBeginS + s][2] - begin_stex;
+					ss = profile[index][2] - begin_stex;
 				}
 			}
 
@@ -6687,7 +6786,7 @@ BOOL LLVolumeFace::createSide(LLVolume* volume, BOOL partial_build)
 
 	LLVector4a* norm = mNormals;
 
-	static LLAlignedArray<LLVector4a, 64> triangle_normals;
+    static thread_local LLAlignedArray<LLVector4a, 64> triangle_normals;
     try
     {
         triangle_normals.resize(count);
@@ -6928,6 +7027,8 @@ BOOL LLVolumeFace::createSide(LLVolume* volume, BOOL partial_build)
 void CalculateTangentArray(U32 vertexCount, const LLVector4a *vertex, const LLVector4a *normal,
         const LLVector2 *texcoord, U32 triangleCount, const U16* index_array, LLVector4a *tangent)
 {
+	LL_PROFILE_ZONE_SCOPED_CATEGORY_VOLUME
+
     //LLVector4a *tan1 = new LLVector4a[vertexCount * 2];
 	LLVector4a* tan1 = (LLVector4a*) ll_aligned_malloc_16(vertexCount*2*sizeof(LLVector4a));
 	// new(tan1) LLVector4a;

@@ -156,7 +156,7 @@ void LLHUDText::renderText()
 	}
 	else
 	{
-		LLViewerCamera::getInstanceFast()->getPixelVectors(mPositionAgent, y_pixel_vec, x_pixel_vec);
+		LLViewerCamera::getInstance()->getPixelVectors(mPositionAgent, y_pixel_vec, x_pixel_vec);
 	}
 
 	LLVector3 width_vec = mWidth * x_pixel_vec;
@@ -174,9 +174,6 @@ void LLHUDText::renderText()
 	F32 y_offset = (F32)mOffsetY;
 		
 	// Render label
-	{
-		gGL.getTexUnit(0)->setTextureBlendType(LLTexUnit::TB_MULT);
-	}
 
 	// Render text
 	{
@@ -349,7 +346,7 @@ void LLHUDText::updateVisibility()
 #if 0
 	if (!mSourceObject)
 	{
-		LL_WARNS() << "HUD text: mSourceObject is NULL,  mOnHUDAttachment: " << mOnHUDAttachment << LL_ENDL;
+        // Beacons
 		mVisible = TRUE;
 		if (mOnHUDAttachment)
 		{
@@ -380,7 +377,7 @@ void LLHUDText::updateVisibility()
 	}
 
 	// push text towards camera by radius of object, but not past camera
-	auto& viewerCamera = LLViewerCamera::instanceFast();
+	auto& viewerCamera = LLViewerCamera::instance();
 	LLVector3 vec_from_camera = mPositionAgent - viewerCamera.getOrigin();
 	LLVector3 dir_from_camera = vec_from_camera;
 	dir_from_camera.normVec();
@@ -464,7 +461,7 @@ LLVector2 LLHUDText::updateScreenPos(const LLVector2 &offset)
 	LLVector2 screen_pos_vec;
 //	LLVector3 x_pixel_vec;
 //	LLVector3 y_pixel_vec;
-//	LLViewerCamera::getInstanceFast()->getPixelVectors(mPositionAgent, y_pixel_vec, x_pixel_vec);
+//	LLViewerCamera::getInstance()->getPixelVectors(mPositionAgent, y_pixel_vec, x_pixel_vec);
 //	LLVector3 world_pos = mPositionAgent + (offset.mV[VX] * x_pixel_vec) + (offset.mV[VY] * y_pixel_vec);
 //	if (!LLViewerCamera::getInstance()->projectPosAgentToScreen(world_pos, screen_pos, FALSE) && mVisibleOffScreen)
 //	{
@@ -592,7 +589,6 @@ void LLHUDText::renderAllHUD()
 {
 	LLGLState::checkStates();
 	LLGLState::checkTextureChannels();
-	LLGLState::checkClientArrays();
 
 	{
 		LLGLEnable color_mat(GL_COLOR_MATERIAL);
@@ -610,7 +606,6 @@ void LLHUDText::renderAllHUD()
 
 	LLGLState::checkStates();
 	LLGLState::checkTextureChannels();
-	LLGLState::checkClientArrays();
 }
 
 void LLHUDText::shiftAll(const LLVector3& offset)

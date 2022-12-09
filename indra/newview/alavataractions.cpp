@@ -190,7 +190,7 @@ bool ALAvatarActions::canTeleportTo(const LLUUID& avatar_id)
 		return false;
 
 	LLWorld::pos_map_t positions;
-	LLWorld::getInstanceFast()->getAvatars(&positions);
+	LLWorld::getInstance()->getAvatars(&positions);
 	auto iter = positions.find(avatar_id);
 	if (iter != positions.cend())
 	{
@@ -211,7 +211,7 @@ void ALAvatarActions::teleportTo(const LLUUID& avatar_id)
 		return;
 
 	LLWorld::pos_map_t positions;
-	LLWorld::getInstanceFast()->getAvatars(&positions);
+	LLWorld::getInstance()->getAvatars(&positions);
 	auto iter = positions.find(avatar_id);
 	if (iter != positions.cend())
 	{
@@ -256,7 +256,7 @@ bool ALAvatarActions::canFreezeEject(const uuid_vec_t& ids)
 		return true;
 
 	LLWorld::region_gpos_map_t idRegions;
-	LLWorld::getInstanceFast()->getAvatars(&idRegions);
+	LLWorld::getInstance()->getAvatars(&idRegions);
 
 	auto ret = false;
 
@@ -273,12 +273,12 @@ bool ALAvatarActions::canFreezeEject(const uuid_vec_t& ids)
 			{
 				// Estate owners / managers can freeze
 				// Parcel owners can also freeze
-				LLParcelSelectionHandle selection = LLViewerParcelMgr::getInstanceFast()->selectParcelAt(pos_global);
+				LLParcelSelectionHandle selection = LLViewerParcelMgr::getInstance()->selectParcelAt(pos_global);
 				const LLParcel* parcel = selection->getParcel();
 				auto local_pos = region->getPosRegionFromGlobal(pos_global);
 
 				if ((region->getOwner() == gAgent.getID() || region->isEstateManager() || region->isOwnedSelf(local_pos))
-					|| (region->isOwnedGroup(local_pos) && parcel && LLViewerParcelMgr::getInstanceFast()->isParcelOwnedByAgent(parcel, GP_LAND_ADMIN)))
+					|| (region->isOwnedGroup(local_pos) && parcel && LLViewerParcelMgr::getInstance()->isParcelOwnedByAgent(parcel, GP_LAND_ADMIN)))
 				{
 					ret = true;
 				}
@@ -351,7 +351,7 @@ void ALAvatarActions::parcelEject(const uuid_vec_t& ids)
 		return;
 
 	LLWorld::pos_map_t avatar_positions;
-	LLWorld::getInstanceFast()->getAvatars(&avatar_positions);
+	LLWorld::getInstance()->getAvatars(&avatar_positions);
 
 	LLSD payload;
 	payload["avatar_ids"] = LLSD::emptyArray();
@@ -370,10 +370,10 @@ void ALAvatarActions::parcelEject(const uuid_vec_t& ids)
 				if (pos_it != avatar_positions.cend())
 				{
 					const auto& pos = pos_it->second;
-					LLParcel* parcel = LLViewerParcelMgr::getInstanceFast()->selectParcelAt(pos)->getParcel();
+					LLParcel* parcel = LLViewerParcelMgr::getInstance()->selectParcelAt(pos)->getParcel();
 					if (parcel)
 					{
-						ban_enabled = LLViewerParcelMgr::getInstanceFast()->isParcelOwnedByAgent(parcel, GP_LAND_MANAGE_BANNED);
+						ban_enabled = LLViewerParcelMgr::getInstance()->isParcelOwnedByAgent(parcel, GP_LAND_MANAGE_BANNED);
 						if (!ban_enabled)
 						{
 							ban_killed = true;
@@ -429,7 +429,7 @@ bool ALAvatarActions::canManageAvatarsEstate(const uuid_vec_t& ids)
 		return true;
 
 	LLWorld::region_gpos_map_t idRegions;
-	LLWorld::getInstanceFast()->getAvatars(&idRegions);
+	LLWorld::getInstance()->getAvatars(&idRegions);
 
 	auto ret = false;
 
@@ -699,7 +699,7 @@ bool ALAvatarActions::handleEstateTeleportHome(const LLSD& notification, const L
 	if (option == 0)
 	{
 		LLWorld::region_gpos_map_t idRegions;
-		LLWorld::getInstanceFast()->getAvatars(&idRegions);
+		LLWorld::getInstance()->getAvatars(&idRegions);
 		const auto& avatar_ids = notification["payload"]["avatar_ids"];
 		for (LLSD::array_const_iterator it = avatar_ids.beginArray(), it_end = avatar_ids.endArray(); it != it_end; ++it)
 		{
@@ -741,7 +741,7 @@ bool ALAvatarActions::handleEstateKick(const LLSD& notification, const LLSD& res
 	if (option == 0)
 	{
 		LLWorld::region_gpos_map_t idRegions;
-		LLWorld::getInstanceFast()->getAvatars(&idRegions);
+		LLWorld::getInstance()->getAvatars(&idRegions);
 		const auto& avatar_ids = notification["payload"]["avatar_ids"];
 		for (LLSD::array_const_iterator it = avatar_ids.beginArray(), it_end = avatar_ids.endArray(); it != it_end; ++it)
 		{

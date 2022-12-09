@@ -521,7 +521,7 @@ void LLGLTexMemBar::draw()
 	F32Bytes total_texture_downloaded = gTotalTextureData;
 	F32Bytes total_object_downloaded = gTotalObjectData;
 	U32 total_http_requests = LLAppViewer::getTextureFetch()->getTotalNumHTTPRequests();
-	U32 total_active_cached_objects = LLWorld::getInstanceFast()->getNumOfActiveCachedObjects();
+	U32 total_active_cached_objects = LLWorld::getInstance()->getNumOfActiveCachedObjects();
 	U32 total_objects = gObjectList.getNumObjects();
 	F32 x_right = 0.0;
 
@@ -558,9 +558,11 @@ void LLGLTexMemBar::draw()
     U32 texFetchLatMed = U32(recording.getMean(LLTextureFetch::sTexFetchLatency).value() * 1000.0f);
     U32 texFetchLatMax = U32(recording.getMax(LLTextureFetch::sTexFetchLatency).value() * 1000.0f);
 
-	text = llformat("GL Tot: %d/%d MB Bound: %4d/%4d MB FBO: %d MB Raw Tot: %d MB Bias: %.2f Cache: %.1f/%.1f MB",
+	text = llformat("GL Tot: %d/%d MB GL Free: %d Sys Free: %d MB Bound: %4d/%4d MB FBO: %d MB Raw Tot: %d MB Bias: %.2f Cache: %.1f/%.1f MB",
 					total_mem.value(),
 					max_total_mem.value(),
+                    LLImageGLThread::getFreeVRAMMegabytes(),
+                    LLMemory::getAvailableMemKB()/1024,
 					bound_mem.value(),
 					max_bound_mem.value(),
 					LLRenderTarget::sBytesAllocated/(1024*1024),
@@ -875,7 +877,7 @@ void LLTextureView::draw()
 
 			if (!mOrderFetch)
 			{
-				if (pri < HIGH_PRIORITY && LLSelectMgr::getInstanceFast())
+				if (pri < HIGH_PRIORITY && LLSelectMgr::getInstance())
 				{
 					struct f : public LLSelectedTEFunctor
 					{
@@ -887,7 +889,7 @@ void LLTextureView::draw()
 						}
 					} func(imagep);
 					const bool firstonly = true;
-					bool match = LLSelectMgr::getInstanceFast()->getSelection()->applyToTEs(&func, firstonly);
+					bool match = LLSelectMgr::getInstance()->getSelection()->applyToTEs(&func, firstonly);
 					if (match)
 					{
 						pri += 3*HIGH_PRIORITY;
@@ -896,7 +898,7 @@ void LLTextureView::draw()
 
 				if (pri < HIGH_PRIORITY && (cur_discard< 0 || desired_discard < cur_discard))
 				{
-					LLSelectNode* hover_node = LLSelectMgr::instanceFast().getHoverNode();
+					LLSelectNode* hover_node = LLSelectMgr::instance().getHoverNode();
 					if (hover_node)
 					{
 						LLViewerObject *objectp = hover_node->getObject();

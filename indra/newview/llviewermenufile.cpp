@@ -119,7 +119,7 @@ class LLMeshUploadVisible : public view_listener_t
 	}
 };
 
-LLMutex LLFilePickerThread::sMutex(LLMutex::E_CONST_INIT);
+LLMutex* LLFilePickerThread::sMutex = NULL;
 std::queue<LLFilePickerThread*> LLFilePickerThread::sDeadQ;
 
 void LLFilePickerThread::getFile()
@@ -165,7 +165,7 @@ void LLFilePickerThread::run()
 	}
 
 	{
-		LLMutexLock lock(&sMutex);
+		LLMutexLock lock(sMutex);
 		sDeadQ.push(this);
 	}
 
@@ -174,12 +174,16 @@ void LLFilePickerThread::run()
 //static
 void LLFilePickerThread::initClass()
 {
+	sMutex = new LLMutex();
 }
 
 //static
 void LLFilePickerThread::cleanupClass()
 {
 	clearDead();
+	
+	delete sMutex;
+	sMutex = NULL;
 }
 
 //static
@@ -187,7 +191,7 @@ void LLFilePickerThread::clearDead()
 {
 	if (!sDeadQ.empty())
 	{
-		LLMutexLock lock(&sMutex);
+		LLMutexLock lock(sMutex);
 		while (!sDeadQ.empty())
 		{
 			LLFilePickerThread* thread = sDeadQ.front();
@@ -253,13 +257,13 @@ void LLFilePickerReplyThread::notify(const std::vector<std::string>& filenames)
 
 LLMediaFilePicker::LLMediaFilePicker(LLPluginClassMedia* plugin, LLFilePicker::ELoadFilter filter, bool get_multiple)
     : LLFilePickerThread(filter, get_multiple),
-    mPlugin(plugin->getSharedPrt())
+    mPlugin(plugin->getSharedPtr())
 {
 }
 
 LLMediaFilePicker::LLMediaFilePicker(LLPluginClassMedia* plugin, LLFilePicker::ESaveFilter filter, const std::string &proposed_name)
     : LLFilePickerThread(filter, proposed_name),
-    mPlugin(plugin->getSharedPrt())
+    mPlugin(plugin->getSharedPtr())
 {
 }
 

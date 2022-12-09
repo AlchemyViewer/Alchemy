@@ -40,7 +40,7 @@
 bool LLPluginProcessParent::sUseReadThread = false;
 apr_pollset_t *LLPluginProcessParent::sPollSet = NULL;
 bool LLPluginProcessParent::sPollsetNeedsRebuild = false;
-LLMutex LLPluginProcessParent::sInstancesMutex(LLMutex::E_CONST_INIT);
+LLMutex *LLPluginProcessParent::sInstancesMutex = nullptr;
 LLPluginProcessParent::mapInstances_t LLPluginProcessParent::sInstances;
 LLThread *LLPluginProcessParent::sReadThread = NULL;
 
@@ -99,6 +99,11 @@ LLPluginProcessParent::LLPluginProcessParent(LLPluginProcessParentOwner *owner):
     mIncomingQueueMutex(),
     pProcessCreationThread(NULL)
 {
+	if(!sInstancesMutex)
+	{
+		sInstancesMutex = new LLMutex();
+	}
+	
 	mOwner = owner;
 	mBoundPort = 0;
 	mState = STATE_UNINITIALIZED;
@@ -163,7 +168,7 @@ LLPluginProcessParent::ptr_t LLPluginProcessParent::create(LLPluginProcessParent
 
     // Don't add to the global list until fully constructed.
     {
-        LLMutexLock lock(&sInstancesMutex);
+        LLMutexLock lock(sInstancesMutex);
         sInstances.emplace(that.get(), that);
     }
 
@@ -173,7 +178,7 @@ LLPluginProcessParent::ptr_t LLPluginProcessParent::create(LLPluginProcessParent
 /*static*/
 void LLPluginProcessParent::shutdown()
 {
-    LLMutexLock lock(&sInstancesMutex);
+    LLMutexLock lock(sInstancesMutex);
 
     mapInstances_t::iterator it;
     for (it = sInstances.begin(); it != sInstances.end(); ++it)
@@ -231,7 +236,7 @@ bool LLPluginProcessParent::pollTick()
         {
             // this grabs a copy of the smart pointer to ourselves to ensure that we do not
             // get destroyed until after this method returns.
-            LLMutexLock lock(&sInstancesMutex);
+            LLMutexLock lock(sInstancesMutex);
             mapInstances_t::iterator it = sInstances.find(this);
             if (it != sInstances.end())
                 that = (*it).second;
@@ -250,7 +255,7 @@ void LLPluginProcessParent::removeFromProcessing()
     // Remove from the global list before beginning destruction.
     {
         // Make sure to get the global mutex _first_ here, to avoid a possible deadlock against LLPluginProcessParent::poll()
-        LLMutexLock lock(&sInstancesMutex);
+        LLMutexLock lock(sInstancesMutex);
         {
             LLMutexLock lock2(&mIncomingQueueMutex);
             sInstances.erase(this);
@@ -854,7 +859,7 @@ void LLPluginProcessParent::dirtyPollSet()
 
 void LLPluginProcessParent::updatePollset()
 {
-	LLMutexLock lock(&sInstancesMutex);
+	LLMutexLock lock(sInstancesMutex);
 	if (sInstances.empty())
 	{
 		// No instances have been created yet.  There's no work to do.
@@ -958,7 +963,7 @@ void LLPluginProcessParent::setUseReadThread(bool use_read_thread)
 bool LLPluginProcessParent::poll(F64 timeout)
 {
 	{	
-		LLMutexLock mtxLock(&sInstancesMutex);
+		LLMutexLock mtxLock(sInstancesMutex);
 		if (sInstances.empty())
 		{
 			return false;
@@ -990,7 +995,7 @@ bool LLPluginProcessParent::poll(F64 timeout)
                 mapInstances_t::iterator it;
 
                 {
-                    LLMutexLock lock(&sInstancesMutex);
+                    LLMutexLock lock(sInstancesMutex);
                     it = sInstances.find(thatId);
                     if (it != sInstances.end())
                         that = (*it).second;
@@ -1023,12 +1028,12 @@ bool LLPluginProcessParent::poll(F64 timeout)
 
     // Remove instances in the done state from the sInstances map.
 	{
-		LLMutexLock inst_lock(&sInstancesMutex);
+		LLMutexLock inst_lock(sInstancesMutex);
 		mapInstances_t::iterator itClean = sInstances.begin();
 		while (itClean != sInstances.end())
 		{
 			if (itClean->second->isDone())
-				sInstances.erase(itClean++);
+            	itClean = sInstances.erase(itClean);
 			else
 				++itClean;
 		}

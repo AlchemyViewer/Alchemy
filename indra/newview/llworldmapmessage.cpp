@@ -150,6 +150,10 @@ void LLWorldMapMessage::sendMapBlockRequest(U16 min_x, U16 min_y, U16 max_x, U16
 // public static
 void LLWorldMapMessage::processMapBlockReply(LLMessageSystem* msg, void**)
 {
+	if (gNonInteractive)
+	{
+		return;
+	}
 	U32 agent_flags;
 	msg->getU32Fast(_PREHASH_AgentData, _PREHASH_Flags, agent_flags);
 
@@ -165,8 +169,8 @@ void LLWorldMapMessage::processMapBlockReply(LLMessageSystem* msg, void**)
 
 	bool found_null_sim = false;
 
-	auto& world_map = LLWorldMap::instanceFast();
-	auto& world_map_message = LLWorldMapMessage::instanceFast();
+	auto& world_map = LLWorldMap::instance();
+	auto& world_map_message = LLWorldMapMessage::instance();
 
 	for (S32 block=0; block<num_blocks; ++block)
 	{
@@ -258,7 +262,7 @@ void LLWorldMapMessage::processMapItemReply(LLMessageSystem* msg, void**)
 
 	S32 num_blocks = msg->getNumberOfBlocksFast(_PREHASH_Data);
 
-	auto& world_map = LLWorldMap::instanceFast();
+	auto& world_map = LLWorldMap::instance();
 
 	for (S32 block=0; block<num_blocks; ++block)
 	{

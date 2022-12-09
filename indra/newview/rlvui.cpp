@@ -386,13 +386,13 @@ bool RlvUIEnabler::canViewParcelProperties()
 	{
 		// RELEASE-RLVa: [SL-3.2] Check that opening the "About Land" floater still sets focus to the current parcel is none is selected
 		const LLParcel* pParcel = NULL;
-		if (LLViewerParcelMgr::getInstanceFast()->selectionEmpty())
+		if (LLViewerParcelMgr::getInstance()->selectionEmpty())
 		{
-			pParcel = LLViewerParcelMgr::getInstanceFast()->getAgentParcel();
+			pParcel = LLViewerParcelMgr::getInstance()->getAgentParcel();
 		}
 		else
 		{
-			LLParcelSelection* pParcelSel = LLViewerParcelMgr::getInstanceFast()->getFloatingParcelSelection();
+			LLParcelSelection* pParcelSel = LLViewerParcelMgr::getInstance()->getFloatingParcelSelection();
 			if (pParcelSel->hasOthersSelected())
 				return false;
 			pParcel = pParcelSel->getParcel();

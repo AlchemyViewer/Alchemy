@@ -10,7 +10,7 @@ include(LLFileSystem)
 include(LLKDU)
 include(LLImageJ2COJ)
 include(WebP)
-include(ZLIB)
+include(ZLIBNG)
 include(LLAddBuildTest)
 include(Tut)
 
@@ -21,7 +21,7 @@ include_directories(
     ${LLFILESYSTEM_INCLUDE_DIRS}
     ${WEBP_INCLUDE_DIRS}
     ${PNG_INCLUDE_DIRS}
-    ${ZLIB_INCLUDE_DIRS}
+    ${ZLIBNG_INCLUDE_DIRS}
     )
 
 set(llimage_SOURCE_FILES
@@ -78,7 +78,7 @@ target_link_libraries(llimage
     ${WEBP_LIBRARIES}
     ${JPEG_LIBRARIES}
     ${PNG_LIBRARIES}
-    ${ZLIB_LIBRARIES}
+    ${ZLIBNG_LIBRARIES}
     readerwriterqueue
     )
 

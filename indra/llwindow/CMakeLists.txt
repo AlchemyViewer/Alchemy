@@ -195,6 +195,12 @@ if (SDL_FOUND)
 endif (SDL_FOUND)
 
 target_link_libraries (llwindow llcommon ${llwindow_LINK_LIBRARIES} readerwriterqueue)
+  
+if (DARWIN)
+  include(CMakeFindFrameworks)
+  find_library(CARBON_LIBRARY Carbon)
+  target_link_libraries(llwindow ${CARBON_LIBRARY})
+endif (DARWIN)
 
 if(USE_PRECOMPILED_HEADERS AND ${CMAKE_VERSION} VERSION_GREATER "3.15.0") 
   target_precompile_headers(llwindow

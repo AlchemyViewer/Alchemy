@@ -47,6 +47,7 @@
 
 extern BOOL gDebugGL;
 extern BOOL gDebugSession;
+extern BOOL gDebugGLSession;
 extern llofstream gFailLog;
 
 #define LL_GL_ERRS LL_ERRS("RenderState")
@@ -96,9 +97,6 @@ public:
 	BOOL mHasMapBufferRange;
 	BOOL mHasFlushBufferRange;
 	BOOL mHasPBuffer;
-	BOOL mHasShaderObjects;
-	BOOL mHasVertexShader;
-	BOOL mHasFragmentShader;
 	S32  mNumTextureImageUnits;
 	BOOL mHasOcclusionQuery;
 	BOOL mHasTimerQuery;
@@ -127,14 +125,9 @@ public:
     bool mHasClipControl = false;
 
 	// Vendor-specific extensions
-	BOOL mIsATI;
+	BOOL mIsAMD;
 	BOOL mIsNVIDIA;
 	BOOL mIsIntel;
-	BOOL mIsGF2or4MX;
-	BOOL mIsGF3;
-	BOOL mIsGFFX;
-	BOOL mATIOffsetVerticalLines;
-	BOOL mATIOldDriver;
 
 #if LL_DARWIN
 	// Needed to distinguish problem cards on older Macs that break with Materials
@@ -275,7 +268,6 @@ public:
 	static void dumpStates();
 	static void checkStates(const std::string& msg = "");
 	static void checkTextureChannels(const std::string& msg = "");
-	static void checkClientArrays(const std::string& msg = "", U32 data_mask = 0);
 	
 protected:
 	static absl::flat_hash_map<LLGLenum, LLGLboolean> sStateMap;
@@ -445,6 +437,7 @@ void init_glstates();
 void parse_gl_version( S32* major, S32* minor, S32* release, std::string* vendor_specific, std::string* version_string );
 
 extern BOOL gHeadlessClient;
+extern BOOL gNonInteractive;
 extern BOOL gGLActive;
 
 #endif // LL_LLGL_H

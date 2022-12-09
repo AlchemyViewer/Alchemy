@@ -103,7 +103,7 @@ void LLToolSelectRect::handleRectangleSelection(S32 x, S32 y, MASK mask)
 	top = ll_round((F32) top * LLUI::getScaleFactor().mV[VY]);
 	bottom = ll_round((F32) bottom * LLUI::getScaleFactor().mV[VY]);
 
-	LLViewerCamera* viewer_cam = LLViewerCamera::getInstanceFast();
+	LLViewerCamera* viewer_cam = LLViewerCamera::getInstance();
 
 	F32 old_far_plane = viewer_cam->getFar();
 	F32 old_near_plane = viewer_cam->getNear();
@@ -192,17 +192,17 @@ void LLToolSelectRect::handleRectangleSelection(S32 x, S32 y, MASK mask)
 				{
 					return true;
 				}
-				S32 result = LLViewerCamera::getInstanceFast()->sphereInFrustum(drawable->getPositionAgent(), drawable->getRadius());
+				S32 result = LLViewerCamera::getInstance()->sphereInFrustum(drawable->getPositionAgent(), drawable->getRadius());
 				switch (result)
 				{
 				  case 0:
-					LLSelectMgr::getInstanceFast()->unhighlightObjectOnly(vobjp);
+					LLSelectMgr::getInstance()->unhighlightObjectOnly(vobjp);
 					break;
 				  case 1:
 					// check vertices
-					if (!LLViewerCamera::getInstanceFast()->areVertsVisible(vobjp, LLSelectMgr::sRectSelectInclusive))
+					if (!LLViewerCamera::getInstance()->areVertsVisible(vobjp, LLSelectMgr::sRectSelectInclusive))
 					{
-						LLSelectMgr::getInstanceFast()->unhighlightObjectOnly(vobjp);
+						LLSelectMgr::getInstance()->unhighlightObjectOnly(vobjp);
 					}
 					break;
 				  default:
@@ -211,14 +211,14 @@ void LLToolSelectRect::handleRectangleSelection(S32 x, S32 y, MASK mask)
 				return true;
 			}
 		} func;
-		LLSelectMgr::getInstanceFast()->getHighlightedObjects()->applyToObjects(&func);
+		LLSelectMgr::getInstance()->getHighlightedObjects()->applyToObjects(&func);
 	}
 
 	if (grow_selection)
 	{
 		std::vector<LLDrawable*> potentials;
 				
-		for (LLViewerRegion* region : LLWorld::getInstanceFast()->getRegionList())
+		for (LLViewerRegion* region : LLWorld::getInstance()->getRegionList())
 		{
 			for (U32 i = 0; i < LLViewerRegion::NUM_PARTITIONS; i++)
 			{
@@ -265,11 +265,11 @@ void LLToolSelectRect::handleRectangleSelection(S32 x, S32 y, MASK mask)
 					// check vertices
 					if (viewer_cam->areVertsVisible(vobjp, LLSelectMgr::sRectSelectInclusive))
 					{
-						LLSelectMgr::getInstanceFast()->highlightObjectOnly(vobjp);
+						LLSelectMgr::getInstance()->highlightObjectOnly(vobjp);
 					}
 					break;
 				case 2:
-					LLSelectMgr::getInstanceFast()->highlightObjectOnly(vobjp);
+					LLSelectMgr::getInstance()->highlightObjectOnly(vobjp);
 					break;
 				default:
 					break;
@@ -284,8 +284,8 @@ void LLToolSelectRect::handleRectangleSelection(S32 x, S32 y, MASK mask)
 	gGL.matrixMode(LLRender::MM_MODELVIEW);
 
 	// restore camera
-	LLViewerCamera::getInstanceFast()->setFar(old_far_plane);
-	LLViewerCamera::getInstanceFast()->setNear(old_near_plane);
+	LLViewerCamera::getInstance()->setFar(old_far_plane);
+	LLViewerCamera::getInstance()->setNear(old_near_plane);
 	gViewerWindow->setup3DRender();
 }
 
@@ -352,7 +352,7 @@ void LLViewerParcelMgr::renderRect(const LLVector3d &west_south_bottom_global,
 	// resolves correctly so we can get a height value.
 	const F32 FUDGE = 0.01f;
 
-	auto& worldInst = LLWorld::instanceFast();
+	auto& worldInst = LLWorld::instance();
 
 	F32 sw_bottom = worldInst.resolveLandHeightAgent( LLVector3( west, south, 0.f ) );
 	F32 se_bottom = worldInst.resolveLandHeightAgent( LLVector3( east-FUDGE, south, 0.f ) );
@@ -833,10 +833,7 @@ void LLViewerObjectList::renderObjectBeacons()
 
 	LLGLSUIDefault gls_ui;
 
-	if (LLGLSLShader::sNoFixedFunction)
-	{
-		gUIProgram.bind();
-	}
+	gUIProgram.bind();
 
 	{
 		gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
@@ -924,10 +921,7 @@ void LLViewerObjectList::renderObjectBeacons()
 void LLSky::renderSunMoonBeacons(const LLVector3& pos_agent, const LLVector3& direction, LLColor4 color)
 {
 	LLGLSUIDefault gls_ui;
-	if (LLGLSLShader::sNoFixedFunction)
-	{
-		gUIProgram.bind();
-	}
+	gUIProgram.bind();
 	gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
 
 	LLVector3 pos_end;
@@ -1060,9 +1054,8 @@ private:
 //-----------------------------------------------------------------------------
 F32 gpu_benchmark()
 {
-	if (!gGLManager.mHasShaderObjects || !gGLManager.mHasTimerQuery)
-	{ // don't bother benchmarking the fixed function
-      // or venerable drivers which don't support accurate timing anyway
+	if (!gGLManager.mHasTimerQuery)
+	{ // don't bother benchmarking venerable drivers which don't support accurate timing anyway
       // and are likely to be correctly identified by the GPU table already.
 		return -1.f;
 	}
@@ -1165,7 +1158,7 @@ F32 gpu_benchmark()
     delete [] pixels;
 
 	//make a dummy triangle to draw with
-	LLPointer<LLVertexBuffer> buff = new LLVertexBuffer(LLVertexBuffer::MAP_VERTEX | LLVertexBuffer::MAP_TEXCOORD0, GL_STREAM_DRAW);
+	LLPointer<LLVertexBuffer> buff = new LLVertexBuffer(LLVertexBuffer::MAP_VERTEX, GL_STREAM_DRAW);
 
 	if (!buff->allocateBuffer(3, 0, true))
 	{
@@ -1175,7 +1168,6 @@ F32 gpu_benchmark()
 	}
 
 	LLStrider<LLVector3> v;
-	LLStrider<LLVector2> tc;
 
 	if (! buff->getVertexStrider(v))
 	{
@@ -1196,6 +1188,16 @@ F32 gpu_benchmark()
 
 	// ensure matched pair of bind() and unbind() calls
 	ShaderBinder binder(gBenchmarkProgram);
+
+#ifdef GL_ARB_vertex_array_object
+    U32 glarray = 0;
+
+    if (LLRender::sGLCoreProfile)
+    {
+        glGenVertexArrays(1, &glarray);
+        glBindVertexArray(glarray);
+    }
+#endif
 
 	buff->setBuffer(LLVertexBuffer::MAP_VERTEX);
 	glFinish();
@@ -1228,6 +1230,15 @@ F32 gpu_benchmark()
 			results.push_back(gbps);
 		}
 	}
+
+#ifdef GL_ARB_vertex_array_object
+    if (LLRender::sGLCoreProfile)
+    {
+        glBindVertexArray(0);
+        glDeleteVertexArrays(1, &glarray);
+    }
+#endif
+
 
 	std::sort(results.begin(), results.end());
 

@@ -33,13 +33,14 @@
 
 void LLMutex::lock()
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD
 	if(isSelfLocked())
 	{ //redundant lock
 		mCount++;
 		return;
 	}
 	
-	mMutex.Lock();
+	mMutex.lock();
 	
 #if MUTEX_DEBUG
 	// Have to have the lock before we can access the debug info
@@ -49,11 +50,12 @@ void LLMutex::lock()
 	mIsLocked[id] = TRUE;
 #endif
 
-	mLockingThread = absl::Hash<std::thread::id>{}(LLThread::currentID());
+	mLockingThread = LLThread::currentID();
 }
 
 void LLMutex::unlock()
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD
 	if (mCount > 0)
 	{ //not the root unlock
 		mCount--;
@@ -68,37 +70,44 @@ void LLMutex::unlock()
 	mIsLocked[id] = FALSE;
 #endif
 
-	mLockingThread = 0;
-	mMutex.Unlock();
+	mLockingThread = LLThread::id_t();
+	mMutex.unlock();
 }
 
 bool LLMutex::isLocked()
 {
-	if (!mMutex.TryLock())
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD
+	if (!mMutex.try_lock())
 	{
 		return true;
 	}
 	else
 	{
-		mMutex.Unlock();
+		mMutex.unlock();
 		return false;
 	}
 }
 
 bool LLMutex::isSelfLocked()
 {
-	return mLockingThread == absl::Hash<std::thread::id>{}(LLThread::currentID());
+	return mLockingThread == LLThread::currentID();
+}
+
+LLThread::id_t LLMutex::lockingThread() const
+{
+	return mLockingThread;
 }
 
 bool LLMutex::trylock()
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD
 	if(isSelfLocked())
 	{ //redundant lock
 		mCount++;
 		return true;
 	}
 	
-	if (!mMutex.TryLock())
+	if (!mMutex.try_lock())
 	{
 		return false;
 	}
@@ -111,7 +120,7 @@ bool LLMutex::trylock()
 	mIsLocked[id] = TRUE;
 #endif
 
-	mLockingThread = absl::Hash<std::thread::id>{}(LLThread::currentID());
+	mLockingThread = LLThread::currentID();
 	return true;
 }
 
@@ -125,19 +134,21 @@ LLCondition::LLCondition() :
 
 void LLCondition::wait()
 {
-	mMutex.Lock();
-	mCond.Wait(&mMutex);
-	mMutex.Unlock();
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD
+	std::unique_lock< std::mutex > lock(mMutex);
+	mCond.wait(lock);
 }
 
 void LLCondition::signal()
 {
-	mCond.Signal();
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD
+	mCond.notify_one();
 }
 
 void LLCondition::broadcast()
 {
-	mCond.SignalAll();
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD
+	mCond.notify_all();
 }
 
 //============================================================================

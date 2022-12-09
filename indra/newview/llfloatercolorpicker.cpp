@@ -167,7 +167,6 @@ void LLFloaterColorPicker::showUI ()
 	openFloater(getKey());
 	setVisible ( TRUE );
 	setFocus ( TRUE );
-	setRevertOnCancel(FALSE);
 
 	// HACK: if system color picker is required - close the SL one we made and use default system dialog
 	if ( gSavedSettings.getBOOL ( "UseDefaultColorPicker" ) )
@@ -179,15 +178,23 @@ void LLFloaterColorPicker::showUI ()
 		// code that will get switched in for default system color picker
 		if ( swatch )
 		{
+            // Todo: this needs to be threaded for viewer not to timeout
 			LLColor4 curCol = swatch->get ();
 			send_agent_pause();
-			getWindow()->dialogColorPicker( &curCol [ 0 ], &curCol [ 1 ], &curCol [ 2 ] );
+			bool commit = getWindow()->dialogColorPicker( &curCol [ 0 ], &curCol [ 1 ], &curCol [ 2 ] );
 			send_agent_resume();
 
-			setOrigRgb ( curCol [ 0 ], curCol [ 1 ], curCol [ 2 ] );
-			setCurRgb( curCol [ 0 ], curCol [ 1 ], curCol [ 2 ] );
+            if (commit)
+            {
+                setOrigRgb(curCol[0], curCol[1], curCol[2]);
+                setCurRgb(curCol[0], curCol[1], curCol[2]);
 
-			LLColorSwatchCtrl::onColorChanged ( swatch, LLColorSwatchCtrl::COLOR_CHANGE );
+                LLColorSwatchCtrl::onColorChanged(swatch, LLColorSwatchCtrl::COLOR_SELECT);
+            }
+            else
+            {
+                LLColorSwatchCtrl::onColorChanged(swatch, LLColorSwatchCtrl::COLOR_CANCEL);
+            }
 		}
 
 		closeFloater();
@@ -391,10 +398,7 @@ void LLFloaterColorPicker::onClickCancel ( void* data )
 
 		if ( self )
 		{
-		    if(self->getRevertOnCancel())
-		    {
-		        self->cancelSelection ();
-		    }
+		    self->cancelSelection();
 			self->closeFloater();
 		}
 	}
@@ -423,11 +427,11 @@ void LLFloaterColorPicker::onClickPipette( )
 	pipette_active = !pipette_active;
 	if (pipette_active)
 	{
-		LLToolMgr::getInstanceFast()->setTransientTool(LLToolPipette::getInstance());
+		LLToolMgr::getInstance()->setTransientTool(LLToolPipette::getInstance());
 	}
 	else
 	{
-		LLToolMgr::getInstanceFast()->clearTransientTool();
+		LLToolMgr::getInstance()->clearTransientTool();
 	}
 }
 
@@ -488,7 +492,7 @@ void LLFloaterColorPicker::draw()
 	static LLCachedControl<F32> max_opacity(gSavedSettings, "PickerContextOpacity", 0.4f);
 	drawConeToOwner(mContextConeOpacity, max_opacity, mSwatch, mContextConeFadeTime, mContextConeInAlpha, mContextConeOutAlpha);
 
-	mPipetteBtn->setToggleState(LLToolMgr::getInstanceFast()->getCurrentTool() == LLToolPipette::getInstance());
+	mPipetteBtn->setToggleState(LLToolMgr::getInstance()->getCurrentTool() == LLToolPipette::getInstance());
 	mApplyImmediateCheck->setEnabled(mActive && mCanApplyImmediately);
 	mSelectBtn->setEnabled(mActive);
 
@@ -1081,8 +1085,8 @@ void LLFloaterColorPicker::setActive(BOOL active)
 
 void LLFloaterColorPicker::stopUsingPipette()
 {
-	if (LLToolMgr::getInstanceFast()->getCurrentTool() == LLToolPipette::getInstanceFast())
+	if (LLToolMgr::getInstance()->getCurrentTool() == LLToolPipette::getInstance())
 	{
-		LLToolMgr::getInstanceFast()->clearTransientTool();
+		LLToolMgr::getInstance()->clearTransientTool();
 	}
 }

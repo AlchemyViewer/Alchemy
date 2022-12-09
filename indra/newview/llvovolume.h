@@ -67,7 +67,10 @@ public:
 	{
 	}
 
-	void update(const LLMeshSkinInfo* skin, LLVOAvatar* avatar, const LLVolume* src_volume, LLVOVolume* src_object);
+    using FaceIndex = S32;
+    static const FaceIndex UPDATE_ALL_FACES = -1;
+    static const FaceIndex DO_NOT_UPDATE_FACES = -2;
+    void update(const LLMeshSkinInfo* skin, LLVOAvatar* avatar, const LLVolume* src_volume, FaceIndex face_index = UPDATE_ALL_FACES, bool rebuild_face_octrees = true);
 
     std::string mExtraDebugText;
 };
@@ -238,7 +241,7 @@ public:
 
 				void	updateFaceFlags();
 				void	regenFaces();
-				BOOL	genBBoxes(BOOL force_global);
+                BOOL    genBBoxes(BOOL force_global, BOOL should_update_octree_bounds = TRUE);
 				void	preRebuild();
 	virtual		void	updateSpatialExtents(LLVector4a& min, LLVector4a& max);
 	virtual		F32		getBinRadius();
@@ -301,7 +304,9 @@ public:
 	BOOL setIsFlexible(BOOL is_flexible);
 
     const LLMeshSkinInfo* getSkinInfo() const;
-	absl::optional<std::pair<LLMatrix4a*, F32*>> getCachedSkinRenderMatrix(U32& joint_count, LLVOAvatar* avatar, const LLMeshSkinInfo* skin = nullptr);
+
+    //convenience accessor for mesh ID (which is stored in sculpt id for legacy reasons)
+    const LLUUID& getMeshID() const { return getVolume()->getParams().getSculptID(); }
     
     // Extended Mesh Properties
     U32 getExtendedMeshFlags() const;
@@ -368,8 +373,9 @@ public:
 	S32 getMDCImplCount() { return mMDCImplCount; }
 	
 
-	//rigged volume update (for raycasting)
-	void updateRiggedVolume(bool force_update = false);
+    // Rigged volume update (for raycasting)
+    // By default, this updates the bounding boxes of all the faces and builds an octree for precise per-triangle raycasting
+    void updateRiggedVolume(bool force_treat_as_rigged, LLRiggedVolume::FaceIndex face_index = LLRiggedVolume::UPDATE_ALL_FACES, bool rebuild_face_octrees = true);
 	LLRiggedVolume* getRiggedVolume();
 
 	//returns true if volume should be treated as a rigged volume
@@ -392,13 +398,14 @@ protected:
 	static S32 mRenderComplexity_last;
 	static S32 mRenderComplexity_current;
 
+    void onDrawableUpdateFromServer();
 	void requestMediaDataUpdate(bool isNew);
 	void cleanUpMediaImpls();
 	void addMediaImpl(LLViewerMediaImpl* media_impl, S32 texture_index) ;
 	void removeMediaImpl(S32 texture_index) ;
 
 private:
-	bool lodOrSculptChanged(LLDrawable *drawable, BOOL &compiled);
+    bool lodOrSculptChanged(LLDrawable *drawable, BOOL &compiled, BOOL &shouldUpdateOctreeBounds);
 
 public:
 
@@ -419,6 +426,7 @@ private:
 	S32			mLOD;
 	BOOL		mLODChanged;
 	BOOL		mSculptChanged;
+    BOOL		mColorChanged;
 	F32			mSpotLightPriority;
 	LL_ALIGN_16(LLMatrix4a	mRelativeXform);
 	LL_ALIGN_16(LLMatrix4a	mRelativeXformInvTrans);
@@ -429,6 +437,7 @@ private:
 	LLPointer<LLViewerFetchedTexture> mLightTexture;
 	media_list_t mMediaImplList;
 	S32			mLastFetchedMediaVersion; // as fetched from the server, starts as -1
+    U32         mServerDrawableUpdateCount;
 	S32 mIndexInTex[LLRender::NUM_VOLUME_TEXTURE_CHANNELS];
 	S32 mMDCImplCount;
 

@@ -187,7 +187,7 @@ SLURL: &lt;nolink&gt;[SLURL]&lt;/nolink&gt;
 	<string name="LoginFailedNoNetwork">
 		Ошибка сети: не удалось установить соединение. Проверьте подключение к сети.
 	</string>
-	<string name="LoginFailed">
+	<string name="LoginFailedHeader">
 		Ошибка входа.
 	</string>
 	<string name="Quit">
@@ -688,9 +688,6 @@ support@secondlife.com.
 	</string>
 	<string name="GroupNameNone">
 		(нет)
-	</string>
-	<string name="AvalineCaller">
-		[ORDER] абонента Avaline
 	</string>
 	<string name="AssetErrorNone">
 		Ошибок нет
@@ -5129,7 +5126,7 @@ support@secondlife.com.
 	<string name="PremiumMembership">
 		Премиум
 	</string>
-	<string name="Premium PlusMembership">
+	<string name="Premium_PlusMembership">
 		Премиум Плюс
 	</string>
 	<string name="DeleteItems">

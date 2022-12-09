@@ -193,12 +193,12 @@ void LLToolBrushLand::modifyLandAtPointGlobal(const LLVector3d &pos_global,
 
 void LLToolBrushLand::modifyLandInSelectionGlobal()
 {
-	if (LLViewerParcelMgr::getInstanceFast()->selectionEmpty())
+	if (LLViewerParcelMgr::getInstance()->selectionEmpty())
 	{
 		return;
 	}
 
-	if (LLToolMgr::getInstanceFast()->getCurrentTool() == LLToolSelectLand::getInstanceFast())
+	if (LLToolMgr::getInstance()->getCurrentTool() == LLToolSelectLand::getInstance())
 	{
 		// selecting land, don't do anything
 		return;
@@ -588,7 +588,7 @@ void LLToolBrushLand::renderOverlay(LLSurface& land, const LLVector3& pos_region
 void LLToolBrushLand::determineAffectedRegions(region_list_t& regions,
 											   const LLVector3d& spot ) const
 {
-	auto& world_inst = LLWorld::instanceFast();
+	auto& world_inst = LLWorld::instance();
 
 	LLVector3d corner(spot);
 	corner.mdV[VX] -= (mBrushSize / 2);
@@ -624,7 +624,7 @@ void LLToolBrushLand::onIdle( void* brush_tool )
 {
 	LLToolBrushLand* self = static_cast<LLToolBrushLand*>(brush_tool);
 
-	if( LLToolMgr::getInstanceFast()->getCurrentTool() == self )
+	if( LLToolMgr::getInstance()->getCurrentTool() == self )
 	{
 		self->brush();
 	}

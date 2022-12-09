@@ -244,7 +244,7 @@ public:
     void dumpShaderSource(U32 shader_code_count, GLchar** shader_code_text);
 	BOOL	linkProgramObject(GLuint obj, BOOL suppress_errors = FALSE);
 	BOOL	validateProgramObject(GLuint obj);
-	GLuint loadShaderFile(const std::string& filename, S32 & shader_level, GLenum type, boost::unordered_map<std::string, std::string>* defines = NULL, S32 texture_index_channels = -1);
+	GLuint loadShaderFile(const std::string& filename, S32 & shader_level, GLenum type, std::unordered_map<std::string, std::string>* defines = NULL, S32 texture_index_channels = -1);
 
 	// Implemented in the application to actually point to the shader directory.
 	virtual std::string getShaderDirPrefix(void) = 0; // Pure Virtual

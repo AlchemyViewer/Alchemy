@@ -99,7 +99,7 @@ void LLHUDIcon::renderIcon(BOOL for_select)
 
 	// put icon above object, and in front
 	// RN: don't use drawable radius, it's fricking HUGE
-	LLViewerCamera* camera = LLViewerCamera::getInstanceFast();
+	LLViewerCamera* camera = LLViewerCamera::getInstance();
 	LLVector3 icon_relative_pos = (camera->getUpAxis() * ~mSourceObject->getRenderRotation());
 	icon_relative_pos.abs();
 
@@ -218,7 +218,7 @@ BOOL LLHUDIcon::lineSegmentIntersect(const LLVector4a& start, const LLVector4a& 
 
 	// put icon above object, and in front
 	// RN: don't use drawable radius, it's fricking HUGE
-	LLViewerCamera* camera = LLViewerCamera::getInstanceFast();
+	LLViewerCamera* camera = LLViewerCamera::getInstance();
 	LLVector3 icon_relative_pos = (camera->getUpAxis() * ~mSourceObject->getRenderRotation());
 	icon_relative_pos.abs();
 

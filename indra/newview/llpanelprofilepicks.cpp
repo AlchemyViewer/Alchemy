@@ -74,16 +74,16 @@ public:
             return true;
         }
 
-        if (!LLUI::getInstanceFast()->mSettingGroups["config"]->getBOOL("EnablePicks"))
+        if (!LLUI::getInstance()->mSettingGroups["config"]->getBOOL("EnablePicks"))
         {
             LLNotificationsUtil::add("NoPicks", LLSD(), LLSD(), std::string("SwitchToStandardSkinAndQuit"));
             return true;
         }
 
-        // handle app/classified/create urls first
+        // handle app/pick/create urls first
         if (params.size() == 1 && params[0].asString() == "create")
         {
-            LLAvatarActions::showPicks(gAgent.getID());
+            LLAvatarActions::createPick();
             return true;
         }
 
@@ -123,7 +123,7 @@ LLPickHandler gPickHandler;
 //-----------------------------------------------------------------------------
 
 LLPanelProfilePicks::LLPanelProfilePicks()
- : LLPanelProfileTab()
+ : LLPanelProfilePropertiesProcessorTab()
  , mPickToSelectOnLoad(LLUUID::null)
 {
 }
@@ -138,17 +138,50 @@ LLPanelProfilePicks::~LLPanelProfilePicks()
 
 void LLPanelProfilePicks::onOpen(const LLSD& key)
 {
-    LLPanelProfileTab::onOpen(key);
+    LLPanelProfilePropertiesProcessorTab::onOpen(key);
 
     resetData();
 
-    if (getSelfProfile() && !getEmbedded())
+    bool own_profile = getSelfProfile();
+    if (own_profile)
     {
         mNewButton->setVisible(TRUE);
         mNewButton->setEnabled(FALSE);
 
         mDeleteButton->setVisible(TRUE);
         mDeleteButton->setEnabled(FALSE);
+    }
+
+    childSetVisible("buttons_header", own_profile);
+}
+
+void LLPanelProfilePicks::createPick(const LLPickData &data)
+{
+    if (getIsLoaded())
+    {
+        if (canAddNewPick())
+        {
+            mNoItemsLabel->setVisible(FALSE);
+            LLPanelProfilePick* pick_panel = LLPanelProfilePick::create();
+            pick_panel->setAvatarId(getAvatarId());
+            pick_panel->processProperties(&data);
+            mTabContainer->addTabPanel(
+                LLTabContainer::TabPanelParams().
+                panel(pick_panel).
+                select_tab(true).
+                label(pick_panel->getPickName()));
+            updateButtons();
+        }
+        else
+        {
+            // This means that something doesn't properly check limits
+            // before creating a pick
+            LL_WARNS() << "failed to add pick" << LL_ENDL;
+        }
+    }
+    else
+    {
+        mSheduledPickCreation.push_back(data);
     }
 }
 
@@ -214,7 +247,7 @@ void LLPanelProfilePicks::onClickDelete()
         LLSD payload;
         payload["pick_id"] = pick_id;
         payload["tab_idx"] = mTabContainer->getCurrentPanelIndex();
-        LLNotificationsUtil::add("DeleteAvatarPick", args, payload,
+        LLNotificationsUtil::add("ProfileDeletePick", args, payload,
             boost::bind(&LLPanelProfilePicks::callbackDeletePick, this, _1, _2));
     }
 }
@@ -236,7 +269,7 @@ void LLPanelProfilePicks::callbackDeletePick(const LLSD& notification, const LLS
 
         if (pick_id.notNull())
         {
-            LLAvatarPropertiesProcessor::getInstanceFast()->sendPickDelete(pick_id);
+            LLAvatarPropertiesProcessor::getInstance()->sendPickDelete(pick_id);
         }
 
         updateButtons();
@@ -250,66 +283,93 @@ void LLPanelProfilePicks::processProperties(void* data, EAvatarProcessorType typ
         LLAvatarPicks* avatar_picks = static_cast<LLAvatarPicks*>(data);
         if (avatar_picks && getAvatarId() == avatar_picks->target_id)
         {
-            LLUUID selected_id = mPickToSelectOnLoad;
-            if (mPickToSelectOnLoad.isNull())
-            {
-                if (mTabContainer->getTabCount() > 0)
-                {
-                    LLPanelProfilePick* active_pick_panel = dynamic_cast<LLPanelProfilePick*>(mTabContainer->getCurrentPanel());
-                    if (active_pick_panel)
-                    {
-                        selected_id = active_pick_panel->getPickId();
-                    }
-                }
-            }
-
-            mTabContainer->deleteAllTabs();
-
-            LLAvatarPicks::picks_list_t::const_iterator it = avatar_picks->picks_list.begin();
-            for (; avatar_picks->picks_list.end() != it; ++it)
-            {
-                LLUUID pick_id = it->first;
-                std::string pick_name = it->second;
-
-                LLPanelProfilePick* pick_panel = LLPanelProfilePick::create();
-
-                pick_panel->setPickId(pick_id);
-                pick_panel->setPickName(pick_name);
-                pick_panel->setAvatarId(getAvatarId());
-
-                mTabContainer->addTabPanel(
-                    LLTabContainer::TabPanelParams().
-                    panel(pick_panel).
-                    select_tab(selected_id == pick_id).
-                    label(pick_name));
-
-                if (selected_id == pick_id)
-                {
-                    mPickToSelectOnLoad = LLUUID::null;
-                }
-            }
-
-            BOOL no_data = !mTabContainer->getTabCount();
-            mNoItemsLabel->setVisible(no_data);
-            if (no_data)
-            {
-                if(getSelfProfile())
-                {
-                    mNoItemsLabel->setValue(LLTrans::getString("NoPicksText"));
-                }
-                else
-                {
-                    mNoItemsLabel->setValue(LLTrans::getString("NoAvatarPicksText"));
-                }
-            }
-            else if (selected_id.isNull())
-            {
-                mTabContainer->selectFirstTab();
-            }
-
-            updateButtons();
+            processProperties(avatar_picks);
         }
     }
+}
+
+void LLPanelProfilePicks::processProperties(const LLAvatarPicks* avatar_picks)
+{
+    LLUUID selected_id = mPickToSelectOnLoad;
+    bool has_selection = false;
+    if (mPickToSelectOnLoad.isNull())
+    {
+        if (mTabContainer->getTabCount() > 0)
+        {
+            LLPanelProfilePick* active_pick_panel = dynamic_cast<LLPanelProfilePick*>(mTabContainer->getCurrentPanel());
+            if (active_pick_panel)
+            {
+                selected_id = active_pick_panel->getPickId();
+            }
+        }
+    }
+
+    mTabContainer->deleteAllTabs();
+
+    LLAvatarPicks::picks_list_t::const_iterator it = avatar_picks->picks_list.begin();
+    for (; avatar_picks->picks_list.end() != it; ++it)
+    {
+        LLUUID pick_id = it->first;
+        std::string pick_name = it->second;
+
+        LLPanelProfilePick* pick_panel = LLPanelProfilePick::create();
+
+        pick_panel->setPickId(pick_id);
+        pick_panel->setPickName(pick_name);
+        pick_panel->setAvatarId(getAvatarId());
+
+        mTabContainer->addTabPanel(
+            LLTabContainer::TabPanelParams().
+            panel(pick_panel).
+            select_tab(selected_id == pick_id).
+            label(pick_name));
+
+        if (selected_id == pick_id)
+        {
+            has_selection = true;
+        }
+    }
+
+    while (!mSheduledPickCreation.empty() && canAddNewPick())
+    {
+        const LLPickData data =
+            mSheduledPickCreation.back();
+
+        LLPanelProfilePick* pick_panel = LLPanelProfilePick::create();
+        pick_panel->setAvatarId(getAvatarId());
+        pick_panel->processProperties(&data);
+        mTabContainer->addTabPanel(
+            LLTabContainer::TabPanelParams().
+            panel(pick_panel).
+            select_tab(!has_selection).
+            label(pick_panel->getPickName()));
+
+        mSheduledPickCreation.pop_back();
+        has_selection = true;
+    }
+
+    // reset 'do on load' values
+    mPickToSelectOnLoad = LLUUID::null;
+    mSheduledPickCreation.clear();
+
+    if (getSelfProfile())
+    {
+        mNoItemsLabel->setValue(LLTrans::getString("NoPicksText"));
+    }
+    else
+    {
+        mNoItemsLabel->setValue(LLTrans::getString("NoAvatarPicksText"));
+    }
+
+    bool has_data = mTabContainer->getTabCount() > 0;
+    mNoItemsLabel->setVisible(!has_data);
+    if (has_data && !has_selection)
+    {
+        mTabContainer->selectFirstTab();
+    }
+
+    setLoaded();
+    updateButtons();
 }
 
 void LLPanelProfilePicks::resetData()
@@ -320,9 +380,7 @@ void LLPanelProfilePicks::resetData()
 
 void LLPanelProfilePicks::updateButtons()
 {
-    LLPanelProfileTab::updateButtons();
-
-    if (getSelfProfile() && !getEmbedded())
+    if (getSelfProfile())
     {
         mNewButton->setEnabled(canAddNewPick());
         mDeleteButton->setEnabled(canDeletePick());
@@ -348,19 +406,47 @@ void LLPanelProfilePicks::updateData()
 {
     // Send picks request only once
     LLUUID avatar_id = getAvatarId();
-    if (!getIsLoading() && avatar_id.notNull())
+    if (!getStarted() && avatar_id.notNull())
     {
         setIsLoading();
+
+        LLAvatarPropertiesProcessor::getInstance()->sendAvatarPicksRequest(avatar_id);
+    }
+    if (!getIsLoaded())
+    {
         mNoItemsLabel->setValue(LLTrans::getString("PicksClassifiedsLoadingText"));
         mNoItemsLabel->setVisible(TRUE);
+    }
+}
 
-        LLAvatarPropertiesProcessor::getInstanceFast()->sendAvatarPicksRequest(avatar_id);
+bool LLPanelProfilePicks::hasUnsavedChanges()
+{
+    for (S32 tab_idx = 0; tab_idx < mTabContainer->getTabCount(); ++tab_idx)
+    {
+        LLPanelProfilePick* pick_panel = dynamic_cast<LLPanelProfilePick*>(mTabContainer->getPanelByIndex(tab_idx));
+        if (pick_panel && (pick_panel->isDirty() || pick_panel->isDirty()))
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+void LLPanelProfilePicks::commitUnsavedChanges()
+{
+    for (S32 tab_idx = 0; tab_idx < mTabContainer->getTabCount(); ++tab_idx)
+    {
+        LLPanelProfilePick* pick_panel = dynamic_cast<LLPanelProfilePick*>(mTabContainer->getPanelByIndex(tab_idx));
+        if (pick_panel)
+        {
+            pick_panel->apply();
+        }
     }
 }
 
 bool LLPanelProfilePicks::canAddNewPick()
 {
-    return (!LLAgentPicksInfo::getInstanceFast()->isPickLimitReached() &&
+    return (!LLAgentPicksInfo::getInstance()->isPickLimitReached() &&
         mTabContainer->getTabCount() < LLAgentBenefitsMgr::current().getPicksLimit() &&
         RlvActions::canShowLocation());
 }
@@ -376,7 +462,7 @@ bool LLPanelProfilePicks::canDeletePick()
 //-----------------------------------------------------------------------------
 
 LLPanelProfilePick::LLPanelProfilePick()
- : LLPanelProfileTab()
+ : LLPanelProfilePropertiesProcessorTab()
  , LLRemoteParcelInfoObserver()
  , mSnapshotCtrl(NULL)
  , mPickId(LLUUID::null)
@@ -384,7 +470,6 @@ LLPanelProfilePick::LLPanelProfilePick()
  , mRequestedId(LLUUID::null)
  , mLocationChanged(false)
  , mNewPick(false)
- , mCurrentPickDescription("")
  , mIsEditing(false)
 {
 }
@@ -401,7 +486,7 @@ LLPanelProfilePick::~LLPanelProfilePick()
 {
     if (mParcelId.notNull())
     {
-        LLRemoteParcelInfoProcessor::getInstanceFast()->removeObserver(mParcelId, this);
+        LLRemoteParcelInfoProcessor::getInstance()->removeObserver(mParcelId, this);
     }
 }
 
@@ -411,7 +496,7 @@ void LLPanelProfilePick::setAvatarId(const LLUUID& avatar_id)
     {
         return;
     }
-    LLPanelProfileTab::setAvatarId(avatar_id);
+    LLPanelProfilePropertiesProcessorTab::setAvatarId(avatar_id);
 
     // creating new Pick
     if (getPickId().isNull() && getSelfProfile())
@@ -423,7 +508,7 @@ void LLPanelProfilePick::setAvatarId(const LLUUID& avatar_id)
         LLUUID parcel_id = LLUUID::null, snapshot_id = LLUUID::null;
         std::string pick_name, pick_desc, region_name;
 
-        LLParcel* parcel = LLViewerParcelMgr::getInstanceFast()->getAgentParcel();
+        LLParcel* parcel = LLViewerParcelMgr::getInstance()->getAgentParcel();
         if (parcel)
         {
             parcel_id = parcel->getID();
@@ -448,14 +533,14 @@ void LLPanelProfilePick::setAvatarId(const LLUUID& avatar_id)
     }
     else
     {
-        LLAvatarPropertiesProcessor::getInstanceFast()->sendPickInfoRequest(getAvatarId(), getPickId());
+        LLAvatarPropertiesProcessor::getInstance()->sendPickInfoRequest(getAvatarId(), getPickId());
 
         enableSaveButton(FALSE);
     }
 
     resetDirty();
 
-    if (getSelfProfile() && !getEmbedded())
+    if (getSelfProfile())
     {
         mPickName->setEnabled(TRUE);
         mPickDescription->setEnabled(TRUE);
@@ -472,6 +557,8 @@ BOOL LLPanelProfilePick::postBuild()
     mPickName = getChild<LLLineEditor>("pick_name");
     mPickDescription = getChild<LLTextEditor>("pick_desc");
     mSaveButton = getChild<LLButton>("save_changes_btn");
+    mCreateButton = getChild<LLButton>("create_changes_btn");
+    mCancelButton = getChild<LLButton>("cancel_changes_btn");
     mSetCurrentLocationButton = getChild<LLButton>("set_to_curr_location_btn");
 
     mSnapshotCtrl = getChild<LLTextureCtrl>("pick_snapshot");
@@ -481,6 +568,8 @@ BOOL LLPanelProfilePick::postBuild()
     childSetAction("show_on_map_btn", boost::bind(&LLPanelProfilePick::onClickMap, this));
 
     mSaveButton->setCommitCallback(boost::bind(&LLPanelProfilePick::onClickSave, this));
+    mCreateButton->setCommitCallback(boost::bind(&LLPanelProfilePick::onClickSave, this));
+    mCancelButton->setCommitCallback(boost::bind(&LLPanelProfilePick::onClickCancel, this));
     mSetCurrentLocationButton->setCommitCallback(boost::bind(&LLPanelProfilePick::onClickSetLocation, this));
 
     mPickName->setKeystrokeCallback(boost::bind(&LLPanelProfilePick::onPickChanged, this, _1), NULL);
@@ -500,7 +589,6 @@ void LLPanelProfilePick::onDescriptionFocusReceived()
     {
         mIsEditing = true;
         mPickDescription->setParseHTML(false);
-        setPickDesc(mCurrentPickDescription);
     }
 }
 
@@ -519,18 +607,22 @@ void LLPanelProfilePick::processProperties(void* data, EAvatarProcessorType type
         return;
     }
 
+    processProperties(pick_info);
+}
+
+void LLPanelProfilePick::processProperties(const LLPickData* pick_info)
+{
     mIsEditing = false;
     mPickDescription->setParseHTML(true);
     mParcelId = pick_info->parcel_id;
     setSnapshotId(pick_info->snapshot_id);
-    if (!getSelfProfile() || getEmbedded())
+    if (!getSelfProfile())
     {
         mSnapshotCtrl->setEnabled(FALSE);
     }
     setPickName(pick_info->name);
     setPickDesc(pick_info->desc);
     setPosGlobal(pick_info->pos_global);
-    mCurrentPickDescription = pick_info->desc;
 
     // Send remote parcel info request to get parcel name and sim (region) name.
     sendParcelInfoRequest();
@@ -540,7 +632,7 @@ void LLPanelProfilePick::processProperties(void* data, EAvatarProcessorType type
     // edit the Pick and we have to update Pick info panel.
     // revomeObserver is called from onClickBack
 
-    updateButtons();
+    setLoaded();
 }
 
 void LLPanelProfilePick::apply()
@@ -594,8 +686,11 @@ void LLPanelProfilePick::onClickTeleport()
 
 void LLPanelProfilePick::enableSaveButton(BOOL enable)
 {
-    mSaveButton->setEnabled(enable);
-    mSaveButton->setVisible(enable);
+    childSetVisible("save_changes_lp", enable);
+
+    childSetVisible("save_btn_lp", enable && !mNewPick);
+    childSetVisible("create_btn_lp", enable && mNewPick);
+    childSetVisible("cancel_btn_lp", enable && !mNewPick);
 }
 
 void LLPanelProfilePick::onSnapshotChanged()
@@ -644,7 +739,7 @@ void LLPanelProfilePick::onClickSetLocation()
 
     std::string parcel_name, region_name;
 
-    LLParcel* parcel = LLViewerParcelMgr::getInstanceFast()->getAgentParcel();
+    LLParcel* parcel = LLViewerParcelMgr::getInstance()->getAgentParcel();
     if (parcel)
     {
         mParcelId = parcel->getID();
@@ -670,6 +765,13 @@ void LLPanelProfilePick::onClickSave()
     mLocationChanged = false;
 }
 
+void LLPanelProfilePick::onClickCancel()
+{
+    LLAvatarPropertiesProcessor::getInstance()->sendPickInfoRequest(getAvatarId(), getPickId());
+    mLocationChanged = false;
+    enableSaveButton(FALSE);
+}
+
 std::string LLPanelProfilePick::getLocationNotice()
 {
     static const std::string notice = getString("location_notice");
@@ -682,10 +784,10 @@ void LLPanelProfilePick::sendParcelInfoRequest()
     {
         if (mRequestedId.notNull())
         {
-            LLRemoteParcelInfoProcessor::getInstanceFast()->removeObserver(mRequestedId, this);
+            LLRemoteParcelInfoProcessor::getInstance()->removeObserver(mRequestedId, this);
         }
-        LLRemoteParcelInfoProcessor::getInstanceFast()->addObserver(mParcelId, this);
-        LLRemoteParcelInfoProcessor::getInstanceFast()->sendParcelInfoRequest(mParcelId);
+        LLRemoteParcelInfoProcessor::getInstance()->addObserver(mParcelId, this);
+        LLRemoteParcelInfoProcessor::getInstance()->sendParcelInfoRequest(mParcelId);
 
         mRequestedId = mParcelId;
     }
@@ -700,7 +802,7 @@ void LLPanelProfilePick::processParcelInfo(const LLParcelData& parcel_data)
 
     if (mParcelId.notNull())
     {
-        LLRemoteParcelInfoProcessor::getInstanceFast()->removeObserver(mParcelId, this);
+        LLRemoteParcelInfoProcessor::getInstance()->removeObserver(mParcelId, this);
     }
 }
 
@@ -730,14 +832,14 @@ void LLPanelProfilePick::sendUpdate()
     pick_data.sort_order = 0;
     pick_data.enabled = TRUE;
 
-    LLAvatarPropertiesProcessor::getInstanceFast()->sendPickInfoUpdate(&pick_data);
+    LLAvatarPropertiesProcessor::getInstance()->sendPickInfoUpdate(&pick_data);
 
     if(mNewPick)
     {
         // Assume a successful create pick operation, make new number of picks
         // available immediately. Actual number of picks will be requested in
         // LLAvatarPropertiesProcessor::sendPickInfoUpdate and updated upon server respond.
-        LLAgentPicksInfo::getInstanceFast()->incrementNumberOfPicks();
+        LLAgentPicksInfo::getInstance()->incrementNumberOfPicks();
     }
 }
 

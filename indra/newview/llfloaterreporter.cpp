@@ -54,6 +54,7 @@
 #include "llbutton.h"
 #include "llfloaterreg.h"
 #include "lltexturectrl.h"
+#include "lltexteditor.h"
 #include "llscrolllistctrl.h"
 #include "lldispatcher.h"
 #include "llviewerobject.h"
@@ -249,9 +250,6 @@ LLFloaterReporter::~LLFloaterReporter()
 	}
 
 	mPosition.setVec(0.0f, 0.0f, 0.0f);
-
-	std::for_each(mMCDList.begin(), mMCDList.end(), DeletePointer() );
-	mMCDList.clear();
 
 	delete mResourceDatap;
 }
@@ -567,8 +565,8 @@ void LLFloaterReporter::onClickCancel(void *userdata)
 void LLFloaterReporter::onClickObjPicker(void *userdata)
 {
 	LLFloaterReporter *self = (LLFloaterReporter *)userdata;
-	LLToolObjPicker::getInstanceFast()->setExitCallback(LLFloaterReporter::closePickTool, self);
-	LLToolMgr::getInstanceFast()->setTransientTool(LLToolObjPicker::getInstanceFast());
+	LLToolObjPicker::getInstance()->setExitCallback(LLFloaterReporter::closePickTool, self);
+	LLToolMgr::getInstance()->setTransientTool(LLToolObjPicker::getInstance());
 	self->mPicking = TRUE;
 	self->getChild<LLUICtrl>("object_name")->setValue(LLStringUtil::null);
 	self->getChild<LLUICtrl>("owner_name")->setValue(LLStringUtil::null);
@@ -583,10 +581,10 @@ void LLFloaterReporter::closePickTool(void *userdata)
 {
 	LLFloaterReporter *self = (LLFloaterReporter *)userdata;
 
-	LLUUID object_id = LLToolObjPicker::getInstanceFast()->getObjectID();
+	LLUUID object_id = LLToolObjPicker::getInstance()->getObjectID();
 	self->getObjectInfo(object_id);
 
-	LLToolMgr::getInstanceFast()->clearTransientTool();
+	LLToolMgr::getInstance()->clearTransientTool();
 	self->mPicking = FALSE;
 	LLButton* pick_btn = self->getChild<LLButton>("pick_btn");
 	if (pick_btn) pick_btn->setToggleState(FALSE);
@@ -667,6 +665,23 @@ void LLFloaterReporter::showFromObject(const LLUUID& object_id, const LLUUID& ex
 void LLFloaterReporter::showFromAvatar(const LLUUID& avatar_id, const std::string avatar_name)
 {
 	show(avatar_id, avatar_name);
+}
+
+// static
+void LLFloaterReporter::showFromChat(const LLUUID& avatar_id, const std::string& avatar_name, const std::string& time, const std::string& description)
+{
+    show(avatar_id, avatar_name);
+
+    LLStringUtil::format_map_t args;
+    args["[MSG_TIME]"] = time;
+    args["[MSG_DESCRIPTION]"] = description;
+
+    LLFloaterReporter *self = LLFloaterReg::findTypedInstance<LLFloaterReporter>("reporter");
+    if (self)
+    {
+        std::string description = self->getString("chat_report_format", args);
+        self->getChild<LLUICtrl>("details_edit")->setValue(description);
+    }
 }
 
 void LLFloaterReporter::setPickedObjectProperties(const std::string& object_name, const std::string& owner_name, const LLUUID owner_id)
@@ -1040,37 +1055,3 @@ void LLFloaterReporter::onClose(bool app_quitting)
 	mSnapshotTimer.stop();
 	gSavedPerAccountSettings.setBOOL("PreviousScreenshotForReport", app_quitting);
 }
-
-
-// void LLFloaterReporter::setDescription(const std::string& description, LLMeanCollisionData *mcd)
-// {
-// 	LLFloaterReporter *self = LLFloaterReg::findTypedInstance<LLFloaterReporter>("reporter");
-// 	if (self)
-// 	{
-// 		self->getChild<LLUICtrl>("details_edit")->setValue(description);
-
-// 		for_each(self->mMCDList.begin(), self->mMCDList.end(), DeletePointer());
-// 		self->mMCDList.clear();
-// 		if (mcd)
-// 		{
-// 			self->mMCDList.push_back(new LLMeanCollisionData(mcd));
-// 		}
-// 	}
-// }
-
-// void LLFloaterReporter::addDescription(const std::string& description, LLMeanCollisionData *mcd)
-// {
-// 	LLFloaterReporter *self = LLFloaterReg::findTypedInstance<LLFloaterReporter>("reporter");
-// 	if (self)
-// 	{
-// 		LLTextEditor* text = self->getChild<LLTextEditor>("details_edit");
-// 		if (text)
-// 		{	
-// 			text->insertText(description);
-// 		}
-// 		if (mcd)
-// 		{
-// 			self->mMCDList.push_back(new LLMeanCollisionData(mcd));
-// 		}
-// 	}
-// }

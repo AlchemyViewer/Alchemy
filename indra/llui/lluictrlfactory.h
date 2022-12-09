@@ -79,10 +79,6 @@ class LLWidgetNameRegistry final
 //	LLSINGLETON(LLDefaultParamBlockRegistry);
 //};
 
-extern LLTrace::BlockTimerStatHandle FTM_WIDGET_SETUP;
-extern LLTrace::BlockTimerStatHandle FTM_WIDGET_CONSTRUCTION;
-extern LLTrace::BlockTimerStatHandle FTM_INIT_FROM_PARAMS;
-
 // Build time optimization, generate this once in .cpp file
 #ifndef LLUICTRLFACTORY_CPP
 extern template class LLUICtrlFactory* LLSingleton<class LLUICtrlFactory>::getInstance();
@@ -122,7 +118,7 @@ public:
 	template<typename T>
 	static const typename T::Params& getDefaultParams()
 	{
-		return instanceFast().mParamDefaultsMap.obtain< ParamDefaults<typename T::Params, 0> >().get();
+		return instance().mParamDefaultsMap.obtain< ParamDefaults<typename T::Params, 0> >().get();
 	}
 
 	// Does what you want for LLFloaters and LLPanels
@@ -137,7 +133,7 @@ public:
 	template<typename T>
 	static T* create(typename T::Params& params, LLView* parent = NULL)
 	{
-		params.fillFrom(instanceFast().mParamDefaultsMap.obtain<
+		params.fillFrom(instance().mParamDefaultsMap.obtain<
 						ParamDefaults<typename T::Params, 0> >().get());
 
 		T* widget = createWidgetImpl<T>(params, parent);
@@ -156,17 +152,17 @@ public:
 	{
 		T* widget = NULL;
 
-		instanceFast().pushFileName(filename);
+		instance().pushFileName(filename);
 		{
 			LLXMLNodePtr root_node;
 
 			if (!LLUICtrlFactory::getLayeredXMLNode(filename, root_node))
 			{
-                LL_WARNS() << "Couldn't parse XUI from path: " << instanceFast().getCurFileName() << ", from filename: " << filename << LL_ENDL;
+                LL_WARNS() << "Couldn't parse XUI from path: " << instance().getCurFileName() << ", from filename: " << filename << LL_ENDL;
 				goto fail;
 			}
 
-			LLView* view = getInstanceFast()->createFromXML(root_node, parent, filename, registry, NULL);
+			LLView* view = getInstance()->createFromXML(root_node, parent, filename, registry, NULL);
 			if (view)
 			{
 				widget = dynamic_cast<T*>(view);
@@ -181,7 +177,7 @@ public:
 			}
 		}
 fail:
-		instanceFast().popFileName();
+		instance().popFileName();
 		return widget;
 	}
 
@@ -213,20 +209,18 @@ private:
 	template<typename T>
 	static T* createWidgetImpl(const typename T::Params& params, LLView* parent = NULL)
 	{
+        LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
 		T* widget = NULL;
 
 		if (!params.validateBlock())
 		{
-			LL_WARNS() << getInstanceFast()->getCurFileName() << ": Invalid parameter block for " << typeid(T).name() << LL_ENDL;
+			LL_WARNS() << getInstance()->getCurFileName() << ": Invalid parameter block for " << typeid(T).name() << LL_ENDL;
 			//return NULL;
 		}
 
-		{ LL_RECORD_BLOCK_TIME(FTM_WIDGET_CONSTRUCTION);
-			widget = new T(params);	
-		}
-		{ LL_RECORD_BLOCK_TIME(FTM_INIT_FROM_PARAMS);
-			widget->initFromParams(params);
-		}
+		widget = new T(params);	
+		
+		widget->initFromParams(params);
 
 		if (parent)
 		{
@@ -239,12 +233,12 @@ private:
 	template<typename T>
 	static T* defaultBuilder(LLXMLNodePtr node, LLView *parent, LLXMLNodePtr output_node)
 	{
-		LL_RECORD_BLOCK_TIME(FTM_WIDGET_SETUP);
+        LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
 
 		typename T::Params params(getDefaultParams<T>());
 
 		LLXUIParser parser;
-		parser.readXUI(node, params, LLUICtrlFactory::getInstanceFast()->getCurFileName());
+		parser.readXUI(node, params, LLUICtrlFactory::getInstance()->getCurFileName());
 
 		if (output_node)
 		{
@@ -262,7 +256,7 @@ private:
 
 		typedef typename T::child_registry_t registry_t;
 
-		createChildren(widget, node, registry_t::instanceFast(), output_node);
+		createChildren(widget, node, registry_t::instance(), output_node);
 
 		if (widget && !widget->postBuild())
 		{
@@ -296,7 +290,7 @@ template <typename PARAM_BLOCK, int DUMMY>
 LLUICtrlFactory::ParamDefaults<PARAM_BLOCK, DUMMY>::ParamDefaults()
 {
 	// look up template file for this param block...
-	const std::string* param_block_tag = LLWidgetNameRegistry::instanceFast().getValue(&typeid(PARAM_BLOCK));
+	const std::string* param_block_tag = LLWidgetNameRegistry::instance().getValue(&typeid(PARAM_BLOCK));
 	if (param_block_tag)
 	{	// ...and if it exists, back fill values using the most specific template first
 		PARAM_BLOCK params;
@@ -305,7 +299,7 @@ LLUICtrlFactory::ParamDefaults<PARAM_BLOCK, DUMMY>::ParamDefaults()
 	}
 	// recursively fill from base class param block
 	((typename PARAM_BLOCK::base_block_t&)mPrototype).fillFrom(
-		LLUICtrlFactory::instanceFast().mParamDefaultsMap.obtain<
+		LLUICtrlFactory::instance().mParamDefaultsMap.obtain<
 		ParamDefaults<typename PARAM_BLOCK::base_block_t, DUMMY> >().get());
 
 }
@@ -320,12 +314,12 @@ LLChildRegistry<DERIVED>::Register<T>::Register(const char* tag, LLWidgetCreator
 :	LLChildRegistry<DERIVED>::StaticRegistrar(tag, func.empty() ? (LLWidgetCreatorFunc)&LLUICtrlFactory::defaultBuilder<T> : func)
 {
 	// add this widget to various registries
-	LLUICtrlFactory::instanceFast().registerWidget(&typeid(T), &typeid(typename T::Params), tag);
+	LLUICtrlFactory::instance().registerWidget(&typeid(T), &typeid(typename T::Params), tag);
 	
 	// since registry_t depends on T, do this in line here
 	// TODO: uncomment this for schema generation
 	//typedef typename T::child_registry_t registry_t;
-	//LLChildRegistryRegistry::instanceFast().defaultRegistrar().add(&typeid(T), registry_t::instanceFast());
+	//LLChildRegistryRegistry::instance().defaultRegistrar().add(&typeid(T), registry_t::instance());
 }
 
 #endif //LLUICTRLFACTORY_H

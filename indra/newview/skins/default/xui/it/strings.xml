@@ -183,7 +183,7 @@ Versione server voce: [VOICE_VERSION]
 	<string name="LoginFailedNoNetwork">
 		Errore di rete: Non è stato possibile stabilire un collegamento, controlla la tua connessione.
 	</string>
-	<string name="LoginFailed">
+	<string name="LoginFailedHeader">
 		Accesso non riuscito.
 	</string>
 	<string name="Quit">
@@ -684,9 +684,6 @@ possono essere allegati ai biglietti.
 	</string>
 	<string name="GroupNameNone">
 		(nessuno)
-	</string>
-	<string name="AvalineCaller">
-		Chiamante Avaline [ORDER]
 	</string>
 	<string name="AssetErrorNone">
 		Nessun errore
@@ -5050,7 +5047,7 @@ Consulta la pagina http://status.secondlifegrid.net per determinare se il proble
 	<string name="PremiumMembership">
 		Premium
 	</string>
-	<string name="Premium PlusMembership">
+	<string name="Premium_PlusMembership">
 		Premium Plus
 	</string>
 	<string name="DeleteItems">

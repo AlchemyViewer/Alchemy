@@ -158,6 +158,8 @@ public:
 	// Draw lines in the dirt showing ownership. Return number of 
 	// vertices drawn.
 	S32 renderPropertyLines();
+    void renderPropertyLinesOnMinimap(F32 scale_pixels_per_meter, const F32* parcel_outline_color);
+
 
 	// Call this whenever you change the height data in the region.
 	// (Automatically called by LLSurfacePatch's update routine)
@@ -279,7 +281,9 @@ public:
 
 	// has region received its final (not seed) capability list?
 	bool capabilitiesReceived() const;
+    bool capabilitiesError() const;
 	void setCapabilitiesReceived(bool received);
+	void setCapabilitiesError();
 	boost::signals2::connection setCapabilitiesReceivedCallback(const caps_received_signal_t::slot_type& cb);
 
 	static bool isSpecialCapabilityName(std::string_view name);
@@ -590,11 +594,19 @@ private:
 	BOOL									mCacheLoaded;
 	BOOL                                    mCacheDirty;
 	BOOL	mAlive;					// can become false if circuit disconnects
-	BOOL	mCapabilitiesReceived;
 	BOOL	mSimulatorFeaturesReceived;
 	BOOL    mReleaseNotesRequested;
 	BOOL    mDead;  //if true, this region is in the process of deleting.
 	BOOL    mPaused; //pause processing the objects in the region
+
+    typedef enum
+    {
+        CAPABILITIES_STATE_INIT = 0,
+        CAPABILITIES_STATE_ERROR,
+        CAPABILITIES_STATE_RECEIVED
+    } eCababilitiesState;
+
+    eCababilitiesState	mCapabilitiesState;
 
 	typedef std::map<U32, std::vector<U32> > orphan_list_t;
 	orphan_list_t mOrphanMap;

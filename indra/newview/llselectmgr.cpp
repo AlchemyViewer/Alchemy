@@ -164,7 +164,7 @@ struct LLDeRezInfo
 
 LLSelectionCallbackData::LLSelectionCallbackData()
 {
-    LLSelectMgr *instance = LLSelectMgr::getInstanceFast();
+    LLSelectMgr *instance = LLSelectMgr::getInstance();
     LLObjectSelectionHandle selection = instance->getSelection();
     if (!selection->getNumNodes())
     {
@@ -215,8 +215,6 @@ void LLSelectMgr::cleanupGlobals()
 	LLSelectMgr::getInstance()->clearSelections();
 }
 
-// Build time optimization, generate this function once here
-template class LLSelectMgr* LLSingleton<class LLSelectMgr>::getInstance();
 //-----------------------------------------------------------------------------
 // LLSelectMgr()
 //-----------------------------------------------------------------------------
@@ -318,14 +316,29 @@ void LLSelectMgr::resetObjectOverrides(LLObjectSelectionHandle selected_handle)
 {
     struct f : public LLSelectedNodeFunctor
     {
+        f(bool a, LLSelectMgr* p) : mAvatarOverridesPersist(a), mManager(p) {}
+        bool mAvatarOverridesPersist;
+        LLSelectMgr* mManager;
         virtual bool apply(LLSelectNode* node)
         {
+            if (mAvatarOverridesPersist)
+            {
+                LLViewerObject* object = node->getObject();
+                if (object && !object->getParent())
+                {
+                    LLVOAvatar* avatar = object->asAvatar();
+                    if (avatar)
+                    {
+                        mManager->mAvatarOverridesMap.emplace(avatar->getID(), AvatarPositionOverride(node->mLastPositionLocal, node->mLastRotation, object));
+                    }
+                }
+            }
             node->mLastPositionLocal.setVec(0, 0, 0);
             node->mLastRotation = LLQuaternion();
             node->mLastScale.setVec(0, 0, 0);
             return true;
         }
-    } func;
+    } func(mAllowSelectAvatar, this);
 
     selected_handle->applyToNodes(&func);
 }
@@ -357,6 +370,93 @@ void LLSelectMgr::overrideObjectUpdates()
 		}
 	} func;
 	getSelection()->applyToNodes(&func);
+}
+
+void LLSelectMgr::resetAvatarOverrides()
+{
+    mAvatarOverridesMap.clear();
+}
+
+void LLSelectMgr::overrideAvatarUpdates()
+{
+    if (mAvatarOverridesMap.size() == 0)
+    {
+        return;
+    }
+
+    if (!mAllowSelectAvatar || !gFloaterTools)
+    {
+        resetAvatarOverrides();
+        return;
+    }
+
+    if (!gFloaterTools->getVisible() && getSelection()->isEmpty())
+    {
+        // when user switches selection, floater is invisible and selection is empty
+        LLToolset *toolset = LLToolMgr::getInstance()->getCurrentToolset();
+        if (toolset->isShowFloaterTools()
+            && toolset->isToolSelected(0)) // Pie tool
+        {
+            resetAvatarOverrides();
+            return;
+        }
+    }
+
+    // remove selected avatars from this list,
+    // but set object overrides to make sure avatar won't snap back 
+    struct f : public LLSelectedNodeFunctor
+    {
+        f(LLSelectMgr* p) : mManager(p) {}
+        LLSelectMgr* mManager;
+        virtual bool apply(LLSelectNode* selectNode)
+        {
+            LLViewerObject* object = selectNode->getObject();
+            if (object && !object->getParent())
+            {
+                LLVOAvatar* avatar = object->asAvatar();
+                if (avatar)
+                {
+                    uuid_av_override_map_t::iterator iter = mManager->mAvatarOverridesMap.find(avatar->getID());
+                    if (iter != mManager->mAvatarOverridesMap.end())
+                    {
+                        if (selectNode->mLastPositionLocal.isExactlyZero())
+                        {
+                            selectNode->mLastPositionLocal = iter->second.mLastPositionLocal;
+                        }
+                        if (selectNode->mLastRotation == LLQuaternion())
+                        {
+                            selectNode->mLastRotation = iter->second.mLastRotation;
+                        }
+                        mManager->mAvatarOverridesMap.erase(iter);
+                    }
+                }
+            }
+            return true;
+        }
+    } func(this);
+    getSelection()->applyToNodes(&func);
+
+    // Override avatar positions
+    uuid_av_override_map_t::iterator it = mAvatarOverridesMap.begin();
+    while (it != mAvatarOverridesMap.end())
+    {
+        if (it->second.mObject->isDead())
+        {
+            it = mAvatarOverridesMap.erase(it);
+        }
+        else
+        {
+            if (!it->second.mLastPositionLocal.isExactlyZero())
+            {
+                it->second.mObject->setPosition(it->second.mLastPositionLocal);
+            }
+            if (it->second.mLastRotation != LLQuaternion())
+            {
+                it->second.mObject->setRotation(it->second.mLastRotation);
+            }
+            it++;
+        }
+    }
 }
 
 //-----------------------------------------------------------------------------
@@ -581,7 +681,7 @@ BOOL LLSelectMgr::removeObjectFromSelections(const LLUUID &id)
 	BOOL object_found = FALSE;
 	LLTool *tool = NULL;
 
-	tool = LLToolMgr::getInstanceFast()->getCurrentTool();
+	tool = LLToolMgr::getInstance()->getCurrentTool();
 
 	// It's possible that the tool is editing an object that is not selected
 	LLViewerObject* tool_editing_object = tool->getEditingObject();
@@ -3701,27 +3801,27 @@ bool LLSelectMgr::confirmDelete(const LLSD& notification, const LLSD& response, 
 			const LLUUID trash_id = gInventory.findCategoryUUIDForType(LLFolderType::FT_TRASH);
 			// attempt to derez into the trash.
 			LLDeRezInfo info(DRD_TRASH, trash_id);
-			LLSelectMgr::getInstanceFast()->sendListToRegions("DeRezObject",
+			LLSelectMgr::getInstance()->sendListToRegions("DeRezObject",
                                                           packDeRezHeader,
                                                           packObjectLocalID,
                                                           logNoOp,
                                                           (void*) &info,
                                                           SEND_ONLY_ROOTS);
 			// VEFFECT: Delete Object - one effect for all deletes
-			if (!gSavedSettings.getBOOL("AlchemyDisableEffectSpiral") && (LLSelectMgr::getInstanceFast()->mSelectedObjects->mSelectType != SELECT_TYPE_HUD))
+			if (!gSavedSettings.getBOOL("AlchemyDisableEffectSpiral") && (LLSelectMgr::getInstance()->mSelectedObjects->mSelectType != SELECT_TYPE_HUD))
 			{
 				LLHUDEffectSpiral *effectp = (LLHUDEffectSpiral *)LLHUDManager::getInstance()->createViewerEffect(LLHUDObject::LL_HUD_EFFECT_POINT, TRUE);
-				effectp->setPositionGlobal( LLSelectMgr::getInstanceFast()->getSelectionCenterGlobal() );
+				effectp->setPositionGlobal( LLSelectMgr::getInstance()->getSelectionCenterGlobal() );
 				effectp->setColor(LLColor4U(gAgent.getEffectColor()));
 				F32 duration = 0.5f;
-				duration += LLSelectMgr::getInstanceFast()->mSelectedObjects->getObjectCount() / 64.f;
+				duration += LLSelectMgr::getInstance()->mSelectedObjects->getObjectCount() / 64.f;
 				effectp->setDuration(duration);
 			}
 
 			gAgentCamera.setLookAt(LOOKAT_TARGET_CLEAR);
 
 			// Keep track of how many objects have been deleted.
-			add(LLStatViewer::DELETE_OBJECT, LLSelectMgr::getInstanceFast()->mSelectedObjects->getObjectCount());
+			add(LLStatViewer::DELETE_OBJECT, LLSelectMgr::getInstance()->mSelectedObjects->getObjectCount());
 		}
 		break;
 	case 1:
@@ -4441,7 +4541,7 @@ void LLSelectMgr::deselectAllIfTooFar()
 // [RLVa:KB] - Checked: 2010-04-11 (RLVa-1.2.0e) | Modified: RLVa-0.2.0f
 	static RlvCachedBehaviourModifier<float> s_nFartouchDist(RLV_MODIFIER_FARTOUCHDIST);
 
-	BOOL fRlvFartouch = gRlvHandler.hasBehaviour(RLV_BHVR_FARTOUCH) && LLToolMgr::instanceFast().inEdit();
+	BOOL fRlvFartouch = gRlvHandler.hasBehaviour(RLV_BHVR_FARTOUCH) && LLToolMgr::instance().inEdit();
 	if ( (ALControlCache::LimitSelectDistance || (fRlvFartouch) )
 // [/RLVa:KB]
 		&& (!mSelectedObjects->getPrimaryObject() || !mSelectedObjects->getPrimaryObject()->isAvatar())
@@ -4569,7 +4669,7 @@ void LLSelectMgr::sendAttach(LLObjectSelectionHandle selection_handle, U8 attach
 		return;
 	}
 
-	BOOL build_mode = LLToolMgr::getInstanceFast()->inEdit();
+	BOOL build_mode = LLToolMgr::getInstance()->inEdit();
 	// Special case: Attach to default location for this object.
 	if (0 == attachment_point ||
 		get_if_there(gAgentAvatarp->mAttachmentPoints, (S32)attachment_point, (LLViewerJointAttachment*)NULL))
@@ -5456,7 +5556,7 @@ void LLSelectMgr::processObjectProperties(LLMessageSystem* msg, void** user_data
 				return (node->getObject() && node->getObject()->mID == mID);
 			}
 		} func(id);
-		LLSelectNode* node = LLSelectMgr::getInstanceFast()->getSelection()->getFirstNode(&func);
+		LLSelectNode* node = LLSelectMgr::getInstance()->getSelection()->getFirstNode(&func);
 
 		if (!node)
 		{
@@ -5585,7 +5685,7 @@ void LLSelectMgr::processObjectPropertiesFamily(LLMessageSystem* msg, void** use
 	else if (request_flags & OBJECT_PAY_REQUEST)
 	{
 		// check if the owner of the paid object is muted
-		LLMuteList::getInstanceFast()->autoRemove(owner_id, LLMuteList::AR_MONEY);
+		LLMuteList::getInstance()->autoRemove(owner_id, LLMuteList::AR_MONEY);
 	}
 
 	// Now look through all of the hovered nodes
@@ -5598,7 +5698,7 @@ void LLSelectMgr::processObjectPropertiesFamily(LLMessageSystem* msg, void** use
 			return (node->getObject() && node->getObject()->mID == mID);
 		}
 	} func(id);
-	LLSelectNode* node = LLSelectMgr::getInstanceFast()->mHoverObjects->getFirstNode(&func);
+	LLSelectNode* node = LLSelectMgr::getInstance()->mHoverObjects->getFirstNode(&func);
 
 	if (node)
 	{
@@ -5624,7 +5724,7 @@ void LLSelectMgr::processForceObjectSelect(LLMessageSystem* msg, void**)
 
 	if (reset_list)
 	{
-		LLSelectMgr::getInstanceFast()->deselectAll();
+		LLSelectMgr::getInstance()->deselectAll();
 	}
 
 	LLUUID full_id;
@@ -5650,7 +5750,7 @@ void LLSelectMgr::processForceObjectSelect(LLMessageSystem* msg, void**)
 	}
 
 	// Don't select, just highlight
-	LLSelectMgr::getInstanceFast()->highlightObjectAndFamily(objects);
+	LLSelectMgr::getInstance()->highlightObjectAndFamily(objects);
 }
 
 void LLSelectMgr::updateSilhouettes()
@@ -5795,7 +5895,7 @@ void LLSelectMgr::updateSilhouettes()
 		num_sils_genned	= 0;
 
 		// render silhouettes for highlighted objects
-		const auto& viewer_cam_origin = LLViewerCamera::instanceFast().getOrigin();
+		const auto& viewer_cam_origin = LLViewerCamera::instance().getOrigin();
 		//BOOL subtracting_from_selection = (gKeyboard->currentMask(TRUE) == MASK_CONTROL);
 		for (S32 pass = 0; pass < 2; pass++)
 		{
@@ -5858,8 +5958,6 @@ void LLSelectMgr::updateSilhouettes()
 		// clear flags after traversing node list (as child objects need to refer to parent flags, etc)
 		objectp->clearChanged(LLXform::MOVED | LLXform::SILHOUETTE);
 	}
-	
-	//gGL.setAlphaRejectSettings(LLRender::CF_DEFAULT);
 }
 
 void LLSelectMgr::updateSelectionSilhouette(LLObjectSelectionHandle object_handle, S32& num_sils_genned, std::vector<LLViewerObject*>& changed_objects)
@@ -5870,7 +5968,7 @@ void LLSelectMgr::updateSelectionSilhouette(LLObjectSelectionHandle object_handl
 
 		//mSilhouetteImagep->bindTexture();
 		//glAlphaFunc(GL_GREATER, sHighlightAlphaTest);
-		const auto& viewer_cam_origin = LLViewerCamera::instanceFast().getOrigin();
+		const auto& viewer_cam_origin = LLViewerCamera::instance().getOrigin();
 		for (S32 pass = 0; pass < 2; pass++)
 		{
 			for (LLSelectNode* node : object_handle->begin_end())
@@ -5933,7 +6031,7 @@ void LLSelectMgr::renderSilhouettes(BOOL for_hud)
 		gGL.pushMatrix();
 		gGL.loadIdentity();
 		F32 depth = llmax(1.f, hud_bbox.getExtentLocal().mV[VX] * 1.1f);
-		auto& viewerCamera = LLViewerCamera::instanceFast();
+		auto& viewerCamera = LLViewerCamera::instance();
 		gGL.ortho(-0.5f * viewerCamera.getAspect(), 0.5f * viewerCamera.getAspect(), -0.5f, 0.5f, 0.f, depth);
 
 		gGL.matrixMode(LLRender::MM_MODELVIEW);
@@ -6229,6 +6327,24 @@ LLSelectNode::LLSelectNode(const LLSelectNode& nodep)
 
 LLSelectNode::~LLSelectNode()
 {
+    LLSelectMgr *manager = LLSelectMgr::getInstance();
+    if (manager->mAllowSelectAvatar
+        && (!mLastPositionLocal.isExactlyZero()
+            || mLastRotation != LLQuaternion()))
+    {
+        LLViewerObject* object = getObject(); //isDead() check
+        if (object && !object->getParent())
+        {
+            LLVOAvatar* avatar = object->asAvatar();
+            if (avatar)
+            {
+                // Avatar was moved and needs to stay that way
+                manager->mAvatarOverridesMap.emplace(avatar->getID(), LLSelectMgr::AvatarPositionOverride(mLastPositionLocal, mLastRotation, object));
+            }
+        }
+    }
+
+
 	delete mPermissions;
 	mPermissions = NULL;
 }
@@ -6533,7 +6649,7 @@ void LLSelectNode::renderOneSilhouette(const LLColor4 &color)
 	LLVolume *volume = objectp->getVolume();
 	if (volume)
 	{
-		auto& viewerCamera = LLViewerCamera::instanceFast();
+		auto& viewerCamera = LLViewerCamera::instance();
 
 		F32 silhouette_thickness;
 		if (isAgentAvatarValid() && is_hud_object)
@@ -6555,22 +6671,9 @@ void LLSelectNode::renderOneSilhouette(const LLColor4 &color)
 		{
 			gGL.flush();
 			gGL.blendFunc(LLRender::BF_SOURCE_COLOR, LLRender::BF_ONE);
-            if (!LLGLSLShader::sNoFixedFunction)
-            {
-                LLGLEnable fog(GL_FOG);
-                glFogi(GL_FOG_MODE, GL_LINEAR);
-                float d = (viewerCamera.getPointOfInterest() - viewerCamera.getOrigin()).magVec();
-                LLColor4 fogCol = color * (F32) llclamp((LLSelectMgr::getInstanceFast()->getSelectionCenterGlobal() -
-                                   gAgentCamera.getCameraPositionGlobal()).magVec() /
-                                      (LLSelectMgr::getInstanceFast()->getBBoxOfSelection().getExtentLocal().magVec() * 4),
-                                  0.0, 1.0);
-                glFogf(GL_FOG_START, d);
-                glFogf(GL_FOG_END, d * (1 + (viewerCamera.getView() / viewerCamera.getDefaultFOV())));
-                glFogfv(GL_FOG_COLOR, fogCol.mV);
-            }
 
             LLGLDepthTest gls_depth(GL_TRUE, GL_FALSE, GL_GEQUAL);
-			gGL.setAlphaRejectSettings(LLRender::CF_DEFAULT);
+            gGL.flush();
 			gGL.begin(LLRender::LINES);
 			{
 				gGL.color4f(color.mV[VRED], color.mV[VGREEN], color.mV[VBLUE], 0.4f);
@@ -6662,7 +6765,7 @@ void dialog_refresh_all()
 	// make cleaning up the functions below easier.  Also, sometimes entities
 	// outside the selection manager change properties of selected objects
 	// and call into this function.  Yuck.
-	LLSelectMgr::getInstanceFast()->mUpdateSignal();
+	LLSelectMgr::getInstance()->mUpdateSignal();
 
 	// *TODO: Eliminate all calls into outside classes below, make those
 	// objects register with the update signal.
@@ -6716,7 +6819,7 @@ S32 get_family_count(LLViewerObject *parent)
 		}
 		else
 		{
-			if (LLSelectMgr::getInstanceFast()->canSelectObject(child))
+			if (LLSelectMgr::getInstance()->canSelectObject(child))
 			{
 				count += get_family_count( child );
 			}
@@ -6736,6 +6839,10 @@ void LLSelectMgr::updateSelectionCenter()
 	const F32 MOVE_SELECTION_THRESHOLD = 1.f;		//  Movement threshold in meters for updating selection
 													//  center (tractor beam)
 
+    // override any avatar updates received
+    // Works only if avatar was repositioned
+    // and edit floater is visible
+    overrideAvatarUpdates();
 	//override any object updates received
 	//for selected objects
 	overrideObjectUpdates();
@@ -6796,7 +6903,7 @@ void LLSelectMgr::updateSelectionCenter()
 	
 	if (gAgentID.notNull())
 	{
-		LLTool		*tool = LLToolMgr::getInstanceFast()->getCurrentTool();
+		LLTool		*tool = LLToolMgr::getInstance()->getCurrentTool();
 		if (mShowSelection)
 		{
 			LLVector3d select_center_global;
@@ -7053,9 +7160,9 @@ void LLSelectMgr::validateSelection()
 	{
 		virtual bool apply(LLViewerObject* object)
 		{
-			if (!instanceFast().canSelectObject(object))
+			if (!instance().canSelectObject(object))
 			{
-				instanceFast().deselectObjectOnly(object);
+				instance().deselectObjectOnly(object);
 			}
 			return true;
 		}
@@ -7912,7 +8019,7 @@ bool LLSelectMgr::selectionMove(const LLVector3& displ,
 		// calculate the distance of the object closest to the camera origin
 		F32 min_dist_squared = F32_MAX; // value will be overridden in the loop
 		
-		const auto& origin = LLViewerCamera::getInstanceFast()->getOrigin();
+		const auto& origin = LLViewerCamera::getInstance()->getOrigin();
 
 		LLVector3 obj_pos;
 		for (LLSelectNode* nodep : selection->root_begin_end())
@@ -7934,16 +8041,16 @@ bool LLSelectMgr::selectionMove(const LLVector3& displ,
 							displ.mV[2] * min_dist);
 
 		// equates to: Displ_global = Displ * M_cam_axes_in_global_frame
-		displ_global = LLViewerCamera::getInstanceFast()->rotateToAbsolute(displ_global);
+		displ_global = LLViewerCamera::getInstance()->rotateToAbsolute(displ_global);
 	}
 
 	LLQuaternion new_rot;
 	if (update_rotation)
 	{
 		// let's calculate the rotation around each camera axes 
-		LLQuaternion qx(roll, LLViewerCamera::getInstanceFast()->getAtAxis());
-		LLQuaternion qy(pitch, LLViewerCamera::getInstanceFast()->getLeftAxis());
-		LLQuaternion qz(yaw, LLViewerCamera::getInstanceFast()->getUpAxis());
+		LLQuaternion qx(roll, LLViewerCamera::getInstance()->getAtAxis());
+		LLQuaternion qy(pitch, LLViewerCamera::getInstance()->getLeftAxis());
+		LLQuaternion qz(yaw, LLViewerCamera::getInstance()->getUpAxis());
 		new_rot.setQuat(qx * qy * qz);
 	}
 	

@@ -1280,7 +1280,7 @@ void LLPanelEditWearable::changeCamera(U8 subpart)
 {
 	// Don't change the camera if this type doesn't have a camera switch.
 	// Useful for wearables like physics that don't have an associated physical body part.
-	if (LLWearableType::getInstanceFast()->getDisableCameraSwitch(mWearablePtr->getType()))
+	if (LLWearableType::getInstance()->getDisableCameraSwitch(mWearablePtr->getType()))
 	{
 		return;
 	}
@@ -1312,7 +1312,9 @@ void LLPanelEditWearable::changeCamera(U8 subpart)
         gMorphView->setCameraOffset( subpart_entry->mCameraOffset );
         if (gSavedSettings.getBOOL("AppearanceCameraMovement"))
         {
-                gMorphView->updateCamera();
+            // Unlock focus from avatar but don't stop animation to not interrupt ANIM_AGENT_CUSTOMIZE
+            gAgentCamera.setFocusOnAvatar(FALSE, gAgentCamera.getCameraAnimating());
+            gMorphView->updateCamera();
         }
 }
 

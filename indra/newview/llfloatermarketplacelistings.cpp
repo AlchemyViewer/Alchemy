@@ -180,7 +180,7 @@ void LLPanelMarketplaceListings::draw()
     // Get the audit button enabled only after the whole inventory is fetched
     if (!mAuditBtn->getEnabled())
     {
-        mAuditBtn->setEnabled(LLInventoryModelBackgroundFetch::instanceFast().isEverythingFetched());
+        mAuditBtn->setEnabled(LLInventoryModelBackgroundFetch::instance().isEverythingFetched());
     }
     
 	LLPanel::draw();
@@ -431,7 +431,7 @@ void LLFloaterMarketplaceListings::fetchContents()
 	{
         LLMarketplaceData::instance().setDataFetchedSignal(boost::bind(&LLFloaterMarketplaceListings::updateView, this));
         LLMarketplaceData::instance().setSLMDataFetched(MarketplaceFetchCodes::MARKET_FETCH_LOADING);
-		LLInventoryModelBackgroundFetch::instanceFast().start(mRootFolderId);
+		LLInventoryModelBackgroundFetch::instance().start(mRootFolderId);
         LLMarketplaceData::instance().getSLMListings();
 	}
 }
@@ -579,7 +579,25 @@ void LLFloaterMarketplaceListings::updateView()
 
         // Update the top message or flip to the tabs and folders view
         // *TODO : check those messages and create better appropriate ones in strings.xml
-        if (mRootFolderId.notNull())
+        if (mkt_status == MarketplaceStatusCodes::MARKET_PLACE_CONNECTION_FAILURE)
+        {
+            std::string reason = LLMarketplaceData::instance().getSLMConnectionfailureReason();
+            if (reason.empty())
+            {
+                text = LLTrans::getString("InventoryMarketplaceConnectionError");
+            }
+            else
+            {
+                LLSD args;
+                args["[REASON]"] = reason;
+                text = LLTrans::getString("InventoryMarketplaceConnectionErrorReason", args);
+            }
+
+            title = LLTrans::getString("InventoryOutboxErrorTitle");
+            tooltip = LLTrans::getString("InventoryOutboxErrorTooltip");
+            LL_WARNS() << "Marketplace status code: " << mkt_status << LL_ENDL;
+        }
+        else if (mRootFolderId.notNull())
         {
             // "Marketplace listings is empty!" message strings
             text = LLTrans::getString("InventoryMarketplaceListingsNoItems", subs);

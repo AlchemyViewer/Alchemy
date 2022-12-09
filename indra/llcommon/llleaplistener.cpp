@@ -219,7 +219,7 @@ void LLLeapListener::getAPI(const LLSD& request) const
 {
     Response reply(LLSD(), request);
 
-    LLEventAPI* found = LLEventAPI::getInstance(request["api"]);
+    auto found = LLEventAPI::getInstance(request["api"]);
     if (found)
     {
         reply["name"] = found->getName();

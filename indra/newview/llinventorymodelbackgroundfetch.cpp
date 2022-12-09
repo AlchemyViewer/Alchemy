@@ -115,12 +115,12 @@ public:
 	BGItemHttpHandler(const LLSD & request_sd)
 		: LLInventoryModel::FetchItemHttpHandler(request_sd)
 		{
-			LLInventoryModelBackgroundFetch::instanceFast().incrFetchCount(1);
+			LLInventoryModelBackgroundFetch::instance().incrFetchCount(1);
 		}
 
 	virtual ~BGItemHttpHandler()
 		{
-			LLInventoryModelBackgroundFetch::instanceFast().incrFetchCount(-1);
+			LLInventoryModelBackgroundFetch::instance().incrFetchCount(-1);
 		}
 
 protected:
@@ -148,12 +148,12 @@ public:
 		  mRequestSD(request_sd),
 		  mRecursiveCatUUIDs(recursive_cats)
 		{
-			LLInventoryModelBackgroundFetch::instanceFast().incrFetchCount(1);
+			LLInventoryModelBackgroundFetch::instance().incrFetchCount(1);
 		}
 
 	virtual ~BGFolderHttpHandler()
 		{
-			LLInventoryModelBackgroundFetch::instanceFast().incrFetchCount(-1);
+			LLInventoryModelBackgroundFetch::instance().incrFetchCount(-1);
 		}
 	
 protected:
@@ -339,7 +339,7 @@ void LLInventoryModelBackgroundFetch::setAllFoldersFetched()
 
 void LLInventoryModelBackgroundFetch::backgroundFetchCB(void *)
 {
-	LLInventoryModelBackgroundFetch::instanceFast().backgroundFetch();
+	LLInventoryModelBackgroundFetch::instance().backgroundFetch();
 }
 
 void LLInventoryModelBackgroundFetch::backgroundFetch()
@@ -347,7 +347,7 @@ void LLInventoryModelBackgroundFetch::backgroundFetch()
 	if (mBackgroundFetchActive && gAgent.getRegion() && gAgent.getRegion()->capabilitiesReceived())
 	{
 		// If we'll be using the capability, we'll be sending batches and the background thing isn't as important.
-		if (LLGridManager::instanceFast().isInSecondlife() || gSavedSettings.getBOOL("UseHTTPInventory"))
+		if (LLGridManager::instance().isInSecondlife() || gSavedSettings.getBOOL("UseHTTPInventory"))
 		{
 			bulkFetch();
 			return;
@@ -556,7 +556,7 @@ void LLInventoryModelBackgroundFetch::bulkFetch()
 		// OnIdle it will be called anyway due to Add flag for processed item.
 		// It seems like in some cases we are updaiting on fail (no flag),
 		// but is there anything to update?
-		if (LLGridManager::getInstanceFast()->isInSecondlife())
+		if (LLGridManager::getInstance()->isInSecondlife())
 		{
 			gInventory.notifyObservers();
 		}
@@ -822,7 +822,7 @@ void BGFolderHttpHandler::onCompleted(LLCore::HttpHandle handle, LLCore::HttpRes
 
 void BGFolderHttpHandler::processData(LLSD & content, LLCore::HttpResponse * response)
 {
-	LLInventoryModelBackgroundFetch * fetcher(LLInventoryModelBackgroundFetch::getInstanceFast());
+	LLInventoryModelBackgroundFetch * fetcher(LLInventoryModelBackgroundFetch::getInstance());
 
 	// API V2 and earlier should probably be testing for "error" map
 	// in response as an application-level error.
@@ -870,7 +870,7 @@ void BGFolderHttpHandler::processData(LLSD & content, LLCore::HttpResponse * res
 							titem->setParent(lost_uuid);
 							titem->updateParentOnServer(FALSE);
 							gInventory.updateItem(titem);
-							if (!LLGridManager::getInstanceFast()->isInSecondlife())
+							if (!LLGridManager::getInstance()->isInSecondlife())
 							{
 								gInventory.notifyObservers();
 							}
@@ -947,7 +947,7 @@ void BGFolderHttpHandler::processData(LLSD & content, LLCore::HttpResponse * res
 		fetcher->setAllFoldersFetched();
 	}
 
-	if (!LLGridManager::getInstanceFast()->isInSecondlife())
+	if (!LLGridManager::getInstance()->isInSecondlife())
 	{
 		gInventory.notifyObservers();
 	}
@@ -972,7 +972,7 @@ void BGFolderHttpHandler::processFailure(LLCore::HttpStatus status, LLCore::Http
 	// cause of the retry.  The new http library should be doing
 	// adquately on retries but I want to keep the structure of a
 	// retry for reference.
-	LLInventoryModelBackgroundFetch *fetcher = LLInventoryModelBackgroundFetch::getInstanceFast();
+	LLInventoryModelBackgroundFetch *fetcher = LLInventoryModelBackgroundFetch::getInstance();
 	if (false)
 	{
 		// timed out or curl failure
@@ -991,7 +991,7 @@ void BGFolderHttpHandler::processFailure(LLCore::HttpStatus status, LLCore::Http
 		}
 	}
 
-	if (!LLGridManager::getInstanceFast()->isInSecondlife())
+	if (!LLGridManager::getInstance()->isInSecondlife())
 	{
 		gInventory.notifyObservers();
 	}
@@ -1012,7 +1012,7 @@ void BGFolderHttpHandler::processFailure(const char * const reason, LLCore::Http
 	// the same but be aware that this may be a source of problems.
 	// Philosophy is that inventory folders are so essential to
 	// operation that this is a reasonable action.
-	LLInventoryModelBackgroundFetch *fetcher = LLInventoryModelBackgroundFetch::getInstanceFast();
+	LLInventoryModelBackgroundFetch *fetcher = LLInventoryModelBackgroundFetch::getInstance();
 	if (true)
 	{
 		for (const auto& folder_sd : mRequestSD["folders"].array())
@@ -1030,7 +1030,7 @@ void BGFolderHttpHandler::processFailure(const char * const reason, LLCore::Http
 		}
 	}
 
-	if (!LLGridManager::getInstanceFast()->isInSecondlife())
+	if (!LLGridManager::getInstance()->isInSecondlife())
 	{
 		gInventory.notifyObservers();
 	}

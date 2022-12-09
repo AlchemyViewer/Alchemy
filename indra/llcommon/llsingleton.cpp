@@ -59,8 +59,8 @@ private:
     // manipulating some data in the master list, we must also check whether
     // it's safe to log -- which involves querying a different LLSingleton --
     // which requires accessing the master list.
-    typedef LLMutex mutex_t;
-    typedef LLMutexLock lock_t;
+    typedef std::recursive_mutex mutex_t;
+    typedef std::unique_lock<mutex_t> lock_t;
 
     mutex_t mMutex;
 
@@ -72,7 +72,7 @@ public:
     public:
         Lock():
             mMasterList(MasterList::instance()),
-            mLock(&mMasterList.mMutex)
+            mLock(mMasterList.mMutex)
         {}
         Lock(const Lock&) = delete;
         Lock& operator=(const Lock&) = delete;

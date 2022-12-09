@@ -102,6 +102,8 @@ public:
 
 	int getDefNavBarHeight();
 	int getDefFavBarHeight();
+
+    bool isRebakeNavMeshAvailable();
 	
 // [RLVa:KB] - Checked: 2014-03-23 (RLVa-1.4.10)
 	void refreshLocationCtrl();

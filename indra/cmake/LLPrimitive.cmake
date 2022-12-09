@@ -6,10 +6,10 @@ include(Prebuilt)
 include(Boost)
 include(LibXML2)
 include(URIPARSER)
-include(ZLIB)
+include(ZLIBNG)
 
 use_prebuilt_binary(colladadom)
-use_prebuilt_binary(minizip-ng)
+use_prebuilt_binary(minizip-ng) # needed for colladadom
 
 set(LLPRIMITIVE_INCLUDE_DIRS
     ${LIBS_OPEN_DIR}/llprimitive
@@ -25,7 +25,7 @@ if (WINDOWS)
         ${LIBXML2_LIBRARIES}
         ${URIPARSER_LIBRARIES}
         ${MINIZIP_LIBRARIES}
-        ${ZLIB_LIBRARIES}
+        ${ZLIBNG_LIBRARIES}
         )
 elseif (DARWIN)
     set(LLPRIMITIVE_LIBRARIES 
@@ -37,7 +37,7 @@ elseif (DARWIN)
         ${LIBXML2_LIBRARIES}
         ${URIPARSER_LIBRARIES}
         ${MINIZIP_LIBRARIES}
-        ${ZLIB_LIBRARIES}
+        ${ZLIBNG_LIBRARIES}
         )
 elseif (LINUX)
     set(LLPRIMITIVE_LIBRARIES 
@@ -49,7 +49,7 @@ elseif (LINUX)
         ${LIBXML2_LIBRARIES}
         ${URIPARSER_LIBRARIES}
         ${MINIZIP_LIBRARIES}
-        ${ZLIB_LIBRARIES}
+        ${ZLIBNG_LIBRARIES}
         )
 endif (WINDOWS)
 

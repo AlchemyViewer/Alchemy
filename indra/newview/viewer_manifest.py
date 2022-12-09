@@ -509,6 +509,18 @@ class WindowsManifest(ViewerManifest):
                     self.path("kdud.dll", "kdud.dll")
                 else:
                     self.path(src="kdu.dll", dst="kdu.dll")
+					
+            # These need to be installed as a SxS assembly, currently a 'private' assembly.
+            # See http://msdn.microsoft.com/en-us/library/ms235291(VS.80).aspx
+            self.path("concrt140.dll")
+            self.path("msvcp140.dll")
+            self.path("msvcp140_1.dll")
+            self.path("msvcp140_2.dll")
+            self.path("msvcp140_atomic_wait.dll")
+            self.path("msvcp140_codecvt_ids.dll")
+            self.path("vccorlib140.dll")
+            self.path("vcruntime140.dll")
+            self.path("vcruntime140_1.dll")
 
             # SLVoice executable
             with self.prefix(src=os.path.join(pkgdir, 'bin', 'release')):
@@ -530,6 +542,7 @@ class WindowsManifest(ViewerManifest):
 
         self.path(src="licenses-win32.txt", dst="licenses.txt")
         self.path("featuretable.txt")
+        self.path("cube.dae")
 
         with self.prefix(src=pkgdir):
             self.path("ca-bundle.crt")
@@ -567,10 +580,7 @@ class WindowsManifest(ViewerManifest):
                     self.path("v8_context_snapshot.bin")
                     self.path("vk_swiftshader_icd.json")
 
-                # CEF software renderer files
-                with self.prefix(src=os.path.join(pkgdir, 'bin', config, 'swiftshader'), dst='swiftshader'):
-                    self.path("libEGL.dll")
-                    self.path("libGLESv2.dll")
+                self.path_optional("vcruntime140_1.dll")
 
                 # CEF files common to all configurations
                 with self.prefix(src=os.path.join(pkgdir, 'resources')):
@@ -893,6 +903,7 @@ class DarwinManifest(ViewerManifest):
 
                 self.path("licenses-mac.txt", dst="licenses.txt")
                 self.path("featuretable_mac.txt")
+                self.path("cube.dae")
 
                 with self.prefix(src=pkgdir,dst=""):
                     self.path("ca-bundle.crt")
@@ -1142,14 +1153,11 @@ class LinuxManifest(ViewerManifest):
             self.path("resources.pak")
             self.path("icudtl.dat")
 
-        with self.prefix(src=os.path.join(pkgdir, 'lib', 'release', 'swiftshader'), dst=os.path.join('bin', 'llplugin', 'swiftshader') ):
-            self.path("libEGL.so")
-            self.path("libGLESv2.so")
-
         with self.prefix(src=os.path.join(pkgdir, 'resources', 'locales'), dst=os.path.join('bin', 'llplugin', 'locales')):
             self.path("*.pak")
 
         self.path("featuretable_linux.txt")
+        self.path("cube.dae")
 
         with self.prefix(src=pkgdir, dst="app_settings"):
             self.path("ca-bundle.crt")

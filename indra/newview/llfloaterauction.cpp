@@ -102,8 +102,8 @@ void LLFloaterAuction::initialize()
 {
 	mParcelUpdateCapUrl.clear();
 
-	mParcelp = LLViewerParcelMgr::getInstanceFast()->getParcelSelection();
-	LLViewerRegion* region = LLViewerParcelMgr::getInstanceFast()->getSelectionRegion();
+	mParcelp = LLViewerParcelMgr::getInstance()->getParcelSelection();
+	LLViewerRegion* region = LLViewerParcelMgr::getInstance()->getSelectionRegion();
 	LLParcel* parcelp = mParcelp->getParcel();
 	if(parcelp && region && !parcelp->getForSale())
 	{
@@ -482,7 +482,7 @@ bool LLFloaterAuction::onSellToAnyoneConfirmed(const LLSD& notification, const L
 void LLFloaterAuction::doSellToAnyone()
 {
 	LLParcel* parcelp = mParcelp->getParcel();
-	LLViewerRegion* region = LLViewerParcelMgr::getInstanceFast()->getSelectionRegion();
+	LLViewerRegion* region = LLViewerParcelMgr::getInstance()->getSelectionRegion();
 
 	if (parcelp
 		&& region

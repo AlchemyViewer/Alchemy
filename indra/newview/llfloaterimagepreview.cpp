@@ -664,10 +664,7 @@ BOOL LLImagePreviewAvatar::render()
 	LLGLSUIDefault def;
 	gGL.color4f(0.15f, 0.2f, 0.3f, 1.f);
 
-	if (LLGLSLShader::sNoFixedFunction)
-	{
-		gUIProgram.bind();
-	}
+	gUIProgram.bind();
 
 	gl_rect_2d_simple( mFullWidth, mFullHeight );
 
@@ -684,16 +681,16 @@ BOOL LLImagePreviewAvatar::render()
 		LLQuaternion(mCameraYaw, LLVector3::z_axis);
 
 	LLQuaternion av_rot = avatarp->mPelvisp->getWorldRotation() * camera_rot;
-	LLViewerCamera::getInstanceFast()->setOriginAndLookAt(
+	LLViewerCamera::getInstance()->setOriginAndLookAt(
 		target_pos + ((LLVector3(mCameraDistance, 0.f, 0.f) + mCameraOffset) * av_rot),		// camera
 		LLVector3::z_axis,																	// up
 		target_pos + (mCameraOffset  * av_rot) );											// point of interest
 
 	stop_glerror();
 
-	LLViewerCamera::getInstanceFast()->setAspect((F32)mFullWidth / mFullHeight);
-	LLViewerCamera::getInstanceFast()->setView(LLViewerCamera::getInstanceFast()->getDefaultFOV() / mCameraZoom);
-	LLViewerCamera::getInstanceFast()->setPerspective(FALSE, mOrigin.mX, mOrigin.mY, mFullWidth, mFullHeight, FALSE);
+	LLViewerCamera::getInstance()->setAspect((F32)mFullWidth / mFullHeight);
+	LLViewerCamera::getInstance()->setView(LLViewerCamera::getInstance()->getDefaultFOV() / mCameraZoom);
+	LLViewerCamera::getInstance()->setPerspective(FALSE, mOrigin.mX, mOrigin.mY, mFullWidth, mFullHeight, FALSE);
 
 	LLVertexBuffer::unbind();
 	avatarp->updateLOD();
@@ -866,10 +863,7 @@ BOOL LLImagePreviewSculpted::render()
 		
 	gGL.color4f(0.15f, 0.2f, 0.3f, 1.f);
 
-	if (LLGLSLShader::sNoFixedFunction)
-	{
-		gUIProgram.bind();
-	}
+	gUIProgram.bind();
 
 	gl_rect_2d_simple( mFullWidth, mFullHeight );
 	
@@ -887,26 +881,23 @@ BOOL LLImagePreviewSculpted::render()
 		LLQuaternion(mCameraYaw, LLVector3::z_axis);
 
 	LLQuaternion av_rot = camera_rot;
-	LLViewerCamera::getInstanceFast()->setOriginAndLookAt(
+	LLViewerCamera::getInstance()->setOriginAndLookAt(
 		target_pos + ((LLVector3(mCameraDistance, 0.f, 0.f) + mCameraOffset) * av_rot),		// camera
 		LLVector3::z_axis,																	// up
 		target_pos + (mCameraOffset  * av_rot) );											// point of interest
 
 	stop_glerror();
 
-	LLViewerCamera::getInstanceFast()->setAspect((F32) mFullWidth / mFullHeight);
-	LLViewerCamera::getInstanceFast()->setView(LLViewerCamera::getInstanceFast()->getDefaultFOV() / mCameraZoom);
-	LLViewerCamera::getInstanceFast()->setPerspective(FALSE, mOrigin.mX, mOrigin.mY, mFullWidth, mFullHeight, FALSE);
+	LLViewerCamera::getInstance()->setAspect((F32) mFullWidth / mFullHeight);
+	LLViewerCamera::getInstance()->setView(LLViewerCamera::getInstance()->getDefaultFOV() / mCameraZoom);
+	LLViewerCamera::getInstance()->setPerspective(FALSE, mOrigin.mX, mOrigin.mY, mFullWidth, mFullHeight, FALSE);
 
 	const LLVolumeFace &vf = mVolume->getVolumeFace(0);
 	U32 num_indices = vf.mNumIndices;
 	
 	gPipeline.enableLightsAvatar();
 
-	if (LLGLSLShader::sNoFixedFunction)
-	{
-		gObjectPreviewProgram.bind();
-	}
+	gObjectPreviewProgram.bind();
 	gPipeline.enableLightsPreview();
 
 	gGL.pushMatrix();
@@ -920,10 +911,7 @@ BOOL LLImagePreviewSculpted::render()
 
 	gGL.popMatrix();
 
-	if (LLGLSLShader::sNoFixedFunction)
-	{
-		gObjectPreviewProgram.unbind();
-	}
+	gObjectPreviewProgram.unbind();
 
 	return TRUE;
 }

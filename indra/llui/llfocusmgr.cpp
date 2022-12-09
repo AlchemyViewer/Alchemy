@@ -183,7 +183,7 @@ void LLFocusMgr::releaseFocusIfNeeded( LLView* view )
 		}
 	}
 
-	LLUI::getInstanceFast()->removePopup(view);
+	LLUI::getInstance()->removePopup(view);
 }
 
 void LLFocusMgr::setKeyboardFocus(LLFocusableElement* new_focus, BOOL lock, BOOL keystrokes_only)
@@ -492,7 +492,7 @@ void LLFocusMgr::setAppHasFocus(BOOL focus)
 	// release focus from "top ctrl"s, which generally hides them
 	if (!focus)
 	{
-		LLUI::getInstanceFast()->clearPopups();
+		LLUI::getInstance()->clearPopups();
 	}
 	mAppHasFocus = focus; 
 }

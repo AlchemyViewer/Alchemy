@@ -107,7 +107,7 @@ CursorRef createImageCursor(const char *fullpath, int hotspotX, int hotspotY)
         [[NSCursor alloc]
           initWithImage:
           [[NSImage alloc] initWithContentsOfFile:
-            [NSString stringWithFormat:@"%s", fullpath]
+            [NSString stringWithUTF8String:fullpath]
             ]
           hotSpot:NSMakePoint(hotspotX, hotspotY)
           ];
@@ -161,6 +161,11 @@ void hideNSCursor()
 void showNSCursor()
 {
 	[NSCursor unhide];
+}
+
+bool isCGCursorVisible()
+{
+    return CGCursorIsVisible();
 }
 
 void hideNSCursorTillMove(bool hide)

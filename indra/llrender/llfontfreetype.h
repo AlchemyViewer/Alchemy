@@ -97,7 +97,7 @@ struct LLFontGlyphInfo
 
 extern LLFontManager *gFontManagerp;
 
-class LLFontFreetype final : public LLRefCount, public LLTrace::MemTrackable<LLFontFreetype>
+class LLFontFreetype final : public LLRefCount
 {
 public:
 	LLFontFreetype();

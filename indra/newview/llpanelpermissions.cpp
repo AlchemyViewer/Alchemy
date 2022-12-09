@@ -323,7 +323,7 @@ void LLPanelPermissions::disableAll()
 
 void LLPanelPermissions::refresh()
 {
-	LLSelectMgr* select_mgr = LLSelectMgr::getInstanceFast();
+	LLSelectMgr* select_mgr = LLSelectMgr::getInstance();
 
 	LLButton*	BtnDeedToGroup = getChild<LLButton>("button deed");
 	if(BtnDeedToGroup)
@@ -1171,21 +1171,21 @@ void LLPanelPermissions::updateCreatorName(const LLUUID& creator_id, const LLAva
 void LLPanelPermissions::onClickClaim(void*)
 {
 	// try to claim ownership
-	LLSelectMgr::getInstanceFast()->sendOwner(gAgent.getID(), gAgent.getGroupID());
+	LLSelectMgr::getInstance()->sendOwner(gAgent.getID(), gAgent.getGroupID());
 }
 
 // static
 void LLPanelPermissions::onClickRelease(void*)
 {
 	// try to release ownership
-	LLSelectMgr::getInstanceFast()->sendOwner(LLUUID::null, LLUUID::null);
+	LLSelectMgr::getInstance()->sendOwner(LLUUID::null, LLUUID::null);
 }
 
 void LLPanelPermissions::onClickGroup()
 {
 	LLUUID owner_id;
 	std::string name;
-	BOOL owners_identical = LLSelectMgr::getInstanceFast()->selectGetOwner(owner_id, name);
+	BOOL owners_identical = LLSelectMgr::getInstance()->selectGetOwner(owner_id, name);
 	LLFloater* parent_floater = gFloaterView->getParentFloater(this);
 
 	if(owners_identical && (owner_id == gAgent.getID()))
@@ -1211,7 +1211,7 @@ void LLPanelPermissions::cbGroupID(LLUUID group_id)
 	{
 		mLabelGroupName->setNameID(group_id, TRUE);
 	}
-	LLSelectMgr::getInstanceFast()->sendGroup(group_id);
+	LLSelectMgr::getInstance()->sendGroup(group_id);
 }
 
 bool callback_deed_to_group(const LLSD& notification, const LLSD& response)
@@ -1220,10 +1220,10 @@ bool callback_deed_to_group(const LLSD& notification, const LLSD& response)
 	if (0 == option)
 	{
 		LLUUID group_id;
-		BOOL groups_identical = LLSelectMgr::getInstanceFast()->selectGetGroup(group_id);
+		BOOL groups_identical = LLSelectMgr::getInstance()->selectGetGroup(group_id);
 		if(group_id.notNull() && groups_identical && (gAgent.hasPowerInGroup(group_id, GP_OBJECT_DEED)))
 		{
-			LLSelectMgr::getInstanceFast()->sendOwner(LLUUID::null, group_id, FALSE);
+			LLSelectMgr::getInstance()->sendOwner(LLUUID::null, group_id, FALSE);
 		}
 	}
 	return false;
@@ -1241,7 +1241,7 @@ void LLPanelPermissions::onClickDeedToGroup(void* data)
 // static
 void LLPanelPermissions::onCommitPerm(LLUICtrl *ctrl, void *data, U8 field, U32 perm)
 {
-	LLViewerObject* object = LLSelectMgr::getInstanceFast()->getSelection()->getFirstRootObject();
+	LLViewerObject* object = LLSelectMgr::getInstance()->getSelection()->getFirstRootObject();
 	if(!object) return;
 
 	// Checkbox will have toggled itself
@@ -1249,7 +1249,7 @@ void LLPanelPermissions::onCommitPerm(LLUICtrl *ctrl, void *data, U8 field, U32 
 	LLCheckBoxCtrl *check = (LLCheckBoxCtrl *)ctrl;
 	BOOL new_state = check->get();
 	
-	LLSelectMgr::getInstanceFast()->selectionSetObjectPermissions(field, new_state, perm);
+	LLSelectMgr::getInstance()->selectionSetObjectPermissions(field, new_state, perm);
 }
 
 // static
@@ -1308,8 +1308,8 @@ void LLPanelPermissions::onCommitName(LLUICtrl*, void* data)
 	{
 		return;
 	}
-	LLSelectMgr::getInstanceFast()->selectionSetObjectName(tb->getText());
-	LLObjectSelectionHandle selection = LLSelectMgr::getInstanceFast()->getSelection();
+	LLSelectMgr::getInstance()->selectionSetObjectName(tb->getText());
+	LLObjectSelectionHandle selection = LLSelectMgr::getInstance()->getSelection();
 	if (selection->isAttachment() && (selection->getNumNodes() == 1) && !tb->getText().empty())
 	{
 		LLUUID object_id = selection->getFirstObject()->getAttachmentItemID();
@@ -1335,8 +1335,8 @@ void LLPanelPermissions::onCommitDesc(LLUICtrl*, void* data)
 	{
 		return;
 	}
-	LLSelectMgr::getInstanceFast()->selectionSetObjectDescription(le->getText());
-	LLObjectSelectionHandle selection = LLSelectMgr::getInstanceFast()->getSelection();
+	LLSelectMgr::getInstance()->selectionSetObjectDescription(le->getText());
+	LLObjectSelectionHandle selection = LLSelectMgr::getInstance()->getSelection();
 	if (selection->isAttachment() && (selection->getNumNodes() == 1))
 	{
 		LLUUID object_id = selection->getFirstObject()->getAttachmentItemID();
@@ -1388,7 +1388,7 @@ void LLPanelPermissions::setAllSaleInfo()
 	if (price < 0)
 		sale_type = LLSaleInfo::FS_NOT;
 
-	LLSelectMgr* select_mgr = LLSelectMgr::getInstanceFast();
+	LLSelectMgr* select_mgr = LLSelectMgr::getInstance();
 
 	LLSaleInfo old_sale_info;
 	select_mgr->selectGetSaleInfo(old_sale_info);
@@ -1449,14 +1449,14 @@ void LLPanelPermissions::onCommitClickAction(LLUICtrl* ctrl, void*)
 	if (click_action == CLICK_ACTION_BUY)
 	{
 		LLSaleInfo sale_info;
-		LLSelectMgr::getInstanceFast()->selectGetSaleInfo(sale_info);
+		LLSelectMgr::getInstance()->selectGetSaleInfo(sale_info);
 		if (!sale_info.isForSale())
 		{
 			LLNotificationsUtil::add("CantSetBuyObject");
 
 			// Set click action back to its old value
 			U8 click_action = 0;
-			LLSelectMgr::getInstanceFast()->selectionGetClickAction(&click_action);
+			LLSelectMgr::getInstance()->selectionGetClickAction(&click_action);
 			std::string item_value = click_action_to_string_value(click_action);
 			box->setValue(LLSD(item_value));
 			return;
@@ -1466,14 +1466,14 @@ void LLPanelPermissions::onCommitClickAction(LLUICtrl* ctrl, void*)
 	{
 		// Verify object has script with money() handler
 		LLSelectionPayable payable;
-		bool can_pay = LLSelectMgr::getInstanceFast()->getSelection()->applyToObjects(&payable);
+		bool can_pay = LLSelectMgr::getInstance()->getSelection()->applyToObjects(&payable);
 		if (!can_pay)
 		{
 			// Warn, but do it anyway.
 			LLNotificationsUtil::add("ClickActionNotPayable");
 		}
 	}
-	LLSelectMgr::getInstanceFast()->selectionSetClickAction(click_action);
+	LLSelectMgr::getInstance()->selectionSetClickAction(click_action);
 }
 
 // static
@@ -1482,7 +1482,7 @@ void LLPanelPermissions::onCommitIncludeInSearch(LLUICtrl* ctrl, void*)
 	LLCheckBoxCtrl* box = (LLCheckBoxCtrl*)ctrl;
 	llassert(box);
 
-	LLSelectMgr::getInstanceFast()->selectionSetIncludeInSearch(box->get());
+	LLSelectMgr::getInstance()->selectionSetIncludeInSearch(box->get());
 }
 
 

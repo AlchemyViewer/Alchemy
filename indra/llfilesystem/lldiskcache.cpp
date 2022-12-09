@@ -151,6 +151,11 @@ void LLDiskCache::purge()
     LL_INFOS() << "Purging cache to a maximum of " << mMaxSizeBytes << " bytes" << LL_ENDL;
 
     // Extra accounting to track the retention of static assets
+    std::vector<bool> file_removed;
+    if (mEnableCacheDebugInfo)
+    {
+        file_removed.reserve(file_info.size());
+    }
     int keep{0};
     int del{0};
     int skip{0};
@@ -159,9 +164,16 @@ void LLDiskCache::purge()
     {
         file_size_total += entry.second.first;
 
-        std::string action = "";
-        if (file_size_total > mMaxSizeBytes)
+        bool should_remove = file_size_total > mMaxSizeBytes;
+        if (mEnableCacheDebugInfo)
         {
+            file_removed.push_back(should_remove);
+        }
+
+        std::string action = "";
+        if (should_remove)
+        {
+
             action = "DELETE:";
             auto uuid_as_string = LLUUID(gDirUtilp->getBaseFileName(entry.second.second.string(), true));
             // LL_INFOS() << "checking UUID=" <<uuid_as_string<< LL_ENDL;
@@ -187,11 +199,22 @@ void LLDiskCache::purge()
         else
         {
             keep++;
-            action = "  KEEP:";
         }
+    }
 
-        if (mEnableCacheDebugInfo)
+    if (mEnableCacheDebugInfo)
+    {
+        auto end_time = std::chrono::high_resolution_clock::now();
+        auto execute_time = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
+
+        // Log afterward so it doesn't affect the time measurement
+        // Logging thousands of file results can take hundreds of milliseconds
+        for (size_t i = 0; i < file_info.size(); ++i)
         {
+            const file_info_t& entry = file_info[i];
+            const bool removed = file_removed[i];
+            const std::string action = removed ? "DELETE:" : "KEEP:";
+
             // have to do this because of LL_INFO/LL_END weirdness
             std::ostringstream line;
 
@@ -202,12 +225,7 @@ void LLDiskCache::purge()
             line << " (" << file_size_total << "/" << mMaxSizeBytes << ")";
             LL_INFOS() << line.str() << LL_ENDL;
         }
-    }
 
-    if (mEnableCacheDebugInfo)
-    {
-        auto end_time = std::chrono::high_resolution_clock::now();
-        auto execute_time = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
         LL_INFOS() << "Total dir size after purge is " << dirFileSize(sCacheDir) << LL_ENDL;
         LL_INFOS() << "Cache purge took " << execute_time << " ms to execute for " << file_info.size() << " files" << LL_ENDL;
         LL_INFOS() << "Deleted: " << del << " Skipped: " << skip << " Kept: " << keep << LL_ENDL;
@@ -395,6 +413,38 @@ void LLDiskCache::clearCache()
         }
 
         createCache();
+    }
+}
+
+void LLDiskCache::removeOldVFSFiles()
+{
+    //VFS files won't be created, so consider removing this code later
+    static const char CACHE_FORMAT[] = "inv.llsd";
+    static const char DB_FORMAT[] = "db2.x";
+
+    boost::system::error_code ec;
+#if LL_WINDOWS
+    std::wstring cache_path(ll_convert_string_to_wide(gDirUtilp->getExpandedFilename(LL_PATH_CACHE, "")));
+#else
+    std::string cache_path(gDirUtilp->getExpandedFilename(LL_PATH_CACHE, ""));
+#endif
+    if (boost::filesystem::is_directory(cache_path, ec) && !ec.failed())
+    {
+        for (auto& entry : boost::make_iterator_range(boost::filesystem::directory_iterator(cache_path, ec), {}))
+        {
+            if (boost::filesystem::is_regular_file(entry, ec) && !ec.failed())
+            {
+                if ((entry.path().string().find(CACHE_FORMAT) != std::string::npos) ||
+                    (entry.path().string().find(DB_FORMAT) != std::string::npos))
+                {
+                    boost::filesystem::remove(entry, ec);
+                    if (ec.failed())
+                    {
+                        LL_WARNS() << "Failed to delete cache file " << entry << ": " << ec.message() << LL_ENDL;
+                    }
+                }
+            }
+        }
     }
 }
 

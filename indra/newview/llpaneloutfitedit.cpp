@@ -102,7 +102,7 @@ std::string LLShopURLDispatcher::resolveURL(LLWearableType::EType wearable_type,
 {
 	const std::string prefix = "MarketplaceURL";
 	const std::string sex_str = (sex == SEX_MALE) ? "Male" : "Female";
-	const std::string type_str = LLWearableType::getInstanceFast()->getTypeName(wearable_type);
+	const std::string type_str = LLWearableType::getInstance()->getTypeName(wearable_type);
 
 	std::string setting_name = prefix;
 
@@ -178,7 +178,7 @@ public:
 private:
 	static void onCreate(const LLSD& param)
 	{
-		LLWearableType::EType type = LLWearableType::getInstanceFast()->typeNameToType(param.asString());
+		LLWearableType::EType type = LLWearableType::getInstance()->typeNameToType(param.asString());
 		if (type == LLWearableType::WT_NONE)
 		{
 			LL_WARNS() << "Invalid wearable type" << LL_ENDL;
@@ -193,7 +193,7 @@ private:
 	{
 		LLView* menu_clothes	= gMenuHolder->getChildView("COF.Gear.New_Clothes", FALSE);
 		LLView* menu_bp			= gMenuHolder->getChildView("COF.Gear.New_Body_Parts", FALSE);
-		LLWearableType * wearable_type_inst = LLWearableType::getInstanceFast();
+		LLWearableType * wearable_type_inst = LLWearableType::getInstance();
 
 		for (U8 i = LLWearableType::WT_SHAPE; i != (U8) LLWearableType::WT_COUNT; ++i)
 		{

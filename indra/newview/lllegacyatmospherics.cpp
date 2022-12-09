@@ -202,19 +202,11 @@ void LLAtmospherics::init()
 	mInitialized = true;
 }
 
-LLColor4 LLAtmospherics::calcSkyColorInDir(AtmosphericsVars& vars, const LLVector3 &dir, bool isShiny)
-{
-	const LLSettingsSky::ptr_t& psky = LLEnvironment::instanceFast().getCurrentSky();
-    return calcSkyColorInDir(psky, vars, dir, isShiny);
-}
-
 // This cubemap is used as "environmentMap" in indra/newview/app_settings/shaders/class2/deferred/softenLightF.glsl
-LLColor4 LLAtmospherics::calcSkyColorInDir(const LLSettingsSky::ptr_t &psky, AtmosphericsVars& vars, const LLVector3 &dir, bool isShiny)
+LLColor4 LLAtmospherics::calcSkyColorInDir(const LLSettingsSky::ptr_t &psky, AtmosphericsVars& vars, const LLVector3 &dir, bool isShiny, bool low_end)
 {
-	F32 sky_saturation = 0.25f;
-	F32 land_saturation = 0.1f;
-
-	bool low_end = !gPipeline.canUseWindLightShaders();
+	const F32 sky_saturation = 0.25f;
+	const F32 land_saturation = 0.1f;
 
 	if (isShiny && dir.mV[VZ] < -0.02f)
 	{
@@ -271,11 +263,12 @@ LLColor4 LLAtmospherics::calcSkyColorInDir(const LLSettingsSky::ptr_t &psky, Atm
 //       indra\newview\lllegacyatmospherics.cpp
 void LLAtmospherics::calcSkyColorWLVert(const LLSettingsSky::ptr_t &psky, LLVector3 & Pn, AtmosphericsVars& vars)
 {
-    LLColor3    blue_density = vars.blue_density;
-    LLColor3    blue_horizon = vars.blue_horizon;
-    F32         haze_horizon = vars.haze_horizon;
-    F32         haze_density = vars.haze_density;
-    F32         density_multiplier = vars.density_multiplier;
+    const LLColor3    blue_density = vars.blue_density;
+    const LLColor3    blue_horizon = vars.blue_horizon;
+    const F32         haze_horizon = vars.haze_horizon;
+    const F32         haze_density = vars.haze_density;
+    const F32         density_multiplier = vars.density_multiplier;
+
     F32         max_y = vars.max_y;
     LLVector4   sun_norm = vars.sun_norm;
 
@@ -315,6 +308,7 @@ void LLAtmospherics::calcSkyColorWLVert(const LLSettingsSky::ptr_t &psky, LLVect
 	// this is used later for sunlight modulation at various altitudes
 	LLColor3 light_atten = vars.light_atten;
     LLColor3 light_transmittance = psky->getLightTransmittanceFast(vars.total_density, vars.density_multiplier, Plen);
+    (void)light_transmittance; // silence Clang warn-error
 
 	// Calculate relative weights
 	LLColor3 temp2(0.f, 0.f, 0.f);
@@ -389,23 +383,16 @@ void LLAtmospherics::updateFog(const F32 distance, const LLVector3& tosun_in)
 
 	if (!gPipeline.hasRenderDebugFeatureMask(LLPipeline::RENDER_DEBUG_FEATURE_FOG))
 	{
-		if (!LLGLSLShader::sNoFixedFunction)
-		{
-			glFogf(GL_FOG_DENSITY, 0);
-			glFogfv(GL_FOG_COLOR, (F32 *) &LLColor4::white.mV);
-			glFogf(GL_FOG_END, 1000000.f);
-		}
 		return;
 	}
 
-	const BOOL hide_clip_plane = TRUE;
 	LLColor4 target_fog(0.f, 0.2f, 0.5f, 0.f);
 
 	const F32 water_height = gAgent.getRegion() ? gAgent.getRegion()->getWaterHeight() : 0.f;
 	// LLWorld::getInstance()->getWaterHeight();
 	F32 camera_height = gAgentCamera.getCameraPositionAgent().mV[2];
 
-	F32 near_clip_height = LLViewerCamera::getInstanceFast()->getAtAxis().mV[VZ] * LLViewerCamera::getInstanceFast()->getNear();
+	F32 near_clip_height = LLViewerCamera::getInstance()->getAtAxis().mV[VZ] * LLViewerCamera::getInstance()->getNear();
 	camera_height += near_clip_height;
 
 	F32 fog_distance = 0.f;
@@ -434,16 +421,19 @@ void LLAtmospherics::updateFog(const F32 distance, const LLVector3& tosun_in)
 	// Sky colors, just slightly above the horizon in the direction of the sun, perpendicular to the sun, and at a 45 degree angle to the sun.
     AtmosphericsVars vars;
 
-	LLEnvironment& env = LLEnvironment::instanceFast();
-
+	LLEnvironment& env = LLEnvironment::instance();
 	const LLSettingsSky::ptr_t& psky = env.getCurrentSky();
 
+    // NOTE: This is very similar to LLVOSky::cacheEnvironment()
+    // Differences:
+    //     vars.sun_norm
+    //     vars.sunlight
     // invariants across whole sky tex process...
-    vars.blue_density = psky->getBlueDensity();    
+    vars.blue_density = psky->getBlueDensity();
     vars.blue_horizon = psky->getBlueHorizon();
     vars.haze_density = psky->getHazeDensity();
     vars.haze_horizon = psky->getHazeHorizon();
-    vars.density_multiplier = psky->getDensityMultiplier();    
+    vars.density_multiplier = psky->getDensityMultiplier();
     vars.distance_multiplier = psky->getDistanceMultiplier();
     vars.max_y = psky->getMaxY();
     vars.sun_norm = env.getSunDirectionCFR();
@@ -458,9 +448,9 @@ void LLAtmospherics::updateFog(const F32 distance, const LLVector3& tosun_in)
 	vars.light_transmittance = psky->getLightTransmittanceFast(vars.total_density, vars.density_multiplier, vars.max_y);
     vars.gamma = psky->getGamma();
 
-	res_color[0] = calcSkyColorInDir(psky, vars, tosun);
-	res_color[1] = calcSkyColorInDir(psky, vars, perp_tosun);
-	res_color[2] = calcSkyColorInDir(psky, vars, tosun_45);
+    res_color[0] = calcSkyColorInDir(psky, vars, tosun);
+    res_color[1] = calcSkyColorInDir(psky, vars, perp_tosun);
+    res_color[2] = calcSkyColorInDir(psky, vars, tosun_45);
 
 	sky_fog_color = color_norm(res_color[0] + res_color[1] + res_color[2]);
 
@@ -482,45 +472,17 @@ void LLAtmospherics::updateFog(const F32 distance, const LLVector3& tosun_in)
 
 	render_fog_color = sky_fog_color;
 
-	F32 fog_density = 0.f;
 	fog_distance = mFogRatio * distance;
 	
 	if (camera_height > water_height)
 	{
 		LLColor4 fog(render_fog_color);
-		if (!LLGLSLShader::sNoFixedFunction)
-		{
-			glFogfv(GL_FOG_COLOR, fog.mV);
-		}
 		mGLFogCol = fog;
-
-		if (hide_clip_plane)
-		{
-			// For now, set the density to extend to the cull distance.
-			const F32 f_log = 2.14596602628934723963618357029f; // sqrt(fabs(log(0.01f)))
-			fog_density = f_log/fog_distance;
-			if (!LLGLSLShader::sNoFixedFunction)
-			{
-				glFogi(GL_FOG_MODE, GL_EXP2);
-			}
-		}
-		else
-		{
-			const F32 f_log = 4.6051701859880913680359829093687f; // fabs(log(0.01f))
-			fog_density = (f_log)/fog_distance;
-			if (!LLGLSLShader::sNoFixedFunction)
-			{
-				glFogi(GL_FOG_MODE, GL_EXP);
-			}
-		}
 	}
 	else
 	{
         const LLSettingsWater::ptr_t& pwater = env.getCurrentWater();
 		F32 depth = water_height - camera_height;
-		
-		// get the water param manager variables
-        float water_fog_density = pwater->getModifiedWaterFogDensity(depth <= 0.0f);
 
 		LLColor4 water_fog_color(pwater->getWaterFogColor());
 
@@ -534,15 +496,6 @@ void LLAtmospherics::updateFog(const F32 distance, const LLVector3& tosun_in)
 
 		// set the gl fog color
 		mGLFogCol = fogCol;
-
-		// set the density based on what the shaders use
-		fog_density = water_fog_density * gSavedSettings.getF32("WaterGLFogDensityScale");
-
-		if (!LLGLSLShader::sNoFixedFunction)
-		{
-			glFogfv(GL_FOG_COLOR, (F32 *) &fogCol.mV);
-			glFogi(GL_FOG_MODE, GL_EXP2);
-		}
 	}
 
 	mFogColor = sky_fog_color;
@@ -550,13 +503,6 @@ void LLAtmospherics::updateFog(const F32 distance, const LLVector3& tosun_in)
 
 	LLDrawPoolWater::sWaterFogEnd = fog_distance*2.2f;
 
-	if (!LLGLSLShader::sNoFixedFunction)
-	{
-		LLGLSFog gls_fog;
-		glFogf(GL_FOG_END, fog_distance*2.2f);
-		glFogf(GL_FOG_DENSITY, fog_density);
-		glHint(GL_FOG_HINT, GL_NICEST);
-	}
 	stop_glerror();
 }
 

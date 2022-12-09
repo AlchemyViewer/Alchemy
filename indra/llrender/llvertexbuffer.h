@@ -94,12 +94,15 @@ public:
 	std::vector<U32> mMissCount;
 	bool mMissCountDirty;   // flag any changes to mFreeList or mMissCount
 
+	//used to avoid calling glGenBuffers for every VBO creation
+	static U32 sNamePool[1024];
+	static U32 sNameIdx;
 };
 
 
 //============================================================================
 // base class 
-class LLVertexBuffer final : public LLRefCount, public LLTrace::MemTrackable<LLVertexBuffer>
+class LLVertexBuffer final : public LLRefCount
 {
 public:
 	class MappedRegion
@@ -137,8 +140,8 @@ public:
 	static void initClass(bool use_vbo, bool no_vbo_mapping);
 	static void cleanupClass();
 	static void setupClientArrays(U32 data_mask);
-	static void drawArrays(U32 mode, const std::vector<LLVector3>& pos, const std::vector<LLVector3>& norm);
-	static void drawElements(U32 mode, const S32 num_vertices, const LLVector4a* pos, const LLVector2* tc, S32 num_indices, const U16* indicesp);
+	static void drawArrays(U32 mode, const std::vector<LLVector3>& pos);
+	static void drawElements(U32 mode, const LLVector4a* pos, const LLVector2* tc, S32 num_indices, const U16* indicesp);
 
  	static void unbind(); //unbind any bound vertex buffer
 
@@ -201,12 +204,16 @@ protected:
 	~LLVertexBuffer() override; // use unref()
 
 	void setupVertexBuffer(U32 data_mask); // called from mapBuffer()
+    void setupVertexBufferFast(U32 data_mask);
+
 	void setupVertexArray();
 	
 	void	genBuffer(U32 size);
 	void	genIndices(U32 size);
 	bool	bindGLBuffer(bool force_bind = false);
+    bool	bindGLBufferFast();
 	bool	bindGLIndices(bool force_bind = false);
+    bool    bindGLIndicesFast();
 	bool	bindGLArray();
 	void	releaseBuffer();
 	void	releaseIndices();
@@ -227,6 +234,8 @@ public:
 
 	// set for rendering
 	void setBuffer(U32 data_mask); 	// calls  setupVertexBuffer() if data_mask is not 0
+    void	setBufferFast(U32 data_mask); 	// calls setupVertexBufferFast(), assumes data_mask is not 0 among other assumptions
+
 	void flush(); //flush pending data to GL memory
 	// allocate buffer
 	bool allocateBuffer(S32 nverts, S32 nindices, bool create);
@@ -250,7 +259,6 @@ public:
 	bool getTangentStrider(LLStrider<LLVector3>& strider, S32 index=0, S32 count = -1, bool map_range = false);
 	bool getTangentStrider(LLStrider<LLVector4a>& strider, S32 index=0, S32 count = -1, bool map_range = false);
 	bool getColorStrider(LLStrider<LLColor4U>& strider, S32 index=0, S32 count = -1, bool map_range = false);
-	bool getTextureIndexStrider(LLStrider<LLColor4U>& strider, S32 index=0, S32 count = -1, bool map_range = false);
 	bool getEmissiveStrider(LLStrider<LLColor4U>& strider, S32 index=0, S32 count = -1, bool map_range = false);
 	bool getWeightStrider(LLStrider<F32>& strider, S32 index=0, S32 count = -1, bool map_range = false);
 	bool getWeight4Strider(LLStrider<LLVector4a>& strider, S32 index=0, S32 count = -1, bool map_range = false);
@@ -278,6 +286,9 @@ public:
 	void draw(U32 mode, U32 count, U32 indices_offset) const;
 	void drawArrays(U32 mode, U32 offset, U32 count) const;
 	void drawRange(U32 mode, U32 start, U32 end, U32 count, U32 indices_offset) const;
+
+    //implementation for inner loops that does no safety checking
+    void drawRangeFast(U32 mode, U32 start, U32 end, U32 count, U32 indices_offset) const;
 
 	//for debugging, validate data in given range is valid
 	void validateRange(U32 start, U32 end, U32 count, U32 offset) const;

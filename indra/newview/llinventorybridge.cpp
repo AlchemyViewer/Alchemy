@@ -849,6 +849,19 @@ void LLInvFVBridge::getClipboardEntries(bool show_asset_id,
 //			disabled_items.push_back(std::string("Copy"));
 //		}
 
+        if (isAgentInventory())
+        {
+            items.push_back(std::string("New folder from selected"));
+            items.push_back(std::string("Subfolder Separator"));
+            std::set<LLUUID> selected_uuid_set = LLAvatarActions::getInventorySelectedUUIDs();
+            uuid_vec_t ids;
+            std::copy(selected_uuid_set.begin(), selected_uuid_set.end(), std::back_inserter(ids));
+            if (!is_only_items_selected(ids) && !is_only_cats_selected(ids))
+            {
+                disabled_items.push_back(std::string("New folder from selected"));
+            }
+        }
+
 		if (obj->getIsLinkType())
 		{
 			items.push_back(std::string("Find Original"));
@@ -1211,7 +1224,10 @@ void LLInvFVBridge::addMarketplaceContextMenuOptions(U32 flags,
         LLInventoryModel::cat_array_t categories;
         LLInventoryModel::item_array_t items;
         gInventory.collectDescendents(local_version_folder_id, categories, items, FALSE);
-        if (categories.size() >= gSavedSettings.getU32("InventoryOutboxMaxFolderCount"))
+        LLCachedControl<U32> max_depth(gSavedSettings, "InventoryOutboxMaxFolderDepth", 4);
+        LLCachedControl<U32> max_count(gSavedSettings, "InventoryOutboxMaxFolderCount", 20);
+        if (categories.size() >= max_count
+            || depth > (max_depth + 1))
         {
             disabled_items.push_back(std::string("New Folder"));
         }
@@ -4010,7 +4026,20 @@ void LLFolderBridge::perform_pasteFromClipboard()
 				{
 					if (item && can_move_to_landmarks(item))
 					{
-						dropToFavorites(item);
+                        if (LLClipboard::instance().isCutMode())
+                        {
+                            LLViewerInventoryItem* viitem = dynamic_cast<LLViewerInventoryItem*>(item);
+                            llassert(viitem);
+                            if (viitem)
+                            {
+                                //changeItemParent() implicity calls dirtyFilter
+                                changeItemParent(model, viitem, parent_id, FALSE);
+                            }
+                        }
+                        else
+                        {
+                            dropToFavorites(item);
+                        }
 					}
 				}
 				else if (LLClipboard::instance().isCutMode())
@@ -4485,7 +4514,16 @@ void LLFolderBridge::buildContextMenuFolderOptions(U32 flags,   menuentry_vec_t&
 			items.push_back(std::string("Conference Chat Folder"));
 			items.push_back(std::string("IM All Contacts In Folder"));
 		}
+
+        if (((flags & ITEM_IN_MULTI_SELECTION) == 0) && hasChildren())
+        {
+            items.push_back(std::string("Ungroup folder items"));
+        }
 	}
+    else
+    {
+        disabled_items.push_back(std::string("New folder from selected"));
+    }
 
 #ifndef LL_RELEASE_FOR_DOWNLOAD
 	if (LLFolderType::lookupIsProtectedType(type) && is_agent_inventory)
@@ -6032,14 +6070,14 @@ class LLCallingCardObserver : public LLFriendObserver
 public:
 	LLCallingCardObserver(LLCallingCardBridge* bridge) : mBridgep(bridge) {}
 	virtual ~LLCallingCardObserver() { mBridgep = NULL; }
-	virtual void changed(U32 mask)
-	{
-		mBridgep->refreshFolderViewItem();
-		if (mask & LLFriendObserver::ONLINE)
-		{
-			mBridgep->checkSearchBySuffixChanges();
-		}
-	}
+    virtual void changed(U32 mask)
+    {
+        if (mask & LLFriendObserver::ONLINE)
+        {
+            mBridgep->refreshFolderViewItem();
+            mBridgep->checkSearchBySuffixChanges();
+        }
+    }
 protected:
 	LLCallingCardBridge* mBridgep;
 };
@@ -6053,14 +6091,16 @@ LLCallingCardBridge::LLCallingCardBridge(LLInventoryPanel* inventory,
 										 const LLUUID& uuid ) :
 	LLItemBridge(inventory, root, uuid)
 {
-	mObserver = new LLCallingCardObserver(this);
-	LLAvatarTracker::instance().addObserver(mObserver);
+    mObserver = new LLCallingCardObserver(this);
+    mCreatorUUID = getItem()->getCreatorUUID();
+    LLAvatarTracker::instance().addParticularFriendObserver(mCreatorUUID, mObserver);
 }
 
 LLCallingCardBridge::~LLCallingCardBridge()
 {
-	LLAvatarTracker::instance().removeObserver(mObserver);
-	delete mObserver;
+    LLAvatarTracker::instance().removeParticularFriendObserver(mCreatorUUID, mObserver);
+
+    delete mObserver;
 }
 
 void LLCallingCardBridge::refreshFolderViewItem()
@@ -7044,10 +7084,10 @@ BOOL LLObjectBridge::renameItem(const std::string& new_name)
 			LLViewerObject* obj = gAgentAvatarp->getWornAttachment( item->getUUID() );
 			if(obj)
 			{
-				LLSelectMgr::getInstanceFast()->deselectAll();
-				LLSelectMgr::getInstanceFast()->addAsIndividual( obj, SELECT_ALL_TES, FALSE );
-				LLSelectMgr::getInstanceFast()->selectionSetObjectName( new_name );
-				LLSelectMgr::getInstanceFast()->deselectAll();
+				LLSelectMgr::getInstance()->deselectAll();
+				LLSelectMgr::getInstance()->addAsIndividual( obj, SELECT_ALL_TES, FALSE );
+				LLSelectMgr::getInstance()->selectionSetObjectName( new_name );
+				LLSelectMgr::getInstance()->deselectAll();
 			}
 		}
 	}
@@ -7256,7 +7296,7 @@ void LLWearableBridge::buildContextMenu(LLMenuGL& menu, U32 flags)
 // [/RLVa:KB]
 					}
 
-					if (LLWearableType::getInstanceFast()->getAllowMultiwear(mWearableType))
+					if (LLWearableType::getInstance()->getAllowMultiwear(mWearableType))
 					{
 						items.push_back(std::string("Wearable Add"));
 //						if (!gAgentWearables.canAddWearable(mWearableType))

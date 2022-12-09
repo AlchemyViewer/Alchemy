@@ -49,9 +49,6 @@
 const LLUUID LLUUID::null;
 const LLTransactionID LLTransactionID::tnull;
 
-// static 
-LLMutex LLUUID::sMutex(LLMutex::E_CONST_INIT);
-
 /*
 
 NOT DONE YET!!!
@@ -979,6 +976,7 @@ void LLUUID::generate()
 	// if clock hasn't changed or went backward, change clockseq
 	if (cmpTime(&timestamp, &time_last) != 1) 
 	{
+		static LLMutex sMutex;
 		LLMutexLock	lock(&sMutex);
 		clock_seq = (clock_seq + 1) & 0x3FFF;
 		if (clock_seq == 0) 

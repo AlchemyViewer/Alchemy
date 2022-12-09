@@ -204,7 +204,7 @@ BOOL LLToolPie::handleRightMouseDown(S32 x, S32 y, MASK mask)
 
 BOOL LLToolPie::handleRightMouseUp(S32 x, S32 y, MASK mask)
 {
-	LLToolMgr::getInstanceFast()->clearTransientTool();
+	LLToolMgr::getInstance()->clearTransientTool();
 	return LLTool::handleRightMouseUp(x, y, mask);
 }
 
@@ -243,12 +243,12 @@ BOOL LLToolPie::handleLeftClickPick()
 	MASK mask = mPick.mKeyMask;
 	if (mPick.mPickType == LLPickInfo::PICK_PARCEL_WALL)
 	{
-		LLParcel* parcel = LLViewerParcelMgr::getInstanceFast()->getCollisionParcel();
+		LLParcel* parcel = LLViewerParcelMgr::getInstance()->getCollisionParcel();
 		if (parcel)
 		{
-			LLViewerParcelMgr::getInstanceFast()->selectCollisionParcel();
+			LLViewerParcelMgr::getInstance()->selectCollisionParcel();
 			if (parcel->getParcelFlag(PF_USE_PASS_LIST) 
-				&& !LLViewerParcelMgr::getInstanceFast()->isCollisionBanned())
+				&& !LLViewerParcelMgr::getInstance()->isCollisionBanned())
 			{
 				// if selling passes, just buy one
 				void* deselect_when_done = (void*)TRUE;
@@ -271,7 +271,7 @@ BOOL LLToolPie::handleLeftClickPick()
 
 	if (mPick.mPickType != LLPickInfo::PICK_LAND)
 	{
-		LLViewerParcelMgr::getInstanceFast()->deselectLand();
+		LLViewerParcelMgr::getInstance()->deselectLand();
 	}
 	
 	if (object)
@@ -354,7 +354,7 @@ BOOL LLToolPie::handleLeftClickPick()
 					// pay event goes to object actually clicked on
 					mClickActionObject = object;
 					mLeftClickSelection = LLToolSelect::handleObjectSelection(mPick, FALSE, TRUE);
-					if (LLSelectMgr::getInstanceFast()->selectGetAllValid())
+					if (LLSelectMgr::getInstance()->selectGetAllValid())
 					{
 						// call this right away, since we have all the info we need to continue the action
 						selectionPropertiesReceived();
@@ -368,7 +368,7 @@ BOOL LLToolPie::handleLeftClickPick()
 			{
 				mClickActionObject = parent;
 				mLeftClickSelection = LLToolSelect::handleObjectSelection(mPick, FALSE, TRUE, TRUE);
-				if (LLSelectMgr::getInstanceFast()->selectGetAllValid())
+				if (LLSelectMgr::getInstance()->selectGetAllValid())
 				{
 					// call this right away, since we have all the info we need to continue the action
 					selectionPropertiesReceived();
@@ -381,7 +381,7 @@ BOOL LLToolPie::handleLeftClickPick()
 			{
 				mClickActionObject = parent;
 				mLeftClickSelection = LLToolSelect::handleObjectSelection(mPick, FALSE, TRUE, TRUE);
-				if (LLSelectMgr::getInstanceFast()->selectGetAllValid())
+				if (LLSelectMgr::getInstance()->selectGetAllValid())
 				{
 					// call this right away, since we have all the info we need to continue the action
 					selectionPropertiesReceived();
@@ -405,10 +405,10 @@ BOOL LLToolPie::handleLeftClickPick()
 					gAgentCamera.setFocusOnAvatar(FALSE, ANIMATE);
 					
 					LLBBox bbox = object->getBoundingBoxAgent() ;
-					F32 angle_of_view = llmax(0.1f, LLViewerCamera::getInstanceFast()->getAspect() > 1.f ? LLViewerCamera::getInstanceFast()->getView() * LLViewerCamera::getInstanceFast()->getAspect() : LLViewerCamera::getInstanceFast()->getView());
+					F32 angle_of_view = llmax(0.1f, LLViewerCamera::getInstance()->getAspect() > 1.f ? LLViewerCamera::getInstance()->getView() * LLViewerCamera::getInstance()->getAspect() : LLViewerCamera::getInstance()->getView());
 					F32 distance = bbox.getExtentLocal().magVec() * PADDING_FACTOR / atan(angle_of_view);
 				
-					LLVector3 obj_to_cam = LLViewerCamera::getInstanceFast()->getOrigin() - bbox.getCenterAgent();
+					LLVector3 obj_to_cam = LLViewerCamera::getInstance()->getOrigin() - bbox.getCenterAgent();
 					obj_to_cam.normVec();
 					
 					LLVector3d object_center_global = gAgent.getPosGlobalFromAgent(bbox.getCenterAgent());
@@ -452,9 +452,9 @@ BOOL LLToolPie::handleLeftClickPick()
 
 		gGrabTransientTool = this;
 		mMouseButtonDown = false;
-		LLToolGrab::getInstanceFast()->setClickedInMouselook(gAgentCamera.cameraMouselook());
-		LLToolMgr::getInstanceFast()->getCurrentToolset()->selectTool( LLToolGrab::getInstanceFast() );
-		return LLToolGrab::getInstanceFast()->handleObjectHit( mPick );
+		LLToolGrab::getInstance()->setClickedInMouselook(gAgentCamera.cameraMouselook());
+		LLToolMgr::getInstance()->getCurrentToolset()->selectTool( LLToolGrab::getInstance() );
+		return LLToolGrab::getInstance()->handleObjectHit( mPick );
 	}
 	
 	LLHUDIcon* last_hit_hud_icon = mPick.mHUDIcon;
@@ -485,10 +485,10 @@ BOOL LLToolPie::handleLeftClickPick()
 	{
 		// we left clicked on avatar, switch to focus mode
 		mMouseButtonDown = false;
-		LLToolMgr::getInstanceFast()->setTransientTool(LLToolCamera::getInstanceFast());
+		LLToolMgr::getInstance()->setTransientTool(LLToolCamera::getInstance());
 		gViewerWindow->hideCursor();
-		LLToolCamera::getInstanceFast()->setMouseCapture(TRUE);
-		LLToolCamera::getInstanceFast()->pickCallback(mPick);
+		LLToolCamera::getInstance()->setMouseCapture(TRUE);
+		LLToolCamera::getInstance()->pickCallback(mPick);
 		gAgentCamera.setFocusOnAvatar(TRUE, TRUE);
 
 		return TRUE;
@@ -563,7 +563,7 @@ ECursorType LLToolPie::cursorFromObject(LLViewerObject* object)
 	case CLICK_ACTION_BUY:
 		if ( mClickActionBuyEnabled )
 		{ 
-			LLSelectNode* node = LLSelectMgr::getInstanceFast()->getHoverNode();
+			LLSelectNode* node = LLSelectMgr::getInstance()->getHoverNode();
 			if (!node || node->mSaleInfo.isForSale())
 			{
 // [RLVa:KB] - @buy
@@ -668,7 +668,7 @@ bool LLToolPie::walkToClickedLocation()
     {
         const F64 SELF_CLICK_WALK_DISTANCE = 3.0;
         // pretend we picked some point a bit in front of avatar
-        mPick.mPosGlobal = gAgent.getPositionGlobal() + LLVector3d(LLViewerCamera::instanceFast().getAtAxis()) * SELF_CLICK_WALK_DISTANCE;
+        mPick.mPosGlobal = gAgent.getPositionGlobal() + LLVector3d(LLViewerCamera::instance().getAtAxis()) * SELF_CLICK_WALK_DISTANCE;
     }
 
 //    if ((mPick.mPickType == LLPickInfo::PICK_LAND && !mPick.mPosGlobal.isExactlyZero()) ||
@@ -777,7 +777,7 @@ void LLToolPie::selectionPropertiesReceived()
 {
 	// Make sure all data has been received.
 	// This function will be called repeatedly as the data comes in.
-	if (!LLSelectMgr::getInstanceFast()->selectGetAllValid())
+	if (!LLSelectMgr::getInstance()->selectGetAllValid())
 	{
 		return;
 	}
@@ -832,7 +832,7 @@ BOOL LLToolPie::handleHover(S32 x, S32 y, MASK mask)
 		return TRUE;
 	}
 // [/RLVa:KB]
-	LLSelectMgr::getInstanceFast()->setHoverObject(object, mHoverPick.mObjectFace);
+	LLSelectMgr::getInstance()->setHoverObject(object, mHoverPick.mObjectFace);
 	if (object)
 	{
 		parent = object->getRootEdit();
@@ -965,7 +965,7 @@ BOOL LLToolPie::handleMouseUp(S32 x, S32 y, MASK mask)
 		setMouseCapture(FALSE);
 	}
 
-	LLToolMgr::getInstanceFast()->clearTransientTool();
+	LLToolMgr::getInstance()->clearTransientTool();
 	gAgentCamera.setLookAt(LOOKAT_TARGET_CONVERSATION, obj); // maybe look at object/person clicked on
 
 	return LLTool::handleMouseUp(x, y, mask);
@@ -1017,12 +1017,12 @@ BOOL LLToolPie::handleTooltipLand(std::string line, std::string tooltip_msg)
 	static const LLCachedControl<bool> show_land_hover_tips(gSavedSettings, "ShowLandHoverTip");
 	if (!show_land_hover_tips) return TRUE;
 
-	LLViewerParcelMgr::getInstanceFast()->setHoverParcel( mHoverPick.mPosGlobal );
+	LLViewerParcelMgr::getInstance()->setHoverParcel( mHoverPick.mPosGlobal );
 
 	// Didn't hit an object, but since we have a land point we
 	// must be hovering over land.
 	
-	LLParcel* hover_parcel = LLViewerParcelMgr::getInstanceFast()->getHoverParcel();
+	LLParcel* hover_parcel = LLViewerParcelMgr::getInstance()->getHoverParcel();
 	LLUUID owner;
 	
 	if ( hover_parcel )
@@ -1254,7 +1254,7 @@ BOOL LLToolPie::handleTooltipObject( LLViewerObject* hover_object, std::string l
 		//  Default prefs will suppress display unless the object is interactive
 		//
 		static const LLCachedControl<bool> show_all_object_tips(gSavedSettings, "ShowAllObjectHoverTip");			
-		LLSelectNode *nodep = LLSelectMgr::getInstanceFast()->getHoverNode();
+		LLSelectNode *nodep = LLSelectMgr::getInstance()->getHoverNode();
 		
 		// only show tooltip if same inspector not already open
 		LLFloater* existing_inspector = LLFloaterReg::findInstance("inspect_object");
@@ -1299,7 +1299,7 @@ BOOL LLToolPie::handleTooltipObject( LLViewerObject* hover_object, std::string l
 				const LLMediaEntry* mep = has_media ? tep->getMediaData() : NULL;
 				if (mep)
 				{
-					viewer_media_t media_impl = LLViewerMedia::getInstanceFast()->getMediaImplFromTextureID(mep->getMediaID());
+					viewer_media_t media_impl = LLViewerMedia::getInstance()->getMediaImplFromTextureID(mep->getMediaID());
 					LLPluginClassMedia* media_plugin = NULL;
 					
 					if (media_impl.notNull() && (media_impl->hasMedia()))
@@ -1338,7 +1338,7 @@ BOOL LLToolPie::handleTooltipObject( LLViewerObject* hover_object, std::string l
 				              for_sale) &&
 				(has_media || 
 				 needs_tooltip(nodep) || 
-				 needs_tooltip(LLSelectMgr::getInstanceFast()->getPrimaryHoverNode()));
+				 needs_tooltip(LLSelectMgr::getInstance()->getPrimaryHoverNode()));
 			
 			if (show_all_object_tips || needs_tip)
 			{
@@ -1390,7 +1390,7 @@ BOOL LLToolPie::handleToolTip(S32 local_x, S32 local_y, MASK mask)
 // [/RLVa:KB]
 
 	// update hover object and hover parcel
-	LLSelectMgr::getInstanceFast()->setHoverObject(hover_object, mHoverPick.mObjectFace);
+	LLSelectMgr::getInstance()->setHoverObject(hover_object, mHoverPick.mObjectFace);
 	
 	
 	std::string tooltip_msg;
@@ -1466,7 +1466,7 @@ void LLToolPie::showObjectInspector(const LLUUID& object_id, const S32& object_f
 void LLToolPie::playCurrentMedia(const LLPickInfo& info)
 {
 	//FIXME: how do we handle object in different parcel than us?
-	LLParcel* parcel = LLViewerParcelMgr::getInstanceFast()->getAgentParcel();
+	LLParcel* parcel = LLViewerParcelMgr::getInstance()->getAgentParcel();
 	if (!parcel) return;
 	
 	LLPointer<LLViewerObject> objectp = info.getObject();
@@ -1493,7 +1493,7 @@ void LLToolPie::playCurrentMedia(const LLPickInfo& info)
 
 	LLPluginClassMedia* media_plugin = NULL;
 	
-	viewer_media_t media_impl = LLViewerMedia::getInstanceFast()->getMediaImplFromTextureID(mep->getMediaID());
+	viewer_media_t media_impl = LLViewerMedia::getInstance()->getMediaImplFromTextureID(mep->getMediaID());
 		
 	if(media_impl.notNull() && media_impl->hasMedia())
 	{
@@ -1518,7 +1518,7 @@ void LLToolPie::playCurrentMedia(const LLPickInfo& info)
 void LLToolPie::VisitHomePage(const LLPickInfo& info)
 {
 	//FIXME: how do we handle object in different parcel than us?
-	LLParcel* parcel = LLViewerParcelMgr::getInstanceFast()->getAgentParcel();
+	LLParcel* parcel = LLViewerParcelMgr::getInstance()->getAgentParcel();
 	if (!parcel) return;
 	
 	LLPointer<LLViewerObject> objectp = info.getObject();
@@ -1545,7 +1545,7 @@ void LLToolPie::VisitHomePage(const LLPickInfo& info)
 	
 	LLPluginClassMedia* media_plugin = NULL;
 	
-	viewer_media_t media_impl = LLViewerMedia::getInstanceFast()->getMediaImplFromTextureID(mep->getMediaID());
+	viewer_media_t media_impl = LLViewerMedia::getInstance()->getMediaImplFromTextureID(mep->getMediaID());
 	
 	if(media_impl.notNull() && media_impl->hasMedia())
 	{
@@ -1570,7 +1570,7 @@ void LLToolPie::handleDeselect()
 		setMouseCapture( FALSE );  // Calls onMouseCaptureLost() indirectly
 	}
 	// remove temporary selection for pie menu
-	LLSelectMgr::getInstanceFast()->setHoverObject(NULL);
+	LLSelectMgr::getInstance()->setHoverObject(NULL);
 
 	// Menu may be still up during transfer to different tool.
 	// toolfocus and toolgrab should retain menu, they will clear it if needed
@@ -1579,7 +1579,7 @@ void LLToolPie::handleDeselect()
 	{
 		// in most cases menu is useless without correct selection, so either keep both or discard both
 		gMenuHolder->hideMenus();
-		LLSelectMgr::getInstanceFast()->validateSelection();
+		LLSelectMgr::getInstance()->validateSelection();
 	}
 }
 
@@ -1642,7 +1642,7 @@ void LLToolPie::render()
 
 static void handle_click_action_play()
 {
-	LLParcel* parcel = LLViewerParcelMgr::getInstanceFast()->getAgentParcel();
+	LLParcel* parcel = LLViewerParcelMgr::getInstance()->getAgentParcel();
 	if (!parcel) return;
 
 	LLViewerMediaImpl::EMediaStatus status = LLViewerParcelMedia::getInstance()->getStatus();
@@ -1665,7 +1665,7 @@ static void handle_click_action_play()
 bool LLToolPie::handleMediaClick(const LLPickInfo& pick)
 {
     //FIXME: how do we handle object in different parcel than us?
-    LLParcel* parcel = LLViewerParcelMgr::getInstanceFast()->getAgentParcel();
+    LLParcel* parcel = LLViewerParcelMgr::getInstance()->getAgentParcel();
     LLPointer<LLViewerObject> objectp = pick.getObject();
 
 
@@ -1688,7 +1688,7 @@ bool LLToolPie::handleMediaClick(const LLPickInfo& pick)
     if (!mep)
         return false;
 
-    viewer_media_t media_impl = LLViewerMedia::getInstanceFast()->getMediaImplFromTextureID(mep->getMediaID());
+    viewer_media_t media_impl = LLViewerMedia::getInstance()->getMediaImplFromTextureID(mep->getMediaID());
 
     if (gSavedSettings.getBOOL("MediaOnAPrimUI"))
     {
@@ -1719,7 +1719,7 @@ bool LLToolPie::handleMediaClick(const LLPickInfo& pick)
 bool LLToolPie::handleMediaDblClick(const LLPickInfo& pick)
 {
     //FIXME: how do we handle object in different parcel than us?
-    LLParcel* parcel = LLViewerParcelMgr::getInstanceFast()->getAgentParcel();
+    LLParcel* parcel = LLViewerParcelMgr::getInstance()->getAgentParcel();
     LLPointer<LLViewerObject> objectp = pick.getObject();
 
 
@@ -1742,7 +1742,7 @@ bool LLToolPie::handleMediaDblClick(const LLPickInfo& pick)
     if (!mep)
         return false;
 
-    viewer_media_t media_impl = LLViewerMedia::getInstanceFast()->getMediaImplFromTextureID(mep->getMediaID());
+    viewer_media_t media_impl = LLViewerMedia::getInstance()->getMediaImplFromTextureID(mep->getMediaID());
 
     if (gSavedSettings.getBOOL("MediaOnAPrimUI"))
     {
@@ -1773,7 +1773,7 @@ bool LLToolPie::handleMediaDblClick(const LLPickInfo& pick)
 bool LLToolPie::handleMediaHover(const LLPickInfo& pick)
 {
 	//FIXME: how do we handle object in different parcel than us?
-	LLParcel* parcel = LLViewerParcelMgr::getInstanceFast()->getAgentParcel();
+	LLParcel* parcel = LLViewerParcelMgr::getInstance()->getAgentParcel();
 	if (!parcel) return false;
 
 	LLPointer<LLViewerObject> objectp = pick.getObject();
@@ -1797,7 +1797,7 @@ bool LLToolPie::handleMediaHover(const LLPickInfo& pick)
 	if (mep
 		&& gSavedSettings.getBOOL("MediaOnAPrimUI"))
 	{		
-		viewer_media_t media_impl = LLViewerMedia::getInstanceFast()->getMediaImplFromTextureID(mep->getMediaID());
+		viewer_media_t media_impl = LLViewerMedia::getInstance()->getMediaImplFromTextureID(mep->getMediaID());
 		
 		if(media_impl.notNull())
 		{
@@ -1835,7 +1835,7 @@ bool LLToolPie::handleMediaMouseUp()
 	if(mMediaMouseCaptureID.notNull())
 	{
 		// Face media needs to know the mouse went up.
-		viewer_media_t media_impl = LLViewerMedia::getInstanceFast()->getMediaImplFromTextureID(mMediaMouseCaptureID);
+		viewer_media_t media_impl = LLViewerMedia::getInstance()->getMediaImplFromTextureID(mMediaMouseCaptureID);
 		if(media_impl)
 		{
 			// This will send a mouseUp event to the plugin using the last known mouse coordinate (from a mouseDown or mouseMove), which is what we want.
@@ -1853,7 +1853,7 @@ bool LLToolPie::handleMediaMouseUp()
 static void handle_click_action_open_media(LLPointer<LLViewerObject> objectp)
 {
 	//FIXME: how do we handle object in different parcel than us?
-	LLParcel* parcel = LLViewerParcelMgr::getInstanceFast()->getAgentParcel();
+	LLParcel* parcel = LLViewerParcelMgr::getInstance()->getAgentParcel();
 	if (!parcel) return;
 
 	// did we hit an object?
@@ -1864,7 +1864,7 @@ static void handle_click_action_open_media(LLPointer<LLViewerObject> objectp)
 	if( face < 0 || face >= objectp->getNumTEs() ) return;
 		
 	// is media playing on this face?
-	if (LLViewerMedia::getInstanceFast()->getMediaImplFromTextureID(objectp->getTE(face)->getID()) != NULL)
+	if (LLViewerMedia::getInstance()->getMediaImplFromTextureID(objectp->getTE(face)->getID()) != NULL)
 	{
 		handle_click_action_play();
 		return;
@@ -1884,7 +1884,7 @@ static ECursorType cursor_from_parcel_media(U8 click_action)
 	
 	//FIXME: how do we handle object in different parcel than us?
 	ECursorType open_cursor = UI_CURSOR_ARROW;
-	LLParcel* parcel = LLViewerParcelMgr::getInstanceFast()->getAgentParcel();
+	LLParcel* parcel = LLViewerParcelMgr::getInstance()->getAgentParcel();
 	if (!parcel) return open_cursor;
 
 	open_cursor = UI_CURSOR_TOOLMEDIAOPEN;
@@ -1909,7 +1909,7 @@ BOOL LLToolPie::handleRightClickPick()
 
 	if (mPick.mPickType != LLPickInfo::PICK_LAND)
 	{
-		LLViewerParcelMgr::getInstanceFast()->deselectLand();
+		LLViewerParcelMgr::getInstance()->deselectLand();
 	}
 
 	// didn't click in any UI object, so must have clicked in the world
@@ -1921,7 +1921,7 @@ BOOL LLToolPie::handleRightClickPick()
 	// Spawn pie menu
 	if (mPick.mPickType == LLPickInfo::PICK_LAND)
 	{
-		LLParcelSelectionHandle selection = LLViewerParcelMgr::getInstanceFast()->selectParcelAt( mPick.mPosGlobal );
+		LLParcelSelectionHandle selection = LLViewerParcelMgr::getInstance()->selectParcelAt( mPick.mPosGlobal );
 		gMenuHolder->setParcelSelection(selection);
 		gMenuLand->show(x, y);
 
@@ -1941,7 +1941,7 @@ BOOL LLToolPie::handleRightClickPick()
 	}
 	else if (object)
 	{
-		gMenuHolder->setObjectSelection(LLSelectMgr::getInstanceFast()->getSelection());
+		gMenuHolder->setObjectSelection(LLSelectMgr::getInstance()->getSelection());
 
 		bool is_other_attachment = (object->isAttachment() && !object->isHUDAttachment() && !object->permYouOwner());
 		if (object->isAvatar() || is_other_attachment)
@@ -1962,7 +1962,7 @@ BOOL LLToolPie::handleRightClickPick()
 			LLVOAvatar* avatar = (LLVOAvatar*)object;
 			std::string name = avatar->getFullname();
 			std::string mute_msg;
-			if (LLMuteList::getInstanceFast()->isMuted(avatar->getID(), avatar->getFullname()))
+			if (LLMuteList::getInstance()->isMuted(avatar->getID(), avatar->getFullname()))
 			{
 				mute_msg = LLTrans::getString("UnmuteAvatar");
 			}
@@ -1973,7 +1973,7 @@ BOOL LLToolPie::handleRightClickPick()
 
 // [RLVa:KB] - Checked: 2010-04-11 (RLVa-1.2.0e) | Modified: RLVa-1.1.0l
 			// Don't show the context menu on empty selection when fartouch restricted [see LLToolSelect::handleObjectSelection()]
-			if ( (!rlv_handler_t::isEnabled()) || (!LLSelectMgr::getInstanceFast()->getSelection()->isEmpty()) ||
+			if ( (!rlv_handler_t::isEnabled()) || (!LLSelectMgr::getInstance()->getSelection()->isEmpty()) ||
 				 (!gRlvHandler.hasBehaviour(RLV_BHVR_FARTOUCH)) )
 			{
 // [/RLVa:KB]
@@ -2003,7 +2003,7 @@ BOOL LLToolPie::handleRightClickPick()
 		{
 			// BUG: What about chatting child objects?
 			std::string name;
-			LLSelectNode* node = LLSelectMgr::getInstanceFast()->getSelection()->getFirstRootNode();
+			LLSelectNode* node = LLSelectMgr::getInstance()->getSelection()->getFirstRootNode();
 			if (node)
 			{
 				name = node->mName;
@@ -2012,7 +2012,7 @@ BOOL LLToolPie::handleRightClickPick()
 // [RLVa:KB] - Checked: 2010-04-11 (RLVa-1.2.el) | Modified: RLVa-1.1.0l
 			// Don't show the pie menu on empty selection when fartouch/interaction restricted
 			// (not entirely accurate in case of Tools / Select Only XXX [see LLToolSelect::handleObjectSelection()]
-			if ( (!rlv_handler_t::isEnabled()) || (!LLSelectMgr::getInstanceFast()->getSelection()->isEmpty()) ||
+			if ( (!rlv_handler_t::isEnabled()) || (!LLSelectMgr::getInstance()->getSelection()->isEmpty()) ||
 				 (!gRlvHandler.hasBehaviour(RLV_BHVR_FARTOUCH)) )
 			{
 // [/RLVa:KB]
@@ -2118,20 +2118,20 @@ void LLToolPie::startCameraSteering()
 		if (avatar_object && ((LLVOAvatar*)avatar_object)->isSelf())
 		{
 			// ...project pick point a few meters in front of avatar
-			mSteerPick.mPosGlobal = gAgent.getPositionGlobal() + LLVector3d(LLViewerCamera::instanceFast().getAtAxis()) * 3.0;
+			mSteerPick.mPosGlobal = gAgent.getPositionGlobal() + LLVector3d(LLViewerCamera::instance().getAtAxis()) * 3.0;
 		}
 
 		if (!mSteerPick.isValid())
 		{
 			mSteerPick.mPosGlobal = gAgent.getPosGlobalFromAgent(
-				LLViewerCamera::instanceFast().getOrigin() + gViewerWindow->mouseDirectionGlobal(mSteerPick.mMousePt.mX, mSteerPick.mMousePt.mY) * 100.f);
+				LLViewerCamera::instance().getOrigin() + gViewerWindow->mouseDirectionGlobal(mSteerPick.mMousePt.mX, mSteerPick.mMousePt.mY) * 100.f);
 		}
 
 		setMouseCapture(TRUE);
 		
 		mMouseSteerX = mMouseDownX;
 		mMouseSteerY = mMouseDownY;
-		const LLVector3 camera_to_rotation_center	= gAgent.getFrameAgent().getOrigin() - LLViewerCamera::instanceFast().getOrigin();
+		const LLVector3 camera_to_rotation_center	= gAgent.getFrameAgent().getOrigin() - LLViewerCamera::instance().getOrigin();
 		const LLVector3 rotation_center_to_pick		= gAgent.getPosAgentFromGlobal(mSteerPick.mPosGlobal) - gAgent.getFrameAgent().getOrigin();
 
 		mClockwise = camera_to_rotation_center * rotation_center_to_pick < 0.f;
@@ -2146,7 +2146,7 @@ void LLToolPie::startCameraSteering()
 
 void LLToolPie::steerCameraWithMouse(S32 x, S32 y)
 {
-	const LLViewerCamera& camera = LLViewerCamera::instanceFast();
+	const LLViewerCamera& camera = LLViewerCamera::instance();
 	const LLCoordFrame& rotation_frame = gAgent.getFrameAgent();
 	const LLVector3 pick_pos = gAgent.getPosAgentFromGlobal(mSteerPick.mPosGlobal);
 	const LLVector3 pick_rotation_center = rotation_frame.getOrigin() + parallel_component(pick_pos - rotation_frame.getOrigin(), rotation_frame.getUpAxis());

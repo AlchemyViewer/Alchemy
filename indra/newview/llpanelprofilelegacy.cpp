@@ -58,7 +58,6 @@
 #include "llfloaterworldmap.h"
 #include "llgroupactions.h"
 #include "llpanelclassified.h"
-#include "llpanelpick.h"
 #if WIP_PROFILES
 #include "llpanelpicks.h"
 #include "llpickitem.h"

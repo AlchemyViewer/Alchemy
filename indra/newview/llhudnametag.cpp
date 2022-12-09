@@ -147,7 +147,7 @@ BOOL LLHUDNameTag::lineSegmentIntersect(const LLVector4a& start, const LLVector4
 
 	LLVector3 position = mPositionAgent;
 
-	auto& viewerCamera = LLViewerCamera::instanceFast();
+	auto& viewerCamera = LLViewerCamera::instance();
 
 	if (mSourceObject)
 	{ //get intersection of eye through mPositionAgent to plane of source object
@@ -226,6 +226,7 @@ BOOL LLHUDNameTag::lineSegmentIntersect(const LLVector4a& start, const LLVector4
 
 void LLHUDNameTag::render()
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
 	if (sDisplayText)
 	{
 		LLGLDepthTest gls_depth(GL_TRUE, GL_FALSE);
@@ -291,7 +292,7 @@ void LLHUDNameTag::renderText(BOOL for_select)
 	LLVector3 x_pixel_vec;
 	LLVector3 y_pixel_vec;
 	
-	LLViewerCamera::getInstanceFast()->getPixelVectors(mPositionAgent, y_pixel_vec, x_pixel_vec);
+	LLViewerCamera::getInstance()->getPixelVectors(mPositionAgent, y_pixel_vec, x_pixel_vec);
 
 	LLVector3 width_vec = mWidth * x_pixel_vec;
 	LLVector3 height_vec = mHeight * y_pixel_vec;
@@ -299,7 +300,7 @@ void LLHUDNameTag::renderText(BOOL for_select)
 	mRadius = (width_vec + height_vec).magVec() * 0.5f;
 
 	LLCoordGL screen_pos;
-	LLViewerCamera::getInstanceFast()->projectPosAgentToScreen(mPositionAgent, screen_pos, FALSE);
+	LLViewerCamera::getInstance()->projectPosAgentToScreen(mPositionAgent, screen_pos, FALSE);
 
 	LLVector2 screen_offset = updateScreenPos(mPositionOffset);
 
@@ -326,8 +327,6 @@ void LLHUDNameTag::renderText(BOOL for_select)
 		
 	// Render label
 	{
-		//gGL.getTexUnit(0)->setTextureBlendType(LLTexUnit::TB_MULT);
-
 		for(std::vector<LLHUDTextSegment>::iterator segment_iter = mLabelSegments.begin();
 			segment_iter != mLabelSegments.end(); ++segment_iter )
 		{
@@ -585,7 +584,7 @@ void LLHUDNameTag::updateVisibility()
 		return;
 	}
 
-	auto& viewerCamera = LLViewerCamera::instanceFast();
+	auto& viewerCamera = LLViewerCamera::instance();
 
 	// push text towards camera by radius of object, but not past camera
 	LLVector3 vec_from_camera = mPositionAgent - viewerCamera.getOrigin();
@@ -648,7 +647,7 @@ LLVector2 LLHUDNameTag::updateScreenPos(LLVector2 &offset)
 	LLVector2 screen_pos_vec;
 	LLVector3 x_pixel_vec;
 	LLVector3 y_pixel_vec;
-	auto& viewerCamera = LLViewerCamera::instanceFast();
+	auto& viewerCamera = LLViewerCamera::instance();
 
 	viewerCamera.getPixelVectors(mPositionAgent, y_pixel_vec, x_pixel_vec);
 	LLVector3 world_pos = mPositionAgent + (offset.mV[VX] * x_pixel_vec) + (offset.mV[VY] * y_pixel_vec);
@@ -739,6 +738,7 @@ void LLHUDNameTag::updateSize()
 
 void LLHUDNameTag::updateAll()
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
 	// iterate over all text objects, calculate their restoration forces,
 	// and add them to the visible set if they are on screen and close enough
 	sVisibleTextObjects.clear();

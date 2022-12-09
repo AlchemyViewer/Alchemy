@@ -589,7 +589,7 @@ void LLFloaterIMNearbyChatHandler::processChat(const LLChat& chat_msg,
 			LLSD userdata;
 			userdata["date"] = LLDate::now();
 			userdata["nearby"] = true;
-			LLRecentPeople::instanceFast().add(chat_msg.mFromID, userdata);
+			LLRecentPeople::instance().add(chat_msg.mFromID, userdata);
 	}
 // [/RLVa:KB]
 	}

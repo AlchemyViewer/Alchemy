@@ -81,6 +81,67 @@ static const S32 LOCAL_TRACKING_ID_COLUMN = 1;
 //static const char WHITE_IMAGE_NAME[] = "Blank Texture";
 //static const char NO_IMAGE_NAME[] = "None";
 
+
+
+//static
+bool get_is_predefined_texture(LLUUID asset_id)
+{
+    if (asset_id == LLUUID(gSavedSettings.getString("DefaultObjectTexture"))
+        || asset_id == LLUUID(gSavedSettings.getString("UIImgWhiteUUID"))
+        || asset_id == LLUUID(gSavedSettings.getString("UIImgInvisibleUUID"))
+        || asset_id == LLUUID(SCULPT_DEFAULT_TEXTURE))
+    {
+        return true;
+    }
+    return false;
+}
+
+LLUUID get_copy_free_item_by_asset_id(LLUUID asset_id, bool no_trans_perm)
+{
+    LLViewerInventoryCategory::cat_array_t cats;
+    LLViewerInventoryItem::item_array_t items;
+    LLAssetIDMatches asset_id_matches(asset_id);
+    gInventory.collectDescendentsIf(LLUUID::null,
+        cats,
+        items,
+        LLInventoryModel::INCLUDE_TRASH,
+        asset_id_matches);
+    
+    LLUUID res;
+    if (items.size())
+    {
+        for (S32 i = 0; i < items.size(); i++)
+        {
+            LLViewerInventoryItem* itemp = items[i];
+            if (itemp)
+            {
+                LLPermissions item_permissions = itemp->getPermissions();
+                if (item_permissions.allowOperationBy(PERM_COPY,
+                    gAgent.getID(),
+                    gAgent.getGroupID()))
+                {
+                    bool allow_trans = item_permissions.allowOperationBy(PERM_TRANSFER, gAgent.getID(), gAgent.getGroupID());
+                    if (allow_trans != no_trans_perm)
+                    {
+                        return itemp->getUUID();
+                    }
+                    res = itemp->getUUID();
+                }
+            }
+        }
+    }
+    return res;
+}
+
+bool get_can_copy_texture(LLUUID asset_id)
+{
+    // User is allowed to copy a texture if:
+    // library asset or default texture,
+    // or copy perm asset exists in user's inventory
+
+    return get_is_predefined_texture(asset_id) || get_copy_free_item_by_asset_id(asset_id).notNull();
+}
+
 LLFloaterTexturePicker::LLFloaterTexturePicker(	
 	LLView* owner,
 	LLUUID image_asset_id,
@@ -205,9 +266,9 @@ void LLFloaterTexturePicker::setCanApplyImmediately(BOOL b)
 
 void LLFloaterTexturePicker::stopUsingPipette()
 {
-	if (LLToolMgr::getInstanceFast()->getCurrentTool() == LLToolPipette::getInstanceFast())
+	if (LLToolMgr::getInstance()->getCurrentTool() == LLToolPipette::getInstance())
 	{
-		LLToolMgr::getInstanceFast()->clearTransientTool();
+		LLToolMgr::getInstance()->clearTransientTool();
 	}
 }
 
@@ -434,7 +495,7 @@ BOOL LLFloaterTexturePicker::postBuild()
 	updateFilterPermMask();
 	mSavedFolderState.setApply(FALSE);
 
-	LLToolPipette::getInstanceFast()->setToolSelectCallback(boost::bind(&LLFloaterTexturePicker::onTextureSelect, this, _1));
+	LLToolPipette::getInstance()->setToolSelectCallback(boost::bind(&LLFloaterTexturePicker::onTextureSelect, this, _1));
 	
 	getChild<LLComboBox>("l_bake_use_texture_combo_box")->setCommitCallback(onBakeTextureSelect, this);
 	getChild<LLCheckBoxCtrl>("hide_base_mesh_region")->setCommitCallback(onHideBaseMeshRegionCheck, this);
@@ -455,7 +516,7 @@ void LLFloaterTexturePicker::draw()
 	getChildView("show_folders_check")->setEnabled(mActive && mCanApplyImmediately && !mNoCopyTextureSelected);
 	getChildView("Select")->setEnabled(mActive && mCanApply);
 	getChildView("Pipette")->setEnabled(mActive);
-	getChild<LLUICtrl>("Pipette")->setValue(LLToolMgr::getInstanceFast()->getCurrentTool() == LLToolPipette::getInstanceFast());
+	getChild<LLUICtrl>("Pipette")->setValue(LLToolMgr::getInstance()->getCurrentTool() == LLToolPipette::getInstance());
 
 	//BOOL allow_copy = FALSE;
 	if( mOwner ) 
@@ -467,7 +528,7 @@ void LLFloaterTexturePicker::draw()
 
 			if (LLAvatarAppearanceDefines::LLAvatarAppearanceDictionary::isBakedImageId(mImageAssetID))
 			{
-				LLViewerObject* obj = LLSelectMgr::getInstanceFast()->getSelection()->getFirstObject();
+				LLViewerObject* obj = LLSelectMgr::getInstance()->getSelection()->getFirstObject();
 				if (obj)
 				{
 					LLViewerTexture* viewerTexture = obj->getBakedTextureForMagicId(mImageAssetID);
@@ -723,11 +784,11 @@ void LLFloaterTexturePicker::onBtnPipette()
 	pipette_active = !pipette_active;
 	if (pipette_active)
 	{
-		LLToolMgr::getInstanceFast()->setTransientTool(LLToolPipette::getInstance());
+		LLToolMgr::getInstance()->setTransientTool(LLToolPipette::getInstance());
 	}
 	else
 	{
-		LLToolMgr::getInstanceFast()->clearTransientTool();
+		LLToolMgr::getInstance()->clearTransientTool();
 	}
 }
 
@@ -1650,7 +1711,7 @@ void LLTextureCtrl::draw()
 
 		if (LLAvatarAppearanceDefines::LLAvatarAppearanceDictionary::isBakedImageId(mImageAssetID))
 		{
-			LLViewerObject* obj = LLSelectMgr::getInstanceFast()->getSelection()->getFirstObject();
+			LLViewerObject* obj = LLSelectMgr::getInstance()->getSelection()->getFirstObject();
 			if (obj)
 			{
 				LLViewerTexture* viewerTexture = obj->getBakedTextureForMagicId(mImageAssetID);

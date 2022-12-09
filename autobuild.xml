@@ -524,11 +524,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>b335f8d0b189801f70497dfbae615961d54df73d7dea1294bf2c3b8eff12baff609df1e138b535f8840d1113d9aa1222c0361e8543e39ee26f49c8101e098a82</string>
+              <string>5690cfb770eac3d42728134b117a84b1430e2b81fd19e0924b098fd746acda119113dfef962108802f1f2e92abf744395d0cbb95f3131af422c2ec56b0050fe6</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/103/packages/generic/dullahan/1.12.3_101.0.15_gca159c5_chromium-101.0.4951.54.1523/dullahan-1.12.3_101.0.15_gca159c5_chromium-101.0.4951.54-darwin64-1523.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/103/packages/generic/dullahan/1.12.4_107.1.4_geb36a79_chromium-107.0.5304.68.1617/dullahan-1.12.4_107.1.4_geb36a79_chromium-107.0.5304.68-darwin64-1617.tar.zst</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
@@ -538,11 +538,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>ccda70482a1daa285465ce999acac76d44da2cd54fc848d66a46726a48b4c76ff9b50f18bc1b644f9b380a44d108417f093de5780bfe4692101de3f265451162</string>
+              <string>31ec77a986a864d1fe70370f27e22a2a1176052bd3f44941cd0b529a57d037d2e101e5f22e5ba14bfd13fe06e30ec00f8b78d8eebafb398fc1f827a097927dba</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/103/packages/generic/dullahan/1.12.3_97.1.5_g2b00258_chromium-97.0.4692.71.1523/dullahan-1.12.3_97.1.5_g2b00258_chromium-97.0.4692.71-linux64-1523.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/103/packages/generic/dullahan/1.12.4_107.1.4_geb36a79_chromium-107.0.5304.68.1617/dullahan-1.12.4_107.1.4_geb36a79_chromium-107.0.5304.68-linux64-1617.tar.zst</string>
             </map>
             <key>name</key>
             <string>linux64</string>
@@ -552,18 +552,18 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>75b13e4f30eae31d5df27c28181e52bca58a9624ce9b6424a4e254270d41d2aecb42ab3b72f53e67a32bd45a9cf7be79d730ba427bf3e1f64da131761b1126b5</string>
+              <string>6097c0e4bd4f2c771f28bb605ca282d0b6ab878b7f05b237c37691435def9ca25c186b8706a54180aa09935c5e36a8cc088c04925afaa84606919725dadaf7a9</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/103/packages/generic/dullahan/1.12.3_101.0.15_gca159c5_chromium-101.0.4951.54.1523/dullahan-1.12.3_101.0.15_gca159c5_chromium-101.0.4951.54-windows64-1523.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/103/packages/generic/dullahan/1.12.4_107.1.7_g59a795c_chromium-107.0.5304.88.1617/dullahan-1.12.4_107.1.7_g59a795c_chromium-107.0.5304.88-windows64-1617.tar.zst</string>
             </map>
             <key>name</key>
             <string>windows64</string>
           </map>
         </map>
         <key>version</key>
-        <string>1.12.3_101.0.15_gca159c5_chromium-101.0.4951.54</string>
+        <string>1.12.4_107.1.4_geb36a79_chromium-107.0.5304.68</string>
       </map>
       <key>expat</key>
       <map>
@@ -1936,11 +1936,9 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>ee960277ce5a3982aa04abbae482ce0b949a4a6d22a719f4d78fda77599cdca001b9cbaf28f00d013b4cd16eff76310cf1c7829b4e6bd5a16b4906daccdbbc88</string>
-              <key>hash_algorithm</key>
-              <string>blake2b</string>
+              <string>b583668b28fde0490e6953f10e93e4ab</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/168/packages/generic/slvoice/4.10.0000.32327.5fc3fe7c.558436.1202/slvoice-4.10.0000.32327.5fc3fe7c.558436-darwin64-1202.tar.zst</string>
+              <string>https://automated-builds-secondlife-com.s3.amazonaws.com/ct2/98681/871545/slvoice-4.10.0000.32327.5fc3fe7c.571099-darwin64-571099.tar.bz2</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
@@ -1959,23 +1957,33 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>name</key>
             <string>linux64</string>
           </map>
+          <key>windows</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>hash</key>
+              <string>6e0ed41653955afe8eeb8945776cf07b</string>
+              <key>url</key>
+              <string>https://automated-builds-secondlife-com.s3.amazonaws.com/ct2/98683/871560/slvoice-4.10.0000.32327.5fc3fe7c.571099-windows-571099.tar.bz2</string>
+            </map>
+            <key>name</key>
+            <string>windows</string>
+          </map>
           <key>windows64</key>
           <map>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>b756951b908b487fb616c6e420d3bfb8d8729613572263ef57fcc17c6d865c1177750b5a3e11f12757004dbb3fd76a4b2082e93bc05b740af394250d5cd050ac</string>
-              <key>hash_algorithm</key>
-              <string>blake2b</string>
+              <string>c39735851fd05c194d0be09b8f9e8cb7</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/168/packages/generic/slvoice/4.10.0000.32327.5fc3fe7c.558436.1202/slvoice-4.10.0000.32327.5fc3fe7c.558436-windows64-1202.tar.zst</string>
+              <string>https://automated-builds-secondlife-com.s3.amazonaws.com/ct2/98682/871552/slvoice-4.10.0000.32327.5fc3fe7c.571099-windows64-571099.tar.bz2</string>
             </map>
             <key>name</key>
             <string>windows64</string>
           </map>
         </map>
         <key>version</key>
-        <string>4.10.0000.32327.5fc3fe7c.558436</string>
+        <string>4.10.0000.32327.5fc3fe7c.571099</string>
       </map>
       <key>threejs</key>
       <map>
@@ -2006,6 +2014,70 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
         </map>
         <key>version</key>
         <string>0.135.0</string>
+      </map>
+      <key>tracy</key>
+      <map>
+        <key>canonical_repo</key>
+        <string>https://bitbucket.org/lindenlab/3p-tracy</string>
+        <key>copyright</key>
+        <string>Copyright (c) 2017-2021, Bartosz Taudul (wolf@nereid.pl)</string>
+        <key>description</key>
+        <string>Tracy Profiler Library</string>
+        <key>license</key>
+        <string>bsd</string>
+        <key>license_file</key>
+        <string>LICENSES/tracy_license.txt</string>
+        <key>name</key>
+        <string>tracy</string>
+        <key>platforms</key>
+        <map>
+          <key>darwin64</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>hash</key>
+              <string>da7317e4a81609f624f84780f28b07de</string>
+              <key>url</key>
+              <string>https://automated-builds-secondlife-com.s3.amazonaws.com/ct2/86972/801630/tracy-v0.7.8.563351-darwin64-563351.tar.bz2</string>
+            </map>
+            <key>name</key>
+            <string>darwin64</string>
+          </map>
+          <key>windows</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>hash</key>
+              <string>47c696cd2966c5cc3c8ba6115dd1f886</string>
+              <key>hash_algorithm</key>
+              <string>md5</string>
+              <key>url</key>
+              <string>https://automated-builds-secondlife-com.s3.amazonaws.com/ct2/86973/801641/tracy-v0.7.8.563351-windows-563351.tar.bz2</string>
+            </map>
+            <key>name</key>
+            <string>windows</string>
+          </map>
+          <key>windows64</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>hash</key>
+              <string>b649ee6591e67d2341e886b3fc3484a7</string>
+              <key>hash_algorithm</key>
+              <string>md5</string>
+              <key>url</key>
+              <string>https://automated-builds-secondlife-com.s3.amazonaws.com/ct2/86974/801642/tracy-v0.7.8.563351-windows64-563351.tar.bz2</string>
+            </map>
+            <key>name</key>
+            <string>windows64</string>
+          </map>
+        </map>
+        <key>source</key>
+        <string>https://bitbucket.org/lindenlab/3p-tracy</string>
+        <key>source_type</key>
+        <string>git</string>
+        <key>version</key>
+        <string>v0.7.8.563351</string>
       </map>
       <key>tut</key>
       <map>

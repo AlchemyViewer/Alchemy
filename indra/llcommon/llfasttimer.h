@@ -30,6 +30,7 @@
 #include "llinstancetracker.h"
 #include "lltrace.h"
 #include "lltreeiterators.h"
+#include "llprofiler.h"
 
 #if LL_WINDOWS
 #include <intrin.h>
@@ -40,6 +41,8 @@
 #define LL_FAST_TIMER_ON 1
 #define LL_FASTTIMER_USE_RDTSC 1
 
+// NOTE: Also see llprofiler.h
+#if !defined(LL_PROFILER_CONFIGURATION)
 #if AL_ENABLE_ALL_TIMERS
 #define LL_RECORD_BLOCK_TIME(timer_stat) const LLTrace::BlockTimer& LL_GLUE_TOKENS(block_time_recorder, __LINE__)(LLTrace::timeThisBlock(timer_stat)); (void)LL_GLUE_TOKENS(block_time_recorder, __LINE__);
 #else
@@ -47,6 +50,7 @@
 #endif
 
 #define LL_ALWAYS_RECORD_BLOCK_TIME(timer_stat) const LLTrace::BlockTimer& LL_GLUE_TOKENS(block_time_recorder, __LINE__)(LLTrace::timeThisBlock(timer_stat)); (void)LL_GLUE_TOKENS(block_time_recorder, __LINE__);
+#endif // LL_PROFILER_CONFIGURATION
 
 namespace LLTrace
 {
@@ -156,6 +160,7 @@ public:
 
 	static BlockTimerStatHandle& getRootTimeBlock();
 	static void pushLog(LLSD sd);
+	static void setLogLock(class LLMutex* mutex);
 	static void writeLog(std::ostream& os);
 	static void updateTimes();
 	

@@ -697,10 +697,9 @@ void LLInventoryPanel::itemChanged(const LLUUID& item_id, U32 mask, const LLInve
 }
 
 // Called when something changed in the global model (new item, item coming through the wire, rename, move, etc...) (CHUI-849)
-static LLTrace::BlockTimerStatHandle FTM_REFRESH("Inventory Refresh");
 void LLInventoryPanel::modelChanged(U32 mask)
 {
-	LL_RECORD_BLOCK_TIME(FTM_REFRESH);
+    LL_PROFILE_ZONE_SCOPED;
 
 	if (mViewsInitialized != VIEWS_INITIALIZED) return;
 	
@@ -794,9 +793,9 @@ void LLInventoryPanel::idle(void* user_data)
 {
 	LLInventoryPanel* panel = (LLInventoryPanel*)user_data;
 	// Nudge the filter if the clipboard state changed
-	if (panel->mClipboardState != LLClipboard::instanceFast().getGeneration())
+	if (panel->mClipboardState != LLClipboard::instance().getGeneration())
 	{
-		panel->mClipboardState = LLClipboard::instanceFast().getGeneration();
+		panel->mClipboardState = LLClipboard::instance().getGeneration();
 		const LLUUID trash_id = gInventory.findCategoryUUIDForType(LLFolderType::FT_TRASH);
 		LLFolderViewFolder* trash_folder = panel->getFolderByID(trash_id);
 		if (trash_folder)
@@ -855,9 +854,9 @@ void LLInventoryPanel::idle(void* user_data)
     {
         panel->mFolderRoot.get()->update();
         // while dragging, update selection rendering to reflect single/multi drag status
-        if (LLToolDragAndDrop::getInstanceFast()->hasMouseCapture())
+        if (LLToolDragAndDrop::getInstance()->hasMouseCapture())
         {
-            EAcceptance last_accept = LLToolDragAndDrop::getInstanceFast()->getLastAccept();
+            EAcceptance last_accept = LLToolDragAndDrop::getInstance()->getLastAccept();
             if (last_accept == ACCEPT_YES_SINGLE || last_accept == ACCEPT_YES_COPY_SINGLE)
             {
                 panel->mFolderRoot.get()->setShowSingleSelection(TRUE);
@@ -1275,7 +1274,7 @@ BOOL LLInventoryPanel::handleHover(S32 x, S32 y, MASK mask)
 	if(handled)
 	{
 		ECursorType cursor = getWindow()->getCursor();
-		if (LLInventoryModelBackgroundFetch::instanceFast().folderFetchActive() && cursor == UI_CURSOR_ARROW)
+		if (LLInventoryModelBackgroundFetch::instance().folderFetchActive() && cursor == UI_CURSOR_ARROW)
 		{
 			// replace arrow cursor with arrow and hourglass cursor
 			getWindow()->setCursor(UI_CURSOR_WORKING);
@@ -1883,10 +1882,9 @@ void LLInventoryPanel::removeItemID(const LLUUID& id)
 	}
 }
 
-LLTrace::BlockTimerStatHandle FTM_GET_ITEM_BY_ID("Get FolderViewItem by ID");
 LLFolderViewItem* LLInventoryPanel::getItemByID(const LLUUID& id)
 {
-	LL_RECORD_BLOCK_TIME(FTM_GET_ITEM_BY_ID);
+    LL_PROFILE_ZONE_SCOPED;
 
 	auto map_it = mItemMap.find(id);
 	if (map_it != mItemMap.end())

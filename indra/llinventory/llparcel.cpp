@@ -228,6 +228,8 @@ void LLParcel::init(const LLUUID &owner_id,
 
     setRegionAllowEnvironmentOverride(FALSE);
     setParcelEnvironmentVersion(INVALID_PARCEL_ENVIRONMENT_VERSION);
+
+    setObscureMOAP(false);
 }
 
 void LLParcel::overrideOwner(const LLUUID& owner_id, BOOL is_group_owned)
@@ -457,13 +459,13 @@ BOOL LLParcel::importAccessEntry(std::istream& input_stream, LLAccessEntry* entr
         }
         else if ("time" == keyword)
         {
-            S32 when = 0;
+            S32 when{};
             LLStringUtil::convertToS32(value, when);
             entry->mTime = when;
         }
         else if ("flags" == keyword)
         {
-            U32 setting = 0;
+            U32 setting{};
             LLStringUtil::convertToU32(value, setting);
             entry->mFlags = setting;
         }
@@ -534,6 +536,7 @@ void LLParcel::packMessage(LLSD& msg)
 	msg["see_avs"] = (LLSD::Boolean) getSeeAVs();
 	msg["group_av_sounds"] = (LLSD::Boolean) getAllowGroupAVSounds();
 	msg["any_av_sounds"] = (LLSD::Boolean) getAllowAnyAVSounds();
+    msg["obscure_moap"] = (LLSD::Boolean) getObscureMOAP();
 }
 
 

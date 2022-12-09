@@ -102,6 +102,4 @@ if (DARWIN)
     LINK_FLAGS "-exported_symbols_list ${CMAKE_CURRENT_SOURCE_DIR}/../base/media_plugin_base.exp"
   )
 
-  ## turns on C++11 using Cmake
-  target_compile_features(media_plugin_cef PRIVATE cxx_range_for)
 endif (DARWIN)

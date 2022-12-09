@@ -50,6 +50,9 @@
 #include "lldrawpoolwlsky.h"
 #include "llglslshader.h"
 #include "llglcommonfunc.h"
+#include "llvoavatar.h"
+#include "llviewershadermgr.h"
+
 
 S32 LLDrawPool::sNumDrawPools = 0;
 
@@ -385,24 +388,47 @@ LLRenderPass::~LLRenderPass()
 }
 
 void LLRenderPass::renderGroup(LLSpatialGroup* group, U32 type, U32 mask, BOOL texture)
-{					
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL;
 	LLSpatialGroup::drawmap_elem_t& draw_info = group->mDrawMap[type];
 	
 	for (LLDrawInfo* pparams : draw_info)
 	{
-		if (pparams) {
+		if (pparams) 
+        {
 			pushBatch(*pparams, mask, texture);
 		}
 	}
 }
 
-void LLRenderPass::renderTexture(U32 type, U32 mask, BOOL batch_textures)
+void LLRenderPass::renderRiggedGroup(LLSpatialGroup* group, U32 type, U32 mask, BOOL texture)
 {
-	pushBatches(type, mask, true, batch_textures);
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL;
+    LLSpatialGroup::drawmap_elem_t& draw_info = group->mDrawMap[type];
+    LLVOAvatar* lastAvatar = nullptr;
+    U64 lastMeshId = 0;
+    mask |= LLVertexBuffer::MAP_WEIGHT4;
+
+    for (LLSpatialGroup::drawmap_elem_t::iterator k = draw_info.begin(); k != draw_info.end(); ++k)
+    {
+        LLDrawInfo* pparams = *k;
+        if (pparams) 
+        {
+            if (lastAvatar != pparams->mAvatar || lastMeshId != pparams->mSkinInfo->mHash)
+            {
+                uploadMatrixPalette(*pparams);
+                lastAvatar = pparams->mAvatar;
+                lastMeshId = pparams->mSkinInfo->mHash;
+            }
+
+            pushBatch(*pparams, mask, texture);
+        }
+    }
 }
 
 void LLRenderPass::pushBatches(U32 type, U32 mask, BOOL texture, BOOL batch_textures)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL;
 	for (LLCullResult::drawinfo_iterator i = gPipeline.beginRenderMap(type), end = gPipeline.endRenderMap(type); i != end; ++i)
 	{
 		LLDrawInfo* pparams = *i;
@@ -413,25 +439,72 @@ void LLRenderPass::pushBatches(U32 type, U32 mask, BOOL texture, BOOL batch_text
 	}
 }
 
+void LLRenderPass::pushRiggedBatches(U32 type, U32 mask, BOOL texture, BOOL batch_textures)
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL;
+    LLVOAvatar* lastAvatar = nullptr;
+    U64 lastMeshId = 0;
+    mask |= LLVertexBuffer::MAP_WEIGHT4;
+    for (LLCullResult::drawinfo_iterator i = gPipeline.beginRenderMap(type); i != gPipeline.endRenderMap(type); ++i)
+    {
+        LLDrawInfo* pparams = *i;
+        if (pparams)
+        {
+            if (pparams->mAvatar.notNull() && (lastAvatar != pparams->mAvatar || lastMeshId != pparams->mSkinInfo->mHash))
+            {
+                uploadMatrixPalette(*pparams);
+                lastAvatar = pparams->mAvatar;
+                lastMeshId = pparams->mSkinInfo->mHash;
+            }
+
+            pushBatch(*pparams, mask, texture, batch_textures);
+        }
+    }
+}
+
 void LLRenderPass::pushMaskBatches(U32 type, U32 mask, BOOL texture, BOOL batch_textures)
 {
-	for (LLCullResult::drawinfo_iterator i = gPipeline.beginRenderMap(type), end = gPipeline.endRenderMap(type); i != end; ++i)
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL;
+	for (LLCullResult::drawinfo_iterator i = gPipeline.beginRenderMap(type); i != gPipeline.endRenderMap(type); ++i)	
 	{
 		LLDrawInfo* pparams = *i;
 		if (pparams) 
 		{
-			if (LLGLSLShader::sCurBoundShaderPtr)
-			{
-				LLGLSLShader::sCurBoundShaderPtr->setMinimumAlpha(pparams->mAlphaMaskCutoff);
-			}
-			else
-			{
-				gGL.setAlphaRejectSettings(LLRender::CF_GREATER, pparams->mAlphaMaskCutoff);
-			}
-			
+			LLGLSLShader::sCurBoundShaderPtr->setMinimumAlpha(pparams->mAlphaMaskCutoff);
 			pushBatch(*pparams, mask, texture, batch_textures);
 		}
 	}
+}
+
+void LLRenderPass::pushRiggedMaskBatches(U32 type, U32 mask, BOOL texture, BOOL batch_textures)
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL;
+    LLVOAvatar* lastAvatar = nullptr;
+    U64 lastMeshId = 0;
+    for (LLCullResult::drawinfo_iterator i = gPipeline.beginRenderMap(type); i != gPipeline.endRenderMap(type); ++i)
+    {
+        LLDrawInfo* pparams = *i;
+        if (pparams)
+        {
+            if (LLGLSLShader::sCurBoundShaderPtr)
+            {
+                LLGLSLShader::sCurBoundShaderPtr->setMinimumAlpha(pparams->mAlphaMaskCutoff);
+            }
+            else
+            {
+                gGL.flush();
+            }
+
+            if (lastAvatar != pparams->mAvatar || lastMeshId != pparams->mSkinInfo->mHash)
+            {
+                uploadMatrixPalette(*pparams);
+                lastAvatar = pparams->mAvatar;
+                lastMeshId = pparams->mSkinInfo->mHash;
+            }
+
+            pushBatch(*pparams, mask | LLVertexBuffer::MAP_WEIGHT4, texture, batch_textures);
+        }
+    }
 }
 
 void LLRenderPass::applyModelMatrix(const LLDrawInfo& params)
@@ -451,6 +524,7 @@ void LLRenderPass::applyModelMatrix(const LLDrawInfo& params)
 
 void LLRenderPass::pushBatch(LLDrawInfo& params, U32 mask, BOOL texture, BOOL batch_textures)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL;
     if (!params.mCount)
     {
         return;
@@ -470,7 +544,7 @@ void LLRenderPass::pushBatch(LLDrawInfo& params, U32 mask, BOOL texture, BOOL ba
 				LLViewerTexture* texture = params.mTextureList[i];
 				if (texture)
 				{
-					gGL.getTexUnit(i)->bind(texture, TRUE);
+					gGL.getTexUnit(i)->bindFast(texture);
 				}
 			}
 		}
@@ -478,8 +552,7 @@ void LLRenderPass::pushBatch(LLDrawInfo& params, U32 mask, BOOL texture, BOOL ba
 		{ //not batching textures or batch has only 1 texture -- might need a texture matrix
 			if (params.mTexture.notNull())
 			{
-				params.mTexture->addTextureStats(params.mVSize);
-				gGL.getTexUnit(0)->bind(params.mTexture, TRUE) ;
+				gGL.getTexUnit(0)->bindFast(params.mTexture);
 				if (params.mTextureMatrix)
 				{
 					tex_setup = true;
@@ -491,23 +564,20 @@ void LLRenderPass::pushBatch(LLDrawInfo& params, U32 mask, BOOL texture, BOOL ba
 			}
 			else
 			{
-				gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+				gGL.getTexUnit(0)->unbindFast(LLTexUnit::TT_TEXTURE);
 			}
 		}
 	}
 	
-	if (params.mVertexBuffer.notNull())
-	{
-		if (params.mGroup)
-		{
-			params.mGroup->rebuildMesh();
-		}
+    if (params.mGroup)
+    {
+        params.mGroup->rebuildMesh();
+    }
 
-		LLGLEnableFunc stencil_test(GL_STENCIL_TEST, params.mSelected, &LLGLCommonFunc::selected_stencil_test);
-	
-		params.mVertexBuffer->setBuffer(mask);
-		params.mVertexBuffer->drawRange(params.mDrawMode, params.mStart, params.mEnd, params.mCount, params.mOffset);
-	}
+    LLGLEnableFunc stencil_test(GL_STENCIL_TEST, params.mSelected, &LLGLCommonFunc::selected_stencil_test);
+
+    params.mVertexBuffer->setBufferFast(mask);
+    params.mVertexBuffer->drawRangeFast(params.mDrawMode, params.mStart, params.mEnd, params.mCount, params.mOffset);
 
 	if (tex_setup)
 	{
@@ -517,7 +587,34 @@ void LLRenderPass::pushBatch(LLDrawInfo& params, U32 mask, BOOL texture, BOOL ba
 	}
 }
 
-void LLRenderPass::renderGroups(U32 type, U32 mask, BOOL texture)
+// static
+bool LLRenderPass::uploadMatrixPalette(LLDrawInfo& params)
 {
-	gPipeline.renderGroups(this, type, mask, texture);
+    // upload matrix palette to shader
+    return uploadMatrixPalette(params.mAvatar, params.mSkinInfo);
 }
+
+//static
+bool LLRenderPass::uploadMatrixPalette(LLVOAvatar* avatar, LLMeshSkinInfo* skinInfo)
+{
+    if (!avatar)
+    {
+        return false;
+    }
+    const LLVOAvatar::MatrixPaletteCache& mpc = avatar->updateSkinInfoMatrixPalette(skinInfo);
+    U32 count = mpc.mMatrixPalette.size();
+
+    if (count == 0)
+    {
+        //skin info not loaded yet, don't render
+        return false;
+    }
+
+    LLGLSLShader::sCurBoundShaderPtr->uniformMatrix3x4fv(LLViewerShaderMgr::AVATAR_MATRIX,
+        count,
+        FALSE,
+        (GLfloat*)&(mpc.mGLMp[0]));
+
+    return true;
+}
+

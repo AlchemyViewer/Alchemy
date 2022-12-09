@@ -95,9 +95,9 @@ void LLDrawPoolWLSky::beginRenderPass( S32 pass )
 				&gObjectFullbrightNoColorWaterProgram :
 				&gCustomAlphaProgram;
 
-    auto& environment = LLEnvironment::instanceFast();
+    auto& environment = LLEnvironment::instance();
     mCamHeightLocal = environment.getCamHeight();
-    mCameraOrigin = LLViewerCamera::getInstanceFast()->getOrigin();
+    mCameraOrigin = LLViewerCamera::getInstance()->getOrigin();
     mCurrentSky = environment.getCurrentSky();
 }
 
@@ -131,9 +131,9 @@ void LLDrawPoolWLSky::beginDeferredPass(S32 pass)
 				&gObjectFullbrightNoColorWaterProgram :
 				&gDeferredStarProgram;
 
-    auto& environment = LLEnvironment::instanceFast();
+    auto& environment = LLEnvironment::instance();
     mCamHeightLocal = environment.getCamHeight();
-    mCameraOrigin = LLViewerCamera::getInstanceFast()->getOrigin();
+    mCameraOrigin = LLViewerCamera::getInstance()->getOrigin();
     mCurrentSky = environment.getCurrentSky();
 }
 
@@ -200,11 +200,9 @@ void LLDrawPoolWLSky::renderSkyHaze() const
             sky_shader->bindTexture(LLShaderMgr::HALO_MAP, halo_tex);
 
             LLSettingsVOSky* voskysetp = ((LLSettingsVOSky*)mCurrentSky.get());
-            voskysetp->updateShader(sky_shader);
-
-            F32 moisture_level = (float)voskysetp->getSkyMoistureLevelFast();
-            F32 droplet_radius = (float)voskysetp->getSkyDropletRadiusFast();
-            F32 ice_level = (float)voskysetp->getSkyIceLevelFast();
+            F32 moisture_level = (float)voskysetp->getSkyMoistureLevel();
+            F32 droplet_radius = (float)voskysetp->getSkyDropletRadius();
+            F32 ice_level = (float)voskysetp->getSkyIceLevel();
 
             // hobble halos and rainbows when there's no light source to generate them
             if (!voskysetp->getIsSunUp() && !voskysetp->getIsMoonUp())
@@ -216,6 +214,8 @@ void LLDrawPoolWLSky::renderSkyHaze() const
             sky_shader->uniform1f(LLShaderMgr::MOISTURE_LEVEL, moisture_level);
             sky_shader->uniform1f(LLShaderMgr::DROPLET_RADIUS, droplet_radius);
             sky_shader->uniform1f(LLShaderMgr::ICE_LEVEL, ice_level);
+            sky_shader->uniform1f(LLShaderMgr::SUN_MOON_GLOW_FACTOR, mCurrentSky->getSunMoonGlowFactor());
+            sky_shader->uniform1i(LLShaderMgr::SUN_UP_FACTOR, mCurrentSky->getIsSunUp() ? 1 : 0);
         }
         else
         {
@@ -274,33 +274,14 @@ void LLDrawPoolWLSky::renderStars() const
     gGL.translatef(mCameraOrigin.mV[0], mCameraOrigin.mV[1], mCameraOrigin.mV[2]);
     gGL.rotatef(gFrameTimeSeconds * 0.01f, 0.f, 0.f, 1.f);
 
-	if (LLGLSLShader::sNoFixedFunction)
-	{
-        star_shader->bind();
-        star_shader->uniform1f(sCustomAlpha, star_alpha.mV[3]);
-	}
-	else
-	{
-		gGL.getTexUnit(0)->setTextureColorBlend(LLTexUnit::TBO_MULT, LLTexUnit::TBS_TEX_COLOR, LLTexUnit::TBS_VERT_COLOR);
-		gGL.getTexUnit(0)->setTextureAlphaBlend(LLTexUnit::TBO_MULT_X2, LLTexUnit::TBS_CONST_ALPHA, LLTexUnit::TBS_TEX_ALPHA);
-		glTexEnvfv(GL_TEXTURE_ENV, GL_TEXTURE_ENV_COLOR, star_alpha.mV);
-	}
+	star_shader->bind();
+	star_shader->uniform1f(sCustomAlpha, star_alpha.mV[3]);
 
 	gSky.mVOWLSkyp->drawStars();
 
     gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
-
 	gGL.popMatrix();
-
-	if (LLGLSLShader::sNoFixedFunction)
-	{
-        star_shader->unbind();
-	}
-	else
-	{
-		// and disable the combiner states
-		gGL.getTexUnit(0)->setTextureBlendType(LLTexUnit::TB_MULT);
-	}
+	star_shader->unbind();
 }
 
 void LLDrawPoolWLSky::renderStarsDeferred() const
@@ -311,7 +292,7 @@ void LLDrawPoolWLSky::renderStarsDeferred() const
 
     LLSettingsVOSky* voskysetp = ((LLSettingsVOSky*)mCurrentSky.get());
 
-    F32 star_alpha = voskysetp->getStarBrightnessFast() / 500.0f;
+    F32 star_alpha = voskysetp->getStarBrightness() / 500.0f;
 
 	// If start_brightness is not set, exit
 	if(star_alpha < 0.001f)
@@ -387,7 +368,7 @@ void LLDrawPoolWLSky::renderSkyClouds() const
 
         LLSettingsVOSky* voskysetp = ((LLSettingsVOSky*)mCurrentSky.get());
 
-        F32 cloud_variance = voskysetp->getCloudVarianceFast();
+        F32 cloud_variance = voskysetp->getCloudVariance();
         F32 blend_factor = voskysetp->getBlendFactor();
 
         // if we even have sun disc textures to work with...
@@ -413,8 +394,7 @@ void LLDrawPoolWLSky::renderSkyClouds() const
 
         cloud_shader->uniform1f(LLShaderMgr::BLEND_FACTOR, blend_factor);
         cloud_shader->uniform1f(LLShaderMgr::CLOUD_VARIANCE, cloud_variance);
-
-        voskysetp->updateShader(cloud_shader);
+        cloud_shader->uniform1f(LLShaderMgr::SUN_MOON_GLOW_FACTOR, voskysetp->getSunMoonGlowFactor());
 
 		/// Render the skydome
         renderDome(cloud_shader);
@@ -436,7 +416,7 @@ void LLDrawPoolWLSky::renderHeavenlyBodies()
 	LLFace * face = gSky.mVOSkyp->mFace[LLVOSky::FACE_SUN];
 
     F32 blend_factor = mCurrentSky->getBlendFactor();
-    bool can_use_vertex_shaders = gPipeline.canUseVertexShaders();
+    bool can_use_vertex_shaders = gPipeline.shadersLoaded();
     bool can_use_windlight_shaders = gPipeline.canUseWindLightShaders();
 
 
@@ -522,7 +502,7 @@ void LLDrawPoolWLSky::renderHeavenlyBodies()
 
             LLSettingsVOSky* voskysetp = ((LLSettingsVOSky*)mCurrentSky.get());
 
-            F32 moon_brightness = (float)voskysetp->getMoonBrightnessFast();
+            F32 moon_brightness = (float)voskysetp->getMoonBrightness();
             LLColor4 moon_color(gSky.mVOSkyp->getMoon().getColor());
             
             moon_shader->uniform1f(LLShaderMgr::MOON_BRIGHTNESS, moon_brightness);
@@ -545,11 +525,11 @@ void LLDrawPoolWLSky::renderHeavenlyBodies()
 
 void LLDrawPoolWLSky::renderDeferred(S32 pass)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL; //LL_RECORD_BLOCK_TIME(FTM_RENDER_WL_SKY);
 	if (!gPipeline.hasRenderType(LLPipeline::RENDER_TYPE_SKY))
 	{
 		return;
 	}
-	LL_RECORD_BLOCK_TIME(FTM_RENDER_WL_SKY);
 
 	gGL.setColorMask(true, false);
 
@@ -565,11 +545,11 @@ void LLDrawPoolWLSky::renderDeferred(S32 pass)
 
 void LLDrawPoolWLSky::render(S32 pass)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL; //LL_RECORD_BLOCK_TIME(FTM_RENDER_WL_SKY);
 	if (!gPipeline.hasRenderType(LLPipeline::RENDER_TYPE_SKY))
 	{
 		return;
 	}
-	LL_RECORD_BLOCK_TIME(FTM_RENDER_WL_SKY);
 
     renderSkyHaze();
     renderStars();

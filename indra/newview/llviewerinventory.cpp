@@ -531,7 +531,7 @@ BOOL LLViewerInventoryItem::unpackMessage(const LLSD& item)
 {
 	BOOL rv = LLInventoryItem::fromLLSD(item);
 
-	LLLocalizedInventoryItemsDictionary::getInstanceFast()->localizeInventoryObjectName(mName);
+	LLLocalizedInventoryItemsDictionary::getInstance()->localizeInventoryObjectName(mName);
 
 	mIsComplete = TRUE;
 	return rv;
@@ -542,7 +542,7 @@ BOOL LLViewerInventoryItem::unpackMessage(LLMessageSystem* msg, const char* bloc
 {
 	BOOL rv = LLInventoryItem::unpackMessage(msg, block, block_num);
 
-	LLLocalizedInventoryItemsDictionary::getInstanceFast()->localizeInventoryObjectName(mName);
+	LLLocalizedInventoryItemsDictionary::getInstance()->localizeInventoryObjectName(mName);
 
 	mIsComplete = TRUE;
 	return rv;
@@ -930,7 +930,7 @@ void LLViewerInventoryCategory::changeType(LLFolderType::EType new_folder_type)
 
 void LLViewerInventoryCategory::localizeName()
 {
-	LLLocalizedInventoryItemsDictionary::getInstanceFast()->localizeInventoryObjectName(mName);
+	LLLocalizedInventoryItemsDictionary::getInstance()->localizeInventoryObjectName(mName);
 }
 
 // virtual
@@ -1133,7 +1133,7 @@ void create_inventory_item(const LLUUID& agent_id, const LLUUID& session_id,
 	std::string server_name = name;
 
 	{
-		for (const auto& pair : LLLocalizedInventoryItemsDictionary::getInstanceFast()->mInventoryItemsDict)
+		for (const auto& pair : LLLocalizedInventoryItemsDictionary::getInstance()->mInventoryItemsDict)
 		{
 			const std::string& localized_name = pair.second;
 			if(localized_name == name)
@@ -2114,7 +2114,7 @@ void menu_create_inventory_item(LLInventoryPanel* panel, LLFolderBridge *bridge,
 	else
 	{
 		// Use for all clothing and body parts.  Adding new wearable types requires updating LLWearableDictionary.
-		LLWearableType::EType wearable_type = LLWearableType::getInstanceFast()->typeNameToType(type_name);
+		LLWearableType::EType wearable_type = LLWearableType::getInstance()->typeNameToType(type_name);
 		if (wearable_type >= LLWearableType::WT_SHAPE && wearable_type < LLWearableType::WT_COUNT)
 		{
 			const LLUUID parent_id = bridge ? bridge->getUUID() : LLUUID::null;
@@ -2355,12 +2355,12 @@ BOOL LLViewerInventoryItem::extractSortFieldAndDisplayName(const std::string& na
 // [SL:KB] - Patch: Build-ScriptRecover | Checked: 2013-03-10 (Catznip-3.4)
 bool LLViewerInventoryItem::lookupLocalizedName(std::string& name)
 {
-	return LLLocalizedInventoryItemsDictionary::instanceFast().localizeInventoryObjectName(name);
+	return LLLocalizedInventoryItemsDictionary::instance().localizeInventoryObjectName(name);
 }
 
 bool LLViewerInventoryItem::lookupSystemName(std::string& name)
 {
-	return LLLocalizedInventoryItemsDictionary::instanceFast().revertInventoryObjectName(name);
+	return LLLocalizedInventoryItemsDictionary::instance().revertInventoryObjectName(name);
 }
 // [/SL:KB]
 

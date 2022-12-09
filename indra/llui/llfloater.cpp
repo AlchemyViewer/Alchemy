@@ -598,7 +598,7 @@ std::string LLFloater::getControlName(const std::string& name, const LLSD& key)
 LLControlGroup*	LLFloater::getControlGroup()
 {
 	// Floater size, position, visibility, etc are saved in per-account settings.
-	return LLUI::getInstanceFast()->mSettingGroups["account"];
+	return LLUI::getInstance()->mSettingGroups["account"];
 }
 
 void LLFloater::setVisible( BOOL visible )
@@ -611,7 +611,7 @@ void LLFloater::setVisible( BOOL visible )
 
 	if( !visible )
 	{
-		LLUI::getInstanceFast()->removePopup(this);
+		LLUI::getInstance()->removePopup(this);
 
 		if( gFocusMgr.childHasMouseCapture( this ) )
 		{
@@ -776,17 +776,13 @@ void LLFloater::closeFloater(bool app_quitting)
 		for(handle_set_iter_t dependent_it = mDependents.begin();
 			dependent_it != mDependents.end(); )
 		{
-			
 			LLFloater* floaterp = dependent_it->get();
-			if (floaterp)
-			{
-				++dependent_it;
-				floaterp->closeFloater(app_quitting);
-			}
-			else
-			{
-				mDependents.erase(dependent_it++);
-			}
+            dependent_it = mDependents.erase(dependent_it);
+            if (floaterp)
+            {
+                floaterp->mDependeeHandle = LLHandle<LLFloater>();
+                floaterp->closeFloater(app_quitting);
+            }
 		}
 		
 		cleanupHandles();
@@ -847,7 +843,7 @@ void LLFloater::reshape(S32 width, S32 height, BOOL called_from_parent)
 
 void LLFloater::releaseFocus()
 {
-	LLUI::getInstanceFast()->removePopup(this);
+	LLUI::getInstance()->removePopup(this);
 
 	setFocus(FALSE);
 
@@ -1457,7 +1453,7 @@ void LLFloater::cleanupHandles()
 		LLFloater* floaterp = dependent_it->get();
 		if (!floaterp)
 		{
-			mDependents.erase(dependent_it++);
+            dependent_it = mDependents.erase(dependent_it);
 		}
 		else
 		{
@@ -1821,13 +1817,13 @@ void LLFloater::onClickDock(LLFloater* self)
 // static
 void LLFloater::onClickHelp( LLFloater* self )
 {
-	if (self && LLUI::getInstanceFast()->mHelpImpl)
+	if (self && LLUI::getInstance()->mHelpImpl)
 	{
 		// find the current help context for this floater
 		std::string help_topic;
 		if (self->findHelpTopic(help_topic))
 		{
-			LLUI::getInstanceFast()->mHelpImpl->showTopic(help_topic);
+			LLUI::getInstance()->mHelpImpl->showTopic(help_topic);
 		}
 	}
 }
@@ -3055,7 +3051,7 @@ void LLFloaterView::syncFloaterTabOrder()
 	if (modal_dialog)
 	{
 		// If we have a visible modal dialog, make sure that it has focus
-		LLUI::getInstanceFast()->addPopup(modal_dialog);
+		LLUI::getInstance()->addPopup(modal_dialog);
 		
 		if( !gFocusMgr.childHasKeyboardFocus( modal_dialog ) )
 		{
@@ -3311,11 +3307,9 @@ boost::signals2::connection LLFloater::setCloseCallback( const commit_signal_t::
 	return mCloseSignal.connect(cb);
 }
 
-LLTrace::BlockTimerStatHandle POST_BUILD("Floater Post Build");
-static LLTrace::BlockTimerStatHandle FTM_EXTERNAL_FLOATER_LOAD("Load Extern Floater Reference");
-
 bool LLFloater::initFloaterXML(LLXMLNodePtr node, LLView *parent, const std::string& filename, LLXMLNodePtr output_node)
 {
+    LL_PROFILE_ZONE_SCOPED;
 	Params default_params(LLUICtrlFactory::getDefaultParams<LLFloater>());
 	Params params(default_params);
 
@@ -3326,7 +3320,7 @@ bool LLFloater::initFloaterXML(LLXMLNodePtr node, LLView *parent, const std::str
 
 	if (!xml_filename.empty())
 	{
-		auto& uifactory_inst = LLUICtrlFactory::instanceFast();
+		auto& uifactory_inst = LLUICtrlFactory::instance();
 		
 		LLXMLNodePtr referenced_xml;
 
@@ -3346,7 +3340,6 @@ bool LLFloater::initFloaterXML(LLXMLNodePtr node, LLView *parent, const std::str
 
 		uifactory_inst.pushFileName(xml_filename);
 
-		LL_RECORD_BLOCK_TIME(FTM_EXTERNAL_FLOATER_LOAD);
 		if (!LLUICtrlFactory::getLayeredXMLNode(xml_filename, referenced_xml))
 		{
 			LL_WARNS() << "Couldn't parse panel from: " << xml_filename << LL_ENDL;
@@ -3360,7 +3353,7 @@ bool LLFloater::initFloaterXML(LLXMLNodePtr node, LLView *parent, const std::str
 
 		// add children using dimensions from referenced xml for consistent layout
 		setShape(params.rect);
-		LLUICtrlFactory::createChildren(this, referenced_xml, child_registry_t::instanceFast());
+		LLUICtrlFactory::createChildren(this, referenced_xml, child_registry_t::instance());
 
 		uifactory_inst.popFileName();
 	}
@@ -3397,7 +3390,7 @@ bool LLFloater::initFloaterXML(LLXMLNodePtr node, LLView *parent, const std::str
 		LLFloater::setFloaterHost((LLMultiFloater*) this);
 	}
 
-	LLUICtrlFactory::createChildren(this, node, child_registry_t::instanceFast(), output_node);
+	LLUICtrlFactory::createChildren(this, node, child_registry_t::instance(), output_node);
 
 	if (node->hasName("multi_floater"))
 	{
@@ -3422,12 +3415,8 @@ bool LLFloater::initFloaterXML(LLXMLNodePtr node, LLView *parent, const std::str
 	}
 
 	BOOL result;
-	{
-		LL_RECORD_BLOCK_TIME(POST_BUILD);
-
-		result = postBuild();
-	}
-
+	result = postBuild();
+	
 	if (!result)
 	{
 		LL_ERRS() << "Failed to construct floater " << getName() << LL_ENDL;
@@ -3471,11 +3460,9 @@ bool LLFloater::isVisible(const LLFloater* floater)
     return floater && floater->getVisible();
 }
 
-static LLTrace::BlockTimerStatHandle FTM_BUILD_FLOATERS("Build Floaters");
-
 bool LLFloater::buildFromFile(const std::string& filename)
 {
-	LL_RECORD_BLOCK_TIME(FTM_BUILD_FLOATERS);
+    LL_PROFILE_ZONE_SCOPED;
 	LLXMLNodePtr root;
 
 	if (!LLUICtrlFactory::getLayeredXMLNode(filename, root))
@@ -3494,7 +3481,7 @@ bool LLFloater::buildFromFile(const std::string& filename)
 	bool res = true;
 	
 	LL_DEBUGS() << "Building floater " << filename << LL_ENDL;
-    auto& uictrl_factory = LLUICtrlFactory::instanceFast();
+    auto& uictrl_factory = LLUICtrlFactory::instance();
     uictrl_factory.pushFileName(filename);
 	{
 		if (!getFactoryMap().empty())

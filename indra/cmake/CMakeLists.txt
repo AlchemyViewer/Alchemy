@@ -30,6 +30,7 @@ set(cmake_SOURCE_FILES
     FindOpenJPEG.cmake
     FindURIPARSER.cmake
     FindXmlRpcEpi.cmake
+    FindZLIBNG.cmake
     FMODSTUDIO.cmake
     FreeType.cmake
     GLEXT.cmake
@@ -48,6 +49,7 @@ set(cmake_SOURCE_FILES
     LLKDU.cmake
     LLLogin.cmake
     LLMath.cmake
+    LLMeshOptimizer.cmake
     LLMessage.cmake
     LLPhysicsExtensions.cmake
     LLPlugin.cmake
@@ -61,6 +63,7 @@ set(cmake_SOURCE_FILES
     LLXML.cmake
     Linking.cmake
     MediaPluginBase.cmake
+    MESHOPTIMIZER.cmake
     NDOF.cmake
     OPENAL.cmake
     OpenGL.cmake
@@ -84,7 +87,7 @@ set(cmake_SOURCE_FILES
     VisualLeakDetector.cmake
     LibVLCPlugin.cmake
     XmlRpcEpi.cmake
-    ZLIB.cmake
+    ZLIBNG.cmake
     )
 
 source_group("Shared Rules" FILES ${cmake_SOURCE_FILES})

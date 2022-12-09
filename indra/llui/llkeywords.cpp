@@ -183,14 +183,14 @@ LLColor4 LLKeywords::getColorGroup(std::string_view key_in)
 	static std::vector<LLUIColor> script_colors;
 	if (script_colors.empty())
 	{
-		script_colors.push_back(LLUIColorTable::instanceFast().getColor("ScriptText"));
-		script_colors.push_back(LLUIColorTable::instanceFast().getColor("SyntaxLslFunction"));
-		script_colors.push_back(LLUIColorTable::instanceFast().getColor("SyntaxLslControlFlow"));
-		script_colors.push_back(LLUIColorTable::instanceFast().getColor("SyntaxLslEvent"));
-		script_colors.push_back(LLUIColorTable::instanceFast().getColor("SyntaxLslDataType"));
-		script_colors.push_back(LLUIColorTable::instanceFast().getColor("SyntaxLslDeprecated"));
-		script_colors.push_back(LLUIColorTable::instanceFast().getColor("SyntaxLslGodMode"));
-		script_colors.push_back(LLUIColorTable::instanceFast().getColor("SyntaxLslConstant"));
+		script_colors.push_back(LLUIColorTable::instance().getColor("ScriptText"));
+		script_colors.push_back(LLUIColorTable::instance().getColor("SyntaxLslFunction"));
+		script_colors.push_back(LLUIColorTable::instance().getColor("SyntaxLslControlFlow"));
+		script_colors.push_back(LLUIColorTable::instance().getColor("SyntaxLslEvent"));
+		script_colors.push_back(LLUIColorTable::instance().getColor("SyntaxLslDataType"));
+		script_colors.push_back(LLUIColorTable::instance().getColor("SyntaxLslDeprecated"));
+		script_colors.push_back(LLUIColorTable::instance().getColor("SyntaxLslGodMode"));
+		script_colors.push_back(LLUIColorTable::instance().getColor("SyntaxLslConstant"));
 	}
 
 	if (key_in == "functions")
@@ -253,7 +253,7 @@ void LLKeywords::processTokens()
 	}
 
 	// Add 'standard' stuff: Quotes, Comments, Strings, Labels, etc. before processing the LLSD
-	static LLUIColor syntax_lsl_comment_color = LLUIColorTable::instanceFast().getColor("SyntaxLslComment");
+	static LLUIColor syntax_lsl_comment_color = LLUIColorTable::instance().getColor("SyntaxLslComment");
 	std::string delimiter;
 	addToken(LLKeywordToken::TT_LABEL, "@", getColorGroup("misc-flow-label"), "Label\nTarget for jump statement", delimiter );
 	addToken(LLKeywordToken::TT_ONE_SIDED_DELIMITER, "//", syntax_lsl_comment_color, "Comment (single-line)\nNon-functional commentary or disabled code", delimiter );

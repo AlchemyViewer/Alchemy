@@ -9,14 +9,6 @@
  follows="all"
  layout="topleft"
 >
-    <!--these strings will be combined into one with different styles-->
-    <string name="header_symbol_limit">
-Warning: Your notes contain more than 1000 characters.
-    </string>
-    <string name="body_symbol_limit">
-Only first 1000 characters are shown here. If you edit your notes and click OK, the extra characters will be lost. To preserve the extra characters, you must edit it [[PROFILE_URL] on the web]
-    </string>
-
     <loading_indicator
      name="progress_indicator"
      top="3"
@@ -29,7 +21,7 @@ Only first 1000 characters are shown here. If you edit your notes and click OK, 
     />
     <text
      name="status_message"
-     value="Private notes on this avatar:"
+     value="Make notes about this person here. No one else can see your notes."
      top="6"
      left="6"
      right="-6"
@@ -41,66 +33,33 @@ Only first 1000 characters are shown here. If you edit your notes and click OK, 
     <text_editor
      name="notes_edit"
      enabled="false"
-     top_pad="4"
+     top="28"
      left="6"
      right="-6"
-     height="311"
+     bottom="-26"
      follows="all"
      layout="topleft"
-     max_length="1000"
+     max_length="65530"
      word_wrap="true"
     />
-    <text
-     layout="topleft"
-     follows="left|bottom|right"
-     top_pad="2"
-     left="6"
-     right="-6"
-     height ="28"
-     name="character_limit_warning"
-     word_wrap="true">
-      Placeholder: Your notes contain more than 1000 characters. Only first 1000 characters are shown here. If you edit your notes and click OK, the extra characters will be lost. To preserve the extra characters, you must edit it [https://my.secondlife.com/settings/profile on the web]
-    </text>
-    <text
-     name="status_message2"
-     value="Allow this avatar to:"
-     top_pad="11"
-     left="6"
-     right="-6"
-     height="16"
-     follows="left|bottom|right"
-     layout="topleft"
-     font.style="BOLD"
-    />
-    <check_box
-     name="status_check"
-     label="See when I am online"
+    <button
+     name="notes_save_changes"
+     label="Save"
+     bottom="-1"
+     right="-108"
+     height="20"
+     width="80"
      enabled="false"
-     top_pad="0"
-     left="10"
-     height="16"
-     width="293"
-     follows="left|bottom|right"
-     layout="topleft"
-    />
-    <check_box
-     name="map_check"
-     label="Find me on the world map"
+     follows="bottom|right"
+     layout="topleft"/>
+    <button
+     name="notes_discard_changes"
+     label="Discard"
+     bottom="-1"
+     right="-4"
+     height="20"
+     width="100"
      enabled="false"
-     left="10"
-     height="16"
-     width="293"
-     follows="left|bottom|right"
-     layout="topleft"
-    />
-    <check_box
-     name="objects_check"
-     label="Edit, delete or take my objects"
-     enabled="false"
-     left="10"
-     height="16"
-     width="293"
-     follows="left|bottom|right"
-     layout="topleft"
-    />
+     follows="bottom|right"
+     layout="topleft"/>
 </panel>

@@ -51,7 +51,7 @@ namespace
 {
 	bool enable_edit_particle_source()
 	{
-		LLObjectSelectionHandle selection = LLSelectMgr::getInstanceFast()->getSelection();
+		LLObjectSelectionHandle selection = LLSelectMgr::getInstance()->getSelection();
 		for (LLObjectSelection::valid_root_iterator iter = selection->valid_root_begin();
 			iter != selection->valid_root_end(); ++iter)
 		{
@@ -66,7 +66,7 @@ namespace
 
 	void edit_particle_source()
 	{
-		LLViewerObject* objectp = LLSelectMgr::getInstanceFast()->getSelection()->getPrimaryObject();
+		LLViewerObject* objectp = LLSelectMgr::getInstance()->getSelection()->getPrimaryObject();
 		if (objectp)
 		{
 			ALFloaterParticleEditor* particleEditor = LLFloaterReg::showTypedInstance<ALFloaterParticleEditor>("particle_editor", LLSD(objectp->getID()), TAKE_FOCUS_YES);
@@ -102,7 +102,7 @@ namespace
 
 	void avatar_copy_data(const LLSD& userdata)
 	{
-		LLViewerObject* objectp = LLSelectMgr::getInstanceFast()->getSelection()->getPrimaryObject();
+		LLViewerObject* objectp = LLSelectMgr::getInstance()->getSelection()->getPrimaryObject();
 		if (!objectp)
 			return;
 
@@ -143,7 +143,7 @@ namespace
 
 	void object_copy_key()
 	{
-		LLViewerObject* objectp = LLSelectMgr::getInstanceFast()->getSelection()->getPrimaryObject();
+		LLViewerObject* objectp = LLSelectMgr::getInstance()->getSelection()->getPrimaryObject();
 		if (!objectp)
 			return;
 
@@ -154,7 +154,7 @@ namespace
 
 	bool can_teleport_to()
 	{
-		LLVOAvatar* avatarp = find_avatar_from_object(LLSelectMgr::getInstanceFast()->getSelection()->getPrimaryObject());
+		LLVOAvatar* avatarp = find_avatar_from_object(LLSelectMgr::getInstance()->getSelection()->getPrimaryObject());
 		if (avatarp)
 		{
 			return ALAvatarActions::canTeleportTo(avatarp->getID());
@@ -164,7 +164,7 @@ namespace
 
 	void teleport_to()
 	{
-		LLVOAvatar* avatarp = find_avatar_from_object(LLSelectMgr::getInstanceFast()->getSelection()->getPrimaryObject());
+		LLVOAvatar* avatarp = find_avatar_from_object(LLSelectMgr::getInstance()->getSelection()->getPrimaryObject());
 		if (avatarp)
 		{
 			ALAvatarActions::teleportTo(avatarp->getID());
@@ -173,7 +173,7 @@ namespace
 
 	bool can_manage_avatar_estate()
 	{
-		LLVOAvatar* avatarp = find_avatar_from_object(LLSelectMgr::getInstanceFast()->getSelection()->getPrimaryObject());
+		LLVOAvatar* avatarp = find_avatar_from_object(LLSelectMgr::getInstance()->getSelection()->getPrimaryObject());
 		if (avatarp)
 		{
 			return ALAvatarActions::canManageAvatarsEstate(avatarp->getID());
@@ -183,7 +183,7 @@ namespace
 
 	void manage_estate(const LLSD& param)
 	{
-		LLVOAvatar* avatarp = find_avatar_from_object(LLSelectMgr::getInstanceFast()->getSelection()->getPrimaryObject());
+		LLVOAvatar* avatarp = find_avatar_from_object(LLSelectMgr::getInstance()->getSelection()->getPrimaryObject());
 		if (avatarp)
 		{
 			S32 action = param.asInteger();
@@ -237,7 +237,7 @@ namespace
 
 	bool is_powerful_wizard_object()
 	{
-		LLViewerObject* objpos = LLSelectMgr::getInstanceFast()->getSelection()->getFirstRootObject();
+		LLViewerObject* objpos = LLSelectMgr::getInstance()->getSelection()->getFirstRootObject();
 		if (objpos)
 		{
 			if (objpos->permYouOwner() && gSavedSettings.getBOOL("AlchemyPowerfulWizard"))
@@ -249,7 +249,7 @@ namespace
 
 	void object_explode()
 	{
-		LLViewerObject* objpos = LLSelectMgr::getInstanceFast()->getSelection()->getFirstRootObject();
+		LLViewerObject* objpos = LLSelectMgr::getInstance()->getSelection()->getFirstRootObject();
 		if (objpos)
 		{
 			if (!objpos->permYouOwner())
@@ -263,16 +263,16 @@ namespace
 			/*
 				NOTE: oh god how did this get here
 			*/
-			LLSelectMgr::getInstanceFast()->selectionUpdateTemporary(1);//set temp to TRUE
-			LLSelectMgr::getInstanceFast()->selectionUpdatePhysics(1);
-			LLSelectMgr::getInstanceFast()->sendDelink();
-			LLSelectMgr::getInstanceFast()->deselectAll();
+			LLSelectMgr::getInstance()->selectionUpdateTemporary(1);//set temp to TRUE
+			LLSelectMgr::getInstance()->selectionUpdatePhysics(1);
+			LLSelectMgr::getInstance()->sendDelink();
+			LLSelectMgr::getInstance()->deselectAll();
 		}
 	}
 
 	void object_destroy()
 	{
-		LLViewerObject* objpos = LLSelectMgr::getInstanceFast()->getSelection()->getFirstRootObject();
+		LLViewerObject* objpos = LLSelectMgr::getInstance()->getSelection()->getFirstRootObject();
 		if (objpos)
 		{
 			if (!objpos->permYouOwner())
@@ -289,17 +289,17 @@ namespace
 
 				So we do selectionUpdateTemporary(1)
 			*/
-			LLSelectMgr::getInstanceFast()->selectionUpdateTemporary(1);//set temp to TRUE
+			LLSelectMgr::getInstance()->selectionUpdateTemporary(1);//set temp to TRUE
 			LLVector3 pos = objpos->getPosition();//get the x and the y
 			pos.mV[VZ] = FLT_MAX;//create the z
 			objpos->setPositionParent(pos);//set the x y z
-			LLSelectMgr::getInstanceFast()->sendMultipleUpdate(UPD_POSITION);//send the data
+			LLSelectMgr::getInstance()->sendMultipleUpdate(UPD_POSITION);//send the data
 		}
 	}
 
 	void object_force_delete()
 	{
-		LLViewerObject* objpos = LLSelectMgr::getInstanceFast()->getSelection()->getFirstRootObject();
+		LLViewerObject* objpos = LLSelectMgr::getInstance()->getSelection()->getFirstRootObject();
 		if (objpos)
 		{
 			if (!objpos->permYouOwner())
@@ -307,7 +307,7 @@ namespace
 				LLNotificationsUtil::add("AlchemyUnpoweredWizard", LLSD());
 				return;
 			}
-			LLSelectMgr::getInstanceFast()->selectForceDelete();
+			LLSelectMgr::getInstance()->selectForceDelete();
 
 		}
 	}

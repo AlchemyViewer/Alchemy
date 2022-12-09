@@ -717,7 +717,18 @@ const std::string& LLTaskCategoryBridge::getDisplayName() const
 
 	if (cat)
 	{
-		mDisplayName.assign(cat->getName());
+        std::string name = cat->getName();
+        if (mChildren.size() > 0)
+        {
+            // Add item count
+            // Normally we would be using getLabelSuffix for this
+            // but object's inventory just uses displaynames
+            LLStringUtil::format_map_t args;
+            args["[ITEMS_COUNT]"] = llformat("%d", mChildren.size());
+
+            name.append(" " + LLTrans::getString("InventoryItemsCount", args));
+        }
+		mDisplayName.assign(name);
 	}
 
 	return mDisplayName;
@@ -1728,6 +1739,8 @@ void LLPanelObjectInventory::createFolderViews(LLInventoryObject* inventory_root
 		{
 			createViewsForCategory(&contents, inventory_root, new_folder);
 		}
+        // Refresh for label to add item count
+        new_folder->refresh();
 	}
 }
 
@@ -1803,7 +1816,7 @@ void LLPanelObjectInventory::refresh()
 	//LL_INFOS() << "LLPanelObjectInventory::refresh()" << LL_ENDL;
 	BOOL has_inventory = FALSE;
 	const BOOL non_root_ok = TRUE;
-	LLObjectSelectionHandle selection = LLSelectMgr::getInstanceFast()->getSelection();
+	LLObjectSelectionHandle selection = LLSelectMgr::getInstance()->getSelection();
 	LLSelectNode* node = selection->getFirstRootNode(NULL, non_root_ok);
 	if(node && node->mValid)
 	{
@@ -1837,7 +1850,7 @@ void LLPanelObjectInventory::refresh()
 				{
 					// Server unsubsribes viewer (deselects object) from property
 					// updates after "ObjectAttach" so we need to resubscribe
-					LLSelectMgr::getInstanceFast()->sendSelect();
+					LLSelectMgr::getInstance()->sendSelect();
 				}
 			}
 

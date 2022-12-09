@@ -373,7 +373,7 @@ void ALFloaterParticleEditor::onClickTargetPicker()
 	mPickTargetButton->setToggleState(TRUE);
 	mPickTargetButton->setEnabled(FALSE);
 	LLToolObjPicker::getInstance()->setExitCallback(onTargetPicked, this);
-	LLToolMgr::getInstanceFast()->setTransientTool(LLToolObjPicker::getInstance());
+	LLToolMgr::getInstance()->setTransientTool(LLToolObjPicker::getInstance());
 }
 
 // static
@@ -383,7 +383,7 @@ void ALFloaterParticleEditor::onTargetPicked(void* userdata)
 
 	const LLUUID picked = LLToolObjPicker::getInstance()->getObjectID();
 
-	LLToolMgr::getInstanceFast()->clearTransientTool();
+	LLToolMgr::getInstance()->clearTransientTool();
 
 	self->mPickTargetButton->setEnabled(TRUE);
 	self->mPickTargetButton->setToggleState(FALSE);

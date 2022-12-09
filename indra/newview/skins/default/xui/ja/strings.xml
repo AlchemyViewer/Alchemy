@@ -186,7 +186,7 @@ LOD 係数: [LOD_FACTOR]
 	<string name="LoginFailedNoNetwork">
 		ネットワークエラー：接続を確立できませんでした。お使いのネットワーク接続をご確認ください。
 	</string>
-	<string name="LoginFailed">
+	<string name="LoginFailedHeader">
 		ログインに失敗しました。
 	</string>
 	<string name="Quit">
@@ -690,9 +690,6 @@ support@secondlife.com にお問い合わせください。
 	</string>
 	<string name="GroupNameNone">
 		（なし）
-	</string>
-	<string name="AvalineCaller">
-		Avaline コール [ORDER]
 	</string>
 	<string name="AssetErrorNone">
 		エラーなし
@@ -5133,7 +5130,7 @@ www.secondlife.com から最新バージョンをダウンロードしてくだ�
 	<string name="PremiumMembership">
 		プレミアム
 	</string>
-	<string name="Premium PlusMembership">
+	<string name="Premium_PlusMembership">
 		プレミアムプラス
 	</string>
 	<string name="DeleteItems">

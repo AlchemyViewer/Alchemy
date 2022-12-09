@@ -42,7 +42,6 @@
 
 S32 LLDrawPoolTree::sDiffTex = 0;
 static LLGLSLShader* shader = NULL;
-static LLTrace::BlockTimerStatHandle FTM_SHADOW_TREE("Tree Shadow");
 
 LLDrawPoolTree::LLDrawPoolTree(LLViewerTexture *texturep) :
 	LLFacePool(POOL_TREE),
@@ -69,7 +68,7 @@ void LLDrawPoolTree::beginRenderPass(S32 pass)
 		shader = &gTreeProgram;
 	}
 
-	if (gPipeline.canUseVertexShaders())
+	if (gPipeline.shadersLoaded())
 	{
 		shader->bind();
 		shader->setMinimumAlpha(0.5f);
@@ -78,27 +77,28 @@ void LLDrawPoolTree::beginRenderPass(S32 pass)
 	else
 	{
 		gPipeline.enableLightsDynamic();
-		gGL.setAlphaRejectSettings(LLRender::CF_GREATER, 0.5f);
+		gGL.flush();
 	}
 }
 
 void LLDrawPoolTree::render(S32 pass)
 {
-	LL_RECORD_BLOCK_TIME(LLPipeline::sShadowRender ? FTM_SHADOW_TREE : FTM_RENDER_TREES);
+    LL_PROFILE_ZONE_SCOPED;
 
 	if (mDrawFace.empty())
 	{
 		return;
 	}
 
-	LLGLState test(GL_ALPHA_TEST, LLGLSLShader::sNoFixedFunction ? 0 : 1);
+	LLGLState test(GL_ALPHA_TEST, 0);
 
 // [SL:KB] - Patch: Render-TextureToggle (Catznip-4.0)
 	LLViewerTexture* pTexture = (LLPipeline::sRenderTextures) ? mTexturep.get() : LLViewerFetchedTexture::sDefaultDiffuseImagep.get();
-	gGL.getTexUnit(sDiffTex)->bind(pTexture);
+	gGL.getTexUnit(sDiffTex)->bindFast(pTexture);
 // [/SL:KB]
-//	gGL.getTexUnit(sDiffTex)->bind(mTexturep);
-				
+//	gGL.getTexUnit(sDiffTex)->bindFast(mTexturep);
+    gPipeline.touchTexture(mTexturep, 1024.f * 1024.f); // <=== keep Linden tree textures at full res
+
 	for (LLFace* face : mDrawFace)
 	{
 		if (!face || !face->getDrawable() || !face->getDrawable()->getRegion())
@@ -125,8 +125,8 @@ void LLDrawPoolTree::render(S32 pass)
 				gPipeline.mMatrixOpCount++;
 			}
 
-			buff->setBuffer(LLDrawPoolTree::VERTEX_DATA_MASK);
-			buff->drawRange(LLRender::TRIANGLES, 0, buff->getNumVerts()-1, buff->getNumIndices(), 0); 
+			buff->setBufferFast(LLDrawPoolTree::VERTEX_DATA_MASK);
+			buff->drawRangeFast(LLRender::TRIANGLES, 0, buff->getNumVerts()-1, buff->getNumIndices(), 0); 
 		}
 	}
 }
@@ -142,7 +142,7 @@ void LLDrawPoolTree::endRenderPass(S32 pass)
 	
 	if (mShaderLevel <= 0)
 	{
-		gGL.setAlphaRejectSettings(LLRender::CF_DEFAULT);
+        gGL.flush();
 	}
 }
 
@@ -160,6 +160,7 @@ void LLDrawPoolTree::beginDeferredPass(S32 pass)
 
 void LLDrawPoolTree::renderDeferred(S32 pass)
 {
+    LL_PROFILE_ZONE_SCOPED;
 	render(pass);
 }
 
@@ -175,12 +176,12 @@ void LLDrawPoolTree::endDeferredPass(S32 pass)
 //============================================
 void LLDrawPoolTree::beginShadowPass(S32 pass)
 {
-	LL_RECORD_BLOCK_TIME(FTM_SHADOW_TREE);
+    LL_PROFILE_ZONE_SCOPED;
 	
 	glPolygonOffset(gSavedSettings.getF32("RenderDeferredTreeShadowOffset"),
 					gSavedSettings.getF32("RenderDeferredTreeShadowBias"));
 
-	LLEnvironment& environment = LLEnvironment::instanceFast();
+	LLEnvironment& environment = LLEnvironment::instance();
 
 	gDeferredTreeShadowProgram.bind();
     gDeferredTreeShadowProgram.uniform1i(LLShaderMgr::SUN_UP_FACTOR, environment.getIsSunUp() ? 1 : 0);
@@ -194,7 +195,7 @@ void LLDrawPoolTree::renderShadow(S32 pass)
 
 void LLDrawPoolTree::endShadowPass(S32 pass)
 {
-	LL_RECORD_BLOCK_TIME(FTM_SHADOW_TREE);
+    LL_PROFILE_ZONE_SCOPED;
 	
 	glPolygonOffset(gSavedSettings.getF32("RenderDeferredSpotShadowOffset"),
 						gSavedSettings.getF32("RenderDeferredSpotShadowBias"));

@@ -274,7 +274,7 @@ void LLFloaterGodTools::processRegionInfo(LLMessageSystem* msg)
 	{
 		// Update is for a different region than the one we're in.
 		// Just check for a waterheight change.
-		LLWorld::getInstanceFast()->waterHeightRegionInfo(sim_name, water_height);
+		LLWorld::getInstance()->waterHeightRegionInfo(sim_name, water_height);
 		return;
 	}
 
@@ -815,7 +815,7 @@ void LLPanelRegionTools::onSelectRegion()
 {
 	LL_INFOS() << "LLPanelRegionTools::onSelectRegion" << LL_ENDL;
 
-	LLViewerRegion *regionp = LLWorld::getInstanceFast()->getRegionFromPosGlobal(gAgent.getPositionGlobal());
+	LLViewerRegion *regionp = LLWorld::getInstance()->getRegionFromPosGlobal(gAgent.getPositionGlobal());
 	if (!regionp)
 	{
 		return;
@@ -1167,12 +1167,12 @@ void LLPanelObjectTools::onClickSetBySelection(void* data)
 	if (!panelp) return;
 
 	const BOOL non_root_ok = TRUE; 
-	LLSelectNode* node = LLSelectMgr::getInstanceFast()->getSelection()->getFirstRootNode(NULL, non_root_ok);
+	LLSelectNode* node = LLSelectMgr::getInstance()->getSelection()->getFirstRootNode(NULL, non_root_ok);
 	if (!node) return;
 
 	std::string owner_name;
 	LLUUID owner_id;
-	LLSelectMgr::getInstanceFast()->selectGetOwner(owner_id, owner_name);
+	LLSelectMgr::getInstance()->selectGetOwner(owner_id, owner_name);
 
 	panelp->mTargetAvatar = owner_id;
 	LLStringUtil::format_map_t args;
@@ -1250,7 +1250,7 @@ void LLPanelRequestTools::refresh()
 	list->selectItemRange(2,last_item);
 	list->operateOnSelection(LLCtrlListInterface::OP_DELETE);
 	}
-	for (LLViewerRegion* regionp : LLWorld::getInstanceFast()->getRegionList())
+	for (LLViewerRegion* regionp : LLWorld::getInstance()->getRegionList())
 	{
 		std::string name = regionp->getName();
 		if (!name.empty())
@@ -1298,7 +1298,7 @@ void LLPanelRequestTools::onClickRequest()
 		std::string req =getChild<LLUICtrl>("request")->getValue();
 		req = req.substr(0, req.find_first_of(" "));
 		std::string param = getChild<LLUICtrl>("parameter")->getValue();
-		LLSelectMgr::getInstanceFast()->sendGodlikeRequest(req, param);
+		LLSelectMgr::getInstance()->sendGodlikeRequest(req, param);
 	}
 	else if(dest == AGENT_REGION)
 	{
@@ -1307,7 +1307,7 @@ void LLPanelRequestTools::onClickRequest()
 	else
 	{
 		// find region by name
-		for (LLViewerRegion* regionp : LLWorld::getInstanceFast()->getRegionList())
+		for (LLViewerRegion* regionp : LLWorld::getInstance()->getRegionList())
 		{
 			if(dest == regionp->getName())
 			{

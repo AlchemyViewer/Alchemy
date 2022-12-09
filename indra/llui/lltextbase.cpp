@@ -743,7 +743,7 @@ void LLTextBase::drawText(const std::pair<S32, S32>& line_range)
 						std::string word = wstring_to_utf8str(wstrText.substr(word_start, word_end - word_start));
 
 						// Don't process words shorter than 3 characters
-						if ( (word.length() >= 3) && (!LLSpellChecker::instanceFast().checkSpelling(word)) )
+						if ( (word.length() >= 3) && (!LLSpellChecker::instance().checkSpelling(word)) )
 						{
 							mMisspellRanges.push_back(std::pair<U32, U32>(word_start, word_end));
 						}
@@ -1495,7 +1495,7 @@ void LLTextBase::addToDictionary()
 {
 	if (canAddToDictionary())
 	{
-		LLSpellChecker::instanceFast().addToCustomDictionary(getMisspelledWord(mCursorPos));
+		LLSpellChecker::instance().addToCustomDictionary(getMisspelledWord(mCursorPos));
 	}
 }
 
@@ -1508,7 +1508,7 @@ void LLTextBase::addToIgnore()
 {
 	if (canAddToIgnore())
 	{
-		LLSpellChecker::instanceFast().addToIgnoreList(getMisspelledWord(mCursorPos));
+		LLSpellChecker::instance().addToIgnoreList(getMisspelledWord(mCursorPos));
 	}
 }
 
@@ -1600,11 +1600,9 @@ S32 LLTextBase::getLeftOffset(S32 width)
 	}
 }
 
-
-static LLTrace::BlockTimerStatHandle FTM_TEXT_REFLOW ("Text Reflow");
 void LLTextBase::reflow()
 {
-	LL_RECORD_BLOCK_TIME(FTM_TEXT_REFLOW);
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
 
 	updateSegments();
 
@@ -1970,10 +1968,9 @@ void LLTextBase::removeDocumentChild(LLView* view)
 }
 
 
-static LLTrace::BlockTimerStatHandle FTM_UPDATE_TEXT_SEGMENTS("Update Text Segments");
 void LLTextBase::updateSegments()
 {
-	LL_RECORD_BLOCK_TIME(FTM_UPDATE_TEXT_SEGMENTS);
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
 	createDefaultSegment();
 }
 
@@ -2114,7 +2111,7 @@ void LLTextBase::createUrlContextMenu(S32 x, S32 y, const std::string &in_url)
 	// work out the XUI menu file to use for this url
 	LLUrlMatch match;
 	std::string url = in_url;
-	if (! LLUrlRegistry::instanceFast().findUrl(url, match))
+	if (! LLUrlRegistry::instance().findUrl(url, match))
 	{
 		return;
 	}
@@ -2138,6 +2135,7 @@ void LLTextBase::createUrlContextMenu(S32 x, S32 y, const std::string &in_url)
 	registrar.add("Url.ShowProfile", boost::bind(&LLUrlAction::showProfile, url));
 	registrar.add("Url.AddFriend", boost::bind(&LLUrlAction::addFriend, url));
 	registrar.add("Url.RemoveFriend", boost::bind(&LLUrlAction::removeFriend, url));
+    registrar.add("Url.ReportAbuse", boost::bind(&LLUrlAction::reportAbuse, url));
 	registrar.add("Url.SendIM", boost::bind(&LLUrlAction::sendIM, url));
 	registrar.add("Url.ShowOnMap", boost::bind(&LLUrlAction::showLocationOnMap, url));
 	registrar.add("Url.CopyLabel", boost::bind(&LLUrlAction::copyLabelToClipboard, url));
@@ -2233,18 +2231,16 @@ static LLUIImagePtr image_from_icon_name(const std::string& icon_name)
 	}
 }
 
-static LLTrace::BlockTimerStatHandle FTM_PARSE_HTML("Parse HTML");
-
-
 
 void LLTextBase::appendTextImpl(const std::string &new_text, const LLStyle::Params& input_params)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
 	LLStyle::Params style_params(input_params);
 	style_params.fillFrom(getStyleParams());
 
 // [SL:KB] - Patch: Control-TextParser | Checked: 2012-07-10 (Catznip-3.3)
 	const LLHighlightEntry* pEntry = NULL;
-	if ( (mParseHighlights) && (LLTextParser::instanceFast().parseFullLineHighlights(new_text, mHighlightsMask, &pEntry)) )
+	if ( (mParseHighlights) && (LLTextParser::instance().parseFullLineHighlights(new_text, mHighlightsMask, &pEntry)) )
 	{
 		if (mHighlightsSignal)
 			(*mHighlightsSignal)(new_text, pEntry);
@@ -2258,11 +2254,10 @@ void LLTextBase::appendTextImpl(const std::string &new_text, const LLStyle::Para
 	S32 part = (S32)LLTextParser::WHOLE;
 	if (mParseHTML && !style_params.is_link) // Don't search for URLs inside a link segment (STORM-358).
 	{
-		LL_RECORD_BLOCK_TIME(FTM_PARSE_HTML);
 		S32 start=0,end=0;
 		LLUrlMatch match;
 		std::string text = new_text;
-		auto& url_reg = LLUrlRegistry::instanceFast();
+		auto& url_reg = LLUrlRegistry::instance();
 		while (url_reg.findUrl(text, match,
 				boost::bind(&LLTextBase::replaceUrl, this, _1, _2, _3),isContentTrusted() || mAlwaysShowIcons))
 		{
@@ -2353,11 +2348,9 @@ void LLTextBase::setLastSegmentToolTip(const std::string &tooltip)
 	}
 }
 
-static LLTrace::BlockTimerStatHandle FTM_APPEND_TEXT("Append Text");
-
 void LLTextBase::appendText(const std::string &new_text, bool prepend_newline, const LLStyle::Params& input_params)
 {
-	LL_RECORD_BLOCK_TIME(FTM_APPEND_TEXT);
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
 	if (new_text.empty()) 
 		return;
 
@@ -2486,10 +2479,10 @@ void LLTextBase::appendAndHighlightTextImpl(const std::string &new_text, S32 hig
 	{
 		LLStyle::Params highlight_params(style_params);
 
-//		LLSD pieces = LLTextParser::instanceFast().parsePartialLineHighlights(new_text, highlight_params.color(), (LLTextParser::EHighlightPosition)highlight_part);
+//		LLSD pieces = LLTextParser::instance().parsePartialLineHighlights(new_text, highlight_params.color(), (LLTextParser::EHighlightPosition)highlight_part);
 //		for (S32 i = 0; i < pieces.size(); i++)
 // [SL:KB] - Patch: Control-TextParser | Checked: 2012-07-10 (Catznip-3.3)
-		LLTextParser::partial_results_t results = LLTextParser::instanceFast().parsePartialLineHighlights(new_text, mHighlightsMask, (LLTextParser::EHighlightPosition)highlight_part);
+		LLTextParser::partial_results_t results = LLTextParser::instance().parsePartialLineHighlights(new_text, mHighlightsMask, (LLTextParser::EHighlightPosition)highlight_part);
 		for (LLTextParser::partial_results_t::const_iterator itResult = results.begin(); itResult != results.end(); ++itResult)
 // [/SL:KB]
 		{
@@ -3624,13 +3617,13 @@ BOOL LLNormalTextSegment::handleToolTip(S32 x, S32 y, MASK mask)
 	if (mToken && !mToken->getToolTip().empty())
 	{
 		const LLWString& wmsg = mToken->getToolTip();
-		LLToolTipMgr::instanceFast().show(wstring_to_utf8str(wmsg));
+		LLToolTipMgr::instance().show(wstring_to_utf8str(wmsg));
 		return TRUE;
 	}
 	// or do we have an explicitly set tooltip (e.g., for Urls)
 	if (!mTooltip.empty())
 	{
-		LLToolTipMgr::instanceFast().show(mTooltip);
+		LLToolTipMgr::instance().show(mTooltip);
 		return TRUE;
 	}
 
@@ -3970,7 +3963,7 @@ BOOL LLImageTextSegment::handleToolTip(S32 x, S32 y, MASK mask)
 {
 	if (!mTooltip.empty())
 	{
-		LLToolTipMgr::instanceFast().show(mTooltip);
+		LLToolTipMgr::instance().show(mTooltip);
 		return TRUE;
 	}
 

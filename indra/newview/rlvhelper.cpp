@@ -743,7 +743,7 @@ RlvCommand::RlvCommand(const LLUUID& idObj, const std::string& strCommand)
 		return;
 	}
 
-	m_pBhvrInfo = RlvBehaviourDictionary::instanceFast().getBehaviourInfo(m_strBehaviour, m_eParamType, &m_fStrict, &m_eBhvrModifier);
+	m_pBhvrInfo = RlvBehaviourDictionary::instance().getBehaviourInfo(m_strBehaviour, m_eParamType, &m_fStrict, &m_eBhvrModifier);
 }
 
 RlvCommand::RlvCommand(const RlvCommand& rlvCmd, ERlvParamType eParamType)
@@ -866,7 +866,7 @@ bool RlvCommandOptionHelper::parseOption<float>(const std::string& strOption, fl
 template<>
 bool RlvCommandOptionHelper::parseOption<LLWearableType::EType>(const std::string& strOption, LLWearableType::EType& wtOption)
 {
-	wtOption = LLWearableType::getInstanceFast()->typeNameToType(strOption);
+	wtOption = LLWearableType::getInstance()->typeNameToType(strOption);
 	return (LLWearableType::WT_INVALID != wtOption) && (LLWearableType::WT_NONE != wtOption);
 }
 
@@ -1217,7 +1217,7 @@ std::string RlvObject::getStatusString(const std::string& strFilter, const std::
 
 void RlvObject::clearModifiers(ERlvBehaviour eBhvr)
 {
-	if (const RlvBehaviourInfo* pBhvrInfo = RlvBehaviourDictionary::instanceFast().getBehaviourInfo(eBhvr, RLV_TYPE_ADDREM))
+	if (const RlvBehaviourInfo* pBhvrInfo = RlvBehaviourDictionary::instance().getBehaviourInfo(eBhvr, RLV_TYPE_ADDREM))
 	{
 		for (const auto& modifierEntry : pBhvrInfo->getModifiers())
 		{
@@ -1909,13 +1909,13 @@ void RlvBehaviourNotifyHandler::sendNotification(const std::string& strText, con
 // Checked: 2011-03-31 (RLVa-1.3.0f) | Added: RLVa-1.3.0f
 void RlvBehaviourNotifyHandler::onWear(LLWearableType::EType eType, bool fAllowed)
 {
-	sendNotification(llformat("worn %s %s", (fAllowed) ? "legally" : "illegally", LLWearableType::getInstanceFast()->getTypeName(eType).c_str()));
+	sendNotification(llformat("worn %s %s", (fAllowed) ? "legally" : "illegally", LLWearableType::getInstance()->getTypeName(eType).c_str()));
 }
 
 // Checked: 2011-03-31 (RLVa-1.3.0f) | Added: RLVa-1.3.0f
 void RlvBehaviourNotifyHandler::onTakeOff(LLWearableType::EType eType, bool fAllowed)
 {
-	sendNotification(llformat("unworn %s %s", (fAllowed) ? "legally" : "illegally", LLWearableType::getInstanceFast()->getTypeName(eType).c_str()));
+	sendNotification(llformat("unworn %s %s", (fAllowed) ? "legally" : "illegally", LLWearableType::getInstance()->getTypeName(eType).c_str()));
 }
 
 // Checked: 2011-03-31 (RLVa-1.3.0f) | Added: RLVa-1.3.0f

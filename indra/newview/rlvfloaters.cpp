@@ -45,7 +45,7 @@ std::string rlvGetItemName(const LLViewerInventoryItem* pItem)
 {
 	if ( (pItem) && ((LLAssetType::AT_BODYPART == pItem->getType()) || (LLAssetType::AT_CLOTHING == pItem->getType())) )
 	{
-		return llformat("%s (%s)", pItem->getName().c_str(), LLWearableType::getInstanceFast()->getTypeName(pItem->getWearableType()).c_str());
+		return llformat("%s (%s)", pItem->getName().c_str(), LLWearableType::getInstance()->getTypeName(pItem->getWearableType()).c_str());
 	}
 	else if ( (pItem) && (LLAssetType::AT_OBJECT == pItem->getType()) && (isAgentAvatarValid()) )
 	{
@@ -192,7 +192,7 @@ std::string rlvFolderLockSourceToTarget(RlvFolderLocks::folderlock_source_t lock
 			}
 		case RlvFolderLocks::ST_WEARABLETYPE:
 			{
-				const std::string& strTypeName = LLWearableType::getInstanceFast()->getTypeName(boost::get<LLWearableType::EType>(lockSource.second));
+				const std::string& strTypeName = LLWearableType::getInstance()->getTypeName(boost::get<LLWearableType::EType>(lockSource.second));
 				return llformat("Wearable type (%s)", strTypeName.c_str());
 			}
 		default:
@@ -379,7 +379,7 @@ void RlvFloaterBehaviours::refreshAll()
 	//
 	for (int idxModifier = 0; idxModifier < RLV_MODIFIER_COUNT; idxModifier++)
 	{
-		const RlvBehaviourModifier* pBhvrModifier = RlvBehaviourDictionary::instanceFast().m_BehaviourModifiers[idxModifier];
+		const RlvBehaviourModifier* pBhvrModifier = RlvBehaviourDictionary::instance().m_BehaviourModifiers[idxModifier];
 		if (pBhvrModifier)
 		{
 			sdModifierRow["enabled"] = (pBhvrModifier->hasValue());
@@ -531,7 +531,7 @@ void RlvFloaterLocks::refreshAll()
 	for (RlvWearableLocks::rlv_wearabletypelock_map_t::const_iterator itWearableType = wearableTypeAdd.begin(); 
 			itWearableType != wearableTypeAdd.end(); ++itWearableType)
 	{
-		sdColumns[2]["value"] = LLWearableType::getInstanceFast()->getTypeLabel(itWearableType->first);
+		sdColumns[2]["value"] = LLWearableType::getInstance()->getTypeLabel(itWearableType->first);
 		sdColumns[3]["value"] = rlvGetItemNameFromObjID(itWearableType->second);
 
 		pLockList->addElement(sdRow, ADD_BOTTOM);
@@ -542,7 +542,7 @@ void RlvFloaterLocks::refreshAll()
 	for (RlvWearableLocks::rlv_wearabletypelock_map_t::const_iterator itWearableType = wearableTypeRem.begin(); 
 			itWearableType != wearableTypeRem.end(); ++itWearableType)
 	{
-		sdColumns[2]["value"] = LLWearableType::getInstanceFast()->getTypeName(itWearableType->first);
+		sdColumns[2]["value"] = LLWearableType::getInstance()->getTypeName(itWearableType->first);
 		sdColumns[3]["value"] = rlvGetItemNameFromObjID(itWearableType->second);
 
 		pLockList->addElement(sdRow, ADD_BOTTOM);
@@ -761,7 +761,7 @@ BOOL RlvFloaterConsole::postBuild()
 
 void RlvFloaterConsole::onClose(bool fQuitting)
 {
-	RlvBehaviourDictionary::instanceFast().clearModifiers(gAgent.getID());
+	RlvBehaviourDictionary::instance().clearModifiers(gAgent.getID());
 	gRlvHandler.processCommand(gAgent.getID(), "clear", true);
 }
 

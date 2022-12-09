@@ -98,9 +98,6 @@ BOOL LLPanelMediaSettingsGeneral::postBuild()
 	childSetCommitCallback( LLMediaEntry::HOME_URL_KEY, onCommitHomeURL, this);
 	childSetCommitCallback( "current_url_reset_btn",onBtnResetCurrentUrl, this);
 
-	// interrogates controls and updates widgets as required
-	updateMediaPreview();
-
 	return true;
 }
 
@@ -313,9 +310,6 @@ void LLPanelMediaSettingsGeneral::initValues( void* userdata, const LLSD& _media
 			data_set[ i ].ctrl_ptr->setTentative( media_settings[ tentative_key ].asBoolean() );
 		};
 	};
-
-	// interrogates controls and updates widgets as required
-	self->updateMediaPreview();
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -457,7 +451,7 @@ bool LLPanelMediaSettingsGeneral::navigateHomeSelectedFace(bool only_if_current_
 					if (!only_if_current_is_empty || (media_data->getCurrentURL().empty() && media_data->getAutoPlay()))
 					{
 						viewer_media_t media_impl =
-							LLViewerMedia::getInstanceFast()->getMediaImplFromTextureID(object->getTE(face)->getMediaData()->getMediaID());
+							LLViewerMedia::getInstance()->getMediaImplFromTextureID(object->getTE(face)->getMediaData()->getMediaID());
 						if(media_impl)
 						{
 							media_impl->navigateHome();
@@ -473,7 +467,7 @@ bool LLPanelMediaSettingsGeneral::navigateHomeSelectedFace(bool only_if_current_
 	} functor_navigate_media(only_if_current_is_empty);
 	
 	bool all_face_media_navigated = false;
-	LLObjectSelectionHandle selected_objects =LLSelectMgr::getInstanceFast()->getSelection();
+	LLObjectSelectionHandle selected_objects =LLSelectMgr::getInstance()->getSelection();
 	selected_objects->getSelectedTEValue( &functor_navigate_media, all_face_media_navigated );
 	
 	// Note: we don't update the 'current URL' field until the media data itself changes
@@ -511,7 +505,7 @@ void LLPanelMediaSettingsGeneral::updateCurrentUrl()
 		const LLMediaEntry &  mMediaEntry;
 		
 	} func_current_url(default_media_data);
-	bool identical = LLSelectMgr::getInstanceFast()->getSelection()->getSelectedTEValue( &func_current_url, value_str );
+	bool identical = LLSelectMgr::getInstance()->getSelection()->getSelectedTEValue( &func_current_url, value_str );
 	mCurrentURL->setText(value_str);
 	mCurrentURL->setTentative(identical);
 

@@ -187,7 +187,7 @@ Voice Server Version: [VOICE_VERSION]
 	<string name="LoginFailedNoNetwork">
 		Erreur réseau : impossible d&apos;établir la connexion. Veuillez vérifier votre connexion réseau.
 	</string>
-	<string name="LoginFailed">
+	<string name="LoginFailedHeader">
 		Échec de la connexion.
 	</string>
 	<string name="Quit">
@@ -691,9 +691,6 @@ peuvent être joints aux notes.
 	</string>
 	<string name="GroupNameNone">
 		(aucun)
-	</string>
-	<string name="AvalineCaller">
-		Appelant Avaline [ORDER]
 	</string>
 	<string name="AssetErrorNone">
 		Aucune erreur
@@ -5135,7 +5132,7 @@ Veuillez vous reporter à http://status.secondlifegrid.net afin de déterminer s
 	<string name="PremiumMembership">
 		Premium
 	</string>
-	<string name="Premium PlusMembership">
+	<string name="Premium_PlusMembership">
 		Premium Plus
 	</string>
 	<string name="DeleteItems">
