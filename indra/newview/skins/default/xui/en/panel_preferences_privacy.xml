@@ -217,6 +217,32 @@
          top_pad="10"
          width="350" />
         <check_box
+         control_name="AlchemyLookAtClampEnabled"
+         height="16"
+         label="Limit camera target distance"
+         layout="topleft"
+         left="30"
+         name="privatelookat"
+	    	 tool_tip="Allows cosmetic features like eye and head movement but will point at nothing specific if beyond the set distance."
+         top_pad="4"
+         width="200" />
+         <slider
+            height="16"
+            left_pad="10"
+            top_delta="0"
+            min_val="0.5"
+            max_val="128"
+            follows="top|left"
+            control_name="AlchemyLookAtClampDistance"
+            initial_value="1.0"
+            increment="0.5"
+            label="Max Distance"
+            width="275"
+            layout="topleft">
+            <button.commit_callback
+               function="Pref.UpdateLookAtClampDistance" />
+         </slider>
+        <check_box
          control_name="AlchemyLookAtPrivate"
          height="16"
          label="Don't send my actual camera target to others"

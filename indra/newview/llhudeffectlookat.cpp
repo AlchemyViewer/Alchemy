@@ -35,6 +35,7 @@
 #include "llagent.h"
 #include "llagentcamera.h"
 #include "llvoavatar.h"
+#include "llvoavatarself.h" // for gAgentAvatarp
 #include "lldrawable.h"
 #include "llviewerobjectlist.h"
 #include "llrendersphere.h"
@@ -411,27 +412,51 @@ BOOL LLHUDEffectLookAt::setLookAt(ELookAtType target_type, LLViewerObject *objec
 		return FALSE;
 	}
 
+	auto newTargetLookat = (*mAttentions)[mTargetType];
+
 	// must be same or higher priority than existing effect
-	if ((*mAttentions)[target_type].mPriority < (*mAttentions)[mTargetType].mPriority)
+	if ((*mAttentions)[target_type].mPriority < newTargetLookat.mPriority)
 	{
 		return FALSE;
 	}
 
 	F32 current_time  = mTimer.getElapsedTimeF32();
 
-	// type of lookat behavior or target object has changed
-	BOOL lookAtChanged = (target_type != mTargetType) || (object != mTargetObject);
-
-	// lookat position has moved a certain amount and we haven't just sent an update
-	lookAtChanged = lookAtChanged || ((dist_vec_squared(position, mLastSentOffsetGlobal) > MIN_DELTAPOS_FOR_UPDATE_SQUARED) && 
-		((current_time - mLastSendTime) > (1.f / MAX_SENDS_PER_SEC)));
-
-	if (lookAtChanged)
+	bool looking_at_self = false;
+	if (object != NULL) // Why does this crash?
 	{
-		mLastSentOffsetGlobal = position;
-		F32 timeout = (*mAttentions)[target_type].mTimeout;
-		setDuration(timeout);
-		setNeedsSendToSim(TRUE);
+		auto objectp = static_cast<LLViewerObject*>(object);
+		if (objectp->isAvatar())
+		{
+			auto voavatarp = dynamic_cast<LLVOAvatar*>(objectp);
+			if (voavatarp->isSelf())
+			{
+				looking_at_self = true;
+			}
+		}
+	}
+	static LLCachedControl<bool> clamp_lookat_enabled(gSavedSettings, "AlchemyLookAtClampEnabled", false);
+	bool clamp_lookat = clamp_lookat_enabled && !looking_at_self && 
+						newTargetLookat.mName != "Respond" &&
+						newTargetLookat.mName != "Conversation" &&
+						newTargetLookat.mName != "AutoListen";
+
+	if (!clamp_lookat)
+	{
+		// type of lookat behavior or target object has changed
+		BOOL lookAtChanged = (target_type != mTargetType) || (object != mTargetObject);
+
+		// lookat position has moved a certain amount and we haven't just sent an update
+		lookAtChanged = lookAtChanged || ((dist_vec_squared(position, mLastSentOffsetGlobal) > MIN_DELTAPOS_FOR_UPDATE_SQUARED) && 
+			((current_time - mLastSendTime) > (1.f / MAX_SENDS_PER_SEC)));
+
+		if (lookAtChanged)
+		{
+			mLastSentOffsetGlobal = position;
+			F32 timeout = (*mAttentions)[target_type].mTimeout;
+			setDuration(timeout);
+			setNeedsSendToSim(TRUE);
+		}
 	}
  
 	if (target_type == LOOKAT_TARGET_CLEAR)
@@ -444,11 +469,53 @@ BOOL LLHUDEffectLookAt::setLookAt(ELookAtType target_type, LLViewerObject *objec
 		mTargetObject = object;
 		if (object)
 		{
-			mTargetOffsetGlobal.setVec(position);
+			if(clamp_lookat)
+			{
+				// Pretend to look at the object
+				mTargetOffsetGlobal.setVec(object->getPositionGlobal() + (LLVector3d)(position * object->getRotationRegion()));
+				mTargetObject = NULL;
+			}
+			else
+			{
+				mTargetOffsetGlobal.setVec(position);
+			}
 		}
 		else
 		{
 			mTargetOffsetGlobal = gAgent.getPosGlobalFromAgent(position);
+		}
+
+		if (clamp_lookat)
+		{
+			static LLCachedControl<F32> lookat_clamp_distance(gSavedSettings, "AlchemyLookAtClampDistance", 1.0f);
+			auto head_position = gAgent.getPosGlobalFromAgent(gAgentAvatarp->mHeadp->getWorldPosition());
+			auto distance = dist_vec(mTargetOffsetGlobal, head_position);
+
+			if (distance > lookat_clamp_distance)
+			{
+				auto distance_from_object = (mTargetOffsetGlobal - head_position) * (lookat_clamp_distance / distance);
+				mTargetOffsetGlobal.setVec(head_position + distance_from_object);
+			}
+
+			bool lookat_changed = target_type != mTargetType;
+
+			// update position
+			if (!lookat_changed)
+			{
+				auto distance_difference = dist_vec_squared(gAgent.getPosAgentFromGlobal(mTargetOffsetGlobal), mLastSentOffsetGlobal);
+				auto time_difference = (current_time - mLastSendTime);
+				if (distance_difference > MIN_DELTAPOS_FOR_UPDATE_SQUARED && time_difference > (1.f / MAX_SENDS_PER_SEC))
+				{
+					lookat_changed = true;
+				}
+			}
+			if (lookat_changed)
+			{
+				mLastSentOffsetGlobal = gAgent.getPosAgentFromGlobal(mTargetOffsetGlobal);
+				F32 timeout = (*mAttentions)[target_type].mTimeout;
+				setDuration(timeout);
+				setNeedsSendToSim(TRUE);
+			}
 		}
 		mKillTime = mTimer.getElapsedTimeF32() + mDuration;
 

@@ -365,6 +365,28 @@
       <key>Value</key>
       <integer>0</integer>
     </map>
+    <key>AlchemyLookAtClampEnabled</key>
+    <map>
+      <key>Comment</key>
+      <string>If true, own look at distance will be clamped to a determined distance</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <integer>0</integer>
+    </map>
+    <key>AlchemyLookAtClampDistance</key>
+    <map>
+      <key>Comment</key>
+      <string>Distance at which to clamp own avatar look at</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>F32</string>
+      <key>Value</key>
+      <real>1.0</real>
+    </map>
     <key>AlchemyLookAtShow</key>
     <map>
       <key>Comment</key>
