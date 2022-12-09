@@ -2788,7 +2788,10 @@ bool LLTextEditor::loadFromFile(const std::string& filename)
 	buffer[nread] = '\0';
 	fclose(file);
 
-	setText(LLStringExplicit(buffer));
+	std::string text = std::string(buffer);
+	LLStringUtil::replaceTabsWithSpaces(text, LLTextEditor::spacesPerTab());
+
+	setText(LLStringExplicit(text));
 	delete[] buffer;
 
 	return true;

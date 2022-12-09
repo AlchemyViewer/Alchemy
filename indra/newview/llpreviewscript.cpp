@@ -599,7 +599,6 @@ void LLScriptEdCore::makeEditorPristine()
 
 bool LLScriptEdCore::loadScriptText(const std::string& filename)
 {
-// ALCHEMYMERGE
 // [SL:KB] - Patch: Build-AssetRecovery | Checked: 2013-07-28 (Catznip-3.6)
 	return mEditor->loadFromFile(filename);
 // [/SL:KB]
