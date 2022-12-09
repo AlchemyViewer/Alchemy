@@ -240,10 +240,11 @@ void sdlLogOutputFunc(void *userdata, int category, SDL_LogPriority priority, co
 }
 
 LLWindowSDL::LLWindowSDL(LLWindowCallbacks* callbacks,
-			 const std::string& title, S32 x, S32 y, S32 width,
+			 const std::string& title, const std::string& name,
+			 S32 x, S32 y, S32 width,
 			 S32 height, U32 flags,
 			 BOOL fullscreen, BOOL clearBg,
-			 BOOL disable_vsync, BOOL use_gl,
+			 BOOL enable_vsync, BOOL use_gl,
 			 BOOL ignore_pixel_depth, U32 fsaa_samples)
 	: LLWindow(callbacks, fullscreen, flags),
 	  mGamma(1.0f)
@@ -294,7 +295,7 @@ LLWindowSDL::LLWindowSDL(LLWindowCallbacks* callbacks,
 		mWindowTitle = title;
 
 	// Create the GL context and set it up for windowed or fullscreen, as appropriate.
-	if(createContext(x, y, width, height, 32, fullscreen, disable_vsync))
+	if(createContext(x, y, width, height, 32, fullscreen, enable_vsync))
 	{
 		gGLManager.initGL();
 
@@ -480,7 +481,7 @@ static int x11_detect_VRAM_kb()
 }
 #endif // LL_X11
 
-BOOL LLWindowSDL::createContext(int x, int y, int width, int height, int bits, BOOL fullscreen, BOOL disable_vsync)
+BOOL LLWindowSDL::createContext(int x, int y, int width, int height, int bits, BOOL fullscreen, BOOL enable_vsync)
 {
 	//bool			glneedsinit = false;
 
@@ -748,15 +749,6 @@ BOOL LLWindowSDL::createContext(int x, int y, int width, int height, int bits, B
     LL_INFOS() << "Created OpenGL " << llformat("%d.%d", major_gl_version, minor_gl_version) <<
 				(LLRender::sGLCoreProfile ? " core" : " compatibility") << " context." << LL_ENDL;
 	
-	int vsync_enable = 1;
-	if(disable_vsync)
-		vsync_enable = 0;
-		
-	if(SDL_GL_SetSwapInterval(vsync_enable) == -1)
-	{
-		LL_INFOS() << "Swap interval not supported with sdl err: " << SDL_GetError() << LL_ENDL;
-	}
-	
     SDL_GL_GetAttribute(SDL_GL_RED_SIZE, &redBits);
     SDL_GL_GetAttribute(SDL_GL_GREEN_SIZE, &greenBits);
     SDL_GL_GetAttribute(SDL_GL_BLUE_SIZE, &blueBits);
@@ -801,6 +793,8 @@ BOOL LLWindowSDL::createContext(int x, int y, int width, int height, int bits, B
         return FALSE;
     }
 
+	// Disable vertical sync for swap
+    toggleVSync(enable_vsync);
 
 	setIcon();
 
@@ -835,15 +829,57 @@ BOOL LLWindowSDL::createContext(int x, int y, int width, int height, int bits, B
 	}
 # endif // LL_X11
 
-    // make sure multisampling is disabled by default
-    glDisable(GL_MULTISAMPLE_ARB);
-
     // Don't need to get the current gamma, since there's a call that restores it to the system defaults.
     return TRUE;
 }
 
+void* LLWindowSDL::createSharedContext()
+{
+	SDL_GLContext shared_context = SDL_GL_CreateContext(mWindow);
+	if (shared_context)
+	{
+		SDL_GL_MakeCurrent(mWindow, shared_context);
+		SDL_GL_SetSwapInterval(0);
+		SDL_GL_MakeCurrent(mWindow, mGLContext);
+
+		LL_INFOS() << "Creating shared OpenGL context successful!" << LL_ENDL;
+
+		return (void*)shared_context;
+	}
+
+	LL_WARNS() << "Creating shared OpenGL context failed!" << LL_ENDL;
+
+	return nullptr;
+}
+
+void LLWindowSDL::makeContextCurrent(void* context)
+{
+	LL_PROFILER_GPU_CONTEXT;
+	SDL_GL_MakeCurrent(mWindow, context);
+}
+
+void LLWindowSDL::destroySharedContext(void* context)
+{
+	SDL_GL_DeleteContext(context);
+}
+
+void LLWindowSDL::toggleVSync(bool enable_vsync)
+{
+	if(enable_vsync)
+	{
+		if(SDL_GL_SetSwapInterval(-1) != 0)
+		{
+			SDL_GL_SetSwapInterval(1);
+		}
+	}
+	else
+	{
+		SDL_GL_SetSwapInterval(0);
+	}
+}
+
 // changing fullscreen resolution, or switching between windowed and fullscreen mode.
-BOOL LLWindowSDL::switchContext(BOOL fullscreen, const LLCoordScreen &size, BOOL disable_vsync, const LLCoordScreen * const posp)
+BOOL LLWindowSDL::switchContext(BOOL fullscreen, const LLCoordScreen &size, BOOL enable_vsync, const LLCoordScreen * const posp)
 {
 	const BOOL needsRebuild = TRUE;  // Just nuke the context and start over.
 	BOOL result = true;
@@ -853,7 +889,7 @@ BOOL LLWindowSDL::switchContext(BOOL fullscreen, const LLCoordScreen &size, BOOL
 	if(needsRebuild)
 	{
 		destroyContext();
-		result = createContext(0, 0, size.mX, size.mY, 32, fullscreen, disable_vsync);
+		result = createContext(0, 0, size.mX, size.mY, 32, fullscreen, enable_vsync);
 		if (result)
 		{
 			gGLManager.initGL();
