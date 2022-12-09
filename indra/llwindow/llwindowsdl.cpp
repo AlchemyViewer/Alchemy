@@ -548,7 +548,6 @@ BOOL LLWindowSDL::createContext(int x, int y, int width, int height, int bits, B
 	if (LLRender::sGLCoreProfile)
 	{
 		SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
-		LLGLSLShader::sNoFixedFunction = true;
 	}
 
 	U32 context_flags = 0;
