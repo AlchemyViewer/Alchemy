@@ -266,7 +266,7 @@ public:
                 return lhs->mAvatarp < rhs->mAvatarp;
             }
 
-            return lhs->mRenderOrder > rhs->mRenderOrder;
+            return lhs->mRenderOrder < rhs->mRenderOrder;
         }
     };
 

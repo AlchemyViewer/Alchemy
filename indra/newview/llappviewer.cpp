@@ -572,7 +572,7 @@ static void settings_to_globals()
 
 	gDebugWindowProc = gSavedSettings.getBOOL("DebugWindowProc");
 	gShowObjectUpdates = gSavedSettings.getBOOL("ShowObjectUpdates");
-	LLWorldMapView::sMapScale = gSavedSettings.getF32("MapScale");
+    LLWorldMapView::setScaleSetting(gSavedSettings.getF32("MapScale"));
 	
 #if LL_DARWIN
 	gHiDPISupport = gSavedSettings.getBOOL("RenderHiDPI");
@@ -2501,10 +2501,24 @@ bool LLAppViewer::initConfiguration()
 	//Load settings files list
 	std::string settings_file_list = gDirUtilp->getExpandedFilename(LL_PATH_APP_SETTINGS, "settings_files.xml");
 	LLXMLNodePtr root;
-	BOOL success  = LLXMLNode::parseFile(settings_file_list, root, NULL);
+	BOOL success = LLXMLNode::parseFile(settings_file_list, root, NULL);
 	if (!success)
 	{
-        LL_ERRS() << "Cannot load default configuration file " << settings_file_list << LL_ENDL;
+        LL_WARNS() << "Cannot load default configuration file " << settings_file_list << LL_ENDL;
+        if (gDirUtilp->fileExists(settings_file_list))
+        {
+            LL_ERRS() << "Cannot load default configuration file settings_files.xml. "
+                << "Please reinstall viewer from https://secondlife.com/support/downloads/ "
+                << "and contact https://support.secondlife.com if issue persists after reinstall."
+                << LL_ENDL;
+        }
+        else
+        {
+            LL_ERRS() << "Default configuration file settings_files.xml not found. "
+                << "Please reinstall viewer from https://secondlife.com/support/downloads/ "
+                << "and contact https://support.secondlife.com if issue persists after reinstall."
+                << LL_ENDL;
+        }
 	}
 
 	mSettingsLocationList = new SettingsFiles();
@@ -3528,7 +3542,7 @@ void LLAppViewer::cleanupSavedSettings()
 		}
 	}
 
-	gSavedSettings.setF32("MapScale", LLWorldMapView::sMapScale );
+    gSavedSettings.setF32("MapScale", LLWorldMapView::getScaleSetting());
 
 	// Some things are cached in LLAgent.
 	if (gAgent.isInitialized())
@@ -4394,7 +4408,6 @@ bool LLAppViewer::initCache()
 	LLSplashScreen::update(LLTrans::getString("StartupInitializingTextureCache"));
 
 	// Init the texture cache
-	// Allocate 80% of the cache size for textures
 	const S32 MB = 1024 * 1024;
 	const S64 MIN_CACHE_SIZE = 512 * MB;
 	const S64 MAX_CACHE_SIZE = 9984ll * MB;
@@ -4404,7 +4417,7 @@ bool LLAppViewer::initCache()
 
 	LLAppViewer::getTextureCache()->initCache(LL_PATH_CACHE, texture_cache_size, texture_cache_mismatch);
 
-		return true;
+    return true;
 }
 
 void LLAppViewer::addOnIdleCallback(const boost::function<void()>& cb)
@@ -5094,8 +5107,7 @@ void LLAppViewer::idle()
 			audio_update_wind(false);
 
 			// this line actually commits the changes we've made to source positions, etc.
-			const F32 max_audio_decode_time = 0.002f; // 2 ms decode time
-			gAudiop->idle(max_audio_decode_time);
+			gAudiop->idle();
 		}
 	}
 

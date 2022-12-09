@@ -621,7 +621,6 @@ BOOL LLWindowMacOSX::createContext(int x, int y, int width, int height, int bits
 		// Get the view instead.
 		mGLView = createOpenGLView(mWindow, mFSAASamples, enable_vsync);
 		mContext = getCGLContextObj(mGLView);
-
 		gGLManager.mVRAM = getVramSize(mGLView);
 	}
 	

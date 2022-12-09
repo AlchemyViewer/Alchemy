@@ -57,7 +57,7 @@ public:
 	virtual ~LLAudioEngine_FMODSTUDIO() = default;
 
 	// initialization/startup/shutdown
-	bool init(const S32 num_channels, void *user_data, const std::string& app_title) final override;
+	virtual bool init(void *user_data, const std::string &app_title) final;
 	std::string getDriverName(bool verbose) final override;
 	void allocateListener() final override;
 

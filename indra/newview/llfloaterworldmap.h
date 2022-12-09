@@ -44,6 +44,7 @@ class LLInventoryObserver;
 class LLItemInfo;
 class LLLineEditor;
 class LLTabContainer;
+class LLWorldMapView;
 
 class LLFloaterWorldMap final : public LLFloater
 {
@@ -157,11 +158,7 @@ protected:
     void            onTeleportFinished();
 
 private:
-	LLPanel*			mPanel;		// Panel displaying the map
-
-	// Ties to LLWorldMapView::sMapScale, in pixels per region
-	F32						mCurZoomVal;
-	LLFrameTimer			mZoomTimer;
+    LLWorldMapView* mMapView; // Panel displaying the map
 
 	// update display of teleport destination coordinates - pos is in global coordinates
 	void updateTeleportCoordsDisplay( const LLVector3d& pos );

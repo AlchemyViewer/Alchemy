@@ -542,6 +542,7 @@ class WindowsManifest(ViewerManifest):
 
         self.path(src="licenses-win32.txt", dst="licenses.txt")
         self.path("featuretable.txt")
+        self.path("cube.dae")
 
         with self.prefix(src=pkgdir):
             self.path("ca-bundle.crt")
@@ -902,6 +903,7 @@ class DarwinManifest(ViewerManifest):
 
                 self.path("licenses-mac.txt", dst="licenses.txt")
                 self.path("featuretable_mac.txt")
+                self.path("cube.dae")
 
                 with self.prefix(src=pkgdir,dst=""):
                     self.path("ca-bundle.crt")
@@ -1159,6 +1161,7 @@ class LinuxManifest(ViewerManifest):
             self.path("*.pak")
 
         self.path("featuretable_linux.txt")
+        self.path("cube.dae")
 
         with self.prefix(src=pkgdir, dst="app_settings"):
             self.path("ca-bundle.crt")

@@ -58,6 +58,7 @@
 #include "llappviewer.h"
 #include "llcoros.h"
 #include "lleventcoro.h"
+#include "lluiusage.h"
 // [RLVa:KB] - Checked: 2011-05-22 (RLVa-1.3.1)
 #include "rlvactions.h"
 #include "rlvhandler.h"
@@ -1479,6 +1480,9 @@ void LLAppearanceMgr::wearItemsOnAvatar(const uuid_vec_t& item_ids_to_wear,
                                         bool replace,
                                         LLPointer<LLInventoryCallback> cb)
 {
+	LL_DEBUGS("UIUsage") << "wearItemsOnAvatar" << LL_ENDL;
+	LLUIUsage::instance().logCommand("Avatar.WearItem");
+
     bool first = true;
 
     LLInventoryObject::const_object_list_t items_to_link;
@@ -3087,6 +3091,7 @@ void LLAppearanceMgr::wearInventoryCategoryOnAvatar( LLInventoryCategory* catego
 
 	LL_INFOS("Avatar") << self_av_string() << "wearInventoryCategoryOnAvatar '" << category->getName()
 			 << "'" << LL_ENDL;
+	LLUIUsage::instance().logCommand("Avatar.WearCategory");
 			 	
 	if (gAgentCamera.cameraCustomizeAvatar())
 	{
@@ -4414,6 +4419,8 @@ void LLAppearanceMgr::makeNewOutfitLinks(const std::string& new_folder_name, boo
 {
 	if (!isAgentAvatarValid()) return;
 
+	LLUIUsage::instance().logCommand("Avatar.CreateNewOutfit");
+
 	LL_DEBUGS("Avatar") << "creating new outfit" << LL_ENDL;
 
 	gAgentWearables.notifyLoadingStarted();
@@ -4455,6 +4462,9 @@ void LLAppearanceMgr::wearBaseOutfit()
 void LLAppearanceMgr::removeItemsFromAvatar(const uuid_vec_t& ids_to_remove, LLPointer<LLInventoryCallback> cb /*= NULL*/, bool immediate_delete /*= false*/)
 // [/SL:KB]
 {
+	LL_DEBUGS("UIUsage") << "removeItemsFromAvatar" << LL_ENDL;
+	LLUIUsage::instance().logCommand("Avatar.RemoveItem");
+
 	if (ids_to_remove.empty())
 	{
 		LL_WARNS() << "called with empty list, nothing to do" << LL_ENDL;
@@ -4972,6 +4982,8 @@ public:
 																			  "Quick Appearance");
 			if ( gInventory.getCategory( folder_uuid ) != NULL )
 			{
+				// Assume this is coming from the predefined avatars web floater
+				LLUIUsage::instance().logCommand("Avatar.WearPredefinedAppearance");
 				LLAppearanceMgr::getInstance()->wearInventoryCategory(category, true, false);
 				
 				// *TODOw: This may not be necessary if initial outfit is chosen already -- josh

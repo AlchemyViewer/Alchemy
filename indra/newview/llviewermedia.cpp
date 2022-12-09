@@ -4007,7 +4007,7 @@ bool LLViewerMediaImpl::shouldShowBasedOnClass() const
 //
 bool LLViewerMediaImpl::isObscured() const
 {
-    if (getUsedInUI() || isParcelMedia()) return false;
+    if (getUsedInUI() || isParcelMedia() || isAttachedToHUD()) return false;
 
     LLParcel* agent_parcel = LLViewerParcelMgr::getInstance()->getAgentParcel();
     if (!agent_parcel)
@@ -4020,6 +4020,20 @@ bool LLViewerMediaImpl::isObscured() const
         return true;
     }
 
+    return false;
+}
+
+bool LLViewerMediaImpl::isAttachedToHUD() const
+{
+    std::list< LLVOVolume* >::const_iterator iter = mObjectList.begin();
+    std::list< LLVOVolume* >::const_iterator end = mObjectList.end();
+    for ( ; iter != end; iter++)
+    {
+        if ((*iter)->isHUDAttachment())
+        {
+            return true;
+        }
+    }
     return false;
 }
 
