@@ -365,9 +365,6 @@ public:
 	// Needed when the render context has changed and invalidated the current state
 	void refreshState(void);
 
-	void resetVertexBuffers();
-	void restoreVertexBuffers();
-
 	void translatef(const GLfloat& x, const GLfloat& y, const GLfloat& z);
 	void scalef(const GLfloat& x, const GLfloat& y, const GLfloat& z);
 	//rotatef requires generation of a transform matrix involving sine/cosine. If rotating by a constant value, use genRot, store the result in a static variable, and pass that var to rotatef.

@@ -5827,7 +5827,7 @@ void LLViewerWindow::stopGL(BOOL save_state)
 			shader->unload();
 		}
 		
-		gGL.resetVertexBuffers();
+		gGL.resetVertexBuffer();
 
 		LLVertexBuffer::cleanupClass();
 

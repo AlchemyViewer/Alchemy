@@ -7415,7 +7415,6 @@ void LLPipeline::doResetVertexBuffers(bool forced)
 	LLVOPartGroup::destroyGL();
     gGL.resetVertexBuffer();
 
-	gGL.resetVertexBuffers();
 	SUBSYSTEM_CLEANUP(LLVertexBuffer);
 	
 	if (LLVertexBuffer::sGLCount != 0)
@@ -7443,8 +7442,6 @@ void LLPipeline::doResetVertexBuffers(bool forced)
 
     mDeferredVB = new LLVertexBuffer(DEFERRED_VB_MASK, 0);
     mDeferredVB->allocateBuffer(8, 0, true);
-
-	gGL.restoreVertexBuffers();
 
 	LLVOPartGroup::restoreGL();
 
