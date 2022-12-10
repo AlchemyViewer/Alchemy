@@ -70,11 +70,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>3cbc9f79842d53a82b8a3c6ff44ea6138be82d4c65d4b7b5f04499df610cd7501cf365a7d8bd9eefb9334e2a39ebd3f37f15c44df0c0b7ce63011f9fa0bac97b</string>
+              <string>e9d6e89117a043b7b661889eaaf73eead9b2e172c0b193c7d0a1a09f66e6036acb827263458dff52c40e2777951066f47e8872bae248c5d69e07a1b1b9dec70c</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/163/packages/generic/abseil-cpp/70dfa84.1478/abseil_cpp-70dfa84-darwin64-1478.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/163/packages/generic/abseil-cpp/522606b.1690/abseil_cpp-522606b-darwin64-1690.tar.zst</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
@@ -84,11 +84,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>294bc0bccbdf65732a81bbd54f3010717829ecc2067d1a4de636336d34df63ae70cb67059a84dfac11dddcb45046da68c61145234601a06a2fa5e2ff88b6edea</string>
+              <string>d45b909319a60627b89c70ee70d6883715e11cba39b78ce641e8b85b86f8f30d62083d0652c3083bdb15afcc10522b3b9f47e273ab46b6f0e06ae305fb2ab7e2</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/163/packages/generic/abseil-cpp/70dfa84.1478/abseil_cpp-70dfa84-linux64-1478.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/163/packages/generic/abseil-cpp/522606b.1690/abseil_cpp-522606b-linux64-1690.tar.zst</string>
             </map>
             <key>name</key>
             <string>linux64</string>
@@ -98,18 +98,18 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>57da399cc1cd38b525eefebcf3c3a796b892e9b3ce288299280fe6fbbbc19979ad9a1ee63dcc682906ecc236d27aaedd4af03bc43537fa85e0112724a19cfb38</string>
+              <string>3412d092fed702c2824c742bc4ab9fa3fb574153ac226ca9f4e37d9acc2db6cebb0d8874488eb2849b4782c4f6b4b534570c239e5abe608810a04399246fd566</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/163/packages/generic/abseil-cpp/70dfa84.1478/abseil_cpp-70dfa84-windows64-1478.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/163/packages/generic/abseil-cpp/522606b.1690/abseil_cpp-522606b-windows64-1690.tar.zst</string>
             </map>
             <key>name</key>
             <string>windows64</string>
           </map>
         </map>
         <key>version</key>
-        <string>70dfa84</string>
+        <string>522606b</string>
       </map>
       <key>apr_suite</key>
       <map>
