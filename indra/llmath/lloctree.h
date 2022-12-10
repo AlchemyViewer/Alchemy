@@ -74,6 +74,7 @@ template <class T, typename T_PTR>
 class LLOctreeTraveler
 {
 public:
+	virtual ~LLOctreeTraveler() = default;
     virtual void traverse(const LLOctreeNode<T, T_PTR>* node);
     virtual void visit(const LLOctreeNode<T, T_PTR>* branch) = 0;
 };
