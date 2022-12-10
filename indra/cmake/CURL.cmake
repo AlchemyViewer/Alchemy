@@ -8,7 +8,6 @@ set(CURL_FIND_REQUIRED ON)
 if (USESYSTEMLIBS)
   include(FindCURL)
 else (USESYSTEMLIBS)
-  use_prebuilt_binary(c-ares)
   use_prebuilt_binary(curl)
   if (WINDOWS)
     set(CURL_LIBRARIES 
