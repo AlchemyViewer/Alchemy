@@ -302,8 +302,8 @@ bool LLAvatarPropertiesProcessor::hasPaymentInfoOnFile(const LLAvatarData* avata
 	if (!avatar_data->caption_text.empty()) return true;
 
 	// Linden employees don't have payment info revealed
-	const S32 LINDEN_EMPLOYEE_INDEX = 3;
-	if (avatar_data->caption_index == LINDEN_EMPLOYEE_INDEX) return true;
+	//const S32 LINDEN_EMPLOYEE_INDEX = 3;
+	//if (avatar_data->caption_index == LINDEN_EMPLOYEE_INDEX) return true;
 
 	return ((avatar_data->flags & AVATAR_TRANSACTED) || (avatar_data->flags & AVATAR_IDENTIFIED));
 }
