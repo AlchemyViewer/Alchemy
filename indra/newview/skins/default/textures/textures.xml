@@ -899,6 +899,9 @@ with the same filename but different name
   <texture name="Clipboard_Cut" file_name="icons/clipboard_cut.png" preload="false" />
   <texture name="Clipboard_Paste" file_name="icons/clipboard_paste.png" preload="false" />
 
+  <texture name="AccountLevel_Internal" file_name="icons/SL_logo.png" preload="false" />
+  <texture name="AccountLevel_Plus" file_name="icons/AccountLevel_Plus.png" preload="false" />
+  <texture name="AccountLevel_Premium" file_name="icons/AccountLevel_Premium.png" preload="false" />
 
   <texture name="Default_Outfit_Photo" file_name="icons/Default_Outfit_Photo.png" preload="true"/>
   <texture name="Notification_Condense" file_name="icons/Icon_Notification_Condense.png" preload="true"/>

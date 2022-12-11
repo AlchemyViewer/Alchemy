@@ -66,8 +66,11 @@ private:
 	void updateData() override;
 	void processProperties(void* data, EAvatarProcessorType type) override;
 	void resetControls() override;
+    void resetInterestsControlValues();
 	void setProgress(bool started);
 	void showAccordion(const std::string& name, bool show);
+    void requestAvatarProfileCoro(std::string url);
+    void sendAvatarProfileCoro(std::string url, LLSD payload);
 	void onAvatarNameCache(const LLUUID& agent_id, const LLAvatarName& av_name);
 	void onCommitAvatarProperties();
 	void onCommitInterest();
@@ -198,36 +201,36 @@ public:
 		LLTextBase* mGroupsText;
 		LLFlatListView* mGroupsList;
 	};
+
+	class LLProfileGroupItem final : public LLPanel, public LLGroupMgrObserver
+    {
+      public:
+        LLProfileGroupItem();
+        ~LLProfileGroupItem() override;
+        static LLProfileGroupItem* create();
+        void                       init(const LLAvatarGroups::LLGroupData& data);
+        BOOL                       postBuild() override;
+
+        void setValue(const LLSD& value) override;
+        void setId(const LLUUID& id);
+        void setInsignia(const LLUUID& id);
+        void setGroupName(const std::string& name);
+        void setCharter(const std::string& charter);
+
+      protected:
+        void changed(LLGroupChange gc) override;
+
+      private:
+        LLUUID      mInsignia;
+        std::string mGroupName;
+        std::string mCharter;
+    };
 	
 private:
 #if WIP_PROFILES
 	LLPanelProfilePicks* mPanelPicks;
 #endif
 	LLPanelProfileGroups* mPanelGroups;
-};
-
-class LLProfileGroupItem final : public LLPanel, public LLGroupMgrObserver
-{
-public:
-	LLProfileGroupItem();
-	~LLProfileGroupItem() override;
-	static LLProfileGroupItem* create();
-	void init(const LLAvatarGroups::LLGroupData& data);
-	BOOL postBuild() override;
-	
-	void setValue(const LLSD& value) override;
-	void setId(const LLUUID& id);
-	void setInsignia(const LLUUID& id);
-	void setGroupName(const std::string& name);
-	void setCharter(const std::string& charter);
-
-protected:
-	void changed(LLGroupChange gc) override;
-
-private:
-	LLUUID	mInsignia;
-	std::string mGroupName;
-	std::string mCharter;	
 };
 
 #endif //LL_PANELPROFILELEGACY_H
