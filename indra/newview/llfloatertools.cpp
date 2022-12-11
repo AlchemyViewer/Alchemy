@@ -554,7 +554,7 @@ void LLFloaterTools::refresh()
         LLObjectSelectionHandle selection = LLSelectMgr::getInstance()->getSelection();
         F32 link_cost = selection->getSelectedLinksetCost();
         S32 link_count = selection->getRootObjectCount();
-        S32 object_count = selection->getObjectCount();
+        //S32 object_count = selection->getObjectCount();
 
         LLCrossParcelFunctor func;
         if (!LLSelectMgr::getInstance()->getSelection()->applyToRootObjects(&func, true))
