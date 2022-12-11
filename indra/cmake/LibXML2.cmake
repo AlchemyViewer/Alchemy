@@ -10,8 +10,8 @@ else(USESYSTEMLIBS)
     use_prebuilt_binary(libxml2)
     if(WINDOWS)
         set(LIBXML2_LIBRARIES
-            debug ${ARCH_PREBUILT_DIRS_DEBUG}/libxml2_a.lib
-            optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libxml2_a.lib
+            debug ${ARCH_PREBUILT_DIRS_DEBUG}/libxml2.lib
+            optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libxml2.lib
         )
     elseif(DARWIN)
         set(LIBXML2_LIBRARIES xml2 iconv)

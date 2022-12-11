@@ -15,9 +15,15 @@ else (USESYSTEMLIBS)
         optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libhunspell.lib
         )
   elseif(DARWIN)
-    set(HUNSPELL_LIBRARY hunspell-1.7)
+    set(HUNSPELL_LIBRARY 
+        debug ${ARCH_PREBUILT_DIRS_DEBUG}/libhunspell-1.7.a
+        optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libhunspell-1.7.a
+        )
   elseif(LINUX)
-    set(HUNSPELL_LIBRARY hunspell-1.7)
+    set(HUNSPELL_LIBRARY 
+        debug ${ARCH_PREBUILT_DIRS_DEBUG}/libhunspell-1.7.a
+        optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libhunspell-1.7.a
+        )
   else()
     message(FATAL_ERROR "Invalid platform")
   endif()

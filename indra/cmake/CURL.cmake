@@ -13,8 +13,6 @@ else (USESYSTEMLIBS)
     set(CURL_LIBRARIES 
       debug ${ARCH_PREBUILT_DIRS_DEBUG}/libcurld.lib
       optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libcurl.lib
-      debug ${ARCH_PREBUILT_DIRS_DEBUG}/libcaresd.lib
-      optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libcares.lib
       Normaliz.lib
       Iphlpapi.lib
     )
@@ -22,14 +20,12 @@ else (USESYSTEMLIBS)
     set(CURL_LIBRARIES 
       debug ${ARCH_PREBUILT_DIRS_DEBUG}/libcurld.a
       optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libcurl.a
-      debug ${ARCH_PREBUILT_DIRS_DEBUG}/libcares.a
-      optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libcares.a
       resolv
     )
   else ()
-    set(CURL_LIBRARIES libcurl.a
-      debug ${ARCH_PREBUILT_DIRS_DEBUG}/libcares.a
-      optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libcares.a
+    set(CURL_LIBRARIES
+      debug ${ARCH_PREBUILT_DIRS_DEBUG}/libcurld.a
+      optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libcurl.a
       )
   endif ()
   set(CURL_INCLUDE_DIRS ${LIBS_PREBUILT_DIR}/include)

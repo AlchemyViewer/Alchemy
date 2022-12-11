@@ -82,10 +82,6 @@ if(WINDOWS)
         libapr-1.dll
         libaprutil-1.dll
         libapriconv-1.dll
-        libhunspell.dll
-        libogg.dll
-        libvorbis.dll
-        libvorbisfile.dll
         openjp2.dll
         xmlrpc-epid.dll
         )
@@ -97,10 +93,6 @@ if(WINDOWS)
         libapr-1.dll
         libaprutil-1.dll
         libapriconv-1.dll
-        libhunspell.dll
-        libogg.dll
-        libvorbis.dll
-        libvorbisfile.dll
         openjp2.dll
         xmlrpc-epi.dll
         )
@@ -212,7 +204,6 @@ elseif(DARWIN)
         libaprutil-1.0.dylib
         libaprutil-1.dylib
         ${EXPAT_COPY}
-        libhunspell-1.7.0.dylib
         libndofdev.dylib
        )
 

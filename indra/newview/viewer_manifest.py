@@ -476,14 +476,6 @@ class WindowsManifest(ViewerManifest):
             else:
                 self.path("xmlrpc-epi.dll")
 
-            # Hunspell
-            self.path("libhunspell.dll")
-
-            # Audio
-            self.path("libogg.dll")
-            self.path("libvorbis.dll")
-            self.path("libvorbisfile.dll")      
-
             # Misc
             if self.args['configuration'].lower() == 'debug':
                 self.path("libexpatd.dll")
@@ -845,7 +837,6 @@ class DarwinManifest(ViewerManifest):
                                 'libapr-1.*.dylib',
                                 'libaprutil-1.*.dylib',
                                 'libepoxy.*.dylib',
-                                'libhunspell-*.dylib',
                                 'libndofdev.dylib',
                                 ):
                     self.path(libfile)
