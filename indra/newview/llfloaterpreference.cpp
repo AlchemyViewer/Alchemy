@@ -2119,7 +2119,9 @@ void LLFloaterPreference::setPersonalInfo(const std::string& visibility, bool im
 		
 	    std::string tooltip;
 	    if (!is_verified_email)
+		{
 	        tooltip = getString("email_unverified_tooltip");
+		}
 
 		send_im_to_email->setToolTip(tooltip);
 	}
