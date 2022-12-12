@@ -502,9 +502,6 @@ extern PFNGLBINDATTRIBLOCATIONARBPROC glBindAttribLocationARB;
 extern PFNGLGETACTIVEATTRIBARBPROC glGetActiveAttribARB;
 extern PFNGLGETATTRIBLOCATIONARBPROC glGetAttribLocationARB;
 
-extern PFNGLCOMPRESSEDTEXIMAGE2DARBPROC glCompressedTexImage2DARB;
-extern PFNGLGETCOMPRESSEDTEXIMAGEARBPROC glGetCompressedTexImageARB;
-
 //GL_EXT_blend_func_separate
 extern PFNGLBLENDFUNCSEPARATEEXTPROC glBlendFuncSeparateEXT;
 
@@ -800,6 +797,11 @@ extern PFNGLDEBUGMESSAGECONTROLARBPROC glDebugMessageControlARB;
 extern PFNGLDEBUGMESSAGEINSERTARBPROC glDebugMessageInsertARB;
 extern PFNGLDEBUGMESSAGECALLBACKARBPROC glDebugMessageCallbackARB;
 extern PFNGLGETDEBUGMESSAGELOGARBPROC glGetDebugMessageLogARB;
+
+extern PFNGLACTIVETEXTUREPROC	glActiveTexture;
+extern PFNGLCLIENTACTIVETEXTUREPROC	glClientActiveTexture;
+extern PFNGLCOMPRESSEDTEXIMAGE2DPROC glCompressedTexImage2D;
+extern PFNGLGETCOMPRESSEDTEXIMAGEPROC glGetCompressedTexImage;
 
 #elif LL_DARWIN
 //----------------------------------------------------------------------------

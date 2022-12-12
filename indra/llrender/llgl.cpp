@@ -305,6 +305,13 @@ PFNGLGETUNIFORMIVARBPROC glGetUniformivARB = NULL;
 PFNGLGETSHADERSOURCEARBPROC glGetShaderSourceARB = NULL;
 PFNGLVERTEXATTRIBIPOINTERPROC glVertexAttribIPointer = NULL;
 
+#if LL_WINDOWS
+PFNGLCOMPRESSEDTEXIMAGE2DPROC glCompressedTexImage2D = nullptr;
+PFNGLGETCOMPRESSEDTEXIMAGEPROC glGetCompressedTexImage = nullptr;
+PFNGLACTIVETEXTUREPROC	glActiveTexture = nullptr;
+PFNGLCLIENTACTIVETEXTUREPROC	glClientActiveTexture = nullptr;
+#endif
+
 #if LL_WINDOWS && !LL_SDL
 PFNWGLCREATECONTEXTATTRIBSARBPROC wglCreateContextAttribsARB = NULL;
 #endif
@@ -1561,7 +1568,13 @@ void LLGLManager::initExtensions()
     glGetVertexAttribPointervARB    = (PFNGLGETVERTEXATTRIBPOINTERVARBPROC) GLH_EXT_GET_PROC_ADDRESS("glgetVertexAttribPointervARB");
     glIsProgramARB                  = (PFNGLISPROGRAMARBPROC) GLH_EXT_GET_PROC_ADDRESS("glIsProgramARB");
 
-	glGetStringi					= (PFNGLGETSTRINGIPROC) GLH_EXT_GET_PROC_ADDRESS("glIsProgramARB");
+	glGetStringi					= (PFNGLGETSTRINGIPROC) GLH_EXT_GET_PROC_ADDRESS("glGetStringi");
+#if LL_WINDOWS
+	glActiveTexture = (PFNGLACTIVETEXTUREPROC)GLH_EXT_GET_PROC_ADDRESS("glActiveTexture");
+	glClientActiveTexture = (PFNGLCLIENTACTIVETEXTUREPROC)GLH_EXT_GET_PROC_ADDRESS("glClientActiveTexture");
+	glCompressedTexImage2D = (PFNGLCOMPRESSEDTEXIMAGE2DPROC) GLH_EXT_GET_PROC_ADDRESS("glCompressedTexImage2D");
+	glGetCompressedTexImage = (PFNGLGETCOMPRESSEDTEXIMAGEPROC) GLH_EXT_GET_PROC_ADDRESS("glGetCompressedTexImage");
+#endif
 
     LL_DEBUGS("RenderInit") << "GL Probe: Got symbols" << LL_ENDL;
 #endif
