@@ -966,7 +966,7 @@ bool LLPipeline::allocateScreenBuffer(U32 resX, U32 resY, U32 samples)
 		if (!mOcclusionDepth.allocate(resX/occlusion_divisor, resY/occlusion_divisor, 0, TRUE, FALSE, LLTexUnit::TT_RECT_TEXTURE, FALSE, samples)) return false;
 		if (!addDeferredAttachments(mDeferredScreen)) return false;
 	
-		if (!mHDRScreen.allocate(resX, resY, GL_RGBA16F, FALSE, FALSE, LLTexUnit::TT_RECT_TEXTURE, FALSE, samples, GL_RGBA, GL_FLOAT)) return false;
+		if (!mHDRScreen.allocate(resX, resY, GL_RGBA16F_ARB, FALSE, FALSE, LLTexUnit::TT_RECT_TEXTURE, FALSE, samples, GL_RGBA, GL_FLOAT)) return false;
 		if (!mScreen.allocate(resX, resY, GL_RGBA8, FALSE, FALSE, LLTexUnit::TT_RECT_TEXTURE, FALSE, samples)) return false;
 		if (samples > 0)
 		{
@@ -1397,7 +1397,7 @@ void LLPipeline::createGLBuffers()
 	U32 pix_type = GL_UNSIGNED_BYTE;
 	if (sRenderDeferred)
 	{
-		color_fmt = GL_R11F_G11F_B10F;
+		color_fmt = GL_R11F_G11F_B10F_ARB;
 		pix_format = GL_RGB;
 		pix_type = GL_FLOAT;
 	}
@@ -1434,7 +1434,7 @@ void LLPipeline::createGLBuffers()
 			LLImageGL::generateTextures(1, &mNoiseMap);
 			
 			gGL.getTexUnit(0)->bindManual(LLTexUnit::TT_TEXTURE, mNoiseMap);
-			LLImageGL::setManualImage(LLTexUnit::getInternalType(LLTexUnit::TT_TEXTURE), 0, GL_RGB16F, noiseRes, noiseRes, GL_RGB, GL_FLOAT, noise, false);
+			LLImageGL::setManualImage(LLTexUnit::getInternalType(LLTexUnit::TT_TEXTURE), 0, GL_RGB16F_ARB, noiseRes, noiseRes, GL_RGB, GL_FLOAT, noise, false);
 			gGL.getTexUnit(0)->setTextureFilteringOption(LLTexUnit::TFO_POINT);
 		}
 
@@ -1449,7 +1449,7 @@ void LLPipeline::createGLBuffers()
 
 			LLImageGL::generateTextures(1, &mTrueNoiseMap);
 			gGL.getTexUnit(0)->bindManual(LLTexUnit::TT_TEXTURE, mTrueNoiseMap);
-			LLImageGL::setManualImage(LLTexUnit::getInternalType(LLTexUnit::TT_TEXTURE), 0, GL_RGB16F, noiseRes, noiseRes, GL_RGB,GL_FLOAT, noise, false);
+			LLImageGL::setManualImage(LLTexUnit::getInternalType(LLTexUnit::TT_TEXTURE), 0, GL_RGB16F_ARB, noiseRes, noiseRes, GL_RGB,GL_FLOAT, noise, false);
 			gGL.getTexUnit(0)->setTextureFilteringOption(LLTexUnit::TFO_POINT);
 		}
 
