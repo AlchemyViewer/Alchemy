@@ -273,6 +273,8 @@ extern PFNGLDEBUGMESSAGECONTROLARBPROC glDebugMessageControlARB;
 extern PFNGLDEBUGMESSAGEINSERTARBPROC glDebugMessageInsertARB;
 extern PFNGLDEBUGMESSAGECALLBACKARBPROC glDebugMessageCallbackARB;
 extern PFNGLGETDEBUGMESSAGELOGARBPROC glGetDebugMessageLogARB;
+
+extern PFNGLGETSTRINGIPROC glGetStringi;
 #elif LL_LINUX
 //----------------------------------------------------------------------------
 // LL_LINUX

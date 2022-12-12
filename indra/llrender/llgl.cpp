@@ -151,7 +151,7 @@ std::list<LLGLUpdate*> LLGLUpdate::sGLQ;
 
 #if (LL_WINDOWS || LL_LINUX)  && !LL_MESA_HEADLESS
 
-#if LL_WINDOWS
+#if LL_WINDOWS || LL_SDL
 PFNGLGETSTRINGIPROC glGetStringi = NULL;
 #endif
 
@@ -1560,6 +1560,8 @@ void LLGLManager::initExtensions()
     glGetVertexAttribivARB          = (PFNGLGETVERTEXATTRIBIVARBPROC) GLH_EXT_GET_PROC_ADDRESS("glGetVertexAttribivARB");
     glGetVertexAttribPointervARB    = (PFNGLGETVERTEXATTRIBPOINTERVARBPROC) GLH_EXT_GET_PROC_ADDRESS("glgetVertexAttribPointervARB");
     glIsProgramARB                  = (PFNGLISPROGRAMARBPROC) GLH_EXT_GET_PROC_ADDRESS("glIsProgramARB");
+
+	glGetStringi					= (PFNGLGETSTRINGIPROC) GLH_EXT_GET_PROC_ADDRESS("glIsProgramARB");
 
     LL_DEBUGS("RenderInit") << "GL Probe: Got symbols" << LL_ENDL;
 #endif
