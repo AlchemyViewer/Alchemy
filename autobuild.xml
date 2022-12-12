@@ -721,6 +721,102 @@
         <key>version</key>
         <string>2.12.1</string>
       </map>
+      <key>glext</key>
+      <map>
+        <key>copyright</key>
+        <string>Copyright (c) 2007-2010 The Khronos Group Inc.</string>
+        <key>description</key>
+        <string>glext headers define function prototypes and constants for OpenGL extensions</string>
+        <key>license</key>
+        <string>Copyright (c) 2007-2010 The Khronos Group Inc.</string>
+        <key>license_file</key>
+        <string>LICENSES/glext.txt</string>
+        <key>name</key>
+        <string>glext</string>
+        <key>platforms</key>
+        <map>
+          <key>darwin64</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>hash</key>
+              <string>1bd3214ac23474ea4c869e386970a1be</string>
+              <key>url</key>
+              <string>http://automated-builds-secondlife-com.s3.amazonaws.com/ct2/54835/510029/glext-68-darwin64-538965.tar.bz2</string>
+            </map>
+            <key>name</key>
+            <string>darwin64</string>
+          </map>
+          <key>linux64</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>hash</key>
+              <string>5f3c9d61b620f949b199ebd8885218ed</string>
+              <key>url</key>
+              <string>http://automated-builds-secondlife-com.s3.amazonaws.com/hg/repo/p64_3p-glext/rev/314200/arch/Linux/installer/glext-68-linux64-314200.tar.bz2</string>
+            </map>
+            <key>name</key>
+            <string>linux64</string>
+          </map>
+          <key>windows</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>hash</key>
+              <string>6a311615bce59b01cf73ee65012a9b38</string>
+              <key>url</key>
+              <string>http://automated-builds-secondlife-com.s3.amazonaws.com/ct2/54951/511711/glext-68-windows-538965.tar.bz2</string>
+            </map>
+            <key>name</key>
+            <string>windows</string>
+          </map>
+          <key>windows64</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>hash</key>
+              <string>daf619dab1cf7518af6532b18800c4b0</string>
+              <key>url</key>
+              <string>http://automated-builds-secondlife-com.s3.amazonaws.com/ct2/54924/511490/glext-68-windows64-538965.tar.bz2</string>
+            </map>
+            <key>name</key>
+            <string>windows64</string>
+          </map>
+        </map>
+        <key>version</key>
+        <string>68</string>
+      </map>
+      <key>glh_linear</key>
+      <map>
+        <key>copyright</key>
+        <string>Copyright (c) 2000 Cass Everitt</string>
+        <key>description</key>
+        <string>glh - is a platform-indepenedent C++ OpenGL helper library</string>
+        <key>license</key>
+        <string>BSD</string>
+        <key>license_file</key>
+        <string>LICENSES/glh-linear.txt</string>
+        <key>name</key>
+        <string>glh_linear</string>
+        <key>platforms</key>
+        <map>
+          <key>common</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>hash</key>
+              <string>dce3f3c01fddb400cb143c3283fe9259</string>
+              <key>url</key>
+              <string>https://automated-builds-secondlife-com.s3.amazonaws.com/ct2/82754/775367/glh_linear-0.0.0-common-560278.tar.bz2</string>
+            </map>
+            <key>name</key>
+            <string>common</string>
+          </map>
+        </map>
+        <key>version</key>
+        <string>0.0.0</string>
+      </map>
       <key>gstreamer</key>
       <map>
         <key>copyright</key>

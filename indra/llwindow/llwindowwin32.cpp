@@ -934,9 +934,6 @@ void LLWindowWin32::close()
 		resetDisplayResolution();
 	}
 
-	// Don't process events in our mainWindowProc any longer.
-	SetWindowLongPtr(mWindowHandle, GWLP_USERDATA, NULL);
-
 	// Make sure cursor is visible and we haven't mangled the clipping state.
 	showCursor();
 	setMouseClipping(FALSE);
@@ -1447,13 +1444,9 @@ BOOL LLWindowWin32::switchContext(BOOL fullscreen, const LLCoordScreen& size, BO
 
 	LL_INFOS("Window") << "Drawing context is created." << LL_ENDL ;
 
+	gGLManager.initWGL();
 	
-	gGLManager.initWGL(mhDC);
-
-	HWND oldWND = nullptr;
-	HDC oldDC = nullptr;
-	HGLRC oldRC = nullptr;
-	if (epoxy_has_wgl_extension(mhDC, "WGL_ARB_pixel_format"))
+	if (wglChoosePixelFormatARB)
 	{
 		// OK, at this point, use the ARB wglChoosePixelFormatsARB function to see if we
 		// can get exactly what we want.
@@ -1615,22 +1608,18 @@ const	S32   max_format  = (S32)num_formats - 1;
 		
 		pixel_format = pixel_formats[cur_format];
 		
-		if (mWindowHandle)
+		if (mhDC != 0)											// Does The Window Have A Device Context?
 		{
-			if (mhDC)				// Does the window have a device context ?
+			wglMakeCurrent(mhDC, 0);							// Set The Current Active Rendering Context To Zero
+			if (mhRC != 0)										// Does The Window Have A Rendering Context?
 			{
-				if (mhRC)
-				{
-					oldRC = mhRC;
-					mhRC = NULL;	// Zero the rendering context
-				}
-				oldDC = mhDC;
+				wglDeleteContext (mhRC);							// Release The Rendering Context
+				mhRC = 0;										// Zero The Rendering Context
 			}
-			oldWND = mWindowHandle;
 		}
 
         // will release and recreate mhDC, mWindowHandle
-		recreateWindow(window_rect, dw_ex_style, dw_style, true);
+		recreateWindow(window_rect, dw_ex_style, dw_style);
         
         RECT rect;
         RECT client_rect;
@@ -1725,7 +1714,7 @@ const	S32   max_format  = (S32)num_formats - 1;
 	}
 
 	mhRC = 0;
-	if (epoxy_has_wgl_extension(mhDC, "WGL_ARB_create_context"))
+	if (wglCreateContextAttribsARB)
 	{ //attempt to create a specific versioned context
         mhRC = (HGLRC) createSharedContext();
         if (!mhRC)
@@ -1739,51 +1728,6 @@ const	S32   max_format  = (S32)num_formats - 1;
 		OSMessageBox(mCallbacks->translateString("MBGLContextActErr"), mCallbacks->translateString("MBError"), OSMB_OK);
         close();
 		return FALSE;
-	}
-
-	if (oldRC)
-	{
-		wglDeleteContext(oldRC); // Release The Old Rendering Context
-
-		std::promise<bool> promise;
-		// What follows must be done on the window thread.
-		auto window_work =
-			[this,
-			self = mWindowThread,
-			oldWND,
-			oldDC,
-			&promise]
-		()
-		{
-			if (oldWND)
-			{
-				if (oldDC && !ReleaseDC(oldWND, oldDC))
-				{
-					LL_WARNS("Window") << "Failed to ReleaseDC" << LL_ENDL;
-				}
-
-				// important to call DestroyWindow() from the window thread
-				if (!destroy_window_handler(oldWND))
-				{
-
-					LL_WARNS("Window") << "Failed to properly close window before recreating it!"
-						<< LL_ENDL;
-				}
-			}
-
-			// It's important to wake up the future either way.
-			promise.set_value(true);
-			LL_DEBUGS("Window") << "recreateWindow(): window_work done" << LL_ENDL;
-		};
-
-		LL_DEBUGS("Window") << "posting window_work to message queue" << LL_ENDL;
-		mWindowThread->Post(mWindowHandle, window_work);
-
-		auto future = promise.get_future();
-		// This blocks until mWindowThread processes CreateWindowEx() and calls
-		// promise.set_value().
-		auto destroyed = future.get();
-		LL_DEBUGS() << destroyed << LL_ENDL;
 	}
 
 	LL_PROFILER_GPU_CONTEXT
@@ -1822,7 +1766,7 @@ const	S32   max_format  = (S32)num_formats - 1;
 	return TRUE;
 }
 
-void LLWindowWin32::recreateWindow(RECT window_rect, DWORD dw_ex_style, DWORD dw_style, bool no_destroy)
+void LLWindowWin32::recreateWindow(RECT window_rect, DWORD dw_ex_style, DWORD dw_style)
 {
     auto oldWindowHandle = mWindowHandle;
     auto oldDCHandle = mhDC;
@@ -1847,7 +1791,6 @@ void LLWindowWin32::recreateWindow(RECT window_rect, DWORD dw_ex_style, DWORD dw
          window_rect,
          dw_ex_style,
          dw_style,
-		 no_destroy,
          &promise]
         ()
         {
@@ -1855,7 +1798,7 @@ void LLWindowWin32::recreateWindow(RECT window_rect, DWORD dw_ex_style, DWORD dw
             self->mWindowHandle = 0;
             self->mhDC = 0;
 
-            if (!no_destroy && oldWindowHandle)
+            if (oldWindowHandle)
             {
                 if (oldDCHandle && !ReleaseDC(oldWindowHandle, oldDCHandle))
                 {
@@ -1993,18 +1936,18 @@ void LLWindowWin32::destroySharedContext(void* contextPtr)
 
 void LLWindowWin32::toggleVSync(bool enable_vsync)
 {
-	if(epoxy_has_wgl_extension(mhDC, "WGL_EXT_swap_control"))
+	if (wglSwapIntervalEXT)
 	{
-	    if (!enable_vsync)
-	    {
-	        LL_INFOS("Window") << "Disabling vertical sync" << LL_ENDL;
-	        wglSwapIntervalEXT(0);
-	    }
-	    else
-	    {
-	        LL_INFOS("Window") << "Enabling vertical sync" << LL_ENDL;
-	        wglSwapIntervalEXT(1);
-	    }
+		if (!enable_vsync)
+		{
+			LL_INFOS("Window") << "Disabling vertical sync" << LL_ENDL;
+			wglSwapIntervalEXT(0);
+		}
+		else
+		{
+			LL_INFOS("Window") << "Enabling vertical sync" << LL_ENDL;
+			wglSwapIntervalEXT(1);
+		}
 	}
 }
 
@@ -2356,13 +2299,17 @@ LRESULT CALLBACK LLWindowWin32::mainWindowProc(HWND h_wnd, UINT u_msg, WPARAM w_
     ASSERT_WINDOW_THREAD();
     LL_PROFILE_ZONE_SCOPED_CATEGORY_WIN32;
 
+#ifdef SHOW_DEBUG
     LL_DEBUGS("Window") << "mainWindowProc(" << std::hex << h_wnd
                         << ", " << u_msg
                         << ", " << w_param << ")" << std::dec << LL_ENDL;
+#endif
 
     if (u_msg == WM_POST_FUNCTION_)
     {
+#ifdef SHOW_DEBUG
         LL_DEBUGS("Window") << "WM_POST_FUNCTION_" << LL_ENDL;
+#endif
         // from LLWindowWin32Thread::Post()
         // Cast l_param back to the pointer to the heap FuncType
         // allocated by Post(). Capture in unique_ptr so we'll delete

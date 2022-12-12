@@ -70,7 +70,7 @@ public:
 	void shutdownGL();
 
 #if LL_WINDOWS
-	void initWGL(HDC dc); // Initializes stupid WGL extensions
+	void initWGL(); // Initializes stupid WGL extensions
 #endif
 
 	std::string getRawGLString(); // For sending to simulator

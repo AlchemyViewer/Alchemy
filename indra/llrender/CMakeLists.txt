@@ -3,7 +3,7 @@
 project(llrender)
 
 include(00-Common)
-include(Epoxy)
+include(OpenGL)
 include(FreeType)
 include(LLCommon)
 include(LLImage)
@@ -15,7 +15,6 @@ include(LLFileSystem)
 
 include_directories(
     ${FREETYPE_INCLUDE_DIRS}
-    ${EPOXY_INCLUDE_DIRS}
     ${LLCOMMON_INCLUDE_DIRS}
     ${LLIMAGE_INCLUDE_DIRS}
     ${LLMATH_INCLUDE_DIRS}
@@ -126,13 +125,12 @@ target_link_libraries(llrender
     ${LLXML_LIBRARIES}
     ${LLWINDOW_LIBRARIES}
     ${FREETYPE_LIBRARIES}
-    ${EPOXY_LIBRARIES})
+    ${OPENGL_LIBRARIES})
 
 if(USE_PRECOMPILED_HEADERS AND ${CMAKE_VERSION} VERSION_GREATER "3.15.0") 
   target_precompile_headers(llrender
     PRIVATE
     [["linden_common.h"]]
-    llglheaders.h
     llgltypes.h
     <map>
     <list>
