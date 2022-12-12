@@ -11,8 +11,8 @@ set(cmake_SOURCE_FILES
     APR.cmake
     Audio.cmake
     Boost.cmake
+    BuildPackagesInfo.cmake
     BuildVersion.cmake
-    CEFPlugin.cmake
     CEFPlugin.cmake
     CMakeCopyIfDifferent.cmake
     CURL.cmake
@@ -72,7 +72,6 @@ set(cmake_SOURCE_FILES
     PluginAPI.cmake
     Prebuilt.cmake
     PulseAudio.cmake
-    Python.cmake
     SDL2.cmake
     Sentry.cmake
     TemplateCheck.cmake
