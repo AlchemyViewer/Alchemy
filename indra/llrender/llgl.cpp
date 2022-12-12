@@ -1081,43 +1081,41 @@ void LLGLManager::initExtensions()
 	mHasPointParameters = FALSE;
 	mHasTextureRectangle = FALSE;
 #elif LL_SDL
-	mHasMultitexture = SDL_GL_ExtensionSupported("GL_ARB_multitexture");
+	mHasMultitexture = mGLVersion >= 1.3f || SDL_GL_ExtensionSupported("GL_ARB_multitexture");
 	mHasATIMemInfo = SDL_GL_ExtensionSupported("GL_ATI_meminfo"); //Basic AMD method, also see mHasAMDAssociations
 	mHasNVXMemInfo = SDL_GL_ExtensionSupported("GL_NVX_gpu_memory_info");
-	mHasSeparateSpecularColor = SDL_GL_ExtensionSupported("GL_EXT_separate_specular_color");
-	mHasAnisotropic = SDL_GL_ExtensionSupported("GL_EXT_texture_filter_anisotropic");
-	mHasCubeMap = SDL_GL_ExtensionSupported("GL_ARB_texture_cube_map");
-	mHasARBEnvCombine = SDL_GL_ExtensionSupported("GL_ARB_texture_env_combine");
-	mHasCompressedTextures = SDL_GL_ExtensionSupported("GL_ARB_texture_compression");
-	mHasOcclusionQuery = SDL_GL_ExtensionSupported("GL_ARB_occlusion_query");
-	mHasTimerQuery = SDL_GL_ExtensionSupported("GL_ARB_timer_query");
-	mHasOcclusionQuery2 = SDL_GL_ExtensionSupported("GL_ARB_occlusion_query2");
-	mHasVertexBufferObject = SDL_GL_ExtensionSupported("GL_ARB_vertex_buffer_object");
-	mHasVertexArrayObject = SDL_GL_ExtensionSupported("GL_ARB_vertex_array_object");
-	mHasSync = SDL_GL_ExtensionSupported("GL_ARB_sync");
-	mHasMapBufferRange = SDL_GL_ExtensionSupported("GL_ARB_map_buffer_range");
+	mHasSeparateSpecularColor = mGLVersion >= 1.2f || SDL_GL_ExtensionSupported("GL_EXT_separate_specular_color");
+	mHasAnisotropic = mGLVersion >= 4.6f || SDL_GL_ExtensionSupported("GL_EXT_texture_filter_anisotropic");
+	mHasCubeMap = mGLVersion >= 1.3f || SDL_GL_ExtensionSupported("GL_ARB_texture_cube_map");
+	mHasARBEnvCombine = mGLVersion >= 1.3f || SDL_GL_ExtensionSupported("GL_ARB_texture_env_combine");
+	mHasCompressedTextures = mGLVersion >= 1.3f || SDL_GL_ExtensionSupported("GL_ARB_texture_compression");
+	mHasOcclusionQuery = mGLVersion >= 1.5f || SDL_GL_ExtensionSupported("GL_ARB_occlusion_query");
+	mHasTimerQuery = mGLVersion >= 3.3f || SDL_GL_ExtensionSupported("GL_ARB_timer_query");
+	mHasOcclusionQuery2 = mGLVersion >= 3.3f || SDL_GL_ExtensionSupported("GL_ARB_occlusion_query2");
+	mHasVertexBufferObject = mGLVersion >= 1.5f || SDL_GL_ExtensionSupported("GL_ARB_vertex_buffer_object");
+	mHasVertexArrayObject = mGLVersion >= 3.0f || SDL_GL_ExtensionSupported("GL_ARB_vertex_array_object");
+	mHasSync = mGLVersion >= 3.2f || SDL_GL_ExtensionSupported("GL_ARB_sync");
+	mHasMapBufferRange = mGLVersion >= 3.0f || SDL_GL_ExtensionSupported("GL_ARB_map_buffer_range");
 	mHasFlushBufferRange = SDL_GL_ExtensionSupported("GL_APPLE_flush_buffer_range");
     // NOTE: Using extensions breaks reflections when Shadows are set to projector.  See: SL-16727
-    //mHasDepthClamp = SDL_GL_ExtensionSupported("GL_ARB_depth_clamp") || SDL_GL_ExtensionSupported("GL_NV_depth_clamp");
-    mHasDepthClamp = FALSE;
-	// mask out FBO support when packed_depth_stencil isn't there 'cause we need it for LLRenderTarget -Brad
-	mHasFramebufferObject = SDL_GL_ExtensionSupported("GL_ARB_framebuffer_object");
-	mHassRGBTexture = SDL_GL_ExtensionSupported("GL_EXT_texture_sRGB");
-	mHassRGBFramebuffer = SDL_GL_ExtensionSupported("GL_ARB_framebuffer_sRGB");
-    mHasTexturesRGBDecode = SDL_GL_ExtensionSupported("GL_EXT_texture_sRGB_decode");
+	//mHasDepthClamp = mGLVersion >= 3.2f || (SDL_GL_ExtensionSupported("GL_ARB_depth_clamp") || SDL_GL_ExtensionSupported("GL_NV_depth_clamp"));
+	mHasFramebufferObject = mGLVersion >= 3.0f || SDL_GL_ExtensionSupported("GL_ARB_framebuffer_object");
+	mHassRGBTexture = mGLVersion >= 2.1f || SDL_GL_ExtensionSupported("GL_EXT_texture_sRGB");
+	mHassRGBFramebuffer = mGLVersion >= 3.0f || SDL_GL_ExtensionSupported("GL_ARB_framebuffer_sRGB");
+	mHasTexturesRGBDecode = SDL_GL_ExtensionSupported("GL_EXT_texture_sRGB_decode");
 
 	mHasMipMapGeneration = mHasFramebufferObject || mGLVersion >= 1.4f;
 
-	mHasDrawBuffers = SDL_GL_ExtensionSupported("GL_ARB_draw_buffers");
-	mHasBlendFuncSeparate = SDL_GL_ExtensionSupported("GL_EXT_blend_func_separate");
-	mHasTextureRectangle = SDL_GL_ExtensionSupported("GL_ARB_texture_rectangle");
-	mHasTextureMultisample = SDL_GL_ExtensionSupported("GL_ARB_texture_multisample");
-	mHasDebugOutput = SDL_GL_ExtensionSupported("GL_ARB_debug_output");
-	mHasTransformFeedback = mGLVersion >= 4.f ? TRUE : FALSE;
-	mHasPointParameters = SDL_GL_ExtensionSupported("GL_ARB_point_parameters");
-	mHasTextureSwizzle = SDL_GL_ExtensionSupported("GL_ARB_texture_swizzle");
-    mHasGPUShader4 = SDL_GL_ExtensionSupported("GL_EXT_gpu_shader4");
-    mHasClipControl = SDL_GL_ExtensionSupported("GL_ARB_clip_control");
+	mHasDrawBuffers = mGLVersion >= 2.0f || SDL_GL_ExtensionSupported("GL_ARB_draw_buffers");
+	mHasBlendFuncSeparate = mGLVersion >= 1.4f || SDL_GL_ExtensionSupported("GL_EXT_blend_func_separate");
+	mHasTextureRectangle = mGLVersion >= 3.1f || SDL_GL_ExtensionSupported("GL_ARB_texture_rectangle");
+	mHasTextureMultisample = mGLVersion >= 3.2f || SDL_GL_ExtensionSupported("GL_ARB_texture_multisample");
+	mHasDebugOutput = mGLVersion >= 4.3f || SDL_GL_ExtensionSupported("GL_ARB_debug_output");
+	mHasTransformFeedback = mGLVersion >= 4.0f ? TRUE : FALSE;
+	mHasPointParameters = mGLVersion >= 1.4f || SDL_GL_ExtensionSupported("GL_ARB_point_parameters");
+	mHasTextureSwizzle = mGLVersion >= 3.3f || SDL_GL_ExtensionSupported("GL_ARB_texture_swizzle");
+    mHasGPUShader4 = mGLVersion >= 3.0f || SDL_GL_ExtensionSupported("GL_EXT_gpu_shader4");
+    mHasClipControl = mGLVersion >= 4.5 || SDL_GL_ExtensionSupported("GL_ARB_clip_control");
 #else // LL_MESA_HEADLESS //important, gGLHExts.mSysExts is uninitialized until after glh_init_extensions is called
 	mHasMultitexture = glh_init_extensions("GL_ARB_multitexture");
 	mHasATIMemInfo = ExtensionExists("GL_ATI_meminfo", gGLHExts.mSysExts); //Basic AMD method, also see mHasAMDAssociations
@@ -1290,6 +1288,10 @@ void LLGLManager::initExtensions()
 	if (!mHasDrawBuffers)
 	{
 		LL_INFOS("RenderInit") << "Couldn't initialize GL_ARB_draw_buffers" << LL_ENDL;
+	}
+	if (!mHasTexturesRGBDecode)
+	{
+		LL_INFOS("RenderInit") << "Couldn't initialize GL_EXT_texture_sRGB_decode" << LL_ENDL;
 	}
 
 	// Disable certain things due to known bugs
