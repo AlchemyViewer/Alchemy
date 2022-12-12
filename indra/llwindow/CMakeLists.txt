@@ -188,12 +188,6 @@ add_library (llwindow
   ${viewer_SOURCE_FILES}
   )
 
-if (SDL_FOUND)
-  set_property(TARGET llwindow
-    PROPERTY COMPILE_DEFINITIONS LL_SDL=1
-    )
-endif (SDL_FOUND)
-
 target_link_libraries (llwindow llcommon ${llwindow_LINK_LIBRARIES} readerwriterqueue)
   
 if (DARWIN)

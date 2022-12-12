@@ -110,10 +110,6 @@ add_library (llrender ${llrender_SOURCE_FILES})
 
 set_target_properties(llrender PROPERTIES POSITION_INDEPENDENT_CODE TRUE)
 
-if (SDL_FOUND)
-  target_compile_definitions(llrender PUBLIC LL_SDL=1)
-endif (SDL_FOUND)
-
 # Libraries on which this library depends, needed for Linux builds
 # Sort by high-level to low-level
 target_link_libraries(llrender 

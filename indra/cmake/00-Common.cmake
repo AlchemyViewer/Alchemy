@@ -18,6 +18,7 @@ set(${CMAKE_CURRENT_LIST_FILE}_INCLUDED "YES")
 
 include(CheckCXXCompilerFlag)
 include(Variables)
+include(SDL2)
 
 # Portable compilation flags.
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DADDRESS_SIZE=${ADDRESS_SIZE}")
@@ -357,6 +358,10 @@ if(ENABLE_TIMING)
   add_definitions(-DAL_ENABLE_ALL_TIMERS=1)
 else()
   add_definitions(-DAL_ENABLE_ALL_TIMERS=0)
+endif()
+
+if(SDL_FOUND)
+  add_definitions(-DLL_SDL=1)
 endif()
 
 

@@ -1860,10 +1860,6 @@ add_executable(${VIEWER_BINARY_NAME}
     ${viewer_SOURCE_FILES}
     )
 
-if (SDL_FOUND)
-  target_compile_definitions(${VIEWER_BINARY_NAME} PRIVATE LL_SDL=1)
-endif (SDL_FOUND)
-
 if (USE_SENTRY)
   target_compile_definitions(${VIEWER_BINARY_NAME} PRIVATE ${SENTRY_DEFINE})
 

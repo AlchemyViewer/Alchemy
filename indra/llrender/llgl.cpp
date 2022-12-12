@@ -1732,7 +1732,7 @@ void LLGLState::resetTextureStates()
 	for (S32 j = maxTextureUnits-1; j >=0; j--)
 	{
 		gGL.getTexUnit(j)->activate();
-		glClientActiveTextureARB(GL_TEXTURE0_ARB+j);
+		glClientActiveTexture(GL_TEXTURE0_ARB+j);
 		j == 0 ? gGL.getTexUnit(j)->enable(LLTexUnit::TT_TEXTURE) : gGL.getTexUnit(j)->disable();
 	}
 }
@@ -1880,7 +1880,7 @@ void LLGLState::checkTextureChannels(const std::string& msg)
 
 		if (i < gGLManager.mNumTextureUnits)
 		{
-			glClientActiveTextureARB(GL_TEXTURE0_ARB+i);
+			glClientActiveTexture(GL_TEXTURE0_ARB+i);
 			stop_glerror();
 			glGetIntegerv(GL_TEXTURE_STACK_DEPTH, &stackDepth);
 			stop_glerror();
@@ -1965,7 +1965,7 @@ void LLGLState::checkTextureChannels(const std::string& msg)
 
 	stop_glerror();
 	gGL.getTexUnit(0)->activate();
-	glClientActiveTextureARB(GL_TEXTURE0_ARB);
+	glClientActiveTexture(GL_TEXTURE0_ARB);
 	stop_glerror();
 
 	if (error)

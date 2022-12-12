@@ -24,9 +24,7 @@ if (LINUX)
 
     if(USE_X11)
       list(APPEND PKGCONFIG_PACKAGES 
-            pangoxft
             x11
-            xinerama
             )
     endif()
       
@@ -42,13 +40,11 @@ if (LINUX)
           gdk-3.0
           gtk+-3.0
           x11
-          xinerama
           )
 
       if(USE_X11)
         list(APPEND PKGCONFIG_PACKAGES 
               x11
-              xinerama
               )
       endif()
 

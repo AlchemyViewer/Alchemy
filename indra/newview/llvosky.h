@@ -38,13 +38,13 @@
 #include "llsettingssky.h"
 #include "lllegacyatmospherics.h"
 
-const F32 SKY_BOX_MULT			= 16.0f;
-const F32 HEAVENLY_BODY_DIST	= HORIZON_DIST - 20.f;
-const F32 HEAVENLY_BODY_FACTOR	= 0.1f;
-const F32 HEAVENLY_BODY_SCALE	= HEAVENLY_BODY_DIST * HEAVENLY_BODY_FACTOR;
+constexpr F32 SKY_BOX_MULT			= 16.0f;
+constexpr F32 HEAVENLY_BODY_DIST	= HORIZON_DIST - 20.f;
+constexpr F32 HEAVENLY_BODY_FACTOR	= 0.1f;
+constexpr F32 HEAVENLY_BODY_SCALE	= HEAVENLY_BODY_DIST * HEAVENLY_BODY_FACTOR;
 
-const F32 SKYTEX_COMPONENTS = 4;
-const F32 SKYTEX_RESOLUTION = 64;
+constexpr S32 SKYTEX_COMPONENTS = 4;
+constexpr S32 SKYTEX_RESOLUTION = 64;
 
 class LLEnvironment;
 class LLFace;

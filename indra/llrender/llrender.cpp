@@ -127,7 +127,7 @@ void LLTexUnit::refreshState(void)
 
 	gGL.flush();
 	
-	glActiveTextureARB(GL_TEXTURE0_ARB + mIndex);
+	glActiveTexture(GL_TEXTURE0_ARB + mIndex);
 
 	if (mCurrTexType != TT_NONE)
 	{
@@ -148,7 +148,7 @@ void LLTexUnit::activate(void)
 	if ((S32)gGL.mCurrTextureUnitIndex != mIndex || gGL.mDirty)
 	{
 		gGL.flush();
-		glActiveTextureARB(GL_TEXTURE0_ARB + mIndex);
+		glActiveTexture(GL_TEXTURE0_ARB + mIndex);
 		gGL.mCurrTextureUnitIndex = mIndex;
 	}
 }
@@ -192,7 +192,7 @@ void LLTexUnit::bindFast(LLTexture* texture)
 {
     LLImageGL* gl_tex = texture->getGLTexture();
 
-    glActiveTextureARB(GL_TEXTURE0_ARB + mIndex);
+    glActiveTexture(GL_TEXTURE0_ARB + mIndex);
     gGL.mCurrTextureUnitIndex = mIndex;
     mCurrTexture = gl_tex->getTexName();
     if (!mCurrTexture)
