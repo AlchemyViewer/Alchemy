@@ -33,11 +33,9 @@
 
 #include "llgroupmgr.h"
 #include "llpanelavatarlegacy.h"
-#if WIP_PROFILES
-#include "llclassifieditem.h"
-#endif
 
 class LLAvatarName;
+class LLClassifiedItem;
 class LLFlatListView;
 class LLPanel;
 class LLPanelPickEdit;
@@ -114,7 +112,6 @@ private:
 	ChildStack		mChildStack;
 	
 public:
-#if WIP_PROFILES
 	class LLPanelProfilePicks final : public LLPanelProfileLegacyTab
 	{
 		friend class LLPanelProfileLegacy;
@@ -172,15 +169,15 @@ public:
 		LLFlatListView* mPicksList;
 		LLPanelPickEdit* mPanelPickEdit;
 		LLPanelPickInfo* mPanelPickInfo;
+		LLPanelClassifiedEdit* mPanelClassifiedEdit;
 		LLPanelClassifiedInfo* mPanelClassifiedInfo;
 		LLHandle<LLView> mPopupMenuHandle;
 		LLHandle<LLToggleableMenu> mPlusMenuHandle;
 
 		// This map is needed for newly created classifieds. The purpose of panel is to
 		// sit in this map and listen to LLPanelClassifiedEdit::processProperties callback.
-		panel_classified_edit_map_t mEditClassifiedPanels;
+        std::map<LLUUID, LLPanelClassifiedEdit*> mEditClassifiedPanels;
 	};
-#endif
 	
 	class LLPanelProfileGroups final : public LLPanelProfileLegacyTab
 	{
@@ -227,9 +224,7 @@ public:
     };
 	
 private:
-#if WIP_PROFILES
 	LLPanelProfilePicks* mPanelPicks;
-#endif
 	LLPanelProfileGroups* mPanelGroups;
 };
 

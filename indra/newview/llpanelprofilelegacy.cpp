@@ -52,16 +52,15 @@
 #include "llagentpicksinfo.h"
 #include "llavataractions.h"
 #include "llcallingcard.h" // for LLAvatarTracker
+#include "llclassifieditem.h"
 #include "lldateutil.h"
 #include "lldroptarget.h"
 #include "llfloaterreporter.h"
 #include "llfloaterworldmap.h"
 #include "llgroupactions.h"
 #include "llpanelclassified.h"
-#if WIP_PROFILES
-#include "llpanelpicks.h"
+#include "llpanelpick.h"
 #include "llpickitem.h"
-#endif
 #include "llmutelist.h"
 #include "llsidetraypanelcontainer.h"
 #include "llslurl.h"
@@ -77,15 +76,11 @@ static const std::array<std::string, 6> sSkillsCheckboxes{{"can_texture", "can_a
 
 static LLPanelInjector<LLPanelProfileLegacy> t_panel_lprofile("panel_profile_legacy_sidetray");
 static LLPanelInjector<LLPanelProfileLegacy::LLPanelProfileGroups> t_panel_group("panel_profile_legacy_groups");
-#ifdef WIP_PROFILES
 static LLPanelInjector<LLPanelProfileLegacy::LLPanelProfilePicks> t_panel_picks("panel_profile_legacy_picks");
-#endif
 
 LLPanelProfileLegacy::LLPanelProfileLegacy()
 :	LLPanelProfileLegacyTab()
-#ifdef WIP_PROFILES
 ,	mPanelPicks(nullptr)
-#endif
 ,	mPanelGroups(nullptr)
 {
 	mChildStack.setParent(this);
@@ -112,10 +107,8 @@ LLPanelProfileLegacy::~LLPanelProfileLegacy()
 BOOL LLPanelProfileLegacy::postBuild()
 {
 	mPanelGroups = static_cast<LLPanelProfileGroups*>(getChild<LLUICtrl>("groups_tab_panel"));
-#ifdef WIP_PROFILES
 	mPanelPicks = static_cast<LLPanelProfilePicks*>(getChild<LLUICtrl>("picks_tab_panel"));
 	mPanelPicks->setProfilePanel(this);
-#endif
 	
 	if (dynamic_cast<LLSideTrayPanelContainer*>(getParent()) != nullptr)
 		getChild<LLUICtrl>("back")->setCommitCallback(boost::bind(&LLPanelProfileLegacy::onBackBtnClick, this));
@@ -161,9 +154,7 @@ void LLPanelProfileLegacy::onOpen(const LLSD& key)
 	setAvatarId(av_id);
 	
 	mPanelGroups->onOpen(LLSD(av_id));
-#ifdef WIP_PROFILES
 	mPanelPicks->onOpen(LLSD(av_id));
-#endif
 	// Oh joy!
 	bool is_self = (getAvatarId() == gAgentID);
 	getChild<LLView>("sl_profile_pic")->setEnabled(is_self);
@@ -810,7 +801,6 @@ void LLPanelProfileLegacy::closePanel(LLPanel* panel)
 }
 
 // LLPanelProfilePicks //
-#if WIP_PROFILES
 LLPanelProfileLegacy::LLPanelProfilePicks::LLPanelProfilePicks()
 :	LLPanelProfileLegacyTab()
 ,	mProfilePanel(nullptr)
@@ -818,6 +808,7 @@ LLPanelProfileLegacy::LLPanelProfilePicks::LLPanelProfilePicks()
 ,	mPicksList(nullptr)
 ,	mPanelPickEdit(nullptr)
 ,	mPanelPickInfo(nullptr)
+,	mPanelClassifiedEdit(nullptr)
 ,	mPanelClassifiedInfo(nullptr)
 ,	mPopupMenuHandle()
 ,	mPlusMenuHandle()
@@ -1066,7 +1057,8 @@ void LLPanelProfileLegacy::LLPanelProfilePicks::onClickDelete()
 	{
 		LLSD args;
 		args["PICK"] = value[PICK_NAME];
-		LLNotificationsUtil::add("DeleteAvatarPick", args, LLSD(), boost::bind(&LLPanelProfilePicks::callbackDeletePick, this, _1, _2));
+		LLNotificationsUtil::add("DeleteAvatarPick", args, LLSD(), 
+			boost::bind(&LLPanelProfilePicks::callbackDeletePick, this, _1, _2));
 		return;
 	}
 	value = mClassifiedsList->getSelectedValue();
@@ -1074,7 +1066,8 @@ void LLPanelProfileLegacy::LLPanelProfilePicks::onClickDelete()
 	{
 		LLSD args;
 		args["NAME"] = value[CLASSIFIED_NAME];
-		LLNotificationsUtil::add("DeleteClassified", args, LLSD(), boost::bind(&LLPanelProfilePicks::callbackDeleteClassified, this, _1, _2));
+		LLNotificationsUtil::add("DeleteClassified", args, LLSD(), 
+			boost::bind(&LLPanelProfilePicks::callbackDeleteClassified, this, _1, _2));
 		return;
 	}
 }
@@ -1157,6 +1150,7 @@ void LLPanelProfileLegacy::LLPanelProfilePicks::openClassifiedInfo()
 	{
 		mPanelClassifiedInfo = LLPanelClassifiedInfo::create();
 		mPanelClassifiedInfo->setExitCallback(boost::bind(&LLPanelProfilePicks::onPanelClassifiedClose, this, mPanelClassifiedInfo));
+		mPanelClassifiedInfo->setEditClassifiedCallback(boost::bind(&LLPanelProfilePicks::onPanelClassifiedEdit, this));
 		mPanelClassifiedInfo->setVisible(FALSE);
 	}
 	
@@ -1441,7 +1435,6 @@ inline LLPanelProfileLegacy* LLPanelProfileLegacy::LLPanelProfilePicks::getProfi
 	llassert_always(mProfilePanel != nullptr);
 	return mProfilePanel;
 }
-#endif
 
 // LLPanelProfileGroups //
 

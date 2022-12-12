@@ -32,13 +32,14 @@
 #include "llavataractions.h"
 #include "llavatarpropertiesprocessor.h"
 #include "llclassifiedflags.h"
+#include "llclassifiedinfo.h"
 #include "llcombobox.h"
 #include "llcommandhandler.h" // for classified HTML detail page click tracking
 #include "llcorehttputil.h"
 #include "lldispatcher.h"
 #include "llfloaterclassified.h"
 #include "llfloaterreg.h"
-#include "llfloatersidepanelcontainer.h"
+#include "llfloaterpublishclassified.h"
 #include "llfloaterworldmap.h"
 #include "lliconctrl.h"
 #include "lllineeditor.h"
@@ -46,7 +47,6 @@
 #include "llnotificationsutil.h"
 #include "llpanelavatar.h"
 #include "llparcel.h"
-#include "llregistry.h"
 #include "llscrollcontainer.h"
 #include "llstartup.h"
 #include "llstatusbar.h"
@@ -57,8 +57,6 @@
 #include "llviewergenericmessage.h" // send_generic_message
 #include "llviewerparcelmgr.h"
 #include "llviewerregion.h"
-#include "llviewertexture.h"
-#include "llviewertexture.h"
 #include "rlvactions.h"
 #include "rlvhandler.h"
 
@@ -66,7 +64,6 @@
 //*TODO: verify this limit
 const S32 MAX_AVATAR_CLASSIFIEDS = 100;
 
-const S32 MINIMUM_PRICE_FOR_LISTING = 50; // L$
 const S32 DEFAULT_EDIT_CLASSIFIED_SCROLL_HEIGHT = 530;
 
 //static
@@ -952,12 +949,12 @@ void LLPanelProfileClassified::onSaveClick()
             return;
         }
 
-        mPublishFloater = LLFloaterReg::findTypedInstance<LLPublishClassifiedFloater>(
+        mPublishFloater = LLFloaterReg::findTypedInstance<LLFloaterPublishClassified>(
             "publish_classified", LLSD());
 
         if(!mPublishFloater)
         {
-            mPublishFloater = LLFloaterReg::getTypedInstance<LLPublishClassifiedFloater>(
+            mPublishFloater = LLFloaterReg::getTypedInstance<LLFloaterPublishClassified>(
                 "publish_classified", LLSD());
 
             mPublishFloater->setPublishClickedCallback(boost::bind
@@ -1482,48 +1479,4 @@ void LLPanelProfileClassified::updateTabLabel(const std::string& title)
     {
         parent->setCurrentTabName(title);
     }
-}
-
-
-//-----------------------------------------------------------------------------
-// LLPublishClassifiedFloater
-//-----------------------------------------------------------------------------
-
-LLPublishClassifiedFloater::LLPublishClassifiedFloater(const LLSD& key)
- : LLFloater(key)
-{
-}
-
-LLPublishClassifiedFloater::~LLPublishClassifiedFloater()
-{
-}
-
-BOOL LLPublishClassifiedFloater::postBuild()
-{
-    LLFloater::postBuild();
-
-    childSetAction("publish_btn", boost::bind(&LLFloater::closeFloater, this, false));
-    childSetAction("cancel_btn", boost::bind(&LLFloater::closeFloater, this, false));
-
-    return TRUE;
-}
-
-void LLPublishClassifiedFloater::setPrice(S32 price)
-{
-    getChild<LLUICtrl>("price_for_listing")->setValue(price);
-}
-
-S32 LLPublishClassifiedFloater::getPrice()
-{
-    return getChild<LLUICtrl>("price_for_listing")->getValue().asInteger();
-}
-
-void LLPublishClassifiedFloater::setPublishClickedCallback(const commit_signal_t::slot_type& cb)
-{
-    getChild<LLButton>("publish_btn")->setClickedCallback(cb);
-}
-
-void LLPublishClassifiedFloater::setCancelClickedCallback(const commit_signal_t::slot_type& cb)
-{
-    getChild<LLButton>("cancel_btn")->setClickedCallback(cb);
 }

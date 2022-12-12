@@ -159,7 +159,7 @@ Remove Friend
            name="interests_tab_panel"
            top="0" />
         </accordion_tab>
-        <!--<accordion_tab
+        <accordion_tab
          expanded="false"
          layout="topleft"
          name="avatar_picks_tab"
@@ -174,7 +174,7 @@ Remove Friend
            left="0"
            name="picks_tab_panel"
            top="0" />
-        </accordion_tab>-->
+        </accordion_tab>
         <accordion_tab
          expanded="false"
          layout="topleft"
