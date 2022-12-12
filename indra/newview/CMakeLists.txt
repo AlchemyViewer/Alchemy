@@ -186,6 +186,7 @@ set(viewer_SOURCE_FILES
     llchathistory.cpp
     llchatitemscontainerctrl.cpp
     llchatmsgbox.cpp
+    llcheatcodes.cpp
     llchiclet.cpp
     llchicletbar.cpp
     llclassifiedinfo.cpp
