@@ -72,6 +72,7 @@ static const std::string HEADLESS_VERSION_STRING("1.0");
 
 llofstream gFailLog;
 
+#if GL_ARB_debug_output
 #ifndef APIENTRY
 #define APIENTRY
 #endif
@@ -109,6 +110,7 @@ void APIENTRY gl_debug_callback(GLenum source,
 		LL_ERRS() << "Halting on GL Error" << LL_ENDL;
 	}
 }
+#endif
 
 void parse_glsl_version(S32& major, S32& minor);
 

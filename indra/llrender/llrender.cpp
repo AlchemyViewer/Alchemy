@@ -38,6 +38,7 @@
 #include "llmatrix4a.h"
 #include "alglmath.h"
 
+#if GL_ARB_debug_output
 #ifndef APIENTRY
 #define APIENTRY
 #endif
@@ -50,6 +51,7 @@ extern void APIENTRY gl_debug_callback(GLenum source,
                                 const GLchar* message,
                                 GLvoid* userParam)
 ;
+#endif
 
 thread_local LLRender gGL;
 
@@ -875,12 +877,14 @@ LLRender::~LLRender()
 
 void LLRender::init(bool needs_vertex_buffer)
 {
+#if GL_ARB_debug_output
     if (gGLManager.mHasDebugOutput && gDebugGL)
     { //setup debug output callback
         //glDebugMessageControlARB(GL_DONT_CARE, GL_DONT_CARE, GL_DEBUG_SEVERITY_LOW_ARB, 0, NULL, GL_TRUE);
         glDebugMessageCallbackARB((GLDEBUGPROCARB) gl_debug_callback, NULL);
         glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS_ARB);
     }
+#endif
 
     glPixelStorei(GL_PACK_ALIGNMENT, 1);
     glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
