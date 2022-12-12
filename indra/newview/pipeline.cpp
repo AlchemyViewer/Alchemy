@@ -1393,18 +1393,16 @@ void LLPipeline::createGLBuffers()
     gGL.setColorMask(true, true);
 
 	U32 color_fmt = GL_RGBA8;
-	U32 pix_format = GL_RGBA;
 	U32 pix_type = GL_UNSIGNED_BYTE;
 	if (sRenderDeferred)
 	{
-		color_fmt = GL_R11F_G11F_B10F_ARB;
-		pix_format = GL_RGB;
+		color_fmt = GL_RGBA16F_ARB;
 		pix_type = GL_FLOAT;
 	}
 
     for (U32 i = 0; i < 2; i++)
     {
-        if(mGlow[i].allocate(llmax(512U, glow_res), glow_res, color_fmt, FALSE, FALSE, LLTexUnit::TT_TEXTURE, false, 0, pix_format, pix_type))
+        if(mGlow[i].allocate(llmax(512U, glow_res), glow_res, color_fmt, FALSE, FALSE, LLTexUnit::TT_TEXTURE, false, 0, GL_RGBA, pix_type))
         {
             mGlow[i].bindTarget();
             mGlow[i].clear();
