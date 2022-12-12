@@ -473,7 +473,7 @@ void LLRenderTarget::bindTarget()
 									GL_COLOR_ATTACHMENT2,
 									GL_COLOR_ATTACHMENT3};
 			LL_PROFILER_GPU_ZONEC( "gl.DrawBuffersARB", 0x4000FF )
-			glDrawBuffers(mTex.size(), drawbuffers);
+			glDrawBuffersARB(mTex.size(), drawbuffers);
 		}
 			
 		if (mTex.empty())

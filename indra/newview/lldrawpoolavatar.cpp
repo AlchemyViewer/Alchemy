@@ -53,7 +53,7 @@
 #include "llviewercontrol.h" // for gSavedSettings
 #include "llviewertexturelist.h"
 
-static U32 sBufferUsage = GL_STREAM_DRAW;
+static U32 sBufferUsage = GL_STREAM_DRAW_ARB;
 static U32 sShaderLevel = 0;
 
 LLGLSLShader* LLDrawPoolAvatar::sVertexProgram = NULL;
@@ -145,11 +145,11 @@ void LLDrawPoolAvatar::prerender()
 	
 	if (sShaderLevel > 0)
 	{
-		sBufferUsage = GL_DYNAMIC_DRAW;
+		sBufferUsage = GL_DYNAMIC_DRAW_ARB;
 	}
 	else
 	{
-		sBufferUsage = GL_STREAM_DRAW;
+		sBufferUsage = GL_STREAM_DRAW_ARB;
 	}
 }
 

@@ -595,7 +595,7 @@ U32 LLVOGrass::getPartitionType() const
 }
 
 LLGrassPartition::LLGrassPartition(LLViewerRegion* regionp)
-: LLSpatialPartition(LLDrawPoolAlpha::VERTEX_DATA_MASK | LLVertexBuffer::MAP_TEXTURE_INDEX, TRUE, GL_STREAM_DRAW, regionp)
+: LLSpatialPartition(LLDrawPoolAlpha::VERTEX_DATA_MASK | LLVertexBuffer::MAP_TEXTURE_INDEX, TRUE, GL_STREAM_DRAW_ARB, regionp)
 {
 	mDrawableType = LLPipeline::RENDER_TYPE_GRASS;
 	mPartitionType = LLViewerRegion::PARTITION_GRASS;
@@ -603,7 +603,7 @@ LLGrassPartition::LLGrassPartition(LLViewerRegion* regionp)
 	mDepthMask = TRUE;
 	mSlopRatio = 0.1f;
 	mRenderPass = LLRenderPass::PASS_GRASS;
-	mBufferUsage = GL_DYNAMIC_DRAW;
+	mBufferUsage = GL_DYNAMIC_DRAW_ARB;
 }
 
 void LLGrassPartition::addGeometryCount(LLSpatialGroup* group, U32& vertex_count, U32& index_count)
@@ -627,7 +627,7 @@ void LLGrassPartition::addGeometryCount(LLSpatialGroup* group, U32& vertex_count
 		
 		if (drawablep->isAnimating())
 		{
-			group->mBufferUsage = GL_STREAM_DRAW;
+			group->mBufferUsage = GL_STREAM_DRAW_ARB;
 		}
 
 		U32 count = 0;

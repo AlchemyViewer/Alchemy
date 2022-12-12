@@ -1,7 +1,6 @@
 # -*- cmake -*-
 
 include(Variables)
-include(Epoxy)
 include(GLEXT)
 include(SDL2)
 

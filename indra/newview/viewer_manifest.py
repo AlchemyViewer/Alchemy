@@ -467,9 +467,6 @@ class WindowsManifest(ViewerManifest):
             # For image support
             self.path("openjp2.dll")
 
-            # For OpenGL extensions
-            self.path("epoxy-0.dll")
-
             # HTTP and Network
             if self.args['configuration'].lower() == 'debug':
                 self.path("xmlrpc-epid.dll")
@@ -836,7 +833,6 @@ class DarwinManifest(ViewerManifest):
                 for libfile in (
                                 'libapr-1.*.dylib',
                                 'libaprutil-1.*.dylib',
-                                'libepoxy.*.dylib',
                                 'libndofdev.dylib',
                                 ):
                     self.path(libfile)
@@ -1213,9 +1209,6 @@ class Linux_i686_Manifest(LinuxManifest):
             self.path("libexpat.so.*")
             self.path("libSDL2*.so*")
             self.path("libopenjp2.*so*")
-            self.path("libepoxy.so")
-            self.path("libepoxy.so.0")
-            self.path("libepoxy.so.0.0.0")
             self.path("libjpeg.so*")
 
             if self.args['openal'] == 'ON' or self.args['openal'] == 'TRUE':
@@ -1254,9 +1247,6 @@ class Linux_x86_64_Manifest(LinuxManifest):
             self.path("libexpat.so.*")
             self.path("libSDL2*.so*")
             self.path("libopenjp2.*so*")
-            self.path("libepoxy.so")
-            self.path("libepoxy.so.0")
-            self.path("libepoxy.so.0.0.0")
             self.path("libjpeg.so*")
 
             if self.args['openal'] == 'ON' or self.args['openal'] == 'TRUE':

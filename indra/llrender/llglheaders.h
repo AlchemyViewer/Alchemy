@@ -328,6 +328,9 @@ extern PFNGLBINDBUFFERBASEPROC glBindBufferBase;
 #include "GL/glext.h"
 #include "GL/glh_extensions.h"
 
+// GL 1.2
+extern PFNGLTEXIMAGE3DPROC glTexImage3D;
+
 // WGL_ARB_create_context
 extern PFNWGLCREATECONTEXTATTRIBSARBPROC wglCreateContextAttribsARB;
 extern PFNGLGETSTRINGIPROC glGetStringi;

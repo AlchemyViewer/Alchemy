@@ -1229,7 +1229,7 @@ void LLOcclusionCullingGroup::doOcclusion(LLCamera* camera, const LLVector4a* sh
 					LLGLEnable clamp(use_depth_clamp ? GL_DEPTH_CLAMP : 0);				
 						
 #if !LL_DARWIN					
-					U32 mode = gGLManager.mHasOcclusionQuery2 ? GL_ANY_SAMPLES_PASSED : GL_SAMPLES_PASSED;
+					U32 mode = gGLManager.mHasOcclusionQuery2 ? GL_ANY_SAMPLES_PASSED : GL_SAMPLES_PASSED_ARB;
 #else
 					U32 mode = GL_SAMPLES_PASSED_ARB;
 #endif
@@ -1251,7 +1251,7 @@ void LLOcclusionCullingGroup::doOcclusion(LLCamera* camera, const LLVector4a* sh
                             //get an occlusion query that hasn't been used in awhile
                             releaseOcclusionQueryObjectName(mOcclusionQuery[LLViewerCamera::sCurCameraID]);
                             mOcclusionQuery[LLViewerCamera::sCurCameraID] = getNewOcclusionQueryObjectName();
-                            glBeginQuery(mode, mOcclusionQuery[LLViewerCamera::sCurCameraID]);
+							glBeginQueryARB(mode, mOcclusionQuery[LLViewerCamera::sCurCameraID]);					
                         }
 					
 						LLGLSLShader* shader = LLGLSLShader::sCurBoundShaderPtr;
@@ -1293,7 +1293,7 @@ void LLOcclusionCullingGroup::doOcclusion(LLCamera* camera, const LLVector4a* sh
 	
                         {
                             LL_PROFILE_ZONE_NAMED("glEndQuery");
-							glEndQuery(mode);
+							glEndQueryARB(mode);
                         }
 					}
 				}

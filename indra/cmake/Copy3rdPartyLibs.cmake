@@ -77,7 +77,6 @@ if(WINDOWS)
 
     set(debug_src_dir "${ARCH_PREBUILT_DIRS_DEBUG}")
     set(debug_files
-        epoxy-0.dll
         libexpatd.dll
         libapr-1.dll
         libaprutil-1.dll
@@ -88,7 +87,6 @@ if(WINDOWS)
 
     set(release_src_dir "${ARCH_PREBUILT_DIRS_RELEASE}")
     set(release_files
-        epoxy-0.dll
         libexpat.dll
         libapr-1.dll
         libaprutil-1.dll
@@ -242,9 +240,6 @@ elseif(LINUX)
         libaprutil-1.so.0
         ${EXPAT_COPY}
         libopenal.so
-        libepoxy.so
-        libepoxy.so.0
-        libepoxy.so.0.0.0
         libjpeg.so
         libjpeg.so.8
         libjpeg.so.8.2.2

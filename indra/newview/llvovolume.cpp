@@ -5065,7 +5065,7 @@ U32 LLVOVolume::getPartitionType() const
 }
 
 LLVolumePartition::LLVolumePartition(LLViewerRegion* regionp)
-: LLSpatialPartition(LLVOVolume::VERTEX_DATA_MASK, TRUE, GL_DYNAMIC_DRAW, regionp),
+: LLSpatialPartition(LLVOVolume::VERTEX_DATA_MASK, TRUE, GL_DYNAMIC_DRAW_ARB, regionp),
 LLVolumeGeometryManager()
 {
 	mLODPeriod = 32;
@@ -5073,7 +5073,7 @@ LLVolumeGeometryManager()
 	mDrawableType = LLPipeline::RENDER_TYPE_VOLUME;
 	mPartitionType = LLViewerRegion::PARTITION_VOLUME;
 	mSlopRatio = 0.25f;
-	mBufferUsage = GL_DYNAMIC_DRAW;
+	mBufferUsage = GL_DYNAMIC_DRAW_ARB;
 }
 
 LLVolumeBridge::LLVolumeBridge(LLDrawable* drawablep, LLViewerRegion* regionp)
@@ -5085,7 +5085,7 @@ LLVolumeGeometryManager()
 	mDrawableType = LLPipeline::RENDER_TYPE_VOLUME;
 	mPartitionType = LLViewerRegion::PARTITION_BRIDGE;
 	
-	mBufferUsage = GL_DYNAMIC_DRAW;
+	mBufferUsage = GL_DYNAMIC_DRAW_ARB;
 
 	mSlopRatio = 0.25f;
 }
@@ -5637,7 +5637,7 @@ void LLVolumeGeometryManager::rebuildGeom(LLSpatialGroup* group)
 	
 			if (drawablep->isAnimating())
 			{ //fall back to stream draw for animating verts
-				useage = GL_STREAM_DRAW;
+				useage = GL_STREAM_DRAW_ARB;
 			}
 
 			LLVOVolume* vobj = drawablep->getVOVolume();
@@ -6454,9 +6454,9 @@ U32 LLVolumeGeometryManager::genDrawInfo(LLSpatialGroup* group, U32 mask, LLFace
 		}
 
 
-		if (flexi && buffer_usage && buffer_usage != GL_STREAM_DRAW)
+		if (flexi && buffer_usage && buffer_usage != GL_STREAM_DRAW_ARB)
 		{
-			buffer_usage = GL_STREAM_DRAW;
+			buffer_usage = GL_STREAM_DRAW_ARB;
 		}
 
 		//create vertex buffer
@@ -6896,7 +6896,7 @@ void LLGeometryManager::addGeometryCount(LLSpatialGroup* group, U32 &vertex_coun
 	
 		if (drawablep->isAnimating())
 		{ //fall back to stream draw for animating verts
-			usage = GL_STREAM_DRAW;
+			usage = GL_STREAM_DRAW_ARB;
 		}
 
 		//for each face

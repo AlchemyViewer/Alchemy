@@ -1391,6 +1391,9 @@ void LLGLManager::initExtensions()
 		glPointParameterfvARB = (PFNGLPOINTPARAMETERFVARBPROC)GLH_EXT_GET_PROC_ADDRESS("glPointParameterfvARB");
 	}
 
+	// Assume 1.2
+	glTexImage3D = (PFNGLTEXIMAGE3DPROC) GLH_EXT_GET_PROC_ADDRESS("glTexImage3D");
+
     // Assume shader capabilities
     glDeleteObjectARB         = (PFNGLDELETEOBJECTARBPROC) GLH_EXT_GET_PROC_ADDRESS("glDeleteObjectARB");
     glGetHandleARB            = (PFNGLGETHANDLEARBPROC) GLH_EXT_GET_PROC_ADDRESS("glGetHandleARB");

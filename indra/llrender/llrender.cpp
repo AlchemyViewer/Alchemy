@@ -74,8 +74,8 @@ static const U32 LL_NUM_LIGHT_UNITS = 8;
 static const GLenum sGLTextureType[] =
 {
 	GL_TEXTURE_2D,
-	GL_TEXTURE_RECTANGLE,
-	GL_TEXTURE_CUBE_MAP,
+	GL_TEXTURE_RECTANGLE_ARB,
+	GL_TEXTURE_CUBE_MAP_ARB,
 	GL_TEXTURE_2D_MULTISAMPLE,
     GL_TEXTURE_3D
 };
@@ -127,7 +127,7 @@ void LLTexUnit::refreshState(void)
 
 	gGL.flush();
 	
-	glActiveTexture(GL_TEXTURE0 + mIndex);
+	glActiveTextureARB(GL_TEXTURE0_ARB + mIndex);
 
 	if (mCurrTexType != TT_NONE)
 	{
@@ -148,7 +148,7 @@ void LLTexUnit::activate(void)
 	if ((S32)gGL.mCurrTextureUnitIndex != mIndex || gGL.mDirty)
 	{
 		gGL.flush();
-		glActiveTexture(GL_TEXTURE0 + mIndex);
+		glActiveTextureARB(GL_TEXTURE0_ARB + mIndex);
 		gGL.mCurrTextureUnitIndex = mIndex;
 	}
 }
@@ -348,7 +348,7 @@ bool LLTexUnit::bind(LLCubeMap* cubeMap)
 			activate();
 			enable(LLTexUnit::TT_CUBE_MAP);
             mCurrTexture = cubeMap->mImages[0]->getTexName();
-			glBindTexture(GL_TEXTURE_CUBE_MAP, mCurrTexture);
+			glBindTexture(GL_TEXTURE_CUBE_MAP_ARB, mCurrTexture);
 			mHasMipMaps = cubeMap->mImages[0]->mHasMipMaps;
 			cubeMap->mImages[0]->updateBindStats(cubeMap->mImages[0]->mTextureMemory);
 			if (cubeMap->mImages[0]->mTexOptionsDirty)
@@ -547,7 +547,7 @@ GLint LLTexUnit::getTextureSource(eTextureBlendSrc src)
 		case TBS_PREV_ALPHA:
 		case TBS_ONE_MINUS_PREV_COLOR:
 		case TBS_ONE_MINUS_PREV_ALPHA:
-			return GL_PREVIOUS;
+			return GL_PREVIOUS_ARB;
 
 		// All four cases should return the same value.
 		case TBS_TEX_COLOR:
@@ -561,18 +561,18 @@ GLint LLTexUnit::getTextureSource(eTextureBlendSrc src)
 		case TBS_VERT_ALPHA:
 		case TBS_ONE_MINUS_VERT_COLOR:
 		case TBS_ONE_MINUS_VERT_ALPHA:
-			return GL_PRIMARY_COLOR;
+			return GL_PRIMARY_COLOR_ARB;
 
 		// All four cases should return the same value.
 		case TBS_CONST_COLOR:
 		case TBS_CONST_ALPHA:
 		case TBS_ONE_MINUS_CONST_COLOR:
 		case TBS_ONE_MINUS_CONST_ALPHA:
-			return GL_CONSTANT;
+			return GL_CONSTANT_ARB;
 
 		default:
 			LL_WARNS() << "Unknown eTextureBlendSrc: " << src << ".  Using Vertex Color instead." << LL_ENDL;
-			return GL_PRIMARY_COLOR;
+			return GL_PRIMARY_COLOR_ARB;
 	}
 }
 
@@ -641,10 +641,10 @@ void LLTexUnit::debugTextureUnit(void)
 	if (mIndex < 0) return;
 
 	GLint activeTexture;
-	glGetIntegerv(GL_ACTIVE_TEXTURE, &activeTexture);
-	if ((GL_TEXTURE0 + mIndex) != activeTexture)
+	glGetIntegerv(GL_ACTIVE_TEXTURE_ARB, &activeTexture);
+	if ((GL_TEXTURE0_ARB + mIndex) != activeTexture)
 	{
-		U32 set_unit = (activeTexture - GL_TEXTURE0);
+		U32 set_unit = (activeTexture - GL_TEXTURE0_ARB);
 		LL_WARNS() << "Incorrect Texture Unit!  Expected: " << set_unit << " Actual: " << mIndex << LL_ENDL;
 	}
 }
@@ -1493,7 +1493,7 @@ void LLRender::blendFunc(eBlendFactor color_sfactor, eBlendFactor color_dfactor,
 	llassert(alpha_dfactor < BF_UNDEF);
 	if (!gGLManager.mHasBlendFuncSeparate)
 	{
-		LL_WARNS_ONCE("render") << "no glBlendFuncSeparate(), using color-only blend func" << LL_ENDL;
+		LL_WARNS_ONCE("render") << "no glBlendFuncSeparateEXT(), using color-only blend func" << LL_ENDL;
 		blendFunc(color_sfactor, color_dfactor);
 		return;
 	}
@@ -1505,7 +1505,7 @@ void LLRender::blendFunc(eBlendFactor color_sfactor, eBlendFactor color_dfactor,
 		mCurrBlendColorDFactor = color_dfactor;
 		mCurrBlendAlphaDFactor = alpha_dfactor;
 		flush();
-		glBlendFuncSeparate(sGLBlendFactor[color_sfactor], sGLBlendFactor[color_dfactor],
+		glBlendFuncSeparateEXT(sGLBlendFactor[color_sfactor], sGLBlendFactor[color_dfactor],
 				       sGLBlendFactor[alpha_sfactor], sGLBlendFactor[alpha_dfactor]);
 	}
 }
