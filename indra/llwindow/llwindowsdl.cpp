@@ -258,6 +258,12 @@ LLWindowSDL::LLWindowSDL(LLWindowCallbacks* callbacks,
 		return;
 	}
 	
+	if (SDL_GL_LoadLibrary(nullptr) != 0)
+	{
+		LL_WARNS() << "Failed to initialize OpenGL Library due to error: " << SDL_GetError() << LL_ENDL;
+		return;
+	}
+
 	// Initialize the keyboard
 	gKeyboard = new LLKeyboardSDL();
 	gKeyboard->setCallbacks(callbacks);

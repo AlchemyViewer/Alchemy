@@ -54,6 +54,12 @@
 #include "lldxhardware.h"
 #endif
 
+#if LL_SDL
+#include "SDL2/SDL_video.h"
+
+#define GLH_EXT_GET_PROC_ADDRESS SDL_GL_GetProcAddress
+#endif
+
 BOOL gDebugSession = FALSE;
 BOOL gDebugGLSession = FALSE;
 BOOL gHeadlessClient = FALSE;
@@ -299,12 +305,12 @@ PFNGLGETUNIFORMIVARBPROC glGetUniformivARB = NULL;
 PFNGLGETSHADERSOURCEARBPROC glGetShaderSourceARB = NULL;
 PFNGLVERTEXATTRIBIPOINTERPROC glVertexAttribIPointer = NULL;
 
-#if LL_WINDOWS
+#if LL_WINDOWS && !LL_SDL
 PFNWGLCREATECONTEXTATTRIBSARBPROC wglCreateContextAttribsARB = NULL;
 #endif
 
 // vertex shader prototypes
-#if LL_LINUX
+#if LL_LINUX || LL_SDL
 PFNGLVERTEXATTRIB1DARBPROC glVertexAttrib1dARB = NULL;
 PFNGLVERTEXATTRIB1DVARBPROC glVertexAttrib1dvARB = NULL;
 PFNGLVERTEXATTRIB1FARBPROC glVertexAttrib1fARB = NULL;
@@ -331,7 +337,7 @@ PFNGLVERTEXATTRIB4NUBARBPROC glVertexAttrib4nubARB = NULL;
 PFNGLVERTEXATTRIB4NUBVARBPROC glVertexAttrib4nubvARB = NULL;
 PFNGLVERTEXATTRIB4NUIVARBPROC glVertexAttrib4nuivARB = NULL;
 PFNGLVERTEXATTRIB4NUSVARBPROC glVertexAttrib4nusvARB = NULL;
-#if LL_LINUX
+#if LL_LINUX || LL_SDL
 PFNGLVERTEXATTRIB4BVARBPROC glVertexAttrib4bvARB = NULL;
 PFNGLVERTEXATTRIB4DARBPROC glVertexAttrib4dARB = NULL;
 PFNGLVERTEXATTRIB4DVARBPROC glVertexAttrib4dvARB = NULL;
@@ -374,7 +380,7 @@ PFNGLBINDATTRIBLOCATIONARBPROC glBindAttribLocationARB = NULL;
 PFNGLGETACTIVEATTRIBARBPROC glGetActiveAttribARB = NULL;
 PFNGLGETATTRIBLOCATIONARBPROC glGetAttribLocationARB = NULL;
 
-#if LL_WINDOWS
+#if LL_WINDOWS && !LL_SDL
 PFNWGLGETGPUIDSAMDPROC				wglGetGPUIDsAMD = NULL;
 PFNWGLGETGPUINFOAMDPROC				wglGetGPUInfoAMD = NULL;
 PFNWGLSWAPINTERVALEXTPROC			wglSwapIntervalEXT = NULL;
@@ -460,7 +466,7 @@ LLGLManager::LLGLManager() :
 //---------------------------------------------------------------------
 // Global initialization for GL
 //---------------------------------------------------------------------
-#if LL_WINDOWS && !LL_MESA_HEADLESS
+#if LL_WINDOWS && !LL_MESA_HEADLESS && !LL_SDL
 void LLGLManager::initWGL()
 {
 	mHasPBuffer = FALSE;
@@ -519,7 +525,7 @@ bool LLGLManager::initGL()
 
 	stop_glerror();
 
-#if LL_WINDOWS
+#if LL_WINDOWS && !LL_SDL
 	if (!glGetStringi)
 	{
 		glGetStringi = (PFNGLGETSTRINGIPROC) GLH_EXT_GET_PROC_ADDRESS("glGetStringi");
@@ -635,7 +641,7 @@ bool LLGLManager::initGL()
 		S32 old_vram = mVRAM;
 	mVRAM = 0;
 
-#if LL_WINDOWS
+#if LL_WINDOWS && !LL_SDL
 	if (mHasAMDAssociations)
 	{
 		GLuint gl_gpus_count = wglGetGPUIDsAMD(0, 0);
@@ -1065,6 +1071,44 @@ void LLGLManager::initExtensions()
 	mHasOcclusionQuery = FALSE;
 	mHasPointParameters = FALSE;
 	mHasTextureRectangle = FALSE;
+#elif LL_SDL
+	mHasMultitexture = SDL_GL_ExtensionSupported("GL_ARB_multitexture");
+	mHasATIMemInfo = SDL_GL_ExtensionSupported("GL_ATI_meminfo"); //Basic AMD method, also see mHasAMDAssociations
+	mHasNVXMemInfo = SDL_GL_ExtensionSupported("GL_NVX_gpu_memory_info");
+	mHasSeparateSpecularColor = SDL_GL_ExtensionSupported("GL_EXT_separate_specular_color");
+	mHasAnisotropic = SDL_GL_ExtensionSupported("GL_EXT_texture_filter_anisotropic");
+	mHasCubeMap = SDL_GL_ExtensionSupported("GL_ARB_texture_cube_map");
+	mHasARBEnvCombine = SDL_GL_ExtensionSupported("GL_ARB_texture_env_combine");
+	mHasCompressedTextures = SDL_GL_ExtensionSupported("GL_ARB_texture_compression");
+	mHasOcclusionQuery = SDL_GL_ExtensionSupported("GL_ARB_occlusion_query");
+	mHasTimerQuery = SDL_GL_ExtensionSupported("GL_ARB_timer_query");
+	mHasOcclusionQuery2 = SDL_GL_ExtensionSupported("GL_ARB_occlusion_query2");
+	mHasVertexBufferObject = SDL_GL_ExtensionSupported("GL_ARB_vertex_buffer_object");
+	mHasVertexArrayObject = SDL_GL_ExtensionSupported("GL_ARB_vertex_array_object");
+	mHasSync = SDL_GL_ExtensionSupported("GL_ARB_sync");
+	mHasMapBufferRange = SDL_GL_ExtensionSupported("GL_ARB_map_buffer_range");
+	mHasFlushBufferRange = SDL_GL_ExtensionSupported("GL_APPLE_flush_buffer_range");
+    // NOTE: Using extensions breaks reflections when Shadows are set to projector.  See: SL-16727
+    //mHasDepthClamp = SDL_GL_ExtensionSupported("GL_ARB_depth_clamp") || SDL_GL_ExtensionSupported("GL_NV_depth_clamp");
+    mHasDepthClamp = FALSE;
+	// mask out FBO support when packed_depth_stencil isn't there 'cause we need it for LLRenderTarget -Brad
+	mHasFramebufferObject = SDL_GL_ExtensionSupported("GL_ARB_framebuffer_object");
+	mHassRGBTexture = SDL_GL_ExtensionSupported("GL_EXT_texture_sRGB");
+	mHassRGBFramebuffer = SDL_GL_ExtensionSupported("GL_ARB_framebuffer_sRGB");
+    mHasTexturesRGBDecode = SDL_GL_ExtensionSupported("GL_EXT_texture_sRGB_decode");
+
+	mHasMipMapGeneration = mHasFramebufferObject || mGLVersion >= 1.4f;
+
+	mHasDrawBuffers = SDL_GL_ExtensionSupported("GL_ARB_draw_buffers");
+	mHasBlendFuncSeparate = SDL_GL_ExtensionSupported("GL_EXT_blend_func_separate");
+	mHasTextureRectangle = SDL_GL_ExtensionSupported("GL_ARB_texture_rectangle");
+	mHasTextureMultisample = SDL_GL_ExtensionSupported("GL_ARB_texture_multisample");
+	mHasDebugOutput = SDL_GL_ExtensionSupported("GL_ARB_debug_output");
+	mHasTransformFeedback = mGLVersion >= 4.f ? TRUE : FALSE;
+	mHasPointParameters = SDL_GL_ExtensionSupported("GL_ARB_point_parameters");
+	mHasTextureSwizzle = SDL_GL_ExtensionSupported("GL_ARB_texture_swizzle");
+    mHasGPUShader4 = SDL_GL_ExtensionSupported("GL_EXT_gpu_shader4");
+    mHasClipControl = SDL_GL_ExtensionSupported("GL_ARB_clip_control");
 #else // LL_MESA_HEADLESS //important, gGLHExts.mSysExts is uninitialized until after glh_init_extensions is called
 	mHasMultitexture = glh_init_extensions("GL_ARB_multitexture");
 	mHasATIMemInfo = ExtensionExists("GL_ATI_meminfo", gGLHExts.mSysExts); //Basic AMD method, also see mHasAMDAssociations
@@ -1350,8 +1394,9 @@ void LLGLManager::initExtensions()
 		glDebugMessageCallbackARB = (PFNGLDEBUGMESSAGECALLBACKARBPROC) GLH_EXT_GET_PROC_ADDRESS("glDebugMessageCallbackARB");
 		glGetDebugMessageLogARB = (PFNGLGETDEBUGMESSAGELOGARBPROC) GLH_EXT_GET_PROC_ADDRESS("glGetDebugMessageLogARB");
 	}
-#if (!LL_LINUX) || LL_LINUX_NV_GL_HEADERS
-	// This is expected to be a static symbol on Linux GL implementations, except if we use the nvidia headers - bah
+
+#if !LL_SDL && ((!LL_LINUX) || LL_LINUX_NV_GL_HEADERS)
+	// These are expected to be a static symbol on Linux GL implementations, except if we use the nvidia headers - bah
 	glDrawRangeElements = (PFNGLDRAWRANGEELEMENTSPROC)GLH_EXT_GET_PROC_ADDRESS("glDrawRangeElements");
 	if (!glDrawRangeElements)
 	{
@@ -1364,6 +1409,10 @@ void LLGLManager::initExtensions()
  	glActiveTextureARB = (PFNGLACTIVETEXTUREARBPROC)GLH_EXT_GET_PROC_ADDRESS("glActiveTextureARB");
  	glClientActiveTextureARB = (PFNGLCLIENTACTIVETEXTUREARBPROC)GLH_EXT_GET_PROC_ADDRESS("glClientActiveTextureARB");
 #endif // LL_LINUX_NV_GL_HEADERS
+
+#if !LL_SDL && LL_WINDOWS
+	glTexImage3D = (PFNGLTEXIMAGE3DPROC) GLH_EXT_GET_PROC_ADDRESS("glTexImage3D");
+#endif
 
 	if (mHasOcclusionQuery)
 	{
@@ -1390,9 +1439,6 @@ void LLGLManager::initExtensions()
 		glPointParameterfARB = (PFNGLPOINTPARAMETERFARBPROC)GLH_EXT_GET_PROC_ADDRESS("glPointParameterfARB");
 		glPointParameterfvARB = (PFNGLPOINTPARAMETERFVARBPROC)GLH_EXT_GET_PROC_ADDRESS("glPointParameterfvARB");
 	}
-
-	// Assume 1.2
-	glTexImage3D = (PFNGLTEXIMAGE3DPROC) GLH_EXT_GET_PROC_ADDRESS("glTexImage3D");
 
     // Assume shader capabilities
     glDeleteObjectARB         = (PFNGLDELETEOBJECTARBPROC) GLH_EXT_GET_PROC_ADDRESS("glDeleteObjectARB");

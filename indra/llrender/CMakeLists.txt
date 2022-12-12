@@ -4,6 +4,7 @@ project(llrender)
 
 include(00-Common)
 include(OpenGL)
+include(SDL2)
 include(FreeType)
 include(LLCommon)
 include(LLImage)
@@ -110,9 +111,7 @@ add_library (llrender ${llrender_SOURCE_FILES})
 set_target_properties(llrender PROPERTIES POSITION_INDEPENDENT_CODE TRUE)
 
 if (SDL_FOUND)
-  set_property(TARGET llrender
-    PROPERTY COMPILE_DEFINITIONS LL_SDL=1
-    )
+  target_compile_definitions(llrender PUBLIC LL_SDL=1)
 endif (SDL_FOUND)
 
 # Libraries on which this library depends, needed for Linux builds
