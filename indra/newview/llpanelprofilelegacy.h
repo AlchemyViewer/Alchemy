@@ -78,7 +78,6 @@ private:
 	void onBackBtnClick();
 	void onCommitModifyObjectsRights(LLUICtrl* ctrl);
 	void onCommitAction(const LLSD& userdata);
-	void copyData(const LLSD& userdata);
 	void onNameChanged();
 	bool isActionEnabled(const LLSD& userdata);
 	bool handleConfirmModifyRightsCallback(const LLSD& notification, const LLSD& response);

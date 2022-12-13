@@ -88,7 +88,6 @@ LLPanelProfileLegacy::LLPanelProfileLegacy()
 	mCommitCallbackRegistrar.add("Profile.CommitProperties", boost::bind(&LLPanelProfileLegacy::onCommitAvatarProperties, this));
 	mCommitCallbackRegistrar.add("Profile.CommitRights", boost::bind(&LLPanelProfileLegacy::onCommitRights, this));
 	mCommitCallbackRegistrar.add("Profile.CommitModifyObjectRights", boost::bind(&LLPanelProfileLegacy::onCommitModifyObjectsRights, this, _1));
-	mCommitCallbackRegistrar.add("Profile.CopyData", boost::bind(&LLPanelProfileLegacy::copyData, this, _2));
 	mCommitCallbackRegistrar.add("Profile.Action", boost::bind(&LLPanelProfileLegacy::onCommitAction, this, _2));
 	mEnableCallbackRegistrar.add("Profile.Enable", boost::bind(&LLPanelProfileLegacy::isActionEnabled, this, _2));
 }
@@ -564,21 +563,6 @@ void LLPanelProfileLegacy::onCommitAction(const LLSD& userdata)
 		LLFloaterReporter::showFromObject(getAvatarId());
 	else
 		LL_WARNS("LegacyProfiles") << "Unhandled action: " << action << LL_ENDL;
-}
-
-void LLPanelProfileLegacy::copyData(const LLSD& userdata)
-{
-#if WIP_COPY
-    const std::string& param = userdata.asString();
-	if (param == "copy_name")
-		LLAvatarActions::copyData(getAvatarId(), LLAvatarActions::E_DATA_NAME);
-	else if (param == "copy_slurl")
-		LLAvatarActions::copyData(getAvatarId(), LLAvatarActions::E_DATA_SLURL);
-	else if (param == "copy_key")
-		LLAvatarActions::copyData(getAvatarId(), LLAvatarActions::E_DATA_UUID);
-	else
-		LL_WARNS("LegacyProfiles") << "Unhandled action: " << param << LL_ENDL;
-#endif
 }
 
 bool LLPanelProfileLegacy::isActionEnabled(const LLSD& userdata)
