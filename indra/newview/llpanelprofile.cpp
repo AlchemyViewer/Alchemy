@@ -306,153 +306,6 @@ void put_avatar_properties_coro(std::string cap_url, LLUUID agent_id, LLSD data)
     LL_DEBUGS("AvatarProperties") << "Agent id: " << agent_id << " Data: " << data << " Result: " << httpResults << LL_ENDL;
 }
 
-LLUUID post_profile_image(std::string cap_url, const LLSD &first_data, std::string path_to_image, LLHandle<LLPanel> *handle)
-{
-    LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
-    LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t
-        httpAdapter(new LLCoreHttpUtil::HttpCoroutineAdapter("post_profile_image_coro", httpPolicy));
-    LLCore::HttpRequest::ptr_t httpRequest(new LLCore::HttpRequest);
-    LLCore::HttpHeaders::ptr_t httpHeaders;
-
-    LLCore::HttpOptions::ptr_t httpOpts(new LLCore::HttpOptions);
-    httpOpts->setFollowRedirects(true);
-    
-    LLSD result = httpAdapter->postAndSuspend(httpRequest, cap_url, first_data, httpOpts, httpHeaders);
-
-    LLSD httpResults = result[LLCoreHttpUtil::HttpCoroutineAdapter::HTTP_RESULTS];
-    LLCore::HttpStatus status = LLCoreHttpUtil::HttpCoroutineAdapter::getStatusFromLLSD(httpResults);
-
-    if (!status)
-    {
-        // todo: notification?
-        LL_WARNS("AvatarProperties") << "Failed to get uploader cap " << status.toString() << LL_ENDL;
-        return LLUUID::null;
-    }
-    if (!result.has("uploader"))
-    {
-        // todo: notification?
-        LL_WARNS("AvatarProperties") << "Failed to get uploader cap, response contains no data." << LL_ENDL;
-        return LLUUID::null;
-    }
-    std::string uploader_cap = result["uploader"].asString();
-    if (uploader_cap.empty())
-    {
-        LL_WARNS("AvatarProperties") << "Failed to get uploader cap, cap invalid." << LL_ENDL;
-        return LLUUID::null;
-    }
-
-    // Upload the image
-
-    LLCore::HttpRequest::ptr_t uploaderhttpRequest(new LLCore::HttpRequest);
-    LLCore::HttpHeaders::ptr_t uploaderhttpHeaders(new LLCore::HttpHeaders);
-    LLCore::HttpOptions::ptr_t uploaderhttpOpts(new LLCore::HttpOptions);
-    S64 length;
-
-    {
-        llifstream instream(path_to_image.c_str(), std::iostream::binary | std::iostream::ate);
-        if (!instream.is_open())
-        {
-            LL_WARNS("AvatarProperties") << "Failed to open file " << path_to_image << LL_ENDL;
-            return LLUUID::null;
-        }
-        length = instream.tellg();
-    }
-
-    uploaderhttpHeaders->append(HTTP_OUT_HEADER_CONTENT_TYPE, "application/jp2"); // optional
-    uploaderhttpHeaders->append(HTTP_OUT_HEADER_CONTENT_LENGTH, llformat("%d", length)); // required!
-    uploaderhttpOpts->setFollowRedirects(true);
-
-    result = httpAdapter->postFileAndSuspend(uploaderhttpRequest, uploader_cap, path_to_image, uploaderhttpOpts, uploaderhttpHeaders);
-
-    httpResults = result[LLCoreHttpUtil::HttpCoroutineAdapter::HTTP_RESULTS];
-    status = LLCoreHttpUtil::HttpCoroutineAdapter::getStatusFromLLSD(httpResults);
-
-    LL_WARNS("AvatarProperties") << result << LL_ENDL;
-
-    if (!status)
-    {
-        LL_WARNS("AvatarProperties") << "Failed to upload image " << status.toString() << LL_ENDL;
-        return LLUUID::null;
-    }
-
-    if (result["state"].asString() != "complete")
-    {
-        if (result.has("message"))
-        {
-            LL_WARNS("AvatarProperties") << "Failed to upload image, state " << result["state"] << " message: " << result["message"] << LL_ENDL;
-        }
-        else
-        {
-            LL_WARNS("AvatarProperties") << "Failed to upload image " << result << LL_ENDL;
-        }
-        return LLUUID::null;
-    }
-
-    return result["new_asset"].asUUID();
-}
-
-enum EProfileImageType
-{
-    PROFILE_IMAGE_SL,
-    PROFILE_IMAGE_FL,
-};
-
-void post_profile_image_coro(std::string cap_url, EProfileImageType type, std::string path_to_image, LLHandle<LLPanel> *handle)
-{
-    LLSD data;
-    switch (type)
-    {
-    case PROFILE_IMAGE_SL:
-        data["profile-image-asset"] = "sl_image_id";
-        break;
-    case PROFILE_IMAGE_FL:
-        data["profile-image-asset"] = "fl_image_id";
-        break;
-    }
-
-    LLUUID result = post_profile_image(cap_url, data, path_to_image, handle);
-
-    // reset loading indicator
-    if (!handle->isDead())
-    {
-        switch (type)
-        {
-        case PROFILE_IMAGE_SL:
-            {
-                LLPanelProfileSecondLife* panel = static_cast<LLPanelProfileSecondLife*>(handle->get());
-                if (result.notNull())
-                {
-                    panel->setProfileImageUploaded(result);
-                }
-                else
-                {
-                    // failure, just stop progress indicator
-                    panel->setProfileImageUploading(false);
-                }
-                break;
-            }
-        case PROFILE_IMAGE_FL:
-            {
-                LLPanelProfileFirstLife* panel = static_cast<LLPanelProfileFirstLife*>(handle->get());
-                if (result.notNull())
-                {
-                    panel->setProfileImageUploaded(result);
-                }
-                else
-                {
-                    // failure, just stop progress indicator
-                    panel->setProfileImageUploading(false);
-                }
-                break;
-            }
-        }
-    }
-
-    // Cleanup
-    LLFile::remove(path_to_image);
-    delete handle;
-}
-
 //////////////////////////////////////////////////////////////////////////
 // LLProfileHandler
 
@@ -1289,94 +1142,12 @@ void LLPanelProfileSecondLife::setLoaded()
     }
 }
 
-
-
-class LLProfileImagePicker : public LLFilePickerThread
-{
-public:
-    LLProfileImagePicker(EProfileImageType type, LLHandle<LLPanel> *handle);
-    ~LLProfileImagePicker();
-    void notify(const std::vector<std::string>& filenames) override;
-
-private:
-    LLHandle<LLPanel> *mHandle;
-    EProfileImageType mType;
-};
-
-LLProfileImagePicker::LLProfileImagePicker(EProfileImageType type, LLHandle<LLPanel> *handle)
-    : LLFilePickerThread(LLFilePicker::FFLOAD_IMAGE),
-    mHandle(handle),
-    mType(type)
-{
-}
-
-LLProfileImagePicker::~LLProfileImagePicker()
-{
-    delete mHandle;
-}
-
-void LLProfileImagePicker::notify(const std::vector<std::string>& filenames)
-{
-    if (mHandle->isDead())
-    {
-        return;
-    }
-    if (filenames.empty())
-    {
-        return;
-    }
-    std::string file_path = filenames[0];
-    if (file_path.empty())
-    {
-        return;
-    }
-
-    // generate a temp texture file for coroutine
-    std::string temp_file = gDirUtilp->getTempFilename();
-    U32 codec = LLImageBase::getCodecFromExtension(gDirUtilp->getExtension(file_path));
-    const S32 MAX_DIM = 256;
-    if (!LLViewerTextureList::createUploadFile(file_path, temp_file, codec, MAX_DIM))
-    {
-        //todo: image not supported notification
-        LL_WARNS("AvatarProperties") << "Failed to upload profile image of type " << (S32)PROFILE_IMAGE_SL << ", failed to open image" << LL_ENDL;
-        return;
-    }
-
-    std::string cap_url = gAgent.getRegionCapability(PROFILE_IMAGE_UPLOAD_CAP);
-    if (cap_url.empty())
-    {
-        LL_WARNS("AvatarProperties") << "Failed to upload profile image of type " << (S32)PROFILE_IMAGE_SL << ", no cap found" << LL_ENDL;
-        return;
-    }
-
-    switch (mType)
-    {
-    case PROFILE_IMAGE_SL:
-        {
-            LLPanelProfileSecondLife* panel = static_cast<LLPanelProfileSecondLife*>(mHandle->get());
-            panel->setProfileImageUploading(true);
-        }
-        break;
-    case PROFILE_IMAGE_FL:
-        {
-            LLPanelProfileFirstLife* panel = static_cast<LLPanelProfileFirstLife*>(mHandle->get());
-            panel->setProfileImageUploading(true);
-        }
-        break;
-    }
-
-    LLCoros::instance().launch("postAgentUserImageCoro",
-        boost::bind(post_profile_image_coro, cap_url, mType, temp_file, mHandle));
-
-    mHandle = nullptr; // transferred to post_profile_image_coro
-}
-
 void LLPanelProfileSecondLife::onCommitMenu(const LLSD& userdata)
 {
     const std::string item_name = userdata.asString();
     const LLUUID agent_id = getAvatarId();
     // todo: consider moving this into LLAvatarActions::onCommit(name, id)
-    // and making all other flaoters, like people menu do the same
+    // and making all other floaters, like people menu, do the same
     if (item_name == "im")
     {
         LLAvatarActions::startIM(agent_id);
@@ -1469,7 +1240,8 @@ void LLPanelProfileSecondLife::onCommitMenu(const LLSD& userdata)
     }
     else if (item_name == "upload_photo")
     {
-        (new LLProfileImagePicker(PROFILE_IMAGE_SL, new LLHandle<LLPanel>(getHandle())))->getFile();
+        (new LLProfileImagePicker(PROFILE_IMAGE_SL, new LLHandle<LLPanel>(getHandle()),
+                                  [this] (LLUUID const& id) { setProfileImageUploaded(id); }))->getFile();
 
         LLFloater* floaterp = mFloaterTexturePickerHandle.get();
         if (floaterp)
@@ -2053,7 +1825,8 @@ void LLPanelProfileFirstLife::commitUnsavedChanges()
 
 void LLPanelProfileFirstLife::onUploadPhoto()
 {
-    (new LLProfileImagePicker(PROFILE_IMAGE_FL, new LLHandle<LLPanel>(getHandle())))->getFile();
+    (new LLProfileImagePicker(PROFILE_IMAGE_FL, new LLHandle<LLPanel>(getHandle()),
+                              [this](LLUUID const& id) { setProfileImageUploaded(id); }))->getFile();
 
     LLFloater* floaterp = mFloaterTexturePickerHandle.get();
     if (floaterp)

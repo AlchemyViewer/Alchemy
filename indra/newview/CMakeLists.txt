@@ -611,6 +611,7 @@ set(viewer_SOURCE_FILES
     llpreviewtexture.cpp
     llproductinforequest.cpp
     llprogressview.cpp
+    llprofileimagepicker.cpp
     llrecentpeople.cpp
     llregioninfomodel.cpp
     llregionposition.cpp
@@ -1304,6 +1305,7 @@ set(viewer_HEADER_FILES
     llpreviewsound.h
     llpreviewtexture.h
     llproductinforequest.h
+    llprofileimagepicker.h
     llprogressview.h
     llrecentpeople.h
     llregioninfomodel.h
