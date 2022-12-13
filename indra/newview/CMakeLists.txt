@@ -152,6 +152,7 @@ set(viewer_SOURCE_FILES
     llagentbenefits.cpp
     llagentcamera.cpp
     llagentdata.cpp
+    llagenthandler.cpp
     llagentlanguage.cpp
     llagentlistener.cpp
     llagentpicksinfo.cpp
@@ -185,9 +186,11 @@ set(viewer_SOURCE_FILES
     llchathistory.cpp
     llchatitemscontainerctrl.cpp
     llchatmsgbox.cpp
+    llcheatcodes.cpp
     llchiclet.cpp
     llchicletbar.cpp
     llclassifiedinfo.cpp
+    llclassifieditem.cpp
     llcofwearables.cpp
     llcolorswatch.cpp
     llcommanddispatcherlistener.cpp
@@ -348,6 +351,7 @@ set(viewer_SOURCE_FILES
     llfloaterprofiletexture.cpp
     llfloaterprogressview.cpp
     llfloaterproperties.cpp
+    llfloaterpublishclassified.cpp
     llfloaterregiondebugconsole.cpp
     llfloaterregioninfo.cpp
     llfloaterreporter.cpp
@@ -538,6 +542,7 @@ set(viewer_SOURCE_FILES
     llpanelpeople.cpp
     llpanelpeoplemenus.cpp
     llpanelpermissions.cpp
+    llpanelpick.cpp
     llpanelplaceinfo.cpp
     llpanelplaceprofile.cpp
     llpanelplaces.cpp
@@ -589,6 +594,7 @@ set(viewer_SOURCE_FILES
     llpersistentnotificationstorage.cpp
     llphysicsmotion.cpp
     llphysicsshapebuilderutil.cpp
+    llpickitem.cpp
     llpipelinelistener.cpp
     llplacesinventorybridge.cpp
     llplacesinventorypanel.cpp
@@ -605,6 +611,7 @@ set(viewer_SOURCE_FILES
     llpreviewtexture.cpp
     llproductinforequest.cpp
     llprogressview.cpp
+    llprofileimagepicker.cpp
     llrecentpeople.cpp
     llregioninfomodel.cpp
     llregionposition.cpp
@@ -890,6 +897,7 @@ set(viewer_HEADER_FILES
     llchiclet.h
     llchicletbar.h
     llclassifiedinfo.h
+    llclassifieditem.h
     llcofwearables.h
     llcolorswatch.h
     llcommanddispatcherlistener.h
@@ -1053,6 +1061,7 @@ set(viewer_HEADER_FILES
     llfloaterprofiletexture.h
     llfloaterprogressview.h
     llfloaterproperties.h
+    llfloaterpublishclassified.h
     llfloaterregiondebugconsole.h
     llfloaterregioninfo.h
     llfloaterreporter.h
@@ -1233,6 +1242,7 @@ set(viewer_HEADER_FILES
     llpanelpeople.h
     llpanelpeoplemenus.h
     llpanelpermissions.h
+    llpanelpick.h
     llpanelplaceinfo.h
     llpanelplaceprofile.h
     llpanelplaces.h
@@ -1279,6 +1289,7 @@ set(viewer_HEADER_FILES
     llpersistentnotificationstorage.h
     llphysicsmotion.h
     llphysicsshapebuilderutil.h
+    llpickitem.h
     llpipelinelistener.h
     llplacesinventorybridge.h
     llplacesinventorypanel.h
@@ -1294,6 +1305,7 @@ set(viewer_HEADER_FILES
     llpreviewsound.h
     llpreviewtexture.h
     llproductinforequest.h
+    llprofileimagepicker.h
     llprogressview.h
     llrecentpeople.h
     llregioninfomodel.h

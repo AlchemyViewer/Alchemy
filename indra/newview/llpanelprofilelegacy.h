@@ -33,11 +33,9 @@
 
 #include "llgroupmgr.h"
 #include "llpanelavatarlegacy.h"
-#if WIP_PROFILES
-#include "llclassifieditem.h"
-#endif
 
 class LLAvatarName;
+class LLClassifiedItem;
 class LLFlatListView;
 class LLPanel;
 class LLPanelPickEdit;
@@ -56,7 +54,8 @@ public:
 	BOOL postBuild() override;
 	void onOpen(const LLSD& key) override;
 	void reshape(S32 width, S32 height, BOOL called_from_parent = TRUE) override;
-	
+    void showAccordion(std::string_view name, bool show);
+
 protected:
 	void openPanel(LLPanel* panel, const LLSD& params);
 	void closePanel(LLPanel* panel);
@@ -66,8 +65,10 @@ private:
 	void updateData() override;
 	void processProperties(void* data, EAvatarProcessorType type) override;
 	void resetControls() override;
+    void resetInterestsControlValues();
 	void setProgress(bool started);
-	void showAccordion(const std::string& name, bool show);
+    void requestAvatarProfileCoro(std::string url);
+    void sendAvatarProfileCoro(std::string url, LLSD payload);
 	void onAvatarNameCache(const LLUUID& agent_id, const LLAvatarName& av_name);
 	void onCommitAvatarProperties();
 	void onCommitInterest();
@@ -77,7 +78,6 @@ private:
 	void onBackBtnClick();
 	void onCommitModifyObjectsRights(LLUICtrl* ctrl);
 	void onCommitAction(const LLSD& userdata);
-	void copyData(const LLSD& userdata);
 	void onNameChanged();
 	bool isActionEnabled(const LLSD& userdata);
 	bool handleConfirmModifyRightsCallback(const LLSD& notification, const LLSD& response);
@@ -111,7 +111,6 @@ private:
 	ChildStack		mChildStack;
 	
 public:
-#if WIP_PROFILES
 	class LLPanelProfilePicks final : public LLPanelProfileLegacyTab
 	{
 		friend class LLPanelProfileLegacy;
@@ -169,15 +168,15 @@ public:
 		LLFlatListView* mPicksList;
 		LLPanelPickEdit* mPanelPickEdit;
 		LLPanelPickInfo* mPanelPickInfo;
+		LLPanelClassifiedEdit* mPanelClassifiedEdit;
 		LLPanelClassifiedInfo* mPanelClassifiedInfo;
 		LLHandle<LLView> mPopupMenuHandle;
 		LLHandle<LLToggleableMenu> mPlusMenuHandle;
 
 		// This map is needed for newly created classifieds. The purpose of panel is to
 		// sit in this map and listen to LLPanelClassifiedEdit::processProperties callback.
-		panel_classified_edit_map_t mEditClassifiedPanels;
+        std::map<LLUUID, LLPanelClassifiedEdit*> mEditClassifiedPanels;
 	};
-#endif
 	
 	class LLPanelProfileGroups final : public LLPanelProfileLegacyTab
 	{
@@ -198,36 +197,34 @@ public:
 		LLTextBase* mGroupsText;
 		LLFlatListView* mGroupsList;
 	};
+
+	class LLProfileGroupItem final : public LLPanel, public LLGroupMgrObserver
+    {
+      public:
+        LLProfileGroupItem();
+        ~LLProfileGroupItem() override;
+        static LLProfileGroupItem* create();
+        void                       init(const LLAvatarGroups::LLGroupData& data);
+        BOOL                       postBuild() override;
+
+        void setValue(const LLSD& value) override;
+        void setId(const LLUUID& id);
+        void setInsignia(const LLUUID& id);
+        void setGroupName(const std::string& name);
+        void setCharter(const std::string& charter);
+
+      protected:
+        void changed(LLGroupChange gc) override;
+
+      private:
+        LLUUID      mInsignia;
+        std::string mGroupName;
+        std::string mCharter;
+    };
 	
 private:
-#if WIP_PROFILES
 	LLPanelProfilePicks* mPanelPicks;
-#endif
 	LLPanelProfileGroups* mPanelGroups;
-};
-
-class LLProfileGroupItem final : public LLPanel, public LLGroupMgrObserver
-{
-public:
-	LLProfileGroupItem();
-	~LLProfileGroupItem() override;
-	static LLProfileGroupItem* create();
-	void init(const LLAvatarGroups::LLGroupData& data);
-	BOOL postBuild() override;
-	
-	void setValue(const LLSD& value) override;
-	void setId(const LLUUID& id);
-	void setInsignia(const LLUUID& id);
-	void setGroupName(const std::string& name);
-	void setCharter(const std::string& charter);
-
-protected:
-	void changed(LLGroupChange gc) override;
-
-private:
-	LLUUID	mInsignia;
-	std::string mGroupName;
-	std::string mCharter;	
 };
 
 #endif //LL_PANELPROFILELEGACY_H

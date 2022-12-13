@@ -34,6 +34,7 @@
 #include "llfloater.h"
 
 class LLAvatarName;
+class LLPanelProfileLegacy;
 
 class LLFloaterProfileLegacy final : public LLFloater
 {
@@ -41,11 +42,13 @@ public:
 	LLFloaterProfileLegacy(LLSD const& key);
 	BOOL postBuild() override;
 	void onOpen(const LLSD& key) override;
+    void openTab(std::string_view tab_name) const;
 
 private:
 	~LLFloaterProfileLegacy() override;
 	void onAvatarNameCache(const LLUUID& agent_id, const LLAvatarName& av_name);
 
+	LLPanelProfileLegacy* mPanel;
 	boost::signals2::connection mAvatarNameCacheConnection;
 };
 

@@ -48,7 +48,7 @@
        type="string"
        height="16"
        length="1"
-       left_pad="4"
+       left="129"
        name="rezday_label"
        top_delta="0">
         Born:
@@ -72,11 +72,44 @@
        type="string"
        height="16"
        length="1"
-       right="-1"
+       right="-15"
        name="online"
        top_delta="0" >
         Online
       </text>
+      <icon
+       follows="right|top"
+       height="14"
+       visible="false"
+       image_name="AccountLevel_Internal"
+       layout="topleft"
+       right="-1"
+       top_delta="0"
+       mouse_opaque="false"
+       name="account_type_internal"
+       width="14" />
+      <icon
+       follows="right|top"
+       height="14"
+       visible="false"
+       image_name="AccountLevel_Premium"
+       layout="topleft"
+       right="-1"
+       top_delta="0"
+       mouse_opaque="false"
+       name="account_type_premium"
+       width="14" />
+      <icon
+       follows="right|top"
+       height="14"
+       visible="false"
+       image_name="AccountLevel_Plus"
+       layout="topleft"
+       right="-1"
+       top_delta="0"
+       mouse_opaque="false"
+       name="account_type_plus"
+       width="14" />
       <text
        font="SansSerifSmall"
        text_color="White_50"
@@ -87,7 +120,7 @@
        type="string"
        height="16"
        length="1"
-       left_delta="-117"
+       left="129"
        name="rezday"
        top_pad="0" >
         (Unknown)

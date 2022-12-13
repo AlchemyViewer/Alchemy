@@ -20,6 +20,9 @@ include(CheckCXXCompilerFlag)
 include(Variables)
 include(SDL2)
 
+set(Python3_FIND_VIRTUALENV FIRST)
+find_package(Python3 COMPONENTS Interpreter)
+
 # Portable compilation flags.
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DADDRESS_SIZE=${ADDRESS_SIZE}")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DADDRESS_SIZE=${ADDRESS_SIZE}")

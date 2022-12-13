@@ -1,8 +1,8 @@
-/*
- * @file llfloaterprofilelegacy.cpp
- * @brief Floater that holds panel don't bitch about it, Dog; Merging is easy.
+/**
+ * @file llcheatcodes.cpp
+ * @brief Cheatcode slurls for virtual worlds.
  *
- * Copyright (c) 2017-2022, Cinder Roxley <cinder@sdf.org>
+ * Copyright (c) 2015-2022, Cinder Roxley <cinder@sdf.org>
  *
  * Permission is hereby granted, free of charge, to any person or organization
  * obtaining a copy of the software and accompanying documentation covered by
@@ -29,48 +29,50 @@
  */
 
 #include "llviewerprecompiledheaders.h"
-#include "llfloaterprofilelegacy.h"
+#include "llcommandhandler.h"
 
-#include "llavatarname.h"
-#include "llavatarnamecache.h"
-#include "llpanelprofilelegacy.h"
+#include "llchat.h"
+#include "llfloaterimnearbychat.h"
+#include "llfloaterreg.h"
+#include "llstatusbar.h"
+#include "lltrans.h"
+#include "llviewermenu.h"
 
-LLFloaterProfileLegacy::LLFloaterProfileLegacy(LLSD const& key)
-:	LLFloater(key)
+class LLXyzzyHandler : public LLCommandHandler
 {
+public:
+	LLXyzzyHandler() : LLCommandHandler("xyzzy", UNTRUSTED_THROTTLE) {}
+	
+	bool handle(const LLSD& params, const LLSD& query_map, LLMediaCtrl* web) override
+	{
+		LLFloaterIMNearbyChat* nearby_chat = LLFloaterReg::findTypedInstance<LLFloaterIMNearbyChat>("nearby_chat");
+		if (nearby_chat)
+		{
+			LLChat chat(LLTrans::getString("NothingHappens"));
+			chat.mSourceType = CHAT_SOURCE_SYSTEM;
+			nearby_chat->addMessage(chat);
+		}
+		return true;
+	}
+};
 
-}
-
-LLFloaterProfileLegacy::~LLFloaterProfileLegacy()
+class LLDyeMenuHandler : public LLCommandHandler
 {
-	if (mAvatarNameCacheConnection.connected())
-		mAvatarNameCacheConnection.disconnect();
-}
+public:
+	LLDyeMenuHandler() : LLCommandHandler("dyemenu", UNTRUSTED_THROTTLE) {}
+	
+	bool handle(const LLSD& params, const LLSD& query_map, LLMediaCtrl* web) override
+	{
+		if (params.size() != 1)
+			return false;
+		
+		LLColor4 color = LLUIColorTable::instance().getColor(params[0].asString(),
+															 gMenuBarView->getBackgroundColor().get());
+		gMenuBarView->setBackgroundColor(color);
+		gStatusBar->setBackgroundColor(color);
+		return true;
+	}
+};
 
-BOOL LLFloaterProfileLegacy::postBuild()
-{
-    mPanel = dynamic_cast<LLPanelProfileLegacy*>(getChild<LLPanel>("panel_profile_legacy_sidetray"));
-	return TRUE;
-}
-
-void LLFloaterProfileLegacy::onOpen(const LLSD& key)
-{
-	if (!key.has("avatar_id")) return;
-	const LLUUID av_id = key["avatar_id"].asUUID();
-
-	mAvatarNameCacheConnection = LLAvatarNameCache::get(av_id,
-		boost::bind(&LLFloaterProfileLegacy::onAvatarNameCache, this, _1, _2));
-
-	if (mPanel) { mPanel->onOpen(key); }
-}
-
-void LLFloaterProfileLegacy::onAvatarNameCache(const LLUUID& agent_id, const LLAvatarName& av_name)
-{
-	setTitle(av_name.getCompleteName());
-	mAvatarNameCacheConnection.disconnect();
-}
-
-void LLFloaterProfileLegacy::openTab(std::string_view tab_name) const
-{
-    if (mPanel) { mPanel->showAccordion(tab_name, true); }
-}
+LLXyzzyHandler gXyzzyHandler;
+LLDyeMenuHandler gDyeMenuHandler;

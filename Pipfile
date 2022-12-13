@@ -8,7 +8,7 @@ name = "pypi"
 [packages]
 llbase = "*"
 certifi = "*"
-autobuild = {git = "https://git.alchemyviewer.org/alchemy/autobuild.git", editable = true, ref = "py3"}
+autobuild = "*"
 
 [requires]
 python_version = "3.4"

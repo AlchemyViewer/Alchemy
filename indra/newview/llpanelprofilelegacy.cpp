@@ -52,21 +52,23 @@
 #include "llagentpicksinfo.h"
 #include "llavataractions.h"
 #include "llcallingcard.h" // for LLAvatarTracker
+#include "llclassifieditem.h"
 #include "lldateutil.h"
 #include "lldroptarget.h"
 #include "llfloaterreporter.h"
 #include "llfloaterworldmap.h"
 #include "llgroupactions.h"
 #include "llpanelclassified.h"
-#if WIP_PROFILES
-#include "llpanelpicks.h"
+#include "llpanelpick.h"
 #include "llpickitem.h"
-#endif
 #include "llmutelist.h"
 #include "llsidetraypanelcontainer.h"
 #include "llslurl.h"
 #include "llviewerdisplayname.h"
 #include "llviewermenu.h" // gMenuHolder
+
+static constexpr std::string_view AGENT_PROFILE_CAP("AgentProfile");
+static constexpr std::string_view UPLOAD_AGENT_PROFILE_CAP("UploadAgentProfileImage");
 
 // These are order-senstitive so don't fk with 'em!
 static const std::array<std::string, 8> sWantCheckboxes{{"wanna_build", "wanna_explore", "wanna_yiff", "wanna_work", "wanna_group", "wanna_buy", "wanna_sell", "wanna_hire"}};
@@ -74,15 +76,11 @@ static const std::array<std::string, 6> sSkillsCheckboxes{{"can_texture", "can_a
 
 static LLPanelInjector<LLPanelProfileLegacy> t_panel_lprofile("panel_profile_legacy_sidetray");
 static LLPanelInjector<LLPanelProfileLegacy::LLPanelProfileGroups> t_panel_group("panel_profile_legacy_groups");
-#if WIP_PROFILES
 static LLPanelInjector<LLPanelProfileLegacy::LLPanelProfilePicks> t_panel_picks("panel_profile_legacy_picks");
-#endif
 
 LLPanelProfileLegacy::LLPanelProfileLegacy()
 :	LLPanelProfileLegacyTab()
-#if WIP_PROFILES
 ,	mPanelPicks(nullptr)
-#endif
 ,	mPanelGroups(nullptr)
 {
 	mChildStack.setParent(this);
@@ -90,7 +88,6 @@ LLPanelProfileLegacy::LLPanelProfileLegacy()
 	mCommitCallbackRegistrar.add("Profile.CommitProperties", boost::bind(&LLPanelProfileLegacy::onCommitAvatarProperties, this));
 	mCommitCallbackRegistrar.add("Profile.CommitRights", boost::bind(&LLPanelProfileLegacy::onCommitRights, this));
 	mCommitCallbackRegistrar.add("Profile.CommitModifyObjectRights", boost::bind(&LLPanelProfileLegacy::onCommitModifyObjectsRights, this, _1));
-	mCommitCallbackRegistrar.add("Profile.CopyData", boost::bind(&LLPanelProfileLegacy::copyData, this, _2));
 	mCommitCallbackRegistrar.add("Profile.Action", boost::bind(&LLPanelProfileLegacy::onCommitAction, this, _2));
 	mEnableCallbackRegistrar.add("Profile.Enable", boost::bind(&LLPanelProfileLegacy::isActionEnabled, this, _2));
 }
@@ -109,10 +106,8 @@ LLPanelProfileLegacy::~LLPanelProfileLegacy()
 BOOL LLPanelProfileLegacy::postBuild()
 {
 	mPanelGroups = static_cast<LLPanelProfileGroups*>(getChild<LLUICtrl>("groups_tab_panel"));
-#if WIP_PROFILES
 	mPanelPicks = static_cast<LLPanelProfilePicks*>(getChild<LLUICtrl>("picks_tab_panel"));
 	mPanelPicks->setProfilePanel(this);
-#endif
 	
 	if (dynamic_cast<LLSideTrayPanelContainer*>(getParent()) != nullptr)
 		getChild<LLUICtrl>("back")->setCommitCallback(boost::bind(&LLPanelProfileLegacy::onBackBtnClick, this));
@@ -158,9 +153,7 @@ void LLPanelProfileLegacy::onOpen(const LLSD& key)
 	setAvatarId(av_id);
 	
 	mPanelGroups->onOpen(LLSD(av_id));
-#if WIP_PROFILES
 	mPanelPicks->onOpen(LLSD(av_id));
-#endif
 	// Oh joy!
 	bool is_self = (getAvatarId() == gAgentID);
 	getChild<LLView>("sl_profile_pic")->setEnabled(is_self);
@@ -180,7 +173,8 @@ void LLPanelProfileLegacy::onOpen(const LLSD& key)
 	childSetEnabled("drop_target", !is_self);
 	getChild<LLLayoutPanel>("avatar_in_search", is_self);
 	getChild<LLDropTarget>("drop_target")->setAgentID(av_id);
-	
+    resetInterestsControlValues();
+
 	updateData();
 	resetControls();
 	
@@ -202,13 +196,41 @@ void LLPanelProfileLegacy::resetControls()
 										: "MuteAvatar"));
 }
 
+void LLPanelProfileLegacy::resetInterestsControlValues()
+{
+    for (U32 i = 0; i < sWantCheckboxes.size(); ++i)
+    {
+        getChild<LLCheckBoxCtrl>(sWantCheckboxes.at(i))->setValue(FALSE);
+    }
+
+    for (U32 i = 0; i < sSkillsCheckboxes.size(); ++i)
+    {
+        getChild<LLCheckBoxCtrl>(sSkillsCheckboxes.at(i))->setValue(FALSE);
+    }
+    getChild<LLLineEditor>("wanna_something")->setText(LLStringUtil::null);
+    getChild<LLLineEditor>("can_something")->setText(LLStringUtil::null);
+    getChild<LLLineEditor>("languages")->setText(LLStringUtil::null);
+}
+
 void LLPanelProfileLegacy::updateData()
 {
-	setProgress(true);
-	LLAvatarPropertiesProcessor::getInstance()->sendAvatarPropertiesRequest(getAvatarId());
-	LLAvatarPropertiesProcessor::getInstance()->sendAvatarNotesRequest(getAvatarId());
-	mAvatarNameCacheConnection = LLAvatarNameCache::get(getAvatarId(),
-														boost::bind(&LLPanelProfileLegacy::onAvatarNameCache, this, _1, _2));
+    setProgress(true);
+
+    const std::string cap = gAgent.getRegionCapability(AGENT_PROFILE_CAP);
+    if (!cap.empty())
+    {
+        LLCoros::instance().launch("requestAvatarProfileCoro",
+                                   boost::bind(&LLPanelProfileLegacy::requestAvatarProfileCoro, this, cap));
+    }
+    else
+    {
+        LLAvatarPropertiesProcessor::getInstance()->sendAvatarPropertiesRequest(getAvatarId());
+        LLAvatarPropertiesProcessor::getInstance()->sendAvatarNotesRequest(getAvatarId());
+    }
+
+	mAvatarNameCacheConnection = LLAvatarNameCache::get(getAvatarId(), 
+		boost::bind(&LLPanelProfileLegacy::onAvatarNameCache, this, _1, _2));
+
 	const LLRelationship* relation = LLAvatarTracker::instance().getBuddyInfo(getAvatarId());
 	bool is_other = (relation && getAvatarId() != gAgentID);
 	getChild<LLLayoutPanel>("avatar_perm")->setVisible(is_other);
@@ -224,6 +246,177 @@ void LLPanelProfileLegacy::updateData()
 void LLPanelProfileLegacy::onAvatarNameCache(const LLUUID& agent_id, const LLAvatarName& av_name)
 {
 	getChild<LLTextEditor>("avatar_name")->setText(av_name.getCompleteName());
+}
+
+void LLPanelProfileLegacy::requestAvatarProfileCoro(std::string url)
+{
+    LLCore::HttpRequest::policy_t  httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
+    LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t httpAdapter(
+        new LLCoreHttpUtil::HttpCoroutineAdapter("request_avatar_profile_coro", httpPolicy));
+    LLCore::HttpRequest::ptr_t httpRequest(new LLCore::HttpRequest);
+    LLCore::HttpHeaders::ptr_t httpHeaders;
+
+    LLCore::HttpOptions::ptr_t httpOpts(new LLCore::HttpOptions);
+    httpOpts->setFollowRedirects(true);
+
+    std::string finalUrl = url + "/" + getAvatarId().asString();
+
+    LLSD result = httpAdapter->getAndSuspend(httpRequest, finalUrl, httpOpts, httpHeaders);
+
+    LLSD httpResults = result[LLCoreHttpUtil::HttpCoroutineAdapter::HTTP_RESULTS];
+    LLCore::HttpStatus status      = LLCoreHttpUtil::HttpCoroutineAdapter::getStatusFromLLSD(httpResults);
+
+    if (!status || !result.has("id") || getAvatarId() != result["id"].asUUID())
+    {
+        LL_WARNS("LegacyProfiles") << "Failed to get agent information for " << getAvatarId() << LL_ENDL;
+        return;
+    }
+
+	// AgentProfile dumps all results into a big ol' map. Let's build some structs and make a bunch of calls
+	// to processProperties()
+    LLAvatarData avatar_data;
+
+    avatar_data.agent_id      = gAgent.getID();
+    avatar_data.avatar_id     = getAvatarId();
+    avatar_data.image_id      = result["sl_image_id"].asUUID();
+    avatar_data.fl_image_id   = result["fl_image_id"].asUUID();
+    avatar_data.partner_id    = result["partner_id"].asUUID();
+    avatar_data.about_text    = result["sl_about_text"].asString();
+    avatar_data.fl_about_text = result["fl_about_text"].asString();
+    avatar_data.born_on       = result["member_since"].asDate();
+    avatar_data.profile_url   = result.has("home_page")
+        ? result["home_page"].asString() : getProfileURL(getAvatarId().asString());
+
+    avatar_data.flags = 0;
+    if (result["online"].asBoolean())
+    {
+        avatar_data.flags |= AVATAR_ONLINE;
+    }
+    if (result["allow_publish"].asBoolean())
+    {
+        avatar_data.flags |= AVATAR_ALLOW_PUBLISH;
+    }
+    if (result["identified"].asBoolean())
+    {
+        avatar_data.flags |= AVATAR_IDENTIFIED;
+    }
+    if (result["transacted"].asBoolean())
+    {
+        avatar_data.flags |= AVATAR_TRANSACTED;
+    }
+
+    avatar_data.caption_index = 0;
+    if (result.has("charter_member"))  // won't be present if "caption" is set
+    {
+        avatar_data.caption_index = result["charter_member"].asInteger();
+    }
+    else if (result.has("caption"))
+    {
+        avatar_data.caption_text = result["caption"].asString();
+    }
+    processProperties(&avatar_data, APT_PROPERTIES);
+
+    LLSD groups_array = result["groups"];
+    LLAvatarGroups avatar_groups;
+    avatar_groups.agent_id  = gAgent.getID();
+    avatar_groups.avatar_id = getAvatarId();
+
+    for (LLSD::array_const_iterator it = groups_array.beginArray(); 
+		it != groups_array.endArray(); ++it)
+    {
+        const LLSD& group_info = *it;
+        LLAvatarGroups::LLGroupData group_data;
+        group_data.group_powers      = 0;
+        group_data.group_title       = group_info["name"].asString();
+        group_data.group_id          = group_info["id"].asUUID();
+        group_data.group_name        = group_info["name"].asString();
+        group_data.group_insignia_id = group_info["image_id"].asUUID();
+
+        avatar_groups.group_list.push_back(group_data);
+    }
+    mPanelGroups->processProperties(&avatar_groups, APT_GROUPS);
+    processProperties(&avatar_groups, APT_GROUPS);
+
+    LLAvatarNotes avatar_notes;
+    avatar_notes.agent_id = gAgent.getID();
+    avatar_notes.target_id = getAvatarId();
+    avatar_notes.notes     = result["notes"].asString();
+
+	processProperties(&avatar_notes, APT_NOTES);
+
+	LLSD picks_array = result["picks"];
+    LLAvatarPicks avatar_picks;
+    avatar_picks.agent_id = gAgent.getID();
+    avatar_picks.target_id = getAvatarId();
+    for (LLSD::array_const_iterator it = picks_array.beginArray();
+		it != picks_array.endArray(); ++it)
+    {
+        const LLSD& pick_data = *it;
+        avatar_picks.picks_list.emplace_back(pick_data["id"].asUUID(), pick_data["name"].asString());
+    }
+
+	processProperties(&avatar_picks, APT_PICKS);
+
+	// bonus time...
+    if (result.has("customer_type"))
+    {
+        LLUICtrl* internal_icon = getChild<LLUICtrl>("account_type_internal");
+        LLUICtrl* premium_icon = getChild<LLUICtrl>("account_type_premium");
+        LLUICtrl* plus_icon = getChild<LLUICtrl>("account_type_plus");
+        std::string_view type = result["customer_type"].asStringRef();
+
+        if (type == "Internal")
+        {
+            internal_icon->setVisible(true);
+            premium_icon->setVisible(false);
+            plus_icon->setVisible(false);
+        }
+        else if (type == "Monthly" || type == "Quarterly" || type == "Annual")
+        {
+            internal_icon->setVisible(false);
+            premium_icon->setVisible(true);
+            plus_icon->setVisible(false);
+        }
+        else if (type.substr(0, 12) == "Premium_Plus")
+        {
+            internal_icon->setVisible(false);
+            premium_icon->setVisible(false);
+            plus_icon->setVisible(true);
+        }
+        else /* if (type == "Base") */
+        {
+            internal_icon->setVisible(false);
+            premium_icon->setVisible(false);
+            plus_icon->setVisible(false);
+        }
+    }
+}
+
+void LLPanelProfileLegacy::sendAvatarProfileCoro(std::string url, LLSD payload)
+{
+    LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
+    LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t
+        httpAdapter(new LLCoreHttpUtil::HttpCoroutineAdapter("send_avatar_profile_coro", httpPolicy));
+    LLCore::HttpRequest::ptr_t httpRequest(new LLCore::HttpRequest);
+    LLCore::HttpHeaders::ptr_t httpHeaders;
+
+    LLCore::HttpOptions::ptr_t httpOpts(new LLCore::HttpOptions);
+    httpOpts->setFollowRedirects(true);
+
+    std::string full_url = url + "/" + getAvatarId().asString();
+
+    LLSD result = httpAdapter->putAndSuspend(httpRequest, full_url, payload, httpOpts, httpHeaders);
+
+    LLSD httpResults = result[LLCoreHttpUtil::HttpCoroutineAdapter::HTTP_RESULTS];
+    LLCore::HttpStatus status = LLCoreHttpUtil::HttpCoroutineAdapter::getStatusFromLLSD(httpResults);
+
+    if (!status)
+    {
+        LL_WARNS("LegacyProfiles") << "Failed to put agent information " << payload << " for id " << getAvatarId() << LL_ENDL;
+        return;
+    }
+
+    LL_DEBUGS("LegacyProfiles") << "Agent id: " << getAvatarId() << " Payload: " << payload << " Result: " << httpResults << LL_ENDL;
 }
 
 void LLPanelProfileLegacy::processProperties(void* data, EAvatarProcessorType type)
@@ -260,7 +453,7 @@ void LLPanelProfileLegacy::processProperties(void* data, EAvatarProcessorType ty
 			args["[REZDAY]"] = birth_date;
 			args["[ACCOUNT_TYPE]"] = LLAvatarPropertiesProcessor::accountType(pData);
 			args["[PAYMENT_INFO]"] = LLAvatarPropertiesProcessor::paymentInfo(pData);
-			args["[AGE_VERIFIED]"] = pData->flags & AVATAR_AGEVERIFIED ? getString("age_verified") : LLStringUtil::null;
+            args["[AGE_VERIFIED]"] = pData->flags & AVATAR_AGEVERIFIED ? getString("age_verified") : LLStringUtil::null;
 			LLSD formatted_info(getString("account_info_fmt", args));
 			getChild<LLTextBase>("account_info")->setValue(formatted_info);
 			formatted_info = LLSD(getString("rezday_fmt", args));
@@ -300,7 +493,7 @@ void LLPanelProfileLegacy::processProperties(void* data, EAvatarProcessorType ty
 		}
 		case APT_GROUPS:
 		{
-			LLAvatarGroups* pData = static_cast<LLAvatarGroups*>(data);
+			const LLAvatarGroups* pData = static_cast<LLAvatarGroups*>(data);
 			if(!pData || getAvatarId() != pData->avatar_id) return;
 			
 			showAccordion("avatar_groups_tab", !pData->group_list.empty());
@@ -311,7 +504,7 @@ void LLPanelProfileLegacy::processProperties(void* data, EAvatarProcessorType ty
 		case APT_CLASSIFIEDS:
 		case APT_PICK_INFO:
 		case APT_CLASSIFIED_INFO:
-		// No idea what this message is...
+		// Used by LLAgent not profiles. ;)
 		case APT_TEXTURES:
 		default:
 			break;
@@ -329,7 +522,7 @@ void LLPanelProfileLegacy::setProgress(bool started)
 		indicator->stop();
 }
 
-void LLPanelProfileLegacy::showAccordion(const std::string& name, bool show)
+void LLPanelProfileLegacy::showAccordion(std::string_view name, bool show)
 {
 	LLAccordionCtrlTab* tab = getChild<LLAccordionCtrlTab>(name);
 	tab->setVisible(show);
@@ -372,21 +565,6 @@ void LLPanelProfileLegacy::onCommitAction(const LLSD& userdata)
 		LL_WARNS("LegacyProfiles") << "Unhandled action: " << action << LL_ENDL;
 }
 
-void LLPanelProfileLegacy::copyData(const LLSD& userdata)
-{
-#if WIP_PROFILES
-    const std::string& param = userdata.asString();
-	if (param == "copy_name")
-		LLAvatarActions::copyData(getAvatarId(), LLAvatarActions::E_DATA_NAME);
-	else if (param == "copy_slurl")
-		LLAvatarActions::copyData(getAvatarId(), LLAvatarActions::E_DATA_SLURL);
-	else if (param == "copy_key")
-		LLAvatarActions::copyData(getAvatarId(), LLAvatarActions::E_DATA_UUID);
-	else
-		LL_WARNS("LegacyProfiles") << "Unhandled action: " << param << LL_ENDL;
-#endif
-}
-
 bool LLPanelProfileLegacy::isActionEnabled(const LLSD& userdata)
 {
 	bool action_enabled = false;
@@ -415,17 +593,34 @@ bool LLPanelProfileLegacy::isActionEnabled(const LLSD& userdata)
 void LLPanelProfileLegacy::onCommitAvatarProperties()
 {
 	if (getAvatarId() != gAgentID) return;
-	LLAvatarData data = LLAvatarData();
-	
-	data.avatar_id = gAgentID;
-	data.image_id = getChild<LLTextureCtrl>("sl_profile_pic")->getImageAssetID();
-	data.fl_image_id = getChild<LLTextureCtrl>("fl_profile_pic")->getImageAssetID();
-	data.about_text = getChild<LLTextEditor>("sl_about")->getText();
-	data.fl_about_text = getChild<LLTextEditor>("fl_about")->getText();
-	data.profile_url = getChild<LLLineEditor>("www_edit")->getText();
-	data.allow_publish = getChild<LLCheckBoxCtrl>("allow_publish")->getValue().asBoolean();
-	
-	LLAvatarPropertiesProcessor::getInstance()->sendAvatarPropertiesUpdate(&data);
+
+
+	std::string cap = gAgent.getRegionCapability(AGENT_PROFILE_CAP);
+    if (!cap.empty())
+    {
+        LLSD data;
+        data["sl_about_text"] = getChild<LLTextEditor>("sl_about")->getText();
+        data["fl_about_text"] = getChild<LLTextEditor>("fl_about")->getText();
+        data["profile_url"]   = getChild<LLLineEditor>("www_edit")->getText();
+		data["allow_publish"] = getChild<LLCheckBoxCtrl>("allow_publish")->getValue().asBoolean();
+
+		LLCoros::instance().launch(
+            "sendAvatarProfileCoro",
+            boost::bind(&LLPanelProfileLegacy::sendAvatarProfileCoro, this, cap, data));
+    }
+    else
+    {
+        LLAvatarData data = LLAvatarData();
+        data.avatar_id     = gAgentID;
+        data.image_id      = getChild<LLTextureCtrl>("sl_profile_pic")->getImageAssetID();
+        data.fl_image_id   = getChild<LLTextureCtrl>("fl_profile_pic")->getImageAssetID();
+        data.about_text    = getChild<LLTextEditor>("sl_about")->getText();
+        data.fl_about_text = getChild<LLTextEditor>("fl_about")->getText();
+        data.profile_url   = getChild<LLLineEditor>("www_edit")->getText();
+        data.allow_publish = getChild<LLCheckBoxCtrl>("allow_publish")->getValue().asBoolean();
+
+        LLAvatarPropertiesProcessor::getInstance()->sendAvatarPropertiesUpdate(&data);
+    }
 }
 
 void LLPanelProfileLegacy::onCommitInterest()
@@ -454,8 +649,18 @@ void LLPanelProfileLegacy::onCommitInterest()
 
 void LLPanelProfileLegacy::onCommitNotes(LLUICtrl* ctrl)
 {
-	const std::string& notes = ctrl->getValue().asString();
-	LLAvatarPropertiesProcessor::getInstance()->sendNotes(getAvatarId(), notes);
+    std::string cap = gAgent.getRegionCapability(AGENT_PROFILE_CAP);
+    if (!cap.empty())
+    {
+        LLCoros::instance().launch("sendAvatarProfileCoro", 
+			boost::bind(&LLPanelProfileLegacy::sendAvatarProfileCoro, this, cap,
+			LLSD().with("notes", ctrl->getValue().asString())));
+    }
+    else
+    {
+        const std::string& notes = ctrl->getValue().asString();
+        LLAvatarPropertiesProcessor::getInstance()->sendNotes(getAvatarId(), notes);
+    }
 }
 
 void LLPanelProfileLegacy::onDoubleClickName()
@@ -580,7 +785,6 @@ void LLPanelProfileLegacy::closePanel(LLPanel* panel)
 }
 
 // LLPanelProfilePicks //
-#if WIP_PROFILES
 LLPanelProfileLegacy::LLPanelProfilePicks::LLPanelProfilePicks()
 :	LLPanelProfileLegacyTab()
 ,	mProfilePanel(nullptr)
@@ -588,6 +792,7 @@ LLPanelProfileLegacy::LLPanelProfilePicks::LLPanelProfilePicks()
 ,	mPicksList(nullptr)
 ,	mPanelPickEdit(nullptr)
 ,	mPanelPickInfo(nullptr)
+,	mPanelClassifiedEdit(nullptr)
 ,	mPanelClassifiedInfo(nullptr)
 ,	mPopupMenuHandle()
 ,	mPlusMenuHandle()
@@ -836,7 +1041,8 @@ void LLPanelProfileLegacy::LLPanelProfilePicks::onClickDelete()
 	{
 		LLSD args;
 		args["PICK"] = value[PICK_NAME];
-		LLNotificationsUtil::add("DeleteAvatarPick", args, LLSD(), boost::bind(&LLPanelProfilePicks::callbackDeletePick, this, _1, _2));
+		LLNotificationsUtil::add("DeleteAvatarPick", args, LLSD(), 
+			boost::bind(&LLPanelProfilePicks::callbackDeletePick, this, _1, _2));
 		return;
 	}
 	value = mClassifiedsList->getSelectedValue();
@@ -844,7 +1050,8 @@ void LLPanelProfileLegacy::LLPanelProfilePicks::onClickDelete()
 	{
 		LLSD args;
 		args["NAME"] = value[CLASSIFIED_NAME];
-		LLNotificationsUtil::add("DeleteClassified", args, LLSD(), boost::bind(&LLPanelProfilePicks::callbackDeleteClassified, this, _1, _2));
+		LLNotificationsUtil::add("DeleteClassified", args, LLSD(), 
+			boost::bind(&LLPanelProfilePicks::callbackDeleteClassified, this, _1, _2));
 		return;
 	}
 }
@@ -907,11 +1114,11 @@ void LLPanelProfileLegacy::LLPanelProfilePicks::onRightMouseUpItem(LLUICtrl* ite
 {
 	updateButtons();
 
-	auto menu = static_cast<LLMenuGL*>(mPopupMenuHandle.get());
+	auto menu = static_cast<LLContextMenu*>(mPopupMenuHandle.get());
 	if (menu)
 	{
 		menu->buildDrawLabels();
-		((LLContextMenu*)menu)->show(x, y);
+		menu->show(x, y);
 		LLMenuGL::showPopup(item, menu, x, y);
 	}
 }
@@ -927,6 +1134,7 @@ void LLPanelProfileLegacy::LLPanelProfilePicks::openClassifiedInfo()
 	{
 		mPanelClassifiedInfo = LLPanelClassifiedInfo::create();
 		mPanelClassifiedInfo->setExitCallback(boost::bind(&LLPanelProfilePicks::onPanelClassifiedClose, this, mPanelClassifiedInfo));
+		mPanelClassifiedInfo->setEditClassifiedCallback(boost::bind(&LLPanelProfilePicks::onPanelClassifiedEdit, this));
 		mPanelClassifiedInfo->setVisible(FALSE);
 	}
 	
@@ -1211,7 +1419,6 @@ inline LLPanelProfileLegacy* LLPanelProfileLegacy::LLPanelProfilePicks::getProfi
 	llassert_always(mProfilePanel != nullptr);
 	return mProfilePanel;
 }
-#endif
 
 // LLPanelProfileGroups //
 
@@ -1242,13 +1449,16 @@ void LLPanelProfileLegacy::LLPanelProfileGroups::updateData()
 {
 	mGroupsText->setVisible(TRUE);
 	mGroupsList->clear();
-	LLAvatarPropertiesProcessor::getInstance()->sendAvatarGroupsRequest(getAvatarId());
+    if (gAgent.getRegionCapability(AGENT_PROFILE_CAP).empty())
+    {
+        LLAvatarPropertiesProcessor::getInstance()->sendAvatarGroupsRequest(getAvatarId());
+    }
 }
 
 void LLPanelProfileLegacy::LLPanelProfileGroups::processProperties(void* data, EAvatarProcessorType type)
 {
 	if (APT_GROUPS != type) return;
-	LLAvatarGroups* avatar_groups = static_cast<LLAvatarGroups*>(data);
+    const LLAvatarGroups* avatar_groups = static_cast<LLAvatarGroups*>(data);
 	if(!avatar_groups || getAvatarId() != avatar_groups->avatar_id) return;
 	
 	for (auto const& gdata: avatar_groups->group_list)
@@ -1277,7 +1487,7 @@ void LLPanelProfileLegacy::LLPanelProfileGroups::showGroup(const LLUUID& id)
 
 // LLProfileGroupItem //
 
-LLProfileGroupItem::LLProfileGroupItem()
+LLPanelProfileLegacy::LLProfileGroupItem::LLProfileGroupItem()
 :	LLPanel()
 ,	mInsignia(LLUUID::null)
 ,	mGroupName(LLStringUtil::null)
@@ -1286,18 +1496,18 @@ LLProfileGroupItem::LLProfileGroupItem()
 	buildFromFile("panel_profile_legacy_group_list_item.xml");
 }
 
-LLProfileGroupItem::~LLProfileGroupItem()
+LLPanelProfileLegacy::LLProfileGroupItem::~LLProfileGroupItem()
 {
 	LLGroupMgr::getInstance()->removeObserver(this);
 }
 
 //static
-LLProfileGroupItem* LLProfileGroupItem::create()
+LLPanelProfileLegacy::LLProfileGroupItem* LLPanelProfileLegacy::LLProfileGroupItem::create()
 {
 	return new LLProfileGroupItem();
 }
 
-void LLProfileGroupItem::init(const LLAvatarGroups::LLGroupData& data)
+void LLPanelProfileLegacy::LLProfileGroupItem::init(const LLAvatarGroups::LLGroupData& data)
 {
 	setId(data.group_id);
 	setGroupName(data.group_name);
@@ -1309,44 +1519,44 @@ void LLProfileGroupItem::init(const LLAvatarGroups::LLGroupData& data)
 	picture->setImageAssetID(data.group_insignia_id);
 }
 
-BOOL LLProfileGroupItem::postBuild()
+BOOL LLPanelProfileLegacy::LLProfileGroupItem::postBuild()
 {
 	setMouseEnterCallback(boost::bind(&set_child_visible, this, "hovered_icon", true));
 	setMouseLeaveCallback(boost::bind(&set_child_visible, this, "hovered_icon", false));
 	return TRUE;
 }
 
-void LLProfileGroupItem::setValue(const LLSD& value)
+void LLPanelProfileLegacy::LLProfileGroupItem::setValue(const LLSD& value)
 {
 	if (!value.isMap()) return;;
 	if (!value.has("selected")) return;
 	getChildView("selected_icon")->setVisible( value["selected"]);
 }
 
-void LLProfileGroupItem::setId(const LLUUID& id)
+void LLPanelProfileLegacy::LLProfileGroupItem::setId(const LLUUID& id)
 {
 	mID = id;
 }
 
-void LLProfileGroupItem::setInsignia(const LLUUID& id)
+void LLPanelProfileLegacy::LLProfileGroupItem::setInsignia(const LLUUID& id)
 {
 	mInsignia = id;
 	getChild<LLTextureCtrl>("picture")->setImageAssetID(id);
 }
 
-void LLProfileGroupItem::setGroupName(const std::string& name)
+void LLPanelProfileLegacy::LLProfileGroupItem::setGroupName(const std::string& name)
 {
 	mGroupName = name;
 	getChild<LLUICtrl>("name")->setValue(name);
 }
 
-void LLProfileGroupItem::setCharter(const std::string& charter)
+void LLPanelProfileLegacy::LLProfileGroupItem::setCharter(const std::string& charter)
 {
 	mCharter = charter;
 	getChild<LLUICtrl>("description")->setValue(charter);
 }
 
-void LLProfileGroupItem::changed(LLGroupChange gc)
+void LLPanelProfileLegacy::LLProfileGroupItem::changed(LLGroupChange gc)
 {
 	if (gc != GC_PROPERTIES) return;
 	LLGroupMgrGroupData* group_data = LLGroupMgr::getInstance()->getGroupData(mID);

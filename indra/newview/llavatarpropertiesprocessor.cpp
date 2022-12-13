@@ -273,10 +273,6 @@ std::string LLAvatarPropertiesProcessor::paymentInfo(const LLAvatarData* avatar_
 	// Special accounts like M Linden don't have payment info revealed.
 	if (!avatar_data->caption_text.empty()) return "";
 
-	// Linden employees don't have payment info revealed
-	const S32 LINDEN_EMPLOYEE_INDEX = 3;
-	if (avatar_data->caption_index == LINDEN_EMPLOYEE_INDEX) return "";
-
 	BOOL transacted = (avatar_data->flags & AVATAR_TRANSACTED);
 	BOOL identified = (avatar_data->flags & AVATAR_IDENTIFIED);
 	// Not currently getting set in dataserver/lldataavatar.cpp for privacy considerations
@@ -306,8 +302,8 @@ bool LLAvatarPropertiesProcessor::hasPaymentInfoOnFile(const LLAvatarData* avata
 	if (!avatar_data->caption_text.empty()) return true;
 
 	// Linden employees don't have payment info revealed
-	const S32 LINDEN_EMPLOYEE_INDEX = 3;
-	if (avatar_data->caption_index == LINDEN_EMPLOYEE_INDEX) return true;
+	//const S32 LINDEN_EMPLOYEE_INDEX = 3;
+	//if (avatar_data->caption_index == LINDEN_EMPLOYEE_INDEX) return true;
 
 	return ((avatar_data->flags & AVATAR_TRANSACTED) || (avatar_data->flags & AVATAR_IDENTIFIED));
 }
@@ -338,6 +334,7 @@ void LLAvatarPropertiesProcessor::requestAvatarPropertiesCoro(std::string cap_ur
         LL_WARNS("AvatarProperties") << "Failed to get agent information for id " << agent_id << LL_ENDL;
         LLAvatarPropertiesProcessor* self = getInstance();
         self->removePendingRequest(agent_id, APT_PROPERTIES);
+        self->removePendingRequest(agent_id, APT_INTERESTS);
         self->removePendingRequest(agent_id, APT_PICKS);
         self->removePendingRequest(agent_id, APT_GROUPS);
         self->removePendingRequest(agent_id, APT_NOTES);
@@ -349,7 +346,7 @@ void LLAvatarPropertiesProcessor::requestAvatarPropertiesCoro(std::string cap_ur
     LLAvatarData avatar_data;
     std::string birth_date;
 
-    avatar_data.agent_id = agent_id;
+    avatar_data.agent_id = gAgent.getID();
     avatar_data.avatar_id = agent_id;
     avatar_data.image_id = result["sl_image_id"].asUUID();
     avatar_data.fl_image_id = result["fl_image_id"].asUUID();
@@ -357,7 +354,7 @@ void LLAvatarPropertiesProcessor::requestAvatarPropertiesCoro(std::string cap_ur
     avatar_data.about_text = result["sl_about_text"].asString();
     avatar_data.fl_about_text = result["fl_about_text"].asString();
     avatar_data.born_on = result["member_since"].asDate();
-    avatar_data.profile_url = getProfileURL(agent_id.asString());
+    avatar_data.profile_url   = result.has("home_page") ? result["home_page"].asString() : getProfileURL(agent_id.asString());
 
     avatar_data.flags = 0;
     avatar_data.caption_index = 0;
@@ -371,7 +368,7 @@ void LLAvatarPropertiesProcessor::requestAvatarPropertiesCoro(std::string cap_ur
 
     LLSD picks_array = result["picks"];
     LLAvatarPicks avatar_picks;
-    avatar_picks.agent_id = agent_id; // Not in use?
+    avatar_picks.agent_id  = gAgent.getID();  // Not in use?
     avatar_picks.target_id = agent_id;
 
     for (LLSD::array_const_iterator it = picks_array.beginArray(); it != picks_array.endArray(); ++it)
@@ -388,7 +385,7 @@ void LLAvatarPropertiesProcessor::requestAvatarPropertiesCoro(std::string cap_ur
 
     LLSD groups_array = result["groups"];
     LLAvatarGroups avatar_groups;
-    avatar_groups.agent_id = agent_id; // Not in use?
+    avatar_groups.agent_id  = gAgent.getID();  // Not in use?
     avatar_groups.avatar_id = agent_id; // target_id
 
     for (LLSD::array_const_iterator it = groups_array.beginArray(); it != groups_array.endArray(); ++it)
@@ -410,7 +407,7 @@ void LLAvatarPropertiesProcessor::requestAvatarPropertiesCoro(std::string cap_ur
     // Notes
     LLAvatarNotes avatar_notes;
 
-    avatar_notes.agent_id = agent_id;
+    avatar_notes.agent_id  = gAgent.getID();
     avatar_notes.target_id = agent_id;
     avatar_notes.notes = result["notes"].asString();
 
