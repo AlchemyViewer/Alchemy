@@ -28,7 +28,7 @@
 
 #include "llimageworker.h"
 #include "llimagedxt.h"
-#include <readerwritercircularbuffer.h>
+#include "llthreadsafequeue.h"
 
 std::atomic< U32 > sImageThreads = 0;
 
@@ -46,7 +46,7 @@ public:
             checkPause();
 
 			LLImageDecodeThread::ImageRequest* req  = nullptr;
-            while (!isQuitting() && mRequestQueue.try_dequeue(req))
+            while (!isQuitting() && mRequestQueue.tryPop(req))
             {
                 if (req)
                 {
@@ -58,12 +58,12 @@ public:
 
 	bool runCondition()
     {
-        return mRequestQueue.size_approx() > 0;
+        return mRequestQueue.size() > 0;
 	}
 
 	bool setRequest(LLImageDecodeThread::ImageRequest* req)
 	{
-        bool bSuccess = mRequestQueue.try_enqueue(req);
+        bool bSuccess = mRequestQueue.tryPush(req);
 		if(bSuccess)
 		{
 		    wake();
@@ -72,7 +72,7 @@ public:
 	}
 
 private:
-    moodycamel::BlockingReaderWriterCircularBuffer<LLImageDecodeThread::ImageRequest*> mRequestQueue;
+	LLThreadSafeQueue<LLImageDecodeThread::ImageRequest*> mRequestQueue;
 };
 
 //----------------------------------------------------------------------------

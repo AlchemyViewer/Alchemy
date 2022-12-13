@@ -51,12 +51,6 @@ FetchContent_Declare(
   GIT_TAG        v3.11.2
   )
 
-FetchContent_Declare(
-  readerwriterqueue
-  GIT_REPOSITORY    https://github.com/cameron314/readerwriterqueue
-  GIT_TAG           v1.0.6
-)
-
 if(NOT USE_BINARY_ABSL)
   FetchContent_Declare(
     absl
@@ -99,8 +93,6 @@ FetchContent_MakeAvailable(meshoptimizer)
 set(JSON_Install OFF CACHE INTERNAL "")
 set(JSON_BuildTests OFF CACHE INTERNAL "")
 FetchContent_MakeAvailable(nlohmann_json)
-
-FetchContent_MakeAvailable(readerwriterqueue)
 
 unset(CMAKE_FOLDER)
 unset(CMAKE_POSITION_INDEPENDENT_CODE)
