@@ -4404,7 +4404,13 @@ bool LLAppViewer::initCache()
 	}
 	LLAppViewer::getPurgeDiskCacheThread()->start();
 
-	LLSplashScreen::update(LLTrans::getString("StartupInitializingTextureCache"));
+    {
+        std::random_device rnddev;
+        std::mt19937 rng(rnddev());
+        std::uniform_int_distribution<> dist(0, 9);
+
+        LLSplashScreen::update(LLTrans::getString(llformat("StartupInitializingTextureCache%d", dist(rng))));
+    }
 
 	// Init the texture cache
 	const S32 MB = 1024 * 1024;
