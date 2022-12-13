@@ -103,7 +103,7 @@ public:
 
 	inline void setIdentity()
 	{
-		static __m128 ones = _mm_set_ps(1.f,0.f,0.f,1.f);
+		const __m128 ones = _mm_set_ps(1.f,0.f,0.f,1.f);
 		mMatrix[0] = _mm_movelh_ps(ones,_mm_setzero_ps());
 		mMatrix[1] = _mm_movehl_ps(_mm_setzero_ps(),ones);
 		mMatrix[2] = _mm_movelh_ps(_mm_setzero_ps(),ones);
@@ -670,7 +670,7 @@ public:
 	//Direct assignment of row3.
 	inline void setTranslate_affine(const LLVector3& trans)
 	{
-		static const LLVector4Logical mask = _mm_load_ps((F32*)&S_V4LOGICAL_MASK_TABLE[3*4]);
+		const LLVector4Logical mask = _mm_load_ps((F32*)&S_V4LOGICAL_MASK_TABLE[3*4]);
 
 		LLVector4a translation;
 		translation.load3(trans.mV);
@@ -735,7 +735,7 @@ public:
 
 	inline void extractRotation_affine()
 	{
-		static const LLVector4Logical mask = _mm_load_ps((F32*)&S_V4LOGICAL_MASK_TABLE[3*4]);
+		const LLVector4Logical mask = _mm_load_ps((F32*)&S_V4LOGICAL_MASK_TABLE[3*4]);
 		mMatrix[0].setSelectWithMask(mask,_mm_setzero_ps(),mMatrix[0]);
 		mMatrix[1].setSelectWithMask(mask,_mm_setzero_ps(),mMatrix[1]);
 		mMatrix[2].setSelectWithMask(mask,_mm_setzero_ps(),mMatrix[2]);
@@ -746,7 +746,7 @@ public:
 private:
 	template<bool mins> inline void init_foos(LLMatrix4a& foos) const
 	{
-		static bool done(false);
+		thread_local bool done(false);
 		if (done) return;
 		const LLVector4a delta(0.0001f);
 		foos.setIdentity();
@@ -760,8 +760,8 @@ private:
 public:
 	inline bool isIdentity() const
 	{
-		static LLMatrix4a mins;
-		static LLMatrix4a maxs;
+		thread_local LLMatrix4a mins;
+		thread_local LLMatrix4a maxs;
 
 		init_foos<false>(mins);
 		init_foos<true>(maxs);
