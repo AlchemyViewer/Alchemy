@@ -35,6 +35,9 @@
 #include "llcombobox.h"
 #include "llfilepicker.h"
 #include "llfloaterreg.h"
+#include "llimagebmp.h"
+#include "llimagejpeg.h"
+#include "llimagej2c.h"
 #include "llimagetga.h"
 #include "llimagepng.h"
 #include "llimagewebp.h"
@@ -42,6 +45,7 @@
 #include "llinventorymodel.h"
 #include "llnotificationsutil.h"
 #include "llresmgr.h"
+#include "llslurl.h"
 #include "lltrans.h"
 #include "lltextbox.h"
 #include "lltextureview.h"
@@ -469,6 +473,18 @@ void LLPreviewTexture::onFileLoadedForSave(BOOL success,
 		{
 			image = new LLImageTGA;
 		}
+		else if(extension == "jpg" || extension == "jpeg")
+		{
+			image = new LLImageJPEG;
+		}
+		else if(extension == "j2c")
+		{
+			image = new LLImageJ2C;
+		}
+		else if(extension == "bmp")
+		{
+			image = new LLImageBMP;
+		}
 		else if (extension == "webp")
 		{
 			image = new LLImageWebP;
@@ -530,6 +546,18 @@ void LLPreviewTexture::updateDimensions()
 
 
 	// Update the width/height display every time
+	LLUICtrl* dimensions = getChild<LLUICtrl>("dimensions");
+	if (mImage->getUploader().notNull())
+	{
+		LLStringUtil::format_map_t args;
+		args["UPLOADER"] = LLSLURL("agent", mImage->getUploader(), "inspect").getSLURLString();
+		args["DATE"] = mImage->getUploadTime().toHTTPDateString(LLStringExplicit("%d %b %Y"));
+		std::string info = getString("UploadInfo", args);
+		dimensions->setTextArg("[UPLOAD_INFO]", info);
+	}
+	else
+		dimensions->setTextArg("[UPLOAD_INFO]", LLStringUtil::null);
+
 	getChild<LLUICtrl>("dimensions")->setTextArg("[WIDTH]",  llformat("%d", img_width));
 	getChild<LLUICtrl>("dimensions")->setTextArg("[HEIGHT]", llformat("%d", img_height));
 

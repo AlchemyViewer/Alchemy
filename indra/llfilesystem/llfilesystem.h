@@ -48,18 +48,18 @@ public:
     bool is_open() { return mFile; }
 
     BOOL read(U8* buffer, S32 bytes);
-    S32  getLastBytesRead();
+    S32  getLastBytesRead() const;
     BOOL eof();
 
     BOOL write(const U8* buffer, S32 bytes);
     BOOL seek(S32 offset, S32 origin = -1);
     S32  tell() const;
 
-    S32 getSize();
-    S32 getMaxSize();
-    BOOL rename(const LLUUID& new_id, const LLAssetType::EType new_type);
-    BOOL remove();
-    BOOL exists();
+    S32        getSize() const;
+    S32        getMaxSize();
+    BOOL       rename(const LLUUID& new_id, const LLAssetType::EType new_type);
+    BOOL       remove();
+    BOOL       exists() const;
 
     /**
      * Update the "last write time" of a file to "now". This must be called whenever a

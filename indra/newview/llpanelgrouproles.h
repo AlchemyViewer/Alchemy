@@ -207,6 +207,8 @@ protected:
 	typedef std::map<LLUUID, role_change_data_map_t*> member_role_changes_map_t;
 
 	bool matchesSearchFilter(const std::string& fullname);
+	
+	void onExportMembersToCSV();
 
 	U64  getAgentPowersBasedOnRoleChanges(const LLUUID& agent_id);
 	bool getRoleChangeType(const LLUUID& member_id,

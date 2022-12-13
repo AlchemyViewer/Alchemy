@@ -303,10 +303,10 @@ public:
 	
 	BOOL	handleScrollWheel(S32 x, S32 y, S32 mask) override;
 	
-	void	draw() override;
+	virtual void	draw() override;
 	virtual void	drawShadow(LLPanel* panel);
 	
-	void	onOpen(const LLSD& key) override {}
+	virtual void	onOpen(const LLSD& key) override {}
 	virtual void	onClose(bool app_quitting) {}
 
 	// This cannot be "const" until all derived floater canClose()
@@ -348,6 +348,8 @@ public:
 	// Close the floater returned by getFrontmostClosableFloater() and 
 	// handle refocusing.
 	static void		closeFrontmostFloater();
+
+    static bool     isQuitRequested() { return sQuitting; }
 
 //	LLNotification::Params contextualNotification(const std::string& name) 
 //	{ 

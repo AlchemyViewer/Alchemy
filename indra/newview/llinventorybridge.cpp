@@ -517,6 +517,8 @@ void  LLInvFVBridge::removeBatchNoCheck(std::vector<LLFolderViewModelItem*>&  ba
 			move_ids.push_back(item->getUUID());
 			--update[item->getParentUUID()];
 			++update[trash_id];
+			if(!gInventory.isObjectDescendentOf(item->getUUID(), gLocalInventory))
+			{
 			if(start_new_message)
 			{
 				start_new_message = false;
@@ -536,6 +538,7 @@ void  LLInvFVBridge::removeBatchNoCheck(std::vector<LLFolderViewModelItem*>&  ba
 				gAgent.sendReliableMessage();
 				gInventory.accountForUpdate(update);
 				update.clear();
+			}
 			}
 		}
 	}
@@ -558,6 +561,8 @@ void  LLInvFVBridge::removeBatchNoCheck(std::vector<LLFolderViewModelItem*>&  ba
 			move_ids.push_back(cat->getUUID());
 			--update[cat->getParentUUID()];
 			++update[trash_id];
+			if(!gInventory.isObjectDescendentOf(cat->getUUID(), gLocalInventory))
+			{
 			if(start_new_message)
 			{
 				start_new_message = false;
@@ -577,6 +582,7 @@ void  LLInvFVBridge::removeBatchNoCheck(std::vector<LLFolderViewModelItem*>&  ba
 				gInventory.accountForUpdate(update);
 				update.clear();
 			}
+			}
 		}
 	}
 	if(!start_new_message)
@@ -590,11 +596,42 @@ void  LLInvFVBridge::removeBatchNoCheck(std::vector<LLFolderViewModelItem*>&  ba
 	uuid_vec_t::iterator end = move_ids.end();
 	for(; it != end; ++it)
 	{
+		if(gInventory.isObjectDescendentOf(*it, gLocalInventory))
+		{
+			// if it's a category, delete descendents
+			if(gInventory.getCategory(*it))
+			{
+				LLViewerInventoryCategory* cat = gInventory.getCategory(*it);
+				cat->setDescendentCount(0);
+				LLInventoryModel::cat_array_t categories;
+				LLInventoryModel::item_array_t items;
+				gInventory.collectDescendents(cat->getUUID(),
+								   categories,
+								   items,
+								   false); // include trash?
+				S32 count = items.size();
+				S32 i;
+				for(i = 0; i < count; ++i)
+				{
+					gInventory.deleteObject(items.at(i)->getUUID());
+				}
+				count = categories.size();
+				for(i = 0; i < count; ++i)
+				{
+					gInventory.deleteObject(categories.at(i)->getUUID());
+				}
+			}
+			// delete it
+			gInventory.deleteObject(*it);
+		}
+		else
+		{
 		gInventory.moveObject((*it), trash_id);
 		LLViewerInventoryItem* item = gInventory.getItem(*it);
 		if (item)
 		{
 			model->updateItem(item);
+		}
 		}
 	}
 
@@ -634,7 +671,7 @@ BOOL LLInvFVBridge::isClipboardPasteable() const
 		if (cat)
 		{
 			LLFolderBridge cat_br(mInventoryPanel.get(), mRoot, item_id);
-			if (!cat_br.isItemCopyable())
+			if (!cat_br.isItemCopyable(false))
 			return FALSE;
 			// Skip to the next item in the clipboard
 			continue;
@@ -642,7 +679,7 @@ BOOL LLInvFVBridge::isClipboardPasteable() const
 
 		// Each item must be copyable to be pastable
 		LLItemBridge item_br(mInventoryPanel.get(), mRoot, item_id);
-		if (!item_br.isItemCopyable())
+		if (!item_br.isItemCopyable(false))
 		{
 			return FALSE;
 		}
@@ -674,6 +711,11 @@ BOOL LLInvFVBridge::isClipboardPasteableAsLink() const
 			{
 				return FALSE;
 			}
+
+            if (gInventory.isObjectDescendentOf(item->getUUID(), gInventory.getLibraryRootFolderID()))
+            {
+                return FALSE;
+            }
 		}
 		const LLViewerInventoryCategory *cat = model->getCategory(objects.at(i));
 		if (cat && LLFolderType::lookupIsProtectedType(cat->getPreferredType()))
@@ -749,15 +791,15 @@ void hide_context_entries(LLMenuGL& menu,
 		}
 
 		bool found = false;
-		menuentry_vec_t::const_iterator itor2;
-		for (itor2 = entries_to_show.begin(); itor2 != entries_to_show.end(); ++itor2)
-		{
-			if (*itor2 == name)
-			{
-				found = true;
-				break;
-			}
-		}
+
+        std::string myinput;
+        std::vector<std::string> mylist{ "a", "b", "c" };
+
+        menuentry_vec_t::const_iterator itor2 = std::find(entries_to_show.begin(), entries_to_show.end(), name);
+        if (itor2 != entries_to_show.end())
+        {
+            found = true;
+        }
 
 		// Don't allow multiple separators in a row (e.g. such as if there are no items
 		// between two separators).
@@ -775,7 +817,21 @@ void hide_context_entries(LLMenuGL& menu,
 				menu_item->setVisible(FALSE);
 			}
 
-			menu_item->setEnabled(FALSE);
+            if (menu_item->getEnabled())
+            {
+                // These should stay enabled unless specifically disabled
+                const menuentry_vec_t exceptions = {
+                    "Detach From Yourself",
+                    "Wearable And Object Wear",
+                    "Wearable Add",
+                };
+
+                menuentry_vec_t::const_iterator itor2 = std::find(exceptions.begin(), exceptions.end(), name);
+                if (itor2 == exceptions.end())
+                {
+                    menu_item->setEnabled(FALSE);
+                }
+            }
 		}
 		else
 		{
@@ -811,6 +867,19 @@ void LLInvFVBridge::getClipboardEntries(bool show_asset_id,
 //		{
 //			disabled_items.push_back(std::string("Copy"));
 //		}
+
+        if (isAgentInventory())
+        {
+            items.push_back(std::string("New folder from selected"));
+            items.push_back(std::string("Subfolder Separator"));
+            std::set<LLUUID> selected_uuid_set = LLAvatarActions::getInventorySelectedUUIDs();
+            uuid_vec_t ids;
+            std::copy(selected_uuid_set.begin(), selected_uuid_set.end(), std::back_inserter(ids));
+            if (!is_only_items_selected(ids) && !is_only_cats_selected(ids))
+            {
+                disabled_items.push_back(std::string("New folder from selected"));
+            }
+        }
 
 		if (obj->getIsLinkType())
 		{
@@ -880,6 +949,17 @@ void LLInvFVBridge::getClipboardEntries(bool show_asset_id,
                     }
                 }
 			}
+            static LLCachedControl<bool> sPowerfulWizard(gSavedSettings, "AlchemyPowerfulWizard", false);
+            if (show_asset_id && sPowerfulWizard)
+            {
+                items.push_back(LLStringExplicit("Extras Separator"));
+                items.push_back(LLStringExplicit("Extras Menu"));
+				
+				if (!isItemModifyable())
+				{
+                    disabled_items.push_back(LLStringExplicit("Edit Hex"));
+				}
+            }
 		}
 
 // [SL:KB] - Patch: Inventory-Actions | Checked: 2010-04-12 (Catznip-2.0)
@@ -909,7 +989,8 @@ void LLInvFVBridge::getClipboardEntries(bool show_asset_id,
 		disabled_items.push_back(std::string("Paste"));
 	}
 
-	if (gSavedSettings.getBOOL("InventoryLinking"))
+    static LLCachedControl<bool> inventory_linking(gSavedSettings, "InventoryLinking", true);
+	if (inventory_linking)
 	{
 		items.push_back(std::string("Paste As Link"));
 		if (!isClipboardPasteableAsLink() || (flags & FIRST_SELECTED_ITEM) == 0)
@@ -1163,7 +1244,10 @@ void LLInvFVBridge::addMarketplaceContextMenuOptions(U32 flags,
         LLInventoryModel::cat_array_t categories;
         LLInventoryModel::item_array_t items;
         gInventory.collectDescendents(local_version_folder_id, categories, items, FALSE);
-        if (categories.size() >= gSavedSettings.getU32("InventoryOutboxMaxFolderCount"))
+        LLCachedControl<U32> max_depth(gSavedSettings, "InventoryOutboxMaxFolderDepth", 4);
+        LLCachedControl<U32> max_count(gSavedSettings, "InventoryOutboxMaxFolderCount", 20);
+        if (categories.size() >= max_count
+            || depth > (max_depth + 1))
         {
             disabled_items.push_back(std::string("New Folder"));
         }
@@ -1799,6 +1883,15 @@ void LLItemBridge::performAction(LLInventoryModel* model, std::string action)
         std::string url = LLMarketplaceData::instance().getListingURL(mUUID);
         LLUrlAction::openURL(url);
 	}
+    else if ("edit_hex" == action)
+    {
+        LLInventoryItem* item = model->getItem(mUUID);
+        if (!item) { return; }
+
+        LLFloaterReg::showInstance("asset_hex_editor",
+                                   LLSD().with("inv_id", item->getUUID())
+			                                 .with("asset_type", item->getActualType()));
+    }
 }
 
 void LLItemBridge::doActionOnCurSelectedLandmark(LLLandmarkList::loaded_callback_t cb)
@@ -1840,7 +1933,7 @@ void copy_slurl_to_clipboard_callback_inv(const std::string& slurl)
 void LLItemBridge::selectItem()
 {
 	LLViewerInventoryItem* item = static_cast<LLViewerInventoryItem*>(getItem());
-	if(item && !item->isFinished())
+	if(item && !item->isFinished() && !(gInventory.isObjectDescendentOf(mUUID, gLocalInventory)))
 	{
 		//item->fetchFromServer();
 		LLInventoryModelBackgroundFetch::instance().start(item->getUUID(), false);
@@ -2110,6 +2203,17 @@ BOOL LLItemBridge::removeItem()
 	}
 	// Already in trash
 	if (model->isObjectDescendentOf(mUUID, trash_id)) return FALSE;
+	else
+	{
+		if(gInventory.isObjectDescendentOf(mUUID, gLocalInventory))
+		{
+			LLInventoryModel::LLCategoryUpdate up(item->getParentUUID(), -1);
+			gInventory.deleteObject(mUUID);
+			gInventory.accountForUpdate(up);
+			gInventory.notifyObservers();
+			return TRUE;
+		}
+	}
 
 	LLNotification::Params params("ConfirmItemDeleteHasLinks");
 	params.functor.function(boost::bind(&LLItemBridge::confirmRemoveItem, this, _1, _2));
@@ -2121,7 +2225,8 @@ BOOL LLItemBridge::removeItem()
 // [SL:KB] - Patch: Inventory-Links | Checked: 2010-06-01 (Catznip-2.0)
 	// Users move folders around and reuse links that way... if we know something has links then it's just bad not to warn them :|
 // [/SL:KB]
-//	if (!gSavedSettings.getBOOL("InventoryLinking"))
+//    static LLCachedControl<bool> inventory_linking(gSavedSettings, "InventoryLinking", true);
+//	if (!inventory_linking)
 	{
 		if (!item->getIsLinkType())
 		{
@@ -2164,34 +2269,48 @@ BOOL LLItemBridge::confirmRemoveItem(const LLSD& notification, const LLSD& respo
 	return FALSE;
 }
 
-BOOL LLItemBridge::isItemCopyable() const
+bool LLItemBridge::isItemCopyable(bool can_copy_as_link) const
 {
-	LLViewerInventoryItem* item = getItem();
-	if (item)
+    LLViewerInventoryItem* item = getItem();
+    if (!item)
+    {
+        return false;
+    }
+//    // Can't copy worn objects.
+//    // Worn objects are tied to their inworld conterparts
+//    // Copy of modified worn object will return object with obsolete asset and inventory
+//    if (get_is_item_worn(mUUID))
+//    {
+//        return false;
+//    }
+
+// [SL:KB] - Patch: Inventory-Links | Checked: 2010-04-12 (Catznip-2.0)
+	// We'll allow copying a link if:
+	//   - its target is available
+	//   - it doesn't point to another link [see LLViewerInventoryItem::getLinkedItem() which returns NULL in that case]
+	if (item->getIsLinkType())
 	{
-//		// Can't copy worn objects.
-//		// Worn objects are tied to their inworld conterparts
-//		// Copy of modified worn object will return object with obsolete asset and inventory
-//		if(get_is_item_worn(mUUID))
-//			return FALSE;
-//		}
-
-// [SL:KB] - Patch: Inventory-Links | Checked: 2010-04-12 (Catznip-2.0)
-		// We'll allow copying a link if:
-		//   - its target is available
-		//   - it doesn't point to another link [see LLViewerInventoryItem::getLinkedItem() which returns NULL in that case]
-		if (item->getIsLinkType())
-		{
-			return (NULL != item->getLinkedItem());
-		}
-// [/SL:KB]
-
-// [SL:KB] - Patch: Inventory-Links | Checked: 2010-04-12 (Catznip-2.0)
-		return (item->getPermissions().allowCopyBy(gAgent.getID()));
-// [/SL:KB]
-//		return item->getPermissions().allowCopyBy(gAgent.getID()) || gSavedSettings.getBOOL("InventoryLinking");
+		return (NULL != item->getLinkedItem());
 	}
-	return FALSE;
+// [/SL:KB]
+
+// [SL:KB] - Patch: Inventory-Links | Checked: 2010-04-12 (Catznip-2.0)
+    return (can_copy_as_link)
+        || item->getPermissions().allowCopyBy(gAgent.getID());
+// [/SL:KB]
+//	static LLCachedControl<bool> inventory_linking(gSavedSettings, "InventoryLinking", true);
+//    return (can_copy_as_link && inventory_linking)
+//        || item->getPermissions().allowCopyBy(gAgent.getID());
+}
+
+BOOL LLItemBridge::isItemModifyable() const
+{
+    LLViewerInventoryItem* item = getItem();
+    if (item)
+    {
+        return (item->getPermissions().allowModifyBy(gAgent.getID()));
+    }
+    return FALSE;
 }
 
 // [SL:KB] - Patch: Inventory-Links | Checked: 2013-09-19 (Catznip-3.6)
@@ -2402,10 +2521,10 @@ BOOL LLFolderBridge::isUpToDate() const
 		return FALSE;
 	}
 
-	return category->getVersion() != LLViewerInventoryCategory::VERSION_UNKNOWN;
+	return (category->getVersion() != LLViewerInventoryCategory::VERSION_UNKNOWN) || (mUUID == gLocalInventory) || (gInventory.isObjectDescendentOf(mUUID, gLocalInventory));
 }
 
-BOOL LLFolderBridge::isItemCopyable() const
+bool LLFolderBridge::isItemCopyable(bool can_copy_as_link) const
 {
 	// Folders are copyable if items in them are, recursively, copyable.
 	
@@ -2420,22 +2539,26 @@ BOOL LLFolderBridge::isItemCopyable() const
 	{
 		LLInventoryItem* item = *iter;
 		LLItemBridge item_br(mInventoryPanel.get(), mRoot, item->getUUID());
-		if (!item_br.isItemCopyable())
-			return FALSE;
-}
+        if (!item_br.isItemCopyable(false))
+        {
+            return false;
+        }
+    }
 
 	// Check the folders
 	LLInventoryModel::cat_array_t cat_array_copy = *cat_array;
 	for (LLInventoryModel::cat_array_t::iterator iter = cat_array_copy.begin(); iter != cat_array_copy.end(); iter++)
-{
+    {
 		LLViewerInventoryCategory* category = *iter;
 		LLFolderBridge cat_br(mInventoryPanel.get(), mRoot, category->getUUID());
-		if (!cat_br.isItemCopyable())
-			return FALSE;
-	}
-	
-		return TRUE;
-	}
+        if (!cat_br.isItemCopyable(false))
+        {
+            return false;
+        }
+    }
+
+    return true;
+}
 
 // [SL:KB] - Patch: Inventory-Links | Checked: 2013-09-19 (Catznip-3.6)
 bool LLFolderBridge::isItemLinkable() const
@@ -3886,6 +4009,7 @@ void LLFolderBridge::perform_pasteFromClipboard()
 			LLInventoryObject *obj = model->getObject(item_id);
 			if (obj)
 			{
+
 				if (move_is_into_lost_and_found)
 				{
 					if (LLAssetType::AT_CATEGORY == obj->getType())
@@ -3932,7 +4056,20 @@ void LLFolderBridge::perform_pasteFromClipboard()
 				{
 					if (item && can_move_to_landmarks(item))
 					{
-						dropToFavorites(item);
+                        if (LLClipboard::instance().isCutMode())
+                        {
+                            LLViewerInventoryItem* viitem = dynamic_cast<LLViewerInventoryItem*>(item);
+                            llassert(viitem);
+                            if (viitem)
+                            {
+                                //changeItemParent() implicity calls dirtyFilter
+                                changeItemParent(model, viitem, parent_id, FALSE);
+                            }
+                        }
+                        else
+                        {
+                            dropToFavorites(item);
+                        }
 					}
 				}
 				else if (LLClipboard::instance().isCutMode())
@@ -4362,8 +4499,12 @@ void LLFolderBridge::buildContextMenuOptions(U32 flags, menuentry_vec_t&   items
 		{
 			// it's all on its way - add an observer, and the inventory will call done for us when everything is here.
 			gInventory.addObserver(fetch);
-        }
-    }
+	}
+	if (mUUID == gLocalInventory)
+	{
+		items.clear();
+	}
+}
 }
 
 void LLFolderBridge::buildContextMenuFolderOptions(U32 flags,   menuentry_vec_t& items, menuentry_vec_t& disabled_items)
@@ -4403,7 +4544,16 @@ void LLFolderBridge::buildContextMenuFolderOptions(U32 flags,   menuentry_vec_t&
 			items.push_back(std::string("Conference Chat Folder"));
 			items.push_back(std::string("IM All Contacts In Folder"));
 		}
+
+        if (((flags & ITEM_IN_MULTI_SELECTION) == 0) && hasChildren() && (type != LLFolderType::FT_OUTFIT))
+        {
+            items.push_back(std::string("Ungroup folder items"));
+        }
 	}
+    else
+    {
+        disabled_items.push_back(std::string("New folder from selected"));
+    }
 
 #ifndef LL_RELEASE_FOR_DOWNLOAD
 	if (LLFolderType::lookupIsProtectedType(type) && is_agent_inventory)
@@ -5950,14 +6100,14 @@ class LLCallingCardObserver : public LLFriendObserver
 public:
 	LLCallingCardObserver(LLCallingCardBridge* bridge) : mBridgep(bridge) {}
 	virtual ~LLCallingCardObserver() { mBridgep = NULL; }
-	virtual void changed(U32 mask)
-	{
-		mBridgep->refreshFolderViewItem();
-		if (mask & LLFriendObserver::ONLINE)
-		{
-			mBridgep->checkSearchBySuffixChanges();
-		}
-	}
+    virtual void changed(U32 mask)
+    {
+        if (mask & LLFriendObserver::ONLINE)
+        {
+            mBridgep->refreshFolderViewItem();
+            mBridgep->checkSearchBySuffixChanges();
+        }
+    }
 protected:
 	LLCallingCardBridge* mBridgep;
 };
@@ -5971,14 +6121,16 @@ LLCallingCardBridge::LLCallingCardBridge(LLInventoryPanel* inventory,
 										 const LLUUID& uuid ) :
 	LLItemBridge(inventory, root, uuid)
 {
-	mObserver = new LLCallingCardObserver(this);
-	LLAvatarTracker::instance().addObserver(mObserver);
+    mObserver = new LLCallingCardObserver(this);
+    mCreatorUUID = getItem()->getCreatorUUID();
+    LLAvatarTracker::instance().addParticularFriendObserver(mCreatorUUID, mObserver);
 }
 
 LLCallingCardBridge::~LLCallingCardBridge()
 {
-	LLAvatarTracker::instance().removeObserver(mObserver);
-	delete mObserver;
+    LLAvatarTracker::instance().removeParticularFriendObserver(mCreatorUUID, mObserver);
+
+    delete mObserver;
 }
 
 void LLCallingCardBridge::refreshFolderViewItem()
@@ -6879,8 +7031,7 @@ void LLObjectBridge::buildContextMenu(LLMenuGL& menu, U32 flags)
 				items.push_back(std::string("Wearable Add"));
 				items.push_back(std::string("Attach To"));
 				items.push_back(std::string("Attach To HUD"));
-				// commented out for DEV-32347
-				//items.push_back(std::string("Restore to Last Position"));
+				items.push_back(std::string("Restore to Last Position"));
 
 				if (!gAgentAvatarp->canAttachMoreObjects())
 				{
@@ -6963,10 +7114,10 @@ BOOL LLObjectBridge::renameItem(const std::string& new_name)
 			LLViewerObject* obj = gAgentAvatarp->getWornAttachment( item->getUUID() );
 			if(obj)
 			{
-				LLSelectMgr::getInstanceFast()->deselectAll();
-				LLSelectMgr::getInstanceFast()->addAsIndividual( obj, SELECT_ALL_TES, FALSE );
-				LLSelectMgr::getInstanceFast()->selectionSetObjectName( new_name );
-				LLSelectMgr::getInstanceFast()->deselectAll();
+				LLSelectMgr::getInstance()->deselectAll();
+				LLSelectMgr::getInstance()->addAsIndividual( obj, SELECT_ALL_TES, FALSE );
+				LLSelectMgr::getInstance()->selectionSetObjectName( new_name );
+				LLSelectMgr::getInstance()->deselectAll();
 			}
 		}
 	}
@@ -7175,7 +7326,7 @@ void LLWearableBridge::buildContextMenu(LLMenuGL& menu, U32 flags)
 // [/RLVa:KB]
 					}
 
-					if (LLWearableType::getInstanceFast()->getAllowMultiwear(mWearableType))
+					if (LLWearableType::getInstance()->getAllowMultiwear(mWearableType))
 					{
 						items.push_back(std::string("Wearable Add"));
 //						if (!gAgentWearables.canAddWearable(mWearableType))

@@ -195,10 +195,7 @@ BOOL LLVisualParamHint::render()
 	gGL.pushMatrix();
 	gGL.loadIdentity();
 
-	if (LLGLSLShader::sNoFixedFunction)
-	{
-		gUIProgram.bind();
-	}
+	gUIProgram.bind();
 
 	LLGLSUIDefault gls_ui;
 	//LLGLState::verify(TRUE);
@@ -234,25 +231,24 @@ BOOL LLVisualParamHint::render()
 	
 	gGL.flush();
 	
-	LLViewerCamera::getInstanceFast()->setAspect((F32)mFullWidth / (F32)mFullHeight);
-	LLViewerCamera::getInstanceFast()->setOriginAndLookAt(
+	LLViewerCamera::getInstance()->setAspect((F32)mFullWidth / (F32)mFullHeight);
+	LLViewerCamera::getInstance()->setOriginAndLookAt(
 		camera_pos,			// camera
 		LLVector3::z_axis,	// up
 		target_pos );		// point of interest
 
-	LLViewerCamera::getInstanceFast()->setPerspective(FALSE, mOrigin.mX, mOrigin.mY, mFullWidth, mFullHeight, FALSE);
+	LLViewerCamera::getInstance()->setPerspective(FALSE, mOrigin.mX, mOrigin.mY, mFullWidth, mFullHeight, FALSE);
 
-	if (gAgentAvatarp->mDrawable.notNull() &&
-		gAgentAvatarp->mDrawable->getFace(0))
-	{
-		LLDrawPoolAvatar *avatarPoolp = (LLDrawPoolAvatar *)gAgentAvatarp->mDrawable->getFace(0)->getPool();
-		LLGLDepthTest gls_depth(GL_TRUE, GL_TRUE);
-		gGL.setAlphaRejectSettings(LLRender::CF_ALWAYS);
-		gGL.setSceneBlendType(LLRender::BT_REPLACE);
-		avatarPoolp->renderAvatars(gAgentAvatarp);  // renders only one avatar
-		gGL.setSceneBlendType(LLRender::BT_ALPHA);
-		gGL.setAlphaRejectSettings(LLRender::CF_DEFAULT);
-	}
+    if (gAgentAvatarp->mDrawable.notNull())
+    {
+        LLGLDepthTest gls_depth(GL_TRUE, GL_TRUE);
+        gGL.flush();
+        gGL.setSceneBlendType(LLRender::BT_REPLACE);
+        gPipeline.generateImpostor(gAgentAvatarp, true);
+        gGL.setSceneBlendType(LLRender::BT_ALPHA);
+        gGL.flush();
+    }
+
 	gAgentAvatarp->setVisualParamWeight(mVisualParam->getID(), mLastParamWeight, false);
 	mWearablePtr->setVisualParamWeight(mVisualParam->getID(), mLastParamWeight, false);
 	LLViewerWearable* wearable = (LLViewerWearable*)mWearablePtr;

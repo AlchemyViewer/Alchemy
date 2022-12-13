@@ -77,32 +77,20 @@ if(WINDOWS)
 
     set(debug_src_dir "${ARCH_PREBUILT_DIRS_DEBUG}")
     set(debug_files
-        epoxy-0.dll
         libexpatd.dll
-        glod.dll
         libapr-1.dll
         libaprutil-1.dll
         libapriconv-1.dll
-        libhunspell.dll
-        libogg.dll
-        libvorbis.dll
-        libvorbisfile.dll
         openjp2.dll
         xmlrpc-epid.dll
         )
 
     set(release_src_dir "${ARCH_PREBUILT_DIRS_RELEASE}")
     set(release_files
-        epoxy-0.dll
         libexpat.dll
-        glod.dll
         libapr-1.dll
         libaprutil-1.dll
         libapriconv-1.dll
-        libhunspell.dll
-        libogg.dll
-        libvorbis.dll
-        libvorbisfile.dll
         openjp2.dll
         xmlrpc-epi.dll
         )
@@ -127,6 +115,72 @@ if(WINDOWS)
       list(APPEND debug_files kdud.dll)
       list(APPEND release_files kdu.dll)
     endif (USE_KDU)
+    
+    #*******************************
+    # Copy MS C runtime dlls, required for packaging.
+    if (MSVC80)
+        set(MSVC_VER 80)
+    elseif (MSVC_VERSION EQUAL 1600) # VisualStudio 2010
+        MESSAGE(STATUS "MSVC_VERSION ${MSVC_VERSION}")
+    elseif (MSVC_VERSION EQUAL 1800) # VisualStudio 2013, which is (sigh) VS 12
+        set(MSVC_VER 120)
+    elseif (MSVC_VERSION GREATER_EQUAL 1910 AND MSVC_VERSION LESS 1940) # Visual Studio 2017 through 2022
+        set(MSVC_VER 140)
+    elseif (MSVC_VERSION GREATER_EQUAL 1920 AND MSVC_VERSION LESS 1930) # Visual Studio 2019
+        set(MSVC_VER 140)
+    elseif (MSVC_VERSION GREATER_EQUAL 1930 AND MSVC_VERSION LESS 1940) # Visual Studio 2019
+        set(MSVC_VER 140)        
+    else (MSVC80)
+        MESSAGE(WARNING "New MSVC_VERSION ${MSVC_VERSION} of MSVC: adapt Copy3rdPartyLibs.cmake")
+    endif (MSVC80)
+
+    if(ADDRESS_SIZE EQUAL 32)
+        # this folder contains the 32bit DLLs.. (yes really!)
+        set(registry_find_path "[HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\Windows;Directory]/SysWOW64")
+    else(ADDRESS_SIZE EQUAL 32)
+        # this folder contains the 64bit DLLs.. (yes really!)
+        set(registry_find_path "[HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\Windows;Directory]/System32")
+    endif(ADDRESS_SIZE EQUAL 32)
+
+    # Having a string containing the system registry path is a start, but to
+    # get CMake to actually read the registry, we must engage some other
+    # operation.
+    get_filename_component(registry_path "${registry_find_path}" ABSOLUTE)
+
+    # These are candidate DLL names. Empirically, VS versions before 2015 have
+    # msvcp*.dll and msvcr*.dll. VS 2017 has msvcp*.dll and vcruntime*.dll.
+    # Check each of them.
+    foreach(release_msvc_file
+            concrt${MSVC_VER}.dll
+            msvcp${MSVC_VER}.dll
+            msvcp${MSVC_VER}_1.dll
+            msvcp${MSVC_VER}_2.dll
+            msvcp${MSVC_VER}_atomic_wait.dll
+            msvcp${MSVC_VER}_codecvt_ids.dll
+            vccorlib${MSVC_VER}.dll
+            vcruntime${MSVC_VER}.dll
+            vcruntime${MSVC_VER}_1.dll
+            )
+        if(EXISTS "${registry_path}/${release_msvc_file}")
+            to_relwithdeb_staging_dirs(
+                ${registry_path}
+                third_party_targets
+                ${release_msvc_file})
+            to_release_staging_dirs(
+                ${registry_path}
+                third_party_targets
+                ${release_msvc_file})
+        else()
+            # This isn't a WARNING because, as noted above, every VS version
+            # we've observed has only a subset of the specified DLL names.
+            MESSAGE(STATUS "Redist lib ${release_msvc_file} not found")
+        endif()
+    endforeach()
+    MESSAGE(STATUS "Will copy redist files for MSVC ${MSVC_VER}:")
+    foreach(target ${third_party_targets})
+        MESSAGE(STATUS "${target}")
+    endforeach()
+
 elseif(DARWIN)
     set(SHARED_LIB_STAGING_DIR_DEBUG            "${SHARED_LIB_STAGING_DIR}/Debug/Resources")
     set(SHARED_LIB_STAGING_DIR_RELWITHDEBINFO   "${SHARED_LIB_STAGING_DIR}/RelWithDebInfo/Resources")
@@ -148,8 +202,6 @@ elseif(DARWIN)
         libaprutil-1.0.dylib
         libaprutil-1.dylib
         ${EXPAT_COPY}
-        libGLOD.dylib
-        libhunspell-1.7.0.dylib
         libndofdev.dylib
        )
 
@@ -187,11 +239,7 @@ elseif(LINUX)
         libapr-1.so.0
         libaprutil-1.so.0
         ${EXPAT_COPY}
-        libGLOD.so
         libopenal.so
-        libepoxy.so
-        libepoxy.so.0
-        libepoxy.so.0.0.0
         libjpeg.so
         libjpeg.so.8
         libjpeg.so.8.2.2

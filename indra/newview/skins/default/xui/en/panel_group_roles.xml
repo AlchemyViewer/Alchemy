@@ -104,27 +104,87 @@ clicking on their names.
                  name="title"
                  relative_width="0.18" />
             </name_list>
-            <button
-             height="23"
-             follows="top|left"
-             label="Invite"
-             left="5"
-             name="member_invite"
-             width="100" />
-            <button
-             height="23"
-             label="Eject"
-             follows="top|left"
-             left_pad="10"
-             name="member_eject"
-             width="100" />
-      <button
-       height="23"
-       label="Ban Member(s)"
-       follows="top|left"
-       left_pad="10"
-       name="member_ban"
-       width="100" />
+            <layout_stack
+             follows="top|left|right"
+             height="25"
+             layout="topleft"
+             name="button_row_ls"
+             left="2"
+             orientation="horizontal"
+             width="302">
+                <layout_panel
+                 follows="top|left|right"
+                 height="23"
+                 layout="bottomleft"
+                 left="0"
+                 name="btn_invite_lp"
+                 auto_resize="true"
+                 width="68">
+                    <button
+                     follows="top|left|right"
+                     height="23"
+                     label="Invite"
+                     layout="topleft"
+                     left="1"
+                     top="0"
+                     name="member_invite"
+                     width="67" />
+                </layout_panel>
+                <layout_panel
+                 follows="top|left|right"
+                 height="23"
+                 layout="topleft"
+                 left_pad="2"
+                 name="eject_btn_lp"
+                 auto_resize="true"
+                 width="68">
+                    <button
+                     follows="top|left|right"
+                     left="1"
+                     height="23"
+                     name="member_eject"
+                     label="Eject"
+                     layout="topleft"
+                     top="0"
+                     width="67" />
+                </layout_panel>
+                <layout_panel
+                 follows="top|left|right"
+                 height="23"
+                 layout="topleft"
+                 left_pad="2"
+                 name="ban_btn_lp"
+                 auto_resize="true"
+                 width="68">
+                    <button
+                     follows="top|left|right"
+                     left="1"
+                     height="23"
+                     name="member_ban"
+                     label="Ban"
+                     layout="topleft"
+                     top="0"
+                     width="67" />
+                </layout_panel>
+                <layout_panel
+                 follows="top|left|right"
+                 height="23"
+                 layout="topleft"
+                 left_pad="2"
+                 name="export_btn_lp"
+                 auto_resize="true"
+                 width="68">
+                    <button
+                     follows="top|left|right"
+                     left="1"
+                     height="23"
+                     name="export_list"
+                     label="Export"
+                     layout="topleft"
+                     top="0"
+                     width="67" />
+                </layout_panel>
+            </layout_stack>
         </panel>
         <panel
          border="false"

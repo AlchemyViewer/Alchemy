@@ -193,7 +193,7 @@ void LLVoiceChannel::handleError(EStatusType type)
 BOOL LLVoiceChannel::isActive()
 { 
 	// only considered active when currently bound channel matches what our channel
-	return callStarted() && LLVoiceClient::getInstanceFast()->getCurrentChannel() == mURI;
+	return callStarted() && LLVoiceClient::getInstance()->getCurrentChannel() == mURI;
 }
 
 BOOL LLVoiceChannel::callStarted()
@@ -216,18 +216,18 @@ void LLVoiceChannel::deactivate()
 		//Default mic is OFF when leaving voice calls
 		if (gSavedSettings.getBOOL("AutoDisengageMic") &&
 			sCurrentVoiceChannel == this &&
-			LLVoiceClient::getInstanceFast()->getUserPTTState())
+			LLVoiceClient::getInstance()->getUserPTTState())
 		{
 			gSavedSettings.setBOOL("PTTCurrentlyEnabled", true);
-			LLVoiceClient::getInstanceFast()->setUserPTTState(false);
+			LLVoiceClient::getInstance()->setUserPTTState(false);
 		}
 	}
-	LLVoiceClient::getInstanceFast()->removeObserver(this);
+	LLVoiceClient::getInstance()->removeObserver(this);
 	
 	if (sCurrentVoiceChannel == this)
 	{
 		// default channel is proximal channel
-		sCurrentVoiceChannel = LLVoiceChannelProximal::getInstanceFast();
+		sCurrentVoiceChannel = LLVoiceChannelProximal::getInstance();
 		sCurrentVoiceChannel->activate();
 	}
 }
@@ -435,13 +435,13 @@ void LLVoiceChannelGroup::activate()
 	if (callStarted())
 	{
 		// we have the channel info, just need to use it now
-		LLVoiceClient::getInstanceFast()->setNonSpatialChannel(
+		LLVoiceClient::getInstance()->setNonSpatialChannel(
 			mURI,
 			mCredentials);
 
 		if (!gAgent.isInGroup(mSessionID)) // ad-hoc channel
 		{
-			LLIMModel::LLIMSession* session = LLIMModel::getInstanceFast()->findIMSession(mSessionID);
+			LLIMModel::LLIMSession* session = LLIMModel::getInstance()->findIMSession(mSessionID);
 			// Adding ad-hoc call participants to Recent People List.
 			// If it's an outgoing ad-hoc, we can use mInitialTargetIDs that holds IDs of people we
 			// called(both online and offline) as source to get people for recent (STORM-210).
@@ -451,7 +451,7 @@ void LLVoiceChannelGroup::activate()
 					it!=session->mInitialTargetIDs.end();++it)
 				{
 					const LLUUID id = *it;
-					LLRecentPeople::instanceFast().add(id);
+					LLRecentPeople::instance().add(id);
 				}
 			}
 			// If this ad-hoc is incoming then trying to get ids of people from mInitialTargetIDs
@@ -463,9 +463,9 @@ void LLVoiceChannelGroup::activate()
 		}
 
 		//Mic default state is OFF on initiating/joining Ad-Hoc/Group calls
-		if (LLVoiceClient::getInstanceFast()->getUserPTTState() && LLVoiceClient::getInstanceFast()->getPTTIsToggle())
+		if (LLVoiceClient::getInstance()->getUserPTTState() && LLVoiceClient::getInstance()->getPTTIsToggle())
 		{
-			LLVoiceClient::getInstanceFast()->inputUserControlState(true);
+			LLVoiceClient::getInstance()->inputUserControlState(true);
 		}
 		
 	}
@@ -516,7 +516,7 @@ void LLVoiceChannelGroup::setChannelInfo(
 	else if ( mIsRetrying )
 	{
 		// we have the channel info, just need to use it now
-		LLVoiceClient::getInstanceFast()->setNonSpatialChannel(
+		LLVoiceClient::getInstance()->setNonSpatialChannel(
 			mURI,
 			mCredentials);
 	}
@@ -674,7 +674,7 @@ LLVoiceChannelProximal::LLVoiceChannelProximal() :
 
 BOOL LLVoiceChannelProximal::isActive()
 {
-	return callStarted() && LLVoiceClient::getInstanceFast()->inProximalChannel(); 
+	return callStarted() && LLVoiceClient::getInstance()->inProximalChannel(); 
 }
 
 void LLVoiceChannelProximal::activate()
@@ -684,7 +684,7 @@ void LLVoiceChannelProximal::activate()
 	if((LLVoiceChannel::sCurrentVoiceChannel != this) && (LLVoiceChannel::getState() == STATE_CONNECTED))
 	{
 		// we're connected to a non-spatial channel, so disconnect.
-		LLVoiceClient::getInstanceFast()->leaveNonSpatialChannel();
+		LLVoiceClient::getInstance()->leaveNonSpatialChannel();
 	}
 	LLVoiceChannel::activate();
 	
@@ -716,10 +716,10 @@ void LLVoiceChannelProximal::handleStatusChange(EStatusType status)
 		// do not notify user when leaving proximal channel
 		return;
 	case STATUS_VOICE_DISABLED:
-		LLVoiceClient::getInstanceFast()->setUserPTTState(false);
+		LLVoiceClient::getInstance()->setUserPTTState(false);
 		gAgent.setVoiceConnected(false);
 		//skip showing "Voice not available at your current location" when agent voice is disabled (EXT-4749)
-		if(LLVoiceClient::getInstanceFast()->voiceEnabled() && LLVoiceClient::getInstanceFast()->isVoiceWorking())
+		if(LLVoiceClient::getInstance()->voiceEnabled() && LLVoiceClient::getInstance()->isVoiceWorking())
 		{
 			//TODO: remove or redirect this call status notification
 //			LLCallInfoDialog::show("unavailable", mNotifyArgs);
@@ -842,12 +842,12 @@ void LLVoiceChannelP2P::activate()
 		if (mSessionHandle.empty())
 		{
 			mReceivedCall = FALSE;
-			LLVoiceClient::getInstanceFast()->callUser(mOtherUserID);
+			LLVoiceClient::getInstance()->callUser(mOtherUserID);
 		}
 		// otherwise answering the call
 		else
 		{
-			if (!LLVoiceClient::getInstanceFast()->answerInvite(mSessionHandle))
+			if (!LLVoiceClient::getInstance()->answerInvite(mSessionHandle))
 			{
 				mCallEndedByAgent = false;
 				mSessionHandle.clear();
@@ -862,9 +862,9 @@ void LLVoiceChannelP2P::activate()
 		addToTheRecentPeopleList();
 
 		//Default mic is ON on initiating/joining P2P calls
-		if (!LLVoiceClient::getInstanceFast()->getUserPTTState() && LLVoiceClient::getInstanceFast()->getPTTIsToggle())
+		if (!LLVoiceClient::getInstance()->getUserPTTState() && LLVoiceClient::getInstance()->getPTTIsToggle())
 		{
-			LLVoiceClient::getInstanceFast()->inputUserControlState(true);
+			LLVoiceClient::getInstance()->inputUserControlState(true);
 		}
 	}
 }
@@ -896,7 +896,7 @@ void LLVoiceChannelP2P::setSessionHandle(const std::string& handle, const std::s
 			// we are active and have priority, invite the other user again
 			// under the assumption they will join this new session
 			mSessionHandle.clear();
-			LLVoiceClient::getInstanceFast()->callUser(mOtherUserID);
+			LLVoiceClient::getInstance()->callUser(mOtherUserID);
 			return;
 		}
 	}
@@ -912,7 +912,7 @@ void LLVoiceChannelP2P::setSessionHandle(const std::string& handle, const std::s
 	{
 		LL_WARNS("Voice") << "incoming SIP URL is not provided. Channel may not work properly." << LL_ENDL;
 		// See LLVoiceClient::sessionAddedEvent()
-		setURI(LLVoiceClient::getInstanceFast()->sipURIFromID(mOtherUserID));
+		setURI(LLVoiceClient::getInstance()->sipURIFromID(mOtherUserID));
 	}
 	
 	mReceivedCall = TRUE;
@@ -945,5 +945,5 @@ void LLVoiceChannelP2P::setState(EState state)
 
 void LLVoiceChannelP2P::addToTheRecentPeopleList()
 {
-	LLRecentPeople::instanceFast().add(mOtherUserID);
+	LLRecentPeople::instance().add(mOtherUserID);
 }

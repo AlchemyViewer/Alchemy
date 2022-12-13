@@ -254,10 +254,9 @@ BOOL LLTexLayerParamAlpha::getSkip() const
 }
 
 
-static LLTrace::BlockTimerStatHandle FTM_TEX_LAYER_PARAM_ALPHA("alpha render");
 BOOL LLTexLayerParamAlpha::render(S32 x, S32 y, S32 width, S32 height)
 {
-	LL_RECORD_BLOCK_TIME(FTM_TEX_LAYER_PARAM_ALPHA);
+    LL_PROFILE_ZONE_SCOPED;
 	BOOL success = TRUE;
 
 	if (!mTexLayer)
@@ -288,7 +287,7 @@ BOOL LLTexLayerParamAlpha::render(S32 x, S32 y, S32 width, S32 height)
 		if (mStaticImageTGA.isNull())
 		{
 			// Don't load the image file until we actually need it the first time.  Like now.
-			mStaticImageTGA = LLTexLayerStaticImageList::getInstanceFast()->getImageTGA(info->mStaticImageFileName);
+			mStaticImageTGA = LLTexLayerStaticImageList::getInstance()->getImageTGA(info->mStaticImageFileName);
 			// We now have something in one of our caches
 			LLTexLayerSet::sHasCaches |= mStaticImageTGA.notNull() ? TRUE : FALSE;
 

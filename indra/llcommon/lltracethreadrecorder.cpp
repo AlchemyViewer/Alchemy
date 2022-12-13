@@ -274,12 +274,10 @@ void ThreadRecorder::pushToParent()
 }
 
 
-static LLTrace::BlockTimerStatHandle FTM_PULL_TRACE_DATA_FROM_CHILDREN("Pull child thread trace data");
-
 void ThreadRecorder::pullFromChildren()
 {
 #if LL_TRACE_ENABLED
-	LL_RECORD_BLOCK_TIME(FTM_PULL_TRACE_DATA_FROM_CHILDREN);
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_STATS;
 	if (mActiveRecordings.empty()) return;
 
 	{ LLMutexLock child_list_lock(&mChildListMutex);
@@ -310,13 +308,13 @@ ThreadRecorder* get_master_thread_recorder()
 	return sMasterThreadRecorder;
 }
 
-LLThreadLocalPointer<ThreadRecorder>& get_thread_recorder_ptr()
+ThreadRecorder*& get_thread_recorder_ptr()
 {
-	static LLThreadLocalPointer<ThreadRecorder> s_thread_recorder;
+	static thread_local ThreadRecorder* s_thread_recorder;
 	return s_thread_recorder;
 }
 
-const LLThreadLocalPointer<ThreadRecorder>& get_thread_recorder()
+ThreadRecorder* get_thread_recorder()
 {
 	return get_thread_recorder_ptr();
 }

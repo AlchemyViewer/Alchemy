@@ -4,9 +4,6 @@ if(NOT DEFINED ${CMAKE_CURRENT_LIST_FILE}_INCLUDED)
 set(${CMAKE_CURRENT_LIST_FILE}_INCLUDED "YES")
 
 include(FindAutobuild)
-if(INSTALL_PROPRIETARY)
-  include(FindSCP)
-endif(INSTALL_PROPRIETARY)
 
 set(PREBUILD_TRACKING_DIR ${AUTOBUILD_INSTALL_DIR}/cmake_tracking)
 # For the library installation process;
@@ -46,6 +43,7 @@ macro (use_prebuilt_binary _binary)
       execute_process(COMMAND "${AUTOBUILD_EXECUTABLE}"
         install
         -A${ADDRESS_SIZE}
+        --skip-source-environment
         --install-dir=${AUTOBUILD_INSTALL_DIR}
         ${_binary}
         WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"

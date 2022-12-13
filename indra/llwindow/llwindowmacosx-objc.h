@@ -96,6 +96,7 @@ void setCrossCursor();
 void setNotAllowedCursor();
 void hideNSCursor();
 void showNSCursor();
+bool isCGCursorVisible();
 void hideNSCursorTillMove(bool hide);
 void requestUserAttention();
 long showAlert(std::string title, std::string text, int type);
@@ -174,6 +175,6 @@ NSWindowRef getMainAppWindow();
 GLViewRef getGLView();
 
 unsigned int getModifiers();
-void setTitle(const std::string& title);
+void setWindowTitle(const std::string& title);
 
 #endif // LL_LLWINDOWMACOSX_OBJC_H

@@ -102,6 +102,7 @@ LLButton::Params::Params()
 	scale_image("scale_image", true),
 	hover_glow_amount("hover_glow_amount"),
 	commit_on_return("commit_on_return", true),
+    commit_on_capture_lost("commit_on_capture_lost", false),
 	display_pressed_state("display_pressed_state", true),
 	use_draw_context_alpha("use_draw_context_alpha", true),
 	badge("badge"),
@@ -166,6 +167,7 @@ LLButton::LLButton(const LLButton::Params& p)
 	mBottomVPad(p.pad_bottom),
 	mHoverGlowStrength(p.hover_glow_amount),
 	mCommitOnReturn(p.commit_on_return),
+    mCommitOnCaptureLost(p.commit_on_capture_lost),
 	mFadeWhenDisabled(FALSE),
 	mForcePressedState(false),
 	mDisplayPressedState(p.display_pressed_state),
@@ -481,6 +483,10 @@ BOOL LLButton::handleMouseUp(S32 x, S32 y, MASK mask)
 	// We only handle the click if the click both started and ended within us
 	if( hasMouseCapture() )
 	{
+        // reset timers before focus change, to not cause
+        // additional commits if mCommitOnCaptureLost.
+        resetMouseDownTimer();
+
 		// Always release the mouse
 		gFocusMgr.setMouseCapture( NULL );
 
@@ -500,8 +506,6 @@ BOOL LLButton::handleMouseUp(S32 x, S32 y, MASK mask)
 
 		// Regardless of where mouseup occurs, handle callback
 		if(mMouseUpSignal) (*mMouseUpSignal)(this, LLSD());
-
-		resetMouseDownTimer();
 
 		// DO THIS AT THE VERY END to allow the button to be destroyed as a result of being clicked.
 		// If mouseup in the widget, it's been clicked
@@ -1216,6 +1220,18 @@ void LLButton::setImageOverlay(const LLUUID& image_id, LLFontGL::HAlign alignmen
 
 void LLButton::onMouseCaptureLost()
 {
+    if (mCommitOnCaptureLost
+        && mMouseDownTimer.getStarted())
+    {
+        if (mMouseUpSignal) (*mMouseUpSignal)(this, LLSD());
+
+        if (mIsToggle)
+        {
+            toggleState();
+        }
+
+        LLUICtrl::onCommit();
+    }
 	resetMouseDownTimer();
 }
 
@@ -1297,10 +1313,10 @@ void LLButton::showHelp(LLUICtrl* ctrl, const LLSD& sdname)
 	// search back through the button's parents for a panel
 	// with a help_topic string defined
 	std::string help_topic;
-	if (LLUI::getInstanceFast()->mHelpImpl &&
+	if (LLUI::getInstance()->mHelpImpl &&
 	    ctrl->findHelpTopic(help_topic))
 	{
-		LLUI::getInstanceFast()->mHelpImpl->showTopic(help_topic);
+		LLUI::getInstance()->mHelpImpl->showTopic(help_topic);
 		return; // success
 	}
 

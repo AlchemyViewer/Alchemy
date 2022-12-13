@@ -56,6 +56,10 @@ VARYING vec3 vary_norm;
 VARYING vec4 vertex_color; //vertex color should be treated as sRGB
 #endif
 
+#ifdef HAS_ALPHA_MASK
+uniform float minimum_alpha;
+#endif
+
 uniform mat4 proj_mat;
 uniform mat4 inv_proj;
 uniform vec2 screen_res;
@@ -86,6 +90,14 @@ float getAmbientClamp();
 
 vec3 calcPointLightOrSpotLight(vec3 light_col, vec3 diffuse, vec3 v, vec3 n, vec4 lp, vec3 ln, float la, float fa, float is_pointlight, float ambiance)
 {
+    // SL-14895 inverted attenuation work-around
+    // This routine is tweaked to match deferred lighting, but previously used an inverted la value. To reconstruct
+    // that previous value now that the inversion is corrected, we reverse the calculations in LLPipeline::setupHWLights()
+    // to recover the `adjusted_radius` value previously being sent as la.
+    float falloff_factor = (12.0 * fa) - 9.0;
+    float inverted_la = falloff_factor / la;
+    // Yes, it makes me want to cry as well. DJH
+    
     vec3 col = vec3(0);
 
 	//get light vector
@@ -95,7 +107,7 @@ vec3 calcPointLightOrSpotLight(vec3 light_col, vec3 diffuse, vec3 v, vec3 n, vec
 	float dist = length(lv);
 	float da = 1.0;
 
-    /*if (dist > la)
+    /*if (dist > inverted_la)
     {
         return col;
     }
@@ -113,9 +125,9 @@ vec3 calcPointLightOrSpotLight(vec3 light_col, vec3 diffuse, vec3 v, vec3 n, vec
         return col;
     }*/
 
-	if (dist > 0.0 && la > 0.0)
+	if (dist > 0.0 && inverted_la > 0.0)
 	{
-        dist /= la;
+        dist /= inverted_la;
 
 		//normalize light vector
 		lv = normalize(lv);
@@ -187,6 +199,11 @@ void main()
 
 #ifdef USE_VERTEX_COLOR
     final_alpha *= vertex_color.a;
+    if (final_alpha < minimum_alpha)
+    { // TODO: figure out how to get invisible faces out of 
+        // render batches without breaking glow
+        discard;
+    }
     diffuse_srgb.rgb *= vertex_color.rgb;
 #endif
 
@@ -197,7 +214,7 @@ void main()
 
     // Insure we don't pollute depth with invis pixels in impostor rendering
     //
-    if (final_alpha < 0.01)
+    if (final_alpha < minimum_alpha)
     {
         discard;
     }
@@ -229,11 +246,11 @@ void main()
 #if !defined(AMBIENT_KILL)
     color.rgb = amblit;
     color.rgb *= ambient;
-#endif
+#endif // !defined(AMBIENT_KILL)
 
 #if !defined(SUNLIGHT_KILL)
     color.rgb += sun_contrib;
-#endif
+#endif // !defined(SUNLIGHT_KILL)
 
     color.rgb *= diffuse_srgb.rgb;
 
@@ -259,7 +276,7 @@ void main()
     // sum local light contrib in linear colorspace
 #if !defined(LOCAL_LIGHT_KILL)
     color.rgb += light.rgb;
-#endif
+#endif // !defined(LOCAL_LIGHT_KILL)
 
 #ifdef WATER_FOG
     color.rgb = linear_to_srgb(color.rgb);

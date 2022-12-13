@@ -119,7 +119,8 @@ public:
 	//virtual BOOL removeItem() = 0;
 	virtual void removeBatch(std::vector<LLFolderViewModelItem*>& batch);
 	virtual void move(LLFolderViewModelItem* new_parent_bridge) {}
-	virtual BOOL isItemCopyable() const { return FALSE; }
+    virtual bool isItemCopyable(bool can_copy_as_link = true) const { return false; }
+	virtual BOOL isItemModifyable() const { return FALSE; }
 // [SL:KB] - Patch: Inventory-Links | Checked: 2013-09-19 (Catznip-3.6)
 	virtual bool isItemLinkable() const { return FALSE; }
 // [/SL:KB]
@@ -248,7 +249,8 @@ public:
 	virtual BOOL isItemRenameable() const;
 	virtual BOOL renameItem(const std::string& new_name);
 	virtual BOOL removeItem();
-	virtual BOOL isItemCopyable() const;
+    virtual bool isItemCopyable(bool can_copy_as_link = true) const;
+	virtual BOOL isItemModifyable() const;
 // [SL:KB] - Patch: Inventory-Links | Checked: 2013-09-19 (Catznip-3.6)
 	/*virtual*/ bool isItemLinkable() const;
 // [/SL:KB]
@@ -324,7 +326,7 @@ public:
 	virtual BOOL isItemRemovable() const;
 	virtual BOOL isItemMovable() const ;
 	virtual BOOL isUpToDate() const;
-	virtual BOOL isItemCopyable() const;
+    virtual bool isItemCopyable(bool can_copy_as_link = true) const;
 // [SL:KB] - Patch: Inventory-Links | Checked: 2013-09-19 (Catznip-3.6)
 	/*virtual*/ bool isItemLinkable() const;
 // [/SL:KB]
@@ -466,6 +468,7 @@ public:
 	void checkSearchBySuffixChanges();
 protected:
 	LLCallingCardObserver* mObserver;
+    LLUUID mCreatorUUID;
 };
 
 class LLNotecardBridge : public LLItemBridge

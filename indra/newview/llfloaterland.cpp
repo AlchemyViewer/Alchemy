@@ -192,7 +192,7 @@ void send_parcel_select_objects(S32 parcel_local_id, U32 return_type,
 
 	// Since new highlight will be coming in, drop any highlights
 	// that exist right now.
-	LLSelectMgr::getInstanceFast()->unhighlightAll();
+	LLSelectMgr::getInstance()->unhighlightAll();
 
 	msg->newMessageFast(_PREHASH_ParcelSelectObjects);
 	msg->nextBlockFast(_PREHASH_AgentData);
@@ -293,7 +293,7 @@ void LLFloaterLand::onVisibilityChanged(const LLSD& visible)
 	if (!visible.asBoolean())
 	{
 		// Might have been showing owned objects
-		LLSelectMgr::getInstanceFast()->unhighlightAll();
+		LLSelectMgr::getInstance()->unhighlightAll();
 
 		// Save which panel we had open
 		sLastTab = mTabLand->getCurrentPanelIndex();
@@ -452,7 +452,8 @@ BOOL LLPanelLandGeneral::postBuild()
 
 	mEditDesc = getChild<LLTextEditor>("Description");
 	mEditDesc->setCommitOnFocusLost(TRUE);
-	mEditDesc->setCommitCallback(onCommitAny, this);	
+	mEditDesc->setCommitCallback(onCommitAny, this);
+    mEditDesc->setContentTrusted(false);
 	// No prevalidate function - historically the prevalidate function was broken,
 	// allowing residents to put in characters like U+2661 WHITE HEART SUIT, so
 	// preserve that ability.
@@ -749,6 +750,7 @@ void LLPanelLandGeneral::refresh()
 		BOOL can_edit_identity = LLViewerParcelMgr::isParcelModifiableByAgent(parcel, GP_LAND_CHANGE_IDENTITY);
 		mEditName->setEnabled(can_edit_identity);
 		mEditDesc->setEnabled(can_edit_identity);
+        mEditDesc->setParseURLs(!can_edit_identity);
 
 		BOOL can_edit_agent_only = LLViewerParcelMgr::isParcelModifiableByAgent(parcel, GP_NO_POWERS);
 		mBtnSetGroup->setEnabled(can_edit_agent_only && !parcel->getIsGroupOwned());
@@ -1484,7 +1486,7 @@ bool LLPanelLandObjects::callbackReturnOwnerObjects(const LLSD& notification, co
 		}
 	}
 
-	LLSelectMgr::getInstanceFast()->unhighlightAll();
+	LLSelectMgr::getInstance()->unhighlightAll();
 	LLViewerParcelMgr::getInstance()->sendParcelPropertiesUpdate( parcel );
 	refresh();
 	return false;
@@ -1506,7 +1508,7 @@ bool LLPanelLandObjects::callbackReturnGroupObjects(const LLSD& notification, co
 			send_return_objects_message(parcel->getLocalID(), RT_GROUP);
 		}
 	}
-	LLSelectMgr::getInstanceFast()->unhighlightAll();
+	LLSelectMgr::getInstance()->unhighlightAll();
 	LLViewerParcelMgr::getInstance()->sendParcelPropertiesUpdate( parcel );
 	refresh();
 	return false;
@@ -1524,7 +1526,7 @@ bool LLPanelLandObjects::callbackReturnOtherObjects(const LLSD& notification, co
 			send_return_objects_message(parcel->getLocalID(), RT_OTHER);
 		}
 	}
-	LLSelectMgr::getInstanceFast()->unhighlightAll();
+	LLSelectMgr::getInstance()->unhighlightAll();
 	LLViewerParcelMgr::getInstance()->sendParcelPropertiesUpdate( parcel );
 	refresh();
 	return false;
@@ -1558,7 +1560,7 @@ bool LLPanelLandObjects::callbackReturnOwnerList(const LLSD& notification, const
 			}
 		}
 	}
-	LLSelectMgr::getInstanceFast()->unhighlightAll();
+	LLSelectMgr::getInstance()->unhighlightAll();
 	LLViewerParcelMgr::getInstance()->sendParcelPropertiesUpdate( parcel );
 	refresh();
 	return false;
@@ -3064,7 +3066,8 @@ BOOL LLPanelLandCovenant::postBuild()
 {
 	mLastRegionID = LLUUID::null;
 	mNextUpdateTime = 0;
-
+    mTextEstateOwner = getChild<LLTextBox>("estate_owner_text");
+    mTextEstateOwner->setIsFriendCallback(LLAvatarActions::isFriend);
 	return TRUE;
 }
 
@@ -3172,8 +3175,7 @@ void LLPanelLandCovenant::updateEstateOwnerName(const std::string& name)
 	LLPanelLandCovenant* self = LLFloaterLand::getCurrentPanelLandCovenant();
 	if (self)
 	{
-		LLTextBox* editor = self->getChild<LLTextBox>("estate_owner_text");
-		if (editor) editor->setText(name);
+		self->mTextEstateOwner->setText(name);
 	}
 }
 

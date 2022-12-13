@@ -314,7 +314,7 @@ void notify_of_message(const LLSD& msg, bool is_dnd_msg)
 				 	 	 	 	 	 	|| NOT_ON_TOP == conversations_floater_status))
 		|| is_dnd_msg)
     {
-    	if(!LLMuteList::getInstanceFast()->isMuted(participant_id))
+    	if(!LLMuteList::getInstance()->isMuted(participant_id))
     	{
 			if(gAgent.isDoNotDisturb())
 			{
@@ -343,7 +343,7 @@ void notify_of_message(const LLSD& msg, bool is_dnd_msg)
 		&& !is_session_focused
 		&& !is_dnd_msg) //prevent flashing FUI button because the conversation floater will have already opened
 	{
-		if(!LLMuteList::getInstanceFast()->isMuted(participant_id))
+		if(!LLMuteList::getInstance()->isMuted(participant_id))
     {
 			if(!gAgent.isDoNotDisturb())
     	{
@@ -771,7 +771,8 @@ void LLIMModel::LLIMSession::sessionInitReplyReceived(const LLUUID& new_session_
 	}
 }
 
-void LLIMModel::LLIMSession::addMessage(const std::string& from, const LLUUID& from_id, const std::string& utf8_text, const std::string& time, const bool is_history)
+void LLIMModel::LLIMSession::addMessage(const std::string& from, const LLUUID& from_id, const std::string& utf8_text, 
+	const std::string& time, const bool is_history, bool is_region_msg, const LLSD& bonus)
 {
 	LLSD message;
 	message["from"] = from;
@@ -780,6 +781,8 @@ void LLIMModel::LLIMSession::addMessage(const std::string& from, const LLUUID& f
 	message["time"] = time; 
 	message["index"] = (LLSD::Integer)mMsgs.size(); 
 	message["is_history"] = is_history;
+	message["is_region_msg"] = is_region_msg;
+    message["is_announcement"] = bonus.has("announcement");
 
 	mMsgs.push_front(message); 
 
@@ -1144,7 +1147,7 @@ void LLIMModel::sendNoUnreadMessages(const LLUUID& session_id)
 	mNoUnreadMsgsSignal(arg);
 }
 
-bool LLIMModel::addToHistory(const LLUUID& session_id, const std::string& from, const LLUUID& from_id, const std::string& utf8_text) {
+bool LLIMModel::addToHistory(const LLUUID& session_id, const std::string& from, const LLUUID& from_id, const std::string& utf8_text, bool is_region_msg, const LLSD& bonus) {
 	
 	LLIMSession* session = findIMSession(session_id);
 
@@ -1154,7 +1157,7 @@ bool LLIMModel::addToHistory(const LLUUID& session_id, const std::string& from, 
 		return false;
 	}
 
-	session->addMessage(from, from_id, utf8_text, LLLogChat::timestamp(false)); //might want to add date separately
+	session->addMessage(from, from_id, utf8_text, LLLogChat::timestamp(false), false, is_region_msg, bonus); //might want to add date separately
 
 	return true;
 }
@@ -1192,16 +1195,16 @@ bool LLIMModel::proccessOnlineOfflineNotification(
 }
 
 bool LLIMModel::addMessage(const LLUUID& session_id, const std::string& from, const LLUUID& from_id, 
-						   const std::string& utf8_text, bool log2file /* = true */) { 
+						   const std::string& utf8_text, bool log2file, bool is_region_msg, const LLSD& bonus) { 
 
-	LLIMSession* session = addMessageSilently(session_id, from, from_id, utf8_text, log2file);
+	LLIMSession* session = addMessageSilently(session_id, from, from_id, utf8_text, log2file, is_region_msg, bonus);
 	if (!session) return false;
 
 	//good place to add some1 to recent list
 	//other places may be called from message history.
 	if( !from_id.isNull() &&
 		( session->isP2PSessionType() || session->isAdHocSessionType() ) )
-		LLRecentPeople::instanceFast().add(from_id);
+		LLRecentPeople::instance().add(from_id);
 
 	// notify listeners
 	LLSD arg;
@@ -1219,13 +1222,12 @@ bool LLIMModel::addMessage(const LLUUID& session_id, const std::string& from, co
 }
 
 LLIMModel::LLIMSession* LLIMModel::addMessageSilently(const LLUUID& session_id, const std::string& from, const LLUUID& from_id, 
-													 const std::string& utf8_text, bool log2file /* = true */)
+													 const std::string& utf8_text, bool log2file, bool is_region_msg, const LLSD& bonus)
 {
 	LLIMSession* session = findIMSession(session_id);
 
 	if (!session)
 	{
-		LL_WARNS() << "session " << session_id << "does not exist " << LL_ENDL;
 		return NULL;
 	}
 
@@ -1236,7 +1238,7 @@ LLIMModel::LLIMSession* LLIMModel::addMessageSilently(const LLUUID& session_id, 
 		from_name = SYSTEM_FROM;
 	}
 
-	addToHistory(session_id, from_name, from_id, utf8_text);
+	addToHistory(session_id, from_name, from_id, utf8_text, is_region_msg, bonus);
 	if (log2file)
 	{
 		logToFile(getHistoryFileName(session_id), from_name, from_id, utf8_text);
@@ -1495,7 +1497,7 @@ void LLIMModel::sendMessage(const std::string& utf8_text,
 		case IM_LURE_USER:
 		case IM_GODLIKE_LURE_USER:
 		case IM_FRIENDSHIP_OFFERED:
-			LLMuteList::getInstanceFast()->autoRemove(other_participant_id, LLMuteList::AR_IM);
+			LLMuteList::getInstance()->autoRemove(other_participant_id, LLMuteList::AR_IM);
 			break;
 		default: ; // do nothing
 		}
@@ -1530,7 +1532,7 @@ void LLIMModel::sendMessage(const std::string& utf8_text,
 	{
 		if( session == 0)//??? shouldn't really happen
 		{
-			LLRecentPeople::instanceFast().add(other_participant_id);
+			LLRecentPeople::instance().add(other_participant_id);
 			return;
 		}
 		// IM_SESSION_INVITE means that this is an Ad-hoc incoming chat
@@ -1550,7 +1552,7 @@ void LLIMModel::sendMessage(const std::string& utf8_text,
 			// Add the recepient of the session.
 			if (!session->mInitialTargetIDs.empty())
 			{
-				LLRecentPeople::instanceFast().add(*(session->mInitialTargetIDs.begin()));
+				LLRecentPeople::instance().add(*(session->mInitialTargetIDs.begin()));
 			}
 		}
 	}
@@ -1567,7 +1569,7 @@ void LLIMModel::addSpeakersToRecent(const LLUUID& im_session_id)
 	for(LLSpeakerMgr::speaker_list_t::iterator it = speaker_list.begin(); it != speaker_list.end(); it++)
 	{
 		const LLPointer<LLSpeaker>& speakerp = *it;
-		LLRecentPeople::instanceFast().add(speakerp->mID);
+		LLRecentPeople::instance().add(speakerp->mID);
 	}
 }
 
@@ -2083,8 +2085,8 @@ void LLCallDialog::setIcon(const LLSD& session_id, const LLSD& participant_id)
 	}
 	else
 	{
-		LL_WARNS() << "Participant neither avatar nor group" << LL_ENDL;
-		group_icon->setValue(session_id);
+        LL_WARNS() << "Participant neither avatar nor group" << LL_ENDL;
+        group_icon->setValue(session_id);
 	}
 }
 
@@ -2357,7 +2359,7 @@ BOOL LLIncomingCallDialog::postBuild()
 		call_type = getString(notify_box_type);
 	}
 
-	if (caller_name == "anonymous") // obsolete? Likely was part of avaline support
+	if (caller_name == "anonymous") // obsolete?  Likely was part of avaline support
 	{
 		caller_name = getString("anonymous");
 		setCallerName(caller_name, caller_name, call_type);
@@ -2703,7 +2705,8 @@ void LLIMMgr::addMessage(
 	U32 parent_estate_id,
 	const LLUUID& region_id,
 	const LLVector3& position,
-	bool link_name) // If this is true, then we insert the name and link it to a profile
+	bool is_region_msg,
+	const LLSD& bonus)
 {
 	LLUUID other_participant_id = target_id;
 
@@ -2775,12 +2778,13 @@ void LLIMMgr::addMessage(
 				//<< "*** region_id: " << region_id << std::endl
 				//<< "*** position: " << position << std::endl;
 
-				LLIMModel::instance().addMessage(new_session_id, from, other_participant_id, bonus_info.str());
+				LLIMModel::instance().addMessage(new_session_id, from, other_participant_id, bonus_info.str(), true, is_region_msg);
 			}
 
 //			// Logically it would make more sense to reject the session sooner, in another area of the
 //			// code, but the session has to be established inside the server before it can be left.
-//			if (LLMuteList::getInstance()->isMuted(other_participant_id, LLMute::flagTextChat) && !from_linden)
+//			if ((LLMuteList::getInstance()->isMuted(other_participant_id, LLMute::flagTextChat) && !from_linden)
+//				|| LLMuteList::getInstance()->isGroupMuted(new_session_id))
 //			{
 //				LL_WARNS() << "Leaving IM session from initiating muted resident " << from << LL_ENDL;
 //				if (!gIMMgr->leaveSession(new_session_id))
@@ -2805,10 +2809,10 @@ void LLIMMgr::addMessage(
 
 //	if (!LLMuteList::getInstance()->isMuted(other_participant_id, LLMute::flagTextChat) && !skip_message)
 // [SL:KB] - Patch: Chat-Misc | Checked: 2014-05-01 (Catznip-3.6)
-	if (!LLMuteList::getInstanceFast()->isMuted(other_participant_id, LLMute::flagTextChat))
+	if (!LLMuteList::getInstance()->isMuted(other_participant_id, LLMute::flagTextChat))
 // [/SL:KB]
 	{
-		LLIMModel::instance().addMessage(new_session_id, from, other_participant_id, msg);
+		LLIMModel::instance().addMessage(new_session_id, from, other_participant_id, msg, true, is_region_msg, bonus);
 	}
 
 	// Open conversation floater if offline messages are present
@@ -3148,14 +3152,14 @@ void LLIMMgr::inviteToSession(
 	//ignore invites from muted residents
 	if (!is_linden)
 	{
-		if (LLMuteList::getInstanceFast()->isMuted(caller_id, LLMute::flagVoiceChat)
+		if (LLMuteList::getInstance()->isMuted(caller_id, LLMute::flagVoiceChat)
 			&& voice_invite && "VoiceInviteQuestionDefault" == question_type)
 		{
 			LL_INFOS("IMVIEW") << "Rejecting voice call from initiating muted resident " << caller_name << LL_ENDL;
 			LLIncomingCallDialog::processCallResponse(1, payload);
 			return;
 		}
-		else if (LLMuteList::getInstanceFast()->isMuted(caller_id, LLMute::flagAll & ~LLMute::flagVoiceChat) && !voice_invite)
+		else if (LLMuteList::getInstance()->isMuted(caller_id, LLMute::flagAll & ~LLMute::flagVoiceChat) && !voice_invite)
 		{
 			LL_INFOS("IMVIEW") << "Rejecting session invite from initiating muted resident " << caller_name << LL_ENDL;
 			return;
@@ -3233,7 +3237,7 @@ void LLIMMgr::inviteToSession(
 		// the call, the caller should be added to the recent list
 		// anyway. STORM-507.
 		if(type == IM_SESSION_P2P_INVITE)
-			LLRecentPeople::instanceFast().add(caller_id);
+			LLRecentPeople::instance().add(caller_id);
 		
 		mPendingInvitations[session_id.asString()] = LLSD();
 	}
@@ -3563,7 +3567,7 @@ void LLIMMgr::noteMutedUsers(const LLUUID& session_id,
 								  const std::vector<LLUUID>& ids)
 {
 	// Don't do this if we don't have a mute list.
-	LLMuteList *ml = LLMuteList::getInstanceFast();
+	LLMuteList *ml = LLMuteList::getInstance();
 	if( !ml )
 	{
 		return;
@@ -3786,7 +3790,7 @@ public:
 
 			BOOL is_do_not_disturb = gAgent.isDoNotDisturb();
  // [SL:KB] - Patch: Chat-GroupOptions | Checked: 2012-06-21 (Catznip-3.3)
-			BOOL is_muted = LLMuteList::getInstanceFast()->isMuted(from_id, LLMute::flagTextChat);
+			BOOL is_muted = LLMuteList::getInstance()->isMuted(from_id, LLMute::flagTextChat);
 			BOOL is_group = gAgent.isInGroup(session_id);
 
 			// Just return if the user is currently marked DnD or if the group session was started by someone on the mute list (we'll get another invitation later)
@@ -3840,7 +3844,8 @@ public:
 
 // [SL:KB] - Patch: Chat-GroupOptions | Checked: 2012-06-21 (Catznip-3.3)
 			const LLGroupOptions* pGroupOptions = LLGroupOptionsMgr::getInstance()->getOptions(session_id);
-			if ( (pGroupOptions) && (!pGroupOptions->mReceiveGroupChat) )
+			if ((pGroupOptions && !pGroupOptions->mReceiveGroupChat)
+				|| LLMuteList::instance().isGroupMuted(session_id))
 			{
 				const std::string strUrl = gAgent.getRegion()->getCapability("ChatSessionRequest");
 				if (!strUrl.empty())
@@ -3880,10 +3885,9 @@ public:
 				IM_SESSION_INVITE,
 				message_params["parent_estate_id"].asInteger(),
 				message_params["region_id"].asUUID(),
-				ll_vector3_from_sd(message_params["position"]),
-				true);
+				ll_vector3_from_sd(message_params["position"]));
 
-			if (LLMuteList::getInstanceFast()->isMuted(from_id, name, LLMute::flagTextChat))
+			if (LLMuteList::getInstance()->isMuted(from_id, name, LLMute::flagTextChat))
 			{
 				return;
 			}

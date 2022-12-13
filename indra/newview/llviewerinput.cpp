@@ -48,7 +48,6 @@
 #include "llfloatercamera.h"
 #include "llinitparam.h"
 #include "llselectmgr.h"
-#include "fsfloatersearch.h"
 #include "llfloaterwebcontent.h"
 // [RLVa:KB] - Checked: 2021-07-29 (RLVa-1.4.4a)
 #include "rlvactions.h"
@@ -287,7 +286,7 @@ bool agent_turn_left(EKeystate s)
 
 	if(gAgent.isMovementLocked()) return false;
 
-	if (LLToolCamera::getInstanceFast()->mouseSteerMode())
+	if (LLToolCamera::getInstance()->mouseSteerMode())
 	{
 		agent_slide_left(s);
 	}
@@ -318,7 +317,7 @@ bool agent_turn_right( EKeystate s )
 
 	if(gAgent.isMovementLocked()) return false;
 
-	if (LLToolCamera::getInstanceFast()->mouseSteerMode())
+	if (LLToolCamera::getInstance()->mouseSteerMode())
 	{
 		agent_slide_right(s);
 	}
@@ -677,7 +676,7 @@ bool start_chat( EKeystate s )
 bool start_gesture( EKeystate s )
 {
     LLFloater* focused_floater = gFloaterView->getFocusedFloater();
-    if (focused_floater && (dynamic_cast<LLFloaterWebContent*>(focused_floater) || dynamic_cast<FSFloaterSearch*>(focused_floater)))
+    if (focused_floater && dynamic_cast<LLFloaterWebContent*>(focused_floater))
     {
         return true;
     }
@@ -877,16 +876,16 @@ bool toggle_sit(EKeystate s)
 bool toggle_pause_media(EKeystate s) // analogue of play/pause button in top bar
 {
     if (KEYSTATE_DOWN != s) return true;
-    bool pause = LLViewerMedia::getInstanceFast()->isAnyMediaPlaying();
-    LLViewerMedia::getInstanceFast()->setAllMediaPaused(pause);
+    bool pause = LLViewerMedia::getInstance()->isAnyMediaPlaying();
+    LLViewerMedia::getInstance()->setAllMediaPaused(pause);
     return true;
 }
 
 bool toggle_enable_media(EKeystate s)
 {
     if (KEYSTATE_DOWN != s) return true;
-    bool pause = LLViewerMedia::getInstanceFast()->isAnyMediaPlaying() || LLViewerMedia::getInstanceFast()->isAnyMediaShowing();
-    LLViewerMedia::getInstanceFast()->setAllMediaEnabled(!pause);
+    bool pause = LLViewerMedia::getInstance()->isAnyMediaPlaying() || LLViewerMedia::getInstance()->isAnyMediaShowing();
+    LLViewerMedia::getInstance()->setAllMediaEnabled(!pause);
     return true;
 }
 
@@ -900,13 +899,13 @@ bool walk_to(EKeystate s)
         // "return !has_teleported"
         return false;
     }
-    return LLToolPie::getInstanceFast()->walkToClickedLocation();
+    return LLToolPie::getInstance()->walkToClickedLocation();
 }
 
 bool teleport_to(EKeystate s)
 {
     if (KEYSTATE_DOWN != s) return false;
-    return LLToolPie::getInstanceFast()->teleportToClickedLocation();
+    return LLToolPie::getInstance()->teleportToClickedLocation();
 }
 
 bool toggle_voice(EKeystate s)

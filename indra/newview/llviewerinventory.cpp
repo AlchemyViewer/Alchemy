@@ -86,6 +86,9 @@ static const char * const LOG_NOTECARD("copy_inventory_from_notecard");
 static const std::string INV_OWNER_ID("owner_id");
 static const std::string INV_VERSION("version");
 
+LLUUID gLocalInventory;
+const char* const LOCAL_INVENTORY_FOLDER_NAME("Local Inventory");
+
 #if 1
 // *TODO$: LLInventoryCallback should be deprecated to conform to the new boost::bind/coroutine model.
 // temp code in transition
@@ -183,6 +186,8 @@ LLLocalizedInventoryItemsDictionary::LLLocalizedInventoryItemsDictionary()
 	mInventoryItemsDict["Other Gestures"]	= LLTrans::getString("Other Gestures");
 	mInventoryItemsDict["Speech Gestures"]	= LLTrans::getString("Speech Gestures");
 	mInventoryItemsDict["Common Gestures"]	= LLTrans::getString("Common Gestures");
+
+	mInventoryItemsDict[LOCAL_INVENTORY_FOLDER_NAME] = LLTrans::getString(LOCAL_INVENTORY_FOLDER_NAME);
 
 	//predefined gestures
 
@@ -418,6 +423,11 @@ void LLViewerInventoryItem::updateServer(BOOL is_new) const
 						 << LL_ENDL;
 		return;
 	}
+
+	if((mParentUUID == gLocalInventory) || (gInventory.isObjectDescendentOf(mUUID, gLocalInventory)))
+	{
+		return;
+	}
 	if(gAgent.getID() != mPermissions.getOwner())
 	{
 		// *FIX: deal with this better.
@@ -521,7 +531,7 @@ BOOL LLViewerInventoryItem::unpackMessage(const LLSD& item)
 {
 	BOOL rv = LLInventoryItem::fromLLSD(item);
 
-	LLLocalizedInventoryItemsDictionary::getInstanceFast()->localizeInventoryObjectName(mName);
+	LLLocalizedInventoryItemsDictionary::getInstance()->localizeInventoryObjectName(mName);
 
 	mIsComplete = TRUE;
 	return rv;
@@ -532,7 +542,7 @@ BOOL LLViewerInventoryItem::unpackMessage(LLMessageSystem* msg, const char* bloc
 {
 	BOOL rv = LLInventoryItem::unpackMessage(msg, block, block_num);
 
-	LLLocalizedInventoryItemsDictionary::getInstanceFast()->localizeInventoryObjectName(mName);
+	LLLocalizedInventoryItemsDictionary::getInstance()->localizeInventoryObjectName(mName);
 
 	mIsComplete = TRUE;
 	return rv;
@@ -572,6 +582,8 @@ BOOL LLViewerInventoryItem::importLegacyStream(std::istream& input_stream)
 
 void LLViewerInventoryItem::updateParentOnServer(BOOL restamp) const
 {
+	if (gInventory.isObjectDescendentOf(mUUID, gLocalInventory)) return;
+
 	LLMessageSystem* msg = gMessageSystem;
 	msg->newMessageFast(_PREHASH_MoveInventoryItem);
 	msg->nextBlockFast(_PREHASH_AgentData);
@@ -650,6 +662,8 @@ void LLViewerInventoryCategory::packMessage(LLMessageSystem* msg) const
 
 void LLViewerInventoryCategory::updateParentOnServer(BOOL restamp) const
 {
+	if(gInventory.isObjectDescendentOf(mUUID, gLocalInventory)) return;
+
 	LLMessageSystem* msg = gMessageSystem;
 	msg->newMessageFast(_PREHASH_MoveInventoryFolder);
 	msg->nextBlockFast(_PREHASH_AgentData);
@@ -707,6 +721,8 @@ void LLViewerInventoryCategory::setVersion(S32 version)
 
 bool LLViewerInventoryCategory::fetch()
 {
+	if((mUUID == gLocalInventory) || (gInventory.isObjectDescendentOf(mUUID, gLocalInventory))) return false;
+
 	if((VERSION_UNKNOWN == getVersion())
 	   && mDescendentsRequested.hasExpired())	//Expired check prevents multiple downloads.
 	{
@@ -914,7 +930,7 @@ void LLViewerInventoryCategory::changeType(LLFolderType::EType new_folder_type)
 
 void LLViewerInventoryCategory::localizeName()
 {
-	LLLocalizedInventoryItemsDictionary::getInstanceFast()->localizeInventoryObjectName(mName);
+	LLLocalizedInventoryItemsDictionary::getInstance()->localizeInventoryObjectName(mName);
 }
 
 // virtual
@@ -1117,7 +1133,7 @@ void create_inventory_item(const LLUUID& agent_id, const LLUUID& session_id,
 	std::string server_name = name;
 
 	{
-		for (const auto& pair : LLLocalizedInventoryItemsDictionary::getInstanceFast()->mInventoryItemsDict)
+		for (const auto& pair : LLLocalizedInventoryItemsDictionary::getInstance()->mInventoryItemsDict)
 		{
 			const std::string& localized_name = pair.second;
 			if(localized_name == name)
@@ -2098,7 +2114,7 @@ void menu_create_inventory_item(LLInventoryPanel* panel, LLFolderBridge *bridge,
 	else
 	{
 		// Use for all clothing and body parts.  Adding new wearable types requires updating LLWearableDictionary.
-		LLWearableType::EType wearable_type = LLWearableType::getInstanceFast()->typeNameToType(type_name);
+		LLWearableType::EType wearable_type = LLWearableType::getInstance()->typeNameToType(type_name);
 		if (wearable_type >= LLWearableType::WT_SHAPE && wearable_type < LLWearableType::WT_COUNT)
 		{
 			const LLUUID parent_id = bridge ? bridge->getUUID() : LLUUID::null;
@@ -2339,12 +2355,12 @@ BOOL LLViewerInventoryItem::extractSortFieldAndDisplayName(const std::string& na
 // [SL:KB] - Patch: Build-ScriptRecover | Checked: 2013-03-10 (Catznip-3.4)
 bool LLViewerInventoryItem::lookupLocalizedName(std::string& name)
 {
-	return LLLocalizedInventoryItemsDictionary::instanceFast().localizeInventoryObjectName(name);
+	return LLLocalizedInventoryItemsDictionary::instance().localizeInventoryObjectName(name);
 }
 
 bool LLViewerInventoryItem::lookupSystemName(std::string& name)
 {
-	return LLLocalizedInventoryItemsDictionary::instanceFast().revertInventoryObjectName(name);
+	return LLLocalizedInventoryItemsDictionary::instance().revertInventoryObjectName(name);
 }
 // [/SL:KB]
 

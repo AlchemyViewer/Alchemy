@@ -120,6 +120,7 @@ namespace {
 		virtual void recordMessage(LLError::ELevel level,
 									const std::string& message) override
 		{
+            LL_PROFILE_ZONE_SCOPED_CATEGORY_LOGGING
 			int syslogPriority = LOG_CRIT;
 			switch (level) {
 				case LLError::LEVEL_DEBUG:	syslogPriority = LOG_DEBUG;	break;
@@ -179,6 +180,7 @@ namespace {
         virtual void recordMessage(LLError::ELevel level,
                                     const std::string& message) override
         {
+            LL_PROFILE_ZONE_SCOPED_CATEGORY_LOGGING
             if (LLError::getAlwaysFlush())
             {
                 mFile << message << std::endl;
@@ -207,7 +209,7 @@ namespace {
         {
             return LLError::getEnabledLogTypesMask() & 0x04;
         }
-
+        
         LL_FORCE_INLINE std::string createBoldANSI()
         {
             std::string ansi_code;
@@ -233,10 +235,10 @@ namespace {
         LL_FORCE_INLINE std::string createANSI(const std::string& color)
         {
             std::string ansi_code;
-            ansi_code += '\033';
-            ansi_code += "[";
+            ansi_code  += '\033';
+            ansi_code  += "[";
             ansi_code += "38;5;";
-            ansi_code += color;
+            ansi_code  += color;
             ansi_code += "m";
 
             return ansi_code;
@@ -245,6 +247,7 @@ namespace {
 		virtual void recordMessage(LLError::ELevel level,
 					   const std::string& message) override
 		{
+            LL_PROFILE_ZONE_SCOPED_CATEGORY_LOGGING
             // The default colors for error, warn and debug are now a bit more pastel
             // and easier to read on the default (black) terminal background but you 
             // now have the option to set the color of each via an environment variables:
@@ -274,6 +277,7 @@ namespace {
 			}
             else
             {
+                LL_PROFILE_ZONE_NAMED("fprintf");
                  fprintf(stderr, "%s\n", message.c_str());
             }
 		}
@@ -283,6 +287,7 @@ namespace {
 
         LL_FORCE_INLINE void writeANSI(const std::string& ansi_code, const std::string& message)
 		{
+            LL_PROFILE_ZONE_SCOPED_CATEGORY_LOGGING
             static std::string s_ansi_bold = createBoldANSI();  // bold text
             static std::string s_ansi_reset = createResetANSI();  // reset
 			// ANSI color code escape sequence, message, and reset in one fprintf call
@@ -319,6 +324,7 @@ namespace {
 		virtual void recordMessage(LLError::ELevel level,
 								   const std::string& message) override
 		{
+            LL_PROFILE_ZONE_SCOPED_CATEGORY_LOGGING
 			mBuffer->addLine(message);
 		}
 	
@@ -345,6 +351,7 @@ namespace {
 		virtual void recordMessage(LLError::ELevel level,
 								   const std::string& message) override
 		{
+            LL_PROFILE_ZONE_SCOPED_CATEGORY_LOGGING
 			debugger_print(message);
 		}
 	};
@@ -1226,6 +1233,7 @@ namespace
 
 	void writeToRecorders(const LLError::CallSite& site, const std::string& message)
 	{
+        LL_PROFILE_ZONE_SCOPED_CATEGORY_LOGGING
 		LLError::ELevel level = site.mLevel;
 		SettingsConfigPtr s = Globals::getInstance()->getSettingsConfig();
 
@@ -1302,26 +1310,16 @@ namespace {
 		LOG_MUTEX,
 		STACKS_MUTEX
 	};
-
-	ABSL_CONST_INIT absl::Mutex sLogMutex(absl::kConstInit);
-	ABSL_CONST_INIT absl::Mutex sStackMutex(absl::kConstInit);
-
+	// Some logging calls happen very early in processing -- so early that our
+	// module-static variables aren't yet initialized. getMutex() wraps a
+	// function-static LLMutex so that early calls can still have a valid
+	// LLMutex instance.
 	template <MutexDiscriminator MTX>
-	absl::Mutex* getMutex()
+	LLMutex* getMutex()
 	{
-		return nullptr;
-	}
-
-	template <>
-	absl::Mutex* getMutex<LOG_MUTEX>()
-	{
-		return &sLogMutex;
-	}
-
-	template <>
-	absl::Mutex* getMutex<STACKS_MUTEX>()
-	{
-		return &sStackMutex;
+		// guaranteed to be initialized the first time control reaches here
+		static LLMutex sMutex;
+		return &sMutex;
 	}
 
 	bool checkLevelMap(const LevelMap& map, const std::string& key,
@@ -1369,7 +1367,8 @@ namespace LLError
 
 	bool Log::shouldLog(CallSite& site)
 	{
-		AbslMutexMaybeTrylock lock(getMutex<LOG_MUTEX>(), 5);
+        LL_PROFILE_ZONE_SCOPED_CATEGORY_LOGGING
+		LLMutexTrylock lock(getMutex<LOG_MUTEX>(), 5);
 		if (!lock.isLocked())
 		{
 			return false;
@@ -1413,7 +1412,8 @@ namespace LLError
 
 	void Log::flush(const std::ostringstream& out, const CallSite& site)
 	{
-		AbslMutexMaybeTrylock lock(getMutex<LOG_MUTEX>(),5);
+        LL_PROFILE_ZONE_SCOPED_CATEGORY_LOGGING
+		LLMutexTrylock lock(getMutex<LOG_MUTEX>(),5);
 		if (!lock.isLocked())
 		{
 			return;
@@ -1542,7 +1542,7 @@ namespace LLError
     //static
     void LLCallStacks::push(const char* function, const int line)
     {
-		AbslMutexMaybeTrylock lock(getMutex<STACKS_MUTEX>(), 5);
+        LLMutexTrylock lock(getMutex<STACKS_MUTEX>(), 5);
         if (!lock.isLocked())
         {
             return;
@@ -1567,7 +1567,7 @@ namespace LLError
     //static
     void LLCallStacks::end(const std::ostringstream& out)
     {
-		AbslMutexMaybeTrylock lock(getMutex<STACKS_MUTEX>(), 5);
+        LLMutexTrylock lock(getMutex<STACKS_MUTEX>(), 5);
         if (!lock.isLocked())
         {
             return;
@@ -1584,7 +1584,7 @@ namespace LLError
     //static
     void LLCallStacks::print()
     {
-		AbslMutexMaybeTrylock lock(getMutex<STACKS_MUTEX>(), 5);
+        LLMutexTrylock lock(getMutex<STACKS_MUTEX>(), 5);
         if (!lock.isLocked())
         {
             return;
@@ -1624,7 +1624,7 @@ namespace LLError
 
 bool debugLoggingEnabled(const std::string& tag)
 {
-	AbslMutexMaybeTrylock lock(getMutex<LOG_MUTEX>(), 5);
+    LLMutexTrylock lock(getMutex<LOG_MUTEX>(), 5);
     if (!lock.isLocked())
     {
         return false;

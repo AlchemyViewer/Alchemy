@@ -181,8 +181,7 @@ public:
 	virtual void processGroupData() = 0;
 protected:
 	LLUUID mGroupId;
-private:
-	bool mRequestProcessed;
+    bool mRequestProcessed;
 };
 
 class LLFetchLeaveGroupData: public LLFetchGroupMemberData
@@ -195,6 +194,22 @@ public:
 	 {
 		 LLGroupActions::processLeaveGroupDataResponse(mGroupId);
 	 }
+     void changed(LLGroupChange gc)
+     {
+         if (gc == GC_PROPERTIES && !mRequestProcessed)
+         {
+             LLGroupMgrGroupData* gdatap = LLGroupMgr::getInstance()->getGroupData(mGroupId);
+             if (!gdatap)
+             {
+                 LL_WARNS() << "GroupData was NULL" << LL_ENDL;
+             } 
+             else
+             {
+                 processGroupData();
+                 mRequestProcessed = true;
+             }
+         }
+     }
 };
 
 LLFetchLeaveGroupData* gFetchLeaveGroupData = NULL;
@@ -202,7 +217,7 @@ LLFetchLeaveGroupData* gFetchLeaveGroupData = NULL;
 // static
 void LLGroupActions::search()
 {
-	LLFloaterReg::showInstance("search");
+	LLFloaterReg::showInstance("search", LLSD().with("category", "groups"));
 }
 
 // static
@@ -497,6 +512,8 @@ LLUUID LLGroupActions::startIM(const LLUUID& group_id)
 	LLGroupData group_data;
 	if (gAgent.getGroupData(group_id, group_data))
 	{
+		// Unmute the group if the user tries to start a session with it.
+		LLMuteList::instance().removeGroup(group_id);
 		LLUUID session_id = gIMMgr->addSession(
 			group_data.mName,
 			IM_SESSION_GROUP_START,

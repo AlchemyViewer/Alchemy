@@ -98,7 +98,7 @@ LLWorld::LLWorld() :
 	mLastPacketsLost(0),
 	mSpaceTimeUSec(0)
 {
-	for (S32 i = 0; i < 8; i++)
+	for (S32 i = 0; i < EDGE_WATER_OBJECTS_COUNT; i++)
 	{
 		mEdgeWaterObjects[i] = NULL;
 	}
@@ -118,7 +118,7 @@ LLWorld::LLWorld() :
 }
 
 
-void LLWorld::destroyClass()
+void LLWorld::resetClass()
 {
 	mHoleWaterObjects.clear();
 	gObjectList.destroy();
@@ -131,7 +131,7 @@ void LLWorld::destroyClass()
 	LLViewerPartSim::getInstance()->destroyClass();
 
 	mDefaultWaterTexturep = NULL ;
-	for (S32 i = 0; i < 8; i++)
+	for (S32 i = 0; i < EDGE_WATER_OBJECTS_COUNT; i++)
 	{
 		mEdgeWaterObjects[i] = NULL;
 	}
@@ -654,7 +654,7 @@ LLVector3 LLWorld::resolveLandNormalGlobal(const LLVector3d &pos_global)
 
 void LLWorld::updateVisibilities()
 {
-	auto& viewerCamera = LLViewerCamera::instanceFast();
+	auto& viewerCamera = LLViewerCamera::instance();
 
 	F32 cur_far_clip = viewerCamera.getFar();
 
@@ -720,7 +720,7 @@ void LLWorld::updateRegions(F32 max_update_time)
 	LLTimer update_timer;
 	mNumOfActiveCachedObjects = 0;
 	
-	if(LLViewerCamera::getInstanceFast()->isChanged())
+	if(LLViewerCamera::getInstance()->isChanged())
 	{
 		LLViewerRegion::sLastCameraUpdated = LLViewerOctreeEntryData::getCurrentFrame() + 1;
 	}
@@ -789,6 +789,8 @@ void LLWorld::clearAllVisibleObjects()
 		//clear all cached visible objects.
 		(*iter)->clearCachedVisibleObjects();
 	}
+    clearHoleWaterObjects();
+    clearEdgeWaterObjects();
 }
 
 void LLWorld::refreshLimits()
@@ -819,20 +821,19 @@ void LLWorld::refreshLimits()
 
 void LLWorld::updateParticles()
 {
-	LLViewerPartSim::getInstanceFast()->updateSimulation();
+	LLViewerPartSim::getInstance()->updateSimulation();
 }
 
 void LLWorld::renderPropertyLines()
 {
 	S32 region_count = 0;
-	S32 vertex_count = 0;
 
 	for (region_list_t::iterator iter = mVisibleRegionList.begin();
 		 iter != mVisibleRegionList.end(); ++iter)
 	{
 		LLViewerRegion* regionp = *iter;
 		region_count++;
-		vertex_count += regionp->renderPropertyLines();
+		regionp->renderPropertyLines();
 	}
 }
 
@@ -840,13 +841,11 @@ void LLWorld::renderPropertyLines()
 void LLWorld::updateNetStats()
 {
 	F64Bits bits;
-	U32 packets = 0;
 
 	for (LLViewerRegion* regionp : mActiveRegionList)
 	{
 		regionp->updateNetStats();
 		bits += regionp->mBitsReceived;
-		packets += llfloor( regionp->mPacketsReceived );
 		regionp->mBitsReceived = (F32Bits)0.f;
 		regionp->mPacketsReceived = 0.f;
 	}
@@ -899,7 +898,7 @@ void LLWorld::printPacketsLost()
 
 void LLWorld::processCoarseUpdate(LLMessageSystem* msg, void** user_data)
 {
-	LLViewerRegion* region = LLWorld::getInstanceFast()->getRegion(msg->getSender());
+	LLViewerRegion* region = LLWorld::getInstance()->getRegion(msg->getSender());
 	if( region )
 	{
 		region->updateCoarseLocations(msg);
@@ -942,6 +941,7 @@ void LLWorld::waterHeightRegionInfo(std::string const& sim_name, F32 water_heigh
 
 void LLWorld::precullWaterObjects(LLCamera& camera, LLCullResult* cull, bool include_void_water)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_PIPELINE;
 	if (!gAgent.getRegion())
 	{
 		return;
@@ -978,7 +978,7 @@ void LLWorld::precullWaterObjects(LLCamera& camera, LLCullResult* cull, bool inc
     }
 
 	S32 dir;
-	for (dir = 0; dir < 8; dir++)
+	for (dir = 0; dir < EDGE_WATER_OBJECTS_COUNT; dir++)
 	{
 		LLVOWater* waterp = mEdgeWaterObjects[dir];
 		if (waterp && waterp->mDrawable)
@@ -987,6 +987,26 @@ void LLWorld::precullWaterObjects(LLCamera& camera, LLCullResult* cull, bool inc
 		    cull->pushDrawable(waterp->mDrawable);
 		}
 	}
+}
+
+void LLWorld::clearHoleWaterObjects()
+{
+    for (std::list<LLPointer<LLVOWater> >::iterator iter = mHoleWaterObjects.begin();
+        iter != mHoleWaterObjects.end(); ++iter)
+    {
+        LLVOWater* waterp = (*iter).get();
+        gObjectList.killObject(waterp);
+    }
+    mHoleWaterObjects.clear();
+}
+
+void LLWorld::clearEdgeWaterObjects()
+{
+    for (S32 i = 0; i < EDGE_WATER_OBJECTS_COUNT; i++)
+    {
+        gObjectList.killObject(mEdgeWaterObjects[i]);
+        mEdgeWaterObjects[i] = NULL;
+    }
 }
 
 void LLWorld::updateWaterObjects()
@@ -1014,7 +1034,7 @@ void LLWorld::updateWaterObjects()
 	S32 const rwidth = (S32)regionp->getWidth();
 
 	// We only want to fill in water for stuff that's near us, say, within 256 or 512m
-	S32 range = LLViewerCamera::getInstanceFast()->getFar() > 256.f ? 512 : 256;
+	S32 range = LLViewerCamera::getInstance()->getFar() > 256.f ? 512 : 256;
 
 	from_region_handle(regionp->getHandle(), &region_x, &region_y);
 
@@ -1032,11 +1052,7 @@ void LLWorld::updateWaterObjects()
 		}
 	}
 
-	for (LLVOWater* waterp : mHoleWaterObjects)
-	{
-		gObjectList.killObject(waterp);
-	}
-	mHoleWaterObjects.clear();
+    clearHoleWaterObjects();
 
 	// Use the water height of the region we're on for areas where there is no region
 	F32 water_height = gAgent.getRegion()->getWaterHeight() + 256.f;
@@ -1078,7 +1094,7 @@ void LLWorld::updateWaterObjects()
         512 - ((S32)region_y - min_y) };
 		
 	S32 dir;
-	for (dir = 0; dir < 8; dir++)
+	for (dir = 0; dir < EDGE_WATER_OBJECTS_COUNT; dir++)
 	{
 		S32 dim[2] = { 0 };
 		switch (gDirAxes[dir][0])
@@ -1132,12 +1148,13 @@ void LLWorld::updateWaterObjects()
 
 void LLWorld::shiftRegions(const LLVector3& offset)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_PIPELINE;
 	for (LLViewerRegion* region : getRegionList())
 	{
 		region->updateRenderMatrix();
 	}
 
-	LLViewerPartSim::getInstanceFast()->shift(offset);
+	LLViewerPartSim::getInstance()->shift(offset);
 }
 
 LLViewerTexture* LLWorld::getDefaultWaterTexture()
@@ -1195,11 +1212,9 @@ void LLWorld::disconnectRegions()
 	}
 }
 
-static LLTrace::BlockTimerStatHandle FTM_ENABLE_SIMULATOR("Enable Sim");
-
 void process_enable_simulator(LLMessageSystem *msg, void **user_data)
 {
-	LL_RECORD_BLOCK_TIME(FTM_ENABLE_SIMULATOR);
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_NETWORK;
 	// enable the appropriate circuit for this simulator and 
 	// add its values into the gSimulator structure
 	U64		handle;
@@ -1280,7 +1295,7 @@ public:
             return;
         }
 
-		LLViewerRegion* regionp = LLWorld::getInstanceFast()->getRegion(sim);
+		LLViewerRegion* regionp = LLWorld::getInstance()->getRegion(sim);
 		if (!regionp)
 		{
 			LL_WARNS() << "Got EstablishAgentCommunication for unknown region "
@@ -1295,17 +1310,16 @@ public:
 	}
 };
 
-static LLTrace::BlockTimerStatHandle FTM_DISABLE_REGION("Disable Region");
 // disable the circuit to this simulator
 // Called in response to "DisableSimulator" message.
 void process_disable_simulator(LLMessageSystem *mesgsys, void **user_data)
 {
-    LL_RECORD_BLOCK_TIME(FTM_DISABLE_REGION);
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_NETWORK;
 
     LLHost host = mesgsys->getSender();
 
 	//LL_INFOS() << "Disabling simulator with message from " << host << LL_ENDL;
-	LLWorld::getInstanceFast()->removeRegion(host);
+	LLWorld::getInstance()->removeRegion(host);
 
 	mesgsys->disableCircuit(host);
 }
@@ -1314,7 +1328,7 @@ void process_disable_simulator(LLMessageSystem *mesgsys, void **user_data)
 void process_region_handshake(LLMessageSystem* msg, void** user_data)
 {
 	LLHost host = msg->getSender();
-	LLViewerRegion* regionp = LLWorld::getInstanceFast()->getRegion(host);
+	LLViewerRegion* regionp = LLWorld::getInstance()->getRegion(host);
 	if (!regionp)
 	{
 		LL_WARNS() << "Got region handshake for unknown region "
@@ -1348,7 +1362,7 @@ void send_agent_pause()
 	gAgentPauseSerialNum++;
 	gMessageSystem->addU32Fast(_PREHASH_SerialNum, gAgentPauseSerialNum);
 
-	for (LLViewerRegion* regionp : LLWorld::getInstanceFast()->getRegionList())
+	for (LLViewerRegion* regionp : LLWorld::getInstance()->getRegionList())
 	{
 		gMessageSystem->sendReliable(regionp->getHost());
 	}
@@ -1357,9 +1371,39 @@ void send_agent_pause()
 	LLViewerStats::instance().getRecording().stop();
 }
 
+CapUrlMatches LLWorld::getCapURLMatches(const std::string &cap_url)
+{
+	std::set<std::string> url_capnames;
+	std::set<LLViewerRegion*> url_capregions;
+
+	for (auto regionp : LLWorld::getInstance()->getRegionList())
+    {
+        std::set<std::string> new_url_capnames = regionp->getCapURLNames(cap_url);
+
+		if(!new_url_capnames.empty())
+		{
+			url_capregions.insert(regionp);
+			url_capnames.insert(new_url_capnames.begin(), new_url_capnames.end());
+		}
+	}
+
+	return CapUrlMatches(url_capregions, url_capnames);
+}
+
+
+bool LLWorld::isCapURLMapped(const std::string &cap_url)
+{
+	for (LLViewerRegion* regionp : LLWorld::getInstance()->getRegionList())
+	{
+		if(regionp->isCapURLMapped(cap_url))
+			return true;
+	}
+	return false;
+}
 
 void send_agent_resume()
 {
+	LL_PROFILE_ZONE_SCOPED_CATEGORY_NETWORK
 	// Note: used to check for LLWorld initialization before it became a singleton.
 	// Rather than just remove this check I'm changing it to assure that the message 
 	// system has been initialized. -MG
@@ -1377,7 +1421,7 @@ void send_agent_resume()
 	gMessageSystem->addU32Fast(_PREHASH_SerialNum, gAgentPauseSerialNum);
 	
 
-	for (LLViewerRegion* regionp : LLWorld::getInstanceFast()->getRegionList())
+	for (LLViewerRegion* regionp : LLWorld::getInstance()->getRegionList())
 	{
 		gMessageSystem->sendReliable(regionp->getHost());
 	}

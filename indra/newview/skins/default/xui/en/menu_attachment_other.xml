@@ -51,7 +51,13 @@
   <context_menu
    label="Appearance"
    name="Appearance">
-    <menu_item_call
+      <menu_item_call
+       label="Refresh Textures"
+       name="Refresh Textures">
+        <menu_item_call.on_click
+         function="Avatar.RefreshTexture" />
+	  </menu_item_call>
+	  <menu_item_call
       label="Reset Skeleton"
       name="Reset Skeleton">
       <menu_item_call.on_click

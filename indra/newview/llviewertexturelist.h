@@ -105,11 +105,12 @@ class LLViewerTextureList
 	friend class LLLocalBitmap;
 	
 public:
-	static BOOL createUploadFile(const std::string& filename, const std::string& out_filename, const U8 codec);
-	static LLPointer<LLImageJ2C> convertToUploadFile(LLPointer<LLImageRaw> raw_image);
+    static BOOL createUploadFile(const std::string& filename,
+                                 const std::string& out_filename,
+                                 const U8 codec,
+                                 const S32 max_image_dimentions = LLViewerFetchedTexture::MAX_IMAGE_SIZE_DEFAULT);
+	static LLPointer<LLImageJ2C> convertToUploadFile(LLPointer<LLImageRaw> raw_image, const S32 max_image_dimentions = LLViewerFetchedTexture::MAX_IMAGE_SIZE_DEFAULT);
 	static void processImageNotInDatabase( LLMessageSystem *msg, void **user_data );
-	static void receiveImageHeader(LLMessageSystem *msg, void **user_data);
-	static void receiveImagePacket(LLMessageSystem *msg, void **user_data);
 
 public:
 	LLViewerTextureList();
@@ -143,7 +144,9 @@ public:
 
 	void updateMaxResidentTexMem(S32Megabytes mem);
 	
+    // Local UI images
 	void doPreloadImages();
+    // Network images. Needs caps and cache to work
 	void doPrefetchImages();
 
 	void clearFetchingRequests();

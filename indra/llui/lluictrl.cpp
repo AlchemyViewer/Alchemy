@@ -120,7 +120,6 @@ LLUICtrl::LLUICtrl(const LLUICtrl::Params& p, const LLViewModelPtr& viewmodel)
 	mDoubleClickSignal(NULL),
 	mTransparencyType(TT_DEFAULT)
 {
-	claimMem(viewmodel.get());
 }
 
 void LLUICtrl::initFromParams(const Params& p)
@@ -484,6 +483,7 @@ LLViewModel* LLUICtrl::getViewModel() const
 //virtual
 BOOL LLUICtrl::postBuild()
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
 	//
 	// Find all of the children that want to be in front and move them to the front
 	//
@@ -789,12 +789,9 @@ BOOL LLUICtrl::getIsChrome() const
 }
 
 
-
-LLTrace::BlockTimerStatHandle FTM_FOCUS_FIRST_ITEM("Focus First Item");
-
 BOOL LLUICtrl::focusFirstItem(BOOL prefer_text_fields, BOOL focus_flash)
 {
-	LL_RECORD_BLOCK_TIME(FTM_FOCUS_FIRST_ITEM);
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
 	// try to select default tab group child
 	LLViewQuery query = getTabOrderQuery();
 	child_list_t result = query(this);
@@ -816,7 +813,7 @@ BOOL LLUICtrl::focusFirstItem(BOOL prefer_text_fields, BOOL focus_flash)
 	if(prefer_text_fields)
 	{
 		LLViewQuery query = getTabOrderQuery();
-		query.addPreFilter(LLUICtrl::LLTextInputFilter::getInstanceFast());
+		query.addPreFilter(LLUICtrl::LLTextInputFilter::getInstance());
 		child_list_t result = query(this);
 		if(result.size() > 0)
 		{
@@ -860,7 +857,7 @@ BOOL LLUICtrl::focusNextItem(BOOL text_fields_only)
 	static LLUICachedControl<bool> tab_to_text_fields_only ("TabToTextFieldsOnly", false);
 	if(text_fields_only || tab_to_text_fields_only)
 	{
-		query.addPreFilter(LLUICtrl::LLTextInputFilter::getInstanceFast());
+		query.addPreFilter(LLUICtrl::LLTextInputFilter::getInstance());
 	}
 	child_list_t result = query(this);
 	return focusNext(result);
@@ -873,7 +870,7 @@ BOOL LLUICtrl::focusPrevItem(BOOL text_fields_only)
 	static LLUICachedControl<bool> tab_to_text_fields_only ("TabToTextFieldsOnly", false);
 	if(text_fields_only || tab_to_text_fields_only)
 	{
-		query.addPreFilter(LLUICtrl::LLTextInputFilter::getInstanceFast());
+		query.addPreFilter(LLUICtrl::LLTextInputFilter::getInstance());
 	}
 	child_list_t result = query(this);
 	return focusPrev(result);
@@ -1013,7 +1010,6 @@ boost::signals2::connection LLUICtrl::setCommitCallback( boost::function<void (L
 boost::signals2::connection LLUICtrl::setValidateBeforeCommit( boost::function<bool (const LLSD& data)> cb )
 {
 	if (!mValidateSignal) mValidateSignal = new enable_signal_t();
-	claimMem(mValidateSignal);
 
 	return mValidateSignal->connect(boost::bind(cb, _2));
 }
@@ -1078,7 +1074,6 @@ boost::signals2::connection LLUICtrl::setValidateCallback(const EnableCallbackPa
 boost::signals2::connection LLUICtrl::setCommitCallback( const commit_signal_t::slot_type& cb ) 
 { 
 	if (!mCommitSignal) mCommitSignal = new commit_signal_t();
-	claimMem(mCommitSignal);
 
 	return mCommitSignal->connect(cb); 
 }
@@ -1086,7 +1081,6 @@ boost::signals2::connection LLUICtrl::setCommitCallback( const commit_signal_t::
 boost::signals2::connection LLUICtrl::setValidateCallback( const enable_signal_t::slot_type& cb ) 
 { 
 	if (!mValidateSignal) mValidateSignal = new enable_signal_t();
-	claimMem(mValidateSignal);
 
 	return mValidateSignal->connect(cb); 
 }
@@ -1094,7 +1088,6 @@ boost::signals2::connection LLUICtrl::setValidateCallback( const enable_signal_t
 boost::signals2::connection LLUICtrl::setMouseEnterCallback( const commit_signal_t::slot_type& cb ) 
 { 
 	if (!mMouseEnterSignal) mMouseEnterSignal = new commit_signal_t();
-	claimMem(mMouseEnterSignal);
 
 	return mMouseEnterSignal->connect(cb); 
 }
@@ -1102,7 +1095,6 @@ boost::signals2::connection LLUICtrl::setMouseEnterCallback( const commit_signal
 boost::signals2::connection LLUICtrl::setMouseLeaveCallback( const commit_signal_t::slot_type& cb ) 
 { 
 	if (!mMouseLeaveSignal) mMouseLeaveSignal = new commit_signal_t();
-	claimMem(mMouseLeaveSignal);
 
 	return mMouseLeaveSignal->connect(cb); 
 }
@@ -1110,7 +1102,6 @@ boost::signals2::connection LLUICtrl::setMouseLeaveCallback( const commit_signal
 boost::signals2::connection LLUICtrl::setMouseDownCallback( const mouse_signal_t::slot_type& cb ) 
 { 
 	if (!mMouseDownSignal) mMouseDownSignal = new mouse_signal_t();
-	claimMem(mMouseDownSignal);
 
 	return mMouseDownSignal->connect(cb); 
 }
@@ -1118,7 +1109,6 @@ boost::signals2::connection LLUICtrl::setMouseDownCallback( const mouse_signal_t
 boost::signals2::connection LLUICtrl::setMouseUpCallback( const mouse_signal_t::slot_type& cb ) 
 { 
 	if (!mMouseUpSignal) mMouseUpSignal = new mouse_signal_t();
-	claimMem(mMouseUpSignal);
 
 	return mMouseUpSignal->connect(cb); 
 }
@@ -1126,7 +1116,6 @@ boost::signals2::connection LLUICtrl::setMouseUpCallback( const mouse_signal_t::
 boost::signals2::connection LLUICtrl::setRightMouseDownCallback( const mouse_signal_t::slot_type& cb ) 
 { 
 	if (!mRightMouseDownSignal) mRightMouseDownSignal = new mouse_signal_t();
-	claimMem(mRightMouseDownSignal);
 
 	return mRightMouseDownSignal->connect(cb); 
 }
@@ -1134,7 +1123,6 @@ boost::signals2::connection LLUICtrl::setRightMouseDownCallback( const mouse_sig
 boost::signals2::connection LLUICtrl::setRightMouseUpCallback( const mouse_signal_t::slot_type& cb ) 
 { 
 	if (!mRightMouseUpSignal) mRightMouseUpSignal = new mouse_signal_t();
-	claimMem(mRightMouseUpSignal);
 
 	return mRightMouseUpSignal->connect(cb); 
 }
@@ -1142,7 +1130,6 @@ boost::signals2::connection LLUICtrl::setRightMouseUpCallback( const mouse_signa
 boost::signals2::connection LLUICtrl::setDoubleClickCallback( const mouse_signal_t::slot_type& cb ) 
 { 
 	if (!mDoubleClickSignal) mDoubleClickSignal = new mouse_signal_t();
-	claimMem(mDoubleClickSignal);
 
 	return mDoubleClickSignal->connect(cb); 
 }

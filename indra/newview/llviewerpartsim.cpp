@@ -139,7 +139,7 @@ LLViewerPartGroup::LLViewerPartGroup(const LLVector3 &center_agent, const F32 bo
 	mVOPartGroupp = NULL;
 	mUniformParticles = TRUE;
 
-	mRegionp = LLWorld::getInstanceFast()->getRegionFromPosAgent(center_agent);
+	mRegionp = LLWorld::getInstance()->getRegionFromPosAgent(center_agent);
 	llassert_always(center_agent.isFinite());
 	
 	if (!mRegionp)
@@ -281,7 +281,7 @@ void LLViewerPartGroup::updateParticles(const F32 lastdt)
 
 	LLViewerPartSim::checkParticleCount(mParticles.size());
 
-	LLViewerCamera* camera = LLViewerCamera::getInstanceFast();
+	LLViewerCamera* camera = LLViewerCamera::getInstance();
 	LLViewerRegion *regionp = getRegion();
 	S32 end = (S32) mParticles.size();
 	for (S32 i = 0 ; i < (S32)mParticles.size();)
@@ -408,7 +408,7 @@ void LLViewerPartGroup::updateParticles(const F32 lastdt)
 			if (!posInGroup(part->mPosAgent, desired_size))
 			{
 				// Transfer particles between groups
-				LLViewerPartSim::getInstanceFast()->put(part) ;
+				LLViewerPartSim::getInstance()->put(part) ;
 				vector_replace_with_last(mParticles, mParticles.begin() + i);
 			}
 			else
@@ -580,7 +580,7 @@ LLViewerPartGroup *LLViewerPartSim::put(LLViewerPart* part)
 	}
 	else
 	{	
-		LLViewerCamera* camera = LLViewerCamera::getInstanceFast();
+		LLViewerCamera* camera = LLViewerCamera::getInstance();
 		F32 desired_size = calc_desired_size(camera, part->mPosAgent, part->mScale);
 
 		S32 count = (S32) mViewerPartGroups.size();

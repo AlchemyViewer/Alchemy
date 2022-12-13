@@ -18,6 +18,10 @@ set(${CMAKE_CURRENT_LIST_FILE}_INCLUDED "YES")
 
 include(CheckCXXCompilerFlag)
 include(Variables)
+include(SDL2)
+
+set(Python3_FIND_VIRTUALENV FIRST)
+find_package(Python3 COMPONENTS Interpreter)
 
 # Portable compilation flags.
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DADDRESS_SIZE=${ADDRESS_SIZE}")
@@ -191,6 +195,7 @@ if (WINDOWS)
       /D_WINSOCK_DEPRECATED_NO_WARNINGS
       /DBOOST_CONFIG_SUPPRESS_OUTDATED_MESSAGE
       /DBOOST_ALLOW_DEPRECATED_HEADERS
+      /D_SILENCE_CXX20_CISO646_REMOVED_WARNING
       )
 
   # library linkage defines
@@ -198,6 +203,7 @@ if (WINDOWS)
       /DCURL_STATICLIB=1
       /DURI_STATIC_BUILD=1
       /DLIBXML_STATIC=1
+      /DHUNSPELL_STATIC=1
   )
 
   # configure win32 API for 7 and above compatibility
@@ -355,6 +361,10 @@ if(ENABLE_TIMING)
   add_definitions(-DAL_ENABLE_ALL_TIMERS=1)
 else()
   add_definitions(-DAL_ENABLE_ALL_TIMERS=0)
+endif()
+
+if(SDL_FOUND)
+  add_definitions(-DLL_SDL=1)
 endif()
 
 

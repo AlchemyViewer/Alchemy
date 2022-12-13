@@ -11,8 +11,8 @@ set(cmake_SOURCE_FILES
     APR.cmake
     Audio.cmake
     Boost.cmake
+    BuildPackagesInfo.cmake
     BuildVersion.cmake
-    CEFPlugin.cmake
     CEFPlugin.cmake
     CMakeCopyIfDifferent.cmake
     CURL.cmake
@@ -20,7 +20,6 @@ set(cmake_SOURCE_FILES
     DBusGlib.cmake
     DeploySharedLibs.cmake
     DragDrop.cmake
-    Epoxy.cmake
     EXPAT.cmake
     FindAPR.cmake
     FindAutobuild.cmake
@@ -30,13 +29,14 @@ set(cmake_SOURCE_FILES
     FindOpenJPEG.cmake
     FindURIPARSER.cmake
     FindXmlRpcEpi.cmake
+    FindZLIBNG.cmake
     FMODSTUDIO.cmake
     FreeType.cmake
     GLEXT.cmake
-    GLOD.cmake
     GStreamer010Plugin.cmake
     Hunspell.cmake
     JPEG.cmake
+    LibXML2.cmake
     LLAddBuildTest.cmake
     LLAppearance.cmake
     LLAudio.cmake
@@ -48,6 +48,7 @@ set(cmake_SOURCE_FILES
     LLKDU.cmake
     LLLogin.cmake
     LLMath.cmake
+    LLMeshOptimizer.cmake
     LLMessage.cmake
     LLPhysicsExtensions.cmake
     LLPlugin.cmake
@@ -61,6 +62,7 @@ set(cmake_SOURCE_FILES
     LLXML.cmake
     Linking.cmake
     MediaPluginBase.cmake
+    MESHOPTIMIZER.cmake
     NDOF.cmake
     OPENAL.cmake
     OpenGL.cmake
@@ -70,7 +72,6 @@ set(cmake_SOURCE_FILES
     PluginAPI.cmake
     Prebuilt.cmake
     PulseAudio.cmake
-    Python.cmake
     SDL2.cmake
     Sentry.cmake
     TemplateCheck.cmake
@@ -84,7 +85,7 @@ set(cmake_SOURCE_FILES
     VisualLeakDetector.cmake
     LibVLCPlugin.cmake
     XmlRpcEpi.cmake
-    ZLIB.cmake
+    ZLIBNG.cmake
     )
 
 source_group("Shared Rules" FILES ${cmake_SOURCE_FILES})

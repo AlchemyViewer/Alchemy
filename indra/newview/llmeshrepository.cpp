@@ -387,6 +387,9 @@ U32 LLMeshRepository::sLODPending = 0;
 
 U32 LLMeshRepository::sCacheBytesRead = 0;
 U32 LLMeshRepository::sCacheBytesWritten = 0;
+U32 LLMeshRepository::sCacheBytesHeaders = 0;
+U32 LLMeshRepository::sCacheBytesSkins = 0;
+U32 LLMeshRepository::sCacheBytesDecomps = 0;
 U32 LLMeshRepository::sCacheReads = 0;
 U32 LLMeshRepository::sCacheWrites = 0;
 U32 LLMeshRepository::sMaxLockHoldoffs = 0;
@@ -1900,6 +1903,7 @@ EMeshProcessingResult LLMeshRepoThread::headerReceived(const LLVolumeParams& mes
 		{
 			LLMutexLock lock(mHeaderMutex);
 			mMeshHeader[mesh_id] = { header_size, header };
+            LLMeshRepository::sCacheBytesHeaders += header_size;
 		}
 
 		
@@ -1989,7 +1993,7 @@ bool LLMeshRepoThread::skinInfoReceived(const LLUUID& mesh_id, U8* data, S32 dat
 			return false;
 		}
 
-		// LL_DEBUGS(LOG_MESH) << "info pelvis offset" << info.mPelvisOffset << LL_ENDL;
+        // LL_DEBUGS(LOG_MESH) << "info pelvis offset" << info.mPelvisOffset << LL_ENDL;
 		{
 			LLMutexLock lock(mMutex);
 			mSkinInfoQ.emplace_back(skin_info);
@@ -3647,7 +3651,7 @@ void LLMeshRepository::unregisterMesh(LLVOVolume* vobj)
 
 S32 LLMeshRepository::loadMesh(LLVOVolume* vobj, const LLVolumeParams& mesh_params, S32 detail, S32 last_lod)
 {
-	LL_RECORD_BLOCK_TIME(FTM_MESH_FETCH);
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_NETWORK; //LL_LL_RECORD_BLOCK_TIME(FTM_MESH_FETCH);
 	
 	// Manage time-to-load metrics for mesh download operations.
 	metricsProgress(1);
@@ -3733,7 +3737,7 @@ S32 LLMeshRepository::loadMesh(LLVOVolume* vobj, const LLVolumeParams& mesh_para
 
 void LLMeshRepository::notifyLoadedMeshes()
 { //called from main thread
-	LL_RECORD_BLOCK_TIME(FTM_MESH_FETCH);
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_NETWORK; //LL_RECORD_BLOCK_TIME(FTM_MESH_FETCH);
 
     // GetMesh2 operation with keepalives, etc.  With pipelining,
     // we'll increase this.  See llappcorehttp and llcorehttp for
@@ -4007,6 +4011,8 @@ void LLMeshRepository::notifyLoadedMeshes()
 void LLMeshRepository::notifySkinInfoReceived(LLMeshSkinInfo* info)
 {
 	auto pair = mSkinMap.emplace(info->mMeshID, info); // Cache into LLPointer
+    // Alternative: We can get skin size from header
+    sCacheBytesSkins += info->sizeBytes();
 
 	skin_load_map::iterator iter = mLoadingSkins.find(info->mMeshID);
 	if (iter != mLoadingSkins.end())
@@ -4045,10 +4051,14 @@ void LLMeshRepository::notifyDecompositionReceived(LLModel::Decomposition* decom
 	{ //just insert decomp into map
 		mDecompositionMap[decomp->mMeshID] = decomp;
 		mLoadingDecompositions.erase(decomp->mMeshID);
+        sCacheBytesDecomps += decomp->sizeBytes();
 	}
 	else
 	{ //merge decomp with existing entry
+        sCacheBytesDecomps -= iter->second->sizeBytes();
 		iter->second->merge(decomp);
+        sCacheBytesDecomps += iter->second->sizeBytes();
+
 		mLoadingDecompositions.erase(decomp->mMeshID);
 		delete decomp;
 	}
@@ -4133,11 +4143,10 @@ S32 LLMeshRepository::getActualMeshLOD(const LLVolumeParams& mesh_params, S32 lo
 
 LLPointer<LLMeshSkinInfo> LLMeshRepository::getSkinInfo(const LLUUID& mesh_id, LLVOVolume* requesting_obj)
 {
-	LL_RECORD_BLOCK_TIME(FTM_MESH_FETCH);
-
-	if (mesh_id.notNull())
-	{
-		skin_map::iterator iter = mSkinMap.find(mesh_id);
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_AVATAR;
+    if (mesh_id.notNull())
+    {
+        skin_map::iterator iter = mSkinMap.find(mesh_id);
 		if (iter != mSkinMap.end())
 		{
 			return iter->second;
@@ -4169,7 +4178,7 @@ LLPointer<LLMeshSkinInfo> LLMeshRepository::getSkinInfo(const LLUUID& mesh_id, L
 
 void LLMeshRepository::fetchPhysicsShape(const LLUUID& mesh_id)
 {
-	LL_RECORD_BLOCK_TIME(FTM_MESH_FETCH);
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_NETWORK; //LL_RECORD_BLOCK_TIME(FTM_MESH_FETCH);
 
 	if (mesh_id.notNull())
 	{
@@ -4198,7 +4207,7 @@ void LLMeshRepository::fetchPhysicsShape(const LLUUID& mesh_id)
 
 LLModel::Decomposition* LLMeshRepository::getDecomposition(const LLUUID& mesh_id)
 {
-	LL_RECORD_BLOCK_TIME(FTM_MESH_FETCH);
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_NETWORK; //LL_RECORD_BLOCK_TIME(FTM_MESH_FETCH);
 
 	LLModel::Decomposition* ret = NULL;
 
@@ -4447,7 +4456,7 @@ F32 LLMeshRepository::getStreamingCostLegacy(LLSD& header, F32 radius, S32* byte
 {
 	if (header.has("404")
 		|| !header.has("lowest_lod")
-		|| ((header.has("version") || !LLGridManager::instanceFast().isInSecondlife()) && header["version"].asInteger() > MAX_MESH_VERSION))
+		|| ((header.has("version") || !LLGridManager::instance().isInSecondlife()) && header["version"].asInteger() > MAX_MESH_VERSION))
 	{
 		return 0.f;
 	}

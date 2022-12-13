@@ -41,7 +41,14 @@
 #include "lldir.h"
 #include "llfindlocale.h"
 
-#include <SDL_misc.h>
+#include "SDL2/SDL_messagebox.h"
+#include "SDL2/SDL_syswm.h"
+
+#if LL_WINDOWS
+#include <commdlg.h>
+#include <shellapi.h>
+#include "../newview/res/resource.h"
+#endif
 
 #if LL_GTK
 extern "C" {
@@ -54,11 +61,12 @@ extern "C" {
 #include <clocale>
 #endif // LL_GTK
 
+#if LL_LINUX
 extern "C" {
 # include "fontconfig/fontconfig.h"
 }
 
-#if LL_LINUX
+
 // not necessarily available on random SDL platforms, so #if LL_LINUX
 // for execv(), waitpid(), fork()
 # include <unistd.h>
@@ -232,10 +240,11 @@ void sdlLogOutputFunc(void *userdata, int category, SDL_LogPriority priority, co
 }
 
 LLWindowSDL::LLWindowSDL(LLWindowCallbacks* callbacks,
-			 const std::string& title, S32 x, S32 y, S32 width,
+			 const std::string& title, const std::string& name,
+			 S32 x, S32 y, S32 width,
 			 S32 height, U32 flags,
 			 BOOL fullscreen, BOOL clearBg,
-			 BOOL disable_vsync, BOOL use_gl,
+			 BOOL enable_vsync, BOOL use_gl,
 			 BOOL ignore_pixel_depth, U32 fsaa_samples)
 	: LLWindow(callbacks, fullscreen, flags),
 	  mGamma(1.0f)
@@ -243,16 +252,18 @@ LLWindowSDL::LLWindowSDL(LLWindowCallbacks* callbacks,
 	SDL_SetMainReady();
 	SDL_LogSetOutputFunction(&sdlLogOutputFunc, nullptr);
 
-#if LL_X11
-	XInitThreads();
-#endif
-
-	if (SDL_InitSubSystem(SDL_INIT_EVENTS|SDL_INIT_VIDEO|SDL_INIT_GAMECONTROLLER|SDL_INIT_JOYSTICK) != 0)
+	if (SDL_InitSubSystem(SDL_INIT_EVERYTHING) != 0)
 	{
 		LL_WARNS() << "Failed to initialize SDL due to error: " << SDL_GetError() << LL_ENDL;
 		return;
 	}
 	
+	if (SDL_GL_LoadLibrary(nullptr) != 0)
+	{
+		LL_WARNS() << "Failed to initialize OpenGL Library due to error: " << SDL_GetError() << LL_ENDL;
+		return;
+	}
+
 	// Initialize the keyboard
 	gKeyboard = new LLKeyboardSDL();
 	gKeyboard->setCallbacks(callbacks);
@@ -285,12 +296,12 @@ LLWindowSDL::LLWindowSDL(LLWindowCallbacks* callbacks,
 	mOriginalAspectRatio = 1024.0 / 768.0;
 
 	if (title.empty())
-		mWindowTitle = "SDL Window";  // *FIX: (?)
+		mWindowTitle = "Alchemy Viewer";  // *FIX: (?)
 	else
 		mWindowTitle = title;
 
 	// Create the GL context and set it up for windowed or fullscreen, as appropriate.
-	if(createContext(x, y, width, height, 32, fullscreen, disable_vsync))
+	if(createContext(x, y, width, height, 32, fullscreen, enable_vsync))
 	{
 		gGLManager.initGL();
 
@@ -328,6 +339,31 @@ static SDL_Surface *Load_BMP_Resource(const char *basename)
 	path_buffer[PATH_BUFFER_SIZE-1] = '\0';
 	
 	return SDL_LoadBMP(path_buffer);
+}
+
+void LLWindowSDL::setIcon()
+{
+#if LL_WINDOWS
+	HINSTANCE handle = ::GetModuleHandle(NULL);
+	mWinWindowIcon = LoadIcon(handle, MAKEINTRESOURCE(IDI_LL_ICON));
+
+	HWND hwnd = (HWND) getPlatformWindow();
+
+	::SetClassLongPtr(hwnd, GCLP_HICON, (LONG_PTR) mWinWindowIcon);
+#elif LL_LINUX
+    // Set the application icon.
+    SDL_Surface* bmpsurface = Load_BMP_Resource("ll_icon.BMP");
+    if (bmpsurface)
+    {
+        // This attempts to give a black-keyed mask to the icon.
+        SDL_SetColorKey(bmpsurface, SDL_TRUE, SDL_MapRGB(bmpsurface->format, 255, 0, 246));
+        SDL_SetWindowIcon(mWindow, bmpsurface);
+        // The SDL examples cheerfully avoid freeing the icon
+        // surface, but I'm betting that's leaky.
+        SDL_FreeSurface(bmpsurface);
+        bmpsurface = NULL;
+    }
+#endif
 }
 
 #if LL_X11
@@ -451,7 +487,7 @@ static int x11_detect_VRAM_kb()
 }
 #endif // LL_X11
 
-BOOL LLWindowSDL::createContext(int x, int y, int width, int height, int bits, BOOL fullscreen, BOOL disable_vsync)
+BOOL LLWindowSDL::createContext(int x, int y, int width, int height, int bits, BOOL fullscreen, BOOL enable_vsync)
 {
 	//bool			glneedsinit = false;
 
@@ -461,6 +497,7 @@ BOOL LLWindowSDL::createContext(int x, int y, int width, int height, int bits, B
 	// captures don't survive contexts
 	mGrabbyKeyFlags = 0;
 	mReallyCapturedCount = 0;
+	SDL_SetHint(SDL_HINT_MOUSE_FOCUS_CLICKTHROUGH, "1");
 
 	SDL_version c_sdl_version;
 	SDL_VERSION(&c_sdl_version);
@@ -517,7 +554,6 @@ BOOL LLWindowSDL::createContext(int x, int y, int width, int height, int bits, B
 	if (LLRender::sGLCoreProfile)
 	{
 		SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
-		LLGLSLShader::sNoFixedFunction = true;
 	}
 
 	U32 context_flags = 0;
@@ -526,6 +562,8 @@ BOOL LLWindowSDL::createContext(int x, int y, int width, int height, int bits, B
 		context_flags |= SDL_GL_CONTEXT_DEBUG_FLAG;
 	}
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, context_flags);
+
+	SDL_GL_SetAttribute(SDL_GL_SHARE_WITH_CURRENT_CONTEXT, 1);
 
 	if (mWindow == nullptr)
 	{
@@ -546,18 +584,6 @@ BOOL LLWindowSDL::createContext(int x, int y, int width, int height, int bits, B
 			LL_WARNS() << "Window creation failure. SDL: " << SDL_GetError() << LL_ENDL;
 			setupFailure("Window creation error", "Error", OSMB_OK);
             return FALSE;
-        }
-        // Set the application icon.
-        SDL_Surface* bmpsurface = Load_BMP_Resource("ll_icon.BMP");
-        if (bmpsurface)
-        {
-            // This attempts to give a black-keyed mask to the icon.
-            SDL_SetColorKey(bmpsurface, SDL_TRUE, SDL_MapRGB(bmpsurface->format, 255, 0, 246));
-            SDL_SetWindowIcon(mWindow, bmpsurface);
-            // The SDL examples cheerfully avoid freeing the icon
-            // surface, but I'm betting that's leaky.
-            SDL_FreeSurface(bmpsurface);
-            bmpsurface = NULL;
         }
     }
 
@@ -728,15 +754,6 @@ BOOL LLWindowSDL::createContext(int x, int y, int width, int height, int bits, B
     LL_INFOS() << "Created OpenGL " << llformat("%d.%d", major_gl_version, minor_gl_version) <<
 				(LLRender::sGLCoreProfile ? " core" : " compatibility") << " context." << LL_ENDL;
 	
-	int vsync_enable = 1;
-	if(disable_vsync)
-		vsync_enable = 0;
-		
-	if(SDL_GL_SetSwapInterval(vsync_enable) == -1)
-	{
-		LL_INFOS() << "Swap interval not supported with sdl err: " << SDL_GetError() << LL_ENDL;
-	}
-	
     SDL_GL_GetAttribute(SDL_GL_RED_SIZE, &redBits);
     SDL_GL_GetAttribute(SDL_GL_GREEN_SIZE, &greenBits);
     SDL_GL_GetAttribute(SDL_GL_BLUE_SIZE, &blueBits);
@@ -781,6 +798,11 @@ BOOL LLWindowSDL::createContext(int x, int y, int width, int height, int bits, B
         return FALSE;
     }
 
+	// Disable vertical sync for swap
+    toggleVSync(enable_vsync);
+
+	setIcon();
+
 #if LL_X11
     /* Grab the window manager specific information */
     SDL_SysWMinfo info;
@@ -812,15 +834,57 @@ BOOL LLWindowSDL::createContext(int x, int y, int width, int height, int bits, B
 	}
 # endif // LL_X11
 
-    // make sure multisampling is disabled by default
-    glDisable(GL_MULTISAMPLE_ARB);
-
     // Don't need to get the current gamma, since there's a call that restores it to the system defaults.
     return TRUE;
 }
 
+void* LLWindowSDL::createSharedContext()
+{
+	SDL_GLContext shared_context = SDL_GL_CreateContext(mWindow);
+	if (shared_context)
+	{
+		SDL_GL_MakeCurrent(mWindow, shared_context);
+		SDL_GL_SetSwapInterval(0);
+		SDL_GL_MakeCurrent(mWindow, mGLContext);
+
+		LL_INFOS() << "Creating shared OpenGL context successful!" << LL_ENDL;
+
+		return (void*)shared_context;
+	}
+
+	LL_WARNS() << "Creating shared OpenGL context failed!" << LL_ENDL;
+
+	return nullptr;
+}
+
+void LLWindowSDL::makeContextCurrent(void* context)
+{
+	LL_PROFILER_GPU_CONTEXT;
+	SDL_GL_MakeCurrent(mWindow, context);
+}
+
+void LLWindowSDL::destroySharedContext(void* context)
+{
+	SDL_GL_DeleteContext(context);
+}
+
+void LLWindowSDL::toggleVSync(bool enable_vsync)
+{
+	if(enable_vsync)
+	{
+		if(SDL_GL_SetSwapInterval(-1) != 0)
+		{
+			SDL_GL_SetSwapInterval(1);
+		}
+	}
+	else
+	{
+		SDL_GL_SetSwapInterval(0);
+	}
+}
+
 // changing fullscreen resolution, or switching between windowed and fullscreen mode.
-BOOL LLWindowSDL::switchContext(BOOL fullscreen, const LLCoordScreen &size, BOOL disable_vsync, const LLCoordScreen * const posp)
+BOOL LLWindowSDL::switchContext(BOOL fullscreen, const LLCoordScreen &size, BOOL enable_vsync, const LLCoordScreen * const posp)
 {
 	const BOOL needsRebuild = TRUE;  // Just nuke the context and start over.
 	BOOL result = true;
@@ -830,7 +894,7 @@ BOOL LLWindowSDL::switchContext(BOOL fullscreen, const LLCoordScreen &size, BOOL
 	if(needsRebuild)
 	{
 		destroyContext();
-		result = createContext(0, 0, size.mX, size.mY, 32, fullscreen, disable_vsync);
+		result = createContext(0, 0, size.mX, size.mY, 32, fullscreen, enable_vsync);
 		if (result)
 		{
 			gGLManager.initGL();
@@ -1205,7 +1269,7 @@ BOOL LLWindowSDL::isCursorHidden()
 // Constrains the mouse to the window.
 void LLWindowSDL::setMouseClipping( BOOL b )
 {
-    //SDL_WM_GrabInput(b ? SDL_GRAB_ON : SDL_GRAB_OFF);
+	SDL_SetWindowGrab(mWindow, b ? SDL_TRUE : SDL_FALSE);
 }
 
 // virtual
@@ -1373,7 +1437,7 @@ void LLWindowSDL::flashIcon(F32 seconds)
 }
 
 
-#if LL_GTK
+#if 0
 BOOL LLWindowSDL::isClipboardTextAvailable()
 {
 	if (ll_try_gtk_init())
@@ -1463,17 +1527,28 @@ BOOL LLWindowSDL::copyTextToPrimary(const LLWString &text)
 
 BOOL LLWindowSDL::isClipboardTextAvailable()
 {
-	return FALSE; // unsupported
+	return SDL_HasClipboardText();
 }
 
 BOOL LLWindowSDL::pasteTextFromClipboard(LLWString &dst)
 {
-	return FALSE; // unsupported
+	if (isClipboardTextAvailable())
+	{
+		char* data = SDL_GetClipboardText();
+		if (data)
+		{
+			dst = LLWString(utf8str_to_wstring(data));
+			SDL_free(data);
+			return TRUE;
+		}
+	}
+	return FALSE; // failure
 }
 
-BOOL LLWindowSDL::copyTextToClipboard(const LLWString &s)
+BOOL LLWindowSDL::copyTextToClipboard(const LLWString &text)
 {
-	return FALSE;  // unsupported
+	const std::string utf8 = wstring_to_utf8str(text);
+	return SDL_SetClipboardText(utf8.c_str()) == 0; // success == 0
 }
 
 BOOL LLWindowSDL::isPrimaryTextAvailable()
@@ -1652,7 +1727,7 @@ BOOL LLWindowSDL::SDLReallyCaptureInput(BOOL capture)
 		// pretend we got what we wanted, when really we don't care.
 	
 	// return boolean success for whether we ended up in the desired state
-	return capture == newGrab;
+	return (bool)capture == newGrab;
 }
 
 U32 LLWindowSDL::SDLCheckGrabbyKeys(SDL_Keycode keysym, BOOL gain)
@@ -1947,18 +2022,6 @@ void LLWindowSDL::gatherInput()
         {
             switch (event.window.event)
             {
-            case SDL_WINDOWEVENT_SHOWN:
-                break;
-            case SDL_WINDOWEVENT_HIDDEN:
-                break;
-            case SDL_WINDOWEVENT_EXPOSED:
-            {
-                int width, height = 0;
-                SDL_GetWindowSize(mWindow, &width, &height);
-
-                mCallbacks->handlePaint(this, 0, 0, width, height);
-                break;
-            }
             case SDL_WINDOWEVENT_MOVED:
                 break;
             //case SDL_WINDOWEVENT_SIZE_CHANGED:
@@ -1969,6 +2032,9 @@ void LLWindowSDL::gatherInput()
                 mCallbacks->handleResize(this, width, height);
                 break;
             }
+            case SDL_WINDOWEVENT_SHOWN:
+            case SDL_WINDOWEVENT_HIDDEN:
+			case SDL_WINDOWEVENT_EXPOSED:
             case SDL_WINDOWEVENT_MINIMIZED:
                 [[fallthrough]];
             case SDL_WINDOWEVENT_MAXIMIZED:
@@ -1977,8 +2043,9 @@ void LLWindowSDL::gatherInput()
             {
                 Uint32 flags = SDL_GetWindowFlags(mWindow);
                 bool minimized = (flags & SDL_WINDOW_MINIMIZED);
+				bool hidden = (flags & SDL_WINDOW_HIDDEN);
 
-                mCallbacks->handleActivate(this, !minimized);
+                mCallbacks->handleActivate(this, !minimized || !hidden);
                 LL_INFOS() << "SDL deiconification state switched to " << minimized << LL_ENDL;
                 break;
             }
@@ -2033,7 +2100,7 @@ void LLWindowSDL::gatherInput()
 
 static SDL_Cursor *makeSDLCursorFromBMP(const char *filename, int hotx, int hoty)
 {
-	SDL_Cursor *sdlcursor = NULL;
+	SDL_Cursor *sdlcursor = nullptr;
 	SDL_Surface *bmpsurface;
 
 	// Load cursor pixel data from BMP file
@@ -2118,10 +2185,13 @@ void LLWindowSDL::updateCursor()
 				sdlcursor = mSDLCursors[UI_CURSOR_ARROW];
 			if (sdlcursor)
 				SDL_SetCursor(sdlcursor);
-		} else {
+
+			mCurrentCursor = mNextCursor;
+		}
+		else
+		{
 			LL_WARNS() << "Tried to set invalid cursor number " << mNextCursor << LL_ENDL;
 		}
-		mCurrentCursor = mNextCursor;
 	}
 }
 
@@ -2131,7 +2201,7 @@ void LLWindowSDL::initCursors()
 	// Blank the cursor pointer array for those we may miss.
 	for (i=0; i<UI_CURSOR_COUNT; ++i)
 	{
-		mSDLCursors[i] = NULL;
+		mSDLCursors[i] = nullptr;
 	}
 	// Pre-make an SDL cursor for each of the known cursor types.
 	// We hardcode the hotspots - to avoid that we'd have to write
@@ -2272,10 +2342,7 @@ void LLWindowSDL::hideCursorUntilMouseMove()
 
 
 
-//
-// LLSplashScreenSDL - I don't think we'll bother to implement this; it's
-// fairly obsolete at this point.
-//
+// Implemented per-platform via #if
 LLSplashScreenSDL::LLSplashScreenSDL()
 {
 }
@@ -2286,14 +2353,52 @@ LLSplashScreenSDL::~LLSplashScreenSDL()
 
 void LLSplashScreenSDL::showImpl()
 {
+#if LL_WINDOWS
+	// This appears to work.  ???
+	HINSTANCE hinst = GetModuleHandle(NULL);
+
+	mWindow = CreateDialog(hinst,
+		TEXT("SPLASHSCREEN"),
+		NULL,	// no parent
+		(DLGPROC) DefWindowProc);
+	ShowWindow(mWindow, SW_SHOW);
+#endif
 }
 
 void LLSplashScreenSDL::updateImpl(const std::string& mesg)
 {
+#if LL_WINDOWS
+	if (!mWindow) return;
+
+	int output_str_len = MultiByteToWideChar(CP_UTF8, 0, mesg.c_str(), mesg.length(), NULL, 0);
+	if (output_str_len>1024)
+		return;
+
+	WCHAR w_mesg[1025];//big enought to keep null terminatos
+
+	MultiByteToWideChar(CP_UTF8, 0, mesg.c_str(), mesg.length(), w_mesg, output_str_len);
+
+	//looks like MultiByteToWideChar didn't add null terminator to converted string, see EXT-4858
+	w_mesg[output_str_len] = 0;
+
+	SendDlgItemMessage(mWindow,
+		666,		// HACK: text id
+		WM_SETTEXT,
+		FALSE,
+		(LPARAM) w_mesg);
+#endif
 }
 
 void LLSplashScreenSDL::hideImpl()
 {
+#if LL_WINDOWS
+	if (mWindow)
+	{
+		DestroyWindow(mWindow);
+		mWindow = nullptr;
+	}
+	gWindowImplementation->bringToFront();
+#endif
 }
 
 
@@ -2414,23 +2519,6 @@ S32 OSMessageBoxSDL(const std::string& text, const std::string& caption, U32 typ
 // 	gtk_color_selection_get_current_color(colorsel, colorp);
 // }
 
-
-/*
-        Make the raw keyboard data available - used to poke through to LLQtWebKit so
-        that Qt/Webkit has access to the virtual keycodes etc. that it needs
-*/
-LLSD LLWindowSDL::getNativeKeyData()
-{
-	LLSD result = LLSD::emptyMap();
-
-	result["scan_code"] = (S32)mKeyScanCode;
-	result["virtual_key"] = (S32)mKeyVirtualKey;
-	result["modifiers"] = (S32)mKeyModifiers;
-
-	return result;
-}
-
-
 BOOL LLWindowSDL::dialogColorPicker( F32 *r, F32 *g, F32 *b)
 {
 	BOOL rtn = FALSE;
@@ -2500,15 +2588,112 @@ BOOL LLWindowSDL::dialogColorPicker( F32 *r, F32 *g, F32 *b)
 #else
 S32 OSMessageBoxSDL(const std::string& text, const std::string& caption, U32 type)
 {
-	LL_INFOS() << "MSGBOX: " << caption << ": " << text << LL_ENDL;
-	return 0;
+	S32 rtn = OSBTN_CANCEL;
+	U32 messagetype = SDL_MESSAGEBOX_INFORMATION;
+
+	const SDL_MessageBoxButtonData buttons_ok [] = {
+		/* .flags, .buttonid, .text */
+		{ SDL_MESSAGEBOX_BUTTON_RETURNKEY_DEFAULT, OSBTN_OK, "Ok" },
+	};
+
+	const SDL_MessageBoxButtonData buttons_okcancel [] = {
+		/* .flags, .buttonid, .text */
+		{ SDL_MESSAGEBOX_BUTTON_RETURNKEY_DEFAULT, OSBTN_OK, "Ok" },
+		{ SDL_MESSAGEBOX_BUTTON_ESCAPEKEY_DEFAULT, OSBTN_CANCEL, "Cancel" },
+	};
+
+	const SDL_MessageBoxButtonData buttons_yesno [] = {
+		/* .flags, .buttonid, .text */
+		{ SDL_MESSAGEBOX_BUTTON_RETURNKEY_DEFAULT, OSBTN_YES, "Yes" },
+		{ SDL_MESSAGEBOX_BUTTON_ESCAPEKEY_DEFAULT, OSBTN_NO, "No" },
+	};
+
+	const SDL_MessageBoxButtonData* buttons;
+
+	switch (type)
+	{
+	default:
+	case OSMB_OK:
+		buttons = buttons_ok;
+		break;
+	case OSMB_OKCANCEL:
+		buttons = buttons_okcancel;
+		break;
+	case OSMB_YESNO:
+		buttons = buttons_yesno;
+		break;
+	}
+
+	const SDL_MessageBoxData messageboxdata = {
+		messagetype, /* .flags */
+		gWindowImplementation->getSDLWindow(), /* .window */
+		caption.c_str(), /* .title */
+		text.c_str(), /* .message */
+		SDL_arraysize(buttons), /* .numbuttons */
+		buttons, /* .buttons */
+		NULL /* .colorScheme */
+	};
+
+	int buttonid;
+	if (SDL_ShowMessageBox(&messageboxdata, &buttonid) < 0)
+	{
+		return 1;
+	}
+	if (buttonid != -1) {
+		rtn = buttonid;
+	}
+
+	return rtn;
 }
 
 BOOL LLWindowSDL::dialogColorPicker( F32 *r, F32 *g, F32 *b)
 {
-	return (FALSE);
+	BOOL retval = FALSE;
+#if LL_WINDOWS
+	static CHOOSECOLOR cc;
+	static COLORREF crCustColors[16];
+	cc.lStructSize = sizeof(CHOOSECOLOR);
+	cc.hwndOwner = (HWND) getPlatformWindow();
+	cc.hInstance = NULL;
+	cc.rgbResult = RGB((*r * 255.f), (*g *255.f), (*b * 255.f));
+	//cc.rgbResult = RGB (0x80,0x80,0x80); 
+	cc.lpCustColors = crCustColors;
+	cc.Flags = CC_RGBINIT | CC_FULLOPEN;
+	cc.lCustData = 0;
+	cc.lpfnHook = NULL;
+	cc.lpTemplateName = NULL;
+
+	// This call is modal, so pause agent
+	//send_agent_pause();	// this is in newview and we don't want to set up a dependency
+	{
+		retval = ChooseColor(&cc);
+	}
+	//send_agent_resume();	// this is in newview and we don't want to set up a dependency
+
+	*b = ((F32) ((cc.rgbResult >> 16) & 0xff)) / 255.f;
+
+	*g = ((F32) ((cc.rgbResult >> 8) & 0xff)) / 255.f;
+
+	*r = ((F32) (cc.rgbResult & 0xff)) / 255.f;
+#endif
+	return retval;
 }
 #endif // LL_GTK
+
+/*
+        Make the raw keyboard data available - used to poke through to LLQtWebKit so
+        that Qt/Webkit has access to the virtual keycodes etc. that it needs
+*/
+LLSD LLWindowSDL::getNativeKeyData()
+{
+	LLSD result = LLSD::emptyMap();
+
+	result["scan_code"] = (S32)mKeyScanCode;
+	result["virtual_key"] = (S32)mKeyVirtualKey;
+	result["modifiers"] = (S32)mKeyModifiers;
+
+	return result;
+}
 
 // Open a URL with the user's default web browser.
 // Must begin with protocol identifier.
@@ -2544,8 +2729,24 @@ void LLWindowSDL::spawnWebBrowser(const std::string& escaped_url, bool async)
 
 void *LLWindowSDL::getPlatformWindow()
 {
-	// Unixoid mozilla really needs GTK.
-	return NULL;
+	if (mWindow)
+	{
+		SDL_SysWMinfo info;
+		SDL_VERSION(&info.version);
+		if (SDL_GetWindowWMInfo(mWindow, &info))
+		{
+			switch (info.subsystem)
+			{
+#if defined(SDL_VIDEO_DRIVER_WINDOWS)
+			case SDL_SYSWM_WINDOWS:
+				return (void*) info.info.win.window;
+#endif
+			default:
+				break;
+			}
+		}
+	}
+	return nullptr;
 }
 
 void LLWindowSDL::bringToFront()
@@ -2586,7 +2787,7 @@ void LLWindowSDL::allowLanguageTextInput(LLPreeditor *preeditor, BOOL b)
 		mPreeditor = (b ? preeditor : NULL);
 	}
 	
-	if (b == mLanguageTextInputAllowed)
+	if ((bool)b == mLanguageTextInputAllowed)
 	{
 		return;
 	}
@@ -2646,6 +2847,7 @@ void LLWindowSDL::setLanguageTextInput( const LLCoordGL & pos )
 //static
 std::vector<std::string> LLWindowSDL::getDynamicFallbackFontList()
 {
+#if LL_LINUX
 	// Use libfontconfig to find us a nice ordered list of fallback fonts
 	// specific to this system.
 	std::string final_fallback("/usr/share/fonts/truetype/kochi/kochi-gothic.ttf");
@@ -2742,9 +2944,12 @@ std::vector<std::string> LLWindowSDL::getDynamicFallbackFontList()
 
 	rtns.push_back(final_fallback);
 	return rtns;
+#else
+	return {};
+#endif
 }
 
-void LLWindowSDL::setWindowTitle(const std::string& title)
+void LLWindowSDL::setTitle(const std::string title)
 {
 	if(mWindow)
 	{

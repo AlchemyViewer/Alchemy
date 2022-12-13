@@ -13,14 +13,14 @@ if (USE_SENTRY)
             include(CURL)
             include(NGHTTP2)
             include(OpenSSL)
-            include(ZLIB)
+            include(ZLIBNG)
             set(SENTRY_LIBRARIES 
                 ${ARCH_PREBUILT_DIRS_RELEASE}/libsentry.a
                 ${ARCH_PREBUILT_DIRS_RELEASE}/libbreakpad_client.a
                 ${CURL_LIBRARIES}
                 ${NGHTTP2_LIBRARIES}
                 ${OPENSSL_LIBRARIES}
-                ${ZLIB_LIBRARIES})
+                ${ZLIBNG_LIBRARIES})
         endif ()
     else ()
         find_package(Sentry REQUIRED)

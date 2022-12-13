@@ -414,7 +414,7 @@ void LLVOTree::idleUpdate(LLAgent &agent, const F64 &time)
 
 void LLVOTree::setPixelAreaAndAngle(LLAgent &agent)
 {
-	auto& viewerCamera = LLViewerCamera::instanceFast();
+	auto& viewerCamera = LLViewerCamera::instance();
 
 	LLVector3 center = getPositionAgent();//center of tree.
 	LLVector3 viewer_pos_agent = gAgentCamera.getCameraPositionAgent();
@@ -491,7 +491,6 @@ LLDrawable* LLVOTree::createDrawable(LLPipeline *pipeline)
 const S32 LEAF_INDICES = 24;
 const S32 LEAF_VERTICES = 16;
 
-static LLTrace::BlockTimerStatHandle FTM_UPDATE_TREE("Update Tree");
 
 void LLVOTree::resetVertexBuffers()
 {
@@ -500,7 +499,7 @@ void LLVOTree::resetVertexBuffers()
 
 BOOL LLVOTree::updateGeometry(LLDrawable *drawable)
 {
-	LL_RECORD_BLOCK_TIME(FTM_UPDATE_TREE);
+    LL_PROFILE_ZONE_SCOPED;
 
 	if(mTrunkLOD >= sMAX_NUM_TREE_LOD_LEVELS) //do not display the tree.
 	{
@@ -902,7 +901,7 @@ void LLVOTree::updateMesh()
 
 
 	LLMatrix4a rot_mat = trans_mat;
-	rot_mat.mul(LLQuaternion2(rot));
+	rot_mat.mul(LLMatrix4a(LLQuaternion2(rot)));
 
 	F32 radius = getScale().magVec()*0.05f;
 	rot_mat.applyScale_affine(radius);
@@ -922,7 +921,7 @@ void LLVOTree::updateMesh()
 
 	LLFace* facep = mDrawable->getFace(0);
 	if (!facep) return;
-	LLVertexBuffer* buff = new LLVertexBuffer(LLDrawPoolTree::VERTEX_DATA_MASK, GL_STATIC_DRAW);
+	LLVertexBuffer* buff = new LLVertexBuffer(LLDrawPoolTree::VERTEX_DATA_MASK, GL_STATIC_DRAW_ARB);
 	if (!buff->allocateBuffer(vert_count, index_count, TRUE))
 	{
 		LL_WARNS() << "Failed to allocate Vertex Buffer on mesh update to "
@@ -1069,7 +1068,7 @@ void LLVOTree::genBranchPipeline(LLStrider<LLVector4a>& vertices,
 					LLQuaternion(((constant_twist + ((i%2==0)?twist:-twist))*i)*DEG_TO_RAD, LLVector4(0.f, 0.f, 1.f));
 
 				LLMatrix4a rot_mat = trans_mat;
-				rot_mat.mul(LLQuaternion2(rot));
+				rot_mat.mul(LLMatrix4a(LLQuaternion2(rot)));
 
 				genBranchPipeline(vertices, normals, tex_coords, colors, indices, index_offset, rot_mat, trunk_LOD, stop_level, depth - 1, 0, scale*mScaleStep, twist, droop, branches, alpha);
 			}
@@ -1222,7 +1221,7 @@ U32 LLVOTree::getPartitionType() const
 }
 
 LLTreePartition::LLTreePartition(LLViewerRegion* regionp)
-: LLSpatialPartition(0, FALSE, GL_DYNAMIC_DRAW, regionp)
+: LLSpatialPartition(0, FALSE, GL_DYNAMIC_DRAW_ARB, regionp)
 {
 	mDrawableType = LLPipeline::RENDER_TYPE_TREE;
 	mPartitionType = LLViewerRegion::PARTITION_TREE;

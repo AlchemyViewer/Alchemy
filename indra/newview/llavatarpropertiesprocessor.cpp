@@ -36,6 +36,7 @@
 #include "llstartup.h"
 
 // Linden library includes
+#include "llavataractions.h" // for getProfileUrl
 #include "lldate.h"
 #include "lltrans.h"
 #include "llui.h"				// LLUI::getLanguage()
@@ -94,54 +95,98 @@ void LLAvatarPropertiesProcessor::removeObserver(const LLUUID& avatar_id, LLAvat
 	}
 }
 
-
-void LLAvatarPropertiesProcessor::sendGenericRequest(const LLUUID& avatar_id, EAvatarProcessorType type, const std::string method)
+void LLAvatarPropertiesProcessor::sendRequest(const LLUUID& avatar_id, EAvatarProcessorType type, const std::string &method)
 {
+    // this is the startup state when send_complete_agent_movement() message is sent.
+    // Before this messages won't work so don't bother trying
+    if (LLStartUp::getStartupState() <= STATE_AGENT_SEND)
+    {
+        return;
+    }
+
+    if (avatar_id.isNull())
+    {
+        return;
+    }
+
 	// Suppress duplicate requests while waiting for a response from the network
 	if (isPendingRequest(avatar_id, type))
 	{
 		// waiting for a response, don't re-request
 		return;
 	}
-	// indicate we're going to make a request
-	addPendingRequest(avatar_id, type);
 
-	std::vector<std::string> strings;
-	strings.push_back( avatar_id.asString() );
-	send_generic_message(method, strings);
+    std::string cap;
+
+    switch (type)
+    {
+    case APT_PROPERTIES:
+        // indicate we're going to make a request
+        sendAvatarPropertiesRequestMessage(avatar_id);
+        // can use getRegionCapability("AgentProfile"), but it is heavy
+        // initAgentProfileCapRequest(avatar_id, cap);
+        break;
+    case APT_PICKS:
+    case APT_GROUPS:
+    case APT_NOTES:
+        if (cap.empty())
+        {
+            // indicate we're going to make a request
+            sendGenericRequest(avatar_id, type, method);
+        }
+        else
+        {
+            initAgentProfileCapRequest(avatar_id, cap);
+        }
+        break;
+    default:
+        sendGenericRequest(avatar_id, type, method);
+        break;
+    }
+}
+
+void LLAvatarPropertiesProcessor::sendGenericRequest(const LLUUID& avatar_id, EAvatarProcessorType type, const std::string &method)
+{
+    // indicate we're going to make a request
+    addPendingRequest(avatar_id, type);
+
+    std::vector<std::string> strings;
+    strings.push_back(avatar_id.asString());
+    send_generic_message(method, strings);
+}
+
+void LLAvatarPropertiesProcessor::sendAvatarPropertiesRequestMessage(const LLUUID& avatar_id)
+{
+    addPendingRequest(avatar_id, APT_PROPERTIES);
+
+    LLMessageSystem *msg = gMessageSystem;
+
+    msg->newMessageFast(_PREHASH_AvatarPropertiesRequest);
+    msg->nextBlockFast(_PREHASH_AgentData);
+	msg->addUUIDFast(   _PREHASH_AgentID, gAgent.getID() );
+    msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
+	msg->addUUIDFast(   _PREHASH_AvatarID, avatar_id);
+    gAgent.sendReliableMessage();
+}
+
+void LLAvatarPropertiesProcessor::initAgentProfileCapRequest(const LLUUID& avatar_id, const std::string& cap_url)
+{
+    addPendingRequest(avatar_id, APT_PROPERTIES);
+    addPendingRequest(avatar_id, APT_PICKS);
+    addPendingRequest(avatar_id, APT_GROUPS);
+    addPendingRequest(avatar_id, APT_NOTES);
+    LLCoros::instance().launch("requestAgentUserInfoCoro",
+        boost::bind(requestAvatarPropertiesCoro, cap_url, avatar_id));
 }
 
 void LLAvatarPropertiesProcessor::sendAvatarPropertiesRequest(const LLUUID& avatar_id)
 {
-	// this is the startup state when send_complete_agent_movement() message is sent.
-	// Before this, the AvatarPropertiesRequest message  
-	// won't work so don't bother trying
-	if (LLStartUp::getStartupState() <= STATE_AGENT_SEND)
-	{
-		return;
-	}
-
-	if (isPendingRequest(avatar_id, APT_PROPERTIES))
-	{
-		// waiting for a response, don't re-request
-		return;
-	}
-	// indicate we're going to make a request
-	addPendingRequest(avatar_id, APT_PROPERTIES);
-
-	LLMessageSystem *msg = gMessageSystem;
-
-	msg->newMessageFast(_PREHASH_AvatarPropertiesRequest);
-	msg->nextBlockFast( _PREHASH_AgentData);
-	msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID() );
-	msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
-	msg->addUUIDFast(_PREHASH_AvatarID, avatar_id);
-	gAgent.sendReliableMessage();
+    sendRequest(avatar_id, APT_PROPERTIES, "AvatarPropertiesRequest");
 }
 
 void LLAvatarPropertiesProcessor::sendAvatarPicksRequest(const LLUUID& avatar_id)
 {
-	sendGenericRequest(avatar_id, APT_PICKS, "avatarpicksrequest");
+    sendGenericRequest(avatar_id, APT_PICKS, "avatarpicksrequest");
 }
 
 void LLAvatarPropertiesProcessor::sendAvatarNotesRequest(const LLUUID& avatar_id)
@@ -174,7 +219,7 @@ void LLAvatarPropertiesProcessor::sendAvatarPropertiesUpdate(const LLAvatarData*
 		return;
 	}
 
-	LL_INFOS() << "Sending avatarinfo update" << LL_ENDL;
+	LL_WARNS() << "Sending avatarinfo update. This trims profile descriptions!!!" << LL_ENDL;
 
 	// This value is required by sendAvatarPropertiesUpdate method.
 	//A profile should never be mature. (From the original code)
@@ -211,13 +256,13 @@ std::string LLAvatarPropertiesProcessor::accountType(const LLAvatarData* avatar_
 	{
 		return avatar_data->caption_text;
 	}
-	const char* const ACCT_TYPE[] = {
+	static const std::array<const char*, 4> ACCT_TYPE{{
 		"AcctTypeResident",
 		"AcctTypeTrial",
 		"AcctTypeCharterMember",
 		"AcctTypeEmployee"
-	};
-	U8 caption_max = (U8)LL_ARRAY_SIZE(ACCT_TYPE)-1;
+	}};
+	U8 caption_max = (U8)ACCT_TYPE.size() - 1;
 	U8 caption_index = llclamp(avatar_data->caption_index, (U8)0, caption_max);
 	return LLTrans::getString(ACCT_TYPE[caption_index]);
 }
@@ -227,10 +272,6 @@ std::string LLAvatarPropertiesProcessor::paymentInfo(const LLAvatarData* avatar_
 {
 	// Special accounts like M Linden don't have payment info revealed.
 	if (!avatar_data->caption_text.empty()) return "";
-
-	// Linden employees don't have payment info revealed
-	const S32 LINDEN_EMPLOYEE_INDEX = 3;
-	if (avatar_data->caption_index == LINDEN_EMPLOYEE_INDEX) return "";
 
 	BOOL transacted = (avatar_data->flags & AVATAR_TRANSACTED);
 	BOOL identified = (avatar_data->flags & AVATAR_IDENTIFIED);
@@ -257,13 +298,122 @@ std::string LLAvatarPropertiesProcessor::paymentInfo(const LLAvatarData* avatar_
 bool LLAvatarPropertiesProcessor::hasPaymentInfoOnFile(const LLAvatarData* avatar_data)
 {
 	// Special accounts like M Linden don't have payment info revealed.
+	// M Linden? lol Who the fuck wrote this? A dinosaur?
 	if (!avatar_data->caption_text.empty()) return true;
 
 	// Linden employees don't have payment info revealed
-	const S32 LINDEN_EMPLOYEE_INDEX = 3;
-	if (avatar_data->caption_index == LINDEN_EMPLOYEE_INDEX) return true;
+	//const S32 LINDEN_EMPLOYEE_INDEX = 3;
+	//if (avatar_data->caption_index == LINDEN_EMPLOYEE_INDEX) return true;
 
 	return ((avatar_data->flags & AVATAR_TRANSACTED) || (avatar_data->flags & AVATAR_IDENTIFIED));
+}
+
+// static
+void LLAvatarPropertiesProcessor::requestAvatarPropertiesCoro(std::string cap_url, LLUUID agent_id)
+{
+    LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
+    LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t
+        httpAdapter(new LLCoreHttpUtil::HttpCoroutineAdapter("requestAvatarPropertiesCoro", httpPolicy));
+    LLCore::HttpRequest::ptr_t httpRequest(new LLCore::HttpRequest);
+    LLCore::HttpHeaders::ptr_t httpHeaders;
+
+    LLCore::HttpOptions::ptr_t httpOpts(new LLCore::HttpOptions);
+    httpOpts->setFollowRedirects(true);
+
+    std::string finalUrl = cap_url + "/" + agent_id.asString();
+
+    LLSD result = httpAdapter->getAndSuspend(httpRequest, finalUrl, httpOpts, httpHeaders);
+
+    LLSD httpResults = result[LLCoreHttpUtil::HttpCoroutineAdapter::HTTP_RESULTS];
+    LLCore::HttpStatus status = LLCoreHttpUtil::HttpCoroutineAdapter::getStatusFromLLSD(httpResults);
+
+    if (!status
+        || !result.has("id")
+        || agent_id != result["id"].asUUID())
+    {
+        LL_WARNS("AvatarProperties") << "Failed to get agent information for id " << agent_id << LL_ENDL;
+        LLAvatarPropertiesProcessor* self = getInstance();
+        self->removePendingRequest(agent_id, APT_PROPERTIES);
+        self->removePendingRequest(agent_id, APT_INTERESTS);
+        self->removePendingRequest(agent_id, APT_PICKS);
+        self->removePendingRequest(agent_id, APT_GROUPS);
+        self->removePendingRequest(agent_id, APT_NOTES);
+        return;
+    }
+
+    // Avatar Data
+
+    LLAvatarData avatar_data;
+    std::string birth_date;
+
+    avatar_data.agent_id = gAgent.getID();
+    avatar_data.avatar_id = agent_id;
+    avatar_data.image_id = result["sl_image_id"].asUUID();
+    avatar_data.fl_image_id = result["fl_image_id"].asUUID();
+    avatar_data.partner_id = result["partner_id"].asUUID();
+    avatar_data.about_text = result["sl_about_text"].asString();
+    avatar_data.fl_about_text = result["fl_about_text"].asString();
+    avatar_data.born_on = result["member_since"].asDate();
+    avatar_data.profile_url   = result.has("home_page") ? result["home_page"].asString() : getProfileURL(agent_id.asString());
+
+    avatar_data.flags = 0;
+    avatar_data.caption_index = 0;
+
+    LLAvatarPropertiesProcessor* self = getInstance();
+    // Request processed, no longer pending
+    self->removePendingRequest(agent_id, APT_PROPERTIES);
+    self->notifyObservers(agent_id, &avatar_data, APT_PROPERTIES);
+
+    // Picks
+
+    LLSD picks_array = result["picks"];
+    LLAvatarPicks avatar_picks;
+    avatar_picks.agent_id  = gAgent.getID();  // Not in use?
+    avatar_picks.target_id = agent_id;
+
+    for (LLSD::array_const_iterator it = picks_array.beginArray(); it != picks_array.endArray(); ++it)
+    {
+        const LLSD& pick_data = *it;
+        avatar_picks.picks_list.emplace_back(pick_data["id"].asUUID(), pick_data["name"].asString());
+    }
+
+    // Request processed, no longer pending
+    self->removePendingRequest(agent_id, APT_PICKS);
+    self->notifyObservers(agent_id, &avatar_picks, APT_PICKS);
+
+    // Groups
+
+    LLSD groups_array = result["groups"];
+    LLAvatarGroups avatar_groups;
+    avatar_groups.agent_id  = gAgent.getID();  // Not in use?
+    avatar_groups.avatar_id = agent_id; // target_id
+
+    for (LLSD::array_const_iterator it = groups_array.beginArray(); it != groups_array.endArray(); ++it)
+    {
+        const LLSD& group_info = *it;
+        LLAvatarGroups::LLGroupData group_data;
+        group_data.group_powers = 0; // Not in use?
+        group_data.group_title = group_info["name"].asString(); // Missing data, not in use?
+        group_data.group_id = group_info["id"].asUUID();
+        group_data.group_name = group_info["name"].asString();
+        group_data.group_insignia_id = group_info["image_id"].asUUID();
+
+        avatar_groups.group_list.push_back(group_data);
+    }
+
+    self->removePendingRequest(agent_id, APT_GROUPS);
+    self->notifyObservers(agent_id, &avatar_groups, APT_GROUPS);
+
+    // Notes
+    LLAvatarNotes avatar_notes;
+
+    avatar_notes.agent_id  = gAgent.getID();
+    avatar_notes.target_id = agent_id;
+    avatar_notes.notes = result["notes"].asString();
+
+    // Request processed, no longer pending
+    self->removePendingRequest(agent_id, APT_NOTES);
+    self->notifyObservers(agent_id, &avatar_notes, APT_NOTES);
 }
 
 void LLAvatarPropertiesProcessor::processAvatarPropertiesReply(LLMessageSystem* msg, void**)
@@ -279,7 +429,7 @@ void LLAvatarPropertiesProcessor::processAvatarPropertiesReply(LLMessageSystem* 
 	msg->getStringFast(	_PREHASH_PropertiesData,	_PREHASH_AboutText,		avatar_data.about_text);
 	msg->getStringFast(	_PREHASH_PropertiesData,	_PREHASH_FLAboutText,	avatar_data.fl_about_text);
 	msg->getStringFast(	_PREHASH_PropertiesData,	_PREHASH_BornOn,		birth_date);
-	msg->getStringFast( _PREHASH_PropertiesData,	_PREHASH_ProfileURL,	avatar_data.profile_url);
+	msg->getStringFast(	_PREHASH_PropertiesData,	_PREHASH_ProfileURL,	avatar_data.profile_url);
 	msg->getU32Fast(	_PREHASH_PropertiesData,	_PREHASH_Flags,			avatar_data.flags);
 
 
@@ -296,7 +446,7 @@ void LLAvatarPropertiesProcessor::processAvatarPropertiesReply(LLMessageSystem* 
 	{
 		msg->getStringFast(_PREHASH_PropertiesData, _PREHASH_CharterMember, avatar_data.caption_text);
 	}
-	LLAvatarPropertiesProcessor* self = getInstanceFast();
+	LLAvatarPropertiesProcessor* self = getInstance();
 	// Request processed, no longer pending
 	self->removePendingRequest(avatar_data.avatar_id, APT_PROPERTIES);
 	self->notifyObservers(avatar_data.avatar_id,&avatar_data,APT_PROPERTIES);
@@ -304,29 +454,20 @@ void LLAvatarPropertiesProcessor::processAvatarPropertiesReply(LLMessageSystem* 
 
 void LLAvatarPropertiesProcessor::processAvatarInterestsReply(LLMessageSystem* msg, void**)
 {
-/*
-	AvatarInterestsReply is automatically sent by the server in response to the 
-	AvatarPropertiesRequest sent when the panel is opened (in addition to the AvatarPropertiesReply message). 
-	If the interests panel is no longer part of the design (?) we should just register the message 
-	to a handler function that does nothing. 
-	That will suppress the warnings and be compatible with old server versions.
-	WARNING: LLTemplateMessageReader::decodeData: Message from 216.82.37.237:13000 with no handler function received: AvatarInterestsReply
-*/
-
-    LLInterestsData interests_data;
-    
-    msg->getUUIDFast(   _PREHASH_AgentData,         _PREHASH_AgentID,       interests_data.agent_id );
-    msg->getUUIDFast(   _PREHASH_AgentData,         _PREHASH_AvatarID,      interests_data.avatar_id );
-    msg->getU32Fast(    _PREHASH_PropertiesData,	_PREHASH_WantToMask,    interests_data.want_to_mask );
-    msg->getStringFast( _PREHASH_PropertiesData,    _PREHASH_WantToText,    interests_data.want_to_text );
-    msg->getU32Fast(    _PREHASH_PropertiesData,	_PREHASH_SkillsMask,    interests_data.skills_mask );
-    msg->getStringFast( _PREHASH_PropertiesData,    _PREHASH_SkillsText,    interests_data.skills_text );
-    msg->getStringFast(     _PREHASH_PropertiesData,    _PREHASH_LanguagesText, interests_data.languages_text );
-    
-    LLAvatarPropertiesProcessor* self = getInstanceFast();
-    // Request processed, no longer pending
-    self->removePendingRequest(interests_data.avatar_id, APT_INTERESTS_INFO);
-    self->notifyObservers(interests_data.avatar_id, &interests_data, APT_INTERESTS_INFO);
+	LLAvatarInterests interests;
+	
+	msg->getUUIDFast(   _PREHASH_AgentData,         _PREHASH_AgentID,       interests.agent_id);
+	msg->getUUIDFast(   _PREHASH_AgentData,         _PREHASH_AvatarID,      interests.avatar_id);
+	msg->getU32Fast(    _PREHASH_PropertiesData,	_PREHASH_WantToMask,    interests.want_to_mask);
+	msg->getStringFast( _PREHASH_PropertiesData,    _PREHASH_WantToText,    interests.want_to_text);
+	msg->getU32Fast(    _PREHASH_PropertiesData,	_PREHASH_SkillsMask,    interests.skills_mask);
+	msg->getStringFast( _PREHASH_PropertiesData,    _PREHASH_SkillsText,    interests.skills_text);
+	msg->getStringFast(     _PREHASH_PropertiesData,    _PREHASH_LanguagesText, interests.languages_text);
+	
+	LLAvatarPropertiesProcessor* self = getInstance();
+	// Request processed, no longer pending
+	self->removePendingRequest(interests.avatar_id, APT_INTERESTS);
+	self->notifyObservers(interests.avatar_id, &interests, APT_INTERESTS);
 }
 
 void LLAvatarPropertiesProcessor::processAvatarClassifiedsReply(LLMessageSystem* msg, void**)
@@ -348,7 +489,7 @@ void LLAvatarPropertiesProcessor::processAvatarClassifiedsReply(LLMessageSystem*
 		classifieds.classifieds_list.push_back(data);
 	}
 
-	LLAvatarPropertiesProcessor* self = getInstanceFast();
+	LLAvatarPropertiesProcessor* self = getInstance();
 	// Request processed, no longer pending
 	self->removePendingRequest(classifieds.target_id, APT_CLASSIFIEDS);
 	self->notifyObservers(classifieds.target_id,&classifieds,APT_CLASSIFIEDS);
@@ -376,12 +517,10 @@ void LLAvatarPropertiesProcessor::processClassifiedInfoReply(LLMessageSystem* ms
 	msg->getU8Fast(_PREHASH_Data, _PREHASH_ClassifiedFlags, c_info.flags);
 	msg->getS32Fast(_PREHASH_Data, _PREHASH_PriceForListing, c_info.price_for_listing);
 
-	LLAvatarPropertiesProcessor* self = getInstanceFast();
+	LLAvatarPropertiesProcessor* self = getInstance();
 	// Request processed, no longer pending
 	self->removePendingRequest(c_info.creator_id, APT_CLASSIFIED_INFO);
 	self->notifyObservers(c_info.creator_id, &c_info, APT_CLASSIFIED_INFO);
-	self->removePendingRequest(c_info.classified_id, APT_CLASSIFIED_INFO);
-	self->notifyObservers(c_info.classified_id, &c_info, APT_CLASSIFIED_INFO);
 }
 
 
@@ -393,7 +532,7 @@ void LLAvatarPropertiesProcessor::processAvatarNotesReply(LLMessageSystem* msg, 
 	msg->getUUIDFast(_PREHASH_Data, _PREHASH_TargetID, avatar_notes.target_id);
 	msg->getStringFast(_PREHASH_Data, _PREHASH_Notes, avatar_notes.notes);
 
-	LLAvatarPropertiesProcessor* self = getInstanceFast();
+	LLAvatarPropertiesProcessor* self = getInstance();
 	// Request processed, no longer pending
 	self->removePendingRequest(avatar_notes.target_id, APT_NOTES);
 	self->notifyObservers(avatar_notes.target_id,&avatar_notes,APT_NOTES);
@@ -402,7 +541,7 @@ void LLAvatarPropertiesProcessor::processAvatarNotesReply(LLMessageSystem* msg, 
 void LLAvatarPropertiesProcessor::processAvatarPicksReply(LLMessageSystem* msg, void**)
 {
 	LLAvatarPicks avatar_picks;
-	msg->getUUIDFast(_PREHASH_AgentData, _PREHASH_AgentID, avatar_picks.target_id);
+	msg->getUUIDFast(_PREHASH_AgentData, _PREHASH_AgentID, avatar_picks.agent_id);
 	msg->getUUIDFast(_PREHASH_AgentData, _PREHASH_TargetID, avatar_picks.target_id);
 
 	S32 block_count = msg->getNumberOfBlocksFast(_PREHASH_Data);
@@ -416,7 +555,7 @@ void LLAvatarPropertiesProcessor::processAvatarPicksReply(LLMessageSystem* msg, 
 
 		avatar_picks.picks_list.push_back(std::make_pair(pick_id,pick_name));
 	}
-	LLAvatarPropertiesProcessor* self = getInstanceFast();
+	LLAvatarPropertiesProcessor* self = getInstance();
 	// Request processed, no longer pending
 	self->removePendingRequest(avatar_picks.target_id, APT_PICKS);
 	self->notifyObservers(avatar_picks.target_id,&avatar_picks,APT_PICKS);
@@ -447,7 +586,7 @@ void LLAvatarPropertiesProcessor::processPickInfoReply(LLMessageSystem* msg, voi
 	msg->getS32Fast(_PREHASH_Data, _PREHASH_SortOrder, pick_data.sort_order);
 	msg->getBOOLFast(_PREHASH_Data, _PREHASH_Enabled, pick_data.enabled);
 
-	LLAvatarPropertiesProcessor* self = getInstanceFast();
+	LLAvatarPropertiesProcessor* self = getInstance();
 	// don't need to remove pending request as we don't track pick info
 	self->notifyObservers(pick_data.creator_id, &pick_data, APT_PICK_INFO);
 }
@@ -472,7 +611,7 @@ void LLAvatarPropertiesProcessor::processAvatarGroupsReply(LLMessageSystem* msg,
 		avatar_groups.group_list.push_back(group_data);
 	}
 
-	LLAvatarPropertiesProcessor* self = getInstanceFast();
+	LLAvatarPropertiesProcessor* self = getInstance();
 	self->removePendingRequest(avatar_groups.avatar_id, APT_GROUPS);
 	self->notifyObservers(avatar_groups.avatar_id,&avatar_groups,APT_GROUPS);
 }
@@ -516,7 +655,7 @@ void LLAvatarPropertiesProcessor::sendFriendRights(const LLUUID& avatar_id, S32 
 	}
 }
 
-void LLAvatarPropertiesProcessor::sendNotes(const LLUUID& avatar_id, const std::string notes)
+void LLAvatarPropertiesProcessor::sendNotes(const LLUUID& avatar_id, const std::string& notes)
 {
 	if(!avatar_id.isNull())
 	{
@@ -548,8 +687,8 @@ void LLAvatarPropertiesProcessor::sendPickDelete( const LLUUID& pick_id )
 	msg->addUUIDFast(_PREHASH_PickID, pick_id);
 	gAgent.sendReliableMessage();
 
-	LLAgentPicksInfo::getInstanceFast()->requestNumberOfPicks();
-	LLAgentPicksInfo::getInstanceFast()->decrementNumberOfPicks();
+	LLAgentPicksInfo::getInstance()->requestNumberOfPicks();
+	LLAgentPicksInfo::getInstance()->decrementNumberOfPicks();
 }
 
 void LLAvatarPropertiesProcessor::sendClassifiedDelete(const LLUUID& classified_id)
@@ -568,29 +707,6 @@ void LLAvatarPropertiesProcessor::sendClassifiedDelete(const LLUUID& classified_
 	gAgent.sendReliableMessage();
 }
 
-void LLAvatarPropertiesProcessor::sendInterestsInfoUpdate(const LLInterestsData* interests_data)
-{
-    if(!interests_data)
-    {
-        return;
-    }
-
-    LLMessageSystem* msg = gMessageSystem;
-
-    msg->newMessageFast(_PREHASH_AvatarInterestsUpdate);
-    msg->nextBlockFast( _PREHASH_AgentData);
-    msg->addUUIDFast(	_PREHASH_AgentID,       gAgent.getID() );
-    msg->addUUIDFast(   _PREHASH_SessionID,     gAgent.getSessionID() );
-    msg->nextBlockFast( _PREHASH_PropertiesData);
-    msg->addU32Fast(	_PREHASH_WantToMask,    interests_data->want_to_mask);
-    msg->addStringFast(	_PREHASH_WantToText,    interests_data->want_to_text);
-    msg->addU32Fast(	_PREHASH_SkillsMask,    interests_data->skills_mask);
-    msg->addStringFast(	_PREHASH_SkillsText,    interests_data->skills_text);
-    msg->addStringFast(     _PREHASH_LanguagesText, interests_data->languages_text);
-    
-    gAgent.sendReliableMessage();
-}
-
 void LLAvatarPropertiesProcessor::sendPickInfoUpdate(const LLPickData* new_pick)
 {
 	if (!new_pick) return;
@@ -607,7 +723,7 @@ void LLAvatarPropertiesProcessor::sendPickInfoUpdate(const LLPickData* new_pick)
 	msg->addUUIDFast(_PREHASH_CreatorID, new_pick->creator_id);
 
 	//legacy var need to be deleted
-	msg->addBOOLFast(_PREHASH_TopPick, FALSE);	
+	msg->addBOOLFast(_PREHASH_TopPick, FALSE);
 
 	// fills in on simulator if null
 	msg->addUUIDFast(_PREHASH_ParcelID, new_pick->parcel_id);
@@ -622,7 +738,7 @@ void LLAvatarPropertiesProcessor::sendPickInfoUpdate(const LLPickData* new_pick)
 	msg->addBOOLFast(_PREHASH_Enabled, new_pick->enabled);
 	gAgent.sendReliableMessage();
 
-	LLAgentPicksInfo::getInstanceFast()->requestNumberOfPicks();
+	LLAgentPicksInfo::getInstance()->requestNumberOfPicks();
 }
 
 void LLAvatarPropertiesProcessor::sendClassifiedInfoUpdate(const LLAvatarClassifiedInfo* c_data)
@@ -652,6 +768,26 @@ void LLAvatarPropertiesProcessor::sendClassifiedInfoUpdate(const LLAvatarClassif
 	msg->addU8Fast(_PREHASH_ClassifiedFlags, c_data->flags);
 	msg->addS32Fast(_PREHASH_PriceForListing, c_data->price_for_listing);
 
+	gAgent.sendReliableMessage();
+}
+
+void LLAvatarPropertiesProcessor::sendInterestsUpdate(const LLAvatarInterests* i_data)
+{
+	if(!i_data) return;
+	
+	LLMessageSystem* msg = gMessageSystem;
+	
+	msg->newMessageFast(_PREHASH_AvatarInterestsUpdate);
+	msg->nextBlockFast( _PREHASH_AgentData);
+	msg->addUUIDFast(	_PREHASH_AgentID,       gAgent.getID());
+	msg->addUUIDFast(   _PREHASH_SessionID,     gAgent.getSessionID());
+	msg->nextBlockFast( _PREHASH_PropertiesData);
+	msg->addU32Fast(	_PREHASH_WantToMask,    i_data->want_to_mask);
+	msg->addStringFast(	_PREHASH_WantToText,    i_data->want_to_text);
+	msg->addU32Fast(	_PREHASH_SkillsMask,    i_data->skills_mask);
+	msg->addStringFast(	_PREHASH_SkillsText,    i_data->skills_text);
+	msg->addStringFast(     _PREHASH_LanguagesText, i_data->languages_text);
+	
 	gAgent.sendReliableMessage();
 }
 

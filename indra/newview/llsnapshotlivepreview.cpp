@@ -234,7 +234,7 @@ bool LLSnapshotLivePreview::setSnapshotQuality(S32 quality, bool set_by_user)
     return false;
 }
 
-void LLSnapshotLivePreview::drawPreviewRect(S32 offset_x, S32 offset_y)
+void LLSnapshotLivePreview::drawPreviewRect(S32 offset_x, S32 offset_y, LLColor4 alpha_color)
 {
 	F32 line_width ; 
 	glGetFloatv(GL_LINE_WIDTH, &line_width) ;
@@ -247,7 +247,6 @@ void LLSnapshotLivePreview::drawPreviewRect(S32 offset_x, S32 offset_y)
 	//draw four alpha rectangles to cover areas outside of the snapshot image
 	if(!mKeepAspectRatio)
 	{
-		LLColor4 alpha_color(0.5f, 0.5f, 0.5f, 0.8f) ;
 		S32 dwl = 0, dwr = 0 ;
 		if(mThumbnailWidth > mPreviewRect.getWidth())
 		{
@@ -676,8 +675,8 @@ BOOL LLSnapshotLivePreview::onIdle( void* snapshot_preview )
 	}
 
 	// If we're in freeze-frame and/or auto update mode and camera has moved, update snapshot.
-	LLVector3 new_camera_pos = LLViewerCamera::getInstanceFast()->getOrigin();
-	LLQuaternion new_camera_rot = LLViewerCamera::getInstanceFast()->getQuaternion();
+	LLVector3 new_camera_pos = LLViewerCamera::getInstance()->getOrigin();
+	LLQuaternion new_camera_rot = LLViewerCamera::getInstance()->getQuaternion();
 	if (previewp->mForceUpdateSnapshot ||
 		(((ALControlCache::AutoSnapshot && LLView::isAvailable(previewp->mViewContainer)) ||
 		(LLPipeline::FreezeTime && previewp->mAllowFullScreenPreview)) &&

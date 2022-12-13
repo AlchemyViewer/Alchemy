@@ -34,7 +34,7 @@
 #include "llvolume.h"
 #include "llrigginginfo.h"
 
-#define MAT_USE_SSE     1
+#define DEBUG_SKINNING  LL_DEBUG
 
 void dump_avatar_and_skin_state(const std::string& reason, LLVOAvatar *avatar, const LLMeshSkinInfo *skin)
 {
@@ -113,24 +113,20 @@ void LLSkinningUtil::scrubInvalidJoints(LLVOAvatar *avatar, LLMeshSkinInfo* skin
     skin->mInvalidJointsScrubbed = true;
 }
 
-#define MAT_USE_SSE 1
-
 void LLSkinningUtil::initSkinningMatrixPalette(
     LLMatrix4a* mat,
     S32 count, 
     const LLMeshSkinInfo* skin,
     LLVOAvatar *avatar)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_AVATAR;
+
     initJointNums(const_cast<LLMeshSkinInfo*>(skin), avatar);
     for (U32 j = 0; j < count; ++j)
     {
         S32 joint_num = skin->mJointNums[j];
-        LLJoint *joint = NULL;
-        if (joint_num >= 0 && joint_num < LL_CHARACTER_MAX_ANIMATED_JOINTS)
-        {
-            joint = avatar->getJoint(joint_num);
-        }
-        llassert(joint);
+        LLJoint *joint = avatar->getJoint(joint_num);
+
         if (joint)
         {
             mat[j].setMul(joint->getWorldMatrix(), skin->mInvBindMatrix[j]);
@@ -178,7 +174,7 @@ void LLSkinningUtil::checkSkinWeights(LLVector4a* weights, U32 num_vertices, con
 
 void LLSkinningUtil::getPerVertexSkinMatrix(
     F32* weights,
-    LLMatrix4a* mat,
+    const LLMatrix4a* mat,
     bool handle_bad_scale,
     LLMatrix4a& final_mat)
 {
@@ -241,6 +237,7 @@ void LLSkinningUtil::initJointNums(LLMeshSkinInfo* skin, LLVOAvatar *avatar)
 {
     if (!skin->mJointNumsInitialized)
     {
+        LL_PROFILE_ZONE_SCOPED_CATEGORY_AVATAR;
         for (U32 j = 0; j < skin->mJointNames.size(); ++j)
         {
     #if DEBUG_SKINNING     
@@ -295,7 +292,7 @@ void LLSkinningUtil::updateRiggingInfo(const LLMeshSkinInfo* skin, LLVOAvatar *a
                 //S32 active_verts = 0;
                 vol_face.mJointRiggingInfoTab.resize(LL_CHARACTER_MAX_ANIMATED_JOINTS);
                 LLJointRiggingInfoTab &rig_info_tab = vol_face.mJointRiggingInfoTab;
-                LLMatrix4a bind_shape = skin->mBindShapeMatrix;
+                const LLMatrix4a& bind_shape = skin->mBindShapeMatrix;
                 LLMatrix4a matrixPalette[LL_CHARACTER_MAX_ANIMATED_JOINTS];
                 for (U32 i = 0; i < llmin(skin->mInvBindMatrix.size(), (size_t)LL_CHARACTER_MAX_ANIMATED_JOINTS); ++i)
                 {

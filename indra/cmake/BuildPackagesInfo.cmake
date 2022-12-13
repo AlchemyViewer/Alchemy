@@ -1,6 +1,5 @@
 # -*- cmake -*-
 # Construct the version and copyright information based on package data.
-include(Python)
 include(FindAutobuild)
 
 # packages-formatter.py runs autobuild install --versions, which needs to know

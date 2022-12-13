@@ -159,7 +159,7 @@ void LLSimInfo::updateAgentCount(F64 time)
 {
 	if ((time - mAgentsUpdateTime > AGENTS_UPDATE_TIMER) || mFirstAgentRequest)
 	{
-		LLWorldMapMessage::getInstanceFast()->sendItemRequest(MAP_ITEM_AGENT_LOCATIONS, mHandle);
+		LLWorldMapMessage::getInstance()->sendItemRequest(MAP_ITEM_AGENT_LOCATIONS, mHandle);
 		mAgentsUpdateTime = time;
 		mFirstAgentRequest = false;
 	}
@@ -398,7 +398,7 @@ void LLWorldMap::reloadItems(bool force)
 	//LL_INFOS("WorldMap") << "LLWorldMap::reloadItems()" << LL_ENDL;
 	if (clearItems(force))
 	{
-		auto& world_map_message = LLWorldMapMessage::instanceFast();
+		auto& world_map_message = LLWorldMapMessage::instance();
 		world_map_message.sendItemRequest(MAP_ITEM_TELEHUB);
 		world_map_message.sendItemRequest(MAP_ITEM_PG_EVENT);
 		world_map_message.sendItemRequest(MAP_ITEM_MATURE_EVENT);
@@ -633,7 +633,7 @@ void LLWorldMap::updateRegions(S32 x0, S32 y0, S32 x1, S32 y1)
 	mMapBlockLastUpdateOffsets.swap(new_offsets);
 
 	// Load the region info those blocks
-	auto& world_map_message = LLWorldMapMessage::instanceFast();
+	auto& world_map_message = LLWorldMapMessage::instance();
 	for (S32 block_x = llmax(x0, 0); block_x <= llmin(x1, MAP_BLOCK_RES-1); ++block_x)
 	{
 		for (S32 block_y = llmax(y0, 0); block_y <= llmin(y1, MAP_BLOCK_RES-1); ++block_y)

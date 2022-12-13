@@ -147,7 +147,7 @@ public:
 	{
 		// support secondlife:///app/appearance/show, but for now we just
 		// make all secondlife:///app/appearance SLapps behave this way
-		if (!LLUI::getInstanceFast()->mSettingGroups["config"]->getBOOL("EnableAppearance"))
+		if (!LLUI::getInstance()->mSettingGroups["config"]->getBOOL("EnableAppearance"))
 		{
 			LLNotificationsUtil::add("NoAppearance", LLSD(), LLSD(), std::string("SwitchToStandardSkinAndQuit"));
 			return true;
@@ -1036,7 +1036,7 @@ void LLWearableHoldingPattern::recoverMissingWearable(LLWearableType::EType type
 	
 		// Try to recover by replacing missing wearable with a new one.
 	LLNotificationsUtil::add("ReplacedMissingWearable");
-	LL_DEBUGS("Avatar") << "Wearable of type '" << LLWearableType::getInstanceFast()->getTypeName(type)
+	LL_DEBUGS("Avatar") << "Wearable of type '" << LLWearableType::getInstance()->getTypeName(type)
 				<< "' could not be downloaded.  Replaced inventory item with default wearable." << LL_ENDL;
 	LLViewerWearable* wearable = LLWearableList::instance().createNewWearable(type, gAgentAvatarp);
 
@@ -2138,7 +2138,7 @@ void LLAppearanceMgr::filterWearableItems(
                 continue;
 //            S32 start_index = llmax(0,size-max_per_type);
 // [SL:KB] - Patch: Appearance-Misc | Checked: 2010-05-11 (Catznip-2.0)
-			S32 start_index = llmax(0, size - ((LLWearableType::getInstanceFast()->getAllowMultiwear((LLWearableType::EType)i)) ? max_per_type : 1));
+			S32 start_index = llmax(0, size - ((LLWearableType::getInstance()->getAllowMultiwear((LLWearableType::EType)i)) ? max_per_type : 1));
 // [/SL:KB[
             for (S32 j = start_index; j<size; j++)
             {
@@ -4124,7 +4124,7 @@ void LLAppearanceMgr::serverAppearanceUpdateCoro(LLCoreHttpUtil::HttpCoroutineAd
                 // through the UDP and be handled in LLVOAvatar::processAvatarAppearance
                 // this should ensure that we receive a new canonical COF from the sim
                 // host. Hopefully it will return before the timeout.
-                LLAvatarPropertiesProcessor::getInstanceFast()->sendAvatarTexturesRequest(gAgent.getID());
+                LLAvatarPropertiesProcessor::getInstance()->sendAvatarTexturesRequest(gAgent.getID());
 
                 bRetry = true;
                 // Wait for a 1/2 second before trying again.  Just to keep from asking too quickly.
@@ -4972,6 +4972,7 @@ public:
 																			  "Quick Appearance");
 			if ( gInventory.getCategory( folder_uuid ) != NULL )
 			{
+				// Assume this is coming from the predefined avatars web floater
 				LLAppearanceMgr::getInstance()->wearInventoryCategory(category, true, false);
 				
 				// *TODOw: This may not be necessary if initial outfit is chosen already -- josh

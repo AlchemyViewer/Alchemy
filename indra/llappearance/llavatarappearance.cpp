@@ -924,6 +924,9 @@ BOOL LLAvatarAppearance::loadAvatar()
 		return FALSE;
 	}
 
+	// initialize mJointAliasMap
+	getJointAliases();
+
 	// avatar_lad.xml : <skeleton>
 	if( !loadSkeletonNode() )
 	{
@@ -1044,7 +1047,6 @@ BOOL LLAvatarAppearance::loadAvatar()
 			return FALSE;
 		}
 	}
-
 	
 	return TRUE;
 }
@@ -1583,7 +1585,7 @@ BOOL LLAvatarAppearance::allocateCollisionVolumes( U32 num )
         delete_and_clear_array(mCollisionVolumes);
         mNumCollisionVolumes = 0;
 
-        mCollisionVolumes = new(std::nothrow) LLAvatarJointCollisionVolume[num];
+        mCollisionVolumes = new LLAvatarJointCollisionVolume[num];
         if (!mCollisionVolumes)
         {
             LL_WARNS() << "Failed to allocate collision volumes" << LL_ENDL;
@@ -1719,7 +1721,8 @@ BOOL LLAvatarSkeletonInfo::parseXml(LLXmlTreeNode* node)
 }
 
 //Make aliases for joint and push to map.
-void LLAvatarAppearance::makeJointAliases(LLAvatarBoneInfo *bone_info)
+/* static */
+void LLAvatarAppearance::makeJointAliases(LLAvatarBoneInfo* bone_info, joint_alias_map_t& joint_alias_map)
 {
     if (! bone_info->mIsJoint )
     {
@@ -1727,61 +1730,64 @@ void LLAvatarAppearance::makeJointAliases(LLAvatarBoneInfo *bone_info)
     }
     
     std::string bone_name = bone_info->mName;
-    mJointAliasMap[bone_name] = bone_name; //Actual name is a valid alias.
+    joint_alias_map[bone_name] = bone_name;  // Actual name is a valid alias.
     
     std::string aliases = bone_info->mAliases;
     
-    boost::char_separator<char> sep(" ");
-    boost::tokenizer<boost::char_separator<char> > tok(aliases, sep);
-    for(boost::tokenizer<boost::char_separator<char> >::iterator i = tok.begin(); i != tok.end(); ++i)
+    boost::char_separator sep(" ");
+    boost::tokenizer tok(aliases, sep);
+    for(auto i = tok.begin(); i != tok.end(); ++i)
     {
-        if ( mJointAliasMap.find(*i) != mJointAliasMap.end() )
+        if (joint_alias_map.find(*i) != joint_alias_map.end())
         {
-            LL_WARNS() << "avatar skeleton:  Joint alias \"" << *i << "\" remapped from " << mJointAliasMap[*i] << " to " << bone_name << LL_ENDL;
+            LL_WARNS() << "avatar skeleton:  Joint alias \"" << *i << "\" remapped from " << joint_alias_map[*i] << " to " << bone_name << LL_ENDL;
         }
-        mJointAliasMap[*i] = bone_name;
+        joint_alias_map[*i] = bone_name;
     }
 
     for (LLAvatarBoneInfo* bone : bone_info->mChildren)
     {
-        makeJointAliases(bone);
+        makeJointAliases(bone, joint_alias_map);
     }
 }
 
-const LLAvatarAppearance::joint_alias_map_t& LLAvatarAppearance::getJointAliases ()
+/* static */
+LLAvatarAppearance::joint_alias_map_t LLAvatarAppearance::buildJointAliases()
+{
+    joint_alias_map_t map;
+    for (auto iter = sAvatarSkeletonInfo->mBoneInfoList.cbegin(); 
+		iter != sAvatarSkeletonInfo->mBoneInfoList.cend();
+		++iter)
+    {
+        makeJointAliases(*iter, map);
+    }
+
+    for (auto attach_iter = sAvatarXmlInfo->mAttachmentInfoList.cbegin();
+		attach_iter != sAvatarXmlInfo->mAttachmentInfoList.cend();
+		++attach_iter)
+    {
+        LLAvatarXmlInfo::LLAvatarAttachmentInfo* info      = *attach_iter;
+        std::string                              bone_name = info->mName;
+
+        // Also accept the name with spaces substituted with
+        // underscores. This gives a mechanism for referencing such joints
+        // in daes, which don't allow spaces.
+        std::string sub_space_to_underscore = bone_name;
+        LLStringUtil::replaceChar(sub_space_to_underscore, ' ', '_');
+        if (sub_space_to_underscore != bone_name)
+        {
+            map[sub_space_to_underscore] = bone_name;
+        }
+    }
+    return map;
+}
+
+const LLAvatarAppearance::joint_alias_map_t& LLAvatarAppearance::getJointAliases()
 {
     if (mJointAliasMap.empty())
     {
-        
-        LLAvatarSkeletonInfo::bone_info_list_t::const_iterator iter;
-        for (iter = sAvatarSkeletonInfo->mBoneInfoList.begin(); 
-             iter != sAvatarSkeletonInfo->mBoneInfoList.end();
-             ++iter)
-        {
-            //LLAvatarBoneInfo *bone_info = *iter;
-            makeJointAliases( *iter );
-        }
-
-        LLAvatarXmlInfo::attachment_info_list_t::iterator attach_iter;
-        for (attach_iter = sAvatarXmlInfo->mAttachmentInfoList.begin();
-             attach_iter != sAvatarXmlInfo->mAttachmentInfoList.end(); 
-             ++attach_iter)
-        {
-            LLAvatarXmlInfo::LLAvatarAttachmentInfo *info = *attach_iter;
-            std::string bone_name = info->mName;
-            
-            // Also accept the name with spaces substituted with
-            // underscores. This gives a mechanism for referencing such joints
-            // in daes, which don't allow spaces.
-            std::string sub_space_to_underscore = bone_name;
-            LLStringUtil::replaceChar(sub_space_to_underscore, ' ', '_');
-            if (sub_space_to_underscore != bone_name)
-            {
-                mJointAliasMap[sub_space_to_underscore] = bone_name;
-            }
-        }
+        mJointAliasMap = buildJointAliases();
     }
-
     return mJointAliasMap;
 } 
 

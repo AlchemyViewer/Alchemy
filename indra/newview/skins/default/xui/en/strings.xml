@@ -86,6 +86,7 @@ Voice Server Version: [VOICE_VERSION]
 	</string>
 	<string name="AboutTraffic">Packets Lost: [PACKETS_LOST,number,0]/[PACKETS_IN,number,0] ([PACKETS_PCT,number,1]%)</string>
 	<string name="AboutTime">[month, datetime, slt] [day, datetime, slt] [year, datetime, slt] [hour, datetime, slt]:[min, datetime, slt]:[second,datetime,slt]</string>
+  <string name="LocalTime">[month, datetime, local] [day, datetime, local] [year, datetime, local] [hour, datetime, local]:[min, datetime, local]:[second,datetime, local]</string>
 	<string name="ErrorFetchingServerReleaseNotesURL">Error fetching server release notes URL.</string>
 	<string name="BuildConfiguration">Build Configuration</string>
 	
@@ -128,7 +129,7 @@ Voice Server Version: [VOICE_VERSION]
 	<string name="CertAllocationFailure">Failed to allocate openssl memory for certificate.</string>
 
 	<string name="LoginFailedNoNetwork">Network error: Could not establish connection, please check your network connection.</string>
-	<string name="LoginFailed">Login failed.</string>
+	<string name="LoginFailedHeader">Login failed.</string>
 	<string name="Quit">Quit</string>
 	
 	<string name="AgniGridLabel">Second Life Main Grid (Agni)</string>
@@ -138,6 +139,8 @@ Voice Server Version: [VOICE_VERSION]
 	<string name="LoginFailedViewerNotPermitted">
     The viewer you are using can no longer access [CURRENT_GRID]. Please visit the following page to download a new viewer:
 https://www.alchemyviewer.org/pages/downloads.html</string>
+	<string name="LoginFailed">Grid emergency login failure.
+If you feel this is an error, please contact support.</string>
 	<string name="LoginIntermediateOptionalUpdateAvailable">Optional viewer update available: [VERSION]</string>
 	<string name="LoginFailedRequiredUpdate">Required viewer update: [VERSION]</string>
 	<string name="LoginFailedAlreadyLoggedIn">This agent is already logged in.
@@ -161,15 +164,18 @@ Logins are currently restricted to [GRID_ADMIN] employees only.</string>
 People with free accounts will not be able to access [CURRENT_GRID] during this time, to make room for those who have paid for [CURRENT_GRID].</string>
 	<string name="LoginFailedComputerProhibited">[CURRENT_GRID] cannot be accessed from this computer.
 If you feel this is an error, please contact support.</string>
+  <!--'Pacific time' placeholder for [TIME] in case time from server can't be decoded-->
+  <string name="PacificTime">Pacific Time</string>
 	<string name="LoginFailedAcountSuspended">Your account is not accessible until
-[TIME] Pacific Time.</string>
+[TIME].
+If you feel this is an error, please contact support.</string>
 	<string name="LoginFailedAccountDisabled">We are unable to complete your request at this time.
 Please contact [CURRENT_GRID] support for assistance.</string>
 	<string name="LoginFailedTransformError">Data inconsistency found during login.
 Please contact [CURRENT_GRID] support.</string>
 	<string name="LoginFailedAccountMaintenance">Your account is undergoing minor maintenance.
 Your account is not accessible until
-[TIME] Pacific Time.
+[TIME].
 If you feel this is an error, please contact [CURRENT_GRID] support.</string>
 	<string name="LoginFailedPendingLogoutFault">Request for logout responded with a fault from simulator.</string>
 	<string name="LoginFailedPendingLogout">The system is logging you out right now.
@@ -350,8 +356,6 @@ can be attached to notecards.
 
 	<!-- Group name: text shown for LLUUID::null -->
 	<string name="GroupNameNone">(none)</string>
-
-	<string name="AvalineCaller">Avaline Caller [ORDER]</string>
 
 	<!-- Asset errors. Used in llassetstorage.cpp, translation from error code to error message. -->
 	<string name="AssetErrorNone">No error</string>
@@ -574,6 +578,7 @@ http://secondlife.com/support for help fixing this problem.
 	<string name="avi_movie_file">AVI Movie File</string>
 	<string name="xaf_animation_file">XAF Anim File</string>
 	<string name="xml_file">XML File</string>
+	<string name="csv_files">Comma separated values</string>
 	<string name="raw_file">RAW File</string>
 	<string name="compressed_image_files">Compressed Images</string>
 	<string name="load_files">Load Files</string>
@@ -2347,6 +2352,14 @@ The [[MARKETPLACE_CREATE_STORE_URL] Marketplace store] is returning errors.
 An error occurred while opening Marketplace Listings.
 If you continue to receive this message, please contact Second Life support for assistance at http://support.secondlife.com
 	</string>
+	<string name="InventoryMarketplaceConnectionError">
+Marketplace Listings failed to connect.
+If you continue to receive this message, please contact Second Life support for assistance at http://support.secondlife.com
+	</string>
+	<string name="InventoryMarketplaceConnectionErrorReason">
+Marketplace Listings failed to connect. Reason: [REASON]
+If you continue to receive this message, please contact Second Life support for assistance at http://support.secondlife.com
+	</string>
 	<string name="InventoryMarketplaceListingsNoItemsTitle">Your Marketplace Listings folder is empty.</string>
 	<string name="InventoryMarketplaceListingsNoItemsTooltip"></string>
 	<string name="InventoryMarketplaceListingsNoItems">
@@ -2824,8 +2837,8 @@ If you continue to receive this message, please contact Second Life support for 
     <string name="NoPicksText">You haven't created any Picks. Click the New button to create a Pick.</string>
     <string name="NoClassifiedsText">You haven't created any Classifieds. Click the New button to create a Classified.</string>
     <string name="NoAvatarPicksClassifiedsText">User has no picks or classifieds</string>
-    <string name="NoAvatarPicksText">User has no picks</string>
-    <string name="NoAvatarClassifiedsText">User has no classifieds</string>
+    <string name="NoAvatarPicksText">This person has no picks</string>
+    <string name="NoAvatarClassifiedsText">This person has no classifieds</string>
     <string name="PicksClassifiedsLoadingText">Loading...</string>
 
 	<!-- Multi Preview Floater -->
@@ -2916,13 +2929,13 @@ Expected .wav, .tga, .bmp, .jpg, .jpeg, or .anim
 	<string name="None">None</string>
 	<string name="Linden Location">Linden Location</string>
 	<string name="Adult">Adult</string>
-	<string name="Arts and Culture">Arts &amp; Culture</string>
+	<string name="Arts&amp;Culture">Arts &amp; Culture</string>
 	<string name="Business">Business</string>
 	<string name="Educational">Educational</string>
 	<string name="Gaming">Gaming</string>
 	<string name="Hangout">Hangout</string>
 	<string name="Newcomer Friendly">Newcomer Friendly</string>
-	<string name="Parks and Nature">Parks &amp; Nature</string>
+	<string name="Parks&amp;Nature">Parks &amp; Nature</string>
 	<string name="Residential">Residential</string>
 	<!--<string name="Shopping">Shopping</string>	-->
 	<string name="Stage">Stage</string>
@@ -3871,6 +3884,7 @@ Abuse Report</string>
   <string name="Common Gestures">Common Gestures</string>
   <!-- Additional inventory entries -->
   <string name="RlvRoot">#RLV</string>
+  <string name="Local Inventory">Local Inventory</string>
   <!-- gestures -->
   <string name="Male - Excuse me">Male - Excuse me</string>
   <string name="Male - Get lost">Male - Get lost</string>
@@ -3990,7 +4004,7 @@ Please check http://status.secondlifegrid.net to see if there is a known problem
   <!-- SL Membership -->
   <string name="BaseMembership">Base</string>
   <string name="PremiumMembership">Premium</string>
-  <string name="Premium PlusMembership">Premium Plus</string>
+  <string name="Premium_PlusMembership">Premium Plus</string>
   <string name="InternalMembership">Internal</string> <!-- No need to translate -->
 
   <string name="MembershipUpgradeText">Upgrade to Premium</string>
@@ -4338,6 +4352,10 @@ name="Command_360_Capture_Tooltip">Capture a 360 equirectangular image</string>
   <string name="Mav_Details_MAV_CONFIRMATION_DATA_MISMATCH">
       The physics shape contains bad confirmation data. Try to correct the physics model.
   </string>
+  <!-- MAV_BLOCK_MISSING means server didn't get and couldn't substitute physics_convex, high_lod or BoundingVerts-->
+  <string name="Mav_Details_MAV_BLOCK_MISSING">
+    Missing data. Make sure high lod is present and valid. Set the physics model if not set.
+  </string>
   <string name="Mav_Details_MAV_UNKNOWN_VERSION">
       The physics shape does not have correct version. Set the correct version for the physics model.
   </string>
@@ -4370,13 +4388,6 @@ and report the problem.
   <string name="outfit_photo_load_codec_error">Invalid image format. Please use another image</string>
 
   <!-- Alchemy Strings -->
-  <string name="not_found">&apos;[TEXT]&apos; not found</string>
-  <string name="no_results">No results</string>
-  <string name="searching">Searching...</string>
-  <string name="all_categories">All Categories</string>
-  <string name="search_banned">Some terms in your search query were excluded due to content restrictions as clarified in the Community Standards.</string>
-  <string name="search_short">Your search terms were too short so no search was performed.</string>
-  <string name="search_disabled">Legacy Search has been disabled in this region.</string>
   <string name="NotifyIncomingMessage">Incoming message from [NAME]...</string>
   <string name="AvatarTyping">Typing</string>
   <string name="UnknownAvatar">Unknown Avatar</string>

@@ -87,7 +87,7 @@ public:
 	virtual BOOL removeItem() { return FALSE; }
 	virtual void removeBatch(std::vector<LLFolderViewModelItem*>& batch) { }
 	virtual void move( LLFolderViewModelItem* parent_listener ) { }
-	virtual BOOL isItemCopyable() const { return FALSE; }
+    virtual bool isItemCopyable(bool can_copy_as_link = true) const { return false; }
 // [SL:KB] - Patch: Inventory-Actions | Checked: 2013-09-19 (Catznip-3.6)
 	/*virtual*/ bool isItemLinkable() const { return false; }
 // [/SL:KB]

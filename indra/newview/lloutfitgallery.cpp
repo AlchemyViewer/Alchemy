@@ -38,7 +38,7 @@
 #include "llfilepicker.h"
 #include "llfloaterperms.h"
 #include "llfloaterreg.h"
-#include "llfloateroutfitsnapshot.h"
+#include "llfloatersimpleoutfitsnapshot.h"
 #include "llimagedimensionsinfo.h"
 #include "llinventoryfunctions.h"
 #include "llinventorymodel.h"
@@ -908,7 +908,7 @@ void LLOutfitGalleryContextMenu::onOutfitsRemovalConfirmation(const LLSD& notifi
 
 void LLOutfitGalleryContextMenu::onCreate(const LLSD& data)
 {
-    LLWearableType::EType type = LLWearableType::getInstanceFast()->typeNameToType(data.asString());
+    LLWearableType::EType type = LLWearableType::getInstance()->typeNameToType(data.asString());
     if (type == LLWearableType::WT_NONE)
     {
         LL_WARNS() << "Invalid wearable type" << LL_ENDL;
@@ -1390,6 +1390,7 @@ void LLOutfitGallery::onSelectPhoto(LLUUID selected_outfit_id)
                 texture_floaterp->setOnFloaterCommitCallback(boost::bind(&LLOutfitGallery::onTexturePickerCommit, this, _1, _2));
                 texture_floaterp->setOnUpdateImageStatsCallback(boost::bind(&LLOutfitGallery::onTexturePickerUpdateImageStats, this, _1));
                 texture_floaterp->setLocalTextureEnabled(FALSE);
+                texture_floaterp->setBakeTextureEnabled(FALSE);
                 texture_floaterp->setCanApply(false, true);
             }
 
@@ -1401,8 +1402,8 @@ void LLOutfitGallery::onSelectPhoto(LLUUID selected_outfit_id)
 
 void LLOutfitGallery::onTakeSnapshot(LLUUID selected_outfit_id)
 {
-    LLFloaterReg::toggleInstanceOrBringToFront("outfit_snapshot");
-    LLFloaterOutfitSnapshot* snapshot_floater = LLFloaterOutfitSnapshot::getInstance();
+    LLFloaterReg::toggleInstanceOrBringToFront("simple_outfit_snapshot");
+    LLFloaterSimpleOutfitSnapshot* snapshot_floater = LLFloaterSimpleOutfitSnapshot::getInstance();
     if (snapshot_floater)
     {
         snapshot_floater->setOutfitID(selected_outfit_id);

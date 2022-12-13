@@ -3,12 +3,14 @@
 include(APR)
 include(Boost)
 include(EXPAT)
-include(ZLIB)
+include(Tracy)
+include(ZLIBNG)
 
 set(LLCOMMON_INCLUDE_DIRS
     ${LIBS_OPEN_DIR}/llcommon
     ${APRUTIL_INCLUDE_DIR}
     ${APR_INCLUDE_DIR}
+    ${TRACY_INCLUDE_DIR}
     ${Boost_INCLUDE_DIRS}
     )
 set(LLCOMMON_SYSTEM_INCLUDE_DIRS
@@ -32,7 +34,8 @@ else (LINUX)
         ${BOOST_CONTEXT_LIBRARY} 
         ${BOOST_THREAD_LIBRARY}
         ${BOOST_STACKTRACE_LIBRARY} 
-        ${BOOST_SYSTEM_LIBRARY} )
+        ${BOOST_SYSTEM_LIBRARY}
+        )
 endif (LINUX)
 
 set(LLCOMMON_LINK_SHARED OFF CACHE BOOL "Build the llcommon target as a static library.")

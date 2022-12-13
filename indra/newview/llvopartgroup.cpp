@@ -65,7 +65,7 @@ void LLVOPartGroup::restoreGL()
 {
 
 	//TODO: optimize out binormal mask here.  Specular and normal coords as well.
-	sVB = new LLVertexBuffer(VERTEX_DATA_MASK | LLVertexBuffer::MAP_TANGENT | LLVertexBuffer::MAP_TEXCOORD1 | LLVertexBuffer::MAP_TEXCOORD2, GL_STREAM_DRAW);
+	sVB = new LLVertexBuffer(VERTEX_DATA_MASK | LLVertexBuffer::MAP_TANGENT | LLVertexBuffer::MAP_TEXCOORD1 | LLVertexBuffer::MAP_TEXCOORD2, GL_STREAM_DRAW_ARB);
 	U32 count = LL_MAX_PARTICLE_COUNT;
 	if (!sVB->allocateBuffer(count*4, count*6, true))
 	{
@@ -223,7 +223,7 @@ void LLVOPartGroup::setPixelAreaAndAngle(LLAgent &agent)
 {
 	// mPixelArea is calculated during render
 	F32 mid_scale = getMidScale();
-	F32 range = (getRenderPosition()-LLViewerCamera::getInstanceFast()->getOrigin()).length();
+	F32 range = (getRenderPosition()-LLViewerCamera::getInstance()->getOrigin()).length();
 
 	if (range < 0.001f || isHUDAttachment())		// range == zero
 	{
@@ -307,10 +307,9 @@ LLVector3 LLVOPartGroup::getCameraPosition() const
 	return gAgentCamera.getCameraPositionAgent();
 }
 
-static LLTrace::BlockTimerStatHandle FTM_UPDATE_PARTICLES("Update Particles");
 BOOL LLVOPartGroup::updateGeometry(LLDrawable *drawable)
 {
-	LL_RECORD_BLOCK_TIME(FTM_UPDATE_PARTICLES);
+    LL_PROFILE_ZONE_SCOPED;
 
 	dirtySpatialGroup();
 	
@@ -351,7 +350,7 @@ BOOL LLVOPartGroup::updateGeometry(LLDrawable *drawable)
 	F32 tot_area = 0;
 
 	F32 max_area = LLViewerPartSim::getMaxPartCount() * MAX_PARTICLE_AREA_SCALE; 
-	F32 pixel_meter_ratio = LLViewerCamera::getInstanceFast()->getPixelMeterRatio();
+	F32 pixel_meter_ratio = LLViewerCamera::getInstance()->getPixelMeterRatio();
 	pixel_meter_ratio *= pixel_meter_ratio;
 
 	LLViewerPartSim::checkParticleCount(mViewerPartGroupp->mParticles.size()) ;
@@ -713,7 +712,7 @@ void LLVOPartGroup::getGeometry(S32 idx,
 	*colorsp++ = color;
 
 	//Only add emissive attributes if glowing (doing it for all particles is INCREDIBLY inefficient as it leads to a second, slower, render pass.)
-	if (gPipeline.canUseVertexShaders() && (pglow.mV[3] > 0 || part.mGlow.mV[3] > 0))
+	if (pglow.mV[3] > 0 || part.mGlow.mV[3] > 0)
 	{ //only write glow if it is not zero
 		*emissivep++ = pglow;
 		*emissivep++ = pglow;
@@ -724,7 +723,7 @@ void LLVOPartGroup::getGeometry(S32 idx,
 
 	if (!(part.mFlags & LLPartData::LL_PART_EMISSIVE_MASK))
 	{ //not fullbright, needs normal
-		LLVector3 normal = -LLViewerCamera::getInstanceFast()->getXAxis();
+		LLVector3 normal = -LLViewerCamera::getInstance()->getXAxis();
 		*normalsp++   = normal;
 		*normalsp++   = normal;
 		*normalsp++   = normal;
@@ -738,7 +737,7 @@ U32 LLVOPartGroup::getPartitionType() const
 }
 
 LLParticlePartition::LLParticlePartition(LLViewerRegion* regionp)
-: LLSpatialPartition(LLDrawPoolAlpha::VERTEX_DATA_MASK | LLVertexBuffer::MAP_TEXTURE_INDEX, TRUE, GL_STREAM_DRAW, regionp)
+: LLSpatialPartition(LLDrawPoolAlpha::VERTEX_DATA_MASK | LLVertexBuffer::MAP_TEXTURE_INDEX, TRUE, GL_STREAM_DRAW_ARB, regionp)
 {
 	mRenderPass = LLRenderPass::PASS_ALPHA;
 	mDrawableType = LLPipeline::RENDER_TYPE_PARTICLES;
@@ -754,10 +753,9 @@ LLHUDParticlePartition::LLHUDParticlePartition(LLViewerRegion* regionp) :
 	mPartitionType = LLViewerRegion::PARTITION_HUD_PARTICLE;
 }
 
-static LLTrace::BlockTimerStatHandle FTM_REBUILD_PARTICLE_VBO("Particle VBO");
-
 void LLParticlePartition::rebuildGeom(LLSpatialGroup* group)
 {
+    LL_PROFILE_ZONE_SCOPED;
 	if (group->isDead() || !group->hasState(LLSpatialGroup::GEOM_DIRTY))
 	{
 		return;
@@ -769,8 +767,6 @@ void LLParticlePartition::rebuildGeom(LLSpatialGroup* group)
 		group->mLastUpdateViewAngle = group->mViewAngle;
 	}
 	
-	LL_RECORD_BLOCK_TIME(FTM_REBUILD_PARTICLE_VBO);	
-
 	group->clearDrawMap();
 	
 	//get geometry count
@@ -803,7 +799,7 @@ void LLParticlePartition::addGeometryCount(LLSpatialGroup* group, U32& vertex_co
 
 	mFaceList.clear();
 
-	LLViewerCamera* camera = LLViewerCamera::getInstanceFast();
+	LLViewerCamera* camera = LLViewerCamera::getInstance();
 	for (LLSpatialGroup::element_iter i = group->getDataBegin(), i_end = group->getDataEnd(); i != i_end; ++i)
 	{
 		LLDrawable* drawablep = (LLDrawable*)(*i)->getDrawable();
@@ -843,11 +839,9 @@ void LLParticlePartition::addGeometryCount(LLSpatialGroup* group, U32& vertex_co
 }
 
 
-static LLTrace::BlockTimerStatHandle FTM_REBUILD_PARTICLE_GEOM("Particle Geom");
-
 void LLParticlePartition::getGeometry(LLSpatialGroup* group)
 {
-	LL_RECORD_BLOCK_TIME(FTM_REBUILD_PARTICLE_GEOM);
+    LL_PROFILE_ZONE_SCOPED;
 
 	std::sort(mFaceList.begin(), mFaceList.end(), LLFace::CompareDistanceGreater());
 

@@ -667,6 +667,17 @@
      layout="topleft" 
      name="Paste Separator" />
     <menu_item_call
+     label="Restore to Last Position"
+     layout="topleft"
+     name="Restore to Last Position">
+    <menu_item_call.on_click
+     function="Inventory.DoToSelected"
+     parameter="restoreToWorld" />
+    <menu_item_call.on_enable
+     function="SavedSetting"
+     parameter="AlchemyPowerfulWizard" />
+	</menu_item_call>
+    <menu_item_call
      label="Delete"
      layout="topleft"
      name="Delete">
@@ -826,18 +837,7 @@
     <menu_item_separator
      layout="topleft" 
      name="Wearable And Object Separator"/>
-	<!-- COMMENTED OUT for DEV-32347 -->
-	<!--
-    <menu_item_call
-     label="Restore to Last Position"
-     layout="topleft"
-     name="Restore to Last Position">
-        <menu_item_call.on_click
-         function="Inventory.DoToSelected"
-         parameter="restoreToWorld" />
-    </menu_item_call>
-	-->
-    <menu_item_call
+	<menu_item_call
      label="Wear"
      layout="topleft"
      name="Wearable And Object Wear">
@@ -912,6 +912,25 @@
                 function="Inventory.DoToSelected"
                 parameter="apply_settings_parcel" />
     </menu_item_call>
+  <menu_item_separator
+   layout="topleft"
+   name="Subfolder Separator" />
+  <menu_item_call
+   label="Create folder from selected"
+   layout="topleft"
+   name="New folder from selected">
+    <menu_item_call.on_click
+     function="Inventory.DoToSelected"
+     parameter="new_folder_from_selected" />
+  </menu_item_call>
+  <menu_item_call
+   label="Ungroup folder items"
+   layout="topleft"
+   name="Ungroup folder items">
+    <menu_item_call.on_click
+     function="Inventory.DoToSelected"
+     parameter="ungroup_folder_items" />
+  </menu_item_call>
 	<menu_item_separator
 	 layout="topleft"
 	 name="Marketplace Separator" />
@@ -931,6 +950,21 @@
         function="Inventory.DoToSelected"
         parameter="move_to_marketplace_listings" />
 	</menu_item_call>
+	<menu_item_separator
+	 layout="topleft"
+	 name="Extras Separator" />
+	<menu
+	 label="Extras"
+	 layout="topleft"
+	 name="Extras Menu">
+		<menu_item_call
+		  label="Edit Hex"
+		  name="Edit Hex">
+			<on_click
+			  function="Inventory.DoToSelected"
+			  parameter="edit_hex" />
+		</menu_item_call>
+	</menu>
 	<menu_item_call
      label="--no options--"
      layout="topleft"

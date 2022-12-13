@@ -11,15 +11,18 @@ include(Boost)
 include(Sentry)
 include(LLSharedLibs)
 include(Copy3rdPartyLibs)
-include(ZLIB)
+include(ZLIBNG)
 include(URIPARSER)
+include(Tracy)
+include(OpenSSL)
 
 include_directories(
     ${EXPAT_INCLUDE_DIRS}
     ${LLCOMMON_INCLUDE_DIRS}
     ${LLMATH_INCLUDE_DIRS}
-    ${ZLIB_INCLUDE_DIRS}
+    ${ZLIBNG_INCLUDE_DIRS}
     ${URIPARSER_INCLUDE_DIRS}
+    ${TRACY_INCLUDE_DIR}
     )
 
 # add_executable(lltreeiterators lltreeiterators.cpp)
@@ -106,7 +109,6 @@ set(llcommon_SOURCE_FILES
     llsys.cpp
     lltempredirect.cpp
     llthread.cpp
-    llthreadlocalstorage.cpp
     llthreadsafequeue.cpp
     lltimer.cpp
     lltrace.cpp
@@ -117,14 +119,17 @@ set(llcommon_SOURCE_FILES
     lluriparser.cpp
     lluuid.cpp
     llworkerthread.cpp
-    timing.cpp
     u64.cpp
+    threadpool.cpp
+    workqueue.cpp
     StackWalker.cpp
     )
     
 set(llcommon_HEADER_FILES
     CMakeLists.txt
 
+    chrono.h
+    classic_callback.h
     ctype_workaround.h
     fix_macros.h
     indra_constants.h
@@ -197,6 +202,8 @@ set(llcommon_HEADER_FILES
     llmutex.h
     llnametable.h
     llpointer.h
+    llprofiler.h
+    llprofilercategories.h
     llpounceable.h
     llpredicate.h
     llpreprocessor.h
@@ -252,10 +259,19 @@ set(llcommon_HEADER_FILES
     lockstatic.h
     stdtypes.h
     stringize.h
+    threadpool.h
+    threadsafeschedule.h
     timer.h
+    tuple.h
     u64.h
+    workqueue.h
     StackWalker.h
     )
+    
+if (DARWIN)
+  list(APPEND llcommon_HEADER_FILES llsys_objc.h)
+  list(APPEND llcommon_SOURCE_FILES llsys_objc.mm)
+endif (DARWIN)
 
 if (DARWIN)
   list(APPEND llcommon_HEADER_FILES llsys_objc.h)
@@ -285,7 +301,8 @@ target_link_libraries(
     ${APRUTIL_LIBRARIES}
     ${APR_LIBRARIES}
     ${EXPAT_LIBRARIES}
-    ${ZLIB_LIBRARIES}
+    ${OPENSSL_LIBRARIES}
+    ${ZLIBNG_LIBRARIES}
     ${WINDOWS_LIBRARIES}
     ${BOOST_FIBER_LIBRARY}
     ${BOOST_CONTEXT_LIBRARY}
@@ -303,6 +320,7 @@ target_link_libraries(
     absl::strings
     nlohmann_json::nlohmann_json
     fmt::fmt
+    ${TRACY_LIBRARY}
     ${DL_LIBRARY}
     ${RT_LIBRARY}
     )
@@ -343,17 +361,21 @@ if (LL_TESTS)
       ${BOOST_FIBER_LIBRARY} 
       ${BOOST_CONTEXT_LIBRARY} 
       ${BOOST_THREAD_LIBRARY} 
-      ${BOOST_SYSTEM_LIBRARY})
-  LL_ADD_INTEGRATION_TEST(commonmisc "" "${test_libs}")
+      ${BOOST_SYSTEM_LIBRARY}
+      ${OPENSSL_LIBRARIES}
+      ${ZLIBNG_LIBRARIES}
+      )
   LL_ADD_INTEGRATION_TEST(bitpack "" "${test_libs}")
+  LL_ADD_INTEGRATION_TEST(classic_callback "" "${test_libs}")
+  LL_ADD_INTEGRATION_TEST(commonmisc "" "${test_libs}")
   LL_ADD_INTEGRATION_TEST(llbase64 "" "${test_libs}")
   LL_ADD_INTEGRATION_TEST(llcond "" "${test_libs}")
   LL_ADD_INTEGRATION_TEST(lldate "" "${test_libs}")
   LL_ADD_INTEGRATION_TEST(lldeadmantimer "" "${test_libs}")
   LL_ADD_INTEGRATION_TEST(lldependencies "" "${test_libs}")
   LL_ADD_INTEGRATION_TEST(llerror "" "${test_libs}")
-  LL_ADD_INTEGRATION_TEST(lleventdispatcher "" "${test_libs}")
   LL_ADD_INTEGRATION_TEST(lleventcoro "" "${test_libs}")
+  LL_ADD_INTEGRATION_TEST(lleventdispatcher "" "${test_libs}")
   LL_ADD_INTEGRATION_TEST(lleventfilter "" "${test_libs}")
   LL_ADD_INTEGRATION_TEST(llframetimer "" "${test_libs}")
   LL_ADD_INTEGRATION_TEST(llheteromap "" "${test_libs}")
@@ -371,9 +393,12 @@ if (LL_TESTS)
   LL_ADD_INTEGRATION_TEST(llstring "" "${test_libs}")
   LL_ADD_INTEGRATION_TEST(lltrace "" "${test_libs}")
   LL_ADD_INTEGRATION_TEST(lltreeiterators "" "${test_libs}")
-  LL_ADD_INTEGRATION_TEST(lluri "" "${test_libs}")
   LL_ADD_INTEGRATION_TEST(llunits "" "${test_libs}")
+  LL_ADD_INTEGRATION_TEST(lluri "" "${test_libs}")
   LL_ADD_INTEGRATION_TEST(stringize "" "${test_libs}")
+  LL_ADD_INTEGRATION_TEST(threadsafeschedule "" "${test_libs}")
+  LL_ADD_INTEGRATION_TEST(tuple "" "${test_libs}")
+  LL_ADD_INTEGRATION_TEST(workqueue "" "${test_libs}")
 
 ## llexception_test.cpp isn't a regression test, and doesn't need to be run
 ## every build. It's to help a developer make implementation choices about

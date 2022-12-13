@@ -152,6 +152,7 @@ BOOL LLShaderMgr::attachShaderFeatures(LLGLSLShader * shader)
 
 	if (features->hasObjectSkinning)
 	{
+        shader->mRiggedVariant = shader;
         if (!shader->attachVertexObject("avatar/objectSkinV.glsl"))
 		{
 			return FALSE;
@@ -528,44 +529,26 @@ BOOL LLShaderMgr::attachShaderFeatures(LLGLSLShader * shader)
 //============================================================================
 // Load Shader
 
-static std::string get_shader_log(GLuint ret)
+static std::string get_object_log(GLhandleARB ret)
 {
 	std::string res;
 	
 	//get log length 
 	GLint length;
-	glGetShaderiv(ret, GL_INFO_LOG_LENGTH, &length);
+	glGetObjectParameterivARB(ret, GL_OBJECT_INFO_LOG_LENGTH_ARB, &length);
 	if (length > 0)
 	{
 		//the log could be any size, so allocate appropriately
-		GLchar* log = new GLchar[length];
-		glGetShaderInfoLog(ret, length, &length, log);
+		GLcharARB* log = new GLcharARB[length];
+		glGetInfoLogARB(ret, length, &length, log);
 		res = std::string((char *)log);
 		delete[] log;
 	}
 	return res;
 }
 
-static std::string get_program_log(GLuint ret)
-{
-	std::string res;
-
-	//get log length 
-	GLint length;
-	glGetProgramiv(ret, GL_INFO_LOG_LENGTH, &length);
-	if (length > 0)
-	{
-		//the log could be any size, so allocate appropriately
-		GLchar* log = new GLchar[length];
-		glGetProgramInfoLog(ret, length, &length, log);
-		res = std::string((char*)log);
-		delete[] log;
-	}
-	return res;
-}
-
 //dump shader source for debugging
-void LLShaderMgr::dumpShaderSource(U32 shader_code_count, GLchar** shader_code_text)
+void LLShaderMgr::dumpShaderSource(U32 shader_code_count, GLcharARB** shader_code_text)
 {
 	char num_str[16]; // U32 = max 10 digits
 
@@ -580,9 +563,9 @@ void LLShaderMgr::dumpShaderSource(U32 shader_code_count, GLchar** shader_code_t
     LL_CONT << LL_ENDL;
 }
 
-void LLShaderMgr::dumpObjectLog(bool is_program, GLuint ret, BOOL warns, const std::string& filename)
+void LLShaderMgr::dumpObjectLog(GLhandleARB ret, BOOL warns, const std::string& filename) 
 {
-	std::string log = is_program ? get_program_log(ret) : get_shader_log(ret);
+	std::string log = get_object_log(ret);
     std::string fname = filename;
     if (filename.empty())
     {
@@ -596,7 +579,7 @@ void LLShaderMgr::dumpObjectLog(bool is_program, GLuint ret, BOOL warns, const s
 	}
  }
 
-GLuint LLShaderMgr::loadShaderFile(const std::string& filename, S32 & shader_level, GLenum type, boost::unordered_map<std::string, std::string>* defines, S32 texture_index_channels)
+GLhandleARB LLShaderMgr::loadShaderFile(const std::string& filename, S32 & shader_level, GLenum type, std::unordered_map<std::string, std::string>* defines, S32 texture_index_channels)
 {
 
 // endsure work-around for missing GLSL funcs gets propogated to feature shader files (e.g. srgbF.glsl)
@@ -661,15 +644,15 @@ GLuint LLShaderMgr::loadShaderFile(const std::string& filename, S32 & shader_lev
 	
 	if (file == NULL)
 	{
-		LL_SHADER_LOADING_WARNS() << "GLSL Shader file not found: " << open_file_name << LL_ENDL;
+		LL_WARNS("ShaderLoading") << "GLSL Shader file not found: " << open_file_name << LL_ENDL;
 		return 0;
 	}
 
 	//we can't have any lines longer than 1024 characters 
 	//or any shaders longer than 4096 lines... deal - DaveP
-    GLchar buff[1024];
-	GLchar*extra_code_text[1024];
-	GLchar*shader_code_text[4096 + LL_ARRAY_SIZE(extra_code_text)] = { NULL };
+    GLcharARB buff[1024];
+    GLcharARB *extra_code_text[1024];
+    GLcharARB *shader_code_text[4096 + LL_ARRAY_SIZE(extra_code_text)] = { NULL };
     GLuint extra_code_count = 0, shader_code_count = 0;
     BOOST_STATIC_ASSERT(LL_ARRAY_SIZE(extra_code_text) < LL_ARRAY_SIZE(shader_code_text));
     
@@ -792,19 +775,19 @@ GLuint LLShaderMgr::loadShaderFile(const std::string& filename, S32 & shader_lev
 	
 	if (defines)
 	{
-		for (boost::unordered_map<std::string,std::string>::iterator iter = defines->begin(); iter != defines->end(); ++iter)
+		for (std::unordered_map<std::string,std::string>::iterator iter = defines->begin(); iter != defines->end(); ++iter)
 		{
 			std::string define = "#define " + iter->first + " " + iter->second + "\n";
-			extra_code_text[extra_code_count++] = (GLchar*) strdup(define.c_str());
+			extra_code_text[extra_code_count++] = (GLcharARB *) strdup(define.c_str());
 		}
 	}
 
-	if( gGLManager.mIsATI )
+	if( gGLManager.mIsAMD )
 	{
 		extra_code_text[extra_code_count++] = strdup( "#define IS_AMD_CARD 1\n" );
 	}
 	
-	if (texture_index_channels > 0 && type == GL_FRAGMENT_SHADER)
+	if (texture_index_channels > 0 && type == GL_FRAGMENT_SHADER_ARB)
 	{
 		//use specified number of texture channels for indexed texture rendering
 
@@ -944,7 +927,7 @@ GLuint LLShaderMgr::loadShaderFile(const std::string& filename, S32 & shader_lev
 		}
         else
         {
-            shader_code_text[shader_code_count] = (GLchar*)strdup((char *)buff);
+            shader_code_text[shader_code_count] = (GLcharARB *)strdup((char *)buff);
 		
             if(flag_write_to_out_of_extra_block_area & flags)
             {
@@ -981,44 +964,44 @@ GLuint LLShaderMgr::loadShaderFile(const std::string& filename, S32 & shader_lev
 	fclose(file);
 
 	//create shader object
-	GLuint ret = glCreateShader(type);
+	GLhandleARB ret = glCreateShaderObjectARB(type);
 
 	error = glGetError();
 	if (error != GL_NO_ERROR)
 	{
-		LL_WARNS("ShaderLoading") << "GL ERROR in glCreateShader: " << error << " for file: " << open_file_name << LL_ENDL;
+		LL_WARNS("ShaderLoading") << "GL ERROR in glCreateShaderObjectARB: " << error << " for file: " << open_file_name << LL_ENDL;
 	}
 
 	//load source
-	glShaderSource(ret, shader_code_count, (const GLchar**) shader_code_text, NULL);
+	glShaderSourceARB(ret, shader_code_count, (const GLcharARB**) shader_code_text, NULL);
 
 	error = glGetError();
 	if (error != GL_NO_ERROR)
 	{
-		LL_WARNS("ShaderLoading") << "GL ERROR in glShaderSource: " << error << " for file: " << open_file_name << LL_ENDL;
+		LL_WARNS("ShaderLoading") << "GL ERROR in glShaderSourceARB: " << error << " for file: " << open_file_name << LL_ENDL;
 	}
 
 	//compile source
-	glCompileShader(ret);
+	glCompileShaderARB(ret);
 
 	error = glGetError();
 	if (error != GL_NO_ERROR)
 	{
-		LL_WARNS("ShaderLoading") << "GL ERROR in glCompileShader: " << error << " for file: " << open_file_name << LL_ENDL;
+		LL_WARNS("ShaderLoading") << "GL ERROR in glCompileShaderARB: " << error << " for file: " << open_file_name << LL_ENDL;
 	}
 
 	if (error == GL_NO_ERROR)
 	{
 		//check for errors
 		GLint success = GL_TRUE;
-		glGetShaderiv(ret, GL_COMPILE_STATUS, &success);
+		glGetObjectParameterivARB(ret, GL_OBJECT_COMPILE_STATUS_ARB, &success);
 
 		error = glGetError();
 		if (error != GL_NO_ERROR || success == GL_FALSE) 
 		{
 			//an error occured, print log
 			LL_WARNS("ShaderLoading") << "GLSL Compilation Error:" << LL_ENDL;
-				dumpObjectLog(false, ret, TRUE, open_file_name);
+			dumpObjectLog(ret, TRUE, open_file_name);
 			dumpShaderSource(shader_code_count, shader_code_text);
 			ret = 0;
 		}
@@ -1039,10 +1022,10 @@ GLuint LLShaderMgr::loadShaderFile(const std::string& filename, S32 & shader_lev
 	if (ret)
 	{
 		// Add shader file to map
-        if (type == GL_VERTEX_SHADER) {
+        if (type == GL_VERTEX_SHADER_ARB) {
             mVertexShaderObjects[filename] = ret;
         }
-        else if (type == GL_FRAGMENT_SHADER) {
+        else if (type == GL_FRAGMENT_SHADER_ARB) {
             mFragmentShaderObjects[filename] = ret;
         }
 		shader_level = try_gpu_class;
@@ -1059,56 +1042,19 @@ GLuint LLShaderMgr::loadShaderFile(const std::string& filename, S32 & shader_lev
 	return ret;
 }
 
-BOOL LLShaderMgr::linkProgramObject(GLuint obj, BOOL suppress_errors) 
+BOOL LLShaderMgr::linkProgramObject(GLhandleARB obj, BOOL suppress_errors) 
 {
 	//check for errors
-	glLinkProgram(obj);
+	glLinkProgramARB(obj);
 	GLint success = GL_TRUE;
-	glGetProgramiv(obj, GL_LINK_STATUS, &success);
+	glGetObjectParameterivARB(obj, GL_OBJECT_LINK_STATUS_ARB, &success);
 	if (!suppress_errors && success == GL_FALSE) 
 	{
 		//an error occured, print log
 		LL_SHADER_LOADING_WARNS() << "GLSL Linker Error:" << LL_ENDL;
 	}
 
-#if LL_DARWIN
-
-	// For some reason this absolutely kills the frame rate when VBO's are enabled
-	/*if (0)
-	{
-		// Force an evaluation of the gl state so the driver can tell if the shader will run in hardware or software
-		// per Apple's suggestion
-		LLGLSLShader::sNoFixedFunction = false;
-		
-		glUseProgram(obj);
-
-		gGL.begin(LLRender::TRIANGLES);
-		gGL.vertex3f(0.0f, 0.0f, 0.0f);
-		gGL.vertex3f(0.0f, 0.0f, 0.0f);
-		gGL.vertex3f(0.0f, 0.0f, 0.0f);
-		gGL.end();
-		gGL.flush();
-		
-		glUseProgram(0);
-		
-		LLGLSLShader::sNoFixedFunction = true;
-
-		// Query whether the shader can or cannot run in hardware
-		// http://developer.apple.com/qa/qa2007/qa1502.html
-		GLint vertexGPUProcessing, fragmentGPUProcessing;
-		CGLContextObj ctx = CGLGetCurrentContext();
-		CGLGetParameter(ctx, kCGLCPGPUVertexProcessing, &vertexGPUProcessing);	
-		CGLGetParameter(ctx, kCGLCPGPUFragmentProcessing, &fragmentGPUProcessing);
-		if (!fragmentGPUProcessing || !vertexGPUProcessing)
-		{
-			LL_SHADER_LOADING_WARNS() << "GLSL Linker: Running in Software:" << LL_ENDL;
-			success = GL_FALSE;
-			suppress_errors = FALSE;		
-		}
-	}*/
-
-#else
-	std::string log = get_program_log(obj);
+	std::string log = get_object_log(obj);
 	LLStringUtil::toLower(log);
 	if (log.find("software") != std::string::npos)
 	{
@@ -1116,24 +1062,23 @@ BOOL LLShaderMgr::linkProgramObject(GLuint obj, BOOL suppress_errors)
 		success = GL_FALSE;
 		suppress_errors = FALSE;
 	}
-#endif
 	return success;
 }
 
-BOOL LLShaderMgr::validateProgramObject(GLuint obj)
+BOOL LLShaderMgr::validateProgramObject(GLhandleARB obj)
 {
 	//check program validity against current GL
-	glValidateProgram(obj);
+	glValidateProgramARB(obj);
 	GLint success = GL_TRUE;
-	glGetProgramiv(obj, GL_VALIDATE_STATUS, &success);
+	glGetObjectParameterivARB(obj, GL_OBJECT_VALIDATE_STATUS_ARB, &success);
 	if (success == GL_FALSE)
 	{
 		LL_SHADER_LOADING_WARNS() << "GLSL program not valid: " << LL_ENDL;
-		dumpObjectLog(true, obj);
+		dumpObjectLog(obj);
 	}
 	else
 	{
-		dumpObjectLog(true, obj, FALSE);
+		dumpObjectLog(obj, FALSE);
 	}
 
 	return success;

@@ -6,7 +6,6 @@
  * Second Life Viewer Source Code
  * Copyright (C) 2010, Linden Research, Inc.
  * Copyright (C) 2014, Cinder Roxley
- * Copyright (C) 2022, Rye Mutt <rye@alchemyviewer.org>
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public

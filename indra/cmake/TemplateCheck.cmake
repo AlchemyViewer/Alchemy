@@ -1,7 +1,5 @@
 # -*- cmake -*-
 
-include(Python)
-
 macro (check_message_template _target)
   add_custom_command(
       TARGET ${_target}

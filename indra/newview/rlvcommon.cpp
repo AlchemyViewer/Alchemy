@@ -488,13 +488,13 @@ void RlvUtil::filterLocation(std::string& strUTF8Text)
 {
 	// Filter any mention of the surrounding region names
 	const std::string& strHiddenRegion = RlvStrings::getString(RlvStringKeys::Hidden::Region);
-	for (LLViewerRegion* pRegion : LLWorld::getInstanceFast()->getRegionList())
+	for (LLViewerRegion* pRegion : LLWorld::getInstance()->getRegionList())
 	{
 		boost::replace_all_regex(strUTF8Text, boost::regex("\\b" + escape_for_regex(pRegion->getName()) + "\\b", boost::regex::icase), strHiddenRegion);
 	}
 
 	// Filter any mention of the parcel name
-	LLViewerParcelMgr* pParcelMgr = LLViewerParcelMgr::getInstanceFast();
+	LLViewerParcelMgr* pParcelMgr = LLViewerParcelMgr::getInstance();
 	if (pParcelMgr)
 		boost::replace_all_regex(strUTF8Text, boost::regex("\\b" + escape_for_regex(pParcelMgr->getAgentParcelName()) + "\\b", boost::regex::icase), RlvStrings::getString(RlvStringKeys::Hidden::Parcel));
 }
@@ -503,7 +503,7 @@ void RlvUtil::filterLocation(std::string& strUTF8Text)
 void RlvUtil::filterNames(std::string& strUTF8Text, bool fFilterLegacy, bool fClearMatches)
 {
 	uuid_vec_t idAgents;
-	LLWorld::getInstanceFast()->getAvatars(&idAgents, NULL);
+	LLWorld::getInstance()->getAvatars(&idAgents, NULL);
 	for (int idxAgent = 0, cntAgent = idAgents.size(); idxAgent < cntAgent; idxAgent++)
 	{
 		LLAvatarName avName;
@@ -573,7 +573,7 @@ bool RlvUtil::isNearbyAgent(const LLUUID& idAgent)
 	if ( (idAgent.notNull()) && (gAgent.getID() != idAgent) )
 	{
 		std::vector<LLUUID> idAgents;
-		LLWorld::getInstanceFast()->getAvatars(&idAgents, NULL);
+		LLWorld::getInstance()->getAvatars(&idAgents, NULL);
 
 		for (int idxAgent = 0, cntAgent = idAgents.size(); idxAgent < cntAgent; idxAgent++)
 			if (idAgents[idxAgent] == idAgent)
@@ -585,7 +585,7 @@ bool RlvUtil::isNearbyAgent(const LLUUID& idAgent)
 // Checked: 2010-04-05 (RLVa-1.2.0d) | Modified: RLVa-1.2.0d
 bool RlvUtil::isNearbyRegion(const std::string& strRegion)
 {
-	for (LLViewerRegion* pRegion : LLWorld::getInstanceFast()->getRegionList())
+	for (LLViewerRegion* pRegion : LLWorld::getInstance()->getRegionList())
 		if (pRegion->getName() == strRegion)
 			return true;
 	return false;
@@ -749,7 +749,7 @@ bool rlvMenuCanShowName()
 	bool fEnable = true;
 	if (rlv_handler_t::isEnabled())
 	{
-		const LLVOAvatar* pAvatar = find_avatar_from_object(LLSelectMgr::getInstanceFast()->getSelection()->getPrimaryObject());
+		const LLVOAvatar* pAvatar = find_avatar_from_object(LLSelectMgr::getInstance()->getSelection()->getPrimaryObject());
 		fEnable = (pAvatar) && (RlvActions::canShowName(RlvActions::SNC_DEFAULT, pAvatar->getID()));
 	}
 	return fEnable;
@@ -761,7 +761,7 @@ bool rlvMenuEnableIfNot(const LLSD& sdParam)
 	bool fEnable = true;
 	if (rlv_handler_t::isEnabled())
 	{
-		ERlvBehaviour eBhvr = RlvBehaviourDictionary::instanceFast().getBehaviourFromString(sdParam.asString(), RLV_TYPE_ADDREM);
+		ERlvBehaviour eBhvr = RlvBehaviourDictionary::instance().getBehaviourFromString(sdParam.asString(), RLV_TYPE_ADDREM);
 		fEnable = (eBhvr != RLV_BHVR_UNKNOWN) ? !gRlvHandler.hasBehaviour(eBhvr) : true;
 	}
 	return fEnable;
@@ -789,7 +789,7 @@ bool rlvCanDeleteOrReturn()
 		{
 			/*virtual*/ bool apply(LLViewerObject* pObj) { return rlvCanDeleteOrReturn(pObj); }
 		} f;
-		LLObjectSelectionHandle hSel = LLSelectMgr::getInstanceFast()->getSelection();
+		LLObjectSelectionHandle hSel = LLSelectMgr::getInstance()->getSelection();
 		return (hSel.notNull()) && (0 != hSel->getRootObjectCount()) && (hSel->applyToRootObjects(&f, false));
 	}
 	return true;

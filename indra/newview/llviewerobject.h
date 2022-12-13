@@ -111,8 +111,7 @@ struct PotentialReturnableObject
 class LLViewerObject 
 :	public LLPrimitive, 
 	public LLRefCount, 
-	public LLGLUpdate,
-	public LLTrace::MemTrackable<LLViewerObject>
+	public LLGLUpdate
 {
 protected:
 	virtual ~LLViewerObject(); // use unref()
@@ -750,6 +749,8 @@ public:
 
 	// Replace textures with web pages on this object while drawing
 	BOOL mRenderMedia;
+
+    bool mRiggedAttachedWarned;
 
 	// In bits
 	S32				mBestUpdatePrecision;

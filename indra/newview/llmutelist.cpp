@@ -70,7 +70,7 @@ namespace
 {
 	// This method is used to return an object to mute given an object id.
 	// Its used by the LLMute constructor and LLMuteList::isMuted.
-	LLViewerObject* get_object_to_mute_from_id(LLUUID object_id)
+	LLViewerObject* get_object_to_mute_from_id(const LLUUID& object_id)
 	{
 		LLViewerObject *objectp = gObjectList.findObject(object_id);
 		if ((objectp) && (!objectp->isAvatar()))
@@ -377,7 +377,7 @@ BOOL LLMuteList::add(const LLMute& mute, U32 flags)
 
 void LLMuteList::updateAdd(const LLMute& mute)
 {
-	// External mutes (e.g. Avaline callers) are local only, don't send them to the server.
+	// External mutes are local only, don't send them to the server.
 	if (mute.mType == LLMute::EXTERNAL)
 	{
 		return;
@@ -791,6 +791,25 @@ void LLMuteList::cache(const LLUUID& agent_id)
 		std::string filename = get_mutes_cache_file(agent_id);
 		saveToFile(filename);
 	}
+}
+
+//-----------------------------------------------------------------------------
+// Group muting
+//-----------------------------------------------------------------------------
+
+BOOL LLMuteList::addGroup(const LLUUID& group_id)
+{
+    return add(LLMute(LLUUID::null, std::string("Group:" + group_id.asString()), LLMute::BY_NAME));
+}
+
+BOOL LLMuteList::removeGroup(const LLUUID& group_id)
+{
+	return remove(LLMute(LLUUID::null, std::string("Group:" + group_id.asString()), LLMute::BY_NAME));
+}
+
+BOOL LLMuteList::isGroupMuted(const LLUUID& group_id)
+{
+    return isMuted(LLUUID::null, std::string("Group:" + group_id.asString()));
 }
 
 //-----------------------------------------------------------------------------

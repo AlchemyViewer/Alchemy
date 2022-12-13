@@ -28,16 +28,17 @@
 #include "llinspectobject.h"
 
 // Viewer
+#include "llagent.h"            // To standup
 #include "llfloatersidepanelcontainer.h"
 #include "llinspect.h"
 #include "llmediaentry.h"
-#include "llnotificationsutil.h"	// *TODO: Eliminate, add LLNotificationsUtil wrapper
 #include "llselectmgr.h"
 #include "llslurl.h"
 #include "llviewermenu.h"		// handle_object_touch(), handle_buy()
 #include "llviewermedia.h"
 #include "llviewermediafocus.h"
 #include "llviewerobjectlist.h"	// to select the requested object
+#include "llvoavatarself.h"
 // [RLVa:KB] - Checked: 2010-02-27 (RLVa-1.2.0c)
 #include "rlvactions.h"
 #include "rlvcommon.h"
@@ -180,7 +181,7 @@ BOOL LLInspectObject::postBuild(void)
 		boost::bind(&LLInspectObject::onClickMoreInfo, this));
 
 	// Watch for updates to selection properties off the network
-	LLSelectMgr::getInstanceFast()->mUpdateSignal.connect(
+	LLSelectMgr::getInstance()->mUpdateSignal.connect(
 		boost::bind(&LLInspectObject::update, this) );
 
 	return TRUE;
@@ -213,8 +214,8 @@ void LLInspectObject::onOpen(const LLSD& data)
 		// Make sure any media is unfocused before changing the selection here.
 		LLViewerMediaFocus::getInstance()->clearFocus();
 		
-		LLSelectMgr::instanceFast().deselectAll();
-		mObjectSelection = LLSelectMgr::instanceFast().selectObjectAndFamily(obj,FALSE,TRUE);
+		LLSelectMgr::instance().deselectAll();
+		mObjectSelection = LLSelectMgr::instance().selectObjectAndFamily(obj,FALSE,TRUE);
 
 		// Mark this as a transient selection
 		struct SetTransient : public LLSelectedNodeFunctor
@@ -236,7 +237,7 @@ void LLInspectObject::onOpen(const LLSD& data)
 		if(!mMediaEntry)
 			return;
 		
-		mMediaImpl = LLViewerMedia::getInstanceFast()->getMediaImplFromTextureID(mMediaEntry->getMediaID());
+		mMediaImpl = LLViewerMedia::getInstance()->getMediaImplFromTextureID(mMediaEntry->getMediaID());
 	}
 }
 
@@ -257,7 +258,7 @@ void LLInspectObject::update()
 	// but we're never destroyed.
 	if (!getVisible()) return;
 
-	LLObjectSelection* selection = LLSelectMgr::getInstanceFast()->getSelection();
+	LLObjectSelection* selection = LLSelectMgr::getInstance()->getSelection();
 	if (!selection) return;
 
 	LLSelectNode* nodep = selection->getFirstRootNode();
@@ -295,7 +296,7 @@ void LLInspectObject::update()
 	if(!mMediaEntry)
 		return;
 	
-	mMediaImpl = LLViewerMedia::getInstanceFast()->getMediaImplFromTextureID(mMediaEntry->getMediaID());
+	mMediaImpl = LLViewerMedia::getInstance()->getMediaImplFromTextureID(mMediaEntry->getMediaID());
 	
 	updateMediaCurrentURL();
 	updateSecureBrowsing();
@@ -623,7 +624,7 @@ void LLInspectObject::onClickPay()
 
 void LLInspectObject::onClickTakeFreeCopy()
 {
-	LLObjectSelection* selection = LLSelectMgr::getInstanceFast()->getSelection();
+	LLObjectSelection* selection = LLSelectMgr::getInstance()->getSelection();
 	if (!selection) return;
 
 	LLSelectNode* nodep = selection->getFirstRootNode();
@@ -652,7 +653,31 @@ void LLInspectObject::onClickTouch()
 
 void LLInspectObject::onClickSit()
 {
-	handle_object_sit_or_stand();
+    bool is_sitting = false;
+    if (mObjectSelection)
+    {
+        LLSelectNode* node = mObjectSelection->getFirstRootNode();
+        if (node && node->mValid)
+        {
+            LLViewerObject* root_object = node->getObject();
+            if (root_object
+                && isAgentAvatarValid()
+                && gAgentAvatarp->isSitting()
+                && gAgentAvatarp->getRoot() == root_object)
+            {
+                is_sitting = true;
+            }
+        }
+    }
+
+    if (is_sitting)
+    {
+        gAgent.standUp();
+    }
+    else
+    {
+        handle_object_sit(mObjectID);
+    }
 	closeFloater();
 }
 

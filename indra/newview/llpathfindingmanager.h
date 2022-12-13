@@ -123,7 +123,7 @@ private:
 	std::string getNavMeshStatusURLForRegion(LLViewerRegion *pRegion) const;
 	std::string getRetrieveNavMeshURLForRegion(LLViewerRegion *pRegion) const;
 	std::string getRetrieveObjectLinksetsURLForCurrentRegion() const;
-	std::string getChangeObjectLinksetsURLForCurrentRegion() const;
+    std::string getChangeObjectLinksetsURLForCurrentRegion() const;
 	std::string getTerrainLinksetsURLForCurrentRegion() const;
 	std::string getCharactersURLForCurrentRegion() const;
 	std::string	getAgentStateURLForRegion(LLViewerRegion *pRegion) const;

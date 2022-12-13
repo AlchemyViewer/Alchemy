@@ -321,7 +321,7 @@ void LLFloaterIMSession::sendMsgFromInputEditor()
 			{
 				// Truncate and convert to UTF8 for transport
 				std::string utf8_text = wstring_to_utf8str(text);
-
+                applyMUPose(utf8_text);
 				sendMsg(utf8_text);
 
 				mInputEditor->setText(LLStringUtil::null);
@@ -992,6 +992,7 @@ void LLFloaterIMSession::updateMessages()
 			std::string from = msg["from"].asString();
 			std::string message = msg["message"].asString();
 			bool is_history = msg["is_history"].asBoolean();
+			bool is_region_msg = msg["is_region_msg"].asBoolean();
 
 			LLChat chat;
 			chat.mFromID = from_id;
@@ -999,6 +1000,10 @@ void LLFloaterIMSession::updateMessages()
 			chat.mFromName = from;
 			chat.mTimeStr = time;
 			chat.mChatStyle = is_history ? CHAT_STYLE_HISTORY : chat.mChatStyle;
+            if (is_region_msg)
+            {
+                chat.mSourceType = CHAT_SOURCE_REGION;
+            }
 
 			// process offer notification
 			if (msg.has("notification_id"))

@@ -108,17 +108,15 @@ LLDrawable *LLVOWater::createDrawable(LLPipeline *pipeline)
 	}
 	else
 	{
-		mDrawable->setNumFaces(1, pool, LLWorld::getInstanceFast()->getDefaultWaterTexture());
+		mDrawable->setNumFaces(1, pool, LLWorld::getInstance()->getDefaultWaterTexture());
 	}
 
 	return mDrawable;
 }
 
-static LLTrace::BlockTimerStatHandle FTM_UPDATE_WATER("Update Water");
-
 BOOL LLVOWater::updateGeometry(LLDrawable *drawable)
 {
-	LL_RECORD_BLOCK_TIME(FTM_UPDATE_WATER);
+    LL_PROFILE_ZONE_SCOPED;
 	LLFace *face;
 
 	if (drawable->getNumFaces() < 1)
@@ -145,7 +143,7 @@ BOOL LLVOWater::updateGeometry(LLDrawable *drawable)
 	static const unsigned int vertices_per_quad = 4;
 	static const unsigned int indices_per_quad = 6;
 
-	const S32 size = LLPipeline::sRenderTransparentWater && LLGLSLShader::sNoFixedFunction ? 16 : 1;
+	const S32 size = LLPipeline::sRenderTransparentWater ? 16 : 1;
 
 	const S32 num_quads = size * size;
 	face->setSize(vertices_per_quad * num_quads,
@@ -154,7 +152,7 @@ BOOL LLVOWater::updateGeometry(LLDrawable *drawable)
 	LLVertexBuffer* buff = face->getVertexBuffer();
 	if (!buff || !buff->isWriteable())
 	{
-		buff = new LLVertexBuffer(LLDrawPoolWater::VERTEX_DATA_MASK, GL_DYNAMIC_DRAW);
+		buff = new LLVertexBuffer(LLDrawPoolWater::VERTEX_DATA_MASK, GL_DYNAMIC_DRAW_ARB);
 		if (!buff->allocateBuffer(face->getGeomCount(), face->getIndicesCount(), TRUE))
 		{
 			LL_WARNS() << "Failed to allocate Vertex Buffer on water update to "
@@ -288,7 +286,7 @@ U32 LLVOVoidWater::getPartitionType() const
 }
 
 LLWaterPartition::LLWaterPartition(LLViewerRegion* regionp)
-: LLSpatialPartition(0, FALSE, GL_DYNAMIC_DRAW, regionp)
+: LLSpatialPartition(0, FALSE, GL_DYNAMIC_DRAW_ARB, regionp)
 {
 	mInfiniteFarClip = TRUE;
 	mDrawableType = LLPipeline::RENDER_TYPE_WATER;

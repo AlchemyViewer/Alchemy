@@ -100,15 +100,25 @@ void LLModalDialog::onOpen(const LLSD& key)
 		if (!sModalStack.empty())
 		{
 			LLModalDialog* front = sModalStack.front();
-			front->setVisible(FALSE);
+            if (front != this)
+            {
+                front->setVisible(FALSE);
+            }
 		}
 	
 		// This is a modal dialog.  It sucks up all mouse and keyboard operations.
 		gFocusMgr.setMouseCapture( this );
-		LLUI::getInstanceFast()->addPopup(this);
+		LLUI::getInstance()->addPopup(this);
 		setFocus(TRUE);
 
-		sModalStack.push_front( this );
+        std::list<LLModalDialog*>::iterator iter = std::find(sModalStack.begin(), sModalStack.end(), this);
+        if (iter != sModalStack.end())
+        {
+            // if already present, we want to move it to front.
+            sModalStack.erase(iter);
+        }
+
+        sModalStack.push_front(this);
 	}
 }
 
@@ -147,7 +157,7 @@ void LLModalDialog::setVisible( BOOL visible )
 			gFocusMgr.setMouseCapture( this );
 
 			// The dialog view is a root view
-			LLUI::getInstanceFast()->addPopup(this);
+			LLUI::getInstance()->addPopup(this);
 			setFocus( TRUE );
 		}
 		else
@@ -318,7 +328,7 @@ void LLModalDialog::onAppFocusGained()
 		// This is a modal dialog.  It sucks up all mouse and keyboard operations.
 		gFocusMgr.setMouseCapture( instance );
 		instance->setFocus(TRUE);
-		LLUI::getInstanceFast()->addPopup(instance);
+		LLUI::getInstance()->addPopup(instance);
 
 		instance->centerOnScreen();
 	}

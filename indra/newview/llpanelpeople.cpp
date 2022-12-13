@@ -100,7 +100,7 @@ public:
 protected:
 	virtual bool doCompare(const LLAvatarListItem* avatar_item1, const LLAvatarListItem* avatar_item2) const
 	{
-		LLRecentPeople& people = LLRecentPeople::instanceFast();
+		LLRecentPeople& people = LLRecentPeople::instance();
 		const LLDate& date1 = people.getDate(avatar_item1->getAvatarId());
 		const LLDate& date2 = people.getDate(avatar_item2->getAvatarId());
 
@@ -221,8 +221,8 @@ protected:
 	virtual bool doCompare(const LLAvatarListItem* item1, const LLAvatarListItem* item2) const
 	{
 
-		F32 arr_time1 = LLRecentPeople::instanceFast().getArrivalTimeByID(item1->getAvatarId());
-		F32 arr_time2 = LLRecentPeople::instanceFast().getArrivalTimeByID(item2->getAvatarId());
+		F32 arr_time1 = LLRecentPeople::instance().getArrivalTimeByID(item1->getAvatarId());
+		F32 arr_time2 = LLRecentPeople::instance().getArrivalTimeByID(item2->getAvatarId());
 
 		if (arr_time1 == arr_time2)
 		{
@@ -255,9 +255,9 @@ static LLPanelInjector<LLPanelPeople> t_people("panel_people");
 class LLPanelPeople::Updater
 {
 public:
-	typedef boost::function<void()> callback_t;
+	typedef std::function<void()> callback_t;
 	Updater(callback_t cb)
-	: mCallback(cb)
+	: mCallback(std::move(cb))
 	{
 	}
 
@@ -526,7 +526,7 @@ public:
 	LLRecentListUpdater(callback_t cb)
 	:	LLAvatarListUpdater(cb, 0)
 	{
-		LLRecentPeople::instanceFast().setChangedCallback(boost::bind(&LLRecentListUpdater::update, this));
+		LLRecentPeople::instance().setChangedCallback(boost::bind(&LLRecentListUpdater::update, this));
 	}
 };
 
@@ -559,6 +559,7 @@ LLPanelPeople::LLPanelPeople()
 	mCommitCallbackRegistrar.add("People.Nearby.ViewSort.Action",  boost::bind(&LLPanelPeople::onNearbyViewSortMenuItemClicked,  this, _2));
 	mCommitCallbackRegistrar.add("People.Groups.ViewSort.Action",  boost::bind(&LLPanelPeople::onGroupsViewSortMenuItemClicked,  this, _2));
 	mCommitCallbackRegistrar.add("People.Recent.ViewSort.Action",  boost::bind(&LLPanelPeople::onRecentViewSortMenuItemClicked,  this, _2));
+	mCommitCallbackRegistrar.add("People.Recent.ClearHistory.Action",	boost::bind(&LLPanelPeople::onRecentViewClearHistoryMenuItemClicked, this));
 
 	mEnableCallbackRegistrar.add("People.Friends.ViewSort.CheckItem",	boost::bind(&LLPanelPeople::onFriendsViewSortMenuItemCheck,	this, _2));
 	mEnableCallbackRegistrar.add("People.Recent.ViewSort.CheckItem",	boost::bind(&LLPanelPeople::onRecentViewSortMenuItemCheck,	this, _2));
@@ -727,6 +728,8 @@ BOOL LLPanelPeople::postBuild()
 	// Must go after setting commit callback and initializing all pointers to children.
 	mTabContainer->selectTabByName(NEARBY_TAB_NAME);
 
+	updateRecentList();
+
 	LLVoiceClient::getInstance()->addObserver(this);
 
 	// call this method in case some list is empty and buttons can be in inconsistent state
@@ -829,7 +832,7 @@ void LLPanelPeople::updateNearbyList()
 	if (RlvActions::canShowNearbyAgents())
 	{
 // [/RLVa:KB]
-		LLWorld::getInstanceFast()->getAvatars(&mNearbyList->getIDs(), &positions, gAgent.getPositionGlobal(), ALControlCache::NearMeRange);
+		LLWorld::getInstance()->getAvatars(&mNearbyList->getIDs(), &positions, gAgent.getPositionGlobal(), ALControlCache::NearMeRange);
 // [RLVa:KB] - Checked: RLVa-2.0.3
 	}
 	else
@@ -848,7 +851,7 @@ void LLPanelPeople::updateRecentList()
 	if (!mRecentList)
 		return;
 
-	LLRecentPeople::instanceFast().get(mRecentList->getIDs());
+	LLRecentPeople::instance().get(mRecentList->getIDs());
 	mRecentList->setDirty();
 }
 
@@ -866,7 +869,7 @@ void LLPanelPeople::updateButtons()
 	uuid_vec_t selected_uuids;
 	getCurrentItemIDs(selected_uuids);
 	bool item_selected = (selected_uuids.size() == 1);
-	bool multiple_selected = (selected_uuids.size() >= 1);
+	bool multiple_selected = (!selected_uuids.empty());
 
 	if (group_tab_active)
 	{
@@ -1120,9 +1123,9 @@ void LLPanelPeople::onGroupLimitInfo()
 	args["MAX_BASIC"] = max_basic;
 	args["MAX_PREMIUM"] = max_premium;
 
-	if (LLAgentBenefitsMgr::has("Premium Plus"))
+	if (LLAgentBenefitsMgr::has("Premium_Plus"))
 	{
-		S32 max_premium_plus = LLAgentBenefitsMgr::get("Premium Plus").getGroupMembershipLimit();
+		S32 max_premium_plus = LLAgentBenefitsMgr::get("Premium_Plus").getGroupMembershipLimit();
 		args["MAX_PREMIUM_PLUS"] = max_premium_plus;
 		LLNotificationsUtil::add("GroupLimitInfoPlus", args);
 	}
@@ -1201,12 +1204,9 @@ void LLPanelPeople::onAddFriendButtonClicked()
 bool LLPanelPeople::isItemsFreeOfFriends(const uuid_vec_t& uuids)
 {
 	const LLAvatarTracker& av_tracker = LLAvatarTracker::instance();
-	for ( uuid_vec_t::const_iterator
-			  id = uuids.begin(),
-			  id_end = uuids.end();
-		  id != id_end; ++id )
-	{
-		if (av_tracker.isBuddy (*id))
+	for (auto uuid : uuids)
+    {
+		if (av_tracker.isBuddy (uuid))
 		{
 			return false;
 		}
@@ -1454,6 +1454,11 @@ void LLPanelPeople::onRecentViewSortMenuItemClicked(const LLSD& userdata)
 	}
 }
 
+void LLPanelPeople::onRecentViewClearHistoryMenuItemClicked()
+{
+	LLRecentPeople::instance().clearHistory();
+}
+
 bool LLPanelPeople::onFriendsViewSortMenuItemCheck(const LLSD& userdata) 
 {
 	std::string item = userdata.asString();
@@ -1630,8 +1635,8 @@ bool LLPanelPeople::updateNearbyArrivalTime()
 {
 	std::vector<LLVector3d> positions;
 	std::vector<LLUUID> uuids;
-	LLWorld::getInstanceFast()->getAvatars(&uuids, &positions, gAgent.getPositionGlobal(), ALControlCache::NearMeRange);
-	LLRecentPeople::instanceFast().updateAvatarsArrivalTime(uuids);
+	LLWorld::getInstance()->getAvatars(&uuids, &positions, gAgent.getPositionGlobal(), ALControlCache::NearMeRange);
+	LLRecentPeople::instance().updateAvatarsArrivalTime(uuids);
 	return LLApp::isExiting();
 }
 

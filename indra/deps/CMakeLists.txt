@@ -33,7 +33,7 @@ endif()
 FetchContent_Declare(
   meshoptimizer
   GIT_REPOSITORY https://git.alchemyviewer.org/alchemy/mirrors/meshoptimizer.git
-  GIT_TAG        v0.17
+  GIT_TAG        v0.18
   )
 # FetchContent_Declare(
 #   Catch2
@@ -43,25 +43,19 @@ FetchContent_Declare(
 FetchContent_Declare(
   fmt
   GIT_REPOSITORY https://github.com/fmtlib/fmt.git
-  GIT_TAG        8.1.1
+  GIT_TAG        9.1.0
   )
 FetchContent_Declare(
   nlohmann_json
   GIT_REPOSITORY https://git.alchemyviewer.org/alchemy/mirrors/modernjson.git
-  GIT_TAG        v3.10.5
+  GIT_TAG        v3.11.2
   )
-
-FetchContent_Declare(
-  readerwriterqueue
-  GIT_REPOSITORY    https://github.com/cameron314/readerwriterqueue
-  GIT_TAG           v1.0.6
-)
 
 if(NOT USE_BINARY_ABSL)
   FetchContent_Declare(
     absl
-    GIT_REPOSITORY https://git.alchemyviewer.org/alchemy/thirdparty/abseil-cpp.git
-    GIT_TAG        a198d62533e8de0c33a6311f38a3335f7930b7c7
+    GIT_REPOSITORY https://git.alchemyviewer.org/alchemy/mirrors/abseil-cpp.git
+    GIT_TAG        522606b7fae37836c138e83f6eec0eabb9947dc0
     )
 
   # This is a hack because absl has dumb cmake
@@ -99,8 +93,6 @@ FetchContent_MakeAvailable(meshoptimizer)
 set(JSON_Install OFF CACHE INTERNAL "")
 set(JSON_BuildTests OFF CACHE INTERNAL "")
 FetchContent_MakeAvailable(nlohmann_json)
-
-FetchContent_MakeAvailable(readerwriterqueue)
 
 unset(CMAKE_FOLDER)
 unset(CMAKE_POSITION_INDEPENDENT_CODE)

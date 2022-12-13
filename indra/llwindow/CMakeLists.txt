@@ -188,13 +188,13 @@ add_library (llwindow
   ${viewer_SOURCE_FILES}
   )
 
-if (SDL_FOUND)
-  set_property(TARGET llwindow
-    PROPERTY COMPILE_DEFINITIONS LL_SDL=1
-    )
-endif (SDL_FOUND)
-
-target_link_libraries (llwindow llcommon ${llwindow_LINK_LIBRARIES} readerwriterqueue)
+target_link_libraries (llwindow llcommon ${llwindow_LINK_LIBRARIES})
+  
+if (DARWIN)
+  include(CMakeFindFrameworks)
+  find_library(CARBON_LIBRARY Carbon)
+  target_link_libraries(llwindow ${CARBON_LIBRARY})
+endif (DARWIN)
 
 if(USE_PRECOMPILED_HEADERS AND ${CMAKE_VERSION} VERSION_GREATER "3.15.0") 
   target_precompile_headers(llwindow

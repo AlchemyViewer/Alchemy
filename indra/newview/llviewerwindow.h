@@ -175,7 +175,8 @@ public:
 	void			setUIVisibility(bool);
 	bool			getUIVisibility();
 	void			handlePieMenu(S32 x, S32 y, MASK mask);
-	void			setWindowTitle(const std::string& title);
+
+    void            reshapeStatusBarContainer();
 
 	BOOL handleAnyMouseClick(LLWindow *window, LLCoordGL pos, MASK mask, EMouseClickType clicktype, BOOL down);
 
@@ -425,7 +426,7 @@ public:
 	void			requestResolutionUpdate();
 	void			checkSettings();
 	void			restartDisplay(BOOL show_progress_bar);
-	BOOL			changeDisplaySettings(LLCoordScreen size, BOOL disable_vsync, BOOL show_progress_bar);
+	BOOL			changeDisplaySettings(LLCoordScreen size, BOOL enable_vsync, BOOL show_progress_bar);
 	BOOL			getIgnoreDestroyWindow() { return mIgnoreActivate; }
 	F32				getWorldViewAspectRatio() const;
 	const LLVector2& getDisplayScale() const { return mDisplayScale; }

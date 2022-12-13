@@ -354,6 +354,17 @@
       <key>Value</key>
       <integer>0</integer>
     </map>
+    <key>AlchemyKeepSettingsOnGPUChange</key>
+    <map>
+      <key>Comment</key>
+      <string>Keep graphical preferences when GPU changes</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <integer>0</integer>
+    </map>
     <key>AlchemyLookAtShow</key>
     <map>
       <key>Comment</key>
@@ -662,6 +673,17 @@
       <key>Value</key>
       <integer>0</integer>
     </map>
+    <key>AlchemyRecentPeopleMaxAge</key>
+    <map>
+      <key>Comment</key>
+      <string>Maximum age to keep recent people around</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>S32</string>
+      <key>Value</key>
+      <integer>30</integer>
+    </map>
     <key>AlchemyRenderSMAA</key>
     <map>
       <key>Comment</key>
@@ -727,6 +749,17 @@
       <string>String</string>
       <key>Value</key>
       <string />
+    </map>
+    <key>LocalInventoryEnabled</key>
+    <map>
+      <key>Comment</key>
+      <string>This enables the local inventory system. (Requires restart.)</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <integer>1</integer>
     </map>
 	<key>OpenSimSearchURL</key>
 	<map>
@@ -995,6 +1028,17 @@
       <key>Value</key>
       <integer>1</integer>
     </map>
+    <key>SnapshotDetection</key>
+    <map>
+      <key>Comment</key>
+      <string>Detect snapshot animation being played</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <integer>1</integer>
+    </map>
     <key>UIImgTransparentUUID</key>
     <map>
       <key>Comment</key>
@@ -1006,27 +1050,16 @@
       <key>Value</key>
       <string>8dcd4a48-2d37-4909-9f78-f7a9eb4ef903</string>
     </map>
-    <key>FSLastSearchTab</key>
+    <key>VoiceMultiInstance</key>
     <map>
-		<key>Comment</key>
-		<string>Last selected tab in search window</string>
-		<key>Persist</key>
-		<integer>1</integer>
-		<key>Type</key>
-		<string>S32</string>
-		<key>Value</key>
-		<integer>0</integer>
-    </map>
-    <key>FSLegacySearchActionOnTeleport</key>
-    <map>
-        <key>Comment</key>
-        <string>Controls what action Legacy Search should take when teleporting: 0 = No effect, 1 = Close floater, 2 Minimise floater</string>
-        <key>Persist</key>
-        <integer>1</integer>
-        <key>Type</key>
-        <string>U32</string>
-        <key>Value</key>
-        <integer>1</integer>
+      <key>Comment</key>
+      <string>Enables using voice in multiple simultaneous viewer instances</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <integer>1</integer>
     </map>
   </map>
 </llsd>

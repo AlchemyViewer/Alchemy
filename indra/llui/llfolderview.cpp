@@ -193,7 +193,6 @@ LLFolderView::LLFolderView(const Params& p)
 	mViewModel(p.view_model),
     mGroupedItemModel(p.grouped_item_model)
 {
-	claimMem(mViewModel);
     LLPanel* panel = p.parent_panel;
     mParentPanel = panel->getHandle();
 	mViewModel->setFolderView(this);
@@ -340,11 +339,9 @@ S32 LLFolderView::arrange( S32* unused_width, S32* unused_height )
 	return ll_round(mTargetHeight);
 }
 
-static LLTrace::BlockTimerStatHandle FTM_FILTER("Filter Folder View");
-
 void LLFolderView::filter( LLFolderViewFilter& filter )
 {
-	LL_RECORD_BLOCK_TIME(FTM_FILTER);
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
     static LLUICachedControl<S32> time_visible("FilterItemsMaxTimePerFrameVisible", 10);
     static LLUICachedControl<S32> time_invisible("FilterItemsMaxTimePerFrameUnvisible", 1);
     filter.resetTime(llclamp(mParentPanel.get()->getVisible() ? time_visible() : time_invisible(), 1, 100));
@@ -506,10 +503,9 @@ BOOL LLFolderView::changeSelection(LLFolderViewItem* selection, BOOL selected)
 	return rv;
 }
 
-static LLTrace::BlockTimerStatHandle FTM_SANITIZE_SELECTION("Sanitize Selection");
 void LLFolderView::sanitizeSelection()
 {
-	LL_RECORD_BLOCK_TIME(FTM_SANITIZE_SELECTION);
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
 	// store off current item in case it is automatically deselected
 	// and we want to preserve context
 	LLFolderViewItem* original_selected_item = getCurSelectedItem();
@@ -743,7 +739,7 @@ void LLFolderView::closeRenamer( void )
 	if (mRenamer && mRenamer->getVisible())
 	{
 		// Triggers onRenamerLost() that actually closes the renamer.
-		LLUI::getInstanceFast()->removePopup(mRenamer);
+		LLUI::getInstance()->removePopup(mRenamer);
 	}
 }
 
@@ -921,7 +917,7 @@ BOOL LLFolderView::canCopy() const
 void LLFolderView::copy()
 {
 	// *NOTE: total hack to clear the inventory clipboard
-	LLClipboard::instanceFast().reset();
+	LLClipboard::instance().reset();
 	S32 count = mSelectedItems.size();
 	if(getVisible() && getEnabled() && (count > 0))
 	{
@@ -965,7 +961,7 @@ BOOL LLFolderView::canCut() const
 void LLFolderView::cut()
 {
 	// clear the inventory clipboard
-	LLClipboard::instanceFast().reset();
+	LLClipboard::instance().reset();
 	if(getVisible() && getEnabled() && (mSelectedItems.size() > 0))
 	{
 		// Find out which item will be selected once the selection will be cut
@@ -1080,7 +1076,7 @@ void LLFolderView::startRenamingSelectedItem( void )
 		// set focus will fail unless item is visible
 		mRenamer->setFocus( TRUE );
 		mRenamer->setTopLostCallback(boost::bind(&LLFolderView::onRenamerLost, this));
-		LLUI::getInstanceFast()->addPopup(mRenamer);
+		LLUI::getInstance()->addPopup(mRenamer);
 	}
 }
 
@@ -1463,12 +1459,12 @@ BOOL LLFolderView::handleRightMouseDown( S32 x, S32 y, MASK mask )
 			mEnableRegistrar->pushScope();
 		}
 		llassert(LLMenuGL::sMenuContainer != NULL);
-		menu = LLUICtrlFactory::getInstanceFast()->createFromFile<LLMenuGL>(mMenuFileName, LLMenuGL::sMenuContainer, LLMenuHolderGL::child_registry_t::instanceFast());
+		menu = LLUICtrlFactory::getInstance()->createFromFile<LLMenuGL>(mMenuFileName, LLMenuGL::sMenuContainer, LLMenuHolderGL::child_registry_t::instance());
 		if (!menu)
 		{
 			menu = LLUICtrlFactory::getDefaultWidget<LLMenuGL>("inventory_menu");
 		}
-	menu->setBackgroundColor(LLUIColorTable::instanceFast().getColor("MenuPopupBgColor"));
+	menu->setBackgroundColor(LLUIColorTable::instance().getColor("MenuPopupBgColor"));
 		mPopupMenuHandle = menu->getHandle();
 		if (mEnableRegistrar)
 		{
@@ -1666,7 +1662,6 @@ void LLFolderView::setShowSingleSelection(bool show)
 	}
 }
 
-static LLTrace::BlockTimerStatHandle FTM_AUTO_SELECT("Open and Select");
 static LLTrace::BlockTimerStatHandle FTM_INVENTORY("Inventory");
 
 // Main idle routine
@@ -1674,7 +1669,7 @@ void LLFolderView::update()
 {
 	// If this is associated with the user's inventory, don't do anything
 	// until that inventory is loaded up.
-	LL_RECORD_BLOCK_TIME(FTM_INVENTORY);
+	LL_PROFILE_ZONE_SCOPED_CATEGORY_UI; //LL_RECORD_BLOCK_TIME(FTM_INVENTORY);
     
     // If there's no model, the view is in suspended state (being deleted) and shouldn't be updated
     if (getFolderViewModel() == NULL)
@@ -1702,7 +1697,6 @@ void LLFolderView::update()
 	// automatically show matching items, and select first one if we had a selection
 	if (mNeedsAutoSelect)
 	{
-		LL_RECORD_BLOCK_TIME(FTM_AUTO_SELECT);
 		// select new item only if a filtered item not currently selected and there was a selection
 		LLFolderViewItem* selected_itemp = mSelectedItems.empty() ? NULL : mSelectedItems.back();
 		if (!mAutoSelectOverride && selected_itemp && !selected_itemp->getViewModelItem()->potentiallyVisible())

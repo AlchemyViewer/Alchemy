@@ -310,8 +310,9 @@ public:
 template<typename T>
 	LLPanelInjector<T>::LLPanelInjector(const std::string& tag) 
 {
-	LLRegisterPanelClass::instanceFast().addPanelClass(tag,&LLRegisterPanelClass::defaultPanelClassBuilder<T>);
+	LLRegisterPanelClass::instance().addPanelClass(tag,&LLRegisterPanelClass::defaultPanelClassBuilder<T>);
 }
 
+void set_child_visible(LLView* parent, const std::string& child_name, bool visible);
 
 #endif

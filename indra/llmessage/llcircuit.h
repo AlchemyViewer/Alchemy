@@ -327,6 +327,8 @@ public:
 		circuit_data_map::iterator& first,
 		circuit_data_map::iterator& end);
 
+	std::vector<LLCircuitData*> getCircuitDataList() const;
+
 	// Lists that optimize how many circuits we need to traverse a frame
 	// HACK - this should become protected eventually, but stupid !@$@# message system/circuit classes are jumbling things up.
 	circuit_data_map mUnackedCircuitMap; // Map of circuits with unacked data

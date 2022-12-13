@@ -55,15 +55,31 @@ class LLCloudPuff;
 class LLCloudGroup;
 class LLVOAvatar;
 
+class CapUrlMatches
+{
+public:
+	CapUrlMatches(std::set<LLViewerRegion*>& regions, std::set<std::string>& cap_names)
+		: mRegions(regions)
+		, mCapNames(cap_names)
+	{
+	}
+
+	std::set<LLViewerRegion*> mRegions;
+	std::set<std::string> mCapNames;
+};
+
 // LLWorld maintains a stack of unused viewer_regions and an array of pointers to viewer regions
 // as simulators are connected to, viewer_regions are popped off the stack and connected as required
 // as simulators are removed, they are pushed back onto the stack
 
-class LLWorld final : public LLSingleton<LLWorld>
+class LLWorld final : public LLSimpleton<LLWorld>
 {
-	LLSINGLETON(LLWorld);
 public:
-	void destroyClass();
+    LLWorld();
+
+    // Clear any objects, regions
+    // Prepares class to be reused or destroyed
+    void resetClass();
 
 	LLViewerRegion*	addRegion(const U64 &region_handle, const LLHost &host);
 		// safe to call if already present, does the "right thing" if
@@ -126,12 +142,9 @@ public:
 	void					updateRegions(F32 max_update_time);
 	void					updateVisibilities();
 	void					updateParticles();
-	void					updateClouds(const F32 dt);
-	LLCloudGroup *			findCloudGroup(const LLCloudPuff &puff);
 
 	void					renderPropertyLines();
 
-	void resetStats();
 	void updateNetStats(); // Update network statistics for all the regions...
 
 	void printPacketsLost();
@@ -144,7 +157,7 @@ public:
 	void setLandFarClip(const F32 far_clip);
 
 	LLViewerTexture *getDefaultWaterTexture();
-	void updateWaterObjects();
+    void updateWaterObjects();
 
     void precullWaterObjects(LLCamera& camera, LLCullResult* cull, bool include_void_water);
 
@@ -159,6 +172,9 @@ public:
 
 	void clearAllVisibleObjects();
 	void refreshLimits();
+
+	virtual CapUrlMatches getCapURLMatches(const std::string& cap_url);
+	virtual bool isCapURLMapped(const std::string& cap_url);
 
 public:
 	typedef std::list<LLViewerRegion*> region_list_t;
@@ -197,6 +213,9 @@ public:
 	bool isRegionListed(const LLViewerRegion* region) const;
 
 private:
+    void clearHoleWaterObjects();
+    void clearEdgeWaterObjects();
+
 	region_list_t	mActiveRegionList;
 	region_list_t	mRegionList;
 	region_list_t	mVisibleRegionList;
@@ -229,15 +248,14 @@ private:
 	U32 mNumOfActiveCachedObjects;
 	U64MicrosecondsImplicit mSpaceTimeUSec;
 
-	BOOL mClassicCloudsEnabled;
-
 	////////////////////////////
 	//
 	// Data for "Fake" objects
 	//
 
 	std::list<LLPointer<LLVOWater> > mHoleWaterObjects;
-	LLPointer<LLVOWater> mEdgeWaterObjects[8];
+    static const S32 EDGE_WATER_OBJECTS_COUNT = 8;
+    LLPointer<LLVOWater> mEdgeWaterObjects[EDGE_WATER_OBJECTS_COUNT];
 
 	LLPointer<LLViewerTexture> mDefaultWaterTexturep;
 };

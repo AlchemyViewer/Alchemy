@@ -364,7 +364,7 @@ void LLSpeakerMgr::update(BOOL resort_ok)
 		return;
 	}
 	
-	auto& voice_client = LLVoiceClient::instanceFast();
+	auto& voice_client = LLVoiceClient::instance();
 
 	static const LLUIColor speaking_color = LLUIColorTable::instance().getColor("SpeakingColor");
 	static const LLUIColor overdriven_color = LLUIColorTable::instance().getColor("OverdrivenColor");
@@ -475,7 +475,7 @@ void LLSpeakerMgr::update(BOOL resort_ok)
 void LLSpeakerMgr::updateSpeakerList()
 {
 	// Are we bound to the currently active voice channel?
-	auto& voice_client = LLVoiceClient::instanceFast();
+	auto& voice_client = LLVoiceClient::instance();
 	if ((!mVoiceChannel && voice_client.inProximalChannel()) || (mVoiceChannel && mVoiceChannel->isActive()))
 	{
 		std::set<LLUUID> participants;
@@ -498,12 +498,12 @@ void LLSpeakerMgr::updateSpeakerList()
 			// If the list is empty, we update it with whatever we have locally so that it doesn't stay empty too long.
 			// *TODO: Fix the server side code that sometimes forgets to send back the list of participants after a chat started.
 			// (IOW, fix why we get no ChatterBoxSessionAgentListUpdates message after the initial ChatterBoxSessionStartReply)
-			LLIMModel::LLIMSession* session = LLIMModel::getInstanceFast()->findIMSession(session_id);
+			LLIMModel::LLIMSession* session = LLIMModel::getInstance()->findIMSession(session_id);
 			if (session->isGroupSessionType() && (mSpeakers.size() <= 1))
 			{
 				// For groups, we need to hit the group manager.
 				// Note: The session uuid and the group uuid are actually one and the same. If that was to change, this will fail.
-				LLGroupMgrGroupData* gdatap = LLGroupMgr::getInstanceFast()->getGroupData(session_id);
+				LLGroupMgrGroupData* gdatap = LLGroupMgr::getInstance()->getGroupData(session_id);
 
 				if (gdatap && gdatap->isMemberDataComplete() && !gdatap->mMembers.empty())
 				{
@@ -533,7 +533,7 @@ void LLSpeakerMgr::updateSpeakerList()
 			}
 			else if (mSpeakers.empty())
 			{
-				// For all other session type (ad-hoc, P2P, avaline), we use the initial participants targets list
+				// For all other session type (ad-hoc, P2P), we use the initial participants targets list
 				for (uuid_vec_t::iterator it = session->mInitialTargetIDs.begin();it!=session->mInitialTargetIDs.end();++it)
 				{
 					// Add buddies if they are on line, add any other avatar.
@@ -649,7 +649,7 @@ void LLSpeakerMgr::speakerChatted(const LLUUID& speaker_id)
 BOOL LLSpeakerMgr::isVoiceActive()
 {
 	// mVoiceChannel = NULL means current voice channel, whatever it is
-	return LLVoiceClient::getInstanceFast()->voiceEnabled() && mVoiceChannel && mVoiceChannel->isActive();
+	return LLVoiceClient::getInstance()->voiceEnabled() && mVoiceChannel && mVoiceChannel->isActive();
 }
 
 
@@ -1004,7 +1004,7 @@ void LLLocalSpeakerMgr::updateSpeakerList()
 	// pick up non-voice speakers in chat range
 	uuid_vec_t avatar_ids;
 	std::vector<LLVector3d> positions;
-	LLWorld::getInstanceFast()->getAvatars(&avatar_ids, &positions, gAgent.getPositionGlobal(), CHAT_NORMAL_RADIUS);
+	LLWorld::getInstance()->getAvatars(&avatar_ids, &positions, gAgent.getPositionGlobal(), CHAT_NORMAL_RADIUS);
 	for(U32 i=0; i<avatar_ids.size(); i++)
 	{
 		setSpeaker(avatar_ids[i]);

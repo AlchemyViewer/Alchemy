@@ -350,8 +350,8 @@ void init_audio()
 					
 	gAudiop->setListener(lpos_global_f,
 						  LLVector3::zero,	// LLViewerCamera::getInstance()->getVelocity(),    // !!! BUG need to replace this with smoothed velocity!
-						  LLViewerCamera::getInstanceFast()->getUpAxis(),
-						  LLViewerCamera::getInstanceFast()->getAtAxis());
+						  LLViewerCamera::getInstance()->getUpAxis(),
+						  LLViewerCamera::getInstance()->getAtAxis());
 
 // load up our initial set of sounds we'll want so they're in memory and ready to be played
 
@@ -427,7 +427,7 @@ void audio_update_volume(bool force_update)
 
 		static const LLCachedControl<F32> rolloff_volume(gSavedSettings, "AudioLevelRolloff");
 		static const LLCachedControl<F32> underwater_rolloff_volume(gSavedSettings, "AudioLevelUnderwaterRolloff");
-		if(!LLViewerCamera::getInstanceFast()->cameraUnderWater())
+		if(!LLViewerCamera::getInstance()->cameraUnderWater())
 			gAudiop->setRolloffFactor(rolloff_volume);
 		else
 			gAudiop->setRolloffFactor(underwater_rolloff_volume);
@@ -437,7 +437,7 @@ void audio_update_volume(bool force_update)
 		//Play any deferred sounds when unmuted
 		if(!gAudiop->getMuted())
 		{
-			LLDeferredSounds::instanceFast().playdeferredSounds();
+			LLDeferredSounds::instance().playdeferredSounds();
 		}
 
 		if (force_update)
@@ -458,15 +458,15 @@ void audio_update_volume(bool force_update)
 
 		// Streaming Music
 
-		if (!progress_view_visible && LLViewerAudio::getInstanceFast()->getForcedTeleportFade())
+		if (!progress_view_visible && LLViewerAudio::getInstance()->getForcedTeleportFade())
 		{
-			LLViewerAudio::getInstanceFast()->setWasPlaying(!gAudiop->getInternetStreamURL().empty());
-			LLViewerAudio::getInstanceFast()->setForcedTeleportFade(false);
+			LLViewerAudio::getInstance()->setWasPlaying(!gAudiop->getInternetStreamURL().empty());
+			LLViewerAudio::getInstance()->setForcedTeleportFade(false);
 		}
 
 		static const LLCachedControl<F32> music_volume_setting(gSavedSettings, "AudioLevelMusic");
 		static const LLCachedControl<bool> music_muted(gSavedSettings, "MuteMusic");
-		const F32 fade_volume = LLViewerAudio::getInstanceFast()->getFadeVolume();
+		const F32 fade_volume = LLViewerAudio::getInstance()->getFadeVolume();
 
 		const F32 music_volume = mute_volume * master_volume * music_volume_setting * fade_volume;
 		gAudiop->setInternetStreamGain (music_muted ? 0.f : music_volume);
@@ -476,7 +476,7 @@ void audio_update_volume(bool force_update)
 	static const LLCachedControl<F32> media_volume_setting(gSavedSettings, "AudioLevelMedia");
 	static const LLCachedControl<bool> media_muted(gSavedSettings, "MuteMedia");
 	const F32 media_volume = mute_volume * master_volume * media_volume_setting;
-	LLViewerMedia::getInstanceFast()->setVolume( media_muted ? 0.0f : media_volume );
+	LLViewerMedia::getInstance()->setVolume( media_muted ? 0.0f : media_volume );
 
 	// Voice, this is parametric singleton, it gets initialized when ready
 	if (LLVoiceClient::instanceExists())
@@ -485,7 +485,7 @@ void audio_update_volume(bool force_update)
 		static const LLCachedControl<bool> voice_mute(gSavedSettings, "MuteVoice");
 		static const LLCachedControl<F32> mic_volume(gSavedSettings, "AudioLevelMic");
 		const F32 voice_volume = mute_volume * master_volume * voice_volume_setting;
-		LLVoiceClient *voice_inst = LLVoiceClient::getInstanceFast();
+		LLVoiceClient *voice_inst = LLVoiceClient::getInstance();
 		voice_inst->setVoiceVolume(voice_mute ? 0.f : voice_volume);
 		voice_inst->setMicGain(voice_mute ? 0.f : mic_volume);
 
@@ -505,7 +505,20 @@ void audio_update_listener()
 	if (gAudiop)
 	{
 		// update listener position because agent has moved	
-		LLVector3d lpos_global = gAgentCamera.getCameraPositionGlobal();		
+        static LLUICachedControl<S32> mEarLocation("MediaSoundsEarLocation", 0);
+        LLVector3d ear_position;
+        switch(mEarLocation)
+        {
+        case 0:
+        default:
+            ear_position = gAgentCamera.getCameraPositionGlobal();
+            break;
+
+        case 1:
+            ear_position = gAgent.getPositionGlobal();
+            break;
+        }
+		LLVector3d lpos_global = ear_position;		
 		LLVector3 lpos_global_f;
 		lpos_global_f.setVec(lpos_global);
 	
@@ -513,8 +526,8 @@ void audio_update_listener()
 							 // LLViewerCamera::getInstance()VelocitySmoothed, 
 							 // LLVector3::zero,	
 							 gAgent.getVelocity(),    // !!! *TODO: need to replace this with smoothed velocity!
-							 LLViewerCamera::getInstanceFast()->getUpAxis(),
-							 LLViewerCamera::getInstanceFast()->getAtAxis());
+							 LLViewerCamera::getInstance()->getUpAxis(),
+							 LLViewerCamera::getInstance()->getAtAxis());
 	}
 }
 

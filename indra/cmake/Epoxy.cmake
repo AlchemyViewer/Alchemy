@@ -7,7 +7,7 @@ if (USESYSTEMLIBS)
 
   pkg_check_modules(EPOXY REQUIRED epoxy)
 else (USESYSTEMLIBS)
-  use_prebuilt_binary(libepoxy)
+  #use_prebuilt_binary(libepoxy)
   set(EPOXY_INCLUDE_DIRS ${LIBS_PREBUILT_DIR}/include/)
   if (WINDOWS)
     set(EPOXY_LIBRARIES 

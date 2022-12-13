@@ -27,6 +27,7 @@
 #ifndef LL_LLVIEWERTEXTURE_H					
 #define LL_LLVIEWERTEXTURE_H
 
+#include "llatomic.h"
 #include "llgltexture.h"
 #include "lltimer.h"
 #include "llframetimer.h"
@@ -35,6 +36,7 @@
 #include "llrender.h"
 #include "llmetricperformancetester.h"
 #include "httpcommon.h"
+#include "workqueue.h"
 
 #include <map>
 #include <list>
@@ -113,7 +115,7 @@ protected:
 
 public:	
 	static void initClass();
-	static void updateClass(const F32 velocity, const F32 angular_velocity) ;
+	static void updateClass();
 	
 	LLViewerTexture(BOOL usemipmaps = TRUE);
 	LLViewerTexture(const LLUUID& id, BOOL usemipmaps) ;
@@ -211,6 +213,9 @@ protected:
 
 	//do not use LLPointer here.
 	LLViewerMediaTexture* mParcelMedia ;
+
+	LL::WorkQueue::weak_t mMainQueue;
+	LL::WorkQueue::weak_t mImageQueue;
 
 	static F32 sTexelPixelRatio;
 public:
@@ -311,6 +316,8 @@ public:
 	void setLoadedCallback(loaded_callback_func cb,
 						   S32 discard_level, BOOL keep_imageraw, BOOL needs_aux,
 						   void* userdata, LLLoadedCallbackEntry::source_callback_list_t* src_callback_list, BOOL pause = FALSE);
+    void setLoadedCallbackNoAux(loaded_callback_func cb, S32 discard_level, BOOL keep_imageraw, BOOL needs_aux, void* userdata,
+                           LLLoadedCallbackEntry::source_callback_list_t* src_callback_list, BOOL pause = FALSE);
 	bool hasCallbacks() { return mLoadedCallbackList.empty() ? false : true; }	
 	void pauseLoadedCallbacks(const LLLoadedCallbackEntry::source_callback_list_t* callback_list);
 	void unpauseLoadedCallbacks(const LLLoadedCallbackEntry::source_callback_list_t* callback_list);
@@ -320,9 +327,13 @@ public:
 
 	void addToCreateTexture();
 
-
-	 // ONLY call from LLViewerTextureList
+    //call to determine if createTexture is necessary
+    BOOL preCreateTexture(S32 usename = 0);
+	 // ONLY call from LLViewerTextureList or ImageGL background thread
 	BOOL createTexture(S32 usename = 0);
+    void postCreateTexture();
+    void scheduleCreateTexture();
+
 	void destroyTexture() ;
 
 	virtual void processTextureStats() ;
@@ -424,6 +435,10 @@ public:
 
 	/*virtual*/bool  isActiveFetching(); //is actively in fetching by the fetching pipeline.
 
+	LLUUID		getUploader();
+	LLDate		getUploadTime();
+	std::string getComment();
+
 protected:
 	/*virtual*/ void switchToCachedImage();
 	S32 getCurrentDiscardLevelForFetching() ;
@@ -519,10 +534,12 @@ protected:
 	LLFrameTimer mStopFetchingTimer;	// Time since mDecodePriority == 0.f.
 
 	BOOL  mInImageList;				// TRUE if image is in list (in which case don't reset priority!)
-	BOOL  mNeedsCreateTexture;	
+	LLAtomicBool mNeedsCreateTexture;	
 
 	BOOL   mForSculpt ; //a flag if the texture is used as sculpt data.
 	BOOL   mIsFetched ; //is loaded from remote or from cache, not generated locally.
+	
+	std::map<S8, std::string> mComment;
 
 public:
 	static LLPointer<LLViewerFetchedTexture> sMissingAssetImagep;	// Texture to show for an image asset that is not in the database

@@ -34,7 +34,6 @@
 #include "mutex.h"
 #include "lockstatic.h"
 #include "llthread.h"               // on_main_thread()
-#include "llmutex.h"
 #include "llmainthreadtask.h"
 
 class LLSingletonBase: private boost::noncopyable
@@ -293,17 +292,13 @@ private:
     {
         // Use a recursive_mutex in case of constructor circularity. With a
         // non-recursive mutex, that would result in deadlock.
-        typedef LLMutex mutex_t;
+        typedef std::recursive_mutex mutex_t;
         mutex_t mMutex;             // LockStatic looks for mMutex
 
         EInitState      mInitState{UNINITIALIZED};
         DERIVED_TYPE*   mInstance{nullptr};
     };
-    typedef llthread::LockStaticLL<SingletonData> LockStatic;
-
-protected:
-    inline static DERIVED_TYPE* sUnsafeInstance = nullptr;
-private:
+    typedef llthread::LockStatic<SingletonData> LockStatic;
 
     // Allow LLParamSingleton subclass -- but NOT DERIVED_TYPE itself -- to
     // access our private members.
@@ -351,9 +346,6 @@ private:
             // breaking cyclic dependencies
             lk->mInstance->initSingleton();
             lk->mInitState = INITIALIZED;
-
-            // Cache for fast unsafe access
-            sUnsafeInstance = lk->mInstance;
 
             // pop this off stack of initializing singletons
             pop_initializing(lk->mInstance);
@@ -423,8 +415,6 @@ protected:
         // deleteSingleton() to defend against manual deletion. When we moved
         // cleanup to deleteSingleton(), we hit crashes due to dangling
         // pointers in the MasterList.
-        sUnsafeInstance = nullptr;
-
         LockStatic lk;
         lk->mInstance  = nullptr;
         lk->mInitState = DELETED;
@@ -465,6 +455,7 @@ public:
 
     static DERIVED_TYPE* getInstance()
     {
+        LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD;
         // We know the viewer has LLSingleton dependency circularities. If you
         // feel strongly motivated to eliminate them, cheers and good luck.
         // (At that point we could consider a much simpler locking mechanism.)
@@ -586,28 +577,11 @@ public:
         return instance;
     }
 
-    // Thread unsafe access
-    static DERIVED_TYPE* getInstanceFast()
-    {
-        if (!sUnsafeInstance)
-        {
-            // Dummy call to force populate
-            return getInstance();
-        }
-        return sUnsafeInstance;
-    }
-
     // Reference version of getInstance()
     // Preferred over getInstance() as it disallows checking for nullptr
     static DERIVED_TYPE& instance()
     {
         return *getInstance();
-    }
-
-    // Thread unsafe access
-    static DERIVED_TYPE& instanceFast()
-    {
-        return *getInstanceFast();
     }
 
     // Has this singleton been created yet?
@@ -763,27 +737,12 @@ public:
         return nullptr;
     }
 
-    static DERIVED_TYPE* getInstanceFast()
-    {
-        if (!super::sUnsafeInstance)
-        {
-            // Dummy call to force populate
-            return getInstance();
-        }
-        return super::sUnsafeInstance;
-    }
-
     // instance() is replicated here so it calls
     // LLParamSingleton::getInstance() rather than LLSingleton::getInstance()
     // -- avoid making getInstance() virtual
     static DERIVED_TYPE& instance()
     {
         return *getInstance();
-    }
-
-    static DERIVED_TYPE& instanceFast()
-    {
-        return *getInstanceFast();
     }
 };
 
@@ -864,5 +823,37 @@ private:                                                                \
 #define LLSINGLETON_EMPTY_CTOR(DERIVED_CLASS)                           \
     /* LLSINGLETON() is carefully implemented to permit exactly this */ \
     LLSINGLETON(DERIVED_CLASS) = default;
+
+// Relatively unsafe singleton implementation that is much faster
+// and simpler than LLSingleton, but has no dependency tracking
+// or inherent thread safety and requires manual invocation of 
+// createInstance before first use.
+template<class T>
+class LLSimpleton
+{
+public:
+    template <typename... ARGS>
+    static void createInstance(ARGS&&... args)
+    {
+        llassert(sInstance == nullptr);
+        sInstance = new T(std::forward<ARGS>(args)...);
+    }
+
+    static inline T* getInstance() { return sInstance; }
+    static inline T& instance() { return *getInstance(); }
+    static inline bool instanceExists() { return sInstance != nullptr; }
+
+    static void deleteSingleton()
+    {
+        delete sInstance;
+        sInstance = nullptr;
+    }
+
+private:
+    static T* sInstance;
+};
+
+template <class T>
+T* LLSimpleton<T>::sInstance{ nullptr };
 
 #endif

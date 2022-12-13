@@ -59,7 +59,7 @@ void hud_render_text(const LLWString &wstr, const LLVector3 &pos_agent,
 					const LLColor4& color,
 					const BOOL orthographic)
 {
-	LLViewerCamera* camera = LLViewerCamera::getInstanceFast();
+	LLViewerCamera* camera = LLViewerCamera::getInstance();
 	// Do cheap plane culling
 	LLVector3 dir_vec = pos_agent - camera->getOrigin();
 	dir_vec /= dir_vec.magVec();

@@ -127,7 +127,7 @@ std::string HttpStatus::toString() const
 	
 	if (*this)
 	{
-		return std::string();
+		return std::string("");
 	}
 	switch (getType())
 	{
@@ -176,7 +176,7 @@ std::string HttpStatus::toString() const
 		}
 		break;
 	}
-	return std::string("Unknown error");
+	return LLStringExplicit("Unknown error");
 }
 
 
@@ -309,9 +309,8 @@ CURL *getCurlTemplateHandle()
     
 LLMutex *getCurlMutex()
 {
-	static LLMutex sHandleMutexp(LLMutex::E_CONST_INIT);
-
-    return &sHandleMutexp;
+    static LLMutex sHandleMutex;
+    return &sHandleMutex;
 }
 
 void deallocateEasyCurl(CURL *curlp)

@@ -1495,7 +1495,7 @@ void LLTextEditor::copy()
 
 BOOL LLTextEditor::canPaste() const
 {
-	return !mReadOnly && LLClipboard::instanceFast().isTextAvailable();
+	return !mReadOnly && LLClipboard::instance().isTextAvailable();
 }
 
 // paste from clipboard
@@ -1632,7 +1632,7 @@ void LLTextEditor::copyPrimary()
 
 BOOL LLTextEditor::canPastePrimary() const
 {
-	return !mReadOnly && LLClipboard::instanceFast().isTextAvailable(true);
+	return !mReadOnly && LLClipboard::instance().isTextAvailable(true);
 }
 
 void LLTextEditor::updatePrimary()
@@ -1889,11 +1889,11 @@ BOOL LLTextEditor::handleKeyHere(KEY key, MASK mask )
 	else 
 	{
 		if (mEnableTooltipPaste &&
-			LLToolTipMgr::instanceFast().toolTipVisible() &&
+			LLToolTipMgr::instance().toolTipVisible() &&
 			KEY_TAB == key)
 		{	// Paste the first line of a tooltip into the editor
 			std::string message;
-			LLToolTipMgr::instanceFast().getToolTipMessage(message);
+			LLToolTipMgr::instance().getToolTipMessage(message);
 			LLWString tool_tip_text(utf8str_to_wstring(message));
 
 			if (tool_tip_text.size() > 0)
@@ -2219,7 +2219,7 @@ void LLTextEditor::showContextMenu(S32 x, S32 y)
 		std::string misspelled_word = getMisspelledWord(mCursorPos);
 		if ((is_misspelled = !misspelled_word.empty()) == true)
 		{
-			LLSpellChecker::instanceFast().getSuggestions(misspelled_word, mSuggestionList);
+			LLSpellChecker::instance().getSuggestions(misspelled_word, mSuggestionList);
 		}
 	}
 
@@ -2605,7 +2605,7 @@ void LLTextEditor::updateLinkSegments()
 	const LLWString& wtext = getWText();
 
 	// update any segments that contain a link
-	auto& url_registry = LLUrlRegistry::instanceFast();
+	auto& url_registry = LLUrlRegistry::instance();
 	for (segment_set_t::iterator it = mSegments.begin(); it != mSegments.end(); ++it)
 	{
 		LLTextSegment *segment = *it;
@@ -2788,7 +2788,10 @@ bool LLTextEditor::loadFromFile(const std::string& filename)
 	buffer[nread] = '\0';
 	fclose(file);
 
-	setText(LLStringExplicit(buffer));
+	std::string text = std::string(buffer);
+	LLStringUtil::replaceTabsWithSpaces(text, LLTextEditor::spacesPerTab());
+
+	setText(LLStringExplicit(text));
 	delete[] buffer;
 
 	return true;

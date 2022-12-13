@@ -136,7 +136,7 @@ public:
 	virtual BOOL removeItem();
 	virtual void removeBatch(std::vector<LLFolderViewModelItem*>& batch);
 	virtual void move(LLFolderViewModelItem* parent_listener);	
-	virtual BOOL isItemCopyable() const;
+    virtual bool isItemCopyable(bool can_copy_as_link = true) const;
 // [SL:KB] - Patch: Inventory-Actions | Checked: 2013-09-19 (Catznip-3.6)
 	/*virtual*/ bool isItemLinkable() const;
 	/*virtual*/ BOOL isLink() const;
@@ -497,10 +497,10 @@ void LLTaskInvFVBridge::move(LLFolderViewModelItem* parent_listener)
 {
 }
 
-BOOL LLTaskInvFVBridge::isItemCopyable() const
+bool LLTaskInvFVBridge::isItemCopyable(bool can_link) const
 {
 	LLInventoryItem* item = findItem();
-	if(!item) return FALSE;
+	if(!item) return false;
 	return gAgent.allowOperation(PERM_COPY, item->getPermissions(),
 								GP_OBJECT_MANIPULATE);
 }
@@ -717,7 +717,18 @@ const std::string& LLTaskCategoryBridge::getDisplayName() const
 
 	if (cat)
 	{
-		mDisplayName.assign(cat->getName());
+        std::string name = cat->getName();
+        if (mChildren.size() > 0)
+        {
+            // Add item count
+            // Normally we would be using getLabelSuffix for this
+            // but object's inventory just uses displaynames
+            LLStringUtil::format_map_t args;
+            args["[ITEMS_COUNT]"] = llformat("%d", mChildren.size());
+
+            name.append(" " + LLTrans::getString("InventoryItemsCount", args));
+        }
+		mDisplayName.assign(name);
 	}
 
 	return mDisplayName;
@@ -1728,6 +1739,8 @@ void LLPanelObjectInventory::createFolderViews(LLInventoryObject* inventory_root
 		{
 			createViewsForCategory(&contents, inventory_root, new_folder);
 		}
+        // Refresh for label to add item count
+        new_folder->refresh();
 	}
 }
 
@@ -1803,7 +1816,7 @@ void LLPanelObjectInventory::refresh()
 	//LL_INFOS() << "LLPanelObjectInventory::refresh()" << LL_ENDL;
 	BOOL has_inventory = FALSE;
 	const BOOL non_root_ok = TRUE;
-	LLObjectSelectionHandle selection = LLSelectMgr::getInstanceFast()->getSelection();
+	LLObjectSelectionHandle selection = LLSelectMgr::getInstance()->getSelection();
 	LLSelectNode* node = selection->getFirstRootNode(NULL, non_root_ok);
 	if(node && node->mValid)
 	{
@@ -1837,7 +1850,7 @@ void LLPanelObjectInventory::refresh()
 				{
 					// Server unsubsribes viewer (deselects object) from property
 					// updates after "ObjectAttach" so we need to resubscribe
-					LLSelectMgr::getInstanceFast()->sendSelect();
+					LLSelectMgr::getInstance()->sendSelect();
 				}
 			}
 

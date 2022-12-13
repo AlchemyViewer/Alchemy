@@ -243,7 +243,7 @@ void fetch_items_from_llsd(const LLSD& items_llsd)
 			gInventory.requestPost(true, url, body[i], handler, (i ? "Library Item" : "Inventory Item"));
 			continue;
 		}
-		else if (!LLGridManager::instanceFast().isInSecondlife())
+		else if (!LLGridManager::instance().isInSecondlife())
 		{
 			LLMessageSystem* msg = gMessageSystem;
 			BOOL start_new_message = TRUE;

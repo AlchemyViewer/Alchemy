@@ -93,7 +93,7 @@ LLSettingsType::type_e LLSettingsType::fromInventoryFlags(U32 flags)
 
 LLInventoryType::EIconName LLSettingsType::getIconName(LLSettingsType::type_e type)
 {
-    const SettingsEntry *entry = LLSettingsDictionary::instanceFast().lookup(type);
+    const SettingsEntry *entry = LLSettingsDictionary::instance().lookup(type);
     if (!entry) 
         return getIconName(ST_INVALID);
     return entry->mIconName;
@@ -101,7 +101,7 @@ LLInventoryType::EIconName LLSettingsType::getIconName(LLSettingsType::type_e ty
 
 std::string LLSettingsType::getDefaultName(LLSettingsType::type_e type)
 {
-    const SettingsEntry *entry = LLSettingsDictionary::instanceFast().lookup(type);
+    const SettingsEntry *entry = LLSettingsDictionary::instance().lookup(type);
     if (!entry)
         return getDefaultName(ST_INVALID);
     return entry->mDefaultNewName;

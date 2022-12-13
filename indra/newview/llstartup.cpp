@@ -37,6 +37,7 @@
 #else
 #	include <sys/stat.h>		// mkdir()
 #endif
+#include <memory>                   // std::unique_ptr
 
 #include "llviewermedia_streamingaudio.h"
 #include "llaudioengine.h"
@@ -127,7 +128,6 @@
 #include "llpanellogin.h"
 #include "llmutelist.h"
 #include "llavatarpropertiesprocessor.h"
-#include "llpanelpick.h"
 #include "llpanelgrouplandmoney.h"
 #include "llpanelgroupnotices.h"
 #include "llparcel.h"
@@ -185,7 +185,7 @@
 #include "pipeline.h"
 #include "llappviewer.h"
 #include "llfasttimerview.h"
-#include "lltelemetry.h"
+#include "llfloaterdirectory.h"
 #include "llfloatermap.h"
 #include "llweb.h"
 #include "llvoiceclient.h"
@@ -199,6 +199,7 @@
 #include "llavatariconctrl.h"
 #include "llvoicechannel.h"
 #include "llpathfindingmanager.h"
+#include "llremoteparcelrequest.h"
 // [RLVa:KB] - Checked: RLVa-1.2.0
 #include "rlvhandler.h"
 // [/RLVa:KB]
@@ -214,10 +215,12 @@
 
 #include "llstacktrace.h"
 
+#include "threadpool.h"
+
+
 #if LL_WINDOWS
 #include "lldxhardware.h"
 #endif
-#include "fsfloatersearch.h"
 
 //
 // exported globals
@@ -227,6 +230,8 @@ S32  gMaxAgentGroups;
 
 const std::string SCREEN_HOME_FILENAME = "screen_home%s.png";
 const std::string SCREEN_LAST_FILENAME = "screen_last%s.png";
+
+extern const char* const LOCAL_INVENTORY_FOLDER_NAME;
 
 LLPointer<LLViewerTexture> gStartTexture;
 
@@ -262,6 +267,7 @@ static bool mLoginStatePastUI = false;
 static bool mBenefitsSuccessfullyInit = false;
 
 const F32 STATE_AGENT_WAIT_TIMEOUT = 240; //seconds
+const S32 MAX_SEED_CAP_ATTEMPTS_BEFORE_LOGIN = 3; // Give region 3 chances
 
 std::unique_ptr<LLEventPump> LLStartUp::sStateWatcher(new LLEventStream("StartupState"));
 std::unique_ptr<LLStartupListener> LLStartUp::sListener(new LLStartupListener());
@@ -296,6 +302,7 @@ void transition_back_to_login_panel(const std::string& emsg);
 // [SL:KB] - Patch: Chat-Alerts | Checked: 2012-09-22 (Catznip-3.3)
 void handleLoadChatAlertSounds();
 // [/SL:KB]
+bool callbackConfirmDisplayPreferencesReset(const LLSD& notification, const LLSD& response);
 
 void callback_cache_name(const LLUUID& id, const std::string& full_name, bool is_group)
 {
@@ -321,6 +328,12 @@ void update_texture_fetch()
 	LLAppViewer::getImageDecodeThread()->update(1); // unpauses the image thread
 	LLAppViewer::getTextureFetch()->update(1); // unpauses the texture fetch thread
 	gTextureList.updateImages(0.10f);
+
+    if (LLImageGLThread::sEnabled)
+    {
+        std::shared_ptr<LL::WorkQueue> main_queue = LL::WorkQueue::getInstance("mainloop");
+        main_queue->runFor(std::chrono::milliseconds(1));
+    }
 }
 
 void set_flags_and_update_appearance()
@@ -425,12 +438,12 @@ bool idle_startup()
 		{
 			LLNotificationsUtil::add("DisplaySetToRecommendedFeatureChange");
 		}
-		else if ( ! lastGPU.empty() && (lastGPU != thisGPU))
+		else if ( ! lastGPU.empty() && lastGPU != thisGPU && !gSavedSettings.getBool("AlchemyKeepSettingsOnGPUChange"))
 		{
 			LLSD subs;
 			subs["LAST_GPU"] = lastGPU;
 			subs["THIS_GPU"] = thisGPU;
-			LLNotificationsUtil::add("DisplaySetToRecommendedGPUChange", subs);
+			LLNotificationsUtil::add("AskForDisplayPreferencesReset", subs, LLSD(), callbackConfirmDisplayPreferencesReset);
 		}
 		else if (!gViewerWindow->getInitAlert().empty())
 		{
@@ -554,8 +567,6 @@ bool idle_startup()
 			}
 
 			#if LL_WINDOWS
-                LLPROFILE_STARTUP();
-
 				// On the windows dev builds, unpackaged, the message.xml file will 
 				// be located in indra/build-vc**/newview/<config>/app_settings.
 				std::string message_path = gDirUtilp->getExpandedFilename(LL_PATH_APP_SETTINGS,"message.xml");
@@ -682,7 +693,7 @@ bool idle_startup()
 #else
 				void* window_handle = NULL;
 #endif
-				bool init = gAudiop->init(kAUDIO_NUM_SOURCES, window_handle, LLAppViewer::instance()->getSecondLifeTitle());
+				bool init = gAudiop->init(window_handle, LLAppViewer::instance()->getSecondLifeTitle());
 				if(init)
 				{
 					gAudiop->setMuted(TRUE);
@@ -969,6 +980,12 @@ bool idle_startup()
 			LLPersistentNotificationStorage::initParamSingleton();
 			LLDoNotDisturbNotificationStorage::initParamSingleton();
 		}
+        else
+        {
+            // reinitialize paths in case user switched grids or accounts
+            LLPersistentNotificationStorage::getInstance()->reset();
+            LLDoNotDisturbNotificationStorage::getInstance()->reset();
+        }
 
 		// Set PerAccountSettingsFile to the default value.
 		std::string settings_per_account = gDirUtilp->getExpandedFilename(LL_PATH_PER_SL_ACCOUNT, LLAppViewer::instance()->getSettingsFilename("Default", "PerAccount"));
@@ -1119,6 +1136,7 @@ bool idle_startup()
 	{
 		// Generic failure message
 		std::ostringstream emsg;
+		emsg << LLTrans::getString("LoginFailedHeader") << "\n";
 		if(LLLoginInstance::getInstance()->authFailure())
 		{
 			LL_INFOS("LLStartup") << "Login failed, LLLoginInstance::getResponse(): "
@@ -1131,11 +1149,37 @@ bool idle_startup()
 			std::string message_id = response["message_id"];
 			std::string message; // actual string to show the user
 
-			if(!message_id.empty() && LLTrans::findString(message, message_id, response["message_args"]))
-			{
-				// message will be filled in with the template and arguments
-			}
-			else if(!message_response.empty())
+            bool localized_by_id = false;
+            if(!message_id.empty())
+            {
+                LLSD message_args = response["message_args"];
+                if (message_args.has("TIME")
+                    && (message_id == "LoginFailedAcountSuspended"
+                        || message_id == "LoginFailedAccountMaintenance"))
+                {
+                    LLDate date;
+                    std::string time_string;
+                    if (date.fromString(message_args["TIME"].asString()))
+                    {
+                        LLSD args;
+                        args["datetime"] = (S32)date.secondsSinceEpoch();
+                        LLTrans::findString(time_string, "LocalTime", args);
+                    }
+                    else
+                    {
+                        time_string = message_args["TIME"].asString() + " " + LLTrans::getString("PacificTime");
+                    }
+
+                    message_args["TIME"] = time_string;
+                }
+                // message will be filled in with the template and arguments
+                if (LLTrans::findString(message, message_id, message_args))
+                {
+                    localized_by_id = true;
+                }
+            }
+
+            if(!localized_by_id && !message_response.empty())
 			{
 				// *HACK: "no_inventory_host" sent as the message itself.
 				// Remove this clause when server is sending message_id as well.
@@ -1310,9 +1354,6 @@ bool idle_startup()
 		// Initialize classes w/graphics stuff.
 		//
 		LLViewerStatsRecorder::instance(); // Since textures work in threads
-		gTextureList.doPrefetchImages();		
-		display_startup();
-
 		LLSurface::initClasses();
 		display_startup();
 
@@ -1418,10 +1459,21 @@ bool idle_startup()
 		{
 			LLStartUp::setStartupState( STATE_SEED_CAP_GRANTED );
 		}
+        else if (regionp->capabilitiesError())
+        {
+            // Try to connect despite capabilities' error state
+            LLStartUp::setStartupState(STATE_SEED_CAP_GRANTED);
+        }
 		else
 		{
 			U32 num_retries = regionp->getNumSeedCapRetries();
-			if (num_retries > 0)
+            if (num_retries > MAX_SEED_CAP_ATTEMPTS_BEFORE_LOGIN)
+            {
+                // Region will keep trying to get capabilities,
+                // but for now continue as if caps were granted
+                LLStartUp::setStartupState(STATE_SEED_CAP_GRANTED);
+            }
+			else if (num_retries > 0)
 			{
 				LLStringUtil::format_map_t args;
 				args["[NUMBER]"] = llformat("%d", num_retries + 1);
@@ -1444,6 +1496,15 @@ bool idle_startup()
 	if (STATE_SEED_CAP_GRANTED == LLStartUp::getStartupState())
 	{
 		display_startup();
+
+        // These textures are not warrantied to be cached, so needs
+        // to hapen with caps granted
+        gTextureList.doPrefetchImages();
+
+        // will init images, should be done with caps, but before gSky.init()
+        LLEnvironment::getInstance()->initSingleton();
+
+        display_startup();
 		update_texture_fetch();
 		display_startup();
 
@@ -1552,6 +1613,9 @@ bool idle_startup()
 		gAgentCamera.resetCamera();
 		display_startup();
 
+		// start up the ThreadPool we'll use for textures et al.
+        LLAppViewer::instance()->initGeneralThread();
+
 		// Initialize global class data needed for surfaces (i.e. textures)
 		LL_DEBUGS("AppInit") << "Initializing sky..." << LL_ENDL;
 		// Initialize all of the viewer object classes for the first time (doing things like texture fetches.
@@ -1566,7 +1630,11 @@ bool idle_startup()
 		display_startup();
 
 		LL_DEBUGS("AppInit") << "Decoding images..." << LL_ENDL;
-		// For all images pre-loaded into viewer cache, decode them.
+		// For all images pre-loaded into viewer cache, init
+        // priorities and fetching using decodeAllImages.
+        // Most of the fetching and decoding likely to be done
+        // by update_texture_fetch() later, while viewer waits.
+        //
 		// Need to do this AFTER we init the sky
 		const S32 DECODE_TIME_SEC = 2;
 		for (int i = 0; i < DECODE_TIME_SEC; i++)
@@ -1929,6 +1997,12 @@ bool idle_startup()
 		LL_INFOS() << "Requesting Agent Data" << LL_ENDL;
 		gAgent.sendAgentDataUpdateRequest();
 		display_startup();
+		if (gSavedSettings.getBOOL("LocalInventoryEnabled"))
+ 		{
+			gLocalInventory = gInventory.createNewCategory(LLUUID::null,
+														   LLFolderType::FT_LOCAL, 
+				                                           LOCAL_INVENTORY_FOLDER_NAME);
+ 		}
 		// Create the inventory views
 		LL_INFOS() << "Creating Inventory Views" << LL_ENDL;
 		LLFloaterReg::getInstance("inventory");
@@ -2422,6 +2496,11 @@ void login_callback(S32 option, void *userdata)
 void show_release_notes_if_required()
 {
     static bool release_notes_shown = false;
+    // We happen to know that instantiating LLVersionInfo implicitly
+    // instantiates the LLEventMailDrop named "relnotes", which we (might) use
+    // below. If viewer release notes stop working, might be because that
+    // LLEventMailDrop got moved out of LLVersionInfo and hasn't yet been
+    // instantiated.
     if (!release_notes_shown && (LLVersionInfo::instance().getChannelAndVersion() != gLastRunVersion)
         && LLVersionInfo::instance().getViewerMaturity() != LLVersionInfo::TEST_VIEWER // don't show Release Notes for the test builds
         && gSavedSettings.getBOOL("UpdaterShowReleaseNotes")
@@ -2540,8 +2619,6 @@ void use_circuit_callback(void**, S32 result)
 void register_viewer_callbacks(LLMessageSystem* msg)
 {
 	msg->setHandlerFuncFast(_PREHASH_LayerData,				process_layer_data );
-	msg->setHandlerFuncFast(_PREHASH_ImageData,				LLViewerTextureList::receiveImageHeader );
-	msg->setHandlerFuncFast(_PREHASH_ImagePacket,				LLViewerTextureList::receiveImagePacket );
 	msg->setHandlerFuncFast(_PREHASH_ObjectUpdate,				process_object_update );
 	msg->setHandlerFuncFast(_PREHASH_ObjectUpdateCompressed,				process_compressed_object_update );
 	msg->setHandlerFuncFast(_PREHASH_ObjectUpdateCached,					process_cached_object_update );
@@ -2686,12 +2763,14 @@ void register_viewer_callbacks(LLMessageSystem* msg)
 	msg->setHandlerFuncFast(_PREHASH_PlacesReply, process_places_reply);
 	msg->setHandlerFuncFast(_PREHASH_GroupNoticesListReply, LLPanelGroupNotices::processGroupNoticesListReply);
 
-	msg->setHandlerFuncFast(_PREHASH_DirPeopleReply, FSPanelSearchPeople::processSearchReply);
-	msg->setHandlerFuncFast(_PREHASH_DirPlacesReply, FSPanelSearchPlaces::processSearchReply);
-	msg->setHandlerFuncFast(_PREHASH_DirGroupsReply, FSPanelSearchGroups::processSearchReply);
-	msg->setHandlerFuncFast(_PREHASH_DirEventsReply, FSPanelSearchEvents::processSearchReply);
-	msg->setHandlerFuncFast(_PREHASH_DirLandReply,   FSPanelSearchLand::processSearchReply);
-	msg->setHandlerFuncFast(_PREHASH_DirClassifiedReply,  FSPanelSearchClassifieds::processSearchReply);
+	// directory search
+	msg->setHandlerFunc("DirPeopleReply", LLFloaterDirectory::processSearchPeopleReply);
+	msg->setHandlerFunc("DirGroupsReply", LLFloaterDirectory::processSearchGroupsReply);
+	msg->setHandlerFunc("DirPlacesReply", LLFloaterDirectory::processSearchPlacesReply);
+	msg->setHandlerFunc("DirEventsReply", LLFloaterDirectory::processSearchEventsReply);
+	msg->setHandlerFunc("DirLandReply",   LLFloaterDirectory::processSearchLandReply);
+	msg->setHandlerFunc("DirClassifiedReply",  LLFloaterDirectory::processSearchClassifiedsReply);
+
 
 	msg->setHandlerFuncFast(_PREHASH_AvatarPickerReply, LLFloaterAvatarPicker::processAvatarPickerReply);
 
@@ -2941,7 +3020,8 @@ void reset_login()
 	gAgentWearables.cleanup();
 	gAgentCamera.cleanup();
 	gAgent.cleanup();
-	LLWorld::getInstance()->destroyClass();
+    gSky.cleanup(); // mVOSkyp is an inworld object.
+	LLWorld::getInstance()->resetClass();
 
 	if ( gViewerWindow )
 	{	// Hide menus and normal buttons
@@ -3409,12 +3489,6 @@ bool init_benefits(LLSD& response)
 		succ = false;
 	}
 
-	// FIXME PREMIUM - for testing if login does not yet provide Premium Plus. Should be removed thereafter.
-	//if (succ && !LLAgentBenefitsMgr::has("Premium Plus"))
-	//{
-	//	LLAgentBenefitsMgr::init("Premium Plus", packages_sd["Premium"]["benefits"]);
-	//	llassert(LLAgentBenefitsMgr::has("Premium Plus"));
-	//}
 	return succ;
 }
 
@@ -3859,3 +3933,24 @@ void handleLoadChatAlertSounds()
 	}
 }
 // [/SL:KB]
+
+bool callbackConfirmDisplayPreferencesReset(const LLSD& notification, const LLSD& response)
+{
+	S32 option = LLNotificationsUtil::getSelectedOption(notification, response);
+
+	switch (option)
+	{
+		case 2:
+			LL_INFOS() << "User chose to always keep graphic settings despite GPU changes." << LL_ENDL;
+			gSavedSettings.setBOOL("AlchemyKeepSettingsOnGPUChange", true);
+			gSavedSettings.saveToFile(gSavedSettings.getString("ClientSettingsFile"), TRUE);
+			break;
+		case 1:
+			LL_INFOS() << "User chose to keep graphic settings despite a GPU change." << LL_ENDL;
+			break;
+		default:
+			LL_INFOS() << "User chose to reset graphic settings due to GPU change." << LL_ENDL;
+			LLFeatureManager::getInstance()->applyRecommendedSettings();
+	}
+	return false;
+}

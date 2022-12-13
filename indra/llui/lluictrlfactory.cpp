@@ -44,10 +44,6 @@
 // this library includes
 #include "llpanel.h"
 
-LLTrace::BlockTimerStatHandle FTM_WIDGET_CONSTRUCTION("Widget Construction");
-LLTrace::BlockTimerStatHandle FTM_INIT_FROM_PARAMS("Widget InitFromParams");
-LLTrace::BlockTimerStatHandle FTM_WIDGET_SETUP("Widget Setup");
-
 //-----------------------------------------------------------------------------
 
 // UI Ctrl class for padding
@@ -104,7 +100,7 @@ void LLUICtrlFactory::loadWidgetTemplate(const std::string& widget_tag, LLInitPa
 	std::string base_filename = search_paths.front();
 	if (!base_filename.empty())
 	{
-		LLUICtrlFactory::instanceFast().pushFileName(base_filename);
+		LLUICtrlFactory::instance().pushFileName(base_filename);
 
 		if (!LLXMLNode::getLayeredXMLNode(root_node, search_paths))
 		{
@@ -113,16 +109,14 @@ void LLUICtrlFactory::loadWidgetTemplate(const std::string& widget_tag, LLInitPa
 		}
 		LLXUIParser parser;
 		parser.readXUI(root_node, block, base_filename);
-		LLUICtrlFactory::instanceFast().popFileName();
+		LLUICtrlFactory::instance().popFileName();
 	}
 }
-
-static LLTrace::BlockTimerStatHandle FTM_CREATE_CHILDREN("Create XUI Children");
 
 //static 
 void LLUICtrlFactory::createChildren(LLView* viewp, LLXMLNodePtr node, const widget_registry_t& registry, LLXMLNodePtr output_node)
 {
-	LL_RECORD_BLOCK_TIME(FTM_CREATE_CHILDREN);
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
 	if (node.isNull()) return;
 
 	for (LLXMLNodePtr child_node = node->getFirstChild(); child_node.notNull(); child_node = child_node->getNextSibling())
@@ -133,11 +127,11 @@ void LLUICtrlFactory::createChildren(LLView* viewp, LLXMLNodePtr node, const wid
 			outputChild = output_node->createChild("", FALSE);
 		}
 
-		if (!instanceFast().createFromXML(child_node, viewp, LLStringUtil::null, registry, outputChild))
+		if (!instance().createFromXML(child_node, viewp, LLStringUtil::null, registry, outputChild))
 		{
 			// child_node is not a valid child for the current parent
 			std::string child_name = std::string(child_node->getName()->mString);
-			if (LLDefaultChildRegistry::instanceFast().getValue(child_name))
+			if (LLDefaultChildRegistry::instance().getValue(child_name))
 			{
 				// This means that the registry assocaited with the parent widget does not have an entry
 				// for the child widget
@@ -159,14 +153,13 @@ void LLUICtrlFactory::createChildren(LLView* viewp, LLXMLNodePtr node, const wid
 
 }
 
-static LLTrace::BlockTimerStatHandle FTM_XML_PARSE("XML Reading/Parsing");
 //-----------------------------------------------------------------------------
 // getLayeredXMLNode()
 //-----------------------------------------------------------------------------
 bool LLUICtrlFactory::getLayeredXMLNode(const std::string &xui_filename, LLXMLNodePtr& root,
                                         LLDir::ESkinConstraint constraint)
 {
-	LL_RECORD_BLOCK_TIME(FTM_XML_PARSE);
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
 	std::vector<std::string> paths =
 		gDirUtilp->findSkinnedFilenames(LLDir::XUI, xui_filename, constraint);
 
@@ -191,11 +184,9 @@ S32 LLUICtrlFactory::saveToXML(LLView* viewp, const std::string& filename)
 //-----------------------------------------------------------------------------
 //-----------------------------------------------------------------------------
 
-static LLTrace::BlockTimerStatHandle FTM_CREATE_FROM_XML("Create child widget");
-
 LLView *LLUICtrlFactory::createFromXML(LLXMLNodePtr node, LLView* parent, const std::string& filename, const widget_registry_t& registry, LLXMLNodePtr output_node)
 {
-	LL_RECORD_BLOCK_TIME(FTM_CREATE_FROM_XML);
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
 	std::string ctrl_type = node->getName()->mString;
 	LLStringUtil::toLower(ctrl_type);
 
@@ -262,7 +253,7 @@ const LLInitParam::BaseBlock& get_empty_param_block()
 void LLUICtrlFactory::registerWidget(const std::type_info* widget_type, const std::type_info* param_block_type, const std::string& name)
 {
 	// associate parameter block type with template .xml file
-	std::string* existing_name = LLWidgetNameRegistry::instanceFast().getValue(param_block_type);
+	std::string* existing_name = LLWidgetNameRegistry::instance().getValue(param_block_type);
 	if (existing_name != NULL)
 	{
 		if(*existing_name != name)
@@ -279,7 +270,7 @@ void LLUICtrlFactory::registerWidget(const std::type_info* widget_type, const st
 		}
 	}
 
-	LLWidgetNameRegistry::instanceFast().defaultRegistrar().add(param_block_type, name);
+	LLWidgetNameRegistry::instance().defaultRegistrar().add(param_block_type, name);
 	//FIXME: comment this in when working on schema generation
 	//LLWidgetTypeRegistry::instance().defaultRegistrar().add(tag, widget_type);
 	//LLDefaultParamBlockRegistry::instance().defaultRegistrar().add(widget_type, &get_empty_param_block<T>);

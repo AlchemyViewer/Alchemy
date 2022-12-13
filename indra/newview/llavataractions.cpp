@@ -63,12 +63,14 @@
 #include "llnotificationsutil.h"	// for LLNotificationsUtil
 #include "llpaneloutfitedit.h"
 #include "llpanelprofile.h"
+#include "llparcel.h"
 #include "llrecentpeople.h"
 #include "lltrans.h"
 #include "llviewercontrol.h"
 #include "llviewerobjectlist.h"
 #include "llviewermessage.h"	// for handle_lure
 #include "llviewernetwork.h" //LLGridManager
+#include "llviewerparcelmgr.h"
 #include "llviewerregion.h"
 #include "lltrans.h"
 #include "llcallingcard.h"
@@ -117,10 +119,10 @@ void LLAvatarActions::requestFriendshipDialog(const LLUUID& id, const std::strin
 	payload["id"] = id;
 	payload["name"] = name;
     
-    	LLNotificationsUtil::add("AddFriendWithMessage", args, payload, &callbackAddFriendWithMessage);
+	LLNotificationsUtil::add("AddFriendWithMessage", args, payload, &callbackAddFriendWithMessage);
 
 	// add friend to recent people list
-	LLRecentPeople::instanceFast().add(id);
+	LLRecentPeople::instance().add(id);
 }
 
 static void on_avatar_name_friendship(const LLUUID& id, const LLAvatarName av_name)
@@ -153,7 +155,7 @@ void LLAvatarActions::removeFriendDialog(const LLUUID& id)
 // static
 void LLAvatarActions::removeFriendsDialog(const uuid_vec_t& ids)
 {
-	if(ids.size() == 0)
+	if(ids.empty())
 		return;
 
 	LLSD args;
@@ -200,7 +202,7 @@ void LLAvatarActions::offerTeleport(const LLUUID& invitee)
 // static
 void LLAvatarActions::offerTeleport(const uuid_vec_t& ids) 
 {
-	if (ids.size() == 0)
+	if (ids.empty())
 		return;
 
 	handle_lure(ids);
@@ -284,7 +286,7 @@ void LLAvatarActions::startCall(const LLUUID& id)
 // static
 void LLAvatarActions::startAdhocCall(const uuid_vec_t& ids, const LLUUID& floater_id)
 {
-	if (ids.size() == 0)
+	if (ids.empty())
 	{
 		return;
 	}
@@ -412,6 +414,33 @@ void LLAvatarActions::showPick(const LLUUID& avatar_id, const LLUUID& pick_id)
 }
 
 // static
+void LLAvatarActions::createPick()
+{
+    
+    LLViewerRegion* region = gAgent.getRegion();
+    if (region)
+    {
+        LLPickData data;
+        data.pos_global = gAgent.getPositionGlobal();
+        data.sim_name = region->getName();
+
+        LLParcel* parcel = LLViewerParcelMgr::getInstance()->getAgentParcel();
+        if (parcel)
+        {
+            data.name = parcel->getName();
+            data.desc = parcel->getDesc();
+            data.snapshot_id = parcel->getSnapshotID();
+            data.parcel_id = parcel->getID();
+        }
+        else
+        {
+            data.name = region->getName();
+        }
+        createPick(data);
+    }
+}
+
+// static
 bool LLAvatarActions::isPickTabSelected(const LLUUID& avatar_id)
 {
     if (avatar_id.notNull())
@@ -451,20 +480,40 @@ void LLAvatarActions::showClassified(const LLUUID& avatar_id, const LLUUID& clas
 	}
 }
 
+// static
+void LLAvatarActions::createClassified()
+{
+    LLFloaterProfile* profilefloater = dynamic_cast<LLFloaterProfile*>(LLFloaterReg::showInstance("profile", LLSD().with("id", gAgent.getID())));
+    if (profilefloater)
+    {
+        profilefloater->createClassified();
+    }
+}
+
 //static 
 bool LLAvatarActions::profileVisible(const LLUUID& avatar_id)
 {
 	LLSD sd;
 	sd["id"] = avatar_id;
-	LLFloater* floater = getProfileFloater(avatar_id);
+	LLFloater* floater = findProfileFloater(avatar_id);
 	return floater && floater->isShown();
 }
 
 //static
-LLFloater* LLAvatarActions::getProfileFloater(const LLUUID& avatar_id)
+LLFloater* LLAvatarActions::findProfileFloater(const LLUUID& avatar_id)
 {
     LLFloaterProfile* floater = LLFloaterReg::findTypedInstance<LLFloaterProfile>("profile", LLSD().with("id", avatar_id));
     return floater;
+}
+
+void LLAvatarActions::createPick(const LLPickData& data)
+{
+    LLFloaterProfile* floater = dynamic_cast<LLFloaterProfile*>(
+		LLFloaterReg::showInstance("profile", LLSD().with("id", gAgent.getID())));
+    if (floater)
+    {
+        floater->createPick(data);
+    }
 }
 
 //static 
@@ -472,7 +521,7 @@ void LLAvatarActions::hideProfile(const LLUUID& avatar_id)
 {
 	LLSD sd;
 	sd["id"] = avatar_id;
-	LLFloater* floater = getProfileFloater(avatar_id);
+	LLFloater* floater = findProfileFloater(avatar_id);
 	if (floater)
 	{
 		floater->closeFloater();
@@ -1165,14 +1214,14 @@ bool LLAvatarActions::toggleBlock(const LLUUID& id)
 
 	LLMute mute(id, av_name.getUserName(), LLMute::AGENT);
 
-	if (LLMuteList::getInstanceFast()->isMuted(mute.mID, mute.mName))
+	if (LLMuteList::getInstance()->isMuted(mute.mID, mute.mName))
 	{
-		LLMuteList::getInstanceFast()->remove(mute);
+		LLMuteList::getInstance()->remove(mute);
 		return false;
 	}
 	else
 	{
-		LLMuteList::getInstanceFast()->add(mute);
+		LLMuteList::getInstance()->add(mute);
 		return true;
 	}
 }
@@ -1183,7 +1232,7 @@ void LLAvatarActions::toggleMute(const LLUUID& id, U32 flags)
 	LLAvatarName av_name;
 	LLAvatarNameCache::get(id, &av_name);
 
-	LLMuteList* mute_list = LLMuteList::getInstanceFast();
+	LLMuteList* mute_list = LLMuteList::getInstance();
 	bool is_muted = mute_list->isMuted(id, flags);
 
 	LLMute mute(id, av_name.getUserName(), LLMute::AGENT);
@@ -1510,13 +1559,13 @@ bool LLAvatarActions::isBlocked(const LLUUID& id)
 {
 	LLAvatarName av_name;
 	LLAvatarNameCache::get(id, &av_name);
-	return LLMuteList::getInstanceFast()->isMuted(id, av_name.getUserName());
+	return LLMuteList::getInstance()->isMuted(id, av_name.getUserName());
 }
 
 // static
 bool LLAvatarActions::isVoiceMuted(const LLUUID& id)
 {
-	return LLMuteList::getInstanceFast()->isMuted(id, LLMute::flagVoiceChat);
+	return LLMuteList::getInstance()->isMuted(id, LLMute::flagVoiceChat);
 }
 
 // static
@@ -1529,4 +1578,19 @@ bool LLAvatarActions::canBlock(const LLUUID& id)
 	bool is_linden = LLMuteList::isLinden(full_name);
 	bool is_self = id == gAgentID;
 	return !is_self && !is_linden;
+}
+
+//static
+bool LLAvatarActions::isAgentMappable(const LLUUID& agent_id)
+{
+	const LLRelationship* buddy_info = nullptr;
+	bool is_friend = LLAvatarActions::isFriend(agent_id);
+	
+	if (is_friend)
+		buddy_info = LLAvatarTracker::instance().getBuddyInfo(agent_id);
+	
+	return (buddy_info &&
+			buddy_info->isOnline() &&
+			buddy_info->isRightGrantedFrom(LLRelationship::GRANT_MAP_LOCATION)
+			);
 }

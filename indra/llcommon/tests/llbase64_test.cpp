@@ -73,5 +73,24 @@ namespace tut
 		ensure("encode 40 bytes", 
 				(result == "c9+s/4xGMX3smy3HZRGkg+YTUEBwNYdi7QwaSH4OkY92xAuxhKnDhg==") );
 	}
-
+	
+	template<> template<>
+	void base64_object::test<3>()
+	{
+		std::string result;
+		
+		result = LLBase64::encode(LLStringExplicit("Hands full of bananas."));
+		ensure("encode string",
+			   (result == "SGFuZHMgZnVsbCBvZiBiYW5hbmFzLg=="));
+	}
+	
+	template<> template<>
+	void base64_object::test<4>()
+	{
+		std::string result;
+		
+		result = LLBase64::decode(LLStringExplicit("SGFuZHMgZnVsbCBvZiBiYW5hbmFzLg=="));
+		ensure("decode string",
+			   (result == "Hands full of bananas."));
+	}
 }

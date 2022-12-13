@@ -466,6 +466,8 @@ public:
 	void					setSkipLinkUnderline(bool skip_link_underline) { mSkipLinkUnderline = skip_link_underline; }
 	bool					getSkipLinkUnderline() { return mSkipLinkUnderline;  }
 
+    void					setParseURLs(bool parse_urls) { mParseHTML = parse_urls; }
+
 	void					setPlainText(bool value) { mPlainText = value;}
 	bool					getPlainText() const { return mPlainText; }
 
@@ -653,7 +655,6 @@ protected:
 	void							updateScrollFromCursor();
 
 	// text selection
-	bool							hasSelection() const { return (mSelectionStart !=mSelectionEnd); }
 	void 							startSelection();
 	void 							endSelection();
 
@@ -675,6 +676,11 @@ protected:
 	{
 		return mLabel.getString() + getToolTip();
 	}
+	
+public:
+	bool							hasSelection() const { return (mSelectionStart !=mSelectionEnd); }
+
+    std::vector<LLRect> getSelctionRects(const highlight_list_t& highlights);
 
 protected:
 	// text segmentation and flow
@@ -757,8 +763,8 @@ protected:
 	bool						mPlainText;			// didn't use Image or Icon segments
 	bool						mAutoIndent;
 	S32							mMaxTextByteLength;	// Maximum length mText is allowed to be in bytes
-	bool						mAlwaysShowIcons;
 	bool						mSkipTripleClick;
+	bool						mAlwaysShowIcons;
 	bool						mSkipLinkUnderline;
 
 	// support widgets

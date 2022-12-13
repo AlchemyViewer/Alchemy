@@ -15,13 +15,12 @@ include(CMakeCopyIfDifferent)
 include(CubemapToEquirectangularJS)
 include(DBusGlib)
 include(DragDrop)
-include(Epoxy)
 include(EXPAT)
 include(FMODSTUDIO)
 include(Fonts)
-include(GLOD)
 include(Hunspell)
 include(JPEGEncoderBasic)
+include(LibXML2)
 include(LLAppearance)
 include(LLAudio)
 include(LLCA)
@@ -34,6 +33,7 @@ include(LLInventory)
 include(LLKDU)
 include(LLLogin)
 include(LLMath)
+include(LLMeshOptimizer)
 include(LLMessage)
 include(LLPhysicsExtensions)
 include(LLPlugin)
@@ -52,12 +52,13 @@ include(PNG)
 include(Sentry)
 include(TemplateCheck)
 include(ThreeJS)
+include(Tracy)
 include(UI)
 include(UnixInstall)
 include(ViewerMiscLibs)
 include(ViewerManager)
 include(VisualLeakDetector)
-include(ZLIB)
+include(ZLIBNG)
 include(URIPARSER)
 
 if( LLPHYSICSEXTENSIONS_SRC_DIR )
@@ -68,14 +69,12 @@ if( LLPHYSICSEXTENSIONS_SRC_DIR )
   endif (NOT HAVOK_TPV)
 endif( LLPHYSICSEXTENSIONS_SRC_DIR )
 
-message(STATUS "CMAKE_CURRENT_BINARY_DIR = ${CMAKE_CURRENT_BINARY_DIR}")
-
 include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_CURRENT_BINARY_DIR}
     ${DBUSGLIB_INCLUDE_DIRS}
-    ${ZLIB_INCLUDE_DIRS}
-    ${GLOD_INCLUDE_DIR}
+    ${ZLIBNG_INCLUDE_DIRS}
+    ${LIBXML2_INCLUDE_DIRS}
     ${LLAUDIO_INCLUDE_DIRS}
     ${LLCHARACTER_INCLUDE_DIRS}
     ${LLCOMMON_INCLUDE_DIRS}
@@ -85,6 +84,7 @@ include_directories(
     ${LLKDU_INCLUDE_DIRS}
     ${LLINVENTORY_INCLUDE_DIRS}
     ${LLMATH_INCLUDE_DIRS}
+    ${LLMESHOPTIMIZER_INCLUDE_DIRS}
     ${LLMESSAGE_INCLUDE_DIRS}
     ${LLPLUGIN_INCLUDE_DIRS}
     ${LLPRIMITIVE_INCLUDE_DIRS}
@@ -100,6 +100,7 @@ include_directories(
     ${FREEALUT_INCLUDE_DIRS}
     "${LIBS_PREBUILT_DIR}/include/collada/1.4"
     ${LLAPPEARANCE_INCLUDE_DIRS}
+    ${TRACY_INCLUDE_DIR}
     )
 
 if(USE_FMODSTUDIO)
@@ -141,7 +142,6 @@ set(viewer_SOURCE_FILES
     altoolalign.cpp
     alunzip.cpp
     alviewermenu.cpp
-    fsfloatersearch.cpp
     groupchatlistener.cpp
     llagentwearablesfetch.cpp
     llaccountingcostmanager.cpp
@@ -152,6 +152,7 @@ set(viewer_SOURCE_FILES
     llagentbenefits.cpp
     llagentcamera.cpp
     llagentdata.cpp
+    llagenthandler.cpp
     llagentlanguage.cpp
     llagentlistener.cpp
     llagentpicksinfo.cpp
@@ -185,9 +186,11 @@ set(viewer_SOURCE_FILES
     llchathistory.cpp
     llchatitemscontainerctrl.cpp
     llchatmsgbox.cpp
+    llcheatcodes.cpp
     llchiclet.cpp
     llchicletbar.cpp
     llclassifiedinfo.cpp
+    llclassifieditem.cpp
     llcofwearables.cpp
     llcolorswatch.cpp
     llcommanddispatcherlistener.cpp
@@ -225,7 +228,11 @@ set(viewer_SOURCE_FILES
     lldrawpooltree.cpp
     lldrawpoolwater.cpp
     lldrawpoolwlsky.cpp
+    lldroptarget.cpp
     lldynamictexture.cpp
+    lleasymessagelogentry.cpp
+    lleasymessagereader.cpp
+    lleasymessagesender.cpp
     llemote.cpp
     llenvironment.cpp
     llestateinfomodel.cpp
@@ -268,12 +275,14 @@ set(viewer_SOURCE_FILES
     llfloatercamerapresets.cpp
     llfloaterchatalerts.cpp
     llfloaterchatvoicevolume.cpp
+    llfloaterclassified.cpp
     llfloatercolorpicker.cpp
     llfloaterconversationlog.cpp
     llfloaterconversationpreview.cpp
     llfloatercreatelandmark.cpp
     llfloaterdeleteprefpreset.cpp
     llfloaterdestinations.cpp
+    llfloaterdirectory.cpp
     llfloaterdisplayname.cpp
     llfloatereditenvironmentbase.cpp
     llfloatereditextdaycycle.cpp
@@ -294,6 +303,7 @@ set(viewer_SOURCE_FILES
     llfloatergroups.cpp
     llfloaterhandler.cpp
     llfloaterhelpbrowser.cpp
+    llfloaterhexeditor.cpp
     llfloaterhoverheight.cpp
     llfloaterhowto.cpp
     llfloaterhud.cpp
@@ -312,17 +322,21 @@ set(viewer_SOURCE_FILES
     llfloatermap.cpp
     llfloatermediasettings.cpp
     llfloatermemleak.cpp
+    llfloatermessagebuilder.cpp
+    llfloatermessagelog.cpp
+    llfloatermessagerewriter.cpp
     llfloatermodelpreview.cpp
     llfloatermodeluploadbase.cpp
     llfloatermyscripts.cpp
     llfloatermyenvironment.cpp
     llfloaternamedesc.cpp
+    llfloaternewlocalinventory.cpp
     llfloaternotificationsconsole.cpp
     llfloaternotificationstabbed.cpp
-    llfloateroutfitphotopreview.cpp
-    llfloateroutfitsnapshot.cpp
+    llfloateroutfitphotopreview.cpp 
     llfloaterobjectweights.cpp
     llfloateropenobject.cpp
+    llfloatersimpleoutfitsnapshot.cpp
     llfloaterpathfindingcharacters.cpp
     llfloaterpathfindingconsole.cpp
     llfloaterpathfindinglinksets.cpp
@@ -330,10 +344,14 @@ set(viewer_SOURCE_FILES
     llfloaterpay.cpp
     llfloaterperms.cpp
     llfloaterprofile.cpp
+    llfloaterprofilelegacy.cpp
     llfloaterpreference.cpp
     llfloaterpreferenceviewadvanced.cpp
     llfloaterpreviewtrash.cpp
+    llfloaterprofiletexture.cpp
+    llfloaterprogressview.cpp
     llfloaterproperties.cpp
+    llfloaterpublishclassified.cpp
     llfloaterregiondebugconsole.cpp
     llfloaterregioninfo.cpp
     llfloaterreporter.cpp
@@ -383,6 +401,7 @@ set(viewer_SOURCE_FILES
     llgroupoptions.cpp
     llgroupmgr.cpp
     llhasheduniqueid.cpp
+    llhexeditor.cpp
     llhints.cpp
     llhttpretrypolicy.cpp
     llhudeffect.cpp
@@ -474,6 +493,7 @@ set(viewer_SOURCE_FILES
     lloutputmonitorctrl.cpp
     llpanelappearancetab.cpp
     llpanelavatar.cpp
+    llpanelavatarlegacy.cpp
     llpanelavatartag.cpp
     llpanelblockedlist.cpp
     llpanelclassified.cpp
@@ -482,6 +502,7 @@ set(viewer_SOURCE_FILES
     llpaneleditwater.cpp
     llpaneleditwearable.cpp
     llpanelenvironment.cpp
+    llpaneleventinfo.cpp
     llpanelexperiencelisteditor.cpp
     llpanelexperiencelog.cpp
     llpanelexperiencepicker.cpp
@@ -530,8 +551,17 @@ set(viewer_SOURCE_FILES
     llpanelpresetspulldown.cpp
     llpanelprimmediacontrols.cpp
     llpanelprofile.cpp
+    llpanelprofilelegacy.cpp
     llpanelprofileclassifieds.cpp
     llpanelprofilepicks.cpp
+    llpanelsearchbase.cpp
+    llpanelsearchclassifieds.cpp
+    llpanelsearchevents.cpp
+    llpanelsearchgroups.cpp
+    llpanelsearchlandsales.cpp
+    llpanelsearchpeople.cpp
+    llpanelsearchplaces.cpp
+    llpanelsearchweb.cpp
     llpanelsnapshot.cpp
     llpanelsnapshotinventory.cpp
     llpanelsnapshotlocal.cpp
@@ -564,6 +594,7 @@ set(viewer_SOURCE_FILES
     llpersistentnotificationstorage.cpp
     llphysicsmotion.cpp
     llphysicsshapebuilderutil.cpp
+    llpickitem.cpp
     llpipelinelistener.cpp
     llplacesinventorybridge.cpp
     llplacesinventorypanel.cpp
@@ -580,6 +611,7 @@ set(viewer_SOURCE_FILES
     llpreviewtexture.cpp
     llproductinforequest.cpp
     llprogressview.cpp
+    llprofileimagepicker.cpp
     llrecentpeople.cpp
     llregioninfomodel.cpp
     llregionposition.cpp
@@ -628,11 +660,8 @@ set(viewer_SOURCE_FILES
     llsyntaxid.cpp
     llsyswellitem.cpp
     llsyswellwindow.cpp
-    lltelemetry.cpp
     llteleporthistory.cpp
     llteleporthistorystorage.cpp
-    lltextureatlas.cpp
-    lltextureatlasmanager.cpp
     lltexturecache.cpp
     lltexturectrl.cpp
     lltexturefetch.cpp
@@ -820,7 +849,6 @@ set(viewer_HEADER_FILES
     altoolalign.h
     alunzip.h
     alviewermenu.h
-    fsfloatersearch.h
     groupchatlistener.h
     llaccountingcost.h
     llagentwearablesfetch.h
@@ -869,6 +897,7 @@ set(viewer_HEADER_FILES
     llchiclet.h
     llchicletbar.h
     llclassifiedinfo.h
+    llclassifieditem.h
     llcofwearables.h
     llcolorswatch.h
     llcommanddispatcherlistener.h
@@ -906,7 +935,11 @@ set(viewer_HEADER_FILES
     lldrawpooltree.h
     lldrawpoolwater.h
     lldrawpoolwlsky.h
+    lldroptarget.h
     lldynamictexture.h
+    lleasymessagelogentry.h
+    lleasymessagereader.h
+    lleasymessagesender.h
     llemote.h
     llenvironment.h
     llestateinfomodel.h
@@ -949,12 +982,14 @@ set(viewer_HEADER_FILES
     llfloatercamera.h
     llfloaterchatalerts.h
     llfloaterchatvoicevolume.h
+    llfloaterclassified.h
     llfloatercolorpicker.h
     llfloaterconversationlog.h
     llfloaterconversationpreview.h
     llfloatercreatelandmark.h
     llfloaterdeleteprefpreset.h
     llfloaterdestinations.h
+    llfloaterdirectory.h
     llfloaterdisplayname.h
     llfloatereditenvironmentbase.h
     llfloatereditextdaycycle.h
@@ -975,6 +1010,7 @@ set(viewer_HEADER_FILES
     llfloatergroups.h
     llfloaterhandler.h
     llfloaterhelpbrowser.h
+    llfloaterhexeditor.h
     llfloaterhoverheight.h
     llfloaterhowto.h
     llfloaterhud.h
@@ -996,17 +1032,21 @@ set(viewer_HEADER_FILES
     llfloatermarketplacelistings.h
     llfloatermediasettings.h
     llfloatermemleak.h
+    llfloatermessagebuilder.h
+    llfloatermessagelog.h
+    llfloatermessagerewriter.h
     llfloatermodelpreview.h
     llfloatermodeluploadbase.h
     llfloatermyscripts.h
     llfloatermyenvironment.h
     llfloaternamedesc.h
+    llfloaternewlocalinventory.h
     llfloaternotificationsconsole.h
     llfloaternotificationstabbed.h
     llfloateroutfitphotopreview.h
-    llfloateroutfitsnapshot.h
     llfloaterobjectweights.h
     llfloateropenobject.h
+    llfloatersimpleoutfitsnapshot.h
     llfloaterpathfindingcharacters.h
     llfloaterpathfindingconsole.h
     llfloaterpathfindinglinksets.h
@@ -1014,10 +1054,14 @@ set(viewer_HEADER_FILES
     llfloaterpay.h
     llfloaterperms.h
     llfloaterprofile.h
+    llfloaterprofilelegacy.h
     llfloaterpreference.h
     llfloaterpreferenceviewadvanced.h
     llfloaterpreviewtrash.h
+    llfloaterprofiletexture.h
+    llfloaterprogressview.h
     llfloaterproperties.h
+    llfloaterpublishclassified.h
     llfloaterregiondebugconsole.h
     llfloaterregioninfo.h
     llfloaterreporter.h
@@ -1066,6 +1110,7 @@ set(viewer_HEADER_FILES
     llgroupoptions.h
     llgroupmgr.h
     llhasheduniqueid.h
+    llhexeditor.h
     llhints.h
     llhttpretrypolicy.h
     llhudeffect.h
@@ -1147,6 +1192,7 @@ set(viewer_HEADER_FILES
     lloutputmonitorctrl.h
     llpanelappearancetab.h
     llpanelavatar.h
+    llpanelavatarlegacy.h
     llpanelavatartag.h
     llpanelblockedlist.h
     llpanelclassified.h
@@ -1155,6 +1201,7 @@ set(viewer_HEADER_FILES
     llpaneleditwater.h
     llpaneleditwearable.h
     llpanelenvironment.h
+    llpaneleventinfo.h
     llpanelexperiencelisteditor.h
     llpanelexperiencelog.h
     llpanelexperiencepicker.h
@@ -1204,8 +1251,17 @@ set(viewer_HEADER_FILES
     llpanelpresetspulldown.h
     llpanelprimmediacontrols.h
     llpanelprofile.h
+    llpanelprofilelegacy.h
     llpanelprofileclassifieds.h
     llpanelprofilepicks.h
+    llpanelsearchbase.h
+    llpanelsearchclassifieds.h
+    llpanelsearchevents.h
+    llpanelsearchgroups.h
+    llpanelsearchlandsales.h
+    llpanelsearchpeople.h
+    llpanelsearchplaces.h
+    llpanelsearchweb.h
     llpanelsnapshot.h
     llpanelteleporthistory.h
     llpaneltiptoast.h
@@ -1233,6 +1289,7 @@ set(viewer_HEADER_FILES
     llpersistentnotificationstorage.h
     llphysicsmotion.h
     llphysicsshapebuilderutil.h
+    llpickitem.h
     llpipelinelistener.h
     llplacesinventorybridge.h
     llplacesinventorypanel.h
@@ -1248,6 +1305,7 @@ set(viewer_HEADER_FILES
     llpreviewsound.h
     llpreviewtexture.h
     llproductinforequest.h
+    llprofileimagepicker.h
     llprogressview.h
     llrecentpeople.h
     llregioninfomodel.h
@@ -1303,8 +1361,6 @@ set(viewer_HEADER_FILES
     lltable.h
     llteleporthistory.h
     llteleporthistorystorage.h
-    lltextureatlas.h
-    lltextureatlasmanager.h
     lltexturecache.h
     lltexturectrl.h
     lltexturefetch.h
@@ -1679,6 +1735,7 @@ if (WINDOWS)
         ${WINDOWS_LIBRARIES}
         comdlg32
         dxguid
+        imm32
         kernel32
         odbc32
         odbccp32
@@ -1744,6 +1801,8 @@ set(viewer_APPSETTINGS_FILES
     ${CMAKE_SOURCE_DIR}/../etc/message.xml
     ${CMAKE_SOURCE_DIR}/../scripts/messages/message_template.msg
     packages-info.txt
+    featuretable.txt
+    featuretable_mac.txt
     )
 
 source_group("App Settings" FILES ${viewer_APPSETTINGS_FILES})
@@ -1802,10 +1861,6 @@ if (USE_FMODSTUDIO)
   set(FMODWRAPPER_LIBRARY ${FMODSTUDIO_LIBRARY})
 endif (USE_FMODSTUDIO)
 
-if (GLODLIB)
-  set_source_files_properties(llfloatermodelpreview.cpp PROPERTIES COMPILE_FLAGS "-DLL_GLOD")
-endif (GLODLIB)
-
 list(APPEND viewer_SOURCE_FILES ${viewer_HEADER_FILES})
 
 set_source_files_properties(${viewer_HEADER_FILES}
@@ -1816,10 +1871,6 @@ add_executable(${VIEWER_BINARY_NAME}
     MACOSX_BUNDLE
     ${viewer_SOURCE_FILES}
     )
-
-if (SDL_FOUND)
-  target_compile_definitions(${VIEWER_BINARY_NAME} PRIVATE LL_SDL=1)
-endif (SDL_FOUND)
 
 if (USE_SENTRY)
   target_compile_definitions(${VIEWER_BINARY_NAME} PRIVATE ${SENTRY_DEFINE})
@@ -1885,10 +1936,7 @@ if (WINDOWS)
       ${SHARED_LIB_STAGING_DIR}/${CMAKE_CFG_INTDIR}/libapr-1.dll
       ${SHARED_LIB_STAGING_DIR}/${CMAKE_CFG_INTDIR}/libaprutil-1.dll
       ${SHARED_LIB_STAGING_DIR}/${CMAKE_CFG_INTDIR}/libapriconv-1.dll
-      ${SHARED_LIB_STAGING_DIR}/${CMAKE_CFG_INTDIR}/glod.dll
       ${SHARED_LIB_STAGING_DIR}/${CMAKE_CFG_INTDIR}/openjp2.dll
-      ${SHARED_LIB_STAGING_DIR}/${CMAKE_CFG_INTDIR}/libhunspell.dll
-      ${SHARED_LIB_STAGING_DIR}/${CMAKE_CFG_INTDIR}/epoxy-0.dll
       ${SHARED_LIB_STAGING_DIR}/${CMAKE_CFG_INTDIR}/SLVoice.exe
       ${CMAKE_CURRENT_SOURCE_DIR}/licenses-win32.txt
       ${CMAKE_CURRENT_SOURCE_DIR}/featuretable.txt
@@ -2100,7 +2148,7 @@ endif (WINDOWS)
 # one of these being libz where you can find four or more versions in play
 # at once.  On Linux, libz can be found at link and run time via a number
 # of paths:
-#
+#     
 #      => -lfreetype
 #        => libz.so.1 (on install machine, not build)
 #      => -lSDL
@@ -2111,19 +2159,20 @@ endif (WINDOWS)
 #
 # We generally want the newest version of the library to provide all symbol
 # resolution.  To that end, when using static archives, the *_PRELOAD_ARCHIVES
-# variables, PNG_PRELOAD_ARCHIVES and ZLIB_PRELOAD_ARCHIVES, get the archives
+# variables, PNG_PRELOAD_ARCHIVES and ZLIBNG_PRELOAD_ARCHIVES, get the archives
 # dumped into the target binary and runtime lookup will find the most
 # modern version.
 
 target_link_libraries(${VIEWER_BINARY_NAME}
     ${PNG_PRELOAD_ARCHIVES}
-    ${ZLIB_PRELOAD_ARCHIVES}
+    ${ZLIBNG_PRELOAD_ARCHIVES}
     ${URIPARSER_PRELOAD_ARCHIVES}
     ${GOOGLE_PERFTOOLS_LIBRARIES}
     ${LLAUDIO_LIBRARIES}
     ${LLCHARACTER_LIBRARIES}
     ${LLIMAGE_LIBRARIES}
     ${LLINVENTORY_LIBRARIES}
+    ${LLMESHOPTIMIZER_LIBRARIES}
     ${LLMESSAGE_LIBRARIES}
     ${LLPLUGIN_LIBRARIES}
     ${LLPRIMITIVE_LIBRARIES}
@@ -2145,16 +2194,14 @@ target_link_libraries(${VIEWER_BINARY_NAME}
     ${BOOST_FIBER_LIBRARY}
     ${BOOST_CONTEXT_LIBRARY}
     ${DBUSGLIB_LIBRARIES}
-    ${EPOXY_LIBRARIES}
     ${OPENGL_LIBRARIES}
     ${FMODWRAPPER_LIBRARY} # must come after LLAudio
-    ${GLOD_LIBRARIES}
-    ${OPENGL_LIBRARIES}
     ${SDL_LIBRARIES}
     ${SMARTHEAP_LIBRARY}
     ${UI_LIBRARIES}
     ${WINDOWS_LIBRARIES}
     ${EXPAT_LIBRARIES}
+    ${LIBXML2_LIBRARIES}
     ${XMLRPCEPI_LIBRARIES}
     ${OPENSSL_LIBRARIES}
     ${CRYPTO_LIBRARIES}
@@ -2162,6 +2209,7 @@ target_link_libraries(${VIEWER_BINARY_NAME}
     ${LLPHYSICS_LIBRARIES}
     ${LLPHYSICSEXTENSIONS_LIBRARIES}
     ${LLAPPEARANCE_LIBRARIES}
+    ${TRACY_LIBRARY}
     ${MINIZIP_LIBRARIES}
     absl::flat_hash_map
     absl::node_hash_map
@@ -2293,7 +2341,7 @@ if (DARWIN)
   set(VIEWER_APP_EXE "${VIEWER_APP_BUNDLE}/Contents/MacOS/${product}")
   set(VIEWER_APP_DSYM "${VIEWER_APP_EXE}.dSYM")
   set(VIEWER_APP_XCARCHIVE "${VIEWER_APP_BUNDLE}/../${product}.xcarchive.zip")
-
+  
   configure_file(
      "${CMAKE_CURRENT_SOURCE_DIR}/Info-Alchemy.plist"
      "${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/Info-Alchemy.plist"
@@ -2507,7 +2555,7 @@ if (LL_TESTS)
     llworldmap.cpp
     llworldmipmap.cpp
     PROPERTIES
-    LL_TEST_ADDITIONAL_SOURCE_FILES
+    LL_TEST_ADDITIONAL_SOURCE_FILES 
     tests/llviewertexture_stub.cpp
     #llviewertexturelist.cpp
   )
@@ -2540,7 +2588,7 @@ if (LL_TESTS)
     llworldmap.cpp
     llworldmipmap.cpp
     PROPERTIES
-    LL_TEST_ADDITIONAL_SOURCE_FILES
+    LL_TEST_ADDITIONAL_SOURCE_FILES 
     tests/llviewertexture_stub.cpp
     #llviewertexturelist.cpp
     LL_TEST_ADDITIONAL_LIBRARIES "${BOOST_SYSTEM_LIBRARY}"

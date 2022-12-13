@@ -71,8 +71,6 @@ public:
     static LLFloaterIMSessionTab* findConversation(const LLUUID& uuid);
     static LLFloaterIMSessionTab* getConversation(const LLUUID& uuid);
 
-	// show/hide the translation check box
-	void showTranslationCheckbox(const BOOL visible = FALSE);
 
 	bool isNearbyChat() {return mIsNearbyChat;}
 
@@ -146,6 +144,8 @@ protected:
 
 	std::string appendTime();
 	void assignResizeLimits();
+	
+	virtual void applyMUPose(std::string& text);
 
 	S32  mFloaterExtraWidth;
 
@@ -191,7 +191,6 @@ protected:
 // [SL:KB] - Patch: Chat-Misc | Checked: 2014-03-22 (Catznip-3.6)
 	LLPanel* mExtendedButtonPanel = nullptr;
 // [/SL:KB]
-    LLUICtrl* mTranslationCheckBox;
 
 private:
 	// Handling selection and contextual menu

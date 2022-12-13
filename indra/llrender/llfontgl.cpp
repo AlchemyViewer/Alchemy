@@ -103,8 +103,6 @@ S32 LLFontGL::getNumFaces(const std::string& filename)
 	return mFontFreetype->getNumFaces(filename);
 }
 
-static LLTrace::BlockTimerStatHandle FTM_RENDER_FONTS("Fonts");
-
 S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, const LLRect& rect, const LLColor4 &color, HAlign halign, VAlign valign, U8 style,
     ShadowType shadow, S32 max_chars, F32* right_x, BOOL use_ellipses) const
 {
@@ -141,7 +139,7 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, const LLRectf& rec
 S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, const LLColor4 &color, HAlign halign, VAlign valign, U8 style, 
 					 ShadowType shadow, S32 max_chars, S32 max_pixels, F32* right_x, BOOL use_ellipses) const
 {
-	LL_RECORD_BLOCK_TIME(FTM_RENDER_FONTS);
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
 
 	if(!sDisplayFont) //do not display texts
 	{
@@ -535,9 +533,19 @@ F32 LLFontGL::getWidthF32(const llwchar* wchars, S32 begin_offset, S32 max_chars
 	return cur_x / sScaleX;
 }
 
+void LLFontGL::generateASCIIglyphs()
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI
+    for (U32 i = 32; (i < 127); i++)
+    {
+        mFontFreetype->getGlyphInfo(i);
+    }
+}
+
 // Returns the max number of complete characters from text (up to max_chars) that can be drawn in max_pixels
 S32 LLFontGL::maxDrawableChars(const llwchar* wchars, F32 max_pixels, S32 max_chars, EWordWrapStyle end_on_word_boundary) const
 {
+	LL_PROFILE_ZONE_SCOPED_CATEGORY_UI
 	if (!wchars || !wchars[0] || max_chars == 0)
 	{
 		return 0;
@@ -807,6 +815,8 @@ void LLFontGL::initClass(F32 screen_dpi, F32 x_scale, F32 y_scale, const std::st
 	{
 		sFontRegistry->reset();
 	}
+
+	LLFontGL::loadDefaultFonts();
 }
 
 // Force standard fonts to get generated up front.
@@ -816,6 +826,7 @@ void LLFontGL::initClass(F32 screen_dpi, F32 x_scale, F32 y_scale, const std::st
 // static
 bool LLFontGL::loadDefaultFonts()
 {
+	LL_PROFILE_ZONE_SCOPED_CATEGORY_UI
 	bool succ = true;
 	succ &= (NULL != getFontSansSerifSmall());
 	succ &= (NULL != getFontSansSerif());
@@ -823,8 +834,16 @@ bool LLFontGL::loadDefaultFonts()
 	succ &= (NULL != getFontSansSerifHuge());
 	succ &= (NULL != getFontSansSerifBold());
 	succ &= (NULL != getFontMonospace());
-	succ &= (NULL != getFontExtChar());
 	return succ;
+}
+
+void LLFontGL::loadCommonFonts()
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI
+    getFont(LLFontDescriptor("SansSerif", "Small", BOLD));
+    getFont(LLFontDescriptor("SansSerif", "Large", BOLD));
+    getFont(LLFontDescriptor("SansSerif", "Huge", BOLD));
+    getFont(LLFontDescriptor("Monospace", "Medium", 0));
 }
 
 // static
@@ -1006,12 +1025,6 @@ LLFontGL* LLFontGL::getFontSansSerifBold()
 {
 	static LLFontGL* fontp = getFont(LLFontDescriptor("SansSerif","Medium",BOLD));
 	return fontp;
-}
-
-//static
-LLFontGL* LLFontGL::getFontExtChar()
-{
-	return getFontSansSerif();
 }
 
 //static 

@@ -536,6 +536,7 @@ void LLVivoxVoiceClient::connectorCreate()
 		<< "<ClientName>V2 SDK</ClientName>"
 		<< "<AccountManagementServer>" << mVoiceAccountServerURI << "</AccountManagementServer>"
 		<< "<Mode>Normal</Mode>"
+        << (gSavedSettings.getBOOL("VoiceMultiInstance") ? "<MinimumPort>30000</MinimumPort><MaximumPort>50000</MaximumPort>" : "")
 #ifndef LL_LINUX
         << "<ConnectorHandle>" << LLVivoxSecurity::getInstance()->connectorHandle() << "</ConnectorHandle>"
 #endif
@@ -694,6 +695,10 @@ void LLVivoxVoiceClient::voiceControlCoro()
         // a member due to unresolved issues with coroutine
         // surviving longer than LLVivoxVoiceClient
         voiceControlStateMachine(state);
+    }
+    catch (const LLCoros::Stop&)
+    {
+        LL_DEBUGS("LLVivoxVoiceClient") << "Received a shutdown exception" << LL_ENDL;
     }
     catch (const LLContinueError&)
     {
@@ -964,6 +969,18 @@ bool LLVivoxVoiceClient::startAndLaunchDaemon()
             }
             params.args.add("-ll");
             params.args.add(loglevel);
+
+			if (gSavedSettings.getBOOL("VoiceMultiInstance"))
+            {
+                S32 port_nr = 30000 + ll_rand(20000);
+                LLControlVariable* voice_port = gSavedSettings.getControl("VivoxVoicePort");
+                if (voice_port)
+                {
+                    voice_port->setValue(LLSD(port_nr), false);
+                    params.args.add("-i");
+                    params.args.add(llformat("127.0.0.1:%u", gSavedSettings.getU32("VivoxVoicePort")));
+                }
+            }
 
             std::string log_folder = gSavedSettings.getString("VivoxLogDirectory");
 
@@ -1255,8 +1272,8 @@ bool LLVivoxVoiceClient::establishVoiceConnection()
 
         if (result.has("connector"))
         {
-            LLVoiceVivoxStats::getInstance()->establishAttemptEnd(connected);
             connected = LLSD::Boolean(result["connector"]);
+            LLVoiceVivoxStats::getInstance()->establishAttemptEnd(connected);
             if (!connected)
             {
                 if (result.has("retry") && ++retries <= CONNECT_RETRY_MAX && !sShuttingDown)
@@ -1618,13 +1635,33 @@ bool LLVivoxVoiceClient::requestParcelVoiceInfo()
         }
         else
         {
-            LL_WARNS("Voice") << "No voice channel credentials" << LL_ENDL;
-
+            LLVoiceChannel* channel = LLVoiceChannel::getCurrentVoiceChannel();
+            if (channel != NULL)
+            {
+                if (channel->getSessionName().empty() && channel->getSessionID().isNull())
+                {
+                    if (LLViewerParcelMgr::getInstance()->allowAgentVoice())
+                    {
+                        LL_WARNS("Voice") << "No channel credentials for default channel" << LL_ENDL;
+                    }
+                }
+                else
+                {
+                    LL_WARNS("Voice") << "No voice channel credentials" << LL_ENDL;
+                }
+            }
         }
     }
     else
     {
-        LL_WARNS("Voice") << "No voice credentials" << LL_ENDL;
+        if (LLViewerParcelMgr::getInstance()->allowAgentVoice())
+        {
+            LL_WARNS("Voice") << "No voice credentials" << LL_ENDL;
+        }
+        else
+        {
+            LL_DEBUGS("Voice") << "No voice credentials" << LL_ENDL;
+        }
     }
 
     // set the spatial channel.  If no voice credentials or uri are 
@@ -4528,7 +4565,7 @@ void LLVivoxVoiceClient::messageEvent(
 		if(session)
 		{
 			bool is_do_not_disturb = gAgent.isDoNotDisturb();
-			bool is_muted = LLMuteList::getInstanceFast()->isMuted(session->mCallerID, session->mName, LLMute::flagTextChat);
+			bool is_muted = LLMuteList::getInstance()->isMuted(session->mCallerID, session->mName, LLMute::flagTextChat);
 			bool is_linden = LLMuteList::isLinden(session->mName);
 			LLChat chat;
 
@@ -4555,9 +4592,7 @@ void LLVivoxVoiceClient::messageEvent(
 						IM_NOTHING_SPECIAL,		// default arg
 						0,						// default arg
 						LLUUID::null,			// default arg
-						LLVector3::zero,		// default arg
-						true);					// prepend name and make it a link to the user's profile
-
+						LLVector3::zero);		// default arg
 			}
 		}		
 	}
@@ -4598,6 +4633,23 @@ void LLVivoxVoiceClient::sessionNotificationEvent(std::string &sessionHandle, st
 	{
 		LL_DEBUGS("Voice") << "Unknown session handle " << sessionHandle << LL_ENDL;
 	}
+}
+
+void LLVivoxVoiceClient::voiceServiceConnectionStateChangedEvent(int statusCode, std::string &statusString, std::string &build_id)
+{
+	// We don't generally need to process this. However, one occurence is when we first connect, and so it is the
+	// earliest opportunity to learn what we're connected to.
+	if (statusCode)
+	{
+		LL_WARNS("Voice") << "VoiceServiceConnectionStateChangedEvent statusCode: " << statusCode <<
+			"statusString: " << statusString << LL_ENDL;
+		return;
+	}
+	if (build_id.empty())
+	{
+		return;
+	}
+	mVoiceVersion.mBuildVersion = build_id;
 }
 
 void LLVivoxVoiceClient::auxAudioPropertiesEvent(F32 energy)
@@ -4716,7 +4768,7 @@ bool LLVivoxVoiceClient::participantState::updateMuteState()
 {
 	bool result = false;
 
-	bool isMuted = LLMuteList::getInstanceFast()->isMuted(mAvatarID, LLMute::flagVoiceChat);
+	bool isMuted = LLMuteList::getInstance()->isMuted(mAvatarID, LLMute::flagVoiceChat);
 	if(mOnMuteList != isMuted)
 	{
 	    mOnMuteList = isMuted;
@@ -4786,7 +4838,7 @@ void LLVivoxVoiceClient::sessionState::VerifySessions()
         if ((*it).expired())
         {
             LL_WARNS("Voice") << "Expired session found! removing" << LL_ENDL;
-            mSession.erase(it++);
+            it = mSession.erase(it);
         }
         else
             ++it;
@@ -4872,7 +4924,7 @@ LLVivoxVoiceClient::participantStatePtr_t LLVivoxVoiceClient::findParticipantByI
 bool LLVivoxVoiceClient::checkParcelChanged(bool update)
 {
 	LLViewerRegion *region = gAgent.getRegion();
-	LLParcel *parcel = LLViewerParcelMgr::getInstanceFast()->getAgentParcel();
+	LLParcel *parcel = LLViewerParcelMgr::getInstance()->getAgentParcel();
 	
 	if(region && parcel)
 	{
@@ -5444,8 +5496,8 @@ void LLVivoxVoiceClient::updatePosition(void)
 		// They're currently always set to zero.
 		
 		// Send the current camera position to the voice code
-		rot.setRows(LLViewerCamera::getInstanceFast()->getAtAxis(), LLViewerCamera::getInstanceFast()->getLeftAxis (),  LLViewerCamera::getInstanceFast()->getUpAxis());
-		pos = gAgent.getRegion()->getPosGlobalFromRegion(LLViewerCamera::getInstanceFast()->getOrigin());
+		rot.setRows(LLViewerCamera::getInstance()->getAtAxis(), LLViewerCamera::getInstance()->getLeftAxis (),  LLViewerCamera::getInstance()->getUpAxis());
+		pos = gAgent.getRegion()->getPosGlobalFromRegion(LLViewerCamera::getInstance()->getOrigin());
 		
 		LLVivoxVoiceClient::getInstance()->setCameraPosition(
 															 pos,				// position
@@ -5594,7 +5646,7 @@ bool LLVivoxVoiceClient::voiceEnabled()
 {
 	static const LLCachedControl<bool> enable_voice_chat(gSavedSettings, "EnableVoiceChat");
 	static const LLCachedControl<bool> cmd_line_disable_voice(gSavedSettings, "CmdLineDisableVoice");
-	return enable_voice_chat && !cmd_line_disable_voice;
+	return enable_voice_chat && !cmd_line_disable_voice && !gNonInteractive;
 }
 
 void LLVivoxVoiceClient::setLipSyncEnabled(BOOL enabled)
@@ -6196,7 +6248,7 @@ void LLVivoxVoiceClient::clearSessionHandle(const sessionStatePtr_t session)
 {
     if (session)
     {
-        if (session->mHandle.empty())
+        if (!session->mHandle.empty())
         {
             sessionMap::iterator iter = mSessionsByHandle.find(session->mHandle);
             if (iter != mSessionsByHandle.end())
@@ -6826,7 +6878,7 @@ void LLVivoxVoiceClient::deleteVoiceFont(const LLUUID& id)
 		if (list_iter->second == id)
 		{
 			LL_DEBUGS("VoiceFont") << "Removing " << id << " from the voice font list." << LL_ENDL;
-			mVoiceFontList.erase(list_iter++);
+            list_iter = mVoiceFontList.erase(list_iter);
 			mVoiceFontListDirty = true;
 		}
 		else
@@ -7599,6 +7651,8 @@ void LLVivoxProtocolParser::EndTag(const char *tag)
 			connectorHandle = string;
 		else if (!stricmp("VersionID", tag))
 			versionID = string;
+		else if (!stricmp("Version", tag))
+			mBuildID = string;
 		else if (!stricmp("AccountHandle", tag))
 			accountHandle = string;
 		else if (!stricmp("State", tag))
@@ -7913,7 +7967,8 @@ void LLVivoxProtocolParser::processResponse(std::string tag)
 			// We don't need to process this, but we also shouldn't warn on it, since that confuses people.
 		}
 		else if (!stricmp(eventTypeCstr, "VoiceServiceConnectionStateChangedEvent"))
-		{	// Yet another ignored event
+		{
+			LLVivoxVoiceClient::getInstance()->voiceServiceConnectionStateChangedEvent(statusCode, statusString, mBuildID);
 		}
 		else if (!stricmp(eventTypeCstr, "AudioDeviceHotSwapEvent"))
 		{

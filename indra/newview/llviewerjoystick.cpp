@@ -829,14 +829,14 @@ void LLViewerJoystick::moveObjects(bool reset)
 		}
 				
 		// the selection update could fail, so we won't send 
-		if (LLSelectMgr::getInstanceFast()->selectionMove(v, sDelta[3],sDelta[4],sDelta[5], upd_type))
+		if (LLSelectMgr::getInstance()->selectionMove(v, sDelta[3],sDelta[4],sDelta[5], upd_type))
 		{
 			toggle_send_to_sim = true;
 		}
 	}
 	else if (toggle_send_to_sim)
 	{
-		LLSelectMgr::getInstanceFast()->sendSelectionMove();
+		LLSelectMgr::getInstance()->sendSelectionMove();
 		toggle_send_to_sim = false;
 	}
 }
@@ -1108,12 +1108,12 @@ void LLViewerJoystick::moveFlycam(bool reset)
 		gSavedSettings.getS32("JoystickAxis6")
 	};
 
-	bool in_build_mode = LLToolMgr::getInstanceFast()->inBuildMode();
+	bool in_build_mode = LLToolMgr::getInstance()->inBuildMode();
 	if (reset || mResetFlag)
 	{
-		sFlycamPosition = LLViewerCamera::getInstanceFast()->getOrigin();
-		sFlycamRotation = LLViewerCamera::getInstanceFast()->getQuaternion();
-		sFlycamZoom = LLViewerCamera::getInstanceFast()->getView();
+		sFlycamPosition = LLViewerCamera::getInstance()->getOrigin();
+		sFlycamRotation = LLViewerCamera::getInstance()->getQuaternion();
+		sFlycamZoom = LLViewerCamera::getInstance()->getView();
 		
 		resetDeltas(axis);
 
@@ -1318,7 +1318,7 @@ void LLViewerJoystick::scanJoystick()
 		toggle_flycam = 0;
 	}
 	
-	if (!mOverrideCamera && !(LLToolMgr::getInstanceFast()->inBuildMode() && gSavedSettings.getBOOL("JoystickBuildEnabled")))
+	if (!mOverrideCamera && !(LLToolMgr::getInstance()->inBuildMode() && gSavedSettings.getBOOL("JoystickBuildEnabled")))
 	{
 		moveAvatar();
 	}

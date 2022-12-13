@@ -55,7 +55,9 @@
 #include "llmessagesenderinterface.h"
 
 #include "llstoredmessage.h"
-#include "boost/function.hpp"
+
+#include <boost/signals2/connection.hpp>
+#include <boost/function.hpp>
 #include "llpounceable.h"
 #include "llcoros.h"
 #include LLCOROS_MUTEX_HEADER
@@ -303,11 +305,9 @@ class LLMessageSystem : public LLMessageSenderInterface
 	typedef std::map<const char *, LLMessageTemplate*> message_template_name_map_t;
 	typedef std::map<U32, LLMessageTemplate*> message_template_number_map_t;
 
-private:
 	message_template_name_map_t		mMessageTemplates;
 	message_template_number_map_t	mMessageNumbers;
 
-public:
 	S32					mSystemVersionMajor;
 	S32					mSystemVersionMinor;
 	S32					mSystemVersionPatch;
@@ -380,14 +380,20 @@ public:
 
 
 	// methods for building, sending, receiving, and handling messages
-	void	setHandlerFuncFast(const char *name, void (*handler_func)(LLMessageSystem *msgsystem, void **user_data), void **user_data = NULL);
-	void	setHandlerFunc(const char *name, void (*handler_func)(LLMessageSystem *msgsystem, void **user_data), void **user_data = NULL)
+	void	setHandlerFuncFast(const char *name, void (*handler_func)(LLMessageSystem *msgsystem, void **user_data), void **user_data = nullptr);
+	void	setHandlerFunc(const char *name, void (*handler_func)(LLMessageSystem *msgsystem, void **user_data), void **user_data = nullptr)
 	{
 		setHandlerFuncFast(LLMessageStringTable::getInstance()->getString(name), handler_func, user_data);
 	}
 
+	void addHandlerFuncFast(const char *name, std::function<void (LLMessageSystem *msgsystem)> handler_slot);
+	void addHandlerFunc(const char *name, std::function<void (LLMessageSystem *msgsystem)> handler_slot)
+	{
+		addHandlerFuncFast(LLMessageStringTable::getInstance()->getString(name), handler_slot);
+	}
+
 	// Set a callback function for a message system exception.
-	void setExceptionFunc(EMessageException exception, msg_exception_callback func, void* data = NULL);
+	void setExceptionFunc(EMessageException exception, msg_exception_callback func, void* data = nullptr);
 	// Call the specified exception func, and return TRUE if a
 	// function was found and called. Otherwise return FALSE.
 	BOOL callExceptionFunc(EMessageException exception);
@@ -396,7 +402,7 @@ public:
 	// hashed message name and the time spent in the processing handler function
 	// measured in seconds.  JC
 	typedef void (*msg_timing_callback)(const char* hashed_name, F32 time, void* data);
-	void setTimingFunc(msg_timing_callback func, void* data = NULL);
+	void setTimingFunc(msg_timing_callback func, void* data = nullptr);
 	msg_timing_callback getTimingCallback() 
 	{ 
 		return mTimingCallback; 
@@ -414,7 +420,8 @@ public:
 	bool addCircuitCode(U32 code, const LLUUID& session_id);
 
 	BOOL	poll(F32 seconds); // Number of seconds that we want to block waiting for data, returns if data was received
-	BOOL	checkMessages(LockMessageChecker&, S64 frame_count = 0 );
+	BOOL	checkMessages(LockMessageChecker&, S64 frame_count = 0, 
+	                      bool faked_message = false, U8 fake_buffer[MAX_BUFFER_SIZE] = nullptr, LLHost fake_host = LLHost(), S32 fake_size = 0);
 	void	processAcks(LockMessageChecker&, F32 collect_time = 0.f);
 
 	BOOL	isMessageFast(const char *msg);
@@ -658,6 +665,7 @@ public:
 	void getCircuitInfo(LLSD& info) const;
 
 	U32 getOurCircuitCode();
+	LLCircuit* getCircuit();
 	
 	void	enableCircuit(const LLHost &host, BOOL trusted);
 	void	disableCircuit(const LLHost &host);
@@ -686,7 +694,7 @@ public:
 	bool isUntrustedMessage(const std::string& name) const;
 
 	// Mark an interface ineligible for trust
-	void setUntrustedInterface( const LLHost host ) { mUntrustedInterface = host; }
+	void setUntrustedInterface( const LLHost& host ) { mUntrustedInterface = host; }
 	LLHost getUntrustedInterface() const { return mUntrustedInterface; }
 	void setBlockUntrustedInterface( bool block ) { mBlockUntrustedInterface = block; } // Throw a switch to allow, sending warnings only
 	bool getBlockUntrustedInterface() const { return mBlockUntrustedInterface; }
@@ -847,12 +855,11 @@ private:
 	void		logValidMsg(LLCircuitData *cdp, const LLHost& sender, BOOL recv_reliable, BOOL recv_resent, BOOL recv_acks );
 	void		logRanOffEndOfPacket( const LLHost& sender );
 
-	class LLMessageCountInfo
+	struct LLMessageCountInfo
 	{
-	public:
-		U32 mMessageNum;
-		U32 mMessageBytes;
-		BOOL mInvalid;
+		U32 mMessageNum = 0;
+		U32 mMessageBytes = 0;
+		bool mInvalid = false;
 	};
 
 	LLMessagePollInfo						*mPollInfop;
@@ -868,7 +875,7 @@ private:
 
 	F64Seconds										mResendDumpTime; // The last time we dumped resends
 
-	LLMessageCountInfo mMessageCountList[MAX_MESSAGE_COUNT_NUM];
+	std::array<LLMessageCountInfo, MAX_MESSAGE_COUNT_NUM> mMessageCountList;
 	S32 mNumMessageCounts;
 	F32Seconds mReceiveTime;
 	F32Seconds mMaxMessageTime; // Max number of seconds for processing messages
@@ -898,6 +905,7 @@ private:
 	S32 mIncomingCompressedSize;		// original size of compressed msg (0 if uncomp.)
 	TPACKETID mCurrentRecvPacketID;       // packet ID of current receive packet (for reporting)
 
+public:
 	LLMessageBuilder* mMessageBuilder;
 	LLTemplateMessageBuilder* mTemplateMessageBuilder;
 	LLSDMessageBuilder* mLLSDMessageBuilder;
@@ -905,6 +913,7 @@ private:
 	LLTemplateMessageReader* mTemplateMessageReader;
 	LLSDMessageReader* mLLSDMessageReader;
 
+private:
 	friend class LLMessageHandlerBridge;
 	friend class LockMessageChecker;
 

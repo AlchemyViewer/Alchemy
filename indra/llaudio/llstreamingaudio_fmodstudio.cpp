@@ -573,7 +573,7 @@ FMOD::Channel *LLAudioStreamManagerFMODSTUDIO::startStream()
 {
 	// We need a live and opened stream before we try and play it.
 	FMOD_OPENSTATE open_state;
-	if (getOpenState(open_state) != FMOD_OK || open_state != FMOD_OPENSTATE_READY)
+	if (!mInternetStream  || (getOpenState(open_state) != FMOD_OK || open_state != FMOD_OPENSTATE_READY))
 	{
         LL_WARNS("FMOD") << "No internet stream to start playing!" << LL_ENDL;
 		return nullptr;

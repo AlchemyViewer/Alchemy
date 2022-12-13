@@ -202,7 +202,9 @@ extern const std::string HTTP_IN_HEADER_X_FORWARDED_FOR;
 
 extern const std::string HTTP_CONTENT_LLSD_XML;
 extern const std::string HTTP_CONTENT_OCTET_STREAM;
+extern const std::string HTTP_CONTENT_OGG_STREAM;
 extern const std::string HTTP_CONTENT_VND_LL_MESH;
+extern const std::string HTTP_CONTENT_VND_LL_ANIMATION;
 extern const std::string HTTP_CONTENT_XML;
 extern const std::string HTTP_CONTENT_JSON;
 extern const std::string HTTP_CONTENT_TEXT_HTML;

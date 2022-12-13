@@ -75,7 +75,7 @@ LLSprite::~LLSprite()
 
 void LLSprite::updateFace(LLFace &face)
 {
-	LLViewerCamera &camera = *LLViewerCamera::getInstanceFast();
+	LLViewerCamera &camera = *LLViewerCamera::getInstance();
 
 	// First, figure out how many vertices/indices we need.
 	U32 num_vertices, num_indices;
@@ -190,7 +190,7 @@ void LLSprite::updateFace(LLFace &face)
 	{	
 		LLVertexBuffer* buff = new LLVertexBuffer(LLVertexBuffer::MAP_VERTEX | 
 												LLVertexBuffer::MAP_TEXCOORD0,
-												GL_STREAM_DRAW);
+												GL_STREAM_DRAW_ARB);
 		buff->allocateBuffer(4, 12, TRUE);
 		face.setGeomIndex(0);
 		face.setIndicesIndex(0);

@@ -109,6 +109,7 @@ LLFloaterAvatarPicker::LLFloaterAvatarPicker(const LLSD& key)
 	mNumResultsReturned(0),
 	mNearMeListComplete(FALSE),
 	mCloseOnSelect(FALSE),
+    mExcludeAgentFromSearchResults(FALSE),
     mContextConeOpacity	(0.f),
     mContextConeInAlpha(0.f),
     mContextConeOutAlpha(0.f),
@@ -315,11 +316,11 @@ void LLFloaterAvatarPicker::populateNearMe()
 	near_me_scroller->deleteAllItems();
 
 	uuid_vec_t avatar_ids;
-	LLWorld::getInstanceFast()->getAvatars(&avatar_ids, NULL, gAgent.getPositionGlobal(), ALControlCache::NearMeRange);
+	LLWorld::getInstance()->getAvatars(&avatar_ids, NULL, gAgent.getPositionGlobal(), ALControlCache::NearMeRange);
 	for(U32 i=0; i<avatar_ids.size(); i++)
 	{
 		LLUUID& av = avatar_ids[i];
-		if(av == gAgent.getID()) continue;
+		if(mExcludeAgentFromSearchResults && (av == gAgent.getID())) continue;
 		LLSD element;
 		element["id"] = av; // value
 		LLAvatarName av_name;

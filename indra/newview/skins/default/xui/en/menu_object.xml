@@ -102,9 +102,7 @@
 		  <menu_item_call.on_click
 			  function="Object.AlchemyExplode" />
 		  <menu_item_call.on_enable
-			  function="Alchemy.PowerfulWizard" />
-		  <menu_item_call.on_visible
-			  function="Alchemy.PowerfulWizard" />
+			  function="Alchemy.PowerfulWizardObject" />
 	  </menu_item_call>
 	  <menu_item_call
 		  label="Destroy"
@@ -112,9 +110,7 @@
 		  <menu_item_call.on_click
 			  function="Object.AlchemyDestroy" />
 		  <menu_item_call.on_enable
-			  function="Alchemy.PowerfulWizard" />
-		  <menu_item_call.on_visible
-			  function="Alchemy.PowerfulWizard" />
+			  function="Alchemy.PowerfulWizardObject" />
 	  </menu_item_call>
 	  <menu_item_call
 		  label="Force Delete"
@@ -122,9 +118,7 @@
 		  <menu_item_call.on_click
 			  function="Object.AlchemyForceDelete" />
 		  <menu_item_call.on_enable
-			  function="Alchemy.PowerfulWizard" />
-		  <menu_item_call.on_visible
-			  function="Alchemy.PowerfulWizard" />
+			  function="Alchemy.PowerfulWizardObject" />
 	  </menu_item_call>
   </context_menu>
   <menu_item_call
@@ -167,6 +161,12 @@
       name="Zoom In">
     <menu_item_call.on_click
         function="Object.ZoomIn" />
+  </menu_item_call>
+  <menu_item_call
+    label="Refresh Textures"
+    name="RefreshTextures">
+     <menu_item_call.on_click
+      function="Object.RefreshTexture" />
   </menu_item_call>
   <menu_item_call
       label="Show in linksets"

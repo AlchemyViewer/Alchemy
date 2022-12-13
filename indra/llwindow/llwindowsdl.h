@@ -30,6 +30,11 @@
 // Simple Directmedia Layer (http://libsdl.org/) implementation of LLWindow class
 
 #include "llwindow.h"
+
+#if LL_WINDOWS
+#include "llwin32headers.h"
+#endif
+
 #include "lltimer.h"
 #include "llpreeditor.h"
 
@@ -70,9 +75,12 @@ public:
 	/*virtual*/ BOOL setPosition(LLCoordScreen position) override;
 	/*virtual*/ BOOL setSizeImpl(LLCoordScreen size) override;
 	/*virtual*/ BOOL setSizeImpl(LLCoordWindow size) override;
-	/*virtual*/ BOOL switchContext(BOOL fullscreen, const LLCoordScreen &size, BOOL disable_vsync, const LLCoordScreen * const posp = NULL) override;
+	/*virtual*/ BOOL switchContext(BOOL fullscreen, const LLCoordScreen &size, BOOL enable_vsync, const LLCoordScreen * const posp = NULL) override;
 	/*virtual*/ BOOL setCursorPosition(LLCoordWindow position) override;
 	/*virtual*/ BOOL getCursorPosition(LLCoordWindow *position) override;
+#if LL_WINDOWS
+    /*virtual*/ BOOL getCursorDelta(LLCoordCommon* delta) override { return FALSE; }
+#endif
 	/*virtual*/ void showCursor() override;
 	/*virtual*/ void hideCursor() override;
 	/*virtual*/ void showCursorFromMouseMove() override;
@@ -91,7 +99,11 @@ public:
 	/*virtual*/ BOOL isPrimaryTextAvailable() override;
 	/*virtual*/ BOOL pasteTextFromPrimary(LLWString &dst) override;
 	/*virtual*/ BOOL copyTextToPrimary(const LLWString & src) override;
-	/*virtual*/ void setWindowTitle(const std::string& title) override;
+	/*virtual*/ void setTitle(const std::string title) override;
+    void* createSharedContext() override;
+    void makeContextCurrent(void* context) override;
+    void destroySharedContext(void* context) override;
+    /*virtual*/ void toggleVSync(bool enable_vsync) override;
 	/*virtual*/ void flashIcon(F32 seconds) override;
 	/*virtual*/ F32 getGamma() override;
 	/*virtual*/ BOOL setGamma(const F32 gamma) override; // Set the gamma
@@ -134,6 +146,8 @@ public:
 	
 	static std::vector<std::string> getDynamicFallbackFontList();
 
+	SDL_Window* getSDLWindow() { return mWindow; }
+
 	// Not great that these are public, but they have to be accessible
 	// by non-class code and it's better than making them global.
 #if LL_X11
@@ -153,7 +167,7 @@ public:
 
 protected:
 	LLWindowSDL(LLWindowCallbacks* callbacks,
-		const std::string& title, int x, int y, int width, int height, U32 flags,
+		const std::string& title, const std::string& name, int x, int y, int width, int height, U32 flags,
 		BOOL fullscreen, BOOL clearBg, BOOL disable_vsync, BOOL use_gl,
 		BOOL ignore_pixel_depth, U32 fsaa_samples);
 	~LLWindowSDL();
@@ -184,6 +198,8 @@ protected:
 	U32 SDLCheckGrabbyKeys(SDL_Keycode keysym, BOOL gain);
 	BOOL SDLReallyCaptureInput(BOOL capture);
 
+	void setIcon();
+
 	//
 	// Platform specific variables
 	//
@@ -206,6 +222,10 @@ protected:
 
 	friend class LLWindowManager;
 
+#if LL_WINDOWS
+	HICON mWinWindowIcon;
+#endif
+
 private:
 	BOOL mFlashing;
 	LLTimer mFlashTimer;
@@ -213,6 +233,11 @@ private:
 	U32 mKeyScanCode;
 	U32 mKeyVirtualKey;
 	SDL_Keymod mKeyModifiers;
+#if LL_WINDOWS
+	U32				mRawMsg;
+	U32				mRawWParam;
+	U32				mRawLParam;
+#endif
 
 	bool			mLanguageTextInputAllowed;
 	LLPreeditor*	mPreeditor;
@@ -228,6 +253,10 @@ public:
 	/*virtual*/ void showImpl() override;
 	/*virtual*/ void updateImpl(const std::string& mesg) override;
 	/*virtual*/ void hideImpl() override;
+private:
+#if LL_WINDOWS
+		HWND mWindow;
+#endif
 };
 
 S32 OSMessageBoxSDL(const std::string& text, const std::string& caption, U32 type);

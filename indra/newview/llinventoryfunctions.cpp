@@ -927,6 +927,9 @@ LLUUID create_folder_for_item(LLInventoryItem* item, const LLUUID& destFolderId)
 S32 depth_nesting_in_marketplace(LLUUID cur_uuid)
 {
     // Get the marketplace listings root, exit with -1 (i.e. not under the marketplace listings root) if none
+    // Todo: findCategoryUUIDForType is somewhat expensive with large
+    // flat root folders yet we use depth_nesting_in_marketplace at
+    // every turn, find a way to correctly cache this id.
     const LLUUID marketplace_listings_uuid = gInventory.findCategoryUUIDForType(LLFolderType::FT_MARKETPLACE_LISTINGS, false);
     if (marketplace_listings_uuid.isNull())
     {
@@ -1566,7 +1569,12 @@ void dump_trace(std::string& message, S32 depth, LLError::ELevel log_level)
 // This function does no deletion of listings but a mere audit and raises issues to the user (through the
 // optional callback cb). It also returns a boolean, true if things validate, false if issues are raised.
 // The only inventory changes that are done is to move and sort folders containing no-copy items to stock folders.
-bool validate_marketplacelistings(LLInventoryCategory* cat, validation_callback_t cb, bool fix_hierarchy, S32 depth)
+bool validate_marketplacelistings(
+    LLInventoryCategory* cat,
+    validation_callback_t cb,
+    bool fix_hierarchy,
+    S32 depth,
+    bool notify_observers)
 {
 #if 0
     // Used only for debug
@@ -1632,7 +1640,7 @@ bool validate_marketplacelistings(LLInventoryCategory* cat, validation_callback_
             LLUUID folder_uuid = gInventory.createNewCategory(parent_uuid, LLFolderType::FT_NONE, cat->getName());
             LLInventoryCategory* new_cat = gInventory.getCategory(folder_uuid);
             gInventory.changeCategoryParent(viewer_cat, folder_uuid, false);
-            result &= validate_marketplacelistings(new_cat, cb, fix_hierarchy, depth + 1);
+            result &= validate_marketplacelistings(new_cat, cb, fix_hierarchy, depth + 1, notify_observers);
             return result;
         }
         else
@@ -1802,7 +1810,10 @@ bool validate_marketplacelistings(LLInventoryCategory* cat, validation_callback_
                     // Next type
                     update_marketplace_category(parent_uuid);
                     update_marketplace_category(folder_uuid);
-                    gInventory.notifyObservers();
+                    if (notify_observers)
+                    {
+                        gInventory.notifyObservers();
+                    }
                     items_vector_it++;
                 }
             }
@@ -1816,7 +1827,7 @@ bool validate_marketplacelistings(LLInventoryCategory* cat, validation_callback_
                 {
                     LLViewerInventoryCategory * viewer_cat = (LLViewerInventoryCategory *) (*iter);
                     gInventory.changeCategoryParent(viewer_cat, parent_uuid, false);
-                    result &= validate_marketplacelistings(viewer_cat, cb, fix_hierarchy, depth);
+                    result &= validate_marketplacelistings(viewer_cat, cb, fix_hierarchy, depth, false);
                 }
             }
         }
@@ -1888,7 +1899,10 @@ bool validate_marketplacelistings(LLInventoryCategory* cat, validation_callback_
                 cb(message,depth,LLError::LEVEL_WARN);
             }
             gInventory.removeCategory(cat->getUUID());
-            gInventory.notifyObservers();
+            if (notify_observers)
+            {
+                gInventory.notifyObservers();
+            }
             return result && !has_bad_items;
         }
     }
@@ -1902,11 +1916,14 @@ bool validate_marketplacelistings(LLInventoryCategory* cat, validation_callback_
 	for (LLInventoryModel::cat_array_t::iterator iter = cat_array_copy.begin(); iter != cat_array_copy.end(); iter++)
 	{
 		LLInventoryCategory* category = *iter;
-		result &= validate_marketplacelistings(category, cb, fix_hierarchy, depth + 1);
+		result &= validate_marketplacelistings(category, cb, fix_hierarchy, depth + 1, false);
 	}
     
     update_marketplace_category(cat->getUUID(), true, true);
-    gInventory.notifyObservers();
+    if (notify_observers)
+    {
+        gInventory.notifyObservers();
+    }
     return result && !has_bad_items;
 }
 
@@ -1928,6 +1945,86 @@ void change_item_parent(const LLUUID& item_id, const LLUUID& new_parent_id)
 		gInventory.updateItem(new_item);
 		gInventory.notifyObservers();
 	}
+}
+
+void move_items_to_folder(const LLUUID& new_cat_uuid, const uuid_vec_t& selected_uuids)
+{
+    for (uuid_vec_t::const_iterator it = selected_uuids.begin(); it != selected_uuids.end(); ++it)
+    {
+        LLInventoryItem* inv_item = gInventory.getItem(*it);
+        if (inv_item)
+        {
+            change_item_parent(*it, new_cat_uuid);
+        }
+        else
+        {
+            LLInventoryCategory* inv_cat = gInventory.getCategory(*it);
+            if (inv_cat && !LLFolderType::lookupIsProtectedType(inv_cat->getPreferredType()))
+            {
+                gInventory.changeCategoryParent((LLViewerInventoryCategory*)inv_cat, new_cat_uuid, false);
+            }
+        }
+    }
+
+    LLFloater* floater_inventory = LLFloaterReg::getInstance("inventory");
+    if (!floater_inventory)
+    {
+        LL_WARNS() << "Could not find My Inventory floater" << LL_ENDL;
+        return;
+    }
+    LLSidepanelInventory *sidepanel_inventory =	LLFloaterSidePanelContainer::getPanel<LLSidepanelInventory>("inventory");
+    if (sidepanel_inventory)
+    {
+        if (sidepanel_inventory->getActivePanel())
+        {
+            sidepanel_inventory->getActivePanel()->setSelection(new_cat_uuid, TAKE_FOCUS_YES);
+            LLFolderViewItem* fv_folder = sidepanel_inventory->getActivePanel()->getItemByID(new_cat_uuid);
+            if (fv_folder)
+            {
+                fv_folder->setOpen(TRUE);
+            }
+        }
+    }
+}
+
+bool is_only_cats_selected(const uuid_vec_t& selected_uuids)
+{
+    for (uuid_vec_t::const_iterator it = selected_uuids.begin(); it != selected_uuids.end(); ++it)
+    {
+        LLInventoryCategory* inv_cat = gInventory.getCategory(*it);
+        if (!inv_cat)
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
+bool is_only_items_selected(const uuid_vec_t& selected_uuids)
+{
+    for (uuid_vec_t::const_iterator it = selected_uuids.begin(); it != selected_uuids.end(); ++it)
+    {
+        LLViewerInventoryItem* inv_item = gInventory.getItem(*it);
+        if (!inv_item)
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
+
+void move_items_to_new_subfolder(const uuid_vec_t& selected_uuids, const std::string& folder_name)
+{
+    LLInventoryObject* first_item = gInventory.getObject(*selected_uuids.begin());
+    if (!first_item)
+    {
+        return;
+    }
+
+    inventory_func_type func = boost::bind(&move_items_to_folder, _1, selected_uuids);
+    gInventory.createNewCategory(first_item->getParentUUID(), LLFolderType::FT_NONE, folder_name, func);
+
 }
 
 ///----------------------------------------------------------------------------
@@ -2565,8 +2662,62 @@ void LLInventoryAction::doToSelected(LLInventoryModel* model, LLFolderView* root
 	}
 
 	std::set<LLUUID> selected_uuid_set = LLAvatarActions::getInventorySelectedUUIDs();
+
+    // copy list of applicable items into a vector for bulk handling
     uuid_vec_t ids;
-    std::copy(selected_uuid_set.begin(), selected_uuid_set.end(), std::back_inserter(ids));
+    if (action == "wear" || action == "wear_add")
+    {
+        const LLUUID trash_id = gInventory.findCategoryUUIDForType(LLFolderType::FT_TRASH);
+        const LLUUID mp_id = gInventory.findCategoryUUIDForType(LLFolderType::FT_MARKETPLACE_LISTINGS, false);
+        std::copy_if(selected_uuid_set.begin(),
+            selected_uuid_set.end(),
+            std::back_inserter(ids),
+            [trash_id, mp_id](LLUUID id)
+        {
+            if (get_is_item_worn(id)
+                || LLAppearanceMgr::instance().getIsInCOF(id)
+                || gInventory.isObjectDescendentOf(id, trash_id))
+            {
+                return false;
+            }
+            if (mp_id.notNull() && gInventory.isObjectDescendentOf(id, mp_id))
+            {
+                return false;
+            }
+            LLInventoryObject* obj = (LLInventoryObject*)gInventory.getObject(id);
+            if (!obj)
+            {
+                return false;
+            }
+            if (obj->getIsLinkType() && gInventory.isObjectDescendentOf(obj->getLinkedUUID(), trash_id))
+            {
+                return false;
+            }
+            if (obj->getIsLinkType() && LLAssetType::lookupIsLinkType(obj->getType()))
+            {
+                // missing
+                return false;
+            }
+            return true;
+        }
+        );
+    }
+    else if (isRemoveAction(action))
+    {
+        std::copy_if(selected_uuid_set.begin(),
+            selected_uuid_set.end(),
+            std::back_inserter(ids),
+            [](LLUUID id)
+        {
+            return get_is_item_worn(id);
+        }
+        );
+    }
+    else
+    {
+        std::copy(selected_uuid_set.begin(), selected_uuid_set.end(), std::back_inserter(ids));
+    }
+
     // Check for actions that get handled in bulk
     if (action == "wear")
     {
@@ -2583,6 +2734,81 @@ void LLInventoryAction::doToSelected(LLInventoryModel* model, LLFolderView* root
     else if ("save_selected_as" == action)
     {
         (new LLDirPickerThread(boost::bind(&LLInventoryAction::saveMultipleTextures, _1, selected_items, model), std::string()))->getFile();
+    }
+    else if ("new_folder_from_selected" == action)
+    {
+
+        LLInventoryObject* first_item = gInventory.getObject(*ids.begin());
+        if (!first_item)
+        {
+            return;
+        }
+        const LLUUID& parent_uuid = first_item->getParentUUID();
+        for (uuid_vec_t::const_iterator it = ids.begin(); it != ids.end(); ++it)
+        {
+            LLInventoryObject *item = gInventory.getObject(*it);
+            if (!item || item->getParentUUID() != parent_uuid)
+            {
+                LLNotificationsUtil::add("SameFolderRequired");
+                return;
+            }
+        }
+        
+        LLSD args;
+        args["DESC"] = LLTrans::getString("New Folder");
+ 
+        LLNotificationsUtil::add("CreateSubfolder", args, LLSD(),
+            [ids](const LLSD& notification, const LLSD& response)
+        {
+            S32 opt = LLNotificationsUtil::getSelectedOption(notification, response);
+            if (opt == 0)
+            {
+                std::string settings_name = response["message"].asString();
+
+                LLInventoryObject::correctInventoryName(settings_name);
+                if (settings_name.empty())
+                {
+                    settings_name = LLTrans::getString("New Folder");
+                }
+                move_items_to_new_subfolder(ids, settings_name);
+            }
+        });
+    }
+    else if ("ungroup_folder_items" == action)
+    {
+        if (selected_uuid_set.size() == 1)
+        {
+            LLInventoryCategory* inv_cat = gInventory.getCategory(*ids.begin());
+            if (!inv_cat || LLFolderType::lookupIsProtectedType(inv_cat->getPreferredType()))
+            {
+                return;
+            }
+            const LLUUID &new_cat_uuid = inv_cat->getParentUUID();
+            LLInventoryModel::cat_array_t* cat_array;
+            LLInventoryModel::item_array_t* item_array;
+            gInventory.getDirectDescendentsOf(inv_cat->getUUID(), cat_array, item_array);
+            LLInventoryModel::cat_array_t cats = *cat_array;
+            LLInventoryModel::item_array_t items = *item_array;
+
+            for (LLInventoryModel::cat_array_t::const_iterator cat_iter = cats.begin(); cat_iter != cats.end(); ++cat_iter)
+            {
+                LLViewerInventoryCategory* cat = *cat_iter;
+                if (cat)
+                {
+                    gInventory.changeCategoryParent(cat, new_cat_uuid, false);
+                }
+            }
+            for (LLInventoryModel::item_array_t::const_iterator item_iter = items.begin(); item_iter != items.end(); ++item_iter)
+            {
+                LLViewerInventoryItem* item = *item_iter;
+                if(item)
+                {
+                    gInventory.changeItemParent(item, new_cat_uuid, false);
+                }
+            }
+            gInventory.removeCategory(inv_cat->getUUID());
+            gInventory.notifyObservers();
+        }
     }
     else
     {

@@ -202,11 +202,6 @@ std::string LLGridManager::getGridId(const std::string& grid) const
     return std::string();
 }
 
-//LLPointer<LLSecAPIHandler> getSecHandler(const std::string& handler_type)
-//{
-//    return nullptr;
-//}
-
 //-----------------------------------------------------------------------------
 #include "../llviewercontrol.h"
 LLControlGroup gSavedSettings("Global");
@@ -239,6 +234,7 @@ bool llHashedUniqueID(unsigned char* id)
 #include "../llappviewer.h"
 void LLAppViewer::forceQuit(void) {}
 bool LLAppViewer::isUpdaterMissing() { return true; }
+bool LLAppViewer::waitForUpdater() { return false; }
 LLAppViewer * LLAppViewer::sInstance = 0;
 
 //-----------------------------------------------------------------------------

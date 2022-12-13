@@ -37,6 +37,7 @@
 #include "llgesturemgr.h"
 #include "llinventorybridge.h"
 #include "llinventoryfunctions.h"
+#include "llinventorymodelbackgroundfetch.h"
 #include "llinventoryobserver.h"
 #include "llinventorypanel.h"
 #include "lllocaltextureobject.h"
@@ -1413,7 +1414,7 @@ void LLAgentWearables::setWearableOutfit(const LLInventoryItem::item_array_t& it
 	}
 
 	// updating inventory
-    LLWearableType* wearable_type_inst = LLWearableType::getInstanceFast();
+    LLWearableType* wearable_type_inst = LLWearableType::getInstance();
 
 	// TODO: Removed check for ensuring that teens don't remove undershirt and underwear. Handle later
 	// note: shirt is the first non-body part wearable item. Update if wearable order changes.
@@ -2082,6 +2083,14 @@ void LLAgentWearables::editWearable(const LLUUID& item_id)
 		return;
 	}
 
+    if (!item->isFinished())
+    {
+        LL_WARNS() << "Tried to edit wearable that isn't loaded" << LL_ENDL;
+        // Restart fetch or put item to the front
+        LLInventoryModelBackgroundFetch::instance().start(item->getUUID(), false);
+        return;
+    }
+
 	LLViewerWearable* wearable = gAgentWearables.getWearableFromItemID(item_id);
 	if (!wearable)
 	{
@@ -2095,7 +2104,19 @@ void LLAgentWearables::editWearable(const LLUUID& item_id)
 		return;
 	}
 
-	const BOOL disable_camera_switch = LLWearableType::getInstanceFast()->getDisableCameraSwitch(wearable->getType());
+    S32 shape_count = gAgentWearables.getWearableCount(LLWearableType::WT_SHAPE);
+    S32 hair_count = gAgentWearables.getWearableCount(LLWearableType::WT_HAIR);
+    S32 eye_count = gAgentWearables.getWearableCount(LLWearableType::WT_EYES);
+    S32 skin_count = gAgentWearables.getWearableCount(LLWearableType::WT_SKIN);
+    if (!shape_count || !hair_count || !eye_count || !skin_count)
+    {
+        // Don't let user edit wearables if avatar is cloud due to missing parts.
+        // Let user edit wearables if avatar is cloud due to missing textures.
+        LL_WARNS() << "Cannot modify wearable. Avatar is cloud and missing parts." << LL_ENDL;
+        return;
+    }
+
+	const BOOL disable_camera_switch = LLWearableType::getInstance()->getDisableCameraSwitch(wearable->getType());
 	LLPanel* panel = LLFloaterSidePanelContainer::getPanel("appearance");
 	LLSidepanelAppearance::editWearable(wearable, panel, disable_camera_switch);
 }

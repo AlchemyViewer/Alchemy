@@ -1048,7 +1048,8 @@ void LLTextureCache::setReadOnly(BOOL read_only)
 	mReadOnly = read_only ;
 }
 
-//called in the main thread.
+// Called in the main thread.
+// Returns the unused amount of max_size if any
 S64 LLTextureCache::initCache(ELLPath location, S64 max_size, BOOL texture_cache_mismatch)
 {
 	llassert_always(getPending() == 0) ; //should not start accessing the texture cache before initialized.
@@ -1652,6 +1653,12 @@ void LLTextureCache::purgeAllTextures(bool purge_directories)
 			{
 				gDirUtilp->deleteFilesInDir(dirname, mask);
 			}
+#if LL_WINDOWS
+            // Texture cache can be large and can take a while to remove
+            // assure OS that processes is alive and not hanging
+            MSG msg;
+            PeekMessage(&msg, 0, 0, 0, PM_NOREMOVE | PM_NOYIELD);
+#endif
 		}
 		gDirUtilp->deleteFilesInDir(mTexturesDirName, mask); // headers, fast cache
 		if (purge_directories)

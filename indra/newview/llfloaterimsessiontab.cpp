@@ -254,7 +254,6 @@ BOOL LLFloaterIMSessionTab::postBuild()
 	mGearBtn = getChild<LLButton>("gear_btn");
     mAddBtn = getChild<LLButton>("add_btn");
 	mVoiceButton = getChild<LLButton>("voice_call_btn");
-    mTranslationCheckBox = getChild<LLUICtrl>("translate_chat_checkbox_lp");
     
 	mParticipantListPanel = getChild<LLLayoutPanel>("speakers_list_panel");
 	mRightPartPanel = getChild<LLLayoutPanel>("right_part_holder");
@@ -553,7 +552,7 @@ void LLFloaterIMSessionTab::removeConversationViewParticipant(const LLUUID& part
 void LLFloaterIMSessionTab::updateConversationViewParticipant(const LLUUID& participant_id)
 {
 	LLFolderViewItem* widget = get_ptr_in_map(mConversationsWidgets,participant_id);
-	if (widget)
+	if (widget && widget->getViewModelItem())
 	{
 		widget->refresh();
 	}
@@ -578,8 +577,11 @@ void LLFloaterIMSessionTab::refreshConversation()
 		{
 			participants_uuids.push_back(widget_it->first);
 		}
-		widget_it->second->refresh();
-		widget_it->second->setVisible(TRUE);
+        if (widget_it->second->getViewModelItem())
+        {
+            widget_it->second->refresh();
+            widget_it->second->setVisible(TRUE);
+        }
 		++widget_it;
 	}
 	if (is_ad_hoc || mIsP2PChat)
@@ -810,8 +812,6 @@ void LLFloaterIMSessionTab::updateHeaderAndToolbar()
 	mCloseBtn->setVisible(is_not_torn_off && !mIsNearbyChat);
 
 	enableDisableCallBtn();
-
-	showTranslationCheckbox();
 }
  
 void LLFloaterIMSessionTab::forceReshape()
@@ -826,11 +826,6 @@ void LLFloaterIMSessionTab::forceReshape()
 void LLFloaterIMSessionTab::reshapeChatLayoutPanel()
 {
 	mChatLayoutPanel->reshape(mChatLayoutPanel->getRect().getWidth(), mInputEditor->getRect().getHeight() + mInputEditorPad, FALSE);
-}
-
-void LLFloaterIMSessionTab::showTranslationCheckbox(BOOL show)
-{
-	mTranslationCheckBox->setVisible(mIsNearbyChat && show);
 }
 
 // static
@@ -1149,7 +1144,10 @@ void LLFloaterIMSessionTab::getSelectedUUIDs(uuid_vec_t& selected_uuids)
     for (; it != it_end; ++it)
     {
         LLConversationItem* conversation_item = static_cast<LLConversationItem *>((*it)->getViewModelItem());
-        selected_uuids.push_back(conversation_item->getUUID());
+        if (conversation_item)
+        {
+            selected_uuids.push_back(conversation_item->getUUID());
+        }
     }
 }
 
@@ -1179,6 +1177,26 @@ void LLFloaterIMSessionTab::saveCollapsedState()
 LLView* LLFloaterIMSessionTab::getChatHistory()
 {
 	return mChatHistory;
+}
+
+// virtual
+void LLFloaterIMSessionTab::applyMUPose(std::string& text)
+{
+	if (text.at(0) == ':'
+		&& text.length() > 3)
+	{
+		if (text.find(":'") == 0)
+		{
+			text.replace(0, 1, "/me");
+ 		}
+		// Account for emotes and smilies
+		else if (!isdigit(text.at(1))
+				 && !ispunct(text.at(1))
+				 && !isspace(text.at(1)))
+		{
+			text.replace(0, 1, "/me ");
+		}
+	}
 }
 
 BOOL LLFloaterIMSessionTab::handleKeyHere(KEY key, MASK mask )

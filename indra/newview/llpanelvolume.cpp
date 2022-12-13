@@ -51,6 +51,7 @@
 #include "llfocusmgr.h"
 #include "llmanipscale.h"
 #include "llinventorymodel.h"
+#include "llmenubutton.h"
 #include "llpreviewscript.h"
 #include "llresmgr.h"
 #include "llselectmgr.h"
@@ -199,6 +200,9 @@ BOOL	LLPanelVolume::postBuild()
 		mSpinPhysicsRestitution->setCommitCallback(boost::bind(&LLPanelVolume::sendPhysicsRestitution, this, _1, mSpinPhysicsRestitution));
 	}
 
+    mMenuClipboardFeatures = getChild<LLMenuButton>("clipboard_features_params_btn");
+    mMenuClipboardLight = getChild<LLMenuButton>("clipboard_light_params_btn");
+
 	std::map<std::string, std::string> material_name_map;
 	material_name_map["Stone"]= LLTrans::getString("Stone");
 	material_name_map["Metal"]= LLTrans::getString("Metal");	
@@ -239,6 +243,8 @@ LLPanelVolume::LLPanelVolume()
 {
 	setMouseOpaque(FALSE);
 
+    mCommitCallbackRegistrar.add("PanelVolume.menuDoToSelected", boost::bind(&LLPanelVolume::menuDoToSelected, this, _2));
+    mEnableCallbackRegistrar.add("PanelVolume.menuEnable", boost::bind(&LLPanelVolume::menuEnableItem, this, _2));
 }
 
 
@@ -249,11 +255,11 @@ LLPanelVolume::~LLPanelVolume()
 
 void LLPanelVolume::getState( )
 {
-	LLViewerObject* objectp = LLSelectMgr::getInstanceFast()->getSelection()->getFirstRootObject();
+	LLViewerObject* objectp = LLSelectMgr::getInstance()->getSelection()->getFirstRootObject();
 	LLViewerObject* root_objectp = objectp;
 	if(!objectp)
 	{
-		objectp = LLSelectMgr::getInstanceFast()->getSelection()->getFirstObject();
+		objectp = LLSelectMgr::getInstance()->getSelection()->getFirstObject();
 		// *FIX: shouldn't we just keep the child?
 		if (objectp)
 		{
@@ -297,14 +303,14 @@ void LLPanelVolume::getState( )
 
 	LLUUID owner_id;
 	std::string owner_name;
-	LLSelectMgr::getInstanceFast()->selectGetOwner(owner_id, owner_name);
+	LLSelectMgr::getInstance()->selectGetOwner(owner_id, owner_name);
 
 	// BUG? Check for all objects being editable?
 	BOOL editable = root_objectp->permModify() && !root_objectp->isPermanentEnforced();
-	BOOL single_volume = LLSelectMgr::getInstanceFast()->selectionAllPCode( LL_PCODE_VOLUME )
-		&& LLSelectMgr::getInstanceFast()->getSelection()->getObjectCount() == 1;
-    BOOL single_root_volume = LLSelectMgr::getInstanceFast()->selectionAllPCode( LL_PCODE_VOLUME ) && 
-        LLSelectMgr::getInstanceFast()->getSelection()->getRootObjectCount() == 1;
+	BOOL single_volume = LLSelectMgr::getInstance()->selectionAllPCode( LL_PCODE_VOLUME )
+		&& LLSelectMgr::getInstance()->getSelection()->getObjectCount() == 1;
+    BOOL single_root_volume = LLSelectMgr::getInstance()->selectionAllPCode( LL_PCODE_VOLUME ) && 
+        LLSelectMgr::getInstance()->getSelection()->getRootObjectCount() == 1;
 
 	// Select Single Message
 	if (single_volume)
@@ -424,7 +430,6 @@ void LLPanelVolume::getState( )
 			gAgentAvatarp->updateMeshVisibility();
 		}
 	}
-	
 
 	// Flexible properties
 	BOOL is_flexible = volobjp && volobjp->isFlexible();
@@ -501,7 +506,7 @@ void LLPanelVolume::getState( )
 			return object->getMaterial();
 		}
 	} func;
-	bool material_same = LLSelectMgr::getInstanceFast()->getSelection()->getSelectedTEValue( &func, material_code );
+	bool material_same = LLSelectMgr::getInstance()->getSelection()->getSelectedTEValue( &func, material_code );
 	std::string LEGACY_FULLBRIGHT_DESC = LLTrans::getString("Fullbright");
 	if (editable && single_volume && material_same)
 	{
@@ -579,6 +584,9 @@ void LLPanelVolume::getState( )
 
 	mObject = objectp;
 	mRootObject = root_objectp;
+
+    mMenuClipboardFeatures->setEnabled(editable && single_volume && volobjp); // Note: physics doesn't need to be limited by single volume
+    mMenuClipboardLight->setEnabled(editable && single_volume && volobjp);
 }
 
 // static
@@ -601,13 +609,6 @@ void LLPanelVolume::refresh()
 	{
 		mRootObject = NULL;
 	}
-
-	BOOL visible = LLViewerShaderMgr::instance()->getShaderLevel(LLViewerShaderMgr::SHADER_DEFERRED) > 0 ? TRUE : FALSE;
-
-	mLightFOV->setVisible(visible);
-    mLightFocus->setVisible(visible);
-    mLightAmbiance->setVisible(visible);
-	mLightTextureCtrl->setVisible( visible);
 
 	bool enable_mesh = false;
 
@@ -713,7 +714,7 @@ void LLPanelVolume::sendIsFlexible()
 
 		if (objectp->getClickAction() == CLICK_ACTION_SIT)
 		{
-			LLSelectMgr::getInstanceFast()->selectionSetClickAction(CLICK_ACTION_NONE);
+			LLSelectMgr::getInstance()->selectionSetClickAction(CLICK_ACTION_NONE);
 		}
 
 	}
@@ -721,7 +722,7 @@ void LLPanelVolume::sendIsFlexible()
 	if (volobjp->setIsFlexible(is_flexible))
 	{
 		mObject->sendShapeUpdate();
-		LLSelectMgr::getInstanceFast()->selectionUpdatePhantom(volobjp->flagPhantom());
+		LLSelectMgr::getInstance()->selectionUpdatePhantom(volobjp->flagPhantom());
 	}
 
 	LL_INFOS() << "update flexible sent" << LL_ENDL;
@@ -730,7 +731,7 @@ void LLPanelVolume::sendIsFlexible()
 void LLPanelVolume::sendPhysicsShapeType(LLUICtrl* ctrl, void* userdata)
 {
 	U8 type = ctrl->getValue().asInteger();
-	LLSelectMgr::getInstanceFast()->selectionSetPhysicsType(type);
+	LLSelectMgr::getInstance()->selectionSetPhysicsType(type);
 
 	refreshCost();
 }
@@ -738,30 +739,30 @@ void LLPanelVolume::sendPhysicsShapeType(LLUICtrl* ctrl, void* userdata)
 void LLPanelVolume::sendPhysicsGravity(LLUICtrl* ctrl, void* userdata)
 {
 	F32 val = ctrl->getValue().asReal();
-	LLSelectMgr::getInstanceFast()->selectionSetGravity(val);
+	LLSelectMgr::getInstance()->selectionSetGravity(val);
 }
 
 void LLPanelVolume::sendPhysicsFriction(LLUICtrl* ctrl, void* userdata)
 {
 	F32 val = ctrl->getValue().asReal();
-	LLSelectMgr::getInstanceFast()->selectionSetFriction(val);
+	LLSelectMgr::getInstance()->selectionSetFriction(val);
 }
 
 void LLPanelVolume::sendPhysicsRestitution(LLUICtrl* ctrl, void* userdata)
 {
 	F32 val = ctrl->getValue().asReal();
-	LLSelectMgr::getInstanceFast()->selectionSetRestitution(val);
+	LLSelectMgr::getInstance()->selectionSetRestitution(val);
 }
 
 void LLPanelVolume::sendPhysicsDensity(LLUICtrl* ctrl, void* userdata)
 {
 	F32 val = ctrl->getValue().asReal();
-	LLSelectMgr::getInstanceFast()->selectionSetDensity(val);
+	LLSelectMgr::getInstance()->selectionSetDensity(val);
 }
 
 void LLPanelVolume::refreshCost()
 {
-	LLViewerObject* obj = LLSelectMgr::getInstanceFast()->getSelection()->getFirstObject();
+	LLViewerObject* obj = LLSelectMgr::getInstance()->getSelection()->getFirstObject();
 	
 	if (obj)
 	{
@@ -827,6 +828,290 @@ void LLPanelVolume::onLightSelectTexture(const LLSD& data)
 	setLightTextureID(id, mLightTextureCtrl->getImageItemID(), volobjp);
 }
 
+void LLPanelVolume::onCopyFeatures()
+{
+    LLViewerObject* objectp = mObject;
+    if (!objectp)
+    {
+        return;
+    }
+
+    LLSD clipboard;
+
+    LLVOVolume *volobjp = NULL;
+    if (objectp && (objectp->getPCode() == LL_PCODE_VOLUME))
+    {
+        volobjp = (LLVOVolume *)objectp;
+    }
+
+    // Flexi Prim
+    if (volobjp && volobjp->isFlexible())
+    {
+        LLFlexibleObjectData *attributes = (LLFlexibleObjectData *)objectp->getFlexibleObjectData();
+        if (attributes)
+        {
+            clipboard["flex"]["lod"] = attributes->getSimulateLOD();
+            clipboard["flex"]["gav"] = attributes->getGravity();
+            clipboard["flex"]["ten"] = attributes->getTension();
+            clipboard["flex"]["fri"] = attributes->getAirFriction();
+            clipboard["flex"]["sen"] = attributes->getWindSensitivity();
+            LLVector3 force = attributes->getUserForce();
+            clipboard["flex"]["forx"] = force.mV[0];
+            clipboard["flex"]["fory"] = force.mV[1];
+            clipboard["flex"]["forz"] = force.mV[2];
+        }
+    }
+
+    // Physics
+    {
+        clipboard["physics"]["shape"] = objectp->getPhysicsShapeType();
+        clipboard["physics"]["gravity"] = objectp->getPhysicsGravity();
+        clipboard["physics"]["friction"] = objectp->getPhysicsFriction();
+        clipboard["physics"]["density"] = objectp->getPhysicsDensity();
+        clipboard["physics"]["restitution"] = objectp->getPhysicsRestitution();
+
+        U8 material_code = 0;
+        struct f : public LLSelectedTEGetFunctor<U8>
+        {
+            U8 get(LLViewerObject* object, S32 te)
+            {
+                return object->getMaterial();
+            }
+        } func;
+        bool material_same = LLSelectMgr::getInstance()->getSelection()->getSelectedTEValue(&func, material_code);
+        // This should always be true since material should be per object.
+        if (material_same)
+        {
+            clipboard["physics"]["material"] = material_code;
+        }
+    }
+
+    mClipboardParams["features"] = clipboard;
+}
+
+void LLPanelVolume::onPasteFeatures()
+{
+    LLViewerObject* objectp = mObject;
+    if (!objectp && mClipboardParams.has("features"))
+    {
+        return;
+    }
+
+    LLSD &clipboard = mClipboardParams["features"];
+
+    LLVOVolume *volobjp = NULL;
+    if (objectp && (objectp->getPCode() == LL_PCODE_VOLUME))
+    {
+        volobjp = (LLVOVolume *)objectp;
+    }
+
+    // Physics
+    bool is_root = objectp->isRoot();
+
+    // Not sure if phantom should go under physics, but doesn't fit elsewhere
+    BOOL is_phantom = clipboard["is_phantom"].asBoolean() && is_root;
+    LLSelectMgr::getInstance()->selectionUpdatePhantom(is_phantom);
+
+    BOOL is_physical = clipboard["is_physical"].asBoolean() && is_root;
+    LLSelectMgr::getInstance()->selectionUpdatePhysics(is_physical);
+
+    if (clipboard.has("physics"))
+    {
+        objectp->setPhysicsShapeType((U8)clipboard["physics"]["shape"].asInteger());
+        U8 cur_material = objectp->getMaterial();
+        U8 material = (U8)clipboard["physics"]["material"].asInteger() | (cur_material & ~LL_MCODE_MASK);
+
+        objectp->setMaterial(material);
+        objectp->sendMaterialUpdate();
+        objectp->setPhysicsGravity(clipboard["physics"]["gravity"].asReal());
+        objectp->setPhysicsFriction(clipboard["physics"]["friction"].asReal());
+        objectp->setPhysicsDensity(clipboard["physics"]["density"].asReal());
+        objectp->setPhysicsRestitution(clipboard["physics"]["restitution"].asReal());
+        objectp->updateFlags(TRUE);
+    }
+
+    // Flexible
+    bool is_flexible = clipboard.has("flex");
+    if (is_flexible && volobjp->canBeFlexible())
+    {
+        LLVOVolume *volobjp = (LLVOVolume *)objectp;
+        BOOL update_shape = FALSE;
+
+        // do before setParameterEntry or it will think that it is already flexi
+        update_shape = volobjp->setIsFlexible(is_flexible);
+
+        if (objectp->getClickAction() == CLICK_ACTION_SIT)
+        {
+            objectp->setClickAction(CLICK_ACTION_NONE);
+        }
+
+        LLFlexibleObjectData *attributes = (LLFlexibleObjectData *)objectp->getFlexibleObjectData();
+        if (attributes)
+        {
+            LLFlexibleObjectData new_attributes;
+            new_attributes = *attributes;
+            new_attributes.setSimulateLOD(clipboard["flex"]["lod"].asInteger());
+            new_attributes.setGravity(clipboard["flex"]["gav"].asReal());
+            new_attributes.setTension(clipboard["flex"]["ten"].asReal());
+            new_attributes.setAirFriction(clipboard["flex"]["fri"].asReal());
+            new_attributes.setWindSensitivity(clipboard["flex"]["sen"].asReal());
+            F32 fx = (F32)clipboard["flex"]["forx"].asReal();
+            F32 fy = (F32)clipboard["flex"]["fory"].asReal();
+            F32 fz = (F32)clipboard["flex"]["forz"].asReal();
+            LLVector3 force(fx, fy, fz);
+            new_attributes.setUserForce(force);
+            objectp->setParameterEntry(LLNetworkData::PARAMS_FLEXIBLE, new_attributes, true);
+        }
+
+        if (update_shape)
+        {
+            mObject->sendShapeUpdate();
+            LLSelectMgr::getInstance()->selectionUpdatePhantom(volobjp->flagPhantom());
+        }
+    }
+    else
+    {
+        LLVOVolume *volobjp = (LLVOVolume *)objectp;
+        if (volobjp->setIsFlexible(false))
+        {
+            mObject->sendShapeUpdate();
+            LLSelectMgr::getInstance()->selectionUpdatePhantom(volobjp->flagPhantom());
+        }
+    }
+}
+
+void LLPanelVolume::onCopyLight()
+{
+    LLViewerObject* objectp = mObject;
+    if (!objectp)
+    {
+        return;
+    }
+
+    LLSD clipboard;
+
+    LLVOVolume *volobjp = NULL;
+    if (objectp && (objectp->getPCode() == LL_PCODE_VOLUME))
+    {
+        volobjp = (LLVOVolume *)objectp;
+    }
+
+    // Light Source
+    if (volobjp && volobjp->getIsLight())
+    {
+        clipboard["light"]["intensity"] = volobjp->getLightIntensity();
+        clipboard["light"]["radius"] = volobjp->getLightRadius();
+        clipboard["light"]["falloff"] = volobjp->getLightFalloff();
+        LLColor3 color = volobjp->getLightSRGBColor();
+        clipboard["light"]["r"] = color.mV[0];
+        clipboard["light"]["g"] = color.mV[1];
+        clipboard["light"]["b"] = color.mV[2];
+
+        // Spotlight
+        if (volobjp->isLightSpotlight())
+        {
+            LLUUID id = volobjp->getLightTextureID();
+            if (id.notNull() && get_can_copy_texture(id))
+            {
+                clipboard["spot"]["id"] = id;
+                LLVector3 spot_params = volobjp->getSpotLightParams();
+                clipboard["spot"]["fov"] = spot_params.mV[0];
+                clipboard["spot"]["focus"] = spot_params.mV[1];
+                clipboard["spot"]["ambiance"] = spot_params.mV[2];
+            }
+        }
+    }
+
+    mClipboardParams["light"] = clipboard;
+}
+
+void LLPanelVolume::onPasteLight()
+{
+    LLViewerObject* objectp = mObject;
+    if (!objectp && mClipboardParams.has("light"))
+    {
+        return;
+    }
+
+    LLSD &clipboard = mClipboardParams["light"];
+
+    LLVOVolume *volobjp = NULL;
+    if (objectp && (objectp->getPCode() == LL_PCODE_VOLUME))
+    {
+        volobjp = (LLVOVolume *)objectp;
+    }
+
+    // Light Source
+    if (volobjp)
+    {
+        if (clipboard.has("light"))
+        {
+            volobjp->setIsLight(TRUE);
+            volobjp->setLightIntensity((F32)clipboard["light"]["intensity"].asReal());
+            volobjp->setLightRadius((F32)clipboard["light"]["radius"].asReal());
+            volobjp->setLightFalloff((F32)clipboard["light"]["falloff"].asReal());
+            F32 r = (F32)clipboard["light"]["r"].asReal();
+            F32 g = (F32)clipboard["light"]["g"].asReal();
+            F32 b = (F32)clipboard["light"]["b"].asReal();
+            volobjp->setLightSRGBColor(LLColor3(r, g, b));
+        }
+        else
+        {
+            volobjp->setIsLight(FALSE);
+        }
+
+        if (clipboard.has("spot"))
+        {
+            volobjp->setLightTextureID(clipboard["spot"]["id"].asUUID());
+            LLVector3 spot_params;
+            spot_params.mV[0] = (F32)clipboard["spot"]["fov"].asReal();
+            spot_params.mV[1] = (F32)clipboard["spot"]["focus"].asReal();
+            spot_params.mV[2] = (F32)clipboard["spot"]["ambiance"].asReal();
+            volobjp->setSpotLightParams(spot_params);
+        }
+    }
+}
+
+void LLPanelVolume::menuDoToSelected(const LLSD& userdata)
+{
+    std::string command = userdata.asString();
+
+    // paste
+    if (command == "features_paste")
+    {
+        onPasteFeatures();
+    }
+    else if (command == "light_paste")
+    {
+        onPasteLight();
+    }
+    // copy
+    else if (command == "features_copy")
+    {
+        onCopyFeatures();
+    }
+    else if (command == "light_copy")
+    {
+        onCopyLight();
+    }
+}
+
+bool LLPanelVolume::menuEnableItem(const LLSD& userdata)
+{
+    std::string command = userdata.asString();
+
+    // paste options
+    if (command == "features_paste")
+    {
+        return mClipboardParams.has("features");
+    }
+    else if (command == "light_paste")
+    {
+        return mClipboardParams.has("light");
+    }
+    return false;
+}
+
 // static
 void LLPanelVolume::onCommitMaterial( LLUICtrl* ctrl, void* userdata )
 {
@@ -854,7 +1139,7 @@ void LLPanelVolume::onCommitMaterial( LLUICtrl* ctrl, void* userdata )
 					objectp->setPhysicsRestitution(LLMaterialTable::basic.getRestitution(material_code));
 				}
 			}
-			LLSelectMgr::getInstanceFast()->selectionSetMaterial(material_code);
+			LLSelectMgr::getInstance()->selectionSetMaterial(material_code);
 		}
 	}
 }

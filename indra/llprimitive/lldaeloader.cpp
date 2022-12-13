@@ -330,7 +330,10 @@ LLModel::EModelStatus load_face_from_dom_triangles(
 			// VFExtents change
 			face.mExtents[0].set(v[0], v[1], v[2]);
 			face.mExtents[1].set(v[0], v[1], v[2]);
-			point_map.clear();
+
+            verts.clear();
+            indices.clear();
+            point_map.clear();
 		}
 	}
 
@@ -1152,7 +1155,7 @@ bool LLDAELoader::OpenFile(const std::string& filename)
 
 	bool badElement = false;
 	
-	processElement( scene, badElement, &dae );
+	processElement( scene, badElement, &dae);
 	
 	if ( badElement )
 	{
@@ -1233,18 +1236,19 @@ void LLDAELoader::processDomModel(LLModel* model, DAE* dae, daeElement* root, do
 
 			LLMeshSkinInfo& skin_info = model->mSkinInfo;
 
-			LLMatrix4 mat;
-			for (auto i = 0; i < 4; i++)
+            LLMatrix4 mat;
+			for (int i = 0; i < 4; i++)
 			{
-				for(auto j = 0; j < 4; j++)
+				for(int j = 0; j < 4; j++)
 				{
-					mat.mMatrix[i][j] = dom_value[i + j*4];
+                    mat.mMatrix[i][j] = dom_value[i + j*4];
 				}
 			}
 
-			LLMatrix4 trans = normalized_transformation;
-			trans *= mat;
-			skin_info.mBindShapeMatrix.loadu(trans);							
+            skin_info.mBindShapeMatrix.loadu(mat);
+
+			LLMatrix4a trans(normalized_transformation);
+            matMul(trans, skin_info.mBindShapeMatrix, skin_info.mBindShapeMatrix);
 		}
 
 
@@ -1451,21 +1455,18 @@ void LLDAELoader::processDomModel(LLModel* model, DAE* dae, daeElement* root, do
 						domListOfFloats& transform = t->getValue();
 						S32 count = transform.getCount()/16;
 
-						for (auto k = 0; k < count; ++k)
+						for (S32 k = 0; k < count; ++k)
 						{
 							LLMatrix4 mat;
 
-							for (auto i = 0; i < 4; i++)
+							for (int i = 0; i < 4; i++)
 							{
-								for(auto j = 0; j < 4; j++)
+								for(int j = 0; j < 4; j++)
 								{
 									mat.mMatrix[i][j] = transform[k*16 + i + j*4];
 								}
 							}
-							
-							LLMatrix4a mat4a;
-							mat4a.loadu(mat);
-							model->mSkinInfo.mInvBindMatrix.push_back(mat4a);
+							model->mSkinInfo.mInvBindMatrix.push_back(LLMatrix4a(mat));
 						}
 					}
 				}
@@ -1539,11 +1540,9 @@ void LLDAELoader::processDomModel(LLModel* model, DAE* dae, daeElement* root, do
 			if (mJointMap.find(lookingForJoint) != mJointMap.end()
 				&& model->mSkinInfo.mInvBindMatrix.size() > i)
 			{
-				alignas(16) F32 bind_matrix[16];
-				model->mSkinInfo.mInvBindMatrix[i].store4a(bind_matrix);
-				LLMatrix4 newInverse(bind_matrix);
+				LLMatrix4 newInverse = LLMatrix4(model->mSkinInfo.mInvBindMatrix[i].getF32ptr());
 				newInverse.setTranslation( mJointList[lookingForJoint].getTranslation() );
-				model->mSkinInfo.mAlternateBindMatrix.push_back( newInverse );
+				model->mSkinInfo.mAlternateBindMatrix.push_back( LLMatrix4a(newInverse) );
             }
 			else
 			{
@@ -2006,7 +2005,7 @@ daeElement* LLDAELoader::getChildFromElement( daeElement* pElement, std::string 
     return NULL;
 }
 
-void LLDAELoader::processElement( daeElement* element, bool& badElement, DAE* dae )
+void LLDAELoader::processElement( daeElement* element, bool& badElement, DAE* dae)
 {
 	LLMatrix4 saved_transform;
 	bool pushed_mat = false;
@@ -2493,6 +2492,7 @@ bool LLDAELoader::addVolumeFacesFromDomMesh(LLModel* pModel,domMesh* mesh, LLSD&
 	for (U32 i = 0; i < polygons.getCount(); ++i)
 	{
 		domPolygonsRef& poly = polygons.get(i);
+
 		status = load_face_from_dom_polygons(pModel->getVolumeFaces(), pModel->getMaterialList(), poly);
 
 		if(status != LLModel::NO_ERRORS)
@@ -2578,7 +2578,7 @@ bool LLDAELoader::loadModelsFromDomMesh(domMesh* mesh, std::vector<LLModel*>& mo
 
 		if (!mNoOptimize)
 		{
-			ret->optimizeVolumeFaces();
+			ret->remapVolumeFaces();
 		}
 
 		volume_faces = remainder.size();

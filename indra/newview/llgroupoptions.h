@@ -49,7 +49,7 @@ class LLGroupOptionsMgr final : public LLSingleton<LLGroupOptionsMgr>
 	 */
 	LLSINGLETON(LLGroupOptionsMgr);
 protected:
-	~LLGroupOptionsMgr() override;
+	~LLGroupOptionsMgr() override = default;
 
 	/*
 	 * Member functions
@@ -60,15 +60,13 @@ public:
 	void            setOptionReceiveChat(const LLUUID& idGroup, bool fReceiveChat);
 	void            setOptionSnoozeOnClose(const LLUUID& idGroup, bool fSnoozeOnClose);
 	void            setOptionSnoozeDuration(const LLUUID& idGroup, int nSnoozeDuration);
-protected:
+private:
 	bool            load();
-//	bool            loadLegacy();
 	bool            save();
 
 	/*
 	 * Member variables
 	 */
-protected:
 	typedef absl::flat_hash_map<LLUUID, std::unique_ptr<LLGroupOptions>> options_map_t;
 	options_map_t mGroupOptions;
 };

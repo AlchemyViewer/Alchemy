@@ -884,7 +884,7 @@ void LLJoint::setWorldRotation( const LLQuaternion& rot )
 	LLMatrix4a temp_mat(rota);
 
 	LLMatrix4a invParentWorldMatrix = mParent->getWorldMatrix();
-	invParentWorldMatrix.setTranslate_affine(LLVector3(0.f));
+	invParentWorldMatrix.setTranslate_affine(LLVector3(0.f, 0.f, 0.f));
 
 	invParentWorldMatrix.invert();
 
@@ -948,6 +948,13 @@ const LLMatrix4a &LLJoint::getWorldMatrix()
 	updateWorldMatrixParent();
 
 	return mXform.getWorldMatrix();
+}
+
+const LLMatrix4a& LLJoint::getWorldMatrix4a()
+{
+    updateWorldMatrixParent();
+
+    return mWorldMatrix;
 }
 
 
@@ -1031,6 +1038,7 @@ void LLJoint::updateWorldMatrix()
 	{
 		sNumUpdates++;
 		mXform.updateMatrix(FALSE);
+        mWorldMatrix = mXform.getWorldMatrix();
 		mDirtyFlags = 0x0;
 	}
 }

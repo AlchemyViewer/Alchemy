@@ -70,7 +70,7 @@ U64         BlockTimer::sClockResolution = 1000000000; // Nanosecond resolution
 U64         BlockTimer::sClockResolution = 1000000; // Microsecond resolution
 #endif
 
-static LLMutex			sLogLock(LLMutex::E_CONST_INIT);
+static LLMutex*			sLogLock = NULL;
 static std::queue<LLSD> sLogQueue;
 
 block_timer_tree_df_iterator_t begin_block_timer_tree_df(BlockTimerStatHandle& id) 
@@ -139,10 +139,16 @@ BlockTimerStatHandle& BlockTimer::getRootTimeBlock()
 
 void BlockTimer::pushLog(LLSD log)
 {
-	LLMutexLock lock(&sLogLock);
+	LLMutexLock lock(sLogLock);
 
 	sLogQueue.push(log);
 }
+
+void BlockTimer::setLogLock(LLMutex* lock)
+{
+	sLogLock = lock;
+}
+
 
 //static
 #if (LL_DARWIN || LL_LINUX) && !(defined(__i386__) || defined(__amd64__))
@@ -185,29 +191,30 @@ TimeBlockTreeNode& BlockTimerStatHandle::getTreeNode() const
 }
 
 
+
 void BlockTimer::bootstrapTimerTree()
 {
-	for (auto& base : BlockTimerStatHandle::instance_snapshot())
-	{
-		// because of indirect derivation from LLInstanceTracker, have to downcast
-		BlockTimerStatHandle& timer = static_cast<BlockTimerStatHandle&>(base);
-		if (&timer == &BlockTimer::getRootTimeBlock()) continue;
+    for (auto& base : BlockTimerStatHandle::instance_snapshot())
+    {
+        // because of indirect derivation from LLInstanceTracker, have to downcast
+        BlockTimerStatHandle& timer = static_cast<BlockTimerStatHandle&>(base);
+        if (&timer == &BlockTimer::getRootTimeBlock()) continue;
 
-		// bootstrap tree construction by attaching to last timer to be on stack
-		// when this timer was called
-		if (timer.getParent() == &BlockTimer::getRootTimeBlock())
-		{
-			TimeBlockAccumulator& accumulator = timer.getCurrentAccumulator();
+        // bootstrap tree construction by attaching to last timer to be on stack
+        // when this timer was called
+        if (timer.getParent() == &BlockTimer::getRootTimeBlock())
+        {
+            TimeBlockAccumulator& accumulator = timer.getCurrentAccumulator();
 
-			if (accumulator.mLastCaller)
-			{
-				timer.setParent(accumulator.mLastCaller);
-				accumulator.mParent = accumulator.mLastCaller;
-			}
-			// no need to push up tree on first use, flag can be set spuriously
-			accumulator.mMoveUpTree = false;
-		}
-	}
+            if (accumulator.mLastCaller)
+            {
+                timer.setParent(accumulator.mLastCaller);
+                accumulator.mParent = accumulator.mLastCaller;
+            }
+            // no need to push up tree on first use, flag can be set spuriously
+            accumulator.mMoveUpTree = false;
+        }
+    }
 }
 
 // bump timers up tree if they have been flagged as being in the wrong place
@@ -215,6 +222,7 @@ void BlockTimer::bootstrapTimerTree()
 // this preserves partial order derived from current frame's observations
 void BlockTimer::incrementalUpdateTimerTree()
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_STATS;
 	for(block_timer_tree_df_post_iterator_t it = begin_block_timer_tree_df_post(BlockTimer::getRootTimeBlock()), end = end_block_timer_tree_df_post();
 		it != end;
 		++it)
@@ -256,7 +264,8 @@ void BlockTimer::incrementalUpdateTimerTree()
 
 
 void BlockTimer::updateTimes()
-	{
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_STATS;
 	// walk up stack of active timers and accumulate current time while leaving timing structures active
 	BlockTimerStackRecord* stack_record	= LLThreadLocalSingletonPointer<BlockTimerStackRecord>::getInstance();
 	if (!stack_record) return;
@@ -267,7 +276,7 @@ void BlockTimer::updateTimes()
 
 	while(cur_timer 
 		&& cur_timer->mParentTimerData.mActiveTimer != cur_timer) // root defined by parent pointing to self
-		{
+	{
 		U64 cumulative_time_delta = cur_time - cur_timer->mStartTime;
 		cur_timer->mStartTime = cur_time;
 
@@ -290,7 +299,7 @@ static LLTrace::BlockTimerStatHandle FTM_PROCESS_TIMES("Process FastTimer Times"
 void BlockTimer::processTimes()
 {
 #if LL_TRACE_ENABLED
-	LL_ALWAYS_RECORD_BLOCK_TIME(FTM_PROCESS_TIMES);
+	LL_RECORD_BLOCK_TIME(FTM_PROCESS_TIMES);
 
 	// set up initial tree
 	bootstrapTimerTree();
@@ -374,7 +383,7 @@ void BlockTimer::logStats()
 		sd["Total"]["Calls"] = (LLSD::Integer) 1;
 
 		{		
-			LLMutexLock lock(&sLogLock);
+			LLMutexLock lock(sLogLock);
 			sLogQueue.push(sd);
 		}
 	}
@@ -418,11 +427,11 @@ void BlockTimer::dumpCurTimes()
 //static
 void BlockTimer::writeLog(std::ostream& os)
 {
-	LLMutexLock lock(&sLogLock);
 	while (!sLogQueue.empty())
 	{
 		LLSD& sd = sLogQueue.front();
 		LLSDSerialize::toXML(sd, os);
+		LLMutexLock lock(sLogLock);
 		sLogQueue.pop();
 	}
 }

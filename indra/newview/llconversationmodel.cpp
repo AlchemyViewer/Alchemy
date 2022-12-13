@@ -182,6 +182,7 @@ void LLConversationItem::buildParticipantMenuOptions(menuentry_vec_t& items, U32
 		items.push_back(std::string("map"));
 		items.push_back(std::string("share"));
 		items.push_back(std::string("pay"));
+        items.push_back(std::string("report_abuse"));
 		items.push_back(std::string("block_unblock"));
 		items.push_back(std::string("MuteText"));
 		items.push_back(std::string("report_abuse"));
@@ -650,7 +651,7 @@ void LLConversationItemParticipant::setDisplayModeratorRole(bool displayRole)
 
 bool LLConversationItemParticipant::isVoiceMuted()
 {
-	return mIsModeratorMuted || LLMuteList::getInstanceFast()->isMuted(mUUID, LLMute::flagVoiceChat);
+	return mIsModeratorMuted || LLMuteList::getInstance()->isMuted(mUUID, LLMute::flagVoiceChat);
 }
 
 //

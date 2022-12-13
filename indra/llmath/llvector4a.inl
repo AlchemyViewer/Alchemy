@@ -58,13 +58,13 @@ inline void LLVector4a::store4a(F32* dst) const
 // BASIC GET/SET 
 ////////////////////////////////////
 
-// Return a "this" as an F32 pointer. Do not use unless you have a very good reason.  (Not sure? Ask Falcon)
+// Return a "this" as an F32 pointer.
 F32* LLVector4a::getF32ptr()
 {
 	return (F32*) &mQ;
 }
 
-// Return a "this" as a const F32 pointer. Do not use unless you have a very good reason.  (Not sure? Ask Falcon)
+// Return a "this" as a const F32 pointer.
 const F32* const LLVector4a::getF32ptr() const
 {
 	return (const F32* const) &mQ;
@@ -244,8 +244,7 @@ inline void LLVector4a::setDiv(const LLVector4a& a, const LLVector4a& b)
 // Set this to the element-wise absolute value of src
 inline void LLVector4a::setAbs(const LLVector4a& src)
 {
-	static const LL_ALIGN_16(U32 F_ABS_MASK_4A[4]) = { 0x7FFFFFFF, 0x7FFFFFFF, 0x7FFFFFFF, 0x7FFFFFFF };
-	mQ = _mm_and_ps(src.mQ, *reinterpret_cast<const LLQuad*>(F_ABS_MASK_4A));
+	mQ = _mm_and_ps(src.mQ, _mm_castsi128_ps(_mm_set_epi32(0x7FFFFFFF, 0x7FFFFFFF, 0x7FFFFFFF, 0x7FFFFFFF)));
 }
 
 // Add to each component in this vector the corresponding component in rhs
@@ -381,8 +380,6 @@ inline void LLVector4a::normalize3()
 	LLVector4a lenSqrd; lenSqrd.setAllDot3( *this, *this );
 	// rsqrt = approximate reciprocal square (i.e., { ~1/len(a)^2, ~1/len(a)^2, ~1/len(a)^2, ~1/len(a)^2 }
 	const LLQuad rsqrt = _mm_rsqrt_ps(lenSqrd.mQ);
-	static const LLQuad half = { 0.5f, 0.5f, 0.5f, 0.5f };
-	static const LLQuad three = {3.f, 3.f, 3.f, 3.f };
 	// Now we do one round of Newton-Raphson approximation to get full accuracy
 	// According to the Newton-Raphson method, given a first 'w' for the root of f(x) = 1/x^2 - a (i.e., x = 1/sqrt(a))
 	// the next better approximation w[i+1] = w - f(w)/f'(w) = w - (1/w^2 - a)/(-2*w^(-3))
@@ -392,8 +389,8 @@ inline void LLVector4a::normalize3()
 	// which is actually lenSqrd). So out = a * [0.5*rsqrt * (3 - lenSqrd*rsqrt*rsqrt)]
 	const LLQuad AtimesRsqrt = _mm_mul_ps( lenSqrd.mQ, rsqrt );
 	const LLQuad AtimesRsqrtTimesRsqrt = _mm_mul_ps( AtimesRsqrt, rsqrt );
-	const LLQuad threeMinusAtimesRsqrtTimesRsqrt = _mm_sub_ps(three, AtimesRsqrtTimesRsqrt );
-	const LLQuad nrApprox = _mm_mul_ps(half, _mm_mul_ps(rsqrt, threeMinusAtimesRsqrtTimesRsqrt));
+	const LLQuad threeMinusAtimesRsqrtTimesRsqrt = _mm_sub_ps(_mm_set_ps1(3.f), AtimesRsqrtTimesRsqrt );
+	const LLQuad nrApprox = _mm_mul_ps(_mm_set_ps1(0.5f), _mm_mul_ps(rsqrt, threeMinusAtimesRsqrtTimesRsqrt));
 	mQ = _mm_mul_ps( mQ, nrApprox );
 }
 
@@ -405,8 +402,6 @@ inline void LLVector4a::normalize4()
 	LLVector4a lenSqrd; lenSqrd.setAllDot4( *this, *this );
 	// rsqrt = approximate reciprocal square (i.e., { ~1/len(a)^2, ~1/len(a)^2, ~1/len(a)^2, ~1/len(a)^2 }
 	const LLQuad rsqrt = _mm_rsqrt_ps(lenSqrd.mQ);
-	static const LLQuad half = { 0.5f, 0.5f, 0.5f, 0.5f };
-	static const LLQuad three = {3.f, 3.f, 3.f, 3.f };
 	// Now we do one round of Newton-Raphson approximation to get full accuracy
 	// According to the Newton-Raphson method, given a first 'w' for the root of f(x) = 1/x^2 - a (i.e., x = 1/sqrt(a))
 	// the next better approximation w[i+1] = w - f(w)/f'(w) = w - (1/w^2 - a)/(-2*w^(-3))
@@ -416,8 +411,8 @@ inline void LLVector4a::normalize4()
 	// which is actually lenSqrd). So out = a * [0.5*rsqrt * (3 - lenSqrd*rsqrt*rsqrt)]
 	const LLQuad AtimesRsqrt = _mm_mul_ps( lenSqrd.mQ, rsqrt );
 	const LLQuad AtimesRsqrtTimesRsqrt = _mm_mul_ps( AtimesRsqrt, rsqrt );
-	const LLQuad threeMinusAtimesRsqrtTimesRsqrt = _mm_sub_ps(three, AtimesRsqrtTimesRsqrt );
-	const LLQuad nrApprox = _mm_mul_ps(half, _mm_mul_ps(rsqrt, threeMinusAtimesRsqrtTimesRsqrt));
+	const LLQuad threeMinusAtimesRsqrtTimesRsqrt = _mm_sub_ps(_mm_set_ps1(3.f), AtimesRsqrtTimesRsqrt );
+	const LLQuad nrApprox = _mm_mul_ps(_mm_set_ps1(0.5f), _mm_mul_ps(rsqrt, threeMinusAtimesRsqrtTimesRsqrt));
 	mQ = _mm_mul_ps( mQ, nrApprox );
 }
 
@@ -429,8 +424,6 @@ inline LLSimdScalar LLVector4a::normalize3withLength()
 	LLVector4a lenSqrd; lenSqrd.setAllDot3( *this, *this );
 	// rsqrt = approximate reciprocal square (i.e., { ~1/len(a)^2, ~1/len(a)^2, ~1/len(a)^2, ~1/len(a)^2 }
 	const LLQuad rsqrt = _mm_rsqrt_ps(lenSqrd.mQ);
-	static const LLQuad half = { 0.5f, 0.5f, 0.5f, 0.5f };
-	static const LLQuad three = {3.f, 3.f, 3.f, 3.f };
 	// Now we do one round of Newton-Raphson approximation to get full accuracy
 	// According to the Newton-Raphson method, given a first 'w' for the root of f(x) = 1/x^2 - a (i.e., x = 1/sqrt(a))
 	// the next better approximation w[i+1] = w - f(w)/f'(w) = w - (1/w^2 - a)/(-2*w^(-3))
@@ -440,8 +433,8 @@ inline LLSimdScalar LLVector4a::normalize3withLength()
 	// which is actually lenSqrd). So out = a * [0.5*rsqrt * (3 - lenSqrd*rsqrt*rsqrt)]
 	const LLQuad AtimesRsqrt = _mm_mul_ps( lenSqrd.mQ, rsqrt );
 	const LLQuad AtimesRsqrtTimesRsqrt = _mm_mul_ps( AtimesRsqrt, rsqrt );
-	const LLQuad threeMinusAtimesRsqrtTimesRsqrt = _mm_sub_ps(three, AtimesRsqrtTimesRsqrt );
-	const LLQuad nrApprox = _mm_mul_ps(half, _mm_mul_ps(rsqrt, threeMinusAtimesRsqrtTimesRsqrt));
+	const LLQuad threeMinusAtimesRsqrtTimesRsqrt = _mm_sub_ps(_mm_set_ps1(3.f), AtimesRsqrtTimesRsqrt );
+	const LLQuad nrApprox = _mm_mul_ps(_mm_set_ps1(0.5f), _mm_mul_ps(rsqrt, threeMinusAtimesRsqrtTimesRsqrt));
 	mQ = _mm_mul_ps( mQ, nrApprox );
 	return _mm_sqrt_ss(lenSqrd);
 }
@@ -535,9 +528,7 @@ inline void LLVector4a::setLerp(const LLVector4a& lhs, const LLVector4a& rhs, F3
 
 inline LLBool32 LLVector4a::isFinite3() const
 {
-	static LL_ALIGN_16(const U32 nanOrInfMask[4]) = { 0x7f800000, 0x7f800000, 0x7f800000, 0x7f800000 };
-	ll_assert_aligned(nanOrInfMask,16);
-	const __m128i nanOrInfMaskV = *reinterpret_cast<const __m128i*> (nanOrInfMask);
+	const __m128i nanOrInfMaskV = _mm_set_epi32(0x7f800000, 0x7f800000, 0x7f800000, 0x7f800000);
 	const __m128i maskResult = _mm_and_si128( _mm_castps_si128(mQ), nanOrInfMaskV );
 	const LLVector4Logical equalityCheck = _mm_castsi128_ps(_mm_cmpeq_epi32( maskResult, nanOrInfMaskV ));
 	return !equalityCheck.areAnySet( LLVector4Logical::MASK_XYZ );
@@ -545,8 +536,7 @@ inline LLBool32 LLVector4a::isFinite3() const
 	
 inline LLBool32 LLVector4a::isFinite4() const
 {
-	static LL_ALIGN_16(const U32 nanOrInfMask[4]) = { 0x7f800000, 0x7f800000, 0x7f800000, 0x7f800000 };
-	const __m128i nanOrInfMaskV = *reinterpret_cast<const __m128i*> (nanOrInfMask);
+	const __m128i nanOrInfMaskV = _mm_set_epi32(0x7f800000, 0x7f800000, 0x7f800000, 0x7f800000);
 	const __m128i maskResult = _mm_and_si128( _mm_castps_si128(mQ), nanOrInfMaskV );
 	const LLVector4Logical equalityCheck = _mm_castsi128_ps(_mm_cmpeq_epi32( maskResult, nanOrInfMaskV ));
 	return !equalityCheck.areAnySet( LLVector4Logical::MASK_XYZW );
@@ -575,8 +565,8 @@ inline void LLVector4a::clamp( const LLVector4a& low, const LLVector4a& high )
 
 inline void LLVector4a::negate()
 {
-	static LL_ALIGN_16(const U32 signMask[4]) = {0x80000000, 0x80000000, 0x80000000, 0x80000000 };
-	mQ = _mm_xor_ps(*reinterpret_cast<const LLQuad*>(signMask), mQ);
+	const __m128i signMask = _mm_set_epi32(0x80000000, 0x80000000, 0x80000000, 0x80000000);
+	mQ = _mm_xor_ps(_mm_castsi128_ps(signMask), mQ);
 }
 
 inline void LLVector4a::setMoveHighLow(const LLVector4a& rhs)

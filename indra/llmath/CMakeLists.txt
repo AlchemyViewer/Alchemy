@@ -4,6 +4,7 @@ project(llmath)
 
 include(00-Common)
 include(LLCommon)
+include(LLMeshOptimizer)
 include(LLMath)
 include(Boost)
 
@@ -11,6 +12,7 @@ include_directories(
     ${LLCOMMON_INCLUDE_DIRS}
     ${LLMATH_INCLUDE_DIRS}
     ${LLCOMMON_SYSTEM_INCLUDE_DIRS}
+    ${LLMESHOPTIMIZER_INCLUDE_DIRS}
     )
 
 set(llmath_SOURCE_FILES
@@ -115,6 +117,7 @@ target_link_libraries(llmath
     meshoptimizer
     PUBLIC
     ${LLCOMMON_LIBRARIES}
+    ${LLMESHOPTIMIZER_LIBRARIES}
     )
 
 if(USE_PRECOMPILED_HEADERS AND ${CMAKE_VERSION} VERSION_GREATER "3.15.0") 

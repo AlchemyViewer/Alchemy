@@ -107,7 +107,9 @@ const std::string HTTP_IN_HEADER_X_FORWARDED_FOR("x-forwarded-for");
 
 const std::string HTTP_CONTENT_LLSD_XML("application/llsd+xml");
 const std::string HTTP_CONTENT_OCTET_STREAM("application/octet-stream");
-const std::string HTTP_CONTENT_VND_LL_MESH("application/vnd.ll.mesh");
+const std::string HTTP_CONTENT_OGG_STREAM("application/ogg");
+const std::string HTTP_CONTENT_VND_LL_MESH("application/vnd.ll.animation");
+const std::string HTTP_CONTENT_VND_LL_ANIMATION("application/vnd.ll.mesh");
 const std::string HTTP_CONTENT_XML("application/xml");
 const std::string HTTP_CONTENT_JSON("application/json");
 const std::string HTTP_CONTENT_TEXT_HTML("text/html");
@@ -139,7 +141,7 @@ const std::string HTTP_VERB_COPY("COPY");
 
 const std::string& httpMethodAsVerb(EHTTPMethod method)
 {
-	static const std::string VERBS [] =
+	static const std::string VERBS [10] =
 	{
 		HTTP_VERB_INVALID,
 		HTTP_VERB_HEAD,
@@ -161,7 +163,7 @@ const std::string& httpMethodAsVerb(EHTTPMethod method)
 
 EHTTPMethod httpVerbAsMethod(const std::string& verb)
 {
-	static const std::string VERBS [] = {
+	static const std::string VERBS [10] = {
 		HTTP_VERB_INVALID,
 		HTTP_VERB_HEAD,
 		HTTP_VERB_GET,
@@ -176,8 +178,10 @@ EHTTPMethod httpVerbAsMethod(const std::string& verb)
 
 	for (int i = 0; i<HTTP_METHOD_COUNT; ++i)
 	{
-		if (VERBS[i] == verb)
-			return (EHTTPMethod) i;
+        if (VERBS[i] == verb)
+        {
+            return static_cast<EHTTPMethod>(i);
+        }
 	}
 	return HTTP_INVALID;
 }

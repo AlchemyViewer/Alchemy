@@ -49,7 +49,6 @@ public:
 	/*virtual*/ void	setMinimized(BOOL b) override;
 
 private:
-	void handleZoom(const LLSD& userdata);
 	void setDirectionPos( LLTextBox* text_box, F32 rotation );
 	void updateMinorDirections();
 

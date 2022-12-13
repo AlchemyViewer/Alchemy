@@ -3,8 +3,8 @@
 project(llrender)
 
 include(00-Common)
-include(Epoxy)
 include(OpenGL)
+include(SDL2)
 include(FreeType)
 include(LLCommon)
 include(LLImage)
@@ -16,7 +16,6 @@ include(LLFileSystem)
 
 include_directories(
     ${FREETYPE_INCLUDE_DIRS}
-    ${EPOXY_INCLUDE_DIRS}
     ${LLCOMMON_INCLUDE_DIRS}
     ${LLIMAGE_INCLUDE_DIRS}
     ${LLMATH_INCLUDE_DIRS}
@@ -111,12 +110,6 @@ add_library (llrender ${llrender_SOURCE_FILES})
 
 set_target_properties(llrender PROPERTIES POSITION_INDEPENDENT_CODE TRUE)
 
-if (SDL_FOUND)
-  set_property(TARGET llrender
-    PROPERTY COMPILE_DEFINITIONS LL_SDL=1
-    )
-endif (SDL_FOUND)
-
 # Libraries on which this library depends, needed for Linux builds
 # Sort by high-level to low-level
 target_link_libraries(llrender 
@@ -127,14 +120,12 @@ target_link_libraries(llrender
     ${LLXML_LIBRARIES}
     ${LLWINDOW_LIBRARIES}
     ${FREETYPE_LIBRARIES}
-    ${EPOXY_LIBRARIES}
     ${OPENGL_LIBRARIES})
 
 if(USE_PRECOMPILED_HEADERS AND ${CMAKE_VERSION} VERSION_GREATER "3.15.0") 
   target_precompile_headers(llrender
     PRIVATE
     [["linden_common.h"]]
-    llglheaders.h
     llgltypes.h
     <map>
     <list>

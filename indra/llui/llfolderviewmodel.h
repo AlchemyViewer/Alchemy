@@ -109,11 +109,10 @@ public:
 	virtual S32 				getFirstRequiredGeneration() const = 0;
 };
 
-class LLFolderViewModelInterface : public LLTrace::MemTrackable<LLFolderViewModelInterface>
+class LLFolderViewModelInterface
 {
 public:
 	LLFolderViewModelInterface() 
-	:	LLTrace::MemTrackable<LLFolderViewModelInterface>("LLFolderViewModelInterface") 
 	{}
 
 	virtual ~LLFolderViewModelInterface() = default;
@@ -134,11 +133,10 @@ public:
 
 // This is an abstract base class that users of the folderview classes
 // would use to bridge the folder view with the underlying data
-class LLFolderViewModelItem : public LLRefCount, public LLTrace::MemTrackable<LLFolderViewModelItem>
+class LLFolderViewModelItem : public LLRefCount
 {
 public:
 	LLFolderViewModelItem() 
-	:	LLTrace::MemTrackable<LLFolderViewModelItem>("LLFolderViewModelItem") 
 	{}
 
 	virtual ~LLFolderViewModelItem() = default;
@@ -175,7 +173,7 @@ public:
 	virtual BOOL removeItem() = 0;
 	virtual void removeBatch(std::vector<LLFolderViewModelItem*>& batch) = 0;
 
-	virtual BOOL isItemCopyable() const = 0;
+	virtual bool isItemCopyable(bool can_copy_as_link = true) const = 0;
 	// [SL:KB] - Patch: Inventory-Actions | Checked: 2013-09-19 (Catznip-3.6)
 	virtual bool isItemLinkable() const = 0;
 	// [/SL:KB]

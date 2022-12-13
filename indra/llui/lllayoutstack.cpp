@@ -210,7 +210,7 @@ LLLayoutStack::Params::Params()
 	open_time_constant("open_time_constant", 0.02f),
 	close_time_constant("close_time_constant", 0.03f),
 	resize_bar_overlap("resize_bar_overlap", 1),
-	border_size("border_size", LLUI::getInstanceFast()->mSettingGroups["config"]->getS32("UIResizeBarHeight")),
+	border_size("border_size", LLUI::getInstance()->mSettingGroups["config"]->getS32("UIResizeBarHeight")),
 	show_drag_handle("show_drag_handle", false),
 	drag_handle_first_indent("drag_handle_first_indent", 0),
 	drag_handle_second_indent("drag_handle_second_indent", 0),
@@ -341,8 +341,6 @@ void LLLayoutStack::collapsePanel(LLPanel* panel, BOOL collapsed)
 	mNeedsLayout = true;
 }
 
-static LLTrace::BlockTimerStatHandle FTM_UPDATE_LAYOUT("Update LayoutStacks");
-
 class LLImagePanel : public LLPanel
 {
 public:
@@ -370,7 +368,7 @@ private:
 
 void LLLayoutStack::updateLayout()
 {	
-	LL_RECORD_BLOCK_TIME(FTM_UPDATE_LAYOUT);
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
 
 	if (!mNeedsLayout) return;
 
@@ -399,7 +397,6 @@ void LLLayoutStack::updateLayout()
 	space_to_distribute += panelp ? ll_round((F32)mPanelSpacing * panelp->getVisibleAmount()) : 0;
 
 	S32 remaining_space = space_to_distribute;
-//	F32 fraction_distributed = 0.f;
 	if (space_to_distribute > 0 && total_visible_fraction > 0.f)
 	{	// give space proportionally to visible auto resize panels
 		for (LLLayoutPanel* panelp : mPanels)
@@ -408,7 +405,6 @@ void LLLayoutStack::updateLayout()
 			{
 				F32 fraction_to_distribute = (panelp->mFractionalSize * panelp->getAutoResizeFactor()) / (total_visible_fraction);
 				S32 delta = ll_round((F32)space_to_distribute * fraction_to_distribute);
-//				fraction_distributed += fraction_to_distribute;
 				panelp->mTargetDim += delta;
 				remaining_space -= delta;
 			}
@@ -567,11 +563,11 @@ void LLLayoutStack::createResizeBar(LLLayoutPanel* panelp)
 				resize_bar_bg_panel_p.follows.flags = FOLLOWS_ALL;
 				resize_bar_bg_panel_p.tab_stop = false;
 				resize_bar_bg_panel_p.background_visible = true;
-				resize_bar_bg_panel_p.bg_alpha_color = LLUIColorTable::instanceFast().getColor("ResizebarBody");
+				resize_bar_bg_panel_p.bg_alpha_color = LLUIColorTable::instance().getColor("ResizebarBody");
 				resize_bar_bg_panel_p.has_border = true;
 				resize_bar_bg_panel_p.border.border_thickness = 1;
-				resize_bar_bg_panel_p.border.highlight_light_color = LLUIColorTable::instanceFast().getColor("ResizebarBorderLight");
-				resize_bar_bg_panel_p.border.shadow_dark_color = LLUIColorTable::instanceFast().getColor("ResizebarBorderDark");
+				resize_bar_bg_panel_p.border.highlight_light_color = LLUIColorTable::instance().getColor("ResizebarBorderLight");
+				resize_bar_bg_panel_p.border.shadow_dark_color = LLUIColorTable::instance().getColor("ResizebarBorderDark");
 
 				LLPanel* resize_bar_bg_panel = LLUICtrlFactory::create<LLPanel>(resize_bar_bg_panel_p);
 

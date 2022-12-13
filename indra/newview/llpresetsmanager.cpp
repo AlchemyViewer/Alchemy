@@ -301,7 +301,6 @@ void LLPresetsManager::getGraphicsControlNames(std::vector<std::string>& names)
 		"RenderAvatarMaxComplexity",
 		"RenderAvatarMaxNonImpostors",
 		"RenderAvatarPhysicsLODFactor",
-		"RenderAvatarVP",
 		"RenderColorGradeLUT",
 		"RenderCompressTextures",
 		"RenderDeferred",

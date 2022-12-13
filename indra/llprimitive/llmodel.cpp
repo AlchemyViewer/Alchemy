@@ -31,6 +31,7 @@
 #include "llconvexdecomposition.h"
 #include "llsdserialize.h"
 #include "llvector4a.h"
+#include "llmd5.h"
 
 #ifdef LL_USESYSTEMLIBS
 # include <zlib.h>
@@ -104,6 +105,14 @@ void LLModel::offsetMesh( const LLVector3& pivotPoint )
 			pos[i].add( pivot );
 		}
 	}
+}
+
+void LLModel::remapVolumeFaces()
+{
+    for (U32 i = 0; i < getNumVolumeFaces(); ++i)
+    {
+        mVolumeFaces[i].remap();
+    }
 }
 
 void LLModel::optimizeVolumeFaces()
@@ -370,6 +379,8 @@ void LLModel::setVolumeFaceData(
 	U32 num_verts, 
 	U32 num_indices)
 {
+    llassert(num_indices % 3 == 0);
+
 	LLVolumeFace& face = mVolumeFaces[f];
 
 	face.resizeVertices(num_verts);
@@ -834,7 +845,7 @@ LLSD LLModel::writeModel(
 					{
 						LLVector3 pos(face.mPositions[j].getF32ptr());
 
-						weight_list& weights = high->getJointInfluences(pos);
+						weight_list& weights = model[idx]->getJointInfluences(pos);
 
 						S32 count = 0;
 						for (weight_list::iterator iter = weights.begin(); iter != weights.end(); ++iter)
@@ -1407,10 +1418,8 @@ void LLMeshSkinInfo::fromLLSD(const LLSD& skin)
 					mat.mMatrix[j][k] = inv_bind_mat[i][j*4+k].asReal();
 				}
 			}
-			LLMatrix4a in_mat;
-			in_mat.loadu(mat);
 
-			mInvBindMatrix.emplace_back(in_mat);
+			mInvBindMatrix.push_back(LLMatrix4a(mat));
 		}
 
         if (mJointNames.size() != mInvBindMatrix.size())
@@ -1450,7 +1459,7 @@ void LLMeshSkinInfo::fromLLSD(const LLSD& skin)
 				}
 			}
 			
-			mAlternateBindMatrix.emplace_back(mat);
+			mAlternateBindMatrix.push_back(LLMatrix4a(mat));
 		}
 	}
 
@@ -1467,6 +1476,8 @@ void LLMeshSkinInfo::fromLLSD(const LLSD& skin)
 	{
 		mLockScaleIfJointPosition = false;
 	}
+
+    updateHash();
 }
 
 LLSD LLMeshSkinInfo::asLLSD(bool include_joints, bool lock_scale_if_joint_position) const
@@ -1520,6 +1531,57 @@ LLSD LLMeshSkinInfo::asLLSD(bool include_joints, bool lock_scale_if_joint_positi
 	}
 
 	return ret;
+}
+
+void LLMeshSkinInfo::updateHash()
+{
+    //  get hash of data relevant to render batches
+    LLMD5 hash;
+
+    //mJointNames
+    for (auto& name : mJointNames)
+    {
+        hash.update(name);
+    }
+    
+    //mJointNums 
+    hash.update((U8*)&(mJointNums[0]), sizeof(S32) * mJointNums.size());
+    
+    //mInvBindMatrix
+    F32* src = mInvBindMatrix[0].getF32ptr();
+    
+    for (int i = 0; i < mInvBindMatrix.size() * 16; ++i)
+    {
+        S32 t = llround(src[i] * 10000.f);
+        hash.update((U8*)&t, sizeof(S32));
+    }
+    //hash.update((U8*)&(mInvBindMatrix[0]), sizeof(LLMatrix4a) * mInvBindMatrix.size());
+
+    hash.finalize();
+
+    U64 digest[2];
+    hash.raw_digest((U8*) digest);
+
+    mHash = digest[0];
+}
+
+U32 LLMeshSkinInfo::sizeBytes() const
+{
+    U32 res = sizeof(LLUUID); // mMeshID
+
+    res += sizeof(std::vector<std::string>) + sizeof(std::string) * mJointNames.size();
+    for (U32 i = 0; i < mJointNames.size(); ++i)
+    {
+        res += mJointNames[i].size(); // actual size, not capacity
+    }
+
+    res += sizeof(std::vector<S32>) + sizeof(S32) * mJointNums.size();
+    res += sizeof(std::vector<LLMatrix4>) + 16 * sizeof(float) * mInvBindMatrix.size();
+    res += sizeof(std::vector<LLMatrix4>) + 16 * sizeof(float) * mAlternateBindMatrix.size();
+    res += 16 * sizeof(float); //mBindShapeMatrix
+    res += sizeof(float) + 3 * sizeof(bool);
+
+    return res;
 }
 
 LLModel::Decomposition::Decomposition(LLSD& data)
@@ -1626,6 +1688,30 @@ void LLModel::Decomposition::fromLLSD(LLSD& decomp)
 		//but contains no base hull
 		mBaseHullMesh.clear();
 	}
+}
+
+U32 LLModel::Decomposition::sizeBytes() const
+{
+    U32 res = sizeof(LLUUID); // mMeshID
+
+    res += sizeof(LLModel::convex_hull_decomposition) + sizeof(std::vector<LLVector3>) * mHull.size();
+    for (U32 i = 0; i < mHull.size(); ++i)
+    {
+        res += mHull[i].size() * sizeof(LLVector3);
+    }
+
+    res += sizeof(LLModel::hull) + sizeof(LLVector3) * mBaseHull.size();
+
+    res += sizeof(std::vector<LLModel::PhysicsMesh>) + sizeof(std::vector<LLModel::PhysicsMesh>) * mMesh.size();
+    for (U32 i = 0; i < mMesh.size(); ++i)
+    {
+        res += mMesh[i].sizeBytes();
+    }
+
+    res += sizeof(std::vector<LLModel::PhysicsMesh>) * 2;
+    res += mBaseHullMesh.sizeBytes() + mPhysicsShapeMesh.sizeBytes();
+
+    return res;
 }
 
 bool LLModel::Decomposition::hasHullList() const

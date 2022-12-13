@@ -71,8 +71,6 @@ with the same filename but different name
   <texture name="Move" file_name="icons/move.png" preload="false" />
   <texture name="Move_Off" file_name="icons/move_off.png" preload="false" />
 
-  <texture name="Avaline_Icon" file_name="icons/avaline_default_icon.jpg" preload="true" />
-
   <texture name="BackArrow_Off" file_name="icons/BackArrow_Off.png" preload="false" />
 
   <texture name="BackButton_Off" file_name="icons/back_arrow_off.png" preload="false" scale.left="22" scale.top="12" scale.right="25" scale.bottom="12" />
@@ -468,6 +466,13 @@ with the same filename but different name
   <texture name="OptionsMenu_Off" file_name="icons/OptionsMenu_Off.png" preload="false" />
   <texture name="OptionsMenu_Press" file_name="icons/OptionsMenu_Press.png" preload="false" />
 
+  <texture name="ClipboardSmallMenu_Disabled" file_name="icons/ClipboardSmallMenu_Disabled.png" preload="false" />
+  <texture name="ClipboardSmallMenu_Off" file_name="icons/ClipboardSmallMenu_Off.png" preload="false" />
+  <texture name="ClipboardSmallMenu_Press" file_name="icons/ClipboardSmallMenu_Press.png" preload="false" />
+  <texture name="ClipboardMenu_Disabled" file_name="icons/ClipboardMenu_Disabled.png" preload="false" />
+  <texture name="ClipboardMenu_Off" file_name="icons/ClipboardMenu_Off.png" preload="false" />
+  <texture name="ClipboardMenu_Press" file_name="icons/ClipboardMenu_Press.png" preload="false" />
+
   <texture name="OutboxStatus_Success" file_name="green_checkmark.png" preload="false" />
   <texture name="OutboxStatus_Warning" file_name="icons/pop_up_caution.png" preload="false" />
   <texture name="OutboxStatus_Error" file_name="red_x.png" preload="false" />
@@ -528,6 +533,19 @@ with the same filename but different name
   <texture name="Play_Off" file_name="icons/Play_Off.png" preload="false" />
   <texture name="Play_Over" file_name="icons/Play_Over.png" preload="false" />
   <texture name="Play_Press" file_name="icons/Play_Press.png" preload="false" />
+  
+  <texture name="Profile_Group_Visibility_Off" file_name="icons/profile_group_visibility_eye_off.png" preload="true"/>
+  <texture name="Profile_Group_Visibility_Off_Pressed" file_name="icons/profile_group_visibility_eye_off_pressed.png" preload="true"/>
+  <texture name="Profile_Group_Visibility_On" file_name="icons/profile_group_visibility_eye_on.png" preload="true"/>
+  <texture name="Profile_Group_Visibility_On_Pressed" file_name="icons/profile_group_visibility_eye_on_pressed.png" preload="true"/>
+  <texture name="Profile_Friend_Offline" file_name="icons/Profile_Friend_Offline.png" preload="true"/>
+  <texture name="Profile_Friend_Online" file_name="icons/Profile_Friend_Online.png" preload="true"/>
+  <texture name="Profile_Perm_Find_Disabled" file_name="icons/Profile_Perm_Find_Disabled.png" preload="true"/>
+  <texture name="Profile_Perm_Find_Enabled" file_name="icons/Profile_Perm_Find_Enabled.png" preload="true"/>
+  <texture name="Profile_Perm_Objects_Disabled" file_name="icons/Profile_Perm_Objects_Disabled.png" preload="true"/>
+  <texture name="Profile_Perm_Objects_Enabled" file_name="icons/Profile_Perm_Objects_Enabled.png" preload="true"/>
+  <texture name="Profile_Perm_Online_Disabled" file_name="icons/Profile_Perm_Online_Disabled.png" preload="true"/>
+  <texture name="Profile_Perm_Online_Enabled" file_name="icons/Profile_Perm_Online_Enabled.png" preload="true"/>
   
   <texture name="ProgressBar" file_name="widgets/ProgressBar.png" preload="true" scale.left="4" scale.top="11" scale.right="48" scale.bottom="3" />
   <texture name="ProgressBarSolid" file_name="widgets/ProgressBarSolid.png" preload="true" scale.left="4" scale.top="11" scale.right="48" scale.bottom="3" />
@@ -637,8 +655,7 @@ with the same filename but different name
 
   <texture name="login_sl_logo"  file_name="windows/login_sl_logo.png" preload="true" />
   <texture name="login_sl_logo_small"  file_name="windows/login_sl_logo_small.png" preload="true" />
-  <texture name="first_login_image_left"  file_name="windows/first_login_image_left.png" preload="true" />
-  <texture name="first_login_image_right"  file_name="windows/first_login_image_right.png" preload="true" />
+  <texture name="first_login_image"  file_name="windows/first_login_image.jpg" preload="true" />
 
   <texture name="Stepper_Down_Off" file_name="widgets/Stepper_Down_Off.png" preload="false" />
   <texture name="Stepper_Down_Press" file_name="widgets/Stepper_Down_Press.png" preload="false" />
@@ -818,6 +835,10 @@ with the same filename but different name
   <texture name="icon_diurnal.tga" />
   <texture name="icon_for_sale.tga" file_name="icons/Icon_For_Sale.png" />
   <texture name="icon_top_pick.tga" />
+  <texture name="Icon_Place" file_name="icon_place.tga" preload="false" />
+  <texture name="Icon_Auction" file_name="icon_auction.tga" preload="false" />
+  <texture name="Icon_Group" file_name="icon_group.tga" preload="false" />
+
 
   <texture name="lag_status_critical.tga" />
   <texture name="lag_status_good.tga" />
@@ -832,6 +853,8 @@ with the same filename but different name
   <texture name="map_infohub.tga" />
   <texture name="map_telehub.tga" />
   <texture name="map_track_16.tga" />
+  <texture name="map_ui_collapse_icon.png" />
+  <texture name="map_ui_expand_icon.png" />
 
   <texture name="notify_caution_icon.tga" />
 
@@ -873,29 +896,19 @@ with the same filename but different name
   <texture name="Camera_Drag_Dot" file_name="world/CameraDragDot.png"/>
   <texture name="NavBar Separator" file_name="navbar/separator.png"/>
 
+  <texture name="Cake" file_name="icons/cake_32.png" preload="false"/>
+  <texture name="Clipboard_Copy" file_name="icons/clipboard_copy.png" preload="false" />
+  <texture name="Clipboard_Cut" file_name="icons/clipboard_cut.png" preload="false" />
+  <texture name="Clipboard_Paste" file_name="icons/clipboard_paste.png" preload="false" />
+
+  <texture name="AccountLevel_Internal" file_name="icons/SL_logo.png" preload="false" />
+  <texture name="AccountLevel_Plus" file_name="icons/AccountLevel_Plus.png" preload="false" />
+  <texture name="AccountLevel_Premium" file_name="icons/AccountLevel_Premium.png" preload="false" />
+
   <texture name="Default_Outfit_Photo" file_name="icons/Default_Outfit_Photo.png" preload="true"/>
   <texture name="Notification_Condense" file_name="icons/Icon_Notification_Condense.png" preload="true"/>
   <texture name="Notification_Expand" file_name="icons/Icon_Notification_Expand.png" preload="true"/>
   <texture name="System_Notification" file_name="icons/SL_Logo.png" preload="true"/>
   <texture name="Icon_Attachment_Small" file_name="icons/Icon_Attachment_Small.png"	preload="true"/>
   <texture name="Icon_Attachment_Large" file_name="icons/Icon_Attachment_Large.png"	preload="true"/>
-<texture name="Icon_Place" file_name="icon_place.tga" preload="false" />
-<texture name="Icon_Auction" file_name="icon_auction.tga" preload="false" />
-<texture name="Icon_Group" file_name="icon_group.png" preload="false" />
-<texture name="Icon_Legacy_Event_PG" file_name="icon_legacy_event.tga" preload="false" />
-<texture name="Icon_Legacy_Event_Mature" file_name="icon_legacy_event_mature.tga" preload="false" />
-<texture name="Icon_Legacy_Event_Adult" file_name="icon_legacy_event_adult.tga" preload="false" />
-
-<texture name="ProgressLarge_1" file_name="icons/ProgressLarge_1.png" preload="true" />
-<texture name="ProgressLarge_2" file_name="icons/ProgressLarge_2.png" preload="true" />
-<texture name="ProgressLarge_3" file_name="icons/ProgressLarge_3.png" preload="true" />
-<texture name="ProgressLarge_4" file_name="icons/ProgressLarge_4.png" preload="true" />
-<texture name="ProgressLarge_5" file_name="icons/ProgressLarge_5.png" preload="true" />
-<texture name="ProgressLarge_6" file_name="icons/ProgressLarge_6.png" preload="true" />
-<texture name="ProgressLarge_7" file_name="icons/ProgressLarge_7.png" preload="true" />
-<texture name="ProgressLarge_8" file_name="icons/ProgressLarge_8.png" preload="true" />
-<texture name="ProgressLarge_9" file_name="icons/ProgressLarge_9.png" preload="true" />
-<texture name="ProgressLarge_10" file_name="icons/ProgressLarge_10.png" preload="true" />
-<texture name="ProgressLarge_11" file_name="icons/ProgressLarge_11.png" preload="true" />
-<texture name="ProgressLarge_12" file_name="icons/ProgressLarge_12.png" preload="true" />
 </textures>

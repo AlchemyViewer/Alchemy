@@ -241,9 +241,7 @@ void LLControlAvatar::matchVolumeTransform()
 #ifdef SHOW_DEBUG
                 LL_DEBUGS("BindShape") << getFullname() << " bind shape " << skin_info->mBindShapeMatrix << LL_ENDL;
 #endif
-                alignas(16) LLMatrix4 mat(LLMatrix4::kUninitialized);
-                skin_info->mBindShapeMatrix.store4a((F32*)mat.mMatrix);
-                bind_rot = LLSkinningUtil::getUnscaledQuaternion(mat);
+                bind_rot = LLSkinningUtil::getUnscaledQuaternion(LLMatrix4(skin_info->mBindShapeMatrix));
 			}
 #endif
 			setRotation(bind_rot*obj_rot);
@@ -300,14 +298,12 @@ void LLControlAvatar::updateVolumeGeom()
 	mRootVolp->mDrawable->makeActive();
 	gPipeline.markMoved(mRootVolp->mDrawable);
 	gPipeline.markTextured(mRootVolp->mDrawable); // face may need to change draw pool to/from POOL_HUD
-	mRootVolp->mDrawable->setState(LLDrawable::USE_BACKLIGHT);
 
 	const LLViewerObject::const_child_list_t& child_list = mRootVolp->getChildren();
 	for (LLViewerObject* childp : child_list)
 	{
 		if (childp && childp->mDrawable.notNull())
 		{
-			childp->mDrawable->setState(LLDrawable::USE_BACKLIGHT);
 			gPipeline.markTextured(childp->mDrawable); // face may need to change draw pool to/from POOL_HUD
 			gPipeline.markMoved(childp->mDrawable);
         }
@@ -567,7 +563,7 @@ void LLControlAvatar::updateAnimations()
     getAnimatedVolumes(volumes);
     
     // Rebuild mSignaledAnimations from the associated volumes.
-    auto& signaled_anim_map = LLObjectSignaledAnimationMap::instanceFast().getMap();
+    auto& signaled_anim_map = LLObjectSignaledAnimationMap::instance().getMap();
 
 	std::map<LLUUID, S32> anims;
     for (LLVOVolume* volp : volumes)

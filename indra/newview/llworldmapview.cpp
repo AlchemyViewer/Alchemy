@@ -63,9 +63,15 @@
 
 #include "llglheaders.h"
 
+// # Constants
+static const F32 MAP_DEFAULT_SCALE = 128.f;
+static const F32 MAP_ITERP_TIME_CONSTANT = 0.75f;
+static const F32 MAP_ZOOM_ACCELERATION_TIME = 0.3f;
+static const F32 MAP_ZOOM_MAX_INTERP = 0.5f;
+static const F32 MAP_SCALE_SNAP_THRESHOLD = 0.005f;
+
 // Basically a C++ implementation of the OCEAN_COLOR defined in mapstitcher.py 
 // Please ensure consistency between those 2 files (TODO: would be better to get that color from an asset source...)
-// # Constants
 // OCEAN_COLOR = "#1D475F"
 const F32 OCEAN_RED   = (F32)(0x1D)/255.f;
 const F32 OCEAN_GREEN = (F32)(0x47)/255.f;
@@ -98,14 +104,12 @@ LLUIImagePtr LLWorldMapView::sClassifiedsImage = NULL;
 LLUIImagePtr LLWorldMapView::sForSaleImage = NULL;
 LLUIImagePtr LLWorldMapView::sForSaleAdultImage = NULL;
 
-F32 LLWorldMapView::sPanX = 0.f;
-F32 LLWorldMapView::sPanY = 0.f;
-F32 LLWorldMapView::sTargetPanX = 0.f;
-F32 LLWorldMapView::sTargetPanY = 0.f;
 S32 LLWorldMapView::sTrackingArrowX = 0;
 S32 LLWorldMapView::sTrackingArrowY = 0;
 bool LLWorldMapView::sVisibleTilesLoaded = false;
-F32 LLWorldMapView::sMapScale = 128.f;
+F32 LLWorldMapView::sMapScaleSetting = MAP_DEFAULT_SCALE;
+LLVector2 LLWorldMapView::sZoomPivot = LLVector2(0.0f, 0.0f);
+LLFrameTimer LLWorldMapView::sZoomTimer = LLFrameTimer();
 
 std::map<std::string,std::string> LLWorldMapView::sStringsMap;
 
@@ -174,20 +178,27 @@ void LLWorldMapView::cleanupClass()
 	sForSaleAdultImage = NULL;
 }
 
-LLWorldMapView::LLWorldMapView()
-:	LLPanel(),
-	mBackgroundColor( LLColor4( OCEAN_RED, OCEAN_GREEN, OCEAN_BLUE, 1.f ) ),
-	mItemPicked(FALSE),
-	mPanning( FALSE ),
-	mMouseDownPanX( 0 ),
-	mMouseDownPanY( 0 ),
-	mMouseDownX( 0 ),
-	mMouseDownY( 0 ),
-	mSelectIDStart(0)
+LLWorldMapView::LLWorldMapView() :
+    LLPanel(),
+    mBackgroundColor(LLColor4(OCEAN_RED, OCEAN_GREEN, OCEAN_BLUE, 1.f)),
+    mItemPicked(FALSE),
+    mPanX(0.f),
+    mPanY(0.f),
+    mTargetPanX(0.f),
+    mTargetPanY(0.f),
+    mPanning(FALSE),
+    mMouseDownPanX(0),
+    mMouseDownPanY(0),
+    mMouseDownX(0),
+    mMouseDownY(0),
+    mSelectIDStart(0),
+    mMapScale(0.f),
+    mTargetMapScale(0.f),
+    mMapIterpTime(MAP_ITERP_TIME_CONSTANT)
 {
-	//LL_INFOS("WorldMap") << "Creating the Map -> LLWorldMapView::LLWorldMapView()" << LL_ENDL;
+    // LL_INFOS("WorldMap") << "Creating the Map -> LLWorldMapView::LLWorldMapView()" << LL_ENDL;
 
-	clearLastClick();
+    clearLastClick();
 }
 
 BOOL LLWorldMapView::postBuild()
@@ -218,6 +229,9 @@ BOOL LLWorldMapView::postBuild()
 	mTextBoxNorthEast ->reshapeToFitText();
 	mTextBoxSouthWest->reshapeToFitText();
 	mTextBoxNorthWest ->reshapeToFitText();
+    
+    sZoomTimer.stop();
+    setScale(sMapScaleSetting, true);
 
 	return true;
 }
@@ -235,58 +249,110 @@ void LLWorldMapView::cleanupTextures()
 {
 }
 
+void LLWorldMapView::zoom(F32 zoom)
+{
+    mTargetMapScale = scaleFromZoom(zoom);
+    if (!sZoomTimer.getStarted() && mMapScale != mTargetMapScale)
+    {
+        sZoomPivot = LLVector2(0, 0);
+        sZoomTimer.start();
+    }
+}
+
+void LLWorldMapView::zoomWithPivot(F32 zoom, S32 x, S32 y)
+{
+    mTargetMapScale = scaleFromZoom(zoom);
+    sZoomPivot      = LLVector2(x, y);
+    if (!sZoomTimer.getStarted() && mMapScale != mTargetMapScale)
+    {
+        sZoomTimer.start();
+    }
+}
+
+F32 LLWorldMapView::getZoom() { return LLWorldMapView::zoomFromScale(mMapScale); }
+
+F32 LLWorldMapView::getScale() { return mMapScale; }
 
 // static
-void LLWorldMapView::setScale( F32 scale )
+void LLWorldMapView::setScaleSetting(F32 scaleSetting) { sMapScaleSetting = scaleSetting; }
+
+// static
+F32 LLWorldMapView::getScaleSetting() { return sMapScaleSetting; }
+
+void LLWorldMapView::setScale(F32 scale, bool snap)
 {
-	if (scale != sMapScale)
-	{
-		F32 old_scale = sMapScale;
+    if (scale != mMapScale)
+    {
+        F32 old_scale = mMapScale;
 
-		sMapScale = scale;
-		if (sMapScale <= 0.f)
-		{
-			sMapScale = 0.1f;
-		}
+        mMapScale = scale;
+        // Set the scale used when saving the setting
+        sMapScaleSetting = scale;
+        if (mMapScale <= 0.f)
+        {
+            mMapScale = 0.1f;
+        }
+        mMapIterpTime = MAP_ITERP_TIME_CONSTANT;
+        F32 ratio = (scale / old_scale);
+        mPanX *= ratio;
+        mPanY *= ratio;
+        mTargetPanX         = mPanX;
+        mTargetPanY         = mPanY;
+        sVisibleTilesLoaded = false;
 
-		F32 ratio = (scale / old_scale);
-		sPanX *= ratio;
-		sPanY *= ratio;
-		sTargetPanX = sPanX;
-		sTargetPanY = sPanY;
-		sVisibleTilesLoaded = false;
-	}
+        // If we are zooming relative to somewhere else rather than the center of the map, compensate for the difference in panning here
+        if (!sZoomPivot.isExactlyZero())
+        {
+            LLVector2 relative_pivot;
+            relative_pivot.mV[VX]     = sZoomPivot.mV[VX] - (getRect().getWidth() / 2.0);
+            relative_pivot.mV[VY]     = sZoomPivot.mV[VY] - (getRect().getHeight() / 2.0);
+            LLVector2 zoom_pan_offset = relative_pivot - (relative_pivot * scale / old_scale);
+            mPanX += zoom_pan_offset.mV[VX];
+            mPanY += zoom_pan_offset.mV[VY];
+            mTargetPanX += zoom_pan_offset.mV[VX];
+            mTargetPanY += zoom_pan_offset.mV[VY];
+        }
+    }
+
+    if (snap)
+    {
+        mTargetMapScale = scale;
+    }
+}
+
+// static
+void LLWorldMapView::translatePan(S32 delta_x, S32 delta_y)
+{
+    mPanX += delta_x;
+    mPanY += delta_y;
+    mTargetPanX         = mPanX;
+    mTargetPanY         = mPanY;
+    sVisibleTilesLoaded = false;
 }
 
 
 // static
-void LLWorldMapView::translatePan( S32 delta_x, S32 delta_y )
+void LLWorldMapView::setPan(S32 x, S32 y, BOOL snap)
 {
-	sPanX += delta_x;
-	sPanY += delta_y;
-	sTargetPanX = sPanX;
-	sTargetPanY = sPanY;
-	sVisibleTilesLoaded = false;
+    mMapIterpTime = MAP_ITERP_TIME_CONSTANT;
+    mTargetPanX = (F32) x;
+    mTargetPanY = (F32) y;
+    if (snap)
+    {
+        mPanX = mTargetPanX;
+        mPanY = mTargetPanY;
+    }
+    sVisibleTilesLoaded = false;
 }
-
 
 // static
-void LLWorldMapView::setPan( S32 x, S32 y, BOOL snap )
+void LLWorldMapView::setPanWithInterpTime(S32 x, S32 y, BOOL snap, F32 interp_time)
 {
-	sTargetPanX = (F32)x;
-	sTargetPanY = (F32)y;
-	if (snap)
-	{
-		sPanX = sTargetPanX;
-		sPanY = sTargetPanY;
-	}
-	sVisibleTilesLoaded = false;
+    setPan(x, y, snap);
+    mMapIterpTime = interp_time;
 }
 
-bool LLWorldMapView::showRegionInfo()
-{
-	return (LLWorldMipmap::scaleToLevel(sMapScale) <= DRAW_SIMINFO_THRESHOLD ? true : false);
-}
+bool LLWorldMapView::showRegionInfo() { return (LLWorldMipmap::scaleToLevel(mMapScale) <= DRAW_SIMINFO_THRESHOLD ? true : false); }
 
 ///////////////////////////////////////////////////////////////////////////////////
 // HELPERS
@@ -308,9 +374,28 @@ void LLWorldMapView::draw()
 
 	mVisibleRegions.clear();
 
-	// animate pan if necessary
-	sPanX = ll_lerp(sPanX, sTargetPanX, LLSmoothInterpolation::getInterpolant(0.1f));
-	sPanY = ll_lerp(sPanY, sTargetPanY, LLSmoothInterpolation::getInterpolant(0.1f));
+    // animate pan if necessary
+    mPanX = ll_lerp(mPanX, mTargetPanX, LLSmoothInterpolation::getInterpolant(mMapIterpTime));
+    mPanY = ll_lerp(mPanY, mTargetPanY, LLSmoothInterpolation::getInterpolant(mMapIterpTime));
+    
+    //RN: snaps to zoom value because interpolation caused jitter in the text rendering
+    if (!sZoomTimer.getStarted() && mMapScale != mTargetMapScale)
+    {
+        sZoomTimer.start();
+    }
+    bool snap_scale = false;
+    F32 interp = llmin(MAP_ZOOM_MAX_INTERP, sZoomTimer.getElapsedTimeF32() / MAP_ZOOM_ACCELERATION_TIME);
+    F32 current_zoom_val = zoomFromScale(mMapScale);
+    F32 target_zoom_val = zoomFromScale(mTargetMapScale);
+    F32 new_zoom_val = ll_lerp(current_zoom_val, target_zoom_val, interp);
+    if (abs(new_zoom_val - current_zoom_val) < MAP_SCALE_SNAP_THRESHOLD)
+    {
+        sZoomTimer.stop();
+        snap_scale = true;
+        new_zoom_val = target_zoom_val;
+    }
+    F32 map_scale = scaleFromZoom(new_zoom_val);
+    setScale(map_scale, snap_scale);
 
 	const S32 width = getRect().getWidth();
 	const S32 height = getRect().getHeight();
@@ -318,7 +403,7 @@ void LLWorldMapView::draw()
 	const F32 half_height = F32(height) / 2.0f;
 	LLVector3d camera_global = gAgentCamera.getCameraPositionGlobal();
 
-	S32 level = LLWorldMipmap::scaleToLevel(sMapScale);
+	S32 level = LLWorldMipmap::scaleToLevel(mMapScale);
 
 	LLLocalClipRect clip(getLocalRect());
 	{
@@ -329,26 +414,23 @@ void LLWorldMapView::draw()
 		// Clear the background alpha to 0
 		gGL.flush();
 		gGL.setColorMask(false, true);
-		gGL.setAlphaRejectSettings(LLRender::CF_GREATER_EQUAL, 0.f);
+        gGL.flush();
 		gGL.setSceneBlendType(LLRender::BT_REPLACE);
 		gGL.color4f(0.0f, 0.0f, 0.0f, 0.0f);
 		gl_rect_2d(0, height, width, 0);
 	}
 
 	gGL.flush();
-
-	gGL.setAlphaRejectSettings(LLRender::CF_DEFAULT);
 	gGL.setColorMask(true, true);
 
 	// Draw the image tiles
 	drawMipmap(width, height);
 	gGL.flush();
 
-	gGL.setAlphaRejectSettings(LLRender::CF_DEFAULT);
 	gGL.setColorMask(true, true);
 
 	// Draw per sim overlayed information (names, mature, offline...)
-	for (const auto& sim_info_pair : LLWorldMap::getInstanceFast()->getRegionMap())
+	for (const auto& sim_info_pair : LLWorldMap::getInstance()->getRegionMap())
 	{
 		U64 handle = sim_info_pair.first;
 		LLSimInfo* info = sim_info_pair.second.get();
@@ -357,15 +439,15 @@ void LLWorldMapView::draw()
 
 		// Find x and y position relative to camera's center.
 		LLVector3d rel_region_pos = origin_global - camera_global;
-		F32 relative_x = (rel_region_pos.mdV[0] / REGION_WIDTH_METERS) * sMapScale;
-		F32 relative_y = (rel_region_pos.mdV[1] / REGION_WIDTH_METERS) * sMapScale;
+		F32 relative_x = (rel_region_pos.mdV[0] / REGION_WIDTH_METERS) * mMapScale;
+		F32 relative_y = (rel_region_pos.mdV[1] / REGION_WIDTH_METERS) * mMapScale;
 
 		// Coordinates of the sim in pixels in the UI panel
 		// When the view isn't panned, 0,0 = center of rectangle
-		F32 bottom =    sPanY + half_height + relative_y;
-		F32 left =      sPanX + half_width + relative_x;
-		F32 top =		bottom+ (sMapScale * (info->getSizeY() / REGION_WIDTH_METERS));
-		F32 right =		left  + (sMapScale * (info->getSizeX() / REGION_WIDTH_METERS));
+		F32 bottom =    mPanY + half_height + relative_y;
+		F32 left =      mPanX + half_width + relative_x;
+		F32 top =		bottom+ (mMapScale * (info->getSizeY() / REGION_WIDTH_METERS));
+		F32 right =		left  + (mMapScale * (info->getSizeX() / REGION_WIDTH_METERS));
 
 		// Discard if region is outside the screen rectangle (not visible on screen)
 		if ((top < 0.f)   || (bottom > height) ||
@@ -426,8 +508,8 @@ void LLWorldMapView::draw()
 			if (overlayimage)
 			{
 				// Inform the fetch mechanism of the size we need
-				S32 x_draw_size = ll_round(sMapScale);
-				S32 y_draw_size = ll_round(sMapScale);
+				S32 x_draw_size = ll_round(mMapScale);
+				S32 y_draw_size = ll_round(mMapScale);
 				x_draw_size *= (info->getSizeX() / REGION_WIDTH_METERS);
 				y_draw_size *= (info->getSizeY() / REGION_WIDTH_METERS);
 
@@ -458,7 +540,7 @@ void LLWorldMapView::draw()
 		}
 
 		// Draw the region name in the lower left corner
-		if (sMapScale >= DRAW_TEXT_THRESHOLD)
+		if (mMapScale >= DRAW_TEXT_THRESHOLD)
 		{
 			static LLCachedControl<bool> mapShowAgentCount(gSavedSettings, "AlchemyMapShowAgentCount", true);
 			LLFontGL* font = LLFontGL::getFont(LLFontDescriptor("SansSerif", "Small", LLFontGL::BOLD));
@@ -496,7 +578,7 @@ void LLWorldMapView::draw()
 					LLColor4::white,
 					LLFontGL::LEFT, LLFontGL::BASELINE, LLFontGL::NORMAL, LLFontGL::DROP_SHADOW,
 					S32_MAX, //max_chars
-					sMapScale, //max_pixels
+					mMapScale, //max_pixels
 					NULL,
 					TRUE); //use ellipses
 			}
@@ -509,13 +591,13 @@ void LLWorldMapView::draw()
 	LLGLSUIDefault gls_ui;
 	{
 		gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
-		gGL.setAlphaRejectSettings(LLRender::CF_GREATER_EQUAL, 0.f);
+        gGL.flush();
 		gGL.blendFunc(LLRender::BF_ONE_MINUS_DEST_ALPHA, LLRender::BF_DEST_ALPHA);
 		gGL.color4fv( mBackgroundColor.mV );
 		gl_rect_2d(0, height, width, 0);
 	}
 
-	gGL.setAlphaRejectSettings(LLRender::CF_DEFAULT);
+    gGL.flush();
 	gGL.setSceneBlendType(LLRender::BT_ALPHA);
 
 	// Draw item infos if we're not zoomed out too much and there's something to draw
@@ -578,13 +660,13 @@ void LLWorldMapView::draw()
 			drawTracking( pos_global, map_track_color, TRUE, LLTracker::getLabel(), LLTracker::getToolTip() );
 		}
 	}
-	else if (LLWorldMap::getInstanceFast()->isTracking())
+	else if (LLWorldMap::getInstance()->isTracking())
 	{
-		if (LLWorldMap::getInstanceFast()->isTrackingInvalidLocation())
+		if (LLWorldMap::getInstance()->isTrackingInvalidLocation())
 		{
 			// We know this location to be invalid, draw a blue circle
 			LLColor4 loading_color(0.0, 0.5, 1.0, 1.0);
-			drawTracking( LLWorldMap::getInstanceFast()->getTrackedPositionGlobal(), loading_color, TRUE, getString("InvalidLocation"), "");
+			drawTracking( LLWorldMap::getInstance()->getTrackedPositionGlobal(), loading_color, TRUE, getString("InvalidLocation"), "");
 		}
 		else
 		{
@@ -592,7 +674,7 @@ void LLWorldMapView::draw()
 			double value = fmod(current_time, 2);
 			value = 0.5 + 0.5*cos(value * F_PI);
 			LLColor4 loading_color(0.0, F32(value/2), F32(value), 1.0);
-			drawTracking( LLWorldMap::getInstanceFast()->getTrackedPositionGlobal(), loading_color, TRUE, getString("Loading"), "");
+			drawTracking( LLWorldMap::getInstance()->getTrackedPositionGlobal(), loading_color, TRUE, getString("Loading"), "");
 		}
 	}
 
@@ -616,16 +698,16 @@ void LLWorldMapView::setVisible(BOOL visible)
 	if (!visible)
 	{
 		// Drop the download of tiles and images priority to nil if we hide the map
-		LLWorldMap::getInstanceFast()->dropImagePriorities();
+		LLWorldMap::getInstance()->dropImagePriorities();
 	}
 }
 
 void LLWorldMapView::drawMipmap(S32 width, S32 height)
 {
 	// Compute the level of the mipmap to use for the current scale level
-	S32 level = LLWorldMipmap::scaleToLevel(sMapScale);
+	S32 level = LLWorldMipmap::scaleToLevel(mMapScale);
 	// Set the tile boost level so that unused tiles get to 0
-	LLWorldMap::getInstanceFast()->equalizeBoostLevels();
+	LLWorldMap::getInstance()->equalizeBoostLevels();
 
 	// Render whatever we already have loaded if we haven't the current level
 	// complete and use it as a background (scaled up or scaled down)
@@ -690,7 +772,7 @@ bool LLWorldMapView::drawMipmapLevel(S32 width, S32 height, S32 level, bool load
 			// Convert to the mipmap level coordinates for that point (i.e. which tile to we hit)
 			LLWorldMipmap::globalToMipmap(pos_global[VX], pos_global[VY], level, &grid_x, &grid_y);
 			// Get the tile. Note: NULL means that the image does not exist (so it's considered "complete" as far as fetching is concerned)
-			LLPointer<LLViewerFetchedTexture> simimage = LLWorldMap::getInstanceFast()->getObjectsTile(grid_x, grid_y, level, load);
+			LLPointer<LLViewerFetchedTexture> simimage = LLWorldMap::getInstance()->getObjectsTile(grid_x, grid_y, level, load);
 			if (simimage)
 			{
 				// Checks that the image has a valid texture
@@ -833,7 +915,7 @@ void LLWorldMapView::drawItems()
 	for (handle_list_t::iterator iter = mVisibleRegions.begin(); iter != mVisibleRegions.end(); ++iter)
 	{
 		U64 handle = *iter;
-		LLSimInfo* info = LLWorldMap::getInstanceFast()->simInfoFromHandle(handle);
+		LLSimInfo* info = LLWorldMap::getInstance()->simInfoFromHandle(handle);
 		if ((info == NULL) || (info->isDown()))
 		{
 			continue;
@@ -885,7 +967,7 @@ void LLWorldMapView::drawAgents()
 	for (handle_list_t::iterator iter = mVisibleRegions.begin(); iter != mVisibleRegions.end(); ++iter)
 	{
 		U64 handle = *iter;
-		LLSimInfo* siminfo = LLWorldMap::getInstanceFast()->simInfoFromHandle(handle);
+		LLSimInfo* siminfo = LLWorldMap::getInstance()->simInfoFromHandle(handle);
 		if ((siminfo == NULL) || (siminfo->isDown()))
 		{
 			continue;
@@ -905,10 +987,10 @@ void LLWorldMapView::drawAgents()
 
 void LLWorldMapView::drawFrustum()
 {
-	auto& viewerCamera = LLViewerCamera::instanceFast();
+	auto& viewerCamera = LLViewerCamera::instance();
 
 	// Draw frustum
-	F32 meters_to_pixels = sMapScale/ REGION_WIDTH_METERS;
+	F32 meters_to_pixels = mMapScale/ REGION_WIDTH_METERS;
 
 	F32 horiz_fov = viewerCamera.getView() * viewerCamera.getAspect();
 	F32 far_clip_meters = viewerCamera.getFar();
@@ -918,8 +1000,8 @@ void LLWorldMapView::drawFrustum()
 	F32 half_width_pixels = half_width_meters * meters_to_pixels;
 	
 	// Compute the frustum coordinates. Take the UI scale into account.
-    F32 ctr_x = ((getLocalRect().getWidth() * 0.5f + sPanX)  * LLUI::getScaleFactor().mV[VX]);
-    F32 ctr_y = ((getLocalRect().getHeight() * 0.5f + sPanY) * LLUI::getScaleFactor().mV[VY]);
+    F32 ctr_x = ((getLocalRect().getWidth() * 0.5f + mPanX)  * LLUI::getScaleFactor().mV[VX]);
+    F32 ctr_y = ((getLocalRect().getHeight() * 0.5f + mPanY) * LLUI::getScaleFactor().mV[VY]);
 
 	gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
 
@@ -976,13 +1058,13 @@ LLVector3 LLWorldMapView::globalPosToView( const LLVector3d& global_pos )
 	LLVector3 pos_local;
 	pos_local.setVec(relative_pos_global);  // convert to floats from doubles
 
-	pos_local.mV[VX] *= sMapScale / REGION_WIDTH_METERS;
-	pos_local.mV[VY] *= sMapScale / REGION_WIDTH_METERS;
+	pos_local.mV[VX] *= mMapScale / REGION_WIDTH_METERS;
+	pos_local.mV[VY] *= mMapScale / REGION_WIDTH_METERS;
 	// leave Z component in meters
 
 
-	pos_local.mV[VX] += getRect().getWidth() / 2 + sPanX;
-	pos_local.mV[VY] += getRect().getHeight() / 2 + sPanY;
+	pos_local.mV[VX] += getRect().getWidth() / 2 + mPanX;
+	pos_local.mV[VY] += getRect().getHeight() / 2 + mPanY;
 
 	return pos_local;
 }
@@ -1056,12 +1138,12 @@ void LLWorldMapView::drawTracking(const LLVector3d& pos_global, const LLColor4& 
 // If you change this, then you need to change LLTracker::getTrackedPositionGlobal() as well
 LLVector3d LLWorldMapView::viewPosToGlobal( S32 x, S32 y )
 {
-	x -= llfloor((getRect().getWidth() / 2 + sPanX));
-	y -= llfloor((getRect().getHeight() / 2 + sPanY));
+	x -= llfloor((getRect().getWidth() / 2 + mPanX));
+	y -= llfloor((getRect().getHeight() / 2 + mPanY));
 
 	LLVector3 pos_local( (F32)x, (F32)y, 0.f );
 
-	pos_local *= ( REGION_WIDTH_METERS / sMapScale );
+	pos_local *= ( REGION_WIDTH_METERS / mMapScale );
 	
 	LLVector3d pos_global;
 	pos_global.setVec( pos_local );
@@ -1085,7 +1167,7 @@ BOOL LLWorldMapView::handleToolTip( S32 x, S32 y, MASK mask )
 	U64 handle = to_region_handle(pos_global);
 	std::string tooltip_msg;
 
-	LLSimInfo* info = LLWorldMap::getInstanceFast()->simInfoFromHandle(handle);
+	LLSimInfo* info = LLWorldMap::getInstance()->simInfoFromHandle(handle);
 	if (info)
 	{
 		LLViewerRegion *region = gAgent.getRegion();
@@ -1483,7 +1565,7 @@ bool LLWorldMapView::checkItemHit(S32 x, S32 y, LLItemInfo& item, LLUUID* id, bo
 	if (y < item_y - BIG_DOT_RADIUS) return false;
 	if (y > item_y + BIG_DOT_RADIUS) return false;
 
-	LLSimInfo* sim_info = LLWorldMap::getInstanceFast()->simInfoFromHandle(item.getRegionHandle());
+	LLSimInfo* sim_info = LLWorldMap::getInstance()->simInfoFromHandle(item.getRegionHandle());
 	if (sim_info)
 	{
 		if (track)
@@ -1521,9 +1603,9 @@ void LLWorldMapView::handleClick(S32 x, S32 y, MASK mask,
 
 	*hit_type = 0; // hit nothing
 
-	LLWorldMap::getInstanceFast()->cancelTracking();
+	LLWorldMap::getInstance()->cancelTracking();
 
-	S32 level = LLWorldMipmap::scaleToLevel(sMapScale);
+	S32 level = LLWorldMipmap::scaleToLevel(mMapScale);
 	// If the zoom level is not too far out already, test hits
 	if (level <= DRAW_SIMINFO_THRESHOLD)
 	{
@@ -1537,7 +1619,7 @@ void LLWorldMapView::handleClick(S32 x, S32 y, MASK mask,
 			for (handle_list_t::iterator iter = mVisibleRegions.begin(); iter != mVisibleRegions.end(); ++iter)
 			{
 				U64 handle = *iter;
-				LLSimInfo* siminfo = LLWorldMap::getInstanceFast()->simInfoFromHandle(handle);
+				LLSimInfo* siminfo = LLWorldMap::getInstance()->simInfoFromHandle(handle);
 				if ((siminfo == NULL) || (siminfo->isDown()))
 				{
 					continue;
@@ -1640,8 +1722,8 @@ BOOL LLWorldMapView::handleMouseDown( S32 x, S32 y, MASK mask )
 {
 	gFocusMgr.setMouseCapture( this );
 
-	mMouseDownPanX = ll_round(sPanX);
-	mMouseDownPanY = ll_round(sPanY);
+	mMouseDownPanX = ll_round(mPanX);
+	mMouseDownPanY = ll_round(mPanY);
 	mMouseDownX = x;
 	mMouseDownY = y;
 	sHandledLastClick = TRUE;
@@ -1656,8 +1738,8 @@ BOOL LLWorldMapView::handleMouseUp( S32 x, S32 y, MASK mask )
 		{
 			// restore mouse cursor
 			S32 local_x, local_y;
-			local_x = mMouseDownX + llfloor(sPanX - mMouseDownPanX);
-			local_y = mMouseDownY + llfloor(sPanY - mMouseDownPanY);
+			local_x = mMouseDownX + llfloor(mPanX - mMouseDownPanX);
+			local_y = mMouseDownY + llfloor(mPanY - mMouseDownPanY);
 			LLRect clip_rect = getRect();
 			clip_rect.stretch(-8);
 			clip_rect.clipPointToRect(mMouseDownX, mMouseDownY, local_x, local_y);
@@ -1685,7 +1767,7 @@ BOOL LLWorldMapView::handleMouseUp( S32 x, S32 y, MASK mask )
 
 void LLWorldMapView::updateVisibleBlocks()
 {
-	if (LLWorldMipmap::scaleToLevel(sMapScale) > DRAW_SIMINFO_THRESHOLD)
+	if (LLWorldMipmap::scaleToLevel(mMapScale) > DRAW_SIMINFO_THRESHOLD)
 	{
 		// If we're zoomed out too much, we just don't load all those sim info: too much!
 		return;
@@ -1701,17 +1783,17 @@ void LLWorldMapView::updateVisibleBlocks()
 	const F32 half_height = F32(height) / 2.0f;
 
 	// Compute center into sim grid coordinates
-	S32 world_center_x = S32((-sPanX / sMapScale) + (camera_global.mdV[0] / REGION_WIDTH_METERS));
-	S32 world_center_y = S32((-sPanY / sMapScale) + (camera_global.mdV[1] / REGION_WIDTH_METERS));
+	S32 world_center_x = S32((-mPanX / mMapScale) + (camera_global.mdV[0] / REGION_WIDTH_METERS));
+	S32 world_center_y = S32((-mPanY / mMapScale) + (camera_global.mdV[1] / REGION_WIDTH_METERS));
 
 	// Compute the boundaries into sim grid coordinates
-	S32 world_left   = world_center_x - S32(half_width  / sMapScale) - 1;
-	S32 world_right  = world_center_x + S32(half_width  / sMapScale) + 1;
-	S32 world_bottom = world_center_y - S32(half_height / sMapScale) - 1;
-	S32 world_top    = world_center_y + S32(half_height / sMapScale) + 1;
+	S32 world_left   = world_center_x - S32(half_width  / mMapScale) - 1;
+	S32 world_right  = world_center_x + S32(half_width  / mMapScale) + 1;
+	S32 world_bottom = world_center_y - S32(half_height / mMapScale) - 1;
+	S32 world_top    = world_center_y + S32(half_height / mMapScale) + 1;
 
-	//LL_INFOS("WorldMap") << "LLWorldMapView::updateVisibleBlocks() : sMapScale = " << sMapScale << ", left = " << world_left << ", right = " << world_right << ", bottom  = " << world_bottom << ", top = " << world_top << LL_ENDL;
-	LLWorldMap::getInstanceFast()->updateRegions(world_left, world_bottom, world_right, world_top);
+	//LL_INFOS("WorldMap") << "LLWorldMapView::updateVisibleBlocks() : mMapScale = " << mMapScale << ", left = " << world_left << ", right = " << world_right << ", bottom  = " << world_bottom << ", top = " << world_top << LL_ENDL;
+	LLWorldMap::getInstance()->updateRegions(world_left, world_bottom, world_right, world_top);
 }
 
 BOOL LLWorldMapView::handleHover( S32 x, S32 y, MASK mask )
@@ -1731,10 +1813,10 @@ BOOL LLWorldMapView::handleHover( S32 x, S32 y, MASK mask )
 			F32 delta_y = (F32)(gViewerWindow->getCurrentMouseDY());
 
 			// Set pan to value at start of drag + offset
-			sPanX += delta_x;
-			sPanY += delta_y;
-			sTargetPanX = sPanX;
-			sTargetPanY = sPanY;
+			mPanX += delta_x;
+			mPanY += delta_y;
+			mTargetPanX = mPanX;
+			mTargetPanY = mPanY;
 
 			gViewerWindow->moveCursorToCenter();
 		}
@@ -1796,7 +1878,7 @@ BOOL LLWorldMapView::handleDoubleClick( S32 x, S32 y, MASK mask )
 			{
 				LLVector3d pos_global = viewPosToGlobal(x, y);
 				std::string sim_name;
-				if (LLWorldMap::getInstanceFast()->simNameFromPosGlobal(pos_global, sim_name))
+				if (LLWorldMap::getInstance()->simNameFromPosGlobal(pos_global, sim_name))
 				{
 					LLFloaterReg::hideInstance("world_map");
 					LLFloaterReg::showInstance("search", LLSD().with("category", "land").with("query", sim_name));
@@ -1811,15 +1893,15 @@ BOOL LLWorldMapView::handleDoubleClick( S32 x, S32 y, MASK mask )
 			}
 		default:
 			{
-				if (LLWorldMap::getInstanceFast()->isTracking())
+				if (LLWorldMap::getInstance()->isTracking())
 				{
-					LLWorldMap::getInstanceFast()->setTrackingDoubleClick();
+					LLWorldMap::getInstance()->setTrackingDoubleClick();
 				}
 				else
 				{
 					// Teleport if we got a valid location
 					LLVector3d pos_global = viewPosToGlobal(x,y);
-					LLSimInfo* sim_info = LLWorldMap::getInstanceFast()->simInfoFromPosGlobal(pos_global);
+					LLSimInfo* sim_info = LLWorldMap::getInstance()->simInfoFromPosGlobal(pos_global);
 					if (sim_info && !sim_info->isDown())
 					{
 						gAgent.teleportViaLocation( pos_global );
@@ -1833,4 +1915,8 @@ BOOL LLWorldMapView::handleDoubleClick( S32 x, S32 y, MASK mask )
 	return FALSE;
 }
 
+// static
+F32 LLWorldMapView::scaleFromZoom(F32 zoom) { return exp2(zoom) * 256.0f; }
 
+// static
+F32 LLWorldMapView::zoomFromScale(F32 scale) { return log2(scale / 256.f); }

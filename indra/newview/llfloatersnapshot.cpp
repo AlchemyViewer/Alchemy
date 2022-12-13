@@ -179,16 +179,20 @@ void LLFloaterSnapshotBase::ImplBase::updateLayout(LLFloaterSnapshotBase* floate
 
 	LLUICtrl* thumbnail_placeholder = floaterp->getChild<LLUICtrl>("thumbnail_placeholder");
 	thumbnail_placeholder->setVisible(mAdvanced);
-	thumbnail_placeholder->reshape(panel_width, thumbnail_placeholder->getRect().getHeight());
+
 	floaterp->getChild<LLUICtrl>("image_res_text")->setVisible(mAdvanced);
 	floaterp->getChild<LLUICtrl>("file_size_label")->setVisible(mAdvanced);
     if (floaterp->hasChild("360_label", TRUE))
     { 
         floaterp->getChild<LLUICtrl>("360_label")->setVisible(mAdvanced);
     }
-	if(!floaterp->isMinimized())
+	if (!mSkipReshaping)
 	{
-		floaterp->reshape(floater_width, floaterp->getRect().getHeight());
+        thumbnail_placeholder->reshape(panel_width, thumbnail_placeholder->getRect().getHeight());
+        if (!floaterp->isMinimized())
+        {
+            floaterp->reshape(floater_width, floaterp->getRect().getHeight());
+        }
 	}
 
 	bool use_freeze_frame = floaterp->getChild<LLUICtrl>("freeze_frame_check")->getValue().asBoolean();
@@ -221,10 +225,10 @@ void LLFloaterSnapshotBase::ImplBase::updateLayout(LLFloaterSnapshotBase* floate
 		// freeze everything else
 		gSavedSettings.setBOOL("FreezeTime", TRUE);
 
-		if (LLToolMgr::getInstanceFast()->getCurrentToolset() != gCameraToolset)
+		if (LLToolMgr::getInstance()->getCurrentToolset() != gCameraToolset)
 		{
-			floaterp->impl->mLastToolset = LLToolMgr::getInstanceFast()->getCurrentToolset();
-			LLToolMgr::getInstanceFast()->setCurrentToolset(gCameraToolset);
+			floaterp->impl->mLastToolset = LLToolMgr::getInstance()->getCurrentToolset();
+			LLToolMgr::getInstance()->setCurrentToolset(gCameraToolset);
 		}
 	}
 	else // turning off freeze frame mode
@@ -247,7 +251,7 @@ void LLFloaterSnapshotBase::ImplBase::updateLayout(LLFloaterSnapshotBase* floate
 		// restore last tool (e.g. pie menu, etc)
 		if (floaterp->impl->mLastToolset)
 		{
-			LLToolMgr::getInstanceFast()->setCurrentToolset(floaterp->impl->mLastToolset);
+			LLToolMgr::getInstance()->setCurrentToolset(floaterp->impl->mLastToolset);
 		}
 	}
 }
@@ -948,7 +952,7 @@ LLFloaterSnapshotBase::~LLFloaterSnapshotBase()
 
 	if (impl->mLastToolset)
 	{
-		LLToolMgr::getInstanceFast()->setCurrentToolset(impl->mLastToolset);
+		LLToolMgr::getInstance()->setCurrentToolset(impl->mLastToolset);
 	}
 
 	delete impl;
@@ -1154,7 +1158,7 @@ void LLFloaterSnapshotBase::onClose(bool app_quitting)
 
 	if (impl->mLastToolset)
 	{
-		LLToolMgr::getInstanceFast()->setCurrentToolset(impl->mLastToolset);
+		LLToolMgr::getInstance()->setCurrentToolset(impl->mLastToolset);
 	}
 }
 
@@ -1196,7 +1200,7 @@ S32 LLFloaterSnapshotBase::notify(const LLSD& info)
 
 		// The refresh button is initially hidden. We show it after the first update,
 		// i.e. when preview appears.
-		if (!mRefreshBtn->getVisible())
+		if (mRefreshBtn && !mRefreshBtn->getVisible())
 		{
 			mRefreshBtn->setVisible(true);
 		}
@@ -1441,7 +1445,7 @@ BOOL LLSnapshotFloaterView::handleMouseDown(S32 x, S32 y, MASK mask)
 	// give floater a change to handle mouse, else camera tool
 	if (childrenHandleMouseDown(x, y, mask) == NULL)
 	{
-		LLToolMgr::getInstanceFast()->getCurrentTool()->handleMouseDown( x, y, mask );
+		LLToolMgr::getInstance()->getCurrentTool()->handleMouseDown( x, y, mask );
 	}
 	return TRUE;
 }
@@ -1457,7 +1461,7 @@ BOOL LLSnapshotFloaterView::handleMouseUp(S32 x, S32 y, MASK mask)
 	// give floater a change to handle mouse, else camera tool
 	if (childrenHandleMouseUp(x, y, mask) == NULL)
 	{
-		LLToolMgr::getInstanceFast()->getCurrentTool()->handleMouseUp( x, y, mask );
+		LLToolMgr::getInstance()->getCurrentTool()->handleMouseUp( x, y, mask );
 	}
 	return TRUE;
 }
@@ -1473,7 +1477,7 @@ BOOL LLSnapshotFloaterView::handleHover(S32 x, S32 y, MASK mask)
 	// give floater a change to handle mouse, else camera tool
 	if (childrenHandleHover(x, y, mask) == NULL)
 	{
-		LLToolMgr::getInstanceFast()->getCurrentTool()->handleHover( x, y, mask );
+		LLToolMgr::getInstance()->getCurrentTool()->handleHover( x, y, mask );
 	}
 	return TRUE;
 }

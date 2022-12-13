@@ -42,6 +42,8 @@
 #include "lldrawpoolalpha.h"
 #include "llfeaturemanager.h"
 //#include "llfirstuse.h"
+#include "llfloaterprogressview.h"
+#include "llfloaterreg.h"
 #include "llhudmanager.h"
 #include "llimagepng.h"
 #include "llmemory.h"
@@ -130,7 +132,8 @@ void display_startup()
 	if (   !gViewerWindow
 		|| !gViewerWindow->getActive()
 		|| !gViewerWindow->getWindow()->getVisible() 
-		|| gViewerWindow->getWindow()->getMinimized() )
+		|| gViewerWindow->getWindow()->getMinimized()
+		|| gNonInteractive)
 	{
 		return; 
 	}
@@ -171,8 +174,6 @@ void display_startup()
 
 	if (gViewerWindow)
 	gViewerWindow->setup2DRender();
-	gGL.getTexUnit(0)->setTextureBlendType(LLTexUnit::TB_MULT);
-
 	gGL.color4f(1,1,1,1);
 	if (gViewerWindow)
 	gViewerWindow->draw();
@@ -204,19 +205,21 @@ void display_update_camera()
 	{
 		final_far *= 0.5f;
 	}
-	LLViewerCamera::getInstanceFast()->setFar(final_far);
+	LLViewerCamera::getInstance()->setFar(final_far);
 	gViewerWindow->setup3DRender();
 	
 	// Update land visibility too
-	LLWorld::getInstanceFast()->setLandFarClip(final_far);
+	LLWorld::getInstance()->setLandFarClip(final_far);
 }
 
 // Write some stats to LL_INFOS()
 void display_stats()
 {
+	LL_PROFILE_ZONE_SCOPED
 	static const LLCachedControl<F32> fps_log_freq(gSavedSettings, "FPSLogFrequency");
 	if (fps_log_freq > 0.f && gRecentFPSTime.getElapsedTimeF32() >= fps_log_freq)
 	{
+		LL_PROFILE_ZONE_NAMED_CATEGORY_DISPLAY("DS - FPS");
 		F32 fps = gRecentFrameCount / fps_log_freq;
 		LL_INFOS() << llformat("FPS: %.02f", fps) << LL_ENDL;
 		gRecentFrameCount = 0;
@@ -225,6 +228,7 @@ void display_stats()
 	static const LLCachedControl<F32> mem_log_freq(gSavedSettings, "MemoryLogFrequency");
 	if (mem_log_freq > 0.f && gRecentMemoryTime.getElapsedTimeF32() >= mem_log_freq)
 	{
+		LL_PROFILE_ZONE_NAMED_CATEGORY_DISPLAY("DS - Memory");
 		gMemoryAllocated = U64Bytes(LLMemory::getCurrentRSS());
 		U32Megabytes memory = gMemoryAllocated;
 		LL_INFOS() << "MEMORY: " << memory << LL_ENDL;
@@ -234,6 +238,7 @@ void display_stats()
     static const LLCachedControl<F32> asset_storage_log_freq(gSavedSettings, "AssetStorageLogFrequency");
     if (asset_storage_log_freq > 0.f && gAssetStorageLogTime.getElapsedTimeF32() >= asset_storage_log_freq)
     {
+		LL_PROFILE_ZONE_NAMED_CATEGORY_DISPLAY("DS - Asset Storage");
         gAssetStorageLogTime.reset();
         gAssetStorage->logAssetStorageInfo();
     }
@@ -284,7 +289,7 @@ static std::string STR_DISPLAY_DONE("Display:Done");
 // Paint the display!
 void display(BOOL rebuild, F32 zoom_factor, int subfield, BOOL for_snapshot)
 {
-	LL_ALWAYS_RECORD_BLOCK_TIME(FTM_RENDER);
+	LL_RECORD_BLOCK_TIME(FTM_RENDER);
 	LLVBOPool::deleteReleasedBuffers();
 
 	if (gWindowResized)
@@ -341,7 +346,8 @@ void display(BOOL rebuild, F32 zoom_factor, int subfield, BOOL for_snapshot)
 	// Attempting to draw into a minimized window causes a GL error. JC
 	if (   !gViewerWindow->getActive()
 		|| !gViewerWindow->getWindow()->getVisible() 
-		|| gViewerWindow->getWindow()->getMinimized() )
+		|| gViewerWindow->getWindow()->getMinimized() 
+		|| gNonInteractive)
 	{
 		// Clean up memory the pools may have allocated
 		if (rebuild)
@@ -465,48 +471,49 @@ void display(BOOL rebuild, F32 zoom_factor, int subfield, BOOL for_snapshot)
 			gAgent.setTeleportMessage(LLStringUtil::null);
 		}
 
+		LLFloaterProgressView* pProgFloater = LLFloaterReg::getTypedInstance<LLFloaterProgressView>("progress_view");
+		
 		const std::string& message = gAgent.getTeleportMessage();
 		switch( gAgent.getTeleportState() )
 		{
 		case LLAgent::TELEPORT_PENDING:
 			gTeleportDisplayTimer.reset();
-			gViewerWindow->setShowProgress(TRUE);
-			gViewerWindow->setProgressPercent(llmin(teleport_percent, 0.0f));
+			pProgFloater->setVisible(TRUE);
+			pProgFloater->setProgressPercent(llmin(teleport_percent, 0.f));
 			gAgent.setTeleportMessage(LLAgent::sTeleportProgressMessages["pending"]);
-			gViewerWindow->setProgressString(LLAgent::sTeleportProgressMessages["pending"]);
+			pProgFloater->setProgressText(LLAgent::sTeleportProgressMessages["pending"]);
 			break;
 
 		case LLAgent::TELEPORT_START:
 			// Transition to REQUESTED.  Viewer has sent some kind
 			// of TeleportRequest to the source simulator
 			gTeleportDisplayTimer.reset();
-			gViewerWindow->setShowProgress(TRUE);
-			gViewerWindow->setProgressPercent(llmin(teleport_percent, 0.0f));
+			pProgFloater->setVisible(TRUE);
+			pProgFloater->setProgressPercent(llmin(teleport_percent, 0.f));
 			LL_INFOS("Teleport") << "A teleport request has been sent, setting state to TELEPORT_REQUESTED" << LL_ENDL;
 			gAgent.setTeleportState( LLAgent::TELEPORT_REQUESTED );
 			gAgent.setTeleportMessage(
 				LLAgent::sTeleportProgressMessages["requesting"]);
-			gViewerWindow->setProgressString(LLAgent::sTeleportProgressMessages["requesting"]);
-			gViewerWindow->setProgressMessage(gAgent.mMOTD);
+			pProgFloater->setProgressText(LLAgent::sTeleportProgressMessages["requesting"]);
 			break;
 
 		case LLAgent::TELEPORT_REQUESTED:
 			// Waiting for source simulator to respond
-			gViewerWindow->setProgressPercent( llmin(teleport_percent, 37.5f) );
-			gViewerWindow->setProgressString(message);
+			pProgFloater->setProgressPercent(llmin(teleport_percent, 37.5f));
+			pProgFloater->setProgressText(message);
 			break;
 
 		case LLAgent::TELEPORT_MOVING:
 			// Viewer has received destination location from source simulator
-			gViewerWindow->setProgressPercent( llmin(teleport_percent, 75.f) );
-			gViewerWindow->setProgressString(message);
+			pProgFloater->setProgressPercent(llmin(teleport_percent, 75.f));
+			pProgFloater->setProgressText(message);
 			break;
 
 		case LLAgent::TELEPORT_START_ARRIVAL:
 			// Transition to ARRIVING.  Viewer has received avatar update, etc., from destination simulator
 			gTeleportArrivalTimer.reset();
-				gViewerWindow->setProgressCancelButtonVisible(FALSE, LLTrans::getString("Cancel"));
-			gViewerWindow->setProgressPercent(75.f);
+pProgFloater->setProgressCancelButtonVisible(FALSE, LLTrans::getString("Cancel"));
+			pProgFloater->setProgressPercent(75.f);
 			LL_INFOS("Teleport") << "Changing state to TELEPORT_ARRIVING" << LL_ENDL;
 			gAgent.setTeleportState( LLAgent::TELEPORT_ARRIVING );
 			gAgent.setTeleportMessage(
@@ -528,9 +535,9 @@ void display(BOOL rebuild, F32 zoom_factor, int subfield, BOOL for_snapshot)
 					LL_INFOS("Teleport") << "arrival_fraction is " << arrival_fraction << " changing state to TELEPORT_NONE" << LL_ENDL;
 					gAgent.setTeleportState( LLAgent::TELEPORT_NONE );
 				}
-				gViewerWindow->setProgressCancelButtonVisible(FALSE, LLTrans::getString("Cancel"));
-				gViewerWindow->setProgressPercent(  arrival_fraction * 25.f + 75.f);
-				gViewerWindow->setProgressString(message);
+				pProgFloater->setProgressCancelButtonVisible(FALSE, LLTrans::getString("Cancel"));
+				pProgFloater->setProgressPercent(arrival_fraction * 25.f + 75.f);
+				pProgFloater->setProgressText(message);
 			}
 			break;
 
@@ -552,7 +559,7 @@ void display(BOOL rebuild, F32 zoom_factor, int subfield, BOOL for_snapshot)
 
 		case LLAgent::TELEPORT_NONE:
 			// No teleport in progress
-			gViewerWindow->setShowProgress(FALSE);
+			pProgFloater->setVisible(FALSE);
 			gTeleportDisplay = FALSE;
 // [SL:KB] - Patch: Appearance-TeleportAttachKill | Checked: Catznip-4.0
 			LLViewerParcelMgr::getInstance()->onTeleportDone();
@@ -612,9 +619,11 @@ void display(BOOL rebuild, F32 zoom_factor, int subfield, BOOL for_snapshot)
 	//
 
 	LLAppViewer::instance()->pingMainloopTimeout(STR_DISPLAY_CAMERA);
-	auto& vwrCamera = LLViewerCamera::instanceFast();
-	vwrCamera.setZoomParameters(zoom_factor, subfield);
-	vwrCamera.setNear(MIN_NEAR_PLANE);
+    if (LLViewerCamera::instanceExists())
+    {
+        LLViewerCamera::getInstance()->setZoomParameters(zoom_factor, subfield);
+        LLViewerCamera::getInstance()->setNear(MIN_NEAR_PLANE);
+    }
 
 	//////////////////////////
 	//
@@ -671,6 +680,7 @@ void display(BOOL rebuild, F32 zoom_factor, int subfield, BOOL for_snapshot)
 	
 	if (!gDisconnected)
 	{
+		LL_PROFILE_ZONE_NAMED_CATEGORY_DISPLAY("display - 1");
 		LLAppViewer::instance()->pingMainloopTimeout(STR_DISPLAY_UPDATE);
 		if (gPipeline.hasRenderType(LLPipeline::RENDER_TYPE_HUD))
 		{ //don't draw hud objects in this frame
@@ -689,7 +699,7 @@ void display(BOOL rebuild, F32 zoom_factor, int subfield, BOOL for_snapshot)
 		{
 			LL_RECORD_BLOCK_TIME(FTM_EEP_UPDATE);
             // update all the sky/atmospheric/water settings
-            LLEnvironment::getInstanceFast()->update(&vwrCamera);
+            LLEnvironment::instance().update(LLViewerCamera::getInstance());
 		}
 
 		// *TODO: merge these two methods
@@ -713,21 +723,6 @@ void display(BOOL rebuild, F32 zoom_factor, int subfield, BOOL for_snapshot)
 		
 		stop_glerror();
 
-		S32 water_clip = 0;
-		if ((LLViewerShaderMgr::instance()->getShaderLevel(LLViewerShaderMgr::SHADER_ENVIRONMENT) > 1) &&
-			 (gPipeline.hasRenderType(LLPipeline::RENDER_TYPE_WATER) || 
-			  gPipeline.hasRenderType(LLPipeline::RENDER_TYPE_VOIDWATER)))
-		{
-			if (vwrCamera.cameraUnderWater())
-			{
-				water_clip = -1;
-			}
-			else
-			{
-				water_clip = 1;
-			}
-		}
-		
 		LLAppViewer::instance()->pingMainloopTimeout(STR_DISPLAY_CULL);
 		
 		//Increment drawable frame counter
@@ -745,21 +740,20 @@ void display(BOOL rebuild, F32 zoom_factor, int subfield, BOOL for_snapshot)
 
 		LLGLState::checkStates();
 		LLGLState::checkTextureChannels();
-		LLGLState::checkClientArrays();
 
 		static LLCullResult result;
 		LLViewerCamera::sCurCameraID = LLViewerCamera::CAMERA_WORLD;
-		LLPipeline::sUnderWaterRender = vwrCamera.cameraUnderWater();
-		gPipeline.updateCull(vwrCamera, result, water_clip);
+		LLPipeline::sUnderWaterRender = LLViewerCamera::getInstance()->cameraUnderWater();
+		gPipeline.updateCull(*LLViewerCamera::getInstance(), result);
 		stop_glerror();
 
 		LLGLState::checkStates();
 		LLGLState::checkTextureChannels();
-		LLGLState::checkClientArrays();
-
+		
 		LLAppViewer::instance()->pingMainloopTimeout(STR_DISPLAY_SWAP);
 		
 		{ 
+			LL_PROFILE_ZONE_NAMED_CATEGORY_DISPLAY("display - 2")
 			if (gResizeScreenTexture)
 			{
 				gResizeScreenTexture = FALSE;
@@ -771,26 +765,23 @@ void display(BOOL rebuild, F32 zoom_factor, int subfield, BOOL for_snapshot)
 
 			LLGLState::checkStates();
 			LLGLState::checkTextureChannels();
-			LLGLState::checkClientArrays();
 
 			if (!for_snapshot)
 			{
 				if (gFrameCount > 1)
 				{ //for some reason, ATI 4800 series will error out if you 
 				  //try to generate a shadow before the first frame is through
-					gPipeline.generateSunShadow(vwrCamera);
+					gPipeline.generateSunShadow(*LLViewerCamera::getInstance());
 				}
 
 				LLVertexBuffer::unbind();
 
 				LLGLState::checkStates();
 				LLGLState::checkTextureChannels();
-				LLGLState::checkClientArrays();
 
 				LLMatrix4a proj = get_current_projection();
 				LLMatrix4a mod = get_current_modelview();
 				glViewport(0,0,512,512);
-				LLVOAvatar::updateFreezeCounter() ;
 
 				LLVOAvatar::updateImpostors();
 
@@ -804,25 +795,23 @@ void display(BOOL rebuild, F32 zoom_factor, int subfield, BOOL for_snapshot)
 
 				LLGLState::checkStates();
 				LLGLState::checkTextureChannels();
-				LLGLState::checkClientArrays();
 
 			}
 			glClear(GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 		}
 
 		LLGLState::checkStates();
-		LLGLState::checkClientArrays();
 
 		//if (!for_snapshot)
 		{
+			LL_PROFILE_ZONE_NAMED_CATEGORY_DISPLAY("display - 3")
 			LLAppViewer::instance()->pingMainloopTimeout(STR_DISPLAY_IMAGERY);
-			gPipeline.generateWaterReflection(vwrCamera);
-			gPipeline.generateHighlight(vwrCamera);
+			gPipeline.generateWaterReflection(*LLViewerCamera::getInstance());
+			gPipeline.generateHighlight(*LLViewerCamera::getInstance());
 			gPipeline.renderPhysicsDisplay();
 		}
 
 		LLGLState::checkStates();
-		LLGLState::checkClientArrays();
 
 		//////////////////////////////////////
 		//
@@ -838,13 +827,11 @@ void display(BOOL rebuild, F32 zoom_factor, int subfield, BOOL for_snapshot)
 			
 			{
 				LL_RECORD_BLOCK_TIME(FTM_IMAGE_UPDATE_CLASS);
-				LLTrace::CountStatHandle<>* velocity_stat = LLViewerCamera::getVelocityStat();
-				LLTrace::CountStatHandle<>* angular_velocity_stat = LLViewerCamera::getAngularVelocityStat();
-				LLViewerTexture::updateClass(LLTrace::get_frame_recording().getPeriodMeanPerSec(*velocity_stat),
-											LLTrace::get_frame_recording().getPeriodMeanPerSec(*angular_velocity_stat));
+				LLViewerTexture::updateClass();
 			}
 
-			
+            LLImageGLThread::updateClass();
+
 			{
 				LL_RECORD_BLOCK_TIME(FTM_IMAGE_UPDATE_BUMP);
 				gBumpImageList.updateImages();  // must be called before gTextureList version so that it's textures are thrown out first.
@@ -863,10 +850,9 @@ void display(BOOL rebuild, F32 zoom_factor, int subfield, BOOL for_snapshot)
 				LLImageGL::deleteDeadTextures();
 				stop_glerror();
 			}*/
-			}
+		}
 
 		LLGLState::checkStates();
-		LLGLState::checkClientArrays();
 
 		///////////////////////////////////
 		//
@@ -878,8 +864,9 @@ void display(BOOL rebuild, F32 zoom_factor, int subfield, BOOL for_snapshot)
 		//
 		LLAppViewer::instance()->pingMainloopTimeout(STR_DISPLAY_STATE_SORT);
 		{
+			LL_PROFILE_ZONE_NAMED_CATEGORY_DISPLAY("display - 4")
 			LLViewerCamera::sCurCameraID = LLViewerCamera::CAMERA_WORLD;
-			gPipeline.stateSort(vwrCamera, result);
+			gPipeline.stateSort(*LLViewerCamera::getInstance(), result);
 			stop_glerror();
 				
 			if (rebuild)
@@ -894,16 +881,15 @@ void display(BOOL rebuild, F32 zoom_factor, int subfield, BOOL for_snapshot)
 			}
 		}
 
-		LLSceneMonitor::getInstanceFast()->fetchQueryResult();
+		LLSceneMonitor::getInstance()->fetchQueryResult();
 		
 		LLGLState::checkStates();
-		LLGLState::checkClientArrays();
 
 		LLPipeline::sUseOcclusion = occlusion;
 
 		{
 			LLAppViewer::instance()->pingMainloopTimeout(STR_DISPLAY_SKY);
-			LL_RECORD_BLOCK_TIME(FTM_UPDATE_SKY);	
+			LL_PROFILE_ZONE_NAMED_CATEGORY_ENVIRONMENT("update sky"); //LL_RECORD_BLOCK_TIME(FTM_UPDATE_SKY);	
 			gSky.updateSky();
 		}
 
@@ -955,10 +941,9 @@ void display(BOOL rebuild, F32 zoom_factor, int subfield, BOOL for_snapshot)
 		//	gGL.popMatrix();
 		//}
 
-		LLPipeline::sUnderWaterRender = vwrCamera.cameraUnderWater() ? TRUE : FALSE;
+		LLPipeline::sUnderWaterRender = LLViewerCamera::getInstance()->cameraUnderWater() ? TRUE : FALSE;
 
 		LLGLState::checkStates();
-		LLGLState::checkClientArrays();
 
 		stop_glerror();
 
@@ -975,7 +960,7 @@ void display(BOOL rebuild, F32 zoom_factor, int subfield, BOOL for_snapshot)
             gPipeline.mScreen.bindTarget();
             if (LLPipeline::sUnderWaterRender && !gPipeline.canUseWindLightShaders())
             {
-                const LLColor3 col = LLEnvironment::getInstanceFast()->getCurrentWater()->getWaterFogColor();
+                const LLColor3 col = LLEnvironment::getInstance()->getCurrentWater()->getWaterFogColor();
                 glClearColor(col.mV[0], col.mV[1], col.mV[2], 0.f);
             }
             gPipeline.mScreen.clear();
@@ -988,10 +973,11 @@ void display(BOOL rebuild, F32 zoom_factor, int subfield, BOOL for_snapshot)
 		if (!(LLAppViewer::instance()->logoutRequestSent() && LLAppViewer::instance()->hasSavedFinalSnapshot())
 				&& !gRestoreGL)
 		{
+			LL_PROFILE_ZONE_NAMED_CATEGORY_DISPLAY("display - 5")
 			LLViewerCamera::sCurCameraID = LLViewerCamera::CAMERA_WORLD;
 
 			static LLCachedControl<bool> renderDepthPrePass(gSavedSettings, "RenderDepthPrePass");
-			if (renderDepthPrePass && LLGLSLShader::sNoFixedFunction)
+			if (renderDepthPrePass)
 			{
 				gGL.setColorMask(false, false);
 
@@ -1015,11 +1001,11 @@ void display(BOOL rebuild, F32 zoom_factor, int subfield, BOOL for_snapshot)
 			gGL.setColorMask(true, false);
 			if (LLPipeline::sRenderDeferred)
 			{
-				gPipeline.renderGeomDeferred(vwrCamera);
+				gPipeline.renderGeomDeferred(*LLViewerCamera::getInstance());
 			}
 			else
 			{
-				gPipeline.renderGeom(vwrCamera, TRUE);
+				gPipeline.renderGeom(*LLViewerCamera::getInstance(), TRUE);
 			}
 			
 			gGL.setColorMask(true, true);
@@ -1065,7 +1051,7 @@ void display(BOOL rebuild, F32 zoom_factor, int subfield, BOOL for_snapshot)
 
 		{
 			//capture the frame buffer.
-			LLSceneMonitor::getInstanceFast()->capture();
+			LLSceneMonitor::getInstance()->capture();
 		}
 
 		LLAppViewer::instance()->pingMainloopTimeout(STR_DISPLAY_RENDERUI);
@@ -1127,7 +1113,7 @@ void render_hud_attachments()
 	if (!ALCinematicMode::isEnabled() && LLPipeline::sShowHUDAttachments && !gDisconnected && setup_hud_matrices())
 	{
 		LLPipeline::sRenderingHUDs = TRUE;
-		LLCamera hud_cam = LLViewerCamera::instanceFast();
+		LLCamera hud_cam = LLViewerCamera::instance();
 		hud_cam.setOrigin(-1.f,0,0);
 		hud_cam.setAxes(LLVector3(1,0,0), LLVector3(0,1,0), LLVector3(0,0,1));
 		LLViewerCamera::updateFrustumPlanes(hud_cam, TRUE);
@@ -1219,7 +1205,7 @@ LLRect get_whole_screen_region()
 	LLRect whole_screen = gViewerWindow->getWorldViewRectScaled();
 	
 	// apply camera zoom transform (for high res screenshots)
-	auto& vwrCamera = LLViewerCamera::instanceFast();
+	auto& vwrCamera = LLViewerCamera::instance();
 	F32 zoom_factor = vwrCamera.getZoomFactor();
 	S16 sub_region = vwrCamera.getZoomSubRegion();
 	if (zoom_factor > 1.f)
@@ -1239,7 +1225,7 @@ bool get_hud_matrices(const LLRect& screen_region, LLMatrix4a &proj, LLMatrix4a 
 {
 	if (isAgentAvatarValid() && gAgentAvatarp->hasHUDAttachment())
 	{
-		auto& vwrCamera = LLViewerCamera::instanceFast();
+		auto& vwrCamera = LLViewerCamera::instance();
 		F32 zoom_level = gAgentCamera.mHUDCurZoom;
 		LLBBox hud_bbox = gAgentAvatarp->getHUDBBox();
 		
@@ -1301,7 +1287,7 @@ bool setup_hud_matrices(const LLRect& screen_region)
 
 void render_ui(F32 zoom_factor, int subfield)
 {
-    LL_RECORD_BLOCK_TIME(FTM_RENDER_UI);
+	LL_PROFILE_ZONE_SCOPED_CATEGORY_UI; //LL_RECORD_BLOCK_TIME(FTM_RENDER_UI);
 
 	LLGLState::checkStates();
 	
@@ -1314,71 +1300,76 @@ void render_ui(F32 zoom_factor, int subfield)
 		set_current_modelview(get_last_modelview());
 	}
 	
-	if(LLSceneMonitor::getInstanceFast()->needsUpdate())
+	if(LLSceneMonitor::getInstance()->needsUpdate())
 	{
-        LL_RECORD_BLOCK_TIME(FTM_RENDER_UI_SCENE_MON);
 		gGL.pushMatrix();
 		gViewerWindow->setup2DRender();
-		LLSceneMonitor::getInstanceFast()->compare();
+		LLSceneMonitor::getInstance()->compare();
 		gViewerWindow->setup3DRender();
 		gGL.popMatrix();
 	}
 
-    // Finalize scene
-    gPipeline.renderFinalize();
+	// Finalize scene
+	gPipeline.renderFinalize();
 
-    LL_RECORD_BLOCK_TIME(FTM_RENDER_HUD);
-    render_hud_elements();
+	{
+		// SL-15709
+		// NOTE: Tracy only allows one ZoneScoped per function.
+		// Solutions are:
+		// 1. Use a new scope
+		// 2. Use named zones
+		// 3. Use transient zones
+		LL_PROFILE_ZONE_NAMED_CATEGORY_UI("HUD"); //LL_RECORD_BLOCK_TIME(FTM_RENDER_HUD);
+		render_hud_elements();
 // [RLVa:KB] - Checked: RLVa-2.2 (@setoverlay)
-    if (RlvActions::hasBehaviour(RLV_BHVR_SETOVERLAY))
-    {
-        LLVfxManager::instanceFast().runEffect(EVisualEffect::RlvOverlay);
-    }
+	    if (RlvActions::hasBehaviour(RLV_BHVR_SETOVERLAY))
+	    {
+	        LLVfxManager::instance().runEffect(EVisualEffect::RlvOverlay);
+	    }
 // [/RLVa:KB]
-	render_hud_attachments();
+		render_hud_attachments();
 
-	LLGLSDefault gls_default;
-	LLGLSUIDefault gls_ui;
-	{
-		gPipeline.disableLights();
-	}
-
-	{
-		gGL.color4f(1,1,1,1);
-		if (gPipeline.hasRenderDebugFeatureMask(LLPipeline::RENDER_DEBUG_FEATURE_UI))
+		LLGLSDefault gls_default;
+		LLGLSUIDefault gls_ui;
 		{
-			if (!gDisconnected)
+			gPipeline.disableLights();
+		}
+
+		{
+			gGL.color4f(1,1,1,1);
+			if (gPipeline.hasRenderDebugFeatureMask(LLPipeline::RENDER_DEBUG_FEATURE_UI))
 			{
-                LL_RECORD_BLOCK_TIME(FTM_RENDER_UI_3D);
-				render_ui_3d();
+				if (!gDisconnected)
+				{
+					LL_PROFILE_ZONE_NAMED_CATEGORY_UI("UI 3D"); //LL_RECORD_BLOCK_TIME(FTM_RENDER_UI_3D);
+					render_ui_3d();
+					LLGLState::checkStates();
+				}
+				else
+				{
+					render_disconnected_background();
+				}
+
+				LL_PROFILE_ZONE_NAMED_CATEGORY_UI("UI 2D"); //LL_RECORD_BLOCK_TIME(FTM_RENDER_UI_2D);
+				render_ui_2d();
 				LLGLState::checkStates();
 			}
-			else
-			{
-				render_disconnected_background();
-			}
+			gGL.flush();
 
-            LL_RECORD_BLOCK_TIME(FTM_RENDER_UI_2D);
-			render_ui_2d();
-			LLGLState::checkStates();
-		}
-		gGL.flush();
-
-		{
-            LL_RECORD_BLOCK_TIME(FTM_RENDER_UI_DEBUG_TEXT);
 			gViewerWindow->setup2DRender();
 			gViewerWindow->updateDebugText();
 			gViewerWindow->drawDebugText();
+
+			LLVertexBuffer::unbind();
 		}
 
-		LLVertexBuffer::unbind();
-	}
+		if (!gSnapshot)
+		{
+			set_current_modelview(saved_view);
+			gGL.popMatrix();
+		}
 
-	if (!gSnapshot)
-	{
-		set_current_modelview(saved_view);
-		gGL.popMatrix();
-	}
+	} // Tracy integration
 }
 
 static LLTrace::BlockTimerStatHandle FTM_SWAP("Swap");
@@ -1483,10 +1474,7 @@ void render_ui_3d()
 
 	stop_glerror();
 	
-	if (LLGLSLShader::sNoFixedFunction)
-	{
-		gUIProgram.bind();
-	}
+	gUIProgram.bind();
 
 	// Coordinate axes
 	static LLCachedControl<bool> showAxes(gSavedSettings, "ShowAxes");
@@ -1513,7 +1501,7 @@ void render_ui_2d()
 	//  Menu overlays, HUD, etc
 	gViewerWindow->setup2DRender();
 
-	auto& vwrCamera = LLViewerCamera::instanceFast();
+	auto& vwrCamera = LLViewerCamera::instance();
 	F32 zoom_factor = vwrCamera.getZoomFactor();
 	S16 sub_region = vwrCamera.getZoomSubRegion();
 
@@ -1528,7 +1516,6 @@ void render_ui_2d()
 	}
 
 	stop_glerror();
-	//gGL.getTexUnit(0)->setTextureBlendType(LLTexUnit::TB_MULT);
 
 	// render outline for HUD
 	if (isAgentAvatarValid() && gAgentCamera.mHUDCurZoom < 0.98f)
@@ -1618,10 +1605,7 @@ void render_ui_2d()
 
 void render_disconnected_background()
 {
-	if (LLGLSLShader::sNoFixedFunction)
-	{
-		gUIProgram.bind();
-	}
+	gUIProgram.bind();
 
 	gGL.color4f(1,1,1,1);
 	if (!gDisconnectedImagep && gDisconnected)
@@ -1693,11 +1677,7 @@ void render_disconnected_background()
 	}
 	gGL.flush();
 
-	if (LLGLSLShader::sNoFixedFunction)
-	{
-		gUIProgram.unbind();
-	}
-
+	gUIProgram.unbind();
 }
 
 void display_cleanup()

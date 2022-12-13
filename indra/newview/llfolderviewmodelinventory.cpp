@@ -107,7 +107,7 @@ void LLFolderViewModelInventory::sort( LLFolderViewFolder* folder )
 
 bool LLFolderViewModelInventory::contentsReady()
 {
-	return !LLInventoryModelBackgroundFetch::instanceFast().folderFetchActive();
+	return !LLInventoryModelBackgroundFetch::instance().folderFetchActive();
 }
 
 bool LLFolderViewModelInventory::isFolderComplete(LLFolderViewFolder* folder)

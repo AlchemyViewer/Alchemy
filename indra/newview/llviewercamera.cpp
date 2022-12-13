@@ -63,9 +63,6 @@ LLTrace::CountStatHandle<> LLViewerCamera::sAngularVelocityStat("camera_angular_
 
 LLViewerCamera::eCameraID LLViewerCamera::sCurCameraID = LLViewerCamera::CAMERA_WORLD;
 
-// Build time optimization, generate this once in .cpp file
-template class LLViewerCamera* LLSingleton<class LLViewerCamera>::getInstance();
-
 LLViewerCamera::LLViewerCamera() : LLCamera()
 {
 	calcProjection(getFar());
@@ -87,7 +84,7 @@ void LLViewerCamera::updateCameraLocation(const LLVector3 &center,
 											const LLVector3 &point_of_interest)
 {
 	// do not update if avatar didn't move
-	if (!LLViewerJoystick::getInstanceFast()->getCameraNeedsUpdate())
+	if (!LLViewerJoystick::getInstance()->getCameraNeedsUpdate())
 	{
 		return;
 	}
