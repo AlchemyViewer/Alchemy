@@ -79,7 +79,6 @@ target_link_libraries(llimage
     ${JPEG_LIBRARIES}
     ${PNG_LIBRARIES}
     ${ZLIBNG_LIBRARIES}
-    readerwriterqueue
     )
 
 if(USE_PRECOMPILED_HEADERS AND ${CMAKE_VERSION} VERSION_GREATER "3.15.0") 
@@ -95,7 +94,7 @@ if (LL_TESTS)
 set_source_files_properties(
     llimageworker.cpp
     PROPERTIES
-    LL_TEST_ADDITIONAL_LIBRARIES "${LLPRIMITIVE_LIBRARIES};readerwriterqueue"
+    LL_TEST_ADDITIONAL_LIBRARIES "${LLPRIMITIVE_LIBRARIES}"
   )
 
   SET(llimage_TEST_SOURCE_FILES

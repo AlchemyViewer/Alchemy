@@ -188,7 +188,7 @@ add_library (llwindow
   ${viewer_SOURCE_FILES}
   )
 
-target_link_libraries (llwindow llcommon ${llwindow_LINK_LIBRARIES} readerwriterqueue)
+target_link_libraries (llwindow llcommon ${llwindow_LINK_LIBRARIES})
   
 if (DARWIN)
   include(CMakeFindFrameworks)
