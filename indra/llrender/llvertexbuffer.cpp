@@ -121,7 +121,6 @@ bool LLVertexBuffer::sMapped = false;
 bool LLVertexBuffer::sUseStreamDraw = true;
 bool LLVertexBuffer::sUseVAO = false;
 bool LLVertexBuffer::sPreferStreamDraw = false;
-LLVertexBuffer* LLVertexBuffer::sUtilityBuffer = nullptr;
 U32 LLVertexBuffer::sDummyVAO = 0;
 
 #if LL_DEBUG || LL_RELEASE_WITH_DEBUG_INFO || defined(RELEASE_SHOW_ASSERT)
@@ -938,10 +937,6 @@ void LLVertexBuffer::cleanupClass()
 		sAvailableVAOName.clear();
 	}
 	sLastMask = 0;
-
-	delete sUtilityBuffer;
-	sUtilityBuffer = nullptr;
-
 
 	if (sDummyVAO != 0)
 	{

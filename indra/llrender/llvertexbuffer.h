@@ -362,7 +362,6 @@ public:
 	static U32 sSetCount;
 
 private:
-	static LLVertexBuffer* sUtilityBuffer;
 	static U32 sDummyVAO;
 };
 
