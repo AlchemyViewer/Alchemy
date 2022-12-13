@@ -1046,7 +1046,9 @@ public:
 	}
 
 private:
-//	GLuint vaoName = 0;
+#ifdef GL_ARB_vertex_array_object
+	GLuint vaoName = 0;
+#endif
 };
 
 //-----------------------------------------------------------------------------
