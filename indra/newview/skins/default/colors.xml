@@ -1008,7 +1008,12 @@
   <color
     name="AddPaymentPanel"
     value="0.27 0.27 0.27 1" />
-
+  <color
+    name="OutfitSnapshotMacMask"
+    value="0.115 0.115 0.115 1"/>
+ <color
+   name="OutfitSnapshotMacMask2"
+   value="0.1 0.1 0.1 1"/>
   <!-- Alchemy -->
   <color
    name="AvatarListItemOnlineColor"

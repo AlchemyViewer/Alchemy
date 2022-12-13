@@ -4359,7 +4359,10 @@ class LLLandSit : public view_listener_t
 		if ( (rlv_handler_t::isEnabled()) && ((!RlvActions::canStand()) || (gRlvHandler.hasBehaviour(RLV_BHVR_SIT))) )
 			return true;
 // [/RLVa:KB]
-
+        if (gAgent.isSitting())
+        {
+            gAgent.standUp();
+        }
         LLVector3d posGlobal = LLToolPie::getInstance()->getPick().mPosGlobal;
 
         LLQuaternion target_rot;

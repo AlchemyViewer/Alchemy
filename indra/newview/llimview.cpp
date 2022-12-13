@@ -772,7 +772,7 @@ void LLIMModel::LLIMSession::sessionInitReplyReceived(const LLUUID& new_session_
 }
 
 void LLIMModel::LLIMSession::addMessage(const std::string& from, const LLUUID& from_id, const std::string& utf8_text, 
-	const std::string& time, const bool is_history, const LLSD& bonus)
+	const std::string& time, const bool is_history, bool is_region_msg, const LLSD& bonus)
 {
 	LLSD message;
 	message["from"] = from;
@@ -781,6 +781,7 @@ void LLIMModel::LLIMSession::addMessage(const std::string& from, const LLUUID& f
 	message["time"] = time; 
 	message["index"] = (LLSD::Integer)mMsgs.size(); 
 	message["is_history"] = is_history;
+	message["is_region_msg"] = is_region_msg;
     message["is_announcement"] = bonus.has("announcement");
 
 	mMsgs.push_front(message); 
@@ -1146,7 +1147,7 @@ void LLIMModel::sendNoUnreadMessages(const LLUUID& session_id)
 	mNoUnreadMsgsSignal(arg);
 }
 
-bool LLIMModel::addToHistory(const LLUUID& session_id, const std::string& from, const LLUUID& from_id, const std::string& utf8_text, const LLSD& bonus) {
+bool LLIMModel::addToHistory(const LLUUID& session_id, const std::string& from, const LLUUID& from_id, const std::string& utf8_text, bool is_region_msg, const LLSD& bonus) {
 	
 	LLIMSession* session = findIMSession(session_id);
 
@@ -1156,7 +1157,7 @@ bool LLIMModel::addToHistory(const LLUUID& session_id, const std::string& from, 
 		return false;
 	}
 
-	session->addMessage(from, from_id, utf8_text, LLLogChat::timestamp(false), bonus); //might want to add date separately
+	session->addMessage(from, from_id, utf8_text, LLLogChat::timestamp(false), false, is_region_msg, bonus); //might want to add date separately
 
 	return true;
 }
@@ -1194,9 +1195,9 @@ bool LLIMModel::proccessOnlineOfflineNotification(
 }
 
 bool LLIMModel::addMessage(const LLUUID& session_id, const std::string& from, const LLUUID& from_id, 
-						   const std::string& utf8_text, bool log2file /* = true */, const LLSD& bonus) { 
+						   const std::string& utf8_text, bool log2file, bool is_region_msg, const LLSD& bonus) { 
 
-	LLIMSession* session = addMessageSilently(session_id, from, from_id, utf8_text, log2file, bonus);
+	LLIMSession* session = addMessageSilently(session_id, from, from_id, utf8_text, log2file, is_region_msg, bonus);
 	if (!session) return false;
 
 	//good place to add some1 to recent list
@@ -1221,7 +1222,7 @@ bool LLIMModel::addMessage(const LLUUID& session_id, const std::string& from, co
 }
 
 LLIMModel::LLIMSession* LLIMModel::addMessageSilently(const LLUUID& session_id, const std::string& from, const LLUUID& from_id, 
-													 const std::string& utf8_text, bool log2file /* = true */, const LLSD& bonus)
+													 const std::string& utf8_text, bool log2file, bool is_region_msg, const LLSD& bonus)
 {
 	LLIMSession* session = findIMSession(session_id);
 
@@ -1237,7 +1238,7 @@ LLIMModel::LLIMSession* LLIMModel::addMessageSilently(const LLUUID& session_id, 
 		from_name = SYSTEM_FROM;
 	}
 
-	addToHistory(session_id, from_name, from_id, utf8_text, bonus);
+	addToHistory(session_id, from_name, from_id, utf8_text, is_region_msg, bonus);
 	if (log2file)
 	{
 		logToFile(getHistoryFileName(session_id), from_name, from_id, utf8_text);
@@ -2704,7 +2705,7 @@ void LLIMMgr::addMessage(
 	U32 parent_estate_id,
 	const LLUUID& region_id,
 	const LLVector3& position,
-	bool link_name, // If this is true, then we insert the name and link it to a profile
+	bool is_region_msg,
 	const LLSD& bonus)
 {
 	LLUUID other_participant_id = target_id;
@@ -2777,7 +2778,7 @@ void LLIMMgr::addMessage(
 				//<< "*** region_id: " << region_id << std::endl
 				//<< "*** position: " << position << std::endl;
 
-				LLIMModel::instance().addMessage(new_session_id, from, other_participant_id, bonus_info.str());
+				LLIMModel::instance().addMessage(new_session_id, from, other_participant_id, bonus_info.str(), true, is_region_msg);
 			}
 
 //			// Logically it would make more sense to reject the session sooner, in another area of the
@@ -2811,7 +2812,7 @@ void LLIMMgr::addMessage(
 	if (!LLMuteList::getInstance()->isMuted(other_participant_id, LLMute::flagTextChat))
 // [/SL:KB]
 	{
-		LLIMModel::instance().addMessage(new_session_id, from, other_participant_id, msg, bonus);
+		LLIMModel::instance().addMessage(new_session_id, from, other_participant_id, msg, true, is_region_msg, bonus);
 	}
 
 	// Open conversation floater if offline messages are present
@@ -3884,8 +3885,7 @@ public:
 				IM_SESSION_INVITE,
 				message_params["parent_estate_id"].asInteger(),
 				message_params["region_id"].asUUID(),
-				ll_vector3_from_sd(message_params["position"]),
-				true);
+				ll_vector3_from_sd(message_params["position"]));
 
 			if (LLMuteList::getInstance()->isMuted(from_id, name, LLMute::flagTextChat))
 			{

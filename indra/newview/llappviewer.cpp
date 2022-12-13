@@ -223,7 +223,7 @@
 #include "llcommandlineparser.h"
 #include "llfloatermemleak.h"
 #include "llfloaterreg.h"
-#include "llfloateroutfitsnapshot.h"
+#include "llfloatersimpleoutfitsnapshot.h"
 #include "llfloatersnapshot.h"
 #include "llsidepanelinventory.h"
 
@@ -1285,7 +1285,6 @@ bool LLAppViewer::init()
 
     //LLSimpleton creations
     LLEnvironment::createInstance();
-    LLEnvironment::getInstance()->initSingleton();
     LLWorld::createInstance();
     LLSelectMgr::createInstance();
     LLViewerCamera::createInstance();
@@ -1533,7 +1532,7 @@ bool LLAppViewer::doFrame()
 					LL_PROFILE_ZONE_NAMED_CATEGORY_APP( "df Snapshot" )
 				pingMainloopTimeout("Main:Snapshot");
 				LLFloaterSnapshot::update(); // take snapshots
-					LLFloaterOutfitSnapshot::update();
+                LLFloaterSimpleOutfitSnapshot::update();
 				gGLActive = FALSE;
 			}
 		}

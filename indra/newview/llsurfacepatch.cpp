@@ -747,7 +747,7 @@ BOOL LLSurfacePatch::updateTexture()
 				{
 					mVObjp->dirtyGeom();
 					gPipeline.markGLRebuild(mVObjp);
-					return TRUE;
+					return !mSTexUpdate;
 				}
 			}
 		}

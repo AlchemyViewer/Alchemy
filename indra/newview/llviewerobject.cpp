@@ -324,7 +324,8 @@ LLViewerObject::LLViewerObject(const LLUUID &id, const LLPCode pcode, LLViewerRe
 	mLastUpdateCached(FALSE),
 	mExtraParameterList(LLNetworkData::PARAMS_MAX >> 4),
 	mCachedMuteListUpdateTime(0),
-	mCachedOwnerInMuteList(false)
+	mCachedOwnerInMuteList(false),
+	mRiggedAttachedWarned(false)
 {
 	if (!is_global)
 	{
