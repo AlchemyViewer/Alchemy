@@ -521,6 +521,8 @@ void LLGLManager::initWGL()
 	mHasPBuffer = ExtensionExists("WGL_ARB_pbuffer", gGLHExts.mSysExts) &&
 					ExtensionExists("WGL_ARB_render_texture", gGLHExts.mSysExts) &&
 					ExtensionExists("WGL_ARB_pixel_format", gGLHExts.mSysExts);
+
+	mHasAdaptiveVSync = ExtensionExists("WGL_EXT_swap_control_tear", gGLHExts.mSysExts);
 }
 #endif
 

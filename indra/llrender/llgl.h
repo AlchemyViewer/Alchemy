@@ -123,6 +123,7 @@ public:
     bool mHasTextureSwizzle = false;
     bool mHasGPUShader4  = false;
     bool mHasClipControl = false;
+	bool mHasAdaptiveVSync = false;
 
 	// Vendor-specific extensions
 	BOOL mIsAMD;
