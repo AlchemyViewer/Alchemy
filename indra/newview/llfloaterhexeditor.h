@@ -24,7 +24,7 @@ public:
 	LLFloaterHexEditor(const LLSD& key);
 
 	void onOpen(const LLSD& key) override;
-	BOOL postBuild();
+	BOOL postBuild() override;
 
 	LLInventoryItem* mItem;
 	LLAssetType::EType mAssetType;

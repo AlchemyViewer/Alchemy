@@ -513,7 +513,6 @@ void LLFloaterDirectory::processSearchPeopleReply(LLMessageSystem* msg, void**)
 	std::string first_name;
 	std::string last_name;
 	LLUUID agent_id;
-	LLUUID avatar_id;
 	U8 online;
 	//S32 reputation;
 	

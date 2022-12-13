@@ -472,7 +472,7 @@ void LLDrawPoolWater::renderWater()
     LLGLDisable blend(GL_BLEND);
 
     LLColor3 light_diffuse(0, 0, 0);
-    F32      light_exp = 0.0f;
+//    F32      light_exp = 0.0f;
 
 	LLEnvironment& environment = LLEnvironment::instance();
 	LLViewerCamera& viewerCamera = LLViewerCamera::instance();
@@ -498,7 +498,7 @@ void LLDrawPoolWater::renderWater()
     // Apply magic numbers translating light direction into intensities
     light_dir.normalize();
     F32 ground_proj_sq = light_dir.mV[0] * light_dir.mV[0] + light_dir.mV[1] * light_dir.mV[1];
-    light_exp          = llmax(32.f, 256.f * powf(ground_proj_sq, 16.0f));
+//    light_exp          = llmax(32.f, 256.f * powf(ground_proj_sq, 16.0f));
     if (0.f < light_diffuse.normalize())  // Normalizing a color? Puzzling...
     {
         light_diffuse *= (1.5f + (6.f * ground_proj_sq));

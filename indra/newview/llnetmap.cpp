@@ -634,7 +634,7 @@ void LLNetMap::draw()
 
         gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
 		
-		LLColor4 frust_col = rotate_map ? map_frustum_color() : map_frustum_rotating_color();
+		const LLColor4& frust_col = rotate_map ? map_frustum_color() : map_frustum_rotating_color();
 		
         if (map_chat_ring)
         {
@@ -659,7 +659,7 @@ void LLNetMap::draw()
 			gGL.rotateUI(rot);
 		}
 
-		gl_washer_segment_2d(far_clip_pixels, 0, arc_start, arc_end, steps, map_frustum_color(), map_frustum_color());
+		gl_washer_segment_2d(far_clip_pixels, 0, arc_start, arc_end, steps, frust_col, frust_col);
 
 		if (render_guide_line)
 		{

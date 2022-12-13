@@ -27,11 +27,6 @@
 #import "llsys_objc.h"
 #import <AppKit/AppKit.h>
 
-static int intAtStringIndex(NSArray *array, int index)
-{
-    return [(NSString *)[array objectAtIndex:index] integerValue];
-}
-
 bool LLGetDarwinOSInfo(int &major, int &minor, int &patch)
 {
     NSOperatingSystemVersion osVersion = [[NSProcessInfo processInfo] operatingSystemVersion];
