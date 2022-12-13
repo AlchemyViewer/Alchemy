@@ -622,6 +622,32 @@ BOOL LLWindowMacOSX::createContext(int x, int y, int width, int height, int bits
 		mGLView = createOpenGLView(mWindow, mFSAASamples, enable_vsync);
 		mContext = getCGLContextObj(mGLView);
 		gGLManager.mVRAM = getVramSize(mGLView);
+        
+        if(!mPixelFormat)
+        {
+            CGLPixelFormatAttribute attribs[] =
+            {
+                kCGLPFANoRecovery,
+                kCGLPFADoubleBuffer,
+                kCGLPFAClosestPolicy,
+                kCGLPFAAccelerated,
+                kCGLPFAMultisample,
+                kCGLPFASampleBuffers, static_cast<CGLPixelFormatAttribute>((mFSAASamples > 0 ? 1 : 0)),
+                kCGLPFASamples, static_cast<CGLPixelFormatAttribute>(mFSAASamples),
+                kCGLPFAStencilSize, static_cast<CGLPixelFormatAttribute>(8),
+                kCGLPFADepthSize, static_cast<CGLPixelFormatAttribute>(24),
+                kCGLPFAAlphaSize, static_cast<CGLPixelFormatAttribute>(8),
+                kCGLPFAColorSize, static_cast<CGLPixelFormatAttribute>(24),
+                static_cast<CGLPixelFormatAttribute>(0)
+            };
+
+            GLint numPixelFormats;
+            CGLChoosePixelFormat (attribs, &mPixelFormat, &numPixelFormats);
+            
+            if(mPixelFormat == NULL) {
+                CGLChoosePixelFormat (attribs, &mPixelFormat, &numPixelFormats);
+            }
+        }
 	}
 	
 	// This sets up our view to recieve text from our non-inline text input window.
@@ -1872,6 +1898,7 @@ public:
 
 void* LLWindowMacOSX::createSharedContext()
 {
+    LL_INFOS() << "Creating shared context" << LL_ENDL;
     sharedContext* sc = new sharedContext();
     CGLCreateContext(mPixelFormat, mContext, &(sc->mContext));
 
@@ -1885,6 +1912,7 @@ void LLWindowMacOSX::makeContextCurrent(void* context)
 
 void LLWindowMacOSX::destroySharedContext(void* context)
 {
+    LL_INFOS() << "Destroying shared context" << LL_ENDL;
     sharedContext* sc = (sharedContext*)context;
 
     CGLDestroyContext(sc->mContext);

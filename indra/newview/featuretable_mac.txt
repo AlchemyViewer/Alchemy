@@ -69,7 +69,7 @@ RenderUseStreamVBO			1	1
 RenderFSAASamples			1	16
 RenderMaxTextureIndex		1	16
 RenderGLContextCoreProfile         1   0
-RenderGLMultiThreaded       1   0
+RenderGLMultiThreaded       1   1
 
 //
 // Low Graphics Settings
