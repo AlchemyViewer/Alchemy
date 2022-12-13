@@ -929,6 +929,12 @@ void LLVertexBuffer::cleanupClass()
 	sDynamicVBOPool.cleanup();
 	clean_validate_buffers();
 
+	if (LLVBOPool::sNameIdx != 0)
+	{
+		glDeleteBuffersARB(LLVBOPool::sNameIdx, LLVBOPool::sNamePool);
+		LLVBOPool::sNameIdx = 0;
+	}
+
 	if (!sAvailableVAOName.empty())
 	{
 #if GL_ARB_vertex_array_object
