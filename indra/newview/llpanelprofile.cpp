@@ -307,13 +307,13 @@ void put_avatar_properties_coro(std::string cap_url, LLUUID agent_id, LLSD data)
 }
 
 //////////////////////////////////////////////////////////////////////////
-// LLProfileHandler
+// LLWebProfileHandler
 
-class LLProfileHandler : public LLCommandHandler
+class LLWebProfileHandler : public LLCommandHandler
 {
 public:
 	// requires trusted browser to trigger
-	LLProfileHandler() : LLCommandHandler("profile", UNTRUSTED_THROTTLE) { }
+	LLWebProfileHandler() : LLCommandHandler("profile", UNTRUSTED_THROTTLE) { }
 
 	bool handle(const LLSD& params, const LLSD& query_map,
 		LLMediaCtrl* web)
@@ -327,7 +327,7 @@ public:
 		return true;
 	}
 };
-LLProfileHandler gProfileHandler;
+LLWebProfileHandler gWebProfileHandler;
 
 ///----------------------------------------------------------------------------
 /// LLFloaterProfilePermissions

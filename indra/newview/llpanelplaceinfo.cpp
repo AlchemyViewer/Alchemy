@@ -43,6 +43,7 @@
 #include "lltrans.h"
 
 #include "llagent.h"
+#include "llavataractions.h"
 #include "llexpandabletextbox.h"
 #include "llslurl.h"
 #include "lltexturectrl.h"
@@ -320,11 +321,7 @@ void LLPanelPlaceInfo::createPick(const LLVector3d& pos_global)
 	data.snapshot_id = mSnapshotCtrl->getImageAssetID();
 	data.parcel_id = mParcelID;
 
-    LLFloaterProfile* profile_floater = dynamic_cast<LLFloaterProfile*>(LLFloaterReg::showInstance("profile", LLSD().with("id", gAgentID)));
-    if (profile_floater)
-    {
-        profile_floater->createPick(data);
-    }
+    LLAvatarActions::createPick(data);
 }
 
 // static

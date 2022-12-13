@@ -416,9 +416,9 @@ void LLAvatarActions::showPick(const LLUUID& avatar_id, const LLUUID& pick_id)
 // static
 void LLAvatarActions::createPick()
 {
-    LLFloaterProfile* profilefloater = dynamic_cast<LLFloaterProfile*>(LLFloaterReg::showInstance("profile", LLSD().with("id", gAgent.getID())));
+    
     LLViewerRegion* region = gAgent.getRegion();
-    if (profilefloater && region)
+    if (region)
     {
         LLPickData data;
         data.pos_global = gAgent.getPositionGlobal();
@@ -436,8 +436,7 @@ void LLAvatarActions::createPick()
         {
             data.name = region->getName();
         }
-
-        profilefloater->createPick(data);
+        createPick(data);
     }
 }
 
@@ -496,15 +495,25 @@ bool LLAvatarActions::profileVisible(const LLUUID& avatar_id)
 {
 	LLSD sd;
 	sd["id"] = avatar_id;
-	LLFloater* floater = getProfileFloater(avatar_id);
+	LLFloater* floater = findProfileFloater(avatar_id);
 	return floater && floater->isShown();
 }
 
 //static
-LLFloater* LLAvatarActions::getProfileFloater(const LLUUID& avatar_id)
+LLFloater* LLAvatarActions::findProfileFloater(const LLUUID& avatar_id)
 {
     LLFloaterProfile* floater = LLFloaterReg::findTypedInstance<LLFloaterProfile>("profile", LLSD().with("id", avatar_id));
     return floater;
+}
+
+void LLAvatarActions::createPick(const LLPickData& data)
+{
+    LLFloaterProfile* floater = dynamic_cast<LLFloaterProfile*>(
+		LLFloaterReg::showInstance("profile", LLSD().with("id", gAgent.getID())));
+    if (floater)
+    {
+        floater->createPick(data);
+    }
 }
 
 //static 
@@ -512,7 +521,7 @@ void LLAvatarActions::hideProfile(const LLUUID& avatar_id)
 {
 	LLSD sd;
 	sd["id"] = avatar_id;
-	LLFloater* floater = getProfileFloater(avatar_id);
+	LLFloater* floater = findProfileFloater(avatar_id);
 	if (floater)
 	{
 		floater->closeFloater();
