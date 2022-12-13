@@ -292,12 +292,6 @@ void LLSkinningUtil::updateRiggingInfo(const LLMeshSkinInfo* skin, LLVOAvatar *a
                 //S32 active_verts = 0;
                 vol_face.mJointRiggingInfoTab.resize(LL_CHARACTER_MAX_ANIMATED_JOINTS);
                 LLJointRiggingInfoTab &rig_info_tab = vol_face.mJointRiggingInfoTab;
-                const LLMatrix4a& bind_shape = skin->mBindShapeMatrix;
-                LLMatrix4a matrixPalette[LL_CHARACTER_MAX_ANIMATED_JOINTS];
-                for (U32 i = 0; i < llmin(skin->mInvBindMatrix.size(), (size_t)LL_CHARACTER_MAX_ANIMATED_JOINTS); ++i)
-                {
-                    matrixPalette[i].setMul(skin->mInvBindMatrix[i], bind_shape);
-                }
                 for (S32 i=0; i<vol_face.mNumVertices; i++)
                 {
                     LLVector4a& pos = vol_face.mPositions[i];
@@ -329,8 +323,9 @@ void LLSkinningUtil::updateRiggingInfo(const LLMeshSkinInfo* skin, LLVOAvatar *a
                             if (joint_num >= 0 && joint_num < LL_CHARACTER_MAX_ANIMATED_JOINTS)
                             {
                                 rig_info_tab[joint_num].setIsRiggedTo(true);
+
                                 LLVector4a pos_joint_space;
-                                matrixPalette[joint_index].affineTransform(pos, pos_joint_space);
+                                skin->mInvBindShapeMatrix[joint_index].affineTransform(pos, pos_joint_space);
                                 pos_joint_space.mul(wght[k]);
 
                                 LLVector4a *extents = rig_info_tab[joint_num].getRiggedExtents();

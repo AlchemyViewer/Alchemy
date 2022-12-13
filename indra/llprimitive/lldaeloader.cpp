@@ -1473,6 +1473,12 @@ void LLDAELoader::processDomModel(LLModel* model, DAE* dae, daeElement* root, do
 			}
 		}
 
+		model->mSkinInfo.mInvBindShapeMatrix.resize(llmin(model->mSkinInfo.mInvBindMatrix.size(), (size_t)216));
+		for (U32 i = 0; i < model->mSkinInfo.mInvBindShapeMatrix.size(); ++i)
+		{
+			matMulUnsafe(model->mSkinInfo.mInvBindMatrix[i], model->mSkinInfo.mBindShapeMatrix, model->mSkinInfo.mInvBindShapeMatrix[i]);
+		}
+
 		//Now that we've parsed the joint array, let's determine if we have a full rig
 		//(which means we have all the joint sthat are required for an avatar versus
 		//a skinned asset attached to a node in a file that contains an entire skeleton,
