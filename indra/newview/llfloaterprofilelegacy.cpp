@@ -1,5 +1,5 @@
 /*
- * @file llfloaterprofilelegacy.h
+ * @file llfloaterprofilelegacy.cpp
  * @brief Floater that holds panel don't bitch about it, Dog; Merging is easy.
  *
  * Copyright (c) 2017-2022, Cinder Roxley <cinder@sdf.org>
@@ -33,6 +33,7 @@
 
 #include "llavatarname.h"
 #include "llavatarnamecache.h"
+#include "llpanelprofilelegacy.h"
 
 LLFloaterProfileLegacy::LLFloaterProfileLegacy(LLSD const& key)
 :	LLFloater(key)
@@ -48,6 +49,7 @@ LLFloaterProfileLegacy::~LLFloaterProfileLegacy()
 
 BOOL LLFloaterProfileLegacy::postBuild()
 {
+    mPanel = dynamic_cast<LLPanelProfileLegacy*>(getChild<LLPanel>("panel_profile_legacy_sidetray"));
 	return TRUE;
 }
 
@@ -59,11 +61,16 @@ void LLFloaterProfileLegacy::onOpen(const LLSD& key)
 	mAvatarNameCacheConnection = LLAvatarNameCache::get(av_id,
 		boost::bind(&LLFloaterProfileLegacy::onAvatarNameCache, this, _1, _2));
 
-	getChild<LLPanel>("panel_profile_legacy_sidetray")->onOpen(key);
+	if (mPanel) { mPanel->onOpen(key); }
 }
 
 void LLFloaterProfileLegacy::onAvatarNameCache(const LLUUID& agent_id, const LLAvatarName& av_name)
 {
 	setTitle(av_name.getCompleteName());
 	mAvatarNameCacheConnection.disconnect();
+}
+
+void LLFloaterProfileLegacy::openTab(std::string_view tab_name) const
+{
+    if (mPanel) { mPanel->showAccordion(tab_name, true); }
 }

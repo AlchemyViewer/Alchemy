@@ -522,7 +522,7 @@ void LLPanelProfileLegacy::setProgress(bool started)
 		indicator->stop();
 }
 
-void LLPanelProfileLegacy::showAccordion(const std::string& name, bool show)
+void LLPanelProfileLegacy::showAccordion(std::string_view name, bool show)
 {
 	LLAccordionCtrlTab* tab = getChild<LLAccordionCtrlTab>(name);
 	tab->setVisible(show);

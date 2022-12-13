@@ -54,7 +54,8 @@ public:
 	BOOL postBuild() override;
 	void onOpen(const LLSD& key) override;
 	void reshape(S32 width, S32 height, BOOL called_from_parent = TRUE) override;
-	
+    void showAccordion(std::string_view name, bool show);
+
 protected:
 	void openPanel(LLPanel* panel, const LLSD& params);
 	void closePanel(LLPanel* panel);
@@ -66,7 +67,6 @@ private:
 	void resetControls() override;
     void resetInterestsControlValues();
 	void setProgress(bool started);
-	void showAccordion(const std::string& name, bool show);
     void requestAvatarProfileCoro(std::string url);
     void sendAvatarProfileCoro(std::string url, LLSD payload);
 	void onAvatarNameCache(const LLUUID& agent_id, const LLAvatarName& av_name);
