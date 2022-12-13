@@ -442,7 +442,7 @@ unsigned int getModifiers()
 	return [NSEvent modifierFlags];
 }
 
-void setTitle(const std::string& title)
+void setWindowTitle(const std::string& title)
 {
     @autoreleasepool {
         LLNSWindow *winRef = [(LLAppDelegate*)[[LLApplication sharedApplication] delegate] window];
