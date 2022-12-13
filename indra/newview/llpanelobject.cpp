@@ -112,7 +112,7 @@ enum {
 	MI_HOLE_COUNT
 };
 
-const F32 MAX_ATTACHMENT_DIST = 3.5f; // meters
+//const F32 MAX_ATTACHMENT_DIST = 3.5f; // meters
 
 //static const std::string LEGACY_FULLBRIGHT_DESC =LLTrans::getString("Fullbright");
 
@@ -1852,11 +1852,7 @@ void LLPanelObject::sendPosition(BOOL btn_down)
 	LLVector3d new_pos_global;
 	LLViewerRegion* regionp = mObject->getRegion();
 
-	if (mObject->isAttachment())
-	{
-		newpos.clamp(LLVector3(-MAX_ATTACHMENT_DIST,-MAX_ATTACHMENT_DIST,-MAX_ATTACHMENT_DIST),LLVector3(MAX_ATTACHMENT_DIST,MAX_ATTACHMENT_DIST,MAX_ATTACHMENT_DIST));
-	}
-	else
+	if (!mObject->isAttachment())
 	{
 		LLWorld* world_inst = LLWorld::getInstance();
 

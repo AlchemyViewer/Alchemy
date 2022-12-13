@@ -11211,7 +11211,7 @@ void LLPipeline::generateImpostor(LLVOAvatar* avatar, bool preview_avatar)
                     {
                         if (attached_object->isRiggedMesh())
                         {
-                            markVisible(attached_object->mDrawable->getSpatialBridge(), *viewer_camera);
+                            markVisible(attached_object->mDrawable->getSpatialBridge(), viewer_camera);
                         }
                         else
                         {
@@ -11223,7 +11223,7 @@ void LLPipeline::generateImpostor(LLVOAvatar* avatar, bool preview_avatar)
                                 LLViewerObject* child = *iter;
                                 if (child->isRiggedMesh())
                                 {
-                                    markVisible(attached_object->mDrawable->getSpatialBridge(), *viewer_camera);
+                                    markVisible(attached_object->mDrawable->getSpatialBridge(), viewer_camera);
                                     break;
                                 }
                             }

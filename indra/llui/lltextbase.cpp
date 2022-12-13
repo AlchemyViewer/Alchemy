@@ -378,7 +378,7 @@ void LLTextBase::onValueChange(S32 start, S32 end)
 {
 }
 
-std::vector<LLRect> LLTextBase::getSelctionRects()
+std::vector<LLRect> LLTextBase::getSelctionRects(const highlight_list_t& highlights)
 {
     // Nor supposed to be called without selection
     llassert(hasSelection());
@@ -386,108 +386,114 @@ std::vector<LLRect> LLTextBase::getSelctionRects()
 
     std::vector<LLRect> selection_rects;
 
-//		S32 selection_left		= llmin( mSelectionStart, mSelectionEnd );
-//		S32 selection_right		= llmax( mSelectionStart, mSelectionEnd );
+	//		S32 selection_left		= llmin( mSelectionStart, mSelectionEnd );
+	//		S32 selection_right		= llmax( mSelectionStart, mSelectionEnd );
 
-		// Skip through the lines we aren't drawing.
-		LLRect content_display_rect = getVisibleDocumentRect();
+    // Skip through the lines we aren't drawing.
+    LLRect content_display_rect = getVisibleDocumentRect();
 
-		// binary search for line that starts before top of visible buffer
-		line_list_t::const_iterator line_iter = std::lower_bound(mLineInfoList.begin(), mLineInfoList.end(), content_display_rect.mTop, compare_bottom());
-		line_list_t::const_iterator end_iter = std::upper_bound(mLineInfoList.begin(), mLineInfoList.end(), content_display_rect.mBottom, compare_top());
+    // binary search for line that starts before top of visible buffer
+    line_list_t::const_iterator line_iter = std::lower_bound(mLineInfoList.begin(), mLineInfoList.end(), content_display_rect.mTop, compare_bottom());
+    line_list_t::const_iterator end_iter = std::upper_bound(mLineInfoList.begin(), mLineInfoList.end(), content_display_rect.mBottom, compare_top());
 
-//		bool done = false;
-// [SL:KB] - Patch: Control-TextHighlight | Checked: 2013-12-30 (Catznip-3.6)
-		highlight_list_t::const_iterator itHighlight = highlights.begin();
-// [/SL:KB]
+	//		bool done = false;
+	// [SL:KB] - Patch: Control-TextHighlight | Checked: 2013-12-30 (Catznip-3.6)
+	highlight_list_t::const_iterator itHighlight = highlights.begin();
+	// [/SL:KB]
 
-		// Find the coordinates of the selected area
-//		for (;line_iter != end_iter && !done; ++line_iter)
-// [SL:KB] - Patch: Control-TextHighlight | Checked: 2013-12-30 (Catznip-3.6)
-		for (; (line_iter != end_iter) && (itHighlight != highlights.end()); ++line_iter)
-// [/SL:KB]
+    // Find the coordinates of the selected area
+	//		for (;line_iter != end_iter && !done; ++line_iter)
+	// [SL:KB] - Patch: Control-TextHighlight | Checked: 2013-12-30 (Catznip-3.6)
+	for (; (line_iter != end_iter) && (itHighlight != highlights.end()); ++line_iter)
+		// [/SL:KB]
+	{
+		// [SL:KB] - Patch: Control-TextHighlight | Checked: 2013-12-30 (Catznip-3.6)
+					// Find a highlight range with an end index larger than the start of this line
+		while ((itHighlight != highlights.end()) && (line_iter->mDocIndexStart > itHighlight->second))
+			++itHighlight;
+
+		// Draw all highlights on the current line
+		while ((itHighlight != highlights.end()) && (itHighlight->first < line_iter->mDocIndexEnd))
 		{
-// [SL:KB] - Patch: Control-TextHighlight | Checked: 2013-12-30 (Catznip-3.6)
-			// Find a highlight range with an end index larger than the start of this line
-			while ( (itHighlight != highlights.end()) && (line_iter->mDocIndexStart > itHighlight->second) )
-				++itHighlight;
+			// Keep the names of these to change fewer lines of LL code
+			S32 selection_left = llmin(itHighlight->first, itHighlight->second);
+			S32 selection_right = llmax(itHighlight->first, itHighlight->second);
+			// [/SL:KB]
 
-			// Draw all highlights on the current line
-			while ( (itHighlight != highlights.end()) && (itHighlight->first < line_iter->mDocIndexEnd) )
+			// is selection visible on this line?
+			if (line_iter->mDocIndexEnd > selection_left && line_iter->mDocIndexStart < selection_right)
 			{
-				// Keep the names of these to change fewer lines of LL code
-				S32 selection_left  = llmin(itHighlight->first, itHighlight->second);
-				S32 selection_right = llmax(itHighlight->first, itHighlight->second) ;
-// [/SL:KB]
+				segment_set_t::iterator segment_iter;
+				S32 segment_offset;
+				getSegmentAndOffset(line_iter->mDocIndexStart, &segment_iter, &segment_offset);
 
-				// is selection visible on this line?
-				if (line_iter->mDocIndexEnd > selection_left && line_iter->mDocIndexStart < selection_right)
+		        // Use F32 otherwise a string of multiple segments
+		        // will accumulate a large error
+		        F32 left_precise = line_iter->mRect.mLeft;
+		        F32 right_precise = line_iter->mRect.mLeft;
+
+				for (; segment_iter != mSegments.end(); ++segment_iter, segment_offset = 0)
 				{
-					segment_set_t::iterator segment_iter;
-					S32 segment_offset;
-					getSegmentAndOffset(line_iter->mDocIndexStart, &segment_iter, &segment_offset);
-				
-					LLRect selection_rect;
-					selection_rect.mLeft = line_iter->mRect.mLeft;
-					selection_rect.mRight = line_iter->mRect.mLeft;
-					selection_rect.mBottom = line_iter->mRect.mBottom;
-					selection_rect.mTop = line_iter->mRect.mTop;
-					
-					for(;segment_iter != mSegments.end(); ++segment_iter, segment_offset = 0)
+					LLTextSegmentPtr segmentp = *segment_iter;
+
+					S32 segment_line_start = segmentp->getStart() + segment_offset;
+					S32 segment_line_end = llmin(segmentp->getEnd(), line_iter->mDocIndexEnd);
+
+					if (segment_line_start > segment_line_end) break;
+
+                	F32 segment_width = 0.f;
+					S32 segment_height = 0;
+
+					// if selection after beginning of segment
+					if (selection_left >= segment_line_start)
 					{
-						LLTextSegmentPtr segmentp = *segment_iter;
-
-						S32 segment_line_start = segmentp->getStart() + segment_offset;
-						S32 segment_line_end = llmin(segmentp->getEnd(), line_iter->mDocIndexEnd);
-
-						if (segment_line_start > segment_line_end) break;
-
-						S32 segment_width = 0;
-						S32 segment_height = 0;
-
-						// if selection after beginning of segment
-						if(selection_left >= segment_line_start)
-						{
-							S32 num_chars = llmin(selection_left, segment_line_end) - segment_line_start;
-							segmentp->getDimensions(segment_offset, num_chars, segment_width, segment_height);
-							selection_rect.mLeft += segment_width;
-						}
-
-						// if selection_right == segment_line_end then that means we are the first character of the next segment
-						// or first character of the next line, in either case we want to add the length of the current segment
-						// to the selection rectangle and continue.
-						// if selection right > segment_line_end then selection spans end of current segment...
-						if (selection_right >= segment_line_end)
-						{
-							// extend selection slightly beyond end of line
-							// to indicate selection of newline character (use "n" character to determine width)
-							S32 num_chars = segment_line_end - segment_line_start;
-							segmentp->getDimensions(segment_offset, num_chars, segment_width, segment_height);
-							selection_rect.mRight += segment_width;
-						}
-						// else if selection ends on current segment...
-						else
-						{
-							S32 num_chars = selection_right - segment_line_start;
-							segmentp->getDimensions(segment_offset, num_chars, segment_width, segment_height);
-							selection_rect.mRight += segment_width;
-
-							break;
-						}
+						S32 num_chars = llmin(selection_left, segment_line_end) - segment_line_start;
+                    	segmentp->getDimensionsF32(segment_offset, num_chars, segment_width, segment_height);
+                    	left_precise += segment_width;
 					}
-					selection_rects.push_back(selection_rect);
+
+					// if selection_right == segment_line_end then that means we are the first character of the next segment
+					// or first character of the next line, in either case we want to add the length of the current segment
+					// to the selection rectangle and continue.
+					// if selection right > segment_line_end then selection spans end of current segment...
+					if (selection_right >= segment_line_end)
+					{
+						// extend selection slightly beyond end of line
+						// to indicate selection of newline character (use "n" character to determine width)
+						S32 num_chars = segment_line_end - segment_line_start;
+                    	segmentp->getDimensionsF32(segment_offset, num_chars, segment_width, segment_height);
+                    	right_precise += segment_width;
+					}
+					// else if selection ends on current segment...
+					else
+					{
+						S32 num_chars = selection_right - segment_line_start;
+                    	segmentp->getDimensionsF32(segment_offset, num_chars, segment_width, segment_height);
+                    	right_precise += segment_width;
+
+						break;
+					}
 				}
 
-// [SL:KB] - Patch: Control-TextHighlight | Checked: 2013-12-30 (Catznip-3.6)
-				// Only advance if the highlight ends on the current line
-				if (itHighlight->second > line_iter->mDocIndexEnd)
-					break;
-				++itHighlight;
+				LLRect selection_rect;
+            	selection_rect.mLeft = left_precise;
+            	selection_rect.mRight = right_precise;
+				selection_rect.mBottom = line_iter->mRect.mBottom;
+				selection_rect.mTop = line_iter->mRect.mTop;
+
+				selection_rects.push_back(selection_rect);
 			}
-// [/SL:KB]
 
+			// [SL:KB] - Patch: Control-TextHighlight | Checked: 2013-12-30 (Catznip-3.6)
+							// Only advance if the highlight ends on the current line
+			if (itHighlight->second > line_iter->mDocIndexEnd)
+				break;
+			++itHighlight;
+		}
+		// [/SL:KB]
+	}
 
-    return selection_rects;
+	return selection_rects;
 }
 
 // Draws the black box behind the selected text
@@ -512,10 +518,7 @@ void LLTextBase::drawHighlightsBackground(const highlight_list_t& highlights, co
 	if (!mLineInfoList.empty())
 // [/SL:KB]
 	{
-		std::vector<LLRect> selection_rects = getSelctionRects();
-
-
-		}
+        std::vector<LLRect> selection_rects = getSelctionRects(highlights);
 		
 		// Draw the selection box (we're using a box instead of reversing the colors on the selected text).
 		gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
