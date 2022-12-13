@@ -316,8 +316,8 @@ LLPanelObject::LLPanelObject()
     mHasClipboardSize(false),
     mHasClipboardRot(false),
 	mSizeChanged(FALSE),
-	mRegionMaxHeight(256.f),
-	mRegionMaxDepth(0.f)
+	mRegionMaxHeight(SL_MAX_OBJECT_Z),
+	mRegionMaxDepth(SL_MIN_OBJECT_Z)
 {
     mCommitCallbackRegistrar.add("PanelObject.menuDoToSelected", boost::bind(&LLPanelObject::menuDoToSelected, this, _2));
     mEnableCallbackRegistrar.add("PanelObject.menuEnable", boost::bind(&LLPanelObject::menuEnableItem, this, _2));
@@ -398,14 +398,55 @@ void LLPanelObject::getState( )
 		}
 	}
 // [/RLVa:KB]
+	// Setup limits
+	{
+		LLWorld* worldp = LLWorld::getInstance();
+		F32 region_width = REGION_WIDTH_METERS;
+		if (objectp && objectp->getRegion())
+		{
+			auto region = objectp->getRegion();
+
+			mRegionMaxHeight = region->getMaxRegionHeight();
+			mRegionMaxDepth = region->getMinRegionHeight();
+			mCtrlPosZ->setMaxValue(mRegionMaxHeight);
+			mMinScale = region->getMinPrimScale();
+			mMaxScale = LLGridManager::getInstance()->isInOpenSim() ? region->getMaxPrimScale() : get_default_max_prim_scale(LLPickInfo::isFlora(objectp));
+			region_width = region->getWidth();
+		}
+		else
+		{
+			mRegionMaxHeight = worldp->getRegionMaxHeight();
+			mRegionMaxDepth = LLGridManager::getInstance()->isInOpenSim() ? -256.f : 0.f; // OpenSim is derp
+			mCtrlPosZ->setMaxValue(mRegionMaxHeight);
+			mMinScale = worldp->getRegionMinPrimScale();
+			mMaxScale = get_default_max_prim_scale(LLPickInfo::isFlora(objectp));
+		}
+		mMaxHollowSize = worldp->getRegionMaxHollowSize();
+		mMinHoleSize = worldp->getRegionMinHoleSize();
+
+		mCtrlScaleX->setMinValue(mMinScale);
+		mCtrlScaleX->setMaxValue(mMaxScale);
+		mCtrlScaleY->setMinValue(mMinScale);
+		mCtrlScaleY->setMaxValue(mMaxScale);
+		mCtrlScaleZ->setMinValue(mMinScale);
+		mCtrlScaleZ->setMaxValue(mMaxScale);
+
+		bool is_attachment = objectp->isAttachment();
+		mCtrlPosX->setMinValue(is_attachment ? -MAX_ATTACHMENT_DIST : -region_width);
+		mCtrlPosX->setMaxValue(is_attachment ? MAX_ATTACHMENT_DIST : region_width);
+		mCtrlPosY->setMinValue(is_attachment ? -MAX_ATTACHMENT_DIST : -region_width);
+		mCtrlPosY->setMaxValue(is_attachment ? MAX_ATTACHMENT_DIST : region_width);
+		mCtrlPosZ->setMinValue(is_attachment ? -MAX_ATTACHMENT_DIST : mRegionMaxDepth);
+		mCtrlPosZ->setMaxValue(is_attachment ? MAX_ATTACHMENT_DIST : mRegionMaxHeight);
+	}
 
 	LLVector3 vec;
 	if (enable_move)
 	{
 		vec = objectp->getPositionEdit();
-		mCtrlPosX->set( vec.mV[VX] );
-		mCtrlPosY->set( vec.mV[VY] );
-		mCtrlPosZ->set( vec.mV[VZ] );
+		mCtrlPosX->set(vec.mV[VX]);
+		mCtrlPosY->set(vec.mV[VY]);
+		mCtrlPosZ->set(vec.mV[VZ]);
 		calcp->setVar(LLCalc::X_POS, vec.mV[VX]);
 		calcp->setVar(LLCalc::Y_POS, vec.mV[VY]);
 		calcp->setVar(LLCalc::Z_POS, vec.mV[VZ]);
@@ -425,16 +466,6 @@ void LLPanelObject::getState( )
 	mCtrlPosX->setEnabled(enable_move);
 	mCtrlPosY->setEnabled(enable_move);
 	mCtrlPosZ->setEnabled(enable_move);
-
-	LLViewerRegion* regionp = objectp->getRegion();
-	F32 width = regionp != nullptr ? regionp->getWidth() : REGION_WIDTH_METERS;
-	bool is_attachment = objectp->isAttachment();
-	mCtrlPosX->setMinValue(is_attachment ? -MAX_ATTACHMENT_DIST : -width);
-	mCtrlPosX->setMaxValue(is_attachment ? MAX_ATTACHMENT_DIST : width);
-	mCtrlPosY->setMinValue(is_attachment ? -MAX_ATTACHMENT_DIST : -width);
-	mCtrlPosY->setMaxValue(is_attachment ? MAX_ATTACHMENT_DIST : width);
-	mCtrlPosZ->setMinValue(is_attachment ? -MAX_ATTACHMENT_DIST : mRegionMaxDepth);
-	mCtrlPosZ->setMaxValue(is_attachment ? MAX_ATTACHMENT_DIST : mRegionMaxHeight);
 
 	if (enable_scale)
 	{
@@ -1063,7 +1094,7 @@ void LLPanelObject::getState( )
 #endif
 	{
 		mSpinHollow->setMinValue(0.f);
-		mSpinHollow->setMaxValue(95.f);
+		mSpinHollow->setMaxValue(mMaxHollowSize);
 	}
 
 	// Update field enablement
@@ -2026,44 +2057,6 @@ void LLPanelObject::refresh()
 	{
 		mRootObject = NULL;
 	}
-
-	LLWorld* worldp = LLWorld::getInstance();
-	if (mObject && mObject->getRegion())
-	{
-		auto region = mObject->getRegion();
-
-		mRegionMaxHeight = region->getMaxRegionHeight();
-		mRegionMaxDepth = region->getMinRegionHeight();
-		mCtrlPosZ->setMaxValue(mRegionMaxHeight);
-		mMinScale = region->getMinPrimScale();
-		mMaxScale = LLGridManager::getInstance()->isInOpenSim() ? region->getMaxPrimScale() : get_default_max_prim_scale(LLPickInfo::isFlora(mObject));
-		mCtrlScaleX->setMinValue(mMinScale);
-		mCtrlScaleX->setMaxValue(mMaxScale);
-		mCtrlScaleY->setMinValue(mMinScale);
-		mCtrlScaleY->setMaxValue(mMaxScale);
-		mCtrlScaleZ->setMinValue(mMinScale);
-		mCtrlScaleZ->setMaxValue(mMaxScale);
-	}
-	else
-	{
-		mRegionMaxHeight = worldp->getRegionMaxHeight();
-		mRegionMaxDepth = LLGridManager::getInstance()->isInOpenSim() ? -256.f : 0.f; // OpenSim is derp
-		mCtrlPosZ->setMaxValue(mRegionMaxHeight);
-		mMinScale = worldp->getRegionMinPrimScale();
-		mMaxScale = get_default_max_prim_scale(LLPickInfo::isFlora(mObject));
-		mCtrlScaleX->setMinValue(mMinScale);
-		mCtrlScaleX->setMaxValue(mMaxScale);
-		mCtrlScaleY->setMinValue(mMinScale);
-		mCtrlScaleY->setMaxValue(mMaxScale);
-		mCtrlScaleZ->setMinValue(mMinScale);
-		mCtrlScaleZ->setMaxValue(mMaxScale);
-	}
-
-	mMaxHollowSize = worldp->getRegionMaxHollowSize();
-	mSpinHollow->setMaxValue(mMaxHollowSize);
-	mMinHoleSize = worldp->getRegionMinHoleSize();
-	mSpinScaleX->setMinValue(mMinHoleSize);
-	mSpinScaleY->setMinValue(mMinHoleSize);
 }
 
 

@@ -1518,6 +1518,7 @@ even though the user gets a free copy.
                 Position (m)
             </text>
             <spinner
+             decimal_digits="4"
              follows="left|top"
              height="19"
              increment="0.01"
@@ -1533,6 +1534,7 @@ even though the user gets a free copy.
              top_pad="8"
              width="87" />
             <spinner
+             decimal_digits="4"
              follows="left|top"
              height="19"
              increment="0.01"
@@ -1548,6 +1550,7 @@ even though the user gets a free copy.
              top_pad="3"
              width="87" />
             <spinner
+             decimal_digits="4"
              follows="left|top"
              height="19"
              increment="0.01"
@@ -1589,6 +1592,7 @@ even though the user gets a free copy.
                 Size (m)
             </text>
             <spinner
+             decimal_digits="4"
              follows="left|top"
              height="19"
              increment="0.01"
@@ -1604,6 +1608,7 @@ even though the user gets a free copy.
              top_pad="8"
              width="87" />
             <spinner
+             decimal_digits="4"
              follows="left|top"
              height="19"
              increment="0.01"
@@ -1619,6 +1624,7 @@ even though the user gets a free copy.
              top_pad="3"
              width="87" />
             <spinner
+             decimal_digits="4"
              follows="left|top"
              height="19"
              increment="0.01"
@@ -1660,7 +1666,7 @@ even though the user gets a free copy.
                 Rotation (°)
             </text>
             <spinner
-             decimal_digits="2"
+             decimal_digits="3"
              follows="left|top"
              height="19"
              increment="1"
@@ -1676,7 +1682,7 @@ even though the user gets a free copy.
              top_pad="8"
              width="87" />
             <spinner
-             decimal_digits="2"
+             decimal_digits="3"
              follows="left|top"
              height="19"
              increment="1"
@@ -1692,7 +1698,7 @@ even though the user gets a free copy.
              top_pad="3"
              width="87" />
             <spinner
-             decimal_digits="2"
+             decimal_digits="3"
              follows="left|top"
              height="19"
              increment="1"
@@ -2028,7 +2034,7 @@ even though the user gets a free copy.
                 Hole Size
             </text>
             <spinner
-             decimal_digits="2"
+             decimal_digits="3"
              follows="left|top"
              height="19"
              increment="0.05"
@@ -2042,7 +2048,7 @@ even though the user gets a free copy.
              top_pad="4"
              width="68" />
             <spinner
-             decimal_digits="2"
+             decimal_digits="3"
              follows="left|top"
              height="19"
              increment="0.05"
@@ -2068,7 +2074,7 @@ even though the user gets a free copy.
                 Top Shear
             </text>
             <spinner
-             decimal_digits="2"
+             decimal_digits="3"
              follows="left|top"
              height="19"
              increment="0.05"
@@ -2083,7 +2089,7 @@ even though the user gets a free copy.
              top_pad="4"
              width="68" />
             <spinner
-             decimal_digits="2"
+             decimal_digits="3"
              follows="left|top"
              height="19"
              increment="0.05"
@@ -2172,11 +2178,11 @@ even though the user gets a free copy.
              name="text taper2"
              top_pad="7"
              width="150">
-                Taper
+                Taper Profile
             </text>
             <spinner
 			 visible="false"
-             decimal_digits="2"
+             decimal_digits="3"
              follows="left|top"
              height="19"
              increment="0.05"
@@ -2191,7 +2197,7 @@ even though the user gets a free copy.
              width="68" />
             <spinner
 			 visible="false"
-             decimal_digits="2"
+             decimal_digits="3"
              follows="left|top"
              height="19"
              increment="0.05"
