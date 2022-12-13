@@ -1110,7 +1110,7 @@ BOOL LLKeyframeMotion::deserialize(LLDataPacker& dp, const LLUUID& asset_id, boo
 	if (female_land_anim == asset_id || formal_female_land_anim == asset_id)
 	{
 		LL_WARNS() << "Animation(" << asset_id << ") won't be looped." << LL_ENDL;
-		mJointMotionList->mLoop = FALSE;
+		joint_motion_list->mLoop = FALSE;
 	}
 
 	//-------------------------------------------------------------------------
