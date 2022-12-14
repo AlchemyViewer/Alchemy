@@ -179,10 +179,10 @@
 					name="sharpenmethod_combo"
 					top_pad="-16"
 					width="80">
-					<combo_box.item
+					<!--<combo_box.item
 						label="None"
 						name="sharp_none"
-						value="0" />
+						value="0" />-->
 					<combo_box.item
 						label="CAS"
 						name="sharp_cas"
@@ -191,9 +191,10 @@
 						label="DLS"
 						name="sharp_DLS"
 						value="2" />
+					<combo_box.commit_callback
+       					function="LightBox.CASSelect" />
 					</combo_box>
-				<!--TODO: Hookup to RenderSharpenCASParams.X, RenderSharpenDLS.X-->
-				<slider_bar
+				<slider
 					top_pad="-18"
 					height="20"
 					increment=".1"
@@ -204,7 +205,12 @@
 					left_delta="80"
 					right="-75"
 					name="sharp_strength_slider"
-					control_name=""/>
+					show_text="false"
+					control_name="">
+					<slider.commit_callback
+						function="LightBox.CASCommit"
+						parameter="slider" />
+					</slider>
 				<spinner
 					top_pad="-20"
 					height="15"
@@ -218,8 +224,11 @@
 					width="55"
 					increment=".1"
 					name="sharp_strength_spinner"
-					control_name=""/>
-				<!--TODO: This effects multiple values that need to be hooked up-->
+					control_name="">
+					<spinner.commit_callback
+						function="LightBox.CASCommit"
+						parameter="spinner" />
+					</spinner>
 				<text
 					name="sharp_dynamic_text"
 					follows="left|top"
@@ -229,7 +238,7 @@
 					width="50"
 					layout="topleft"
 					value="Contrast:" />
-				<slider_bar
+				<slider
 					top_pad="-18"
 					height="20"
 					increment=".1"
@@ -239,8 +248,13 @@
 					min_val="0.0"
 					left_delta="80"
 					right="-75"
+					show_text="false"
 					name="sharp_dynamic_slider"
-					control_name=""/>
+					control_name="">
+					<slider.commit_callback
+						function="LightBox.CASCommit"
+						parameter="slider" />
+					</slider>
 				<spinner
 					top_pad="-20"
 					height="15"
@@ -254,7 +268,11 @@
 					width="55"
 					increment=".1"
 					name="sharp_dynamic_spinner"
-					control_name=""/>
+					control_name="">
+					<spinner.commit_callback
+						function="LightBox.CASCommit"
+						parameter="spinner" />
+					</spinner>
 				<button
 					name="sharpen_default_btn"
 					follows="top|right"
@@ -328,6 +346,8 @@
 						label="Uncharted"
 						name="toneUncharted"
 						value="9" />
+					<combo_box.commit_callback
+       					function="LightBox.TonemapperSelect" />
 				</combo_box>
 				<button
 					name="exposure_default_btn"
@@ -383,7 +403,6 @@
 					name="exposure_spinner"
 					tool_tip="Adjusts the overall brightness of the image via the Tonemapper"
 					control_name="RenderToneMapExposure"/>
-				<!--TODO: This effects multiple values that need to be hooked up-->
 				<text
 					visible="false"
 					name="tonemapper_dynamic_text1"
@@ -394,7 +413,7 @@
 					width="100"
 					layout="topleft"
 					value="TonemapD1:" />
-				<slider_bar
+				<slider
 					visible="false"
 					top_pad="-18"
 					height="20"
@@ -405,8 +424,13 @@
 					min_val="0.0"
 					left_delta="100"
 					right="-55"
+					show_text="false"
 					name="tonemapper_dynamic_slider1"
-					control_name=""/>
+					control_name="">
+					<slider.commit_callback
+						function="LightBox.TonemapperCommit"
+						parameter="slider" />
+					</slider>
 				<spinner
 					visible="false"
 					top_pad="-20"
@@ -421,7 +445,12 @@
 					width="55"
 					increment=".1"
 					name="tonemapper_dynamic_spinner1"
-					control_name=""/>
+					control_name="">
+					<spinner.commit_callback
+						function="LightBox.TonemapperCommit"
+						parameter="spinner" />
+					</spinner>
+					
 				<text
 					visible="false"
 					name="tonemapper_dynamic_text2"
@@ -432,7 +461,7 @@
 					width="100"
 					layout="topleft"
 					value="TonemapD2:" />
-				<slider_bar
+				<slider
 					visible="false"
 					top_pad="-18"
 					height="20"
@@ -443,8 +472,13 @@
 					min_val="0.0"
 					left_delta="100"
 					right="-55"
+					show_text="false"
 					name="tonemapper_dynamic_slider2"
-					control_name=""/>
+					control_name="">
+					<slider.commit_callback
+						function="LightBox.TonemapperCommit"
+						parameter="slider" />
+					</slider>
 				<spinner
 					visible="false"
 					top_pad="-20"
@@ -459,7 +493,11 @@
 					width="55"
 					increment=".1"
 					name="tonemapper_dynamic_spinner2"
-					control_name=""/>
+					control_name="">
+					<spinner.commit_callback
+						function="LightBox.TonemapperCommit"
+						parameter="spinner" />
+					</spinner>
 				<text
 					visible="false"
 					name="tonemapper_dynamic_text3"
@@ -470,7 +508,7 @@
 					width="100"
 					layout="topleft"
 					value="TonemapD3:" />
-				<slider_bar
+				<slider
 					visible="false"
 					top_pad="-18"
 					height="20"
@@ -481,8 +519,13 @@
 					min_val="0.0"
 					left_delta="100"
 					right="-55"
+					show_text="false"
 					name="tonemapper_dynamic_slider3"
-					control_name=""/>
+					control_name="">
+					<slider.commit_callback
+						function="LightBox.TonemapperCommit"
+						parameter="slider" />
+					</slider>
 				<spinner
 					visible="false"
 					top_pad="-20"
@@ -497,7 +540,11 @@
 					width="55"
 					increment=".1"
 					name="tonemapper_dynamic_spinner3"
-					control_name=""/>
+					control_name="">
+					<spinner.commit_callback
+						function="LightBox.TonemapperCommit"
+						parameter="spinner" />
+					</spinner>
 				<text
 					visible="false"
 					name="tonemapper_dynamic_text4"
@@ -508,7 +555,7 @@
 					width="100"
 					layout="topleft"
 					value="TonemapD4:" />
-				<slider_bar
+				<slider
 					visible="false"
 					top_pad="-18"
 					height="20"
@@ -519,8 +566,13 @@
 					min_val="0.0"
 					left_delta="100"
 					right="-55"
+					show_text="false"
 					name="tonemapper_dynamic_slider4"
-					control_name=""/>
+					control_name="">
+					<slider.commit_callback
+						function="LightBox.TonemapperCommit"
+						parameter="slider" />
+					</slider>
 				<spinner
 					visible="false"
 					top_pad="-20"
@@ -535,7 +587,11 @@
 					width="55"
 					increment=".1"
 					name="tonemapper_dynamic_spinner4"
-					control_name=""/>
+					control_name="">
+					<spinner.commit_callback
+						function="LightBox.TonemapperCommit"
+						parameter="spinner" />
+					</spinner>
 				<text
 					visible="false"
 					name="tonemapper_dynamic_text5"
@@ -546,7 +602,7 @@
 					width="100"
 					layout="topleft"
 					value="TonemapD5:" />
-				<slider_bar
+				<slider
 					visible="false"
 					top_pad="-18"
 					height="20"
@@ -557,8 +613,13 @@
 					min_val="0.0"
 					left_delta="100"
 					right="-55"
+					show_text="false"
 					name="tonemapper_dynamic_slider5"
-					control_name=""/>
+					control_name="">
+					<slider.commit_callback
+						function="LightBox.TonemapperCommit"
+						parameter="slider" />
+					</slider>
 				<spinner
 					visible="false"
 					top_pad="-20"
@@ -573,7 +634,11 @@
 					width="55"
 					increment=".1"
 					name="tonemapper_dynamic_spinner5"
-					control_name=""/>
+					control_name="">
+					<spinner.commit_callback
+						function="LightBox.TonemapperCommit"
+						parameter="spinner" />
+					</spinner>
 				<text
 					visible="false"
 					name="tonemapper_dynamic_text6"
@@ -584,7 +649,7 @@
 					width="100"
 					layout="topleft"
 					value="TonemapD6:" />
-				<slider_bar
+				<slider
 					visible="false"
 					top_pad="-18"
 					height="20"
@@ -595,8 +660,13 @@
 					min_val="0.0"
 					left_delta="100"
 					right="-55"
+					show_text="false"
 					name="tonemapper_dynamic_slider6"
-					control_name=""/>
+					control_name="">
+					<slider.commit_callback
+						function="LightBox.TonemapperCommit"
+						parameter="slider" />
+					</slider>
 				<spinner
 					visible="false"
 					top_pad="-20"
@@ -611,7 +681,11 @@
 					width="55"
 					increment=".1"
 					name="tonemapper_dynamic_spinner6"
-					control_name=""/>
+					control_name="">
+					<spinner.commit_callback
+						function="LightBox.TonemapperCommit"
+						parameter="spinner" />
+					</spinner>
 				<text
 					visible="false"
 					name="tonemapper_dynamic_text7"
@@ -622,7 +696,7 @@
 					width="100"
 					layout="topleft"
 					value="TonemapD7:" />
-				<slider_bar
+				<slider
 					visible="false"
 					top_pad="-18"
 					height="20"
@@ -633,8 +707,13 @@
 					min_val="0.0"
 					left_delta="100"
 					right="-55"
+					show_text="false"
 					name="tonemapper_dynamic_slider7"
-					control_name=""/>
+					control_name="">
+					<slider.commit_callback
+						function="LightBox.TonemapperCommit"
+						parameter="slider" />
+					</slider>
 				<spinner
 					visible="false"
 					top_pad="-20"
@@ -649,7 +728,11 @@
 					width="55"
 					increment=".1"
 					name="tonemapper_dynamic_spinner7"
-					control_name=""/>
+					control_name="">
+					<spinner.commit_callback
+						function="LightBox.TonemapperCommit"
+						parameter="spinner" />
+					</spinner>
 				<text
 					visible="false"
 					name="tonemapper_dynamic_text8"
@@ -660,7 +743,7 @@
 					width="100"
 					layout="topleft"
 					value="TonemapD8:" />
-				<slider_bar
+				<slider
 					visible="false"
 					top_pad="-18"
 					height="20"
@@ -671,8 +754,13 @@
 					min_val="0.0"
 					left_delta="100"
 					right="-55"
+					show_text="false"
 					name="tonemapper_dynamic_slider8"
-					control_name=""/>
+					control_name="">
+					<slider.commit_callback
+						function="LightBox.TonemapperCommit"
+						parameter="slider" />
+					</slider>
 				<spinner
 					visible="false"
 					top_pad="-20"
@@ -687,7 +775,11 @@
 					width="55"
 					increment=".1"
 					name="tonemapper_dynamic_spinner8"
-					control_name=""/>
+					control_name="">
+					<spinner.commit_callback
+						function="LightBox.TonemapperCommit"
+						parameter="spinner" />
+					</spinner>
 				
 			</panel>
 			<!--Rendering Panel-->
@@ -718,10 +810,10 @@
 					tool_tip="Controls SMAA Quality"
 					control_name="RenderFSAASamples"
 					name="smaa_combo">
-					<combo_box.item
+					<!--<combo_box.item
 						label="Disable"
 						name="smaa_off"
-						value="0" />
+						value="0" />-->
 					<combo_box.item
 						label="Low (x2)"
 						name="smaa_2"
@@ -1444,8 +1536,6 @@
 					label="Use Screen Space Ambient Occlusion"
 					tool_tip="Toggles SSAO (Also toggles Shadow Smoothing!)"
 					control_name="RenderDeferredSSAO"/>
-				<!--TODO: Hook to RenderSSAOEffect.X-->
-				<!-- Range should be mapped to 0.0:-1.0 = 0.0:2.0 -->
 				<text
 					follows="left|top"
 					height="15"
@@ -1455,19 +1545,24 @@
 					layout="topleft"
 					tool_tip="Controls the strength of the SSAO effect."
 					value="SSAO Strength:" />
-				<slider_bar
+				<slider
 					top_pad="-18"
 					height="20"
 					increment=".1"
 					follows="left|top|right"
 					layout="topleft"
-					max_val="2"
+					max_val="1"
 					min_val="0"
 					left="140"
 					right="-75"
+					show_text="false"
 					name="ssao_strength_slider"
 					tool_tip="Controls the strength of the SSAO effect."
-					control_name=""/>
+					control_name="">
+					<slider.commit_callback
+						function="LightBox.SSAOCommit"
+						parameter="slider" />
+					</slider>
 				<spinner
 					top_pad="-20"
 					height="15"
@@ -1476,13 +1571,17 @@
 					decimal_digits="1"
 					follows="top|right"
 					layout="topleft"
-					max_val="2"
+					max_val="1"
 					min_val="0"
 					width="55"
 					increment=".1"
 					name="ssao_strength_spinner"
 					tool_tip="Controls the strength of the SSAO effect."
-					control_name=""/>
+					control_name="">
+					<spinner.commit_callback
+						function="LightBox.SSAOCommit"
+						parameter="spinner" />
+					</spinner>
 				<button
 					name="ssaoStrength_default_btn"
 					follows="top|right"
