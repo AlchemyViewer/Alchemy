@@ -497,7 +497,7 @@ void LLPanelProfileLegacy::processProperties(void* data, EAvatarProcessorType ty
 			const LLAvatarGroups* pData = static_cast<LLAvatarGroups*>(data);
 			if(!pData || getAvatarId() != pData->avatar_id) return;
 			
-			showAccordion("avatar_groups_tab", !pData->group_list.empty());
+			showTab("avatar_groups_tab", !pData->group_list.empty());
 			break;
 		}
 		// These are handled by their respective panels
@@ -523,11 +523,17 @@ void LLPanelProfileLegacy::setProgress(bool started)
 		indicator->stop();
 }
 
-void LLPanelProfileLegacy::showAccordion(std::string_view name, bool show)
+void LLPanelProfileLegacy::showTab(std::string_view name, bool show) const
 {
 	LLAccordionCtrlTab* tab = getChild<LLAccordionCtrlTab>(name);
 	tab->setVisible(show);
 	getChild<LLAccordionCtrl>("avatar_accordion")->arrange();
+}
+
+std::string_view LLPanelProfileLegacy::getShownTab() const
+{
+    const LLAccordionCtrlTab* tab = getChild<LLAccordionCtrl>("avatar_accordion")->getExpandedTab();
+    return tab != nullptr ? tab->getTitle() : LLStringUtil::null;
 }
 
 void LLPanelProfileLegacy::onCommitAction(const LLSD& userdata)
@@ -1192,9 +1198,9 @@ void LLPanelProfileLegacy::LLPanelProfilePicks::onPanelClassifiedSave(LLPanelCla
 		c_item->setMouseUpCallback(boost::bind(&LLPanelProfilePicks::updateButtons, this));
 		c_item->childSetAction("info_chevron", boost::bind(&LLPanelProfilePicks::onClickInfo, this));
 
-		// order does matter, showAccordion will invoke arrange for accordions.
+		// order does matter, showTab will invoke arrange for accordions.
 		//mClassifiedsAccTab->changeOpenClose(false);
-		//showAccordion("tab_classifieds", true);
+		//showTab("tab_classifieds", true);
 	}
 	else if (panel->isNewWithErrors())
 	{
