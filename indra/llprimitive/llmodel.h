@@ -62,6 +62,7 @@ public:
 
     // bones/joints position overrides
 	matrix_list_t mAlternateBindMatrix;
+	matrix_list_t mInvBindShapeMatrix;
 
 	LL_ALIGN_16(LLMatrix4a mBindShapeMatrix);
 

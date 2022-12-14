@@ -20,8 +20,17 @@
 	<!-- starting up -->
 	<string name="StartupDetectingHardware">Detecting hardware...</string>
 	<string name="StartupLoading">Loading [APP_NAME]...</string>
-	<string name="StartupClearingCache">Clearing cache...</string>
-	<string name="StartupInitializingTextureCache">Initializing texture cache...</string>
+	<string name="StartupClearingCache">Obliterating cache...</string>
+	<string name="StartupInitializingTextureCache0">Fluffing texture cache...</string>
+	<string name="StartupInitializingTextureCache1">Reticulating splines...</string>
+	<string name="StartupInitializingTextureCache2">Preheating texture baking oven...</string>
+	<string name="StartupInitializingTextureCache3">Booping the snoot, texturally...</string>
+	<string name="StartupInitializingTextureCache4">Loading the enchanted hippo...</string>
+	<string name="StartupInitializingTextureCache5">Sacrificing virgin goats to Nvidia...</string>
+	<string name="StartupInitializingTextureCache6">Preparing for Project Sansar. (lol)...</string>
+	<string name="StartupInitializingTextureCache7">Discovering new ways to make you wait...</string>
+	<string name="StartupInitializingTextureCache8">Trying to sort in O(n)...</string>
+	<string name="StartupInitializingTextureCache9">Generating witty startup message...</string>
 	<string name="StartupRequireDriverUpdate">Graphics initialization failed. Please update your graphics driver!</string>
 
 	<!-- about dialog/support string-->
@@ -106,11 +115,11 @@ Voice Server Version: [VOICE_VERSION]
 	<string name="LoginPrecaching">Loading world...</string>
 	<string name="LoginInitializingBrowser">Initializing embedded web browser...</string>
 	<string name="LoginInitializingMultimedia">Initializing multimedia...</string>
-	<string name="LoginInitializingFonts">Loading fonts...</string>
-	<string name="LoginVerifyingCache">Verifying cache files (can take 60-90 seconds)...</string>
+	<string name="LoginInitializingFonts">Loading all the pretty fonts...</string>
+	<string name="LoginVerifyingCache">Verifying cache files (can take 69-99 seconds)...</string>
 	<string name="LoginProcessingResponse">Processing response...</string>
 	<string name="LoginInitializingWorld">Initializing world...</string>
-	<string name="LoginDecodingImages">Decoding images...</string>
+	<string name="LoginDecodingImages">Handcrafting images...</string>
 	<string name="LoginInitializingQuicktime">Initializing QuickTime...</string>
 	<string name="LoginQuicktimeNotFound">QuickTime not found - unable to initialize.</string>
 	<string name="LoginQuicktimeOK">QuickTime initialized successfully.</string>
@@ -143,11 +152,10 @@ https://www.alchemyviewer.org/pages/downloads.html</string>
 If you feel this is an error, please contact support.</string>
 	<string name="LoginIntermediateOptionalUpdateAvailable">Optional viewer update available: [VERSION]</string>
 	<string name="LoginFailedRequiredUpdate">Required viewer update: [VERSION]</string>
-	<string name="LoginFailedAlreadyLoggedIn">This agent is already logged in.
-</string>
+	<string name="LoginFailedAlreadyLoggedIn">This agent is already logged in.</string>
 	<string name="LoginFailedAuthenticationFailed">Sorry! We couldn't log you in.
 Please check to make sure you entered the right
-    * Username (like bobsmith12 or steller.sunshine)
+    * Username (like yiffmaster69 or steller.sunshine)
     * Password
     * Second Factor Token (if enabled)
 Also, please make sure your Caps Lock key is off.</string>
@@ -212,7 +220,7 @@ Please try logging in again in a minute.</string>
 If you feel this is an error, please contact support@secondlife.com</string>
 
 	<!-- Disconnection -->
-	<string name="AgentLostConnection">This region may be experiencing trouble.  Please check your connection to the Internet.</string>
+	<string name="AgentLostConnection">Well this is embarassing.  This region may be experiencing trouble.  Please check your connection to the Internet.</string>
 	<string name="SavingSettings">Saving your settings...</string>
 	<string name="LoggingOut">Logging out...</string>
 	<string name="ShuttingDown">Shutting down...</string>
