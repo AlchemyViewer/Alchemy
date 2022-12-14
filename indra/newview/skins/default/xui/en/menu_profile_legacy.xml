@@ -3,14 +3,33 @@
      name="menu_profile_legacy"
      left="0" bottom="0" visible="false"
      mouse_opaque="false">
-  <!--<menu_item_call
+  <menu_item_call
    label="Open Webprofile..."
    name="webprofile">
      <menu_item_call.on_click
       function="Profile.Action"
       parameter="webprofile"/>
   </menu_item_call>
-  <menu_item_separator/>-->
+  <menu_item_separator/>
+  <!--<menu
+	label="Upload profile image"
+	layout="topleft"
+	name="upload_image_menu">
+	  <menu_item_call
+       label="Second Life..."
+       name="upload_second_life">
+		<menu_item_call.on_click
+		 function="Profile.Action"
+		 parameter="upload_sl"/>
+	  </menu_item_call>
+	  <menu_item_call
+       label="First Life..."
+       name="upload_first_life">
+        <menu_item_call.on_click
+	     function="Profile.Action"
+	     parameter="upload_fl"/>
+	  </menu_item_call>
+  </menu>-->
   <menu_item_call
    label="Share..."
    name="share">

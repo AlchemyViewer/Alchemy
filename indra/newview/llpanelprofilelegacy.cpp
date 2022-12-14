@@ -47,6 +47,7 @@
 #include "lltrans.h"
 
 // newview
+#include "alavataractions.h"
 #include "llagent.h"
 #include "llagentdata.h"
 #include "llagentpicksinfo.h"
@@ -532,35 +533,37 @@ void LLPanelProfileLegacy::showAccordion(std::string_view name, bool show)
 void LLPanelProfileLegacy::onCommitAction(const LLSD& userdata)
 {
 	const std::string action = userdata.asString();
-	if (action == "friend")
-	{
-		if (LLAvatarTracker::instance().getBuddyInfo(getAvatarId()) == nullptr)
-			LLAvatarActions::requestFriendshipDialog(getAvatarId());
-		else
-			LLAvatarActions::removeFriendDialog(getAvatarId());
-		resetControls();
-	}
-	else if (action == "block")
-	{
-		LLAvatarActions::toggleBlock(getAvatarId());
-		resetControls();
-	}
-	else if (action == "chat")
-		LLAvatarActions::startIM(getAvatarId());
-	else if (action == "call")
-		LLAvatarActions::startCall(getAvatarId());
-	else if (action == "share")
-		LLAvatarActions::share(getAvatarId());
-	else if (action == "teleport")
-		LLAvatarActions::offerTeleport(getAvatarId());
-	else if (action == "req_teleport")
-		LLAvatarActions::teleportRequest(getAvatarId());
-	else if (action == "map")
-		LLAvatarActions::showOnMap(getAvatarId());
-	else if (action == "pay")
-		LLAvatarActions::pay(getAvatarId());
-	else if (action == "report_abuse")
-		LLFloaterReporter::showFromObject(getAvatarId());
+    if (action == "friend")
+    {
+        if (LLAvatarTracker::instance().getBuddyInfo(getAvatarId()) == nullptr)
+            LLAvatarActions::requestFriendshipDialog(getAvatarId());
+        else
+            LLAvatarActions::removeFriendDialog(getAvatarId());
+        resetControls();
+    }
+    else if (action == "block")
+    {
+        LLAvatarActions::toggleBlock(getAvatarId());
+        resetControls();
+    }
+    else if (action == "chat")
+        LLAvatarActions::startIM(getAvatarId());
+    else if (action == "call")
+        LLAvatarActions::startCall(getAvatarId());
+    else if (action == "share")
+        LLAvatarActions::share(getAvatarId());
+    else if (action == "teleport")
+        LLAvatarActions::offerTeleport(getAvatarId());
+    else if (action == "req_teleport")
+        LLAvatarActions::teleportRequest(getAvatarId());
+    else if (action == "map")
+        LLAvatarActions::showOnMap(getAvatarId());
+    else if (action == "pay")
+        LLAvatarActions::pay(getAvatarId());
+    else if (action == "report_abuse")
+        LLFloaterReporter::showFromObject(getAvatarId());
+    else if (action == "webprofile")
+        ALAvatarActions::showWebProfile(getAvatarId());
 	else
 		LL_WARNS("LegacyProfiles") << "Unhandled action: " << action << LL_ENDL;
 }
