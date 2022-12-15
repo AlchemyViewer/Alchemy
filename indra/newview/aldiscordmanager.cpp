@@ -114,8 +114,8 @@ void ALDiscordManager::init()
     activity.GetAssets().SetLargeText("Alchemy Viewer");
     activity.SetType(discord::ActivityType::Playing);
     mDiscord->ActivityManager().UpdateActivity(activity, [](discord::Result result) {
-        LL_INFOS() << ((result == discord::Result::Ok) ? "Succeeded" : "Failed")
-                  << " updating activity!" << LL_ENDL;
+        //LL_INFOS() << ((result == discord::Result::Ok) ? "Succeeded" : "Failed")
+        //          << " updating activity!" << LL_ENDL;
     });
 
 	LLEventPumps::instance().obtain("mainloop").listen("ALDiscordManager", boost::bind(&ALDiscordManager::update, this, _1));
@@ -220,7 +220,7 @@ void ALDiscordManager::updateActivity()
 	activity.GetParty().SetPrivacy(discord::ActivityPartyPrivacy::Public);
 
 	mDiscord->ActivityManager().UpdateActivity(activity, [](discord::Result result) {
-		LL_INFOS() << ((result == discord::Result::Ok) ? "Succeeded" : "Failed")
-		<< " updating activity!" << LL_ENDL;
+		//LL_DEBUGS() << ((result == discord::Result::Ok) ? "Succeeded" : "Failed")
+		//<< " updating activity!" << LL_ENDL;
 		});
 }
