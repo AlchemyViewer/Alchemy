@@ -568,6 +568,14 @@ void LLPanelProfileLegacy::onCommitAction(const LLSD& userdata)
         LLAvatarActions::pay(getAvatarId());
     else if (action == "report_abuse")
         LLFloaterReporter::showFromObject(getAvatarId());
+    else if (action == "upload_sl")
+    {
+        // *TODO:
+    }
+    else if (action == "upload_fl")
+    {
+        // *TODO:
+    }
     else if (action == "webprofile")
         ALAvatarActions::showWebProfile(getAvatarId());
 	else
@@ -594,6 +602,11 @@ bool LLPanelProfileLegacy::isActionEnabled(const LLSD& userdata)
 		action_enabled = (getAvatarId() != gAgentID);
 	else if (check == "can_drama")
 		action_enabled = (getAvatarId() != gAgentID);
+    else if (check == "can_upload_pic")
+    {
+        action_enabled = getAvatarId() == gAgentID
+            && !gAgent.getRegionCapability("UploadAgentProfileImage").empty();
+    }
 	else
 		LL_INFOS("LegacyProfiles") << "Unhandled check " << check << LL_ENDL;
 	return action_enabled;

@@ -21,6 +21,9 @@
 		<menu_item_call.on_click
 		 function="Profile.Action"
 		 parameter="upload_sl"/>
+		<menu_item_call.on_enable
+		 function="Profile.Enable"
+		 parameter="can_upload_pic" />
 	  </menu_item_call>
 	  <menu_item_call
        label="First Life..."
@@ -28,6 +31,9 @@
         <menu_item_call.on_click
 	     function="Profile.Action"
 	     parameter="upload_fl"/>
+        <menu_item_call.on_enable
+		 function="Profile.Enable"
+		 parameter="can_upload_pic" />
 	  </menu_item_call>
   </menu>-->
   <menu_item_call
