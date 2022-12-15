@@ -23,8 +23,8 @@ if (USE_DISCORD)
           ${ARCH_PREBUILT_DIRS_RELEASE}/discord_game_sdk.dylib)
     elseif (LINUX)
       set(DISCORD_LIBRARY 
-          ${ARCH_PREBUILT_DIRS_RELEASE}/libdiscordgamesdk.a
-          ${ARCH_PREBUILT_DIRS_RELEASE}/discord_game_sdk.so)
+          optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libdiscord_game_sdk.so
+          optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libdiscordgamesdk.a)
     endif (WINDOWS)
     set(DISCORD_LIBRARIES ${DISCORD_LIBRARY})
     set(DISCORD_INCLUDE_DIRS ${LIBS_PREBUILT_DIR}/include/discord/)

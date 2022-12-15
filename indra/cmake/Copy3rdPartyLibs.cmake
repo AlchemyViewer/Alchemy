@@ -214,6 +214,10 @@ elseif(DARWIN)
       list(APPEND release_files libfmod.dylib)
     endif (USE_FMODSTUDIO)
 
+    if(USE_DISCORD)
+      list(APPEND release_files discord_game_sdk.dylib)
+    endif()
+
 elseif(LINUX)
     # linux is weird, multiple side by side configurations aren't supported
     # and we don't seem to have any debug shared libs built yet anyways...
@@ -253,6 +257,10 @@ elseif(LINUX)
       list(APPEND debug_files libfmodL.so)
       list(APPEND release_files libfmod.so)
     endif (USE_FMODSTUDIO)
+
+    if(USE_DISCORD)
+      list(APPEND release_files libdiscord_game_sdk.so)
+    endif()
 
 else(WINDOWS)
     message(STATUS "WARNING: unrecognized platform for staging 3rd party libs, skipping...")

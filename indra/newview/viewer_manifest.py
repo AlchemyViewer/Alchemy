@@ -1225,7 +1225,7 @@ class Linux_i686_Manifest(LinuxManifest):
                 self.path("libfmod.so*")
 
             if self.args['discord'] == 'ON' or self.args['discord'] == 'TRUE':
-                self.path("discord_game_sdk.so")
+                self.path("libdiscord_game_sdk.so")
 
         # Vivox runtimes
         with self.prefix(src=os.path.join(pkgdir, 'bin', 'release'), dst="bin"):
@@ -1266,7 +1266,7 @@ class Linux_x86_64_Manifest(LinuxManifest):
                 self.path("libfmod.so*")
 
             if self.args['discord'] == 'ON' or self.args['discord'] == 'TRUE':
-                self.path("discord_game_sdk.so")
+                self.path("libdiscord_game_sdk.so")
 
         # Vivox runtimes
         with self.prefix(src=os.path.join(pkgdir, 'bin', 'release'), dst="bin"):
