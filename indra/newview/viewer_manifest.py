@@ -524,12 +524,12 @@ class WindowsManifest(ViewerManifest):
                 self.path("ortp.dll")
 
             # Sentry
-            if self.args.get('sentry'):
+            if self.args['sentry'] == 'ON' or self.args['sentry'] == 'TRUE':
                 self.path("sentry.dll")
                 with self.prefix(src=os.path.join(pkgdir, 'bin', 'release')):
                     self.path("crashpad_handler.exe")
 
-            if self.args.get('discord'):
+            if self.args['discord'] == 'ON' or self.args['discord'] == 'TRUE':
                 self.path("discord_game_sdk.dll")
 
         self.path(src="licenses-win32.txt", dst="licenses.txt")
@@ -840,7 +840,7 @@ class DarwinManifest(ViewerManifest):
                                 ):
                     self.path(libfile)
 
-                if self.args.get('sentry'):
+                if self.args['sentry'] == 'ON' or self.args['sentry'] == 'TRUE':
                     self.path("Sentry.framework")
 
                 if self.args['openal'] == 'ON' or self.args['openal'] == 'TRUE':
@@ -856,7 +856,7 @@ class DarwinManifest(ViewerManifest):
                     else:
                         self.path("libfmod.dylib")
 
-                if self.args.get('discord'):
+                if self.args['discord'] == 'ON' or self.args['discord'] == 'TRUE':
                     self.path("discord_game_sdk.dylib")
 
             with self.prefix(dst="MacOS"):
@@ -1224,7 +1224,7 @@ class Linux_i686_Manifest(LinuxManifest):
             if self.args['fmodstudio'] == 'ON' or self.args['fmodstudio'] == 'TRUE':
                 self.path("libfmod.so*")
 
-            if self.args.get('discord'):
+            if self.args['discord'] == 'ON' or self.args['discord'] == 'TRUE':
                 self.path("discord_game_sdk.so")
 
         # Vivox runtimes
@@ -1265,7 +1265,7 @@ class Linux_x86_64_Manifest(LinuxManifest):
             if self.args['fmodstudio'] == 'ON' or self.args['fmodstudio'] == 'TRUE':
                 self.path("libfmod.so*")
 
-            if self.args.get('discord'):
+            if self.args['discord'] == 'ON' or self.args['discord'] == 'TRUE':
                 self.path("discord_game_sdk.so")
 
         # Vivox runtimes
