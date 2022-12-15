@@ -579,6 +579,13 @@ void LLFloaterTools::refresh()
                 LL_WARNS() << "Failed to get selected object" << LL_ENDL;
             }
         }
+        else
+        {
+            // Selection crosses parcel bounds.
+            // We don't display remaining land capacity in this case.
+            const LLStringExplicit empty_str("");
+            childSetTextArg("remaining_capacity", "[CAPACITY_STRING]", empty_str);
+        }
 
         //if (object_count == 1)
         //{
