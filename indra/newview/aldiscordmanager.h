@@ -28,6 +28,7 @@
 #define AL_DISCORDMANAGER_H
 
 #include "llsingleton.h"
+#include "llhost.h"
 
 #include "discord.h"
 
@@ -45,9 +46,12 @@ public:
 
 private:
     void onLoginCompleted();
+    void onRegionChange();
     void updateActivity();
 
+    boost::signals2::connection mRegionChangeConnection;
     std::unique_ptr<discord::Core> mDiscord;
+    LLHost mCurrentHost;
     F64 mLoggedInTime = 0.0;
 };
 

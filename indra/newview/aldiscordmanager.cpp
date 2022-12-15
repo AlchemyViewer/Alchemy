@@ -119,10 +119,12 @@ void ALDiscordManager::init()
 		});
 
 	LLEventPumps::instance().obtain("mainloop").listen("ALDiscordManager", boost::bind(&ALDiscordManager::update, this, _1));
+	mRegionChangeConnection = gAgent.addRegionChangedCallback(boost::bind(&ALDiscordManager::onRegionChange, this));
 }
 
 void ALDiscordManager::shutdown()
 {
+	mRegionChangeConnection.disconnect();
 	LLEventPumps::instance().obtain("mainloop").stopListening("ALDiscordManager");
 	mDiscord.reset();
 }
@@ -145,7 +147,23 @@ bool ALDiscordManager::update(const LLSD&)
 void ALDiscordManager::onLoginCompleted()
 {
 	mLoggedInTime = LLDate::now().secondsSinceEpoch();
+	onRegionChange();
 	updateActivity();
+}
+
+void ALDiscordManager::onRegionChange()
+{
+	if (gAgent.getRegionHost() != mCurrentHost)
+	{
+		LLMessageSystem* msg = gMessageSystem;
+		msg->newMessageFast(_PREHASH_RequestRegionInfo);
+		msg->nextBlockFast(_PREHASH_AgentData);
+		msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID());
+		msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
+		gAgent.sendReliableMessage();
+
+		mCurrentHost = gAgent.getRegionHost();
+	}
 }
 
 void ALDiscordManager::updateActivity()
@@ -215,15 +233,6 @@ void ALDiscordManager::updateActivity()
 	if (max_agents > 0)
 	{
 		activity.GetParty().GetSize().SetMaxSize(max_agents);
-	}
-	else
-	{
-		LLMessageSystem* msg = gMessageSystem;
-		msg->newMessageFast(_PREHASH_RequestRegionInfo);
-		msg->nextBlockFast(_PREHASH_AgentData);
-		msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID());
-		msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
-		gAgent.sendReliableMessage();
 	}
 	activity.GetParty().SetId(regionId.c_str());
 	activity.GetParty().SetPrivacy(discord::ActivityPartyPrivacy::Public);
