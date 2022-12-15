@@ -49,19 +49,19 @@ ALDiscordManager::ALDiscordManager()
 	LLAppViewer::instance()->setOnLoginCompletedCallback(boost::bind(&ALDiscordManager::onLoginCompleted, this));
 
 	gSavedPerAccountSettings.getControl("ALDiscordIntegration")->getSignal()->connect([this](LLControlVariable* control, const LLSD& new_val, const LLSD& old_val)
-    {
-		bool discord_enabled = new_val;
-        if(discord_enabled)
 		{
-			init();
-		}
-		else
-		{
-			shutdown();
-		}
-    });
+			bool discord_enabled = new_val;
+			if (discord_enabled)
+			{
+				init();
+			}
+			else
+			{
+				shutdown();
+			}
+		});
 
-	if(gSavedPerAccountSettings.getBool("ALDiscordIntegration"))
+	if (gSavedPerAccountSettings.getBool("ALDiscordIntegration"))
 	{
 		init();
 	}
@@ -74,16 +74,16 @@ ALDiscordManager::~ALDiscordManager()
 
 void ALDiscordManager::init()
 {
-	if(initialized()) return;
+	if (initialized()) return;
 
-    discord::Core* core{};
-    auto result = discord::Core::Create(DISCORD_CLIENTID, DiscordCreateFlags_NoRequireDiscord, &core);
-    mDiscord.reset(core);
-    if (!mDiscord) {
-        LL_WARNS() << "Failed to instantiate discord core! (err " << static_cast<int>(result)
-                  << ")" << LL_ENDL;
-        return;
-    }
+	discord::Core* core{};
+	auto result = discord::Core::Create(DISCORD_CLIENTID, DiscordCreateFlags_NoRequireDiscord, &core);
+	mDiscord.reset(core);
+	if (!mDiscord) {
+		LL_WARNS() << "Failed to instantiate discord core! (err " << static_cast<int>(result)
+			<< ")" << LL_ENDL;
+		return;
+	}
 
 	mDiscord->SetLogHook(
 		discord::LogLevel::Info, [](discord::LogLevel level, const char* message)
@@ -109,14 +109,14 @@ void ALDiscordManager::init()
 			}
 		});
 
-    discord::Activity activity{};
-    activity.GetAssets().SetLargeImage("alchemy_1024");
-    activity.GetAssets().SetLargeText("Alchemy Viewer");
-    activity.SetType(discord::ActivityType::Playing);
-    mDiscord->ActivityManager().UpdateActivity(activity, [](discord::Result result) {
-        //LL_INFOS() << ((result == discord::Result::Ok) ? "Succeeded" : "Failed")
-        //          << " updating activity!" << LL_ENDL;
-    });
+	discord::Activity activity{};
+	activity.GetAssets().SetLargeImage("alchemy_1024");
+	activity.GetAssets().SetLargeText("Alchemy Viewer");
+	activity.SetType(discord::ActivityType::Playing);
+	mDiscord->ActivityManager().UpdateActivity(activity, [](discord::Result result) {
+		//LL_INFOS() << ((result == discord::Result::Ok) ? "Succeeded" : "Failed")
+		//          << " updating activity!" << LL_ENDL;
+		});
 
 	LLEventPumps::instance().obtain("mainloop").listen("ALDiscordManager", boost::bind(&ALDiscordManager::update, this, _1));
 }
@@ -129,12 +129,12 @@ void ALDiscordManager::shutdown()
 
 bool ALDiscordManager::update(const LLSD&)
 {
-	if(mDiscord)
+	if (mDiscord)
 	{
 		mDiscord->RunCallbacks();
 	}
 	static LLFrameTimer timer;
-	if(timer.checkExpirationAndReset(5.f))
+	if (timer.checkExpirationAndReset(5.f))
 	{
 		updateActivity();
 	}
@@ -189,7 +189,7 @@ void ALDiscordManager::updateActivity()
 		activity.SetDetails(name.c_str());
 	}
 
-	if(mLoggedInTime > 0.0)
+	if (mLoggedInTime > 0.0)
 	{
 		activity.GetTimestamps().SetStart(mLoggedInTime);
 	}
@@ -212,9 +212,18 @@ void ALDiscordManager::updateActivity()
 	std::string regionId = region->getRegionID().asString();
 	activity.GetParty().GetSize().SetCurrentSize(region->mMapAvatars.size());
 	S32 max_agents = LLRegionInfoModel::instance().mAgentLimit;
-	if(max_agents > 1)
+	if (max_agents > 0)
 	{
 		activity.GetParty().GetSize().SetMaxSize(max_agents);
+	}
+	else
+	{
+		LLMessageSystem* msg = gMessageSystem;
+		msg->newMessageFast(_PREHASH_RequestRegionInfo);
+		msg->nextBlockFast(_PREHASH_AgentData);
+		msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID());
+		msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
+		gAgent.sendReliableMessage();
 	}
 	activity.GetParty().SetId(regionId.c_str());
 	activity.GetParty().SetPrivacy(discord::ActivityPartyPrivacy::Public);
