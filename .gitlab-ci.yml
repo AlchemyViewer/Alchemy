@@ -45,8 +45,8 @@ variables:
     name: "$env:CI_COMMIT_REF_NAME-$env:CI_COMMIT_SHORT_SHA"
     expire_in: 1 week
     paths:
+      - build-vc-*/packages/lib/release/discord_game_sdk.dll
       - build-vc-*/packages/lib/release/alut*.dll
-      - build-vc-*/packages/lib/release/epoxy-*.dll
       - build-vc-*/packages/lib/release/fmod*.dll
       - build-vc-*/packages/lib/release/libapr*.dll
       - build-vc-*/packages/lib/release/libexpat*.dll
@@ -87,7 +87,7 @@ variables:
     - source .venv/bin/activate
     - pip3 install --upgrade llbase autobuild dmgbuild
   script:
-    - autobuild configure -c ReleaseOS -- -DUSE_FMODSTUDIO=ON -DUSE_NVAPI=ON -DUSE_LTO=ON -DDISABLE_FATAL_WARNINGS=ON -DREVISION_FROM_VCS=FALSE
+    - autobuild configure -c ReleaseOS -- -DUSE_FMODSTUDIO=ON -DUSE_NVAPI=ON -DUSE_DISCORD=ON -DUSE_LTO=ON -DDISABLE_FATAL_WARNINGS=ON -DREVISION_FROM_VCS=FALSE
     - autobuild build -c ReleaseOS --no-configure
     - autobuild graph -c ReleaseOS --graph-file alchemy-darwin${AUTOBUILD_ADDRSIZE}-dependencies.svg build-darwin-64/autobuild-package.xml
     - |
@@ -100,9 +100,9 @@ variables:
     expire_in: 1 week
     paths:
       - build-darwin-*/build_data.json
+      - build-darwin-*/packages/lib/release/discord_game_sdk.dylib
       - build-darwin-*/packages/lib/release/libalut*.dylib
       - build-darwin-*/packages/lib/release/libapr*.dylib
-      - build-darwin-*/packages/lib/release/libepoxy*.dylib
       - build-darwin-*/packages/lib/release/libfmod*.dylib
       - build-darwin-*/packages/lib/release/libhunspell*.dylib
       - build-darwin-*/packages/lib/release/libndofdev*.dylib
@@ -151,10 +151,10 @@ variables:
     expire_in: 1 week
     paths:
       - build-linux-*/build_data.json
+      - build-linux-*/packages/lib/release/discord_game_sdk.so*
       - build-linux-*/packages/lib/release/libalut.so*
       - build-linux-*/packages/lib/release/libapr-1.so*
       - build-linux-*/packages/lib/release/libaprutil-1.so*
-      - build-linux-*/packages/lib/release/libepoxy*.so*
       - build-linux-*/packages/lib/release/libexpat*.so*
       - build-linux-*/packages/lib/release/libfmod*.so*
       - build-linux-*/packages/lib/release/libjpeg.so*

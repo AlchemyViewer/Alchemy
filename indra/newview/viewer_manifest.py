@@ -856,6 +856,9 @@ class DarwinManifest(ViewerManifest):
                     else:
                         self.path("libfmod.dylib")
 
+                if self.args.get('discord'):
+                    self.path("discord_game_sdk.dylib")
+
             with self.prefix(dst="MacOS"):
                 executable = self.dst_path_of(self.channel())
 

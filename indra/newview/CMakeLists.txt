@@ -2396,6 +2396,7 @@ if (DARWIN)
       --actions=copy
       --arch=${ARCH}
       --artwork=${ARTWORK_DIR}
+      "--discord=${USE_DISCORD}"
       "--sentry=${SENTRY_DSN}"
       "--fmodstudio=${USE_FMODSTUDIO}"
       "--openal=${USE_OPENAL}"
@@ -2440,6 +2441,7 @@ if (DARWIN)
           ${CMAKE_CURRENT_SOURCE_DIR}/viewer_manifest.py
           --arch=${ARCH}
           --artwork=${ARTWORK_DIR}
+          "--discord=${USE_DISCORD}"
           "--sentry=${SENTRY_DSN}"
           "--fmodstudio=${USE_FMODSTUDIO}"
           "--openal=${USE_OPENAL}"
