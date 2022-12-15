@@ -529,6 +529,9 @@ class WindowsManifest(ViewerManifest):
                 with self.prefix(src=os.path.join(pkgdir, 'bin', 'release')):
                     self.path("crashpad_handler.exe")
 
+            if self.args.get('discord'):
+                self.path("discord_game_sdk.dll")
+
         self.path(src="licenses-win32.txt", dst="licenses.txt")
         self.path("featuretable.txt")
         self.path("cube.dae")
@@ -1218,6 +1221,9 @@ class Linux_i686_Manifest(LinuxManifest):
             if self.args['fmodstudio'] == 'ON' or self.args['fmodstudio'] == 'TRUE':
                 self.path("libfmod.so*")
 
+            if self.args.get('discord'):
+                self.path("discord_game_sdk.so")
+
         # Vivox runtimes
         with self.prefix(src=os.path.join(pkgdir, 'bin', 'release'), dst="bin"):
             self.path("SLVoice")
@@ -1256,6 +1262,9 @@ class Linux_x86_64_Manifest(LinuxManifest):
             if self.args['fmodstudio'] == 'ON' or self.args['fmodstudio'] == 'TRUE':
                 self.path("libfmod.so*")
 
+            if self.args.get('discord'):
+                self.path("discord_game_sdk.so")
+
         # Vivox runtimes
         with self.prefix(src=os.path.join(pkgdir, 'bin', 'release'), dst="bin"):
             self.path("SLVoice")
@@ -1278,6 +1287,7 @@ if __name__ == "__main__":
            ' '.join((("'%s'" % arg) if ' ' in arg else arg) for arg in sys.argv))))
     # fmodstudio and openal can be used simultaneously and controled by environment
     extra_arguments = [
+        dict(name='discord', description="""Enable Discord integration""", default=''),
         dict(name='sentry', description="""Enable Sentry crash report system""", default=''),
         dict(name='fmodstudio', description="""Indication if fmod studio libraries are needed""", default='OFF'),
         dict(name='openal', description="""Indication if openal libraries are needed""", default='OFF'),

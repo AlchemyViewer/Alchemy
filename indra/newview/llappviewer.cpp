@@ -256,6 +256,10 @@ using namespace LL;
 #include "llcoproceduremanager.h"
 #include "llviewereventrecorder.h"
 
+#if USE_DISCORD
+#include "aldiscordmanager.h"
+#endif
+
 // *FIX: These extern globals should be cleaned up.
 // The globals either represent state/config/resource-storage of either
 // this app, or another 'component' of the viewer. App globals should be
@@ -1294,6 +1298,11 @@ bool LLAppViewer::init()
     {
         gDirUtilp->deleteDirAndContents(gDirUtilp->getDumpLogsDirPath());
     }
+#endif
+
+#if USE_DISCORD
+		ALDiscordManager::getInstance();
+		LL_INFOS("AppInit") << "Discord Integration Initialized." << LL_ENDL; 
 #endif
 
 	return true;

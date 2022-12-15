@@ -115,6 +115,10 @@ if(WINDOWS)
       list(APPEND debug_files kdud.dll)
       list(APPEND release_files kdu.dll)
     endif (USE_KDU)
+
+    if(USE_DISCORD)
+      list(APPEND release_files discord_game_sdk.dll)
+    endif()
     
     #*******************************
     # Copy MS C runtime dlls, required for packaging.

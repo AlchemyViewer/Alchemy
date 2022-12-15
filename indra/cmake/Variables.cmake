@@ -57,6 +57,12 @@ if (DEFINED ENV{USE_SENTRY})
   set(USE_SENTRY $ENV{USE_SENTRY} CACHE BOOL "" FORCE)
 endif()
 
+#Discord Integration
+option(USE_DISCORD "Enable Discord client integration" OFF)
+if (DEFINED ENV{USE_DISCORD})
+  set(USE_DISCORD $ENV{USE_DISCORD} CACHE BOOL "" FORCE)
+endif()
+
 if(LIBS_CLOSED_DIR)
   file(TO_CMAKE_PATH "${LIBS_CLOSED_DIR}" LIBS_CLOSED_DIR)
 else(LIBS_CLOSED_DIR)

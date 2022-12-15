@@ -14,6 +14,7 @@ include(BuildVersion)
 include(CMakeCopyIfDifferent)
 include(CubemapToEquirectangularJS)
 include(DBusGlib)
+include(DiscordSDK)
 include(DragDrop)
 include(EXPAT)
 include(FMODSTUDIO)
@@ -101,6 +102,7 @@ include_directories(
     "${LIBS_PREBUILT_DIR}/include/collada/1.4"
     ${LLAPPEARANCE_INCLUDE_DIRS}
     ${TRACY_INCLUDE_DIR}
+    ${DISCORD_INCLUDE_DIRS}
     )
 
 if(USE_FMODSTUDIO)
@@ -1528,6 +1530,11 @@ set(viewer_HEADER_FILES
     VorbisFramework.h
     )
 
+if(USE_DISCORD)
+  LIST(APPEND viewer_HEADER_FILES aldiscordmanager.h)
+  LIST(APPEND viewer_SOURCE_FILES aldiscordmanager.cpp)
+endif()
+
 source_group("CMake Rules" FILES ViewerInstall.cmake)
 
 #build_data.json creation moved to viewer_manifest.py MAINT-6413
@@ -2034,6 +2041,7 @@ if (WINDOWS)
         --actions=copy
         --arch=${ARCH}
         --artwork=${ARTWORK_DIR}
+        "--discord=${USE_DISCORD}"
         "--sentry=${SENTRY_DSN}"
         "--fmodstudio=${USE_FMODSTUDIO}"
         "--openal=${USE_OPENAL}"
@@ -2095,6 +2103,7 @@ if (WINDOWS)
           ${CMAKE_CURRENT_SOURCE_DIR}/viewer_manifest.py
           --arch=${ARCH}
           --artwork=${ARTWORK_DIR}
+          "--discord=${USE_DISCORD}"
           "--sentry=${SENTRY_DSN}"
           "--fmodstudio=${USE_FMODSTUDIO}"
           "--openal=${USE_OPENAL}"
@@ -2211,6 +2220,7 @@ target_link_libraries(${VIEWER_BINARY_NAME}
     ${LLAPPEARANCE_LIBRARIES}
     ${TRACY_LIBRARY}
     ${MINIZIP_LIBRARIES}
+    ${DISCORD_LIBRARIES}
     absl::flat_hash_map
     absl::node_hash_map
     absl::strings
@@ -2263,6 +2273,7 @@ if (LINUX)
         ${CMAKE_CURRENT_SOURCE_DIR}/viewer_manifest.py
         --arch=${ARCH}
         --artwork=${ARTWORK_DIR}
+        "--discord=${USE_DISCORD}"
         "--sentry=${SENTRY_DSN}"
         "--fmodstudio=${USE_FMODSTUDIO}"
         "--openal=${USE_OPENAL}"
@@ -2290,6 +2301,7 @@ if (LINUX)
       --actions=copy
       --arch=${ARCH}
       --artwork=${ARTWORK_DIR}
+      "--discord=${USE_DISCORD}"
       "--sentry=${SENTRY_DSN}"
       "--fmodstudio=${USE_FMODSTUDIO}"
       "--openal=${USE_OPENAL}"
