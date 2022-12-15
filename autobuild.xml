@@ -476,11 +476,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>816e70283c4152a8b51731de350b235fcca3c80025a4d199cbdbb0e344b19985565131ac58348b7ba5d3f8f3ea0dd6729cbeb1b8f7db6483b5bb977fdf207663</string>
+              <string>1e47de39d3ee0b26d9e6b900a6b7ca80a7d84d5e3db33ccf0b1abf30a09e75c1c57d8423933f25fb931715a1c238cdf5f263b29ad07c7f416c108f1f869dcd1e</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/191/packages/generic/discord-gamesdk/3.2.1.1760/discord_gamesdk-3.2.1-darwin64-1760.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/191/packages/generic/discord-gamesdk/3.2.1.1764/discord_gamesdk-3.2.1-darwin64-1764.tar.zst</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
@@ -490,11 +490,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>7692d1cb707617e885967c5e210924bddd4d8e7c9e85dd012cef71bfa3a93901a19c6a20421a492930df11d95e02cb58f5a2a19e4850520824019be7faf0e927</string>
+              <string>94c2daadac705d0bf1d171e432118565f3047b8409f6d8667f8711c64122f3d1e7eeef4a30e8c81f943a469de746823688021766467abe6099c3a56f92ceef5c</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/191/packages/generic/discord-gamesdk/3.2.1.1760/discord_gamesdk-3.2.1-linux64-1760.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/191/packages/generic/discord-gamesdk/3.2.1.1764/discord_gamesdk-3.2.1-linux64-1764.tar.zst</string>
             </map>
             <key>name</key>
             <string>linux64</string>
@@ -504,11 +504,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>e25ed20f0366b98ae0323b9a6f3071ab1d825dad55e03fba3ebca32a35412115c600f9658062bfb209f979880bdf8f9a694971fa9c48bbe64ab5ff8ed46f21b5</string>
+              <string>3783cdb9759cf5f4f924f3afeca576fb8cc4209608d7f4874b3285e1b9928ecda8a72cb040532f91058d9d31420106541a62de378e265cf7e3f4d1167a6fb5f8</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/191/packages/generic/discord-gamesdk/3.2.1.1760/discord_gamesdk-3.2.1-windows64-1760.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/191/packages/generic/discord-gamesdk/3.2.1.1764/discord_gamesdk-3.2.1-windows64-1764.tar.zst</string>
             </map>
             <key>name</key>
             <string>windows64</string>
