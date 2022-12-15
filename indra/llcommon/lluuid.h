@@ -58,8 +58,14 @@ public:
 	// CREATORS
 	//
 	LLUUID() = default;
+#if HAVOK_BUILD
+	LLUUID(const LLUUID& rhs) { memcpy(mData, rhs.mData, UUID_BYTES); }
+	~LLUUID() {}
+#endif
 	explicit LLUUID(const char *in_string); // Convert from string.
 	explicit LLUUID(const std::string_view in_string); // Convert from string.
+
+
 
 	//
 	// MANIPULATORS
@@ -265,9 +271,11 @@ public:
 
 	U8 mData[UUID_BYTES] = {};
 };
+#ifndef HAVOK_BUILD
 static_assert(std::is_trivially_copyable<LLUUID>::value, "LLUUID must be trivial copy");
 static_assert(std::is_trivially_move_assignable<LLUUID>::value, "LLUUID must be trivial move");
 static_assert(std::is_standard_layout<LLUUID>::value, "LLUUID must be a standard layout type");
+#endif
 
 typedef std::vector<LLUUID> uuid_vec_t;
 typedef std::set<LLUUID> uuid_set_t;

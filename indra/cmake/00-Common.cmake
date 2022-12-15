@@ -356,6 +356,10 @@ else()
   add_definitions(-URELEASE_SHOW_ASSERT)
 endif()
 
+if(HAVOK_TPV)
+  add_definitions(-DHAVOK_BUILD=1)
+endif(HAVOK_TPV)
+
 option(ENABLE_TIMING "Enable all fast timers" ON)
 if(ENABLE_TIMING)
   add_definitions(-DAL_ENABLE_ALL_TIMERS=1)
