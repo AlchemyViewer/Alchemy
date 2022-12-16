@@ -376,6 +376,7 @@ set(viewer_SOURCE_FILES
     llfloatertestinspectors.cpp
     llfloatertestlistview.cpp
     llfloatertexturefetchdebugger.cpp
+    llfloatertexturepicker.cpp
     llfloatertools.cpp
     llfloatertopobjects.cpp
     llfloatertos.cpp
@@ -1087,6 +1088,7 @@ set(viewer_HEADER_FILES
     llfloatertestinspectors.h
     llfloatertestlistview.h
     llfloatertexturefetchdebugger.h
+    llfloatertexturepicker.h
     llfloatertools.h
     llfloatertopobjects.h
     llfloatertos.h

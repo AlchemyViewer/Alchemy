@@ -62,7 +62,7 @@
 #include "llcommandhandler.h"
 #include "llfloaterprofiletexture.h"
 #include "llfloaterreg.h"
-#include "llfloaterreporter.h"
+#include "llfloatertexturepicker.h"
 #include "llfilepicker.h"
 #include "llfirstuse.h"
 #include "llgroupactions.h"
