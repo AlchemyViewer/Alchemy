@@ -46,6 +46,9 @@
 // Sentry
 #define SENTRY_DSN "@SENTRY_DSN@"
 
+// Discord
+#define DISCORD_CLIENTID @DISCORD_CLIENTID@
+
 // Graphics Utils
 #cmakedefine01 USE_NVAPI
 

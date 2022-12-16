@@ -524,10 +524,13 @@ class WindowsManifest(ViewerManifest):
                 self.path("ortp.dll")
 
             # Sentry
-            if self.args.get('sentry'):
+            if self.args['sentry'] == 'ON' or self.args['sentry'] == 'TRUE':
                 self.path("sentry.dll")
                 with self.prefix(src=os.path.join(pkgdir, 'bin', 'release')):
                     self.path("crashpad_handler.exe")
+
+            if self.args['discord'] == 'ON' or self.args['discord'] == 'TRUE':
+                self.path("discord_game_sdk.dll")
 
         self.path(src="licenses-win32.txt", dst="licenses.txt")
         self.path("featuretable.txt")
@@ -837,7 +840,7 @@ class DarwinManifest(ViewerManifest):
                                 ):
                     self.path(libfile)
 
-                if self.args.get('sentry'):
+                if self.args['sentry'] == 'ON' or self.args['sentry'] == 'TRUE':
                     self.path("Sentry.framework")
 
                 if self.args['openal'] == 'ON' or self.args['openal'] == 'TRUE':
@@ -852,6 +855,9 @@ class DarwinManifest(ViewerManifest):
                         self.path("libfmodL.dylib")
                     else:
                         self.path("libfmod.dylib")
+
+                if self.args['discord'] == 'ON' or self.args['discord'] == 'TRUE':
+                    self.path("discord_game_sdk.dylib")
 
             with self.prefix(dst="MacOS"):
                 executable = self.dst_path_of(self.channel())
@@ -1218,6 +1224,9 @@ class Linux_i686_Manifest(LinuxManifest):
             if self.args['fmodstudio'] == 'ON' or self.args['fmodstudio'] == 'TRUE':
                 self.path("libfmod.so*")
 
+            if self.args['discord'] == 'ON' or self.args['discord'] == 'TRUE':
+                self.path("libdiscord_game_sdk.so")
+
         # Vivox runtimes
         with self.prefix(src=os.path.join(pkgdir, 'bin', 'release'), dst="bin"):
             self.path("SLVoice")
@@ -1256,6 +1265,9 @@ class Linux_x86_64_Manifest(LinuxManifest):
             if self.args['fmodstudio'] == 'ON' or self.args['fmodstudio'] == 'TRUE':
                 self.path("libfmod.so*")
 
+            if self.args['discord'] == 'ON' or self.args['discord'] == 'TRUE':
+                self.path("libdiscord_game_sdk.so")
+
         # Vivox runtimes
         with self.prefix(src=os.path.join(pkgdir, 'bin', 'release'), dst="bin"):
             self.path("SLVoice")
@@ -1278,6 +1290,7 @@ if __name__ == "__main__":
            ' '.join((("'%s'" % arg) if ' ' in arg else arg) for arg in sys.argv))))
     # fmodstudio and openal can be used simultaneously and controled by environment
     extra_arguments = [
+        dict(name='discord', description="""Enable Discord integration""", default=''),
         dict(name='sentry', description="""Enable Sentry crash report system""", default=''),
         dict(name='fmodstudio', description="""Indication if fmod studio libraries are needed""", default='OFF'),
         dict(name='openal', description="""Indication if openal libraries are needed""", default='OFF'),

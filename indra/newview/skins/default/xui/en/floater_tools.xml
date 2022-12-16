@@ -2,7 +2,7 @@
 <floater
  positioning="none"
  legacy_header_height="18"
- height="629"
+ height="620"
  layout="topleft"
  bg_opaque_image="Window_NoTitle_Foreground"
  bg_alpha_image="Window_NoTitle_Background"
@@ -68,7 +68,7 @@
     </floater.string>
     <floater.string
      name="status_selectcount">
-        [OBJ_COUNT] objects selected, land impact [LAND_IMPACT] [secondlife:///app/openfloater/object_weights More info]
+        [OBJ_COUNT] objects selected, land impact [LAND_IMPACT]
     </floater.string>
     <floater.string
      name="status_remaining_capacity">
@@ -822,7 +822,6 @@
 		Nothing selected.
 	</text>
 	<text
-	 text_color="LtGray_50"
 	  type="string"
 	  length="1"
 	  height="16"
@@ -834,9 +833,8 @@
 	  top_delta="0"
 	  visible="false"
 	  width="280">
-  </text>
+	</text>
 	<text
-	 text_color="LtGray_50"
 	  type="string"
 	  length="1"
 	  height="16"

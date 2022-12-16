@@ -455,6 +455,68 @@
         <key>version</key>
         <string>1.0.0</string>
       </map>
+      <key>discord-gamesdk</key>
+      <map>
+        <key>canonical_repo</key>
+        <string>https://git.alchemyviewer.org/alchemy/thirdparty/3p-discord-gamesdk</string>
+        <key>copyright</key>
+        <string>Copyright (c) Discord.</string>
+        <key>description</key>
+        <string>Discord GameSDK for integrating with Discord</string>
+        <key>license</key>
+        <string>proprietary</string>
+        <key>license_file</key>
+        <string>LICENSES/discord-gamesdk.txt</string>
+        <key>name</key>
+        <string>discord-gamesdk</string>
+        <key>platforms</key>
+        <map>
+          <key>darwin64</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>hash</key>
+              <string>1e47de39d3ee0b26d9e6b900a6b7ca80a7d84d5e3db33ccf0b1abf30a09e75c1c57d8423933f25fb931715a1c238cdf5f263b29ad07c7f416c108f1f869dcd1e</string>
+              <key>hash_algorithm</key>
+              <string>blake2b</string>
+              <key>url</key>
+              <string>https://git.alchemyviewer.org/api/v4/projects/191/packages/generic/discord-gamesdk/3.2.1.1764/discord_gamesdk-3.2.1-darwin64-1764.tar.zst</string>
+            </map>
+            <key>name</key>
+            <string>darwin64</string>
+          </map>
+          <key>linux64</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>hash</key>
+              <string>94c2daadac705d0bf1d171e432118565f3047b8409f6d8667f8711c64122f3d1e7eeef4a30e8c81f943a469de746823688021766467abe6099c3a56f92ceef5c</string>
+              <key>hash_algorithm</key>
+              <string>blake2b</string>
+              <key>url</key>
+              <string>https://git.alchemyviewer.org/api/v4/projects/191/packages/generic/discord-gamesdk/3.2.1.1764/discord_gamesdk-3.2.1-linux64-1764.tar.zst</string>
+            </map>
+            <key>name</key>
+            <string>linux64</string>
+          </map>
+          <key>windows64</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>hash</key>
+              <string>3783cdb9759cf5f4f924f3afeca576fb8cc4209608d7f4874b3285e1b9928ecda8a72cb040532f91058d9d31420106541a62de378e265cf7e3f4d1167a6fb5f8</string>
+              <key>hash_algorithm</key>
+              <string>blake2b</string>
+              <key>url</key>
+              <string>https://git.alchemyviewer.org/api/v4/projects/191/packages/generic/discord-gamesdk/3.2.1.1764/discord_gamesdk-3.2.1-windows64-1764.tar.zst</string>
+            </map>
+            <key>name</key>
+            <string>windows64</string>
+          </map>
+        </map>
+        <key>version</key>
+        <string>3.2.1</string>
+      </map>
       <key>dullahan</key>
       <map>
         <key>copyright</key>
@@ -1409,6 +1471,72 @@
         </map>
         <key>version</key>
         <string>1.0</string>
+      </map>
+      <key>llphysicsextensions_tpv</key>
+      <map>
+        <key>copyright</key>
+        <string>Copyright (c) 2010, Linden Research, Inc.</string>
+        <key>license</key>
+        <string>commercial</string>
+        <key>license_file</key>
+        <string>LICENSES/llphysicsextensions.txt</string>
+        <key>name</key>
+        <string>llphysicsextensions_tpv</string>
+        <key>platforms</key>
+        <map>
+          <key>darwin64</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>creds</key>
+              <string>gitlab</string>
+              <key>hash</key>
+              <string>d406063afef2eaffb95cd20987da021b9eb1489495f7d70bf46263ca675ed7b763a4f10a74557335b3d2120607f18ad42cb574bdf57acde76cff9f79e83806db</string>
+              <key>hash_algorithm</key>
+              <string>blake2b</string>
+              <key>url</key>
+              <string>https://git.alchemyviewer.org/api/v4/projects/192/packages/generic/llphysicsextensions_tpv/1.0.571939/llphysicsextensions_tpv-1.0.571939-darwin64-571939.tar.bz2</string>
+            </map>
+            <key>name</key>
+            <string>darwin64</string>
+          </map>
+          <key>windows</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>creds</key>
+              <string>gitlab</string>
+              <key>hash</key>
+              <string>4a2de5ef7194c64268de1b87b517b8d22cb8347a9fa2fdbc2ac48deebe92ad08a0b664ab4c7419de249de11385bcdf5d2a075b764ac3399e228db29506dbd54b</string>
+              <key>hash_algorithm</key>
+              <string>blake2b</string>
+              <key>url</key>
+              <string>https://git.alchemyviewer.org/api/v4/projects/192/packages/generic/llphysicsextensions_tpv/1.0.571939/llphysicsextensions_tpv-1.0.571939-windows-571939.tar.bz2</string>
+            </map>
+            <key>name</key>
+            <string>windows</string>
+          </map>
+          <key>windows64</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>creds</key>
+              <string>gitlab</string>
+              <key>hash</key>
+              <string>254ecd68df52da6b86bcc64cd83758a8b9a1c398e33ed43cfe9efef28b249f6d7eb8450e27d901177eb9084d52ff7fa428e93fe6f4721ad6ff3d1f4728dc34d8</string>
+              <key>hash_algorithm</key>
+              <string>blake2b</string>
+              <key>url</key>
+              <string>https://git.alchemyviewer.org/api/v4/projects/192/packages/generic/llphysicsextensions_tpv/1.0.571939/llphysicsextensions_tpv-1.0.571939-windows64-571939.tar.bz2</string>
+            </map>
+            <key>name</key>
+            <string>windows64</string>
+          </map>
+        </map>
+        <key>source_type</key>
+        <string>hg</string>
+        <key>version</key>
+        <string>1.0.571939</string>
       </map>
       <key>minizip-ng</key>
       <map>

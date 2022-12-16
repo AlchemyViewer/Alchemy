@@ -175,6 +175,7 @@ void LLGridManager::initialize(const std::string& grid_file)
 				  "secondlife",
 				  "Aditi");
 
+#if !LL_HAVOK
 	LLSD other_grids;
 	llifstream llsd_xml;
 	if (!grid_file.empty())
@@ -246,6 +247,7 @@ void LLGridManager::initialize(const std::string& grid_file)
 		}
 	}
 	else
+#endif
 	{
 		// if a grid was not passed in via the command line, grab it from the CurrentGrid setting.
 		// if there's no current grid, that's ok as it'll be either set by the value passed
@@ -370,6 +372,7 @@ bool LLGridManager::addGrid(LLSD& grid_data)
 	return added;
 }
 
+#if !LL_HAVOK
 bool LLGridManager::removeGrid(const std::string& gridkey)
 {
 	//Grid must exist and not be a system addition
@@ -382,6 +385,7 @@ bool LLGridManager::removeGrid(const std::string& gridkey)
 	}
 	return false;
 }
+#endif
 
 //
 // LLGridManager::addSystemGrid - helper for adding a system grid.
@@ -444,6 +448,7 @@ void LLGridManager::addSystemGrid(const std::string& label,
 	addGrid(grid);
 }
 
+#if !LL_HAVOK
 void LLGridManager::addRemoteGrid(const std::string& login_uri, const EAddGridType type)
 {
 	LL_DEBUGS("GridManager") << "Adding '" << login_uri << "' to grid manager." << LL_ENDL;
@@ -660,6 +665,8 @@ void LLGridManager::saveGridList()
 	outstream.close();
 }
 
+#endif
+
 // return a list of grid name -> grid label mappings for UI purposes
 std::map<std::string, std::string> LLGridManager::getKnownGrids() const
 {
@@ -702,6 +709,7 @@ void LLGridManager::setGridChoice(const std::string& grid, const bool only_selec
 		
 		updateIsInProductionGrid();
 	}
+#if !LL_HAVOK
 	else if (!only_select)
 	{
 		// the grid was not in the list of grids.
@@ -709,6 +717,7 @@ void LLGridManager::setGridChoice(const std::string& grid, const bool only_selec
 		
 		addRemoteGrid(grid, ADD_LINK);
 	}
+#endif
 	else
 	{
 		// the grid was not in the list of grids.
