@@ -376,6 +376,7 @@ set(viewer_SOURCE_FILES
     llfloatertestinspectors.cpp
     llfloatertestlistview.cpp
     llfloatertexturefetchdebugger.cpp
+    llfloatertexturepicker.cpp
     llfloatertools.cpp
     llfloatertopobjects.cpp
     llfloatertos.cpp
@@ -386,6 +387,7 @@ set(viewer_SOURCE_FILES
     llfloatervoiceeffect.cpp
     llfloatervoicevolume.cpp
     llfloaterwebcontent.cpp
+    llfloaterwebprofile.cpp
     llfloaterwhitelistentry.cpp
     llfloaterwindowsize.cpp
     llfloaterworldmap.cpp
@@ -444,6 +446,7 @@ set(viewer_SOURCE_FILES
     lllandmarkactions.cpp
     lllandmarklist.cpp
     lllegacyatmospherics.cpp
+    lllegacynotificationwellwindow.cpp
     lllistbrowser.cpp
     lllistcontextmenu.cpp
     lllistview.cpp
@@ -1086,6 +1089,7 @@ set(viewer_HEADER_FILES
     llfloatertestinspectors.h
     llfloatertestlistview.h
     llfloatertexturefetchdebugger.h
+    llfloatertexturepicker.h
     llfloatertools.h
     llfloatertopobjects.h
     llfloatertos.h
@@ -1096,6 +1100,7 @@ set(viewer_HEADER_FILES
     llfloatervoiceeffect.h
     llfloatervoicevolume.h
     llfloaterwebcontent.h
+    llfloaterwebprofile.h
     llfloaterwhitelistentry.h
     llfloaterwindowsize.h
     llfloaterworldmap.h
@@ -1151,6 +1156,7 @@ set(viewer_HEADER_FILES
     llkeyconflict.h
     lllandmarkactions.h
     lllandmarklist.h
+    lllegacynotificationwellwindow.h
     lllightconstants.h
     lllistbrowser.h
     lllistcontextmenu.h

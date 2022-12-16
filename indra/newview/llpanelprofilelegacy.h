@@ -54,7 +54,8 @@ public:
 	BOOL postBuild() override;
 	void onOpen(const LLSD& key) override;
 	void reshape(S32 width, S32 height, BOOL called_from_parent = TRUE) override;
-    void showAccordion(std::string_view name, bool show);
+    void showTab(std::string_view name, bool show) const;
+    std::string_view getShownTab() const;
 
 protected:
 	void openPanel(LLPanel* panel, const LLSD& params);

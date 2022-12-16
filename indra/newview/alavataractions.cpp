@@ -36,8 +36,11 @@
 #include "roles_constants.h"
 
 #include "llagent.h"
+#include "llavataractions.h"
+#include "llfloaterreg.h"
 #include "llfloaterregioninfo.h"
 #include "llfloaterreporter.h"
+#include "llfloaterwebcontent.h"
 #include "llslurl.h"
 #include "llviewercontrol.h"
 #include "llviewermenu.h"
@@ -841,4 +844,22 @@ bool ALAvatarActions::handleGodKick(const LLSD& notification, const LLSD& respon
 		gAgent.sendReliableMessage();
 	}
 	return false;
+}
+
+// Webprofile junk... for posterity!
+
+static void on_avatar_name_show_profile(const LLUUID& agent_id, const LLAvatarName& av_name)
+{
+    LLFloaterWebContent::Params p;
+    p.url(getProfileURL(av_name.getAccountName())).id(agent_id.asString());
+    LLFloaterReg::showInstance("webprofile", p);
+}
+
+// static
+void ALAvatarActions::showWebProfile(const LLUUID& id)
+{
+    if (id.notNull())
+    {
+        LLAvatarNameCache::get(id, boost::bind(&on_avatar_name_show_profile, _1, _2));
+    }
 }
