@@ -1022,7 +1022,6 @@ bool LLVivoxVoiceClient::startAndLaunchDaemon()
 
             sGatewayPtr = LLProcess::create(params);
 
-            mDaemonHost = LLHost(host.c_str(), port);
             mDaemonHost = LLHost(gSavedSettings.getString("VivoxVoiceHost").c_str(), gSavedSettings.getU32("VivoxVoicePort"));
         }
         else
