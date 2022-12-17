@@ -32,9 +32,9 @@ variables:
     - .\.venv\Scripts\activate.ps1
     - pip3 install --upgrade llbase autobuild
   script:
-    - autobuild configure -c ReleaseOS -- -DUSE_FMODSTUDIO=ON -DUSE_NVAPI=ON -DUSE_DISCORD=ON -DUSE_LTO=ON -DDISABLE_FATAL_WARNINGS=ON -DREVISION_FROM_VCS=FALSE
-    - autobuild build -c ReleaseOS --no-configure
-    - autobuild graph -c ReleaseOS --graph-file alchemy-windows${AUTOBUILD_ADDRSIZE}-dependencies.svg build-vc-64/autobuild-package.xml
+    - autobuild configure -c Release -- -DUSE_LTO=ON -DDISABLE_FATAL_WARNINGS=ON -DREVISION_FROM_VCS=FALSE
+    - autobuild build -c Release --no-configure
+    - autobuild graph -c Release --graph-file alchemy-windows${AUTOBUILD_ADDRSIZE}-dependencies.svg build-vc-64/autobuild-package.xml
     - |
         If ($env:USE_SENTRY -eq 'TRUE') 
         {
@@ -87,9 +87,9 @@ variables:
     - source .venv/bin/activate
     - pip3 install --upgrade llbase autobuild dmgbuild
   script:
-    - autobuild configure -c ReleaseOS -- -DUSE_FMODSTUDIO=ON -DUSE_NVAPI=ON -DUSE_DISCORD=ON -DUSE_LTO=ON -DDISABLE_FATAL_WARNINGS=ON -DREVISION_FROM_VCS=FALSE
-    - autobuild build -c ReleaseOS --no-configure
-    - autobuild graph -c ReleaseOS --graph-file alchemy-darwin${AUTOBUILD_ADDRSIZE}-dependencies.svg build-darwin-64/autobuild-package.xml
+    - autobuild configure -c Release -- -DUSE_LTO=ON -DDISABLE_FATAL_WARNINGS=ON -DREVISION_FROM_VCS=FALSE
+    - autobuild build -c Release --no-configure
+    - autobuild graph -c Release --graph-file alchemy-darwin${AUTOBUILD_ADDRSIZE}-dependencies.svg build-darwin-64/autobuild-package.xml
     - |
         if [ "$USE_SENTRY" = "TRUE" ]
         then
@@ -138,9 +138,9 @@ variables:
     - source .venv/bin/activate
     - pip3 install --upgrade llbase autobuild
   script:
-    - autobuild configure -c ReleaseOS -- -DUSE_FMODSTUDIO=ON -DUSE_NVAPI=ON -DUSE_DISCORD=ON -DUSE_LTO=ON -DDISABLE_FATAL_WARNINGS=ON -DREVISION_FROM_VCS=FALSE
-    - autobuild build -c ReleaseOS --no-configure
-    - autobuild graph -c ReleaseOS --graph-file alchemy-linuxs${AUTOBUILD_ADDRSIZE}-dependencies.svg build-linux-${AUTOBUILD_ADDRSIZE}/autobuild-package.xml
+    - autobuild configure -c Release -- -DUSE_LTO=ON -DDISABLE_FATAL_WARNINGS=ON -DREVISION_FROM_VCS=FALSE
+    - autobuild build -c Release --no-configure
+    - autobuild graph -c Release --graph-file alchemy-linuxs${AUTOBUILD_ADDRSIZE}-dependencies.svg build-linux-${AUTOBUILD_ADDRSIZE}/autobuild-package.xml
     - |
         if [ "$USE_SENTRY" = "TRUE" ] 
         then

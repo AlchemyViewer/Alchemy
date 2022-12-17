@@ -8,7 +8,7 @@ include(Prebuilt)
 # - The prebuilt package available to those with sublicenses, selected by -DHAVOK_TPV:BOOL=ON
 
 if (INSTALL_PROPRIETARY)
-   set(HAVOK ON CACHE BOOL "Use Havok physics library")
+   set(HAVOK_TPV ON CACHE BOOL "Use Havok physics library" FORCE)
 endif (INSTALL_PROPRIETARY)
 
 
@@ -22,7 +22,7 @@ if (HAVOK)
    set(LLPHYSICSEXTENSIONS_SRC_DIR ${LIBS_PREBUILT_DIR}/llphysicsextensions/src)
    set(LLPHYSICSEXTENSIONS_LIBRARIES    llphysicsextensions)
    set(LLPHYSICSEXTENSIONS_INCLUDE_DIRS ${LIBS_PREBUILT_DIR}/include/llphysicsextensions) 
-elseif (HAVOK_TPV)
+elseif (HAVOK_TPV AND NOT LINUX)
    use_prebuilt_binary(llphysicsextensions_tpv)
    set(LLPHYSICSEXTENSIONS_LIBRARIES    ${ARCH_PREBUILT_DIRS}/llphysicsextensions_tpv.lib)
    set(LLPHYSICSEXTENSIONS_INCLUDE_DIRS ${LIBS_PREBUILT_DIR}/include/llphysicsextensions) 

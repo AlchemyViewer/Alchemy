@@ -1,7 +1,11 @@
 # -*- cmake -*-
 include(Prebuilt)
 
-set(USE_NVAPI OFF CACHE BOOL "Use NVAPI.")
+set(USE_NVAPI OFF CACHE BOOL "Use NVAPI library.")
+
+if (INSTALL_PROPRIETARY)
+  set(USE_NVAPI ON CACHE BOOL "" FORCE)
+endif (INSTALL_PROPRIETARY)
 
 if (USE_NVAPI)
   if (WINDOWS)
