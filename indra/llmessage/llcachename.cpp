@@ -37,7 +37,7 @@
 #include "lluuid.h"
 #include "message.h"
 
-#include "absl/container/flat_hash_map.h"
+#include "boost/unordered/unordered_flat_map.hpp"
 
 // llsd serialization constants
 static const std::string AGENTS("agents");
@@ -184,8 +184,8 @@ void ReplySender::flush()
 typedef std::set<LLUUID>					AskQueue;
 typedef std::list<PendingReply*>			ReplyQueue;
 typedef std::map<LLUUID,U32>				PendingQueue;
-typedef absl::flat_hash_map<LLUUID, LLCacheNameEntry*> Cache;
-typedef absl::flat_hash_map<std::string, LLUUID> 		ReverseCache;
+typedef boost::unordered_flat_map<LLUUID, LLCacheNameEntry*> Cache;
+typedef boost::unordered_flat_map<std::string, LLUUID> 		ReverseCache;
 
 class LLCacheName::Impl
 {
@@ -543,7 +543,8 @@ std::string LLCacheName::buildUsername(const std::string& full_name)
 
 		if (lastname != "Resident")
 		{
-			username = absl::StrCat(username, ".", lastname);
+			username += ".";
+			username += lastname;
 		}
 		
 		LLStringUtil::toLower(username);
@@ -586,7 +587,7 @@ std::string LLCacheName::buildLegacyName(const std::string& complete_name)
 				{
 					cap_letter = last_name.substr(0, 1);
 					LLStringUtil::toUpper(cap_letter);
-					legacy_name = absl::StrCat(legacy_name, " ", cap_letter, last_name.substr(1));
+					legacy_name = fmt::format("{} {}{}", legacy_name, cap_letter, last_name.substr(1));
 				}
 			}
 

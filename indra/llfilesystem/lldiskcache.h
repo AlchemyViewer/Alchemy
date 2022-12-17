@@ -63,8 +63,9 @@
 #define _LLDISKCACHE
 
 #include "llsingleton.h"
+#include "lluuid.h"
 
-#include "absl/container/flat_hash_set.h"
+#include "boost/unordered/unordered_flat_set.hpp"
 
 class LLDiskCache final :
     public LLParamSingleton<LLDiskCache>
@@ -198,7 +199,7 @@ class LLDiskCache final :
          */
         bool mEnableCacheDebugInfo;
         
-        absl::flat_hash_set<LLUUID> mSkipList;
+        boost::unordered_flat_set<LLUUID> mSkipList;
 };
 
 class LLPurgeDiskCacheThread : public LLThread

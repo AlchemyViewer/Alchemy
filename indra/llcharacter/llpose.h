@@ -35,7 +35,7 @@
 #include "lljoint.h"
 #include "llpointer.h"
 
-#include <absl/container/flat_hash_map.h>
+#include "boost/unordered/unordered_flat_map.hpp"
 
 #include <map>
 #include <string>
@@ -109,7 +109,7 @@ class LLPoseBlender
 {
 protected:
 	typedef std::list<LLJointStateBlender*> blender_list_t;
-	typedef absl::flat_hash_map<LLJoint*,LLJointStateBlender*> blender_map_t;
+	typedef boost::unordered_flat_map<LLJoint*,LLJointStateBlender*> blender_map_t;
 	blender_map_t mJointStateBlenderPool;
 	blender_list_t mActiveBlenders;
 

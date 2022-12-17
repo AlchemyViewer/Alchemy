@@ -130,7 +130,6 @@ if(USE_PRECOMPILED_HEADERS AND ${CMAKE_VERSION} VERSION_GREATER "3.15.0")
     <map>
     <list>
     <string>
-    <absl/container/flat_hash_set.h>
-    <absl/container/flat_hash_map.h>
+    <boost/unordered/unordered_flat_map.hpp>
     )
 endif()

@@ -280,6 +280,7 @@ namespace tut
 			   LLGridManager::getInstance()->isSystemGrid("util.aditi.lindenlab.com"));
 	}
 
+#ifndef HAVOK_BUILD
 	// initialization with a grid file
 	template<> template<>
 	void viewerNetworkTestObject::test<2>()
@@ -408,7 +409,7 @@ namespace tut
 					  std::string("http://minimal.long.name/app/login/"));
 
 	}
-
+#endif
 
 	// validate grid selection
 	template<> template<>
@@ -449,6 +450,7 @@ namespace tut
 					  uris[0],
 					  std::string("https://login.agni.lindenlab.com/cgi-bin/login.cgi"));
 
+#ifndef HAVOK_BUILD
 		LLGridManager::getInstance()->setGridChoice(std::string("altgrid.long.name"));
 		ensure_equals("getGridLabel",
 					  LLGridManager::getInstance()->getGridLabel(),
@@ -462,6 +464,7 @@ namespace tut
 			   LLGridManager::getInstance()->isInOpenSim());
 		ensure("alternative grid is not Second Life",
 			   !LLGridManager::getInstance()->isInSecondlife());
+#endif
 	}
 
 }

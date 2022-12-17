@@ -37,7 +37,9 @@
 #include "llglslshader.h"
 #include "llmemory.h"
 
-#include "absl/container/flat_hash_set.h"
+#if LL_DEBUG || LL_RELEASE_WITH_DEBUG_INFO || defined(RELEASE_SHOW_ASSERT)
+#include "boost/unordered/unordered_flat_set.hpp"
+#endif
 
 //Next Highest Power Of Two
 //helper function, returns first number > v that is a power of 2, or v if v is already a power of 2
@@ -124,8 +126,8 @@ bool LLVertexBuffer::sPreferStreamDraw = false;
 U32 LLVertexBuffer::sDummyVAO = 0;
 
 #if LL_DEBUG || LL_RELEASE_WITH_DEBUG_INFO || defined(RELEASE_SHOW_ASSERT)
-static absl::flat_hash_set<U32> sActiveBufferNames;
-static absl::flat_hash_set<U32> sDeletedBufferNames;
+static boost::unordered_flat_set<U32> sActiveBufferNames;
+static boost::unordered_flat_set<U32> sDeletedBufferNames;
 
 void validate_add_buffer(U32 name)
 {

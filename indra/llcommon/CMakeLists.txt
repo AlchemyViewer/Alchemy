@@ -312,12 +312,8 @@ target_link_libraries(
     ${BOOST_SYSTEM_LIBRARY}
     ${GOOGLE_PERFTOOLS_LIBRARIES}
     ${URIPARSER_LIBRARIES}
-    absl::synchronization
     absl::flat_hash_map
     absl::node_hash_map
-    absl::random_random
-    absl::random_bit_gen_ref
-    absl::strings
     nlohmann_json::nlohmann_json
     fmt::fmt
     ${TRACY_LIBRARY}
@@ -340,8 +336,10 @@ if(USE_PRECOMPILED_HEADERS AND ${CMAKE_VERSION} VERSION_GREATER "3.15.0")
     <string>
     <string_view>
     <thread>
-    <absl/container/node_hash_map.h>
-    <absl/container/flat_hash_map.h>
+    <boost/unordered/unordered_flat_map.hpp>
+    <boost/unordered/unordered_flat_set.hpp>
+    <boost/unordered/unordered_map.hpp>
+    <boost/unordered/unordered_set.hpp>
     <fmt/format.h>
     <fmt/compile.h>
     )

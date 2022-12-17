@@ -220,7 +220,7 @@ void LLUUID::toCompressedString(char *out) const
 
 BOOL LLUUID::set(const char* in_string, BOOL emit)
 {
-	return set(absl::NullSafeStringView(in_string),emit);
+	return set(ll_safe_string(in_string), emit);
 }
 
 BOOL LLUUID::parseInternalScalar(const char* in_string, bool broken_format, bool emit)

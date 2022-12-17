@@ -132,12 +132,12 @@ LLUUID find_ui_sound(std::string_view name)
 
 LLUUID find_ui_sound(const char* namep)
 {
-	return find_ui_sound(absl::NullSafeStringView(namep));
+	return find_ui_sound(ll_safe_string(namep));
 }
 
 void make_ui_sound(const char* namep)
 {
-	LLUUID soundUUID = find_ui_sound(absl::NullSafeStringView(namep));
+	LLUUID soundUUID = find_ui_sound(namep);
 	if(soundUUID.notNull())
 	{
 		LLUI::getInstance()->mAudioCallback(soundUUID);
@@ -146,7 +146,7 @@ void make_ui_sound(const char* namep)
 
 void make_ui_sound_deferred(const char* namep)
 {
-	LLUUID soundUUID = find_ui_sound(absl::NullSafeStringView(namep));
+	LLUUID soundUUID = find_ui_sound(namep);
 	if(soundUUID.notNull())
 	{
 		LLUI::getInstance()->mDeferredAudioCallback(soundUUID);

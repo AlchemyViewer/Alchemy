@@ -47,8 +47,7 @@
 #include <string_view>
 #include "string.h"
 
-#include "absl/synchronization/mutex.h"
-#include "absl/container/flat_hash_map.h"
+#include "boost/unordered/unordered_flat_map.hpp"
 
 #include "llapp.h"
 #include "llapr.h"
@@ -500,7 +499,7 @@ namespace
 	}
 
 
-	typedef absl::flat_hash_map<std::string, LLError::ELevel> LevelMap;
+	typedef boost::unordered_flat_map<std::string, LLError::ELevel> LevelMap;
 	typedef std::vector<LLError::RecorderPtr> Recorders;
 	typedef std::vector<LLError::CallSite*> CallSiteVector;
 
@@ -1388,7 +1387,7 @@ namespace LLError
 		if (site.mClassInfo != typeid(NoClassInfo))
 #endif // LL_LINUX
 		{
-			function_name = absl::StrCat(class_name, "::", function_name);
+			function_name = fmt::format(FMT_COMPILE("{}::{}"), class_name, function_name);
 		}
 
 		ELevel compareLevel = s->mDefaultLevel;

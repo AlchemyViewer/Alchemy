@@ -36,7 +36,6 @@
 #include <immintrin.h>
 
 #include "absl/hash/hash.h"
-#include "absl/strings/str_format.h"
 
 class LLMutex;
 
@@ -201,18 +200,6 @@ public:
 	template <typename H>
 	friend H AbslHashValue(H h, const LLUUID& id) {
 		return H::combine_contiguous(std::move(h), id.mData, UUID_BYTES);
-	}
-
-	friend absl::FormatConvertResult<absl::FormatConversionCharSet::kString>
-		AbslFormatConvert(const LLUUID& id,
-			const absl::FormatConversionSpec& spec,
-			absl::FormatSink* s) {
-		if (spec.conversion_char() == absl::FormatConversionChar::s) {
-            char uuid_str[UUID_STR_SIZE] = {}; // will be null-terminated
-            id.to_chars(uuid_str);
-			s->Append(uuid_str);
-		}
-		return { true };
 	}
 
 	// xor functions. Useful since any two random uuids xored together

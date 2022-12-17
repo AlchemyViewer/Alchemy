@@ -40,7 +40,7 @@
 #include "llrefcount.h"
 #include "llsortedvector.h"
 
-#include <absl/container/flat_hash_map.h>
+#include "boost/unordered/unordered_flat_map.hpp"
 
 class LLPolyMesh;
 
@@ -260,7 +260,7 @@ public:
 protected:
 	LLMotionController	mMotionController;
 
-	typedef absl::flat_hash_map<std::string, void *> animation_data_map_t;
+	typedef boost::unordered_flat_map<std::string, void *, al::string_hash, std::equal_to<>> animation_data_map_t;
 	animation_data_map_t mAnimationData;
 
 	F32					mPreferredPelvisHeight;
@@ -271,9 +271,9 @@ protected:
 
 private:
 	// visual parameter stuff
-	typedef absl::flat_hash_map<S32, LLVisualParam *> 		visual_param_index_map_t;	//Hash map for fast lookup.
+	typedef boost::unordered_flat_map<S32, LLVisualParam *> 		visual_param_index_map_t;	//Hash map for fast lookup.
 	typedef LLSortedVector<S32,LLVisualParam *>				visual_param_sorted_vec_t;	//Contiguous sorted array.
-	typedef absl::flat_hash_map<char *, LLVisualParam *> 	visual_param_name_map_t;
+	typedef boost::unordered_flat_map<char *, LLVisualParam *> 	visual_param_name_map_t;
 
 	visual_param_sorted_vec_t::iterator 			mCurIterator;
 	visual_param_sorted_vec_t						mVisualParamSortedVector;

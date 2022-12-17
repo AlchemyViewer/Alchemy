@@ -142,7 +142,7 @@ const char *LLAssetType::lookup(LLAssetType::EType asset_type)
 // static
 LLAssetType::EType LLAssetType::lookup(const char* name)
 {
-	return lookup(absl::NullSafeStringView(name));
+	return lookup(ll_safe_string(name));
 }
 
 // static
@@ -180,7 +180,7 @@ const char *LLAssetType::lookupHumanReadable(LLAssetType::EType asset_type)
 // static
 LLAssetType::EType LLAssetType::lookupHumanReadable(const char* name)
 {
-	return lookupHumanReadable(absl::NullSafeStringView(name));
+	return lookupHumanReadable(ll_safe_string(name));
 }
 
 // static

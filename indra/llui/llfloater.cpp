@@ -588,7 +588,7 @@ std::string LLFloater::getControlName(const std::string& name, const LLSD& key)
 	// Add the key to the control name if appropriate.
 	if (key.isString() && !key.asString().empty())
 	{
-		absl::StrAppend(&ctrl_name, "_", key.asString());
+		ctrl_name += "_" + key.asString();
 	}
 
 	return ctrl_name;
