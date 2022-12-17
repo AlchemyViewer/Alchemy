@@ -132,7 +132,7 @@ LLUUID find_ui_sound(std::string_view name)
 
 LLUUID find_ui_sound(const char* namep)
 {
-	return find_ui_sound(ll_safe_string(namep));
+	return find_ui_sound(al::safe_string_view(namep));
 }
 
 void make_ui_sound(const char* namep)

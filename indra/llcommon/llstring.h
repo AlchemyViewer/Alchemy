@@ -162,6 +162,10 @@ namespace al
 		[[nodiscard]] size_t operator()(std::string_view txt) const { return hash_type{}(txt); }
 		[[nodiscard]] size_t operator()(const std::string& txt) const { return hash_type{}(txt); }
 	};
+
+	inline std::string_view safe_string_view(const char* p) {
+		return p ? std::string_view(p) : std::string_view();
+	}
 }
 
 class LL_COMMON_API LLStringOps
