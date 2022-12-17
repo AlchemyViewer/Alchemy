@@ -2048,7 +2048,7 @@ if (WINDOWS)
         --arch=${ARCH}
         --artwork=${ARTWORK_DIR}
         "--discord=${USE_DISCORD}"
-        "--sentry=${SENTRY_DSN}"
+        "--sentry=${USE_SENTRY}"
         "--fmodstudio=${USE_FMODSTUDIO}"
         "--openal=${USE_OPENAL}"
         "--kdu=${USE_KDU}"
@@ -2110,7 +2110,7 @@ if (WINDOWS)
           --arch=${ARCH}
           --artwork=${ARTWORK_DIR}
           "--discord=${USE_DISCORD}"
-          "--sentry=${SENTRY_DSN}"
+          "--sentry=${USE_SENTRY}"
           "--fmodstudio=${USE_FMODSTUDIO}"
           "--openal=${USE_OPENAL}"
           "--kdu=${USE_KDU}"
@@ -2280,7 +2280,7 @@ if (LINUX)
         --arch=${ARCH}
         --artwork=${ARTWORK_DIR}
         "--discord=${USE_DISCORD}"
-        "--sentry=${SENTRY_DSN}"
+        "--sentry=${USE_SENTRY}"
         "--fmodstudio=${USE_FMODSTUDIO}"
         "--openal=${USE_OPENAL}"
         "--kdu=${USE_KDU}"
@@ -2308,7 +2308,7 @@ if (LINUX)
       --arch=${ARCH}
       --artwork=${ARTWORK_DIR}
       "--discord=${USE_DISCORD}"
-      "--sentry=${SENTRY_DSN}"
+      "--sentry=${USE_SENTRY}"
       "--fmodstudio=${USE_FMODSTUDIO}"
       "--openal=${USE_OPENAL}"
       "--kdu=${USE_KDU}"
@@ -2403,7 +2403,7 @@ if (DARWIN)
       --arch=${ARCH}
       --artwork=${ARTWORK_DIR}
       "--discord=${USE_DISCORD}"
-      "--sentry=${SENTRY_DSN}"
+      "--sentry=${USE_SENTRY}"
       "--fmodstudio=${USE_FMODSTUDIO}"
       "--openal=${USE_OPENAL}"
       "--kdu=${USE_KDU}"
@@ -2448,7 +2448,7 @@ if (DARWIN)
           --arch=${ARCH}
           --artwork=${ARTWORK_DIR}
           "--discord=${USE_DISCORD}"
-          "--sentry=${SENTRY_DSN}"
+          "--sentry=${USE_SENTRY}"
           "--fmodstudio=${USE_FMODSTUDIO}"
           "--openal=${USE_OPENAL}"
           "--kdu=${USE_KDU}"

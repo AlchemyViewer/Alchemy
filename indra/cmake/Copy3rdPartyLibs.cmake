@@ -6,6 +6,9 @@
 
 include(CMakeCopyIfDifferent)
 include(Linking)
+include(DiscordSDK)
+include(FMODSTUDIO)
+include(Sentry)
 
 # When we copy our dependent libraries, we almost always want to copy them to
 # both the Release and the RelWithDebInfo staging directories. This has
@@ -98,7 +101,7 @@ if(WINDOWS)
     # Filenames are different for 32/64 bit BugSplat file and we don't
     # have any control over them so need to branch.
     if (USE_SENTRY)
-      set(release_files ${release_files} sentry.dll)
+      list(APPEND release_files sentry.dll)
     endif ()
 
     if (USE_FMODSTUDIO)
