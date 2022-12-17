@@ -17,7 +17,7 @@
 #ifndef LL_LLGROUPOPTIONS_H
 #define LL_LLGROUPOPTIONS_H
 
-#include "absl/container/flat_hash_map.h"
+#include "boost/unordered/unordered_flat_map.hpp"
 
 #include "llsd.h"
 #include "llsingleton.h"
@@ -67,7 +67,7 @@ private:
 	/*
 	 * Member variables
 	 */
-	typedef absl::flat_hash_map<LLUUID, std::unique_ptr<LLGroupOptions>> options_map_t;
+	typedef boost::unordered_flat_map<LLUUID, std::unique_ptr<LLGroupOptions>> options_map_t;
 	options_map_t mGroupOptions;
 };
 

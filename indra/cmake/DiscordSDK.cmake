@@ -3,7 +3,7 @@ include(Linking)
 include(Prebuilt)
 
 if (INSTALL_PROPRIETARY)
-  set(USE_DISCORD ON)
+  set(USE_DISCORD ON CACHE BOOL "Use Discord SDK" FORCE)
 endif (INSTALL_PROPRIETARY)
 
 if (USE_DISCORD)

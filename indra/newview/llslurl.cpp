@@ -404,14 +404,14 @@ std::string LLSLURL::getSLURLString() const
 		case APP:
 		{
 			std::string app_url;
-			absl::StrAppend(&app_url, LLGridManager::getInstance()->getAppSLURLBase(), "/", mAppCmd);
+			app_url += LLGridManager::getInstance()->getAppSLURLBase() + "/" + mAppCmd;
 			for(const LLSD& entry : mAppPath.array())
 			{
-				absl::StrAppend(&app_url, "/", entry.asString());
+				app_url += "/" + entry.asString();
 			}
 			if(mAppQuery.length() > 0)
 			{
-				absl::StrAppend(&app_url, "?", mAppQuery);
+				app_url += "?" + mAppQuery;
 			}
 			return app_url;
 		}	

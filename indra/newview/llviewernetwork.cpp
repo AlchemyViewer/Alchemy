@@ -37,7 +37,7 @@
 #include "lltrans.h"
 #include "llxmlnode.h"
 
-#include "absl/strings/match.h"
+#include "boost/algorithm/string.hpp"
 
 /// key used to store the grid, and the name attribute in the grid data
 const std::string  GRID_VALUE = "keyname";
@@ -743,7 +743,7 @@ std::string LLGridManager::getGrid(const std::string& grid) const
 		{
 			if (grid_pair.second.has(GRID_ID_VALUE))
 			{
-				if (absl::EqualsIgnoreCase(grid, grid_pair.second[GRID_ID_VALUE].asStringRef()))
+				if (0 == (LLStringUtil::compareInsensitive(grid, grid_pair.second[GRID_ID_VALUE].asStringRef())))
 				{
 					// found a matching label, return this name
 					grid_name = grid_pair.first;
@@ -752,7 +752,7 @@ std::string LLGridManager::getGrid(const std::string& grid) const
 			}
 			if (grid_pair.second.has(GRID_GATEKEEPER))
 			{
-				if (absl::StartsWithIgnoreCase(grid, grid_pair.second[GRID_GATEKEEPER].asStringRef()))
+				if (boost::algorithm::istarts_with(grid, grid_pair.second[GRID_GATEKEEPER].asStringRef()))
 				{
 					// found a matching label, return this name
 					grid_name = grid_pair.first;
@@ -778,7 +778,7 @@ std::string LLGridManager::getGridByProbing(const std::string& grid) const
 		{
 			if (grid_pair.second.has(GRID_ID_VALUE))
 			{
-				if (absl::EqualsIgnoreCase(grid, grid_pair.second[GRID_ID_VALUE].asStringRef()))
+				if (0 == (LLStringUtil::compareInsensitive(grid, grid_pair.second[GRID_ID_VALUE].asStringRef())))
 				{
 					// found a matching label, return this name
 					return grid_pair.first;
@@ -787,7 +787,7 @@ std::string LLGridManager::getGridByProbing(const std::string& grid) const
 			}
 			if (grid_pair.second.has(GRID_GATEKEEPER))
 			{
-				if (absl::StartsWithIgnoreCase(grid, grid_pair.second[GRID_GATEKEEPER].asStringRef()))
+				if (boost::algorithm::istarts_with(grid, grid_pair.second[GRID_GATEKEEPER].asStringRef()))
 				{
 					// found a matching label, return this name
 					return grid_pair.first;

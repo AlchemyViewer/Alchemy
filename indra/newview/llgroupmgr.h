@@ -77,7 +77,7 @@ class LLGroupMemberData
 friend class LLGroupMgrGroupData;
 
 public:
-	typedef absl::flat_hash_map<LLUUID, LLGroupRoleData*> role_list_t;
+	typedef boost::unordered_flat_map<LLUUID, LLGroupRoleData*> role_list_t;
 	
 	LLGroupMemberData(const LLUUID& id, 
 						S32 contribution,
@@ -273,7 +273,7 @@ public:
 	void banMemberById(const LLUUID& participant_uuid);
 	
 public:
-	typedef	absl::flat_hash_map<LLUUID, LLGroupMemberData*> member_list_t;
+	typedef	boost::unordered_flat_map<LLUUID, LLGroupMemberData*> member_list_t;
 	typedef	std::map<LLUUID,LLGroupRoleData*> role_list_t;
 	typedef std::map<lluuid_pair,LLRoleMemberChange,lluuid_pair_less> change_map_t;
 	typedef std::map<LLUUID,LLRoleData> role_data_map_t;
@@ -448,11 +448,11 @@ private:
 	typedef std::multimap<LLUUID,LLGroupMgrObserver*> observer_multimap_t;
 	observer_multimap_t mObservers;
 
-	typedef absl::flat_hash_map<LLUUID, LLGroupMgrGroupData*> group_map_t;
+	typedef boost::unordered_flat_map<LLUUID, LLGroupMgrGroupData*> group_map_t;
 	group_map_t mGroups;
 
 	const U64MicrosecondsImplicit MIN_GROUP_PROPERTY_REQUEST_FREQ = 100000;//100ms between requests should be enough to avoid spamming.
-	typedef absl::flat_hash_map<LLUUID, U64MicrosecondsImplicit> properties_request_map_t;
+	typedef boost::unordered_flat_map<LLUUID, U64MicrosecondsImplicit> properties_request_map_t;
 	properties_request_map_t mPropRequests;
 
 	typedef std::set<LLParticularGroupObserver*> observer_set_t;

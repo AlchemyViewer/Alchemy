@@ -43,7 +43,7 @@
 #include "v3math.h"
 #include "llbvhconsts.h"
 
-#include <absl/container/flat_hash_map.h>
+#include "boost/unordered/unordered_flat_map.hpp"
 
 class LLKeyframeDataCache;
 class LLDataPacker;
@@ -445,7 +445,7 @@ public:
 	LLKeyframeDataCache() = default;
 	~LLKeyframeDataCache();
 
-	typedef absl::flat_hash_map<LLUUID, class LLKeyframeMotion::JointMotionList*> keyframe_data_map_t; 
+	typedef boost::unordered_flat_map<LLUUID, class LLKeyframeMotion::JointMotionList*> keyframe_data_map_t; 
 	static keyframe_data_map_t sKeyframeDataMap;
 
 	static void addKeyframeData(const LLUUID& id, LLKeyframeMotion::JointMotionList*);

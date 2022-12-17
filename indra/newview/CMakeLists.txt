@@ -7,7 +7,6 @@ include(00-Common)
 # sets variables on which the 3p .cmake files depend.
 include(Linking)
 
-include(Abseil)
 include(Boost)
 include(BuildPackagesInfo)
 include(BuildVersion)
@@ -2048,7 +2047,7 @@ if (WINDOWS)
         --arch=${ARCH}
         --artwork=${ARTWORK_DIR}
         "--discord=${USE_DISCORD}"
-        "--sentry=${SENTRY_DSN}"
+        "--sentry=${USE_SENTRY}"
         "--fmodstudio=${USE_FMODSTUDIO}"
         "--openal=${USE_OPENAL}"
         "--kdu=${USE_KDU}"
@@ -2110,7 +2109,7 @@ if (WINDOWS)
           --arch=${ARCH}
           --artwork=${ARTWORK_DIR}
           "--discord=${USE_DISCORD}"
-          "--sentry=${SENTRY_DSN}"
+          "--sentry=${USE_SENTRY}"
           "--fmodstudio=${USE_FMODSTUDIO}"
           "--openal=${USE_OPENAL}"
           "--kdu=${USE_KDU}"
@@ -2227,9 +2226,6 @@ target_link_libraries(${VIEWER_BINARY_NAME}
     ${TRACY_LIBRARY}
     ${MINIZIP_LIBRARIES}
     ${DISCORD_LIBRARIES}
-    absl::flat_hash_map
-    absl::node_hash_map
-    absl::strings
     meshoptimizer
     nlohmann_json::nlohmann_json
     fmt::fmt
@@ -2280,7 +2276,7 @@ if (LINUX)
         --arch=${ARCH}
         --artwork=${ARTWORK_DIR}
         "--discord=${USE_DISCORD}"
-        "--sentry=${SENTRY_DSN}"
+        "--sentry=${USE_SENTRY}"
         "--fmodstudio=${USE_FMODSTUDIO}"
         "--openal=${USE_OPENAL}"
         "--kdu=${USE_KDU}"
@@ -2308,7 +2304,7 @@ if (LINUX)
       --arch=${ARCH}
       --artwork=${ARTWORK_DIR}
       "--discord=${USE_DISCORD}"
-      "--sentry=${SENTRY_DSN}"
+      "--sentry=${USE_SENTRY}"
       "--fmodstudio=${USE_FMODSTUDIO}"
       "--openal=${USE_OPENAL}"
       "--kdu=${USE_KDU}"
@@ -2403,7 +2399,7 @@ if (DARWIN)
       --arch=${ARCH}
       --artwork=${ARTWORK_DIR}
       "--discord=${USE_DISCORD}"
-      "--sentry=${SENTRY_DSN}"
+      "--sentry=${USE_SENTRY}"
       "--fmodstudio=${USE_FMODSTUDIO}"
       "--openal=${USE_OPENAL}"
       "--kdu=${USE_KDU}"
@@ -2448,7 +2444,7 @@ if (DARWIN)
           --arch=${ARCH}
           --artwork=${ARTWORK_DIR}
           "--discord=${USE_DISCORD}"
-          "--sentry=${SENTRY_DSN}"
+          "--sentry=${USE_SENTRY}"
           "--fmodstudio=${USE_FMODSTUDIO}"
           "--openal=${USE_OPENAL}"
           "--kdu=${USE_KDU}"

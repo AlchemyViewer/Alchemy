@@ -38,6 +38,7 @@
 #include "llbadgeholder.h"
 #include <list>
 #include <queue>
+#include <boost/unordered/unordered_map.hpp>
 
 const S32 LLPANEL_BORDER_WIDTH = 1;
 const BOOL BORDER_YES = TRUE;
@@ -249,7 +250,7 @@ private:
 	LLButton*		mDefaultBtn;
 	LLUIString		mLabel;
 
-	typedef absl::node_hash_map<std::string, std::string> ui_string_map_t;
+	typedef boost::unordered_map<std::string, std::string, al::string_hash, std::equal_to<>> ui_string_map_t;
 	ui_string_map_t	mUIStrings;
 
 

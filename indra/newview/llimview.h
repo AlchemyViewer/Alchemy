@@ -170,7 +170,7 @@ public:
 
 
 	/** Session id to session object */
-	absl::flat_hash_map<LLUUID, LLIMSession*> mId2SessionMap;
+	boost::unordered_flat_map<LLUUID, LLIMSession*> mId2SessionMap;
 
 	typedef boost::signals2::signal<void(const LLSD&)> session_signal_t;
 	session_signal_t mNewMsgSignal;
@@ -521,7 +521,7 @@ private:
 	LLSD mPendingAgentListUpdates;
 
 // [SL:KB] - Patch: Chat-GroupSnooze | Checked: Catznip-3.3
-	typedef absl::flat_hash_map<LLUUID, F64> snoozed_sessions_t;
+	typedef boost::unordered_flat_map<LLUUID, F64> snoozed_sessions_t;
 	snoozed_sessions_t mSnoozedSessions;
 // [/SL:KB]
 };

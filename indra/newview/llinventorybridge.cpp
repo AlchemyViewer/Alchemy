@@ -2435,7 +2435,7 @@ std::string LLFolderBridge::getLabelSuffix() const
         {
 			static LLUIString ITEM_COUNT_STR = LLTrans::getString("InventoryItemsCount");
 			ITEM_COUNT_STR.setArg("[ITEMS_COUNT]", fmt::to_string(count));
-			suffix = absl::StrCat(" ", ITEM_COUNT_STR.getString());
+			suffix = fmt::format(" {}", ITEM_COUNT_STR.getString());
         }
     }
 

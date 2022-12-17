@@ -58,7 +58,7 @@ protected:
 	
 
 	std::string	mFilename;
-	absl::flat_hash_map<LLUUID,LLAvatarIconIDCacheItem> mCache;//we cache only LLUID and time
+	boost::unordered_flat_map<LLUUID,LLAvatarIconIDCacheItem> mCache;//we cache only LLUID and time
 };
 
 inline

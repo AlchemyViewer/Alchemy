@@ -39,9 +39,9 @@
 #include "llframetimer.h"
 #include "llstring.h"
 
-#include "absl/container/node_hash_map.h"
-#include "absl/container/flat_hash_map.h"
-#include "absl/container/flat_hash_set.h"
+#include "boost/unordered/unordered_map.hpp"
+#include "boost/unordered/unordered_flat_map.hpp"
+#include "boost/unordered/unordered_flat_set.hpp"
 
 //-----------------------------------------------------------------------------
 // Class predeclaration
@@ -76,7 +76,7 @@ public:
 
 
 protected:
-	typedef absl::node_hash_map<LLUUID, LLMotionConstructor> motion_map_t;
+	typedef boost::unordered_map<LLUUID, LLMotionConstructor> motion_map_t;
 	motion_map_t mMotionTable;
 };
 
@@ -87,7 +87,7 @@ class LLMotionController
 {
 public:
 	typedef std::list<LLMotion*> motion_list_t;
-	typedef absl::flat_hash_set<LLMotion*> motion_set_t;
+	typedef boost::unordered_flat_set<LLMotion*> motion_set_t;
 	BOOL mIsSelf;
 	
 public:
@@ -211,7 +211,7 @@ protected:
 //	Once an animations is loaded, it will be initialized and put on the mLoadedMotions list.
 //	Any animation that is currently playing also sits in the mActiveMotions list.
 
-	typedef absl::flat_hash_map<LLUUID, LLMotion*> motion_map_t;
+	typedef boost::unordered_flat_map<LLUUID, LLMotion*> motion_map_t;
 	motion_map_t	mAllMotions;
 
 	motion_set_t		mLoadingMotions;

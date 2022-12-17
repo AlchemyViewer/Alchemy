@@ -30,7 +30,7 @@
 #include "llpointer.h"
 #include "llstring.h"
 
-#include <absl/container/node_hash_map.h>
+#include <boost/unordered/unordered_map.hpp>
 
 class LLXMLNode;
 
@@ -126,7 +126,7 @@ public:
 	}
 	
 private:
-	typedef absl::node_hash_map<std::string, LLTransTemplate> template_map_t;
+	typedef boost::unordered_map<std::string, LLTransTemplate, al::string_hash, std::equal_to<>> template_map_t;
 	static template_map_t sStringTemplates;
 	static template_map_t sDefaultStringTemplates;
 	static LLStringUtil::format_map_t sDefaultArgs;

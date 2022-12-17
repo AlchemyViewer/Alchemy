@@ -33,8 +33,6 @@
 #include "llmetricperformancetester.h"
 #include "llfasttimer.h"
 
-#include <absl/strings/str_format.h>
-
 //----------------------------------------------------------------------------------------------
 // LLMetricPerformanceTesterBasic : static methods and testers management
 //----------------------------------------------------------------------------------------------

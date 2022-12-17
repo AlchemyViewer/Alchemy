@@ -29,6 +29,7 @@
 
 #include <map>
 #include <boost/function.hpp>
+#include <boost/unordered/unordered_flat_map.hpp>
 
 #include "llstringtable.h"
 #include "lltimer.h"
@@ -109,8 +110,8 @@ protected:
 	void 			addKeyName(KEY key, const std::string& name);
 
 protected:
-	absl::flat_hash_map<U32, KEY>	mTranslateKeyMap;		// Map of translations from OS keys to Linden KEYs
-	absl::flat_hash_map<KEY, U32>	mInvTranslateKeyMap;	// Map of translations from Linden KEYs to OS keys
+	boost::unordered_flat_map<U32, KEY>	mTranslateKeyMap;		// Map of translations from OS keys to Linden KEYs
+	boost::unordered_flat_map<KEY, U32>	mInvTranslateKeyMap;	// Map of translations from Linden KEYs to OS keys
 	LLWindowCallbacks *mCallbacks;
 
 	LLTimer			mKeyLevelTimer[KEY_COUNT];	// Time since level was set

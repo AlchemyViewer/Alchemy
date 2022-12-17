@@ -28,6 +28,7 @@
 #ifndef LL_AUDIOENGINE_H
 #define LL_AUDIOENGINE_H
 
+#include <array>
 #include <list>
 #include <map>
 
@@ -40,8 +41,7 @@
 #include "llextendedstatus.h"
 
 #include "lllistener.h"
-#include "absl/container/node_hash_map.h"
-#include "absl/container/flat_hash_map.h"
+#include "boost/unordered/unordered_flat_map.hpp"
 
 const F32 LL_WIND_UPDATE_INTERVAL = 0.1f;
 const F32 LL_WIND_UNDERWATER_CENTER_FREQ = 20.f;
@@ -222,8 +222,8 @@ protected:
 	// A list of all audio sources that are known to the viewer at this time.
 	// This is most likely a superset of the ones that we actually have audio
 	// data for, or are playing back.
-	typedef absl::flat_hash_map<LLUUID, LLAudioSource *> source_map;
-	typedef absl::flat_hash_map<LLUUID, LLAudioData *> data_map;
+	typedef boost::unordered_flat_map<LLUUID, LLAudioSource *> source_map;
+	typedef boost::unordered_flat_map<LLUUID, LLAudioData *> data_map;
 
 	source_map mAllSources;
 	data_map mAllData;
@@ -251,7 +251,7 @@ public:
 private:
 	S32 mSoundHistoryPruneCounter = 0;
 
-	using sound_history_map = absl::node_hash_map<LLUUID, LLSoundHistoryItem>;
+	using sound_history_map = boost::unordered_flat_map<LLUUID, std::unique_ptr<LLSoundHistoryItem>>;
 	sound_history_map mSoundHistory;
 private:
 	void setDefaults();
@@ -362,7 +362,7 @@ protected:
 	LLAudioData		*mCurrentDatap;
 	LLAudioData		*mQueuedDatap;
 
-	typedef absl::flat_hash_map<LLUUID, LLAudioData *> data_map;
+	typedef boost::unordered_flat_map<LLUUID, LLAudioData *> data_map;
 	data_map mPreloadMap;
 
 	LLFrameTimer mAgeTimer;

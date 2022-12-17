@@ -59,7 +59,6 @@ using namespace boost::phoenix;
 #include "../test/lltut.h"
 #include "../test/namedtempfile.h"
 #include "stringize.h"
-#include "llrand.h"
 
 std::vector<U8> string_to_vector(const std::string& str)
 {
@@ -1661,7 +1660,7 @@ namespace tut
 		for(int ii = 0; ii < 100; ++ii)
 		{
 			srand(ii);		/* Flawfinder: ignore */
-			S32 size = ll_rand() % 100 + 10;
+			S32 size = rand() % 100 + 10;
 			std::generate_n(
 				std::back_insert_iterator<buf_t>(val),
 				size,
@@ -1795,7 +1794,7 @@ namespace tut
         set_test_name("verify NamedTempFile");
         python("platform",
                "import sys\n"
-               "print('Running on %s' % sys.platform)\n");
+               "print('Running on', sys.platform)\n");
     }
 
     // helper for test<3>
@@ -1852,10 +1851,10 @@ namespace tut
                import_llsd <<
                "def parse_each(iterable):\n"
                "    for item in iterable:\n"
-               "        yield llsd.parse(item.encode(\"utf-8\"))\n" <<
+               "        yield llsd.parse(item)\n" <<
                pydata <<
                // Don't forget raw-string syntax for Windows pathnames.
-               "verify(parse_each(open(r'" << file.getName() << "')))\n");
+               "verify(parse_each(open(r'" << file.getName() << "', 'rb')))\n");
     }
 
     template<> template<>
@@ -1883,7 +1882,7 @@ namespace tut
                // N.B. Using 'print' implicitly adds newlines.
                "with open(r'" << file.getName() << "', 'w') as f:\n"
                "    for item in DATA:\n"
-               "        print(llsd.format_notation(item).decode(\"utf-8\"), file=f)\n");
+               "        print(llsd.format_notation(item).decode(), file=f)\n");
 
         std::ifstream inf(file.getName().c_str());
         LLSD item;

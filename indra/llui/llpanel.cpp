@@ -608,7 +608,7 @@ std::string LLPanel::getString(std::string_view name, const LLStringUtil::format
 		formatted_string.setArgList(args);
 		return formatted_string.getString();
 	}
-	std::string err_str = absl::StrCat("Failed to find string ", name, " in panel ", getName()); //*TODO: Translate
+	std::string err_str = fmt::format("Failed to find string {} in panel {} loaded from file {}", name, getName(), mXMLFilename); //*TODO: Translate
 	if(LLUI::getInstance()->mSettingGroups["config"]->getBOOL("QAMode"))
 	{
 		LL_ERRS() << err_str << LL_ENDL;
@@ -627,7 +627,7 @@ std::string LLPanel::getString(std::string_view name) const
 	{
 		return found_it->second;
 	}
-	std::string err_str = absl::StrCat("Failed to find string ", name, " in panel ", getName()); //*TODO: Translate
+	std::string err_str = fmt::format("Failed to find string {} in panel {} loaded from file {}", name, getName(), mXMLFilename); //*TODO: Translate
 	if(LLUI::getInstance()->mSettingGroups["config"]->getBOOL("QAMode"))
 	{
 		LL_ERRS() << err_str << LL_ENDL;

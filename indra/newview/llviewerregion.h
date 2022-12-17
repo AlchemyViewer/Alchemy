@@ -31,7 +31,7 @@
 // that are in to a particular region.
 #include <string>
 #include <boost/signals2.hpp>
-#include <absl/container/flat_hash_set.h>
+#include <boost/unordered/unordered_flat_set.hpp>
 
 #include "xform.h"
 #include "llwind.h"
@@ -659,10 +659,10 @@ private:
 	LLFrameTimer mRenderInfoReportTimer;
 
 	mutable tex_matrix_t mWorldMapTiles;
-	absl::flat_hash_set<std::string> mGodNames;
+	boost::unordered_flat_set<std::string> mGodNames;
 
 	LLEasyMessageSender mMessageSender;
-	using url_mapping_t = std::unordered_multimap<std::string, std::string>;
+	using url_mapping_t = boost::unordered_multimap<std::string, std::string>;
 	url_mapping_t mCapURLMappings;
 };
 

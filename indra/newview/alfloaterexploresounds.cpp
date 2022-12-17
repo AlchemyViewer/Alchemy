@@ -113,7 +113,7 @@ LLSoundHistoryItem ALFloaterExploreSounds::getItem(const LLUUID& itemID)
 	auto found = sound_log.find(itemID);
 	if (found != sound_log.end())
 	{
-		return found->second;
+		return *found->second;
 	}
 	else
 	{
@@ -187,7 +187,7 @@ BOOL ALFloaterExploreSounds::tick()
 		{
 			for (const auto& sound_pair : gAudiop->getSoundLog())
 			{
-				history.push_back(sound_pair.second);
+				history.push_back(*sound_pair.second);
 			}
 			LLSoundHistoryItemCompare c;
 			history.sort(c);
@@ -442,8 +442,8 @@ void ALFloaterExploreSounds::handleStop()
 				auto iter = sound_log.find(item.mID);
 				if (iter != sound_log.end())
 				{
-					iter->second.mPlaying = false;
-					iter->second.mTimeStopped = LLTimer::getElapsedSeconds();
+					iter->second->mPlaying = false;
+					iter->second->mTimeStopped = LLTimer::getElapsedSeconds();
 				}
 				else
 				{

@@ -29,6 +29,7 @@
 
 #include "llworldmipmap.h"
 #include <boost/function.hpp>
+#include <boost/unordered/unordered_flat_map.hpp>
 
 #include "v3dmath.h"
 #include "lluuid.h"
@@ -216,7 +217,7 @@ public:
 	void reloadItems(bool force = false);	// Reload the items (people, hub, etc...)
 
 	// Region Map access
-	typedef absl::flat_hash_map<U64, std::unique_ptr<LLSimInfo>> sim_info_map_t;
+	typedef boost::unordered_flat_map<U64, std::unique_ptr<LLSimInfo>> sim_info_map_t;
 	const LLWorldMap::sim_info_map_t& getRegionMap() const { return mSimInfoMap; }
 	void updateRegions(S32 x0, S32 y0, S32 x1, S32 y1);		// Requests region info for a rectangle of regions (in grid coordinates)
 
@@ -278,7 +279,7 @@ private:
 	// cases where a block is never retrieved and, because of this boolean being set, never re-requested
 	std::array<bool, MAP_BLOCK_RES*MAP_BLOCK_RES>	mMapBlockLoaded;		// Telling us if the block of regions has been requested or not
 
-	typedef absl::flat_hash_map<S32, F64> block_last_update_map_t;
+	typedef boost::unordered_flat_map<S32, F64> block_last_update_map_t;
 	block_last_update_map_t	mMapBlockLastUpdateOffsets;
 
 	// Track location data : used while there's nothing tracked yet by LLTracker

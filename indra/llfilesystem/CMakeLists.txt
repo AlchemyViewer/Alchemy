@@ -4,7 +4,6 @@ project(llfilesystem)
 
 include(00-Common)
 include(LLCommon)
-include(Abseil)
 include(UnixInstall)
 
 include_directories(
@@ -73,7 +72,6 @@ target_link_libraries(llfilesystem
     PUBLIC
     ${LLCOMMON_LIBRARIES}
     ${cache_BOOST_LIBRARIES}
-    absl::strings
     )
 
 if (WINDOWS)
@@ -108,7 +106,7 @@ if (LL_TESTS)
     LL_ADD_PROJECT_UNIT_TESTS(llfilesystem "${llfilesystem_TEST_SOURCE_FILES}")
 
     # INTEGRATION TESTS
-    set(test_libs llmath llcommon llfilesystem ${LLCOMMON_LIBRARIES} ${WINDOWS_LIBRARIES} absl::strings)
+    set(test_libs llmath llcommon llfilesystem ${LLCOMMON_LIBRARIES} ${WINDOWS_LIBRARIES})
 
     # TODO: Some of these need refactoring to be proper Unit tests rather than Integration tests.
     LL_ADD_INTEGRATION_TEST(lldir "" "${test_libs}")

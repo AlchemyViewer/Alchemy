@@ -40,8 +40,8 @@
 #include "llcoros.h"
 
 // system includes
-#include <absl/container/flat_hash_map.h>
-#include <absl/container/node_hash_map.h>
+#include <boost/unordered/unordered_flat_map.hpp>
+#include <boost/unordered/unordered_map.hpp>
 
 class LLCamera;
 class LLNetMap;
@@ -214,7 +214,7 @@ protected:
 
     uuid_set_t   mDeadObjects;
 
-	absl::flat_hash_map<LLUUID, LLPointer<LLViewerObject> > mUUIDObjectMap;
+	boost::unordered_flat_map<LLUUID, LLPointer<LLViewerObject> > mUUIDObjectMap;
 
 	//set of objects that need to update their cost
     uuid_set_t   mStaleObjectCost;
@@ -229,9 +229,9 @@ protected:
 	S32 mCurLazyUpdateIndex;
 
 	static U32 sSimulatorMachineIndex;
-	static absl::flat_hash_map<U64, U32> sIPAndPortToIndex;
+	static boost::unordered_flat_map<U64, U32> sIPAndPortToIndex;
 
-	static absl::node_hash_map<U64, LLUUID> sIndexAndLocalIDToUUID;
+	static boost::unordered_map<U64, LLUUID> sIndexAndLocalIDToUUID;
 
 	std::set<LLViewerObject *> mSelectPickList;
 

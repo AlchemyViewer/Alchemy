@@ -104,7 +104,7 @@ void LLFloaterAssetRecovery::onBtnRecover()
 		if (pCheckColumn->getCheckBox()->getValue().asBoolean())
 			sdFiles.append(sdFile);
 		else
-			LLFile::remove(sdFile["path"]);
+			LLFile::remove(sdFile["path"].asString());
 	}
 
 	if (!sdFiles.emptyArray())

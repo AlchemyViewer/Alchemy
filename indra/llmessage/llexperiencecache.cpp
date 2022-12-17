@@ -669,7 +669,7 @@ void LLExperienceCache::getGroupExperiencesCoro(LLCoreHttpUtil::HttpCoroutineAda
         return;
     }
 
-    absl::StrAppend(&url, "?", groupId.asString());
+    url += "?" + groupId.asString();
 
     LLSD result = httpAdapter->getAndSuspend(httpRequest, url);
 
@@ -741,7 +741,7 @@ void LLExperienceCache::getExperiencePermission(const LLUUID &experienceId, Expe
         return;
     }
 
-    std::string url = absl::StrCat(mCapability("ExperiencePreferences"), "?", experienceId.asString());
+    std::string url = mCapability("ExperiencePreferences") + "?" + experienceId.asString();
     
     permissionInvoker_fn invoker(boost::bind(
         // Humans ignore next line.  It is just a cast to specify which LLCoreHttpUtil::HttpCoroutineAdapter routine overload.
@@ -795,8 +795,7 @@ void LLExperienceCache::forgetExperiencePermission(const LLUUID &experienceId, E
         return;
     }
 
-    std::string url = absl::StrCat(mCapability("ExperiencePreferences"), "?", experienceId.asString());
-
+    std::string url = fmt::format("{}?{}", mCapability("ExperiencePreferences"), experienceId.asString());
 
     permissionInvoker_fn invoker(boost::bind(
         // Humans ignore next line.  It is just a cast to specify which LLCoreHttpUtil::HttpCoroutineAdapter routine overload.
@@ -853,7 +852,7 @@ void LLExperienceCache::getExperienceAdminCoro(LLCoreHttpUtil::HttpCoroutineAdap
         LL_WARNS("ExperienceCache") << "No Region Experiences capability" << LL_ENDL;
         return;
     }
-    absl::StrAppend(&url, "?experience_id=", experienceId.asString());
+    url += "?experience_id=" + experienceId.asString();
 
     LLSD result = httpAdapter->getAndSuspend(httpRequest, url);
 //     LLSD httpResults = result[LLCoreHttpUtil::HttpCoroutineAdapter::HTTP_RESULTS];

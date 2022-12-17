@@ -41,8 +41,6 @@
 #include "llviewershadermgr.h"
 #include "pipeline.h"
 
-#include "absl/strings/numbers.h"
-
 const U32 ALRENDER_BUFFER_MASK = LLVertexBuffer::MAP_VERTEX | LLVertexBuffer::MAP_TEXCOORD0 | LLVertexBuffer::MAP_TEXCOORD1;
 
 static LLStaticHashedString al_exposure("exposure");

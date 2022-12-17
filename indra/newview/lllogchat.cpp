@@ -559,8 +559,11 @@ void LLLogChat::triggerHistorySignal()
 // static
 std::string LLLogChat::oldLogFileName(std::string filename)
 {
-	// get Users log directory and add final OS dependent delimiter
-	std::string directory = absl::StrCat(gDirUtilp->getPerAccountChatLogsDir(), gDirUtilp->getDirDelimiter());
+	// get Users log directory
+	std::string directory = gDirUtilp->getPerAccountChatLogsDir();
+
+	// add final OS dependent delimiter
+	directory += gDirUtilp->getDirDelimiter();
 
 	// lest make sure the file name has no invalid characters before making the pattern
 	filename = cleanFileName(filename);
@@ -579,12 +582,12 @@ std::string LLLogChat::oldLogFileName(std::string filename)
 
 	if (allfiles.size() == 0)  // if no result from date search, return generic filename
 	{
-		scanResult = absl::StrCat(directory, filename, ".", LL_TRANSCRIPT_FILE_EXTENSION);
+		scanResult = directory + filename + '.' + LL_TRANSCRIPT_FILE_EXTENSION;
 	}
 	else 
 	{
 		sort(allfiles.begin(), allfiles.end());
-		scanResult = absl::StrCat(directory, allfiles.back());
+		scanResult = directory + allfiles.back();
 		// this file is now the most recent version of the file.
 	}
 
@@ -624,7 +627,7 @@ void LLLogChat::getListOfTranscriptFiles(std::vector<std::string>& list_of_trans
 void LLLogChat::getListOfTranscriptBackupFiles(std::vector<std::string>& list_of_transcriptions)
 {
 	// create search pattern
-	std::string pattern = absl::StrCat("*.", LL_TRANSCRIPT_FILE_EXTENSION, ".backup*");
+	std::string pattern = "*." + LL_TRANSCRIPT_FILE_EXTENSION + ".backup*";
 	findTranscriptFiles(pattern, list_of_transcriptions);
 }
 
@@ -657,7 +660,7 @@ bool LLLogChat::moveTranscripts(const std::string originDirectory,
 		//The target directory contains that file already, so lets store it
 		if(LLFile::isfile(newFullPath))
 		{
-			backupFileName = absl::StrCat(newFullPath, ".backup");
+			backupFileName = newFullPath + ".backup";
 
 			//If needed store backup file as .backup1 etc.
 			while(LLFile::isfile(backupFileName))
@@ -720,7 +723,7 @@ void LLLogChat::deleteTranscripts()
 	getListOfTranscriptFiles(list_of_transcriptions);
 	getListOfTranscriptBackupFiles(list_of_transcriptions);
 
-	for (const std::string& fullpath : list_of_transcriptions)
+	for(const std::string& fullpath : list_of_transcriptions)
 	{
 		S32 retry_count = 0;
 		while (retry_count < 5)

@@ -274,6 +274,7 @@ namespace tut
 		ensure_equals(" slurl, region + coords", slurl.getSLURLString(),
 					  "http://maps.secondlife.com/secondlife/my%20region/1/2/3");
 
+#ifndef HAVOK_BUILD
 		LLGridManager::getInstance()->setGridChoice("my.grid.com");
 		slurl = LLSLURL("x-grid-info://my.grid.com/region/my%20region/1/2/3");
 		ensure_equals("grid slurl, region + coords - type", slurl.getType(), LLSLURL::LOCATION);
@@ -338,7 +339,7 @@ namespace tut
 		ensure_equals("apppath", slurl.getAppPath().size(), 1);
 		ensure_equals("apppath2", slurl.getAppPath()[0].asString(), "bar");
 		ensure_equals("appquery", slurl.getAppQuery(), "12345");
-
+#endif
 	}
 
 	// construction from grid/region/vector combos
@@ -367,14 +368,16 @@ namespace tut
 		ensure_equals(" default grid/region/vector", slurl.getSLURLString(),
 					  "http://maps.secondlife.com/secondlife/my%20region/1/2/3");
 
+#ifndef HAVOK_BUILD
 		LLGridManager::getInstance()->setGridChoice("MyGrid");
 		slurl = LLSLURL("my region", LLVector3(1,2,3));
 		ensure_equals("default grid/region/vector - type", slurl.getType(), LLSLURL::LOCATION);
 		ensure_equals(" default grid/region/vector", slurl.getSLURLString(),
 					  "x-grid-info://my.grid.com/region/my%20region/1/2/3");
-
+#endif
 	}
 
+#ifndef HAVOK_BUILD
 	// x-grid-location-info
 	template<> template<>
 	void slurlTestObject::test<3>()
@@ -417,4 +420,5 @@ namespace tut
 		ensure_equals("position", slurl.getPosition(), LLVector3(1, 2, 3));
 
 	}
+#endif
 }
