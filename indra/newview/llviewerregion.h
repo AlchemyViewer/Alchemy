@@ -662,7 +662,7 @@ private:
 	boost::unordered_flat_set<std::string> mGodNames;
 
 	LLEasyMessageSender mMessageSender;
-	using url_mapping_t = std::unordered_multimap<std::string, std::string>;
+	using url_mapping_t = boost::unordered_multimap<std::string, std::string>;
 	url_mapping_t mCapURLMappings;
 };
 
