@@ -193,9 +193,9 @@ public:
 	// END BOOST
 
 
-	inline size_t hash() const
+	friend std::size_t hash_value(LLUUID const& id)
 	{
-		return absl::Hash<LLUUID>{}(*this);
+		return boost::hash_range(id.mData, id.mData + UUID_BYTES);
 	}
 
 	template <typename H>
@@ -301,18 +301,7 @@ namespace std {
 	{
 		size_t operator()(const LLUUID & id) const
 		{
-			return id.hash();
-		}
-	};
-}
-
-namespace boost 
-{
-	template <> struct hash<LLUUID>
-	{
-		size_t operator()(const LLUUID& id) const
-		{
-			return id.hash();
+			return boost::hash_range(id.mData, id.mData + UUID_BYTES);
 		}
 	};
 }

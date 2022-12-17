@@ -28,7 +28,7 @@
 #define LL_LLANIMATIONSTATES_H
 
 #include <map>
-#include <absl/container/flat_hash_map.h>
+#include "boost/unordered/unordered_flat_map.hpp"
 
 #include "llstringtable.h"
 #include "lluuid.h"
@@ -204,7 +204,7 @@ class LLAnimationLibrary
 private:
 	LLStringTable mAnimStringTable;
 
-	typedef absl::flat_hash_map<LLUUID, char *> anim_map_t;
+	typedef boost::unordered_flat_map<LLUUID, char *> anim_map_t;
 	anim_map_t mAnimMap;
 
 public:
