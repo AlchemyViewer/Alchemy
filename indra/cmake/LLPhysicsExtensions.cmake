@@ -26,7 +26,7 @@ elseif (HAVOK_TPV AND NOT LINUX)
    use_prebuilt_binary(llphysicsextensions_tpv)
    if(WINDOWS)
       set(LLPHYSICSEXTENSIONS_LIBRARIES    ${ARCH_PREBUILT_DIRS}/llphysicsextensions_tpv.lib)
-   else
+   else()
       set(LLPHYSICSEXTENSIONS_LIBRARIES    ${ARCH_PREBUILT_DIRS}/llphysicsextensions_tpv.a)
    endif()
    set(LLPHYSICSEXTENSIONS_INCLUDE_DIRS ${LIBS_PREBUILT_DIR}/include/llphysicsextensions) 
