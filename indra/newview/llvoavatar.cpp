@@ -778,6 +778,7 @@ LLVOAvatar::LLVOAvatar(const LLUUID& id,
 
 S32 LLVOAvatar::getNumBakes() const 
 {
+#if !LL_HAVOK
 	// BAKED_LEFT_ARM is equal to the pre-BOM BAKED_NUM_INDICES
 	if(LLViewerRegion* regionp = getRegion())
 	{
@@ -794,6 +795,9 @@ S32 LLVOAvatar::getNumBakes() const
 	// 				<< LL_ENDL;
 	// fallback, in SL assume BOM, elsewhere assume not.
 	return LLGridManager::instance().isInSecondlife() ? BAKED_NUM_INDICES : BAKED_LEFT_ARM;
+#else
+	return BAKED_NUM_INDICES;
+#endif
 }
 std::string LLVOAvatar::avString() const
 {
