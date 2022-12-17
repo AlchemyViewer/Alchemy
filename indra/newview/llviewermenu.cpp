@@ -148,13 +148,13 @@
 #include "rlvlocks.h"
 // [/RLVa:KB]
 
-#include <absl/container/flat_hash_map.h>
+#include <boost/unordered/unordered_flat_map.hpp>
 
 using namespace LLAvatarAppearanceDefines;
 
 typedef LLPointer<LLViewerObject> LLViewerObjectPtr;
 
-static absl::flat_hash_map<std::string, LLStringExplicit> sDefaultItemLabels;
+static boost::unordered_flat_map<std::string, LLStringExplicit> sDefaultItemLabels;
 
 BOOL enable_land_build(void*);
 BOOL enable_object_build(void*);

@@ -74,9 +74,6 @@
 // for base64 decoding
 #include "apr_base64.h"
 
-#include <absl/strings/escaping.h>
-#include <absl/strings/str_replace.h>
-
 #define USE_SESSION_GROUPS 0
 #define VX_NULL_POSITION -2147483648.0 /*The Silence*/
 
@@ -947,21 +944,6 @@ bool LLVivoxVoiceClient::startAndLaunchDaemon()
             LLProcess::Params params;
             params.executable = exe_path;
 
-            // VOICE-88: Cycle through [portbase..portbase+portrange) on
-            // successive tries because attempting to relaunch (after manually
-            // disabling and then re-enabling voice) with the same port can
-            // cause SLVoice's bind() call to fail with EADDRINUSE. We expect
-            // that eventually the OS will time out previous ports, which is
-            // why we cycle instead of incrementing indefinitely.
-            U32 portbase = gSavedSettings.getU32("VivoxVoicePort");
-            static U32 portoffset = 0;
-            static const U32 portrange = 100;
-            std::string host(gSavedSettings.getString("VivoxVoiceHost"));
-            U32 port = portbase + portoffset;
-            portoffset = (portoffset + 1) % portrange;
-            params.args.add("-i");
-            params.args.add(STRINGIZE(host << ':' << port));
-
             std::string loglevel = gSavedSettings.getString("VivoxDebugLevel");
             if (loglevel.empty())
             {
@@ -969,18 +951,6 @@ bool LLVivoxVoiceClient::startAndLaunchDaemon()
             }
             params.args.add("-ll");
             params.args.add(loglevel);
-
-			if (gSavedSettings.getBOOL("VoiceMultiInstance"))
-            {
-                S32 port_nr = 30000 + ll_rand(20000);
-                LLControlVariable* voice_port = gSavedSettings.getControl("VivoxVoicePort");
-                if (voice_port)
-                {
-                    voice_port->setValue(LLSD(port_nr), false);
-                    params.args.add("-i");
-                    params.args.add(llformat("127.0.0.1:%u", gSavedSettings.getU32("VivoxVoicePort")));
-                }
-            }
 
             std::string log_folder = gSavedSettings.getString("VivoxLogDirectory");
 
@@ -1017,6 +987,18 @@ bool LLVivoxVoiceClient::startAndLaunchDaemon()
                 params.args.add("-st");
                 params.args.add(shutdown_timeout);
             }
+			if (gSavedSettings.getBOOL("VoiceMultiInstance"))
+            {
+                S32 port_nr = 30000 + ll_rand(20000);
+                LLControlVariable* voice_port = gSavedSettings.getControl("VivoxVoicePort");
+                if (voice_port)
+                {
+                    voice_port->setValue(LLSD(port_nr), false);
+                    params.args.add("-i");
+                    params.args.add(llformat("127.0.0.1:%u", gSavedSettings.getU32("VivoxVoicePort")));
+                }
+            }
+
             params.cwd = gDirUtilp->getAppRODataDir();
 
 #ifndef LL_LINUX
@@ -1037,7 +1019,7 @@ bool LLVivoxVoiceClient::startAndLaunchDaemon()
 
             sGatewayPtr = LLProcess::create(params);
 
-            mDaemonHost = LLHost(host.c_str(), port);
+            mDaemonHost = LLHost(gSavedSettings.getString("VivoxVoiceHost").c_str(), gSavedSettings.getU32("VivoxVoicePort"));
         }
         else
         {
@@ -5303,7 +5285,7 @@ bool LLVivoxVoiceClient::inProximalChannel()
 
 std::string LLVivoxVoiceClient::sipURIFromID(const LLUUID &id)
 {
-	std::string result = absl::StrCat("sip:", nameFromID(id), "@", mVoiceSIPURIHostName);
+	std::string result = fmt::format(FMT_COMPILE("sip:{}@{}"), nameFromID(id), mVoiceSIPURIHostName);
 	return result;
 }
 
@@ -5312,7 +5294,7 @@ std::string LLVivoxVoiceClient::sipURIFromAvatar(LLVOAvatar *avatar)
 	std::string result;
 	if(avatar)
 	{
-		result = absl::StrCat("sip:", nameFromID(avatar->getID()), "@", mVoiceSIPURIHostName);
+		result = fmt::format(FMT_COMPILE("sip:{}@{}"), nameFromID(avatar->getID()), mVoiceSIPURIHostName);
 	}
 	return result;
 }
@@ -5337,15 +5319,16 @@ std::string LLVivoxVoiceClient::nameFromID(const LLUUID &uuid)
 		LLStringUtil::replaceChar(result, '_', ' ');
 		return result;
 	}
+	// Prepending this apparently prevents conflicts with reserved names inside the vivox code.
+	result = "x";
 	
 	// Base64 encode and replace the pieces of base64 that are less compatible 
 	// with e-mail local-parts.
 	// See RFC-4648 "Base 64 Encoding with URL and Filename Safe Alphabet"
-
-	// Prepending this apparently prevents conflicts with reserved names inside the vivox code.
-	result = absl::StrCat("x", absl::Base64Escape(std::string((char*)uuid.mData, UUID_BYTES)));
-	absl::StrReplaceAll({ {"+", "-"}, {"/", "_"} }, &result);
-
+	result += LLBase64::encode(uuid.mData, UUID_BYTES);
+	LLStringUtil::replaceChar(result, '+', '-');
+	LLStringUtil::replaceChar(result, '/', '_');
+	
 	// If you need to transform a GUID to this form on the Mac OS X command line, this will do so:
 	// echo -n x && (echo e669132a-6c43-4ee1-a78d-6c82fff59f32 |xxd -r -p |openssl base64|tr '/+' '_-')
 	
@@ -5377,11 +5360,11 @@ bool LLVivoxVoiceClient::IDFromName(const std::string& inName, LLUUID &uuid)
 
 		// Reverse the transforms done by nameFromID
 		std::string_view temp = name;
-		std::string outstr;
-		if(absl::WebSafeBase64Unescape(temp.substr(1), &outstr) && outstr.size() == UUID_BYTES)
+		U8 id_buff[UUID_BYTES];
+		if(LLBase64::decode(temp.substr(1), id_buff, UUID_BYTES))
 		{
 			// The decode succeeded.  Stuff the bits into the result's UUID
-			memcpy(uuid.mData, outstr.data(), UUID_BYTES);
+			memcpy(uuid.mData, id_buff, UUID_BYTES);
 			result = true;
 		}
 	} 
@@ -5403,7 +5386,7 @@ std::string LLVivoxVoiceClient::displayNameFromAvatar(LLVOAvatar *avatar)
 
 std::string LLVivoxVoiceClient::sipURIFromName(std::string_view name)
 {
-	std::string result = absl::StrCat("sip:", name, "@", mVoiceSIPURIHostName);
+	std::string result = fmt::format(FMT_COMPILE("sip:{}@{}"), name, mVoiceSIPURIHostName);
 //	LLStringUtil::toLower(result);
 	return result;
 }

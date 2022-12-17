@@ -37,7 +37,7 @@
 #include "lltrans.h"
 #include "llxmlnode.h"
 
-#include "absl/strings/match.h"
+#include "boost/algorithm/string.hpp"
 
 /// key used to store the grid, and the name attribute in the grid data
 const std::string  GRID_VALUE = "keyname";
@@ -175,6 +175,7 @@ void LLGridManager::initialize(const std::string& grid_file)
 				  "secondlife",
 				  "Aditi");
 
+#if !LL_HAVOK
 	LLSD other_grids;
 	llifstream llsd_xml;
 	if (!grid_file.empty())
@@ -246,6 +247,7 @@ void LLGridManager::initialize(const std::string& grid_file)
 		}
 	}
 	else
+#endif
 	{
 		// if a grid was not passed in via the command line, grab it from the CurrentGrid setting.
 		// if there's no current grid, that's ok as it'll be either set by the value passed
@@ -370,6 +372,7 @@ bool LLGridManager::addGrid(LLSD& grid_data)
 	return added;
 }
 
+#if !LL_HAVOK
 bool LLGridManager::removeGrid(const std::string& gridkey)
 {
 	//Grid must exist and not be a system addition
@@ -382,6 +385,7 @@ bool LLGridManager::removeGrid(const std::string& gridkey)
 	}
 	return false;
 }
+#endif
 
 //
 // LLGridManager::addSystemGrid - helper for adding a system grid.
@@ -444,6 +448,7 @@ void LLGridManager::addSystemGrid(const std::string& label,
 	addGrid(grid);
 }
 
+#if !LL_HAVOK
 void LLGridManager::addRemoteGrid(const std::string& login_uri, const EAddGridType type)
 {
 	LL_DEBUGS("GridManager") << "Adding '" << login_uri << "' to grid manager." << LL_ENDL;
@@ -660,6 +665,8 @@ void LLGridManager::saveGridList()
 	outstream.close();
 }
 
+#endif
+
 // return a list of grid name -> grid label mappings for UI purposes
 std::map<std::string, std::string> LLGridManager::getKnownGrids() const
 {
@@ -702,6 +709,7 @@ void LLGridManager::setGridChoice(const std::string& grid, const bool only_selec
 		
 		updateIsInProductionGrid();
 	}
+#if !LL_HAVOK
 	else if (!only_select)
 	{
 		// the grid was not in the list of grids.
@@ -709,6 +717,7 @@ void LLGridManager::setGridChoice(const std::string& grid, const bool only_selec
 		
 		addRemoteGrid(grid, ADD_LINK);
 	}
+#endif
 	else
 	{
 		// the grid was not in the list of grids.
@@ -734,7 +743,7 @@ std::string LLGridManager::getGrid(const std::string& grid) const
 		{
 			if (grid_pair.second.has(GRID_ID_VALUE))
 			{
-				if (absl::EqualsIgnoreCase(grid, grid_pair.second[GRID_ID_VALUE].asStringRef()))
+				if (0 == (LLStringUtil::compareInsensitive(grid, grid_pair.second[GRID_ID_VALUE].asStringRef())))
 				{
 					// found a matching label, return this name
 					grid_name = grid_pair.first;
@@ -743,7 +752,7 @@ std::string LLGridManager::getGrid(const std::string& grid) const
 			}
 			if (grid_pair.second.has(GRID_GATEKEEPER))
 			{
-				if (absl::StartsWithIgnoreCase(grid, grid_pair.second[GRID_GATEKEEPER].asStringRef()))
+				if (boost::algorithm::istarts_with(grid, grid_pair.second[GRID_GATEKEEPER].asStringRef()))
 				{
 					// found a matching label, return this name
 					grid_name = grid_pair.first;
@@ -769,7 +778,7 @@ std::string LLGridManager::getGridByProbing(const std::string& grid) const
 		{
 			if (grid_pair.second.has(GRID_ID_VALUE))
 			{
-				if (absl::EqualsIgnoreCase(grid, grid_pair.second[GRID_ID_VALUE].asStringRef()))
+				if (0 == (LLStringUtil::compareInsensitive(grid, grid_pair.second[GRID_ID_VALUE].asStringRef())))
 				{
 					// found a matching label, return this name
 					return grid_pair.first;
@@ -778,7 +787,7 @@ std::string LLGridManager::getGridByProbing(const std::string& grid) const
 			}
 			if (grid_pair.second.has(GRID_GATEKEEPER))
 			{
-				if (absl::StartsWithIgnoreCase(grid, grid_pair.second[GRID_GATEKEEPER].asStringRef()))
+				if (boost::algorithm::istarts_with(grid, grid_pair.second[GRID_GATEKEEPER].asStringRef()))
 				{
 					// found a matching label, return this name
 					return grid_pair.first;

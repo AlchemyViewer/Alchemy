@@ -28,6 +28,8 @@
 #ifndef LL_LLVIEWERNETWORK_H
 #define LL_LLVIEWERNETWORK_H
 
+#include "llviewerbuildconfig.h"
+
 // @TODO this really should be private, but is used in llslurl
 #define MAINGRID "util.agni.lindenlab.com"
 
@@ -256,6 +258,7 @@ class LLGridManager final : public LLSingleton<LLGridManager>
 	/// Is the selected grid aditi?
 	bool isInSLBeta() const;
 	
+#if !LL_HAVOK
 	/* ===============================================================
 	 * @name User grid management functions
 	 * @{
@@ -269,23 +272,26 @@ class LLGridManager final : public LLSingleton<LLGridManager>
 	///< @returns true if successfully removed
 	
 	//@}
+#endif
 
 	/// Sets login lock so grid cannot be changed once we are logged in
 	void setLoggedIn(bool logged_in) { mLoggedIn = logged_in; }
 	
 protected:
-
+#if !LL_HAVOK
     void gridInfoResponderCoro(const std::string uri, bool hypergrid);
-	
+#endif	
 private:
 	
 	/// Add a grid to the list of grids
 	bool addGrid(LLSD& grid_info);
 	///< @returns true if successfully added
 	
+#if !LL_HAVOK
 	/// Save grids list to file
 	void saveGridList();
-	
+#endif
+
 	void updateIsInProductionGrid();
 
 	// helper function for adding the hard coded grids

@@ -694,7 +694,7 @@ void LLNotification::respond(const LLSD& response)
 		mForm->setIgnored(mIgnored);
 		if (mIgnored && mForm->getIgnoreType() == LLNotificationForm::IGNORE_WITH_LAST_RESPONSE)
 		{
-			LLUI::getInstance()->mSettingGroups["ignores"]->setLLSD(absl::StrCat("Default", getName()), response);
+			LLUI::getInstance()->mSettingGroups["ignores"]->setLLSD("Default" + getName(), response);
 		}
 	}
 
@@ -877,7 +877,10 @@ void LLNotification::init(const std::string& template_name, const LLSD& form_ele
 
 std::string LLNotification::summarize() const
 {
-	std::string s = absl::StrCat("Notification(", getName(), ") : ", mTemplatep ? mTemplatep->mMessage : "");
+	std::string s = "Notification(";
+	s += getName();
+	s += ") : ";
+	s += mTemplatep ? mTemplatep->mMessage : "";
 	// should also include timestamp and expiration time (but probably not payload)
 	return s;
 }
@@ -1194,10 +1197,13 @@ size_t LLNotificationChannel::size()
 
 std::string LLNotificationChannel::summarize()
 {
-	std::string s = absl::StrCat("Channel '", mName, "'\n  ");
+	std::string s("Channel '");
+	s += mName;
+	s += "'\n  ";
 	for (LLNotificationChannel::Iterator it = begin(); it != end(); ++it)
 	{
-		absl::StrAppend(&s, (*it)->summarize(), "\n  ");
+		s += (*it)->summarize();
+		s += "\n  ";
 	}
 	return s;
 }

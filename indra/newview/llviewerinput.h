@@ -30,8 +30,8 @@
 #include "llkeyboard.h" // For EKeystate
 #include "llinitparam.h"
 
-#include "absl/container/flat_hash_set.h"
-#include "absl/container/flat_hash_map.h"
+#include <boost/unordered/unordered_flat_map.hpp>
+#include <boost/unordered/unordered_flat_set.hpp>
 
 const S32 MAX_KEY_BINDINGS = 128; // was 60
 const S32 keybindings_xml_version = 1;
@@ -183,9 +183,9 @@ private:
     std::vector<LLKeyboardBinding>	mGlobalKeyBindings[MODE_COUNT];
     std::vector<LLMouseBinding>		mGlobalMouseBindings[MODE_COUNT];
 
-	typedef absl::flat_hash_map<U32, U32> key_remap_t;
+	typedef boost::unordered_flat_map<U32, U32> key_remap_t;
 	key_remap_t		mRemapKeys[MODE_COUNT];
-	absl::flat_hash_set<KEY>	mKeysSkippedByUI;
+	boost::unordered_flat_set<KEY>	mKeysSkippedByUI;
 	BOOL			mKeyHandledByUI[KEY_COUNT];		// key processed successfully by UI
 
     // This is indentical to what llkeyboard does (mKeyRepeated, mKeyLevel, mKeyDown e t c),

@@ -151,4 +151,36 @@ void LLCondition::broadcast()
 	mCond.notify_all();
 }
 
+//---------------------------------------------------------------------
+//
+// LLScopedLock
+//
+LLScopedLock::LLScopedLock(std::mutex* mutex) : mMutex(mutex)
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD
+	if(mutex)
+	{
+		mutex->lock();
+		mLocked = true;
+	}
+	else
+	{
+		mLocked = false;
+	}
+}
+
+LLScopedLock::~LLScopedLock()
+{
+	unlock();
+}
+
+void LLScopedLock::unlock()
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD
+	if(mLocked)
+	{
+		mLocked = false;
+		mMutex->unlock();
+	}
+}
 //============================================================================

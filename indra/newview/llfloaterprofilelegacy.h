@@ -42,7 +42,8 @@ public:
 	LLFloaterProfileLegacy(LLSD const& key);
 	BOOL postBuild() override;
 	void onOpen(const LLSD& key) override;
-    void openTab(std::string_view tab_name) const;
+    void showTab(std::string_view tab_name) const;
+    std::string_view getShownTab() const;
 
 private:
 	~LLFloaterProfileLegacy() override;

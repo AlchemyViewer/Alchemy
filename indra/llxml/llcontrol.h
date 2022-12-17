@@ -34,7 +34,7 @@
 #include "llrefcount.h"
 #include "llinstancetracker.h"
 
-#include "absl/container/flat_hash_map.h"
+#include <boost/unordered/unordered_flat_map.hpp>
 
 #include <vector>
 #include <string_view>
@@ -171,7 +171,7 @@ class LLControlGroup final : public LLInstanceTracker<LLControlGroup, std::strin
 	LOG_CLASS(LLControlGroup);
 
 protected:
-	typedef absl::flat_hash_map<std::string, LLControlVariablePtr> ctrl_name_table_t;
+	typedef boost::unordered_flat_map<std::string, LLControlVariablePtr, al::string_hash, std::equal_to<>> ctrl_name_table_t;
 	ctrl_name_table_t mNameTable;
 	static const std::string mTypeString[TYPE_COUNT];
 

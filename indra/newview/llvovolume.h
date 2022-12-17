@@ -37,8 +37,6 @@
 #include <map>
 #include <set>
 
-#include "absl/types/optional.h"
-
 class LLViewerTextureAnim;
 class LLDrawPool;
 class LLMaterialID;

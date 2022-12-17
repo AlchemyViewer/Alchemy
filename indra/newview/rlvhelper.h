@@ -25,8 +25,6 @@
 #include "rlvdefines.h"
 #include "rlvcommon.h"
 
-#include "absl/strings/str_cat.h"
-
 // ============================================================================
 // Forward declarations
 //

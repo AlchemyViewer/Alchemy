@@ -41,8 +41,6 @@
 
 #include "llstring.h"
 
-#include "absl/synchronization/mutex.h"
-
 struct apr_dso_handle_t;
 /**
  * @brief Function which appropriately logs error or remains quiet on
@@ -119,7 +117,7 @@ private:
 	S32 mNumActiveRef ; //number of active pointers pointing to the apr_pool.
 	S32 mNumTotalRef ;  //number of total pointers pointing to the apr_pool since last creating.  
 
-	std::unique_ptr<absl::Mutex> mMutexp;
+	std::unique_ptr<std::mutex> mMutexp;
 } ;
 
 // File IO convenience functions.

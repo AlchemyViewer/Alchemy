@@ -7,13 +7,13 @@ include(00-Common)
 # sets variables on which the 3p .cmake files depend.
 include(Linking)
 
-include(Abseil)
 include(Boost)
 include(BuildPackagesInfo)
 include(BuildVersion)
 include(CMakeCopyIfDifferent)
 include(CubemapToEquirectangularJS)
 include(DBusGlib)
+include(DiscordSDK)
 include(DragDrop)
 include(EXPAT)
 include(FMODSTUDIO)
@@ -101,6 +101,7 @@ include_directories(
     "${LIBS_PREBUILT_DIR}/include/collada/1.4"
     ${LLAPPEARANCE_INCLUDE_DIRS}
     ${TRACY_INCLUDE_DIR}
+    ${DISCORD_INCLUDE_DIRS}
     )
 
 if(USE_FMODSTUDIO)
@@ -374,6 +375,7 @@ set(viewer_SOURCE_FILES
     llfloatertestinspectors.cpp
     llfloatertestlistview.cpp
     llfloatertexturefetchdebugger.cpp
+    llfloatertexturepicker.cpp
     llfloatertools.cpp
     llfloatertopobjects.cpp
     llfloatertos.cpp
@@ -384,6 +386,7 @@ set(viewer_SOURCE_FILES
     llfloatervoiceeffect.cpp
     llfloatervoicevolume.cpp
     llfloaterwebcontent.cpp
+    llfloaterwebprofile.cpp
     llfloaterwhitelistentry.cpp
     llfloaterwindowsize.cpp
     llfloaterworldmap.cpp
@@ -442,6 +445,7 @@ set(viewer_SOURCE_FILES
     lllandmarkactions.cpp
     lllandmarklist.cpp
     lllegacyatmospherics.cpp
+    lllegacynotificationwellwindow.cpp
     lllistbrowser.cpp
     lllistcontextmenu.cpp
     lllistview.cpp
@@ -1084,6 +1088,7 @@ set(viewer_HEADER_FILES
     llfloatertestinspectors.h
     llfloatertestlistview.h
     llfloatertexturefetchdebugger.h
+    llfloatertexturepicker.h
     llfloatertools.h
     llfloatertopobjects.h
     llfloatertos.h
@@ -1094,6 +1099,7 @@ set(viewer_HEADER_FILES
     llfloatervoiceeffect.h
     llfloatervoicevolume.h
     llfloaterwebcontent.h
+    llfloaterwebprofile.h
     llfloaterwhitelistentry.h
     llfloaterwindowsize.h
     llfloaterworldmap.h
@@ -1149,6 +1155,7 @@ set(viewer_HEADER_FILES
     llkeyconflict.h
     lllandmarkactions.h
     lllandmarklist.h
+    lllegacynotificationwellwindow.h
     lllightconstants.h
     lllistbrowser.h
     lllistcontextmenu.h
@@ -1527,6 +1534,11 @@ set(viewer_HEADER_FILES
     VertexCache.h
     VorbisFramework.h
     )
+
+if(USE_DISCORD)
+  LIST(APPEND viewer_HEADER_FILES aldiscordmanager.h)
+  LIST(APPEND viewer_SOURCE_FILES aldiscordmanager.cpp)
+endif()
 
 source_group("CMake Rules" FILES ViewerInstall.cmake)
 
@@ -2034,7 +2046,8 @@ if (WINDOWS)
         --actions=copy
         --arch=${ARCH}
         --artwork=${ARTWORK_DIR}
-        "--sentry=${SENTRY_DSN}"
+        "--discord=${USE_DISCORD}"
+        "--sentry=${USE_SENTRY}"
         "--fmodstudio=${USE_FMODSTUDIO}"
         "--openal=${USE_OPENAL}"
         "--kdu=${USE_KDU}"
@@ -2095,7 +2108,8 @@ if (WINDOWS)
           ${CMAKE_CURRENT_SOURCE_DIR}/viewer_manifest.py
           --arch=${ARCH}
           --artwork=${ARTWORK_DIR}
-          "--sentry=${SENTRY_DSN}"
+          "--discord=${USE_DISCORD}"
+          "--sentry=${USE_SENTRY}"
           "--fmodstudio=${USE_FMODSTUDIO}"
           "--openal=${USE_OPENAL}"
           "--kdu=${USE_KDU}"
@@ -2211,9 +2225,7 @@ target_link_libraries(${VIEWER_BINARY_NAME}
     ${LLAPPEARANCE_LIBRARIES}
     ${TRACY_LIBRARY}
     ${MINIZIP_LIBRARIES}
-    absl::flat_hash_map
-    absl::node_hash_map
-    absl::strings
+    ${DISCORD_LIBRARIES}
     meshoptimizer
     nlohmann_json::nlohmann_json
     fmt::fmt
@@ -2263,7 +2275,8 @@ if (LINUX)
         ${CMAKE_CURRENT_SOURCE_DIR}/viewer_manifest.py
         --arch=${ARCH}
         --artwork=${ARTWORK_DIR}
-        "--sentry=${SENTRY_DSN}"
+        "--discord=${USE_DISCORD}"
+        "--sentry=${USE_SENTRY}"
         "--fmodstudio=${USE_FMODSTUDIO}"
         "--openal=${USE_OPENAL}"
         "--kdu=${USE_KDU}"
@@ -2290,7 +2303,8 @@ if (LINUX)
       --actions=copy
       --arch=${ARCH}
       --artwork=${ARTWORK_DIR}
-      "--sentry=${SENTRY_DSN}"
+      "--discord=${USE_DISCORD}"
+      "--sentry=${USE_SENTRY}"
       "--fmodstudio=${USE_FMODSTUDIO}"
       "--openal=${USE_OPENAL}"
       "--kdu=${USE_KDU}"
@@ -2384,7 +2398,8 @@ if (DARWIN)
       --actions=copy
       --arch=${ARCH}
       --artwork=${ARTWORK_DIR}
-      "--sentry=${SENTRY_DSN}"
+      "--discord=${USE_DISCORD}"
+      "--sentry=${USE_SENTRY}"
       "--fmodstudio=${USE_FMODSTUDIO}"
       "--openal=${USE_OPENAL}"
       "--kdu=${USE_KDU}"
@@ -2428,7 +2443,8 @@ if (DARWIN)
           ${CMAKE_CURRENT_SOURCE_DIR}/viewer_manifest.py
           --arch=${ARCH}
           --artwork=${ARTWORK_DIR}
-          "--sentry=${SENTRY_DSN}"
+          "--discord=${USE_DISCORD}"
+          "--sentry=${USE_SENTRY}"
           "--fmodstudio=${USE_FMODSTUDIO}"
           "--openal=${USE_OPENAL}"
           "--kdu=${USE_KDU}"

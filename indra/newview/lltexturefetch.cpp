@@ -1373,7 +1373,8 @@ bool LLTextureFetchWorker::doWork(S32 param)
 					{
 						LL_WARNS(LOG_TXT) << "trying to seek a non-default texture on the sim. Bad!" << LL_ENDL;
 					}
-					absl::StrAppend(&http_url, "/?texture_id=", mID.asString());
+					http_url += "/?texture_id=";
+					http_url += mID.asString();
 					setUrl(std::move(http_url));
 #ifdef SHOW_DEBUG
 					LL_DEBUGS(LOG_TXT) << "Texture URL: " << mUrl << LL_ENDL;
@@ -4214,7 +4215,7 @@ S32 LLTextureFetchDebugger::fillCurlQueue()
 		{
 			continue;
 		}
-		std::string texture_url = absl::StrCat(mHTTPUrl, "/?texture_id=", mFetchingHistory[i].mID.asString());
+		std::string texture_url = fmt::format(FMT_COMPILE("{}/?texture_id={}"), mHTTPUrl, mFetchingHistory[i].mID.asString());
 		S32 requestedSize = mFetchingHistory[i].mRequestedSize;
 		// We request the whole file if the size was not set.
 		requestedSize = llmax(0,requestedSize);
@@ -4639,7 +4640,7 @@ void LLTextureFetchDebugger::callbackHTTP(FetchEntry & fetch, LLCore::HttpRespon
 			llassert_always(fetch.mFormattedImage.isNull());
 			{
 				// For now, create formatted image based on extension
-				std::string texture_url = absl::StrCat(mHTTPUrl, "/?texture_id=", fetch.mID.asString());
+				std::string texture_url = fmt::format(FMT_COMPILE("{}/?texture_id={}"), mHTTPUrl, fetch.mID.asString());
 				std::string extension = gDirUtilp->getExtension(texture_url);
 				fetch.mFormattedImage = LLImageFormatted::createFromType(LLImageBase::getCodecFromExtension(extension));
 				if (fetch.mFormattedImage.isNull())

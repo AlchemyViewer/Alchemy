@@ -34,7 +34,10 @@
 #include <boost/shared_ptr.hpp>
 #include <boost/type_traits/is_convertible.hpp>
 #include <boost/type_traits/is_enum.hpp>
-#include <absl/container/node_hash_map.h>
+#include "boost/unordered/unordered_flat_map.hpp"
+#include "boost/unordered/unordered_flat_set.hpp"
+#include "boost/unordered/unordered_map.hpp"
+#include "boost/unordered/unordered_set.hpp"
 
 #include "llerror.h"
 #include "llstl.h"
@@ -262,7 +265,7 @@ namespace LLInitParam
 	private:
 		struct Inaccessable{};
 	public:
-		typedef absl::flat_hash_map<std::string, T> value_name_map_t;
+		typedef boost::unordered_flat_map<std::string, T> value_name_map_t;
 		typedef Inaccessable name_t;
 		typedef TypeValues<T> type_value_t;
 		typedef ParamValue<typename LLTypeTags::Sorted<T>::value_t>	param_value_t;
@@ -324,7 +327,7 @@ namespace LLInitParam
 	{
 		typedef TypeValuesHelper<T, DERIVED_TYPE, IS_SPECIALIZED> self_t;
 	public:
-		typedef typename absl::flat_hash_map<std::string, T> value_name_map_t;
+		typedef typename boost::unordered_flat_map<std::string, T, al::string_hash, std::equal_to<>> value_name_map_t;
 		typedef std::string name_t;
 		typedef self_t type_value_t;
 		typedef ParamValue<typename LLTypeTags::Sorted<T>::value_t> param_value_t;
@@ -558,9 +561,9 @@ namespace LLInitParam
 		typedef bool (*parser_write_func_t)(Parser& parser, const void*, name_stack_t&);
 		typedef boost::function<void (name_stack_t&, S32, S32, const possible_values_t*)>	parser_inspect_func_t;
 
-		typedef absl::flat_hash_map<const std::type_info*, parser_read_func_t>		parser_read_func_map_t;
-        typedef absl::flat_hash_map<const std::type_info*, parser_write_func_t>		parser_write_func_map_t;
-        typedef absl::flat_hash_map<const std::type_info*, parser_inspect_func_t>   parser_inspect_func_map_t;
+		typedef boost::unordered_flat_map<const std::type_info*, parser_read_func_t>		parser_read_func_map_t;
+        typedef boost::unordered_flat_map<const std::type_info*, parser_write_func_t>		parser_write_func_map_t;
+        typedef boost::unordered_flat_map<const std::type_info*, parser_inspect_func_t>   parser_inspect_func_map_t;
 
 	public:
 
@@ -726,7 +729,7 @@ namespace LLInitParam
 		void aggregateBlockData(BlockDescriptor& src_block_data);
 		void addParam(ParamDescriptorPtr param, const char* name);
 
-		typedef absl::node_hash_map<std::string, ParamDescriptorPtr>							param_map_t; 
+		typedef boost::unordered_map<std::string, ParamDescriptorPtr>							param_map_t; 
 		typedef std::vector<ParamDescriptorPtr>													param_list_t; 
 		typedef std::list<ParamDescriptorPtr>													all_params_list_t;
 		typedef std::vector<std::pair<param_handle_t, ParamDescriptor::validation_func_t> >		param_validation_list_t;

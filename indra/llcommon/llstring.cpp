@@ -933,7 +933,7 @@ boost::optional<std::string> llstring_getoptenv(const std::string& key)
 long LLStringOps::sPacificTimeOffset = 0;
 long LLStringOps::sLocalTimeOffset = 0;
 bool LLStringOps::sPacificDaylightTime = 0;
-absl::flat_hash_map<std::string, std::string> LLStringOps::datetimeToCodes;
+boost::unordered_flat_map<std::string, std::string, al::string_hash, std::equal_to<>> LLStringOps::datetimeToCodes;
 
 std::vector<std::string> LLStringOps::sWeekDayList;
 std::vector<std::string> LLStringOps::sWeekDayShortList;
@@ -1224,7 +1224,7 @@ bool LLStringUtil::simpleReplacement(std::string &replacement, std::string token
 		return true;
 	}
 	// if not, see if there's one WITH brackets
-	iter = substitutions.find(absl::StrCat("[", token, "]"));
+	iter = substitutions.find(fmt::format(FMT_COMPILE("[{}]"), token));
 	if (iter != substitutions.end())
 	{
 		replacement = iter->second;
@@ -1249,7 +1249,7 @@ bool LLStringUtil::simpleReplacement(std::string &replacement, std::string token
 	}
 
 	// if not, see if there's one WITH brackets
-	std::string temp_token = absl::StrCat("[", token, "]");
+	std::string temp_token = fmt::format(FMT_COMPILE("[{}]"), token);
 	if (substitutions.has(temp_token))
 	{
 		replacement = substitutions[temp_token].asString();

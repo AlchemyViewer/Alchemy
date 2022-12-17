@@ -51,10 +51,10 @@ set(VIEWER_SYMBOL_FILE "" CACHE STRING "Name of tarball into which to place symb
 option(USE_CEF "Enable CEF media plugin" ON)
 option(USE_VLC "Enable VLC media plugin" ON)
 
-#Crash reporting
-option(USE_SENTRY "Use the Sentry crash reporting system" OFF)
-if (DEFINED ENV{USE_SENTRY})
-  set(USE_SENTRY $ENV{USE_SENTRY} CACHE BOOL "" FORCE)
+#Discord Integration
+option(USE_DISCORD "Enable Discord client integration" OFF)
+if (DEFINED ENV{USE_DISCORD})
+  set(USE_DISCORD $ENV{USE_DISCORD} CACHE BOOL "" FORCE)
 endif()
 
 if(LIBS_CLOSED_DIR)
@@ -146,14 +146,14 @@ if (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
   set(LL_ARCH ${ARCH}_linux)
   set(LL_ARCH_DIR ${ARCH}-linux)
 
-  if (INSTALL_PROPRIETARY)
+  #if (INSTALL_PROPRIETARY)
     # Only turn on headless if we can find osmesa libraries.
-    include(FindPkgConfig)
+    # include(FindPkgConfig)
     #pkg_check_modules(OSMESA osmesa)
     #if (OSMESA_FOUND)
     #  set(BUILD_HEADLESS ON CACHE BOOL "Build headless libraries.")
     #endif (OSMESA_FOUND)
-  endif (INSTALL_PROPRIETARY)
+  #endif (INSTALL_PROPRIETARY)
 
 endif (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
 

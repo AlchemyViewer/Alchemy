@@ -60,7 +60,7 @@ void LLDiskCache::createCache()
     std::vector<std::string> uuidprefix = { "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "a", "b", "c", "d", "e", "f" };
     for (auto& prefixchar : uuidprefix)
     {
-        LLFile::mkdir(absl::StrCat(sCacheDir, gDirUtilp->getDirDelimiter(), prefixchar));
+        LLFile::mkdir(fmt::format("{}{}{}", sCacheDir, gDirUtilp->getDirDelimiter(), prefixchar));
     }
     prepopulateCacheWithStatic();
 }
@@ -286,7 +286,7 @@ const std::string LLDiskCache::metaDataToFilepath(const LLUUID& id,
 {
     std::string uuidstr = id.asString();
     const auto& dirdelim = gDirUtilp->getDirDelimiter();
-    return absl::StrCat(sCacheDir, dirdelim, std::string_view(&uuidstr[0], 1), dirdelim, uuidstr, sCacheFilenameExt);
+    return fmt::format("{}{}{}{}{}{}", sCacheDir, dirdelim, std::string_view(&uuidstr[0], 1), dirdelim, uuidstr, sCacheFilenameExt);
 }
 
 void LLDiskCache::updateFileAccessTime(const boost::filesystem::path& file_path)

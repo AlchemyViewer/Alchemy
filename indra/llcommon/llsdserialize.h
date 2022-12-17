@@ -34,8 +34,6 @@
 #include "llrefcount.h"
 #include "llsd.h"
 
-#include "absl/strings/str_format.h"
-
 /** 
  * @class LLSDParser
  * @brief Abstract base class for LLSD parsers.

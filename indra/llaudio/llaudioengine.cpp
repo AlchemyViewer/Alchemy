@@ -1257,23 +1257,23 @@ void LLAudioEngine::logSoundPlay(const LLUUID& id, LLVector3d position, S32 type
 	if (mSoundHistory.size() > 2048)
 		return; // Might clear out oldest entries before giving up?
 
-	LLSoundHistoryItem item;
-	item.mID = id;
-	item.mPosition = position;
-	item.mType = type;
-	item.mAssetID = assetid;
-	item.mOwnerID = ownerid;
-	item.mSourceID = sourceid;
-	item.mPlaying = true;
-	item.mTimeStarted = LLTimer::getElapsedSeconds();
-	item.mTimeStopped = F64_MAX;
-	item.mIsTrigger = is_trigger;
-	item.mIsLooped = is_looped;
+	auto item = std::make_unique<LLSoundHistoryItem>();
+	item->mID = id;
+	item->mPosition = position;
+	item->mType = type;
+	item->mAssetID = assetid;
+	item->mOwnerID = ownerid;
+	item->mSourceID = sourceid;
+	item->mPlaying = true;
+	item->mTimeStarted = LLTimer::getElapsedSeconds();
+	item->mTimeStopped = F64_MAX;
+	item->mIsTrigger = is_trigger;
+	item->mIsLooped = is_looped;
 
-	item.mReviewed = false;
-	item.mReviewedCollision = false;
+	item->mReviewed = false;
+	item->mReviewedCollision = false;
 
-	mSoundHistory.insert_or_assign(id, item);
+	mSoundHistory.insert_or_assign(id, std::move(item));
 }
 
 void LLAudioEngine::logSoundStop(const LLUUID& id)
@@ -1281,7 +1281,7 @@ void LLAudioEngine::logSoundStop(const LLUUID& id)
 	auto iter = mSoundHistory.find(id);
 	if (iter != mSoundHistory.end())
 	{
-		LLSoundHistoryItem& hist_item = iter->second;
+		LLSoundHistoryItem& hist_item = *iter->second;
 		hist_item.mPlaying = false;
 		hist_item.mTimeStopped = LLTimer::getElapsedSeconds();
 		pruneSoundLog();
@@ -1297,13 +1297,13 @@ void LLAudioEngine::pruneSoundLog()
 		{
 			auto iter = mSoundHistory.begin();
 			auto end = mSoundHistory.end();
-			U64 lowest_time = (*iter).second.mTimeStopped;
+			U64 lowest_time = (*iter).second->mTimeStopped;
 			LLUUID lowest_id = (*iter).first;
 			for (; iter != end; ++iter)
 			{
-				if ((*iter).second.mTimeStopped < lowest_time)
+				if ((*iter).second->mTimeStopped < lowest_time)
 				{
-					lowest_time = (*iter).second.mTimeStopped;
+					lowest_time = (*iter).second->mTimeStopped;
 					lowest_id = (*iter).first;
 				}
 			}

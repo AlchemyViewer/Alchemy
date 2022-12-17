@@ -1716,7 +1716,7 @@ void clear_glerror()
 //
 
 // Static members
-absl::flat_hash_map<LLGLenum, LLGLboolean> LLGLState::sStateMap;
+boost::unordered_flat_map<LLGLenum, LLGLboolean> LLGLState::sStateMap;
 
 GLboolean LLGLDepthTest::sDepthEnabled = GL_FALSE; // OpenGL default
 GLenum LLGLDepthTest::sDepthFunc = GL_LESS; // OpenGL default

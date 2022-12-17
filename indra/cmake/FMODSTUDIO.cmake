@@ -8,7 +8,7 @@ include(Prebuilt)
 # Open source devs should use the -DFMODSTUDIO:BOOL=ON then if they want to build with FMOD, whether
 # they are using STANDALONE or not.
 if (INSTALL_PROPRIETARY)
-  set(USE_FMODSTUDIO ON)
+  set(USE_FMODSTUDIO ON CACHE BOOL "Use FMOD Studio audio subsystem" FORCE)
 endif (INSTALL_PROPRIETARY)
 
 if (USE_FMODSTUDIO)

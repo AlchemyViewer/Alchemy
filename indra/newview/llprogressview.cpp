@@ -407,7 +407,7 @@ void LLProgressView::initLogos()
     // original image size is 264x96, it is on longer side but
     // with no internal paddings so it gets additional padding
     icon_width = 77;
-    icon_height = 21;
+    icon_height = 20;
     S32 pad_fmod_y = 4;
     texture_start_x++;
     loadLogo(temp_str + "fmod_logo.png",

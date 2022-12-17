@@ -778,6 +778,7 @@ LLVOAvatar::LLVOAvatar(const LLUUID& id,
 
 S32 LLVOAvatar::getNumBakes() const 
 {
+#if !LL_HAVOK
 	// BAKED_LEFT_ARM is equal to the pre-BOM BAKED_NUM_INDICES
 	if(LLViewerRegion* regionp = getRegion())
 	{
@@ -794,6 +795,9 @@ S32 LLVOAvatar::getNumBakes() const
 	// 				<< LL_ENDL;
 	// fallback, in SL assume BOM, elsewhere assume not.
 	return LLGridManager::instance().isInSecondlife() ? BAKED_NUM_INDICES : BAKED_LEFT_ARM;
+#else
+	return BAKED_NUM_INDICES;
+#endif
 }
 std::string LLVOAvatar::avString() const
 {
@@ -3437,27 +3441,33 @@ void LLVOAvatar::idleUpdateNameTagText(bool new_name)
 			std::string line;
 			if (is_away)
 			{
-				absl::StrAppend(&line, avatar_away_str, ", ");
+				line += avatar_away_str;
+				line += ", ";
 			}
 			if (is_do_not_disturb)
 			{
-				absl::StrAppend(&line, avatar_dnd_str, ", ");
+				line += avatar_dnd_str;
+				line += ", ";
 			}
 			if (is_muted)
 			{
-				absl::StrAppend(&line, avatar_muted_str, ", ");
+				line += avatar_muted_str;
+				line += ", ";
 			}
 			if (is_appearance)
 			{
-				absl::StrAppend(&line, avatar_edit_appr_str, ", ");
+				line += avatar_edit_appr_str;
+				line += ", ";
 			}
 			if (is_cloud)
 			{
-				absl::StrAppend(&line, avatar_loading_data_str, ", ");
+				line += avatar_loading_data_str;
+				line += ", ";
 			}
 			if (is_typing)
 			{
-				absl::StrAppend(&line, avatar_typing_str, ", ");
+				line += avatar_typing_str;
+				line += ", ";
 			}
 			// trim last ", "
 			line.resize( line.length() - 2 );
@@ -10743,7 +10753,7 @@ void LLVOAvatar::updateRiggingInfo()
             }
         }
         rig_count = curr_rigging_info_key.size();
-        rig_hash = absl::Hash<rigging_info_hash_vec_t>{}(curr_rigging_info_key);
+        rig_hash = boost::hash<rigging_info_hash_vec_t>()(curr_rigging_info_key);
         // Check for key change, which indicates some change in volume composition or LOD.
         if (rig_hash == mLastRiggingInfoKeyHash)
         {

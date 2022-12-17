@@ -41,7 +41,8 @@
 #include "httphandler.h"
 #include "llthread.h"
 
-#include "absl/container/node_hash_map.h"
+#include "boost/unordered/unordered_map.hpp"
+#include "boost/unordered/unordered_flat_map.hpp"
 
 #define LLCONVEXDECOMPINTER_STATIC 1
 
@@ -212,7 +213,7 @@ public:
 	LLCondition* mSignal;
 
 	//map of known mesh headers
-	typedef absl::node_hash_map<LLUUID, std::pair<U32, LLSD>> mesh_header_map;
+	typedef boost::unordered_flat_map<LLUUID, std::pair<U32, LLSD>> mesh_header_map;
 	mesh_header_map mMeshHeader;
 
 	class HeaderRequest : public RequestStats
@@ -323,7 +324,7 @@ public:
 	// End
 
 	//map of pending header requests and currently desired LODs
-	typedef absl::node_hash_map<LLUUID, std::vector<S32>> pending_lod_map;
+	typedef boost::unordered_map<LLUUID, std::vector<S32>> pending_lod_map;
 	pending_lod_map mPendingLOD;
 
 	// llcorehttp library interface objects.
@@ -632,10 +633,10 @@ public:
 	static void metricsProgress(unsigned int count);
 	static void metricsUpdate();
 	
-	typedef absl::node_hash_map<LLUUID, std::vector<LLVOVolume*> > mesh_load_map;
+	typedef boost::unordered_map<LLUUID, std::vector<LLVOVolume*> > mesh_load_map;
 	mesh_load_map mLoadingMeshes[4];
 	
-	typedef absl::flat_hash_map<LLUUID, LLPointer<LLMeshSkinInfo>> skin_map;
+	typedef boost::unordered_flat_map<LLUUID, LLPointer<LLMeshSkinInfo>> skin_map;
 	skin_map mSkinMap;
 
 	typedef std::map<LLUUID, LLModel::Decomposition*> decomposition_map;
@@ -646,7 +647,7 @@ public:
 	std::vector<LLMeshRepoThread::LODRequest> mPendingRequests;
 	
 	//list of mesh ids awaiting skin info
-	typedef absl::node_hash_map<LLUUID, std::vector<LLVOVolume*> > skin_load_map;
+	typedef boost::unordered_map<LLUUID, std::vector<LLVOVolume*> > skin_load_map;
 	skin_load_map mLoadingSkins;
 
 	//list of mesh ids that need to send skin info fetch requests

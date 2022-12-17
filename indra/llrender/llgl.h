@@ -30,7 +30,7 @@
 // This file contains various stuff for handling gl extensions and other gl related stuff.
 
 #include <string>
-#include <absl/container/flat_hash_map.h>
+#include <boost/unordered/unordered_flat_map.hpp>
 #include <list>
 
 #include "llerror.h"
@@ -271,7 +271,7 @@ public:
 	static void checkTextureChannels(const std::string& msg = "");
 	
 protected:
-	static absl::flat_hash_map<LLGLenum, LLGLboolean> sStateMap;
+	static boost::unordered_flat_map<LLGLenum, LLGLboolean> sStateMap;
 	
 public:
 	enum { CURRENT_STATE = -2 };

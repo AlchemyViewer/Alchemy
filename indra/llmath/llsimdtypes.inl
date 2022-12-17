@@ -61,7 +61,7 @@ inline LLSimdScalar operator/(const LLSimdScalar& a, const LLSimdScalar& b)
 
 inline LLSimdScalar operator-(const LLSimdScalar& a)
 {
-	LL_ALIGN_16(const U32 signMask[4]) = {0x80000000, 0x80000000, 0x80000000, 0x80000000 };
+	static LL_ALIGN_16(const U32 signMask[4]) = {0x80000000, 0x80000000, 0x80000000, 0x80000000 };
 	ll_assert_aligned(signMask,16);
 	return _mm_xor_ps(*reinterpret_cast<const LLQuad*>(signMask), a);
 }
@@ -146,7 +146,9 @@ inline LLSimdScalar& LLSimdScalar::operator/=(const LLSimdScalar& rhs)
 
 inline LLSimdScalar LLSimdScalar::getAbs() const
 {
-	return _mm_and_ps( mQ, _mm_castsi128_ps(_mm_set1_epi32(0x7fffffff)));
+	static const LL_ALIGN_16(U32 F_ABS_MASK_4A[4]) = { 0x7FFFFFFF, 0x7FFFFFFF, 0x7FFFFFFF, 0x7FFFFFFF };
+	ll_assert_aligned(F_ABS_MASK_4A,16);
+	return _mm_and_ps( mQ, *reinterpret_cast<const LLQuad*>(F_ABS_MASK_4A));
 }
 
 inline F32 LLSimdScalar::getF32() const

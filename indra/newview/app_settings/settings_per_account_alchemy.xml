@@ -11,6 +11,50 @@
       <key>Value</key>
       <integer>0</integer>
     </map>
+    <key>ALDiscordIntegration</key>
+    <map>
+      <key>Comment</key>
+      <string>Enable discord integration</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <integer>1</integer>
+    </map>
+    <key>ALDiscordShareLocationRegion</key>
+    <map>
+      <key>Comment</key>
+      <string>Share avatar region to discord</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <integer>0</integer>
+    </map>
+    <key>ALDiscordShareRegionMaxMaturity</key>
+    <map>
+      <key>Comment</key>
+      <string>Maximum maturity of location shared to Discord</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>U32</string>
+      <key>Value</key>
+      <integer>0</integer>
+    </map>
+    <key>ALDiscordShareName</key>
+    <map>
+      <key>Comment</key>
+      <string>Share avatar name to discord</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <integer>0</integer>
+    </map>
     <key>AlchemyMouselookAlternativeFOV</key>
     <map>
       <key>Comment</key>

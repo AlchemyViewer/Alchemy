@@ -244,7 +244,8 @@ inline void LLVector4a::setDiv(const LLVector4a& a, const LLVector4a& b)
 // Set this to the element-wise absolute value of src
 inline void LLVector4a::setAbs(const LLVector4a& src)
 {
-	mQ = _mm_and_ps(src.mQ, _mm_castsi128_ps(_mm_set_epi32(0x7FFFFFFF, 0x7FFFFFFF, 0x7FFFFFFF, 0x7FFFFFFF)));
+	static const LL_ALIGN_16(U32 F_ABS_MASK_4A[4]) = { 0x7FFFFFFF, 0x7FFFFFFF, 0x7FFFFFFF, 0x7FFFFFFF };
+	mQ = _mm_and_ps(src.mQ, *reinterpret_cast<const LLQuad*>(F_ABS_MASK_4A));
 }
 
 // Add to each component in this vector the corresponding component in rhs
@@ -528,7 +529,9 @@ inline void LLVector4a::setLerp(const LLVector4a& lhs, const LLVector4a& rhs, F3
 
 inline LLBool32 LLVector4a::isFinite3() const
 {
-	const __m128i nanOrInfMaskV = _mm_set_epi32(0x7f800000, 0x7f800000, 0x7f800000, 0x7f800000);
+	static LL_ALIGN_16(const U32 nanOrInfMask[4]) = { 0x7f800000, 0x7f800000, 0x7f800000, 0x7f800000 };
+	ll_assert_aligned(nanOrInfMask,16);
+	const __m128i nanOrInfMaskV = *reinterpret_cast<const __m128i*> (nanOrInfMask);
 	const __m128i maskResult = _mm_and_si128( _mm_castps_si128(mQ), nanOrInfMaskV );
 	const LLVector4Logical equalityCheck = _mm_castsi128_ps(_mm_cmpeq_epi32( maskResult, nanOrInfMaskV ));
 	return !equalityCheck.areAnySet( LLVector4Logical::MASK_XYZ );
@@ -536,7 +539,8 @@ inline LLBool32 LLVector4a::isFinite3() const
 	
 inline LLBool32 LLVector4a::isFinite4() const
 {
-	const __m128i nanOrInfMaskV = _mm_set_epi32(0x7f800000, 0x7f800000, 0x7f800000, 0x7f800000);
+	static LL_ALIGN_16(const U32 nanOrInfMask[4]) = { 0x7f800000, 0x7f800000, 0x7f800000, 0x7f800000 };
+	const __m128i nanOrInfMaskV = *reinterpret_cast<const __m128i*> (nanOrInfMask);
 	const __m128i maskResult = _mm_and_si128( _mm_castps_si128(mQ), nanOrInfMaskV );
 	const LLVector4Logical equalityCheck = _mm_castsi128_ps(_mm_cmpeq_epi32( maskResult, nanOrInfMaskV ));
 	return !equalityCheck.areAnySet( LLVector4Logical::MASK_XYZW );
@@ -565,8 +569,8 @@ inline void LLVector4a::clamp( const LLVector4a& low, const LLVector4a& high )
 
 inline void LLVector4a::negate()
 {
-	const __m128i signMask = _mm_set_epi32(0x80000000, 0x80000000, 0x80000000, 0x80000000);
-	mQ = _mm_xor_ps(_mm_castsi128_ps(signMask), mQ);
+	static LL_ALIGN_16(const U32 signMask[4]) = {0x80000000, 0x80000000, 0x80000000, 0x80000000 };
+	mQ = _mm_xor_ps(*reinterpret_cast<const LLQuad*>(signMask), mQ);
 }
 
 inline void LLVector4a::setMoveHighLow(const LLVector4a& rhs)

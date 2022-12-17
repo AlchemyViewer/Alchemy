@@ -32,9 +32,9 @@
 
 #include <list>
 #include <boost/function.hpp>
-#include<absl/container/flat_hash_set.h>
-#include<absl/container/flat_hash_map.h>
-#include<absl/container/node_hash_map.h>
+#include <boost/unordered/unordered_flat_map.hpp>
+#include <boost/unordered/unordered_flat_set.hpp>
+#include <boost/unordered/unordered_map.hpp>
 // [RLVa:KB] - Checked: 2011-05-25 (RLVa-1.4.0a)
 #include <boost/signals2.hpp>
 #include "llboost.h"
@@ -58,15 +58,15 @@ public:
 	// 2) We can change the key of a floater without altering the list.
 	typedef std::list<LLFloater*> instance_list_t;
 	typedef const instance_list_t const_instance_list_t;
-	typedef absl::node_hash_map<std::string, instance_list_t> instance_map_t;
+	typedef boost::unordered_map<std::string, instance_list_t, al::string_hash, std::equal_to<>> instance_map_t;
 
 	struct BuildData
 	{
 		LLFloaterBuildFunc mFunc;
 		std::string mFile;
 	};
-	typedef absl::flat_hash_map<std::string, BuildData> build_map_t;
-	typedef absl::flat_hash_map<std::string, std::string> group_map_t;
+	typedef boost::unordered_flat_map<std::string, BuildData, al::string_hash, std::equal_to<>> build_map_t;
+	typedef boost::unordered_flat_map<std::string, std::string, al::string_hash, std::equal_to<>> group_map_t;
 	
 private:
 	friend class LLFloaterRegListener;
@@ -78,7 +78,7 @@ private:
 	/**
 	 * Defines list of floater names that can be shown despite state of sBlockShowFloaters.
 	 */
-	static absl::flat_hash_set<std::string> sAlwaysShowableList;
+	static boost::unordered_flat_set<std::string, al::string_hash, std::equal_to<>> sAlwaysShowableList;
 	
 // [RLVa:KB] - Checked: 2010-02-28 (RLVa-1.4.0a) | Modified: RLVa-1.2.0a
 	// Used to determine whether a floater can be shown

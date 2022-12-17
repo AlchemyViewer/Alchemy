@@ -33,9 +33,9 @@
 #include "httprequest.h"
 #include "httpheaders.h"
 #include "httpoptions.h"
-#include "absl/container/flat_hash_map.h"
-#include "absl/container/node_hash_map.h"
-#include "absl/container/flat_hash_set.h"
+#include "boost/unordered/unordered_map.hpp"
+#include "boost/unordered/unordered_flat_map.hpp"
+#include "boost/unordered/unordered_flat_set.hpp"
 
 class LLViewerRegion;
 
@@ -45,7 +45,7 @@ class LLMaterialMgr final : public LLSingleton<LLMaterialMgr>
 	virtual ~LLMaterialMgr();
 
 public:
-	typedef absl::node_hash_map<LLMaterialID, LLMaterialPtr> material_map_t;
+	typedef boost::unordered_map<LLMaterialID, LLMaterialPtr> material_map_t;
 
 	typedef boost::signals2::signal<void (const LLMaterialID&, const LLMaterialPtr)> get_callback_t;
 	const LLMaterialPtr         get(const LLUUID& region_id, const LLMaterialID& material_id);
@@ -93,28 +93,31 @@ private:
 		U32 te;
 		LLMaterialID materialID;
 
-		template <typename H>
-		friend H AbslHashValue(H h, const TEMaterialPair& m) {
-			return H::combine(std::move(h), m.materialID, m.te);
+		friend std::size_t hash_value(TEMaterialPair const& id)
+		{
+			std::size_t seed = 0;
+			boost::hash_combine(seed, id.te);
+			boost::hash_combine(seed, id.materialID);
+			return seed;
 		}
 
-		bool operator==(const TEMaterialPair& b) const { return (materialID == b.materialID) && (te == b.te); }
+		bool operator==(const TEMaterialPair& b) const { return (te == b.te) && (materialID == b.materialID); }
 		bool operator<(const TEMaterialPair& b) const { return (te < b.te) ? TRUE : (materialID < b.materialID);}
 	};
 	
-	typedef absl::flat_hash_set<LLMaterialID> material_queue_t;
-	typedef absl::flat_hash_map<LLUUID, material_queue_t> get_queue_t;
+	typedef boost::unordered_flat_set<LLMaterialID> material_queue_t;
+	typedef boost::unordered_flat_map<LLUUID, material_queue_t> get_queue_t;
 	typedef std::pair<const LLUUID, LLMaterialID> pending_material_t;
-	typedef absl::flat_hash_map<const pending_material_t, F64> get_pending_map_t;
-	typedef absl::flat_hash_map<LLMaterialID, std::unique_ptr<get_callback_t> > get_callback_map_t;
+	typedef boost::unordered_flat_map<const pending_material_t, F64> get_pending_map_t;
+	typedef boost::unordered_flat_map<LLMaterialID, std::unique_ptr<get_callback_t> > get_callback_map_t;
 
 
-	typedef absl::flat_hash_map<TEMaterialPair, std::unique_ptr<get_callback_te_t> > get_callback_te_map_t;
-	typedef absl::flat_hash_set<LLUUID> getall_queue_t;
-	typedef absl::flat_hash_map<LLUUID, F64> getall_pending_map_t;
-	typedef absl::flat_hash_map<LLUUID, std::unique_ptr<getall_callback_t> > getall_callback_map_t;
-	typedef absl::flat_hash_map<U8, LLMaterial> facematerial_map_t;
-	typedef absl::flat_hash_map<LLUUID, facematerial_map_t> put_queue_t;
+	typedef boost::unordered_flat_map<TEMaterialPair, std::unique_ptr<get_callback_te_t> > get_callback_te_map_t;
+	typedef boost::unordered_flat_set<LLUUID> getall_queue_t;
+	typedef boost::unordered_flat_map<LLUUID, F64> getall_pending_map_t;
+	typedef boost::unordered_flat_map<LLUUID, std::unique_ptr<getall_callback_t> > getall_callback_map_t;
+	typedef boost::unordered_flat_map<U8, LLMaterial> facematerial_map_t;
+	typedef boost::unordered_flat_map<LLUUID, facematerial_map_t> put_queue_t;
 
 
 	get_queue_t				mGetQueue;

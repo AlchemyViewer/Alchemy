@@ -39,7 +39,7 @@
 #include "lluictrlfactory.h"
 #include <set>
 
-#include "absl/container/flat_hash_map.h"
+#include "boost/unordered/unordered_flat_map.hpp"
 
 class LLInvFVBridge;
 class LLInventoryFolderViewModelBuilder;
@@ -290,7 +290,7 @@ protected:
     LLPointer<LLFolderViewGroupedItemBridge> mGroupedItemBridge;
 	Params						mParams;	// stored copy of parameter block
 
-	absl::flat_hash_map<LLUUID, LLFolderViewItem*> mItemMap;
+	boost::unordered_flat_map<LLUUID, LLFolderViewItem*> mItemMap;
 	/**
 	 * Pointer to LLInventoryFolderViewModelBuilder.
 	 *

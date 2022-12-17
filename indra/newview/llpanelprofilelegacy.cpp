@@ -47,6 +47,7 @@
 #include "lltrans.h"
 
 // newview
+#include "alavataractions.h"
 #include "llagent.h"
 #include "llagentdata.h"
 #include "llagentpicksinfo.h"
@@ -496,7 +497,7 @@ void LLPanelProfileLegacy::processProperties(void* data, EAvatarProcessorType ty
 			const LLAvatarGroups* pData = static_cast<LLAvatarGroups*>(data);
 			if(!pData || getAvatarId() != pData->avatar_id) return;
 			
-			showAccordion("avatar_groups_tab", !pData->group_list.empty());
+			showTab("avatar_groups_tab", !pData->group_list.empty());
 			break;
 		}
 		// These are handled by their respective panels
@@ -522,45 +523,61 @@ void LLPanelProfileLegacy::setProgress(bool started)
 		indicator->stop();
 }
 
-void LLPanelProfileLegacy::showAccordion(std::string_view name, bool show)
+void LLPanelProfileLegacy::showTab(std::string_view name, bool show) const
 {
 	LLAccordionCtrlTab* tab = getChild<LLAccordionCtrlTab>(name);
 	tab->setVisible(show);
 	getChild<LLAccordionCtrl>("avatar_accordion")->arrange();
 }
 
+std::string_view LLPanelProfileLegacy::getShownTab() const
+{
+    const LLAccordionCtrlTab* tab = getChild<LLAccordionCtrl>("avatar_accordion")->getExpandedTab();
+    return tab != nullptr ? tab->getTitle() : LLStringUtil::null;
+}
+
 void LLPanelProfileLegacy::onCommitAction(const LLSD& userdata)
 {
 	const std::string action = userdata.asString();
-	if (action == "friend")
-	{
-		if (LLAvatarTracker::instance().getBuddyInfo(getAvatarId()) == nullptr)
-			LLAvatarActions::requestFriendshipDialog(getAvatarId());
-		else
-			LLAvatarActions::removeFriendDialog(getAvatarId());
-		resetControls();
-	}
-	else if (action == "block")
-	{
-		LLAvatarActions::toggleBlock(getAvatarId());
-		resetControls();
-	}
-	else if (action == "chat")
-		LLAvatarActions::startIM(getAvatarId());
-	else if (action == "call")
-		LLAvatarActions::startCall(getAvatarId());
-	else if (action == "share")
-		LLAvatarActions::share(getAvatarId());
-	else if (action == "teleport")
-		LLAvatarActions::offerTeleport(getAvatarId());
-	else if (action == "req_teleport")
-		LLAvatarActions::teleportRequest(getAvatarId());
-	else if (action == "map")
-		LLAvatarActions::showOnMap(getAvatarId());
-	else if (action == "pay")
-		LLAvatarActions::pay(getAvatarId());
-	else if (action == "report_abuse")
-		LLFloaterReporter::showFromObject(getAvatarId());
+    if (action == "friend")
+    {
+        if (LLAvatarTracker::instance().getBuddyInfo(getAvatarId()) == nullptr)
+            LLAvatarActions::requestFriendshipDialog(getAvatarId());
+        else
+            LLAvatarActions::removeFriendDialog(getAvatarId());
+        resetControls();
+    }
+    else if (action == "block")
+    {
+        LLAvatarActions::toggleBlock(getAvatarId());
+        resetControls();
+    }
+    else if (action == "chat")
+        LLAvatarActions::startIM(getAvatarId());
+    else if (action == "call")
+        LLAvatarActions::startCall(getAvatarId());
+    else if (action == "share")
+        LLAvatarActions::share(getAvatarId());
+    else if (action == "teleport")
+        LLAvatarActions::offerTeleport(getAvatarId());
+    else if (action == "req_teleport")
+        LLAvatarActions::teleportRequest(getAvatarId());
+    else if (action == "map")
+        LLAvatarActions::showOnMap(getAvatarId());
+    else if (action == "pay")
+        LLAvatarActions::pay(getAvatarId());
+    else if (action == "report_abuse")
+        LLFloaterReporter::showFromObject(getAvatarId());
+    else if (action == "upload_sl")
+    {
+        // *TODO:
+    }
+    else if (action == "upload_fl")
+    {
+        // *TODO:
+    }
+    else if (action == "webprofile")
+        ALAvatarActions::showWebProfile(getAvatarId());
 	else
 		LL_WARNS("LegacyProfiles") << "Unhandled action: " << action << LL_ENDL;
 }
@@ -585,6 +602,11 @@ bool LLPanelProfileLegacy::isActionEnabled(const LLSD& userdata)
 		action_enabled = (getAvatarId() != gAgentID);
 	else if (check == "can_drama")
 		action_enabled = (getAvatarId() != gAgentID);
+    else if (check == "can_upload_pic")
+    {
+        action_enabled = getAvatarId() == gAgentID
+            && !gAgent.getRegionCapability("UploadAgentProfileImage").empty();
+    }
 	else
 		LL_INFOS("LegacyProfiles") << "Unhandled check " << check << LL_ENDL;
 	return action_enabled;
@@ -1189,9 +1211,9 @@ void LLPanelProfileLegacy::LLPanelProfilePicks::onPanelClassifiedSave(LLPanelCla
 		c_item->setMouseUpCallback(boost::bind(&LLPanelProfilePicks::updateButtons, this));
 		c_item->childSetAction("info_chevron", boost::bind(&LLPanelProfilePicks::onClickInfo, this));
 
-		// order does matter, showAccordion will invoke arrange for accordions.
+		// order does matter, showTab will invoke arrange for accordions.
 		//mClassifiedsAccTab->changeOpenClose(false);
-		//showAccordion("tab_classifieds", true);
+		//showTab("tab_classifieds", true);
 	}
 	else if (panel->isNewWithErrors())
 	{

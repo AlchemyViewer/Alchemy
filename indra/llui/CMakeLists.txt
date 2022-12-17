@@ -3,7 +3,6 @@
 project(llui)
 
 include(00-Common)
-include(Abseil)
 include(Hunspell)
 include(LLCommon)
 include(LLImage)
@@ -291,9 +290,6 @@ target_link_libraries(llui
     ${HUNSPELL_LIBRARY}
     ${LLMESSAGE_LIBRARIES}
     ${LLCOMMON_LIBRARIES} # must be after llimage, llwindow, llrender
-    absl::flat_hash_map
-    absl::node_hash_map
-    absl::strings
     )
 
 if(USE_PRECOMPILED_HEADERS AND ${CMAKE_VERSION} VERSION_GREATER "3.15.0") 
@@ -324,8 +320,10 @@ if(USE_PRECOMPILED_HEADERS AND ${CMAKE_VERSION} VERSION_GREATER "3.15.0")
     <boost/function.hpp>
     <boost/noncopyable.hpp>
     <boost/signals2.hpp>
-    <absl/container/flat_hash_set.h>
-    <absl/container/flat_hash_map.h>
+    <boost/unordered/unordered_flat_map.hpp>
+    <boost/unordered/unordered_flat_set.hpp>
+    <boost/unordered/unordered_map.hpp>
+    <boost/unordered/unordered_set.hpp>
     )
 endif()
 

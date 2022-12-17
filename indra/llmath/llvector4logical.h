@@ -77,7 +77,9 @@ public:
 	// Invert this mask
 	inline LLVector4Logical& invert()
 	{
-		mQ = _mm_andnot_ps( mQ, _mm_castsi128_ps(_mm_set_epi32(0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF)));
+		static const LL_ALIGN_16(U32 allOnes[4]) = { 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF };
+		ll_assert_aligned(allOnes,16);
+		mQ = _mm_andnot_ps( mQ, *(LLQuad*)(allOnes) );
 		return *this;
 	}
 	

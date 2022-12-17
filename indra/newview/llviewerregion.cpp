@@ -88,6 +88,7 @@
 #include "llviewernetwork.h"
 #include "llslurl.h"
 #include "llnotificationsutil.h"
+#include "llviewerbuildconfig.h"
 
 #include <boost/regex.hpp>
 
@@ -2435,6 +2436,7 @@ void LLViewerRegion::setSimulatorFeatures(const LLSD& sim_features)
 	{
 		setGodnames();
         std::string cur_symbol = LLCurrencyWrapper::instance().getHomeCurrency();
+#if !LL_HAVOK
 		if (mSimulatorFeatures.has("OpenSimExtras"))
 		{
 			const LLSD& extras(mSimulatorFeatures["OpenSimExtras"]);
@@ -2488,6 +2490,7 @@ void LLViewerRegion::setSimulatorFeatures(const LLSD& sim_features)
 			mMaxPhysPrimScale = extras.has("MaxPhysPrimScale") ? extras["MaxPhysPrimScale"].asReal() : OS_DEFAULT_MAX_PRIM_SCALE;
 		}
 		else
+#endif
 		{
 			mWhisperRange = 10;
 			mSayRange = 20;

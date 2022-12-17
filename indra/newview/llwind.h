@@ -27,6 +27,8 @@
 #ifndef LL_LLWIND_H
 #define LL_LLWIND_H
 
+#include <array>
+
 #include "llmath.h"
 #include "v3math.h"
 #include "v3dmath.h"

@@ -33,7 +33,7 @@
 #endif
 #include <boost/call_traits.hpp>
 #include <boost/optional/optional.hpp>
-#include <absl/container/flat_hash_map.h>
+#include <boost/unordered/unordered_flat_map.hpp>
 #if LL_GNUC && GCC_VERSION >= 90000
 #pragma GCC diagnostic pop
 #endif
@@ -152,6 +152,22 @@ struct char_traits<U16>
 };
 #endif
 
+namespace al 
+{
+	struct string_hash 
+	{
+		using hash_type = boost::hash<std::string_view>;
+		using is_transparent = void;
+		[[nodiscard]] size_t operator()(const char* txt) const { return hash_type{}(txt); }
+		[[nodiscard]] size_t operator()(std::string_view txt) const { return hash_type{}(txt); }
+		[[nodiscard]] size_t operator()(const std::string& txt) const { return hash_type{}(txt); }
+	};
+
+	inline std::string_view safe_string_view(const char* p) {
+		return p ? std::string_view(p) : std::string_view();
+	}
+}
+
 class LL_COMMON_API LLStringOps
 {
 private:
@@ -159,7 +175,7 @@ private:
 	static long sLocalTimeOffset;
 	static bool sPacificDaylightTime;
 
-	static absl::flat_hash_map<std::string, std::string> datetimeToCodes;
+	static boost::unordered_flat_map<std::string, std::string, al::string_hash, std::equal_to<>> datetimeToCodes;
 
 public:
 	static std::vector<std::string> sWeekDayList;

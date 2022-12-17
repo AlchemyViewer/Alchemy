@@ -32,8 +32,8 @@
 #include "llavatarname.h"	// for convenience
 #include "llsingleton.h"
 #include <boost/signals2.hpp>
-#include <absl/container/flat_hash_map.h>
-#include <absl/container/node_hash_map.h>
+#include "boost/unordered/unordered_flat_map.hpp"
+#include "boost/unordered/unordered_map.hpp"
 
 #include <set>
 
@@ -180,18 +180,18 @@ private:
 
     // Agent IDs that have been requested, but with no reply.
     // Maps agent ID to frame time request was made.
-    typedef absl::flat_hash_map<LLUUID, F64> pending_queue_t;
+    typedef boost::unordered_flat_map<LLUUID, F64> pending_queue_t;
     pending_queue_t mPendingQueue;
 
     // Callbacks to fire when we received a name.
     // May have multiple callbacks for a single ID, which are
     // represented as multiple slots bound to the signal.
     // Avoid copying signals via pointers.
-    typedef absl::flat_hash_map<LLUUID, callback_signal_t* > signal_map_t;
+    typedef boost::unordered_flat_map<LLUUID, callback_signal_t* > signal_map_t;
     signal_map_t mSignalMap;
 
     // The cache at last, i.e. avatar names we know about.
-    typedef absl::node_hash_map<LLUUID, LLAvatarName> cache_t;
+    typedef boost::unordered_map<LLUUID, LLAvatarName> cache_t;
     cache_t mCache;
 
     // Time when unrefreshed cached names were checked last.

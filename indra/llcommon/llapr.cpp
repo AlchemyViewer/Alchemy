@@ -148,7 +148,7 @@ LLVolatileAPRPool::LLVolatileAPRPool(std::string name, BOOL is_local, apr_pool_t
 	//create mutex
 	if(!is_local) //not a local apr_pool, that is: shared by multiple threads.
 	{
-		mMutexp = std::make_unique<absl::Mutex>();
+		mMutexp = std::make_unique<std::mutex>();
 	}
 }
 
@@ -169,7 +169,7 @@ apr_pool_t* LLVolatileAPRPool::getAPRPool()
 
 apr_pool_t* LLVolatileAPRPool::getVolatileAPRPool() 
 {	
-	absl::MutexLockMaybe lock(mMutexp.get()) ;
+	LLScopedLock lock(mMutexp.get()) ;
 
 	mNumTotalRef++ ;
 	mNumActiveRef++ ;
@@ -184,7 +184,7 @@ apr_pool_t* LLVolatileAPRPool::getVolatileAPRPool()
 
 void LLVolatileAPRPool::clearVolatileAPRPool() 
 {
-	absl::MutexLockMaybe lock(mMutexp.get());
+    LLScopedLock lock(mMutexp.get());
 
 	if(mNumActiveRef > 0)
 	{

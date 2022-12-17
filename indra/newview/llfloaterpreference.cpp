@@ -355,12 +355,14 @@ LLFloaterPreference::LLFloaterPreference(const LLSD& key)
 	mCommitCallbackRegistrar.add("Pref.DeleteTranscripts",      boost::bind(&LLFloaterPreference::onDeleteTranscripts, this));
 	mCommitCallbackRegistrar.add("UpdateFilter", boost::bind(&LLFloaterPreference::onUpdateFilterTerm, this, false));
 
+#ifndef LL_HAVOK
 	mCommitCallbackRegistrar.add("Pref.AddGrid", boost::bind(&LLFloaterPreference::onClickAddGrid, this));
     mCommitCallbackRegistrar.add("Pref.ActivateGrid", boost::bind(&LLFloaterPreference::onClickActivateGrid, this));
 	mCommitCallbackRegistrar.add("Pref.RemoveGrid", boost::bind(&LLFloaterPreference::onClickRemoveGrid, this));
 	mCommitCallbackRegistrar.add("Pref.RefreshGrid", boost::bind(&LLFloaterPreference::onClickRefreshGrid, this));
 	mCommitCallbackRegistrar.add("Pref.DebugGrid", boost::bind(&LLFloaterPreference::onClickDebugGrid, this));
 	mCommitCallbackRegistrar.add("Pref.SelectGrid", boost::bind(&LLFloaterPreference::onSelectGrid, this, _2));
+#endif
 	mCommitCallbackRegistrar.add("Pref.AddSkin", boost::bind(&LLFloaterPreference::onAddSkin, this));
 	mCommitCallbackRegistrar.add("Pref.RemoveSkin", boost::bind(&LLFloaterPreference::onRemoveSkin, this));
 	mCommitCallbackRegistrar.add("Pref.ApplySkin", boost::bind(&LLFloaterPreference::onApplySkin, this));
@@ -470,9 +472,17 @@ BOOL LLFloaterPreference::postBuild()
 
 	LLLogChat::getInstance()->setSaveHistorySignal(boost::bind(&LLFloaterPreference::onLogChatHistorySaved, this));
 	
+#ifndef LL_HAVOK
 	refreshGridList();
 	mGridListChangedConnection = LLGridManager::getInstance()->addGridListChangedCallback(boost::bind(&LLFloaterPreference::refreshGridList, this));
-	
+#else
+	if(tabcontainer)
+	{
+		auto tab = tabcontainer->getPanelByName("grids");
+		if(tab) tabcontainer->removeTabPanel(tab);
+	}
+#endif
+
 	loadUserSkins();
 	
 
@@ -527,6 +537,7 @@ void LLFloaterPreference::onDoNotDisturbResponseChanged()
 	gSavedPerAccountSettings.setBOOL("DoNotDisturbResponseChanged", response_changed_flag );
 }
 
+#ifndef LL_HAVOK
 ////////////////////////////////////////////////////
 // Grid panel
 
@@ -630,6 +641,7 @@ bool LLFloaterPreference::handleRemoveGridCB(const LLSD& notification, const LLS
 	}
 	return false;
 }
+#endif
 
 ////////////////////////////////////////////////////
 // Skins panel
@@ -890,9 +902,10 @@ void LLFloaterPreference::refreshSkinInfo(const skin_t& skin)
 
 LLFloaterPreference::~LLFloaterPreference()
 {
-	
+#ifndef LL_HAVOK
 	if (mGridListChangedConnection.connected())
 		mGridListChangedConnection.disconnect();
+#endif
 	LLConversationLog::instance().removeObserver(this);
 }
 

@@ -35,9 +35,6 @@
 #include "llpreprocessor.h"
 #include <immintrin.h>
 
-#include "absl/hash/hash.h"
-#include "absl/strings/str_format.h"
-
 class LLMutex;
 
 static constexpr S32 UUID_BYTES = 16;
@@ -58,8 +55,17 @@ public:
 	// CREATORS
 	//
 	LLUUID() = default;
+	LLUUID(const LLUUID& rhs) { std::memcpy(mData, rhs.mData, sizeof(mData)); }
+	LLUUID(LLUUID&& rhs) { std::memmove(mData, rhs.mData, sizeof(mData)); }
+	~LLUUID() {}
+
+	LLUUID& operator=(const LLUUID& rhs) { std::memcpy(mData, rhs.mData, sizeof(mData)); return *this;}
+	LLUUID& operator=(LLUUID&& rhs) noexcept { std::memmove(mData, rhs.mData, sizeof(mData)); return *this;}
+
 	explicit LLUUID(const char *in_string); // Convert from string.
 	explicit LLUUID(const std::string_view in_string); // Convert from string.
+
+
 
 	//
 	// MANIPULATORS
@@ -187,26 +193,9 @@ public:
 	// END BOOST
 
 
-	inline size_t hash() const
+	friend std::size_t hash_value(LLUUID const& id)
 	{
-		return absl::Hash<LLUUID>{}(*this);
-	}
-
-	template <typename H>
-	friend H AbslHashValue(H h, const LLUUID& id) {
-		return H::combine_contiguous(std::move(h), id.mData, UUID_BYTES);
-	}
-
-	friend absl::FormatConvertResult<absl::FormatConversionCharSet::kString>
-		AbslFormatConvert(const LLUUID& id,
-			const absl::FormatConversionSpec& spec,
-			absl::FormatSink* s) {
-		if (spec.conversion_char() == absl::FormatConversionChar::s) {
-            char uuid_str[UUID_STR_SIZE] = {}; // will be null-terminated
-            id.to_chars(uuid_str);
-			s->Append(uuid_str);
-		}
-		return { true };
+		return boost::hash_value(id.mData);
 	}
 
 	// xor functions. Useful since any two random uuids xored together
@@ -265,9 +254,6 @@ public:
 
 	U8 mData[UUID_BYTES] = {};
 };
-static_assert(std::is_trivially_copyable<LLUUID>::value, "LLUUID must be trivial copy");
-static_assert(std::is_trivially_move_assignable<LLUUID>::value, "LLUUID must be trivial move");
-static_assert(std::is_standard_layout<LLUUID>::value, "LLUUID must be a standard layout type");
 
 typedef std::vector<LLUUID> uuid_vec_t;
 typedef std::set<LLUUID> uuid_set_t;
@@ -293,18 +279,7 @@ namespace std {
 	{
 		size_t operator()(const LLUUID & id) const
 		{
-			return id.hash();
-		}
-	};
-}
-
-namespace boost 
-{
-	template <> struct hash<LLUUID>
-	{
-		size_t operator()(const LLUUID& id) const
-		{
-			return id.hash();
+			return boost::hash_value(id.mData);
 		}
 	};
 }

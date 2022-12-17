@@ -39,6 +39,7 @@
 #include "llsearcheditor.h"
 #include "llsetkeybinddialog.h"
 #include "llkeyconflict.h"
+#include "llviewerbuildconfig.h"
 
 class LLConversationLogObserver;
 class LLPanelPreference;
@@ -204,6 +205,7 @@ private:
 	void updateMaxComplexity();
 	static bool loadFromFilename(const std::string& filename, std::map<std::string, std::string> &label_map);
 
+#if !LL_HAVOK
 	void refreshGridList();
 	void onClickAddGrid();
     void onClickActivateGrid();
@@ -212,7 +214,8 @@ private:
 	void onClickDebugGrid();
 	void onSelectGrid(const LLSD& data);
 	bool handleRemoveGridCB(const LLSD& notification, const LLSD& response);
-	
+#endif
+
 	void loadUserSkins();
 	void reloadSkinList();
 	void onAddSkin();
@@ -241,7 +244,9 @@ private:
 	typedef std::map<std::string, skin_t> skinmap_t;
 	skinmap_t mUserSkins;
 	
+#ifndef LL_HAVOK
 	boost::signals2::connection mGridListChangedConnection;
+#endif
 
 	LOG_CLASS(LLFloaterPreference);
 

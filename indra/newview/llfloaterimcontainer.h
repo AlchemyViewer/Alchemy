@@ -124,7 +124,7 @@ public:
 
 
 private:
-	typedef absl::flat_hash_map<LLUUID,LLFloater*> avatarID_panel_map_t;
+	typedef boost::unordered_flat_map<LLUUID,LLFloater*> avatarID_panel_map_t;
 	avatarID_panel_map_t mSessions;
 	boost::signals2::connection mNewMessageConnection;
 

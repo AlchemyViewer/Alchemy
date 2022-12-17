@@ -63,68 +63,6 @@
         <key>version</key>
         <string>2.26.1</string>
       </map>
-      <key>abseil-cpp</key>
-      <map>
-        <key>canonical_repo</key>
-        <string>https://git.alchemyviewer.org/alchemy/thirdparty/3p-abseil-cpp</string>
-        <key>copyright</key>
-        <string>Copyright 2018 The Abseil Authors.</string>
-        <key>description</key>
-        <string>Abseil is an open-source collection of C++ code designed to augment the C++ standard library.</string>
-        <key>license</key>
-        <string>Apache 2.0</string>
-        <key>license_file</key>
-        <string>LICENSES/abseil-cpp.txt</string>
-        <key>name</key>
-        <string>abseil-cpp</string>
-        <key>platforms</key>
-        <map>
-          <key>darwin64</key>
-          <map>
-            <key>archive</key>
-            <map>
-              <key>hash</key>
-              <string>e9d6e89117a043b7b661889eaaf73eead9b2e172c0b193c7d0a1a09f66e6036acb827263458dff52c40e2777951066f47e8872bae248c5d69e07a1b1b9dec70c</string>
-              <key>hash_algorithm</key>
-              <string>blake2b</string>
-              <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/163/packages/generic/abseil-cpp/522606b.1690/abseil_cpp-522606b-darwin64-1690.tar.zst</string>
-            </map>
-            <key>name</key>
-            <string>darwin64</string>
-          </map>
-          <key>linux64</key>
-          <map>
-            <key>archive</key>
-            <map>
-              <key>hash</key>
-              <string>d45b909319a60627b89c70ee70d6883715e11cba39b78ce641e8b85b86f8f30d62083d0652c3083bdb15afcc10522b3b9f47e273ab46b6f0e06ae305fb2ab7e2</string>
-              <key>hash_algorithm</key>
-              <string>blake2b</string>
-              <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/163/packages/generic/abseil-cpp/522606b.1690/abseil_cpp-522606b-linux64-1690.tar.zst</string>
-            </map>
-            <key>name</key>
-            <string>linux64</string>
-          </map>
-          <key>windows64</key>
-          <map>
-            <key>archive</key>
-            <map>
-              <key>hash</key>
-              <string>3412d092fed702c2824c742bc4ab9fa3fb574153ac226ca9f4e37d9acc2db6cebb0d8874488eb2849b4782c4f6b4b534570c239e5abe608810a04399246fd566</string>
-              <key>hash_algorithm</key>
-              <string>blake2b</string>
-              <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/163/packages/generic/abseil-cpp/522606b.1690/abseil_cpp-522606b-windows64-1690.tar.zst</string>
-            </map>
-            <key>name</key>
-            <string>windows64</string>
-          </map>
-        </map>
-        <key>version</key>
-        <string>522606b</string>
-      </map>
       <key>apr_suite</key>
       <map>
         <key>copyright</key>
@@ -204,11 +142,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>0efbda71b890eb506226ec890bfb15e11e6bd725620f6202a99e4da675cd7deda4684dd8a68d4c35d71bcbda4fcafbdfe97824ab4cbbfa70a1561adbb53c7264</string>
+              <string>5265fa05c31a7a8fccca5481192ed4f45863e22620d98515e6f1c343eff0e99bf40e392effa7f2a9ce5562edf7d683ce319694b5163cece9ec9f9fb4bc860ac6</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/92/packages/generic/boost/1.80.0.1699/boost-1.80.0-darwin64-1699.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/92/packages/generic/boost/1.81.0.1768/boost-1.81.0-darwin64-1768.tar.zst</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
@@ -218,11 +156,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>6c0ebf87f2765d51c802fd04fc2752a3b179488b2e34e86c80f84d5931b5d4a74136a52e8b80038840741fe61580e0674e151721aaf39e6f2ac6c84922606f57</string>
+              <string>12b8f815fcb740f990a0e7fe68984f9d481ebd41f9d07d99ebad8f14010958467f8cecb692a782b8d70ecb80c17bb8a23e842b5562b033bd444e0febe2f29c79</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/92/packages/generic/boost/1.80.0.1699/boost-1.80.0-linux64-1699.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/92/packages/generic/boost/1.81.0.1768/boost-1.81.0-linux64-1768.tar.zst</string>
             </map>
             <key>name</key>
             <string>linux64</string>
@@ -232,18 +170,18 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>229c29faef184e7fa9c7d17e62cc629e6a5fbb00153a10550143a30551cf4984bb4f62fb5384703d20b872eb0b7f7ef89ba43bc16fed6b4e1db5cb6e2797d406</string>
+              <string>fc6af1d3acd14d7ec9058fdf5bdb363ca9cae1c604414f65f24b48a419919b6c1119fba44805525a2cbfb49fda3d0050e8d4883a52963635220526e01aebd648</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/92/packages/generic/boost/1.80.0.1699/boost-1.80.0-windows64-1699.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/92/packages/generic/boost/1.81.0.1768/boost-1.81.0-windows64-1768.tar.zst</string>
             </map>
             <key>name</key>
             <string>windows64</string>
           </map>
         </map>
         <key>version</key>
-        <string>1.80.0</string>
+        <string>1.81.0</string>
       </map>
       <key>colladadom</key>
       <map>
@@ -262,11 +200,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>75fa180957a1b921b11bbc6b3d3f8d04cd5154c8f43b0d8ffeb39a1b020f425826d87f5c15af4978bf21eeb233209f507265fe3cf88fde5604d479f54dcc747a</string>
+              <string>42534634e4d37ca120baaaaf9a6127f1023b92935e0554da0f8b52ea72f3aa6f5f556481fc586e1e6ac7d2ba8ae229c453fb12212cacb052da83622da9a3c130</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/98/packages/generic/colladadom/2.3.0.1705/colladadom-2.3.0-darwin64-1705.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/98/packages/generic/colladadom/2.3.0.1769/colladadom-2.3.0-darwin64-1769.tar.zst</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
@@ -276,11 +214,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>95439a509974d258cfffbee1a65c755b5958a5b44e6e5fb15ecb694c5bc41e54c0d04a72d36efdb40de4ed1903779d4c3a8226ba7fb5ae1aac9d98bc7b665d3e</string>
+              <string>427c8c7631dd0a40dcdc1d6230cdc54228d08580ed02aa9ac40b28e0dfd1f9d79fde9a803285e14bbabf2fed082cfd8502cad9f56d9a96df579e5ae68157b548</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/98/packages/generic/colladadom/2.3.0.1705/colladadom-2.3.0-linux64-1705.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/98/packages/generic/colladadom/2.3.0.1769/colladadom-2.3.0-linux64-1769.tar.zst</string>
             </map>
             <key>name</key>
             <string>linux64</string>
@@ -290,11 +228,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>cdd00a4d693c1018982e321d01d18da73a67354c6a24ab7cc68d23a1347484b445f3b99c0cd7a990d29af7db1cafa158c91f60c26fa2c476e9855dad22238eef</string>
+              <string>eb467d62914cf31d86ed393ef18304e0bd169f89dabc640a0780b346fc9a00284c5f11ee86adb8cc21b69abef37bc78a3bb7292d8b964d6ad652b3daa6a69ce5</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/98/packages/generic/colladadom/2.3.0.1705/colladadom-2.3.0-windows64-1705.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/98/packages/generic/colladadom/2.3.0.1769/colladadom-2.3.0-windows64-1769.tar.zst</string>
             </map>
             <key>name</key>
             <string>windows64</string>
@@ -454,6 +392,68 @@
         </map>
         <key>version</key>
         <string>1.0.0</string>
+      </map>
+      <key>discord-gamesdk</key>
+      <map>
+        <key>canonical_repo</key>
+        <string>https://git.alchemyviewer.org/alchemy/thirdparty/3p-discord-gamesdk</string>
+        <key>copyright</key>
+        <string>Copyright (c) Discord.</string>
+        <key>description</key>
+        <string>Discord GameSDK for integrating with Discord</string>
+        <key>license</key>
+        <string>proprietary</string>
+        <key>license_file</key>
+        <string>LICENSES/discord-gamesdk.txt</string>
+        <key>name</key>
+        <string>discord-gamesdk</string>
+        <key>platforms</key>
+        <map>
+          <key>darwin64</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>hash</key>
+              <string>1e47de39d3ee0b26d9e6b900a6b7ca80a7d84d5e3db33ccf0b1abf30a09e75c1c57d8423933f25fb931715a1c238cdf5f263b29ad07c7f416c108f1f869dcd1e</string>
+              <key>hash_algorithm</key>
+              <string>blake2b</string>
+              <key>url</key>
+              <string>https://git.alchemyviewer.org/api/v4/projects/191/packages/generic/discord-gamesdk/3.2.1.1764/discord_gamesdk-3.2.1-darwin64-1764.tar.zst</string>
+            </map>
+            <key>name</key>
+            <string>darwin64</string>
+          </map>
+          <key>linux64</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>hash</key>
+              <string>94c2daadac705d0bf1d171e432118565f3047b8409f6d8667f8711c64122f3d1e7eeef4a30e8c81f943a469de746823688021766467abe6099c3a56f92ceef5c</string>
+              <key>hash_algorithm</key>
+              <string>blake2b</string>
+              <key>url</key>
+              <string>https://git.alchemyviewer.org/api/v4/projects/191/packages/generic/discord-gamesdk/3.2.1.1764/discord_gamesdk-3.2.1-linux64-1764.tar.zst</string>
+            </map>
+            <key>name</key>
+            <string>linux64</string>
+          </map>
+          <key>windows64</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>hash</key>
+              <string>3783cdb9759cf5f4f924f3afeca576fb8cc4209608d7f4874b3285e1b9928ecda8a72cb040532f91058d9d31420106541a62de378e265cf7e3f4d1167a6fb5f8</string>
+              <key>hash_algorithm</key>
+              <string>blake2b</string>
+              <key>url</key>
+              <string>https://git.alchemyviewer.org/api/v4/projects/191/packages/generic/discord-gamesdk/3.2.1.1764/discord_gamesdk-3.2.1-windows64-1764.tar.zst</string>
+            </map>
+            <key>name</key>
+            <string>windows64</string>
+          </map>
+        </map>
+        <key>version</key>
+        <string>3.2.1</string>
       </map>
       <key>dullahan</key>
       <map>
@@ -1409,6 +1409,72 @@
         </map>
         <key>version</key>
         <string>1.0</string>
+      </map>
+      <key>llphysicsextensions_tpv</key>
+      <map>
+        <key>copyright</key>
+        <string>Copyright (c) 2010, Linden Research, Inc.</string>
+        <key>license</key>
+        <string>commercial</string>
+        <key>license_file</key>
+        <string>LICENSES/llphysicsextensions.txt</string>
+        <key>name</key>
+        <string>llphysicsextensions_tpv</string>
+        <key>platforms</key>
+        <map>
+          <key>darwin64</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>creds</key>
+              <string>gitlab</string>
+              <key>hash</key>
+              <string>d406063afef2eaffb95cd20987da021b9eb1489495f7d70bf46263ca675ed7b763a4f10a74557335b3d2120607f18ad42cb574bdf57acde76cff9f79e83806db</string>
+              <key>hash_algorithm</key>
+              <string>blake2b</string>
+              <key>url</key>
+              <string>https://git.alchemyviewer.org/api/v4/projects/192/packages/generic/llphysicsextensions_tpv/1.0.571939/llphysicsextensions_tpv-1.0.571939-darwin64-571939.tar.bz2</string>
+            </map>
+            <key>name</key>
+            <string>darwin64</string>
+          </map>
+          <key>windows</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>creds</key>
+              <string>gitlab</string>
+              <key>hash</key>
+              <string>4a2de5ef7194c64268de1b87b517b8d22cb8347a9fa2fdbc2ac48deebe92ad08a0b664ab4c7419de249de11385bcdf5d2a075b764ac3399e228db29506dbd54b</string>
+              <key>hash_algorithm</key>
+              <string>blake2b</string>
+              <key>url</key>
+              <string>https://git.alchemyviewer.org/api/v4/projects/192/packages/generic/llphysicsextensions_tpv/1.0.571939/llphysicsextensions_tpv-1.0.571939-windows-571939.tar.bz2</string>
+            </map>
+            <key>name</key>
+            <string>windows</string>
+          </map>
+          <key>windows64</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>creds</key>
+              <string>gitlab</string>
+              <key>hash</key>
+              <string>254ecd68df52da6b86bcc64cd83758a8b9a1c398e33ed43cfe9efef28b249f6d7eb8450e27d901177eb9084d52ff7fa428e93fe6f4721ad6ff3d1f4728dc34d8</string>
+              <key>hash_algorithm</key>
+              <string>blake2b</string>
+              <key>url</key>
+              <string>https://git.alchemyviewer.org/api/v4/projects/192/packages/generic/llphysicsextensions_tpv/1.0.571939/llphysicsextensions_tpv-1.0.571939-windows64-571939.tar.bz2</string>
+            </map>
+            <key>name</key>
+            <string>windows64</string>
+          </map>
+        </map>
+        <key>source_type</key>
+        <string>hg</string>
+        <key>version</key>
+        <string>1.0.571939</string>
       </map>
       <key>minizip-ng</key>
       <map>
@@ -2943,8 +3009,6 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
                   <string>-A</string>
                   <string>${AUTOBUILD_WIN_VSPLATFORM|NOTWIN}</string>
                   <string>-DUNATTENDED:BOOL=ON</string>
-                  <string>-DINSTALL_PROPRIETARY=FALSE</string>
-                  <string>-DUSE_KDU=FALSE</string>
                 </array>
               </map>
               <key>name</key>
@@ -3015,8 +3079,6 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
                   <string>${AUTOBUILD_WIN_VSPLATFORM|NOTWIN}</string>
                   <string>-T</string>
                   <string>host=x64</string>
-                  <string>-DINSTALL_PROPRIETARY=FALSE</string>
-                  <string>-DUSE_KDU=FALSE</string>
                 </array>
               </map>
               <key>name</key>

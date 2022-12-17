@@ -19,6 +19,7 @@ set(cmake_SOURCE_FILES
     Copy3rdPartyLibs.cmake
     DBusGlib.cmake
     DeploySharedLibs.cmake
+    DiscordSDK.cmake
     DragDrop.cmake
     EXPAT.cmake
     FindAPR.cmake

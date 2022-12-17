@@ -33,8 +33,6 @@
 #include <immintrin.h>
 #include "llsd.h"
 
-#include "absl/hash/hash.h"
-
 class LLMaterialID
 {
 public:
@@ -140,16 +138,11 @@ public:
 #endif
 	}
 
-	inline size_t hash() const
+	friend std::size_t hash_value(LLMaterialID const& id)
 	{
-		return absl::Hash<LLMaterialID>{}(*this);
+		return boost::hash_value(id.mID);
 	}
 // END BOOST
-
-	template <typename H>
-	friend H AbslHashValue(H h, const LLMaterialID& id) {
-		return H::combine_contiguous(std::move(h), id.mID, MATERIAL_ID_SIZE);
-	}
 
 	const U8*     get() const;
 	void          set(const void* pMemory);
@@ -173,17 +166,7 @@ namespace std {
 	{
 		size_t operator()(const LLMaterialID& id) const
 		{
-			return id.hash();
-		}
-	};
-}
-
-namespace boost {
-	template<> struct hash<LLMaterialID>
-	{
-		size_t operator()(const LLMaterialID& id) const
-		{
-			return id.hash();
+			return hash_value(id);
 		}
 	};
 }

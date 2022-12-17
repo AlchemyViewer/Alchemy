@@ -35,7 +35,7 @@
 #include "llviewervisualparam.h"
 #include "llxmltree.h"
 
-#include <absl/container/flat_hash_map.h>
+#include "boost/unordered/unordered_flat_map.hpp"
 
 class LLTexLayerSet;
 class LLTexGlobalColor;
@@ -142,7 +142,7 @@ public:
 	LLVector3			mHeadOffset; // current head position
 	LLAvatarJoint		*mRoot;
 
-	typedef absl::flat_hash_map<std::string, LLJoint*> joint_map_t;
+	typedef boost::unordered_flat_map<std::string, LLJoint*> joint_map_t;
 	joint_map_t			mJointMap;
 
     typedef std::map<std::string, LLVector3> joint_state_map_t;

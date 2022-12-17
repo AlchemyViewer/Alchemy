@@ -32,7 +32,7 @@
 #include <string>
 #include <vector>
 
-#include "absl/container/flat_hash_map.h"
+#include "boost/unordered/unordered_flat_map.hpp"
 
 #include "lluserrelations.h"
 #include "lluuid.h"
@@ -111,7 +111,7 @@ public:
 
 	// add or remove agents from buddy list. Each method takes a set
 	// of buddies and returns how many were actually added or removed.
-	typedef absl::flat_hash_map<LLUUID, LLRelationship*> buddy_map_t;
+	typedef boost::unordered_flat_map<LLUUID, LLRelationship*> buddy_map_t;
 
 	S32 addBuddyList(const buddy_map_t& buddies);
 	//S32 removeBuddyList(const buddy_list_t& exes);
