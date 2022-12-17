@@ -140,7 +140,7 @@ public:
 
 	friend std::size_t hash_value(LLMaterialID const& id)
 	{
-		return boost::hash_range(id.mID, id.mID + MATERIAL_ID_SIZE);
+		return boost::hash_value(id.mID);
 	}
 // END BOOST
 

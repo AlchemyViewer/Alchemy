@@ -192,7 +192,7 @@ public:
 
 	friend std::size_t hash_value(LLUUID const& id)
 	{
-		return boost::hash_range(id.mData, id.mData + UUID_BYTES);
+		return boost::hash_value(id.mData);
 	}
 
 	// xor functions. Useful since any two random uuids xored together
@@ -281,7 +281,7 @@ namespace std {
 	{
 		size_t operator()(const LLUUID & id) const
 		{
-			return boost::hash_range(id.mData, id.mData + UUID_BYTES);
+			return boost::hash_value(id.mData);
 		}
 	};
 }
