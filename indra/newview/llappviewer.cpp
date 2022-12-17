@@ -2983,6 +2983,8 @@ bool LLAppViewer::initConfiguration()
         // good because we haven't yet called LLUI::initClass().
         gDirUtilp->setSkinFolder(skinfolder->getValue().asString(),
                                  gSavedSettings.getString("Language"));
+        std::string skin_settings_file = gDirUtilp->findSkinnedFilename(LLDir::SKINBASE, "skin_settings.xml");
+        (void)gSkinSettings.loadFromFile(skin_settings_file, true, false);
     }
 
     if (gNonInteractive)
