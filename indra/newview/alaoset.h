@@ -27,6 +27,7 @@
 #ifndef AL_AOSET_H
 #define AL_AOSET_H
 
+#include <array>
 #include <utility>
 #include "lleventtimer.h"
 

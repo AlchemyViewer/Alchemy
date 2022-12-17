@@ -6,7 +6,6 @@ include(00-Common)
 include(LLCommon)
 include(LLMath)
 include(Linking)
-include(Abseil)
 include(Boost)
 include(Sentry)
 include(LLSharedLibs)
@@ -312,8 +311,6 @@ target_link_libraries(
     ${BOOST_SYSTEM_LIBRARY}
     ${GOOGLE_PERFTOOLS_LIBRARIES}
     ${URIPARSER_LIBRARIES}
-    absl::flat_hash_map
-    absl::node_hash_map
     nlohmann_json::nlohmann_json
     fmt::fmt
     ${TRACY_LIBRARY}

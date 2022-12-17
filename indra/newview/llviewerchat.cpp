@@ -257,7 +257,8 @@ std::string LLViewerChat::getSenderSLURL(const LLChat& chat, const LLSD& args)
 std::string LLViewerChat::getObjectImSLURL(const LLChat& chat, const LLSD& args)
 {
 	std::string url = LLSLURL("objectim", chat.mFromID, "").getSLURLString();
-	absl::StrAppend(&url, "?name=", chat.mFromName, "&owner=", chat.mOwnerID.asString());
+	url += "?name=" + chat.mFromName;
+	url += "&owner=" + chat.mOwnerID.asString();
 
 	std::string slurl = args["slurl"].asString();
 	if (slurl.empty())
@@ -270,7 +271,7 @@ std::string LLViewerChat::getObjectImSLURL(const LLChat& chat, const LLSD& args)
 		}
 	}
 
-	absl::StrAppend(&url, "&slurl=", LLURI::escape(slurl));
+	url += "&slurl=" + LLURI::escape(slurl);
 
 	return url;
 }

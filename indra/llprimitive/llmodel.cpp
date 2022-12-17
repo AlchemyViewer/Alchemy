@@ -26,6 +26,8 @@
 
 #include "linden_common.h"
 
+#include <array>
+
 #include "llmodel.h"
 #include "llmemory.h"
 #include "llconvexdecomposition.h"

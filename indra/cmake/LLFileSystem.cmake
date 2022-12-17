@@ -1,5 +1,4 @@
 # -*- cmake -*-
-include(Abseil)
 include(Boost)
 
 set(LLFILESYSTEM_INCLUDE_DIRS

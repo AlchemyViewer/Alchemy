@@ -27,6 +27,8 @@
 #ifndef LL_ENVIRONMENT_H
 #define LL_ENVIRONMENT_H
 
+#include <array>
+
 #include "llsingleton.h"
 #include "llmemory.h"
 #include "llsd.h"

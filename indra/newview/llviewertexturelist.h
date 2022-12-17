@@ -36,7 +36,7 @@
 #include <set>
 #include "lluiimage.h"
 
-#include "absl/container/flat_hash_map.h"
+#include "boost/unordered/unordered_flat_map.hpp"
 
 const U32 LL_IMAGE_REZ_LOSSLESS_CUTOFF = 128;
 
@@ -91,10 +91,12 @@ struct LLTextureKey
 		return lhs.textureId == rhs.textureId && lhs.textureType == rhs.textureType;
 	}
 
-	template <typename H>
-	friend H AbslHashValue(H h, const LLTextureKey& id) 
+	friend std::size_t hash_value(LLTextureKey const& id)
 	{
-		return H::combine(std::move(h), id.textureId, id.textureType);
+		std::size_t seed = 0;
+		boost::hash_combine(seed, id.textureId);
+		boost::hash_combine(seed, id.textureType);
+		return seed;
 	}
 };
 
@@ -229,7 +231,7 @@ public:
     
 private:
     using uuid_map_t = std::map< LLTextureKey, LLPointer<LLViewerFetchedTexture> >;
-    using uuid_hash_map_t = absl::flat_hash_map< LLTextureKey, LLViewerFetchedTexture* >;
+    using uuid_hash_map_t = boost::unordered_flat_map< LLTextureKey, LLViewerFetchedTexture* >;
     uuid_map_t mUUIDMap;
     uuid_hash_map_t mUUIDHashMap;
     LLTextureKey mLastUpdateKey;
@@ -288,7 +290,7 @@ private:
 		LLRect mImageClipRegion;
 	};
 
-	typedef absl::flat_hash_map< std::string, LLPointer<LLUIImage> > uuid_ui_image_map_t;
+	typedef boost::unordered_flat_map< std::string, LLPointer<LLUIImage> > uuid_ui_image_map_t;
 	uuid_ui_image_map_t mUIImages;
 
 	//

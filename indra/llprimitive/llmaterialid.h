@@ -144,11 +144,6 @@ public:
 	}
 // END BOOST
 
-	template <typename H>
-	friend H AbslHashValue(H h, const LLMaterialID& id) {
-		return H::combine_contiguous(std::move(h), id.mID, MATERIAL_ID_SIZE);
-	}
-
 	const U8*     get() const;
 	void          set(const void* pMemory);
 	void          clear();

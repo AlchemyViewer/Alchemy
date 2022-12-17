@@ -3,7 +3,6 @@
 project(llmessage)
 
 include(00-Common)
-include(Abseil)
 include(CURL)
 include(OpenSSL)
 include(NGHTTP2)

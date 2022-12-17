@@ -931,8 +931,7 @@ std::string LLTextureCache::getTextureFileName(const LLUUID& id)
 {
 	std::string idstr = id.asString();
 	const std::string& delem = gDirUtilp->getDirDelimiter();
-	std::string filename = absl::StrCat(mTexturesDirName, delem, absl::string_view(&idstr[0], 1), delem, idstr, ".texture");
-	return filename;
+	return fmt::format(FMT_COMPILE("{}{}{}{}{}.texture"), mTexturesDirName, delem, std::string_view(&idstr[0], 1), delem, idstr);
 }
 
 //debug

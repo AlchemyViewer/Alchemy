@@ -7,7 +7,6 @@ include(00-Common)
 # sets variables on which the 3p .cmake files depend.
 include(Linking)
 
-include(Abseil)
 include(Boost)
 include(BuildPackagesInfo)
 include(BuildVersion)
@@ -2227,9 +2226,6 @@ target_link_libraries(${VIEWER_BINARY_NAME}
     ${TRACY_LIBRARY}
     ${MINIZIP_LIBRARIES}
     ${DISCORD_LIBRARIES}
-    absl::flat_hash_map
-    absl::node_hash_map
-    absl::strings
     meshoptimizer
     nlohmann_json::nlohmann_json
     fmt::fmt

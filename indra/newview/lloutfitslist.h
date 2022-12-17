@@ -339,7 +339,7 @@ private:
 	typedef wearables_lists_map_t::value_type			wearables_lists_map_value_t;
 	wearables_lists_map_t			mSelectedListsMap;
 
-	typedef	absl::flat_hash_map<LLUUID, LLAccordionCtrlTab*>		outfits_map_t;
+	typedef	boost::unordered_flat_map<LLUUID, LLAccordionCtrlTab*>		outfits_map_t;
 	typedef outfits_map_t::value_type					outfits_map_value_t;
 	outfits_map_t					mOutfitsMap;
 

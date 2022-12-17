@@ -27,6 +27,7 @@
 #ifndef LL_MESSAGE_H
 #define LL_MESSAGE_H
 
+#include <array>
 #include <cstring>
 #include <set>
 

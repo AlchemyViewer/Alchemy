@@ -2,7 +2,6 @@ project(deps)
 
 include(00-Common)
 include(FetchContent)
-include(Abseil)
 
 set(CMAKE_FOLDER "Third Party")
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
@@ -50,37 +49,6 @@ FetchContent_Declare(
   GIT_REPOSITORY https://git.alchemyviewer.org/alchemy/mirrors/modernjson.git
   GIT_TAG        v3.11.2
   )
-
-if(NOT USE_BINARY_ABSL)
-  FetchContent_Declare(
-    absl
-    GIT_REPOSITORY https://git.alchemyviewer.org/alchemy/mirrors/abseil-cpp.git
-    GIT_TAG        522606b7fae37836c138e83f6eec0eabb9947dc0
-    )
-
-  # This is a hack because absl has dumb cmake
-  set(OLD_BUILD_TEST ${BUILD_TESTING})
-  set(BUILD_TESTING OFF)
-  FetchContent_MakeAvailable(absl)
-  set(BUILD_TESTING ${OLD_BUILD_TEST})
-
-  # Supress warnings inside abseil under MSVC
-  if(WINDOWS)
-    target_compile_options(absl_strings PRIVATE /wd4018)
-    target_compile_options(absl_str_format_internal PRIVATE /wd4018)
-    target_compile_options(absl_flags_usage_internal PRIVATE /wd4018)
-    target_compile_options(absl_random_internal_distribution_test_util PRIVATE /wd4723)
-  elseif(LINUX) 
-    target_compile_options(absl_flags PRIVATE -Wno-non-virtual-dtor)
-    target_compile_options(absl_flags_commandlineflag PRIVATE -Wno-non-virtual-dtor)
-    target_compile_options(absl_flags_internal PRIVATE -Wno-non-virtual-dtor)
-    target_compile_options(absl_flags_parse PRIVATE -Wno-non-virtual-dtor)
-    target_compile_options(absl_flags_private_handle_accessor PRIVATE -Wno-non-virtual-dtor)
-    target_compile_options(absl_flags_reflection PRIVATE -Wno-non-virtual-dtor)
-    target_compile_options(absl_flags_usage PRIVATE -Wno-non-virtual-dtor)
-    target_compile_options(absl_flags_usage_internal PRIVATE -Wno-non-virtual-dtor)
-  endif()
-endif()
 
 # #Download the rest of the libraries
 FetchContent_MakeAvailable(fmt)

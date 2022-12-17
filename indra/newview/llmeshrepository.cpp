@@ -1250,7 +1250,7 @@ void LLMeshRepoThread::constructUrl(LLUUID mesh_id, std::string * url, int * leg
 
 		if (!res_url.empty())
 		{
-			absl::StrAppend(&res_url, "/?mesh_id=", mesh_id.asString());
+			res_url += "/?mesh_id=" + mesh_id.asString();
 		}
 		else
 		{
@@ -3941,7 +3941,7 @@ void LLMeshRepository::notifyLoadedMeshes()
 				//calculate "score" for pending requests
 
 				//create score map
-				absl::flat_hash_map<LLUUID, F32> score_map;
+				boost::unordered_flat_map<LLUUID, F32> score_map;
 
 				for (const auto& lod : mLoadingMeshes)
 				{

@@ -3,7 +3,6 @@
 project(llui)
 
 include(00-Common)
-include(Abseil)
 include(Hunspell)
 include(LLCommon)
 include(LLImage)

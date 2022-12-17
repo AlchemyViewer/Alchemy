@@ -35,8 +35,6 @@
 #include "llpreprocessor.h"
 #include <immintrin.h>
 
-#include "absl/hash/hash.h"
-
 class LLMutex;
 
 static constexpr S32 UUID_BYTES = 16;
@@ -195,11 +193,6 @@ public:
 	friend std::size_t hash_value(LLUUID const& id)
 	{
 		return boost::hash_range(id.mData, id.mData + UUID_BYTES);
-	}
-
-	template <typename H>
-	friend H AbslHashValue(H h, const LLUUID& id) {
-		return H::combine_contiguous(std::move(h), id.mData, UUID_BYTES);
 	}
 
 	// xor functions. Useful since any two random uuids xored together

@@ -99,7 +99,7 @@ protected:
 	BOOL			isSelectionRemovable();
 
 private:
-	absl::flat_hash_map<LLUUID, LLFolderViewItem*> mItemMap;
+	boost::unordered_flat_map<LLUUID, LLFolderViewItem*> mItemMap;
 
 	LLScrollContainer* mScroller;
 	LLFolderView* mFolders;

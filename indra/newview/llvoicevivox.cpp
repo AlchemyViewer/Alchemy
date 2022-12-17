@@ -74,9 +74,6 @@
 // for base64 decoding
 #include "apr_base64.h"
 
-#include <absl/strings/escaping.h>
-#include <absl/strings/str_replace.h>
-
 #define USE_SESSION_GROUPS 0
 #define VX_NULL_POSITION -2147483648.0 /*The Silence*/
 
@@ -5288,7 +5285,7 @@ bool LLVivoxVoiceClient::inProximalChannel()
 
 std::string LLVivoxVoiceClient::sipURIFromID(const LLUUID &id)
 {
-	std::string result = absl::StrCat("sip:", nameFromID(id), "@", mVoiceSIPURIHostName);
+	std::string result = fmt::format(FMT_COMPILE("sip:{}@{}"), nameFromID(id), mVoiceSIPURIHostName);
 	return result;
 }
 
@@ -5297,7 +5294,7 @@ std::string LLVivoxVoiceClient::sipURIFromAvatar(LLVOAvatar *avatar)
 	std::string result;
 	if(avatar)
 	{
-		result = absl::StrCat("sip:", nameFromID(avatar->getID()), "@", mVoiceSIPURIHostName);
+		result = fmt::format(FMT_COMPILE("sip:{}@{}"), nameFromID(avatar->getID()), mVoiceSIPURIHostName);
 	}
 	return result;
 }
@@ -5322,15 +5319,16 @@ std::string LLVivoxVoiceClient::nameFromID(const LLUUID &uuid)
 		LLStringUtil::replaceChar(result, '_', ' ');
 		return result;
 	}
+	// Prepending this apparently prevents conflicts with reserved names inside the vivox code.
+	result = "x";
 	
 	// Base64 encode and replace the pieces of base64 that are less compatible 
 	// with e-mail local-parts.
 	// See RFC-4648 "Base 64 Encoding with URL and Filename Safe Alphabet"
-
-	// Prepending this apparently prevents conflicts with reserved names inside the vivox code.
-	result = absl::StrCat("x", absl::Base64Escape(std::string((char*)uuid.mData, UUID_BYTES)));
-	absl::StrReplaceAll({ {"+", "-"}, {"/", "_"} }, &result);
-
+	result += LLBase64::encode(uuid.mData, UUID_BYTES);
+	LLStringUtil::replaceChar(result, '+', '-');
+	LLStringUtil::replaceChar(result, '/', '_');
+	
 	// If you need to transform a GUID to this form on the Mac OS X command line, this will do so:
 	// echo -n x && (echo e669132a-6c43-4ee1-a78d-6c82fff59f32 |xxd -r -p |openssl base64|tr '/+' '_-')
 	
@@ -5388,7 +5386,7 @@ std::string LLVivoxVoiceClient::displayNameFromAvatar(LLVOAvatar *avatar)
 
 std::string LLVivoxVoiceClient::sipURIFromName(std::string_view name)
 {
-	std::string result = absl::StrCat("sip:", name, "@", mVoiceSIPURIHostName);
+	std::string result = fmt::format(FMT_COMPILE("sip:{}@{}"), name, mVoiceSIPURIHostName);
 //	LLStringUtil::toLower(result);
 	return result;
 }
