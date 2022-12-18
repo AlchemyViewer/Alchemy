@@ -413,6 +413,8 @@
           <map>
             <key>archive</key>
             <map>
+              <key>creds</key>
+              <string>gitlab</string>
               <key>hash</key>
               <string>1e47de39d3ee0b26d9e6b900a6b7ca80a7d84d5e3db33ccf0b1abf30a09e75c1c57d8423933f25fb931715a1c238cdf5f263b29ad07c7f416c108f1f869dcd1e</string>
               <key>hash_algorithm</key>
@@ -427,6 +429,8 @@
           <map>
             <key>archive</key>
             <map>
+              <key>creds</key>
+              <string>gitlab</string>
               <key>hash</key>
               <string>94c2daadac705d0bf1d171e432118565f3047b8409f6d8667f8711c64122f3d1e7eeef4a30e8c81f943a469de746823688021766467abe6099c3a56f92ceef5c</string>
               <key>hash_algorithm</key>
@@ -441,6 +445,8 @@
           <map>
             <key>archive</key>
             <map>
+              <key>creds</key>
+              <string>gitlab</string>
               <key>hash</key>
               <string>3783cdb9759cf5f4f924f3afeca576fb8cc4209608d7f4874b3285e1b9928ecda8a72cb040532f91058d9d31420106541a62de378e265cf7e3f4d1167a6fb5f8</string>
               <key>hash_algorithm</key>
