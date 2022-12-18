@@ -5359,12 +5359,16 @@ bool LLVivoxVoiceClient::IDFromName(const std::string& inName, LLUUID &uuid)
 		// The name appears to have the right form.
 
 		// Reverse the transforms done by nameFromID
-		std::string_view temp = name;
-		U8 id_buff[UUID_BYTES];
-		if(LLBase64::decode(temp.substr(1), id_buff, UUID_BYTES))
+		name.erase(0,1);
+		LLStringUtil::replaceChar(name, '-', '+');
+		LLStringUtil::replaceChar(name, '_', '/');
+
+		U8 rawuuid[UUID_BYTES];
+		int len = LLBase64::decode(name, rawuuid, UUID_BYTES);
+		if(len == UUID_BYTES)
 		{
 			// The decode succeeded.  Stuff the bits into the result's UUID
-			memcpy(uuid.mData, id_buff, UUID_BYTES);
+			memcpy(uuid.mData, rawuuid, UUID_BYTES);
 			result = true;
 		}
 	} 
