@@ -35,6 +35,7 @@
 
 class LLAvatarName;
 class LLPanelProfileLegacy;
+class LLPanelProfileLegacyTab;
 
 class LLFloaterProfileLegacy final : public LLFloater
 {
@@ -42,8 +43,9 @@ public:
 	LLFloaterProfileLegacy(LLSD const& key);
 	BOOL postBuild() override;
 	void onOpen(const LLSD& key) override;
-    void showTab(std::string_view tab_name) const;
-    std::string_view getShownTab() const;
+
+	LLPanel* expandTab(const std::string& name) const;
+    LLPanel* getExpandedTab() const;
 
 private:
 	~LLFloaterProfileLegacy() override;

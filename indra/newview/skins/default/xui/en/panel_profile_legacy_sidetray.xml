@@ -125,7 +125,7 @@ Remove Friend
            layout="topleft"
            left="0"
            follows="all"
-           name="secondlife_tab_panel"
+           name="avatar_secondlife_tab_panel"
            top="0" />
         </accordion_tab>
         <accordion_tab
@@ -141,7 +141,7 @@ Remove Friend
            follows="all"
            layout="topleft"
            left="0"
-           name="groups_tab_panel"
+           name="avatar_groups_tab_panel"
            top="0" />
         </accordion_tab>
         <accordion_tab
@@ -156,7 +156,7 @@ Remove Friend
            follows="left|top|right"
            layout="topleft"
            left="0"
-           name="interests_tab_panel"
+           name="avatar_interest_tab_panel"
            top="0" />
         </accordion_tab>
         <accordion_tab
@@ -172,7 +172,7 @@ Remove Friend
            follows="all"
            layout="topleft"
            left="0"
-           name="picks_tab_panel"
+           name="avatar_picks_tab_panel"
            top="0" />
         </accordion_tab>
         <accordion_tab
@@ -187,7 +187,7 @@ Remove Friend
            follows="left|top|right"
            layout="topleft"
            left="0"
-           name="firstlife_tab_panel"
+           name="avatar_firstlife_tab_panel"
            top="0" />
         </accordion_tab>
         <accordion_tab
@@ -202,7 +202,7 @@ Remove Friend
            follows="all"
            layout="topleft"
            left="0"
-           name="notes_tab_panel"
+           name="avatar_notes_tab_panel"
            top="0" />
         </accordion_tab>
       </accordion>
