@@ -1,0 +1,2 @@
+# Protect sensitive files
+.gitlab-ci.yml @rye
