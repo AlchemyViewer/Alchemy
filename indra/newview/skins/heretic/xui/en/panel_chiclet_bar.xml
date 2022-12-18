@@ -117,7 +117,7 @@
                  width="34">
           <button.init_callback
                      function="Button.SetDockableFloaterToggle"
-                     parameter="notification_well_window" />
+                     parameter="legacy_notification_well_window" />
         </button>
       </chiclet_notification>
     </layout_panel>

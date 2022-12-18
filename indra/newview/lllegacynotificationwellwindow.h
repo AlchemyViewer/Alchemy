@@ -33,11 +33,11 @@
 
 class LLPanel;
 
-class LLNotificationWellWindow : public LLSysWellWindow
+class LLLegacyNotificationWellWindow : public LLSysWellWindow
 {
 public:
-	LLNotificationWellWindow(const LLSD& key);
-	static LLNotificationWellWindow* getInstance(const LLSD& key = LLSD());
+	LLLegacyNotificationWellWindow(const LLSD& key);
+	static LLLegacyNotificationWellWindow* getInstance(const LLSD& key = LLSD());
 	
 	BOOL postBuild() override;
 	void setVisible(BOOL visible) override;
@@ -51,13 +51,13 @@ public:
 protected:
 	struct WellNotificationChannel : public LLNotificationChannel
 	{
-		WellNotificationChannel(LLNotificationWellWindow*);
+		WellNotificationChannel(LLLegacyNotificationWellWindow*);
 		void onDelete(LLNotificationPtr notify)
 		{
 			mWellWindow->removeItemByID(notify->getID());
 		}
 		
-		LLNotificationWellWindow* mWellWindow;
+		LLLegacyNotificationWellWindow* mWellWindow;
 	};
 	
 	LLNotificationChannelPtr mNotificationUpdates;
