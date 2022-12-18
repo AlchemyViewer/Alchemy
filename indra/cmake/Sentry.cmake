@@ -1,25 +1,7 @@
+# -*- cmake -*-
+include(Linking)
+include(Prebuilt)
 include(Variables)
-
-#Crash reporting
-option(USE_SENTRY "Use the Sentry crash reporting system" OFF)
-if (DEFINED ENV{USE_SENTRY})
-  set(USE_SENTRY $ENV{USE_SENTRY} CACHE BOOL "" FORCE)
-endif()
-
-if(DEFINED ENV{SENTRY_DSN})
-    set(SENTRY_DSN $ENV{SENTRY_DSN} CACHE STRING "Sentry DSN" FORCE)
-endif()
-
-if (INSTALL_PROPRIETARY)
-    # Note that viewer_manifest.py makes decision based on SENTRY_DSN and not USE_SENTRY
-    if (SENTRY_DSN)
-        set(USE_SENTRY ON  CACHE BOOL "Use the Sentry crash reporting system" FORCE)
-    else (SENTRY_DSN)
-        set(USE_SENTRY OFF CACHE BOOL "Use the Sentry crash reporting system" FORCE)
-    endif (SENTRY_DSN)
-else (INSTALL_PROPRIETARY)
-    set(USE_SENTRY OFF CACHE BOOL "Use the Sentry crash reporting system" FORCE)
-endif (INSTALL_PROPRIETARY)
 
 if (USE_SENTRY)
     if (NOT USESYSTEMLIBS)

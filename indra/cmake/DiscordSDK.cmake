@@ -1,10 +1,7 @@
 # -*- cmake -*-
 include(Linking)
 include(Prebuilt)
-
-if (INSTALL_PROPRIETARY)
-  set(USE_DISCORD ON CACHE BOOL "Use Discord SDK" FORCE)
-endif (INSTALL_PROPRIETARY)
+include(Variables)
 
 if (USE_DISCORD)
   if (STANDALONE)
@@ -31,12 +28,6 @@ if (USE_DISCORD)
 
     add_definitions(-DUSE_DISCORD=1)
   endif (STANDALONE)
-
-  if(DEFINED ENV{DISCORD_CLIENTID})
-    set(DISCORD_CLIENTID $ENV{DISCORD_CLIENTID} CACHE STRING "Discord Client ID" FORCE)
-  else()
-    set(DISCORD_CLIENTID "" CACHE STRING "Discord Client ID")
-  endif()
 
   if(DISCORD_CLIENTID STREQUAL "")
     message(FATAL_ERROR "You must set a ClientID with -DDISCORD_CLIENTID= to enable Discord integration")
