@@ -256,6 +256,10 @@ elseif(LINUX)
         libjpeg.so.8.2.2
        )
 
+    if (USE_SENTRY)
+      list(APPEND release_files libsentry.so)
+    endif ()
+
     if (USE_FMODSTUDIO)
       list(APPEND debug_files libfmodL.so)
       list(APPEND release_files libfmod.so)

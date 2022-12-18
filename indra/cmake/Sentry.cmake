@@ -18,8 +18,7 @@ if (USE_SENTRY)
             include(OpenSSL)
             include(ZLIBNG)
             set(SENTRY_LIBRARIES 
-                ${ARCH_PREBUILT_DIRS_RELEASE}/libsentry.a
-                ${ARCH_PREBUILT_DIRS_RELEASE}/libbreakpad_client.a
+                ${ARCH_PREBUILT_DIRS_RELEASE}/libsentry.so
                 ${CURL_LIBRARIES}
                 ${NGHTTP2_LIBRARIES}
                 ${OPENSSL_LIBRARIES}
