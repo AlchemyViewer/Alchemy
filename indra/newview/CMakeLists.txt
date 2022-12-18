@@ -1767,6 +1767,7 @@ endif ()
 # from within the IDE.
 set(viewer_XUI_FILES
     skins/default/colors.xml
+    skins/default/skin_settings.xml
     skins/default/default_languages.xml
     skins/default/textures/textures.xml
     )
