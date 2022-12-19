@@ -782,7 +782,7 @@
      reference="LtGray" />
   <color
       name="NotifyCautionBoxColor"
-     reference="LtOrange" />
+     reference="Taffy" />
   <color
       name="NotifyCautionWarnColor"
       reference="White" />
@@ -797,10 +797,10 @@
      reference="AccentColor" />
     <color
       name="ObjectChatColor"
-     value="0.69 0.89 0.69 1" />
+     value="0.89 0.89 0.69 1" />
   <color
      name="ObjectIMColor"
-     value="0.41 0.70 0.38 1" />
+     value="0.81 0.70 0.38 1" />
     <color
       name="OverdrivenColor"
       reference="Red" />
@@ -812,10 +812,10 @@
       reference="White_50" />
   <color
       name="PanelFocusBackgroundColor"
-      reference="DkGray2" />
+      reference="SL-Background" />
   <color
       name="PanelNotificationBackground"
-      value="1 0.3 0.3 0" />
+      reference="SL-Background" />
   <color
      name="PanelOutfitBg"
      reference="Taffy_35" />
@@ -836,7 +836,7 @@
       reference="LtGreen" />
   <color
       name="PathfindingDefaultBeaconColor"
-      reference="Red_80" />
+      reference="Taffy_75" />
   <color
       name="PathfindingDefaultBeaconTextColor"
       reference="White" />
@@ -1000,7 +1000,7 @@
 
   <color
       name="DirectChatColor"
-      value="1 0.85 0.73 1" />
+      value="1 0.85 0.85 1" />
 
   <color
       name="ToolbarDropZoneColor"
