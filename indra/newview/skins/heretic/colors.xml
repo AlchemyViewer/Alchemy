@@ -9,19 +9,19 @@
 	 value="0.75 0.75 0.75 1" />
 	<color
 	 name="AccentColor"
-	 value="0.901 0.533 0.729 1" />
+	 reference="Taffy" />
   <color
 	 name="EmphasisColor"
-	 value="0.901 0.533 0.729 0.7" /> <!--text selection, focused textedit borders etc />-->
+	 reference="Taffy_75" /> <!--text selection, focused textedit borders etc />-->
   <color
 	 name="EmphasisColorLight"
-	 value="0.901 0.533 0.729 0.5" /> <!--value="0.86 0.66 0.55 1.0" />-->
+	 reference="Taffy_50" /> <!--value="0.86 0.66 0.55 1.0" />-->
 	<color
 	 name="SchemeLightest"
-	 value="0.901 0.533 0.729 0.5" /> <!--links on login screen />-->
+	 reference="Taffy" /> <!--links on login screen />-->
 	<color
 	 name="SchemeLightest_35"
-	 value="0.76 0.58 0.49 0.35" />
+	 reference="Taffy_35" />
 	<color 
 	 name="SchemeDark"
 	 value="0.49 0.33 0.25 1.0" />
@@ -133,10 +133,22 @@
   <color
       name="LtOrange"
       value="1 .85 .73 1" />
+  <color
+      name="Taffy"
+      value="0.901 0.533 0.729 1" />
+  <color
+      name="Taffy_75"
+      value="0.901 0.533 0.729 0.75" />
+  <color
+	  name="Taffy_50"
+	  value="0.901 0.533 0.729 0.5" />
+  <color
+	  name="Taffy_35"
+	  value="0.901 0.533 0.729 0.35" />
 
   <!-- Skin and Theme Colors -->
 
-      <color
+    <color
 	 name="SL-White"
 	 value="1 1 1 1" />
 	<color
@@ -240,6 +252,9 @@
   <color
       name="AccordionHeaderTextColor"
       reference="LtGray" />
+  <color
+	  name="AccordionHeaderBgColor"
+	  reference="Taffy_50" />
   <color
       name="AgentChatColor"
      value="0.75 0.75 0.75 1" />
@@ -677,7 +692,7 @@
       reference="LtGray" />
   <color
       name="MenuItemHighlightBgColor"
-     value="0 0 0 0.3" />
+      reference="Taffy_35" />
   <color
       name="MenuItemHighlightFgColor"
       reference="White" />
@@ -686,7 +701,7 @@
      value="0.5 0.0 0.0 1.0" />
   <color
       name="MenuPopupBgColor"
-      reference="DkGray2" />
+      reference="Taffy_50" />
   <color
       name="ModelUploaderLabels"
       value="1 0.6 0 1" />	  
