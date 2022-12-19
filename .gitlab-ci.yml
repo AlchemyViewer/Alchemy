@@ -361,10 +361,10 @@ build:release:windows64:
 
 .upload_template:
   stage: upload
+  image: r.alchemyviewer.org/alchemy/infrastructure/viewer-deploy-image:latest
   tags:
-    - powershell
-    - m1
-    - mac
+    - pwsh
+    - docker
   allow_failure: false
   variables:
     USE_SENTRY: "TRUE"
