@@ -11,7 +11,7 @@
  title="SELL LAND"
  width="313">
     <scroll_container
-     color="DkGray2"
+     color="PanelDefaultBackgroundColor"
      follows="left|top|right|bottom"
      height="520"
      layout="topleft"

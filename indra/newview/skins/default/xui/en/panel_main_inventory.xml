@@ -96,8 +96,8 @@
      top_pad="10"
      width="312">
     <inventory_panel
-     bg_opaque_color="DkGray2"
-     bg_alpha_color="DkGray2"
+     bg_opaque_color="PanelDefaultBackgroundColor"
+     bg_alpha_color="PanelDefaultBackgroundColor"
      background_visible="true"
      border="false"
      bevel_style="none"
@@ -113,8 +113,8 @@
      top="16"
      width="288" />
     <recent_inventory_panel
-     bg_opaque_color="DkGray2"
-     bg_alpha_color="DkGray2"
+     bg_opaque_color="PanelDefaultBackgroundColor"
+     bg_alpha_color="PanelDefaultBackgroundColor"
      background_visible="true"
      border="false"
      bevel_style="none"
@@ -134,8 +134,8 @@
       follows="all"
       layout="topleft"
       width="290"
-      bg_opaque_color="DkGray2"
-      bg_alpha_color="DkGray2"
+      bg_opaque_color="PanelDefaultBackgroundColor"
+      bg_alpha_color="PanelDefaultBackgroundColor"
       background_visible="true"
       border="false"
       bevel_style="none"

@@ -87,7 +87,7 @@
     <!-- "HEADER WITH ICON, STATUS TEXT AND OUTFIT NAME" -->
     <panel
             background_visible="true"
-            bg_alpha_color="DkGray2"
+            bg_alpha_color="PanelDefaultBackgroundColor"
             bevel_style="none"
             follows="top|left|right"
             height="40"
@@ -265,7 +265,7 @@ It is calculated as border_size + 2*UIResizeBarOverlap
                 <layout_panel
                         auto_resize="false"
                         background_visible="true"
-                        bg_alpha_color="DkGray2"
+                        bg_alpha_color="PanelDefaultBackgroundColor"
                         height="30"
                         name="filter_panel"
                         width="311"
@@ -290,7 +290,7 @@ It is calculated as border_size + 2*UIResizeBarOverlap
 
 
         <layout_panel background_visible="false"
-                bg_alpha_color="DkGray2"
+                bg_alpha_color="PanelDefaultBackgroundColor"
                 auto_resize="true"
                 height="450"
                 min_height="80"

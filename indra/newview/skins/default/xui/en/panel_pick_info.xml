@@ -36,7 +36,7 @@
      use_ellipses="true"
      width="275" />
     <scroll_container
-     color="DkGray2"
+     color="PanelDefaultBackgroundColor"
      opaque="true"
      follows="all"
      height="503"
