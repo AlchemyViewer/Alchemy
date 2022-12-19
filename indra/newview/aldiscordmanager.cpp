@@ -228,7 +228,8 @@ void ALDiscordManager::updateActivity()
 	activity.GetAssets().SetSmallText(app_str.c_str());
 
 	std::string regionId = region->getRegionID().asString();
-	activity.GetParty().GetSize().SetCurrentSize(region->mMapAvatars.size());
+	S32 agents = llmax((size_t)1, region->mMapAvatars.size());
+	activity.GetParty().GetSize().SetCurrentSize(agents);
 	S32 max_agents = LLRegionInfoModel::instance().mAgentLimit;
 	if (max_agents > 0)
 	{
