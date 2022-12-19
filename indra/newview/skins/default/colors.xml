@@ -675,6 +675,9 @@
      name="PanelNotificationBackground"
      value="1 0.3 0.3 0" />
     <color
+     name="PanelOutfitBg"
+     reference="FrogGreen" />
+	<color
      name="ParcelHoverColor"
      reference="White" />
     <color

@@ -78,7 +78,7 @@
       value="0.169 0.169 0.169 1" />
   <color
       name="MouseGray"
-      value="0.191 0.191 0.191 1" />
+      reference="SL-Background" />
   <color
       name="Black"
       value="0 0 0 1" />
@@ -816,6 +816,9 @@
   <color
       name="PanelNotificationBackground"
       value="1 0.3 0.3 0" />
+  <color
+     name="PanelOutfitBg"
+     reference="Taffy_35" />
   <color
       name="ParcelNormalColor"
       reference="White" />
