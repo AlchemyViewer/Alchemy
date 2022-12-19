@@ -49,11 +49,11 @@ LLExternalEditor::EErrorCode LLExternalEditor::setCommand(const std::string& env
 		static std::string comspec = getenv("COMSPEC");
 		static const std::string os_cmd = comspec.append(" /C START \"%s\"");
 #elif LL_DARWIN
-		constexpr std::string_view os_cmd = "/usr/bin/open \"%s\"";
+		static const std::string os_cmd = "/usr/bin/open \"%s\"";
 #elif LL_LINUX
-		constexpr std::string_view os_cmd = "/usr/bin/xdg-open \"%s\"";
+		static const std::string os_cmd = "/usr/bin/xdg-open \"%s\"";
 #endif
-		cmd = findCommand("",os_cmd);
+		cmd = findCommand("", os_cmd);
 		if (cmd.empty())
 		{
 			LL_WARNS() << "Failed to find the OS-specific open handler \"" << cmd << "\"" << LL_ENDL;
