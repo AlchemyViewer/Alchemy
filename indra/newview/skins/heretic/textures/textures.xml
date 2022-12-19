@@ -31,5 +31,6 @@ with the same filename but different name
 <textures version="101">
 	<texture name="BoxGreen" file_name="icons/box_green.png" preload="false" />
 	<texture name="BoxGrey" file_name="icons/box_grey.png" preload="false" />
+    <texture name="BoxPink" file_name="icons/box_pink.png" preload="false" />
     <texture name="Heretic" file_name="icons/heretic.png" preload="false" />
 </textures>
