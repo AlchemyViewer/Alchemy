@@ -2518,7 +2518,7 @@ void forceAppearanceUpdate()
 	// Trying to rebake immediately after crossing region boundary
 	// seems to be failure prone; adding a delay factor. Yes, this
 	// fix is ad-hoc and not guaranteed to work in all cases.
-	doAfterInterval(boost::bind(&LLVOAvatarSelf::forceBakeAllTextures,	gAgentAvatarp.get(), true), 5.0);
+	doAfterInterval([](){ if (isAgentAvatarValid()) { gAgentAvatarp->forceBakeAllTextures(true); }}, 5.0);
 }
 
 void CheckAgentAppearanceService_httpFailure( LLSD const &aData )

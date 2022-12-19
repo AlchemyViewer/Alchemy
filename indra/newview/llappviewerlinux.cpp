@@ -364,8 +364,14 @@ void LLAppViewerLinux::initCrashReporting(bool reportFreeze)
 	sentry_options_set_dsn(options, SENTRY_DSN);
 	sentry_options_set_release(options, LL_VIEWER_CHANNEL_AND_VERSION);
 
+	std::string crashpad_path = gDirUtilp->getExpandedFilename(LL_PATH_EXECUTABLE, "crashpad_handler");
+	sentry_options_set_handler_path(options, crashpad_path.c_str());
+
 	std::string database_path = gDirUtilp->getExpandedFilename(LL_PATH_LOGS, "sentry");
 	sentry_options_set_database_path(options, database_path.c_str());
+
+	std::string logfile_path = gDirUtilp->getExpandedFilename(LL_PATH_LOGS, "Alchemy.log");
+	sentry_options_add_attachment(options, logfile_path.c_str());
 
 	mSentryInitialized = (sentry_init(options) == 0);
 	if (mSentryInitialized)

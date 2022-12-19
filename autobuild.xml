@@ -413,6 +413,8 @@
           <map>
             <key>archive</key>
             <map>
+              <key>creds</key>
+              <string>gitlab</string>
               <key>hash</key>
               <string>1e47de39d3ee0b26d9e6b900a6b7ca80a7d84d5e3db33ccf0b1abf30a09e75c1c57d8423933f25fb931715a1c238cdf5f263b29ad07c7f416c108f1f869dcd1e</string>
               <key>hash_algorithm</key>
@@ -427,6 +429,8 @@
           <map>
             <key>archive</key>
             <map>
+              <key>creds</key>
+              <string>gitlab</string>
               <key>hash</key>
               <string>94c2daadac705d0bf1d171e432118565f3047b8409f6d8667f8711c64122f3d1e7eeef4a30e8c81f943a469de746823688021766467abe6099c3a56f92ceef5c</string>
               <key>hash_algorithm</key>
@@ -441,6 +445,8 @@
           <map>
             <key>archive</key>
             <map>
+              <key>creds</key>
+              <string>gitlab</string>
               <key>hash</key>
               <string>3783cdb9759cf5f4f924f3afeca576fb8cc4209608d7f4874b3285e1b9928ecda8a72cb040532f91058d9d31420106541a62de378e265cf7e3f4d1167a6fb5f8</string>
               <key>hash_algorithm</key>
@@ -1988,11 +1994,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>f5681cad63d011ed1bad37ca72cea58d153b858927d2b74808de06c94a363ac853016a8f8fbdccc04f341b6aeadf7ef417d256ed46038e3943f4c61729127b0f</string>
+              <string>4059aaff847174e3be09e877334c77e98d5e2f606eeef4ab2c5f83b8863795663d7fc5f7ef29e9e4219f613b5cf00ed1ef47cfb03a8024b2a526c919ccbc7d07</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/164/packages/generic/sentry/7.31.3-0.5.2.1740/sentry-7.31.3-0.5.2-darwin64-1740.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/164/packages/generic/sentry/7.31.3-0.5.2.1789/sentry-7.31.3-0.5.2-darwin64-1789.tar.zst</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
@@ -2002,11 +2008,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>7536b86455efe0176150082ec4f931d7e16ca0b5fab0a28d4d017d50a9327e58e30d5a947816f325a39580f8930af00fb9c28e5449844128f4238591192487b7</string>
+              <string>861adfdf3fd98b09720f562c8e2e7aa9e819245c3bbf6585743516dbc1ac954a6102eb58522f4a0acaee22069dbe06ce40cb0f7de5d5d7b120c756ff9ac4a5d3</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/164/packages/generic/sentry/7.31.3-0.5.2.1740/sentry-7.31.3-0.5.2-linux64-1740.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/164/packages/generic/sentry/7.31.3-0.5.2.1789/sentry-7.31.3-0.5.2-linux64-1789.tar.zst</string>
             </map>
             <key>name</key>
             <string>linux64</string>
@@ -2016,11 +2022,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>5aa22a78081626e935f7f6220b5e16ab80880ac8e0b043904c1878ce53227f7be7cca1657e5904ad10e5d2c3f82adc532b15c16a49bb9050dd35f6264889457c</string>
+              <string>d3e280fe277d3fe928f6da83b381a2a025979bebf4dc4972f0d1bad84e2ea367b2d33e4210fba1d820d31b2b599498492514f40aa5ea85a66c446f64e5c02ee7</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/164/packages/generic/sentry/7.31.3-0.5.2.1740/sentry-7.31.3-0.5.2-windows64-1740.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/164/packages/generic/sentry/7.31.3-0.5.2.1789/sentry-7.31.3-0.5.2-windows64-1789.tar.zst</string>
             </map>
             <key>name</key>
             <string>windows64</string>

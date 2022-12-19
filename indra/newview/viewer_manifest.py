@@ -1224,12 +1224,21 @@ class Linux_i686_Manifest(LinuxManifest):
             if self.args['fmodstudio'] == 'ON' or self.args['fmodstudio'] == 'TRUE':
                 self.path("libfmod.so*")
 
+            # Sentry
+            if self.args['sentry'] == 'ON' or self.args['sentry'] == 'TRUE':
+                self.path("libsentry.so")
+
             if self.args['discord'] == 'ON' or self.args['discord'] == 'TRUE':
                 self.path("libdiscord_game_sdk.so")
 
         # Vivox runtimes
         with self.prefix(src=os.path.join(pkgdir, 'bin', 'release'), dst="bin"):
             self.path("SLVoice")
+
+            # Sentry
+            if self.args['sentry'] == 'ON' or self.args['sentry'] == 'TRUE':
+                self.path("crashpad_handler")
+
         with self.prefix(src=relpkgdir, dst="lib"):
             self.path("libortp.so")
             self.path("libsndfile.so.1")
@@ -1265,12 +1274,21 @@ class Linux_x86_64_Manifest(LinuxManifest):
             if self.args['fmodstudio'] == 'ON' or self.args['fmodstudio'] == 'TRUE':
                 self.path("libfmod.so*")
 
+            # Sentry
+            if self.args['sentry'] == 'ON' or self.args['sentry'] == 'TRUE':
+                self.path("libsentry.so")
+
             if self.args['discord'] == 'ON' or self.args['discord'] == 'TRUE':
                 self.path("libdiscord_game_sdk.so")
 
         # Vivox runtimes
         with self.prefix(src=os.path.join(pkgdir, 'bin', 'release'), dst="bin"):
             self.path("SLVoice")
+
+            # Sentry
+            if self.args['sentry'] == 'ON' or self.args['sentry'] == 'TRUE':
+                self.path("crashpad_handler")
+
         with self.prefix(src=relpkgdir, dst="lib"):
             self.path("libortp.so")
             self.path("libsndfile.so.1")

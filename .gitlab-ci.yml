@@ -8,6 +8,7 @@ default:
 
 variables:
   AUTOBUILD_BUILD_ID: $CI_PIPELINE_ID
+  AUTOBUILD_GITLAB_TOKEN: $CI_JOB_TOKEN
   AUTOBUILD_INSTALLABLE_CACHE: "$CI_PROJECT_DIR/.cache/autobuild"
   PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
 
@@ -360,10 +361,10 @@ build:release:windows64:
 
 .upload_template:
   stage: upload
+  image: r.alchemyviewer.org/alchemy/infrastructure/viewer-deploy-image:latest
   tags:
-    - powershell
-    - m1
-    - mac
+    - pwsh
+    - docker
   allow_failure: false
   variables:
     USE_SENTRY: "TRUE"

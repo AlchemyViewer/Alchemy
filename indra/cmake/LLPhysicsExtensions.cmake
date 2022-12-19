@@ -1,4 +1,5 @@
 # -*- cmake -*-
+include(Variables)
 include(Linking)
 include(Prebuilt)
 
@@ -7,9 +8,9 @@ include(Prebuilt)
 # - The stub source package, selected by -DHAVOK:BOOL=OFF 
 # - The prebuilt package available to those with sublicenses, selected by -DHAVOK_TPV:BOOL=ON
 
-if (INSTALL_PROPRIETARY)
+if (INSTALL_PROPRIETARY AND NOT LINUX)
    set(HAVOK_TPV ON CACHE BOOL "Use Havok physics library" FORCE)
-endif (INSTALL_PROPRIETARY)
+endif ()
 
 
 # Note that the use_prebuilt_binary macros below do not in fact include binaries;
@@ -22,9 +23,13 @@ if (HAVOK)
    set(LLPHYSICSEXTENSIONS_SRC_DIR ${LIBS_PREBUILT_DIR}/llphysicsextensions/src)
    set(LLPHYSICSEXTENSIONS_LIBRARIES    llphysicsextensions)
    set(LLPHYSICSEXTENSIONS_INCLUDE_DIRS ${LIBS_PREBUILT_DIR}/include/llphysicsextensions) 
-elseif (HAVOK_TPV AND NOT LINUX)
+elseif (HAVOK_TPV)
    use_prebuilt_binary(llphysicsextensions_tpv)
-   set(LLPHYSICSEXTENSIONS_LIBRARIES    ${ARCH_PREBUILT_DIRS}/llphysicsextensions_tpv.lib)
+   if(WINDOWS)
+      set(LLPHYSICSEXTENSIONS_LIBRARIES    ${ARCH_PREBUILT_DIRS}/llphysicsextensions_tpv.lib)
+   else()
+      set(LLPHYSICSEXTENSIONS_LIBRARIES    ${ARCH_PREBUILT_DIRS}/libllphysicsextensions_tpv.a)
+   endif()
    set(LLPHYSICSEXTENSIONS_INCLUDE_DIRS ${LIBS_PREBUILT_DIR}/include/llphysicsextensions) 
 else (HAVOK)
   if (NOT USE_LL_STUBS)

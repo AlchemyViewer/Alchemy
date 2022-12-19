@@ -30,7 +30,7 @@
 #include "llgl.h"
 #include "llrender.h"
 #include "llstaticstringtable.h"
-#include <unordered_map>
+#include <boost/unordered/unordered_map.hpp>
 
 class LLShaderFeatures
 {
@@ -272,8 +272,8 @@ public:
 	U32 mAttributeMask;  //mask of which reserved attributes are set (lines up with LLVertexBuffer::getTypeMask())
 	std::vector<GLint> mUniform;   //lookup table of uniform enum to uniform location
 	LLStaticStringTable<GLint> mUniformMap; //lookup map of uniform name to uniform location
-    typedef std::unordered_map<GLint, std::string> uniform_name_map_t;
-    typedef std::unordered_map<GLint, LLVector4> uniform_value_map_t;
+    typedef boost::unordered_flat_map<GLint, std::string> uniform_name_map_t;
+    typedef boost::unordered_flat_map<GLint, LLVector4> uniform_value_map_t;
     uniform_name_map_t mUniformNameMap; //lookup map of uniform location to uniform name
 	uniform_value_map_t mValue; //lookup map of uniform location to last known value
 	std::vector<GLint> mTexture;
@@ -285,7 +285,7 @@ public:
 	LLShaderFeatures mFeatures;
 	std::vector< std::pair< std::string, GLenum > > mShaderFiles;
 	std::string mName;
-    typedef std::unordered_map<std::string, std::string> defines_map_t;
+    typedef boost::unordered_map<std::string, std::string> defines_map_t;
 	defines_map_t mDefines;
 
 	//statistcis for profiling shader performance

@@ -897,7 +897,7 @@ std::string LLViewerShaderMgr::loadBasicShaders()
 	}
 	shaders.push_back( make_pair( "objects/nonindexedTextureV.glsl",        1 ) );
 
-	std::unordered_map<std::string, std::string> attribs;
+	boost::unordered_map<std::string, std::string> attribs;
 	attribs["MAX_JOINTS_PER_MESH_OBJECT"] = 
 		fmt::to_string(LLSkinningUtil::getMaxJointCount());
 
