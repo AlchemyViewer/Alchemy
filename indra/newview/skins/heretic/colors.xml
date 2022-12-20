@@ -1134,7 +1134,7 @@
    reference="LtGray" />
   <color
    name="FPSTextColor"
-   reference="Coral" />
+   reference="Taffy" />
   <color
    name="MapLineColor"
    reference="Red" />
