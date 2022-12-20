@@ -89,7 +89,7 @@
     value="(Inventory)"
     width="275" />
   <scroll_container
-    color="DkGray2"
+    color="PanelDefaultBackgroundColor"
     follows="all"
     layout="topleft"
     left="9"

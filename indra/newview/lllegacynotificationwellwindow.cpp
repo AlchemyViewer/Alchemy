@@ -33,7 +33,7 @@
 #include "llnotificationhandler.h"
 #include "lltoastpanel.h"
 
-LLNotificationWellWindow::WellNotificationChannel::WellNotificationChannel(LLNotificationWellWindow* well_window)
+LLLegacyNotificationWellWindow::WellNotificationChannel::WellNotificationChannel(LLLegacyNotificationWellWindow* well_window)
 :	LLNotificationChannel(LLNotificationChannel::Params().name(well_window->getPathname()))
 ,	mWellWindow(well_window)
 {
@@ -42,20 +42,20 @@ LLNotificationWellWindow::WellNotificationChannel::WellNotificationChannel(LLNot
 	connectToChannel("Offer");
 }
 
-LLNotificationWellWindow::LLNotificationWellWindow(const LLSD& key)
+LLLegacyNotificationWellWindow::LLLegacyNotificationWellWindow(const LLSD& key)
 :	LLSysWellWindow(key)
 {
 	mNotificationUpdates.reset(new WellNotificationChannel(this));
 }
 
 // static
-LLNotificationWellWindow* LLNotificationWellWindow::getInstance(const LLSD& key /*= LLSD()*/)
+LLLegacyNotificationWellWindow* LLLegacyNotificationWellWindow::getInstance(const LLSD& key /*= LLSD()*/)
 {
-	return LLFloaterReg::getTypedInstance<LLNotificationWellWindow>("legacy_notification_well_window", key);
+	return LLFloaterReg::getTypedInstance<LLLegacyNotificationWellWindow>("legacy_notification_well_window", key);
 }
 
 // virtual
-BOOL LLNotificationWellWindow::postBuild()
+BOOL LLLegacyNotificationWellWindow::postBuild()
 {
 	BOOL rv = LLSysWellWindow::postBuild();
 	setTitle(getString("title_notification_well_window"));
@@ -63,7 +63,7 @@ BOOL LLNotificationWellWindow::postBuild()
 }
 
 // virtual
-void LLNotificationWellWindow::setVisible(BOOL visible)
+void LLLegacyNotificationWellWindow::setVisible(BOOL visible)
 {
 	if (visible)
 	{
@@ -74,7 +74,7 @@ void LLNotificationWellWindow::setVisible(BOOL visible)
 	LLSysWellWindow::setVisible(visible);
 }
 
-void LLNotificationWellWindow::addItem(const LLSysWellItem::Params& p)
+void LLLegacyNotificationWellWindow::addItem(const LLSysWellItem::Params& p)
 {
 	LLSD value = p.notification_id;
 	// do not add clones
@@ -84,10 +84,11 @@ void LLNotificationWellWindow::addItem(const LLSysWellItem::Params& p)
 	LLSysWellItem* new_item = new LLSysWellItem(p);
 	if (mMessageList->addItem(new_item, value, ADD_TOP))
 	{
-		mSysWellChiclet->updateWidget(isWindowEmpty());
+
+	    mSysWellChiclet->updateWidget(isWindowEmpty());
 		reshapeWindow();
-		new_item->setOnItemCloseCallback(boost::bind(&LLNotificationWellWindow::onItemClose, this, _1));
-		new_item->setOnItemClickCallback(boost::bind(&LLNotificationWellWindow::onItemClick, this, _1));
+		new_item->setOnItemCloseCallback(boost::bind(&LLLegacyNotificationWellWindow::onItemClose, this, _1));
+		new_item->setOnItemClickCallback(boost::bind(&LLLegacyNotificationWellWindow::onItemClick, this, _1));
 	}
 	else
 	{
@@ -99,7 +100,7 @@ void LLNotificationWellWindow::addItem(const LLSysWellItem::Params& p)
 	}
 }
 
-void LLNotificationWellWindow::closeAll()
+void LLLegacyNotificationWellWindow::closeAll()
 {
 	// Need to clear notification channel, to add storable toasts into the list.
 	clearScreenChannels();
@@ -116,16 +117,16 @@ void LLNotificationWellWindow::closeAll()
 	}
 }
 
-void LLNotificationWellWindow::initChannel()
+void LLLegacyNotificationWellWindow::initChannel()
 {
 	LLSysWellWindow::initChannel();
 	if(mChannel)
 	{
-		mChannel->addOnStoreToastCallback(boost::bind(&LLNotificationWellWindow::onStoreToast, this, _1, _2));
+		mChannel->addOnStoreToastCallback(boost::bind(&LLLegacyNotificationWellWindow::onStoreToast, this, _1, _2));
 	}
 }
 
-void LLNotificationWellWindow::clearScreenChannels()
+void LLLegacyNotificationWellWindow::clearScreenChannels()
 {
 	// 1 - remove StartUp toast and channel if present
 	if(!LLNotificationsUI::LLScreenChannel::getStartUpToastShown())
@@ -140,7 +141,7 @@ void LLNotificationWellWindow::clearScreenChannels()
 	}
 }
 
-void LLNotificationWellWindow::onStoreToast(LLPanel* info_panel, LLUUID id)
+void LLLegacyNotificationWellWindow::onStoreToast(LLPanel* info_panel, LLUUID id)
 {
 	LLSysWellItem::Params p;
 	p.notification_id = id;
@@ -148,13 +149,13 @@ void LLNotificationWellWindow::onStoreToast(LLPanel* info_panel, LLUUID id)
 	addItem(p);
 }
 
-void LLNotificationWellWindow::onItemClick(LLSysWellItem* item)
+void LLLegacyNotificationWellWindow::onItemClick(LLSysWellItem* item)
 {
 	LLUUID id = item->getID();
 	LLFloaterReg::showInstance("inspect_toast", id);
 }
 
-void LLNotificationWellWindow::onItemClose(LLSysWellItem* item)
+void LLLegacyNotificationWellWindow::onItemClose(LLSysWellItem* item)
 {
 	LLUUID id = item->getID();
 	
@@ -171,7 +172,7 @@ void LLNotificationWellWindow::onItemClose(LLSysWellItem* item)
 	
 }
 
-void LLNotificationWellWindow::onAdd( LLNotificationPtr notify )
+void LLLegacyNotificationWellWindow::onAdd( LLNotificationPtr notify )
 {
 	removeItemByID(notify->getID());
 }

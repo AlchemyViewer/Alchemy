@@ -164,7 +164,7 @@
     <asset_filtered_inv_panel
      allow_multi_select="false"
      bg_visible="true"
-     bg_alpha_color="DkGray2"
+     bg_alpha_color="PanelDefaultBackgroundColor"
      border="false"
      follows="all"
      height="262"

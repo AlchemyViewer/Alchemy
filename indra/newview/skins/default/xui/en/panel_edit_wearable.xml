@@ -179,8 +179,8 @@
     <panel
      background_opaque="true"
      background_visible="true"
-     bg_alpha_color="DkGray2"
-     bg_opaque_color="DkGray2"
+     bg_alpha_color="PanelDefaultBackgroundColor"
+     bg_opaque_color="PanelDefaultBackgroundColor"
      border="false"
      follows="top|left|right"
      height="60"

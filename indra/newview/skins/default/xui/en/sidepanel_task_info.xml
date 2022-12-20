@@ -106,8 +106,8 @@
          name="properties_panel"
          top="45"
          width="313"
-   background_visible="true"
-   bg_alpha_color="DkGray2">
+         background_visible="true"
+         bg_alpha_color="PanelDefaultBackgroundColor">
 	    	    <text
 		     type="string"
 		     length="1"

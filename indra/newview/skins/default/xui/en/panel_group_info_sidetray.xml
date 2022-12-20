@@ -89,8 +89,8 @@ background_visible="true"
      width="292"
      border_size="0">
    <layout_panel
-       bg_alpha_color="DkGray2"
-       bg_opaque_color="DkGray2"
+       bg_alpha_color="PanelDefaultBackgroundColor"
+       bg_opaque_color="PanelDefaultBackgroundColor"
        background_visible="true"
        background_opaque="true"
        name="group_accordions"

@@ -44,7 +44,7 @@
         Edit Pick
     </text>
    <scroll_container
-     color="DkGray2"
+     color="PanelDefaultBackgroundColor"
      follows="all"
      height="502"
      layout="topleft"
