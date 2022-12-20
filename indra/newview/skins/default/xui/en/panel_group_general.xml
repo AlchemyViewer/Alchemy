@@ -98,7 +98,7 @@ Hover your mouse over the options for more help.
      parse_urls="true"
      top="105"
      right="-4"
-    bg_readonly_color="DkGray2"
+    bg_readonly_color="PanelDefaultBackgroundColor"
     text_readonly_color="White"
      word_wrap="true">
      Group Charter

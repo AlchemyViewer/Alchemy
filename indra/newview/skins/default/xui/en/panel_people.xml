@@ -330,8 +330,8 @@ Learn about [https://community.secondlife.com/knowledgebase/joining-and-particip
             </panel>
             <accordion
        		 background_visible="true"
-       		 bg_alpha_color="DkGray2"
-       		 bg_opaque_color="DkGray2"
+       		 bg_alpha_color="PanelDefaultBackgroundColor"
+       		 bg_opaque_color="PanelDefaultBackgroundColor"
              follows="all"
              height="408"
              layout="topleft"

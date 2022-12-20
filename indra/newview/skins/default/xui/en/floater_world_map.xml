@@ -68,7 +68,7 @@
        top="3"
        left="5"
        background_visible="true"
-       bg_alpha_color="DkGray2">
+       bg_alpha_color="PanelDefaultBackgroundColor">
       <text
        text_color="White"
        font="SansSerifLarge"
@@ -420,7 +420,7 @@
    top_pad="0"
    width="238"
    background_visible="true"
-   bg_alpha_color="DkGray2"
+   bg_alpha_color="PanelDefaultBackgroundColor"
    name="layout_panel_3">
     <text
      text_color="White"
@@ -700,7 +700,7 @@
     top_pad="0"
     width="238"
     background_visible="true"
-    bg_alpha_color="DkGray2"
+    bg_alpha_color="PanelDefaultBackgroundColor"
     name="layout_panel_5">
     <text
      text_color="White"

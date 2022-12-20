@@ -70,12 +70,12 @@ void LLFloaterProfileLegacy::onAvatarNameCache(const LLUUID& agent_id, const LLA
 	mAvatarNameCacheConnection.disconnect();
 }
 
-void LLFloaterProfileLegacy::showTab(std::string_view tab_name) const
+LLPanel* LLFloaterProfileLegacy::expandTab(const std::string& name) const
 {
-    if (mPanel) { mPanel->showTab(tab_name, true); }
+    return mPanel != nullptr ? mPanel->expandTab(name) : nullptr;
 }
 
-std::string_view LLFloaterProfileLegacy::getShownTab() const
+LLPanel* LLFloaterProfileLegacy::getExpandedTab() const
 {
-    return mPanel != nullptr ? mPanel->getShownTab() : LLStringUtil::null;
+    return mPanel != nullptr ? mPanel->getExpandedTab() : nullptr;
 }

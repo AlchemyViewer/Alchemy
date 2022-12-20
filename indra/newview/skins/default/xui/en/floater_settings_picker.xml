@@ -73,14 +73,14 @@
               right="-2"
               bottom="-2"
               background_visible="true"
-              bg_alpha_color="DkGray2">
+              bg_alpha_color="PanelDefaultBackgroundColor">
                 <asset_filtered_inv_panel
                     allow_multi_select="false"
                     allow_drag="false"
                     accepts_drag_and_drop="false"
                     suppress_folder_menu="true"
                     bg_visible="true"
-                    bg_alpha_color="DkGray2"
+                    bg_alpha_color="PanelDefaultBackgroundColor"
                     border="false"
                     follows="all"
                     layout="topleft"

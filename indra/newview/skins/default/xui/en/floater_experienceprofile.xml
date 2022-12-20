@@ -61,7 +61,7 @@
       width="348"
       name="panel_experience_info">
       <scroll_container
-        color="DkGray2"
+        color="PanelDefaultBackgroundColor"
         follows="all"
         height="520"
         layout="topleft"
@@ -71,7 +71,7 @@
         top_pad="10"
         width="330">
         <panel
-          bg_alpha_color="DkGray2"
+          bg_alpha_color="PanelDefaultBackgroundColor"
           follows="top|left|right"
           height="550"
           layout="topleft"
@@ -431,7 +431,7 @@
       width="348"
       name="edit_panel_experience_info">
       <scroll_container
-        color="DkGray2"
+        color="PanelDefaultBackgroundColor"
         follows="all"
         height="520"
         layout="topleft"
@@ -441,7 +441,7 @@
         top_pad="10"
         width="330">
         <panel
-          bg_alpha_color="DkGray2"
+          bg_alpha_color="PanelDefaultBackgroundColor"
           follows="top|left|right"
           height="590"
           layout="topleft"

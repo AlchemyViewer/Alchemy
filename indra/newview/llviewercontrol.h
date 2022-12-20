@@ -53,6 +53,9 @@ extern LLControlGroup gSavedSettings;
 extern LLControlGroup gSavedPerAccountSettings;
 extern LLControlGroup gWarningSettings;
 
+// [AL:CR] Read only skin settings are not saved.
+extern LLControlGroup gSkinSettings;
+
 // Saved at end of session
 extern LLControlGroup gCrashSettings;
 
