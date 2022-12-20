@@ -365,7 +365,7 @@ build:release:windows64:
     - If ($env:USE_SENTRY -eq 'TRUE') { sentry-cli releases new $BuildChannelVersion && sentry-cli releases set-commits --auto $BuildChannelVersion }
 
     - $DestStatus = "?select=package_file&status=default"
-    - If ($env:PUBLIC_BUILD -eq 'TRUE') { $DestStatus = "?select=package_file&status=hidden" }
+    - If ($env:PUBLIC_BUILD -eq 'FALSE') { $DestStatus = "?select=package_file&status=hidden" }
 
     - Push-Location ./build-linux-64/
     -   Push-Location ./newview/
