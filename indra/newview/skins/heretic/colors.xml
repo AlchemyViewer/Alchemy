@@ -680,13 +680,13 @@
      value="1 1 1 0.5" />
   <color
       name="MenuBarBgColor"
-      reference="DkGray" />
+      reference="SL-Background" />
   <color
       name="MenuBarGodBgColor"
-      reference="DkGray" />
+      reference="SL-Background" />
   <color
       name="MenuDefaultBgColor"
-      reference="DkGray2" />
+      reference="SL-Background_66" />
   <color
       name="MenuItemDisabledColor"
       reference="LtGray_50" />
@@ -695,7 +695,7 @@
       reference="LtGray" />
   <color
       name="MenuItemHighlightBgColor"
-      reference="Taffy_35" />
+      reference="Taffy_50" />
   <color
       name="MenuItemHighlightFgColor"
       reference="White" />
@@ -707,7 +707,7 @@
      value="0.5 0.0 0.0 1.0" />
   <color
       name="MenuPopupBgColor"
-      reference="Taffy_50" />
+      reference="SL-Background_66" />
   <color
       name="ModelUploaderLabels"
       value="1 0.6 0 1" />	  
