@@ -52,6 +52,9 @@ else (USESYSTEMLIBS)
     set(BOOST_THREAD_LIBRARY 
         optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libboost_thread-mt${addrsfx}.lib
         debug ${ARCH_PREBUILT_DIRS_DEBUG}/libboost_thread-mt-gd${addrsfx}.lib)
+    set(BOOST_WAVE_LIBRARY 
+        optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libboost_wave-mt${addrsfx}.lib
+        debug ${ARCH_PREBUILT_DIRS_DEBUG}/libboost_wave-mt-gd${addrsfx}.lib)
   elseif (LINUX)
     set(BOOST_CONTEXT_LIBRARY
         optimized boost_context-mt${addrsfx}
@@ -77,6 +80,9 @@ else (USESYSTEMLIBS)
     set(BOOST_THREAD_LIBRARY
         optimized boost_thread-mt${addrsfx}
         debug boost_thread-mt${addrsfx}-d)
+    set(BOOST_WAVE_LIBRARY
+        optimized boost_wave-mt${addrsfx}
+        debug boost_wave-mt${addrsfx}-d)
   elseif (DARWIN)
     set(BOOST_CONTEXT_LIBRARY
         optimized boost_context-mt
@@ -102,6 +108,9 @@ else (USESYSTEMLIBS)
     set(BOOST_THREAD_LIBRARY
         optimized boost_thread-mt
         debug boost_thread-mt-d)
+    set(BOOST_WAVE_LIBRARY
+        optimized boost_wave-mt
+        debug boost_wave-mt-d)
   endif (WINDOWS)
 endif (USESYSTEMLIBS)
 

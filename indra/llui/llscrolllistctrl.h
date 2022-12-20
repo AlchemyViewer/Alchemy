@@ -255,6 +255,7 @@ public:
 	S32				getItemIndex( const LLUUID& item_id ) const;
 
 	void setCommentText( const std::string& comment_text);
+	void addCommentText( const std::string& comment_text);
 	LLScrollListItem* addSeparator(EAddPosition pos);
 
 	// "Simple" interface: use this when you're creating a list that contains only unique strings, only

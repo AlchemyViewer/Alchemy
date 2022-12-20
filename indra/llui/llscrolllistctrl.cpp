@@ -1250,6 +1250,12 @@ void LLScrollListCtrl::setCommentText(const std::string& comment_text)
 	getChild<LLTextBox>("comment_text")->setValue(comment_text);
 }
 
+void LLScrollListCtrl::addCommentText(const std::string& comment_text)
+{
+	LLTextBox *ctrl = getChild<LLTextBox>("comment_text");
+	ctrl->appendText(comment_text, !ctrl->getText().empty()); // don't prepend newline if empty
+}
+
 LLScrollListItem* LLScrollListCtrl::addSeparator(EAddPosition pos)
 {
 	LLScrollListItem::Params separator_params;
