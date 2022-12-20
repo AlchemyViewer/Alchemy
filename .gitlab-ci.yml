@@ -7,6 +7,8 @@ default:
   timeout: 4h
 
 variables:
+  PUBLIC_BUILD: "FALSE"
+  USE_SENTRY: "TRUE"
   AUTOBUILD_BUILD_ID: $CI_PIPELINE_ID
   AUTOBUILD_GITLAB_TOKEN: $CI_JOB_TOKEN
   AUTOBUILD_INSTALLABLE_CACHE: "$CI_PROJECT_DIR/.cache/autobuild"
@@ -26,8 +28,6 @@ variables:
       - .cache/autobuild
       - .cache/pip
     when: 'always'
-  variables:
-    USE_SENTRY: "TRUE"
   before_script:
     - virtualenv -p python .venv
     - .\.venv\Scripts\activate.ps1
@@ -36,12 +36,8 @@ variables:
     - autobuild configure -c Release -- -DUSE_LTO=ON -DDISABLE_FATAL_WARNINGS=ON -DREVISION_FROM_VCS=FALSE
     - autobuild build -c Release --no-configure
     - autobuild graph -c Release --graph-file alchemy-windows${AUTOBUILD_ADDRSIZE}-dependencies.svg build-vc-64/autobuild-package.xml
-    - |
-        If ($env:USE_SENTRY -eq 'TRUE') 
-        {
-          $AlchemyPdbPath = Resolve-Path build-vc-*/newview/Release/alchemy-bin.pdb
-          sentry-cli difutil bundle-sources $AlchemyPdbPath
-        }
+    - $AlchemyPdbPath = Resolve-Path build-vc-*/newview/Release/alchemy-bin.pdb
+    - If ($env:USE_SENTRY -eq 'TRUE') { sentry-cli difutil bundle-sources $AlchemyPdbPath }
   artifacts:
     name: "$env:CI_COMMIT_REF_NAME-$env:CI_COMMIT_SHORT_SHA"
     expire_in: 1 week
@@ -81,8 +77,6 @@ variables:
       - .cache/autobuild
       - .cache/pip
     when: 'always'
-  variables:
-    USE_SENTRY: "TRUE"
   before_script:
     - virtualenv .venv -p python3
     - source .venv/bin/activate
@@ -91,13 +85,9 @@ variables:
     - autobuild configure -c Release -- -DUSE_LTO=ON -DDISABLE_FATAL_WARNINGS=ON -DREVISION_FROM_VCS=FALSE
     - autobuild build -c Release --no-configure
     - autobuild graph -c Release --graph-file alchemy-darwin${AUTOBUILD_ADDRSIZE}-dependencies.svg build-darwin-64/autobuild-package.xml
-    - |
-        if [ "$USE_SENTRY" = "TRUE" ]
-        then
-          sentry-cli difutil bundle-sources build-darwin-*/newview/Release/*.app.dSYM/Contents/Resources/DWARF/*
-        fi
+    - if [ "$USE_SENTRY" = "TRUE" ]; then sentry-cli difutil bundle-sources build-darwin-*/newview/Release/*.app.dSYM/Contents/Resources/DWARF/*; fi
   artifacts:
-    name: "$env:CI_COMMIT_REF_NAME-$env:CI_COMMIT_SHORT_SHA"
+    name: "$CI_COMMIT_REF_NAME-$CI_COMMIT_SHORT_SHA"
     expire_in: 1 week
     paths:
       - build-darwin-*/build_data.json
@@ -132,8 +122,6 @@ variables:
       - .cache/autobuild
       - .cache/pip
     when: 'always'
-  variables:
-    USE_SENTRY: "TRUE"
   before_script:
     - virtualenv .venv -p python3
     - source .venv/bin/activate
@@ -142,13 +130,9 @@ variables:
     - autobuild configure -c Release -- -DUSE_LTO=ON -DDISABLE_FATAL_WARNINGS=ON -DREVISION_FROM_VCS=FALSE
     - autobuild build -c Release --no-configure
     - autobuild graph -c Release --graph-file alchemy-linuxs${AUTOBUILD_ADDRSIZE}-dependencies.svg build-linux-${AUTOBUILD_ADDRSIZE}/autobuild-package.xml
-    - |
-        if [ "$USE_SENTRY" = "TRUE" ] 
-        then
-          sentry-cli difutil bundle-sources build-linux-*/newview/alchemy-bin.debug
-        fi
+    - if [ "$USE_SENTRY" = "TRUE" ]; then sentry-cli difutil bundle-sources build-linux-*/newview/alchemy-bin.debug; fi
   artifacts:
-    name: "$env:CI_COMMIT_REF_NAME-$env:CI_COMMIT_SHORT_SHA"
+    name: "$CI_COMMIT_REF_NAME-$CI_COMMIT_SHORT_SHA"
     expire_in: 1 week
     paths:
       - build-linux-*/build_data.json
@@ -167,7 +151,6 @@ variables:
       - build-linux-*/newview/alchemy-bin.debug
       - build-linux-*/newview/alchemy-bin.src.zip
       - alchemy-*-dependencies.svg
-
 
 coverity_scan:
   stage: build
@@ -188,7 +171,6 @@ coverity_scan:
     when: 'always'
   variables:
     AUTOBUILD_ADDRSIZE: 64
-    USE_SENTRY: "TRUE"
   before_script:
     - virtualenv .venv -p python3
     - source .venv/bin/activate
@@ -198,11 +180,10 @@ coverity_scan:
     - cov-configure --template --comptype clangcxx --compiler clang++-12
     - autobuild configure -c Coverity -- -DLL_TESTS=OFF -DUSE_FMODSTUDIO=ON -DUSE_NVAPI=ON -DUSE_LTO=OFF -DDISABLE_FATAL_WARNINGS=ON -DREVISION_FROM_VCS=FALSE -DUSE_PRECOMPILED_HEADERS=OFF
     - autobuild build -c Coverity --no-configure
-    - |
-        pushd "build-linux-64"
-          tar caf alchemyviewer.xz cov-int
-          curl --header "JOB-TOKEN: $CI_JOB_TOKEN" --upload-file alchemyviewer.xz "${CI_API_V4_URL}/projects/165/packages/generic/coverity/0.0.$CI_PIPELINE_ID/alchemyviewer.xz"
-        popd
+    - pushd "build-linux-64"
+    -   tar caf alchemyviewer.xz cov-int
+    -   curl --header "JOB-TOKEN:$CI_JOB_TOKEN" --upload-file alchemyviewer.xz "${CI_API_V4_URL}/projects/165/packages/generic/coverity/0.0.$CI_PIPELINE_ID/alchemyviewer.xz"
+    - popd
 
 
 .win32_build:
@@ -247,7 +228,7 @@ coverity_scan:
 
 .dev_rules:
   rules:
-    - if: $BUILD_CHANNEL || $CI_COMMIT_TAG
+    - if: $BUILD_CHANNEL != "Test" || $CI_COMMIT_TAG
       when: never
     - if: '$CI_PIPELINE_SOURCE == "web"'
     - if: '$CI_PIPELINE_SOURCE == "schedule"'
@@ -366,76 +347,57 @@ build:release:windows64:
     - pwsh
     - docker
   allow_failure: false
-  variables:
-    USE_SENTRY: "TRUE"
   script:
-    - |
-        $BuildData = Get-Content ./build-vc-64/newview/Release/build_data.json | ConvertFrom-Json
-        $BuildChannelVersion = $BuildData."Channel" + ' ' + $BuildData."Version"
-        $PkgName = $BuildData.Channel.Replace(" ", "_")
-        $PkgVer = $BuildData.Version
-        $UploadDestURL = "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${PkgName}/${PkgVer}"
-
-        $UploadParams = @{ UseBasicParsing = $true;
+    - $BuildData = Get-Content ./build-vc-64/newview/Release/build_data.json | ConvertFrom-Json
+    - $BuildChannelVersion = $BuildData.Channel + ' ' + $BuildData.Version
+    - $PkgName = $BuildData.Channel.Replace(" ", "_")
+    - $PkgVer = $BuildData.Version
+    - $UploadDestURL = "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${PkgName}/${PkgVer}"
+    - >
+        $UploadParams = @{
          Method = "PUT";
          Headers = @{
            "JOB-TOKEN" = "${CI_JOB_TOKEN}"; };
-         Verbose = $true; };
+         Verbose = $true;
+         HttpVersion = 2.0;
+        };
 
-        If ($env:USE_SENTRY -eq 'TRUE') 
-        {
-          sentry-cli releases new $BuildChannelVersion
-          sentry-cli releases set-commits --auto $BuildChannelVersion
-        }
+    - If ($env:USE_SENTRY -eq 'TRUE') { sentry-cli releases new $BuildChannelVersion && sentry-cli releases set-commits --auto $BuildChannelVersion }
 
-        Push-Location ./build-linux-64/
-          Push-Location ./newview/
-            $FileNameLnx64 = Get-ChildItem -Path . -Name -Include Alchemy_*.tar.*
-            Invoke-WebRequest -HttpVersion 2.0 @UploadParams -InFile ./$FileNameLnx64 -Uri "${UploadDestURL}/${FileNameLnx64}"
+    - $DestStatus = "?select=package_file&status=default"
+    - If ($env:PUBLIC_BUILD -eq 'TRUE') { $DestStatus = "?select=package_file&status=hidden" }
 
-            If ($env:USE_SENTRY -eq 'TRUE') 
-            {
-              sentry-cli upload-dif alchemy-bin alchemy-bin.debug alchemy-bin.src.zip
-            }
-          Pop-Location
+    - Push-Location ./build-linux-64/
+    -   Push-Location ./newview/
+    -     $LnxFileName = Get-ChildItem -Path . -Name -Include Alchemy_*.tar.*
+    -     $LnxFileHash = (Get-FileHash .\$LnxFileName -a sha256).Hash
+    -     $LnxUploadResult = Invoke-WebRequest @UploadParams -InFile ./$LnxFileName -Uri "${UploadDestURL}/${LnxFileName}${DestStatus}" | ConvertFrom-Json
+    -     If ($LnxFileHash -ne $LnxUploadResult.file_sha256) { Write-Output "Upload hash mismatch. expected $Hash actual $($LnxUploadResult.file_sha256)" && Exit 1 }
+    -   Pop-Location
+    -   If ($env:USE_SENTRY -eq 'TRUE') { sentry-cli upload-dif newview/alchemy-bin newview/alchemy-bin.debug newview/alchemy-bin.src.zip packages/ }
+    - Pop-Location
 
-          If ($env:USE_SENTRY -eq 'TRUE') 
-          {
-            sentry-cli upload-dif packages/
-          }
-        Pop-Location
+    - Push-Location ./build-darwin-64/
+    -   Push-Location ./newview/
+    -     $MacFileName = Get-ChildItem -Path . -Name -Include Alchemy_*.dmg
+    -     $MacFileHash = (Get-FileHash .\$MacFileName -a sha256).Hash
+    -     $MacUploadResult = Invoke-WebRequest @UploadParams -InFile ./$MacFileName -Uri "${UploadDestURL}/${MacFileName}${DestStatus}" | ConvertFrom-Json
+    -     If ($MacFileHash -ne $MacUploadResult.file_sha256)  { Write-Output "Upload hash mismatch. expected $Hash actual $($MacUploadResult.file_sha256)" && Exit 1 }
+    -   Pop-Location
+    -   If ($env:USE_SENTRY -eq 'TRUE') { sentry-cli upload-dif newview/Release/ packages/ }
+    - Pop-Location
 
-        Push-Location ./build-darwin-64/
-          Push-Location ./newview/
-            $FileNameMac64 = Get-ChildItem -Path . -Name -Include Alchemy_*.dmg
-            Invoke-WebRequest -HttpVersion 2.0 @UploadParams -InFile ./$FileNameMac64 -Uri "${UploadDestURL}/${FileNameMac64}"
-          Pop-Location
-
-          If ($env:USE_SENTRY -eq 'TRUE') 
-          {
-            sentry-cli upload-dif newview/Release/
-            sentry-cli upload-dif packages/
-          }
-        Pop-Location
-
-        Push-Location ./build-vc-64/
-          Push-Location ./newview/Release/
-            $FileNameWin64 = Get-ChildItem -Path . -Name -Include Alchemy_*_Setup.exe
-            Invoke-WebRequest -HttpVersion 2.0 @UploadParams -InFile ./$FileNameWin64 -Uri "${UploadDestURL}/${FileNameWin64}"
-          Pop-Location
-
-          If ($env:USE_SENTRY -eq 'TRUE') 
-          {
-            $AlchemyBinPath = Resolve-Path newview/Release/alchemy-bin.*
-            sentry-cli upload-dif $AlchemyBinPath
-            sentry-cli upload-dif packages/
-          }
-        Pop-Location
-
-        If ($env:USE_SENTRY -eq 'TRUE') 
-        {
-          sentry-cli releases finalize $BuildChannelVersion
-        }
+    - Push-Location ./build-vc-64/
+    -   Push-Location ./newview/Release/
+    -     $WinFileName = Get-ChildItem -Path . -Name -Include Alchemy_*_Setup.exe
+    -     $WinFileHash = (Get-FileHash .\$WinFileName -a sha256).Hash
+    -     $WinUploadResult = Invoke-WebRequest @UploadParams -InFile ./$WinFileName -Uri "${UploadDestURL}/${WinFileName}${DestStatus}" | ConvertFrom-Json
+    -     If ($WinFileHash -ne $WinUploadResult.file_sha256) { Write-Output "Upload hash mismatch. expected $Hash actual $($WinUploadResult.file_sha256)" && Exit 1 }
+    -   Pop-Location
+    -   $AlchemyBinPath = Resolve-Path newview/Release/alchemy-bin.*
+    -   If ($env:USE_SENTRY -eq 'TRUE') { sentry-cli upload-dif $AlchemyBinPath packages/ }
+    - Pop-Location
+    - If ($env:USE_SENTRY -eq 'TRUE') { sentry-cli releases finalize $BuildChannelVersion }
 
 upload:project:
   extends:
