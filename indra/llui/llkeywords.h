@@ -68,7 +68,8 @@ public:
 		TT_FUNCTION,						// WORD
 		TT_LABEL,							// LINE
 		TT_SECTION,							// WORD
-		TT_TYPE								// WORD
+		TT_TYPE,							// WORD
+		TT_PREPROC							// WORD
 	} ETokenType;
 
 	LLKeywordToken( ETokenType type, const LLColor4& color, const LLWString& token, const LLWString& tool_tip, const LLWString& delimiter  )

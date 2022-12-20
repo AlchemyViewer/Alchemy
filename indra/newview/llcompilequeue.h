@@ -36,6 +36,25 @@
 #include "llevents.h"
 
 class LLScrollListCtrl;
+class FSLSLPreprocessor;
+
+struct LLScriptQueueData
+{
+	LLUUID mQueueID;
+	LLUUID mTaskId;
+	LLPointer<LLInventoryItem> mItem;
+	LLUUID mExperienceId;
+	std::string mExperiencename;
+
+	LLScriptQueueData(const LLUUID& q_id, const LLUUID& task_id, const LLUUID& experience_id, LLInventoryItem* item) :
+		mQueueID(q_id),
+		mTaskId(task_id),
+		mExperienceId(experience_id),
+		mItem(new LLInventoryItem(item))
+	{ }
+
+};
+// </FS:KC>
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // Class LLFloaterScriptQueue
@@ -126,6 +145,9 @@ public:
 	void experienceIdsReceived( const LLSD& content );
 	BOOL hasExperience(const LLUUID& id)const;
 
+	static void finishLSLUpload(LLUUID itemId, LLUUID taskId, LLUUID newAssetId, LLSD response, std::string scriptName, LLUUID queueId);
+	static void scriptPreprocComplete(const LLUUID& asset_id, LLScriptQueueData* data, LLAssetType::EType type, const std::string& script_text);
+	static void scriptLogMessage(LLScriptQueueData* data, std::string message);
 protected:
 	LLFloaterCompileQueue(const LLSD& key);
 	virtual ~LLFloaterCompileQueue();
@@ -142,6 +164,8 @@ private:
     static void processExperienceIdResults(LLSD result, LLUUID parent);
     //uuid_list_t mAssetIds;  // list of asset IDs processed.
 	uuid_list_t mExperienceIds;
+
+	std::unique_ptr<FSLSLPreprocessor> mLSLProc;
 };
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

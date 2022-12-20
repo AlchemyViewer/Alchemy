@@ -33,6 +33,7 @@
 #include "llsdserialize.h"
 #include "lltexteditor.h"
 #include "llstl.h"
+#include "llsdutil.h"
 
 inline bool LLKeywordToken::isHead(const llwchar* s) const
 {
@@ -109,6 +110,7 @@ void LLKeywords::addToken(LLKeywordToken::ETokenType type,
 	case LLKeywordToken::TT_LABEL:
 	case LLKeywordToken::TT_SECTION:
 	case LLKeywordToken::TT_TYPE:
+	case LLKeywordToken::TT_PREPROC:
 	case LLKeywordToken::TT_WORD:
 		mWordTokenMap[key] = new LLKeywordToken(type, color, key, tool_tip, LLWStringUtil::null);
 		break;
@@ -193,7 +195,7 @@ LLColor4 LLKeywords::getColorGroup(std::string_view key_in)
 		script_colors.push_back(LLUIColorTable::instance().getColor("SyntaxLslConstant"));
 	}
 
-	if (key_in == "functions")
+	if (key_in == "functions" || key_in == "preprocessor")
 	{
 		return script_colors[SyntaxLslFunction].get();
 	}
@@ -242,6 +244,34 @@ LLColor4 LLKeywords::getColorGroup(std::string_view key_in)
 void LLKeywords::initialize(LLSD SyntaxXML)
 {
 	mSyntax = SyntaxXML;
+	
+	std::string preproc_tokens = gDirUtilp->getExpandedFilename(LL_PATH_APP_SETTINGS, "keywords_lsl_preproc.xml");
+	if (gDirUtilp->fileExists(preproc_tokens))
+	{
+		LLSD content;
+		llifstream file;
+		file.open(preproc_tokens.c_str());
+		if (file.is_open())
+		{
+			if(LLSDSerialize::fromXML(content, file) == LLSDParser::PARSE_FAILURE)
+			{
+				LL_INFOS() << "Failed to parse preproc token file" << LL_ENDL;
+			}
+			file.close();
+		}
+		else
+		{
+			LL_WARNS("SyntaxLSL") << "Failed to open: " << preproc_tokens << LL_ENDL;
+		}
+
+		if (content.isMap())
+		{
+			if (content.has("preprocessor"))
+			{
+				mSyntax["preprocessor"] = llsd_clone(content["preprocessor"]);
+			}
+		}
+	}
 	mLoaded = true;
 }
 
@@ -313,6 +343,10 @@ void LLKeywords::processTokensGroup(const LLSD& tokens, std::string_view group)
 	else if (group == "types")
 	{
 		token_type = LLKeywordToken::TT_TYPE;
+	}
+	else if (group == "preprocessor")
+	{
+		token_type = LLKeywordToken::TT_PREPROC;
 	}
 
 	color_group = getColorGroup(group);
@@ -680,10 +714,10 @@ void LLKeywords::findSegments(std::vector<LLTextSegmentPtr>* seg_list, const LLW
 
 			// check against words
 			llwchar prev = cur > base ? *(cur-1) : 0;
-			if( !iswalnum( prev ) && (prev != '_') )
+			if( !iswalnum( prev ) && (prev != '_') && (prev != '#'))
 			{
 				const llwchar* p = cur;
-				while( iswalnum( *p ) || (*p == '_') )
+				while( *p && ( iswalnum( *p ) || (*p == '_') || (*p == '#') ) )
 				{
 					p++;
 				}

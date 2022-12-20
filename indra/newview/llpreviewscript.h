@@ -52,6 +52,8 @@ class LLViewerInventoryItem;
 class LLScriptEdContainer;
 class LLFloaterGotoLine;
 class LLFloaterExperienceProfile;
+class FSLSLPreprocessor;
+class FSLSLPreProcViewer;
 
 class LLLiveLSLFile final : public LLLiveFile
 {
@@ -79,6 +81,9 @@ class LLScriptEdCore final : public LLPanel
 //	friend class LLFloaterScriptSearch;
 	friend class LLScriptEdContainer;
 	friend class LLFloaterGotoLine;
+	// NaCl - LSL Preprocessor
+	friend class FSLSLPreprocessor;
+	// NaCl End
 
 protected:
 	// Supposed to be invoked only by the container.
@@ -87,7 +92,7 @@ protected:
 		const std::string& sample,
 		const LLHandle<LLFloater>& floater_handle,
 		void (*load_callback)(void* userdata),
-		void (*save_callback)(void* userdata, BOOL close_after_save),
+		void (*save_callback)(void* userdata, BOOL close_after_save, bool sync),
 //		void (*search_replace_callback)(void* userdata),
 		void* userdata,
 		bool live,
@@ -107,12 +112,16 @@ public:
 	bool			canLoadOrSaveToFile( void* userdata );
 
 	void            setScriptText(const std::string& text, BOOL is_valid);
+	// NaCL - LSL Preprocessor
+	std::string		getScriptText();
+	void			doSaveComplete(void* userdata, BOOL close_after_save, bool sync);
+	// NaCl End
 	void			makeEditorPristine();
 	bool			loadScriptText(const std::string& filename);
-	bool			writeToFile(const std::string& filename);
+	bool			writeToFile(const std::string& filename, bool unprocessed);
 	void			sync();
 	
-	void			doSave( BOOL close_after_save );
+	void			doSave(BOOL close_after_save, bool sync = true);
 
 	bool			handleSaveChangesDialog(const LLSD& notification, const LLSD& response);
 	bool			handleReloadFromServerDialog(const LLSD& notification, const LLSD& response);
@@ -146,6 +155,11 @@ public:
     LLUUID 			getAssetID() { return mAssetID; }
 
 private:
+	// NaCl - LSL Preprocessor
+	LLCachedControl<bool> mLSLPreprocEnabled; 
+	boost::signals2::connection	mTogglePreprocConnection;
+	void		onPreprocTabChanged(const std::string& tab_name);
+	// NaCl End
 	void		onBtnDynamicHelp();
 	void		onBtnUndoChanges();
 
@@ -175,7 +189,7 @@ private:
 // [/SL:KB]
 	LLScriptEditor*	mEditor;
 	void			(*mLoadCallback)(void* userdata);
-	void			(*mSaveCallback)(void* userdata, BOOL close_after_save);
+	void			(*mSaveCallback)(void* userdata, BOOL close_after_save, bool sync);
 //	void			(*mSearchReplaceCallback) (void* userdata);
     void*			mUserdata;
     LLComboBox		*mFunctions;
@@ -194,6 +208,15 @@ private:
 	BOOL			mScriptRemoved;
 	BOOL			mSaveDialogShown;
     LLUUID          mAssetID;
+
+	LLTextBox*		mLineCol;
+	// NaCl - LSL Preprocessor
+	std::unique_ptr<FSLSLPreprocessor>	mLSLProc;
+	FSLSLPreProcViewer*	mPostEditor;
+	LLScriptEditor*		mCurrentEditor;
+	LLTabContainer*		mPreprocTab;
+	std::string			mPostScript;
+	// NaCl End
 
 	LLScriptEdContainer* mContainer; // parent view
 
@@ -246,7 +269,7 @@ protected:
 
 //	static void onSearchReplace(void* userdata);
 	static void onLoad(void* userdata);
-	static void onSave(void* userdata, BOOL close_after_save);
+	static void onSave(void* userdata, BOOL close_after_save, bool sync);
 	
 	static void onLoadComplete(const LLUUID& uuid,
 							   LLAssetType::EType type,
@@ -311,7 +334,7 @@ private:
 
 //	static void onSearchReplace(void* userdata);
 	static void onLoad(void* userdata);
-	static void onSave(void* userdata, BOOL close_after_save);
+	static void onSave(void* userdata, BOOL close_after_save, bool sync);
 
 	static void onLoadComplete(const LLUUID& asset_uuid,
 							   LLAssetType::EType type,
