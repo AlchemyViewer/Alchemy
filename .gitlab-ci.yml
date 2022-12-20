@@ -359,7 +359,6 @@ build:release:windows64:
          Headers = @{
            "JOB-TOKEN" = "${CI_JOB_TOKEN}"; };
          Verbose = $true;
-         HttpVersion = 2.0;
         };
 
     - If ($env:USE_SENTRY -eq 'TRUE') { sentry-cli releases new $BuildChannelVersion && sentry-cli releases set-commits --auto $BuildChannelVersion }
@@ -371,7 +370,8 @@ build:release:windows64:
     -   Push-Location ./newview/
     -     $LnxFileName = Get-ChildItem -Path . -Name -Include Alchemy_*.tar.*
     -     $LnxFileHash = (Get-FileHash .\$LnxFileName -a sha256).Hash
-    -     $LnxUploadResult = Invoke-WebRequest @UploadParams -InFile ./$LnxFileName -Uri "${UploadDestURL}/${LnxFileName}${DestStatus}" | ConvertFrom-Json
+    -     $LnxPackageUrl = "${UploadDestURL}/${LnxFileName}"
+    -     $LnxUploadResult = Invoke-WebRequest -HttpVersion 2.0 @UploadParams -InFile ./$LnxFileName -Uri "${LnxPackageUrl}${DestStatus}" | ConvertFrom-Json
     -     If ($LnxFileHash -ne $LnxUploadResult.file_sha256) { Write-Output "Upload hash mismatch. expected $Hash actual $($LnxUploadResult.file_sha256)" && Exit 1 }
     -   Pop-Location
     -   If ($env:USE_SENTRY -eq 'TRUE') { sentry-cli upload-dif newview/alchemy-bin newview/alchemy-bin.debug newview/alchemy-bin.src.zip packages/ }
@@ -381,7 +381,8 @@ build:release:windows64:
     -   Push-Location ./newview/
     -     $MacFileName = Get-ChildItem -Path . -Name -Include Alchemy_*.dmg
     -     $MacFileHash = (Get-FileHash .\$MacFileName -a sha256).Hash
-    -     $MacUploadResult = Invoke-WebRequest @UploadParams -InFile ./$MacFileName -Uri "${UploadDestURL}/${MacFileName}${DestStatus}" | ConvertFrom-Json
+    -     $MacPackageUrl = "${UploadDestURL}/${MacFileName}"
+    -     $MacUploadResult = Invoke-WebRequest -HttpVersion 2.0 @UploadParams -InFile ./$MacFileName -Uri "${MacPackageUrl}${DestStatus}" | ConvertFrom-Json
     -     If ($MacFileHash -ne $MacUploadResult.file_sha256)  { Write-Output "Upload hash mismatch. expected $Hash actual $($MacUploadResult.file_sha256)" && Exit 1 }
     -   Pop-Location
     -   If ($env:USE_SENTRY -eq 'TRUE') { sentry-cli upload-dif newview/Release/ packages/ }
@@ -391,13 +392,19 @@ build:release:windows64:
     -   Push-Location ./newview/Release/
     -     $WinFileName = Get-ChildItem -Path . -Name -Include Alchemy_*_Setup.exe
     -     $WinFileHash = (Get-FileHash .\$WinFileName -a sha256).Hash
-    -     $WinUploadResult = Invoke-WebRequest @UploadParams -InFile ./$WinFileName -Uri "${UploadDestURL}/${WinFileName}${DestStatus}" | ConvertFrom-Json
+    -     $WinPackageUrl = "${UploadDestURL}/${WinFileName}"
+    -     $WinUploadResult = Invoke-WebRequest -HttpVersion 2.0 @UploadParams -InFile ./$WinFileName -Uri "${WinPackageUrl}${DestStatus}" | ConvertFrom-Json
     -     If ($WinFileHash -ne $WinUploadResult.file_sha256) { Write-Output "Upload hash mismatch. expected $Hash actual $($WinUploadResult.file_sha256)" && Exit 1 }
     -   Pop-Location
     -   $AlchemyBinPath = Resolve-Path newview/Release/alchemy-bin.*
     -   If ($env:USE_SENTRY -eq 'TRUE') { sentry-cli upload-dif $AlchemyBinPath packages/ }
     - Pop-Location
     - If ($env:USE_SENTRY -eq 'TRUE') { sentry-cli releases finalize $BuildChannelVersion }
+    - Write-Output "Deploy Success!"
+    - Write-Output "Package Listing > https://git.alchemyviewer.org/alchemy/alchemy-next/-/packages/$($WinUploadResult.package_id)"
+    - Write-Output "Windows Package > ${WinPackageUrl}"
+    - Write-Output "macOS Package   > ${MacPackageUrl}"
+    - Write-Output "Linux Package   > ${LnxPackageUrl}"
 
 upload:project:
   extends:
