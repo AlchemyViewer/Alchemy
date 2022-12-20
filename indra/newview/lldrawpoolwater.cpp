@@ -474,6 +474,7 @@ void LLDrawPoolWater::renderWater()
     LLColor3 light_diffuse(0, 0, 0);
 //    F32      light_exp = 0.0f;
 
+	static LLCachedControl<bool> has_normal_mips(gSavedSettings, "RenderWaterMipNormal");
 	LLEnvironment& environment = LLEnvironment::instance();
 	LLViewerCamera& viewerCamera = LLViewerCamera::instance();
 	const LLSettingsWater::ptr_t& pwater = environment.getCurrentWater();
@@ -481,7 +482,6 @@ void LLDrawPoolWater::renderWater()
     LLVector3              light_dir       = environment.getLightDirection();
     bool                   sun_up          = environment.getIsSunUp();
     bool                   moon_up         = environment.getIsMoonUp();
-    bool                   has_normal_mips = gSavedSettings.getBOOL("RenderWaterMipNormal");
     bool                   underwater      = viewerCamera.cameraUnderWater();
 
     if (sun_up)
