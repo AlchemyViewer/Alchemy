@@ -4401,8 +4401,7 @@ and report the problem.
   <string name="UnknownAvatar">Unknown Avatar</string>
   <string name="NotAvailableOnPlatform">Not availalbe on this platform</string>
   <string name="GridInfoTitle">GRID INFO</string>
-  
-  <!-- <FS:Cron> FIRE-9335 -->
+
   <!-- <LSL Preprocessor -->
   <string name="preproc_toggle_warning">Toggling the preprocessor will not take full effect until you close and reopen this editor.</string>
   <string name="fs_preprocessor_starting">[APP_NAME] preprocessor starting...</string>
@@ -4442,5 +4441,5 @@ and report the problem.
   <string name="fs_preprocessor_cache_unsafe">Error: script named '[FILENAME]' isn't safe to copy to the filesystem. This include will fail.</string>
   <string name="fs_preprocessor_caching_err">Error caching included file '[FILENAME]'</string>
   <string name="fs_preprocessor_truncated">Warning: Preprocessor output truncated due to excessive script text size. This script will most likely not work.</string>
-  <!-- </FS:Cron> -->
+
 </strings>
