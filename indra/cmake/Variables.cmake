@@ -31,6 +31,12 @@ set(VIEWER_PREFIX)
 set(INTEGRATION_TESTS_PREFIX)
 
 option(LL_TESTS "Build and run unit and integration tests (disable for build timing runs to reduce variation" ON)
+if(DEFINED ENV{LL_TESTS})
+  set(LL_TESTS $ENV{LL_TESTS} CACHE STRING "Build and run unit and integration tests (disable for build timing runs to reduce variation" FORCE)
+else()
+  set(LL_TESTS "" CACHE STRING "Build and run unit and integration tests (disable for build timing runs to reduce variation")
+endif()
+
 option(ENABLE_MEDIA_PLUGINS "Turn off building media plugins if they are imported by third-party library mechanism" ON)
 
 # Compiler and toolchain options
@@ -53,9 +59,6 @@ option(USE_VLC "Enable VLC media plugin" ON)
 
 #Discord Integration
 option(USE_DISCORD "Enable Discord client integration" OFF)
-if (DEFINED ENV{USE_DISCORD})
-  set(USE_DISCORD $ENV{USE_DISCORD} CACHE BOOL "" FORCE)
-endif()
 
 if(DEFINED ENV{DISCORD_CLIENTID})
   set(DISCORD_CLIENTID $ENV{DISCORD_CLIENTID} CACHE STRING "Discord Client ID" FORCE)
@@ -73,11 +76,12 @@ if (INSTALL_PROPRIETARY)
   endif ()
 endif ()
 
+if (DEFINED ENV{USE_DISCORD})
+  set(USE_DISCORD $ENV{USE_DISCORD} CACHE BOOL "" FORCE)
+endif()
+
 #Crash reporting
 option(USE_SENTRY "Use the Sentry crash reporting system" OFF)
-if (DEFINED ENV{USE_SENTRY})
-  set(USE_SENTRY $ENV{USE_SENTRY} CACHE BOOL "" FORCE)
-endif()
 
 if(DEFINED ENV{SENTRY_DSN})
   set(SENTRY_DSN $ENV{SENTRY_DSN} CACHE STRING "Sentry DSN" FORCE)
@@ -93,6 +97,10 @@ if (INSTALL_PROPRIETARY)
 else ()
   set(USE_SENTRY OFF CACHE BOOL "Use the Sentry crash reporting system" FORCE)
 endif ()
+
+if (DEFINED ENV{USE_SENTRY})
+  set(USE_SENTRY $ENV{USE_SENTRY} CACHE BOOL "" FORCE)
+endif()
 
 if(LIBS_CLOSED_DIR)
   file(TO_CMAKE_PATH "${LIBS_CLOSED_DIR}" LIBS_CLOSED_DIR)
