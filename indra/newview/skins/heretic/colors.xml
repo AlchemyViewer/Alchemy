@@ -10,7 +10,10 @@
 	<color
 	 name="AccentColor"
 	 reference="Taffy" />
-  <color
+    <color
+     name="BeaconColor"
+     reference="Taffy" />
+    <color
 	 name="EmphasisColor"
 	 reference="Taffy_75" /> <!--text selection, focused textedit borders etc />-->
   <color
@@ -362,7 +365,7 @@
   <color
       name="ChatHistoryMutedTextColor"
       reference="White_70" />
-  <color
+	<color
       name="ColorDropShadow"
       reference="Black_50" />
   <color
@@ -696,6 +699,9 @@
   <color
       name="MenuItemHighlightFgColor"
       reference="White" />
+  <color
+     name="MenuItemFlashBgColor"
+     reference="Taffy" />
   <color
       name="MenuNonProductionBgColor"
      value="0.5 0.0 0.0 1.0" />
