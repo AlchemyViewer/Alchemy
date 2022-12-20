@@ -497,13 +497,13 @@ void LLAppViewerWin32::disableWinErrorReporting()
 {
 	std::string executable_name = gDirUtilp->getExecutableFilename();
 
-	if( S_OK == WerAddExcludedApplication( ll_convert_string_to_wide(executable_name).c_str(), FALSE ) )
+	if( S_OK == WerRemoveExcludedApplication( ll_convert_string_to_wide(executable_name).c_str(), FALSE ) )
 	{
-		LL_INFOS() << "WerAddExcludedApplication() succeeded for " << executable_name << LL_ENDL;
+		LL_INFOS() << "WerRemoveExcludedApplication() succeeded for " << executable_name << LL_ENDL;
 	}
 	else
 	{
-		LL_INFOS() << "WerAddExcludedApplication() failed for " << executable_name << LL_ENDL;
+		LL_INFOS() << "WerRemoveExcludedApplication() failed for " << executable_name << LL_ENDL;
 	}
 }
 
