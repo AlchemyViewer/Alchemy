@@ -7542,12 +7542,10 @@ BOOL enable_detach(const LLSD&)
 {
 	LLViewerObject* object = LLSelectMgr::getInstance()->getSelection()->getPrimaryObject();
 	
-	LLObjectSelectionHandle hSelect = LLSelectMgr::getInstance()->getSelection();
-
 	// Only enable detach if all faces of object are selected
 	if (!object ||
 		!object->isAttachment() ||
-		!hSelect->contains(object,SELECT_ALL_TES ))
+		!LLSelectMgr::getInstance()->getSelection()->contains(object,SELECT_ALL_TES ))
 	{
 		return FALSE;
 	}
@@ -7567,6 +7565,7 @@ BOOL enable_detach(const LLSD&)
 			//                          SEND_ONLY_ROOTS so we only need to examine the roots which saves us time
 			if ( (rlv_handler_t::isEnabled()) && (gRlvAttachmentLocks.hasLockedAttachmentPoint(RLV_LOCK_REMOVE)) )
 			{
+				LLObjectSelectionHandle hSelect = LLSelectMgr::getInstance()->getSelection();
 				RlvSelectHasLockedAttach f;
 				if ( (hSelect->isAttachment()) && (hSelect->getFirstRootNode(&f, FALSE) != NULL) )
 					return FALSE;
