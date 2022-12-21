@@ -2522,7 +2522,7 @@ void renderPhysicsShape(LLDrawable* drawable, LLVOVolume* volume)
 					index_offset += face.mNumVertices;
 				}
 
-				if (!pos.empty() && !index.empty())
+				if (!pos.empty() && !index.empty() && LLConvexDecomposition::isFunctional())
 				{
 					LLCDMeshData mesh;
 					mesh.mIndexBase = &index[0];
