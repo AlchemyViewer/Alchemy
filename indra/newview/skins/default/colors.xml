@@ -146,7 +146,7 @@
      reference="LtGray" />
     <color
      name="AccordionHeaderBgColor"
-     reference="DkGray" />
+     reference="DkGray2" />
     <color
      name="AgentChatColor"
      reference="White" />
@@ -664,7 +664,7 @@
      reference="Red" />
     <color
      name="PanelDefaultBackgroundColor"
-     reference="DkGray" />
+     reference="DkGray2" />
     <color
      name="PanelDefaultHighlightLight"
      reference="White_50" />

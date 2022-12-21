@@ -750,7 +750,7 @@
      reference="Red" />
     <color
      name="PanelDefaultBackgroundColor"
-     reference="DkGray" />
+     reference="DkGray2" />
     <color
      name="PanelDefaultHighlightLight"
      reference="White_50" />

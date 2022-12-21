@@ -23,7 +23,7 @@
      top="0"
      name="wearables_accordion"
      background_visible="true"
-     bg_alpha_color="PanelDefaultBackgroundColor2"
+     bg_alpha_color="PanelDefaultBackgroundColor"
      width="309">
      <accordion_tab
      layout="topleft"
