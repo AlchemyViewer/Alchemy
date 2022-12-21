@@ -313,7 +313,7 @@ void LLFileSystem::updateFileAccessTime(const std::string& file_path)
 #if LL_WINDOWS
     boost::filesystem::path native_file_path(ll_convert_string_to_wide(file_path));
 #else
-    boost::filesystem::path native_file_path(sCacheDir);
+    boost::filesystem::path native_file_path(file_path);
 #endif
     const std::time_t last_write_time = boost::filesystem::last_write_time(native_file_path);
 
