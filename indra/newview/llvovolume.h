@@ -357,7 +357,7 @@ public:
     void updateVisualComplexity();
     
 	void notifyMeshLoaded();
-	void notifySkinInfoLoaded(const LLMeshSkinInfo* skin);
+	void notifySkinInfoLoaded(LLMeshSkinInfo* skin);
 	void notifySkinInfoUnavailable();
 	
 	// Returns 'true' iff the media data for this object is in flight
@@ -442,7 +442,15 @@ private:
 	bool mResetDebugText;
 
 	LLPointer<LLRiggedVolume> mRiggedVolume;
-	LLConstPointer<LLMeshSkinInfo> mSkinInfo;
+
+	bool hasSkinInfoFailed() const { return mSkinInfoFailed; }
+
+	bool mSkinInfoFailed;
+	LLPointer<LLMeshSkinInfo> mSkinInfo;
+	std::unique_ptr <LLMatrix4a[]> mSkinMatrixCache;
+	std::unique_ptr <F32[]> mSkinRenderMatrixCache;
+	U32 mSkinRenderMatrixJointCount;
+	U32 mSkinLastRenderFrame;
 	
 	// statics
 public:

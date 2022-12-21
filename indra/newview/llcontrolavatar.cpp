@@ -235,7 +235,7 @@ void LLControlAvatar::matchVolumeTransform()
 #define MATCH_BIND_SHAPE
 #ifdef MATCH_BIND_SHAPE
             // MAINT-8671 - based on a patch from Beq Janus
-	        LLConstPointer<LLMeshSkinInfo> skin_info = mRootVolp->getSkinInfo();
+	        const LLMeshSkinInfo* skin_info = mRootVolp->getSkinInfo();
 			if (skin_info)
 			{
 #ifdef SHOW_DEBUG

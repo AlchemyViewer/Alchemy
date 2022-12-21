@@ -234,7 +234,10 @@ LLVOVolume::LLVOVolume(const LLUUID &id, const LLPCode pcode, LLViewerRegion *re
     mColorChanged = FALSE;
 	mSpotLightPriority = 0.f;
 
+	mSkinInfoFailed = false;
 	mSkinInfo = NULL;
+	mSkinRenderMatrixJointCount = 0;
+	mSkinLastRenderFrame = 0;
 
 	mMediaImplList.resize(getNumTEs());
 	mLastFetchedMediaVersion = -1;
@@ -254,10 +257,7 @@ LLVOVolume::~LLVOVolume()
 
 	mSkinInfo = nullptr;
 
-	//if(mMeshDataInFlight || mSkinInfoInFlight)
-	{
-		gMeshRepo.unregisterMesh(this);
-	}
+	gMeshRepo.unregisterMesh(this);
 
 	if(!mMediaImplList.empty())
 	{
@@ -1117,6 +1117,7 @@ BOOL LLVOVolume::setVolume(const LLVolumeParams &params_in, const S32 detail, bo
 				if (mSkinInfo && mSkinInfo->mMeshID != volume_params.getSculptID())
 				{
 					mSkinInfo = NULL;
+					mSkinInfoFailed = false;
 				}
 
 				if (!getVolume()->isMeshAssetLoaded())
@@ -1129,12 +1130,12 @@ BOOL LLVOVolume::setVolume(const LLVolumeParams &params_in, const S32 detail, bo
 					}
 				}
 				
-				if (!mSkinInfo)
+				if (!mSkinInfo && !hasSkinInfoFailed())
 				{
-					const LLMeshSkinInfo* skin_info = gMeshRepo.getSkinInfo(volume_params.getSculptID(), this);
-					if (skin_info)
+					mSkinInfo = gMeshRepo.getSkinInfo(volume_params.getSculptID(), this);
+					if (mSkinInfo)
 					{
-						notifySkinInfoLoaded(skin_info);
+						notifySkinInfoLoaded(mSkinInfo);
 					}
 				}
 			}
@@ -1170,6 +1171,7 @@ void LLVOVolume::updateSculptTexture()
 			mSculptTexture = LLViewerTextureManager::getFetchedTexture(id, FTT_DEFAULT, TRUE, LLGLTexture::BOOST_NONE, LLViewerTexture::LOD_TEXTURE);
 		}
 
+		mSkinInfoFailed = false;
 		mSkinInfo = NULL;
 	}
 	else
@@ -1225,29 +1227,17 @@ void LLVOVolume::notifyMeshLoaded()
     updateVisualComplexity();
 }
 
-void LLVOVolume::notifySkinInfoLoaded(const LLMeshSkinInfo* skin)
+void LLVOVolume::notifySkinInfoLoaded(LLMeshSkinInfo* skin)
 {
+	mSkinInfoFailed = false;
 	mSkinInfo = skin;
-	mSculptChanged = TRUE;
-	gPipeline.markRebuild(mDrawable, LLDrawable::REBUILD_GEOMETRY, TRUE);
 
-    LLVOAvatar *av = getAvatar();
-    if (av && !isAnimatedObject())
-    {
-        av->addAttachmentOverridesForObject(this);
-        av->notifyAttachmentMeshLoaded();
-    }
-    LLControlAvatar *cav = getControlAvatar();
-    if (cav && isAnimatedObject())
-    {
-        cav->addAttachmentOverridesForObject(this);
-        cav->notifyAttachmentMeshLoaded();
-    }
-    updateVisualComplexity();
+	notifyMeshLoaded();
 }
 
 void LLVOVolume::notifySkinInfoUnavailable()
 {
+	mSkinInfoFailed = true;
 	mSkinInfo = nullptr;
 }
 

@@ -283,16 +283,6 @@ public:
 
 	};
 
-	struct MeshHeaderInfo
-	{
-		MeshHeaderInfo()
-			: mHeaderSize(0), mVersion(0), mOffset(-1), mSize(0) {}
-		U32 mHeaderSize;
-		U32 mVersion;
-		S32 mOffset;
-		S32 mSize;
-	};
-
 	/////////
 	// In flight queues
 	/////////
@@ -372,9 +362,6 @@ public:
 	bool decompositionReceived(const LLUUID& mesh_id, U8* data, S32 data_size);
 	EMeshProcessingResult physicsShapeReceived(const LLUUID& mesh_id, U8* data, S32 data_size);
 	bool hasPhysicsShapeInHeader(const LLUUID& mesh_id);
-
-	bool getMeshHeaderInfo(const LLUUID& mesh_id, const char* block_name, MeshHeaderInfo& info);
-	bool loadInfoFromFilesystem(const LLUUID& mesh_id, MeshHeaderInfo& info, boost::function<bool(const LLUUID&, U8*, S32)> fn);
 
 	void notifyLoadedMeshes(); // Only call from main thread.
 	S32 getActualMeshLOD(const LLVolumeParams& mesh_params, S32 lod);
@@ -646,7 +633,7 @@ public:
 	static void metricsProgress(unsigned int count);
 	static void metricsUpdate();
 	
-	typedef boost::unordered_map<LLUUID, boost::unordered_set<LLVOVolume*> > mesh_load_map;
+	typedef boost::unordered_map<LLUUID, std::vector<LLVOVolume*> > mesh_load_map;
 	mesh_load_map mLoadingMeshes[4];
 	
 	typedef boost::unordered_flat_map<LLUUID, LLPointer<LLMeshSkinInfo>> skin_map;
@@ -660,7 +647,7 @@ public:
 	std::vector<LLMeshRepoThread::LODRequest> mPendingRequests;
 	
 	//list of mesh ids awaiting skin info
-	typedef boost::unordered_map<LLUUID, boost::unordered_set<LLVOVolume*> > skin_load_map;
+	typedef boost::unordered_map<LLUUID, std::vector<LLVOVolume*> > skin_load_map;
 	skin_load_map mLoadingSkins;
 
 	//list of mesh ids that need to send skin info fetch requests
