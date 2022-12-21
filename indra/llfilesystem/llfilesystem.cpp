@@ -80,7 +80,7 @@ BOOL LLFileSystem::read(U8* buffer, S32 bytes)
 {
     if (!mFile)
     {
-        LL_WARNS() << "Attempt to write to file " << mFileID << " that is not open" << LL_ENDL;
+        LL_WARNS() << "Attempt to read from file " << mFileID << " that is not open" << LL_ENDL;
         return FALSE;
     }
 

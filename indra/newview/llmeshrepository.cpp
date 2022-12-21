@@ -1355,7 +1355,7 @@ bool LLMeshRepoThread::loadInfoFromFilesystem(const LLUUID& mesh_id, MeshHeaderI
 {
 	//check cache for mesh skin info
 	LLFileSystem file(mesh_id, LLAssetType::AT_MESH);
-	if (file.getSize() >= info.mOffset + info.mSize)
+	if (file.open() && file.getSize() >= info.mOffset + info.mSize)
 	{
 		auto buffer = std::make_unique<U8[]>(info.mSize);
 		if (!buffer)
