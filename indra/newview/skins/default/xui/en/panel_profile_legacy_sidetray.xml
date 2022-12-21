@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes" ?>
 <panel
- bg_opaque_color="SL-Background"
+ bg_opaque_color="PanelDefaultBackgroundColor"
  background_opaque="true"
  background_visible="true"
  follows="all"
@@ -36,7 +36,7 @@ Remove Friend
   </panel.string>
   <panel
    name="avatar_info_top"
-   bg_opaque_color="SL-Background"
+   bg_opaque_color="PanelDefaultBackgroundColor"
    background_visible="true"
    background_opaque="true"
    follows="top|left|right"
@@ -88,7 +88,7 @@ Remove Friend
   </panel>
   <layout_stack
    name="layout"
-   bg_opaque_color="SL-Background"
+   bg_opaque_color="PanelDefaultBackgroundColor"
    background_visible="true"
    background_opaque="true"
    orientation="vertical"
@@ -99,7 +99,7 @@ Remove Friend
    width="302"
    border_size="0">
     <layout_panel
-     bg_opaque_color="SL-Background"
+     bg_opaque_color="PanelDefaultBackgroundColor"
      background_visible="true"
      background_opaque="true"
      name="avatar_accordions"

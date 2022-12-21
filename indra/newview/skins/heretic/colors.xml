@@ -81,7 +81,7 @@
       value="0.169 0.169 0.169 1" />
   <color
       name="MouseGray"
-      reference="SL-Background" />
+      reference="PanelDefaultBackgroundColor" />
   <color
       name="Black"
       value="0 0 0 1" />
@@ -503,7 +503,7 @@
 <!-- Changed Color -->
   <color
       name="FloaterFocusBackgroundColor"
-     reference="SL-Background" />
+     reference="PanelDefaultBackgroundColor" />
 <!-- Changed Color -->
   <color
       name="FloaterFocusBorderColor"
@@ -821,7 +821,7 @@
       reference="SL-Background" />
   <color
       name="PanelNotificationBackground"
-      reference="SL-Background" />
+      value="0.025 0.025 0.025 1" />
   <color
      name="PanelOutfitBg"
      reference="Taffy_35" />
