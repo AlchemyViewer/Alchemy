@@ -8189,7 +8189,7 @@ void LLPipeline::renderFinalize()
 
                 {
                     LLGLDisable stencil(GL_STENCIL_TEST);
-                    LLGLState srgb_state(GL_FRAMEBUFFER_SRGB, gGLManager.mHasTexturesRGBDecode);
+                    LLGLState srgb_state(GL_FRAMEBUFFER_SRGB, sharpen_enabled);
 
                     // Bind setup:
                     bound_target = &mScratchBuffer;
@@ -8197,7 +8197,7 @@ void LLPipeline::renderFinalize()
 
                     mFXAABuffer.bindTexture(0, 0, LLTexUnit::TFO_BILINEAR);
                     gGL.getTexUnit(0)->setTextureAddressMode(LLTexUnit::TAM_CLAMP);
-                    gGL.getTexUnit(0)->setTextureColorSpace(LLTexUnit::TCS_LINEAR);
+                    gGL.getTexUnit(0)->setTextureColorSpace(sharpen_enabled ? LLTexUnit::TCS_LINEAR : LLTexUnit::TCS_SRGB);
 
                     mSMAABlendBuffer.bindTexture(0, 1, LLTexUnit::TFO_BILINEAR);
 
