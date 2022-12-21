@@ -2020,61 +2020,43 @@ void LLPreviewLSL::onLoadComplete(const LLUUID& asset_uuid, LLAssetType::EType t
 	{
 		if(0 == status)
 		{
-			LLFileSystem file(asset_uuid, type, LLFileSystem::READ);
-			if (file.open())
+			LLFileSystem file(asset_uuid, type);
+			S32 file_length = file.getSize();
+
+			std::vector<char> buffer(file_length+1);
+			file.read((U8*)&buffer[0], file_length);
+
+			// put a EOS at the end
+			buffer[file_length] = 0;
+			preview->mScriptEd->setScriptText(LLStringExplicit(&buffer[0]), TRUE);
+			preview->mScriptEd->mEditor->makePristine();
+
+			std::string script_name = DEFAULT_SCRIPT_NAME;
+			LLInventoryItem* item = gInventory.getItem(*item_uuid);
+			BOOL is_modifiable = FALSE;
+			if (item)
 			{
-				S32 file_length = file.getSize();
-
-				std::vector<char> buffer(file_length + 1);
-				if (file.read((U8*)&buffer[0], file_length))
+				if (!item->getName().empty())
 				{
-					file.close();
-
-					// put a EOS at the end
-					buffer[file_length] = 0;
-					preview->mScriptEd->setScriptText(LLStringExplicit(&buffer[0]), TRUE);
-					preview->mScriptEd->mEditor->makePristine();
-
-					std::string script_name = DEFAULT_SCRIPT_NAME;
-					LLInventoryItem* item = gInventory.getItem(*item_uuid);
-					BOOL is_modifiable = FALSE;
-					if (item)
-					{
-						if (!item->getName().empty())
-						{
-							script_name = item->getName();
-						}
-						if (gAgent.allowOperation(PERM_MODIFY, item->getPermissions(), GP_OBJECT_MANIPULATE))
-						{
-							is_modifiable = TRUE;
-						}
-					}
-					preview->mScriptEd->setScriptName(script_name);
-					preview->mScriptEd->setEnableEditing(is_modifiable);
-					preview->mScriptEd->setAssetID(asset_uuid);
-					preview->mAssetStatus = PREVIEW_ASSET_LOADED;
+					script_name = item->getName();
+				}
+				if (gAgent.allowOperation(PERM_MODIFY, item->getPermissions(), GP_OBJECT_MANIPULATE))
+				{
+					is_modifiable = TRUE;
+				}
+			}
+			preview->mScriptEd->setScriptName(script_name);
+			preview->mScriptEd->setEnableEditing(is_modifiable);
+            preview->mScriptEd->setAssetID(asset_uuid);
+			preview->mAssetStatus = PREVIEW_ASSET_LOADED;
 
 // [SL:KB] - Patch: Build-ScriptRecover | Checked: 2011-11-23 (Catznip-3.2)
-					// Start the timer which will perform regular backup saves
-					if (!preview->isBackupRunning())
-					{
-						preview->startBackupTimer(60.0f);
-					}
-// [/SL:KB]
-				}
-				else
-				{
-					LLNotificationsUtil::add("UnableToLoadScript");
-					preview->mAssetStatus = PREVIEW_ASSET_ERROR;
-					LL_WARNS() << "Problem loading script: " << status << LL_ENDL;
-				}
-			}
-			else
+			// Start the timer which will perform regular backup saves
+			if (!preview->isBackupRunning())
 			{
-				LLNotificationsUtil::add("UnableToLoadScript");
-				preview->mAssetStatus = PREVIEW_ASSET_ERROR;
-				LL_WARNS() << "Problem loading script: " << status << LL_ENDL;
+				preview->startBackupTimer(60.0f);
 			}
+// [/SL:KB]
 		}
 		else
 		{
@@ -2389,19 +2371,10 @@ void LLLiveLSLEditor::onLoadComplete(const LLUUID& asset_id,
 
 void LLLiveLSLEditor::loadScriptText(const LLUUID &uuid, LLAssetType::EType type)
 {
-	LLFileSystem file(uuid, type, LLFileSystem::READ);
-	if (!file.open())
-	{
-		return;
-	}
+	LLFileSystem file(uuid, type);
 	S32 file_length = file.getSize();
 	std::vector<char> buffer(file_length + 1);
-	if (!file.read((U8*)&buffer[0], file_length))
-	{
-		LL_WARNS() << "Error reading " << uuid << ":" << type << LL_ENDL;
-	}
-
-	file.close();
+	file.read((U8*)&buffer[0], file_length);
 
 	if (file.getLastBytesRead() != file_length ||
 		file_length <= 0)

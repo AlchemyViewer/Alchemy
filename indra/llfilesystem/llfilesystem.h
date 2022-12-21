@@ -34,62 +34,52 @@
 #include "llassettype.h"
 #include "lldiskcache.h"
 
-#include <boost/filesystem.hpp>
-
 class LLFileSystem
 {
-public:
-    LLFileSystem(const LLUUID& file_id, const LLAssetType::EType file_type, S32 mode = LLFileSystem::READ);
-    ~LLFileSystem() = default;
+    public:
+        LLFileSystem(const LLUUID& file_id, const LLAssetType::EType file_type, S32 mode = LLFileSystem::READ);
+        ~LLFileSystem();
 
-    bool open();
-    void close();
+        BOOL read(U8* buffer, S32 bytes);
+        S32  getLastBytesRead();
+        BOOL eof();
 
-    bool is_open() { return mFile; }
+        BOOL write(const U8* buffer, S32 bytes);
+        BOOL seek(S32 offset, S32 origin = -1);
+        S32  tell() const;
 
-    BOOL read(U8* buffer, S32 bytes);
-    S32  getLastBytesRead() const;
-    BOOL eof();
+        S32 getSize();
+        S32 getMaxSize();
+        BOOL rename(const LLUUID& new_id, const LLAssetType::EType new_type);
+        BOOL remove();
 
-    BOOL write(const U8* buffer, S32 bytes);
-    BOOL seek(S32 offset, S32 origin = -1);
-    S32  tell() const;
+        /**
+         * Update the "last write time" of a file to "now". This must be called whenever a
+         * file in the cache is read (not written) so that the last time the file was
+         * accessed is up to date (This is used in the mechanism for purging the cache)
+         */
+        void updateFileAccessTime(const std::string& filename);
 
-    S32        getSize() const;
-    S32        getMaxSize();
-    BOOL       rename(const LLUUID& new_id, const LLAssetType::EType new_type);
-    BOOL       remove();
-    BOOL       exists() const;
+        static bool getExists(const LLUUID& file_id, const LLAssetType::EType file_type);
+        static bool removeFile(const LLUUID& file_id, const LLAssetType::EType file_type, int suppress_error = 0);
+        static bool renameFile(const LLUUID& old_file_id, const LLAssetType::EType old_file_type,
+                               const LLUUID& new_file_id, const LLAssetType::EType new_file_type);
+        static S32 getFileSize(const LLUUID& file_id, const LLAssetType::EType file_type);
 
-    /**
-     * Update the "last write time" of a file to "now". This must be called whenever a
-     * file in the cache is read (not written) so that the last time the file was
-     * accessed is up to date (This is used in the mechanism for purging the cache)
-     */
-    void updateFileAccessTime();
+    public:
+        static const S32 READ;
+        static const S32 WRITE;
+        static const S32 READ_WRITE;
+        static const S32 APPEND;
 
-    static bool getExists(const LLUUID& file_id, const LLAssetType::EType file_type);
-    static bool removeFile(const LLUUID& file_id, const LLAssetType::EType file_type);
-    static bool renameFile(const LLUUID& old_file_id, const LLAssetType::EType old_file_type,
-        const LLUUID& new_file_id, const LLAssetType::EType new_file_type);
-
-public:
-    enum
-    {
-        READ = 0x00000001,
-        WRITE = 0x00000002,
-        READ_WRITE = 0x00000003,  // LLFileSystem::READ & LLFileSystem::WRITE
-        APPEND = 0x00000006,  // 0x00000004 & LLFileSystem::WRITE
-    };
-
-protected:
-    boost::filesystem::path mFilePath;
-    LLUniqueFile mFile;
-    LLUUID  mFileID;
-    LLAssetType::EType mFileType;
-    S32     mPosition;
-    S32     mMode;
-    S32     mBytesRead;
+    protected:
+        LLAssetType::EType mFileType;
+        LLUUID  mFileID;
+        S32     mPosition;
+        S32     mMode;
+        S32     mBytesRead;
+//private:
+//    static const std::string idToFilepath(const std::string id, LLAssetType::EType at);
 };
 
 #endif  // LL_FILESYSTEM_H

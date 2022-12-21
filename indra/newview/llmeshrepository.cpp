@@ -1355,7 +1355,7 @@ bool LLMeshRepoThread::loadInfoFromFilesystem(const LLUUID& mesh_id, MeshHeaderI
 {
 	//check cache for mesh skin info
 	LLFileSystem file(mesh_id, LLAssetType::AT_MESH);
-	if (file.open() && file.getSize() >= info.mOffset + info.mSize)
+	if (file.getSize() >= info.mOffset + info.mSize)
 	{
 		auto buffer = std::make_unique<U8[]>(info.mSize);
 		if (!buffer)
@@ -1567,15 +1567,13 @@ void LLMeshRepoThread::decActiveHeaderRequests()
 //return false if failed to get header
 bool LLMeshRepoThread::fetchMeshHeader(const LLVolumeParams& mesh_params, bool can_retry)
 {
-	++LLMeshRepository::sMeshRequestCount;
-
 	{
 		//look for mesh in asset in cache
-		LLFileSystem file(mesh_params.getSculptID(), LLAssetType::AT_MESH, LLFileSystem::READ);
+		LLFileSystem file(mesh_params.getSculptID(), LLAssetType::AT_MESH);
 			
 		S32 size = file.getSize();
 
-		if (size > 0 && file.open())
+		if (size > 0)
 		{
 			// *NOTE:  if the header size is ever more than 4KB, this will break
 			U8 buffer[MESH_HEADER_SIZE];
@@ -1583,7 +1581,6 @@ bool LLMeshRepoThread::fetchMeshHeader(const LLVolumeParams& mesh_params, bool c
 			LLMeshRepository::sCacheBytesRead += bytes;	
 			++LLMeshRepository::sCacheReads;
 			file.read(buffer, bytes);
-			file.close();
 			if (headerReceived(mesh_params, buffer, bytes) == MESH_OK)
 			{
 #ifdef SHOW_DEBUG
@@ -3115,12 +3112,15 @@ void LLMeshHeaderHandler::processData(LLCore::BufferArray * /* body */, S32 /* b
 
 			S32 bytes = lod_bytes + header_bytes; 
 
+		
 			// It's possible for the remote asset to have more data than is needed for the local cache
 			// only allocate as much space in the cache as is needed for the local cache
 			data_size = llmin(data_size, bytes);
 
-			LLFileSystem file(mesh_id, LLAssetType::AT_MESH, LLFileSystem::APPEND);
-			if (file.open() && file.getMaxSize() >= bytes && file.getMaxSize() >= data_size)
+			// <FS:Ansariel> Fix asset caching
+			//LLFileSystem file(mesh_id, LLAssetType::AT_MESH, LLFileSystem::WRITE);
+			LLFileSystem file(mesh_id, LLAssetType::AT_MESH, LLFileSystem::READ_WRITE);
+			if (file.getMaxSize() >= bytes)
 			{
 				LLMeshRepository::sCacheBytesWritten += data_size;
 				++LLMeshRepository::sCacheWrites;
@@ -3139,8 +3139,7 @@ void LLMeshHeaderHandler::processData(LLCore::BufferArray * /* body */, S32 /* b
 						delete[] block;
 					}
 				}
-				file.close();
-
+				// </FS:Ansariel>
 			}
 		}
 		else
@@ -3193,16 +3192,17 @@ void LLMeshLODHandler::processData(LLCore::BufferArray * /* body */, S32 /* body
 		if (result == MESH_OK)
 		{
 			// good fetch from sim, write to cache
+			// <FS:Ansariel> Fix asset caching
+			//LLFileSystem file(mMeshParams.getSculptID(), LLAssetType::AT_MESH, LLFileSystem::WRITE);
 			LLFileSystem file(mMeshParams.getSculptID(), LLAssetType::AT_MESH, LLFileSystem::READ_WRITE);
 
 			S32 offset = mOffset;
 			S32 size = mRequestedBytes;
 
-			if (file.open() && file.getSize() >= offset+size && file.getMaxSize() >= offset + size)
+			if (file.getSize() >= offset+size)
 			{
 				file.seek(offset);
 				file.write(data, size);
-				file.close();
 				LLMeshRepository::sCacheBytesWritten += size;
 				++LLMeshRepository::sCacheWrites;
 			}
@@ -3257,18 +3257,19 @@ void LLMeshSkinInfoHandler::processData(LLCore::BufferArray * /* body */, S32 /*
 		&& gMeshRepo.mThread->skinInfoReceived(mMeshID, data, data_size))
 	{
 		// good fetch from sim, write to cache
+		// <FS:Ansariel> Fix asset caching
+		//LLFileSystem file(mMeshID, LLAssetType::AT_MESH, LLFileSystem::WRITE);
 		LLFileSystem file(mMeshID, LLAssetType::AT_MESH, LLFileSystem::READ_WRITE);
 
 		S32 offset = mOffset;
 		S32 size = mRequestedBytes;
 
-		if (file.open() && file.getSize() >= offset+size && file.getMaxSize() >= offset + size)
+		if (file.getSize() >= offset+size)
 		{
 			LLMeshRepository::sCacheBytesWritten += size;
 			++LLMeshRepository::sCacheWrites;
 			file.seek(offset);
 			file.write(data, size);
-			file.close();
 		}
 	}
 	else
@@ -3307,18 +3308,19 @@ void LLMeshDecompositionHandler::processData(LLCore::BufferArray * /* body */, S
 		&& gMeshRepo.mThread->decompositionReceived(mMeshID, data, data_size))
 	{
 		// good fetch from sim, write to cache
+		// <FS:Ansariel> Fix asset caching
+		//LLFileSystem file(mMeshID, LLAssetType::AT_MESH, LLFileSystem::WRITE);
 		LLFileSystem file(mMeshID, LLAssetType::AT_MESH, LLFileSystem::READ_WRITE);
 
 		S32 offset = mOffset;
 		S32 size = mRequestedBytes;
 
-		if (file.open() && file.getSize() >= offset+size && file.getMaxSize() >= offset + size)
+		if (file.getSize() >= offset+size)
 		{
 			LLMeshRepository::sCacheBytesWritten += size;
 			++LLMeshRepository::sCacheWrites;
 			file.seek(offset);
 			file.write(data, size);
-			file.close();
 		}
 	}
 	else
@@ -3355,18 +3357,19 @@ void LLMeshPhysicsShapeHandler::processData(LLCore::BufferArray * /* body */, S3
 		&& gMeshRepo.mThread->physicsShapeReceived(mMeshID, data, data_size) == MESH_OK)
 	{
 		// good fetch from sim, write to cache for caching
+		// <FS:Ansariel> Fix asset caching
+		//LLFileSystem file(mMeshID, LLAssetType::AT_MESH, LLFileSystem::WRITE);
 		LLFileSystem file(mMeshID, LLAssetType::AT_MESH, LLFileSystem::READ_WRITE);
 
 		S32 offset = mOffset;
 		S32 size = mRequestedBytes;
 
-		if (file.open() && file.getSize() >= offset+size && file.getMaxSize() >= offset + size)
+		if (file.getSize() >= offset+size)
 		{
 			LLMeshRepository::sCacheBytesWritten += size;
 			++LLMeshRepository::sCacheWrites;
 			file.seek(offset);
 			file.write(data, size);
-			file.close();
 		}
 	}
 	else

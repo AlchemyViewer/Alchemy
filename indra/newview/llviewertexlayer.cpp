@@ -490,9 +490,8 @@ void LLViewerTexLayerSetBuffer::doUpload(LLRenderTarget* bound_target)
 		tid.generate();
 		const LLAssetID asset_id = tid.makeAssetID(gAgent.getSecureSessionID());
 		LLFileSystem up_file(asset_id, LLAssetType::AT_TEXTURE, LLFileSystem::WRITE);
-		if (up_file.open() && up_file.write(compressedImage->getData(), compressedImage->getDataSize()))
+		if (up_file.write(compressedImage->getData(), compressedImage->getDataSize()))
 		{
-			up_file.close();
 			// Read back the file and validate.
 			BOOL valid = FALSE;
 			std::string asset_data;
@@ -502,10 +501,9 @@ void LLViewerTexLayerSetBuffer::doUpload(LLRenderTarget* bound_target)
 				LLFileSystem file(asset_id, LLAssetType::AT_TEXTURE, LLFileSystem::READ);
 				file_size = file.getSize();
 				U8* data = integrity_test->allocateData(file_size);
-				if (data && file.open())
+				if (data)
 				{
 					file.read(data, file_size);
-					file.close();
 					asset_data.append(reinterpret_cast<char const*> (data), file_size);
 					valid = integrity_test->validate(data, file_size); // integrity_test will delete 'data'
 				}

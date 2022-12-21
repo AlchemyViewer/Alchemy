@@ -34,88 +34,142 @@
 #include "llfasttimer.h"
 #include "lldiskcache.h"
 
-#include <boost/filesystem.hpp>
+const S32 LLFileSystem::READ        = 0x00000001;
+const S32 LLFileSystem::WRITE       = 0x00000002;
+const S32 LLFileSystem::READ_WRITE  = 0x00000003;  // LLFileSystem::READ & LLFileSystem::WRITE
+const S32 LLFileSystem::APPEND      = 0x00000006;  // 0x00000004 & LLFileSystem::WRITE
+
+static LLTrace::BlockTimerStatHandle FTM_VFILE_WAIT("VFile Wait");
 
 LLFileSystem::LLFileSystem(const LLUUID& file_id, const LLAssetType::EType file_type, S32 mode)
-    : mFileID(file_id),
-    mFileType(file_type),
-    mPosition(0),
-    mMode(mode),
-    mBytesRead(0)
+{
+    mFileType = file_type;
+    mFileID = file_id;
+    mPosition = 0;
+    mBytesRead = 0;
+    mMode = mode;
+
+    // This block of code was originally called in the read() method but after comments here:
+    // https://bitbucket.org/lindenlab/viewer/commits/e28c1b46e9944f0215a13cab8ee7dded88d7fc90#comment-10537114
+    // we decided to follow Henri's suggestion and move the code to update the last access time here.
+    if (mode == LLFileSystem::READ)
+    {
+        // build the filename (TODO: we do this in a few places - perhaps we should factor into a single function)
+        const std::string filename = LLDiskCache::metaDataToFilepath(file_id, file_type);
+
+        // update the last access time for the file if it exists - this is required
+        // even though we are reading and not writing because this is the
+        // way the cache works - it relies on a valid "last accessed time" for
+        // each file so it knows how to remove the oldest, unused files
+        bool exists = gDirUtilp->fileExists(filename);
+        if (exists)
+        {
+            updateFileAccessTime(filename);
+        }
+    }
+}
+
+LLFileSystem::~LLFileSystem()
+{
+}
+
+// static
+bool LLFileSystem::getExists(const LLUUID& file_id, const LLAssetType::EType file_type)
 {
     const std::string filename = LLDiskCache::metaDataToFilepath(file_id, file_type);
-#if LL_WINDOWS
-    mFilePath = ll_convert_string_to_wide(filename);
-#else
-    mFilePath = filename;
-#endif
+
+    llifstream file(filename, std::ios::binary);
+    if (file.is_open())
+    {
+        file.seekg(0, std::ios::end);
+        return file.tellg() > 0;
+    }
+    return false;
 }
 
-bool LLFileSystem::open()
+// static
+bool LLFileSystem::removeFile(const LLUUID& file_id, const LLAssetType::EType file_type, int suppress_error /*= 0*/)
 {
-    switch (mMode)
-    {
-    case READ: mFile = LLFile::fopen(mFilePath, TEXT("rb")); break;
-    case WRITE: mFile = LLFile::fopen(mFilePath, TEXT("wb")); break;
-    case READ_WRITE: mFile = LLFile::fopen(mFilePath, TEXT("r+b")); break;
-    case APPEND: mFile = LLFile::fopen(mFilePath, TEXT("a+b")); break;
-    }
-    if (mMode == READ_WRITE && !mFile)
-        mFile = LLFile::fopen(mFilePath, TEXT("wb+"));
+    const std::string filename = LLDiskCache::metaDataToFilepath(file_id, file_type);
 
-    if (mFile)
-    {
-        mPosition = ftell(mFile);
-    }
+    LLFile::remove(filename.c_str(), suppress_error);
 
-    return mFile;
+    return true;
 }
 
-void LLFileSystem::close()
+// static
+bool LLFileSystem::renameFile(const LLUUID& old_file_id, const LLAssetType::EType old_file_type,
+                              const LLUUID& new_file_id, const LLAssetType::EType new_file_type)
 {
-    mFile.close();
+    const std::string old_filename =  LLDiskCache::metaDataToFilepath(old_file_id, old_file_type);
+    const std::string new_filename =  LLDiskCache::metaDataToFilepath(new_file_id, new_file_type);
+
+    // Rename needs the new file to not exist.
+    LLFileSystem::removeFile(new_file_id, new_file_type, ENOENT);
+
+    if (LLFile::rename(old_filename, new_filename) != 0)
+    {
+        // We would like to return FALSE here indicating the operation
+        // failed but the original code does not and doing so seems to
+        // break a lot of things so we go with the flow...
+        //return FALSE;
+        LL_WARNS() << "Failed to rename " << old_file_id << " to " << new_file_id << " reason: "  << strerror(errno) << LL_ENDL;
+    }
+
+    return TRUE;
+}
+
+// static
+S32 LLFileSystem::getFileSize(const LLUUID& file_id, const LLAssetType::EType file_type)
+{
+    const std::string filename =  LLDiskCache::metaDataToFilepath(file_id, file_type);
+
+    S32 file_size = 0;
+    llifstream file(filename, std::ios::binary);
+    if (file.is_open())
+    {
+        file.seekg(0, std::ios::end);
+        file_size = file.tellg();
+    }
+
+    return file_size;
 }
 
 BOOL LLFileSystem::read(U8* buffer, S32 bytes)
 {
-    if (!mFile)
-    {
-        LL_WARNS() << "Attempt to read from file " << mFileID << " that is not open" << LL_ENDL;
-        return FALSE;
-    }
-
-    if (!(mMode & READ))
-    {
-        LL_WARNS() << "Attempt to read from file " << mFileID << " opened with mode " << std::hex << mMode << std::dec << LL_ENDL;
-        return FALSE;
-    }
-
     BOOL success = FALSE;
 
-    if (fseek(mFile, mPosition, SEEK_SET) == 0)
+    const std::string filename =  LLDiskCache::metaDataToFilepath(mFileID, mFileType);
+
+    llifstream file(filename, std::ios::binary);
+    if (file.is_open())
     {
-        mBytesRead = fread(buffer, 1, bytes, mFile);
+        file.seekg(mPosition, std::ios::beg);
 
-        mPosition = ftell(mFile);
+        file.read((char*)buffer, bytes);
 
-        // It probably would be correct to check for mBytesRead == bytes,
-        // but that will break avatar rezzing...
+        if (file)
+        {
+            mBytesRead = bytes;
+        }
+        else
+        {
+            mBytesRead = file.gcount();
+        }
+
+        file.close();
+
+        mPosition += mBytesRead;
         if (mBytesRead)
         {
             success = TRUE;
         }
     }
 
-    // update the last access time for the file - this is required
-    // even though we are reading and not writing because this is the
-    // way the cache works - it relies on a valid "last accessed time" for
-    // each file so it knows how to remove the oldest, unused files
-    updateFileAccessTime();
-
     return success;
 }
 
-S32 LLFileSystem::getLastBytesRead() const
+S32 LLFileSystem::getLastBytesRead()
 {
     return mBytesRead;
 }
@@ -127,35 +181,59 @@ BOOL LLFileSystem::eof()
 
 BOOL LLFileSystem::write(const U8* buffer, S32 bytes)
 {
-    if (!mFile)
-    {
-        LL_WARNS() << "Attempt to write to file " << mFileID << " that is not open" << LL_ENDL;
-        return FALSE;
-    }
-
-    if (!(mMode & WRITE) || !(mMode & APPEND))
-    {
-        LL_WARNS() << "Attempt to write to file " << mFileID << " opened with mode " << std::hex << mMode << std::dec << LL_ENDL;
-        return FALSE;
-    }
+    const std::string filename =  LLDiskCache::metaDataToFilepath(mFileID, mFileType);
 
     BOOL success = FALSE;
-    if (mMode == READ_WRITE)
+
+    if (mMode == APPEND)
     {
-        if (fseek(mFile, mPosition, SEEK_SET) == 0)
+        llofstream ofs(filename, std::ios::app | std::ios::binary);
+        if (ofs)
         {
-            size_t bytes_written = fwrite((const void*)buffer, 1, bytes, mFile);
-            success = (bytes_written == bytes);
+            ofs.write((const char*)buffer, bytes);
+
+            mPosition = ofs.tellp(); // <FS:Ansariel> Fix asset caching
+
+            success = TRUE;
         }
     }
+    // <FS:Ansariel> Fix asset caching
+    else if (mMode == READ_WRITE)
+    {
+        // Don't truncate if file already exists
+        llofstream ofs(filename, std::ios::in | std::ios::binary);
+        if (ofs)
+        {
+            ofs.seekp(mPosition, std::ios::beg);
+            ofs.write((const char*)buffer, bytes);
+            mPosition += bytes;
+            success = TRUE;
+        }
+        else
+        {
+            // File doesn't exist - open in write mode
+            ofs.open(filename, std::ios::binary);
+            if (ofs.is_open())
+            {
+                ofs.write((const char*)buffer, bytes);
+                mPosition += bytes;
+                success = TRUE;
+            }
+        }
+    }
+    // </FS:Ansariel>
     else
     {
-        size_t bytes_written = fwrite((const void*)buffer, 1, bytes, mFile);
-        success = (bytes_written == bytes);
-    }
+        llofstream ofs(filename, std::ios::binary);
+        if (ofs)
+        {
+            ofs.write((const char*)buffer, bytes);
 
-    // Always update position after any write operation in case file pointer position changed
-    mPosition = ftell(mFile);
+            mPosition += bytes;
+
+            success = TRUE;
+        }
+    }
 
     return success;
 }
@@ -195,77 +273,36 @@ S32 LLFileSystem::tell() const
     return mPosition;
 }
 
-S32 LLFileSystem::getSize() const
+S32 LLFileSystem::getSize()
 {
-    S32 file_size = 0;
-
-    llstat stat;
-	if (LLFile::stat(mFilePath, &stat) == 0)
-	{
-		file_size = stat.st_size;
-	}
-
-    return file_size;
+    return LLFileSystem::getFileSize(mFileID, mFileType);
 }
 
 S32 LLFileSystem::getMaxSize()
 {
-    // Max size at 50mb to avoid error conditions resulting in huge files on disk
-    return 52428800;
+    // offer up a huge size since we don't care what the max is
+    return INT_MAX;
 }
 
 BOOL LLFileSystem::rename(const LLUUID& new_id, const LLAssetType::EType new_type)
 {
-    close();
-
-#if LL_WINDOWS
-    boost::filesystem::path new_filename = ll_convert_string_to_wide(LLDiskCache::metaDataToFilepath(new_id, new_type));
-#else
-    boost::filesystem::path new_filename = LLDiskCache::metaDataToFilepath(new_id, new_type);
-#endif
-
-    // Rename needs the new file to not exist.
-    LLFile::remove(new_filename, ENOENT);
-
-    if (LLFile::rename(mFilePath, new_filename) != 0)
-    {
-        // We would like to return FALSE here indicating the operation
-        // failed but the original code does not and doing so seems to
-        // break a lot of things so we go with the flow...
-        //return FALSE;
-        LL_WARNS() << "Failed to rename " << mFileID << " to " << new_id << " reason: " << strerror(errno) << LL_ENDL;
-    }
+    LLFileSystem::renameFile(mFileID, mFileType, new_id, new_type);
 
     mFileID = new_id;
     mFileType = new_type;
-
-    mFilePath = std::move(new_filename);
 
     return TRUE;
 }
 
 BOOL LLFileSystem::remove()
 {
-    close();
-
-    LLFile::remove(mFilePath, ENOENT);
+    LLFileSystem::removeFile(mFileID, mFileType);
 
     return TRUE;
 }
 
-BOOL LLFileSystem::exists() const
+void LLFileSystem::updateFileAccessTime(const std::string& file_path)
 {
-    llstat stat;
-    if (LLFile::stat(mFilePath, &stat) == 0)
-    {
-        return S_ISREG(stat.st_mode) && stat.st_size > 0;
-    }
-    return false;
-}
-
-void LLFileSystem::updateFileAccessTime()
-{
-    boost::system::error_code ec;
     /**
      * Threshold in time_t units that is used to decide if the last access time
      * time of the file is updated or not. Added as a precaution for the concern
@@ -281,12 +318,12 @@ void LLFileSystem::updateFileAccessTime()
     const std::time_t cur_time = std::time(nullptr);
 
     // file last write time
-    const std::time_t last_write_time = boost::filesystem::last_write_time(mFilePath, ec);
-    if (ec.failed())
-    {
-        LL_WARNS() << "Failed to read last write time for cache file " << mFilePath << ": " << ec.message() << LL_ENDL;
-        return;
-    }
+#if LL_WINDOWS
+    boost::filesystem::path native_file_path(ll_convert_string_to_wide(file_path));
+#else
+    boost::filesystem::path native_file_path(sCacheDir);
+#endif
+    const std::time_t last_write_time = boost::filesystem::last_write_time(native_file_path);
 
     // delta between cur time and last time the file was written
     const std::time_t delta_time = cur_time - last_write_time;
@@ -295,32 +332,6 @@ void LLFileSystem::updateFileAccessTime()
     // before the last one
     if (delta_time > time_threshold)
     {
-        boost::filesystem::last_write_time(mFilePath, cur_time, ec);
-		if (ec.failed())
-		{
-			LL_WARNS() << "Failed to update last write time for cache file " << mFilePath << ": " << ec.message() << LL_ENDL;
-		}
+        boost::filesystem::last_write_time(native_file_path, cur_time);
     }
-}
-
-// static
-bool LLFileSystem::getExists(const LLUUID& file_id, const LLAssetType::EType file_type)
-{
-    LLFileSystem file(file_id, file_type, READ);
-    return file.exists();
-}
-
-// static
-bool LLFileSystem::removeFile(const LLUUID& file_id, const LLAssetType::EType file_type)
-{
-    LLFileSystem file(file_id, file_type, READ_WRITE);
-    return file.remove();
-}
-
-// static
-bool LLFileSystem::renameFile(const LLUUID& old_file_id, const LLAssetType::EType old_file_type,
-    const LLUUID& new_file_id, const LLAssetType::EType new_file_type)
-{
-    LLFileSystem file(old_file_id, old_file_type, READ_WRITE);
-    return file.rename(new_file_id, new_file_type);
 }

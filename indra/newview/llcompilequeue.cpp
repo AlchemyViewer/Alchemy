@@ -318,7 +318,6 @@ void LLFloaterCompileQueue::handleScriptRetrieval(const LLUUID& assetId,
         if (queue && queue->mLSLProc)
         {
             LLFileSystem file(assetId, type);
-			if (file.open())
 			{
 				S32 file_length = file.getSize();
 				std::vector<char> script_data(file_length + 1);

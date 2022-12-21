@@ -132,63 +132,52 @@ void LLLandmarkList::processGetAssetReply(
 {
 	if( status == 0 )
 	{
-		LLFileSystem file(uuid, type, LLFileSystem::READ);
-		if (file.open())
-		{
-			S32 file_length = file.getSize();
+		LLFileSystem file(uuid, type);
+		S32 file_length = file.getSize();
 
-        	if (file_length > 0)
-        	{
-            	std::vector<char> buffer(file_length + 1);
-	            if(file.read((U8*)&buffer[0], file_length))
-				{
-					file.close();
-    	        	buffer[file_length] = 0;
+        if (file_length > 0)
+        {
+            std::vector<char> buffer(file_length + 1);
+            file.read((U8*)&buffer[0], file_length);
+            buffer[file_length] = 0;
 
-            		LLLandmark* landmark = LLLandmark::constructFromString(&buffer[0], buffer.size());
-           	 		if (landmark)
-            		{
-                		gLandmarkList.mList[uuid] = landmark;
-                		gLandmarkList.mRequestedList.erase(uuid);
+            LLLandmark* landmark = LLLandmark::constructFromString(&buffer[0], buffer.size());
+            if (landmark)
+            {
+                gLandmarkList.mList[uuid] = landmark;
+                gLandmarkList.mRequestedList.erase(uuid);
 
-                		LLVector3d pos;
-                		if (!landmark->getGlobalPos(pos))
-                		{
-                    		LLUUID region_id;
-                    		if (landmark->getRegionID(region_id))
-                    		{
-                        		LLLandmark::requestRegionHandle(
-                            		gMessageSystem,
-	                            	gAgent.getRegionHost(),
-    	                        	region_id,
-        	                    	boost::bind(&LLLandmarkList::onRegionHandle, &gLandmarkList, uuid));
-            	        	}
+                LLVector3d pos;
+                if (!landmark->getGlobalPos(pos))
+                {
+                    LLUUID region_id;
+                    if (landmark->getRegionID(region_id))
+                    {
+                        LLLandmark::requestRegionHandle(
+                            gMessageSystem,
+                            gAgent.getRegionHost(),
+                            region_id,
+                            boost::bind(&LLLandmarkList::onRegionHandle, &gLandmarkList, uuid));
+                    }
 
-                	    	// the callback will be called when we get the region handle.
-                		}
-                		else
-                		{
-                    		gLandmarkList.makeCallbacks(uuid);
-                		}
-					}
-					else
-            		{
-                		// failed to read, shouldn't happen
-                		gLandmarkList.eraseCallbacks(uuid);
-            		}
-            	}
-            	else
-            	{
-                	// failed to parse, shouldn't happen
-                	gLandmarkList.eraseCallbacks(uuid);
-            	}
-        	}
-        	else
-        	{
-            	// got a good status, but no file, shouldn't happen
-            	gLandmarkList.eraseCallbacks(uuid);
-        	}
-		}
+                    // the callback will be called when we get the region handle.
+                }
+                else
+                {
+                    gLandmarkList.makeCallbacks(uuid);
+                }
+            }
+            else
+            {
+                // failed to parse, shouldn't happen
+                gLandmarkList.eraseCallbacks(uuid);
+            }
+        }
+        else
+        {
+            // got a good status, but no file, shouldn't happen
+            gLandmarkList.eraseCallbacks(uuid);
+        }
 	}
 	else
 	{

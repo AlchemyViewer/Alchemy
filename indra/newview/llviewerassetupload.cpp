@@ -573,15 +573,11 @@ LLSD LLNewFileResourceUploadInfo::exportTempFile()
     {
         LLFileSystem file(getAssetId(), assetType, LLFileSystem::APPEND);
 
-        if (file.open())
+        const S32 buf_size = 65536;
+        U8 copy_buf[buf_size];
+        while ((file_size = infile.read(copy_buf, buf_size)))
         {
-            const S32 buf_size = 65536;
-            U8 copy_buf[buf_size];
-            while ((file_size = infile.read(copy_buf, buf_size)))
-            {
-                file.write(copy_buf, file_size);
-            }
-            file.close();
+            file.write(copy_buf, file_size);
         }
     }
     else
@@ -666,13 +662,10 @@ LLSD LLBufferedAssetUploadInfo::prepareUpload()
     if (getAssetId().isNull())
         generateNewAssetId();
 
-    LLFileSystem file(getAssetId(), getAssetType(), LLFileSystem::WRITE);
-    if (file.open())
-    {
-        S32 size = mContents.length() + 1;
-        file.write((U8*)mContents.c_str(), size);
-        file.close();
-    }
+    LLFileSystem file(getAssetId(), getAssetType(), LLFileSystem::APPEND);
+
+    S32 size = mContents.length() + 1;
+    file.write((U8*)mContents.c_str(), size);
 
     mStoredToCache = true;
 

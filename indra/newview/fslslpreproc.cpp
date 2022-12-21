@@ -667,7 +667,6 @@ void FSLSLPreprocessor::FSProcCacheCallback(const LLUUID& iuuid, LLAssetType::ET
 		if (result == LL_ERR_NOERR)
 		{
 			LLFileSystem file(uuid, type);
-			if (file.open())
 			{
 				S32 file_length = file.getSize();
 

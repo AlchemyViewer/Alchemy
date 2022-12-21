@@ -306,43 +306,27 @@ void LLSettingsVOBase::onAssetDownloadComplete(const LLUUID &asset_id, S32 statu
     if (!status)
     {
         LLFileSystem file(asset_id, LLAssetType::AT_SETTINGS, LLFileSystem::READ);
-        if (file.open())
+        S32 size = file.getSize();
+
+        std::string buffer(size + 1, '\0');
+        file.read((U8 *)buffer.data(), size);
+
+        boost::iostreams::stream<boost::iostreams::array_source> llsdstream(buffer.data(), buffer.size());
+        LLSD llsdsettings;
+
+        if (LLSDSerialize::deserialize(llsdsettings, llsdstream, -1))
         {
-            S32 size = file.getSize();
+            settings = createFromLLSD(llsdsettings);
+        }
 
-            std::string buffer(size + 1, '\0');
-            if (file.read((U8*)buffer.data(), size))
-            {
-                file.close();
-
-                boost::iostreams::stream<boost::iostreams::array_source> llsdstream(buffer.data(), buffer.size());
-                LLSD llsdsettings;
-
-                if (LLSDSerialize::deserialize(llsdsettings, llsdstream, -1))
-                {
-                    settings = createFromLLSD(llsdsettings);
-                }
-
-                if (!settings)
-                {
-                    status = 1;
-                    LL_WARNS("SETTINGS") << "Unable to create settings object." << LL_ENDL;
-                }
-                else
-                {
-                    settings->setAssetId(asset_id);
-                }
-            }
-            else
-            {
-                status = 1;
-                LL_WARNS("SETTINGS") << "Unable to read settings object from cache." << LL_ENDL;
-            }
+        if (!settings)
+        {
+            status = 1;
+            LL_WARNS("SETTINGS") << "Unable to create settings object." << LL_ENDL;
         }
         else
         {
-            status = 1;
-            LL_WARNS("SETTINGS") << "Unable to open settings object from cache." << LL_ENDL;
+            settings->setAssetId(asset_id);
         }
     }
     else
