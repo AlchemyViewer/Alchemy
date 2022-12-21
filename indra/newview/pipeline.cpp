@@ -8033,15 +8033,33 @@ void LLPipeline::renderFinalize()
 // [RLVa:KB] - @setsphere
             if (pRenderBuffer)
             {
-				pRenderBuffer->copyContents(mScreen, 0, 0, mScreen.getWidth(), mScreen.getHeight(), 0, 0,
-					mScreen.getWidth(), mScreen.getHeight(), GL_COLOR_BUFFER_BIT, GL_NEAREST);
+				pRenderBuffer->bindTarget();
             }
-			else
-			{
-				LLRenderTarget::copyContentsToFramebuffer(mScreen, 0, 0, mScreen.getWidth(), mScreen.getHeight(), 0, 0,
-					mScreen.getWidth(), mScreen.getHeight(), GL_COLOR_BUFFER_BIT, GL_NEAREST);
-			}
 // [/RLVa:KB]
+            LLGLSLShader *shader = &gDeferredPostNoDoFProgram;
+
+            bindDeferredShader(*shader);
+
+            S32 channel = shader->enableTexture(LLShaderMgr::DEFERRED_DIFFUSE, mScreen.getUsage());
+            if (channel > -1)
+            {
+                mScreen.bindTexture(0, channel);
+            }
+
+			mDeferredVB->setBuffer(LLVertexBuffer::MAP_VERTEX);
+			mDeferredVB->drawArrays(LLRender::TRIANGLES, 0, 3);
+            unbindDeferredShader(*shader);
+
+// [RLVa:KB] - @setsphere
+            if (pRenderBuffer)
+            {
+				pRenderBuffer->flush();
+            }
+// [/RLVa:KB]
+//            if (multisample)
+//            {
+//                mDeferredLight.flush();
+//            }
         }
 
 // [RLVa:KB] - @setsphere
