@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes" ?>
 <panel
- bg_opaque_color="SL-Background"
+ bg_opaque_color="PanelDefaultBackgroundColor"
  background_visible="true"
  background_opaque="true"
  follows="all"
@@ -24,7 +24,7 @@
  No Groups
  </text>
  <flat_list_view
-  color="SL-Background"
+  color="PanelDefaultBackgroundColor"
   follows="all"
   layout="topleft"
   left="0"
