@@ -77,13 +77,12 @@ LLFileSystem::~LLFileSystem()
 bool LLFileSystem::getExists(const LLUUID& file_id, const LLAssetType::EType file_type)
 {
     const std::string filename = LLDiskCache::metaDataToFilepath(file_id, file_type);
-
-    llifstream file(filename, std::ios::binary);
-    if (file.is_open())
+    llstat file_stat;
+    if (LLFile::stat(filename, &file_stat) == 0)
     {
-        file.seekg(0, std::ios::end);
-        return file.tellg() > 0;
+        return S_ISREG(file_stat.st_mode) && file_stat.st_size > 0;
     }
+
     return false;
 }
 
@@ -125,12 +124,12 @@ S32 LLFileSystem::getFileSize(const LLUUID& file_id, const LLAssetType::EType fi
     const std::string filename =  LLDiskCache::metaDataToFilepath(file_id, file_type);
 
     S32 file_size = 0;
-    llifstream file(filename, std::ios::binary);
-    if (file.is_open())
+    llstat file_stat;
+    if (LLFile::stat(filename, &file_stat) == 0)
     {
-        file.seekg(0, std::ios::end);
-        file_size = file.tellg();
+        file_size = file_stat.st_size;
     }
+
 
     return file_size;
 }
@@ -141,30 +140,24 @@ BOOL LLFileSystem::read(U8* buffer, S32 bytes)
 
     const std::string filename =  LLDiskCache::metaDataToFilepath(mFileID, mFileType);
 
-    llifstream file(filename, std::ios::binary);
-    if (file.is_open())
+    LLFILE* file = LLFile::fopen(filename, "rb");
+    if (file)
     {
-        file.seekg(mPosition, std::ios::beg);
-
-        file.read((char*)buffer, bytes);
-
-        if (file)
+        if (fseek(file, mPosition, SEEK_SET) == 0)
         {
-            mBytesRead = bytes;
-        }
-        else
-        {
-            mBytesRead = file.gcount();
-        }
+            mBytesRead = fread(buffer, 1, bytes, file);
+            fclose(file);
 
-        file.close();
-
-        mPosition += mBytesRead;
-        if (mBytesRead)
-        {
-            success = TRUE;
+            mPosition += mBytesRead;
+            // It probably would be correct to check for mBytesRead == bytes,
+            // but that will break avatar rezzing...
+            if (mBytesRead)
+            {
+                success = TRUE;
+            }
         }
     }
+
 
     return success;
 }
@@ -187,53 +180,52 @@ BOOL LLFileSystem::write(const U8* buffer, S32 bytes)
 
     if (mMode == APPEND)
     {
-        llofstream ofs(filename, std::ios::app | std::ios::binary);
+        LLFILE* ofs = LLFile::fopen(filename, "a+b");
         if (ofs)
         {
-            ofs.write((const char*)buffer, bytes);
-
-            mPosition = ofs.tellp(); // <FS:Ansariel> Fix asset caching
-
-            success = TRUE;
+            S32 bytes_written = fwrite(buffer, 1, bytes, ofs);
+            mPosition = ftell(ofs);
+            fclose(ofs);
+            success = (bytes_written == bytes);
         }
     }
-    // <FS:Ansariel> Fix asset caching
     else if (mMode == READ_WRITE)
     {
-        // Don't truncate if file already exists
-        llofstream ofs(filename, std::ios::in | std::ios::binary);
+        LLFILE* ofs = LLFile::fopen(filename, "r+b");
         if (ofs)
         {
-            ofs.seekp(mPosition, std::ios::beg);
-            ofs.write((const char*)buffer, bytes);
-            mPosition += bytes;
-            success = TRUE;
+            if (fseek(ofs, mPosition, SEEK_SET) == 0)
+            {
+                S32 bytes_written = fwrite(buffer, 1, bytes, ofs);
+                mPosition = ftell(ofs);
+                fclose(ofs);
+                success = (bytes_written == bytes);
+            }
         }
         else
         {
-            // File doesn't exist - open in write mode
-            ofs.open(filename, std::ios::binary);
-            if (ofs.is_open())
+            ofs = LLFile::fopen(filename, "wb");
+            if (ofs)
             {
-                ofs.write((const char*)buffer, bytes);
-                mPosition += bytes;
-                success = TRUE;
+                S32 bytes_written = fwrite(buffer, 1, bytes, ofs);
+                mPosition = ftell(ofs);
+                fclose(ofs);
+                success = (bytes_written == bytes);
             }
         }
     }
-    // </FS:Ansariel>
     else
     {
-        llofstream ofs(filename, std::ios::binary);
+        LLFILE* ofs = LLFile::fopen(filename, "wb");
         if (ofs)
         {
-            ofs.write((const char*)buffer, bytes);
-
-            mPosition += bytes;
-
-            success = TRUE;
+            S32 bytes_written = fwrite(buffer, 1, bytes, ofs);
+            mPosition = ftell(ofs);
+            fclose(ofs);
+            success = (bytes_written == bytes);
         }
     }
+
 
     return success;
 }
