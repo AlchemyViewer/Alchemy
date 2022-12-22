@@ -3562,8 +3562,9 @@ void LLVOAvatar::idleUpdateNameTagText(bool new_name)
 
 		static LLUIColor user_chat_color = LLUIColorTable::instance().getColor("UserChatColor");
 		static LLUIColor agent_chat_color = LLUIColorTable::instance().getColor("AgentChatColor");
+		static LLUIColor friend_chat_color = LLUIColorTable::instance().getColor("FriendChatColor");
 		
-		LLColor4 new_chat =  isSelf() ? user_chat_color : agent_chat_color ;
+		LLColor4 new_chat =  isSelf() ? user_chat_color : isInBuddyList() ? friend_chat_color : agent_chat_color ;
 		LLColor4 normal_chat = lerp(new_chat, LLColor4(0.8f, 0.8f, 0.8f, 1.f), 0.7f);
 		LLColor4 old_chat = lerp(normal_chat, LLColor4(0.6f, 0.6f, 0.6f, 1.f), 0.7f);
 		if (mTyping && mChats.size() >= MAX_BUBBLE_CHAT_UTTERANCES) 

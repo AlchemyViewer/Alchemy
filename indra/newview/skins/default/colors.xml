@@ -1027,4 +1027,7 @@
   <color
    name="FPSTextColor"
    reference="EmphasisColor" />
+  <color
+   name="FriendChatColor"
+   reference="White" />
 </colors>
