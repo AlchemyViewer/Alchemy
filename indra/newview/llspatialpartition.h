@@ -118,7 +118,7 @@ public:
 	U8   mDiffuseAlphaMode;
 	bool mSelected;
     LLPointer<LLVOAvatar> mAvatar = nullptr;
-    LLMeshSkinInfo* mSkinInfo = nullptr;
+    LLPointer<LLMeshSkinInfo> mSkinInfo = nullptr;
 
 
 	struct CompareTexture
