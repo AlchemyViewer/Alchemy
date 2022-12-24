@@ -7,8 +7,26 @@ default:
   timeout: 4h
 
 variables:
-  PUBLIC_BUILD: "FALSE"
-  USE_SENTRY: "TRUE"
+  BUILD_CHANNEL:
+    value: "Test"
+    options:
+      - "Release"
+      - "Beta"
+      - "Project"
+      - "Test"
+    description: "The deployment channel target. Set to 'Test' by default."
+  PUBLIC_BUILD:
+    value: "FALSE"
+    options:
+      - "FALSE"
+      - "TRUE"
+    description: "Are package registry uploads public?. Set to 'TRUE' by default"
+  USE_SENTRY:
+    value: "TRUE"
+    options:
+      - "FALSE"
+      - "TRUE"
+    description: "Enable sentry crash reporting module. Set to 'TRUE' by default."
   AUTOBUILD_BUILD_ID: $CI_PIPELINE_ID
   AUTOBUILD_GITLAB_TOKEN: $CI_JOB_TOKEN
   AUTOBUILD_INSTALLABLE_CACHE: "$CI_PROJECT_DIR/.cache/autobuild"
