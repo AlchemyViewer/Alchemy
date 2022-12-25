@@ -1159,4 +1159,7 @@
   <color
    name="ALMediaTickerOscillatorColor"
    reference="EmphasisColor"/>
+  <color
+   name="FriendChatColor"
+   reference="White" />
 </colors>
