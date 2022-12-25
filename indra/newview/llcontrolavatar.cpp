@@ -710,3 +710,12 @@ void LLControlAvatar::onRegionChanged()
 		}
 	}
 }
+
+bool LLControlAvatar::isTooComplex() const
+{
+	if (mRootVolp && !mRootVolp->isAttachment())
+	{
+		return false;
+	}
+	return LLVOAvatar::isTooComplex();
+}

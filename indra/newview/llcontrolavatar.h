@@ -81,6 +81,8 @@ public:
     virtual bool shouldRenderRigged() const;
 
 	virtual BOOL isImpostor(); 
+
+    bool isTooComplex() const;
     
     bool mPlaying;
 
