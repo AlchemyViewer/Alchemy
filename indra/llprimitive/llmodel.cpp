@@ -1450,7 +1450,7 @@ void LLMeshSkinInfo::fromLLSD(const LLSD& skin)
 	mInvBindShapeMatrix.resize(llmin(mInvBindMatrix.size(), (size_t)216));
 	for (U32 i = 0; i < mInvBindShapeMatrix.size(); ++i)
 	{
-		matMulUnsafe(mInvBindMatrix[i], mBindShapeMatrix, mInvBindShapeMatrix[i]);
+		mInvBindShapeMatrix[i].setMul(mInvBindMatrix[i], mBindShapeMatrix);
 	}
 
 	if (skin.has("alt_inverse_bind_matrix"))
