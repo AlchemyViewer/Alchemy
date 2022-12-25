@@ -1560,7 +1560,7 @@ void LLMeshSkinInfo::updateHash()
     
     for (int i = 0; i < mInvBindMatrix.size() * 16; ++i)
     {
-        S32 t = llround(src[i] * 10000.f);
+        S32 t = ll_round(src[i] * 10000.f);
         hash.update((U8*)&t, sizeof(S32));
     }
     //hash.update((U8*)&(mInvBindMatrix[0]), sizeof(LLMatrix4a) * mInvBindMatrix.size());
