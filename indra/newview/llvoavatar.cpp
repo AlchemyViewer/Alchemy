@@ -4573,7 +4573,7 @@ void LLVOAvatar::updateRootPositionAndRotation(LLAgent& agent, F32 speed, bool w
         LLVector3 normal;
 		resolveHeightGlobal(root_pos, ground_under_pelvis, normal);
 		F32 foot_to_ground = (F32) (root_pos.mdV[VZ] - mPelvisToFoot - ground_under_pelvis.mdV[VZ]);				
-		BOOL in_air = ((!LLWorld::getInstance()->getRegionFromPosGlobal(ground_under_pelvis)) ||
+		BOOL in_air = ((!LLWorld::getInstance()->getRegionFromPosGlobal(ground_under_pelvis)) || 
 						foot_to_ground > FOOT_GROUND_COLLISION_TOLERANCE);
 
 		if (in_air && !mInAir)

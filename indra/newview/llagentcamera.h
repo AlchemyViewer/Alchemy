@@ -144,11 +144,7 @@ private:
 	/** Camera preset in Third Person Mode */
 	ECameraPreset mCameraPreset; 
 
-	/** Initial camera offset */
-//	LLPointer<LLControlVariable> mCameraOffsetInitial;
 // [RLVa:KB] - @setcam_eyeoffset
-	// Renamed to catch their uses
-	LLPointer<LLControlVariable> mCameraOffsetInitialControl;
 	LLPointer<LLControlVariable> mRlvCameraOffsetInitialControl;
 // [/RLVa:KB]
 
@@ -156,11 +152,8 @@ private:
 	LLPointer<LLControlVariable> mRlvCameraOffsetScaleControl;
 // [/RLVa:KB]
 
-	/** Initial focus offset */
 //	LLPointer<LLControlVariable> mFocusOffsetInitial;
 // [RLVa:KB] - @setcam_focusoffset
-	// Renamed to catch their uses
-	LLPointer<LLControlVariable> mFocusOffsetInitialControl;
 	LLPointer<LLControlVariable> mRlvFocusOffsetInitialControl;
 // [/RLVa:KB]
 

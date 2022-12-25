@@ -3773,6 +3773,8 @@ bool LLVOVolume::isAnimatedObject() const
 // virtual
 void LLVOVolume::onReparent(LLViewerObject *old_parent, LLViewerObject *new_parent)
 {
+	LLVOVolume *old_volp = old_parent ? old_parent->asVolume() : nullptr;
+
     if (new_parent && !new_parent->isAvatar())
     {
         if (mControlAvatar.notNull())
@@ -3784,8 +3786,6 @@ void LLVOVolume::onReparent(LLViewerObject *old_parent, LLViewerObject *new_pare
             av->markForDeath();
         }
     }
-
-	LLVOVolume *old_volp = old_parent ? old_parent->asVolume() : nullptr;
 	if (old_volp && old_volp->isAnimatedObject())
     {
         if (old_volp->getControlAvatar())
@@ -6721,7 +6721,7 @@ U32 LLVolumeGeometryManager::genDrawInfo(LLSpatialGroup* group, U32 mask, LLFace
 				}
 				else if (facep->canRenderAsMask())
 				{
-					if (te->getFullbright() || (fullbright && hud_group) || LLPipeline::sNoAlpha)
+					if (te->getFullbright() || LLPipeline::sNoAlpha)
 					{
 						registerFace(group, facep, LLRenderPass::PASS_FULLBRIGHT_ALPHA_MASK);
 					}

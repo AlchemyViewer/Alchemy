@@ -215,11 +215,7 @@ void LLAgentCamera::init()
 	
 	mCameraPreset = (ECameraPreset) gSavedSettings.getU32("CameraPresetType");
 
-//	mCameraOffsetInitial = gSavedSettings.getControl("CameraOffsetRearView");
-//	mFocusOffsetInitial = gSavedSettings.getControl("FocusOffsetRearView");
 // [RLVa:KB] - @setcam_eyeoffset, @setcam_focusoffset and @setcam_eyeoffsetscale
-	mCameraOffsetInitialControl = gSavedSettings.getControl("CameraOffsetRearView");
-	mFocusOffsetInitialControl = gSavedSettings.getControl("FocusOffsetRearView");
 	if (RlvActions::isRlvEnabled())
 	{
 		mRlvCameraOffsetInitialControl = gSavedSettings.declareVec3("CameraOffsetRLVaView", LLVector3::zero, "Declared in code", LLControlVariable::PERSIST_NO);

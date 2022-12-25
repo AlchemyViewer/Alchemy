@@ -590,9 +590,9 @@ void LLDrawPoolAlpha::renderAlpha(U32 mask, bool depth_only, bool rigged)
                 U32 have_mask = params.mVertexBuffer->getTypeMask() & mask;
 				if (have_mask != mask)
 				{ //FIXME!
-					LL_WARNS_ONCE() << "Missing required components, expected mask: " << mask
-									<< " present: " << have_mask
-									<< ". Skipping render batch." << LL_ENDL;
+					//LL_WARNS_ONCE() << "Missing required components, expected mask: " << mask
+					//				<< " present: " << have_mask
+					//				<< ". Skipping render batch." << LL_ENDL;
 					continue;
 				}
 
