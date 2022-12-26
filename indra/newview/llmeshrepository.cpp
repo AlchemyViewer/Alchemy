@@ -1796,29 +1796,30 @@ EMeshProcessingResult LLMeshRepoThread::lodReceived(const LLVolumeParams& mesh_p
 	return MESH_UNKNOWN;
 }
 
-bool LLMeshRepoThread::skinInfoReceived(const LLUUID& mesh_id, U8* data, S32 data_size)
+EMeshProcessingResult LLMeshRepoThread::skinInfoReceived(const LLUUID& mesh_id, U8* data, S32 data_size)
 {
+	if (data == NULL || data_size == 0)
+	{
+		return MESH_NO_DATA;
+	}
 	LLSD skin;
 
-	if (data_size > 0)
-	{
-        try
+    try
+    {
+        U32 uzip_result = LLUZipHelper::unzip_llsd(skin, data, data_size);
+        if (uzip_result != LLUZipHelper::ZR_OK)
         {
-            U32 uzip_result = LLUZipHelper::unzip_llsd(skin, data, data_size);
-            if (uzip_result != LLUZipHelper::ZR_OK)
-            {
-                LL_WARNS(LOG_MESH) << "Mesh skin info parse error.  Not a valid mesh asset!  ID:  " << mesh_id
-                    << " uzip result" << uzip_result
-                    << LL_ENDL;
-                return false;
-            }
+            LL_WARNS(LOG_MESH) << "Mesh skin info parse error.  Not a valid mesh asset!  ID:  " << mesh_id
+                << " uzip result" << uzip_result
+                << LL_ENDL;
+            return MESH_PARSE_FAILURE;
         }
-        catch (std::bad_alloc&)
-        {
-            LL_WARNS(LOG_MESH) << "Out of memory for mesh ID " << mesh_id << " of size: " << data_size << LL_ENDL;
-            return false;
-        }
-	}
+    }
+    catch (std::bad_alloc&)
+    {
+        LL_WARNS(LOG_MESH) << "Out of memory for mesh ID " << mesh_id << " of size: " << data_size << LL_ENDL;
+        return MESH_OUT_OF_MEMORY;
+    }
 	
 	{
 		LLMeshSkinInfo* skin_info = nullptr;
@@ -1829,7 +1830,7 @@ bool LLMeshRepoThread::skinInfoReceived(const LLUUID& mesh_id, U8* data, S32 dat
 		catch (const std::bad_alloc& ex)
 		{
 			LL_WARNS() << "Failed to allocate skin info with exception: " << ex.what()  << LL_ENDL;
-			return false;
+			return MESH_OUT_OF_MEMORY;
 		}
 
         // LL_DEBUGS(LOG_MESH) << "info pelvis offset" << info.mPelvisOffset << LL_ENDL;
@@ -1839,32 +1840,33 @@ bool LLMeshRepoThread::skinInfoReceived(const LLUUID& mesh_id, U8* data, S32 dat
 		}
 	}
 
-	return true;
+	return MESH_OK;
 }
 
-bool LLMeshRepoThread::decompositionReceived(const LLUUID& mesh_id, U8* data, S32 data_size)
+EMeshProcessingResult LLMeshRepoThread::decompositionReceived(const LLUUID& mesh_id, U8* data, S32 data_size)
 {
+	if (data == NULL || data_size == 0)
+	{
+		return MESH_NO_DATA;
+	}
 	LLSD decomp;
 
-	if (data_size > 0)
+    try
     {
-        try
+        U32 uzip_result = LLUZipHelper::unzip_llsd(decomp, data, data_size);
+        if (uzip_result != LLUZipHelper::ZR_OK)
         {
-            U32 uzip_result = LLUZipHelper::unzip_llsd(decomp, data, data_size);
-            if (uzip_result != LLUZipHelper::ZR_OK)
-            {
-                LL_WARNS(LOG_MESH) << "Mesh decomposition parse error.  Not a valid mesh asset!  ID:  " << mesh_id
-                    << " uzip result: " << uzip_result
-                    << LL_ENDL;
-                return false;
-            }
+            LL_WARNS(LOG_MESH) << "Mesh decomposition parse error.  Not a valid mesh asset!  ID:  " << mesh_id
+                << " uzip result: " << uzip_result
+                << LL_ENDL;
+            return MESH_PARSE_FAILURE;
         }
-        catch (const std::bad_alloc&)
-        {
-            LL_WARNS(LOG_MESH) << "Out of memory for mesh ID " << mesh_id << " of size: " << data_size << LL_ENDL;
-            return false;
-        }
-	}
+    }
+    catch (const std::bad_alloc&)
+    {
+        LL_WARNS(LOG_MESH) << "Out of memory for mesh ID " << mesh_id << " of size: " << data_size << LL_ENDL;
+        return MESH_OUT_OF_MEMORY;
+    }
 	
 	{
 		LLModel::Decomposition* d = new LLModel::Decomposition(decomp);
@@ -1875,11 +1877,15 @@ bool LLMeshRepoThread::decompositionReceived(const LLUUID& mesh_id, U8* data, S3
 		}
 	}
 
-	return true;
+	return MESH_OK;
 }
 
 EMeshProcessingResult LLMeshRepoThread::physicsShapeReceived(const LLUUID& mesh_id, U8* data, S32 data_size)
 {
+	if (data == NULL || data_size == 0)
+	{
+		return MESH_NO_DATA;
+	}
 	LLSD physics_shape;
 
 	LLModel::Decomposition* d = new LLModel::Decomposition();
@@ -3243,7 +3249,7 @@ void LLMeshSkinInfoHandler::processData(LLCore::BufferArray * /* body */, S32 /*
 {
 	if ((!MESH_SKIN_INFO_PROCESS_FAILED)
 		&& ((data != NULL) == (data_size > 0)) // if we have data but no size or have size but no data, something is wrong
-		&& gMeshRepo.mThread->skinInfoReceived(mMeshID, data, data_size))
+		&& gMeshRepo.mThread->skinInfoReceived(mMeshID, data, data_size) == MESH_OK)
 	{
 		// good fetch from sim, write to cache
 		// <FS:Ansariel> Fix asset caching
@@ -3294,7 +3300,7 @@ void LLMeshDecompositionHandler::processData(LLCore::BufferArray * /* body */, S
 {
 	if ((!MESH_DECOMP_PROCESS_FAILED)
 		&& ((data != NULL) == (data_size > 0)) // if we have data but no size or have size but no data, something is wrong
-		&& gMeshRepo.mThread->decompositionReceived(mMeshID, data, data_size))
+		&& gMeshRepo.mThread->decompositionReceived(mMeshID, data, data_size) == MESH_OK)
 	{
 		// good fetch from sim, write to cache
 		// <FS:Ansariel> Fix asset caching
