@@ -254,11 +254,6 @@ LLVOVolume::~LLVOVolume()
 
 	mSkinInfo = nullptr;
 
-	//if(mMeshDataInFlight || mSkinInfoInFlight)
-	{
-		gMeshRepo.unregisterMesh(this);
-	}
-
 	if(!mMediaImplList.empty())
 	{
 		for(U32 i = 0 ; i < mMediaImplList.size() ; i++)
@@ -283,6 +278,15 @@ void LLVOVolume::markDead()
         if (getVolume())
         {
             LLSculptIDSize::instance().rem(getVolume()->getParams().getSculptID());
+
+			if (mHasRequestedMeshData)
+			{
+				gMeshRepo.unregisterMesh(this, getVolume()->getParams().getSculptID());
+			}
+			if (mHasRequestedSkinData)
+			{
+				gMeshRepo.unregisterSkin(this, getVolume()->getParams().getSculptID());
+			}
         }
 
 		if(getMDCImplCount() > 0)
@@ -1121,6 +1125,7 @@ BOOL LLVOVolume::setVolume(const LLVolumeParams &params_in, const S32 detail, bo
 
 				if (!getVolume()->isMeshAssetLoaded())
 				{ 
+					mHasRequestedMeshData = true;
 					//load request not yet issued, request pipeline load this mesh
 					S32 available_lod = gMeshRepo.loadMesh(this, volume_params, lod, last_lod);
 					if (available_lod != lod)
@@ -1132,6 +1137,7 @@ BOOL LLVOVolume::setVolume(const LLVolumeParams &params_in, const S32 detail, bo
 				if (!mSkinInfo)
 				{
 					const LLMeshSkinInfo* skin_info = gMeshRepo.getSkinInfo(volume_params.getSculptID(), this);
+					mHasRequestedSkinData = true;
 					if (skin_info)
 					{
 						notifySkinInfoLoaded(skin_info);
@@ -1207,6 +1213,7 @@ void LLVOVolume::updateVisualComplexity()
 
 void LLVOVolume::notifyMeshLoaded()
 { 
+	mHasRequestedMeshData = false;
 	mSculptChanged = TRUE;
 	gPipeline.markRebuild(mDrawable, LLDrawable::REBUILD_GEOMETRY, TRUE);
 
@@ -1227,6 +1234,7 @@ void LLVOVolume::notifyMeshLoaded()
 
 void LLVOVolume::notifySkinInfoLoaded(const LLMeshSkinInfo* skin)
 {
+	mHasRequestedSkinData = false;
 	mSkinInfo = skin;
 	mSculptChanged = TRUE;
 	gPipeline.markRebuild(mDrawable, LLDrawable::REBUILD_GEOMETRY, TRUE);
@@ -1248,6 +1256,7 @@ void LLVOVolume::notifySkinInfoLoaded(const LLMeshSkinInfo* skin)
 
 void LLVOVolume::notifySkinInfoUnavailable()
 {
+	mHasRequestedSkinData = false;
 	mSkinInfo = nullptr;
 }
 
@@ -4378,6 +4387,7 @@ U32 LLVOVolume::getHighLODTriangleCount()
 		if (!ref->isMeshAssetLoaded() || ref->getNumVolumeFaces() == 0)
 		{
 			gMeshRepo.loadMesh(this, volume->getParams(), LLModel::LOD_HIGH);
+			mHasRequestedMeshData = true;
 		}
 		ret = ref->getNumTriangles();
 		LLPrimitive::getVolumeManager()->unrefVolume(ref);

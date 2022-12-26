@@ -3478,19 +3478,32 @@ S32 LLMeshRepository::update()
 	return size ;
 }
 
-void LLMeshRepository::unregisterMesh(LLVOVolume* vobj)
+void LLMeshRepository::unregisterMesh(LLVOVolume* vobj, const LLUUID& mesh_id)
 {
 	for (auto& lod : mLoadingMeshes)
 	{
-		for (auto& param : lod)
+		auto it = lod.find(mesh_id);
+		if(it != lod.end())
 		{
-			param.second.erase(vobj);
+			it->second.erase(vobj);
+			if (it->second.empty())
+			{
+				lod.erase(it);
+			}
 		}
 	}
+}
 
-	for (auto& skin_pair : mLoadingSkins)
+void LLMeshRepository::unregisterSkin(LLVOVolume* vobj, const LLUUID& mesh_id)
+{
+	auto it = mLoadingSkins.find(mesh_id);
+	if (it != mLoadingSkins.end())
 	{
-		skin_pair.second.erase(vobj);
+		it->second.erase(vobj);
+		if(it->second.empty())
+		{
+			mLoadingSkins.erase(it);
+		}
 	}
 }
 

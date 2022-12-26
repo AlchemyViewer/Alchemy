@@ -608,7 +608,8 @@ public:
 	void shutdown();
 	S32 update();
 
-	void unregisterMesh(LLVOVolume* volume);
+	void unregisterMesh(LLVOVolume* volume, const LLUUID& mesh_id);
+	void unregisterSkin(LLVOVolume* volume, const LLUUID& mesh_id);
 	//mesh management functions
 	S32 loadMesh(LLVOVolume* volume, const LLVolumeParams& mesh_params, S32 detail = 0, S32 last_lod = -1);
 	

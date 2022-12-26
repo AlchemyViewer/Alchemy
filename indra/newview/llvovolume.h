@@ -443,6 +443,8 @@ private:
 
 	LLPointer<LLRiggedVolume> mRiggedVolume;
 	LLConstPointer<LLMeshSkinInfo> mSkinInfo;
+	bool mHasRequestedMeshData = false;
+	bool mHasRequestedSkinData = false;
 	
 	// statics
 public:
