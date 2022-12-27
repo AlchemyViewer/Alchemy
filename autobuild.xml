@@ -416,11 +416,11 @@
               <key>creds</key>
               <string>gitlab</string>
               <key>hash</key>
-              <string>1e47de39d3ee0b26d9e6b900a6b7ca80a7d84d5e3db33ccf0b1abf30a09e75c1c57d8423933f25fb931715a1c238cdf5f263b29ad07c7f416c108f1f869dcd1e</string>
+              <string>74cc00abab75892574da5d8cfe0baa32a0b8071f758ed78c4f8c667b50e6949733c0773900c20cb8a34d67548f51072824724a7a7acaf43087b5b20b4ba55f99</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/191/packages/generic/discord-gamesdk/3.2.1.1764/discord_gamesdk-3.2.1-darwin64-1764.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/191/packages/generic/discord-gamesdk/3.2.1.1834/discord_gamesdk-3.2.1-darwin64-1834.tar.zst</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
@@ -432,11 +432,11 @@
               <key>creds</key>
               <string>gitlab</string>
               <key>hash</key>
-              <string>94c2daadac705d0bf1d171e432118565f3047b8409f6d8667f8711c64122f3d1e7eeef4a30e8c81f943a469de746823688021766467abe6099c3a56f92ceef5c</string>
+              <string>647331d9ec47cfe0c35cabf6404f240a4da5ac47bbb1bc323d8b751298d0906875aa59fe6a5ab35e34095811872f4bb09a7e733c04a303ea21b1a5903613b39a</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/191/packages/generic/discord-gamesdk/3.2.1.1764/discord_gamesdk-3.2.1-linux64-1764.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/191/packages/generic/discord-gamesdk/3.2.1.1834/discord_gamesdk-3.2.1-linux64-1834.tar.zst</string>
             </map>
             <key>name</key>
             <string>linux64</string>
@@ -448,11 +448,11 @@
               <key>creds</key>
               <string>gitlab</string>
               <key>hash</key>
-              <string>3783cdb9759cf5f4f924f3afeca576fb8cc4209608d7f4874b3285e1b9928ecda8a72cb040532f91058d9d31420106541a62de378e265cf7e3f4d1167a6fb5f8</string>
+              <string>1b19bc00e2b90a07fc498c0392bc86be3e87fd9787d9d31301cd69cc7c97e58e46452a0a32041f395c417a01e23be0a5f9a2febf9d1da2b7aeb84bdc5d787103</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/191/packages/generic/discord-gamesdk/3.2.1.1764/discord_gamesdk-3.2.1-windows64-1764.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/191/packages/generic/discord-gamesdk/3.2.1.1834/discord_gamesdk-3.2.1-windows64-1834.tar.zst</string>
             </map>
             <key>name</key>
             <string>windows64</string>
@@ -1994,11 +1994,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>4059aaff847174e3be09e877334c77e98d5e2f606eeef4ab2c5f83b8863795663d7fc5f7ef29e9e4219f613b5cf00ed1ef47cfb03a8024b2a526c919ccbc7d07</string>
+              <string>56cd32dc7e782b2ff6749b4eadb9b3118765f289c4d6c0555e546e499ab0ebcfa7dd8ee93146d06ff45d65c543640f1f821813a5833d2b2d130eedeb7481b2bd</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/164/packages/generic/sentry/7.31.3-0.5.2.1789/sentry-7.31.3-0.5.2-darwin64-1789.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/164/packages/generic/sentry/7.31.3-0.5.2.1835/sentry-7.31.3-0.5.2-darwin64-1835.tar.zst</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
@@ -2008,11 +2008,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>861adfdf3fd98b09720f562c8e2e7aa9e819245c3bbf6585743516dbc1ac954a6102eb58522f4a0acaee22069dbe06ce40cb0f7de5d5d7b120c756ff9ac4a5d3</string>
+              <string>9020ca48029a91ac7f0b8eb2e8503a340771c8851e1ddd0a76250d8a2cebb22e72f9e205e5d9053c5d409880c4891a00cda0e85004e13908c08956f37f9d8fcd</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/164/packages/generic/sentry/7.31.3-0.5.2.1789/sentry-7.31.3-0.5.2-linux64-1789.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/164/packages/generic/sentry/7.31.3-0.5.2.1835/sentry-7.31.3-0.5.2-linux64-1835.tar.zst</string>
             </map>
             <key>name</key>
             <string>linux64</string>
@@ -2022,11 +2022,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>d3e280fe277d3fe928f6da83b381a2a025979bebf4dc4972f0d1bad84e2ea367b2d33e4210fba1d820d31b2b599498492514f40aa5ea85a66c446f64e5c02ee7</string>
+              <string>56bc0520511d154be4343d69a6a09a87a52f1bece4539f17485f15b97d4d6d4f567d00132334244d71b013344bfed38a5357bce230dfd387af40fdb376ac7d97</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/164/packages/generic/sentry/7.31.3-0.5.2.1789/sentry-7.31.3-0.5.2-windows64-1789.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/164/packages/generic/sentry/7.31.3-0.5.2.1835/sentry-7.31.3-0.5.2-windows64-1835.tar.zst</string>
             </map>
             <key>name</key>
             <string>windows64</string>
