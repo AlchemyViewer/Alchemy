@@ -366,7 +366,7 @@ build:release:windows64:
          Method = "PUT";
          Headers = @{
            "JOB-TOKEN" = "${CI_JOB_TOKEN}"; };
-         Verbose = $true;
+         Verbose = $false;
         };
 
     - If ($env:USE_SENTRY -eq 'TRUE') { sentry-cli releases new $BuildChannelVersion && sentry-cli releases set-commits --auto $BuildChannelVersion }
