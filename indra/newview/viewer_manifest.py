@@ -459,25 +459,8 @@ class WindowsManifest(ViewerManifest):
         # Get shared libs from the shared libs staging directory
         with self.prefix(src=os.path.join(self.args['build'], os.pardir,
                                           'sharedlibs', self.args['configuration'])):
-            # APR Libraries
-            self.path("libapr-1.dll")
-            self.path("libapriconv-1.dll")
-            self.path("libaprutil-1.dll")
-
             # For image support
             self.path("openjp2.dll")
-
-            # HTTP and Network
-            if self.args['configuration'].lower() == 'debug':
-                self.path("xmlrpc-epid.dll")
-            else:
-                self.path("xmlrpc-epi.dll")
-
-            # Misc
-            if self.args['configuration'].lower() == 'debug':
-                self.path("libexpatd.dll")
-            else:
-                self.path("libexpat.dll")
 
             # Get openal dll for audio engine, continue if missing
             if self.args['openal'] == 'ON' or self.args['openal'] == 'TRUE':
@@ -1311,10 +1294,6 @@ class Linux_i686_Manifest(LinuxManifest):
         debpkgdir = os.path.join(pkgdir, "lib", "debug")
 
         with self.prefix(src=relpkgdir, dst="lib"):
-            self.path("libapr-1.so*")
-            self.path("libaprutil-1.so*")
-            self.path("libdb*.so")
-            self.path("libexpat.so.*")
             self.path("libSDL2*.so*")
             self.path("libopenjp2.*so*")
             self.path("libjpeg.so*")
@@ -1362,9 +1341,6 @@ class Linux_x86_64_Manifest(LinuxManifest):
         debpkgdir = os.path.join(pkgdir, "lib", "debug")
 
         with self.prefix(src=relpkgdir, dst="lib"):
-            self.path("libapr-1.so*")
-            self.path("libaprutil-1.so*")
-            self.path("libexpat.so.*")
             self.path("libSDL2*.so*")
             self.path("libopenjp2.*so*")
             self.path("libjpeg.so*")

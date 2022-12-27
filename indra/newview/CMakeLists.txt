@@ -1950,9 +1950,6 @@ if (WINDOWS)
       # The following commented dependencies are determined at variably at build time. Can't do this here.
       ${CMAKE_SOURCE_DIR}/../etc/message.xml
       ${CMAKE_SOURCE_DIR}/../scripts/messages/message_template.msg
-      ${SHARED_LIB_STAGING_DIR}/${CMAKE_CFG_INTDIR}/libapr-1.dll
-      ${SHARED_LIB_STAGING_DIR}/${CMAKE_CFG_INTDIR}/libaprutil-1.dll
-      ${SHARED_LIB_STAGING_DIR}/${CMAKE_CFG_INTDIR}/libapriconv-1.dll
       ${SHARED_LIB_STAGING_DIR}/${CMAKE_CFG_INTDIR}/openjp2.dll
       ${SHARED_LIB_STAGING_DIR}/${CMAKE_CFG_INTDIR}/SLVoice.exe
       ${CMAKE_CURRENT_SOURCE_DIR}/licenses-win32.txt
@@ -1962,38 +1959,6 @@ if (WINDOWS)
       media_plugin_example
       )
 
-    if (GEN_IS_MULTI_CONFIG)
-      list(APPEND COPY_INPUT_DEPENDENCIES
-          ${SHARED_LIB_STAGING_DIR}/Release/libexpat.dll
-          ${SHARED_LIB_STAGING_DIR}/RelWithDebInfo/libexpat.dll
-          ${SHARED_LIB_STAGING_DIR}/Debug/libexpatd.dll
-          )
-    elseif (UPPERCASE_CMAKE_BUILD_TYPE MATCHES DEBUG)
-      list(APPEND COPY_INPUT_DEPENDENCIES
-          ${SHARED_LIB_STAGING_DIR}/${CMAKE_CFG_INTDIR}/libexpatd.dll
-          )
-    else()
-      list(APPEND COPY_INPUT_DEPENDENCIES
-          ${SHARED_LIB_STAGING_DIR}/${CMAKE_CFG_INTDIR}/libexpat.dll
-          )
-    endif()
-
-    if (GEN_IS_MULTI_CONFIG)
-      list(APPEND COPY_INPUT_DEPENDENCIES
-          ${SHARED_LIB_STAGING_DIR}/Release/xmlrpc-epi.dll
-          ${SHARED_LIB_STAGING_DIR}/RelWithDebInfo/xmlrpc-epi.dll
-          ${SHARED_LIB_STAGING_DIR}/Debug/xmlrpc-epid.dll
-          )
-    elseif (UPPERCASE_CMAKE_BUILD_TYPE MATCHES DEBUG)
-      list(APPEND COPY_INPUT_DEPENDENCIES
-          ${SHARED_LIB_STAGING_DIR}/${CMAKE_CFG_INTDIR}/xmlrpc-epid.dll
-          )
-    else()
-      list(APPEND COPY_INPUT_DEPENDENCIES
-          ${SHARED_LIB_STAGING_DIR}/${CMAKE_CFG_INTDIR}/xmlrpc-epi.dll
-          )
-    endif()
-    
     if (ADDRESS_SIZE EQUAL 64)
         list(APPEND COPY_INPUT_DEPENDENCIES
             ${SHARED_LIB_STAGING_DIR}/${CMAKE_CFG_INTDIR}/vivoxsdk_x64.dll
