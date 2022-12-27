@@ -95,12 +95,14 @@ variables:
       - .cache/autobuild
       - .cache/pip
     when: 'always'
+  variables:
+    VIEWER_SIGNING_IDENTITY: $APPLE_SIGNATURE
   before_script:
     - python3 -m venv .venv
     - source .venv/bin/activate
     - pip3 install --upgrade llbase autobuild dmgbuild
   script:
-    - autobuild configure -c Release -- -DUSE_LTO=ON -DDISABLE_FATAL_WARNINGS=ON -DREVISION_FROM_VCS=FALSE
+    - autobuild configure -c Release -- -DENABLE_SIGNING=ON -DUSE_LTO=ON -DDISABLE_FATAL_WARNINGS=ON -DREVISION_FROM_VCS=FALSE
     - autobuild build -c Release --no-configure
     - autobuild graph -c Release --graph-file alchemy-darwin${AUTOBUILD_ADDRSIZE}-dependencies.svg build-darwin-64/autobuild-package.xml
     - if [ "$USE_SENTRY" = "TRUE" ]; then sentry-cli difutil bundle-sources build-darwin-*/newview/Release/*.app.dSYM/Contents/Resources/DWARF/*; fi
