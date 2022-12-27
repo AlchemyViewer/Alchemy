@@ -47,9 +47,9 @@ variables:
       - .cache/pip
     when: 'always'
   before_script:
-    - virtualenv -p python .venv
-    - .\.venv\Scripts\activate.ps1
-    - pip3 install --upgrade llbase autobuild
+    - python -m venv .venv
+    - .\.venv\Scripts\Activate.ps1
+    - pip install --upgrade llbase autobuild certifi
   script:
     - autobuild configure -c Release -- -DUSE_LTO=ON -DDISABLE_FATAL_WARNINGS=ON -DREVISION_FROM_VCS=FALSE
     - autobuild build -c Release --no-configure
@@ -96,7 +96,7 @@ variables:
       - .cache/pip
     when: 'always'
   before_script:
-    - virtualenv .venv -p python3
+    - python3 -m venv .venv
     - source .venv/bin/activate
     - pip3 install --upgrade llbase autobuild dmgbuild
   script:
@@ -141,7 +141,7 @@ variables:
       - .cache/pip
     when: 'always'
   before_script:
-    - virtualenv .venv -p python3
+    - python -m venv .venv
     - source .venv/bin/activate
     - pip3 install --upgrade llbase autobuild
   script:
@@ -190,7 +190,7 @@ coverity_scan:
   variables:
     AUTOBUILD_ADDRSIZE: 64
   before_script:
-    - virtualenv .venv -p python3
+    - python -m venv .venv
     - source .venv/bin/activate
     - pip3 install --upgrade autobuild
   script:
