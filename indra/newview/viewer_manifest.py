@@ -1139,6 +1139,7 @@ class DarwinManifest(ViewerManifest):
                 self.run_command(
                     ['xcrun', 'notarytool',
                         'submit', finalname,
+                        '--keychain', viewer_keychain,
                         '--keychain-profile', notary_token,
                         '--wait'])
                 self.run_command(
