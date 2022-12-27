@@ -834,8 +834,6 @@ class DarwinManifest(ViewerManifest):
             # Remember where we parked this car.
             with self.prefix(src=libdir, dst="Frameworks"):
                 for libfile in (
-                                'libapr-1.*.dylib',
-                                'libaprutil-1.*.dylib',
                                 'libndofdev.dylib',
                                 ):
                     self.path(libfile)
@@ -981,13 +979,11 @@ class DarwinManifest(ViewerManifest):
                             self.path( "*.dylib" )
                             self.path( "plugins.dat" )
 
-
     def package_finish(self):
         import dmgbuild
 
         volname=self.app_name() + " Installer"
         finalname = self.installer_base_name() + ".dmg"
-
         application = self.get_dst_prefix()
         appname = os.path.basename(application)
 
