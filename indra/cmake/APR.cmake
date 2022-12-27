@@ -25,7 +25,7 @@ else (USESYSTEMLIBS)
       debug ${ARCH_PREBUILT_DIRS_DEBUG}/${APR_selector}aprutil-1.lib ${APRICONV_LIBRARIES}
       optimized ${ARCH_PREBUILT_DIRS_RELEASE}/${APR_selector}aprutil-1.lib ${APRICONV_LIBRARIES}
       )
-  else()
+  elseif(DARWIN)
     set(APR_LIBRARIES 
       debug ${ARCH_PREBUILT_DIRS_DEBUG}/libapr-1.a
       optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libapr-1.a
@@ -34,6 +34,15 @@ else (USESYSTEMLIBS)
     set(APRUTIL_LIBRARIES 
       debug ${ARCH_PREBUILT_DIRS_DEBUG}/libaprutil-1.a ${APRICONV_LIBRARIES}
       optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libaprutil-1.a ${APRICONV_LIBRARIES}
+      )
+  else()
+    set(APR_LIBRARIES 
+      debug ${ARCH_PREBUILT_DIRS_DEBUG}/libapr-1.a
+      optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libapr-1.a
+      )
+    set(APRUTIL_LIBRARIES 
+      debug ${ARCH_PREBUILT_DIRS_DEBUG}/libaprutil-1.a
+      optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libaprutil-1.a
       )
   endif ()
   set(APR_INCLUDE_DIR ${LIBS_PREBUILT_DIR}/include/apr-1)
