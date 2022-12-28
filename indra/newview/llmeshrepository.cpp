@@ -419,13 +419,14 @@ std::string make_dump_name(std::string_view prefix, S32 num)
 void dump_llsd_to_file(const LLSD& content, std::string filename);
 LLSD llsd_from_file(std::string filename);
 
-const std::string header_lod[] = 
+const std::array<std::string, 4> header_lod =
 {
 	"lowest_lod",
 	"low_lod",
 	"medium_lod",
 	"high_lod"
 };
+
 const char * const LOG_MESH = "Mesh";
 
 // Static data and functions to measure mesh load
@@ -1322,7 +1323,7 @@ LLCore::HttpHandle LLMeshRepoThread::getByteRange(const std::string & url, int l
 	return handle;
 }
 
-bool LLMeshRepoThread::getMeshHeaderInfo(const LLUUID& mesh_id, const char* block_name, MeshHeaderInfo& info)
+bool LLMeshRepoThread::getMeshHeaderInfo(const LLUUID& mesh_id, std::string_view block_name, MeshHeaderInfo& info)
 {	//protected by mMutex
 	if (!mHeaderMutex)
 	{
@@ -1634,7 +1635,7 @@ bool LLMeshRepoThread::fetchMeshLOD(const LLVolumeParams& mesh_params, S32 lod, 
 	const LLUUID& mesh_id = mesh_params.getSculptID();
 	MeshHeaderInfo info;
 
-	if (!getMeshHeaderInfo(mesh_id, header_lod[lod].c_str(), info))
+	if (!getMeshHeaderInfo(mesh_id, header_lod[lod], info))
 	{
 		return false;
 	}

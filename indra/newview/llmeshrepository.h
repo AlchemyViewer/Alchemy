@@ -373,7 +373,7 @@ public:
 	EMeshProcessingResult physicsShapeReceived(const LLUUID& mesh_id, U8* data, S32 data_size);
 	bool hasPhysicsShapeInHeader(const LLUUID& mesh_id);
 
-	bool getMeshHeaderInfo(const LLUUID& mesh_id, const char* block_name, MeshHeaderInfo& info);
+	bool getMeshHeaderInfo(const LLUUID& mesh_id, std::string_view block_name, MeshHeaderInfo& info);
 	bool loadInfoFromFilesystem(const LLUUID& mesh_id, MeshHeaderInfo& info, boost::function<bool(const LLUUID&, U8*, S32)> fn);
 
 	void notifyLoadedMeshes(); // Only call from main thread.
