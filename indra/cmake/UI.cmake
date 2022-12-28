@@ -39,7 +39,6 @@ if (LINUX)
       set(PKGCONFIG_PACKAGES
           gdk-3.0
           gtk+-3.0
-          x11
           )
 
       if(USE_X11)
