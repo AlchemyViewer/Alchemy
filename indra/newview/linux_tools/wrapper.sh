@@ -1,15 +1,15 @@
 #! /usr/bin/env bash
 
-## Here are some configuration options for Linux Client Testers.
+## Here are some configuration options for Linux Client Users.
 
 ## - Avoids using any FMOD STUDIO audio driver.
 #export LL_BAD_FMODSTUDIO_DRIVER=x
 ## - Avoids using any OpenAL audio driver.
 #export LL_BAD_OPENAL_DRIVER=x
 
-## - Avoids using the FMOD Studio or FMOD Ex PulseAudio audio driver.
+## - Avoids using the FMOD Studio PulseAudio audio driver.
 #export LL_BAD_FMOD_PULSEAUDIO=x
-## - Avoids using the FMOD Studio or FMOD Ex ALSA audio driver.
+## - Avoids using the FMOD Studio ALSA audio driver.
 #export LL_BAD_FMOD_ALSA=x
 
 # Completely prevent gamemode from enabling even if set to true in the settings
@@ -24,8 +24,7 @@
 #export LL_GL_BASICEXT=x
 
 ## - Avoids *all* optional OpenGL extensions.  This is the safest and least-
-##   exciting option.  Enable this if you experience stability issues, and
-##   report whether it helps in the Linux Client Testers forum.
+##   exciting option.  Enable this if you experience stability issues.
 #export LL_GL_NOEXT=x
 
 ## - For advanced troubleshooters, this lets you disable specific GL
@@ -122,7 +121,8 @@ LL_RUN_ERR=$?
 
 # Handle any resulting errors
 if [ $LL_RUN_ERR -ne 0 ]; then
-	# generic error running the binaryecho '*** Bad shutdown ($LL_RUN_ERR). ***'
+	# generic error running the binary
+	echo '*** Bad shutdown ($LL_RUN_ERR). ***'
 	if [ "$(uname -m)" = "x86_64" ]; then
 		echo
 		cat << EOFMARKER
@@ -131,9 +131,3 @@ EOFMARKER
 	fi
 fi
 
-echo
-echo '*******************************************************'
-echo 'This is a BETA release of the Alchemy Viewer Linux client.'
-echo 'Thank you for testing!'
-echo 'Please see README-linux.txt before reporting problems.'
-echo
