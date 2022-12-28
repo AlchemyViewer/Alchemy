@@ -82,11 +82,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>cc796144023b4f108ad68b0a9de3c05330e53def4d27a29b15671879b6f15276b240c2fc3d080d2a627591faf68e3b659d3c993ae3f25079b3026eeedeb9975e</string>
+              <string>4e42b1e9e77ead4f0538cb10a486f587cef0144ccd32161f62edc7477540224e62b9e32bdcac4a82664249486bba4e2191e5fe4f91923af859d17f76b719dbb8</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/111/packages/generic/apr_suite/1.4.5.1817/apr_suite-1.4.5-darwin64-1817.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/111/packages/generic/apr_suite/1.4.5.1844/apr_suite-1.4.5-darwin64-1844.tar.zst</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
@@ -96,11 +96,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>ae54745072cf3b6a2d6807d481a6ea32cde3cfca3edb3fc82481197ae3b388da9ed854fcfd18e8a003d33faf245041da2004c1853a45300d3512f835a27f7654</string>
+              <string>a0817cf401cc4af54e139c90bb1dddd636915bc6029218a3a3dfc932fcd2b3524bad89e8008370e8e7c5d21965fe8d30591918d542dca9b83b3718a38d128136</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/111/packages/generic/apr_suite/1.4.5.1817/apr_suite-1.4.5-linux64-1817.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/111/packages/generic/apr_suite/1.4.5.1844/apr_suite-1.4.5-linux64-1844.tar.zst</string>
             </map>
             <key>name</key>
             <string>linux64</string>
@@ -110,11 +110,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>239b9ffddbea76fad64fb5f001ce4b35816fa6518e03f7b3b87a5abd3136cd398c16380d6eb6e919fe80ccaea3be31072a2b065d469afef875c1cbaa76048206</string>
+              <string>91ad66e4d6e1cd33a020460aa690b89a6942a02052fc15828dfb6439726b6eaa65793a14f1716b1800838c92399994722069040cb52ab6d520cb54623436bcbe</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/111/packages/generic/apr_suite/1.4.5.1817/apr_suite-1.4.5-windows64-1817.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/111/packages/generic/apr_suite/1.4.5.1844/apr_suite-1.4.5-windows64-1844.tar.zst</string>
             </map>
             <key>name</key>
             <string>windows64</string>
