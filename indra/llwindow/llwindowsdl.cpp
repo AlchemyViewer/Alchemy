@@ -2401,191 +2401,6 @@ void LLSplashScreenSDL::hideImpl()
 #endif
 }
 
-
-
-#if LL_GTK
-static void response_callback (GtkDialog *dialog,
-			       gint       arg1,
-			       gpointer   user_data)
-{
-	gint *response = (gint*)user_data;
-	*response = arg1;
-	gtk_widget_destroy(GTK_WIDGET(dialog));
-	gtk_main_quit();
-}
-
-S32 OSMessageBoxSDL(const std::string& text, const std::string& caption, U32 type)
-{
-	S32 rtn = OSBTN_CANCEL;
-
-	if(gWindowImplementation != NULL)
-		gWindowImplementation->beforeDialog();
-
-	if (LLWindowSDL::ll_try_gtk_init())
-	{
-		GtkWidget *win = NULL;
-
-		LL_INFOS() << "Creating a dialog because we're in windowed mode and GTK is happy." << LL_ENDL;
-		
-		GtkDialogFlags flags = GTK_DIALOG_MODAL;
-		GtkMessageType messagetype;
-		GtkButtonsType buttons;
-		switch (type)
-		{
-		default:
-		case OSMB_OK:
-			messagetype = GTK_MESSAGE_WARNING;
-			buttons = GTK_BUTTONS_OK;
-			break;
-		case OSMB_OKCANCEL:
-			messagetype = GTK_MESSAGE_QUESTION;
-			buttons = GTK_BUTTONS_OK_CANCEL;
-			break;
-		case OSMB_YESNO:
-			messagetype = GTK_MESSAGE_QUESTION;
-			buttons = GTK_BUTTONS_YES_NO;
-			break;
-		}
-		win = gtk_message_dialog_new(NULL, flags, messagetype, buttons, "%s",
-									 text.c_str());
-
-# if LL_X11
-		// Make GTK tell the window manager to associate this
-		// dialog with our non-GTK SDL window, which should try
-		// to keep it on top etc.
-		if (gWindowImplementation &&
-		    gWindowImplementation->mSDL_XWindowID != None)
-		{
-			gtk_widget_realize(GTK_WIDGET(win)); // so we can get its gdkwin
-            GdkWindow* gdkwin = gdk_x11_window_foreign_new_for_display(gdk_display_get_default(), static_cast<Window>(gWindowImplementation->mSDL_XWindowID));
-			gdk_window_set_transient_for(gtk_widget_get_window(GTK_WIDGET(win)), gdkwin);
-		}
-# endif //LL_X11
-
-		gtk_window_set_position(GTK_WINDOW(win),
-					GTK_WIN_POS_CENTER_ON_PARENT);
-
-		gtk_window_set_type_hint(GTK_WINDOW(win),
-					 GDK_WINDOW_TYPE_HINT_DIALOG);
-
-		if (!caption.empty())
-			gtk_window_set_title(GTK_WINDOW(win), caption.c_str());
-
-		gint response = GTK_RESPONSE_NONE;
-		g_signal_connect (win,
-				  "response", 
-				  G_CALLBACK (response_callback),
-				  &response);
-
-		// we should be able to use a gtk_dialog_run(), but it's
-		// apparently not written to exist in a world without a higher
-		// gtk_main(), so we manage its signal/destruction outselves.
-		gtk_widget_show_all (win);
-		gtk_main();
-
-		//LL_INFOS() << "response: " << response << LL_ENDL;
-		switch (response)
-		{
-		case GTK_RESPONSE_OK:     rtn = OSBTN_OK; break;
-		case GTK_RESPONSE_YES:    rtn = OSBTN_YES; break;
-		case GTK_RESPONSE_NO:     rtn = OSBTN_NO; break;
-		case GTK_RESPONSE_APPLY:  rtn = OSBTN_OK; break;
-		case GTK_RESPONSE_NONE:
-		case GTK_RESPONSE_CANCEL:
-		case GTK_RESPONSE_CLOSE:
-		case GTK_RESPONSE_DELETE_EVENT:
-		default: rtn = OSBTN_CANCEL;
-		}
-	}
-	else
-	{
-		LL_INFOS() << "MSGBOX: " << caption << ": " << text << LL_ENDL;
-		LL_INFOS() << "Skipping dialog because we're in fullscreen mode or GTK is not happy." << LL_ENDL;
-		rtn = OSBTN_OK;
-	}
-
-	if(gWindowImplementation != NULL)
-		gWindowImplementation->afterDialog();
-
-	return rtn;
-}
-
-// static void color_changed_callback(GtkWidget *widget,
-// 				   gpointer user_data)
-// {
-// 	GtkColorSelection *colorsel = GTK_COLOR_SELECTION(widget);
-// 	GdkColor *colorp = (GdkColor*)user_data;
-	
-// 	gtk_color_selection_get_current_color(colorsel, colorp);
-// }
-
-BOOL LLWindowSDL::dialogColorPicker( F32 *r, F32 *g, F32 *b)
-{
-	BOOL rtn = FALSE;
-
-	beforeDialog();
-
-// 	if (ll_try_gtk_init())
-// 	{
-// 		GtkWidget* win = gtk_color_chooser_dialog_new();
-
-// # if LL_X11
-// 		// Get GTK to tell the window manager to associate this
-// 		// dialog with our non-GTK SDL window, which should try
-// 		// to keep it on top etc.
-// 		if (mSDL_XWindowID != None)
-// 		{
-// 			gtk_widget_realize(GTK_WIDGET(win)); // so we can get its gdkwin
-//             GdkWindow* gdkwin = gdk_x11_window_foreign_new_for_display(gdk_display_get_default(), static_cast<Window>(mSDL_XWindowID));
-// 			gdk_window_set_transient_for(gtk_widget_get_window(GTK_WIDGET(win)), gdkwin);
-// 		}
-// # endif //LL_X11
-
-// 		GtkColorSelection *colorsel = GTK_COLOR_SELECTION (gtk_color_selection_dialog_get_color_selection (GTK_COLOR_SELECTION_DIALOG(win)));
-
-// 		GdkColor color, orig_color;
-// 		orig_color.pixel = 0;
-// 		orig_color.red = guint16(65535 * *r);
-// 		orig_color.green= guint16(65535 * *g);
-// 		orig_color.blue = guint16(65535 * *b);
-// 		color = orig_color;
-
-// 		gtk_color_selection_set_previous_color (colorsel, &color);
-// 		gtk_color_selection_set_current_color (colorsel, &color);
-// 		gtk_color_selection_set_has_palette (colorsel, TRUE);
-// 		gtk_color_selection_set_has_opacity_control(colorsel, FALSE);
-
-// 		gint response = GTK_RESPONSE_NONE;
-// 		g_signal_connect (win,
-// 				  "response", 
-// 				  G_CALLBACK (response_callback),
-// 				  &response);
-
-// 		g_signal_connect (G_OBJECT (colorsel), "color_changed",
-// 				  G_CALLBACK (color_changed_callback),
-// 				  &color);
-
-// 		gtk_window_set_modal(GTK_WINDOW(win), TRUE);
-// 		gtk_widget_show_all(win);
-// 		gtk_main();
-
-// 		if (response == GTK_RESPONSE_OK &&
-// 		    (orig_color.red != color.red
-// 		     || orig_color.green != color.green
-// 		     || orig_color.blue != color.blue) )
-// 		{
-// 			*r = color.red / 65535.0f;
-// 			*g = color.green / 65535.0f;
-// 			*b = color.blue / 65535.0f;
-// 			rtn = TRUE;
-// 		}
-// 	}
-
-	afterDialog();
-
-	return rtn;
-}
-#else
 S32 OSMessageBoxSDL(const std::string& text, const std::string& caption, U32 type)
 {
 	S32 rtn = OSBTN_CANCEL;
@@ -2648,6 +2463,7 @@ S32 OSMessageBoxSDL(const std::string& text, const std::string& caption, U32 typ
 
 BOOL LLWindowSDL::dialogColorPicker( F32 *r, F32 *g, F32 *b)
 {
+	beforeDialog();
 	BOOL retval = FALSE;
 #if LL_WINDOWS
 	static CHOOSECOLOR cc;
@@ -2675,10 +2491,66 @@ BOOL LLWindowSDL::dialogColorPicker( F32 *r, F32 *g, F32 *b)
 	*g = ((F32) ((cc.rgbResult >> 8) & 0xff)) / 255.f;
 
 	*r = ((F32) (cc.rgbResult & 0xff)) / 255.f;
+#elif LL_LINUX
+// 	if (ll_try_gtk_init())
+// 	{
+// 		GtkWidget* win = gtk_color_chooser_dialog_new();
+
+// # if LL_X11
+// 		// Get GTK to tell the window manager to associate this
+// 		// dialog with our non-GTK SDL window, which should try
+// 		// to keep it on top etc.
+// 		if (mSDL_XWindowID != None)
+// 		{
+// 			gtk_widget_realize(GTK_WIDGET(win)); // so we can get its gdkwin
+//             GdkWindow* gdkwin = gdk_x11_window_foreign_new_for_display(gdk_display_get_default(), static_cast<Window>(mSDL_XWindowID));
+// 			gdk_window_set_transient_for(gtk_widget_get_window(GTK_WIDGET(win)), gdkwin);
+// 		}
+// # endif //LL_X11
+
+// 		GtkColorSelection *colorsel = GTK_COLOR_SELECTION (gtk_color_selection_dialog_get_color_selection (GTK_COLOR_SELECTION_DIALOG(win)));
+
+// 		GdkColor color, orig_color;
+// 		orig_color.pixel = 0;
+// 		orig_color.red = guint16(65535 * *r);
+// 		orig_color.green= guint16(65535 * *g);
+// 		orig_color.blue = guint16(65535 * *b);
+// 		color = orig_color;
+
+// 		gtk_color_selection_set_previous_color (colorsel, &color);
+// 		gtk_color_selection_set_current_color (colorsel, &color);
+// 		gtk_color_selection_set_has_palette (colorsel, TRUE);
+// 		gtk_color_selection_set_has_opacity_control(colorsel, FALSE);
+
+// 		gint response = GTK_RESPONSE_NONE;
+// 		g_signal_connect (win,
+// 				  "response", 
+// 				  G_CALLBACK (response_callback),
+// 				  &response);
+
+// 		g_signal_connect (G_OBJECT (colorsel), "color_changed",
+// 				  G_CALLBACK (color_changed_callback),
+// 				  &color);
+
+// 		gtk_window_set_modal(GTK_WINDOW(win), TRUE);
+// 		gtk_widget_show_all(win);
+// 		gtk_main();
+
+// 		if (response == GTK_RESPONSE_OK &&
+// 		    (orig_color.red != color.red
+// 		     || orig_color.green != color.green
+// 		     || orig_color.blue != color.blue) )
+// 		{
+// 			*r = color.red / 65535.0f;
+// 			*g = color.green / 65535.0f;
+// 			*b = color.blue / 65535.0f;
+// 			rtn = TRUE;
+// 		}
+// 	}
 #endif
+	afterDialog();
 	return retval;
 }
-#endif // LL_GTK
 
 /*
         Make the raw keyboard data available - used to poke through to LLQtWebKit so
