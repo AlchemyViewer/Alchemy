@@ -2216,56 +2216,6 @@ if (LINUX)
     media_plugin_libvlc
     )
 
-  find_program (OBJCOPY NAMES "objcopy" REQUIRED)
-
-  add_custom_command (TARGET ${VIEWER_BINARY_NAME} POST_BUILD
-                      COMMAND ${OBJCOPY}
-                      ARGS
-                        --only-keep-debug --compress-debug-sections=zlib
-                        ${VIEWER_BINARY_NAME} "${VIEWER_BINARY_NAME}.debug"
-                      BYPRODUCTS "${VIEWER_BINARY_NAME}.debug"
-                      COMMENT "Extracting and compressing debug information")
-
-  add_custom_command (TARGET ${VIEWER_BINARY_NAME} POST_BUILD
-                      COMMAND ${OBJCOPY}
-                      ARGS
-                        --strip-all ${VIEWER_BINARY_NAME}
-                      COMMENT "Extracting and compressing debug information")
-
-  add_custom_command (TARGET ${VIEWER_BINARY_NAME} POST_BUILD
-                      COMMAND ${OBJCOPY}
-                      ARGS
-                        --add-gnu-debuglink="${VIEWER_BINARY_NAME}.debug" ${VIEWER_BINARY_NAME}
-                      COMMENT "Extracting and compressing debug information")
-
-  if (PACKAGE)
-  add_custom_command(
-      OUTPUT ${product}.tar.xz
-      COMMAND ${Python3_EXECUTABLE}
-      ARGS
-        ${CMAKE_CURRENT_SOURCE_DIR}/viewer_manifest.py
-        --arch=${ARCH}
-        --artwork=${ARTWORK_DIR}
-        "--discord=${USE_DISCORD}"
-        "--sentry=${USE_SENTRY}"
-        "--fmodstudio=${USE_FMODSTUDIO}"
-        "--openal=${USE_OPENAL}"
-        "--kdu=${USE_KDU}"
-        --build=${CMAKE_CURRENT_BINARY_DIR}
-        --buildtype=${CMAKE_BUILD_TYPE}
-        "--channel=${VIEWER_CHANNEL}"
-        --configuration=${CMAKE_CFG_INTDIR}
-        --dest=${CMAKE_CURRENT_BINARY_DIR}/packaged
-        --grid=${GRID}
-        --source=${CMAKE_CURRENT_SOURCE_DIR}
-        --touch=${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/.${product}.touched
-        --versionfile=${CMAKE_CURRENT_BINARY_DIR}/viewer_version.txt
-      DEPENDS
-        ${CMAKE_CURRENT_SOURCE_DIR}/viewer_manifest.py
-        ${COPY_INPUT_DEPENDENCIES}
-      )
-  endif (PACKAGE)
-
   add_custom_command(
     OUTPUT  ${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/.${product}.copy_touched
     COMMAND ${Python3_EXECUTABLE}
@@ -2296,6 +2246,32 @@ if (LINUX)
   add_custom_target(copy_l_viewer_manifest ALL DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/.${product}.copy_touched)
 
   if (PACKAGE)
+    add_custom_command(
+        OUTPUT ${product}.tar.xz
+        COMMAND ${Python3_EXECUTABLE}
+        ARGS
+          ${CMAKE_CURRENT_SOURCE_DIR}/viewer_manifest.py
+          --arch=${ARCH}
+          --artwork=${ARTWORK_DIR}
+          "--discord=${USE_DISCORD}"
+          "--sentry=${USE_SENTRY}"
+          "--fmodstudio=${USE_FMODSTUDIO}"
+          "--openal=${USE_OPENAL}"
+          "--kdu=${USE_KDU}"
+          --build=${CMAKE_CURRENT_BINARY_DIR}
+          --buildtype=${CMAKE_BUILD_TYPE}
+          "--channel=${VIEWER_CHANNEL}"
+          --configuration=${CMAKE_CFG_INTDIR}
+          --dest=${CMAKE_CURRENT_BINARY_DIR}/packaged
+          --grid=${GRID}
+          --source=${CMAKE_CURRENT_SOURCE_DIR}
+          --touch=${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/.${product}.touched
+          --versionfile=${CMAKE_CURRENT_BINARY_DIR}/viewer_version.txt
+        DEPENDS
+          ${CMAKE_CURRENT_SOURCE_DIR}/viewer_manifest.py
+          ${COPY_INPUT_DEPENDENCIES}
+        )
+
     add_custom_target(llpackage ALL DEPENDS ${product}.tar.xz)
     # Make sure we don't run two instances of viewer_manifest.py at the same time.
     add_dependencies(llpackage copy_l_viewer_manifest)

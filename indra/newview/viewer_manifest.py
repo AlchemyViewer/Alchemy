@@ -1328,8 +1328,6 @@ class Linux_i686_Manifest(LinuxManifest):
             self.path("libvivoxplatform.so")
             self.path("libvivoxsdk.so")
 
-        self.strip_binaries()
-
 
 class Linux_x86_64_Manifest(LinuxManifest):
     address_size = 64
@@ -1374,8 +1372,6 @@ class Linux_x86_64_Manifest(LinuxManifest):
             self.path("libvivoxoal.so.1")
             self.path("libvivoxplatform.so")
             self.path("libvivoxsdk.so")
-
-        self.strip_binaries()
 
 ################################################################
 
