@@ -2,6 +2,17 @@
 <llsd xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
   xsi:noNamespaceSchemaLocation="llsd.xsd">
   <map>
+    <key>AlchemyLinuxVoiceVariant</key>
+    <map>
+      <key>Comment</key>
+      <string>0 - native, 1 - 32bit wine voice, 2 - 64bit wine voice</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>U32</string>
+      <key>Value</key>
+      <integer>2</integer>
+    </map>
     <key>AlchemyAutoAcceptAllInventory</key>
     <map>
       <key>Comment</key>

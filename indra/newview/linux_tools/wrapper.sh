@@ -112,6 +112,18 @@ if [[ !(-u $SANDBOX_BIN) || (-w $SANDBOX_BIN) || !(-x $SANDBOX_BIN) || !(-r $SAN
     pkexec "$SCRIPT_DIR/etc/chrome_sandboxing_permissions_setup.sh"
 fi
 
+#setup wine voice
+if [ -x "$(command -v wine)" ]; then
+    export WINEDEBUG=-all # disable all debug output for wine
+    export WINEPREFIX="$HOME/.alchemynext/wine"
+    if [ ! -d "$WINEPREFIX" ]; then
+        DISPLAY="" wine hostname
+    fi
+else
+    export VIEWER_DISABLE_WINE=1
+    echo "Please install wine to enable full voice functionality."
+fi
+
 # Run the program.
 # Don't quote $LL_WRAPPER because, if empty, it should simply vanish from the
 # command line. But DO quote "${ARGS[@]}": preserve separate args as

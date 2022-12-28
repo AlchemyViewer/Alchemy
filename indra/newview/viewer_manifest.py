@@ -1316,6 +1316,8 @@ class Linux_i686_Manifest(LinuxManifest):
         # Vivox runtimes
         with self.prefix(src=os.path.join(pkgdir, 'bin', 'release'), dst="bin"):
             self.path("SLVoice")
+            self.path("win32")
+            self.path("win64")
 
             # Sentry
             if self.args['sentry'] == 'ON' or self.args['sentry'] == 'TRUE':
@@ -1361,6 +1363,8 @@ class Linux_x86_64_Manifest(LinuxManifest):
         # Vivox runtimes
         with self.prefix(src=os.path.join(pkgdir, 'bin', 'release'), dst="bin"):
             self.path("SLVoice")
+            self.path("win32")
+            self.path("win64")
 
             # Sentry
             if self.args['sentry'] == 'ON' or self.args['sentry'] == 'TRUE':
