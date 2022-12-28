@@ -215,7 +215,7 @@ void LLNetMap::draw()
 	//static LLUIColor map_track_disabled_color = LLUIColorTable::instance().getColor("MapTrackDisabledColor", LLColor4::white);
 	static LLUIColor map_frustum_color = LLUIColorTable::instance().getColor("MapFrustumRotatingColor", LLColor4::white);
 	static LLUIColor map_frustum_rotating_color = LLUIColorTable::instance().getColor("MapFrustumColor", LLColor4::white);
-	static LLUIColor map_parcel_outline_color = LLUIColorTable::instance().getColor("MapParcelOutlineColor", LLColor4(LLColor3(LLColor4::yellow), 0.5f));
+	//static LLUIColor map_parcel_outline_color = LLUIColorTable::instance().getColor("MapParcelOutlineColor", LLColor4(LLColor3(LLColor4::yellow), 0.5f));
 	static LLUIColor map_line_color = LLUIColorTable::instance().getColor("MapLineColor", LLColor4::red);
     static LLUIColor map_parcel_line_color = LLUIColorTable::instance().getColor("MapParcelBoundryLine", LLColor4::white);
 	

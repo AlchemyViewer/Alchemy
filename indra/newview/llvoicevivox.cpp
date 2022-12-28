@@ -323,6 +323,7 @@ LLVivoxVoiceClient::LLVivoxVoiceClient() :
 	mSpeakerMuteDirty(true),
 	mMicVolume(0),
 	mMicVolumeDirty(true),
+	mHidden(false),
 
 	mVoiceEnabled(false),
 	mWriteInProgress(false),
@@ -4927,6 +4928,7 @@ bool LLVivoxVoiceClient::checkParcelChanged(bool update)
 				{
 					mCurrentParcelLocalID = parcelLocalID;
 					mCurrentRegionName = regionName;
+					mAreaVoiceDisabled = false;
 				}
 				return true;
 			}
@@ -5483,7 +5485,7 @@ void LLVivoxVoiceClient::updatePosition(void)
 		// They're currently always set to zero.
 		
 		// Send the current camera position to the voice code
-		rot.setRows(LLViewerCamera::getInstance()->getAtAxis(), LLViewerCamera::getInstance()->getLeftAxis (),  LLViewerCamera::getInstance()->getUpAxis());
+		rot.setRows(LLViewerCamera::getInstance()->getAtAxis(), LLViewerCamera::getInstance()->getLeftAxis (),  LLViewerCamera::getInstance()->getUpAxis());		
 		pos = gAgent.getRegion()->getPosGlobalFromRegion(LLViewerCamera::getInstance()->getOrigin());
 		
 		LLVivoxVoiceClient::getInstance()->setCameraPosition(
