@@ -41,7 +41,7 @@ class LLVivoxProtocolParser;
 #include "llcoros.h"
 #include <queue>
 
-#if LL_DARWIN || defined(LL_USESYSTEMLIBS)
+#if defined(LL_USESYSTEMLIBS)
 # include <expat.h>
 #else
 # include "expat/expat.h"
