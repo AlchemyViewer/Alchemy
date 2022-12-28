@@ -3526,7 +3526,6 @@ S32 LLMeshRepository::loadMesh(LLVOVolume* vobj, const LLVolumeParams& mesh_para
 	}
 
 	{
-		LLMutexLock lock(mMeshMutex);
 		//add volume to list of loading meshes
 		const auto& mesh_id = mesh_params.getSculptID();
 		mesh_load_map::iterator iter = mLoadingMeshes[detail].find(mesh_id);
@@ -3540,6 +3539,7 @@ S32 LLMeshRepository::loadMesh(LLVOVolume* vobj, const LLVolumeParams& mesh_para
 		}
 		else
 		{
+			LLMutexLock lock(mMeshMutex);
 			//first request for this mesh
 			mLoadingMeshes[detail][mesh_id].insert(vobj);
 			mPendingRequests.emplace_back(mesh_params, detail);
@@ -4021,7 +4021,6 @@ LLPointer<LLMeshSkinInfo> LLMeshRepository::getSkinInfo(const LLUUID& mesh_id, L
         //no skin info known about given mesh, try to fetch it
         if (requesting_obj != nullptr)
         {
-            LLMutexLock lock(mMeshMutex);
             //add volume to list of loading meshes
             skin_load_map::iterator iter = mLoadingSkins.find(mesh_id);
 			if (iter != mLoadingSkins.end())
@@ -4034,6 +4033,7 @@ LLPointer<LLMeshSkinInfo> LLMeshRepository::getSkinInfo(const LLUUID& mesh_id, L
 			}
 			else
 			{
+				LLMutexLock lock(mMeshMutex);
 				//first request for this mesh
 				mLoadingSkins[mesh_id].insert(requesting_obj);
                 mPendingSkinRequests.push(mesh_id);

@@ -254,6 +254,15 @@ LLVOVolume::~LLVOVolume()
 
 	mSkinInfo = nullptr;
 
+	//if (mHasRequestedMeshData)
+	{
+		gMeshRepo.unregisterMesh(this, getVolume()->getParams().getSculptID());
+	}
+	//if (mHasRequestedSkinData)
+	{
+		gMeshRepo.unregisterSkin(this, getVolume()->getParams().getSculptID());
+	}
+
 	if(!mMediaImplList.empty())
 	{
 		for(U32 i = 0 ; i < mMediaImplList.size() ; i++)
@@ -278,15 +287,6 @@ void LLVOVolume::markDead()
         if (getVolume())
         {
             LLSculptIDSize::instance().rem(getVolume()->getParams().getSculptID());
-
-			if (mHasRequestedMeshData)
-			{
-				gMeshRepo.unregisterMesh(this, getVolume()->getParams().getSculptID());
-			}
-			if (mHasRequestedSkinData)
-			{
-				gMeshRepo.unregisterSkin(this, getVolume()->getParams().getSculptID());
-			}
         }
 
 		if(getMDCImplCount() > 0)
