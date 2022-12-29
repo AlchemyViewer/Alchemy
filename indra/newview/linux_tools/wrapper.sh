@@ -66,6 +66,7 @@ fi
 #export UBSAN_OPTIONS="print_stacktrace=1 print_summary=1 halt_on_error=0"
 
 ## Allow Gnome 3 to properly display window title in app bar
+export SDL_VIDEO_WAYLAND_WMCLASS=Alchemy
 export SDL_VIDEO_X11_WMCLASS=Alchemy
 
 ## - Enable threaded mesa GL impl

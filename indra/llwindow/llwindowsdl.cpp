@@ -249,8 +249,17 @@ LLWindowSDL::LLWindowSDL(LLWindowCallbacks* callbacks,
 	: LLWindow(callbacks, fullscreen, flags),
 	  mGamma(1.0f)
 {
+	if (title.empty())
+		mWindowTitle = "Alchemy Viewer";  // *FIX: (?)
+	else
+		mWindowTitle = title;
+
 	SDL_SetMainReady();
 	SDL_LogSetOutputFunction(&sdlLogOutputFunc, nullptr);
+
+	SDL_SetHint(SDL_HINT_SCREENSAVER_INHIBIT_ACTIVITY_NAME, mWindowTitle.c_str());
+	SDL_SetHint(SDL_HINT_APP_NAME, mWindowTitle.c_str());
+	SDL_SetHint(SDL_HINT_MOUSE_FOCUS_CLICKTHROUGH, "1");
 
 	if (SDL_InitSubSystem(SDL_INIT_EVERYTHING) != 0)
 	{
@@ -294,11 +303,6 @@ LLWindowSDL::LLWindowSDL(LLWindowCallbacks* callbacks,
 
 	// Assume 4:3 aspect ratio until we know better
 	mOriginalAspectRatio = 1024.0 / 768.0;
-
-	if (title.empty())
-		mWindowTitle = "Alchemy Viewer";  // *FIX: (?)
-	else
-		mWindowTitle = title;
 
 	// Create the GL context and set it up for windowed or fullscreen, as appropriate.
 	if(createContext(x, y, width, height, 32, fullscreen, enable_vsync))
@@ -497,7 +501,6 @@ BOOL LLWindowSDL::createContext(int x, int y, int width, int height, int bits, B
 	// captures don't survive contexts
 	mGrabbyKeyFlags = 0;
 	mReallyCapturedCount = 0;
-	SDL_SetHint(SDL_HINT_MOUSE_FOCUS_CLICKTHROUGH, "1");
 
 	SDL_version c_sdl_version;
 	SDL_VERSION(&c_sdl_version);
@@ -1436,95 +1439,6 @@ void LLWindowSDL::flashIcon(F32 seconds)
 	mFlashing = TRUE;
 }
 
-
-#if 0
-BOOL LLWindowSDL::isClipboardTextAvailable()
-{
-	if (ll_try_gtk_init())
-	{
-		GtkClipboard * const clipboard =
-			gtk_clipboard_get(GDK_NONE);
-		return gtk_clipboard_wait_is_text_available(clipboard) ?
-			TRUE : FALSE;
-	}
-	return FALSE; // failure
-}
-
-BOOL LLWindowSDL::pasteTextFromClipboard(LLWString &text)
-{
-	if (ll_try_gtk_init())
-	{
-		GtkClipboard * const clipboard =
-			gtk_clipboard_get(GDK_NONE);
-		gchar * const data = gtk_clipboard_wait_for_text(clipboard);
-		if (data)
-		{
-			text = LLWString(utf8str_to_wstring(data));
-			g_free(data);
-			return TRUE;
-		}
-	}
-	return FALSE; // failure
-}
-
-BOOL LLWindowSDL::copyTextToClipboard(const LLWString &text)
-{
-	if (ll_try_gtk_init())
-	{
-		const std::string utf8 = wstring_to_utf8str(text);
-		GtkClipboard * const clipboard =
-			gtk_clipboard_get(GDK_NONE);
-		gtk_clipboard_set_text(clipboard, utf8.c_str(), utf8.length());
-		return TRUE;
-	}
-	return FALSE; // failure
-}
-
-
-BOOL LLWindowSDL::isPrimaryTextAvailable()
-{
-	if (ll_try_gtk_init())
-	{
-		GtkClipboard * const clipboard =
-			gtk_clipboard_get(GDK_SELECTION_PRIMARY);
-		return gtk_clipboard_wait_is_text_available(clipboard) ?
-			TRUE : FALSE;
-	}
-	return FALSE; // failure
-}
-
-BOOL LLWindowSDL::pasteTextFromPrimary(LLWString &text)
-{
-	if (ll_try_gtk_init())
-	{
-		GtkClipboard * const clipboard =
-			gtk_clipboard_get(GDK_SELECTION_PRIMARY);
-		gchar * const data = gtk_clipboard_wait_for_text(clipboard);
-		if (data)
-		{
-			text = LLWString(utf8str_to_wstring(data));
-			g_free(data);
-			return TRUE;
-		}
-	}
-	return FALSE; // failure
-}
-
-BOOL LLWindowSDL::copyTextToPrimary(const LLWString &text)
-{
-	if (ll_try_gtk_init())
-	{
-		const std::string utf8 = wstring_to_utf8str(text);
-		GtkClipboard * const clipboard =
-			gtk_clipboard_get(GDK_SELECTION_PRIMARY);
-		gtk_clipboard_set_text(clipboard, utf8.c_str(), utf8.length());
-		return TRUE;
-	}
-	return FALSE; // failure
-}
-
-#else
-
 BOOL LLWindowSDL::isClipboardTextAvailable()
 {
 	return SDL_HasClipboardText();
@@ -1553,20 +1467,29 @@ BOOL LLWindowSDL::copyTextToClipboard(const LLWString &text)
 
 BOOL LLWindowSDL::isPrimaryTextAvailable()
 {
-	return FALSE; // unsupported
+	return SDL_HasPrimarySelectionText();
 }
 
 BOOL LLWindowSDL::pasteTextFromPrimary(LLWString &dst)
 {
-	return FALSE; // unsupported
+	if (isPrimaryTextAvailable())
+	{
+		char* data = SDL_GetPrimarySelectionText();
+		if (data)
+		{
+			dst = LLWString(utf8str_to_wstring(data));
+			SDL_free(data);
+			return TRUE;
+		}
+	}
+	return FALSE; // failure
 }
 
-BOOL LLWindowSDL::copyTextToPrimary(const LLWString &s)
+BOOL LLWindowSDL::copyTextToPrimary(const LLWString &text)
 {
-	return FALSE;  // unsupported
+	const std::string utf8 = wstring_to_utf8str(text);
+	return SDL_SetPrimarySelectionText(utf8.c_str()) == 0; // success == 0
 }
-
-#endif // LL_GTK
 
 LLWindow::LLWindowResolution* LLWindowSDL::getSupportedResolutions(S32 &num_resolutions)
 {
@@ -2425,17 +2348,21 @@ S32 OSMessageBoxSDL(const std::string& text, const std::string& caption, U32 typ
 
 	const SDL_MessageBoxButtonData* buttons;
 
+	int num_buttons = 0;
 	switch (type)
 	{
 	default:
 	case OSMB_OK:
 		buttons = buttons_ok;
+		num_buttons = 1;
 		break;
 	case OSMB_OKCANCEL:
 		buttons = buttons_okcancel;
+		num_buttons = 2;
 		break;
 	case OSMB_YESNO:
 		buttons = buttons_yesno;
+		num_buttons = 2;
 		break;
 	}
 
@@ -2444,7 +2371,7 @@ S32 OSMessageBoxSDL(const std::string& text, const std::string& caption, U32 typ
 		gWindowImplementation->getSDLWindow(), /* .window */
 		caption.c_str(), /* .title */
 		text.c_str(), /* .message */
-		SDL_arraysize(buttons), /* .numbuttons */
+		num_buttons, /* .numbuttons */
 		buttons, /* .buttons */
 		NULL /* .colorScheme */
 	};
@@ -2491,62 +2418,6 @@ BOOL LLWindowSDL::dialogColorPicker( F32 *r, F32 *g, F32 *b)
 	*g = ((F32) ((cc.rgbResult >> 8) & 0xff)) / 255.f;
 
 	*r = ((F32) (cc.rgbResult & 0xff)) / 255.f;
-#elif LL_LINUX
-// 	if (ll_try_gtk_init())
-// 	{
-// 		GtkWidget* win = gtk_color_chooser_dialog_new();
-
-// # if LL_X11
-// 		// Get GTK to tell the window manager to associate this
-// 		// dialog with our non-GTK SDL window, which should try
-// 		// to keep it on top etc.
-// 		if (mSDL_XWindowID != None)
-// 		{
-// 			gtk_widget_realize(GTK_WIDGET(win)); // so we can get its gdkwin
-//             GdkWindow* gdkwin = gdk_x11_window_foreign_new_for_display(gdk_display_get_default(), static_cast<Window>(mSDL_XWindowID));
-// 			gdk_window_set_transient_for(gtk_widget_get_window(GTK_WIDGET(win)), gdkwin);
-// 		}
-// # endif //LL_X11
-
-// 		GtkColorSelection *colorsel = GTK_COLOR_SELECTION (gtk_color_selection_dialog_get_color_selection (GTK_COLOR_SELECTION_DIALOG(win)));
-
-// 		GdkColor color, orig_color;
-// 		orig_color.pixel = 0;
-// 		orig_color.red = guint16(65535 * *r);
-// 		orig_color.green= guint16(65535 * *g);
-// 		orig_color.blue = guint16(65535 * *b);
-// 		color = orig_color;
-
-// 		gtk_color_selection_set_previous_color (colorsel, &color);
-// 		gtk_color_selection_set_current_color (colorsel, &color);
-// 		gtk_color_selection_set_has_palette (colorsel, TRUE);
-// 		gtk_color_selection_set_has_opacity_control(colorsel, FALSE);
-
-// 		gint response = GTK_RESPONSE_NONE;
-// 		g_signal_connect (win,
-// 				  "response", 
-// 				  G_CALLBACK (response_callback),
-// 				  &response);
-
-// 		g_signal_connect (G_OBJECT (colorsel), "color_changed",
-// 				  G_CALLBACK (color_changed_callback),
-// 				  &color);
-
-// 		gtk_window_set_modal(GTK_WINDOW(win), TRUE);
-// 		gtk_widget_show_all(win);
-// 		gtk_main();
-
-// 		if (response == GTK_RESPONSE_OK &&
-// 		    (orig_color.red != color.red
-// 		     || orig_color.green != color.green
-// 		     || orig_color.blue != color.blue) )
-// 		{
-// 			*r = color.red / 65535.0f;
-// 			*g = color.green / 65535.0f;
-// 			*b = color.blue / 65535.0f;
-// 			rtn = TRUE;
-// 		}
-// 	}
 #endif
 	afterDialog();
 	return retval;
