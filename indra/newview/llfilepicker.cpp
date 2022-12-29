@@ -55,9 +55,6 @@ LLFilePicker LLFilePicker::sInstance;
 #define IMAGE_FILTER L"Images (*.tga; *.bmp; *.jpg; *.jpeg; *.png; *.webp)\0*.tga;*.bmp;*.jpg;*.jpeg;*.png;*.webp\0"
 #define ANIM_FILTER L"Animations (*.bvh; *.anim)\0*.bvh;*.anim\0"
 #define COLLADA_FILTER L"Scene (*.dae)\0*.dae\0"
-#ifdef _CORY_TESTING
-#define GEOMETRY_FILTER L"SL Geometry (*.slg)\0*.slg\0"
-#endif
 #define XML_FILTER L"XML files (*.xml)\0*.xml\0"
 #define SLOBJECT_FILTER L"Objects (*.slobject)\0*.slobject\0"
 #define RAW_FILTER L"RAW files (*.raw)\0*.raw\0"
@@ -198,12 +195,6 @@ BOOL LLFilePicker::setupFilter(ELoadFilter filter)
 		mOFN.lpstrFilter = COLLADA_FILTER \
 			L"\0";
 		break;
-#ifdef _CORY_TESTING
-	case FFLOAD_GEOMETRY:
-		mOFN.lpstrFilter = GEOMETRY_FILTER \
-			L"\0";
-		break;
-#endif
 	case FFLOAD_XML:
 		mOFN.lpstrFilter = XML_FILTER \
 			L"\0";
@@ -499,18 +490,6 @@ BOOL LLFilePicker::getSaveFile(ESaveFilter filter, const std::string& filename, 
 			L"XAF Anim File (*.xaf)\0*.xaf\0" \
 			L"\0";
 		break;
-#ifdef _CORY_TESTING
-	case FFSAVE_GEOMETRY:
-		if (filename.empty())
-		{
-			wcsncpy( mFilesW,L"untitled.slg", FILENAME_BUFFER_SIZE);	/*Flawfinder: ignore*/
-		}
-		mOFN.lpstrDefExt = L"slg";
-		mOFN.lpstrFilter =
-			L"SLG SL Geometry File (*.slg)\0*.slg\0" \
-			L"\0";
-		break;
-#endif
 	case FFSAVE_CSV:
 		if (filename.empty())
 		{
@@ -655,11 +634,6 @@ std::vector<std::string>* LLFilePicker::navOpenFilterProc(ELoadFilter filter) //
         case FFLOAD_COLLADA:
             allowedv->emplace_back("dae");
             break;
-#ifdef _CORY_TESTING
-        case FFLOAD_GEOMETRY:
-            allowedv->emplace_back("slg");
-            break;
-#endif
         case FFLOAD_XML:
             allowedv->emplace_back("xml");
             break;
@@ -748,12 +722,6 @@ bool	LLFilePicker::doNavSaveDialog(ESaveFilter filter, const std::string& filena
 		case FFSAVE_ANIM:
 			extension = "xaf";
 			break;
-
-#ifdef _CORY_TESTING
-		case FFSAVE_GEOMETRY:
-			extension = "slg";
-			break;
-#endif	
 			
 		case FFSAVE_XML:
 			extension = "xml";
