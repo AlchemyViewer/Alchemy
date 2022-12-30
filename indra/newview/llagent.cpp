@@ -5658,7 +5658,6 @@ LLTeleportRequestViaLocation::LLTeleportRequestViaLocation(const LLVector3d &pPo
 
 LLTeleportRequestViaLocation::~LLTeleportRequestViaLocation()
 {
-    LL_INFOS("Teleport") << "~LLTeleportRequestViaLocation" << LL_ENDL;
 }
 
 void LLTeleportRequestViaLocation::toOstream(std::ostream& os) const
