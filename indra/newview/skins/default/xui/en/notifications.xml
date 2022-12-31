@@ -8320,7 +8320,7 @@ Do not allow access if you do not fully understand why it wants access to your a
    name="ScriptDialog"
    show_toast="false"
    type="notify">
-[NAME]&apos;s &apos;&lt;nolink&gt;[TITLE]&lt;/nolink&gt;&apos;
+[NAME]&apos;s &apos;&lt;nolink&gt;[TITLE]&lt;/nolink&gt;&apos; on channel [CHANNEL]
 [MESSAGE]
     <form name="form">
       <button
