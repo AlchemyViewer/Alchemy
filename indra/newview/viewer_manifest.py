@@ -158,7 +158,7 @@ class ViewerManifest(LLManifest):
             with self.prefix(src_dst="skins"):
                 # include the entire textures directory recursively
                 with self.prefix(src_dst="*/textures"):
-                    self.path("*/*.jpg")
+                    # self.path("*/*.jpg")
                     self.path("*/*.png")
                     self.path("*.tga")
                     self.path("*.j2c")
@@ -459,25 +459,8 @@ class WindowsManifest(ViewerManifest):
         # Get shared libs from the shared libs staging directory
         with self.prefix(src=os.path.join(self.args['build'], os.pardir,
                                           'sharedlibs', self.args['configuration'])):
-            # APR Libraries
-            self.path("libapr-1.dll")
-            self.path("libapriconv-1.dll")
-            self.path("libaprutil-1.dll")
-
             # For image support
             self.path("openjp2.dll")
-
-            # HTTP and Network
-            if self.args['configuration'].lower() == 'debug':
-                self.path("xmlrpc-epid.dll")
-            else:
-                self.path("xmlrpc-epi.dll")
-
-            # Misc
-            if self.args['configuration'].lower() == 'debug':
-                self.path("libexpatd.dll")
-            else:
-                self.path("libexpat.dll")
 
             # Get openal dll for audio engine, continue if missing
             if self.args['openal'] == 'ON' or self.args['openal'] == 'TRUE':
@@ -834,8 +817,6 @@ class DarwinManifest(ViewerManifest):
             # Remember where we parked this car.
             with self.prefix(src=libdir, dst="Frameworks"):
                 for libfile in (
-                                'libapr-1.*.dylib',
-                                'libaprutil-1.*.dylib',
                                 'libndofdev.dylib',
                                 ):
                     self.path(libfile)
@@ -981,15 +962,81 @@ class DarwinManifest(ViewerManifest):
                             self.path( "*.dylib" )
                             self.path( "plugins.dat" )
 
-
     def package_finish(self):
         import dmgbuild
 
         volname=self.app_name() + " Installer"
         finalname = self.installer_base_name() + ".dmg"
-
         application = self.get_dst_prefix()
         appname = os.path.basename(application)
+
+        # Sign the app if requested; 
+        if 'signature' in self.args:
+            print("Attempting to sign '%s'" % application)
+            identity = self.args['signature']
+            if identity == '':
+                identity = 'Developer ID Application'
+
+            # Look for an environment variable set via CI
+            try:
+                keychain_name = os.environ['APPLE_KEYCHAIN']
+                keychain_pwd = os.environ['APPLE_KEY']
+            except KeyError:
+                pass
+            else:
+                # variable found so use it to unlock keychain followed by codesign
+                slplugin_path = os.path.join(application, "Contents", "Resources", "SLPlugin.app")
+                home_path = os.environ['HOME']
+                viewer_keychain = os.path.join(home_path, 'Library',
+                                                'Keychains', keychain_name)
+                self.run_command(['security', 'unlock-keychain',
+                                    '-p', keychain_pwd, viewer_keychain])
+
+                self.run_command(
+                    ['codesign',
+                        '--verbose',
+                        '--force',
+                        '--timestamp',
+                        '--keychain', viewer_keychain,
+                        '--sign', identity,
+                        os.path.join(slplugin_path, "Contents", "Frameworks", "media_plugin_cef.dylib")])
+                self.run_command(
+                    ['codesign',
+                        '--verbose',
+                        '--force',
+                        '--timestamp',
+                        '--keychain', viewer_keychain,
+                        '--sign', identity,
+                        os.path.join(slplugin_path, "Contents", "Frameworks", "plugins", "plugins.dat")])
+                self.run_command(
+                    ['codesign',
+                        '--verbose',
+                        '--force',
+                        '--timestamp',
+                        '--keychain', viewer_keychain,
+                        '--sign', identity,
+                        os.path.join(slplugin_path, "Contents", "Frameworks", "media_plugin_libvlc.dylib")])
+                self.run_command(
+                    ['codesign',
+                        '--verbose',
+                        '--force',
+                        '--timestamp',
+                        '--entitlements', self.src_path_of("slplugin.entitlements"),
+                        '--options', 'runtime',
+                        '--keychain', viewer_keychain,
+                        '--sign', identity,
+                        slplugin_path])
+                self.run_command(
+                    ['codesign',
+                        '--verbose',
+                        '--force',
+                        '--timestamp',
+                        '--entitlements', self.src_path_of("slplugin.entitlements"),
+                        '--options', 'runtime',
+                        '--keychain', viewer_keychain,
+                        '--sign', identity,
+                        application])
+                self.run_command(['codesign', '--verify', '--deep', '--verbose', application])
 
         vol_icon = self.src_path_of(os.path.join(self.icon_path(), 'alchemy.icns'))
         print("DEBUG: icon_path '%s'" % vol_icon)
@@ -1059,6 +1106,45 @@ class DarwinManifest(ViewerManifest):
             }
 
         dmgbuild.build_dmg(filename=finalname, volume_name=volname, settings=dmgoptions)
+
+        if 'signature' in self.args:
+            print("Attempting to sign '%s'" % finalname)
+            identity = self.args['signature']
+            if identity == '':
+                identity = 'Developer ID Application'
+
+            # Look for an environment variable set via build.sh when running in Team City.
+            try:
+                keychain_name = os.environ['APPLE_KEYCHAIN']
+                keychain_pwd = os.environ['APPLE_KEY']
+                notary_token = os.environ['APPLE_TOKEN']
+            except KeyError:
+                pass
+            else:
+                # variable found so use it to unlock keychain followed by codesign
+                home_path = os.environ['HOME']
+                viewer_keychain = os.path.join(home_path, 'Library',
+                                                'Keychains', keychain_name)
+                self.run_command(['security', 'unlock-keychain',
+                                    '-p', keychain_pwd, viewer_keychain])
+
+                self.run_command(
+                    ['xcrun', 'codesign',
+                        '--verbose',
+                        '--force',
+                        '--timestamp',
+                        '--keychain', viewer_keychain,
+                        '--sign', identity,
+                        finalname])
+                self.run_command(
+                    ['xcrun', 'notarytool',
+                        'submit', finalname,
+                        '--keychain', viewer_keychain,
+                        '--keychain-profile', notary_token,
+                        '--wait'])
+                self.run_command(
+                    ['xcrun', 'stapler',
+                        'staple', finalname])
 
         self.package_file = finalname
 
@@ -1209,10 +1295,6 @@ class Linux_i686_Manifest(LinuxManifest):
         debpkgdir = os.path.join(pkgdir, "lib", "debug")
 
         with self.prefix(src=relpkgdir, dst="lib"):
-            self.path("libapr-1.so*")
-            self.path("libaprutil-1.so*")
-            self.path("libdb*.so")
-            self.path("libexpat.so.*")
             self.path("libSDL2*.so*")
             self.path("libopenjp2.*so*")
             self.path("libjpeg.so*")
@@ -1224,12 +1306,21 @@ class Linux_i686_Manifest(LinuxManifest):
             if self.args['fmodstudio'] == 'ON' or self.args['fmodstudio'] == 'TRUE':
                 self.path("libfmod.so*")
 
+            # Sentry
+            if self.args['sentry'] == 'ON' or self.args['sentry'] == 'TRUE':
+                self.path("libsentry.so")
+
             if self.args['discord'] == 'ON' or self.args['discord'] == 'TRUE':
                 self.path("libdiscord_game_sdk.so")
 
         # Vivox runtimes
         with self.prefix(src=os.path.join(pkgdir, 'bin', 'release'), dst="bin"):
             self.path("SLVoice")
+
+            # Sentry
+            if self.args['sentry'] == 'ON' or self.args['sentry'] == 'TRUE':
+                self.path("crashpad_handler")
+
         with self.prefix(src=relpkgdir, dst="lib"):
             self.path("libortp.so")
             self.path("libsndfile.so.1")
@@ -1251,9 +1342,6 @@ class Linux_x86_64_Manifest(LinuxManifest):
         debpkgdir = os.path.join(pkgdir, "lib", "debug")
 
         with self.prefix(src=relpkgdir, dst="lib"):
-            self.path("libapr-1.so*")
-            self.path("libaprutil-1.so*")
-            self.path("libexpat.so.*")
             self.path("libSDL2*.so*")
             self.path("libopenjp2.*so*")
             self.path("libjpeg.so*")
@@ -1265,12 +1353,21 @@ class Linux_x86_64_Manifest(LinuxManifest):
             if self.args['fmodstudio'] == 'ON' or self.args['fmodstudio'] == 'TRUE':
                 self.path("libfmod.so*")
 
+            # Sentry
+            if self.args['sentry'] == 'ON' or self.args['sentry'] == 'TRUE':
+                self.path("libsentry.so")
+
             if self.args['discord'] == 'ON' or self.args['discord'] == 'TRUE':
                 self.path("libdiscord_game_sdk.so")
 
         # Vivox runtimes
         with self.prefix(src=os.path.join(pkgdir, 'bin', 'release'), dst="bin"):
             self.path("SLVoice")
+
+            # Sentry
+            if self.args['sentry'] == 'ON' or self.args['sentry'] == 'TRUE':
+                self.path("crashpad_handler")
+
         with self.prefix(src=relpkgdir, dst="lib"):
             self.path("libortp.so")
             self.path("libsndfile.so.1")

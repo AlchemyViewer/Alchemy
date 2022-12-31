@@ -35,7 +35,6 @@ each other.
 
 import sys
 import os.path
-import certifi
 
 # Look for indra/lib/python in all possible parent directories ...
 # This is an improvement over the setup-path.py method used previously:
@@ -142,7 +141,7 @@ def fetch(url):
         with open(file_name, 'rb') as f:
             return f.read()
     else:
-        with urllib.request.urlopen(url, cafile=certifi.where()) as res:
+        with urllib.request.urlopen(url) as res:
             body = res.read()
             if res.status > 299:
                 sys.exit("ERROR: Unable to download %s. HTTP status %d.\n%s" % (url, res.status, body.decode("utf-8")))

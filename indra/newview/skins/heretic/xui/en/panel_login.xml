@@ -1,0 +1,252 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<panel
+    follows="all"
+    height="768"
+    layout="topleft"
+    left="0"
+    name="panel_login"
+    focus_root="true" 
+    bg_opaque_color="PanelDefaultBackgroundColor"
+    background_visible="true"
+    background_opaque="true"
+    width="1024">
+  <!-- *NOTE: Custom resize logic for login_html in llpanellogin.cpp -->
+  <web_browser
+      tab_stop="false" 
+      trusted_content="true" 
+      bg_opaque_color="Black"
+      border_visible="false"
+      follows="all"
+      left="0"
+      name="login_html"
+      start_url=""
+      top="18"
+      height="670"
+      width="1024" />
+  <layout_stack
+      animate="false"
+      clip="false"
+      follows="left|bottom|right"
+      name="login_widgets"
+      layout="topleft"
+      orientation="horizontal"
+      top="688"
+      width="1024"
+      height="80">
+    <layout_panel
+        auto_resize="false"
+        follows="left|bottom"
+        name="login"
+        layout="topleft"
+        width="335"
+        min_width="335"
+        height="80">
+      <text
+          follows="left|bottom"
+          font="SansSerif"
+          font.style="BOLD"
+          font.size="Large"
+          height="16"
+          name="log_in_text"
+          top="8"
+          left="15"
+          width="150">
+        LOG IN
+      </text>
+      <text
+          follows="left|bottom"
+          font="SansSerifSmall"
+          height="16"
+          name="username_text"
+          top="35"
+          left="15"
+          width="150">
+        Username:
+      </text>
+      <combo_box
+          allow_text_entry="true"
+          follows="left|bottom"
+          height="22"
+          left="15"
+          max_chars="128"
+          combo_editor.commit_on_focus_lost="false"
+          combo_editor.prevalidate_callback="ascii"
+          tool_tip="The account name you chose when you registered, like yiffmaster420 or Steller Sunshine"
+          top_pad="0"
+          name="username_combo"
+          width="178">
+          <combo_box.combo_editor
+            text_pad_left="8" 
+            bg_image_always_focused="true"/>
+      </combo_box>
+      <text
+          follows="left|bottom"
+          font="SansSerifSmall"
+          height="16"
+          name="password_text"
+          top="35"
+          left="200"
+          width="128">
+        Password:
+      </text>
+      <!-- STEAM-14: Turn off commit_on_focus_lost so if user presses Enter
+           with focus in this line_editor, we can use commit action to
+           initiate login -->
+      <line_editor
+          follows="left|bottom"
+          height="22"
+          max_length_chars="64"
+          name="password_edit"
+          is_password="true" 
+          select_on_focus="true"
+          commit_on_focus_lost="false"
+          top_pad="0"
+          width="140" />
+    </layout_panel>
+    <layout_panel
+        auto_resize="false"
+        follows="left|bottom"
+        name="start_location_panel"
+        layout="topleft"
+        width="175"
+        min_width="175"
+        height="80">
+      <text
+          follows="left|bottom"
+          font="SansSerifSmall"
+          height="16"
+          left="10"
+          name="start_location_text"
+          top="35"
+          width="130">
+        Start at:
+      </text>
+      <combo_box
+          allow_text_entry="true"
+          control_name="NextLoginLocation"
+          follows="left|bottom"
+          height="22"
+          max_chars="128"
+          top_pad="0"
+          name="start_location_combo"
+          width="167">
+	<combo_box.combo_editor
+	  bg_image_always_focused="true"
+	  text_pad_left="8"/>
+	<combo_box.item
+	  label="Last location"
+	  name="MyLastLocation"
+	  value="last" />
+	<combo_box.item
+	  label="Home"
+	  name="MyHome"
+	  value="home" />
+      </combo_box>
+    </layout_panel>
+    <layout_panel
+        auto_resize="false"
+        follows="left|bottom"
+        name="grid_panel"
+        layout="topleft"
+        width="145"
+        height="80"
+        visible="false">
+      <text
+        follows="left|bottom"
+        font="SansSerifSmall"
+        height="16"
+        name="grid_login_text"
+        top="35"
+        left="10"
+        width="128">
+        Log into Grid:
+      </text>
+      <combo_box
+        allow_text_entry="true"
+        follows="left|bottom"
+        height="22"
+        max_chars="256"
+	top_pad="0"
+        combo_editor.commit_on_focus_lost="false"
+        combo_editor.prevalidate_callback="ascii"
+        name="server_combo"
+        width="135"
+        combo_button.scale_image="true" >
+      <combo_box.drop_down_button
+        font="SansSerifLarge"/>
+      </combo_box>
+    </layout_panel>
+    <layout_panel
+        auto_resize="false"
+        follows="left|bottom"
+        name="links_login_panel"
+        layout="topleft"
+        width="290"
+        height="80">
+      <text
+          follows="left|bottom"
+          font="SansSerifSmall"
+          text_color="SchemeLightest"
+          left="10"
+          height="16"
+          name="sign_up_text"
+          top="10"
+          width="280">
+        Create an account
+      </text>
+      <text
+          follows="left|bottom"
+          font="SansSerifSmall"
+          text_color="SchemeLightest"
+          height="16"
+          name="forgot_password_text"
+          top="26"
+          width="280">
+        Forgot your username or password?
+      </text>
+      <button
+          follows="left|bottom"
+          top_pad="9"
+          height="23"
+          label="Log In"
+          layout="topleft"
+          name="connect_btn"
+          width="90" />
+      <check_box
+          follows="left|bottom"
+          font="SansSerifSmall"
+          left="110"
+          top="45"
+          height="16"
+          label="Remember username"
+          name="remember_name"
+          width="145" />
+      <check_box
+          control_name="RememberPassword"
+          follows="left|bottom"
+          font="SansSerifSmall"
+          left="110"
+          height="16"
+          label="Remember password"
+          top_pad="1"
+          name="remember_password"
+          width="145" />
+    </layout_panel>
+	<layout_panel
+	  auto_resize="true"
+	  follows="right|bottom"
+	  name="heretic_panel"
+	  layout="topleft"
+	  width="280"
+      min_width="280"
+	  height="80">
+        <icon
+          follows="right|bottom"
+          image_name="Heretic"
+          top="25"
+          left="70"
+          width="130"
+          height="35" />
+	</layout_panel>
+  </layout_stack>
+</panel>

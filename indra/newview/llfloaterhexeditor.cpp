@@ -206,11 +206,10 @@ void LLFloaterHexEditor::assetCallback(const LLUUID& asset_uuid,
 		return;
 	}
 
-    if (!file.open() || !file.read(buffer.get(), file_size))
+    if (!file.read(buffer.get(), file_size))
     {
         LL_WARNS("Hex") << "Could not read " << asset_uuid.asString() << " into memory" << LL_ENDL;
     }
-    file.close();
 
 	std::vector<U8> new_data;
 	for(S32 i = 0; i < file_size; ++i)
@@ -278,13 +277,12 @@ void LLFloaterHexEditor::onClickUpload()
 	value.clear();
 
 	LLFileSystem file(fake_asset_id, item->getType(), LLFileSystem::APPEND);
-    if (!file.open() || !file.write(buffer.get(), val_size))
+    if (!file.write(buffer.get(), val_size))
 	{
         LLSD args = LLSD().with("MESSAGE", "Couldn't write data to file");
 		LLNotificationsUtil::add("GenericAlert", args);
 		return;
 	}
-    file.close();
 
 	LLAssetStorage::LLStoreAssetCallback callback  = nullptr;
 	S32 expected_upload_cost = LLGlobalEconomy::getInstance()->getPriceUpload();
@@ -344,7 +342,7 @@ void LLFloaterHexEditor::onClickSave()
 	value.clear();
 
 	LLFileSystem file(fake_asset_id, item->getType(), LLFileSystem::APPEND);
-    if (file.open() && file.getMaxSize() > val_size)
+    if (file.getMaxSize() > val_size)
     {
         if (!file.write(buffer.get(), val_size))
         {
@@ -352,7 +350,6 @@ void LLFloaterHexEditor::onClickSave()
             LLNotificationsUtil::add("GenericAlert", args);
             return;
         }
-        file.close();
     }
 
 

@@ -750,7 +750,7 @@
      reference="Red" />
     <color
      name="PanelDefaultBackgroundColor"
-     reference="DkGray" />
+     reference="DkGray2" />
     <color
      name="PanelDefaultHighlightLight"
      reference="White_50" />
@@ -1148,4 +1148,7 @@
   <color
    name="ProfileOnlineIndicatorColor"
    reference="Green" />
+  <color
+   name="FriendChatColor"
+   reference="White" />
 </colors>

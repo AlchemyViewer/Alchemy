@@ -234,10 +234,7 @@ LLVOVolume::LLVOVolume(const LLUUID &id, const LLPCode pcode, LLViewerRegion *re
     mColorChanged = FALSE;
 	mSpotLightPriority = 0.f;
 
-	mSkinInfoFailed = false;
 	mSkinInfo = NULL;
-	mSkinRenderMatrixJointCount = 0;
-	mSkinLastRenderFrame = 0;
 
 	mMediaImplList.resize(getNumTEs());
 	mLastFetchedMediaVersion = -1;
@@ -257,7 +254,14 @@ LLVOVolume::~LLVOVolume()
 
 	mSkinInfo = nullptr;
 
-	gMeshRepo.unregisterMesh(this);
+	//if (mHasRequestedMeshData)
+	{
+		gMeshRepo.unregisterMesh(this, getVolume()->getParams().getSculptID());
+	}
+	//if (mHasRequestedSkinData)
+	{
+		gMeshRepo.unregisterSkin(this, getVolume()->getParams().getSculptID());
+	}
 
 	if(!mMediaImplList.empty())
 	{
@@ -1117,11 +1121,11 @@ BOOL LLVOVolume::setVolume(const LLVolumeParams &params_in, const S32 detail, bo
 				if (mSkinInfo && mSkinInfo->mMeshID != volume_params.getSculptID())
 				{
 					mSkinInfo = NULL;
-					mSkinInfoFailed = false;
 				}
 
 				if (!getVolume()->isMeshAssetLoaded())
 				{ 
+					mHasRequestedMeshData = true;
 					//load request not yet issued, request pipeline load this mesh
 					S32 available_lod = gMeshRepo.loadMesh(this, volume_params, lod, last_lod);
 					if (available_lod != lod)
@@ -1130,12 +1134,13 @@ BOOL LLVOVolume::setVolume(const LLVolumeParams &params_in, const S32 detail, bo
 					}
 				}
 				
-				if (!mSkinInfo && !hasSkinInfoFailed())
+				if (!mSkinInfo)
 				{
-					mSkinInfo = gMeshRepo.getSkinInfo(volume_params.getSculptID(), this);
-					if (mSkinInfo)
+					const LLMeshSkinInfo* skin_info = gMeshRepo.getSkinInfo(volume_params.getSculptID(), this);
+					mHasRequestedSkinData = true;
+					if (skin_info)
 					{
-						notifySkinInfoLoaded(mSkinInfo);
+						notifySkinInfoLoaded(skin_info);
 					}
 				}
 			}
@@ -1171,7 +1176,6 @@ void LLVOVolume::updateSculptTexture()
 			mSculptTexture = LLViewerTextureManager::getFetchedTexture(id, FTT_DEFAULT, TRUE, LLGLTexture::BOOST_NONE, LLViewerTexture::LOD_TEXTURE);
 		}
 
-		mSkinInfoFailed = false;
 		mSkinInfo = NULL;
 	}
 	else
@@ -1209,6 +1213,7 @@ void LLVOVolume::updateVisualComplexity()
 
 void LLVOVolume::notifyMeshLoaded()
 { 
+	mHasRequestedMeshData = false;
 	mSculptChanged = TRUE;
 	gPipeline.markRebuild(mDrawable, LLDrawable::REBUILD_GEOMETRY, TRUE);
 
@@ -1227,17 +1232,31 @@ void LLVOVolume::notifyMeshLoaded()
     updateVisualComplexity();
 }
 
-void LLVOVolume::notifySkinInfoLoaded(LLMeshSkinInfo* skin)
+void LLVOVolume::notifySkinInfoLoaded(const LLMeshSkinInfo* skin)
 {
-	mSkinInfoFailed = false;
+	mHasRequestedSkinData = false;
 	mSkinInfo = skin;
+	mSculptChanged = TRUE;
+	gPipeline.markRebuild(mDrawable, LLDrawable::REBUILD_GEOMETRY, TRUE);
 
-	notifyMeshLoaded();
+    LLVOAvatar *av = getAvatar();
+    if (av && !isAnimatedObject())
+    {
+        av->addAttachmentOverridesForObject(this);
+        av->notifyAttachmentMeshLoaded();
+    }
+    LLControlAvatar *cav = getControlAvatar();
+    if (cav && isAnimatedObject())
+    {
+        cav->addAttachmentOverridesForObject(this);
+        cav->notifyAttachmentMeshLoaded();
+    }
+    updateVisualComplexity();
 }
 
 void LLVOVolume::notifySkinInfoUnavailable()
 {
-	mSkinInfoFailed = true;
+	mHasRequestedSkinData = false;
 	mSkinInfo = nullptr;
 }
 
@@ -3763,6 +3782,8 @@ bool LLVOVolume::isAnimatedObject() const
 // virtual
 void LLVOVolume::onReparent(LLViewerObject *old_parent, LLViewerObject *new_parent)
 {
+	LLVOVolume *old_volp = old_parent ? old_parent->asVolume() : nullptr;
+
     if (new_parent && !new_parent->isAvatar())
     {
         if (mControlAvatar.notNull())
@@ -3774,8 +3795,6 @@ void LLVOVolume::onReparent(LLViewerObject *old_parent, LLViewerObject *new_pare
             av->markForDeath();
         }
     }
-
-	LLVOVolume *old_volp = old_parent ? old_parent->asVolume() : nullptr;
 	if (old_volp && old_volp->isAnimatedObject())
     {
         if (old_volp->getControlAvatar())
@@ -4368,6 +4387,7 @@ U32 LLVOVolume::getHighLODTriangleCount()
 		if (!ref->isMeshAssetLoaded() || ref->getNumVolumeFaces() == 0)
 		{
 			gMeshRepo.loadMesh(this, volume->getParams(), LLModel::LOD_HIGH);
+			mHasRequestedMeshData = true;
 		}
 		ret = ref->getNumTriangles();
 		LLPrimitive::getVolumeManager()->unrefVolume(ref);
@@ -6711,7 +6731,7 @@ U32 LLVolumeGeometryManager::genDrawInfo(LLSpatialGroup* group, U32 mask, LLFace
 				}
 				else if (facep->canRenderAsMask())
 				{
-					if (te->getFullbright() || (fullbright && hud_group) || LLPipeline::sNoAlpha)
+					if (te->getFullbright() || LLPipeline::sNoAlpha)
 					{
 						registerFace(group, facep, LLRenderPass::PASS_FULLBRIGHT_ALPHA_MASK);
 					}

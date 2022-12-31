@@ -98,6 +98,7 @@ LLControlGroup gSavedSettings("Global");	// saved at end of session
 LLControlGroup gSavedPerAccountSettings("PerAccount"); // saved at end of session
 LLControlGroup gCrashSettings("CrashSettings");	// saved at end of session
 LLControlGroup gWarningSettings("Warnings"); // persists ignored dialogs/warnings
+LLControlGroup gSkinSettings("SkinUI"); // [AL:CR] read only settings tied to skin selection
 
 std::string gLastRunVersion;
 

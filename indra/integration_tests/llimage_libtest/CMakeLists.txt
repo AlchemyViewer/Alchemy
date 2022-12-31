@@ -102,27 +102,27 @@ add_custom_command(TARGET llimage_libtest POST_BUILD
   DEPENDS ${BUILT_LLCOMMON}
 )
 
-if (DARWIN)
-  # Copy the required libraries to the package app
-  add_custom_command(TARGET llimage_libtest POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy ${AUTOBUILD_INSTALL_DIR}/lib/release/libapr-1.0.dylib ${LLIMAGE_LIBTEST_DESTINATION_DIR}
-    DEPENDS ${AUTOBUILD_INSTALL_DIR}/lib/release/libapr-1.0.dylib
-  )
-  add_custom_command(TARGET llimage_libtest POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy ${AUTOBUILD_INSTALL_DIR}/lib/release/libaprutil-1.0.dylib ${LLIMAGE_LIBTEST_DESTINATION_DIR}
-    DEPENDS ${AUTOBUILD_INSTALL_DIR}/lib/release/libaprutil-1.0.dylib
-  )
-  add_custom_command(TARGET llimage_libtest POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy ${AUTOBUILD_INSTALL_DIR}/lib/release/libexception_handler.dylib ${LLIMAGE_LIBTEST_DESTINATION_DIR}
-    DEPENDS ${AUTOBUILD_INSTALL_DIR}/lib/release/libexception_handler.dylib
-  )
-  foreach(expat ${EXPAT_COPY})
-    add_custom_command(TARGET llimage_libtest POST_BUILD
-      COMMAND ${CMAKE_COMMAND} -E copy ${AUTOBUILD_INSTALL_DIR}/lib/release/${expat} ${LLIMAGE_LIBTEST_DESTINATION_DIR}
-      DEPENDS ${AUTOBUILD_INSTALL_DIR}/lib/release/${expat}
-    )
-  endforeach(expat)
-endif (DARWIN)
+# if (DARWIN)
+#   # Copy the required libraries to the package app
+#   add_custom_command(TARGET llimage_libtest POST_BUILD
+#     COMMAND ${CMAKE_COMMAND} -E copy ${AUTOBUILD_INSTALL_DIR}/lib/release/libapr-1.0.dylib ${LLIMAGE_LIBTEST_DESTINATION_DIR}
+#     DEPENDS ${AUTOBUILD_INSTALL_DIR}/lib/release/libapr-1.0.dylib
+#   )
+#   add_custom_command(TARGET llimage_libtest POST_BUILD
+#     COMMAND ${CMAKE_COMMAND} -E copy ${AUTOBUILD_INSTALL_DIR}/lib/release/libaprutil-1.0.dylib ${LLIMAGE_LIBTEST_DESTINATION_DIR}
+#     DEPENDS ${AUTOBUILD_INSTALL_DIR}/lib/release/libaprutil-1.0.dylib
+#   )
+#   add_custom_command(TARGET llimage_libtest POST_BUILD
+#     COMMAND ${CMAKE_COMMAND} -E copy ${AUTOBUILD_INSTALL_DIR}/lib/release/libexception_handler.dylib ${LLIMAGE_LIBTEST_DESTINATION_DIR}
+#     DEPENDS ${AUTOBUILD_INSTALL_DIR}/lib/release/libexception_handler.dylib
+#   )
+#   foreach(expat ${EXPAT_COPY})
+#     add_custom_command(TARGET llimage_libtest POST_BUILD
+#       COMMAND ${CMAKE_COMMAND} -E copy ${AUTOBUILD_INSTALL_DIR}/lib/release/${expat} ${LLIMAGE_LIBTEST_DESTINATION_DIR}
+#       DEPENDS ${AUTOBUILD_INSTALL_DIR}/lib/release/${expat}
+#     )
+#   endforeach(expat)
+# endif (DARWIN)
 
 if (WINDOWS)
   # Check indra/test_apps/llplugintest/CMakeLists.txt for an example of what to copy over for Windows and how

@@ -45,6 +45,9 @@ private:
 	void applyUIColor(LLUICtrl* ctrl, const LLSD& param);
 	void getUIColor(LLUICtrl* ctrl, const LLSD& param);
 	
+	void setPreprocInclude();
+	void changePreprocIncludePath(const std::vector<std::string>& filenames, const std::string& proposed_name);
+
 	LLScriptEditor* mEditor;
 };
 

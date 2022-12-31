@@ -252,7 +252,7 @@ void LLControlAvatar::matchVolumeTransform()
             }
 			mRoot->setPosition(vol_pos + mPositionConstraintFixup);
 
-             setGlobalScale(global_scale * mScaleConstraintFixup);
+            setGlobalScale(global_scale * mScaleConstraintFixup);
         }
     }
 }
@@ -709,4 +709,13 @@ void LLControlAvatar::onRegionChanged()
 			cav->mRegionChanged = true;
 		}
 	}
+}
+
+bool LLControlAvatar::isTooComplex() const
+{
+	if (mRootVolp && !mRootVolp->isAttachment())
+	{
+		return false;
+	}
+	return LLVOAvatar::isTooComplex();
 }

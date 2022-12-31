@@ -2,7 +2,7 @@
 <floater
  legacy_header_height="18"
  can_resize="false"
- height="354"
+ height="528"
  layout="topleft"
  name="floater_script_colors"
  help_topic="script_colors"
@@ -324,13 +324,12 @@
     <script_editor
      left="8"
      right="-8"
-     top="176"
-     bottom="-8"
+     top_pad="15"
      type="string"
      length="1"
      follows="left|top|right|bottom"
      font="Monospace"
-     height="100"
+     height="165"
      ignore_tab="false"
      layout="topleft"
      max_length="300"
@@ -356,4 +355,105 @@ default
     }
 }
     </script_editor>
+
+	<text
+		follows="left|top"
+		height="15"
+		layout="topleft"
+		left="12"
+		name="prefs_label"
+		top_pad="6"
+		width="150">
+		Script Editor Options:
+    </text>
+	<check_box
+		control_name="AlchemyLSLPreprocessor"
+		follows="left|top"
+		height="16"
+		top_pad="2"
+		label="Enable LSL preprocessor"
+		tool_tip="When checked, the LSL preprocessor is enabled."
+		name="preproc_checkbox" />
+	<check_box
+		control_name="AlchemyPreProcLSLOptimizer"
+		enabled_control="AlchemyLSLPreprocessor"
+		follows="left|top"
+		height="16"
+		top_pad="2"
+		left_delta="16"
+		label="Script optimizer"
+		tool_tip="When checked, the LSL preprocessor will optimize space used by scripts."
+		name="preprocoptimizer_checkbox" />
+	<check_box
+		control_name="AlchemyPreProcLSLSwitch"
+		enabled_control="AlchemyLSLPreprocessor"
+		follows="left|top"
+		height="16"
+		top_pad="2"
+		label="switch() statement"
+		tool_tip="When checked, the LSL preprocessor will allow the use of the switch() statement for script flow control."
+		name="preprocswitch_checkbox" />
+	<check_box
+		control_name="AlchemyPreProcLSLLazyLists"
+		enabled_control="AlchemyLSLPreprocessor"
+		follows="left|top"
+		height="16"
+		top_pad="2"
+		label="Lazy lists"
+		tool_tip="When checked, the LSL preprocessor will allow the use of syntax extensions for list handling."
+		name="preproclazy_checkbox" />
+	<check_box
+		control_name="AlchemyPreProcEnableHDDInclude"
+		enabled_control="AlchemyLSLPreprocessor"
+		follows="left|top"
+		top_pad="2"
+		height="16"
+		label="#includes from local disk"
+		tool_tip="When checked, the LSL preprocessor will allow #include statements to reference files on your local disk."
+		name="preprocinclude_checkbox" />
+	<text
+		follows="left|top"
+		height="16"
+		type="string"
+		length="1"
+		layout="topleft"
+		name="lslpreprocinclude_textbox"
+		top_pad="2"
+		width="256">
+		Preprocessor include path:
+	</text>
+	<line_editor
+		control_name="AlchemyPreProcHDDIncludeLocation"
+		border_style="line"
+		border_thickness="1"
+		follows="left|top"
+		height="23"
+		enabled_control="AlchemyPreProcEnableHDDInclude"
+		max_length_chars="4096"
+		name="preprocinclude_location"
+		top_pad="0"
+		width="235" />
+	<button
+		follows="left|top"
+		height="23"
+		enabled_control="AlchemyPreProcEnableHDDInclude"
+		label="..."
+		label_selected="Browse"
+		left_pad="5"
+		name="SetPreprocInclude"
+		top_delta="0"
+		width="30">
+		<button.commit_callback
+		function="ScriptPref.SetPreprocInclude" />
+	</button>
+       
+	<button
+		follows="top|left"
+		height="23"
+		layout="topleft"
+		top_pad="6"
+		left="115"
+		name="close_btn"
+		width="100"
+		label="OK" />
 </floater>

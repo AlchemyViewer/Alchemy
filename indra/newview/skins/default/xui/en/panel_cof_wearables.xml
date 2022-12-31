@@ -18,7 +18,7 @@
      top="0"
      name="cof_wearables_accordion"
      background_visible="true"
-     bg_alpha_color="DkGray2"
+     bg_alpha_color="PanelDefaultBackgroundColor"
      width="311">
         <accordion_tab
          layout="topleft"

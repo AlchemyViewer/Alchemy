@@ -320,8 +320,8 @@ bool LLTextBase::truncate()
 {
 	BOOL did_truncate = FALSE;
 
-	// First rough check - if we're less than 1/4th the size, we're OK
-	if (getLength() >= S32(mMaxTextByteLength / 4))
+	// First rough check - if we're less than 1/2th the size, we're OK
+	if (getLength() >= S32(mMaxTextByteLength / 2))
 	{	
 		// Have to check actual byte size
 		S32 utf8_byte_size = 0;
@@ -953,7 +953,8 @@ S32 LLTextBase::insertStringNoUndo(S32 pos, const LLWString &wstr, LLTextBase::s
 
 	getViewModel()->getEditableDisplay().insert(pos, wstr);
 
-	if ( truncate() )
+	//HACK: If we are readonly we shouldn't need to truncate
+	if ( !mReadOnly && truncate() )
 	{
 		insert_len = getLength() - old_len;
 	}

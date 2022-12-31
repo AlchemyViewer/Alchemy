@@ -106,8 +106,8 @@ LLPanelProfileLegacy::~LLPanelProfileLegacy()
 // virtual
 BOOL LLPanelProfileLegacy::postBuild()
 {
-	mPanelGroups = static_cast<LLPanelProfileGroups*>(getChild<LLUICtrl>("groups_tab_panel"));
-	mPanelPicks = static_cast<LLPanelProfilePicks*>(getChild<LLUICtrl>("picks_tab_panel"));
+	mPanelGroups = static_cast<LLPanelProfileGroups*>(getChild<LLUICtrl>("avatar_groups_tab_panel"));
+	mPanelPicks = static_cast<LLPanelProfilePicks*>(getChild<LLUICtrl>("avatar_picks_tab_panel"));
 	mPanelPicks->setProfilePanel(this);
 	
 	if (dynamic_cast<LLSideTrayPanelContainer*>(getParent()) != nullptr)
@@ -525,15 +525,20 @@ void LLPanelProfileLegacy::setProgress(bool started)
 
 void LLPanelProfileLegacy::showTab(std::string_view name, bool show) const
 {
-	LLAccordionCtrlTab* tab = getChild<LLAccordionCtrlTab>(name);
-	tab->setVisible(show);
-	getChild<LLAccordionCtrl>("avatar_accordion")->arrange();
+    getChild<LLAccordionCtrlTab>(name)->setVisible(show);
+    getChild<LLAccordionCtrl>("avatar_accordion")->arrange();
 }
 
-std::string_view LLPanelProfileLegacy::getShownTab() const
+LLPanel* LLPanelProfileLegacy::expandTab(const std::string& name) const
+{
+    getChild<LLAccordionCtrl>("avatar_accordion")->expandTab(name);
+    return getChild<LLAccordionCtrlTab>(name)->getChild<LLPanel>(name + "_panel");
+}
+
+LLPanel* LLPanelProfileLegacy::getExpandedTab() const
 {
     const LLAccordionCtrlTab* tab = getChild<LLAccordionCtrl>("avatar_accordion")->getExpandedTab();
-    return tab != nullptr ? tab->getTitle() : LLStringUtil::null;
+    return tab->getChild<LLPanel>(tab->getName() + "_panel");
 }
 
 void LLPanelProfileLegacy::onCommitAction(const LLSD& userdata)

@@ -8033,15 +8033,33 @@ void LLPipeline::renderFinalize()
 // [RLVa:KB] - @setsphere
             if (pRenderBuffer)
             {
-				pRenderBuffer->copyContents(mScreen, 0, 0, mScreen.getWidth(), mScreen.getHeight(), 0, 0,
-					mScreen.getWidth(), mScreen.getHeight(), GL_COLOR_BUFFER_BIT, GL_NEAREST);
+				pRenderBuffer->bindTarget();
             }
-			else
-			{
-				LLRenderTarget::copyContentsToFramebuffer(mScreen, 0, 0, mScreen.getWidth(), mScreen.getHeight(), 0, 0,
-					mScreen.getWidth(), mScreen.getHeight(), GL_COLOR_BUFFER_BIT, GL_NEAREST);
-			}
 // [/RLVa:KB]
+            LLGLSLShader *shader = &gDeferredPostNoDoFProgram;
+
+            bindDeferredShader(*shader);
+
+            S32 channel = shader->enableTexture(LLShaderMgr::DEFERRED_DIFFUSE, mScreen.getUsage());
+            if (channel > -1)
+            {
+                mScreen.bindTexture(0, channel);
+            }
+
+			mDeferredVB->setBuffer(LLVertexBuffer::MAP_VERTEX);
+			mDeferredVB->drawArrays(LLRender::TRIANGLES, 0, 3);
+            unbindDeferredShader(*shader);
+
+// [RLVa:KB] - @setsphere
+            if (pRenderBuffer)
+            {
+				pRenderBuffer->flush();
+            }
+// [/RLVa:KB]
+//            if (multisample)
+//            {
+//                mDeferredLight.flush();
+//            }
         }
 
 // [RLVa:KB] - @setsphere
@@ -8171,7 +8189,7 @@ void LLPipeline::renderFinalize()
 
                 {
                     LLGLDisable stencil(GL_STENCIL_TEST);
-                    LLGLState srgb_state(GL_FRAMEBUFFER_SRGB, gGLManager.mHasTexturesRGBDecode);
+                    LLGLState srgb_state(GL_FRAMEBUFFER_SRGB, sharpen_enabled);
 
                     // Bind setup:
                     bound_target = &mScratchBuffer;
@@ -8179,7 +8197,7 @@ void LLPipeline::renderFinalize()
 
                     mFXAABuffer.bindTexture(0, 0, LLTexUnit::TFO_BILINEAR);
                     gGL.getTexUnit(0)->setTextureAddressMode(LLTexUnit::TAM_CLAMP);
-                    gGL.getTexUnit(0)->setTextureColorSpace(LLTexUnit::TCS_LINEAR);
+                    gGL.getTexUnit(0)->setTextureColorSpace(sharpen_enabled ? LLTexUnit::TCS_LINEAR : LLTexUnit::TCS_SRGB);
 
                     mSMAABlendBuffer.bindTexture(0, 1, LLTexUnit::TFO_BILINEAR);
 

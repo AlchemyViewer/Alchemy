@@ -83,7 +83,7 @@
      value="Place Profile"
      width="280" />
     <scroll_container
-     color="DkGray2"
+     color="PanelDefaultBackgroundColor"
      follows="all"
      height="534"
      layout="topleft"
@@ -93,7 +93,7 @@
      top_pad="9"
      width="324">
         <panel
-         bg_alpha_color="DkGray2"
+         bg_alpha_color="PanelDefaultBackgroundColor"
          follows="left|top|right"
          height="654"
          layout="topleft"

@@ -32,7 +32,7 @@
 
 class LLFileSystem;
 
-class LLXfer_VFile final : public LLXfer
+class LLXfer_VFile : public LLXfer
 {
  protected:
 	LLUUID mLocalID;
@@ -40,7 +40,7 @@ class LLXfer_VFile final : public LLXfer
 	LLUUID mTempID;
 	LLAssetType::EType mType;
 	
-	std::unique_ptr<LLFileSystem> mVFile;
+	LLFileSystem *mVFile;
 
 	std::string mName;
 

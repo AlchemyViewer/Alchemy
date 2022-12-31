@@ -343,6 +343,17 @@
       <key>Value</key>
       <integer>0</integer>
     </map>
+    <key>AlchemyInventoryScriptsMono</key>
+    <map>
+      <key>Comment</key>
+      <string>Control whether new scripts in inventory are mono(true) or lsl(false)</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <integer>1</integer>
+    </map>
     <key>AlchemyMoonWalk</key>
       <map>
       <key>Comment</key>
@@ -607,8 +618,85 @@
       <key>Value</key>
       <integer>0</integer>
     </map>
-    <key>AlchemyPointAtPrivate</key>
+    <key>AlchemyLSLPreprocessor</key>
     <map>
+      <key>Comment</key>
+      <string>LSL Preprocessor</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <integer>0</integer>
+    </map>
+    <key>AlchemyPreProcLSLOptimizer</key>
+    <map>
+      <key>Comment</key>
+      <string>LSL Optimizer</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <integer>1</integer>
+    </map>
+    <key>AlchemyPreProcLSLTextCompress</key>
+    <map>
+      <key>Comment</key>
+      <string>LSL Text Compress</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <integer>0</integer>
+    </map>
+    <key>AlchemyPreProcLSLLazyLists</key>
+    <map>
+      <key>Comment</key>
+      <string>LSL Lazy Lists</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <integer>1</integer>
+    </map>
+    <key>AlchemyPreProcLSLSwitch</key>
+    <map>
+      <key>Comment</key>
+      <string>LSL Switch Statements</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <integer>1</integer>
+    </map>
+    <key>AlchemyPreProcEnableHDDInclude</key>
+    <map>
+      <key>Comment</key>
+      <string>Enable #include from local disk</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <integer>0</integer>
+    </map>
+    <key>AlchemyPreProcHDDIncludeLocation</key>
+    <map>
+      <key>Comment</key>
+      <string>Path for local disk includes</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>String</string>
+      <key>Value</key>
+      <string/>
+    </map>
+    <key>AlchemyPointAtPrivate</key>
+      <map>
       <key>Comment</key>
       <string>Disable setting current point at target</string>
       <key>Persist</key>
@@ -761,8 +849,8 @@
       <key>Value</key>
       <integer>1</integer>
     </map>
-	<key>OpenSimSearchURL</key>
-	<map>
+    <key>OpenSimSearchURL</key>
+    <map>
       <key>Comment</key>
       <string>OpenSim fallback search url</string>
       <key>Persist</key>
@@ -771,7 +859,7 @@
       <string>String</string>
       <key>Value</key>
       <string>http://search.metaverseink.com/opensim/results.jsp?query=[QUERY]&amp;submit=[CATEGORY]</string>
-	</map>
+    </map>
     <key>RenderAutoMaskAlphaUseRMSE</key>
     <map>
       <key>Comment</key>
@@ -816,28 +904,28 @@
       <key>Value</key>
       <string></string>
     </map>
-	<key>RenderFocusPointLocked</key>
-	<map>
-		<key>Comment</key>
-		<string>Whether the focus point used for DoF is currently Locked in place</string>
-		<key>Persist</key>
-		<integer>0</integer>
-		<key>Type</key>
-		<string>Boolean</string>
-		<key>Value</key>
-		<integer>0</integer>
-	</map>
-	<key>RenderFocusPointFollowsPointer</key>
-	<map>
-		<key>Comment</key>
-		<string>Allows the Depth of Field focus to actively follow the mouse point</string>
-		<key>Persist</key>
-		<integer>0</integer>
-		<key>Type</key>
-		<string>Boolean</string>
-		<key>Value</key>
-		<integer>0</integer>
-	</map>
+    <key>RenderFocusPointLocked</key>
+    <map>
+        <key>Comment</key>
+        <string>Whether the focus point used for DoF is currently Locked in place</string>
+        <key>Persist</key>
+        <integer>0</integer>
+        <key>Type</key>
+        <string>Boolean</string>
+        <key>Value</key>
+        <integer>0</integer>
+    </map>
+    <key>RenderFocusPointFollowsPointer</key>
+    <map>
+        <key>Comment</key>
+        <string>Allows the Depth of Field focus to actively follow the mouse point</string>
+        <key>Persist</key>
+        <integer>0</integer>
+        <key>Type</key>
+        <string>Boolean</string>
+        <key>Value</key>
+        <integer>0</integer>
+    </map>
     <key>RenderSharpenMethod</key>
     <map>
       <key>Comment</key>
@@ -1037,7 +1125,7 @@
       <key>Type</key>
       <string>Boolean</string>
       <key>Value</key>
-      <integer>1</integer>
+      <integer>0</integer>
     </map>
     <key>UIImgTransparentUUID</key>
     <map>

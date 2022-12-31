@@ -307,38 +307,35 @@ LLMotion::LLMotionInitStatus LLKeyframeMotion::onInitialize(LLCharacter *charact
 	// Load named file by concatenating the character prefix with the motion name.
 	// Load data into a buffer to be parsed.
 	//-------------------------------------------------------------------------
+	U8 *anim_data;
+	S32 anim_file_size;
+
 	BOOL success = FALSE;
-	U8* anim_data = nullptr;
-	S32 anim_file_size = 0;
-
+	LLFileSystem* anim_file = new LLFileSystem(mID, LLAssetType::AT_ANIMATION);
+	if (!anim_file || !anim_file->getSize())
 	{
-		LLFileSystem anim_file(mID, LLAssetType::AT_ANIMATION);
-		if (!anim_file.open() || !anim_file.getSize())
-		{
-			// request asset over network on next call to load
-			mAssetStatus = ASSET_NEEDS_FETCH;
+		delete anim_file;
+		anim_file = NULL;
+		
+		// request asset over network on next call to load
+		mAssetStatus = ASSET_NEEDS_FETCH;
 
-			return STATUS_HOLD;
+		return STATUS_HOLD;
+	}
+	else
+	{
+		anim_file_size = anim_file->getSize();
+		anim_data = new(std::nothrow) U8[anim_file_size];
+		if (anim_data)
+		{
+			success = anim_file->read(anim_data, anim_file_size);	/*Flawfinder: ignore*/
 		}
 		else
 		{
-			anim_file_size = anim_file.getSize();
-			anim_data = new(std::nothrow) U8[anim_file_size];
-			if (anim_data)
-			{
-				success = anim_file.read(anim_data, anim_file_size);
-				if (!success)
-				{
-					delete[] anim_data;
-					anim_data = nullptr;
-					LL_WARNS() << "Failed to read animation from cache. ID: " << mID << LL_ENDL;
-				}
-			}
-			else
-			{
-				LL_WARNS() << "Failed to allocate buffer: " << anim_file_size << " " << mID << LL_ENDL;
-			}
+			LL_WARNS() << "Failed to allocate buffer: " << anim_file_size << mID << LL_ENDL;
 		}
+		delete anim_file;
+		anim_file = NULL;
 	}
 
 	if (!success)
@@ -2128,25 +2125,14 @@ void LLKeyframeMotion::onLoadComplete(const LLUUID& asset_uuid,
 				return;
 			}
 			LLFileSystem file(asset_uuid, type, LLFileSystem::READ);
-			if (!file.open())
-			{
-				return;
-			}
 			S32 size = file.getSize();
 			
-			std::unique_ptr<U8[]> buffer(new U8[size]);
-			if (!file.read((U8*)buffer.get(), size))	/*Flawfinder: ignore*/
-			{
-				LL_WARNS() << "Failed to load asset for animation from cache " << motionp->getName() << ":" << motionp->getID() << LL_ENDL;
-				motionp->mAssetStatus = ASSET_FETCH_FAILED;
-				return;
-			}
+			U8* buffer = new U8[size];
+			file.read((U8*)buffer, size);	/*Flawfinder: ignore*/
 
-#ifdef SHOW_DEBUG
 			LL_DEBUGS("Animation") << "Loading keyframe data for: " << motionp->getName() << ":" << motionp->getID() << " (" << size << " bytes)" << LL_ENDL;
-#endif
 			
-			LLDataPackerBinaryBuffer dp(buffer.get(), size);
+			LLDataPackerBinaryBuffer dp(buffer, size);
 			if (motionp->deserialize(dp, asset_uuid))
 			{
 				motionp->mAssetStatus = ASSET_LOADED;
@@ -2155,8 +2141,9 @@ void LLKeyframeMotion::onLoadComplete(const LLUUID& asset_uuid,
 			{
 				LL_WARNS() << "Failed to decode asset for animation " << motionp->getName() << ":" << motionp->getID() << LL_ENDL;
 				motionp->mAssetStatus = ASSET_FETCH_FAILED;
-				return;
 			}
+			
+			delete[] buffer;
 		}
 		else
 		{

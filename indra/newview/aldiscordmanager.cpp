@@ -98,7 +98,7 @@ void ALDiscordManager::init()
 			}
 			case discord::LogLevel::Info:
 			{
-				LL_INFOS() << "Discord: " << message << LL_ENDL;
+				LL_DEBUGS() << "Discord: " << message << LL_ENDL;
 				break;
 			}
 			case discord::LogLevel::Debug:
@@ -228,12 +228,10 @@ void ALDiscordManager::updateActivity()
 	activity.GetAssets().SetSmallText(app_str.c_str());
 
 	std::string regionId = region->getRegionID().asString();
-	activity.GetParty().GetSize().SetCurrentSize(region->mMapAvatars.size());
-	S32 max_agents = LLRegionInfoModel::instance().mAgentLimit;
-	if (max_agents > 0)
-	{
-		activity.GetParty().GetSize().SetMaxSize(max_agents);
-	}
+	S32 agents = llmax((int32_t)1, (int32_t)region->mMapAvatars.size());
+	activity.GetParty().GetSize().SetCurrentSize(agents);
+	int32_t max_agents = llmax((int32_t)1, (int32_t)LLRegionInfoModel::instance().mAgentLimit);
+	activity.GetParty().GetSize().SetMaxSize(max_agents);
 	activity.GetParty().SetId(regionId.c_str());
 	activity.GetParty().SetPrivacy(discord::ActivityPartyPrivacy::Public);
 

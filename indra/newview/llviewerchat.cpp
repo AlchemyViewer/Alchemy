@@ -28,7 +28,8 @@
 #include "llviewerchat.h" 
 
 // newview includes
-#include "llagent.h" 	// gAgent		
+#include "llagent.h" 	// gAgent	
+#include "llcallingcard.h"
 #include "llslurl.h"
 #include "lluicolor.h"
 #include "lluicolortable.h"
@@ -67,7 +68,14 @@ void LLViewerChat::getChatColor(const LLChat& chat, LLColor4& r_color)
 					}
 					else
 					{
-						r_color = LLUIColorTable::instance().getColor("AgentChatColor");
+						if(LLAvatarTracker::instance().isBuddy(chat.mFromID))
+						{
+							r_color = LLUIColorTable::instance().getColor("FriendChatColor");
+						}
+						else
+						{
+							r_color = LLUIColorTable::instance().getColor("AgentChatColor");
+						}
 					}
 				}
 				break;
@@ -136,7 +144,14 @@ void LLViewerChat::getChatColor(const LLChat& chat, std::string& r_color_name, F
 					}
 					else
 					{
-						r_color_name = "AgentChatColor";
+						if(LLAvatarTracker::instance().isBuddy(chat.mFromID))
+						{
+							r_color_name = "FriendChatColor";
+						}
+						else
+						{
+							r_color_name = "AgentChatColor";
+						}
 					}
 				}
 				break;

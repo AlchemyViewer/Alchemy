@@ -283,6 +283,16 @@ public:
 
 	};
 
+	struct MeshHeaderInfo
+	{
+		MeshHeaderInfo()
+			: mHeaderSize(0), mVersion(0), mOffset(-1), mSize(0) {}
+		U32 mHeaderSize;
+		U32 mVersion;
+		S32 mOffset;
+		S32 mSize;
+	};
+
 	/////////
 	// In flight queues
 	/////////
@@ -358,10 +368,13 @@ public:
 	bool fetchMeshLOD(const LLVolumeParams& mesh_params, S32 lod, bool can_retry = true);
 	EMeshProcessingResult headerReceived(const LLVolumeParams& mesh_params, U8* data, S32 data_size);
 	EMeshProcessingResult lodReceived(const LLVolumeParams& mesh_params, S32 lod, U8* data, S32 data_size);
-	bool skinInfoReceived(const LLUUID& mesh_id, U8* data, S32 data_size);
-	bool decompositionReceived(const LLUUID& mesh_id, U8* data, S32 data_size);
+	EMeshProcessingResult skinInfoReceived(const LLUUID& mesh_id, U8* data, S32 data_size);
+	EMeshProcessingResult decompositionReceived(const LLUUID& mesh_id, U8* data, S32 data_size);
 	EMeshProcessingResult physicsShapeReceived(const LLUUID& mesh_id, U8* data, S32 data_size);
 	bool hasPhysicsShapeInHeader(const LLUUID& mesh_id);
+
+	bool getMeshHeaderInfo(const LLUUID& mesh_id, std::string_view block_name, MeshHeaderInfo& info);
+	bool loadInfoFromFilesystem(const LLUUID& mesh_id, MeshHeaderInfo& info, boost::function<bool(const LLUUID&, U8*, S32)> fn);
 
 	void notifyLoadedMeshes(); // Only call from main thread.
 	S32 getActualMeshLOD(const LLVolumeParams& mesh_params, S32 lod);
@@ -595,7 +608,8 @@ public:
 	void shutdown();
 	S32 update();
 
-	void unregisterMesh(LLVOVolume* volume);
+	void unregisterMesh(LLVOVolume* volume, const LLUUID& mesh_id);
+	void unregisterSkin(LLVOVolume* volume, const LLUUID& mesh_id);
 	//mesh management functions
 	S32 loadMesh(LLVOVolume* volume, const LLVolumeParams& mesh_params, S32 detail = 0, S32 last_lod = -1);
 	
@@ -633,7 +647,7 @@ public:
 	static void metricsProgress(unsigned int count);
 	static void metricsUpdate();
 	
-	typedef boost::unordered_map<LLUUID, std::vector<LLVOVolume*> > mesh_load_map;
+	typedef boost::unordered_map<LLUUID, boost::unordered_set<LLVOVolume*> > mesh_load_map;
 	mesh_load_map mLoadingMeshes[4];
 	
 	typedef boost::unordered_flat_map<LLUUID, LLPointer<LLMeshSkinInfo>> skin_map;
@@ -647,7 +661,7 @@ public:
 	std::vector<LLMeshRepoThread::LODRequest> mPendingRequests;
 	
 	//list of mesh ids awaiting skin info
-	typedef boost::unordered_map<LLUUID, std::vector<LLVOVolume*> > skin_load_map;
+	typedef boost::unordered_map<LLUUID, boost::unordered_set<LLVOVolume*> > skin_load_map;
 	skin_load_map mLoadingSkins;
 
 	//list of mesh ids that need to send skin info fetch requests

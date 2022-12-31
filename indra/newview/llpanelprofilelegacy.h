@@ -40,7 +40,6 @@ class LLFlatListView;
 class LLPanel;
 class LLPanelPickEdit;
 class LLPanelPickInfo;
-class LLPanelProfileLegacyTab;
 class LLPanelClassifiedInfo;
 class LLPanelClassifiedEdit;
 class LLPickItem;
@@ -55,7 +54,8 @@ public:
 	void onOpen(const LLSD& key) override;
 	void reshape(S32 width, S32 height, BOOL called_from_parent = TRUE) override;
     void showTab(std::string_view name, bool show) const;
-    std::string_view getShownTab() const;
+    LLPanel* expandTab(const std::string& name) const;
+    LLPanel* getExpandedTab() const;
 
 protected:
 	void openPanel(LLPanel* panel, const LLSD& params);
@@ -120,6 +120,9 @@ public:
 		~LLPanelProfilePicks() override;
 		BOOL postBuild() override;
 
+        void createNewPick();
+        void createNewClassified();
+
 	protected:
 		void onOpen(const LLSD& key) override;
 
@@ -137,8 +140,6 @@ public:
 		void onPanelClassifiedEdit();
 		void onPanelPickEdit();
 		void onPlusMenuItemClicked(const LLSD& param);
-		void createNewPick();
-		void createNewClassified();
 		void editClassified(const LLUUID& classified_id);
 		void updateButtons() override;
 		void onClickPlusBtn();

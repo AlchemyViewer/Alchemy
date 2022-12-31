@@ -4876,7 +4876,7 @@ Request a teleport to [NAME] with the following message
     <tag>confirm</tag>
     <form name="form">
       <input name="message" type="text">
-
+May I join you?
       </input>
       <button
        default="true"

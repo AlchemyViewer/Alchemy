@@ -204,6 +204,11 @@ if (WINDOWS)
       /DURI_STATIC_BUILD=1
       /DLIBXML_STATIC=1
       /DHUNSPELL_STATIC=1
+      /DXML_STATIC=1
+      /DXMLRPCEPI_STATIC=1
+      /DAPR_DECLARE_STATIC=1
+      /DAPU_DECLARE_STATIC=1
+      /DAPI_DECLARE_STATIC=1
   )
 
   # configure win32 API for 7 and above compatibility

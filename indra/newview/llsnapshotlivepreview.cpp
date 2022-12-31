@@ -1037,43 +1037,26 @@ void LLSnapshotLivePreview::saveTexture(BOOL outfit_snapshot, std::string name)
 	if (formatted->encode(scaled, 0.0f))
 	{
         LLFileSystem fmt_file(new_asset_id, LLAssetType::AT_TEXTURE, LLFileSystem::WRITE);
-		if (fmt_file.open())
-		{
-			if (fmt_file.write(formatted->getData(), formatted->getDataSize()))
-			{
-				fmt_file.close();
+        fmt_file.write(formatted->getData(), formatted->getDataSize());
+		std::string pos_string;
+		LLAgentUI::buildLocationString(pos_string, LLAgentUI::LOCATION_FORMAT_FULL);
+		std::string who_took_it;
+		LLAgentUI::buildFullname(who_took_it);
+		S32 expected_upload_cost = LLAgentBenefitsMgr::current().getTextureUploadCost();
+        std::string res_name = outfit_snapshot ? name : "Snapshot : " + pos_string;
+        std::string res_desc = outfit_snapshot ? "" : "Taken by " + who_took_it + " at " + pos_string;
+        LLFolderType::EType folder_type = outfit_snapshot ? LLFolderType::FT_NONE : LLFolderType::FT_SNAPSHOT_CATEGORY;
+        LLInventoryType::EType inv_type = outfit_snapshot ? LLInventoryType::IT_NONE : LLInventoryType::IT_SNAPSHOT;
 
-				std::string pos_string;
-				LLAgentUI::buildLocationString(pos_string, LLAgentUI::LOCATION_FORMAT_FULL);
-				std::string who_took_it;
-				LLAgentUI::buildFullname(who_took_it);
-				S32 expected_upload_cost = LLAgentBenefitsMgr::current().getTextureUploadCost();
-				std::string res_name = outfit_snapshot ? name : "Snapshot : " + pos_string;
-				std::string res_desc = outfit_snapshot ? "" : "Taken by " + who_took_it + " at " + pos_string;
-				LLFolderType::EType folder_type = outfit_snapshot ? LLFolderType::FT_NONE : LLFolderType::FT_SNAPSHOT_CATEGORY;
-				LLInventoryType::EType inv_type = outfit_snapshot ? LLInventoryType::IT_NONE : LLInventoryType::IT_SNAPSHOT;
+        LLResourceUploadInfo::ptr_t assetUploadInfo(new LLResourceUploadInfo(
+            tid, LLAssetType::AT_TEXTURE, res_name, res_desc, 0,
+            folder_type, inv_type,
+            PERM_ALL, LLFloaterPerms::getGroupPerms("Uploads"), LLFloaterPerms::getEveryonePerms("Uploads"),
+            expected_upload_cost, !outfit_snapshot));
 
-				LLResourceUploadInfo::ptr_t assetUploadInfo(new LLResourceUploadInfo(
-					tid, LLAssetType::AT_TEXTURE, res_name, res_desc, 0,
-					folder_type, inv_type,
-					PERM_ALL, LLFloaterPerms::getGroupPerms("Uploads"), LLFloaterPerms::getEveryonePerms("Uploads"),
-					expected_upload_cost, !outfit_snapshot));
+        upload_new_resource(assetUploadInfo);
 
-				upload_new_resource(assetUploadInfo);
-
-				gViewerWindow->playSnapshotAnimAndSound();
-			}
-			else
-			{
-				LLNotificationsUtil::add("ErrorEncodingSnapshot");
-				LL_WARNS("Snapshot") << "Error writing snapshot to cache" << LL_ENDL;
-			}
-		}
-		else
-		{
-			LLNotificationsUtil::add("ErrorEncodingSnapshot");
-			LL_WARNS("Snapshot") << "Error opening snapshot cache file for write" << LL_ENDL;
-		}
+		gViewerWindow->playSnapshotAnimAndSound();
 	}
 	else
 	{

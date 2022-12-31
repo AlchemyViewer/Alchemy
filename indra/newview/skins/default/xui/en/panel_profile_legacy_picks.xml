@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes" ?>
 <panel
- bg_opaque_color="DkGray2"
+ bg_opaque_color="PanelDefaultBackgroundColor"
  background_visible="true"
  background_opaque="true"
  follows="all"
@@ -41,7 +41,7 @@
     title="Picks"
     visible="true">
      <flat_list_view
-      color="DkGray2"
+      color="PanelDefaultBackgroundColor"
       follows="all"
       layout="topleft"
       left="0"
@@ -57,7 +57,7 @@
     title="Classifieds"
     visible="true">
      <flat_list_view
-      color="DkGray2"
+      color="PanelDefaultBackgroundColor"
       follows="all"
       layout="topleft"
       left="0"
@@ -68,7 +68,7 @@
     </accordion_tab>
   </accordion>
   <panel
-   bg_opaque_color="DkGray"
+   bg_opaque_color="PanelDefaultBackgroundColor"
    background_visible="true"
    background_opaque="true"
    follows="bottom|left|right"

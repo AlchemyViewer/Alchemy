@@ -107,7 +107,7 @@ void LLFloaterAssetRecovery::onBtnRecover()
 			LLFile::remove(sdFile["path"].asString());
 	}
 
-	if (!sdFiles.emptyArray())
+	if (sdFiles.isArray() && sdFiles.size() != 0)
 		new LLAssetRecoverQueue(sdFiles);
 
 	closeFloater();

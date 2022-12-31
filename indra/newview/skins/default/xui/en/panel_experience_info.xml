@@ -23,7 +23,7 @@
     left="3"
     right="-3"/>
   <scroll_container
-    color="DkGray2"
+    color="PanelDefaultBackgroundColor"
     follows="all"
     height="532"
     layout="topleft"
@@ -33,7 +33,7 @@
     top_pad="10"
     width="330">
     <panel
-      bg_alpha_color="DkGray2"
+      bg_alpha_color="PanelDefaultBackgroundColor"
       follows="top|left"
       height="480"
       layout="topleft"

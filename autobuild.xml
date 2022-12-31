@@ -82,11 +82,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>f6c2ad4ff9b937af23a2cb415aaee18a2da6e9cc575d1c30341df527c96b473d75e95b0db597a92a035cb37f5a9e206c9585fdc3ee9f31c7e8b982870ebaef48</string>
+              <string>cc796144023b4f108ad68b0a9de3c05330e53def4d27a29b15671879b6f15276b240c2fc3d080d2a627591faf68e3b659d3c993ae3f25079b3026eeedeb9975e</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/111/packages/generic/apr_suite/1.4.5.1510/apr_suite-1.4.5-darwin64-1510.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/111/packages/generic/apr_suite/1.4.5.1817/apr_suite-1.4.5-darwin64-1817.tar.zst</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
@@ -96,11 +96,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>ebc22324302c2ae7369556a35890060278be86e075ad245b9e67dbacaa20280941e0116d8ea887647d6ec1125eb212f5b6257512910383405e4afcc37ad28ed9</string>
+              <string>ae54745072cf3b6a2d6807d481a6ea32cde3cfca3edb3fc82481197ae3b388da9ed854fcfd18e8a003d33faf245041da2004c1853a45300d3512f835a27f7654</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/111/packages/generic/apr_suite/1.4.5.1510/apr_suite-1.4.5-linux64-1510.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/111/packages/generic/apr_suite/1.4.5.1817/apr_suite-1.4.5-linux64-1817.tar.zst</string>
             </map>
             <key>name</key>
             <string>linux64</string>
@@ -110,11 +110,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>6086a8d5611ef104bf3185289134a47354915b47dbe43f69c0d2915b83f4aff8c7a8225241303a402e579ccc8a1504de637a60cb11c287ee30edec723cc7dc28</string>
+              <string>239b9ffddbea76fad64fb5f001ce4b35816fa6518e03f7b3b87a5abd3136cd398c16380d6eb6e919fe80ccaea3be31072a2b065d469afef875c1cbaa76048206</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/111/packages/generic/apr_suite/1.4.5.1510/apr_suite-1.4.5-windows64-1510.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/111/packages/generic/apr_suite/1.4.5.1817/apr_suite-1.4.5-windows64-1817.tar.zst</string>
             </map>
             <key>name</key>
             <string>windows64</string>
@@ -413,12 +413,14 @@
           <map>
             <key>archive</key>
             <map>
+              <key>creds</key>
+              <string>gitlab</string>
               <key>hash</key>
-              <string>1e47de39d3ee0b26d9e6b900a6b7ca80a7d84d5e3db33ccf0b1abf30a09e75c1c57d8423933f25fb931715a1c238cdf5f263b29ad07c7f416c108f1f869dcd1e</string>
+              <string>74cc00abab75892574da5d8cfe0baa32a0b8071f758ed78c4f8c667b50e6949733c0773900c20cb8a34d67548f51072824724a7a7acaf43087b5b20b4ba55f99</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/191/packages/generic/discord-gamesdk/3.2.1.1764/discord_gamesdk-3.2.1-darwin64-1764.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/191/packages/generic/discord-gamesdk/3.2.1.1834/discord_gamesdk-3.2.1-darwin64-1834.tar.zst</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
@@ -427,12 +429,14 @@
           <map>
             <key>archive</key>
             <map>
+              <key>creds</key>
+              <string>gitlab</string>
               <key>hash</key>
-              <string>94c2daadac705d0bf1d171e432118565f3047b8409f6d8667f8711c64122f3d1e7eeef4a30e8c81f943a469de746823688021766467abe6099c3a56f92ceef5c</string>
+              <string>647331d9ec47cfe0c35cabf6404f240a4da5ac47bbb1bc323d8b751298d0906875aa59fe6a5ab35e34095811872f4bb09a7e733c04a303ea21b1a5903613b39a</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/191/packages/generic/discord-gamesdk/3.2.1.1764/discord_gamesdk-3.2.1-linux64-1764.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/191/packages/generic/discord-gamesdk/3.2.1.1834/discord_gamesdk-3.2.1-linux64-1834.tar.zst</string>
             </map>
             <key>name</key>
             <string>linux64</string>
@@ -441,12 +445,14 @@
           <map>
             <key>archive</key>
             <map>
+              <key>creds</key>
+              <string>gitlab</string>
               <key>hash</key>
-              <string>3783cdb9759cf5f4f924f3afeca576fb8cc4209608d7f4874b3285e1b9928ecda8a72cb040532f91058d9d31420106541a62de378e265cf7e3f4d1167a6fb5f8</string>
+              <string>1b19bc00e2b90a07fc498c0392bc86be3e87fd9787d9d31301cd69cc7c97e58e46452a0a32041f395c417a01e23be0a5f9a2febf9d1da2b7aeb84bdc5d787103</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/191/packages/generic/discord-gamesdk/3.2.1.1764/discord_gamesdk-3.2.1-windows64-1764.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/191/packages/generic/discord-gamesdk/3.2.1.1834/discord_gamesdk-3.2.1-windows64-1834.tar.zst</string>
             </map>
             <key>name</key>
             <string>windows64</string>
@@ -474,11 +480,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>5690cfb770eac3d42728134b117a84b1430e2b81fd19e0924b098fd746acda119113dfef962108802f1f2e92abf744395d0cbb95f3131af422c2ec56b0050fe6</string>
+              <string>5c52973564a5c408c67ce9c857a150ed00f961b5efa59f38a4aeeca9a3b77726cd13347ad55463cd98d421d529b230c9c2544fdf7605314faaf17754fe93198f</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/103/packages/generic/dullahan/1.12.4_107.1.4_geb36a79_chromium-107.0.5304.68.1617/dullahan-1.12.4_107.1.4_geb36a79_chromium-107.0.5304.68-darwin64-1617.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/103/packages/generic/dullahan/1.12.4_107.1.4_geb36a79_chromium-107.0.5304.68.1822/dullahan-1.12.4_107.1.4_geb36a79_chromium-107.0.5304.68-darwin64-1822.tar.zst</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
@@ -488,11 +494,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>31ec77a986a864d1fe70370f27e22a2a1176052bd3f44941cd0b529a57d037d2e101e5f22e5ba14bfd13fe06e30ec00f8b78d8eebafb398fc1f827a097927dba</string>
+              <string>85dfdad06410478d69b051a30f3fadcf4c3338058b395be7769c40f1b82a885eef9acc8ef639a826103d8ebcf3e827063c9c2df36b74e971c1e994a764689d79</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/103/packages/generic/dullahan/1.12.4_107.1.4_geb36a79_chromium-107.0.5304.68.1617/dullahan-1.12.4_107.1.4_geb36a79_chromium-107.0.5304.68-linux64-1617.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/103/packages/generic/dullahan/1.12.4_107.1.4_geb36a79_chromium-107.0.5304.68.1822/dullahan-1.12.4_107.1.4_geb36a79_chromium-107.0.5304.68-linux64-1822.tar.zst</string>
             </map>
             <key>name</key>
             <string>linux64</string>
@@ -502,11 +508,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>6097c0e4bd4f2c771f28bb605ca282d0b6ab878b7f05b237c37691435def9ca25c186b8706a54180aa09935c5e36a8cc088c04925afaa84606919725dadaf7a9</string>
+              <string>5108d9abc8c5cc49392fc4e0053466fce335da55d2daa6883c7c937094d1d8da590fe42203848b1ef3748759df96a79ec092e7c6382d348bd6f1cae981917604</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/103/packages/generic/dullahan/1.12.4_107.1.7_g59a795c_chromium-107.0.5304.88.1617/dullahan-1.12.4_107.1.7_g59a795c_chromium-107.0.5304.88-windows64-1617.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/103/packages/generic/dullahan/1.12.4_107.1.7_g59a795c_chromium-107.0.5304.88.1822/dullahan-1.12.4_107.1.7_g59a795c_chromium-107.0.5304.88-windows64-1822.tar.zst</string>
             </map>
             <key>name</key>
             <string>windows64</string>
@@ -534,11 +540,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>8128c7985bfde031c7edb1fb571fa3d0d6497a1d3266953b5f60d40acfd43f521c9cfed22262120b546fa2cf0b1abd89a46e618c471c739bc2b0c61439c7dc62</string>
+              <string>64e061836013151fbdf21545c50e0b7ffb51b83bdd95ba9a8f7b63a229824a8da6457b644c234eafaab13f21849413068123c79afce3ebe1b2cbca4e7974b586</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/109/packages/generic/expat/2.4.8.1508/expat-2.4.8-darwin64-1508.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/109/packages/generic/expat/2.5.0.1816/expat-2.5.0-darwin64-1816.tar.zst</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
@@ -548,11 +554,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>9fcf8c0f932cfa5f39b0b7b28f951d051812b8c5266f89e8913154410c94789111c50a6e35151be6ec8b87bff17f3488dddb6e982bc4060056ad77f7fafc8fa1</string>
+              <string>d640ea81458c0a26bc8c5385cd63e5b08f4ece5125ada07baddcaf775fac5baaf5d4b031207868836ae881dadb9748aa9c62224871cc72cfbdcb0260ab00b2f8</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/109/packages/generic/expat/2.4.8.1508/expat-2.4.8-linux64-1508.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/109/packages/generic/expat/2.5.0.1816/expat-2.5.0-linux64-1816.tar.zst</string>
             </map>
             <key>name</key>
             <string>linux64</string>
@@ -562,18 +568,18 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>4ff8e24ab11f4bbae488045f43b08c9fa2141d02e2353464670b2f131c5e76c0a72c854fa45eb38cc8a50bf494907d8f19f4f3a7fb904b449aae3fe2a0b67b0c</string>
+              <string>b2382a145a94fd0b5786d00fe29d43e680fe14f2bb19639f1b72e5330f7f7b2e39b610f26af9c8a06ff54ecf9db91051129e6edbb1ad15987260dfd1d4c48bde</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/109/packages/generic/expat/2.4.8.1508/expat-2.4.8-windows64-1508.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/109/packages/generic/expat/2.5.0.1816/expat-2.5.0-windows64-1816.tar.zst</string>
             </map>
             <key>name</key>
             <string>windows64</string>
           </map>
         </map>
         <key>version</key>
-        <string>2.4.8</string>
+        <string>2.5.0</string>
       </map>
       <key>fmodstudio</key>
       <map>
@@ -596,11 +602,11 @@
               <key>creds</key>
               <string>gitlab</string>
               <key>hash</key>
-              <string>c359499ed9ee9913d91291cf404b2318a45262232f5065c91ff3b3c76333116bf6b8be9135aef971d048f0dc27f544defa294a1c089903e5db693a48371bee10</string>
+              <string>76a4c99d957f69a6074502218866444b3903d34d3afc677bb9de8c009e298c8e92e5621b12d1adbf0aa7b4123baf9beb2ef81384fccecd38b5840f99dd59582d</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/49/packages/generic/fmodstudio/2.02.11.1732/fmodstudio-2.02.11-darwin64-1732.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/49/packages/generic/fmodstudio/2.02.11.1809/fmodstudio-2.02.11-darwin64-1809.tar.zst</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
@@ -612,11 +618,11 @@
               <key>creds</key>
               <string>gitlab</string>
               <key>hash</key>
-              <string>64cb1dfa5bb203d9a7d2b75b836353d32457bb30d31932c774b644254538adad2335713c3b304ab7cc2f0fe7221d99c406bc88b02447548674eb745c6fd2c380</string>
+              <string>c220b39c2a09098cfda5ef780b0fee7315bea6354de3dc71fc447b697239d5dcd6ca9c0bf0038e3d1bc65f8c712b222366cb72467f909a456754cdff27498aec</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/49/packages/generic/fmodstudio/2.02.11.1732/fmodstudio-2.02.11-linux64-1732.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/49/packages/generic/fmodstudio/2.02.11.1809/fmodstudio-2.02.11-linux64-1809.tar.zst</string>
             </map>
             <key>name</key>
             <string>linux64</string>
@@ -628,11 +634,11 @@
               <key>creds</key>
               <string>gitlab</string>
               <key>hash</key>
-              <string>8345649d7ee7671f2f09147ed618f847fe26642e4ac3471eb02bb2b5972c58c8ce414c16c2cd1e8279cc51d697365b015556abc6a6ccf17cedcd859ce1f78d4d</string>
+              <string>8f665a6a532ca751c4ab6221c4d62016f4fae5086f1097b1de63ab0825a9d69607d42c223979ebd185534dbfd5b8bb54287b7bd8ca1ee26ae67f9a2de55ae45a</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/49/packages/generic/fmodstudio/2.02.11.1732/fmodstudio-2.02.11-windows64-1732.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/49/packages/generic/fmodstudio/2.02.11.1809/fmodstudio-2.02.11-windows64-1809.tar.zst</string>
             </map>
             <key>name</key>
             <string>windows64</string>
@@ -1140,11 +1146,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>ff60b0a7aa53b45c244508f97727ad1f8ce5b29a9a0848c5be59d10b9ce577c955a750c2fa1a1c731df18d76f50b9688ef70e8b0c769fdd7d1e6ac542eaea469</string>
+              <string>32fcfd260a964ab9acca93aed0d4269b67712b7289b0d2db9b84717ebe6d9f0c7881e89a57e12d525252f954fea190623325fb7443a8e7f966ac7203f4e59657</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/117/packages/generic/libndofdev/0.1.0.1735/libndofdev-0.1.0-darwin64-1735.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/117/packages/generic/libndofdev/0.1.0.1813/libndofdev-0.1.0-darwin64-1813.tar.zst</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
@@ -1154,11 +1160,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>d9193798e8a4ceee8f346c7d765d6e0dbc8a30239a7ea0fed7af73b3ce57572b23c1279e7b7856afb685ccf4c1b59d0547d3f1dd4f4c808b46bfd71a711bb128</string>
+              <string>98b655fda88d5108205853b6b9e805751cf2f64cb0940e9bef45fcaac4c6610cc74418cad83b84b65485823bae40129d50c60d45265dfe60e3228faa41de35a5</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/117/packages/generic/libndofdev/0.1.0.1735/libndofdev-0.1.0-windows64-1735.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/117/packages/generic/libndofdev/0.1.0.1813/libndofdev-0.1.0-windows64-1813.tar.zst</string>
             </map>
             <key>name</key>
             <string>windows64</string>
@@ -1557,11 +1563,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>ff1c3781fba09d1227775c125e2ca2827053a49f6869913d81f6a5bde5427a7409f615d51244c5eb671c74b3a294053fd2257ab50f3c20373d043bd720d05ff6</string>
+              <string>38e4e3abc144540d0e60558fdae7da2f84ae29594031700e705ef0c22fcd1c5cd56552762739dd521f2919c024b5c0462006e6512b0cc0d4ea90e5ff20f8def3</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/127/packages/generic/ndPhysicsStub/0.1.2.1316/ndPhysicsStub-0.1.2-darwin64-1316.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/127/packages/generic/ndPhysicsStub/0.1.2.1803/ndPhysicsStub-0.1.2-darwin64-1803.tar.zst</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
@@ -1571,11 +1577,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>67df53eaee29c4b92be494b46cfb5ccc9097bbe4850f33a5c0309c2ee227a41b0193765f34a85c0cb60059dd52d2097b8658dba8fecbdcf7a71be4af6e66e0d3</string>
+              <string>0fa656f9359e869a4314f9e9947f00533329f738d378078097c3b5d359691742d8fddb2e63c2ff6fe44240de383a029610c74e03aa6ab41cf20edfd54eddfc74</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/127/packages/generic/ndPhysicsStub/0.1.2.1316/ndPhysicsStub-0.1.2-linux64-1316.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/127/packages/generic/ndPhysicsStub/0.1.2.1803/ndPhysicsStub-0.1.2-linux64-1803.tar.zst</string>
             </map>
             <key>name</key>
             <string>linux64</string>
@@ -1585,11 +1591,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>881beb6507ac9d574e9727321f4463d6838f34edb50b964a465d3961e74a1d1886b8c500b62b2186cabc8e7a3f5ac54a951d6eaf076cd175b381472ffe43f86f</string>
+              <string>4e87379aec68a832c268a240d612f4f00e7bf56235ccb6852b55f75c9d85c880ae2ae282d88332eed0930b5b4823d7f4e61c44674157184235bc04e910eb9c52</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/127/packages/generic/ndPhysicsStub/0.1.2.1316/ndPhysicsStub-0.1.2-windows64-1316.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/127/packages/generic/ndPhysicsStub/0.1.2.1803/ndPhysicsStub-0.1.2-windows64-1803.tar.zst</string>
             </map>
             <key>name</key>
             <string>windows64</string>
@@ -1806,11 +1812,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>780a62501227d1bbcc5a775e8153ea1b16fdafe3843a3d8a0b3c2d12fddc2d31fe5b3cc1c2368b671d178bf938e77b361ffdad98c5a414381469f174b0a51f9f</string>
+              <string>8f3ffede2d28ac9f4ba2aec3e9c60026a56b2b50130adc5479c5f79f145a6f6d5c72c13e652f5838b4571ee4a8b9871f0995fb15dd06079e8fbab6e35449e2db</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/141/packages/generic/openal/1.22.2.1734/openal-1.22.2-darwin64-1734.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/141/packages/generic/openal/1.22.2.1812/openal-1.22.2-darwin64-1812.tar.zst</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
@@ -1820,11 +1826,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>824fc8b8e22fbaea1df6c7f6a0cebd10c5a30425408f1eda43ee19854bd21107eb05b8358d2492d8d0b926dd7d141c85f8f912f1f59f29121082aa6faf13623a</string>
+              <string>77a2bfb7f96c76ca8266be13fc012a848ae967ab6dc409cde4feb29900be822bcbc41e57eec4484187d0774e492378bd84e86777e68ed578fdc16913b449d70d</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/141/packages/generic/openal/1.22.2.1734/openal-1.22.2-linux64-1734.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/141/packages/generic/openal/1.22.2.1812/openal-1.22.2-linux64-1812.tar.zst</string>
             </map>
             <key>name</key>
             <string>linux64</string>
@@ -1834,11 +1840,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>6c5d07480f19b63794ced70ebecb3ae1abc5f07238d3fd439cdbe33eb4a8e10ab7345543c9c1317330c271b734afe0276d6f13bcc115933dea29a38cc558ba01</string>
+              <string>5e43c6901eb671ab88c8e86f20423c79c5cffc5a80f7234336260dfa34ef0827417850fc09ed2f2f15bc0407a982a2c933e57ccc0e5a0af4050c2a7ac5e1483a</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/141/packages/generic/openal/1.22.2.1734/openal-1.22.2-windows64-1734.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/141/packages/generic/openal/1.22.2.1812/openal-1.22.2-windows64-1812.tar.zst</string>
             </map>
             <key>name</key>
             <string>windows64</string>
@@ -1988,11 +1994,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>f5681cad63d011ed1bad37ca72cea58d153b858927d2b74808de06c94a363ac853016a8f8fbdccc04f341b6aeadf7ef417d256ed46038e3943f4c61729127b0f</string>
+              <string>56cd32dc7e782b2ff6749b4eadb9b3118765f289c4d6c0555e546e499ab0ebcfa7dd8ee93146d06ff45d65c543640f1f821813a5833d2b2d130eedeb7481b2bd</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/164/packages/generic/sentry/7.31.3-0.5.2.1740/sentry-7.31.3-0.5.2-darwin64-1740.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/164/packages/generic/sentry/7.31.3-0.5.2.1835/sentry-7.31.3-0.5.2-darwin64-1835.tar.zst</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
@@ -2002,11 +2008,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>7536b86455efe0176150082ec4f931d7e16ca0b5fab0a28d4d017d50a9327e58e30d5a947816f325a39580f8930af00fb9c28e5449844128f4238591192487b7</string>
+              <string>9020ca48029a91ac7f0b8eb2e8503a340771c8851e1ddd0a76250d8a2cebb22e72f9e205e5d9053c5d409880c4891a00cda0e85004e13908c08956f37f9d8fcd</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/164/packages/generic/sentry/7.31.3-0.5.2.1740/sentry-7.31.3-0.5.2-linux64-1740.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/164/packages/generic/sentry/7.31.3-0.5.2.1835/sentry-7.31.3-0.5.2-linux64-1835.tar.zst</string>
             </map>
             <key>name</key>
             <string>linux64</string>
@@ -2016,11 +2022,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>5aa22a78081626e935f7f6220b5e16ab80880ac8e0b043904c1878ce53227f7be7cca1657e5904ad10e5d2c3f82adc532b15c16a49bb9050dd35f6264889457c</string>
+              <string>56bc0520511d154be4343d69a6a09a87a52f1bece4539f17485f15b97d4d6d4f567d00132334244d71b013344bfed38a5357bce230dfd387af40fdb376ac7d97</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/164/packages/generic/sentry/7.31.3-0.5.2.1740/sentry-7.31.3-0.5.2-windows64-1740.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/164/packages/generic/sentry/7.31.3-0.5.2.1835/sentry-7.31.3-0.5.2-windows64-1835.tar.zst</string>
             </map>
             <key>name</key>
             <string>windows64</string>
@@ -2048,9 +2054,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>b583668b28fde0490e6953f10e93e4ab</string>
+              <string>f56e4ab8fb80e23806b3bd255f82dcaad8f0483181b9f63e3342f841a8bd8473bc72a6c0268ebef6d59a31e6609e6c9716b36d401d6a4d179102521565ac6cb0</string>
+              <key>hash_algorithm</key>
+              <string>blake2b</string>
               <key>url</key>
-              <string>https://automated-builds-secondlife-com.s3.amazonaws.com/ct2/98681/871545/slvoice-4.10.0000.32327.5fc3fe7c.571099-darwin64-571099.tar.bz2</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/168/packages/generic/slvoice/4.10.0000.32327.5fc3fe7c.558436.1811/slvoice-4.10.0000.32327.5fc3fe7c.558436-darwin64-1811.tar.zst</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
@@ -2060,11 +2068,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>2e2f8a3793cfd4ab441d4cfb6ec2af1c6a0e929076a56f18d6c741b15c2850aaf5ab790291b931a315a6289753de767c802df34c6f8e7ba21e6f549cf8347691</string>
+              <string>e3369cda080cf1a582339ce5a69262f363e68f571e9303184fe7837b54ea59b76a19a3963721e9a3e138d72c3d68cc5645c19682a9759bd3719abc26430e9687</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/168/packages/generic/slvoice/4.10.0000.32327.5fc3fe7c.558436.1202/slvoice-4.10.0000.32327.5fc3fe7c.558436-linux64-1202.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/168/packages/generic/slvoice/4.10.0000.32327.5fc3fe7c.558436.1811/slvoice-4.10.0000.32327.5fc3fe7c.558436-linux64-1811.tar.zst</string>
             </map>
             <key>name</key>
             <string>linux64</string>
@@ -2086,16 +2094,18 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>c39735851fd05c194d0be09b8f9e8cb7</string>
+              <string>bdd00d734fe7665290414bb20437b0bf17adaf18bd0e43d729d19b2480dc2216d6ae4aa0ab3ce4290e3bf0bd5941b4a89cd46f8bd2b871c65873ccb660e08f68</string>
+              <key>hash_algorithm</key>
+              <string>blake2b</string>
               <key>url</key>
-              <string>https://automated-builds-secondlife-com.s3.amazonaws.com/ct2/98682/871552/slvoice-4.10.0000.32327.5fc3fe7c.571099-windows64-571099.tar.bz2</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/168/packages/generic/slvoice/4.10.0000.32327.5fc3fe7c.558436.1811/slvoice-4.10.0000.32327.5fc3fe7c.558436-windows64-1811.tar.zst</string>
             </map>
             <key>name</key>
             <string>windows64</string>
           </map>
         </map>
         <key>version</key>
-        <string>4.10.0000.32327.5fc3fe7c.571099</string>
+        <string>4.10.0000.32327.5fc3fe7c.558436</string>
       </map>
       <key>threejs</key>
       <map>
@@ -2302,9 +2312,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>2e8d817e7837dd6f4284b13fa3f5c15e</string>
+              <string>9a84c74acf3d8d467f2f32291955f25ebe5c3ff21e8a31b8956294e4322a938a98e4f7398a75fb9f568725aa45b652015d35d3b4e17562d0a1fad69ec4837b13</string>
+              <key>hash_algorithm</key>
+              <string>blake2b</string>
               <key>url</key>
-              <string>https://automated-builds-secondlife-com.s3.amazonaws.com/ct2/104765/917714/viewer_manager-3.0.575083-darwin64-575083.tar.bz2</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/196/packages/generic/viewer-manager/3.0.1829.1829/viewer_manager-3.0.1829-darwin64-1829.tar.zst</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
@@ -2321,13 +2333,27 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>name</key>
             <string>windows</string>
           </map>
+          <key>windows64</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>hash</key>
+              <string>c06f6bdc21f513ccd0b58c444336021883d0856ba63203024228cd0add3ea6714724418c851a9e679c9ea088f4d985768b81381decaefbdb6f42aa1ef7263477</string>
+              <key>hash_algorithm</key>
+              <string>blake2b</string>
+              <key>url</key>
+              <string>https://git.alchemyviewer.org/api/v4/projects/196/packages/generic/viewer-manager/3.0.1829.1829/viewer_manager-3.0.1829-windows64-1829.tar.zst</string>
+            </map>
+            <key>name</key>
+            <string>windows64</string>
+          </map>
         </map>
         <key>source</key>
         <string>https://bitbucket.org/lindenlab/vmp-standalone</string>
         <key>source_type</key>
         <string>hg</string>
         <key>version</key>
-        <string>3.0.575083</string>
+        <string>3.0.1829</string>
       </map>
       <key>vlc-bin</key>
       <map>
@@ -2346,11 +2372,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>82f633c8633ec5a721084f8a43cea5526e9ddde2fc6b81d2f39131d2d8e06e22ca2064e5b172cbbb34014cb42a7eab88b3bc08e86ad9242f0e3b06fed5980cde</string>
+              <string>5f5b0814eb8e54299c8bdf22b1d6dc61bb4cff6af1a377037b7fcc450752e8fb7f4e0ba5961c37b33225c71f49e7173814791662f667cbc1c2b9eba8be18d639</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/108/packages/generic/vlc-bin/3.0.16.1212/vlc_bin-3.0.16-darwin64-1212.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/108/packages/generic/vlc-bin/3.0.18.1820/vlc_bin-3.0.18-darwin64-1820.tar.zst</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
@@ -2360,18 +2386,18 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>db3b3bf6f37b66291d862e16bf4b84acb6dcdc82e219cb928a0b40dc2245b001c2ce6c5c0f204b1fef3566b0cfd74532a575d4af392dbfdbe770631b699d4755</string>
+              <string>c0cbbf5d4ec89e2aa2855408a3ed5aaa06842d018ddd12d5324bc14c85886d6824bd1ab306d5aa322b1f85b954318b0a7ddaae9b78b34aa4267192d046f18c85</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/108/packages/generic/vlc-bin/3.0.16.1212/vlc_bin-3.0.16-windows64-1212.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/108/packages/generic/vlc-bin/3.0.18.1820/vlc_bin-3.0.18-windows64-1820.tar.zst</string>
             </map>
             <key>name</key>
             <string>windows64</string>
           </map>
         </map>
         <key>version</key>
-        <string>3.0.16</string>
+        <string>3.0.18</string>
       </map>
       <key>xmlrpc-epi</key>
       <map>
@@ -2392,11 +2418,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>5d7e064e98a4ce12d89a42f950e124bc0e7c5ee23d796d151e8ae5419837c6e8f7b2fb764a9c60ee3df50f43f46acf37fba09f2eec6562db69b555b2b5b09607</string>
+              <string>71caa1eede137c0a942f4ac9bb21af400e4d4b6e80dbeecd5ed07b0f67d151684d0e83cfd74be49d00cec0bb047849109fd4625f8700573f64bb041f5e1d6e26</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/110/packages/generic/xmlrpc-epi/0.54.1.1509/xmlrpc_epi-0.54.1-darwin64-1509.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/110/packages/generic/xmlrpc-epi/0.54.1.1818/xmlrpc_epi-0.54.1-darwin64-1818.tar.zst</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
@@ -2406,11 +2432,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>c74cc14b07ddd7a9063e652df6101c62f98e76108926220d033889ea445a0c1c030674ab7b22264cff37e4d75ae94804b3e19f8d7778113035380f382b414081</string>
+              <string>52b330b451aafa27a4a2b0fad72ffac904df518bab182ab0c9171957f1319cbaece0849c37114d23b41808073417fcb53a26e36eb7f7d6210117530f24dc2167</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/110/packages/generic/xmlrpc-epi/0.54.1.1509/xmlrpc_epi-0.54.1-linux64-1509.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/110/packages/generic/xmlrpc-epi/0.54.1.1818/xmlrpc_epi-0.54.1-linux64-1818.tar.zst</string>
             </map>
             <key>name</key>
             <string>linux64</string>
@@ -2420,11 +2446,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>70e65bd88e97cb6ecc0cd6dcbbdc0d717e78cabb2b9f7062afd0a5ed8259f6d76454336f883b87d59fc639eb1298677fbd663ead35e8d98f27c674f9d49e08fa</string>
+              <string>1960bdd5aef6877ad7f33482743c8e747534bb87419ed23a2c5b470d7b5d89138d1d175fb2f785adad8daeefa6480bd13128fb3165656ecc9685c36525c36966</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/110/packages/generic/xmlrpc-epi/0.54.1.1509/xmlrpc_epi-0.54.1-windows64-1509.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/110/packages/generic/xmlrpc-epi/0.54.1.1818/xmlrpc_epi-0.54.1-windows64-1818.tar.zst</string>
             </map>
             <key>name</key>
             <string>windows64</string>

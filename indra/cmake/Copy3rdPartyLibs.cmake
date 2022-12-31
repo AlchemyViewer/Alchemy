@@ -80,22 +80,12 @@ if(WINDOWS)
 
     set(debug_src_dir "${ARCH_PREBUILT_DIRS_DEBUG}")
     set(debug_files
-        libexpatd.dll
-        libapr-1.dll
-        libaprutil-1.dll
-        libapriconv-1.dll
         openjp2.dll
-        xmlrpc-epid.dll
         )
 
     set(release_src_dir "${ARCH_PREBUILT_DIRS_RELEASE}")
     set(release_files
-        libexpat.dll
-        libapr-1.dll
-        libaprutil-1.dll
-        libapriconv-1.dll
         openjp2.dll
-        xmlrpc-epi.dll
         )
 
     # Filenames are different for 32/64 bit BugSplat file and we don't
@@ -204,11 +194,6 @@ elseif(DARWIN)
        )
     set(release_src_dir "${ARCH_PREBUILT_DIRS_RELEASE}")
     set(release_files
-        libapr-1.0.dylib
-        libapr-1.dylib
-        libaprutil-1.0.dylib
-        libaprutil-1.dylib
-        ${EXPAT_COPY}
         libndofdev.dylib
        )
 
@@ -247,14 +232,15 @@ elseif(LINUX)
     set(release_src_dir "${ARCH_PREBUILT_DIRS_RELEASE}")
     # *FIX - figure out what to do with duplicate libalut.so here -brad
     set(release_files
-        libapr-1.so.0
-        libaprutil-1.so.0
-        ${EXPAT_COPY}
         libopenal.so
         libjpeg.so
         libjpeg.so.8
         libjpeg.so.8.2.2
        )
+
+    if (USE_SENTRY)
+      list(APPEND release_files libsentry.so)
+    endif ()
 
     if (USE_FMODSTUDIO)
       list(APPEND debug_files libfmodL.so)

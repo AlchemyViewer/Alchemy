@@ -13,8 +13,11 @@ else (USESYSTEMLIBS)
             debug ${ARCH_PREBUILT_DIRS_DEBUG}/xmlrpc-epid.lib
             optimized ${ARCH_PREBUILT_DIRS_RELEASE}/xmlrpc-epi.lib
         )
-    else (WINDOWS)
-        set(XMLRPCEPI_LIBRARIES xmlrpc-epi)
+    else()
+        set(XMLRPCEPI_LIBRARIES
+            debug ${ARCH_PREBUILT_DIRS_DEBUG}/libxmlrpc-epi.a
+            optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libxmlrpc-epi.a
+        )
     endif (WINDOWS)
     set(XMLRPCEPI_INCLUDE_DIRS ${LIBS_PREBUILT_DIR}/include)
 endif (USESYSTEMLIBS)

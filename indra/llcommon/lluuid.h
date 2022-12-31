@@ -54,10 +54,10 @@ public:
 	//
 	// CREATORS
 	//
-	LLUUID() = default;
-	LLUUID(const LLUUID& rhs) { std::memcpy(mData, rhs.mData, sizeof(mData)); }
-	LLUUID(LLUUID&& rhs) { std::memmove(mData, rhs.mData, sizeof(mData)); }
-	~LLUUID() {}
+	LLUUID();
+	LLUUID(const LLUUID& rhs);
+	LLUUID(LLUUID&& rhs) noexcept;
+	~LLUUID();
 
 	LLUUID& operator=(const LLUUID& rhs) { std::memcpy(mData, rhs.mData, sizeof(mData)); return *this;}
 	LLUUID& operator=(LLUUID&& rhs) noexcept { std::memmove(mData, rhs.mData, sizeof(mData)); return *this;}
@@ -133,20 +133,7 @@ public:
 
 	// JC: These must return real bool's (not BOOLs) or else use of the STL
 	// will generate bool-to-int performance warnings.
-	bool operator==(const LLUUID& rhs) const
-	{
-		__m128i mm_left = load_unaligned_si128(mData);
-		__m128i mm_right = load_unaligned_si128(rhs.mData);
-
-#if defined(__SSE4_1__)
-		__m128i mm = _mm_xor_si128(mm_left, mm_right);
-		return _mm_test_all_zeros(mm, mm) != 0;
-#else
-		__m128i mm_cmp = _mm_cmpeq_epi32(mm_left, mm_right);
-		return _mm_movemask_epi8(mm_cmp) == 0xFFFF;
-#endif
-	}
-
+	bool operator==(const LLUUID& rhs) const;
 	bool operator!=(const LLUUID& rhs) const
 	{
 		return !((*this) == rhs);

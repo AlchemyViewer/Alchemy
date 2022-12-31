@@ -31,6 +31,12 @@ set(VIEWER_PREFIX)
 set(INTEGRATION_TESTS_PREFIX)
 
 option(LL_TESTS "Build and run unit and integration tests (disable for build timing runs to reduce variation" ON)
+if(DEFINED ENV{LL_TESTS})
+  set(LL_TESTS $ENV{LL_TESTS} CACHE STRING "Build and run unit and integration tests (disable for build timing runs to reduce variation" FORCE)
+else()
+  set(LL_TESTS "" CACHE STRING "Build and run unit and integration tests (disable for build timing runs to reduce variation")
+endif()
+
 option(ENABLE_MEDIA_PLUGINS "Turn off building media plugins if they are imported by third-party library mechanism" ON)
 
 # Compiler and toolchain options
@@ -53,8 +59,47 @@ option(USE_VLC "Enable VLC media plugin" ON)
 
 #Discord Integration
 option(USE_DISCORD "Enable Discord client integration" OFF)
+
+if(DEFINED ENV{DISCORD_CLIENTID})
+  set(DISCORD_CLIENTID $ENV{DISCORD_CLIENTID} CACHE STRING "Discord Client ID" FORCE)
+else()
+  set(DISCORD_CLIENTID "" CACHE STRING "Discord Client ID")
+endif()
+
+if (INSTALL_PROPRIETARY)
+  set(USE_DISCORD ON CACHE BOOL "Use Discord SDK" FORCE)
+  # Note that viewer_manifest.py makes decision based on SENTRY_DSN and not USE_SENTRY
+  if (DISCORD_CLIENTID)
+      set(USE_DISCORD ON CACHE BOOL "Use Discord SDK" FORCE)
+  else ()
+      set(USE_DISCORD OFF CACHE BOOL "Use Discord SDK" FORCE)
+  endif ()
+endif ()
+
 if (DEFINED ENV{USE_DISCORD})
   set(USE_DISCORD $ENV{USE_DISCORD} CACHE BOOL "" FORCE)
+endif()
+
+#Crash reporting
+option(USE_SENTRY "Use the Sentry crash reporting system" OFF)
+
+if(DEFINED ENV{SENTRY_DSN})
+  set(SENTRY_DSN $ENV{SENTRY_DSN} CACHE STRING "Sentry DSN" FORCE)
+endif()
+
+if (INSTALL_PROPRIETARY)
+  # Note that viewer_manifest.py makes decision based on SENTRY_DSN and not USE_SENTRY
+  if (SENTRY_DSN)
+      set(USE_SENTRY ON  CACHE BOOL "Use the Sentry crash reporting system" FORCE)
+  else ()
+      set(USE_SENTRY OFF CACHE BOOL "Use the Sentry crash reporting system" FORCE)
+  endif ()
+else ()
+  set(USE_SENTRY OFF CACHE BOOL "Use the Sentry crash reporting system" FORCE)
+endif ()
+
+if (DEFINED ENV{USE_SENTRY})
+  set(USE_SENTRY $ENV{USE_SENTRY} CACHE BOOL "" FORCE)
 endif()
 
 if(LIBS_CLOSED_DIR)
@@ -223,6 +268,14 @@ set(GRID agni CACHE STRING "Target Grid")
 
 set(ENABLE_SIGNING OFF CACHE BOOL "Enable signing the viewer")
 set(SIGNING_IDENTITY "" CACHE STRING "Specifies the signing identity to use, if necessary.")
+
+if (DEFINED ENV{VIEWER_ENABLE_SIGNING})
+  set(ENABLE_SIGNING $ENV{VIEWER_ENABLE_SIGNING} CACHE BOOL "" FORCE)
+endif()
+
+if(DEFINED ENV{VIEWER_SIGNING_IDENTITY})
+  set(SIGNING_IDENTITY $ENV{VIEWER_SIGNING_IDENTITY} CACHE STRING "Specifies the signing identity to use, if necessary." FORCE)
+endif()
 
 set(VERSION_BUILD "0" CACHE STRING "Revision number passed in from the outside")
 set(USESYSTEMLIBS OFF CACHE BOOL "Use libraries from your system rather than Linden-supplied prebuilt libraries.")

@@ -87,7 +87,7 @@
        width="310"
        follows="all"
        layout="topleft"
-       color="DkGray2"
+       color="PanelDefaultBackgroundColor"
        opaque="true"
        reserve_scroll_corner="false"
       >
