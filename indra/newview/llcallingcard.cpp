@@ -663,6 +663,11 @@ void LLAvatarTracker::processChange(LLMessageSystem* msg)
 						LLNotifications::instance().add(LLRelationship::GRANT_MAP_LOCATION & new_rights
 							? "GrantedMapRights" : "RevokedMapRights", args, payload);
 					}
+                    if (change & LLRelationship::GRANT_ONLINE_STATUS)
+                    {
+                        LLNotifications::instance().add(LLRelationship::GRANT_ONLINE_STATUS & new_rights
+							? "GrantedOnlineStatus" : "RevokedOnlineStatus", args, payload);
+                    }
 				}
 				buddy_it->second->setRightsFrom(new_rights);
 			}
