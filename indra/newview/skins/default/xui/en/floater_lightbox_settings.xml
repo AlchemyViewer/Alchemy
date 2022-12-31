@@ -794,10 +794,20 @@
 					height="15"
 					left="10"
 					top_pad="4"
-					width="90"
+					width="75"
 					layout="topleft"
-					tool_tip="Controls SMAA Quality"
+					tool_tip="Controls Anti-Aliasing Quality"
 					value="Anti-Aliasing:" />
+				<check_box
+					follows="left|top"
+					height="15"
+					left="115"
+					top_pad="-14"
+					width="80"
+					layout="topleft"
+					label="Use SMAA"
+					tool_tip="Toggles using Subpixel Morphological AA instead of Fast Approximate AA. SMAA in most situations results in a less blurry image vs FXAA"
+					control_name="AlchemyRenderSMAA"/>
 				<combo_box
 					follows="top|left"
 					layout="topleft"
@@ -807,7 +817,7 @@
 					top_pad="-16"
 					max_chars="128"
 					allow_text_entry="false"
-					tool_tip="Controls SMAA Quality"
+					tool_tip="Controls Anti-Aliasing Quality"
 					control_name="RenderFSAASamples"
 					name="smaa_combo">
 					<combo_box.item
