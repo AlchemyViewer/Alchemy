@@ -69,6 +69,10 @@ if( LLPHYSICSEXTENSIONS_SRC_DIR )
   endif (NOT HAVOK_TPV)
 endif( LLPHYSICSEXTENSIONS_SRC_DIR )
 
+if (WINDOWS)
+  use_prebuilt_binary(squirrel)
+endif()
+
 include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_CURRENT_BINARY_DIR}
