@@ -910,4 +910,12 @@ with the same filename but different name
   <texture name="System_Notification" file_name="icons/SL_Logo.png" preload="true"/>
   <texture name="Icon_Attachment_Small" file_name="icons/Icon_Attachment_Small.png"	preload="true"/>
   <texture name="Icon_Attachment_Large" file_name="icons/Icon_Attachment_Large.png"	preload="true"/>
+
+  <texture name="AlchemyRelease128" file_name="alchemy/alchemy_128.png" preload="false" />
+  <texture name="AlchemyBeta128" file_name="alchemy/alchemybeta_128.png" preload="false" />
+  <texture name="AlchemyProject128" file_name="alchemy/alchemyproject_128.png" preload="false" />
+  <texture name="AlchemyTest128" file_name="alchemy/alchemytest_128.png" preload="false" />
+
+  <texture name="social_discord" file_name="alchemy/discord_32.png" preload="false" />
+  <texture name="social_mastodon" file_name="alchemy/mastodon_32.png" preload="false" />
 </textures>

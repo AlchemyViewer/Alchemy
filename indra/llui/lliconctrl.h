@@ -48,6 +48,9 @@ public:
 	{
 		Optional<LLUIImage*>	image;
 		Optional<LLUIColor>		color;
+// [SL:KB] - Patch: Control-IconCtrl | Checked: Catznip-3.6
+		Optional<bool>			commit_on_click;
+// [/SL:KB]
 		Optional<bool>			use_draw_context_alpha,
                                 interactable;
 		Optional<S32>			min_width,

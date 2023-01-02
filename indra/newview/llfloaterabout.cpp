@@ -32,6 +32,9 @@
 #include "llfloaterabout.h"
 
 // Viewer includes
+#if LL_WINDOWS
+#include "alsquirrelupdater.h"
+#endif
 #include "llagent.h"
 #include "llagentui.h"
 #include "llappviewer.h"
@@ -63,6 +66,7 @@
 #include "lleventapi.h"
 #include "llcorehttputil.h"
 #include "lldir.h"
+#include "lliconctrl.h"
 
 #if LL_WINDOWS
 #include "lldxhardware.h"
@@ -90,17 +94,10 @@ public:
 	static LLSD getInfo();
 	void onClickCopyToClipboard();
 	void onClickUpdateCheck();
-    static void setUpdateListener();
 
 private:
 	void setSupportText(const std::string& server_release_notes_url);
 
-	// notifications for user requested checks
-	static void showCheckUpdateNotification(S32 state);
-
-	// callback method for manual checks
-	static bool callbackCheckUpdate(LLSD const & event);
-    
     // listener name for update checks
     static const std::string sCheckUpdateListenerName;
 	
@@ -129,7 +126,10 @@ BOOL LLFloaterAbout::postBuild()
 		getChild<LLViewerTextEditor>("support_editor", true);
 
 	LLViewerTextEditor *contrib_names_widget = 
-		getChild<LLViewerTextEditor>("contrib_names", true);
+		getChild<LLViewerTextEditor>("contrib_names", true);  
+
+	LLViewerTextEditor *suppoter_names_widget = 
+		getChild<LLViewerTextEditor>("alchemy_supporter_names", true);
 
 	LLViewerTextEditor *licenses_widget = 
 		getChild<LLViewerTextEditor>("licenses_editor", true);
@@ -139,6 +139,26 @@ BOOL LLFloaterAbout::postBuild()
     
     getChild<LLUICtrl>("update_btn")->setCommitCallback(
         boost::bind(&LLFloaterAbout::onClickUpdateCheck, this));
+
+	auto viewer_logo = getChild<LLIconCtrl>("viewer_logo");
+
+	auto viewer_maturity = LLVersionInfo::instance().getViewerMaturity();
+	switch(viewer_maturity)
+	{
+	case LLVersionInfo::TEST_VIEWER:
+		viewer_logo->setImage(LLUI::getUIImage("AlchemyTest128"));
+		break;
+	case LLVersionInfo::PROJECT_VIEWER:
+		viewer_logo->setImage(LLUI::getUIImage("AlchemyProject128"));
+		break;
+	case LLVersionInfo::BETA_VIEWER:
+		viewer_logo->setImage(LLUI::getUIImage("AlchemyBeta128"));
+		break;
+	default:
+	case LLVersionInfo::RELEASE_VIEWER:
+		viewer_logo->setImage(LLUI::getUIImage("AlchemyRelease128"));
+		break;
+	}
 
 	static const LLUIColor about_color = LLUIColorTable::instance().getColor("TextFgReadOnlyColor");
 
@@ -160,23 +180,45 @@ BOOL LLFloaterAbout::postBuild()
 	support_widget->setEnabled(FALSE);
 	support_widget->startOfDoc();
 
-	// Get the names of contributors, extracted from .../doc/contributions.txt by viewer_manifest.py at build time
-	std::string contributors_path = gDirUtilp->getExpandedFilename(LL_PATH_APP_SETTINGS,"contributors.txt");
-	llifstream contrib_file;
-	std::string contributors;
-	contrib_file.open(contributors_path.c_str());		/* Flawfinder: ignore */
-	if (contrib_file.is_open())
 	{
-		std::getline(contrib_file, contributors); // all names are on a single line
-		contrib_file.close();
+		// Get the names of contributors, extracted from .../doc/contributions.txt by viewer_manifest.py at build time
+		std::string contributors_path = gDirUtilp->getExpandedFilename(LL_PATH_APP_SETTINGS,"contributors.txt");
+		llifstream contrib_file;
+		std::string contributors;
+		contrib_file.open(contributors_path.c_str());		/* Flawfinder: ignore */
+		if (contrib_file.is_open())
+		{
+			std::getline(contrib_file, contributors); // all names are on a single line
+			contrib_file.close();
+		}
+		else
+		{
+			LL_WARNS("AboutInit") << "Could not read contributors file at " << contributors_path << LL_ENDL;
+		}
+		contrib_names_widget->setText(contributors);
+		contrib_names_widget->setEnabled(FALSE);
+		contrib_names_widget->startOfDoc();
 	}
-	else
+
 	{
-		LL_WARNS("AboutInit") << "Could not read contributors file at " << contributors_path << LL_ENDL;
+		// Get the names of supporters, extracted from .../doc/supporters.txt by viewer_manifest.py at build time
+		std::string supporters_path = gDirUtilp->getExpandedFilename(LL_PATH_APP_SETTINGS,"supporters.txt");
+		llifstream supporters_file;
+		std::string supporters;
+		supporters_file.open(supporters_path.c_str());		/* Flawfinder: ignore */
+		if (supporters_file.is_open())
+		{
+			std::getline(supporters_file, supporters); // all names are on a single line
+			supporters_file.close();
+		}
+		else
+		{
+			LL_WARNS("AboutInit") << "Could not read supporters file at " << supporters_path << LL_ENDL;
+		}
+		suppoter_names_widget->setText(supporters);
+		suppoter_names_widget->setEnabled(FALSE);
+		suppoter_names_widget->startOfDoc();
 	}
-	contrib_names_widget->setText(contributors);
-	contrib_names_widget->setEnabled(FALSE);
-	contrib_names_widget->startOfDoc();
 
     // Get the Versions and Copyrights, created at build time
 	std::string licenses_path = gDirUtilp->getExpandedFilename(LL_PATH_APP_SETTINGS,"packages-info.txt");
@@ -317,7 +359,12 @@ void LLFloaterAbout::onClickCopyToClipboard()
 
 void LLFloaterAbout::onClickUpdateCheck()
 {
-    setUpdateListener();
+#if LL_WINDOWS
+	if (ALUpdateHandler::isSupported())
+	{
+		ALUpdateHandler::getInstance()->check();
+	}
+#endif
 }
 
 void LLFloaterAbout::setSupportText(const std::string& server_release_notes_url)
@@ -340,94 +387,6 @@ void LLFloaterAbout::setSupportText(const std::string& server_release_notes_url)
 							   FALSE, LLStyle::Params() .color(about_color));
 }
 
-//This is bound as a callback in postBuild()
-void LLFloaterAbout::setUpdateListener()
-{
-    typedef std::vector<std::string> vec;
-    
-    //There are four possibilities:
-    //no downloads directory or version directory in "getOSUserAppDir()/downloads"
-    //   => no update
-    //version directory exists and .done file is not present
-    //   => download in progress
-    //version directory exists and .done file exists
-    //   => update ready for install
-    //version directory, .done file and either .skip or .next file exists
-    //   => update deferred
-    BOOL downloads = false;
-    std::string downloadDir = "";
-    BOOL done = false;
-    BOOL next = false;
-    BOOL skip = false;
-    
-    LLSD info(LLFloaterAbout::getInfo());
-    std::string version = info["VIEWER_VERSION_STR"].asString();
-    std::string appDir = gDirUtilp->getOSUserAppDir();
-    
-    //drop down two directory levels so we aren't searching for markers among the log files and crash dumps
-    //or among other possible viewer upgrade directories if the resident is running multiple viewer versions
-    //we should end up with a path like ../downloads/1.2.3.456789
-    vec file_vec = gDirUtilp->getFilesInDir(appDir);
-    
-    for(vec::const_iterator iter=file_vec.begin(); iter!=file_vec.end(); ++iter)
-    {
-        if ( (iter->rfind("downloads") ) )
-        {
-            vec dir_vec = gDirUtilp->getFilesInDir(*iter);
-            for(vec::const_iterator dir_iter=dir_vec.begin(); dir_iter!=dir_vec.end(); ++dir_iter)
-            {
-                if ( (dir_iter->rfind(version)))
-                {
-                    downloads = true;
-                    downloadDir = *dir_iter;
-                }
-            }
-        }
-    }
-    
-    if ( downloads )
-    {
-        for(vec::const_iterator iter=file_vec.begin(); iter!=file_vec.end(); ++iter)
-        {
-            if (iter->rfind(version) != std::string::npos)
-            {
-                if (iter->rfind(".done") != std::string::npos)
-                {
-                    done = true;
-                }
-                else if (iter->rfind(".next") != std::string::npos)
-                {
-                    next = true;
-                }
-                else if (iter->rfind(".skip") != std::string::npos)
-                {
-                    skip = true;
-                }
-            }
-        }
-    }
-    
-    if ( !downloads )
-    {
-        LLNotificationsUtil::add("UpdateViewerUpToDate");
-    }
-    else
-    {
-        if ( !done )
-        {
-            LLNotificationsUtil::add("UpdateDownloadInProgress");
-        }
-        else if ( (!next) && (!skip) )
-        {
-            LLNotificationsUtil::add("UpdateDownloadComplete");
-        }
-        else //done and there is a next or skip
-        {
-            LLNotificationsUtil::add("UpdateDeferred");
-        }
-    }
-}
-
 ///----------------------------------------------------------------------------
 /// LLFloaterAboutUtil
 ///----------------------------------------------------------------------------
@@ -436,9 +395,3 @@ void LLFloaterAboutUtil::registerFloater()
 	LLFloaterReg::add("sl_about", "floater_about.xml",
 		&LLFloaterReg::build<LLFloaterAbout>);
 }
-
-void LLFloaterAboutUtil::checkUpdatesAndNotify()
-{
-    LLFloaterAbout::setUpdateListener();
-}
-
