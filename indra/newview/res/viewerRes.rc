@@ -136,8 +136,8 @@ TOOLNO                  CURSOR                  "llno.cur"
 //
 
 VS_VERSION_INFO VERSIONINFO
- FILEVERSION ${VIEWER_VERSION_MAJOR},${VIEWER_VERSION_MINOR},${VIEWER_VERSION_PATCH},${VIEWER_VERSION_REVISION}
- PRODUCTVERSION ${VIEWER_VERSION_MAJOR},${VIEWER_VERSION_MINOR},${VIEWER_VERSION_PATCH},${VIEWER_VERSION_REVISION}
+ FILEVERSION ${VIEWER_VERSION_MAJOR},${VIEWER_VERSION_MINOR},${VIEWER_VERSION_PATCH},0
+ PRODUCTVERSION ${VIEWER_VERSION_MAJOR},${VIEWER_VERSION_MINOR},${VIEWER_VERSION_PATCH},0
  FILEFLAGSMASK 0x3fL
 #ifdef _DEBUG
  FILEFLAGS 0x1L
@@ -154,12 +154,13 @@ BEGIN
         BEGIN
             VALUE "CompanyName", "Alchemy Development Group"
             VALUE "FileDescription", "Alchemy"
-            VALUE "FileVersion", "${VIEWER_VERSION_MAJOR}.${VIEWER_VERSION_MINOR}.${VIEWER_VERSION_PATCH}.${VIEWER_VERSION_REVISION}"
+            VALUE "FileVersion", "${VIEWER_VERSION_MAJOR}.${VIEWER_VERSION_MINOR}.${VIEWER_VERSION_PATCH}"
             VALUE "InternalName", "Alchemy"
-            VALUE "LegalCopyright", "Copyright (C) 2013-2021 Alchemy Development Group"
+            VALUE "LegalCopyright", "Copyright (C) 2013-2023 Alchemy Development Group"
             VALUE "OriginalFilename", "Alchemy.exe"
             VALUE "ProductName", "Alchemy"
-            VALUE "ProductVersion", "${VIEWER_VERSION_MAJOR}.${VIEWER_VERSION_MINOR}.${VIEWER_VERSION_PATCH}.${VIEWER_VERSION_REVISION}"
+            VALUE "ProductVersion", "${VIEWER_VERSION_MAJOR}.${VIEWER_VERSION_MINOR}.${VIEWER_VERSION_PATCH}"
+            VALUE "SquirrelAwareVersion", "1"
         END
     END
     BLOCK "VarFileInfo"

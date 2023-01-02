@@ -1549,10 +1549,15 @@ source_group("CMake Rules" FILES ViewerInstall.cmake)
 #build_data.json creation moved to viewer_manifest.py MAINT-6413
 # the viewer_version.txt file created here is for passing to viewer_manifest and autobuild
 file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/viewer_version.txt"
-           "${VIEWER_SHORT_VERSION}.${VIEWER_VERSION_REVISION}\n")
+           "${VIEWER_SHORT_VERSION}\n")
 
 configure_file(llviewerbuildconfig.h.in llviewerbuildconfig.h @ONLY)
 LIST(APPEND viewer_HEADER_FILES ${CMAKE_CURRENT_BINARY_DIR}/llviewerbuildconfig.h)
+
+if (WINDOWS)
+  LIST(APPEND viewer_SOURCE_FILES alsquirrelupdater.cpp)
+  LIST(APPEND viewer_HEADER_FILES alsquirrelupdater.h)
+endif (WINDOWS)
 
 if (DARWIN)
   LIST(APPEND viewer_SOURCE_FILES llappviewermacosx.cpp)
@@ -1725,6 +1730,10 @@ if (WINDOWS)
 
     configure_file( ${CMAKE_CURRENT_SOURCE_DIR}/res/viewerRes.rc
                     ${CMAKE_CURRENT_BINARY_DIR}/viewerRes.rc
+                    )
+
+    configure_file( ${CMAKE_CURRENT_SOURCE_DIR}/installers/windows/viewer.nuspec
+                    ${CMAKE_CURRENT_BINARY_DIR}/viewer.nuspec
                     )
 
     list(APPEND viewer_RESOURCE_FILES
@@ -2206,7 +2215,7 @@ set(ARTWORK_DIR ${CMAKE_CURRENT_SOURCE_DIR} CACHE PATH
     "Path to artwork files.")
 
 if (LINUX)
-  set(product Alchemy-${ARCH}-${VIEWER_SHORT_VERSION}.${VIEWER_VERSION_REVISION})
+  set(product Alchemy-${ARCH}-${VIEWER_SHORT_VERSION})
 
   # These are the generated targets that are copied to package/
   set(COPY_INPUT_DEPENDENCIES
@@ -2287,10 +2296,10 @@ if (DARWIN)
   set(MACOSX_BUNDLE_INFO_STRING "${VIEWER_CHANNEL}")
   set(MACOSX_BUNDLE_ICON_FILE "alchemy.icns")
   set(MACOSX_BUNDLE_GUI_IDENTIFIER "org.alchemyviewer.viewer")
-  set(MACOSX_BUNDLE_LONG_VERSION_STRING "${VIEWER_CHANNEL} ${VIEWER_SHORT_VERSION}.${VIEWER_VERSION_REVISION}")
+  set(MACOSX_BUNDLE_LONG_VERSION_STRING "${VIEWER_CHANNEL} ${VIEWER_SHORT_VERSION}")
   set(MACOSX_BUNDLE_BUNDLE_NAME "Alchemy")
-  set(MACOSX_BUNDLE_SHORT_VERSION_STRING "${VIEWER_SHORT_VERSION}.${VIEWER_VERSION_REVISION}")
-  set(MACOSX_BUNDLE_BUNDLE_VERSION "${VIEWER_SHORT_VERSION}${VIEWER_VERSION_REVISION}")
+  set(MACOSX_BUNDLE_SHORT_VERSION_STRING "${VIEWER_SHORT_VERSION}")
+  set(MACOSX_BUNDLE_BUNDLE_VERSION "${VIEWER_SHORT_VERSION}")
   set(MACOSX_BUNDLE_COPYRIGHT "Copyright (C) 2013-2021 Alchemy Development Group")
   set(MACOSX_BUNDLE_NSMAIN_NIB_FILE "Alchemy.nib")
   set(MACOSX_BUNDLE_NSPRINCIPAL_CLASS "LLApplication")

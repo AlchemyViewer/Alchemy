@@ -761,7 +761,7 @@ void LLAppViewerWin32::initCrashReporting(bool reportFreeze)
 	sentry_options_set_dsn(options, SENTRY_DSN);
 	sentry_options_set_release(options, LL_VIEWER_CHANNEL_AND_VERSION);
 
-	std::string crashpad_path = gDirUtilp->getExpandedFilename(LL_PATH_EXECUTABLE, "crashpad_handler.exe");
+	std::string crashpad_path = gDirUtilp->getExpandedFilename(LL_PATH_EXECUTABLE, "sentry", "crashpad_handler.exe");
 	sentry_options_set_handler_pathw(options, ll_convert_string_to_wide(crashpad_path).c_str());
 
 	std::string database_path = gDirUtilp->getExpandedFilename(LL_PATH_LOGS, "sentry");

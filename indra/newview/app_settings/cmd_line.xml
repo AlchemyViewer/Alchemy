@@ -415,6 +415,40 @@
       <key>map-to</key>
       <string>CmdLineSkipUpdater</string>
     </map>
-
+    <key>squirrel-install</key>
+    <map>
+      <key>count</key>
+      <integer>1</integer>
+      <key>map-to</key>
+      <string>CmdLineSquirrelInstall</string>
+    </map>
+    <key>squirrel-firstrun</key>
+    <map>
+      <key>count</key>
+      <integer>0</integer>
+      <key>map-to</key>
+      <string>CmdLineSquirrelFirstRun</string>
+    </map>
+    <key>squirrel-updated</key>
+    <map>
+      <key>count</key>
+      <integer>1</integer>
+      <key>map-to</key>
+      <string>CmdLineSquirrelUpdated</string>
+    </map>
+    <key>squirrel-obsolete</key>
+    <map>
+      <key>count</key>
+      <integer>1</integer>
+      <key>map-to</key>
+      <string>CmdLineSquirrelObsolete</string>
+    </map>
+    <key>squirrel-uninstall</key>
+    <map>
+      <key>count</key>
+      <integer>1</integer>
+      <key>map-to</key>
+      <string>CmdLineSquirrelUninstall</string>
+    </map>
   </map>
 </llsd>

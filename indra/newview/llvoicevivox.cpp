@@ -956,7 +956,7 @@ bool LLVivoxVoiceClient::startAndLaunchDaemon()
 #if LL_WINDOWS
         // On windows use exe (not work or RO) directory
         std::string exe_path = gDirUtilp->getExecutableDir();
-        gDirUtilp->append(exe_path, "SLVoice.exe");
+        gDirUtilp->append(exe_path, "voice", "SLVoice.exe");
 #elif LL_DARWIN
         // On MAC use resource directory
         std::string exe_path = gDirUtilp->getAppRODataDir();

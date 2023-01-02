@@ -12730,4 +12730,63 @@ Would you like to reset the graphic preferences?
   notext="Leave as-is"
   canceltext="Never reset"/>
  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="UpdateDownloadRequest"
+   type="alertmodal">
+A new version has been detected.
+Would you like to download and install [VIEWER_VER] with following updates now?
+
+[VIEWER_UPDATES]
+    <tag>confirm</tag>
+    <usetemplate
+     name="okcancelbuttons"
+     notext="Remind Me Later"
+     yestext="Ok"/>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="UpdateDownloaded"
+   type="alertmodal">
+[VIEWER_VER] has been downloaded.
+Would you like to install [VIEWER_VER] for following updates now?
+
+[VIEWER_UPDATES]
+    <tag>confirm</tag>
+    <usetemplate
+     name="okcancelbuttons"
+     notext="Remind Me Later"
+     yestext="Ok"/>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="UpdateInstalledRestart"
+   type="alertmodal">
+Your viewer has been updated to the following version:
+[VIEWER_VER] => [VIEWER_UPDATES] 
+
+Would you like to restart now?
+    <tag>confirm</tag>
+    <usetemplate
+     name="okcancelbuttons"
+     notext="Remind Me Later"
+     yestext="Ok"/>
+  </notification>
+  <notification
+   icon="notify.tga"
+   name="UpdateInstalledRestartToast"
+   type="notify">
+Your viewer has been updated to the following version:
+[VIEWER_VER] => [VIEWER_UPDATES] 
+
+Would you like to restart now?
+    <tag>confirm</tag>
+    <usetemplate
+     name="okcancelbuttons"
+     notext="Remind Me Later"
+     yestext="Ok"/>
+  </notification>
 </notifications>

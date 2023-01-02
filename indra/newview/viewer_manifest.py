@@ -439,22 +439,11 @@ class WindowsManifest(ViewerManifest):
             # Find alchemy-bin.exe in the 'configuration' dir, then rename it to the result of final_exe.
             self.path(src='%s/alchemy-bin.exe' % self.args['configuration'], dst=self.final_exe())
 
-            with self.prefix(src=os.path.join(pkgdir, "VMP")):
-                # include the compiled launcher scripts so that it gets included in the file_list
-                self.path('SLVersionChecker.exe')
-
-            with self.prefix(dst="vmp_icons"):
-                with self.prefix(src=self.icon_path()):
-                    self.path(src="alchemy.ico", dst="secondlife.ico")
-                #VMP  Tkinter icons
-                with self.prefix(src="vmp_icons"):
-                    self.path("*.png")
-                    self.path("*.gif")
-
         # Plugin host application
-        self.path2basename(os.path.join(os.pardir,
-                                        'llplugin', 'slplugin', self.args['configuration']),
-                           "slplugin.exe")
+        with self.prefix(dst="llplugin"):
+            self.path2basename(os.path.join(os.pardir,
+                                            'llplugin', 'slplugin', self.args['configuration']),
+                                            "slplugin.exe")
         
         # Get shared libs from the shared libs staging directory
         with self.prefix(src=os.path.join(self.args['build'], os.pardir,
@@ -482,34 +471,23 @@ class WindowsManifest(ViewerManifest):
                 else:
                     self.path(src="kdu.dll", dst="kdu.dll")
 					
-            # These need to be installed as a SxS assembly, currently a 'private' assembly.
-            # See http://msdn.microsoft.com/en-us/library/ms235291(VS.80).aspx
-            self.path("concrt140.dll")
-            self.path("msvcp140.dll")
-            self.path("msvcp140_1.dll")
-            self.path("msvcp140_2.dll")
-            self.path("msvcp140_atomic_wait.dll")
-            self.path("msvcp140_codecvt_ids.dll")
-            self.path("vccorlib140.dll")
-            self.path("vcruntime140.dll")
-            self.path("vcruntime140_1.dll")
-
             # SLVoice executable
-            with self.prefix(src=os.path.join(pkgdir, 'bin', 'release')):
-                self.path("SLVoice.exe")
+            with self.prefix(dst="voice"):
+                with self.prefix(src=os.path.join(pkgdir, 'bin', 'release')):
+                    self.path("SLVoice.exe")
 
-            # Vivox libraries
-            if (self.address_size == 64):
-                self.path("vivoxsdk_x64.dll")
-                self.path("ortp_x64.dll")
-            else:
-                self.path("vivoxsdk.dll")
-                self.path("ortp.dll")
+                # Vivox libraries
+                if (self.address_size == 64):
+                    self.path("vivoxsdk_x64.dll")
+                    self.path("ortp_x64.dll")
+                else:
+                    self.path("vivoxsdk.dll")
+                    self.path("ortp.dll")
 
             # Sentry
             if self.args['sentry'] == 'ON' or self.args['sentry'] == 'TRUE':
                 self.path("sentry.dll")
-                with self.prefix(src=os.path.join(pkgdir, 'bin', 'release')):
+                with self.prefix(src=os.path.join(pkgdir, 'bin', 'release'), dst="sentry"):
                     self.path("crashpad_handler.exe")
 
             if self.args['discord'] == 'ON' or self.args['discord'] == 'TRUE':
@@ -626,139 +604,27 @@ class WindowsManifest(ViewerManifest):
         if not self.is_packaging_viewer():
             self.package_file = "copied_deps"    
 
-    def nsi_file_commands(self, install=True):
-        def wpath(path):
-            if path.endswith('/') or path.endswith(os.path.sep):
-                path = path[:-1]
-            path = path.replace('/', '\\')
-            return path
-
-        result = ""
-        dest_files = [pair[1] for pair in self.file_list if pair[0] and os.path.isfile(pair[1])]
-        # sort deepest hierarchy first
-        dest_files.sort(key=lambda f: (f.count(os.path.sep), f), reverse=True)
-        out_path = None
-        for pkg_file in dest_files:
-            rel_file = os.path.normpath(pkg_file.replace(self.get_dst_prefix()+os.path.sep,''))
-            installed_dir = wpath(os.path.join('$INSTDIR', os.path.dirname(rel_file)))
-            pkg_file = wpath(os.path.normpath(pkg_file))
-            if installed_dir != out_path:
-                if install:
-                    out_path = installed_dir
-                    result += 'SetOutPath ' + out_path + '\n'
-            if install:
-                result += 'File ' + pkg_file + '\n'
-            else:
-                result += 'Delete ' + wpath(os.path.join('$INSTDIR', rel_file)) + '\n'
-
-        # at the end of a delete, just rmdir all the directories
-        if not install:
-            deleted_file_dirs = [os.path.dirname(pair[1].replace(self.get_dst_prefix()+os.path.sep,'')) for pair in self.file_list]
-            # find all ancestors so that we don't skip any dirs that happened to have no non-dir children
-            deleted_dirs = []
-            for d in deleted_file_dirs:
-                deleted_dirs.extend(path_ancestors(d))
-            # sort deepest hierarchy first
-            deleted_dirs.sort(key=lambda f: (f.count(os.path.sep), f), reverse=True)
-            prev = None
-            for d in deleted_dirs:
-                if d != prev:   # skip duplicates
-                    result += 'RMDir ' + wpath(os.path.join('$INSTDIR', os.path.normpath(d))) + '\n'
-                prev = d
-
-        return result
-
     def package_finish(self):
-        # a standard map of strings for replacing in the templates
-        substitution_strings = {
-            'version' : '.'.join(self.args['version']),
-            'version_short' : '.'.join(self.args['version'][:-1]),
-            'version_dashes' : '-'.join(self.args['version']),
-            'version_registry' : '%s(%s)' %
-            ('.'.join(self.args['version']), self.address_size),
-            'final_exe' : self.final_exe(),
-            'flags':'',
-            'app_name':self.app_name(),
-            'app_name_oneword':self.app_name_oneword()
-            }
+        nuget_exe = os.path.join(self.args['build'], os.pardir, 'packages', 'squirrel', 'nuget.exe')
+        self.run_command(
+            [nuget_exe,
+                'pack',
+                '-Properties', 'NoWarn=NU5128',
+                os.path.join(self.args['build'], 'viewer.nuspec')])
+
+        squirrel_exe = os.path.join(self.args['build'], os.pardir, 'packages', 'squirrel', 'Squirrel.exe')
+        self.run_command(
+            [squirrel_exe,
+                'releasify',
+                '--releaseDir', os.path.join(self.args['build'], 'Releases'),
+                '--framework', 'vcredist143-x64',
+                '--icon', os.path.join(self.args['source'], 'installers', 'windows', 'install_icon.ico'),
+                '--splashImage', os.path.join(self.args['source'], 'installers', 'windows', 'splash.gif'),
+                '--package', os.path.join(self.args['build'], '{}.{}.nupkg'.format(self.app_name_oneword(), '.'.join(self.args['version'])))])
 
         installer_file = self.installer_base_name() + '_Setup.exe'
-        substitution_strings['installer_file'] = installer_file
-        
-        version_vars = """
-        !define INSTEXE "SLVersionChecker.exe"
-        !define VERSION "%(version_short)s"
-        !define VERSION_LONG "%(version)s"
-        !define VERSION_DASHES "%(version_dashes)s"
-        !define VERSION_REGISTRY "%(version_registry)s"
-        !define VIEWER_EXE "%(final_exe)s"
-        """ % substitution_strings
-        
-        if self.channel_type() == 'release':
-            substitution_strings['caption'] = CHANNEL_VENDOR_BASE
-        else:
-            substitution_strings['caption'] = self.app_name() + ' ${VERSION}'
 
-        inst_vars_template = """
-            OutFile "%(installer_file)s"
-            !define INSTNAME   "%(app_name_oneword)s"
-            !define SHORTCUT   "%(app_name)s"
-            !define URLNAME   "secondlife"
-            Caption "%(caption)s"
-            """
-
-        if(self.address_size == 64):
-            engage_registry="SetRegView 64"
-            program_files="!define MULTIUSER_USE_PROGRAMFILES64"
-        else:
-            engage_registry="SetRegView 32"
-            program_files=""
-
-        tempfile = "alchemy_setup_tmp.nsi"
-        # the following replaces strings in the nsi template
-        # it also does python-style % substitution
-        self.replace_in("installers/windows/installer_template.nsi", tempfile, {
-                "%%VERSION%%":version_vars,
-                "%%SOURCE%%":self.get_src_prefix(),
-                "%%INST_VARS%%":inst_vars_template % substitution_strings,
-                "%%INSTALL_FILES%%":self.nsi_file_commands(True),
-                "%%PROGRAMFILES%%":program_files,
-                "%%ENGAGEREGISTRY%%":engage_registry,
-                "%%DELETE_FILES%%":self.nsi_file_commands(False)})
-
-        # If we're on a build machine, sign the code using our Authenticode certificate. JC
-        # note that the enclosing setup exe is signed later, after the makensis makes it.
-        # Unlike the viewer binary, the VMP filenames are invariant with respect to version, os, etc.
-        for exe in (
-            self.final_exe(),
-            "SLVersionChecker.exe",
-            "llplugin/dullahan_host.exe",
-            ):
-            self.sign(exe)
-            
-        # Check two paths, one for Program Files, and one for Program Files (x86).
-        # Yay 64bit windows.
-        for ProgramFiles in 'ProgramFiles', 'ProgramFiles(x86)':
-            NSIS_path = os.path.expandvars(r'${%s}\NSIS\makensis.exe' % ProgramFiles)
-            if os.path.exists(NSIS_path):
-                break
-        installer_created=False
-        nsis_attempts=3
-        nsis_retry_wait=15
-        for attempt in range(nsis_attempts):
-            try:
-                self.run_command([NSIS_path, '/V2', self.dst_path_of(tempfile)])
-            except ManifestError as err:
-                if attempt+1 < nsis_attempts:
-                    print("nsis failed, waiting %d seconds before retrying" % nsis_retry_wait, file=sys.stderr)
-                    time.sleep(nsis_retry_wait)
-                    nsis_retry_wait*=2
-            else:
-                # NSIS worked! Done!
-                break
-        else:
-            print("Maximum nsis attempts exceeded; giving up", file=sys.stderr)
-            raise
+        os.rename(os.path.join('Releases', self.app_name_oneword() + 'Setup.exe'), os.path.join('Release', installer_file))
 
         self.sign(installer_file)
         self.created_path(self.dst_path_of(installer_file))
@@ -862,15 +728,6 @@ class DarwinManifest(ViewerManifest):
                 # need .icns file referenced by Info.plist
                 with self.prefix(src=self.icon_path(), dst="") :
                     self.path("alchemy.icns")
-
-                # Copy in the updater script and helper modules
-                self.path(src=os.path.join(pkgdir, 'VMP'), dst="updater")
-
-                with self.prefix(src="", dst=os.path.join("updater", "icons")):
-                    self.path2basename(self.icon_path(), "alchemy.ico")
-                    with self.prefix(src="vmp_icons", dst=""):
-                        self.path("*.png")
-                        self.path("*.gif")
 
                 with self.prefix(src_dst="cursors_mac"):
                     self.path("*.tif")
