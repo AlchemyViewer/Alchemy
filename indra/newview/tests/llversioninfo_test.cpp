@@ -56,13 +56,13 @@ namespace tut
 
 			stream << LL_VIEWER_CHANNEL
 				   << " "
-				   << mVersion;
+				   << mShortVersion;
 			mVersionAndChannel = stream.str();
 			stream.str("");
 
 			stream << mResetChannel
 				   << " "
-				   << mVersion;
+				   << mShortVersion;
 			mResetVersionAndChannel = stream.str();
 			stream.str("");
 
