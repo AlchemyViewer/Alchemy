@@ -159,6 +159,12 @@ BASE_ARGUMENTS=[
          default=None),
     dict(name='versionfile',
          description="""The name of a file containing the full version number."""),
+    dict(name='updateurl',
+         description="""This specifies the updater service URL for delta package generation""",
+         default="https://update.alchemyviewer.org"),
+    dict(name='gendelta',
+         description="""Enable generation of delta updates on windows""",
+         default=None),
     ]
 
 def usage(arguments, srctree=""):
