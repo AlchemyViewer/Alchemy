@@ -27,6 +27,8 @@
 
 #include "alsquirrelupdater.h"
 
+#include "llviewerbuildconfig.h"
+
 #include "llappviewer.h"
 #include "llnotificationsutil.h"
 #include "llversioninfo.h"
@@ -38,6 +40,14 @@
 #include "llsdutil.h"
 #include "llwin32headerslean.h"
 #include "llstartup.h"
+
+#if LL_WINDOWS
+#define UPDATER_PLATFORM "windows"
+#define UPDATER_ARCH "x64"
+#elif LL_DARWIN
+#define UPDATER_PLATFORM "macos"
+#define UPDATER_ARCH "universal"
+#endif
 
 static std::string win32_errorcode_to_string(LONG errorMessageID)
 {
@@ -121,7 +131,7 @@ struct ALRegWriter
 void ALUpdateUtils::updateSlurlRegistryKeys(const std::string& protocol, const std::string& name, const std::string& executable_path)
 {
 	// SecondLife slurls
-	std::wstring reg_path = ll_convert_string_to_wide(llformat("Software\\Classes\\%s", protocol.c_str()));
+	std::wstring reg_path = ll_convert_string_to_wide(fmt::format("Software\\Classes\\{}", protocol));
 	if (auto regpath = ALRegWriter(HKEY_CURRENT_USER, reg_path))
 	{
 		regpath.setValue(name);
@@ -143,7 +153,7 @@ void ALUpdateUtils::updateSlurlRegistryKeys(const std::string& protocol, const s
 
 				if (auto command = open.createSubKey(TEXT("command")))
 				{
-					std::string open_cmd_string = llformat("\"%s\" -url \"%s\"", executable_path.c_str(), "%1");
+					std::string open_cmd_string = fmt::format("\"{}\" -url \"%1\"", executable_path);
 					command.setValue(open_cmd_string, REG_EXPAND_SZ);
 				}
 			}
@@ -154,8 +164,6 @@ void ALUpdateUtils::updateSlurlRegistryKeys(const std::string& protocol, const s
 // static
 bool ALUpdateUtils::handleCommandLineParse(LLControlGroupCLP& clp)
 {
-	if(!ALUpdateHandler::isSupported()) return true;
-
 	bool is_install = clp.hasOption("squirrel-install");
 	bool is_update = clp.hasOption("squirrel-updated");
 	bool is_uninstall = clp.hasOption("squirrel-uninstall");
@@ -232,9 +240,9 @@ bool ALUpdateUtils::handleCommandLineParse(LLControlGroupCLP& clp)
 		}
 		LLAppViewer::instance()->removeDumpDir();
 		LLAppViewer::instance()->removeMarkerFiles();
-		return false;
+		return true;
 	}
-	return true;
+	return false;
 }
 
 ALUpdateHandler::ALUpdateHandler()
@@ -250,8 +258,7 @@ ALUpdateHandler::ALUpdateHandler()
 	{
 		std::string channel = LLVersionInfo::instance().getChannel();
 		channel.erase(std::remove_if(channel.begin(), channel.end(), isspace), channel.end());
-
-		mUpdateURL = llformat("http://update.alchemyviewer.net/windows%s/channel/%s/", std::to_string(ADDRESS_SIZE).c_str(), channel.c_str());
+		mUpdateURL = fmt::format("{}/{}/{}/{}/", VIEWER_UPDATE_SERVICE, UPDATER_PLATFORM, UPDATER_ARCH, channel);
 	}
 	LL_INFOS() << "Update service url: " << mUpdateURL << LL_ENDL;
 
@@ -468,8 +475,8 @@ void ALUpdateHandler::updateCheckFinished(const LLSD& data)
 		else if (update_preference == 2)
 		{
 			LLSD args;
-			args["VIEWER_VER"] = llformat("%s %s", LLVersionInfo::instance().getChannel().c_str(), LLVersionInfo::instance().getShortVersion().c_str());
-			args["VIEWER_UPDATES"] = llformat("%s", new_ver.version().c_str());
+			args["VIEWER_VER"] = fmt::format("{} {}", LLVersionInfo::instance().getChannel(), LLVersionInfo::instance().getShortVersion());
+			args["VIEWER_UPDATES"] = fmt::format("{}", new_ver.version());
 			LLSD payload;
 			payload["user_update_action"] = LLSD(E_DOWNLOAD_INSTALL);
 			LLNotificationsUtil::add("UpdateDownloadRequest", args, payload, boost::bind(&ALUpdateHandler::onUpdateNotification, this, _1, _2));
@@ -507,7 +514,7 @@ void ALUpdateHandler::updateDownloadFinished(const LLSD& data)
 			}
 		}
 		LLSD args;
-		args["VIEWER_VER"] = llformat("%s %s", LLVersionInfo::instance().getChannel().c_str(), new_ver.version().c_str());
+		args["VIEWER_VER"] = fmt::format("{} {}", LLVersionInfo::instance().getChannel(), new_ver.version());
 		args["VIEWER_UPDATES"] = releases;
 		LLSD payload;
 		payload["user_update_action"] = LLSD(E_DOWNLOADED);
@@ -524,8 +531,8 @@ void ALUpdateHandler::updateInstallFinished(const LLSD& data)
 		ALVersionInfo new_ver;
 		if (mSavedUpdateInfo.has("futureVersion")) new_ver.parse(mSavedUpdateInfo["futureVersion"].asString());
 		LLSD args;
-		args["VIEWER_VER"] = llformat("%s %s", LLVersionInfo::instance().getChannel().c_str(), LLVersionInfo::instance().getShortVersion().c_str());
-		args["VIEWER_UPDATES"] = llformat("%s", new_ver.version().c_str());
+		args["VIEWER_VER"] = fmt::format("{} {}", LLVersionInfo::instance().getChannel(), LLVersionInfo::instance().getShortVersion());
+		args["VIEWER_UPDATES"] = fmt::format("{}", new_ver.version());
 		LLSD payload;
 		payload["user_update_action"] = LLSD(E_INSTALLED_RESTART);
 		LLNotificationsUtil::add((LLStartUp::getStartupState() < STATE_STARTED ? "UpdateInstalledRestart" : "UpdateInstalledRestartToast"), args, payload, boost::bind(&ALUpdateHandler::onUpdateNotification, this, _1, _2));

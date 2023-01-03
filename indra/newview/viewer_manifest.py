@@ -617,22 +617,46 @@ class WindowsManifest(ViewerManifest):
                 '-Properties', 'NoWarn=NU5128',
                 os.path.join(self.args['build'], 'viewer.nuspec')])
 
+        #Build installer and update delta
         squirrel_exe = os.path.join(self.args['build'], os.pardir, 'packages', 'squirrel', 'Squirrel.exe')
+
+        # Download previous build for delta generation
+        temp_installdir = os.path.join(self.args['build'], 'Installer')
+        if 'gendelta' in self.args and 'updateurl' in self.args:
+            if (self.address_size == 64):
+                updater_arch = 'x64'
+            else:
+                updater_arch = 'x86'
+
+            self.run_command(
+                [squirrel_exe,
+                    'http-down',
+                    '--releaseDir', temp_installdir,
+                    '--url', '{}/windows/{}/{}/'.format(self.args['updateurl'], updater_arch, self.app_name_oneword())])
+
+        # Build installer files
+        temp_nupkg = os.path.join(self.args['build'], '{}.{}.nupkg'.format(self.app_name_oneword(), '.'.join(self.args['version'])))
         self.run_command(
             [squirrel_exe,
                 'releasify',
-                '--releaseDir', os.path.join(self.args['build'], 'Releases'),
+                '--releaseDir', temp_installdir,
                 '--framework', 'vcredist143-x64',
                 '--icon', os.path.join(self.args['source'], 'installers', 'windows', 'install_icon.ico'),
-                '--splashImage', os.path.join(self.args['source'], 'installers', 'windows', 'splash.gif'),
-                '--package', os.path.join(self.args['build'], '{}.{}.nupkg'.format(self.app_name_oneword(), '.'.join(self.args['version'])))])
+                '--splashImage', os.path.join(self.args['source'], 'installers', 'windows', 'placeholder.gif'),
+                '--package', temp_nupkg])
 
+        # Copy to final installer destination
         installer_file = self.installer_base_name() + '_Setup.exe'
+        with self.prefix(src=temp_installdir, dst=os.path.join(self.args['build'], 'Deploy')):  # everything goes in Contents
+            self.path(src=self.app_name_oneword() + 'Setup.exe', dst=installer_file)
+            self.path('{}-{}-*.nupkg'.format(self.app_name_oneword(), '.'.join(self.args['version'])))
+            self.path('RELEASES')
 
-        os.rename(os.path.join('Releases', self.app_name_oneword() + 'Setup.exe'), os.path.join('Release', installer_file))
+        # Clean up temporary files
+        os.remove(temp_nupkg)
+        shutil.rmtree(temp_installdir, True)
 
-        self.sign(installer_file)
-        self.created_path(self.dst_path_of(installer_file))
+        self.created_path(os.path.join(self.args['build'], 'Deploy', installer_file))
         self.package_file = installer_file
 
     def sign(self, exe):

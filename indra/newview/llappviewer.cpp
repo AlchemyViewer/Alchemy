@@ -2560,7 +2560,7 @@ bool LLAppViewer::initConfiguration()
 	}
 
 #if LL_WINDOWS
-	if (ALUpdateHandler::isSupported() && !ALUpdateUtils::handleCommandLineParse(clp))
+	if (ALUpdateUtils::handleCommandLineParse(clp))
 	{
 		return false;
 	}

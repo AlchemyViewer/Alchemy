@@ -51,7 +51,7 @@ variables:
     - .\.venv\Scripts\Activate.ps1
     - pip install --upgrade llbase autobuild certifi
   script:
-    - autobuild configure -c Release -- -DUSE_LTO=ON -DDISABLE_FATAL_WARNINGS=ON -DREVISION_FROM_VCS=FALSE
+    - autobuild configure -c Release -- -DUSE_LTO=ON -DDISABLE_FATAL_WARNINGS=ON -DREVISION_FROM_VCS=FALSE -DENABLE_DELTA_GEN=ON
     - autobuild build -c Release --no-configure
     - autobuild graph -c Release --graph-file alchemy-windows${AUTOBUILD_ADDRSIZE}-dependencies.svg build-vc-64/autobuild-package.xml
     - $AlchemyPdbPath = Resolve-Path build-vc-*/newview/Release/alchemy-bin.pdb
@@ -71,7 +71,7 @@ variables:
       - build-vc-*/newview/Release/alchemy-bin.exe
       - build-vc-*/newview/Release/alchemy-bin.pdb
       - build-vc-*/newview/Release/alchemy-bin.src.zip
-      - build-vc-*/newview/Release/Alchemy_*_Setup.exe
+      - build-vc-*/newview/Deploy/*
       - alchemy-*-dependencies.svg
 
 .mac_build:
@@ -396,7 +396,7 @@ build:release:windows64:
     - Pop-Location
 
     - Push-Location ./build-vc-64/
-    -   Push-Location ./newview/Release/
+    -   Push-Location ./newview/Deploy/
     -     $WinFileName = Get-ChildItem -Path . -Name -Include Alchemy_*_Setup.exe
     -     $WinFileHash = (Get-FileHash .\$WinFileName -a sha256).Hash
     -     $WinPackageUrl = "${UploadDestURL}/${WinFileName}"

@@ -2084,6 +2084,12 @@ if (WINDOWS)
           ${CMAKE_CURRENT_SOURCE_DIR}/event_host_manifest.py
         )
 
+      if (ENABLE_DELTA_GEN)
+        set(DELTA_GEN_SETTING "--gendelta=ON")
+      else ()
+        set(DELTA_GEN_SETTING "")
+      endif ()
+
       add_custom_command(
         OUTPUT ${VIEWER_BUILD_DEST_DIR}/touched.bat
         COMMAND ${Python3_EXECUTABLE}
@@ -2105,6 +2111,8 @@ if (WINDOWS)
           --source=${CMAKE_CURRENT_SOURCE_DIR}
           --touch=${VIEWER_BUILD_DEST_DIR}/touched.bat
           --versionfile=${CMAKE_CURRENT_BINARY_DIR}/viewer_version.txt
+          --updateurl=${VIEWER_UPDATE_SERVICE}
+          ${DELTA_GEN_SETTING}
         DEPENDS
             ${VIEWER_BINARY_NAME}
             ${CMAKE_CURRENT_SOURCE_DIR}/viewer_manifest.py

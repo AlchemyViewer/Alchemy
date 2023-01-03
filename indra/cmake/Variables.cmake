@@ -282,6 +282,8 @@ set(USESYSTEMLIBS OFF CACHE BOOL "Use libraries from your system rather than Lin
 
 set(USE_PRECOMPILED_HEADERS ON CACHE BOOL "Enable use of precompiled header directives where supported.")
 
+set(VIEWER_UPDATE_SERVICE "https://update.alchemyviewer.org" CACHE STRING "Update service URL")
+
 source_group("CMake Rules" FILES CMakeLists.txt)
 
 endif(NOT DEFINED ${CMAKE_CURRENT_LIST_FILE}_INCLUDED)
