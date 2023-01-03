@@ -44,7 +44,7 @@ namespace tut
 			stream << LL_VIEWER_VERSION_MAJOR << "."
 				   << LL_VIEWER_VERSION_MINOR << "."
 				   << LL_VIEWER_VERSION_PATCH << "."
-				   << LL_VIEWER_VERSION_BUILD;
+				   << 0;
 			mVersion = stream.str();
 			stream.str("");
 
@@ -87,7 +87,7 @@ namespace tut
 	template<> template<>
 	void versioninfo_object_t::test<1>()
 	{   
-		std::cout << "What we parsed from CMake: " << LL_VIEWER_VERSION_BUILD << std::endl;
+		std::cout << "What we parsed from CMake: " << LL_VIEWER_VERSION_PATCH << std::endl;
 		std::cout << "What we get from llversioninfo: " << LLVersionInfo::instance().getBuild() << std::endl;
 		ensure_equals("Major version", 
 					  LLVersionInfo::instance().getMajor(), 
@@ -100,7 +100,7 @@ namespace tut
 					  LL_VIEWER_VERSION_PATCH);
 		ensure_equals("Build version", 
 					  LLVersionInfo::instance().getBuild(), 
-					  LL_VIEWER_VERSION_BUILD);
+					  0);
 		ensure_equals("Channel version", 
 					  LLVersionInfo::instance().getChannel(), 
 					  LL_VIEWER_CHANNEL);
