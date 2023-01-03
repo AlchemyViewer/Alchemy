@@ -5573,7 +5573,6 @@ LLTeleportRequestViaLandmark::LLTeleportRequestViaLandmark(const LLUUID &pLandma
 
 LLTeleportRequestViaLandmark::~LLTeleportRequestViaLandmark()
 {
-    LL_INFOS("Teleport") << "~LLTeleportRequestViaLandmark, " << *this << LL_ENDL;
 }
 
 void LLTeleportRequestViaLandmark::toOstream(std::ostream& os) const
@@ -5612,7 +5611,6 @@ LLTeleportRequestViaLure::LLTeleportRequestViaLure(const LLUUID &pLureId, BOOL p
 
 LLTeleportRequestViaLure::~LLTeleportRequestViaLure()
 {
-    LL_INFOS("Teleport") << "~LLTeleportRequestViaLure" << LL_ENDL;
 }
 
 void LLTeleportRequestViaLure::toOstream(std::ostream& os) const
@@ -5703,7 +5701,6 @@ LLTeleportRequestViaLocationLookAt::LLTeleportRequestViaLocationLookAt(const LLV
 
 LLTeleportRequestViaLocationLookAt::~LLTeleportRequestViaLocationLookAt()
 {
-    LL_INFOS("Teleport") << "~LLTeleportRequestViaLocationLookAt" << LL_ENDL;
 }
 
 void LLTeleportRequestViaLocationLookAt::toOstream(std::ostream& os) const
