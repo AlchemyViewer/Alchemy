@@ -628,11 +628,14 @@ class WindowsManifest(ViewerManifest):
             else:
                 updater_arch = 'x86'
 
-            self.run_command(
-                [squirrel_exe,
-                    'http-down',
-                    '--releaseDir', temp_installdir,
-                    '--url', '{}/windows/{}/{}/'.format(self.args['updateurl'], updater_arch, self.app_name_oneword())])
+            try:
+                self.run_command(
+                    [squirrel_exe,
+                        'http-down',
+                        '--releaseDir', temp_installdir,
+                        '--url', '{}/windows/{}/{}/'.format(self.args['updateurl'], updater_arch, self.app_name_oneword())])
+            except (ManifestError, MissingError) as err:
+                pass
 
         # Build installer files
         temp_nupkg = os.path.join(self.args['build'], '{}.{}.nupkg'.format(self.app_name_oneword(), '.'.join(self.args['version'])))
