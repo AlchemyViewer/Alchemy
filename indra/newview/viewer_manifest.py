@@ -271,7 +271,7 @@ class ViewerManifest(LLManifest):
         return ''.join(self.app_name().split())
     
     def icon_path(self):
-        return "icons/" + self.channel_type()
+        return os.path.join(self.args['build'], os.pardir, 'packages', 'branding', 'viewer', 'icons', self.channel_type())
 
     def extract_names(self,src):
         """Extract contributor names from source file, returns string"""
@@ -645,7 +645,7 @@ class WindowsManifest(ViewerManifest):
                 '--releaseDir', temp_installdir,
                 '--framework', 'vcredist143-x64',
                 '--icon', os.path.join(self.args['source'], 'installers', 'windows', 'install_icon.ico'),
-                '--splashImage', os.path.join(self.args['source'], 'installers', 'windows', 'placeholder.gif'),
+                '--splashImage', os.path.join(self.args['source'], 'installers', 'windows', 'install_splash.gif'),
                 '--package', temp_nupkg])
 
         # Copy to final installer destination

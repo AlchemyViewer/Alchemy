@@ -61,6 +61,12 @@ include(VisualLeakDetector)
 include(ZLIBNG)
 include(URIPARSER)
 
+# Viewer Branding Assets
+use_prebuilt_binary(branding)
+if (WINDOWS)
+  use_prebuilt_binary(squirrel)
+endif()
+
 if( LLPHYSICSEXTENSIONS_SRC_DIR )
   if (NOT HAVOK_TPV)
     # When using HAVOK_TPV, the library is precompiled, so no need for this
@@ -68,10 +74,6 @@ if( LLPHYSICSEXTENSIONS_SRC_DIR )
     target_link_libraries(${LLPHYSICSEXTENSIONS_LIBRARIES} llcommon)
   endif (NOT HAVOK_TPV)
 endif( LLPHYSICSEXTENSIONS_SRC_DIR )
-
-if (WINDOWS)
-  use_prebuilt_binary(squirrel)
-endif()
 
 include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}
@@ -1668,18 +1670,28 @@ if (WINDOWS)
     message(STATUS "Copying icons for ${ICON_PATH}")
     execute_process(
       COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        "${CMAKE_CURRENT_SOURCE_DIR}/icons/${ICON_PATH}/alchemy.ico"
+        "${AUTOBUILD_INSTALL_DIR}/branding/viewer/icons/${ICON_PATH}/alchemy.ico"
         "${CMAKE_CURRENT_SOURCE_DIR}/res/ll_icon.ico"
       )
     execute_process(
       COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        "${CMAKE_CURRENT_SOURCE_DIR}/icons/${ICON_PATH}/alchemy_256.BMP"
+        "${AUTOBUILD_INSTALL_DIR}/branding/viewer/icons/${ICON_PATH}/alchemy_256.BMP"
         "${CMAKE_CURRENT_SOURCE_DIR}/res/ll_icon.BMP"
       )
     execute_process(
       COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        "${CMAKE_CURRENT_SOURCE_DIR}/icons/${ICON_PATH}/alchemy_256.BMP"
+        "${AUTOBUILD_INSTALL_DIR}/branding/viewer/icons/${ICON_PATH}/alchemy_256.BMP"
         "${CMAKE_CURRENT_SOURCE_DIR}/res-sdl/ll_icon.BMP"
+      )
+    execute_process(
+      COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${AUTOBUILD_INSTALL_DIR}/branding/installer/icons/install_icon.ico"
+        "${CMAKE_CURRENT_SOURCE_DIR}/installers/windows/install_icon.ico"
+      )
+    execute_process(
+      COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${AUTOBUILD_INSTALL_DIR}/branding/installer/splash/${ICON_PATH}/install_splash.gif"
+        "${CMAKE_CURRENT_SOURCE_DIR}/installers/windows/install_splash.gif"
       )
 
     # Add resource files to the project.
@@ -1691,7 +1703,6 @@ if (WINDOWS)
         res/arrowcopmulti.cur
         res/arrowdrag.cur
         res/circleandline.cur
-        res/icon1.ico
         res/llarrow.cur
         res/llarrowdrag.cur
         res/llarrowdragmulti.cur
@@ -1736,7 +1747,7 @@ if (WINDOWS)
                     ${CMAKE_CURRENT_BINARY_DIR}/viewerRes.rc
                     )
 
-    configure_file( ${CMAKE_CURRENT_SOURCE_DIR}/installers/windows/viewer.nuspec
+    configure_file( ${CMAKE_CURRENT_SOURCE_DIR}/viewer.nuspec
                     ${CMAKE_CURRENT_BINARY_DIR}/viewer.nuspec
                     )
 

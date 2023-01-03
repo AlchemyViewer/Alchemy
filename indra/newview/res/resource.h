@@ -36,7 +36,6 @@
 #define IDB_LOGIN                       149
 #define IDC_CURSOR4                     153
 #define IDC_CURSOR5                     154
-#define IDI_LCD_LL_ICON                 157
 #define IDC_CURSOR6                     158
 #define IDC_STATIC                      1000
 #define IDC_RADIO_56                    1000

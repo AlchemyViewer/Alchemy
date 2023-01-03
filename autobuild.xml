@@ -183,6 +183,38 @@
         <key>version</key>
         <string>1.81.0</string>
       </map>
+      <key>branding</key>
+      <map>
+        <key>copyright</key>
+        <string>Copyright (c) 2023 Alchemy Development Group</string>
+        <key>description</key>
+        <string>Alchemy Branding Material</string>
+        <key>license</key>
+        <string>All Rights Reserved.</string>
+        <key>license_file</key>
+        <string>LICENSES/branding.txt</string>
+        <key>name</key>
+        <string>branding</string>
+        <key>platforms</key>
+        <map>
+          <key>common</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>hash</key>
+              <string>3280a6c52b91ba02b630bd2d2ab0e318bf2a800db02c4bab38b2ccbe71a230cb755663348615891b9d388c2fc2bc1eaa38650e2b5421c4133f750267b2b3c538</string>
+              <key>hash_algorithm</key>
+              <string>blake2b</string>
+              <key>url</key>
+              <string>https://git.alchemyviewer.org/api/v4/projects/199/packages/generic/branding/1.0.0.1857/branding-1.0.0-common-1857.tar.zst</string>
+            </map>
+            <key>name</key>
+            <string>common</string>
+          </map>
+        </map>
+        <key>version</key>
+        <string>1.0.0</string>
+      </map>
       <key>colladadom</key>
       <map>
         <key>copyright</key>
