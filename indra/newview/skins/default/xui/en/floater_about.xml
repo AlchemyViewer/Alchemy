@@ -73,7 +73,7 @@
       <button
        follows="bottom|left" 
        tool_tip="Check for and download updates."
-       name="copy_btn"
+       name="update_btn"
        label="Check for Updates"
        left="3"
        bottom="-30"
