@@ -357,9 +357,11 @@ build:release:windows64:
   script:
     - $BuildData = Get-Content ./build-vc-64/newview/Release/build_data.json | ConvertFrom-Json
     - $BuildChannelVersion = $BuildData.Channel + ' ' + $BuildData.Version
+    - $BuildChannelOneword = $BuildData.Channel.Replace(" ", "")
     - $PkgName = $BuildData.Channel.Replace(" ", "_")
     - $PkgVer = $BuildData.Version
     - $UploadDestURL = "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${PkgName}/${PkgVer}"
+    - $UpdateDeployDestURL = "${CI_API_V4_URL}/projects/198/packages/generic/${BuildChannelOneword}"
     - >
         $UploadParams = @{
          Method = "PUT";
@@ -402,6 +404,15 @@ build:release:windows64:
     -     $WinPackageUrl = "${UploadDestURL}/${WinFileName}"
     -     $WinUploadResult = Invoke-WebRequest -HttpVersion 2.0 @UploadParams -InFile ./$WinFileName -Uri "${WinPackageUrl}${DestStatus}" | ConvertFrom-Json
     -     If ($WinFileHash -ne $WinUploadResult.file_sha256) { Write-Output "Upload hash mismatch. expected $Hash actual $($WinUploadResult.file_sha256)" && Exit 1 }
+
+    -     $WinUpdateDeployURL = "${UpdateDeployDestURL}/win-x64"
+    -     $FullUpdatePkg = Get-ChildItem -Path . -Name -Include Alchemy*-full.nupkg
+    -     if (Test-Path -Path $FullUpdatePkg) { Invoke-WebRequest -HttpVersion 2.0 @UploadParams -InFile ./$FullUpdatePkg -Uri "${WinUpdateDeployURL}/${FullUpdatePkg}" }
+    -     $DeltaUpdatePkg = Get-ChildItem -Path . -Name -Include Alchemy*-delta.nupkg
+    -     if (Test-Path -Path $DeltaUpdatePkg) { Invoke-WebRequest -HttpVersion 2.0 @UploadParams -InFile ./$DeltaUpdatePkg -Uri "${WinUpdateDeployURL}/${DeltaUpdatePkg}" }
+    -     $ReleaseFile = Get-ChildItem -Path . -Name -Include RELEASES
+    -     if (Test-Path -Path $ReleaseFile) { Invoke-WebRequest -HttpVersion 2.0 @UploadParams -InFile ./$ReleaseFile -Uri "${WinUpdateDeployURL}/${ReleaseFile}" }
+
     -   Pop-Location
     -   $AlchemyBinPath = Resolve-Path newview/Release/alchemy-bin.*
     -   If ($env:USE_SENTRY -eq 'TRUE') { sentry-cli upload-dif $AlchemyBinPath packages/ }

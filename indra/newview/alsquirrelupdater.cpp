@@ -42,11 +42,14 @@
 #include "llstartup.h"
 
 #if LL_WINDOWS
-#define UPDATER_PLATFORM "windows"
+#define UPDATER_PLATFORM "win"
+#define UPDATER_ARCH "x64"
+#elif LL_LINUX
+#define UPDATER_PLATFORM "lnx"
 #define UPDATER_ARCH "x64"
 #elif LL_DARWIN
-#define UPDATER_PLATFORM "macos"
-#define UPDATER_ARCH "universal"
+#define UPDATER_PLATFORM "mac"
+#define UPDATER_ARCH "u2"
 #endif
 
 static std::string win32_errorcode_to_string(LONG errorMessageID)
@@ -256,7 +259,8 @@ ALUpdateHandler::ALUpdateHandler()
 	{
 		std::string channel = LLVersionInfo::instance().getChannel();
 		channel.erase(std::remove_if(channel.begin(), channel.end(), isspace), channel.end());
-		mUpdateURL = fmt::format("{}/{}/{}/{}/", VIEWER_UPDATE_SERVICE, UPDATER_PLATFORM, UPDATER_ARCH, channel);
+
+		mUpdateURL = fmt::format("{}/{}/{}-{}/", VIEWER_UPDATE_SERVICE, channel, UPDATER_PLATFORM, UPDATER_ARCH);
 	}
 	LL_INFOS() << "Update service url: " << mUpdateURL << LL_ENDL;
 

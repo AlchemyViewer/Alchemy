@@ -633,7 +633,7 @@ class WindowsManifest(ViewerManifest):
                     [squirrel_exe,
                         'http-down',
                         '--releaseDir', temp_installdir,
-                        '--url', '{}/windows/{}/{}/'.format(self.args['updateurl'], updater_arch, self.app_name_oneword())])
+                        '--url', '{}/{}/win-{}/'.format(self.args['updateurl'], self.app_name_oneword(), updater_arch)])
             except (ManifestError, MissingError) as err:
                 pass
 

@@ -2357,68 +2357,6 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
         <key>version</key>
         <string>0.9.7</string>
       </map>
-      <key>viewer-manager</key>
-      <map>
-        <key>copyright</key>
-        <string>Copyright (c) 2000-2012, Linden Research, Inc.</string>
-        <key>description</key>
-        <string>Linden Lab Viewer Management Process suite.</string>
-        <key>license</key>
-        <string>viewerlgpl</string>
-        <key>license_file</key>
-        <string>LICENSE</string>
-        <key>name</key>
-        <string>viewer-manager</string>
-        <key>platforms</key>
-        <map>
-          <key>darwin64</key>
-          <map>
-            <key>archive</key>
-            <map>
-              <key>hash</key>
-              <string>9a84c74acf3d8d467f2f32291955f25ebe5c3ff21e8a31b8956294e4322a938a98e4f7398a75fb9f568725aa45b652015d35d3b4e17562d0a1fad69ec4837b13</string>
-              <key>hash_algorithm</key>
-              <string>blake2b</string>
-              <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/196/packages/generic/viewer-manager/3.0.1829.1829/viewer_manager-3.0.1829-darwin64-1829.tar.zst</string>
-            </map>
-            <key>name</key>
-            <string>darwin64</string>
-          </map>
-          <key>windows</key>
-          <map>
-            <key>archive</key>
-            <map>
-              <key>hash</key>
-              <string>3efa80faaf537e39a77218cd6efa9409</string>
-              <key>url</key>
-              <string>https://automated-builds-secondlife-com.s3.amazonaws.com/ct2/104766/917721/viewer_manager-3.0.575083-windows-575083.tar.bz2</string>
-            </map>
-            <key>name</key>
-            <string>windows</string>
-          </map>
-          <key>windows64</key>
-          <map>
-            <key>archive</key>
-            <map>
-              <key>hash</key>
-              <string>c06f6bdc21f513ccd0b58c444336021883d0856ba63203024228cd0add3ea6714724418c851a9e679c9ea088f4d985768b81381decaefbdb6f42aa1ef7263477</string>
-              <key>hash_algorithm</key>
-              <string>blake2b</string>
-              <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/196/packages/generic/viewer-manager/3.0.1829.1829/viewer_manager-3.0.1829-windows64-1829.tar.zst</string>
-            </map>
-            <key>name</key>
-            <string>windows64</string>
-          </map>
-        </map>
-        <key>source</key>
-        <string>https://bitbucket.org/lindenlab/vmp-standalone</string>
-        <key>source_type</key>
-        <string>hg</string>
-        <key>version</key>
-        <string>3.0.1829</string>
-      </map>
       <key>vlc-bin</key>
       <map>
         <key>copyright</key>
