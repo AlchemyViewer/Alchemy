@@ -622,7 +622,7 @@ class WindowsManifest(ViewerManifest):
 
         # Download previous build for delta generation
         temp_installdir = os.path.join(self.args['build'], 'Installer')
-        os.mkdir(temp_installdir) # Create the directory as Squirrel is fragile at this time
+        self.cmakedirs(temp_installdir)
         if 'gendelta' in self.args and 'updateurl' in self.args:
             if (self.address_size == 64):
                 updater_arch = 'x64'
