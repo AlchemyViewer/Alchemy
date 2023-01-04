@@ -118,10 +118,14 @@ public:
         DEFERRED_SHADOW_MATRIX,             //  "shadow_matrix"
         DEFERRED_ENV_MAT,                   //  "env_mat"
         DEFERRED_SHADOW_CLIP,               //  "shadow_clip"
+		DEFERRED_SUN_WASH,
+		DEFERRED_SHADOW_NOISE,
+		DEFERRED_BLUR_SIZE,
         DEFERRED_SSAO_RADIUS,               //  "ssao_radius"
         DEFERRED_SSAO_MAX_RADIUS,           //  "ssao_max_radius"
         DEFERRED_SSAO_FACTOR,               //  "ssao_factor"
-		DEFERRED_SSAO_EFFECT,               //  "ssao_effect"
+		DEFERRED_SSAO_FACTOR_INV,
+		DEFERRED_SSAO_EFFECT_MAT,
         DEFERRED_SCREEN_RES,                //  "screen_res"
         DEFERRED_NEAR_CLIP,                 //  "near_clip"
         DEFERRED_SHADOW_OFFSET,             //  "shadow_offset"

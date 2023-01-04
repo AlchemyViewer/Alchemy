@@ -1201,10 +1201,14 @@ void LLShaderMgr::initAttribsAndUniforms()
 	mReservedUniforms.push_back("shadow_matrix");
 	mReservedUniforms.push_back("env_mat");
 	mReservedUniforms.push_back("shadow_clip");
+	mReservedUniforms.push_back("sun_wash");
+	mReservedUniforms.push_back("shadow_noise");
+	mReservedUniforms.push_back("blur_size");
 	mReservedUniforms.push_back("ssao_radius");
 	mReservedUniforms.push_back("ssao_max_radius");
 	mReservedUniforms.push_back("ssao_factor");
-	mReservedUniforms.push_back("ssao_effect");
+	mReservedUniforms.push_back("ssao_factor_inv");
+	mReservedUniforms.push_back("ssao_effect_mat");
 	mReservedUniforms.push_back("screen_res");
 	mReservedUniforms.push_back("near_clip");
 	mReservedUniforms.push_back("shadow_offset");

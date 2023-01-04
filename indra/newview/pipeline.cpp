@@ -8595,10 +8595,18 @@ void LLPipeline::bindDeferredShader(LLGLSLShader& shader, LLRenderTarget* light_
 
 		F32 ssao_factor = RenderSSAOFactor;
 		shader.uniform1f(LLShaderMgr::DEFERRED_SSAO_FACTOR, ssao_factor);
+		shader.uniform1f(LLShaderMgr::DEFERRED_SSAO_FACTOR_INV, 1.f/ssao_factor);
 	}
 
 	LLVector3 ssao_effect = RenderSSAOEffect;
-	shader.uniform1f(LLShaderMgr::DEFERRED_SSAO_EFFECT, ssao_effect[0]);
+	F32 matrix_diag = (ssao_effect[0] + 2.0*ssao_effect[1])/3.0;
+	F32 matrix_nondiag = (ssao_effect[0] - ssao_effect[1])/3.0;
+	// This matrix scales (proj of color onto <1/rt(3),1/rt(3),1/rt(3)>) by
+	// value factor, and scales remainder by saturation factor
+	F32 ssao_effect_mat[] = {	matrix_diag, matrix_nondiag, matrix_nondiag,
+								matrix_nondiag, matrix_diag, matrix_nondiag,
+								matrix_nondiag, matrix_nondiag, matrix_diag};
+	shader.uniformMatrix3fv(LLShaderMgr::DEFERRED_SSAO_EFFECT_MAT, 1, GL_FALSE, ssao_effect_mat);
 
     shader.uniform2f(LLShaderMgr::DEFERRED_SCREEN_RES, deferred_target->getWidth(), deferred_target->getHeight());
 
@@ -8748,14 +8756,14 @@ void LLPipeline::renderDeferredLighting(LLRenderTarget *screen_target)
             bindDeferredShader(gDeferredBlurLightProgram);
             mDeferredVB->setBuffer(LLVertexBuffer::MAP_VERTEX);
             LLVector3 go          = RenderShadowGaussian;
-            const U32 kern_length = 4;
+            constexpr U32 kern_length = 4;
             F32       blur_size   = RenderShadowBlurSize;
             F32       dist_factor = RenderShadowBlurDistFactor;
 
             // sample symmetrically with the middle sample falling exactly on 0.0
             F32 x = 0.f;
 
-            LLVector3 gauss[4];  // xweight, yweight, offset
+            LLVector3 gauss[kern_length];  // xweight, yweight, offset
 
             for (U32 i = 0; i < kern_length; i++)
             {
