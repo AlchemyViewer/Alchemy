@@ -8736,7 +8736,7 @@ void LLPipeline::renderDeferredLighting(LLRenderTarget *screen_target)
             deferred_light_target->flush();
         }
 
-        if (RenderDeferredSSAO)
+        if (RenderDeferredSSAO || RenderShadowDetail > 0)
         {  // soften direct lighting lightmap
             LL_PROFILE_ZONE_NAMED_CATEGORY_PIPELINE("renderDeferredLighting - soften shadow");
             // blur lightmap
