@@ -1,12 +1,12 @@
 <?xml version="1.0"?>
 <package >
   <metadata>
-    <id>${VIEWER_CHANNEL_ONEWORD}</id>
+    <id>${WIN_BINARY_NAME}</id>
     <version>${VIEWER_VERSION_MAJOR}.${VIEWER_VERSION_MINOR}.${VIEWER_VERSION_PATCH}</version>
     <authors>Alchemy Development Group</authors>
     <owners>Alchemy Development Group</owners>
-  	<title>${VIEWER_CHANNEL}</title>
-    <description>${VIEWER_CHANNEL}</description>
+  	<title>${WIN_PRODUCT_NAME}</title>
+    <description>${WIN_PRODUCT_NAME}</description>
     <copyright>Copyright (C) 2013-2023 Alchemy Development Group</copyright>
 	<projectUrl>https://www.alchemyviewer.org</projectUrl>
   </metadata>

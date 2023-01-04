@@ -440,10 +440,6 @@ class WindowsManifest(ViewerManifest):
         relpkgdir = os.path.join(pkgdir, "lib", "release")
         debpkgdir = os.path.join(pkgdir, "lib", "debug")
 
-        if self.is_packaging_viewer():
-            # Find alchemy-bin.exe in the 'configuration' dir, then rename it to the result of final_exe.
-            self.path(src='%s/alchemy-bin.exe' % self.args['configuration'], dst=self.final_exe())
-
         # Plugin host application
         with self.prefix(dst="llplugin"):
             self.path2basename(os.path.join(os.pardir,

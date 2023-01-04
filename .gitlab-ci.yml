@@ -54,23 +54,18 @@ variables:
     - autobuild configure -c Release -- -DUSE_LTO=ON -DDISABLE_FATAL_WARNINGS=ON -DREVISION_FROM_VCS=FALSE -DENABLE_DELTA_GEN=ON
     - autobuild build -c Release --no-configure
     - autobuild graph -c Release --graph-file alchemy-windows${AUTOBUILD_ADDRSIZE}-dependencies.svg build-vc-64/autobuild-package.xml
-    - $AlchemyPdbPath = Resolve-Path build-vc-*/newview/Release/alchemy-bin.pdb
+    - $AlchemyPdbPath = Resolve-Path build-vc-*/newview/Release/Alchemy*.pdb
     - If ($env:USE_SENTRY -eq 'TRUE') { sentry-cli difutil bundle-sources $AlchemyPdbPath }
   artifacts:
     name: "$env:CI_COMMIT_REF_NAME-$env:CI_COMMIT_SHORT_SHA"
     expire_in: 1 week
     paths:
-      - build-vc-*/packages/lib/release/discord_game_sdk.dll
-      - build-vc-*/packages/lib/release/alut*.dll
-      - build-vc-*/packages/lib/release/fmod*.dll
-      - build-vc-*/packages/lib/release/OpenAL32*.dll
-      - build-vc-*/packages/lib/release/openjp2*.dll
-      - build-vc-*/packages/lib/release/sentry.dll
       - build-vc-*/packages/lib/release/*.pdb
       - build-vc-*/newview/Release/build_data.json
-      - build-vc-*/newview/Release/alchemy-bin.exe
-      - build-vc-*/newview/Release/alchemy-bin.pdb
-      - build-vc-*/newview/Release/alchemy-bin.src.zip
+      - build-vc-*/newview/Release/Alchemy*.exe
+      - build-vc-*/newview/Release/Alchemy*.pdb
+      - build-vc-*/newview/Release/Alchemy*.src.zip
+      - build-vc-*/newview/Release/*.dll
       - build-vc-*/newview/Deploy/*
       - alchemy-*-dependencies.svg
 
@@ -414,8 +409,7 @@ build:release:windows64:
     -     if (Test-Path -Path ./RELEASES) { Invoke-WebRequest -HttpVersion 2.0 @UploadParams -InFile ./$ReleaseFile -Uri "${WinUpdateDeployURL}/${ReleaseFile}" }
 
     -   Pop-Location
-    -   $AlchemyBinPath = Resolve-Path newview/Release/alchemy-bin.*
-    -   If ($env:USE_SENTRY -eq 'TRUE') { sentry-cli upload-dif $AlchemyBinPath packages/ }
+    -   If ($env:USE_SENTRY -eq 'TRUE') { sentry-cli upload-dif newview/Release/ packages/ }
     - Pop-Location
     - If ($env:USE_SENTRY -eq 'TRUE') { sentry-cli releases finalize $BuildChannelVersion }
     - Write-Output "Deploy Success!"

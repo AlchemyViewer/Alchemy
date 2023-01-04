@@ -1743,6 +1743,17 @@ if (WINDOWS)
     set_source_files_properties(${viewer_RESOURCE_FILES}
                                 PROPERTIES HEADER_FILE_ONLY TRUE)
 
+    # Replace the icons with the appropriate ones for the channel
+    # ('test' is the default)
+    set(WIN_BINARY_NAME ${VIEWER_CHANNEL_ONEWORD})
+    set(WIN_PRODUCT_NAME ${VIEWER_CHANNEL})
+    string(TOLOWER ${VIEWER_CHANNEL} channel_lower)
+    if(channel_lower MATCHES "^alchemy release")
+      set(WIN_BINARY_NAME "AlchemyViewer")
+      set(WIN_PRODUCT_NAME "Alchemy Viewer")
+    endif()
+
+
     configure_file( ${CMAKE_CURRENT_SOURCE_DIR}/res/viewerRes.rc
                     ${CMAKE_CURRENT_BINARY_DIR}/viewerRes.rc
                     )
@@ -1949,6 +1960,8 @@ if (WINDOWS)
         LINK_FLAGS_DEBUG "/NODEFAULTLIB:\"LIBCMT;LIBCMTD;MSVCRT\" /INCREMENTAL:NO /LARGEADDRESSAWARE"
         LINK_FLAGS_RELEASE "/OPT:REF /LARGEADDRESSAWARE"
         )
+
+    set_target_properties(${VIEWER_BINARY_NAME} PROPERTIES OUTPUT_NAME "${WIN_BINARY_NAME}")
 
     if(GEN_IS_MULTI_CONFIG)
       set(VIEWER_BUILD_DEST_DIR "${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}")
@@ -2472,7 +2485,7 @@ if (PACKAGE AND (RELEASE_CRASH_REPORTING OR NON_RELEASE_CRASH_REPORTING) AND VIE
           "-C"
           "${PARENT_DIRECTORY_CYGWIN}"
           "alchemy-bin.pdb"
-        DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/alchemy-bin.pdb"
+        DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/${WIN_BINARY_NAME}.pdb"
         COMMENT "Packing viewer PDB into ${VIEWER_SYMBOL_FILE_CYGWIN}"
         )
       add_custom_target(generate_symbols DEPENDS "${VIEWER_SYMBOL_FILE}" ${VIEWER_BINARY_NAME})
