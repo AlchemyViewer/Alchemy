@@ -238,8 +238,6 @@ bool ALUpdateUtils::handleCommandLineParse(LLControlGroupCLP& clp)
 		{
 			LL_WARNS() << "Squirrel not found or viewer is not running in squirrel directory" << LL_ENDL;
 		}
-		LLAppViewer::instance()->removeDumpDir();
-		LLAppViewer::instance()->removeMarkerFiles();
 		return true;
 	}
 	return false;
