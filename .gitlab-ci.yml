@@ -407,11 +407,11 @@ build:release:windows64:
 
     -     $WinUpdateDeployURL = "${UpdateDeployDestURL}/win-x64"
     -     $FullUpdatePkg = Get-ChildItem -Path . -Name -Include Alchemy*-full.nupkg
-    -     if (Test-Path -Path $FullUpdatePkg) { Invoke-WebRequest -HttpVersion 2.0 @UploadParams -InFile ./$FullUpdatePkg -Uri "${WinUpdateDeployURL}/${FullUpdatePkg}" }
+    -     if (Test-Path -Path ./Alchemy*-full.nupkg) { Invoke-WebRequest -HttpVersion 2.0 @UploadParams -InFile ./$FullUpdatePkg -Uri "${WinUpdateDeployURL}/${FullUpdatePkg}" }
     -     $DeltaUpdatePkg = Get-ChildItem -Path . -Name -Include Alchemy*-delta.nupkg
-    -     if (Test-Path -Path $DeltaUpdatePkg) { Invoke-WebRequest -HttpVersion 2.0 @UploadParams -InFile ./$DeltaUpdatePkg -Uri "${WinUpdateDeployURL}/${DeltaUpdatePkg}" }
+    -     if (Test-Path -Path ./Alchemy*-delta.nupkg) { Invoke-WebRequest -HttpVersion 2.0 @UploadParams -InFile ./$DeltaUpdatePkg -Uri "${WinUpdateDeployURL}/${DeltaUpdatePkg}" }
     -     $ReleaseFile = Get-ChildItem -Path . -Name -Include RELEASES
-    -     if (Test-Path -Path $ReleaseFile) { Invoke-WebRequest -HttpVersion 2.0 @UploadParams -InFile ./$ReleaseFile -Uri "${WinUpdateDeployURL}/${ReleaseFile}" }
+    -     if (Test-Path -Path ./RELEASES) { Invoke-WebRequest -HttpVersion 2.0 @UploadParams -InFile ./$ReleaseFile -Uri "${WinUpdateDeployURL}/${ReleaseFile}" }
 
     -   Pop-Location
     -   $AlchemyBinPath = Resolve-Path newview/Release/alchemy-bin.*
