@@ -78,6 +78,13 @@ private:
 		E_SORT_BY_RECENT_ARRIVAL = 5
 	} ESortOrder;
 
+	typedef enum e_click_actions {
+		E_CLICK_TO_IM = 0,
+		E_CLICK_TO_PROFILE = 1,
+		E_CLICK_TO_ZOOM = 2,
+		E_CLICK_TO_TELEPORT = 3
+	} EClickActions;
+
     void				    removePicker();
 
 	// methods indirectly called by the updaters
@@ -108,6 +115,7 @@ private:
 	void					onMoreButtonClicked();
 	void					onAvatarListDoubleClicked(LLUICtrl* ctrl);
 	void					onAvatarListCommitted(LLAvatarList* list);
+	void					onNearbyListDoubleClicked(LLUICtrl* ctrl);
 	bool					onGroupPlusButtonValidate();
 	void					onGroupMinusButtonClicked();
 	void					onGroupPlusMenuItemClicked(const LLSD& userdata);

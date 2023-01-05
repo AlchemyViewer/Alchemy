@@ -44,6 +44,47 @@
          parameter="sort_arrival"/>
   </menu_item_check>
     <menu_item_separator layout="topleft" />
+    <menu_item_check
+       label="Click to IM"
+       name="click_im">
+      <menu_item_check.on_click
+         function="People.Nearby.ViewSort.Action"
+         parameter="click_im"/>
+      <menu_item_check.on_check
+         function="People.Nearby.ViewSort.CheckItem"
+         parameter="click_im"/>
+    </menu_item_check>
+    <menu_item_check
+       label="Click to view profile"
+       name="click_profile">
+      <menu_item_check.on_click
+         function="People.Nearby.ViewSort.Action"
+         parameter="click_profile"/>
+      <menu_item_check.on_check
+         function="People.Nearby.ViewSort.CheckItem"
+         parameter="click_profile"/>
+    </menu_item_check>
+    <menu_item_check
+       label="Click to zoom in"
+       name="click_zoom">
+      <menu_item_check.on_click
+         function="People.Nearby.ViewSort.Action"
+         parameter="click_zoom"/>
+      <menu_item_check.on_check
+         function="People.Nearby.ViewSort.CheckItem"
+         parameter="click_zoom"/>
+    </menu_item_check>	
+    <menu_item_check
+       label="Click to teleport to"
+       name="click_teleport">
+      <menu_item_check.on_click
+         function="People.Nearby.ViewSort.Action"
+         parameter="click_teleport"/>
+      <menu_item_check.on_check
+         function="People.Nearby.ViewSort.CheckItem"
+         parameter="click_teleport"/>
+    </menu_item_check>	
+    <menu_item_separator layout="topleft" />	
     <menu_item_check name="view_icons" label="View People Icons">
         <menu_item_check.on_click
          function="People.Nearby.ViewSort.Action"

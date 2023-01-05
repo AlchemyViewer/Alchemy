@@ -44,6 +44,7 @@
 #include "llpanelpeople.h"
 
 // newview
+#include "alavataractions.h"
 #include "llaccordionctrl.h"
 #include "llaccordionctrltab.h"
 #include "llagent.h"
@@ -686,7 +687,7 @@ BOOL LLPanelPeople::postBuild()
 
 	mOnlineFriendList->setItemDoubleClickCallback(boost::bind(&LLPanelPeople::onAvatarListDoubleClicked, this, _1));
 	mAllFriendList->setItemDoubleClickCallback(boost::bind(&LLPanelPeople::onAvatarListDoubleClicked, this, _1));
-	mNearbyList->setItemDoubleClickCallback(boost::bind(&LLPanelPeople::onAvatarListDoubleClicked, this, _1));
+	mNearbyList->setItemDoubleClickCallback(boost::bind(&LLPanelPeople::onNearbyListDoubleClicked, this, _1));
 	mRecentList->setItemDoubleClickCallback(boost::bind(&LLPanelPeople::onAvatarListDoubleClicked, this, _1));
 
 	mOnlineFriendList->setCommitCallback(boost::bind(&LLPanelPeople::onAvatarListCommitted, this, mOnlineFriendList));
@@ -1192,6 +1193,38 @@ void LLPanelPeople::onAvatarListCommitted(LLAvatarList* list)
 	updateButtons();
 }
 
+void LLPanelPeople::onNearbyListDoubleClicked(LLUICtrl* ctrl)
+{
+	LLAvatarListItem* item = dynamic_cast<LLAvatarListItem*>(ctrl);
+	if(!item)
+	{
+		return;
+	}
+
+	LLUUID clicked_id = item->getAvatarId();
+	if(gAgent.getID() == clicked_id)
+	{
+		return;
+	}
+	U32 nearby_list_click_behavior = gSavedSettings.getU32("AlchemyNearbyPeopleClickAction");
+	switch (nearby_list_click_behavior)
+	{
+	default:
+	case 0:
+		LLAvatarActions::startIM(clicked_id);
+		break;
+	case 1:
+		LLAvatarActions::showProfile(clicked_id);
+		break;
+	case 2:
+		handle_zoom_to_object(clicked_id);
+		break;
+	case 3:
+		ALAvatarActions::teleportTo(clicked_id);
+		break;
+	}
+}
+
 void LLPanelPeople::onAddFriendButtonClicked()
 {
 	LLUUID id = getCurrentItemID();
@@ -1417,21 +1450,46 @@ void LLPanelPeople::onNearbyViewSortMenuItemClicked(const LLSD& userdata)
 	    mNearbyList->setShowCompleteName(!hide_usernames);
 	    mNearbyList->handleDisplayNamesOptionChanged();
 	}
+	else if (chosen_item == "click_im")
+	{
+		gSavedSettings.setU32("AlchemyNearbyPeopleClickAction", E_CLICK_TO_IM);
+	}
+	else if (chosen_item == "click_profile")
+	{
+		gSavedSettings.setU32("AlchemyNearbyPeopleClickAction", E_CLICK_TO_PROFILE);
+	}
+	else if (chosen_item == "click_zoom")
+	{
+		gSavedSettings.setU32("AlchemyNearbyPeopleClickAction", E_CLICK_TO_ZOOM);
+	}
+	else if (chosen_item == "click_teleport")
+	{
+		gSavedSettings.setU32("AlchemyNearbyPeopleClickAction", E_CLICK_TO_TELEPORT);
+	}
 }
 
 bool LLPanelPeople::onNearbyViewSortMenuItemCheck(const LLSD& userdata)
 {
 	std::string item = userdata.asString();
 	U32 sort_order = gSavedSettings.getU32("NearbyPeopleSortOrder");
+	U32 click_action = gSavedSettings.getU32("AlchemyNearbyPeopleClickAction");
 
 	if (item == "sort_by_recent_speakers")
 		return sort_order == E_SORT_BY_RECENT_SPEAKERS;
-	if (item == "sort_name")
+	else if (item == "sort_name")
 		return sort_order == E_SORT_BY_NAME;
-	if (item == "sort_distance")
+	else if (item == "sort_distance")
 		return sort_order == E_SORT_BY_DISTANCE;
-	if (item == "sort_arrival")
+	else if (item == "sort_arrival")
 		return sort_order == E_SORT_BY_RECENT_ARRIVAL;
+	else if (item == "click_im")
+		return click_action == E_CLICK_TO_IM;
+	else if (item == "click_profile")
+		return click_action == E_CLICK_TO_PROFILE;
+	else if (item == "click_zoom")
+		return click_action == E_CLICK_TO_ZOOM;
+	else if (item == "click_teleport")
+		return click_action == E_CLICK_TO_TELEPORT;
 
 	return false;
 }

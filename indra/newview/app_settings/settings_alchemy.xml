@@ -607,6 +607,17 @@
       <key>Value</key>
       <real>0.15</real>
     </map>
+    <key>AlchemyNearbyPeopleClickAction</key>
+    <map>
+    <key>Comment</key>
+    <string>0 - IM, 1 - Profile, 2 - Zoom In, 3 - Teleport To</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>U32</string>
+      <key>Value</key>
+      <integer>2</integer>
+    </map>
     <key>AlchemyNearbyTypingIndicators</key>
     <map>
       <key>Comment</key>
