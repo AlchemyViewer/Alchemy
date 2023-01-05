@@ -106,6 +106,13 @@ void calcAtmosphericVars(vec3 inPositionEye, vec3 light_dir, float ambFactor, ou
     // increase ambient when there are more clouds
     vec4 tmpAmbient = amb_color + (vec4(1.) - amb_color) * cloud_shadow * 0.5;
 
+    // Similar/Shared Algorithms:
+    //     indra\llinventory\llsettingssky.cpp                                        -- LLSettingsSky::calculateLightSettings()
+    //     indra\newview\app_settings\shaders\class1\windlight\atmosphericsFuncs.glsl -- calcAtmosphericVars()
+    // haze color
+    vec3 cs = sunlight.rgb * (1. - cloud_shadow);
+    additive = (blue_horizon.rgb * blue_weight.rgb) * (cs + tmpAmbient.rgb) + (haze_horizon * haze_weight.rgb) * (cs * haze_glow + tmpAmbient.rgb);
+
     /*  decrease value and saturation (that in HSV, not HSL) for occluded areas
      * // for HSV color/geometry used here, see http://gimp-savvy.com/BOOK/index.html?node52.html
      * // The following line of code performs the equivalent of:
@@ -119,13 +126,6 @@ void calcAtmosphericVars(vec3 inPositionEye, vec3 light_dir, float ambFactor, ou
     {
         tmpAmbient = vec4(mix(ssao_effect_mat * tmpAmbient.rgb, tmpAmbient.rgb, ambFactor), tmpAmbient.a);
     }
-
-    // Similar/Shared Algorithms:
-    //     indra\llinventory\llsettingssky.cpp                                        -- LLSettingsSky::calculateLightSettings()
-    //     indra\newview\app_settings\shaders\class1\windlight\atmosphericsFuncs.glsl -- calcAtmosphericVars()
-    // haze color
-    vec3 cs = sunlight.rgb * (1. - cloud_shadow);
-    additive = (blue_horizon.rgb * blue_weight.rgb) * (cs + tmpAmbient.rgb) + (haze_horizon * haze_weight.rgb) * (cs * haze_glow + tmpAmbient.rgb);
 
     // brightness of surface both sunlight and ambient
     sunlit = sunlight.rgb * 0.5;
