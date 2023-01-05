@@ -355,7 +355,9 @@ build:release:windows64:
     - $BuildChannelOneword = $BuildData.Channel.Replace(" ", "")
     - $PkgName = $BuildData.Channel.Replace(" ", "_")
     - $PkgVer = $BuildData.Version
-    - $UploadDestURL = "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${PkgName}/${PkgVer}"
+    - $SetupUploadProjectID = "${CI_PROJECT_ID}"
+    - If ($env:PUBLIC_BUILD -eq 'FALSE') { $SetupUploadProjectID = "200" }
+    - $UploadDestURL = "${CI_API_V4_URL}/projects/${SetupUploadProjectID}/packages/generic/${PkgName}/${PkgVer}"
     - $UpdateDeployDestURL = "${CI_API_V4_URL}/projects/198/packages/generic/${BuildChannelOneword}"
     - >
         $UploadParams = @{
@@ -368,7 +370,6 @@ build:release:windows64:
     - If ($env:USE_SENTRY -eq 'TRUE') { sentry-cli releases new $BuildChannelVersion && sentry-cli releases set-commits --auto $BuildChannelVersion }
 
     - $DestStatus = "?select=package_file&status=default"
-    - If ($env:PUBLIC_BUILD -eq 'FALSE') { $DestStatus = "?select=package_file&status=hidden" }
 
     - Push-Location ./build-linux-64/
     -   Push-Location ./newview/
