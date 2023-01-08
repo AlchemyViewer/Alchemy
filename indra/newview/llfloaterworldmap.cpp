@@ -680,11 +680,11 @@ void LLFloaterWorldMap::trackLocation(const LLVector3d& pos_global)
 	
 	std::string tooltip("");
 	mTrackedStatus = LLTracker::TRACKING_LOCATION;
-	LLWorldMap::getInstance()->cancelTracking();		// The floater is taking over the tracking
 // [RLVa:KB] - Checked: 2012-02-08 (RLVa-1.4.5) | Added: RLVa-1.4.5
 	LLTracker::trackLocation(pos_global, (!gRlvHandler.hasBehaviour(RLV_BHVR_SHOWLOC)) ? full_name : RlvStrings::getString(RlvStringKeys::Hidden::Generic).c_str(), tooltip);
 // [/RLVa:KB]
 //	LLTracker::trackLocation(pos_global, full_name, tooltip);
+	LLWorldMap::getInstance()->cancelTracking();		// The floater is taking over the tracking
 	
 	LLVector3d coord_pos = LLTracker::getTrackedPositionGlobal();
 	updateTeleportCoordsDisplay( coord_pos );
@@ -1660,6 +1660,8 @@ void LLFloaterWorldMap::updateSims(bool found_null_sim)
 	
 	if (num_results > 0)
 	{
+		list->sortByColumn("sim_name", TRUE);
+
 		// if match found, highlight it and go
 		if (!match.isUndefined())
 		{

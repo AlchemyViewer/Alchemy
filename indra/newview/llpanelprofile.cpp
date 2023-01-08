@@ -1291,8 +1291,8 @@ bool LLPanelProfileSecondLife::onEnableMenu(const LLSD& userdata)
     }
     else if (item_name == "can_show_on_map")
     {
-        return (LLAvatarTracker::instance().isBuddyOnline(agent_id) && LLAvatarActions::isAgentMappable(agent_id))
-        || gAgent.isGodlike();
+        return ((LLAvatarTracker::instance().isBuddyOnline(agent_id) && LLAvatarActions::isAgentMappable(agent_id))
+        || gAgent.isGodlike()) && !gRlvHandler.hasBehaviour(RLV_BHVR_SHOWWORLDMAP);
     }
     else if (item_name == "toggle_block_agent")
     {
