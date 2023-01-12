@@ -234,6 +234,9 @@ void LLViewerTextureList::doPrefetchImages()
         }
     }
 
+	LLViewerFetchedTexture::sSmokeImagep = LLViewerTextureManager::getFetchedTexture(IMG_SMOKE, FTT_DEFAULT, MIPMAP_YES, LLGLTexture::BOOST_UI);
+	LLViewerFetchedTexture::sSmokeImagep->setNoDelete();
+
     LLViewerTextureManager::getFetchedTexture(IMG_SHOT);
     LLViewerTextureManager::getFetchedTexture(IMG_SMOKE_POOF);
 
