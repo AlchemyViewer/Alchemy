@@ -55,17 +55,9 @@ public:
 	// CREATORS
 	//
 	LLUUID();
-	LLUUID(const LLUUID& rhs);
-	LLUUID(LLUUID&& rhs) noexcept;
-	~LLUUID();
-
-	LLUUID& operator=(const LLUUID& rhs) { std::memcpy(mData, rhs.mData, sizeof(mData)); return *this;}
-	LLUUID& operator=(LLUUID&& rhs) noexcept { std::memmove(mData, rhs.mData, sizeof(mData)); return *this;}
-
 	explicit LLUUID(const char *in_string); // Convert from string.
 	explicit LLUUID(const std::string_view in_string); // Convert from string.
-
-
+	~LLUUID() = default;
 
 	//
 	// MANIPULATORS
@@ -241,6 +233,10 @@ public:
 
 	U8 mData[UUID_BYTES] = {};
 };
+
+static_assert(std::is_trivially_copyable<LLUUID>::value, "LLUUID must be trivial copy");
+static_assert(std::is_trivially_move_assignable<LLUUID>::value, "LLUUID must be trivial move");
+static_assert(std::is_standard_layout<LLUUID>::value, "LLUUID must be a standard layout type");
 
 typedef std::vector<LLUUID> uuid_vec_t;
 typedef std::set<LLUUID> uuid_set_t;

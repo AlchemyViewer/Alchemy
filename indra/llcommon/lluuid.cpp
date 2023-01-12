@@ -53,20 +53,6 @@ LLUUID::LLUUID()
 {
 }
 
-LLUUID::LLUUID(const LLUUID& rhs) 
-{ 
-	std::memcpy(mData, rhs.mData, sizeof(mData)); 
-}
-
-LLUUID::LLUUID(LLUUID&& rhs) noexcept
-{ 
-	std::memmove(mData, rhs.mData, sizeof(mData)); 
-}
-
-LLUUID::~LLUUID() 
-{
-}
-
 bool LLUUID::operator==(const LLUUID& rhs) const
 {
 	__m128i mm_left = load_unaligned_si128(mData);

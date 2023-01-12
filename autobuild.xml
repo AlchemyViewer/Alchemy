@@ -1467,11 +1467,11 @@
               <key>creds</key>
               <string>gitlab</string>
               <key>hash</key>
-              <string>d406063afef2eaffb95cd20987da021b9eb1489495f7d70bf46263ca675ed7b763a4f10a74557335b3d2120607f18ad42cb574bdf57acde76cff9f79e83806db</string>
+              <string>9069e994d5a7fa050872abef8afbc6587f09e02bf5a108a6090c5f15fcdf522004b85e29b30ae08ea83fdd43b805f37bb8b719bee7587a940109fa520dd33301</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/192/packages/generic/llphysicsextensions_tpv/1.0.571939/llphysicsextensions_tpv-1.0.571939-darwin64-571939.tar.bz2</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/192/packages/generic/llphysicsextensions_tpv/1.0.577418/llphysicsextensions_tpv-1.0.577418-darwin64-577418.tar.bz2</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
@@ -1483,11 +1483,11 @@
               <key>creds</key>
               <string>gitlab</string>
               <key>hash</key>
-              <string>4a2de5ef7194c64268de1b87b517b8d22cb8347a9fa2fdbc2ac48deebe92ad08a0b664ab4c7419de249de11385bcdf5d2a075b764ac3399e228db29506dbd54b</string>
+              <string>f0d5a4733498fbc779bed2639ea5a14cf2cf888c7e74c446e24df00d593e69c2edce17592ea69da7fff3ef8070672534d074a7654d3e18c691dcef5cc4c4ec1e</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/192/packages/generic/llphysicsextensions_tpv/1.0.571939/llphysicsextensions_tpv-1.0.571939-windows-571939.tar.bz2</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/192/packages/generic/llphysicsextensions_tpv/1.0.577418/llphysicsextensions_tpv-1.0.577418-windows-577418.tar.bz2</string>
             </map>
             <key>name</key>
             <string>windows</string>
@@ -1499,11 +1499,11 @@
               <key>creds</key>
               <string>gitlab</string>
               <key>hash</key>
-              <string>254ecd68df52da6b86bcc64cd83758a8b9a1c398e33ed43cfe9efef28b249f6d7eb8450e27d901177eb9084d52ff7fa428e93fe6f4721ad6ff3d1f4728dc34d8</string>
+              <string>3471aae4c25f6376589b1688165f7568a6735abc928dda2ee8767b5a9e1d0b537eb4f5e67c6c1f3e619b6cafb1a9c295002ad7e10431f424a0bf853bbc67e6a5</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/192/packages/generic/llphysicsextensions_tpv/1.0.571939/llphysicsextensions_tpv-1.0.571939-windows64-571939.tar.bz2</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/192/packages/generic/llphysicsextensions_tpv/1.0.577418/llphysicsextensions_tpv-1.0.577418-windows64-577418.tar.bz2</string>
             </map>
             <key>name</key>
             <string>windows64</string>
@@ -1512,7 +1512,7 @@
         <key>source_type</key>
         <string>hg</string>
         <key>version</key>
-        <string>1.0.571939</string>
+        <string>1.0.577418</string>
       </map>
       <key>minizip-ng</key>
       <map>
