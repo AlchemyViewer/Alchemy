@@ -456,7 +456,7 @@ void ALUpdateHandler::restartToNewVersion()
 
 void ALUpdateHandler::updateCheckFinished(const LLSD& data)
 {
-	if (data.emptyMap()) return;
+	if (!data.isMap() || data.size() == 0) return;
 	ALVersionInfo cur_ver(LLVersionInfo::instance().getMajor(), LLVersionInfo::instance().getMinor(), LLVersionInfo::instance().getPatch());
 	ALVersionInfo new_ver;
 	if (data.has("futureVersion")) new_ver.parse(data["futureVersion"].asString());
