@@ -2652,6 +2652,8 @@ If you continue to receive this message, please contact Second Life support for 
 	<string name="CompileNoExperiencePerm">Skipping script [SCRIPT] with Experience [EXPERIENCE].</string>
 	<string name="CompileQueueTitle">Recompilation Progress</string>
 	<string name="CompileQueueStart">recompile</string>
+	<string name="CompileQueuePreprocessing">Preprocessing: [SCRIPT]</string>
+	<string name="CompileQueuePreprocessingComplete">Preprocessing of script [SCRIPT] completed</string>
 	<string name="ResetQueueTitle">Reset Progress</string>
 	<string name="ResetQueueStart">reset</string>
 	<string name="RunQueueTitle">Set Running Progress</string>
