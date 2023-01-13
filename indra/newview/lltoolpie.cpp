@@ -139,6 +139,10 @@ BOOL LLToolPie::handleMouseDown(S32 x, S32 y, MASK mask)
 		// !transparent_object check will be covered by transparent_object == visible_object.
 		mPick = transparent_pick;
 	}
+	else if( !transp_object)
+	{
+		mPick = visible_pick;
+	}
 	else
 	{
 		// Select between two non-null picks
