@@ -267,7 +267,8 @@ static const F32 MIN_UI_SCALE = 0.75f;
 static const F32 MAX_UI_SCALE = 7.0f;
 static const F32 MIN_DISPLAY_SCALE = 0.75f;
 
-static const char KEY_MOUSELOOK = 'M';
+// <FS:Ansariel> FIRE-31852: Now it aggressively executes gestures within focussed floaters...
+//static const char KEY_MOUSELOOK = 'M';
 
 LLTrace::SampleStatHandle<> LLViewerWindow::sMouseVelocityStat("Mouse Velocity");
 
@@ -2910,13 +2911,15 @@ BOOL LLViewerWindow::handleKey(KEY key, MASK mask)
     {
         //Most things should fall through, but mouselook is an exception,
         //don't switch to mouselook if any floater has focus
-        if ((key == KEY_MOUSELOOK) && !(mask & (MASK_CONTROL | MASK_ALT)))
-        {
-            return TRUE;
-        }
+        // <FS:Ansariel> FIRE-31852: Now it aggressively executes gestures within focussed floaters...
+        //if ((key == KEY_MOUSELOOK) && !(mask & (MASK_CONTROL | MASK_ALT)))
+        //{
+        //    return TRUE;
+        //}
 
-        LLUICtrl* cur_focus = dynamic_cast<LLUICtrl*>(keyboard_focus);
-        if (cur_focus && cur_focus->acceptsTextInput())
+        //LLUICtrl* cur_focus = dynamic_cast<LLUICtrl*>(keyboard_focus);
+        //if (cur_focus && cur_focus->acceptsTextInput())
+        // </FS:Ansariel>
         {
 #ifdef LL_WINDOWS
             // On windows Alt Gr key generates additional Ctrl event, as result handling situations
