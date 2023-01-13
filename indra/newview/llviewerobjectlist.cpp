@@ -955,6 +955,7 @@ void LLViewerObjectList::update(LLAgent &agent)
 
 	U32 idle_count = 0;
 	
+	mNumAvatars = 0;
 	{
  		for (std::vector<LLPointer<LLViewerObject> >::iterator active_iter = mActiveObjects.begin();
 			active_iter != mActiveObjects.end(); active_iter++)
@@ -971,6 +972,8 @@ void LLViewerObjectList::update(LLAgent &agent)
 					idle_list[idle_count] = objectp;
 				}
 				++idle_count;
+				if (objectp->isAvatar())
+					mNumAvatars++;
 			}
 			else
 			{	// There shouldn't be any NULL pointers in the list, but they have caused
