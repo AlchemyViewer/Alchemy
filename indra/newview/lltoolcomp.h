@@ -164,6 +164,9 @@ public:
 	virtual LLTool*		getOverrideTool(MASK mask) override;
 	
 	static void pickCallback(const LLPickInfo& pick_info);
+
+	virtual BOOL		handleMiddleMouseDown(S32 x, S32 y, MASK mask) override;
+	virtual BOOL		handleMiddleMouseUp(S32 x, S32 y, MASK mask) override;
 };
 
 

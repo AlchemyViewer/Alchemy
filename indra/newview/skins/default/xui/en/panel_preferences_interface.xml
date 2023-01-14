@@ -112,9 +112,42 @@
     layout="topleft"
     left="45"
     name="HideHoverTextInCinematicMode"
-    top_delta="20"
+    top_pad="7"
     width="256">
     <check_box.commit_callback
       function="Pref.RenderOptionUpdate" />
   </check_box>
+  <text
+     type="string"
+     length="1"
+     follows="left|top"
+     height="10"
+     layout="topleft"
+     left="30"
+     name="InventoryText"
+     mouse_opaque="false"
+     top_pad="7"
+     width="300">
+    Inventory:
+  </text>
+  <check_box
+    control_name="DoubleClickAttachmentAdd"
+    height="16"
+    initial_value="true"
+    label="Double-click to add Attachments"
+    layout="topleft"
+    left="45"
+    name="DoubleClickAttachmentAddCheck"
+    top_pad="7"
+    width="256"/>
+  <check_box
+    control_name="DoubleClickWearableAdd"
+    height="16"
+    initial_value="true"
+    label="Double-click to add Wearables"
+    layout="topleft"
+    left="45"
+    name="DoubleClickWearableAddCheck"
+    top_pad="5"
+    width="256"/>
 </panel>

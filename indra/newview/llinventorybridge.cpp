@@ -6829,8 +6829,16 @@ void LLObjectBridge::performAction(LLInventoryModel* model, std::string action)
 void LLObjectBridge::openItem()
 {
 	// object double-click action is to wear/unwear object
-	performAction(getInventoryModel(),
-		      get_is_item_worn(mUUID) ? "detach" : "attach");
+// [SL:KB] - Patch: Inventory-MultiAttach | Checked: 2011-10-04 (Catznip-3.0)
+	MASK mask = gKeyboard->currentMask(TRUE);
+	bool fCtrlDown = (MASK_CONTROL == mask);
+	bool fOpenAdd = gSavedSettings.getBOOL("DoubleClickAttachmentAdd");
+
+	const char* pstrAction = get_is_item_worn(mUUID) ? "detach" : ((fCtrlDown ^ fOpenAdd) ? "wear_add" : "attach");
+	performAction(getInventoryModel(), pstrAction);
+// [/SL:KB]
+//	performAction(getInventoryModel(),
+//		      get_is_item_worn(mUUID) ? "detach" : "attach");
 }
 
 std::string LLObjectBridge::getLabelSuffix() const
@@ -7211,8 +7219,26 @@ void LLWearableBridge::performAction(LLInventoryModel* model, std::string action
 
 void LLWearableBridge::openItem()
 {
-	performAction(getInventoryModel(),
-			      get_is_item_worn(mUUID) ? "take_off" : "wear");
+	LLViewerInventoryItem* item = getItem();
+
+// [SL:KB] - Patch: Inventory-MultiWear | Checked: 2011-10-04 (Catznip-3.0)
+	if ( (item) && (item->isWearableType()) )
+	{
+		// Wearable double-click action should match attachment double-click action (=wear/unwear but don't attempt to unwear body parts)
+		bool fIsWorn = get_is_item_worn(mUUID);
+		if ( (!fIsWorn) || (LLAssetType::AT_BODYPART != item->getType()) )
+		{
+			MASK mask = gKeyboard->currentMask(TRUE); 
+			bool fCtrlDown = (MASK_CONTROL == mask);
+			bool fOpenAdd = gSavedSettings.getBOOL("DoubleClickWearableAdd");
+
+			const char* pstrAction = (fIsWorn) ? "take_off" : ((fCtrlDown ^ fOpenAdd) && (LLAssetType::AT_BODYPART != item->getType())) ? "wear_add" : "wear";
+			performAction(getInventoryModel(), pstrAction);
+		}
+	}
+// [/SL:KB]
+//	performAction(getInventoryModel(),
+//			      get_is_item_worn(mUUID) ? "take_off" : "wear");
 }
 
 void LLWearableBridge::buildContextMenu(LLMenuGL& menu, U32 flags)
