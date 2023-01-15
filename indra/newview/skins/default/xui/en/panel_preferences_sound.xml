@@ -360,7 +360,29 @@
        name="1"
        top_delta ="18"
        width="200" />
-  </radio_group>  
+  </radio_group>
+  <check_box
+   name="gesture_audio_play_btn"
+   control_name="EnableGestureSounds"
+   disabled_control="MuteAudio"
+   value="true"
+   follows="left|bottom|right"
+   height="15"
+   tool_tip="Check this to hear sounds from gestures"
+   label="Play sounds from gestures"
+   top_pad="5"
+   left="20"/>
+  <check_box
+   name="sound_on_collisions"
+   control_name="EnableCollisionSounds"
+   disabled_control="MuteAudio"
+   value="true"
+   follows="left|bottom|right"
+   height="15"
+   tool_tip="Check this to hear sounds from collisions with objects and avatars"
+   label="Play sounds from collisions"
+   top_pad="5"
+   left="20"/>
  	<check_box
     name="media_show_on_others_btn"
     control_name="MediaShowOnOthers"
@@ -466,28 +488,6 @@
    width="237"
    tool_tip="When in toggle mode, press and release the trigger key ONCE to switch your microphone on or off. When not in toggle mode, the microphone broadcasts your voice only while the trigger is being held down."
    top_pad="5"/>
-  <check_box
-   name="gesture_audio_play_btn"
-   control_name="EnableGestureSounds"
-   disabled_control="MuteAudio"
-   value="true"
-   follows="left|bottom|right"
-   height="15"
-   tool_tip="Check this to hear sounds from gestures"
-   label="Play sounds from gestures"
-   top_pad="5"
-   left="20"/>
-  <check_box
-   name="sound_on_collisions"
-   control_name="EnableCollisionSounds"
-   disabled_control="MuteAudio"
-   value="true"
-   follows="left|bottom|right"
-   height="15"
-   tool_tip="Check this to hear sounds from collisions with objects and avatars"
-   label="Play sounds from collisions"
-   top_pad="5"
-   left="20"/>
   <button
    control_name="ShowDeviceSettings"
    follows="left|top"
@@ -495,10 +495,10 @@
    is_toggle="true"
    label="Voice Input/Output devices"
    layout="topleft"
-   left="20"
-   top_pad="9"
+   left_pad="60"
+   top_delta="-6"
    name="device_settings_btn"
-   width="230">
+   width="180">
   </button>
     <panel
     layout="topleft"
