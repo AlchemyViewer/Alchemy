@@ -339,15 +339,15 @@ void HttpCoroHandler::buildStatusEntry(LLCore::HttpResponse *response, LLCore::H
 
     if (hdrs)
     {
-        for (LLCore::HttpHeaders::iterator it = hdrs->begin(); it != hdrs->end(); ++it)
+        for (const auto& header_pair : (*hdrs))
         {
-            if (!(*it).second.empty())
+            if (!header_pair.second.empty())
             {
-                httpHeaders[(*it).first] = (*it).second;
+                httpHeaders[header_pair.first] = header_pair.second;
             }
             else
             {
-                httpHeaders[(*it).first] = static_cast<LLSD::Boolean>(true);
+                httpHeaders[header_pair.first] = static_cast<LLSD::Boolean>(true);
             }
         }
     }

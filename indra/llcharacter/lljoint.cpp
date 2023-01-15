@@ -209,10 +209,8 @@ void LLJoint::touch(U32 flags)
 			child_flags |= POSITION_DIRTY;
 		}
 
-		for (joints_t::iterator iter = mChildren.begin();
-			 iter != mChildren.end(); ++iter)
+		for (LLJoint* joint : mChildren)
 		{
-			LLJoint* joint = *iter;
 			joint->touch(child_flags);
 		}
 	}
@@ -251,10 +249,8 @@ LLJoint *LLJoint::findJoint( const std::string &name )
 	if (name == getName())
 		return this;
 
-	for (joints_t::iterator iter = mChildren.begin();
-		 iter != mChildren.end(); ++iter)
+	for (LLJoint* joint : mChildren)
 	{
-		LLJoint* joint = *iter;
 		LLJoint *found = joint->findJoint(name);
 		if (found)
 		{
@@ -1021,10 +1017,8 @@ void LLJoint::updateWorldMatrixChildren()
 	{
 		updateWorldMatrix();
 	}
-	for (joints_t::iterator iter = mChildren.begin();
-		 iter != mChildren.end(); ++iter)
+	for (LLJoint* joint : mChildren)
 	{
-		LLJoint* joint = *iter;
 		joint->updateWorldMatrixChildren();
 	}
 }
@@ -1068,10 +1062,8 @@ void LLJoint::clampRotation(LLQuaternion old_rot, LLQuaternion new_rot)
 {
 	LLVector3 main_axis(1.f, 0.f, 0.f);
 
-	for (joints_t::iterator iter = mChildren.begin();
-		 iter != mChildren.end(); ++iter)
+	for (LLJoint* joint : mChildren)
 	{
-		LLJoint* joint = *iter;
 		if (joint->isAnimatable())
 		{
 			main_axis = joint->getPosition();
