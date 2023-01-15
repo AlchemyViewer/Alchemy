@@ -432,6 +432,10 @@ std::string LLFloaterIMSessionTab::appendTime()
 
 	static const std::string time_str = fmt::format(FMT_STRING("[{}]:[{}]"), LLTrans::getString("TimeHour"), LLTrans::getString("TimeMin"));
 	std::string timeStr = time_str;
+	if (gSavedSettings.getBOOL("ChatTimestampSeconds"))
+	{
+		timeStr += fmt::format(":[{}]", LLTrans::getString ("TimeSec"));
+	}
 
 	LLSD substitution;
 	substitution["datetime"] = (S32) utc_time;

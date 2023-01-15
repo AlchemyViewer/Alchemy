@@ -115,6 +115,10 @@ const std::string LLConversation::createTimestamp(const U64Seconds& utc_time)
 	static const std::string time_fmt_str = fmt::format(FMT_STRING("[{:s}]/[{:s}]/[{:s}] [{:s}]:[{:s}]"), LLTrans::getString("TimeMonth"), LLTrans::getString("TimeDay"), LLTrans::getString("TimeYear"), LLTrans::getString("TimeHour"), LLTrans::getString("TimeMin"));
 
 	std::string timeStr = time_fmt_str;
+	if (gSavedSettings.getBOOL("ChatTimestampSeconds"))
+	{
+		timeStr += fmt::format(":[{}]", LLTrans::getString ("TimeSec"));
+	}
 	LLSD substitution;
 	substitution["datetime"] = (S32)utc_time.value();
 

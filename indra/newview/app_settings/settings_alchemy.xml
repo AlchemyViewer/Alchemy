@@ -849,6 +849,17 @@
       <key>Value</key>
       <boolean>0</boolean>
     </map>
+    <key>ChatTimestampSeconds</key>
+    <map>
+      <key>Comment</key>
+      <string>Display seconds in chat log timestamp</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <boolean>0</boolean>
+    </map>
     <key>CmdLineSquirrelInstall</key>
     <map>
       <key>Comment</key>
