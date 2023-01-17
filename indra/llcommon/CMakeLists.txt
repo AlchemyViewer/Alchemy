@@ -312,7 +312,7 @@ target_link_libraries(
     ${URIPARSER_LIBRARIES}
     nlohmann_json::nlohmann_json
     fmt::fmt
-    TracyClient
+    ${TRACY_LIBRARY}
     ${DL_LIBRARY}
     ${RT_LIBRARY}
     )
