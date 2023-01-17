@@ -604,15 +604,6 @@ static bool proximity_comparitor(const LLViewerMediaImpl* i1, const LLViewerMedi
 	}
 }
 
-static LLTrace::BlockTimerStatHandle FTM_MEDIA_UPDATE("Update Media");
-static LLTrace::BlockTimerStatHandle FTM_MEDIA_SPARE_IDLE("Spare Idle");
-static LLTrace::BlockTimerStatHandle FTM_MEDIA_UPDATE_INTEREST("Update/Interest");
-static LLTrace::BlockTimerStatHandle FTM_MEDIA_UPDATE_VOLUME("Update/Volume");
-static LLTrace::BlockTimerStatHandle FTM_MEDIA_SORT("Media Sort");
-static LLTrace::BlockTimerStatHandle FTM_MEDIA_SORT2("Media Sort 2");
-static LLTrace::BlockTimerStatHandle FTM_MEDIA_MISC("Misc");
-
-
 //////////////////////////////////////////////////////////////////////////////////////////
 void LLViewerMedia::onIdle(void *dummy_arg)
 {
@@ -2790,11 +2781,6 @@ bool LLViewerMediaImpl::canNavigateBack()
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////
-static LLTrace::BlockTimerStatHandle FTM_MEDIA_DO_UPDATE("Do Update");
-static LLTrace::BlockTimerStatHandle FTM_MEDIA_GET_DATA("Get Data");
-static LLTrace::BlockTimerStatHandle FTM_MEDIA_SET_SUBIMAGE("Set Subimage");
-
-
 void LLViewerMediaImpl::update()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_MEDIA; //LL_RECORD_BLOCK_TIME(FTM_MEDIA_DO_UPDATE);
@@ -3662,8 +3648,6 @@ BOOL LLViewerMediaImpl::isUpdated()
 {
 	return mIsUpdated ;
 }
-
-static LLTrace::BlockTimerStatHandle FTM_MEDIA_CALCULATE_INTEREST("Calculate Interest");
 
 void LLViewerMediaImpl::calculateInterest()
 {

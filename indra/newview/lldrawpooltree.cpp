@@ -57,7 +57,7 @@ void LLDrawPoolTree::prerender()
 
 void LLDrawPoolTree::beginRenderPass(S32 pass)
 {
-	LL_RECORD_BLOCK_TIME(FTM_RENDER_TREES);
+	LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL;
 		
 	if (LLPipeline::sUnderWaterRender)
 	{
@@ -83,7 +83,7 @@ void LLDrawPoolTree::beginRenderPass(S32 pass)
 
 void LLDrawPoolTree::render(S32 pass)
 {
-    LL_PROFILE_ZONE_SCOPED;
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL;
 
 	if (mDrawFace.empty())
 	{
@@ -133,7 +133,7 @@ void LLDrawPoolTree::render(S32 pass)
 
 void LLDrawPoolTree::endRenderPass(S32 pass)
 {
-	LL_RECORD_BLOCK_TIME(FTM_RENDER_TREES);
+	LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL;
 		
 	if (gPipeline.canUseWindLightShadersOnObjects())
 	{
@@ -151,7 +151,7 @@ void LLDrawPoolTree::endRenderPass(S32 pass)
 //============================================
 void LLDrawPoolTree::beginDeferredPass(S32 pass)
 {
-	LL_RECORD_BLOCK_TIME(FTM_RENDER_TREES);
+	LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL;
 		
 	shader = &gDeferredTreeProgram;
 	shader->bind();
@@ -160,13 +160,13 @@ void LLDrawPoolTree::beginDeferredPass(S32 pass)
 
 void LLDrawPoolTree::renderDeferred(S32 pass)
 {
-    LL_PROFILE_ZONE_SCOPED;
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL;
 	render(pass);
 }
 
 void LLDrawPoolTree::endDeferredPass(S32 pass)
 {
-	LL_RECORD_BLOCK_TIME(FTM_RENDER_TREES);
+	LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL;
 		
 	shader->unbind();
 }
@@ -176,7 +176,7 @@ void LLDrawPoolTree::endDeferredPass(S32 pass)
 //============================================
 void LLDrawPoolTree::beginShadowPass(S32 pass)
 {
-    LL_PROFILE_ZONE_SCOPED;
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL;
 	
 	glPolygonOffset(gSavedSettings.getF32("RenderDeferredTreeShadowOffset"),
 					gSavedSettings.getF32("RenderDeferredTreeShadowBias"));

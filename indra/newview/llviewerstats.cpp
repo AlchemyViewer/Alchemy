@@ -360,8 +360,8 @@ void update_statistics()
 	record(LLStatViewer::UPDATE_STACKTIME, idle_secs - network_secs);
 	record(LLStatViewer::NETWORK_STACKTIME, network_secs);
 	record(LLStatViewer::IMAGE_STACKTIME, last_frame_recording.getSum(*stat_type_t::getInstance("Update Images")));
-	record(LLStatViewer::REBUILD_STACKTIME, last_frame_recording.getSum(*stat_type_t::getInstance("Sort Draw State")));
-	record(LLStatViewer::RENDER_STACKTIME, last_frame_recording.getSum(*stat_type_t::getInstance("Render Geometry")));
+	record(LLStatViewer::REBUILD_STACKTIME, 0);
+	record(LLStatViewer::RENDER_STACKTIME, 0);
 		
 	if (gAgent.getRegion() && isAgentAvatarValid())
 	{
