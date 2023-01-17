@@ -744,7 +744,7 @@ void LLVertexBuffer::drawRange(U32 mode, U32 start, U32 end, U32 count, U32 indi
 
 	stop_glerror();
 	LLGLSLShader::startProfile();
-    LL_PROFILER_GPU_ZONEC( "gl.DrawRangeElements", 0xFFFF00 )
+    LL_PROFILER_GPU_ZONEC( "gl.DrawRangeElements", 0xFFFF00 );
 	glDrawRangeElements(sGLMode[mode], start, end, count, GL_UNSIGNED_SHORT, 
 		idx);
 	LLGLSLShader::stopProfile(count, mode);
@@ -762,7 +762,7 @@ void LLVertexBuffer::drawRangeFast(U32 mode, U32 start, U32 end, U32 count, U32 
 
     U16* idx = ((U16*)getIndicesPointer()) + indices_offset;
 
-    LL_PROFILER_GPU_ZONEC("gl.DrawRangeElements", 0xFFFF00)
+    LL_PROFILER_GPU_ZONEC("gl.DrawRangeElements", 0xFFFF00);
         glDrawRangeElements(sGLMode[mode], start, end, count, GL_UNSIGNED_SHORT,
             idx);
 }
@@ -808,7 +808,7 @@ void LLVertexBuffer::draw(U32 mode, U32 count, U32 indices_offset) const
 
 	stop_glerror();
 	LLGLSLShader::startProfile();
-    LL_PROFILER_GPU_ZONEC( "gl.DrawElements", 0xA0FFA0 )
+    LL_PROFILER_GPU_ZONEC( "gl.DrawElements", 0xA0FFA0 );
 	glDrawElements(sGLMode[mode], count, GL_UNSIGNED_SHORT,
 		((U16*) getIndicesPointer()) + indices_offset);
 	LLGLSLShader::stopProfile(count, mode);
@@ -856,7 +856,7 @@ void LLVertexBuffer::drawArrays(U32 mode, U32 first, U32 count) const
 
     LLGLSLShader::startProfile();
     {
-        LL_PROFILER_GPU_ZONEC("gl.DrawArrays", 0xFF4040)
+        LL_PROFILER_GPU_ZONEC("gl.DrawArrays", 0xFF4040);
             glDrawArrays(sGLMode[mode], first, count);
     }
     LLGLSLShader::stopProfile(count, mode);

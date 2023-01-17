@@ -88,12 +88,15 @@ extern thread_local bool gProfilerEnabled;
 
         // Mutually exclusive with detailed memory tracing
     	#define LL_PROFILER_ENABLE_TRACY_MEMORY 0
-        #define LL_PROFILER_ENABLE_TRACY_OPENGL 0
+        #define LL_PROFILER_ENABLE_TRACY_OPENGL 1
     #endif
 
     #if LL_PROFILER_CONFIGURATION == LL_PROFILER_CONFIG_TRACY
         #define LL_PROFILER_FRAME_END                   FrameMark;
         #define LL_PROFILER_SET_THREAD_NAME( name )     tracy::SetThreadName( name );    gProfilerEnabled = true;
+        #define LL_PROFILER_THREAD_BEGIN(name)          FrameMarkStart(name)
+        #define LL_PROFILER_THREAD_END(name)            FrameMarkEnd(name)
+
         #define LL_RECORD_BLOCK_TIME(name)              ZoneNamedN( ___tracy_scoped_zone, #name, true);
         #define LL_PROFILE_ZONE_NAMED(name)             ZoneNamedN( ___tracy_scoped_zone, name, true );
         #define LL_PROFILE_ZONE_NAMED_COLOR(name,color) ZoneNamedNC( ___tracy_scopped_zone, name, color, true ); // RGB
@@ -110,7 +113,9 @@ extern thread_local bool gProfilerEnabled;
     #endif
     #if LL_PROFILER_CONFIGURATION == LL_PROFILER_CONFIG_FAST_TIMER
         #define LL_PROFILER_FRAME_END
-        #define LL_PROFILER_SET_THREAD_NAME( name )      (void)(name)
+        #define LL_PROFILER_SET_THREAD_NAME(name)     (void)(name)
+        #define LL_PROFILER_THREAD_BEGIN(name)          (void)(name)
+        #define LL_PROFILER_THREAD_END(name)            (void)(name)
         #define LL_RECORD_BLOCK_TIME(name)                                                                  const LLTrace::BlockTimer& LL_GLUE_TOKENS(block_time_recorder, __LINE__)(LLTrace::timeThisBlock(name)); (void)LL_GLUE_TOKENS(block_time_recorder, __LINE__);
         #define LL_PROFILE_ZONE_NAMED(name)             // LL_PROFILE_ZONE_NAMED is a no-op when Tracy is disabled
         #define LL_PROFILE_ZONE_SCOPED                  // LL_PROFILE_ZONE_SCOPED is a no-op when Tracy is disabled
@@ -128,6 +133,9 @@ extern thread_local bool gProfilerEnabled;
     #if LL_PROFILER_CONFIGURATION == LL_PROFILER_CONFIG_TRACY_FAST_TIMER
         #define LL_PROFILER_FRAME_END                   FrameMark;
         #define LL_PROFILER_SET_THREAD_NAME( name )     tracy::SetThreadName( name );    gProfilerEnabled = true;
+        #define LL_PROFILER_THREAD_BEGIN(name)          FrameMarkStart(name)
+        #define LL_PROFILER_THREAD_END(name)            FrameMarkEnd(name)
+
         #define LL_RECORD_BLOCK_TIME(name)              ZoneNamedN(___tracy_scoped_zone, #name, true);   const LLTrace::BlockTimer& LL_GLUE_TOKENS(block_time_recorder, __LINE__)(LLTrace::timeThisBlock(name)); (void)LL_GLUE_TOKENS(block_time_recorder, __LINE__);
         #define LL_PROFILE_ZONE_NAMED(name)             ZoneNamedN( ___tracy_scoped_zone, name, true );
         #define LL_PROFILE_ZONE_NAMED_COLOR(name,color) ZoneNamedNC( ___tracy_scopped_zone, name, color, true ); // RGB

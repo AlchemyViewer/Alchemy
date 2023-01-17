@@ -150,7 +150,9 @@ void LLThread::threadRun()
     {
         try
         {
+            LL_PROFILER_THREAD_BEGIN(mName.c_str());
             run();
+            LL_PROFILER_THREAD_END(mName.c_str());
         }
         catch (const LLContinueError &e)
         {

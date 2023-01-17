@@ -1730,8 +1730,6 @@ const	S32   max_format  = (S32)num_formats - 1;
 		return FALSE;
 	}
 
-	LL_PROFILER_GPU_CONTEXT
-
 	if (!gGLManager.initGL())
 	{
 		OSMessageBox(mCallbacks->translateString("MBVideoDrvErr"), mCallbacks->translateString("MBError"), OSMB_OK);
@@ -1739,6 +1737,8 @@ const	S32   max_format  = (S32)num_formats - 1;
 		return FALSE;
 	}
 	
+	LL_PROFILER_GPU_CONTEXT
+
 	// Disable vertical sync for swap
     toggleVSync(enable_vsync);
 
@@ -2289,9 +2289,6 @@ void LLWindowWin32::gatherInput()
 	updateCursor();
 }
 
-static LLTrace::BlockTimerStatHandle FTM_KEYHANDLER("Handle Keyboard");
-static LLTrace::BlockTimerStatHandle FTM_MOUSEHANDLER("Handle Mouse");
-
 #define WINDOW_IMP_POST(x) window_imp->post([=]() { x; })
 
 LRESULT CALLBACK LLWindowWin32::mainWindowProc(HWND h_wnd, UINT u_msg, WPARAM w_param, LPARAM l_param)
@@ -2581,9 +2578,9 @@ LRESULT CALLBACK LLWindowWin32::mainWindowProc(HWND h_wnd, UINT u_msg, WPARAM w_
             // intentional fall-through here
         case WM_KEYUP:
         {
-            LL_PROFILE_ZONE_NAMED_CATEGORY_WIN32("mwp - WM_KEYUP");
             window_imp->post([=]()
             {
+				LL_PROFILE_ZONE_NAMED_CATEGORY_WIN32("mwp - WM_KEYUP");
                 window_imp->mKeyScanCode = (l_param >> 16) & 0xff;
                 window_imp->mKeyVirtualKey = w_param;
                 window_imp->mRawMsg = u_msg;
@@ -2591,8 +2588,6 @@ LRESULT CALLBACK LLWindowWin32::mainWindowProc(HWND h_wnd, UINT u_msg, WPARAM w_
                 window_imp->mRawLParam = l_param;
 
                 {
-                    LL_RECORD_BLOCK_TIME(FTM_KEYHANDLER);
-
                     if (debug_window_proc)
                     {
                         LL_INFOS("Window") << "Debug WindowProc WM_KEYUP "
@@ -2722,9 +2717,8 @@ LRESULT CALLBACK LLWindowWin32::mainWindowProc(HWND h_wnd, UINT u_msg, WPARAM w_
         }
         case WM_LBUTTONDOWN:
         {
-            LL_PROFILE_ZONE_NAMED_CATEGORY_WIN32("mwp - WM_LBUTTONDOWN");
             {
-                LL_RECORD_BLOCK_TIME(FTM_MOUSEHANDLER);
+				LL_PROFILE_ZONE_NAMED_CATEGORY_WIN32("mwp - WM_LBUTTONDOWN");
                 window_imp->postMouseButtonEvent([=]()
                     {
                         sHandleLeftMouseUp = true;
@@ -2768,11 +2762,10 @@ LRESULT CALLBACK LLWindowWin32::mainWindowProc(HWND h_wnd, UINT u_msg, WPARAM w_
         }
         case WM_LBUTTONUP:
         {
-            LL_PROFILE_ZONE_NAMED_CATEGORY_WIN32("mwp - WM_LBUTTONUP");
             {
                 window_imp->postMouseButtonEvent([=]()
                     {
-                        LL_RECORD_BLOCK_TIME(FTM_MOUSEHANDLER);
+						LL_PROFILE_ZONE_NAMED_CATEGORY_WIN32("mwp - WM_LBUTTONUP");
                         if (!sHandleLeftMouseUp)
                         {
                             sHandleLeftMouseUp = true;
@@ -2794,7 +2787,6 @@ LRESULT CALLBACK LLWindowWin32::mainWindowProc(HWND h_wnd, UINT u_msg, WPARAM w_
         {
             LL_PROFILE_ZONE_NAMED_CATEGORY_WIN32("mwp - WM_RBUTTONDOWN");
             {
-                LL_RECORD_BLOCK_TIME(FTM_MOUSEHANDLER);
                 window_imp->post([=]()
                     {
                         if (LLWinImm::isAvailable() && window_imp->mPreeditor)
@@ -2817,7 +2809,6 @@ LRESULT CALLBACK LLWindowWin32::mainWindowProc(HWND h_wnd, UINT u_msg, WPARAM w_
         {
             LL_PROFILE_ZONE_NAMED_CATEGORY_WIN32("mwp - WM_RBUTTONUP");
             {
-                LL_RECORD_BLOCK_TIME(FTM_MOUSEHANDLER);
                 window_imp->postMouseButtonEvent([=]()
                     {
                         MASK mask = gKeyboard->currentMask(TRUE);
@@ -2832,7 +2823,6 @@ LRESULT CALLBACK LLWindowWin32::mainWindowProc(HWND h_wnd, UINT u_msg, WPARAM w_
         {
             LL_PROFILE_ZONE_NAMED_CATEGORY_WIN32("mwp - WM_MBUTTONDOWN");
             {
-                LL_RECORD_BLOCK_TIME(FTM_MOUSEHANDLER);
                 window_imp->postMouseButtonEvent([=]()
                     {
                         if (LLWinImm::isAvailable() && window_imp->mPreeditor)
@@ -2849,12 +2839,11 @@ LRESULT CALLBACK LLWindowWin32::mainWindowProc(HWND h_wnd, UINT u_msg, WPARAM w_
 
         case WM_MBUTTONUP:
         {
-            LL_PROFILE_ZONE_NAMED_CATEGORY_WIN32("mwp - WM_MBUTTONUP");
             {
-                LL_RECORD_BLOCK_TIME(FTM_MOUSEHANDLER);
                 window_imp->postMouseButtonEvent([=]()
                     {
-                        MASK mask = gKeyboard->currentMask(TRUE);
+						LL_PROFILE_ZONE_NAMED_CATEGORY_WIN32("mwp - WM_MBUTTONUP");
+						MASK mask = gKeyboard->currentMask(TRUE);
                         window_imp->mCallbacks->handleMiddleMouseUp(window_imp, window_imp->mCursorPosition.convert(), mask);
                     });
             }
@@ -2862,10 +2851,9 @@ LRESULT CALLBACK LLWindowWin32::mainWindowProc(HWND h_wnd, UINT u_msg, WPARAM w_
         break;
         case WM_XBUTTONDOWN:
         {
-            LL_PROFILE_ZONE_NAMED_CATEGORY_WIN32("mwp - WM_XBUTTONDOWN");
             window_imp->postMouseButtonEvent([=]()
                 {
-                    LL_RECORD_BLOCK_TIME(FTM_MOUSEHANDLER);
+                    LL_PROFILE_ZONE_NAMED_CATEGORY_WIN32("mwp - WM_XBUTTONDOWN");
                     S32 button = GET_XBUTTON_WPARAM(w_param);
                     if (LLWinImm::isAvailable() && window_imp->mPreeditor)
                     {
@@ -2882,11 +2870,9 @@ LRESULT CALLBACK LLWindowWin32::mainWindowProc(HWND h_wnd, UINT u_msg, WPARAM w_
 
         case WM_XBUTTONUP:
         {
-            LL_PROFILE_ZONE_NAMED_CATEGORY_WIN32("mwp - WM_XBUTTONUP");
             window_imp->postMouseButtonEvent([=]()
                 {
-
-                    LL_RECORD_BLOCK_TIME(FTM_MOUSEHANDLER);
+					LL_PROFILE_ZONE_NAMED_CATEGORY_WIN32("mwp - WM_XBUTTONUP");
 
                     S32 button = GET_XBUTTON_WPARAM(w_param);
                     MASK mask = gKeyboard->currentMask(TRUE);
@@ -3742,7 +3728,7 @@ void LLWindowWin32::swapBuffers()
     glFlush(); //superstitious flush for maybe frame stall removal?
 	SwapBuffers(mhDC);
 
-    LL_PROFILER_GPU_COLLECT
+    LL_PROFILER_GPU_COLLECT;
 }
 
 

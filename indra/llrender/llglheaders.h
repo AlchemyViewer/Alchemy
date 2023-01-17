@@ -1061,7 +1061,7 @@ extern void glGetBufferPointervARB (GLenum, GLenum, GLvoid* *);
     #define glGetQueryObjectiv  glGetQueryObjectivARB
     #include <tracy/TracyOpenGL.hpp>
 
-    #define LL_PROFILER_GPU_ZONEC(name,color) TracyGpuZoneC(name,color);
+    #define LL_PROFILER_GPU_ZONEC(name,color) TracyGpuZoneC(name,color)
     #define LL_PROFILER_GPU_COLLECT           TracyGpuCollect
     #define LL_PROFILER_GPU_CONTEXT           TracyGpuContext
 #else

@@ -507,9 +507,11 @@ void LLQueuedThread::run()
 
 		mIdleThread = false;
 
+        LL_PROFILER_THREAD_BEGIN(mName.c_str());
 		threadedUpdate();
-		
+
 		int pending_work = processNextRequest();
+        LL_PROFILER_THREAD_END(mName.c_str());
 
 		if (pending_work == 0)
 		{
