@@ -21,7 +21,6 @@ include_directories(
     ${LLMATH_INCLUDE_DIRS}
     ${ZLIBNG_INCLUDE_DIRS}
     ${URIPARSER_INCLUDE_DIRS}
-    ${TRACY_INCLUDE_DIR}
     )
 
 # add_executable(lltreeiterators lltreeiterators.cpp)
@@ -313,7 +312,7 @@ target_link_libraries(
     ${URIPARSER_LIBRARIES}
     nlohmann_json::nlohmann_json
     fmt::fmt
-    ${TRACY_LIBRARY}
+    TracyClient
     ${DL_LIBRARY}
     ${RT_LIBRARY}
     )

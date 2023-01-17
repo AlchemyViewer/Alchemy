@@ -84,22 +84,23 @@ extern thread_local bool gProfilerEnabled;
 //      #define TRACY_NO_BROADCAST   1
 //      #define TRACY_ONLY_LOCALHOST 1
         #define TRACY_ONLY_IPV4      1
-        #include "Tracy.hpp"
+        #include "tracy/Tracy.hpp"
 
         // Mutually exclusive with detailed memory tracing
+    	#define LL_PROFILER_ENABLE_TRACY_MEMORY 0
         #define LL_PROFILER_ENABLE_TRACY_OPENGL 0
     #endif
 
     #if LL_PROFILER_CONFIGURATION == LL_PROFILER_CONFIG_TRACY
-        #define LL_PROFILER_FRAME_END                   FrameMark
+        #define LL_PROFILER_FRAME_END                   FrameMark;
         #define LL_PROFILER_SET_THREAD_NAME( name )     tracy::SetThreadName( name );    gProfilerEnabled = true;
-        #define LL_RECORD_BLOCK_TIME(name)              ZoneScoped // Want descriptive names; was: ZoneNamedN( ___tracy_scoped_zone, #name, true );
+        #define LL_RECORD_BLOCK_TIME(name)              ZoneNamedN( ___tracy_scoped_zone, #name, true);
         #define LL_PROFILE_ZONE_NAMED(name)             ZoneNamedN( ___tracy_scoped_zone, name, true );
-        #define LL_PROFILE_ZONE_NAMED_COLOR(name,color) ZoneNamedNC( ___tracy_scopped_zone, name, color, true ) // RGB
-        #define LL_PROFILE_ZONE_SCOPED                  ZoneScoped
+        #define LL_PROFILE_ZONE_NAMED_COLOR(name,color) ZoneNamedNC( ___tracy_scopped_zone, name, color, true ); // RGB
+        #define LL_PROFILE_ZONE_SCOPED                  ZoneScoped;
 
-        #define LL_PROFILE_ZONE_NUM( val )              ZoneValue( val )
-        #define LL_PROFILE_ZONE_TEXT( text, size )      ZoneText( text, size )
+        #define LL_PROFILE_ZONE_NUM( val )              ZoneValue( val );
+        #define LL_PROFILE_ZONE_TEXT( text, size )      ZoneText( text, size );
 
         #define LL_PROFILE_ZONE_ERR(name)               LL_PROFILE_ZONE_NAMED_COLOR( name, 0XFF0000  )  // RGB yellow
         #define LL_PROFILE_ZONE_INFO(name)              LL_PROFILE_ZONE_NAMED_COLOR( name, 0X00FFFF  )  // RGB cyan
@@ -125,15 +126,15 @@ extern thread_local bool gProfilerEnabled;
         #define LL_PROFILE_FREE(ptr)                    (void)(ptr);
     #endif
     #if LL_PROFILER_CONFIGURATION == LL_PROFILER_CONFIG_TRACY_FAST_TIMER
-        #define LL_PROFILER_FRAME_END                   FrameMark
+        #define LL_PROFILER_FRAME_END                   FrameMark;
         #define LL_PROFILER_SET_THREAD_NAME( name )     tracy::SetThreadName( name );    gProfilerEnabled = true;
         #define LL_RECORD_BLOCK_TIME(name)              ZoneNamedN(___tracy_scoped_zone, #name, true);   const LLTrace::BlockTimer& LL_GLUE_TOKENS(block_time_recorder, __LINE__)(LLTrace::timeThisBlock(name)); (void)LL_GLUE_TOKENS(block_time_recorder, __LINE__);
-        #define LL_PROFILE_ZONE_NAMED(name)             ZoneNamedN( ___tracy_scoped_zone, #name, true );
-        #define LL_PROFILE_ZONE_NAMED_COLOR(name,color) ZoneNamedNC( ___tracy_scopped_zone, name, color, true ) // RGB
-        #define LL_PROFILE_ZONE_SCOPED                  ZoneScoped
+        #define LL_PROFILE_ZONE_NAMED(name)             ZoneNamedN( ___tracy_scoped_zone, name, true );
+        #define LL_PROFILE_ZONE_NAMED_COLOR(name,color) ZoneNamedNC( ___tracy_scopped_zone, name, color, true ); // RGB
+        #define LL_PROFILE_ZONE_SCOPED                  ZoneScoped;
 
-        #define LL_PROFILE_ZONE_NUM( val )              ZoneValue( val )
-        #define LL_PROFILE_ZONE_TEXT( text, size )      ZoneText( text, size )
+        #define LL_PROFILE_ZONE_NUM( val )              ZoneValue( val );
+        #define LL_PROFILE_ZONE_TEXT( text, size )      ZoneText( text, size );
 
         #define LL_PROFILE_ZONE_ERR(name)               LL_PROFILE_ZONE_NAMED_COLOR( name, 0XFF0000  )  // RGB yellow
         #define LL_PROFILE_ZONE_INFO(name)              LL_PROFILE_ZONE_NAMED_COLOR( name, 0X00FFFF  )  // RGB cyan

@@ -35,7 +35,7 @@
 
 thread_local bool gProfilerEnabled = false;
 
-#if (TRACY_ENABLE)
+#if (TRACY_ENABLE) && LL_PROFILER_ENABLE_TRACY_MEMORY
 // Override new/delete for tracy memory profiling
 void *operator new(size_t size)
 {

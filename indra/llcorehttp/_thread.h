@@ -54,7 +54,7 @@ private:
 
 	void run()
 		{ // THREAD CONTEXT
-
+			LL_PROFILER_SET_THREAD_NAME("HTTP Service");
 			// Take out additional reference for the at_exit handler
 			addRef();
 			boost::this_thread::at_thread_exit(boost::bind(&HttpThread::at_exit, this));
