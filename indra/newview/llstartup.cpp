@@ -177,7 +177,6 @@
 #include "llviewerwindow.h"
 #include "llvoavatar.h"
 #include "llvoavatarself.h"
-#include "llvocache.h"
 #include "llweb.h"
 #include "llworld.h"
 #include "llworldmapmessage.h"
@@ -963,12 +962,6 @@ bool idle_startup()
 		// create necessary directories
 		// *FIX: these mkdir's should error check
 		std::string gridlabel = LLGridManager::getInstance()->isInSLMain() ? LLStringUtil::null : LLGridManager::getInstance()->getGridId();
-		gDirUtilp->setCurrentGrid(gridlabel);
-		LLFile::mkdir(gDirUtilp->getExpandedFilename(LL_PATH_CACHE, "gridcache", ""));
-		LLFile::mkdir(gDirUtilp->getCacheDirPerGrid());
-
-		LLVOCache::getInstance()->initCache(LL_PATH_CACHE_PER_GRID, gSavedSettings.getU32("CacheNumberOfRegionsForObjects"), LLAppViewer::getObjectCacheVersion());
-
 		gDirUtilp->setLindenUserDir(userid, gridlabel);
 		LLFile::mkdir(gDirUtilp->getLindenUserDir());
 
@@ -1023,7 +1016,7 @@ bool idle_startup()
 		{
 			gDirUtilp->setChatLogsDir(gSavedPerAccountSettings.getString("InstantMessageLogPath"));		
 		}
-		gDirUtilp->setPerAccountChatLogsDir(userid);
+		gDirUtilp->setPerAccountChatLogsDir(userid, gridlabel);
 		
 		LLFile::mkdir(gDirUtilp->getChatLogsDir());
 		LLFile::mkdir(gDirUtilp->getPerAccountChatLogsDir());
@@ -3087,6 +3080,8 @@ void LLStartUp::initNameCache()
 void LLStartUp::initExperiences()
 {   
     // Should trigger loading the cache.
+	const std::string& gridlabel = !LLGridManager::getInstance()->isInSecondlife() ? LLGridManager::getInstance()->getGridId() : LLStringUtil::null;
+	LLExperienceCache::initParamSingleton(gridlabel);
     LLExperienceCache::instance().setCapabilityQuery(
         boost::bind(&LLAgent::getRegionCapability, &gAgent, _1));
 

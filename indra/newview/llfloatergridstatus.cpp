@@ -99,6 +99,10 @@ void LLFloaterGridStatus::getGridStatusRSSCoro()
     httpOpts->setSSLVerifyPeer(false); // We want this data even if SSL fails
     httpHeaders->append(HTTP_OUT_HEADER_CONTENT_TYPE, HTTP_CONTENT_TEXT_XML);
     std::string url = LLGridManager::instance().getGridStatusRSSURL();
+    if(url.empty())
+    {
+        return; // No Grid Status service
+    }
 
     LLSD result = httpAdapter->getRawAndSuspend(httpRequest, url, httpOpts, httpHeaders);
     LLSD httpResults = result[LLCoreHttpUtil::HttpCoroutineAdapter::HTTP_RESULTS];
@@ -110,8 +114,16 @@ void LLFloaterGridStatus::getGridStatusRSSCoro()
 
     const LLSD::Binary &rawBody = result[LLCoreHttpUtil::HttpCoroutineAdapter::HTTP_RESULTS_RAW].asBinary();
     std::string body(rawBody.begin(), rawBody.end());
-
-    std::string fullpath = gDirUtilp->getExpandedFilename(LL_PATH_CACHE_PER_GRID, "grid_status_rss.xml");
+    std::string fullpath;
+    if(LLGridManager::getInstance()->isInSecondlife())
+    {
+        fullpath = gDirUtilp->getExpandedFilename(LL_PATH_LOGS, "grid_status_rss.xml");
+    }
+    else
+    {
+        const std::string grid_status_file = LLDir::getScrubbedFileName(llformat("grid_status_rss.%s.xml", LLGridManager::getInstance()->getGridId().c_str()));
+        fullpath = gDirUtilp->getExpandedFilename( LL_PATH_LOGS, grid_status_file);
+    }
     if(!gSavedSettings.getBOOL("TestGridStatusRSSFromFile"))
     {
         llofstream custom_file_out(fullpath.c_str(), std::ios::trunc);

@@ -743,16 +743,12 @@ BOOL LLMuteList::isMuted(const std::string& username, U32 flags) const
 //-----------------------------------------------------------------------------
 // requestFromServer()
 //-----------------------------------------------------------------------------
-
-std::string get_mutes_cache_file(const LLUUID& agent_id)
-{
-	return gDirUtilp->getExpandedFilename(LL_PATH_CACHE_PER_GRID, agent_id.asString()).append(".cached_mute");
-
-}
-
 void LLMuteList::requestFromServer(const LLUUID& agent_id)
 {
-	std::string filename = get_mutes_cache_file(agent_id);
+	std::string agent_id_string;
+	std::string filename;
+	agent_id.toString(agent_id_string);
+	filename = gDirUtilp->getExpandedFilename(LL_PATH_CACHE,agent_id_string) + ".cached_mute";
 	LLCRC crc;
 	crc.update(filename);
 
@@ -788,7 +784,10 @@ void LLMuteList::cache(const LLUUID& agent_id)
 	// Write to disk even if empty.
 	if(mIsLoaded)
 	{
-		std::string filename = get_mutes_cache_file(agent_id);
+		std::string agent_id_string;
+		std::string filename;
+		agent_id.toString(agent_id_string);
+		filename = gDirUtilp->getExpandedFilename(LL_PATH_CACHE,agent_id_string) + ".cached_mute";
 		saveToFile(filename);
 	}
 }
@@ -845,7 +844,10 @@ void LLMuteList::processUseCachedMuteList(LLMessageSystem* msg, void**)
 {
 	LL_INFOS() << "LLMuteList::processUseCachedMuteList()" << LL_ENDL;
 
-	std::string filename = get_mutes_cache_file(gAgent.getID());
+	std::string agent_id_string;
+	gAgent.getID().toString(agent_id_string);
+	std::string filename;
+	filename = gDirUtilp->getExpandedFilename(LL_PATH_CACHE,agent_id_string) + ".cached_mute";
 	LLMuteList::getInstance()->loadFromFile(filename);
 }
 

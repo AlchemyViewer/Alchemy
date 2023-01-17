@@ -4385,6 +4385,8 @@ bool LLAppViewer::initCache()
 
 	LLAppViewer::getTextureCache()->initCache(LL_PATH_CACHE, texture_cache_size, texture_cache_mismatch);
 
+	LLVOCache::getInstance()->initCache(LL_PATH_CACHE, gSavedSettings.getU32("CacheNumberOfRegionsForObjects"), getObjectCacheVersion());
+
     return true;
 }
 
@@ -4432,7 +4434,7 @@ void LLAppViewer::purgeCacheImmediate()
 {
 	LL_INFOS("AppCache") << "Purging Object Cache and Texture Cache immediately..." << LL_ENDL;
 	LLAppViewer::getTextureCache()->purgeCache(LL_PATH_CACHE, false);
-	LLVOCache::getInstance()->removeCache(LL_PATH_CACHE_PER_GRID, true);
+	LLVOCache::getInstance()->removeCache(LL_PATH_CACHE, true);
 }
 
 std::string LLAppViewer::getSecondLifeTitle() const
@@ -4575,8 +4577,19 @@ void LLAppViewer::saveFinalSnapshot()
 void LLAppViewer::loadNameCache()
 {
 	// display names cache
+	std::string file;
+	if (LLGridManager::getInstance()->isInSecondlife())
+	{
+		file = "avatar_name_cache.xml";
+	}
+	else
+	{
+		std::string gridlabel = LLGridManager::getInstance()->getGridId();
+		LLStringUtil::toLower(gridlabel);
+		file = llformat("avatar_name_cache.%s.xml", gridlabel.c_str());
+	}
 	std::string filename =
-		gDirUtilp->getExpandedFilename(LL_PATH_CACHE_PER_GRID, "avatar_name_cache.xml");
+		gDirUtilp->getExpandedFilename(LL_PATH_CACHE, file);
 	LL_INFOS("AvNameCache") << filename << LL_ENDL;
 	llifstream name_cache_stream(filename.c_str());
 	if(name_cache_stream.is_open())
@@ -4591,7 +4604,19 @@ void LLAppViewer::loadNameCache()
 
 	if (!gCacheName) return;
 
-	std::string name_cache = gDirUtilp->getExpandedFilename(LL_PATH_CACHE_PER_GRID, "name.cache");
+	std::string name_file;
+	if (LLGridManager::getInstance()->isInSecondlife())
+	{
+		name_file = "name.cache";
+	}
+	else
+	{
+		std::string gridid = LLGridManager::getInstance()->getGridId();
+		LLStringUtil::toLower(gridid);
+		name_file = llformat("name.%s.cache", gridid.c_str());
+	}
+
+	std::string name_cache = gDirUtilp->getExpandedFilename(LL_PATH_CACHE, name_file);
 	llifstream cache_file(name_cache.c_str());
 	if(cache_file.is_open())
 	{
@@ -4602,8 +4627,19 @@ void LLAppViewer::loadNameCache()
 void LLAppViewer::saveNameCache()
 {
 	// display names cache
+	std::string file;
+	if (LLGridManager::getInstance()->isInSecondlife())
+	{
+		file = "avatar_name_cache.xml";
+	}
+	else
+	{
+		std::string gridlabel = LLGridManager::getInstance()->getGridId();
+		LLStringUtil::toLower(gridlabel);
+		file = llformat("avatar_name_cache.%s.xml", gridlabel.c_str());
+	}
 	std::string filename =
-		gDirUtilp->getExpandedFilename(LL_PATH_CACHE_PER_GRID, "avatar_name_cache.xml");
+		gDirUtilp->getExpandedFilename(LL_PATH_CACHE, file);
 	llofstream name_cache_stream(filename.c_str());
 	if(name_cache_stream.is_open())
 	{
@@ -4613,7 +4649,19 @@ void LLAppViewer::saveNameCache()
     // real names cache
 	if (gCacheName)
     {
-        std::string name_cache = gDirUtilp->getExpandedFilename(LL_PATH_CACHE_PER_GRID, "name.cache");
+		std::string name_file;
+		if (LLGridManager::getInstance()->isInSecondlife())
+		{
+			name_file = "name.cache";
+		}
+		else
+		{
+			std::string gridid = LLGridManager::getInstance()->getGridId();
+			LLStringUtil::toLower(gridid);
+			name_file = llformat("name.%s.cache", gridid.c_str());
+		}
+
+        std::string name_cache = gDirUtilp->getExpandedFilename(LL_PATH_CACHE, name_file);
         llofstream cache_file(name_cache.c_str());
         if(cache_file.is_open())
         {
