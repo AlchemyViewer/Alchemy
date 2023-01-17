@@ -273,7 +273,6 @@ LLTrace::BlockTimerStatHandle FTM_DEFERRED_POOLRENDER("RenderPool (Deferred)");
 LLTrace::BlockTimerStatHandle FTM_DEFERRED_POOLS("Pools (Deferred)");
 LLTrace::BlockTimerStatHandle FTM_POST_DEFERRED_POOLRENDER("RenderPool (Post)");
 LLTrace::BlockTimerStatHandle FTM_POST_DEFERRED_POOLS("Pools (Post)");
-LLTrace::BlockTimerStatHandle FTM_RENDER_DEFERRED_BLOOM("HDRBloom");
 LLTrace::BlockTimerStatHandle FTM_STATESORT("Sort Draw State");
 LLTrace::BlockTimerStatHandle FTM_PIPELINE("Pipeline");
 LLTrace::BlockTimerStatHandle FTM_CLIENT_COPY("Client Copy");
@@ -3090,7 +3089,7 @@ void LLPipeline::updateGeom(F32 max_dtime)
 	LLTimer update_timer;
 	LLPointer<LLDrawable> drawablep;
 
-	LL_RECORD_BLOCK_TIME(FTM_GEO_UPDATE);
+	LL_PROFILE_ZONE_NAMED_CATEGORY_DRAWABLE("updateGeom") //LL_RECORD_BLOCK_TIME(FTM_GEO_UPDATE);
 
 	assertInitialized();
 
@@ -7591,13 +7590,10 @@ void LLPipeline::bindScreenToTexture()
 	
 }
 
-static LLTrace::BlockTimerStatHandle FTM_RENDER_FINALIZE("Render Finalize");
-
-static LLTrace::BlockTimerStatHandle FTM_RENDER_BLOOM("Bloom");
-
 void LLPipeline::renderFinalize()
 {
-    LLVertexBuffer::unbind();
+	LL_PROFILE_ZONE_SCOPED_CATEGORY_PIPELINE;
+	LLVertexBuffer::unbind();
     LLGLState::checkStates();
     LLGLState::checkTextureChannels();
 
@@ -7611,7 +7607,6 @@ void LLPipeline::renderFinalize()
     LLVector2 tc1(0, 0);
     LLVector2 tc2((F32) mScreen.getWidth() * 2, (F32) mScreen.getHeight() * 2);
 
-    LL_RECORD_BLOCK_TIME(FTM_RENDER_FINALIZE);
     gGL.color4f(1, 1, 1, 1);
     LLGLDepthTest depth(GL_FALSE);
     LLGLDisable blend(GL_BLEND);
@@ -7633,7 +7628,7 @@ void LLPipeline::renderFinalize()
 
 	if (!sRenderDeferred)
 	{
-		LL_RECORD_BLOCK_TIME(FTM_RENDER_BLOOM);
+		LL_PROFILE_ZONE_NAMED_CATEGORY_PIPELINE("forward Bloom")
 		if (sRenderGlow)
 		{
 			mGlow[1].bindTarget();
@@ -8654,8 +8649,6 @@ void LLPipeline::renderDeferredLighting(LLRenderTarget *screen_target)
         return;
     }
 
-	LL_RECORD_BLOCK_TIME(FTM_RENDER_DEFERRED);
-
     LLRenderTarget *deferred_target       = &mDeferredScreen;
     LLRenderTarget *deferred_depth_target = &mDeferredDepth;
     LLRenderTarget *deferred_light_target = &mDeferredLight;
@@ -9181,7 +9174,7 @@ void LLPipeline::renderDeferredLighting(LLRenderTarget *screen_target)
 		LLVector2 tc1(0, 0);
 		LLVector2 tc2((F32)mScreen.getWidth() * 2, (F32)mScreen.getHeight() * 2);
 
-		LL_RECORD_BLOCK_TIME(FTM_RENDER_DEFERRED_BLOOM);
+		LL_PROFILE_ZONE_NAMED_CATEGORY_PIPELINE("renderDeferredLighting - bloom");
 		LLGLDepthTest depth(GL_FALSE);
 		LLGLDisable blend(GL_BLEND);
 		LLGLDisable cull(GL_CULL_FACE);
@@ -11135,11 +11128,9 @@ void LLPipeline::renderRiggedGroups(LLRenderPass* pass, U32 type, U32 mask, bool
     }
 }
 
-static LLTrace::BlockTimerStatHandle FTM_GENERATE_IMPOSTOR("Generate Impostor");
-
 void LLPipeline::generateImpostor(LLVOAvatar* avatar, bool preview_avatar)
 {
-    LL_RECORD_BLOCK_TIME(FTM_GENERATE_IMPOSTOR);
+	LL_PROFILE_ZONE_NAMED_CATEGORY_PIPELINE("Generate Impostor");
 	LLGLState::checkStates();
 	LLGLState::checkTextureChannels();
 

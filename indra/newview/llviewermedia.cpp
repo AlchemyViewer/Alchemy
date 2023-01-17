@@ -2079,7 +2079,7 @@ void LLViewerMediaImpl::setMute(bool mute)
 //////////////////////////////////////////////////////////////////////////////////////////
 void LLViewerMediaImpl::updateVolume()
 {
-    LL_RECORD_BLOCK_TIME(FTM_MEDIA_UPDATE_VOLUME);
+	LL_PROFILE_ZONE_NAMED_CATEGORY_MEDIA("media update volume");
 	if(mMediaSource)
 	{
 		// always scale the volume by the global media volume

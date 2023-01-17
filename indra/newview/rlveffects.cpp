@@ -395,11 +395,9 @@ void RlvSphereEffect::renderPass(LLGLSLShader* pShader, const LLShaderEffectPara
 	}
 }
 
-LLTrace::BlockTimerStatHandle FTM_RLV_EFFECT_SPHERE("Post-process (RLVa sphere)");
-
 void RlvSphereEffect::run(const LLVisualEffectParams* pParams)
 {
-	LL_RECORD_BLOCK_TIME(FTM_RLV_EFFECT_SPHERE);
+	LL_PROFILE_ZONE_NAMED_CATEGORY_PIPELINE("Post-process (RLVa sphere)");
 	LLGLDepthTest depth(GL_FALSE, GL_FALSE);
 
 	gRlvSphereProgram.bind();

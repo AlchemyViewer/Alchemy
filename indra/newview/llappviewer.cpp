@@ -1352,39 +1352,34 @@ bool LLAppViewer::doFrame()
 	LLSD newFrame;
 
 	{
-        LL_PROFILE_ZONE_NAMED_CATEGORY_APP("df LLTrace");
-        if (LLFloaterReg::instanceVisible("block_timers"))
-        {
-	LLTrace::BlockTimer::processTimes();
-        }
-        
-	LLTrace::get_frame_recording().nextPeriod();
-	LLTrace::BlockTimer::logStats();
-	}
+		LL_PROFILE_ZONE_NAMED_CATEGORY_APP("df LLTrace");
+		if (LLFloaterReg::instanceVisible("block_timers"))
+		{
+			LLTrace::BlockTimer::processTimes();
+		}
 
-	LLTrace::get_thread_recorder()->pullFromChildren();
+		LLTrace::get_frame_recording().nextPeriod();
+		LLTrace::BlockTimer::logStats();
+
+		LLTrace::get_thread_recorder()->pullFromChildren();
+	}
 
 	//clear call stack records
 	LL_CLEAR_CALLSTACKS();
 
 	{
-		LL_PROFILE_ZONE_NAMED_CATEGORY_APP( "df processMiscNativeEvents" )
-		pingMainloopTimeout("Main:MiscNativeWindowEvents");
-
 		if (gViewerWindow)
 		{
-			LL_RECORD_BLOCK_TIME(FTM_MESSAGES);
+			LL_PROFILE_ZONE_NAMED_CATEGORY_APP("df processMiscNativeEvents")
+			pingMainloopTimeout("Main:MiscNativeWindowEvents");
 			gViewerWindow->getWindow()->processMiscNativeEvents();
 		}
 
-		{
-			LL_PROFILE_ZONE_NAMED_CATEGORY_APP( "df gatherInput" )
-		pingMainloopTimeout("Main:GatherInput");
-		}
 
 		if (gViewerWindow)
 		{
-			LL_RECORD_BLOCK_TIME(FTM_MESSAGES);
+			LL_PROFILE_ZONE_NAMED_CATEGORY_APP( "df gatherInput" )
+			pingMainloopTimeout("Main:GatherInput");
 			if (!restoreErrorTrap())
 			{
 				LL_WARNS() << " Someone took over my signal/exception handler (post messagehandling)!" << LL_ENDL;
@@ -1406,21 +1401,20 @@ bool LLAppViewer::doFrame()
 
 		{
 			LL_PROFILE_ZONE_NAMED_CATEGORY_APP( "df mainloop" )
-		// canonical per-frame event
-		mainloop.post(newFrame);
+			// canonical per-frame event
+			mainloop.post(newFrame);
 		}
 
 		{
 			LL_PROFILE_ZONE_NAMED_CATEGORY_APP( "df suspend" )
-		// give listeners a chance to run
-		llcoro::suspend();
-		// if one of our coroutines threw an uncaught exception, rethrow it now
-		LLCoros::instance().rethrow();
+			// give listeners a chance to run
+			llcoro::suspend();
+			// if one of our coroutines threw an uncaught exception, rethrow it now
+			LLCoros::instance().rethrow();
 		}
 
 		if (!LLApp::isExiting())
 		{
-			LL_PROFILE_ZONE_NAMED_CATEGORY_APP( "df JoystickKeyboard" )
 			pingMainloopTimeout("Main:JoystickKeyboard");
 
 			// Scan keyboard for movement keys.  Command keys and typing
@@ -1434,6 +1428,7 @@ bool LLAppViewer::doFrame()
 				&& (gHeadlessClient || !gViewerWindow->getShowProgress())
 				&& !gFocusMgr.focusLocked())
 			{
+				LL_PROFILE_ZONE_NAMED_CATEGORY_APP( "df JoystickKeyboard" )
 				joystick->scanJoystick();
 				gKeyboard->scanKeyboard();
                 gViewerInput.scanMouse();
@@ -1443,24 +1438,23 @@ bool LLAppViewer::doFrame()
 
 			// Update state based on messages, user input, object idle.
 			{
-				{
-					LL_PROFILE_ZONE_NAMED_CATEGORY_APP( "df pauseMainloopTimeout" )
-					pauseMainloopTimeout(); // *TODO: Remove. Messages shouldn't be stalling for 20+ seconds!
-				}
+				LL_PROFILE_ZONE_NAMED_CATEGORY_APP( "df idle pauseMainloopTimeout" )
+				pauseMainloopTimeout(); // *TODO: Remove. Messages shouldn't be stalling for 20+ seconds!
+			}
 
-				{
-					LL_PROFILE_ZONE_NAMED_CATEGORY_APP("df idle"); //LL_RECORD_BLOCK_TIME(FTM_IDLE);
-					idle();
-				}
+			{
+				LL_PROFILE_ZONE_NAMED_CATEGORY_APP("df idle"); //LL_RECORD_BLOCK_TIME(FTM_IDLE);
+				idle();
+			}
 
-				{
-					LL_PROFILE_ZONE_NAMED_CATEGORY_APP( "df resumeMainloopTimeout" )
-					resumeMainloopTimeout();
-				}
+			{
+				LL_PROFILE_ZONE_NAMED_CATEGORY_APP( "df idle resumeMainloopTimeout" )
+				resumeMainloopTimeout();
 			}
 
 			if (gDoDisconnect && (LLStartUp::getStartupState() == STATE_STARTED))
 			{
+				LL_PROFILE_ZONE_NAMED_CATEGORY_APP("Shutdown:SaveSnapshot");
 				pauseMainloopTimeout();
 				saveFinalSnapshot();
 
@@ -1484,20 +1478,20 @@ bool LLAppViewer::doFrame()
 				display();
 
 				{
-					LL_PROFILE_ZONE_NAMED_CATEGORY_APP( "df Snapshot" )
-				pingMainloopTimeout("Main:Snapshot");
-				LLFloaterSnapshot::update(); // take snapshots
+					LL_PROFILE_ZONE_NAMED_CATEGORY_APP("df Snapshot")
+					pingMainloopTimeout("Main:Snapshot");
+					LLFloaterSnapshot::update(); // take snapshots
                 LLFloaterSimpleOutfitSnapshot::update();
-				gGLActive = FALSE;
+					gGLActive = FALSE;
+				}
 			}
-		}
 		}
 
 		{
-			LL_PROFILE_ZONE_NAMED_CATEGORY_APP( "df pauseMainloopTimeout" )
-		pingMainloopTimeout("Main:Sleep");
+			LL_PROFILE_ZONE_NAMED_CATEGORY_APP( "df pauseMainloopTimeout2" )
+			pingMainloopTimeout("Main:Sleep");
 
-		pauseMainloopTimeout();
+			pauseMainloopTimeout();
 		}
 
 		// Sleep and run background threads
@@ -1544,7 +1538,7 @@ bool LLAppViewer::doFrame()
 
 			if (mRandomizeFramerate)
 			{
-				ms_sleep(ll_rand() % 200);
+				ms_sleep(rand() % 200);
 			}
 
 			if (mPeriodicSlowFrame
@@ -1580,7 +1574,7 @@ bool LLAppViewer::doFrame()
 
 			{
 				LL_PROFILE_ZONE_NAMED_CATEGORY_APP( "df gMeshRepo" )
-			gMeshRepo.update() ;
+				gMeshRepo.update() ;
 			}
 
 			if(!total_work_pending) //pause texture fetching threads if nothing to process.
@@ -1609,8 +1603,8 @@ bool LLAppViewer::doFrame()
 			}
 
 			{
-				LL_PROFILE_ZONE_NAMED_CATEGORY_APP( "df resumeMainloopTimeout" )
-			resumeMainloopTimeout();
+				LL_PROFILE_ZONE_NAMED_CATEGORY_APP( "df bg resumeMainloopTimeout" )
+				resumeMainloopTimeout();
 			}
 			pingMainloopTimeout("Main:End");
 		}
