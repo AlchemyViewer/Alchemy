@@ -138,10 +138,6 @@ bool LLTrans::parseLanguageStrings(LLXMLNodePtr &root)
 	return true;
 }
 
-
-
-static LLTrace::BlockTimerStatHandle FTM_GET_TRANS("Translate string");
-
 //static 
 std::string LLTrans::getString(std::string_view xml_desc, const LLStringUtil::format_map_t& msg_args, bool def_string)
 {

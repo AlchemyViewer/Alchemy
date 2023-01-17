@@ -39,10 +39,6 @@
 
 static LLGLSLShader* simple_shader = NULL;
 
-static LLTrace::BlockTimerStatHandle FTM_RENDER_SIMPLE_DEFERRED("Deferred Simple");
-static LLTrace::BlockTimerStatHandle FTM_RENDER_GRASS_DEFERRED("Deferred Grass");
-
-
 static void setup_simple_shader(LLGLSLShader* shader)
 {
     shader->bind();
@@ -198,9 +194,6 @@ void LLDrawPoolSimple::render(S32 pass)
 	}
 }
 
-
-static LLTrace::BlockTimerStatHandle FTM_RENDER_ALPHA_MASK("Alpha Mask");
-
 LLDrawPoolAlphaMask::LLDrawPoolAlphaMask() :
 	LLRenderPass(POOL_ALPHA_MASK)
 {
@@ -299,9 +292,6 @@ void LLDrawPoolSimple::renderDeferred(S32 pass)
     setup_simple_shader(gDeferredDiffuseProgram.mRiggedVariant);
     pushRiggedBatches(LLRenderPass::PASS_SIMPLE_RIGGED, getVertexDataMask() | LLVertexBuffer::MAP_TEXTURE_INDEX, TRUE, TRUE);
 }
-
-static LLTrace::BlockTimerStatHandle FTM_RENDER_ALPHA_MASK_DEFERRED("Deferred Alpha Mask");
-
 
 void LLDrawPoolAlphaMask::renderDeferred(S32 pass)
 {

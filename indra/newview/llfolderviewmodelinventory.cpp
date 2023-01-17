@@ -36,8 +36,6 @@
 //
 // class LLFolderViewModelInventory
 //
-static LLTrace::BlockTimerStatHandle FTM_INVENTORY_SORT("Inventory Sort");
-
 bool LLFolderViewModelInventory::startDrag(std::vector<LLFolderViewModelItem*>& items)
 {
 	std::vector<EDragAndDropType> types;
@@ -65,7 +63,7 @@ bool LLFolderViewModelInventory::startDrag(std::vector<LLFolderViewModelItem*>& 
 
 void LLFolderViewModelInventory::sort( LLFolderViewFolder* folder )
 {
-	LL_RECORD_BLOCK_TIME(FTM_INVENTORY_SORT);
+	LL_PROFILE_ZONE_NAMED_CATEGORY_UI("Inventory Sort");
 
 	if (!folder->areChildrenInited() || !needsSort(folder->getViewModelItem())) return;
 

@@ -405,11 +405,9 @@ LLDrawable* LLVOGrass::createDrawable(LLPipeline *pipeline)
 	return mDrawable;
 }
 
-static LLTrace::BlockTimerStatHandle FTM_UPDATE_GRASS("Update Grass");
-
 BOOL LLVOGrass::updateGeometry(LLDrawable *drawable)
 {
-	LL_RECORD_BLOCK_TIME(FTM_UPDATE_GRASS);
+	LL_PROFILE_ZONE_NAMED_CATEGORY_DRAWABLE("Update Grass");
 
 	dirtySpatialGroup();
 
