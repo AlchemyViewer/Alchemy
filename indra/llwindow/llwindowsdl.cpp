@@ -261,7 +261,7 @@ LLWindowSDL::LLWindowSDL(LLWindowCallbacks* callbacks,
 	SDL_SetHint(SDL_HINT_APP_NAME, mWindowTitle.c_str());
 	SDL_SetHint(SDL_HINT_MOUSE_FOCUS_CLICKTHROUGH, "1");
 
-	if (SDL_InitSubSystem(SDL_INIT_EVERYTHING) != 0)
+	if (SDL_InitSubSystem(SDL_INIT_TIMER|SDL_INIT_VIDEO|SDL_INIT_JOYSTICK|SDL_INIT_GAMECONTROLLER|SDL_INIT_EVENTS) != 0)
 	{
 		LL_WARNS() << "Failed to initialize SDL due to error: " << SDL_GetError() << LL_ENDL;
 		return;
