@@ -12334,22 +12334,8 @@ the region &quot;[REGION]&quot;?
    </notification>
    <notification
     icon="notifytip.tga"
-    name="RadarAlertEnterChat"
-    type="notifytip">
-     <tag>radar</tag>
-     [AGENT] has entered [REGION].
-   </notification>
-   <notification
-    icon="notifytip.tga"
     name="RadarAlertLeave"
     log_to_chat="false"
-    type="notifytip">
-     <tag>radar</tag>
-     [AGENT] has left [REGION].
-  </notification>
-   <notification
-    icon="notifytip.tga"
-    name="RadarAlertLeaveChat"
     type="notifytip">
      <tag>radar</tag>
      [AGENT] has left [REGION].

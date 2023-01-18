@@ -36,13 +36,21 @@
      layout="topleft"
      left_delta="150"
      name="friends_online_notify_checkbox"     
-     width="300" />	
+     width="30" />
+    <check_box
+     control_name="AlchemyOnlineOfflineToChat"
+     height="16"
+     label="In Nearby Chat"
+     layout="topleft"
+     left_delta="170"
+     name="friends_online_notify_checkbox_chat"     
+     width="20" />
     <check_box
      control_name="NotifyMoneyReceived"
      height="16"
      label="When I get L$"
      layout="topleft"
-     left_delta="-150"
+     left_delta="-320"
      top_pad="4"	
      name="notify_money_received_checkbox"     
      width="300" />   

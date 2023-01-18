@@ -488,7 +488,8 @@ LLNotification::LLNotification(const LLSDParamAdapter<Params>& p) :
 	mResponderObj(NULL),
 	mId(p.id.isProvided() ? p.id : LLUUID::generateNewID()),
 	mOfferFromAgent(p.offer_from_agent),
-    mIsDND(p.is_dnd)
+    mIsDND(p.is_dnd),
+	mForceChat(p.force_to_chat)
 {
 	if (p.functor.name.isChosen())
 	{

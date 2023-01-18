@@ -651,6 +651,17 @@
       <key>Value</key>
       <integer>0</integer>
     </map>
+    <key>AlchemyOnlineOfflineToChat</key>
+      <map>
+      <key>Comment</key>
+      <string>Log online and offline notifications to local chat</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <integer>0</integer>
+    </map>
     <key>AlchemyPreProcLSLOptimizer</key>
     <map>
       <key>Comment</key>
