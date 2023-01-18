@@ -99,7 +99,7 @@ LLExperienceCache::LLExperienceCache(std::string grid)
     {
         LLStringUtil::toLower(grid);
         LLStringUtil::replaceChar(grid, ' ', '_');
-        file = llformat("experience_cache.%s.xml", grid);
+        file = fmt::format("experience_cache.{:s}.xml", grid);
     }
 
     mCacheFileName = gDirUtilp->getExpandedFilename(LL_PATH_CACHE, file);
