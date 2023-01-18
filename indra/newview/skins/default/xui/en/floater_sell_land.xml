@@ -149,6 +149,10 @@
          name="--selectone--"
          value="select" />
         <combo_box.item
+         label="Myself"
+         name="Myself"
+         value="self" />
+        <combo_box.item
          label="Anyone"
          name="Anyone"
          value="anyone" />

@@ -27,6 +27,7 @@
 
 #include "llfloatersellland.h"
 
+#include "llagent.h"
 #include "llavatarnamecache.h"
 #include "llfloateravatarpicker.h"
 #include "llfloaterreg.h"
@@ -75,6 +76,7 @@ private:
 	bool					mParcelIsForSale;
 	bool					mSellToBuyer;
 	bool					mChoseSellTo;
+	bool					mSellToSelf;
 	S32						mParcelPrice;
 	S32						mParcelActualArea;
 	LLUUID					mParcelSnapshot;
@@ -226,6 +228,7 @@ void LLFloaterSellLandUI::updateParcelInfo()
 
 	mAuthorizedBuyer = parcelp->getAuthorizedBuyerID();
 	mSellToBuyer = mAuthorizedBuyer.notNull();
+	mSellToSelf = mAuthorizedBuyer == gAgent.getID();
 
 	if(mSellToBuyer)
 	{
@@ -304,7 +307,7 @@ void LLFloaterSellLandUI::refreshUI()
 
 	if (mSellToBuyer)
 	{
-		getChild<LLUICtrl>("sell_to")->setValue("user");
+		getChild<LLUICtrl>("sell_to")->setValue(mSellToSelf ? "self" : "user");
 		getChildView("sell_to_agent")->setVisible(TRUE);
 		getChildView("sell_to_select_agent")->setVisible(TRUE);
 	}
@@ -325,7 +328,7 @@ void LLFloaterSellLandUI::refreshUI()
 	// Must select Sell To: Anybody, or User (with a specified username)
 	std::string sell_to = getChild<LLUICtrl>("sell_to")->getValue().asString();
 	bool valid_sell_to = "select" != sell_to &&
-		("user" != sell_to || mAuthorizedBuyer.notNull());
+		(("user" != sell_to || "self" != sell_to) || mAuthorizedBuyer.notNull());
 
 	if (!valid_sell_to)
 	{
@@ -364,10 +367,29 @@ void LLFloaterSellLandUI::onChangeValue(LLUICtrl *ctrl, void *userdata)
 
 	std::string sell_to = self->getChild<LLUICtrl>("sell_to")->getValue().asString();
 
-	if (sell_to == "user")
+	if (sell_to == "self")
 	{
 		self->mChoseSellTo = true;
 		self->mSellToBuyer = true;
+		self->mSellToSelf  = true;
+
+		LLParcel* parcel = self->mParcelSelection->getParcel();
+
+		parcel->setAuthorizedBuyerID(gAgent.getID());
+
+		self->mAuthorizedBuyer = gAgent.getID();
+
+		if (self->mAvatarNameCacheConnection.connected())
+		{
+			self->mAvatarNameCacheConnection.disconnect();
+		}
+		self->mAvatarNameCacheConnection = LLAvatarNameCache::get(self->mAuthorizedBuyer, boost::bind(&LLFloaterSellLandUI::onBuyerNameCache, self, _2));
+	}
+	else if (sell_to == "user")
+	{
+		self->mChoseSellTo = true;
+		self->mSellToBuyer = true;
+		self->mSellToSelf  = false;
 		if (self->mAuthorizedBuyer.isNull())
 		{
 			self->doSelectAgent();
@@ -377,6 +399,7 @@ void LLFloaterSellLandUI::onChangeValue(LLUICtrl *ctrl, void *userdata)
 	{
 		self->mChoseSellTo = true;
 		self->mSellToBuyer = false;
+		self->mSellToSelf  = false;
 	}
 
 	self->mParcelPrice = self->getChild<LLUICtrl>("price")->getValue();
@@ -462,7 +485,8 @@ void LLFloaterSellLandUI::doSellLand(void *userdata)
 	S32 area = parcel->getArea();
 	std::string authorizedBuyerName = LLTrans::getString("Anyone");
 	bool sell_to_anyone = true;
-	if ("user" == self->getChild<LLUICtrl>("sell_to")->getValue().asString())
+	std::string sell_to_val = self->getChild<LLUICtrl>("sell_to")->getValue().asString();
+	if ("user" == sell_to_val || "self" == sell_to_val)
 	{
 		authorizedBuyerName = self->getChild<LLUICtrl>("sell_to_agent")->getValue().asString();
 		sell_to_anyone = false;
@@ -538,7 +562,11 @@ bool LLFloaterSellLandUI::onConfirmSale(const LLSD& notification, const LLSD& re
 		sell_with_objects = true;
 	}
 	parcel->setSellWithObjects(sell_with_objects);
-	if ("user" == getChild<LLUICtrl>("sell_to")->getValue().asString())
+	if ("self" == getChild<LLUICtrl>("sell_to")->getValue().asString())
+	{
+		parcel->setAuthorizedBuyerID(gAgent.getID());
+	}
+	else if ("user" == getChild<LLUICtrl>("sell_to")->getValue().asString())
 	{
 		parcel->setAuthorizedBuyerID(mAuthorizedBuyer);
 	}
