@@ -665,8 +665,7 @@ void LLPanelLandGeneral::refresh()
 		BOOL estate_manager_sellable = !parcel->getAuctionID()
 										&& gAgent.canManageEstate()
 										// estate manager/owner can only sell parcels owned by estate owner
-										&& regionp
-										&& (parcel->getOwnerID() == regionp->getOwner());
+										&& regionp;
 		BOOL owner_sellable = region_xfer && !parcel->getAuctionID()
 							&& LLViewerParcelMgr::isParcelModifiableByAgent(
 										parcel, GP_LAND_SET_SALE_INFO);
