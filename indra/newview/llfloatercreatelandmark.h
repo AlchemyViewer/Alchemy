@@ -47,7 +47,6 @@ public:
 
 	BOOL postBuild() override;
 	void onOpen(const LLSD& key) override;
-	void onClose(bool app_quitting) override;
 
 	void setItem(const uuid_set_t& items);
     void updateItem(const uuid_set_t& items, U32 mask);

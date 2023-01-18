@@ -158,16 +158,6 @@ void LLFloaterCreateLandmark::onOpen(const LLSD& key)
 	populateFoldersList(dest_folder);
 }
 
-void LLFloaterCreateLandmark::onClose(bool app_quitting)
-{
-	if (!mItem.isNull())
-	{
-		LLUUID item_id = mItem->getUUID();
-		remove_inventory_item(item_id, NULL);
-		mItem = nullptr;
-	}
-}
-
 void LLFloaterCreateLandmark::setLandmarkInfo(const LLUUID &folder_id)
 {
 	LLViewerParcelMgr* parcel_mgr = LLViewerParcelMgr::getInstance();
@@ -202,7 +192,7 @@ void LLFloaterCreateLandmark::setLandmarkInfo(const LLUUID &folder_id)
 		mLandmarkTitleEditor->setText(name);
 	}
 
-	LLLandmarkActions::createLandmarkHere(name, "", folder_id.notNull() ? folder_id : gInventory.findCategoryUUIDForType(LLFolderType::FT_FAVORITE));
+	LLLandmarkActions::createLandmarkHere(name, "", folder_id.notNull() ? folder_id : gInventory.findCategoryUUIDForType(LLFolderType::FT_LANDMARK));
 }
 
 bool cmp_folders(const folder_pair_t& left, const folder_pair_t& right)
@@ -219,17 +209,6 @@ void LLFloaterCreateLandmark::populateFoldersList(const LLUUID &folder_id)
 	mFolderCombo->removeall();
 
 	// Put the "My Favorites" folder first in list.
-	LLUUID favorites_id = gInventory.findCategoryUUIDForType(LLFolderType::FT_FAVORITE);
-	LLViewerInventoryCategory* favorites_cat = gInventory.getCategory(favorites_id);
-	if (!favorites_cat)
-	{
-		LL_WARNS() << "Cannot find the favorites folder" << LL_ENDL;
-	}
-	else
-	{
-		mFolderCombo->add(getString("favorites_bar"), favorites_cat->getUUID());
-	}
-
 	// Add the "Landmarks" category. 
 	const LLViewerInventoryCategory* lmcat = gInventory.getCategory(mLandmarksID);
 	if (!lmcat)
@@ -240,6 +219,17 @@ void LLFloaterCreateLandmark::populateFoldersList(const LLUUID &folder_id)
 	{
 		std::string cat_full_name = LLPanelLandmarkInfo::getFullFolderName(lmcat);
 		mFolderCombo->add(cat_full_name, lmcat->getUUID());
+	}
+
+	LLUUID favorites_id = gInventory.findCategoryUUIDForType(LLFolderType::FT_FAVORITE);
+	LLViewerInventoryCategory* favorites_cat = gInventory.getCategory(favorites_id);
+	if (!favorites_cat)
+	{
+		LL_WARNS() << "Cannot find the favorites folder" << LL_ENDL;
+	}
+	else
+	{
+		mFolderCombo->add(getString("favorites_bar"), favorites_cat->getUUID());
 	}
 
 	typedef std::vector<folder_pair_t> folder_vec_t;
@@ -368,8 +358,6 @@ void LLFloaterCreateLandmark::onSaveClicked()
 	gInventory.updateItem(new_item);
 	gInventory.notifyObservers();
 
-	mItem = nullptr;
-
 	closeFloater();
 }
 
@@ -380,7 +368,6 @@ void LLFloaterCreateLandmark::onCancelClicked()
 	{
 		LLUUID item_id = mItem->getUUID();
 		remove_inventory_item(item_id, NULL);
-		mItem = nullptr;
 	}
 	closeFloater();
 }
