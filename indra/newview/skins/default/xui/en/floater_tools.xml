@@ -393,6 +393,15 @@
      top_pad="-2"
      name="checkbox actual root"
      width="134" />
+    <check_box
+     control_name="RenderHighlightSelections"
+     height="18"
+     initial_value="false"
+     label="Show Selection Outlines"
+     layout="topleft"
+     top_pad="-2"
+     name="checkbox selection"
+     width="134" />
     <button
      left_pad="0"
      image_selected="ForwardArrow_Press"

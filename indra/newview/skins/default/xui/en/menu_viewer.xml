@@ -1575,13 +1575,16 @@ function="World.EnvPreset"
                      function="ToggleControl"
                      parameter="RenderHighlightSelections" />
                 </menu_item_check>
-                <menu_item_check
+                <menu_item_check			
+                 shortcut="alt|control|shift|h"
                  label="Show Hidden Selection"
                  name="Show Hidden Selection">
                     <menu_item_check.on_check
-                     control="RenderHiddenSelections" />
+                     function="CheckControl"
+                     parameter="RenderHiddenSelections" />
                     <menu_item_check.on_click
-                     function="Tools.ShowHiddenSelection" />
+                     function="ToggleControl"
+                     parameter="RenderHiddenSelections" />
                 </menu_item_check>
                 <menu_item_check
                  label="Show Light Radius for Selection"
@@ -2908,8 +2911,7 @@ function="World.EnvPreset"
             </menu_item_check>
             <menu_item_check
              label="Badge"
-             name="Badge"
-			 shortcut="alt|control|shift|h">
+             name="Badge">
                 <menu_item_check.on_check
                  function="Advanced.CheckHUDInfo"
                  parameter="badge" />
