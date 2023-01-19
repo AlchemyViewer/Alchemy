@@ -204,37 +204,29 @@ void inventory_offer_handler(LLOfferInfo* info)
     {
         LLStringUtil::truncate(msg, indx);
     }
-    bool bAutoAccept(false);
-
-    bool al_accept_new_inv = gSavedSettings.getBOOL("AlchemyAutoAcceptAllInventory");
-    bool is_nc_lm_txtr = info->mType == LLAssetType::AT_NOTECARD
-        || info->mType == LLAssetType::AT_LANDMARK
-        || info->mType == LLAssetType::AT_TEXTURE;
 
     // Avoid the Accept/Discard dialog if the user so desires. JC
-    // For certain types, just accept the items into the inventory,
-    // and possibly open them on receipt depending upon "ShowNewInventory".
-    // Also accept all inventory types if secondary override is in effect
-    // But do not accept RLV folder gives automagically
-    if ((al_accept_new_inv || (gSavedSettings.getBOOL("AutoAcceptNewInventory")
-        && is_nc_lm_txtr))
+    bool bAutoAccept(false);
+    if ((gSavedSettings.getBOOL("AutoAcceptNewInventory"))
         && ((!rlv_handler_t::isEnabled()) || (!RlvInventory::instance().isGiveToRLVOffer(*info))))
     {
-        bAutoAccept = true;
-        if (al_accept_new_inv && !is_nc_lm_txtr)
-        {
-            LLSD args;
-            args["NAME"] = LLSLURL(info->mFromGroup ? "group" : "agent", info->mFromID, "about").getSLURLString();
-            if (info->mFromObject)
-                args["ITEM"] = msg;
-            else
-            {
-                const std::string& verb = "select?name=" + LLURI::escape(msg);
-                args["ITEM"] = LLSLURL("inventory", info->mObjectID, verb.c_str()).getSLURLString();
-            }
-            LLNotificationsUtil::add("AutoAcceptedInventory", args);
-        }
-    }
+		bAutoAccept = true;
+		if (info->mType != LLAssetType::AT_NOTECARD
+			|| info->mType != LLAssetType::AT_LANDMARK
+			|| info->mType != LLAssetType::AT_TEXTURE)
+		{
+			LLSD args;
+			args["NAME"] = LLSLURL(info->mFromGroup ? "group" : "agent", info->mFromID, "about").getSLURLString();
+			if (info->mFromObject)
+				args["ITEM"] = msg;
+			else
+			{
+				const std::string& verb = "select?name=" + LLURI::escape(msg);
+				args["ITEM"] = LLSLURL("inventory", info->mObjectID, verb.c_str()).getSLURLString();
+			}
+			LLNotificationsUtil::add("AutoAcceptedInventory", args);
+		}
+	}
 
     // Strip any SLURL from the message display. (DEV-2754)
         // try to find new slurl host
@@ -326,7 +318,15 @@ void inventory_offer_handler(LLOfferInfo* info)
 		if (!fRlvCanShowName)
 		{
 			payload["rlv_shownames"] = TRUE;
-			args["NAME"] = RlvStrings::getAnonym(info->mFromName);
+            LLAvatarName av_name;
+            if (LLAvatarNameCache::get(info->mFromID, &av_name))
+            {
+                args["NAME"] = RlvStrings::getAnonym(av_name);
+            }
+            else
+            {
+				args["NAME"] = RlvStrings::getAnonym(info->mFromName);
+            }
 			args["NAME_SLURL"] = LLSLURL("agent", info->mFromID, "rlvanonym").getSLURLString();
 		}
 // [/RLVa:KB]
@@ -367,6 +367,28 @@ void inventory_offer_handler(LLOfferInfo* info)
             payload["give_inventory_notification"] = TRUE;
             p.payload = payload;
             LLPostponedNotification::add<LLPostponedOfferNotification>(p, info->mFromID, false);
+        }
+
+        if (bAutoAccept && gSavedSettings.getBOOL("ShowNewInventory"))
+        {
+            LLViewerInventoryCategory* catp = NULL;
+            catp = (LLViewerInventoryCategory*)gInventory.getCategory(info->mObjectID);
+            LLViewerInventoryItem* itemp = NULL;
+            if(!catp)
+            {
+                itemp = (LLViewerInventoryItem*)gInventory.getItem(info->mObjectID);
+            }
+
+            LLOpenAgentOffer* open_agent_offer = new LLOpenAgentOffer(info->mObjectID, info->mFromName, false);
+            open_agent_offer->startFetch();
+            if(catp || (itemp && itemp->isFinished()))
+            {
+                open_agent_offer->done();
+            }
+            else
+            {
+                gInventory.addObserver(open_agent_offer);
+            }
         }
     }
 

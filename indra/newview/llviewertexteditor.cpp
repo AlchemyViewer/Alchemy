@@ -148,10 +148,8 @@ public:
 		}
 		else
 		{
-			if(!gSavedSettings.getBOOL("ShowNewInventory"))
-			{
-				LLFloaterReg::showInstance("preview_notecard", LLSD(item->getUUID()), TAKE_FOCUS_YES);
-			}
+			// Removed for inventory show
+			LLFloaterReg::showInstance("preview_notecard", LLSD(item->getUUID()), TAKE_FOCUS_YES);
 		}
 	}
 };
