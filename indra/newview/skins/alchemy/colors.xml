@@ -80,7 +80,7 @@
      value="0.694 0.125 0.161 1" />
     <color
      name="AlchemyText"
-     value="0.72 0.72 0.72 1" />
+     value="0.797 0.803 0.805 1" />
      <color
      name="AlchemyTextDark"
      reference="AlSilverGrey" />
@@ -1151,4 +1151,7 @@
   <color
    name="FriendChatColor"
    reference="White" />
+  <color
+    name="SearchableControlHighlightColor" 
+    reference="AlDangerRed"/>
 </colors>

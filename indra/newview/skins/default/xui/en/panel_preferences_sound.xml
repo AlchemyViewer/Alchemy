@@ -364,7 +364,6 @@
   <check_box
    name="gesture_audio_play_btn"
    control_name="EnableGestureSounds"
-   disabled_control="MuteAudio"
    value="true"
    follows="left|bottom|right"
    height="15"
@@ -375,7 +374,6 @@
   <check_box
    name="sound_on_collisions"
    control_name="EnableCollisionSounds"
-   disabled_control="MuteAudio"
    value="true"
    follows="left|bottom|right"
    height="15"
