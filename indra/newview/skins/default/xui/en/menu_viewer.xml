@@ -206,7 +206,6 @@
        </menu_item_call>
        <menu_item_call label="Hover height..."
          layout="topleft"
-         shortcut="alt|control|H"
          name="Hover Height">
             <menu_item_call.on_click
              function="HoverHeight" />
@@ -1566,6 +1565,7 @@ function="World.EnvPreset"
           <menu_item_separator/>
 
                 <menu_item_check
+                 shortcut="alt|control|H"
                  label="Show Selection Outlines"
                  name="Show Selection Outlines">
                     <menu_item_check.on_check
@@ -1852,7 +1852,7 @@ function="World.EnvPreset"
      tear_off="true"
      visible="true">
       <menu
-       label="Develop"
+       label="Debug"
        name="Debug"
        tear_off="true">
         <menu_item_check
@@ -2716,9 +2716,10 @@ function="World.EnvPreset"
              parameter="all" />
         </menu_item_call>
      <menu_item_check
-         label="Show Develop Menu"
+         label="Show Developer Menu"
          name="Debug Mode"
-         shortcut="control|alt|Q">
+         shortcut="control|alt|Q"
+         use_mac_ctrl="true">
             <menu_item_check.on_check
              function="CheckControl"
              parameter="QAMode" />
@@ -2729,7 +2730,7 @@ function="World.EnvPreset"
     </menu>
     <menu
      create_jump_keys="true"
-     label="Develop"
+     label="Developer"
      name="Develop"
      tear_off="true"
      visible="false">
@@ -2770,18 +2771,6 @@ function="World.EnvPreset"
                function="Floater.Toggle"
                parameter="notifications_console" />
             </menu_item_call>
-            <menu_item_check
-             label="Region Debug Console"
-             name="Region Debug Console"
-             shortcut="control|shift|`"
-             use_mac_ctrl="true">
-                <menu_item_check.on_check
-                 function="Floater.Visible"
-                 parameter="region_debug_console" />
-                <menu_item_check.on_click
-                 function="Floater.Toggle"
-                 parameter="region_debug_console" />
-            </menu_item_check>
             <menu_item_check
              label="Fast Timers"
              name="Fast Timers"
@@ -2840,6 +2829,21 @@ function="World.EnvPreset"
                 function="Develop.SetTexFetchDebugger" />
             </menu_item_call>
           
+            <menu_item_separator/>
+
+            <menu_item_check
+             label="Region Debug Console"
+             name="Region Debug Console"
+             shortcut="control|shift|`"
+             use_mac_ctrl="true">
+                <menu_item_check.on_check
+                 function="Floater.Visible"
+                 parameter="region_debug_console" />
+                <menu_item_check.on_click
+                 function="Floater.Toggle"
+                 parameter="region_debug_console" />
+            </menu_item_check>
+
             <menu_item_separator/>
 
             <menu_item_call
@@ -3023,8 +3027,7 @@ function="World.EnvPreset"
          tear_off="true">
             <menu_item_call
              label="Force Breakpoint"
-             name="Force Breakpoint"
-             shortcut="control|alt|shift|B">
+             name="Force Breakpoint">
                 <menu_item_call.on_click
                  function="Advanced.ForceErrorBreakpoint" />
             </menu_item_call>
