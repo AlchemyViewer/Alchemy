@@ -2540,6 +2540,7 @@ void LLImageGLThread::run()
     // WorkQueue, likewise cleanup afterwards.
     mWindow->makeContextCurrent(mContext);
     gGL.init(false);
+	LL_PROFILER_GPU_CONTEXT;
     ThreadPool::run();
     gGL.shutdown();
     mWindow->destroySharedContext(mContext);

@@ -801,6 +801,8 @@ BOOL LLWindowSDL::createContext(int x, int y, int width, int height, int bits, B
         return FALSE;
     }
 
+	LL_PROFILER_GPU_CONTEXT;
+
 	// Disable vertical sync for swap
     toggleVSync(enable_vsync);
 
@@ -1220,6 +1222,7 @@ void LLWindowSDL::swapBuffers()
 	{
 		SDL_GL_SwapWindow(mWindow);
 	}
+	LL_PROFILER_GPU_COLLECT;
 }
 
 U32 LLWindowSDL::getFSAASamples()
