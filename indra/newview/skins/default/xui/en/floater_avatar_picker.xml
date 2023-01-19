@@ -65,7 +65,7 @@
              name="InstructSearchResidentName"
              top="8"
              width="220">
-                Type part of a person&apos;s name:
+                Type part of a person&apos;s name or a complete key:
             </text>
             <line_editor
 	     bevel_style="none"
@@ -172,7 +172,7 @@
                 Select a person nearby:
             </text>
             <slider
-             control_name="NearMeRange"
+             control_name="AVPickerNearMeRange"
              decimal_digits="0"
              follows="left|top"
              height="18"
