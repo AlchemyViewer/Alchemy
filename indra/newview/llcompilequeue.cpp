@@ -150,9 +150,7 @@ public:
         LLFloaterCompileQueue* queue = LLFloaterReg::findTypedInstance<LLFloaterCompileQueue>("compile_queue", LLSD(mQueueId));
         if (queue)
         {
-            std::string message = std::string("Compiling \"") + getScriptName() + std::string("\"...");
-
-            queue->getChild<LLScrollListCtrl>("queue output")->addSimpleElement(message, ADD_BOTTOM);
+            queue->addProcessingMessage("CompileQueueCompiling", LLSDMap("SCRIPT", getScriptName()));
         }
 
         return LLSDMap("success", LLSD::Boolean(true));
@@ -935,11 +933,7 @@ public:
         LLFloaterCompileQueue* queue = LLFloaterReg::findTypedInstance<LLFloaterCompileQueue>("compile_queue", LLSD(mQueueId));
         if (queue)
         {
-            LLStringUtil::format_map_t args;
-            args["OBJECT_NAME"] = getScriptName();
-            std::string message = queue->getString("Compiling", args);
-
-            queue->addStringMessage(message);
+            queue->addProcessingMessage("CompileQueueCompiling", LLSDMap("SCRIPT", getScriptName()));
         }
 
         return LLBufferedAssetUploadInfo::prepareUpload();
@@ -963,11 +957,7 @@ void LLFloaterCompileQueue::finishLSLUpload(LLUUID itemId, LLUUID taskId, LLUUID
         // Bytecode save completed
         if (response["compiled"])
         {
-            std::string message = std::string("Compilation of \"") + scriptName + std::string("\" succeeded");
-            LL_INFOS() << message << LL_ENDL;
-            LLStringUtil::format_map_t args;
-            args["OBJECT_NAME"] = scriptName;
-            queue->addStringMessage(queue->getString("CompileSuccess", args));
+            queue->addProcessingMessage("CompileSuccess", LLSDMap("SCRIPT", scriptName));
         }
         else
         {

@@ -2654,6 +2654,8 @@ If you continue to receive this message, please contact Second Life support for 
 	<string name="CompileQueueStart">recompile</string>
 	<string name="CompileQueuePreprocessing">Preprocessing: [SCRIPT]</string>
 	<string name="CompileQueuePreprocessingComplete">Preprocessing of script [SCRIPT] completed</string>
+	<string name="CompileQueueCompiling">Compiling "[SCRIPT]"...</string>
+	<string name="CompileSuccess">Compilation of "[SCRIPT]" succeeded</string>
 	<string name="ResetQueueTitle">Reset Progress</string>
 	<string name="ResetQueueStart">reset</string>
 	<string name="RunQueueTitle">Set Running Progress</string>
