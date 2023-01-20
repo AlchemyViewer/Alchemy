@@ -12584,23 +12584,6 @@ Your privilege to find [NAME]&apos;s map location has been revoked.
     type="notify">
 [NAME] has given you permission to find their location on the map.
   </notification>
-
-  <notification
-    icon="alertmodal.tga"
-    name="RevokedOnlineStatus"
-    persist="true"
-    log_to_im="true"
-    type="notify">
-Your privilege to see [NAME]&apos;s online status has been revoked. Very sneaky!
-  </notification>
-  <notification
-    icon="alertmodal.tga"
-    name="GrantedOnlineStatus"
-    persist="true"
-    log_to_im="true"
-    type="notify">
-[NAME] has given you permission to see their online status.
-  </notification>
   
   <notification
     icon="alertmodal.tga"
