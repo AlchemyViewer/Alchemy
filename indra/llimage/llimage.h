@@ -161,8 +161,6 @@ public:
 
 	static EImageCodec getCodecFromExtension(const std::string& exten);
 
-	//static LLTrace::MemStatHandle sMemStat;
-
 private:
 	U8 *mData;
 	S32 mDataSize;
