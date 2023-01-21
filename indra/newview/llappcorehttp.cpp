@@ -89,7 +89,7 @@ static const struct
 		"mesh2 fetch"
 	},
 	{ // AP_LARGE_MESH
-		2,		1,		8,		0,		true,
+		2,		1,		8,		0,		false,
 		"",
 		"large mesh fetch"
 	},
