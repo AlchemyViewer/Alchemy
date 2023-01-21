@@ -1340,7 +1340,7 @@ void LLIMProcessing::processNewMessage(LLUUID from_id,
             {
                 return;
             }
-            else if (accept_im_from_only_friend && (LLAvatarTracker::instance().getBuddyInfo(from_id) == NULL))
+            else if (gSavedPerAccountSettings.getBOOL("VoiceCallsFriendsOnly") && (LLAvatarTracker::instance().getBuddyInfo(from_id) == NULL))
             {
                 return;
             }

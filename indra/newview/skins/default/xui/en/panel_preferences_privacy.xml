@@ -76,16 +76,6 @@
      width="350">
     </check_box>
     <check_box
-     control_name="ConferencesFriendsOnly"
-     enabled="false"
-     height="16"
-     label="Only friends can add me to conference chats"
-     layout="topleft"
-     follows="left|top"
-     name="conferences_friends_only_check"
-     width="350">
-    </check_box>
-    <check_box
      height="16"
      enabled="false"
      label="Show my profile info in Search results"
