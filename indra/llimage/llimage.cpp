@@ -1072,8 +1072,8 @@ void LLImageRaw::composite( LLImageRaw* src )
 		return;
 	}
 
-	llassert(3 == src->getComponents());
-	llassert(3 == dst->getComponents());
+	// llassert(3 == src->getComponents());
+	// llassert(3 == dst->getComponents());
 
 	if( 3 == dst->getComponents() )
 	{
@@ -1136,12 +1136,31 @@ void LLImageRaw::compositeUnscaled4onto3( LLImageRaw* src )
 {
 	LLImageRaw* dst = this;  // Just for clarity.
 
-	llassert( (3 == src->getComponents()) || (4 == src->getComponents()) );
+	llassert( (4 == src->getComponents()) || (3 == dst->getComponents()) );
 	llassert( (src->getWidth() == dst->getWidth()) && (src->getHeight() == dst->getHeight()) );
 
 	U8* src_data = src->getData();
 	U8* dst_data = dst->getData();
 	S32 pixels = getWidth() * getHeight();
+
+	if(!src_data)
+	{
+		LL_WARNS() << "source is null!" << LL_ENDL;
+		return;
+	}
+	if(!dst_data)
+	{
+		LL_WARNS() << "destination is null!" << LL_ENDL;
+		return;
+	}
+	auto src_comps = src->getComponents();
+	if( src_comps != 4)
+	{
+		// This should never be reached, buit apparently it is.
+		LL_WARNS() << "src has incorrect number of layers (" << src_comps << ")" << LL_ENDL;
+		return;
+	}
+
 	while( pixels-- )
 	{
 		U8 alpha = src_data[3];
@@ -2077,7 +2096,7 @@ bool LLImageFormatted::decodeChannels(LLImageRaw* raw_image,F32  decode_time, S3
 U8* LLImageFormatted::allocateData(S32 size)
 {
 	U8* res = LLImageBase::allocateData(size); // calls deleteData()
-	sGlobalFormattedMemory += getDataSize();
+	if(res) sGlobalFormattedMemory += getDataSize();
 	return res;
 }
 
@@ -2086,7 +2105,7 @@ U8* LLImageFormatted::reallocateData(S32 size)
 {
 	sGlobalFormattedMemory -= getDataSize();
 	U8* res = LLImageBase::reallocateData(size);
-	sGlobalFormattedMemory += getDataSize();
+	if(res) sGlobalFormattedMemory += getDataSize();
 	return res;
 }
 
