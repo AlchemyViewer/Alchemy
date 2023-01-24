@@ -490,9 +490,6 @@ F32 texmem_middle_bound_scale = 0.925f;
 bool LLViewerTexture::isMemoryForTextureLow()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
-	static LLCachedControl<bool> disable_vidmem_check(gSavedSettings, "RenderDisableLowVidMem", true);
-	if (disable_vidmem_check)
-		return false;
 
     // Note: we need to figure out a better source for 'min' values,
     // what is free for low end at minimal settings is 'nothing left'
