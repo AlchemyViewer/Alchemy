@@ -1508,7 +1508,7 @@ Only large parcels can be listed in search.
              type="string"
              length="1"
              follows="left|top"
-             text_color="LtGray"
+			 text_color="LabelTextColor"
              text_readonly_color="LabelDisabledColor"
              height="32"
              layout="topleft"
