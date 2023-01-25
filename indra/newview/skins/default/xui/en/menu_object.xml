@@ -33,6 +33,41 @@
   <context_menu
     label="Tools"
     name="Tools">
+      <menu_item_call
+        label="Refresh Textures"
+        name="RefreshTextures">
+         <menu_item_call.on_click
+          function="Object.RefreshTexture" />
+      </menu_item_call>
+	  <menu_item_call
+	   label="Edit Particles"
+	   name="Menu Object Edit Particles">
+		  <menu_item_call.on_click
+		   function="Object.EditParticles" />
+		  <menu_item_call.on_enable
+		   function="Object.EnableEditParticles" />
+	  </menu_item_call>
+	  <menu_item_call
+          label="Show in linksets"
+          name="show_in_linksets">
+        <menu_item_call.on_click
+            function="Pathfinding.Linksets.Select" />
+        <menu_item_call.on_enable
+            function="EnableSelectInPathfindingLinksets"/>
+        <menu_item_call.on_visible
+            function="VisibleSelectInPathfindingLinksets"/>
+      </menu_item_call>
+      <menu_item_call
+          label="Show in characters"
+          name="show_in_characters">
+        <menu_item_call.on_click
+            function="Pathfinding.Characters.Select" />
+        <menu_item_call.on_enable
+            function="EnableSelectInPathfindingCharacters"/>
+        <menu_item_call.on_visible
+            function="EnableSelectInPathfindingCharacters"/>
+      </menu_item_call>
+      <menu_item_separator layout="topleft" />
 	  <menu_item_call
 		  label="Recompile Scripts (Mono)"
 		  name="Mono">
@@ -87,21 +122,18 @@
 		  <menu_item_call.on_enable
 			  function="EditableSelected" />
 	  </menu_item_call>
-	  <menu_item_separator layout="topleft" />
-	  <menu_item_call
-	   label="Edit Particles"
-	   name="Menu Object Edit Particles">
-		  <menu_item_call.on_click
-		   function="Object.EditParticles" />
-		  <menu_item_call.on_enable
-		   function="Object.EnableEditParticles" />
-	  </menu_item_call>
+	  <menu_item_separator layout="topleft">
+        <menu_item_separator.on_visible
+            function="Alchemy.PowerfulWizardObject" />
+	  </menu_item_separator>
 	  <menu_item_call
 		  label="Explode"
 		  name="Explode">
 		  <menu_item_call.on_click
 			  function="Object.AlchemyExplode" />
 		  <menu_item_call.on_enable
+			  function="Alchemy.PowerfulWizardObject" />
+		  <menu_item_call.on_visible
 			  function="Alchemy.PowerfulWizardObject" />
 	  </menu_item_call>
 	  <menu_item_call
@@ -111,6 +143,8 @@
 			  function="Object.AlchemyDestroy" />
 		  <menu_item_call.on_enable
 			  function="Alchemy.PowerfulWizardObject" />
+		  <menu_item_call.on_visible
+			  function="Alchemy.PowerfulWizardObject" />
 	  </menu_item_call>
 	  <menu_item_call
 		  label="Force Delete"
@@ -118,6 +152,8 @@
 		  <menu_item_call.on_click
 			  function="Object.AlchemyForceDelete" />
 		  <menu_item_call.on_enable
+			  function="Alchemy.PowerfulWizardObject" />
+		  <menu_item_call.on_visible
 			  function="Alchemy.PowerfulWizardObject" />
 	  </menu_item_call>
   </context_menu>
@@ -138,6 +174,8 @@
         function="Object.SitOrStand" />
     <menu_item_call.on_enable
         function="Object.EnableSit" />
+    <menu_item_call.on_visible
+        function="Object.EnableSit" />
   </menu_item_call>
   <menu_item_call
       enabled="false"
@@ -146,6 +184,8 @@
     <menu_item_call.on_click
         function="Object.SitOrStand" />
     <menu_item_call.on_enable
+        function="Object.EnableStandUp" />
+    <menu_item_call.on_visible
         function="Object.EnableStandUp" />
   </menu_item_call>
   <menu_item_call
@@ -161,32 +201,6 @@
       name="Zoom In">
     <menu_item_call.on_click
         function="Object.ZoomIn" />
-  </menu_item_call>
-  <menu_item_call
-    label="Refresh Textures"
-    name="RefreshTextures">
-     <menu_item_call.on_click
-      function="Object.RefreshTexture" />
-  </menu_item_call>
-  <menu_item_call
-      label="Show in linksets"
-      name="show_in_linksets">
-    <menu_item_call.on_click
-        function="Pathfinding.Linksets.Select" />
-    <menu_item_call.on_enable
-        function="EnableSelectInPathfindingLinksets"/>
-    <menu_item_call.on_visible
-        function="VisibleSelectInPathfindingLinksets"/>
-  </menu_item_call>
-  <menu_item_call
-      label="Show in characters"
-      name="show_in_characters">
-    <menu_item_call.on_click
-        function="Pathfinding.Characters.Select" />
-    <menu_item_call.on_enable
-        function="EnableSelectInPathfindingCharacters"/>
-    <menu_item_call.on_visible
-        function="EnableSelectInPathfindingCharacters"/>
   </menu_item_call>
   <menu_item_separator layout="topleft" />
   <context_menu

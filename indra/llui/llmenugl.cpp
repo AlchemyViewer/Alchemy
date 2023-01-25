@@ -582,6 +582,30 @@ LLMenuItemSeparatorGL::LLMenuItemSeparatorGL(const LLMenuItemSeparatorGL::Params
 {
 }
 
+void LLMenuItemSeparatorGL::initFromParams(const Params& p)
+{
+	if (p.on_visible.isProvided())
+	{
+		mVisibleSignal.connect(initEnableCallback(p.on_visible));
+	}
+	LLUICtrl::initFromParams(p);
+}
+
+void LLMenuItemSeparatorGL::updateVisible()
+{
+	if (mVisibleSignal.num_slots() > 0)
+	{
+		bool visible = mVisibleSignal(this, LLSD());
+		setVisible(visible);
+	}
+}
+
+void LLMenuItemSeparatorGL::buildDrawLabel()
+{
+	updateVisible();
+	LLMenuItemGL::buildDrawLabel();
+}
+
 //virtual
 U32 LLMenuItemSeparatorGL::getNominalHeight( void ) const
 {
