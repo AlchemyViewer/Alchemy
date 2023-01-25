@@ -4584,8 +4584,16 @@ void process_avatar_appearance(LLMessageSystem *mesgsys, void **user_data)
 
 void process_camera_constraint(LLMessageSystem *mesgsys, void **user_data)
 {
+	static LLCachedControl<bool> disable_sim_cam_constraint(gSavedSettings, "AlchemyIgnoreSimCameraConstraint", false);
 	LLVector4 cameraCollidePlane;
-	mesgsys->getVector4Fast(_PREHASH_CameraCollidePlane, _PREHASH_Plane, cameraCollidePlane);
+	if(disable_sim_cam_constraint)
+	{
+		cameraCollidePlane.clearVec();	
+	}
+	else
+	{
+		mesgsys->getVector4Fast(_PREHASH_CameraCollidePlane, _PREHASH_Plane, cameraCollidePlane);
+	}
 
 	gAgentCamera.setCameraCollidePlane(cameraCollidePlane);
 }
