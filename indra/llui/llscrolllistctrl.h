@@ -333,6 +333,10 @@ public:
 
 	void			clearSearchString() { mSearchString.clear(); }
 
+	void			setFilterString(const std::string& str);
+	void			setFilterColumn(S32 col) { mFilterColumn = col; }
+	bool			isFiltered(const LLScrollListItem* item) const;
+
 	// support right-click context menus for avatar/group lists
 	enum ContextMenuType { MENU_NONE, MENU_AVATAR, MENU_GROUP };
 	void setContextMenu(const ContextMenuType &menu) { mContextMenuType = menu; }
@@ -433,6 +437,8 @@ public:
 
 	boost::signals2::connection setIsFriendCallback(const is_friend_signal_t::slot_type& cb);
 
+
+	std::vector<LLScrollListColumn::Params> getColumnInitParams() const { return mColumnInitParams; }
 
 protected:
 	// "Full" interface: use this when you're creating a list that has one or more of the following:
@@ -538,11 +544,16 @@ private:
 	LLWString		mSearchString;
 	LLFrameTimer	mSearchTimer;
 	
+	std::string		mFilterString;
+	S32				mFilterColumn;
+	bool			mIsFiltered;
+
 	S32				mSearchColumn;
 	S32				mNumDynamicWidthColumns;
 	S32				mTotalStaticColumnWidth;
 	S32				mTotalColumnPadding;
 
+	std::vector<LLScrollListColumn::Params> mColumnInitParams;
 	mutable bool	mSorted;
 	
 	typedef std::map<std::string, LLScrollListColumn*, std::less<>> column_map_t;

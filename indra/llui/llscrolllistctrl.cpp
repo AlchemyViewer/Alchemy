@@ -223,7 +223,9 @@ LLScrollListCtrl::LLScrollListCtrl(const LLScrollListCtrl::Params& p)
 	mRowPadding(p.row_padding),
 	mAlternateSort(false),
 	mContextMenuType(MENU_NONE),
-	mIsFriendSignal(NULL)
+	mIsFriendSignal(NULL),
+	mFilterColumn(-1),
+	mIsFiltered(false)
 {
 	mItemListRect.setOriginAndSize(
 		mBorderThickness,
@@ -291,6 +293,7 @@ LLScrollListCtrl::LLScrollListCtrl(const LLScrollListCtrl::Params& p)
 		++row_it)
 	{
 		addColumn(*row_it);
+		mColumnInitParams.push_back(*row_it);
 	}
 
 	if (p.sort_column >= 0)
@@ -376,6 +379,22 @@ S32 LLScrollListCtrl::isEmpty() const
 
 S32 LLScrollListCtrl::getItemCount() const
 {
+	if (mIsFiltered)
+	{
+		S32 count(0);
+		item_list::const_iterator iter;
+		for(LLScrollListItem* item : mItemList)
+		{
+			std::string filterColumnValue = item->getColumn(mFilterColumn)->getValue().asString();
+			LLStringUtil::toLower(filterColumnValue);
+			if (filterColumnValue.find(mFilterString) == std::string::npos)
+			{
+				continue;
+			}
+			count++;
+		}
+		return count;
+	}
 	return mItemList.size();
 }
 
@@ -463,10 +482,12 @@ S32 LLScrollListCtrl::getFirstSelectedIndex() const
 	// make sure sort is up to date before returning an index
 	updateSort();
 
-	item_list::const_iterator iter;
-	for (iter = mItemList.begin(); iter != mItemList.end(); iter++)
+	for (LLScrollListItem* item : mItemList)
 	{
-		LLScrollListItem* item  = *iter;
+		if (isFiltered(item))
+		{
+			continue;
+		}
 		if (item->getSelected())
 		{
 			return CurSelectedIndex;
@@ -932,6 +953,11 @@ BOOL LLScrollListCtrl::selectItemRange( S32 first_index, S32 last_index )
 			continue ;
 		}
 		
+		if (isFiltered(itemp))
+		{
+			iter++;
+			continue;
+		}
 		if( index >= first_index && index <= last_index )
 		{
 			if( itemp->getEnabled() )
@@ -1110,6 +1136,10 @@ S32 LLScrollListCtrl::getItemIndex( LLScrollListItem* target_item ) const
 	for (iter = mItemList.begin(); iter != mItemList.end(); iter++)
 	{
 		LLScrollListItem *itemp = *iter;
+		if (isFiltered(itemp))
+		{
+			continue;
+		}
 		if (target_item == itemp)
 		{
 			return index;
@@ -1429,11 +1459,10 @@ U32 LLScrollListCtrl::searchItems(const LLWString& substring, bool case_sensitiv
             LLWStringUtil::toLower(substring_trimmed);
         }
 
-        for (item_list::iterator iter = mItemList.begin(); iter != mItemList.end(); iter++)
+        for (LLScrollListItem* item : mItemList)
         {
-            LLScrollListItem* item = *iter;
             // Only select enabled items with matching names
-            if (!item->getEnabled())
+            if (!item->getEnabled() || isFiltered(item))
             {
                 continue;
             }
@@ -1632,18 +1661,33 @@ void LLScrollListCtrl::drawItems()
 		static LLUICachedControl<F32> type_ahead_timeout ("TypeAheadTimeout", 0);
 		highlight_color.mV[VALPHA] = clamp_rescale(mSearchTimer.getElapsedTimeF32(), type_ahead_timeout * 0.7f, type_ahead_timeout(), 0.4f, 0.f);
 
-		S32 first_line = mScrollLines;
-		S32 last_line = llmin((S32)mItemList.size() - 1, mScrollLines + getLinesPerPage());
+		S32 first_line;
+		S32 last_line;
+		if (mIsFiltered)
+		{
+			first_line = 0;
+			last_line = (S32)mItemList.size() - 1;
+		}
+		else
+		{
+			first_line = mScrollLines;
+			last_line = llmin((S32)mItemList.size() - 1, mScrollLines + getLinesPerPage());
+		}
+		S32 line = first_line;
 
 		if (first_line >= mItemList.size())
 		{
 			return;
 		}
 		item_list::iterator iter;
-		for (S32 line = first_line; line <= last_line; line++)
+		for (S32 itline = first_line; itline <= last_line; itline++)
 		{
-			LLScrollListItem* item = mItemList[line];
+			LLScrollListItem* item = mItemList[itline];
 			
+			if (isFiltered(item))
+			{
+				continue;
+			}
 			item_rect.setOriginAndSize( 
 				x, 
 				cur_y, 
@@ -1705,6 +1749,7 @@ void LLScrollListCtrl::drawItems()
 
 				cur_y -= mLineHeight;
 			}
+			line++;
 		}
 	}
 }
@@ -1862,12 +1907,11 @@ BOOL LLScrollListCtrl::selectItemAt(S32 x, S32 y, MASK mask)
 				{
 					// Select everthing between mLastSelected and hit_item
 					bool selecting = false;
-					item_list::iterator itor;
 					// If we multiselect backwards, we'll stomp on mLastSelected,
 					// meaning that we never stop selecting until hitting max or
 					// the end of the list.
 					LLScrollListItem* lastSelected = mLastSelected;
-					for (itor = mItemList.begin(); itor != mItemList.end(); ++itor)
+					for (LLScrollListItem *item : mItemList)
 					{
 						if(mMaxSelectable > 0 && getAllSelected().size() >= mMaxSelectable)
 						{
@@ -1877,7 +1921,11 @@ BOOL LLScrollListCtrl::selectItemAt(S32 x, S32 y, MASK mask)
 							}
 							break;
 						}
-						LLScrollListItem *item = *itor;
+
+						if (isFiltered(item))
+						{
+							continue;
+						}
                         if (item == hit_item || item == lastSelected)
 						{
 							selectItem(item, getColumnIndexFromOffset(x), FALSE);
@@ -2219,10 +2267,13 @@ LLScrollListItem* LLScrollListCtrl::hitItem( S32 x, S32 y )
 	S32 num_page_lines = getLinesPerPage();
 
 	S32 line = 0;
-	item_list::iterator iter;
-	for(iter = mItemList.begin(); iter != mItemList.end(); iter++)
+	for(LLScrollListItem* item : mItemList)
 	{
-		LLScrollListItem* item  = *iter;
+		if (isFiltered(item))
+		{
+			continue;
+		}
+
 		if( mScrollLines <= line && line < mScrollLines + num_page_lines )
 		{
 			if( item->getEnabled() && item_rect.pointInRect( x, y ) )
@@ -3475,3 +3526,36 @@ BOOL LLScrollListIcon::handleClick()
 	return FALSE;
 }
 
+void LLScrollListCtrl::setFilterString(const std::string& str)
+{
+	mFilterString = str;
+	std::transform(mFilterString.begin(), mFilterString.end(), mFilterString.begin(), ::tolower);
+	mIsFiltered = (mFilterColumn > -1 && !mFilterString.empty());
+	updateLayout();
+
+	if (mIsFiltered && getNumSelected() > 0 && isFiltered(getFirstSelected()))
+	{
+		for (item_list::iterator iter = mItemList.begin(); iter != mItemList.end(); iter++)
+		{
+			if (!isFiltered(*iter))
+			{
+				selectItem(*iter, -1);
+				break;
+			}
+		}
+	}
+}
+
+bool LLScrollListCtrl::isFiltered(const LLScrollListItem* item) const
+{
+	if (mIsFiltered)
+	{
+		std::string filterColumnValue = item->getColumn(mFilterColumn)->getValue().asString();
+		std::transform(filterColumnValue.begin(), filterColumnValue.end(), filterColumnValue.begin(), ::tolower);
+		if (filterColumnValue.find(mFilterString) == std::string::npos)
+		{
+			return true;
+		}
+	}
+	return false;
+}
