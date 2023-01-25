@@ -2132,7 +2132,16 @@ function="World.EnvPreset"
              function="ToggleControl"
              parameter="AlchemyCameraNoZoomLimit" />
         </menu_item_check>
-
+        <menu_item_check
+         label="Disable Sim Camera Collision Plane"
+         name="Disable Sim Camera Collision Plane">
+            <menu_item_check.on_check
+             function="CheckControl"
+             parameter="AlchemyIgnoreSimCameraConstraint" />
+            <menu_item_check.on_click
+             function="ToggleControl"
+             parameter="AlchemyIgnoreSimCameraConstraint" />
+        </menu_item_check>
         <menu_item_separator/>
 
         <menu_item_check
