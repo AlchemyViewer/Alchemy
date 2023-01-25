@@ -2,73 +2,173 @@
 <floater
  legacy_header_height="18"
  can_resize="true"
- height="300"
+ height="272"
  layout="topleft"
  min_height="300"
- min_width="400"
+ min_width="610"
  name="inspect"
  help_topic="inspect"
  save_rect="true"
- title="INSPECT OBJECTS"
- width="400">
+ title="Inspect Objects"
+ width="610">
     <floater.string
      name="timeStamp">
-        [wkday,datetime,slt] [mth,datetime,slt] [day,datetime,slt] [hour,datetime,slt]:[min,datetime,slt]:[second,datetime,slt] [year,datetime,slt]
+        [year,datetime,slt] [mth,datetime,slt] [day,datetime,slt], [hour,datetime,slt]:[min,datetime,slt]:[second,datetime,slt], [wkday,datetime,slt]
     </floater.string>
+    <floater.string
+     name="Group">
+        (Group)
+    </floater.string>
+    <floater.string name="stats_list">
+        Total stats:
+
+[NUM_OBJECTS] objects, [NUM_PRIMS] prims
+
+Faces: [NUM_FACES]
+Visible: [NUM_VISIBLE_FACES]
+Vertices: [NUM_VERTICES]
+Triangles: [NUM_TRIANGLES]
+Complex.: [COMPLEXITY]
+
+Textures: [NUM_TEXTURES]
+TMem: [TEXTURE_MEMORY] KB
+VRAM: [VRAM_USAGE] KB
+    </floater.string>
+    <text_editor
+      top="24"
+      left="5"
+      width="130"
+      height="189"
+      layout="topleft"
+      follows="left|top|bottom"
+      name="linksetstats_text"
+      max_length="2048"
+      bg_visible="false"
+      border_visible="true"
+      allow_scroll="true"
+      h_pad="2"
+      v_pad="2"
+      read_only="true"
+      tab_stop="false"
+      value="(loading...)"
+      word_wrap="true"/>
     <scroll_list
-     bottom="268"
+     top="24"
+     height="243"
      column_padding="0"
      draw_heading="true"
      follows="top|right|left|bottom"
      layout="topleft"
-     left="10"
+     left_pad="6"
      name="object_list"
-     right="-10"
-     tool_tip="Select an object from this list to highlight it in-world"
-     top="20">
+     right="-6"
+     tool_tip="Select an object from this list to highlight it in-world">
         <scroll_list.columns
-         relative_width="0.25"
+         dynamic_width="true"
          label="Object Name"
          name="object_name" />
         <scroll_list.columns
-         relative_width="0.25"
+         dynamic_width="true"
+         label="Description"
+         name="description" />
+        <scroll_list.columns
+         dynamic_width="true"
          label="Owner Name"
          name="owner_name" />
         <scroll_list.columns
-         relative_width="0.25"
+         dynamic_width="true"
          label="Creator Name"
          name="creator_name" />
         <scroll_list.columns
-         relative_width="0.25"
+         label="Faces"
+         name="facecount"
+         width="45"
+         sort_column="facecount_sort"/>
+        <scroll_list.columns
+         label="Vertices"
+         name="vertexcount"
+         width="55"
+         sort_column="vertexcount_sort"/>
+        <scroll_list.columns
+         label="Triangles"
+         name="trianglecount"
+         width="55"
+         sort_column="trianglecount_sort"/>
+        <scroll_list.columns
+         label="TMem"
+         name="tramcount"
+         width="55"
+         sort_column="tramcount_sort"/>
+        <scroll_list.columns
+         label="VRAM"
+         name="vramcount"
+         width="55"
+         sort_column="vramcount_sort"/>
+        <scroll_list.columns
          label="Creation Date"
-         name="creation_date" />
-		 <scroll_list.commit_callback
-		   function="Inspect.SelectObject" />
+         name="creation_date"
+         dynamic_width="true"
+         sort_column="creation_date_sort"/>
+        <scroll_list.columns
+         label=""
+         name="facecount_sort"
+         width="-1" />
+        <scroll_list.columns
+         label=""
+         name="vertexcount_sort"
+         width="-1" />
+        <scroll_list.columns
+         label=""
+         name="trianglecount_sort"
+         width="-1" />
+        <scroll_list.columns
+         label=""
+         name="tramcount_sort"
+         width="-1" />
+        <scroll_list.columns
+         label=""
+         name="vramcount_sort"
+         width="-1" />
+        <scroll_list.columns
+         label=""
+         name="creation_date_sort"
+         width="-1" />
+         <scroll_list.commit_callback
+         function="Inspect.SelectObject" />
     </scroll_list>
+    <menu_button
+     menu_filename="menu_inspect_options.xml"
+     follows="left|top"
+     height="23"
+     image_overlay="Conv_toolbar_sort"
+     layout="topleft"
+     name="options_btn"
+     tool_tip="Options"
+     top="24"
+     left="103"
+     width="31" />
     <button
      follows="left|bottom"
      height="23"
      label="See Owner Profile..."
      layout="topleft"
-     left_delta="-1"
+     left="4"
      name="button owner"
      tool_tip="See profile of the highlighted object&apos;s owner"
-     top_pad="4"
-     width="150">
-		<button.commit_callback
-		function="Inspect.OwnerProfile" />
-	</button>
+     top="217"
+     width="130">
+        <button.commit_callback
+        function="Inspect.OwnerProfile" />
+    </button>
     <button
      follows="left|bottom"
      height="23"
      label="See Creator Profile..."
      layout="topleft"
-     left_pad="5"
      name="button creator"
      tool_tip="See profile of the highlighted object&apos;s original creator"
-     top_delta="0"
-     width="150">
-		<button.commit_callback
-		function="Inspect.CreatorProfile" />
-	</button>
+     width="130">
+        <button.commit_callback
+        function="Inspect.CreatorProfile" />
+    </button>
 </floater>

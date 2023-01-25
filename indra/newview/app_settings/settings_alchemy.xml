@@ -1303,5 +1303,16 @@
       <key>Value</key>
       <integer>1</integer>
     </map>
+    <key>ALInspectColumnConfig</key>
+    <map>
+      <key>Comment</key>
+      <string>Stores the column visibility of the inspect window</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>U32</string>
+      <key>Value</key>
+      <integer>1023</integer>
+    </map>
   </map>
 </llsd>

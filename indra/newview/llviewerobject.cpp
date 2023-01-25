@@ -516,6 +516,23 @@ void LLViewerObject::markDead()
 	}
 }
 
+S32 LLViewerObject::getNumVisibleFaces() const 
+{ 
+	int v{0}; 
+	if(mDrawable.notNull())
+	{ 
+		for (int i = 0;i < mDrawable->getNumFaces();i++)
+		{
+			const LLFace* f = mDrawable->getFace(i);
+			if (f && f->getTextureEntry() && f->getTextureEntry()->getAlpha() != 0.0f)
+			{
+				v++;
+			}
+		} 
+	}
+	return v;
+};
+
 void LLViewerObject::dump() const
 {
 	LL_INFOS() << "Type: " << pCodeToString(mPrimitiveCode) << LL_ENDL;
