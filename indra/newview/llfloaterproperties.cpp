@@ -39,6 +39,7 @@
 #include "llcheckboxctrl.h"
 #include "llcombobox.h"
 #include "llavataractions.h"
+#include "llcombobox.h"
 #include "llinventorydefines.h"
 #include "llinventoryobserver.h"
 #include "llinventorymodel.h"
@@ -57,6 +58,7 @@
 #include "llviewercontrol.h"
 #include "llviewerwindow.h"
 #include "llgroupactions.h"
+#include "llslurl.h"
 
 #include "lluictrlfactory.h"
 
@@ -95,32 +97,84 @@ private:
 void LLPropertiesObserver::changed(U32 mask)
 {
 	// if there's a change we're interested in.
-	if((mask & (LLInventoryObserver::LABEL | LLInventoryObserver::INTERNAL | LLInventoryObserver::REMOVE)) != 0)
+	if ((mask & (LLInventoryObserver::LABEL | LLInventoryObserver::INTERNAL | LLInventoryObserver::REMOVE)) != 0)
 	{
-		mFloater->dirty();
+		const std::set<LLUUID>& idItems = gInventory.getChangedIDs();
+		for (const LLUUID& id : idItems)
+		{
+			if (mFloater->getItemID() == id)
+				mFloater->dirty();
+		}
 	}
 }
 
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+// Class LLObjectPropertiesObserver
+//
+// Helper class to watch for changes in an object inventory.
+// Used to update item properties in LLFloaterProperties.
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+class LLObjectPropertiesObserver : public LLVOInventoryListener
+{
+public:
+	LLObjectPropertiesObserver(LLFloaterProperties* floater, LLViewerObject* object)
+		: mFloater(floater)
+	{
+		registerVOInventoryListener(object, NULL);
+	}
 
+	/*virtual*/ ~LLObjectPropertiesObserver()
+	{
+		removeVOInventoryListener();
+	}
+
+	/*virtual*/ void inventoryChanged(LLViewerObject* object, LLInventoryObject::object_list_t* inventory, S32 serial_num, void* user_data)
+	{
+		mFloater->dirty();
+	}
+
+private:
+	LLFloaterProperties* mFloater;
+};
 
 ///----------------------------------------------------------------------------
 /// Class LLFloaterProperties
 ///----------------------------------------------------------------------------
 
 // Default constructor
-LLFloaterProperties::LLFloaterProperties(const LLUUID& item_id)
-  : LLFloater(mItemID),
-	mItemID(item_id),
-	mDirty(TRUE)
+LLFloaterProperties::LLFloaterProperties(const LLSD& key)
+	: LLFloater(key)
+	, mDirty(TRUE)
+	, mPropertiesObserver(NULL)
+	, mObjectPropertiesObserver(NULL)
 {
-	mPropertiesObserver = new LLPropertiesObserver(this);
+	if (key.has("item_id"))
+	{
+		mItemID = key["item_id"].asUUID();
+		if (key.has("object_id"))
+			mObjectID = key["object_id"].asUUID();
+	}
+
+	if (mObjectID.isNull())
+		mPropertiesObserver = new LLPropertiesObserver(this);
+	else
+		mObjectPropertiesObserver = new LLObjectPropertiesObserver(this, gObjectList.findObject(mObjectID));
 }
 
 // Destroys the object
 LLFloaterProperties::~LLFloaterProperties()
 {
-	delete mPropertiesObserver;
-	mPropertiesObserver = NULL;
+	if (mPropertiesObserver)
+	{
+		delete mPropertiesObserver;
+		mPropertiesObserver = NULL;
+	}
+
+	if (mObjectPropertiesObserver)
+	{
+		delete mObjectPropertiesObserver;
+		mObjectPropertiesObserver = NULL;
+	}
 }
 
 // virtual
@@ -132,10 +186,6 @@ BOOL LLFloaterProperties::postBuild()
 	getChild<LLUICtrl>("LabelItemName")->setCommitCallback(boost::bind(&LLFloaterProperties::onCommitName,this));
 	getChild<LLLineEditor>("LabelItemDesc")->setPrevalidate(&LLTextValidate::validateASCIIPrintableNoPipe);
 	getChild<LLUICtrl>("LabelItemDesc")->setCommitCallback(boost::bind(&LLFloaterProperties:: onCommitDescription, this));
-	// Creator information
-	getChild<LLUICtrl>("BtnCreator")->setCommitCallback(boost::bind(&LLFloaterProperties::onClickCreator,this));
-	// owner information
-	getChild<LLUICtrl>("BtnOwner")->setCommitCallback(boost::bind(&LLFloaterProperties::onClickOwner,this));
 	// acquired date
 	// owner permissions
 	// Permissions debug text
@@ -154,6 +204,8 @@ BOOL LLFloaterProperties::postBuild()
 	getChild<LLUICtrl>("Edit Cost")->setCommitCallback(boost::bind(&LLFloaterProperties::onCommitSaleInfo, this));
 	// The UI has been built, now fill in all the values
 	refresh();
+
+	setTitle(llformat("%s %s", getTitle().c_str(), getString( (mObjectID.notNull()) ? "origin_inworld" : "origin_inventory").c_str()));
 
 	return TRUE;
 }
@@ -182,9 +234,7 @@ void LLFloaterProperties::refresh()
 			"LabelItemName",
 			"LabelItemDesc",
 			"LabelCreatorName",
-			"BtnCreator",
 			"LabelOwnerName",
-			"BtnOwner",
 			"CheckOwnerModify",
 			"CheckOwnerCopy",
 			"CheckOwnerTransfer",
@@ -279,9 +329,8 @@ void LLFloaterProperties::refreshFromItem(LLInventoryItem* item)
 
 	if (item->getCreatorUUID().notNull())
 	{
-		LLAvatarName av_name;
-		LLAvatarNameCache::get(item->getCreatorUUID(), &av_name);
-		getChildView("BtnCreator")->setEnabled(TRUE);
+		const LLUUID& creator_id = item->getCreatorUUID();
+		std::string name = LLSLURL("agent", creator_id, "inspect").getSLURLString();
 		getChildView("LabelCreatorTitle")->setEnabled(TRUE);
 		getChildView("LabelCreatorName")->setEnabled(TRUE);
 // [RLVa:KB] - Checked: RLVa-2.0.1
@@ -289,19 +338,13 @@ void LLFloaterProperties::refreshFromItem(LLInventoryItem* item)
 		if ( (!RlvActions::canShowName(RlvActions::SNC_DEFAULT, item->getCreatorUUID())) &&
 		     ( ((perm.isOwned()) && (!perm.isGroupOwned()) && (perm.getOwner() == item->getCreatorUUID()) ) || (RlvUtil::isNearbyAgent(item->getCreatorUUID())) ) )
 		{
-			childSetEnabled("BtnCreator", FALSE);
-			getChild<LLUICtrl>("LabelCreatorName")->setValue(RlvStrings::getAnonym(av_name.getUserName()));
-		}
-		else
-		{
-			getChild<LLUICtrl>("LabelCreatorName")->setValue(av_name.getUserName());
+			name = RlvStrings::getAnonym(name);
 		}
 // [/RLVa:KB]
-//		getChild<LLUICtrl>("LabelCreatorName")->setValue(av_name.getUserName());
+		getChild<LLUICtrl>("LabelCreatorName")->setValue(name);
 	}
 	else
 	{
-		getChildView("BtnCreator")->setEnabled(FALSE);
 		getChildView("LabelCreatorTitle")->setEnabled(FALSE);
 		getChildView("LabelCreatorName")->setEnabled(FALSE);
 		getChild<LLUICtrl>("LabelCreatorName")->setValue(getString("unknown"));
@@ -318,13 +361,13 @@ void LLFloaterProperties::refreshFromItem(LLInventoryItem* item)
 		std::string name;
 		if (perm.isGroupOwned())
 		{
-			gCacheName->getGroupName(perm.getGroup(), name);
+			const LLUUID& group_id = perm.getGroup();
+			name = LLSLURL("group", group_id, "inspect").getSLURLString();
 		}
 		else
 		{
-			LLAvatarName av_name;
-			LLAvatarNameCache::get(perm.getOwner(), &av_name);
-			name = av_name.getUserName();
+			const LLUUID& owner_id = perm.getOwner();
+			name = LLSLURL("agent", owner_id, "inspect").getSLURLString();
 // [RLVa:KB] - Checked: RLVa-2.0.1
 			if (RlvActions::isRlvEnabled())
 			{
@@ -334,17 +377,12 @@ void LLFloaterProperties::refreshFromItem(LLInventoryItem* item)
 			}
 // [/RLVa:KB]
 		}
-//		getChildView("BtnOwner")->setEnabled(TRUE);
-// [RLVa:KB] - Checked: RLVa-2.0.1
-		getChildView("BtnOwner")->setEnabled(fRlvCanShowOwner);
-// [/RLVa:KB]
 		getChildView("LabelOwnerTitle")->setEnabled(TRUE);
 		getChildView("LabelOwnerName")->setEnabled(TRUE);
 		getChild<LLUICtrl>("LabelOwnerName")->setValue(name);
 	}
 	else
 	{
-		getChildView("BtnOwner")->setEnabled(FALSE);
 		getChildView("LabelOwnerTitle")->setEnabled(FALSE);
 		getChildView("LabelOwnerName")->setEnabled(FALSE);
 		getChild<LLUICtrl>("LabelOwnerName")->setValue(getString("public"));
@@ -561,46 +599,6 @@ void LLFloaterProperties::refreshFromItem(LLInventoryItem* item)
 	{
 		edit_cost->setValue(llformat("%d",0));
 		combo_sale_type->setValue(LLSaleInfo::FS_COPY);
-	}
-}
-
-void LLFloaterProperties::onClickCreator()
-{
-	LLInventoryItem* item = findItem();
-	if(!item) return;
-	if(!item->getCreatorUUID().isNull())
-	{
-// [RLVa:KB] - Checked: RLVa-1.2.1
-		const LLUUID& idCreator = item->getCreatorUUID();
-		if ( (RlvActions::isRlvEnabled()) && (!RlvActions::canShowName(RlvActions::SNC_DEFAULT, idCreator)) )
-		{
-			const LLPermissions& perm = item->getPermissions();
-			if ( ((perm.isOwned()) && (!perm.isGroupOwned()) && (perm.getOwner() == idCreator) ) || (RlvUtil::isNearbyAgent(idCreator)) )
-			{
-				return;
-			}
-		}
-// [/RLVa:KB]
-		LLAvatarActions::showProfile(item->getCreatorUUID());
-	}
-}
-
-// static
-void LLFloaterProperties::onClickOwner()
-{
-	LLInventoryItem* item = findItem();
-	if(!item) return;
-	if(item->getPermissions().isGroupOwned())
-	{
-		LLGroupActions::show(item->getPermissions().getGroup());
-	}
-	else
-	{
-// [RLVa:KB] - Checked: RLVa-1.0.0
-		if ( (RlvActions::isRlvEnabled()) && (!RlvActions::canShowName(RlvActions::SNC_DEFAULT, item->getPermissions().getOwner())) )
-			return;
-// [/RLVa:KB]
-		LLAvatarActions::showProfile(item->getPermissions().getOwner());
 	}
 }
 
@@ -921,7 +919,7 @@ LLMultiProperties::LLMultiProperties()
 {
 	// start with a small rect in the top-left corner ; will get resized
 	LLRect rect;
-	rect.setLeftTopAndSize(0, gViewerWindow->getWindowHeightScaled(), 20, 20);
+	rect.setLeftTopAndSize(0, gViewerWindow->getWindowHeightScaled(), 350, 300);
 	setRect(rect);
 	LLFloater* last_floater = LLFloaterReg::getLastFloaterInGroup("properties");
 	if (last_floater)

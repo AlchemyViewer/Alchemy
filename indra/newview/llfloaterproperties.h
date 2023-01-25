@@ -43,26 +43,27 @@ class LLRadioGroup;
 class LLTextBox;
 
 class LLPropertiesObserver;
+class LLObjectPropertiesObserver;
 
 class LLFloaterProperties final : public LLFloater
 {
 public:
-	LLFloaterProperties(const LLUUID& item_id);
+	LLFloaterProperties(const LLSD& key);
 	/*virtual*/ ~LLFloaterProperties();
 	
 	/*virtual*/ BOOL postBuild();
 	/*virtual*/ void onOpen(const LLSD& key);
-	void setObjectID(const LLUUID& object_id) { mObjectID = object_id; }
 
 	void dirty() { mDirty = TRUE; }
 	void refresh();
 	
 	static void dirtyAll();
 	
+	const LLUUID& getItemID() const		{ return mItemID; }
+	const LLUUID& getObjectID() const	{ return mObjectID; }
+
 protected:
 	// ui callbacks
-	void onClickCreator();
-	void onClickOwner();
 	void onCommitName();
 	void onCommitDescription();
 	void onCommitPermissions();
@@ -87,6 +88,7 @@ protected:
 	BOOL mDirty;
 
 	LLPropertiesObserver* mPropertiesObserver;
+	LLObjectPropertiesObserver* mObjectPropertiesObserver;
 };
 
 class LLMultiProperties final : public LLMultiFloater

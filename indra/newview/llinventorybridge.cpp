@@ -1003,8 +1003,8 @@ void LLInvFVBridge::getClipboardEntries(bool show_asset_id,
 
 	addDeleteContextMenuOptions(items, disabled_items);
 
-	// If multiple items are selected, disable properties (if it exists).
-	if ((flags & FIRST_SELECTED_ITEM) == 0)
+	// If multiple items are selected, only disable properties if we're not showing them in a multi-floater
+	if ( ((flags & FIRST_SELECTED_ITEM) == 0) && (!gSavedSettings.getBOOL("ShowPropertiesFloaters")) )
 	{
 		disabled_items.push_back(std::string("Properties"));
 	}
