@@ -30,7 +30,7 @@
 #include "stdtypes.h"
 #include "llthread.h"
 
-#include "mutex.h"
+#include <shared_mutex>
 #include <condition_variable>
 
 //============================================================================
@@ -49,14 +49,14 @@ public:
 	LLMutex() = default;
 	
 	void lock();		// blocks
-	bool trylock();		// non-blocking, returns true if lock held.
+	bool try_lock();		// non-blocking, returns true if lock held.
 	void unlock();		// undefined behavior when called on mutex not being held
 	bool isLocked(); 	// non-blocking, but does do a lock/unlock so not free
 	bool isSelfLocked(); //return true if locked in a same thread
 	LLThread::id_t lockingThread() const; //get ID of locking thread
 
 protected:
-	std::mutex			mMutex;
+	std::shared_mutex			mMutex;
 	mutable U32			mCount = 0;
 	mutable LLThread::id_t	mLockingThread;
 	
@@ -76,7 +76,7 @@ public:
 	void broadcast();
 	
 protected:
-	std::condition_variable mCond;
+	std::condition_variable_any mCond;
 };
 
 class LLMutexLock
@@ -134,7 +134,7 @@ public:
 		mLocked(false)
 	{
 		if (mMutex)
-			mLocked = mMutex->trylock();
+			mLocked = mMutex->try_lock();
 	}
 
 	LLMutexTrylock(LLMutex* mutex, U32 aTries, U32 delay_ms = 10)
@@ -158,7 +158,7 @@ public:
 	{
 		if (mMutex && !mLocked)
 		{
-			mLocked = mMutex->trylock();
+			mLocked = mMutex->try_lock();
 		}
 	}
 
@@ -168,7 +168,7 @@ public:
 		{
 			for (U32 i = 0; i < aTries; ++i)
 			{
-				mLocked = mMutex->trylock();
+				mLocked = mMutex->try_lock();
 				if (mLocked)
 					break;
 				std::this_thread::sleep_for(std::chrono::milliseconds(delay_ms));
@@ -206,7 +206,7 @@ public:
     * @param mutex An allocated mutex. If you pass in NULL,
     * this wrapper will not lock.
     */
-    LLScopedLock(std::mutex* mutex);
+    LLScopedLock(std::shared_mutex* mutex);
 
     /**
     * @brief Destructor which unlocks the mutex if still locked.
@@ -225,7 +225,7 @@ public:
 
 protected:
     bool mLocked;
-    std::mutex* mMutex;
+    std::shared_mutex* mMutex;
 };
 
 #endif // LL_LLMUTEX_H

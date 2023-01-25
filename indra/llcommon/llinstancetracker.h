@@ -35,7 +35,7 @@
 #include <memory>
 #include <type_traits>
 
-#include "mutex.h"
+#include <shared_mutex>
 
 #include <boost/iterator/transform_iterator.hpp>
 #include <boost/iterator/indirect_iterator.hpp>
@@ -52,7 +52,7 @@ namespace LLInstanceTrackerPrivate
     struct StaticBase
     {
         // We need to be able to lock static data while manipulating it.
-        std::mutex mMutex;
+        std::shared_mutex mMutex;
     };
 
     void logerrs(const char* cls, const std::string&, const std::string&, const std::string&);

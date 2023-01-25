@@ -329,6 +329,7 @@ if(USE_PRECOMPILED_HEADERS AND ${CMAKE_VERSION} VERSION_GREATER "3.15.0")
     <functional>
     <map>
     <mutex>
+    <shared_mutex>
     <string>
     <string_view>
     <thread>

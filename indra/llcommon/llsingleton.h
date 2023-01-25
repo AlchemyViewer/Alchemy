@@ -31,10 +31,11 @@
 #include <list>
 #include <typeinfo>
 #include <vector>
-#include "mutex.h"
+#include <shared_mutex>
 #include "lockstatic.h"
 #include "llthread.h"               // on_main_thread()
 #include "llmainthreadtask.h"
+#include "llmutex.h"
 
 class LLSingletonBase: private boost::noncopyable
 {
@@ -292,7 +293,7 @@ private:
     {
         // Use a recursive_mutex in case of constructor circularity. With a
         // non-recursive mutex, that would result in deadlock.
-        typedef std::recursive_mutex mutex_t;
+        typedef LLMutex mutex_t;
         mutex_t mMutex;             // LockStatic looks for mMutex
 
         EInitState      mInitState{UNINITIALIZED};
