@@ -91,9 +91,6 @@ BOOL LLFloaterInspect::postBuild()
 {
 	mObjectList = getChild<LLScrollListCtrl>("object_list");
 
-	LLUICtrl::CommitCallbackRegistry::ScopedRegistrar registrar;
-	LLUICtrl::EnableCallbackRegistry::ScopedRegistrar enable_registrar;
-
 	mInspectColumnConfigConnection = gSavedSettings.getControl("ALInspectColumnConfig")->getSignal()->connect(boost::bind(&LLFloaterInspect::onColumnDisplayModeChanged, this));
 	onColumnDisplayModeChanged();
 	
