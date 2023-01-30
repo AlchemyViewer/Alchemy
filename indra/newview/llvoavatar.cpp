@@ -1520,7 +1520,7 @@ void LLVOAvatar::calculateSpatialExtents(LLVector4a& newMin, LLVector4a& newMax)
 
             if (joint && rig_info && rig_info->isRiggedTo())
             {
-                LLViewerJointAttachment *as_joint_attach = joint->asViewerJointAttachment();
+                LLViewerJointAttachment *as_joint_attach = dynamic_cast<LLViewerJointAttachment*>(joint);
                 if (as_joint_attach && as_joint_attach->getIsHUDAttachment())
                 {
                     // Ignore bounding box of HUD joints
@@ -7419,7 +7419,7 @@ BOOL LLVOAvatar::updateJointLODs()
 		}
 
 		// now select meshes to render based on adjusted pixel area
-		LLViewerJoint* root = mRoot && mRoot->asViewerJoint() ? mRoot->asViewerJoint() : nullptr;
+		LLViewerJoint* root = dynamic_cast<LLViewerJoint*>(mRoot);
 		BOOL res = FALSE;
 		if (root)
 		{
@@ -7519,7 +7519,7 @@ void LLVOAvatar::dirtyMesh(S32 priority)
 //-----------------------------------------------------------------------------
 LLViewerJoint*	LLVOAvatar::getViewerJoint(S32 idx)
 {
-	return (mMeshLOD[idx] && mMeshLOD[idx]->asViewerJoint()) ? mMeshLOD[idx]->asViewerJoint() : nullptr;
+	return dynamic_cast<LLViewerJoint*>(mMeshLOD[idx]);
 }
 
 //-----------------------------------------------------------------------------

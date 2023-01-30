@@ -41,9 +41,6 @@
 #include "xform.h"
 #include "llmatrix4a.h"
 
-class LLViewerJoint;
-class LLViewerJointAttachment;
-
 const S32 LL_CHARACTER_MAX_JOINTS_PER_MESH = 15;
 // Need to set this to count of animate-able joints,
 // currently = #bones + #collision_volumes + #attachments + 2,
@@ -192,9 +189,6 @@ public:
 	// *TODO: Only used for LLVOAvatarSelf::mScreenp.  *DOES NOT INITIALIZE mResetAfterRestoreOldXform*
 	LLJoint( const std::string &name, LLJoint *parent=NULL );
 	virtual ~LLJoint();
-
-	virtual LLViewerJointAttachment* asViewerJointAttachment() { return nullptr; }
-	virtual LLViewerJoint* asViewerJoint() { return nullptr; }
 
 private:
 	void init();
