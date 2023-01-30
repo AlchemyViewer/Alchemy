@@ -1056,11 +1056,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>21b4e5696181a867272dfe3dbec339159563387bebe43997ab5677c4a283bdd4cdb1e5bec9161fc74c0607328bb82979c30daf4a52ca2a026ec9361e204b09e3</string>
+              <string>291de8bfbef71ca67cce02ec6bb7a830ff5d81cf2f5ab758e938ff00f75bbd0774051b37ce63e3119ed28829c5d7768b29eacab3881f8b1d500918ddfccc7212</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/107/packages/generic/libhunspell/1.7.1.1724/libhunspell-1.7.1-darwin64-1724.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/107/packages/generic/libhunspell/1.7.2.1871/libhunspell-1.7.2-darwin64-1871.tar.zst</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
@@ -1070,11 +1070,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>17f2c23905d9469a5320e2a6e3d8496a1c2d9833f27f08fa94eef9ed64466ae2e2ac8c0e525cbd493d0e7937799023b756ea8a77e8c98408390f337c085d8cb5</string>
+              <string>0bd314b8f518f1a67f6d43b1777a1c6347977de3cced2c3cbe0a3198f2ff6b1ad7a2eef02d05f847c0fe44be13019845a6712bf85672d80b6e8e9ae3de1ceb1d</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/107/packages/generic/libhunspell/1.7.1.1724/libhunspell-1.7.1-linux64-1724.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/107/packages/generic/libhunspell/1.7.2.1871/libhunspell-1.7.2-linux64-1871.tar.zst</string>
             </map>
             <key>name</key>
             <string>linux64</string>
@@ -1084,18 +1084,18 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>4edd39f5a6e9e3247e1cf0121a7333219900d2dd10f092bcffcb7f56a21e69628b5478c985f4990082dc032342737b82868dadebbec2c0c8c8bec29b66d127f8</string>
+              <string>15fa091650ee1c5b248e131033bad34d1d540dd3e0aaf909ef0f8b4c69f3b07f133b4bcb20d088fbd8017fac4fc11b9b7dc8ccabe308265e6d2846b05f93f670</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/107/packages/generic/libhunspell/1.7.1.1724/libhunspell-1.7.1-windows64-1724.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/107/packages/generic/libhunspell/1.7.2.1871/libhunspell-1.7.2-windows64-1871.tar.zst</string>
             </map>
             <key>name</key>
             <string>windows64</string>
           </map>
         </map>
         <key>version</key>
-        <string>1.7.1</string>
+        <string>1.7.2</string>
       </map>
       <key>libjpeg-turbo</key>
       <map>
