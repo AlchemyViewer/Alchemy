@@ -389,7 +389,7 @@ bool LLTextParser::loadKeywords()
 	llifstream fileHighlights(getFileName());
 	if (!fileHighlights.is_open())
 	{
-		LL_WARNS() << "Can't open highlights file for reading" << LL_ENDL;
+		LL_DEBUGS() << "Can't open highlights file for reading" << LL_ENDL;
 		return false;
 	}
 
