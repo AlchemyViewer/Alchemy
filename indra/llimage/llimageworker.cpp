@@ -35,7 +35,8 @@ std::atomic< U32 > sImageThreads = 0;
 class PoolWorkerThread final : public LLThread
 {
 public:
-	PoolWorkerThread(std::string name) : LLThread(name), mRequestQueue(256)
+	PoolWorkerThread(std::string name) : LLThread(name),
+		mCurrentRequest(NULL)
 	{
 	}
 
@@ -43,36 +44,40 @@ public:
 	{
 		while (!isQuitting())
 		{
-            checkPause();
+			auto *pReq = mCurrentRequest.exchange(nullptr);
 
-			LLImageDecodeThread::ImageRequest* req  = nullptr;
-            while (!isQuitting() && mRequestQueue.tryPop(req))
-            {
-                if (req)
-                {
-                    req->processRequestIntern();
-                }
-            }
+			if (pReq)
+				pReq->processRequestIntern();
+			checkPause();
 		}
+	}
+	bool isBusy()
+	{
+		auto *pReq = mCurrentRequest.load();
+		if (!pReq)
+			return false;
+
+		auto status = pReq->getStatus();
+
+		return status  == LLQueuedThread::STATUS_QUEUED || status == LLQueuedThread::STATUS_INPROGRESS;
 	}
 
 	bool runCondition()
-    {
-        return mRequestQueue.size() > 0;
+	{
+		return mCurrentRequest != NULL;
 	}
 
 	bool setRequest(LLImageDecodeThread::ImageRequest* req)
 	{
-        bool bSuccess = mRequestQueue.tryPush(req);
-		if(bSuccess)
-		{
-		    wake();
-		}
+		LLImageDecodeThread::ImageRequest* pOld{ nullptr };
+		bool bSuccess = mCurrentRequest.compare_exchange_strong(pOld, req);
+		wake();
+
 		return bSuccess;
 	}
 
 private:
-	LLThreadSafeQueue<LLImageDecodeThread::ImageRequest*> mRequestQueue;
+	std::atomic<LLImageDecodeThread::ImageRequest*> mCurrentRequest;
 };
 
 //----------------------------------------------------------------------------
@@ -344,13 +349,14 @@ bool LLImageDecodeThread::ImageRequest::tut_isOK()
 
 bool LLImageDecodeThread::enqueRequest(ImageRequest * req)
 {
+	for(size_t num_tries = 0, pool_size = mThreadPool.size(); num_tries < pool_size; ++num_tries)
     {
-        if (mLastPoolAllocation >= mThreadPool.size())
+        if (mLastPoolAllocation >= pool_size)
         {
             mLastPoolAllocation = 0;
         }
         auto& thread = mThreadPool[mLastPoolAllocation++];
-        if (thread->setRequest(req))
+        if (!thread->isBusy() && thread->setRequest(req))
         {
             return true;
         }
