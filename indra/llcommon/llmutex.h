@@ -52,17 +52,9 @@ public:
 	bool try_lock();		// non-blocking, returns true if lock held.
 	void unlock();		// undefined behavior when called on mutex not being held
 	bool isLocked(); 	// non-blocking, but does do a lock/unlock so not free
-	bool isSelfLocked(); //return true if locked in a same thread
-	LLThread::id_t lockingThread() const; //get ID of locking thread
 
 protected:
-	std::shared_mutex			mMutex;
-	mutable U32			mCount = 0;
-	mutable LLThread::id_t	mLockingThread;
-	
-#if MUTEX_DEBUG
-	std::map<LLThread::id_t, BOOL> mIsLocked;
-#endif
+	std::recursive_mutex	mMutex;
 };
 
 // Actually a condition/mutex pair (since each condition needs to be associated with a mutex).

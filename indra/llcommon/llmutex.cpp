@@ -34,43 +34,12 @@
 void LLMutex::lock()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD
-	if(isSelfLocked())
-	{ //redundant lock
-		mCount++;
-		return;
-	}
-	
 	mMutex.lock();
-	
-#if MUTEX_DEBUG
-	// Have to have the lock before we can access the debug info
-	auto id = LLThread::currentID();
-	if (mIsLocked[id] != FALSE)
-		LL_ERRS() << "Already locked in Thread: " << id << LL_ENDL;
-	mIsLocked[id] = TRUE;
-#endif
-
-	mLockingThread = LLThread::currentID();
 }
 
 void LLMutex::unlock()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD
-	if (mCount > 0)
-	{ //not the root unlock
-		mCount--;
-		return;
-	}
-	
-#if MUTEX_DEBUG
-	// Access the debug info while we have the lock
-	auto id = LLThread::currentID();
-	if (mIsLocked[id] != TRUE)
-		LL_ERRS() << "Not locked in Thread: " << id << LL_ENDL;	
-	mIsLocked[id] = FALSE;
-#endif
-
-	mLockingThread = LLThread::id_t();
 	mMutex.unlock();
 }
 
@@ -88,40 +57,10 @@ bool LLMutex::isLocked()
 	}
 }
 
-bool LLMutex::isSelfLocked()
-{
-	return mLockingThread == LLThread::currentID();
-}
-
-LLThread::id_t LLMutex::lockingThread() const
-{
-	return mLockingThread;
-}
-
 bool LLMutex::try_lock()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD
-	if(isSelfLocked())
-	{ //redundant lock
-		mCount++;
-		return true;
-	}
-	
-	if (!mMutex.try_lock())
-	{
-		return false;
-	}
-	
-#if MUTEX_DEBUG
-	// Have to have the lock before we can access the debug info
-	auto id = LLThread::currentID();
-	if (mIsLocked[id] != FALSE)
-		LL_ERRS() << "Already locked in Thread: " << id << LL_ENDL;
-	mIsLocked[id] = TRUE;
-#endif
-
-	mLockingThread = LLThread::currentID();
-	return true;
+	return mMutex.try_lock();
 }
 
 //============================================================================
@@ -135,7 +74,7 @@ LLCondition::LLCondition() :
 void LLCondition::wait()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD
-	std::unique_lock< std::shared_mutex > lock(mMutex);
+	std::unique_lock<std::recursive_mutex> lock(mMutex);
 	mCond.wait(lock);
 }
 
