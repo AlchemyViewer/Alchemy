@@ -287,8 +287,6 @@ LLAvatarAppearance::~LLAvatarAppearance()
 	if (mRoot)
     {
         mRoot->removeAllChildren();
-        delete mRoot;
-		mRoot = nullptr;
     }
 	mJointMap.clear();
 
@@ -308,6 +306,9 @@ LLAvatarAppearance::~LLAvatarAppearance()
 	}
 	std::for_each(mMeshLOD.begin(), mMeshLOD.end(), DeletePointer());
 	mMeshLOD.clear();
+
+    delete mRoot;
+    mRoot = nullptr;
 }
 
 //static
