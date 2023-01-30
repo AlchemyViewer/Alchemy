@@ -31,19 +31,26 @@
 
 //static LLDefaultChildRegistry::Register<LLFlyoutButton> r2("flyout_button");
 
-const S32 FLYOUT_BUTTON_ARROW_WIDTH = 24;
+//const S32 FLYOUT_BUTTON_ARROW_WIDTH = 24;
 
 LLFlyoutButton::LLFlyoutButton(const Params& p)
 :	LLComboBox(p),
 	mToggleState(FALSE),
 	mActionButton(NULL)
 {
+// [SL:KB] - Patch: Control-FlyoutButton | Checked: Catznip-6.4
+	mButton->setLabel(LLStringUtil::null);
+// [/SL:KB]
+
 	// Always use text box 
 	// Text label button
 	LLButton::Params bp(p.action_button);
 	bp.name(p.label);
 	bp.label(p.label);
-	bp.rect.left(0).bottom(0).width(getRect().getWidth() - FLYOUT_BUTTON_ARROW_WIDTH).height(getRect().getHeight());
+//	bp.rect.left(0).bottom(0).width(getRect().getWidth() - FLYOUT_BUTTON_ARROW_WIDTH).height(getRect().getHeight());
+// [SL:KB] - Patch: Control-FlyoutButton | Checked: 2012-08-09 (Catznip-3.3)
+	bp.rect.left(0).bottom(0).width(getRect().getWidth() - p.arrow_button_width).height(getRect().getHeight());
+// [/SL:KB]
 	bp.click_callback.function(boost::bind(&LLFlyoutButton::onActionButtonClick, this, _2));
 	bp.follows.flags(FOLLOWS_ALL);
 
@@ -65,7 +72,7 @@ void LLFlyoutButton::draw()
 
 	//FIXME: this should be an attribute of comboboxes, whether they have a distinct label or
 	// the label reflects the last selected item, for now we have to manually remove the label
-	setLabel(LLStringUtil::null);
+//	setLabel(LLStringUtil::null);
 	LLComboBox::draw();	
 }
 
