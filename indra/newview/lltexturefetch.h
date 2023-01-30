@@ -310,7 +310,7 @@ private:
 	LLImageDecodeThread* mImageDecodeThread;
 	
 	// Map of all requests by UUID
-	typedef boost::unordered_flat_map<LLUUID,LLTextureFetchWorker*> map_t;
+	typedef boost::unordered_map<LLUUID,LLTextureFetchWorker*> map_t;
 	map_t mRequestMap;													// Mfq
 
 	// Set of requests that require network data

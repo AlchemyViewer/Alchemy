@@ -206,7 +206,7 @@ private:
 	// so it needs own pool (not thread safe by itself, relies onto header's mutex)
 	LLVolatileAPRPool*   mHeaderAPRFilePoolp;
 	
-	typedef boost::unordered_flat_map<handle_t, LLTextureCacheWorker*> handle_map_t;
+	typedef boost::unordered_map<handle_t, LLTextureCacheWorker*> handle_map_t;
 	handle_map_t mReaders;
 	handle_map_t mWriters;
 
@@ -227,7 +227,7 @@ private:
 	EntriesInfo mHeaderEntriesInfo;
 	std::set<S32> mFreeList; // deleted entries
 	std::set<LLUUID> mLRU;
-	typedef boost::unordered_flat_map<LLUUID, S32> id_map_t;
+	typedef boost::unordered_map<LLUUID, S32> id_map_t;
 	id_map_t mHeaderIDMap;
 
 	LLAPRFile*   mFastCachep;
@@ -236,12 +236,12 @@ private:
 
 	// BODIES (TEXTURES minus headers)
 	std::string mTexturesDirName;
-	typedef boost::unordered_flat_map<LLUUID,S32> size_map_t;
+	typedef boost::unordered_map<LLUUID,S32> size_map_t;
 	size_map_t mTexturesSizeMap;
 	S64 mTexturesSizeTotal;
 	LLAtomicBool mDoPurge;
 
-	typedef boost::unordered_flat_map<S32, Entry> idx_entry_map_t;
+	typedef boost::unordered_map<S32, Entry> idx_entry_map_t;
 	idx_entry_map_t mUpdatedEntryMap;
 	typedef std::vector<std::pair<S32, Entry> > idx_entry_vector_t;
 	idx_entry_vector_t mPurgeEntryList;
