@@ -78,7 +78,7 @@ protected:
 
 	bool mLastOutfitDirtiness;
 
-	LLMD5 mItemNameHash;
+	U64 mItemNameHash;
 
 private:
 	signal_t mBOFReplaced;

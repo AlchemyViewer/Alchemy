@@ -47,6 +47,7 @@
 #include "httphandler.h"
 #include "lleventcoro.h"
 #include "llcoros.h"
+#include "alxxh.h"
 
 #include "boost/unordered/unordered_map.hpp"
 #include "boost/unordered/unordered_flat_map.hpp"
@@ -261,7 +262,7 @@ public:
 								item_array_t*& items) const;
 
 	// Compute a hash of direct descendant names (for detecting child name changes)
-	LLMD5 hashDirectDescendentNames(const LLUUID& cat_id) const;
+	U64 hashDirectDescendentNames(const LLUUID& cat_id) const;
 	
 	// Starting with the object specified, add its descendants to the
 	// array provided, but do not add the inventory object specified
