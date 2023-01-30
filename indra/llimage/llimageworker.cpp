@@ -349,7 +349,7 @@ bool LLImageDecodeThread::ImageRequest::tut_isOK()
 
 bool LLImageDecodeThread::enqueRequest(ImageRequest * req)
 {
-	for(size_t num_tries = 0, pool_size = mThreadPool.size(); num_tries < pool_size; ++num_tries)
+	for(size_t num_tries = 0, pool_size = mThreadPool.size(); num_tries <= pool_size; ++num_tries)
     {
         if (mLastPoolAllocation >= pool_size)
         {
