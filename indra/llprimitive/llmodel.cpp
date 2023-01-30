@@ -41,6 +41,8 @@
 # include "zlib/zlib.h"
 #endif
 
+#include "alxxh.h"
+
 std::string model_names[] =
 {
 	"lowest_lod",
@@ -1544,7 +1546,7 @@ LLSD LLMeshSkinInfo::asLLSD(bool include_joints, bool lock_scale_if_joint_positi
 void LLMeshSkinInfo::updateHash()
 {
     //  get hash of data relevant to render batches
-    LLMD5 hash;
+    ALXXH hash;
 
     //mJointNames
     for (auto& name : mJointNames)
@@ -1567,10 +1569,7 @@ void LLMeshSkinInfo::updateHash()
 
     hash.finalize();
 
-    U64 digest[2];
-    hash.raw_digest((U8*) digest);
-
-    mHash = digest[0];
+    mHash = hash.digest();
 }
 
 U32 LLMeshSkinInfo::sizeBytes() const
