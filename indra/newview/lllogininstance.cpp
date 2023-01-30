@@ -290,11 +290,7 @@ void LLLoginInstance::constructAuthParams(LLPointer<LLCredential> user_credentia
 	mRequestData["params"] = request_params;
 	mRequestData["options"] = requested_options;
 	mRequestData["http_params"] = http_params;
-#if LL_RELEASE_FOR_DOWNLOAD
-    mRequestData["wait_for_updater"] = LLAppViewer::instance()->waitForUpdater();
-#else
     mRequestData["wait_for_updater"] = false;
-#endif
 }
 
 bool LLLoginInstance::handleLoginEvent(const LLSD& event)
