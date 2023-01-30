@@ -2447,6 +2447,68 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
         <key>version</key>
         <string>0.54.1</string>
       </map>
+      <key>xxhash</key>
+      <map>
+        <key>canonical_repo</key>
+        <string>https://git.alchemyviewer.org/alchemy/thirdparty/3p-xxhash</string>
+        <key>copyright</key>
+        <string>Copyright (c) 2012-2021 Yann Collet</string>
+        <key>description</key>
+        <string>Extremely fast non-cryptographic hash algorithm</string>
+        <key>license</key>
+        <string>BSD 2-Clause</string>
+        <key>license_file</key>
+        <string>LICENSES/xxhash.txt</string>
+        <key>name</key>
+        <string>xxhash</string>
+        <key>platforms</key>
+        <map>
+          <key>darwin64</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>hash</key>
+              <string>b3bc18dbb02a910000d8ab710d3f5da43935f15894ff51c3bd6c7d7beeaa6cdb6d124f8143657ec81c424a3d32ac2e1046683fd0a140775a953e4c85669da21a</string>
+              <key>hash_algorithm</key>
+              <string>blake2b</string>
+              <key>url</key>
+              <string>https://git.alchemyviewer.org/api/v4/projects/202/packages/generic/xxhash/0.8.1.1872/xxhash-0.8.1-darwin64-1872.tar.zst</string>
+            </map>
+            <key>name</key>
+            <string>darwin64</string>
+          </map>
+          <key>linux64</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>hash</key>
+              <string>d02ea9260eff0df687261dcf7201858408501b5dbe4e0cb3e402363d50cd44111936f7a5baae06c8addf56155e5815fbb41540af68188c4e9616f804ad438875</string>
+              <key>hash_algorithm</key>
+              <string>blake2b</string>
+              <key>url</key>
+              <string>https://git.alchemyviewer.org/api/v4/projects/202/packages/generic/xxhash/0.8.1.1872/xxhash-0.8.1-linux64-1872.tar.zst</string>
+            </map>
+            <key>name</key>
+            <string>linux64</string>
+          </map>
+          <key>windows64</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>hash</key>
+              <string>ced6c02704cffb9c5ebe33fbef50cae56ebe332c8562f3e5c1ad18a83b529b957422a6d58c91e08ab854cd6328ee51e8b3f9788ac819b0c565c262bb6050046d</string>
+              <key>hash_algorithm</key>
+              <string>blake2b</string>
+              <key>url</key>
+              <string>https://git.alchemyviewer.org/api/v4/projects/202/packages/generic/xxhash/0.8.1.1872/xxhash-0.8.1-windows64-1872.tar.zst</string>
+            </map>
+            <key>name</key>
+            <string>windows64</string>
+          </map>
+        </map>
+        <key>version</key>
+        <string>0.8.1</string>
+      </map>
       <key>zlib-ng</key>
       <map>
         <key>canonical_repo</key>

@@ -14,6 +14,7 @@ include(ZLIBNG)
 include(URIPARSER)
 include(Tracy)
 include(OpenSSL)
+include(XXHash)
 
 include_directories(
     ${EXPAT_INCLUDE_DIRS}
@@ -21,6 +22,7 @@ include_directories(
     ${LLMATH_INCLUDE_DIRS}
     ${ZLIBNG_INCLUDE_DIRS}
     ${URIPARSER_INCLUDE_DIRS}
+    ${XXHASH_INCLUDE_DIRS}
     )
 
 # add_executable(lltreeiterators lltreeiterators.cpp)
@@ -29,6 +31,7 @@ include_directories(
 #     ${LLCOMMON_LIBRARIES})
 
 set(llcommon_SOURCE_FILES
+    alxxh.cpp
     indra_constants.cpp
     llapp.cpp
     llapr.cpp
@@ -126,6 +129,7 @@ set(llcommon_SOURCE_FILES
 set(llcommon_HEADER_FILES
     CMakeLists.txt
 
+    alxxh.h
     chrono.h
     classic_callback.h
     ctype_workaround.h
