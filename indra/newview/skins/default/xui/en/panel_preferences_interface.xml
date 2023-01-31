@@ -148,6 +148,88 @@
     layout="topleft"
     left="45"
     name="DoubleClickWearableAddCheck"
-    top_pad="5"
+    top_pad="4"
     width="256"/>
+  <text
+     type="string"
+     length="1"
+     follows="left|top"
+     height="10"
+     layout="topleft"
+     left="30"
+     name="SecurityText"
+     mouse_opaque="false"
+     top_pad="5"
+     width="300">
+    Security:
+  </text>
+      <check_box
+       follows="left|top"
+       height="16"
+       label="Block left-click sitting on Objects"
+       left="45"
+       top_pad="7"
+       name="AlchemyDisableClickToSit"
+       width="275"
+       control_name="AlchemyDisableClickToSit"/>
+      <check_box
+       follows="left|top"
+       height="16"
+       label="Allow scripts to show map UI (llMapDestination)"
+       left="45"
+       top_pad="4"
+       name="ScriptsCanShowUI"
+       width="275"
+       control_name="ScriptsCanShowUI"/>
+      <text
+       type="string"
+       length="1"
+       follows="left|top"
+       height="16"
+       layout="topleft"
+       left="49"
+       name="inworld_typing_rg_label"
+       top_pad="5"
+       width="300"
+       value="Revoke object permissions when:" />
+      <radio_group
+       control_name="AlchemyRevokeObjectPerms"
+       height="20"
+       layout="topleft"
+       name="revoke_perms_radio"
+       width="340">
+        <radio_item
+         top_pad="0"
+         left_delta="15"
+         height="16"
+         label="Never"
+         layout="topleft"
+         name="None"
+         value="0"
+         width="90" />
+        <radio_item
+         left_pad="1"
+         height="16"
+         label="Sitting"
+         layout="topleft"
+         name="Sitting"
+         value="1"
+         width="90" />
+        <radio_item
+         left_pad="1"
+         height="16"
+         label="Standing"
+         layout="topleft"
+         name="Standing"
+         value="2"
+         width="90" />
+        <radio_item
+         left_pad="1"
+         height="16"
+         label="Both"
+         layout="topleft"
+         name="Both"
+         value="3"
+         width="90" />
+    </radio_group>
 </panel>

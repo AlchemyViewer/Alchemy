@@ -13,6 +13,17 @@
       <key>Value</key>
       <integer>2</integer>
     </map>
+    <key>AlchemyDisableClickToSit</key>
+    <map>
+      <key>Comment</key>
+      <string>Disable automatic sit upon click for sit click action targets</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <integer>0</integer>
+    </map>
     <key>AlchemyCameraNoZoomLimit</key>
     <map>
       <key>Comment</key>
@@ -815,6 +826,17 @@
       <string>Boolean</string>
       <key>Value</key>
       <integer>1</integer>
+    </map>
+    <key>AlchemyRevokeObjectPerms</key>
+    <map>
+      <key>Comment</key>
+      <string>Revoke permissions on object on sit(1), stand(2) or both(3)</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>U32</string>
+      <key>Value</key>
+      <integer>0</integer>
     </map>
     <key>AlchemyRezUnderLandGroup</key>
     <map>
