@@ -83,23 +83,20 @@ public:
 
     LLVolatileAPRPool* getLocalAPRFilePool() { return mLocalAPRFilePoolp ; }
 
-    id_t getID() const { return mID; }
+    id_t getID() const;
 
 private:
     bool                mPaused;
-    std::thread::native_handle_type mNativeHandle; // for termination in case of issues
-    
+
     // static function passed to APR thread creation routine
     void threadRun();
 
 protected:
     std::string         mName;
-    class LLCondition*  mRunCondition;
-    LLMutex*            mDataLock;
-
-    std::thread        *mThreadp;
-    EThreadStatus       mStatus;
-    id_t                mID;
+    std::unique_ptr<class LLCondition>  mRunCondition;
+    std::unique_ptr<LLMutex>            mDataLock;
+    std::unique_ptr<std::thread>        mThreadp;
+    std::atomic_int                     mStatus;
 #ifndef LL_RELEASE_FOR_DOWNLOAD
     LLTrace::ThreadRecorder* mRecorder;
 #endif

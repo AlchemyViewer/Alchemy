@@ -1411,7 +1411,7 @@ bool LLMeshRepoThread::fetchMeshSkinInfo(const LLUUID& mesh_id, bool can_retry)
 			LLCore::HttpHandle handle = getByteRange(http_url, legacy_cap_version, info.mOffset, info.mSize, handler);
 			if (LLCORE_HTTP_HANDLE_INVALID == handle)
 			{
-				LL_WARNS(LOG_MESH) << "HTTP GET request failed for skin info on mesh " << mID
+				LL_WARNS(LOG_MESH) << "HTTP GET request failed for skin info on mesh " << getID()
 								   << ".  Reason:  " << mHttpStatus.toString()
 								   << " (" << mHttpStatus.toTerseString() << ")"
 								   << LL_ENDL;
@@ -1469,7 +1469,7 @@ bool LLMeshRepoThread::fetchMeshDecomposition(const LLUUID& mesh_id)
 			LLCore::HttpHandle handle = getByteRange(http_url, legacy_cap_version, info.mOffset, info.mSize, handler);
 			if (LLCORE_HTTP_HANDLE_INVALID == handle)
 			{
-				LL_WARNS(LOG_MESH) << "HTTP GET request failed for decomposition mesh " << mID
+				LL_WARNS(LOG_MESH) << "HTTP GET request failed for decomposition mesh " << getID()
 								   << ".  Reason:  " << mHttpStatus.toString()
 								   << " (" << mHttpStatus.toTerseString() << ")"
 								   << LL_ENDL;
@@ -1511,7 +1511,7 @@ bool LLMeshRepoThread::fetchMeshPhysicsShape(const LLUUID& mesh_id)
 			LLCore::HttpHandle handle = getByteRange(http_url, legacy_cap_version, info.mOffset, info.mSize, handler);
 			if (LLCORE_HTTP_HANDLE_INVALID == handle)
 			{
-				LL_WARNS(LOG_MESH) << "HTTP GET request failed for physics shape on mesh " << mID
+				LL_WARNS(LOG_MESH) << "HTTP GET request failed for physics shape on mesh " << getID()
 									<< ".  Reason:  " << mHttpStatus.toString()
 									<< " (" << mHttpStatus.toTerseString() << ")"
 									<< LL_ENDL;
@@ -1613,7 +1613,7 @@ bool LLMeshRepoThread::fetchMeshHeader(const LLVolumeParams& mesh_params, bool c
 		LLCore::HttpHandle handle = getByteRange(http_url, legacy_cap_version, 0, MESH_HEADER_SIZE, handler);
 		if (LLCORE_HTTP_HANDLE_INVALID == handle)
 		{
-			LL_WARNS(LOG_MESH) << "HTTP GET request failed for mesh header " << mID
+			LL_WARNS(LOG_MESH) << "HTTP GET request failed for mesh header " << getID()
 							   << ".  Reason:  " << mHttpStatus.toString()
 							   << " (" << mHttpStatus.toTerseString() << ")"
 							   << LL_ENDL;
@@ -1661,7 +1661,7 @@ bool LLMeshRepoThread::fetchMeshLOD(const LLVolumeParams& mesh_params, S32 lod, 
 			LLCore::HttpHandle handle = getByteRange(http_url, legacy_cap_version, info.mOffset, info.mSize, handler);
 			if (LLCORE_HTTP_HANDLE_INVALID == handle)
 			{
-				LL_WARNS(LOG_MESH) << "HTTP GET request failed for LOD on mesh " << mID
+				LL_WARNS(LOG_MESH) << "HTTP GET request failed for LOD on mesh " << getID()
 									<< ".  Reason:  " << mHttpStatus.toString()
 									<< " (" << mHttpStatus.toTerseString() << ")"
 									<< LL_ENDL;

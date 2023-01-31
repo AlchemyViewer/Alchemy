@@ -124,18 +124,17 @@ LL_COMMON_API void assert_main_thread()
 }
 
 //
-// Handed to the APR thread creation function
+// Handed to the thread creation function
 //
 void LLThread::threadRun()
 {
+    // Set thread state to running
+    mStatus = RUNNING;
+
 #ifdef LL_WINDOWS
     set_thread_name(mName.c_str());
 #endif
-
     LL_PROFILER_SET_THREAD_NAME( mName.c_str() );
-
-    // this is the first point at which we're actually running in the new thread
-    mID = currentID();
 
 #ifndef LL_RELEASE_FOR_DOWNLOAD
     // for now, hard code all LLThreads to report to single master thread recorder, which is known to be running on main thread
@@ -182,14 +181,13 @@ void LLThread::threadRun()
 LLThread::LLThread(const std::string& name, apr_pool_t *poolp) :
     mPaused(FALSE),
     mName(name),
-    mThreadp(NULL),
     mStatus(STOPPED)
 #ifndef LL_RELEASE_FOR_DOWNLOAD
     , mRecorder(NULL)
 #endif
 {
-    mRunCondition = new LLCondition();
-    mDataLock = new LLMutex();
+    mRunCondition = std::make_unique<LLCondition>();
+    mDataLock = std::make_unique<LLMutex>();
     mLocalAPRFilePoolp = NULL ;
 }
 
@@ -251,16 +249,11 @@ void LLThread::shutdown()
             mThreadp->join();
             LL_INFOS() << "Successfully joined thread: " << mName << LL_ENDL;
         }
-
-        delete mThreadp;
-        mThreadp = NULL;
     }
 
-    delete mRunCondition;
-    mRunCondition = NULL;
-
-    delete mDataLock;
-    mDataLock = NULL;
+    mThreadp.reset();
+    mRunCondition.reset();
+    mDataLock.reset();
 #ifndef LL_RELEASE_FOR_DOWNLOAD
     if (mRecorder)
     {
@@ -272,24 +265,28 @@ void LLThread::shutdown()
 #endif
 }
 
-
 void LLThread::start()
 {
     llassert(isStopped());
-    
-    // Set thread state to running
-    mStatus = RUNNING;
-
     try
     {
-        mThreadp = new std::thread(std::bind(&LLThread::threadRun, this));
-        mNativeHandle = mThreadp->native_handle();
+        mThreadp = std::make_unique<std::thread>(std::bind(&LLThread::threadRun, this));
 	}
 	catch (const std::system_error& err)
 	{
 		mStatus = CRASHED;
 		LL_WARNS() << "Failed to start thread: \"" << mName << "\" due to error: " << err.what() << LL_ENDL;
 	}
+    catch (const std::bad_alloc& err)
+	{
+		mStatus = CRASHED;
+		LL_WARNS() << "Failed to allocate thread: \"" << mName << "\" due to error: " << err.what() << LL_ENDL;
+	}
+}
+
+LLThread::id_t LLThread::getID() const
+{
+    return mThreadp ? mThreadp->get_id() : std::thread::id();
 }
 
 //============================================================================
