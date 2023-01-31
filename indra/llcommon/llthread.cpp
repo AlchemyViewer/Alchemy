@@ -123,9 +123,6 @@ LL_COMMON_API void assert_main_thread()
     }
 }
 
-// this function has become moot
-void LLThread::registerThreadID() {}
-
 //
 // Handed to the APR thread creation function
 //
@@ -249,23 +246,12 @@ void LLThread::shutdown()
             }
         }
 
-        if (!isStopped())
+        if(mThreadp->joinable())
         {
-            // This thread just wouldn't stop, even though we gave it time
-            //LL_WARNS() << "LLThread::~LLThread() exiting thread before clean exit!" << LL_ENDL;
-            // Put a stake in its heart. (A very hostile method to force a thread to quit)
-#if		LL_WINDOWS
-            TerminateThread(mNativeHandle, 0);
-#else
-            pthread_cancel(mNativeHandle);
-#endif
-#ifndef LL_RELEASE_FOR_DOWNLOAD
-            delete mRecorder;
-            mRecorder = NULL;
-#endif
-            mStatus = STOPPED;
-            return;
+            mThreadp->join();
+            LL_INFOS() << "Successfully joined thread: " << mName << LL_ENDL;
         }
+
         delete mThreadp;
         mThreadp = NULL;
     }
@@ -298,7 +284,6 @@ void LLThread::start()
     {
         mThreadp = new std::thread(std::bind(&LLThread::threadRun, this));
         mNativeHandle = mThreadp->native_handle();
-		mThreadp->detach();
 	}
 	catch (const std::system_error& err)
 	{
