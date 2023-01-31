@@ -227,7 +227,7 @@ protected:
 	static volatile EState				sState;
 	HttpRequestQueue *					mRequestQueue;	// Refcounted
 	LLAtomicU32							mExitRequested;
-	LLCoreInt::HttpThread *				mThread;
+	std::unique_ptr<LLCoreInt::HttpThread>		mThread;
 	
 	// === working-thread-only data ===
 	HttpPolicy *						mPolicy;		// Simple pointer, has ownership

@@ -27,6 +27,7 @@
 #ifndef	_LLCORE_HTTP_REQUEST_H_
 #define	_LLCORE_HTTP_REQUEST_H_
 
+#include <boost/function.hpp>
 
 #include "httpcommon.h"
 #include "httphandler.h"

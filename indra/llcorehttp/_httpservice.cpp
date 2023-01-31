@@ -71,7 +71,6 @@ volatile HttpService::EState HttpService::sState(NOT_INITIALIZED);
 HttpService::HttpService()
 	: mRequestQueue(NULL),
 	  mExitRequested(0U),
-	  mThread(NULL),
 	  mPolicy(NULL),
 	  mTransport(NULL),
 	  mLastPolicy(0)
@@ -93,22 +92,15 @@ HttpService::~HttpService()
                 ms_sleep(10);
             }
 		}
-		
-		if (mThread)
-		{
-			if (! mThread->timedJoin(250))
-			{
-				// Failed to join, expect problems ahead so do a hard termination.
-				LL_WARNS(LOG_CORE) << "Destroying HttpService with running thread.  Expect problems." << LL_NEWLINE
-									<< "State: " << S32(sState)
-									<< " Last policy: " << U32(mLastPolicy)
-									<< LL_ENDL;
-
-				mThread->cancel();
-			}
-		}
 	}
-	
+
+	if (mThread && mThread->joinable())
+	{
+		mThread->join();
+		LL_INFOS() << "Joined HTTP Service Thread." << LL_ENDL;
+	}
+	mThread.reset();
+
 	if (mRequestQueue)
 	{
 		mRequestQueue->release();
@@ -120,12 +112,6 @@ HttpService::~HttpService()
 	
 	delete mPolicy;
 	mPolicy = NULL;
-
-	if (mThread)
-	{
-		mThread->release();
-		mThread = NULL;
-	}
 }
 	
 
@@ -201,14 +187,14 @@ void HttpService::startThread()
 
 	if (mThread)
 	{
-		mThread->release();
+		mThread.reset();
 	}
 
 	// Push current policy definitions, enable policy & transport components
 	mPolicy->start();
 	mTransport->start(mLastPolicy + 1);
 
-	mThread = new LLCoreInt::HttpThread(boost::bind(&HttpService::threadRun, this, _1));
+	mThread = std::make_unique<LLCoreInt::HttpThread>(boost::bind(&HttpService::threadRun, this, _1));
 	sState = RUNNING;
 }
 
@@ -293,10 +279,6 @@ void HttpService::shutdown()
 // requested to stop.
 void HttpService::threadRun(LLCoreInt::HttpThread * thread)
 {
-	boost::this_thread::disable_interruption di;
-
-	LLThread::registerThreadID();
-	
 	ELoopSpeed loop(REQUEST_SLEEP);
 	while (! mExitRequested)
 	{
