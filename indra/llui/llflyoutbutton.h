@@ -61,6 +61,10 @@ protected:
 	friend class LLUICtrlFactory;
 public:
 	virtual void	draw();
+// [SL:KB] - Patch: Control-FlyoutButton | Checked: Catznip-6.4
+	        void	setLabel(const LLStringExplicit& name) override;
+			void    updateLabel() override;
+// [/SL:KB]
 
 	void setToggleState(BOOL state);
 

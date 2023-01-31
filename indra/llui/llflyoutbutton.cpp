@@ -76,6 +76,21 @@ void LLFlyoutButton::draw()
 	LLComboBox::draw();	
 }
 
+// [SL:KB] - Patch: Control-FlyoutButton | Checked: Catznip-6.4
+// override
+void LLFlyoutButton::setLabel(const LLStringExplicit& name)
+{
+	mActionButton->setLabel(name);
+	mButton->setLabel(LLStringUtil::null);
+}
+
+// override
+void LLFlyoutButton::updateLabel()
+{
+	mButton->setLabel(LLStringUtil::null);
+}
+// [/SL:KB]
+
 void LLFlyoutButton::setToggleState(BOOL state)
 {
 	mToggleState = state;
