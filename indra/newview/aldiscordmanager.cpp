@@ -180,7 +180,7 @@ void ALDiscordManager::updateActivity()
 	static LLCachedControl<bool> discord_shared_region(gSavedPerAccountSettings, "ALDiscordShareLocationRegion", true);
 	static LLCachedControl<U32> discord_shared_region_maturity(gSavedPerAccountSettings, "ALDiscordShareRegionMaxMaturity", true);
 	std::string region_name;
-	if (RlvActions::canShowLocation() && discord_shared_region && region->getSimAccess() > discord_shared_region_maturity)
+	if (RlvActions::canShowLocation() && discord_shared_region && region->getSimAccess() >= discord_shared_region_maturity)
 	{
 		const LLVector3& pos = gAgent.getPositionAgent();
 		region_name = fmt::format(FMT_COMPILE("{} ({:.0f}, {:.0f}, {:.0f})"), region->getName(), pos.mV[VX], pos.mV[VY], pos.mV[VZ]);
