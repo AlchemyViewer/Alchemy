@@ -269,14 +269,9 @@ static bool handleLUTBufferChanged(const LLSD& newvalue)
 	return true;
 }
 
-static bool handleAnisotropicFilteringChanged(LLControlVariable* ctrl, const LLSD& newval)
+static bool handleAnisotropicFilteringChanged(const LLSD& newval)
 {
 	F32 val = newval.asReal();
-	if (val > gGLManager.mGLMaxAnisotropy)
-	{
-		val = llclamp(val, 0.f, gGLManager.mGLMaxAnisotropy);
-		ctrl->setValue(val);
-	}
 	LLRender::sAnisotropicFilteringLevel = val;
 	LLImageGL::dirtyTexOptions();
 	return true;
@@ -517,14 +512,8 @@ static bool handleRenderDebugPipelineChanged(const LLSD& newvalue)
 	return true;
 }
 
-static bool validateRenderResolutionDivisor(const LLSD& newvalue)
+static bool handleRenderResolutionDivisorChanged(const LLSD&)
 {
-	return (newvalue.asReal() > 0.01f);
-}
-
-static bool handleRenderResolutionDivisorChanged(const LLSD& newvalue)
-{
-	LLPipeline::RenderResolutionMultiplier = llmin((F32)newvalue.asReal(), 0.01f);
 	gResizeScreenTexture = TRUE;
 	return true;
 }
@@ -746,20 +735,19 @@ void settings_setup_listeners()
 	setting_setup_signal_listener(gSavedSettings, "RenderDebugTextureBind", handleResetVertexBuffersChanged);
 	setting_setup_signal_listener(gSavedSettings, "RenderAutoMaskAlphaDeferred", handleResetVertexBuffersChanged);
 	setting_setup_signal_listener(gSavedSettings, "RenderAutoMaskAlphaNonDeferred", handleResetVertexBuffersChanged);
-	gSavedSettings.getControl("RenderAutoMaskAlphaUseRMSE")->getSignal()->connect(boost::bind(&handleResetVertexBuffersChanged, _2));
-	gSavedSettings.getControl("RenderAutoMaskAlphaMaxRMSE")->getSignal()->connect(boost::bind(&handleResetVertexBuffersChanged, _2));
-	gSavedSettings.getControl("RenderAutoMaskAlphaMaxMid")->getSignal()->connect(boost::bind(&handleResetVertexBuffersChanged, _2));
+	setting_setup_signal_listener(gSavedSettings, "RenderAutoMaskAlphaUseRMSE", handleResetVertexBuffersChanged);
+	setting_setup_signal_listener(gSavedSettings, "RenderAutoMaskAlphaMaxRMSE", handleResetVertexBuffersChanged);
+	setting_setup_signal_listener(gSavedSettings, "RenderAutoMaskAlphaMaxMid", handleResetVertexBuffersChanged);
 	setting_setup_signal_listener(gSavedSettings, "RenderObjectBump", handleRenderBumpChanged);
 	setting_setup_signal_listener(gSavedSettings, "RenderMaxVBOSize", handleResetVertexBuffersChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderVSyncEnable", handleVSyncChanged);
 	setting_setup_signal_listener(gSavedSettings, "RenderDeferredNoise", handleReleaseGLBufferChanged);
 	setting_setup_signal_listener(gSavedSettings, "RenderDebugPipeline", handleRenderDebugPipelineChanged);
-	gSavedSettings.getControl("RenderResolutionDivisor")->getValidateSignal()->connect(boost::bind(&validateRenderResolutionDivisor, _2));
 	setting_setup_signal_listener(gSavedSettings, "RenderResolutionDivisor", handleRenderResolutionDivisorChanged);
 // [SL:KB] - Patch: Settings-RenderResolutionMultiplier | Checked: Catznip-5.4
-	gSavedSettings.getControl("RenderResolutionMultiplier")->getSignal()->connect(boost::bind(&handleRenderResolutionDivisorChanged, _2));
+	setting_setup_signal_listener(gSavedSettings, "RenderResolutionMultiplier", handleRenderResolutionDivisorChanged);
 // [/SL:KB]
-	gSavedSettings.getControl("RenderWaterRefResolution")->getSignal()->connect(boost::bind(&handleReleaseGLBufferChanged, _2));
+	setting_setup_signal_listener(gSavedSettings, "RenderWaterRefResolution", handleReleaseGLBufferChanged);
 	setting_setup_signal_listener(gSavedSettings, "RenderDeferred", handleRenderDeferredChanged);
 	setting_setup_signal_listener(gSavedSettings, "RenderShadowDetail", handleSetShaderChanged);
 	setting_setup_signal_listener(gSavedSettings, "RenderDeferredSSAO", handleSetShaderChanged);
@@ -867,11 +855,11 @@ void settings_setup_listeners()
 
     setting_setup_signal_listener(gSavedPerAccountSettings, "AvatarHoverOffsetZ", handleAvatarHoverOffsetChanged);
 // [RLVa:KB] - Checked: 2015-12-27 (RLVa-1.5.0)
-	gSavedSettings.getControl(RlvSettingNames::Main)->getSignal()->connect(boost::bind(&RlvSettings::onChangedSettingMain, _2));
+	setting_setup_signal_listener(gSavedSettings, std::string(RlvSettingNames::Main), RlvSettings::onChangedSettingMain);
 // [/RLVa:KB]
-	gSavedSettings.getControl("AlchemyHudTextFadeDistance")->getSignal()->connect(boost::bind(&LLHUDText::onFadeSettingsChanged));
-	gSavedSettings.getControl("AlchemyHudTextFadeRange")->getSignal()->connect(boost::bind(&LLHUDText::onFadeSettingsChanged));
-	gSavedSettings.getControl("RenderAnisotropicLevel")->getSignal()->connect(boost::bind(&handleAnisotropicFilteringChanged, _1, _2));
+	setting_setup_signal_listener(gSavedSettings, "AlchemyHudTextFadeDistance", LLHUDText::onFadeSettingsChanged);
+	setting_setup_signal_listener(gSavedSettings, "AlchemyHudTextFadeRange", LLHUDText::onFadeSettingsChanged);
+	setting_setup_signal_listener(gSavedSettings, "RenderAnisotropicLevel", handleAnisotropicFilteringChanged);
 	gSavedSettings.getControl("RenderAnisotropicLevel")->getValidateSignal()->connect(boost::bind(&validateAnisotropicFiltering, _2));
 }
 
