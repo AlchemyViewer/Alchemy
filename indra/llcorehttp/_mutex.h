@@ -30,6 +30,7 @@
 
 #include "mutex.h"
 #include <thread>
+#include <condition_variable>
 
 namespace LLCoreInt
 {
