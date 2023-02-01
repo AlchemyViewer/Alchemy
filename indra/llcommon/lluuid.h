@@ -226,7 +226,6 @@ public:
 	static const LLUUID null;
 	static LLMutex sMutex;
 
-	static U32 getRandomSeed();
 	static S32 getNodeID(unsigned char * node_id);
 
 	static BOOL parseUUID(const std::string& buf, LLUUID* value);
