@@ -653,7 +653,7 @@ public:
 	typedef boost::unordered_flat_map<LLUUID, LLPointer<LLMeshSkinInfo>> skin_map;
 	skin_map mSkinMap;
 
-	typedef std::map<LLUUID, LLModel::Decomposition*> decomposition_map;
+	typedef boost::unordered_map<LLUUID, LLModel::Decomposition*> decomposition_map;
 	decomposition_map mDecompositionMap;
 
 	LLMutex*					mMeshMutex;
