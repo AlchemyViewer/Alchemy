@@ -149,15 +149,15 @@ void LLMemory::updateMemoryInfo()
         sMaxPhysicalMemInKB = U64Bytes(total_memory);
         sAvailPhysicalMemInKB = U64Bytes((vm_stats.free_count + vm_stats.inactive_count) * page_size);
     } else {
-        sMaxPhysicalMemInKB = U64Bytes(U32_MAX);
-        sAvailPhysicalMemInKB = U64Bytes(U32_MAX);
+        sMaxPhysicalMemInKB = U64Bytes(U32_MAX * 2);
+        sAvailPhysicalMemInKB = U64Bytes(U32_MAX * 2);
     }
     
 #else
 	//not valid for other systems for now.
 	sAllocatedMemInKB = U64Bytes(LLMemory::getCurrentRSS());
-	sMaxPhysicalMemInKB = U64Bytes(U32_MAX);
-	sAvailPhysicalMemInKB = U64Bytes(U32_MAX);
+	sMaxPhysicalMemInKB = U64Bytes(U32_MAX * 2);
+	sAvailPhysicalMemInKB = U64Bytes(U32_MAX * 2);
 #endif
 }
 
