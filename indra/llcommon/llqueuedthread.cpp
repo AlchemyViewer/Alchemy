@@ -467,9 +467,7 @@ S32 LLQueuedThread::processNextRequest()
 				yield();
 			}
 		}
-#ifndef LL_RELEASE_FOR_DOWNLOAD
 		LLTrace::get_thread_recorder()->pushToParent();
-#endif
 	}
 
 	S32 pending = getPending();
@@ -498,9 +496,7 @@ void LLQueuedThread::run()
 		
 		if (isQuitting())
 		{
-#ifndef LL_RELEASE_FOR_DOWNLOAD
 			LLTrace::get_thread_recorder()->pushToParent();
-#endif
 			endThread();
 			break;
 		}
