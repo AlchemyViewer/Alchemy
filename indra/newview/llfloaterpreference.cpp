@@ -367,6 +367,8 @@ LLFloaterPreference::LLFloaterPreference(const LLSD& key)
 	mCommitCallbackRegistrar.add("Pref.RemoveSkin", boost::bind(&LLFloaterPreference::onRemoveSkin, this));
 	mCommitCallbackRegistrar.add("Pref.ApplySkin", boost::bind(&LLFloaterPreference::onApplySkin, this));
 	mCommitCallbackRegistrar.add("Pref.SelectSkin", boost::bind(&LLFloaterPreference::onSelectSkin, this, _2));
+
+	mCommitCallbackRegistrar.add("Pref.UpdateLookAtClampDistance", boost::bind(&LLFloaterPreference::onUpdateLookAtClampDistance, this, _2));
 }
 
 void LLFloaterPreference::processProperties( void* pData, EAvatarProcessorType type )
@@ -898,6 +900,12 @@ void LLFloaterPreference::refreshSkinInfo(const skin_t& skin)
 	getChild<LLTextBase>("skin_date")->setText(skin.mDate.toHTTPDateString("%A, %d %b %Y"));
 	getChild<LLTextBase>("skin_compatibility")->setText(skin.mCompatVer);
 	getChild<LLTextBase>("skin_notes")->setText(skin.mNotes);
+}
+
+void LLFloaterPreference::onUpdateLookAtClampDistance(const LLSD& data)
+{
+	F32 clamp_distance = (F32)(data.asReal());
+	gSavedSettings.setF32("AlchemyLookAtClampDistance", clamp_distance);
 }
 
 LLFloaterPreference::~LLFloaterPreference()
