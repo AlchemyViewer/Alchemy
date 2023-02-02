@@ -226,8 +226,6 @@ private:
 	void onSelectSkin(const LLSD& data);
 	void refreshSkinInfo(const skin_t& skin);
 
-	void onUpdateLookAtClampDistance(const LLSD& data);
-
 	static std::string sSkin;
 	notifications_map mNotificationOptions;
 	bool mGotPersonalInfo;

@@ -24,7 +24,7 @@
      left="20"
      mouse_opaque="false"
      name="privacy_text"
-     top="10"
+     top="4"
      text_color="LtGray_50"
      width="60">
      Privacy:
@@ -236,14 +236,23 @@
          tool_tip="Don't show me my own camera crosshairs"
          width="350" />
         <check_box
+         control_name="AlchemyLookAtPrivate"
+         height="16"
+         label="Don't send my actual camera target to others"
+         layout="topleft"
+         left="30"
+         name="privatelookat"
+         tool_tip="Disable your camera focus point from showing to others"
+         width="350" />
+        <check_box
          control_name="AlchemyLookAtClampEnabled"
+         disabled_control="AlchemyLookAtPrivate"
          height="16"
          label="Limit camera target distance"
          layout="topleft"
          left="30"
          name="privatelookat"
-	    	 tool_tip="Allows cosmetic features like eye and head movement but will point at nothing specific if beyond the set distance."
-         top_pad="4"
+         tool_tip="Allows cosmetic features like eye and head movement but will point at nothing specific if beyond the set distance."
          width="200" />
          <slider
             height="16"
@@ -253,23 +262,12 @@
             max_val="128"
             follows="top|left"
             control_name="AlchemyLookAtClampDistance"
+            disabled_control="AlchemyLookAtPrivate"
             initial_value="1.0"
             increment="0.5"
             label="Max Distance"
             width="275"
-            layout="topleft">
-            <button.commit_callback
-               function="Pref.UpdateLookAtClampDistance" />
-         </slider>
-        <check_box
-         control_name="AlchemyLookAtPrivate"
-         height="16"
-         label="Don't send my actual camera target to others"
-         layout="topleft"
-         left="30"
-         name="privatelookat"
-         tool_tip="Disable your camera focus point from showing to others"
-         width="350" />
+            layout="topleft"/>
     <button
      follows="left|top"
      height="23"
@@ -277,7 +275,7 @@
      layout="topleft"
      left="30"
      name="block_list"
-     top_pad="8"
+     top_pad="4"
      width="145">
         <!--<button.commit_callback
          function="SideTray.ShowPanel"-->

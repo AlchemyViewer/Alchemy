@@ -412,10 +412,8 @@ BOOL LLHUDEffectLookAt::setLookAt(ELookAtType target_type, LLViewerObject *objec
 		return FALSE;
 	}
 
-	auto newTargetLookat = (*mAttentions)[mTargetType];
-
 	// must be same or higher priority than existing effect
-	if ((*mAttentions)[target_type].mPriority < newTargetLookat.mPriority)
+	if ((*mAttentions)[target_type].mPriority < (*mAttentions)[mTargetType].mPriority)
 	{
 		return FALSE;
 	}
@@ -423,13 +421,11 @@ BOOL LLHUDEffectLookAt::setLookAt(ELookAtType target_type, LLViewerObject *objec
 	F32 current_time  = mTimer.getElapsedTimeF32();
 
 	bool looking_at_self = false;
-	if (object != NULL) // Why does this crash?
+	if (object && object->isAvatar())
 	{
-		auto objectp = static_cast<LLViewerObject*>(object);
-		if (objectp->isAvatar())
+		if (auto avatarp = object->asAvatar())
 		{
-			auto voavatarp = dynamic_cast<LLVOAvatar*>(objectp);
-			if (voavatarp->isSelf())
+			if (avatarp->isSelf())
 			{
 				looking_at_self = true;
 			}
@@ -437,14 +433,14 @@ BOOL LLHUDEffectLookAt::setLookAt(ELookAtType target_type, LLViewerObject *objec
 	}
 	static LLCachedControl<bool> clamp_lookat_enabled(gSavedSettings, "AlchemyLookAtClampEnabled", false);
 	bool clamp_lookat = clamp_lookat_enabled && !looking_at_self && 
-						newTargetLookat.mName != "Respond" &&
-						newTargetLookat.mName != "Conversation" &&
-						newTargetLookat.mName != "AutoListen";
+						(*mAttentions)[target_type].mName != "Respond" &&
+						(*mAttentions)[target_type].mName != "Conversation" &&
+						(*mAttentions)[target_type].mName != "AutoListen";
 
 	if (!clamp_lookat)
 	{
 		// type of lookat behavior or target object has changed
-		BOOL lookAtChanged = (target_type != mTargetType) || (object != mTargetObject);
+		bool lookAtChanged = (target_type != mTargetType) || (object != mTargetObject);
 
 		// lookat position has moved a certain amount and we haven't just sent an update
 		lookAtChanged = lookAtChanged || ((dist_vec_squared(position, mLastSentOffsetGlobal) > MIN_DELTAPOS_FOR_UPDATE_SQUARED) && 
