@@ -136,8 +136,10 @@ void LLThread::threadRun()
 #endif
     LL_PROFILER_SET_THREAD_NAME( mName.c_str() );
 
+#ifndef LL_RELEASE_FOR_DOWNLOAD
     // for now, hard code all LLThreads to report to single master thread recorder, which is known to be running on main thread
-    mRecorder = std::make_unique<LLTrace::ThreadRecorder>(*LLTrace::get_master_thread_recorder());
+    mRecorder = new LLTrace::ThreadRecorder(*LLTrace::get_master_thread_recorder());
+#endif
 
     // Run the user supplied function
     do 
@@ -164,7 +166,10 @@ void LLThread::threadRun()
 
     //LL_INFOS() << "LLThread::staticRun() Exiting: " << threadp->mName << LL_ENDL;
 
-    mRecorder.reset();
+#ifndef LL_RELEASE_FOR_DOWNLOAD
+    delete mRecorder;
+    mRecorder = NULL;
+#endif
 
     // We're done with the run function, this thread is done executing now.
     //NB: we are using this flag to sync across threads...we really need memory barriers here
@@ -177,6 +182,9 @@ LLThread::LLThread(const std::string& name, apr_pool_t *poolp) :
     mPaused(FALSE),
     mName(name),
     mStatus(STOPPED)
+#ifndef LL_RELEASE_FOR_DOWNLOAD
+    , mRecorder(NULL)
+#endif
 {
     mRunCondition = std::make_unique<LLCondition>();
     mDataLock = std::make_unique<LLMutex>();
@@ -246,15 +254,15 @@ void LLThread::shutdown()
     mThreadp.reset();
     mRunCondition.reset();
     mDataLock.reset();
-
+#ifndef LL_RELEASE_FOR_DOWNLOAD
     if (mRecorder)
     {
         // missed chance to properly shut down recorder (needs to be done in thread context)
         // probably due to abnormal thread termination
         // so just leak it and remove it from parent
-        LLTrace::get_master_thread_recorder()->removeChildRecorder(mRecorder.release());
+        LLTrace::get_master_thread_recorder()->removeChildRecorder(mRecorder);
     }
-
+#endif
 }
 
 void LLThread::start()

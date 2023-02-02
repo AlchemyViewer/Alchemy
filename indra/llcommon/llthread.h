@@ -97,8 +97,9 @@ protected:
     std::unique_ptr<LLMutex>            mDataLock;
     std::unique_ptr<std::thread>        mThreadp;
     std::atomic_int                     mStatus;
-
-    std::unique_ptr<LLTrace::ThreadRecorder> mRecorder;
+#ifndef LL_RELEASE_FOR_DOWNLOAD
+    LLTrace::ThreadRecorder* mRecorder;
+#endif
 
     //a local apr_pool for APRFile operations in this thread. If it exists, LLAPRFile::sAPRFilePoolp should not be used.
     //Note: this pool is used by APRFile ONLY, do NOT use it for any other purposes.
