@@ -949,7 +949,7 @@ void AISUpdate::parseEmbeddedCategories(const LLSD& categories)
 void AISUpdate::doUpdate()
 {
 	// Do version/descendant accounting.
-	for (std::map<LLUUID,S32>::const_iterator catit = mCatDescendentDeltas.begin();
+	for (auto catit = mCatDescendentDeltas.begin();
 		 catit != mCatDescendentDeltas.end(); ++catit)
 	{
 #ifdef SHOW_DEBUG

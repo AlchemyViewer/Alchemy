@@ -109,15 +109,15 @@ public:
 private:
 	void clearParseResults();
 
-	typedef std::map<LLUUID,S32> uuid_int_map_t;
+	typedef boost::unordered_map<LLUUID,S32> uuid_int_map_t;
 	uuid_int_map_t mCatDescendentDeltas;
 	uuid_int_map_t mCatDescendentsKnown;
 	uuid_int_map_t mCatVersionsUpdated;
 
-	typedef std::map<LLUUID,LLPointer<LLViewerInventoryItem> > deferred_item_map_t;
+	typedef boost::unordered_map<LLUUID,LLPointer<LLViewerInventoryItem> > deferred_item_map_t;
 	deferred_item_map_t mItemsCreated;
 	deferred_item_map_t mItemsUpdated;
-	typedef std::map<LLUUID,LLPointer<LLViewerInventoryCategory> > deferred_category_map_t;
+	typedef boost::unordered_map<LLUUID,LLPointer<LLViewerInventoryCategory> > deferred_category_map_t;
 	deferred_category_map_t mCategoriesCreated;
 	deferred_category_map_t mCategoriesUpdated;
 

@@ -540,7 +540,7 @@ public:
 		LLInitializedS32& operator++() { ++mValue; return *this; }
 		LLInitializedS32& operator--() { --mValue; return *this; }
 	};
-	typedef std::map<LLUUID, LLInitializedS32> update_map_t;
+	typedef boost::unordered_map<LLUUID, LLInitializedS32> update_map_t;
 
 	// Call when there are category updates.  Call them *before* the 
 	// actual update so the method can do descendent accounting correctly.
@@ -716,8 +716,8 @@ protected:
 	cat_array_t* getUnlockedCatArray(const LLUUID& id);
 	item_array_t* getUnlockedItemArray(const LLUUID& id);
 private:
-	std::map<LLUUID, bool> mCategoryLock;
-	std::map<LLUUID, bool> mItemLock;
+	boost::unordered_map<LLUUID, bool> mCategoryLock;
+	boost::unordered_map<LLUUID, bool> mItemLock;
 	
 	//--------------------------------------------------------------------
 	// Debugging

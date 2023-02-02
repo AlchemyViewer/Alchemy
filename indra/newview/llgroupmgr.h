@@ -273,11 +273,11 @@ public:
 	void banMemberById(const LLUUID& participant_uuid);
 	
 public:
-	typedef	boost::unordered_flat_map<LLUUID, LLGroupMemberData*> member_list_t;
-	typedef	std::map<LLUUID,LLGroupRoleData*> role_list_t;
+	typedef	boost::unordered_map<LLUUID, LLGroupMemberData*> member_list_t;
+	typedef	boost::unordered_map<LLUUID,LLGroupRoleData*> role_list_t;
 	typedef std::map<lluuid_pair,LLRoleMemberChange,lluuid_pair_less> change_map_t;
-	typedef std::map<LLUUID,LLRoleData> role_data_map_t;
-	typedef std::map<LLUUID,LLGroupBanData> ban_list_t;
+	typedef boost::unordered_map<LLUUID,LLRoleData> role_data_map_t;
+	typedef boost::unordered_map<LLUUID,LLGroupBanData> ban_list_t;
 
 	member_list_t		mMembers;
 	role_list_t			mRoles;
