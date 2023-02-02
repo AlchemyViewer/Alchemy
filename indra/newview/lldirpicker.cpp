@@ -92,6 +92,13 @@ LLDirPicker::~LLDirPicker()
 	// nothing
 }
 
+template <typename T>
+struct Release_Guard {
+    T* data;
+    Release_Guard(T* releasable) noexcept : data(releasable) {}
+    ~Release_Guard() { data->Release(); }
+};
+
 BOOL LLDirPicker::getDir(std::string* filename, bool blocking)
 {
 	if( mLocked )
@@ -114,27 +121,46 @@ BOOL LLDirPicker::getDir(std::string* filename, bool blocking)
 		send_agent_pause();
 	}
 
-	bi.hwndOwner = (HWND)gViewerWindow->getPlatformWindow();
+	CoInitialize(0);
 
-	::OleInitialize(NULL);
-	LPITEMIDLIST pIDL = ::SHBrowseForFolder(&bi);
+	::IFileOpenDialog* fileOpenDialog;
 
-	if(pIDL != NULL)
+	// Create dialog
+	if (SUCCEEDED(::CoCreateInstance(::CLSID_FileOpenDialog,
+		nullptr,
+		CLSCTX_ALL,
+		::IID_IFileOpenDialog,
+		reinterpret_cast<void**>(&fileOpenDialog))))
 	{
-		WCHAR buffer[_MAX_PATH] = {'\0'};
+		Release_Guard<::IFileOpenDialog> fileOpenDialogGuard(fileOpenDialog);
 
-		if(::SHGetPathFromIDList(pIDL, buffer) != 0)
+		FILEOPENDIALOGOPTIONS existingOptions;
+		if (SUCCEEDED(fileOpenDialog->GetOptions(&existingOptions)))
 		{
-			// Set the string value.
-
-			mDir = ll_convert_wide_to_string(buffer);
-			success = TRUE;
+			if (SUCCEEDED(fileOpenDialog->SetOptions(existingOptions | (::FOS_FORCEFILESYSTEM | ::FOS_PICKFOLDERS))))
+			{
+				// Show the dialog to the user
+				const HRESULT result = fileOpenDialog->Show(nullptr);
+				if (result != HRESULT_FROM_WIN32(ERROR_CANCELLED) && SUCCEEDED(result))
+				{
+					// Get the shell item result
+					::IShellItem* psiResult;
+					if (SUCCEEDED(fileOpenDialog->GetResult(&psiResult)))
+					{
+						Release_Guard<::IShellItem> psiResultGuard(psiResult);
+						wchar_t* filePath;
+						if (SUCCEEDED(psiResult->GetDisplayName(::SIGDN_FILESYSPATH, &filePath)))
+						{
+							mDir = ll_convert_wide_to_string(std::wstring(filePath));
+							success = TRUE;
+						}
+					}
+				}
+			}
 		}
-		// free the item id list
-		CoTaskMemFree(pIDL);
 	}
 
-	::OleUninitialize();
+	CoUninitialize();
 
 	if (blocking)
 	{
