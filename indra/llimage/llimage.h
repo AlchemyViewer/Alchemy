@@ -277,8 +277,8 @@ protected:
 	void setDataAndSize(U8 *data, S32 width, S32 height, S8 components) ;
 
 public:
-	static S64 sGlobalRawMemory;
-	static S32 sRawImageCount;
+	static std::atomic<S64> sGlobalRawMemory;
+	static std::atomic<S32> sRawImageCount;
 
 private:
 	bool validateSrcAndDst(std::string func, LLImageRaw* src, LLImageRaw* dst);

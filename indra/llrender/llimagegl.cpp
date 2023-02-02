@@ -57,7 +57,7 @@ U32 wpo2(U32 i);
 
 U32 LLImageGL::sUniqueCount				= 0;
 U32 LLImageGL::sBindCount				= 0;
-S64Bytes LLImageGL::sGlobalTextureMemory(0);
+std::atomic<S64> LLImageGL::sGlobalTextureMemory(0); // Used across thread boundries
 S64Bytes LLImageGL::sBoundTextureMemory(0);
 S64Bytes LLImageGL::sCurBoundTextureMemory(0);
 S32 LLImageGL::sCount					= 0;
@@ -289,7 +289,7 @@ void LLImageGL::updateStats(F32 current_time)
 S64 LLImageGL::updateBoundTexMem(const S64Bytes mem, const S32 ncomponents, S32 category)
 {
 	LLImageGL::sCurBoundTextureMemory += mem ;
-	return LLImageGL::sCurBoundTextureMemory.value();
+	return LLImageGL::sCurBoundTextureMemory;
 }
 
 //----------------------------------------------------------------------------

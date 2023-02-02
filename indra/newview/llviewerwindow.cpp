@@ -5850,7 +5850,7 @@ void LLViewerWindow::stopGL(BOOL save_state)
 
 		stop_glerror();
 		
-		LL_INFOS() << "Remaining allocated texture memory: " << LLImageGL::sGlobalTextureMemory.value() << " bytes" << LL_ENDL;
+		LL_INFOS() << "Remaining allocated texture memory: " << LLImageGL::sGlobalTextureMemory.load() << " bytes" << LL_ENDL;
 	}
 }
 

@@ -565,7 +565,7 @@ void LLGLTexMemBar::draw()
 					bound_mem.value(),
 					max_bound_mem.value(),
 					LLRenderTarget::sBytesAllocated/(1024*1024),
-					LLImageRaw::sGlobalRawMemory >> 20,
+					S32Megabytes(S64Bytes(LLImageRaw::sGlobalRawMemory.load())),
 					discard_bias,
 					cache_usage,
 					cache_max_usage);
@@ -613,7 +613,7 @@ void LLGLTexMemBar::draw()
 					LLAppViewer::getTextureFetch()->mPacketCount, LLAppViewer::getTextureFetch()->mBadPacketCount, 
 					LLAppViewer::getTextureCache()->getNumReads(), LLAppViewer::getTextureCache()->getNumWrites(),
 					LLLFSThread::sLocal->getPending(),
-					LLImageRaw::sRawImageCount,
+					LLImageRaw::sRawImageCount.load(),
 					LLAppViewer::getTextureFetch()->getNumHTTPRequests(),
 					LLAppViewer::getImageDecodeThread()->getPending(), 
 					gTextureList.mCreateTextureList.size());

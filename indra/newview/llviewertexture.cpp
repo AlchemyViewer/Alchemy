@@ -562,7 +562,7 @@ void LLViewerTexture::updateClass()
 	LLViewerMediaTexture::updateClass();
 
 	sBoundTextureMemory = LLImageGL::sBoundTextureMemory;
-	sTotalTextureMemory = LLImageGL::sGlobalTextureMemory;
+	sTotalTextureMemory = S64Bytes(LLImageGL::sGlobalTextureMemory.load());
 	sMaxBoundTextureMemory = gTextureList.getMaxResidentTexMem();
 	sMaxTotalTextureMem = gTextureList.getMaxTotalTextureMem();
 	sMaxDesiredTextureMem = sMaxTotalTextureMem; //in Bytes, by default and when total used texture memory is small.
@@ -1364,7 +1364,7 @@ void LLViewerFetchedTexture::dump()
 void LLViewerFetchedTexture::destroyTexture() 
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
-	if(LLImageGL::sGlobalTextureMemory < sMaxDesiredTextureMem * 0.95f)//not ready to release unused memory.
+	if(LLImageGL::sGlobalTextureMemory.load() < sMaxDesiredTextureMem * 0.95f)//not ready to release unused memory.
 	{
 		return ;
 	}
