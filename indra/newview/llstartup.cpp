@@ -216,6 +216,7 @@
 
 #include "threadpool.h"
 
+#include "llfloatersidepanelcontainer.h"
 
 #if LL_WINDOWS
 #include "lldxhardware.h"
@@ -1558,6 +1559,12 @@ bool idle_startup()
 			LLViewerParcelAskPlay::getInstance()->loadSettings();
 		}
 
+		// Create people views early enough to register with avatar tracker
+		LLFloaterSidePanelContainer::getPanel("people", "panel_people");
+		
+		// Create search early enough to not cause stutter
+		LLFloaterReg::getInstance("search");
+
 		// *Note: this is where gWorldMap used to be initialized.
 
 		// register null callbacks for audio until the audio system is initialized
@@ -1809,6 +1816,11 @@ bool idle_startup()
 
         display_startup();
 
+		// request all group information
+		LL_INFOS() << "Requesting Agent Data" << LL_ENDL;
+		gAgent.sendAgentDataUpdateRequest();
+		display_startup();
+
 		// Inform simulator of our language preference
 		LLAgentLanguage::update();
 
@@ -1871,16 +1883,17 @@ bool idle_startup()
  		if(buddy_list.isDefined())
  		{
 			LLAvatarTracker::buddy_map_t list;
-			LLUUID agent_id;
-			S32 has_rights = 0, given_rights = 0;
 			for(LLSD::array_const_iterator it = buddy_list.beginArray(),
 				end = buddy_list.endArray(); it != end; ++it)
 			{
+				LLUUID agent_id;
+				S32 has_rights = 0, given_rights = 0;
 				LLSD buddy_id = (*it)["buddy_id"];
 				if(buddy_id.isDefined())
 				{
 					agent_id = buddy_id.asUUID();
 				}
+				else continue;
 
 				LLSD buddy_rights_has = (*it)["buddy_rights_has"];
 				if(buddy_rights_has.isDefined())
@@ -1986,10 +1999,6 @@ bool idle_startup()
 		LLLandmark::registerCallbacks(msg);
 		display_startup();
 
-		// request all group information
-		LL_INFOS() << "Requesting Agent Data" << LL_ENDL;
-		gAgent.sendAgentDataUpdateRequest();
-		display_startup();
 		if (gSavedSettings.getBOOL("LocalInventoryEnabled"))
  		{
 			gLocalInventory = gInventory.createNewCategory(LLUUID::null,
