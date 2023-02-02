@@ -146,7 +146,7 @@ LLVolatileAPRPool::LLVolatileAPRPool(std::string name, BOOL is_local, apr_pool_t
 				  mNumTotalRef(0)
 {
 	//create mutex for thread safe.
-	mMutexp = std::make_unique<std::shared_mutex>();
+	mMutexp = std::make_unique<std::mutex>();
 }
 
 LLVolatileAPRPool::~LLVolatileAPRPool()

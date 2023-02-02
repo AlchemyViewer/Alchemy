@@ -52,7 +52,7 @@ namespace LLInstanceTrackerPrivate
     struct StaticBase
     {
         // We need to be able to lock static data while manipulating it.
-        std::shared_mutex mMutex;
+        std::mutex mMutex;
     };
 
     void logerrs(const char* cls, const std::string&, const std::string&, const std::string&);

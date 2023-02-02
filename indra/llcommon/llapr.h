@@ -119,7 +119,7 @@ private:
 	S32 mNumActiveRef ; //number of active pointers pointing to the apr_pool.
 	S32 mNumTotalRef ;  //number of total pointers pointing to the apr_pool since last creating.  
 
-	std::unique_ptr<std::shared_mutex> mMutexp;
+	std::unique_ptr<std::mutex> mMutexp;
 } ;
 
 // File IO convenience functions.

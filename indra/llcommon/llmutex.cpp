@@ -94,7 +94,7 @@ void LLCondition::broadcast()
 //
 // LLScopedLock
 //
-LLScopedLock::LLScopedLock(std::shared_mutex* mutex) : mMutex(mutex)
+LLScopedLock::LLScopedLock(std::mutex* mutex) : mMutex(mutex)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD
 	if(mutex)

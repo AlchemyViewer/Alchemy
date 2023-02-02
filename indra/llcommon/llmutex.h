@@ -198,7 +198,7 @@ public:
     * @param mutex An allocated mutex. If you pass in NULL,
     * this wrapper will not lock.
     */
-    LLScopedLock(std::shared_mutex* mutex);
+    LLScopedLock(std::mutex* mutex);
 
     /**
     * @brief Destructor which unlocks the mutex if still locked.
@@ -217,7 +217,7 @@ public:
 
 protected:
     bool mLocked;
-    std::shared_mutex* mMutex;
+    std::mutex* mMutex;
 };
 
 #endif // LL_LLMUTEX_H
