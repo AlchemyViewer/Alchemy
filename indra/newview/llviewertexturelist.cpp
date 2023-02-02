@@ -827,10 +827,10 @@ void LLViewerTextureList::updateImages(F32 max_time)
 	{
 		using namespace LLStatViewer;
 		sample(NUM_IMAGES, sNumImages);
-		sample(NUM_RAW_IMAGES, F64Bytes(LLImageRaw::sRawImageCount.load()));
+		sample(NUM_RAW_IMAGES, LLImageRaw::sRawImageCount);
 		sample(GL_TEX_MEM, F64Bytes(LLImageGL::sGlobalTextureMemory.load()));
 		sample(GL_BOUND_MEM, LLImageGL::sBoundTextureMemory);
-		sample(RAW_MEM, F64Bytes(LLImageRaw::sGlobalRawMemory.load()));
+		sample(RAW_MEM, F64Bytes(LLImageRaw::sGlobalRawMemory));
 		sample(FORMATTED_MEM, F64Bytes(LLImageFormatted::sGlobalFormattedMemory));
 	}
 
