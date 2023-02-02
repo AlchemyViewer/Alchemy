@@ -84,7 +84,7 @@ public:
 	/**
 	 * Refresh group notices panel.
 	 */
-	static void refresh_notices();
+	static void refresh_notices(const LLUUID& group_id);
 
 	/**
 	 * Refresh group information panel.

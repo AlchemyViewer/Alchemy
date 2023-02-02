@@ -36,6 +36,7 @@
 #include "llfloaterreg.h"
 #include "llfloatersidepanelcontainer.h"
 #include "llgroupmgr.h"
+#include "llfloatergroupprofile.h"
 #include "llfloaterimcontainer.h"
 #include "llimview.h" // for gIMMgr
 #include "llnotificationsutil.h"
@@ -409,15 +410,22 @@ void LLGroupActions::show(const LLUUID& group_id)
 
 	LLSD params;
 	params["group_id"] = group_id;
-	params["open_tab_name"] = "panel_group_info_sidetray";
 
-	LLFloaterSidePanelContainer::showPanel("people", "panel_group_info_sidetray", params);
-    LLFloater *floater = LLFloaterReg::getTypedInstance<LLFloaterSidePanelContainer>("people");
-    if (!floater->isFrontmost())
-    {
-        floater->setVisibleAndFrontmost(TRUE, params);
-    }
+	if (gSavedSettings.getBool("ShowGroupFloaters")) 
+	{
+		LLFloaterGroupProfile::showInstance(params, TRUE);
+	}
+	else
+	{
+		LLFloaterSidePanelContainer::showPanel("people", "panel_group_info_sidetray", params);
+		LLFloater *floater = LLFloaterReg::getTypedInstance<LLFloaterSidePanelContainer>("people");
+		if (!floater->isFrontmost())
+		{
+			floater->setVisibleAndFrontmost(TRUE, params);
+		}	
+	}
 }
+
 
 // [SL:KB] - Patch: Notification-GroupCreateNotice | Checked: 2012-02-16 (Catznip-3.2)
 // static
@@ -430,9 +438,14 @@ void LLGroupActions::showNotices(const LLUUID& group_id)
 	sdParams["group_id"] = group_id;
 	sdParams["action"] = "view_notices";
 
-	sdParams["open_tab_name"] = "panel_group_info_sidetray";
-
-	LLFloaterSidePanelContainer::showPanel("people", "panel_group_info_sidetray", sdParams);
+	if (gSavedSettings.getBool("ShowGroupFloaters")) 
+	{
+		LLFloaterGroupProfile::showInstance(sdParams, TRUE);
+	}
+	else
+	{
+		LLFloaterSidePanelContainer::showPanel("people", "panel_group_info_sidetray", sdParams);
+	}
 }
 
 // static
@@ -442,31 +455,49 @@ void LLGroupActions::viewChatHistory(const LLUUID& group_id)
 }
 // [/SL:KB]
 
-void LLGroupActions::refresh_notices()
+void LLGroupActions::refresh_notices(const LLUUID& group_id)
 {
-	if(!isGroupUIVisible())
-		return;
-
 	LLSD params;
-	params["group_id"] = LLUUID::null;
-	params["open_tab_name"] = "panel_group_info_sidetray";
+	params["group_id"] = group_id;
 	params["action"] = "refresh_notices";
 
-	LLFloaterSidePanelContainer::showPanel("people", "panel_group_info_sidetray", params);
+	if (gSavedSettings.getBool("ShowGroupFloaters")) 
+	{
+		if (LLFloaterReg::instanceVisible("group_profile", LLSD(group_id)))
+		{
+			LLFloaterGroupProfile::showInstance(params, FALSE);
+		}
+	}
+	else
+	{
+		if (isGroupUIVisible())
+		{
+			LLFloaterSidePanelContainer::showPanel("people", "panel_group_info_sidetray", params);
+		}
+	}
 }
 
 //static 
 void LLGroupActions::refresh(const LLUUID& group_id)
 {
-	if(!isGroupUIVisible())
-		return;
-
 	LLSD params;
 	params["group_id"] = group_id;
-	params["open_tab_name"] = "panel_group_info_sidetray";
 	params["action"] = "refresh";
 
-	LLFloaterSidePanelContainer::showPanel("people", "panel_group_info_sidetray", params);
+	if (gSavedSettings.getBool("ShowGroupFloaters")) 
+	{
+		if (LLFloaterReg::instanceVisible("group_profile", LLSD(group_id)))
+		{
+			LLFloaterGroupProfile::showInstance(params, TRUE);
+		}
+	}
+	else
+	{
+		if (isGroupUIVisible())
+		{
+			LLFloaterSidePanelContainer::showPanel("people", "panel_group_info_sidetray", params);
+		}
+	}
 }
 
 //static 
@@ -474,24 +505,29 @@ void LLGroupActions::createGroup()
 {
 	LLSD params;
 	params["group_id"] = LLUUID::null;
-	params["open_tab_name"] = "panel_group_creation_sidetray";
 	params["action"] = "create";
 
-	LLFloaterSidePanelContainer::showPanel("people", "panel_group_creation_sidetray", params);
-
+	if (gSavedSettings.getBool("ShowGroupFloaters"))
+	{
+		LLFloaterGroupProfile::showInstance(params, TRUE);
+	}
+	else
+	{
+		LLFloaterSidePanelContainer::showPanel("people", "panel_group_creation_sidetray", params);
+	}
 }
 //static
 void LLGroupActions::closeGroup(const LLUUID& group_id)
 {
-	if(!isGroupUIVisible())
-		return;
+	LLFloaterReg::hideInstance("group_profile", LLSD(group_id));
 
-	LLSD params;
-	params["group_id"] = group_id;
-	params["open_tab_name"] = "panel_group_info_sidetray";
-	params["action"] = "close";
-
-	LLFloaterSidePanelContainer::showPanel("people", "panel_group_info_sidetray", params);
+	if (isGroupUIVisible())
+	{
+		LLSD params;
+		params["group_id"] = group_id;
+		params["action"] = "close";
+		LLFloaterSidePanelContainer::showPanel("people", "panel_group_info_sidetray", params);
+	}
 }
 
 

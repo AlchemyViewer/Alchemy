@@ -90,6 +90,7 @@
 #include "llfloatergesture.h"
 #include "llfloatergodtools.h"
 #include "llfloatergridstatus.h"
+#include "llfloatergroupprofile.h"
 #include "llfloatergroups.h"
 #include "llfloaterhelpbrowser.h"
 #include "llfloaterhexeditor.h"
@@ -442,6 +443,7 @@ void LLViewerFloaterReg::registerFloaters()
     LLFloaterReg::add("asset_hex_editor", "floater_hex_editor.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterHexEditor>);
 	LLFloaterReg::add("delete_queue", "floater_script_queue.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterDeleteQueue>);
 	LLFloaterReg::add("generic_text", "floater_generic_text.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterGenericText>);
+	LLFloaterReg::add("group_profile", "floater_group_profile.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterGroupProfile>);
     LLFloaterReg::add("legacy_profile", "floater_profile_legacy.xml", (LLFloaterBuildFunc) &LLFloaterReg::build<LLFloaterProfileLegacy>);
 	LLFloaterReg::add("legacy_notification_well_window", "floater_legacy_sys_well.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLLegacyNotificationWellWindow>);
 	LLFloaterReg::add("lightbox", "floater_lightbox_settings.xml", (LLFloaterBuildFunc) &LLFloaterReg::build<ALFloaterLightBox>);

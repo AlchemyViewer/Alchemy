@@ -42,6 +42,7 @@
 #include "llfloaterreg.h"
 #include "llfloater.h"
 #include "llgroupactions.h"
+#include "llfloatergroupprofile.h"
 
 #include "llagent.h" 
 
@@ -237,10 +238,18 @@ void LLPanelGroup::reshape(S32 width, S32 height, BOOL called_from_parent )
 
 void LLPanelGroup::onBackBtnClick()
 {
-	LLSideTrayPanelContainer* parent = dynamic_cast<LLSideTrayPanelContainer*>(getParent());
-	if(parent)
+	LLFloaterGroupProfile* parent = dynamic_cast<LLFloaterGroupProfile*>(getParent());
+	if (parent)
 	{
-		parent->openPreviousPanel();
+		parent->closeHostedFloater();
+	}
+	else
+	{
+		LLSideTrayPanelContainer* parent = dynamic_cast<LLSideTrayPanelContainer*>(getParent());
+		if (parent)
+		{
+			parent->openPreviousPanel();
+		}
 	}
 }
 
@@ -303,10 +312,22 @@ void LLPanelGroup::update(LLGroupChange gc)
 	LLGroupMgrGroupData* gdatap = LLGroupMgr::getInstance()->getGroupData(mID);
 	if(gdatap)
 	{
-		std::string group_name =  gdatap->mName.empty() ? LLTrans::getString("LoadingData") : gdatap->mName;
-		LLUICtrl* group_name_ctrl = getChild<LLUICtrl>("group_name");
-		group_name_ctrl->setValue(group_name);
-		group_name_ctrl->setToolTip(group_name);
+
+		{
+			LLFloaterGroupProfile* parent = dynamic_cast<LLFloaterGroupProfile*>(getParent());
+			if (parent)
+			{
+				parent->setGroupName(gdatap->mName);
+			}
+		}
+
+		{
+			std::string group_name =  gdatap->mName.empty() ? LLTrans::getString("LoadingData") : gdatap->mName;
+			LLUICtrl* group_name_ctrl = getChild<LLUICtrl>("group_name");
+			group_name_ctrl->setValue(group_name);
+			group_name_ctrl->setToolTip(group_name);
+		}
+
 		
 		LLGroupData agent_gdatap;
 		bool is_member = gAgent.getGroupData(mID,agent_gdatap) || gAgent.isGodlikeWithoutAdminMenuFakery();
@@ -537,7 +558,7 @@ void LLPanelGroup::draw()
 		for(std::vector<LLPanelGroupTab* >::iterator it = mTabs.begin();it!=mTabs.end();++it)
 			enable = enable || (*it)->needsApply(mesg);
 
-		childSetEnabled("btn_apply", enable);
+		button_apply->setEnabled(enable);
 	}
 }
 
@@ -598,7 +619,16 @@ void LLPanelGroup::showNotice(const std::string& subject,
 					   const std::string& inventory_name,
 					   LLOfferInfo* inventory_offer)
 {
-	LLPanelGroup* panel = LLFloaterSidePanelContainer::getPanel<LLPanelGroup>("people", "panel_group_info_sidetray");
+	LLPanelGroup* panel(NULL);
+	if (auto* floater = LLFloaterReg::findTypedInstance<LLFloaterGroupProfile>("group_profile", LLSD(group_id))) 
+	{
+		panel = floater->getGroupPanel();
+	}
+	else
+	{
+		panel = LLFloaterSidePanelContainer::getPanel<LLPanelGroup>("people", "panel_group_info_sidetray");
+	}
+
 	if(!panel)
 		return;
 

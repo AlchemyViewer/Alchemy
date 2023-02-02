@@ -46,11 +46,13 @@
 #include "llagentbenefits.h"
 #include "llfloaterreg.h"
 #include "llfloater.h"
+#include "llfloatergroupprofile.h"
 #include "llgroupmgr.h"
 #include "llstatusbar.h" // to re-request balance
 #include "lltrans.h"
 #include "llnotificationsutil.h"
 #include "lluicolortable.h"
+#include "llviewercontrol.h"
 
 
 const S32 MATURE_CONTENT = 1;
@@ -116,10 +118,23 @@ void LLPanelGroupCreate::onOpen(const LLSD& key)
 //static
 void LLPanelGroupCreate::refreshCreatedGroup(const LLUUID& group_id)
 {
-    LLSD params;
-    params["group_id"] = group_id;
-    params["open_tab_name"] = "panel_group_info_sidetray";
-    LLFloaterSidePanelContainer::showPanel("people", "panel_group_info_sidetray", params);
+	LLSD params;
+	params["group_id"] = group_id;
+
+    auto* floater = LLFloaterReg::findTypedInstance<LLFloaterGroupProfile>("group_profile", LLSD(LLUUID::null));
+    if (floater)
+	{
+		floater->openFloater(params);
+		floater->setFocus(TRUE);
+	}
+	else if(gSavedSettings.getBool("ShowGroupFloaters"))
+	{
+		LLFloaterGroupProfile::showInstance(params, TRUE);
+	}
+    else
+	{
+		LLFloaterSidePanelContainer::showPanel("people", "panel_group_info_sidetray", params);
+	}
     LLStatusBar::sendMoneyBalanceRequest();
 }
 
@@ -159,10 +174,18 @@ void LLPanelGroupCreate::addMembershipRow(const std::string &name)
 
 void LLPanelGroupCreate::onBackBtnClick()
 {
-    LLSideTrayPanelContainer* parent = dynamic_cast<LLSideTrayPanelContainer*>(getParent());
+    LLFloaterGroupProfile* parent = dynamic_cast<LLFloaterGroupProfile*>(getParent());
     if(parent)
     {
-        parent->openPreviousPanel();
+        parent->closeHostedFloater();
+    }
+    else
+    {
+        LLSideTrayPanelContainer* parent = dynamic_cast<LLSideTrayPanelContainer*>(getParent());
+        if(parent)
+        {
+            parent->openPreviousPanel();
+        }
     }
 }
 
