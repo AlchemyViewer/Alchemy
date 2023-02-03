@@ -835,7 +835,8 @@ void LLViewerTextureList::updateImages(F32 max_time)
 	}
 
 	//loading from fast cache 
-	max_time -= updateImagesLoadingFastCache(max_time);
+	F32 fastcache_time = updateImagesLoadingFastCache(max_time / 3);
+	max_time = llmax(max_time * 2/3, max_time - fastcache_time); // at least 66% for update fetch & create
 	
 	updateImagesDecodePriorities();
 	
