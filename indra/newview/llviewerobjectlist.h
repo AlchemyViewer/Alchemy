@@ -214,17 +214,19 @@ protected:
 
 	vobj_list_t mMapObjects;
 
-    uuid_set_t   mDeadObjects;
+
+	using uuid_hash_set_t = boost::unordered_set<LLUUID>;
+    uuid_hash_set_t   mDeadObjects;
 
 	boost::unordered_flat_map<LLUUID, LLPointer<LLViewerObject> > mUUIDObjectMap;
 
 	//set of objects that need to update their cost
-    uuid_set_t   mStaleObjectCost;
-    uuid_set_t   mPendingObjectCost;
+    uuid_hash_set_t   mStaleObjectCost;
+    uuid_hash_set_t   mPendingObjectCost;
 
 	//set of objects that need to update their physics flags
-    uuid_set_t   mStalePhysicsFlags;
-    uuid_set_t   mPendingPhysicsFlags;
+    uuid_hash_set_t   mStalePhysicsFlags;
+    uuid_hash_set_t   mPendingPhysicsFlags;
 
 	std::vector<LLDebugBeacon> mDebugBeacons;
 

@@ -121,7 +121,6 @@ private:
 
 
 	get_queue_t				mGetQueue;
-    uuid_set_t              mRegionGets;
 	get_pending_map_t		mGetPending;
 	get_callback_map_t		mGetCallbacks;
 

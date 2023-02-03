@@ -1253,7 +1253,7 @@ void LLViewerObjectList::fetchPhisicsFlagsCoro(std::string url)
     LLSD idList;
     U32 objectIndex = 0;
 
-    for (uuid_set_t::iterator it = mStalePhysicsFlags.begin(); it != mStalePhysicsFlags.end();)
+    for (auto it = mStalePhysicsFlags.begin(); it != mStalePhysicsFlags.end();)
     {
         // Check to see if a request for this object
         // has already been made.
@@ -1263,7 +1263,7 @@ void LLViewerObjectList::fetchPhisicsFlagsCoro(std::string url)
             idList[objectIndex++] = *it;
         }
 
-        mStalePhysicsFlags.erase(it++);
+        it = mStalePhysicsFlags.erase(it);
 
         if (objectIndex >= MAX_CONCURRENT_PHYSICS_REQUESTS)
         {
