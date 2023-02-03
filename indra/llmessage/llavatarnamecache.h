@@ -175,12 +175,12 @@ private:
     std::string mNameLookupURL;
 
     // Accumulated agent IDs for next query against service
-    typedef std::set<LLUUID> ask_queue_t;
+    typedef boost::unordered_set<LLUUID> ask_queue_t;
     ask_queue_t mAskQueue;
 
     // Agent IDs that have been requested, but with no reply.
     // Maps agent ID to frame time request was made.
-    typedef boost::unordered_flat_map<LLUUID, F64> pending_queue_t;
+    typedef boost::unordered_map<LLUUID, F64> pending_queue_t;
     pending_queue_t mPendingQueue;
 
     // Callbacks to fire when we received a name.

@@ -362,12 +362,10 @@ void LLAvatarNameCache::requestNamesViaCapability()
 	agent_ids.reserve(128);
 	
 	U32 ids = 0;
-	ask_queue_t::const_iterator it;
-	while(!mAskQueue.empty())
+	for(auto it = mAskQueue.begin(); it != mAskQueue.end();)
 	{
-		it = mAskQueue.begin();
 		LLUUID agent_id = *it;
-		mAskQueue.erase(it);
+		it = mAskQueue.erase(it);
 
 		if (url.empty())
 		{
