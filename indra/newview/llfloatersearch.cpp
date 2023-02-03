@@ -192,17 +192,35 @@ void LLFloaterSearch::search(const SearchQuery &p)
 
 	// add the user's preferred maturity (can be changed via prefs)
 	std::string maturity;
-	if (gAgent.prefersAdult())
+	if (LLGridManager::instance().isInSecondlife())
 	{
-		maturity = "gma";  // PG,Mature,Adult
-	}
-	else if (gAgent.prefersMature())
-	{
-		maturity = "gm";  // PG,Mature
+		if (gAgent.prefersAdult())
+		{
+			maturity = "gma";  // PG,Mature,Adult
+		}
+		else if (gAgent.prefersMature())
+		{
+			maturity = "gm";  // PG,Mature
+		}
+		else
+		{
+			maturity = "g";  // PG
+		}
 	}
 	else
 	{
-		maturity = "g";  // PG
+		if (gAgent.prefersAdult())
+		{
+			maturity = "42";  // PG,Mature,Adult
+		}
+		else if (gAgent.prefersMature())
+		{
+			maturity = "21";  // PG,Mature
+		}
+		else
+		{
+			maturity = "13";  // PG
+		}
 	}
 	subs["MATURITY"] = maturity;
 

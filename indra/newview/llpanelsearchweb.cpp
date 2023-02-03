@@ -86,19 +86,37 @@ BOOL LLPanelSearchWeb::postBuild()
 	return TRUE;
 }
 
-void LLPanelSearchWeb::loadUrl(const SearchQuery &p)
+void LLPanelSearchWeb::loadUrl(const SearchQuery& p)
 {
 	if (!mWebBrowser || !p.validateBlock()) return;
-	
+
 	mWebBrowser->setTrustedContent(true);
 	// work out the subdir to use based on the requested category
-	LLSD subs = LLSD().with("CATEGORY", (mCategoryPaths.has(p.category.getValue()) 
-		? mCategoryPaths[p.category.getValue()].asString()
-		: mCategoryPaths["all"].asString()));
-	
+	LLSD subs = LLSD().with("CATEGORY", "");
+
+	if (LLGridManager::instance().isInSecondlife())
+	{
+		subs["TYPE"] = "standard";
+
+		const std::array<std::string, 5> collections = { {"events", "destinations","places","groups","people"} };
+
+		std::string collection_args("");
+		for (auto it = collections.begin(); it != collections.end(); ++it)
+		{
+			collection_args += "&collection_chosen=" + std::string(*it);
+		}
+		subs["COLLECTION"] = collection_args;
+	}
+	else
+	{
+		subs["CATEGORY"] = (mCategoryPaths.has(p.category.getValue())
+			? mCategoryPaths[p.category.getValue()].asString()
+			: mCategoryPaths["all"].asString());
+	}
+
 	// add the search query string
 	subs["QUERY"] = LLURI::escape(p.query);
-	
+
 	// add the permissions token that login.cgi gave us
 	// We use "search_token", and fallback to "auth_token" if not present.
 	LLSD search_token = LLLoginInstance::getInstance()->getResponse("search_token");
@@ -107,26 +125,44 @@ void LLPanelSearchWeb::loadUrl(const SearchQuery &p)
 		search_token = LLLoginInstance::getInstance()->getResponse("auth_token");
 	}
 	subs["AUTH_TOKEN"] = search_token.asString();
-	
+
 	// add the user's preferred maturity (can be changed via prefs)
 	std::string maturity;
-	if (gAgent.prefersAdult())
+	if (LLGridManager::instance().isInSecondlife())
 	{
-		maturity = "42";  // PG,Mature,Adult
-	}
-	else if (gAgent.prefersMature())
-	{
-		maturity = "21";  // PG,Mature
+		if (gAgent.prefersAdult())
+		{
+			maturity = "gma";  // PG,Mature,Adult
+		}
+		else if (gAgent.prefersMature())
+		{
+			maturity = "gm";  // PG,Mature
+		}
+		else
+		{
+			maturity = "g";  // PG
+		}
 	}
 	else
 	{
-		maturity = "13";  // PG
+		if (gAgent.prefersAdult())
+		{
+			maturity = "42";  // PG,Mature,Adult
+		}
+		else if (gAgent.prefersMature())
+		{
+			maturity = "21";  // PG,Mature
+		}
+		else
+		{
+			maturity = "13";  // PG
+		}
 	}
 	subs["MATURITY"] = maturity;
-	
+
 	// add the user's god status
 	subs["GODLIKE"] = gAgent.isGodlike() ? "1" : "0";
-	
+
 	// Get the search URL and expand all of the substitutions
 	// (also adds things like [LANGUAGE], [VERSION], [OS], etc.)
 	LLViewerRegion* regionp = gAgent.getRegion();
