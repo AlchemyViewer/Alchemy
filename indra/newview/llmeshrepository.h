@@ -329,7 +329,10 @@ public:
 	std::deque<UUIDBasedRequest> mSkinUnavailableQ;
 
 	// list of completed Decomposition info requests
-	std::deque<LLModel::Decomposition*> mDecompositionQ;
+	std::deque<std::unique_ptr<LLModel::Decomposition>> mDecompositionQ;
+
+	// list of completed Physics info requests shared with decomp..
+	std::deque<std::unique_ptr<LLModel::Decomposition>> mPhysicsQ;
 
 	// End
 
@@ -618,7 +621,8 @@ public:
 	void notifyMeshUnavailable(const LLVolumeParams& mesh_params, S32 lod);
 	void notifySkinInfoReceived(LLMeshSkinInfo* info);
 	void notifySkinInfoUnavailable(const LLUUID& info);
-	void notifyDecompositionReceived(LLModel::Decomposition* info);
+	void notifyDecompositionReceived(std::unique_ptr<LLModel::Decomposition> info);
+	void notifyPhysicsReceived(std::unique_ptr<LLModel::Decomposition> info);
 
 	S32 getActualMeshLOD(const LLVolumeParams& mesh_params, S32 lod);
 	static S32 getActualMeshLOD(LLSD& header, S32 lod);
@@ -653,7 +657,7 @@ public:
 	typedef boost::unordered_flat_map<LLUUID, LLPointer<LLMeshSkinInfo>> skin_map;
 	skin_map mSkinMap;
 
-	typedef boost::unordered_map<LLUUID, LLModel::Decomposition*> decomposition_map;
+	typedef boost::unordered_map<LLUUID, std::unique_ptr<LLModel::Decomposition>> decomposition_map;
 	decomposition_map mDecompositionMap;
 
 	LLMutex*					mMeshMutex;

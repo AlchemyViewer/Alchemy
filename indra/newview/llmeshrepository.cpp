@@ -857,11 +857,8 @@ LLMeshRepoThread::~LLMeshRepoThread()
 
 	delete_and_clear(mSkinInfoQ);
 
-    while (!mDecompositionQ.empty())
-    {
-        delete mDecompositionQ.front();
-        mDecompositionQ.pop_front();
-    }
+	mDecompositionQ.clear();
+	mPhysicsQ.clear();
 
     delete mHttpRequest;
 	mHttpRequest = NULL;
@@ -1870,11 +1867,11 @@ EMeshProcessingResult LLMeshRepoThread::decompositionReceived(const LLUUID& mesh
     }
 	
 	{
-		LLModel::Decomposition* d = new LLModel::Decomposition(decomp);
+		auto d = std::make_unique<LLModel::Decomposition>(decomp);
 		d->mMeshID = mesh_id;
 		{
 			LLMutexLock lock(mMutex);
-			mDecompositionQ.push_back(d);
+			mDecompositionQ.emplace_back(std::move(d));
 		}
 	}
 
@@ -1889,7 +1886,7 @@ EMeshProcessingResult LLMeshRepoThread::physicsShapeReceived(const LLUUID& mesh_
 	}
 	LLSD physics_shape;
 
-	LLModel::Decomposition* d = new LLModel::Decomposition();
+	auto d = std::make_unique<LLModel::Decomposition>();
 	d->mMeshID = mesh_id;
 
 	if (data == NULL)
@@ -1918,8 +1915,8 @@ EMeshProcessingResult LLMeshRepoThread::physicsShapeReceived(const LLUUID& mesh_
 				{
 					U16 idx = face.mIndices[i];
 
-					pos.push_back(LLVector3(face.mPositions[idx].getF32ptr()));
-					norm.push_back(LLVector3(face.mNormals[idx].getF32ptr()));				
+					pos.emplace_back(LLVector3(face.mPositions[idx].getF32ptr()));
+					norm.emplace_back(LLVector3(face.mNormals[idx].getF32ptr()));				
 				}			
 			}
 		}
@@ -1927,7 +1924,7 @@ EMeshProcessingResult LLMeshRepoThread::physicsShapeReceived(const LLUUID& mesh_
 
 	{
 		LLMutexLock lock(mMutex);
-		mDecompositionQ.push_back(d);
+		mPhysicsQ.emplace_back(std::move(d));
 	}
 	return MESH_OK;
 }
@@ -2803,7 +2800,7 @@ void LLMeshRepoThread::notifyLoadedMeshes()
 
 	if (!mDecompositionQ.empty())
 	{
-		std::deque<LLModel::Decomposition*> decomp_q;
+		std::deque<std::unique_ptr<LLModel::Decomposition>> decomp_q;
 
 		LLMutexTrylock mtx_lock(mMutex);
 		if (mtx_lock.isLocked() && !mDecompositionQ.empty())
@@ -2812,9 +2809,27 @@ void LLMeshRepoThread::notifyLoadedMeshes()
 			mtx_lock.unlock();
 
 			// Process the elements free of the lock
-			for (auto decomp : decomp_q)
+			for (auto& decomp : decomp_q)
 			{
-				gMeshRepo.notifyDecompositionReceived(decomp);
+				gMeshRepo.notifyDecompositionReceived(std::move(decomp));
+			}
+		}
+	}
+
+	if (!mPhysicsQ.empty())
+	{
+		std::deque<std::unique_ptr<LLModel::Decomposition>> physics_q;
+
+		LLMutexTrylock mtx_lock(mMutex);
+		if (mtx_lock.isLocked() && !mPhysicsQ.empty())
+		{
+			physics_q.swap(mPhysicsQ);
+			mtx_lock.unlock();
+
+			// Process the elements free of the lock
+			for (auto& decomp : physics_q)
+			{
+				gMeshRepo.notifyPhysicsReceived(std::move(decomp));
 			}
 		}
 	}
@@ -3911,23 +3926,41 @@ void LLMeshRepository::notifySkinInfoUnavailable(const LLUUID& mesh_id)
 	}
 }
 
-void LLMeshRepository::notifyDecompositionReceived(LLModel::Decomposition* decomp)
+void LLMeshRepository::notifyDecompositionReceived(std::unique_ptr<LLModel::Decomposition> decomp)
 {
 	decomposition_map::iterator iter = mDecompositionMap.find(decomp->mMeshID);
 	if (iter == mDecompositionMap.end())
 	{ //just insert decomp into map
-		mDecompositionMap[decomp->mMeshID] = decomp;
 		mLoadingDecompositions.erase(decomp->mMeshID);
         sCacheBytesDecomps += decomp->sizeBytes();
+		mDecompositionMap[decomp->mMeshID] = std::move(decomp);
 	}
 	else
 	{ //merge decomp with existing entry
         sCacheBytesDecomps -= iter->second->sizeBytes();
-		iter->second->merge(decomp);
+		iter->second->merge(decomp.get());
         sCacheBytesDecomps += iter->second->sizeBytes();
 
 		mLoadingDecompositions.erase(decomp->mMeshID);
-		delete decomp;
+	}
+}
+
+void LLMeshRepository::notifyPhysicsReceived(std::unique_ptr<LLModel::Decomposition> decomp)
+{
+	decomposition_map::iterator iter = mDecompositionMap.find(decomp->mMeshID);
+	if (iter == mDecompositionMap.end())
+	{ //just insert decomp into map
+		mLoadingPhysicsShapes.erase(decomp->mMeshID);
+        sCacheBytesDecomps += decomp->sizeBytes();
+		mDecompositionMap[decomp->mMeshID] = std::move(decomp);
+	}
+	else
+	{ //merge decomp with existing entry
+        sCacheBytesDecomps -= iter->second->sizeBytes();
+		iter->second->merge(decomp.get());
+        sCacheBytesDecomps += iter->second->sizeBytes();
+
+		mLoadingPhysicsShapes.erase(decomp->mMeshID);
 	}
 }
 
@@ -4054,10 +4087,10 @@ void LLMeshRepository::fetchPhysicsShape(const LLUUID& mesh_id)
 		decomposition_map::iterator iter = mDecompositionMap.find(mesh_id);
 		if (iter != mDecompositionMap.end())
 		{
-			decomp = iter->second;
+			decomp = iter->second.get();
 		}
 		
-		//decomposition block hasn't been fetched yet
+		// physics block hasn't been fetched yet
 		if (!decomp || decomp->mPhysicsShapeMesh.empty())
 		{
 			LLMutexLock lock(mMeshMutex);
@@ -4065,7 +4098,6 @@ void LLMeshRepository::fetchPhysicsShape(const LLUUID& mesh_id)
 			std::set<LLUUID>::iterator iter = mLoadingPhysicsShapes.find(mesh_id);
 			if (iter == mLoadingPhysicsShapes.end())
 			{ //no request pending for this skin info
-				// *FIXME:  Nothing ever deletes entries, can't be right
 				mLoadingPhysicsShapes.insert(mesh_id);
 				mPendingPhysicsShapeRequests.push(mesh_id);
 			}
@@ -4084,7 +4116,7 @@ LLModel::Decomposition* LLMeshRepository::getDecomposition(const LLUUID& mesh_id
 		decomposition_map::iterator iter = mDecompositionMap.find(mesh_id);
 		if (iter != mDecompositionMap.end())
 		{
-			ret = iter->second;
+			ret = iter->second.get();
 		}
 		
 		//decomposition block hasn't been fetched yet
