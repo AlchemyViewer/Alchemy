@@ -1477,7 +1477,6 @@ bool move_item_to_marketplacelistings(LLInventoryItem* inv_item, LLUUID dest_fol
                 LLNotificationsUtil::add("MerchantPasteFailed", subs);
                 return false;
             }
-            
             if (copy)
             {
                 // Copy the item

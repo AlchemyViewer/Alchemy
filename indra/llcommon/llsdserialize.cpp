@@ -2161,12 +2161,8 @@ std::string zip_llsd(LLSD& data)
 // and deserializes from that copy using LLSDSerialize
 LLUZipHelper::EZipRresult LLUZipHelper::unzip_llsd(LLSD& data, std::istream& is, S32 size)
 {
-	std::unique_ptr<U8[]> in;
-	try
-	{
-		in = std::unique_ptr<U8[]>(new U8[size]);
-	}
-	catch(const std::bad_alloc&)
+	std::unique_ptr<U8[]> in = std::unique_ptr<U8[]>(new(std::nothrow) U8[size]);
+	if (!in)
 	{
 		return ZR_MEM_ERROR;
 	}
@@ -2181,19 +2177,12 @@ LLUZipHelper::EZipRresult LLUZipHelper::unzip_llsd(LLSD& data, const U8* in, S32
 	U32 cur_size = 0;
 	z_stream strm;
 		
-	constexpr U32 CHUNK = 1024 * 256;
+	constexpr U32 CHUNK = 1024 * 512;
 
 	static thread_local std::unique_ptr<U8[]> out;
 	if (!out)
 	{
-		try
-		{
-			out = std::unique_ptr<U8[]>(new U8[CHUNK]);
-		}
-		catch (const std::bad_alloc&)
-		{
-			return ZR_MEM_ERROR;
-		}
+		out = std::unique_ptr<U8[]>(new(std::nothrow) U8[CHUNK]);
 	}
 		
 	strm.zalloc = Z_NULL;

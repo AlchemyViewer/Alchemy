@@ -762,7 +762,6 @@ void LLPanelProfileSecondLife::resetData()
 
 void LLPanelProfileSecondLife::processProfileProperties(const LLAvatarData* avatar_data)
 {
-    LLUUID avatar_id = getAvatarId();
     const LLRelationship* relationship = LLAvatarTracker::instance().getBuddyInfo(getAvatarId());
     if ((relationship != NULL || gAgent.isGodlike()) && !getSelfProfile())
     {
@@ -1011,6 +1010,8 @@ void LLPanelProfileSecondLife::fillRightsData()
 
 void LLPanelProfileSecondLife::fillAgeData(const LLDate &born_on)
 {
+    // Date from server comes already converted to stl timezone,
+    // so display it as an UTC + 0
     std::string name_and_date = getString("date_format");
     LLSD args_name;
     args_name["datetime"] = (S32)born_on.secondsSinceEpoch();

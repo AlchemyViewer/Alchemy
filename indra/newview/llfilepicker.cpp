@@ -595,9 +595,9 @@ BOOL LLFilePicker::getSaveFile(ESaveFilter filter, const std::string& filename, 
 
 #elif LL_DARWIN
 
-std::vector<std::string>* LLFilePicker::navOpenFilterProc(ELoadFilter filter) //(AEDesc *theItem, void *info, void *callBackUD, NavFilterModes filterMode)
+std::unique_ptr<std::vector<std::string>> LLFilePicker::navOpenFilterProc(ELoadFilter filter) //(AEDesc *theItem, void *info, void *callBackUD, NavFilterModes filterMode)
 {
-    std::vector<std::string> *allowedv = new std::vector< std::string >;
+    std::unique_ptr<std::vector<std::string>> allowedv(new std::vector< std::string >);
     switch(filter)
     {
         case FFLOAD_ALL:
@@ -669,11 +669,10 @@ bool	LLFilePicker::doNavChooseDialog(ELoadFilter filter)
     
 	gViewerWindow->getWindow()->beforeDialog();
     
-    std::unique_ptr<std::vector<std::string>> allowed_types;
-    allowed_types.reset(navOpenFilterProc(filter));
+    std::unique_ptr<std::vector<std::string>> allowed_types = navOpenFilterProc(filter);
     
-    std::unique_ptr<std::vector<std::string>> filev;
-    filev.reset(doLoadDialog(allowed_types.get(), mPickOptions));
+    std::unique_ptr<std::vector<std::string>> filev  = doLoadDialog(allowed_types.get(),
+                                                    mPickOptions);
 
 	gViewerWindow->getWindow()->afterDialog();
 
@@ -759,9 +758,11 @@ bool	LLFilePicker::doNavSaveDialog(ESaveFilter filter, const std::string& filena
 	gViewerWindow->getWindow()->beforeDialog();
 
 	// Run the dialog
-    std::unique_ptr<std::string> filev(doSaveDialog(&namestring,
+    std::unique_ptr<std::string> filev = doSaveDialog(&namestring, 
+                 &type,
+                 &creator,
                  &extension,
-                 mPickOptions));
+                 mPickOptions);
 
 	gViewerWindow->getWindow()->afterDialog();
 

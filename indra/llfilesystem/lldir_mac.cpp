@@ -127,9 +127,7 @@ LLDir_Mac::LLDir_Mac()
     
 		//mOSCacheDir
         std::string cachedir =  getSystemCacheFolder();
-
         if (!cachedir.empty())
-		
 		{
             mOSCacheDir = cachedir;
             //TODO:  This changes from ~/Library/Cache/Secondlife to ~/Library/Cache/com.app.secondlife/Secondlife.  Last dir level could go away.

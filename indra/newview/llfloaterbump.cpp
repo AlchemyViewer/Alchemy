@@ -84,7 +84,7 @@ BOOL LLFloaterBump::postBuild()
 	mList->setAllowMultipleSelection(false);
 	mList->setRightMouseDownCallback(boost::bind(&LLFloaterBump::onScrollListRightClicked, this, _1, _2, _3));
 
-	auto menu = LLUICtrlFactory::getInstance()->createFromFile<LLContextMenu>("menu_avatar_other.xml", gMenuHolder, LLViewerMenuHolderGL::child_registry_t::instance());
+	LLContextMenu* menu = LLUICtrlFactory::getInstance()->createFromFile<LLContextMenu>("menu_avatar_other.xml", gMenuHolder, LLViewerMenuHolderGL::child_registry_t::instance());
 	if (menu)
 	{
 		mPopupMenuHandle = menu->getHandle();

@@ -552,9 +552,8 @@ void LLGroupNoticeNotificationListItem::onClickAttachment()
         if (!isAttachmentOpenable(mInventoryOffer->mType)) {
             LLNotifications::instance().add("AttachmentSaved", LLSD(), LLSD());
         }
-
         mInventoryOffer->forceResponse(IOR_ACCEPT);
-        mInventoryOffer = nullptr;
+        mInventoryOffer = NULL;
     }
 }
 

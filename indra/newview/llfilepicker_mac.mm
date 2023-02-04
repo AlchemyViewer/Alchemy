@@ -29,13 +29,13 @@
 #include <iostream>
 #include "llfilepicker_mac.h"
 
-std::vector<std::string>* doLoadDialog(const std::vector<std::string>* allowed_types, 
+std::unique_ptr<std::vector<std::string>> doLoadDialog(const std::vector<std::string>* allowed_types,
                  unsigned int flags)
 {
-    @autoreleasepool
-    {
+    std::unique_ptr<std::vector<std::string>> outfiles;
+
+    @autoreleasepool {
         int i, result;
-        
         //Aura TODO:  We could init a small window and release it at the end of this routine
         //for a modeless interface.
         
@@ -43,8 +43,7 @@ std::vector<std::string>* doLoadDialog(const std::vector<std::string>* allowed_t
         //NSString *fileName = nil;
         NSMutableArray *fileTypes = nil;
         
-        
-        if (allowed_types && !allowed_types->empty())
+        if ( allowed_types && !allowed_types->empty())
         {
             fileTypes = [[NSMutableArray alloc] init];
             
@@ -63,8 +62,6 @@ std::vector<std::string>* doLoadDialog(const std::vector<std::string>* allowed_t
         [panel setResolvesAliases: true];
         [panel setCanChooseFiles: ( (flags & F_FILE)?true:false )];
         [panel setTreatsFilePackagesAsDirectories: ( flags & F_NAV_SUPPORT ) ];
-        
-        std::vector<std::string>* outfiles = NULL;
         
         if (fileTypes)
         {
@@ -87,25 +84,27 @@ std::vector<std::string>* doLoadDialog(const std::vector<std::string>* allowed_t
             
             if (count > 0)
             {
-                outfiles = new std::vector<std::string>;
+                outfiles.reset(new std::vector<std::string>);
             }
             
             for (i=0; i<count; i++) {
                 NSString *aFile = [[filesToOpen objectAtIndex:i] path];
-                outfiles->emplace_back([aFile UTF8String]);
+                std::string afilestr = std::string([aFile UTF8String]);
+                outfiles->push_back(afilestr);
             }
         }
-        return outfiles;
-    };
+    }
+
+    return outfiles;
 }
 
 
-std::string* doSaveDialog(const std::string* file, 
+std::unique_ptr<std::string> doSaveDialog(const std::string* file,
                   const std::string* extension,
                   unsigned int flags)
 {
-    @autoreleasepool
-    {
+    std::unique_ptr<std::string> outfile;
+    @autoreleasepool {
         NSSavePanel *panel = [NSSavePanel savePanel];
         
         NSString *extensionns = [NSString stringWithCString:extension->c_str() encoding:[NSString defaultCStringEncoding]];
@@ -117,19 +116,19 @@ std::string* doSaveDialog(const std::string* file,
         [panel setAllowedFileTypes:fileType];
         NSString *fileName = [NSString stringWithCString:file->c_str() encoding:[NSString defaultCStringEncoding]];
         
-        std::string *outfile = NULL;
         NSURL* url = [NSURL fileURLWithPath:fileName];
         [panel setNameFieldStringValue: fileName];
         [panel setDirectoryURL: url];
-        if([panel runModal] == NSModalResponseOK)
+        if([panel runModal] ==
+           NSModalResponseOK)
         {
             NSURL* url = [panel URL];
             NSString* p = [url path];
-            outfile = new std::string( [p UTF8String] );
+            outfile.reset(new std::string([p UTF8String]));
             // write the file
         }
-        return outfile;
     }
+    return outfile;
 }
 
 #endif

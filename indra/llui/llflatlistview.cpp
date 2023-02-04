@@ -514,7 +514,13 @@ LLFlatListView::LLFlatListView(const LLFlatListView::Params& p)
 
 LLFlatListView::~LLFlatListView()
 {
-	delete_and_clear(mItemPairs);
+	for (pairs_iterator_t it = mItemPairs.begin(); it != mItemPairs.end(); ++it)
+	{
+		mItemsPanel->removeChild((*it)->first);
+		(*it)->first->die();
+		delete *it;
+	}
+	mItemPairs.clear();
 }
 
 // virtual

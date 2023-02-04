@@ -2859,8 +2859,9 @@ void handle_object_show_original()
 }
 
 
-static void init_default_item_label(LLUICtrl* ctrl, const std::string& item_name)
+static void init_default_item_label(LLUICtrl* ctrl)
 {
+	const std::string& item_name = ctrl->getName();
 	auto it = sDefaultItemLabels.find(item_name);
 	if (it == sDefaultItemLabels.end())
 	{
@@ -2905,8 +2906,7 @@ bool enable_object_touch(LLUICtrl* ctrl)
 	}
 // [/RLVa:KB]
 
-	const std::string& item_name = ctrl->getName();
-	init_default_item_label(ctrl, item_name);
+	init_default_item_label(ctrl);
 
 	// Update label based on the node touch name if available.
 	LLSelectNode* node = LLSelectMgr::getInstance()->getSelection()->getFirstRootNode();
@@ -2916,7 +2916,7 @@ bool enable_object_touch(LLUICtrl* ctrl)
 	}
 	else
 	{
-		ctrl->setValue(get_default_item_label(item_name));
+		ctrl->setValue(get_default_item_label(ctrl->getName()));
 	}
 
 	return new_value;
@@ -5689,6 +5689,7 @@ class LLToolsSelectNextPartFace : public view_listener_t
                     }
                 }
                 LLSelectMgr::getInstance()->selectObjectOnly(to_select, new_te);
+                LLSelectMgr::getInstance()->addAsIndividual(to_select, new_te, false);
             }
             else
             {
@@ -6698,10 +6699,8 @@ bool enable_object_sit(LLUICtrl* ctrl)
 	bool sitting_on_sel = sitting_on_selection();
 	if (!sitting_on_sel)
 	{
-		const std::string& item_name = ctrl->getName();
-
 		// init default labels
-		init_default_item_label(ctrl, item_name);
+		init_default_item_label(ctrl);
 
 		// Update label
 		LLSelectNode* node = LLSelectMgr::getInstance()->getSelection()->getFirstRootNode();
@@ -6711,7 +6710,7 @@ bool enable_object_sit(LLUICtrl* ctrl)
 		}
 		else
 		{
-			ctrl->setValue(get_default_item_label(item_name));
+			ctrl->setValue(get_default_item_label(ctrl->getName()));
 		}
 	}
 

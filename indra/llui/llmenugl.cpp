@@ -4106,7 +4106,7 @@ LLContextMenuBranch::LLContextMenuBranch(const LLContextMenuBranch::Params& p)
 	LLContextMenu* branch = static_cast<LLContextMenu*>(p.branch);
 	if (branch)
 	{
-		mBranchHandle = branch->getHandle();
+		mBranch = branch->getHandle();
 		branch->hide();
 		branch->setParentMenuItem(this);
 	}
@@ -4114,9 +4114,9 @@ LLContextMenuBranch::LLContextMenuBranch(const LLContextMenuBranch::Params& p)
 
 LLContextMenuBranch::~LLContextMenuBranch()
 {
-	if (mBranchHandle.get())
+	if (mBranch.get())
 	{
-		mBranchHandle.get()->die();
+		mBranch.get()->die();
 	}
 }
 

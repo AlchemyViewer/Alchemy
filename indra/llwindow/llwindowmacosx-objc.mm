@@ -55,7 +55,7 @@ void setupCocoa()
             // ie. running './secondlife -set Language fr' would cause a pop-up saying can't open document 'fr'
             // when init'ing the Cocoa App window.
             [[NSUserDefaults standardUserDefaults] setObject:@"NO" forKey:@"NSTreatUnknownArgumentsAsOpen"];
-        } // @autoreleasepool
+        }
 
 		inited = true;
 	}
@@ -91,10 +91,9 @@ unsigned short *copyFromPBoard()
             NSArray *objToPaste = [pboard readObjectsForClasses:classArray options:[NSDictionary dictionary]];
             str = [objToPaste objectAtIndex:0];
         }
-        NSUInteger len = [str length];
-        unichar* temp = (unichar*)calloc(len+1, sizeof(unichar));
-        [str getCharacters:temp range:NSMakeRange(0, len)];
-        
+        NSUInteger str_len = [str length];
+        unichar* temp = (unichar*)calloc(str_len+1, sizeof(unichar));
+        [str getCharacters:temp range:NSMakeRange(0, str_len)];
         return temp;
     }
 }

@@ -603,38 +603,6 @@ public:
 
 	BOOL postBuild()
 	{
-// [AL:SE] - Patch: Menu-Optimization | Checked: 2021-01-05
-//		LLUICtrl::CommitCallbackRegistry::ScopedRegistrar registrar;
-//		LLUICtrl::EnableCallbackRegistry::ScopedRegistrar registrar_enable;
-//
-//		registrar.add("AvatarIcon.Action", boost::bind(&LLChatHistoryHeader::onAvatarIconContextMenuItemClicked, this, _2));
-//		registrar_enable.add("AvatarIcon.Check", boost::bind(&LLChatHistoryHeader::onAvatarIconContextMenuItemChecked, this, _2));
-//		registrar_enable.add("AvatarIcon.Enable", boost::bind(&LLChatHistoryHeader::onAvatarIconContextMenuItemEnabled, this, _2));
-//		registrar_enable.add("AvatarIcon.Visible", boost::bind(&LLChatHistoryHeader::onAvatarIconContextMenuItemVisible, this, _2));
-//		registrar.add("ObjectIcon.Action", boost::bind(&LLChatHistoryHeader::onObjectIconContextMenuItemClicked, this, _2));
-//		registrar_enable.add("ObjectIcon.Visible", boost::bind(&LLChatHistoryHeader::onObjectIconContextMenuItemVisible, this, _2));
-//
-//		LLMenuGL* menu = LLUICtrlFactory::getInstance()->createFromFile<LLMenuGL>("menu_avatar_icon.xml", gMenuHolder, LLViewerMenuHolderGL::child_registry_t::instance());
-//		if (menu)
-//		{
-//			mPopupMenuHandleAvatar = menu->getHandle();
-//		}
-//		else
-//		{
-//			LL_WARNS() << " Failed to create menu_avatar_icon.xml" << LL_ENDL;
-//		}
-//
-//		menu = LLUICtrlFactory::getInstance()->createFromFile<LLMenuGL>("menu_object_icon.xml", gMenuHolder, LLViewerMenuHolderGL::child_registry_t::instance());
-//		if (menu)
-//		{
-//			mPopupMenuHandleObject = menu->getHandle();
-//		}
-//		else
-//		{
-//			LL_WARNS() << " Failed to create menu_object_icon.xml" << LL_ENDL;
-//		}
-// [/AL:SE]
-
 		setDoubleClickCallback(boost::bind(&LLChatHistoryHeader::showInspector, this));
 
 		setMouseEnterCallback(boost::bind(&LLChatHistoryHeader::showInfoCtrl, this));

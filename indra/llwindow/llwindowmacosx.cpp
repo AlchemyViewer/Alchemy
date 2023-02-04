@@ -1259,9 +1259,10 @@ BOOL LLWindowMacOSX::isClipboardTextAvailable()
 
 BOOL LLWindowMacOSX::pasteTextFromClipboard(LLWString &dst)
 {
-    unsigned short* temp = copyFromPBoard();
-	llutf16string str(temp);
-    free(temp);
+    unsigned short* pboard_data = copyFromPBoard(); // must free returned data
+	llutf16string str(pboard_data);
+    free(pboard_data);
+
 	dst = utf16str_to_wstring(str);
 	if (dst != L"")
 	{
@@ -1298,7 +1299,7 @@ LLWindow::LLWindowResolution* LLWindowMacOSX::getSupportedResolutions(S32 &num_r
 {
 	if (!mSupportedResolutions)
 	{
-		CFArrayRef modes = CGDisplayCopyAllDisplayModes(mDisplay, NULL);
+		CFArrayRef modes = CGDisplayCopyAllDisplayModes(mDisplay, nullptr);
 
 		if(modes != NULL)
 		{
@@ -1337,7 +1338,7 @@ LLWindow::LLWindowResolution* LLWindowMacOSX::getSupportedResolutions(S32 &num_r
 					}
 				}
 			}
-			CFRelease(modes);
+            CFRelease(modes);
 		}
 	}
 

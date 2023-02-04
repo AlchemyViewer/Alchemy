@@ -2152,7 +2152,6 @@ void LLOutgoingCallDialog::show(const LLSD& key)
 	}
 
 	std::string callee_name = mPayload["session_name"].asString();
-
 	if (callee_name == "anonymous") // obsolete? Likely was part of avaline support
 	{
 		callee_name = getString("anonymous");

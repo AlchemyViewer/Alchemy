@@ -1476,7 +1476,7 @@ BOOL LLFolderView::handleRightMouseDown( S32 x, S32 y, MASK mask )
 		}
 	}
 	bool hide_folder_menu = mSuppressFolderMenu && isFolderSelected();
-	if ((menu && handled
+	if (menu && (handled
 		&& ( count > 0 && (hasVisibleChildren()) )) && // show menu only if selected items are visible
 		!hide_folder_menu)
 	{

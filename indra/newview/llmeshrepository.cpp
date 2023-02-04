@@ -139,7 +139,7 @@
 //                               data copied
 //                               headerReceived() invoked
 //                                 LLSD parsed
-//                                 mMeshHeader, mMeshHeaderSize updated
+//                                 mMeshHeader updated
 //                                 scan mPendingLOD for LOD request
 //                                 push LODRequest to mLODReqQ
 //                             ...
@@ -3976,7 +3976,7 @@ void LLMeshRepository::notifyMeshLoaded(const LLVolumeParams& mesh_params, LLVol
 		//make sure target volume is still valid
 		if (volume->getNumVolumeFaces() <= 0)
 		{
-			LL_WARNS(LOG_MESH) << "Mesh loading returned empty volume.  ID:  " << mesh_params.getSculptID()
+			LL_WARNS(LOG_MESH) << "Mesh loading returned empty volume.  ID:  " << mesh_id
 							   << LL_ENDL;
 		}
 		
@@ -3990,7 +3990,7 @@ void LLMeshRepository::notifyMeshLoaded(const LLVolumeParams& mesh_params, LLVol
 			}
 			else
 			{
-				LL_WARNS(LOG_MESH) << "Couldn't find system volume for mesh " << mesh_params.getSculptID()
+				LL_WARNS(LOG_MESH) << "Couldn't find system volume for mesh " << mesh_id
 								   << LL_ENDL;
 			}
 		}

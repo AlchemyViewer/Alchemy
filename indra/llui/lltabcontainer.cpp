@@ -1447,7 +1447,11 @@ void LLTabContainer::selectLastTab()
 
 void LLTabContainer::selectNextTab()
 {
-	if (mTabList.empty()) return;
+    if (mTabList.size() == 0)
+    {
+        return;
+    }
+
 	BOOL tab_has_focus = FALSE;
 	if (mCurrentTabIdx >= 0 && mTabList[mCurrentTabIdx]->mButton->hasFocus())
 	{

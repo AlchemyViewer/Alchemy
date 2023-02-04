@@ -82,10 +82,10 @@ LLSysWellChiclet::LLSysWellChiclet(const Params& p)
 LLSysWellChiclet::~LLSysWellChiclet()
 {
 	mFlashToLitTimer->unset();
-	LLContextMenu* menu_avatar = static_cast<LLContextMenu*>(mContextMenuHandle.get());
-	if (menu_avatar)
+	LLContextMenu* menu = static_cast<LLContextMenu*>(mContextMenuHandle.get());
+	if (menu)
 	{
-		menu_avatar->die();
+		menu->die();
 		mContextMenuHandle.markDead();
 	}
 }
@@ -1240,7 +1240,7 @@ void LLInvOfferChiclet::createPopupMenu()
 	LLUICtrl::CommitCallbackRegistry::ScopedRegistrar registrar;
 	registrar.add("InvOfferChiclet.Action", boost::bind(&LLInvOfferChiclet::onMenuItemClicked, this, _2));
 
-	auto menu = LLUICtrlFactory::getInstance()->createFromFile<LLMenuGL>
+	LLMenuGL* menu = LLUICtrlFactory::getInstance()->createFromFile<LLMenuGL>
 		("menu_inv_offer_chiclet.xml", gMenuHolder, LLViewerMenuHolderGL::child_registry_t::instance());
 	if (menu)
 	{

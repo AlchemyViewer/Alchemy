@@ -129,14 +129,13 @@ void main()
     haze_glow = (sun_moon_glow_factor < 1.0) ? 0.0 : (sun_moon_glow_factor * (haze_glow + 0.25));
 
     // Haze color above cloud
-    vec4 color = (blue_horizon * blue_weight * (sunlight + ambient_color) 
-               + haze_horizon * haze_weight * (sunlight * haze_glow + ambient_color));
+    vec4 color = (blue_horizon * blue_weight * (sunlight + ambient_color)
+               + (haze_horizon * haze_weight) * (sunlight * haze_glow + ambient_color));
 
     // Final atmosphere additive
     color *= (1. - combined_haze);
 
     // Increase ambient when there are more clouds
-    // TODO 9/20: DJH what does this do?  max(0,(1-ambient)) will change the color
     vec4 ambient = ambient_color + max(vec4(0), (1. - ambient_color)) * cloud_shadow * 0.5;
 
     // Dim sunlight by cloud shadow percentage
@@ -150,7 +149,7 @@ void main()
     combined_haze = sqrt(combined_haze);  // less atmos opacity (more transparency) below clouds
 
     // At horizon, blend high altitude sky color towards the darker color below the clouds
-    color += (add_below_cloud - color) * (1. - combined_haze);
+    color += (add_below_cloud - color) * (1. - sqrt(combined_haze));
 
     // Haze color above cloud
     vary_HazeColor = color;

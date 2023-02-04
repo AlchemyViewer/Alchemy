@@ -300,7 +300,7 @@
     <button
       follows="left|top"
       label="Clear History"
-      tool_tip="Clear login image, last location, teleport history, web and texture cache"
+      tool_tip="Clear search and teleport history, web and texture cache"
       layout="topleft"
       left="30"
       name="clear_cache"
