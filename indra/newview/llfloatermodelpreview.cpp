@@ -1086,8 +1086,8 @@ void LLFloaterModelPreview::onPhysicsUseLOD(LLUICtrl* ctrl, void* userdata)
 	}
 	else if (which_mode == cube_mode)
 	{
-		std::string path = gDirUtilp->getAppRODataDir();
-		gDirUtilp->append(path, "cube.dae");
+		
+		std::string path = gDirUtilp->getExpandedFilename(LL_PATH_APP_SETTINGS, "cube.dae");
 		sInstance->loadModel(LLModel::LOD_PHYSICS, path);
 	}
 

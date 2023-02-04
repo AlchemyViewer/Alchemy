@@ -3969,7 +3969,8 @@ void LLMeshRepository::notifyMeshLoaded(const LLVolumeParams& mesh_params, LLVol
 	S32 detail = LLVolumeLODGroup::getVolumeDetailFromScale(volume->getDetail());
 
 	//get list of objects waiting to be notified this mesh is loaded
-	mesh_load_map::iterator obj_iter = mLoadingMeshes[detail].find(mesh_params.getSculptID());
+	const auto& mesh_id = mesh_params.getSculptID();
+	mesh_load_map::iterator obj_iter = mLoadingMeshes[detail].find(mesh_id);
 
 	if (volume && obj_iter != mLoadingMeshes[detail].end())
 	{

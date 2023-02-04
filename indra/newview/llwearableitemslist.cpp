@@ -110,10 +110,9 @@ BOOL LLPanelWearableOutfitItem::postBuild()
     
     LLViewerInventoryItem* inv_item = getItem();
     mShowWidgets &= (inv_item->getType() != LLAssetType::AT_BODYPART);
-    if(mShowWidgets)
     {
-        addWidgetToRightSide("add_wearable");
-        addWidgetToRightSide("remove_wearable");
+        addWidgetToRightSide("add_wearable", mShowWidgets);
+        addWidgetToRightSide("remove_wearable", mShowWidgets);
 
         childSetAction("add_wearable", boost::bind(&LLPanelWearableOutfitItem::onAddWearable, this));
         childSetAction("remove_wearable", boost::bind(&LLPanelWearableOutfitItem::onRemoveWearable, this));
