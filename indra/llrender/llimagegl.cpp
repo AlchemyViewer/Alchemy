@@ -1715,7 +1715,7 @@ void LLImageGLThread::updateClass()
         {
             S32 meminfo[4];
             glGetIntegerv(GL_TEXTURE_FREE_MEMORY_ATI, meminfo);
-            LLImageGLThread::sFreeVRAMMegabytes = meminfo[0];
+            LLImageGLThread::sFreeVRAMMegabytes = meminfo[0] / 1024;
 
         }
         else if (gGLManager.mHasNVXMemInfo)

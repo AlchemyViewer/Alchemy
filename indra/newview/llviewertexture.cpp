@@ -536,7 +536,7 @@ void LLViewerTexture::getGPUMemoryForTextures(S32Megabytes &gpu, S32Megabytes &p
     timer.reset();
 
     {
-        gpu_res = (S32Megabytes) LLImageGLThread::getFreeVRAMMegabytes();
+        gpu_res = S32Megabytes(LLImageGLThread::getFreeVRAMMegabytes());
         
         //check main memory, only works for windows.
         LLMemory::updateMemoryInfo();
