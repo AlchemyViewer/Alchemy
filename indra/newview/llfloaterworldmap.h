@@ -45,6 +45,9 @@ class LLItemInfo;
 class LLLineEditor;
 class LLTabContainer;
 class LLWorldMapView;
+class LLButton;
+class LLCheckBoxCtrl;
+class LLSliderCtrl;
 
 class LLFloaterWorldMap final : public LLFloater
 {
@@ -196,7 +199,25 @@ private:
 	LLCtrlListInterface *	mListLandmarkCombo;
 	LLCtrlListInterface *	mListSearchResults;
 
-	LLButton*				mTrackRegionButton;
+	LLButton*				mTeleportButton = nullptr;
+	LLButton*				mShowDestinationButton = nullptr;
+	LLButton*				mCopySlurlButton = nullptr;
+	LLButton*				mTrackRegionButton = nullptr;
+	LLButton*				mGoHomeButton = nullptr;
+
+	LLCheckBoxCtrl*			mPeopleCheck = nullptr;
+	LLCheckBoxCtrl*			mInfohubCheck = nullptr;
+	LLCheckBoxCtrl*			mTelehubCheck = nullptr;
+	LLCheckBoxCtrl*			mLandSaleCheck = nullptr;
+	LLCheckBoxCtrl*			mEventsCheck = nullptr;
+	LLCheckBoxCtrl*			mEventsMatureCheck = nullptr;
+	LLCheckBoxCtrl*			mEventsAdultCheck = nullptr;
+
+	LLUICtrl*				mAvatarIcon = nullptr;
+	LLUICtrl*				mLandmarkIcon = nullptr;
+	LLUICtrl*				mLocationIcon = nullptr;
+
+	LLSliderCtrl*				mZoomSlider = nullptr;
 
     boost::signals2::connection mTeleportFinishConnection;
 };
