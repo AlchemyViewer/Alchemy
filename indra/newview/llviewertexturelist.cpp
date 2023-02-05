@@ -1406,7 +1406,7 @@ S32Megabytes LLViewerTextureList::getMinVideoRamSetting()
 
 //static
 // Returns max setting for TextureMemory (in MB)
-S32Megabytes LLViewerTextureList::getMaxVideoRamSetting(bool get_recommended, float mem_multiplier)
+S32Megabytes LLViewerTextureList::getMaxVideoRamSetting(bool get_recommended, float mem_multiplier, bool clamp_upper_limit /* = true */)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
 	S32Megabytes max_texmem;
@@ -1415,13 +1415,6 @@ S32Megabytes LLViewerTextureList::getMaxVideoRamSetting(bool get_recommended, fl
 		// Treat any card with < 32 MB (shudder) as having 32 MB
 		//  - it's going to be swapping constantly regardless
 		S32Megabytes max_vram(gGLManager.mVRAM);
-
-		if(gGLManager.mIsAMD)
-		{
-			//shrink the availabe vram for ATI cards because some of them do not handel texture swapping well.
-			max_vram = max_vram * 0.75f; 
-		}
-
 		max_vram = llmax(max_vram, getMinVideoRamSetting());
 		max_texmem = max_vram;
 		if (!get_recommended)
@@ -1453,7 +1446,14 @@ S32Megabytes LLViewerTextureList::getMaxVideoRamSetting(bool get_recommended, fl
     // limit the texture memory to a multiple of the default if we've found some cards to behave poorly otherwise
 	max_texmem = llmin(max_texmem, (S32Megabytes) (mem_multiplier * max_texmem));
 
-	max_texmem = llclamp(max_texmem, getMinVideoRamSetting(), gMaxVideoRam); 
+	if (clamp_upper_limit)
+	{
+		max_texmem = llclamp(max_texmem, getMinVideoRamSetting(), gMaxVideoRam);
+	}
+	else
+	{
+		max_texmem = llmax(max_texmem, getMinVideoRamSetting());
+	}
 	
 	return max_texmem;
 }
@@ -1519,8 +1519,24 @@ void LLViewerTextureList::updateMaxResidentTexMem(S32Megabytes mem)
 	// currently max(12MB, VRAM/4) assumed...
 	
 	S32Megabytes vb_mem = mem;
-	S32Megabytes fb_mem = llmax(VIDEO_CARD_FRAMEBUFFER_MEM, vb_mem/4);
-	mMaxResidentTexMemInMegaBytes = (vb_mem - fb_mem) ; //in MB
+
+	S32Megabytes total_mem = getMaxVideoRamSetting(true, mem_multiplier, false);
+
+	if ((vb_mem / 3) > VIDEO_CARD_FRAMEBUFFER_MEM)
+	{
+		vb_mem = vb_mem * 4 / 3;
+	}
+	else
+	{
+		vb_mem += VIDEO_CARD_FRAMEBUFFER_MEM;
+	}
+
+	vb_mem = llmin (vb_mem, total_mem);
+	mMaxResidentTexMemInMegaBytes = vb_mem; //in MB
+	{
+		S32Megabytes fb_mem = llmax(VIDEO_CARD_FRAMEBUFFER_MEM, vb_mem/4);
+		mMaxResidentTexMemInMegaBytes -= fb_mem; //in MB
+	}
 	
 #if defined(_WIN64) || defined(__amd64__) || defined(__x86_64__)
 	if (mMaxResidentTexMemInMegaBytes > gMaxVideoRam / 2)
@@ -1553,7 +1569,7 @@ void LLViewerTextureList::updateMaxResidentTexMem(S32Megabytes mem)
 	}
 	
 	LL_INFOS() << "Total Video Memory set to: " << vb_mem << " MB" << LL_ENDL;
-	LL_INFOS() << "Available Texture Memory set to: " << (vb_mem - fb_mem) << " MB" << LL_ENDL;
+	LL_INFOS() << "Available Texture Memory set to: " << mMaxResidentTexMemInMegaBytes << " MB" << LL_ENDL;
 	LL_INFOS() << "Total Texture Memory set to: " << mMaxTotalTextureMemInMegaBytes << " MB" << LL_ENDL;
 	LL_INFOS() << "Maxiumum Resident Texture Memory set to: " << mMaxResidentTexMemInMegaBytes << " MB" << LL_ENDL;
 }

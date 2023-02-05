@@ -64,7 +64,7 @@
 // extern
 const S32Megabytes gMinVideoRam(32);
 #if defined(_WIN64) || defined(__amd64__) || defined(__x86_64__)
-const S32Megabytes gMaxVideoRam(3072);
+const S32Megabytes gMaxVideoRam(4096);
 #else
 const S32Megabytes gMaxVideoRam(512);
 #endif

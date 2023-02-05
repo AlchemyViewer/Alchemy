@@ -155,7 +155,7 @@ public:
 	void setDebugFetching(LLViewerFetchedTexture* tex, S32 debug_level);
 
 	static S32Megabytes getMinVideoRamSetting();
-	static S32Megabytes getMaxVideoRamSetting(bool get_recommended, float mem_multiplier);
+	static S32Megabytes getMaxVideoRamSetting(bool get_recommended, float mem_multiplier, bool clamp_upper_limit = true);
 
 	static bool isPrioRequestsFetched();
 	
@@ -290,7 +290,7 @@ private:
 		LLRect mImageClipRegion;
 	};
 
-	typedef boost::unordered_flat_map< std::string, LLPointer<LLUIImage> > uuid_ui_image_map_t;
+	typedef boost::unordered_map< std::string, LLPointer<LLUIImage> > uuid_ui_image_map_t;
 	uuid_ui_image_map_t mUIImages;
 
 	//
