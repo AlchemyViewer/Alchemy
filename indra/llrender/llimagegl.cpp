@@ -2522,7 +2522,7 @@ LLImageGLThread::LLImageGLThread(LLWindow* window)
     // We want exactly one thread, but a very large capacity: we never want
     // anyone, especially inner-loop render code, to have to block on post()
     // because we're full.
-    : ThreadPool("LLImageGL", 1, 1024*1024)
+    : ThreadPool("LLImageGL", 1, 1024*1024, LL::ThreadPool::E_ABOVE_NORMAL)
     , mWindow(window)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;

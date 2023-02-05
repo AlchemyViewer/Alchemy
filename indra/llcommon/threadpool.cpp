@@ -21,21 +21,46 @@
 #include "llevents.h"
 #include "stringize.h"
 
-LL::ThreadPool::ThreadPool(const std::string& name, size_t threads, size_t capacity):
+LL::ThreadPool::ThreadPool(const std::string& name, size_t threads, size_t capacity, EThreadPrio prio):
     super(name),
     mQueue(name, capacity),
     mName("ThreadPool:" + name),
-    mThreadCount(threads)
+    mThreadCount(threads),
+    mThreadPriority(prio)
 {}
 
 void LL::ThreadPool::start()
 {
     for (size_t i = 0; i < mThreadCount; ++i)
     {
-        std::string tname{ stringize(mName, ':', (i+1), '/', mThreadCount) };
-        mThreads.emplace_back(tname, [this, tname]()
-            {
-                LL_PROFILER_SET_THREAD_NAME(tname.c_str());
+		std::string tname{ stringize(mName, ':', (i + 1), '/', mThreadCount) };
+        EThreadPrio prio = mThreadPriority;
+		mThreads.emplace_back(tname, [this, tname, prio]()
+			{
+				LL_PROFILER_SET_THREAD_NAME(tname.c_str());
+#if LL_WINDOWS
+		        int thread_prio = 0;
+		        switch (prio)
+		        {
+		        case E_LOWEST:
+			        thread_prio = THREAD_PRIORITY_LOWEST;
+			        break;
+		        case E_BELOW_NORMAL:
+			        thread_prio = THREAD_PRIORITY_BELOW_NORMAL;
+			        break;
+		        default:
+		        case E_NORMAL:
+			        thread_prio = THREAD_PRIORITY_NORMAL;
+			        break;
+		        case E_ABOVE_NORMAL:
+			        thread_prio = THREAD_PRIORITY_ABOVE_NORMAL;
+			        break;
+		        case E_HIGHEST:
+			        thread_prio = THREAD_PRIORITY_HIGHEST;
+			        break;
+		        }
+		        SetThreadPriority(GetCurrentThread(), thread_prio);
+#endif
                 run(tname);
             });
     }

@@ -92,10 +92,11 @@ LLImageDecodeThread::LLImageDecodeThread(bool threaded, U32 pool_size)
             pool_size = 2U;  // Use a sane default: 2 cores
         if (pool_size >= 8U)
 		{
-			// Using number of (virtual) cores minus 3 for:
+			// Using number of (virtual) cores minus 4 for:
 			// - main image worker
 			// - viewer main loop thread
 			// - mesh repo thread
+			// - gl image thread
 			// further bound to a maximum of 12 threads (more than that is totally useless, even
 			// when flying over main land with 512m draw distance).
             pool_size = llclamp(pool_size - 4U, 0U, 12U);
@@ -124,6 +125,7 @@ LLImageDecodeThread::LLImageDecodeThread(bool threaded, U32 pool_size)
 	{
 		mThreadPool.push_back(std::make_unique<PoolWorkerThread>(fmt::format("Image Decode Thread {}", i)));
 		mThreadPool[i]->start();
+		mThreadPool[i]->setPriority(LLThread::BELOW_NORMAL);
 	}
 }
 
@@ -133,6 +135,10 @@ LLImageDecodeThread::~LLImageDecodeThread()
     if (sImageThreads > 0) 
 	{
         LL_INFOS() << "Requests failed to queue to pool: " << mFailedRequests << LL_ENDL;
+		for (auto& thread : mThreadPool)
+		{
+			thread->shutdown();
+		}
 	}
 	delete mCreationMutex ;
 }
@@ -344,7 +350,7 @@ bool LLImageDecodeThread::ImageRequest::tut_isOK()
 
 bool LLImageDecodeThread::enqueRequest(ImageRequest * req)
 {
-	for(size_t num_tries = 0, pool_size = mThreadPool.size(); num_tries <= pool_size; ++num_tries)
+	for(size_t num_tries = 0, pool_size = mThreadPool.size(); num_tries < pool_size; ++num_tries)
     {
         if (mLastPoolAllocation >= pool_size)
         {

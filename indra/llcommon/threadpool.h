@@ -27,11 +27,20 @@ namespace LL
     private:
         using super = LLInstanceTracker<ThreadPool, std::string>;
     public:
+        enum EThreadPrio
+        {
+            E_LOWEST = 0,
+            E_BELOW_NORMAL,
+            E_NORMAL,
+            E_ABOVE_NORMAL,
+            E_HIGHEST
+        };
+
         /**
          * Pass ThreadPool a string name. This can be used to look up the
          * relevant WorkQueue.
          */
-        ThreadPool(const std::string& name, size_t threads=1, size_t capacity=1024);
+        ThreadPool(const std::string& name, size_t threads=1, size_t capacity=1024, EThreadPrio = E_NORMAL);
         virtual ~ThreadPool();
 
         /**
@@ -66,6 +75,7 @@ namespace LL
         std::string mName;
         size_t mThreadCount;
         std::vector<std::pair<std::string, std::thread>> mThreads;
+        EThreadPrio mThreadPriority;
     };
 
 } // namespace LL

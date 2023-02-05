@@ -289,6 +289,35 @@ LLThread::id_t LLThread::getID() const
     return mThreadp ? mThreadp->get_id() : std::thread::id();
 }
 
+ bool LLThread::setPriority(EThreadPriority thread_priority)
+{
+     if(!mThreadp) return false;
+#if LL_WINDOWS
+	int thread_prio = 0;
+	switch (thread_priority)
+	{
+	case LOWEST:
+		thread_prio = THREAD_PRIORITY_LOWEST;
+		break;
+	case BELOW_NORMAL:
+		thread_prio = THREAD_PRIORITY_BELOW_NORMAL;
+		break;
+	default:
+	case NORMAL:
+		thread_prio = THREAD_PRIORITY_NORMAL;
+		break;
+	case ABOVE_NORMAL:
+		thread_prio = THREAD_PRIORITY_ABOVE_NORMAL;
+		break;
+	case HIGHEST:
+		thread_prio = THREAD_PRIORITY_HIGHEST;
+		break;
+	}
+	SetThreadPriority(mThreadp->native_handle(), thread_prio);
+#endif
+    return true;
+}
+
 //============================================================================
 // Called from MAIN THREAD.
 

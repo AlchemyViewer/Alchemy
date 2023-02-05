@@ -49,6 +49,15 @@ public:
         QUITTING= 2,    // Someone wants this thread to quit
         CRASHED = -1    // An uncaught exception was thrown by the thread
     } EThreadStatus;
+
+    typedef enum e_thread_priority
+    {
+        LOWEST = 0,
+        BELOW_NORMAL,
+        NORMAL,
+        ABOVE_NORMAL,
+        HIGHEST
+    } EThreadPriority;
     typedef std::thread::id id_t;
 
     LLThread(const std::string& name, apr_pool_t *poolp = NULL);
@@ -84,6 +93,8 @@ public:
     LLVolatileAPRPool* getLocalAPRFilePool() { return mLocalAPRFilePoolp ; }
 
     id_t getID() const;
+
+    bool setPriority(EThreadPriority thread_priority);
 
 private:
     bool                mPaused;
