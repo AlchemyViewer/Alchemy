@@ -625,7 +625,8 @@ void LLGLTexMemBar::draw()
 											 &x_right, FALSE);
 
 	F32Kilobits bandwidth(LLAppViewer::getTextureFetch()->getTextureBandwidth());
-	F32Kilobits max_bandwidth(gSavedSettings.getF32("ThrottleBandwidthKBPS"));
+	static LLCachedControl<F32> band_width(gSavedSettings,"ThrottleBandwidthKBPS", 3000.0f);
+	F32Kilobits max_bandwidth(band_width());
 	color = bandwidth > max_bandwidth ? LLColor4::red : bandwidth > max_bandwidth*.75f ? LLColor4::yellow : text_color;
 	color[VALPHA] = text_color[VALPHA];
 	text = llformat("BW:%.0f/%.0f",bandwidth.value(), max_bandwidth.value());

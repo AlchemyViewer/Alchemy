@@ -121,9 +121,9 @@ void LLFloaterJoystick::draw()
 		{
 			F32 minbar, maxbar;
 			mAxisStatsBar[i]->getRange(minbar, maxbar);
-			if (llabs(value) > maxbar)
+			F32 range = llabs(value);
+			if (range > maxbar)
 			{
-				F32 range = llabs(value);
 				mAxisStatsBar[i]->setRange(-range, range);
 			}
 		}
