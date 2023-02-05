@@ -35,8 +35,7 @@ std::atomic< U32 > sImageThreads = 0;
 class PoolWorkerThread final : public LLThread
 {
 public:
-	PoolWorkerThread(std::string name) : LLThread(name),
-		mCurrentRequest(NULL)
+	PoolWorkerThread(std::string name) : LLThread(name), mRequestQueue(512)
 	{
 	}
 
@@ -44,40 +43,36 @@ public:
 	{
 		while (!isQuitting())
 		{
-			auto *pReq = mCurrentRequest.exchange(nullptr);
+            checkPause();
 
-			if (pReq)
-				pReq->processRequestIntern();
-			checkPause();
+			LLImageDecodeThread::ImageRequest* req  = nullptr;
+            while (!isQuitting() && mRequestQueue.tryPop(req))
+            {
+                if (req)
+                {
+                    req->processRequestIntern();
+                }
+            }
 		}
-	}
-	bool isBusy()
-	{
-		auto *pReq = mCurrentRequest.load();
-		if (!pReq)
-			return false;
-
-		auto status = pReq->getStatus();
-
-		return status  == LLQueuedThread::STATUS_QUEUED || status == LLQueuedThread::STATUS_INPROGRESS;
 	}
 
 	bool runCondition()
-	{
-		return mCurrentRequest != NULL;
+    {
+        return mRequestQueue.size() > 0;
 	}
 
 	bool setRequest(LLImageDecodeThread::ImageRequest* req)
 	{
-		LLImageDecodeThread::ImageRequest* pOld{ nullptr };
-		bool bSuccess = mCurrentRequest.compare_exchange_strong(pOld, req);
-		wake();
-
+        bool bSuccess = mRequestQueue.tryPush(req);
+		if(bSuccess)
+		{
+		    wake();
+		}
 		return bSuccess;
 	}
 
 private:
-	std::atomic<LLImageDecodeThread::ImageRequest*> mCurrentRequest;
+	LLThreadSafeQueue<LLImageDecodeThread::ImageRequest*> mRequestQueue;
 };
 
 //----------------------------------------------------------------------------
@@ -356,7 +351,7 @@ bool LLImageDecodeThread::enqueRequest(ImageRequest * req)
             mLastPoolAllocation = 0;
         }
         auto& thread = mThreadPool[mLastPoolAllocation++];
-        if (!thread->isBusy() && thread->setRequest(req))
+        if (thread->setRequest(req))
         {
             return true;
         }
