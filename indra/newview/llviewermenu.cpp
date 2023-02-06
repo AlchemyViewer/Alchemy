@@ -408,11 +408,33 @@ void initialize_menus();
 // Break up groups of more than 6 items with separators
 //-----------------------------------------------------------------------------
 
-void set_merchant_SLM_menu()
+class LLSLMMenuUpdater
 {
-    // All other cases (new merchant, not merchant, migrated merchant): show the new Marketplace Listings menu and enable the tool
+public:
+	LLSLMMenuUpdater();
+	~LLSLMMenuUpdater() = default;
+
+	void setMerchantMenu();
+	void checkMerchantStatus(bool force);
+
+private:
+	LLHandle<LLView> mMarketplaceListingsItem;
+};
+
+static LLSLMMenuUpdater* gSLMMenuUpdater = NULL;
+
+LLSLMMenuUpdater::LLSLMMenuUpdater()
+{
+	mMarketplaceListingsItem = gMenuHolder->getChild<LLView>("MarketplaceListings")->getHandle();
+}
+void LLSLMMenuUpdater::setMerchantMenu()
+{
+	// All other cases (new merchant, not merchant, migrated merchant): show the new Marketplace Listings menu and enable the tool
 	bool in_sl = LLGridManager::getInstance()->isInSecondlife();
-    gMenuHolder->getChild<LLView>("MarketplaceListings")->setVisible((BOOL)in_sl);
+	if(!mMarketplaceListingsItem.isDead())
+	{
+		mMarketplaceListingsItem.get()->setVisible((BOOL)in_sl);
+	}
     LLCommand* command = LLCommandManager::instance().getCommand("marketplacelistings");
     gToolBarView->enableCommand(command->id(), in_sl);
 
@@ -432,7 +454,7 @@ void set_merchant_SLM_menu()
 	}
 }
 
-void check_merchant_status(bool force)
+void LLSLMMenuUpdater::checkMerchantStatus(bool force)
 {
     if (force)
     {
@@ -440,8 +462,10 @@ void check_merchant_status(bool force)
         LLMarketplaceData::instance().setSLMStatus(MarketplaceStatusCodes::MARKET_PLACE_NOT_INITIALIZED);
     }
     // Hide SLM related menu item
-    gMenuHolder->getChild<LLView>("MarketplaceListings")->setVisible(FALSE);
-
+	if(!mMarketplaceListingsItem.isDead())
+	{
+		mMarketplaceListingsItem.get()->setVisible(FALSE);
+	}
     // Also disable the toolbar button for Marketplace Listings
     LLCommand* command = LLCommandManager::instance().getCommand("marketplacelistings");
     gToolBarView->enableCommand(command->id(), false);
@@ -449,8 +473,18 @@ void check_merchant_status(bool force)
     if (!gAgent.getRegionCapability("DirectDelivery").empty())
     {
     	// Launch an SLM test connection to get the merchant status
-    	LLMarketplaceData::instance().initializeSLM(boost::bind(&set_merchant_SLM_menu));
+		LLMarketplaceData::instance().initializeSLM([&](){ setMerchantMenu();});
 	}
+}
+
+void set_merchant_SLM_menu()
+{
+   if(gSLMMenuUpdater) gSLMMenuUpdater->setMerchantMenu();
+}
+
+void check_merchant_status(bool force)
+{
+   if(gSLMMenuUpdater) gSLMMenuUpdater->checkMerchantStatus(force);
 }
 
 void init_menus()
@@ -569,6 +603,8 @@ void init_menus()
 
 	// Let land based option enable when parcel changes
 	gMenuParcelObserver = new LLMenuParcelObserver();
+
+	gSLMMenuUpdater = new LLSLMMenuUpdater();
 
 	gLoginMenuBarView = LLUICtrlFactory::getInstance()->createFromFile<LLMenuBarGL>("menu_login.xml", gMenuHolder, LLViewerMenuHolderGL::child_registry_t::instance());
 	gLoginMenuBarView->arrangeAndClear();
@@ -2746,6 +2782,9 @@ class LLAdminOnSaveState: public view_listener_t
 //-----------------------------------------------------------------------------
 void cleanup_menus()
 {
+	delete gSLMMenuUpdater;
+	gSLMMenuUpdater = nullptr;
+
 	delete gMenuParcelObserver;
 	gMenuParcelObserver = NULL;
 
