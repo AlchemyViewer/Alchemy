@@ -377,6 +377,9 @@ BOOL LLPanelPlaces::postBuild()
 	LLButton* edit_btn = mLandmarkInfo->getChild<LLButton>("edit_btn");
 	edit_btn->setCommitCallback(boost::bind(&LLPanelPlaces::onEditButtonClicked, this));
 
+	mOptionLP = getChild<LLLayoutPanel>("lp_options");
+	mLayoutPanel2 = getChild<LLLayoutPanel>("lp2");
+
 	createTabs();
 	updateVerbs();
 
@@ -1291,8 +1294,9 @@ void LLPanelPlaces::updateVerbs()
 
 	bool show_options_btn = is_place_info_visible && !is_create_landmark_visible && !isLandmarkEditModeOn;
 	mOverflowBtn->setVisible(show_options_btn);
-	getChild<LLLayoutPanel>("lp_options")->setVisible(show_options_btn);
-	getChild<LLLayoutPanel>("lp2")->setVisible(!show_options_btn);
+
+	mOptionLP->setVisible(show_options_btn);
+	mLayoutPanel2->setVisible(!show_options_btn);
 
 	if (is_place_info_visible)
 	{

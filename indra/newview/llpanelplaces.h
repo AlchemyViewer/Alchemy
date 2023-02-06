@@ -48,6 +48,7 @@ class LLTabContainer;
 class LLToggleableMenu;
 class LLMenuButton;
 class LLLayoutStack;
+class LLLayoutPanel;
 
 typedef std::pair<LLUUID, std::string>	folder_pair_t;
 
@@ -116,6 +117,8 @@ private:
 	LLLayoutStack*				mFilterContainer;
 	LLPanelPlaceProfile*		mPlaceProfile;
 	LLPanelLandmarkInfo*		mLandmarkInfo;
+	LLLayoutPanel*				mOptionLP = nullptr;
+	LLLayoutPanel*				mLayoutPanel2 = nullptr;
 
 	LLToggleableMenu*			mPlaceMenu;
 	LLToggleableMenu*			mLandmarkMenu;
