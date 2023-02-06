@@ -74,7 +74,9 @@ BOOL ALFloaterExploreSounds::postBuild()
 	getChild<LLButton>("look_at_btn")->setClickedCallback(boost::bind(&ALFloaterExploreSounds::handleLookAt, this));
 	getChild<LLButton>("stop_btn")->setClickedCallback(boost::bind(&ALFloaterExploreSounds::handleStop, this));
 	getChild<LLButton>("bl_btn")->setClickedCallback(boost::bind(&ALFloaterExploreSounds::blacklistSound, this));
-	getChild<LLButton>("stop_locally_btn")->setClickedCallback(boost::bind(&ALFloaterExploreSounds::handleStopLocally, this));
+	
+	mStopLocalButton = getChild<LLButton>("stop_locally_btn");
+	mStopLocalButton->setClickedCallback(boost::bind(&ALFloaterExploreSounds::handleStopLocally, this));
 
 	mHistoryScroller = getChild<LLScrollListCtrl>("sound_list");
 	mHistoryScroller->setCommitCallback(boost::bind(&ALFloaterExploreSounds::handleSelection, this));
@@ -348,7 +350,7 @@ BOOL ALFloaterExploreSounds::tick()
 		}
 	}
 
-	childSetEnabled("stop_locally_btn", mLocalPlayingAudioSourceIDs.size() > 0);
+	mStopLocalButton->setEnabled(mLocalPlayingAudioSourceIDs.size() > 0);
 
 	return FALSE;
 }
@@ -377,7 +379,7 @@ void ALFloaterExploreSounds::handlePlayLocally()
 		}
 	}
 
-	childSetEnabled("stop_locally_btn", mLocalPlayingAudioSourceIDs.size() > 0);
+	mStopLocalButton->setEnabled(mLocalPlayingAudioSourceIDs.size() > 0);
 }
 
 void ALFloaterExploreSounds::handleLookAt()
