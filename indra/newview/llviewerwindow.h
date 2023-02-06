@@ -505,6 +505,9 @@ private:
 	LLHandle<LLView> mHintHolder;			// container for hints
 	LLHandle<LLView> mLoginPanelHolder;		// container for login panel
 	LLPopupView*	mPopupView;			// container for transient popups
+
+	LLPanel*		mStatusBarContainer = nullptr;
+	LLView*		mNavBarBarContainer = nullptr;
 	
 	class LLDebugText* mDebugText; // Internal class for debug text
 	

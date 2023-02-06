@@ -143,6 +143,7 @@ private:
 	LLTextBox	*mBoxBalance;
 	LLButton	*mBtnBuyL;
 	LLButton	*mMediaToggle;
+	LLView		*mBalanceBG;
 	LLFrameTimer	mClockUpdateTimer;
 	LLFrameTimer*	mFPSUpdateTimer;
 

@@ -206,7 +206,8 @@ BOOL LLStatusBar::postBuild()
 	mMediaToggle->setClickedCallback( &LLStatusBar::onClickMediaToggle, this );
 	mMediaToggle->setMouseEnterCallback(boost::bind(&LLStatusBar::onMouseEnterNearbyMedia, this));
 
-	LLHints::getInstance()->registerHintTarget("linden_balance", getChild<LLView>("balance_bg")->getHandle());
+	mBalanceBG = getChild<LLView>("balance_bg");
+	LLHints::getInstance()->registerHintTarget("linden_balance", mBalanceBG->getHandle());
 
 	gSavedSettings.getControl("MuteAudio")->getSignal()->connect(boost::bind(&LLStatusBar::onVolumeChanged, this, _2));
 	gSavedPerAccountSettings.getControl("AlchemyAOEnable")->getCommitSignal()->connect(boost::bind(&LLStatusBar::onAOStateChanged, this));
@@ -391,7 +392,7 @@ void LLStatusBar::refresh()
 void LLStatusBar::setVisibleForMouselook(bool visible)
 {
 	mTextTime->setVisible(visible);
-	getChild<LLUICtrl>("balance_bg")->setVisible(visible);
+	mBalanceBG->setVisible(visible);
 	mBoxBalance->setVisible(visible);
 	mBtnQuickSettings->setVisible(visible);
 	mBtnAO->setVisible(visible);
@@ -820,7 +821,7 @@ void LLStatusBar::updateMenuSearchVisibility(const LLSD& data)
 void LLStatusBar::updateMenuSearchPosition()
 {
 	const S32 HPAD = 12;
-	LLRect balanceRect = getChildView("balance_bg")->getRect();
+	LLRect balanceRect = mBalanceBG->getRect();
 	LLRect searchRect = mSearchPanel->getRect();
 	S32 w = searchRect.getWidth();
 	searchRect.mLeft = balanceRect.mLeft - w - HPAD;
@@ -833,12 +834,11 @@ void LLStatusBar::updateBalancePanelPosition()
     // Resize the L$ balance background to be wide enough for your balance plus the buy button
     const S32 HPAD = 24;
     LLRect balance_rect = mBoxBalance->getTextBoundingRect();
-    LLRect buy_rect = getChildView("buyL")->getRect();
+    LLRect buy_rect = mBtnBuyL->getRect();
     LLRect shop_rect = getChildView("goShop")->getRect();
-    LLView* balance_bg_view = getChildView("balance_bg");
-    LLRect balance_bg_rect = balance_bg_view->getRect();
+    LLRect balance_bg_rect = mBalanceBG->getRect();
     balance_bg_rect.mLeft = balance_bg_rect.mRight - (buy_rect.getWidth() + shop_rect.getWidth() + balance_rect.getWidth() + HPAD);
-    balance_bg_view->setShape(balance_bg_rect);
+    mBalanceBG->setShape(balance_bg_rect);
 }
 
 
