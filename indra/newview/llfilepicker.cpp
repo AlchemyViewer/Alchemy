@@ -759,8 +759,6 @@ bool	LLFilePicker::doNavSaveDialog(ESaveFilter filter, const std::string& filena
 
 	// Run the dialog
     std::unique_ptr<std::string> filev = doSaveDialog(&namestring, 
-                 &type,
-                 &creator,
                  &extension,
                  mPickOptions);
 
