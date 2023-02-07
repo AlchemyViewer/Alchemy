@@ -65,6 +65,8 @@ public:
 	void setFailureLabelPanelVisible(bool value) { if (mFailureLblPanel) mFailureLblPanel->setVisible(value); }
 	void inventorySaveFailed();
 
+	LLUICtrl* getLayerTypesCombo() { return mLayerTypesCombo; }
+
 	class ImplBase;
 	friend class ImplBase;
 	ImplBase* impl;
@@ -73,6 +75,7 @@ protected:
 	LLUICtrl* mThumbnailPlaceholder;
 	LLUICtrl *mRefreshBtn, *mRefreshLabel;
 	LLUICtrl *mSucceessLblPanel, *mFailureLblPanel;
+	LLUICtrl* mLayerTypesCombo = nullptr;
 	LLUICtrl* mFreezeFrameCheck = nullptr;
 	LLTextBox* m360Label = nullptr;
 };
@@ -173,6 +176,7 @@ public:
 
 	class Impl;
 	friend class Impl;
+	friend class LLFloaterSnapshotBase::ImplBase;
 };
 
 ///----------------------------------------------------------------------------
@@ -181,6 +185,7 @@ public:
 
 class LLFloaterSnapshot::Impl final : public LLFloaterSnapshotBase::ImplBase
 {
+	friend class LLFloaterSnapshotBase;
 	LOG_CLASS(LLFloaterSnapshot::Impl);
 public:
 	Impl(LLFloaterSnapshotBase* floater)
