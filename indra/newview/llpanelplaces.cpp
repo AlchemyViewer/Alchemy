@@ -380,6 +380,9 @@ BOOL LLPanelPlaces::postBuild()
 	mOptionLP = getChild<LLLayoutPanel>("lp_options");
 	mLayoutPanel2 = getChild<LLLayoutPanel>("lp2");
 
+	mAddBtnPanel = getChild<LLUICtrl>("add_btn_panel");
+	mTrashBtnPanel = getChild<LLUICtrl>("trash_btn_panel");
+
 	createTabs();
 	updateVerbs();
 
@@ -663,10 +666,10 @@ void LLPanelPlaces::onTabSelected()
     // History panel does not support deletion nor creation
     // Hide menus
     bool supports_create = mActivePanel->getCreateMenu() != NULL;
-    childSetVisible("add_btn_panel", supports_create);
+	mAddBtnPanel->setVisible(supports_create);
 
     // favorites and inventory can remove items, history can clear history
-    childSetVisible("trash_btn_panel", TRUE);
+	mTrashBtnPanel->setVisible(TRUE);
 
     if (supports_create)
     {
@@ -1213,10 +1216,10 @@ void LLPanelPlaces::createTabs()
         // History panel does not support deletion nor creation
         // Hide menus
         bool supports_create = mActivePanel->getCreateMenu() != NULL;
-        childSetVisible("add_btn_panel", supports_create);
+		mAddBtnPanel->setVisible(supports_create);
 
         // favorites and inventory can remove items, history can clear history
-        childSetVisible("trash_btn_panel", TRUE);
+		mTrashBtnPanel->setVisible(TRUE);
 
         if (supports_create)
         {

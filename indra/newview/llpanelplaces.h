@@ -119,6 +119,8 @@ private:
 	LLPanelLandmarkInfo*		mLandmarkInfo;
 	LLLayoutPanel*				mOptionLP = nullptr;
 	LLLayoutPanel*				mLayoutPanel2 = nullptr;
+	LLUICtrl*					mAddBtnPanel = nullptr;
+	LLUICtrl*					mTrashBtnPanel = nullptr;
 
 	LLToggleableMenu*			mPlaceMenu;
 	LLToggleableMenu*			mLandmarkMenu;
