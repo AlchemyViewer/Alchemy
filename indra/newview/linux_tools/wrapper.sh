@@ -107,10 +107,13 @@ done
 # Check chrome-sandbox permissions, and try to set them if they are not already
 SANDBOX_BIN=bin/llplugin/chrome-sandbox
 # if set-user-id = false || is writable || executable = false || read is false || is owned by effective uid || is owned by effective gid
+OPTOUT_FILE="bin/llplugin/.user_does_not_want_chrome_sandboxing_and_accepts_the_risks"
 if [[ !(-u $SANDBOX_BIN) || (-w $SANDBOX_BIN) || !(-x $SANDBOX_BIN) || !(-r $SANDBOX_BIN) || ( -O $SANDBOX_BIN) || (-G $SANDBOX_BIN) ]]; then
-    echo "$SANDBOX_BIN permissions are incorrect and will be reset"
-    SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
-    pkexec "$SCRIPT_DIR/etc/chrome_sandboxing_permissions_setup.sh"
+    echo "$SANDBOX_BIN permissions are not set properly to run under sandboxing."
+    if [ ! -f "$OPTOUT_FILE" ]; then
+        SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+        pkexec "$SCRIPT_DIR/etc/chrome_sandboxing_permissions_setup.sh"
+    fi
 fi
 
 #setup wine voice
