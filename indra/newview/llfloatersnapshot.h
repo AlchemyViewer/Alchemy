@@ -35,6 +35,7 @@
 class LLSpinCtrl;
 class LLSnapshotLivePreview;
 class LLToolset;
+class LLTextBox;
 
 class LLFloaterSnapshotBase : public LLFloater
 {
@@ -72,6 +73,8 @@ protected:
 	LLUICtrl* mThumbnailPlaceholder;
 	LLUICtrl *mRefreshBtn, *mRefreshLabel;
 	LLUICtrl *mSucceessLblPanel, *mFailureLblPanel;
+	LLUICtrl* mFreezeFrameCheck = nullptr;
+	LLTextBox* m360Label = nullptr;
 };
 
 class LLFloaterSnapshotBase::ImplBase

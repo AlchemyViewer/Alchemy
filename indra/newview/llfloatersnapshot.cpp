@@ -195,7 +195,7 @@ void LLFloaterSnapshotBase::ImplBase::updateLayout(LLFloaterSnapshotBase* floate
         }
 	}
 
-	bool use_freeze_frame = floaterp->getChild<LLUICtrl>("freeze_frame_check")->getValue().asBoolean();
+	bool use_freeze_frame = floaterp->mFreezeFrameCheck->getValue().asBoolean();
 
 	if (use_freeze_frame)
 	{
@@ -994,14 +994,16 @@ BOOL LLFloaterSnapshot::postBuild()
 	getChild<LLUICtrl>("layer_types")->setValue("colors");
 	getChildView("layer_types")->setEnabled(FALSE);
 
-	getChild<LLUICtrl>("freeze_frame_check")->setValue(gSavedSettings.getBOOL("UseFreezeFrame"));
-	childSetCommitCallback("freeze_frame_check", ImplBase::onCommitFreezeFrame, this);
+	mFreezeFrameCheck = getChild<LLUICtrl>("freeze_frame_check");
+	mFreezeFrameCheck->setValue(gSavedSettings.getBOOL("UseFreezeFrame"));
+	mFreezeFrameCheck->setCommitCallback(&ImplBase::onCommitFreezeFrame, this);
 
 	getChild<LLUICtrl>("auto_snapshot_check")->setValue(gSavedSettings.getBOOL("AutoSnapshot"));
 	childSetCommitCallback("auto_snapshot_check", ImplBase::onClickAutoSnap, this);
 
     getChild<LLButton>("retract_btn")->setCommitCallback(boost::bind(&LLFloaterSnapshot::onExtendFloater, this));
     getChild<LLButton>("extend_btn")->setCommitCallback(boost::bind(&LLFloaterSnapshot::onExtendFloater, this));
+
 
     getChild<LLTextBox>("360_label")->setSoundFlags(LLView::MOUSE_UP);
     getChild<LLTextBox>("360_label")->setShowCursorHand(false);

@@ -53,19 +53,21 @@ LLRect LLScreenChannelBase::getChannelRect()
 {
     LL_PROFILE_ZONE_SCOPED;
 
+	LLRect channel_rect;
+	LLRect chiclet_rect;
+
 	if (mFloaterSnapRegion == NULL)
 	{
-		mFloaterSnapRegion = gViewerWindow->getRootView()->getChildView("floater_snap_region");
+		mFloaterSnapRegion = gViewerWindow->getFloaterSnapRegion();
+		//if(!mFloaterSnapRegion) mFloaterSnapRegion = gViewerWindow->getRootView()->getChildView("floater_snap_region");
 	}
 	
 	if (mChicletRegion == NULL)
 	{
-		mChicletRegion = gViewerWindow->getRootView()->getChildView("chiclet_container");
+		mChicletRegion = gViewerWindow->getChicletContainer();
+		//if(!mChicletRegion) mChicletRegion = gViewerWindow->getRootView()->getChildView("chiclet_container");
 	}
 	
-	LLRect channel_rect;
-	LLRect chiclet_rect;
-
 	mFloaterSnapRegion->localRectToScreen(mFloaterSnapRegion->getLocalRect(), &channel_rect);
 	mChicletRegion->localRectToScreen(mChicletRegion->getLocalRect(), &chiclet_rect);
 
@@ -103,12 +105,12 @@ BOOL LLScreenChannelBase::postBuild()
 {
 	if (mFloaterSnapRegion == NULL)
 	{
-		mFloaterSnapRegion = gViewerWindow->getRootView()->getChildView("floater_snap_region");
+		mFloaterSnapRegion = gViewerWindow->getFloaterSnapRegion();
 	}
 	
 	if (mChicletRegion == NULL)
 	{
-		mChicletRegion = gViewerWindow->getRootView()->getChildView("chiclet_container");
+		mChicletRegion = gViewerWindow->getChicletContainer();
 	}
 	
 	return TRUE;

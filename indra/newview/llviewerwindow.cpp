@@ -2183,7 +2183,9 @@ void LLViewerWindow::initBase()
 			toolbarp->getCenterLayoutPanel()->setReshapeCallback(boost::bind(&LLFloaterView::setToolbarRect, gFloaterView, _1, _2));
 		}
 	}
-	gFloaterView->setFloaterSnapView(main_view->getChild<LLView>("floater_snap_region")->getHandle());
+	mChicletContainer = getRootView()->getChild<LLPanel>("chiclet_container");
+	mFloaterSnapRegion = main_view->getChild<LLView>("floater_snap_region");
+	gFloaterView->setFloaterSnapView(mFloaterSnapRegion->getHandle());
 	gSnapshotFloaterView = main_view->getChild<LLSnapshotFloaterView>("Snapshot Floater View");
 
 	// Console
@@ -2247,12 +2249,11 @@ void LLViewerWindow::initWorldUI()
 
 	if (!gNonInteractive)
 	{
-		LLPanel* chiclet_container = getRootView()->getChild<LLPanel>("chiclet_container");
 		LLChicletBar* chiclet_bar = LLChicletBar::getInstance();
-		chiclet_bar->setShape(chiclet_container->getLocalRect());
+		chiclet_bar->setShape(mChicletContainer->getLocalRect());
 		chiclet_bar->setFollowsAll();
-		chiclet_container->addChild(chiclet_bar);
-		chiclet_container->setVisible(TRUE);
+		mChicletContainer->addChild(chiclet_bar);
+		mChicletContainer->setVisible(TRUE);
 	}
 
 	LLRect morph_view_rect = full_window;

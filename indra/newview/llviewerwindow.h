@@ -435,6 +435,9 @@ public:
 
 	static std::string getLastSnapshotDir();
 
+	LLPanel* getChicletContainer() { return mChicletContainer; }
+	LLView* getFloaterSnapRegion() { return mFloaterSnapRegion; }
+
 private:
 	bool                    shouldShowToolTipFor(LLMouseHandler *mh);
 
@@ -506,6 +509,8 @@ private:
 	LLHandle<LLView> mLoginPanelHolder;		// container for login panel
 	LLPopupView*	mPopupView;			// container for transient popups
 
+	LLView*		mFloaterSnapRegion = nullptr;
+	LLPanel*		mChicletContainer = nullptr;
 	LLPanel*		mStatusBarContainer = nullptr;
 	LLView*		mNavBarBarContainer = nullptr;
 	
