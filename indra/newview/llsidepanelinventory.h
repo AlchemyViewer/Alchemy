@@ -123,6 +123,7 @@ private:
 	LLButton*					mPlayBtn;
 	LLButton*					mTeleportBtn;
 	LLButton*					mShopBtn;
+	LLButton*					mInboxBtn = nullptr;
 
 	bool						mInboxEnabled;
 

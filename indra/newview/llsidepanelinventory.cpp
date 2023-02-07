@@ -216,12 +216,12 @@ BOOL LLSidepanelInventory::postBuild()
 		LLLayoutStack* inv_stack = getChild<LLLayoutStack>(INVENTORY_LAYOUT_STACK_NAME);
 
 		// Set up button states and callbacks
-		LLButton * inbox_button = getChild<LLButton>(INBOX_BUTTON_NAME);
+		mInboxBtn = getChild<LLButton>(INBOX_BUTTON_NAME);
 
-		inbox_button->setCommitCallback(boost::bind(&LLSidepanelInventory::onToggleInboxBtn, this));
+		mInboxBtn->setCommitCallback(boost::bind(&LLSidepanelInventory::onToggleInboxBtn, this));
 
 		// Get the previous inbox state from "InventoryInboxToggleState" setting.
-		bool is_inbox_collapsed = !inbox_button->getToggleState();
+		bool is_inbox_collapsed = !mInboxBtn->getToggleState();
 
 		// Restore the collapsed inbox panel state
 		LLLayoutPanel* inbox_panel = getChild<LLLayoutPanel>(INBOX_LAYOUT_PANEL_NAME);
@@ -344,7 +344,7 @@ void LLSidepanelInventory::openInbox()
 {
 	if (mInboxEnabled)
 	{
-		getChild<LLButton>(INBOX_BUTTON_NAME)->setToggleState(true);
+		mInboxBtn->setToggleState(true);
 		onToggleInboxBtn();
 	}
 }
@@ -358,7 +358,7 @@ void LLSidepanelInventory::onInboxChanged(const LLUUID& inbox_id)
 	// Expand the inbox since we have fresh items
 	if (mInboxEnabled)
 	{
-		getChild<LLButton>(INBOX_BUTTON_NAME)->setToggleState(true);
+		mInboxBtn->setToggleState(true);
 		onToggleInboxBtn();
 	}
 #endif
@@ -366,11 +366,10 @@ void LLSidepanelInventory::onInboxChanged(const LLUUID& inbox_id)
 
 void LLSidepanelInventory::onToggleInboxBtn()
 {
-	LLButton* inboxButton = getChild<LLButton>(INBOX_BUTTON_NAME);
 	LLLayoutPanel* inboxPanel = getChild<LLLayoutPanel>(INBOX_LAYOUT_PANEL_NAME);
 	LLLayoutStack* inv_stack = getChild<LLLayoutStack>(INVENTORY_LAYOUT_STACK_NAME);
 	
-	const bool inbox_expanded = inboxButton->getToggleState();
+	const bool inbox_expanded = mInboxBtn->getToggleState();
 	
 	// Expand/collapse the indicated panel
 	inv_stack->collapsePanel(inboxPanel, !inbox_expanded);
@@ -399,11 +398,11 @@ void LLSidepanelInventory::onOpen(const LLSD& key)
 	LLPanelMarketplaceInbox * inbox = findChild<LLPanelMarketplaceInbox>(MARKETPLACE_INBOX_PANEL);
 	if (inbox && (inbox->getFreshItemCount() > 0))
 	{
-		getChild<LLButton>(INBOX_BUTTON_NAME)->setToggleState(true);
+		mInboxBtn->setToggleState(true);
 		onToggleInboxBtn();
 	}
 #else
-	if (mInboxEnabled && getChild<LLButton>(INBOX_BUTTON_NAME)->getToggleState())
+	if (mInboxEnabled && mInboxBtn->getToggleState())
 	{
 		gSavedPerAccountSettings.setU32("LastInventoryInboxActivity", time_corrected());
 	}
