@@ -118,7 +118,6 @@ BOOL LLViewerDynamicTexture::render()
 //-----------------------------------------------------------------------------
 void LLViewerDynamicTexture::preRender(BOOL clear_depth)
 {
-	gPipeline.allocatePhysicsBuffer();
 	if (!gNonInteractive)
 	{
 		llassert(mFullWidth <= static_cast<S32>(gPipeline.mBake.getWidth()));
