@@ -571,10 +571,13 @@ bool LLSidepanelAppearance::isWearableEditPanelVisible() const
 void LLSidepanelAppearance::updateAvatarComplexity(U32 complexity, const std::map<LLUUID, U32>& item_complexity, const std::map<LLUUID, U32>& temp_item_complexity, U32 body_parts_complexity)
 {
 	LLSidepanelAppearance* instance = LLFloaterSidePanelContainer::getPanel<LLSidepanelAppearance>("appearance");
-	if (instance->mLastAvatarComplexity != complexity)
+	if(instance)
 	{
-		instance->mPanelOutfitsInventory->updateAvatarComplexity(complexity, item_complexity, temp_item_complexity, body_parts_complexity);
-		instance->mOutfitEdit->updateAvatarComplexity(complexity);
+		if (instance->mLastAvatarComplexity != complexity)
+		{
+			instance->mPanelOutfitsInventory->updateAvatarComplexity(complexity, item_complexity, temp_item_complexity, body_parts_complexity);
+			instance->mOutfitEdit->updateAvatarComplexity(complexity);
+		}
+		instance->mLastAvatarComplexity = complexity;
 	}
-	instance->mLastAvatarComplexity = complexity;
 }
