@@ -462,7 +462,7 @@ void LLViewerWearable::revertValues()
 {
 	LLWearable::revertValues();
 
-	LLSidepanelAppearance *panel = dynamic_cast<LLSidepanelAppearance*>(LLFloaterSidePanelContainer::findPanel("appearance"));
+	LLSidepanelAppearance *panel = LLFloaterSidePanelContainer::findPanel<LLSidepanelAppearance>("appearance");
 	if( panel )
 	{
 		panel->updateScrollingPanelList();
@@ -478,7 +478,7 @@ void LLViewerWearable::saveValues()
 {
 	LLWearable::saveValues();
 
-	LLSidepanelAppearance *panel = dynamic_cast<LLSidepanelAppearance*>(LLFloaterSidePanelContainer::findPanel("appearance"));
+	LLSidepanelAppearance *panel = LLFloaterSidePanelContainer::findPanel<LLSidepanelAppearance>("appearance");
 	if( panel )
 	{
 		panel->updateScrollingPanelList();
