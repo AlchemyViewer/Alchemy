@@ -66,24 +66,27 @@ void LLFloaterSidePanelContainer::onOpen(const LLSD& key)
 
 void LLFloaterSidePanelContainer::closeFloater(bool app_quitting)
 {
-	LLPanelOutfitEdit* panel_outfit_edit =
-		dynamic_cast<LLPanelOutfitEdit*>(LLFloaterSidePanelContainer::findPanel("appearance", "panel_outfit_edit"));
-	if (panel_outfit_edit)
+	if(getInstanceName() == "appearance")
 	{
-		LLFloater *parent = gFloaterView->getParentFloater(panel_outfit_edit);
-		if (parent == this )
+		LLPanelOutfitEdit* panel_outfit_edit =
+			LLFloaterSidePanelContainer::findPanel<LLPanelOutfitEdit>("appearance", "panel_outfit_edit");
+		if (panel_outfit_edit)
 		{
-			LLSidepanelAppearance* panel_appearance = dynamic_cast<LLSidepanelAppearance*>(mMainPanel);
-			if ( panel_appearance )
+			LLFloater *parent = gFloaterView->getParentFloater(panel_outfit_edit);
+			if (parent == this )
 			{
-				LLPanelEditWearable *edit_wearable_ptr = panel_appearance->getWearable();
-				if (edit_wearable_ptr)
+				LLSidepanelAppearance* panel_appearance = dynamic_cast<LLSidepanelAppearance*>(mMainPanel);
+				if ( panel_appearance )
 				{
-					edit_wearable_ptr->onClose();
-				}
-				if(!app_quitting)
-				{
-					panel_appearance->showOutfitsInventoryPanel();
+					LLPanelEditWearable *edit_wearable_ptr = panel_appearance->getWearable();
+					if (edit_wearable_ptr)
+					{
+						edit_wearable_ptr->onClose();
+					}
+					if(!app_quitting)
+					{
+						panel_appearance->showOutfitsInventoryPanel();
+					}
 				}
 			}
 		}
