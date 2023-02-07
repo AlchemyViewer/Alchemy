@@ -30,6 +30,8 @@
 
 #include "llfloater.h"
 
+class LLPanel;
+
 /**
  * Class LLFloaterSidePanelContainer
  *
@@ -43,11 +45,13 @@
 class LLFloaterSidePanelContainer final : public LLFloater
 {
 private:
-	static const std::string sMainPanelName;
-
+	static inline constexpr std::string_view sMainPanelName = "main_panel";
+	LLPanel* mMainPanel = nullptr;
 public:
 	LLFloaterSidePanelContainer(const LLSD& key, const Params& params = getDefaultParams());
 	~LLFloaterSidePanelContainer();
+
+	/*virtual*/ BOOL postBuild();
 
 	/*virtual*/ void onOpen(const LLSD& key);
 
@@ -55,20 +59,20 @@ public:
 
 	void cleanup() { destroy(); }
 
-	LLPanel* openChildPanel(const std::string& panel_name, const LLSD& params);
+	LLPanel* openChildPanel(std::string_view panel_name, const LLSD& params);
 
 // [RLVa:KB] - Checked: 2012-02-07 (RLVa-1.4.5) | Added: RLVa-1.4.5
-	static bool canShowPanel(const std::string& floater_name, const LLSD& key);
-	static bool canShowPanel(const std::string& floater_name, const std::string& panel_name, const LLSD& key);
+	static bool canShowPanel(std::string_view floater_name, const LLSD& key);
+	static bool canShowPanel(std::string_view floater_name, std::string_view panel_name, const LLSD& key);
 // [/RLVa:KB]
 	
-	static void showPanel(const std::string& floater_name, const LLSD& key);
+	static void showPanel(std::string_view floater_name, const LLSD& key);
 
-	static void showPanel(const std::string& floater_name, const std::string& panel_name, const LLSD& key);
+	static void showPanel(std::string_view floater_name, std::string_view panel_name, const LLSD& key);
 	
-	static LLPanel* getPanel(const std::string& floater_name, const std::string& panel_name = sMainPanelName);
+	static LLPanel* getPanel(std::string_view floater_name, std::string_view panel_name = sMainPanelName);
 
-	static LLPanel* findPanel(const std::string& floater_name, const std::string& panel_name = sMainPanelName);
+	static LLPanel* findPanel(std::string_view floater_name, std::string_view panel_name = sMainPanelName);
 	
 	/**
 	 * Gets the panel of given type T (doesn't show it or do anything else with it).
@@ -78,7 +82,12 @@ public:
 	 * @returns a pointer to the panel of given type T.
 	 */
 	template <typename T>
-	static T* getPanel(const std::string& floater_name, const std::string& panel_name = sMainPanelName)
+	static T* findPanel(std::string_view floater_name, std::string_view panel_name = sMainPanelName)
+	{
+		return dynamic_cast<T*>(findPanel(floater_name, panel_name));
+	}
+	template <typename T>
+	static T* getPanel(std::string_view floater_name, std::string_view panel_name = sMainPanelName)
 	{
 		T* panel = dynamic_cast<T*>(getPanel(floater_name, panel_name));
 		if (!panel)
@@ -91,7 +100,7 @@ public:
 // [RLVa:KB] - Checked: 2012-02-07 (RLVa-1.4.5) | Added: RLVa-1.4.5
 	// Used to determine whether a sidepanel can be shown
 public:
-	typedef boost::signals2::signal<bool(const std::string&, const std::string&, const LLSD&), boost_boolean_combiner> validate_signal_t;
+	typedef boost::signals2::signal<bool(std::string_view, std::string_view, const LLSD&), boost_boolean_combiner> validate_signal_t;
 	static boost::signals2::connection setValidateCallback(const validate_signal_t::slot_type& cb) { return mValidateSignal.connect(cb); }
 private:
 	static validate_signal_t mValidateSignal;
