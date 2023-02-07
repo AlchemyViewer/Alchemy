@@ -341,7 +341,7 @@ bool RlvUIEnabler::filterFloaterShowLoc(std::string_view strName, const LLSD&)
 }
 
 // Checked: 2012-02-07 (RLVa-1.4.5) | Added: RLVa-1.4.5
-bool RlvUIEnabler::filterPanelShowLoc(const std::string& strFloater, const std::string&, const LLSD& sdKey)
+bool RlvUIEnabler::filterPanelShowLoc(std::string_view strFloater, std::string_view, const LLSD& sdKey)
 {
 	if ("places" == strFloater)
 	{
