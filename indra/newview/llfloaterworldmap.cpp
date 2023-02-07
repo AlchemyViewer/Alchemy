@@ -315,6 +315,11 @@ BOOL LLFloaterWorldMap::postBuild()
 
 	mZoomSlider = getChild<LLSliderCtrl>("zoom slider");
 	
+	mLocationsLabel = getChild<LLUICtrl>("locations_label");
+	mTeleportCoordSpinX = getChild<LLUICtrl>("teleport_coordinate_x");
+	mTeleportCoordSpinY = getChild<LLUICtrl>("teleport_coordinate_y");
+	mTeleportCoordSpinZ = getChild<LLUICtrl>("teleport_coordinate_z");
+
 	LLComboBox *avatar_combo = getChild<LLComboBox>("friend combo");
 	avatar_combo->selectFirstItem();
 	avatar_combo->setPrearrangeCallback( boost::bind(&LLFloaterWorldMap::onAvatarComboPrearrange, this) );
@@ -577,7 +582,7 @@ void LLFloaterWorldMap::trackAvatar( const LLUUID& avatar_id, const std::string&
 		// convenience.
 		if(gAgent.isGodlike())
 		{
-			getChild<LLUICtrl>("teleport_coordinate_z")->setValue(LLSD(200.f));
+			mTeleportCoordSpinZ->setValue(LLSD(200.f));
 		}
 		// Don't re-request info if we already have it or we won't have it in time to teleport
 		if (mTrackedStatus != LLTracker::TRACKING_AVATAR || avatar_id != mTrackedAvatarID)
@@ -718,20 +723,16 @@ void LLFloaterWorldMap::trackLocation(const LLVector3d& pos_global)
 void LLFloaterWorldMap::enableTeleportCoordsDisplay( bool enabled )
 {
 // [RLVa:KB] - Checked: 2012-02-08 (RLVa-1.4.5) | Added: RLVa-1.4.5
-	LLUICtrl* pCtrl = getChild<LLUICtrl>("events_label");
-	pCtrl->setVisible(!gRlvHandler.hasBehaviour(RLV_BHVR_SHOWLOC));
+	mLocationsLabel->setVisible(!gRlvHandler.hasBehaviour(RLV_BHVR_SHOWLOC));
 
-	pCtrl = getChild<LLUICtrl>("teleport_coordinate_x");
-	pCtrl->setVisible(!gRlvHandler.hasBehaviour(RLV_BHVR_SHOWLOC));
-	pCtrl->setEnabled(enabled);
+	mTeleportCoordSpinX->setVisible(!gRlvHandler.hasBehaviour(RLV_BHVR_SHOWLOC));
+	mTeleportCoordSpinX->setEnabled(enabled);
 
-	pCtrl = getChild<LLUICtrl>("teleport_coordinate_y");
-	pCtrl->setVisible(!gRlvHandler.hasBehaviour(RLV_BHVR_SHOWLOC));
-	pCtrl->setEnabled(enabled);
+	mTeleportCoordSpinY->setVisible(!gRlvHandler.hasBehaviour(RLV_BHVR_SHOWLOC));
+	mTeleportCoordSpinY->setEnabled(enabled);
 
-	pCtrl = getChild<LLUICtrl>("teleport_coordinate_z");
-	pCtrl->setVisible(!gRlvHandler.hasBehaviour(RLV_BHVR_SHOWLOC));
-	pCtrl->setEnabled(enabled);
+	mTeleportCoordSpinZ->setVisible(!gRlvHandler.hasBehaviour(RLV_BHVR_SHOWLOC));
+	mTeleportCoordSpinZ->setEnabled(enabled);
 // [/RLVa:KB]
 //	childSetEnabled("teleport_coordinate_x", enabled );
 //	childSetEnabled("teleport_coordinate_y", enabled );
@@ -765,9 +766,9 @@ void LLFloaterWorldMap::updateTeleportCoordsDisplay( const LLVector3d& pos )
 	}
 
 	// write in the values
-	childSetValue("teleport_coordinate_x", region_local_x);
-	childSetValue("teleport_coordinate_y", region_local_y);
-	childSetValue("teleport_coordinate_z", region_local_z);
+	mTeleportCoordSpinX->setValue(region_local_x);
+	mTeleportCoordSpinY->setValue(region_local_y);
+	mTeleportCoordSpinZ->setValue(region_local_z);
 }
 
 void LLFloaterWorldMap::updateLocation()
@@ -1350,9 +1351,9 @@ void LLFloaterWorldMap::onCoordinatesCommit()
 		return;
 	}
 	
-	S32 x_coord = (S32)childGetValue("teleport_coordinate_x").asReal();
-	S32 y_coord = (S32)childGetValue("teleport_coordinate_y").asReal();
-	S32 z_coord = (S32)childGetValue("teleport_coordinate_z").asReal();
+	S32 x_coord = (S32)mTeleportCoordSpinX->getValue().asReal();
+	S32 y_coord = (S32)mTeleportCoordSpinY->getValue().asReal();
+	S32 z_coord = (S32)mTeleportCoordSpinZ->getValue().asReal();
 	
 	const std::string region_name = childGetValue("location").asString();
 	
@@ -1504,7 +1505,7 @@ void LLFloaterWorldMap::teleport()
 		&& av_tracker.haveTrackingInfo() )
 	{
 		pos_global = av_tracker.getGlobalPos();
-		pos_global.mdV[VZ] = getChild<LLUICtrl>("teleport_coordinate_z")->getValue();
+		pos_global.mdV[VZ] = mTeleportCoordSpinZ->getValue();
 	}
 	else if ( LLTracker::TRACKING_LANDMARK == tracking_status)
 	{

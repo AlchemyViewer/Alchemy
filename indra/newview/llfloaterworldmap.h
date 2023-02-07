@@ -48,6 +48,7 @@ class LLWorldMapView;
 class LLButton;
 class LLCheckBoxCtrl;
 class LLSliderCtrl;
+class LLSpinCtrl;
 
 class LLFloaterWorldMap final : public LLFloater
 {
@@ -216,6 +217,11 @@ private:
 	LLUICtrl*				mAvatarIcon = nullptr;
 	LLUICtrl*				mLandmarkIcon = nullptr;
 	LLUICtrl*				mLocationIcon = nullptr;
+
+	LLUICtrl*				mLocationsLabel = nullptr;
+	LLUICtrl*				mTeleportCoordSpinX = nullptr;
+	LLUICtrl*				mTeleportCoordSpinY = nullptr;
+	LLUICtrl*				mTeleportCoordSpinZ = nullptr;
 
 	LLSliderCtrl*				mZoomSlider = nullptr;
 

@@ -79,7 +79,7 @@
        height="16"
        layout="topleft"
        left="15"
-       name="events_label"
+       name="legends_label"
        top="2"
        width="215">
         Legend
@@ -588,7 +588,7 @@
       height="16"
       layout="topleft"
       left="15"
-      name="events_label"
+      name="locations_label"
       top_pad="16"
       width="70">
       Location:
