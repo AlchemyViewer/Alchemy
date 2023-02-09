@@ -195,7 +195,7 @@ void LLFloaterSnapshotBase::ImplBase::updateLayout(LLFloaterSnapshotBase* floate
         }
 	}
 
-	bool use_freeze_frame = floaterp->mFreezeFrameCheck->getValue().asBoolean();
+	bool use_freeze_frame = floaterp->mFreezeFrameCheck && floaterp->mFreezeFrameCheck->getValue().asBoolean();
 
 	if (use_freeze_frame)
 	{
