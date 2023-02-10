@@ -14,7 +14,7 @@
    left="10"
    top="4"
    width="180"
-   height="306"
+   height="320"
    follows="all"
    visible="true"
    layout="topleft">
@@ -336,7 +336,7 @@
    left="0"
    top="0"
    width="200"
-   height="315"
+   height="325"
    follows="all"
    visible="false"
    bg_alpha_color="Black_50"
