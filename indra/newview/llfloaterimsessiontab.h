@@ -145,7 +145,8 @@ protected:
 	std::string appendTime();
 	void assignResizeLimits();
 	
-	virtual void applyMUPose(std::string& text);
+	void applyMUPose(std::string& text);
+	void applyOOCClose(std::string& text);
 
 	S32  mFloaterExtraWidth;
 

@@ -1183,9 +1183,12 @@ LLView* LLFloaterIMSessionTab::getChatHistory()
 	return mChatHistory;
 }
 
-// virtual
 void LLFloaterIMSessionTab::applyMUPose(std::string& text)
 {
+	if (!gSavedSettings.getBOOL("EnableMUPoseChat"))
+	{
+		return;
+	}
 	if (text.at(0) == ':'
 		&& text.length() > 3)
 	{
@@ -1200,6 +1203,48 @@ void LLFloaterIMSessionTab::applyMUPose(std::string& text)
 		{
 			text.replace(0, 1, "/me ");
 		}
+	}
+}
+
+void LLFloaterIMSessionTab::applyOOCClose(std::string& message)
+{
+	if (!gSavedSettings.getBOOL("EnableAutoCloseOOC"))
+	{
+		return;
+	}
+
+	// Try to find any unclosed OOC chat (i.e. an opening
+	// double parenthesis without a matching closing double
+	// parenthesis.
+	if (message.find("(( ") != std::string::npos && message.find("))") == std::string::npos)
+	{
+		// add the missing closing double parenthesis.
+		message.append(" ))");
+	}
+	else if (message.find("((") != std::string::npos && message.find("))") == std::string::npos)
+	{
+		if (message.at(message.length() - 1) == ')')
+		{
+			// cosmetic: add a space first to avoid a closing triple parenthesis
+			message.append(" ");
+		}
+		// add the missing closing double parenthesis.
+		message.append("))");
+	}
+	else if (message.find("[[ ") != std::string::npos && message.find("]]") == std::string::npos)
+	{
+		// add the missing closing double parenthesis.
+		message.append(" ]]");
+	}
+	else if (message.find("[[") != std::string::npos && message.find("]]") == std::string::npos)
+	{
+		if (message.at(message.length() - 1) == ']')
+		{
+			// cosmetic: add a space first to avoid a closing triple parenthesis
+			message.append(" ");
+		}
+			// add the missing closing double parenthesis.
+		message.append("]]");
 	}
 }
 
