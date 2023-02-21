@@ -93,11 +93,35 @@ function install_to_prefix()
     if [ "$UID" == "0" ]; then
         "$1/etc/chrome_sandboxing_permissions_setup.sh"
     else
-        echo "Permissions on $SANDBOX_BIN need to be set to enable security sandboxing for the integrated browser. You may be asked to authorize this step with administrative credentials."
-        prompt "This step is optional, though recommended for safety and security. Proceed with the installation? [Y/N]: "
+        echo "                 ╭──────────────────────────────────────────╮"
+        echo "╭────────────────┘    Web Media Process Sandboxing Setup    └──────────────────╮"
+        echo "│                                                                              │"
+        echo "│    Embedded Chromium sandboxing is a highly recommended security feature!    │"
+        echo "│                                                                              │"
+        echo "│Sandboxing helps prevents malicious code from running in the browser process, │"
+        echo "│which could otherwise be used to compromise the viewer or your system.        │"
+        echo "│                                                                              │"
+        echo "│For more information please see the following resources:                      │"
+        echo "│https://chromium.googlesource.com/chromium/src/+/HEAD/docs/design/sandbox.md  │"
+        echo "│https://chromium.googlesource.com/chromium/src/+/HEAD/docs/linux/sandboxing.md│"
+        echo "│                                                                              │"
+        echo "│Permissions on the following viewer file must be set to enable sandboxing.    │"
+        echo "│   bin/llplugin/chrome-sandbox                                                │"
+        echo "│                                                                              │"
+        echo "│You may be asked provide credentials to authorize this setup.                 │"
+        echo "╰──────────────────────────────────────────────────────────────────────────────╯"
+        echo "Saying no will not enable sandboxing, which endangers your system security."
+        echo "Saying yes will run a chown and chmod command to enable sandboxing."
+        echo ""
+        warn "By refusing this step, you accept this risk."
+        prompt "Proceed with enabling web media process sandboxing? [Y/N]: "
         if [[ $? == 0 ]]; then
+            # Save this choice so that we don't ask for creds on every viewer launch
+            touch "$1/bin/llplugin/.user_does_not_want_chrome_sandboxing_and_accepts_the_risks"
             exit 0 
         fi
+        # Remove any previous opt-out file since we're opting in now
+        rm "$1/bin/llplugin/.user_does_not_want_chrome_sandboxing_and_accepts_the_risks" 2> /dev/null
         pkexec "$1/etc/chrome_sandboxing_permissions_setup.sh" || die "Failed to set permissions on chrome-sandbox"
     fi
 }
