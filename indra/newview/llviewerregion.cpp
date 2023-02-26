@@ -2439,11 +2439,11 @@ void LLViewerRegion::setSimulatorFeatures(const LLSD& sim_features)
 {
 	LL_INFOS() << "region " << getName() << " "  << ll_pretty_print_sd(sim_features) << LL_ENDL;
 	mSimulatorFeatures = sim_features;
+#if !LL_HAVOK
 	if (LLGridManager::getInstance()->isInOpenSim())
 	{
 		setGodnames();
         std::string cur_symbol = LLCurrencyWrapper::instance().getHomeCurrency();
-#if !LL_HAVOK
 		if (mSimulatorFeatures.has("OpenSimExtras"))
 		{
 			const LLSD& extras(mSimulatorFeatures["OpenSimExtras"]);
@@ -2497,7 +2497,6 @@ void LLViewerRegion::setSimulatorFeatures(const LLSD& sim_features)
 			mMaxPhysPrimScale = extras.has("MaxPhysPrimScale") ? extras["MaxPhysPrimScale"].asReal() : OS_DEFAULT_MAX_PRIM_SCALE;
 		}
 		else
-#endif
 		{
 			mWhisperRange = 10;
 			mSayRange = 20;
@@ -2517,6 +2516,7 @@ void LLViewerRegion::setSimulatorFeatures(const LLSD& sim_features)
         }
 	}
 	else
+#endif
 	{
 		mMinSimHeight = SL_MIN_OBJECT_Z;
 		mMaxSimHeight = SL_MAX_OBJECT_Z;

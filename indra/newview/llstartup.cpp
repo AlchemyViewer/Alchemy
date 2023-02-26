@@ -3087,8 +3087,11 @@ void LLStartUp::initNameCache()
 void LLStartUp::initExperiences()
 {   
     // Should trigger loading the cache.
-	const std::string& gridlabel = !LLGridManager::getInstance()->isInSecondlife() ? LLGridManager::getInstance()->getGridId() : LLStringUtil::null;
-	LLExperienceCache::initParamSingleton(gridlabel);
+	if (!LLExperienceCache::instanceExists())
+	{
+		const std::string& gridlabel = !LLGridManager::getInstance()->isInSecondlife() ? LLGridManager::getInstance()->getGridId() : LLStringUtil::null;
+		LLExperienceCache::initParamSingleton(gridlabel);
+	}
     LLExperienceCache::instance().setCapabilityQuery(
         boost::bind(&LLAgent::getRegionCapability, &gAgent, _1));
 

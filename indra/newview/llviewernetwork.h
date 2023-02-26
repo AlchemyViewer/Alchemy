@@ -312,7 +312,6 @@ private:
 
 	bool mLoggedIn;
 	std::string mGrid;
-	std::string mGridFile;
 	LLSD mGridList;
 	EGridPlatform mPlatform;
 	

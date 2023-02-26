@@ -143,7 +143,6 @@ void LLGridManager::initialize(const std::string& grid_file)
 
 	// set to undefined
 	mGridList = LLSD();
-	mGridFile = grid_file;
 	// as we don't want an attacker to override our grid list
 	// to point the default grid to an invalid grid
   	addSystemGrid("Second Life",
