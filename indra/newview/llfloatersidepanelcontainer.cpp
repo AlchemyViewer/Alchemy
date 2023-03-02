@@ -165,6 +165,7 @@ void LLFloaterSidePanelContainer::showPanel(std::string_view floater_name, std::
 LLPanel* LLFloaterSidePanelContainer::getPanel(std::string_view floater_name, std::string_view panel_name)
 {
 	LLFloaterSidePanelContainer* floaterp = LLFloaterReg::getTypedInstance<LLFloaterSidePanelContainer>(floater_name);
+
 	if (floaterp)
 	{
 		if (panel_name == sMainPanelName)
@@ -183,6 +184,7 @@ LLPanel* LLFloaterSidePanelContainer::getPanel(std::string_view floater_name, st
 LLPanel* LLFloaterSidePanelContainer::findPanel(std::string_view floater_name, std::string_view panel_name)
 {
 	LLFloaterSidePanelContainer* floaterp = LLFloaterReg::findTypedInstance<LLFloaterSidePanelContainer>(floater_name);
+
 	if (floaterp)
 	{
 		if (panel_name == sMainPanelName)

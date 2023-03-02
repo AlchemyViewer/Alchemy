@@ -67,7 +67,7 @@ public:
 
 	//static versions of above for use in initializer expressions such as constructor params, etc. 
 	static LLUUID generateNewID();	
-	static LLUUID generateNewID(const std::string& stream);	//static version of above for use in initializer expressions such as constructor params, etc. 
+	static LLUUID generateNewID(const std::string& stream);
 
 private:
     BOOL    parseInternalScalar(const char* in_string, bool broken_format, bool emit);
@@ -171,12 +171,6 @@ public:
 	}
 	// END BOOST
 
-
-	friend std::size_t hash_value(LLUUID const& id)
-	{
-		return boost::hash_value(id.mData);
-	}
-
 	// xor functions. Useful since any two random uuids xored together
 	// will yield a determinate third random unique id that can be
 	// used as a key in a single uuid that represents 2.
@@ -220,6 +214,11 @@ public:
 
 	U16 getCRC16() const;
 	U32 getCRC32() const;
+
+	friend std::size_t hash_value(LLUUID const& id)
+	{
+		return boost::hash_value(id.mData);
+	}
 
 	static BOOL validate(const std::string_view in_string); // Validate that the UUID string is legal.
 

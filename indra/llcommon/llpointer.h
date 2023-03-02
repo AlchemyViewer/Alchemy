@@ -140,7 +140,6 @@ public:
 		return *this; 
 	}
 
-	// support assignment up the type hierarchy. See Item 45 in Effective C++, 3rd Ed.
 	template<typename Subclass>
 	LLPointer<Type>& operator =(LLPointer<Subclass>&& ptr) noexcept
 	{
@@ -151,7 +150,6 @@ public:
 		return *this;
 	}
 	
-	// support assignment up the type hierarchy. See Item 45 in Effective C++, 3rd Ed.
 	inline void swap(LLPointer<Type>& ptr) noexcept
     {
 		Type* temp = mPointer;
@@ -159,7 +157,6 @@ public:
 		ptr.mPointer = temp;
 	}
 
-	// support assignment up the type hierarchy. See Item 45 in Effective C++, 3rd Ed.
 	template<typename Subclass>
 	inline void swap(LLPointer<Subclass>& ptr) noexcept
 	{
@@ -330,7 +327,6 @@ public:
 		return *this; 
 	}
 	
-	// support assignment up the type hierarchy. See Item 45 in Effective C++, 3rd Ed.
 	template<typename Subclass>
 	LLConstPointer<Type>& operator =(LLConstPointer<Subclass>&& ptr) noexcept
 	{
@@ -348,7 +344,6 @@ public:
 		ptr.mPointer = temp;
 	}
 
-	// support assignment up the type hierarchy. See Item 45 in Effective C++, 3rd Ed.
 	template<typename Subclass>
 	inline void swap(LLConstPointer<Subclass>& ptr) noexcept
 	{

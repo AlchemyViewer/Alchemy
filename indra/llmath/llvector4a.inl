@@ -351,7 +351,7 @@ inline LLSimdScalar LLVector4a::dot3(const LLVector4a& b) const
 	const LLQuad splatY = _mm_castsi128_ps( _mm_shuffle_epi32( _mm_castps_si128(ab), _MM_SHUFFLE(1, 1, 1, 1) ) );
 	const LLQuad splatZ = _mm_castsi128_ps( _mm_shuffle_epi32( _mm_castps_si128(ab), _MM_SHUFFLE(2, 2, 2, 2) ) );
 	const LLQuad xPlusY = _mm_add_ps( ab, splatY );
-	return _mm_add_ps( xPlusY, splatZ );
+	return _mm_add_ps( xPlusY, splatZ );	
 #endif
 }
 

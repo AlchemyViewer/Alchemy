@@ -359,6 +359,9 @@ F32 LLFontFreetype::getXAdvance(const LLFontGlyphInfo* glyph) const
 
 F32 LLFontFreetype::getXKerning(llwchar char_left, llwchar char_right) const
 {
+	if (mFTFace == NULL)
+		return 0.f;
+
 	LLFontGlyphInfo* left_glyph_info = getGlyphInfo(char_left);;
 	LLFontGlyphInfo* right_glyph_info = getGlyphInfo(char_right);
 	return getXKerning(left_glyph_info, right_glyph_info);

@@ -126,20 +126,20 @@ public:
 		mMatrix[3].loadua(src.mMatrix[3]);
 	}
 
-	inline void loadu(const LLMatrix3& src)
-	{
-		mMatrix[0].load3(src.mMatrix[0]);
-		mMatrix[1].load3(src.mMatrix[1]);
-		mMatrix[2].load3(src.mMatrix[2]);
-		mMatrix[3].set(0,0,0,1.f);
-	}
-
 	inline void loadu(const F32* src)
 	{
 		mMatrix[0].loadua(src+0);
 		mMatrix[1].loadua(src+4);
 		mMatrix[2].loadua(src+8);
 		mMatrix[3].loadua(src+12);
+	}
+
+	inline void loadu(const LLMatrix3& src)
+	{
+		mMatrix[0].load3(src.mMatrix[0]);
+		mMatrix[1].load3(src.mMatrix[1]);
+		mMatrix[2].load3(src.mMatrix[2]);
+		mMatrix[3].set(0,0,0,1.f);
 	}
 
 	inline void store4a(F32* dst) const

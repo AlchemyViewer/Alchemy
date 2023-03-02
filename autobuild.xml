@@ -975,68 +975,6 @@
         <key>version</key>
         <string>8.0.6</string>
       </map>
-      <key>libepoxy</key>
-      <map>
-        <key>canonical_repo</key>
-        <string>https://git.alchemyviewer.org/alchemy/thirdparty/3p-libepoxy</string>
-        <key>copyright</key>
-        <string>Copyright © 2013-2014 Intel Corporation</string>
-        <key>description</key>
-        <string>Epoxy is a library for handling OpenGL function pointer management for you.</string>
-        <key>license</key>
-        <string>MIT</string>
-        <key>license_file</key>
-        <string>LICENSES/libepoxy.txt</string>
-        <key>name</key>
-        <string>libepoxy</string>
-        <key>platforms</key>
-        <map>
-          <key>darwin64</key>
-          <map>
-            <key>archive</key>
-            <map>
-              <key>hash</key>
-              <string>33d3e32095370c8613d7188b33b181c7cfb7b9090fab51fdbf10d27587ee47441a1abe90b23a61f944d843e611880af26b25279e95ebbdbbf0fb396c27de000d</string>
-              <key>hash_algorithm</key>
-              <string>blake2b</string>
-              <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/101/packages/generic/libepoxy/1.5.9.1311/libepoxy-1.5.9-darwin64-1311.tar.zst</string>
-            </map>
-            <key>name</key>
-            <string>darwin64</string>
-          </map>
-          <key>linux64</key>
-          <map>
-            <key>archive</key>
-            <map>
-              <key>hash</key>
-              <string>58383c84fb5ebe8e86ced17fa2da3d9825072e025cd6aa922c96bf9d3a4b49b30c196b4c8d6f373f68b474c03c10cd73c24da71a71fe4933ee4daa829554fdba</string>
-              <key>hash_algorithm</key>
-              <string>blake2b</string>
-              <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/101/packages/generic/libepoxy/1.5.9.1311/libepoxy-1.5.9-linux64-1311.tar.zst</string>
-            </map>
-            <key>name</key>
-            <string>linux64</string>
-          </map>
-          <key>windows64</key>
-          <map>
-            <key>archive</key>
-            <map>
-              <key>hash</key>
-              <string>8ca7b60108758a29d63e3c794c38adccf3a464cfcac6465e581bb8f9374b05cc541e18915d731e30e3dca3ed2f41092a6e5b111eae3ac7056a1c3a4f89bb9402</string>
-              <key>hash_algorithm</key>
-              <string>blake2b</string>
-              <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/101/packages/generic/libepoxy/1.5.9.1311/libepoxy-1.5.9-windows64-1311.tar.zst</string>
-            </map>
-            <key>name</key>
-            <string>windows64</string>
-          </map>
-        </map>
-        <key>version</key>
-        <string>1.5.9</string>
-      </map>
       <key>libhunspell</key>
       <map>
         <key>copyright</key>
@@ -1509,8 +1447,6 @@
             <string>windows64</string>
           </map>
         </map>
-        <key>source_type</key>
-        <string>hg</string>
         <key>version</key>
         <string>1.0.577418</string>
       </map>

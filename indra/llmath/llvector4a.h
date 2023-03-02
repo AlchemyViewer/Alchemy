@@ -357,7 +357,7 @@ public:
 	inline const LLVector4a& operator= ( const LLQuad& rhs );
 
 	inline operator LLQuad() const;	
-
+    
 private:
 	LLQuad mQ;
 };
