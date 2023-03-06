@@ -5493,8 +5493,8 @@ BOOL LLViewerWindow::cubeSnapshot(const LLVector3& origin, LLCubeMapArray* cubea
     LLViewerCamera* camera = LLViewerCamera::getInstance();
     
     LLViewerCamera saved_camera = LLViewerCamera::instance();
-    glh::matrix4f saved_proj = get_current_projection();
-    glh::matrix4f saved_mod = get_current_modelview();
+    LLMatrix4a saved_proj = get_current_projection();
+    LLMatrix4a saved_mod = get_current_modelview();
 
     // camera constants for the square, cube map capture image
     camera->setAspect(1.0); // must set aspect ratio first to avoid undesirable clamping of vertical FoV

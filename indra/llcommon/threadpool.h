@@ -94,7 +94,6 @@ namespace LL
         std::string mName;
         size_t mThreadCount;
         std::vector<std::pair<std::string, std::thread>> mThreads;
-        EThreadPrio mThreadPriority;
     };
 
     /**

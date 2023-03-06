@@ -121,7 +121,7 @@ void LLMemory::updateMemoryInfo()
 	{
 		sAvailPhysicalMemInKB = U32Kilobytes(0);
 	}
-
+#endif
 #elif defined(LL_DARWIN)
     task_vm_info info;
     mach_msg_type_number_t  infoCount = TASK_VM_INFO_COUNT;

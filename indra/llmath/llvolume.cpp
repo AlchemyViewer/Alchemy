@@ -58,8 +58,6 @@
 #include "mikktspace/mikktspace.h"
 #include "mikktspace/mikktspace.c" // insert mikktspace implementation into llvolume object file
 
-#include "meshoptimizer/meshoptimizer.h"
-
 #define DEBUG_SILHOUETTE_BINORMALS 0
 #define DEBUG_SILHOUETTE_NORMALS 0 // TomY: Use this to display normals using the silhouette
 #define DEBUG_SILHOUETTE_EDGE_MAP 0 // DaveP: Use this to display edge map using the silhouette
@@ -4802,7 +4800,7 @@ LLVolumeFace::LLVolumeFace(const LLVolumeFace& src)
 	mIndices(NULL),
 	mWeights(NULL),
     mWeightsScrubbed(FALSE),
-	mOctree(NULL),
+    mOctree(NULL),
     mOctreeTriangles(NULL),
 	mOptimized(FALSE)
 {
@@ -4846,7 +4844,7 @@ LLVolumeFace& LLVolumeFace::operator=(const LLVolumeFace& src)
 
 		if (src.mNormals)
 		{
-			LLVector4a::memcpyNonAliased16((F32*) mNormals, (F32*) src.mNormals, vert_size);
+		LLVector4a::memcpyNonAliased16((F32*) mNormals, (F32*) src.mNormals, vert_size);
 		}
 
 		if(src.mTexCoords)
@@ -4936,10 +4934,26 @@ LLVolumeFace::~LLVolumeFace()
 
 void LLVolumeFace::freeData()
 {
-	allocateVertices(0);
-	allocateTangents(0);
-	allocateWeights(0);
-	allocateIndices(0);
+	ll_aligned_free<64>(mPositions);
+	mPositions = NULL;
+
+	//normals and texture coordinates are part of the same buffer as mPositions, do not free them separately
+	mNormals = NULL;
+	mTexCoords = NULL;
+
+	ll_aligned_free_16(mIndices);
+	mIndices = NULL;
+	ll_aligned_free_16(mTangents);
+	mTangents = NULL;
+	ll_aligned_free_16(mWeights);
+	mWeights = NULL;
+
+#if USE_SEPARATE_JOINT_INDICES_AND_WEIGHTS
+    ll_aligned_free_16(mJointIndices);
+	mJointIndices = NULL;
+    ll_aligned_free_16(mJustWeights);
+	mJustWeights = NULL;
+#endif
 
     destroyOctree();
 }

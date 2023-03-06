@@ -262,8 +262,8 @@ ALRenderUtil::ALRenderUtil()
 
 void ALRenderUtil::restoreVertexBuffers()
 {
-	mRenderBuffer = new LLVertexBuffer(ALRENDER_BUFFER_MASK, 0);
-	mRenderBuffer->allocateBuffer(3, 0, true);
+	mRenderBuffer = new LLVertexBuffer(ALRENDER_BUFFER_MASK);
+	mRenderBuffer->allocateBuffer(3, 0);
 
 	LLStrider<LLVector3> vert;
 	LLStrider<LLVector2> tc0;
@@ -276,7 +276,7 @@ void ALRenderUtil::restoreVertexBuffers()
 	vert[1].set(3.f, -1.f, 0.f);
 	vert[2].set(-1.f, 3.f, 0.f);
 
-	mRenderBuffer->flush();
+	mRenderBuffer->unmapBuffer();
 }
 
 void ALRenderUtil::resetVertexBuffers()
@@ -585,7 +585,7 @@ void ALRenderUtil::renderTonemap(LLRenderTarget* src, LLRenderTarget* dst, LLRen
 		tone_shader->uniform4fv(LLShaderMgr::COLORGRADE_LUT_SIZE, 1, mCGLutSize.mV);
 	}
 
-	mRenderBuffer->setBuffer(LLVertexBuffer::MAP_VERTEX);
+	mRenderBuffer->setBuffer();
 	mRenderBuffer->drawArrays(LLRender::TRIANGLES, 0, 3);
 	stop_glerror();
 
@@ -676,9 +676,9 @@ void ALRenderUtil::renderSharpen(LLRenderTarget* src, LLRenderTarget* dst)
 	sharpen_shader->bind();
 
 	// Draw
-	src->bindTexture(0, 0, LLTexUnit::TFO_POINT, LLTexUnit::TCS_LINEAR);
+	src->bindTexture(0, 0, LLTexUnit::TFO_POINT);
 
-	mRenderBuffer->setBuffer(LLVertexBuffer::MAP_VERTEX);
+	mRenderBuffer->setBuffer();
 	mRenderBuffer->drawArrays(LLRender::TRIANGLES, 0, 3);
 
 	if (dst)

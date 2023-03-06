@@ -826,7 +826,7 @@ bool LLBufferedAssetUploadInfo::failedUpload(LLSD &result, std::string &reason)
 
 //=========================================================================
 
-LLScriptAssetUpload::LLScriptAssetUpload(LLUUID itemId, std::string buffer, invnUploadFinish_f finish, TargetType_t targetType, uploadFailed_f failed):
+LLScriptAssetUpload::LLScriptAssetUpload(LLUUID itemId, std::string buffer, invnUploadFinish_f finish, uploadFailed_f failed, TargetType_t targetType):
     LLBufferedAssetUploadInfo(itemId, LLAssetType::AT_LSL_TEXT, buffer, finish, failed),
     mExerienceId(),
     mTargetType(targetType),

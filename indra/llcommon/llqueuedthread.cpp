@@ -242,7 +242,6 @@ bool LLQueuedThread::addRequest(QueuedRequest* req)
 #if _DEBUG
 // 	LL_INFOS() << llformat("LLQueuedThread::Added req [%08d]",handle) << LL_ENDL;
 #endif
-	mRequestQueueSize = mRequestQueue.size();
 	unlockData();
 
     llassert(!mDataLock->isSelfLocked());

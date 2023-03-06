@@ -1099,8 +1099,8 @@ void LLRender::syncMatrices()
 			// Anything beyond the standard proj and inv proj mats are special cases.  Please setup special uniforms accordingly in the future.
             if (shader->getUniformLocation(LLShaderMgr::INVERSE_PROJECTION_MATRIX))
             {
-	            LLMatrix4a inv_proj = mat
-	            mat.invert();
+	            LLMatrix4a inv_proj = mat;
+	            inv_proj.invert();
 	            shader->uniformMatrix4fv(LLShaderMgr::INVERSE_PROJECTION_MATRIX, 1, FALSE, inv_proj.getF32ptr());
             }
 
