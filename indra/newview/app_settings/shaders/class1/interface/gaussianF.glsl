@@ -1,19 +1,9 @@
 /** 
-<<<<<<<< HEAD:indra/media_plugins/cef/dummy_volume_catcher.cpp
- * @file dummy_volume_catcher.cpp
- * @brief A null implementation of the "VolumeCatcher" class for platforms where it's not implemented yet.
- *
- * @cond
- * $LicenseInfo:firstyear=2010&license=viewerlgpl$
- * Second Life Viewer Source Code
- * Copyright (C) 2010, Linden Research, Inc.
-========
  * @file gaussianF.glsl
  *
  * $LicenseInfo:firstyear=2023&license=viewerlgpl$
  * Second Life Viewer Source Code
  * Copyright (C) 2023, Linden Research, Inc.
->>>>>>>> 2020201ba6890feb9a31168c40e1ed14727fa719:indra/newview/app_settings/shaders/class1/interface/gaussianF.glsl
  * 
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -31,39 +21,8 @@
  * 
  * Linden Research, Inc., 945 Battery Street, San Francisco, CA  94111  USA
  * $/LicenseInfo$
- * @endcond
  */
 
-<<<<<<<< HEAD:indra/media_plugins/cef/dummy_volume_catcher.cpp
-#include "volume_catcher.h"
-
-
-class VolumeCatcherImpl
-{
-};
-
-/////////////////////////////////////////////////////
-
-VolumeCatcher::VolumeCatcher()
-{
-	pimpl = NULL;
-}
-
-VolumeCatcher::~VolumeCatcher()
-{
-}
-
-void VolumeCatcher::setVolume(F32 volume)
-{
-}
-
-void VolumeCatcher::setPan(F32 pan)
-{
-}
-
-void VolumeCatcher::pump()
-{
-========
 out vec4 frag_color;
 
 uniform sampler2D diffuseRect;
@@ -91,5 +50,4 @@ void main()
     }
 
     frag_color = vec4(col, 0.0);
->>>>>>>> 2020201ba6890feb9a31168c40e1ed14727fa719:indra/newview/app_settings/shaders/class1/interface/gaussianF.glsl
 }

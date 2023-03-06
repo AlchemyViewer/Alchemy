@@ -46,7 +46,7 @@ void default_lighting()
 		discard;
 	}
 	
-	color.rgb *= vertex_color.rgb;
+	color *= vertex_color;
 
 	color.rgb = atmosLighting(color.rgb);
 	color.rgb = scaleSoftClip(color.rgb);

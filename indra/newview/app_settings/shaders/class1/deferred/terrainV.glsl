@@ -33,6 +33,7 @@ ATTRIBUTE vec4 diffuse_color;
 ATTRIBUTE vec2 texcoord0;
 ATTRIBUTE vec2 texcoord1;
 
+VARYING vec3 pos;
 VARYING vec3 vary_normal;
 VARYING vec4 vary_texcoord0;
 VARYING vec4 vary_texcoord1;
@@ -57,7 +58,11 @@ vec4 texgen_object(vec4  vpos, vec4 tc, mat4 mat, vec4 tp0, vec4 tp1)
 void main()
 {
     //transform vertex
-    gl_Position = modelview_projection_matrix * vec4(position.xyz, 1.0);
+    vec4 pre_pos = vec4(position.xyz, 1.0);
+    vec4 t_pos = modelview_projection_matrix * pre_pos;
+
+    gl_Position = t_pos;
+    pos = t_pos.xyz;
 
     vary_normal = normalize(normal_matrix * normal);
     
